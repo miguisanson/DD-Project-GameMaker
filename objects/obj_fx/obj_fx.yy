@@ -9,8 +9,8 @@
   "name":"obj_fx",
   "overriddenProperties":[],
   "parent":{
-    "name":"Decorations",
-    "path":"folders/Objects/Decorations.yy",
+    "name":"Entities",
+    "path":"folders/Objects/Entities.yy",
   },
   "parentObjectId":null,
   "persistent":false,
