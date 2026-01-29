@@ -16,7 +16,7 @@ if (room != rm_battle && gs.ui.mode == UI_NONE) {
 }
 
 // Dialogue box
-if (gs.ui.mode == UI_DIALOGUE) {
+if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     var bx = margin;
     var by = h - 64 - margin;
     var bw = w - margin * 2;

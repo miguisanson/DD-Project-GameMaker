@@ -1,5 +1,5 @@
 var gs = GameState_Get();
-if (gs.ui.mode != UI_NONE) exit;
+if (gs.ui.mode != UI_NONE || array_length(gs.ui.lines) > 0) exit;
 
 if (battle_cooldown > 0) {
     battle_cooldown -= 1;

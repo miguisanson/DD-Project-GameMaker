@@ -5,7 +5,11 @@ var k_down = keyboard_check_pressed(ord("S"));
 var k_ok = keyboard_check_pressed(ord("Z")) || keyboard_check_pressed(vk_enter);
 var k_back = keyboard_check_pressed(ord("X")) || keyboard_check_pressed(vk_escape);
 
-if (gs.ui.mode == UI_DIALOGUE) {
+if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
+    if (variable_struct_exists(gs.ui, "just_opened") && gs.ui.just_opened) {
+        gs.ui.just_opened = false;
+        exit;
+    }
     if (k_ok) {
         Dialogue_Advance();
     }
