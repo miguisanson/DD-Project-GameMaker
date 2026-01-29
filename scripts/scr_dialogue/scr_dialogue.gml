@@ -122,6 +122,7 @@ function Dialogue_StartLinesWithSpeaker(_speaker, _lines) {
 function Dialogue_Advance() {
     var gs = GameState_Get();
     if (gs.ui.mode != UI_DIALOGUE) return;
+    gs.ui.just_opened = false;
     gs.ui.index += 1;
     if (gs.ui.index >= array_length(gs.ui.lines)) {
         gs.ui.mode = UI_NONE;

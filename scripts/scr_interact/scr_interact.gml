@@ -46,6 +46,7 @@ function Interact_Handle(_inst) {
     var gs = GameState_Get();
     var pl = gs.player_inst;
     if (!instance_exists(pl)) return;
+    if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) return;
     if (!keyboard_check_pressed(ord("Z"))) return;
     if (!Interact_PlayerFacing(pl, _inst)) return;
 
