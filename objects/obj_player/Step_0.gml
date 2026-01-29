@@ -11,22 +11,18 @@ if (battle_cooldown > 0) {
     battle_cooldown -= 1;
 }
 
-right_key = Input_Held("move_right");
-left_key  = Input_Held("move_left");
-up_key    = Input_Held("move_up");
-down_key  = Input_Held("move_down");
-
 interact_key = Input_Pressed("interact");
 
 if (!moving) {
     move_dir = -1;
     if (!interact_key) {
+        var act = Input_MoveAction();
         var tx = x;
         var ty = y;
-        if (up_key) { move_dir = UP; face = UP; ty = y - tile_size; }
-        else if (down_key) { move_dir = DOWN; face = DOWN; ty = y + tile_size; }
-        else if (left_key) { move_dir = LEFT; face = LEFT; tx = x - tile_size; }
-        else if (right_key) { move_dir = RIGHT; face = RIGHT; tx = x + tile_size; }
+        if (act == "move_up") { move_dir = UP; face = UP; ty = y - tile_size; }
+        else if (act == "move_down") { move_dir = DOWN; face = DOWN; ty = y + tile_size; }
+        else if (act == "move_left") { move_dir = LEFT; face = LEFT; tx = x - tile_size; }
+        else if (act == "move_right") { move_dir = RIGHT; face = RIGHT; tx = x + tile_size; }
 
         if (move_dir != -1) {
             if (!place_meeting(tx, ty, obj_wall) && !place_meeting(tx, ty, obj_interactable)) {

@@ -50,6 +50,9 @@ function Input_Init() {
     if (!variable_struct_exists(inp, "cooldown")) {
         inp.cooldown = {};
     }
+    if (!variable_struct_exists(inp, "move_order")) {
+        inp.move_order = [];
+    }
 }
 
 function Input_Update() {
@@ -85,9 +88,43 @@ function Input_Update() {
 
         var pressed = held && !prev;
         variable_struct_set(inp.state, action, { held: held, pressed: pressed });
+
+        if (Input_IsMoveAction(action)) {
+            var order = inp.move_order;
+            if (pressed) {
+                order = Input_ArrayRemove(order, action);
+                array_push(order, action);
+            } else if (!held && prev) {
+                order = Input_ArrayRemove(order, action);
+            }
+            inp.move_order = order;
+        }
     }
 }
 
+
+function Input_ArrayRemove(_arr, _val) {
+    for (var i = array_length(_arr) - 1; i >= 0; i--) {
+        if (_arr[i] == _val) array_delete(_arr, i, 1);
+    }
+    return _arr;
+}
+
+function Input_IsMoveAction(_action) {
+    return _action == "move_up" || _action == "move_down" || _action == "move_left" || _action == "move_right";
+}
+
+function Input_MoveAction() {
+    Input_EnsureUpdated();
+    var order = global.input.move_order;
+    while (array_length(order) > 0) {
+        var act = order[array_length(order) - 1];
+        if (Input_Held(act)) return act;
+        array_delete(order, array_length(order) - 1, 1);
+    }
+    global.input.move_order = order;
+    return "";
+}
 
 function Input_EnsureUpdated() {
     Input_Update();
