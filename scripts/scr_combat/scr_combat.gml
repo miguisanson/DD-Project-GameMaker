@@ -15,15 +15,15 @@ function Combat_AttackBonus(_attacker, _weapon) {
 }
 
 function Combat_DodgeBonus(_defender) {
-    return StatMod(Stat_Get(_defender, STAT_AGI));
+    return StatMod(Stat_Get(_defender, STAT_AGI)) + Status_GetSum(_defender, "dodge_bonus");
 }
 
 function Combat_CritCheck(_attacker, _crit_bonus) {
-    // Base 5% crit, small bonus from LUCK and any explicit crit bonus.
+    // Base 5% crit, bonus from LUCK and any explicit crit bonus (percent).
     var luck_mod = StatMod(Stat_Get(_attacker, STAT_LUCK));
     if (luck_mod < 0) luck_mod = 0;
     var crit_chance = 0.05 + (luck_mod * 0.01) + (_crit_bonus * 0.01);
-    crit_chance = clamp(crit_chance, 0.05, 0.15); // 5% to 15% max
+    crit_chance = clamp(crit_chance, 0.05, 0.50); // 5% to 50% max
     return (random(1) < crit_chance);
 }
 
@@ -43,6 +43,49 @@ function Combat_Damage(_attacker, _defender, _weapon) {
 
     var final = max(1, raw - mitig);
     return final;
+}
+
+function Combat_AttemptHit(_attacker, _defender, _acc_bonus) {
+    var res = { hit: false, forced: false, attacker: _attacker, defender: _defender };
+
+    if (Status_HasFlag(_defender, "force_dodge")) {
+        res.hit = false;
+        res.forced = true;
+        res.defender = Status_ConsumeByField(_defender, "consume_on_defend");
+        return res;
+    }
+
+    if (Status_HasFlag(_attacker, "always_hit")) {
+        res.hit = true;
+        res.forced = true;
+        return res;
+    }
+
+    var hit_roll = RollD20() + _acc_bonus;
+    var dodge_roll = RollD20() + Combat_DodgeBonus(_defender);
+    res.hit = (hit_roll >= dodge_roll);
+    return res;
+}
+
+function Combat_ApplyDamage(_attacker, _defender, _weapon, _crit_mult, _skill_mult) {
+    var dmg = Combat_Damage(_attacker, _defender, _weapon);
+
+    var dmg_mult = Status_GetMul(_attacker, "dmg_mult");
+    if (dmg_mult != 1) dmg = floor(dmg * dmg_mult);
+
+    if (argument_count >= 5) dmg = floor(dmg * _skill_mult);
+    if (argument_count >= 4) dmg = floor(dmg * _crit_mult);
+
+    var guard_mult = Status_GetMul(_defender, "guard_mult");
+    if (guard_mult != 1) {
+        dmg = floor(dmg * guard_mult);
+        _defender = Status_ConsumeByField(_defender, "consume_on_hit");
+    }
+
+    dmg = max(0, dmg);
+    _defender.hp = max(0, _defender.hp - dmg);
+
+    return { dmg: dmg, defender: _defender };
 }
 
 function FX_Spawn(_sprite, _x, _y, _frames, _speed) {
@@ -142,20 +185,22 @@ function Battle_PlayerAttack(_bc) {
         _bc.player_weapon = w;
     }
 
-    var hit_roll = RollD20() + Combat_AttackBonus(p, w);
-    var dodge_roll = RollD20() + Combat_DodgeBonus(e);
+    var hit_res = Combat_AttemptHit(p, e, Combat_AttackBonus(p, w));
 
-    _bc.last_hit = (hit_roll >= dodge_roll);
+    _bc.last_hit = hit_res.hit;
     _bc.last_dmg = 0;
     _bc.last_crit = false;
+    e = hit_res.defender;
 
     if (_bc.last_hit) {
-        _bc.last_dmg = Combat_Damage(p, e, w);
-        _bc.last_crit = Combat_CritCheck(p, 1);
-        if (_bc.last_crit) _bc.last_dmg *= 2;
-
-        e.hp = max(0, e.hp - _bc.last_dmg);
+        var crit_bonus = Status_GetSum(p, "crit_bonus");
+        _bc.last_crit = Combat_CritCheck(p, 1 + crit_bonus);
+        var dmg_pack = Combat_ApplyDamage(p, e, w, (_bc.last_crit ? 2 : 1), 1);
+        _bc.last_dmg = dmg_pack.dmg;
+        e = dmg_pack.defender;
     }
+
+    p = Status_ConsumeByField(p, "consume_on_attack");
 
     if (Battle_CheckEnd(_bc, p, e)) return;
 
@@ -361,20 +406,22 @@ function Battle_EnemyAct(_bc) {
             _bc.enemy_weapon = ew;
         }
 
-        var hit_roll_e = RollD20() + Combat_AttackBonus(e, ew);
-        var dodge_roll_p = RollD20() + Combat_DodgeBonus(p);
+        var hit_res_e = Combat_AttemptHit(e, p, Combat_AttackBonus(e, ew));
 
-        _bc.last_hit = (hit_roll_e >= dodge_roll_p);
+        _bc.last_hit = hit_res_e.hit;
         _bc.last_dmg = 0;
         _bc.last_crit = false;
+        p = hit_res_e.defender;
 
         if (_bc.last_hit) {
-            _bc.last_dmg = Combat_Damage(e, p, ew);
-            _bc.last_crit = Combat_CritCheck(e, 1);
-            if (_bc.last_crit) _bc.last_dmg *= 2;
-
-            p.hp = max(0, p.hp - _bc.last_dmg);
+            var crit_bonus_e = Status_GetSum(e, "crit_bonus");
+            _bc.last_crit = Combat_CritCheck(e, 1 + crit_bonus_e);
+            var dmg_pack_e = Combat_ApplyDamage(e, p, ew, (_bc.last_crit ? 2 : 1), 1);
+            _bc.last_dmg = dmg_pack_e.dmg;
+            p = dmg_pack_e.defender;
         }
+
+        e = Status_ConsumeByField(e, "consume_on_attack");
 
         if (Battle_CheckEnd(_bc, p, e)) return;
 

@@ -8,8 +8,8 @@
   "name":"obj_chest",
   "overriddenProperties":[],
   "parent":{
-    "name":"Entities",
-    "path":"folders/Objects/Entities.yy",
+    "name":"Decorations",
+    "path":"folders/Objects/Decorations.yy",
   },
   "parentObjectId":{
     "name":"obj_interactable",

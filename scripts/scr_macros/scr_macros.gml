@@ -50,13 +50,32 @@
 #macro TGT_ALL_ALLIES  3
 #macro TGT_ALL         4
 
-#macro STATUS_POISON  0
-#macro STATUS_REGEN   1
-#macro STATUS_STUN    2
+#macro STATUS_POISON     0
+#macro STATUS_BLEED      1
+#macro STATUS_BURN       2
+#macro STATUS_STUN       3
+#macro STATUS_GUARD      4
+#macro STATUS_DMG_UP     5
+#macro STATUS_EVASION    6
+#macro STATUS_CRIT_UP    7
+#macro STATUS_HIT_UP     8
+#macro STATUS_MEDITATION 9
 
 #macro SKILL_POWER_STRIKE 0
-#macro SKILL_FOCUS        1
-#macro SKILL_FIRE         2
+#macro SKILL_WOUND        1
+#macro SKILL_HILT_BASH    2
+#macro SKILL_MUSCLE_UP    3
+#macro SKILL_REV_UP       4
+#macro SKILL_HORIZ_SLASH  5
+#macro SKILL_POISON_ARROW 6
+#macro SKILL_EVASION      7
+#macro SKILL_DOUBLE_SHOT  8
+#macro SKILL_TAKE_AIM     9
+#macro SKILL_FIREBALL     10
+#macro SKILL_POISON_MIST  11
+#macro SKILL_ICE_SPEAR    12
+#macro SKILL_MEDITATION   13
+#macro SKILL_FORESIGHT    14
 
 #macro BATTLE_COOLDOWN_FRAMES 60
 

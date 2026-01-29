@@ -3,6 +3,18 @@ function Equip_Item(_ch, _item_id) {
     if (item.type != ITEM_WEAPON && item.type != ITEM_ARMOR) return false;
     if (item.equip_slot == "") return false;
 
+    if (variable_struct_exists(item, "preferred_class") && item.preferred_class != -1) {
+        if (!variable_struct_exists(_ch, "class_id") || _ch.class_id != item.preferred_class) return false;
+    }
+
+    if (variable_struct_exists(item, "allowed_classes") && is_array(item.allowed_classes)) {
+        var allowed = false;
+        for (var i = 0; i < array_length(item.allowed_classes); i++) {
+            if (item.allowed_classes[i] == _ch.class_id) { allowed = true; break; }
+        }
+        if (!allowed) return false;
+    }
+
     // Remove from inventory (1)
     _ch.inventory = Inv_Remove(_ch.inventory, _item_id, 1);
 

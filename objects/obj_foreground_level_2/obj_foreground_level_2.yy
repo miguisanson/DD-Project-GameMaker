@@ -1,20 +1,15 @@
 {
   "$GMObject":"",
-  "%Name":"obj_shop",
-  "eventList":[
-    {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":0,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",},
-  ],
+  "%Name":"obj_foreground_level_2",
+  "eventList":[],
   "managed":true,
-  "name":"obj_shop",
+  "name":"obj_foreground_level_2",
   "overriddenProperties":[],
   "parent":{
-    "name":"Entities",
-    "path":"folders/Objects/Entities.yy",
+    "name":"Objects",
+    "path":"folders/Objects.yy",
   },
-  "parentObjectId":{
-    "name":"obj_interactable",
-    "path":"objects/obj_interactable/obj_interactable.yy",
-  },
+  "parentObjectId":null,
   "persistent":false,
   "physicsAngularDamping":0.1,
   "physicsDensity":0.5,
@@ -32,7 +27,10 @@
   "resourceType":"GMObject",
   "resourceVersion":"2.0",
   "solid":false,
-  "spriteId":null,
+  "spriteId":{
+    "name":"level_2_foreground",
+    "path":"sprites/level_2_foreground/level_2_foreground.yy",
+  },
   "spriteMaskId":null,
   "visible":true,
 }

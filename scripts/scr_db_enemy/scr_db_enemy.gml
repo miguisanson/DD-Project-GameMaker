@@ -84,7 +84,7 @@ function EnemyDB_Init() {
         gold: 12,
         ai: { scan_radius: 80, think_rate: 10, forget_delay: 75, leash_mult: 5, wander_chance: 1, move_speed: 1.3 },
         drops: [ { item_id: 11, chance: 0.2, qty: 1 } ],
-        skills: [SKILL_FIRE],
+        skills: [SKILL_FIREBALL],
         traits: [],
         is_boss: false
     };

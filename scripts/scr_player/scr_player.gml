@@ -35,11 +35,11 @@ function CharacterCreate_Player(_class_id) {
 
 function Player_DefaultSkills(_class_id) {
     switch (_class_id) {
-        case CLASS_ARCHER: return [SKILL_POWER_STRIKE];
-        case CLASS_KNIGHT: return [SKILL_POWER_STRIKE];
-        case CLASS_MAGE:   return [SKILL_FIRE];
+        case CLASS_ARCHER: return [SKILL_WOUND, SKILL_TAKE_AIM];
+        case CLASS_KNIGHT: return [SKILL_WOUND, SKILL_MUSCLE_UP];
+        case CLASS_MAGE:   return [SKILL_FIREBALL, SKILL_MEDITATION];
     }
-    return [SKILL_POWER_STRIKE];
+    return [SKILL_WOUND];
 }
 
 function Player_EnsureSpriteSet() {
@@ -200,7 +200,7 @@ function GameState_Init() {
     }
 
     if (!variable_struct_exists(gs, "checkpoint")) {
-        gs.checkpoint = { room: rm_floor1, x: 32, y: 128 };
+        gs.checkpoint = { room: rm_floor2, x: 32, y: 128 };
     }
 
     if (!variable_struct_exists(gs, "ui")) {
