@@ -19,10 +19,12 @@ function Combat_DodgeBonus(_defender) {
 }
 
 function Combat_CritCheck(_attacker, _crit_bonus) {
-    var crit_roll = RollD20();
-    var threshold = StatMod(Stat_Get(_attacker, STAT_LUCK)) + _crit_bonus;
-    threshold = clamp(threshold, 1, 6); // caps crit at 30% (6/20)
-    return (crit_roll <= threshold);
+    // Base 5% crit, small bonus from LUCK and any explicit crit bonus.
+    var luck_mod = StatMod(Stat_Get(_attacker, STAT_LUCK));
+    if (luck_mod < 0) luck_mod = 0;
+    var crit_chance = 0.05 + (luck_mod * 0.01) + (_crit_bonus * 0.01);
+    crit_chance = clamp(crit_chance, 0.05, 0.15); // 5% to 15% max
+    return (random(1) < crit_chance);
 }
 
 function Combat_Damage(_attacker, _defender, _weapon) {
