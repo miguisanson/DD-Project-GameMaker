@@ -93,6 +93,11 @@ function Interact_Handle(_inst) {
             if (variable_instance_exists(_inst, "container_level")) lvl = _inst.container_level;
             var key = "";
             if (variable_instance_exists(_inst, "loot_table_key")) key = _inst.loot_table_key;
+            if (key == "") {
+                if (_inst.object_index == obj_chest) key = "chest_basic";
+                if (_inst.object_index == obj_barrel) key = "barrel_basic";
+            }
+
             var loot = [];
             if (key != "") loot = Loot_RollContainer(lvl, key);
             if (is_array(loot) && array_length(loot) > 0) {
@@ -108,7 +113,10 @@ function Interact_Handle(_inst) {
                 }
                 Dialogue_StartWithSpeaker(name, loot_lines);
             } else {
-                Dialogue_StartWithSpeaker(name, DialogueDB_Get(base_id));
+                var empty_id = base_id;
+                if (after_id != "") empty_id = after_id;
+                if (empty_id == "") empty_id = "loot_empty";
+                Dialogue_StartWithSpeaker(name, DialogueDB_Get(empty_id));
             }
         } else {
             var use_id = (after_id != "") ? after_id : base_id;

@@ -27,6 +27,8 @@ function DialogueDB_Init() {
     global.dialogue_db[? "chest_empty"] = ["It's empty."];
     global.dialogue_db[? "loot_received"] = ["Received {item} x{qty}."];
 
+    global.dialogue_db[? "loot_empty"] = ["It's empty."];
+
     global.dialogue_db[? "fire_stand_extinguish"] = ["You extinguish the flame."];
     global.dialogue_db[? "fire_stand_off"] = ["The flame is out."];
 

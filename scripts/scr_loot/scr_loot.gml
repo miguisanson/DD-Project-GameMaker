@@ -67,8 +67,9 @@ function Loot_Init() {
     ds_map_add(global.loot_tables, "enemy", enemy);
 
     // --- configs ---
-    ds_map_add(global.loot_configs, "chest_basic",  { table:"chest",  chance:[0.65, 0.8, 0.9], max_items:1 });
-    ds_map_add(global.loot_configs, "barrel_basic", { table:"barrel", chance:[0.35, 0.45, 0.55], max_items:1 });
+    // Containers always yield 1 item by default (chest/barrel should always have loot)
+    ds_map_add(global.loot_configs, "chest_basic",  { table:"chest",  chance:[1, 1, 1], max_items:1 });
+    ds_map_add(global.loot_configs, "barrel_basic", { table:"barrel", chance:[1, 1, 1], max_items:1 });
     ds_map_add(global.loot_configs, "enemy_basic",  { table:"enemy",  chance:[0.2, 0.3, 0.4], max_items:1 });
 
     if (variable_global_exists("state") && is_struct(global.state)) {
