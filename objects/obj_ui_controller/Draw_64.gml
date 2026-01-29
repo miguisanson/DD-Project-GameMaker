@@ -33,7 +33,7 @@ if (gs.ui.mode == UI_DIALOGUE) {
     var speaker = "";
     if (variable_struct_exists(gs.ui, "speaker")) speaker = gs.ui.speaker;
 
-    draw_set_color(c_black);
+    draw_set_color(c_white);
     if (speaker != "") {
         draw_text(bx + 8, by + 6, speaker + ":");
         draw_text(bx + 8, by + 22, line);
@@ -55,7 +55,7 @@ if (gs.ui.mode == UI_SHOP) {
     draw_set_color(c_black);
     draw_rectangle(bx2, by2, bx2 + bw2, by2 + bh2, true);
 
-    draw_set_color(c_black);
+    draw_set_color(c_white);
     draw_text(bx2 + 8, by2 + 8, "Shop  Gold: " + string(gs.player_ch.gold));
 
     var list = gs.ui.shop_items;
