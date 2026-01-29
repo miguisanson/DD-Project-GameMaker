@@ -17,19 +17,30 @@ function Flag_Toggle(_key) {
 function Interact_PlayerFacing(_pl, _inst) {
     var tile = 16;
     if (variable_instance_exists(_pl, "tile_size")) tile = _pl.tile_size;
-
-    var tx = _pl.x;
-    var ty = _pl.y;
+    var margin = 2;
 
     switch (_pl.face) {
-        case UP:    ty -= tile; break;
-        case DOWN:  ty += tile; break;
-        case LEFT:  tx -= tile; break;
-        case RIGHT: tx += tile; break;
+        case UP: {
+            var dy = _pl.bbox_top - _inst.bbox_bottom;
+            return (dy >= -margin && dy <= tile + margin) && (_pl.bbox_right > _inst.bbox_left) && (_pl.bbox_left < _inst.bbox_right);
+        }
+        case DOWN: {
+            var dy2 = _inst.bbox_top - _pl.bbox_bottom;
+            return (dy2 >= -margin && dy2 <= tile + margin) && (_pl.bbox_right > _inst.bbox_left) && (_pl.bbox_left < _inst.bbox_right);
+        }
+        case LEFT: {
+            var dx = _pl.bbox_left - _inst.bbox_right;
+            return (dx >= -margin && dx <= tile + margin) && (_pl.bbox_bottom > _inst.bbox_top) && (_pl.bbox_top < _inst.bbox_bottom);
+        }
+        case RIGHT: {
+            var dx2 = _inst.bbox_left - _pl.bbox_right;
+            return (dx2 >= -margin && dx2 <= tile + margin) && (_pl.bbox_bottom > _inst.bbox_top) && (_pl.bbox_top < _inst.bbox_bottom);
+        }
     }
 
-    return (_inst.x == tx && _inst.y == ty);
+    return false;
 }
+
 
 function Interact_Handle(_inst) {
     var gs = GameState_Get();
