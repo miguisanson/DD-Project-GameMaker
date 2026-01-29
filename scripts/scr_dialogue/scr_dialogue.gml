@@ -54,7 +54,17 @@ function DialogueDB_Get(_npc_id) {
     return global.dialogue_db[? _npc_id];
 }
 
+function Dialogue_EnsureUI() {
+    if (!instance_exists(obj_ui_controller)) {
+        if (!layer_exists("Instances")) {
+            layer_create(0, "Instances");
+        }
+        instance_create_layer(0, 0, "Instances", obj_ui_controller);
+    }
+}
+
 function Dialogue_Start(_npc_id) {
+    Dialogue_EnsureUI();
     var gs = GameState_Get();
     gs.ui.speaker = "";
     gs.ui.lines = DialogueDB_Get(_npc_id);
@@ -63,6 +73,7 @@ function Dialogue_Start(_npc_id) {
 }
 
 function Dialogue_StartLines(_lines) {
+    Dialogue_EnsureUI();
     var gs = GameState_Get();
     gs.ui.speaker = "";
     gs.ui.lines = _lines;
@@ -93,6 +104,7 @@ function DialogueDB_GetFormatted(_npc_id, _vars) {
 }
 
 function Dialogue_StartWithSpeaker(_speaker, _lines) {
+    Dialogue_EnsureUI();
     var gs = GameState_Get();
     gs.ui.speaker = _speaker;
     gs.ui.lines = _lines;
