@@ -12,7 +12,7 @@ swap_sprite = noone;
 swapped = false;
 
 // chest config
-chest_item_id = 10;
+chest_item_id = 0;
 chest_qty = 1;
 
 switch_id = 0;
