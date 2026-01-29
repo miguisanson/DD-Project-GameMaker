@@ -42,7 +42,10 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     } else {
         draw_text(bx + 8, by + 8, line);
     }
-    draw_text(bx + bw - 18, by + bh - 18, "Z");
+    var key_override = "";
+    if (variable_struct_exists(gs.ui, "confirm_action")) key_override = gs.ui.confirm_action;
+    var key_label = Input_LabelWithKey("confirm", key_override);
+    draw_text(bx + bw - 18, by + bh - 18, key_label);
 }
 
 // Shop UI

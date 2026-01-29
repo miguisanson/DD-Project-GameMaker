@@ -26,7 +26,8 @@ if (battle_state == BSTATE_MESSAGE) {
 
     draw_set_color(c_black);
     draw_text(bx + 12, by + 12, message_text);
-    draw_text(bx + bw - 18, by + bh - 24, "Z");
+    var key_label = Input_Label("confirm");
+    draw_text(bx + bw - 18, by + bh - 24, key_label);
 }
 
 // MENU STATES ONLY

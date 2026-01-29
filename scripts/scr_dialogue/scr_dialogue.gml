@@ -36,7 +36,7 @@ function DialogueDB_Init() {
     global.dialogue_db[? NPC_OLD_MAN] = [
         "Welcome to the dungeon.",
         "Stay alert—monsters lurk nearby.",
-        "Press Z to interact."
+        "Press {interact} to interact."
     ];
 
     if (variable_global_exists("state") && is_struct(global.state)) {
@@ -51,8 +51,11 @@ function DialogueDB_Get(_npc_id) {
     if (!ds_map_exists(global.dialogue_db, _npc_id)) {
         _npc_id = "default";
     }
-    return global.dialogue_db[? _npc_id];
+    var lines = global.dialogue_db[? _npc_id];
+    var vars = { interact: Input_Label("interact"), confirm: Input_Label("confirm"), cancel: Input_Label("cancel") };
+    return Dialogue_FormatLines(lines, vars);
 }
+
 
 function Dialogue_EnsureUI() {
     if (!instance_exists(obj_ui_controller)) {
@@ -71,6 +74,7 @@ function Dialogue_Start(_npc_id) {
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.just_opened = true;
+    gs.ui.confirm_action = "interact";
 }
 
 function Dialogue_StartLines(_lines) {
@@ -81,6 +85,7 @@ function Dialogue_StartLines(_lines) {
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.just_opened = true;
+    gs.ui.confirm_action = "interact";
 }
 
 function Dialogue_FormatLines(_lines, _vars) {
@@ -113,6 +118,7 @@ function Dialogue_StartWithSpeaker(_speaker, _lines) {
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.just_opened = true;
+    gs.ui.confirm_action = "interact";
 }
 
 function Dialogue_StartLinesWithSpeaker(_speaker, _lines) {
@@ -129,6 +135,7 @@ function Dialogue_Advance() {
         gs.ui.lines = [];
         gs.ui.index = 0;
         gs.ui.speaker = "";
+        gs.ui.confirm_action = "";
         if (variable_struct_exists(gs.ui, "lock_actions")) gs.ui.lock_actions = 2;
     }
 }
