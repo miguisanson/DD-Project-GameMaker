@@ -3,8 +3,8 @@ sprite_id = noone;
 
 // display / dialogue config
 interact_name = "";
-dialogue_id = -1;
-dialogue_lines = [];
+dialogue_id = "";
+dialogue_id_after = "";
 
 // swap-state config
 swap_on_interact = false;

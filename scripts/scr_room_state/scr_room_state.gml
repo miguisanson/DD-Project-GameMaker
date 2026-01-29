@@ -49,7 +49,7 @@ function RoomState_Save(_room) {
         array_push(state.enemies, snap);
     }
 
-    var interact_fields = ["interact_kind","sprite_id","sprite_index","interact_name","dialogue_id","dialogue_lines","swap_on_interact","swap_sprite","swapped","chest_item_id","chest_qty","switch_id","npc_id","shop_id","checkpoint_id","door_room","door_x","door_y"];
+    var interact_fields = ["interact_kind","sprite_id","sprite_index","interact_name","dialogue_id","dialogue_id_after","swap_on_interact","swap_sprite","swapped","chest_item_id","chest_qty","switch_id","npc_id","shop_id","checkpoint_id","door_room","door_x","door_y"];
     with (obj_interactable) {
         var snap2 = RoomState_SnapshotInstance(self, interact_fields);
         array_push(state.interactables, snap2);

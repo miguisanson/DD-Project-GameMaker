@@ -42,6 +42,28 @@ function Interact_Handle(_inst) {
     if (variable_instance_exists(_inst, "interact_name")) name = _inst.interact_name;
     if (name == "") name = object_get_name(_inst.object_index);
 
+    var has_dialogue_id = false;
+    var base_id = "default";
+    if (variable_instance_exists(_inst, "dialogue_id")) {
+        var did = _inst.dialogue_id;
+        if (did != -1 && did != "") {
+            base_id = did;
+            has_dialogue_id = true;
+        }
+    }
+    if (!has_dialogue_id && _inst.interact_kind == INTERACT_NPC && variable_instance_exists(_inst, "npc_id")) {
+        base_id = _inst.npc_id;
+        has_dialogue_id = true;
+    }
+
+    var after_id = "";
+    if (variable_instance_exists(_inst, "dialogue_id_after")) {
+        var aid = _inst.dialogue_id_after;
+        if (aid != -1 && aid != "") {
+            after_id = aid;
+        }
+    }
+
     // swap-state interaction
     if (variable_instance_exists(_inst, "swap_on_interact") && _inst.swap_on_interact) {
         if (!_inst.swapped) {
@@ -56,27 +78,21 @@ function Interact_Handle(_inst) {
                 gs.player_ch.inventory = Inv_Add(gs.player_ch.inventory, _inst.chest_item_id, qty);
                 var item = ItemDB_Get(_inst.chest_item_id);
                 var item_name = item.name;
-                Dialogue_StartWithSpeaker(name, ["Received " + item_name + " x" + string(qty)]);
+                var lines = DialogueDB_GetFormatted("loot_received", { item: item_name, qty: qty });
+                Dialogue_StartWithSpeaker(name, lines);
             } else {
-                Dialogue_StartWithSpeaker(name, ["..."]);
+                Dialogue_StartWithSpeaker(name, DialogueDB_Get(base_id));
             }
         } else {
-            Dialogue_StartWithSpeaker(name, ["It's empty."]);
+            var use_id = (after_id != "") ? after_id : base_id;
+            Dialogue_StartWithSpeaker(name, DialogueDB_Get(use_id));
         }
 
         GameState_SyncLegacy();
         return;
     }
 
-    // dialogue by id or lines
-    if (variable_instance_exists(_inst, "dialogue_lines") && is_array(_inst.dialogue_lines) && array_length(_inst.dialogue_lines) > 0) {
-        Dialogue_StartWithSpeaker(name, _inst.dialogue_lines);
-    } else if (variable_instance_exists(_inst, "dialogue_id") && _inst.dialogue_id != -1) {
-        var lines = DialogueDB_Get(_inst.dialogue_id);
-        Dialogue_StartWithSpeaker(name, lines);
-    } else {
-        Dialogue_StartWithSpeaker(name, ["..."]);
-    }
+    Dialogue_StartWithSpeaker(name, DialogueDB_Get(base_id));
 
     // other interact types (door/shop/checkpoint) keep compatibility
     switch (_inst.interact_kind) {
@@ -100,4 +116,3 @@ function Interact_Handle(_inst) {
 
     GameState_SyncLegacy();
 }
-

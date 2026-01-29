@@ -19,13 +19,13 @@ if (gs.last_room != room) {
 
 if (keyboard_check_pressed(vk_f5)) {
     Save_Write(0);
-    Dialogue_StartLines(["Game saved."]);
+    Dialogue_Start("sys_save_ok");
 }
 
 if (keyboard_check_pressed(vk_f9)) {
     if (Save_Read(0)) {
-        Dialogue_StartLines(["Game loaded."]);
+        Dialogue_Start("sys_load_ok");
     } else {
-        Dialogue_StartLines(["No save found."]);
+        Dialogue_Start("sys_load_missing");
     }
 }
