@@ -17,9 +17,9 @@ function Input_Init() {
         inp.bindings.move_left = [ord("A"), vk_left];
         inp.bindings.move_right = [ord("D"), vk_right];
 
-        inp.bindings.interact = [ord("Z"), vk_space];
-        inp.bindings.confirm = [ord("Z"), vk_enter];
-        inp.bindings.cancel = [ord("X"), vk_escape];
+        inp.bindings.interact = [vk_space];
+        inp.bindings.confirm = [vk_space];
+        inp.bindings.cancel = [vk_escape];
         inp.bindings.menu = [ord("I"), vk_tab];
 
         inp.bindings.menu_up = [ord("W"), vk_up];
@@ -142,12 +142,6 @@ function Input_Label(_action) {
     return out;
 }
 
-function Input_LabelWithKey(_action, _key) {
-    if (_key == "" || is_undefined(_key)) return Input_Label(_action);
-    var code = _key;
-    if (is_string(code)) code = Input_KeyCodeFromName(code);
-    return Input_KeyLabel(code);
-}
 
 function Input_Update() {
     Input_Init();
@@ -169,7 +163,6 @@ function Input_Update() {
         if (is_array(keys)) {
             for (var k = 0; k < array_length(keys); k++) {
                 var key = keys[k];
-                if (is_string(key)) key = Input_KeyCodeFromName(key);
                 if (key != -1 && keyboard_check(key)) {
                     held = true;
                     break;

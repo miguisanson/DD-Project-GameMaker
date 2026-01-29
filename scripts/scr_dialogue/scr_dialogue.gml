@@ -74,7 +74,7 @@ function Dialogue_Start(_npc_id) {
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.just_opened = true;
-    gs.ui.confirm_action = "interact";
+    gs.ui.confirm_action = "confirm";
 }
 
 function Dialogue_StartLines(_lines) {
@@ -85,7 +85,7 @@ function Dialogue_StartLines(_lines) {
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.just_opened = true;
-    gs.ui.confirm_action = "interact";
+    gs.ui.confirm_action = "confirm";
 }
 
 function Dialogue_FormatLines(_lines, _vars) {
@@ -118,7 +118,7 @@ function Dialogue_StartWithSpeaker(_speaker, _lines) {
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.just_opened = true;
-    gs.ui.confirm_action = "interact";
+    gs.ui.confirm_action = "confirm";
 }
 
 function Dialogue_StartLinesWithSpeaker(_speaker, _lines) {
