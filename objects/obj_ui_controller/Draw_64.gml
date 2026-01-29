@@ -30,8 +30,16 @@ if (gs.ui.mode == UI_DIALOGUE) {
         line = gs.ui.lines[gs.ui.index];
     }
 
+    var speaker = "";
+    if (variable_struct_exists(gs.ui, "speaker")) speaker = gs.ui.speaker;
+
     draw_set_color(c_black);
-    draw_text(bx + 8, by + 8, line);
+    if (speaker != "") {
+        draw_text(bx + 8, by + 6, speaker + ":");
+        draw_text(bx + 8, by + 22, line);
+    } else {
+        draw_text(bx + 8, by + 8, line);
+    }
     draw_text(bx + bw - 18, by + bh - 18, "Z");
 }
 

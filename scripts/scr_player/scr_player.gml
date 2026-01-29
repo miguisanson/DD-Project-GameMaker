@@ -148,7 +148,7 @@ function GameState_Init() {
     }
 
     if (!variable_struct_exists(gs, "ui")) {
-        gs.ui = { mode: 0, lines: [], index: 0, shop_items: [], shop_index: 0, prompt: "" };
+        gs.ui = { mode: 0, lines: [], index: 0, speaker: "", shop_items: [], shop_index: 0, prompt: "" };
     }
 
     if (!variable_struct_exists(gs, "room_states")) {

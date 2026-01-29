@@ -1,11 +1,11 @@
 {
   "$GMObject":"",
-  "%Name":"obj_chest",
+  "%Name":"obj_tree_stump1",
   "eventList":[
     {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":0,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",},
   ],
   "managed":true,
-  "name":"obj_chest",
+  "name":"obj_tree_stump1",
   "overriddenProperties":[],
   "parent":{
     "name":"Decorations",
@@ -33,8 +33,8 @@
   "resourceVersion":"2.0",
   "solid":false,
   "spriteId":{
-    "name":"chest_asset",
-    "path":"sprites/chest_asset/chest_asset.yy",
+    "name":"tree_stump1",
+    "path":"sprites/tree_stump1/tree_stump1.yy",
   },
   "spriteMaskId":null,
   "visible":true,

@@ -1,11 +1,11 @@
 {
   "$GMObject":"",
-  "%Name":"obj_chest",
+  "%Name":"obj_horned_skull",
   "eventList":[
     {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":0,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",},
   ],
   "managed":true,
-  "name":"obj_chest",
+  "name":"obj_horned_skull",
   "overriddenProperties":[],
   "parent":{
     "name":"Decorations",
@@ -33,8 +33,8 @@
   "resourceVersion":"2.0",
   "solid":false,
   "spriteId":{
-    "name":"chest_asset",
-    "path":"sprites/chest_asset/chest_asset.yy",
+    "name":"horned_skull_asset",
+    "path":"sprites/horned_skull_asset/horned_skull_asset.yy",
   },
   "spriteMaskId":null,
   "visible":true,

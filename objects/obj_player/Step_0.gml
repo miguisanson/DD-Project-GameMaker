@@ -31,7 +31,7 @@ if (moving) {
         case RIGHT: x += 1; break;
     }
 
-    if (place_meeting(x, y, obj_wall)) {
+    if (place_meeting(x, y, obj_wall) || place_meeting(x, y, obj_interactable)) {
         moving = false;
 
         switch (move_dir) {

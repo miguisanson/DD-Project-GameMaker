@@ -1,11 +1,11 @@
 {
   "$GMObject":"",
-  "%Name":"obj_chest",
+  "%Name":"obj_rock2",
   "eventList":[
     {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":0,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",},
   ],
   "managed":true,
-  "name":"obj_chest",
+  "name":"obj_rock2",
   "overriddenProperties":[],
   "parent":{
     "name":"Decorations",
@@ -33,8 +33,8 @@
   "resourceVersion":"2.0",
   "solid":false,
   "spriteId":{
-    "name":"chest_asset",
-    "path":"sprites/chest_asset/chest_asset.yy",
+    "name":"rock2",
+    "path":"sprites/rock2/rock2.yy",
   },
   "spriteMaskId":null,
   "visible":true,

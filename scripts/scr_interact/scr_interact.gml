@@ -38,20 +38,48 @@ function Interact_Handle(_inst) {
     if (!keyboard_check_pressed(ord("Z"))) return;
     if (!Interact_PlayerFacing(pl, _inst)) return;
 
-    switch (_inst.interact_kind) {
-        case INTERACT_CHEST: {
-            var key = "chest_" + string(_inst.chest_id);
-            if (Flag_Get(key)) {
-                Dialogue_StartLines(["It's empty."]); 
-                break;
+    var name = "";
+    if (variable_instance_exists(_inst, "interact_name")) name = _inst.interact_name;
+    if (name == "") name = object_get_name(_inst.object_index);
+
+    // swap-state interaction
+    if (variable_instance_exists(_inst, "swap_on_interact") && _inst.swap_on_interact) {
+        if (!_inst.swapped) {
+            if (variable_instance_exists(_inst, "swap_sprite") && _inst.swap_sprite != noone) {
+                _inst.sprite_index = _inst.swap_sprite;
             }
+            _inst.swapped = true;
 
-            var qty = max(1, _inst.chest_qty);
-            gs.player_ch.inventory = Inv_Add(gs.player_ch.inventory, _inst.chest_item_id, qty);
-            Flag_Set(key, true);
-            Dialogue_StartLines(["You got " + string(qty) + " item(s)."]);
-        } break;
+            // chest reward (optional)
+            if (variable_instance_exists(_inst, "chest_item_id") && _inst.chest_item_id > 0) {
+                var qty = max(1, _inst.chest_qty);
+                gs.player_ch.inventory = Inv_Add(gs.player_ch.inventory, _inst.chest_item_id, qty);
+                var item = ItemDB_Get(_inst.chest_item_id);
+                var item_name = item.name;
+                Dialogue_StartWithSpeaker(name, ["Received " + item_name + " x" + string(qty)]);
+            } else {
+                Dialogue_StartWithSpeaker(name, ["..."]);
+            }
+        } else {
+            Dialogue_StartWithSpeaker(name, ["It's empty."]);
+        }
 
+        GameState_SyncLegacy();
+        return;
+    }
+
+    // dialogue by id or lines
+    if (variable_instance_exists(_inst, "dialogue_lines") && is_array(_inst.dialogue_lines) && array_length(_inst.dialogue_lines) > 0) {
+        Dialogue_StartWithSpeaker(name, _inst.dialogue_lines);
+    } else if (variable_instance_exists(_inst, "dialogue_id") && _inst.dialogue_id != -1) {
+        var lines = DialogueDB_Get(_inst.dialogue_id);
+        Dialogue_StartWithSpeaker(name, lines);
+    } else {
+        Dialogue_StartWithSpeaker(name, ["..."]);
+    }
+
+    // other interact types (door/shop/checkpoint) keep compatibility
+    switch (_inst.interact_kind) {
         case INTERACT_DOOR: {
             if (_inst.door_room != noone) {
                 if (variable_global_exists("room_state_ready") && global.room_state_ready) RoomState_Save(room);
@@ -61,25 +89,15 @@ function Interact_Handle(_inst) {
             }
         } break;
 
-        case INTERACT_SWITCH: {
-            var skey = "switch_" + string(_inst.switch_id);
-            Flag_Toggle(skey);
-            Dialogue_StartLines(["Switch toggled."]);
-        } break;
-
-        case INTERACT_NPC: {
-            Dialogue_Start(_inst.npc_id);
-        } break;
-
         case INTERACT_SHOP: {
             Shop_Open(_inst.shop_id);
         } break;
 
         case INTERACT_CHECKPOINT: {
             GameState_SetCheckpoint(room, _inst.x, _inst.y);
-            Dialogue_StartLines(["Checkpoint set."]);
         } break;
     }
 
     GameState_SyncLegacy();
 }
+

@@ -1,11 +1,11 @@
 {
   "$GMObject":"",
-  "%Name":"obj_chest",
+  "%Name":"obj_barrel_broken",
   "eventList":[
     {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":0,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",},
   ],
   "managed":true,
-  "name":"obj_chest",
+  "name":"obj_barrel_broken",
   "overriddenProperties":[],
   "parent":{
     "name":"Decorations",
@@ -33,8 +33,8 @@
   "resourceVersion":"2.0",
   "solid":false,
   "spriteId":{
-    "name":"chest_asset",
-    "path":"sprites/chest_asset/chest_asset.yy",
+    "name":"barrel_asset_broken",
+    "path":"sprites/barrel_asset_broken/barrel_asset_broken.yy",
   },
   "spriteMaskId":null,
   "visible":true,

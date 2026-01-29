@@ -1,11 +1,11 @@
 {
   "$GMObject":"",
-  "%Name":"obj_chest",
+  "%Name":"obj_fire_stand",
   "eventList":[
     {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":0,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",},
   ],
   "managed":true,
-  "name":"obj_chest",
+  "name":"obj_fire_stand",
   "overriddenProperties":[],
   "parent":{
     "name":"Decorations",
@@ -33,8 +33,8 @@
   "resourceVersion":"2.0",
   "solid":false,
   "spriteId":{
-    "name":"chest_asset",
-    "path":"sprites/chest_asset/chest_asset.yy",
+    "name":"fire_stand_moving",
+    "path":"sprites/fire_stand_moving/fire_stand_moving.yy",
   },
   "spriteMaskId":null,
   "visible":true,

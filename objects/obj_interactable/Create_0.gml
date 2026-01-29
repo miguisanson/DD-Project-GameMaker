@@ -1,7 +1,17 @@
 interact_kind = INTERACT_NONE;
 sprite_id = noone;
 
-chest_id = 0;
+// display / dialogue config
+interact_name = "";
+dialogue_id = -1;
+dialogue_lines = [];
+
+// swap-state config
+swap_on_interact = false;
+swap_sprite = noone;
+swapped = false;
+
+// chest config
 chest_item_id = 10;
 chest_qty = 1;
 

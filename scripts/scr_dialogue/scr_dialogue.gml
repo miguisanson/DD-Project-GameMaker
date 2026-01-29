@@ -25,6 +25,7 @@ function DialogueDB_Get(_npc_id) {
 
 function Dialogue_Start(_npc_id) {
     var gs = GameState_Get();
+    gs.ui.speaker = "";
     gs.ui.lines = DialogueDB_Get(_npc_id);
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
@@ -32,9 +33,23 @@ function Dialogue_Start(_npc_id) {
 
 function Dialogue_StartLines(_lines) {
     var gs = GameState_Get();
+    gs.ui.speaker = "";
     gs.ui.lines = _lines;
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
+}
+
+
+function Dialogue_StartWithSpeaker(_speaker, _lines) {
+    var gs = GameState_Get();
+    gs.ui.speaker = _speaker;
+    gs.ui.lines = _lines;
+    gs.ui.index = 0;
+    gs.ui.mode = UI_DIALOGUE;
+}
+
+function Dialogue_StartLinesWithSpeaker(_speaker, _lines) {
+    Dialogue_StartWithSpeaker(_speaker, _lines);
 }
 
 function Dialogue_Advance() {
@@ -45,5 +60,6 @@ function Dialogue_Advance() {
         gs.ui.mode = UI_NONE;
         gs.ui.lines = [];
         gs.ui.index = 0;
+        gs.ui.speaker = "";
     }
 }
