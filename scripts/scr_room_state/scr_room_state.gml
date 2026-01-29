@@ -41,7 +41,7 @@ function RoomState_Save(_room) {
 
     var state = { enemies: [], interactables: [], pickups: [] };
 
-    var enemy_fields = ["enemy_id","defeated","ai_state","forget_time","home_x","home_y","moving","move_dir","move_timer","think_delay","scan_radius","think_rate","forget_delay","leash_mult","wander_chance","move_speed","sprite_index"];
+    var enemy_fields = ["enemy_id","ai_state","forget_time","home_x","home_y","moving","move_dir","move_timer","think_delay","scan_radius","think_rate","forget_delay","leash_mult","wander_chance","move_speed","sprite_index"];
     with (obj_enemy) {
         var snap = RoomState_SnapshotInstance(self, enemy_fields);
         array_push(state.enemies, snap);

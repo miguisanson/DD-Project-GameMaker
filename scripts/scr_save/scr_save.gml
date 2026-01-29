@@ -46,6 +46,7 @@ function Save_ApplySnapshot(_snap) {
     if (ds_exists(gs.defeated_enemies, ds_type_list)) ds_list_destroy(gs.defeated_enemies);
     gs.defeated_enemies = Array_ToDSList(_snap.defeated);
     if (variable_struct_exists(_snap, "room_states")) gs.room_states = _snap.room_states;
+    gs.last_room = _snap.room;
 
     GameState_SyncLegacy();
 
