@@ -68,6 +68,36 @@ function Player_ApplyClassSprites(_class_id) {
     }
 }
 
+
+function Player_IsSettled(_pl) {
+    if (!instance_exists(_pl)) return false;
+    var tile = 16;
+    if (variable_instance_exists(_pl, "tile_size")) tile = _pl.tile_size;
+    var gx = round(_pl.x / tile) * tile;
+    var gy = round(_pl.y / tile) * tile;
+    if (abs(_pl.x - gx) > 0.01 || abs(_pl.y - gy) > 0.01) return false;
+    if (variable_instance_exists(_pl, "move_timer") && _pl.move_timer > 0) return false;
+    return true;
+}
+
+function Player_CanAcceptMove(_pl) {
+    if (!instance_exists(_pl)) return false;
+    if (variable_instance_exists(_pl, "moving") && _pl.moving) return false;
+    if (variable_instance_exists(_pl, "move_timer") && _pl.move_timer > 0) return false;
+    return true;
+}
+
+function Action_CanAct(_pl) {
+    var gs = GameState_Get();
+    if (gs.ui.mode != UI_NONE || array_length(gs.ui.lines) > 0) return false;
+    return Player_CanAcceptMove(_pl);
+}
+
+function Action_KeyPressed(_pl, _key) {
+    if (!Action_CanAct(_pl)) return false;
+    return keyboard_check_pressed(_key);
+}
+
 // --------------------
 // GAME STATE
 // --------------------

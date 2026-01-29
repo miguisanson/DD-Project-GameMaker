@@ -16,11 +16,15 @@ left_key  = keyboard_check(ord("A"));
 up_key    = keyboard_check(ord("W"));
 down_key  = keyboard_check(ord("S"));
 
+interact_key = Action_KeyPressed(id, ord("Z"));
+
 if (!moving) {
-    if (up_key) { move_dir = UP; moving = true; }
-    else if (down_key) { move_dir = DOWN; moving = true; }
-    else if (left_key) { move_dir = LEFT; moving = true; }
-    else if (right_key) { move_dir = RIGHT; moving = true; }
+    if (!interact_key) {
+        if (up_key) { move_dir = UP; moving = true; }
+        else if (down_key) { move_dir = DOWN; moving = true; }
+        else if (left_key) { move_dir = LEFT; moving = true; }
+        else if (right_key) { move_dir = RIGHT; moving = true; }
+    }
 
     if (moving) {
         face = move_dir;
@@ -39,6 +43,7 @@ if (moving) {
 
     if (place_meeting(x, y, obj_wall) || place_meeting(x, y, obj_interactable)) {
         moving = false;
+        move_timer = 0;
 
         switch (move_dir) {
             case UP:    y += 1; break;
@@ -52,6 +57,7 @@ if (moving) {
     move_timer -= 1;
     if (move_timer <= 0) {
         moving = false;
+        move_timer = 0;
         image_index = 0;
     }
 }
