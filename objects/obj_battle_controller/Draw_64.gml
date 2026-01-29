@@ -26,8 +26,12 @@ if (battle_state == BSTATE_MESSAGE) {
 
     draw_set_color(c_black);
     draw_text(bx + 12, by + 12, message_text);
-    var key_label = Input_Label("confirm");
-    draw_text(bx + bw - 18, by + bh - 24, key_label);
+    var icon = asset_get_index("button_A_icon");
+    if (icon != -1) {
+        var iw = sprite_get_width(icon);
+        var ih = sprite_get_height(icon);
+        draw_sprite(icon, 0, bx + bw - iw - 6, by + bh - ih - 10);
+    }
 }
 
 // MENU STATES ONLY

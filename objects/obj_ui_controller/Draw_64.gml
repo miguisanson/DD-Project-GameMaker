@@ -42,10 +42,13 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     } else {
         draw_text(bx + 8, by + 8, line);
     }
-    var action = "confirm";
-    if (variable_struct_exists(gs.ui, "confirm_action") && gs.ui.confirm_action != "") action = gs.ui.confirm_action;
-    var key_label = Input_Label(action);
-    draw_text(bx + bw - 18, by + bh - 18, key_label);
+    var icon = asset_get_index("button_A_icon");
+    if (icon != -1) {
+        var iw = sprite_get_width(icon);
+        var ih = sprite_get_height(icon);
+        draw_sprite(icon, 0, bx + bw - iw - 6, by + bh - ih - 6);
+    }
+
 }
 
 // Shop UI
