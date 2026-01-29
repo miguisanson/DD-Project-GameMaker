@@ -93,9 +93,9 @@ function Action_CanAct(_pl) {
     return Player_CanAcceptMove(_pl);
 }
 
-function Action_KeyPressed(_pl, _key) {
+function Action_KeyPressed(_pl, _action) {
     if (!Action_CanAct(_pl)) return false;
-    return keyboard_check_pressed(_key);
+    return Input_Pressed(_action);
 }
 
 // --------------------
@@ -107,6 +107,8 @@ function GameState_Init() {
     }
 
     var gs = global.state;
+
+    Input_Init();
 
     if (!variable_struct_exists(gs, "selected_class")) {
         gs.selected_class = CLASS_ARCHER;
@@ -214,6 +216,8 @@ function GameState_NextUID() {
 
 function GameState_SyncLegacy() {
     var gs = global.state;
+
+    Input_Init();
 
     global.selected_class = gs.selected_class;
     global.defeated_enemies = gs.defeated_enemies;

@@ -95,6 +95,7 @@
     {"id":{"name":"scr_dialogue","path":"scripts/scr_dialogue/scr_dialogue.yy",},},
     {"id":{"name":"scr_enemy","path":"scripts/scr_enemy/scr_enemy.yy",},},
     {"id":{"name":"scr_equip","path":"scripts/scr_equip/scr_equip.yy",},},
+    {"id":{"name":"scr_input","path":"scripts/scr_input/scr_input.yy",},},
     {"id":{"name":"scr_interact","path":"scripts/scr_interact/scr_interact.yy",},},
     {"id":{"name":"scr_inventory","path":"scripts/scr_inventory/scr_inventory.yy",},},
     {"id":{"name":"scr_levelup","path":"scripts/scr_levelup/scr_levelup.yy",},},

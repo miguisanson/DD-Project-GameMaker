@@ -48,7 +48,7 @@ function Interact_Handle(_inst) {
     var pl = gs.player_inst;
     if (!instance_exists(pl)) return;
     if (!Action_CanAct(pl)) return;
-    if (!Action_KeyPressed(pl, ord("Z"))) return;
+    if (!Action_KeyPressed(pl, "interact")) return;
     if (!Interact_PlayerFacing(pl, _inst)) return;
 
     var name = "";

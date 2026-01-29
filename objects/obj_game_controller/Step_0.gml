@@ -17,12 +17,12 @@ if (gs.last_room != room) {
     }
 }
 
-if (keyboard_check_pressed(vk_f5)) {
+if (Input_Pressed("debug_save")) {
     Save_Write(0);
     Dialogue_Start("sys_save_ok");
 }
 
-if (keyboard_check_pressed(vk_f9)) {
+if (Input_Pressed("debug_load")) {
     if (Save_Read(0)) {
         Dialogue_Start("sys_load_ok");
     } else {

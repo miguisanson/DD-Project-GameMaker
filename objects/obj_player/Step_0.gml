@@ -11,12 +11,12 @@ if (battle_cooldown > 0) {
     battle_cooldown -= 1;
 }
 
-right_key = keyboard_check(ord("D"));
-left_key  = keyboard_check(ord("A"));
-up_key    = keyboard_check(ord("W"));
-down_key  = keyboard_check(ord("S"));
+right_key = Input_Held("move_right");
+left_key  = Input_Held("move_left");
+up_key    = Input_Held("move_up");
+down_key  = Input_Held("move_down");
 
-interact_key = Action_KeyPressed(id, ord("Z"));
+interact_key = Action_KeyPressed(id, "interact");
 
 if (!moving) {
     if (!interact_key) {

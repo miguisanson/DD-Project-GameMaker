@@ -1,9 +1,9 @@
 var gs = GameState_Get();
 
-var k_up = keyboard_check_pressed(ord("W"));
-var k_down = keyboard_check_pressed(ord("S"));
-var k_ok = keyboard_check_pressed(ord("Z")) || keyboard_check_pressed(vk_enter);
-var k_back = keyboard_check_pressed(ord("X")) || keyboard_check_pressed(vk_escape);
+var k_up = Input_Pressed("menu_up");
+var k_down = Input_Pressed("menu_down");
+var k_ok = Input_Pressed("confirm");
+var k_back = Input_Pressed("cancel");
 
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     if (variable_struct_exists(gs.ui, "just_opened") && gs.ui.just_opened) {
