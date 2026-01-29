@@ -1,3 +1,4 @@
+Input_PreStep();
 if (!instance_exists(obj_ui_controller)) {
     instance_create_layer(0, 0, "Instances", obj_ui_controller);
 }

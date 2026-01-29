@@ -1,3 +1,7 @@
+function Input_PreStep() {
+    Input_Update();
+}
+
 function Input_Init() {
     if (!variable_global_exists("input") || !is_struct(global.input)) {
         global.input = {};
@@ -34,13 +38,28 @@ function Input_Init() {
     if (!variable_struct_exists(inp, "last_time")) {
         inp.last_time = -1;
     }
+    if (!variable_struct_exists(inp, "last_step_time")) {
+        inp.last_step_time = -1;
+    }
+    if (!variable_struct_exists(inp, "frame")) {
+        inp.frame = 0;
+    }
+    if (!variable_struct_exists(inp, "buffer")) {
+        inp.buffer = {};
+    }
+    if (!variable_struct_exists(inp, "cooldown")) {
+        inp.cooldown = {};
+    }
 }
 
 function Input_Update() {
     Input_Init();
+    if (global.input.last_step_time == current_time) return;
+    global.input.last_step_time = current_time;
 
     var inp = global.input;
     inp.last_time = current_time;
+    inp.frame += 1;
 
     var names = variable_struct_get_names(inp.bindings);
     for (var i = 0; i < array_length(names); i++) {
@@ -69,9 +88,8 @@ function Input_Update() {
     }
 }
 
+
 function Input_EnsureUpdated() {
-    Input_Init();
-    if (global.input.last_time == current_time) return;
     Input_Update();
 }
 
@@ -90,6 +108,46 @@ function Input_Held(_action) {
 
 function Input_Pressed(_action) {
     return Input_StateGet(_action, "pressed");
+}
+
+function Input_Frame() {
+    Input_EnsureUpdated();
+    return global.input.frame;
+}
+
+function Input_ActionBuffer(_action) {
+    Input_EnsureUpdated();
+    variable_struct_set(global.input.buffer, _action, global.input.frame);
+}
+
+function Input_ActionBuffered(_action, _max_age) {
+    Input_EnsureUpdated();
+    if (!variable_struct_exists(global.input.buffer, _action)) return false;
+    var t = variable_struct_get(global.input.buffer, _action);
+    if (global.input.frame - t > _max_age) {
+        variable_struct_remove(global.input.buffer, _action);
+        return false;
+    }
+    return true;
+}
+
+function Input_ActionConsume(_action) {
+    Input_EnsureUpdated();
+    if (variable_struct_exists(global.input.buffer, _action)) {
+        variable_struct_remove(global.input.buffer, _action);
+    }
+}
+
+function Input_ActionCooldownReady(_action) {
+    Input_EnsureUpdated();
+    if (!variable_struct_exists(global.input.cooldown, _action)) return true;
+    var t = variable_struct_get(global.input.cooldown, _action);
+    return global.input.frame >= t;
+}
+
+function Input_ActionSetCooldown(_action, _frames) {
+    Input_EnsureUpdated();
+    variable_struct_set(global.input.cooldown, _action, global.input.frame + _frames);
 }
 
 function Input_MoveX() {

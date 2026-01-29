@@ -47,9 +47,12 @@ function Interact_Handle(_inst) {
     var gs = GameState_Get();
     var pl = gs.player_inst;
     if (!instance_exists(pl)) return;
-    if (!Action_CanAct(pl)) return;
-    if (!Action_KeyPressed(pl, "interact")) return;
+    if (!Action_CanAct(pl)) {
+        Action_Request(pl, "interact");
+        return;
+    }
     if (!Interact_PlayerFacing(pl, _inst)) return;
+    if (!Action_Request(pl, "interact")) return;
 
     var name = "";
     if (variable_instance_exists(_inst, "interact_name")) name = _inst.interact_name;

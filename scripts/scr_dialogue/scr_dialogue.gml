@@ -129,5 +129,6 @@ function Dialogue_Advance() {
         gs.ui.lines = [];
         gs.ui.index = 0;
         gs.ui.speaker = "";
+        if (variable_struct_exists(gs.ui, "lock_actions")) gs.ui.lock_actions = 2;
     }
 }

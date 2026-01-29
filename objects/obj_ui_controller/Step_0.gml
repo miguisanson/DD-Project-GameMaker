@@ -1,4 +1,6 @@
+Input_PreStep();
 var gs = GameState_Get();
+if (variable_struct_exists(gs.ui, "lock_actions") && gs.ui.lock_actions > 0) gs.ui.lock_actions -= 1;
 
 var k_up = Input_Pressed("menu_up");
 var k_down = Input_Pressed("menu_down");

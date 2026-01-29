@@ -16,18 +16,26 @@ left_key  = Input_Held("move_left");
 up_key    = Input_Held("move_up");
 down_key  = Input_Held("move_down");
 
-interact_key = Action_KeyPressed(id, "interact");
+interact_key = Input_Pressed("interact");
 
 if (!moving) {
+    move_dir = -1;
     if (!interact_key) {
-        if (up_key) { move_dir = UP; moving = true; }
-        else if (down_key) { move_dir = DOWN; moving = true; }
-        else if (left_key) { move_dir = LEFT; moving = true; }
-        else if (right_key) { move_dir = RIGHT; moving = true; }
+        var tx = x;
+        var ty = y;
+        if (up_key) { move_dir = UP; face = UP; ty = y - tile_size; }
+        else if (down_key) { move_dir = DOWN; face = DOWN; ty = y + tile_size; }
+        else if (left_key) { move_dir = LEFT; face = LEFT; tx = x - tile_size; }
+        else if (right_key) { move_dir = RIGHT; face = RIGHT; tx = x + tile_size; }
+
+        if (move_dir != -1) {
+            if (!place_meeting(tx, ty, obj_wall) && !place_meeting(tx, ty, obj_interactable)) {
+                moving = true;
+            }
+        }
     }
 
     if (moving) {
-        face = move_dir;
         sprite_index = sprite[face];
         move_timer = tile_size;
     }
@@ -54,11 +62,15 @@ if (moving) {
         image_index = 0;
     }
 
-    move_timer -= 1;
-    if (move_timer <= 0) {
-        moving = false;
-        move_timer = 0;
-        image_index = 0;
+    if (moving) {
+        move_timer -= 1;
+        if (move_timer <= 0) {
+            moving = false;
+            move_timer = 0;
+            image_index = 0;
+            x = round(x / tile_size) * tile_size;
+            y = round(y / tile_size) * tile_size;
+        }
     }
 }
 

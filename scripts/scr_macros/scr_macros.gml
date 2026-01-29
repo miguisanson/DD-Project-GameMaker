@@ -79,3 +79,6 @@
 #macro UI_NONE     0
 #macro UI_DIALOGUE 1
 #macro UI_SHOP     2
+
+#macro ACTION_BUFFER_FRAMES 6
+#macro ACTION_COOLDOWN_FRAMES 4

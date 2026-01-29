@@ -1,3 +1,4 @@
+Input_PreStep();
 if (battle_over) exit;
 
 // helper input keys
