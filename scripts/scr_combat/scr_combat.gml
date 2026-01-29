@@ -317,13 +317,15 @@ function Battle_EnemyAct(_bc) {
 
     var use_skill = false;
     var skill_id = -1;
+    var sk = undefined;
     if (is_array(e.skills) && array_length(e.skills) > 0) {
         skill_id = e.skills[irandom(array_length(e.skills) - 1)];
-        var sk = SkillDB_Get(skill_id);
+        sk = SkillDB_Get(skill_id);
         if (Skill_CanUse(e, sk) && random(1) < 0.35) use_skill = true;
     }
 
     if (use_skill) {
+        if (!is_struct(sk)) sk = SkillDB_Get(skill_id);
         var res = Skill_Use(e, p, skill_id);
         if (res.fx_sprite != noone) {
             var tx2 = _bc.enemy_fx_x;
