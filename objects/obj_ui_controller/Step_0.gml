@@ -11,9 +11,9 @@ if (icon != -1) {
     if (frames > 1) {
         var spd = sprite_get_speed(icon);
         if (sprite_get_speed_type(icon) == SPR_SPEED_FPS) {
-            var fps = game_get_speed(gamespeed_fps);
-            if (fps <= 0) fps = 60;
-            spd = spd / fps;
+            var game_fps = game_get_speed(gamespeed_fps);
+            if (game_fps <= 0) game_fps = 60;
+            spd = spd / game_fps;
         }
         gs.ui.icon_frame += spd;
         if (gs.ui.icon_frame >= frames) gs.ui.icon_frame -= frames;
