@@ -39,11 +39,6 @@ if (is_struct(ch)) {
     var icon_y = bar_y + (bar_h * 2) + 10;
     Status_DrawIcons(ch, bar_x, icon_y, 12, false);
 
-    // Gold (overworld only)
-    if (room != rm_battle) {
-        draw_set_color(c_white);
-        draw_text(bar_x, icon_y + 14, "G: " + string(ch.gold));
-    }
 }
 
 // Dialogue box
@@ -89,30 +84,3 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
 
 }
 
-// Shop UI
-if (gs.ui.mode == UI_SHOP) {
-    var bx2 = margin;
-    var by2 = h - 96 - margin;
-    var bw2 = w - margin * 2;
-    var bh2 = 96;
-
-    draw_set_color(c_black);
-    draw_rectangle(bx2, by2, bx2 + bw2, by2 + bh2, false);
-    draw_set_color(c_white);
-    draw_rectangle(bx2, by2, bx2 + bw2, by2 + bh2, true);
-
-    draw_set_color(c_white);
-    draw_text(bx2 + 8, by2 + 8, "Shop  Gold: " + string(gs.player_ch.gold));
-
-    var list = gs.ui.shop_items;
-    for (var i = 0; i < array_length(list); i++) {
-        var item = ItemDB_Get(list[i].item_id);
-        var yy = by2 + 28 + i * 14;
-        if (i == gs.ui.shop_index) draw_text(bx2 + 6, yy, ">");
-        draw_text(bx2 + 16, yy, item.name + "  " + string(list[i].price) + "G");
-    }
-
-    if (gs.ui.prompt != "") {
-        draw_text(bx2 + 8, by2 + bh2 - 16, gs.ui.prompt);
-    }
-}

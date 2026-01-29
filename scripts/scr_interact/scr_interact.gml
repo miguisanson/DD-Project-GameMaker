@@ -88,46 +88,24 @@ function Interact_Handle(_inst) {
             }
             _inst.swapped = true;
 
-            // loot reward (optional, per-instance)
-            var loot_lines = [];
-            var gave_loot = false;
+            // shared loot system (container)
+            var lvl = 1;
+            if (variable_instance_exists(_inst, "container_level")) lvl = _inst.container_level;
+            var key = "";
+            if (variable_instance_exists(_inst, "loot_table_key")) key = _inst.loot_table_key;
+            var loot = [];
+            if (key != "") loot = Loot_RollContainer(lvl, key);
+            if (is_array(loot) && array_length(loot) > 0) {
+                gs.player_ch.inventory = Loot_Grant(gs.player_ch.inventory, loot);
 
-            if (variable_instance_exists(_inst, "loot_list") && is_array(_inst.loot_list) && array_length(_inst.loot_list) > 0) {
-                for (var i = 0; i < array_length(_inst.loot_list); i++) {
-                    var li = _inst.loot_list[i];
-                    if (!is_struct(li) || !variable_struct_exists(li, "item_id")) continue;
-                    var id = li.item_id;
-                    var qty = 1;
-                    if (variable_struct_exists(li, "qty")) qty = li.qty;
-                    qty = max(1, qty);
-
-                    gs.player_ch.inventory = Inv_Add(gs.player_ch.inventory, id, qty);
-                    var item = ItemDB_Get(id);
-                    var item_name = item.name;
-                    var lines = DialogueDB_GetFormatted("loot_received", { item: item_name, qty: qty });
+                var loot_lines = [];
+                for (var i = 0; i < array_length(loot); i++) {
+                    var it = loot[i];
+                    var qty = it.qty;
+                    var item = ItemDB_Get(it.item_id);
+                    var lines = DialogueDB_GetFormatted("loot_received", { item: item.name, qty: qty });
                     for (var j = 0; j < array_length(lines); j++) array_push(loot_lines, lines[j]);
-                    gave_loot = true;
                 }
-            } else {
-                var id2 = 0;
-                var qty2 = 1;
-                if (variable_instance_exists(_inst, "loot_item_id")) id2 = _inst.loot_item_id;
-                if (variable_instance_exists(_inst, "loot_qty")) qty2 = _inst.loot_qty;
-                if (id2 <= 0 && variable_instance_exists(_inst, "chest_item_id")) id2 = _inst.chest_item_id;
-                if (variable_instance_exists(_inst, "chest_qty")) qty2 = _inst.chest_qty;
-
-                if (id2 > 0) {
-                    qty2 = max(1, qty2);
-                    gs.player_ch.inventory = Inv_Add(gs.player_ch.inventory, id2, qty2);
-                    var item2 = ItemDB_Get(id2);
-                    var item_name2 = item2.name;
-                    var lines2 = DialogueDB_GetFormatted("loot_received", { item: item_name2, qty: qty2 });
-                    for (var k = 0; k < array_length(lines2); k++) array_push(loot_lines, lines2[k]);
-                    gave_loot = true;
-                }
-            }
-
-            if (gave_loot) {
                 Dialogue_StartWithSpeaker(name, loot_lines);
             } else {
                 Dialogue_StartWithSpeaker(name, DialogueDB_Get(base_id));
@@ -143,7 +121,7 @@ function Interact_Handle(_inst) {
 
     Dialogue_StartWithSpeaker(name, DialogueDB_Get(base_id));
 
-    // other interact types (door/shop/checkpoint) keep compatibility
+    // other interact types (door/checkpoint)
     switch (_inst.interact_kind) {
         case INTERACT_DOOR: {
             if (_inst.door_room != noone) {
@@ -152,10 +130,6 @@ function Interact_Handle(_inst) {
                 GameState_SetJustReturned(true);
                 room_goto(_inst.door_room);
             }
-        } break;
-
-        case INTERACT_SHOP: {
-            Shop_Open(_inst.shop_id);
         } break;
 
         case INTERACT_CHECKPOINT: {

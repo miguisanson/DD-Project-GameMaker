@@ -100,21 +100,10 @@ function FX_Spawn(_sprite, _x, _y, _frames, _speed) {
 function Battle_GrantRewards(_p, _e) {
     if (is_struct(_e)) {
         if (variable_struct_exists(_e, "exp")) _p = Player_AddExp(_p, _e.exp);
-        if (variable_struct_exists(_e, "gold")) _p = Player_AddGold(_p, _e.gold);
 
-        if (variable_struct_exists(_e, "id")) {
-            var cfg = EnemyDB_Get(_e.id);
-            if (is_struct(cfg) && variable_struct_exists(cfg, "drops")) {
-                var drops = cfg.drops;
-                for (var i = 0; i < array_length(drops); i++) {
-                    var d = drops[i];
-                    if (random(1) <= d.chance) {
-                        var qty = max(1, d.qty);
-                        _p.inventory = Inv_Add(_p.inventory, d.item_id, qty);
-                    }
-                }
-            }
-        }
+        // shared loot system
+        var loot = Loot_RollEnemy(_e);
+        _p.inventory = Loot_Grant(_p.inventory, loot);
     }
 
     return _p;

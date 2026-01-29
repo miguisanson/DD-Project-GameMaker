@@ -89,15 +89,12 @@
 #macro INTERACT_DOOR       2
 #macro INTERACT_SWITCH     3
 #macro INTERACT_NPC        4
-#macro INTERACT_SHOP       5
 #macro INTERACT_CHECKPOINT 6
 
 #macro NPC_OLD_MAN 0
-#macro SHOP_BASIC  0
 
 #macro UI_NONE     0
 #macro UI_DIALOGUE 1
-#macro UI_SHOP     2
 
 #macro ACTION_BUFFER_FRAMES 6
 #macro ACTION_COOLDOWN_FRAMES 4

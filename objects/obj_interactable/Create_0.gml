@@ -11,18 +11,13 @@ swap_on_interact = false;
 swap_sprite = noone;
 swapped = false;
 
-// chest config
-chest_item_id = 0;
-chest_qty = 1;
+container_level = 1;
+loot_table_key = "";
 
-loot_item_id = 0;
-loot_qty = 1;
-loot_list = [];
 
 switch_id = 0;
 
 npc_id = NPC_OLD_MAN;
-shop_id = SHOP_BASIC;
 
 checkpoint_id = 0;
 

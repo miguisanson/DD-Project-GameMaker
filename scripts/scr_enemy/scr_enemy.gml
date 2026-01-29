@@ -38,7 +38,6 @@ function EnemyCreate(_enemy_id) {
     ch.weapon_id = base.weapon_id;
     ch.sprite = base.sprite;
     ch.exp = base.exp;
-    ch.gold = base.gold;
     ch.skills = base.skills;
     ch.status = [];
     ch.is_boss = base.is_boss;

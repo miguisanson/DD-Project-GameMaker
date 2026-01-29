@@ -7,7 +7,6 @@ function CharacterCreate_Player(_class_id) {
     ch.level = 1;
     ch.exp = 0;
     ch.exp_next = Exp_NextLevel(ch.level);
-    ch.gold = 0;
 
     ch.stats = StatsCreateBase();
     // apply class bonus
@@ -175,10 +174,13 @@ function GameState_Init() {
         gs.dialogue_db = global.dialogue_db;
     }
 
-    if (!variable_struct_exists(gs, "shop_db")) {
-        ShopDB_Init();
-        gs.shop_db = global.shop_db;
+    if (!variable_struct_exists(gs, "loot_tables")) {
+        Loot_Init();
+        gs.loot_tables = global.loot_tables;
+        gs.loot_configs = global.loot_configs;
+        gs.loot_tier_weights = global.loot_tier_weights;
     }
+
 
     if (!variable_struct_exists(gs, "battle")) {
         gs.battle = {
@@ -204,7 +206,7 @@ function GameState_Init() {
     }
 
     if (!variable_struct_exists(gs, "ui")) {
-        gs.ui = { mode: 0, lines: [], index: 0, speaker: "", shop_items: [], shop_index: 0, prompt: "", just_opened: false, lock_actions: 0, confirm_action: "", icon_frame: 0 };
+        gs.ui = { mode: 0, lines: [], index: 0, speaker: "", just_opened: false, lock_actions: 0, confirm_action: "", icon_frame: 0 };
     }
 
     if (!variable_struct_exists(gs, "room_states")) {
@@ -267,9 +269,6 @@ function GameState_SyncLegacy() {
         global.dialogue_db = gs.dialogue_db;
     }
 
-    if (variable_struct_exists(gs, "shop_db")) {
-        global.shop_db = gs.shop_db;
-    }
 
     if (variable_struct_exists(gs, "battle")) {
         global.battle_return_room = gs.battle.return_room;
@@ -346,8 +345,3 @@ function Player_LearnSkill(_ch, _skill_id) {
     return _ch;
 }
 
-function Player_AddGold(_ch, _amount) {
-    _ch.gold += _amount;
-    if (_ch.gold < 0) _ch.gold = 0;
-    return _ch;
-}

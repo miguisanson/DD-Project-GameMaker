@@ -11,7 +11,9 @@ if (icon != -1) {
     if (frames > 1) {
         var spd = sprite_get_speed(icon);
         if (sprite_get_speed_type(icon) == SPR_SPEED_FPS) {
-            spd = spd / max(1, room_speed);
+            var fps = game_get_speed(gamespeed_fps);
+            if (fps <= 0) fps = 60;
+            spd = spd / fps;
         }
         gs.ui.icon_frame += spd;
         if (gs.ui.icon_frame >= frames) gs.ui.icon_frame -= frames;
@@ -37,19 +39,3 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     exit;
 }
 
-if (gs.ui.mode == UI_SHOP) {
-    var list = gs.ui.shop_items;
-    if (array_length(list) > 0) {
-        if (k_down) gs.ui.shop_index = (gs.ui.shop_index + 1) mod array_length(list);
-        if (k_up)   gs.ui.shop_index = (gs.ui.shop_index + array_length(list) - 1) mod array_length(list);
-    }
-
-    if (k_ok) {
-        Shop_Buy(gs.ui.shop_index);
-    }
-    if (k_back) {
-        gs.ui.mode = UI_NONE;
-        gs.ui.prompt = "";
-    }
-    exit;
-}
