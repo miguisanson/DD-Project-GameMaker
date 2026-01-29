@@ -8,8 +8,8 @@
   "name":"obj_bone",
   "overriddenProperties":[],
   "parent":{
-    "name":"Decorations",
-    "path":"folders/Objects/Decorations.yy",
+    "name":"Interactable",
+    "path":"folders/Objects/Interactable.yy",
   },
   "parentObjectId":{
     "name":"obj_interactable",

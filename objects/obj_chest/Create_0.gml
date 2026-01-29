@@ -5,5 +5,7 @@ swap_on_interact = true;
 swap_sprite = chest_opened_asset;
 chest_item_id = 10;
 chest_qty = 1;
+loot_item_id = 10;
+loot_qty = 1;
 dialogue_id = "chest_open";
 dialogue_id_after = "chest_empty";

@@ -88,14 +88,47 @@ function Interact_Handle(_inst) {
             }
             _inst.swapped = true;
 
-            // chest reward (optional)
-            if (variable_instance_exists(_inst, "chest_item_id") && _inst.chest_item_id > 0) {
-                var qty = max(1, _inst.chest_qty);
-                gs.player_ch.inventory = Inv_Add(gs.player_ch.inventory, _inst.chest_item_id, qty);
-                var item = ItemDB_Get(_inst.chest_item_id);
-                var item_name = item.name;
-                var lines = DialogueDB_GetFormatted("loot_received", { item: item_name, qty: qty });
-                Dialogue_StartWithSpeaker(name, lines);
+            // loot reward (optional, per-instance)
+            var loot_lines = [];
+            var gave_loot = false;
+
+            if (variable_instance_exists(_inst, "loot_list") && is_array(_inst.loot_list) && array_length(_inst.loot_list) > 0) {
+                for (var i = 0; i < array_length(_inst.loot_list); i++) {
+                    var li = _inst.loot_list[i];
+                    if (!is_struct(li) || !variable_struct_exists(li, "item_id")) continue;
+                    var id = li.item_id;
+                    var qty = 1;
+                    if (variable_struct_exists(li, "qty")) qty = li.qty;
+                    qty = max(1, qty);
+
+                    gs.player_ch.inventory = Inv_Add(gs.player_ch.inventory, id, qty);
+                    var item = ItemDB_Get(id);
+                    var item_name = item.name;
+                    var lines = DialogueDB_GetFormatted("loot_received", { item: item_name, qty: qty });
+                    for (var j = 0; j < array_length(lines); j++) array_push(loot_lines, lines[j]);
+                    gave_loot = true;
+                }
+            } else {
+                var id2 = 0;
+                var qty2 = 1;
+                if (variable_instance_exists(_inst, "loot_item_id")) id2 = _inst.loot_item_id;
+                if (variable_instance_exists(_inst, "loot_qty")) qty2 = _inst.loot_qty;
+                if (id2 <= 0 && variable_instance_exists(_inst, "chest_item_id")) id2 = _inst.chest_item_id;
+                if (variable_instance_exists(_inst, "chest_qty")) qty2 = _inst.chest_qty;
+
+                if (id2 > 0) {
+                    qty2 = max(1, qty2);
+                    gs.player_ch.inventory = Inv_Add(gs.player_ch.inventory, id2, qty2);
+                    var item2 = ItemDB_Get(id2);
+                    var item_name2 = item2.name;
+                    var lines2 = DialogueDB_GetFormatted("loot_received", { item: item_name2, qty: qty2 });
+                    for (var k = 0; k < array_length(lines2); k++) array_push(loot_lines, lines2[k]);
+                    gave_loot = true;
+                }
+            }
+
+            if (gave_loot) {
+                Dialogue_StartWithSpeaker(name, loot_lines);
             } else {
                 Dialogue_StartWithSpeaker(name, DialogueDB_Get(base_id));
             }

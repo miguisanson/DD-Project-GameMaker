@@ -8,8 +8,8 @@
   "name":"obj_checkpoint",
   "overriddenProperties":[],
   "parent":{
-    "name":"Entities",
-    "path":"folders/Objects/Entities.yy",
+    "name":"Interactable",
+    "path":"folders/Objects/Interactable.yy",
   },
   "parentObjectId":{
     "name":"obj_interactable",

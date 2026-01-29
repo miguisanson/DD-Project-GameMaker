@@ -8,8 +8,8 @@
   "name":"obj_rock2",
   "overriddenProperties":[],
   "parent":{
-    "name":"Decorations",
-    "path":"folders/Objects/Decorations.yy",
+    "name":"Interactable",
+    "path":"folders/Objects/Interactable.yy",
   },
   "parentObjectId":{
     "name":"obj_interactable",

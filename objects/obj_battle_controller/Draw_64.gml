@@ -14,49 +14,15 @@ var vh = camera_get_view_height(cam);
 var sx = w / vw;
 var sy = h / vh;
 
-// Player HP/MP bars (top-left)
-draw_set_alpha(1);
-var hp_bar_sprite = hp_bar;
-var mp_bar_sprite = mp_bar;
-var bar_w = sprite_get_width(hp_bar_sprite);
-var bar_h = sprite_get_height(hp_bar_sprite);
-var max_frame = 10;
-
-var hp_ratio = 0;
-if (p.max_hp > 0) hp_ratio = clamp(p.hp / p.max_hp, 0, 1);
-var hp_frame = clamp(floor(hp_ratio * max_frame), 0, max_frame);
-
-var mp_ratio = 0;
-if (p.max_mp > 0) mp_ratio = clamp(p.mp / p.max_mp, 0, 1);
-var mp_frame = clamp(floor(mp_ratio * max_frame), 0, max_frame);
-
-var bar_x = margin;
-var bar_y = margin;
-draw_sprite(hp_bar_sprite, hp_frame, bar_x, bar_y);
-draw_sprite(mp_bar_sprite, mp_frame, bar_x, bar_y + bar_h + 2);
-
-// Player status icons below MP bar (right-to-left stacking)
-var icon_y = bar_y + (bar_h * 2) + 6;
-Status_DrawIcons(p, bar_x, icon_y, 10, true);
-
-// Enemy HP bar above enemy sprite + status icons above bar
+// Enemy status icons below sprite (battle only)
 if (instance_exists(enemy_inst)) {
     var espr = enemy_inst.sprite_index;
     var ex = (enemy_inst.x - sprite_get_xoffset(espr) - vx) * sx;
     var ey = (enemy_inst.y - sprite_get_yoffset(espr) - vy) * sy;
     var ew = sprite_get_width(espr) * sx;
     var eh = sprite_get_height(espr) * sy;
-    var ebar_w = sprite_get_width(hp_bar_sprite);
-    var ebar_h = sprite_get_height(hp_bar_sprite);
-    var e_ratio = 0;
-    if (e.max_hp > 0) e_ratio = clamp(e.hp / e.max_hp, 0, 1);
-    var e_frame = clamp(floor(e_ratio * max_frame), 0, max_frame);
-
-    var ebar_x = ex + (ew / 2) - (ebar_w / 2);
-    var ebar_y = ey - ebar_h - 4;
-    draw_sprite(hp_bar_sprite, e_frame, ebar_x, ebar_y);
-
-    Status_DrawIcons(e, ebar_x, ebar_y - 10, 10, true);
+    var icon_y = ey + eh + 4;
+    Status_DrawIcons(e, ex, icon_y, 12, false);
 }
 
 // bottom box rect

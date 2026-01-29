@@ -8,3 +8,5 @@ dialogue_id_after = "barrel_broken";
 
 chest_item_id = 10;
 chest_qty = 1;
+loot_item_id = 10;
+loot_qty = 1;

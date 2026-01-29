@@ -5,13 +5,44 @@ var margin = 8;
 
 draw_set_alpha(1);
 
-// HUD (overworld only)
-if (room != rm_battle && gs.ui.mode == UI_NONE) {
-    if (is_struct(gs.player_ch)) {
+// HUD (always visible)
+var ch = gs.player_ch;
+if (room == rm_battle && instance_exists(obj_battle_controller)) {
+    var bc = instance_find(obj_battle_controller, 0);
+    if (instance_exists(bc) && is_struct(bc.p)) ch = bc.p;
+}
+
+if (is_struct(ch)) {
+    var hp_bar_sprite = hp_bar;
+    var mp_bar_sprite = mp_bar;
+    var max_frame = min(10, sprite_get_number(hp_bar_sprite) - 1);
+    if (max_frame < 0) max_frame = 0;
+
+    var hp_ratio = 0;
+    if (ch.max_hp > 0) hp_ratio = clamp(ch.hp / ch.max_hp, 0, 1);
+    var hp_frame = clamp(floor(hp_ratio * max_frame), 0, max_frame);
+
+    var mp_ratio = 0;
+    if (ch.max_mp > 0) mp_ratio = clamp(ch.mp / ch.max_mp, 0, 1);
+    var mp_frame = clamp(floor(mp_ratio * max_frame), 0, max_frame);
+
+    var scale = 3;
+    var bar_w = sprite_get_width(hp_bar_sprite) * scale;
+    var bar_h = sprite_get_height(hp_bar_sprite) * scale;
+
+    var bar_x = margin;
+    var bar_y = margin;
+    draw_sprite_ext(hp_bar_sprite, hp_frame, bar_x, bar_y, scale, scale, 0, c_white, 1);
+    draw_sprite_ext(mp_bar_sprite, mp_frame, bar_x, bar_y + bar_h + 4, scale, scale, 0, c_white, 1);
+
+    // Player status icons below MP bar
+    var icon_y = bar_y + (bar_h * 2) + 10;
+    Status_DrawIcons(ch, bar_x, icon_y, 12, false);
+
+    // Gold (overworld only)
+    if (room != rm_battle) {
         draw_set_color(c_white);
-        draw_text(margin, margin, "HP: " + string(gs.player_ch.hp) + "/" + string(gs.player_ch.max_hp));
-        draw_text(margin, margin + 12, "MP: " + string(gs.player_ch.mp) + "/" + string(gs.player_ch.max_mp));
-        draw_text(margin, margin + 24, "G: " + string(gs.player_ch.gold));
+        draw_text(bar_x, icon_y + 14, "G: " + string(ch.gold));
     }
 }
 
