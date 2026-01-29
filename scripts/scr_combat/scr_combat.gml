@@ -299,6 +299,8 @@ function Battle_EndRun(_bc) {
     GameState_SetPlayer(_bc.p);
 
     var gs = GameState_Get();
+    // mark return so player gets a short grace window
+    GameState_SetJustReturned(true);
     room_goto(gs.battle.return_room);
 }
 
