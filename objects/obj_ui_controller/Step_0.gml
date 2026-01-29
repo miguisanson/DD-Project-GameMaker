@@ -1,5 +1,24 @@
 Input_PreStep();
 var gs = GameState_Get();
+var icon = -1;
+if (variable_struct_exists(gs.ui, "icon_sprite")) icon = gs.ui.icon_sprite;
+if (icon == -1) {
+    icon = asset_get_index("button_A_icon");
+    gs.ui.icon_sprite = icon;
+}
+if (icon != -1) {
+    var frames = sprite_get_number(icon);
+    if (frames > 1) {
+        var spd = sprite_get_speed(icon);
+        if (sprite_get_speed_type(icon) == SPR_SPEED_FPS) {
+            spd = spd / max(1, room_speed);
+        }
+        gs.ui.icon_frame += spd;
+        if (gs.ui.icon_frame >= frames) gs.ui.icon_frame -= frames;
+    } else {
+        gs.ui.icon_frame = 0;
+    }
+}
 if (variable_struct_exists(gs.ui, "lock_actions") && gs.ui.lock_actions > 0) gs.ui.lock_actions -= 1;
 
 var k_up = Input_Pressed("menu_up");

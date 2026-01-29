@@ -204,7 +204,7 @@ function GameState_Init() {
     }
 
     if (!variable_struct_exists(gs, "ui")) {
-        gs.ui = { mode: 0, lines: [], index: 0, speaker: "", shop_items: [], shop_index: 0, prompt: "", just_opened: false, lock_actions: 0, confirm_action: "" };
+        gs.ui = { mode: 0, lines: [], index: 0, speaker: "", shop_items: [], shop_index: 0, prompt: "", just_opened: false, lock_actions: 0, confirm_action: "", icon_frame: 0 };
     }
 
     if (!variable_struct_exists(gs, "room_states")) {

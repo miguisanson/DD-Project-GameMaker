@@ -129,7 +129,6 @@
     {"id":{"name":"fire_stand_off_asset","path":"sprites/fire_stand_off_asset/fire_stand_off_asset.yy",},},
     {"id":{"name":"ghost_sword_moving","path":"sprites/ghost_sword_moving/ghost_sword_moving.yy",},},
     {"id":{"name":"ghost_sword_profile","path":"sprites/ghost_sword_profile/ghost_sword_profile.yy",},},
-    {"id":{"name":"gold_coin","path":"sprites/gold_coin/gold_coin.yy",},},
     {"id":{"name":"horned_skull_asset","path":"sprites/horned_skull_asset/horned_skull_asset.yy",},},
     {"id":{"name":"knight_down","path":"sprites/knight_down/knight_down.yy",},},
     {"id":{"name":"knight_left","path":"sprites/knight_left/knight_left.yy",},},

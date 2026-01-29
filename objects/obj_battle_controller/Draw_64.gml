@@ -30,7 +30,14 @@ if (battle_state == BSTATE_MESSAGE) {
     if (icon != -1) {
         var iw = sprite_get_width(icon);
         var ih = sprite_get_height(icon);
-        draw_sprite(icon, 0, bx + bw - iw - 6, by + bh - ih - 10);
+        var scale_x = 32 / max(1, iw);
+        var scale_y = 32 / max(1, ih);
+        var frames = sprite_get_number(icon);
+        var frame = 0;
+        if (frames > 1) frame = floor(gs.ui.icon_frame);
+        var dx = bx + bw - 32 - 6;
+        var dy = by + bh - 32 - 10;
+        draw_sprite_ext(icon, frame, dx, dy, scale_x, scale_y, 0, c_white, 1);
     }
 }
 
