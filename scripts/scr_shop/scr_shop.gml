@@ -14,7 +14,10 @@ function ShopDB_Init() {
 }
 
 function ShopDB_Get(_shop_id) {
-    if (ds_exists(global.shop_db, ds_type_map) && ds_map_exists(global.shop_db, _shop_id)) {
+    if (!variable_global_exists("shop_db") || !ds_exists(global.shop_db, ds_type_map)) {
+        ShopDB_Init();
+    }
+    if (ds_map_exists(global.shop_db, _shop_id)) {
         return global.shop_db[? _shop_id];
     }
     return [];

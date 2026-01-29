@@ -62,7 +62,10 @@ function SkillDB_Init() {
 }
 
 function SkillDB_Get(_skill_id) {
-    if (ds_exists(global.skill_db, ds_type_map) && ds_map_exists(global.skill_db, _skill_id)) {
+    if (!variable_global_exists("skill_db") || !ds_exists(global.skill_db, ds_type_map)) {
+        SkillDB_Init();
+    }
+    if (ds_map_exists(global.skill_db, _skill_id)) {
         return global.skill_db[? _skill_id];
     }
     return { id: -1, name: "Unknown", mp_cost: 0, power: 0, stat_type: STAT_STR, acc: 0, target: TGT_ENEMY, effect: "damage", status: -1, status_turns: 0, status_chance: 0, icon_sprite: noone, fx_sprite: noone, fx_frames: 12, fx_speed: 0.2 };

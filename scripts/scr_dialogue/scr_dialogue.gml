@@ -14,7 +14,10 @@ function DialogueDB_Init() {
 }
 
 function DialogueDB_Get(_npc_id) {
-    if (ds_exists(global.dialogue_db, ds_type_map) && ds_map_exists(global.dialogue_db, _npc_id)) {
+    if (!variable_global_exists("dialogue_db") || !ds_exists(global.dialogue_db, ds_type_map)) {
+        DialogueDB_Init();
+    }
+    if (ds_map_exists(global.dialogue_db, _npc_id)) {
         return global.dialogue_db[? _npc_id];
     }
     return ["..."];

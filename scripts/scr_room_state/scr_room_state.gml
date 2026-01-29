@@ -37,11 +37,12 @@ function RoomState_Save(_room) {
 
     RoomState_Init();
     var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "uid_counter")) gs.uid_counter = 1;
     var key = RoomState_Key(_room);
 
     var state = { enemies: [], interactables: [], pickups: [] };
 
-    var enemy_fields = ["enemy_id","ai_state","forget_time","home_x","home_y","moving","move_dir","move_timer","think_delay","scan_radius","think_rate","forget_delay","leash_mult","wander_chance","move_speed","sprite_index"];
+    var enemy_fields = ["enemy_id","enemy_uid","ai_state","forget_time","home_x","home_y","moving","move_dir","move_timer","think_delay","scan_radius","think_rate","forget_delay","leash_mult","wander_chance","move_speed","sprite_index"];
     with (obj_enemy) {
         var snap = RoomState_SnapshotInstance(self, enemy_fields);
         array_push(state.enemies, snap);
@@ -69,6 +70,7 @@ function RoomState_Apply(_room) {
 
     RoomState_Init();
     var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "uid_counter")) gs.uid_counter = 1;
     var key = RoomState_Key(_room);
     if (!variable_struct_exists(gs.room_states, key)) return;
 
@@ -78,8 +80,28 @@ function RoomState_Apply(_room) {
     with (obj_interactable) instance_destroy();
     if (object_exists(obj_item_pickup)) with (obj_item_pickup) instance_destroy();
 
+    var defeated = noone;
+    if (ds_exists(gs.defeated_enemies, ds_type_list)) defeated = gs.defeated_enemies;
+
     for (var i = 0; i < array_length(state.enemies); i++) {
-        RoomState_RestoreInstance(state.enemies[i]);
+        var data = state.enemies[i];
+        var skip = false;
+        if (is_struct(data.vars)) {
+            var uid = -1;
+            if (variable_struct_exists(data.vars, "enemy_uid")) {
+                uid = variable_struct_get(data.vars, "enemy_uid");
+            } else {
+                uid = gs.uid_counter;
+                gs.uid_counter += 1;
+                variable_struct_set(data.vars, "enemy_uid", uid);
+            }
+
+            if (uid >= gs.uid_counter) gs.uid_counter = uid + 1;
+            if (defeated != noone && ds_list_find_index(defeated, uid) != -1) skip = true;
+        }
+        if (!skip) {
+            RoomState_RestoreInstance(data);
+        }
     }
     for (var j = 0; j < array_length(state.interactables); j++) {
         RoomState_RestoreInstance(state.interactables[j]);

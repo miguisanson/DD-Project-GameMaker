@@ -21,6 +21,7 @@ function Save_BuildSnapshot() {
     snap.flags = gs.flags;
     snap.checkpoint = gs.checkpoint;
     snap.defeated = DSList_ToArray(gs.defeated_enemies);
+    snap.uid_counter = gs.uid_counter;
     snap.room_states = gs.room_states;
 
     if (instance_exists(gs.player_inst)) {
@@ -42,6 +43,7 @@ function Save_ApplySnapshot(_snap) {
     gs.player_ch = _snap.player;
     gs.flags = _snap.flags;
     gs.checkpoint = _snap.checkpoint;
+    if (variable_struct_exists(_snap, "uid_counter")) gs.uid_counter = _snap.uid_counter;
 
     if (ds_exists(gs.defeated_enemies, ds_type_list)) ds_list_destroy(gs.defeated_enemies);
     gs.defeated_enemies = Array_ToDSList(_snap.defeated);

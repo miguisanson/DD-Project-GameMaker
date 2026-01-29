@@ -86,6 +86,10 @@ function GameState_Init() {
         gs.defeated_enemies = ds_list_create();
     }
 
+    if (!variable_struct_exists(gs, "uid_counter")) {
+        gs.uid_counter = 1;
+    }
+
     if (!variable_struct_exists(gs, "item_db")) {
         ItemDB_Init();
         gs.item_db = global.item_db;
@@ -168,6 +172,14 @@ function GameState_Get() {
     return global.state;
 }
 
+function GameState_NextUID() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "uid_counter")) gs.uid_counter = 1;
+    var uid = gs.uid_counter;
+    gs.uid_counter += 1;
+    return uid;
+}
+
 function GameState_SyncLegacy() {
     var gs = global.state;
 
@@ -206,6 +218,10 @@ function GameState_SyncLegacy() {
         global.battle_enemy_uid = gs.battle.enemy_uid;
         global.battle_enemy_id = gs.battle.enemy_id;
         global.just_returned_from_battle = gs.battle.just_returned;
+    }
+
+    if (variable_struct_exists(gs, "uid_counter")) {
+        global.uid_counter = gs.uid_counter;
     }
 
     global.player_inst = gs.player_inst;

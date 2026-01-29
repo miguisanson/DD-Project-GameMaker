@@ -116,7 +116,10 @@ function EnemyDB_Init() {
 }
 
 function EnemyDB_Get(_enemy_id) {
-    if (ds_exists(global.enemy_db, ds_type_map) && ds_map_exists(global.enemy_db, _enemy_id)) {
+    if (!variable_global_exists("enemy_db") || !ds_exists(global.enemy_db, ds_type_map)) {
+        EnemyDB_Init();
+    }
+    if (ds_map_exists(global.enemy_db, _enemy_id)) {
         return global.enemy_db[? _enemy_id];
     }
 

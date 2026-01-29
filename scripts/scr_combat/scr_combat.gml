@@ -299,8 +299,6 @@ function Battle_EndRun(_bc) {
     GameState_SetPlayer(_bc.p);
 
     var gs = GameState_Get();
-    show_debug_message("RUN RETURN ROOM: " + room_get_name(gs.battle.return_room));
-
     room_goto(gs.battle.return_room);
 }
 

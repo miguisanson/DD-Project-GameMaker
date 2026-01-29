@@ -32,7 +32,10 @@ function StatusDB_Init() {
 }
 
 function StatusDB_Get(_status_id) {
-    if (ds_exists(global.status_db, ds_type_map) && ds_map_exists(global.status_db, _status_id)) {
+    if (!variable_global_exists("status_db") || !ds_exists(global.status_db, ds_type_map)) {
+        StatusDB_Init();
+    }
+    if (ds_map_exists(global.status_db, _status_id)) {
         return global.status_db[? _status_id];
     }
     return { id: -1, name: "Unknown", stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 }, tick: { hp:0, mp:0 }, stackable: false };

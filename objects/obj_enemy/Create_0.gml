@@ -2,13 +2,20 @@
 // ID / BATTLE
 // --------------------
 var gs = GameState_Init();
+
+if (!variable_instance_exists(id, "enemy_uid")) {
+    enemy_uid = GameState_NextUID();
+} else if (enemy_uid == noone) {
+    enemy_uid = GameState_NextUID();
+}
+
 enemy_id = -1;     // set in child
 defeated = false;
 enemy_cfg = undefined;
 
 // check defeated list (persist after battle)
 if (ds_exists(gs.defeated_enemies, ds_type_list)) {
-    var idx = ds_list_find_index(gs.defeated_enemies, id);
+    var idx = ds_list_find_index(gs.defeated_enemies, enemy_uid);
     if (idx != -1) defeated = true;
 }
 

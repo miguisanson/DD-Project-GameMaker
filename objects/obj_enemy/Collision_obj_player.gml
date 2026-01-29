@@ -7,7 +7,7 @@ RoomState_Save(room);
 GameState_SetBattleReturn(room, other.x, other.y);
 
 // remember enemy instance + type
-GameState_SetBattleEnemy(id, enemy_id);
+GameState_SetBattleEnemy(enemy_uid, enemy_id);
 
 // tell player to reposition after return
 GameState_SetJustReturned(true);
