@@ -3,6 +3,8 @@ var w = display_get_gui_width();
 var h = display_get_gui_height();
 var margin = 8;
 
+draw_set_alpha(1);
+
 // HUD (overworld only)
 if (room != rm_battle && gs.ui.mode == UI_NONE) {
     if (is_struct(gs.player_ch)) {
@@ -20,9 +22,9 @@ if (gs.ui.mode == UI_DIALOGUE) {
     var bw = w - margin * 2;
     var bh = 64;
 
-    draw_set_color(c_white);
-    draw_rectangle(bx, by, bx + bw, by + bh, false);
     draw_set_color(c_black);
+    draw_rectangle(bx, by, bx + bw, by + bh, false);
+    draw_set_color(c_white);
     draw_rectangle(bx, by, bx + bw, by + bh, true);
 
     var line = "";
@@ -50,9 +52,9 @@ if (gs.ui.mode == UI_SHOP) {
     var bw2 = w - margin * 2;
     var bh2 = 96;
 
-    draw_set_color(c_white);
-    draw_rectangle(bx2, by2, bx2 + bw2, by2 + bh2, false);
     draw_set_color(c_black);
+    draw_rectangle(bx2, by2, bx2 + bw2, by2 + bh2, false);
+    draw_set_color(c_white);
     draw_rectangle(bx2, by2, bx2 + bw2, by2 + bh2, true);
 
     draw_set_color(c_white);
