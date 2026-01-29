@@ -159,6 +159,8 @@ function GameState_Init() {
         gs.last_room = room;
     }
 
+    RoomState_Init();
+
     GameState_SyncLegacy();
 
     return gs;

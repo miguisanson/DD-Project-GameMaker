@@ -7,6 +7,7 @@ function RoomState_Init() {
     if (!variable_struct_exists(gs, "room_states")) {
         gs.room_states = {};
     }
+    global.room_state_ready = true;
 }
 
 function RoomState_SnapshotInstance(_inst, _fields) {

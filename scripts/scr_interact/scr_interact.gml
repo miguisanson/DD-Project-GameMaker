@@ -54,7 +54,7 @@ function Interact_Handle(_inst) {
 
         case INTERACT_DOOR: {
             if (_inst.door_room != noone) {
-                RoomState_Save(room);
+                if (variable_global_exists("room_state_ready") && global.room_state_ready) RoomState_Save(room);
                 GameState_SetBattleReturn(_inst.door_room, _inst.door_x, _inst.door_y);
                 GameState_SetJustReturned(true);
                 room_goto(_inst.door_room);

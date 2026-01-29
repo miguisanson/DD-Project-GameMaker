@@ -60,8 +60,12 @@ if (battle_state == BSTATE_SKILL_MENU) {
         exit;
     }
 
-    if (k_down) skill_index = (skill_index + 1) mod array_length(skills);
-    if (k_up)   skill_index = (skill_index + array_length(skills) - 1) mod array_length(skills);
+    var skill_count = array_length(skills);
+    var skill_menu_count = skill_count + 1; // +1 for Back
+    if (skill_index >= skill_menu_count) skill_index = 0;
+
+    if (k_down) skill_index = (skill_index + 1) mod skill_menu_count;
+    if (k_up)   skill_index = (skill_index + skill_menu_count - 1) mod skill_menu_count;
 
     if (k_back) {
         battle_state = BSTATE_MENU;
@@ -69,7 +73,11 @@ if (battle_state == BSTATE_SKILL_MENU) {
     }
 
     if (k_ok) {
-        Battle_PlayerSkill(self, skills[skill_index]);
+        if (skill_index == skill_count) {
+            battle_state = BSTATE_MENU;
+        } else {
+            Battle_PlayerSkill(self, skills[skill_index]);
+        }
     }
 
     exit;
@@ -85,8 +93,12 @@ if (battle_state == BSTATE_ITEM_MENU) {
         exit;
     }
 
-    if (k_down) item_index = (item_index + 1) mod array_length(items);
-    if (k_up)   item_index = (item_index + array_length(items) - 1) mod array_length(items);
+    var item_count = array_length(items);
+    var item_menu_count = item_count + 1; // +1 for Back
+    if (item_index >= item_menu_count) item_index = 0;
+
+    if (k_down) item_index = (item_index + 1) mod item_menu_count;
+    if (k_up)   item_index = (item_index + item_menu_count - 1) mod item_menu_count;
 
     if (k_back) {
         battle_state = BSTATE_MENU;
@@ -94,7 +106,11 @@ if (battle_state == BSTATE_ITEM_MENU) {
     }
 
     if (k_ok) {
-        Battle_PlayerItem(self, items[item_index].id);
+        if (item_index == item_count) {
+            battle_state = BSTATE_MENU;
+        } else {
+            Battle_PlayerItem(self, items[item_index].id);
+        }
     }
 
     exit;

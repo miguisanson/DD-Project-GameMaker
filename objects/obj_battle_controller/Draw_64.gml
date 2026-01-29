@@ -58,7 +58,8 @@ if (battle_state == BSTATE_SKILL_MENU) {
     var mx2 = bx + 12;
     var my2 = by + 12;
 
-    for (var s = 0; s < array_length(skills); s++) {
+    var skill_count = array_length(skills);
+    for (var s = 0; s < skill_count; s++) {
         var sk = SkillDB_Get(skills[s]);
         var yy = my2 + s * 16;
         if (s == skill_index) draw_text(mx2 - 10, yy, ">");
@@ -69,6 +70,10 @@ if (battle_state == BSTATE_SKILL_MENU) {
         }
         draw_text(tx, yy, sk.name + " (" + string(sk.mp_cost) + "MP)");
     }
+
+    var back_y = my2 + skill_count * 16;
+    if (skill_index == skill_count) draw_text(mx2 - 10, back_y, ">");
+    draw_text(mx2, back_y, "Back");
 }
 
 // item menu
@@ -77,7 +82,8 @@ if (battle_state == BSTATE_ITEM_MENU) {
     var mx3 = bx + 12;
     var my3 = by + 12;
 
-    for (var it = 0; it < array_length(items); it++) {
+    var item_count = array_length(items);
+    for (var it = 0; it < item_count; it++) {
         var item = ItemDB_Get(items[it].id);
         var yy2 = my3 + it * 16;
         if (it == item_index) draw_text(mx3 - 10, yy2, ">");
@@ -88,4 +94,8 @@ if (battle_state == BSTATE_ITEM_MENU) {
         }
         draw_text(tx2, yy2, item.name + " x" + string(items[it].qty));
     }
+
+    var back_y2 = my3 + item_count * 16;
+    if (item_index == item_count) draw_text(mx3 - 10, back_y2, ">");
+    draw_text(mx3, back_y2, "Back");
 }
