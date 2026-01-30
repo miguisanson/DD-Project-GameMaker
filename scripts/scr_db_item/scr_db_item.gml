@@ -769,7 +769,7 @@ function Item_Use(_item_id, _user, _target) {
         _target.hp = clamp(_target.hp + amt, 0, _target.max_hp);
         if (_target.hp == before_hp) {
             result.ok = false;
-            result.msg = "No effect.";
+            result.msg = "Already full health.";
         } else {
             result.msg = "Healed " + string(amt) + " HP.";
         }
@@ -779,7 +779,7 @@ function Item_Use(_item_id, _user, _target) {
         _target.mp = clamp(_target.mp + amt2, 0, _target.max_mp);
         if (_target.mp == before_mp) {
             result.ok = false;
-            result.msg = "No effect.";
+            result.msg = "Already full mana.";
         } else {
             result.msg = "Recovered " + string(amt2) + " MP.";
         }
