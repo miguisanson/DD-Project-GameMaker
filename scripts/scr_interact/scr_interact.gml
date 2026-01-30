@@ -113,10 +113,7 @@ function Interact_Handle(_inst) {
                 }
                 Dialogue_StartWithSpeaker(name, loot_lines);
             } else {
-                var empty_id = base_id;
-                if (after_id != "") empty_id = after_id;
-                if (empty_id == "") empty_id = "loot_empty";
-                Dialogue_StartWithSpeaker(name, DialogueDB_Get(empty_id));
+                Dialogue_StartWithSpeaker(name, DialogueDB_Get("loot_empty"));
             }
         } else {
             var use_id = (after_id != "") ? after_id : base_id;

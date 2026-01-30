@@ -11,55 +11,57 @@ function Loot_Init() {
 
     // --- item tables (NO skillbooks) ---
     var chest = [
-        { item_id:10, weight:30, tier:1, min:1, max:1 }, // HP Lv1
-        { item_id:11, weight:25, tier:1, min:1, max:1 }, // MP Lv1
-        { item_id:12, weight:18, tier:1, min:1, max:1 }, // Antidote
-        { item_id:13, weight:18, tier:1, min:1, max:1 }, // Bandage
-        { item_id:1,  weight:10, tier:1, min:1, max:1 }, // Wooden Sword
-        { item_id:4,  weight:10, tier:1, min:1, max:1 }, // Wooden Bow
-        { item_id:7,  weight:10, tier:1, min:1, max:1 }, // Wooden Staff
-        { item_id:20, weight:8,  tier:1, min:1, max:1 }, // Leather Armor
-        { item_id:23, weight:8,  tier:1, min:1, max:1 }, // Cloth Robe
+        { item_id:0,  weight:6,  tier:1, qty_min:0, qty_max:0 },
+        { item_id:10, weight:32, tier:1, qty_min:1, qty_max:3 },
+        { item_id:11, weight:28, tier:1, qty_min:1, qty_max:3 },
+        { item_id:12, weight:20, tier:1, qty_min:1, qty_max:2 },
+        { item_id:13, weight:20, tier:1, qty_min:1, qty_max:2 },
+        { item_id:1,  weight:8,  tier:1, qty_min:0, qty_max:1 },
+        { item_id:4,  weight:8,  tier:1, qty_min:0, qty_max:1 },
+        { item_id:7,  weight:8,  tier:1, qty_min:0, qty_max:1 },
+        { item_id:20, weight:6,  tier:1, qty_min:0, qty_max:1 },
+        { item_id:23, weight:6,  tier:1, qty_min:0, qty_max:1 },
 
-        { item_id:14, weight:18, tier:2, min:1, max:1 }, // HP Lv2
-        { item_id:17, weight:15, tier:2, min:1, max:1 }, // MP Lv2
-        { item_id:2,  weight:8,  tier:2, min:1, max:1 }, // Iron Sword
-        { item_id:5,  weight:8,  tier:2, min:1, max:1 }, // Iron Bow
-        { item_id:8,  weight:6,  tier:2, min:1, max:1 }, // Ruby Staff
-        { item_id:21, weight:6,  tier:2, min:1, max:1 }, // Iron Armor
-        { item_id:24, weight:6,  tier:2, min:1, max:1 }, // Silk Robe
+        { item_id:14, weight:20, tier:2, qty_min:1, qty_max:4 },
+        { item_id:17, weight:18, tier:2, qty_min:1, qty_max:4 },
+        { item_id:2,  weight:7,  tier:2, qty_min:0, qty_max:1 },
+        { item_id:5,  weight:7,  tier:2, qty_min:0, qty_max:1 },
+        { item_id:8,  weight:6,  tier:2, qty_min:0, qty_max:1 },
+        { item_id:21, weight:6,  tier:2, qty_min:0, qty_max:1 },
+        { item_id:24, weight:6,  tier:2, qty_min:0, qty_max:1 },
 
-        { item_id:15, weight:12, tier:3, min:1, max:1 }, // HP Lv3
-        { item_id:18, weight:10, tier:3, min:1, max:1 }, // MP Lv3
-        { item_id:3,  weight:5,  tier:3, min:1, max:1 }, // Platinum Sword
-        { item_id:6,  weight:5,  tier:3, min:1, max:1 }, // Platinum Bow
-        { item_id:9,  weight:4,  tier:3, min:1, max:1 }, // Diamond Staff
-        { item_id:22, weight:4,  tier:3, min:1, max:1 }, // Platinum Armor
-        { item_id:25, weight:4,  tier:3, min:1, max:1 }  // Mithril Robe
+        { item_id:15, weight:14, tier:3, qty_min:1, qty_max:5 },
+        { item_id:18, weight:12, tier:3, qty_min:1, qty_max:5 },
+        { item_id:3,  weight:5,  tier:3, qty_min:0, qty_max:1 },
+        { item_id:6,  weight:5,  tier:3, qty_min:0, qty_max:1 },
+        { item_id:9,  weight:4,  tier:3, qty_min:0, qty_max:1 },
+        { item_id:22, weight:4,  tier:3, qty_min:0, qty_max:1 },
+        { item_id:25, weight:4,  tier:3, qty_min:0, qty_max:1 }
     ];
 
     var barrel = [
-        { item_id:10, weight:30, tier:1, min:1, max:1 },
-        { item_id:11, weight:25, tier:1, min:1, max:1 },
-        { item_id:12, weight:18, tier:1, min:1, max:1 },
-        { item_id:13, weight:18, tier:1, min:1, max:1 },
-        { item_id:14, weight:10, tier:2, min:1, max:1 },
-        { item_id:17, weight:8,  tier:2, min:1, max:1 },
-        { item_id:1,  weight:6,  tier:1, min:1, max:1 },
-        { item_id:4,  weight:6,  tier:1, min:1, max:1 }
+        { item_id:0,  weight:24, tier:1, qty_min:0, qty_max:0 },
+        { item_id:10, weight:30, tier:1, qty_min:1, qty_max:2 },
+        { item_id:11, weight:26, tier:1, qty_min:1, qty_max:2 },
+        { item_id:12, weight:20, tier:1, qty_min:1, qty_max:2 },
+        { item_id:13, weight:20, tier:1, qty_min:1, qty_max:2 },
+        { item_id:14, weight:12, tier:2, qty_min:1, qty_max:3 },
+        { item_id:17, weight:10, tier:2, qty_min:1, qty_max:3 },
+        { item_id:1,  weight:6,  tier:1, qty_min:0, qty_max:1 },
+        { item_id:4,  weight:6,  tier:1, qty_min:0, qty_max:1 }
     ];
 
     var enemy = [
-        { item_id:10, weight:30, tier:1, min:1, max:1 },
-        { item_id:11, weight:22, tier:1, min:1, max:1 },
-        { item_id:12, weight:12, tier:1, min:1, max:1 },
-        { item_id:13, weight:12, tier:1, min:1, max:1 },
-        { item_id:14, weight:10, tier:2, min:1, max:1 },
-        { item_id:17, weight:8,  tier:2, min:1, max:1 },
-        { item_id:2,  weight:4,  tier:2, min:1, max:1 },
-        { item_id:5,  weight:4,  tier:2, min:1, max:1 },
-        { item_id:3,  weight:2,  tier:3, min:1, max:1 },
-        { item_id:6,  weight:2,  tier:3, min:1, max:1 }
+        { item_id:10, weight:30, tier:1, qty_min:1, qty_max:2 },
+        { item_id:11, weight:22, tier:1, qty_min:1, qty_max:2 },
+        { item_id:12, weight:12, tier:1, qty_min:1, qty_max:1 },
+        { item_id:13, weight:12, tier:1, qty_min:1, qty_max:1 },
+        { item_id:14, weight:10, tier:2, qty_min:1, qty_max:2 },
+        { item_id:17, weight:8,  tier:2, qty_min:1, qty_max:2 },
+        { item_id:2,  weight:4,  tier:2, qty_min:0, qty_max:1 },
+        { item_id:5,  weight:4,  tier:2, qty_min:0, qty_max:1 },
+        { item_id:3,  weight:2,  tier:3, qty_min:0, qty_max:1 },
+        { item_id:6,  weight:2,  tier:3, qty_min:0, qty_max:1 }
     ];
 
     ds_map_add(global.loot_tables, "chest", chest);
@@ -184,8 +186,15 @@ function Loot_RollFromTable(_table_key, _level) {
         var e2 = entries[j];
         acc += e2.weight * Loot_TierMult(_level, e2.tier);
         if (r <= acc) {
-            var qty = (e2.min == e2.max) ? e2.min : irandom_range(e2.min, e2.max);
-            return { item_id: e2.item_id, qty: max(1, qty) };
+            var minv = 1;
+            var maxv = 1;
+            if (variable_struct_exists(e2, "qty_min")) minv = e2.qty_min; else if (variable_struct_exists(e2, "min_qty")) minv = e2.min_qty; else if (variable_struct_exists(e2, "min")) minv = e2.min;
+            if (variable_struct_exists(e2, "qty_max")) maxv = e2.qty_max; else if (variable_struct_exists(e2, "max_qty")) maxv = e2.max_qty; else if (variable_struct_exists(e2, "max")) maxv = e2.max;
+            if (maxv < minv) maxv = minv;
+            var qty = (minv == maxv) ? minv : irandom_range(minv, maxv);
+            if (qty <= 0) return undefined;
+            if (variable_struct_exists(e2, "item_id") && e2.item_id <= 0) return undefined;
+            return { item_id: e2.item_id, qty: qty };
         }
     }
 
