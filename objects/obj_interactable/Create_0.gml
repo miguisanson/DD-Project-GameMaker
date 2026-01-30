@@ -1,3 +1,6 @@
+state_uid = -1;
+if (state_uid == -1) state_uid = GameState_NextUID();
+
 interact_kind = INTERACT_NONE;
 sprite_id = noone;
 

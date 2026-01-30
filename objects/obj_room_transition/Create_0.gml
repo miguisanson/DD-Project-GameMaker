@@ -1,3 +1,4 @@
-rif (!variable_instance_exists(id, "target_room")) target_room = noone;
-if (!variable_instance_exists(id, "target_spawn_id")) target_spawn_id = "";
-if (!variable_instance_exists(id, "target_facing")) target_facing = -1;
+if (!variable_instance_exists(id, "transition_id")) transition_id = "";
+if (!variable_instance_exists(id, "trans_w")) trans_w = 16;
+if (!variable_instance_exists(id, "trans_h")) trans_h = 16;
+if (!variable_instance_exists(id, "cooldown")) cooldown = 0;

@@ -223,6 +223,8 @@ function GameState_Init() {
         gs.room_states = {};
     }
 
+    RoomDB_Init();
+
     if (!variable_struct_exists(gs, "last_room")) {
         gs.last_room = room;
     }
