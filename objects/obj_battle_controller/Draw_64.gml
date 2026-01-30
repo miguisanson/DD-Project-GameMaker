@@ -17,6 +17,8 @@ var vw = camera_get_view_width(cam);
 var vh = camera_get_view_height(cam);
 var sx = w / vw;
 var sy = h / vh;
+var gui_off_x = cam_off.x * sx;
+var gui_off_y = cam_off.y * sy;
 
 // Enemy status icons below sprite (battle only)
 if (instance_exists(enemy_inst)) {
@@ -30,8 +32,8 @@ if (instance_exists(enemy_inst)) {
 }
 
 // bottom box rect
-var bx = margin;
-var by = h - box_h - margin;
+var bx = margin + gui_off_x;
+var by = h - box_h - margin + gui_off_y;
 var bw = w - margin * 2;
 var bh = box_h;
 

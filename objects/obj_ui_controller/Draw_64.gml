@@ -30,10 +30,23 @@ if (room == rm_battle && is_struct(ch)) {
     var bar_w = sprite_get_width(hp_bar_sprite) * scale;
     var bar_h = sprite_get_height(hp_bar_sprite) * scale;
 
-    var bar_x = margin;
-    var bar_y = margin;
+    var cam = view_camera[0];
+    var sx = w / camera_get_view_width(cam);
+    var sy = h / camera_get_view_height(cam);
+    var cam_off = CameraShake_Offset();
+    var gui_off_x = cam_off.x * sx;
+    var gui_off_y = cam_off.y * sy;
+
+    var bar_x = margin + gui_off_x;
+    var bar_y = margin + gui_off_y;
     draw_sprite_ext(hp_bar_sprite, hp_frame, bar_x, bar_y, scale, scale, 0, c_white, 1);
     draw_sprite_ext(mp_bar_sprite, mp_frame, bar_x, bar_y + bar_h + 4, scale, scale, 0, c_white, 1);
+
+    draw_set_color(c_white);
+    var hp_text = string(ch.hp) + " / " + string(ch.max_hp);
+    var mp_text = string(ch.mp) + " / " + string(ch.max_mp);
+    draw_text(bar_x + bar_w + 6, bar_y, hp_text);
+    draw_text(bar_x + bar_w + 6, bar_y + bar_h + 4, mp_text);
 
     // Player status icons below MP bar
     var icon_y = bar_y + (bar_h * 2) + 10;

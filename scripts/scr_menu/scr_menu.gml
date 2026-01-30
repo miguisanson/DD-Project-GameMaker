@@ -448,7 +448,6 @@ function Menu_Draw() {
         var mp_bar_h = sprite_get_height(mp_bar_sprite) * bar_scale;
 
         var exp_label_1 = "Required EXP";
-        var exp_label_2 = "to LEVEL";
         var exp_value = string(ch.exp) + "/" + string(ch.exp_next);
         var line_h = string_height("A") + 2;
 
@@ -456,7 +455,6 @@ function Menu_Draw() {
             bar_w,
             string_width("Level: " + string(ch.level)),
             string_width(exp_label_1),
-            string_width(exp_label_2),
             string_width(exp_value),
             string_width("Available Points: " + string(m.pending_points))
         ) + pad * 2;
@@ -473,8 +471,6 @@ function Menu_Draw() {
         draw_text(left_x, text_y, "Level: " + string(ch.level));
         text_y += line_h;
         draw_text(left_x, text_y, exp_label_1);
-        text_y += line_h;
-        draw_text(left_x, text_y, exp_label_2);
         text_y += line_h;
         draw_text(left_x, text_y, exp_value);
         text_y += line_h;
