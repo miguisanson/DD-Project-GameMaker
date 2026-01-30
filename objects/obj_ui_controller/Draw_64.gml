@@ -5,14 +5,14 @@ var margin = 8;
 
 draw_set_alpha(1);
 
-// HUD (always visible)
+// HUD (battle only)
 var ch = gs.player_ch;
 if (room == rm_battle && instance_exists(obj_battle_controller)) {
     var bc = instance_find(obj_battle_controller, 0);
     if (instance_exists(bc) && is_struct(bc.p)) ch = bc.p;
 }
 
-if (is_struct(ch)) {
+if (room == rm_battle && is_struct(ch)) {
     var hp_bar_sprite = hp_bar;
     var mp_bar_sprite = mp_bar;
     var max_frame = min(10, sprite_get_number(hp_bar_sprite) - 1);

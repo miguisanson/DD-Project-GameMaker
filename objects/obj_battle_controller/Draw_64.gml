@@ -7,8 +7,12 @@ var h = display_get_gui_height();
 var gs = GameState_Get();
 
 var cam = view_camera[0];
-var vx = camera_get_view_x(cam);
-var vy = camera_get_view_y(cam);
+var base_x = cam_base_x;
+var base_y = cam_base_y;
+var cam_off = CameraShake_Offset();
+var vx = base_x + cam_off.x;
+var vy = base_y + cam_off.y;
+camera_set_view_pos(cam, vx, vy);
 var vw = camera_get_view_width(cam);
 var vh = camera_get_view_height(cam);
 var sx = w / vw;
@@ -53,6 +57,18 @@ if (battle_state == BSTATE_MESSAGE) {
         var dy = by + bh - 32 - 10;
         draw_sprite_ext(icon, frame, dx, dy, scale_x, scale_y, 0, c_white, 1);
     }
+}
+
+// enemy sprite draw with shake/flash
+if (instance_exists(enemy_inst)) {
+    var off = SpriteShake_Offset(enemy_inst);
+    var exs = (enemy_inst.x + off.x - vx) * sx;
+    var eys = (enemy_inst.y + off.y - vy) * sy;
+    var scx = enemy_inst.image_xscale * sx;
+    var scy = enemy_inst.image_yscale * sy;
+    if (off.flash) gpu_set_blendmode(bm_add);
+    draw_sprite_ext(enemy_inst.sprite_index, enemy_inst.image_index, exs, eys, scx, scy, enemy_inst.image_angle, c_white, 1);
+    if (off.flash) gpu_set_blendmode(bm_normal);
 }
 
 // MENU STATES ONLY

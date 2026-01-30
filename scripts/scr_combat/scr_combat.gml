@@ -134,7 +134,7 @@ function Battle_CheckEnd(_bc, _p, _e) {
             ds_list_add(gs.defeated_enemies, gs.battle.enemy_uid);
         }
 
-        room_goto(gs.battle.return_room);
+        Battle_Message(_bc, _e.name + " has been slain.", BSTATE_END_RUN);
         return true;
     }
 
@@ -196,8 +196,14 @@ function Battle_PlayerAttack(_bc) {
     if (!_bc.last_hit) {
         Battle_Message(_bc, "You missed!", BSTATE_ENEMY_ACT);
     } else if (_bc.last_crit) {
+        if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
+            SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
+        }
         Battle_Message(_bc, "Critical hit! " + string(_bc.last_dmg) + " dmg!", BSTATE_ENEMY_ACT);
     } else {
+        if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
+            SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
+        }
         Battle_Message(_bc, "You hit for " + string(_bc.last_dmg) + " dmg!", BSTATE_ENEMY_ACT);
     }
 
@@ -252,6 +258,9 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     } else if (res.crit) {
         Battle_Message(_bc, "Critical skill! " + string(res.dmg) + " dmg!", BSTATE_ENEMY_ACT);
     } else if (res.dmg > 0) {
+        if (instance_exists(_bc.enemy_inst)) {
+            SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
+        }
         Battle_Message(_bc, "Skill hit for " + string(res.dmg) + " dmg!", BSTATE_ENEMY_ACT);
     } else {
         Battle_Message(_bc, "Skill used.", BSTATE_ENEMY_ACT);
@@ -393,8 +402,10 @@ function Battle_EnemyAct(_bc) {
         } else if (!res.hit) {
             Battle_Message(_bc, e.name + " missed!", BSTATE_MENU);
         } else if (res.crit) {
+            if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
             Battle_Message(_bc, e.name + " crit! " + string(res.dmg) + " dmg!", BSTATE_MENU);
         } else {
+            if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
             Battle_Message(_bc, e.name + " hits for " + string(res.dmg) + " dmg!", BSTATE_MENU);
         }
     } else {
@@ -426,8 +437,10 @@ function Battle_EnemyAct(_bc) {
         if (!_bc.last_hit) {
             Battle_Message(_bc, e.name + " missed!", BSTATE_MENU);
         } else if (_bc.last_crit) {
+            if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
             Battle_Message(_bc, e.name + " crit! " + string(_bc.last_dmg) + " dmg!", BSTATE_MENU);
         } else {
+            if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
             Battle_Message(_bc, e.name + " hits for " + string(_bc.last_dmg) + " dmg!", BSTATE_MENU);
         }
     }

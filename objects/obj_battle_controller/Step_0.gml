@@ -1,5 +1,5 @@
 Input_PreStep();
-if (battle_over) exit;
+if (battle_over && battle_state != BSTATE_MESSAGE) exit;
 
 // helper input keys
 var k_up = Input_Pressed("menu_up");
@@ -12,7 +12,13 @@ var k_back = Input_Pressed("cancel");
 // --------------------
 if (battle_state == BSTATE_MESSAGE) {
     if (k_ok) {
-        battle_state = message_next_state;
+        if (message_next_state == BSTATE_END_RUN) {
+            Battle_EndRun(self);
+        } else if (message_next_state == BSTATE_ENEMY_ACT && turn != TURN_ENEMY) {
+            battle_state = BSTATE_MENU;
+        } else {
+            battle_state = message_next_state;
+        }
     }
     exit;
 }

@@ -96,6 +96,20 @@
 #macro UI_NONE     0
 #macro UI_DIALOGUE 1
 
+#macro SHAKE_DIR_H 0
+#macro SHAKE_DIR_V 1
+#macro SHAKE_DIR_D 2
+
+#macro ENEMY_SHAKE_MAG 0.3 // Enemy sprite shake magnitude (higher = wider shake)
+#macro ENEMY_SHAKE_FRAMES 12 // Enemy shake duration in frames
+#macro ENEMY_FLASH_FRAMES 12 // Enemy flash/blink duration in frames
+#macro ENEMY_FLASH_RATE 3 // Enemy flash toggle rate (lower = faster blink)
+#macro ENEMY_SHAKE_DIR SHAKE_DIR_H // Enemy shake direction (H/V/D)
+
+#macro PLAYER_SHAKE_MAG 0.3
+#macro PLAYER_SHAKE_FRAMES 12
+#macro PLAYER_SHAKE_DIR SHAKE_DIR_V
+
 #macro ACTION_BUFFER_FRAMES 6
 #macro ACTION_COOLDOWN_FRAMES 4
 
