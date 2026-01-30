@@ -73,6 +73,19 @@ if (instance_exists(enemy_inst)) {
     if (off.flash) gpu_set_blendmode(bm_normal);
 }
 
+
+// DEBUG ENEMY HP
+if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled) {
+    if (instance_exists(enemy_inst)) {
+        var off2 = SpriteShake_Offset(enemy_inst);
+        var espr2 = enemy_inst.sprite_index;
+        var ex2 = (enemy_inst.x + off2.x - sprite_get_xoffset(espr2) - vx) * sx;
+        var ey2 = (enemy_inst.y + off2.y - sprite_get_yoffset(espr2) - vy) * sy;
+        draw_set_color(c_white);
+        draw_text(ex2, ey2 - 12, string(e.hp));
+    }
+}
+
 // MENU STATES ONLY
 if (battle_state == BSTATE_MENU || battle_state == BSTATE_SKILL_MENU || battle_state == BSTATE_ITEM_MENU) {
     draw_set_color(c_white);
