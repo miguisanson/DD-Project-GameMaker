@@ -27,6 +27,7 @@ var k_up = Input_Pressed("menu_up");
 var k_down = Input_Pressed("menu_down");
 var k_ok = Input_Pressed("confirm");
 var k_back = Input_Pressed("cancel");
+var k_menu = Input_Pressed("menu");
 
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     if (variable_struct_exists(gs.ui, "just_opened") && gs.ui.just_opened) {
@@ -36,6 +37,22 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     if (k_ok) {
         Dialogue_Advance();
     }
+    exit;
+}
+
+if (k_menu) {
+    if (gs.ui.mode == UI_MENU) {
+        Menu_Close();
+    } else {
+        var pl = gs.player_inst;
+        if (instance_exists(pl) && Player_IsSettled(pl)) {
+            Menu_Open();
+        }
+    }
+}
+
+if (gs.ui.mode == UI_MENU) {
+    Menu_HandleInput();
     exit;
 }
 

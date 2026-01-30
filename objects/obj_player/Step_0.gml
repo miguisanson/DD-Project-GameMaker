@@ -1,5 +1,5 @@
 var gs = GameState_Get();
-if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
+if (gs.ui.mode == UI_DIALOGUE || gs.ui.mode == UI_MENU || array_length(gs.ui.lines) > 0) {
     moving = false;
     move_timer = 0;
     image_index = 0;

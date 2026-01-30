@@ -26,7 +26,7 @@ if (room == rm_battle && is_struct(ch)) {
     if (ch.max_mp > 0) mp_ratio = clamp(ch.mp / ch.max_mp, 0, 1);
     var mp_frame = clamp(floor(mp_ratio * max_frame), 0, max_frame);
 
-    var scale = 3;
+    var scale = UI_BAR_SCALE;
     var bar_w = sprite_get_width(hp_bar_sprite) * scale;
     var bar_h = sprite_get_height(hp_bar_sprite) * scale;
 
@@ -39,6 +39,11 @@ if (room == rm_battle && is_struct(ch)) {
     var icon_y = bar_y + (bar_h * 2) + 10;
     Status_DrawIcons(ch, bar_x, icon_y, 12, false);
 
+}
+
+if (gs.ui.mode == UI_MENU) {
+    Menu_Draw();
+    exit;
 }
 
 // Dialogue box

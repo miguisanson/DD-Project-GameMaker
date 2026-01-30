@@ -26,6 +26,7 @@ function CharacterCreate_Player(_class_id) {
     ch.inventory = [];
     ch.equip = { weapon: 0, head: 0, body: 0, ring1: 0, ring2: 0 };
     ch.skills = Player_DefaultSkills(_class_id);
+    ch.stat_points = 0;
     ch.status = [];
     ch.inventory = Inv_Add(ch.inventory, 10, 2);
 
@@ -327,6 +328,8 @@ function GameState_SetBattleEnemy(_uid, _enemy_id) {
 
     global.battle_enemy_uid = _uid;
     global.battle_enemy_id = _enemy_id;
+
+    if (Menu_IsOpen()) Menu_Close();
 }
 
 function GameState_SetJustReturned(_flag) {
