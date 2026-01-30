@@ -71,8 +71,13 @@ function Loot_Init() {
     ds_map_add(global.loot_configs, "chest_basic",  { table:"chest",  chance:[1, 1, 1], max_items:1 });
     ds_map_add(global.loot_configs, "barrel_basic", { table:"barrel", chance:[1, 1, 1], max_items:1 });
     ds_map_add(global.loot_configs, "enemy_basic",  { table:"enemy",  chance:[0.2, 0.3, 0.4], max_items:1 });
+    ds_map_add(global.loot_configs, "skillbook",  { table:"skillbook", chance:[1, 1, 1], max_items:1, mode:"skillbook" });
+
+    Loot_BuildSkillbookLists();
 
     if (variable_global_exists("state") && is_struct(global.state)) {
+        global.state.skillbook_by_class = global.skillbook_by_class;
+
         global.state.loot_tables = global.loot_tables;
         global.state.loot_configs = global.loot_configs;
         global.state.loot_tier_weights = global.loot_tier_weights;
@@ -89,6 +94,73 @@ function Loot_ConfigGet(_key) {
     if (!variable_global_exists("loot_configs") || !ds_exists(global.loot_configs, ds_type_map)) Loot_Init();
     if (ds_map_exists(global.loot_configs, _key)) return global.loot_configs[? _key];
     return { table:"chest", chance:[0.5, 0.6, 0.7], max_items:1 };
+}
+
+function Loot_BuildSkillbookLists() {
+    if (!variable_global_exists("item_db") || !ds_exists(global.item_db, ds_type_map)) ItemDB_Init();
+    if (!variable_global_exists("skill_db") || !ds_exists(global.skill_db, ds_type_map)) SkillDB_Init();
+
+    if (variable_global_exists("skillbook_by_class") && ds_exists(global.skillbook_by_class, ds_type_map)) {
+        ds_map_destroy(global.skillbook_by_class);
+    }
+    global.skillbook_by_class = ds_map_create();
+
+    var classes = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE];
+    for (var c = 0; c < array_length(classes); c++) {
+        global.skillbook_by_class[? classes[c]] = [];
+    }
+
+    var keylist = ds_map_keys(global.item_db);
+    for (var i = 0; i < ds_list_size(keylist); i++) {
+        var key = keylist[| i];
+        var item = global.item_db[? key];
+        if (!is_struct(item)) continue;
+        if (!variable_struct_exists(item, "use")) continue;
+        if (!variable_struct_exists(item.use, "effect")) continue;
+        if (item.use.effect != "learn_skill") continue;
+
+        var skill = SkillDB_Get(item.use.skill_id);
+        if (!is_struct(skill) || !variable_struct_exists(skill, "class_list")) {
+            for (var c2 = 0; c2 < array_length(classes); c2++) {
+                var arr = global.skillbook_by_class[? classes[c2]];
+                array_push(arr, item.id);
+                global.skillbook_by_class[? classes[c2]] = arr;
+            }
+            continue;
+        }
+
+        var cl = skill.class_list;
+        if (!is_array(cl) || array_length(cl) == 0) {
+            for (var c3 = 0; c3 < array_length(classes); c3++) {
+                var arr2 = global.skillbook_by_class[? classes[c3]];
+                array_push(arr2, item.id);
+                global.skillbook_by_class[? classes[c3]] = arr2;
+            }
+        } else {
+            for (var j = 0; j < array_length(cl); j++) {
+                var cls = cl[j];
+                if (ds_map_exists(global.skillbook_by_class, cls)) {
+                    var arr3 = global.skillbook_by_class[? cls];
+                    array_push(arr3, item.id);
+                    global.skillbook_by_class[? cls] = arr3;
+                }
+            }
+        }
+    }
+    ds_list_destroy(keylist);
+}
+
+function Loot_SkillbookList(_class_id) {
+    if (!variable_global_exists("skillbook_by_class") || !ds_exists(global.skillbook_by_class, ds_type_map)) Loot_BuildSkillbookLists();
+    if (ds_map_exists(global.skillbook_by_class, _class_id)) return global.skillbook_by_class[? _class_id];
+    return [];
+}
+
+function Loot_RollSkillbook(_class_id) {
+    var list = Loot_SkillbookList(_class_id);
+    if (!is_array(list) || array_length(list) <= 0) return undefined;
+    var idx = irandom(array_length(list) - 1);
+    return { item_id: list[idx], qty: 1 };
 }
 
 function Loot_TierMult(_level, _tier) {
@@ -129,6 +201,15 @@ function Loot_RollContainer(_level, _key) {
     var cfg = Loot_ConfigGet(_key);
     var lvl = clamp(round(_level), 1, 3);
     var chance = cfg.chance[lvl - 1];
+
+    if (variable_struct_exists(cfg, "mode") && cfg.mode == "skillbook") {
+        var gs = GameState_Get();
+        var class_id = gs.selected_class;
+        if (is_struct(gs.player_ch) && variable_struct_exists(gs.player_ch, "class_id")) class_id = gs.player_ch.class_id;
+        var it_sb = Loot_RollSkillbook(class_id);
+        if (is_struct(it_sb)) return [it_sb];
+        return [];
+    }
 
     if (random(1) > chance) return [];
 

@@ -133,6 +133,11 @@ function GameState_Init() {
 
     Input_Init();
 
+    if (!variable_global_exists("rng_inited") || !global.rng_inited) {
+        randomize();
+        global.rng_inited = true;
+    }
+
     if (!variable_struct_exists(gs, "selected_class")) {
         gs.selected_class = CLASS_ARCHER;
     }
