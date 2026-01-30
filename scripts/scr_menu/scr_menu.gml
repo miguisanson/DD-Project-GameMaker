@@ -11,6 +11,8 @@ function Menu_Ensure() {
             tab: 0,
             tabs: ["Inventory","Skills","Stats"],
             header_focus: true,
+            repeat_dir: 0,
+            repeat_next: 0,
             inv_index: 0,
             inv_scroll: 0,
             skill_index: 0,
@@ -33,6 +35,8 @@ function Menu_Open() {
     gs.ui.menu.open = true;
     gs.ui.menu.header_focus = true;
     gs.ui.menu.stats_focus = false;
+    gs.ui.menu.repeat_dir = 0;
+    gs.ui.menu.repeat_next = 0;
     Menu_StatsSync();
 }
 
@@ -111,6 +115,30 @@ function Menu_StatsApply() {
     Menu_StatsSync();
 }
 
+function Menu_NavRepeat(_dir, _pressed, _held) {
+    var gs = GameState_Get();
+    var m = gs.ui.menu;
+    var frame = Input_Frame();
+
+    if (_pressed) {
+        m.repeat_dir = _dir;
+        m.repeat_next = frame + MENU_REPEAT_DELAY;
+        return true;
+    }
+
+    if (!_held) {
+        if (m.repeat_dir == _dir) m.repeat_dir = 0;
+        return false;
+    }
+
+    if (m.repeat_dir != _dir) return false;
+    if (frame >= m.repeat_next) {
+        m.repeat_next = frame + MENU_REPEAT_INTERVAL;
+        return true;
+    }
+    return false;
+}
+
 function Menu_HandleInput() {
     var gs = GameState_Get();
     var m = gs.ui.menu;
@@ -118,6 +146,10 @@ function Menu_HandleInput() {
 
     var k_up = Input_Pressed("menu_up");
     var k_down = Input_Pressed("menu_down");
+    var h_up = Input_Held("menu_up");
+    var h_down = Input_Held("menu_down");
+    var nav_up = Menu_NavRepeat(-1, k_up, h_up);
+    var nav_down = Menu_NavRepeat(1, k_down, h_down);
     var k_left = Input_Pressed("menu_left");
     var k_right = Input_Pressed("menu_right");
     var k_ok = Input_Pressed("confirm");
@@ -142,7 +174,7 @@ function Menu_HandleInput() {
             m.tab = (m.tab + 1) mod array_length(m.tabs);
             if (m.tab == 2) Menu_StatsSync();
         }
-        if (k_down) {
+        if (nav_down) {
             m.header_focus = false;
             if (m.tab == 2) {
                 if (!is_struct(m.pending_stats)) Menu_StatsSync();
@@ -159,18 +191,19 @@ function Menu_HandleInput() {
         var items = is_array(ch.inventory) ? ch.inventory : [];
         var count = array_length(items);
         if (count <= 0) {
-            if (k_up) m.header_focus = true;
+            if (nav_up) m.header_focus = true;
             return;
         }
-        if (k_up) {
+        if (nav_up) {
             if (m.inv_index > 0) {
                 m.inv_index -= 1;
             } else {
                 m.header_focus = true;
+                m.repeat_dir = 0;
                 return;
             }
         }
-        if (k_down) {
+        if (nav_down) {
             if (m.inv_index < count - 1) m.inv_index += 1;
         }
 
@@ -182,18 +215,19 @@ function Menu_HandleInput() {
         var skills = is_array(ch.skills) ? ch.skills : [];
         var scount = array_length(skills);
         if (scount <= 0) {
-            if (k_up) m.header_focus = true;
+            if (nav_up) m.header_focus = true;
             return;
         }
-        if (k_up) {
+        if (nav_up) {
             if (m.skill_index > 0) {
                 m.skill_index -= 1;
             } else {
                 m.header_focus = true;
+                m.repeat_dir = 0;
                 return;
             }
         }
-        if (k_down) {
+        if (nav_down) {
             if (m.skill_index < scount - 1) m.skill_index += 1;
         }
 
@@ -208,7 +242,7 @@ function Menu_HandleInput() {
         var row_count = stat_count + 1; // action row
 
         if (!m.stats_focus) {
-            if (k_ok || k_down || k_up) {
+            if (k_ok || nav_down || nav_up) {
                 m.stats_focus = true;
                 m.stats_row = 0;
                 m.stats_col = 1;
@@ -216,17 +250,18 @@ function Menu_HandleInput() {
             return;
         }
 
-        if (k_up) {
+        if (nav_up) {
             if (m.stats_row > 0) {
                 m.stats_row -= 1;
             } else {
                 m.stats_focus = false;
                 m.header_focus = true;
+                m.repeat_dir = 0;
                 return;
             }
         }
 
-        if (k_down) {
+        if (nav_down) {
             if (m.stats_row < row_count - 1) m.stats_row += 1;
         }
 

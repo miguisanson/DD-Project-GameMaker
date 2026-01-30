@@ -20,39 +20,56 @@ function Debug_IsEnabled() {
 function Debug_GiveAllItems() {
     var gs = GameState_Get();
     if (!is_struct(gs.player_ch)) return;
-    if (!variable_global_exists("item_db") || !is_struct(global.item_db)) ItemDB_Init();
+    if (!variable_global_exists("item_db")) ItemDB_Init();
 
     var ch = gs.player_ch;
     var max_qty = 99;
 
-    var keys = variable_struct_get_names(global.item_db);
-    for (var i = 0; i < array_length(keys); i++) {
-        var key = keys[i];
-        var item = variable_struct_get(global.item_db, key);
-        if (!is_struct(item) || !variable_struct_exists(item, "id")) continue;
-        if (item.id <= 0) continue;
+    if (ds_exists(global.item_db, ds_type_map)) {
+        var keylist = ds_map_keys_to_array(global.item_db);
+        var count = array_length(keylist);
+        for (var i = 0; i < count; i++) {
+            var key = keylist[i];
+            var item = ds_map_find_value(global.item_db, key);
+            if (!is_struct(item) || !variable_struct_exists(item, "id")) continue;
+            if (item.id <= 0) continue;
 
-        var qty = 1;
-        if (variable_struct_exists(item, "stackable") && item.stackable) {
-            qty = max_qty;
-            if (variable_struct_exists(item, "max_stack")) qty = min(item.max_stack, max_qty);
+            var qty = 1;
+            if (variable_struct_exists(item, "stackable") && item.stackable) {
+                qty = max_qty;
+                if (variable_struct_exists(item, "max_stack")) qty = min(item.max_stack, max_qty);
+            }
+
+            ch.inventory = Inv_Add(ch.inventory, item.id, qty);
         }
+    } else if (is_struct(global.item_db)) {
+        var keys = variable_struct_get_names(global.item_db);
+        for (var j = 0; j < array_length(keys); j++) {
+            var key2 = keys[j];
+            var item2 = variable_struct_get(global.item_db, key2);
+            if (!is_struct(item2) || !variable_struct_exists(item2, "id")) continue;
+            if (item2.id <= 0) continue;
 
-        ch.inventory = Inv_Add(ch.inventory, item.id, qty);
+            var qty2 = 1;
+            if (variable_struct_exists(item2, "stackable") && item2.stackable) {
+                qty2 = max_qty;
+                if (variable_struct_exists(item2, "max_stack")) qty2 = min(item2.max_stack, max_qty);
+            }
+
+            ch.inventory = Inv_Add(ch.inventory, item2.id, qty2);
+        }
     }
 
     GameState_SetPlayer(ch);
 }
 
+
 function Debug_LevelUp() {
     var gs = GameState_Get();
     if (!is_struct(gs.player_ch)) return;
     var ch = gs.player_ch;
-    var before = ch.level;
     ch.exp += ch.exp_next;
     ch = LevelUp_FromExp(ch);
-    if (!variable_struct_exists(ch, "stat_points")) ch.stat_points = 0;
-    if (ch.level > before) ch.stat_points += (ch.level - before);
     GameState_SetPlayer(ch);
 }
 

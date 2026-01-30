@@ -23,7 +23,7 @@ function Input_Init() {
         inp.bindings.menu = [ord("I"), vk_tab];
 
         inp.bindings.menu_up = [ord("W"), vk_up];
-        inp.bindings.debug_toggle = [ord("="), ord("+")];
+        inp.bindings.debug_toggle = [ord("P")];
 
         inp.bindings.menu_down = [ord("S"), vk_down];
         inp.bindings.menu_left = [ord("A"), vk_left];
@@ -35,6 +35,12 @@ function Input_Init() {
         inp.bindings.debug_all_items = [ord("K")];
     }
 
+
+    inp.bindings.debug_toggle = [ord("P")];
+    if (!variable_struct_exists(inp.bindings, "debug_levelup")) inp.bindings.debug_levelup = [ord("L")];
+    if (!variable_struct_exists(inp.bindings, "debug_all_items")) inp.bindings.debug_all_items = [ord("K")];
+    if (!variable_struct_exists(inp.bindings, "debug_save")) inp.bindings.debug_save = [vk_f5];
+    if (!variable_struct_exists(inp.bindings, "debug_load")) inp.bindings.debug_load = [vk_f9];
     if (!variable_struct_exists(inp, "state")) {
         inp.state = {};
     }
