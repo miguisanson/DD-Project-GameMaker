@@ -71,7 +71,7 @@ function Debug_Load() {
 
 function Debug_Update() {
     Debug_Init();
-    if (Input_Pressed("debug_toggle") || Input_Pressed("debug_toggle_alt")) Debug_Toggle();
+    if (Input_Pressed("debug_toggle")) Debug_Toggle();
     if (!Debug_IsEnabled()) return;
     if (Input_Pressed("debug_levelup")) Debug_LevelUp();
     if (Input_Pressed("debug_all_items")) Debug_GiveAllItems();

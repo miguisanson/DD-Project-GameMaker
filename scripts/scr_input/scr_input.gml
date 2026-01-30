@@ -23,8 +23,7 @@ function Input_Init() {
         inp.bindings.menu = [ord("I"), vk_tab];
 
         inp.bindings.menu_up = [ord("W"), vk_up];
-        inp.bindings.debug_toggle = [ord("=")];
-        inp.bindings.debug_toggle_alt = [vk_oem_plus];
+        inp.bindings.debug_toggle = [ord("="), ord("+")];
 
         inp.bindings.menu_down = [ord("S"), vk_down];
         inp.bindings.menu_left = [ord("A"), vk_left];
