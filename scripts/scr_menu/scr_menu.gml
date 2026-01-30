@@ -450,12 +450,16 @@ function Menu_Draw() {
         var label_x = right_x;
         var btn_w = max(12, row_h2 * 0.6);
         var btn_h = row_h2 - 4;
-        var plus_x = right_x + right_w - btn_w;
+        var preview_w = max(btn_w, string_width("+99"));
+        var preview_x = right_x + right_w - preview_w;
+        var plus_x = preview_x - btn_w - pad;
         var minus_x = plus_x - btn_w - pad;
 
         for (var i3 = 0; i3 < stat_count; i3++) {
             var row_y = list_y + i3 * row_h2;
             var val = variable_struct_get(m.pending_stats, stat_keys[i3]);
+            var base_v = variable_struct_get(m.base_stats, stat_keys[i3]);
+            var preview = val - base_v;
 
             var sel_minus = (m.stats_focus && m.stats_row == i3 && m.stats_col == 0);
             var sel_plus = (m.stats_focus && m.stats_row == i3 && m.stats_col == 1);
@@ -483,6 +487,11 @@ function Menu_Draw() {
             draw_text(minus_tx, row_y, "-");
             draw_set_color(sel_plus ? c_black : c_white);
             draw_text(plus_tx, row_y, "+");
+
+            if (preview > 0) {
+                draw_set_color(c_white);
+                draw_text(preview_x, row_y, "+" + string(preview));
+            }
         }
 
         var action_row = stat_count;

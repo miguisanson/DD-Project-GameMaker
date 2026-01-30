@@ -29,6 +29,7 @@ function Input_Init() {
 
         inp.bindings.debug_save = [vk_f5];
         inp.bindings.debug_load = [vk_f9];
+        inp.bindings.debug_levelup = [ord("L")];
     }
 
     if (!variable_struct_exists(inp, "state")) {
