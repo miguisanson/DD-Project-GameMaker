@@ -17,5 +17,6 @@ if (gs.last_room != room) {
     if (variable_global_exists("room_state_ready") && global.room_state_ready) {
         RoomState_Apply(room);
     }
+    RoomTransition_Apply();
 }
 

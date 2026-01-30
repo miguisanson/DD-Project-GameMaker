@@ -215,6 +215,10 @@ function GameState_Init() {
         gs.ui = { mode: 0, lines: [], index: 0, speaker: "", just_opened: false, lock_actions: 0, confirm_action: "", icon_frame: 0 };
     }
 
+    if (!variable_struct_exists(gs, "transition")) {
+        gs.transition = { pending: false, room: noone, spawn_id: "", face: -1 };
+    }
+
     if (!variable_struct_exists(gs, "room_states")) {
         gs.room_states = {};
     }

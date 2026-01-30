@@ -7,6 +7,9 @@ function RoomState_Init() {
     if (!variable_struct_exists(gs, "room_states")) {
         gs.room_states = {};
     }
+    if (!variable_struct_exists(gs, "room_state_version")) {
+        gs.room_state_version = 0;
+    }
     global.room_state_ready = true;
 }
 
@@ -41,7 +44,7 @@ function RoomState_Save(_room) {
     if (!variable_struct_exists(gs, "uid_counter")) gs.uid_counter = 1;
     var key = RoomState_Key(_room);
 
-    var state = { enemies: [], interactables: [], pickups: [] };
+    var state = { version: gs.room_state_version, enemies: [], interactables: [], pickups: [] };
 
     var enemy_fields = ["enemy_id","enemy_uid","ai_state","forget_time","home_x","home_y","moving","move_dir","move_timer","think_delay","scan_radius","think_rate","forget_delay","leash_mult","wander_chance","move_speed","sprite_index"];
     with (obj_enemy) {
@@ -76,6 +79,7 @@ function RoomState_Apply(_room) {
     if (!variable_struct_exists(gs.room_states, key)) return;
 
     var state = variable_struct_get(gs.room_states, key);
+    if (variable_struct_exists(state, "version") && state.version != gs.room_state_version) return;
 
     with (obj_enemy) instance_destroy();
     with (obj_interactable) instance_destroy();
