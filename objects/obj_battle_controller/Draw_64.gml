@@ -86,9 +86,9 @@ if (battle_state == BSTATE_SKILL_MENU) {
 
     var skill_count = array_length(skills);
     var total = skill_count + 1;
-    var visible = 4;
-    var start = clamp(skill_index - (visible - 1), 0, max(0, total - visible));
-    var endv = min(total, start + visible);
+    var rows_visible = 4;
+    var start = clamp(skill_index - (rows_visible - 1), 0, max(0, total - rows_visible));
+    var endv = min(total, start + rows_visible);
 
     for (var s = start; s < endv; s++) {
         var row = s - start;
@@ -117,9 +117,9 @@ if (battle_state == BSTATE_ITEM_MENU) {
 
     var item_count = array_length(items);
     var total = item_count + 1;
-    var visible = 4;
-    var start = clamp(item_index - (visible - 1), 0, max(0, total - visible));
-    var endv = min(total, start + visible);
+    var rows_visible = 4;
+    var start = clamp(item_index - (rows_visible - 1), 0, max(0, total - rows_visible));
+    var endv = min(total, start + rows_visible);
 
     for (var it = start; it < endv; it++) {
         var row = it - start;

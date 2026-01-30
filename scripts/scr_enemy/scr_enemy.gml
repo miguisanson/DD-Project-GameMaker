@@ -76,7 +76,7 @@ function EnemyAI_BuildContext(_inst, _cfg) {
     return { move_speed_mult: 1 };
 }
 
-function EnemyAI_ApplyTraitsfunction EnemyAI_ApplyTraits(_inst, _cfg, _ctx, _hook) {
+function EnemyAI_ApplyTraits(_inst, _cfg, _ctx, _hook) {
     if (!is_struct(_cfg) || !variable_struct_exists(_cfg, "traits")) return;
 
     var traits = _cfg.traits;
