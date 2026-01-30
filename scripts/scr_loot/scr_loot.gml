@@ -110,44 +110,39 @@ function Loot_BuildSkillbookLists() {
         global.skillbook_by_class[? classes[c]] = [];
     }
 
-    var keylist = ds_map_keys(global.item_db);
-    for (var i = 0; i < ds_list_size(keylist); i++) {
-        var key = keylist[| i];
+    var key = ds_map_find_first(global.item_db);
+    while (key != undefined) {
         var item = global.item_db[? key];
-        if (!is_struct(item)) continue;
-        if (!variable_struct_exists(item, "use")) continue;
-        if (!variable_struct_exists(item.use, "effect")) continue;
-        if (item.use.effect != "learn_skill") continue;
-
-        var skill = SkillDB_Get(item.use.skill_id);
-        if (!is_struct(skill) || !variable_struct_exists(skill, "class_list")) {
-            for (var c2 = 0; c2 < array_length(classes); c2++) {
-                var arr = global.skillbook_by_class[? classes[c2]];
-                array_push(arr, item.id);
-                global.skillbook_by_class[? classes[c2]] = arr;
-            }
-            continue;
-        }
-
-        var cl = skill.class_list;
-        if (!is_array(cl) || array_length(cl) == 0) {
-            for (var c3 = 0; c3 < array_length(classes); c3++) {
-                var arr2 = global.skillbook_by_class[? classes[c3]];
-                array_push(arr2, item.id);
-                global.skillbook_by_class[? classes[c3]] = arr2;
-            }
-        } else {
-            for (var j = 0; j < array_length(cl); j++) {
-                var cls = cl[j];
-                if (ds_map_exists(global.skillbook_by_class, cls)) {
-                    var arr3 = global.skillbook_by_class[? cls];
-                    array_push(arr3, item.id);
-                    global.skillbook_by_class[? cls] = arr3;
+        if (is_struct(item) && variable_struct_exists(item, "use") && variable_struct_exists(item.use, "effect") && item.use.effect == "learn_skill") {
+            var skill = SkillDB_Get(item.use.skill_id);
+            if (!is_struct(skill) || !variable_struct_exists(skill, "class_list")) {
+                for (var c2 = 0; c2 < array_length(classes); c2++) {
+                    var arr = global.skillbook_by_class[? classes[c2]];
+                    array_push(arr, item.id);
+                    global.skillbook_by_class[? classes[c2]] = arr;
+                }
+            } else {
+                var cl = skill.class_list;
+                if (!is_array(cl) || array_length(cl) == 0) {
+                    for (var c3 = 0; c3 < array_length(classes); c3++) {
+                        var arr2 = global.skillbook_by_class[? classes[c3]];
+                        array_push(arr2, item.id);
+                        global.skillbook_by_class[? classes[c3]] = arr2;
+                    }
+                } else {
+                    for (var j = 0; j < array_length(cl); j++) {
+                        var cls = cl[j];
+                        if (ds_map_exists(global.skillbook_by_class, cls)) {
+                            var arr3 = global.skillbook_by_class[? cls];
+                            array_push(arr3, item.id);
+                            global.skillbook_by_class[? cls] = arr3;
+                        }
+                    }
                 }
             }
         }
+        key = ds_map_find_next(global.item_db, key);
     }
-    ds_list_destroy(keylist);
 }
 
 function Loot_SkillbookList(_class_id) {
