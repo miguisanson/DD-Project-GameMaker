@@ -1,4 +1,5 @@
 Input_PreStep();
+Debug_Update();
 if (!instance_exists(obj_ui_controller)) {
     instance_create_layer(0, 0, "Instances", obj_ui_controller);
 }
@@ -18,15 +19,3 @@ if (gs.last_room != room) {
     }
 }
 
-if (Input_Pressed("debug_save")) {
-    Save_Write(0);
-    Dialogue_Start("sys_save_ok");
-}
-
-if (Input_Pressed("debug_load")) {
-    if (Save_Read(0)) {
-        Dialogue_Start("sys_load_ok");
-    } else {
-        Dialogue_Start("sys_load_missing");
-    }
-}

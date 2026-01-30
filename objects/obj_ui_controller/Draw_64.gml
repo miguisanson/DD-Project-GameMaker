@@ -89,3 +89,9 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
 
 }
 
+
+// Debug indicator
+if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled) {
+    draw_set_color(c_yellow);
+    draw_text(8, 8, "DEBUG MODE: ON");
+}

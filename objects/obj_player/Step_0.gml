@@ -13,16 +13,6 @@ if (battle_cooldown > 0) {
 
 interact_key = Input_Pressed("interact");
 
-if (Input_Pressed("debug_levelup")) {
-    var ch = gs.player_ch;
-    var before_level = ch.level;
-    ch.exp += ch.exp_next;
-    ch = LevelUp_FromExp(ch);
-    if (!variable_struct_exists(ch, "stat_points")) ch.stat_points = 0;
-    if (ch.level > before_level) ch.stat_points += (ch.level - before_level);
-    GameState_SetPlayer(ch);
-}
-
 if (!moving) {
     move_dir = -1;
     if (!interact_key) {
