@@ -11,57 +11,57 @@ function Loot_Init() {
 
     // --- item tables (NO skillbooks) ---
     var chest = [
-        { item_id:0,  weight:6,  tier:1, qty_min:0, qty_max:0 },
-        { item_id:10, weight:32, tier:1, qty_min:1, qty_max:3 },
-        { item_id:11, weight:28, tier:1, qty_min:1, qty_max:3 },
-        { item_id:12, weight:20, tier:1, qty_min:1, qty_max:2 },
-        { item_id:13, weight:20, tier:1, qty_min:1, qty_max:2 },
-        { item_id:1,  weight:8,  tier:1, qty_min:0, qty_max:1 },
-        { item_id:4,  weight:8,  tier:1, qty_min:0, qty_max:1 },
-        { item_id:7,  weight:8,  tier:1, qty_min:0, qty_max:1 },
-        { item_id:20, weight:6,  tier:1, qty_min:0, qty_max:1 },
-        { item_id:23, weight:6,  tier:1, qty_min:0, qty_max:1 },
+        { item_id:0,  weight:6,  tier:1, qty_min:0, qty_max:0 }, // Nothing found
+        { item_id:10, weight:32, tier:1, qty_min:1, qty_max:3 }, // HP Potion Lv1
+        { item_id:11, weight:28, tier:1, qty_min:1, qty_max:3 }, // MP Potion Lv1
+        { item_id:12, weight:20, tier:1, qty_min:1, qty_max:2 }, // Antidote
+        { item_id:13, weight:20, tier:1, qty_min:1, qty_max:2 }, // Bandage
+        { item_id:1,  weight:8,  tier:1, qty_min:0, qty_max:1 }, // Wooden Sword
+        { item_id:4,  weight:8,  tier:1, qty_min:0, qty_max:1 }, // Wooden Bow
+        { item_id:7,  weight:8,  tier:1, qty_min:0, qty_max:1 }, // Wooden Staff
+        { item_id:20, weight:6,  tier:1, qty_min:0, qty_max:1 }, // Leather Armor
+        { item_id:23, weight:6,  tier:1, qty_min:0, qty_max:1 }, // Cloth Robe
 
-        { item_id:14, weight:20, tier:2, qty_min:1, qty_max:4 },
-        { item_id:17, weight:18, tier:2, qty_min:1, qty_max:4 },
-        { item_id:2,  weight:7,  tier:2, qty_min:0, qty_max:1 },
-        { item_id:5,  weight:7,  tier:2, qty_min:0, qty_max:1 },
-        { item_id:8,  weight:6,  tier:2, qty_min:0, qty_max:1 },
-        { item_id:21, weight:6,  tier:2, qty_min:0, qty_max:1 },
-        { item_id:24, weight:6,  tier:2, qty_min:0, qty_max:1 },
+        { item_id:14, weight:20, tier:2, qty_min:1, qty_max:4 }, // HP Potion Lv2
+        { item_id:17, weight:18, tier:2, qty_min:1, qty_max:4 }, // MP Potion Lv2
+        { item_id:2,  weight:7,  tier:2, qty_min:0, qty_max:1 }, // Iron Sword
+        { item_id:5,  weight:7,  tier:2, qty_min:0, qty_max:1 }, // Iron Bow
+        { item_id:8,  weight:6,  tier:2, qty_min:0, qty_max:1 }, // Ruby Staff
+        { item_id:21, weight:6,  tier:2, qty_min:0, qty_max:1 }, // Iron Armor
+        { item_id:24, weight:6,  tier:2, qty_min:0, qty_max:1 }, // Silk Robe
 
-        { item_id:15, weight:14, tier:3, qty_min:1, qty_max:5 },
-        { item_id:18, weight:12, tier:3, qty_min:1, qty_max:5 },
-        { item_id:3,  weight:5,  tier:3, qty_min:0, qty_max:1 },
-        { item_id:6,  weight:5,  tier:3, qty_min:0, qty_max:1 },
-        { item_id:9,  weight:4,  tier:3, qty_min:0, qty_max:1 },
-        { item_id:22, weight:4,  tier:3, qty_min:0, qty_max:1 },
-        { item_id:25, weight:4,  tier:3, qty_min:0, qty_max:1 }
+        { item_id:15, weight:14, tier:3, qty_min:1, qty_max:5 }, // HP Potion Lv3
+        { item_id:18, weight:12, tier:3, qty_min:1, qty_max:5 }, // MP Potion Lv3
+        { item_id:3,  weight:5,  tier:3, qty_min:0, qty_max:1 }, // Platinum Sword
+        { item_id:6,  weight:5,  tier:3, qty_min:0, qty_max:1 }, // Platinum Bow
+        { item_id:9,  weight:4,  tier:3, qty_min:0, qty_max:1 }, // Diamond Staff
+        { item_id:22, weight:4,  tier:3, qty_min:0, qty_max:1 }, // Platinum Armor
+        { item_id:25, weight:4,  tier:3, qty_min:0, qty_max:1 }  // Mithril Robe
     ];
 
     var barrel = [
-        { item_id:0,  weight:24, tier:1, qty_min:0, qty_max:0 },
-        { item_id:10, weight:30, tier:1, qty_min:1, qty_max:2 },
-        { item_id:11, weight:26, tier:1, qty_min:1, qty_max:2 },
-        { item_id:12, weight:20, tier:1, qty_min:1, qty_max:2 },
-        { item_id:13, weight:20, tier:1, qty_min:1, qty_max:2 },
-        { item_id:14, weight:12, tier:2, qty_min:1, qty_max:3 },
-        { item_id:17, weight:10, tier:2, qty_min:1, qty_max:3 },
-        { item_id:1,  weight:6,  tier:1, qty_min:0, qty_max:1 },
-        { item_id:4,  weight:6,  tier:1, qty_min:0, qty_max:1 }
+        { item_id:0,  weight:24, tier:1, qty_min:0, qty_max:0 }, // Nothing found
+        { item_id:10, weight:30, tier:1, qty_min:1, qty_max:2 }, // HP Potion Lv1
+        { item_id:11, weight:26, tier:1, qty_min:1, qty_max:2 }, // MP Potion Lv1
+        { item_id:12, weight:20, tier:1, qty_min:1, qty_max:2 }, // Antidote
+        { item_id:13, weight:20, tier:1, qty_min:1, qty_max:2 }, // Bandage
+        { item_id:14, weight:12, tier:2, qty_min:1, qty_max:3 }, // HP Potion Lv2
+        { item_id:17, weight:10, tier:2, qty_min:1, qty_max:3 }, // MP Potion Lv2
+        { item_id:1,  weight:6,  tier:1, qty_min:0, qty_max:1 }, // Wooden Sword
+        { item_id:4,  weight:6,  tier:1, qty_min:0, qty_max:1 }  // Wooden Bow
     ];
 
     var enemy = [
-        { item_id:10, weight:30, tier:1, qty_min:1, qty_max:2 },
-        { item_id:11, weight:22, tier:1, qty_min:1, qty_max:2 },
-        { item_id:12, weight:12, tier:1, qty_min:1, qty_max:1 },
-        { item_id:13, weight:12, tier:1, qty_min:1, qty_max:1 },
-        { item_id:14, weight:10, tier:2, qty_min:1, qty_max:2 },
-        { item_id:17, weight:8,  tier:2, qty_min:1, qty_max:2 },
-        { item_id:2,  weight:4,  tier:2, qty_min:0, qty_max:1 },
-        { item_id:5,  weight:4,  tier:2, qty_min:0, qty_max:1 },
-        { item_id:3,  weight:2,  tier:3, qty_min:0, qty_max:1 },
-        { item_id:6,  weight:2,  tier:3, qty_min:0, qty_max:1 }
+        { item_id:10, weight:30, tier:1, qty_min:1, qty_max:2 }, // HP Potion Lv1
+        { item_id:11, weight:22, tier:1, qty_min:1, qty_max:2 }, // MP Potion Lv1
+        { item_id:12, weight:12, tier:1, qty_min:1, qty_max:1 }, // Antidote
+        { item_id:13, weight:12, tier:1, qty_min:1, qty_max:1 }, // Bandage
+        { item_id:14, weight:10, tier:2, qty_min:1, qty_max:2 }, // HP Potion Lv2
+        { item_id:17, weight:8,  tier:2, qty_min:1, qty_max:2 }, // MP Potion Lv2
+        { item_id:2,  weight:4,  tier:2, qty_min:0, qty_max:1 }, // Iron Sword
+        { item_id:5,  weight:4,  tier:2, qty_min:0, qty_max:1 }, // Iron Bow
+        { item_id:3,  weight:2,  tier:3, qty_min:0, qty_max:1 }, // Platinum Sword
+        { item_id:6,  weight:2,  tier:3, qty_min:0, qty_max:1 }  // Platinum Bow
     ];
 
     ds_map_add(global.loot_tables, "chest", chest);
