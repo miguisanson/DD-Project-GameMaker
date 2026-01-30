@@ -42,6 +42,58 @@ function Interact_PlayerFacing(_pl, _inst) {
 }
 
 
+function Interact_FacingDistance(_pl, _inst) {
+    var INF = 1000000000;
+    var tile = 16;
+    if (variable_instance_exists(_pl, "tile_size")) tile = _pl.tile_size;
+    var margin = 2;
+
+    switch (_pl.face) {
+        case UP: {
+            var dy = _pl.bbox_top - _inst.bbox_bottom;
+            if (!((_pl.bbox_right > _inst.bbox_left) && (_pl.bbox_left < _inst.bbox_right))) return INF;
+            if (dy < -margin || dy > tile + margin) return INF;
+            return dy;
+        }
+        case DOWN: {
+            var dy2 = _inst.bbox_top - _pl.bbox_bottom;
+            if (!((_pl.bbox_right > _inst.bbox_left) && (_pl.bbox_left < _inst.bbox_right))) return INF;
+            if (dy2 < -margin || dy2 > tile + margin) return INF;
+            return dy2;
+        }
+        case LEFT: {
+            var dx = _pl.bbox_left - _inst.bbox_right;
+            if (!((_pl.bbox_bottom > _inst.bbox_top) && (_pl.bbox_top < _inst.bbox_bottom))) return INF;
+            if (dx < -margin || dx > tile + margin) return INF;
+            return dx;
+        }
+        case RIGHT: {
+            var dx2 = _inst.bbox_left - _pl.bbox_right;
+            if (!((_pl.bbox_bottom > _inst.bbox_top) && (_pl.bbox_top < _inst.bbox_bottom))) return INF;
+            if (dx2 < -margin || dx2 > tile + margin) return INF;
+            return dx2;
+        }
+    }
+
+    return INF;
+}
+
+function Interact_GetTarget(_pl) {
+    if (!instance_exists(_pl)) return noone;
+    var INF = 1000000000;
+    var best = noone;
+    var best_dist = INF;
+    with (obj_interactable) {
+        var d = Interact_FacingDistance(_pl, self);
+        if (d < best_dist) {
+            best_dist = d;
+            best = self;
+        }
+    }
+    return best;
+}
+
+
 
 function Interact_Handle(_inst) {
     var gs = GameState_Get();
@@ -51,6 +103,8 @@ function Interact_Handle(_inst) {
         Action_Request(pl, "interact");
         return;
     }
+    var target = Interact_GetTarget(pl);
+    if (target != _inst) return;
     if (!Interact_PlayerFacing(pl, _inst)) return;
     if (!Action_Request(pl, "interact")) return;
 
