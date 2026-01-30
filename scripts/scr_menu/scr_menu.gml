@@ -239,7 +239,13 @@ function Menu_HandleInput() {
         if (!is_struct(m.pending_stats)) Menu_StatsSync();
         var stat_keys = ["str","agi","def","intt","luck"];
         var stat_count = array_length(stat_keys);
-        var row_count = stat_count + 1; // action row
+        var pending_total = 0;
+        for (var pidx = 0; pidx < stat_count; pidx++) {
+            var base_v = variable_struct_get(m.base_stats, stat_keys[pidx]);
+            var cur_v = variable_struct_get(m.pending_stats, stat_keys[pidx]);
+            if (cur_v > base_v) pending_total += (cur_v - base_v);
+        }
+        var row_count = stat_count + ((pending_total > 0) ? 1 : 0); // action row
 
         if (!m.stats_focus) {
             if (k_ok || nav_down || nav_up) {
@@ -286,7 +292,7 @@ function Menu_HandleInput() {
                     variable_struct_set(m.pending_stats, key, cur_v - 1);
                     m.pending_points += 1;
                 }
-            } else {
+            } else if (pending_total > 0) {
                 if (m.stats_col == 0) {
                     Menu_StatsApply();
                 } else {
@@ -429,6 +435,13 @@ function Menu_Draw() {
         var stat_keys = ["str","agi","def","intt","luck"];
         var stat_count = array_length(stat_keys);
 
+        var pending_total = 0;
+        for (var pidx = 0; pidx < stat_count; pidx++) {
+            var base_v = variable_struct_get(m.base_stats, stat_keys[pidx]);
+            var cur_v = variable_struct_get(m.pending_stats, stat_keys[pidx]);
+            if (cur_v > base_v) pending_total += (cur_v - base_v);
+        }
+
         var left_x = bx + pad;
         var y0 = by + header_h + pad;
 
@@ -465,6 +478,12 @@ function Menu_Draw() {
 
         draw_sprite_ext(hp_bar_sprite, hp_frame, left_x, y0, bar_scale, bar_scale, 0, c_white, 1);
         draw_sprite_ext(mp_bar_sprite, mp_frame, left_x, y0 + hp_bar_h + pad, bar_scale, bar_scale, 0, c_white, 1);
+
+        draw_set_color(c_white);
+        var hp_text = string(ch.hp) + " / " + string(ch.max_hp);
+        var mp_text = string(ch.mp) + " / " + string(ch.max_mp);
+        draw_text(left_x + bar_w + 6, y0, hp_text);
+        draw_text(left_x + bar_w + 6, y0 + hp_bar_h + pad, mp_text);
 
         draw_set_color(c_white);
         var text_y = y0 + hp_bar_h + mp_bar_h + pad * 2;
@@ -527,6 +546,7 @@ function Menu_Draw() {
 
         var action_row = stat_count;
         var action_y = list_y + stat_count * row_h2 + pad;
+        var show_actions = (pending_total > 0);
         var confirm_text = "Confirm";
         var cancel_text = "Cancel";
         var confirm_w = string_width(confirm_text);
@@ -537,23 +557,25 @@ function Menu_Draw() {
         var confirm_x = right_x;
         var cancel_x = confirm_x + confirm_w + btn_pad * 2 + pad;
 
+        if (show_actions) {
         if (m.stats_focus && m.stats_row == action_row && m.stats_col == 0) {
-            draw_set_color(c_white);
-            draw_rectangle(confirm_x - btn_pad, action_y - 2, confirm_x + confirm_w + btn_pad, action_y + action_h, false);
-            draw_set_color(c_black);
-            draw_rectangle(confirm_x - btn_pad, action_y - 2, confirm_x + confirm_w + btn_pad, action_y + action_h, true);
-        }
-        draw_set_color((m.stats_focus && m.stats_row == action_row && m.stats_col == 0) ? c_black : c_white);
-        draw_text(confirm_x, action_y, confirm_text);
-
-        if (m.stats_focus && m.stats_row == action_row && m.stats_col == 1) {
-            draw_set_color(c_white);
-            draw_rectangle(cancel_x - btn_pad, action_y - 2, cancel_x + cancel_w + btn_pad, action_y + action_h, false);
-            draw_set_color(c_black);
-            draw_rectangle(cancel_x - btn_pad, action_y - 2, cancel_x + cancel_w + btn_pad, action_y + action_h, true);
-        }
-        draw_set_color((m.stats_focus && m.stats_row == action_row && m.stats_col == 1) ? c_black : c_white);
-        draw_text(cancel_x, action_y, cancel_text);
+                draw_set_color(c_white);
+                draw_rectangle(confirm_x - btn_pad, action_y - 2, confirm_x + confirm_w + btn_pad, action_y + action_h, false);
+                draw_set_color(c_black);
+                draw_rectangle(confirm_x - btn_pad, action_y - 2, confirm_x + confirm_w + btn_pad, action_y + action_h, true);
+            }
+            draw_set_color((m.stats_focus && m.stats_row == action_row && m.stats_col == 0) ? c_black : c_white);
+            draw_text(confirm_x, action_y, confirm_text);
+    
+            if (m.stats_focus && m.stats_row == action_row && m.stats_col == 1) {
+                draw_set_color(c_white);
+                draw_rectangle(cancel_x - btn_pad, action_y - 2, cancel_x + cancel_w + btn_pad, action_y + action_h, false);
+                draw_set_color(c_black);
+                draw_rectangle(cancel_x - btn_pad, action_y - 2, cancel_x + cancel_w + btn_pad, action_y + action_h, true);
+            }
+            draw_set_color((m.stats_focus && m.stats_row == action_row && m.stats_col == 1) ? c_black : c_white);
+            draw_text(cancel_x, action_y, cancel_text);
+            }
     }
 
 }
