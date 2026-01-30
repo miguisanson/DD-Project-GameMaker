@@ -764,13 +764,25 @@ function Item_Use(_item_id, _user, _target) {
 
     var eff = item.use.effect;
     if (eff == "heal") {
+        var before_hp = _target.hp;
         var amt = Item_ComputeAmount(_user, item.use);
         _target.hp = clamp(_target.hp + amt, 0, _target.max_hp);
-        result.msg = "Healed " + string(amt) + " HP.";
+        if (_target.hp == before_hp) {
+            result.ok = false;
+            result.msg = "No effect.";
+        } else {
+            result.msg = "Healed " + string(amt) + " HP.";
+        }
     } else if (eff == "mp") {
+        var before_mp = _target.mp;
         var amt2 = Item_ComputeAmount(_user, item.use);
         _target.mp = clamp(_target.mp + amt2, 0, _target.max_mp);
-        result.msg = "Recovered " + string(amt2) + " MP.";
+        if (_target.mp == before_mp) {
+            result.ok = false;
+            result.msg = "No effect.";
+        } else {
+            result.msg = "Recovered " + string(amt2) + " MP.";
+        }
     } else if (eff == "cure") {
         var cured_name = "";
         if (is_array(_target.status)) {
@@ -785,6 +797,7 @@ function Item_Use(_item_id, _user, _target) {
         if (cured_name != "") {
             result.msg = cured_name + " cured.";
         } else {
+            result.ok = false;
             result.msg = "No status to cure.";
         }
     } else if (eff == "learn_skill") {
