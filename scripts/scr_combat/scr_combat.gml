@@ -159,6 +159,7 @@ function Battle_PlayerAttack(_bc) {
 
     if (!Status_CanAct(p)) {
         p = Status_Tick(p);
+        if (Battle_CheckEnd(_bc, p, e)) return;
         Battle_Message(_bc, "You are stunned!", BSTATE_ENEMY_ACT);
         _bc.turn = TURN_ENEMY;
         _bc.p = p;
@@ -208,6 +209,7 @@ function Battle_PlayerAttack(_bc) {
     }
 
     p = Status_Tick(p);
+    if (Battle_CheckEnd(_bc, p, e)) return;
     _bc.turn = TURN_ENEMY;
     _bc.p = p;
     _bc.e = e;
@@ -219,6 +221,7 @@ function Battle_PlayerSkill(_bc, _skill_id) {
 
     if (!Status_CanAct(p)) {
         p = Status_Tick(p);
+        if (Battle_CheckEnd(_bc, p, e)) return;
         Battle_Message(_bc, "You are stunned!", BSTATE_ENEMY_ACT);
         _bc.turn = TURN_ENEMY;
         _bc.p = p;
@@ -267,6 +270,7 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     }
 
     p = Status_Tick(p);
+    if (Battle_CheckEnd(_bc, p, e)) return;
     _bc.turn = TURN_ENEMY;
     _bc.p = p;
     _bc.e = e;
@@ -278,6 +282,7 @@ function Battle_PlayerItem(_bc, _item_id) {
 
     if (!Status_CanAct(p)) {
         p = Status_Tick(p);
+        if (Battle_CheckEnd(_bc, p, e)) return;
         Battle_Message(_bc, "You are stunned!", BSTATE_ENEMY_ACT);
         _bc.turn = TURN_ENEMY;
         _bc.p = p;
@@ -307,6 +312,7 @@ function Battle_PlayerItem(_bc, _item_id) {
 
     Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT);
     p = Status_Tick(p);
+    if (Battle_CheckEnd(_bc, p, e)) return;
     _bc.turn = TURN_ENEMY;
     _bc.p = p;
     _bc.e = e;
@@ -364,6 +370,7 @@ function Battle_EnemyAct(_bc) {
 
     if (!Status_CanAct(e)) {
         e = Status_Tick(e);
+        if (Battle_CheckEnd(_bc, p, e)) return;
         Battle_Message(_bc, e.name + " is stunned!", BSTATE_MENU);
         _bc.turn = TURN_PLAYER;
         _bc.p = p;
@@ -446,6 +453,7 @@ function Battle_EnemyAct(_bc) {
     }
 
     e = Status_Tick(e);
+    if (Battle_CheckEnd(_bc, p, e)) return;
     _bc.turn = TURN_PLAYER;
     _bc.p = p;
     _bc.e = e;

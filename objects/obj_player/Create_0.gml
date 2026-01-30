@@ -8,8 +8,9 @@ GameState_SetPlayerInst(id);
 // BATTLE COOLDOWN
 // --------------------
 battle_cooldown = 0;
+var just_returned = gs.battle.just_returned;
 
-if (gs.battle.just_returned) {
+if (just_returned) {
     x = gs.battle.return_x;
     y = gs.battle.return_y;
     GameState_SetJustReturned(false);
@@ -39,3 +40,8 @@ moving = false;
 move_dir = -1;
 move_timer = 0;
 tile_size = 16;
+if (just_returned) {
+    x = round(x / tile_size) * tile_size;
+    y = round(y / tile_size) * tile_size;
+}
+

@@ -320,6 +320,9 @@ function GameState_SetPlayerInst(_inst) {
 
 function GameState_SetBattleReturn(_room, _x, _y) {
     var gs = GameState_Get();
+    var tile = 16;
+    _x = round(_x / tile) * tile;
+    _y = round(_y / tile) * tile;
     gs.battle.return_room = _room;
     gs.battle.return_x = _x;
     gs.battle.return_y = _y;
