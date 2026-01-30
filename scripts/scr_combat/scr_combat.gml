@@ -130,8 +130,8 @@ function Battle_CheckEnd(_bc, _p, _e) {
         GameState_SetPlayer(_p);
 
         var gs = GameState_Get();
-        if (ds_exists(gs.defeated_enemies, ds_type_list) && gs.battle.enemy_uid != noone) {
-            ds_list_add(gs.defeated_enemies, gs.battle.enemy_uid);
+        if (variable_struct_exists(gs, "battle") && gs.battle.enemy_persist_id != "") {
+            RoomState_SetRemoved(gs.battle.enemy_room, gs.battle.enemy_persist_id);
         }
 
         Battle_Message(_bc, _e.name + " has been slain.", BSTATE_END_RUN);

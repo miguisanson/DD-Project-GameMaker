@@ -193,8 +193,9 @@ function GameState_Init() {
             return_room: noone,
             return_x: 0,
             return_y: 0,
-            enemy_uid: noone,
+            enemy_persist_id: "",
             enemy_id: -1,
+            enemy_room: noone,
             just_returned: false
         };
     }
@@ -286,8 +287,9 @@ function GameState_SyncLegacy() {
         global.battle_return_room = gs.battle.return_room;
         global.battle_return_x = gs.battle.return_x;
         global.battle_return_y = gs.battle.return_y;
-        global.battle_enemy_uid = gs.battle.enemy_uid;
+        global.battle_enemy_persist_id = gs.battle.enemy_persist_id;
         global.battle_enemy_id = gs.battle.enemy_id;
+        global.battle_enemy_room = gs.battle.enemy_room;
         global.just_returned_from_battle = gs.battle.just_returned;
     }
 
@@ -327,13 +329,15 @@ function GameState_SetBattleReturn(_room, _x, _y) {
     global.battle_return_y = _y;
 }
 
-function GameState_SetBattleEnemy(_uid, _enemy_id) {
+function GameState_SetBattleEnemy(_persist_id, _enemy_id) {
     var gs = GameState_Get();
-    gs.battle.enemy_uid = _uid;
+    gs.battle.enemy_persist_id = _persist_id;
     gs.battle.enemy_id = _enemy_id;
+    gs.battle.enemy_room = room;
 
-    global.battle_enemy_uid = _uid;
+    global.battle_enemy_persist_id = _persist_id;
     global.battle_enemy_id = _enemy_id;
+    global.battle_enemy_room = room;
 
     if (Menu_IsOpen()) Menu_Close();
 }

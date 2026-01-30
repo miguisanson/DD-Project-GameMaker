@@ -13,6 +13,8 @@ if (k_ok) {
     // reset core state for new game
     if (ds_exists(gs.defeated_enemies, ds_type_list)) ds_list_clear(gs.defeated_enemies);
     gs.room_states = {};
+    gs.persist = {};
+    gs.persist_applied = {};
     gs.uid_counter = 1;
 
     gs.player_ch = CharacterCreate_Player(class_id);

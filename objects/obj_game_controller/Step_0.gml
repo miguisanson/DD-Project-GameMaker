@@ -15,6 +15,7 @@ if (gs.last_room != room) {
     }
     gs.last_room = room;
     if (variable_global_exists("room_state_ready") && global.room_state_ready) {
+        RoomState_ClearApplied(room);
         RoomState_Apply(room);
     }
     RoomTransition_Apply();
@@ -31,3 +32,11 @@ if (gs.last_room != room) {
     }
 }
 
+// apply persistence once on initial room load
+if (room != rm_battle && variable_global_exists("room_state_ready") && global.room_state_ready) {
+    var gs_apply = GameState_Get();
+    var rname = room_get_name(room);
+    if (!variable_struct_exists(gs_apply, "persist_applied") || !variable_struct_exists(gs_apply.persist_applied, rname) || variable_struct_get(gs_apply.persist_applied, rname) == false) {
+        RoomState_Apply(room);
+    }
+}

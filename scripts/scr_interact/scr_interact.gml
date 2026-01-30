@@ -87,6 +87,7 @@ function Interact_Handle(_inst) {
                 _inst.sprite_index = _inst.swap_sprite;
             }
             _inst.swapped = true;
+            RoomState_SaveInstance(_inst, ["swapped","sprite_index"], false);
 
             // shared loot system (container)
             var lvl = 1;

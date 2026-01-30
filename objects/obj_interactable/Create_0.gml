@@ -1,3 +1,4 @@
+if (!variable_instance_exists(id, "persist_id")) persist_id = "";
 state_uid = -1;
 if (state_uid == -1) state_uid = GameState_NextUID();
 

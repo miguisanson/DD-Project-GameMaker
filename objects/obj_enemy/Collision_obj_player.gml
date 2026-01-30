@@ -7,7 +7,7 @@ if (variable_global_exists("room_state_ready") && global.room_state_ready) RoomS
 GameState_SetBattleReturn(room, other.x, other.y);
 
 // remember enemy instance + type
-GameState_SetBattleEnemy(enemy_uid, enemy_id);
+GameState_SetBattleEnemy(persist_id, enemy_id);
 
 // tell player to reposition after return
 GameState_SetJustReturned(true);
