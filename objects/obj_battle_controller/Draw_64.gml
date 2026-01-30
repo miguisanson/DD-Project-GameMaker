@@ -85,21 +85,28 @@ if (battle_state == BSTATE_SKILL_MENU) {
     var my2 = by + 12;
 
     var skill_count = array_length(skills);
-    for (var s = 0; s < skill_count; s++) {
-        var sk = SkillDB_Get(skills[s]);
-        var yy = my2 + s * 16;
-        if (s == skill_index) draw_text(mx2 - 10, yy, ">");
-        var tx = mx2;
-        if (sk.icon_sprite != noone) {
-            draw_sprite(sk.icon_sprite, 0, mx2, yy + 2);
-            tx += 16;
-        }
-        draw_text(tx, yy, sk.name + " (" + string(sk.mp_cost) + "MP)");
-    }
+    var total = skill_count + 1;
+    var visible = 4;
+    var start = clamp(skill_index - (visible - 1), 0, max(0, total - visible));
+    var endv = min(total, start + visible);
 
-    var back_y = my2 + skill_count * 16;
-    if (skill_index == skill_count) draw_text(mx2 - 10, back_y, ">");
-    draw_text(mx2, back_y, "Back");
+    for (var s = start; s < endv; s++) {
+        var row = s - start;
+        var yy = my2 + row * 16;
+        if (s == skill_count) {
+            if (s == skill_index) draw_text(mx2 - 10, yy, ">");
+            draw_text(mx2, yy, "Back");
+        } else {
+            var sk = SkillDB_Get(skills[s]);
+            if (s == skill_index) draw_text(mx2 - 10, yy, ">");
+            var tx = mx2;
+            if (sk.icon_sprite != noone) {
+                draw_sprite(sk.icon_sprite, 0, mx2, yy + 2);
+                tx += 16;
+            }
+            draw_text(tx, yy, sk.name + " (" + string(sk.mp_cost) + "MP)");
+        }
+    }
 }
 
 // item menu
@@ -109,19 +116,26 @@ if (battle_state == BSTATE_ITEM_MENU) {
     var my3 = by + 12;
 
     var item_count = array_length(items);
-    for (var it = 0; it < item_count; it++) {
-        var item = ItemDB_Get(items[it].id);
-        var yy2 = my3 + it * 16;
-        if (it == item_index) draw_text(mx3 - 10, yy2, ">");
-        var tx2 = mx3;
-        if (item.sprite != noone) {
-            draw_sprite(item.sprite, 0, mx3, yy2 + 2);
-            tx2 += 16;
-        }
-        draw_text(tx2, yy2, item.name + " x" + string(items[it].qty));
-    }
+    var total = item_count + 1;
+    var visible = 4;
+    var start = clamp(item_index - (visible - 1), 0, max(0, total - visible));
+    var endv = min(total, start + visible);
 
-    var back_y2 = my3 + item_count * 16;
-    if (item_index == item_count) draw_text(mx3 - 10, back_y2, ">");
-    draw_text(mx3, back_y2, "Back");
+    for (var it = start; it < endv; it++) {
+        var row = it - start;
+        var yy2 = my3 + row * 16;
+        if (it == item_count) {
+            if (it == item_index) draw_text(mx3 - 10, yy2, ">");
+            draw_text(mx3, yy2, "Back");
+        } else {
+            var item = ItemDB_Get(items[it].id);
+            if (it == item_index) draw_text(mx3 - 10, yy2, ">");
+            var tx2 = mx3;
+            if (item.sprite != noone) {
+                draw_sprite(item.sprite, 0, mx3, yy2 + 2);
+                tx2 += 16;
+            }
+            draw_text(tx2, yy2, item.name + " x" + string(items[it].qty));
+        }
+    }
 }

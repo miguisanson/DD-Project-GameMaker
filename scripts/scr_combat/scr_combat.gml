@@ -311,8 +311,17 @@ function Battle_GetSkillList(_bc) {
 
 function Battle_GetItemList(_bc) {
     var p = _bc.p;
-    if (is_array(p.inventory)) return p.inventory;
-    return [];
+    if (!is_array(p.inventory)) return [];
+
+    var out = [];
+    for (var i = 0; i < array_length(p.inventory); i++) {
+        var inv = p.inventory[i];
+        var item = ItemDB_Get(inv.id);
+        if (item.type == ITEM_CONSUMABLE && variable_struct_exists(item, "usable_battle") && item.usable_battle) {
+            array_push(out, inv);
+        }
+    }
+    return out;
 }
 
 function Battle_RunAttempt(_bc) {

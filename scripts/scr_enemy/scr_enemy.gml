@@ -76,7 +76,7 @@ function EnemyAI_BuildContext(_inst, _cfg) {
     return { move_speed_mult: 1 };
 }
 
-function EnemyAI_ApplyTraits(_inst, _cfg, _ctx, _hook) {
+function EnemyAI_ApplyTraitsfunction EnemyAI_ApplyTraits(_inst, _cfg, _ctx, _hook) {
     if (!is_struct(_cfg) || !variable_struct_exists(_cfg, "traits")) return;
 
     var traits = _cfg.traits;
@@ -89,6 +89,10 @@ function EnemyAI_ApplyTraits(_inst, _cfg, _ctx, _hook) {
         var fn = t[_hook];
         if (is_callable(fn)) fn(_inst, _cfg, _ctx);
     }
+}
+
+ function EnemyAI_CanStep(_inst, _mx, _my) {
+    return !place_meeting(_inst.x + _mx, _inst.y + _my, obj_wall) && !place_meeting(_inst.x + _mx, _inst.y + _my, obj_interactable);
 }
 
 function EnemyAI_Update(_inst, _cfg, _pl) {
@@ -143,8 +147,12 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
             if (_inst.ai_state == ENEMY_IDLE && _inst.wander_chance > 0) {
                 if (irandom(_inst.wander_chance - 1) == 0) {
                     _inst.move_dir = choose(UP, DOWN, LEFT, RIGHT);
-                    _inst.move_timer = _inst.tile_size;
-                    _inst.moving = true;
+                    var mxw = (_inst.move_dir == RIGHT) - (_inst.move_dir == LEFT);
+                    var myw = (_inst.move_dir == DOWN) - (_inst.move_dir == UP);
+                    if (EnemyAI_CanStep(_inst, mxw, myw)) {
+                        _inst.move_timer = _inst.tile_size;
+                        _inst.moving = true;
+                    }
                 }
             }
 
@@ -160,8 +168,12 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
                     else        _inst.move_dir = UP;
                 }
 
-                _inst.move_timer = _inst.tile_size;
-                _inst.moving = true;
+                var mxa = (_inst.move_dir == RIGHT) - (_inst.move_dir == LEFT);
+                var mya = (_inst.move_dir == DOWN) - (_inst.move_dir == UP);
+                if (EnemyAI_CanStep(_inst, mxa, mya)) {
+                    _inst.move_timer = _inst.tile_size;
+                    _inst.moving = true;
+                }
             }
         }
     }
@@ -180,7 +192,7 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
             case UP:    my = -1; break;
         }
 
-        if (!place_meeting(_inst.x + mx, _inst.y + my, obj_wall)) {
+        if (EnemyAI_CanStep(_inst, mx, my)) {
             var step = _inst.move_speed * ctx.move_speed_mult;
             if (step > _inst.move_timer) step = _inst.move_timer;
 
@@ -189,6 +201,7 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
             _inst.move_timer -= step;
         } else {
             _inst.moving = false;
+            _inst.move_timer = 0;
         }
 
         if (_inst.move_timer <= 0) {
