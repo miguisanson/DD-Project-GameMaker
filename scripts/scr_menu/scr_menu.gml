@@ -10,6 +10,7 @@ function Menu_Ensure() {
             open: false,
             tab: 0,
             tabs: ["Inventory","Skills","Stats"],
+            header_focus: true,
             inv_index: 0,
             inv_scroll: 0,
             skill_index: 0,
@@ -30,6 +31,7 @@ function Menu_Open() {
     var gs = GameState_Get();
     gs.ui.mode = UI_MENU;
     gs.ui.menu.open = true;
+    gs.ui.menu.header_focus = true;
     gs.ui.menu.stats_focus = false;
     Menu_StatsSync();
 }
@@ -124,13 +126,14 @@ function Menu_HandleInput() {
     if (k_back) {
         if (m.tab == 2 && m.stats_focus) {
             m.stats_focus = false;
+            m.header_focus = true;
             return;
         }
         Menu_Close();
         return;
     }
 
-    if (!m.stats_focus) {
+    if (m.header_focus) {
         if (k_left) {
             m.tab = (m.tab + array_length(m.tabs) - 1) mod array_length(m.tabs);
             if (m.tab == 2) Menu_StatsSync();
@@ -139,6 +142,14 @@ function Menu_HandleInput() {
             m.tab = (m.tab + 1) mod array_length(m.tabs);
             if (m.tab == 2) Menu_StatsSync();
         }
+        if (k_down) {
+            m.header_focus = false;
+            if (m.tab == 2) {
+                if (!is_struct(m.pending_stats)) Menu_StatsSync();
+                m.stats_focus = true;
+            }
+        }
+        return;
     }
 
     var layout = Menu_GetLayout();
@@ -147,8 +158,21 @@ function Menu_HandleInput() {
     if (m.tab == 0) {
         var items = is_array(ch.inventory) ? ch.inventory : [];
         var count = array_length(items);
-        if (k_down && count > 0) m.inv_index = (m.inv_index + 1) mod count;
-        if (k_up && count > 0) m.inv_index = (m.inv_index + count - 1) mod count;
+        if (count <= 0) {
+            if (k_up) m.header_focus = true;
+            return;
+        }
+        if (k_up) {
+            if (m.inv_index > 0) {
+                m.inv_index -= 1;
+            } else {
+                m.header_focus = true;
+                return;
+            }
+        }
+        if (k_down) {
+            if (m.inv_index < count - 1) m.inv_index += 1;
+        }
 
         if (m.inv_index < m.inv_scroll) m.inv_scroll = m.inv_index;
         if (m.inv_index >= m.inv_scroll + rows_visible) m.inv_scroll = m.inv_index - rows_visible + 1;
@@ -157,8 +181,21 @@ function Menu_HandleInput() {
     if (m.tab == 1) {
         var skills = is_array(ch.skills) ? ch.skills : [];
         var scount = array_length(skills);
-        if (k_down && scount > 0) m.skill_index = (m.skill_index + 1) mod scount;
-        if (k_up && scount > 0) m.skill_index = (m.skill_index + scount - 1) mod scount;
+        if (scount <= 0) {
+            if (k_up) m.header_focus = true;
+            return;
+        }
+        if (k_up) {
+            if (m.skill_index > 0) {
+                m.skill_index -= 1;
+            } else {
+                m.header_focus = true;
+                return;
+            }
+        }
+        if (k_down) {
+            if (m.skill_index < scount - 1) m.skill_index += 1;
+        }
 
         if (m.skill_index < m.skill_scroll) m.skill_scroll = m.skill_index;
         if (m.skill_index >= m.skill_scroll + rows_visible) m.skill_scroll = m.skill_index - rows_visible + 1;
@@ -168,7 +205,7 @@ function Menu_HandleInput() {
         if (!is_struct(m.pending_stats)) Menu_StatsSync();
         var stat_keys = ["str","agi","def","intt","luck"];
         var stat_count = array_length(stat_keys);
-        var row_count = stat_count + 2; // confirm, cancel
+        var row_count = stat_count + 1; // action row
 
         if (!m.stats_focus) {
             if (k_ok || k_down || k_up) {
@@ -179,12 +216,25 @@ function Menu_HandleInput() {
             return;
         }
 
-        if (k_down) m.stats_row = (m.stats_row + 1) mod row_count;
-        if (k_up)   m.stats_row = (m.stats_row + row_count - 1) mod row_count;
+        if (k_up) {
+            if (m.stats_row > 0) {
+                m.stats_row -= 1;
+            } else {
+                m.stats_focus = false;
+                m.header_focus = true;
+                return;
+            }
+        }
+
+        if (k_down) {
+            if (m.stats_row < row_count - 1) m.stats_row += 1;
+        }
 
         if (m.stats_row < stat_count) {
             if (k_left)  m.stats_col = 0;
             if (k_right) m.stats_col = 1;
+        } else {
+            if (k_left || k_right) m.stats_col = 1 - m.stats_col;
         }
 
         if (k_ok) {
@@ -201,14 +251,17 @@ function Menu_HandleInput() {
                     variable_struct_set(m.pending_stats, key, cur_v - 1);
                     m.pending_points += 1;
                 }
-            } else if (m.stats_row == stat_count) {
-                Menu_StatsApply();
             } else {
-                Menu_StatsDiscard();
+                if (m.stats_col == 0) {
+                    Menu_StatsApply();
+                } else {
+                    Menu_StatsDiscard();
+                }
             }
         }
     }
 }
+
 
 function Menu_Draw() {
     var gs = GameState_Get();
@@ -242,7 +295,9 @@ function Menu_Draw() {
     var tab_w = bw / array_length(m.tabs);
     for (var i = 0; i < array_length(m.tabs); i++) {
         var tx = bx + i * tab_w;
-        if (i == m.tab) {
+        var tab_active = (i == m.tab);
+        var tab_hi = tab_active && m.header_focus;
+        if (tab_hi) {
             draw_set_color(c_white);
             draw_rectangle(tx, by, tx + tab_w, by + header_h, false);
             draw_set_color(c_black);
@@ -269,7 +324,7 @@ function Menu_Draw() {
                 var row = i2 - start;
                 var yy = layout.content_y + row * row_h;
 
-                var sel = (i2 == m.inv_index);
+                var sel = (i2 == m.inv_index) && !m.header_focus;
                 if (sel) {
                     draw_set_color(c_white);
                     draw_rectangle(bx + pad - 4, yy - 2, bx + bw - pad + 4, yy + row_h - 2, false);
@@ -311,7 +366,7 @@ function Menu_Draw() {
                 var row2 = s - start2;
                 var y2 = layout.content_y + row2 * row_h;
 
-                var sel2 = (s == m.skill_index);
+                var sel2 = (s == m.skill_index) && !m.header_focus;
                 if (sel2) {
                     draw_set_color(c_white);
                     draw_rectangle(bx + pad - 4, y2 - 2, bx + bw - pad + 4, y2 + row_h - 2, false);
@@ -430,8 +485,7 @@ function Menu_Draw() {
             draw_text(plus_tx, row_y, "+");
         }
 
-        var confirm_row = stat_count;
-        var cancel_row = stat_count + 1;
+        var action_row = stat_count;
         var action_y = list_y + stat_count * row_h2 + pad;
         var confirm_text = "Confirm";
         var cancel_text = "Cancel";
@@ -443,22 +497,22 @@ function Menu_Draw() {
         var confirm_x = right_x;
         var cancel_x = confirm_x + confirm_w + btn_pad * 2 + pad;
 
-        if (m.stats_focus && m.stats_row == confirm_row) {
+        if (m.stats_focus && m.stats_row == action_row && m.stats_col == 0) {
             draw_set_color(c_white);
             draw_rectangle(confirm_x - btn_pad, action_y - 2, confirm_x + confirm_w + btn_pad, action_y + action_h, false);
             draw_set_color(c_black);
             draw_rectangle(confirm_x - btn_pad, action_y - 2, confirm_x + confirm_w + btn_pad, action_y + action_h, true);
         }
-        draw_set_color((m.stats_focus && m.stats_row == confirm_row) ? c_black : c_white);
+        draw_set_color((m.stats_focus && m.stats_row == action_row && m.stats_col == 0) ? c_black : c_white);
         draw_text(confirm_x, action_y, confirm_text);
 
-        if (m.stats_focus && m.stats_row == cancel_row) {
+        if (m.stats_focus && m.stats_row == action_row && m.stats_col == 1) {
             draw_set_color(c_white);
             draw_rectangle(cancel_x - btn_pad, action_y - 2, cancel_x + cancel_w + btn_pad, action_y + action_h, false);
             draw_set_color(c_black);
             draw_rectangle(cancel_x - btn_pad, action_y - 2, cancel_x + cancel_w + btn_pad, action_y + action_h, true);
         }
-        draw_set_color((m.stats_focus && m.stats_row == cancel_row) ? c_black : c_white);
+        draw_set_color((m.stats_focus && m.stats_row == action_row && m.stats_col == 1) ? c_black : c_white);
         draw_text(cancel_x, action_y, cancel_text);
     }
 
