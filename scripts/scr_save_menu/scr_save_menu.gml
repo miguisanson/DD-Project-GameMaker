@@ -16,18 +16,11 @@ function SaveMenu_Open(_mode, _context) {
         col: 0,
         confirm: false,
         confirm_choice: 0,
-        confirm_mode: "delete", // delete | overwrite | saved | bed_prompt
+        confirm_mode: "delete", // delete | overwrite | save | saved
         message: "",
         just_opened: true
     };
 
-    if (_context == "bed" && _mode == "save") {
-        SaveMenu_Log("bed prompt open");
-        gs.ui.save_menu.confirm = true;
-        gs.ui.save_menu.confirm_mode = "bed_prompt";
-        gs.ui.save_menu.confirm_choice = 1; // default Cancel
-        gs.ui.save_menu.message = "Save Game?";
-    }
 }
 
 function SaveMenu_Close() {
@@ -67,23 +60,6 @@ function SaveMenu_Handle() {
             return;
         }
 
-        if (sm.confirm_mode == "bed_prompt") {
-            if (k_left || k_right) sm.confirm_choice = 1 - sm.confirm_choice;
-            if (k_back) { SaveMenu_Close(); return; }
-            if (k_ok) {
-                if (sm.confirm_choice == 0) {
-                    SaveMenu_Log("bed prompt confirm -> slot select");
-                    sm.confirm = false;
-                } else {
-                    SaveMenu_Log("bed prompt cancel");
-                    SaveMenu_Close();
-                    return;
-                }
-            }
-            gs.ui.save_menu = sm;
-            return;
-        }
-
         if (k_left || k_right) sm.confirm_choice = 1 - sm.confirm_choice;
         if (k_back) { sm.confirm = false; gs.ui.save_menu = sm; return; }
         if (k_ok) {
@@ -93,6 +69,16 @@ function SaveMenu_Handle() {
                 Save_Delete(sm.slot + 1);
                 } else if (sm.confirm_mode == "overwrite") {
                     SaveMenu_Log("overwrite confirmed slot " + string(sm.slot + 1));
+                    Save_Write(sm.slot + 1);
+                    gs.save_slot = sm.slot + 1;
+                    if (sm.context == "bed") Enemy_ResetAll();
+                    sm.message = "Game saved.";
+                    sm.confirm_mode = "saved";
+                    sm.confirm_choice = 0;
+                    gs.ui.save_menu = sm;
+                    return;
+                } else if (sm.confirm_mode == "save") {
+                    SaveMenu_Log("save confirmed slot " + string(sm.slot + 1));
                     Save_Write(sm.slot + 1);
                     gs.save_slot = sm.slot + 1;
                     if (sm.context == "bed") Enemy_ResetAll();
@@ -150,14 +136,10 @@ function SaveMenu_Handle() {
                 sm.confirm_choice = 1; // default to Cancel
                 SaveMenu_Log("overwrite confirm open slot " + string(slot));
             } else {
-                SaveMenu_Log("save slot " + string(slot));
-                Save_Write(slot);
-                gs.save_slot = slot;
-                if (sm.context == "bed") Enemy_ResetAll();
                 sm.confirm = true;
-                sm.confirm_mode = "saved";
-                sm.message = "Game saved.";
-                sm.confirm_choice = 0;
+                sm.confirm_mode = "save";
+                sm.confirm_choice = 1; // default Cancel
+                SaveMenu_Log("save confirm open slot " + string(slot));
             }
         }
     }
@@ -255,7 +237,7 @@ function SaveMenu_Draw() {
         var msg = "";
         if (sm.confirm_mode == "delete") msg = "Delete slot?";
         else if (sm.confirm_mode == "overwrite") msg = "Overwrite save?";
-        else if (sm.confirm_mode == "bed_prompt") msg = "Save Game?";
+        else if (sm.confirm_mode == "save") msg = "Save to slot?";
         else msg = sm.message;
         draw_text(cx - 70, cy - 12, msg);
 

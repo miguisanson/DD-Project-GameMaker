@@ -37,7 +37,9 @@ xspeed = 0;
 yspeed = 0;
 move_speed = 1;
 
-face = DOWN;
+if (!just_returned) {
+    face = DOWN;
+}
 
 moving = false;
 move_dir = -1;

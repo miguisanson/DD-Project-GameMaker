@@ -87,7 +87,7 @@ function Save_ApplySnapshot(_snap) {
     var room_id = asset_get_index(room_name);
     if (room_id == -1) room_id = rm_floor1;
 
-    gs.last_room = room_id;
+    gs.last_room = noone;
 
     global.statData = stat;
     global.levelData = gs.persist;
