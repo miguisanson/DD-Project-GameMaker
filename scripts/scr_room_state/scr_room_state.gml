@@ -59,10 +59,15 @@ function RoomState_SaveInstance(_inst, _vars, _removed) {
     RoomState_Set(room, _inst.persist_id, data);
 }
 
-function RoomState_SetRemoved(_room, _persist_id) {
+function RoomState_SetRemoved(_room, _persist_id, _obj_type) {
     RoomState_Init();
     if (_persist_id == "") return;
-    RoomState_Set(_room, _persist_id, { removed: true, vars: {} });
+    var gs = GameState_Get();
+    var data = { removed: true, vars: {} };
+    if (argument_count >= 3 && _obj_type == obj_enemy) {
+        data.removed_reset_version = gs.enemy_reset_version;
+    }
+    RoomState_Set(_room, _persist_id, data);
 }
 
 function RoomState_ApplyInstance(_inst) {
@@ -73,6 +78,14 @@ function RoomState_ApplyInstance(_inst) {
     var data = RoomState_Get(room, _inst.persist_id);
     if (!is_struct(data)) return;
     if (variable_struct_exists(data, "removed") && data.removed) {
+        if (_inst.object_index == obj_enemy) {
+            var gs = GameState_Get();
+            var rv = 0;
+            if (variable_struct_exists(data, "removed_reset_version")) rv = data.removed_reset_version;
+            if (rv < gs.enemy_reset_version) {
+                return; // allow respawn after reset
+            }
+        }
         instance_destroy(_inst);
         return;
     }
@@ -100,4 +113,9 @@ function RoomState_Apply(_room) {
     with (obj_enemy) RoomState_ApplyInstance(self);
     with (obj_interactable) RoomState_ApplyInstance(self);
     if (object_exists(obj_item_pickup)) with (obj_item_pickup) RoomState_ApplyInstance(self);
+}
+
+function Enemy_ResetAll() {
+    var gs = GameState_Get();
+    gs.enemy_reset_version += 1;
 }

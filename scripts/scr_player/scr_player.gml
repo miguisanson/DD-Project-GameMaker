@@ -87,6 +87,14 @@ function Player_CanAcceptMove(_pl) {
     return true;
 }
 
+
+function UI_IsBlocking() {
+    var gs = GameState_Get();
+    if (gs.ui.mode != UI_NONE) return true;
+    if (array_length(gs.ui.lines) > 0) return true;
+    return false;
+}
+
 function Action_CanAct(_pl) {
     var gs = GameState_Get();
     if (gs.ui.mode != UI_NONE || array_length(gs.ui.lines) > 0) return false;
@@ -180,6 +188,10 @@ function GameState_Init() {
         gs.dialogue_db = global.dialogue_db;
     }
 
+    if (!variable_struct_exists(gs, "enemy_reset_version")) {
+        gs.enemy_reset_version = 0;
+    }
+
     if (!variable_struct_exists(gs, "loot_tables")) {
         Loot_Init();
         gs.loot_tables = global.loot_tables;
@@ -206,6 +218,14 @@ function GameState_Init() {
 
     if (!variable_struct_exists(gs, "flags")) {
         gs.flags = {};
+    }
+
+    if (!variable_struct_exists(gs, "save_slot")) {
+        gs.save_slot = 0;
+    }
+
+    if (!variable_struct_exists(gs, "skip_room_save")) {
+        gs.skip_room_save = false;
     }
 
     if (!variable_struct_exists(gs, "checkpoint")) {
@@ -318,7 +338,7 @@ function GameState_SetPlayerInst(_inst) {
     global.player_inst = _inst;
 }
 
-function GameState_SetBattleReturn(_room, _x, _y) {
+function GameState_SetBattleReturn(_room, _x, _y, _face) {
     var gs = GameState_Get();
     var tile = 16;
     _x = round(_x / tile) * tile;
@@ -326,10 +346,12 @@ function GameState_SetBattleReturn(_room, _x, _y) {
     gs.battle.return_room = _room;
     gs.battle.return_x = _x;
     gs.battle.return_y = _y;
+    gs.battle.return_face = (argument_count >= 4) ? _face : -1;
 
     global.battle_return_room = _room;
     global.battle_return_x = _x;
     global.battle_return_y = _y;
+    global.battle_return_face = gs.battle.return_face;
 }
 
 function GameState_SetBattleEnemy(_persist_id, _enemy_id) {

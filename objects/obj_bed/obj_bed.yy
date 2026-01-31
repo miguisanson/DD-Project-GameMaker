@@ -1,11 +1,11 @@
 {
   "$GMObject":"",
-  "%Name":"obj_checkpoint",
+  "%Name":"obj_bed",
   "eventList":[
     {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":0,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",},
   ],
   "managed":true,
-  "name":"obj_checkpoint",
+  "name":"obj_bed",
   "overriddenProperties":[],
   "parent":{
     "name":"Interactable",
@@ -32,7 +32,10 @@
   "resourceType":"GMObject",
   "resourceVersion":"2.0",
   "solid":false,
-  "spriteId":null,
+  "spriteId":{
+    "name":"spr_yellow",
+    "path":"sprites/spr_yellow/spr_yellow.yy",
+  },
   "spriteMaskId":null,
-  "visible":true,
+  "visible":false,
 }

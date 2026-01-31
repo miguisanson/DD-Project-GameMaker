@@ -3,7 +3,10 @@ if (other.battle_cooldown > 0) exit;
 
 // SAVE RETURN LOCATION (BATTLE SAFE)
 GameState_Init();
-if (variable_global_exists("room_state_ready") && global.room_state_ready) RoomState_Save(room);
+if (variable_global_exists("room_state_ready") && global.room_state_ready) {
+    RoomState_Save(room);
+    RoomState_SaveInstance(id, ["x", "y"], false);
+}
 GameState_SetBattleReturn(room, other.x, other.y);
 
 // remember enemy instance + type

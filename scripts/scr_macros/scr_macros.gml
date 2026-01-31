@@ -96,6 +96,7 @@
 #macro UI_NONE     0
 #macro UI_DIALOGUE 1
 #macro UI_MENU 2
+#macro UI_SAVE 3
 #macro UI_BAR_SCALE 3
 
 #macro SHAKE_DIR_H 0

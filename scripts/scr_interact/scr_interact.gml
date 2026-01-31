@@ -179,7 +179,12 @@ function Interact_Handle(_inst) {
         return;
     }
 
-    Dialogue_StartWithSpeaker(name, DialogueDB_Get(base_id));
+    var skip_dialogue = false;
+    if (_inst.interact_kind == INTERACT_CHECKPOINT && variable_instance_exists(_inst, "is_bed") && _inst.is_bed) skip_dialogue = true;
+
+    if (!skip_dialogue) {
+        Dialogue_StartWithSpeaker(name, DialogueDB_Get(base_id));
+    }
 
     // other interact types (door/checkpoint)
     switch (_inst.interact_kind) {
@@ -194,6 +199,10 @@ function Interact_Handle(_inst) {
 
         case INTERACT_CHECKPOINT: {
             GameState_SetCheckpoint(room, _inst.x, _inst.y);
+            if (variable_instance_exists(_inst, "is_bed") && _inst.is_bed) {
+                var gs = GameState_Get();
+                SaveMenu_Open("save", "bed");
+            }
         } break;
     }
 

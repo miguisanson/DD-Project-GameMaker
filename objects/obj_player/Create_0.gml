@@ -16,6 +16,9 @@ if (just_returned) {
     GameState_SetJustReturned(false);
 
     battle_cooldown = BATTLE_COOLDOWN_FRAMES;
+    if (variable_struct_exists(gs.battle, "return_face") && gs.battle.return_face != -1) {
+        face = gs.battle.return_face;
+    }
 }
 
 // --------------------

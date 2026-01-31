@@ -9,8 +9,13 @@ if (!variable_struct_exists(gs, "last_room")) gs.last_room = room;
 
 if (gs.last_room != room) {
     if (room != rm_battle) {
-        if (variable_global_exists("room_state_ready") && global.room_state_ready) {
-            RoomState_Save(gs.last_room);
+        var skip_save = false;
+        if (variable_struct_exists(gs, "skip_room_save") && gs.skip_room_save) skip_save = true;
+        if (variable_global_exists("skipRoomSave") && global.skipRoomSave) skip_save = true;
+        if (!skip_save) {
+            if (variable_global_exists("room_state_ready") && global.room_state_ready) {
+                RoomState_Save(gs.last_room);
+            }
         }
     }
     gs.last_room = room;
@@ -19,6 +24,9 @@ if (gs.last_room != room) {
         RoomState_Apply(room);
     }
     RoomTransition_Apply();
+
+    if (variable_struct_exists(gs, "skip_room_save")) gs.skip_room_save = false;
+    global.skipRoomSave = false;
 
     // ensure player exists if no transition pending (e.g. initial room / battle return)
     if (room != rm_battle && !instance_exists(obj_player)) {

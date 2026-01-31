@@ -40,6 +40,11 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     exit;
 }
 
+if (gs.ui.mode == UI_SAVE) {
+    SaveMenu_Handle();
+    exit;
+}
+
 if (k_menu) {
     if (gs.ui.mode == UI_MENU) {
         Menu_Close();
