@@ -1,4 +1,8 @@
 var gs = GameState_Get();
+Player_EnsureSpriteSet();
+if (!is_real(face)) face = DOWN;
+if (face < 0 || face > 3) face = DOWN;
+
 if (UI_IsBlocking()) {
     moving = false;
     move_timer = 0;
