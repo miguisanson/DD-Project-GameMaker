@@ -17,7 +17,8 @@ function SaveMenu_Open(_mode, _context) {
         confirm: false,
         confirm_choice: 0,
         confirm_mode: "delete", // delete | overwrite | saved | bed_prompt
-        message: ""
+        message: "",
+        just_opened: true
     };
 
     if (_context == "bed" && _mode == "save") {
@@ -42,6 +43,12 @@ function SaveMenu_Handle() {
     if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "save_menu")) return;
     var sm = gs.ui.save_menu;
     if (!sm.open) return;
+
+    if (variable_struct_exists(sm, "just_opened") && sm.just_opened) {
+        sm.just_opened = false;
+        gs.ui.save_menu = sm;
+        return;
+    }
 
     var k_up = Input_Pressed("menu_up");
     var k_down = Input_Pressed("menu_down");

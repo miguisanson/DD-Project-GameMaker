@@ -96,8 +96,8 @@ function UI_IsBlocking() {
 }
 
 function Action_CanAct(_pl) {
+    if (UI_IsBlocking()) return false;
     var gs = GameState_Get();
-    if (gs.ui.mode != UI_NONE || array_length(gs.ui.lines) > 0) return false;
     if (variable_struct_exists(gs.ui, "lock_actions") && gs.ui.lock_actions > 0) return false;
     return Player_CanAcceptMove(_pl);
 }
