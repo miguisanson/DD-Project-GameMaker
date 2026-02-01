@@ -73,6 +73,17 @@ if (instance_exists(enemy_inst)) {
     if (off.flash) gpu_set_blendmode(bm_normal);
 }
 
+// FX draw (battle-only), over enemy sprite
+with (obj_fx) {
+    if (sprite_index != noone) {
+        var fx_x = (x - sprite_get_xoffset(sprite_index) - vx) * sx;
+        var fx_y = (y - sprite_get_yoffset(sprite_index) - vy) * sy;
+        var fx_sx = image_xscale * sx;
+        var fx_sy = image_yscale * sy;
+        draw_sprite_ext(sprite_index, image_index, fx_x, fx_y, fx_sx, fx_sy, image_angle, image_blend, image_alpha);
+    }
+}
+
 
 // DEBUG ENEMY HP
 if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled) {

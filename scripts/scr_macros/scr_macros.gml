@@ -99,6 +99,7 @@
 #macro UI_SAVE 3
 #macro UI_PAUSE 4
 #macro UI_BAR_SCALE 3
+#macro VFX_SPEED_MULT 1.0
 
 #macro SHAKE_DIR_H 0
 #macro SHAKE_DIR_V 1

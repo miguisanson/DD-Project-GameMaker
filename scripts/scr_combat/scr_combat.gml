@@ -92,9 +92,44 @@ function FX_Spawn(_sprite, _x, _y, _frames, _speed) {
     if (_sprite == noone) return noone;
     var fx = instance_create_layer(_x, _y, "Instances", obj_fx);
     fx.sprite_index = _sprite;
-    fx.life = _frames;
-    fx.image_speed = _speed;
+    if (room == rm_battle) fx.visible = false;
+    var spd = sprite_get_speed(_sprite);
+    var spd_type = sprite_get_speed_type(_sprite);
+    if (spd_type == SPR_SPEED_FPS) {
+        var game_fps = game_get_speed(gamespeed_fps);
+        if (game_fps <= 0) game_fps = 60;
+        spd = spd / game_fps;
+    }
+    spd *= VFX_SPEED_MULT;
+    if (spd <= 0) spd = 0.001;
+    var frames = sprite_get_number(_sprite);
+    fx.life = ceil(frames / spd);
+    fx.image_speed = spd;
     return fx;
+}
+
+function FX_CenterOn(_sprite, _inst) {
+    var cx = _inst.x;
+    var cy = _inst.y;
+    if (instance_exists(_inst)) {
+        var ispr = _inst.sprite_index;
+        if (ispr != noone) {
+            var sx = abs(_inst.image_xscale);
+            var sy = abs(_inst.image_yscale);
+            var iw = sprite_get_width(ispr) * sx;
+            var ih = sprite_get_height(ispr) * sy;
+            var iox = sprite_get_xoffset(ispr) * sx;
+            var ioy = sprite_get_yoffset(ispr) * sy;
+            cx = _inst.x - iox + (iw * 0.5);
+            cy = _inst.y - ioy + (ih * 0.5);
+        }
+    }
+    if (_sprite == noone) return { x: cx, y: cy };
+    var w = sprite_get_width(_sprite);
+    var h = sprite_get_height(_sprite);
+    var ox = sprite_get_xoffset(_sprite);
+    var oy = sprite_get_yoffset(_sprite);
+    return { x: cx - (w * 0.5) + ox, y: cy - (h * 0.5) + oy };
 }
 
 function Battle_GrantRewards(_p, _e) {
@@ -233,12 +268,16 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     var target = (skill.target == TGT_SELF) ? p : e;
     var res = Skill_Use(p, target, _skill_id);
 
-    if (res.fx_sprite != noone) {
+    if (res.ok && res.fx_sprite != noone && (skill.effect != "damage" || res.hit)) {
         var tx = _bc.enemy_fx_x;
         var ty = _bc.enemy_fx_y;
         if (skill.target == TGT_SELF) {
             tx = _bc.player_fx_x;
             ty = _bc.player_fx_y;
+        } else if (instance_exists(_bc.enemy_inst)) {
+            var pos = FX_CenterOn(res.fx_sprite, _bc.enemy_inst);
+            tx = pos.x;
+            ty = pos.y;
         }
         FX_Spawn(res.fx_sprite, tx, ty, res.fx_frames, res.fx_speed);
     }
@@ -390,12 +429,15 @@ function Battle_EnemyAct(_bc) {
     if (use_skill) {
         if (!is_struct(sk)) sk = SkillDB_Get(skill_id);
         var res = Skill_Use(e, p, skill_id);
-        if (res.fx_sprite != noone) {
+        if (res.ok && res.fx_sprite != noone && (sk.effect != "damage" || res.hit)) {
             var tx2 = _bc.enemy_fx_x;
             var ty2 = _bc.enemy_fx_y;
             if (sk.target == TGT_SELF) {
-                tx2 = _bc.enemy_fx_x;
-                ty2 = _bc.enemy_fx_y;
+                if (instance_exists(_bc.enemy_inst)) {
+                    var pos2 = FX_CenterOn(res.fx_sprite, _bc.enemy_inst);
+                    tx2 = pos2.x;
+                    ty2 = pos2.y;
+                }
             } else {
                 tx2 = _bc.player_fx_x;
                 ty2 = _bc.player_fx_y;
