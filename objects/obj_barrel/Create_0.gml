@@ -6,5 +6,6 @@ swap_sprite = barrel_asset_broken;
 dialogue_id = "barrel_break";
 dialogue_id_after = "barrel_broken";
 
+is_container = true;
 container_level = 1;
 loot_table_key = "barrel_basic";

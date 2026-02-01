@@ -22,6 +22,8 @@ function Interact_PlayerFacing(_pl, _inst) {
 
 function Interact_FacingDistance(_pl, _inst) {
     var INF = 1000000000;
+    if (!instance_exists(_pl)) return INF;
+    if (!variable_instance_exists(_pl, "face")) return INF;
     var tile = 16;
     if (variable_instance_exists(_pl, "tile_size")) tile = _pl.tile_size;
     var px = round(_pl.x / tile) * tile;
@@ -49,6 +51,7 @@ function Interact_FacingDistance(_pl, _inst) {
 
 function Interact_GetTarget(_pl) {
     if (!instance_exists(_pl)) return noone;
+    if (!variable_instance_exists(_pl, "face")) return noone;
     var INF = 1000000000;
     var best = noone;
     var best_dist = INF;
@@ -68,6 +71,7 @@ function Interact_Handle(_inst) {
     var gs = GameState_Get();
     var pl = gs.player_inst;
     if (!instance_exists(pl)) return;
+    if (!variable_instance_exists(pl, "face")) return;
     if (!Action_CanAct(pl)) {
         Action_Request(pl, "interact");
         return;
@@ -105,6 +109,7 @@ function Interact_Handle(_inst) {
 
     // swap-state interaction
     if (variable_instance_exists(_inst, "swap_on_interact") && _inst.swap_on_interact) {
+        var is_container = (variable_instance_exists(_inst, "is_container") && _inst.is_container);
         if (!_inst.swapped) {
             if (variable_instance_exists(_inst, "swap_sprite") && _inst.swap_sprite != noone) {
                 _inst.sprite_index = _inst.swap_sprite;
@@ -112,32 +117,36 @@ function Interact_Handle(_inst) {
             _inst.swapped = true;
             RoomState_SaveInstance(_inst, ["swapped","sprite_index"], false);
 
-            // shared loot system (container)
-            var lvl = 1;
-            if (variable_instance_exists(_inst, "container_level")) lvl = _inst.container_level;
-            var key = "";
-            if (variable_instance_exists(_inst, "loot_table_key")) key = _inst.loot_table_key;
-            if (key == "") {
-                if (_inst.object_index == obj_chest) key = "chest_basic";
-                if (_inst.object_index == obj_barrel) key = "barrel_basic";
-            }
-
-            var loot = [];
-            if (key != "") loot = Loot_RollContainer(lvl, key);
-            if (is_array(loot) && array_length(loot) > 0) {
-                gs.player_ch.inventory = Loot_Grant(gs.player_ch.inventory, loot);
-
-                var loot_lines = [];
-                for (var i = 0; i < array_length(loot); i++) {
-                    var it = loot[i];
-                    var qty = it.qty;
-                    var item = ItemDB_Get(it.item_id);
-                    var lines = DialogueDB_GetFormatted("loot_received", { item: item.name, qty: qty });
-                    for (var j = 0; j < array_length(lines); j++) array_push(loot_lines, lines[j]);
+            if (is_container) {
+                // shared loot system (container)
+                var lvl = 1;
+                if (variable_instance_exists(_inst, "container_level")) lvl = _inst.container_level;
+                var key = "";
+                if (variable_instance_exists(_inst, "loot_table_key")) key = _inst.loot_table_key;
+                if (key == "") {
+                    if (_inst.object_index == obj_chest) key = "chest_basic";
+                    if (_inst.object_index == obj_barrel) key = "barrel_basic";
                 }
-                Dialogue_StartWithSpeaker(name, loot_lines);
+
+                var loot = [];
+                if (key != "") loot = Loot_RollContainer(lvl, key);
+                if (is_array(loot) && array_length(loot) > 0) {
+                    gs.player_ch.inventory = Loot_Grant(gs.player_ch.inventory, loot);
+
+                    var loot_lines = [];
+                    for (var i = 0; i < array_length(loot); i++) {
+                        var it = loot[i];
+                        var qty = it.qty;
+                        var item = ItemDB_Get(it.item_id);
+                        var lines = DialogueDB_GetFormatted("loot_received", { item: item.name, qty: qty });
+                        for (var j = 0; j < array_length(lines); j++) array_push(loot_lines, lines[j]);
+                    }
+                    Dialogue_StartWithSpeaker(name, loot_lines);
+                } else {
+                    Dialogue_StartWithSpeaker(name, DialogueDB_Get("loot_empty"));
+                }
             } else {
-                Dialogue_StartWithSpeaker(name, DialogueDB_Get("loot_empty"));
+                Dialogue_StartWithSpeaker(name, DialogueDB_Get(base_id));
             }
         } else {
             var use_id = (after_id != "") ? after_id : base_id;

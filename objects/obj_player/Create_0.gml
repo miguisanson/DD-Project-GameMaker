@@ -18,6 +18,8 @@ if (just_returned) {
     battle_cooldown = BATTLE_COOLDOWN_FRAMES;
     if (variable_struct_exists(gs.battle, "return_face") && gs.battle.return_face != -1) {
         face = gs.battle.return_face;
+    } else {
+        face = DOWN;
     }
 }
 
@@ -49,4 +51,3 @@ if (just_returned) {
     x = round(x / tile_size) * tile_size;
     y = round(y / tile_size) * tile_size;
 }
-
