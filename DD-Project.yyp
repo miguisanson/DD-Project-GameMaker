@@ -10,6 +10,7 @@
   },
   "defaultScriptType":1,
   "Folders":[
+    {"$GMFolder":"","%Name":"Fonts","folderPath":"folders/Fonts.yy","name":"Fonts","resourceType":"GMFolder","resourceVersion":"2.0",},
     {"$GMFolder":"","%Name":"Objects","folderPath":"folders/Objects.yy","name":"Objects","resourceType":"GMFolder","resourceVersion":"2.0",},
     {"$GMFolder":"","%Name":"Controllers","folderPath":"folders/Objects/Controllers.yy","name":"Controllers","resourceType":"GMFolder","resourceVersion":"2.0",},
     {"$GMFolder":"","%Name":"Entities","folderPath":"folders/Objects/Entities.yy","name":"Entities","resourceType":"GMFolder","resourceVersion":"2.0",},
@@ -49,6 +50,7 @@
   },
   "name":"DD-Project",
   "resources":[
+    {"id":{"name":"retro_gaming","path":"fonts/retro_gaming/retro_gaming.yy",},},
     {"id":{"name":"obj_archer","path":"objects/obj_archer/obj_archer.yy",},},
     {"id":{"name":"obj_barrel_broken","path":"objects/obj_barrel_broken/obj_barrel_broken.yy",},},
     {"id":{"name":"obj_barrel_lv1","path":"objects/obj_barrel_lv1/obj_barrel_lv1.yy",},},

@@ -153,6 +153,8 @@ function SaveMenu_Draw() {
     var sm = gs.ui.save_menu;
     if (!sm.open) return;
 
+    UI_SetFont();
+
     var w = display_get_gui_width();
     var h = display_get_gui_height();
     var line_h = string_height("A");
@@ -173,10 +175,11 @@ function SaveMenu_Draw() {
     draw_set_color(c_white);
     draw_text(bx + 12, by + 10, title);
 
+    var row_h = max(22, line_h + 8);
     var row_y = by + 36;
     for (var i = 0; i < 3; i++) {
         var info = Save_SlotInfo(i + 1);
-        var yy = row_y + i * 22;
+        var yy = row_y + i * row_h;
         var label = "Slot " + string(i + 1);
         if (info.exists) {
             label += "  " + info.class_name + " Lv" + string(info.level) + "  " + info.room;
@@ -210,7 +213,7 @@ function SaveMenu_Draw() {
 
     // Back label
     var back_x = bx + 12;
-    var back_y = by + bh - 18;
+    var back_y = by + bh - (line_h + 4);
     if (sm.slot == 3 && !sm.confirm) {
         var bwid = string_width("Back");
         draw_set_color(c_white);

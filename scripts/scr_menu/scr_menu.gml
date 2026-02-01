@@ -57,14 +57,16 @@ function Menu_IsOpen() {
 function Menu_GetLayout() {
     var w = display_get_gui_width();
     var h = display_get_gui_height();
+    UI_SetFont();
+    var line_h = string_height("A");
     var margin = min(w, h) * 0.05;
     var bx = margin;
     var by = margin;
     var bw = w - margin * 2;
     var bh = h - margin * 2;
-    var header_h = max(20, bh * 0.10);
+    var header_h = max(line_h + 10, bh * 0.10);
     var pad = max(6, min(w, h) * 0.02);
-    var row_h = max(16, bh * 0.06);
+    var row_h = max(line_h + 4, bh * 0.06);
     var content_y = by + header_h + pad;
     var content_h = bh - header_h - pad * 2;
     var rows_visible = max(4, floor(content_h / row_h));
@@ -308,6 +310,8 @@ function Menu_Draw() {
     var gs = GameState_Get();
     var m = gs.ui.menu;
     var ch = gs.player_ch;
+
+    UI_SetFont();
 
     var layout = Menu_GetLayout();
     var w = layout.w;
@@ -708,6 +712,8 @@ function PauseMenu_Draw() {
     if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "pause_menu")) return;
     var pm = gs.ui.pause_menu;
     if (!pm.open) return;
+
+    UI_SetFont();
 
     var layout = Menu_GetLayout();
     var w = layout.w;

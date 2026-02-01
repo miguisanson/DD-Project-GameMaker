@@ -3,6 +3,8 @@ var w = display_get_gui_width();
 var h = display_get_gui_height();
 var margin = 8;
 
+UI_SetFont();
+
 draw_set_alpha(1);
 
 // HUD (battle only)

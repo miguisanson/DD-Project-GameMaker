@@ -1,13 +1,16 @@
 var w = display_get_gui_width();
 var h = display_get_gui_height();
-var line_h = string_height("A");
 var gs = GameState_Get();
 if (gs.ui.mode == UI_SAVE) exit;
+
+UI_SetFont();
+var line_h = string_height("A");
 
 // main menu
 var title = "MAIN MENU";
 var tx = (w - string_width(title)) * 0.5;
 var ty = h * 0.2;
+var row_gap = max(18, line_h + 4);
 
 draw_set_color(c_white);
 draw_text(tx, ty, title);
@@ -20,7 +23,7 @@ var pad_y = 4;
 
 for (var i = 0; i < array_length(main_options); i++) {
     var label = main_options[i];
-    var yy = start_y + i * 18;
+    var yy = start_y + i * row_gap;
     if (state == "main" && i == main_index) {
         draw_set_color(c_white);
         draw_rectangle(bx1 - pad_x, yy - pad_y, bx2 + pad_x, yy + line_h + pad_y, false);
@@ -54,7 +57,7 @@ if (state == "class") {
     var cy = by + 40;
     for (var j = 0; j < array_length(choices); j++) {
         var c = choices[j];
-        var yy2 = cy + j * 18;
+        var yy2 = cy + j * row_gap;
         if (j == class_index) {
             draw_set_color(c_white);
             draw_rectangle(bx + 10 - pad_x, yy2 - pad_y, bx + bw - 10 + pad_x, yy2 + line_h + pad_y, false);
@@ -68,7 +71,7 @@ if (state == "class") {
     }
 
     // Back label
-    var back_y = by + bh - 18;
+    var back_y = by + bh - (line_h + 4);
     if (class_index == array_length(choices)) {
         draw_set_color(c_white);
         draw_rectangle(bx + 10 - pad_x, back_y - pad_y, bx + bw - 10 + pad_x, back_y + line_h + pad_y, false);
@@ -97,7 +100,7 @@ if (state == "settings") {
     draw_text(sx + 12, sy + 12, "Settings");
 
     var sbx = sx + 12;
-    var sby = sy + sh - 18;
+    var sby = sy + sh - (line_h + 4);
     var swid = string_width("Back");
     if (settings_index == 0) {
         draw_set_color(c_white);

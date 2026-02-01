@@ -95,6 +95,10 @@ function UI_IsBlocking() {
     return false;
 }
 
+function UI_SetFont() {
+    draw_set_font(UI_FONT);
+}
+
 function Action_CanAct(_pl) {
     if (UI_IsBlocking()) return false;
     var gs = GameState_Get();

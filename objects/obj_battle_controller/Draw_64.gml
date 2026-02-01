@@ -6,6 +6,8 @@ var h = display_get_gui_height();
 
 var gs = GameState_Get();
 
+UI_SetFont();
+
 var cam = view_camera[0];
 var base_x = cam_base_x;
 var base_y = cam_base_y;
@@ -123,7 +125,7 @@ if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.e
 
 // MENU STATES ONLY
 if (battle_state == BSTATE_MENU || battle_state == BSTATE_SKILL_MENU || battle_state == BSTATE_ITEM_MENU) {
-    var row_h = 16;
+    var row_h = max(16, string_height("A") + 2);
     var box_pad = 12;
     if (battle_state == BSTATE_MENU) {
         var max_label_w = 0;
@@ -176,7 +178,7 @@ if (battle_state == BSTATE_SKILL_MENU) {
 
     for (var s = start; s < endv; s++) {
         var row = s - start;
-        var yy = my2 + row * 16;
+        var yy = my2 + row * row_h;
         if (s == skill_count) {
             if (s == skill_index) draw_text(mx2 - 10, yy, ">");
             draw_text(mx2, yy, "Back");
@@ -207,7 +209,7 @@ if (battle_state == BSTATE_ITEM_MENU) {
 
     for (var it = start; it < endv; it++) {
         var row = it - start;
-        var yy2 = my3 + row * 16;
+        var yy2 = my3 + row * row_h;
         if (it == item_count) {
             if (it == item_index) draw_text(mx3 - 10, yy2, ">");
             draw_text(mx3, yy2, "Back");
