@@ -7,7 +7,7 @@ if (variable_global_exists("room_state_ready") && global.room_state_ready) {
     RoomState_Save(room);
     RoomState_SaveInstance(id, ["x", "y"], false);
 }
-GameState_SetBattleReturn(room, other.x, other.y);
+GameState_SetBattleReturn(room, other.x, other.y, -1);
 
 // remember enemy instance + type
 GameState_SetBattleEnemy(persist_id, enemy_id);

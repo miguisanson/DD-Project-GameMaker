@@ -15,30 +15,8 @@ function Flag_Toggle(_key) {
 }
 
 function Interact_PlayerFacing(_pl, _inst) {
-    var tile = 16;
-    if (variable_instance_exists(_pl, "tile_size")) tile = _pl.tile_size;
-    var margin = 2;
-
-    switch (_pl.face) {
-        case UP: {
-            var dy = _pl.bbox_top - _inst.bbox_bottom;
-            return (dy >= -margin && dy <= tile + margin) && (_pl.bbox_right > _inst.bbox_left) && (_pl.bbox_left < _inst.bbox_right);
-        }
-        case DOWN: {
-            var dy2 = _inst.bbox_top - _pl.bbox_bottom;
-            return (dy2 >= -margin && dy2 <= tile + margin) && (_pl.bbox_right > _inst.bbox_left) && (_pl.bbox_left < _inst.bbox_right);
-        }
-        case LEFT: {
-            var dx = _pl.bbox_left - _inst.bbox_right;
-            return (dx >= -margin && dx <= tile + margin) && (_pl.bbox_bottom > _inst.bbox_top) && (_pl.bbox_top < _inst.bbox_bottom);
-        }
-        case RIGHT: {
-            var dx2 = _inst.bbox_left - _pl.bbox_right;
-            return (dx2 >= -margin && dx2 <= tile + margin) && (_pl.bbox_bottom > _inst.bbox_top) && (_pl.bbox_top < _inst.bbox_bottom);
-        }
-    }
-
-    return false;
+    var INF = 1000000000;
+    return (Interact_FacingDistance(_pl, _inst) < INF);
 }
 
 
@@ -46,36 +24,27 @@ function Interact_FacingDistance(_pl, _inst) {
     var INF = 1000000000;
     var tile = 16;
     if (variable_instance_exists(_pl, "tile_size")) tile = _pl.tile_size;
-    var margin = 2;
+    var px = round(_pl.x / tile) * tile;
+    var py = round(_pl.y / tile) * tile;
+    var tx = px;
+    var ty = py;
 
     switch (_pl.face) {
-        case UP: {
-            var dy = _pl.bbox_top - _inst.bbox_bottom;
-            if (!((_pl.bbox_right > _inst.bbox_left) && (_pl.bbox_left < _inst.bbox_right))) return INF;
-            if (dy < -margin || dy > tile + margin) return INF;
-            return dy;
-        }
-        case DOWN: {
-            var dy2 = _inst.bbox_top - _pl.bbox_bottom;
-            if (!((_pl.bbox_right > _inst.bbox_left) && (_pl.bbox_left < _inst.bbox_right))) return INF;
-            if (dy2 < -margin || dy2 > tile + margin) return INF;
-            return dy2;
-        }
-        case LEFT: {
-            var dx = _pl.bbox_left - _inst.bbox_right;
-            if (!((_pl.bbox_bottom > _inst.bbox_top) && (_pl.bbox_top < _inst.bbox_bottom))) return INF;
-            if (dx < -margin || dx > tile + margin) return INF;
-            return dx;
-        }
-        case RIGHT: {
-            var dx2 = _inst.bbox_left - _pl.bbox_right;
-            if (!((_pl.bbox_bottom > _inst.bbox_top) && (_pl.bbox_top < _inst.bbox_bottom))) return INF;
-            if (dx2 < -margin || dx2 > tile + margin) return INF;
-            return dx2;
-        }
+        case UP:    ty -= tile; break;
+        case DOWN:  ty += tile; break;
+        case LEFT:  tx -= tile; break;
+        case RIGHT: tx += tile; break;
+        default:    return INF;
     }
 
-    return INF;
+    var hit = false;
+    var cx = tx + (tile * 0.5);
+    var cy = ty + (tile * 0.5);
+    with (_pl) {
+        hit = position_meeting(cx, cy, _inst);
+    }
+
+    return hit ? tile : INF;
 }
 
 function Interact_GetTarget(_pl) {
@@ -191,7 +160,7 @@ function Interact_Handle(_inst) {
         case INTERACT_DOOR: {
             if (_inst.door_room != noone) {
                 if (variable_global_exists("room_state_ready") && global.room_state_ready) RoomState_Save(room);
-                GameState_SetBattleReturn(_inst.door_room, _inst.door_x, _inst.door_y);
+                GameState_SetBattleReturn(_inst.door_room, _inst.door_x, _inst.door_y, -1);
                 GameState_SetJustReturned(true);
                 room_goto(_inst.door_room);
             }
@@ -200,7 +169,6 @@ function Interact_Handle(_inst) {
         case INTERACT_CHECKPOINT: {
             GameState_SetCheckpoint(room, _inst.x, _inst.y);
             if (variable_instance_exists(_inst, "is_bed") && _inst.is_bed) {
-                var gs = GameState_Get();
                 SaveMenu_Open("save", "bed");
             }
         } break;

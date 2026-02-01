@@ -115,7 +115,7 @@ function Player_OnDeath(_p) {
     _p.mp = _p.max_mp;
     GameState_SetPlayer(_p);
 
-    GameState_SetBattleReturn(gs.checkpoint.room, gs.checkpoint.x, gs.checkpoint.y);
+    GameState_SetBattleReturn(gs.checkpoint.room, gs.checkpoint.x, gs.checkpoint.y, -1);
     GameState_SetJustReturned(true);
     room_goto(gs.checkpoint.room);
 }
