@@ -55,6 +55,7 @@ if (state == "class") {
         gs.player_ch = CharacterCreate_Player(class_id);
         GameState_SetPlayer(gs.player_ch);
 
+        gs.in_main_menu = false;
         RoomTransition_Set(rm_floor1, "start", -1);
         room_goto(rm_floor1);
     }

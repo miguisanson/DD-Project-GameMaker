@@ -592,7 +592,7 @@ function PauseMenu_Ensure() {
             index: 0,
             repeat_dir: 0,
             repeat_next: 0,
-            options: ["Resume","Exit Game"]
+            options: ["Resume","Exit to Main Menu"]
         };
     }
 }
@@ -614,6 +614,22 @@ function PauseMenu_Close() {
     var gs = GameState_Get();
     gs.ui.pause_menu.open = false;
     gs.ui.mode = UI_NONE;
+}
+
+function PauseMenu_ExitToMainMenu() {
+    var gs = GameState_Get();
+    PauseMenu_Close();
+    gs.in_main_menu = true;
+    gs.player_inst = noone;
+    global.player_inst = noone;
+    if (variable_struct_exists(gs, "ui")) {
+        gs.ui.lines = [];
+        gs.ui.index = 0;
+        gs.ui.speaker = "";
+        gs.ui.confirm_action = "";
+        if (variable_struct_exists(gs.ui, "lock_actions")) gs.ui.lock_actions = 0;
+    }
+    if (room != rm_start) room_goto(rm_start);
 }
 
 function PauseMenu_IsOpen() {
@@ -679,7 +695,7 @@ function PauseMenu_HandleInput() {
             PauseMenu_Close();
             return;
         } else if (pm.index == 1) {
-            game_end();
+            PauseMenu_ExitToMainMenu();
             return;
         }
     }

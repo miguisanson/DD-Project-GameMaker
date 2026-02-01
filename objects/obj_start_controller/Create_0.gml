@@ -7,4 +7,7 @@ choice_ids = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE];
 
 settings_index = 0;
 
+var gs = GameState_Get();
+gs.in_main_menu = true;
+
 state = "main"; // main, class, settings

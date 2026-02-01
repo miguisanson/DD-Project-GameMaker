@@ -29,7 +29,7 @@ if (gs.last_room != room) {
     global.skipRoomSave = false;
 
     // ensure player exists if no transition pending (e.g. initial room / battle return)
-    if (room != rm_battle && !instance_exists(obj_player)) {
+    if (room != rm_battle && (!variable_struct_exists(gs, "in_main_menu") || !gs.in_main_menu) && !instance_exists(obj_player)) {
         var sp = RoomTransition_FindSpawn("start");
         if (sp == noone) sp = RoomTransition_FindSpawn("");
         if (sp != noone) {
