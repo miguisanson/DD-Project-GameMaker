@@ -59,12 +59,12 @@ function RoomState_SaveInstance(_inst, _vars, _removed) {
     RoomState_Set(room, _inst.persist_id, data);
 }
 
-function RoomState_SetRemoved(_room, _persist_id, _obj_type) {
+function RoomState_SetRemoved(_room, _persist_id, _obj_type = noone) {
     RoomState_Init();
     if (_persist_id == "") return;
     var gs = GameState_Get();
     var data = { removed: true, vars: {} };
-    if (argument_count >= 3 && _obj_type == obj_enemy) {
+    if (_obj_type == obj_enemy) {
         data.removed_reset_version = gs.enemy_reset_version;
     }
     RoomState_Set(_room, _persist_id, data);

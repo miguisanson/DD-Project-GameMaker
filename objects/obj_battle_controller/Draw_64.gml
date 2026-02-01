@@ -21,6 +21,7 @@ var sx = w / vw;
 var sy = h / vh;
 var gui_off_x = cam_off.x * sx;
 var gui_off_y = cam_off.y * sy;
+var row_h = max(16, string_height("A") + 2);
 
 // Combat log (top-right, text-only)
 if (!is_array(combat_log)) combat_log = [];
@@ -32,8 +33,8 @@ var log_bottom = margin + (log_visible * log_line_h);
 if (log_count > 0) {
     var log_start = max(0, log_count - log_visible);
     var max_w = w * 0.45;
-    var base_x = w - margin;
-    var base_y = margin;
+    var log_base_x = w - margin;
+    var log_base_y = margin;
 
     draw_set_alpha(1);
     draw_set_color(c_white);
@@ -43,8 +44,8 @@ if (log_count > 0) {
         while (string_width(line) > max_w && string_length(line) > 3) {
             line = string_copy(line, 1, string_length(line) - 4) + "...";
         }
-        var lx = base_x - string_width(line);
-        var ly = base_y + row * log_line_h;
+        var lx = log_base_x - string_width(line);
+        var ly = log_base_y + row * log_line_h;
         draw_text(lx, ly, line);
     }
 }
@@ -125,7 +126,6 @@ if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.e
 
 // MENU STATES ONLY
 if (battle_state == BSTATE_MENU || battle_state == BSTATE_SKILL_MENU || battle_state == BSTATE_ITEM_MENU) {
-    var row_h = max(16, string_height("A") + 2);
     var box_pad = 12;
     if (battle_state == BSTATE_MENU) {
         var max_label_w = 0;

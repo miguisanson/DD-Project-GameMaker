@@ -148,11 +148,11 @@ function Combat_Log(_text) {
     bc.combat_log = log;
 }
 
-function Battle_Message(_bc, _text, _next_state, _fx) {
+function Battle_Message(_bc, _text, _next_state, _fx = noone) {
     _bc.message_text = _text;
     _bc.message_next_state = _next_state;
     _bc.battle_state = BSTATE_MESSAGE;
-    _bc.wait_fx = (argument_count >= 4) ? _fx : noone;
+    _bc.wait_fx = _fx;
     _bc.wait_timer = COMBAT_ACTION_DELAY;
     Combat_Log(_text);
 }
