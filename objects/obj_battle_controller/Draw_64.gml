@@ -130,7 +130,8 @@ if (battle_state == BSTATE_MENU || battle_state == BSTATE_SKILL_MENU || battle_s
         for (var i = 0; i < array_length(battle_actions); i++) {
             max_label_w = max(max_label_w, string_width(battle_actions[i].label));
         }
-        bw = max_label_w + box_pad * 2 + 12;
+        var selector_pad = 16;
+        bw = max_label_w + box_pad * 2 + selector_pad;
         bh = (array_length(battle_actions) * row_h) + box_pad * 2;
         bx = w - margin - bw + gui_off_x;
         by = h - margin - bh + gui_off_y;
@@ -149,7 +150,7 @@ if (battle_state == BSTATE_MENU || battle_state == BSTATE_SKILL_MENU || battle_s
 
 // command menu
 if (battle_state == BSTATE_MENU && turn == TURN_PLAYER) {
-    var mx = bx + 12;
+    var mx = bx + 16;
     var my = by + 12;
 
     for (var i = 0; i < array_length(battle_actions); i++) {
