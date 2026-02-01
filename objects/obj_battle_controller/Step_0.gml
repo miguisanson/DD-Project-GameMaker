@@ -1,6 +1,6 @@
 Input_PreStep();
 var gs = GameState_Get();
-if (gs.ui.mode == UI_MENU) exit;
+if (gs.ui.mode == UI_MENU || gs.ui.mode == UI_PAUSE) exit;
 if (battle_over && battle_state != BSTATE_MESSAGE) exit;
 
 // helper input keys

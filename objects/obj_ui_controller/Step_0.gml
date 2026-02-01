@@ -45,10 +45,30 @@ if (gs.ui.mode == UI_SAVE) {
     exit;
 }
 
+// Pause menu (Esc)
+if (k_back) {
+    if (gs.ui.mode == UI_PAUSE) {
+        PauseMenu_Close();
+        exit;
+    }
+    if (gs.ui.mode == UI_NONE) {
+        var pl = gs.player_inst;
+        if (instance_exists(pl) && Player_IsSettled(pl)) {
+            PauseMenu_Open();
+            exit;
+        }
+    }
+}
+
+if (gs.ui.mode == UI_PAUSE) {
+    PauseMenu_HandleInput();
+    exit;
+}
+
 if (k_menu) {
     if (gs.ui.mode == UI_MENU) {
         Menu_Close();
-    } else {
+    } else if (gs.ui.mode == UI_NONE) {
         var pl = gs.player_inst;
         if (instance_exists(pl) && Player_IsSettled(pl)) {
             Menu_Open();
@@ -60,4 +80,3 @@ if (gs.ui.mode == UI_MENU) {
     Menu_HandleInput();
     exit;
 }
-

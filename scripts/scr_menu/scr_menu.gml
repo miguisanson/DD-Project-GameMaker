@@ -579,3 +579,160 @@ function Menu_Draw() {
     }
 
 }
+
+// --------------------
+// PAUSE MENU (inventory-style popup)
+// --------------------
+function PauseMenu_Ensure() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    if (!variable_struct_exists(gs.ui, "pause_menu")) {
+        gs.ui.pause_menu = {
+            open: false,
+            index: 0,
+            repeat_dir: 0,
+            repeat_next: 0,
+            options: ["Resume","Exit Game"]
+        };
+    }
+}
+
+function PauseMenu_Open() {
+    PauseMenu_Ensure();
+    var gs = GameState_Get();
+    gs.ui.mode = UI_PAUSE;
+    var pm = gs.ui.pause_menu;
+    pm.open = true;
+    pm.index = 0;
+    pm.repeat_dir = 0;
+    pm.repeat_next = 0;
+    gs.ui.pause_menu = pm;
+}
+
+function PauseMenu_Close() {
+    PauseMenu_Ensure();
+    var gs = GameState_Get();
+    gs.ui.pause_menu.open = false;
+    gs.ui.mode = UI_NONE;
+}
+
+function PauseMenu_IsOpen() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) return false;
+    return gs.ui.mode == UI_PAUSE;
+}
+
+function PauseMenu_NavRepeat(_dir, _pressed, _held) {
+    var gs = GameState_Get();
+    var pm = gs.ui.pause_menu;
+    var frame = Input_Frame();
+
+    if (_pressed) {
+        pm.repeat_dir = _dir;
+        pm.repeat_next = frame + MENU_REPEAT_DELAY;
+        gs.ui.pause_menu = pm;
+        return true;
+    }
+
+    if (!_held) {
+        if (pm.repeat_dir == _dir) pm.repeat_dir = 0;
+        gs.ui.pause_menu = pm;
+        return false;
+    }
+
+    if (pm.repeat_dir != _dir) return false;
+    if (frame >= pm.repeat_next) {
+        pm.repeat_next = frame + MENU_REPEAT_INTERVAL;
+        gs.ui.pause_menu = pm;
+        return true;
+    }
+    gs.ui.pause_menu = pm;
+    return false;
+}
+
+function PauseMenu_HandleInput() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "pause_menu")) return;
+    var pm = gs.ui.pause_menu;
+    if (!pm.open) return;
+
+    var k_up = Input_Pressed("menu_up");
+    var k_down = Input_Pressed("menu_down");
+    var h_up = Input_Held("menu_up");
+    var h_down = Input_Held("menu_down");
+    var nav_up = PauseMenu_NavRepeat(-1, k_up, h_up);
+    var nav_down = PauseMenu_NavRepeat(1, k_down, h_down);
+    var k_ok = Input_Pressed("confirm");
+    var k_back = Input_Pressed("cancel");
+
+    if (k_back) {
+        PauseMenu_Close();
+        return;
+    }
+
+    var count = array_length(pm.options);
+    if (nav_up && pm.index > 0) pm.index -= 1;
+    if (nav_down && pm.index < count - 1) pm.index += 1;
+
+    if (k_ok) {
+        if (pm.index == 0) {
+            PauseMenu_Close();
+            return;
+        } else if (pm.index == 1) {
+            game_end();
+            return;
+        }
+    }
+
+    gs.ui.pause_menu = pm;
+}
+
+function PauseMenu_Draw() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "pause_menu")) return;
+    var pm = gs.ui.pause_menu;
+    if (!pm.open) return;
+
+    var layout = Menu_GetLayout();
+    var w = layout.w;
+    var h = layout.h;
+    var pad = layout.pad;
+    var line_h = string_height("A");
+    var inner_pad = max(4, pad * 0.6);
+    var row_h = max(16, line_h + inner_pad * 2);
+
+    var max_w = 0;
+    for (var i = 0; i < array_length(pm.options); i++) {
+        max_w = max(max_w, string_width(pm.options[i]));
+    }
+    var bw = max_w + inner_pad * 4;
+    var bh = (row_h * array_length(pm.options)) + inner_pad * 2;
+    var bx = (w - bw) * 0.5;
+    var by = (h - bh) * 0.5;
+
+    draw_set_alpha(0.6);
+    draw_set_color(c_black);
+    draw_rectangle(0, 0, w, h, false);
+
+    draw_set_alpha(0.9);
+    draw_set_color(c_black);
+    draw_rectangle(bx, by, bx + bw, by + bh, false);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+    draw_rectangle(bx, by, bx + bw, by + bh, true);
+
+    var options = pm.options;
+    var start_y = by + inner_pad;
+    for (var i = 0; i < array_length(options); i++) {
+        var yy = start_y + i * row_h;
+        var sel = (i == pm.index);
+        if (sel) {
+            draw_set_color(c_white);
+            draw_rectangle(bx + inner_pad - 4, yy - 2, bx + bw - inner_pad + 4, yy + row_h - 2, false);
+            draw_set_color(c_black);
+            draw_rectangle(bx + inner_pad - 4, yy - 2, bx + bw - inner_pad + 4, yy + row_h - 2, true);
+        }
+        draw_set_color(sel ? c_black : c_white);
+        draw_text(bx + inner_pad, yy, options[i]);
+    }
+}

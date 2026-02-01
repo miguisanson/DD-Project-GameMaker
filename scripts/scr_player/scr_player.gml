@@ -365,6 +365,7 @@ function GameState_SetBattleEnemy(_persist_id, _enemy_id) {
     global.battle_enemy_room = room;
 
     if (Menu_IsOpen()) Menu_Close();
+    if (PauseMenu_IsOpen()) PauseMenu_Close();
 }
 
 function GameState_SetJustReturned(_flag) {
@@ -387,4 +388,3 @@ function Player_LearnSkill(_ch, _skill_id) {
     }
     return _ch;
 }
-
