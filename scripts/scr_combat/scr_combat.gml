@@ -132,6 +132,31 @@ function FX_CenterOn(_sprite, _inst) {
     return { x: cx - (w * 0.5) + ox, y: cy - (h * 0.5) + oy };
 }
 
+function Combat_Log(_text) {
+    if (_text == "") return;
+    var bc = instance_find(obj_battle_controller, 0);
+    if (!instance_exists(bc)) return;
+    if (!variable_instance_exists(bc, "combat_log") || !is_array(bc.combat_log)) {
+        bc.combat_log = [];
+    }
+    var log = bc.combat_log;
+    array_push(log, _text);
+    var maxv = COMBAT_LOG_MAX;
+    while (array_length(log) > maxv) {
+        array_delete(log, 0, 1);
+    }
+    bc.combat_log = log;
+}
+
+function Battle_Message(_bc, _text, _next_state, _fx) {
+    _bc.message_text = _text;
+    _bc.message_next_state = _next_state;
+    _bc.battle_state = BSTATE_MESSAGE;
+    _bc.wait_fx = (argument_count >= 4) ? _fx : noone;
+    _bc.wait_timer = COMBAT_ACTION_DELAY;
+    Combat_Log(_text);
+}
+
 function Battle_GrantRewards(_p, _e) {
     if (is_struct(_e)) {
         if (variable_struct_exists(_e, "exp")) _p = Player_AddExp(_p, _e.exp);
@@ -182,12 +207,6 @@ function Battle_CheckEnd(_bc, _p, _e) {
     return false;
 }
 
-function Battle_Message(_bc, _text, _next_state) {
-    _bc.message_text = _text;
-    _bc.message_next_state = _next_state;
-    _bc.battle_state = BSTATE_MESSAGE;
-}
-
 function Battle_PlayerAttack(_bc) {
     var p = _bc.p;
     var e = _bc.e;
@@ -202,6 +221,7 @@ function Battle_PlayerAttack(_bc) {
         return;
     }
 
+    Combat_Log("Player attacked.");
     var w = _bc.player_weapon;
     if (!is_struct(w) || !variable_struct_exists(w, "power")) {
         var wid = p.equip.weapon;
@@ -267,7 +287,12 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     var skill = SkillDB_Get(_skill_id);
     var target = (skill.target == TGT_SELF) ? p : e;
     var res = Skill_Use(p, target, _skill_id);
+    if (res.ok) {
+        _bc.skill_banner_active = true;
+        _bc.skill_banner_name = skill.name;
+    }
 
+    var fx = noone;
     if (res.ok && res.fx_sprite != noone && (skill.effect != "damage" || res.hit)) {
         var tx = _bc.enemy_fx_x;
         var ty = _bc.enemy_fx_y;
@@ -279,7 +304,7 @@ function Battle_PlayerSkill(_bc, _skill_id) {
             tx = pos.x;
             ty = pos.y;
         }
-        FX_Spawn(res.fx_sprite, tx, ty, res.fx_frames, res.fx_speed);
+        fx = FX_Spawn(res.fx_sprite, tx, ty, res.fx_frames, res.fx_speed);
     }
 
     if (!res.ok) {
@@ -294,18 +319,18 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     if (Battle_CheckEnd(_bc, p, e)) return;
 
     if (res.msg != "") {
-        Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT, fx);
     } else if (!res.hit) {
-        Battle_Message(_bc, "Skill missed!", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, "Skill missed!", BSTATE_ENEMY_ACT, fx);
     } else if (res.crit) {
-        Battle_Message(_bc, "Critical skill! " + string(res.dmg) + " dmg!", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, "Critical skill! " + string(res.dmg) + " dmg!", BSTATE_ENEMY_ACT, fx);
     } else if (res.dmg > 0) {
         if (instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        Battle_Message(_bc, "Skill hit for " + string(res.dmg) + " dmg!", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, "Skill hit for " + string(res.dmg) + " dmg!", BSTATE_ENEMY_ACT, fx);
     } else {
-        Battle_Message(_bc, "Skill used.", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, "Skill used.", BSTATE_ENEMY_ACT, fx);
     }
 
     p = Status_Tick(p);
@@ -332,9 +357,13 @@ function Battle_PlayerItem(_bc, _item_id) {
     var item = ItemDB_Get(_item_id);
     var target = (item.use.target == TGT_SELF) ? p : e;
     var res = Item_Use(_item_id, p, target);
+    if (res.ok) {
+        Combat_Log("Player used " + item.name);
+    }
 
+    var fx = noone;
     if (res.fx_sprite != noone) {
-        FX_Spawn(res.fx_sprite, _bc.player_fx_x, _bc.player_fx_y, res.fx_frames, res.fx_speed);
+        fx = FX_Spawn(res.fx_sprite, _bc.player_fx_x, _bc.player_fx_y, res.fx_frames, res.fx_speed);
     }
 
     if (!res.ok) {
@@ -349,7 +378,7 @@ function Battle_PlayerItem(_bc, _item_id) {
 
     if (Battle_CheckEnd(_bc, p, e)) return;
 
-    Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT);
+    Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT, fx);
     p = Status_Tick(p);
     if (Battle_CheckEnd(_bc, p, e)) return;
     _bc.turn = TURN_ENEMY;
@@ -429,6 +458,11 @@ function Battle_EnemyAct(_bc) {
     if (use_skill) {
         if (!is_struct(sk)) sk = SkillDB_Get(skill_id);
         var res = Skill_Use(e, p, skill_id);
+        if (res.ok) {
+            _bc.skill_banner_active = true;
+            _bc.skill_banner_name = sk.name;
+        }
+        var fx2 = noone;
         if (res.ok && res.fx_sprite != noone && (sk.effect != "damage" || res.hit)) {
             var tx2 = _bc.enemy_fx_x;
             var ty2 = _bc.enemy_fx_y;
@@ -442,20 +476,20 @@ function Battle_EnemyAct(_bc) {
                 tx2 = _bc.player_fx_x;
                 ty2 = _bc.player_fx_y;
             }
-            FX_Spawn(res.fx_sprite, tx2, ty2, res.fx_frames, res.fx_speed);
+            fx2 = FX_Spawn(res.fx_sprite, tx2, ty2, res.fx_frames, res.fx_speed);
         }
         if (Battle_CheckEnd(_bc, p, e)) return;
 
         if (res.msg != "") {
-            Battle_Message(_bc, e.name + ": " + res.msg, BSTATE_MENU);
+            Battle_Message(_bc, e.name + ": " + res.msg, BSTATE_MENU, fx2);
         } else if (!res.hit) {
-            Battle_Message(_bc, e.name + " missed!", BSTATE_MENU);
+            Battle_Message(_bc, e.name + " missed!", BSTATE_MENU, fx2);
         } else if (res.crit) {
             if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " crit! " + string(res.dmg) + " dmg!", BSTATE_MENU);
+            Battle_Message(_bc, e.name + " crit! " + string(res.dmg) + " dmg!", BSTATE_MENU, fx2);
         } else {
             if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " hits for " + string(res.dmg) + " dmg!", BSTATE_MENU);
+            Battle_Message(_bc, e.name + " hits for " + string(res.dmg) + " dmg!", BSTATE_MENU, fx2);
         }
     } else {
         var ew = _bc.enemy_weapon;

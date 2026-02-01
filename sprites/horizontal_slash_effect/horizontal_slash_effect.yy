@@ -63,7 +63,7 @@
     },
     "name":"horizontal_slash_effect",
     "playback":1,
-    "playbackSpeed":16.0,
+    "playbackSpeed":8.0,
     "playbackSpeedType":0,
     "resourceType":"GMSequence",
     "resourceVersion":"2.0",

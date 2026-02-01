@@ -13,14 +13,20 @@ var k_back = Input_Pressed("cancel");
 // MESSAGE STATE
 // --------------------
 if (battle_state == BSTATE_MESSAGE) {
-    if (k_ok) {
-        if (message_next_state == BSTATE_END_RUN) {
-            Battle_EndRun(self);
-        } else if (message_next_state == BSTATE_ENEMY_ACT && turn != TURN_ENEMY) {
-            battle_state = BSTATE_MENU;
-        } else {
-            battle_state = message_next_state;
-        }
+    if (wait_fx != noone && !instance_exists(wait_fx)) wait_fx = noone;
+    if (wait_fx != noone) exit;
+    if (wait_timer > 0) {
+        wait_timer -= 1;
+        exit;
+    }
+    skill_banner_active = false;
+    skill_banner_name = "";
+    if (message_next_state == BSTATE_END_RUN) {
+        Battle_EndRun(self);
+    } else if (message_next_state == BSTATE_ENEMY_ACT && turn != TURN_ENEMY) {
+        battle_state = BSTATE_MENU;
+    } else {
+        battle_state = message_next_state;
     }
     exit;
 }
