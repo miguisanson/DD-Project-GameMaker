@@ -40,7 +40,7 @@ function EnemyDB_Init() {
         exp: 18,
         loot_key: "enemy_basic",
         ai: { scan_radius: 64, think_rate: 8, forget_delay: 45, leash_mult: 4, wander_chance: 2, move_speed: 1.2 },
-        skills: [SKILL_POWER_STRIKE],
+        skills: [],
         traits: [],
         is_boss: false
     };
@@ -60,7 +60,7 @@ function EnemyDB_Init() {
         exp: 28,
         loot_key: "enemy_basic",
         ai: { scan_radius: 40, think_rate: 1, forget_delay: 60, leash_mult: 4, wander_chance: 0, move_speed: 3 },
-        skills: [SKILL_POWER_STRIKE],
+        skills: [],
         traits: [],
         is_boss: false
     };

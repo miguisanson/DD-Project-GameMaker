@@ -326,24 +326,6 @@ function ItemDB_Init() {
     ds_map_add(global.item_db, c7.id, c7);
 
     // Skillbooks (one per skill, shared sprite)
-    var sb0 = {
-        id: 100,
-        name: "Skillbook: Power Strike",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_STR,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_POWER_STRIKE },
-        value: 25
-    };
-    ds_map_add(global.item_db, sb0.id, sb0);
-
     var sb1 = {
         id: 101,
         name: "Skillbook: Wound",
