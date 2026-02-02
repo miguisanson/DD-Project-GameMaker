@@ -7,7 +7,6 @@ function CharacterCreate_Player(_class_id) {
     ch.level = 1;
     ch.exp = 0;
     ch.exp_next = Exp_NextLevel(ch.level);
-    ch.gold = 0;
 
     ch.stats = StatsCreateBase();
     // apply class bonus
@@ -27,6 +26,7 @@ function CharacterCreate_Player(_class_id) {
     ch.inventory = [];
     ch.equip = { weapon: 0, head: 0, body: 0, ring1: 0, ring2: 0 };
     ch.skills = Player_DefaultSkills(_class_id);
+    ch.stat_points = 0;
     ch.status = [];
     ch.inventory = Inv_Add(ch.inventory, 10, 2);
 
@@ -35,11 +35,11 @@ function CharacterCreate_Player(_class_id) {
 
 function Player_DefaultSkills(_class_id) {
     switch (_class_id) {
-        case CLASS_ARCHER: return [SKILL_POWER_STRIKE];
-        case CLASS_KNIGHT: return [SKILL_POWER_STRIKE];
-        case CLASS_MAGE:   return [SKILL_FIRE];
+        case CLASS_ARCHER: return [SKILL_WOUND, SKILL_TAKE_AIM];
+        case CLASS_KNIGHT: return [SKILL_HORIZ_SLASH, SKILL_MUSCLE_UP];
+        case CLASS_MAGE:   return [SKILL_FIREBALL, SKILL_MEDITATION];
     }
-    return [SKILL_POWER_STRIKE];
+    return [SKILL_WOUND];
 }
 
 function Player_EnsureSpriteSet() {
@@ -68,6 +68,72 @@ function Player_ApplyClassSprites(_class_id) {
     }
 }
 
+
+function Player_IsSettled(_pl) {
+    if (!instance_exists(_pl)) return false;
+    var tile = 16;
+    if (variable_instance_exists(_pl, "tile_size")) tile = _pl.tile_size;
+    var gx = round(_pl.x / tile) * tile;
+    var gy = round(_pl.y / tile) * tile;
+    if (abs(_pl.x - gx) > 0.01 || abs(_pl.y - gy) > 0.01) return false;
+    if (variable_instance_exists(_pl, "move_timer") && _pl.move_timer > 0) return false;
+    return true;
+}
+
+function Player_CanAcceptMove(_pl) {
+    if (!instance_exists(_pl)) return false;
+    if (variable_instance_exists(_pl, "moving") && _pl.moving) return false;
+    if (variable_instance_exists(_pl, "move_timer") && _pl.move_timer > 0) return false;
+    return true;
+}
+
+
+function UI_IsBlocking() {
+    var gs = GameState_Get();
+    if (gs.ui.mode != UI_NONE) return true;
+    if (array_length(gs.ui.lines) > 0) return true;
+    return false;
+}
+
+function UI_SetFont() {
+    draw_set_font(UI_FONT);
+}
+
+function Action_CanAct(_pl) {
+    if (UI_IsBlocking()) return false;
+    var gs = GameState_Get();
+    if (variable_struct_exists(gs.ui, "lock_actions") && gs.ui.lock_actions > 0) return false;
+    return Player_CanAcceptMove(_pl);
+}
+
+function Action_KeyPressed(_pl, _action) {
+    if (!Action_CanAct(_pl)) return false;
+    return Input_Pressed(_action);
+}
+
+function Action_Request(_pl, _action) {
+    var gs = GameState_Get();
+
+    // If UI is open, do not buffer (prevents re-trigger on close)
+    if (gs.ui.mode != UI_NONE || array_length(gs.ui.lines) > 0) {
+        return false;
+    }
+
+    // If movement isn't complete, buffer the action for when it settles
+    if (!Player_CanAcceptMove(_pl)) {
+        if (Input_Pressed(_action)) Input_ActionBuffer(_action);
+        return false;
+    }
+
+    if (!Input_ActionCooldownReady(_action)) return false;
+    if (Input_Pressed(_action) || Input_ActionBuffered(_action, ACTION_BUFFER_FRAMES)) {
+        Input_ActionConsume(_action);
+        Input_ActionSetCooldown(_action, ACTION_COOLDOWN_FRAMES);
+        return true;
+    }
+    return false;
+}
+
 // --------------------
 // GAME STATE
 // --------------------
@@ -77,6 +143,13 @@ function GameState_Init() {
     }
 
     var gs = global.state;
+
+    Input_Init();
+
+    if (!variable_global_exists("rng_inited") || !global.rng_inited) {
+        randomize();
+        global.rng_inited = true;
+    }
 
     if (!variable_struct_exists(gs, "selected_class")) {
         gs.selected_class = CLASS_ARCHER;
@@ -119,18 +192,26 @@ function GameState_Init() {
         gs.dialogue_db = global.dialogue_db;
     }
 
-    if (!variable_struct_exists(gs, "shop_db")) {
-        ShopDB_Init();
-        gs.shop_db = global.shop_db;
+    if (!variable_struct_exists(gs, "enemy_reset_version")) {
+        gs.enemy_reset_version = 0;
     }
+
+    if (!variable_struct_exists(gs, "loot_tables")) {
+        Loot_Init();
+        gs.loot_tables = global.loot_tables;
+        gs.loot_configs = global.loot_configs;
+        gs.loot_tier_weights = global.loot_tier_weights;
+    }
+
 
     if (!variable_struct_exists(gs, "battle")) {
         gs.battle = {
             return_room: noone,
             return_x: 0,
             return_y: 0,
-            enemy_uid: noone,
+            enemy_persist_id: "",
             enemy_id: -1,
+            enemy_room: noone,
             just_returned: false
         };
     }
@@ -143,17 +224,35 @@ function GameState_Init() {
         gs.flags = {};
     }
 
+    if (!variable_struct_exists(gs, "save_slot")) {
+        gs.save_slot = 0;
+    }
+
+    if (!variable_struct_exists(gs, "skip_room_save")) {
+        gs.skip_room_save = false;
+    }
+
     if (!variable_struct_exists(gs, "checkpoint")) {
-        gs.checkpoint = { room: rm_floor1, x: 32, y: 128 };
+        gs.checkpoint = { room: rm_floor2, x: 32, y: 128 };
     }
 
     if (!variable_struct_exists(gs, "ui")) {
-        gs.ui = { mode: 0, lines: [], index: 0, shop_items: [], shop_index: 0, prompt: "" };
+        gs.ui = { mode: 0, lines: [], index: 0, speaker: "", just_opened: false, lock_actions: 0, confirm_action: "", icon_frame: 0 };
+    }
+
+    if (!variable_struct_exists(gs, "in_main_menu")) {
+        gs.in_main_menu = false;
+    }
+
+    if (!variable_struct_exists(gs, "transition")) {
+        gs.transition = { pending: false, room: noone, spawn_id: "", face: -1 };
     }
 
     if (!variable_struct_exists(gs, "room_states")) {
         gs.room_states = {};
     }
+
+    RoomDB_Init();
 
     if (!variable_struct_exists(gs, "last_room")) {
         gs.last_room = room;
@@ -185,6 +284,8 @@ function GameState_NextUID() {
 function GameState_SyncLegacy() {
     var gs = global.state;
 
+    Input_Init();
+
     global.selected_class = gs.selected_class;
     global.defeated_enemies = gs.defeated_enemies;
     global.player_ch = gs.player_ch;
@@ -209,16 +310,14 @@ function GameState_SyncLegacy() {
         global.dialogue_db = gs.dialogue_db;
     }
 
-    if (variable_struct_exists(gs, "shop_db")) {
-        global.shop_db = gs.shop_db;
-    }
 
     if (variable_struct_exists(gs, "battle")) {
         global.battle_return_room = gs.battle.return_room;
         global.battle_return_x = gs.battle.return_x;
         global.battle_return_y = gs.battle.return_y;
-        global.battle_enemy_uid = gs.battle.enemy_uid;
+        global.battle_enemy_persist_id = gs.battle.enemy_persist_id;
         global.battle_enemy_id = gs.battle.enemy_id;
+        global.battle_enemy_room = gs.battle.enemy_room;
         global.just_returned_from_battle = gs.battle.just_returned;
     }
 
@@ -247,24 +346,34 @@ function GameState_SetPlayerInst(_inst) {
     global.player_inst = _inst;
 }
 
-function GameState_SetBattleReturn(_room, _x, _y) {
+function GameState_SetBattleReturn(_room, _x, _y, _face) {
     var gs = GameState_Get();
+    var tile = 16;
+    _x = round(_x / tile) * tile;
+    _y = round(_y / tile) * tile;
     gs.battle.return_room = _room;
     gs.battle.return_x = _x;
     gs.battle.return_y = _y;
+    gs.battle.return_face = (argument_count >= 4) ? _face : -1;
 
     global.battle_return_room = _room;
     global.battle_return_x = _x;
     global.battle_return_y = _y;
+    global.battle_return_face = gs.battle.return_face;
 }
 
-function GameState_SetBattleEnemy(_uid, _enemy_id) {
+function GameState_SetBattleEnemy(_persist_id, _enemy_id) {
     var gs = GameState_Get();
-    gs.battle.enemy_uid = _uid;
+    gs.battle.enemy_persist_id = _persist_id;
     gs.battle.enemy_id = _enemy_id;
+    gs.battle.enemy_room = room;
 
-    global.battle_enemy_uid = _uid;
+    global.battle_enemy_persist_id = _persist_id;
     global.battle_enemy_id = _enemy_id;
+    global.battle_enemy_room = room;
+
+    if (Menu_IsOpen()) Menu_Close();
+    if (PauseMenu_IsOpen()) PauseMenu_Close();
 }
 
 function GameState_SetJustReturned(_flag) {
@@ -285,11 +394,5 @@ function Player_LearnSkill(_ch, _skill_id) {
     if (array_index_of(_ch.skills, _skill_id) == -1) {
         array_push(_ch.skills, _skill_id);
     }
-    return _ch;
-}
-
-function Player_AddGold(_ch, _amount) {
-    _ch.gold += _amount;
-    if (_ch.gold < 0) _ch.gold = 0;
     return _ch;
 }

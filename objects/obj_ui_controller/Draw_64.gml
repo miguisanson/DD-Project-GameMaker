@@ -3,26 +3,87 @@ var w = display_get_gui_width();
 var h = display_get_gui_height();
 var margin = 8;
 
-// HUD (overworld only)
-if (room != rm_battle && gs.ui.mode == UI_NONE) {
-    if (is_struct(gs.player_ch)) {
-        draw_set_color(c_white);
-        draw_text(margin, margin, "HP: " + string(gs.player_ch.hp) + "/" + string(gs.player_ch.max_hp));
-        draw_text(margin, margin + 12, "MP: " + string(gs.player_ch.mp) + "/" + string(gs.player_ch.max_mp));
-        draw_text(margin, margin + 24, "G: " + string(gs.player_ch.gold));
+UI_SetFont();
+
+draw_set_alpha(1);
+
+// HUD (battle only)
+var ch = gs.player_ch;
+if (room == rm_battle && instance_exists(obj_battle_controller)) {
+    var bc = instance_find(obj_battle_controller, 0);
+    if (instance_exists(bc) && is_struct(bc.p)) ch = bc.p;
+}
+
+if (room == rm_battle && is_struct(ch)) {
+    var hp_bar_sprite = hp_bar;
+    var mp_bar_sprite = mp_bar;
+    var max_frame = min(10, sprite_get_number(hp_bar_sprite) - 1);
+    if (max_frame < 0) max_frame = 0;
+
+    var hp_ratio = 0;
+    if (ch.max_hp > 0) hp_ratio = clamp(ch.hp / ch.max_hp, 0, 1);
+    var hp_frame = clamp(floor(hp_ratio * max_frame), 0, max_frame);
+
+    var mp_ratio = 0;
+    if (ch.max_mp > 0) mp_ratio = clamp(ch.mp / ch.max_mp, 0, 1);
+    var mp_frame = clamp(floor(mp_ratio * max_frame), 0, max_frame);
+
+    var scale = UI_BAR_SCALE;
+    var bar_w = sprite_get_width(hp_bar_sprite) * scale;
+    var bar_h = sprite_get_height(hp_bar_sprite) * scale;
+
+    var cam = view_camera[0];
+    var sx = w / camera_get_view_width(cam);
+    var sy = h / camera_get_view_height(cam);
+    var cam_off = CameraShake_Offset();
+    var gui_off_x = cam_off.x * sx;
+    var gui_off_y = cam_off.y * sy;
+
+    var bar_x = margin + gui_off_x;
+    var bar_y = margin + gui_off_y;
+    draw_sprite_ext(hp_bar_sprite, hp_frame, bar_x, bar_y, scale, scale, 0, c_white, 1);
+    draw_sprite_ext(mp_bar_sprite, mp_frame, bar_x, bar_y + bar_h + 4, scale, scale, 0, c_white, 1);
+
+    draw_set_color(c_white);
+    var hp_text = string(ch.hp) + " / " + string(ch.max_hp);
+    var mp_text = string(ch.mp) + " / " + string(ch.max_mp);
+    draw_text(bar_x + bar_w + 6, bar_y, hp_text);
+    draw_text(bar_x + bar_w + 6, bar_y + bar_h + 4, mp_text);
+
+    // Player status icons below MP bar
+    var icon_y = bar_y + (bar_h * 2) + 10;
+    Status_DrawIcons(ch, bar_x, icon_y, 12, false);
+
+}
+
+if (gs.ui.mode == UI_PAUSE) {
+    PauseMenu_Draw();
+    if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled) {
+        draw_set_color(c_yellow);
+        draw_text(8, 8, "DEBUG MODE: ON");
     }
+    exit;
+}
+
+if (gs.ui.mode == UI_MENU) {
+    Menu_Draw();
+    if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled) {
+        draw_set_color(c_yellow);
+        draw_text(8, 8, "DEBUG MODE: ON");
+    }
+    exit;
 }
 
 // Dialogue box
-if (gs.ui.mode == UI_DIALOGUE) {
+if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     var bx = margin;
     var by = h - 64 - margin;
     var bw = w - margin * 2;
     var bh = 64;
 
-    draw_set_color(c_white);
-    draw_rectangle(bx, by, bx + bw, by + bh, false);
     draw_set_color(c_black);
+    draw_rectangle(bx, by, bx + bw, by + bh, false);
+    draw_set_color(c_white);
     draw_rectangle(bx, by, bx + bw, by + bh, true);
 
     var line = "";
@@ -30,35 +91,52 @@ if (gs.ui.mode == UI_DIALOGUE) {
         line = gs.ui.lines[gs.ui.index];
     }
 
-    draw_set_color(c_black);
-    draw_text(bx + 8, by + 8, line);
-    draw_text(bx + bw - 18, by + bh - 18, "Z");
-}
-
-// Shop UI
-if (gs.ui.mode == UI_SHOP) {
-    var bx2 = margin;
-    var by2 = h - 96 - margin;
-    var bw2 = w - margin * 2;
-    var bh2 = 96;
+    var speaker = "";
+    if (variable_struct_exists(gs.ui, "speaker")) speaker = gs.ui.speaker;
 
     draw_set_color(c_white);
-    draw_rectangle(bx2, by2, bx2 + bw2, by2 + bh2, false);
-    draw_set_color(c_black);
-    draw_rectangle(bx2, by2, bx2 + bw2, by2 + bh2, true);
-
-    draw_set_color(c_black);
-    draw_text(bx2 + 8, by2 + 8, "Shop  Gold: " + string(gs.player_ch.gold));
-
-    var list = gs.ui.shop_items;
-    for (var i = 0; i < array_length(list); i++) {
-        var item = ItemDB_Get(list[i].item_id);
-        var yy = by2 + 28 + i * 14;
-        if (i == gs.ui.shop_index) draw_text(bx2 + 6, yy, ">");
-        draw_text(bx2 + 16, yy, item.name + "  " + string(list[i].price) + "G");
+    if (speaker != "") {
+        draw_text(bx + 8, by + 6, speaker + ":");
+        draw_text(bx + 8, by + 22, line);
+    } else {
+        draw_text(bx + 8, by + 8, line);
+    }
+    var icon = asset_get_index("button_A_icon");
+    if (icon != -1) {
+        var iw = sprite_get_width(icon);
+        var ih = sprite_get_height(icon);
+        var scale_x = 32 / max(1, iw);
+        var scale_y = 32 / max(1, ih);
+        var frames = sprite_get_number(icon);
+        var frame = 0;
+        if (frames > 1) frame = floor(gs.ui.icon_frame);
+        var dx = bx + bw - 32 - 6;
+        var dy = by + bh - 32 - 6;
+        draw_sprite_ext(icon, frame, dx, dy, scale_x, scale_y, 0, c_white, 1);
     }
 
-    if (gs.ui.prompt != "") {
-        draw_text(bx2 + 8, by2 + bh2 - 16, gs.ui.prompt);
+}
+
+
+
+if (gs.ui.mode == UI_SAVE) {
+    SaveMenu_Draw();
+}
+
+// Debug indicator
+if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled) {
+    draw_set_color(c_yellow);
+    draw_text(8, 8, "DEBUG MODE: ON");
+    var gs2 = GameState_Get();
+    if (variable_struct_exists(gs2, "ui") && variable_struct_exists(gs2.ui, "debug_warns")) {
+        var dw = gs2.ui.debug_warns;
+        if (is_array(dw) && array_length(dw) > 0) {
+            draw_set_color(c_red);
+            draw_text(8, 24, dw[array_length(dw) - 1]);
+        }
     }
+}
+if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled) {
+    draw_set_color(c_yellow);
+    draw_text(8, 8, "DEBUG MODE: ON");
 }

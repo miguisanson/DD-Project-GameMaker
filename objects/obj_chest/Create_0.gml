@@ -1,2 +1,10 @@
 event_inherited();
-interact_kind = INTERACT_CHEST;
+sprite_id = chest_asset;
+interact_name = "Chest";
+swap_on_interact = true;
+swap_sprite = chest_opened_asset;
+dialogue_id = "chest_open";
+dialogue_id_after = "chest_empty";
+is_container = true;
+container_level = 1;
+loot_table_key = "chest_basic";

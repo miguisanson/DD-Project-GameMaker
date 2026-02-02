@@ -18,9 +18,8 @@ function EnemyDB_Init() {
         sprite: slime_profile,
         sprite_world: slime_moving,
         exp: 6,
-        gold: 3,
+        loot_key: "enemy_basic",
         ai: { scan_radius: 32, think_rate: 20, forget_delay: 15, leash_mult: 3, wander_chance: 4, move_speed: 1 },
-        drops: [ { item_id: 10, chance: 0.3, qty: 1 } ],
         skills: [],
         traits: [],
         is_boss: false
@@ -39,10 +38,9 @@ function EnemyDB_Init() {
         sprite: dire_wolf_profile,
         sprite_world: dire_wolf_moving,
         exp: 18,
-        gold: 10,
+        loot_key: "enemy_basic",
         ai: { scan_radius: 64, think_rate: 8, forget_delay: 45, leash_mult: 4, wander_chance: 2, move_speed: 1.2 },
-        drops: [ { item_id: 10, chance: 0.2, qty: 1 } ],
-        skills: [SKILL_POWER_STRIKE],
+        skills: [],
         traits: [],
         is_boss: false
     };
@@ -60,10 +58,9 @@ function EnemyDB_Init() {
         sprite: ghost_sword_profile,
         sprite_world: ghost_sword_moving,
         exp: 28,
-        gold: 14,
+        loot_key: "enemy_basic",
         ai: { scan_radius: 40, think_rate: 1, forget_delay: 60, leash_mult: 4, wander_chance: 0, move_speed: 3 },
-        drops: [ { item_id: 11, chance: 0.15, qty: 1 } ],
-        skills: [SKILL_POWER_STRIKE],
+        skills: [],
         traits: [],
         is_boss: false
     };
@@ -81,10 +78,9 @@ function EnemyDB_Init() {
         sprite: mad_whisp_profile,
         sprite_world: mad_whisp_moving,
         exp: 26,
-        gold: 12,
+        loot_key: "enemy_basic",
         ai: { scan_radius: 80, think_rate: 10, forget_delay: 75, leash_mult: 5, wander_chance: 1, move_speed: 1.3 },
-        drops: [ { item_id: 11, chance: 0.2, qty: 1 } ],
-        skills: [SKILL_FIRE],
+        skills: [SKILL_FIREBALL],
         traits: [],
         is_boss: false
     };
@@ -102,9 +98,8 @@ function EnemyDB_Init() {
         sprite: spider_profile,
         sprite_world: spider_moving,
         exp: 12,
-        gold: 6,
+        loot_key: "enemy_basic",
         ai: { scan_radius: 32, think_rate: 14, forget_delay: 30, leash_mult: 3, wander_chance: 3, move_speed: 1.1 },
-        drops: [ { item_id: 10, chance: 0.2, qty: 1 } ],
         skills: [],
         traits: [],
         is_boss: false
@@ -136,9 +131,8 @@ function EnemyDB_Get(_enemy_id) {
         sprite: slime_profile,
         sprite_world: noone,
         exp: 1,
-        gold: 0,
+        loot_key: "enemy_basic",
         ai: { scan_radius: ENEMY_SCAN_RADIUS_DEFAULT, think_rate: 15, forget_delay: 30, leash_mult: 2, wander_chance: 4, move_speed: 1 },
-        drops: [],
         skills: [],
         traits: [],
         is_boss: false

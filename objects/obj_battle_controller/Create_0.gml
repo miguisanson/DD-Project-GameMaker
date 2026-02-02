@@ -31,6 +31,7 @@ enemy_inst = instance_create_layer(
 );
 
 if (e.sprite != noone) enemy_inst.sprite_index = e.sprite;
+enemy_inst.visible = false;
 
 enemy_fx_x = enemy_inst.x;
 enemy_fx_y = enemy_inst.y;
@@ -59,6 +60,11 @@ if (playeri > enemyi) {
 // --------------------
 battle_over  = false;
 battle_state = BSTATE_MESSAGE;
+wait_fx = noone;
+wait_timer = COMBAT_ACTION_DELAY;
+combat_log = [];
+skill_banner_active = false;
+skill_banner_name = "";
 
 menu_index = 0;
 battle_actions = [
@@ -75,6 +81,11 @@ item_index = 0;
 // MESSAGE SETUP
 // --------------------
 message_text = e.name + " appeared!";
+Combat_Log(message_text);
+
+// camera shake base
+cam_base_x = camera_get_view_x(view_camera[0]);
+cam_base_y = camera_get_view_y(view_camera[0]);
 
 if (turn == TURN_PLAYER) {
     message_next_state = BSTATE_MENU;

@@ -3,6 +3,8 @@
 // --------------------
 var gs = GameState_Init();
 
+if (!variable_instance_exists(id, "persist_id")) persist_id = "";
+
 if (!variable_instance_exists(id, "enemy_uid")) {
     enemy_uid = GameState_NextUID();
 } else if (enemy_uid == noone) {
@@ -12,12 +14,6 @@ if (!variable_instance_exists(id, "enemy_uid")) {
 enemy_id = -1;     // set in child
 defeated = false;
 enemy_cfg = undefined;
-
-// check defeated list (persist after battle)
-if (ds_exists(gs.defeated_enemies, ds_type_list)) {
-    var idx = ds_list_find_index(gs.defeated_enemies, enemy_uid);
-    if (idx != -1) defeated = true;
-}
 
 // --------------------
 // DEFAULT TUNING (CHILD CAN OVERRIDE)

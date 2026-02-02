@@ -8,8 +8,8 @@
   "name":"obj_chest",
   "overriddenProperties":[],
   "parent":{
-    "name":"Entities",
-    "path":"folders/Objects/Entities.yy",
+    "name":"Interactable",
+    "path":"folders/Objects/Interactable.yy",
   },
   "parentObjectId":{
     "name":"obj_interactable",
@@ -32,7 +32,10 @@
   "resourceType":"GMObject",
   "resourceVersion":"2.0",
   "solid":false,
-  "spriteId":null,
+  "spriteId":{
+    "name":"chest_asset",
+    "path":"sprites/chest_asset/chest_asset.yy",
+  },
   "spriteMaskId":null,
   "visible":true,
 }

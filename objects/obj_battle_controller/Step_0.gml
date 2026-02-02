@@ -1,16 +1,31 @@
-if (battle_over) exit;
+Input_PreStep();
+var gs = GameState_Get();
+if (gs.ui.mode == UI_MENU || gs.ui.mode == UI_PAUSE) exit;
+if (battle_over && battle_state != BSTATE_MESSAGE) exit;
 
 // helper input keys
-var k_up = keyboard_check_pressed(ord("W"));
-var k_down = keyboard_check_pressed(ord("S"));
-var k_ok = keyboard_check_pressed(ord("Z")) || keyboard_check_pressed(vk_enter);
-var k_back = keyboard_check_pressed(ord("X")) || keyboard_check_pressed(vk_escape);
+var k_up = Input_Pressed("menu_up");
+var k_down = Input_Pressed("menu_down");
+var k_ok = Input_Pressed("confirm");
+var k_back = Input_Pressed("cancel");
 
 // --------------------
 // MESSAGE STATE
 // --------------------
 if (battle_state == BSTATE_MESSAGE) {
-    if (k_ok) {
+    if (wait_fx != noone && !instance_exists(wait_fx)) wait_fx = noone;
+    if (wait_fx != noone) exit;
+    if (wait_timer > 0) {
+        wait_timer -= 1;
+        exit;
+    }
+    skill_banner_active = false;
+    skill_banner_name = "";
+    if (message_next_state == BSTATE_END_RUN) {
+        Battle_EndRun(self);
+    } else if (message_next_state == BSTATE_ENEMY_ACT && turn != TURN_ENEMY) {
+        battle_state = BSTATE_MENU;
+    } else {
         battle_state = message_next_state;
     }
     exit;
