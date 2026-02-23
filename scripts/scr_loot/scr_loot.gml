@@ -73,6 +73,9 @@ function Loot_Init() {
     ds_map_add(global.loot_configs, "chest_basic",  { table:"chest",  chance:[1, 1, 1], max_items:1 });
     ds_map_add(global.loot_configs, "barrel_basic", { table:"barrel", chance:[1, 1, 1], max_items:1 });
     ds_map_add(global.loot_configs, "enemy_basic",  { table:"enemy",  chance:[0.2, 0.3, 0.4], max_items:1 });
+    ds_map_add(global.loot_configs, "enemy_mid",    { table:"enemy",  chance:[0.3, 0.45, 0.6], max_items:1 });
+    ds_map_add(global.loot_configs, "enemy_elite",  { table:"enemy",  chance:[0.55, 0.75, 0.95], max_items:1 });
+    ds_map_add(global.loot_configs, "enemy_boss",   { table:"enemy",  chance:[1, 1, 1], max_items:2 });
     ds_map_add(global.loot_configs, "skillbook",  { table:"skillbook", chance:[1, 1, 1], max_items:1, mode:"skillbook" });
 
     Loot_BuildSkillbookLists();
@@ -95,6 +98,9 @@ function Loot_TableGet(_key) {
 function Loot_ConfigGet(_key) {
     if (!variable_global_exists("loot_configs") || !ds_exists(global.loot_configs, ds_type_map)) Loot_Init();
     if (ds_map_exists(global.loot_configs, _key)) return global.loot_configs[? _key];
+    if (is_string(_key) && string_pos("enemy_", _key) == 1 && ds_map_exists(global.loot_configs, "enemy_basic")) {
+        return global.loot_configs[? "enemy_basic"];
+    }
     return { table:"chest", chance:[0.5, 0.6, 0.7], max_items:1 };
 }
 
