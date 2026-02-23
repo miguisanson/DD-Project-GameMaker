@@ -1,1 +1,1 @@
-spawn_id = "spawn_from_floor1";
+spawn_id = "spawn_from_floor3";

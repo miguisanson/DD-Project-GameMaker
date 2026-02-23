@@ -1,3 +1,3 @@
-transition_id = "floor6_5_to_floor6";
+transition_id = "floor3_to_floor4";
 require_dir = UP;
 require_move = true;
