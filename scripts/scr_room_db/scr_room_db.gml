@@ -37,6 +37,10 @@ function RoomDB_Init() {
     // Floor 8 <-> 9
     global.room_db.floor8_to_floor9 = { target_room: rm_floor9, target_spawn_id: "spawn_from_floor8", face: -1 };
     global.room_db.floor9_to_floor8 = { target_room: rm_floor8, target_spawn_id: "spawn_from_floor9", face: -1 };
+
+    // Floor 9 <-> 9_5
+    global.room_db.floor9_to_floor9_5 = { target_room: rm_floor9_5, target_spawn_id: "spawn_from_floor9", face: -1 };
+    global.room_db.floor9_5_to_floor9 = { target_room: rm_floor9, target_spawn_id: "spawn_from_floor9_5", face: -1 };
 }
 
 function RoomDB_Get(_id) {
