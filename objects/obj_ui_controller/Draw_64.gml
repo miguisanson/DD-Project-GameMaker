@@ -88,7 +88,9 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
 
     var line = "";
     if (array_length(gs.ui.lines) > 0) {
-        line = gs.ui.lines[gs.ui.index];
+        if (gs.ui.index >= 0 && gs.ui.index < array_length(gs.ui.lines)) {
+            line = Dialogue_LineText(gs.ui.lines[gs.ui.index]);
+        }
     }
 
     var speaker = "";
@@ -97,9 +99,19 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     draw_set_color(c_white);
     if (speaker != "") {
         draw_text(bx + 8, by + 6, speaker + ":");
-        draw_text(bx + 8, by + 22, line);
+        Dialogue_TypewriterPrepareCurrentLine();
+        var page_text0 = variable_struct_exists(gs.ui, "dialogue_full_text") ? gs.ui.dialogue_full_text : line;
+        var visible_count0 = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text0);
+        visible_count0 = clamp(visible_count0, 0, string_length(page_text0));
+        var visible_text0 = string_copy(page_text0, 1, visible_count0);
+        draw_text(bx + 8, by + 22, visible_text0);
     } else {
-        draw_text(bx + 8, by + 8, line);
+        Dialogue_TypewriterPrepareCurrentLine();
+        var page_text = variable_struct_exists(gs.ui, "dialogue_full_text") ? gs.ui.dialogue_full_text : line;
+        var visible_count = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text);
+        visible_count = clamp(visible_count, 0, string_length(page_text));
+        var visible_text = string_copy(page_text, 1, visible_count);
+        draw_text(bx + 8, by + 8, visible_text);
     }
     var icon = asset_get_index("button_A_icon");
     if (icon != -1) {

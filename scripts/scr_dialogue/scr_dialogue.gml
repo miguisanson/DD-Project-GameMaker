@@ -68,6 +68,91 @@ function Dialogue_EnsureUI() {
     }
 }
 
+function Dialogue_ResetTypewriter() {
+    var gs = GameState_Get();
+    gs.ui.dialogue_tw_line_index = -1;
+    gs.ui.dialogue_full_text = "";
+    gs.ui.dialogue_visible_count = 0;
+    gs.ui.dialogue_reveal_accum = 0;
+    gs.ui.dialogue_state = UI_DIALOGUE_STATE_REVEALING;
+    gs.ui.dialogue_hold_frames = 0;
+}
+
+function Dialogue_LineText(_line_entry) {
+    if (is_struct(_line_entry) && variable_struct_exists(_line_entry, "text")) {
+        return string(_line_entry.text);
+    }
+    return string(_line_entry);
+}
+
+function Dialogue_TypewriterPrepareCurrentLine() {
+    var gs = GameState_Get();
+    if (gs.ui.mode != UI_DIALOGUE) return;
+    if (!is_array(gs.ui.lines) || array_length(gs.ui.lines) <= 0) return;
+    if (gs.ui.index < 0 || gs.ui.index >= array_length(gs.ui.lines)) return;
+
+    var game_fps = max(1, game_get_speed(gamespeed_fps));
+    gs.ui.dialogue_chars_per_sec = max(1, UI_DIALOGUE_CHARS_PER_SEC);
+    gs.ui.dialogue_hold_duration = max(1, round(UI_DIALOGUE_ADVANCE_HOLD_SEC * game_fps));
+
+    var line_text = Dialogue_LineText(gs.ui.lines[gs.ui.index]);
+    var line_changed = (!variable_struct_exists(gs.ui, "dialogue_tw_line_index") || gs.ui.dialogue_tw_line_index != gs.ui.index
+        || !variable_struct_exists(gs.ui, "dialogue_full_text") || gs.ui.dialogue_full_text != line_text);
+    if (line_changed) {
+        gs.ui.dialogue_full_text = line_text;
+        gs.ui.dialogue_visible_count = 0;
+        gs.ui.dialogue_reveal_accum = 0;
+        gs.ui.dialogue_state = UI_DIALOGUE_STATE_REVEALING;
+        gs.ui.dialogue_hold_frames = gs.ui.dialogue_hold_duration;
+        gs.ui.dialogue_tw_line_index = gs.ui.index;
+    }
+
+    var max_len = string_length(gs.ui.dialogue_full_text);
+    gs.ui.dialogue_visible_count = clamp(gs.ui.dialogue_visible_count, 0, max_len);
+}
+
+function Dialogue_TypewriterStep() {
+    var gs = GameState_Get();
+    if (gs.ui.mode != UI_DIALOGUE) return;
+
+    Dialogue_TypewriterPrepareCurrentLine();
+
+    var full_text = gs.ui.dialogue_full_text;
+    var full_len = string_length(full_text);
+    var game_fps = max(1, game_get_speed(gamespeed_fps));
+
+    if (gs.ui.dialogue_state == UI_DIALOGUE_STATE_REVEALING) {
+        gs.ui.dialogue_reveal_accum += (gs.ui.dialogue_chars_per_sec / game_fps);
+        while (gs.ui.dialogue_reveal_accum >= 1 && gs.ui.dialogue_visible_count < full_len) {
+            gs.ui.dialogue_visible_count += 1;
+            gs.ui.dialogue_reveal_accum -= 1;
+        }
+        if (gs.ui.dialogue_visible_count >= full_len) {
+            gs.ui.dialogue_visible_count = full_len;
+            gs.ui.dialogue_reveal_accum = 0;
+            gs.ui.dialogue_state = UI_DIALOGUE_STATE_HOLDING;
+            gs.ui.dialogue_hold_frames = gs.ui.dialogue_hold_duration;
+        }
+    } else if (gs.ui.dialogue_state == UI_DIALOGUE_STATE_HOLDING) {
+        gs.ui.dialogue_hold_frames -= 1;
+        if (gs.ui.dialogue_hold_frames <= 0) {
+            gs.ui.dialogue_hold_frames = 0;
+            gs.ui.dialogue_state = UI_DIALOGUE_STATE_READY;
+        }
+    }
+}
+
+function Dialogue_TypewriterRevealInstant() {
+    var gs = GameState_Get();
+    if (gs.ui.mode != UI_DIALOGUE) return;
+    Dialogue_TypewriterPrepareCurrentLine();
+    var full_len = string_length(gs.ui.dialogue_full_text);
+    gs.ui.dialogue_visible_count = full_len;
+    gs.ui.dialogue_reveal_accum = 0;
+    gs.ui.dialogue_state = UI_DIALOGUE_STATE_HOLDING;
+    gs.ui.dialogue_hold_frames = gs.ui.dialogue_hold_duration;
+}
+
 function Dialogue_Start(_npc_id) {
     if (PauseMenu_IsOpen()) PauseMenu_Close();
     Dialogue_EnsureUI();
@@ -77,7 +162,9 @@ function Dialogue_Start(_npc_id) {
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.opened_frame = Input_Frame();
+    gs.ui.dialogue_open_block_frame = gs.ui.opened_frame;
     gs.ui.confirm_action = "confirm";
+    Dialogue_ResetTypewriter();
     SFX_Play("dialogue_open");
 }
 
@@ -90,7 +177,9 @@ function Dialogue_StartLines(_lines) {
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.opened_frame = Input_Frame();
+    gs.ui.dialogue_open_block_frame = gs.ui.opened_frame;
     gs.ui.confirm_action = "confirm";
+    Dialogue_ResetTypewriter();
     SFX_Play("dialogue_open");
 }
 
@@ -101,12 +190,30 @@ function Dialogue_FormatLines(_lines, _vars) {
     var keys = variable_struct_get_names(_vars);
     var out = array_create(array_length(_lines));
     for (var i = 0; i < array_length(_lines); i++) {
-        var s = _lines[i];
-        for (var k = 0; k < array_length(keys); k++) {
-            var key = keys[k];
-            s = string_replace_all(s, "{" + key + "}", string(variable_struct_get(_vars, key)));
+        var line = _lines[i];
+        if (is_struct(line)) {
+            var copy = {};
+            var names = variable_struct_get_names(line);
+            for (var n = 0; n < array_length(names); n++) {
+                var nm = names[n];
+                variable_struct_set(copy, nm, variable_struct_get(line, nm));
+            }
+            var t = "";
+            if (variable_struct_exists(copy, "text")) t = string(copy.text);
+            for (var k0 = 0; k0 < array_length(keys); k0++) {
+                var key0 = keys[k0];
+                t = string_replace_all(t, "{" + key0 + "}", string(variable_struct_get(_vars, key0)));
+            }
+            variable_struct_set(copy, "text", t);
+            out[i] = copy;
+        } else {
+            var s = string(line);
+            for (var k = 0; k < array_length(keys); k++) {
+                var key = keys[k];
+                s = string_replace_all(s, "{" + key + "}", string(variable_struct_get(_vars, key)));
+            }
+            out[i] = s;
         }
-        out[i] = s;
     }
     return out;
 }
@@ -125,7 +232,9 @@ function Dialogue_StartWithSpeaker(_speaker, _lines) {
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.opened_frame = Input_Frame();
+    gs.ui.dialogue_open_block_frame = gs.ui.opened_frame;
     gs.ui.confirm_action = "confirm";
+    Dialogue_ResetTypewriter();
     SFX_Play("dialogue_open");
 }
 
@@ -136,8 +245,30 @@ function Dialogue_StartLinesWithSpeaker(_speaker, _lines) {
 function Dialogue_Advance() {
     var gs = GameState_Get();
     if (gs.ui.mode != UI_DIALOGUE) return;
+
+    var frame = Input_Frame();
+    if (variable_struct_exists(gs.ui, "dialogue_open_block_frame") && frame <= gs.ui.dialogue_open_block_frame) return;
+
+    Dialogue_TypewriterPrepareCurrentLine();
+    if (gs.ui.dialogue_state == UI_DIALOGUE_STATE_REVEALING) {
+        SFX_Play("dialogue_advance");
+        Dialogue_TypewriterRevealInstant();
+        return;
+    }
+    if (gs.ui.dialogue_state == UI_DIALOGUE_STATE_HOLDING) {
+        return;
+    }
+
     gs.ui.opened_frame = UI_OPENED_FRAME_NONE;
     gs.ui.index += 1;
+    Dialogue_ResetTypewriter();
+
+    if (gs.ui.index < array_length(gs.ui.lines)) {
+        SFX_Play("dialogue_advance");
+        Dialogue_TypewriterPrepareCurrentLine();
+        return;
+    }
+
     if (gs.ui.index >= array_length(gs.ui.lines)) {
         SFX_Play("dialogue_close");
         gs.ui.mode = UI_NONE;
@@ -145,7 +276,8 @@ function Dialogue_Advance() {
         gs.ui.index = 0;
         gs.ui.speaker = "";
         gs.ui.confirm_action = "";
-    } else {
-        SFX_Play("dialogue_advance");
+        gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
+        gs.ui.dialogue_lock = UI_DIALOGUE_REOPEN_LOCK;
+        gs.ui.dialogue_require_release = true;
     }
 }

@@ -91,6 +91,8 @@ function Interact_Handle(_inst) {
     var target = Interact_GetTarget(pl);
     if (target != _inst) return;
     if (!Interact_PlayerFacing(pl, _inst)) return;
+    if (variable_struct_exists(gs.ui, "dialogue_require_release") && gs.ui.dialogue_require_release && Input_Held("interact")) return;
+    if (variable_struct_exists(gs.ui, "dialogue_lock") && gs.ui.dialogue_lock > 0) return;
     if (!Action_Request(pl, "interact")) return;
 
     var name = "";

@@ -430,9 +430,39 @@ function GameState_Init() {
     gs.settings = GameSettings_Normalize(gs.settings);
 
     if (!variable_struct_exists(gs, "ui")) {
-        gs.ui = { mode: 0, lines: [], index: 0, speaker: "", confirm_action: "", icon_frame: 0, opened_frame: UI_OPENED_FRAME_NONE };
+        gs.ui = {
+            mode: 0,
+            lines: [],
+            index: 0,
+            speaker: "",
+            confirm_action: "",
+            icon_frame: 0,
+            opened_frame: UI_OPENED_FRAME_NONE,
+            dialogue_lock: 0,
+            dialogue_require_release: false,
+            dialogue_full_text: "",
+            dialogue_visible_count: 0,
+            dialogue_reveal_accum: 0,
+            dialogue_chars_per_sec: UI_DIALOGUE_CHARS_PER_SEC,
+            dialogue_state: UI_DIALOGUE_STATE_REVEALING,
+            dialogue_hold_frames: 0,
+            dialogue_hold_duration: 0,
+            dialogue_tw_line_index: -1,
+            dialogue_open_block_frame: UI_OPENED_FRAME_NONE
+        };
     }
     if (!variable_struct_exists(gs.ui, "opened_frame")) gs.ui.opened_frame = UI_OPENED_FRAME_NONE;
+    if (!variable_struct_exists(gs.ui, "dialogue_lock")) gs.ui.dialogue_lock = 0;
+    if (!variable_struct_exists(gs.ui, "dialogue_require_release")) gs.ui.dialogue_require_release = false;
+    if (!variable_struct_exists(gs.ui, "dialogue_full_text")) gs.ui.dialogue_full_text = "";
+    if (!variable_struct_exists(gs.ui, "dialogue_visible_count")) gs.ui.dialogue_visible_count = 0;
+    if (!variable_struct_exists(gs.ui, "dialogue_reveal_accum")) gs.ui.dialogue_reveal_accum = 0;
+    if (!variable_struct_exists(gs.ui, "dialogue_chars_per_sec")) gs.ui.dialogue_chars_per_sec = UI_DIALOGUE_CHARS_PER_SEC;
+    if (!variable_struct_exists(gs.ui, "dialogue_state")) gs.ui.dialogue_state = UI_DIALOGUE_STATE_REVEALING;
+    if (!variable_struct_exists(gs.ui, "dialogue_hold_frames")) gs.ui.dialogue_hold_frames = 0;
+    if (!variable_struct_exists(gs.ui, "dialogue_hold_duration")) gs.ui.dialogue_hold_duration = 0;
+    if (!variable_struct_exists(gs.ui, "dialogue_tw_line_index")) gs.ui.dialogue_tw_line_index = -1;
+    if (!variable_struct_exists(gs.ui, "dialogue_open_block_frame")) gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
 
     if (!variable_struct_exists(gs, "in_main_menu")) {
         gs.in_main_menu = false;

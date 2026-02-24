@@ -22,11 +22,19 @@ if (icon != -1) {
     }
 }
 
+if (variable_struct_exists(gs.ui, "dialogue_lock") && gs.ui.dialogue_lock > 0) {
+    gs.ui.dialogue_lock -= 1;
+}
+if (variable_struct_exists(gs.ui, "dialogue_require_release") && gs.ui.dialogue_require_release && !Input_Held("interact")) {
+    gs.ui.dialogue_require_release = false;
+}
+
 var k_ok = Input_UIConfirm();
 var k_back = Input_UIBack();
 var k_menu = Input_UIPressed("menu");
 
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
+    Dialogue_TypewriterStep();
     if (k_ok) {
         Dialogue_Advance();
     }
