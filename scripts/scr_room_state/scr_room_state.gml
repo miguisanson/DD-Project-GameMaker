@@ -31,7 +31,7 @@ function RoomState_EnsurePersistId(_inst) {
     if (variable_instance_exists(_inst, "ystart")) sy = _inst.ystart;
 
     var base = "auto:" + room_get_name(room) + ":" + object_get_name(_inst.object_index) + ":" + string(round(sx)) + ":" + string(round(sy));
-    var ord = 1;
+    var duplicate_index = 1;
     var obj = _inst.object_index;
     var n = instance_number(obj);
     for (var i = 0; i < n; i++) {
@@ -40,10 +40,10 @@ function RoomState_EnsurePersistId(_inst) {
         if (!variable_instance_exists(other_inst, "persist_id")) continue;
         var pid = other_inst.persist_id;
         if (pid == "") continue;
-        if (string_pos(base + "#", pid) == 1) ord += 1;
+        if (string_pos(base + "#", pid) == 1) duplicate_index += 1;
     }
 
-    _inst.persist_id = base + "#" + string(ord);
+    _inst.persist_id = base + "#" + string(duplicate_index);
     return (_inst.persist_id != "");
 }
 
