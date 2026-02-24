@@ -9,7 +9,7 @@ if (require_move) {
 var entry = RoomDB_Get(transition_id);
 if (!is_struct(entry)) exit;
 
-if (variable_global_exists("room_state_ready") && global.room_state_ready) RoomState_Save(room);
+RoomState_OnRoomExit();
 
 var face_dir = -1;
 if (variable_struct_exists(entry, "face")) face_dir = entry.face;

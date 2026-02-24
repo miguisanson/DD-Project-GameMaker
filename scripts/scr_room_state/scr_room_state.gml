@@ -148,6 +148,35 @@ function RoomState_Save(_room) {
     }
 }
 
+function RoomState_OnRoomExit() {
+    RoomState_Init();
+    if (room == rm_battle) return;
+    RoomState_Save(room);
+}
+
+function EnemyPersist_BeginEncounter(_enemy_inst, _player_inst) {
+    if (!instance_exists(_enemy_inst) || !instance_exists(_player_inst)) return false;
+    if (!variable_instance_exists(_enemy_inst, "enemy_id")) return false;
+    if (!RoomState_EnsurePersistId(_enemy_inst)) return false;
+
+    RoomState_OnRoomExit();
+    GameState_SetBattleReturn(room, _player_inst.x, _player_inst.y, -1);
+    GameState_SetBattleEnemy(_enemy_inst.persist_id, _enemy_inst.enemy_id);
+    return true;
+}
+
+function EnemyPersist_ResolveBattle(_defeated) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "battle")) return;
+    if (gs.battle.enemy_persist_id == "") return;
+
+    if (_defeated) {
+        RoomState_SetRemoved(gs.battle.enemy_room, gs.battle.enemy_persist_id, obj_enemy);
+    } else {
+        RoomState_SetAlive(gs.battle.enemy_room, gs.battle.enemy_persist_id);
+    }
+}
+
 function RoomState_Apply(_room) {
     if (_room == rm_battle) return;
     RoomState_Init();

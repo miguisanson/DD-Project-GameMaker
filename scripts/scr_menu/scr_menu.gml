@@ -674,7 +674,10 @@ function PauseMenu_ExitToMainMenu() {
         gs.ui.confirm_action = "";
         if (variable_struct_exists(gs.ui, "lock_actions")) gs.ui.lock_actions = 0;
     }
-    if (room != rm_start) room_goto(rm_start);
+    if (room != rm_start) {
+        RoomState_OnRoomExit();
+        room_goto(rm_start);
+    }
 }
 
 function PauseMenu_IsOpen() {

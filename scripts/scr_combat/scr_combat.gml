@@ -188,11 +188,7 @@ function Battle_CheckEnd(_bc, _p, _e) {
         _bc.battle_over = true;
         _p = Battle_GrantRewards(_p, _e);
         GameState_SetPlayer(_p);
-
-        var gs = GameState_Get();
-        if (variable_struct_exists(gs, "battle") && gs.battle.enemy_persist_id != "") {
-            RoomState_SetRemoved(gs.battle.enemy_room, gs.battle.enemy_persist_id, obj_enemy);
-        }
+        EnemyPersist_ResolveBattle(true);
 
         Battle_Message(_bc, _e.name + " has been slain.", BSTATE_END_RUN);
         return true;
@@ -421,10 +417,7 @@ function Battle_RunAttempt(_bc) {
     var er = RollD20() + StatMod(Stat_Get(e, STAT_AGI));
 
     if (pr >= er) {
-        var gs = GameState_Get();
-        if (variable_struct_exists(gs, "battle") && gs.battle.enemy_persist_id != "") {
-            RoomState_SetAlive(gs.battle.enemy_room, gs.battle.enemy_persist_id);
-        }
+        EnemyPersist_ResolveBattle(false);
         Battle_Message(_bc, "You ran away!", BSTATE_END_RUN);
     } else {
         _bc.turn = TURN_ENEMY;

@@ -8,17 +8,8 @@ var gs = GameState_Get();
 if (!variable_struct_exists(gs, "last_room")) gs.last_room = room;
 
 if (gs.last_room != room) {
-    if (room != rm_battle) {
-        var skip_save = false;
-        if (variable_struct_exists(gs, "skip_room_save") && gs.skip_room_save) skip_save = true;
-        if (variable_global_exists("skipRoomSave") && global.skipRoomSave) skip_save = true;
-        if (!skip_save) {
-            if (variable_global_exists("room_state_ready") && global.room_state_ready) {
-                RoomState_Save(gs.last_room);
-            }
-        }
-    }
     gs.last_room = room;
+    // Room-exit snapshots are captured at transition/encounter hooks before room_goto.
     if (variable_global_exists("room_state_ready") && global.room_state_ready) {
         RoomState_ClearApplied(room);
         RoomState_Apply(room);
