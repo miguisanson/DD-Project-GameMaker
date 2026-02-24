@@ -84,10 +84,10 @@ function SFX_RegisterDefaults() {
     SFX_RegisterResolved("ui_back", [Modern6, "Modern6", "ui_back"]);
     SFX_RegisterResolved("ui_openclose", [Modern14, "Modern14", "ui_openclose"]);
 
-    // Dialogue
-    SFX_RegisterResolved("dialogue_open", [Modern8, "Modern8", "dialogue_open"]);
-    SFX_RegisterResolved("dialogue_advance", [Abstract1, "Abstract1", "dialogue_advance"]);
-    SFX_RegisterResolved("dialogue_close", [Modern9, "Modern9", "dialogue_close"]);
+    // Dialogue (muted by design)
+    SFX_Register("dialogue_open", noone);
+    SFX_Register("dialogue_advance", noone);
+    SFX_Register("dialogue_close", noone);
 
     // Save/Load
     SFX_RegisterResolved("save_confirm", [Modern5, "Modern5", "save_confirm"]);
