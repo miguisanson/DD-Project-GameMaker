@@ -10,7 +10,7 @@
   "compression":0,
   "compressionQuality":4,
   "conversionMode":0,
-  "duration":1.0,
+  "duration":60.0,
   "exportDir":"",
   "name":"overall_bgm",
   "parent":{

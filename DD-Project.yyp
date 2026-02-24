@@ -38,7 +38,6 @@
     {"$GMFolder":"","%Name":"Interactable","folderPath":"folders/Sounds/Interactable.yy","name":"Interactable","resourceType":"GMFolder","resourceVersion":"2.0",},
     {"$GMFolder":"","%Name":"Skill Effects","folderPath":"folders/Sounds/Skill Effects.yy","name":"Skill Effects","resourceType":"GMFolder","resourceVersion":"2.0",},
     {"$GMFolder":"","%Name":"UI_Soundpack","folderPath":"folders/Sounds/UI_Soundpack.yy","name":"UI_Soundpack","resourceType":"GMFolder","resourceVersion":"2.0",},
-    {"$GMFolder":"","%Name":"UI","folderPath":"folders/Sounds/UI.yy","name":"UI","resourceType":"GMFolder","resourceVersion":"2.0",},
     {"$GMFolder":"","%Name":"Sprites","folderPath":"folders/Sprites.yy","name":"Sprites","resourceType":"GMFolder","resourceVersion":"2.0",},
     {"$GMFolder":"","%Name":"Cutscene_Main_Menu","folderPath":"folders/Sprites/Cutscene_Main_Menu.yy","name":"Cutscene_Main_Menu","resourceType":"GMFolder","resourceVersion":"2.0",},
     {"$GMFolder":"","%Name":"Decorations","folderPath":"folders/Sprites/Decorations.yy","name":"Decorations","resourceType":"GMFolder","resourceVersion":"2.0",},
