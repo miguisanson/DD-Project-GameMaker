@@ -421,6 +421,10 @@ function Battle_RunAttempt(_bc) {
     var er = RollD20() + StatMod(Stat_Get(e, STAT_AGI));
 
     if (pr >= er) {
+        var gs = GameState_Get();
+        if (variable_struct_exists(gs, "battle") && gs.battle.enemy_persist_id != "") {
+            RoomState_SetAlive(gs.battle.enemy_room, gs.battle.enemy_persist_id);
+        }
         Battle_Message(_bc, "You ran away!", BSTATE_END_RUN);
     } else {
         _bc.turn = TURN_ENEMY;

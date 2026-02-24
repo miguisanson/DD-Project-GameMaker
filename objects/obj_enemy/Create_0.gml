@@ -4,6 +4,7 @@
 var gs = GameState_Init();
 
 if (!variable_instance_exists(id, "persist_id")) persist_id = "";
+RoomState_EnsurePersistId(id);
 
 if (!variable_instance_exists(id, "enemy_uid")) {
     enemy_uid = GameState_NextUID();

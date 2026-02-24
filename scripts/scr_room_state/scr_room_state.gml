@@ -19,6 +19,34 @@ function RoomState_Warn(_msg) {
     }
 }
 
+function RoomState_EnsurePersistId(_inst) {
+    if (!instance_exists(_inst)) return false;
+    if (!variable_instance_exists(_inst, "persist_id")) return false;
+    if (_inst.persist_id != "") return true;
+
+    // Deterministic fallback for room-placed instances that forgot to set persist_id.
+    var sx = _inst.x;
+    var sy = _inst.y;
+    if (variable_instance_exists(_inst, "xstart")) sx = _inst.xstart;
+    if (variable_instance_exists(_inst, "ystart")) sy = _inst.ystart;
+
+    var base = "auto:" + room_get_name(room) + ":" + object_get_name(_inst.object_index) + ":" + string(round(sx)) + ":" + string(round(sy));
+    var ord = 1;
+    var obj = _inst.object_index;
+    var n = instance_number(obj);
+    for (var i = 0; i < n; i++) {
+        var other_inst = instance_find(obj, i);
+        if (other_inst == _inst) continue;
+        if (!variable_instance_exists(other_inst, "persist_id")) continue;
+        var pid = other_inst.persist_id;
+        if (pid == "") continue;
+        if (string_pos(base + "#", pid) == 1) ord += 1;
+    }
+
+    _inst.persist_id = base + "#" + string(ord);
+    return (_inst.persist_id != "");
+}
+
 function RoomState_Set(_room, _persist_id, _data) {
     RoomState_Init();
     if (_persist_id == "") return;
@@ -45,7 +73,7 @@ function RoomState_ClearApplied(_room) {
 
 function RoomState_SaveInstance(_inst, _vars, _removed) {
     RoomState_Init();
-    if (!variable_instance_exists(_inst, "persist_id") || _inst.persist_id == "") {
+    if (!RoomState_EnsurePersistId(_inst)) {
         RoomState_Warn("[Persist] Missing persist_id on " + object_get_name(_inst.object_index) + " in " + room_get_name(room));
         return;
     }
@@ -70,8 +98,19 @@ function RoomState_SetRemoved(_room, _persist_id, _obj_type = noone) {
     RoomState_Set(_room, _persist_id, data);
 }
 
+function RoomState_SetAlive(_room, _persist_id) {
+    RoomState_Init();
+    if (_persist_id == "") return;
+
+    var data = RoomState_Get(_room, _persist_id);
+    if (!is_struct(data)) data = { removed: false, vars: {} };
+    data.removed = false;
+    if (!variable_struct_exists(data, "vars")) data.vars = {};
+    RoomState_Set(_room, _persist_id, data);
+}
+
 function RoomState_ApplyInstance(_inst) {
-    if (!variable_instance_exists(_inst, "persist_id") || _inst.persist_id == "") {
+    if (!RoomState_EnsurePersistId(_inst)) {
         RoomState_Warn("[Persist] Missing persist_id on " + object_get_name(_inst.object_index) + " in " + room_get_name(room));
         return;
     }
@@ -99,7 +138,14 @@ function RoomState_ApplyInstance(_inst) {
 }
 
 function RoomState_Save(_room) {
-    // no-op: persistence is updated on interaction/defeat/pickup
+    RoomState_Init();
+    if (_room != room) return;
+    if (_room == rm_battle) return;
+
+    // Enemy positions are the single source of truth for overworld battle return.
+    with (obj_enemy) {
+        RoomState_SaveInstance(id, ["x", "y", "enemy_id", "enemy_uid"], false);
+    }
 }
 
 function RoomState_Apply(_room) {
