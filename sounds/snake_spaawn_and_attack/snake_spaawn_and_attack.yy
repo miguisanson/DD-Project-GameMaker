@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"snake_spaawn_and_attack",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":5.15483,
+  "exportDir":"",
+  "name":"snake_spaawn_and_attack",
+  "parent":{
+    "name":"Snake",
+    "path":"folders/Sounds/Entities/Monsters/Snake.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"snake_spaawn_and_attack.mp3",
+  "volume":1.0,
+}

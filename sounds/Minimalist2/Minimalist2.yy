@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Minimalist2",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":0.753356,
+  "exportDir":"",
+  "name":"Minimalist2",
+  "parent":{
+    "name":"UI_Soundpack",
+    "path":"folders/Sounds/UI_Soundpack.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Minimalist2.ogg",
+  "volume":1.0,
+}

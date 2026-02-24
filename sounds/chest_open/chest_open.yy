@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"chest_open",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":1.0,
+  "exportDir":"",
+  "name":"chest_open",
+  "parent":{
+    "name":"Interactable",
+    "path":"folders/Sounds/Interactable.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"chest_open.ogg",
+  "volume":1.0,
+}

@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Slime_Attack__Nr__1__Minecraft_Sound____Sound_Effect_for_editing",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":0.8011111,
+  "exportDir":"",
+  "name":"Slime_Attack__Nr__1__Minecraft_Sound____Sound_Effect_for_editing",
+  "parent":{
+    "name":"Slime",
+    "path":"folders/Sounds/Entities/Monsters/Slime.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Slime_Attack__Nr__1__Minecraft_Sound____Sound_Effect_for_editing.mp3",
+  "volume":1.0,
+}
