@@ -19,6 +19,32 @@ function RoomState_Warn(_msg) {
     }
 }
 
+function EnemyPersist_IsBossEnemyId(_enemy_id) {
+    return (_enemy_id == ENEMY_MINI_BOSS || _enemy_id == ENEMY_FINAL_BOSS);
+}
+
+function EnemyPersist_EnsureBossFlags() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "boss_defeated") || !is_struct(gs.boss_defeated)) {
+        gs.boss_defeated = { mini_boss: false, final_boss: false };
+    }
+    return gs.boss_defeated;
+}
+
+function EnemyPersist_SetBossDefeated(_enemy_id, _defeated = true) {
+    var flags = EnemyPersist_EnsureBossFlags();
+    if (_enemy_id == ENEMY_MINI_BOSS) flags.mini_boss = _defeated;
+    if (_enemy_id == ENEMY_FINAL_BOSS) flags.final_boss = _defeated;
+}
+
+function EnemyPersist_IsBossDefeated(_enemy_id) {
+    if (!EnemyPersist_IsBossEnemyId(_enemy_id)) return false;
+    var flags = EnemyPersist_EnsureBossFlags();
+    if (_enemy_id == ENEMY_MINI_BOSS) return (variable_struct_exists(flags, "mini_boss") && flags.mini_boss);
+    if (_enemy_id == ENEMY_FINAL_BOSS) return (variable_struct_exists(flags, "final_boss") && flags.final_boss);
+    return false;
+}
+
 function RoomState_EnsurePersistId(_inst) {
     if (!instance_exists(_inst)) return false;
     if (!variable_instance_exists(_inst, "persist_id")) return false;
@@ -87,13 +113,14 @@ function RoomState_SaveInstance(_inst, _vars, _removed) {
     RoomState_Set(room, _inst.persist_id, data);
 }
 
-function RoomState_SetRemoved(_room, _persist_id, _obj_type = noone) {
+function RoomState_SetRemoved(_room, _persist_id, _obj_type = noone, _enemy_id = -1) {
     RoomState_Init();
     if (_persist_id == "") return;
     var gs = GameState_Get();
     var data = { removed: true, vars: {} };
     if (_obj_type == obj_enemy) {
         data.removed_reset_version = gs.enemy_reset_version;
+        if (_enemy_id != -1) data.enemy_id = _enemy_id;
     }
     RoomState_Set(_room, _persist_id, data);
 }
@@ -114,6 +141,14 @@ function RoomState_ApplyInstance(_inst) {
         RoomState_Warn("[Persist] Missing persist_id on " + object_get_name(_inst.object_index) + " in " + room_get_name(room));
         return;
     }
+
+    if (_inst.object_index == obj_enemy && variable_instance_exists(_inst, "enemy_id")) {
+        if (EnemyPersist_IsBossDefeated(_inst.enemy_id)) {
+            instance_destroy(_inst);
+            return;
+        }
+    }
+
     var data = RoomState_Get(room, _inst.persist_id);
     if (!is_struct(data)) return;
     if (variable_struct_exists(data, "removed") && data.removed) {
@@ -171,7 +206,10 @@ function EnemyPersist_ResolveBattle(_defeated) {
     if (gs.battle.enemy_persist_id == "") return;
 
     if (_defeated) {
-        RoomState_SetRemoved(gs.battle.enemy_room, gs.battle.enemy_persist_id, obj_enemy);
+        if (EnemyPersist_IsBossEnemyId(gs.battle.enemy_id)) {
+            EnemyPersist_SetBossDefeated(gs.battle.enemy_id, true);
+        }
+        RoomState_SetRemoved(gs.battle.enemy_room, gs.battle.enemy_persist_id, obj_enemy, gs.battle.enemy_id);
     } else {
         RoomState_SetAlive(gs.battle.enemy_room, gs.battle.enemy_persist_id);
     }

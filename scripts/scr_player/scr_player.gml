@@ -196,6 +196,10 @@ function GameState_Init() {
         gs.enemy_reset_version = 0;
     }
 
+    if (!variable_struct_exists(gs, "boss_defeated") || !is_struct(gs.boss_defeated)) {
+        gs.boss_defeated = { mini_boss: false, final_boss: false };
+    }
+
     if (!variable_struct_exists(gs, "loot_tables")) {
         Loot_Init();
         gs.loot_tables = global.loot_tables;

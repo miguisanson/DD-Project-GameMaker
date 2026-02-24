@@ -13,6 +13,66 @@ function Array_ToDSList(_arr) {
     return list;
 }
 
+function Save_IsBossEnemyId(_enemy_id) {
+    return (_enemy_id == ENEMY_MINI_BOSS || _enemy_id == ENEMY_FINAL_BOSS);
+}
+
+function Save_PersistEntryEnemyId(_entry, _key = "") {
+    if (!is_struct(_entry)) return -1;
+    if (variable_struct_exists(_entry, "enemy_id")) return _entry.enemy_id;
+    if (variable_struct_exists(_entry, "vars") && is_struct(_entry.vars) && variable_struct_exists(_entry.vars, "enemy_id")) {
+        return _entry.vars.enemy_id;
+    }
+
+    // Backward-compat fallback for older auto-generated persist keys.
+    if (_key != "") {
+        if (string_pos(":obj_mini_boss:", _key) > 0) return ENEMY_MINI_BOSS;
+        if (string_pos(":obj_final_boss:", _key) > 0) return ENEMY_FINAL_BOSS;
+    }
+    return -1;
+}
+
+function Save_IsEnemyPersistEntry(_entry, _key = "") {
+    if (!is_struct(_entry)) return false;
+    if (Save_PersistEntryEnemyId(_entry, _key) != -1) return true;
+    if (variable_struct_exists(_entry, "removed_reset_version")) return true;
+    return false;
+}
+
+function Save_DeriveBossFlagsFromPersist(_persist) {
+    var out = { mini_boss: false, final_boss: false };
+    if (!is_struct(_persist)) return out;
+
+    var keys = variable_struct_get_names(_persist);
+    for (var i = 0; i < array_length(keys); i++) {
+        var key = keys[i];
+        var entry = variable_struct_get(_persist, key);
+        if (!Save_IsEnemyPersistEntry(entry, key)) continue;
+        if (!is_struct(entry)) continue;
+        if (!variable_struct_exists(entry, "removed") || !entry.removed) continue;
+
+        var enemy_id = Save_PersistEntryEnemyId(entry, key);
+        if (enemy_id == ENEMY_MINI_BOSS) out.mini_boss = true;
+        if (enemy_id == ENEMY_FINAL_BOSS) out.final_boss = true;
+    }
+
+    return out;
+}
+
+function Save_FilterPersistWithoutEnemies(_persist) {
+    var out = {};
+    if (!is_struct(_persist)) return out;
+
+    var keys = variable_struct_get_names(_persist);
+    for (var i = 0; i < array_length(keys); i++) {
+        var key = keys[i];
+        var entry = variable_struct_get(_persist, key);
+        if (Save_IsEnemyPersistEntry(entry, key)) continue;
+        variable_struct_set(out, key, entry);
+    }
+    return out;
+}
+
 function Save_BuildSnapshot() {
     var gs = GameState_Get();
     var stat = {};
@@ -24,6 +84,13 @@ function Save_BuildSnapshot() {
     stat.uid_counter = gs.uid_counter;
     stat.enemy_reset_version = gs.enemy_reset_version;
     stat.save_slot = gs.save_slot;
+
+    var boss_flags = Save_DeriveBossFlagsFromPersist(gs.persist);
+    if (variable_struct_exists(gs, "boss_defeated") && is_struct(gs.boss_defeated)) {
+        if (variable_struct_exists(gs.boss_defeated, "mini_boss") && gs.boss_defeated.mini_boss) boss_flags.mini_boss = true;
+        if (variable_struct_exists(gs.boss_defeated, "final_boss") && gs.boss_defeated.final_boss) boss_flags.final_boss = true;
+    }
+    stat.boss_defeated = boss_flags;
 
     var px = 0;
     var py = 0;
@@ -47,7 +114,7 @@ function Save_BuildSnapshot() {
 
     var snap = {};
     snap.statData = stat;
-    snap.levelData = gs.persist;
+    snap.levelData = Save_FilterPersistWithoutEnemies(gs.persist);
     return snap;
 }
 
@@ -69,7 +136,15 @@ function Save_ApplySnapshot(_snap) {
     var levelData = {};
     if (variable_struct_exists(_snap, "levelData")) levelData = _snap.levelData;
     else if (variable_struct_exists(_snap, "persist")) levelData = _snap.persist;
-    gs.persist = levelData;
+
+    var boss_flags = Save_DeriveBossFlagsFromPersist(levelData);
+    if (variable_struct_exists(stat, "boss_defeated") && is_struct(stat.boss_defeated)) {
+        if (variable_struct_exists(stat.boss_defeated, "mini_boss") && stat.boss_defeated.mini_boss) boss_flags.mini_boss = true;
+        if (variable_struct_exists(stat.boss_defeated, "final_boss") && stat.boss_defeated.final_boss) boss_flags.final_boss = true;
+    }
+    gs.boss_defeated = boss_flags;
+
+    gs.persist = Save_FilterPersistWithoutEnemies(levelData);
     gs.persist_applied = {};
 
     if (variable_struct_exists(stat, "enemy_reset_version")) gs.enemy_reset_version = stat.enemy_reset_version; else gs.enemy_reset_version = 0;

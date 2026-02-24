@@ -66,6 +66,7 @@ if (state == "class") {
         gs.persist_applied = {};
         gs.uid_counter = 1;
         gs.enemy_reset_version = 0;
+        gs.boss_defeated = { mini_boss: false, final_boss: false };
 
         gs.player_ch = CharacterCreate_Player(class_id);
         GameState_SetPlayer(gs.player_ch);
