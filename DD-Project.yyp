@@ -240,8 +240,6 @@
     {"id":{"name":"black_screen","path":"sprites/black_screen/black_screen.yy",},},
     {"id":{"name":"bleed_effect","path":"sprites/bleed_effect/bleed_effect.yy",},},
     {"id":{"name":"bone_asset","path":"sprites/bone_asset/bone_asset.yy",},},
-    {"id":{"name":"button_A_icon","path":"sprites/button_A_icon/button_A_icon.yy",},},
-    {"id":{"name":"buttons_controller","path":"sprites/buttons_controller/buttons_controller.yy",},},
     {"id":{"name":"cave","path":"sprites/cave/cave.yy",},},
     {"id":{"name":"chest_asset","path":"sprites/chest_asset/chest_asset.yy",},},
     {"id":{"name":"chest_opened_asset","path":"sprites/chest_opened_asset/chest_opened_asset.yy",},},
