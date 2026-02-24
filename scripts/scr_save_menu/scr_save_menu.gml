@@ -54,12 +54,6 @@ function SaveMenu_Handle() {
     var k_right = Input_UIPressed("menu_right");
     var k_ok = Input_UIConfirm();
     var k_back = Input_UIBack();
-    var opened_this_frame = variable_struct_exists(sm, "opened_frame") && (sm.opened_frame == Input_Frame());
-    if (opened_this_frame) {
-        // Prevent immediate same-press confirm/back from the action that opened the menu.
-        k_ok = false;
-        k_back = false;
-    }
 
     if (sm.confirm) {
         if (sm.confirm_mode == "saved") {

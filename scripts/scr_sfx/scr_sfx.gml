@@ -22,6 +22,51 @@ function BGM_Register(_key, _asset) {
     else ds_map_add(global.bgm_db, _key, snd);
 }
 
+function SFX_ToReal01(_value, _fallback = 1) {
+    var out = _fallback;
+    if (is_real(_value)) out = _value;
+    else if (is_string(_value)) out = real(_value);
+    else if (_value == true) out = 1;
+    else if (_value == false) out = 0;
+    return clamp(out, 0, 1);
+}
+
+function SFX_EnsureGainMaps() {
+    if (!variable_global_exists("sfx_gain_db") || !ds_exists(global.sfx_gain_db, ds_type_map)) {
+        global.sfx_gain_db = ds_map_create();
+    }
+    if (!variable_global_exists("bgm_gain_db") || !ds_exists(global.bgm_gain_db, ds_type_map)) {
+        global.bgm_gain_db = ds_map_create();
+    }
+}
+
+function SFX_RegisterGain(_key, _gain = 1) {
+    SFX_EnsureGainMaps();
+    var g = SFX_ToReal01(_gain, 1);
+    if (ds_map_exists(global.sfx_gain_db, _key)) ds_map_replace(global.sfx_gain_db, _key, g);
+    else ds_map_add(global.sfx_gain_db, _key, g);
+}
+
+function BGM_RegisterGain(_key, _gain = 1) {
+    SFX_EnsureGainMaps();
+    var g = SFX_ToReal01(_gain, 1);
+    if (ds_map_exists(global.bgm_gain_db, _key)) ds_map_replace(global.bgm_gain_db, _key, g);
+    else ds_map_add(global.bgm_gain_db, _key, g);
+}
+
+function SFX_GetGain(_key) {
+    SFX_EnsureGainMaps();
+    if (!ds_map_exists(global.sfx_gain_db, _key)) return 1;
+    return SFX_ToReal01(global.sfx_gain_db[? _key], 1);
+}
+
+function BGM_GetGainByKey(_key) {
+    SFX_EnsureGainMaps();
+    if (!is_string(_key) || _key == "") return 1;
+    if (!ds_map_exists(global.bgm_gain_db, _key)) return 1;
+    return SFX_ToReal01(global.bgm_gain_db[? _key], 1);
+}
+
 function SFX_ResolveAsset(_candidates) {
     if (is_undefined(_candidates)) return noone;
     if (!is_string(_candidates) && SFX_IsValidSoundAsset(_candidates)) return _candidates;
@@ -114,9 +159,10 @@ function SFX_ApplyActiveGains(_fade_ms = 0) {
         if (h == -1 || !audio_is_playing(h)) continue;
         var key = variable_struct_exists(rec, "key") ? rec.key : "";
         var base = variable_struct_exists(rec, "base") ? rec.base : 1;
+        var trim = SFX_GetGain(key);
         var cat = SFX_CategoryForKey(key);
         var cat_gain = (cat == "ui") ? global.vol_ui : global.vol_sfx;
-        var gain = clamp(base, 0, 1) * global.vol_master * cat_gain;
+        var gain = clamp(base, 0, 1) * trim * global.vol_master * cat_gain;
         audio_sound_gain(h, gain, max(0, _fade_ms));
     }
 }
@@ -215,6 +261,104 @@ function SFX_RegisterDefaults() {
     SFX_Register("image_open", noone);
     SFX_Register("image_advance", noone);
     SFX_Register("image_close", noone);
+
+    SFX_RegisterGainDefaults();
+}
+
+function SFX_RegisterGainDefaults() {
+    SFX_EnsureGainMaps();
+    ds_map_clear(global.sfx_gain_db);
+
+    // UI_Soundpack
+    SFX_RegisterGain("ui_move", 1.00);
+    SFX_RegisterGain("ui_confirm", 1.00);
+    SFX_RegisterGain("ui_back", 1.00);
+    SFX_RegisterGain("ui_openclose", 1.00);
+
+    // Dialogue
+    SFX_RegisterGain("dialogue_open", 0.00);
+    SFX_RegisterGain("dialogue_advance", 0.00);
+    SFX_RegisterGain("dialogue_close", 0.00);
+
+    // Save/Load
+    SFX_RegisterGain("save_confirm", 1.00);
+    SFX_RegisterGain("load_confirm", 1.00);
+    SFX_RegisterGain("delete_confirm", 1.00);
+
+    // World/Interact (UI category in routing)
+    SFX_RegisterGain("barrel_break", 1.00);
+    SFX_RegisterGain("chest_open", 1.00);
+    SFX_RegisterGain("kill_torch", 1.00);
+
+    // Battle basic
+    SFX_RegisterGain("bow_attack", 1.00);
+    SFX_RegisterGain("mage_attack", 1.00);
+    SFX_RegisterGain("sword_attack", 1.00);
+
+    // Miss/Blocked
+    SFX_RegisterGain("miss_effect", 1.00);
+    SFX_RegisterGain("blocked", 1.00);
+
+    // Skills
+    SFX_RegisterGain("skill_generic", 1.00);
+    SFX_RegisterGain("skill_bleed", 1.00);
+    SFX_RegisterGain("skill_double_shot", 1.00);
+    SFX_RegisterGain("skill_evasion_up", 1.00);
+    SFX_RegisterGain("skill_fireball", 1.00);
+    SFX_RegisterGain("skill_foresight", 1.00);
+    SFX_RegisterGain("skill_horizontal_slash", 1.00);
+    SFX_RegisterGain("skill_ice_spear", 1.00);
+    SFX_RegisterGain("skill_meditation", 1.00);
+    SFX_RegisterGain("skill_muscle_up", 1.00);
+    SFX_RegisterGain("skill_poison_arrow", 1.00);
+    SFX_RegisterGain("skill_poison_mist", 1.00);
+    SFX_RegisterGain("skill_rev_up", 1.00);
+    SFX_RegisterGain("skill_stun", 1.00);
+    SFX_RegisterGain("skill_take_aim", 1.00);
+
+    // Enemy spawn
+    SFX_RegisterGain("enemy_spawn_slime", 1.00);
+    SFX_RegisterGain("enemy_spawn_spider", 1.00);
+    SFX_RegisterGain("enemy_spawn_mad_whisp", 1.00);
+    SFX_RegisterGain("enemy_spawn_ghost_sword", 1.00);
+    SFX_RegisterGain("enemy_spawn_dire_wolf", 0.30);
+    SFX_RegisterGain("enemy_spawn_snake", 1.00);
+    SFX_RegisterGain("enemy_spawn_killer_plant", 1.00);
+    SFX_RegisterGain("enemy_spawn_stranger", 1.00);
+    SFX_RegisterGain("enemy_spawn_mini_boss", 1.00);
+    SFX_RegisterGain("enemy_spawn_final_boss", 1.00);
+
+    // Enemy special
+    SFX_RegisterGain("enemy_special_slime", 1.00);
+    SFX_RegisterGain("enemy_special_spider", 1.00);
+    SFX_RegisterGain("enemy_special_mad_whisp", 1.00);
+    SFX_RegisterGain("enemy_special_ghost_sword", 1.00);
+    SFX_RegisterGain("enemy_special_dire_wolf", 1.00);
+    SFX_RegisterGain("enemy_special_snake", 1.00);
+    SFX_RegisterGain("enemy_special_killer_plant", 1.00);
+    SFX_RegisterGain("enemy_special_stranger", 1.00);
+    SFX_RegisterGain("enemy_special_mini_boss", 1.00);
+    SFX_RegisterGain("enemy_special_final_boss", 1.00);
+
+    // Legacy/Fallback
+    SFX_RegisterGain("enemy_spawn_unknown", 1.00);
+    SFX_RegisterGain("enemy_special_unknown", 1.00);
+    SFX_RegisterGain("pickup", 1.00);
+    SFX_RegisterGain("push_rock", 1.00);
+    SFX_RegisterGain("dog_pet", 1.00);
+    SFX_RegisterGain("switch_on", 1.00);
+    SFX_RegisterGain("umbrella_give", 1.00);
+    SFX_RegisterGain("kdrama_complete", 1.00);
+    SFX_RegisterGain("interact", 1.00);
+    SFX_RegisterGain("interact_fail", 1.00);
+    SFX_RegisterGain("step", 1.00);
+    SFX_RegisterGain("move_blocked", 1.00);
+    SFX_RegisterGain("rock_blocked", 1.00);
+    SFX_RegisterGain("crater_break", 1.00);
+    SFX_RegisterGain("dog_move", 1.00);
+    SFX_RegisterGain("image_open", 1.00);
+    SFX_RegisterGain("image_advance", 1.00);
+    SFX_RegisterGain("image_close", 1.00);
 }
 
 function BGM_RegisterDefaults() {
@@ -222,6 +366,13 @@ function BGM_RegisterDefaults() {
     ds_map_clear(global.bgm_db);
     // BGM
     BGM_RegisterResolved("overall_bgm", [overall_bgm, "overall_bgm"]);
+    BGM_RegisterGainDefaults();
+}
+
+function BGM_RegisterGainDefaults() {
+    SFX_EnsureGainMaps();
+    ds_map_clear(global.bgm_gain_db);
+    BGM_RegisterGain("overall_bgm", 1.00);
 }
 
 function SFX_ClampVolumes() {
@@ -267,7 +418,8 @@ function SFX_Play(_key, _vol = 1, _pitch = 1) {
     var cat_gain = global.vol_sfx;
     if (category == "ui") cat_gain = global.vol_ui;
     var base_gain = clamp(_vol, 0, 1);
-    var gain = base_gain * global.vol_master * cat_gain;
+    var trim = SFX_GetGain(_key);
+    var gain = base_gain * trim * global.vol_master * cat_gain;
     audio_sound_gain(snd_handle, gain, 0);
     audio_sound_pitch(snd_handle, max(0.01, _pitch));
 
@@ -438,7 +590,8 @@ function BGM_ApplyGain(_fade_ms = 0) {
     if (!variable_global_exists("bgm_current_handle")) return;
     var h = global.bgm_current_handle;
     if (h == -1 || !audio_is_playing(h)) return;
-    audio_sound_gain(h, global.vol_master * global.vol_music, max(0, _fade_ms));
+    var trim = BGM_GetGainByKey(global.bgm_current_key);
+    audio_sound_gain(h, global.vol_master * global.vol_music * trim, max(0, _fade_ms));
 }
 
 function BGM_Play(_key, _loop = true, _force_restart = false) {
@@ -473,7 +626,8 @@ function BGM_Play(_key, _loop = true, _force_restart = false) {
         global.bgm_current_key = is_string(_key) ? _key : "";
         global.bgm_current_sound = snd;
         global.bgm_current_handle = h;
-        audio_sound_gain(h, global.vol_master * global.vol_music, 0);
+        var trim = BGM_GetGainByKey(global.bgm_current_key);
+        audio_sound_gain(h, global.vol_master * global.vol_music * trim, 0);
     } else {
         global.bgm_current_key = "";
         global.bgm_current_sound = noone;

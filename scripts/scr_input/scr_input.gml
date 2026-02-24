@@ -173,13 +173,14 @@ function Input_Update() {
         var keys = bind;
         if (is_struct(bind) && variable_struct_exists(bind, "keys")) keys = bind.keys;
         var held = false;
+        var pressed = false;
 
         if (is_array(keys)) {
             for (var k = 0; k < array_length(keys); k++) {
                 var key = keys[k];
-                if (key != -1 && keyboard_check(key)) {
-                    held = true;
-                    break;
+                if (key != -1) {
+                    if (keyboard_check(key)) held = true;
+                    if (keyboard_check_pressed(key)) pressed = true;
                 }
             }
         }
@@ -190,7 +191,6 @@ function Input_Update() {
             if (is_struct(st) && variable_struct_exists(st, "held")) prev = st.held;
         }
 
-        var pressed = held && !prev;
         variable_struct_set(inp.state, action, { held: held, pressed: pressed });
 
         if (Input_IsMoveAction(action)) {

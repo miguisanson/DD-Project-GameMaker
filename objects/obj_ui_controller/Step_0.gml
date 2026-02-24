@@ -25,10 +25,9 @@ if (icon != -1) {
 var k_ok = Input_UIConfirm();
 var k_back = Input_UIBack();
 var k_menu = Input_UIPressed("menu");
-var ui_opened_this_frame = variable_struct_exists(gs.ui, "opened_frame") && (gs.ui.opened_frame == Input_Frame());
 
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
-    if (k_ok && !ui_opened_this_frame) {
+    if (k_ok) {
         Dialogue_Advance();
     }
     exit;

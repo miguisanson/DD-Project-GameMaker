@@ -44,8 +44,16 @@ if (variable_global_exists("sfx_db") && ds_exists(global.sfx_db, ds_type_map)) {
 if (variable_global_exists("bgm_db") && ds_exists(global.bgm_db, ds_type_map)) {
     ds_map_destroy(global.bgm_db);
 }
+if (variable_global_exists("sfx_gain_db") && ds_exists(global.sfx_gain_db, ds_type_map)) {
+    ds_map_destroy(global.sfx_gain_db);
+}
+if (variable_global_exists("bgm_gain_db") && ds_exists(global.bgm_gain_db, ds_type_map)) {
+    ds_map_destroy(global.bgm_gain_db);
+}
 global.sfx_db = ds_map_create();
 global.bgm_db = ds_map_create();
+global.sfx_gain_db = ds_map_create();
+global.bgm_gain_db = ds_map_create();
 SFX_RegisterDefaults();
 BGM_RegisterDefaults();
 var _audit = SFX_DebugAuditRequired(true);
