@@ -252,8 +252,6 @@ function GameSettings_ApplyDisplay() {
         view_yport[0] = port_y;
         view_wport[0] = port_w;
         view_hport[0] = port_h;
-        view_wview[0] = base_w;
-        view_hview[0] = base_h;
     }
 
     var cam = view_camera[0];

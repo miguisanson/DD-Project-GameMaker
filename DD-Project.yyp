@@ -245,6 +245,7 @@
     {"id":{"name":"chest_opened_asset","path":"sprites/chest_opened_asset/chest_opened_asset.yy",},},
     {"id":{"name":"cloth_robe","path":"sprites/cloth_robe/cloth_robe.yy",},},
     {"id":{"name":"diamond_staff","path":"sprites/diamond_staff/diamond_staff.yy",},},
+    {"id":{"name":"dialogue_arrow_down","path":"sprites/dialogue_arrow_down/dialogue_arrow_down.yy",},},
     {"id":{"name":"dire_wolf_moving","path":"sprites/dire_wolf_moving/dire_wolf_moving.yy",},},
     {"id":{"name":"dire_wolf_profile","path":"sprites/dire_wolf_profile/dire_wolf_profile.yy",},},
     {"id":{"name":"double_shot_effect","path":"sprites/double_shot_effect/double_shot_effect.yy",},},

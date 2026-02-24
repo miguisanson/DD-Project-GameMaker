@@ -1,26 +1,8 @@
 Input_PreStep();
 var gs = GameState_Get();
-var icon = -1;
-if (variable_struct_exists(gs.ui, "icon_sprite")) icon = gs.ui.icon_sprite;
-if (icon == -1) {
-    icon = asset_get_index("button_A_icon");
-    gs.ui.icon_sprite = icon;
-}
-if (icon != -1) {
-    var frames = sprite_get_number(icon);
-    if (frames > 1) {
-        var spd = sprite_get_speed(icon);
-        if (sprite_get_speed_type(icon) == SPR_SPEED_FPS) {
-            var game_fps = game_get_speed(gamespeed_fps);
-            if (game_fps <= 0) game_fps = 60;
-            spd = spd / game_fps;
-        }
-        gs.ui.icon_frame += spd;
-        if (gs.ui.icon_frame >= frames) gs.ui.icon_frame -= frames;
-    } else {
-        gs.ui.icon_frame = 0;
-    }
-}
+var game_fps = max(1, game_get_speed(gamespeed_fps));
+gs.ui.icon_frame += max(0, UI_DIALOGUE_ARROW_FPS) / game_fps;
+if (gs.ui.icon_frame >= 2) gs.ui.icon_frame -= 2;
 
 if (variable_struct_exists(gs.ui, "dialogue_lock") && gs.ui.dialogue_lock > 0) {
     gs.ui.dialogue_lock -= 1;

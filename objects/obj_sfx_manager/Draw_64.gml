@@ -79,7 +79,7 @@ if (!is_undefined(cam) && cam != -1) {
 }
 array_push(lines, "display desired: scale=" + string(desired_scale) + " fullscreen=" + string(desired_full));
 array_push(lines, "display actual: window=" + string(actual_win_w) + "x" + string(actual_win_h) + " fullscreen=" + string(actual_full));
-array_push(lines, "view0: wview=" + string(view_wview[0]) + " hview=" + string(view_hview[0]) + " wport=" + string(view_wport[0]) + " hport=" + string(view_hport[0]));
+array_push(lines, "view0: cam=" + string(cam_w) + "x" + string(cam_h) + " wport=" + string(view_wport[0]) + " hport=" + string(view_hport[0]));
 array_push(lines, "camera0 view: " + string(cam_w) + "x" + string(cam_h));
 
 for (var i = 0; i < array_length(lines); i++) {

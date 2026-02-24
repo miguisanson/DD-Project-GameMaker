@@ -113,18 +113,24 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
         var visible_text = string_copy(page_text, 1, visible_count);
         draw_text(bx + 8, by + 8, visible_text);
     }
-    var icon = asset_get_index("button_A_icon");
-    if (icon != -1) {
-        var iw = sprite_get_width(icon);
-        var ih = sprite_get_height(icon);
-        var scale_x = 32 / max(1, iw);
-        var scale_y = 32 / max(1, ih);
-        var frames = sprite_get_number(icon);
-        var frame = 0;
-        if (frames > 1) frame = floor(gs.ui.icon_frame);
-        var dx = bx + bw - 32 - 6;
-        var dy = by + bh - 32 - 6;
-        draw_sprite_ext(icon, frame, dx, dy, scale_x, scale_y, 0, c_white, 1);
+    if (gs.ui.mode == UI_DIALOGUE && array_length(gs.ui.lines) > 0
+    && variable_struct_exists(gs.ui, "dialogue_state") && gs.ui.dialogue_state == UI_DIALOGUE_STATE_READY) {
+        var icon = dialogue_arrow_down;
+        if (icon != -1) {
+            var line_h = max(8, string_height("Ag"));
+            var cue_w = max(6, round(line_h * 0.8));
+            var cue_h = max(4, round(line_h * 0.4));
+            var blink = (floor(gs.ui.icon_frame) mod 2);
+            var bob = blink ? 0 : UI_DIALOGUE_ARROW_BOB_PX;
+
+            var iw = max(1, sprite_get_width(icon));
+            var ih = max(1, sprite_get_height(icon));
+            var scale_x = cue_w / iw;
+            var scale_y = cue_h / ih;
+            var dx = round(bx + bw - cue_w - 8);
+            var dy = round(by + bh - cue_h - 8 + bob);
+            draw_sprite_ext(icon, 0, dx, dy, scale_x, scale_y, 0, c_white, 1);
+        }
     }
 
 }

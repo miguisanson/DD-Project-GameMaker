@@ -112,8 +112,15 @@ if (exp_port_h > target_h) exp_port_h = target_h;
 var exp_port_x = floor((target_w - exp_port_w) * 0.5);
 var exp_port_y = floor((target_h - exp_port_h) * 0.5);
 
-if (view_wview[0] != base_w || view_hview[0] != base_h) {
+var cam = view_camera[0];
+if (is_undefined(cam) || cam == -1) {
     needs_display_apply = true;
+} else {
+    var cam_w = camera_get_view_width(cam);
+    var cam_h = camera_get_view_height(cam);
+    if (cam_w != base_w || cam_h != base_h) {
+        needs_display_apply = true;
+    }
 }
 if (view_xport[0] != exp_port_x || view_yport[0] != exp_port_y) {
     needs_display_apply = true;
