@@ -23,11 +23,9 @@ if (icon != -1) {
 }
 if (variable_struct_exists(gs.ui, "lock_actions") && gs.ui.lock_actions > 0) gs.ui.lock_actions -= 1;
 
-var k_up = Input_Pressed("menu_up");
-var k_down = Input_Pressed("menu_down");
-var k_ok = Input_Pressed("confirm");
-var k_back = Input_Pressed("cancel");
-var k_menu = Input_Pressed("menu");
+var k_ok = Input_UIPressed("confirm");
+var k_back = Input_UIPressed("cancel");
+var k_menu = Input_UIPressed("menu");
 
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     if (variable_struct_exists(gs.ui, "just_opened") && gs.ui.just_opened) {

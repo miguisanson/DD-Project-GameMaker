@@ -60,6 +60,9 @@ function Input_Init() {
     if (!variable_struct_exists(inp, "cooldown")) {
         inp.cooldown = {};
     }
+    if (!variable_struct_exists(inp, "repeat_state")) {
+        inp.repeat_state = {};
+    }
     if (!variable_struct_exists(inp, "move_order")) {
         inp.move_order = [];
     }
@@ -253,38 +256,46 @@ function Input_Frame() {
 }
 
 function Input_ActionBuffer(_action) {
-    Input_EnsureUpdated();
-    variable_struct_set(global.input.buffer, _action, global.input.frame);
+    // Input buffering disabled globally.
 }
 
 function Input_ActionBuffered(_action, _max_age) {
-    Input_EnsureUpdated();
-    if (!variable_struct_exists(global.input.buffer, _action)) return false;
-    var t = variable_struct_get(global.input.buffer, _action);
-    if (global.input.frame - t > _max_age) {
-        variable_struct_remove(global.input.buffer, _action);
-        return false;
-    }
-    return true;
+    // Input buffering disabled globally.
+    return false;
 }
 
 function Input_ActionConsume(_action) {
-    Input_EnsureUpdated();
-    if (variable_struct_exists(global.input.buffer, _action)) {
-        variable_struct_remove(global.input.buffer, _action);
-    }
+    // Input buffering disabled globally.
+}
+
+// Buffering disabled: always returns no action.
+function Input_BufferedLatest(_actions, _max_age) {
+    // Input buffering disabled globally.
+    return "";
 }
 
 function Input_ActionCooldownReady(_action) {
-    Input_EnsureUpdated();
-    if (!variable_struct_exists(global.input.cooldown, _action)) return true;
-    var t = variable_struct_get(global.input.cooldown, _action);
-    return global.input.frame >= t;
+    // Input cooldown disabled globally.
+    return true;
 }
 
 function Input_ActionSetCooldown(_action, _frames) {
-    Input_EnsureUpdated();
-    variable_struct_set(global.input.cooldown, _action, global.input.frame + _frames);
+    // Input cooldown disabled globally.
+}
+
+// Repeat behavior disabled: this is now discrete press only.
+function Input_ActionRepeat(_action, _initial_delay, _repeat_delay) {
+    // Hold-repeat disabled globally.
+    return Input_Pressed(_action);
+}
+
+function Input_UIPressed(_action) {
+    return Input_Pressed(_action);
+}
+
+function Input_UIRepeat(_action, _initial_delay = UI_NAV_REPEAT_DELAY, _repeat_delay = UI_NAV_REPEAT_RATE) {
+    // UI repeat disabled: discrete presses only.
+    return Input_Pressed(_action);
 }
 
 function Input_MoveX() {

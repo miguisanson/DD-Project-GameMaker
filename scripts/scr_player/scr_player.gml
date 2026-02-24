@@ -101,8 +101,6 @@ function UI_SetFont() {
 
 function Action_CanAct(_pl) {
     if (UI_IsBlocking()) return false;
-    var gs = GameState_Get();
-    if (variable_struct_exists(gs.ui, "lock_actions") && gs.ui.lock_actions > 0) return false;
     return Player_CanAcceptMove(_pl);
 }
 
@@ -114,24 +112,17 @@ function Action_KeyPressed(_pl, _action) {
 function Action_Request(_pl, _action) {
     var gs = GameState_Get();
 
-    // If UI is open, do not buffer (prevents re-trigger on close)
+    // UI open means input is blocked.
     if (gs.ui.mode != UI_NONE || array_length(gs.ui.lines) > 0) {
         return false;
     }
 
-    // If movement isn't complete, buffer the action for when it settles
+    // Only allow discrete press when the player can act.
     if (!Player_CanAcceptMove(_pl)) {
-        if (Input_Pressed(_action)) Input_ActionBuffer(_action);
         return false;
     }
 
-    if (!Input_ActionCooldownReady(_action)) return false;
-    if (Input_Pressed(_action) || Input_ActionBuffered(_action, ACTION_BUFFER_FRAMES)) {
-        Input_ActionConsume(_action);
-        Input_ActionSetCooldown(_action, ACTION_COOLDOWN_FRAMES);
-        return true;
-    }
-    return false;
+    return Input_Pressed(_action);
 }
 
 // --------------------

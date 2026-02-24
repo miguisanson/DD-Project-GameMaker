@@ -4,10 +4,10 @@ if (gs.ui.mode == UI_MENU || gs.ui.mode == UI_PAUSE) exit;
 if (battle_over && battle_state != BSTATE_MESSAGE) exit;
 
 // helper input keys
-var k_up = Input_Pressed("menu_up");
-var k_down = Input_Pressed("menu_down");
-var k_ok = Input_Pressed("confirm");
-var k_back = Input_Pressed("cancel");
+var k_up = Input_UIRepeat("menu_up");
+var k_down = Input_UIRepeat("menu_down");
+var k_ok = Input_UIPressed("confirm");
+var k_back = Input_UIPressed("cancel");
 
 // --------------------
 // MESSAGE STATE

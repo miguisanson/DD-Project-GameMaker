@@ -45,12 +45,12 @@ function SaveMenu_Handle() {
         return;
     }
 
-    var k_up = Input_Pressed("menu_up");
-    var k_down = Input_Pressed("menu_down");
-    var k_left = Input_Pressed("menu_left");
-    var k_right = Input_Pressed("menu_right");
-    var k_ok = Input_Pressed("confirm");
-    var k_back = Input_Pressed("cancel");
+    var k_up = Input_UIRepeat("menu_up");
+    var k_down = Input_UIRepeat("menu_down");
+    var k_left = Input_UIRepeat("menu_left");
+    var k_right = Input_UIRepeat("menu_right");
+    var k_ok = Input_UIPressed("confirm");
+    var k_back = Input_UIPressed("cancel");
 
     if (sm.confirm) {
         if (sm.confirm_mode == "saved") {

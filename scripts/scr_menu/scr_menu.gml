@@ -11,8 +11,6 @@ function Menu_Ensure() {
             tab: 0,
             tabs: ["Inventory","Skills","Stats"],
             header_focus: true,
-            repeat_dir: 0,
-            repeat_next: 0,
             inv_index: 0,
             inv_scroll: 0,
             skill_index: 0,
@@ -36,8 +34,6 @@ function Menu_Open() {
     gs.ui.menu.open = true;
     gs.ui.menu.header_focus = true;
     gs.ui.menu.stats_focus = false;
-    gs.ui.menu.repeat_dir = 0;
-    gs.ui.menu.repeat_next = 0;
     Menu_StatsSync();
 }
 
@@ -119,28 +115,8 @@ function Menu_StatsApply() {
     Menu_StatsSync();
 }
 
-function Menu_NavRepeat(_dir, _pressed, _held) {
-    var gs = GameState_Get();
-    var m = gs.ui.menu;
-    var frame = Input_Frame();
-
-    if (_pressed) {
-        m.repeat_dir = _dir;
-        m.repeat_next = frame + MENU_REPEAT_DELAY;
-        return true;
-    }
-
-    if (!_held) {
-        if (m.repeat_dir == _dir) m.repeat_dir = 0;
-        return false;
-    }
-
-    if (m.repeat_dir != _dir) return false;
-    if (frame >= m.repeat_next) {
-        m.repeat_next = frame + MENU_REPEAT_INTERVAL;
-        return true;
-    }
-    return false;
+function Menu_NavRepeat(_action) {
+    return Input_UIRepeat(_action);
 }
 
 function Menu_HandleInput() {
@@ -148,16 +124,12 @@ function Menu_HandleInput() {
     var m = gs.ui.menu;
     var ch = gs.player_ch;
 
-    var k_up = Input_Pressed("menu_up");
-    var k_down = Input_Pressed("menu_down");
-    var h_up = Input_Held("menu_up");
-    var h_down = Input_Held("menu_down");
-    var nav_up = Menu_NavRepeat(-1, k_up, h_up);
-    var nav_down = Menu_NavRepeat(1, k_down, h_down);
-    var k_left = Input_Pressed("menu_left");
-    var k_right = Input_Pressed("menu_right");
-    var k_ok = Input_Pressed("confirm");
-    var k_back = Input_Pressed("cancel");
+    var nav_up = Menu_NavRepeat("menu_up");
+    var nav_down = Menu_NavRepeat("menu_down");
+    var k_left = Input_UIPressed("menu_left");
+    var k_right = Input_UIPressed("menu_right");
+    var k_ok = Input_UIPressed("confirm");
+    var k_back = Input_UIPressed("cancel");
 
     if (k_back) {
         SFX_PlayUI("ui_back");
@@ -211,7 +183,6 @@ function Menu_HandleInput() {
                 SFX_PlayUI("ui_move");
             } else {
                 m.header_focus = true;
-                m.repeat_dir = 0;
                 SFX_PlayUI("ui_move");
                 return;
             }
@@ -243,7 +214,6 @@ function Menu_HandleInput() {
                 SFX_PlayUI("ui_move");
             } else {
                 m.header_focus = true;
-                m.repeat_dir = 0;
                 SFX_PlayUI("ui_move");
                 return;
             }
@@ -289,7 +259,6 @@ function Menu_HandleInput() {
             } else {
                 m.stats_focus = false;
                 m.header_focus = true;
-                m.repeat_dir = 0;
                 SFX_PlayUI("ui_move");
                 return;
             }
@@ -633,8 +602,6 @@ function PauseMenu_Ensure() {
         gs.ui.pause_menu = {
             open: false,
             index: 0,
-            repeat_dir: 0,
-            repeat_next: 0,
             options: ["Resume","Exit to Main Menu"]
         };
     }
@@ -648,8 +615,6 @@ function PauseMenu_Open() {
     var pm = gs.ui.pause_menu;
     pm.open = true;
     pm.index = 0;
-    pm.repeat_dir = 0;
-    pm.repeat_next = 0;
     gs.ui.pause_menu = pm;
 }
 
@@ -686,32 +651,8 @@ function PauseMenu_IsOpen() {
     return gs.ui.mode == UI_PAUSE;
 }
 
-function PauseMenu_NavRepeat(_dir, _pressed, _held) {
-    var gs = GameState_Get();
-    var pm = gs.ui.pause_menu;
-    var frame = Input_Frame();
-
-    if (_pressed) {
-        pm.repeat_dir = _dir;
-        pm.repeat_next = frame + MENU_REPEAT_DELAY;
-        gs.ui.pause_menu = pm;
-        return true;
-    }
-
-    if (!_held) {
-        if (pm.repeat_dir == _dir) pm.repeat_dir = 0;
-        gs.ui.pause_menu = pm;
-        return false;
-    }
-
-    if (pm.repeat_dir != _dir) return false;
-    if (frame >= pm.repeat_next) {
-        pm.repeat_next = frame + MENU_REPEAT_INTERVAL;
-        gs.ui.pause_menu = pm;
-        return true;
-    }
-    gs.ui.pause_menu = pm;
-    return false;
+function PauseMenu_NavRepeat(_action) {
+    return Input_UIRepeat(_action);
 }
 
 function PauseMenu_HandleInput() {
@@ -720,14 +661,10 @@ function PauseMenu_HandleInput() {
     var pm = gs.ui.pause_menu;
     if (!pm.open) return;
 
-    var k_up = Input_Pressed("menu_up");
-    var k_down = Input_Pressed("menu_down");
-    var h_up = Input_Held("menu_up");
-    var h_down = Input_Held("menu_down");
-    var nav_up = PauseMenu_NavRepeat(-1, k_up, h_up);
-    var nav_down = PauseMenu_NavRepeat(1, k_down, h_down);
-    var k_ok = Input_Pressed("confirm");
-    var k_back = Input_Pressed("cancel");
+    var nav_up = PauseMenu_NavRepeat("menu_up");
+    var nav_down = PauseMenu_NavRepeat("menu_down");
+    var k_ok = Input_UIPressed("confirm");
+    var k_back = Input_UIPressed("cancel");
 
     if (k_back) {
         SFX_PlayUI("ui_back");
