@@ -70,6 +70,26 @@ if (!variable_instance_exists(id, "last_room_id")) {
 if (room != last_room_id) {
     last_room_id = room;
     BGM_ApplyForRoom(room);
+    GameSettings_ApplyDisplay();
+}
+
+// Guard against any room/view/window overrides: keep display state aligned to settings.
+var ds = GameSettings_Ensure();
+var needs_display_apply = false;
+if (window_get_fullscreen() != ds.fullscreen) {
+    needs_display_apply = true;
+} else if (!ds.fullscreen) {
+    var exp_w = DISPLAY_BASE_W * ds.display_scale;
+    var exp_h = DISPLAY_BASE_H * ds.display_scale;
+    if (window_get_width() != exp_w || window_get_height() != exp_h) {
+        needs_display_apply = true;
+    }
+}
+if (view_wview[0] != DISPLAY_BASE_W || view_hview[0] != DISPLAY_BASE_H) {
+    needs_display_apply = true;
+}
+if (needs_display_apply) {
+    GameSettings_ApplyDisplay();
 }
 
 var expected_key = BGM_GetTrackForRoom(room);

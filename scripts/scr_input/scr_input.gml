@@ -35,8 +35,9 @@ function Input_Init() {
         inp.bindings.debug_all_items = [ord("K")];
     }
 
-
     inp.bindings.debug_toggle = [ord("P")];
+    // UI confirm is intentionally space-only.
+    inp.bindings.confirm = [vk_space];
     if (!variable_struct_exists(inp.bindings, "debug_levelup")) inp.bindings.debug_levelup = [ord("L")];
     if (!variable_struct_exists(inp.bindings, "debug_all_items")) inp.bindings.debug_all_items = [ord("K")];
     if (!variable_struct_exists(inp.bindings, "debug_save")) inp.bindings.debug_save = [vk_f5];
@@ -296,6 +297,14 @@ function Input_UIPressed(_action) {
 function Input_UIRepeat(_action, _initial_delay = UI_NAV_REPEAT_DELAY, _repeat_delay = UI_NAV_REPEAT_RATE) {
     // UI repeat disabled: discrete presses only.
     return Input_Pressed(_action);
+}
+
+function Input_UIConfirm() {
+    return Input_UIPressed("confirm");
+}
+
+function Input_UIBack() {
+    return Input_UIPressed("cancel");
 }
 
 function Input_MoveX() {

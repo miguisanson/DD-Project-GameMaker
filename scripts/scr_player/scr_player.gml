@@ -139,7 +139,7 @@ function GameSettings_Defaults() {
         audio_sfx: VOL_SFX_DEFAULT,
         audio_bgm: VOL_MUSIC_DEFAULT,
         display_scale: DISPLAY_SCALE_DEFAULT,
-        display_fullscreen: false
+        fullscreen: false
     };
 }
 
@@ -150,15 +150,19 @@ function GameSettings_Normalize(_settings) {
         if (variable_struct_exists(_settings, "audio_sfx")) out.audio_sfx = _settings.audio_sfx;
         if (variable_struct_exists(_settings, "audio_bgm")) out.audio_bgm = _settings.audio_bgm;
         if (variable_struct_exists(_settings, "display_scale")) out.display_scale = _settings.display_scale;
-        if (variable_struct_exists(_settings, "display_fullscreen")) out.display_fullscreen = _settings.display_fullscreen;
+        if (variable_struct_exists(_settings, "fullscreen")) out.fullscreen = _settings.fullscreen;
     }
 
     out.audio_ui = clamp(GameSettings_ToReal(out.audio_ui, VOL_UI_DEFAULT), 0, 1);
     out.audio_sfx = clamp(GameSettings_ToReal(out.audio_sfx, VOL_SFX_DEFAULT), 0, 1);
     out.audio_bgm = clamp(GameSettings_ToReal(out.audio_bgm, VOL_MUSIC_DEFAULT), 0, 1);
     out.display_scale = clamp(round(GameSettings_ToReal(out.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-    out.display_fullscreen = (out.display_fullscreen == true) || (out.display_fullscreen == 1);
+    out.fullscreen = (GameSettings_ToReal(out.fullscreen, 0) != 0);
     return out;
+}
+
+function GameSettings_Copy(_settings) {
+    return GameSettings_Normalize(_settings);
 }
 
 function GameSettings_Ensure() {
@@ -182,34 +186,44 @@ function GameSettings_ApplyDisplay() {
     var base_w = DISPLAY_BASE_W;
     var base_h = DISPLAY_BASE_H;
 
-    var scale = clamp(round(GameSettings_ToReal(settings.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-    settings.display_scale = scale;
+    var scale_fixed = clamp(round(GameSettings_ToReal(settings.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
+    settings.display_scale = scale_fixed;
 
-    var is_fullscreen = (settings.display_fullscreen == true) || (settings.display_fullscreen == 1);
-    settings.display_fullscreen = is_fullscreen;
+    var is_fullscreen = settings.fullscreen;
+    settings.fullscreen = is_fullscreen;
 
-    var port_w = base_w * scale;
-    var port_h = base_h * scale;
-    var port_x = 0;
-    var port_y = 0;
+    var target_w = 0;
+    var target_h = 0;
+
+    // Force the requested fullscreen state (avoid stale state checks).
+    window_set_fullscreen(is_fullscreen);
 
     if (is_fullscreen) {
-        window_set_fullscreen(true);
-        var disp_w = display_get_width();
-        var disp_h = display_get_height();
-        var max_scale = max(DISPLAY_SCALE_MIN, floor(min(disp_w / base_w, disp_h / base_h)));
-        var fs_scale = clamp(scale, DISPLAY_SCALE_MIN, max_scale);
-        port_w = base_w * fs_scale;
-        port_h = base_h * fs_scale;
-        port_x = floor((disp_w - port_w) * 0.5);
-        port_y = floor((disp_h - port_h) * 0.5);
+        target_w = max(1, display_get_width());
+        target_h = max(1, display_get_height());
     } else {
-        window_set_fullscreen(false);
-        if (window_get_width() != port_w || window_get_height() != port_h) {
-            window_set_size(port_w, port_h);
+        var win_w = base_w * scale_fixed;
+        var win_h = base_h * scale_fixed;
+        if (window_get_width() != win_w || window_get_height() != win_h) {
+            window_set_size(win_w, win_h);
             window_center();
         }
+        target_w = max(1, window_get_width());
+        target_h = max(1, window_get_height());
     }
+
+    var used_scale = scale_fixed;
+    if (is_fullscreen) {
+        used_scale = floor(min(target_w / base_w, target_h / base_h));
+        if (used_scale < 1) used_scale = 1;
+    }
+
+    var port_w = max(1, floor(base_w * used_scale));
+    var port_h = max(1, floor(base_h * used_scale));
+    var port_x = 0;
+    var port_y = 0;
+    port_x = floor((target_w - port_w) * 0.5);
+    port_y = floor((target_h - port_h) * 0.5);
 
     if (view_enabled) {
         view_visible[0] = true;
@@ -217,6 +231,8 @@ function GameSettings_ApplyDisplay() {
         view_yport[0] = port_y;
         view_wport[0] = port_w;
         view_hport[0] = port_h;
+        view_wview[0] = base_w;
+        view_hview[0] = base_h;
     }
 
     var cam = view_camera[0];
@@ -228,6 +244,17 @@ function GameSettings_ApplyDisplay() {
 function GameSettings_ApplyAll() {
     GameSettings_ApplyAudio();
     GameSettings_ApplyDisplay();
+}
+
+function GameSettings_Commit(_settings, _save_config = false) {
+    var gs = GameState_Get();
+    gs.settings = GameSettings_Normalize(_settings);
+    GameState_SyncLegacy();
+    GameSettings_ApplyAll();
+    if (_save_config) {
+        Save_WriteSettingsConfig(gs.settings);
+    }
+    return gs.settings;
 }
 
 function GameSettings_SetUIVolume(_v) {
@@ -256,13 +283,13 @@ function GameSettings_SetScale(_scale) {
 
 function GameSettings_SetFullscreen(_enabled) {
     var settings = GameSettings_Ensure();
-    settings.display_fullscreen = (_enabled == true) || (_enabled == 1);
+    settings.fullscreen = (_enabled == true) || (_enabled == 1);
     GameSettings_ApplyDisplay();
 }
 
 function GameSettings_ToggleFullscreen() {
     var settings = GameSettings_Ensure();
-    GameSettings_SetFullscreen(!settings.display_fullscreen);
+    GameSettings_SetFullscreen(!settings.fullscreen);
 }
 
 // --------------------

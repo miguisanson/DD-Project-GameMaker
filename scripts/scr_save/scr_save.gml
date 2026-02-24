@@ -21,6 +21,59 @@ function Save_ToReal(_value, _fallback) {
     return _fallback;
 }
 
+function Save_SettingsPath() {
+    return "settings_config.json";
+}
+
+function Save_ReadSettingsConfig() {
+    var path = Save_SettingsPath();
+    if (!file_exists(path)) return undefined;
+
+    var buf = buffer_load(path);
+    var json = buffer_read(buf, buffer_string);
+    buffer_delete(buf);
+
+    var raw = json_parse(json);
+    if (!is_struct(raw)) return undefined;
+    var settings_version = 0;
+    if (variable_struct_exists(raw, "settings_version")) settings_version = Save_ToReal(raw.settings_version, 0);
+
+    var out = {};
+    if (variable_struct_exists(raw, "vol_ui")) out.audio_ui = raw.vol_ui;
+    if (variable_struct_exists(raw, "vol_sfx")) out.audio_sfx = raw.vol_sfx;
+    if (variable_struct_exists(raw, "vol_bgm")) out.audio_bgm = raw.vol_bgm;
+    if (variable_struct_exists(raw, "display_scale")) out.display_scale = raw.display_scale;
+    if (variable_struct_exists(raw, "fullscreen")) out.fullscreen = raw.fullscreen;
+
+    // Migrate older configs that defaulted to tiny 1x startup scale.
+    if (settings_version < 2) {
+        var loaded_scale = DISPLAY_SCALE_DEFAULT;
+        if (variable_struct_exists(out, "display_scale")) loaded_scale = Save_ToReal(out.display_scale, DISPLAY_SCALE_DEFAULT);
+        if (loaded_scale <= 1) out.display_scale = DISPLAY_SCALE_DEFAULT;
+    }
+
+    return GameSettings_Normalize(out);
+}
+
+function Save_WriteSettingsConfig(_settings) {
+    var s = GameSettings_Normalize(_settings);
+    var raw = {
+        settings_version: 2,
+        vol_ui: s.audio_ui,
+        vol_sfx: s.audio_sfx,
+        vol_bgm: s.audio_bgm,
+        display_scale: s.display_scale,
+        fullscreen: s.fullscreen
+    };
+
+    var json = json_stringify(raw);
+    var path = Save_SettingsPath();
+    var buf = buffer_create(string_length(json) + 1, buffer_fixed, 1);
+    buffer_write(buf, buffer_string, json);
+    buffer_save(buf, path);
+    buffer_delete(buf);
+}
+
 function Save_LoadSlotStat(_slot) {
     var path = Save_Path(_slot);
     if (!file_exists(path)) return undefined;
@@ -35,6 +88,9 @@ function Save_LoadSlotStat(_slot) {
 }
 
 function Save_LoadLatestSettings() {
+    var cfg = Save_ReadSettingsConfig();
+    if (is_struct(cfg)) return cfg;
+
     var best_settings = undefined;
     var best_stamp = -1;
 
@@ -55,6 +111,9 @@ function Save_LoadLatestSettings() {
         }
     }
 
+    if (is_struct(best_settings)) {
+        Save_WriteSettingsConfig(best_settings);
+    }
     return best_settings;
 }
 
@@ -220,6 +279,7 @@ function Save_ApplySnapshot(_snap) {
 
     GameState_SyncLegacy();
     GameSettings_ApplyAll();
+    Save_WriteSettingsConfig(gs.settings);
 
     gs.skip_room_save = true;
     global.skipRoomSave = true;

@@ -4,7 +4,7 @@ var ui_x = 8;
 var ui_y = 8;
 var line_h = 14;
 var ui_w = 780;
-var ui_h = 220;
+var ui_h = 300;
 
 draw_set_alpha(0.75);
 draw_set_color(c_black);
@@ -63,6 +63,24 @@ var lines = [
     "current_bgm: key=" + bgm_key + " handle=" + string(bgm_handle) + " playing=" + string(bgm_playing),
     "status: " + last_status
 ];
+
+var ds = GameSettings_Ensure();
+var desired_scale = variable_struct_exists(ds, "display_scale") ? ds.display_scale : -1;
+var desired_full = variable_struct_exists(ds, "fullscreen") ? ds.fullscreen : false;
+var actual_win_w = window_get_width();
+var actual_win_h = window_get_height();
+var actual_full = window_get_fullscreen();
+var cam = view_camera[0];
+var cam_w = -1;
+var cam_h = -1;
+if (!is_undefined(cam) && cam != -1) {
+    cam_w = camera_get_view_width(cam);
+    cam_h = camera_get_view_height(cam);
+}
+array_push(lines, "display desired: scale=" + string(desired_scale) + " fullscreen=" + string(desired_full));
+array_push(lines, "display actual: window=" + string(actual_win_w) + "x" + string(actual_win_h) + " fullscreen=" + string(actual_full));
+array_push(lines, "view0: wview=" + string(view_wview[0]) + " hview=" + string(view_hview[0]) + " wport=" + string(view_wport[0]) + " hport=" + string(view_hport[0]));
+array_push(lines, "camera0 view: " + string(cam_w) + "x" + string(cam_h));
 
 for (var i = 0; i < array_length(lines); i++) {
     draw_text(ui_x, ui_y + i * line_h, lines[i]);

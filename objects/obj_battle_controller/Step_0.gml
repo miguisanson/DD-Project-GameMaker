@@ -6,8 +6,8 @@ if (battle_over && battle_state != BSTATE_MESSAGE) exit;
 // helper input keys
 var k_up = Input_UIRepeat("menu_up");
 var k_down = Input_UIRepeat("menu_down");
-var k_ok = Input_UIPressed("confirm");
-var k_back = Input_UIPressed("cancel");
+var k_ok = Input_UIConfirm();
+var k_back = Input_UIBack();
 
 // --------------------
 // MESSAGE STATE

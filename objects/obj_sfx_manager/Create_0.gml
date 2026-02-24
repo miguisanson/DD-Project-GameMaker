@@ -52,6 +52,7 @@ var _audit = SFX_DebugAuditRequired(true);
 global.audio_debug_missing_count = _audit.missing;
 global.audio_debug_total_count = _audit.total;
 SFX_ClampVolumes();
+GameSettings_ApplyAll();
 
 if (!audio_group_is_loaded(audiogroup_default)) {
     audio_group_load(audiogroup_default);

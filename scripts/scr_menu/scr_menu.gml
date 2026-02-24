@@ -126,10 +126,10 @@ function Menu_HandleInput() {
 
     var nav_up = Menu_NavRepeat("menu_up");
     var nav_down = Menu_NavRepeat("menu_down");
-    var k_left = Input_UIPressed("menu_left");
-    var k_right = Input_UIPressed("menu_right");
-    var k_ok = Input_UIPressed("confirm");
-    var k_back = Input_UIPressed("cancel");
+    var k_left = Input_UIRepeat("menu_left");
+    var k_right = Input_UIRepeat("menu_right");
+    var k_ok = Input_UIConfirm();
+    var k_back = Input_UIBack();
 
     if (k_back) {
         SFX_PlayUI("ui_back");
@@ -663,8 +663,8 @@ function PauseMenu_HandleInput() {
 
     var nav_up = PauseMenu_NavRepeat("menu_up");
     var nav_down = PauseMenu_NavRepeat("menu_down");
-    var k_ok = Input_UIPressed("confirm");
-    var k_back = Input_UIPressed("cancel");
+    var k_ok = Input_UIConfirm();
+    var k_back = Input_UIBack();
 
     if (k_back) {
         SFX_PlayUI("ui_back");

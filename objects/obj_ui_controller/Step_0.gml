@@ -23,8 +23,8 @@ if (icon != -1) {
 }
 if (variable_struct_exists(gs.ui, "lock_actions") && gs.ui.lock_actions > 0) gs.ui.lock_actions -= 1;
 
-var k_ok = Input_UIPressed("confirm");
-var k_back = Input_UIPressed("cancel");
+var k_ok = Input_UIConfirm();
+var k_back = Input_UIBack();
 var k_menu = Input_UIPressed("menu");
 
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {

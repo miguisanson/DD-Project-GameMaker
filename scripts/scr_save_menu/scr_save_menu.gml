@@ -49,8 +49,8 @@ function SaveMenu_Handle() {
     var k_down = Input_UIRepeat("menu_down");
     var k_left = Input_UIRepeat("menu_left");
     var k_right = Input_UIRepeat("menu_right");
-    var k_ok = Input_UIPressed("confirm");
-    var k_back = Input_UIPressed("cancel");
+    var k_ok = Input_UIConfirm();
+    var k_back = Input_UIBack();
 
     if (sm.confirm) {
         if (sm.confirm_mode == "saved") {
