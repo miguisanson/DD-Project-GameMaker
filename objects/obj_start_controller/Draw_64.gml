@@ -7,19 +7,17 @@ UI_SetFont();
 var line_h = string_height("A");
 
 // main menu
-var title = "MAIN MENU";
-var tx = (w - string_width(title)) * 0.5;
-var ty = h * 0.2;
 var row_gap = max(18, line_h + 4);
-
-draw_set_color(c_white);
-draw_text(tx, ty, title);
-
-var start_y = h * 0.35;
 var bx1 = w * 0.3;
 var bx2 = w * 0.7;
 var pad_x = 6;
 var pad_y = 4;
+var list_rows = array_length(main_options);
+var list_h = max(0, list_rows - 1) * row_gap + line_h + pad_y * 2;
+var start_target_y = h * 0.52;
+var start_min_y = h * 0.35;
+var start_max_y = max(start_min_y, h - (h * 0.10) - list_h);
+var start_y = clamp(start_target_y, start_min_y, start_max_y);
 
 for (var i = 0; i < array_length(main_options); i++) {
     var label = main_options[i];
