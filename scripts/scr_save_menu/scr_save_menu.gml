@@ -201,6 +201,16 @@ function SaveMenu_Draw() {
 
     var row_h = max(22, line_h + 8);
     var row_y = by + 36;
+    var delete_label = "Delete";
+    var delete_pad_x = 8;
+    var delete_text_w = string_width(delete_label);
+    var delete_btn_w = delete_text_w + delete_pad_x * 2;
+    var delete_right_margin = 12;
+    var delete_right = bx + bw - delete_right_margin;
+    var delete_left = delete_right - delete_btn_w;
+    var delete_text_x = delete_left + delete_pad_x;
+    var slot_select_right = (sm.mode == "load") ? (delete_left - 10) : (bx + bw - 90);
+    slot_select_right = max(bx + 40, slot_select_right);
     for (var i = 0; i < 3; i++) {
         var info = Save_SlotInfo(i + 1);
         var yy = row_y + i * row_h;
@@ -211,9 +221,9 @@ function SaveMenu_Draw() {
 
         if (i == sm.slot && sm.col == 0 && !sm.confirm) {
             draw_set_color(c_white);
-            draw_rectangle(bx + 8 - pad, yy - 4, bx + bw - 90 + pad, yy + line_h + 4, false);
+            draw_rectangle(bx + 8 - pad, yy - 4, slot_select_right + pad, yy + line_h + 4, false);
             draw_set_color(c_black);
-            draw_rectangle(bx + 8 - pad, yy - 4, bx + bw - 90 + pad, yy + line_h + 4, true);
+            draw_rectangle(bx + 8 - pad, yy - 4, slot_select_right + pad, yy + line_h + 4, true);
             draw_set_color(c_black);
         } else {
             draw_set_color(c_white);
@@ -221,17 +231,16 @@ function SaveMenu_Draw() {
         draw_text(bx + 14, yy, label);
 
         if (sm.mode == "load") {
-            var delx = bx + bw - 70;
             if (i == sm.slot && sm.col == 1 && !sm.confirm) {
                 draw_set_color(c_white);
-                draw_rectangle(delx - 8, yy - 4, delx + 52, yy + line_h + 4, false);
+                draw_rectangle(delete_left, yy - 4, delete_right, yy + line_h + 4, false);
                 draw_set_color(c_black);
-                draw_rectangle(delx - 8, yy - 4, delx + 52, yy + line_h + 4, true);
+                draw_rectangle(delete_left, yy - 4, delete_right, yy + line_h + 4, true);
                 draw_set_color(c_black);
             } else {
                 draw_set_color(c_white);
             }
-            draw_text(delx, yy, "Delete");
+            draw_text(delete_text_x, yy, delete_label);
         }
     }
 
