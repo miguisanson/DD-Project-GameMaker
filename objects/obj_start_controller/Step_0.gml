@@ -86,7 +86,7 @@ if (state == "class") {
 }
 
 if (state == "settings") {
-    var settings_rows = 7; // UI, SFX, BGM, Scale, Fullscreen, Apply, Back
+    var settings_rows = SETTINGS_MENU_ROW_COUNT; // UI, SFX, BGM, Scale, Fullscreen, Apply, Back
 
     if (k_up) {
         settings_index = (settings_index + settings_rows - 1) mod settings_rows;

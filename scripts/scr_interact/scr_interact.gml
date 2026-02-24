@@ -24,7 +24,7 @@ function Interact_FacingDistance(_pl, _inst) {
     var INF = 1000000000;
     if (!instance_exists(_pl)) return INF;
     if (!variable_instance_exists(_pl, "face")) return INF;
-    var tile = 16;
+    var tile = GRID_TILE_SIZE;
     if (variable_instance_exists(_pl, "tile_size")) tile = _pl.tile_size;
     var px = round(_pl.x / tile) * tile;
     var py = round(_pl.y / tile) * tile;
@@ -52,6 +52,16 @@ function Interact_FacingDistance(_pl, _inst) {
 function Interact_GetTarget(_pl) {
     if (!instance_exists(_pl)) return noone;
     if (!variable_instance_exists(_pl, "face")) return noone;
+
+    var gs = GameState_Get();
+    var frame = Input_Frame();
+    if (!variable_struct_exists(gs, "interact_cache_frame")) gs.interact_cache_frame = -1;
+    if (!variable_struct_exists(gs, "interact_cache_target")) gs.interact_cache_target = noone;
+    if (gs.interact_cache_frame == frame) {
+        var cached = gs.interact_cache_target;
+        if (cached == noone || instance_exists(cached)) return cached;
+    }
+
     var INF = 1000000000;
     var best = noone;
     var best_dist = INF;
@@ -62,6 +72,8 @@ function Interact_GetTarget(_pl) {
             best = self;
         }
     }
+    gs.interact_cache_frame = frame;
+    gs.interact_cache_target = best;
     return best;
 }
 

@@ -20,10 +20,10 @@ enemy_cfg = undefined;
 // DEFAULT TUNING (CHILD CAN OVERRIDE)
 // --------------------
 scan_radius   = ENEMY_SCAN_RADIUS_DEFAULT;
-think_rate    = 15;   // decision delay (frames)
-forget_delay  = 30;   // memory duration
-leash_mult    = 2;
-wander_chance = 4;    // idle wander chance (0 = never wander)
+think_rate    = ENEMY_THINK_RATE_DEFAULT;   // decision delay (frames)
+forget_delay  = ENEMY_FORGET_DELAY_DEFAULT; // memory duration
+leash_mult    = ENEMY_LEASH_MULT_DEFAULT;
+wander_chance = ENEMY_WANDER_CHANCE_DEFAULT; // idle wander chance (0 = never wander)
 
 leash_radius  = 0;
 
@@ -40,8 +40,8 @@ home_y = y;
 // --------------------
 // GRID MOVEMENT
 // --------------------
-tile_size  = 16;
-move_speed = 1;
+tile_size  = GRID_TILE_SIZE;
+move_speed = ENEMY_MOVE_SPEED_DEFAULT;
 moving     = false;
 move_dir   = -1;
 move_timer = 0;

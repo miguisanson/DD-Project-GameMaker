@@ -71,7 +71,7 @@ function Player_ApplyClassSprites(_class_id) {
 
 function Player_IsSettled(_pl) {
     if (!instance_exists(_pl)) return false;
-    var tile = 16;
+    var tile = GRID_TILE_SIZE;
     if (variable_instance_exists(_pl, "tile_size")) tile = _pl.tile_size;
     var gx = round(_pl.x / tile) * tile;
     var gy = round(_pl.y / tile) * tile;
@@ -430,8 +430,9 @@ function GameState_Init() {
     gs.settings = GameSettings_Normalize(gs.settings);
 
     if (!variable_struct_exists(gs, "ui")) {
-        gs.ui = { mode: 0, lines: [], index: 0, speaker: "", just_opened: false, lock_actions: 0, confirm_action: "", icon_frame: 0 };
+        gs.ui = { mode: 0, lines: [], index: 0, speaker: "", confirm_action: "", icon_frame: 0, opened_frame: UI_OPENED_FRAME_NONE };
     }
+    if (!variable_struct_exists(gs.ui, "opened_frame")) gs.ui.opened_frame = UI_OPENED_FRAME_NONE;
 
     if (!variable_struct_exists(gs, "in_main_menu")) {
         gs.in_main_menu = false;
@@ -545,7 +546,7 @@ function GameState_SetPlayerInst(_inst) {
 
 function GameState_SetBattleReturn(_room, _x, _y, _face) {
     var gs = GameState_Get();
-    var tile = 16;
+    var tile = GRID_TILE_SIZE;
     _x = round(_x / tile) * tile;
     _y = round(_y / tile) * tile;
     gs.battle.return_room = _room;

@@ -4,6 +4,14 @@ function SaveMenu_Log(_msg) {
     }
 }
 
+function SaveMenu_BuildSlotInfoCache() {
+    var out = array_create(3);
+    for (var i = 0; i < 3; i++) {
+        out[i] = Save_SlotInfo(i + 1);
+    }
+    return out;
+}
+
 function SaveMenu_Open(_mode, _context) {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
@@ -19,7 +27,8 @@ function SaveMenu_Open(_mode, _context) {
         confirm_choice: 0,
         confirm_mode: "delete", // delete | overwrite | save | saved
         message: "",
-        just_opened: true
+        slot_info_cache: SaveMenu_BuildSlotInfoCache(),
+        opened_frame: Input_Frame()
     };
 
 }
@@ -39,18 +48,18 @@ function SaveMenu_Handle() {
     var sm = gs.ui.save_menu;
     if (!sm.open) return;
 
-    if (variable_struct_exists(sm, "just_opened") && sm.just_opened) {
-        sm.just_opened = false;
-        gs.ui.save_menu = sm;
-        return;
-    }
-
     var k_up = Input_UIPressed("menu_up");
     var k_down = Input_UIPressed("menu_down");
     var k_left = Input_UIPressed("menu_left");
     var k_right = Input_UIPressed("menu_right");
     var k_ok = Input_UIConfirm();
     var k_back = Input_UIBack();
+    var opened_this_frame = variable_struct_exists(sm, "opened_frame") && (sm.opened_frame == Input_Frame());
+    if (opened_this_frame) {
+        // Prevent immediate same-press confirm/back from the action that opened the menu.
+        k_ok = false;
+        k_back = false;
+    }
 
     if (sm.confirm) {
         if (sm.confirm_mode == "saved") {
@@ -79,10 +88,16 @@ function SaveMenu_Handle() {
                 if (sm.confirm_mode == "delete") {
                     SaveMenu_Log("delete slot " + string(sm.slot + 1));
                     Save_Delete(sm.slot + 1);
+                    if (variable_struct_exists(sm, "slot_info_cache") && is_array(sm.slot_info_cache) && sm.slot >= 0 && sm.slot < array_length(sm.slot_info_cache)) {
+                        sm.slot_info_cache[sm.slot] = Save_SlotInfo(sm.slot + 1);
+                    }
                     SFX_Play("delete_confirm");
                 } else if (sm.confirm_mode == "overwrite") {
                     SaveMenu_Log("overwrite confirmed slot " + string(sm.slot + 1));
                     Save_Write(sm.slot + 1);
+                    if (variable_struct_exists(sm, "slot_info_cache") && is_array(sm.slot_info_cache) && sm.slot >= 0 && sm.slot < array_length(sm.slot_info_cache)) {
+                        sm.slot_info_cache[sm.slot] = Save_SlotInfo(sm.slot + 1);
+                    }
                     SFX_Play("save_confirm");
                     gs.save_slot = sm.slot + 1;
                     if (sm.context == "bed") Enemy_ResetAll();
@@ -94,6 +109,9 @@ function SaveMenu_Handle() {
                 } else if (sm.confirm_mode == "save") {
                     SaveMenu_Log("save confirmed slot " + string(sm.slot + 1));
                     Save_Write(sm.slot + 1);
+                    if (variable_struct_exists(sm, "slot_info_cache") && is_array(sm.slot_info_cache) && sm.slot >= 0 && sm.slot < array_length(sm.slot_info_cache)) {
+                        sm.slot_info_cache[sm.slot] = Save_SlotInfo(sm.slot + 1);
+                    }
                     SFX_Play("save_confirm");
                     gs.save_slot = sm.slot + 1;
                     if (sm.context == "bed") Enemy_ResetAll();
@@ -191,7 +209,12 @@ function SaveMenu_Draw() {
     var slot_labels = array_create(3, "");
     var longest_slot_w = 0;
     for (var li = 0; li < 3; li++) {
-        var info_l = Save_SlotInfo(li + 1);
+        var info_l = undefined;
+        if (variable_struct_exists(sm, "slot_info_cache") && is_array(sm.slot_info_cache) && li < array_length(sm.slot_info_cache)) {
+            info_l = sm.slot_info_cache[li];
+        } else {
+            info_l = Save_SlotInfo(li + 1);
+        }
         var label_l = "Slot " + string(li + 1);
         if (info_l.exists) {
             label_l += "  " + info_l.class_name + " Lv" + string(info_l.level) + "  " + info_l.room;

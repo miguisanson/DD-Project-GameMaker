@@ -76,7 +76,7 @@ function Dialogue_Start(_npc_id) {
     gs.ui.lines = DialogueDB_Get(_npc_id);
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
-    gs.ui.just_opened = true;
+    gs.ui.opened_frame = Input_Frame();
     gs.ui.confirm_action = "confirm";
     SFX_Play("dialogue_open");
 }
@@ -89,7 +89,7 @@ function Dialogue_StartLines(_lines) {
     gs.ui.lines = _lines;
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
-    gs.ui.just_opened = true;
+    gs.ui.opened_frame = Input_Frame();
     gs.ui.confirm_action = "confirm";
     SFX_Play("dialogue_open");
 }
@@ -124,7 +124,7 @@ function Dialogue_StartWithSpeaker(_speaker, _lines) {
     gs.ui.lines = _lines;
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
-    gs.ui.just_opened = true;
+    gs.ui.opened_frame = Input_Frame();
     gs.ui.confirm_action = "confirm";
     SFX_Play("dialogue_open");
 }
@@ -136,7 +136,7 @@ function Dialogue_StartLinesWithSpeaker(_speaker, _lines) {
 function Dialogue_Advance() {
     var gs = GameState_Get();
     if (gs.ui.mode != UI_DIALOGUE) return;
-    gs.ui.just_opened = false;
+    gs.ui.opened_frame = UI_OPENED_FRAME_NONE;
     gs.ui.index += 1;
     if (gs.ui.index >= array_length(gs.ui.lines)) {
         SFX_Play("dialogue_close");
@@ -145,7 +145,6 @@ function Dialogue_Advance() {
         gs.ui.index = 0;
         gs.ui.speaker = "";
         gs.ui.confirm_action = "";
-        if (variable_struct_exists(gs.ui, "lock_actions")) gs.ui.lock_actions = 2;
     } else {
         SFX_Play("dialogue_advance");
     }

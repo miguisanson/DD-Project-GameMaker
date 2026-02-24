@@ -37,7 +37,7 @@ Player_ApplyClassSprites(character.class_id);
 // --------------------
 xspeed = 0;
 yspeed = 0;
-move_speed = 1;
+move_speed = PLAYER_MOVE_SPEED_DEFAULT;
 
 if (!just_returned) {
     face = DOWN;
@@ -46,7 +46,7 @@ if (!just_returned) {
 moving = false;
 move_dir = -1;
 move_timer = 0;
-tile_size = 16;
+tile_size = GRID_TILE_SIZE;
 if (just_returned) {
     x = round(x / tile_size) * tile_size;
     y = round(y / tile_size) * tile_size;

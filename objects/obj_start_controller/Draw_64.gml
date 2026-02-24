@@ -117,7 +117,7 @@ if (state == "settings") {
     draw_text(sx + 12, audio_header_y, "Audio");
     draw_text(sx + 12, display_header_y, "Display");
 
-    for (var r = 0; r <= 6; r++) {
+    for (var r = 0; r < SETTINGS_MENU_ROW_COUNT; r++) {
         var yy = row_y[r];
         var selected_row = (settings_index == r);
         var label = "";
