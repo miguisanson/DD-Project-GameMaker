@@ -74,6 +74,53 @@ function SFX_IsValidSoundAsset(_asset) {
     return true;
 }
 
+function SFX_CategoryForKey(_key) {
+    var key = string_lower(string(_key));
+
+    if (string_copy(key, 1, 3) == "ui_") return "ui";
+    if (string_copy(key, 1, 9) == "dialogue_") return "ui";
+    if (key == "save_confirm" || key == "load_confirm" || key == "delete_confirm") return "ui";
+    if (key == "barrel_break" || key == "chest_open" || key == "kill_torch") return "ui";
+
+    return "sfx";
+}
+
+function SFX_CleanupActive() {
+    if (!variable_global_exists("sfx_active") || !is_array(global.sfx_active)) {
+        global.sfx_active = [];
+        return;
+    }
+
+    var active = global.sfx_active;
+    for (var i = array_length(active) - 1; i >= 0; i--) {
+        var rec = active[i];
+        var keep = is_struct(rec) && variable_struct_exists(rec, "handle") && rec.handle != -1 && audio_is_playing(rec.handle);
+        if (!keep) array_delete(active, i, 1);
+    }
+    global.sfx_active = active;
+}
+
+function SFX_ApplyActiveGains(_fade_ms = 0) {
+    SFX_ClampVolumes();
+    SFX_CleanupActive();
+    if (!variable_global_exists("sfx_active") || !is_array(global.sfx_active)) return;
+
+    var active = global.sfx_active;
+    for (var i = 0; i < array_length(active); i++) {
+        var rec = active[i];
+        if (!is_struct(rec)) continue;
+        if (!variable_struct_exists(rec, "handle")) continue;
+        var h = rec.handle;
+        if (h == -1 || !audio_is_playing(h)) continue;
+        var key = variable_struct_exists(rec, "key") ? rec.key : "";
+        var base = variable_struct_exists(rec, "base") ? rec.base : 1;
+        var cat = SFX_CategoryForKey(key);
+        var cat_gain = (cat == "ui") ? global.vol_ui : global.vol_sfx;
+        var gain = clamp(base, 0, 1) * global.vol_master * cat_gain;
+        audio_sound_gain(h, gain, max(0, _fade_ms));
+    }
+}
+
 function SFX_RegisterDefaults() {
     if (!variable_global_exists("sfx_db") || !ds_exists(global.sfx_db, ds_type_map)) return;
     ds_map_clear(global.sfx_db);
@@ -179,9 +226,11 @@ function BGM_RegisterDefaults() {
 
 function SFX_ClampVolumes() {
     if (!variable_global_exists("vol_master")) global.vol_master = VOL_MASTER_DEFAULT;
+    if (!variable_global_exists("vol_ui")) global.vol_ui = VOL_UI_DEFAULT;
     if (!variable_global_exists("vol_sfx")) global.vol_sfx = VOL_SFX_DEFAULT;
     if (!variable_global_exists("vol_music")) global.vol_music = VOL_MUSIC_DEFAULT;
     global.vol_master = clamp(global.vol_master, 0, 1);
+    global.vol_ui = clamp(global.vol_ui, 0, 1);
     global.vol_sfx = clamp(global.vol_sfx, 0, 1);
     global.vol_music = clamp(global.vol_music, 0, 1);
 }
@@ -214,9 +263,18 @@ function SFX_Play(_key, _vol = 1, _pitch = 1) {
         return -1;
     }
 
-    var gain = clamp(_vol, 0, 1) * global.vol_master * global.vol_sfx;
+    var category = SFX_CategoryForKey(_key);
+    var cat_gain = global.vol_sfx;
+    if (category == "ui") cat_gain = global.vol_ui;
+    var base_gain = clamp(_vol, 0, 1);
+    var gain = base_gain * global.vol_master * cat_gain;
     audio_sound_gain(snd_handle, gain, 0);
     audio_sound_pitch(snd_handle, max(0.01, _pitch));
+
+    if (!variable_global_exists("sfx_active") || !is_array(global.sfx_active)) global.sfx_active = [];
+    SFX_CleanupActive();
+    array_push(global.sfx_active, { handle: snd_handle, key: _key, base: base_gain });
+
     global.sfx_last_key = _key;
     global.sfx_last_handle = snd_handle;
     return snd_handle;
@@ -457,11 +515,18 @@ function BGM_IsPlaying(_key = "") {
 
 function Audio_SetMasterVolume(_v) {
     global.vol_master = clamp(_v, 0, 1);
+    SFX_ApplyActiveGains(100);
     BGM_ApplyGain(100);
+}
+
+function Audio_SetUIVolume(_v) {
+    global.vol_ui = clamp(_v, 0, 1);
+    SFX_ApplyActiveGains(100);
 }
 
 function Audio_SetSFXVolume(_v) {
     global.vol_sfx = clamp(_v, 0, 1);
+    SFX_ApplyActiveGains(100);
 }
 
 function Audio_SetMusicVolume(_v) {
@@ -471,6 +536,7 @@ function Audio_SetMusicVolume(_v) {
 
 // Backward-compatible aliases
 function Master_SetVolume(_v) { Audio_SetMasterVolume(_v); }
+function UI_SetVolume(_v) { Audio_SetUIVolume(_v); }
 function SFX_SetVolume(_v) { Audio_SetSFXVolume(_v); }
 function BGM_SetVolume(_v) { Audio_SetMusicVolume(_v); }
 

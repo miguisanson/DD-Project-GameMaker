@@ -15,6 +15,7 @@ if (gs.last_room != room) {
         RoomState_Apply(room);
     }
     RoomTransition_Apply();
+    GameSettings_ApplyDisplay();
 
     if (variable_struct_exists(gs, "skip_room_save")) gs.skip_room_save = false;
     global.skipRoomSave = false;

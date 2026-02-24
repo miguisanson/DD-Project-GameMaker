@@ -3,9 +3,14 @@ if (instance_number(obj_sfx_manager) > 1) {
     exit;
 }
 
+var _settings = GameSettings_Ensure();
 if (!variable_global_exists("vol_master")) global.vol_master = VOL_MASTER_DEFAULT;
+if (!variable_global_exists("vol_ui")) global.vol_ui = VOL_UI_DEFAULT;
 if (!variable_global_exists("vol_sfx")) global.vol_sfx = VOL_SFX_DEFAULT;
 if (!variable_global_exists("vol_music")) global.vol_music = VOL_MUSIC_DEFAULT;
+global.vol_ui = _settings.audio_ui;
+global.vol_sfx = _settings.audio_sfx;
+global.vol_music = _settings.audio_bgm;
 
 global.bgm_current_sound = noone;
 global.bgm_current_handle = -1;
@@ -14,6 +19,7 @@ global.bgm_pending_stop_handle = -1;
 global.bgm_pending_stop_frames = 0;
 global.sfx_last_key = "";
 global.sfx_last_handle = -1;
+global.sfx_active = [];
 global.audio_debug_enabled = false;
 global.audio_debug_test_key = "ui_confirm";
 global.audio_debug_last_key = global.audio_debug_test_key;

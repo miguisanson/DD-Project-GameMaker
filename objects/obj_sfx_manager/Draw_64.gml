@@ -20,6 +20,7 @@ var sfx_db_ok = variable_global_exists("sfx_db") && ds_exists(global.sfx_db, ds_
 var bgm_db_ok = variable_global_exists("bgm_db") && ds_exists(global.bgm_db, ds_type_map);
 
 var vol_master = variable_global_exists("vol_master") ? string(global.vol_master) : "n/a";
+var vol_ui = variable_global_exists("vol_ui") ? string(global.vol_ui) : "n/a";
 var vol_sfx = variable_global_exists("vol_sfx") ? string(global.vol_sfx) : "n/a";
 var vol_music = variable_global_exists("vol_music") ? string(global.vol_music) : "n/a";
 
@@ -51,7 +52,7 @@ var lines = [
     "sfx_db exists: " + string(sfx_db_ok),
     "bgm_db exists: " + string(bgm_db_ok),
     "audiogroup_default loaded: " + string(group_loaded),
-    "vol master/sfx/music: " + vol_master + " / " + vol_sfx + " / " + vol_music,
+    "vol master/ui/sfx/music: " + vol_master + " / " + vol_ui + " / " + vol_sfx + " / " + vol_music,
     "ui_confirm resolve: ok=" + string(ui_confirm_info.ok) + " id=" + string(ui_confirm_info.asset) + " name=" + ui_confirm_name + " reason=" + string(ui_confirm_info.reason),
     "missing required keys: " + string(missing_count) + " / " + string(total_count),
     "last_test_key: " + test_key,

@@ -125,6 +125,146 @@ function Action_Request(_pl, _action) {
     return Input_Pressed(_action);
 }
 
+function GameSettings_ToReal(_value, _fallback) {
+    if (is_real(_value)) return _value;
+    if (is_string(_value)) return real(_value);
+    if (_value == true) return 1;
+    if (_value == false) return 0;
+    return _fallback;
+}
+
+function GameSettings_Defaults() {
+    return {
+        audio_ui: VOL_UI_DEFAULT,
+        audio_sfx: VOL_SFX_DEFAULT,
+        audio_bgm: VOL_MUSIC_DEFAULT,
+        display_scale: DISPLAY_SCALE_DEFAULT,
+        display_fullscreen: false
+    };
+}
+
+function GameSettings_Normalize(_settings) {
+    var out = GameSettings_Defaults();
+    if (is_struct(_settings)) {
+        if (variable_struct_exists(_settings, "audio_ui")) out.audio_ui = _settings.audio_ui;
+        if (variable_struct_exists(_settings, "audio_sfx")) out.audio_sfx = _settings.audio_sfx;
+        if (variable_struct_exists(_settings, "audio_bgm")) out.audio_bgm = _settings.audio_bgm;
+        if (variable_struct_exists(_settings, "display_scale")) out.display_scale = _settings.display_scale;
+        if (variable_struct_exists(_settings, "display_fullscreen")) out.display_fullscreen = _settings.display_fullscreen;
+    }
+
+    out.audio_ui = clamp(GameSettings_ToReal(out.audio_ui, VOL_UI_DEFAULT), 0, 1);
+    out.audio_sfx = clamp(GameSettings_ToReal(out.audio_sfx, VOL_SFX_DEFAULT), 0, 1);
+    out.audio_bgm = clamp(GameSettings_ToReal(out.audio_bgm, VOL_MUSIC_DEFAULT), 0, 1);
+    out.display_scale = clamp(round(GameSettings_ToReal(out.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
+    out.display_fullscreen = (out.display_fullscreen == true) || (out.display_fullscreen == 1);
+    return out;
+}
+
+function GameSettings_Ensure() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "settings") || !is_struct(gs.settings)) {
+        gs.settings = GameSettings_Defaults();
+    }
+    gs.settings = GameSettings_Normalize(gs.settings);
+    return gs.settings;
+}
+
+function GameSettings_ApplyAudio() {
+    var settings = GameSettings_Ensure();
+    Audio_SetUIVolume(settings.audio_ui);
+    Audio_SetSFXVolume(settings.audio_sfx);
+    Audio_SetMusicVolume(settings.audio_bgm);
+}
+
+function GameSettings_ApplyDisplay() {
+    var settings = GameSettings_Ensure();
+    var base_w = DISPLAY_BASE_W;
+    var base_h = DISPLAY_BASE_H;
+
+    var scale = clamp(round(GameSettings_ToReal(settings.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
+    settings.display_scale = scale;
+
+    var is_fullscreen = (settings.display_fullscreen == true) || (settings.display_fullscreen == 1);
+    settings.display_fullscreen = is_fullscreen;
+
+    var port_w = base_w * scale;
+    var port_h = base_h * scale;
+    var port_x = 0;
+    var port_y = 0;
+
+    if (is_fullscreen) {
+        window_set_fullscreen(true);
+        var disp_w = display_get_width();
+        var disp_h = display_get_height();
+        var max_scale = max(DISPLAY_SCALE_MIN, floor(min(disp_w / base_w, disp_h / base_h)));
+        var fs_scale = clamp(scale, DISPLAY_SCALE_MIN, max_scale);
+        port_w = base_w * fs_scale;
+        port_h = base_h * fs_scale;
+        port_x = floor((disp_w - port_w) * 0.5);
+        port_y = floor((disp_h - port_h) * 0.5);
+    } else {
+        window_set_fullscreen(false);
+        if (window_get_width() != port_w || window_get_height() != port_h) {
+            window_set_size(port_w, port_h);
+            window_center();
+        }
+    }
+
+    if (view_enabled) {
+        view_visible[0] = true;
+        view_xport[0] = port_x;
+        view_yport[0] = port_y;
+        view_wport[0] = port_w;
+        view_hport[0] = port_h;
+    }
+
+    var cam = view_camera[0];
+    if (!is_undefined(cam) && cam != -1) {
+        camera_set_view_size(cam, base_w, base_h);
+    }
+}
+
+function GameSettings_ApplyAll() {
+    GameSettings_ApplyAudio();
+    GameSettings_ApplyDisplay();
+}
+
+function GameSettings_SetUIVolume(_v) {
+    var settings = GameSettings_Ensure();
+    settings.audio_ui = clamp(GameSettings_ToReal(_v, settings.audio_ui), 0, 1);
+    GameSettings_ApplyAudio();
+}
+
+function GameSettings_SetSFXVolume(_v) {
+    var settings = GameSettings_Ensure();
+    settings.audio_sfx = clamp(GameSettings_ToReal(_v, settings.audio_sfx), 0, 1);
+    GameSettings_ApplyAudio();
+}
+
+function GameSettings_SetBGMVolume(_v) {
+    var settings = GameSettings_Ensure();
+    settings.audio_bgm = clamp(GameSettings_ToReal(_v, settings.audio_bgm), 0, 1);
+    GameSettings_ApplyAudio();
+}
+
+function GameSettings_SetScale(_scale) {
+    var settings = GameSettings_Ensure();
+    settings.display_scale = clamp(round(GameSettings_ToReal(_scale, settings.display_scale)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
+    GameSettings_ApplyDisplay();
+}
+
+function GameSettings_SetFullscreen(_enabled) {
+    var settings = GameSettings_Ensure();
+    settings.display_fullscreen = (_enabled == true) || (_enabled == 1);
+    GameSettings_ApplyDisplay();
+}
+
+function GameSettings_ToggleFullscreen() {
+    var settings = GameSettings_Ensure();
+    GameSettings_SetFullscreen(!settings.display_fullscreen);
+}
+
 // --------------------
 // GAME STATE
 // --------------------
@@ -231,6 +371,16 @@ function GameState_Init() {
         gs.checkpoint = { room: rm_floor2, x: 32, y: 128 };
     }
 
+    if (!variable_struct_exists(gs, "settings") || !is_struct(gs.settings)) {
+        gs.settings = GameSettings_Defaults();
+    }
+    if (!variable_struct_exists(gs, "settings_boot_loaded") || !gs.settings_boot_loaded) {
+        var boot_settings = Save_LoadLatestSettings();
+        if (is_struct(boot_settings)) gs.settings = boot_settings;
+        gs.settings_boot_loaded = true;
+    }
+    gs.settings = GameSettings_Normalize(gs.settings);
+
     if (!variable_struct_exists(gs, "ui")) {
         gs.ui = { mode: 0, lines: [], index: 0, speaker: "", just_opened: false, lock_actions: 0, confirm_action: "", icon_frame: 0 };
     }
@@ -318,6 +468,10 @@ function GameState_SyncLegacy() {
 
     if (variable_struct_exists(gs, "uid_counter")) {
         global.uid_counter = gs.uid_counter;
+    }
+
+    if (variable_struct_exists(gs, "settings")) {
+        global.settings = gs.settings;
     }
 
     global.player_inst = gs.player_inst;

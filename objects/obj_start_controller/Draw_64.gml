@@ -84,10 +84,11 @@ if (state == "class") {
 
 // settings popup
 if (state == "settings") {
-    var sw = w * 0.6;
-    var sh = h * 0.4;
+    var sw = w * 0.72;
+    var sh = h * 0.62;
     var sx = (w - sw) * 0.5;
     var sy = (h - sh) * 0.5;
+    var settings = GameSettings_Ensure();
 
     draw_set_alpha(0.85);
     draw_set_color(c_black);
@@ -97,17 +98,110 @@ if (state == "settings") {
     draw_rectangle(sx, sy, sx + sw, sy + sh, true);
     draw_text(sx + 12, sy + 12, "Settings");
 
-    var sbx = sx + 12;
-    var sby = sy + sh - (line_h + 4);
-    var swid = string_width("Back");
-    if (settings_index == 0) {
-        draw_set_color(c_white);
-        draw_rectangle(sbx - 4, sby - 2, sbx + swid + 4, sby + line_h + 2, false);
-        draw_set_color(c_black);
-        draw_rectangle(sbx - 4, sby - 2, sbx + swid + 4, sby + line_h + 2, true);
-        draw_set_color(c_black);
-    } else {
-        draw_set_color(c_white);
+    var row_gap_s = max(18, line_h + 6);
+    var audio_header_y = sy + 34;
+    var audio_row_y0 = audio_header_y + row_gap_s;
+    var display_header_y = audio_row_y0 + row_gap_s * 3 + 4;
+    var display_row_y0 = display_header_y + row_gap_s;
+
+    var row_y = [];
+    row_y[0] = audio_row_y0;
+    row_y[1] = audio_row_y0 + row_gap_s;
+    row_y[2] = audio_row_y0 + row_gap_s * 2;
+    row_y[3] = display_row_y0;
+    row_y[4] = display_row_y0 + row_gap_s;
+    row_y[5] = display_row_y0 + row_gap_s * 2;
+
+    draw_set_color(c_white);
+    draw_text(sx + 12, audio_header_y, "Audio");
+    draw_text(sx + 12, display_header_y, "Display");
+
+    var right_pad = 14;
+    var btn_w = max(14, string_width("+") + 8);
+    var btn_h = line_h + 4;
+    var plus_x = sx + sw - right_pad - btn_w;
+    var minus_x = plus_x - 6 - btn_w;
+    var value_w = max(52, string_width("100%") + 8);
+    var value_x = minus_x - 6 - value_w;
+
+    for (var r = 0; r <= 5; r++) {
+        var yy = row_y[r];
+        var selected_row = (settings_index == r);
+        var label = "";
+        var value = "";
+
+        switch (r) {
+            case 0:
+                label = "UI";
+                value = string(round(settings.audio_ui * 100)) + "%";
+                break;
+            case 1:
+                label = "SFX";
+                value = string(round(settings.audio_sfx * 100)) + "%";
+                break;
+            case 2:
+                label = "BGM";
+                value = string(round(settings.audio_bgm * 100)) + "%";
+                break;
+            case 3:
+                label = "Scale";
+                value = string(settings.display_scale) + "x";
+                break;
+            case 4:
+                label = "Fullscreen";
+                value = settings.display_fullscreen ? "On" : "Off";
+                break;
+            case 5:
+                label = "Back";
+                break;
+        }
+
+        if (selected_row) {
+            draw_set_color(c_white);
+            draw_rectangle(sx + 8, yy - 3, sx + sw - 8, yy + line_h + 5, false);
+            draw_set_color(c_black);
+            draw_rectangle(sx + 8, yy - 3, sx + sw - 8, yy + line_h + 5, true);
+        }
+
+        draw_set_color(selected_row ? c_black : c_white);
+        draw_text(sx + 16, yy, label);
+
+        if (r <= 3) {
+            var sel_minus = selected_row && settings_col == 0;
+            var sel_plus = selected_row && settings_col == 2;
+
+            if (sel_minus) {
+                draw_set_color(c_white);
+                draw_rectangle(minus_x - 1, yy - 2, minus_x + btn_w + 1, yy + btn_h + 1, false);
+                draw_set_color(c_black);
+                draw_rectangle(minus_x - 1, yy - 2, minus_x + btn_w + 1, yy + btn_h + 1, true);
+            } else {
+                draw_set_color(selected_row ? c_black : c_white);
+                draw_rectangle(minus_x - 1, yy - 2, minus_x + btn_w + 1, yy + btn_h + 1, true);
+            }
+
+            if (sel_plus) {
+                draw_set_color(c_white);
+                draw_rectangle(plus_x - 1, yy - 2, plus_x + btn_w + 1, yy + btn_h + 1, false);
+                draw_set_color(c_black);
+                draw_rectangle(plus_x - 1, yy - 2, plus_x + btn_w + 1, yy + btn_h + 1, true);
+            } else {
+                draw_set_color(selected_row ? c_black : c_white);
+                draw_rectangle(plus_x - 1, yy - 2, plus_x + btn_w + 1, yy + btn_h + 1, true);
+            }
+
+            draw_set_color(sel_minus ? c_black : (selected_row ? c_black : c_white));
+            draw_text(minus_x + (btn_w - string_width("-")) * 0.5, yy, "-");
+
+            draw_set_color(selected_row ? c_black : c_white);
+            draw_text(value_x + (value_w - string_width(value)) * 0.5, yy, value);
+
+            draw_set_color(sel_plus ? c_black : (selected_row ? c_black : c_white));
+            draw_text(plus_x + (btn_w - string_width("+")) * 0.5, yy, "+");
+        } else if (r == 4) {
+            draw_set_color(selected_row ? c_black : c_white);
+            draw_rectangle(value_x - 1, yy - 2, plus_x + btn_w + 1, yy + btn_h + 1, true);
+            draw_text(value_x + (plus_x + btn_w - value_x - string_width(value)) * 0.5, yy, value);
+        }
     }
-    draw_text(sbx, sby, "Back");
 }

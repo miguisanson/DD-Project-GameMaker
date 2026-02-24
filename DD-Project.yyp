@@ -190,6 +190,7 @@
     {"id":{"name":"final_boss_spawn","path":"sounds/final_boss_spawn/final_boss_spawn.yy",},},
     {"id":{"name":"fireball","path":"sounds/fireball/fireball.yy",},},
     {"id":{"name":"foresight","path":"sounds/foresight/foresight.yy",},},
+    {"id":{"name":"forest_bgm__for_everymap_with_trees","path":"sounds/forest_bgm__for_everymap_with_trees/forest_bgm__for_everymap_with_trees.yy",},},
     {"id":{"name":"ghost_sword_attack","path":"sounds/ghost_sword_attack/ghost_sword_attack.yy",},},
     {"id":{"name":"ghost_sword_spawn","path":"sounds/ghost_sword_spawn/ghost_sword_spawn.yy",},},
     {"id":{"name":"GooeySlime___Sound_Effect","path":"sounds/GooeySlime___Sound_Effect/GooeySlime___Sound_Effect.yy",},},

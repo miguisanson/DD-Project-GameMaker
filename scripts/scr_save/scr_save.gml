@@ -13,6 +13,51 @@ function Array_ToDSList(_arr) {
     return list;
 }
 
+function Save_ToReal(_value, _fallback) {
+    if (is_real(_value)) return _value;
+    if (is_string(_value)) return real(_value);
+    if (_value == true) return 1;
+    if (_value == false) return 0;
+    return _fallback;
+}
+
+function Save_LoadSlotStat(_slot) {
+    var path = Save_Path(_slot);
+    if (!file_exists(path)) return undefined;
+
+    var buf = buffer_load(path);
+    var json = buffer_read(buf, buffer_string);
+    buffer_delete(buf);
+
+    var snap = json_parse(json);
+    if (variable_struct_exists(snap, "statData")) return snap.statData;
+    return snap;
+}
+
+function Save_LoadLatestSettings() {
+    var best_settings = undefined;
+    var best_stamp = -1;
+
+    for (var slot = 1; slot <= 3; slot++) {
+        var stat = Save_LoadSlotStat(slot);
+        if (!is_struct(stat)) continue;
+        if (!variable_struct_exists(stat, "settings")) continue;
+        if (!is_struct(stat.settings)) continue;
+
+        var stamp = slot;
+        if (variable_struct_exists(stat, "saved_at")) {
+            stamp = Save_ToReal(stat.saved_at, slot);
+        }
+
+        if (is_undefined(best_settings) || stamp >= best_stamp) {
+            best_settings = stat.settings;
+            best_stamp = stamp;
+        }
+    }
+
+    return best_settings;
+}
+
 function Save_IsBossEnemyId(_enemy_id) {
     return (_enemy_id == ENEMY_MINI_BOSS || _enemy_id == ENEMY_FINAL_BOSS);
 }
@@ -84,6 +129,8 @@ function Save_BuildSnapshot() {
     stat.uid_counter = gs.uid_counter;
     stat.enemy_reset_version = gs.enemy_reset_version;
     stat.save_slot = gs.save_slot;
+    stat.settings = GameSettings_Normalize(gs.settings);
+    stat.saved_at = date_current_datetime();
 
     var boss_flags = Save_DeriveBossFlagsFromPersist(gs.persist);
     if (variable_struct_exists(gs, "boss_defeated") && is_struct(gs.boss_defeated)) {
@@ -149,6 +196,9 @@ function Save_ApplySnapshot(_snap) {
 
     if (variable_struct_exists(stat, "enemy_reset_version")) gs.enemy_reset_version = stat.enemy_reset_version; else gs.enemy_reset_version = 0;
     if (variable_struct_exists(stat, "save_slot")) gs.save_slot = stat.save_slot; else gs.save_slot = 0;
+    if (variable_struct_exists(stat, "settings") && is_struct(stat.settings)) {
+        gs.settings = GameSettings_Normalize(stat.settings);
+    }
 
     var room_name = "";
     if (variable_struct_exists(stat, "save_room_name")) room_name = stat.save_room_name;
@@ -169,6 +219,7 @@ function Save_ApplySnapshot(_snap) {
     global.levelData = gs.persist;
 
     GameState_SyncLegacy();
+    GameSettings_ApplyAll();
 
     gs.skip_room_save = true;
     global.skipRoomSave = true;

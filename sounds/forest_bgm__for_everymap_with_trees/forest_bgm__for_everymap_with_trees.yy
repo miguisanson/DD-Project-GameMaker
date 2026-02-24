@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"forest_bgm__for_everymap_with_trees",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":60.0,
+  "exportDir":"",
+  "name":"forest_bgm__for_everymap_with_trees",
+  "parent":{
+    "name":"BGM",
+    "path":"folders/Sounds/BGM.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"forest_bgm__for_everymap_with_trees.ogg",
+  "volume":1.0,
+}
