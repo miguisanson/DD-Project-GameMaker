@@ -12,6 +12,9 @@ GameState_SetBattleReturn(room, other.x, other.y, -1);
 // remember enemy instance + type
 GameState_SetBattleEnemy(persist_id, enemy_id);
 
+// monster encounter sound
+SFX_PlayEnemySpawn(enemy_id);
+
 // tell player to reposition after return
 GameState_SetJustReturned(true);
 

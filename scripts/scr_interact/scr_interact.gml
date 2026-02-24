@@ -117,6 +117,18 @@ function Interact_Handle(_inst) {
             _inst.swapped = true;
             RoomState_SaveInstance(_inst, ["swapped","sprite_index"], false);
 
+            // World interaction SFX
+            var is_barrel = (_inst.object_index == obj_barrel) || object_is_ancestor(_inst.object_index, obj_barrel);
+            var is_chest = (_inst.object_index == obj_chest) || object_is_ancestor(_inst.object_index, obj_chest);
+            var is_torch_like = (_inst.object_index == obj_torch) || (_inst.object_index == obj_fire_stand);
+            if (is_barrel) {
+                SFX_Play("barrel_break");
+            } else if (is_chest) {
+                SFX_Play("chest_open");
+            } else if (is_torch_like) {
+                SFX_Play("kill_torch");
+            }
+
             if (is_container) {
                 // shared loot system (container)
                 var lvl = 1;

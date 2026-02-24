@@ -8,10 +8,17 @@ var k_ok = Input_Pressed("confirm");
 var k_back = Input_Pressed("cancel");
 
 if (state == "main") {
-    if (k_up) main_index = (main_index + array_length(main_options) - 1) mod array_length(main_options);
-    if (k_down) main_index = (main_index + 1) mod array_length(main_options);
+    if (k_up) {
+        main_index = (main_index + array_length(main_options) - 1) mod array_length(main_options);
+        SFX_PlayUI("ui_move");
+    }
+    if (k_down) {
+        main_index = (main_index + 1) mod array_length(main_options);
+        SFX_PlayUI("ui_move");
+    }
 
     if (k_ok) {
+        SFX_PlayUI("ui_confirm");
         var opt = main_options[main_index];
         if (opt == "New Game") {
             state = "class";
@@ -28,15 +35,23 @@ if (state == "main") {
 
 if (state == "class") {
     var total = array_length(choices) + 1; // +1 for Back
-    if (k_up) class_index = (class_index + total - 1) mod total;
-    if (k_down) class_index = (class_index + 1) mod total;
+    if (k_up) {
+        class_index = (class_index + total - 1) mod total;
+        SFX_PlayUI("ui_move");
+    }
+    if (k_down) {
+        class_index = (class_index + 1) mod total;
+        SFX_PlayUI("ui_move");
+    }
 
     if (k_back) {
+        SFX_PlayUI("ui_back");
         state = "main";
         return;
     }
 
     if (k_ok) {
+        SFX_PlayUI("ui_confirm");
         if (class_index == array_length(choices)) {
             state = "main";
             return;
@@ -63,8 +78,12 @@ if (state == "class") {
 }
 
 if (state == "settings") {
-    if (k_up || k_down) settings_index = 0;
+    if (k_up || k_down) {
+        settings_index = 0;
+        SFX_PlayUI("ui_move");
+    }
     if (k_back || k_ok) {
+        if (k_back) SFX_PlayUI("ui_back"); else SFX_PlayUI("ui_confirm");
         state = "main";
     }
     return;

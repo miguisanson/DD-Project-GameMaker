@@ -78,6 +78,7 @@ function Dialogue_Start(_npc_id) {
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.just_opened = true;
     gs.ui.confirm_action = "confirm";
+    SFX_Play("dialogue_open");
 }
 
 function Dialogue_StartLines(_lines) {
@@ -90,6 +91,7 @@ function Dialogue_StartLines(_lines) {
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.just_opened = true;
     gs.ui.confirm_action = "confirm";
+    SFX_Play("dialogue_open");
 }
 
 function Dialogue_FormatLines(_lines, _vars) {
@@ -124,6 +126,7 @@ function Dialogue_StartWithSpeaker(_speaker, _lines) {
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.just_opened = true;
     gs.ui.confirm_action = "confirm";
+    SFX_Play("dialogue_open");
 }
 
 function Dialogue_StartLinesWithSpeaker(_speaker, _lines) {
@@ -136,11 +139,14 @@ function Dialogue_Advance() {
     gs.ui.just_opened = false;
     gs.ui.index += 1;
     if (gs.ui.index >= array_length(gs.ui.lines)) {
+        SFX_Play("dialogue_close");
         gs.ui.mode = UI_NONE;
         gs.ui.lines = [];
         gs.ui.index = 0;
         gs.ui.speaker = "";
         gs.ui.confirm_action = "";
         if (variable_struct_exists(gs.ui, "lock_actions")) gs.ui.lock_actions = 2;
+    } else {
+        SFX_Play("dialogue_advance");
     }
 }

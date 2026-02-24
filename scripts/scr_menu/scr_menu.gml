@@ -31,6 +31,7 @@ function Menu_Ensure() {
 function Menu_Open() {
     Menu_Ensure();
     var gs = GameState_Get();
+    SFX_PlayUI("ui_openclose");
     gs.ui.mode = UI_MENU;
     gs.ui.menu.open = true;
     gs.ui.menu.header_focus = true;
@@ -44,6 +45,7 @@ function Menu_Close() {
     Menu_Ensure();
     var gs = GameState_Get();
     Menu_StatsDiscard();
+    SFX_PlayUI("ui_openclose");
     gs.ui.mode = UI_NONE;
     gs.ui.menu.open = false;
 }
@@ -158,6 +160,7 @@ function Menu_HandleInput() {
     var k_back = Input_Pressed("cancel");
 
     if (k_back) {
+        SFX_PlayUI("ui_back");
         if (m.tab == 2 && m.stats_focus) {
             m.stats_focus = false;
             m.header_focus = true;
@@ -171,10 +174,12 @@ function Menu_HandleInput() {
         if (k_left) {
             m.tab = (m.tab + array_length(m.tabs) - 1) mod array_length(m.tabs);
             if (m.tab == 2) Menu_StatsSync();
+            SFX_PlayUI("ui_move");
         }
         if (k_right) {
             m.tab = (m.tab + 1) mod array_length(m.tabs);
             if (m.tab == 2) Menu_StatsSync();
+            SFX_PlayUI("ui_move");
         }
         if (nav_down) {
             m.header_focus = false;
@@ -182,6 +187,7 @@ function Menu_HandleInput() {
                 if (!is_struct(m.pending_stats)) Menu_StatsSync();
                 m.stats_focus = true;
             }
+            SFX_PlayUI("ui_move");
         }
         return;
     }
@@ -193,20 +199,28 @@ function Menu_HandleInput() {
         var items = is_array(ch.inventory) ? ch.inventory : [];
         var count = array_length(items);
         if (count <= 0) {
-            if (nav_up) m.header_focus = true;
+            if (nav_up) {
+                m.header_focus = true;
+                SFX_PlayUI("ui_move");
+            }
             return;
         }
         if (nav_up) {
             if (m.inv_index > 0) {
                 m.inv_index -= 1;
+                SFX_PlayUI("ui_move");
             } else {
                 m.header_focus = true;
                 m.repeat_dir = 0;
+                SFX_PlayUI("ui_move");
                 return;
             }
         }
         if (nav_down) {
-            if (m.inv_index < count - 1) m.inv_index += 1;
+            if (m.inv_index < count - 1) {
+                m.inv_index += 1;
+                SFX_PlayUI("ui_move");
+            }
         }
 
         if (m.inv_index < m.inv_scroll) m.inv_scroll = m.inv_index;
@@ -217,20 +231,28 @@ function Menu_HandleInput() {
         var skills = is_array(ch.skills) ? ch.skills : [];
         var scount = array_length(skills);
         if (scount <= 0) {
-            if (nav_up) m.header_focus = true;
+            if (nav_up) {
+                m.header_focus = true;
+                SFX_PlayUI("ui_move");
+            }
             return;
         }
         if (nav_up) {
             if (m.skill_index > 0) {
                 m.skill_index -= 1;
+                SFX_PlayUI("ui_move");
             } else {
                 m.header_focus = true;
                 m.repeat_dir = 0;
+                SFX_PlayUI("ui_move");
                 return;
             }
         }
         if (nav_down) {
-            if (m.skill_index < scount - 1) m.skill_index += 1;
+            if (m.skill_index < scount - 1) {
+                m.skill_index += 1;
+                SFX_PlayUI("ui_move");
+            }
         }
 
         if (m.skill_index < m.skill_scroll) m.skill_scroll = m.skill_index;
@@ -254,6 +276,8 @@ function Menu_HandleInput() {
                 m.stats_focus = true;
                 m.stats_row = 0;
                 m.stats_col = 1;
+                if (k_ok) SFX_PlayUI("ui_confirm");
+                else SFX_PlayUI("ui_move");
             }
             return;
         }
@@ -261,26 +285,41 @@ function Menu_HandleInput() {
         if (nav_up) {
             if (m.stats_row > 0) {
                 m.stats_row -= 1;
+                SFX_PlayUI("ui_move");
             } else {
                 m.stats_focus = false;
                 m.header_focus = true;
                 m.repeat_dir = 0;
+                SFX_PlayUI("ui_move");
                 return;
             }
         }
 
         if (nav_down) {
-            if (m.stats_row < row_count - 1) m.stats_row += 1;
+            if (m.stats_row < row_count - 1) {
+                m.stats_row += 1;
+                SFX_PlayUI("ui_move");
+            }
         }
 
         if (m.stats_row < stat_count) {
-            if (k_left)  m.stats_col = 0;
-            if (k_right) m.stats_col = 1;
+            if (k_left && m.stats_col != 0) {
+                m.stats_col = 0;
+                SFX_PlayUI("ui_move");
+            }
+            if (k_right && m.stats_col != 1) {
+                m.stats_col = 1;
+                SFX_PlayUI("ui_move");
+            }
         } else {
-            if (k_left || k_right) m.stats_col = 1 - m.stats_col;
+            if (k_left || k_right) {
+                m.stats_col = 1 - m.stats_col;
+                SFX_PlayUI("ui_move");
+            }
         }
 
         if (k_ok) {
+            SFX_PlayUI("ui_confirm");
             if (m.stats_row < stat_count) {
                 var key = stat_keys[m.stats_row];
                 var base_v = variable_struct_get(m.base_stats, key);
@@ -604,6 +643,7 @@ function PauseMenu_Ensure() {
 function PauseMenu_Open() {
     PauseMenu_Ensure();
     var gs = GameState_Get();
+    SFX_PlayUI("ui_openclose");
     gs.ui.mode = UI_PAUSE;
     var pm = gs.ui.pause_menu;
     pm.open = true;
@@ -616,6 +656,7 @@ function PauseMenu_Open() {
 function PauseMenu_Close() {
     PauseMenu_Ensure();
     var gs = GameState_Get();
+    SFX_PlayUI("ui_openclose");
     gs.ui.pause_menu.open = false;
     gs.ui.mode = UI_NONE;
 }
@@ -686,15 +727,19 @@ function PauseMenu_HandleInput() {
     var k_back = Input_Pressed("cancel");
 
     if (k_back) {
+        SFX_PlayUI("ui_back");
         PauseMenu_Close();
         return;
     }
 
     var count = array_length(pm.options);
+    var prev_idx = pm.index;
     if (nav_up && pm.index > 0) pm.index -= 1;
     if (nav_down && pm.index < count - 1) pm.index += 1;
+    if (pm.index != prev_idx) SFX_PlayUI("ui_move");
 
     if (k_ok) {
+        SFX_PlayUI("ui_confirm");
         if (pm.index == 0) {
             PauseMenu_Close();
             return;

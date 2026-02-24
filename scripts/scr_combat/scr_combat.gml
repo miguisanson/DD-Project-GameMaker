@@ -222,6 +222,9 @@ function Battle_PlayerAttack(_bc) {
     }
 
     Combat_Log("Player attacked.");
+    var player_class_id = -1;
+    if (variable_struct_exists(p, "class_id")) player_class_id = p.class_id;
+    SFX_PlayClassAttack(player_class_id);
     var w = _bc.player_weapon;
     if (!is_struct(w) || !variable_struct_exists(w, "power")) {
         var wid = p.equip.weapon;
@@ -250,6 +253,7 @@ function Battle_PlayerAttack(_bc) {
     if (Battle_CheckEnd(_bc, p, e)) return;
 
     if (!_bc.last_hit) {
+        SFX_PlayMissOrBlocked(false, -1);
         Battle_Message(_bc, "You missed!", BSTATE_ENEMY_ACT);
     } else if (_bc.last_crit) {
         if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
@@ -290,6 +294,7 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     if (res.ok) {
         _bc.skill_banner_active = true;
         _bc.skill_banner_name = skill.name;
+        SFX_PlaySkill(_skill_id);
     }
 
     var fx = noone;
@@ -321,6 +326,7 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     if (res.msg != "") {
         Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT, fx);
     } else if (!res.hit) {
+        SFX_PlayMissOrBlocked(false, -1);
         Battle_Message(_bc, "Skill missed!", BSTATE_ENEMY_ACT, fx);
     } else if (res.crit) {
         Battle_Message(_bc, "Critical skill! " + string(res.dmg) + " dmg!", BSTATE_ENEMY_ACT, fx);
@@ -461,6 +467,8 @@ function Battle_EnemyAct(_bc) {
         if (res.ok) {
             _bc.skill_banner_active = true;
             _bc.skill_banner_name = sk.name;
+            SFX_PlayEnemySpecial(e.id);
+            SFX_PlaySkill(skill_id);
         }
         var fx2 = noone;
         if (res.ok && res.fx_sprite != noone && (sk.effect != "damage" || res.hit)) {
@@ -483,6 +491,9 @@ function Battle_EnemyAct(_bc) {
         if (res.msg != "") {
             Battle_Message(_bc, e.name + ": " + res.msg, BSTATE_MENU, fx2);
         } else if (!res.hit) {
+            var miss_class_id = -1;
+            if (variable_struct_exists(p, "class_id")) miss_class_id = p.class_id;
+            SFX_PlayMissOrBlocked(true, miss_class_id);
             Battle_Message(_bc, e.name + " missed!", BSTATE_MENU, fx2);
         } else if (res.crit) {
             if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
@@ -518,6 +529,9 @@ function Battle_EnemyAct(_bc) {
         if (Battle_CheckEnd(_bc, p, e)) return;
 
         if (!_bc.last_hit) {
+            var miss_class_id2 = -1;
+            if (variable_struct_exists(p, "class_id")) miss_class_id2 = p.class_id;
+            SFX_PlayMissOrBlocked(true, miss_class_id2);
             Battle_Message(_bc, e.name + " missed!", BSTATE_MENU);
         } else if (_bc.last_crit) {
             if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);

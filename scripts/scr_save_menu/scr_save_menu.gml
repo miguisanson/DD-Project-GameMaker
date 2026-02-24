@@ -7,6 +7,7 @@ function SaveMenu_Log(_msg) {
 function SaveMenu_Open(_mode, _context) {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    SFX_PlayUI("ui_openclose");
     gs.ui.mode = UI_SAVE;
     gs.ui.save_menu = {
         open: true,
@@ -28,6 +29,7 @@ function SaveMenu_Close() {
     if (variable_struct_exists(gs, "ui") && variable_struct_exists(gs.ui, "save_menu")) {
         gs.ui.save_menu.open = false;
     }
+    SFX_PlayUI("ui_openclose");
     gs.ui.mode = UI_NONE;
 }
 
@@ -53,6 +55,7 @@ function SaveMenu_Handle() {
     if (sm.confirm) {
         if (sm.confirm_mode == "saved") {
             if (k_ok || k_back) {
+                SFX_PlayUI("ui_confirm");
                 sm.confirm = false;
                 SaveMenu_Close();
             }
@@ -60,16 +63,27 @@ function SaveMenu_Handle() {
             return;
         }
 
-        if (k_left || k_right) sm.confirm_choice = 1 - sm.confirm_choice;
-        if (k_back) { sm.confirm = false; gs.ui.save_menu = sm; return; }
+        if (k_left || k_right) {
+            sm.confirm_choice = 1 - sm.confirm_choice;
+            SFX_PlayUI("ui_move");
+        }
+        if (k_back) {
+            SFX_PlayUI("ui_back");
+            sm.confirm = false;
+            gs.ui.save_menu = sm;
+            return;
+        }
         if (k_ok) {
+            SFX_PlayUI("ui_confirm");
             if (sm.confirm_choice == 0) {
                 if (sm.confirm_mode == "delete") {
                     SaveMenu_Log("delete slot " + string(sm.slot + 1));
-                Save_Delete(sm.slot + 1);
+                    Save_Delete(sm.slot + 1);
+                    SFX_Play("delete_confirm");
                 } else if (sm.confirm_mode == "overwrite") {
                     SaveMenu_Log("overwrite confirmed slot " + string(sm.slot + 1));
                     Save_Write(sm.slot + 1);
+                    SFX_Play("save_confirm");
                     gs.save_slot = sm.slot + 1;
                     if (sm.context == "bed") Enemy_ResetAll();
                     sm.message = "Game saved.";
@@ -80,6 +94,7 @@ function SaveMenu_Handle() {
                 } else if (sm.confirm_mode == "save") {
                     SaveMenu_Log("save confirmed slot " + string(sm.slot + 1));
                     Save_Write(sm.slot + 1);
+                    SFX_Play("save_confirm");
                     gs.save_slot = sm.slot + 1;
                     if (sm.context == "bed") Enemy_ResetAll();
                     sm.message = "Game saved.";
@@ -95,6 +110,8 @@ function SaveMenu_Handle() {
         return;
     }
 
+    var prev_slot = sm.slot;
+    var prev_col = sm.col;
     if (k_up) sm.slot = (sm.slot + 4 - 1) mod 4;
     if (k_down) sm.slot = (sm.slot + 1) mod 4;
 
@@ -104,14 +121,17 @@ function SaveMenu_Handle() {
     } else {
         sm.col = 0;
     }
+    if (sm.slot != prev_slot || sm.col != prev_col) SFX_PlayUI("ui_move");
 
     if (k_back) {
+        SFX_PlayUI("ui_back");
         SaveMenu_Close();
         return;
     }
 
     if (k_ok) {
         if (sm.slot == 3) {
+            SFX_PlayUI("ui_back");
             SaveMenu_Close();
             return;
         }
@@ -119,10 +139,12 @@ function SaveMenu_Handle() {
         if (sm.mode == "load") {
             if (sm.col == 0) {
                 if (Save_Read(slot)) {
+                    SFX_Play("load_confirm");
                     gs.save_slot = slot;
                     SaveMenu_Close();
                 }
             } else {
+                SFX_PlayUI("ui_confirm");
                 sm.confirm = true;
                 sm.confirm_mode = "delete";
                 sm.confirm_choice = 1; // default to Cancel
@@ -131,11 +153,13 @@ function SaveMenu_Handle() {
         } else {
             var info = Save_SlotInfo(slot);
             if (info.exists) {
+                SFX_PlayUI("ui_confirm");
                 sm.confirm = true;
                 sm.confirm_mode = "overwrite";
                 sm.confirm_choice = 1; // default to Cancel
                 SaveMenu_Log("overwrite confirm open slot " + string(slot));
             } else {
+                SFX_PlayUI("ui_confirm");
                 sm.confirm = true;
                 sm.confirm_mode = "save";
                 sm.confirm_choice = 1; // default Cancel
