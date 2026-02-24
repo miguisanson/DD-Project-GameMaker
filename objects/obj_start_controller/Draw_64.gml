@@ -154,15 +154,26 @@ if (state == "settings") {
         }
 
         if (selected_row) {
-            draw_set_color(c_white);
-            draw_rectangle(sx + 8, yy - 3, sx + sw - 8, yy + line_h + 5, false);
-            draw_set_color(c_black);
-            draw_rectangle(sx + 8, yy - 3, sx + sw - 8, yy + line_h + 5, true);
+            if (r == 5 || r == 6) {
+                var row_x = sx + 16;
+                var row_w = string_width(label) + 8;
+                draw_set_color(c_white);
+                draw_rectangle(row_x - 4, yy - 3, row_x + row_w, yy + line_h + 5, false);
+                draw_set_color(c_black);
+                draw_rectangle(row_x - 4, yy - 3, row_x + row_w, yy + line_h + 5, true);
+            } else {
+                draw_set_color(c_white);
+                draw_rectangle(sx + 8, yy - 3, sx + sw - 8, yy + line_h + 5, false);
+                draw_set_color(c_black);
+                draw_rectangle(sx + 8, yy - 3, sx + sw - 8, yy + line_h + 5, true);
+            }
         }
 
         draw_set_color(selected_row ? c_black : c_white);
         draw_text(sx + 16, yy, label);
         if (value != "") {
+            if (r == 5) draw_set_color(c_white);
+            else draw_set_color(selected_row ? c_black : c_white);
             draw_set_halign(fa_right);
             draw_text(sx + sw - 16, yy, value);
             draw_set_halign(fa_left);

@@ -76,16 +76,49 @@ if (room != last_room_id) {
 // Guard against any room/view/window overrides: keep display state aligned to settings.
 var ds = GameSettings_Ensure();
 var needs_display_apply = false;
-if (window_get_fullscreen() != ds.fullscreen) {
+var actual_full = window_get_fullscreen();
+var base_w = DISPLAY_BASE_W;
+var base_h = DISPLAY_BASE_H;
+
+if (actual_full != ds.fullscreen) {
     needs_display_apply = true;
-} else if (!ds.fullscreen) {
-    var exp_w = DISPLAY_BASE_W * ds.display_scale;
-    var exp_h = DISPLAY_BASE_H * ds.display_scale;
+}
+
+if (!actual_full) {
+    var exp_w = base_w * ds.display_scale;
+    var exp_h = base_h * ds.display_scale;
     if (window_get_width() != exp_w || window_get_height() != exp_h) {
         needs_display_apply = true;
     }
 }
-if (view_wview[0] != DISPLAY_BASE_W || view_hview[0] != DISPLAY_BASE_H) {
+
+var target_w = actual_full ? max(1, display_get_width()) : max(1, window_get_width());
+var target_h = actual_full ? max(1, display_get_height()) : max(1, window_get_height());
+var used_scale = ds.display_scale;
+if (actual_full) {
+    var fit_scale = min(target_w / base_w, target_h / base_h);
+    if (fit_scale < 0.01) fit_scale = 0.01;
+    var fit_int = floor(fit_scale);
+    if (fit_int >= 1 && abs(fit_scale - fit_int) < 0.0001) {
+        used_scale = fit_int;
+    } else {
+        used_scale = fit_scale;
+    }
+}
+var exp_port_w = max(1, round(base_w * used_scale));
+var exp_port_h = max(1, round(base_h * used_scale));
+if (exp_port_w > target_w) exp_port_w = target_w;
+if (exp_port_h > target_h) exp_port_h = target_h;
+var exp_port_x = floor((target_w - exp_port_w) * 0.5);
+var exp_port_y = floor((target_h - exp_port_h) * 0.5);
+
+if (view_wview[0] != base_w || view_hview[0] != base_h) {
+    needs_display_apply = true;
+}
+if (view_xport[0] != exp_port_x || view_yport[0] != exp_port_y) {
+    needs_display_apply = true;
+}
+if (view_wport[0] != exp_port_w || view_hport[0] != exp_port_h) {
     needs_display_apply = true;
 }
 if (needs_display_apply) {

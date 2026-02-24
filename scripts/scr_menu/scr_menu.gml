@@ -115,8 +115,8 @@ function Menu_StatsApply() {
     Menu_StatsSync();
 }
 
-function Menu_NavRepeat(_action) {
-    return Input_UIRepeat(_action);
+function Menu_NavPressed(_action) {
+    return Input_UIPressed(_action);
 }
 
 function Menu_HandleInput() {
@@ -124,10 +124,10 @@ function Menu_HandleInput() {
     var m = gs.ui.menu;
     var ch = gs.player_ch;
 
-    var nav_up = Menu_NavRepeat("menu_up");
-    var nav_down = Menu_NavRepeat("menu_down");
-    var k_left = Input_UIRepeat("menu_left");
-    var k_right = Input_UIRepeat("menu_right");
+    var nav_up = Menu_NavPressed("menu_up");
+    var nav_down = Menu_NavPressed("menu_down");
+    var k_left = Input_UIPressed("menu_left");
+    var k_right = Input_UIPressed("menu_right");
     var k_ok = Input_UIConfirm();
     var k_back = Input_UIBack();
 
@@ -651,8 +651,8 @@ function PauseMenu_IsOpen() {
     return gs.ui.mode == UI_PAUSE;
 }
 
-function PauseMenu_NavRepeat(_action) {
-    return Input_UIRepeat(_action);
+function PauseMenu_NavPressed(_action) {
+    return Input_UIPressed(_action);
 }
 
 function PauseMenu_HandleInput() {
@@ -661,8 +661,8 @@ function PauseMenu_HandleInput() {
     var pm = gs.ui.pause_menu;
     if (!pm.open) return;
 
-    var nav_up = PauseMenu_NavRepeat("menu_up");
-    var nav_down = PauseMenu_NavRepeat("menu_down");
+    var nav_up = PauseMenu_NavPressed("menu_up");
+    var nav_down = PauseMenu_NavPressed("menu_down");
     var k_ok = Input_UIConfirm();
     var k_back = Input_UIBack();
 

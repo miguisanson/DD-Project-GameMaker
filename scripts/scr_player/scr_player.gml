@@ -192,34 +192,55 @@ function GameSettings_ApplyDisplay() {
     var is_fullscreen = settings.fullscreen;
     settings.fullscreen = is_fullscreen;
 
-    var target_w = 0;
-    var target_h = 0;
+    // This project does not use a manual application surface pipeline.
+    application_surface_draw_enable(true);
 
-    // Force the requested fullscreen state (avoid stale state checks).
-    window_set_fullscreen(is_fullscreen);
+    if (window_get_fullscreen() != is_fullscreen) {
+        window_set_fullscreen(is_fullscreen);
+    }
 
-    if (is_fullscreen) {
-        target_w = max(1, display_get_width());
-        target_h = max(1, display_get_height());
-    } else {
+    // Use the runtime fullscreen state after toggling. If OS switching is delayed by a frame,
+    // this prevents applying fullscreen viewport math to a windowed backbuffer (clipping).
+    var actual_fullscreen = window_get_fullscreen();
+
+    if (!actual_fullscreen) {
         var win_w = base_w * scale_fixed;
         var win_h = base_h * scale_fixed;
         if (window_get_width() != win_w || window_get_height() != win_h) {
             window_set_size(win_w, win_h);
             window_center();
         }
+    }
+
+    var target_w = 0;
+    var target_h = 0;
+    if (actual_fullscreen) {
+        target_w = max(1, display_get_width());
+        target_h = max(1, display_get_height());
+    } else {
         target_w = max(1, window_get_width());
         target_h = max(1, window_get_height());
     }
 
     var used_scale = scale_fixed;
-    if (is_fullscreen) {
-        used_scale = floor(min(target_w / base_w, target_h / base_h));
-        if (used_scale < 1) used_scale = 1;
+    if (actual_fullscreen) {
+        // Fullscreen letterbox fit: always show whole scene, preserve aspect ratio.
+        var fit_scale = min(target_w / base_w, target_h / base_h);
+        if (fit_scale < 0.01) fit_scale = 0.01;
+
+        // Keep integer scale when it exactly fits; otherwise use full-fit scale to maximize visibility.
+        var fit_int = floor(fit_scale);
+        if (fit_int >= 1 && abs(fit_scale - fit_int) < 0.0001) {
+            used_scale = fit_int;
+        } else {
+            used_scale = fit_scale;
+        }
     }
 
-    var port_w = max(1, floor(base_w * used_scale));
-    var port_h = max(1, floor(base_h * used_scale));
+    var port_w = max(1, round(base_w * used_scale));
+    var port_h = max(1, round(base_h * used_scale));
+    if (port_w > target_w) port_w = target_w;
+    if (port_h > target_h) port_h = target_h;
     var port_x = 0;
     var port_y = 0;
     port_x = floor((target_w - port_w) * 0.5);

@@ -3,10 +3,10 @@ var gs = GameState_Get();
 
 if (gs.ui.mode == UI_SAVE) exit;
 
-var k_up = Input_UIRepeat("menu_up");
-var k_down = Input_UIRepeat("menu_down");
-var k_left = Input_UIRepeat("menu_left");
-var k_right = Input_UIRepeat("menu_right");
+var k_up = Input_UIPressed("menu_up");
+var k_down = Input_UIPressed("menu_down");
+var k_left = Input_UIPressed("menu_left");
+var k_right = Input_UIPressed("menu_right");
 var k_ok = Input_UIConfirm();
 var k_back = Input_UIBack();
 
