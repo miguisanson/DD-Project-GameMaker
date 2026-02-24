@@ -182,11 +182,37 @@ function SaveMenu_Draw() {
     var w = display_get_gui_width();
     var h = display_get_gui_height();
     var line_h = string_height("A");
-    var bw = w * 0.7;
+    var pad = 6;
+    var side_margin = 12;
+    var slot_text_left_pad = 14;
+
+    var title = (sm.mode == "load") ? "Load Game" : "Save Game";
+
+    var slot_labels = array_create(3, "");
+    var longest_slot_w = 0;
+    for (var li = 0; li < 3; li++) {
+        var info_l = Save_SlotInfo(li + 1);
+        var label_l = "Slot " + string(li + 1);
+        if (info_l.exists) {
+            label_l += "  " + info_l.class_name + " Lv" + string(info_l.level) + "  " + info_l.room;
+        }
+        slot_labels[li] = label_l;
+        longest_slot_w = max(longest_slot_w, string_width(label_l));
+    }
+
+    var delete_label = "Delete";
+    var delete_pad_x = 8;
+    var delete_text_w = string_width(delete_label);
+    var delete_btn_w = delete_text_w + delete_pad_x * 2;
+    var slot_delete_gap = 6;
+
+    var min_content_w = slot_text_left_pad + longest_slot_w + side_margin;
+    if (sm.mode == "load") min_content_w += slot_delete_gap + delete_btn_w + side_margin;
+
+    var bw = min(max(w * 0.7, min_content_w + 20), w - 24);
     var bh = h * 0.6;
     var bx = (w - bw) * 0.5;
     var by = (h - bh) * 0.5;
-    var pad = 6;
 
     draw_set_alpha(0.85);
     draw_set_color(c_black);
@@ -195,28 +221,27 @@ function SaveMenu_Draw() {
     draw_set_color(c_white);
     draw_rectangle(bx, by, bx + bw, by + bh, true);
 
-    var title = (sm.mode == "load") ? "Load Game" : "Save Game";
     draw_set_color(c_white);
     draw_text(bx + 12, by + 10, title);
 
     var row_h = max(22, line_h + 8);
     var row_y = by + 36;
-    var delete_label = "Delete";
-    var delete_pad_x = 8;
-    var delete_text_w = string_width(delete_label);
-    var delete_btn_w = delete_text_w + delete_pad_x * 2;
-    var delete_right_margin = 12;
-    var delete_right = bx + bw - delete_right_margin;
+    var delete_right = bx + bw - side_margin;
     var delete_left = delete_right - delete_btn_w;
     var delete_text_x = delete_left + delete_pad_x;
-    var slot_select_right = (sm.mode == "load") ? (delete_left - 10) : (bx + bw - 90);
+    var slot_select_right = (sm.mode == "load") ? (delete_left - slot_delete_gap) : (bx + bw - side_margin);
     slot_select_right = max(bx + 40, slot_select_right);
+    var slot_text_x = bx + slot_text_left_pad;
+    var slot_text_max_w = max(24, slot_select_right - slot_text_x - 4);
     for (var i = 0; i < 3; i++) {
-        var info = Save_SlotInfo(i + 1);
         var yy = row_y + i * row_h;
-        var label = "Slot " + string(i + 1);
-        if (info.exists) {
-            label += "  " + info.class_name + " Lv" + string(info.level) + "  " + info.room;
+        var label = slot_labels[i];
+        var draw_label = label;
+        if (string_width(draw_label) > slot_text_max_w) {
+            while (string_length(draw_label) > 0 && string_width(draw_label + "...") > slot_text_max_w) {
+                draw_label = string_delete(draw_label, string_length(draw_label), 1);
+            }
+            draw_label += "...";
         }
 
         if (i == sm.slot && sm.col == 0 && !sm.confirm) {
@@ -228,7 +253,7 @@ function SaveMenu_Draw() {
         } else {
             draw_set_color(c_white);
         }
-        draw_text(bx + 14, yy, label);
+        draw_text(slot_text_x, yy, draw_label);
 
         if (sm.mode == "load") {
             if (i == sm.slot && sm.col == 1 && !sm.confirm) {
@@ -262,48 +287,86 @@ function SaveMenu_Draw() {
     if (sm.confirm) {
         var cx = bx + bw * 0.5;
         var cy = by + bh * 0.7;
-        draw_set_alpha(0.85);
-        draw_set_color(c_black);
-        draw_rectangle(cx - 80, cy - 22, cx + 80, cy + 22, false);
-        draw_set_alpha(1);
-        draw_set_color(c_white);
-        draw_rectangle(cx - 80, cy - 22, cx + 80, cy + 22, true);
-        draw_set_color(c_white);
-
         var msg = "";
         if (sm.confirm_mode == "delete") msg = "Delete slot?";
         else if (sm.confirm_mode == "overwrite") msg = "Overwrite save?";
         else if (sm.confirm_mode == "save") msg = "Save to slot?";
         else msg = sm.message;
-        draw_text(cx - 70, cy - 12, msg);
+
+        var popup_pad_x = 12;
+        var popup_pad_y = 8;
+        var popup_gap_y = 8;
+        var btn_pad_x = 8;
+        var btn_h = line_h + 4;
+        var msg_w = string_width(msg);
+
+        var buttons_w = 0;
+        if (sm.confirm_mode != "saved") {
+            buttons_w = (string_width("OK") + btn_pad_x * 2) + 14 + (string_width("Cancel") + btn_pad_x * 2);
+        } else {
+            buttons_w = string_width("OK") + btn_pad_x * 2;
+        }
+
+        var popup_w = max(160, max(msg_w + popup_pad_x * 2, buttons_w + popup_pad_x * 2));
+        var popup_h = popup_pad_y + line_h + popup_gap_y + btn_h + popup_pad_y;
+        var px1 = cx - popup_w * 0.5;
+        var py1 = cy - popup_h * 0.5;
+        var px2 = px1 + popup_w;
+        var py2 = py1 + popup_h;
+
+        draw_set_alpha(0.85);
+        draw_set_color(c_black);
+        draw_rectangle(px1, py1, px2, py2, false);
+        draw_set_alpha(1);
+        draw_set_color(c_white);
+        draw_rectangle(px1, py1, px2, py2, true);
+        draw_set_color(c_white);
+
+        var msg_x = px1 + (popup_w - msg_w) * 0.5;
+        var msg_y = py1 + popup_pad_y;
+        draw_text(msg_x, msg_y, msg);
+        var btn_y = msg_y + line_h + popup_gap_y;
 
         if (sm.confirm_mode != "saved") {
-            var yesx = cx - 40;
-            var nox = cx + 10;
+            var yes_label = "OK";
+            var no_label = "Cancel";
+            var yes_w = string_width(yes_label) + btn_pad_x * 2;
+            var no_w = string_width(no_label) + btn_pad_x * 2;
+            var btn_gap_x = 14;
+            var total_btn_w = yes_w + btn_gap_x + no_w;
+            var yesx = px1 + (popup_w - total_btn_w) * 0.5;
+            var nox = yesx + yes_w + btn_gap_x;
             if (sm.confirm_choice == 0) {
                 draw_set_color(c_white);
-                draw_rectangle(yesx - 8, cy + 2, yesx + 34, cy + line_h + 4, false);
+                draw_rectangle(yesx, btn_y, yesx + yes_w, btn_y + btn_h, false);
                 draw_set_color(c_black);
-                draw_rectangle(yesx - 8, cy + 2, yesx + 34, cy + line_h + 4, true);
+                draw_rectangle(yesx, btn_y, yesx + yes_w, btn_y + btn_h, true);
                 draw_set_color(c_black);
             } else {
                 draw_set_color(c_white);
             }
-            draw_text(yesx, cy + 4, "OK");
+            draw_text(yesx + (yes_w - string_width(yes_label)) * 0.5, btn_y + 2, yes_label);
 
             if (sm.confirm_choice == 1) {
                 draw_set_color(c_white);
-                draw_rectangle(nox - 8, cy + 2, nox + 46, cy + line_h + 4, false);
+                draw_rectangle(nox, btn_y, nox + no_w, btn_y + btn_h, false);
                 draw_set_color(c_black);
-                draw_rectangle(nox - 8, cy + 2, nox + 46, cy + line_h + 4, true);
+                draw_rectangle(nox, btn_y, nox + no_w, btn_y + btn_h, true);
                 draw_set_color(c_black);
             } else {
                 draw_set_color(c_white);
             }
-            draw_text(nox, cy + 4, "Cancel");
+            draw_text(nox + (no_w - string_width(no_label)) * 0.5, btn_y + 2, no_label);
         } else {
+            var ok_label = "OK";
+            var ok_w = string_width(ok_label) + btn_pad_x * 2;
+            var ok_x = px1 + (popup_w - ok_w) * 0.5;
             draw_set_color(c_white);
-            draw_text(cx - 20, cy + 4, "OK");
+            draw_rectangle(ok_x, btn_y, ok_x + ok_w, btn_y + btn_h, false);
+            draw_set_color(c_black);
+            draw_rectangle(ok_x, btn_y, ok_x + ok_w, btn_y + btn_h, true);
+            draw_set_color(c_black);
+            draw_text(ok_x + (ok_w - string_width(ok_label)) * 0.5, btn_y + 2, ok_label);
         }
     }
 }
