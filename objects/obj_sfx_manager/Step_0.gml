@@ -73,46 +73,12 @@ if (room != last_room_id) {
     GameSettings_ApplyDisplay();
 }
 
-// Guard against any room/view/window overrides: keep display state aligned to settings.
-var ds = GameSettings_Ensure();
-var needs_display_apply = false;
-var base_w = DISPLAY_BASE_W;
-var base_h = DISPLAY_BASE_H;
-
-var exp_w = base_w * ds.display_scale;
-var exp_h = base_h * ds.display_scale;
-if (window_get_width() != exp_w || window_get_height() != exp_h) {
-    needs_display_apply = true;
-}
-
-var target_w = max(1, window_get_width());
-var target_h = max(1, window_get_height());
-var used_scale = ds.display_scale;
-var exp_port_w = max(1, round(base_w * used_scale));
-var exp_port_h = max(1, round(base_h * used_scale));
-if (exp_port_w > target_w) exp_port_w = target_w;
-if (exp_port_h > target_h) exp_port_h = target_h;
-var exp_port_x = floor((target_w - exp_port_w) * 0.5);
-var exp_port_y = floor((target_h - exp_port_h) * 0.5);
-
-var cam = view_camera[0];
-if (is_undefined(cam) || cam == -1) {
-    needs_display_apply = true;
-} else {
-    var cam_w = camera_get_view_width(cam);
-    var cam_h = camera_get_view_height(cam);
-    if (cam_w != base_w || cam_h != base_h) {
-        needs_display_apply = true;
-    }
-}
-if (view_xport[0] != exp_port_x || view_yport[0] != exp_port_y) {
-    needs_display_apply = true;
-}
-if (view_wport[0] != exp_port_w || view_hport[0] != exp_port_h) {
-    needs_display_apply = true;
-}
-if (needs_display_apply) {
-    GameSettings_ApplyDisplay();
+if (!variable_global_exists("mouse_cursor_hidden")) global.mouse_cursor_hidden = false;
+var hide_cursor = window_has_focus();
+if (hide_cursor != global.mouse_cursor_hidden) {
+    if (hide_cursor) window_set_cursor(cr_none);
+    else window_set_cursor(cr_default);
+    global.mouse_cursor_hidden = hide_cursor;
 }
 
 var expected_key = BGM_GetTrackForRoom(room);

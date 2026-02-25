@@ -138,7 +138,8 @@ function GameSettings_Defaults() {
         audio_ui: VOL_UI_DEFAULT,
         audio_sfx: VOL_SFX_DEFAULT,
         audio_bgm: VOL_MUSIC_DEFAULT,
-        display_scale: DISPLAY_SCALE_DEFAULT
+        display_scale: DISPLAY_SCALE_DEFAULT,
+        fit_screen: true
     };
 }
 
@@ -149,12 +150,15 @@ function GameSettings_Normalize(_settings) {
         if (variable_struct_exists(_settings, "audio_sfx")) out.audio_sfx = _settings.audio_sfx;
         if (variable_struct_exists(_settings, "audio_bgm")) out.audio_bgm = _settings.audio_bgm;
         if (variable_struct_exists(_settings, "display_scale")) out.display_scale = _settings.display_scale;
+        if (variable_struct_exists(_settings, "fit_screen")) out.fit_screen = _settings.fit_screen;
     }
 
     out.audio_ui = clamp(GameSettings_ToReal(out.audio_ui, VOL_UI_DEFAULT), 0, 1);
     out.audio_sfx = clamp(GameSettings_ToReal(out.audio_sfx, VOL_SFX_DEFAULT), 0, 1);
     out.audio_bgm = clamp(GameSettings_ToReal(out.audio_bgm, VOL_MUSIC_DEFAULT), 0, 1);
     out.display_scale = clamp(round(GameSettings_ToReal(out.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
+    out.fit_screen = (GameSettings_ToReal(out.fit_screen, 1) != 0);
+    if (DISPLAY_FORCE_FIT_SCREEN != 0) out.fit_screen = true;
     return out;
 }
 
@@ -185,29 +189,56 @@ function GameSettings_ApplyDisplay() {
 
     var scale_fixed = clamp(round(GameSettings_ToReal(settings.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
     settings.display_scale = scale_fixed;
+    var fit_screen = settings.fit_screen;
 
     // This project does not use a manual application surface pipeline.
     application_surface_draw_enable(true);
-
-    var win_w = base_w * scale_fixed;
-    var win_h = base_h * scale_fixed;
-    if (window_get_width() != win_w || window_get_height() != win_h) {
-        window_set_size(win_w, win_h);
-        window_center();
+    if (!variable_global_exists("display_texfilter_init") || !global.display_texfilter_init) {
+        gpu_set_texfilter(false);
+        global.display_texfilter_init = true;
     }
 
-    var target_w = max(1, window_get_width());
-    var target_h = max(1, window_get_height());
-    var used_scale = scale_fixed;
-
-    var port_w = max(1, round(base_w * used_scale));
-    var port_h = max(1, round(base_h * used_scale));
-    if (port_w > target_w) port_w = target_w;
-    if (port_h > target_h) port_h = target_h;
     var port_x = 0;
     var port_y = 0;
-    port_x = floor((target_w - port_w) * 0.5);
-    port_y = floor((target_h - port_h) * 0.5);
+    var port_w = base_w;
+    var port_h = base_h;
+
+    if (fit_screen) {
+        var disp_w = max(1, display_get_width());
+        var disp_h = max(1, display_get_height());
+
+        if (window_get_width() != disp_w || window_get_height() != disp_h) {
+            window_set_size(disp_w, disp_h);
+        }
+        if (window_get_x() != 0 || window_get_y() != 0) {
+            window_set_position(0, 0);
+        }
+
+        var fit_scale = min(disp_w / base_w, disp_h / base_h);
+        var scale_i = max(1, floor(fit_scale));
+        port_w = base_w * scale_i;
+        port_h = base_h * scale_i;
+        port_x = floor((disp_w - port_w) * 0.5);
+        port_y = floor((disp_h - port_h) * 0.5);
+    } else {
+        var win_w = base_w * scale_fixed;
+        var win_h = base_h * scale_fixed;
+        if (window_get_width() != win_w || window_get_height() != win_h) {
+            window_set_size(win_w, win_h);
+            window_center();
+        }
+
+        var target_w = max(1, window_get_width());
+        var target_h = max(1, window_get_height());
+        var used_scale = scale_fixed;
+
+        port_w = max(1, round(base_w * used_scale));
+        port_h = max(1, round(base_h * used_scale));
+        if (port_w > target_w) port_w = target_w;
+        if (port_h > target_h) port_h = target_h;
+        port_x = floor((target_w - port_w) * 0.5);
+        port_y = floor((target_h - port_h) * 0.5);
+    }
 
     if (view_enabled) {
         view_visible[0] = true;

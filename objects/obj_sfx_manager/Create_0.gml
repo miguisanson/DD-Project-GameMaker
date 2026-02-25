@@ -36,6 +36,7 @@ global.audio_group_load_requested = false;
 global.audio_debug_missing_count = 0;
 global.audio_debug_total_count = 0;
 global.audio_debug_map_report = [];
+global.mouse_cursor_hidden = false;
 last_room_id = room;
 
 if (variable_global_exists("sfx_db") && ds_exists(global.sfx_db, ds_type_map)) {

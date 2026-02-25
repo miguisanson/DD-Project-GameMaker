@@ -66,8 +66,11 @@ var lines = [
 
 var ds = GameSettings_Ensure();
 var desired_scale = variable_struct_exists(ds, "display_scale") ? ds.display_scale : -1;
+var desired_fit = variable_struct_exists(ds, "fit_screen") ? ds.fit_screen : false;
 var actual_win_w = window_get_width();
 var actual_win_h = window_get_height();
+var disp_w = display_get_width();
+var disp_h = display_get_height();
 var cam = view_camera[0];
 var cam_w = -1;
 var cam_h = -1;
@@ -75,8 +78,8 @@ if (!is_undefined(cam) && cam != -1) {
     cam_w = camera_get_view_width(cam);
     cam_h = camera_get_view_height(cam);
 }
-array_push(lines, "display desired: scale=" + string(desired_scale));
-array_push(lines, "display actual: window=" + string(actual_win_w) + "x" + string(actual_win_h));
+array_push(lines, "display desired: scale=" + string(desired_scale) + " fit=" + string(desired_fit));
+array_push(lines, "display actual: window=" + string(actual_win_w) + "x" + string(actual_win_h) + " display=" + string(disp_w) + "x" + string(disp_h));
 array_push(lines, "view0: cam=" + string(cam_w) + "x" + string(cam_h) + " wport=" + string(view_wport[0]) + " hport=" + string(view_hport[0]));
 array_push(lines, "camera0 view: " + string(cam_w) + "x" + string(cam_h));
 
