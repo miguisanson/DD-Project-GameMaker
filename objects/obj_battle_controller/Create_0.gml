@@ -33,8 +33,9 @@ enemy_inst = instance_create_layer(
 if (e.sprite != noone) enemy_inst.sprite_index = e.sprite;
 enemy_inst.visible = false;
 
-enemy_fx_x = enemy_inst.x;
-enemy_fx_y = enemy_inst.y;
+var enemy_center = FX_CenterOn(noone, enemy_inst);
+enemy_fx_x = enemy_center.x;
+enemy_fx_y = enemy_center.y;
 player_fx_x = cx - 48;
 player_fx_y = cy + 24;
 

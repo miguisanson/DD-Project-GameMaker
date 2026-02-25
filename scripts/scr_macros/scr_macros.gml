@@ -105,7 +105,6 @@
 #macro UI_PAUSE 4
 #macro UI_BAR_SCALE 3
 #macro UI_FONT retro_gaming
-#macro VFX_SPEED_MULT 1.0
 #macro GRID_TILE_SIZE 16
 #macro PLAYER_MOVE_SPEED_DEFAULT 1
 #macro ENEMY_THINK_RATE_DEFAULT 15

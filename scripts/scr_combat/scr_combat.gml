@@ -93,18 +93,22 @@ function FX_Spawn(_sprite, _x, _y, _frames, _speed) {
     var fx = instance_create_layer(_x, _y, "Instances", obj_fx);
     fx.sprite_index = _sprite;
     if (room == rm_battle) fx.visible = false;
-    var spd = sprite_get_speed(_sprite);
-    var spd_type = sprite_get_speed_type(_sprite);
-    if (spd_type == SPR_SPEED_FPS) {
-        var game_fps = game_get_speed(gamespeed_fps);
-        if (game_fps <= 0) game_fps = 60;
-        spd = spd / game_fps;
+
+    var spd = _speed;
+    if (!is_real(spd) || spd <= 0) {
+        spd = sprite_get_speed(_sprite);
+        if (sprite_get_speed_type(_sprite) == SPR_SPEED_FPS) {
+            var game_fps = game_get_speed(gamespeed_fps);
+            if (game_fps <= 0) game_fps = 60;
+            spd = spd / game_fps;
+        }
     }
-    spd *= VFX_SPEED_MULT;
-    if (spd <= 0) spd = 0.001;
-    var frames = sprite_get_number(_sprite);
-    fx.life = ceil(frames / spd);
+    if (spd <= 0) spd = 0.2;
+
+    fx.image_index = 0;
     fx.image_speed = spd;
+    fx.fx_prev_frame = 0;
+    fx.fx_age = 0;
     return fx;
 }
 
@@ -297,10 +301,7 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     if (res.ok && res.fx_sprite != noone && (skill.effect != "damage" || res.hit)) {
         var tx = _bc.enemy_fx_x;
         var ty = _bc.enemy_fx_y;
-        if (skill.target == TGT_SELF) {
-            tx = _bc.player_fx_x;
-            ty = _bc.player_fx_y;
-        } else if (instance_exists(_bc.enemy_inst)) {
+        if (instance_exists(_bc.enemy_inst)) {
             var pos = FX_CenterOn(res.fx_sprite, _bc.enemy_inst);
             tx = pos.x;
             ty = pos.y;
@@ -471,15 +472,10 @@ function Battle_EnemyAct(_bc) {
         if (res.ok && res.fx_sprite != noone && (sk.effect != "damage" || res.hit)) {
             var tx2 = _bc.enemy_fx_x;
             var ty2 = _bc.enemy_fx_y;
-            if (sk.target == TGT_SELF) {
-                if (instance_exists(_bc.enemy_inst)) {
-                    var pos2 = FX_CenterOn(res.fx_sprite, _bc.enemy_inst);
-                    tx2 = pos2.x;
-                    ty2 = pos2.y;
-                }
-            } else {
-                tx2 = _bc.player_fx_x;
-                ty2 = _bc.player_fx_y;
+            if (instance_exists(_bc.enemy_inst)) {
+                var pos2 = FX_CenterOn(res.fx_sprite, _bc.enemy_inst);
+                tx2 = pos2.x;
+                ty2 = pos2.y;
             }
             fx2 = FX_Spawn(res.fx_sprite, tx2, ty2, res.fx_frames, res.fx_speed);
         }

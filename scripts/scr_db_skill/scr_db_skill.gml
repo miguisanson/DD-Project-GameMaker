@@ -188,7 +188,7 @@ function SkillDB_Init() {
         icon_sprite: noone,
         fx_sprite: take_aim_effect,
         fx_frames: 12,
-        fx_speed: 0.01,
+        fx_speed: 0.2,
         hits: 0,
         class_list: [CLASS_ARCHER]
     };
