@@ -86,7 +86,7 @@ if (state == "class") {
 }
 
 if (state == "settings") {
-    var settings_rows = SETTINGS_MENU_ROW_COUNT; // UI, SFX, BGM, Scale, Fullscreen, Apply, Back
+    var settings_rows = SETTINGS_MENU_ROW_COUNT; // UI, SFX, BGM, Scale, Apply, Back
 
     if (k_up) {
         settings_index = (settings_index + settings_rows - 1) mod settings_rows;
@@ -97,7 +97,7 @@ if (state == "settings") {
         SFX_PlayUI("ui_move");
     }
 
-    if (settings_index == 6) {
+    if (settings_index == 5) {
         if (k_back || k_ok) {
             if (k_back) SFX_PlayUI("ui_back"); else SFX_PlayUI("ui_confirm");
             settings_pending = GameSettings_Copy(GameSettings_Ensure());
@@ -160,14 +160,7 @@ if (state == "settings") {
                 changed = true;
             }
             break;
-        case 4: // Fullscreen
-            if (k_left || k_right || k_ok) {
-                pending.fullscreen = !pending.fullscreen;
-                changed = true;
-                did_confirm = k_ok;
-            }
-            break;
-        case 5:
+        case 4:
             if (k_ok) {
                 var committed = GameSettings_Commit(pending, true);
                 settings_pending = GameSettings_Copy(committed);

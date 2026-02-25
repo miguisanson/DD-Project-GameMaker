@@ -109,9 +109,8 @@ if (state == "settings") {
     row_y[1] = rows_y0 + row_gap_s;
     row_y[2] = rows_y0 + row_gap_s * 2;
     row_y[3] = display_rows_y0;
-    row_y[4] = display_rows_y0 + row_gap_s;
+    row_y[4] = display_rows_y0 + row_gap_s + 2;
     row_y[5] = display_rows_y0 + row_gap_s * 2 + 2;
-    row_y[6] = display_rows_y0 + row_gap_s * 3 + 2;
 
     draw_set_color(c_white);
     draw_text(sx + 12, audio_header_y, "Audio");
@@ -141,20 +140,16 @@ if (state == "settings") {
                 value = string(settings.display_scale) + "x";
                 break;
             case 4:
-                label = "Fullscreen";
-                value = settings.fullscreen ? "On" : "Off";
-                break;
-            case 5:
                 label = "Apply";
                 value = settings_dirty ? "Pending" : "Saved";
                 break;
-            case 6:
+            case 5:
                 label = "Back";
                 break;
         }
 
         if (selected_row) {
-            if (r == 5 || r == 6) {
+            if (r == 4 || r == 5) {
                 var row_x = sx + 16;
                 var row_w = string_width(label) + 8;
                 draw_set_color(c_white);
@@ -172,7 +167,7 @@ if (state == "settings") {
         draw_set_color(selected_row ? c_black : c_white);
         draw_text(sx + 16, yy, label);
         if (value != "") {
-            if (r == 5) draw_set_color(c_white);
+            if (r == 4) draw_set_color(c_white);
             else draw_set_color(selected_row ? c_black : c_white);
             draw_set_halign(fa_right);
             draw_text(sx + sw - 16, yy, value);

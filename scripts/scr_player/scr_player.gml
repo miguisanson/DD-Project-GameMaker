@@ -138,8 +138,7 @@ function GameSettings_Defaults() {
         audio_ui: VOL_UI_DEFAULT,
         audio_sfx: VOL_SFX_DEFAULT,
         audio_bgm: VOL_MUSIC_DEFAULT,
-        display_scale: DISPLAY_SCALE_DEFAULT,
-        fullscreen: false
+        display_scale: DISPLAY_SCALE_DEFAULT
     };
 }
 
@@ -150,14 +149,12 @@ function GameSettings_Normalize(_settings) {
         if (variable_struct_exists(_settings, "audio_sfx")) out.audio_sfx = _settings.audio_sfx;
         if (variable_struct_exists(_settings, "audio_bgm")) out.audio_bgm = _settings.audio_bgm;
         if (variable_struct_exists(_settings, "display_scale")) out.display_scale = _settings.display_scale;
-        if (variable_struct_exists(_settings, "fullscreen")) out.fullscreen = _settings.fullscreen;
     }
 
     out.audio_ui = clamp(GameSettings_ToReal(out.audio_ui, VOL_UI_DEFAULT), 0, 1);
     out.audio_sfx = clamp(GameSettings_ToReal(out.audio_sfx, VOL_SFX_DEFAULT), 0, 1);
     out.audio_bgm = clamp(GameSettings_ToReal(out.audio_bgm, VOL_MUSIC_DEFAULT), 0, 1);
     out.display_scale = clamp(round(GameSettings_ToReal(out.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-    out.fullscreen = (GameSettings_ToReal(out.fullscreen, 0) != 0);
     return out;
 }
 
@@ -189,53 +186,19 @@ function GameSettings_ApplyDisplay() {
     var scale_fixed = clamp(round(GameSettings_ToReal(settings.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
     settings.display_scale = scale_fixed;
 
-    var is_fullscreen = settings.fullscreen;
-    settings.fullscreen = is_fullscreen;
-
     // This project does not use a manual application surface pipeline.
     application_surface_draw_enable(true);
 
-    if (window_get_fullscreen() != is_fullscreen) {
-        window_set_fullscreen(is_fullscreen);
+    var win_w = base_w * scale_fixed;
+    var win_h = base_h * scale_fixed;
+    if (window_get_width() != win_w || window_get_height() != win_h) {
+        window_set_size(win_w, win_h);
+        window_center();
     }
 
-    // Use the runtime fullscreen state after toggling. If OS switching is delayed by a frame,
-    // this prevents applying fullscreen viewport math to a windowed backbuffer (clipping).
-    var actual_fullscreen = window_get_fullscreen();
-
-    if (!actual_fullscreen) {
-        var win_w = base_w * scale_fixed;
-        var win_h = base_h * scale_fixed;
-        if (window_get_width() != win_w || window_get_height() != win_h) {
-            window_set_size(win_w, win_h);
-            window_center();
-        }
-    }
-
-    var target_w = 0;
-    var target_h = 0;
-    if (actual_fullscreen) {
-        target_w = max(1, display_get_width());
-        target_h = max(1, display_get_height());
-    } else {
-        target_w = max(1, window_get_width());
-        target_h = max(1, window_get_height());
-    }
-
+    var target_w = max(1, window_get_width());
+    var target_h = max(1, window_get_height());
     var used_scale = scale_fixed;
-    if (actual_fullscreen) {
-        // Fullscreen letterbox fit: always show whole scene, preserve aspect ratio.
-        var fit_scale = min(target_w / base_w, target_h / base_h);
-        if (fit_scale < 0.01) fit_scale = 0.01;
-
-        // Keep integer scale when it exactly fits; otherwise use full-fit scale to maximize visibility.
-        var fit_int = floor(fit_scale);
-        if (fit_int >= 1 && abs(fit_scale - fit_int) < 0.0001) {
-            used_scale = fit_int;
-        } else {
-            used_scale = fit_scale;
-        }
-    }
 
     var port_w = max(1, round(base_w * used_scale));
     var port_h = max(1, round(base_h * used_scale));
@@ -298,17 +261,6 @@ function GameSettings_SetScale(_scale) {
     var settings = GameSettings_Ensure();
     settings.display_scale = clamp(round(GameSettings_ToReal(_scale, settings.display_scale)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
     GameSettings_ApplyDisplay();
-}
-
-function GameSettings_SetFullscreen(_enabled) {
-    var settings = GameSettings_Ensure();
-    settings.fullscreen = (_enabled == true) || (_enabled == 1);
-    GameSettings_ApplyDisplay();
-}
-
-function GameSettings_ToggleFullscreen() {
-    var settings = GameSettings_Ensure();
-    GameSettings_SetFullscreen(!settings.fullscreen);
 }
 
 // --------------------

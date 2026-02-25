@@ -43,7 +43,6 @@ function Save_ReadSettingsConfig() {
     if (variable_struct_exists(raw, "vol_sfx")) out.audio_sfx = raw.vol_sfx;
     if (variable_struct_exists(raw, "vol_bgm")) out.audio_bgm = raw.vol_bgm;
     if (variable_struct_exists(raw, "display_scale")) out.display_scale = raw.display_scale;
-    if (variable_struct_exists(raw, "fullscreen")) out.fullscreen = raw.fullscreen;
 
     // Migrate older configs that defaulted to tiny 1x startup scale.
     if (settings_version < 2) {
@@ -58,12 +57,11 @@ function Save_ReadSettingsConfig() {
 function Save_WriteSettingsConfig(_settings) {
     var s = GameSettings_Normalize(_settings);
     var raw = {
-        settings_version: 2,
+        settings_version: 3,
         vol_ui: s.audio_ui,
         vol_sfx: s.audio_sfx,
         vol_bgm: s.audio_bgm,
-        display_scale: s.display_scale,
-        fullscreen: s.fullscreen
+        display_scale: s.display_scale
     };
 
     var json = json_stringify(raw);
