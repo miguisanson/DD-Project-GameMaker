@@ -12,7 +12,7 @@ function DialogueDB_Init() {
     global.dialogue_db[? "sys_class_chest_prompt"] = ["How convenient.. Just what I needed to get out of here."];
     global.dialogue_db[? "sys_intro_cutscene"] = [
         "You ventured deep in a tunnel heading towards a neighboring enemy castle...", 
-		"The plan was to ambush using this shortcut.",
+		"The plan was to ambush the enemy using this shortcut.",
         "You are just a porter for this raid party...",
         "You knew this was a mistake...",
         "You were from this area's village. However, this place never existed before...",
