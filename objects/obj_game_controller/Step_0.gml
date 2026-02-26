@@ -20,7 +20,8 @@ if (gs.last_room != room) {
     global.skipRoomSave = false;
 
     // ensure player exists if no transition pending (e.g. initial room / battle return)
-    if (room != rm_battle && (!variable_struct_exists(gs, "in_main_menu") || !gs.in_main_menu) && !instance_exists(obj_player)) {
+    // Cutscene room must never spawn player visuals.
+    if (room != rm_battle && room != rm_cutscene && (!variable_struct_exists(gs, "in_main_menu") || !gs.in_main_menu) && !instance_exists(obj_player)) {
         var sp = RoomTransition_FindSpawn("start");
         if (sp == noone) sp = RoomTransition_FindSpawn("");
         if (sp != noone) {
@@ -29,6 +30,11 @@ if (gs.last_room != room) {
             instance_create_layer(0, 0, "Instances", obj_player);
         }
     }
+}
+
+// Safety: keep cutscene room free of stray player instance to avoid one-frame flash.
+if (room == rm_cutscene && instance_exists(obj_player)) {
+    with (obj_player) instance_destroy();
 }
 
 if (room == rm_floor1 && variable_struct_exists(gs, "pending_floor1_intro_dialogue") && gs.pending_floor1_intro_dialogue) {
