@@ -109,7 +109,10 @@ function Transition_Init() {
             encounter_port_x: 0,
             encounter_port_y: 0,
             encounter_port_w: 0,
-            encounter_port_h: 0
+            encounter_port_h: 0,
+            encounter_focus_x: 0,
+            encounter_focus_y: 0,
+            encounter_has_focus: false
         };
     }
 }
@@ -137,8 +140,25 @@ function Transition_ApplyEncounterViewport(_tr) {
     var scale = 1 + max(0, _tr.encounter_zoom);
     var out_w = max(1, round(_tr.encounter_port_w * scale));
     var out_h = max(1, round(_tr.encounter_port_h * scale));
-    var out_x = round(_tr.encounter_port_x - ((out_w - _tr.encounter_port_w) * 0.5) + _tr.encounter_shake_x);
-    var out_y = round(_tr.encounter_port_y - ((out_h - _tr.encounter_port_h) * 0.5) + _tr.encounter_shake_y);
+    var anchor_x = _tr.encounter_port_x + (_tr.encounter_port_w * 0.5);
+    var anchor_y = _tr.encounter_port_y + (_tr.encounter_port_h * 0.5);
+
+    if (_tr.encounter_has_focus) {
+        var cam = view_camera[0];
+        if (!is_undefined(cam) && cam != -1) {
+            var cam_x = camera_get_view_x(cam);
+            var cam_y = camera_get_view_y(cam);
+            var cam_w = max(1, camera_get_view_width(cam));
+            var cam_h = max(1, camera_get_view_height(cam));
+            var nx = clamp((_tr.encounter_focus_x - cam_x) / cam_w, 0, 1);
+            var ny = clamp((_tr.encounter_focus_y - cam_y) / cam_h, 0, 1);
+            anchor_x = _tr.encounter_port_x + (_tr.encounter_port_w * nx);
+            anchor_y = _tr.encounter_port_y + (_tr.encounter_port_h * ny);
+        }
+    }
+
+    var out_x = round(anchor_x - ((anchor_x - _tr.encounter_port_x) * scale) + _tr.encounter_shake_x);
+    var out_y = round(anchor_y - ((anchor_y - _tr.encounter_port_y) * scale) + _tr.encounter_shake_y);
 
     view_xport[0] = out_x;
     view_yport[0] = out_y;
@@ -155,7 +175,7 @@ function Transition_RestoreEncounterViewport(_tr) {
     view_hport[0] = _tr.encounter_port_h;
 }
 
-function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn) {
+function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus_x = undefined, _enc_focus_y = undefined) {
     Transition_Init();
     var gs = GameState_Get();
     var tr = gs.transition_fx;
@@ -170,6 +190,9 @@ function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn) {
     tr.target_spawn_id = _spawn_id;
     tr.target_face = _face;
     tr.use_spawn = _use_spawn;
+    tr.encounter_focus_x = 0;
+    tr.encounter_focus_y = 0;
+    tr.encounter_has_focus = false;
 
     if (_type == TRANSITION_TYPE_CUTSCENE) {
         tr.fade_out_frames = max(1, TRANSITION_CUTSCENE_FADE_OUT_FRAMES);
@@ -180,6 +203,11 @@ function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn) {
         tr.encounter_zoom = 0;
         tr.encounter_shake_x = 0;
         tr.encounter_shake_y = 0;
+        tr.encounter_has_focus = is_real(_enc_focus_x) && is_real(_enc_focus_y);
+        if (tr.encounter_has_focus) {
+            tr.encounter_focus_x = _enc_focus_x;
+            tr.encounter_focus_y = _enc_focus_y;
+        }
         Transition_CaptureEncounterViewport(tr);
     } else {
         tr.fade_out_frames = max(1, TRANSITION_ROOM_FADE_OUT_FRAMES);
@@ -197,8 +225,8 @@ function Transition_RequestRoomFade(_room, _spawn_id = "", _face = -1, _use_spaw
     return Transition_Begin(TRANSITION_TYPE_ROOM, _room, _spawn_id, _face, _use_spawn);
 }
 
-function Transition_RequestEncounterBattle(_room = rm_battle) {
-    return Transition_Begin(TRANSITION_TYPE_ENCOUNTER, _room, "", -1, false);
+function Transition_RequestEncounterBattle(_room = rm_battle, _focus_x = undefined, _focus_y = undefined) {
+    return Transition_Begin(TRANSITION_TYPE_ENCOUNTER, _room, "", -1, false, _focus_x, _focus_y);
 }
 
 function Transition_RequestCutsceneFade(_room, _spawn_id = "", _face = -1, _use_spawn = false) {
@@ -242,6 +270,9 @@ function Transition_Finish() {
     tr.encounter_zoom = 0;
     tr.encounter_shake_x = 0;
     tr.encounter_shake_y = 0;
+    tr.encounter_focus_x = 0;
+    tr.encounter_focus_y = 0;
+    tr.encounter_has_focus = false;
 }
 
 function Transition_Update() {
@@ -276,6 +307,7 @@ function Transition_Update() {
                 tr.timer += 1;
                 var p = clamp(tr.timer / tr.fade_out_frames, 0, 1);
                 tr.encounter_zoom = lerp(0, TRANSITION_ENCOUNTER_ZOOM_MAX, p);
+                tr.alpha = clamp((p - 0.15) / 0.85, 0, 1);
                 var shake_mag = max(0, round(TRANSITION_ENCOUNTER_SHAKE_PX * (1 - (p * 0.5))));
                 tr.encounter_shake_x = irandom_range(-shake_mag, shake_mag);
                 tr.encounter_shake_y = irandom_range(-shake_mag, shake_mag);
