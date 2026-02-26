@@ -81,10 +81,13 @@ cutscene_definitions.ending = [
     },
     {
         sprite: last_cut_scene,
-        lines: [],
-        hold_frames: CUTSCENE_LAST_SCENE_HOLD_FRAMES,
+        lines: [
+            "There is no hope."
+        ],
+        hold_frames: 0,
         transition_speed: "slow",
-        text_only: true
+        text_only: true,
+        chars_per_sec: 12
     },
     {
         sprite: black_screen,
@@ -95,6 +98,19 @@ cutscene_definitions.ending = [
         hold_frames: 0,
         transition_speed: "normal",
         text_only: false
+    }
+];
+
+cutscene_definitions.game_over = [
+    {
+        sprite_name: "GAME_OVER",
+        lines: [
+            "GAME OVER"
+        ],
+        hold_frames: 0,
+        transition_speed: "normal",
+        text_only: true,
+        chars_per_sec: UI_CUTSCENE_GAME_OVER_CHARS_PER_SEC
     }
 ];
 

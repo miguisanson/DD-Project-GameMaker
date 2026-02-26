@@ -268,6 +268,7 @@
     {"id":{"name":"fire_stand_moving","path":"sprites/fire_stand_moving/fire_stand_moving.yy",},},
     {"id":{"name":"fire_stand_off_asset","path":"sprites/fire_stand_off_asset/fire_stand_off_asset.yy",},},
     {"id":{"name":"foresight_effect_Sheet","path":"sprites/foresight_effect_Sheet/foresight_effect_Sheet.yy",},},
+    {"id":{"name":"GAME_OVER","path":"sprites/GAME_OVER/GAME_OVER.yy",},},
     {"id":{"name":"ghost_easter_egg","path":"sprites/ghost_easter_egg/ghost_easter_egg.yy",},},
     {"id":{"name":"ghost_sword_moving","path":"sprites/ghost_sword_moving/ghost_sword_moving.yy",},},
     {"id":{"name":"ghost_sword_profile","path":"sprites/ghost_sword_profile/ghost_sword_profile.yy",},},

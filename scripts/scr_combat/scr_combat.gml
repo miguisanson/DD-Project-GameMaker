@@ -181,13 +181,11 @@ function Battle_GrantRewards(_p, _e) {
 
 function Player_OnDeath(_p) {
     var gs = GameState_Get();
-    _p.hp = _p.max_hp;
-    _p.mp = _p.max_mp;
+    _p.hp = 0;
     GameState_SetPlayer(_p);
-
-    GameState_SetBattleReturn(gs.checkpoint.room, gs.checkpoint.x, gs.checkpoint.y, -1);
-    GameState_SetJustReturned(true);
-    Transition_RequestRoomFade(gs.checkpoint.room);
+    gs.in_main_menu = false;
+    GameState_SetJustReturned(false);
+    Transition_RequestCutsceneById("game_over");
 }
 
 // --------------------

@@ -95,7 +95,15 @@ if (state == "cutscene") {
         var seg0_text_only = true;
         if (variable_struct_exists(seg0, "text_only")) seg0_text_only = seg0.text_only;
         gs.ui.cutscene_text_only = seg0_text_only;
-        gs.ui.cutscene_bg_sprite = seg0.sprite;
+        if (variable_struct_exists(seg0, "chars_per_sec")) gs.ui.cutscene_chars_per_sec = real(seg0.chars_per_sec);
+        else gs.ui.cutscene_chars_per_sec = -1;
+        var seg0_sprite = noone;
+        if (variable_struct_exists(seg0, "sprite")) seg0_sprite = seg0.sprite;
+        if ((is_undefined(seg0_sprite) || seg0_sprite == noone || seg0_sprite == -1) && variable_struct_exists(seg0, "sprite_name")) {
+            seg0_sprite = asset_get_index(string(seg0.sprite_name));
+        }
+        if (is_undefined(seg0_sprite) || seg0_sprite == -1 || seg0_sprite == noone) seg0_sprite = black_screen;
+        gs.ui.cutscene_bg_sprite = seg0_sprite;
         var seg0_lines = variable_struct_exists(seg0, "lines") ? seg0.lines : [];
         if (is_array(seg0_lines) && array_length(seg0_lines) > 0) {
             Dialogue_StartLines(seg0_lines);
@@ -123,7 +131,15 @@ if (state == "cutscene") {
                 var seg_sw_text_only = true;
                 if (variable_struct_exists(seg_sw, "text_only")) seg_sw_text_only = seg_sw.text_only;
                 gs.ui.cutscene_text_only = seg_sw_text_only;
-                gs.ui.cutscene_bg_sprite = seg_sw.sprite;
+                if (variable_struct_exists(seg_sw, "chars_per_sec")) gs.ui.cutscene_chars_per_sec = real(seg_sw.chars_per_sec);
+                else gs.ui.cutscene_chars_per_sec = -1;
+                var seg_sw_sprite = noone;
+                if (variable_struct_exists(seg_sw, "sprite")) seg_sw_sprite = seg_sw.sprite;
+                if ((is_undefined(seg_sw_sprite) || seg_sw_sprite == noone || seg_sw_sprite == -1) && variable_struct_exists(seg_sw, "sprite_name")) {
+                    seg_sw_sprite = asset_get_index(string(seg_sw.sprite_name));
+                }
+                if (is_undefined(seg_sw_sprite) || seg_sw_sprite == -1 || seg_sw_sprite == noone) seg_sw_sprite = black_screen;
+                gs.ui.cutscene_bg_sprite = seg_sw_sprite;
 
                 var seg_sw_lines = variable_struct_exists(seg_sw, "lines") ? seg_sw.lines : [];
                 if (is_array(seg_sw_lines) && array_length(seg_sw_lines) > 0) {
@@ -149,7 +165,15 @@ if (state == "cutscene") {
             var seg_fallback_text_only = true;
             if (variable_struct_exists(seg_fallback, "text_only")) seg_fallback_text_only = seg_fallback.text_only;
             gs.ui.cutscene_text_only = seg_fallback_text_only;
-            gs.ui.cutscene_bg_sprite = seg_fallback.sprite;
+            if (variable_struct_exists(seg_fallback, "chars_per_sec")) gs.ui.cutscene_chars_per_sec = real(seg_fallback.chars_per_sec);
+            else gs.ui.cutscene_chars_per_sec = -1;
+            var seg_fallback_sprite = noone;
+            if (variable_struct_exists(seg_fallback, "sprite")) seg_fallback_sprite = seg_fallback.sprite;
+            if ((is_undefined(seg_fallback_sprite) || seg_fallback_sprite == noone || seg_fallback_sprite == -1) && variable_struct_exists(seg_fallback, "sprite_name")) {
+                seg_fallback_sprite = asset_get_index(string(seg_fallback.sprite_name));
+            }
+            if (is_undefined(seg_fallback_sprite) || seg_fallback_sprite == -1 || seg_fallback_sprite == noone) seg_fallback_sprite = black_screen;
+            gs.ui.cutscene_bg_sprite = seg_fallback_sprite;
 
             var seg_fallback_lines = variable_struct_exists(seg_fallback, "lines") ? seg_fallback.lines : [];
             if (is_array(seg_fallback_lines) && array_length(seg_fallback_lines) > 0) {
@@ -206,7 +230,15 @@ if (state == "cutscene") {
         var seg_next_text_only = true;
         if (variable_struct_exists(seg_next, "text_only")) seg_next_text_only = seg_next.text_only;
         gs.ui.cutscene_text_only = seg_next_text_only;
-        gs.ui.cutscene_bg_sprite = seg_next.sprite;
+        if (variable_struct_exists(seg_next, "chars_per_sec")) gs.ui.cutscene_chars_per_sec = real(seg_next.chars_per_sec);
+        else gs.ui.cutscene_chars_per_sec = -1;
+        var seg_next_sprite = noone;
+        if (variable_struct_exists(seg_next, "sprite")) seg_next_sprite = seg_next.sprite;
+        if ((is_undefined(seg_next_sprite) || seg_next_sprite == noone || seg_next_sprite == -1) && variable_struct_exists(seg_next, "sprite_name")) {
+            seg_next_sprite = asset_get_index(string(seg_next.sprite_name));
+        }
+        if (is_undefined(seg_next_sprite) || seg_next_sprite == -1 || seg_next_sprite == noone) seg_next_sprite = black_screen;
+        gs.ui.cutscene_bg_sprite = seg_next_sprite;
         var seg_next_lines = variable_struct_exists(seg_next, "lines") ? seg_next.lines : [];
         if (is_array(seg_next_lines) && array_length(seg_next_lines) > 0) {
             Dialogue_StartLines(seg_next_lines);
@@ -225,6 +257,7 @@ if (state == "cutscene") {
     gs.ui.cutscene_bg_sprite = noone;
     gs.ui.dialogue_box_half = false;
     gs.ui.cutscene_text_only = false;
+    gs.ui.cutscene_chars_per_sec = -1;
     gs.pending_cutscene_id = "";
 
     cutscene_started = false;
@@ -258,6 +291,24 @@ if (state == "cutscene") {
         case "ending":
             gs.in_main_menu = true;
             Transition_RequestCutsceneFade(rm_start);
+            break;
+        case "game_over":
+            gs.in_main_menu = false;
+            var load_slot = 0;
+            if (variable_struct_exists(gs, "save_slot")) {
+                var preferred_slot = round(real(gs.save_slot));
+                if (preferred_slot >= 1 && preferred_slot <= 3 && Save_HasSlot(preferred_slot)) {
+                    load_slot = preferred_slot;
+                }
+            }
+            if (load_slot <= 0) load_slot = Save_FindLatestSlot();
+
+            if (load_slot > 0 && Save_Read(load_slot)) {
+                // Save_Read handles transition to the loaded room.
+            } else {
+                gs.in_main_menu = true;
+                Transition_RequestCutsceneFade(rm_start);
+            }
             break;
         default:
             Transition_RequestRoomFade(rm_start);

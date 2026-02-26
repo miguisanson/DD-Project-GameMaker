@@ -377,7 +377,13 @@ function Dialogue_TypewriterPrepareCurrentLine() {
 
     var game_fps = max(1, game_get_speed(gamespeed_fps));
     var chars_per_sec = UI_DIALOGUE_CHARS_PER_SEC;
-    if (Dialogue_IsCutsceneTextOnly()) chars_per_sec = UI_CUTSCENE_DIALOGUE_CHARS_PER_SEC;
+    if (Dialogue_IsCutsceneTextOnly()) {
+        chars_per_sec = UI_CUTSCENE_DIALOGUE_CHARS_PER_SEC;
+        if (variable_struct_exists(gs.ui, "cutscene_chars_per_sec")) {
+            var cutscene_cps = real(gs.ui.cutscene_chars_per_sec);
+            if (cutscene_cps > 0) chars_per_sec = cutscene_cps;
+        }
+    }
     gs.ui.dialogue_chars_per_sec = max(1, chars_per_sec);
     gs.ui.dialogue_hold_duration = max(1, round(UI_DIALOGUE_ADVANCE_HOLD_SEC * game_fps));
 
