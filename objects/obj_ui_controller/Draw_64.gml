@@ -74,20 +74,20 @@ if (gs.ui.mode == UI_MENU) {
     exit;
 }
 
+var cutscene_active = variable_struct_exists(gs.ui, "cutscene_active") && gs.ui.cutscene_active;
+if (cutscene_active) {
+    var bg_sprite = variable_struct_exists(gs.ui, "cutscene_bg_sprite") ? gs.ui.cutscene_bg_sprite : noone;
+    if (bg_sprite != noone) {
+        draw_sprite_stretched(bg_sprite, 0, 0, 0, w, h);
+    }
+}
+
 if (gs.ui.mode == UI_CLASS_SELECT) {
     ClassSelect_Draw();
 }
 
 // Dialogue box
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
-    var cutscene_active = variable_struct_exists(gs.ui, "cutscene_active") && gs.ui.cutscene_active;
-    if (cutscene_active) {
-        var bg_sprite = variable_struct_exists(gs.ui, "cutscene_bg_sprite") ? gs.ui.cutscene_bg_sprite : noone;
-        if (bg_sprite != noone) {
-            draw_sprite_stretched(bg_sprite, 0, 0, 0, w, h);
-        }
-    }
-
     var box = Dialogue_BoxRect();
     var bx = box.x;
     var by = box.y;

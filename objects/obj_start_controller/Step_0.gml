@@ -90,9 +90,11 @@ if (state == "cutscene") {
 
         gs.ui.cutscene_active = true;
         gs.ui.dialogue_box_half = false;
-        gs.ui.cutscene_text_only = true;
 
         var seg0 = cutscene_sequence[cutscene_segment_index];
+        var seg0_text_only = true;
+        if (variable_struct_exists(seg0, "text_only")) seg0_text_only = seg0.text_only;
+        gs.ui.cutscene_text_only = seg0_text_only;
         gs.ui.cutscene_bg_sprite = seg0.sprite;
         var seg0_lines = variable_struct_exists(seg0, "lines") ? seg0.lines : [];
         if (is_array(seg0_lines) && array_length(seg0_lines) > 0) {
@@ -118,6 +120,9 @@ if (state == "cutscene") {
                 cutscene_segment_index = cutscene_transition_next_index;
                 cutscene_segment_hold_timer = 0;
                 var seg_sw = cutscene_sequence[cutscene_segment_index];
+                var seg_sw_text_only = true;
+                if (variable_struct_exists(seg_sw, "text_only")) seg_sw_text_only = seg_sw.text_only;
+                gs.ui.cutscene_text_only = seg_sw_text_only;
                 gs.ui.cutscene_bg_sprite = seg_sw.sprite;
 
                 var seg_sw_lines = variable_struct_exists(seg_sw, "lines") ? seg_sw.lines : [];
@@ -141,6 +146,9 @@ if (state == "cutscene") {
             cutscene_segment_index = cutscene_transition_next_index;
             cutscene_segment_hold_timer = 0;
             var seg_fallback = cutscene_sequence[cutscene_segment_index];
+            var seg_fallback_text_only = true;
+            if (variable_struct_exists(seg_fallback, "text_only")) seg_fallback_text_only = seg_fallback.text_only;
+            gs.ui.cutscene_text_only = seg_fallback_text_only;
             gs.ui.cutscene_bg_sprite = seg_fallback.sprite;
 
             var seg_fallback_lines = variable_struct_exists(seg_fallback, "lines") ? seg_fallback.lines : [];
@@ -195,6 +203,9 @@ if (state == "cutscene") {
 
         cutscene_segment_index = next_index;
         cutscene_segment_hold_timer = 0;
+        var seg_next_text_only = true;
+        if (variable_struct_exists(seg_next, "text_only")) seg_next_text_only = seg_next.text_only;
+        gs.ui.cutscene_text_only = seg_next_text_only;
         gs.ui.cutscene_bg_sprite = seg_next.sprite;
         var seg_next_lines = variable_struct_exists(seg_next, "lines") ? seg_next.lines : [];
         if (is_array(seg_next_lines) && array_length(seg_next_lines) > 0) {

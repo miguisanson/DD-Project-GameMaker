@@ -27,7 +27,8 @@ cutscene_definitions.intro = [
             "Cracking.. Small Tremors..."
         ],
         hold_frames: 0,
-        transition_speed: "normal"
+        transition_speed: "normal",
+        text_only: true
     },
     {
         sprite: intro_scene,
@@ -36,7 +37,8 @@ cutscene_definitions.intro = [
             "You fell down."
         ],
         hold_frames: 0,
-        transition_speed: "normal"
+        transition_speed: "normal",
+        text_only: true
     }
 ];
 
@@ -49,7 +51,8 @@ cutscene_definitions.ending = [
             "I need to find out where I am."
         ],
         hold_frames: 0,
-        transition_speed: "normal"
+        transition_speed: "normal",
+        text_only: true
     },
     {
         sprite: third_to_last_scene,
@@ -61,7 +64,8 @@ cutscene_definitions.ending = [
             "... What on earth..."
         ],
         hold_frames: 0,
-        transition_speed: "normal"
+        transition_speed: "normal",
+        text_only: true
     },
     {
         sprite: second_to_last_scene,
@@ -72,13 +76,15 @@ cutscene_definitions.ending = [
             "I wasn't so lucky after all"
         ],
         hold_frames: 0,
-        transition_speed: "normal"
+        transition_speed: "normal",
+        text_only: true
     },
     {
         sprite: last_cut_scene,
         lines: [],
         hold_frames: CUTSCENE_LAST_SCENE_HOLD_FRAMES,
-        transition_speed: "slow"
+        transition_speed: "slow",
+        text_only: true
     },
     {
         sprite: black_screen,
@@ -87,7 +93,8 @@ cutscene_definitions.ending = [
             "Please support our next development :)"
         ],
         hold_frames: 0,
-        transition_speed: "normal"
+        transition_speed: "normal",
+        text_only: false
     }
 ];
 
