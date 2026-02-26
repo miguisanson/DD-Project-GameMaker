@@ -953,7 +953,7 @@ function ClassSelect_HandleInput() {
             ClassSelect_ApplyClass(class_id);
             gs.ui.class_select = cs;
             ClassSelect_Close(false);
-            Transition_RequestBlackFlash();
+            Transition_RequestBlackFlash(TRANSITION_CLASS_SELECT_FADE_OUT_FRAMES, TRANSITION_CLASS_SELECT_FADE_IN_FRAMES);
             return;
         }
     }

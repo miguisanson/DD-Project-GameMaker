@@ -508,6 +508,9 @@ function Battle_EnemyAct(_bc) {
             _bc.enemy_weapon = ew;
         }
 
+        // Enemy basic attack SFX (non-skill turn).
+        SFX_PlayEnemySpecial(e.id);
+
         var hit_res_e = Combat_AttemptHit(e, p, Combat_AttackBonus(e, ew));
 
         _bc.last_hit = hit_res_e.hit;

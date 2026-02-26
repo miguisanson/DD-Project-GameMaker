@@ -723,8 +723,9 @@ function SFX_PlayClassAttack(_class_id) {
         case CLASS_ARCHER: return SFX_Play("bow_attack");
         case CLASS_MAGE: return SFX_Play("mage_attack");
         case CLASS_KNIGHT: return SFX_Play("sword_attack");
+        case CLASS_NOBODY: return SFX_Play("sword_attack");
     }
-    return -1;
+    return SFX_Play("sword_attack");
 }
 
 function SFX_SkillKey(_skill_id) {
