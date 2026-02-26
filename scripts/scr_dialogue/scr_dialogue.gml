@@ -56,7 +56,7 @@ function DialogueDB_Init() {
     global.dialogue_db[? "torch_extinguish"] = ["You extinguish the torch."];
     global.dialogue_db[? "torch_off"] = ["The torch is cold."];
 
-    global.dialogue_db[? NPC_OLD_MAN] = [
+    global.dialogue_db[? DIALOGUE_PROFILE_GENERIC] = [
         "Welcome to the dungeon.",
         "Stay alert—monsters lurk nearby.",
         "Press {interact} to interact."
@@ -67,14 +67,14 @@ function DialogueDB_Init() {
     }
 }
 
-function DialogueDB_Get(_npc_id) {
+function DialogueDB_Get(_dialogue_id) {
     if (!variable_global_exists("dialogue_db") || !ds_exists(global.dialogue_db, ds_type_map)) {
         DialogueDB_Init();
     }
-    if (!ds_map_exists(global.dialogue_db, _npc_id)) {
-        _npc_id = "default";
+    if (!ds_map_exists(global.dialogue_db, _dialogue_id)) {
+        _dialogue_id = "default";
     }
-    var lines = global.dialogue_db[? _npc_id];
+    var lines = global.dialogue_db[? _dialogue_id];
     var vars = { interact: Input_Label("interact"), confirm: Input_Label("confirm"), cancel: Input_Label("cancel") };
     return Dialogue_FormatLines(lines, vars);
 }
@@ -458,12 +458,12 @@ function Dialogue_TypewriterRevealInstant() {
     gs.ui.dialogue_hold_frames = gs.ui.dialogue_hold_duration;
 }
 
-function Dialogue_Start(_npc_id) {
+function Dialogue_Start(_dialogue_id) {
     if (PauseMenu_IsOpen()) PauseMenu_Close();
     Dialogue_EnsureUI();
     var gs = GameState_Get();
     gs.ui.speaker = "";
-    gs.ui.lines_raw = DialogueDB_Get(_npc_id);
+    gs.ui.lines_raw = DialogueDB_Get(_dialogue_id);
     gs.ui.lines = [];
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
@@ -535,8 +535,8 @@ function Dialogue_FormatLines(_lines, _vars) {
     return out;
 }
 
-function DialogueDB_GetFormatted(_npc_id, _vars) {
-    var lines = DialogueDB_Get(_npc_id);
+function DialogueDB_GetFormatted(_dialogue_id, _vars) {
+    var lines = DialogueDB_Get(_dialogue_id);
     return Dialogue_FormatLines(lines, _vars);
 }
 

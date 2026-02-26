@@ -106,6 +106,12 @@ function Transition_Init() {
             encounter_zoom: 0,
             encounter_shake_x: 0,
             encounter_shake_y: 0,
+            encounter_cam: -1,
+            encounter_cam_valid: false,
+            encounter_cam_x: 0,
+            encounter_cam_y: 0,
+            encounter_cam_w: 0,
+            encounter_cam_h: 0,
             encounter_port_x: 0,
             encounter_port_y: 0,
             encounter_port_w: 0,
@@ -128,51 +134,72 @@ function Transition_IsInputLocked() {
 }
 
 function Transition_CaptureEncounterViewport(_tr) {
+    _tr.encounter_cam = -1;
+    _tr.encounter_cam_valid = false;
+    _tr.encounter_cam_x = 0;
+    _tr.encounter_cam_y = 0;
+    _tr.encounter_cam_w = 0;
+    _tr.encounter_cam_h = 0;
+
     if (!view_enabled) return;
     _tr.encounter_port_x = view_xport[0];
     _tr.encounter_port_y = view_yport[0];
     _tr.encounter_port_w = max(1, view_wport[0]);
     _tr.encounter_port_h = max(1, view_hport[0]);
+
+    var cam = view_camera[0];
+    if (!is_undefined(cam) && cam != -1) {
+        _tr.encounter_cam = cam;
+        _tr.encounter_cam_x = camera_get_view_x(cam);
+        _tr.encounter_cam_y = camera_get_view_y(cam);
+        _tr.encounter_cam_w = max(1, camera_get_view_width(cam));
+        _tr.encounter_cam_h = max(1, camera_get_view_height(cam));
+        _tr.encounter_cam_valid = true;
+    }
 }
 
 function Transition_ApplyEncounterViewport(_tr) {
     if (!view_enabled) return;
-    var scale = 1 + max(0, _tr.encounter_zoom);
-    var out_w = max(1, round(_tr.encounter_port_w * scale));
-    var out_h = max(1, round(_tr.encounter_port_h * scale));
-    var anchor_x = _tr.encounter_port_x + (_tr.encounter_port_w * 0.5);
-    var anchor_y = _tr.encounter_port_y + (_tr.encounter_port_h * 0.5);
+    if (!_tr.encounter_cam_valid) return;
 
+    var cam = _tr.encounter_cam;
+    if (is_undefined(cam) || cam == -1) return;
+
+    var scale = 1 + max(0, _tr.encounter_zoom);
+    var view_w = max(1, round(_tr.encounter_cam_w / scale));
+    var view_h = max(1, round(_tr.encounter_cam_h / scale));
+
+    var center_x = _tr.encounter_cam_x + (_tr.encounter_cam_w * 0.5);
+    var center_y = _tr.encounter_cam_y + (_tr.encounter_cam_h * 0.5);
     if (_tr.encounter_has_focus) {
-        var cam = view_camera[0];
-        if (!is_undefined(cam) && cam != -1) {
-            var cam_x = camera_get_view_x(cam);
-            var cam_y = camera_get_view_y(cam);
-            var cam_w = max(1, camera_get_view_width(cam));
-            var cam_h = max(1, camera_get_view_height(cam));
-            var nx = clamp((_tr.encounter_focus_x - cam_x) / cam_w, 0, 1);
-            var ny = clamp((_tr.encounter_focus_y - cam_y) / cam_h, 0, 1);
-            anchor_x = _tr.encounter_port_x + (_tr.encounter_port_w * nx);
-            anchor_y = _tr.encounter_port_y + (_tr.encounter_port_h * ny);
-        }
+        center_x = lerp(center_x, _tr.encounter_focus_x, 0.35);
+        center_y = lerp(center_y, _tr.encounter_focus_y, 0.35);
     }
 
-    var out_x = round(anchor_x - ((anchor_x - _tr.encounter_port_x) * scale) + _tr.encounter_shake_x);
-    var out_y = round(anchor_y - ((anchor_y - _tr.encounter_port_y) * scale) + _tr.encounter_shake_y);
+    var cam_x = round(center_x - (view_w * 0.5) + _tr.encounter_shake_x);
+    var cam_y = round(center_y - (view_h * 0.5) + _tr.encounter_shake_y);
 
-    view_xport[0] = out_x;
-    view_yport[0] = out_y;
-    view_wport[0] = out_w;
-    view_hport[0] = out_h;
+    camera_set_view_size(cam, view_w, view_h);
+    camera_set_view_pos(cam, cam_x, cam_y);
 }
 
 function Transition_RestoreEncounterViewport(_tr) {
     if (!view_enabled) return;
-    if (_tr.encounter_port_w <= 0 || _tr.encounter_port_h <= 0) return;
-    view_xport[0] = _tr.encounter_port_x;
-    view_yport[0] = _tr.encounter_port_y;
-    view_wport[0] = _tr.encounter_port_w;
-    view_hport[0] = _tr.encounter_port_h;
+
+    if (_tr.encounter_port_w > 0 && _tr.encounter_port_h > 0) {
+        view_xport[0] = _tr.encounter_port_x;
+        view_yport[0] = _tr.encounter_port_y;
+        view_wport[0] = _tr.encounter_port_w;
+        view_hport[0] = _tr.encounter_port_h;
+    }
+
+    if (_tr.encounter_cam_valid) {
+        var cam = _tr.encounter_cam;
+        if (!is_undefined(cam) && cam != -1) {
+            camera_set_view_size(cam, _tr.encounter_cam_w, _tr.encounter_cam_h);
+            camera_set_view_pos(cam, _tr.encounter_cam_x, _tr.encounter_cam_y);
+        }
+    }
 }
 
 function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus_x = undefined, _enc_focus_y = undefined) {
@@ -193,6 +220,12 @@ function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus
     tr.encounter_focus_x = 0;
     tr.encounter_focus_y = 0;
     tr.encounter_has_focus = false;
+    tr.encounter_cam = -1;
+    tr.encounter_cam_valid = false;
+    tr.encounter_cam_x = 0;
+    tr.encounter_cam_y = 0;
+    tr.encounter_cam_w = 0;
+    tr.encounter_cam_h = 0;
 
     if (_type == TRANSITION_TYPE_CUTSCENE) {
         tr.fade_out_frames = max(1, TRANSITION_CUTSCENE_FADE_OUT_FRAMES);
@@ -233,6 +266,16 @@ function Transition_RequestCutsceneFade(_room, _spawn_id = "", _face = -1, _use_
     return Transition_Begin(TRANSITION_TYPE_CUTSCENE, _room, _spawn_id, _face, _use_spawn);
 }
 
+function Transition_RequestBlackFlash(_fade_out_frames = TRANSITION_FLASH_FADE_OUT_FRAMES, _fade_in_frames = TRANSITION_FLASH_FADE_IN_FRAMES) {
+    var ok = Transition_Begin(TRANSITION_TYPE_FLASH, noone, "", -1, false);
+    if (!ok) return false;
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+    tr.fade_out_frames = max(1, _fade_out_frames);
+    tr.fade_in_frames = max(1, _fade_in_frames);
+    return true;
+}
+
 function Transition_RequestCutsceneById(_cutscene_id) {
     var gs = GameState_Get();
     gs.pending_cutscene_id = string(_cutscene_id);
@@ -270,6 +313,12 @@ function Transition_Finish() {
     tr.encounter_zoom = 0;
     tr.encounter_shake_x = 0;
     tr.encounter_shake_y = 0;
+    tr.encounter_cam = -1;
+    tr.encounter_cam_valid = false;
+    tr.encounter_cam_x = 0;
+    tr.encounter_cam_y = 0;
+    tr.encounter_cam_w = 0;
+    tr.encounter_cam_h = 0;
     tr.encounter_focus_x = 0;
     tr.encounter_focus_y = 0;
     tr.encounter_has_focus = false;
@@ -355,6 +404,24 @@ function Transition_Update() {
                 tr.alpha = 1;
                 if (tr.timer >= max(0, TRANSITION_ENCOUNTER_BLACK_HOLD_FRAMES)) {
                     tr.phase = 4;
+                    tr.timer = 0;
+                }
+            } else {
+                tr.timer += 1;
+                tr.alpha = 1 - clamp(tr.timer / tr.fade_in_frames, 0, 1);
+                if (tr.timer >= tr.fade_in_frames) {
+                    Transition_Finish();
+                }
+            }
+        } break;
+
+        case TRANSITION_TYPE_FLASH: {
+            if (tr.phase == 0) {
+                tr.timer += 1;
+                tr.alpha = clamp(tr.timer / tr.fade_out_frames, 0, 1);
+                if (tr.timer >= tr.fade_out_frames) {
+                    tr.alpha = 1;
+                    tr.phase = 1;
                     tr.timer = 0;
                 }
             } else {

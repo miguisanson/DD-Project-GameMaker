@@ -75,15 +75,45 @@ function Save_WriteSettingsConfig(_settings) {
     buffer_delete(buf);
 }
 
-function Save_LoadSlotStat(_slot) {
+function Save_IsCurrentSnapshot(_snap) {
+    if (!is_struct(_snap)) return false;
+    if (!variable_struct_exists(_snap, "save_version")) return false;
+    var ver = Save_ToReal(_snap.save_version, -1);
+    if (ver != SAVE_SNAPSHOT_VERSION) return false;
+    if (!variable_struct_exists(_snap, "statData")) return false;
+    return is_struct(_snap.statData);
+}
+
+function Save_TryLoadSnapshot(_slot, _delete_legacy = true) {
     var path = Save_Path(_slot);
     if (!file_exists(path)) return undefined;
 
-    var buf = buffer_load(path);
-    var json = buffer_read(buf, buffer_string);
-    buffer_delete(buf);
+    var snap = undefined;
+    var ok = false;
 
-    var snap = json_parse(json);
+    var buf = buffer_load(path);
+    if (buf != -1) {
+        var json = buffer_read(buf, buffer_string);
+        buffer_delete(buf);
+        if (is_string(json) && string_length(json) > 0) {
+            var c0 = string_char_at(json, 1);
+            if (c0 == "{" || c0 == "[") {
+                snap = json_parse(json);
+                ok = Save_IsCurrentSnapshot(snap);
+            }
+        }
+    }
+
+    if (!ok) {
+        if (_delete_legacy && file_exists(path)) file_delete(path);
+        return undefined;
+    }
+    return snap;
+}
+
+function Save_LoadSlotStat(_slot) {
+    var snap = Save_TryLoadSnapshot(_slot, true);
+    if (!is_struct(snap)) return undefined;
     if (variable_struct_exists(snap, "statData")) return snap.statData;
     return snap;
 }
@@ -220,6 +250,7 @@ function Save_BuildSnapshot() {
     stat.save_face = face;
 
     var snap = {};
+    snap.save_version = SAVE_SNAPSHOT_VERSION;
     snap.statData = stat;
     snap.levelData = Save_FilterPersistWithoutEnemies(gs.persist);
     return snap;
@@ -309,13 +340,8 @@ function Save_Write(_slot) {
 }
 
 function Save_Read(_slot) {
-    var path = Save_Path(_slot);
-    if (!file_exists(path)) return false;
-    var buf = buffer_load(path);
-    var json = buffer_read(buf, buffer_string);
-    buffer_delete(buf);
-
-    var snap = json_parse(json);
+    var snap = Save_TryLoadSnapshot(_slot, true);
+    if (!is_struct(snap)) return false;
     Save_ApplySnapshot(snap);
     var gs = GameState_Get();
     gs.save_slot = _slot;
@@ -328,14 +354,8 @@ function Save_Delete(_slot) {
 }
 
 function Save_SlotInfo(_slot) {
-    var path = Save_Path(_slot);
-    if (!file_exists(path)) return { exists: false, class_name: "", level: 0, room: "" };
-
-    var buf = buffer_load(path);
-    var json = buffer_read(buf, buffer_string);
-    buffer_delete(buf);
-
-    var snap = json_parse(json);
+    var snap = Save_TryLoadSnapshot(_slot, true);
+    if (!is_struct(snap)) return { exists: false, class_name: "", level: 0, room: "" };
     var stat = {};
     if (variable_struct_exists(snap, "statData")) stat = snap.statData; else stat = snap;
 

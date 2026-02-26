@@ -23,7 +23,7 @@ loot_table_key = "";
 
 switch_id = 0;
 
-npc_id = NPC_OLD_MAN;
+dialogue_profile_id = DIALOGUE_PROFILE_GENERIC;
 
 checkpoint_id = 0;
 

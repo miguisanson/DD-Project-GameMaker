@@ -1,2 +1,2 @@
 event_inherited();
-interact_kind = INTERACT_NPC;
+interact_kind = INTERACT_DIALOGUE;

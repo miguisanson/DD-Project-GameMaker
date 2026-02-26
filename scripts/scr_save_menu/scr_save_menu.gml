@@ -25,7 +25,7 @@ function SaveMenu_Open(_mode, _context) {
         col: 0,
         confirm: false,
         confirm_choice: 0,
-        confirm_mode: "delete", // delete | overwrite | save | saved
+        confirm_mode: "delete", // delete | overwrite | save | saved | message
         message: "",
         slot_info_cache: SaveMenu_BuildSlotInfoCache(),
         opened_frame: Input_Frame()
@@ -56,11 +56,11 @@ function SaveMenu_Handle() {
     var k_back = Input_UIBack();
 
     if (sm.confirm) {
-        if (sm.confirm_mode == "saved") {
+        if (sm.confirm_mode == "saved" || sm.confirm_mode == "message") {
             if (k_ok || k_back) {
                 SFX_PlayUI("ui_confirm");
                 sm.confirm = false;
-                SaveMenu_Close();
+                if (sm.confirm_mode == "saved") SaveMenu_Close();
             }
             gs.ui.save_menu = sm;
             return;
@@ -154,6 +154,12 @@ function SaveMenu_Handle() {
                     SFX_Play("load_confirm");
                     gs.save_slot = slot;
                     SaveMenu_Close();
+                } else {
+                    SFX_PlayUI("ui_back");
+                    sm.confirm = true;
+                    sm.confirm_mode = "message";
+                    sm.confirm_choice = 0;
+                    sm.message = "No save found.";
                 }
             } else {
                 SFX_PlayUI("ui_confirm");
@@ -318,7 +324,7 @@ function SaveMenu_Draw() {
         var msg_w = string_width(msg);
 
         var buttons_w = 0;
-        if (sm.confirm_mode != "saved") {
+        if (sm.confirm_mode != "saved" && sm.confirm_mode != "message") {
             buttons_w = (string_width("OK") + btn_pad_x * 2) + 14 + (string_width("Cancel") + btn_pad_x * 2);
         } else {
             buttons_w = string_width("OK") + btn_pad_x * 2;
@@ -344,7 +350,7 @@ function SaveMenu_Draw() {
         draw_text(msg_x, msg_y, msg);
         var btn_y = msg_y + line_h + popup_gap_y;
 
-        if (sm.confirm_mode != "saved") {
+        if (sm.confirm_mode != "saved" && sm.confirm_mode != "message") {
             var yes_label = "OK";
             var no_label = "Cancel";
             var yes_w = string_width(yes_label) + btn_pad_x * 2;

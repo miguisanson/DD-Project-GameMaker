@@ -108,8 +108,8 @@ function Interact_Handle(_inst) {
             has_dialogue_id = true;
         }
     }
-    if (!has_dialogue_id && _inst.interact_kind == INTERACT_NPC && variable_instance_exists(_inst, "npc_id")) {
-        base_id = _inst.npc_id;
+    if (!has_dialogue_id && _inst.interact_kind == INTERACT_DIALOGUE && variable_instance_exists(_inst, "dialogue_profile_id")) {
+        base_id = _inst.dialogue_profile_id;
         has_dialogue_id = true;
     }
 
