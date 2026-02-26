@@ -11,6 +11,14 @@ if (!is_struct(entry)) exit;
 
 RoomState_OnRoomExit();
 
+if (variable_struct_exists(entry, "cutscene_id")) {
+    var cutscene_id = string(entry.cutscene_id);
+    if (cutscene_id != "") {
+        Transition_RequestCutsceneById(cutscene_id);
+        exit;
+    }
+}
+
 var face_dir = -1;
 if (variable_struct_exists(entry, "face")) face_dir = entry.face;
 if (face_dir == -1 && variable_instance_exists(other, "face")) face_dir = other.face;

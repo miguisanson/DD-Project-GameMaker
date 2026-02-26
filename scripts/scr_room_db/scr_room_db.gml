@@ -41,6 +41,9 @@ function RoomDB_Init() {
     // Floor 9 <-> 9_5
     global.room_db.floor9_to_floor9_5 = { target_room: rm_floor9_5, target_spawn_id: "spawn_from_floor9", face: -1 };
     global.room_db.floor9_5_to_floor9 = { target_room: rm_floor9, target_spawn_id: "spawn_from_floor9_5", face: -1 };
+
+    // Floor 9_5 -> Ending cutscene
+    global.room_db.floor9_5_to_ending = { target_room: rm_cutscene, target_spawn_id: "", face: -1, cutscene_id: "ending" };
 }
 
 function RoomDB_Get(_id) {

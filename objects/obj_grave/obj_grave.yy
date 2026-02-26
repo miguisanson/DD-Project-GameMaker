@@ -1,11 +1,11 @@
 {
   "$GMObject":"",
-  "%Name":"obj_bone",
+  "%Name":"obj_grave",
   "eventList":[
     {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":0,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",},
   ],
   "managed":true,
-  "name":"obj_bone",
+  "name":"obj_grave",
   "overriddenProperties":[],
   "parent":{
     "name":"Interactable",
@@ -33,8 +33,8 @@
   "resourceVersion":"2.0",
   "solid":false,
   "spriteId":{
-    "name":"bone_asset",
-    "path":"sprites/bone_asset/bone_asset.yy",
+    "name":"spr_red",
+    "path":"sprites/spr_red/spr_red.yy",
   },
   "spriteMaskId":null,
   "visible":false,

@@ -21,6 +21,14 @@ function DialogueDB_Init() {
         "But it was already too late to speak up.",
         "You fell down."
     ];
+    global.dialogue_db[? "sys_ending_cutscene"] = [
+        "This is it. FInally out of this nightmare..",
+        " Just what was that..",
+        "...",
+        "It can't be--",
+        "...",
+        "Thank you for playing our game."
+    ];
     global.dialogue_db[? "sys_floor1_intro"] = ["Where am I?... I knew it there's something wrong with this place."];
 
     // interactables

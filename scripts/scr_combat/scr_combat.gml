@@ -92,6 +92,8 @@ function FX_Spawn(_sprite, _x, _y, _frames, _speed) {
     if (_sprite == noone) return noone;
     var fx = instance_create_layer(_x, _y, "Instances", obj_fx);
     fx.sprite_index = _sprite;
+    fx.image_xscale = SKILL_FX_SCALE;
+    fx.image_yscale = SKILL_FX_SCALE;
     if (room == rm_battle) fx.visible = false;
 
     var spd = _speed;
@@ -129,11 +131,15 @@ function FX_CenterOn(_sprite, _inst) {
         }
     }
     if (_sprite == noone) return { x: cx, y: cy };
+    var fx_scale = max(0.01, abs(SKILL_FX_SCALE));
     var w = sprite_get_width(_sprite);
     var h = sprite_get_height(_sprite);
     var ox = sprite_get_xoffset(_sprite);
     var oy = sprite_get_yoffset(_sprite);
-    return { x: cx - (w * 0.5) + ox, y: cy - (h * 0.5) + oy };
+    return {
+        x: cx - ((w * 0.5 - ox) * fx_scale),
+        y: cy - ((h * 0.5 - oy) * fx_scale)
+    };
 }
 
 function Combat_Log(_text) {

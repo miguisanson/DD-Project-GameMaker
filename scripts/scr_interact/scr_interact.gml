@@ -149,6 +149,57 @@ function Interact_Handle(_inst) {
         return;
     }
 
+    // Grave interaction: random text + optional ghost easter egg spawn.
+    if (variable_instance_exists(_inst, "grave_interactable") && _inst.grave_interactable) {
+        var grave_line = "An old grave rests here.";
+        if (variable_instance_exists(_inst, "grave_lines") && is_array(_inst.grave_lines) && array_length(_inst.grave_lines) > 0) {
+            grave_line = _inst.grave_lines[irandom(array_length(_inst.grave_lines) - 1)];
+        }
+        Dialogue_StartWithSpeaker(name, [grave_line]);
+
+        var ghost_chance = 0.60;
+        if (variable_instance_exists(_inst, "ghost_spawn_chance")) {
+            ghost_chance = clamp(real(_inst.ghost_spawn_chance), 0, 1);
+        }
+
+        if (random(1) < ghost_chance) {
+            var marker = noone;
+            var marker_id = "";
+            if (variable_instance_exists(_inst, "ghost_marker_id")) {
+                marker_id = string(_inst.ghost_marker_id);
+            }
+
+            if (marker_id != "") {
+                var marker_count = instance_number(obj_marker);
+                for (var marker_i = 0; marker_i < marker_count; marker_i++) {
+                    var marker_inst = instance_find(obj_marker, marker_i);
+                    if (instance_exists(marker_inst) && variable_instance_exists(marker_inst, "marker_id")) {
+                        if (string(marker_inst.marker_id) == marker_id) {
+                            marker = marker_inst;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (marker == noone) {
+                marker = instance_nearest(_inst.x, _inst.y, obj_marker);
+            }
+
+            if (marker != noone) {
+                var layer_name = layer_get_name(_inst.layer);
+                if (layer_name == "") layer_name = "Instances";
+                var ghost = instance_create_layer(marker.x, marker.y, layer_name, obj_ghost_easter_egg_temp);
+                if (variable_instance_exists(_inst, "ghost_duration_frames")) {
+                    ghost.life_frames = max(1, round(real(_inst.ghost_duration_frames)));
+                }
+            }
+        }
+
+        GameState_SyncLegacy();
+        return;
+    }
+
     // swap-state interaction
     if (variable_instance_exists(_inst, "swap_on_interact") && _inst.swap_on_interact) {
         var is_container = (variable_instance_exists(_inst, "is_container") && _inst.is_container);

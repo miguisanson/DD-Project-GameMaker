@@ -1,20 +1,17 @@
 {
   "$GMObject":"",
-  "%Name":"obj_bone",
+  "%Name":"obj_marker",
   "eventList":[
     {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":0,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",},
   ],
   "managed":true,
-  "name":"obj_bone",
+  "name":"obj_marker",
   "overriddenProperties":[],
   "parent":{
     "name":"Interactable",
     "path":"folders/Objects/Interactable.yy",
   },
-  "parentObjectId":{
-    "name":"obj_interactable",
-    "path":"objects/obj_interactable/obj_interactable.yy",
-  },
+  "parentObjectId":null,
   "persistent":false,
   "physicsAngularDamping":0.1,
   "physicsDensity":0.5,
@@ -24,7 +21,7 @@
   "physicsLinearDamping":0.1,
   "physicsObject":false,
   "physicsRestitution":0.1,
-  "physicsSensor":false,
+  "physicsSensor":true,
   "physicsShape":1,
   "physicsShapePoints":[],
   "physicsStartAwake":true,
@@ -33,8 +30,8 @@
   "resourceVersion":"2.0",
   "solid":false,
   "spriteId":{
-    "name":"bone_asset",
-    "path":"sprites/bone_asset/bone_asset.yy",
+    "name":"ghost_easter_egg",
+    "path":"sprites/ghost_easter_egg/ghost_easter_egg.yy",
   },
   "spriteMaskId":null,
   "visible":false,

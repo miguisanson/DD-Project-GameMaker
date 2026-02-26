@@ -1,3 +1,9 @@
+function Status_ResolveIcon(_asset_name, _fallback_sprite) {
+    var spr = asset_get_index(_asset_name);
+    if (is_real(spr) && spr != -1) return spr;
+    return _fallback_sprite;
+}
+
 function StatusDB_Init() {
     if (variable_global_exists("status_db") && ds_exists(global.status_db, ds_type_map)) return;
     global.status_db = ds_map_create();
@@ -5,7 +11,7 @@ function StatusDB_Init() {
     global.status_db[? STATUS_POISON] = {
         id: STATUS_POISON,
         name: "Poison",
-        icon_sprite: antidote,
+        icon_sprite: Status_ResolveIcon("poison_status", antidote),
         stat_mods: { str:0, agi:0, def:-1, intt:0, luck:0 },
         tick: { hp_min:-4, hp_max:-2, mp_min:0, mp_max:0 },
         stackable: false,
@@ -15,7 +21,7 @@ function StatusDB_Init() {
     global.status_db[? STATUS_BLEED] = {
         id: STATUS_BLEED,
         name: "Bleeding",
-        icon_sprite: bandage,
+        icon_sprite: Status_ResolveIcon("bleed_status", bandage),
         stat_mods: { str:0, agi:-1, def:0, intt:0, luck:0 },
         tick: { hp_min:-4, hp_max:-2, mp_min:0, mp_max:0 },
         stackable: false,
@@ -25,7 +31,7 @@ function StatusDB_Init() {
     global.status_db[? STATUS_BURN] = {
         id: STATUS_BURN,
         name: "Burning",
-        icon_sprite: fire_stand_moving,
+        icon_sprite: Status_ResolveIcon("burn_status", fire_stand_moving),
         stat_mods: { str:0, agi:0, def:-1, intt:0, luck:0 },
         tick: { hp_min:-5, hp_max:-3, mp_min:0, mp_max:0 },
         stackable: false,
@@ -35,7 +41,7 @@ function StatusDB_Init() {
     global.status_db[? STATUS_STUN] = {
         id: STATUS_STUN,
         name: "Stun",
-        icon_sprite: skull_1_asset,
+        icon_sprite: Status_ResolveIcon("stun_status", skull_1_asset),
         stat_mods: { str:0, agi:-2, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
