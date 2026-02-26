@@ -47,7 +47,3 @@ moving = false;
 move_dir = -1;
 move_timer = 0;
 tile_size = GRID_TILE_SIZE;
-if (just_returned) {
-    x = round(x / tile_size) * tile_size;
-    y = round(y / tile_size) * tile_size;
-}

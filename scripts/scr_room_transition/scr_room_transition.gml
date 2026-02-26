@@ -202,6 +202,15 @@ function Transition_RestoreEncounterViewport(_tr) {
     }
 }
 
+function Transition_PreRoomChange() {
+    var gs = GameState_Get();
+    if (is_struct(gs)) {
+        gs.last_room = noone;
+        gs.player_inst = noone;
+    }
+    global.player_inst = noone;
+}
+
 function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus_x = undefined, _enc_focus_y = undefined) {
     Transition_Init();
     var gs = GameState_Get();
@@ -340,6 +349,7 @@ function Transition_Update() {
                     tr.alpha = 1;
                     tr.phase = 1;
                     tr.timer = 0;
+                    Transition_PreRoomChange();
                     room_goto(tr.target_room);
                 }
             } else {
@@ -397,6 +407,7 @@ function Transition_Update() {
                     tr.encounter_port_h = 0;
                     tr.phase = 3;
                     tr.timer = 0;
+                    Transition_PreRoomChange();
                     room_goto(tr.target_room);
                 }
             } else if (tr.phase == 3) {
@@ -450,6 +461,7 @@ function Transition_Update() {
                     tr.alpha = 1;
                     tr.phase = 1;
                     tr.timer = 0;
+                    Transition_PreRoomChange();
                     room_goto(tr.target_room);
                 }
             } else {

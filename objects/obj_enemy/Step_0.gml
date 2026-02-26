@@ -1,4 +1,10 @@
 if (defeated) exit;
+if (Transition_IsActive()) {
+    moving = false;
+    move_timer = 0;
+    move_dir = -1;
+    exit;
+}
 
 var gs = GameState_Get();
 var pl = gs.player_inst;

@@ -646,11 +646,13 @@ function GameState_SetPlayerInst(_inst) {
     global.player_inst = _inst;
 }
 
-function GameState_SetBattleReturn(_room, _x, _y, _face) {
+function GameState_SetBattleReturn(_room, _x, _y, _face, _snap_to_grid = true) {
     var gs = GameState_Get();
-    var tile = GRID_TILE_SIZE;
-    _x = round(_x / tile) * tile;
-    _y = round(_y / tile) * tile;
+    if (_snap_to_grid) {
+        var tile = GRID_TILE_SIZE;
+        _x = round(_x / tile) * tile;
+        _y = round(_y / tile) * tile;
+    }
     gs.battle.return_room = _room;
     gs.battle.return_x = _x;
     gs.battle.return_y = _y;

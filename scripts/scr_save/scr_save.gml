@@ -268,11 +268,13 @@ function Save_BuildSnapshot() {
     var py = 0;
     var face = DOWN;
     var room_name = "";
-    if (instance_exists(gs.player_inst)) {
+    var pl_inst = gs.player_inst;
+    if (!instance_exists(pl_inst) && instance_exists(obj_player)) pl_inst = instance_find(obj_player, 0);
+    if (instance_exists(pl_inst)) {
         room_name = room_get_name(room);
-        px = gs.player_inst.x;
-        py = gs.player_inst.y;
-        if (variable_instance_exists(gs.player_inst, "face")) face = gs.player_inst.face;
+        px = pl_inst.x;
+        py = pl_inst.y;
+        if (variable_instance_exists(pl_inst, "face")) face = pl_inst.face;
     } else {
         room_name = room_get_name(gs.checkpoint.room);
         px = gs.checkpoint.x;
@@ -339,12 +341,19 @@ function Save_ApplySnapshot(_snap) {
     var px = variable_struct_exists(stat, "save_x") ? stat.save_x : (variable_struct_exists(_snap, "player_x") ? _snap.player_x : gs.checkpoint.x);
     var py = variable_struct_exists(stat, "save_y") ? stat.save_y : (variable_struct_exists(_snap, "player_y") ? _snap.player_y : gs.checkpoint.y);
     var face = variable_struct_exists(stat, "save_face") ? stat.save_face : DOWN;
+    px = Save_ToReal(px, gs.checkpoint.x);
+    py = Save_ToReal(py, gs.checkpoint.y);
+    face = round(Save_ToReal(face, DOWN));
 
     var room_id = asset_get_index(room_name);
     if (room_id == -1) room_id = rm_floor1;
 
     gs.in_main_menu = false;
     gs.last_room = noone;
+
+    // Save-load should always restore exact saved coordinates, never queued room spawns.
+    RoomTransition_Clear();
+    Transition_Finish();
 
     global.statData = stat;
     global.levelData = gs.persist;
@@ -356,7 +365,8 @@ function Save_ApplySnapshot(_snap) {
     gs.skip_room_save = true;
     global.skipRoomSave = true;
 
-    GameState_SetBattleReturn(room_id, px, py, face);
+    // Preserve exact saved position when loading from a slot.
+    GameState_SetBattleReturn(room_id, px, py, face, false);
     GameState_SetJustReturned(true);
     Transition_RequestRoomFade(room_id);
 }
@@ -368,6 +378,8 @@ function Save_Path(_slot) {
 }
 
 function Save_Write(_slot) {
+    // Saving resets regular enemies globally; boss defeat flags remain authoritative.
+    Enemy_ResetAll();
     var snap = Save_BuildSnapshot();
     var json = json_stringify(snap);
     var path = Save_Path(_slot);

@@ -133,11 +133,8 @@ function SaveMenu_Handle() {
                     }
                     SFX_Play("save_confirm");
                     gs.save_slot = sm.slot + 1;
-                    if (sm.context == "bed") Enemy_ResetAll();
-                    sm.message = "Game saved.";
-                    sm.confirm_mode = "saved";
-                    sm.confirm_choice = 0;
-                    gs.ui.save_menu = sm;
+                    SaveMenu_Close();
+                    Save_Read(gs.save_slot);
                     return;
                 } else if (sm.confirm_mode == "save") {
                     SaveMenu_Log("save confirmed slot " + string(sm.slot + 1));
@@ -147,11 +144,8 @@ function SaveMenu_Handle() {
                     }
                     SFX_Play("save_confirm");
                     gs.save_slot = sm.slot + 1;
-                    if (sm.context == "bed") Enemy_ResetAll();
-                    sm.message = "Game saved.";
-                    sm.confirm_mode = "saved";
-                    sm.confirm_choice = 0;
-                    gs.ui.save_menu = sm;
+                    SaveMenu_Close();
+                    Save_Read(gs.save_slot);
                     return;
                 }
             }
