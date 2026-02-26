@@ -34,13 +34,7 @@ function CharacterCreate_Player(_class_id) {
 }
 
 function Player_DefaultSkills(_class_id) {
-    switch (_class_id) {
-        case CLASS_ARCHER: return [SKILL_WOUND, SKILL_TAKE_AIM];
-        case CLASS_KNIGHT: return [SKILL_HORIZ_SLASH, SKILL_MUSCLE_UP];
-        case CLASS_MAGE:   return [SKILL_FIREBALL, SKILL_MEDITATION];
-        case CLASS_NOBODY: return [];
-    }
-    return [SKILL_WOUND];
+    return [];
 }
 
 function Player_EnsureSpriteSet() {
@@ -610,7 +604,14 @@ function GameState_SetCheckpoint(_room, _x, _y) {
 
 function Player_LearnSkill(_ch, _skill_id) {
     if (!is_array(_ch.skills)) _ch.skills = [];
-    if (array_index_of(_ch.skills, _skill_id) == -1) {
+    var exists = false;
+    for (var i = 0; i < array_length(_ch.skills); i++) {
+        if (_ch.skills[i] == _skill_id) {
+            exists = true;
+            break;
+        }
+    }
+    if (!exists) {
         array_push(_ch.skills, _skill_id);
     }
     return _ch;

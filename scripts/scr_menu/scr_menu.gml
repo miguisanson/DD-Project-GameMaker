@@ -13,6 +13,12 @@ function Menu_Ensure() {
             header_focus: true,
             inv_index: 0,
             inv_scroll: 0,
+            inv_popup_open: false,
+            inv_popup_mode: "",
+            inv_popup_choice: 1,
+            inv_popup_message: "",
+            inv_popup_item_id: -1,
+            inv_popup_block_frame: UI_OPENED_FRAME_NONE,
             skill_index: 0,
             skill_scroll: 0,
             stats_focus: false,
@@ -79,6 +85,35 @@ function Menu_IsEquipped(_ch, _item_id) {
     return false;
 }
 
+function Menu_InvPopupOpenConfirm(_m, _item_id) {
+    _m.inv_popup_open = true;
+    _m.inv_popup_mode = "confirm";
+    _m.inv_popup_choice = 1; // default to Cancel
+    _m.inv_popup_message = "Learn a skill";
+    _m.inv_popup_item_id = _item_id;
+    _m.inv_popup_block_frame = Input_Frame() + 1;
+    return _m;
+}
+
+function Menu_InvPopupOpenMessage(_m, _msg) {
+    _m.inv_popup_open = true;
+    _m.inv_popup_mode = "message";
+    _m.inv_popup_choice = 0;
+    _m.inv_popup_message = _msg;
+    _m.inv_popup_block_frame = Input_Frame() + 1;
+    return _m;
+}
+
+function Menu_InvPopupClose(_m) {
+    _m.inv_popup_open = false;
+    _m.inv_popup_mode = "";
+    _m.inv_popup_choice = 1;
+    _m.inv_popup_message = "";
+    _m.inv_popup_item_id = -1;
+    _m.inv_popup_block_frame = UI_OPENED_FRAME_NONE;
+    return _m;
+}
+
 function Menu_StatsSync() {
     var gs = GameState_Get();
     if (!is_struct(gs.player_ch)) return;
@@ -130,6 +165,69 @@ function Menu_HandleInput() {
     var k_right = Input_UIPressed("menu_right");
     var k_ok = Input_UIConfirm();
     var k_back = Input_UIBack();
+
+    if (variable_struct_exists(m, "inv_popup_open") && m.inv_popup_open) {
+        var frame = Input_Frame();
+        if (m.inv_popup_block_frame != UI_OPENED_FRAME_NONE && frame <= m.inv_popup_block_frame) {
+            gs.ui.menu = m;
+            return;
+        }
+
+        if (m.inv_popup_mode == "confirm") {
+            if (k_left || k_right) {
+                m.inv_popup_choice = 1 - m.inv_popup_choice;
+                SFX_PlayUI("ui_move");
+            }
+
+            if (k_back) {
+                SFX_PlayUI("ui_back");
+                m = Menu_InvPopupClose(m);
+                gs.ui.menu = m;
+                return;
+            }
+
+            if (k_ok) {
+                SFX_PlayUI("ui_confirm");
+                if (m.inv_popup_choice == 0) {
+                    var use_result = Item_Use(m.inv_popup_item_id, ch, ch);
+                    if (use_result.ok) {
+                        ch.inventory = Inv_Remove(ch.inventory, m.inv_popup_item_id, 1);
+                        GameState_SetPlayer(ch);
+
+                        var inv_count = array_length(ch.inventory);
+                        if (inv_count <= 0) {
+                            m.inv_index = 0;
+                            m.inv_scroll = 0;
+                        } else {
+                            m.inv_index = clamp(m.inv_index, 0, inv_count - 1);
+                            if (m.inv_index < m.inv_scroll) m.inv_scroll = m.inv_index;
+                            var visible_rows = Menu_GetLayout().rows_visible;
+                            if (m.inv_index >= m.inv_scroll + visible_rows) m.inv_scroll = m.inv_index - visible_rows + 1;
+                        }
+                    }
+                    m = Menu_InvPopupOpenMessage(m, use_result.msg);
+                } else {
+                    m = Menu_InvPopupClose(m);
+                }
+            }
+
+            gs.ui.menu = m;
+            return;
+        }
+
+        if (m.inv_popup_mode == "message") {
+            if (k_ok || k_back) {
+                if (k_ok) SFX_PlayUI("ui_confirm"); else SFX_PlayUI("ui_back");
+                m = Menu_InvPopupClose(m);
+            }
+            gs.ui.menu = m;
+            return;
+        }
+
+        m = Menu_InvPopupClose(m);
+        gs.ui.menu = m;
+        return;
+    }
 
     if (k_back) {
         SFX_PlayUI("ui_back");
@@ -196,6 +294,22 @@ function Menu_HandleInput() {
 
         if (m.inv_index < m.inv_scroll) m.inv_scroll = m.inv_index;
         if (m.inv_index >= m.inv_scroll + rows_visible) m.inv_scroll = m.inv_index - rows_visible + 1;
+
+        if (k_ok) {
+            var selected_item_id = -1;
+            if (m.inv_index >= 0 && m.inv_index < count && is_struct(items[m.inv_index]) && variable_struct_exists(items[m.inv_index], "id")) {
+                selected_item_id = items[m.inv_index].id;
+            }
+
+            SFX_PlayUI("ui_confirm");
+            if (selected_item_id != -1 && Item_IsSkillbook(ItemDB_Get(selected_item_id))) {
+                m = Menu_InvPopupOpenConfirm(m, selected_item_id);
+            } else {
+                m = Menu_InvPopupOpenMessage(m, "Can't use that.");
+            }
+            gs.ui.menu = m;
+            return;
+        }
     }
 
     if (m.tab == 1) {
@@ -588,6 +702,109 @@ function Menu_Draw() {
             draw_set_color((m.stats_focus && m.stats_row == action_row && m.stats_col == 1) ? c_black : c_white);
             draw_text(cancel_x, action_y, cancel_text);
             }
+    }
+
+    if (variable_struct_exists(m, "inv_popup_open") && m.inv_popup_open) {
+        var popup_msg = "Learn a skill";
+        if (m.inv_popup_mode == "message") popup_msg = string(m.inv_popup_message);
+
+        var popup_pad_x = 12;
+        var popup_pad_y = 8;
+        var popup_gap_y = 8;
+        var btn_pad_x = 8;
+        var line_h_popup = string_height("A");
+        var btn_h = line_h_popup + 4;
+        var msg_w = string_width(popup_msg);
+        var popup_w = 0;
+        var popup_h = 0;
+        var px1 = 0;
+        var py1 = 0;
+        var px2 = 0;
+        var py2 = 0;
+
+        if (m.inv_popup_mode == "confirm") {
+            var yes_label = "Confirm";
+            var no_label = "Cancel";
+            var yes_w = string_width(yes_label) + btn_pad_x * 2;
+            var no_w = string_width(no_label) + btn_pad_x * 2;
+            var btn_gap_x = 14;
+            var total_btn_w = yes_w + btn_gap_x + no_w;
+
+            popup_w = max(180, max(msg_w + popup_pad_x * 2, total_btn_w + popup_pad_x * 2));
+            popup_h = popup_pad_y + line_h_popup + popup_gap_y + btn_h + popup_pad_y;
+            px1 = bx + (bw - popup_w) * 0.5;
+            py1 = by + (bh - popup_h) * 0.62;
+            px2 = px1 + popup_w;
+            py2 = py1 + popup_h;
+
+            draw_set_alpha(0.85);
+            draw_set_color(c_black);
+            draw_rectangle(px1, py1, px2, py2, false);
+            draw_set_alpha(1);
+            draw_set_color(c_white);
+            draw_rectangle(px1, py1, px2, py2, true);
+
+            var msg_x = px1 + (popup_w - msg_w) * 0.5;
+            var msg_y = py1 + popup_pad_y;
+            draw_set_color(c_white);
+            draw_text(msg_x, msg_y, popup_msg);
+
+            var btn_y = msg_y + line_h_popup + popup_gap_y;
+            var yes_x = px1 + (popup_w - total_btn_w) * 0.5;
+            var no_x = yes_x + yes_w + btn_gap_x;
+
+            if (m.inv_popup_choice == 0) {
+                draw_set_color(c_white);
+                draw_rectangle(yes_x, btn_y, yes_x + yes_w, btn_y + btn_h, false);
+                draw_set_color(c_black);
+                draw_rectangle(yes_x, btn_y, yes_x + yes_w, btn_y + btn_h, true);
+                draw_set_color(c_black);
+            } else {
+                draw_set_color(c_white);
+            }
+            draw_text(yes_x + (yes_w - string_width(yes_label)) * 0.5, btn_y + 2, yes_label);
+
+            if (m.inv_popup_choice == 1) {
+                draw_set_color(c_white);
+                draw_rectangle(no_x, btn_y, no_x + no_w, btn_y + btn_h, false);
+                draw_set_color(c_black);
+                draw_rectangle(no_x, btn_y, no_x + no_w, btn_y + btn_h, true);
+                draw_set_color(c_black);
+            } else {
+                draw_set_color(c_white);
+            }
+            draw_text(no_x + (no_w - string_width(no_label)) * 0.5, btn_y + 2, no_label);
+        } else {
+            var ok_label = "OK";
+            var ok_w = string_width(ok_label) + btn_pad_x * 2;
+            popup_w = max(180, max(msg_w + popup_pad_x * 2, ok_w + popup_pad_x * 2));
+            popup_h = popup_pad_y + line_h_popup + popup_gap_y + btn_h + popup_pad_y;
+            px1 = bx + (bw - popup_w) * 0.5;
+            py1 = by + (bh - popup_h) * 0.62;
+            px2 = px1 + popup_w;
+            py2 = py1 + popup_h;
+
+            draw_set_alpha(0.85);
+            draw_set_color(c_black);
+            draw_rectangle(px1, py1, px2, py2, false);
+            draw_set_alpha(1);
+            draw_set_color(c_white);
+            draw_rectangle(px1, py1, px2, py2, true);
+
+            var msg_x2 = px1 + (popup_w - msg_w) * 0.5;
+            var msg_y2 = py1 + popup_pad_y;
+            draw_set_color(c_white);
+            draw_text(msg_x2, msg_y2, popup_msg);
+
+            var btn_y2 = msg_y2 + line_h_popup + popup_gap_y;
+            var ok_x = px1 + (popup_w - ok_w) * 0.5;
+            draw_set_color(c_white);
+            draw_rectangle(ok_x, btn_y2, ok_x + ok_w, btn_y2 + btn_h, false);
+            draw_set_color(c_black);
+            draw_rectangle(ok_x, btn_y2, ok_x + ok_w, btn_y2 + btn_h, true);
+            draw_set_color(c_black);
+            draw_text(ok_x + (ok_w - string_width(ok_label)) * 0.5, btn_y2 + 2, ok_label);
+        }
     }
 
 }

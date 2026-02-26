@@ -716,6 +716,68 @@ function Item_IsConsumable(_item) {
     return _item.type == ITEM_CONSUMABLE;
 }
 
+function Item_IsSkillbook(_item_or_id) {
+    var item = _item_or_id;
+    if (!is_struct(item)) item = ItemDB_Get(_item_or_id);
+    if (!is_struct(item)) return false;
+    if (!Item_IsConsumable(item)) return false;
+    if (!variable_struct_exists(item, "use") || !is_struct(item.use)) return false;
+    if (!variable_struct_exists(item.use, "effect") || item.use.effect != "learn_skill") return false;
+    if (!variable_struct_exists(item.use, "skill_id")) return false;
+    return true;
+}
+
+function Item_SkillbookValidate(_item_or_id, _user) {
+    var out = { ok: false, msg: "Can't use that.", skill_id: -1, skill_name: "" };
+    var item = _item_or_id;
+    if (!is_struct(item)) item = ItemDB_Get(_item_or_id);
+    if (!Item_IsSkillbook(item)) return out;
+
+    var skill_id = item.use.skill_id;
+    var skill_cfg = SkillDB_Get(skill_id);
+    var skill_name = "that skill";
+    if (is_struct(skill_cfg) && variable_struct_exists(skill_cfg, "name")) {
+        skill_name = string(skill_cfg.name);
+    }
+
+    out.skill_id = skill_id;
+    out.skill_name = skill_name;
+
+    if (!is_struct(_user) || !variable_struct_exists(_user, "class_id")) {
+        out.msg = "Can't use that.";
+        return out;
+    }
+
+    var class_id = _user.class_id;
+    if (class_id == CLASS_NOBODY) {
+        out.msg = "You are not ready to learn this yet.";
+        return out;
+    }
+
+    if (!Skill_ClassAllowed(skill_cfg, class_id)) {
+        out.msg = "Your class cannot learn " + skill_name + ".";
+        return out;
+    }
+
+    var already_known = false;
+    if (is_array(_user.skills)) {
+        for (var si = 0; si < array_length(_user.skills); si++) {
+            if (_user.skills[si] == skill_id) {
+                already_known = true;
+                break;
+            }
+        }
+    }
+    if (already_known) {
+        out.msg = "Already know " + skill_name + ".";
+        return out;
+    }
+
+    out.ok = true;
+    out.msg = "Learned " + skill_name + ".";
+    return out;
+}
+
 function Item_ComputeAmount(_user, _use) {
     var minv = 0;
     var maxv = 0;
@@ -783,24 +845,13 @@ function Item_Use(_item_id, _user, _target) {
             result.msg = "No status to cure.";
         }
     } else if (eff == "learn_skill") {
-        if (variable_struct_exists(item.use, "skill_id")) {
-            if (variable_struct_exists(_user, "class_id") && _user.class_id == CLASS_NOBODY) {
-                result.ok = false;
-                result.msg = "You are not ready to learn this yet.";
-                return result;
-            }
-            var sk = item.use.skill_id;
-            var already = false;
-            if (is_array(_user.skills) && array_index_of(_user.skills, sk) != -1) already = true;
-            if (already) {
-                var s_cfg = SkillDB_Get(sk);
-                result.ok = false;
-                result.msg = "Already know " + s_cfg.name + ".";
-            } else {
-                _user = Player_LearnSkill(_user, sk);
-                var s_cfg2 = SkillDB_Get(sk);
-                result.msg = "Learned " + s_cfg2.name + ".";
-            }
+        var learn = Item_SkillbookValidate(item, _user);
+        if (!learn.ok) {
+            result.ok = false;
+            result.msg = learn.msg;
+        } else {
+            _user = Player_LearnSkill(_user, learn.skill_id);
+            result.msg = learn.msg;
         }
     }
 
