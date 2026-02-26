@@ -43,6 +43,14 @@ if (room == rm_battle && is_struct(ch)) {
     var bar_y = margin + gui_off_y;
     draw_sprite_ext(hp_bar_sprite, hp_frame, bar_x, bar_y, scale, scale, 0, c_white, 1);
     draw_sprite_ext(mp_bar_sprite, mp_frame, bar_x, bar_y + bar_h + 4, scale, scale, 0, c_white, 1);
+    if (variable_instance_exists(id, "hud_hurt_flash_timer") && hud_hurt_flash_timer > 0) {
+        var flash_t = clamp(hud_hurt_flash_timer / max(1, UI_HUD_HURT_FLASH_FRAMES), 0, 1);
+        var flash_a = UI_HUD_HURT_FLASH_ALPHA * flash_t;
+        gpu_set_blendmode(bm_add);
+        draw_sprite_ext(hp_bar_sprite, hp_frame, bar_x, bar_y, scale, scale, 0, c_white, flash_a);
+        draw_sprite_ext(mp_bar_sprite, mp_frame, bar_x, bar_y + bar_h + 4, scale, scale, 0, c_white, flash_a);
+        gpu_set_blendmode(bm_normal);
+    }
 
     draw_set_color(c_white);
     var hp_text = string(ch.hp) + " / " + string(ch.max_hp);

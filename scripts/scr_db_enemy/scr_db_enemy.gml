@@ -8,22 +8,19 @@ function EnemyDB_Init() {
     global.enemy_db[? ENEMY_SLIME] = {
         id: ENEMY_SLIME,
         name: "Slime",
-        level: 1,
-        stats: { str: 7, agi: 7, def: 8, intt: 5, luck: 6 },
+        level: 2,
+        stats: { str: 9, agi: 10, def: 8, intt: 5, luck: 7 },
         base_hp: 10,
         base_mp: 0,
-        hd: 6,
+        hd: 7,
         mp_gain: 0,
         weapon_id: 0,
         sprite: slime_profile,
         sprite_world: slime_moving,
-        exp: 6,
+        exp: 10,
         loot_key: "enemy_basic",
         ai: { scan_radius: 32, think_rate: 20, forget_delay: 15, leash_mult: 3, wander_chance: 4, move_speed: 1 },
-        skills: [],
-        on_hit_status: -1,
-        on_hit_status_turns: 0,
-        on_hit_status_chance: 0,
+        skills: [SKILL_SOLIDIFY],
         traits: [],
         is_boss: false
     };
@@ -43,10 +40,7 @@ function EnemyDB_Init() {
         exp: 10,
         loot_key: "enemy_basic",
         ai: { scan_radius: 32, think_rate: 14, forget_delay: 30, leash_mult: 3, wander_chance: 3, move_speed: 1.1 },
-        skills: [],
-        on_hit_status: STATUS_POISON,
-        on_hit_status_turns: 2,
-        on_hit_status_chance: 0.35,
+        skills: [SKILL_POISON_FANGS],
         traits: [],
         is_boss: false
     };
@@ -66,10 +60,7 @@ function EnemyDB_Init() {
         exp: 10,
         loot_key: "enemy_basic",
         ai: { scan_radius: 36, think_rate: 14, forget_delay: 30, leash_mult: 3, wander_chance: 3, move_speed: 1.1 },
-        skills: [],
-        on_hit_status: -1,
-        on_hit_status_turns: 0,
-        on_hit_status_chance: 0,
+        skills: [SKILL_BITE],
         traits: [],
         is_boss: false
     };
@@ -89,10 +80,7 @@ function EnemyDB_Init() {
         exp: 36,
         loot_key: "enemy_mid",
         ai: { scan_radius: 80, think_rate: 10, forget_delay: 75, leash_mult: 5, wander_chance: 1, move_speed: 1.3 },
-        skills: [SKILL_FIREBALL],
-        on_hit_status: -1,
-        on_hit_status_turns: 0,
-        on_hit_status_chance: 0,
+        skills: [SKILL_SCORCHING_TOUCH],
         traits: [],
         is_boss: false
     };
@@ -112,10 +100,7 @@ function EnemyDB_Init() {
         exp: 28,
         loot_key: "enemy_mid",
         ai: { scan_radius: 44, think_rate: 12, forget_delay: 45, leash_mult: 3, wander_chance: 2, move_speed: 1 },
-        skills: [SKILL_POISON_MIST],
-        on_hit_status: -1,
-        on_hit_status_turns: 0,
-        on_hit_status_chance: 0,
+        skills: [SKILL_VINE_TRAP],
         traits: [],
         is_boss: false
     };
@@ -135,10 +120,7 @@ function EnemyDB_Init() {
         exp: 18,
         loot_key: "enemy_mid",
         ai: { scan_radius: 64, think_rate: 8, forget_delay: 45, leash_mult: 4, wander_chance: 2, move_speed: 1.2 },
-        skills: [],
-        on_hit_status: -1,
-        on_hit_status_turns: 0,
-        on_hit_status_chance: 0,
+        skills: [SKILL_BLOODTHIRSTY],
         traits: [],
         is_boss: false
     };
@@ -158,10 +140,7 @@ function EnemyDB_Init() {
         exp: 48,
         loot_key: "enemy_mid",
         ai: { scan_radius: 40, think_rate: 1, forget_delay: 60, leash_mult: 4, wander_chance: 0, move_speed: 3 },
-        skills: [],
-        on_hit_status: -1,
-        on_hit_status_turns: 0,
-        on_hit_status_chance: 0,
+        skills: [SKILL_GHOST_CUT],
         traits: [],
         is_boss: false
     };
@@ -181,10 +160,7 @@ function EnemyDB_Init() {
         exp: 70,
         loot_key: "enemy_elite",
         ai: { scan_radius: 88, think_rate: 8, forget_delay: 80, leash_mult: 5, wander_chance: 1, move_speed: 1.3 },
-        skills: [SKILL_FIREBALL, SKILL_ICE_SPEAR],
-        on_hit_status: -1,
-        on_hit_status_turns: 0,
-        on_hit_status_chance: 0,
+        skills: [SKILL_STEAL],
         traits: [],
         is_boss: false
     };
@@ -204,10 +180,7 @@ function EnemyDB_Init() {
         exp: 116,
         loot_key: "enemy_boss",
         ai: { scan_radius: 64, think_rate: 8, forget_delay: 60, leash_mult: 4, wander_chance: 2, move_speed: 1.15 },
-        skills: [SKILL_HORIZ_SLASH, SKILL_WOUND],
-        on_hit_status: -1,
-        on_hit_status_turns: 0,
-        on_hit_status_chance: 0,
+        skills: [SKILL_RAMMING, SKILL_RAMPAGE],
         traits: [],
         is_boss: true
     };
@@ -227,10 +200,7 @@ function EnemyDB_Init() {
         exp: 170,
         loot_key: "enemy_boss",
         ai: { scan_radius: 0, think_rate: 30, forget_delay: 0, leash_mult: 1, wander_chance: 0, move_speed: 1 },
-        skills: [SKILL_HORIZ_SLASH, SKILL_FIREBALL, SKILL_ICE_SPEAR, SKILL_POISON_MIST],
-        on_hit_status: -1,
-        on_hit_status_turns: 0,
-        on_hit_status_chance: 0,
+        skills: [SKILL_CURSE, SKILL_BLESSING, SKILL_FINAL_FURY],
         traits: [],
         is_boss: true
     };
@@ -264,9 +234,6 @@ function EnemyDB_Get(_enemy_id) {
         loot_key: "enemy_basic",
         ai: { scan_radius: ENEMY_SCAN_RADIUS_DEFAULT, think_rate: 15, forget_delay: 30, leash_mult: 2, wander_chance: 4, move_speed: 1 },
         skills: [],
-        on_hit_status: -1,
-        on_hit_status_turns: 0,
-        on_hit_status_chance: 0,
         traits: [],
         is_boss: false
     };

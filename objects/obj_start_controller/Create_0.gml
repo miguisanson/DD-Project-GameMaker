@@ -1,5 +1,8 @@
 main_index = 0;
 main_options = ["New Game", "Load Game", "Settings", "Exit Game"];
+difficulty_options = ["Easy", "Normal", "Hard"];
+difficulty_values = [DIFFICULTY_EASY, DIFFICULTY_NORMAL, DIFFICULTY_HARD];
+difficulty_index = 1;
 
 settings_index = 0;
 settings_volume_step = SETTINGS_VOLUME_STEP;

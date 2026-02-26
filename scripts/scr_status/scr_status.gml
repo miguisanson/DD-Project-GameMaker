@@ -111,6 +111,39 @@ function StatusDB_Init() {
         stackable: false
     };
 
+    global.status_db[? STATUS_SOLIDIFY] = {
+        id: STATUS_SOLIDIFY,
+        name: "Solidify",
+        icon_sprite: Status_ResolveIcon("stun_status", rock1),
+        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
+        stackable: false,
+        force_dodge: true,
+        consume_on_defend: true
+    };
+
+    global.status_db[? STATUS_BLOODTHIRSTY] = {
+        id: STATUS_BLOODTHIRSTY,
+        name: "Bloodthirsty",
+        icon_sprite: Status_ResolveIcon("bleed_status", torch_asset_moving),
+        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
+        stackable: false,
+        guard_mult: 0.5,
+        dmg_mult: 1.08,
+        consume_on_hit: true
+    };
+
+    global.status_db[? STATUS_BLESSING] = {
+        id: STATUS_BLESSING,
+        name: "Blessing",
+        icon_sprite: Status_ResolveIcon("burn_status", mp_potion),
+        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
+        stackable: false,
+        guard_mult: 0.7
+    };
+
     if (variable_global_exists("state") && is_struct(global.state)) {
         global.state.status_db = global.status_db;
     }

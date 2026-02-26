@@ -193,7 +193,18 @@ function Battle_Message(_bc, _text, _next_state, _fx = noone) {
 
 function Battle_GrantRewards(_p, _e) {
     if (is_struct(_e)) {
-        if (variable_struct_exists(_e, "exp")) _p = Player_AddExp(_p, _e.exp);
+        if (variable_struct_exists(_e, "exp")) {
+            var exp_gain = max(0, round(real(_e.exp)));
+            if (exp_gain > 0) {
+                var diff = Difficulty_Profile();
+                var exp_mult = 1;
+                if (is_struct(diff) && variable_struct_exists(diff, "player_exp_mult")) {
+                    exp_mult = max(0, real(diff.player_exp_mult));
+                }
+                exp_gain = max(1, round(exp_gain * exp_mult));
+                _p = Player_AddExp(_p, exp_gain);
+            }
+        }
 
         // shared loot system
         var loot = Loot_RollEnemy(_e);
@@ -442,8 +453,8 @@ function Battle_RunAttempt(_bc) {
     var p = _bc.p;
     var e = _bc.e;
 
-    var pr = RollD20() + StatMod(Stat_Get(p, STAT_AGI));
-    var er = RollD20() + StatMod(Stat_Get(e, STAT_AGI));
+    var pr = RollD20() + StatMod(Combat_EffectiveStat(p, STAT_AGI));
+    var er = RollD20() + StatMod(Combat_EffectiveStat(e, STAT_AGI));
 
     if (pr >= er) {
         EnemyPersist_ResolveBattle(false);
@@ -464,6 +475,57 @@ function Battle_EndRun(_bc) {
     Transition_RequestRoomFade(gs.battle.return_room);
 }
 
+function Battle_EnemyInitActionBudget(_bc, _e) {
+    if (!variable_instance_exists(_bc, "enemy_actions_remaining")) _bc.enemy_actions_remaining = 0;
+    if (!variable_instance_exists(_bc, "enemy_turn_used_skills") || !is_array(_bc.enemy_turn_used_skills)) _bc.enemy_turn_used_skills = [];
+    if (_bc.enemy_actions_remaining > 0) return;
+
+    _bc.enemy_turn_used_skills = [];
+
+    var actions = 1;
+    if (is_array(_e.skills) && array_length(_e.skills) > 0) {
+        for (var i = 0; i < array_length(_e.skills); i++) {
+            var sid = _e.skills[i];
+            var sk = SkillDB_Get(sid);
+            if (!is_struct(sk) || sk.id == -1) continue;
+            if (!variable_struct_exists(sk, "enemy_passive_action_budget") || !sk.enemy_passive_action_budget) continue;
+            if (!Skill_EnemyCanTrigger(sk, _e, _e)) continue;
+            if (!variable_struct_exists(sk, "set_enemy_actions")) continue;
+            actions = max(actions, max(1, round(real(sk.set_enemy_actions))));
+        }
+    }
+
+    _bc.enemy_actions_remaining = clamp(actions, 1, ENEMY_ACTION_CHAIN_MAX);
+}
+
+function Battle_EnemyChooseSkill(_e, _p, _actions_remaining = -1, _used_skills = []) {
+    if (!is_array(_e.skills) || array_length(_e.skills) <= 0) return -1;
+
+    var candidates = [];
+    for (var i = 0; i < array_length(_e.skills); i++) {
+        var sid = _e.skills[i];
+        var sk = SkillDB_Get(sid);
+        if (!is_struct(sk) || sk.id == -1) continue;
+        if (variable_struct_exists(sk, "enemy_passive_action_budget") && sk.enemy_passive_action_budget) continue;
+        if (variable_struct_exists(sk, "enemy_once_per_turn") && sk.enemy_once_per_turn) {
+            var already_used = false;
+            for (var us = 0; us < array_length(_used_skills); us++) {
+                if (_used_skills[us] == sid) { already_used = true; break; }
+            }
+            if (already_used) continue;
+        }
+        if (!Skill_CanUse(_e, sk)) continue;
+        if (!Skill_EnemyCanTrigger(sk, _e, _p, _actions_remaining)) continue;
+
+        var chance = Skill_EnemyUseChance(sk);
+        if (chance <= 0) continue;
+        if (random(1) <= chance) array_push(candidates, sid);
+    }
+
+    if (array_length(candidates) <= 0) return -1;
+    return candidates[irandom(array_length(candidates) - 1)];
+}
+
 function Battle_EnemyAct(_bc) {
     var p = _bc.p;
     var e = _bc.e;
@@ -472,56 +534,72 @@ function Battle_EnemyAct(_bc) {
         e = Status_Tick(e);
         if (Battle_CheckEnd(_bc, p, e)) return;
         Battle_Message(_bc, e.name + " is stunned!", BSTATE_MENU);
+        _bc.enemy_actions_remaining = 0;
         _bc.turn = TURN_PLAYER;
         _bc.p = p;
         _bc.e = e;
         return;
     }
 
-    var use_skill = false;
-    var skill_id = -1;
-    var sk = undefined;
-    if (is_array(e.skills) && array_length(e.skills) > 0) {
-        skill_id = e.skills[irandom(array_length(e.skills) - 1)];
-        sk = SkillDB_Get(skill_id);
-        if (Skill_CanUse(e, sk) && random(1) < 0.35) use_skill = true;
-    }
+    Battle_EnemyInitActionBudget(_bc, e);
+
+    var skill_id = Battle_EnemyChooseSkill(e, p, _bc.enemy_actions_remaining, _bc.enemy_turn_used_skills);
+    var use_skill = (skill_id != -1);
+    var sk = use_skill ? SkillDB_Get(skill_id) : undefined;
+    var consumes_turn = true;
+    var free_action = false;
+    var set_actions = 0;
+    var extra_turns = 0;
+    var follow_state = BSTATE_MENU;
 
     if (use_skill) {
         if (!is_struct(sk)) sk = SkillDB_Get(skill_id);
         var res = Skill_Use(e, p, skill_id);
+        if (!res.ok) {
+            use_skill = false;
+        } else {
+            free_action = variable_struct_exists(res, "free_action") && res.free_action;
+            set_actions = variable_struct_exists(res, "set_enemy_actions") ? max(0, round(real(res.set_enemy_actions))) : 0;
+            extra_turns = variable_struct_exists(res, "extra_turns") ? max(0, round(real(res.extra_turns))) : 0;
+            consumes_turn = !free_action;
+        }
+    }
+
+    if (use_skill) {
         if (res.ok) {
+            var exists_used = false;
+            for (var ui = 0; ui < array_length(_bc.enemy_turn_used_skills); ui++) {
+                if (_bc.enemy_turn_used_skills[ui] == skill_id) { exists_used = true; break; }
+            }
+            if (!exists_used) array_push(_bc.enemy_turn_used_skills, skill_id);
             _bc.skill_banner_active = true;
             _bc.skill_banner_name = sk.name;
             SFX_PlayEnemySpecial(e.id);
             SFX_PlaySkill(skill_id);
         }
         var fx2 = noone;
-        if (res.ok && res.fx_sprite != noone && (sk.effect != "damage" || res.hit)) {
-            var tx2 = _bc.enemy_fx_x;
-            var ty2 = _bc.enemy_fx_y;
-            if (instance_exists(_bc.enemy_inst)) {
-                var pos2 = FX_CenterOn(res.fx_sprite, _bc.enemy_inst);
-                tx2 = pos2.x;
-                ty2 = pos2.y;
-            }
-            fx2 = FX_Spawn(res.fx_sprite, tx2, ty2, res.fx_frames, res.fx_speed);
-        }
+        // Enemy actions intentionally skip skill VFX; only player skills spawn battle FX.
         if (Battle_CheckEnd(_bc, p, e)) return;
 
+        if (consumes_turn) _bc.enemy_actions_remaining = max(0, _bc.enemy_actions_remaining - 1);
+        if (set_actions > 0) _bc.enemy_actions_remaining = max(_bc.enemy_actions_remaining, set_actions);
+        if (extra_turns > 0) _bc.enemy_actions_remaining += extra_turns;
+        _bc.enemy_actions_remaining = clamp(_bc.enemy_actions_remaining, 0, ENEMY_ACTION_CHAIN_MAX);
+        follow_state = (_bc.enemy_actions_remaining > 0) ? BSTATE_ENEMY_ACT : BSTATE_MENU;
+
         if (res.msg != "") {
-            Battle_Message(_bc, e.name + ": " + res.msg, BSTATE_MENU, fx2);
+            Battle_Message(_bc, e.name + ": " + res.msg, follow_state, fx2);
         } else if (!res.hit) {
             var miss_class_id = -1;
             if (variable_struct_exists(p, "class_id")) miss_class_id = p.class_id;
             SFX_PlayMissOrBlocked(true, miss_class_id);
-            Battle_Message(_bc, e.name + " missed!", BSTATE_MENU, fx2);
+            Battle_Message(_bc, e.name + " missed!", follow_state, fx2);
         } else if (res.crit) {
             if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " crit! " + string(res.dmg) + " dmg!", BSTATE_MENU, fx2);
+            Battle_Message(_bc, e.name + " crit! " + string(res.dmg) + " dmg!", follow_state, fx2);
         } else {
             if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " hits for " + string(res.dmg) + " dmg!", BSTATE_MENU, fx2);
+            Battle_Message(_bc, e.name + " hits for " + string(res.dmg) + " dmg!", follow_state, fx2);
         }
     } else {
         var ew = _bc.enemy_weapon;
@@ -551,44 +629,27 @@ function Battle_EnemyAct(_bc) {
         e = Status_ConsumeByField(e, "consume_on_attack");
 
         if (Battle_CheckEnd(_bc, p, e)) return;
-
-        var on_hit_status_suffix = "";
-        if (_bc.last_hit
-        && variable_struct_exists(e, "on_hit_status")
-        && variable_struct_exists(e, "on_hit_status_turns")
-        && variable_struct_exists(e, "on_hit_status_chance")) {
-            var sid = e.on_hit_status;
-            var turns = max(0, round(e.on_hit_status_turns));
-            var chance = clamp(real(e.on_hit_status_chance), 0, 1);
-            if (sid != -1 && turns > 0 && chance > 0) {
-                chance = clamp(chance * Combat_EffectiveEnemyStatusChanceMult(), 0, 1);
-                if (random(1) <= chance) {
-                    p = Status_Add(p, sid, turns, 1);
-                    var scfg = StatusDB_Get(sid);
-                    if (is_struct(scfg) && variable_struct_exists(scfg, "name")) {
-                        on_hit_status_suffix = " " + string(scfg.name) + " applied!";
-                    }
-                }
-            }
-        }
+        _bc.enemy_actions_remaining = max(0, _bc.enemy_actions_remaining - 1);
+        follow_state = (_bc.enemy_actions_remaining > 0) ? BSTATE_ENEMY_ACT : BSTATE_MENU;
 
         if (!_bc.last_hit) {
             var miss_class_id2 = -1;
             if (variable_struct_exists(p, "class_id")) miss_class_id2 = p.class_id;
             SFX_PlayMissOrBlocked(true, miss_class_id2);
-            Battle_Message(_bc, e.name + " missed!", BSTATE_MENU);
+            Battle_Message(_bc, e.name + " missed!", follow_state);
         } else if (_bc.last_crit) {
             if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " crit! " + string(_bc.last_dmg) + " dmg!" + on_hit_status_suffix, BSTATE_MENU);
+            Battle_Message(_bc, e.name + " crit! " + string(_bc.last_dmg) + " dmg!", follow_state);
         } else {
             if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " hits for " + string(_bc.last_dmg) + " dmg!" + on_hit_status_suffix, BSTATE_MENU);
+            Battle_Message(_bc, e.name + " hits for " + string(_bc.last_dmg) + " dmg!", follow_state);
         }
     }
 
     e = Status_Tick(e);
     if (Battle_CheckEnd(_bc, p, e)) return;
-    _bc.turn = TURN_PLAYER;
+    if (_bc.enemy_actions_remaining > 0) _bc.turn = TURN_ENEMY;
+    else _bc.turn = TURN_PLAYER;
     _bc.p = p;
     _bc.e = e;
 }

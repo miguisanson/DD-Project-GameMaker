@@ -11,6 +11,17 @@ var row_gap = max(18, line_h + 4);
 var pad_x = 6;
 var pad_y = 4;
 
+if (!variable_instance_exists(id, "difficulty_options") || !is_array(difficulty_options) || array_length(difficulty_options) <= 0) {
+    difficulty_options = ["Easy", "Normal", "Hard"];
+}
+if (!variable_instance_exists(id, "difficulty_values") || !is_array(difficulty_values) || array_length(difficulty_values) != array_length(difficulty_options)) {
+    difficulty_values = [DIFFICULTY_EASY, DIFFICULTY_NORMAL, DIFFICULTY_HARD];
+}
+if (!variable_instance_exists(id, "difficulty_index")) {
+    difficulty_index = 1;
+}
+difficulty_index = clamp(difficulty_index, 0, max(0, array_length(difficulty_options) - 1));
+
 if (state == "main") {
     var can_load = true;
     if (variable_instance_exists(id, "load_available")) can_load = load_available;

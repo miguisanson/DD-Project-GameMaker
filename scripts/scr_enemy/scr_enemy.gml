@@ -43,9 +43,6 @@ function EnemyCreate(_enemy_id) {
     ch.sprite = base.sprite;
     ch.exp = base.exp;
     ch.skills = base.skills;
-    ch.on_hit_status = variable_struct_exists(base, "on_hit_status") ? base.on_hit_status : -1;
-    ch.on_hit_status_turns = variable_struct_exists(base, "on_hit_status_turns") ? base.on_hit_status_turns : 0;
-    ch.on_hit_status_chance = variable_struct_exists(base, "on_hit_status_chance") ? base.on_hit_status_chance : 0;
     ch.status = [];
     ch.is_boss = base.is_boss;
 

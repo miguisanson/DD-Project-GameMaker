@@ -77,7 +77,8 @@ function Difficulty_Profile(_difficulty = -1) {
                 enemy_mp_mult: 0.90,
                 player_damage_mult: 1.12,
                 enemy_damage_mult: 0.86,
-                enemy_status_chance_mult: 0.85
+                enemy_status_chance_mult: 0.85,
+                player_exp_mult: 1.25
             };
         case DIFFICULTY_HARD:
             return {
@@ -90,7 +91,8 @@ function Difficulty_Profile(_difficulty = -1) {
                 enemy_mp_mult: 1.05,
                 player_damage_mult: 0.92,
                 enemy_damage_mult: 1.18,
-                enemy_status_chance_mult: 1.10
+                enemy_status_chance_mult: 1.10,
+                player_exp_mult: 0.85
             };
         default:
             return {
@@ -103,7 +105,8 @@ function Difficulty_Profile(_difficulty = -1) {
                 enemy_mp_mult: 1.00,
                 player_damage_mult: 1.00,
                 enemy_damage_mult: 1.00,
-                enemy_status_chance_mult: 1.00
+                enemy_status_chance_mult: 1.00,
+                player_exp_mult: 1.00
             };
     }
 }

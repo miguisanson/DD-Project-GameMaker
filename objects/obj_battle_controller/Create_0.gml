@@ -66,6 +66,8 @@ wait_timer = COMBAT_ACTION_DELAY;
 combat_log = [];
 skill_banner_active = false;
 skill_banner_name = "";
+enemy_actions_remaining = 0;
+enemy_turn_used_skills = [];
 
 menu_index = 0;
 battle_actions = [
