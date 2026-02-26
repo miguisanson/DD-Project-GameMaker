@@ -74,6 +74,10 @@ if (gs.ui.mode == UI_MENU) {
     exit;
 }
 
+if (gs.ui.mode == UI_CLASS_SELECT) {
+    ClassSelect_Draw();
+}
+
 // Dialogue box
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     var cutscene_active = variable_struct_exists(gs.ui, "cutscene_active") && gs.ui.cutscene_active;
@@ -89,11 +93,14 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     var by = box.y;
     var bw = box.w;
     var bh = box.h;
+    var cutscene_text_only = Dialogue_IsCutsceneTextOnly();
 
-    draw_set_color(c_black);
-    draw_rectangle(bx, by, bx + bw, by + bh, false);
-    draw_set_color(c_white);
-    draw_rectangle(bx, by, bx + bw, by + bh, true);
+    if (!cutscene_text_only) {
+        draw_set_color(c_black);
+        draw_rectangle(bx, by, bx + bw, by + bh, false);
+        draw_set_color(c_white);
+        draw_rectangle(bx, by, bx + bw, by + bh, true);
+    }
 
     var line = "";
     if (array_length(gs.ui.lines) > 0) {
@@ -108,12 +115,22 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
 
     draw_set_color(c_white);
     if (speaker != "") {
-        draw_text(bx + UI_DIALOGUE_TEXT_PAD_X, by + UI_DIALOGUE_SPEAKER_Y, speaker + ":");
+        if (cutscene_text_only) {
+            draw_set_color(c_black);
+            draw_text(layout.speaker_x + UI_CUTSCENE_TEXT_SHADOW_X, layout.speaker_y + UI_CUTSCENE_TEXT_SHADOW_Y, speaker + ":");
+            draw_set_color(c_white);
+        }
+        draw_text(layout.speaker_x, layout.speaker_y, speaker + ":");
         Dialogue_TypewriterPrepareCurrentLine();
         var page_text0 = variable_struct_exists(gs.ui, "dialogue_full_text") ? gs.ui.dialogue_full_text : line;
         var visible_count0 = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text0);
         visible_count0 = clamp(visible_count0, 0, string_length(page_text0));
         var visible_text0 = string_copy(page_text0, 1, visible_count0);
+        if (cutscene_text_only) {
+            draw_set_color(c_black);
+            draw_text(layout.text_x + UI_CUTSCENE_TEXT_SHADOW_X, layout.text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text0);
+            draw_set_color(c_white);
+        }
         draw_text(layout.text_x, layout.text_y, visible_text0);
     } else {
         Dialogue_TypewriterPrepareCurrentLine();
@@ -121,6 +138,11 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
         var visible_count = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text);
         visible_count = clamp(visible_count, 0, string_length(page_text));
         var visible_text = string_copy(page_text, 1, visible_count);
+        if (cutscene_text_only) {
+            draw_set_color(c_black);
+            draw_text(layout.text_x + UI_CUTSCENE_TEXT_SHADOW_X, layout.text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text);
+            draw_set_color(c_white);
+        }
         draw_text(layout.text_x, layout.text_y, visible_text);
     }
     if (gs.ui.mode == UI_DIALOGUE && array_length(gs.ui.lines) > 0
@@ -137,8 +159,11 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
             var ih = max(1, sprite_get_height(icon));
             var scale_x = cue_w / iw;
             var scale_y = cue_h / ih;
-            var dx = round(bx + bw - cue_w - 8);
-            var dy = round(by + bh - cue_h - 8 + bob);
+            var cue_pad = cutscene_text_only ? 2 : 8;
+            var cue_right = cutscene_text_only ? (layout.box.x + layout.box.w) : (bx + bw);
+            var cue_bottom = cutscene_text_only ? (layout.box.y + layout.box.h) : (by + bh);
+            var dx = round(cue_right - cue_w - cue_pad);
+            var dy = round(cue_bottom - cue_h - cue_pad + bob);
             draw_sprite_ext(icon, 0, dx, dy, scale_x, scale_y, 0, c_white, 1);
         }
     }
@@ -168,3 +193,5 @@ if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.e
     draw_set_color(c_yellow);
     draw_text(8, 8, "DEBUG MODE: ON");
 }
+
+Transition_DrawGUI();

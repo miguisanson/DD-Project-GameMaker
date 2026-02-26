@@ -95,6 +95,13 @@ function Dialogue_LineText(_line_entry) {
     return string(_line_entry);
 }
 
+function Dialogue_IsCutsceneTextOnly() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) return false;
+    if (!variable_struct_exists(gs.ui, "cutscene_text_only")) return false;
+    return gs.ui.cutscene_text_only;
+}
+
 function Dialogue_CopyLineEntryWithText(_line_entry, _text) {
     if (is_struct(_line_entry)) {
         var out = {};
@@ -139,14 +146,48 @@ function Dialogue_BoxRect() {
 
 function Dialogue_TextLayout(_speaker) {
     UI_SetFont();
+    var line_h = max(8, string_height("Ag"));
+    var has_speaker = (string(_speaker) != "");
+    var cutscene_text_only = Dialogue_IsCutsceneTextOnly();
 
     var box = Dialogue_BoxRect();
-    var has_speaker = (string(_speaker) != "");
     var text_x = box.x + UI_DIALOGUE_TEXT_PAD_X;
     var text_y = box.y + (has_speaker ? UI_DIALOGUE_TEXT_Y_WITH_SPEAKER : UI_DIALOGUE_TEXT_PAD_Y);
     var text_w = max(1, box.w - (UI_DIALOGUE_TEXT_PAD_X * 2));
-    var line_h = max(8, string_height("Ag"));
+    var speaker_x = box.x + UI_DIALOGUE_TEXT_PAD_X;
+    var speaker_y = box.y + UI_DIALOGUE_SPEAKER_Y;
     var text_h = max(line_h, box.h - (text_y - box.y) - UI_DIALOGUE_BOTTOM_PAD);
+
+    if (cutscene_text_only) {
+        var w = display_get_gui_width();
+        var h = display_get_gui_height();
+        var margin_ratio = clamp(UI_CUTSCENE_TEXT_SIDE_PAD_RATIO, 0, 0.45);
+        var margin_x = max(max(0, UI_CUTSCENE_TEXT_MARGIN_X), floor(w * margin_ratio));
+        var region_top = floor(h * UI_CUTSCENE_TEXT_TOP_RATIO);
+        var region_bottom = h - max(0, UI_CUTSCENE_TEXT_BOTTOM_PAD);
+        if (region_bottom <= region_top) {
+            region_bottom = min(h, region_top + line_h);
+        }
+
+        box = {
+            x: margin_x,
+            y: region_top,
+            w: max(1, w - margin_x * 2),
+            h: max(1, region_bottom - region_top)
+        };
+
+        speaker_x = box.x;
+        speaker_y = box.y;
+        text_x = box.x;
+        text_w = box.w;
+        if (has_speaker) {
+            text_y = box.y + line_h + 2;
+        } else {
+            text_y = box.y;
+        }
+        text_h = max(line_h, box.h - (text_y - box.y));
+    }
+
     var max_lines = max(1, floor(text_h / line_h));
 
     return {
@@ -154,9 +195,12 @@ function Dialogue_TextLayout(_speaker) {
         text_x: text_x,
         text_y: text_y,
         text_w: text_w,
+        speaker_x: speaker_x,
+        speaker_y: speaker_y,
         line_h: line_h,
         max_lines: max_lines,
-        has_speaker: has_speaker
+        has_speaker: has_speaker,
+        cutscene_text_only: cutscene_text_only
     };
 }
 
@@ -340,7 +384,9 @@ function Dialogue_TypewriterPrepareCurrentLine() {
     if (gs.ui.index < 0 || gs.ui.index >= array_length(gs.ui.lines)) return;
 
     var game_fps = max(1, game_get_speed(gamespeed_fps));
-    gs.ui.dialogue_chars_per_sec = max(1, UI_DIALOGUE_CHARS_PER_SEC);
+    var chars_per_sec = UI_DIALOGUE_CHARS_PER_SEC;
+    if (Dialogue_IsCutsceneTextOnly()) chars_per_sec = UI_CUTSCENE_DIALOGUE_CHARS_PER_SEC;
+    gs.ui.dialogue_chars_per_sec = max(1, chars_per_sec);
     gs.ui.dialogue_hold_duration = max(1, round(UI_DIALOGUE_ADVANCE_HOLD_SEC * game_fps));
 
     var line_text = Dialogue_LineText(gs.ui.lines[gs.ui.index]);
@@ -410,8 +456,12 @@ function Dialogue_Start(_npc_id) {
     gs.ui.lines = [];
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
+    if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
+        gs.ui.cutscene_text_only = false;
+    }
     gs.ui.opened_frame = Input_Frame();
-    gs.ui.dialogue_open_block_frame = gs.ui.opened_frame;
+    var open_block_frames = Dialogue_IsCutsceneTextOnly() ? max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES) : 0;
+    gs.ui.dialogue_open_block_frame = gs.ui.opened_frame + open_block_frames;
     gs.ui.confirm_action = "confirm";
     Dialogue_RebuildPagedLines();
     Dialogue_ResetTypewriter();
@@ -427,8 +477,12 @@ function Dialogue_StartLines(_lines) {
     gs.ui.lines = [];
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
+    if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
+        gs.ui.cutscene_text_only = false;
+    }
     gs.ui.opened_frame = Input_Frame();
-    gs.ui.dialogue_open_block_frame = gs.ui.opened_frame;
+    var open_block_frames = Dialogue_IsCutsceneTextOnly() ? max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES) : 0;
+    gs.ui.dialogue_open_block_frame = gs.ui.opened_frame + open_block_frames;
     gs.ui.confirm_action = "confirm";
     Dialogue_RebuildPagedLines();
     Dialogue_ResetTypewriter();
@@ -484,8 +538,12 @@ function Dialogue_StartWithSpeaker(_speaker, _lines) {
     gs.ui.lines = [];
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
+    if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
+        gs.ui.cutscene_text_only = false;
+    }
     gs.ui.opened_frame = Input_Frame();
-    gs.ui.dialogue_open_block_frame = gs.ui.opened_frame;
+    var open_block_frames = Dialogue_IsCutsceneTextOnly() ? max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES) : 0;
+    gs.ui.dialogue_open_block_frame = gs.ui.opened_frame + open_block_frames;
     gs.ui.confirm_action = "confirm";
     Dialogue_RebuildPagedLines();
     Dialogue_ResetTypewriter();
@@ -516,6 +574,9 @@ function Dialogue_Advance() {
     gs.ui.opened_frame = UI_OPENED_FRAME_NONE;
     gs.ui.index += 1;
     Dialogue_ResetTypewriter();
+    if (Dialogue_IsCutsceneTextOnly()) {
+        gs.ui.dialogue_open_block_frame = Input_Frame() + max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES);
+    }
 
     if (gs.ui.index < array_length(gs.ui.lines)) {
         SFX_Play("dialogue_advance");
@@ -534,5 +595,8 @@ function Dialogue_Advance() {
         gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
         gs.ui.dialogue_lock = UI_DIALOGUE_REOPEN_LOCK;
         gs.ui.dialogue_require_release = true;
+        if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
+            gs.ui.cutscene_text_only = false;
+        }
     }
 }

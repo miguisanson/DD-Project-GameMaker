@@ -592,6 +592,220 @@ function Menu_Draw() {
 
 }
 
+function ClassSelect_Ensure() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    if (!variable_struct_exists(gs.ui, "class_select")) {
+        gs.ui.class_select = {
+            open: false,
+            index: 0,
+            choices: ["Warrior", "Archer", "Mage"],
+            choice_ids: [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE],
+            allow_cancel: true,
+            open_block_frame: UI_OPENED_FRAME_NONE
+        };
+    }
+}
+
+function ClassSelect_IsOpen() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) return false;
+    return gs.ui.mode == UI_CLASS_SELECT;
+}
+
+function ClassSelect_Open(_allow_cancel = true) {
+    ClassSelect_Ensure();
+    var gs = GameState_Get();
+    if (Transition_IsInputLocked()) return false;
+    if (gs.ui.mode != UI_NONE) return false;
+
+    var cs = gs.ui.class_select;
+    cs.open = true;
+    cs.index = 0;
+    cs.allow_cancel = _allow_cancel;
+    cs.open_block_frame = Input_Frame() + 1;
+    gs.ui.class_select = cs;
+    gs.ui.mode = UI_CLASS_SELECT;
+    SFX_PlayUI("ui_openclose");
+    return true;
+}
+
+function ClassSelect_Close(_play_sfx = true) {
+    ClassSelect_Ensure();
+    var gs = GameState_Get();
+    var cs = gs.ui.class_select;
+    cs.open = false;
+    cs.open_block_frame = UI_OPENED_FRAME_NONE;
+    gs.ui.class_select = cs;
+    if (gs.ui.mode == UI_CLASS_SELECT) gs.ui.mode = UI_NONE;
+    if (_play_sfx) SFX_PlayUI("ui_openclose");
+}
+
+function ClassSelect_ApplyClass(_class_id) {
+    var gs = GameState_Get();
+    var old = gs.player_ch;
+    var ch = CharacterCreate_Player(_class_id);
+
+    if (is_struct(old)) {
+        if (variable_struct_exists(old, "level")) ch.level = old.level;
+        if (variable_struct_exists(old, "exp")) ch.exp = old.exp;
+        if (variable_struct_exists(old, "exp_next")) ch.exp_next = old.exp_next;
+        if (variable_struct_exists(old, "inventory")) ch.inventory = old.inventory;
+        if (variable_struct_exists(old, "equip")) ch.equip = old.equip;
+        if (variable_struct_exists(old, "stat_points")) ch.stat_points = old.stat_points;
+        if (variable_struct_exists(old, "status")) ch.status = old.status;
+    }
+
+    ch = RecomputeResources(ch);
+    if (is_struct(old)) {
+        if (variable_struct_exists(old, "hp")) ch.hp = clamp(old.hp, 0, ch.max_hp);
+        if (variable_struct_exists(old, "mp")) ch.mp = clamp(old.mp, 0, ch.max_mp);
+    }
+
+    GameState_SetSelectedClass(_class_id);
+    GameState_SetPlayer(ch);
+
+    if (instance_exists(obj_player)) {
+        with (obj_player) {
+            character = global.player_ch;
+            Player_ApplyClassSprites(global.selected_class);
+            sprite_index = sprite[face];
+            image_index = 0;
+            mask_index = sprite[DOWN];
+        }
+    }
+
+    GameState_SyncLegacy();
+}
+
+function ClassSelect_HandleInput() {
+    var gs = GameState_Get();
+    if (gs.ui.mode != UI_CLASS_SELECT) return;
+    ClassSelect_Ensure();
+
+    var cs = gs.ui.class_select;
+    if (!cs.open) {
+        gs.ui.mode = UI_NONE;
+        return;
+    }
+
+    var frame = Input_Frame();
+    if (cs.open_block_frame != UI_OPENED_FRAME_NONE && frame <= cs.open_block_frame) {
+        gs.ui.class_select = cs;
+        return;
+    }
+
+    var k_up = Input_UIPressed("menu_up");
+    var k_down = Input_UIPressed("menu_down");
+    var k_ok = Input_UIConfirm();
+    var k_back = Input_UIBack();
+
+    var choice_count = array_length(cs.choices);
+    var total = choice_count + (cs.allow_cancel ? 1 : 0);
+    if (total <= 0) {
+        ClassSelect_Close(false);
+        return;
+    }
+
+    if (k_up) {
+        cs.index = (cs.index + total - 1) mod total;
+        SFX_PlayUI("ui_move");
+    }
+    if (k_down) {
+        cs.index = (cs.index + 1) mod total;
+        SFX_PlayUI("ui_move");
+    }
+
+    if (cs.allow_cancel && k_back) {
+        SFX_PlayUI("ui_back");
+        gs.ui.class_select = cs;
+        ClassSelect_Close(false);
+        return;
+    }
+
+    if (k_ok) {
+        SFX_PlayUI("ui_confirm");
+        if (cs.allow_cancel && cs.index >= choice_count) {
+            gs.ui.class_select = cs;
+            ClassSelect_Close(false);
+            return;
+        }
+
+        if (cs.index >= 0 && cs.index < choice_count && cs.index < array_length(cs.choice_ids)) {
+            var class_id = cs.choice_ids[cs.index];
+            ClassSelect_ApplyClass(class_id);
+            gs.ui.class_select = cs;
+            ClassSelect_Close(false);
+            return;
+        }
+    }
+
+    gs.ui.class_select = cs;
+}
+
+function ClassSelect_Draw() {
+    var gs = GameState_Get();
+    if (gs.ui.mode != UI_CLASS_SELECT) return;
+    ClassSelect_Ensure();
+    var cs = gs.ui.class_select;
+    if (!cs.open) return;
+
+    var w = display_get_gui_width();
+    var h = display_get_gui_height();
+
+    UI_SetFont();
+    var line_h = string_height("A");
+    var row_gap = max(18, line_h + 4);
+    var pad_x = 6;
+    var pad_y = 4;
+
+    var bw = w * 0.6;
+    var bh = h * 0.5;
+    var bx = (w - bw) * 0.5;
+    var by = (h - bh) * 0.5;
+
+    draw_set_alpha(0.85);
+    draw_set_color(c_black);
+    draw_rectangle(bx, by, bx + bw, by + bh, false);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+    draw_rectangle(bx, by, bx + bw, by + bh, true);
+
+    draw_set_color(c_white);
+    draw_text(bx + 12, by + 12, "Select Class");
+
+    var cy = by + 40;
+    for (var j = 0; j < array_length(cs.choices); j++) {
+        var yy = cy + j * row_gap;
+        var selected = (j == cs.index);
+        if (selected) {
+            draw_set_color(c_white);
+            draw_rectangle(bx + 10 - pad_x, yy - pad_y, bx + bw - 10 + pad_x, yy + line_h + pad_y, false);
+            draw_set_color(c_black);
+            draw_rectangle(bx + 10 - pad_x, yy - pad_y, bx + bw - 10 + pad_x, yy + line_h + pad_y, true);
+            draw_set_color(c_black);
+        } else {
+            draw_set_color(c_white);
+        }
+        draw_text(bx + 18, yy, cs.choices[j]);
+    }
+
+    if (cs.allow_cancel) {
+        var back_y = by + bh - (line_h + 4);
+        var back_selected = (cs.index == array_length(cs.choices));
+        if (back_selected) {
+            draw_set_color(c_white);
+            draw_rectangle(bx + 10 - pad_x, back_y - pad_y, bx + bw - 10 + pad_x, back_y + line_h + pad_y, false);
+            draw_set_color(c_black);
+            draw_rectangle(bx + 10 - pad_x, back_y - pad_y, bx + bw - 10 + pad_x, back_y + line_h + pad_y, true);
+            draw_set_color(c_black);
+        } else {
+            draw_set_color(c_white);
+        }
+        draw_text(bx + 18, back_y, "Back");
+    }
+}
+
 // --------------------
 // PAUSE MENU (inventory-style popup)
 // --------------------
@@ -640,7 +854,7 @@ function PauseMenu_ExitToMainMenu() {
     }
     if (room != rm_start) {
         RoomState_OnRoomExit();
-        room_goto(rm_start);
+        Transition_RequestRoomFade(rm_start);
     }
 }
 

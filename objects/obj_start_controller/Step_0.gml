@@ -2,6 +2,7 @@ Input_PreStep();
 var gs = GameState_Get();
 
 if (gs.ui.mode == UI_SAVE) exit;
+if (Transition_IsInputLocked()) return;
 
 var k_up = Input_UIPressed("menu_up");
 var k_down = Input_UIPressed("menu_down");
@@ -24,12 +25,7 @@ if (state == "main") {
         SFX_PlayUI("ui_confirm");
         var opt = main_options[main_index];
         if (opt == "New Game") {
-            state = "intro";
-            class_index = 0;
-            gs.ui.cutscene_active = true;
-            gs.ui.cutscene_bg_sprite = intro_bg_sprite;
-            gs.ui.dialogue_box_half = true;
-            Dialogue_Start(intro_dialogue_id);
+            Transition_RequestCutsceneById("intro");
         } else if (opt == "Load Game") {
             SaveMenu_Open("load", "main");
         } else if (opt == "Settings") {
@@ -44,59 +40,73 @@ if (state == "main") {
     return;
 }
 
-if (state == "intro") {
+if (state == "cutscene") {
+    if (!cutscene_started) {
+        cutscene_id = "";
+        if (variable_struct_exists(gs, "pending_cutscene_id")) {
+            cutscene_id = string(gs.pending_cutscene_id);
+        }
+        if (cutscene_id == "") cutscene_id = "intro";
+
+        switch (cutscene_id) {
+            case "intro":
+                gs.ui.cutscene_active = true;
+                gs.ui.cutscene_bg_sprite = intro_bg_sprite;
+                gs.ui.dialogue_box_half = false;
+                gs.ui.cutscene_text_only = true;
+                Dialogue_Start(intro_dialogue_id);
+                cutscene_started = true;
+                break;
+            case "ending":
+                gs.ui.cutscene_active = true;
+                gs.ui.cutscene_bg_sprite = ending_bg_sprite;
+                gs.ui.dialogue_box_half = false;
+                gs.ui.cutscene_text_only = true;
+                Dialogue_Start(ending_dialogue_id);
+                cutscene_started = true;
+                break;
+            default:
+                Transition_RequestCutsceneFade(rm_start);
+                break;
+        }
+        return;
+    }
+
     if (gs.ui.mode != UI_DIALOGUE && array_length(gs.ui.lines) <= 0) {
         gs.ui.cutscene_active = false;
         gs.ui.cutscene_bg_sprite = noone;
         gs.ui.dialogue_box_half = false;
-        room_goto(rm_character_class);
-    }
-    return;
-}
+        gs.ui.cutscene_text_only = false;
+        gs.pending_cutscene_id = "";
 
-if (state == "class") {
-    var total = array_length(choices) + 1; // +1 for Back
-    if (k_up) {
-        class_index = (class_index + total - 1) mod total;
-        SFX_PlayUI("ui_move");
-    }
-    if (k_down) {
-        class_index = (class_index + 1) mod total;
-        SFX_PlayUI("ui_move");
-    }
+        switch (cutscene_id) {
+            case "intro":
+                // reset core state for new game
+                if (ds_exists(gs.defeated_enemies, ds_type_list)) ds_list_clear(gs.defeated_enemies);
+                gs.room_states = {};
+                gs.persist = {};
+                gs.persist_applied = {};
+                gs.uid_counter = 1;
+                gs.enemy_reset_version = 0;
+                gs.boss_defeated = { mini_boss: false, final_boss: false };
 
-    if (k_back) {
-        SFX_PlayUI("ui_back");
-        room_goto(rm_start);
-        return;
-    }
+                GameState_SetSelectedClass(CLASS_NOBODY);
+                gs.player_ch = CharacterCreate_Player(CLASS_NOBODY);
+                GameState_SetPlayer(gs.player_ch);
 
-    if (k_ok) {
-        SFX_PlayUI("ui_confirm");
-        if (class_index == array_length(choices)) {
-            room_goto(rm_start);
-            return;
+                gs.in_main_menu = false;
+                gs.pending_floor1_intro_dialogue = true;
+                GameSettings_ApplyAll();
+                Transition_RequestCutsceneFade(rm_floor1, "start", -1, true);
+                break;
+            case "ending":
+                gs.in_main_menu = true;
+                Transition_RequestCutsceneFade(rm_start);
+                break;
+            default:
+                Transition_RequestRoomFade(rm_start);
+                break;
         }
-        var class_id = choice_ids[class_index];
-        GameState_SetSelectedClass(class_id);
-
-        // reset core state for new game
-        if (ds_exists(gs.defeated_enemies, ds_type_list)) ds_list_clear(gs.defeated_enemies);
-        gs.room_states = {};
-        gs.persist = {};
-        gs.persist_applied = {};
-        gs.uid_counter = 1;
-        gs.enemy_reset_version = 0;
-        gs.boss_defeated = { mini_boss: false, final_boss: false };
-
-        gs.player_ch = CharacterCreate_Player(class_id);
-        GameState_SetPlayer(gs.player_ch);
-
-        gs.in_main_menu = false;
-        gs.pending_floor1_intro_dialogue = true;
-        GameSettings_ApplyAll();
-        RoomTransition_Set(rm_floor1, "start", -1);
-        room_goto(rm_floor1);
     }
     return;
 }

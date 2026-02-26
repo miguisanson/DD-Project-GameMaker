@@ -287,7 +287,7 @@ function Save_ApplySnapshot(_snap) {
 
     GameState_SetBattleReturn(room_id, px, py, face);
     GameState_SetJustReturned(true);
-    room_goto(room_id);
+    Transition_RequestRoomFade(room_id);
 }
 
 function Save_Path(_slot) {

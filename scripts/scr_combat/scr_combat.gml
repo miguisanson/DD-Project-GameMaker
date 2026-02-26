@@ -181,7 +181,7 @@ function Player_OnDeath(_p) {
 
     GameState_SetBattleReturn(gs.checkpoint.room, gs.checkpoint.x, gs.checkpoint.y, -1);
     GameState_SetJustReturned(true);
-    room_goto(gs.checkpoint.room);
+    Transition_RequestRoomFade(gs.checkpoint.room);
 }
 
 // --------------------
@@ -433,7 +433,7 @@ function Battle_EndRun(_bc) {
     var gs = GameState_Get();
     // mark return so player gets a short grace window
     GameState_SetJustReturned(true);
-    room_goto(gs.battle.return_room);
+    Transition_RequestRoomFade(gs.battle.return_room);
 }
 
 function Battle_EnemyAct(_bc) {

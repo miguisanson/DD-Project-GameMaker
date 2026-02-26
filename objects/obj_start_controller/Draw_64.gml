@@ -2,7 +2,7 @@ var w = display_get_gui_width();
 var h = display_get_gui_height();
 var gs = GameState_Get();
 if (gs.ui.mode == UI_SAVE) exit;
-if (state == "intro") exit;
+if (state == "cutscene") exit;
 
 UI_SetFont();
 var line_h = string_height("A");
@@ -11,7 +11,7 @@ var row_gap = max(18, line_h + 4);
 var pad_x = 6;
 var pad_y = 4;
 
-if (state != "class") {
+if (state == "main") {
     // main menu
     var bx1 = w * 0.3;
     var bx2 = w * 0.7;
@@ -36,54 +36,6 @@ if (state != "class") {
         }
         draw_text(bx1 + 8, yy, label);
     }
-}
-
-// class select screen
-if (state == "class") {
-    var bw = w * 0.6;
-    var bh = h * 0.5;
-    var bx = (w - bw) * 0.5;
-    var by = (h - bh) * 0.5;
-
-    draw_set_alpha(0.85);
-    draw_set_color(c_black);
-    draw_rectangle(bx, by, bx + bw, by + bh, false);
-    draw_set_alpha(1);
-    draw_set_color(c_white);
-    draw_rectangle(bx, by, bx + bw, by + bh, true);
-
-    var ctitle = "Select Class";
-    draw_set_color(c_white);
-    draw_text(bx + 12, by + 12, ctitle);
-
-    var cy = by + 40;
-    for (var j = 0; j < array_length(choices); j++) {
-        var c = choices[j];
-        var yy2 = cy + j * row_gap;
-        if (j == class_index) {
-            draw_set_color(c_white);
-            draw_rectangle(bx + 10 - pad_x, yy2 - pad_y, bx + bw - 10 + pad_x, yy2 + line_h + pad_y, false);
-            draw_set_color(c_black);
-            draw_rectangle(bx + 10 - pad_x, yy2 - pad_y, bx + bw - 10 + pad_x, yy2 + line_h + pad_y, true);
-            draw_set_color(c_black);
-        } else {
-            draw_set_color(c_white);
-        }
-        draw_text(bx + 18, yy2, c);
-    }
-
-    // Back label
-    var back_y = by + bh - (line_h + 4);
-    if (class_index == array_length(choices)) {
-        draw_set_color(c_white);
-        draw_rectangle(bx + 10 - pad_x, back_y - pad_y, bx + bw - 10 + pad_x, back_y + line_h + pad_y, false);
-        draw_set_color(c_black);
-        draw_rectangle(bx + 10 - pad_x, back_y - pad_y, bx + bw - 10 + pad_x, back_y + line_h + pad_y, true);
-        draw_set_color(c_black);
-    } else {
-        draw_set_color(c_white);
-    }
-    draw_text(bx + 18, back_y, "Back");
 }
 
 // settings popup

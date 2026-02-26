@@ -9,4 +9,4 @@ SFX_PlayEnemySpawn(enemy_id);
 // tell player to reposition after return
 GameState_SetJustReturned(true);
 
-room_goto(rm_battle);
+Transition_RequestEncounterBattle(rm_battle);

@@ -38,6 +38,7 @@ function Player_DefaultSkills(_class_id) {
         case CLASS_ARCHER: return [SKILL_WOUND, SKILL_TAKE_AIM];
         case CLASS_KNIGHT: return [SKILL_HORIZ_SLASH, SKILL_MUSCLE_UP];
         case CLASS_MAGE:   return [SKILL_FIREBALL, SKILL_MEDITATION];
+        case CLASS_NOBODY: return [];
     }
     return [SKILL_WOUND];
 }
@@ -89,6 +90,7 @@ function Player_CanAcceptMove(_pl) {
 
 
 function UI_IsBlocking() {
+    if (Transition_IsInputLocked()) return true;
     var gs = GameState_Get();
     if (gs.ui.mode != UI_NONE) return true;
     if (array_length(gs.ui.lines) > 0) return true;
@@ -312,7 +314,7 @@ function GameState_Init() {
     }
 
     if (!variable_struct_exists(gs, "selected_class")) {
-        gs.selected_class = CLASS_ARCHER;
+        gs.selected_class = CLASS_NOBODY;
     }
 
     if (!variable_struct_exists(gs, "defeated_enemies")) {
@@ -417,6 +419,7 @@ function GameState_Init() {
             lines_raw: [],
             index: 0,
             speaker: "",
+            cutscene_text_only: false,
             confirm_action: "",
             icon_frame: 0,
             opened_frame: UI_OPENED_FRAME_NONE,
@@ -446,9 +449,14 @@ function GameState_Init() {
     if (!variable_struct_exists(gs.ui, "dialogue_tw_line_index")) gs.ui.dialogue_tw_line_index = -1;
     if (!variable_struct_exists(gs.ui, "dialogue_open_block_frame")) gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
     if (!variable_struct_exists(gs.ui, "lines_raw") || !is_array(gs.ui.lines_raw)) gs.ui.lines_raw = [];
+    if (!variable_struct_exists(gs.ui, "cutscene_text_only")) gs.ui.cutscene_text_only = false;
 
     if (!variable_struct_exists(gs, "in_main_menu")) {
         gs.in_main_menu = false;
+    }
+
+    if (!variable_struct_exists(gs, "pending_cutscene_id")) {
+        gs.pending_cutscene_id = "";
     }
 
     if (!variable_struct_exists(gs, "transition")) {

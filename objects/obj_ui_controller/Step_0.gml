@@ -1,5 +1,7 @@
 Input_PreStep();
 var gs = GameState_Get();
+Transition_Update();
+if (Transition_IsInputLocked()) exit;
 var game_fps = max(1, game_get_speed(gamespeed_fps));
 gs.ui.icon_frame += max(0, UI_DIALOGUE_ARROW_FPS) / game_fps;
 if (gs.ui.icon_frame >= 2) gs.ui.icon_frame -= 2;
@@ -20,6 +22,11 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     if (k_ok) {
         Dialogue_Advance();
     }
+    exit;
+}
+
+if (gs.ui.mode == UI_CLASS_SELECT) {
+    ClassSelect_HandleInput();
     exit;
 }
 

@@ -15,6 +15,7 @@ swap_on_interact = false;
 swap_sprite = noone;
 swapped = false;
 is_container = false;
+class_select_chest = false;
 
 container_level = 1;
 loot_table_key = "";

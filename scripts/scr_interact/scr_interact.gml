@@ -121,6 +121,32 @@ function Interact_Handle(_inst) {
         }
     }
 
+    // Special chest that opens class-select popup (used in rm_floor1).
+    if (variable_instance_exists(_inst, "class_select_chest") && _inst.class_select_chest) {
+        if (variable_instance_exists(_inst, "swap_on_interact") && _inst.swap_on_interact && !_inst.swapped) {
+            if (variable_instance_exists(_inst, "swap_sprite") && _inst.swap_sprite != noone) {
+                _inst.sprite_index = _inst.swap_sprite;
+            }
+            _inst.swapped = true;
+            RoomState_SaveInstance(_inst, ["swapped","sprite_index"], false);
+            SFX_Play("chest_open");
+        }
+
+        var current_class = CLASS_NOBODY;
+        if (is_struct(gs.player_ch) && variable_struct_exists(gs.player_ch, "class_id")) {
+            current_class = gs.player_ch.class_id;
+        }
+
+        if (current_class == CLASS_NOBODY) {
+            ClassSelect_Open(true);
+        } else {
+            Dialogue_StartWithSpeaker(name, DialogueDB_Get("chest_empty"));
+        }
+
+        GameState_SyncLegacy();
+        return;
+    }
+
     // swap-state interaction
     if (variable_instance_exists(_inst, "swap_on_interact") && _inst.swap_on_interact) {
         var is_container = (variable_instance_exists(_inst, "is_container") && _inst.is_container);
@@ -197,7 +223,7 @@ function Interact_Handle(_inst) {
                 RoomState_OnRoomExit();
                 GameState_SetBattleReturn(_inst.door_room, _inst.door_x, _inst.door_y, -1);
                 GameState_SetJustReturned(true);
-                room_goto(_inst.door_room);
+                Transition_RequestRoomFade(_inst.door_room);
             }
         } break;
 

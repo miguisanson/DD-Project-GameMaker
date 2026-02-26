@@ -1,13 +1,13 @@
 {
   "$GMRoom":"v1",
-  "%Name":"rm_character_class",
+  "%Name":"rm_cutscene",
   "creationCodeFile":"",
   "inheritCode":false,
   "inheritCreationOrder":false,
   "inheritLayers":false,
   "instanceCreationOrder":[
-    {"name":"inst_start_controller","path":"rooms/rm_character_class/rm_character_class.yy",},
-    {"name":"inst_game_controller","path":"rooms/rm_character_class/rm_character_class.yy",},
+    {"name":"inst_start_controller","path":"rooms/rm_cutscene/rm_cutscene.yy",},
+    {"name":"inst_game_controller","path":"rooms/rm_cutscene/rm_cutscene.yy",},
   ],
   "isDnd":false,
   "layers":[
@@ -17,7 +17,7 @@
       ],"layers":[],"name":"Instances","properties":[],"resourceType":"GMRInstanceLayer","resourceVersion":"2.0","userdefinedDepth":false,"visible":true,},
     {"$GMRBackgroundLayer":"","%Name":"Background","animationFPS":30.0,"animationSpeedType":0,"colour":4294967295,"depth":100,"effectEnabled":true,"effectType":null,"gridX":16,"gridY":16,"hierarchyFrozen":false,"hspeed":0.0,"htiled":false,"inheritLayerDepth":false,"inheritLayerSettings":false,"inheritSubLayers":true,"inheritVisibility":true,"layers":[],"name":"Background","properties":[],"resourceType":"GMRBackgroundLayer","resourceVersion":"2.0","spriteId":{"name":"black_screen","path":"sprites/black_screen/black_screen.yy",},"stretch":false,"userdefinedAnimFPS":false,"userdefinedDepth":false,"visible":true,"vspeed":0.0,"vtiled":false,"x":0,"y":0,},
   ],
-  "name":"rm_character_class",
+  "name":"rm_cutscene",
   "parent":{
     "name":"Rooms",
     "path":"folders/Rooms.yy",

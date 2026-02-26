@@ -14,6 +14,11 @@ function DB_PlayerClass(_class_id) {
             return { name:"Mage", hd:6, mp_gain:3, base_hp:10, base_mp:10,
                      bonus:{ str:0, agi:0, def:0, intt:2, luck:1 },
                      sprites:{ right:mage_right, left:mage_left, up:mage_up, down:mage_down } };
+
+        case CLASS_NOBODY:
+            return { name:"Nobody", hd:8, mp_gain:1, base_hp:10, base_mp:10,
+                     bonus:{ str:0, agi:0, def:0, intt:0, luck:0 },
+                     sprites:{ right:nobody_right, left:nobody_left, up:nobody_up, down:nobody_down } };
     }
 
     return { name:"Unknown", hd:6, mp_gain:0, base_hp:10, base_mp:10,

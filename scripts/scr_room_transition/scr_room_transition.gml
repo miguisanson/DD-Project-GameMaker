@@ -86,3 +86,271 @@ function RoomTransition_Apply() {
 
     RoomTransition_Clear();
 }
+
+function Transition_Init() {
+    RoomTransition_Init();
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "transition_fx") || !is_struct(gs.transition_fx)) {
+        gs.transition_fx = {
+            active: false,
+            type: TRANSITION_TYPE_NONE,
+            phase: 0,
+            timer: 0,
+            alpha: 0,
+            target_room: noone,
+            target_spawn_id: "",
+            target_face: -1,
+            use_spawn: false,
+            fade_out_frames: TRANSITION_ROOM_FADE_OUT_FRAMES,
+            fade_in_frames: TRANSITION_ROOM_FADE_IN_FRAMES,
+            encounter_zoom: 0,
+            encounter_shake_x: 0,
+            encounter_shake_y: 0,
+            encounter_port_x: 0,
+            encounter_port_y: 0,
+            encounter_port_w: 0,
+            encounter_port_h: 0
+        };
+    }
+}
+
+function Transition_IsActive() {
+    Transition_Init();
+    var gs = GameState_Get();
+    return gs.transition_fx.active;
+}
+
+function Transition_IsInputLocked() {
+    return Transition_IsActive();
+}
+
+function Transition_CaptureEncounterViewport(_tr) {
+    if (!view_enabled) return;
+    _tr.encounter_port_x = view_xport[0];
+    _tr.encounter_port_y = view_yport[0];
+    _tr.encounter_port_w = max(1, view_wport[0]);
+    _tr.encounter_port_h = max(1, view_hport[0]);
+}
+
+function Transition_ApplyEncounterViewport(_tr) {
+    if (!view_enabled) return;
+    var scale = 1 + max(0, _tr.encounter_zoom);
+    var out_w = max(1, round(_tr.encounter_port_w * scale));
+    var out_h = max(1, round(_tr.encounter_port_h * scale));
+    var out_x = round(_tr.encounter_port_x - ((out_w - _tr.encounter_port_w) * 0.5) + _tr.encounter_shake_x);
+    var out_y = round(_tr.encounter_port_y - ((out_h - _tr.encounter_port_h) * 0.5) + _tr.encounter_shake_y);
+
+    view_xport[0] = out_x;
+    view_yport[0] = out_y;
+    view_wport[0] = out_w;
+    view_hport[0] = out_h;
+}
+
+function Transition_RestoreEncounterViewport(_tr) {
+    if (!view_enabled) return;
+    if (_tr.encounter_port_w <= 0 || _tr.encounter_port_h <= 0) return;
+    view_xport[0] = _tr.encounter_port_x;
+    view_yport[0] = _tr.encounter_port_y;
+    view_wport[0] = _tr.encounter_port_w;
+    view_hport[0] = _tr.encounter_port_h;
+}
+
+function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn) {
+    Transition_Init();
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+    if (tr.active) return false;
+
+    tr.active = true;
+    tr.type = _type;
+    tr.phase = 0;
+    tr.timer = 0;
+    tr.alpha = 0;
+    tr.target_room = _room;
+    tr.target_spawn_id = _spawn_id;
+    tr.target_face = _face;
+    tr.use_spawn = _use_spawn;
+
+    if (_type == TRANSITION_TYPE_CUTSCENE) {
+        tr.fade_out_frames = max(1, TRANSITION_CUTSCENE_FADE_OUT_FRAMES);
+        tr.fade_in_frames = max(1, TRANSITION_CUTSCENE_FADE_IN_FRAMES);
+    } else if (_type == TRANSITION_TYPE_ENCOUNTER) {
+        tr.fade_out_frames = max(1, TRANSITION_ENCOUNTER_ZOOM_FRAMES);
+        tr.fade_in_frames = max(1, TRANSITION_ENCOUNTER_FADE_IN_FRAMES);
+        tr.encounter_zoom = 0;
+        tr.encounter_shake_x = 0;
+        tr.encounter_shake_y = 0;
+        Transition_CaptureEncounterViewport(tr);
+    } else {
+        tr.fade_out_frames = max(1, TRANSITION_ROOM_FADE_OUT_FRAMES);
+        tr.fade_in_frames = max(1, TRANSITION_ROOM_FADE_IN_FRAMES);
+    }
+
+    if (_use_spawn && _room != noone) {
+        RoomTransition_Set(_room, _spawn_id, _face);
+    }
+
+    return true;
+}
+
+function Transition_RequestRoomFade(_room, _spawn_id = "", _face = -1, _use_spawn = false) {
+    return Transition_Begin(TRANSITION_TYPE_ROOM, _room, _spawn_id, _face, _use_spawn);
+}
+
+function Transition_RequestEncounterBattle(_room = rm_battle) {
+    return Transition_Begin(TRANSITION_TYPE_ENCOUNTER, _room, "", -1, false);
+}
+
+function Transition_RequestCutsceneFade(_room, _spawn_id = "", _face = -1, _use_spawn = false) {
+    return Transition_Begin(TRANSITION_TYPE_CUTSCENE, _room, _spawn_id, _face, _use_spawn);
+}
+
+function Transition_RequestCutsceneById(_cutscene_id) {
+    var gs = GameState_Get();
+    gs.pending_cutscene_id = string(_cutscene_id);
+    return Transition_RequestCutsceneFade(rm_cutscene);
+}
+
+function Transition_RequestCutsceneIn() {
+    var ok = Transition_Begin(TRANSITION_TYPE_CUTSCENE, noone, "", -1, false);
+    if (!ok) return false;
+
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+    tr.phase = 2; // intro fade-in only
+    tr.timer = 0;
+    tr.alpha = 1;
+    return true;
+}
+
+function Transition_Finish() {
+    Transition_Init();
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+    if (tr.type == TRANSITION_TYPE_ENCOUNTER) {
+        Transition_RestoreEncounterViewport(tr);
+    }
+    tr.active = false;
+    tr.type = TRANSITION_TYPE_NONE;
+    tr.phase = 0;
+    tr.timer = 0;
+    tr.alpha = 0;
+    tr.target_room = noone;
+    tr.target_spawn_id = "";
+    tr.target_face = -1;
+    tr.use_spawn = false;
+    tr.encounter_zoom = 0;
+    tr.encounter_shake_x = 0;
+    tr.encounter_shake_y = 0;
+}
+
+function Transition_Update() {
+    Transition_Init();
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+
+    if (!tr.active) return;
+
+    switch (tr.type) {
+        case TRANSITION_TYPE_ROOM: {
+            if (tr.phase == 0) {
+                tr.timer += 1;
+                tr.alpha = clamp(tr.timer / tr.fade_out_frames, 0, 1);
+                if (tr.timer >= tr.fade_out_frames) {
+                    tr.alpha = 1;
+                    tr.phase = 1;
+                    tr.timer = 0;
+                    room_goto(tr.target_room);
+                }
+            } else {
+                tr.timer += 1;
+                tr.alpha = 1 - clamp(tr.timer / tr.fade_in_frames, 0, 1);
+                if (tr.timer >= tr.fade_in_frames) {
+                    Transition_Finish();
+                }
+            }
+        } break;
+
+        case TRANSITION_TYPE_ENCOUNTER: {
+            if (tr.phase == 0) {
+                tr.timer += 1;
+                var p = clamp(tr.timer / tr.fade_out_frames, 0, 1);
+                tr.encounter_zoom = lerp(0, TRANSITION_ENCOUNTER_ZOOM_MAX, p);
+                var shake_mag = max(0, round(TRANSITION_ENCOUNTER_SHAKE_PX * (1 - (p * 0.5))));
+                tr.encounter_shake_x = irandom_range(-shake_mag, shake_mag);
+                tr.encounter_shake_y = irandom_range(-shake_mag, shake_mag);
+                Transition_ApplyEncounterViewport(tr);
+
+                if (tr.timer >= tr.fade_out_frames) {
+                    Transition_RestoreEncounterViewport(tr);
+                    tr.encounter_zoom = 0;
+                    tr.encounter_shake_x = 0;
+                    tr.encounter_shake_y = 0;
+                    tr.alpha = 1;
+                    tr.phase = 1;
+                    tr.timer = 0;
+                    room_goto(tr.target_room);
+                }
+            } else if (tr.phase == 1) {
+                tr.timer += 1;
+                tr.alpha = 1;
+                if (tr.timer >= max(0, TRANSITION_ENCOUNTER_BLACK_HOLD_FRAMES)) {
+                    tr.phase = 2;
+                    tr.timer = 0;
+                }
+            } else {
+                tr.timer += 1;
+                tr.alpha = 1 - clamp(tr.timer / tr.fade_in_frames, 0, 1);
+                if (tr.timer >= tr.fade_in_frames) {
+                    Transition_Finish();
+                }
+            }
+        } break;
+
+        case TRANSITION_TYPE_CUTSCENE: {
+            if (tr.phase == 2) {
+                tr.timer += 1;
+                tr.alpha = 1 - clamp(tr.timer / tr.fade_in_frames, 0, 1);
+                if (tr.timer >= tr.fade_in_frames) {
+                    Transition_Finish();
+                }
+                break;
+            }
+
+            if (tr.phase == 0) {
+                tr.timer += 1;
+                tr.alpha = clamp(tr.timer / tr.fade_out_frames, 0, 1);
+                if (tr.timer >= tr.fade_out_frames) {
+                    tr.alpha = 1;
+                    tr.phase = 1;
+                    tr.timer = 0;
+                    room_goto(tr.target_room);
+                }
+            } else {
+                tr.timer += 1;
+                tr.alpha = 1 - clamp(tr.timer / tr.fade_in_frames, 0, 1);
+                if (tr.timer >= tr.fade_in_frames) {
+                    Transition_Finish();
+                }
+            }
+        } break;
+    }
+}
+
+function Transition_DrawGUI() {
+    Transition_Init();
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+
+    var w = display_get_gui_width();
+    var h = display_get_gui_height();
+
+    if (tr.alpha > 0) {
+        draw_set_alpha(clamp(tr.alpha, 0, 1));
+        draw_set_color(c_black);
+        draw_rectangle(0, 0, w, h, false);
+    }
+
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}

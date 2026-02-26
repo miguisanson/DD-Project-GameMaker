@@ -784,6 +784,11 @@ function Item_Use(_item_id, _user, _target) {
         }
     } else if (eff == "learn_skill") {
         if (variable_struct_exists(item.use, "skill_id")) {
+            if (variable_struct_exists(_user, "class_id") && _user.class_id == CLASS_NOBODY) {
+                result.ok = false;
+                result.msg = "You are not ready to learn this yet.";
+                return result;
+            }
             var sk = item.use.skill_id;
             var already = false;
             if (is_array(_user.skills) && array_index_of(_user.skills, sk) != -1) already = true;
