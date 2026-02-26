@@ -246,6 +246,7 @@ function Save_BuildSnapshot() {
     var gs = GameState_Get();
     var stat = {};
     stat.selected_class = gs.selected_class;
+    stat.difficulty = Difficulty_Normalize(gs.difficulty);
     stat.player = gs.player_ch;
     stat.flags = gs.flags;
     stat.checkpoint = gs.checkpoint;
@@ -296,6 +297,11 @@ function Save_ApplySnapshot(_snap) {
     if (variable_struct_exists(_snap, "statData")) stat = _snap.statData; else stat = _snap;
 
     gs.selected_class = stat.selected_class;
+    if (variable_struct_exists(stat, "difficulty")) {
+        gs.difficulty = Difficulty_Normalize(stat.difficulty);
+    } else {
+        gs.difficulty = DIFFICULTY_NORMAL;
+    }
     gs.player_ch = stat.player;
     gs.flags = stat.flags;
     gs.checkpoint = stat.checkpoint;

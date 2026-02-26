@@ -30,6 +30,12 @@ function RecomputeResources(_ch) {
     _ch.max_mp = cfg.base_mp + (lvl - 1) * (mp_gain + int_mod);
     _ch.max_mp = max(0, _ch.max_mp);
 
+    if (variable_struct_exists(_ch, "is_player") && _ch.is_player) {
+        var diff = Difficulty_Profile();
+        _ch.max_hp = max(1, round(_ch.max_hp * diff.player_hp_mult));
+        _ch.max_mp = max(0, round(_ch.max_mp * diff.player_mp_mult));
+    }
+
     _ch.hp = clamp(_ch.hp, 0, _ch.max_hp);
     _ch.mp = clamp(_ch.mp, 0, _ch.max_mp);
 

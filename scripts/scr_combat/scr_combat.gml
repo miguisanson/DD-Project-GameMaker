@@ -1,26 +1,47 @@
 function Combat_Initiative(_ch) {
-    return RollD20() + StatMod(Stat_Get(_ch, STAT_AGI));
+    return RollD20() + StatMod(Combat_EffectiveStat(_ch, STAT_AGI));
+}
+
+function Combat_EffectiveStat(_ch, _stat_id) {
+    var base = Stat_Get(_ch, _stat_id);
+    var diff = Difficulty_Profile();
+    var mult = diff.enemy_stat_mult;
+    if (variable_struct_exists(_ch, "is_player") && _ch.is_player) mult = diff.player_stat_mult;
+    return max(1, round(base * mult));
+}
+
+function Combat_EffectiveDamageMult(_attacker) {
+    var diff = Difficulty_Profile();
+    if (variable_struct_exists(_attacker, "is_player") && _attacker.is_player) {
+        return diff.player_damage_mult;
+    }
+    return diff.enemy_damage_mult;
+}
+
+function Combat_EffectiveEnemyStatusChanceMult() {
+    var diff = Difficulty_Profile();
+    return diff.enemy_status_chance_mult;
 }
 
 function Combat_AttackBonus(_attacker, _weapon) {
     // Minimal version: MOD(relevant) + weapon.acc
     var rel_mod = 0;
     switch (_weapon.stat_type) {
-        case STAT_STR:  rel_mod = StatMod(Stat_Get(_attacker, STAT_STR)); break;
-        case STAT_AGI:  rel_mod = StatMod(Stat_Get(_attacker, STAT_AGI)); break;
-        case STAT_INT:  rel_mod = StatMod(Stat_Get(_attacker, STAT_INT)); break;
+        case STAT_STR:  rel_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_STR)); break;
+        case STAT_AGI:  rel_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_AGI)); break;
+        case STAT_INT:  rel_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_INT)); break;
         default:        rel_mod = 0; break;
     }
     return rel_mod + _weapon.acc;
 }
 
 function Combat_DodgeBonus(_defender) {
-    return StatMod(Stat_Get(_defender, STAT_AGI)) + Status_GetSum(_defender, "dodge_bonus");
+    return StatMod(Combat_EffectiveStat(_defender, STAT_AGI)) + Status_GetSum(_defender, "dodge_bonus");
 }
 
 function Combat_CritCheck(_attacker, _crit_bonus) {
     // Base 5% crit, bonus from LUCK and any explicit crit bonus (percent).
-    var luck_mod = StatMod(Stat_Get(_attacker, STAT_LUCK));
+    var luck_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_LUCK));
     if (luck_mod < 0) luck_mod = 0;
     var crit_chance = 0.05 + (luck_mod * 0.01) + (_crit_bonus * 0.01);
     crit_chance = clamp(crit_chance, 0.05, 0.50); // 5% to 50% max
@@ -30,16 +51,16 @@ function Combat_CritCheck(_attacker, _crit_bonus) {
 function Combat_Damage(_attacker, _defender, _weapon) {
     var rel_mod = 0;
     switch (_weapon.stat_type) {
-        case STAT_STR: rel_mod = StatMod(Stat_Get(_attacker, STAT_STR)); break;
-        case STAT_AGI: rel_mod = StatMod(Stat_Get(_attacker, STAT_AGI)); break;
-        case STAT_INT: rel_mod = StatMod(Stat_Get(_attacker, STAT_INT)); break;
+        case STAT_STR: rel_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_STR)); break;
+        case STAT_AGI: rel_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_AGI)); break;
+        case STAT_INT: rel_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_INT)); break;
         default: rel_mod = 0; break;
     }
 
     var raw = _weapon.power + rel_mod;
 
     // softened mitigation: use half of DEF mod (rounded down)
-    var mitig = floor(StatMod(Stat_Get(_defender, STAT_DEF)) / 2);
+    var mitig = floor(StatMod(Combat_EffectiveStat(_defender, STAT_DEF)) / 2);
 
     var final = max(1, raw - mitig);
     return final;
@@ -81,6 +102,9 @@ function Combat_ApplyDamage(_attacker, _defender, _weapon, _crit_mult, _skill_mu
         dmg = floor(dmg * guard_mult);
         _defender = Status_ConsumeByField(_defender, "consume_on_hit");
     }
+
+    var diff_mult = Combat_EffectiveDamageMult(_attacker);
+    if (diff_mult != 1) dmg = floor(dmg * diff_mult);
 
     dmg = max(0, dmg);
     _defender.hp = max(0, _defender.hp - dmg);
@@ -528,6 +552,26 @@ function Battle_EnemyAct(_bc) {
 
         if (Battle_CheckEnd(_bc, p, e)) return;
 
+        var on_hit_status_suffix = "";
+        if (_bc.last_hit
+        && variable_struct_exists(e, "on_hit_status")
+        && variable_struct_exists(e, "on_hit_status_turns")
+        && variable_struct_exists(e, "on_hit_status_chance")) {
+            var sid = e.on_hit_status;
+            var turns = max(0, round(e.on_hit_status_turns));
+            var chance = clamp(real(e.on_hit_status_chance), 0, 1);
+            if (sid != -1 && turns > 0 && chance > 0) {
+                chance = clamp(chance * Combat_EffectiveEnemyStatusChanceMult(), 0, 1);
+                if (random(1) <= chance) {
+                    p = Status_Add(p, sid, turns, 1);
+                    var scfg = StatusDB_Get(sid);
+                    if (is_struct(scfg) && variable_struct_exists(scfg, "name")) {
+                        on_hit_status_suffix = " " + string(scfg.name) + " applied!";
+                    }
+                }
+            }
+        }
+
         if (!_bc.last_hit) {
             var miss_class_id2 = -1;
             if (variable_struct_exists(p, "class_id")) miss_class_id2 = p.class_id;
@@ -535,10 +579,10 @@ function Battle_EnemyAct(_bc) {
             Battle_Message(_bc, e.name + " missed!", BSTATE_MENU);
         } else if (_bc.last_crit) {
             if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " crit! " + string(_bc.last_dmg) + " dmg!", BSTATE_MENU);
+            Battle_Message(_bc, e.name + " crit! " + string(_bc.last_dmg) + " dmg!" + on_hit_status_suffix, BSTATE_MENU);
         } else {
             if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " hits for " + string(_bc.last_dmg) + " dmg!", BSTATE_MENU);
+            Battle_Message(_bc, e.name + " hits for " + string(_bc.last_dmg) + " dmg!" + on_hit_status_suffix, BSTATE_MENU);
         }
     }
 

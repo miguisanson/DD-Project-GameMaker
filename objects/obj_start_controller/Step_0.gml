@@ -44,7 +44,16 @@ if (state == "main") {
 
         SFX_PlayUI("ui_confirm");
         if (opt == "New Game") {
-            Transition_RequestCutsceneById("intro");
+            var current_difficulty = DIFFICULTY_NORMAL;
+            if (variable_struct_exists(gs, "difficulty")) current_difficulty = Difficulty_Normalize(gs.difficulty);
+            difficulty_index = 1;
+            for (var di = 0; di < array_length(difficulty_values); di++) {
+                if (difficulty_values[di] == current_difficulty) {
+                    difficulty_index = di;
+                    break;
+                }
+            }
+            state = "difficulty";
         } else if (opt == "Load Game") {
             SaveMenu_Open("load", "main");
         } else if (opt == "Settings") {
@@ -55,6 +64,34 @@ if (state == "main") {
         } else if (opt == "Exit Game") {
             game_end();
         }
+    }
+    return;
+}
+
+if (state == "difficulty") {
+    if (k_up) {
+        difficulty_index = (difficulty_index + array_length(difficulty_options) - 1) mod array_length(difficulty_options);
+        SFX_PlayUI("ui_move");
+    }
+    if (k_down) {
+        difficulty_index = (difficulty_index + 1) mod array_length(difficulty_options);
+        SFX_PlayUI("ui_move");
+    }
+
+    if (k_back) {
+        SFX_PlayUI("ui_back");
+        state = "main";
+        return;
+    }
+
+    if (k_ok) {
+        SFX_PlayUI("ui_confirm");
+        if (difficulty_index >= 0 && difficulty_index < array_length(difficulty_values)) {
+            Difficulty_SetCurrent(difficulty_values[difficulty_index]);
+        } else {
+            Difficulty_SetCurrent(DIFFICULTY_NORMAL);
+        }
+        Transition_RequestCutsceneById("intro");
     }
     return;
 }

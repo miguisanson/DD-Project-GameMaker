@@ -37,6 +37,84 @@ function Player_DefaultSkills(_class_id) {
     return [];
 }
 
+function Difficulty_Normalize(_difficulty) {
+    var d = round(GameSettings_ToReal(_difficulty, DIFFICULTY_NORMAL));
+    return clamp(d, DIFFICULTY_EASY, DIFFICULTY_HARD);
+}
+
+function Difficulty_GetCurrent() {
+    if (variable_global_exists("state") && is_struct(global.state) && variable_struct_exists(global.state, "difficulty")) {
+        return Difficulty_Normalize(global.state.difficulty);
+    }
+    return DIFFICULTY_NORMAL;
+}
+
+function Difficulty_Label(_difficulty = -1) {
+    var d = _difficulty;
+    if (argument_count <= 0 || d == -1) d = Difficulty_GetCurrent();
+    d = Difficulty_Normalize(d);
+    switch (d) {
+        case DIFFICULTY_EASY: return "Easy";
+        case DIFFICULTY_HARD: return "Hard";
+        default: return "Normal";
+    }
+}
+
+function Difficulty_Profile(_difficulty = -1) {
+    var d = _difficulty;
+    if (argument_count <= 0 || d == -1) d = Difficulty_GetCurrent();
+    d = Difficulty_Normalize(d);
+
+    switch (d) {
+        case DIFFICULTY_EASY:
+            return {
+                id: DIFFICULTY_EASY,
+                player_stat_mult: 1.10,
+                enemy_stat_mult: 0.92,
+                player_hp_mult: 1.20,
+                player_mp_mult: 1.10,
+                enemy_hp_mult: 0.85,
+                enemy_mp_mult: 0.90,
+                player_damage_mult: 1.12,
+                enemy_damage_mult: 0.86,
+                enemy_status_chance_mult: 0.85
+            };
+        case DIFFICULTY_HARD:
+            return {
+                id: DIFFICULTY_HARD,
+                player_stat_mult: 0.95,
+                enemy_stat_mult: 1.10,
+                player_hp_mult: 0.90,
+                player_mp_mult: 0.95,
+                enemy_hp_mult: 1.20,
+                enemy_mp_mult: 1.05,
+                player_damage_mult: 0.92,
+                enemy_damage_mult: 1.18,
+                enemy_status_chance_mult: 1.10
+            };
+        default:
+            return {
+                id: DIFFICULTY_NORMAL,
+                player_stat_mult: 1.00,
+                enemy_stat_mult: 1.00,
+                player_hp_mult: 1.00,
+                player_mp_mult: 1.00,
+                enemy_hp_mult: 1.00,
+                enemy_mp_mult: 1.00,
+                player_damage_mult: 1.00,
+                enemy_damage_mult: 1.00,
+                enemy_status_chance_mult: 1.00
+            };
+    }
+}
+
+function Difficulty_SetCurrent(_difficulty) {
+    var gs = GameState_Get();
+    gs.difficulty = Difficulty_Normalize(_difficulty);
+    global.difficulty = gs.difficulty;
+    return gs.difficulty;
+}
+
 function Player_EnsureSpriteSet() {
     if (!variable_instance_exists(id, "sprite") || !is_array(sprite) || array_length(sprite) < 4) {
         sprite = array_create(4, sprite_index);
@@ -311,6 +389,11 @@ function GameState_Init() {
         gs.selected_class = CLASS_NOBODY;
     }
 
+    if (!variable_struct_exists(gs, "difficulty")) {
+        gs.difficulty = DIFFICULTY_NORMAL;
+    }
+    gs.difficulty = Difficulty_Normalize(gs.difficulty);
+
     if (!variable_struct_exists(gs, "defeated_enemies")) {
         gs.defeated_enemies = ds_list_create();
     }
@@ -496,6 +579,7 @@ function GameState_SyncLegacy() {
     Input_Init();
 
     global.selected_class = gs.selected_class;
+    global.difficulty = gs.difficulty;
     global.defeated_enemies = gs.defeated_enemies;
     global.player_ch = gs.player_ch;
 

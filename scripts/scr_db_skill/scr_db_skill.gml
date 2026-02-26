@@ -399,7 +399,11 @@ function Skill_Use(_user, _target, _skill_id) {
         _user = Status_ConsumeByField(_user, "consume_on_attack");
 
         if (s.status != -1 && any_hit) {
-            if (s.status_chance >= 1 || random(1) <= s.status_chance) {
+            var status_chance = s.status_chance;
+            if (!variable_struct_exists(_user, "is_player") || !_user.is_player) {
+                status_chance = clamp(status_chance * Combat_EffectiveEnemyStatusChanceMult(), 0, 1);
+            }
+            if (status_chance >= 1 || random(1) <= status_chance) {
                 _target = Status_Add(_target, s.status, s.status_turns, 1);
                 var cfg2 = StatusDB_Get(s.status);
                 result.msg = cfg2.name + " applied.";

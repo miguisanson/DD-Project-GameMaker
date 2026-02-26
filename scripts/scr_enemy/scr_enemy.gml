@@ -1,19 +1,21 @@
 function EnemyCreate(_enemy_id) {
     var base = EnemyDB_Get(_enemy_id);
+    var diff = Difficulty_Profile();
 
     // build battle character struct
     var ch = {};
     ch.id = base.id;
     ch.name = base.name;
     ch.level = base.level;
+    ch.is_player = false;
 
     // copy stats (keep same keys you use everywhere)
     ch.stats = {
-        str:  base.stats.str,
-        agi:  base.stats.agi,
-        def:  base.stats.def,
-        intt: base.stats.intt,
-        luck: base.stats.luck
+        str:  max(1, round(base.stats.str * diff.enemy_stat_mult)),
+        agi:  max(1, round(base.stats.agi * diff.enemy_stat_mult)),
+        def:  max(1, round(base.stats.def * diff.enemy_stat_mult)),
+        intt: max(1, round(base.stats.intt * diff.enemy_stat_mult)),
+        luck: max(1, round(base.stats.luck * diff.enemy_stat_mult))
     };
 
     ch.base_hp = base.base_hp;
@@ -29,6 +31,8 @@ function EnemyCreate(_enemy_id) {
     ch.max_hp = max(1, ch.base_hp + (ch.level - 1) * (hp_gain + def_mod));
 
     ch.max_mp = max(0, ch.base_mp + (ch.level - 1) * (ch.mp_gain + int_mod));
+    ch.max_hp = max(1, round(ch.max_hp * diff.enemy_hp_mult));
+    ch.max_mp = max(0, round(ch.max_mp * diff.enemy_mp_mult));
 
     // current resources start full
     ch.hp = ch.max_hp;
@@ -39,6 +43,9 @@ function EnemyCreate(_enemy_id) {
     ch.sprite = base.sprite;
     ch.exp = base.exp;
     ch.skills = base.skills;
+    ch.on_hit_status = variable_struct_exists(base, "on_hit_status") ? base.on_hit_status : -1;
+    ch.on_hit_status_turns = variable_struct_exists(base, "on_hit_status_turns") ? base.on_hit_status_turns : 0;
+    ch.on_hit_status_chance = variable_struct_exists(base, "on_hit_status_chance") ? base.on_hit_status_chance : 0;
     ch.status = [];
     ch.is_boss = base.is_boss;
 

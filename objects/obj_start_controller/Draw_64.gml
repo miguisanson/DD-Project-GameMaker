@@ -46,6 +46,44 @@ if (state == "main") {
     }
 }
 
+if (state == "difficulty") {
+    var dw = w * 0.62;
+    var dh = h * 0.44;
+    var dx = (w - dw) * 0.5;
+    var dy = (h - dh) * 0.5;
+
+    draw_set_alpha(0.88);
+    draw_set_color(c_black);
+    draw_rectangle(dx, dy, dx + dw, dy + dh, false);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+    draw_rectangle(dx, dy, dx + dw, dy + dh, true);
+    draw_text(dx + 12, dy + 12, "Select Difficulty");
+
+    var drow_gap = max(18, line_h + 6);
+    var start_y2 = dy + 36;
+    for (var di2 = 0; di2 < array_length(difficulty_options); di2++) {
+        var dlabel = difficulty_options[di2];
+        var dyy = start_y2 + di2 * drow_gap;
+        var dsel = (di2 == difficulty_index);
+
+        if (dsel) {
+            draw_set_color(c_white);
+            draw_rectangle(dx + 10 - pad_x, dyy - pad_y, dx + dw - 10 + pad_x, dyy + line_h + pad_y, false);
+            draw_set_color(c_black);
+            draw_rectangle(dx + 10 - pad_x, dyy - pad_y, dx + dw - 10 + pad_x, dyy + line_h + pad_y, true);
+            draw_set_color(c_black);
+        } else {
+            draw_set_color(c_white);
+        }
+
+        draw_text(dx + 18, dyy, dlabel);
+    }
+
+    draw_set_color(c_white);
+    draw_text(dx + 12, dy + dh - (line_h + 8), "Back");
+}
+
 // settings popup
 if (state == "settings") {
     var sw = w * 0.72;
