@@ -554,7 +554,10 @@ function Battle_EnemyAct(_bc) {
 
     if (use_skill) {
         if (!is_struct(sk)) sk = SkillDB_Get(skill_id);
-        var res = Skill_Use(e, p, skill_id);
+        var enemy_targets_self = (variable_struct_exists(sk, "target") && sk.target == TGT_SELF);
+        var enemy_skill_target = enemy_targets_self ? e : p;
+        var res = Skill_Use(e, enemy_skill_target, skill_id);
+        if (enemy_targets_self) e = enemy_skill_target; else p = enemy_skill_target;
         if (!res.ok) {
             use_skill = false;
         } else {
