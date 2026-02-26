@@ -12,6 +12,10 @@ var pad_x = 6;
 var pad_y = 4;
 
 if (state == "main") {
+    var can_load = true;
+    if (variable_instance_exists(id, "load_available")) can_load = load_available;
+    else can_load = Save_HasAnySlot();
+
     // main menu
     var bx1 = w * 0.3;
     var bx2 = w * 0.7;
@@ -25,14 +29,18 @@ if (state == "main") {
     for (var i = 0; i < array_length(main_options); i++) {
         var label = main_options[i];
         var yy = start_y + i * row_gap;
-        if (state == "main" && i == main_index) {
+        var load_disabled = (label == "Load Game" && !can_load);
+        var selected = (state == "main" && i == main_index && !load_disabled);
+
+        if (selected) {
             draw_set_color(c_white);
             draw_rectangle(bx1 - pad_x, yy - pad_y, bx2 + pad_x, yy + line_h + pad_y, false);
             draw_set_color(c_black);
             draw_rectangle(bx1 - pad_x, yy - pad_y, bx2 + pad_x, yy + line_h + pad_y, true);
             draw_set_color(c_black);
         } else {
-            draw_set_color(c_white);
+            if (load_disabled) draw_set_color(c_gray);
+            else draw_set_color(c_white);
         }
         draw_text(bx1 + 8, yy, label);
     }

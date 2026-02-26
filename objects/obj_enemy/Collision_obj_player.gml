@@ -4,7 +4,7 @@ if (other.battle_cooldown > 0) exit;
 
 if (!EnemyPersist_BeginEncounter(id, other)) exit;
 
-if (!Transition_RequestEncounterBattle(rm_battle, x, y)) exit;
+if (!Transition_RequestEncounterBattle(rm_battle)) exit;
 
 // monster encounter sound
 SFX_PlayEnemySpawn(enemy_id);

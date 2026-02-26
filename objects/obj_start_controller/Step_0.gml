@@ -12,18 +12,37 @@ var k_ok = Input_UIConfirm();
 var k_back = Input_UIBack();
 
 if (state == "main") {
+    load_available = Save_HasAnySlot();
+    if (!load_available && main_options[main_index] == "Load Game") {
+        main_index = (main_index + 1) mod array_length(main_options);
+    }
+
     if (k_up) {
-        main_index = (main_index + array_length(main_options) - 1) mod array_length(main_options);
+        var max_loop_up = array_length(main_options);
+        repeat (max_loop_up) {
+            main_index = (main_index + array_length(main_options) - 1) mod array_length(main_options);
+            if (load_available || main_options[main_index] != "Load Game") break;
+        }
         SFX_PlayUI("ui_move");
     }
     if (k_down) {
-        main_index = (main_index + 1) mod array_length(main_options);
+        var max_loop_down = array_length(main_options);
+        repeat (max_loop_down) {
+            main_index = (main_index + 1) mod array_length(main_options);
+            if (load_available || main_options[main_index] != "Load Game") break;
+        }
         SFX_PlayUI("ui_move");
     }
 
     if (k_ok) {
-        SFX_PlayUI("ui_confirm");
         var opt = main_options[main_index];
+        if (opt == "Load Game" && !load_available) {
+            main_index = (main_index + 1) mod array_length(main_options);
+            SFX_PlayUI("ui_move");
+            return;
+        }
+
+        SFX_PlayUI("ui_confirm");
         if (opt == "New Game") {
             Transition_RequestCutsceneById("intro");
         } else if (opt == "Load Game") {

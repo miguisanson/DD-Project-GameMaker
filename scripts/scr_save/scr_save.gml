@@ -148,6 +148,18 @@ function Save_LoadLatestSettings() {
     return best_settings;
 }
 
+function Save_HasSlot(_slot) {
+    var info = Save_SlotInfo(_slot);
+    return is_struct(info) && variable_struct_exists(info, "exists") && info.exists;
+}
+
+function Save_HasAnySlot() {
+    for (var i = 1; i <= 3; i++) {
+        if (Save_HasSlot(i)) return true;
+    }
+    return false;
+}
+
 function Save_IsBossEnemyId(_enemy_id) {
     return (_enemy_id == ENEMY_MINI_BOSS || _enemy_id == ENEMY_FINAL_BOSS);
 }

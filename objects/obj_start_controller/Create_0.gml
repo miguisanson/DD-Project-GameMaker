@@ -13,6 +13,7 @@ cutscene_started = false;
 
 var gs = GameState_Get();
 settings_pending = GameSettings_Copy(GameSettings_Ensure());
+load_available = Save_HasAnySlot();
 
 if (room == rm_start) {
     gs.in_main_menu = true;

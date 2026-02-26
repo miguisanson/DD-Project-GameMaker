@@ -15,6 +15,10 @@ function SaveMenu_BuildSlotInfoCache() {
 function SaveMenu_Open(_mode, _context) {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    var opened_with_confirm = (
+        Input_Held("confirm") || Input_Held("interact") ||
+        Input_Pressed("confirm") || Input_Pressed("interact")
+    );
     SFX_PlayUI("ui_openclose");
     gs.ui.mode = UI_SAVE;
     gs.ui.save_menu = {
@@ -25,10 +29,11 @@ function SaveMenu_Open(_mode, _context) {
         col: 0,
         confirm: false,
         confirm_choice: 0,
-        confirm_mode: "delete", // delete | overwrite | save | saved | message
+        confirm_mode: "delete", // delete | load | overwrite | save | saved | message
         message: "",
         slot_info_cache: SaveMenu_BuildSlotInfoCache(),
-        opened_frame: Input_Frame()
+        opened_frame: Input_Frame(),
+        require_release: opened_with_confirm
     };
 
 }
@@ -47,6 +52,28 @@ function SaveMenu_Handle() {
     if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "save_menu")) return;
     var sm = gs.ui.save_menu;
     if (!sm.open) return;
+
+    if (variable_struct_exists(sm, "require_release") && sm.require_release) {
+        var confirm_active = (
+            Input_Held("confirm") || Input_Held("interact") ||
+            Input_Pressed("confirm") || Input_Pressed("interact")
+        );
+        if (confirm_active) {
+            gs.ui.save_menu = sm;
+            return;
+        }
+        sm.require_release = false;
+        gs.ui.save_menu = sm;
+        return;
+    }
+
+    var frame = Input_Frame();
+    if (variable_struct_exists(sm, "opened_frame")) {
+        if (frame <= sm.opened_frame) {
+            gs.ui.save_menu = sm;
+            return;
+        }
+    }
 
     var k_up = Input_UIPressed("menu_up");
     var k_down = Input_UIPressed("menu_down");
@@ -86,6 +113,18 @@ function SaveMenu_Handle() {
                         sm.slot_info_cache[sm.slot] = Save_SlotInfo(sm.slot + 1);
                     }
                     SFX_Play("delete_confirm");
+                } else if (sm.confirm_mode == "load") {
+                    SaveMenu_Log("load confirmed slot " + string(sm.slot + 1));
+                    if (Save_Read(sm.slot + 1)) {
+                        SFX_Play("load_confirm");
+                        gs.save_slot = sm.slot + 1;
+                        SaveMenu_Close();
+                        return;
+                    } else {
+                        SFX_PlayUI("ui_back");
+                        SaveMenu_Close();
+                        return;
+                    }
                 } else if (sm.confirm_mode == "overwrite") {
                     SaveMenu_Log("overwrite confirmed slot " + string(sm.slot + 1));
                     Save_Write(sm.slot + 1);
@@ -150,16 +189,17 @@ function SaveMenu_Handle() {
         var slot = sm.slot + 1;
         if (sm.mode == "load") {
             if (sm.col == 0) {
-                if (Save_Read(slot)) {
-                    SFX_Play("load_confirm");
-                    gs.save_slot = slot;
-                    SaveMenu_Close();
+                var load_info = Save_SlotInfo(slot);
+                if (load_info.exists) {
+                    SFX_PlayUI("ui_confirm");
+                    sm.confirm = true;
+                    sm.confirm_mode = "load";
+                    sm.confirm_choice = 1; // default to Cancel
+                    SaveMenu_Log("load confirm open slot " + string(slot));
                 } else {
                     SFX_PlayUI("ui_back");
-                    sm.confirm = true;
-                    sm.confirm_mode = "message";
-                    sm.confirm_choice = 0;
-                    sm.message = "No save found.";
+                    SaveMenu_Close();
+                    return;
                 }
             } else {
                 SFX_PlayUI("ui_confirm");
@@ -312,6 +352,7 @@ function SaveMenu_Draw() {
         var cy = by + bh * 0.7;
         var msg = "";
         if (sm.confirm_mode == "delete") msg = "Delete slot?";
+        else if (sm.confirm_mode == "load") msg = "Load save?";
         else if (sm.confirm_mode == "overwrite") msg = "Overwrite save?";
         else if (sm.confirm_mode == "save") msg = "Save to slot?";
         else msg = sm.message;
