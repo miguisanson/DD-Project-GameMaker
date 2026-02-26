@@ -31,6 +31,13 @@ if (gs.last_room != room) {
     }
 }
 
+if (room == rm_floor1 && variable_struct_exists(gs, "pending_floor1_intro_dialogue") && gs.pending_floor1_intro_dialogue) {
+    if (instance_exists(obj_player) && gs.ui.mode == UI_NONE && array_length(gs.ui.lines) <= 0) {
+        gs.pending_floor1_intro_dialogue = false;
+        Dialogue_Start("sys_floor1_intro");
+    }
+}
+
 // apply persistence once on initial room load
 if (room != rm_battle && variable_global_exists("room_state_ready") && global.room_state_ready) {
     var gs_apply = GameState_Get();

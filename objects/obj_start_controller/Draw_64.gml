@@ -2,6 +2,7 @@ var w = display_get_gui_width();
 var h = display_get_gui_height();
 var gs = GameState_Get();
 if (gs.ui.mode == UI_SAVE) exit;
+if (state == "intro") exit;
 
 UI_SetFont();
 var line_h = string_height("A");

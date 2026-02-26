@@ -76,10 +76,24 @@ if (gs.ui.mode == UI_MENU) {
 
 // Dialogue box
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
+    var cutscene_active = variable_struct_exists(gs.ui, "cutscene_active") && gs.ui.cutscene_active;
+    if (cutscene_active) {
+        var bg_sprite = variable_struct_exists(gs.ui, "cutscene_bg_sprite") ? gs.ui.cutscene_bg_sprite : noone;
+        if (bg_sprite != noone) {
+            draw_sprite_stretched(bg_sprite, 0, 0, 0, w, h);
+        }
+    }
+
     var bx = margin;
     var by = h - 64 - margin;
     var bw = w - margin * 2;
     var bh = 64;
+    if (variable_struct_exists(gs.ui, "dialogue_box_half") && gs.ui.dialogue_box_half) {
+        bx = 0;
+        by = floor(h * 0.5);
+        bw = w;
+        bh = h - by;
+    }
 
     draw_set_color(c_black);
     draw_rectangle(bx, by, bx + bw, by + bh, false);

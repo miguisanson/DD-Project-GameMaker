@@ -24,7 +24,12 @@ if (state == "main") {
         SFX_PlayUI("ui_confirm");
         var opt = main_options[main_index];
         if (opt == "New Game") {
-            state = "class";
+            state = "intro";
+            class_index = 0;
+            gs.ui.cutscene_active = true;
+            gs.ui.cutscene_bg_sprite = intro_bg_sprite;
+            gs.ui.dialogue_box_half = true;
+            Dialogue_Start(intro_dialogue_id);
         } else if (opt == "Load Game") {
             SaveMenu_Open("load", "main");
         } else if (opt == "Settings") {
@@ -35,6 +40,17 @@ if (state == "main") {
         } else if (opt == "Exit Game") {
             game_end();
         }
+    }
+    return;
+}
+
+if (state == "intro") {
+    if (gs.ui.mode != UI_DIALOGUE && array_length(gs.ui.lines) <= 0) {
+        gs.ui.cutscene_active = false;
+        gs.ui.cutscene_bg_sprite = noone;
+        gs.ui.dialogue_box_half = false;
+        class_index = 0;
+        state = "class";
     }
     return;
 }
@@ -78,6 +94,7 @@ if (state == "class") {
         GameState_SetPlayer(gs.player_ch);
 
         gs.in_main_menu = false;
+        gs.pending_floor1_intro_dialogue = true;
         GameSettings_ApplyAll();
         RoomTransition_Set(rm_floor1, "start", -1);
         room_goto(rm_floor1);

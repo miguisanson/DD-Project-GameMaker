@@ -9,6 +9,16 @@ function DialogueDB_Init() {
     global.dialogue_db[? "sys_save_ok"] = ["Game saved."];
     global.dialogue_db[? "sys_load_ok"] = ["Game loaded."];
     global.dialogue_db[? "sys_load_missing"] = ["No save found."];
+    global.dialogue_db[? "sys_intro_cutscene"] = [
+        "You ventured deep in a tunnel heading towards a neighboring enemy castle... The plan was to ambush using this shortcut",
+        "You are just a porter for this raid party",
+        "You knew this was a mistake",
+        "You are from here, this place never existed before...",
+        "You just knew the ground ground was weak and unsupported",
+        "But it was already too late to speak up",
+        "You fell down."
+    ];
+    global.dialogue_db[? "sys_floor1_intro"] = ["Where am I?... I knew it there's something wrong with this place."];
 
     // interactables
     global.dialogue_db[? "tree"] = ["A sturdy tree."];
