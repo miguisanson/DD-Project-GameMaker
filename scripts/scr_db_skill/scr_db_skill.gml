@@ -333,7 +333,7 @@ function Skill_CanUse(_ch, _skill) {
 
 function Skill_Use(_user, _target, _skill_id) {
     var s = SkillDB_Get(_skill_id);
-    var result = { ok: true, hit: true, dmg: 0, crit: false, msg: "", fx_sprite: s.fx_sprite, fx_frames: s.fx_frames, fx_speed: s.fx_speed };
+    var result = { ok: true, hit: true, dmg: 0, crit: false, msg: "", fx_sprite: s.fx_sprite, fx_frames: s.fx_frames, fx_speed: s.fx_speed * SKILL_FX_SPEED_MULT };
 
     if (_user.mp < s.mp_cost) {
         result.ok = false;

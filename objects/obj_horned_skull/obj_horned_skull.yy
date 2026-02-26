@@ -37,5 +37,5 @@
     "path":"sprites/horned_skull_asset/horned_skull_asset.yy",
   },
   "spriteMaskId":null,
-  "visible":true,
+  "visible":false,
 }

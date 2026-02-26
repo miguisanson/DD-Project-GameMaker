@@ -37,5 +37,5 @@
     "path":"sprites/fire_stand_off_asset/fire_stand_off_asset.yy",
   },
   "spriteMaskId":null,
-  "visible":true,
+  "visible":false,
 }

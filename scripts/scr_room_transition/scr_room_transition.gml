@@ -198,7 +198,7 @@ function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus
         tr.fade_out_frames = max(1, TRANSITION_CUTSCENE_FADE_OUT_FRAMES);
         tr.fade_in_frames = max(1, TRANSITION_CUTSCENE_FADE_IN_FRAMES);
     } else if (_type == TRANSITION_TYPE_ENCOUNTER) {
-        tr.fade_out_frames = max(1, TRANSITION_ENCOUNTER_ZOOM_FRAMES);
+        tr.fade_out_frames = max(1, TRANSITION_ENCOUNTER_FADE_OUT_FRAMES);
         tr.fade_in_frames = max(1, TRANSITION_ENCOUNTER_FADE_IN_FRAMES);
         tr.encounter_zoom = 0;
         tr.encounter_shake_x = 0;
@@ -305,29 +305,36 @@ function Transition_Update() {
         case TRANSITION_TYPE_ENCOUNTER: {
             if (tr.phase == 0) {
                 tr.timer += 1;
-                var p = clamp(tr.timer / tr.fade_out_frames, 0, 1);
+                var p = clamp(tr.timer / max(1, TRANSITION_ENCOUNTER_ZOOM_FRAMES), 0, 1);
                 tr.encounter_zoom = lerp(0, TRANSITION_ENCOUNTER_ZOOM_MAX, p);
-                tr.alpha = clamp((p - 0.15) / 0.85, 0, 1);
                 var shake_mag = max(0, round(TRANSITION_ENCOUNTER_SHAKE_PX * (1 - (p * 0.5))));
                 tr.encounter_shake_x = irandom_range(-shake_mag, shake_mag);
                 tr.encounter_shake_y = irandom_range(-shake_mag, shake_mag);
                 Transition_ApplyEncounterViewport(tr);
+                tr.alpha = 0;
 
-                if (tr.timer >= tr.fade_out_frames) {
+                if (tr.timer >= max(1, TRANSITION_ENCOUNTER_ZOOM_FRAMES)) {
                     Transition_RestoreEncounterViewport(tr);
                     tr.encounter_zoom = 0;
                     tr.encounter_shake_x = 0;
                     tr.encounter_shake_y = 0;
-                    tr.alpha = 1;
                     tr.phase = 1;
                     tr.timer = 0;
-                    room_goto(tr.target_room);
                 }
             } else if (tr.phase == 1) {
                 tr.timer += 1;
+                tr.alpha = clamp(tr.timer / tr.fade_out_frames, 0, 1);
+                if (tr.timer >= tr.fade_out_frames) {
+                    tr.alpha = 1;
+                    tr.phase = 2;
+                    tr.timer = 0;
+                    room_goto(tr.target_room);
+                }
+            } else if (tr.phase == 2) {
+                tr.timer += 1;
                 tr.alpha = 1;
                 if (tr.timer >= max(0, TRANSITION_ENCOUNTER_BLACK_HOLD_FRAMES)) {
-                    tr.phase = 2;
+                    tr.phase = 3;
                     tr.timer = 0;
                 }
             } else {

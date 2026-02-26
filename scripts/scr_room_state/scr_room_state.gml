@@ -225,6 +225,7 @@ function RoomState_Apply(_room) {
 
     with (obj_enemy) RoomState_ApplyInstance(self);
     with (obj_interactable) RoomState_ApplyInstance(self);
+    if (object_exists(obj_dialogue_trigger)) with (obj_dialogue_trigger) RoomState_ApplyInstance(self);
     if (object_exists(obj_item_pickup)) with (obj_item_pickup) RoomState_ApplyInstance(self);
 }
 

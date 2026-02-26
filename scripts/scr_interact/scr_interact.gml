@@ -138,7 +138,9 @@ function Interact_Handle(_inst) {
         }
 
         if (current_class == CLASS_NOBODY) {
-            ClassSelect_Open(true);
+            Dialogue_StartWithSpeaker(name, DialogueDB_Get("sys_class_chest_prompt"));
+            gs.pending_class_select_open = true;
+            gs.pending_class_select_block_frame = Input_Frame() + 1;
         } else {
             Dialogue_StartWithSpeaker(name, DialogueDB_Get("chest_empty"));
         }
