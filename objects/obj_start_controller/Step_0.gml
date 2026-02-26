@@ -49,8 +49,7 @@ if (state == "intro") {
         gs.ui.cutscene_active = false;
         gs.ui.cutscene_bg_sprite = noone;
         gs.ui.dialogue_box_half = false;
-        class_index = 0;
-        state = "class";
+        room_goto(rm_character_class);
     }
     return;
 }
@@ -68,14 +67,14 @@ if (state == "class") {
 
     if (k_back) {
         SFX_PlayUI("ui_back");
-        state = "main";
+        room_goto(rm_start);
         return;
     }
 
     if (k_ok) {
         SFX_PlayUI("ui_confirm");
         if (class_index == array_length(choices)) {
-            state = "main";
+            room_goto(rm_start);
             return;
         }
         var class_id = choice_ids[class_index];

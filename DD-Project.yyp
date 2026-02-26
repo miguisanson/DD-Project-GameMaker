@@ -136,6 +136,7 @@
     {"id":{"name":"obj_ui_controller","path":"objects/obj_ui_controller/obj_ui_controller.yy",},},
     {"id":{"name":"obj_wall","path":"objects/obj_wall/obj_wall.yy",},},
     {"id":{"name":"rm_battle","path":"rooms/rm_battle/rm_battle.yy",},},
+    {"id":{"name":"rm_character_class","path":"rooms/rm_character_class/rm_character_class.yy",},},
     {"id":{"name":"rm_floor1","path":"rooms/rm_floor1/rm_floor1.yy",},},
     {"id":{"name":"rm_floor2","path":"rooms/rm_floor2/rm_floor2.yy",},},
     {"id":{"name":"rm_floor3","path":"rooms/rm_floor3/rm_floor3.yy",},},
@@ -236,6 +237,7 @@
     {"id":{"name":"bandage","path":"sprites/bandage/bandage.yy",},},
     {"id":{"name":"barrel_asset_broken","path":"sprites/barrel_asset_broken/barrel_asset_broken.yy",},},
     {"id":{"name":"barrel_asset","path":"sprites/barrel_asset/barrel_asset.yy",},},
+    {"id":{"name":"battle_screen","path":"sprites/battle_screen/battle_screen.yy",},},
     {"id":{"name":"bed_save","path":"sprites/bed_save/bed_save.yy",},},
     {"id":{"name":"black_screen","path":"sprites/black_screen/black_screen.yy",},},
     {"id":{"name":"bleed_effect","path":"sprites/bleed_effect/bleed_effect.yy",},},
@@ -349,6 +351,7 @@
   "resourceVersion":"2.0",
   "RoomOrderNodes":[
     {"roomId":{"name":"rm_start","path":"rooms/rm_start/rm_start.yy",},},
+    {"roomId":{"name":"rm_character_class","path":"rooms/rm_character_class/rm_character_class.yy",},},
     {"roomId":{"name":"rm_floor1","path":"rooms/rm_floor1/rm_floor1.yy",},},
     {"roomId":{"name":"rm_floor2","path":"rooms/rm_floor2/rm_floor2.yy",},},
     {"roomId":{"name":"rm_battle","path":"rooms/rm_battle/rm_battle.yy",},},

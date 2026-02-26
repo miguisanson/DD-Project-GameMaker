@@ -84,16 +84,11 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
         }
     }
 
-    var bx = margin;
-    var by = h - 64 - margin;
-    var bw = w - margin * 2;
-    var bh = 64;
-    if (variable_struct_exists(gs.ui, "dialogue_box_half") && gs.ui.dialogue_box_half) {
-        bx = 0;
-        by = floor(h * 0.5);
-        bw = w;
-        bh = h - by;
-    }
+    var box = Dialogue_BoxRect();
+    var bx = box.x;
+    var by = box.y;
+    var bw = box.w;
+    var bh = box.h;
 
     draw_set_color(c_black);
     draw_rectangle(bx, by, bx + bw, by + bh, false);
@@ -109,23 +104,24 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
 
     var speaker = "";
     if (variable_struct_exists(gs.ui, "speaker")) speaker = gs.ui.speaker;
+    var layout = Dialogue_TextLayout(speaker);
 
     draw_set_color(c_white);
     if (speaker != "") {
-        draw_text(bx + 8, by + 6, speaker + ":");
+        draw_text(bx + UI_DIALOGUE_TEXT_PAD_X, by + UI_DIALOGUE_SPEAKER_Y, speaker + ":");
         Dialogue_TypewriterPrepareCurrentLine();
         var page_text0 = variable_struct_exists(gs.ui, "dialogue_full_text") ? gs.ui.dialogue_full_text : line;
         var visible_count0 = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text0);
         visible_count0 = clamp(visible_count0, 0, string_length(page_text0));
         var visible_text0 = string_copy(page_text0, 1, visible_count0);
-        draw_text(bx + 8, by + 22, visible_text0);
+        draw_text(layout.text_x, layout.text_y, visible_text0);
     } else {
         Dialogue_TypewriterPrepareCurrentLine();
         var page_text = variable_struct_exists(gs.ui, "dialogue_full_text") ? gs.ui.dialogue_full_text : line;
         var visible_count = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text);
         visible_count = clamp(visible_count, 0, string_length(page_text));
         var visible_text = string_copy(page_text, 1, visible_count);
-        draw_text(bx + 8, by + 8, visible_text);
+        draw_text(layout.text_x, layout.text_y, visible_text);
     }
     if (gs.ui.mode == UI_DIALOGUE && array_length(gs.ui.lines) > 0
     && variable_struct_exists(gs.ui, "dialogue_state") && gs.ui.dialogue_state == UI_DIALOGUE_STATE_READY) {

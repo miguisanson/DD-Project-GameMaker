@@ -7,35 +7,38 @@ if (state == "intro") exit;
 UI_SetFont();
 var line_h = string_height("A");
 
-// main menu
 var row_gap = max(18, line_h + 4);
-var bx1 = w * 0.3;
-var bx2 = w * 0.7;
 var pad_x = 6;
 var pad_y = 4;
-var list_rows = array_length(main_options);
-var list_h = max(0, list_rows - 1) * row_gap + line_h + pad_y * 2;
-var start_target_y = h * 0.62;
-var start_min_y = h * 0.35;
-var start_max_y = max(start_min_y, h - (h * 0.10) - list_h);
-var start_y = clamp(start_target_y, start_min_y, start_max_y);
 
-for (var i = 0; i < array_length(main_options); i++) {
-    var label = main_options[i];
-    var yy = start_y + i * row_gap;
-    if (state == "main" && i == main_index) {
-        draw_set_color(c_white);
-        draw_rectangle(bx1 - pad_x, yy - pad_y, bx2 + pad_x, yy + line_h + pad_y, false);
-        draw_set_color(c_black);
-        draw_rectangle(bx1 - pad_x, yy - pad_y, bx2 + pad_x, yy + line_h + pad_y, true);
-        draw_set_color(c_black);
-    } else {
-        draw_set_color(c_white);
+if (state != "class") {
+    // main menu
+    var bx1 = w * 0.3;
+    var bx2 = w * 0.7;
+    var list_rows = array_length(main_options);
+    var list_h = max(0, list_rows - 1) * row_gap + line_h + pad_y * 2;
+    var start_target_y = h * 0.62;
+    var start_min_y = h * 0.35;
+    var start_max_y = max(start_min_y, h - (h * 0.10) - list_h);
+    var start_y = clamp(start_target_y, start_min_y, start_max_y);
+
+    for (var i = 0; i < array_length(main_options); i++) {
+        var label = main_options[i];
+        var yy = start_y + i * row_gap;
+        if (state == "main" && i == main_index) {
+            draw_set_color(c_white);
+            draw_rectangle(bx1 - pad_x, yy - pad_y, bx2 + pad_x, yy + line_h + pad_y, false);
+            draw_set_color(c_black);
+            draw_rectangle(bx1 - pad_x, yy - pad_y, bx2 + pad_x, yy + line_h + pad_y, true);
+            draw_set_color(c_black);
+        } else {
+            draw_set_color(c_white);
+        }
+        draw_text(bx1 + 8, yy, label);
     }
-    draw_text(bx1 + 8, yy, label);
 }
 
-// class select popup
+// class select screen
 if (state == "class") {
     var bw = w * 0.6;
     var bh = h * 0.5;

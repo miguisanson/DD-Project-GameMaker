@@ -414,6 +414,7 @@ function GameState_Init() {
         gs.ui = {
             mode: 0,
             lines: [],
+            lines_raw: [],
             index: 0,
             speaker: "",
             confirm_action: "",
@@ -444,6 +445,7 @@ function GameState_Init() {
     if (!variable_struct_exists(gs.ui, "dialogue_hold_duration")) gs.ui.dialogue_hold_duration = 0;
     if (!variable_struct_exists(gs.ui, "dialogue_tw_line_index")) gs.ui.dialogue_tw_line_index = -1;
     if (!variable_struct_exists(gs.ui, "dialogue_open_block_frame")) gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
+    if (!variable_struct_exists(gs.ui, "lines_raw") || !is_array(gs.ui.lines_raw)) gs.ui.lines_raw = [];
 
     if (!variable_struct_exists(gs, "in_main_menu")) {
         gs.in_main_menu = false;

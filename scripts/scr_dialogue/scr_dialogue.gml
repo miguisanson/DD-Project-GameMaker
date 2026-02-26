@@ -95,9 +95,247 @@ function Dialogue_LineText(_line_entry) {
     return string(_line_entry);
 }
 
+function Dialogue_CopyLineEntryWithText(_line_entry, _text) {
+    if (is_struct(_line_entry)) {
+        var out = {};
+        var names = variable_struct_get_names(_line_entry);
+        for (var i = 0; i < array_length(names); i++) {
+            var nm = names[i];
+            variable_struct_set(out, nm, variable_struct_get(_line_entry, nm));
+        }
+        variable_struct_set(out, "text", _text);
+        return out;
+    }
+    return _text;
+}
+
+function Dialogue_BoxRect() {
+    var gs = GameState_Get();
+    var w = display_get_gui_width();
+    var h = display_get_gui_height();
+
+    var margin = UI_DIALOGUE_BOX_MARGIN;
+    var bx = margin;
+    var by = h - UI_DIALOGUE_BOX_HEIGHT - margin;
+    var bw = w - margin * 2;
+    var bh = UI_DIALOGUE_BOX_HEIGHT;
+
+    if (variable_struct_exists(gs.ui, "dialogue_box_half") && gs.ui.dialogue_box_half) {
+        bx = 0;
+        bw = w;
+        var min_h = max(1, UI_CUTSCENE_DIALOGUE_MIN_HEIGHT);
+        by = floor(h * UI_CUTSCENE_DIALOGUE_TOP_RATIO);
+        by = clamp(by, 0, max(0, h - min_h));
+        bh = h - by;
+    }
+
+    return {
+        x: bx,
+        y: by,
+        w: bw,
+        h: bh
+    };
+}
+
+function Dialogue_TextLayout(_speaker) {
+    UI_SetFont();
+
+    var box = Dialogue_BoxRect();
+    var has_speaker = (string(_speaker) != "");
+    var text_x = box.x + UI_DIALOGUE_TEXT_PAD_X;
+    var text_y = box.y + (has_speaker ? UI_DIALOGUE_TEXT_Y_WITH_SPEAKER : UI_DIALOGUE_TEXT_PAD_Y);
+    var text_w = max(1, box.w - (UI_DIALOGUE_TEXT_PAD_X * 2));
+    var line_h = max(8, string_height("Ag"));
+    var text_h = max(line_h, box.h - (text_y - box.y) - UI_DIALOGUE_BOTTOM_PAD);
+    var max_lines = max(1, floor(text_h / line_h));
+
+    return {
+        box: box,
+        text_x: text_x,
+        text_y: text_y,
+        text_w: text_w,
+        line_h: line_h,
+        max_lines: max_lines,
+        has_speaker: has_speaker
+    };
+}
+
+function Dialogue_BreakWordToLines(_word, _max_w) {
+    var out = [];
+    var max_w = max(1, _max_w);
+    var word = string(_word);
+    var len = string_length(word);
+    if (len <= 0) {
+        array_push(out, "");
+        return out;
+    }
+
+    var chunk = "";
+    for (var i = 1; i <= len; i++) {
+        var ch = string_char_at(word, i);
+        var test = chunk + ch;
+        if (chunk == "" || string_width(test) <= max_w) {
+            chunk = test;
+        } else {
+            array_push(out, chunk);
+            chunk = ch;
+        }
+    }
+    if (chunk != "") array_push(out, chunk);
+    if (array_length(out) <= 0) array_push(out, word);
+    return out;
+}
+
+function Dialogue_WrapToLines(_text, _max_w) {
+    var src = string_replace_all(string(_text), "\r", "");
+    var max_w = max(1, _max_w);
+    var paragraphs = string_split(src, "\n");
+    var out = [];
+
+    if (!is_array(paragraphs) || array_length(paragraphs) <= 0) {
+        array_push(out, src);
+        return out;
+    }
+
+    for (var p = 0; p < array_length(paragraphs); p++) {
+        var para = string(paragraphs[p]);
+
+        if (para == "") {
+            array_push(out, "");
+            continue;
+        }
+
+        var words = string_split(para, " ");
+        var line = "";
+
+        for (var w = 0; w < array_length(words); w++) {
+            var word = string(words[w]);
+            if (word == "") continue;
+
+            if (line == "") {
+                if (string_width(word) <= max_w) {
+                    line = word;
+                } else {
+                    var split_head = Dialogue_BreakWordToLines(word, max_w);
+                    for (var sh = 0; sh < array_length(split_head) - 1; sh++) {
+                        array_push(out, split_head[sh]);
+                    }
+                    line = split_head[array_length(split_head) - 1];
+                }
+            } else {
+                var candidate = line + " " + word;
+                if (string_width(candidate) <= max_w) {
+                    line = candidate;
+                } else {
+                    array_push(out, line);
+                    if (string_width(word) <= max_w) {
+                        line = word;
+                    } else {
+                        var split_tail = Dialogue_BreakWordToLines(word, max_w);
+                        for (var st = 0; st < array_length(split_tail) - 1; st++) {
+                            array_push(out, split_tail[st]);
+                        }
+                        line = split_tail[array_length(split_tail) - 1];
+                    }
+                }
+            }
+        }
+
+        if (line != "") array_push(out, line);
+    }
+
+    if (array_length(out) <= 0) array_push(out, "");
+    return out;
+}
+
+function Dialogue_PaginateLineEntry(_line_entry, _max_w, _max_lines) {
+    var page_line_limit = max(1, _max_lines);
+    var wrapped = Dialogue_WrapToLines(Dialogue_LineText(_line_entry), _max_w);
+    var pages = [];
+
+    if (!is_array(wrapped) || array_length(wrapped) <= 0) {
+        array_push(pages, Dialogue_CopyLineEntryWithText(_line_entry, ""));
+        return pages;
+    }
+
+    var idx = 0;
+    while (idx < array_length(wrapped)) {
+        var page_text = "";
+        var lines_added = 0;
+        while (idx < array_length(wrapped) && lines_added < page_line_limit) {
+            var wrapped_line = wrapped[idx];
+            if (lines_added == 0) page_text = wrapped_line;
+            else page_text += "\n" + wrapped_line;
+            lines_added += 1;
+            idx += 1;
+        }
+        array_push(pages, Dialogue_CopyLineEntryWithText(_line_entry, page_text));
+    }
+
+    if (array_length(pages) <= 0) array_push(pages, Dialogue_CopyLineEntryWithText(_line_entry, ""));
+    return pages;
+}
+
+function Dialogue_RebuildPagedLines() {
+    var gs = GameState_Get();
+    if (!is_array(gs.ui.lines_raw)) {
+        if (is_array(gs.ui.lines)) gs.ui.lines_raw = gs.ui.lines;
+        else gs.ui.lines_raw = [];
+    }
+
+    var speaker = variable_struct_exists(gs.ui, "speaker") ? string(gs.ui.speaker) : "";
+    var layout = Dialogue_TextLayout(speaker);
+
+    var paged = [];
+    for (var i = 0; i < array_length(gs.ui.lines_raw); i++) {
+        var line_entry = gs.ui.lines_raw[i];
+        var pages = Dialogue_PaginateLineEntry(line_entry, layout.text_w, layout.max_lines);
+        for (var p = 0; p < array_length(pages); p++) {
+            array_push(paged, pages[p]);
+        }
+    }
+
+    if (array_length(paged) <= 0) {
+        array_push(paged, "");
+    }
+
+    gs.ui.lines = paged;
+    gs.ui.dialogue_layout_text_w = layout.text_w;
+    gs.ui.dialogue_layout_max_lines = layout.max_lines;
+    gs.ui.dialogue_layout_has_speaker = layout.has_speaker;
+    gs.ui.dialogue_layout_box_y = layout.box.y;
+    gs.ui.dialogue_layout_box_h = layout.box.h;
+}
+
+function Dialogue_EnsurePagedLinesCurrent() {
+    var gs = GameState_Get();
+    if (gs.ui.mode != UI_DIALOGUE) return;
+
+    var speaker = variable_struct_exists(gs.ui, "speaker") ? string(gs.ui.speaker) : "";
+    var layout = Dialogue_TextLayout(speaker);
+    var needs_rebuild = false;
+
+    if (!is_array(gs.ui.lines_raw)) needs_rebuild = true;
+    if (!is_array(gs.ui.lines)) needs_rebuild = true;
+    if (!variable_struct_exists(gs.ui, "dialogue_layout_text_w") || gs.ui.dialogue_layout_text_w != layout.text_w) needs_rebuild = true;
+    if (!variable_struct_exists(gs.ui, "dialogue_layout_max_lines") || gs.ui.dialogue_layout_max_lines != layout.max_lines) needs_rebuild = true;
+    if (!variable_struct_exists(gs.ui, "dialogue_layout_has_speaker") || gs.ui.dialogue_layout_has_speaker != layout.has_speaker) needs_rebuild = true;
+    if (!variable_struct_exists(gs.ui, "dialogue_layout_box_y") || gs.ui.dialogue_layout_box_y != layout.box.y) needs_rebuild = true;
+    if (!variable_struct_exists(gs.ui, "dialogue_layout_box_h") || gs.ui.dialogue_layout_box_h != layout.box.h) needs_rebuild = true;
+
+    if (needs_rebuild) {
+        var prev_index = gs.ui.index;
+        Dialogue_RebuildPagedLines();
+        if (array_length(gs.ui.lines) <= 0) gs.ui.index = 0;
+        else gs.ui.index = clamp(prev_index, 0, array_length(gs.ui.lines) - 1);
+        Dialogue_ResetTypewriter();
+    }
+}
+
 function Dialogue_TypewriterPrepareCurrentLine() {
     var gs = GameState_Get();
     if (gs.ui.mode != UI_DIALOGUE) return;
+    Dialogue_EnsurePagedLinesCurrent();
     if (!is_array(gs.ui.lines) || array_length(gs.ui.lines) <= 0) return;
     if (gs.ui.index < 0 || gs.ui.index >= array_length(gs.ui.lines)) return;
 
@@ -168,12 +406,14 @@ function Dialogue_Start(_npc_id) {
     Dialogue_EnsureUI();
     var gs = GameState_Get();
     gs.ui.speaker = "";
-    gs.ui.lines = DialogueDB_Get(_npc_id);
+    gs.ui.lines_raw = DialogueDB_Get(_npc_id);
+    gs.ui.lines = [];
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.opened_frame = Input_Frame();
     gs.ui.dialogue_open_block_frame = gs.ui.opened_frame;
     gs.ui.confirm_action = "confirm";
+    Dialogue_RebuildPagedLines();
     Dialogue_ResetTypewriter();
     SFX_Play("dialogue_open");
 }
@@ -183,12 +423,14 @@ function Dialogue_StartLines(_lines) {
     Dialogue_EnsureUI();
     var gs = GameState_Get();
     gs.ui.speaker = "";
-    gs.ui.lines = _lines;
+    gs.ui.lines_raw = is_array(_lines) ? _lines : [];
+    gs.ui.lines = [];
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.opened_frame = Input_Frame();
     gs.ui.dialogue_open_block_frame = gs.ui.opened_frame;
     gs.ui.confirm_action = "confirm";
+    Dialogue_RebuildPagedLines();
     Dialogue_ResetTypewriter();
     SFX_Play("dialogue_open");
 }
@@ -238,12 +480,14 @@ function Dialogue_StartWithSpeaker(_speaker, _lines) {
     Dialogue_EnsureUI();
     var gs = GameState_Get();
     gs.ui.speaker = _speaker;
-    gs.ui.lines = _lines;
+    gs.ui.lines_raw = is_array(_lines) ? _lines : [];
+    gs.ui.lines = [];
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
     gs.ui.opened_frame = Input_Frame();
     gs.ui.dialogue_open_block_frame = gs.ui.opened_frame;
     gs.ui.confirm_action = "confirm";
+    Dialogue_RebuildPagedLines();
     Dialogue_ResetTypewriter();
     SFX_Play("dialogue_open");
 }
@@ -283,6 +527,7 @@ function Dialogue_Advance() {
         SFX_Play("dialogue_close");
         gs.ui.mode = UI_NONE;
         gs.ui.lines = [];
+        gs.ui.lines_raw = [];
         gs.ui.index = 0;
         gs.ui.speaker = "";
         gs.ui.confirm_action = "";

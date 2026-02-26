@@ -15,4 +15,9 @@ var gs = GameState_Get();
 gs.in_main_menu = true;
 settings_pending = GameSettings_Copy(GameSettings_Ensure());
 
-state = "main"; // main, intro, class, settings
+if (room == rm_character_class) {
+    state = "class";
+    class_index = 0;
+} else {
+    state = "main";
+} // main, intro, class, settings
