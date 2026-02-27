@@ -200,7 +200,7 @@ if (instance_exists(enemy_inst)) {
     var eh = sprite_get_height(espr) * sy;
     var icon_y = ey + eh + 4;
     draw_set_alpha(enemy_fade_alpha);
-    Status_DrawIcons(e, ex, icon_y, 12, false);
+    Status_DrawIcons(e, ex, icon_y, 12, false, true);
     draw_set_alpha(1);
 }
 
