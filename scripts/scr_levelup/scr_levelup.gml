@@ -16,6 +16,52 @@ function LevelUp_AddStat(_ch, _stat_id) {
     return _ch;
 }
 
+function LevelUp_StatName(_stat_id) {
+    switch (_stat_id) {
+        case STAT_STR:  return "STR";
+        case STAT_AGI:  return "AGI";
+        case STAT_DEF:  return "DEF";
+        case STAT_INT:  return "INT";
+        case STAT_LUCK: return "LUCK";
+    }
+    return "";
+}
+
+function LevelUp_AutoStatForClass(_ch) {
+    var cfg = undefined;
+    if (is_struct(_ch) && variable_struct_exists(_ch, "class_cfg") && is_struct(_ch.class_cfg)) {
+        cfg = _ch.class_cfg;
+    }
+    if ((!is_struct(cfg) || !variable_struct_exists(cfg, "auto_stat"))
+    && is_struct(_ch) && variable_struct_exists(_ch, "class_id")) {
+        cfg = DB_PlayerClass(_ch.class_id);
+    }
+    if (is_struct(cfg) && variable_struct_exists(cfg, "auto_stat")) {
+        var stat_id = round(real(cfg.auto_stat));
+        switch (stat_id) {
+            case STAT_STR:
+            case STAT_AGI:
+            case STAT_DEF:
+            case STAT_INT:
+            case STAT_LUCK:
+                return stat_id;
+        }
+    }
+    return -1;
+}
+
+function LevelUp_AutoGainSummary(_ch) {
+    if (!is_struct(_ch)) return "";
+    var stat_id = -1;
+    var gained = 0;
+    if (variable_struct_exists(_ch, "last_auto_stat_id")) stat_id = round(real(_ch.last_auto_stat_id));
+    if (variable_struct_exists(_ch, "last_auto_stat_gained")) gained = max(0, round(real(_ch.last_auto_stat_gained)));
+    if (stat_id == -1 || gained <= 0) return "";
+    var nm = LevelUp_StatName(stat_id);
+    if (nm == "") return "";
+    return nm + " +" + string(gained);
+}
+
 function Exp_NextLevel(_level) {
     var lvl = max(1, round(_level));
     if (lvl >= LEVEL_CAP_TECHNICAL) return 999999999;
@@ -37,14 +83,7 @@ function Exp_NextLevel(_level) {
 }
 
 function LevelUp_Auto(_ch) {
-    var pick = -1;
-    switch (_ch.class_id) {
-        case CLASS_KNIGHT: pick = STAT_STR; break;
-        case CLASS_ARCHER: pick = STAT_AGI; break;
-        case CLASS_MAGE:   pick = STAT_INT; break;
-        case CLASS_NOBODY: pick = -1; break;
-    }
-
+    var pick = LevelUp_AutoStatForClass(_ch);
     return LevelUp_AddStat(_ch, pick);
 }
 
@@ -53,14 +92,17 @@ function LevelUp_FromExp(_ch) {
     if (!variable_struct_exists(_ch, "exp_next")) _ch.exp_next = Exp_NextLevel(_ch.level);
     _ch.last_levels_gained = 0;
     _ch.last_stat_points_gained = 0;
+    _ch.last_auto_stat_id = LevelUp_AutoStatForClass(_ch);
+    _ch.last_auto_stat_gained = 0;
 
     var guard = 0;
     while (_ch.exp >= _ch.exp_next && _ch.level < LEVEL_CAP_TECHNICAL) {
         _ch.exp -= _ch.exp_next;
-        _ch = LevelUp_Auto(_ch);
+        _ch = LevelUp_AddStat(_ch, _ch.last_auto_stat_id);
         _ch.exp_next = Exp_NextLevel(_ch.level);
         _ch.last_levels_gained += 1;
         _ch.last_stat_points_gained += 1;
+        if (_ch.last_auto_stat_id != -1) _ch.last_auto_stat_gained += 1;
 
         guard += 1;
         if (guard > 200) break;

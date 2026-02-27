@@ -13,6 +13,12 @@ function StatsClampAll(_s) {
 
 function HPGainPerLevel(_hd) { return ceil(_hd / 2) + 1; }
 
+function ResourceStatWeight(_level) {
+    var lvl = max(1, round(_level));
+    // Mild scaling in a short campaign: keeps DEF/INT meaningful without oversized retroactive growth.
+    return 1 + floor((lvl - 1) / 4);
+}
+
 function RecomputeResources(_ch) {
     var lvl = _ch.level;
     var cfg = _ch.class_cfg;
@@ -23,11 +29,12 @@ function RecomputeResources(_ch) {
 
     var hp_gain = HPGainPerLevel(cfg.hd);
     var mp_gain = cfg.mp_gain;
+    var stat_weight = ResourceStatWeight(lvl);
 
-    _ch.max_hp = cfg.base_hp + (lvl - 1) * (hp_gain + def_mod);
+    _ch.max_hp = cfg.base_hp + (lvl - 1) * hp_gain + (def_mod * stat_weight);
     _ch.max_hp = max(1, _ch.max_hp);
 
-    _ch.max_mp = cfg.base_mp + (lvl - 1) * (mp_gain + int_mod);
+    _ch.max_mp = cfg.base_mp + (lvl - 1) * mp_gain + (int_mod * stat_weight);
     _ch.max_mp = max(0, _ch.max_mp);
 
     if (variable_struct_exists(_ch, "is_player") && _ch.is_player) {

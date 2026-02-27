@@ -193,6 +193,9 @@ function Battle_GrantRewards(_p, _e) {
         exp_gain: 0,
         levels_gained: 0,
         stat_points_gained: 0,
+        auto_stat_id: -1,
+        auto_stat_gained: 0,
+        auto_stat_summary: "",
         loot: []
     };
 
@@ -210,6 +213,9 @@ function Battle_GrantRewards(_p, _e) {
                 out.exp_gain = exp_gain;
                 if (variable_struct_exists(_p, "last_levels_gained")) out.levels_gained = _p.last_levels_gained;
                 if (variable_struct_exists(_p, "last_stat_points_gained")) out.stat_points_gained = _p.last_stat_points_gained;
+                if (variable_struct_exists(_p, "last_auto_stat_id")) out.auto_stat_id = _p.last_auto_stat_id;
+                if (variable_struct_exists(_p, "last_auto_stat_gained")) out.auto_stat_gained = _p.last_auto_stat_gained;
+                out.auto_stat_summary = LevelUp_AutoGainSummary(_p);
             }
         }
 
@@ -245,8 +251,13 @@ function Battle_CheckEnd(_bc, _p, _e) {
 
         if (rewards.exp_gain > 0) Combat_Log("EXP +" + string(rewards.exp_gain));
         if (rewards.levels_gained > 0) {
-            Combat_Log("Level up x" + string(rewards.levels_gained)
-                + " (+" + string(rewards.stat_points_gained) + " points)");
+            var level_msg = "Level up x" + string(rewards.levels_gained)
+                + " (+" + string(rewards.stat_points_gained) + " points";
+            if (rewards.auto_stat_gained > 0 && rewards.auto_stat_summary != "") {
+                level_msg += ", auto " + rewards.auto_stat_summary;
+            }
+            level_msg += ")";
+            Combat_Log(level_msg);
         }
         if (is_array(rewards.loot) && array_length(rewards.loot) > 0) Combat_Log("Loot found.");
         Battle_Message(_bc, _e.name + " has been slain.", BSTATE_END_RUN);

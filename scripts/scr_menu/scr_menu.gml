@@ -743,15 +743,13 @@ function Menu_Draw() {
         var hp_bar_h = sprite_get_height(hp_bar_sprite) * bar_scale;
         var mp_bar_h = sprite_get_height(mp_bar_sprite) * bar_scale;
 
-        var exp_label_1 = (ch.level >= LEVEL_EFFECTIVE_CAMPAIGN_CAP) ? "Post-Campaign EXP" : "Required EXP";
+        var exp_label_1 = "Required EXP";
         var exp_value = string(ch.exp) + "/" + string(ch.exp_next);
-        var cap_label = "Campaign Target Lv " + string(LEVEL_EFFECTIVE_CAMPAIGN_CAP);
         var line_h = string_height("A") + 2;
 
         var left_content_w = max(
             bar_w,
             string_width("Level: " + string(ch.level)),
-            string_width(cap_label),
             string_width(exp_label_1),
             string_width(exp_value),
             string_width("Available Points: " + string(m.pending_points))
@@ -773,8 +771,6 @@ function Menu_Draw() {
         draw_set_color(c_white);
         var text_y = y0 + hp_bar_h + mp_bar_h + pad * 2;
         draw_text(left_x, text_y, "Level: " + string(ch.level));
-        text_y += line_h;
-        draw_text(left_x, text_y, cap_label);
         text_y += line_h;
         draw_text(left_x, text_y, exp_label_1);
         text_y += line_h;

@@ -85,7 +85,16 @@ function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
     var msg = "You overpower " + string(cfg.name) + " (+"
         + string(exp_gain) + " EXP).";
     if (variable_struct_exists(p, "last_levels_gained") && p.last_levels_gained > 0) {
-        msg += " Level up x" + string(p.last_levels_gained) + ".";
+        var lvl_msg = " Level up x" + string(p.last_levels_gained);
+        var pts = variable_struct_exists(p, "last_stat_points_gained") ? max(0, round(real(p.last_stat_points_gained))) : 0;
+        lvl_msg += " (+" + string(pts) + " points";
+        var auto_summary = LevelUp_AutoGainSummary(p);
+        var auto_gained = variable_struct_exists(p, "last_auto_stat_gained") ? max(0, round(real(p.last_auto_stat_gained))) : 0;
+        if (auto_gained > 0 && auto_summary != "") {
+            lvl_msg += ", auto " + auto_summary;
+        }
+        lvl_msg += ").";
+        msg += lvl_msg;
     }
     if (is_array(loot) && array_length(loot) > 0) {
         msg += " Loot gained.";
