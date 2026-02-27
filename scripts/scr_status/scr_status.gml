@@ -28,6 +28,47 @@ function Status_LastFrame(_sprite) {
     return max(0, sprite_get_number(_sprite) - 1);
 }
 
+function Status_ShouldUseTextFallback(_cfg) {
+    if (!is_struct(_cfg)) return false;
+    return variable_struct_exists(_cfg, "use_text_fallback") && _cfg.use_text_fallback;
+}
+
+function Status_SetPresentation(_status_id, _is_buff, _use_text_fallback, _display_label = "") {
+    if (!variable_global_exists("status_db") || !ds_exists(global.status_db, ds_type_map)) return;
+    if (!ds_map_exists(global.status_db, _status_id)) return;
+
+    var cfg = global.status_db[? _status_id];
+    if (!is_struct(cfg)) return;
+
+    cfg.is_buff = _is_buff;
+    cfg.use_text_fallback = _use_text_fallback;
+    if (_display_label != "") cfg.display_label = _display_label;
+
+    if (_use_text_fallback) {
+        cfg.icon_sprite = noone;
+        cfg.icon_subimg = 0;
+    }
+}
+
+function Status_AssignPresentationDefaults() {
+    if (!variable_global_exists("status_db") || !ds_exists(global.status_db, ds_type_map)) return;
+
+    Status_SetPresentation(STATUS_POISON, false, false, "Poison");
+    Status_SetPresentation(STATUS_BLEED, false, false, "Bleed");
+    Status_SetPresentation(STATUS_BURN, false, false, "Burn");
+    Status_SetPresentation(STATUS_STUN, false, false, "Stun");
+
+    Status_SetPresentation(STATUS_GUARD, true, true, "Guard");
+    Status_SetPresentation(STATUS_DMG_UP, true, true, "Rev Up");
+    Status_SetPresentation(STATUS_EVASION, true, true, "Evasion");
+    Status_SetPresentation(STATUS_CRIT_UP, true, true, "Take Aim");
+    Status_SetPresentation(STATUS_HIT_UP, true, true, "Foresight");
+    Status_SetPresentation(STATUS_MEDITATION, true, true, "Meditation");
+    Status_SetPresentation(STATUS_SOLIDIFY, true, true, "Solidify");
+    Status_SetPresentation(STATUS_BLOODTHIRSTY, true, true, "Bloodthirsty");
+    Status_SetPresentation(STATUS_BLESSING, true, true, "Blessing");
+}
+
 function Status_AssignCoreIcons() {
     if (!variable_global_exists("status_db") || !ds_exists(global.status_db, ds_type_map)) return;
 
@@ -40,19 +81,25 @@ function Status_AssignCoreIcons() {
 function Status_AssignPlayerBuffIconsFromFX() {
     if (!variable_global_exists("status_db") || !ds_exists(global.status_db, ds_type_map)) return;
 
-    var sp_guard = Status_ResolveIcon("muscle_up_effect", rock1);
-    var sp_dmg_up = Status_ResolveIcon("rev_up_effect", torch_asset_moving);
-    var sp_evasion = Status_ResolveIcon("evasion_up_effect", tall_grass_asset);
-    var sp_crit_up = Status_ResolveIcon("take_aim_effect", skull_2_asset);
-    var sp_hit_up = Status_ResolveIcon("foresight_effect_Sheet", horned_skull_asset);
-    var sp_meditation = Status_ResolveIcon("meditation", mp_potion);
+    var buff_fx = [
+        { status_id: STATUS_GUARD, fx_name: "muscle_up_effect" },
+        { status_id: STATUS_DMG_UP, fx_name: "rev_up_effect" },
+        { status_id: STATUS_EVASION, fx_name: "evasion_up_effect" },
+        { status_id: STATUS_CRIT_UP, fx_name: "take_aim_effect" },
+        { status_id: STATUS_HIT_UP, fx_name: "foresight_effect_Sheet" },
+        { status_id: STATUS_MEDITATION, fx_name: "meditation" }
+    ];
 
-    Status_SetIcon(STATUS_GUARD, sp_guard, Status_LastFrame(sp_guard));
-    Status_SetIcon(STATUS_DMG_UP, sp_dmg_up, Status_LastFrame(sp_dmg_up));
-    Status_SetIcon(STATUS_EVASION, sp_evasion, Status_LastFrame(sp_evasion));
-    Status_SetIcon(STATUS_CRIT_UP, sp_crit_up, Status_LastFrame(sp_crit_up));
-    Status_SetIcon(STATUS_HIT_UP, sp_hit_up, Status_LastFrame(sp_hit_up));
-    Status_SetIcon(STATUS_MEDITATION, sp_meditation, Status_LastFrame(sp_meditation));
+    for (var i = 0; i < array_length(buff_fx); i++) {
+        var entry = buff_fx[i];
+        var cfg = StatusDB_Get(entry.status_id);
+        if (Status_ShouldUseTextFallback(cfg)) continue;
+
+        var spr = asset_get_index(entry.fx_name);
+        if (is_real(spr) && spr != -1) {
+            Status_SetIcon(entry.status_id, spr, Status_LastFrame(spr));
+        }
+    }
 }
 
 function Status_SkillAppliesStatus(_skill, _status_id) {
@@ -93,6 +140,7 @@ function Status_AssignMissingIconsFromSkillFX() {
         var status_id = keys[i];
         var cfg = global.status_db[? status_id];
         if (!is_struct(cfg)) continue;
+        if (Status_ShouldUseTextFallback(cfg)) continue;
 
         var has_icon = (variable_struct_exists(cfg, "icon_sprite") && cfg.icon_sprite != noone);
         if (has_icon) continue;
@@ -106,6 +154,7 @@ function Status_AssignMissingIconsFromSkillFX() {
 function StatusDB_Init() {
     if (variable_global_exists("status_db") && ds_exists(global.status_db, ds_type_map)) {
         Status_AssignCoreIcons();
+        Status_AssignPresentationDefaults();
         Status_AssignPlayerBuffIconsFromFX();
         Status_AssignMissingIconsFromSkillFX();
         if (variable_global_exists("state") && is_struct(global.state)) {
@@ -118,6 +167,9 @@ function StatusDB_Init() {
     global.status_db[? STATUS_POISON] = {
         id: STATUS_POISON,
         name: "Poison",
+        display_label: "Poison",
+        is_buff: false,
+        use_text_fallback: false,
         icon_sprite: poison_status,
         icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:-1, luck:0 },
@@ -129,6 +181,9 @@ function StatusDB_Init() {
     global.status_db[? STATUS_BLEED] = {
         id: STATUS_BLEED,
         name: "Bleeding",
+        display_label: "Bleed",
+        is_buff: false,
+        use_text_fallback: false,
         icon_sprite: bleed_status,
         icon_subimg: 0,
         stat_mods: { str:0, agi:-2, def:0, intt:0, luck:0 },
@@ -140,6 +195,9 @@ function StatusDB_Init() {
     global.status_db[? STATUS_BURN] = {
         id: STATUS_BURN,
         name: "Burning",
+        display_label: "Burn",
+        is_buff: false,
+        use_text_fallback: false,
         icon_sprite: burn_status,
         icon_subimg: 0,
         stat_mods: { str:-1, agi:0, def:0, intt:0, luck:0 },
@@ -151,6 +209,9 @@ function StatusDB_Init() {
     global.status_db[? STATUS_STUN] = {
         id: STATUS_STUN,
         name: "Stun",
+        display_label: "Stun",
+        is_buff: false,
+        use_text_fallback: false,
         icon_sprite: stun_status,
         icon_subimg: 0,
         stat_mods: { str:0, agi:-2, def:0, intt:0, luck:0 },
@@ -162,7 +223,11 @@ function StatusDB_Init() {
     global.status_db[? STATUS_GUARD] = {
         id: STATUS_GUARD,
         name: "Guard",
-        icon_sprite: rock1,
+        display_label: "Guard",
+        is_buff: true,
+        use_text_fallback: true,
+        icon_sprite: noone,
+        icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
@@ -173,7 +238,11 @@ function StatusDB_Init() {
     global.status_db[? STATUS_DMG_UP] = {
         id: STATUS_DMG_UP,
         name: "Rev Up",
-        icon_sprite: torch_asset_moving,
+        display_label: "Rev Up",
+        is_buff: true,
+        use_text_fallback: true,
+        icon_sprite: noone,
+        icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
@@ -184,7 +253,11 @@ function StatusDB_Init() {
     global.status_db[? STATUS_EVASION] = {
         id: STATUS_EVASION,
         name: "Evasion",
-        icon_sprite: tall_grass_asset,
+        display_label: "Evasion",
+        is_buff: true,
+        use_text_fallback: true,
+        icon_sprite: noone,
+        icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
@@ -195,7 +268,11 @@ function StatusDB_Init() {
     global.status_db[? STATUS_CRIT_UP] = {
         id: STATUS_CRIT_UP,
         name: "Take Aim",
-        icon_sprite: skull_2_asset,
+        display_label: "Take Aim",
+        is_buff: true,
+        use_text_fallback: true,
+        icon_sprite: noone,
+        icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
@@ -205,7 +282,11 @@ function StatusDB_Init() {
     global.status_db[? STATUS_HIT_UP] = {
         id: STATUS_HIT_UP,
         name: "Foresight",
-        icon_sprite: horned_skull_asset,
+        display_label: "Foresight",
+        is_buff: true,
+        use_text_fallback: true,
+        icon_sprite: noone,
+        icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
@@ -216,7 +297,11 @@ function StatusDB_Init() {
     global.status_db[? STATUS_MEDITATION] = {
         id: STATUS_MEDITATION,
         name: "Meditation",
-        icon_sprite: mp_potion,
+        display_label: "Meditation",
+        is_buff: true,
+        use_text_fallback: true,
+        icon_sprite: noone,
+        icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:2, mp_max:4 },
         stackable: false
@@ -225,7 +310,11 @@ function StatusDB_Init() {
     global.status_db[? STATUS_SOLIDIFY] = {
         id: STATUS_SOLIDIFY,
         name: "Solidify",
-        icon_sprite: Status_ResolveIcon("stun_status", rock1),
+        display_label: "Solidify",
+        is_buff: true,
+        use_text_fallback: true,
+        icon_sprite: noone,
+        icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
@@ -236,7 +325,11 @@ function StatusDB_Init() {
     global.status_db[? STATUS_BLOODTHIRSTY] = {
         id: STATUS_BLOODTHIRSTY,
         name: "Bloodthirsty",
-        icon_sprite: Status_ResolveIcon("bleed_status", torch_asset_moving),
+        display_label: "Bloodthirsty",
+        is_buff: true,
+        use_text_fallback: true,
+        icon_sprite: noone,
+        icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
@@ -248,7 +341,11 @@ function StatusDB_Init() {
     global.status_db[? STATUS_BLESSING] = {
         id: STATUS_BLESSING,
         name: "Blessing",
-        icon_sprite: Status_ResolveIcon("burn_status", mp_potion),
+        display_label: "Blessing",
+        is_buff: true,
+        use_text_fallback: true,
+        icon_sprite: noone,
+        icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
@@ -257,6 +354,7 @@ function StatusDB_Init() {
     };
 
     Status_AssignCoreIcons();
+    Status_AssignPresentationDefaults();
     Status_AssignPlayerBuffIconsFromFX();
     Status_AssignMissingIconsFromSkillFX();
     if (variable_global_exists("state") && is_struct(global.state)) {
@@ -442,30 +540,41 @@ function Status_DrawIcons(_ch, _x, _y, _spacing, _rtl) {
     var rtl = false;
     if (argument_count >= 5) rtl = _rtl;
 
+    var draw_status_entry = function(_cfg, _draw_x, _draw_y) {
+        if (!is_struct(_cfg)) return 0;
+
+        if (Status_ShouldUseTextFallback(_cfg)) {
+            var lbl = variable_struct_exists(_cfg, "display_label") ? string(_cfg.display_label) : string(_cfg.name);
+            var is_buff = variable_struct_exists(_cfg, "is_buff") && _cfg.is_buff;
+            var arrow = is_buff ? "^" : "v";
+            var text = lbl + " " + arrow;
+            draw_set_color(c_white);
+            draw_text(_draw_x, _draw_y, text);
+            return max(spacing, string_width(text) + 6);
+        }
+
+        if (variable_struct_exists(_cfg, "icon_sprite") && _cfg.icon_sprite != noone) {
+            var icon_sub = 0;
+            if (variable_struct_exists(_cfg, "icon_subimg")) icon_sub = round(_cfg.icon_subimg);
+            var icon_max = max(0, sprite_get_number(_cfg.icon_sprite) - 1);
+            icon_sub = clamp(icon_sub, 0, icon_max);
+            draw_sprite(_cfg.icon_sprite, icon_sub, _draw_x, _draw_y);
+            return max(spacing, sprite_get_width(_cfg.icon_sprite) + 2);
+        }
+
+        return 0;
+    };
+
     var off = 0;
     if (rtl) {
         for (var i = array_length(_ch.status) - 1; i >= 0; i--) {
             var cfg = StatusDB_Get(_ch.status[i].id);
-            if (variable_struct_exists(cfg, "icon_sprite") && cfg.icon_sprite != noone) {
-                var icon_sub = 0;
-                if (variable_struct_exists(cfg, "icon_subimg")) icon_sub = round(cfg.icon_subimg);
-                var icon_max = max(0, sprite_get_number(cfg.icon_sprite) - 1);
-                icon_sub = clamp(icon_sub, 0, icon_max);
-                draw_sprite(cfg.icon_sprite, icon_sub, _x + off, _y);
-                off += spacing;
-            }
+            off += draw_status_entry(cfg, _x + off, _y);
         }
     } else {
         for (var i = 0; i < array_length(_ch.status); i++) {
             var cfg2 = StatusDB_Get(_ch.status[i].id);
-            if (variable_struct_exists(cfg2, "icon_sprite") && cfg2.icon_sprite != noone) {
-                var icon_sub2 = 0;
-                if (variable_struct_exists(cfg2, "icon_subimg")) icon_sub2 = round(cfg2.icon_subimg);
-                var icon_max2 = max(0, sprite_get_number(cfg2.icon_sprite) - 1);
-                icon_sub2 = clamp(icon_sub2, 0, icon_max2);
-                draw_sprite(cfg2.icon_sprite, icon_sub2, _x + off, _y);
-                off += spacing;
-            }
+            off += draw_status_entry(cfg2, _x + off, _y);
         }
     }
 }
