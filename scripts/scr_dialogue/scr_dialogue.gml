@@ -4,13 +4,21 @@ function DialogueDB_Init() {
 
     // defaults
     global.dialogue_db[? "default"] = ["..."];
+	
+	// in-game dialogues
+	global.dialogue_db[? "first_encounter_slime"] = ["What..", "..the hell is that?"];
+	global.dialogue_db[? "entering_second_floor"] = 
+	["I don't understand.", 
+	"How can such creatures exist?",
+	"Some sort of mutated animals..",
+	"..Monsters?"];
 
     // system
     global.dialogue_db[? "sys_save_ok"] = ["Game saved."];
     global.dialogue_db[? "sys_load_ok"] = ["Game loaded."];
     global.dialogue_db[? "sys_load_missing"] = ["No save found."];
     global.dialogue_db[? "sys_class_chest_prompt"] = ["How convenient..", "Just what I needed to get out of this place."];
-    global.dialogue_db[? "sys_floor1_intro"] = ["Where am I?... I knew it there's something wrong with this place."];
+    global.dialogue_db[? "sys_floor1_intro"] = ["Where am I?", "...", "I knew it there's something wrong with this place."];
 
     // interactables
     global.dialogue_db[? "tree"] = ["A sturdy tree."];
@@ -37,6 +45,7 @@ function DialogueDB_Init() {
     global.dialogue_db[? "torch_extinguish"] = ["You extinguish the torch."];
     global.dialogue_db[? "torch_off"] = ["The torch is cold."];
 
+	// legacy just in case we want to add npcs
     global.dialogue_db[? DIALOGUE_PROFILE_GENERIC] = [
         "Welcome to the dungeon.",
         "Stay alert—monsters lurk nearby.",

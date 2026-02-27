@@ -20,7 +20,8 @@ if (!variable_instance_exists(id, "difficulty_values") || !is_array(difficulty_v
 if (!variable_instance_exists(id, "difficulty_index")) {
     difficulty_index = 1;
 }
-difficulty_index = clamp(difficulty_index, 0, max(0, array_length(difficulty_options) - 1));
+var difficulty_row_count = array_length(difficulty_options) + 1; // + Back row
+difficulty_index = clamp(difficulty_index, 0, max(0, difficulty_row_count - 1));
 
 if (state == "main") {
     var can_load = true;
@@ -91,8 +92,18 @@ if (state == "difficulty") {
         draw_text(dx + 18, dyy, dlabel);
     }
 
-    draw_set_color(c_white);
-    draw_text(dx + 12, dy + dh - (line_h + 8), "Back");
+    var back_y = dy + dh - (line_h + 8);
+    var back_sel = (difficulty_index == array_length(difficulty_options));
+    if (back_sel) {
+        draw_set_color(c_white);
+        draw_rectangle(dx + 10 - pad_x, back_y - pad_y, dx + dw - 10 + pad_x, back_y + line_h + pad_y, false);
+        draw_set_color(c_black);
+        draw_rectangle(dx + 10 - pad_x, back_y - pad_y, dx + dw - 10 + pad_x, back_y + line_h + pad_y, true);
+        draw_set_color(c_black);
+    } else {
+        draw_set_color(c_white);
+    }
+    draw_text(dx + 18, back_y, "Back");
 }
 
 // settings popup

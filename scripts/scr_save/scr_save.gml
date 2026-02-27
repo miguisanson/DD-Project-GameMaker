@@ -365,10 +365,17 @@ function Save_ApplySnapshot(_snap) {
     gs.skip_room_save = true;
     global.skipRoomSave = true;
 
+    gs.load_spawn_pending = true;
+    gs.load_spawn_room = room_id;
+    gs.load_spawn_x = px;
+    gs.load_spawn_y = py;
+    gs.load_spawn_face = face;
+
     // Preserve exact saved position when loading from a slot.
     GameState_SetBattleReturn(room_id, px, py, face, false);
     GameState_SetJustReturned(true);
-    Transition_RequestRoomFade(room_id);
+    // Use longer cinematic fade for load-in to ensure full black before room swap.
+    Transition_RequestCutsceneFade(room_id);
 }
 
 function Save_Path(_slot) {

@@ -10,7 +10,8 @@ if (!variable_instance_exists(id, "difficulty_values") || !is_array(difficulty_v
 if (!variable_instance_exists(id, "difficulty_index")) {
     difficulty_index = 1;
 }
-difficulty_index = clamp(difficulty_index, 0, max(0, array_length(difficulty_values) - 1));
+var difficulty_row_count = array_length(difficulty_options) + 1; // + Back row
+difficulty_index = clamp(difficulty_index, 0, max(0, difficulty_row_count - 1));
 
 if (gs.ui.mode == UI_SAVE) exit;
 if (Transition_IsInputLocked() && state != "cutscene") return;
@@ -80,12 +81,13 @@ if (state == "main") {
 }
 
 if (state == "difficulty") {
+    var diff_rows = array_length(difficulty_options) + 1; // options + Back
     if (k_up) {
-        difficulty_index = (difficulty_index + array_length(difficulty_options) - 1) mod array_length(difficulty_options);
+        difficulty_index = (difficulty_index + diff_rows - 1) mod diff_rows;
         SFX_PlayUI("ui_move");
     }
     if (k_down) {
-        difficulty_index = (difficulty_index + 1) mod array_length(difficulty_options);
+        difficulty_index = (difficulty_index + 1) mod diff_rows;
         SFX_PlayUI("ui_move");
     }
 
@@ -99,10 +101,10 @@ if (state == "difficulty") {
         SFX_PlayUI("ui_confirm");
         if (difficulty_index >= 0 && difficulty_index < array_length(difficulty_values)) {
             Difficulty_SetCurrent(difficulty_values[difficulty_index]);
+            Transition_RequestCutsceneById("intro");
         } else {
-            Difficulty_SetCurrent(DIFFICULTY_NORMAL);
+            state = "main";
         }
-        Transition_RequestCutsceneById("intro");
     }
     return;
 }

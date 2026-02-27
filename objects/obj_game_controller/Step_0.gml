@@ -21,7 +21,7 @@ if (gs.last_room != room) {
 
     // ensure player exists if no transition pending (e.g. initial room / battle return)
     // Cutscene room must never spawn player visuals.
-    if (room != rm_battle && room != rm_cutscene && (!variable_struct_exists(gs, "in_main_menu") || !gs.in_main_menu) && !instance_exists(obj_player)) {
+    if (room != rm_start && room != rm_battle && room != rm_cutscene && (!variable_struct_exists(gs, "in_main_menu") || !gs.in_main_menu) && !instance_exists(obj_player)) {
         var sp = RoomTransition_FindSpawn("start");
         if (sp == noone) sp = RoomTransition_FindSpawn("");
         if (sp != noone) {
@@ -41,6 +41,25 @@ if (room == rm_floor1 && variable_struct_exists(gs, "pending_floor1_intro_dialog
     if (instance_exists(obj_player) && gs.ui.mode == UI_NONE && array_length(gs.ui.lines) <= 0) {
         gs.pending_floor1_intro_dialogue = false;
         Dialogue_Start("sys_floor1_intro");
+    }
+}
+
+// One-shot load spawn override: ensure slot-load position always beats room default spawn.
+if (variable_struct_exists(gs, "load_spawn_pending") && gs.load_spawn_pending) {
+    var load_room_ok = (!variable_struct_exists(gs, "load_spawn_room") || room == gs.load_spawn_room);
+    if (load_room_ok && instance_exists(obj_player)) {
+        var pl_load = instance_find(obj_player, 0);
+        if (instance_exists(pl_load)) {
+            if (variable_struct_exists(gs, "load_spawn_x")) pl_load.x = gs.load_spawn_x;
+            if (variable_struct_exists(gs, "load_spawn_y")) pl_load.y = gs.load_spawn_y;
+            if (variable_struct_exists(gs, "load_spawn_face") && gs.load_spawn_face != -1 && variable_instance_exists(pl_load, "face")) {
+                pl_load.face = gs.load_spawn_face;
+            }
+            if (variable_instance_exists(pl_load, "moving")) pl_load.moving = false;
+            if (variable_instance_exists(pl_load, "move_timer")) pl_load.move_timer = 0;
+            if (variable_instance_exists(pl_load, "move_dir")) pl_load.move_dir = -1;
+        }
+        gs.load_spawn_pending = false;
     }
 }
 

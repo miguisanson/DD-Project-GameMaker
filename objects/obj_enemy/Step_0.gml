@@ -7,6 +7,20 @@ if (Transition_IsActive()) {
 }
 
 var gs = GameState_Get();
+var dialogue_active = false;
+if (variable_struct_exists(gs, "ui") && is_struct(gs.ui)) {
+    if ((variable_struct_exists(gs.ui, "mode") && gs.ui.mode == UI_DIALOGUE)
+    || (variable_struct_exists(gs.ui, "lines") && is_array(gs.ui.lines) && array_length(gs.ui.lines) > 0)) {
+        dialogue_active = true;
+    }
+}
+if (dialogue_active) {
+    moving = false;
+    move_timer = 0;
+    move_dir = -1;
+    exit;
+}
+
 var pl = gs.player_inst;
 if (!instance_exists(pl)) exit;
 

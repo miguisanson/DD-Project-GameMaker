@@ -31,6 +31,7 @@ function SaveMenu_Open(_mode, _context) {
         confirm_choice: 0,
         confirm_mode: "delete", // delete | load | overwrite | save | saved | message
         message: "",
+        close_after_message: false,
         slot_info_cache: SaveMenu_BuildSlotInfoCache(),
         opened_frame: Input_Frame(),
         require_release: opened_with_confirm
@@ -88,6 +89,10 @@ function SaveMenu_Handle() {
                 SFX_PlayUI("ui_confirm");
                 sm.confirm = false;
                 if (sm.confirm_mode == "saved") SaveMenu_Close();
+                else if (sm.confirm_mode == "message" && variable_struct_exists(sm, "close_after_message") && sm.close_after_message) {
+                    SaveMenu_Close();
+                    return;
+                }
             }
             gs.ui.save_menu = sm;
             return;
@@ -189,10 +194,15 @@ function SaveMenu_Handle() {
                     sm.confirm = true;
                     sm.confirm_mode = "load";
                     sm.confirm_choice = 1; // default to Cancel
+                    sm.close_after_message = false;
                     SaveMenu_Log("load confirm open slot " + string(slot));
                 } else {
                     SFX_PlayUI("ui_back");
-                    SaveMenu_Close();
+                    sm.confirm = true;
+                    sm.confirm_mode = "message";
+                    sm.confirm_choice = 0;
+                    sm.message = "No game saves.";
+                    sm.close_after_message = true;
                     return;
                 }
             } else {
@@ -200,6 +210,7 @@ function SaveMenu_Handle() {
                 sm.confirm = true;
                 sm.confirm_mode = "delete";
                 sm.confirm_choice = 1; // default to Cancel
+                sm.close_after_message = false;
                 SaveMenu_Log("delete confirm open slot " + string(slot));
             }
         } else {
@@ -209,12 +220,14 @@ function SaveMenu_Handle() {
                 sm.confirm = true;
                 sm.confirm_mode = "overwrite";
                 sm.confirm_choice = 1; // default to Cancel
+                sm.close_after_message = false;
                 SaveMenu_Log("overwrite confirm open slot " + string(slot));
             } else {
                 SFX_PlayUI("ui_confirm");
                 sm.confirm = true;
                 sm.confirm_mode = "save";
                 sm.confirm_choice = 1; // default Cancel
+                sm.close_after_message = false;
                 SaveMenu_Log("save confirm open slot " + string(slot));
             }
         }
