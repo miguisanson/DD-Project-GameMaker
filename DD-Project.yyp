@@ -347,6 +347,8 @@
     {"id":{"name":"spr_blue","path":"sprites/spr_blue/spr_blue.yy",},},
     {"id":{"name":"spr_red","path":"sprites/spr_red/spr_red.yy",},},
     {"id":{"name":"spr_yellow","path":"sprites/spr_yellow/spr_yellow.yy",},},
+    {"id":{"name":"spr_attack_timing_target","path":"sprites/spr_attack_timing_target/spr_attack_timing_target.yy",},},
+    {"id":{"name":"spr_attack_timing_falling","path":"sprites/spr_attack_timing_falling/spr_attack_timing_falling.yy",},},
     {"id":{"name":"stranger_moving","path":"sprites/stranger_moving/stranger_moving.yy",},},
     {"id":{"name":"stranger_profile","path":"sprites/stranger_profile/stranger_profile.yy",},},
     {"id":{"name":"stun_effect","path":"sprites/stun_effect/stun_effect.yy",},},

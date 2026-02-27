@@ -133,26 +133,24 @@ if (battle_state == BSTATE_ATTACK_TIMING && attack_timing_active) {
     var cx_t = round(attack_timing_x);
     var cy_t = round(attack_timing_y);
     var marker_alpha = clamp(attack_timing_marker_alpha, 0, 1);
-    var pulse = 0.75 + (0.25 * sin(current_time * 0.02));
-    marker_alpha = clamp(marker_alpha * pulse, 0, 1);
+    var target_sp = attack_timing_target_sprite;
+    var fall_sp = attack_timing_falling_sprite;
+    var s = ATTACK_TIMING_SPRITE_SCALE;
 
-    // Target marker: black fill + thick white outline (fade in/pulse).
-    draw_set_alpha(marker_alpha * 0.90);
-    draw_set_color(c_black);
-    draw_circle(tx_t, ty_t, ATTACK_TIMING_TARGET_RADIUS, true);
+    if (target_sp != -1 && target_sp != noone) {
+        var tw = sprite_get_width(target_sp) * s;
+        var th = sprite_get_height(target_sp) * s;
+        draw_set_alpha(1);
+        draw_sprite_ext(target_sp, 0, tx_t - (tw * 0.5), ty_t - (th * 0.5), s, s, 0, c_white, marker_alpha);
+    }
 
-    draw_set_alpha(marker_alpha);
-    draw_set_color(c_white);
-    draw_circle(tx_t, ty_t, ATTACK_TIMING_TARGET_RADIUS, false);
-    draw_circle(tx_t, ty_t, max(1, ATTACK_TIMING_TARGET_RADIUS - 1), false);
-    draw_circle(tx_t, ty_t, max(1, ATTACK_TIMING_TARGET_RADIUS - 2), false);
+    if (fall_sp != -1 && fall_sp != noone) {
+        var fw = sprite_get_width(fall_sp) * s;
+        var fh = sprite_get_height(fall_sp) * s;
+        draw_set_alpha(1);
+        draw_sprite_ext(fall_sp, 0, cx_t - (fw * 0.5), cy_t - (fh * 0.5), s, s, 0, c_white, 1);
+    }
 
-    // Falling marker: thick white outline only, no fill.
-    draw_set_alpha(1);
-    draw_set_color(c_white);
-    draw_circle(cx_t, cy_t, ATTACK_TIMING_RING_RADIUS, false);
-    draw_circle(cx_t, cy_t, max(1, ATTACK_TIMING_RING_RADIUS - 1), false);
-    draw_circle(cx_t, cy_t, max(1, ATTACK_TIMING_RING_RADIUS - 2), false);
     draw_set_alpha(1);
     draw_set_color(c_white);
 }
