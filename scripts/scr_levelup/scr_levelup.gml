@@ -2,7 +2,7 @@ function Level_IsAtCap(_level) {
     return (round(_level) >= LEVEL_CAP_TECHNICAL);
 }
 
-function Player_NormalizeProgression(_ch, _recompute_resources = true) {
+function Player_NormalizeProgression(_ch, _recompute_resources = true, _clamp_exp_for_ui = true) {
     if (!is_struct(_ch)) return _ch;
 
     if (!variable_struct_exists(_ch, "class_id")) _ch.class_id = CLASS_NOBODY;
@@ -32,7 +32,9 @@ function Player_NormalizeProgression(_ch, _recompute_resources = true) {
     } else {
         _ch.exp_next = Exp_NextLevel(_ch.level);
         if (_ch.exp_next <= 0) _ch.exp_next = 1;
-        _ch.exp = min(_ch.exp, _ch.exp_next - 1);
+        if (_clamp_exp_for_ui) {
+            _ch.exp = min(_ch.exp, _ch.exp_next - 1);
+        }
     }
 
     if (_recompute_resources) {
@@ -45,7 +47,7 @@ function Player_NormalizeProgression(_ch, _recompute_resources = true) {
 }
 
 function LevelUp_AddStat(_ch, _stat_id) {
-    _ch = Player_NormalizeProgression(_ch, false);
+    _ch = Player_NormalizeProgression(_ch, false, true);
     if (Level_IsAtCap(_ch.level)) return _ch;
 
     _ch.level += 1;
@@ -134,7 +136,7 @@ function LevelUp_Auto(_ch) {
 }
 
 function LevelUp_FromExp(_ch) {
-    _ch = Player_NormalizeProgression(_ch, false);
+    _ch = Player_NormalizeProgression(_ch, false, false);
     _ch.last_levels_gained = 0;
     _ch.last_stat_points_gained = 0;
     _ch.last_auto_stat_id = LevelUp_AutoStatForClass(_ch);
@@ -172,7 +174,7 @@ function LevelUp_FromExp(_ch) {
 }
 
 function Player_AddExp(_ch, _amount) {
-    _ch = Player_NormalizeProgression(_ch, false);
+    _ch = Player_NormalizeProgression(_ch, false, false);
     if (Level_IsAtCap(_ch.level)) {
         _ch.last_exp_gain = 0;
         _ch.last_levels_gained = 0;

@@ -1062,8 +1062,15 @@ function ClassSelect_CloseFinalize() {
     if (gs.ui.mode == UI_CLASS_SELECT) gs.ui.mode = UI_NONE;
 
     if (is_real(apply_class_id) && apply_class_id >= 0) {
-        ClassSelect_ApplyClass(apply_class_id);
-        Transition_RequestBlackFlash(TRANSITION_CLASS_SELECT_FADE_OUT_FRAMES, TRANSITION_CLASS_SELECT_FADE_IN_FRAMES);
+        var queued = Transition_RequestBlackFlash(
+            TRANSITION_CLASS_SELECT_FADE_OUT_FRAMES,
+            TRANSITION_CLASS_SELECT_FADE_IN_FRAMES,
+            apply_class_id
+        );
+        if (!queued) {
+            // Fallback when another transition is already active.
+            ClassSelect_ApplyClass(apply_class_id);
+        }
     }
 }
 

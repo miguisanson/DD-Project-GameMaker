@@ -81,11 +81,18 @@ function Debug_GiveAllItems() {
 function Debug_LevelUp() {
     var gs = GameState_Get();
     if (!is_struct(gs.player_ch)) return;
-    var ch = gs.player_ch;
-    ch.exp += ch.exp_next;
-    ch = LevelUp_FromExp(ch);
+    var ch = Player_NormalizeProgression(gs.player_ch, false);
+
+    if (Level_IsAtCap(ch.level)) {
+        GameState_SetPlayer(ch);
+        Debug_Record("Level Up (at cap)");
+        return;
+    }
+
+    var exp_needed = max(1, ch.exp_next - ch.exp);
+    ch = Player_AddExp(ch, exp_needed);
     GameState_SetPlayer(ch);
-    Debug_Record("Level Up");
+    Debug_Record("Level Up -> Lv " + string(ch.level));
 }
 
 function Debug_Save() {

@@ -118,7 +118,9 @@ function Transition_Init() {
             encounter_port_h: 0,
             encounter_focus_x: 0,
             encounter_focus_y: 0,
-            encounter_has_focus: false
+            encounter_has_focus: false,
+            flash_apply_class_id: -1,
+            flash_apply_class_pending: false
         };
     }
 }
@@ -229,6 +231,8 @@ function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus
     tr.encounter_focus_x = 0;
     tr.encounter_focus_y = 0;
     tr.encounter_has_focus = false;
+    tr.flash_apply_class_id = -1;
+    tr.flash_apply_class_pending = false;
     tr.encounter_cam = -1;
     tr.encounter_cam_valid = false;
     tr.encounter_cam_x = 0;
@@ -275,13 +279,15 @@ function Transition_RequestCutsceneFade(_room, _spawn_id = "", _face = -1, _use_
     return Transition_Begin(TRANSITION_TYPE_CUTSCENE, _room, _spawn_id, _face, _use_spawn);
 }
 
-function Transition_RequestBlackFlash(_fade_out_frames = TRANSITION_FLASH_FADE_OUT_FRAMES, _fade_in_frames = TRANSITION_FLASH_FADE_IN_FRAMES) {
+function Transition_RequestBlackFlash(_fade_out_frames = TRANSITION_FLASH_FADE_OUT_FRAMES, _fade_in_frames = TRANSITION_FLASH_FADE_IN_FRAMES, _flash_apply_class_id = -1) {
     var ok = Transition_Begin(TRANSITION_TYPE_FLASH, noone, "", -1, false);
     if (!ok) return false;
     var gs = GameState_Get();
     var tr = gs.transition_fx;
     tr.fade_out_frames = max(1, _fade_out_frames);
     tr.fade_in_frames = max(1, _fade_in_frames);
+    tr.flash_apply_class_pending = is_real(_flash_apply_class_id) && (_flash_apply_class_id >= 0);
+    tr.flash_apply_class_id = tr.flash_apply_class_pending ? _flash_apply_class_id : -1;
     return true;
 }
 
@@ -331,6 +337,8 @@ function Transition_Finish() {
     tr.encounter_focus_x = 0;
     tr.encounter_focus_y = 0;
     tr.encounter_has_focus = false;
+    tr.flash_apply_class_id = -1;
+    tr.flash_apply_class_pending = false;
 }
 
 function Transition_Update() {
@@ -432,6 +440,11 @@ function Transition_Update() {
                 tr.alpha = clamp(tr.timer / tr.fade_out_frames, 0, 1);
                 if (tr.timer >= tr.fade_out_frames) {
                     tr.alpha = 1;
+                    if (tr.flash_apply_class_pending && is_real(tr.flash_apply_class_id) && tr.flash_apply_class_id >= 0) {
+                        ClassSelect_ApplyClass(tr.flash_apply_class_id);
+                    }
+                    tr.flash_apply_class_pending = false;
+                    tr.flash_apply_class_id = -1;
                     tr.phase = 1;
                     tr.timer = 0;
                 }
