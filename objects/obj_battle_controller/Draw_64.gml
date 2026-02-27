@@ -5,6 +5,16 @@ var w = display_get_gui_width();
 var h = display_get_gui_height();
 
 var gs = GameState_Get();
+var transition_alpha = 0;
+if (is_struct(gs)
+&& variable_struct_exists(gs, "transition_fx")
+&& is_struct(gs.transition_fx)
+&& variable_struct_exists(gs.transition_fx, "active")
+&& gs.transition_fx.active
+&& variable_struct_exists(gs.transition_fx, "alpha")) {
+    transition_alpha = clamp(real(gs.transition_fx.alpha), 0, 1);
+}
+var enemy_fade_alpha = 1 - transition_alpha;
 
 UI_SetFont();
 
@@ -105,7 +115,9 @@ if (instance_exists(enemy_inst)) {
     var ew = sprite_get_width(espr) * sx;
     var eh = sprite_get_height(espr) * sy;
     var icon_y = ey + eh + 4;
+    draw_set_alpha(enemy_fade_alpha);
     Status_DrawIcons(e, ex, icon_y, 12, false);
+    draw_set_alpha(1);
 }
 
 // bottom box rect
@@ -122,7 +134,7 @@ if (instance_exists(enemy_inst)) {
     var scx = enemy_inst.image_xscale * sx;
     var scy = enemy_inst.image_yscale * sy;
     if (off.flash) gpu_set_blendmode(bm_add);
-    draw_sprite_ext(enemy_inst.sprite_index, enemy_inst.image_index, exs, eys, scx, scy, enemy_inst.image_angle, c_white, 1);
+    draw_sprite_ext(enemy_inst.sprite_index, enemy_inst.image_index, exs, eys, scx, scy, enemy_inst.image_angle, c_white, enemy_fade_alpha);
     if (off.flash) gpu_set_blendmode(bm_normal);
 }
 
@@ -174,7 +186,7 @@ with (obj_fx) {
         var fx_y = (y - vy) * sy;
         var fx_sx = image_xscale * sx;
         var fx_sy = image_yscale * sy;
-        draw_sprite_ext(sprite_index, image_index, fx_x, fx_y, fx_sx, fx_sy, image_angle, image_blend, image_alpha);
+        draw_sprite_ext(sprite_index, image_index, fx_x, fx_y, fx_sx, fx_sy, image_angle, image_blend, image_alpha * enemy_fade_alpha);
     }
 }
 
