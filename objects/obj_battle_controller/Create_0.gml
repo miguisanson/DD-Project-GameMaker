@@ -71,7 +71,7 @@ enemy_turn_used_skills = [];
 
 menu_index = 0;
 battle_actions = [
-    { label: "FIGHT", state: BSTATE_PLAYER_ATTACK },
+    { label: "ATTACK", state: BSTATE_ATTACK_TIMING },
     { label: "SKILL", state: BSTATE_SKILL_MENU },
     { label: "ITEM",  state: BSTATE_ITEM_MENU },
     { label: "RUN",   state: BSTATE_PLAYER_RUN }
@@ -79,6 +79,17 @@ battle_actions = [
 menu_count = array_length(battle_actions);
 skill_index = 0;
 item_index = 0;
+
+attack_timing_active = false;
+attack_timing_started = false;
+attack_timing_x = 0;
+attack_timing_y = 0;
+attack_timing_target_x = 0;
+attack_timing_target_y = 0;
+attack_timing_input_lock = 0;
+attack_timing_result_text = "";
+attack_timing_result_key = "";
+attack_timing_result_timer = 0;
 
 // --------------------
 // MESSAGE SETUP

@@ -9,6 +9,8 @@ var k_down = Input_UIPressed("menu_down");
 var k_ok = Input_UIConfirm();
 var k_back = Input_UIBack();
 
+if (attack_timing_result_timer > 0) attack_timing_result_timer -= 1;
+
 // --------------------
 // MESSAGE STATE
 // --------------------
@@ -45,7 +47,9 @@ if (battle_state == BSTATE_MENU) {
 
     if (k_ok) {
         var action = battle_actions[menu_index];
-        if (action.state == BSTATE_SKILL_MENU) {
+        if (action.state == BSTATE_ATTACK_TIMING) {
+            Battle_AttackTimingBegin(self);
+        } else if (action.state == BSTATE_SKILL_MENU) {
             if (array_length(Battle_GetSkillList(self)) <= 0) {
                 Battle_Message(self, "No skills available.", BSTATE_MENU);
             } else {
@@ -128,6 +132,14 @@ if (battle_state == BSTATE_ITEM_MENU) {
         }
     }
 
+    exit;
+}
+
+// --------------------
+// PLAYER ATTACK TIMING
+// --------------------
+if (battle_state == BSTATE_ATTACK_TIMING) {
+    Battle_PlayerAttackTimingStep(self, k_ok);
     exit;
 }
 

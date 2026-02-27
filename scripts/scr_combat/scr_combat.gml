@@ -304,7 +304,45 @@ function Battle_CheckEnd(_bc, _p, _e) {
     return false;
 }
 
-function Battle_PlayerAttack(_bc) {
+function Battle_AttackTimingTarget(_bc) {
+    var gui_w = max(1, display_get_gui_width());
+    var gui_h = max(1, display_get_gui_height());
+    var tx = gui_w * 0.5;
+    var ty = gui_h * 0.5;
+
+    if (instance_exists(_bc.enemy_inst)) {
+        var cam = view_camera[0];
+        var vx = _bc.cam_base_x;
+        var vy = _bc.cam_base_y;
+        var vw = max(1, camera_get_view_width(cam));
+        var vh = max(1, camera_get_view_height(cam));
+        var sx = gui_w / vw;
+        var sy = gui_h / vh;
+
+        var espr = _bc.enemy_inst.sprite_index;
+        if (espr != noone) {
+            var ex = (_bc.enemy_inst.x - sprite_get_xoffset(espr) - vx) * sx;
+            var ey = (_bc.enemy_inst.y - sprite_get_yoffset(espr) - vy) * sy;
+            var ew = sprite_get_width(espr) * abs(_bc.enemy_inst.image_xscale) * sx;
+            var eh = sprite_get_height(espr) * abs(_bc.enemy_inst.image_yscale) * sy;
+            tx = ex + (ew * 0.5);
+            ty = ey + (eh * 0.5);
+        }
+    }
+
+    return { x: round(tx), y: round(ty) };
+}
+
+function Battle_AttackTimingJudge(_delta) {
+    var d = abs(_delta);
+    if (d <= ATTACK_WINDOW_PERFECT) return { key: "PERFECT", label: "PERFECT", mult: 1.00, hit: true };
+    if (d <= ATTACK_WINDOW_GOOD)    return { key: "GOOD",    label: "GOOD",    mult: 0.75, hit: true };
+    if (d <= ATTACK_WINDOW_OKAY)    return { key: "OKAY",    label: "OKAY",    mult: 0.50, hit: true };
+    if (d <= ATTACK_WINDOW_BAD)     return { key: "BAD",     label: "BAD",     mult: 0.25, hit: true };
+    return { key: "MISS", label: "MISS", mult: 0.00, hit: false };
+}
+
+function Battle_AttackTimingBegin(_bc) {
     var p = _bc.p;
     var e = _bc.e;
 
@@ -315,13 +353,44 @@ function Battle_PlayerAttack(_bc) {
         _bc.turn = TURN_ENEMY;
         _bc.p = p;
         _bc.e = e;
+        _bc.attack_timing_active = false;
+        _bc.attack_timing_started = false;
         return;
     }
 
-    Combat_Log("Player attacked.");
+    var target = Battle_AttackTimingTarget(_bc);
+    _bc.attack_timing_target_x = target.x;
+    _bc.attack_timing_target_y = target.y;
+    _bc.attack_timing_x = target.x;
+    _bc.attack_timing_y = -ATTACK_TIMING_START_OFFSET;
+    _bc.attack_timing_input_lock = max(0, ATTACK_TIMING_INPUT_LOCK_FRAMES);
+    _bc.attack_timing_active = true;
+    _bc.attack_timing_started = true;
+    _bc.battle_state = BSTATE_ATTACK_TIMING;
+}
+
+function Battle_PlayerAttackResolveTimed(_bc, _timing) {
+    var p = _bc.p;
+    var e = _bc.e;
+    var timing = _timing;
+    if (!is_struct(timing)) timing = { key: "MISS", label: "MISS", mult: 0.00, hit: false };
+
+    var timing_label = variable_struct_exists(timing, "label") ? string(timing.label) : "MISS";
+    var timing_key = variable_struct_exists(timing, "key") ? string(timing.key) : "MISS";
+    var timing_mult = variable_struct_exists(timing, "mult") ? clamp(real(timing.mult), 0, 1) : 0;
+    var timing_hit = variable_struct_exists(timing, "hit") && timing.hit;
+
+    _bc.attack_timing_active = false;
+    _bc.attack_timing_started = false;
+    _bc.attack_timing_result_text = timing_label;
+    _bc.attack_timing_result_key = timing_key;
+    _bc.attack_timing_result_timer = ATTACK_TIMING_FEEDBACK_FRAMES;
+
+    Combat_Log("Player attacked. (" + timing_label + ")");
     var player_class_id = -1;
     if (variable_struct_exists(p, "class_id")) player_class_id = p.class_id;
     SFX_PlayClassAttack(player_class_id);
+
     var w = _bc.player_weapon;
     if (!is_struct(w) || !variable_struct_exists(w, "power")) {
         var wid = p.equip.weapon;
@@ -330,38 +399,46 @@ function Battle_PlayerAttack(_bc) {
         _bc.player_weapon = w;
     }
 
-    var hit_res = Combat_AttemptHit(p, e, Combat_AttackBonus(p, w));
-
-    _bc.last_hit = hit_res.hit;
+    _bc.last_hit = timing_hit;
     _bc.last_dmg = 0;
     _bc.last_crit = false;
-    e = hit_res.defender;
 
-    if (_bc.last_hit) {
+    if (timing_hit) {
         var crit_bonus = Status_GetSum(p, "crit_bonus");
         _bc.last_crit = Combat_CritCheck(p, 1 + crit_bonus);
         var dmg_pack = Combat_ApplyDamage(p, e, w, (_bc.last_crit ? 2 : 1), 1);
-        _bc.last_dmg = dmg_pack.dmg;
+
+        var base_dmg = max(0, dmg_pack.dmg);
+        var scaled_dmg = floor(base_dmg * timing_mult);
+        if (base_dmg > 0 && scaled_dmg < 1) scaled_dmg = 1;
+        scaled_dmg = clamp(scaled_dmg, 0, base_dmg);
+
+        var refund = base_dmg - scaled_dmg;
         e = dmg_pack.defender;
+        if (refund > 0) {
+            e.hp = clamp(e.hp + refund, 0, e.max_hp);
+        }
+
+        _bc.last_dmg = scaled_dmg;
     }
 
     p = Status_ConsumeByField(p, "consume_on_attack");
 
     if (Battle_CheckEnd(_bc, p, e)) return;
 
-    if (!_bc.last_hit) {
+    if (!timing_hit) {
         SFX_PlayMissOrBlocked(false, -1);
-        Battle_Message(_bc, "You missed!", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, timing_label + "! You missed!", BSTATE_ENEMY_ACT);
     } else if (_bc.last_crit) {
         if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        Battle_Message(_bc, "Critical hit! " + string(_bc.last_dmg) + " dmg!", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, timing_label + "! Critical hit! " + string(_bc.last_dmg) + " dmg!", BSTATE_ENEMY_ACT);
     } else {
         if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        Battle_Message(_bc, "You hit for " + string(_bc.last_dmg) + " dmg!", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, timing_label + "! You hit for " + string(_bc.last_dmg) + " dmg!", BSTATE_ENEMY_ACT);
     }
 
     p = Status_Tick(p);
@@ -369,6 +446,37 @@ function Battle_PlayerAttack(_bc) {
     _bc.turn = TURN_ENEMY;
     _bc.p = p;
     _bc.e = e;
+}
+
+function Battle_PlayerAttackTimingStep(_bc, _confirm_pressed) {
+    if (!_bc.attack_timing_started || !_bc.attack_timing_active) {
+        Battle_AttackTimingBegin(_bc);
+        return;
+    }
+
+    var target = Battle_AttackTimingTarget(_bc);
+    _bc.attack_timing_target_x = target.x;
+    _bc.attack_timing_target_y = target.y;
+    _bc.attack_timing_x = target.x;
+
+    if (_bc.attack_timing_input_lock > 0) _bc.attack_timing_input_lock -= 1;
+    _bc.attack_timing_y += ATTACK_TIMING_SPEED;
+
+    if (_confirm_pressed && _bc.attack_timing_input_lock <= 0) {
+        var d = abs(_bc.attack_timing_y - _bc.attack_timing_target_y);
+        Battle_PlayerAttackResolveTimed(_bc, Battle_AttackTimingJudge(d));
+        return;
+    }
+
+    var late_limit = _bc.attack_timing_target_y + ATTACK_WINDOW_BAD + ATTACK_TIMING_END_MARGIN;
+    if (_bc.attack_timing_y >= late_limit) {
+        Battle_PlayerAttackResolveTimed(_bc, { key: "MISS", label: "MISS", mult: 0.00, hit: false });
+        return;
+    }
+}
+
+function Battle_PlayerAttack(_bc) {
+    Battle_PlayerAttackResolveTimed(_bc, { key: "PERFECT", label: "PERFECT", mult: 1.00, hit: true });
 }
 
 function Battle_PlayerSkill(_bc, _skill_id) {

@@ -126,6 +126,40 @@ if (instance_exists(enemy_inst)) {
     if (off.flash) gpu_set_blendmode(bm_normal);
 }
 
+// Timed ATTACK UI
+if (battle_state == BSTATE_ATTACK_TIMING && attack_timing_active) {
+    var tx_t = round(attack_timing_target_x);
+    var ty_t = round(attack_timing_target_y);
+    var cx_t = round(attack_timing_x);
+    var cy_t = round(attack_timing_y);
+
+    draw_set_alpha(0.35);
+    draw_set_color(c_white);
+    draw_circle(tx_t, ty_t, ATTACK_WINDOW_BAD, true);
+    draw_set_alpha(0.65);
+    draw_circle(tx_t, ty_t, ATTACK_WINDOW_GOOD, true);
+    draw_set_alpha(1);
+    draw_circle(tx_t, ty_t, ATTACK_WINDOW_PERFECT, true);
+    draw_circle(tx_t, ty_t, ATTACK_TIMING_TARGET_RADIUS, true);
+
+    draw_circle(cx_t, cy_t, ATTACK_TIMING_RING_RADIUS, true);
+    draw_circle(cx_t, cy_t, max(1, ATTACK_TIMING_RING_RADIUS - 1), false);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
+// Timed ATTACK feedback text
+if (attack_timing_result_timer > 0 && attack_timing_result_text != "") {
+    var t_norm = clamp(attack_timing_result_timer / max(1, ATTACK_TIMING_FEEDBACK_FRAMES), 0, 1);
+    var tyf = attack_timing_target_y - 12 - ((1 - t_norm) * 6);
+    var txf = attack_timing_target_x - (string_width(attack_timing_result_text) * 0.5);
+    draw_set_alpha(1);
+    draw_set_color(c_black);
+    draw_text(txf + 1, tyf + 1, attack_timing_result_text);
+    draw_set_color(c_white);
+    draw_text(txf, tyf, attack_timing_result_text);
+}
+
 // FX draw (battle-only), over enemy sprite
 with (obj_fx) {
     if (sprite_index != noone) {
