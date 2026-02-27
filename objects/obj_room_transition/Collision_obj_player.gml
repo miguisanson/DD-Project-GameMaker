@@ -2,8 +2,16 @@ if (transition_id == "") exit;
 
 // Require intentional movement into the transition direction
 if (require_move) {
-    if (!other.moving) exit;
-    if (require_dir != -1 && other.move_dir != require_dir) exit;
+    var requested_dir = -1;
+    if (variable_instance_exists(other, "move_dir")) requested_dir = other.move_dir;
+
+    // Accept directional intent even if the movement step is blocked this frame.
+    // This allows re-triggering while still overlapping the transition tile.
+    var has_intent = (requested_dir != -1);
+    if (!has_intent && variable_instance_exists(other, "moving")) has_intent = other.moving;
+    if (!has_intent) exit;
+
+    if (require_dir != -1 && requested_dir != require_dir) exit;
 }
 
 var entry = RoomDB_Get(transition_id);

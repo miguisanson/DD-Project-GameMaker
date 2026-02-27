@@ -66,19 +66,11 @@ if (room == rm_battle && is_struct(ch)) {
 
 if (gs.ui.mode == UI_PAUSE) {
     PauseMenu_Draw();
-    if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled) {
-        draw_set_color(c_yellow);
-        draw_text(8, 8, "DEBUG MODE: ON");
-    }
     exit;
 }
 
 if (gs.ui.mode == UI_MENU) {
     Menu_Draw();
-    if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled) {
-        draw_set_color(c_yellow);
-        draw_text(8, 8, "DEBUG MODE: ON");
-    }
     exit;
 }
 
@@ -184,24 +176,6 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
 
 if (gs.ui.mode == UI_SAVE) {
     SaveMenu_Draw();
-}
-
-// Debug indicator
-if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled) {
-    draw_set_color(c_yellow);
-    draw_text(8, 8, "DEBUG MODE: ON");
-    var gs2 = GameState_Get();
-    if (variable_struct_exists(gs2, "ui") && variable_struct_exists(gs2.ui, "debug_warns")) {
-        var dw = gs2.ui.debug_warns;
-        if (is_array(dw) && array_length(dw) > 0) {
-            draw_set_color(c_red);
-            draw_text(8, 24, dw[array_length(dw) - 1]);
-        }
-    }
-}
-if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled) {
-    draw_set_color(c_yellow);
-    draw_text(8, 8, "DEBUG MODE: ON");
 }
 
 Transition_DrawGUI();

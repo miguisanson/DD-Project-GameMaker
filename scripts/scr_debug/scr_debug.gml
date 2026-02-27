@@ -5,11 +5,24 @@ function Debug_Init() {
     if (!variable_struct_exists(global.debug, "enabled")) {
         global.debug.enabled = false;
     }
+    if (!variable_struct_exists(global.debug, "last_command")) {
+        global.debug.last_command = "";
+    }
+    if (!variable_struct_exists(global.debug, "last_command_frame")) {
+        global.debug.last_command_frame = -1;
+    }
+}
+
+function Debug_Record(_label) {
+    Debug_Init();
+    global.debug.last_command = string(_label);
+    global.debug.last_command_frame = Input_Frame();
 }
 
 function Debug_Toggle() {
     Debug_Init();
     global.debug.enabled = !global.debug.enabled;
+    Debug_Record("Toggle Debug: " + (global.debug.enabled ? "ON" : "OFF"));
 }
 
 function Debug_IsEnabled() {
@@ -61,6 +74,7 @@ function Debug_GiveAllItems() {
     }
 
     GameState_SetPlayer(ch);
+    Debug_Record("Give All Items");
 }
 
 
@@ -71,11 +85,13 @@ function Debug_LevelUp() {
     ch.exp += ch.exp_next;
     ch = LevelUp_FromExp(ch);
     GameState_SetPlayer(ch);
+    Debug_Record("Level Up");
 }
 
 function Debug_Save() {
     Save_Write(0);
     Dialogue_Start("sys_save_ok");
+    Debug_Record("Quick Save");
 }
 
 function Debug_Load() {
@@ -84,6 +100,29 @@ function Debug_Load() {
     } else {
         Dialogue_Start("sys_load_missing");
     }
+    Debug_Record("Quick Load");
+}
+
+function Debug_KillPlayer() {
+    var gs = GameState_Get();
+    if (!is_struct(gs.player_ch)) return;
+
+    var ch = gs.player_ch;
+    ch.hp = 0;
+    GameState_SetPlayer(ch);
+
+    // Mirror in-battle runtime struct too (if present), then invoke the standard death cutscene flow.
+    if (room == rm_battle && instance_exists(obj_battle_controller)) {
+        var bc = instance_find(obj_battle_controller, 0);
+        if (instance_exists(bc) && variable_instance_exists(bc, "p") && is_struct(bc.p)) {
+            bc.p.hp = 0;
+        }
+    }
+
+    if (!Transition_IsActive()) {
+        Transition_RequestCutsceneById("game_over");
+    }
+    Debug_Record("Kill Player");
 }
 
 function Debug_Update() {
@@ -94,4 +133,5 @@ function Debug_Update() {
     if (Input_Pressed("debug_all_items")) Debug_GiveAllItems();
     if (Input_Pressed("debug_save")) Debug_Save();
     if (Input_Pressed("debug_load")) Debug_Load();
+    if (Input_Pressed("debug_kill")) Debug_KillPlayer();
 }

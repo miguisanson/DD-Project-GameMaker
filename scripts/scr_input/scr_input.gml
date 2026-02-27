@@ -33,6 +33,7 @@ function Input_Init() {
         inp.bindings.debug_load = [vk_f9];
         inp.bindings.debug_levelup = [ord("L")];
         inp.bindings.debug_all_items = [ord("K")];
+        inp.bindings.debug_kill = [ord("J")];
     }
 
     inp.bindings.debug_toggle = [ord("P")];
@@ -42,6 +43,7 @@ function Input_Init() {
     if (!variable_struct_exists(inp.bindings, "debug_all_items")) inp.bindings.debug_all_items = [ord("K")];
     if (!variable_struct_exists(inp.bindings, "debug_save")) inp.bindings.debug_save = [vk_f5];
     if (!variable_struct_exists(inp.bindings, "debug_load")) inp.bindings.debug_load = [vk_f9];
+    if (!variable_struct_exists(inp.bindings, "debug_kill")) inp.bindings.debug_kill = [ord("J")];
     if (!variable_struct_exists(inp, "state")) {
         inp.state = {};
     }
