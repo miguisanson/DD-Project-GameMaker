@@ -1,0 +1,788 @@
+1. PROJECT OVERVIEW
+This project is a GameMaker Studio 2 pixel-art dungeon RPG with low internal resolution and integer-scaled presentation.
+
+Confirmed systems in current code:
+- Overworld exploration with tile-based movement and room transitions.
+- Turn-based 1v1 battles in `rm_battle`.
+- Player class system with `Knight`, `Archer`, `Mage`, and `Nobody`.
+- Dialogue/typewriter UI and cutscene flow in `rm_cutscene`.
+- Inventory, equipment, consumables, skillbooks, loot tables.
+- Save/load slots with room position restore.
+- Global transition manager (room fade, encounter zoom/fade, cutscene fade).
+- Difficulty selection and runtime difficulty multipliers.
+
+Intended (by naming/comments/flow):
+- Data-driven systems (`DB` scripts, room DB, status DB, loot DB).
+- Reusable centralized managers (game state, UI, transitions, audio).
+
+Actual:
+- Most systems are centralized and data-driven.
+- Some legacy/stale artifacts and behavioral mismatches exist (see sections 16 and 17).
+
+
+2. CORE GAME LOOP
+Overworld:
+- Player moves on a 16x16 grid (`obj_player/Step_0.gml`), 1 px/step until tile settle.
+- Interactions are tile-facing checks through `obj_interactable` + `Interact_Handle`.
+- Enemies use chase/wander AI (`EnemyAI_Update`) and collide with player to trigger battle.
+
+Room transitions:
+- `obj_room_transition` collision reads `transition_id` and `RoomDB_Get`.
+- Direction/intent gating: `require_dir` + `require_move`.
+- If entry has `cutscene_id`, transition routes to cutscene flow.
+- Otherwise room fade transition + spawn routing.
+
+Battle entry:
+- Enemy collision path:
+  - Guards: defeated/transition active/player cooldown.
+  - `EnemyPersist_BeginEncounter` captures return room/x/y and enemy identity.
+  - `Transition_RequestEncounterBattle(rm_battle)`.
+  - Enemy and player movement frozen immediately.
+  - Enemy encounter SFX plays once on trigger path.
+
+Battle exit:
+- Win:
+  - Rewards applied (EXP + loot roll).
+  - Enemy persist marked removed (boss flag update if boss).
+  - Returns to overworld via room fade.
+- Run:
+  - Enemy marked alive in persist.
+  - Returns via room fade.
+- Death:
+  - Triggers cutscene transition with cutscene id `game_over`.
+
+New game flow:
+- `rm_start` main menu -> difficulty popup -> intro cutscene transition.
+- `rm_cutscene` plays `intro` sequence.
+- On intro completion:
+  - state reset
+  - class forced to `Nobody`
+  - transitions to `rm_floor1`
+  - immediate floor1 intro dialogue is queued and shown.
+
+Class selection flow:
+- No dedicated class room.
+- In `rm_floor1`, interacting with `obj_chest_class_select`:
+  - shows class prompt dialogue
+  - opens class selection popup
+  - on selection, class apply + black flash transition.
+
+Ending flow:
+- Room transition id `floor9_5_to_ending` routes to `rm_cutscene` with `ending` cutscene id.
+- Ending sequence plays multi-segment cutscene and returns to `rm_start`.
+
+Save/load flow:
+- Save menu opened from bed (`obj_bed` checkpoint interaction) or main menu load.
+- Save writes snapshot, resets regular enemies, then save flow reloads selected slot.
+- Load restores player class/data, exact room position, and triggers cutscene-style fade transition into saved room.
+
+Death/game over flow:
+- `Player_OnDeath` or debug kill transitions to `game_over` cutscene.
+- On cutscene completion: load current/latest save slot if available, else return to main menu.
+
+
+3. PLAYER PROGRESSION
+EXP progression:
+- `Exp_NextLevel(level) = 10 + level^2 * 10`.
+- `LevelUp_FromExp` loops while `exp >= exp_next`.
+
+What level-up is intended to do:
+- Intended by function naming/known design: class auto-growth + manual stat point gain.
+
+What level-up actually does:
+- `LevelUp_AddStat(_ch, _stat_id)` increments:
+  - `level += 1`
+  - `stat_points += 1`
+  - recompute resources
+- `_stat_id` is currently unused.
+- Result: no automatic class-stat increment is currently applied.
+
+Manual stat allocation:
+- Stats tab in menu allows spending pending stat points on STR/AGI/DEF/INT/LUCK.
+- Confirm/Cancel apply or discard pending allocation.
+
+Level cap:
+- No explicit level cap enforcement found in level-up logic.
+- `STAT_MAX` macro exists but is not applied by level-up/menu allocation path.
+- Technical implication: level can continue as long as EXP is added.
+
+EXP table (next-level requirement):
+- L1 -> 20
+- L2 -> 50
+- L3 -> 100
+- L4 -> 170
+- L5 -> 260
+- L6 -> 370
+- L7 -> 500
+- L8 -> 650
+- L9 -> 820
+- L10 -> 1010
+
+Cumulative EXP to reach level:
+- L2: 20
+- L3: 70
+- L4: 170
+- L5: 340
+- L6: 600
+- L7: 970
+- L8: 1470
+- L9: 2120
+- L10: 2940
+
+
+4. CLASS SYSTEM
+Class IDs:
+- `CLASS_ARCHER=0`, `CLASS_KNIGHT=1`, `CLASS_MAGE=2`, `CLASS_NOBODY=3`.
+
+Class DB (`DB_PlayerClass`):
+- Knight: `hd=10`, `mp_gain=1`, `base_hp=10`, `base_mp=10`, bonus `{str+1, def+2}`.
+- Archer: `hd=8`, `mp_gain=2`, `base_hp=10`, `base_mp=10`, bonus `{agi+2, luck+1}`.
+- Mage: `hd=6`, `mp_gain=3`, `base_hp=10`, `base_mp=10`, bonus `{int+2, luck+1}`.
+- Nobody: `hd=8`, `mp_gain=1`, `base_hp=10`, `base_mp=10`, bonus all zero.
+
+Sprite assignment:
+- `Player_ApplyClassSprites` maps class to directional sprites.
+- Nobody uses `nobody_right/left/up/down`.
+
+Class selection:
+- Popup choices are labeled `Warrior`, `Archer`, `Mage`, mapped to class IDs `[Knight, Archer, Mage]`.
+- Applying class rebuilds character, preserving selected old fields (level/exp/inventory/equip/stat_points/status).
+
+Nobody behavior:
+- Starts with no skills.
+- Skillbook validation explicitly blocks Nobody from learning skills.
+- Skill use checks class restrictions, so player cannot use out-of-class skills.
+- Nobody can still use basic attack and items like any class.
+
+
+5. PLAYER STATS / FORMULAS
+Base stat creation:
+- `StatsCreateBase`: all 10.
+- Class bonus added at character creation.
+
+Stat modifier:
+- `StatMod(stat) = floor((stat - 10) / 2)`.
+
+Combat stat retrieval:
+- `Stat_Get(ch, stat_id) = base stat + equip bonus + status mod`.
+
+Resource recompute (`RecomputeResources`):
+- Uses `ch.stats` directly (base allocated stats), not `Stat_Get`.
+- `hp_gain = ceil(hd/2) + 1`.
+- `max_hp = base_hp + (level - 1) * (hp_gain + StatMod(stats.def))`.
+- `max_mp = base_mp + (level - 1) * (mp_gain + StatMod(stats.intt))`.
+- Player then applies difficulty multipliers:
+  - `max_hp *= diff.player_hp_mult`
+  - `max_mp *= diff.player_mp_mult`
+
+Starting class stats at level 1 (confirmed):
+- Knight: STR 11, AGI 10, DEF 12, INT 10, LUCK 10
+- Archer: STR 10, AGI 12, DEF 10, INT 10, LUCK 11
+- Mage: STR 10, AGI 10, DEF 10, INT 12, LUCK 11
+- Nobody: STR 10, AGI 10, DEF 10, INT 10, LUCK 10
+
+Default no-manual-allocation per-level HP/MP increments on Normal:
+- Knight: HP +7, MP +1
+- Archer: HP +5, MP +2
+- Mage: HP +4, MP +4
+- Nobody: HP +5, MP +1
+
+Important actual behavior:
+- DEF/INT allocation retroactively scales full HP/MP formula (because formula multiplies by `level-1` each recompute).
+- Equipment/status bonuses do not change max HP/MP (resource recompute does not use `Stat_Get`).
+
+
+6. COMBAT FORMULAS
+Initiative:
+- `RollD20() + StatMod(Combat_EffectiveStat(ch, AGI))`.
+
+Effective combat stat:
+- `Combat_EffectiveStat = round(Stat_Get * difficulty_stat_mult_for_side)`, min 1.
+
+Attack bonus:
+- `StatMod(effective relevant stat) + weapon.acc`.
+
+Dodge bonus:
+- `StatMod(effective AGI) + Status_GetSum(defender, "dodge_bonus")`.
+
+Hit check:
+- Forced miss if defender has `force_dodge` (consumes consume_on_defend statuses).
+- Forced hit if attacker has `always_hit`.
+- Else `d20 + acc_bonus >= d20 + dodge_bonus`.
+
+Crit check:
+- `crit_chance = 0.05 + max(0, StatMod(effective LUCK))*0.01 + crit_bonus*0.01`.
+- Clamped to `[0.05, 0.50]`.
+
+Base damage:
+- `raw = weapon.power + StatMod(effective relevant stat)`.
+- `mitig = floor(StatMod(effective DEF)/2)`.
+- `base = max(1, raw - mitig)`.
+
+Final damage order:
+- Apply attacker status `dmg_mult`.
+- Apply skill multiplier.
+- Apply crit multiplier.
+- Apply defender `guard_mult` (and consume consume_on_hit statuses if guard_mult field present).
+- Apply difficulty side damage multiplier (attacker side).
+- Clamp to `>= 0`.
+
+Run check:
+- Player run roll: `d20 + AGI mod`.
+- Enemy run roll: `d20 + AGI mod`.
+- Success if player roll `>=` enemy roll.
+
+
+7. TURN FLOW / ACTION ECONOMY
+Battle states:
+- `MESSAGE`, `MENU`, `PLAYER_ATTACK`, `PLAYER_RUN`, `ENEMY_ACT`, `END_RUN`, `SKILL_MENU`, `ITEM_MENU`.
+
+Message pacing:
+- Message state auto-advances after `COMBAT_ACTION_DELAY` frames (default 60) and waits for FX completion.
+- No player confirm-skip in this state.
+
+Player turn:
+- Actions: `FIGHT`, `SKILL`, `ITEM`, `RUN`.
+- No-skill/no-item cases show message and return to menu.
+
+Enemy turn:
+- Action budget initialized per turn:
+  - default 1 action
+  - passive action-budget skills can raise it.
+- Enemy chooses skill candidate based on:
+  - trigger conditions (`hp ratio`, required inventory, etc.)
+  - once-per-turn restrictions
+  - per-skill random chance range.
+- If no skill candidate selected, does basic attack.
+- Free-action skills do not consume action budget.
+- `set_enemy_actions` and `extra_turns` can extend chain.
+- Chain cap is `ENEMY_ACTION_CHAIN_MAX` (default 6).
+
+Win/loss/reward:
+- Win: EXP with difficulty multiplier + loot roll, mark enemy defeated persist, fade back.
+- Run: enemy persist restored alive, fade back.
+- Loss: transitions to game-over cutscene path.
+
+
+8. STATUS SYSTEM
+Status DB entries are non-stackable; reapplying refreshes max(turns,power).
+Exclusion rules are enforced on apply.
+
+Status mechanics table:
+- Poison:
+  - stat mods: DEF -1
+  - tick: HP -4..-2
+  - excludes: Bleed
+- Bleeding:
+  - stat mods: AGI -1
+  - tick: HP -4..-2
+  - excludes: Poison, Burn
+- Burning:
+  - stat mods: DEF -1
+  - tick: HP -5..-3
+  - excludes: Bleed
+- Stun:
+  - stat mods: AGI -2
+  - tick: none
+  - flag: skip_turn
+- Guard:
+  - guard_mult: 0
+  - consume_on_hit: true
+- Rev Up:
+  - dmg_mult: 2
+  - consume_on_attack: true
+- Evasion:
+  - force_dodge: true
+  - consume_on_defend: true
+- Take Aim:
+  - crit_bonus: +25
+- Foresight:
+  - always_hit: true
+  - consume_on_attack: true
+- Meditation:
+  - tick: MP +2..+4
+- Solidify:
+  - force_dodge: true
+  - consume_on_defend: true
+- Bloodthirsty:
+  - guard_mult: 0.5
+  - dmg_mult: 1.08
+  - consume_on_hit: true
+- Blessing:
+  - guard_mult: 0.7
+
+Tick timing (actual):
+- Player statuses tick at end of player action functions (including stunned skip branch).
+- Enemy statuses tick at end of each `Battle_EnemyAct` call.
+- Because enemy turns can chain multiple actions, enemy statuses may tick multiple times before player regains turn.
+
+Status application direction:
+- Skill target drives where status is applied (`self` vs `enemy`).
+- Status icons are shared by both sides and rendered from status list of that character.
+
+Status icons:
+- Core debuffs use dedicated sprites:
+  - `bleed_status`, `poison_status`, `stun_status`, `burn_status`.
+- Player buff icons are assigned from last frame of corresponding FX sprites.
+
+
+9. PLAYER SKILLS
+Current player-usable skills in DB:
+
+| ID | Skill | Class list | MP | Effect | Status payload |
+|---|---|---|---:|---|---|
+| 1 | Wound | Knight, Archer | 3 | damage, 1 hit | Bleed 2T, 75% |
+| 2 | Hilt Bash | Knight | 4 | damage, 1 hit | Stun 1T, 60% |
+| 3 | Muscle Up | Knight | 3 | status self | Guard 2T |
+| 4 | Rev Up | Knight | 3 | status self | Rev Up 2T |
+| 5 | Horizontal Slash | Knight | 5 | damage | no status, power_mult 1.5 |
+| 6 | Poison Arrow | Archer | 4 | damage | Poison 2T, 75%, acc+1 |
+| 7 | Evasion | Archer | 3 | status self | Evasion 2T |
+| 8 | Double Shot | Archer | 5 | damage, 2 hits | no status |
+| 9 | Take Aim | Archer | 3 | status self | Crit Up 3T |
+| 10 | Fireball | Mage | 4 | damage | Burn 2T, 60% |
+| 11 | Poison Mist | Mage | 4 | damage | Poison 2T, 75% |
+| 12 | Ice Spear | Mage | 5 | damage | Stun 1T, 60% |
+| 13 | Meditation | Mage | 3 | status self | Meditation 3T |
+| 14 | Foresight | Mage | 3 | status self | Hit Up 2T |
+
+Skill FX behavior:
+- Player skill FX spawned via `obj_fx`.
+- Runtime speed uses `fx_speed * SKILL_FX_SPEED_MULT` (`2.5` currently).
+- FX scale uses `SKILL_FX_SCALE` (`2` currently).
+
+Starting skills:
+- `Player_DefaultSkills` currently returns `[]` for all classes.
+
+
+10. ENEMY SKILLS / AI
+Enemy overworld AI:
+- Chase/wander logic with per-enemy AI tuning from enemy DB (`scan_radius`, `think_rate`, `forget_delay`, `leash_mult`, `wander_chance`, `move_speed`).
+- Enemies cannot step through `obj_room_transition`.
+- Enemies stop moving if transition is active or dialogue is active.
+
+Enemy skill DB entries:
+
+| ID | Skill | Effect | Target | Use chance | Extra conditions |
+|---|---|---|---|---|---|
+| 15 | Poison Fangs | damage + Poison(2T) | enemy | 10%-25% | none |
+| 16 | Solidify | status Solidify(2T) | self | 10%-25% | none |
+| 17 | Bite | damage + Bleed(2T) | enemy | 25%-30% | none |
+| 18 | Bloodthirsty | status Bloodthirsty(3T) | self | 20%-30% | none |
+| 19 | Vine Trap | damage + Stun(1T) | enemy | 20% | none |
+| 20 | Scorching Touch | damage + Burn(2T) | enemy | 40% | none |
+| 21 | Cut | damage + Bleed(2T) | enemy | 50% | none |
+| 22 | Steal | steal random inventory item | enemy | 25% | target must have inventory |
+| 23 | Ramming | damage + [Stun(1T), Bleed(2T)] | enemy | 40% | none |
+| 24 | Rampage | free action, set actions=2 | self | 20%-30% | requires actions below 2, once/turn |
+| 25 | Curse | multi-status [Burn, Poison, Stun, Bleed] | enemy | 30% | none |
+| 26 | Blessing | status Blessing(2T), free action | self | 30% | hp <= 80% |
+| 27 | Fury | passive action budget to 2, free_action flag | self | N/A active cast | passive trigger hp <= 50% |
+
+Important implementation notes:
+- Enemy skill pick uses random candidate pass, then chooses one candidate randomly.
+- If no skill chosen, enemy basic attacks.
+- Enemy skills intentionally do not spawn visual FX in battle.
+- Enemy skill banners are shown for active skill uses; passive action-budget behavior has no explicit banner/log.
+
+
+11. ENEMY ROSTER / SCALING
+Enemy DB roster (normal difficulty, pre-battle-status):
+
+| Enemy | Lvl | STR | AGI | DEF | INT | LUCK | Derived Max HP | Derived Max MP | EXP | Skills | Boss |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| Slime | 2 | 9 | 10 | 8 | 5 | 7 | 14 | 0 | 10 | Solidify | No |
+| Spider | 2 | 9 | 10 | 8 | 5 | 7 | 14 | 0 | 10 | Poison Fangs | No |
+| Snake | 2 | 9 | 10 | 8 | 5 | 7 | 14 | 0 | 10 | Bite | No |
+| Dire Wolf | 3 | 12 | 12 | 10 | 6 | 8 | 20 | 0 | 18 | Bloodthirsty | No |
+| Killer Plant | 4 | 13 | 9 | 12 | 10 | 8 | 32 | 9 | 28 | Vine Trap | No |
+| Mad Whisp | 5 | 10 | 13 | 10 | 14 | 10 | 28 | 24 | 36 | Scorching Touch | No |
+| Ghost Sword | 6 | 15 | 12 | 13 | 10 | 11 | 44 | 9 | 48 | Cut | No |
+| Stranger | 7 | 17 | 13 | 15 | 16 | 12 | 58 | 38 | 70 | Steal | No |
+| Mini Boss | 8 | 20 | 12 | 17 | 15 | 13 | 83 | 36 | 116 | Ramming, Rampage | Yes |
+| Final Boss | 9 | 23 | 13 | 20 | 21 | 15 | 114 | 76 | 170 | Curse, Blessing, Fury | Yes |
+
+Overworld placement (actual room content, read from room files):
+- `rm_floor1`: Slime
+- `rm_floor2`: Slime, Dire Wolf
+- `rm_floor3`: Spider, Snake
+- `rm_floor4`: Dire Wolf, Killer Plant x2
+- `rm_floor5`: Snake, Dire Wolf, Mini Boss
+- `rm_floor6`: Slime, Mad Whisp x2, Ghost Sword x2
+- `rm_floor7`: Spider, Mad Whisp, Ghost Sword, Stranger
+- `rm_floor8`: Mad Whisp, Stranger
+- `rm_floor9`: Stranger
+- `rm_floor9_5`: Final Boss
+
+Inferred:
+- Effective campaign level range behaves like early game (roughly single-digit enemy level arc), despite no hard player level cap.
+
+
+12. ITEMS / EQUIPMENT / SKILLBOOKS
+Inventory model:
+- Array of `{id, qty}` structs.
+- Stackables merge up to `max_stack`.
+- Non-stackables occupy separate entries.
+- No explicit inventory capacity limit found.
+
+Equipment model:
+- Slots in player struct: `weapon`, `head`, `body`, `ring1`, `ring2`.
+- Current item DB provides weapon/body gear; no head/ring content defined.
+- Equipping sets slot pointer only; item is not consumed.
+- Equipping another item in same slot replaces previous equipped item.
+- UI marks equipped inventory item with `"E"`.
+
+Weapons:
+- 1 Wooden Sword (Knight, power 2, STR)
+- 2 Iron Sword (Knight, power 4, STR)
+- 3 Platinum Sword (Knight, power 6, STR, acc 1)
+- 4 Wooden Bow (Archer, power 2, AGI, acc 1)
+- 5 Iron Bow (Archer, power 4, AGI, acc 1)
+- 6 Platinum Bow (Archer, power 6, AGI, acc 2)
+- 7 Wooden Staff (Mage, power 2, INT)
+- 8 Ruby Staff (Mage, power 4, INT)
+- 9 Diamond Staff (Mage, power 6, INT, acc 1)
+
+Armor:
+- 20 Leather Armor (+DEF 1, Knight/Archer)
+- 21 Iron Armor (+DEF 2, Knight/Archer)
+- 22 Platinum Armor (+DEF 3, Knight/Archer)
+- 23 Cloth Robe (+INT 1, Mage)
+- 24 Silk Robe (+INT 2, Mage)
+- 25 Mithril Robe (+INT 3, Mage)
+
+Consumables:
+- HP Potions: IDs 10/14/15 (scale with user level).
+- MP Potions: IDs 11/17/18 (scale with user level).
+- 12 Antidote: cures Poison.
+- 13 Bandage: cures Bleed.
+
+Skillbooks:
+- IDs 101-114 map one-to-one to player skills (Wound..Foresight).
+- Use effect: `learn_skill`.
+- Validation checks:
+  - item is skillbook
+  - user has class
+  - Nobody blocked
+  - class allowed by skill `class_list`
+  - skill not already learned
+- On success:
+  - skill added
+  - book consumed
+
+Menu use behavior:
+- Selecting skillbook opens confirm popup: `Learn a skill` with Confirm/Cancel.
+- Selecting equip item attempts equip; non-consuming.
+- Selecting consumable applies effect and consumes one item if success.
+
+Battle item behavior:
+- Battle item list includes only consumables with `usable_battle=true`.
+- Skillbooks are excluded in battle item list.
+
+
+13. DIFFICULTY SYSTEM
+Selection:
+- Difficulty popup shown on New Game before intro cutscene.
+- Choices: Easy/Normal/Hard (+ Back).
+
+Difficulty profiles:
+
+Easy:
+- player_stat_mult 1.10
+- enemy_stat_mult 0.92
+- player_hp_mult 1.20
+- player_mp_mult 1.10
+- enemy_hp_mult 0.85
+- enemy_mp_mult 0.90
+- player_damage_mult 1.12
+- enemy_damage_mult 0.86
+- enemy_status_chance_mult 0.85
+- player_exp_mult 1.25
+
+Normal:
+- all multipliers 1.00
+
+Hard:
+- player_stat_mult 0.95
+- enemy_stat_mult 1.10
+- player_hp_mult 0.90
+- player_mp_mult 0.95
+- enemy_hp_mult 1.20
+- enemy_mp_mult 1.05
+- player_damage_mult 0.92
+- enemy_damage_mult 1.18
+- enemy_status_chance_mult 1.10
+- player_exp_mult 0.85
+
+Where applied:
+- Player HP/MP in `RecomputeResources`.
+- Enemy stats + HP/MP in `EnemyCreate`.
+- Effective combat stats in `Combat_EffectiveStat`.
+- Final damage in `Combat_ApplyDamage` via side damage multipliers.
+- Enemy status chance multiplier for enemy skill status application.
+- Player EXP reward multiplier in `Battle_GrantRewards`.
+
+Critical actual behavior:
+- Enemy stat multiplier is applied in `EnemyCreate` and again in `Combat_EffectiveStat`.
+- This causes compounding enemy stat scaling in combat.
+
+
+14. UI / FLOW / PRESENTATION RULES THAT AFFECT GAMEPLAY
+Input mapping:
+- Movement: WASD + arrows.
+- Confirm/interact: Space.
+- Cancel: Esc.
+- Menu: I / Tab.
+- Debug toggle: P (also toggles audio debug diagnostics path).
+
+Dialogue/typewriter:
+- Drawn in Draw GUI.
+- Word wrapping + pagination is centralized.
+- Overflow automatically paginates into next dialogue page.
+- Confirm during reveal: reveal instantly.
+- Confirm after ready: advance.
+- Cutscene text-only mode:
+  - no dialogue panel box
+  - text drawn directly over scene with shadow
+  - uses cutscene-specific chars/sec defaults and overrides.
+
+Popup behavior:
+- Menu/class-select/save/pause/settings/difficulty use fade-in/fade-out alpha helpers.
+
+Battle HUD:
+- Draw GUI bars and status icons.
+- Player HP/MP bars flash additive white briefly when HP drops.
+- Enemy status icons drawn under enemy sprite.
+- Skill banner drawn near top.
+
+Transitions:
+- Central transition authority in `scr_room_transition`.
+- Types:
+  - Room fade
+  - Encounter transition (zoom -> hold -> fade-to-black -> room switch -> black hold -> fade in)
+  - Cutscene fade
+  - Black flash
+
+Display/scaling:
+- Internal base constants: 160x144.
+- Camera view fixed to base size.
+- Viewport scaled integer-fit to display or fixed scale windowed mode.
+- No `display_set_gui_size`/`display_set_gui_maximise` calls currently.
+- GUI coordinates use `display_get_gui_width/height`.
+- Texture filtering disabled once at init.
+
+Enemy/pacing interactions:
+- Enemy movement halts while transition active.
+- Enemy movement halts while dialogue active.
+
+
+15. DATABASE STRUCTURE SUMMARY
+Player class DB (`scr_db_player_class`):
+- `name`, `hd`, `mp_gain`, `base_hp`, `base_mp`, `bonus`, `sprites`.
+
+Enemy DB (`scr_db_enemy`):
+- `id`, `name`, `level`, `stats`, `base_hp`, `base_mp`, `hd`, `mp_gain`,
+  `weapon_id`, `sprite`, `sprite_world`, `exp`, `loot_key`, `ai`, `skills`, `traits`, `is_boss`.
+
+Skill DB (`scr_db_skill`):
+- Common fields:
+  - `id`, `name`, `mp_cost`, `power`, `power_mult`, `stat_type`, `acc`,
+    `target`, `effect`, `status`, `status_turns`, `status_chance`,
+    `status_list`, `status_turns_list`,
+    `icon_sprite`, `fx_sprite`, `fx_frames`, `fx_speed`, `hits`,
+    `class_list`.
+- Enemy-only control fields:
+  - `enemy_use_chance_min/max`,
+  - `enemy_require_target_inventory`,
+  - `enemy_hp_below_ratio` / `enemy_hp_above_ratio`,
+  - `enemy_require_actions_below`,
+  - `enemy_once_per_turn`,
+  - `enemy_passive_action_budget`,
+  - `free_action`, `extra_turns`, `set_enemy_actions`.
+
+Status DB (`scr_status`):
+- `id`, `name`, `icon_sprite`, `icon_subimg`,
+  `stat_mods`, `tick`, `stackable`,
+  optional behavior flags/fields (`skip_turn`, `guard_mult`, `dmg_mult`, `force_dodge`,
+  `consume_on_hit`, `consume_on_attack`, `consume_on_defend`, `always_hit`, `crit_bonus`, `excludes`).
+
+Item DB (`scr_db_item`):
+- `id`, `name`, `type`, `stackable`, `max_stack`, `equip_slot`, `power`,
+  `stat_type`, `acc`, `preferred_class`, `allowed_classes`,
+  `sprite`, `bonus`, `use`, `value`.
+- `use` struct supports:
+  - `effect` (`none`, `heal`, `mp`, `cure`, `learn_skill`)
+  - `min/max/scale` or `power`
+  - `status`, `target`
+  - FX fields
+  - `skill_id` for skillbooks.
+
+Loot DB (`scr_loot`):
+- tables: `chest`, `barrel`, `enemy`
+- per-entry: `item_id`, `weight`, `tier`, `qty_min`, `qty_max`
+- configs: key -> `{table, chance[1..3], max_items, mode?}`
+- tier weighting by level bucket
+- skillbook class lists derived from skill class lists.
+
+Room DB (`scr_room_db`):
+- transition id -> `{target_room, target_spawn_id, face, cutscene_id?}`.
+
+Dialogue DB (`scr_dialogue`):
+- key -> array of lines.
+- supports formatted placeholders with `Dialogue_FormatLines`.
+
+Save snapshot schema (`scr_save`):
+- `save_version`
+- `statData`:
+  - class, difficulty, player struct, flags, checkpoint, defeated list,
+    uid counter, enemy reset version, save slot, settings, saved_at,
+    boss_defeated flags, save room/x/y/face.
+- `levelData`:
+  - persist data filtered to non-enemy entries.
+
+
+16. DISCREPANCIES / RISKS / HIDDEN BEHAVIORS
+1) Level-up auto-growth mismatch (major):
+- `LevelUp_Auto` chooses class stat but `LevelUp_AddStat` ignores `_stat_id`.
+- Actual result: no automatic class stat gain, only +1 manual stat point each level.
+
+2) Stat cap mismatch:
+- `STAT_MAX`/`StatClamp` exist but manual stat allocation path does not clamp stats.
+- Potentially unbounded stats from accumulated points.
+
+3) DEF/INT retroactive resource scaling:
+- HP/MP formulas use current DEF/INT mods multiplied by `(level-1)`.
+- Spending DEF/INT points at high level can spike max HP/MP immediately.
+
+4) Difficulty enemy stat double-scaling:
+- Enemy stats multiplied in `EnemyCreate` and again in `Combat_EffectiveStat`.
+
+5) Status tick pressure with multi-action enemies:
+- Enemy statuses tick once per `Battle_EnemyAct` invocation, including chained actions.
+- This changes duration/value relative to single-action turns.
+
+6) Poison/Burn overlap:
+- Poison and Burn can coexist (Bleed excludes both, but Poison and Burn do not exclude each other).
+- Combined DOT + DEF debuff stacking can increase pressure.
+
+7) Free-action buff spam risk:
+- Blessing is free_action and not once-per-turn constrained; can chain if repeatedly selected.
+
+8) Passive Fury visibility:
+- Final boss Fury is passive action-budget logic (not an active cast); no explicit banner/log for trigger.
+
+9) Skillbook chest + Nobody trap:
+- Skillbook chest loot is class-based.
+- Nobody class has no skillbook list; opening chest as Nobody can return empty and consume chest state.
+
+10) Room transition anomalies:
+- `rm_floor1` has an active room-transition instance (`inst_5DFCA07F`) with `transition_id = "floor9_5_to_ending"`.
+- This creates an unexpected shortcut to ending cutscene from floor1.
+- Additional orphan instance creation files exist (not referenced by room instance list), indicating stale room artifacts.
+
+11) Unused/legacy content markers:
+- `SKILL_POWER_STRIKE` macro exists with no skill DB entry.
+- Legacy dialogue entries remain and one string has mojibake text (`Stay alertâ€”...`).
+
+12) Confirm key hard-forced:
+- Input system supports bindings, but confirm is forced to Space in `Input_Init`.
+
+13) Equipment and resources:
+- Equipment stat bonuses affect combat stats via `Stat_Get`, but not max HP/MP recompute path.
+
+14) Save/load enemy persist behavior:
+- Enemy persist entries are stripped from snapshot level data by design.
+- Normal enemies effectively repopulate after load/reset logic, bosses remain defeated via dedicated boss flags.
+
+15) Hidden debug commands:
+- F5/F9 quick save/load are still active in debug script though not listed in overlay command list.
+
+
+17. UNKNOWNS / NEEDS CONFIRMATION
+- Unknown / needs confirmation:
+  - Is floor1 transition `floor9_5_to_ending` intentional (debug shortcut) or accidental?
+  - Is no auto class-stat growth on level-up an intentional design pivot or a regression?
+  - Intended max level: unlimited vs implied 60 vs planned 99?
+  - Should manual stat allocation be capped (STAT_MAX) or intentionally uncapped?
+  - Should equipment bonuses affect max HP/MP formulas?
+  - Should Blessing be limited to once per turn to avoid free-action spam loops?
+  - Should Nobody be blocked from opening class-based skillbook chests, or should chest defer reward until class selected?
+  - Should confirm key remain hard Space-only or be fully remappable through input bindings?
+  - Should orphan room instance creation code files be removed for hygiene?
+
+Inferred:
+- Campaign pacing appears tuned around low single-digit enemy levels (roughly 1-10 style arc), despite broader level-growth code paths.
+
+
+18. SCRIPT-BY-SCRIPT EVIDENCE MAP
+Core state/bootstrap/display:
+- `scripts/scr_player/scr_player.gml` (`GameState_Init`, `GameSettings_*`, `CharacterCreate_Player`, difficulty profile, sprite apply).
+- `objects/obj_game_controller/Create_0.gml`, `objects/obj_game_controller/Step_0.gml`.
+- `objects/obj_sfx_manager/Create_0.gml`, `objects/obj_sfx_manager/Step_0.gml`.
+
+Combat formulas/flow:
+- `scripts/scr_combat/scr_combat.gml`.
+- `objects/obj_battle_controller/Create_0.gml`, `Step_0.gml`, `Draw_64.gml`.
+- `scripts/scr_enemy/scr_enemy.gml` (EnemyCreate).
+
+Statuses:
+- `scripts/scr_status/scr_status.gml`.
+
+Leveling/progression:
+- `scripts/scr_levelup/scr_levelup.gml`.
+- `scripts/scr_math/scr_math.gml`.
+- `scripts/scr_stats/scr_stats.gml`.
+- `scripts/scr_menu/scr_menu.gml` (stat allocation UI apply/discard).
+
+Class system and class select:
+- `scripts/scr_db_player_class/scr_db_player_class.gml`.
+- `scripts/scr_menu/scr_menu.gml` (`ClassSelect_*`).
+- `scripts/scr_interact/scr_interact.gml` (class chest trigger).
+
+Skills/items/equip/inventory:
+- `scripts/scr_db_skill/scr_db_skill.gml`.
+- `scripts/scr_db_item/scr_db_item.gml`.
+- `scripts/scr_inventory/scr_inventory.gml`.
+- `scripts/scr_equip/scr_equip.gml`.
+- `scripts/scr_loot/scr_loot.gml`.
+- `scripts/scr_player/scr_player.gml` (`Player_DefaultSkills`, `Player_LearnSkill`).
+
+Enemy roster/AI:
+- `scripts/scr_db_enemy/scr_db_enemy.gml`.
+- `scripts/scr_enemy/scr_enemy.gml`.
+- enemy object Create events (`objects/obj_*enemy*/Create_0.gml`) for `enemy_id` binding.
+
+Transitions/room flow/persistence:
+- `scripts/scr_room_transition/scr_room_transition.gml`.
+- `scripts/scr_room_state/scr_room_state.gml`.
+- `scripts/scr_room_db/scr_room_db.gml`.
+- `objects/obj_enemy/Collision_obj_player.gml`.
+- `objects/obj_room_transition/Collision_obj_player.gml`.
+
+Save/load:
+- `scripts/scr_save/scr_save.gml`.
+- `scripts/scr_save_menu/scr_save_menu.gml`.
+- `objects/obj_start_controller/Step_0.gml` (main-menu load and cutscene branch).
+- `objects/obj_game_controller/Step_0.gml` (load spawn application).
+
+Cutscene and dialogue:
+- `objects/obj_start_controller/Create_0.gml`, `Step_0.gml`, `Draw_64.gml`.
+- `scripts/scr_dialogue/scr_dialogue.gml`.
+- `objects/obj_ui_controller/Step_0.gml`, `Draw_64.gml`.
+
+Interaction-driven systems:
+- `scripts/scr_interact/scr_interact.gml`.
+- `objects/obj_interactable/Create_0.gml`, `Step_0.gml`.
+- `objects/obj_chest/Create_0.gml`, `obj_chest_skillbook/Create_0.gml`, `obj_chest_class_select/Create_0.gml`.
+- `objects/obj_bed/Create_0.gml`.
+- `objects/obj_dialogue_trigger/Create_0.gml`, `Collision_obj_player.gml`, `Step_0.gml`.
+- `objects/obj_grave/Create_0.gml`, `objects/obj_ghost_easter_egg_temp/Create_0.gml`, `Step_0.gml`.
+
+Input/debug:
+- `scripts/scr_input/scr_input.gml`.
+- `scripts/scr_debug/scr_debug.gml`.
+- `objects/obj_sfx_manager/Draw_64.gml` (debug overlay rendering).
+
+Room content evidence:
+- `rooms/*/*.yy` for object placement.
+- `rooms/*/InstanceCreationCode_*.gml` for transition IDs, spawn IDs, dialogue trigger IDs, and per-instance overrides.

@@ -1,21 +1,125 @@
+function Enemy_ZoneLevelForRoom(_room) {
+    switch (_room) {
+        case rm_floor1: return 1;
+        case rm_floor2: return 2;
+        case rm_floor3: return 3;
+        case rm_floor4: return 4;
+        case rm_floor5: return 5;
+        case rm_floor6: return 6;
+        case rm_floor6_5: return 6;
+        case rm_floor7: return 7;
+        case rm_floor8: return 8;
+        case rm_floor9: return 9;
+        case rm_floor9_5: return 10;
+    }
+    return 1;
+}
+
+function Enemy_ResolveLevel(_cfg, _room) {
+    if (!is_struct(_cfg)) return 1;
+
+    var min_lvl = variable_struct_exists(_cfg, "species_min_level") ? max(1, round(_cfg.species_min_level)) : max(1, round(_cfg.level));
+    var max_lvl = variable_struct_exists(_cfg, "species_max_level") ? max(min_lvl, round(_cfg.species_max_level)) : max(min_lvl, round(_cfg.level));
+    max_lvl = min(max_lvl, LEVEL_CAP_TECHNICAL);
+
+    if (variable_struct_exists(_cfg, "is_boss") && _cfg.is_boss) {
+        return clamp(round(_cfg.level), min_lvl, max_lvl);
+    }
+
+    var zone_level = Enemy_ZoneLevelForRoom(_room);
+    var offset = variable_struct_exists(_cfg, "species_level_offset") ? round(_cfg.species_level_offset) : 0;
+    var roll = irandom_range(-1, 1);
+    var lvl = zone_level + roll + offset;
+    return clamp(lvl, min_lvl, max_lvl);
+}
+
+function Enemy_CanAutoResolve(_cfg, _player_level, _enemy_level) {
+    if (!is_struct(_cfg)) return false;
+    if (variable_struct_exists(_cfg, "is_boss") && _cfg.is_boss) return false;
+    if (!variable_struct_exists(_cfg, "can_auto_resolve") || !_cfg.can_auto_resolve) return false;
+    if (variable_struct_exists(_cfg, "threat_rank") && _cfg.threat_rank > 1) return false;
+    return (_player_level >= _enemy_level + ENEMY_AUTO_RESOLVE_LEVEL_DELTA);
+}
+
+function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
+    if (!instance_exists(_enemy_inst) || !instance_exists(_player_inst)) return false;
+    if (!variable_instance_exists(_enemy_inst, "enemy_id")) return false;
+
+    var cfg = EnemyDB_Get(_enemy_inst.enemy_id);
+    var enemy_level = (variable_instance_exists(_enemy_inst, "enemy_level") ? _enemy_inst.enemy_level : cfg.level);
+    var gs = GameState_Get();
+    if (!is_struct(gs.player_ch)) return false;
+    var p = gs.player_ch;
+
+    if (!Enemy_CanAutoResolve(cfg, p.level, enemy_level)) return false;
+    if (!RoomState_EnsurePersistId(_enemy_inst)) return false;
+
+    var exp_mult = variable_struct_exists(cfg, "auto_resolve_exp_mult") ? max(0, real(cfg.auto_resolve_exp_mult)) : ENEMY_AUTO_RESOLVE_EXP_MULT_DEFAULT;
+    var loot_mult = variable_struct_exists(cfg, "auto_resolve_loot_mult") ? clamp(real(cfg.auto_resolve_loot_mult), 0, 1) : ENEMY_AUTO_RESOLVE_LOOT_MULT_DEFAULT;
+    var diff = Difficulty_Profile();
+
+    var level_exp_mult = 1;
+    if (variable_struct_exists(cfg, "level")) {
+        level_exp_mult = clamp(1 + ((enemy_level - round(cfg.level)) * 0.10), 0.70, 1.40);
+    }
+    var exp_gain = max(1, round(real(cfg.exp) * level_exp_mult * exp_mult));
+    if (is_struct(diff) && variable_struct_exists(diff, "player_exp_mult")) {
+        exp_gain = max(1, round(exp_gain * max(0, real(diff.player_exp_mult))));
+    }
+    p = Player_AddExp(p, exp_gain);
+
+    var loot = Loot_RollEnemy({ id: cfg.id, level: enemy_level, loot_key: cfg.loot_key });
+    if (loot_mult < 1 && is_array(loot)) {
+        var kept = [];
+        for (var i = 0; i < array_length(loot); i++) {
+            if (random(1) <= loot_mult) array_push(kept, loot[i]);
+        }
+        loot = kept;
+    }
+    p.inventory = Loot_Grant(p.inventory, loot);
+    GameState_SetPlayer(p);
+
+    RoomState_SetRemoved(room, _enemy_inst.persist_id, obj_enemy, _enemy_inst.enemy_id);
+    instance_destroy(_enemy_inst);
+
+    var msg = "You overpower " + string(cfg.name) + " (+"
+        + string(exp_gain) + " EXP).";
+    if (variable_struct_exists(p, "last_levels_gained") && p.last_levels_gained > 0) {
+        msg += " Level up x" + string(p.last_levels_gained) + ".";
+    }
+    if (is_array(loot) && array_length(loot) > 0) {
+        msg += " Loot gained.";
+    }
+    Dialogue_StartLines([msg]);
+    return true;
+}
+
 function EnemyCreate(_enemy_id) {
     var base = EnemyDB_Get(_enemy_id);
     var diff = Difficulty_Profile();
+    var gs = GameState_Get();
 
     // build battle character struct
     var ch = {};
     ch.id = base.id;
     ch.name = base.name;
-    ch.level = base.level;
+    var resolved_level = base.level;
+    if (is_struct(gs) && variable_struct_exists(gs, "battle") && is_struct(gs.battle)
+    && variable_struct_exists(gs.battle, "enemy_level") && gs.battle.enemy_level > 0) {
+        resolved_level = gs.battle.enemy_level;
+    }
+    var min_lvl = variable_struct_exists(base, "species_min_level") ? max(1, round(base.species_min_level)) : max(1, round(base.level));
+    var max_lvl = variable_struct_exists(base, "species_max_level") ? max(min_lvl, round(base.species_max_level)) : max(min_lvl, round(base.level));
+    ch.level = clamp(round(resolved_level), min_lvl, max_lvl);
     ch.is_player = false;
 
     // copy stats (keep same keys you use everywhere)
     ch.stats = {
-        str:  max(1, round(base.stats.str * diff.enemy_stat_mult)),
-        agi:  max(1, round(base.stats.agi * diff.enemy_stat_mult)),
-        def:  max(1, round(base.stats.def * diff.enemy_stat_mult)),
-        intt: max(1, round(base.stats.intt * diff.enemy_stat_mult)),
-        luck: max(1, round(base.stats.luck * diff.enemy_stat_mult))
+        str:  max(1, round(base.stats.str)),
+        agi:  max(1, round(base.stats.agi)),
+        def:  max(1, round(base.stats.def)),
+        intt: max(1, round(base.stats.intt)),
+        luck: max(1, round(base.stats.luck))
     };
 
     ch.base_hp = base.base_hp;
@@ -41,7 +145,8 @@ function EnemyCreate(_enemy_id) {
     // weapon & sprite (important!)
     ch.weapon_id = base.weapon_id;
     ch.sprite = base.sprite;
-    ch.exp = base.exp;
+    var exp_mult = clamp(1 + ((ch.level - base.level) * 0.10), 0.70, 1.40);
+    ch.exp = max(1, round(base.exp * exp_mult));
     ch.skills = base.skills;
     ch.status = [];
     ch.is_boss = base.is_boss;
@@ -54,6 +159,9 @@ function Enemy_ApplyConfig(_inst) {
 
     var cfg = EnemyDB_Get(_inst.enemy_id);
     _inst.enemy_cfg = cfg;
+    if (!variable_instance_exists(_inst, "enemy_level") || _inst.enemy_level <= 0) {
+        _inst.enemy_level = Enemy_ResolveLevel(cfg, room);
+    }
 
     if (is_struct(cfg) && variable_struct_exists(cfg, "ai")) {
         var ai = cfg.ai;

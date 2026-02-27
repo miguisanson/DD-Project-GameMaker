@@ -3,11 +3,7 @@ function Combat_Initiative(_ch) {
 }
 
 function Combat_EffectiveStat(_ch, _stat_id) {
-    var base = Stat_Get(_ch, _stat_id);
-    var diff = Difficulty_Profile();
-    var mult = diff.enemy_stat_mult;
-    if (variable_struct_exists(_ch, "is_player") && _ch.is_player) mult = diff.player_stat_mult;
-    return max(1, round(base * mult));
+    return max(1, round(Stat_Get(_ch, _stat_id)));
 }
 
 function Combat_EffectiveDamageMult(_attacker) {
@@ -192,6 +188,14 @@ function Battle_Message(_bc, _text, _next_state, _fx = noone) {
 }
 
 function Battle_GrantRewards(_p, _e) {
+    var out = {
+        player: _p,
+        exp_gain: 0,
+        levels_gained: 0,
+        stat_points_gained: 0,
+        loot: []
+    };
+
     if (is_struct(_e)) {
         if (variable_struct_exists(_e, "exp")) {
             var exp_gain = max(0, round(real(_e.exp)));
@@ -203,15 +207,20 @@ function Battle_GrantRewards(_p, _e) {
                 }
                 exp_gain = max(1, round(exp_gain * exp_mult));
                 _p = Player_AddExp(_p, exp_gain);
+                out.exp_gain = exp_gain;
+                if (variable_struct_exists(_p, "last_levels_gained")) out.levels_gained = _p.last_levels_gained;
+                if (variable_struct_exists(_p, "last_stat_points_gained")) out.stat_points_gained = _p.last_stat_points_gained;
             }
         }
 
         // shared loot system
         var loot = Loot_RollEnemy(_e);
         _p.inventory = Loot_Grant(_p.inventory, loot);
+        out.loot = loot;
     }
 
-    return _p;
+    out.player = _p;
+    return out;
 }
 
 function Player_OnDeath(_p) {
@@ -229,10 +238,17 @@ function Player_OnDeath(_p) {
 function Battle_CheckEnd(_bc, _p, _e) {
     if (_e.hp <= 0) {
         _bc.battle_over = true;
-        _p = Battle_GrantRewards(_p, _e);
+        var rewards = Battle_GrantRewards(_p, _e);
+        _p = rewards.player;
         GameState_SetPlayer(_p);
         EnemyPersist_ResolveBattle(true);
 
+        if (rewards.exp_gain > 0) Combat_Log("EXP +" + string(rewards.exp_gain));
+        if (rewards.levels_gained > 0) {
+            Combat_Log("Level up x" + string(rewards.levels_gained)
+                + " (+" + string(rewards.stat_points_gained) + " points)");
+        }
+        if (is_array(rewards.loot) && array_length(rewards.loot) > 0) Combat_Log("Loot found.");
         Battle_Message(_bc, _e.name + " has been slain.", BSTATE_END_RUN);
         return true;
     }
@@ -650,10 +666,14 @@ function Battle_EnemyAct(_bc) {
         }
     }
 
-    e = Status_Tick(e);
-    if (Battle_CheckEnd(_bc, p, e)) return;
-    if (_bc.enemy_actions_remaining > 0) _bc.turn = TURN_ENEMY;
-    else _bc.turn = TURN_PLAYER;
+    var enemy_turn_finished = (_bc.enemy_actions_remaining <= 0);
+    if (enemy_turn_finished) {
+        e = Status_Tick(e);
+        if (Battle_CheckEnd(_bc, p, e)) return;
+        _bc.turn = TURN_PLAYER;
+    } else {
+        _bc.turn = TURN_ENEMY;
+    }
     _bc.p = p;
     _bc.e = e;
 }

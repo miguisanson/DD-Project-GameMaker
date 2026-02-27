@@ -11,7 +11,7 @@ function DB_PlayerClass(_class_id) {
                      sprites:{ right:archer_right, left:archer_left, up:archer_up, down:archer_down } };
 
         case CLASS_MAGE:
-            return { name:"Mage", hd:6, mp_gain:3, base_hp:10, base_mp:10,
+            return { name:"Mage", hd:6, mp_gain:2, base_hp:10, base_mp:10,
                      bonus:{ str:0, agi:0, def:0, intt:2, luck:1 },
                      sprites:{ right:mage_right, left:mage_left, up:mage_up, down:mage_down } };
 

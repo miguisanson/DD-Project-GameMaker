@@ -2,6 +2,11 @@ if (defeated) exit;
 if (Transition_IsActive()) exit;
 if (other.battle_cooldown > 0) exit;
 
+if (Enemy_AutoResolveEncounter(id, other)) {
+    other.battle_cooldown = BATTLE_COOLDOWN_FRAMES;
+    exit;
+}
+
 if (!EnemyPersist_BeginEncounter(id, other)) exit;
 
 if (!Transition_RequestEncounterBattle(rm_battle)) exit;

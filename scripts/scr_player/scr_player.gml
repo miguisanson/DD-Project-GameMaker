@@ -69,29 +69,29 @@ function Difficulty_Profile(_difficulty = -1) {
         case DIFFICULTY_EASY:
             return {
                 id: DIFFICULTY_EASY,
-                player_stat_mult: 1.10,
-                enemy_stat_mult: 0.92,
-                player_hp_mult: 1.20,
-                player_mp_mult: 1.10,
-                enemy_hp_mult: 0.85,
-                enemy_mp_mult: 0.90,
-                player_damage_mult: 1.12,
-                enemy_damage_mult: 0.86,
-                enemy_status_chance_mult: 0.85,
-                player_exp_mult: 1.25
+                player_stat_mult: 1.00,
+                enemy_stat_mult: 1.00,
+                player_hp_mult: 1.15,
+                player_mp_mult: 1.05,
+                enemy_hp_mult: 0.90,
+                enemy_mp_mult: 0.95,
+                player_damage_mult: 1.08,
+                enemy_damage_mult: 0.90,
+                enemy_status_chance_mult: 0.90,
+                player_exp_mult: 1.20
             };
         case DIFFICULTY_HARD:
             return {
                 id: DIFFICULTY_HARD,
-                player_stat_mult: 0.95,
-                enemy_stat_mult: 1.10,
-                player_hp_mult: 0.90,
+                player_stat_mult: 1.00,
+                enemy_stat_mult: 1.00,
+                player_hp_mult: 0.92,
                 player_mp_mult: 0.95,
-                enemy_hp_mult: 1.20,
-                enemy_mp_mult: 1.05,
-                player_damage_mult: 0.92,
-                enemy_damage_mult: 1.18,
-                enemy_status_chance_mult: 1.10,
+                enemy_hp_mult: 1.12,
+                enemy_mp_mult: 1.00,
+                player_damage_mult: 0.94,
+                enemy_damage_mult: 1.12,
+                enemy_status_chance_mult: 1.08,
                 player_exp_mult: 0.85
             };
         default:
@@ -476,10 +476,12 @@ function GameState_Init() {
             return_y: 0,
             enemy_persist_id: "",
             enemy_id: -1,
+            enemy_level: 0,
             enemy_room: noone,
             just_returned: false
         };
     }
+    if (!variable_struct_exists(gs.battle, "enemy_level")) gs.battle.enemy_level = 0;
 
     if (!variable_struct_exists(gs, "player_inst")) {
         gs.player_inst = noone;
@@ -632,6 +634,7 @@ function GameState_SyncLegacy() {
         global.battle_return_y = gs.battle.return_y;
         global.battle_enemy_persist_id = gs.battle.enemy_persist_id;
         global.battle_enemy_id = gs.battle.enemy_id;
+        global.battle_enemy_level = gs.battle.enemy_level;
         global.battle_enemy_room = gs.battle.enemy_room;
         global.just_returned_from_battle = gs.battle.just_returned;
     }
@@ -683,14 +686,16 @@ function GameState_SetBattleReturn(_room, _x, _y, _face, _snap_to_grid = true) {
     global.battle_return_face = gs.battle.return_face;
 }
 
-function GameState_SetBattleEnemy(_persist_id, _enemy_id) {
+function GameState_SetBattleEnemy(_persist_id, _enemy_id, _enemy_level = 0) {
     var gs = GameState_Get();
     gs.battle.enemy_persist_id = _persist_id;
     gs.battle.enemy_id = _enemy_id;
+    gs.battle.enemy_level = max(0, round(_enemy_level));
     gs.battle.enemy_room = room;
 
     global.battle_enemy_persist_id = _persist_id;
     global.battle_enemy_id = _enemy_id;
+    global.battle_enemy_level = gs.battle.enemy_level;
     global.battle_enemy_room = room;
 
     if (Menu_IsOpen()) Menu_Close();

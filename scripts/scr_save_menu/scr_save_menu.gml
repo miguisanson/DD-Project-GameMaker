@@ -26,6 +26,7 @@ function SaveMenu_Open(_mode, _context) {
         closing: false,
         close_frame: UI_OPENED_FRAME_NONE,
         mode: _mode, // "load" or "save"
+        hide_slots: false,
         context: _context, // "main" or "bed"
         slot: 0,
         col: 0,
@@ -81,6 +82,7 @@ function SaveMenu_Handle() {
     if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "save_menu")) return;
     var sm = gs.ui.save_menu;
     if (!sm.open) return;
+    var hide_slots = variable_struct_exists(sm, "hide_slots") && sm.hide_slots;
 
     var frame = Input_Frame();
     if (variable_struct_exists(sm, "closing") && sm.closing) {
@@ -110,6 +112,31 @@ function SaveMenu_Handle() {
                     gs.save_slot = pending_slot;
                     Save_Read(pending_slot);
                 }
+            } else if (pending_action == "show_no_saves_message") {
+                gs.ui.mode = UI_SAVE;
+                gs.ui.save_menu = {
+                    open: true,
+                    closing: false,
+                    close_frame: UI_OPENED_FRAME_NONE,
+                    mode: "load",
+                    hide_slots: true,
+                    context: "main",
+                    slot: 0,
+                    col: 0,
+                    confirm: true,
+                    confirm_choice: 0,
+                    confirm_mode: "message",
+                    message: "No saved games found.",
+                    close_after_message: true,
+                    slot_info_cache: SaveMenu_BuildSlotInfoCache(),
+                    opened_frame: Input_Frame(),
+                    confirm_opened_frame: Input_Frame(),
+                    confirm_closing: false,
+                    confirm_close_frame: UI_OPENED_FRAME_NONE,
+                    pending_action: "",
+                    pending_slot: 0,
+                    require_release: false
+                };
             }
         } else {
             gs.ui.save_menu = sm;
@@ -192,6 +219,11 @@ function SaveMenu_Handle() {
                         sm.slot_info_cache[sm.slot] = Save_SlotInfo(sm.slot + 1);
                     }
                     SFX_Play("delete_confirm");
+                    if (sm.mode == "load" && !Save_HasAnySlot()) {
+                        gs.ui.save_menu = sm;
+                        SaveMenu_Close(false, "show_no_saves_message", 0);
+                        return;
+                    }
                 } else if (sm.confirm_mode == "load") {
                     var load_slot = sm.slot + 1;
                     SaveMenu_Log("load confirmed slot " + string(load_slot));
@@ -215,6 +247,11 @@ function SaveMenu_Handle() {
             sm.confirm_closing = true;
             sm.confirm_close_frame = Input_Frame();
         }
+        gs.ui.save_menu = sm;
+        return;
+    }
+
+    if (hide_slots) {
         gs.ui.save_menu = sm;
         return;
     }
@@ -325,6 +362,7 @@ function SaveMenu_Draw() {
     var side_margin = 12;
     var slot_text_left_pad = 14;
     var popup_alpha = UI_PopupAlpha(sm.opened_frame, sm.closing, sm.close_frame, 1);
+    var hide_slots = variable_struct_exists(sm, "hide_slots") && sm.hide_slots;
 
     var title = (sm.mode == "load") ? "Load Game" : "Save Game";
 
@@ -359,15 +397,17 @@ function SaveMenu_Draw() {
     var bx = (w - bw) * 0.5;
     var by = (h - bh) * 0.5;
 
-    draw_set_alpha(popup_alpha * 0.85);
-    draw_set_color(c_black);
-    draw_rectangle(bx, by, bx + bw, by + bh, false);
-    draw_set_alpha(popup_alpha);
-    draw_set_color(c_white);
-    draw_rectangle(bx, by, bx + bw, by + bh, true);
+    if (!hide_slots) {
+        draw_set_alpha(popup_alpha * 0.85);
+        draw_set_color(c_black);
+        draw_rectangle(bx, by, bx + bw, by + bh, false);
+        draw_set_alpha(popup_alpha);
+        draw_set_color(c_white);
+        draw_rectangle(bx, by, bx + bw, by + bh, true);
 
-    draw_set_color(c_white);
-    draw_text(bx + 12, by + 10, title);
+        draw_set_color(c_white);
+        draw_text(bx + 12, by + 10, title);
+    }
 
     var row_h = max(22, line_h + 8);
     var row_y = by + 36;
@@ -378,56 +418,62 @@ function SaveMenu_Draw() {
     slot_select_right = max(bx + 40, slot_select_right);
     var slot_text_x = bx + slot_text_left_pad;
     var slot_text_max_w = max(24, slot_select_right - slot_text_x - 4);
-    for (var i = 0; i < 3; i++) {
-        var yy = row_y + i * row_h;
-        var label = slot_labels[i];
-        var draw_label = label;
-        if (string_width(draw_label) > slot_text_max_w) {
-            while (string_length(draw_label) > 0 && string_width(draw_label + "...") > slot_text_max_w) {
-                draw_label = string_delete(draw_label, string_length(draw_label), 1);
+    if (!hide_slots) {
+        for (var i = 0; i < 3; i++) {
+            var yy = row_y + i * row_h;
+            var label = slot_labels[i];
+            var draw_label = label;
+            if (string_width(draw_label) > slot_text_max_w) {
+                while (string_length(draw_label) > 0 && string_width(draw_label + "...") > slot_text_max_w) {
+                    draw_label = string_delete(draw_label, string_length(draw_label), 1);
+                }
+                draw_label += "...";
             }
-            draw_label += "...";
-        }
 
-        if (i == sm.slot && sm.col == 0 && !sm.confirm) {
-            draw_set_color(c_white);
-            draw_rectangle(bx + 8 - pad, yy - 4, slot_select_right + pad, yy + line_h + 4, false);
-            draw_set_color(c_black);
-            draw_rectangle(bx + 8 - pad, yy - 4, slot_select_right + pad, yy + line_h + 4, true);
-            draw_set_color(c_black);
-        } else {
-            draw_set_color(c_white);
-        }
-        draw_text(slot_text_x, yy, draw_label);
-
-        if (sm.mode == "load") {
-            if (i == sm.slot && sm.col == 1 && !sm.confirm) {
+            if (i == sm.slot && sm.col == 0 && !sm.confirm) {
                 draw_set_color(c_white);
-                draw_rectangle(delete_left, yy - 4, delete_right, yy + line_h + 4, false);
+                draw_rectangle(bx + 8 - pad, yy - 4, slot_select_right + pad, yy + line_h + 4, false);
                 draw_set_color(c_black);
-                draw_rectangle(delete_left, yy - 4, delete_right, yy + line_h + 4, true);
+                draw_rectangle(bx + 8 - pad, yy - 4, slot_select_right + pad, yy + line_h + 4, true);
                 draw_set_color(c_black);
             } else {
                 draw_set_color(c_white);
             }
-            draw_text(delete_text_x, yy, delete_label);
+            draw_text(slot_text_x, yy, draw_label);
+
+            if (sm.mode == "load") {
+                if (i == sm.slot && sm.col == 1 && !sm.confirm) {
+                    draw_set_color(c_white);
+                    draw_rectangle(delete_left, yy - 4, delete_right, yy + line_h + 4, false);
+                    draw_set_color(c_black);
+                    draw_rectangle(delete_left, yy - 4, delete_right, yy + line_h + 4, true);
+                    draw_set_color(c_black);
+                } else {
+                    draw_set_color(c_white);
+                }
+                draw_text(delete_text_x, yy, delete_label);
+            }
         }
     }
 
     // Back label
     var back_x = bx + 12;
     var back_y = by + bh - (line_h + 4);
-    if (sm.slot == 3 && !sm.confirm) {
-        var bwid = string_width("Back");
-        draw_set_color(c_white);
-        draw_rectangle(back_x - 4, back_y - 2, back_x + bwid + 4, back_y + line_h + 2, false);
-        draw_set_color(c_black);
-        draw_rectangle(back_x - 4, back_y - 2, back_x + bwid + 4, back_y + line_h + 2, true);
-        draw_set_color(c_black);
+    if (!hide_slots) {
+        if (sm.slot == 3 && !sm.confirm) {
+            var bwid = string_width("Back");
+            draw_set_color(c_white);
+            draw_rectangle(back_x - 4, back_y - 2, back_x + bwid + 4, back_y + line_h + 2, false);
+            draw_set_color(c_black);
+            draw_rectangle(back_x - 4, back_y - 2, back_x + bwid + 4, back_y + line_h + 2, true);
+            draw_set_color(c_black);
+        } else {
+            draw_set_color(c_white);
+        }
+        draw_text(back_x, back_y, "Back");
     } else {
         draw_set_color(c_white);
     }
-    draw_text(back_x, back_y, "Back");
 
     if (sm.confirm) {
         var confirm_fade_frame = sm.opened_frame;

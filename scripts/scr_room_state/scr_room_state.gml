@@ -179,7 +179,7 @@ function RoomState_Save(_room) {
 
     // Enemy positions are the single source of truth for overworld battle return.
     with (obj_enemy) {
-        RoomState_SaveInstance(id, ["x", "y", "enemy_id", "enemy_uid"], false);
+        RoomState_SaveInstance(id, ["x", "y", "enemy_id", "enemy_uid", "enemy_level"], false);
     }
 }
 
@@ -196,7 +196,8 @@ function EnemyPersist_BeginEncounter(_enemy_inst, _player_inst) {
 
     RoomState_OnRoomExit();
     GameState_SetBattleReturn(room, _player_inst.x, _player_inst.y, -1);
-    GameState_SetBattleEnemy(_enemy_inst.persist_id, _enemy_inst.enemy_id);
+    var lvl = variable_instance_exists(_enemy_inst, "enemy_level") ? _enemy_inst.enemy_level : 0;
+    GameState_SetBattleEnemy(_enemy_inst.persist_id, _enemy_inst.enemy_id, lvl);
     return true;
 }
 

@@ -258,6 +258,7 @@ function Menu_StatsSync() {
     var ch = gs.player_ch;
     Menu_Ensure();
     if (!variable_struct_exists(ch, "stat_points")) ch.stat_points = 0;
+    ch.stats = StatsClampAll(ch.stats);
     gs.ui.menu.base_stats = Menu_StatsCopy(ch.stats);
     gs.ui.menu.pending_stats = Menu_StatsCopy(ch.stats);
     gs.ui.menu.pending_points = ch.stat_points;
@@ -281,7 +282,7 @@ function Menu_StatsApply() {
     if (!is_struct(gs.player_ch)) return;
     var ch = gs.player_ch;
     if (!is_struct(m.pending_stats)) return;
-    ch.stats = Menu_StatsCopy(m.pending_stats);
+    ch.stats = StatsClampAll(Menu_StatsCopy(m.pending_stats));
     ch.stat_points = m.pending_points;
     ch = RecomputeResources(ch);
     GameState_SetPlayer(ch);
@@ -559,8 +560,10 @@ function Menu_HandleInput() {
                 var cur_v = variable_struct_get(m.pending_stats, key);
 
                 if (m.stats_col == 1 && m.pending_points > 0) {
-                    variable_struct_set(m.pending_stats, key, cur_v + 1);
-                    m.pending_points -= 1;
+                    if (cur_v < STAT_MAX) {
+                        variable_struct_set(m.pending_stats, key, cur_v + 1);
+                        m.pending_points -= 1;
+                    }
                 }
                 if (m.stats_col == 0 && cur_v > base_v) {
                     variable_struct_set(m.pending_stats, key, cur_v - 1);
@@ -740,13 +743,15 @@ function Menu_Draw() {
         var hp_bar_h = sprite_get_height(hp_bar_sprite) * bar_scale;
         var mp_bar_h = sprite_get_height(mp_bar_sprite) * bar_scale;
 
-        var exp_label_1 = "Required EXP";
+        var exp_label_1 = (ch.level >= LEVEL_EFFECTIVE_CAMPAIGN_CAP) ? "Post-Campaign EXP" : "Required EXP";
         var exp_value = string(ch.exp) + "/" + string(ch.exp_next);
+        var cap_label = "Campaign Target Lv " + string(LEVEL_EFFECTIVE_CAMPAIGN_CAP);
         var line_h = string_height("A") + 2;
 
         var left_content_w = max(
             bar_w,
             string_width("Level: " + string(ch.level)),
+            string_width(cap_label),
             string_width(exp_label_1),
             string_width(exp_value),
             string_width("Available Points: " + string(m.pending_points))
@@ -768,6 +773,8 @@ function Menu_Draw() {
         draw_set_color(c_white);
         var text_y = y0 + hp_bar_h + mp_bar_h + pad * 2;
         draw_text(left_x, text_y, "Level: " + string(ch.level));
+        text_y += line_h;
+        draw_text(left_x, text_y, cap_label);
         text_y += line_h;
         draw_text(left_x, text_y, exp_label_1);
         text_y += line_h;

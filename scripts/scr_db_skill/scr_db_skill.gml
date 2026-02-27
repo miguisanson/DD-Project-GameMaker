@@ -312,7 +312,7 @@ function SkillDB_Init() {
         effect: "damage",
         status: STATUS_POISON,
         status_turns: 2,
-        status_chance: 1,
+        status_chance: 0.70,
         icon_sprite: noone,
         fx_sprite: noone,
         fx_frames: 12,
@@ -334,7 +334,7 @@ function SkillDB_Init() {
         target: TGT_SELF,
         effect: "status",
         status: STATUS_SOLIDIFY,
-        status_turns: 2,
+        status_turns: 1,
         status_chance: 1,
         icon_sprite: noone,
         fx_sprite: noone,
@@ -342,6 +342,7 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 0,
         class_list: [],
+        enemy_require_status_missing: STATUS_SOLIDIFY,
         enemy_use_chance_min: 0.10,
         enemy_use_chance_max: 0.25
     };
@@ -358,7 +359,7 @@ function SkillDB_Init() {
         effect: "damage",
         status: STATUS_BLEED,
         status_turns: 2,
-        status_chance: 1,
+        status_chance: 0.75,
         icon_sprite: noone,
         fx_sprite: noone,
         fx_frames: 12,
@@ -380,7 +381,7 @@ function SkillDB_Init() {
         target: TGT_SELF,
         effect: "status",
         status: STATUS_BLOODTHIRSTY,
-        status_turns: 3,
+        status_turns: 2,
         status_chance: 1,
         icon_sprite: noone,
         fx_sprite: noone,
@@ -388,6 +389,7 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 0,
         class_list: [],
+        enemy_require_status_missing: STATUS_BLOODTHIRSTY,
         enemy_use_chance_min: 0.20,
         enemy_use_chance_max: 0.30
     };
@@ -404,7 +406,7 @@ function SkillDB_Init() {
         effect: "damage",
         status: STATUS_STUN,
         status_turns: 1,
-        status_chance: 1,
+        status_chance: 0.65,
         icon_sprite: noone,
         fx_sprite: noone,
         fx_frames: 12,
@@ -427,7 +429,7 @@ function SkillDB_Init() {
         effect: "damage",
         status: STATUS_BURN,
         status_turns: 2,
-        status_chance: 1,
+        status_chance: 0.70,
         icon_sprite: noone,
         fx_sprite: noone,
         fx_frames: 12,
@@ -450,7 +452,7 @@ function SkillDB_Init() {
         effect: "damage",
         status: STATUS_BLEED,
         status_turns: 2,
-        status_chance: 1,
+        status_chance: 0.80,
         icon_sprite: noone,
         fx_sprite: noone,
         fx_frames: 12,
@@ -497,7 +499,7 @@ function SkillDB_Init() {
         effect: "damage",
         status: -1,
         status_turns: 0,
-        status_chance: 1,
+        status_chance: 0.60,
         status_list: [STATUS_STUN, STATUS_BLEED],
         status_turns_list: [1, 2],
         icon_sprite: noone,
@@ -534,8 +536,9 @@ function SkillDB_Init() {
         set_enemy_actions: 2,
         enemy_require_actions_below: 2,
         enemy_once_per_turn: true,
-        enemy_use_chance_min: 0.20,
-        enemy_use_chance_max: 0.30
+        enemy_hp_below_ratio: 0.80,
+        enemy_use_chance_min: 0.18,
+        enemy_use_chance_max: 0.24
     };
 
     global.skill_db[? SKILL_CURSE] = {
@@ -549,16 +552,18 @@ function SkillDB_Init() {
         target: TGT_ENEMY,
         effect: "multi_status",
         status: -1,
-        status_turns: 2,
-        status_chance: 1,
+        status_turns: 1,
+        status_chance: 0.50,
         status_list: [STATUS_BURN, STATUS_POISON, STATUS_STUN, STATUS_BLEED],
-        status_turns_list: [2, 2, 1, 2],
+        status_turns_list: [1, 1, 1, 1],
         icon_sprite: noone,
         fx_sprite: noone,
         fx_frames: 12,
         fx_speed: 0.2,
         hits: 0,
         class_list: [],
+        enemy_hp_below_ratio: 0.70,
+        enemy_once_per_turn: true,
         enemy_use_chance_min: 0.30,
         enemy_use_chance_max: 0.30
     };
@@ -583,8 +588,10 @@ function SkillDB_Init() {
         hits: 0,
         class_list: [],
         free_action: true,
-        enemy_use_chance_min: 0.30,
-        enemy_use_chance_max: 0.30,
+        enemy_require_status_missing: STATUS_BLESSING,
+        enemy_once_per_turn: true,
+        enemy_use_chance_min: 0.25,
+        enemy_use_chance_max: 0.25,
         enemy_hp_below_ratio: 0.8
     };
 
@@ -610,7 +617,7 @@ function SkillDB_Init() {
         free_action: true,
         set_enemy_actions: 2,
         enemy_passive_action_budget: true,
-        enemy_hp_below_ratio: 0.5
+        enemy_hp_below_ratio: 0.45
     };
 
     if (variable_global_exists("state") && is_struct(global.state)) {

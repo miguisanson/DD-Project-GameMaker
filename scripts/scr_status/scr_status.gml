@@ -71,10 +71,10 @@ function StatusDB_Init() {
         name: "Poison",
         icon_sprite: poison_status,
         icon_subimg: 0,
-        stat_mods: { str:0, agi:0, def:-1, intt:0, luck:0 },
-        tick: { hp_min:-4, hp_max:-2, mp_min:0, mp_max:0 },
+        stat_mods: { str:0, agi:0, def:0, intt:-1, luck:0 },
+        tick: { hp_min:-3, hp_max:-2, mp_min:0, mp_max:0 },
         stackable: false,
-        excludes: [STATUS_BLEED]
+        excludes: [STATUS_BLEED, STATUS_BURN]
     };
 
     global.status_db[? STATUS_BLEED] = {
@@ -82,7 +82,7 @@ function StatusDB_Init() {
         name: "Bleeding",
         icon_sprite: bleed_status,
         icon_subimg: 0,
-        stat_mods: { str:0, agi:-1, def:0, intt:0, luck:0 },
+        stat_mods: { str:0, agi:-2, def:0, intt:0, luck:0 },
         tick: { hp_min:-4, hp_max:-2, mp_min:0, mp_max:0 },
         stackable: false,
         excludes: [STATUS_POISON, STATUS_BURN]
@@ -93,10 +93,10 @@ function StatusDB_Init() {
         name: "Burning",
         icon_sprite: burn_status,
         icon_subimg: 0,
-        stat_mods: { str:0, agi:0, def:-1, intt:0, luck:0 },
-        tick: { hp_min:-5, hp_max:-3, mp_min:0, mp_max:0 },
+        stat_mods: { str:-1, agi:0, def:0, intt:0, luck:0 },
+        tick: { hp_min:-6, hp_max:-4, mp_min:0, mp_max:0 },
         stackable: false,
-        excludes: [STATUS_BLEED]
+        excludes: [STATUS_BLEED, STATUS_POISON]
     };
 
     global.status_db[? STATUS_STUN] = {
@@ -191,8 +191,8 @@ function StatusDB_Init() {
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
-        guard_mult: 0.5,
-        dmg_mult: 1.08,
+        guard_mult: 0.65,
+        dmg_mult: 1.06,
         consume_on_hit: true
     };
 
@@ -203,7 +203,8 @@ function StatusDB_Init() {
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
-        guard_mult: 0.7
+        guard_mult: 0.8,
+        consume_on_hit: true
     };
 
     Status_AssignCoreIcons();
