@@ -47,3 +47,4 @@ moving = false;
 move_dir = -1;
 move_timer = 0;
 tile_size = GRID_TILE_SIZE;
+auto_resolve_recover_timer = 0;

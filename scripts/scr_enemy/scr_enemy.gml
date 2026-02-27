@@ -41,6 +41,49 @@ function Enemy_CanAutoResolve(_cfg, _player_level, _enemy_level) {
     return (_player_level >= _enemy_level + ENEMY_AUTO_RESOLVE_LEVEL_DELTA);
 }
 
+function Enemy_AutoResolveBuildMessage(_cfg, _result) {
+    var msg = "You overpower " + string(_cfg.name) + ".";
+    if (!is_struct(_result)) return msg;
+
+    var parts = [];
+    if (variable_struct_exists(_result, "exp_gain") && _result.exp_gain > 0) {
+        array_push(parts, "(+" + string(_result.exp_gain) + " EXP)");
+    }
+
+    var levels = (variable_struct_exists(_result, "levels_gained")) ? max(0, round(real(_result.levels_gained))) : 0;
+    var stat_points = (variable_struct_exists(_result, "stat_points_gained")) ? max(0, round(real(_result.stat_points_gained))) : 0;
+    var auto_summary = (variable_struct_exists(_result, "auto_stat_summary")) ? string(_result.auto_stat_summary) : "";
+    if (levels > 0) {
+        var lvl_msg = "Level up x" + string(levels) + "!";
+        if (stat_points > 0 || auto_summary != "") {
+            lvl_msg += " (";
+            var sub = [];
+            if (stat_points > 0) array_push(sub, "+" + string(stat_points) + " stat point" + ((stat_points == 1) ? "" : "s"));
+            if (auto_summary != "") array_push(sub, "auto " + auto_summary);
+            for (var si = 0; si < array_length(sub); si++) {
+                if (si > 0) lvl_msg += ", ";
+                lvl_msg += sub[si];
+            }
+            lvl_msg += ")";
+        }
+        array_push(parts, lvl_msg);
+    } else if (variable_struct_exists(_result, "at_level_cap") && _result.at_level_cap) {
+        array_push(parts, "Max level reached.");
+    }
+
+    if (variable_struct_exists(_result, "loot_gained") && _result.loot_gained) {
+        array_push(parts, "Loot gained.");
+    }
+
+    if (array_length(parts) <= 0) return msg;
+    msg += " ";
+    for (var i = 0; i < array_length(parts); i++) {
+        if (i > 0) msg += " ";
+        msg += parts[i];
+    }
+    return msg;
+}
+
 function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
     if (!instance_exists(_enemy_inst) || !instance_exists(_player_inst)) return false;
     if (!variable_instance_exists(_enemy_inst, "enemy_id")) return false;
@@ -57,6 +100,7 @@ function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
     var exp_mult = variable_struct_exists(cfg, "auto_resolve_exp_mult") ? max(0, real(cfg.auto_resolve_exp_mult)) : ENEMY_AUTO_RESOLVE_EXP_MULT_DEFAULT;
     var loot_mult = variable_struct_exists(cfg, "auto_resolve_loot_mult") ? clamp(real(cfg.auto_resolve_loot_mult), 0, 1) : ENEMY_AUTO_RESOLVE_LOOT_MULT_DEFAULT;
     var diff = Difficulty_Profile();
+    var at_cap_before = Level_IsAtCap(p.level);
 
     var level_exp_mult = 1;
     if (variable_struct_exists(cfg, "level")) {
@@ -69,6 +113,11 @@ function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
             exp_gain = max(1, round(exp_gain * max(0, real(diff.player_exp_mult))));
         }
         p = Player_AddExp(p, exp_gain);
+    } else {
+        // Keep reward flags truthful when already capped.
+        p.last_levels_gained = 0;
+        p.last_stat_points_gained = 0;
+        p.last_auto_stat_gained = 0;
     }
 
     var loot = Loot_RollEnemy({ id: cfg.id, level: enemy_level, loot_key: cfg.loot_key });
@@ -81,27 +130,20 @@ function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
     }
     p.inventory = Loot_Grant(p.inventory, loot);
     GameState_SetPlayer(p);
+    Player_StartAutoResolveRecover(_player_inst, ENEMY_AUTO_RESOLVE_RECOVER_FRAMES);
 
     RoomState_SetRemoved(room, _enemy_inst.persist_id, obj_enemy, _enemy_inst.enemy_id);
     instance_destroy(_enemy_inst);
 
-    var msg = "You overpower " + string(cfg.name) + ".";
-    if (exp_gain > 0) msg = "You overpower " + string(cfg.name) + " (+" + string(exp_gain) + " EXP).";
-    if (variable_struct_exists(p, "last_levels_gained") && p.last_levels_gained > 0) {
-        var lvl_msg = " Level up x" + string(p.last_levels_gained);
-        var pts = variable_struct_exists(p, "last_stat_points_gained") ? max(0, round(real(p.last_stat_points_gained))) : 0;
-        lvl_msg += " (+" + string(pts) + " points";
-        var auto_summary = LevelUp_AutoGainSummary(p);
-        var auto_gained = variable_struct_exists(p, "last_auto_stat_gained") ? max(0, round(real(p.last_auto_stat_gained))) : 0;
-        if (auto_gained > 0 && auto_summary != "") {
-            lvl_msg += ", auto " + auto_summary;
-        }
-        lvl_msg += ").";
-        msg += lvl_msg;
-    }
-    if (is_array(loot) && array_length(loot) > 0) {
-        msg += " Loot gained.";
-    }
+    var result = {
+        exp_gain: exp_gain,
+        levels_gained: variable_struct_exists(p, "last_levels_gained") ? max(0, round(real(p.last_levels_gained))) : 0,
+        stat_points_gained: variable_struct_exists(p, "last_stat_points_gained") ? max(0, round(real(p.last_stat_points_gained))) : 0,
+        auto_stat_summary: LevelUp_AutoGainSummary(p),
+        loot_gained: is_array(loot) && array_length(loot) > 0,
+        at_level_cap: at_cap_before || Level_IsAtCap(p.level)
+    };
+    var msg = Enemy_AutoResolveBuildMessage(cfg, result);
     Dialogue_StartLines([msg]);
     return true;
 }

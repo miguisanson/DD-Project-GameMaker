@@ -164,6 +164,26 @@ function Player_CanAcceptMove(_pl) {
     return true;
 }
 
+function Player_StartAutoResolveRecover(_pl, _recover_frames = ENEMY_AUTO_RESOLVE_RECOVER_FRAMES) {
+    if (!instance_exists(_pl)) return;
+
+    var tile = GRID_TILE_SIZE;
+    if (variable_instance_exists(_pl, "tile_size")) tile = max(1, round(real(_pl.tile_size)));
+    var gx = round(_pl.x / tile) * tile;
+    var gy = round(_pl.y / tile) * tile;
+
+    _pl.x = gx;
+    _pl.y = gy;
+
+    if (variable_instance_exists(_pl, "moving")) _pl.moving = false;
+    if (variable_instance_exists(_pl, "move_timer")) _pl.move_timer = 0;
+    if (variable_instance_exists(_pl, "move_dir")) _pl.move_dir = -1;
+    if (variable_instance_exists(_pl, "xspeed")) _pl.xspeed = 0;
+    if (variable_instance_exists(_pl, "yspeed")) _pl.yspeed = 0;
+    if (variable_instance_exists(_pl, "auto_resolve_recover_timer")) _pl.auto_resolve_recover_timer = max(0, round(real(_recover_frames)));
+    if (variable_instance_exists(_pl, "battle_cooldown")) _pl.battle_cooldown = max(_pl.battle_cooldown, BATTLE_COOLDOWN_FRAMES);
+}
+
 
 function UI_IsBlocking() {
     if (Transition_IsInputLocked()) return true;

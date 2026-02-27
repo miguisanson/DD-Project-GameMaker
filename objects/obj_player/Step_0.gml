@@ -15,6 +15,19 @@ if (battle_cooldown > 0) {
     battle_cooldown -= 1;
 }
 
+if (auto_resolve_recover_timer > 0) {
+    auto_resolve_recover_timer -= 1;
+    moving = false;
+    move_timer = 0;
+    move_dir = -1;
+    x = round(x / tile_size) * tile_size;
+    y = round(y / tile_size) * tile_size;
+    sprite_index = sprite[face];
+    image_index = 0;
+    mask_index = sprite[DOWN];
+    exit;
+}
+
 interact_key = Input_Pressed("interact");
 
 if (!moving) {
