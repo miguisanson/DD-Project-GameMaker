@@ -148,6 +148,7 @@ function Player_ApplyClassSprites(_class_id) {
 
 function Player_IsSettled(_pl) {
     if (!instance_exists(_pl)) return false;
+    if (variable_instance_exists(_pl, "auto_resolve_recover_timer") && _pl.auto_resolve_recover_timer > 0) return false;
     var tile = GRID_TILE_SIZE;
     if (variable_instance_exists(_pl, "tile_size")) tile = _pl.tile_size;
     var gx = round(_pl.x / tile) * tile;
@@ -159,29 +160,51 @@ function Player_IsSettled(_pl) {
 
 function Player_CanAcceptMove(_pl) {
     if (!instance_exists(_pl)) return false;
+    if (variable_instance_exists(_pl, "auto_resolve_recover_timer") && _pl.auto_resolve_recover_timer > 0) return false;
     if (variable_instance_exists(_pl, "moving") && _pl.moving) return false;
     if (variable_instance_exists(_pl, "move_timer") && _pl.move_timer > 0) return false;
     return true;
 }
 
-function Player_StartAutoResolveRecover(_pl, _recover_frames = ENEMY_AUTO_RESOLVE_RECOVER_FRAMES) {
+function Player_StartAutoResolveRecover(_pl, _recover_frames = ENEMY_AUTO_RESOLVE_RECOVER_FRAMES, _apply_battle_cooldown = true) {
     if (!instance_exists(_pl)) return;
 
     var tile = GRID_TILE_SIZE;
     if (variable_instance_exists(_pl, "tile_size")) tile = max(1, round(real(_pl.tile_size)));
     var gx = round(_pl.x / tile) * tile;
     var gy = round(_pl.y / tile) * tile;
-
-    _pl.x = gx;
-    _pl.y = gy;
+    var frames = max(0, round(real(_recover_frames)));
 
     if (variable_instance_exists(_pl, "moving")) _pl.moving = false;
     if (variable_instance_exists(_pl, "move_timer")) _pl.move_timer = 0;
     if (variable_instance_exists(_pl, "move_dir")) _pl.move_dir = -1;
     if (variable_instance_exists(_pl, "xspeed")) _pl.xspeed = 0;
     if (variable_instance_exists(_pl, "yspeed")) _pl.yspeed = 0;
-    if (variable_instance_exists(_pl, "auto_resolve_recover_timer")) _pl.auto_resolve_recover_timer = max(0, round(real(_recover_frames)));
-    if (variable_instance_exists(_pl, "battle_cooldown")) _pl.battle_cooldown = max(_pl.battle_cooldown, BATTLE_COOLDOWN_FRAMES);
+
+    var needs_settle = (abs(_pl.x - gx) > 0.01 || abs(_pl.y - gy) > 0.01);
+    if (!needs_settle || frames <= 0) {
+        _pl.x = gx;
+        _pl.y = gy;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_timer")) _pl.auto_resolve_recover_timer = 0;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_total")) _pl.auto_resolve_recover_total = 0;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_progress")) _pl.auto_resolve_recover_progress = 0;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_start_x")) _pl.auto_resolve_recover_start_x = gx;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_start_y")) _pl.auto_resolve_recover_start_y = gy;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_target_x")) _pl.auto_resolve_recover_target_x = gx;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_target_y")) _pl.auto_resolve_recover_target_y = gy;
+    } else {
+        if (variable_instance_exists(_pl, "auto_resolve_recover_start_x")) _pl.auto_resolve_recover_start_x = _pl.x;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_start_y")) _pl.auto_resolve_recover_start_y = _pl.y;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_target_x")) _pl.auto_resolve_recover_target_x = gx;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_target_y")) _pl.auto_resolve_recover_target_y = gy;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_total")) _pl.auto_resolve_recover_total = frames;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_progress")) _pl.auto_resolve_recover_progress = 0;
+        if (variable_instance_exists(_pl, "auto_resolve_recover_timer")) _pl.auto_resolve_recover_timer = frames;
+    }
+
+    if (_apply_battle_cooldown && variable_instance_exists(_pl, "battle_cooldown")) {
+        _pl.battle_cooldown = max(_pl.battle_cooldown, BATTLE_COOLDOWN_FRAMES);
+    }
 }
 
 

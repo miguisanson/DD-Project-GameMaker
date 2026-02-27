@@ -83,6 +83,7 @@ function RoomTransition_Apply() {
     if (variable_instance_exists(pl, "moving")) pl.moving = false;
     if (variable_instance_exists(pl, "move_timer")) pl.move_timer = 0;
     if (variable_instance_exists(pl, "move_dir")) pl.move_dir = -1;
+    Player_StartAutoResolveRecover(pl, PLAYER_POST_TRANSITION_RECOVER_FRAMES, false);
 
     RoomTransition_Clear();
 }
