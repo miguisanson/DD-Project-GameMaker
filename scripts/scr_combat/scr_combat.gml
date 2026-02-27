@@ -366,6 +366,7 @@ function Battle_AttackTimingBegin(_bc) {
     _bc.attack_timing_input_lock = max(0, ATTACK_TIMING_INPUT_LOCK_FRAMES);
     _bc.attack_timing_active = true;
     _bc.attack_timing_started = true;
+    _bc.attack_timing_marker_alpha = 0;
     _bc.battle_state = BSTATE_ATTACK_TIMING;
 }
 
@@ -458,6 +459,7 @@ function Battle_PlayerAttackTimingStep(_bc, _confirm_pressed) {
     _bc.attack_timing_target_x = target.x;
     _bc.attack_timing_target_y = target.y;
     _bc.attack_timing_x = target.x;
+    _bc.attack_timing_marker_alpha = min(1, _bc.attack_timing_marker_alpha + 0.08);
 
     if (_bc.attack_timing_input_lock > 0) _bc.attack_timing_input_lock -= 1;
     _bc.attack_timing_y += ATTACK_TIMING_SPEED;

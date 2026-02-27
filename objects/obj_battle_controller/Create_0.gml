@@ -90,6 +90,7 @@ attack_timing_input_lock = 0;
 attack_timing_result_text = "";
 attack_timing_result_key = "";
 attack_timing_result_timer = 0;
+attack_timing_marker_alpha = 0;
 
 // --------------------
 // MESSAGE SETUP

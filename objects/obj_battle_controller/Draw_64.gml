@@ -132,18 +132,27 @@ if (battle_state == BSTATE_ATTACK_TIMING && attack_timing_active) {
     var ty_t = round(attack_timing_target_y);
     var cx_t = round(attack_timing_x);
     var cy_t = round(attack_timing_y);
+    var marker_alpha = clamp(attack_timing_marker_alpha, 0, 1);
+    var pulse = 0.75 + (0.25 * sin(current_time * 0.02));
+    marker_alpha = clamp(marker_alpha * pulse, 0, 1);
 
-    draw_set_alpha(0.35);
-    draw_set_color(c_white);
-    draw_circle(tx_t, ty_t, ATTACK_WINDOW_BAD, true);
-    draw_set_alpha(0.65);
-    draw_circle(tx_t, ty_t, ATTACK_WINDOW_GOOD, true);
-    draw_set_alpha(1);
-    draw_circle(tx_t, ty_t, ATTACK_WINDOW_PERFECT, true);
+    // Target marker: black fill + thick white outline (fade in/pulse).
+    draw_set_alpha(marker_alpha * 0.90);
+    draw_set_color(c_black);
     draw_circle(tx_t, ty_t, ATTACK_TIMING_TARGET_RADIUS, true);
 
-    draw_circle(cx_t, cy_t, ATTACK_TIMING_RING_RADIUS, true);
+    draw_set_alpha(marker_alpha);
+    draw_set_color(c_white);
+    draw_circle(tx_t, ty_t, ATTACK_TIMING_TARGET_RADIUS, false);
+    draw_circle(tx_t, ty_t, max(1, ATTACK_TIMING_TARGET_RADIUS - 1), false);
+    draw_circle(tx_t, ty_t, max(1, ATTACK_TIMING_TARGET_RADIUS - 2), false);
+
+    // Falling marker: thick white outline only, no fill.
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+    draw_circle(cx_t, cy_t, ATTACK_TIMING_RING_RADIUS, false);
     draw_circle(cx_t, cy_t, max(1, ATTACK_TIMING_RING_RADIUS - 1), false);
+    draw_circle(cx_t, cy_t, max(1, ATTACK_TIMING_RING_RADIUS - 2), false);
     draw_set_alpha(1);
     draw_set_color(c_white);
 }
