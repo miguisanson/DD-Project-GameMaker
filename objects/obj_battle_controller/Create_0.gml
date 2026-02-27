@@ -91,8 +91,8 @@ attack_timing_result_text = "";
 attack_timing_result_key = "";
 attack_timing_result_timer = 0;
 attack_timing_marker_alpha = 0;
-attack_timing_target_sprite = asset_get_index("spr_attack_timing_target");
-attack_timing_falling_sprite = asset_get_index("spr_attack_timing_falling");
+attack_timing_target_sprite = spr_attack_timing_target;
+attack_timing_falling_sprite = spr_attack_timing_falling;
 
 // --------------------
 // MESSAGE SETUP
