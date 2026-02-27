@@ -176,6 +176,14 @@ function UI_SetFont() {
     draw_set_font(UI_FONT);
 }
 
+function UI_PopupFadeAlpha(_opened_frame, _target_alpha = 1, _fade_frames = UI_POPUP_FADE_FRAMES) {
+    var target = clamp(real(_target_alpha), 0, 1);
+    var frames = max(1, round(real(_fade_frames)));
+    if (!is_real(_opened_frame) || _opened_frame < 0) return target;
+    var age = max(0, Input_Frame() - _opened_frame);
+    return target * clamp(age / frames, 0, 1);
+}
+
 function Action_CanAct(_pl) {
     if (UI_IsBlocking()) return false;
     return Player_CanAcceptMove(_pl);

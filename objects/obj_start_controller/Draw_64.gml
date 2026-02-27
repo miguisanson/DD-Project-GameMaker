@@ -3,6 +3,7 @@ var h = display_get_gui_height();
 var gs = GameState_Get();
 if (gs.ui.mode == UI_SAVE) exit;
 if (state == "cutscene") exit;
+if (Transition_IsActive()) exit;
 
 UI_SetFont();
 var line_h = string_height("A");
@@ -59,15 +60,16 @@ if (state == "main") {
 }
 
 if (state == "difficulty") {
+    var difficulty_alpha = UI_PopupFadeAlpha(difficulty_opened_frame, 1);
     var dw = w * 0.62;
     var dh = h * 0.44;
     var dx = (w - dw) * 0.5;
     var dy = (h - dh) * 0.5;
 
-    draw_set_alpha(0.88);
+    draw_set_alpha(difficulty_alpha * 0.88);
     draw_set_color(c_black);
     draw_rectangle(dx, dy, dx + dw, dy + dh, false);
-    draw_set_alpha(1);
+    draw_set_alpha(difficulty_alpha);
     draw_set_color(c_white);
     draw_rectangle(dx, dy, dx + dw, dy + dh, true);
     draw_text(dx + 12, dy + 12, "Select Difficulty");
@@ -108,16 +110,17 @@ if (state == "difficulty") {
 
 // settings popup
 if (state == "settings") {
+    var settings_alpha = UI_PopupFadeAlpha(settings_opened_frame, 1);
     var sw = w * 0.72;
     var sh = h * 0.72;
     var sx = (w - sw) * 0.5;
     var sy = (h - sh) * 0.5;
     var settings = GameSettings_Copy(settings_pending);
 
-    draw_set_alpha(0.85);
+    draw_set_alpha(settings_alpha * 0.85);
     draw_set_color(c_black);
     draw_rectangle(sx, sy, sx + sw, sy + sh, false);
-    draw_set_alpha(1);
+    draw_set_alpha(settings_alpha);
     draw_set_color(c_white);
     draw_rectangle(sx, sy, sx + sw, sy + sh, true);
     draw_text(sx + 12, sy + 12, "Settings");
@@ -199,3 +202,4 @@ if (state == "settings") {
         }
     }
 }
+draw_set_alpha(1);

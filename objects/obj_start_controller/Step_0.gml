@@ -65,6 +65,7 @@ if (state == "main") {
                     break;
                 }
             }
+            difficulty_opened_frame = Input_Frame();
             state = "difficulty";
         } else if (opt == "Load Game") {
             SaveMenu_Open("load", "main");
@@ -72,6 +73,7 @@ if (state == "main") {
             settings_index = 0;
             settings_dirty = false;
             settings_pending = GameSettings_Copy(GameSettings_Ensure());
+            settings_opened_frame = Input_Frame();
             state = "settings";
         } else if (opt == "Exit Game") {
             game_end();

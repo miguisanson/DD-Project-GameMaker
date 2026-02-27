@@ -11,6 +11,7 @@ function Menu_Ensure() {
             tab: 0,
             tabs: ["Inventory","Skills","Stats"],
             header_focus: true,
+            opened_frame: UI_OPENED_FRAME_NONE,
             inv_index: 0,
             inv_scroll: 0,
             inv_popup_open: false,
@@ -19,6 +20,7 @@ function Menu_Ensure() {
             inv_popup_message: "",
             inv_popup_item_id: -1,
             inv_popup_block_frame: UI_OPENED_FRAME_NONE,
+            inv_popup_open_frame: UI_OPENED_FRAME_NONE,
             skill_index: 0,
             skill_scroll: 0,
             stats_focus: false,
@@ -29,6 +31,10 @@ function Menu_Ensure() {
             pending_stats: undefined,
             pending_points: 0
         };
+    } else {
+        var m0 = gs.ui.menu;
+        if (!variable_struct_exists(m0, "opened_frame")) m0.opened_frame = UI_OPENED_FRAME_NONE;
+        if (!variable_struct_exists(m0, "inv_popup_open_frame")) m0.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
     }
 }
 
@@ -40,6 +46,7 @@ function Menu_Open() {
     gs.ui.menu.open = true;
     gs.ui.menu.header_focus = true;
     gs.ui.menu.stats_focus = false;
+    gs.ui.menu.opened_frame = Input_Frame();
     Menu_StatsSync();
 }
 
@@ -92,6 +99,7 @@ function Menu_InvPopupOpenConfirm(_m, _item_id) {
     _m.inv_popup_message = "Learn a skill";
     _m.inv_popup_item_id = _item_id;
     _m.inv_popup_block_frame = Input_Frame() + 1;
+    _m.inv_popup_open_frame = Input_Frame();
     return _m;
 }
 
@@ -101,6 +109,7 @@ function Menu_InvPopupOpenMessage(_m, _msg) {
     _m.inv_popup_choice = 0;
     _m.inv_popup_message = _msg;
     _m.inv_popup_block_frame = Input_Frame() + 1;
+    _m.inv_popup_open_frame = Input_Frame();
     return _m;
 }
 
@@ -111,6 +120,7 @@ function Menu_InvPopupClose(_m) {
     _m.inv_popup_message = "";
     _m.inv_popup_item_id = -1;
     _m.inv_popup_block_frame = UI_OPENED_FRAME_NONE;
+    _m.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
     return _m;
 }
 
@@ -446,15 +456,16 @@ function Menu_Draw() {
     var pad = layout.pad;
     var row_h = layout.row_h;
     var rows_visible = layout.rows_visible;
+    var menu_alpha = UI_PopupFadeAlpha(m.opened_frame, 1);
 
-    draw_set_alpha(0.6);
+    draw_set_alpha(menu_alpha * 0.6);
     draw_set_color(c_black);
     draw_rectangle(0, 0, w, h, false);
 
-    draw_set_alpha(0.9);
+    draw_set_alpha(menu_alpha * 0.9);
     draw_set_color(c_black);
     draw_rectangle(bx, by, bx + bw, by + bh, false);
-    draw_set_alpha(1);
+    draw_set_alpha(menu_alpha);
     draw_set_color(c_white);
     draw_rectangle(bx, by, bx + bw, by + bh, true);
 
@@ -705,6 +716,7 @@ function Menu_Draw() {
     }
 
     if (variable_struct_exists(m, "inv_popup_open") && m.inv_popup_open) {
+        var popup_alpha = UI_PopupFadeAlpha(m.inv_popup_open_frame, 1);
         var popup_msg = "Learn a skill";
         if (m.inv_popup_mode == "message") popup_msg = string(m.inv_popup_message);
 
@@ -737,10 +749,10 @@ function Menu_Draw() {
             px2 = px1 + popup_w;
             py2 = py1 + popup_h;
 
-            draw_set_alpha(0.85);
+            draw_set_alpha(popup_alpha * 0.85);
             draw_set_color(c_black);
             draw_rectangle(px1, py1, px2, py2, false);
-            draw_set_alpha(1);
+            draw_set_alpha(popup_alpha);
             draw_set_color(c_white);
             draw_rectangle(px1, py1, px2, py2, true);
 
@@ -784,10 +796,10 @@ function Menu_Draw() {
             px2 = px1 + popup_w;
             py2 = py1 + popup_h;
 
-            draw_set_alpha(0.85);
+            draw_set_alpha(popup_alpha * 0.85);
             draw_set_color(c_black);
             draw_rectangle(px1, py1, px2, py2, false);
-            draw_set_alpha(1);
+            draw_set_alpha(popup_alpha);
             draw_set_color(c_white);
             draw_rectangle(px1, py1, px2, py2, true);
 
@@ -807,6 +819,7 @@ function Menu_Draw() {
         }
     }
 
+    draw_set_alpha(1);
 }
 
 function ClassSelect_Ensure() {
@@ -819,8 +832,12 @@ function ClassSelect_Ensure() {
             choices: ["Warrior", "Archer", "Mage"],
             choice_ids: [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE],
             allow_cancel: true,
-            open_block_frame: UI_OPENED_FRAME_NONE
+            open_block_frame: UI_OPENED_FRAME_NONE,
+            opened_frame: UI_OPENED_FRAME_NONE
         };
+    } else {
+        var cs0 = gs.ui.class_select;
+        if (!variable_struct_exists(cs0, "opened_frame")) cs0.opened_frame = UI_OPENED_FRAME_NONE;
     }
 }
 
@@ -841,6 +858,7 @@ function ClassSelect_Open(_allow_cancel = true) {
     cs.index = 0;
     cs.allow_cancel = _allow_cancel;
     cs.open_block_frame = Input_Frame() + 1;
+    cs.opened_frame = Input_Frame();
     gs.ui.class_select = cs;
     gs.ui.mode = UI_CLASS_SELECT;
     SFX_PlayUI("ui_openclose");
@@ -853,6 +871,7 @@ function ClassSelect_Close(_play_sfx = true) {
     var cs = gs.ui.class_select;
     cs.open = false;
     cs.open_block_frame = UI_OPENED_FRAME_NONE;
+    cs.opened_frame = UI_OPENED_FRAME_NONE;
     gs.ui.class_select = cs;
     if (gs.ui.mode == UI_CLASS_SELECT) gs.ui.mode = UI_NONE;
     if (_play_sfx) SFX_PlayUI("ui_openclose");
@@ -981,11 +1000,12 @@ function ClassSelect_Draw() {
     var bh = h * 0.5;
     var bx = (w - bw) * 0.5;
     var by = (h - bh) * 0.5;
+    var popup_alpha = UI_PopupFadeAlpha(cs.opened_frame, 1);
 
-    draw_set_alpha(0.85);
+    draw_set_alpha(popup_alpha * 0.85);
     draw_set_color(c_black);
     draw_rectangle(bx, by, bx + bw, by + bh, false);
-    draw_set_alpha(1);
+    draw_set_alpha(popup_alpha);
     draw_set_color(c_white);
     draw_rectangle(bx, by, bx + bw, by + bh, true);
 
@@ -1022,6 +1042,7 @@ function ClassSelect_Draw() {
         }
         draw_text(bx + 18, back_y, "Back");
     }
+    draw_set_alpha(1);
 }
 
 // --------------------
@@ -1034,8 +1055,12 @@ function PauseMenu_Ensure() {
         gs.ui.pause_menu = {
             open: false,
             index: 0,
-            options: ["Resume","Exit to Main Menu"]
+            options: ["Resume","Exit to Main Menu"],
+            opened_frame: UI_OPENED_FRAME_NONE
         };
+    } else {
+        var pm0 = gs.ui.pause_menu;
+        if (!variable_struct_exists(pm0, "opened_frame")) pm0.opened_frame = UI_OPENED_FRAME_NONE;
     }
 }
 
@@ -1047,6 +1072,7 @@ function PauseMenu_Open() {
     var pm = gs.ui.pause_menu;
     pm.open = true;
     pm.index = 0;
+    pm.opened_frame = Input_Frame();
     gs.ui.pause_menu = pm;
 }
 
@@ -1055,6 +1081,7 @@ function PauseMenu_Close() {
     var gs = GameState_Get();
     SFX_PlayUI("ui_openclose");
     gs.ui.pause_menu.open = false;
+    gs.ui.pause_menu.opened_frame = UI_OPENED_FRAME_NONE;
     gs.ui.mode = UI_NONE;
 }
 
@@ -1147,15 +1174,16 @@ function PauseMenu_Draw() {
     var bh = (row_h * array_length(pm.options)) + inner_pad * 2;
     var bx = (w - bw) * 0.5;
     var by = (h - bh) * 0.5;
+    var popup_alpha = UI_PopupFadeAlpha(pm.opened_frame, 1);
 
-    draw_set_alpha(0.6);
+    draw_set_alpha(popup_alpha * 0.6);
     draw_set_color(c_black);
     draw_rectangle(0, 0, w, h, false);
 
-    draw_set_alpha(0.9);
+    draw_set_alpha(popup_alpha * 0.9);
     draw_set_color(c_black);
     draw_rectangle(bx, by, bx + bw, by + bh, false);
-    draw_set_alpha(1);
+    draw_set_alpha(popup_alpha);
     draw_set_color(c_white);
     draw_rectangle(bx, by, bx + bw, by + bh, true);
 
@@ -1173,4 +1201,5 @@ function PauseMenu_Draw() {
         draw_set_color(sel ? c_black : c_white);
         draw_text(bx + inner_pad, yy, options[i]);
     }
+    draw_set_alpha(1);
 }

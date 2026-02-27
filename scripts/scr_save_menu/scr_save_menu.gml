@@ -34,6 +34,7 @@ function SaveMenu_Open(_mode, _context) {
         close_after_message: false,
         slot_info_cache: SaveMenu_BuildSlotInfoCache(),
         opened_frame: Input_Frame(),
+        confirm_opened_frame: UI_OPENED_FRAME_NONE,
         require_release: opened_with_confirm
     };
 
@@ -88,6 +89,7 @@ function SaveMenu_Handle() {
             if (k_ok || k_back) {
                 SFX_PlayUI("ui_confirm");
                 sm.confirm = false;
+                sm.confirm_opened_frame = UI_OPENED_FRAME_NONE;
                 if (sm.confirm_mode == "saved") SaveMenu_Close();
                 else if (sm.confirm_mode == "message" && variable_struct_exists(sm, "close_after_message") && sm.close_after_message) {
                     SaveMenu_Close();
@@ -105,6 +107,7 @@ function SaveMenu_Handle() {
         if (k_back) {
             SFX_PlayUI("ui_back");
             sm.confirm = false;
+            sm.confirm_opened_frame = UI_OPENED_FRAME_NONE;
             gs.ui.save_menu = sm;
             return;
         }
@@ -155,6 +158,7 @@ function SaveMenu_Handle() {
                 }
             }
             sm.confirm = false;
+            sm.confirm_opened_frame = UI_OPENED_FRAME_NONE;
         }
         gs.ui.save_menu = sm;
         return;
@@ -195,6 +199,7 @@ function SaveMenu_Handle() {
                     sm.confirm_mode = "load";
                     sm.confirm_choice = 1; // default to Cancel
                     sm.close_after_message = false;
+                    sm.confirm_opened_frame = Input_Frame();
                     SaveMenu_Log("load confirm open slot " + string(slot));
                 } else {
                     SFX_PlayUI("ui_back");
@@ -203,6 +208,7 @@ function SaveMenu_Handle() {
                     sm.confirm_choice = 0;
                     sm.message = "No game saves.";
                     sm.close_after_message = true;
+                    sm.confirm_opened_frame = Input_Frame();
                     return;
                 }
             } else {
@@ -211,6 +217,7 @@ function SaveMenu_Handle() {
                 sm.confirm_mode = "delete";
                 sm.confirm_choice = 1; // default to Cancel
                 sm.close_after_message = false;
+                sm.confirm_opened_frame = Input_Frame();
                 SaveMenu_Log("delete confirm open slot " + string(slot));
             }
         } else {
@@ -221,6 +228,7 @@ function SaveMenu_Handle() {
                 sm.confirm_mode = "overwrite";
                 sm.confirm_choice = 1; // default to Cancel
                 sm.close_after_message = false;
+                sm.confirm_opened_frame = Input_Frame();
                 SaveMenu_Log("overwrite confirm open slot " + string(slot));
             } else {
                 SFX_PlayUI("ui_confirm");
@@ -228,6 +236,7 @@ function SaveMenu_Handle() {
                 sm.confirm_mode = "save";
                 sm.confirm_choice = 1; // default Cancel
                 sm.close_after_message = false;
+                sm.confirm_opened_frame = Input_Frame();
                 SaveMenu_Log("save confirm open slot " + string(slot));
             }
         }
@@ -250,6 +259,7 @@ function SaveMenu_Draw() {
     var pad = 6;
     var side_margin = 12;
     var slot_text_left_pad = 14;
+    var popup_alpha = UI_PopupFadeAlpha(sm.opened_frame, 1);
 
     var title = (sm.mode == "load") ? "Load Game" : "Save Game";
 
@@ -284,10 +294,10 @@ function SaveMenu_Draw() {
     var bx = (w - bw) * 0.5;
     var by = (h - bh) * 0.5;
 
-    draw_set_alpha(0.85);
+    draw_set_alpha(popup_alpha * 0.85);
     draw_set_color(c_black);
     draw_rectangle(bx, by, bx + bw, by + bh, false);
-    draw_set_alpha(1);
+    draw_set_alpha(popup_alpha);
     draw_set_color(c_white);
     draw_rectangle(bx, by, bx + bw, by + bh, true);
 
@@ -355,6 +365,11 @@ function SaveMenu_Draw() {
     draw_text(back_x, back_y, "Back");
 
     if (sm.confirm) {
+        var confirm_fade_frame = sm.opened_frame;
+        if (variable_struct_exists(sm, "confirm_opened_frame") && sm.confirm_opened_frame != UI_OPENED_FRAME_NONE) {
+            confirm_fade_frame = sm.confirm_opened_frame;
+        }
+        var confirm_alpha = UI_PopupFadeAlpha(confirm_fade_frame, 1);
         var cx = bx + bw * 0.5;
         var cy = by + bh * 0.7;
         var msg = "";
@@ -385,10 +400,10 @@ function SaveMenu_Draw() {
         var px2 = px1 + popup_w;
         var py2 = py1 + popup_h;
 
-        draw_set_alpha(0.85);
+        draw_set_alpha(confirm_alpha * 0.85);
         draw_set_color(c_black);
         draw_rectangle(px1, py1, px2, py2, false);
-        draw_set_alpha(1);
+        draw_set_alpha(confirm_alpha);
         draw_set_color(c_white);
         draw_rectangle(px1, py1, px2, py2, true);
         draw_set_color(c_white);
@@ -440,4 +455,5 @@ function SaveMenu_Draw() {
             draw_text(ok_x + (ok_w - string_width(ok_label)) * 0.5, btn_y + 2, ok_label);
         }
     }
+    draw_set_alpha(1);
 }
