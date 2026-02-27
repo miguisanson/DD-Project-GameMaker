@@ -105,15 +105,33 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     }
 
     var line = "";
+    var line_entry = "";
+    var line_icon_sprite = noone;
+    var line_icon_subimg = 0;
     if (array_length(gs.ui.lines) > 0) {
         if (gs.ui.index >= 0 && gs.ui.index < array_length(gs.ui.lines)) {
-            line = Dialogue_LineText(gs.ui.lines[gs.ui.index]);
+            line_entry = gs.ui.lines[gs.ui.index];
+            line = Dialogue_LineText(line_entry);
+            if (is_struct(line_entry) && variable_struct_exists(line_entry, "icon_sprite")) {
+                line_icon_sprite = line_entry.icon_sprite;
+            }
+            if (is_struct(line_entry) && variable_struct_exists(line_entry, "icon_subimg")) {
+                line_icon_subimg = round(line_entry.icon_subimg);
+            }
         }
     }
 
     var speaker = "";
     if (variable_struct_exists(gs.ui, "speaker")) speaker = gs.ui.speaker;
     var layout = Dialogue_TextLayout(speaker);
+    var icon_draw_w = 0;
+    if (line_icon_sprite != noone && line_icon_sprite != -1) {
+        var icon_max_sub = max(0, sprite_get_number(line_icon_sprite) - 1);
+        line_icon_subimg = clamp(line_icon_subimg, 0, icon_max_sub);
+        icon_draw_w = max(10, sprite_get_width(line_icon_sprite)) + 4;
+    }
+    var text_x = layout.text_x + icon_draw_w;
+    var text_y = layout.text_y;
 
     draw_set_color(c_white);
     if (speaker != "") {
@@ -128,24 +146,26 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
         var visible_count0 = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text0);
         visible_count0 = clamp(visible_count0, 0, string_length(page_text0));
         var visible_text0 = string_copy(page_text0, 1, visible_count0);
+        if (icon_draw_w > 0) draw_sprite(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1);
         if (cutscene_text_only) {
             draw_set_color(c_black);
-            draw_text(layout.text_x + UI_CUTSCENE_TEXT_SHADOW_X, layout.text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text0);
+            draw_text(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text0);
             draw_set_color(c_white);
         }
-        draw_text(layout.text_x, layout.text_y, visible_text0);
+        draw_text(text_x, text_y, visible_text0);
     } else {
         Dialogue_TypewriterPrepareCurrentLine();
         var page_text = variable_struct_exists(gs.ui, "dialogue_full_text") ? gs.ui.dialogue_full_text : line;
         var visible_count = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text);
         visible_count = clamp(visible_count, 0, string_length(page_text));
         var visible_text = string_copy(page_text, 1, visible_count);
+        if (icon_draw_w > 0) draw_sprite(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1);
         if (cutscene_text_only) {
             draw_set_color(c_black);
-            draw_text(layout.text_x + UI_CUTSCENE_TEXT_SHADOW_X, layout.text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text);
+            draw_text(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text);
             draw_set_color(c_white);
         }
-        draw_text(layout.text_x, layout.text_y, visible_text);
+        draw_text(text_x, text_y, visible_text);
     }
     if (gs.ui.mode == UI_DIALOGUE && array_length(gs.ui.lines) > 0
     && variable_struct_exists(gs.ui, "dialogue_state") && gs.ui.dialogue_state == UI_DIALOGUE_STATE_READY) {

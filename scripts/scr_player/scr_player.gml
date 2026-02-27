@@ -608,6 +608,9 @@ function GameState_Init() {
     if (!variable_struct_exists(gs, "pending_cutscene_id")) {
         gs.pending_cutscene_id = "";
     }
+    if (!variable_struct_exists(gs, "pending_post_battle_dialogue_lines") || !is_array(gs.pending_post_battle_dialogue_lines)) {
+        gs.pending_post_battle_dialogue_lines = [];
+    }
 
     if (!variable_struct_exists(gs, "transition")) {
         gs.transition = { pending: false, room: noone, spawn_id: "", face: -1 };

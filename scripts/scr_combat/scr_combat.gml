@@ -162,15 +162,26 @@ function FX_CenterOn(_sprite, _inst) {
     };
 }
 
-function Combat_Log(_text) {
-    if (_text == "") return;
+function Combat_Log(_text, _icon_sprite = noone, _icon_subimg = 0) {
+    var entry = _text;
+    if (is_struct(_text) && variable_struct_exists(_text, "text")) {
+        entry = _text;
+    } else {
+        if (string(_text) == "") return;
+        entry = {
+            text: string(_text),
+            icon_sprite: _icon_sprite,
+            icon_subimg: _icon_subimg
+        };
+    }
+
     var bc = instance_find(obj_battle_controller, 0);
     if (!instance_exists(bc)) return;
     if (!variable_instance_exists(bc, "combat_log") || !is_array(bc.combat_log)) {
         bc.combat_log = [];
     }
     var log = bc.combat_log;
-    array_push(log, _text);
+    array_push(log, entry);
     var maxv = COMBAT_LOG_MAX;
     while (array_length(log) > maxv) {
         array_delete(log, 0, 1);
@@ -232,10 +243,36 @@ function Battle_GrantRewards(_p, _e) {
     return out;
 }
 
+function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
+    var enemy_name = "Enemy";
+    if (is_struct(_enemy) && variable_struct_exists(_enemy, "name")) enemy_name = string(_enemy.name);
+
+    var loot_gained = is_struct(_rewards) && variable_struct_exists(_rewards, "loot") && is_array(_rewards.loot) && array_length(_rewards.loot) > 0;
+    var result = {
+        exp_gain: (is_struct(_rewards) && variable_struct_exists(_rewards, "exp_gain")) ? max(0, round(real(_rewards.exp_gain))) : 0,
+        levels_gained: (is_struct(_rewards) && variable_struct_exists(_rewards, "levels_gained")) ? max(0, round(real(_rewards.levels_gained))) : 0,
+        stat_points_gained: (is_struct(_rewards) && variable_struct_exists(_rewards, "stat_points_gained")) ? max(0, round(real(_rewards.stat_points_gained))) : 0,
+        auto_stat_summary: (is_struct(_rewards) && variable_struct_exists(_rewards, "auto_stat_summary")) ? string(_rewards.auto_stat_summary) : "",
+        loot_gained: loot_gained,
+        at_level_cap: (is_struct(_player) && variable_struct_exists(_player, "level")) ? Level_IsAtCap(_player.level) : false
+    };
+
+    var lines = [Enemy_AutoResolveBuildMessage({ name: enemy_name }, result, "You defeated ")];
+    if (loot_gained) {
+        var loot_entries = Loot_BuildMessageEntries(_rewards.loot, "Loot: ");
+        for (var i = 0; i < array_length(loot_entries); i++) {
+            array_push(lines, loot_entries[i]);
+        }
+    }
+
+    return lines;
+}
+
 function Player_OnDeath(_p) {
     var gs = GameState_Get();
     _p.hp = 0;
     GameState_SetPlayer(_p);
+    if (variable_struct_exists(gs, "pending_post_battle_dialogue_lines")) gs.pending_post_battle_dialogue_lines = [];
     gs.in_main_menu = false;
     GameState_SetJustReturned(false);
     Transition_RequestCutsceneById("game_over");
@@ -251,18 +288,9 @@ function Battle_CheckEnd(_bc, _p, _e) {
         _p = rewards.player;
         GameState_SetPlayer(_p);
         EnemyPersist_ResolveBattle(true);
+        var gs = GameState_Get();
+        gs.pending_post_battle_dialogue_lines = Battle_BuildVictoryDialogueLines(_e, rewards, _p);
 
-        if (rewards.exp_gain > 0) Combat_Log("EXP +" + string(rewards.exp_gain));
-        if (rewards.levels_gained > 0) {
-            var level_msg = "Level up x" + string(rewards.levels_gained)
-                + " (+" + string(rewards.stat_points_gained) + " points";
-            if (rewards.auto_stat_gained > 0 && rewards.auto_stat_summary != "") {
-                level_msg += ", auto " + rewards.auto_stat_summary;
-            }
-            level_msg += ")";
-            Combat_Log(level_msg);
-        }
-        if (is_array(rewards.loot) && array_length(rewards.loot) > 0) Combat_Log("Loot found.");
         Battle_Message(_bc, _e.name + " has been slain.", BSTATE_END_RUN);
         return true;
     }

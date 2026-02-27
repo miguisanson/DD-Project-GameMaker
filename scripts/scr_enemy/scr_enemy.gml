@@ -41,8 +41,8 @@ function Enemy_CanAutoResolve(_cfg, _player_level, _enemy_level) {
     return (_player_level >= _enemy_level + ENEMY_AUTO_RESOLVE_LEVEL_DELTA);
 }
 
-function Enemy_AutoResolveBuildMessage(_cfg, _result) {
-    var msg = "You overpower " + string(_cfg.name) + ".";
+function Enemy_AutoResolveBuildMessage(_cfg, _result, _verb_prefix = "You overpower ") {
+    var msg = string(_verb_prefix) + string(_cfg.name) + ".";
     if (!is_struct(_result)) return msg;
 
     var parts = [];
@@ -86,7 +86,7 @@ function Enemy_AutoResolveBuildMessage(_cfg, _result) {
 
 function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_name) {
     var gs = GameState_Get();
-    if (!is_struct(gs.player_ch)) return "";
+    if (!is_struct(gs.player_ch)) return { message: "", loot_entries: [] };
     var p = gs.player_ch;
     var cfg = EnemyDB_Get(_enemy_id);
 
@@ -132,7 +132,12 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
         at_level_cap: at_cap_before || Level_IsAtCap(p.level)
     };
     if (variable_struct_exists(cfg, "name")) _enemy_name = cfg.name;
-    return Enemy_AutoResolveBuildMessage({ name: _enemy_name }, result);
+    var summary = Enemy_AutoResolveBuildMessage({ name: _enemy_name }, result);
+    var loot_entries = Loot_BuildMessageEntries(loot, "Loot: ");
+    return {
+        message: summary,
+        loot_entries: loot_entries
+    };
 }
 
 function Enemy_AutoResolveFinalizePending() {
@@ -150,7 +155,9 @@ function Enemy_AutoResolveFinalizePending() {
     var player_inst = variable_struct_exists(pending, "player_inst") ? pending.player_inst : noone;
     var persist_id = variable_struct_exists(pending, "persist_id") ? string(pending.persist_id) : "";
 
-    var msg = Enemy_AutoResolveFinalize(enemy_id, enemy_level, loot_key, enemy_name);
+    var final = Enemy_AutoResolveFinalize(enemy_id, enemy_level, loot_key, enemy_name);
+    var msg = "";
+    if (is_struct(final) && variable_struct_exists(final, "message")) msg = string(final.message);
 
     if (persist_id != "") {
         RoomState_SetRemoved(room, persist_id, obj_enemy, enemy_id);
@@ -167,7 +174,13 @@ function Enemy_AutoResolveFinalizePending() {
     }
 
     if (msg != "") {
-        Dialogue_StartLines([msg]);
+        var lines = [msg];
+        if (is_struct(final) && variable_struct_exists(final, "loot_entries") && is_array(final.loot_entries)) {
+            for (var li = 0; li < array_length(final.loot_entries); li++) {
+                array_push(lines, final.loot_entries[li]);
+            }
+        }
+        Dialogue_StartLines(lines);
     }
 }
 

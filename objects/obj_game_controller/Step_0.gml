@@ -70,6 +70,14 @@ if (variable_struct_exists(gs, "pending_save_success_popup") && gs.pending_save_
     }
 }
 
+if (room != rm_battle && variable_struct_exists(gs, "pending_post_battle_dialogue_lines") && is_array(gs.pending_post_battle_dialogue_lines) && array_length(gs.pending_post_battle_dialogue_lines) > 0) {
+    if (!Transition_IsActive() && instance_exists(obj_player) && gs.ui.mode == UI_NONE && array_length(gs.ui.lines) <= 0) {
+        var lines = gs.pending_post_battle_dialogue_lines;
+        gs.pending_post_battle_dialogue_lines = [];
+        Dialogue_StartLines(lines);
+    }
+}
+
 // apply persistence once on initial room load
 if (room != rm_battle && variable_global_exists("room_state_ready") && global.room_state_ready) {
     var gs_apply = GameState_Get();

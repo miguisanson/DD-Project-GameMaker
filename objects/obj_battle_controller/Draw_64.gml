@@ -40,12 +40,38 @@ if (log_count > 0) {
     draw_set_color(c_white);
     for (var li2 = log_start; li2 < log_count; li2++) {
         var row = li2 - log_start;
-        var line = log_lines[li2];
-        while (string_width(line) > max_w && string_length(line) > 3) {
+        var entry = log_lines[li2];
+        var line = "";
+        var icon_sprite = noone;
+        var icon_subimg = 0;
+        if (is_struct(entry) && variable_struct_exists(entry, "text")) {
+            line = string(entry.text);
+            if (variable_struct_exists(entry, "icon_sprite")) icon_sprite = entry.icon_sprite;
+            if (variable_struct_exists(entry, "icon_subimg")) icon_subimg = round(entry.icon_subimg);
+        } else {
+            line = string(entry);
+        }
+
+        var icon_w = 0;
+        if (icon_sprite != noone && icon_sprite != -1) {
+            var iw = max(1, sprite_get_width(icon_sprite));
+            icon_w = max(10, iw);
+            var max_sub = max(0, sprite_get_number(icon_sprite) - 1);
+            icon_subimg = clamp(icon_subimg, 0, max_sub);
+        }
+
+        var max_text_w = max_w - ((icon_w > 0) ? (icon_w + 4) : 0);
+        while (string_width(line) > max_text_w && string_length(line) > 3) {
             line = string_copy(line, 1, string_length(line) - 4) + "...";
         }
-        var lx = log_base_x - string_width(line);
+
+        var line_w = string_width(line) + ((icon_w > 0) ? (icon_w + 4) : 0);
+        var lx = log_base_x - line_w;
         var ly = log_base_y + row * log_line_h;
+        if (icon_w > 0) {
+            draw_sprite(icon_sprite, icon_subimg, lx, ly + 1);
+            lx += icon_w + 4;
+        }
         draw_text(lx, ly, line);
     }
 }

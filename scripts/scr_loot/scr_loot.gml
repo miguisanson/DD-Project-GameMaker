@@ -273,3 +273,25 @@ function Loot_Grant(_inv, _loot) {
     }
     return _inv;
 }
+
+function Loot_BuildMessageEntries(_loot, _prefix = "Loot: ") {
+    var out = [];
+    if (!is_array(_loot)) return out;
+    var prefix = string(_prefix);
+
+    for (var i = 0; i < array_length(_loot); i++) {
+        var it = _loot[i];
+        if (!is_struct(it) || !variable_struct_exists(it, "item_id")) continue;
+        var qty = variable_struct_exists(it, "qty") ? max(1, round(real(it.qty))) : 1;
+        var item = ItemDB_Get(it.item_id);
+        if (!is_struct(item)) continue;
+        var txt = prefix + string(item.name) + " x" + string(qty);
+        array_push(out, {
+            text: txt,
+            icon_sprite: variable_struct_exists(item, "sprite") ? item.sprite : noone,
+            icon_subimg: 0
+        });
+    }
+
+    return out;
+}
