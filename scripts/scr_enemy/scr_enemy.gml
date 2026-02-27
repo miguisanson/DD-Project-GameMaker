@@ -96,7 +96,11 @@ function EnemyAI_ApplyTraits(_inst, _cfg, _ctx, _hook) {
 }
 
  function EnemyAI_CanStep(_inst, _mx, _my) {
-    return !place_meeting(_inst.x + _mx, _inst.y + _my, obj_wall) && !place_meeting(_inst.x + _mx, _inst.y + _my, obj_interactable);
+    var nx = _inst.x + _mx;
+    var ny = _inst.y + _my;
+    return !place_meeting(nx, ny, obj_wall)
+        && !place_meeting(nx, ny, obj_interactable)
+        && !place_meeting(nx, ny, obj_room_transition);
 }
 
 function EnemyAI_Update(_inst, _cfg, _pl) {

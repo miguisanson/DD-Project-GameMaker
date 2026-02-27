@@ -104,8 +104,10 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     var cutscene_text_only = Dialogue_IsCutsceneTextOnly();
 
     if (!cutscene_text_only) {
+        draw_set_alpha(0.85);
         draw_set_color(c_black);
         draw_rectangle(bx, by, bx + bw, by + bh, false);
+        draw_set_alpha(1);
         draw_set_color(c_white);
         draw_rectangle(bx, by, bx + bw, by + bh, true);
     }
