@@ -456,51 +456,25 @@ function Status_IsNegative(_status_id) {
     return false;
 }
 
-function Status_LabelWithArrow(_cfg, _status_id) {
+function Status_LabelWithSign(_cfg, _status_id) {
     var name_txt = "Status";
     if (is_struct(_cfg) && variable_struct_exists(_cfg, "name")) {
         name_txt = string(_cfg.name);
     }
-    return name_txt;
+    var suffix = Status_IsNegative(_status_id) ? " -" : " +";
+    return name_txt + suffix;
 }
 
-function Status_DrawFallbackTag(_cfg, _status_id, _x, _y) {
-    var txt = Status_LabelWithArrow(_cfg, _status_id);
+function Status_DrawFallbackLabel(_cfg, _status_id, _x, _y) {
+    var txt = Status_LabelWithSign(_cfg, _status_id);
     var text_scale = UI_STATUS_FALLBACK_TEXT_SCALE;
-    var arrow_scale = UI_STATUS_FALLBACK_ARROW_SCALE;
-    var gap = UI_STATUS_FALLBACK_GAP;
 
     draw_set_color(c_black);
     draw_text_transformed(_x + 1, _y + 1, txt, text_scale, text_scale, 0);
     draw_set_color(c_white);
     draw_text_transformed(_x, _y, txt, text_scale, text_scale, 0);
 
-    var used_w = max(1, round(string_width(txt) * text_scale));
-    var total_w = used_w;
-    var arrow_sp = dialogue_arrow_down;
-    if (!is_real(arrow_sp) || arrow_sp == -1) arrow_sp = noone;
-
-    if (arrow_sp != noone && arrow_sp != -1) {
-        var bb_l = sprite_get_bbox_left(arrow_sp);
-        var bb_t = sprite_get_bbox_top(arrow_sp);
-        var bb_r = sprite_get_bbox_right(arrow_sp);
-        var bb_b = sprite_get_bbox_bottom(arrow_sp);
-        var src_w = max(1, (bb_r - bb_l) + 1);
-        var src_h = max(1, (bb_b - bb_t) + 1);
-        var aw = max(1, round(src_w * arrow_scale));
-        var ah = max(1, round(src_h * arrow_scale));
-        var ax = _x + used_w + gap;
-        var text_h = max(1, round(string_height("A") * text_scale));
-        var ay = _y + floor((text_h - ah) * 0.5);
-        if (Status_IsNegative(_status_id)) {
-            draw_sprite_part_ext(arrow_sp, 0, bb_l, bb_t, src_w, src_h, ax, ay, arrow_scale, arrow_scale, c_white, 1);
-        } else {
-            draw_sprite_part_ext(arrow_sp, 0, bb_l, bb_t, src_w, src_h, ax, ay + ah, arrow_scale, -arrow_scale, c_white, 1);
-        }
-        total_w += gap + aw;
-    }
-
-    return total_w;
+    return max(1, round(string_width(txt) * text_scale));
 }
 
 function Status_DrawIcons(_ch, _x, _y, _spacing, _rtl, _noncore_text_fallback) {
@@ -521,7 +495,7 @@ function Status_DrawIcons(_ch, _x, _y, _spacing, _rtl, _noncore_text_fallback) {
             var has_sprite = (variable_struct_exists(cfg, "icon_sprite") && cfg.icon_sprite != noone);
             var use_text_fallback = noncore_text_fallback && (!has_sprite || !Status_UsesCoreIconSprite(sid, cfg.icon_sprite));
             if (use_text_fallback) {
-                var tag_w = Status_DrawFallbackTag(cfg, sid, _x + off, _y);
+                var tag_w = Status_DrawFallbackLabel(cfg, sid, _x + off, _y);
                 off += max(spacing, tag_w + 4);
             } else if (has_sprite) {
                 var icon_sub = 0;
@@ -539,7 +513,7 @@ function Status_DrawIcons(_ch, _x, _y, _spacing, _rtl, _noncore_text_fallback) {
             var has_sprite2 = (variable_struct_exists(cfg2, "icon_sprite") && cfg2.icon_sprite != noone);
             var use_text_fallback2 = noncore_text_fallback && (!has_sprite2 || !Status_UsesCoreIconSprite(sid2, cfg2.icon_sprite));
             if (use_text_fallback2) {
-                var tag_w2 = Status_DrawFallbackTag(cfg2, sid2, _x + off, _y);
+                var tag_w2 = Status_DrawFallbackLabel(cfg2, sid2, _x + off, _y);
                 off += max(spacing, tag_w2 + 4);
             } else if (has_sprite2) {
                 var icon_sub2 = 0;
