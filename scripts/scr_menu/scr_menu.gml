@@ -504,7 +504,17 @@ function Menu_HandleInput() {
             var cur_v = variable_struct_get(m.pending_stats, stat_keys[pidx]);
             if (cur_v > base_v) pending_total += (cur_v - base_v);
         }
-        var row_count = stat_count + ((pending_total > 0) ? 1 : 0); // action row
+        var show_actions = (pending_total > 0);
+        var action_row = stat_count;
+        var row_count = stat_count + (show_actions ? 1 : 0); // action row
+
+        // If Confirm/Cancel row just became unavailable, snap selection back to nearest stat row.
+        if (!show_actions && m.stats_row >= action_row) {
+            m.stats_row = max(0, stat_count - 1);
+            m.stats_col = 1;
+        }
+        m.stats_row = clamp(m.stats_row, 0, max(0, row_count - 1));
+        m.stats_col = clamp(m.stats_col, 0, 1);
 
         if (!m.stats_focus) {
             if (k_ok || nav_down || nav_up) {
@@ -569,7 +579,7 @@ function Menu_HandleInput() {
                     variable_struct_set(m.pending_stats, key, cur_v - 1);
                     m.pending_points += 1;
                 }
-            } else if (pending_total > 0) {
+            } else if (show_actions) {
                 if (m.stats_col == 0) {
                     Menu_StatsApply();
                 } else {
