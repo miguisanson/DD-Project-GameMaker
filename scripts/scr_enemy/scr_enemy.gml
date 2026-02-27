@@ -84,6 +84,93 @@ function Enemy_AutoResolveBuildMessage(_cfg, _result) {
     return msg;
 }
 
+function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_name) {
+    var gs = GameState_Get();
+    if (!is_struct(gs.player_ch)) return "";
+    var p = gs.player_ch;
+    var cfg = EnemyDB_Get(_enemy_id);
+
+    var exp_mult = variable_struct_exists(cfg, "auto_resolve_exp_mult") ? max(0, real(cfg.auto_resolve_exp_mult)) : ENEMY_AUTO_RESOLVE_EXP_MULT_DEFAULT;
+    var loot_mult = variable_struct_exists(cfg, "auto_resolve_loot_mult") ? clamp(real(cfg.auto_resolve_loot_mult), 0, 1) : ENEMY_AUTO_RESOLVE_LOOT_MULT_DEFAULT;
+    var diff = Difficulty_Profile();
+    var at_cap_before = Level_IsAtCap(p.level);
+
+    var level_exp_mult = 1;
+    if (variable_struct_exists(cfg, "level")) {
+        level_exp_mult = clamp(1 + ((_enemy_level - round(cfg.level)) * 0.10), 0.70, 1.40);
+    }
+    var exp_gain = 0;
+    if (!Level_IsAtCap(p.level)) {
+        exp_gain = max(1, round(real(cfg.exp) * level_exp_mult * exp_mult));
+        if (is_struct(diff) && variable_struct_exists(diff, "player_exp_mult")) {
+            exp_gain = max(1, round(exp_gain * max(0, real(diff.player_exp_mult))));
+        }
+        p = Player_AddExp(p, exp_gain);
+    } else {
+        p.last_levels_gained = 0;
+        p.last_stat_points_gained = 0;
+        p.last_auto_stat_gained = 0;
+    }
+
+    var loot = Loot_RollEnemy({ id: _enemy_id, level: _enemy_level, loot_key: _loot_key });
+    if (loot_mult < 1 && is_array(loot)) {
+        var kept = [];
+        for (var i = 0; i < array_length(loot); i++) {
+            if (random(1) <= loot_mult) array_push(kept, loot[i]);
+        }
+        loot = kept;
+    }
+    p.inventory = Loot_Grant(p.inventory, loot);
+    GameState_SetPlayer(p);
+
+    var result = {
+        exp_gain: exp_gain,
+        levels_gained: variable_struct_exists(p, "last_levels_gained") ? max(0, round(real(p.last_levels_gained))) : 0,
+        stat_points_gained: variable_struct_exists(p, "last_stat_points_gained") ? max(0, round(real(p.last_stat_points_gained))) : 0,
+        auto_stat_summary: LevelUp_AutoGainSummary(p),
+        loot_gained: is_array(loot) && array_length(loot) > 0,
+        at_level_cap: at_cap_before || Level_IsAtCap(p.level)
+    };
+    if (variable_struct_exists(cfg, "name")) _enemy_name = cfg.name;
+    return Enemy_AutoResolveBuildMessage({ name: _enemy_name }, result);
+}
+
+function Enemy_AutoResolveFinalizePending() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "auto_resolve_pending") || !is_struct(gs.auto_resolve_pending)) return;
+    var pending = gs.auto_resolve_pending;
+    gs.auto_resolve_pending = undefined;
+
+    var enemy_id = variable_struct_exists(pending, "enemy_id") ? pending.enemy_id : -1;
+    if (enemy_id < 0) return;
+    var enemy_level = variable_struct_exists(pending, "enemy_level") ? max(1, round(real(pending.enemy_level))) : 1;
+    var loot_key = variable_struct_exists(pending, "loot_key") ? pending.loot_key : "";
+    var enemy_name = variable_struct_exists(pending, "enemy_name") ? string(pending.enemy_name) : "Enemy";
+    var enemy_inst = variable_struct_exists(pending, "enemy_inst") ? pending.enemy_inst : noone;
+    var player_inst = variable_struct_exists(pending, "player_inst") ? pending.player_inst : noone;
+    var persist_id = variable_struct_exists(pending, "persist_id") ? string(pending.persist_id) : "";
+
+    var msg = Enemy_AutoResolveFinalize(enemy_id, enemy_level, loot_key, enemy_name);
+
+    if (persist_id != "") {
+        RoomState_SetRemoved(room, persist_id, obj_enemy, enemy_id);
+    }
+    if (instance_exists(enemy_inst)) {
+        instance_destroy(enemy_inst);
+    }
+
+    if (!instance_exists(player_inst) && instance_exists(obj_player)) {
+        player_inst = instance_find(obj_player, 0);
+    }
+    if (instance_exists(player_inst)) {
+        Player_StartAutoResolveRecover(player_inst, ENEMY_AUTO_RESOLVE_RECOVER_FRAMES);
+    }
+
+    if (msg != "") {
+        Dialogue_StartLines([msg]);
+    }
+}
+
 function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
     if (!instance_exists(_enemy_inst) || !instance_exists(_player_inst)) return false;
     if (!variable_instance_exists(_enemy_inst, "enemy_id")) return false;
@@ -97,54 +184,37 @@ function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
     if (!Enemy_CanAutoResolve(cfg, p.level, enemy_level)) return false;
     if (!RoomState_EnsurePersistId(_enemy_inst)) return false;
 
-    var exp_mult = variable_struct_exists(cfg, "auto_resolve_exp_mult") ? max(0, real(cfg.auto_resolve_exp_mult)) : ENEMY_AUTO_RESOLVE_EXP_MULT_DEFAULT;
-    var loot_mult = variable_struct_exists(cfg, "auto_resolve_loot_mult") ? clamp(real(cfg.auto_resolve_loot_mult), 0, 1) : ENEMY_AUTO_RESOLVE_LOOT_MULT_DEFAULT;
-    var diff = Difficulty_Profile();
-    var at_cap_before = Level_IsAtCap(p.level);
+    if (variable_instance_exists(_enemy_inst, "moving")) _enemy_inst.moving = false;
+    if (variable_instance_exists(_enemy_inst, "move_timer")) _enemy_inst.move_timer = 0;
+    if (variable_instance_exists(_enemy_inst, "move_dir")) _enemy_inst.move_dir = -1;
+    if (variable_instance_exists(_enemy_inst, "ai_state")) _enemy_inst.ai_state = ENEMY_IDLE;
+    if (variable_instance_exists(_enemy_inst, "forget_time")) _enemy_inst.forget_time = 0;
 
-    var level_exp_mult = 1;
-    if (variable_struct_exists(cfg, "level")) {
-        level_exp_mult = clamp(1 + ((enemy_level - round(cfg.level)) * 0.10), 0.70, 1.40);
-    }
-    var exp_gain = 0;
-    if (!Level_IsAtCap(p.level)) {
-        exp_gain = max(1, round(real(cfg.exp) * level_exp_mult * exp_mult));
-        if (is_struct(diff) && variable_struct_exists(diff, "player_exp_mult")) {
-            exp_gain = max(1, round(exp_gain * max(0, real(diff.player_exp_mult))));
-        }
-        p = Player_AddExp(p, exp_gain);
-    } else {
-        // Keep reward flags truthful when already capped.
-        p.last_levels_gained = 0;
-        p.last_stat_points_gained = 0;
-        p.last_auto_stat_gained = 0;
-    }
+    if (variable_instance_exists(_player_inst, "moving")) _player_inst.moving = false;
+    if (variable_instance_exists(_player_inst, "move_timer")) _player_inst.move_timer = 0;
+    if (variable_instance_exists(_player_inst, "move_dir")) _player_inst.move_dir = -1;
 
-    var loot = Loot_RollEnemy({ id: cfg.id, level: enemy_level, loot_key: cfg.loot_key });
-    if (loot_mult < 1 && is_array(loot)) {
-        var kept = [];
-        for (var i = 0; i < array_length(loot); i++) {
-            if (random(1) <= loot_mult) array_push(kept, loot[i]);
-        }
-        loot = kept;
-    }
-    p.inventory = Loot_Grant(p.inventory, loot);
-    GameState_SetPlayer(p);
-    Player_StartAutoResolveRecover(_player_inst, ENEMY_AUTO_RESOLVE_RECOVER_FRAMES);
-
-    RoomState_SetRemoved(room, _enemy_inst.persist_id, obj_enemy, _enemy_inst.enemy_id);
-    instance_destroy(_enemy_inst);
-
-    var result = {
-        exp_gain: exp_gain,
-        levels_gained: variable_struct_exists(p, "last_levels_gained") ? max(0, round(real(p.last_levels_gained))) : 0,
-        stat_points_gained: variable_struct_exists(p, "last_stat_points_gained") ? max(0, round(real(p.last_stat_points_gained))) : 0,
-        auto_stat_summary: LevelUp_AutoGainSummary(p),
-        loot_gained: is_array(loot) && array_length(loot) > 0,
-        at_level_cap: at_cap_before || Level_IsAtCap(p.level)
+    gs.auto_resolve_pending = {
+        enemy_inst: _enemy_inst,
+        player_inst: _player_inst,
+        enemy_id: _enemy_inst.enemy_id,
+        enemy_level: enemy_level,
+        loot_key: variable_struct_exists(cfg, "loot_key") ? cfg.loot_key : "",
+        enemy_name: variable_struct_exists(cfg, "name") ? cfg.name : "Enemy",
+        persist_id: variable_instance_exists(_enemy_inst, "persist_id") ? string(_enemy_inst.persist_id) : ""
     };
-    var msg = Enemy_AutoResolveBuildMessage(cfg, result);
-    Dialogue_StartLines([msg]);
+
+    var ok = Transition_RequestBlackFlash(
+        TRANSITION_FLASH_FADE_OUT_FRAMES,
+        TRANSITION_FLASH_FADE_IN_FRAMES,
+        -1,
+        "auto_resolve"
+    );
+    if (!ok) {
+        gs.auto_resolve_pending = undefined;
+        return false;
+    }
+
     return true;
 }
 

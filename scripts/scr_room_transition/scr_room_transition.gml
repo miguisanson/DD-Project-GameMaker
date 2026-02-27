@@ -121,7 +121,8 @@ function Transition_Init() {
             encounter_focus_y: 0,
             encounter_has_focus: false,
             flash_apply_class_id: -1,
-            flash_apply_class_pending: false
+            flash_apply_class_pending: false,
+            flash_action: ""
         };
     }
 }
@@ -234,6 +235,7 @@ function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus
     tr.encounter_has_focus = false;
     tr.flash_apply_class_id = -1;
     tr.flash_apply_class_pending = false;
+    tr.flash_action = "";
     tr.encounter_cam = -1;
     tr.encounter_cam_valid = false;
     tr.encounter_cam_x = 0;
@@ -280,7 +282,7 @@ function Transition_RequestCutsceneFade(_room, _spawn_id = "", _face = -1, _use_
     return Transition_Begin(TRANSITION_TYPE_CUTSCENE, _room, _spawn_id, _face, _use_spawn);
 }
 
-function Transition_RequestBlackFlash(_fade_out_frames = TRANSITION_FLASH_FADE_OUT_FRAMES, _fade_in_frames = TRANSITION_FLASH_FADE_IN_FRAMES, _flash_apply_class_id = -1) {
+function Transition_RequestBlackFlash(_fade_out_frames = TRANSITION_FLASH_FADE_OUT_FRAMES, _fade_in_frames = TRANSITION_FLASH_FADE_IN_FRAMES, _flash_apply_class_id = -1, _flash_action = "") {
     var ok = Transition_Begin(TRANSITION_TYPE_FLASH, noone, "", -1, false);
     if (!ok) return false;
     var gs = GameState_Get();
@@ -289,6 +291,7 @@ function Transition_RequestBlackFlash(_fade_out_frames = TRANSITION_FLASH_FADE_O
     tr.fade_in_frames = max(1, _fade_in_frames);
     tr.flash_apply_class_pending = is_real(_flash_apply_class_id) && (_flash_apply_class_id >= 0);
     tr.flash_apply_class_id = tr.flash_apply_class_pending ? _flash_apply_class_id : -1;
+    tr.flash_action = string(_flash_action);
     return true;
 }
 
@@ -340,6 +343,7 @@ function Transition_Finish() {
     tr.encounter_has_focus = false;
     tr.flash_apply_class_id = -1;
     tr.flash_apply_class_pending = false;
+    tr.flash_action = "";
 }
 
 function Transition_Update() {
@@ -444,8 +448,12 @@ function Transition_Update() {
                     if (tr.flash_apply_class_pending && is_real(tr.flash_apply_class_id) && tr.flash_apply_class_id >= 0) {
                         ClassSelect_ApplyClass(tr.flash_apply_class_id);
                     }
+                    if (tr.flash_action == "auto_resolve") {
+                        Enemy_AutoResolveFinalizePending();
+                    }
                     tr.flash_apply_class_pending = false;
                     tr.flash_apply_class_id = -1;
+                    tr.flash_action = "";
                     tr.phase = 1;
                     tr.timer = 0;
                 }
