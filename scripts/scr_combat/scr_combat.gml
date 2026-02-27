@@ -434,12 +434,12 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
         if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        Battle_Message(_bc, timing_label + "! Critical hit! " + string(_bc.last_dmg) + " dmg!", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, timing_label + "! Critical hit! " + string(_bc.last_dmg) + " damage!", BSTATE_ENEMY_ACT);
     } else {
         if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        Battle_Message(_bc, timing_label + "! You hit for " + string(_bc.last_dmg) + " dmg!", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, timing_label + "! You hit for " + string(_bc.last_dmg) + " damage!", BSTATE_ENEMY_ACT);
     }
 
     p = Status_Tick(p);
@@ -533,12 +533,12 @@ function Battle_PlayerSkill(_bc, _skill_id) {
         SFX_PlayMissOrBlocked(false, -1);
         Battle_Message(_bc, "Skill missed!", BSTATE_ENEMY_ACT, fx);
     } else if (res.crit) {
-        Battle_Message(_bc, "Critical skill! " + string(res.dmg) + " dmg!", BSTATE_ENEMY_ACT, fx);
+        Battle_Message(_bc, "Critical skill! " + string(res.dmg) + " damage!", BSTATE_ENEMY_ACT, fx);
     } else if (res.dmg > 0) {
         if (instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        Battle_Message(_bc, "Skill hit for " + string(res.dmg) + " dmg!", BSTATE_ENEMY_ACT, fx);
+        Battle_Message(_bc, "Skill hit for " + string(res.dmg) + " damage!", BSTATE_ENEMY_ACT, fx);
     } else {
         Battle_Message(_bc, "Skill used.", BSTATE_ENEMY_ACT, fx);
     }
@@ -768,10 +768,10 @@ function Battle_EnemyAct(_bc) {
             Battle_Message(_bc, e.name + " missed!", follow_state, fx2);
         } else if (res.crit) {
             if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " crit! " + string(res.dmg) + " dmg!", follow_state, fx2);
+            Battle_Message(_bc, e.name + " crit! " + string(res.dmg) + " damage!", follow_state, fx2);
         } else {
             if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " hits for " + string(res.dmg) + " dmg!", follow_state, fx2);
+            Battle_Message(_bc, e.name + " hits for " + string(res.dmg) + " damage!", follow_state, fx2);
         }
     } else {
         var ew = _bc.enemy_weapon;
@@ -811,10 +811,10 @@ function Battle_EnemyAct(_bc) {
             Battle_Message(_bc, e.name + " missed!", follow_state);
         } else if (_bc.last_crit) {
             if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " crit! " + string(_bc.last_dmg) + " dmg!", follow_state);
+            Battle_Message(_bc, e.name + " crit! " + string(_bc.last_dmg) + " damage!", follow_state);
         } else {
             if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " hits for " + string(_bc.last_dmg) + " dmg!", follow_state);
+            Battle_Message(_bc, e.name + " hits for " + string(_bc.last_dmg) + " damage!", follow_state);
         }
     }
 
