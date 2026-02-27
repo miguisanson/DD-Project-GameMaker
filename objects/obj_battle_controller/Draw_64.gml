@@ -33,23 +33,86 @@ var gui_off_x = cam_off.x * sx;
 var gui_off_y = cam_off.y * sy;
 var row_h = max(16, string_height("A") + 2);
 
-// Combat log (top-right, text-only)
+var __wrap_for_width = function(_text, _max_width) {
+    var wrapped = [];
+    var remain = string(_text);
+    while (string_length(remain) > 0 && string_char_at(remain, 1) == " ") {
+        remain = string_delete(remain, 1, 1);
+    }
+    while (string_length(remain) > 0 && string_char_at(remain, string_length(remain)) == " ") {
+        remain = string_delete(remain, string_length(remain), 1);
+    }
+    var safe_width = max(8, floor(_max_width));
+
+    while (string_length(remain) > 0) {
+        if (string_width(remain) <= safe_width) {
+            array_push(wrapped, remain);
+            break;
+        }
+
+        var cut = string_length(remain);
+        while (cut > 1 && string_width(string_copy(remain, 1, cut)) > safe_width) {
+            cut -= 1;
+        }
+
+        if (cut <= 1) {
+            array_push(wrapped, string_copy(remain, 1, 1));
+            remain = string_delete(remain, 1, 1);
+            while (string_length(remain) > 0 && string_char_at(remain, 1) == " ") {
+                remain = string_delete(remain, 1, 1);
+            }
+            while (string_length(remain) > 0 && string_char_at(remain, string_length(remain)) == " ") {
+                remain = string_delete(remain, string_length(remain), 1);
+            }
+            continue;
+        }
+
+        var prefix = string_copy(remain, 1, cut);
+        var last_space = 0;
+        for (var si = 1; si <= string_length(prefix); si++) {
+            if (string_char_at(prefix, si) == " ") last_space = si;
+        }
+
+        var used_len = cut;
+        if (last_space > 0) used_len = max(1, last_space - 1);
+
+        var row_text = string_copy(remain, 1, used_len);
+        while (string_length(row_text) > 0 && string_char_at(row_text, 1) == " ") {
+            row_text = string_delete(row_text, 1, 1);
+        }
+        while (string_length(row_text) > 0 && string_char_at(row_text, string_length(row_text)) == " ") {
+            row_text = string_delete(row_text, string_length(row_text), 1);
+        }
+        if (row_text == "") row_text = string_copy(remain, 1, cut);
+
+        array_push(wrapped, row_text);
+        remain = string_delete(remain, 1, used_len);
+        while (string_length(remain) > 0 && string_char_at(remain, 1) == " ") {
+            remain = string_delete(remain, 1, 1);
+        }
+        while (string_length(remain) > 0 && string_char_at(remain, string_length(remain)) == " ") {
+            remain = string_delete(remain, string_length(remain), 1);
+        }
+    }
+
+    if (array_length(wrapped) <= 0) array_push(wrapped, "");
+    return wrapped;
+};
+
+// Combat log (top-right, wrapped, icon-aware)
 if (!is_array(combat_log)) combat_log = [];
 var log_lines = combat_log;
 var log_count = array_length(log_lines);
-var log_visible = 3;
-var log_line_h = string_height("A") + 2;
-var log_bottom = margin + (log_visible * log_line_h);
+var log_visible_lines = 6;
+var log_line_h = max(12, string_height("A") + 1);
+var log_bottom = margin + (log_visible_lines * log_line_h);
 if (log_count > 0) {
-    var log_start = max(0, log_count - log_visible);
     var max_w = w * 0.45;
     var log_base_x = w - margin;
     var log_base_y = margin;
+    var log_rows = [];
 
-    draw_set_alpha(1);
-    draw_set_color(c_white);
-    for (var li2 = log_start; li2 < log_count; li2++) {
-        var row = li2 - log_start;
+    for (var li2 = 0; li2 < log_count; li2++) {
         var entry = log_lines[li2];
         var line = "";
         var icon_sprite = noone;
@@ -70,19 +133,40 @@ if (log_count > 0) {
             icon_subimg = clamp(icon_subimg, 0, max_sub);
         }
 
-        var max_text_w = max_w - ((icon_w > 0) ? (icon_w + 4) : 0);
-        while (string_width(line) > max_text_w && string_length(line) > 3) {
-            line = string_copy(line, 1, string_length(line) - 4) + "...";
-        }
+        var max_text_w = max(24, max_w - ((icon_w > 0) ? (icon_w + 4) : 0));
+        var wrapped_lines = __wrap_for_width(line, max_text_w);
 
-        var line_w = string_width(line) + ((icon_w > 0) ? (icon_w + 4) : 0);
+        for (var wi = 0; wi < array_length(wrapped_lines); wi++) {
+            array_push(log_rows, {
+                text: wrapped_lines[wi],
+                icon_sprite: icon_sprite,
+                icon_subimg: icon_subimg,
+                icon_w: icon_w,
+                show_icon: (wi == 0 && icon_w > 0)
+            });
+        }
+    }
+
+    var row_count = array_length(log_rows);
+    var draw_start = max(0, row_count - log_visible_lines);
+    var shown_rows = min(log_visible_lines, row_count);
+    log_bottom = margin + (shown_rows * log_line_h);
+
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+    for (var ri = draw_start; ri < row_count; ri++) {
+        var row = ri - draw_start;
+        var r = log_rows[ri];
+        var line_w = string_width(r.text) + (r.show_icon ? (r.icon_w + 4) : 0);
         var lx = log_base_x - line_w;
         var ly = log_base_y + row * log_line_h;
-        if (icon_w > 0) {
-            draw_sprite(icon_sprite, icon_subimg, lx, ly + 1);
-            lx += icon_w + 4;
+
+        if (r.show_icon && r.icon_sprite != noone && r.icon_sprite != -1) {
+            draw_sprite(r.icon_sprite, r.icon_subimg, lx, ly + 1);
+            lx += r.icon_w + 4;
         }
-        draw_text(lx, ly, line);
+
+        draw_text(lx, ly, r.text);
     }
 }
 
