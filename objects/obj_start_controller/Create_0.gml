@@ -84,7 +84,7 @@ cutscene_definitions.ending = [
             "...",
             "oh",
             "...",
-            "I wasn't so lucky after all"
+            "I wasn't so lucky after all."
         ],
         hold_frames: 0,
         transition_speed: "normal",
@@ -116,7 +116,7 @@ cutscene_definitions.game_over = [
     {
         sprite_name: "GAME_OVER",
         lines: [
-            "GAME OVER"
+            "GAME OVER."
         ],
         hold_frames: 0,
         transition_speed: "normal",
