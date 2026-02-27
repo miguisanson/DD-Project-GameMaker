@@ -6,7 +6,7 @@ dialogue_id = "";
 grave_interactable = true;
 ghost_spawn_chance = 0.60;
 ghost_marker_id = "";
-ghost_duration_frames = room_speed;
+ghost_duration_frames = game_get_speed(gamespeed_fps);
 grave_lines = [
     "A worn grave marker sinks into the soil.",
     "An old grave rests here, quiet and cold.",

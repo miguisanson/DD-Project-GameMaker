@@ -551,12 +551,13 @@ function Battle_EnemyAct(_bc) {
     var set_actions = 0;
     var extra_turns = 0;
     var follow_state = BSTATE_MENU;
+    var res = undefined;
 
     if (use_skill) {
         if (!is_struct(sk)) sk = SkillDB_Get(skill_id);
         var enemy_targets_self = (variable_struct_exists(sk, "target") && sk.target == TGT_SELF);
         var enemy_skill_target = enemy_targets_self ? e : p;
-        var res = Skill_Use(e, enemy_skill_target, skill_id);
+        res = Skill_Use(e, enemy_skill_target, skill_id);
         if (enemy_targets_self) e = enemy_skill_target; else p = enemy_skill_target;
         if (!res.ok) {
             use_skill = false;
