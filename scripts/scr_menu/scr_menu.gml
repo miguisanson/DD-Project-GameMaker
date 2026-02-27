@@ -151,6 +151,82 @@ function Menu_IsEquipped(_ch, _item_id) {
     return false;
 }
 
+function Menu_ClampInventoryCursor(_m, _inventory) {
+    var inv_count = is_array(_inventory) ? array_length(_inventory) : 0;
+    if (inv_count <= 0) {
+        _m.inv_index = 0;
+        _m.inv_scroll = 0;
+        return _m;
+    }
+
+    _m.inv_index = clamp(_m.inv_index, 0, inv_count - 1);
+    if (_m.inv_index < _m.inv_scroll) _m.inv_scroll = _m.inv_index;
+
+    var visible_rows = Menu_GetLayout().rows_visible;
+    if (_m.inv_index >= _m.inv_scroll + visible_rows) {
+        _m.inv_scroll = _m.inv_index - visible_rows + 1;
+    }
+
+    _m.inv_scroll = clamp(_m.inv_scroll, 0, max(0, inv_count - visible_rows));
+    return _m;
+}
+
+function Menu_UseInventoryItem(_m, _ch, _item_id) {
+    var item = ItemDB_Get(_item_id);
+    var out = { menu: _m, ch: _ch, changed: false };
+
+    if (!is_struct(item) || item.id == 0) {
+        out.menu = Menu_InvPopupOpenMessage(_m, "Can't use that.");
+        return out;
+    }
+
+    if (Item_IsSkillbook(item)) {
+        out.menu = Menu_InvPopupOpenConfirm(_m, item.id);
+        return out;
+    }
+
+    if (item.type == ITEM_WEAPON || item.type == ITEM_ARMOR) {
+        var can = Equip_CanEquip(_ch, item);
+        if (!can.ok) {
+            out.menu = Menu_InvPopupOpenMessage(_m, can.msg);
+            return out;
+        }
+
+        if (Equip_Item(_ch, item.id)) {
+            _ch = RecomputeResources(_ch);
+            _m = Menu_ClampInventoryCursor(_m, _ch.inventory);
+            out.menu = Menu_InvPopupOpenMessage(_m, "Equipped " + item.name + ".");
+            out.ch = _ch;
+            out.changed = true;
+            return out;
+        }
+
+        out.menu = Menu_InvPopupOpenMessage(_m, "Can't equip that.");
+        return out;
+    }
+
+    if (Item_IsConsumable(item)) {
+        var target = _ch;
+        var use_result = Item_Use(item.id, _ch, target);
+
+        if (use_result.ok) {
+            _ch.inventory = Inv_Remove(_ch.inventory, item.id, 1);
+            _ch = RecomputeResources(_ch);
+            _m = Menu_ClampInventoryCursor(_m, _ch.inventory);
+            out.menu = Menu_InvPopupOpenMessage(_m, use_result.msg);
+            out.ch = _ch;
+            out.changed = true;
+            return out;
+        }
+
+        out.menu = Menu_InvPopupOpenMessage(_m, use_result.msg);
+        return out;
+    }
+
+    out.menu = Menu_InvPopupOpenMessage(_m, "Can't use that.");
+    return out;
+}
+
 function Menu_InvPopupOpenConfirm(_m, _item_id) {
     _m.inv_popup_open = true;
     _m.inv_popup_closing = false;
@@ -270,18 +346,9 @@ function Menu_HandleInput() {
                     var use_result = Item_Use(m.inv_popup_item_id, ch, ch);
                     if (use_result.ok) {
                         ch.inventory = Inv_Remove(ch.inventory, m.inv_popup_item_id, 1);
+                        ch = RecomputeResources(ch);
                         GameState_SetPlayer(ch);
-
-                        var inv_count = array_length(ch.inventory);
-                        if (inv_count <= 0) {
-                            m.inv_index = 0;
-                            m.inv_scroll = 0;
-                        } else {
-                            m.inv_index = clamp(m.inv_index, 0, inv_count - 1);
-                            if (m.inv_index < m.inv_scroll) m.inv_scroll = m.inv_index;
-                            var visible_rows = Menu_GetLayout().rows_visible;
-                            if (m.inv_index >= m.inv_scroll + visible_rows) m.inv_scroll = m.inv_index - visible_rows + 1;
-                        }
+                        m = Menu_ClampInventoryCursor(m, ch.inventory);
                     }
                     m = Menu_InvPopupOpenMessage(m, use_result.msg);
                 } else {
@@ -380,8 +447,13 @@ function Menu_HandleInput() {
             }
 
             SFX_PlayUI("ui_confirm");
-            if (selected_item_id != -1 && Item_IsSkillbook(ItemDB_Get(selected_item_id))) {
-                m = Menu_InvPopupOpenConfirm(m, selected_item_id);
+            if (selected_item_id != -1) {
+                var use_out = Menu_UseInventoryItem(m, ch, selected_item_id);
+                m = use_out.menu;
+                ch = use_out.ch;
+                if (use_out.changed) {
+                    GameState_SetPlayer(ch);
+                }
             } else {
                 m = Menu_InvPopupOpenMessage(m, "Can't use that.");
             }
@@ -593,7 +665,8 @@ function Menu_Draw() {
                 draw_text(tx, yy, label);
 
                 if (Menu_IsEquipped(ch, inv.id)) {
-                    draw_sprite(bandage, 0, bx + bw - pad - 16, yy + 2);
+                    draw_set_color(sel ? c_black : c_white);
+                    draw_text(bx + bw - pad - string_width("E"), yy, "E");
                 }
             }
         }

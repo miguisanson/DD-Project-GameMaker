@@ -1,29 +1,73 @@
-function Equip_Item(_ch, _item_id) {
-    var item = ItemDB_Get(_item_id);
-    if (item.type != ITEM_WEAPON && item.type != ITEM_ARMOR) return false;
-    if (item.equip_slot == "") return false;
+function Equip_ClassName(_class_id) {
+    var cfg = DB_PlayerClass(_class_id);
+    if (is_struct(cfg) && variable_struct_exists(cfg, "name")) return string(cfg.name);
+    return "Unknown";
+}
+
+function Equip_CanEquip(_ch, _item_or_id) {
+    var item = _item_or_id;
+    if (!is_struct(item)) item = ItemDB_Get(_item_or_id);
+
+    var out = { ok: false, msg: "Can't equip that.", item: item };
+
+    if (!is_struct(_ch)) return out;
+    if (!is_struct(item) || item.id == 0) return out;
+    if (item.type != ITEM_WEAPON && item.type != ITEM_ARMOR) return out;
+    if (!variable_struct_exists(item, "equip_slot") || item.equip_slot == "") return out;
+    if (!variable_struct_exists(_ch, "class_id")) return out;
+
+    if (!variable_struct_exists(_ch, "inventory") || !is_array(_ch.inventory) || !Inv_Has(_ch.inventory, item.id, 1)) {
+        out.msg = "Item not in inventory.";
+        return out;
+    }
+
+    var slot = string(item.equip_slot);
+    if (Equip_SlotGet(_ch, slot) == item.id) {
+        out.msg = "Already equipped.";
+        return out;
+    }
 
     if (variable_struct_exists(item, "preferred_class") && item.preferred_class != -1) {
-        if (!variable_struct_exists(_ch, "class_id") || _ch.class_id != item.preferred_class) return false;
+        if (_ch.class_id != item.preferred_class) {
+            out.msg = Equip_ClassName(item.preferred_class) + " only.";
+            return out;
+        }
     }
 
     if (variable_struct_exists(item, "allowed_classes") && is_array(item.allowed_classes)) {
         var allowed = false;
         for (var i = 0; i < array_length(item.allowed_classes); i++) {
-            if (item.allowed_classes[i] == _ch.class_id) { allowed = true; break; }
+            if (item.allowed_classes[i] == _ch.class_id) {
+                allowed = true;
+                break;
+            }
         }
-        if (!allowed) return false;
+
+        if (!allowed) {
+            var class_text = "";
+            for (var j = 0; j < array_length(item.allowed_classes); j++) {
+                if (j > 0) class_text += "/";
+                class_text += Equip_ClassName(item.allowed_classes[j]);
+            }
+            if (class_text == "") class_text = "That";
+            out.msg = class_text + " only.";
+            return out;
+        }
     }
 
-    // Remove from inventory (1)
-    _ch.inventory = Inv_Remove(_ch.inventory, _item_id, 1);
+    out.ok = true;
+    out.msg = "Equipped " + string(item.name) + ".";
+    return out;
+}
 
-    // Swap existing
+function Equip_Item(_ch, _item_id) {
+    var can = Equip_CanEquip(_ch, _item_id);
+    if (!can.ok) return false;
+
+    var item = can.item;
+    // One slot at a time: assigning the new item automatically unequips the old one.
     var slot = item.equip_slot;
-    var old = Equip_SlotGet(_ch, slot);
     Equip_SlotSet(_ch, slot, _item_id);
-
-    if (old != 0) _ch.inventory = Inv_Add(_ch.inventory, old, 1);
 
     return true;
 }
