@@ -8,6 +8,8 @@ function Menu_Ensure() {
     if (!variable_struct_exists(gs.ui, "menu")) {
         gs.ui.menu = {
             open: false,
+            closing: false,
+            close_frame: UI_OPENED_FRAME_NONE,
             tab: 0,
             tabs: ["Inventory","Skills","Stats"],
             header_focus: true,
@@ -21,6 +23,8 @@ function Menu_Ensure() {
             inv_popup_item_id: -1,
             inv_popup_block_frame: UI_OPENED_FRAME_NONE,
             inv_popup_open_frame: UI_OPENED_FRAME_NONE,
+            inv_popup_closing: false,
+            inv_popup_close_frame: UI_OPENED_FRAME_NONE,
             skill_index: 0,
             skill_scroll: 0,
             stats_focus: false,
@@ -35,6 +39,10 @@ function Menu_Ensure() {
         var m0 = gs.ui.menu;
         if (!variable_struct_exists(m0, "opened_frame")) m0.opened_frame = UI_OPENED_FRAME_NONE;
         if (!variable_struct_exists(m0, "inv_popup_open_frame")) m0.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
+        if (!variable_struct_exists(m0, "closing")) m0.closing = false;
+        if (!variable_struct_exists(m0, "close_frame")) m0.close_frame = UI_OPENED_FRAME_NONE;
+        if (!variable_struct_exists(m0, "inv_popup_closing")) m0.inv_popup_closing = false;
+        if (!variable_struct_exists(m0, "inv_popup_close_frame")) m0.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
     }
 }
 
@@ -44,19 +52,70 @@ function Menu_Open() {
     SFX_PlayUI("ui_openclose");
     gs.ui.mode = UI_MENU;
     gs.ui.menu.open = true;
+    gs.ui.menu.closing = false;
+    gs.ui.menu.close_frame = UI_OPENED_FRAME_NONE;
     gs.ui.menu.header_focus = true;
     gs.ui.menu.stats_focus = false;
     gs.ui.menu.opened_frame = Input_Frame();
     Menu_StatsSync();
 }
 
-function Menu_Close() {
+function Menu_Close(_immediate = false) {
     Menu_Ensure();
     var gs = GameState_Get();
+    var m = gs.ui.menu;
+    if (_immediate) {
+        Menu_StatsDiscard();
+        gs.ui.menu.open = false;
+        gs.ui.menu.closing = false;
+        gs.ui.menu.close_frame = UI_OPENED_FRAME_NONE;
+        gs.ui.mode = UI_NONE;
+        SFX_PlayUI("ui_openclose");
+        return;
+    }
+    if (!m.open || m.closing) return;
     Menu_StatsDiscard();
+    m.closing = true;
+    m.close_frame = Input_Frame();
+    m.inv_popup_closing = false;
+    m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
+    gs.ui.menu = m;
     SFX_PlayUI("ui_openclose");
+}
+
+function Menu_CloseFinalize() {
+    Menu_Ensure();
+    var gs = GameState_Get();
+    var m = gs.ui.menu;
+    m.open = false;
+    m.closing = false;
+    m.close_frame = UI_OPENED_FRAME_NONE;
+    m.inv_popup_open = false;
+    m.inv_popup_closing = false;
+    m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
+    m.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
+    gs.ui.menu = m;
     gs.ui.mode = UI_NONE;
-    gs.ui.menu.open = false;
+}
+
+function Menu_InvPopupClose(_m, _immediate = false) {
+    if (_immediate) {
+        _m.inv_popup_open = false;
+        _m.inv_popup_closing = false;
+        _m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
+        _m.inv_popup_mode = "";
+        _m.inv_popup_choice = 1;
+        _m.inv_popup_message = "";
+        _m.inv_popup_item_id = -1;
+        _m.inv_popup_block_frame = UI_OPENED_FRAME_NONE;
+        _m.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
+        return _m;
+    }
+    if (!_m.inv_popup_open || _m.inv_popup_closing) return _m;
+    _m.inv_popup_closing = true;
+    _m.inv_popup_close_frame = Input_Frame();
+    _m.inv_popup_block_frame = Input_Frame() + 1;
+    return _m;
 }
 
 function Menu_IsOpen() {
@@ -94,6 +153,8 @@ function Menu_IsEquipped(_ch, _item_id) {
 
 function Menu_InvPopupOpenConfirm(_m, _item_id) {
     _m.inv_popup_open = true;
+    _m.inv_popup_closing = false;
+    _m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
     _m.inv_popup_mode = "confirm";
     _m.inv_popup_choice = 1; // default to Cancel
     _m.inv_popup_message = "Learn a skill";
@@ -105,22 +166,13 @@ function Menu_InvPopupOpenConfirm(_m, _item_id) {
 
 function Menu_InvPopupOpenMessage(_m, _msg) {
     _m.inv_popup_open = true;
+    _m.inv_popup_closing = false;
+    _m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
     _m.inv_popup_mode = "message";
     _m.inv_popup_choice = 0;
     _m.inv_popup_message = _msg;
     _m.inv_popup_block_frame = Input_Frame() + 1;
     _m.inv_popup_open_frame = Input_Frame();
-    return _m;
-}
-
-function Menu_InvPopupClose(_m) {
-    _m.inv_popup_open = false;
-    _m.inv_popup_mode = "";
-    _m.inv_popup_choice = 1;
-    _m.inv_popup_message = "";
-    _m.inv_popup_item_id = -1;
-    _m.inv_popup_block_frame = UI_OPENED_FRAME_NONE;
-    _m.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
     return _m;
 }
 
@@ -168,6 +220,16 @@ function Menu_HandleInput() {
     var gs = GameState_Get();
     var m = gs.ui.menu;
     var ch = gs.player_ch;
+    var frame = Input_Frame();
+
+    if (variable_struct_exists(m, "closing") && m.closing) {
+        if (frame - m.close_frame >= UI_POPUP_FADE_FRAMES) {
+            Menu_CloseFinalize();
+        } else {
+            gs.ui.menu = m;
+        }
+        return;
+    }
 
     var nav_up = Menu_NavPressed("menu_up");
     var nav_down = Menu_NavPressed("menu_down");
@@ -177,7 +239,13 @@ function Menu_HandleInput() {
     var k_back = Input_UIBack();
 
     if (variable_struct_exists(m, "inv_popup_open") && m.inv_popup_open) {
-        var frame = Input_Frame();
+        if (variable_struct_exists(m, "inv_popup_closing") && m.inv_popup_closing) {
+            if (frame - m.inv_popup_close_frame >= UI_POPUP_FADE_FRAMES) {
+                m = Menu_InvPopupClose(m, true);
+            }
+            gs.ui.menu = m;
+            return;
+        }
         if (m.inv_popup_block_frame != UI_OPENED_FRAME_NONE && frame <= m.inv_popup_block_frame) {
             gs.ui.menu = m;
             return;
@@ -456,7 +524,9 @@ function Menu_Draw() {
     var pad = layout.pad;
     var row_h = layout.row_h;
     var rows_visible = layout.rows_visible;
-    var menu_alpha = UI_PopupFadeAlpha(m.opened_frame, 1);
+    var menu_closing = variable_struct_exists(m, "closing") && m.closing;
+    var menu_close_frame = variable_struct_exists(m, "close_frame") ? m.close_frame : UI_OPENED_FRAME_NONE;
+    var menu_alpha = UI_PopupAlpha(m.opened_frame, menu_closing, menu_close_frame, 1);
 
     draw_set_alpha(menu_alpha * 0.6);
     draw_set_color(c_black);
@@ -716,7 +786,9 @@ function Menu_Draw() {
     }
 
     if (variable_struct_exists(m, "inv_popup_open") && m.inv_popup_open) {
-        var popup_alpha = UI_PopupFadeAlpha(m.inv_popup_open_frame, 1);
+        var inv_closing = variable_struct_exists(m, "inv_popup_closing") && m.inv_popup_closing;
+        var inv_close_frame = variable_struct_exists(m, "inv_popup_close_frame") ? m.inv_popup_close_frame : UI_OPENED_FRAME_NONE;
+        var popup_alpha = UI_PopupAlpha(m.inv_popup_open_frame, inv_closing, inv_close_frame, 1);
         var popup_msg = "Learn a skill";
         if (m.inv_popup_mode == "message") popup_msg = string(m.inv_popup_message);
 
@@ -828,16 +900,22 @@ function ClassSelect_Ensure() {
     if (!variable_struct_exists(gs.ui, "class_select")) {
         gs.ui.class_select = {
             open: false,
+            closing: false,
+            close_frame: UI_OPENED_FRAME_NONE,
             index: 0,
             choices: ["Warrior", "Archer", "Mage"],
             choice_ids: [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE],
             allow_cancel: true,
             open_block_frame: UI_OPENED_FRAME_NONE,
-            opened_frame: UI_OPENED_FRAME_NONE
+            opened_frame: UI_OPENED_FRAME_NONE,
+            pending_apply_class: -1
         };
     } else {
         var cs0 = gs.ui.class_select;
         if (!variable_struct_exists(cs0, "opened_frame")) cs0.opened_frame = UI_OPENED_FRAME_NONE;
+        if (!variable_struct_exists(cs0, "closing")) cs0.closing = false;
+        if (!variable_struct_exists(cs0, "close_frame")) cs0.close_frame = UI_OPENED_FRAME_NONE;
+        if (!variable_struct_exists(cs0, "pending_apply_class")) cs0.pending_apply_class = -1;
     }
 }
 
@@ -855,6 +933,9 @@ function ClassSelect_Open(_allow_cancel = true) {
 
     var cs = gs.ui.class_select;
     cs.open = true;
+    cs.closing = false;
+    cs.close_frame = UI_OPENED_FRAME_NONE;
+    cs.pending_apply_class = -1;
     cs.index = 0;
     cs.allow_cancel = _allow_cancel;
     cs.open_block_frame = Input_Frame() + 1;
@@ -865,16 +946,48 @@ function ClassSelect_Open(_allow_cancel = true) {
     return true;
 }
 
-function ClassSelect_Close(_play_sfx = true) {
+function ClassSelect_Close(_play_sfx = true, _immediate = false) {
     ClassSelect_Ensure();
     var gs = GameState_Get();
     var cs = gs.ui.class_select;
+    if (_immediate) {
+        cs.open = false;
+        cs.closing = false;
+        cs.close_frame = UI_OPENED_FRAME_NONE;
+        cs.pending_apply_class = -1;
+        cs.open_block_frame = UI_OPENED_FRAME_NONE;
+        cs.opened_frame = UI_OPENED_FRAME_NONE;
+        gs.ui.class_select = cs;
+        if (gs.ui.mode == UI_CLASS_SELECT) gs.ui.mode = UI_NONE;
+        if (_play_sfx) SFX_PlayUI("ui_openclose");
+        return;
+    }
+    if (!cs.open || cs.closing) return;
+    cs.closing = true;
+    cs.close_frame = Input_Frame();
+    cs.open_block_frame = Input_Frame() + 1;
+    gs.ui.class_select = cs;
+    if (_play_sfx) SFX_PlayUI("ui_openclose");
+}
+
+function ClassSelect_CloseFinalize() {
+    var gs = GameState_Get();
+    var cs = gs.ui.class_select;
+    var apply_class_id = cs.pending_apply_class;
+
     cs.open = false;
+    cs.closing = false;
+    cs.close_frame = UI_OPENED_FRAME_NONE;
+    cs.pending_apply_class = -1;
     cs.open_block_frame = UI_OPENED_FRAME_NONE;
     cs.opened_frame = UI_OPENED_FRAME_NONE;
     gs.ui.class_select = cs;
     if (gs.ui.mode == UI_CLASS_SELECT) gs.ui.mode = UI_NONE;
-    if (_play_sfx) SFX_PlayUI("ui_openclose");
+
+    if (is_real(apply_class_id) && apply_class_id >= 0) {
+        ClassSelect_ApplyClass(apply_class_id);
+        Transition_RequestBlackFlash(TRANSITION_CLASS_SELECT_FADE_OUT_FRAMES, TRANSITION_CLASS_SELECT_FADE_IN_FRAMES);
+    }
 }
 
 function ClassSelect_ApplyClass(_class_id) {
@@ -926,6 +1039,14 @@ function ClassSelect_HandleInput() {
     }
 
     var frame = Input_Frame();
+    if (variable_struct_exists(cs, "closing") && cs.closing) {
+        if (frame - cs.close_frame >= UI_POPUP_FADE_FRAMES) {
+            ClassSelect_CloseFinalize();
+        } else {
+            gs.ui.class_select = cs;
+        }
+        return;
+    }
     if (cs.open_block_frame != UI_OPENED_FRAME_NONE && frame <= cs.open_block_frame) {
         gs.ui.class_select = cs;
         return;
@@ -969,10 +1090,9 @@ function ClassSelect_HandleInput() {
 
         if (cs.index >= 0 && cs.index < choice_count && cs.index < array_length(cs.choice_ids)) {
             var class_id = cs.choice_ids[cs.index];
-            ClassSelect_ApplyClass(class_id);
+            cs.pending_apply_class = class_id;
             gs.ui.class_select = cs;
             ClassSelect_Close(false);
-            Transition_RequestBlackFlash(TRANSITION_CLASS_SELECT_FADE_OUT_FRAMES, TRANSITION_CLASS_SELECT_FADE_IN_FRAMES);
             return;
         }
     }
@@ -1000,7 +1120,7 @@ function ClassSelect_Draw() {
     var bh = h * 0.5;
     var bx = (w - bw) * 0.5;
     var by = (h - bh) * 0.5;
-    var popup_alpha = UI_PopupFadeAlpha(cs.opened_frame, 1);
+    var popup_alpha = UI_PopupAlpha(cs.opened_frame, cs.closing, cs.close_frame, 1);
 
     draw_set_alpha(popup_alpha * 0.85);
     draw_set_color(c_black);
@@ -1054,6 +1174,9 @@ function PauseMenu_Ensure() {
     if (!variable_struct_exists(gs.ui, "pause_menu")) {
         gs.ui.pause_menu = {
             open: false,
+            closing: false,
+            close_frame: UI_OPENED_FRAME_NONE,
+            pending_exit_main_menu: false,
             index: 0,
             options: ["Resume","Exit to Main Menu"],
             opened_frame: UI_OPENED_FRAME_NONE
@@ -1061,6 +1184,9 @@ function PauseMenu_Ensure() {
     } else {
         var pm0 = gs.ui.pause_menu;
         if (!variable_struct_exists(pm0, "opened_frame")) pm0.opened_frame = UI_OPENED_FRAME_NONE;
+        if (!variable_struct_exists(pm0, "closing")) pm0.closing = false;
+        if (!variable_struct_exists(pm0, "close_frame")) pm0.close_frame = UI_OPENED_FRAME_NONE;
+        if (!variable_struct_exists(pm0, "pending_exit_main_menu")) pm0.pending_exit_main_menu = false;
     }
 }
 
@@ -1071,35 +1197,73 @@ function PauseMenu_Open() {
     gs.ui.mode = UI_PAUSE;
     var pm = gs.ui.pause_menu;
     pm.open = true;
+    pm.closing = false;
+    pm.close_frame = UI_OPENED_FRAME_NONE;
+    pm.pending_exit_main_menu = false;
     pm.index = 0;
     pm.opened_frame = Input_Frame();
     gs.ui.pause_menu = pm;
 }
 
-function PauseMenu_Close() {
+function PauseMenu_Close(_immediate = false) {
     PauseMenu_Ensure();
     var gs = GameState_Get();
+    var pm = gs.ui.pause_menu;
+    if (_immediate) {
+        SFX_PlayUI("ui_openclose");
+        pm.open = false;
+        pm.closing = false;
+        pm.close_frame = UI_OPENED_FRAME_NONE;
+        pm.pending_exit_main_menu = false;
+        pm.opened_frame = UI_OPENED_FRAME_NONE;
+        gs.ui.pause_menu = pm;
+        gs.ui.mode = UI_NONE;
+        return;
+    }
+    if (!pm.open || pm.closing) return;
     SFX_PlayUI("ui_openclose");
-    gs.ui.pause_menu.open = false;
-    gs.ui.pause_menu.opened_frame = UI_OPENED_FRAME_NONE;
-    gs.ui.mode = UI_NONE;
+    pm.closing = true;
+    pm.close_frame = Input_Frame();
+    gs.ui.pause_menu = pm;
 }
 
 function PauseMenu_ExitToMainMenu() {
+    PauseMenu_Ensure();
     var gs = GameState_Get();
-    PauseMenu_Close();
-    gs.in_main_menu = true;
-    gs.player_inst = noone;
-    global.player_inst = noone;
-    if (variable_struct_exists(gs, "ui")) {
-        gs.ui.lines = [];
-        gs.ui.index = 0;
-        gs.ui.speaker = "";
-        gs.ui.confirm_action = "";
-    }
-    if (room != rm_start) {
-        RoomState_OnRoomExit();
-        Transition_RequestRoomFade(rm_start);
+    var pm = gs.ui.pause_menu;
+    pm.pending_exit_main_menu = true;
+    gs.ui.pause_menu = pm;
+    PauseMenu_Close(false);
+}
+
+function PauseMenu_CloseFinalize() {
+    PauseMenu_Ensure();
+    var gs = GameState_Get();
+    var pm = gs.ui.pause_menu;
+    var do_exit = pm.pending_exit_main_menu;
+
+    pm.open = false;
+    pm.closing = false;
+    pm.close_frame = UI_OPENED_FRAME_NONE;
+    pm.pending_exit_main_menu = false;
+    pm.opened_frame = UI_OPENED_FRAME_NONE;
+    gs.ui.pause_menu = pm;
+    if (gs.ui.mode == UI_PAUSE) gs.ui.mode = UI_NONE;
+
+    if (do_exit) {
+        gs.in_main_menu = true;
+        gs.player_inst = noone;
+        global.player_inst = noone;
+        if (variable_struct_exists(gs, "ui")) {
+            gs.ui.lines = [];
+            gs.ui.index = 0;
+            gs.ui.speaker = "";
+            gs.ui.confirm_action = "";
+        }
+        if (room != rm_start) {
+            RoomState_OnRoomExit();
+            Transition_RequestRoomFade(rm_start);
+        }
     }
 }
 
@@ -1118,6 +1282,16 @@ function PauseMenu_HandleInput() {
     if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "pause_menu")) return;
     var pm = gs.ui.pause_menu;
     if (!pm.open) return;
+    var frame = Input_Frame();
+
+    if (pm.closing) {
+        if (frame - pm.close_frame >= UI_POPUP_FADE_FRAMES) {
+            PauseMenu_CloseFinalize();
+        } else {
+            gs.ui.pause_menu = pm;
+        }
+        return;
+    }
 
     var nav_up = PauseMenu_NavPressed("menu_up");
     var nav_down = PauseMenu_NavPressed("menu_down");
@@ -1174,7 +1348,7 @@ function PauseMenu_Draw() {
     var bh = (row_h * array_length(pm.options)) + inner_pad * 2;
     var bx = (w - bw) * 0.5;
     var by = (h - bh) * 0.5;
-    var popup_alpha = UI_PopupFadeAlpha(pm.opened_frame, 1);
+    var popup_alpha = UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
 
     draw_set_alpha(popup_alpha * 0.6);
     draw_set_color(c_black);

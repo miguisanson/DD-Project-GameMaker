@@ -184,6 +184,17 @@ function UI_PopupFadeAlpha(_opened_frame, _target_alpha = 1, _fade_frames = UI_P
     return target * clamp(age / frames, 0, 1);
 }
 
+function UI_PopupAlpha(_opened_frame, _closing = false, _close_frame = UI_OPENED_FRAME_NONE, _target_alpha = 1, _fade_frames = UI_POPUP_FADE_FRAMES) {
+    var a = UI_PopupFadeAlpha(_opened_frame, _target_alpha, _fade_frames);
+    if (_closing) {
+        var frames = max(1, round(real(_fade_frames)));
+        var cf = is_real(_close_frame) ? _close_frame : Input_Frame();
+        var t = clamp((Input_Frame() - cf) / frames, 0, 1);
+        a *= (1 - t);
+    }
+    return clamp(a, 0, 1);
+}
+
 function Action_CanAct(_pl) {
     if (UI_IsBlocking()) return false;
     return Player_CanAcceptMove(_pl);

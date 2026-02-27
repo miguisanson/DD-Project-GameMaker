@@ -23,6 +23,8 @@ function SaveMenu_Open(_mode, _context) {
     gs.ui.mode = UI_SAVE;
     gs.ui.save_menu = {
         open: true,
+        closing: false,
+        close_frame: UI_OPENED_FRAME_NONE,
         mode: _mode, // "load" or "save"
         context: _context, // "main" or "bed"
         slot: 0,
@@ -35,18 +37,43 @@ function SaveMenu_Open(_mode, _context) {
         slot_info_cache: SaveMenu_BuildSlotInfoCache(),
         opened_frame: Input_Frame(),
         confirm_opened_frame: UI_OPENED_FRAME_NONE,
+        confirm_closing: false,
+        confirm_close_frame: UI_OPENED_FRAME_NONE,
+        pending_action: "",
+        pending_slot: 0,
         require_release: opened_with_confirm
     };
 
 }
 
-function SaveMenu_Close() {
+function SaveMenu_Close(_immediate = false, _pending_action = "", _pending_slot = 0) {
     var gs = GameState_Get();
-    if (variable_struct_exists(gs, "ui") && variable_struct_exists(gs.ui, "save_menu")) {
-        gs.ui.save_menu.open = false;
+    if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "save_menu")) return;
+    var sm = gs.ui.save_menu;
+    if (_immediate) {
+        sm.open = false;
+        sm.closing = false;
+        sm.close_frame = UI_OPENED_FRAME_NONE;
+        sm.pending_action = "";
+        sm.pending_slot = 0;
+        sm.confirm = false;
+        sm.confirm_closing = false;
+        sm.confirm_close_frame = UI_OPENED_FRAME_NONE;
+        gs.ui.save_menu = sm;
+        SFX_PlayUI("ui_openclose");
+        gs.ui.mode = UI_NONE;
+        return;
     }
+    if (!sm.open || sm.closing) return;
+    sm.closing = true;
+    sm.close_frame = Input_Frame();
+    sm.pending_action = _pending_action;
+    sm.pending_slot = _pending_slot;
+    sm.confirm = false;
+    sm.confirm_closing = false;
+    sm.confirm_close_frame = UI_OPENED_FRAME_NONE;
+    gs.ui.save_menu = sm;
     SFX_PlayUI("ui_openclose");
-    gs.ui.mode = UI_NONE;
 }
 
 function SaveMenu_Handle() {
@@ -54,6 +81,41 @@ function SaveMenu_Handle() {
     if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "save_menu")) return;
     var sm = gs.ui.save_menu;
     if (!sm.open) return;
+
+    var frame = Input_Frame();
+    if (variable_struct_exists(sm, "closing") && sm.closing) {
+        if (frame - sm.close_frame >= UI_POPUP_FADE_FRAMES) {
+            var pending_action = variable_struct_exists(sm, "pending_action") ? string(sm.pending_action) : "";
+            var pending_slot = variable_struct_exists(sm, "pending_slot") ? round(real(sm.pending_slot)) : 0;
+
+            sm.open = false;
+            sm.closing = false;
+            sm.close_frame = UI_OPENED_FRAME_NONE;
+            sm.pending_action = "";
+            sm.pending_slot = 0;
+            gs.ui.save_menu = sm;
+            gs.ui.mode = UI_NONE;
+
+            if (pending_action == "load_slot") {
+                if (pending_slot >= 1 && pending_slot <= 3 && Save_Read(pending_slot)) {
+                    SFX_Play("load_confirm");
+                    gs.save_slot = pending_slot;
+                } else {
+                    SFX_PlayUI("ui_back");
+                }
+            } else if (pending_action == "save_and_reload_slot") {
+                if (pending_slot >= 1 && pending_slot <= 3) {
+                    Save_Write(pending_slot);
+                    SFX_Play("save_confirm");
+                    gs.save_slot = pending_slot;
+                    Save_Read(pending_slot);
+                }
+            }
+        } else {
+            gs.ui.save_menu = sm;
+        }
+        return;
+    }
 
     if (variable_struct_exists(sm, "require_release") && sm.require_release) {
         var confirm_active = (
@@ -69,7 +131,6 @@ function SaveMenu_Handle() {
         return;
     }
 
-    var frame = Input_Frame();
     if (variable_struct_exists(sm, "opened_frame")) {
         if (frame <= sm.opened_frame) {
             gs.ui.save_menu = sm;
@@ -85,16 +146,26 @@ function SaveMenu_Handle() {
     var k_back = Input_UIBack();
 
     if (sm.confirm) {
+        if (variable_struct_exists(sm, "confirm_closing") && sm.confirm_closing) {
+            if (frame - sm.confirm_close_frame >= UI_POPUP_FADE_FRAMES) {
+                sm.confirm = false;
+                sm.confirm_closing = false;
+                sm.confirm_close_frame = UI_OPENED_FRAME_NONE;
+                sm.confirm_opened_frame = UI_OPENED_FRAME_NONE;
+                if (sm.confirm_mode == "message" && variable_struct_exists(sm, "close_after_message") && sm.close_after_message) {
+                    gs.ui.save_menu = sm;
+                    SaveMenu_Close(false);
+                    return;
+                }
+            }
+            gs.ui.save_menu = sm;
+            return;
+        }
         if (sm.confirm_mode == "saved" || sm.confirm_mode == "message") {
             if (k_ok || k_back) {
                 SFX_PlayUI("ui_confirm");
-                sm.confirm = false;
-                sm.confirm_opened_frame = UI_OPENED_FRAME_NONE;
-                if (sm.confirm_mode == "saved") SaveMenu_Close();
-                else if (sm.confirm_mode == "message" && variable_struct_exists(sm, "close_after_message") && sm.close_after_message) {
-                    SaveMenu_Close();
-                    return;
-                }
+                sm.confirm_closing = true;
+                sm.confirm_close_frame = Input_Frame();
             }
             gs.ui.save_menu = sm;
             return;
@@ -106,8 +177,8 @@ function SaveMenu_Handle() {
         }
         if (k_back) {
             SFX_PlayUI("ui_back");
-            sm.confirm = false;
-            sm.confirm_opened_frame = UI_OPENED_FRAME_NONE;
+            sm.confirm_closing = true;
+            sm.confirm_close_frame = Input_Frame();
             gs.ui.save_menu = sm;
             return;
         }
@@ -122,43 +193,27 @@ function SaveMenu_Handle() {
                     }
                     SFX_Play("delete_confirm");
                 } else if (sm.confirm_mode == "load") {
-                    SaveMenu_Log("load confirmed slot " + string(sm.slot + 1));
-                    if (Save_Read(sm.slot + 1)) {
-                        SFX_Play("load_confirm");
-                        gs.save_slot = sm.slot + 1;
-                        SaveMenu_Close();
-                        return;
-                    } else {
-                        SFX_PlayUI("ui_back");
-                        SaveMenu_Close();
-                        return;
-                    }
+                    var load_slot = sm.slot + 1;
+                    SaveMenu_Log("load confirmed slot " + string(load_slot));
+                    gs.ui.save_menu = sm;
+                    SaveMenu_Close(false, "load_slot", load_slot);
+                    return;
                 } else if (sm.confirm_mode == "overwrite") {
-                    SaveMenu_Log("overwrite confirmed slot " + string(sm.slot + 1));
-                    Save_Write(sm.slot + 1);
-                    if (variable_struct_exists(sm, "slot_info_cache") && is_array(sm.slot_info_cache) && sm.slot >= 0 && sm.slot < array_length(sm.slot_info_cache)) {
-                        sm.slot_info_cache[sm.slot] = Save_SlotInfo(sm.slot + 1);
-                    }
-                    SFX_Play("save_confirm");
-                    gs.save_slot = sm.slot + 1;
-                    SaveMenu_Close();
-                    Save_Read(gs.save_slot);
+                    var overwrite_slot = sm.slot + 1;
+                    SaveMenu_Log("overwrite confirmed slot " + string(overwrite_slot));
+                    gs.ui.save_menu = sm;
+                    SaveMenu_Close(false, "save_and_reload_slot", overwrite_slot);
                     return;
                 } else if (sm.confirm_mode == "save") {
-                    SaveMenu_Log("save confirmed slot " + string(sm.slot + 1));
-                    Save_Write(sm.slot + 1);
-                    if (variable_struct_exists(sm, "slot_info_cache") && is_array(sm.slot_info_cache) && sm.slot >= 0 && sm.slot < array_length(sm.slot_info_cache)) {
-                        sm.slot_info_cache[sm.slot] = Save_SlotInfo(sm.slot + 1);
-                    }
-                    SFX_Play("save_confirm");
-                    gs.save_slot = sm.slot + 1;
-                    SaveMenu_Close();
-                    Save_Read(gs.save_slot);
+                    var save_slot = sm.slot + 1;
+                    SaveMenu_Log("save confirmed slot " + string(save_slot));
+                    gs.ui.save_menu = sm;
+                    SaveMenu_Close(false, "save_and_reload_slot", save_slot);
                     return;
                 }
             }
-            sm.confirm = false;
-            sm.confirm_opened_frame = UI_OPENED_FRAME_NONE;
+            sm.confirm_closing = true;
+            sm.confirm_close_frame = Input_Frame();
         }
         gs.ui.save_menu = sm;
         return;
@@ -179,14 +234,14 @@ function SaveMenu_Handle() {
 
     if (k_back) {
         SFX_PlayUI("ui_back");
-        SaveMenu_Close();
+        SaveMenu_Close(false);
         return;
     }
 
     if (k_ok) {
         if (sm.slot == 3) {
             SFX_PlayUI("ui_back");
-            SaveMenu_Close();
+            SaveMenu_Close(false);
             return;
         }
         var slot = sm.slot + 1;
@@ -196,6 +251,8 @@ function SaveMenu_Handle() {
                 if (load_info.exists) {
                     SFX_PlayUI("ui_confirm");
                     sm.confirm = true;
+                    sm.confirm_closing = false;
+                    sm.confirm_close_frame = UI_OPENED_FRAME_NONE;
                     sm.confirm_mode = "load";
                     sm.confirm_choice = 1; // default to Cancel
                     sm.close_after_message = false;
@@ -204,6 +261,8 @@ function SaveMenu_Handle() {
                 } else {
                     SFX_PlayUI("ui_back");
                     sm.confirm = true;
+                    sm.confirm_closing = false;
+                    sm.confirm_close_frame = UI_OPENED_FRAME_NONE;
                     sm.confirm_mode = "message";
                     sm.confirm_choice = 0;
                     sm.message = "No game saves.";
@@ -214,6 +273,8 @@ function SaveMenu_Handle() {
             } else {
                 SFX_PlayUI("ui_confirm");
                 sm.confirm = true;
+                sm.confirm_closing = false;
+                sm.confirm_close_frame = UI_OPENED_FRAME_NONE;
                 sm.confirm_mode = "delete";
                 sm.confirm_choice = 1; // default to Cancel
                 sm.close_after_message = false;
@@ -225,6 +286,8 @@ function SaveMenu_Handle() {
             if (info.exists) {
                 SFX_PlayUI("ui_confirm");
                 sm.confirm = true;
+                sm.confirm_closing = false;
+                sm.confirm_close_frame = UI_OPENED_FRAME_NONE;
                 sm.confirm_mode = "overwrite";
                 sm.confirm_choice = 1; // default to Cancel
                 sm.close_after_message = false;
@@ -233,6 +296,8 @@ function SaveMenu_Handle() {
             } else {
                 SFX_PlayUI("ui_confirm");
                 sm.confirm = true;
+                sm.confirm_closing = false;
+                sm.confirm_close_frame = UI_OPENED_FRAME_NONE;
                 sm.confirm_mode = "save";
                 sm.confirm_choice = 1; // default Cancel
                 sm.close_after_message = false;
@@ -259,7 +324,7 @@ function SaveMenu_Draw() {
     var pad = 6;
     var side_margin = 12;
     var slot_text_left_pad = 14;
-    var popup_alpha = UI_PopupFadeAlpha(sm.opened_frame, 1);
+    var popup_alpha = UI_PopupAlpha(sm.opened_frame, sm.closing, sm.close_frame, 1);
 
     var title = (sm.mode == "load") ? "Load Game" : "Save Game";
 
@@ -369,7 +434,12 @@ function SaveMenu_Draw() {
         if (variable_struct_exists(sm, "confirm_opened_frame") && sm.confirm_opened_frame != UI_OPENED_FRAME_NONE) {
             confirm_fade_frame = sm.confirm_opened_frame;
         }
-        var confirm_alpha = UI_PopupFadeAlpha(confirm_fade_frame, 1);
+        var confirm_alpha = UI_PopupAlpha(
+            confirm_fade_frame,
+            variable_struct_exists(sm, "confirm_closing") && sm.confirm_closing,
+            variable_struct_exists(sm, "confirm_close_frame") ? sm.confirm_close_frame : UI_OPENED_FRAME_NONE,
+            1
+        );
         var cx = bx + bw * 0.5;
         var cy = by + bh * 0.7;
         var msg = "";

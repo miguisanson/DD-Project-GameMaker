@@ -60,7 +60,7 @@ if (state == "main") {
 }
 
 if (state == "difficulty") {
-    var difficulty_alpha = UI_PopupFadeAlpha(difficulty_opened_frame, 1);
+    var difficulty_alpha = UI_PopupAlpha(difficulty_opened_frame, difficulty_closing, difficulty_close_frame, 1);
     var dw = w * 0.62;
     var dh = h * 0.44;
     var dx = (w - dw) * 0.5;
@@ -110,7 +110,7 @@ if (state == "difficulty") {
 
 // settings popup
 if (state == "settings") {
-    var settings_alpha = UI_PopupFadeAlpha(settings_opened_frame, 1);
+    var settings_alpha = UI_PopupAlpha(settings_opened_frame, settings_closing, settings_close_frame, 1);
     var sw = w * 0.72;
     var sh = h * 0.72;
     var sx = (w - sw) * 0.5;

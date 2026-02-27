@@ -66,6 +66,9 @@ if (state == "main") {
                 }
             }
             difficulty_opened_frame = Input_Frame();
+            difficulty_closing = false;
+            difficulty_close_frame = UI_OPENED_FRAME_NONE;
+            difficulty_pending_action = "";
             state = "difficulty";
         } else if (opt == "Load Game") {
             SaveMenu_Open("load", "main");
@@ -74,6 +77,8 @@ if (state == "main") {
             settings_dirty = false;
             settings_pending = GameSettings_Copy(GameSettings_Ensure());
             settings_opened_frame = Input_Frame();
+            settings_closing = false;
+            settings_close_frame = UI_OPENED_FRAME_NONE;
             state = "settings";
         } else if (opt == "Exit Game") {
             game_end();
@@ -83,6 +88,21 @@ if (state == "main") {
 }
 
 if (state == "difficulty") {
+    if (difficulty_closing) {
+        if (Input_Frame() - difficulty_close_frame >= UI_POPUP_FADE_FRAMES) {
+            var da = string(difficulty_pending_action);
+            difficulty_closing = false;
+            difficulty_close_frame = UI_OPENED_FRAME_NONE;
+            if (da == "start_intro") {
+                Difficulty_SetCurrent(difficulty_pending_value);
+                Transition_RequestCutsceneById("intro");
+            } else {
+                state = "main";
+            }
+        }
+        return;
+    }
+
     var diff_rows = array_length(difficulty_options) + 1; // options + Back
     if (k_up) {
         difficulty_index = (difficulty_index + diff_rows - 1) mod diff_rows;
@@ -95,17 +115,23 @@ if (state == "difficulty") {
 
     if (k_back) {
         SFX_PlayUI("ui_back");
-        state = "main";
+        difficulty_closing = true;
+        difficulty_close_frame = Input_Frame();
+        difficulty_pending_action = "to_main";
         return;
     }
 
     if (k_ok) {
         SFX_PlayUI("ui_confirm");
         if (difficulty_index >= 0 && difficulty_index < array_length(difficulty_values)) {
-            Difficulty_SetCurrent(difficulty_values[difficulty_index]);
-            Transition_RequestCutsceneById("intro");
+            difficulty_pending_value = difficulty_values[difficulty_index];
+            difficulty_closing = true;
+            difficulty_close_frame = Input_Frame();
+            difficulty_pending_action = "start_intro";
         } else {
-            state = "main";
+            difficulty_closing = true;
+            difficulty_close_frame = Input_Frame();
+            difficulty_pending_action = "to_main";
         }
     }
     return;
@@ -370,6 +396,15 @@ if (state == "cutscene") {
 }
 
 if (state == "settings") {
+    if (settings_closing) {
+        if (Input_Frame() - settings_close_frame >= UI_POPUP_FADE_FRAMES) {
+            settings_closing = false;
+            settings_close_frame = UI_OPENED_FRAME_NONE;
+            state = "main";
+        }
+        return;
+    }
+
     var settings_rows = SETTINGS_MENU_ROW_COUNT; // UI, SFX, BGM, Scale, Apply, Back
 
     if (k_up) {
@@ -386,7 +421,8 @@ if (state == "settings") {
             if (k_back) SFX_PlayUI("ui_back"); else SFX_PlayUI("ui_confirm");
             settings_pending = GameSettings_Copy(GameSettings_Ensure());
             settings_dirty = false;
-            state = "main";
+            settings_closing = true;
+            settings_close_frame = Input_Frame();
         }
         return;
     }
@@ -395,7 +431,8 @@ if (state == "settings") {
         SFX_PlayUI("ui_back");
         settings_pending = GameSettings_Copy(GameSettings_Ensure());
         settings_dirty = false;
-        state = "main";
+        settings_closing = true;
+        settings_close_frame = Input_Frame();
         return;
     }
 
