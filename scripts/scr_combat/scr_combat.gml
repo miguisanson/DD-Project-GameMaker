@@ -202,6 +202,9 @@ function Battle_GrantRewards(_p, _e) {
     if (is_struct(_e)) {
         if (variable_struct_exists(_e, "exp")) {
             var exp_gain = max(0, round(real(_e.exp)));
+            if (variable_struct_exists(_p, "level") && Level_IsAtCap(_p.level)) {
+                exp_gain = 0;
+            }
             if (exp_gain > 0) {
                 var diff = Difficulty_Profile();
                 var exp_mult = 1;

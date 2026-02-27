@@ -743,8 +743,9 @@ function Menu_Draw() {
         var hp_bar_h = sprite_get_height(hp_bar_sprite) * bar_scale;
         var mp_bar_h = sprite_get_height(mp_bar_sprite) * bar_scale;
 
-        var exp_label_1 = "Required EXP";
-        var exp_value = string(ch.exp) + "/" + string(ch.exp_next);
+        var level_capped = Level_IsAtCap(ch.level);
+        var exp_label_1 = level_capped ? "Level Cap" : "Required EXP";
+        var exp_value = level_capped ? "MAX" : (string(ch.exp) + "/" + string(ch.exp_next));
         var line_h = string_height("A") + 2;
 
         var left_content_w = max(
@@ -1081,7 +1082,7 @@ function ClassSelect_ApplyClass(_class_id) {
         if (variable_struct_exists(old, "status")) ch.status = old.status;
     }
 
-    ch = RecomputeResources(ch);
+    ch = Player_NormalizeProgression(ch, true);
     if (is_struct(old)) {
         if (variable_struct_exists(old, "hp")) ch.hp = clamp(old.hp, 0, ch.max_hp);
         if (variable_struct_exists(old, "mp")) ch.mp = clamp(old.mp, 0, ch.max_mp);

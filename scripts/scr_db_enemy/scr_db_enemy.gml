@@ -302,7 +302,7 @@ function EnemyDB_Get(_enemy_id) {
         sprite_world: noone,
         exp: 1,
         species_min_level: 1,
-        species_max_level: 99,
+        species_max_level: LEVEL_CAP_TECHNICAL,
         species_level_offset: 0,
         threat_rank: 1,
         can_auto_resolve: true,

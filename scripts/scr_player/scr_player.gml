@@ -29,6 +29,7 @@ function CharacterCreate_Player(_class_id) {
     ch.stat_points = 0;
     ch.status = [];
     ch.inventory = Inv_Add(ch.inventory, 10, 2);
+    ch = Player_NormalizeProgression(ch, true);
 
     return ch;
 }
@@ -432,6 +433,11 @@ function GameState_Init() {
     if (!variable_struct_exists(gs, "player_ch")) {
         gs.player_ch = CharacterCreate_Player(gs.selected_class);
     }
+    if (is_struct(gs.player_ch)) {
+        if (!variable_struct_exists(gs.player_ch, "class_id")) gs.player_ch.class_id = gs.selected_class;
+        gs.player_ch = Player_NormalizeProgression(gs.player_ch, true);
+        gs.selected_class = gs.player_ch.class_id;
+    }
 
     if (!variable_struct_exists(gs, "enemy_db")) {
         EnemyDB_Init();
@@ -657,6 +663,7 @@ function GameState_SetSelectedClass(_class_id) {
 }
 
 function GameState_SetPlayer(_ch) {
+    if (is_struct(_ch)) _ch = Player_NormalizeProgression(_ch, true);
     var gs = GameState_Get();
     gs.player_ch = _ch;
     global.player_ch = _ch;

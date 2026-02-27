@@ -15,7 +15,7 @@ function HPGainPerLevel(_hd) { return ceil(_hd / 2) + 1; }
 
 function ResourceStatWeight(_level) {
     var lvl = max(1, round(_level));
-    // Mild scaling in a short campaign: keeps DEF/INT meaningful without oversized retroactive growth.
+    // MP scaling remains tied to INT, with gentle level weighting.
     return 1 + floor((lvl - 1) / 4);
 }
 
@@ -30,8 +30,10 @@ function RecomputeResources(_ch) {
     var hp_gain = HPGainPerLevel(cfg.hd);
     var mp_gain = cfg.mp_gain;
     var stat_weight = ResourceStatWeight(lvl);
+    var hp_def_bonus = max(0, floor(max(0, def_mod) * PLAYER_HP_DEF_BONUS_FACTOR));
 
-    _ch.max_hp = cfg.base_hp + (lvl - 1) * hp_gain + (def_mod * stat_weight);
+    // Class level growth is the primary HP source; DEF only adds a small flat bonus.
+    _ch.max_hp = cfg.base_hp + (lvl - 1) * hp_gain + hp_def_bonus;
     _ch.max_hp = max(1, _ch.max_hp);
 
     _ch.max_mp = cfg.base_mp + (lvl - 1) * mp_gain + (int_mod * stat_weight);

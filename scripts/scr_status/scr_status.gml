@@ -55,10 +55,59 @@ function Status_AssignPlayerBuffIconsFromFX() {
     Status_SetIcon(STATUS_MEDITATION, sp_meditation, Status_LastFrame(sp_meditation));
 }
 
+function Status_SkillAppliesStatus(_skill, _status_id) {
+    if (!is_struct(_skill)) return false;
+    if (variable_struct_exists(_skill, "status") && _skill.status == _status_id) return true;
+    if (variable_struct_exists(_skill, "status_list") && is_array(_skill.status_list)) {
+        for (var i = 0; i < array_length(_skill.status_list); i++) {
+            if (_skill.status_list[i] == _status_id) return true;
+        }
+    }
+    return false;
+}
+
+function Status_FindIconFallbackFromSkillFX(_status_id) {
+    if (!variable_global_exists("skill_db") || !ds_exists(global.skill_db, ds_type_map)) {
+        SkillDB_Init();
+    }
+    if (!variable_global_exists("skill_db") || !ds_exists(global.skill_db, ds_type_map)) return noone;
+
+    var keys = ds_map_keys_to_array(global.skill_db);
+    for (var i = 0; i < array_length(keys); i++) {
+        var sid = keys[i];
+        var sk = global.skill_db[? sid];
+        if (!Status_SkillAppliesStatus(sk, _status_id)) continue;
+        if (is_struct(sk) && variable_struct_exists(sk, "fx_sprite") && sk.fx_sprite != noone) {
+            return sk.fx_sprite;
+        }
+    }
+
+    return noone;
+}
+
+function Status_AssignMissingIconsFromSkillFX() {
+    if (!variable_global_exists("status_db") || !ds_exists(global.status_db, ds_type_map)) return;
+
+    var keys = ds_map_keys_to_array(global.status_db);
+    for (var i = 0; i < array_length(keys); i++) {
+        var status_id = keys[i];
+        var cfg = global.status_db[? status_id];
+        if (!is_struct(cfg)) continue;
+
+        var has_icon = (variable_struct_exists(cfg, "icon_sprite") && cfg.icon_sprite != noone);
+        if (has_icon) continue;
+
+        var spr = Status_FindIconFallbackFromSkillFX(status_id);
+        if (spr == noone) continue;
+        Status_SetIcon(status_id, spr, Status_LastFrame(spr));
+    }
+}
+
 function StatusDB_Init() {
     if (variable_global_exists("status_db") && ds_exists(global.status_db, ds_type_map)) {
         Status_AssignCoreIcons();
         Status_AssignPlayerBuffIconsFromFX();
+        Status_AssignMissingIconsFromSkillFX();
         if (variable_global_exists("state") && is_struct(global.state)) {
             global.state.status_db = global.status_db;
         }
@@ -209,6 +258,7 @@ function StatusDB_Init() {
 
     Status_AssignCoreIcons();
     Status_AssignPlayerBuffIconsFromFX();
+    Status_AssignMissingIconsFromSkillFX();
     if (variable_global_exists("state") && is_struct(global.state)) {
         global.state.status_db = global.status_db;
     }

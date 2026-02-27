@@ -62,11 +62,14 @@ function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
     if (variable_struct_exists(cfg, "level")) {
         level_exp_mult = clamp(1 + ((enemy_level - round(cfg.level)) * 0.10), 0.70, 1.40);
     }
-    var exp_gain = max(1, round(real(cfg.exp) * level_exp_mult * exp_mult));
-    if (is_struct(diff) && variable_struct_exists(diff, "player_exp_mult")) {
-        exp_gain = max(1, round(exp_gain * max(0, real(diff.player_exp_mult))));
+    var exp_gain = 0;
+    if (!Level_IsAtCap(p.level)) {
+        exp_gain = max(1, round(real(cfg.exp) * level_exp_mult * exp_mult));
+        if (is_struct(diff) && variable_struct_exists(diff, "player_exp_mult")) {
+            exp_gain = max(1, round(exp_gain * max(0, real(diff.player_exp_mult))));
+        }
+        p = Player_AddExp(p, exp_gain);
     }
-    p = Player_AddExp(p, exp_gain);
 
     var loot = Loot_RollEnemy({ id: cfg.id, level: enemy_level, loot_key: cfg.loot_key });
     if (loot_mult < 1 && is_array(loot)) {
@@ -82,8 +85,8 @@ function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
     RoomState_SetRemoved(room, _enemy_inst.persist_id, obj_enemy, _enemy_inst.enemy_id);
     instance_destroy(_enemy_inst);
 
-    var msg = "You overpower " + string(cfg.name) + " (+"
-        + string(exp_gain) + " EXP).";
+    var msg = "You overpower " + string(cfg.name) + ".";
+    if (exp_gain > 0) msg = "You overpower " + string(cfg.name) + " (+" + string(exp_gain) + " EXP).";
     if (variable_struct_exists(p, "last_levels_gained") && p.last_levels_gained > 0) {
         var lvl_msg = " Level up x" + string(p.last_levels_gained);
         var pts = variable_struct_exists(p, "last_stat_points_gained") ? max(0, round(real(p.last_stat_points_gained))) : 0;

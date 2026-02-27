@@ -670,8 +670,9 @@ function Skill_ClassAllowed(_skill, _class_id) {
 }
 
 function Skill_CanUse(_ch, _skill) {
-    if (_ch.mp < _skill.mp_cost) return false;
-    if (variable_struct_exists(_ch, "is_player") && _ch.is_player) {
+    var user_is_player = (variable_struct_exists(_ch, "is_player") && _ch.is_player);
+    if (user_is_player && _ch.mp < _skill.mp_cost) return false;
+    if (user_is_player) {
         if (variable_struct_exists(_ch, "class_id") && !Skill_ClassAllowed(_skill, _ch.class_id)) return false;
     }
     return true;
@@ -731,13 +732,15 @@ function Skill_Use(_user, _target, _skill_id) {
         set_enemy_actions: variable_struct_exists(s, "set_enemy_actions") ? max(0, round(real(s.set_enemy_actions))) : 0
     };
 
-    if (_user.mp < s.mp_cost) {
+    var user_is_player = (variable_struct_exists(_user, "is_player") && _user.is_player);
+
+    if (user_is_player && _user.mp < s.mp_cost) {
         result.ok = false;
         result.msg = "Not enough MP.";
         return result;
     }
 
-    if (variable_struct_exists(_user, "is_player") && _user.is_player) {
+    if (user_is_player) {
         if (variable_struct_exists(_user, "class_id") && !Skill_ClassAllowed(s, _user.class_id)) {
             result.ok = false;
             result.msg = "Can't use that.";
@@ -745,7 +748,7 @@ function Skill_Use(_user, _target, _skill_id) {
         }
     }
 
-    _user.mp -= s.mp_cost;
+    if (user_is_player) _user.mp -= s.mp_cost;
 
     var status_turns_default = variable_struct_exists(s, "status_turns") ? max(1, round(real(s.status_turns))) : 1;
     var applied_status_names = [];

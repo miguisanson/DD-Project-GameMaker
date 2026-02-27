@@ -305,6 +305,11 @@ function Save_ApplySnapshot(_snap) {
         gs.difficulty = DIFFICULTY_NORMAL;
     }
     gs.player_ch = stat.player;
+    if (is_struct(gs.player_ch)) {
+        if (!variable_struct_exists(gs.player_ch, "class_id")) gs.player_ch.class_id = gs.selected_class;
+        gs.player_ch = Player_NormalizeProgression(gs.player_ch, true);
+        gs.selected_class = gs.player_ch.class_id;
+    }
     gs.flags = stat.flags;
     gs.checkpoint = stat.checkpoint;
     if (variable_struct_exists(stat, "uid_counter")) gs.uid_counter = stat.uid_counter;

@@ -1,0 +1,179 @@
+Here’s the current live gameplay/combat snapshot from your project scripts.
+
+**Player Class DB**
+| Class | Auto Stat/Level | Base Bonuses (at creation) | HD | MP Gain | Base HP/MP |
+|---|---:|---|---:|---:|---|
+| Knight | STR | `+1 STR, +2 DEF` | 10 | 1 | 10 / 10 |
+| Archer | AGI | `+2 AGI, +1 LUCK` | 8 | 2 | 10 / 10 |
+| Mage | INT | `+2 INT, +1 LUCK` | 6 | 2 | 10 / 10 |
+| Nobody | none | none | 8 | 1 | 10 / 10 |
+
+Starting base stats are `10/10/10/10/10`, then class bonuses are applied.  
+All classes currently start with **no default skills**.
+
+**Leveling Spread (EXP)**
+Per-level EXP-to-next:
+| Level | EXP to next | Cumulative from Lv1 |
+|---:|---:|---:|
+| 1->2 | 15 | 15 |
+| 2->3 | 30 | 45 |
+| 3->4 | 50 | 95 |
+| 4->5 | 75 | 170 |
+| 5->6 | 105 | 275 |
+| 6->7 | 140 | 415 |
+| 7->8 | 180 | 595 |
+| 8->9 | 225 | 820 |
+| 9->10 | 275 | 1095 |
+
+Beyond 10: `10 + (level^2 * 10)` (large jump).  
+Technical cap: `99`. Effective campaign macro exists at `10`.
+
+**Per-Level Stat Rule (current)**
+- Every level-up gives exactly:
+  - `+1` unspent manual stat point
+  - `+1` auto class stat (Knight STR / Archer AGI / Mage INT / Nobody none)
+- Multi-level-up in one EXP grant is supported.
+
+**Player Resource Formulas**
+- `StatMod = floor((stat - 10) / 2)`
+- `HPGainPerLevel = ceil(HD / 2) + 1`
+- `ResourceStatWeight(level) = 1 + floor((level - 1)/4)` (1 for Lv1-4, 2 for Lv5-8, 3 for Lv9-12)
+- `max_hp = base_hp + (level-1)*hp_gain + StatMod(DEF)*weight`
+- `max_mp = base_mp + (level-1)*mp_gain + StatMod(INT)*weight`
+- Then player difficulty multipliers are applied.
+
+**Player Baseline Progression (derived, no manual allocation/equipment/status)**
+| Class | Lv1 (HP/MP) | Lv5 (HP/MP) | Lv10 (HP/MP) | Auto stat trend |
+|---|---|---|---|---|
+| Knight | 11 / 10 | 36 / 14 | 67 / 19 | STR 11 -> 20 |
+| Archer | 10 / 10 | 30 / 18 | 55 / 28 | AGI 12 -> 21 |
+| Mage | 10 / 11 | 26 / 24 | 46 / 43 | INT 12 -> 21 |
+| Nobody | 10 / 10 | 30 / 14 | 55 / 19 | no auto growth |
+
+**Enemy DB (core)**
+| Enemy | Base Lv | Lv Band | Stats (STR/AGI/DEF/INT/LUCK) | Base HP/MP | HD/MP gain | EXP | Threat | Auto-resolve | Skills |
+|---|---:|---|---|---|---|---:|---:|---|---|
+| Slime | 2 | 1-3 | 8/9/7/5/7 | 10/0 | 7/0 | 8 | 1 | yes | Solidify |
+| Spider | 2 | 1-3 | 8/10/7/5/7 | 10/0 | 7/0 | 8 | 1 | yes | Poison Fangs |
+| Snake | 2 | 2-4 | 9/10/7/5/7 | 10/0 | 7/0 | 10 | 1 | yes | Bite |
+| Dire Wolf | 3 | 3-5 | 11/11/9/6/8 | 12/0 | 7/0 | 14 | 1 | yes | Bloodthirsty |
+| Killer Plant | 4 | 4-6 | 12/9/11/10/8 | 14/6 | 8/1 | 20 | 2 | no | Vine Trap |
+| Mad Whisp | 5 | 5-7 | 10/12/9/13/10 | 12/8 | 6/2 | 28 | 2 | no | Scorching Touch |
+| Ghost Sword | 6 | 6-8 | 14/12/12/10/11 | 14/4 | 8/1 | 38 | 2 | no | Cut |
+| Stranger | 7 | 7-9 | 16/13/14/15/12 | 16/8 | 8/2 | 50 | 2 | no | Steal |
+| Mini Boss | 8 | 8-9 | 18/12/16/14/12 | 22/8 | 10/2 | 75 | 3 | no | Ramming, Rampage |
+| Final Boss | 10 | 10-10 | 21/14/18/19/14 | 30/12 | 10/3 | 110 | 4 | no | Curse, Blessing, Fury |
+
+Enemy spawn level resolution: zone level + random `[-1..1]` + offset, clamped to species min/max (bosses use fixed base level).
+
+**Enemy Derived HP/MP at DB Base Level (Normal difficulty, derived)**
+| Enemy | HP | MP |
+|---|---:|---:|
+| Slime | 13 | 0 |
+| Spider | 13 | 0 |
+| Snake | 13 | 0 |
+| Dire Wolf | 20 | 0 |
+| Killer Plant | 29 | 9 |
+| Mad Whisp | 24 | 20 |
+| Ghost Sword | 44 | 9 |
+| Stranger | 58 | 32 |
+| Mini Boss | 85 | 36 |
+| Final Boss | 120 | 75 |
+
+**Player Skills DB**
+| Skill | Class | MP | Effect | Power x Mult | Status (chance, turns) | Hits |
+|---|---|---:|---|---|---|---:|
+| Wound | Knight/Archer | 3 | damage | 2 x 1.0 (STR) | Bleed (0.75, 2) | 1 |
+| Hilt Bash | Knight | 4 | damage | 2 x 1.0 (STR) | Stun (0.6, 1) | 1 |
+| Muscle Up | Knight | 3 | status self | - | Guard (1.0, 2) | 0 |
+| Rev Up | Knight | 3 | status self | - | Dmg Up (1.0, 2) | 0 |
+| Horizontal Slash | Knight | 5 | damage | 3 x 1.5 (STR) | none | 1 |
+| Poison Arrow | Archer | 4 | damage | 3 x 1.0 (AGI) | Poison (0.75, 2) | 1 |
+| Evasion | Archer | 3 | status self | - | Evasion (1.0, 2) | 0 |
+| Double Shot | Archer | 5 | damage | 2 x 1.0 (AGI) | none | 2 |
+| Take Aim | Archer | 3 | status self | - | Crit Up (1.0, 3) | 0 |
+| Fireball | Mage | 4 | damage | 4 x 1.0 (INT) | Burn (0.6, 2) | 1 |
+| Poison Mist | Mage | 4 | damage | 2 x 1.0 (INT) | Poison (0.75, 2) | 1 |
+| Ice Spear | Mage | 5 | damage | 3 x 1.0 (INT) | Stun (0.6, 1) | 1 |
+| Meditation | Mage | 3 | status self | - | Meditation (1.0, 3) | 0 |
+| Foresight | Mage | 3 | status self | - | Hit Up (1.0, 2) | 0 |
+
+**Enemy Skills / AI Hooks**
+| Skill | Effect | Core status/effect | Enemy use chance | Special gating |
+|---|---|---|---|---|
+| Poison Fangs | damage | Poison (0.70,2) | 10-25% | - |
+| Solidify | self status | Solidify (1 turn) | 10-25% | requires missing Solidify |
+| Bite | damage | Bleed (0.75,2) | 25-30% | - |
+| Bloodthirsty | self status | Bloodthirsty | 20-30% | requires missing Bloodthirsty |
+| Vine Trap | damage | Stun (0.65,1) | 20% | - |
+| Scorching Touch | damage | Burn (0.70,2) | 40% | - |
+| Cut | damage | Bleed (0.80,2) | 50% | - |
+| Steal | steal_item | steals random player item | 25% | requires target inventory |
+| Ramming | damage | multi-status via list | 40% | applies Stun/Bleed list at 0.60 |
+| Rampage | self utility | free action | 18-24% | once/turn, hp<=80%, sets enemy actions=2 |
+| Curse | multi_status | Burn+Poison+Stun+Bleed | 30% | once/turn, hp<=70% |
+| Blessing | self status | Blessing | 25% | free action, once/turn, hp<=80%, requires missing |
+| Fury | passive budget | free action | n/a | passive action-budget hook, hp<=45%, sets actions=2 |
+
+**Status System DB**
+| Status | Stat Mods | Tick | Key behavior |
+|---|---|---|---|
+| Poison | INT -1 | HP -3..-2 | mutually exclusive with Bleed/Burn |
+| Bleed | AGI -2 | HP -4..-2 | mutually exclusive with Poison/Burn |
+| Burn | STR -1 | HP -6..-4 | mutually exclusive with Poison/Bleed |
+| Stun | AGI -2 | none | `skip_turn=true` |
+| Guard | none | none | `guard_mult=0`, consumed on hit |
+| Rev Up | none | none | `dmg_mult=2`, consumed on attack |
+| Evasion | none | none | `force_dodge=true`, consumed on defend |
+| Take Aim | none | none | `crit_bonus=25` |
+| Foresight | none | none | `always_hit=true`, consumed on attack |
+| Meditation | none | MP +2..+4 | duration-based |
+| Solidify | none | none | `force_dodge=true`, consumed on defend |
+| Bloodthirsty | none | none | `guard_mult=0.65`, `dmg_mult=1.06`, consumed on hit |
+| Blessing | none | none | `guard_mult=0.8`, consumed on hit |
+
+**Combat Formula/Flow (current)**
+- Initiative: `d20 + AGI mod`.
+- Hit check: attacker `(d20 + accuracy bonus)` vs defender `(d20 + dodge bonus)`.
+- Damage base: `weapon/skill power + attacker rel stat mod - floor(defender DEF mod / 2)`, min 1.
+- Crit chance: `0.05 + luck_mod*0.01 + crit_bonus*0.01`, clamped 5%-50%.
+- Final damage order:
+  - attacker `dmg_mult`
+  - skill multiplier
+  - crit multiplier (x2)
+  - defender `guard_mult` (and consume guard on hit)
+  - difficulty damage multiplier
+- Status ticks:
+  - Player status ticks after player action (or when stunned and turn is skipped).
+  - Enemy status ticks once after enemy turn completes (after action chain ends).
+- Enemy action economy:
+  - `ENEMY_ACTION_CHAIN_MAX = 3`
+  - action budget may be increased by passive `Fury` and set by `Rampage`.
+
+**Difficulty Multipliers**
+| Difficulty | Player HP | Player MP | Player DMG | Enemy HP | Enemy MP | Enemy DMG | Enemy status chance | Player EXP |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Easy | 1.15 | 1.05 | 1.08 | 0.90 | 0.95 | 0.90 | 0.90 | 1.20 |
+| Normal | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| Hard | 0.92 | 0.95 | 0.94 | 1.12 | 1.00 | 1.12 | 1.08 | 0.85 |
+
+**Other gameplay-relevant rules**
+- Trivial auto-resolve: allowed only if enemy `can_auto_resolve=true`, `threat_rank<=1`, not boss, and player level >= enemy level + 3.
+- Skillbooks:
+  - `CLASS_NOBODY` cannot learn skillbooks.
+  - Skillbook learning respects each skill’s `class_list`.
+  - Already-known and wrong-class checks are enforced.
+
+**Main tuning files**
+- [scr_db_player_class.gml](E:/Github_Projects/DD-Project-GameMaker/scripts/scr_db_player_class/scr_db_player_class.gml)
+- [scr_levelup.gml](E:/Github_Projects/DD-Project-GameMaker/scripts/scr_levelup/scr_levelup.gml)
+- [scr_stats.gml](E:/Github_Projects/DD-Project-GameMaker/scripts/scr_stats/scr_stats.gml)
+- [scr_db_enemy.gml](E:/Github_Projects/DD-Project-GameMaker/scripts/scr_db_enemy/scr_db_enemy.gml)
+- [scr_db_skill.gml](E:/Github_Projects/DD-Project-GameMaker/scripts/scr_db_skill/scr_db_skill.gml)
+- [scr_status.gml](E:/Github_Projects/DD-Project-GameMaker/scripts/scr_status/scr_status.gml)
+- [scr_combat.gml](E:/Github_Projects/DD-Project-GameMaker/scripts/scr_combat/scr_combat.gml)
+- [scr_enemy.gml](E:/Github_Projects/DD-Project-GameMaker/scripts/scr_enemy/scr_enemy.gml)
+- [scr_player.gml](E:/Github_Projects/DD-Project-GameMaker/scripts/scr_player/scr_player.gml)
+- [scr_db_item.gml](E:/Github_Projects/DD-Project-GameMaker/scripts/scr_db_item/scr_db_item.gml)
+
+If you want, next I can give you the same thing as a balancing sheet format (`target`, `current`, `delta`) for direct tuning passes.
