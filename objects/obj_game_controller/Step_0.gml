@@ -63,6 +63,13 @@ if (variable_struct_exists(gs, "load_spawn_pending") && gs.load_spawn_pending) {
     }
 }
 
+if (variable_struct_exists(gs, "pending_save_success_popup") && gs.pending_save_success_popup) {
+    if (!Transition_IsActive() && gs.ui.mode == UI_NONE) {
+        gs.pending_save_success_popup = false;
+        SaveMenu_OpenMessage("Game saved.", true);
+    }
+}
+
 // apply persistence once on initial room load
 if (room != rm_battle && variable_global_exists("room_state_ready") && global.room_state_ready) {
     var gs_apply = GameState_Get();

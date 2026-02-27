@@ -47,6 +47,35 @@ function SaveMenu_Open(_mode, _context) {
 
 }
 
+function SaveMenu_OpenMessage(_message, _close_after = true) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    gs.ui.mode = UI_SAVE;
+    gs.ui.save_menu = {
+        open: true,
+        closing: false,
+        close_frame: UI_OPENED_FRAME_NONE,
+        mode: "load",
+        hide_slots: true,
+        context: "main",
+        slot: 0,
+        col: 0,
+        confirm: true,
+        confirm_choice: 0,
+        confirm_mode: "message",
+        message: string(_message),
+        close_after_message: _close_after,
+        slot_info_cache: SaveMenu_BuildSlotInfoCache(),
+        opened_frame: Input_Frame(),
+        confirm_opened_frame: Input_Frame(),
+        confirm_closing: false,
+        confirm_close_frame: UI_OPENED_FRAME_NONE,
+        pending_action: "",
+        pending_slot: 0,
+        require_release: false
+    };
+}
+
 function SaveMenu_Close(_immediate = false, _pending_action = "", _pending_slot = 0) {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "save_menu")) return;
@@ -110,33 +139,12 @@ function SaveMenu_Handle() {
                     Save_Write(pending_slot);
                     SFX_Play("save_confirm");
                     gs.save_slot = pending_slot;
-                    Save_Read(pending_slot);
+                    if (Save_Read(pending_slot)) {
+                        gs.pending_save_success_popup = true;
+                    }
                 }
             } else if (pending_action == "show_no_saves_message") {
-                gs.ui.mode = UI_SAVE;
-                gs.ui.save_menu = {
-                    open: true,
-                    closing: false,
-                    close_frame: UI_OPENED_FRAME_NONE,
-                    mode: "load",
-                    hide_slots: true,
-                    context: "main",
-                    slot: 0,
-                    col: 0,
-                    confirm: true,
-                    confirm_choice: 0,
-                    confirm_mode: "message",
-                    message: "No saved games found.",
-                    close_after_message: true,
-                    slot_info_cache: SaveMenu_BuildSlotInfoCache(),
-                    opened_frame: Input_Frame(),
-                    confirm_opened_frame: Input_Frame(),
-                    confirm_closing: false,
-                    confirm_close_frame: UI_OPENED_FRAME_NONE,
-                    pending_action: "",
-                    pending_slot: 0,
-                    require_release: false
-                };
+                SaveMenu_OpenMessage("No saved games found.", true);
             }
         } else {
             gs.ui.save_menu = sm;
