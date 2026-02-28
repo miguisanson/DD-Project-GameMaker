@@ -8,13 +8,7 @@ difficulty_close_frame = UI_OPENED_FRAME_NONE;
 difficulty_pending_action = "";
 difficulty_pending_value = DIFFICULTY_NORMAL;
 
-settings_index = 0;
-settings_volume_step = SETTINGS_VOLUME_STEP;
-settings_dirty = false;
 difficulty_opened_frame = UI_OPENED_FRAME_NONE;
-settings_opened_frame = UI_OPENED_FRAME_NONE;
-settings_closing = false;
-settings_close_frame = UI_OPENED_FRAME_NONE;
 cutscene_id = "";
 cutscene_started = false;
 cutscene_sequence = [];
@@ -126,7 +120,6 @@ cutscene_definitions.game_over = [
 ];
 
 var gs = GameState_Get();
-settings_pending = GameSettings_Copy(GameSettings_Ensure());
 load_available = Save_HasAnySlot();
 
 if (room == rm_start) {

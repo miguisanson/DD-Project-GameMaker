@@ -121,31 +121,7 @@ function Save_LoadSlotStat(_slot) {
 function Save_LoadLatestSettings() {
     var cfg = Save_ReadSettingsConfig();
     if (is_struct(cfg)) return cfg;
-
-    var best_settings = undefined;
-    var best_stamp = -1;
-
-    for (var slot = 1; slot <= 3; slot++) {
-        var stat = Save_LoadSlotStat(slot);
-        if (!is_struct(stat)) continue;
-        if (!variable_struct_exists(stat, "settings")) continue;
-        if (!is_struct(stat.settings)) continue;
-
-        var stamp = slot;
-        if (variable_struct_exists(stat, "saved_at")) {
-            stamp = Save_ToReal(stat.saved_at, slot);
-        }
-
-        if (is_undefined(best_settings) || stamp >= best_stamp) {
-            best_settings = stat.settings;
-            best_stamp = stamp;
-        }
-    }
-
-    if (is_struct(best_settings)) {
-        Save_WriteSettingsConfig(best_settings);
-    }
-    return best_settings;
+    return undefined;
 }
 
 function Save_HasSlot(_slot) {
@@ -254,7 +230,6 @@ function Save_BuildSnapshot() {
     stat.uid_counter = gs.uid_counter;
     stat.enemy_reset_version = gs.enemy_reset_version;
     stat.save_slot = gs.save_slot;
-    stat.settings = GameSettings_Normalize(gs.settings);
     stat.saved_at = date_current_datetime();
 
     var boss_flags = Save_DeriveBossFlagsFromPersist(gs.persist);
@@ -334,10 +309,6 @@ function Save_ApplySnapshot(_snap) {
 
     if (variable_struct_exists(stat, "enemy_reset_version")) gs.enemy_reset_version = stat.enemy_reset_version; else gs.enemy_reset_version = 0;
     if (variable_struct_exists(stat, "save_slot")) gs.save_slot = stat.save_slot; else gs.save_slot = 0;
-    if (variable_struct_exists(stat, "settings") && is_struct(stat.settings)) {
-        gs.settings = GameSettings_Normalize(stat.settings);
-    }
-
     var room_name = "";
     if (variable_struct_exists(stat, "save_room_name")) room_name = stat.save_room_name;
     if (room_name == "" && variable_struct_exists(_snap, "room")) room_name = room_get_name(_snap.room);

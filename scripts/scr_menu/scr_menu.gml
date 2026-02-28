@@ -770,8 +770,8 @@ function Menu_Draw() {
         var right_x = bx + left_w + pad;
         var right_w = (bx + bw - pad) - right_x;
 
-        draw_sprite_ext(hp_bar_sprite, hp_frame, left_x, y0, bar_scale, bar_scale, 0, c_white, 1);
-        draw_sprite_ext(mp_bar_sprite, mp_frame, left_x, y0 + hp_bar_h + pad, bar_scale, bar_scale, 0, c_white, 1);
+        draw_sprite_ext(hp_bar_sprite, hp_frame, left_x, y0, bar_scale, bar_scale, 0, c_white, menu_alpha);
+        draw_sprite_ext(mp_bar_sprite, mp_frame, left_x, y0 + hp_bar_h + pad, bar_scale, bar_scale, 0, c_white, menu_alpha);
 
         draw_set_color(c_white);
         var hp_text = string(ch.hp) + " / " + string(ch.max_hp);
@@ -1259,6 +1259,329 @@ function ClassSelect_Draw() {
     draw_set_alpha(1);
 }
 
+function SettingsPopup_Ensure() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    if (!variable_struct_exists(gs.ui, "settings_popup")) {
+        gs.ui.settings_popup = {
+            open: false,
+            owner: "",
+            index: 0,
+            volume_step: SETTINGS_VOLUME_STEP,
+            dirty: false,
+            pending: GameSettings_Copy(GameSettings_Ensure()),
+            opened_frame: UI_OPENED_FRAME_NONE,
+            closing: false,
+            close_frame: UI_OPENED_FRAME_NONE
+        };
+    } else {
+        var sp0 = gs.ui.settings_popup;
+        if (!variable_struct_exists(sp0, "owner")) sp0.owner = "";
+        if (!variable_struct_exists(sp0, "index")) sp0.index = 0;
+        if (!variable_struct_exists(sp0, "volume_step")) sp0.volume_step = SETTINGS_VOLUME_STEP;
+        if (!variable_struct_exists(sp0, "dirty")) sp0.dirty = false;
+        if (!variable_struct_exists(sp0, "pending") || !is_struct(sp0.pending)) sp0.pending = GameSettings_Copy(GameSettings_Ensure());
+        if (!variable_struct_exists(sp0, "opened_frame")) sp0.opened_frame = UI_OPENED_FRAME_NONE;
+        if (!variable_struct_exists(sp0, "closing")) sp0.closing = false;
+        if (!variable_struct_exists(sp0, "close_frame")) sp0.close_frame = UI_OPENED_FRAME_NONE;
+    }
+}
+
+function SettingsPopup_IsOpen(_owner = "") {
+    SettingsPopup_Ensure();
+    var gs = GameState_Get();
+    var sp = gs.ui.settings_popup;
+    if (!sp.open) return false;
+    if (_owner != "" && string(sp.owner) != string(_owner)) return false;
+    return true;
+}
+
+function SettingsPopup_Open(_owner = "") {
+    SettingsPopup_Ensure();
+    var gs = GameState_Get();
+    var sp = gs.ui.settings_popup;
+    sp.open = true;
+    sp.owner = string(_owner);
+    sp.index = 0;
+    sp.volume_step = SETTINGS_VOLUME_STEP;
+    sp.dirty = false;
+    sp.pending = GameSettings_Copy(GameSettings_Ensure());
+    sp.opened_frame = Input_Frame();
+    sp.closing = false;
+    sp.close_frame = UI_OPENED_FRAME_NONE;
+    gs.ui.settings_popup = sp;
+    SFX_PlayUI("ui_openclose");
+}
+
+function SettingsPopup_Close(_immediate = false) {
+    SettingsPopup_Ensure();
+    var gs = GameState_Get();
+    var sp = gs.ui.settings_popup;
+    if (!sp.open) return;
+    if (_immediate) {
+        sp.open = false;
+        sp.owner = "";
+        sp.closing = false;
+        sp.close_frame = UI_OPENED_FRAME_NONE;
+        sp.opened_frame = UI_OPENED_FRAME_NONE;
+        sp.dirty = false;
+        sp.pending = GameSettings_Copy(GameSettings_Ensure());
+        gs.ui.settings_popup = sp;
+        SFX_PlayUI("ui_openclose");
+        return;
+    }
+    if (sp.closing) return;
+    sp.closing = true;
+    sp.close_frame = Input_Frame();
+    gs.ui.settings_popup = sp;
+    SFX_PlayUI("ui_openclose");
+}
+
+function SettingsPopup_CloseFinalize() {
+    SettingsPopup_Ensure();
+    var gs = GameState_Get();
+    var sp = gs.ui.settings_popup;
+    sp.open = false;
+    sp.owner = "";
+    sp.closing = false;
+    sp.close_frame = UI_OPENED_FRAME_NONE;
+    sp.opened_frame = UI_OPENED_FRAME_NONE;
+    sp.dirty = false;
+    sp.pending = GameSettings_Copy(GameSettings_Ensure());
+    gs.ui.settings_popup = sp;
+}
+
+function SettingsPopup_HandleInput() {
+    SettingsPopup_Ensure();
+    var gs = GameState_Get();
+    var sp = gs.ui.settings_popup;
+    if (!sp.open) return;
+
+    if (sp.closing) {
+        if (Input_Frame() - sp.close_frame >= UI_POPUP_FADE_FRAMES) {
+            SettingsPopup_CloseFinalize();
+        } else {
+            gs.ui.settings_popup = sp;
+        }
+        return;
+    }
+
+    var k_up = Input_UIPressed("menu_up");
+    var k_down = Input_UIPressed("menu_down");
+    var k_left = Input_UIPressed("menu_left");
+    var k_right = Input_UIPressed("menu_right");
+    var k_ok = Input_UIConfirm();
+    var k_back = Input_UIBack();
+
+    var settings_rows = SETTINGS_MENU_ROW_COUNT;
+    if (k_up) {
+        sp.index = (sp.index + settings_rows - 1) mod settings_rows;
+        SFX_PlayUI("ui_move");
+    }
+    if (k_down) {
+        sp.index = (sp.index + 1) mod settings_rows;
+        SFX_PlayUI("ui_move");
+    }
+
+    if (sp.index == 5 && k_left) {
+        sp.index = 4;
+        SFX_PlayUI("ui_move");
+    }
+
+    if (k_back) {
+        sp.pending = GameSettings_Copy(GameSettings_Ensure());
+        sp.dirty = false;
+        gs.ui.settings_popup = sp;
+        SettingsPopup_Close(false);
+        return;
+    }
+
+    var pending = GameSettings_Copy(sp.pending);
+    var changed = false;
+    var step = sp.volume_step;
+
+    switch (sp.index) {
+        case 0:
+            if (k_left) {
+                pending.audio_ui = clamp(pending.audio_ui - step, 0, 1);
+                changed = true;
+            }
+            if (k_right) {
+                pending.audio_ui = clamp(pending.audio_ui + step, 0, 1);
+                changed = true;
+            }
+            break;
+        case 1:
+            if (k_left) {
+                pending.audio_sfx = clamp(pending.audio_sfx - step, 0, 1);
+                changed = true;
+            }
+            if (k_right) {
+                pending.audio_sfx = clamp(pending.audio_sfx + step, 0, 1);
+                changed = true;
+            }
+            break;
+        case 2:
+            if (k_left) {
+                pending.audio_bgm = clamp(pending.audio_bgm - step, 0, 1);
+                changed = true;
+            }
+            if (k_right) {
+                pending.audio_bgm = clamp(pending.audio_bgm + step, 0, 1);
+                changed = true;
+            }
+            break;
+        case 3:
+            if (k_left) {
+                pending.display_scale = clamp(pending.display_scale - 1, DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
+                changed = true;
+            }
+            if (k_right) {
+                pending.display_scale = clamp(pending.display_scale + 1, DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
+                changed = true;
+            }
+            break;
+        case 4:
+            if (k_ok) {
+                var committed = GameSettings_Commit(pending, true);
+                sp.pending = GameSettings_Copy(committed);
+                sp.dirty = false;
+                gs.ui.settings_popup = sp;
+                SFX_PlayUI("ui_confirm");
+                return;
+            }
+            break;
+        case 5:
+            if (k_ok) {
+                sp.pending = GameSettings_Copy(GameSettings_Ensure());
+                sp.dirty = false;
+                gs.ui.settings_popup = sp;
+                SFX_PlayUI("ui_confirm");
+                SettingsPopup_Close(false);
+                return;
+            }
+            break;
+    }
+
+    if (changed) {
+        sp.pending = GameSettings_Copy(pending);
+        sp.dirty = true;
+        gs.ui.settings_popup = sp;
+        SFX_PlayUI("ui_move");
+        return;
+    }
+
+    gs.ui.settings_popup = sp;
+}
+
+function SettingsPopup_Draw(_draw_backdrop = true) {
+    SettingsPopup_Ensure();
+    var gs = GameState_Get();
+    var sp = gs.ui.settings_popup;
+    if (!sp.open) return;
+
+    var w = display_get_gui_width();
+    var h = display_get_gui_height();
+    UI_SetFont();
+    var line_h = string_height("A");
+    var popup_alpha = UI_PopupAlpha(sp.opened_frame, sp.closing, sp.close_frame, 1);
+    var sw = w * 0.72;
+    var sh = h * 0.72;
+    var sx = (w - sw) * 0.5;
+    var sy = (h - sh) * 0.5;
+    var settings = GameSettings_Copy(sp.pending);
+
+    if (_draw_backdrop) {
+        draw_set_alpha(popup_alpha * 0.85);
+        draw_set_color(c_black);
+        draw_rectangle(sx, sy, sx + sw, sy + sh, false);
+    }
+    draw_set_alpha(popup_alpha);
+    draw_set_color(c_white);
+    draw_rectangle(sx, sy, sx + sw, sy + sh, true);
+    draw_text(sx + 12, sy + 12, "Settings");
+
+    var row_gap_s = max(18, line_h + 6);
+    var audio_header_y = sy + 32;
+    var rows_y0 = audio_header_y + row_gap_s;
+    var display_header_y = rows_y0 + row_gap_s * 3 + 2;
+    var display_rows_y0 = display_header_y + row_gap_s;
+
+    var row_y = [];
+    row_y[0] = rows_y0;
+    row_y[1] = rows_y0 + row_gap_s;
+    row_y[2] = rows_y0 + row_gap_s * 2;
+    row_y[3] = display_rows_y0;
+    row_y[4] = display_rows_y0 + row_gap_s + 2;
+    row_y[5] = display_rows_y0 + row_gap_s * 2 + 2;
+
+    draw_set_color(c_white);
+    draw_text(sx + 12, audio_header_y, "Audio");
+    draw_text(sx + 12, display_header_y, "Display");
+
+    for (var r = 0; r < SETTINGS_MENU_ROW_COUNT; r++) {
+        var yy = row_y[r];
+        var selected_row = (sp.index == r);
+        var label = "";
+        var value = "";
+
+        switch (r) {
+            case 0:
+                label = "UI";
+                value = string(clamp(round(settings.audio_ui * 100), 0, 100)) + "%";
+                break;
+            case 1:
+                label = "SFX";
+                value = string(clamp(round(settings.audio_sfx * 100), 0, 100)) + "%";
+                break;
+            case 2:
+                label = "BGM";
+                value = string(clamp(round(settings.audio_bgm * 100), 0, 100)) + "%";
+                break;
+            case 3:
+                label = "Scale";
+                value = string(settings.display_scale) + "x";
+                break;
+            case 4:
+                label = "Apply";
+                value = sp.dirty ? "Pending" : "Saved";
+                break;
+            case 5:
+                label = "Back";
+                break;
+        }
+
+        if (selected_row) {
+            if (r == 4 || r == 5) {
+                var row_x = sx + 16;
+                var row_w = string_width(label) + 8;
+                draw_set_color(c_white);
+                draw_rectangle(row_x - 4, yy - 3, row_x + row_w, yy + line_h + 5, false);
+                draw_set_color(c_black);
+                draw_rectangle(row_x - 4, yy - 3, row_x + row_w, yy + line_h + 5, true);
+            } else {
+                draw_set_color(c_white);
+                draw_rectangle(sx + 8, yy - 3, sx + sw - 8, yy + line_h + 5, false);
+                draw_set_color(c_black);
+                draw_rectangle(sx + 8, yy - 3, sx + sw - 8, yy + line_h + 5, true);
+            }
+        }
+
+        draw_set_color(selected_row ? c_black : c_white);
+        draw_text(sx + 16, yy, label);
+        if (value != "") {
+            if (r == 4) draw_set_color(c_white);
+            else draw_set_color(selected_row ? c_black : c_white);
+            draw_set_halign(fa_right);
+            draw_text(sx + sw - 16, yy, value);
+            draw_set_halign(fa_left);
+        }
+    }
+
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
 // --------------------
 // PAUSE MENU (inventory-style popup)
 // --------------------
@@ -1272,7 +1595,7 @@ function PauseMenu_Ensure() {
             close_frame: UI_OPENED_FRAME_NONE,
             pending_exit_main_menu: false,
             index: 0,
-            options: ["Resume","Exit to Main Menu"],
+            options: ["Resume","Settings","Exit to Main Menu"],
             opened_frame: UI_OPENED_FRAME_NONE
         };
     } else {
@@ -1378,6 +1701,11 @@ function PauseMenu_HandleInput() {
     if (!pm.open) return;
     var frame = Input_Frame();
 
+    if (SettingsPopup_IsOpen("pause")) {
+        SettingsPopup_HandleInput();
+        return;
+    }
+
     if (pm.closing) {
         if (frame - pm.close_frame >= UI_POPUP_FADE_FRAMES) {
             PauseMenu_CloseFinalize();
@@ -1410,6 +1738,10 @@ function PauseMenu_HandleInput() {
             PauseMenu_Close();
             return;
         } else if (pm.index == 1) {
+            SettingsPopup_Open("pause");
+            gs.ui.pause_menu = pm;
+            return;
+        } else if (pm.index == 2) {
             PauseMenu_ExitToMainMenu();
             return;
         }
@@ -1423,6 +1755,20 @@ function PauseMenu_Draw() {
     if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "pause_menu")) return;
     var pm = gs.ui.pause_menu;
     if (!pm.open) return;
+
+    if (SettingsPopup_IsOpen("pause")) {
+        UI_SetFont();
+        var layout_settings = Menu_GetLayout();
+        var w_settings = layout_settings.w;
+        var h_settings = layout_settings.h;
+        var popup_alpha_settings = UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
+        draw_set_alpha(popup_alpha_settings * 0.6);
+        draw_set_color(c_black);
+        draw_rectangle(0, 0, w_settings, h_settings, false);
+        SettingsPopup_Draw(false);
+        draw_set_alpha(1);
+        return;
+    }
 
     UI_SetFont();
 

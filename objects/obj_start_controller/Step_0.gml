@@ -73,12 +73,7 @@ if (state == "main") {
         } else if (opt == "Load Game") {
             SaveMenu_Open("load", "main");
         } else if (opt == "Settings") {
-            settings_index = 0;
-            settings_dirty = false;
-            settings_pending = GameSettings_Copy(GameSettings_Ensure());
-            settings_opened_frame = Input_Frame();
-            settings_closing = false;
-            settings_close_frame = UI_OPENED_FRAME_NONE;
+            SettingsPopup_Open("title");
             state = "settings";
         } else if (opt == "Exit Game") {
             game_end();
@@ -396,107 +391,7 @@ if (state == "cutscene") {
 }
 
 if (state == "settings") {
-    if (settings_closing) {
-        if (Input_Frame() - settings_close_frame >= UI_POPUP_FADE_FRAMES) {
-            settings_closing = false;
-            settings_close_frame = UI_OPENED_FRAME_NONE;
-            state = "main";
-        }
-        return;
-    }
-
-    var settings_rows = SETTINGS_MENU_ROW_COUNT; // UI, SFX, BGM, Scale, Apply, Back
-
-    if (k_up) {
-        settings_index = (settings_index + settings_rows - 1) mod settings_rows;
-        SFX_PlayUI("ui_move");
-    }
-    if (k_down) {
-        settings_index = (settings_index + 1) mod settings_rows;
-        SFX_PlayUI("ui_move");
-    }
-
-    if (settings_index == 5) {
-        if (k_back || k_ok) {
-            if (k_back) SFX_PlayUI("ui_back"); else SFX_PlayUI("ui_confirm");
-            settings_pending = GameSettings_Copy(GameSettings_Ensure());
-            settings_dirty = false;
-            settings_closing = true;
-            settings_close_frame = Input_Frame();
-        }
-        return;
-    }
-
-    if (k_back) {
-        SFX_PlayUI("ui_back");
-        settings_pending = GameSettings_Copy(GameSettings_Ensure());
-        settings_dirty = false;
-        settings_closing = true;
-        settings_close_frame = Input_Frame();
-        return;
-    }
-
-    var changed = false;
-    var did_confirm = false;
-    var pending = GameSettings_Copy(settings_pending);
-
-    switch (settings_index) {
-        case 0: // UI
-            if (k_left) {
-                pending.audio_ui = clamp(pending.audio_ui - settings_volume_step, 0, 1);
-                changed = true;
-            }
-            if (k_right) {
-                pending.audio_ui = clamp(pending.audio_ui + settings_volume_step, 0, 1);
-                changed = true;
-            }
-            break;
-        case 1: // SFX
-            if (k_left) {
-                pending.audio_sfx = clamp(pending.audio_sfx - settings_volume_step, 0, 1);
-                changed = true;
-            }
-            if (k_right) {
-                pending.audio_sfx = clamp(pending.audio_sfx + settings_volume_step, 0, 1);
-                changed = true;
-            }
-            break;
-        case 2: // BGM
-            if (k_left) {
-                pending.audio_bgm = clamp(pending.audio_bgm - settings_volume_step, 0, 1);
-                changed = true;
-            }
-            if (k_right) {
-                pending.audio_bgm = clamp(pending.audio_bgm + settings_volume_step, 0, 1);
-                changed = true;
-            }
-            break;
-        case 3: // Scale
-            if (k_left) {
-                pending.display_scale = clamp(pending.display_scale - 1, DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-                changed = true;
-            }
-            if (k_right) {
-                pending.display_scale = clamp(pending.display_scale + 1, DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-                changed = true;
-            }
-            break;
-        case 4:
-            if (k_ok) {
-                var committed = GameSettings_Commit(pending, true);
-                settings_pending = GameSettings_Copy(committed);
-                settings_dirty = false;
-                SFX_PlayUI("ui_confirm");
-                return;
-            }
-            break;
-    }
-
-    if (changed) {
-        settings_pending = GameSettings_Copy(pending);
-        settings_dirty = true;
-        if (did_confirm) SFX_PlayUI("ui_confirm");
-        else SFX_PlayUI("ui_move");
-    }
+    SettingsPopup_HandleInput();
+    if (!SettingsPopup_IsOpen("title")) state = "main";
     return;
 }

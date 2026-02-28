@@ -69,6 +69,11 @@ if (gs.ui.mode == UI_SAVE) {
     exit;
 }
 
+if (SettingsPopup_IsOpen("pause")) {
+    PauseMenu_HandleInput();
+    exit;
+}
+
 // Pause menu (Esc)
 if (k_back) {
     if (gs.ui.mode == UI_PAUSE) {
