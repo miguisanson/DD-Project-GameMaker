@@ -11,5 +11,8 @@ trigger_cooldown_frames = 15;
 trigger_cooldown = 0;
 destroy_after_trigger = false;
 save_trigger_state = true;
+pending_trigger = false;
+pending_wait_for_settle = false;
+pending_player_id = noone;
 
 visible = false;

@@ -138,9 +138,17 @@ if (state == "difficulty") {
 }
 
 if (state == "cutscene") {
-    // Prevent cutscene re-initialization while exiting rm_cutscene to another room.
-    // Keep processing only for internal cutscene segment flash transitions.
-    if (Transition_IsInputLocked() && !cutscene_wait_transition) return;
+    // Allow first cutscene segment to initialize under the entry fade so the
+    // first image reveals with fade-in (instead of popping after fade ends).
+    // Still block processing while transitioning out of rm_cutscene.
+    var allow_entry_bootstrap = false;
+    if (!cutscene_started && Transition_IsInputLocked() && variable_struct_exists(gs, "transition_fx") && is_struct(gs.transition_fx)) {
+        var tr_boot = gs.transition_fx;
+        if (tr_boot.active && tr_boot.type == TRANSITION_TYPE_CUTSCENE && tr_boot.target_room == room) {
+            allow_entry_bootstrap = true;
+        }
+    }
+    if (Transition_IsInputLocked() && !cutscene_wait_transition && !allow_entry_bootstrap) return;
 
     if (!cutscene_started) {
         cutscene_id = "";

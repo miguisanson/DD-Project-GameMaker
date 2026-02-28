@@ -363,7 +363,18 @@ function UI_GetModalVisualAlpha() {
 
     if (SettingsPopup_IsOpen("pause") && variable_struct_exists(gs.ui, "settings_popup")) {
         var sp = gs.ui.settings_popup;
-        return UI_PopupAlpha(sp.opened_frame, sp.closing, sp.close_frame, 1);
+        var sp_alpha = UI_PopupAlpha(sp.opened_frame, sp.closing, sp.close_frame, 1);
+
+        // Linked modal chain: while pause owns the stack and opens Settings,
+        // keep dim sourced from the stronger of parent/child alpha so dim
+        // never drops during handoff frames.
+        if (gs.ui.mode == UI_PAUSE && variable_struct_exists(gs.ui, "pause_menu")) {
+            var pm = gs.ui.pause_menu;
+            var pm_alpha = UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
+            return max(sp_alpha, pm_alpha);
+        }
+
+        return sp_alpha;
     }
 
     switch (gs.ui.mode) {
@@ -400,6 +411,7 @@ function UI_UpdateModalDimState() {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
     if (!variable_struct_exists(gs.ui, "modal_dim_alpha")) gs.ui.modal_dim_alpha = 0;
+    var prev_alpha = real(gs.ui.modal_dim_alpha);
 
     var root = UI_ModalRootEnsure();
     var alpha = 0;
@@ -450,6 +462,10 @@ function UI_UpdateModalDimState() {
             var visual_alpha = UI_GetModalVisualAlpha();
             if (visual_alpha >= 0) {
                 alpha = visual_alpha * 0.6;
+                // Keep dim sustained across linked modal handoffs (e.g. Bed -> Save,
+                // Pause -> Settings) while modal root remains active. Only the final
+                // modal-root close should fade the dim out.
+                if (!root.closing && alpha < prev_alpha) alpha = prev_alpha;
             } else if (root.closing) {
                 alpha = UI_PopupAlpha(root.opened_frame, true, root.close_frame, 1) * 0.6;
                 if (Input_Frame() - root.close_frame >= UI_POPUP_FADE_FRAMES) {
