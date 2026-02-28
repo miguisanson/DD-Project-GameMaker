@@ -345,6 +345,45 @@ function UI_ModalRootEnd(_hold_until_transition = false, _immediate = false) {
     gs.ui.modal_root = root;
 }
 
+function UI_GetModalVisualAlpha() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) return -1;
+
+    if (SettingsPopup_IsOpen("pause") && variable_struct_exists(gs.ui, "settings_popup")) {
+        var sp = gs.ui.settings_popup;
+        return UI_PopupAlpha(sp.opened_frame, sp.closing, sp.close_frame, 1);
+    }
+
+    switch (gs.ui.mode) {
+        case UI_MENU:
+            if (variable_struct_exists(gs.ui, "menu")) {
+                var m = gs.ui.menu;
+                return UI_PopupAlpha(m.opened_frame, m.closing, m.close_frame, 1);
+            }
+            break;
+        case UI_PAUSE:
+            if (variable_struct_exists(gs.ui, "pause_menu")) {
+                var pm = gs.ui.pause_menu;
+                return UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
+            }
+            break;
+        case UI_SAVE:
+            if (variable_struct_exists(gs.ui, "save_menu")) {
+                var sm = gs.ui.save_menu;
+                return UI_PopupAlpha(sm.opened_frame, sm.closing, sm.close_frame, 1);
+            }
+            break;
+        case UI_BED:
+            if (variable_struct_exists(gs.ui, "bed_menu")) {
+                var bm = gs.ui.bed_menu;
+                return UI_PopupAlpha(bm.opened_frame, bm.closing, bm.close_frame, 1);
+            }
+            break;
+    }
+
+    return -1;
+}
+
 function UI_UpdateModalDimState() {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
@@ -380,20 +419,25 @@ function UI_UpdateModalDimState() {
                 root.hold_mode = "";
                 alpha = 0;
             }
-        } else if (root.closing) {
-            alpha = UI_PopupAlpha(root.opened_frame, true, root.close_frame, 1) * 0.6;
-            if (Input_Frame() - root.close_frame >= UI_POPUP_FADE_FRAMES) {
-                root.active = false;
-                root.owner = "";
-                root.opened_frame = UI_OPENED_FRAME_NONE;
-                root.closing = false;
-                root.close_frame = UI_OPENED_FRAME_NONE;
-                root.hold_until_transition = false;
-                root.hold_mode = "";
-                alpha = 0;
-            }
         } else {
-            alpha = UI_PopupAlpha(root.opened_frame, false, UI_OPENED_FRAME_NONE, 1) * 0.6;
+            var visual_alpha = UI_GetModalVisualAlpha();
+            if (visual_alpha >= 0) {
+                alpha = visual_alpha * 0.6;
+            } else if (root.closing) {
+                alpha = UI_PopupAlpha(root.opened_frame, true, root.close_frame, 1) * 0.6;
+                if (Input_Frame() - root.close_frame >= UI_POPUP_FADE_FRAMES) {
+                    root.active = false;
+                    root.owner = "";
+                    root.opened_frame = UI_OPENED_FRAME_NONE;
+                    root.closing = false;
+                    root.close_frame = UI_OPENED_FRAME_NONE;
+                    root.hold_until_transition = false;
+                    root.hold_mode = "";
+                    alpha = 0;
+                }
+            } else {
+                alpha = UI_PopupAlpha(root.opened_frame, false, UI_OPENED_FRAME_NONE, 1) * 0.6;
+            }
         }
     }
 

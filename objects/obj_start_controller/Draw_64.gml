@@ -77,6 +77,7 @@ if (state == "difficulty" && gs.ui.mode != UI_SAVE && !loading_into_game) {
     draw_set_alpha(difficulty_alpha);
     draw_set_color(c_white);
     draw_rectangle(dx, dy, dx + dw, dy + dh, true);
+    draw_set_alpha(difficulty_alpha);
     draw_text(dx + 12, dy + 12, "Select Difficulty");
 
     var drow_gap = max(18, line_h + 6);

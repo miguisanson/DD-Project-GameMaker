@@ -622,6 +622,7 @@ function Menu_Draw() {
     draw_set_alpha(menu_alpha);
     draw_set_color(c_white);
     draw_rectangle(bx, by, bx + bw, by + bh, true);
+    draw_set_alpha(menu_alpha);
 
     // tabs
     var tab_w = bw / array_length(m.tabs);
@@ -913,6 +914,7 @@ function Menu_Draw() {
             draw_set_alpha(popup_alpha);
             draw_set_color(c_white);
             draw_rectangle(px1, py1, px2, py2, true);
+            draw_set_alpha(popup_alpha);
 
             var msg_x = px1 + (popup_w - msg_w) * 0.5;
             var msg_y = py1 + popup_pad_y;
@@ -960,6 +962,7 @@ function Menu_Draw() {
             draw_set_alpha(popup_alpha);
             draw_set_color(c_white);
             draw_rectangle(px1, py1, px2, py2, true);
+            draw_set_alpha(popup_alpha);
 
             var msg_x2 = px1 + (popup_w - msg_w) * 0.5;
             var msg_y2 = py1 + popup_pad_y;
@@ -1221,6 +1224,7 @@ function ClassSelect_Draw() {
     draw_set_alpha(popup_alpha);
     draw_set_color(c_white);
     draw_rectangle(bx, by, bx + bw, by + bh, true);
+    draw_set_alpha(popup_alpha);
 
     draw_set_color(c_white);
     draw_text(bx + 12, by + 12, "Select Class");
@@ -1502,6 +1506,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     draw_set_alpha(popup_alpha);
     draw_set_color(c_white);
     draw_rectangle(sx, sy, sx + sw, sy + sh, true);
+    draw_set_alpha(popup_alpha);
     draw_text(sx + 12, sy + 12, "Settings");
 
     var row_gap_s = max(18, line_h + 6);
@@ -1794,6 +1799,7 @@ function PauseMenu_Draw() {
     draw_set_alpha(popup_alpha);
     draw_set_color(c_white);
     draw_rectangle(bx, by, bx + bw, by + bh, true);
+    draw_set_alpha(popup_alpha);
 
     var options = pm.options;
     var start_y = by + inner_pad;

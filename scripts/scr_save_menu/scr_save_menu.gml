@@ -159,6 +159,7 @@ function BedMenu_Draw() {
     draw_set_alpha(popup_alpha);
     draw_set_color(c_white);
     draw_rectangle(bx, by, bx + bw, by + bh, true);
+    draw_set_alpha(popup_alpha);
 
     var start_y = by + inner_pad;
     for (var j = 0; j < array_length(bm.options); j++) {
@@ -273,6 +274,11 @@ function SaveMenu_Close(_immediate = false, _pending_action = "", _pending_slot 
         return;
     }
     if (!sm.open || sm.closing) return;
+    if (string(_pending_action) == "load_slot"
+    && variable_struct_exists(sm, "context")
+    && string(sm.context) == "main") {
+        UI_ModalRootHold("gameplay_load");
+    }
     if (string(_pending_action) == "") {
         UI_ModalRootEnd(false);
     }
@@ -607,6 +613,7 @@ function SaveMenu_Draw() {
         draw_set_alpha(popup_alpha);
         draw_set_color(c_white);
         draw_rectangle(bx, by, bx + bw, by + bh, true);
+        draw_set_alpha(popup_alpha);
 
         draw_set_color(c_white);
         draw_text(bx + 12, by + 10, title);
@@ -725,6 +732,7 @@ function SaveMenu_Draw() {
         draw_set_alpha(confirm_alpha);
         draw_set_color(c_white);
         draw_rectangle(px1, py1, px2, py2, true);
+        draw_set_alpha(confirm_alpha);
         draw_set_color(c_white);
 
         var msg_x = px1 + (popup_w - msg_w) * 0.5;
