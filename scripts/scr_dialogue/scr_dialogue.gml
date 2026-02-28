@@ -1,4 +1,4 @@
-﻿function DialogueDB_Init() {
+function DialogueDB_Init() {
     if (variable_global_exists("dialogue_db") && ds_exists(global.dialogue_db, ds_type_map)) return;
     global.dialogue_db = ds_map_create();
 

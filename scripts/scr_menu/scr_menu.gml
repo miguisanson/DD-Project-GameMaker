@@ -1284,7 +1284,9 @@ function SettingsPopup_Ensure() {
             pending: GameSettings_Copy(GameSettings_Ensure()),
             opened_frame: UI_OPENED_FRAME_NONE,
             closing: false,
-            close_frame: UI_OPENED_FRAME_NONE
+            close_frame: UI_OPENED_FRAME_NONE,
+            lr_hold_dir: 0,
+            lr_hold_frames: 0
         };
     } else {
         var sp0 = gs.ui.settings_popup;
@@ -1296,6 +1298,8 @@ function SettingsPopup_Ensure() {
         if (!variable_struct_exists(sp0, "opened_frame")) sp0.opened_frame = UI_OPENED_FRAME_NONE;
         if (!variable_struct_exists(sp0, "closing")) sp0.closing = false;
         if (!variable_struct_exists(sp0, "close_frame")) sp0.close_frame = UI_OPENED_FRAME_NONE;
+        if (!variable_struct_exists(sp0, "lr_hold_dir")) sp0.lr_hold_dir = 0;
+        if (!variable_struct_exists(sp0, "lr_hold_frames")) sp0.lr_hold_frames = 0;
     }
 }
 
@@ -1321,6 +1325,8 @@ function SettingsPopup_Open(_owner = "") {
     sp.opened_frame = Input_Frame();
     sp.closing = false;
     sp.close_frame = UI_OPENED_FRAME_NONE;
+    sp.lr_hold_dir = 0;
+    sp.lr_hold_frames = 0;
     gs.ui.settings_popup = sp;
     SFX_PlayUI("ui_openclose");
 }
@@ -1338,6 +1344,8 @@ function SettingsPopup_Close(_immediate = false) {
         sp.opened_frame = UI_OPENED_FRAME_NONE;
         sp.dirty = false;
         sp.pending = GameSettings_Copy(GameSettings_Ensure());
+        sp.lr_hold_dir = 0;
+        sp.lr_hold_frames = 0;
         gs.ui.settings_popup = sp;
         SFX_PlayUI("ui_openclose");
         return;
@@ -1360,6 +1368,8 @@ function SettingsPopup_CloseFinalize() {
     sp.opened_frame = UI_OPENED_FRAME_NONE;
     sp.dirty = false;
     sp.pending = GameSettings_Copy(GameSettings_Ensure());
+    sp.lr_hold_dir = 0;
+    sp.lr_hold_frames = 0;
     gs.ui.settings_popup = sp;
 }
 
@@ -1382,6 +1392,8 @@ function SettingsPopup_HandleInput() {
     var k_down = Input_UIPressed("menu_down");
     var k_left = Input_UIPressed("menu_left");
     var k_right = Input_UIPressed("menu_right");
+    var h_left = Input_Held("menu_left");
+    var h_right = Input_Held("menu_right");
     var k_ok = Input_UIConfirm();
     var k_back = Input_UIBack();
 
@@ -1411,44 +1423,69 @@ function SettingsPopup_HandleInput() {
     var pending = GameSettings_Copy(sp.pending);
     var changed = false;
     var step = sp.volume_step;
+    var can_hold_adjust = (sp.index >= 0 && sp.index <= 3);
+
+    // Local hold-repeat for slider/scale rows only.
+    var hold_dir = 0;
+    if (h_right && !h_left) hold_dir = 1;
+    if (h_left && !h_right) hold_dir = -1;
+    if (!can_hold_adjust) hold_dir = 0;
+
+    if (hold_dir != sp.lr_hold_dir) {
+        sp.lr_hold_dir = hold_dir;
+        sp.lr_hold_frames = 0;
+    } else if (hold_dir != 0) {
+        sp.lr_hold_frames += 1;
+    } else {
+        sp.lr_hold_frames = 0;
+    }
+
+    var k_left_step = k_left;
+    var k_right_step = k_right;
+    if (can_hold_adjust && hold_dir != 0) {
+        var repeat_fire = (sp.lr_hold_frames >= SETTINGS_HOLD_REPEAT_DELAY)
+            && (((sp.lr_hold_frames - SETTINGS_HOLD_REPEAT_DELAY) mod max(1, SETTINGS_HOLD_REPEAT_INTERVAL)) == 0);
+        if (hold_dir < 0) k_left_step = (k_left_step || repeat_fire);
+        if (hold_dir > 0) k_right_step = (k_right_step || repeat_fire);
+    }
 
     switch (sp.index) {
         case 0:
-            if (k_left) {
+            if (k_left_step) {
                 pending.audio_ui = clamp(pending.audio_ui - step, 0, 1);
                 changed = true;
             }
-            if (k_right) {
+            if (k_right_step) {
                 pending.audio_ui = clamp(pending.audio_ui + step, 0, 1);
                 changed = true;
             }
             break;
         case 1:
-            if (k_left) {
+            if (k_left_step) {
                 pending.audio_sfx = clamp(pending.audio_sfx - step, 0, 1);
                 changed = true;
             }
-            if (k_right) {
+            if (k_right_step) {
                 pending.audio_sfx = clamp(pending.audio_sfx + step, 0, 1);
                 changed = true;
             }
             break;
         case 2:
-            if (k_left) {
+            if (k_left_step) {
                 pending.audio_bgm = clamp(pending.audio_bgm - step, 0, 1);
                 changed = true;
             }
-            if (k_right) {
+            if (k_right_step) {
                 pending.audio_bgm = clamp(pending.audio_bgm + step, 0, 1);
                 changed = true;
             }
             break;
         case 3:
-            if (k_left) {
+            if (k_left_step) {
                 pending.display_scale = clamp(pending.display_scale - 1, DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
                 changed = true;
             }
-            if (k_right) {
+            if (k_right_step) {
                 pending.display_scale = clamp(pending.display_scale + 1, DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
                 changed = true;
             }

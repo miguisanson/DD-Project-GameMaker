@@ -724,6 +724,8 @@ function BGM_MixApplyForRoom(_room_id, _fade_in_ms = -1, _fade_out_ms = -1) {
     var tracks = BGM_GetMixTracksForRoom(_room_id);
     var in_ms = (_fade_in_ms >= 0) ? _fade_in_ms : BGM_MixFadeInMs();
     var out_ms = (_fade_out_ms >= 0) ? _fade_out_ms : BGM_MixFadeOutMs();
+    var restart_main_menu = (variable_global_exists("bgm_mix_restart_main_menu") && global.bgm_mix_restart_main_menu);
+    if (restart_main_menu) global.bgm_mix_restart_main_menu = false;
 
     for (var i = 0; i < array_length(cfg.tracks); i++) {
         var key = cfg.tracks[i];
@@ -731,6 +733,15 @@ function BGM_MixApplyForRoom(_room_id, _fade_in_ms = -1, _fade_out_ms = -1) {
         var always_run = variable_struct_exists(cfg, "always_running_tracks") && BGM_ArrayContains(cfg.always_running_tracks, key);
         var was_initialized = variable_struct_exists(global.bgm_mix_handles, key);
         if (!active && !was_initialized && !always_run) continue;
+
+        if (restart_main_menu && _room_id == rm_start && BGM_ArrayContains(cfg.main_menu_tracks, key) && was_initialized) {
+            var old_h = variable_struct_get(global.bgm_mix_handles, key);
+            if (old_h != -1 && audio_is_playing(old_h)) {
+                audio_stop_sound(old_h);
+            }
+            variable_struct_set(global.bgm_mix_handles, key, -1);
+            was_initialized = false;
+        }
 
         var handle = BGM_MixEnsureTrackHandle(key);
         if (handle == -1 || !audio_is_playing(handle)) continue;

@@ -477,7 +477,7 @@ function Status_DrawFallbackLabel(_cfg, _status_id, _x, _y) {
     return max(1, round(string_width(txt) * text_scale));
 }
 
-function Status_DrawIcons(_ch, _x, _y, _spacing, _rtl, _noncore_text_fallback) {
+function Status_DrawIcons(_ch, _x, _y, _spacing = 10, _rtl = false, _noncore_text_fallback = false) {
     if (!is_array(_ch.status)) return;
 
     var spacing = 10;

@@ -68,7 +68,11 @@ if (!variable_instance_exists(id, "last_room_id")) {
 }
 
 if (room != last_room_id) {
+    var prev_room = last_room_id;
     last_room_id = room;
+    if (room == rm_start && prev_room != rm_start) {
+        global.bgm_mix_restart_main_menu = true;
+    }
     BGM_ApplyForRoom(room);
     GameSettings_ApplyDisplay();
 }
