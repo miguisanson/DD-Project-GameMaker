@@ -3,18 +3,8 @@ var h = display_get_gui_height();
 var gs = GameState_Get();
 if (state == "cutscene") exit;
 
-var scene_alpha = 1;
-if (Transition_IsActive()
-&& variable_struct_exists(gs, "transition_fx")
-&& is_struct(gs.transition_fx)
-&& variable_struct_exists(gs.transition_fx, "alpha")) {
-    scene_alpha = 1 - clamp(real(gs.transition_fx.alpha), 0, 1);
-}
-
 if (room == rm_start && title_bg_sprite != noone) {
-    draw_set_alpha(scene_alpha);
     draw_sprite_stretched(title_bg_sprite, 0, 0, 0, w, h);
-    draw_set_alpha(1);
 }
 
 UI_SetFont();
@@ -57,7 +47,6 @@ if (state == "main" && gs.ui.mode != UI_SAVE) {
         var load_disabled = (label == "Load Game" && !can_load);
         var selected = (state == "main" && i == main_index && !load_disabled);
 
-        draw_set_alpha(scene_alpha);
         if (selected) {
             draw_set_color(c_white);
             draw_rectangle(bx1 - pad_x, yy - pad_y, bx2 + pad_x, yy + line_h + pad_y, false);
@@ -70,12 +59,10 @@ if (state == "main" && gs.ui.mode != UI_SAVE) {
         }
         draw_text(bx1 + 8, yy, label);
     }
-    draw_set_alpha(1);
 }
 
 if (state == "difficulty" && gs.ui.mode != UI_SAVE) {
     var difficulty_alpha = UI_PopupAlpha(difficulty_opened_frame, difficulty_closing, difficulty_close_frame, 1);
-    difficulty_alpha *= scene_alpha;
     var dw = w * 0.62;
     var dh = h * 0.44;
     var dx = (w - dw) * 0.5;
@@ -124,7 +111,6 @@ if (state == "difficulty" && gs.ui.mode != UI_SAVE) {
 }
 
 if (SettingsPopup_IsOpen("title")) {
-    draw_set_alpha(scene_alpha);
     SettingsPopup_Draw();
 }
 draw_set_alpha(1);

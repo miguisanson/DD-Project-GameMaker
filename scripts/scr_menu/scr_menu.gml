@@ -1685,7 +1685,7 @@ function PauseMenu_CloseFinalize() {
         }
         if (room != rm_start) {
             RoomState_OnRoomExit();
-            Transition_RequestRoomFade(rm_start);
+            Transition_RequestLoadingRoomFade(rm_start);
         }
     }
 }

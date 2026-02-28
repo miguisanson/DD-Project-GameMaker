@@ -350,8 +350,8 @@ function Save_ApplySnapshot(_snap) {
     // Preserve exact saved position when loading from a slot.
     GameState_SetBattleReturn(room_id, px, py, face, false);
     GameState_SetJustReturned(true);
-    // Use longer cinematic fade for load-in to ensure full black before room swap.
-    Transition_RequestCutsceneFade(room_id);
+    // Use a slower loading-style fade so loaded rooms stay hidden until the black screen fully owns the transition.
+    Transition_RequestLoadingRoomFade(room_id);
 }
 
 function Save_Path(_slot) {

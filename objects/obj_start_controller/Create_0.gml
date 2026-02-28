@@ -127,6 +127,7 @@ title_bg_layer_id = -1;
 if (room == rm_start) {
     gs.in_main_menu = true;
     state = "main";
+    depth = 100000;
     title_bg_sprite = main_menu;
     title_bg_layer_id = layer_get_id("Background");
     if (title_bg_layer_id != -1) layer_set_visible(title_bg_layer_id, false);

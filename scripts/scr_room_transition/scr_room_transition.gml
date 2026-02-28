@@ -103,6 +103,7 @@ function Transition_Init() {
             target_face: -1,
             use_spawn: false,
             fade_out_frames: TRANSITION_ROOM_FADE_OUT_FRAMES,
+            black_hold_frames: TRANSITION_ROOM_BLACK_HOLD_FRAMES,
             fade_in_frames: TRANSITION_ROOM_FADE_IN_FRAMES,
             encounter_zoom: 0,
             encounter_shake_x: 0,
@@ -245,9 +246,11 @@ function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus
 
     if (_type == TRANSITION_TYPE_CUTSCENE) {
         tr.fade_out_frames = max(1, TRANSITION_CUTSCENE_FADE_OUT_FRAMES);
+        tr.black_hold_frames = max(0, TRANSITION_CUTSCENE_BLACK_HOLD_FRAMES);
         tr.fade_in_frames = max(1, TRANSITION_CUTSCENE_FADE_IN_FRAMES);
     } else if (_type == TRANSITION_TYPE_ENCOUNTER) {
         tr.fade_out_frames = max(1, TRANSITION_ENCOUNTER_FADE_OUT_FRAMES);
+        tr.black_hold_frames = max(0, TRANSITION_ENCOUNTER_BLACK_HOLD_FRAMES);
         tr.fade_in_frames = max(1, TRANSITION_ENCOUNTER_FADE_IN_FRAMES);
         tr.encounter_zoom = 0;
         tr.encounter_shake_x = 0;
@@ -260,6 +263,7 @@ function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus
         Transition_CaptureEncounterViewport(tr);
     } else {
         tr.fade_out_frames = max(1, TRANSITION_ROOM_FADE_OUT_FRAMES);
+        tr.black_hold_frames = max(0, TRANSITION_ROOM_BLACK_HOLD_FRAMES);
         tr.fade_in_frames = max(1, TRANSITION_ROOM_FADE_IN_FRAMES);
     }
 
@@ -272,6 +276,18 @@ function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus
 
 function Transition_RequestRoomFade(_room, _spawn_id = "", _face = -1, _use_spawn = false) {
     return Transition_Begin(TRANSITION_TYPE_ROOM, _room, _spawn_id, _face, _use_spawn);
+}
+
+function Transition_RequestLoadingRoomFade(_room, _spawn_id = "", _face = -1, _use_spawn = false) {
+    var ok = Transition_Begin(TRANSITION_TYPE_ROOM, _room, _spawn_id, _face, _use_spawn);
+    if (!ok) return false;
+
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+    tr.fade_out_frames = max(1, TRANSITION_LOADING_FADE_OUT_FRAMES);
+    tr.black_hold_frames = max(0, TRANSITION_LOADING_BLACK_HOLD_FRAMES);
+    tr.fade_in_frames = max(1, TRANSITION_LOADING_FADE_IN_FRAMES);
+    return true;
 }
 
 function Transition_RequestEncounterBattle(_room = rm_battle, _focus_x = undefined, _focus_y = undefined) {
@@ -288,6 +304,7 @@ function Transition_RequestBlackFlash(_fade_out_frames = TRANSITION_FLASH_FADE_O
     var gs = GameState_Get();
     var tr = gs.transition_fx;
     tr.fade_out_frames = max(1, _fade_out_frames);
+    tr.black_hold_frames = 0;
     tr.fade_in_frames = max(1, _fade_in_frames);
     tr.flash_apply_class_pending = is_real(_flash_apply_class_id) && (_flash_apply_class_id >= 0);
     tr.flash_apply_class_id = tr.flash_apply_class_pending ? _flash_apply_class_id : -1;
@@ -307,6 +324,7 @@ function Transition_RequestCutsceneIn() {
 
     var gs = GameState_Get();
     var tr = gs.transition_fx;
+    tr.black_hold_frames = 0;
     tr.phase = 2; // intro fade-in only
     tr.timer = 0;
     tr.alpha = 1;
@@ -330,6 +348,7 @@ function Transition_Finish() {
     tr.target_face = -1;
     tr.use_spawn = false;
     tr.encounter_zoom = 0;
+    tr.black_hold_frames = 0;
     tr.encounter_shake_x = 0;
     tr.encounter_shake_y = 0;
     tr.encounter_cam = -1;
@@ -364,6 +383,13 @@ function Transition_Update() {
                     tr.timer = 0;
                     Transition_PreRoomChange();
                     room_goto(tr.target_room);
+                }
+            } else if (tr.phase == 1) {
+                tr.timer += 1;
+                tr.alpha = 1;
+                if (tr.timer >= max(0, tr.black_hold_frames)) {
+                    tr.phase = 2;
+                    tr.timer = 0;
                 }
             } else {
                 tr.timer += 1;
@@ -485,6 +511,13 @@ function Transition_Update() {
                     tr.timer = 0;
                     Transition_PreRoomChange();
                     room_goto(tr.target_room);
+                }
+            } else if (tr.phase == 1) {
+                tr.timer += 1;
+                tr.alpha = 1;
+                if (tr.timer >= max(0, tr.black_hold_frames)) {
+                    tr.phase = 3;
+                    tr.timer = 0;
                 }
             } else {
                 tr.timer += 1;
