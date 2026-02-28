@@ -1,4 +1,12 @@
 if (defeated) exit;
+if (variable_instance_exists(id, "cine_lock_count") && cine_lock_count > 0) {
+    moving = false;
+    move_timer = 0;
+    move_dir = -1;
+    ai_state = ENEMY_IDLE;
+    forget_time = 0;
+    exit;
+}
 if (Transition_IsActive()) {
     moving = false;
     move_timer = 0;

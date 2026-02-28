@@ -40,6 +40,7 @@ if (room == rm_cutscene && instance_exists(obj_player)) {
 if (room == rm_floor1 && variable_struct_exists(gs, "pending_floor1_intro_dialogue") && gs.pending_floor1_intro_dialogue) {
     if (instance_exists(obj_player) && gs.ui.mode == UI_NONE && array_length(gs.ui.lines) <= 0) {
         gs.pending_floor1_intro_dialogue = false;
+        SFX_Play("body_falling_wood");
         Dialogue_Start("sys_floor1_intro");
     }
 }

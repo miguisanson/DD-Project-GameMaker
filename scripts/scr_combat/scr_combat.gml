@@ -265,6 +265,26 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
         }
     }
 
+    // One-time floor1 slime reaction.
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
+    var floor1_slime_key = "floor1_slime_kill_reaction_done";
+    var floor1_slime_done = variable_struct_exists(gs.flags, floor1_slime_key) && variable_struct_get(gs.flags, floor1_slime_key);
+
+    var killed_floor1_slime = false;
+    if (is_struct(gs) && variable_struct_exists(gs, "battle") && is_struct(gs.battle)) {
+        if (variable_struct_exists(gs.battle, "enemy_room") && gs.battle.enemy_room == rm_floor1
+        && variable_struct_exists(gs.battle, "enemy_id") && gs.battle.enemy_id == ENEMY_SLIME) {
+            killed_floor1_slime = true;
+        }
+    }
+
+    if (!floor1_slime_done && killed_floor1_slime) {
+        array_push(lines, "How was that even alive?! I almost died.");
+        array_push(lines, "God, I just need to get out of here.");
+        variable_struct_set(gs.flags, floor1_slime_key, true);
+    }
+
     return lines;
 }
 

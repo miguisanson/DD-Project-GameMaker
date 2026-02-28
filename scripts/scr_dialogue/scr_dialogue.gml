@@ -123,7 +123,7 @@ function Dialogue_EventConfigEnsure() {
         class_chest_ambience_keys: [
             "", // archer
             "", // knight
-            "@mana_pool", // mage
+            SKILLBOOK_MANA_AMBIENCE_KEY_3, // mage
             ""  // nobody
         ],
         skillbook_first_ids: skillbook_first_ids,
@@ -188,14 +188,7 @@ function Dialogue_SkillbookAmbienceSfxKeys() {
 }
 
 function Dialogue_PickSkillbookAmbienceSfxKey() {
-    var keys = Dialogue_SkillbookAmbienceSfxKeys();
-    var valid = [];
-    for (var i = 0; i < array_length(keys); i++) {
-        var k = string(keys[i]);
-        if (k != "") array_push(valid, k);
-    }
-    if (array_length(valid) <= 0) return "";
-    return valid[irandom(array_length(valid) - 1)];
+    return SKILLBOOK_MANA_AMBIENCE_KEY_1;
 }
 
 function Dialogue_ActiveAmbienceUIKey() {
@@ -218,9 +211,7 @@ function Dialogue_GetActiveAmbienceSfxKey() {
 }
 
 function Dialogue_ClassChestAmbienceSfxKey(_class_id) {
-    var key = Dialogue_ClassEventId("class_chest_ambience_keys", _class_id);
-    if (key == "@mana_pool") return Dialogue_PickSkillbookAmbienceSfxKey();
-    return key;
+    return Dialogue_ClassEventId("class_chest_ambience_keys", _class_id);
 }
 
 function Dialogue_SetSkillbookFirstReadUIActive(_active) {

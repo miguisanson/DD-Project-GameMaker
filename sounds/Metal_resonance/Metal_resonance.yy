@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Metal_resonance",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":7.673492,
+  "exportDir":"",
+  "name":"Metal_resonance",
+  "parent":{
+    "name":"Cutscenes_Dialogue",
+    "path":"folders/Sounds/Cutscenes_Dialogue.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Metal_resonance.ogg",
+  "volume":1.0,
+}

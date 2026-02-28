@@ -220,12 +220,496 @@ function Player_EnsureDialogueSettle(_pl, _recover_frames = PLAYER_DIALOGUE_SETT
     Player_StartAutoResolveRecover(_pl, _recover_frames, false);
 }
 
+function DialogueTrigger_IsDialogueActive() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) return false;
+    var ui = gs.ui;
+    if (variable_struct_exists(ui, "mode") && ui.mode == UI_DIALOGUE) return true;
+    if (variable_struct_exists(ui, "lines") && is_array(ui.lines) && array_length(ui.lines) > 0) return true;
+    return false;
+}
+
+function DialogueTrigger_GetPlayerInst() {
+    var gs = GameState_Get();
+    if (is_struct(gs) && variable_struct_exists(gs, "player_inst") && instance_exists(gs.player_inst)) {
+        return gs.player_inst;
+    }
+    if (instance_exists(obj_player)) return instance_find(obj_player, 0);
+    return noone;
+}
+
+function DialogueTrigger_EaseValue(_t, _ease = "smoothstep") {
+    var t = clamp(real(_t), 0, 1);
+    if (string(_ease) == "linear") return t;
+    return t * t * (3 - (2 * t)); // smoothstep (bell-curve accel/decel)
+}
+
+function DialogueTrigger_GetTargetPoint(_inst) {
+    if (!instance_exists(_inst)) return { ok: false, x: 0, y: 0 };
+
+    var cx = _inst.x;
+    var cy = _inst.y;
+    if (variable_instance_exists(_inst, "bbox_left")
+    && variable_instance_exists(_inst, "bbox_right")
+    && variable_instance_exists(_inst, "bbox_top")
+    && variable_instance_exists(_inst, "bbox_bottom")) {
+        cx = (_inst.bbox_left + _inst.bbox_right) * 0.5;
+        cy = (_inst.bbox_top + _inst.bbox_bottom) * 0.5;
+    }
+
+    return { ok: true, x: cx, y: cy };
+}
+
+function DialogueTrigger_CameraPosForPoint(_cam, _wx, _wy) {
+    var vw = max(1, camera_get_view_width(_cam));
+    var vh = max(1, camera_get_view_height(_cam));
+    var max_x = max(0, room_width - vw);
+    var max_y = max(0, room_height - vh);
+    var cx = clamp(round(real(_wx) - (vw * 0.5)), 0, max_x);
+    var cy = clamp(round(real(_wy) - (vh * 0.5)), 0, max_y);
+    return { x: cx, y: cy };
+}
+
+function DialogueTrigger_ResolveTargetFromConfig(_tr, _prefix) {
+    if (!instance_exists(_tr)) return noone;
+
+    var pfx = string(_prefix);
+    var direct_name = pfx + "_target";
+    var tag_name = pfx + "_tag";
+    var tag_var_name = pfx + "_tag_var";
+    var obj_name = pfx + "_object";
+    var radius_name = pfx + "_search_radius";
+
+    var obj_idx = obj_enemy;
+    if (variable_instance_exists(_tr, obj_name)) {
+        var obj_val = variable_instance_get(_tr, obj_name);
+        if (is_real(obj_val) && object_exists(obj_val)) obj_idx = obj_val;
+    }
+
+    if (variable_instance_exists(_tr, direct_name)) {
+        var direct = variable_instance_get(_tr, direct_name);
+        if (instance_exists(direct)) return direct;
+    }
+
+    var target_tag = "";
+    if (variable_instance_exists(_tr, tag_name)) {
+        target_tag = string(variable_instance_get(_tr, tag_name));
+    }
+
+    var target_tag_var = "cine_id";
+    if (variable_instance_exists(_tr, tag_var_name)) {
+        target_tag_var = string(variable_instance_get(_tr, tag_var_name));
+    }
+
+    if (target_tag != "" && object_exists(obj_idx) && instance_exists(obj_idx)) {
+        var n = instance_number(obj_idx);
+        for (var i = 0; i < n; i++) {
+            var inst = instance_find(obj_idx, i);
+            if (!instance_exists(inst)) continue;
+            if (!variable_instance_exists(inst, target_tag_var)) continue;
+            if (string(variable_instance_get(inst, target_tag_var)) == target_tag) return inst;
+        }
+    }
+
+    var radius = DIALOGUE_TRIGGER_TARGET_SEARCH_RADIUS;
+    if (variable_instance_exists(_tr, radius_name)) {
+        radius = max(0, real(variable_instance_get(_tr, radius_name)));
+    }
+
+    if (!object_exists(obj_idx) || !instance_exists(obj_idx)) return noone;
+
+    var best = noone;
+    var best_dist = 1000000000;
+    var n2 = instance_number(obj_idx);
+    for (var j = 0; j < n2; j++) {
+        var inst2 = instance_find(obj_idx, j);
+        if (!instance_exists(inst2)) continue;
+
+        var d = point_distance(_tr.x, _tr.y, inst2.x, inst2.y);
+        if (radius > 0 && d > radius) continue;
+        if (d < best_dist) {
+            best_dist = d;
+            best = inst2;
+        }
+    }
+
+    return best;
+}
+
+function DialogueTrigger_EnemyLockAcquire(_enemy, _owner = noone) {
+    if (!instance_exists(_enemy)) return false;
+
+    if (!variable_instance_exists(_enemy, "cine_lock_count")) _enemy.cine_lock_count = 0;
+    if (!variable_instance_exists(_enemy, "cine_lock_owner")) _enemy.cine_lock_owner = noone;
+
+    _enemy.cine_lock_count += 1;
+    _enemy.cine_lock_owner = _owner;
+
+    if (variable_instance_exists(_enemy, "moving")) _enemy.moving = false;
+    if (variable_instance_exists(_enemy, "move_timer")) _enemy.move_timer = 0;
+    if (variable_instance_exists(_enemy, "move_dir")) _enemy.move_dir = -1;
+    if (variable_instance_exists(_enemy, "ai_state")) _enemy.ai_state = ENEMY_IDLE;
+    if (variable_instance_exists(_enemy, "forget_time")) _enemy.forget_time = 0;
+
+    return true;
+}
+
+function DialogueTrigger_EnemyLockRelease(_enemy, _owner = noone) {
+    if (!instance_exists(_enemy)) return;
+    if (!variable_instance_exists(_enemy, "cine_lock_count")) return;
+
+    _enemy.cine_lock_count = max(0, _enemy.cine_lock_count - 1);
+    if (_enemy.cine_lock_count <= 0) {
+        _enemy.cine_lock_count = 0;
+        if (variable_instance_exists(_enemy, "cine_lock_owner")) _enemy.cine_lock_owner = noone;
+    }
+}
+
+function DialogueTrigger_CleanupCinematic(_tr, _release_enemy = true, _restore_follow = true) {
+    if (!instance_exists(_tr)) return;
+
+    if (_restore_follow && variable_instance_exists(_tr, "cine_follow_suspended") && _tr.cine_follow_suspended) {
+        var cam_restore = -1;
+        if (variable_instance_exists(_tr, "cine_cam_id")) cam_restore = _tr.cine_cam_id;
+        if (!is_undefined(cam_restore) && cam_restore != -1) {
+            var restore_obj = obj_player;
+            if (variable_instance_exists(_tr, "camera_restore_target_object")) {
+                var ro = _tr.camera_restore_target_object;
+                if (is_real(ro) && object_exists(ro)) restore_obj = ro;
+            }
+            camera_set_view_target(cam_restore, restore_obj);
+        }
+        _tr.cine_follow_suspended = false;
+    }
+
+    if (_release_enemy && variable_instance_exists(_tr, "lock_enemy_acquired") && _tr.lock_enemy_acquired) {
+        if (variable_instance_exists(_tr, "lock_enemy_runtime_target") && instance_exists(_tr.lock_enemy_runtime_target)) {
+            DialogueTrigger_EnemyLockRelease(_tr.lock_enemy_runtime_target, _tr);
+        }
+        _tr.lock_enemy_acquired = false;
+    }
+
+    if (variable_instance_exists(_tr, "cine_runtime_active")) _tr.cine_runtime_active = false;
+    if (variable_instance_exists(_tr, "cine_phase")) _tr.cine_phase = "";
+    if (variable_instance_exists(_tr, "cine_cam_id")) _tr.cine_cam_id = -1;
+    if (variable_instance_exists(_tr, "cine_target_inst")) _tr.cine_target_inst = noone;
+    if (variable_instance_exists(_tr, "cine_dialogue_started")) _tr.cine_dialogue_started = false;
+    if (variable_instance_exists(_tr, "cine_wait_dialogue_end")) _tr.cine_wait_dialogue_end = false;
+    if (variable_instance_exists(_tr, "cine_hold_frames")) _tr.cine_hold_frames = 0;
+    if (variable_instance_exists(_tr, "lock_enemy_runtime_target")) _tr.lock_enemy_runtime_target = noone;
+
+    if (variable_instance_exists(_tr, "destroy_pending_after_cinematic") && _tr.destroy_pending_after_cinematic) {
+        with (_tr) instance_destroy();
+    }
+}
+
+function DialogueTrigger_BeginFollowRestoreBlend(_tr) {
+    if (!instance_exists(_tr)) return false;
+    if (!variable_instance_exists(_tr, "cine_follow_suspended") || !_tr.cine_follow_suspended) return false;
+    if (!variable_instance_exists(_tr, "cine_cam_id")) return false;
+
+    var cam = _tr.cine_cam_id;
+    if (is_undefined(cam) || cam == -1) return false;
+
+    var restore_obj = obj_player;
+    if (variable_instance_exists(_tr, "camera_restore_target_object")) {
+        var ro = _tr.camera_restore_target_object;
+        if (is_real(ro) && object_exists(ro)) restore_obj = ro;
+    }
+
+    var from_x = camera_get_view_x(cam);
+    var from_y = camera_get_view_y(cam);
+    // Turn follow back on, but keep controlling view position during blend.
+    camera_set_view_target(cam, restore_obj);
+
+    var game_fps = max(1, game_get_speed(gamespeed_fps));
+    var blend_sec = DIALOGUE_TRIGGER_CAM_RESTORE_SEC;
+    if (variable_instance_exists(_tr, "camera_restore_blend_sec")) {
+        blend_sec = max(0.01, real(_tr.camera_restore_blend_sec));
+    }
+
+    _tr.cine_phase = "restore_blend";
+    _tr.cine_step = 0;
+    _tr.cine_frames = max(1, round(blend_sec * game_fps));
+    _tr.cine_from_x = from_x;
+    _tr.cine_from_y = from_y;
+    _tr.cine_to_x = from_x;
+    _tr.cine_to_y = from_y;
+    _tr.cine_follow_suspended = false;
+    return true;
+}
+
+function DialogueTrigger_ApplyBlackHandoff(_tr) {
+    if (!instance_exists(_tr)) return;
+    DialogueTrigger_CleanupCinematic(_tr, true, true);
+}
+
+function DialogueTrigger_StartCinematic(_tr) {
+    if (!instance_exists(_tr)) return;
+
+    var release_on_fire = false;
+    if (variable_instance_exists(_tr, "lock_enemy_release_on_fire")) {
+        release_on_fire = _tr.lock_enemy_release_on_fire;
+    }
+
+    if (variable_instance_exists(_tr, "lock_enemy_enabled")
+    && _tr.lock_enemy_enabled
+    && variable_instance_exists(_tr, "lock_mode")
+    && string(_tr.lock_mode) == "freeze"
+    && variable_instance_exists(_tr, "lock_enemy_acquired")
+    && _tr.lock_enemy_acquired
+    && release_on_fire) {
+        if (variable_instance_exists(_tr, "lock_enemy_runtime_target") && instance_exists(_tr.lock_enemy_runtime_target)) {
+            DialogueTrigger_EnemyLockRelease(_tr.lock_enemy_runtime_target, _tr);
+        }
+        _tr.lock_enemy_acquired = false;
+        _tr.lock_enemy_runtime_target = noone;
+    }
+
+    var keep_enemy_locked = false;
+    if (variable_instance_exists(_tr, "lock_enemy_enabled")
+    && _tr.lock_enemy_enabled
+    && variable_instance_exists(_tr, "lock_mode")
+    && string(_tr.lock_mode) == "freeze"
+    && variable_instance_exists(_tr, "lock_enemy_acquired")
+    && _tr.lock_enemy_acquired) {
+        keep_enemy_locked = !release_on_fire;
+    }
+
+    if (!keep_enemy_locked
+    && (!variable_instance_exists(_tr, "camera_focus_enabled") || !_tr.camera_focus_enabled)) {
+        return;
+    }
+
+    _tr.cine_runtime_active = true;
+    _tr.cine_dialogue_started = DialogueTrigger_IsDialogueActive();
+    _tr.cine_wait_dialogue_end = true;
+    _tr.cine_target_inst = noone;
+    _tr.cine_hold_frames = 0;
+
+    if (!_tr.camera_focus_enabled || !view_enabled) {
+        _tr.cine_phase = "wait_dialogue_end";
+        return;
+    }
+
+    var cam = view_camera[0];
+    if (is_undefined(cam) || cam == -1) {
+        _tr.cine_phase = "wait_dialogue_end";
+        return;
+    }
+
+    var target = DialogueTrigger_ResolveTargetFromConfig(_tr, "camera_focus");
+    if (!instance_exists(target)) target = DialogueTrigger_GetPlayerInst();
+    if (!instance_exists(target)) {
+        _tr.cine_phase = "wait_dialogue_end";
+        return;
+    }
+
+    var game_fps = max(1, game_get_speed(gamespeed_fps));
+    var dur_in_frames = max(1, round(max(0.01, real(_tr.camera_focus_duration_in)) * game_fps));
+    var hold_frames = -1;
+    var hold_sec = real(_tr.camera_focus_hold);
+    if (hold_sec >= 0) hold_frames = max(0, round(hold_sec * game_fps));
+
+    var pt = DialogueTrigger_GetTargetPoint(target);
+    var pos = DialogueTrigger_CameraPosForPoint(cam, pt.x, pt.y);
+
+    _tr.cine_cam_id = cam;
+    if (variable_instance_exists(_tr, "camera_suspend_follow") && _tr.camera_suspend_follow) {
+        camera_set_view_target(cam, noone);
+        _tr.cine_follow_suspended = true;
+    }
+    _tr.cine_phase = "pan_in";
+    _tr.cine_step = 0;
+    _tr.cine_frames = dur_in_frames;
+    _tr.cine_hold_frames = hold_frames;
+    _tr.cine_from_x = camera_get_view_x(cam);
+    _tr.cine_from_y = camera_get_view_y(cam);
+    _tr.cine_to_x = pos.x;
+    _tr.cine_to_y = pos.y;
+    _tr.cine_target_inst = target;
+}
+
+function DialogueTrigger_UpdateCinematic(_tr) {
+    if (!instance_exists(_tr)) return;
+
+    if (variable_instance_exists(_tr, "lock_enemy_enabled")
+    && _tr.lock_enemy_enabled
+    && variable_instance_exists(_tr, "lock_mode")
+    && string(_tr.lock_mode) == "freeze"
+    && variable_instance_exists(_tr, "trigger_enabled")
+    && _tr.trigger_enabled) {
+        var prevent_until_trigger = true;
+        if (variable_instance_exists(_tr, "lock_enemy_prevent_until_trigger")) {
+            prevent_until_trigger = _tr.lock_enemy_prevent_until_trigger;
+        }
+        var fired_once = false;
+        if (variable_instance_exists(_tr, "trigger_fired_once") && _tr.trigger_fired_once) fired_once = true;
+        if (variable_instance_exists(_tr, "trigger_once") && _tr.trigger_once && variable_instance_exists(_tr, "triggered") && _tr.triggered) {
+            fired_once = true;
+        }
+
+        if ((!prevent_until_trigger || !fired_once) && !_tr.lock_enemy_acquired) {
+            var lock_target = noone;
+            if (variable_instance_exists(_tr, "lock_enemy_runtime_target") && instance_exists(_tr.lock_enemy_runtime_target)) {
+                lock_target = _tr.lock_enemy_runtime_target;
+            } else {
+                lock_target = DialogueTrigger_ResolveTargetFromConfig(_tr, "lock_enemy");
+                _tr.lock_enemy_runtime_target = lock_target;
+            }
+
+            if (instance_exists(lock_target)) {
+                _tr.lock_enemy_acquired = DialogueTrigger_EnemyLockAcquire(lock_target, _tr);
+            }
+        }
+    }
+
+    if (!variable_instance_exists(_tr, "cine_runtime_active") || !_tr.cine_runtime_active) return;
+
+    var dialogue_active = DialogueTrigger_IsDialogueActive();
+    if (!_tr.cine_dialogue_started && dialogue_active) _tr.cine_dialogue_started = true;
+
+    var cam_ok = (variable_instance_exists(_tr, "cine_cam_id") && !is_undefined(_tr.cine_cam_id) && _tr.cine_cam_id != -1);
+    if (!cam_ok || !view_enabled || _tr.cine_phase == "wait_dialogue_end") {
+        if (_tr.cine_dialogue_started && !dialogue_active) {
+            DialogueTrigger_CleanupCinematic(_tr, true);
+        }
+        return;
+    }
+
+    var cam = _tr.cine_cam_id;
+    var ease_name = DIALOGUE_TRIGGER_EASE_DEFAULT;
+    if (variable_instance_exists(_tr, "camera_ease")) ease_name = string(_tr.camera_ease);
+
+    if (_tr.cine_phase == "pan_in") {
+        var focus_inst = _tr.cine_target_inst;
+        if (!instance_exists(focus_inst)) focus_inst = DialogueTrigger_GetPlayerInst();
+        if (instance_exists(focus_inst)) {
+            var p_focus = DialogueTrigger_GetTargetPoint(focus_inst);
+            var cam_focus = DialogueTrigger_CameraPosForPoint(cam, p_focus.x, p_focus.y);
+            _tr.cine_to_x = cam_focus.x;
+            _tr.cine_to_y = cam_focus.y;
+            _tr.cine_target_inst = focus_inst;
+        }
+
+        _tr.cine_step += 1;
+        var t_in = clamp(_tr.cine_step / max(1, _tr.cine_frames), 0, 1);
+        var e_in = DialogueTrigger_EaseValue(t_in, ease_name);
+        var nx = lerp(_tr.cine_from_x, _tr.cine_to_x, e_in);
+        var ny = lerp(_tr.cine_from_y, _tr.cine_to_y, e_in);
+        camera_set_view_pos(cam, nx, ny);
+
+        if (_tr.cine_step >= _tr.cine_frames) {
+            _tr.cine_phase = "hold";
+            _tr.cine_step = 0;
+        }
+        return;
+    }
+
+    if (_tr.cine_phase == "hold") {
+        var hold_focus = _tr.cine_target_inst;
+        if (!instance_exists(hold_focus)) hold_focus = DialogueTrigger_GetPlayerInst();
+        if (instance_exists(hold_focus)) {
+            var p_hold = DialogueTrigger_GetTargetPoint(hold_focus);
+            var cam_hold = DialogueTrigger_CameraPosForPoint(cam, p_hold.x, p_hold.y);
+            camera_set_view_pos(cam, cam_hold.x, cam_hold.y);
+            _tr.cine_target_inst = hold_focus;
+        }
+
+        if (_tr.cine_hold_frames > 0) _tr.cine_hold_frames -= 1;
+        var hold_done = (_tr.cine_hold_frames == 0 || _tr.cine_hold_frames == -1);
+        var dialogue_done = (_tr.cine_dialogue_started && !dialogue_active);
+
+        if (hold_done && dialogue_done) {
+            var pl = DialogueTrigger_GetPlayerInst();
+            var pout = DialogueTrigger_GetTargetPoint(pl);
+            var cam_out = DialogueTrigger_CameraPosForPoint(cam, pout.x, pout.y);
+            var cam_curr_x = camera_get_view_x(cam);
+            var cam_curr_y = camera_get_view_y(cam);
+
+            var fps_out = max(1, game_get_speed(gamespeed_fps));
+            _tr.cine_phase = "pan_out";
+            _tr.cine_step = 0;
+            _tr.cine_frames = max(1, round(max(0.01, real(_tr.camera_focus_duration_out)) * fps_out));
+            _tr.cine_from_x = cam_curr_x;
+            _tr.cine_from_y = cam_curr_y;
+            _tr.cine_to_x = cam_out.x;
+            _tr.cine_to_y = cam_out.y;
+        }
+        return;
+    }
+
+    if (_tr.cine_phase == "pan_out") {
+        _tr.cine_step += 1;
+        var t_out = clamp(_tr.cine_step / max(1, _tr.cine_frames), 0, 1);
+        var e_out = DialogueTrigger_EaseValue(t_out, ease_name);
+        var ox = lerp(_tr.cine_from_x, _tr.cine_to_x, e_out);
+        var oy = lerp(_tr.cine_from_y, _tr.cine_to_y, e_out);
+        camera_set_view_pos(cam, ox, oy);
+
+        if (_tr.cine_step >= _tr.cine_frames) {
+            var use_black_handoff = true;
+            if (variable_instance_exists(_tr, "camera_handoff_use_black")) {
+                use_black_handoff = _tr.camera_handoff_use_black;
+            }
+
+            if (use_black_handoff) {
+                var flash_out = TRANSITION_FLASH_FADE_OUT_FRAMES;
+                var flash_in = TRANSITION_FLASH_FADE_IN_FRAMES;
+                if (variable_instance_exists(_tr, "camera_handoff_fade_out_frames")) {
+                    flash_out = max(1, round(real(_tr.camera_handoff_fade_out_frames)));
+                }
+                if (variable_instance_exists(_tr, "camera_handoff_fade_in_frames")) {
+                    flash_in = max(1, round(real(_tr.camera_handoff_fade_in_frames)));
+                }
+
+                if (Transition_RequestBlackFlash(flash_out, flash_in, -1, "dialogue_trigger_handoff", _tr)) {
+                    _tr.cine_phase = "handoff_wait";
+                    return;
+                }
+            }
+
+            if (!DialogueTrigger_BeginFollowRestoreBlend(_tr)) {
+                DialogueTrigger_CleanupCinematic(_tr, true);
+            }
+        }
+        return;
+    }
+
+    if (_tr.cine_phase == "handoff_wait") {
+        // Safety fallback: if flash couldn't complete for any reason, still restore cleanly.
+        if (!Transition_IsActive()) {
+            DialogueTrigger_CleanupCinematic(_tr, true, true);
+        }
+        return;
+    }
+
+    if (_tr.cine_phase == "restore_blend") {
+        // Sample the engine's follow result and blend from cinematic->follow each step.
+        var follow_x = camera_get_view_x(cam);
+        var follow_y = camera_get_view_y(cam);
+        _tr.cine_step += 1;
+        var t_rb = clamp(_tr.cine_step / max(1, _tr.cine_frames), 0, 1);
+        var e_rb = DialogueTrigger_EaseValue(t_rb, ease_name);
+        var rx = lerp(_tr.cine_from_x, follow_x, e_rb);
+        var ry = lerp(_tr.cine_from_y, follow_y, e_rb);
+        camera_set_view_pos(cam, rx, ry);
+
+        if (_tr.cine_step >= _tr.cine_frames) {
+            // Follow is already active; stop manual override cleanly.
+            DialogueTrigger_CleanupCinematic(_tr, true, false);
+        }
+    }
+}
+
 
 function UI_IsBlocking() {
     if (Transition_IsInputLocked()) return true;
     var gs = GameState_Get();
-    if (gs.ui.mode != UI_NONE) return true;
-    if (array_length(gs.ui.lines) > 0) return true;
+    if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) return false;
+    if (variable_struct_exists(gs.ui, "mode") && gs.ui.mode != UI_NONE) return true;
+    if (variable_struct_exists(gs.ui, "lines") && is_array(gs.ui.lines) && array_length(gs.ui.lines) > 0) return true;
+    if (variable_struct_exists(gs.ui, "dialogue_lock") && gs.ui.dialogue_lock > 0) return true;
     return false;
 }
 

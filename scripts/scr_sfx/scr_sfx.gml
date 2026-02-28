@@ -191,6 +191,8 @@ function SFX_RegisterDefaults() {
     SFX_RegisterResolved("barrel_break", ["barrel_break"]);
     SFX_RegisterResolved("chest_open", ["chest_open"]);
     SFX_RegisterResolved("kill_torch", ["kill_torch"]);
+    SFX_RegisterResolved("body_falling_wood", ["Body_falling_wood"]);
+    SFX_RegisterResolved("metal_resonance", ["Metal_resonance"]);
 
     // Battle Basic
     SFX_RegisterResolved("bow_attack", ["Bow_Attack_", "bow_attack"]);
@@ -292,6 +294,8 @@ function SFX_RegisterGainDefaults() {
     SFX_RegisterGain("barrel_break", 1.00);
     SFX_RegisterGain("chest_open", 1.00);
     SFX_RegisterGain("kill_torch", 1.00);
+    SFX_RegisterGain("body_falling_wood", 1.00);
+    SFX_RegisterGain("metal_resonance", 1.00);
 
     // Battle basic
     SFX_RegisterGain("bow_attack", 1.00);
