@@ -23,7 +23,7 @@ loot_table_key = "";
 
 switch_id = 0;
 
-dialogue_profile_id = DIALOGUE_PROFILE_GENERIC;
+dialogue_profile_id = "";
 
 checkpoint_id = 0;
 

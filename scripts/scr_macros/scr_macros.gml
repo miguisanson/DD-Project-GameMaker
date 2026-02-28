@@ -121,8 +121,6 @@
 #macro INTERACT_DIALOGUE   4
 #macro INTERACT_CHECKPOINT 6
 
-#macro DIALOGUE_PROFILE_GENERIC "dialogue_generic"
-
 #macro UI_NONE     0
 #macro UI_DIALOGUE 1
 #macro UI_MENU 2

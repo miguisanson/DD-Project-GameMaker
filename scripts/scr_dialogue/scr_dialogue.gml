@@ -1,4 +1,4 @@
-function DialogueDB_Init() {
+﻿function DialogueDB_Init() {
     if (variable_global_exists("dialogue_db") && ds_exists(global.dialogue_db, ds_type_map)) return;
     global.dialogue_db = ds_map_create();
 
@@ -6,26 +6,26 @@ function DialogueDB_Init() {
     global.dialogue_db[? "default"] = ["..."];
 	
 	// in-game dialogues
-	global.dialogue_db[? "first_encounter_slime"] = ["What..", "..the hell is that?"];
+	global.dialogue_db[? "first_encounter_slime"] = ["What...", "...the hell is that?"];
 	global.dialogue_db[? "entering_second_floor"] = 
 	["I don't understand.", 
 	"How can such creatures exist?",
-	"Some sort of mutated animals..",
-	"..Monsters?"];
+	"Some sort of mutated animals...",
+	"...Monsters?"];
 
     // system
     global.dialogue_db[? "sys_save_ok"] = ["Game saved."];
     global.dialogue_db[? "sys_load_ok"] = ["Game loaded."];
     global.dialogue_db[? "sys_load_missing"] = ["No save found."];
     global.dialogue_db[? "sys_class_chest_prompt"] = 
-						["How convenient..", 
-						"Just what I needed to get out of this place."];
+						["How convenient...", 
+						"Just what I need to get out of this place."];
     global.dialogue_db[? "sys_floor1_intro"] = 
 						["*Thud* *Crash*",
-						"Wha.. What just happened?",
+						"Wha... What just happened?",
 						"Where am I?", 
 						"...", 
-						"I knew it there's something wrong about this place.",
+						"I knew it. there's something wrong about this place.",
 						"I need to get back."];
 
     // interactables
@@ -53,12 +53,6 @@ function DialogueDB_Init() {
     global.dialogue_db[? "torch_extinguish"] = ["You extinguish the torch."];
     global.dialogue_db[? "torch_off"] = ["The torch is cold."];
 
-	// legacy just in case we want to add npcs
-    global.dialogue_db[? DIALOGUE_PROFILE_GENERIC] = [
-        "Welcome to the dungeon.",
-        "Stay alert—monsters lurk nearby.",
-        "Press {interact} to interact."
-    ];
 
     if (variable_global_exists("state") && is_struct(global.state)) {
         global.state.dialogue_db = global.dialogue_db;
