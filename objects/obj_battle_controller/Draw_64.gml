@@ -404,6 +404,9 @@ if (battle_state == BSTATE_ITEM_MENU) {
     }
 }
 
+// DEV_NOTE (tooltip audit, 2026-03-01):
+// Kept this battle tooltip hook/state flow as-is (already reuses Tooltip_Build* + Tooltip_DrawBox).
+// Only tightened sizing/clamping so the panel stays compact, left-aligned, on-screen, avoids list overlap, and grows to fit wrapped text.
 // Battle selection tooltip (small panel above the bottom command box, left-aligned).
 if (battle_state == BSTATE_SKILL_MENU || battle_state == BSTATE_ITEM_MENU) {
     var battle_tip_lines = [];
@@ -424,27 +427,26 @@ if (battle_state == BSTATE_SKILL_MENU || battle_state == BSTATE_ITEM_MENU) {
     if (array_length(battle_tip_lines) > 0) {
         var tip_style_b = Tooltip_GetStyle("battle");
         var tip_gap = 3;
-        var tip_w = bw;
-        var tip_h = tip_style_b.min_h;
+        var tip_w = round(max(tip_style_b.min_w, bw * tip_style_b.width_ratio));
+        tip_w = clamp(tip_w, tip_style_b.min_w, bw);
+        var tip_h = max(tip_style_b.min_h, Tooltip_RequiredHeight(battle_tip_lines, tip_w, tip_style_b));
         var tip_x = bx;
-        var tip_y = by - tip_h - tip_gap;
+        var tip_list_top = by - tip_gap;
+        var tip_top_limit = max(tip_style_b.margin_px, margin);
 
-        if (instance_exists(enemy_inst)) {
-            var t_espr = enemy_inst.sprite_index;
-            if (t_espr != noone && t_espr != -1) {
-                var enemy_bottom_screen = (enemy_inst.y - sprite_get_yoffset(t_espr) + (sprite_get_height(t_espr) * abs(enemy_inst.image_yscale)) - vy) * sy;
-                var min_tip_y = enemy_bottom_screen + tip_gap;
-                if (tip_y < min_tip_y) tip_y = min_tip_y;
-                var max_tip_h = (by - tip_gap) - tip_y;
-                if (max_tip_h > 20) {
-                    tip_h = min(tip_h, max_tip_h);
-                }
-            }
+        var max_tip_h = tip_list_top - tip_top_limit;
+        if (max_tip_h <= 0) {
+            battle_tip_lines = [];
+        } else {
+            tip_h = min(tip_h, max_tip_h);
         }
 
         var tip_margin = max(margin, tip_style_b.margin_px);
-        var tip_min_h = min(tip_style_b.min_h, max(20, tip_h));
-        var tip_rect = Tooltip_ClampRect(tip_x, tip_y, tip_w, tip_h, tip_margin, tip_style_b.min_w, tip_min_h);
-        Tooltip_DrawBox(tip_rect.x, tip_rect.y, tip_rect.w, tip_rect.h, battle_tip_lines, 1, tip_style_b);
+        if (array_length(battle_tip_lines) > 0 && tip_h >= 20) {
+            var tip_y = tip_list_top - tip_h;
+            var tip_min_h = min(tip_style_b.min_h, max(20, tip_h));
+            var tip_rect = Tooltip_ClampRect(tip_x, tip_y, tip_w, tip_h, tip_margin, tip_style_b.min_w, tip_min_h);
+            Tooltip_DrawBox(tip_rect.x, tip_rect.y, tip_rect.w, tip_rect.h, battle_tip_lines, 1, tip_style_b);
+        }
     }
 }

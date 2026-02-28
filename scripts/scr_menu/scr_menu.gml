@@ -219,6 +219,13 @@ function Tooltip_ClassListText(_class_list) {
     return txt;
 }
 
+function Tooltip_ClassOnlyText(_class_list) {
+    if (!is_array(_class_list) || array_length(_class_list) <= 0) return "";
+    var class_txt = Tooltip_ClassListText(_class_list);
+    if (class_txt == "All Classes") return "";
+    return class_txt + " only";
+}
+
 function Tooltip_StatusName(_status_id) {
     if (_status_id == -1) return "";
     var cfg = StatusDB_Get(_status_id);
@@ -250,6 +257,178 @@ function Tooltip_PassiveLineHuman(_line) {
     return txt;
 }
 
+function Tooltip_ContainsTextInsensitive(_haystack, _needle) {
+    var hay = string_lower(string(_haystack));
+    var needle = string_lower(string(_needle));
+    if (needle == "") return false;
+    return string_pos(needle, hay) > 0;
+}
+
+function Tooltip_EquippableNote(_item) {
+    if (!is_struct(_item)) return "";
+
+    if (variable_struct_exists(_item, "tooltip_note")) {
+        var single = string(_item.tooltip_note);
+        if (single != "") return single;
+    }
+
+    if (variable_struct_exists(_item, "tooltip_notes") && is_array(_item.tooltip_notes) && array_length(_item.tooltip_notes) > 0) {
+        var joined = "";
+        for (var ni = 0; ni < array_length(_item.tooltip_notes); ni++) {
+            var note = string(_item.tooltip_notes[ni]);
+            if (note == "") continue;
+            if (joined != "") joined += "; ";
+            joined += note;
+        }
+        if (joined != "") return joined;
+    }
+
+    var passive_id = variable_struct_exists(_item, "passive_id") ? string(_item.passive_id) : "";
+    switch (passive_id) {
+        case "steady_strike": return "Forgiving timing weapon.";
+        case "sunder_edge": return "Softens enemy DEF on opening hit.";
+        case "executioner": return "Strong finisher vs low HP.";
+        case "aim_assist": return "Forgiving timing for accurate shots.";
+        case "pinning_shot": return "Can stun on clean hits.";
+        case "predator": return "Bonus damage vs statused foes.";
+        case "mana_trickle": return "MP sustain for long fights.";
+        case "ember_lens": return "Boosts skill damage and status duration.";
+        case "arcane_surge": return "High skill burst with PERFECT MP refund.";
+        case "first_impact": return "Reduces first hit each battle.";
+        case "brace": return "After a hit, braces the next impact.";
+        case "debt_plate": return "Cuts damage from heavy hits.";
+        case "thin_veil": return "MP sustain, but weaker vs physical hits.";
+        case "silk_flow": return "Supports stronger, longer-lasting spells.";
+        case "mirror_stitch": return "Reflects the first status each battle.";
+    }
+
+    if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 1) {
+        return Tooltip_PassiveLineHuman(_item.passive_desc[1]);
+    }
+    return "";
+}
+
+function Tooltip_SkillDamageLine(_skill) {
+    if (!is_struct(_skill)) return "Damage";
+    var parts = ["Power " + string(max(0, round(real(_skill.power))))];
+
+    if (variable_struct_exists(_skill, "power_mult")) {
+        var pm = real(_skill.power_mult);
+        if (pm != 1) array_push(parts, "x" + string_format(pm, 1, 2));
+    }
+    if (variable_struct_exists(_skill, "hits") && _skill.hits > 1) {
+        array_push(parts, string(round(real(_skill.hits))) + " hits");
+    }
+    if (variable_struct_exists(_skill, "acc") && _skill.acc != 0) {
+        array_push(parts, "Acc " + ((_skill.acc > 0) ? "+" : "") + string(_skill.acc));
+    }
+    if (variable_struct_exists(_skill, "stat_type")) {
+        array_push(parts, "Stat " + Tooltip_StatShortName(_skill.stat_type));
+    }
+
+    var out = parts[0];
+    for (var i = 1; i < array_length(parts); i++) out += " | " + parts[i];
+    return out;
+}
+
+function Tooltip_SkillSingleStatusLine(_status_id, _turns, _chance) {
+    if (_status_id == -1) return "";
+    var chance = clamp(real(_chance), 0, 1);
+    var line = "Status: " + Tooltip_StatusName(_status_id) + " " + string(round(chance * 100)) + "%";
+    var turns = max(0, round(real(_turns)));
+    if (turns > 0) line += " | " + string(turns) + " turns";
+    return line;
+}
+
+function Tooltip_SkillMultiStatusLine(_skill, _max_entries = 3) {
+    if (!is_struct(_skill)) return "";
+    if (!variable_struct_exists(_skill, "status_list") || !is_array(_skill.status_list) || array_length(_skill.status_list) <= 0) return "";
+
+    var base_turns = variable_struct_exists(_skill, "status_turns") ? max(1, round(real(_skill.status_turns))) : 1;
+    var has_turn_list = variable_struct_exists(_skill, "status_turns_list") && is_array(_skill.status_turns_list);
+    var shown = [];
+    var total_statuses = 0;
+    var max_entries = max(1, round(real(_max_entries)));
+
+    for (var i = 0; i < array_length(_skill.status_list); i++) {
+        var sid = _skill.status_list[i];
+        if (sid == -1) continue;
+        total_statuses += 1;
+        if (array_length(shown) >= max_entries) continue;
+
+        var turns = base_turns;
+        if (has_turn_list && i < array_length(_skill.status_turns_list)) {
+            turns = max(1, round(real(_skill.status_turns_list[i])));
+        }
+
+        var seg = Tooltip_StatusName(sid);
+        if (turns > 0) seg += " " + string(turns) + "t";
+        array_push(shown, seg);
+    }
+
+    if (array_length(shown) <= 0) return "";
+    var line = "Statuses: " + shown[0];
+    for (var j = 1; j < array_length(shown); j++) line += ", " + shown[j];
+    if (total_statuses > array_length(shown)) {
+        var remaining = total_statuses - array_length(shown);
+        line += ", +" + string(remaining) + " more";
+    }
+
+    var chance = variable_struct_exists(_skill, "status_chance") ? clamp(real(_skill.status_chance), 0, 1) : 1;
+    if (chance < 1) line += " (" + string(round(chance * 100)) + "%)";
+    return line;
+}
+
+function Tooltip_SkillEffectLines(_skill, _compact = false) {
+    var lines = [];
+    if (!is_struct(_skill)) return lines;
+
+    var effect = variable_struct_exists(_skill, "effect") ? string(_skill.effect) : "";
+    switch (effect) {
+        case "damage":
+            array_push(lines, Tooltip_SkillDamageLine(_skill));
+            if (variable_struct_exists(_skill, "status") && _skill.status != -1) {
+                var dmg_turns = variable_struct_exists(_skill, "status_turns") ? max(1, round(real(_skill.status_turns))) : 1;
+                var dmg_chance = variable_struct_exists(_skill, "status_chance") ? clamp(real(_skill.status_chance), 0, 1) : 1;
+                var dmg_status_line = Tooltip_SkillSingleStatusLine(_skill.status, dmg_turns, dmg_chance);
+                if (dmg_status_line != "") array_push(lines, dmg_status_line);
+            }
+        break;
+
+        case "status":
+            if (variable_struct_exists(_skill, "status") && _skill.status != -1) {
+                var turns = variable_struct_exists(_skill, "status_turns") ? max(1, round(real(_skill.status_turns))) : 1;
+                var chance = variable_struct_exists(_skill, "status_chance") ? clamp(real(_skill.status_chance), 0, 1) : 1;
+                var status_line = Tooltip_SkillSingleStatusLine(_skill.status, turns, chance);
+                if (status_line != "") array_push(lines, status_line);
+            } else {
+                array_push(lines, "Effect: Buff");
+            }
+        break;
+
+        case "multi_status":
+            var max_status_entries = _compact ? 3 : 4;
+            var multi_line = Tooltip_SkillMultiStatusLine(_skill, max_status_entries);
+            if (multi_line != "") array_push(lines, multi_line);
+            else array_push(lines, "Effect: Multiple statuses");
+        break;
+
+        case "heal":
+            array_push(lines, "Effect: Restore HP");
+        break;
+
+        case "steal_item":
+            array_push(lines, "Effect: Steal one random item");
+        break;
+
+        default:
+            if (effect != "" && effect != "none") array_push(lines, "Effect: " + effect);
+        break;
+    }
+
+    return lines;
+}
+
 function Tooltip_BuildStatLines(_stat_key, _stat_label, _cur, _base, _pending_pts, _selected_col) {
     var lines = [];
     array_push(lines, _stat_label + " (" + string(_cur) + ")");
@@ -279,14 +458,6 @@ function Tooltip_BuildStatLines(_stat_key, _stat_label, _cur, _base, _pending_pt
         default:
             array_push(lines, "Affects combat performance.");
         break;
-    }
-
-    if (_selected_col == 1) {
-        if (_pending_pts > 0) array_push(lines, "Press Confirm on + to spend 1 point.");
-        else array_push(lines, "No points available to add.");
-    } else {
-        if (delta > 0) array_push(lines, "Press Confirm on - to refund 1 pending point.");
-        else array_push(lines, "Nothing to refund on this stat.");
     }
     return lines;
 }
@@ -325,11 +496,35 @@ function Tooltip_BuildItemLines(_item) {
     if (!is_struct(_item) || !variable_struct_exists(_item, "id") || _item.id == 0) return lines;
 
     array_push(lines, string(_item.name));
-    if (!Item_IsSkillbook(_item)) {
+    if (!Item_IsSkillbook(_item) && _item.type != ITEM_ARMOR) {
         array_push(lines, Tooltip_ItemTypeLine(_item));
     }
 
     if (_item.type == ITEM_WEAPON || _item.type == ITEM_ARMOR) {
+        if (_item.type == ITEM_ARMOR) {
+            var armor_line = Tooltip_ItemBonusText(_item);
+            if (armor_line == "") {
+                if (variable_struct_exists(_item, "stat_type")) {
+                    armor_line = Tooltip_StatShortName(_item.stat_type);
+                } else {
+                    armor_line = "Armor";
+                }
+            }
+            array_push(lines, armor_line);
+
+            var armor_note = Tooltip_EquippableNote(_item);
+            if (armor_note != "") array_push(lines, armor_note);
+
+            var armor_only = "";
+            if (variable_struct_exists(_item, "preferred_class") && _item.preferred_class != -1) {
+                armor_only = Equip_ClassName(_item.preferred_class) + " only";
+            } else if (variable_struct_exists(_item, "allowed_classes") && is_array(_item.allowed_classes)) {
+                armor_only = Tooltip_ClassOnlyText(_item.allowed_classes);
+            }
+            if (armor_only != "") array_push(lines, armor_only);
+            return lines;
+        }
+
         var parts = ["Power " + string(max(0, round(real(_item.power))))];
         if (variable_struct_exists(_item, "acc") && _item.acc != 0) {
             array_push(parts, "Acc " + ((_item.acc > 0) ? "+" : "") + string(_item.acc));
@@ -340,25 +535,12 @@ function Tooltip_BuildItemLines(_item) {
         var core = parts[0];
         for (var i = 1; i < array_length(parts); i++) core += " | " + parts[i];
         array_push(lines, core);
-        if (variable_struct_exists(_item, "equip_slot") && string(_item.equip_slot) == "weapon") {
-            if (variable_struct_exists(_item, "stat_type")) {
-                array_push(lines, "Built around " + Tooltip_StatShortName(_item.stat_type) + " scaling.");
-            }
-        }
 
         var bonus_txt = Tooltip_ItemBonusText(_item);
         if (bonus_txt != "") array_push(lines, "Bonus: " + bonus_txt);
 
-        if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 0) {
-            var passive_line = "Trait: " + string(_item.passive_desc[0]);
-            if (array_length(_item.passive_desc) > 1) {
-                passive_line += " - " + Tooltip_PassiveLineHuman(_item.passive_desc[1]);
-            }
-            array_push(lines, passive_line);
-            for (var pidx = 2; pidx < array_length(_item.passive_desc); pidx++) {
-                array_push(lines, Tooltip_PassiveLineHuman(_item.passive_desc[pidx]));
-            }
-        }
+        var note_txt = Tooltip_EquippableNote(_item);
+        if (note_txt != "") array_push(lines, note_txt);
 
         var class_txt = "All Classes";
         if (variable_struct_exists(_item, "preferred_class") && _item.preferred_class != -1) {
@@ -366,7 +548,7 @@ function Tooltip_BuildItemLines(_item) {
         } else if (variable_struct_exists(_item, "allowed_classes") && is_array(_item.allowed_classes)) {
             class_txt = Tooltip_ClassListText(_item.allowed_classes);
         }
-        if (class_txt != "All Classes") array_push(lines, "Class: " + class_txt);
+        if (class_txt != "All Classes") array_push(lines, class_txt + " only");
         return lines;
     }
 
@@ -402,38 +584,20 @@ function Tooltip_BuildItemLines(_item) {
             case "learn_skill":
                 var skill = SkillDB_Get(use.skill_id);
                 if (is_struct(skill) && skill.id != -1) {
-                    array_push(lines, "Teaches: " + string(skill.name));
+                    var skill_name = string(skill.name);
+                    var item_name = variable_struct_exists(_item, "name") ? string(_item.name) : "";
+                    if (!Tooltip_ContainsTextInsensitive(item_name, skill_name)) {
+                        array_push(lines, "Teaches: " + skill_name);
+                    }
                     var mp_cost = variable_struct_exists(skill, "mp_cost") ? max(0, round(real(skill.mp_cost))) : 0;
                     var target_txt = variable_struct_exists(skill, "target") ? Tooltip_TargetName(skill.target) : "Unknown";
                     array_push(lines, "MP " + string(mp_cost) + " | Target: " + target_txt);
-                    if (variable_struct_exists(skill, "effect")) {
-                        var skill_eff = string(skill.effect);
-                        if (skill_eff == "damage") {
-                            var eff_line = "Effect: Damage";
-                            if (variable_struct_exists(skill, "hits") && skill.hits > 1) {
-                                eff_line += " (" + string(round(real(skill.hits))) + " hits)";
-                            }
-                            if (variable_struct_exists(skill, "status") && skill.status != -1) {
-                                eff_line += ", may inflict " + Tooltip_StatusName(skill.status);
-                            }
-                            array_push(lines, eff_line);
-                        } else if (skill_eff == "status") {
-                            if (variable_struct_exists(skill, "status") && skill.status != -1) {
-                                var turns = variable_struct_exists(skill, "status_turns") ? max(1, round(real(skill.status_turns))) : 1;
-                                array_push(lines, "Effect: Apply " + Tooltip_StatusName(skill.status) + " (" + string(turns) + " turns)");
-                            } else {
-                                array_push(lines, "Effect: Apply a buff");
-                            }
-                        } else if (skill_eff == "heal") {
-                            array_push(lines, "Effect: Restore HP");
-                        } else if (skill_eff == "multi_status") {
-                            array_push(lines, "Effect: Apply multiple statuses");
-                        } else if (skill_eff == "steal_item") {
-                            array_push(lines, "Effect: Steal one random item");
-                        }
+                    var skill_effect_lines = Tooltip_SkillEffectLines(skill, true);
+                    for (var sei = 0; sei < array_length(skill_effect_lines); sei++) {
+                        array_push(lines, skill_effect_lines[sei]);
                     }
-                    var sb_classes = Tooltip_ClassListText(skill.class_list);
-                    if (sb_classes != "All Classes") array_push(lines, "Class: " + sb_classes);
+                    var sb_only = Tooltip_ClassOnlyText(skill.class_list);
+                    if (sb_only != "") array_push(lines, sb_only);
                 } else {
                     array_push(lines, "Teaches: Unknown skill");
                 }
@@ -457,53 +621,23 @@ function Tooltip_BuildSkillLines(_skill) {
     mp_line += " | Target: " + Tooltip_TargetName(tgt);
     array_push(lines, mp_line);
 
+    var effect_lines = Tooltip_SkillEffectLines(_skill, false);
+    for (var i = 0; i < array_length(effect_lines); i++) {
+        array_push(lines, effect_lines[i]);
+    }
+
     var class_list = variable_struct_exists(_skill, "class_list") && is_array(_skill.class_list) ? _skill.class_list : [];
-    var class_txt = Tooltip_ClassListText(class_list);
-    if (class_txt != "All Classes") array_push(lines, "Class: " + class_txt);
-
-    if (_skill.effect == "damage") {
-        var dmg_parts = ["Damage: Power " + string(max(0, round(real(_skill.power))))];
-        var pm = variable_struct_exists(_skill, "power_mult") ? real(_skill.power_mult) : 1;
-        if (pm != 1) array_push(dmg_parts, "x" + string_format(pm, 1, 2));
-        if (variable_struct_exists(_skill, "hits") && _skill.hits > 1) array_push(dmg_parts, "Hits " + string(round(real(_skill.hits))));
-        if (variable_struct_exists(_skill, "acc") && _skill.acc != 0) array_push(dmg_parts, "Acc " + ((_skill.acc > 0) ? "+" : "") + string(_skill.acc));
-        if (variable_struct_exists(_skill, "stat_type")) array_push(dmg_parts, "Stat " + Tooltip_StatShortName(_skill.stat_type));
-        var dmg_line = dmg_parts[0];
-        for (var i = 1; i < array_length(dmg_parts); i++) dmg_line += " | " + dmg_parts[i];
-        array_push(lines, dmg_line);
-    } else if (_skill.effect == "heal") {
-        array_push(lines, "Effect: Restore HP");
-    } else if (_skill.effect == "status") {
-        array_push(lines, "Effect: Apply status");
-    } else if (_skill.effect == "multi_status") {
-        array_push(lines, "Effect: Apply multiple statuses");
-    } else if (_skill.effect == "steal_item") {
-        array_push(lines, "Effect: Steal one random item");
-    } else {
-        array_push(lines, "Effect: " + string(_skill.effect));
-    }
-
-    if (variable_struct_exists(_skill, "status") && _skill.status != -1) {
-        var turns = variable_struct_exists(_skill, "status_turns") ? max(1, round(real(_skill.status_turns))) : 1;
-        var chance = variable_struct_exists(_skill, "status_chance") ? clamp(real(_skill.status_chance), 0, 1) : 1;
-        array_push(lines, "Applies: " + Tooltip_StatusName(_skill.status) + " (" + string(round(chance * 100)) + "%, " + string(turns) + " turns)");
-    }
-
-    if (variable_struct_exists(_skill, "status_list") && is_array(_skill.status_list) && array_length(_skill.status_list) > 0) {
-        for (var sidx = 0; sidx < array_length(_skill.status_list); sidx++) {
-            var sid = _skill.status_list[sidx];
-            if (sid == -1) continue;
-            var turns2 = variable_struct_exists(_skill, "status_turns") ? max(1, round(real(_skill.status_turns))) : 1;
-            if (variable_struct_exists(_skill, "status_turns_list") && is_array(_skill.status_turns_list) && sidx < array_length(_skill.status_turns_list)) {
-                turns2 = max(1, round(real(_skill.status_turns_list[sidx])));
-            }
-            array_push(lines, "Applies: " + Tooltip_StatusName(sid) + " (" + string(turns2) + " turns)");
-        }
-    }
+    var class_only = Tooltip_ClassOnlyText(class_list);
+    if (class_only != "") array_push(lines, class_only);
 
     return lines;
 }
 
+// DEV_NOTE (tooltip audit, 2026-03-01):
+// Kept the shared tooltip pipeline in this file:
+// Tooltip_BuildItemLines / Tooltip_BuildSkillLines + Tooltip_DrawBox.
+// Reason: both Menu_Draw and obj_battle_controller/Draw_64.gml already reuse it cleanly.
+// Changed only where useful: compact text scale, data-driven equippable Notes, skillbook de-duplication, and content-fit tooltip sizing.
 function Tooltip_GetStyle(_context = "default") {
     var s = {
         pad: 4,
@@ -519,7 +653,7 @@ function Tooltip_GetStyle(_context = "default") {
 
     if (_context == "menu") {
         s.pad = 5;
-        s.text_scale = 1.00;
+        s.text_scale = 0.93;
         s.line_gap = 1;
         s.min_w = 62;
         s.min_h = 72;
@@ -528,7 +662,7 @@ function Tooltip_GetStyle(_context = "default") {
         s.height_ratio = 0.36;
     } else if (_context == "battle") {
         s.pad = 5;
-        s.text_scale = 1.00;
+        s.text_scale = 0.93;
         s.line_gap = 1;
         s.min_w = 72;
         s.min_h = 56;
@@ -582,20 +716,7 @@ function Tooltip_DrawBox(_x, _y, _w, _h, _lines, _alpha = 1, _style = undefined)
     var text_scale = style.text_scale;
     var line_h = max(5, floor(string_height("A") * text_scale) + style.line_gap);
     var max_text_w = max(1, floor((rect.w - pad * 2) / text_scale));
-    var wrapped = [];
-    for (var i = 0; i < array_length(_lines); i++) {
-        var line_txt = string(_lines[i]);
-        if (line_txt == "") {
-            array_push(wrapped, "");
-            continue;
-        }
-        wrapped = Tooltip_AddWrappedLines(wrapped, line_txt, max_text_w);
-    }
-
-    var max_lines = max(1, floor((rect.h - pad * 2) / line_h));
-    if (array_length(wrapped) > max_lines) {
-        array_resize(wrapped, max_lines);
-    }
+    var wrapped = Tooltip_WrapLines(_lines, max_text_w);
 
     var a = clamp(real(_alpha), 0, 1);
     draw_set_alpha(a * style.frame_alpha_mult);
@@ -611,6 +732,33 @@ function Tooltip_DrawBox(_x, _y, _w, _h, _lines, _alpha = 1, _style = undefined)
         draw_y += line_h;
         if (draw_y > rect.y + rect.h - pad) break;
     }
+}
+
+function Tooltip_WrapLines(_lines, _max_text_w) {
+    var wrapped = [];
+    if (!is_array(_lines)) return wrapped;
+    var w = max(1, floor(real(_max_text_w)));
+    for (var i = 0; i < array_length(_lines); i++) {
+        var line_txt = string(_lines[i]);
+        if (line_txt == "") {
+            array_push(wrapped, "");
+            continue;
+        }
+        wrapped = Tooltip_AddWrappedLines(wrapped, line_txt, w);
+    }
+    return wrapped;
+}
+
+function Tooltip_RequiredHeight(_lines, _box_w, _style = undefined) {
+    var style = is_struct(_style) ? _style : Tooltip_GetStyle("default");
+    var box_w = max(style.min_w, round(real(_box_w)));
+    var pad = style.pad;
+    var text_scale = style.text_scale;
+    var line_h = max(5, floor(string_height("A") * text_scale) + style.line_gap);
+    var max_text_w = max(1, floor((box_w - pad * 2) / text_scale));
+    var wrapped = Tooltip_WrapLines(_lines, max_text_w);
+    var line_count = max(1, array_length(wrapped));
+    return (pad * 2) + (line_count * line_h);
 }
 
 // Backward-compat wrappers (call sites can migrate to Tooltip_* progressively).
@@ -1438,10 +1586,13 @@ function Menu_Draw() {
     if (!(variable_struct_exists(m, "inv_popup_open") && m.inv_popup_open) && array_length(tooltip_lines) > 0) {
         var tip_style = Tooltip_GetStyle("menu");
         var tip_w = bw;
-        var tip_h = menu_tip_h;
         var tip_x = bx;
         var tip_y = menu_tip_y;
         var tip_margin = max(tip_style.margin_px, max(2, floor(pad * 0.5)));
+        var tip_h_needed = Tooltip_RequiredHeight(tooltip_lines, tip_w, tip_style);
+        var tip_bottom_limit = by + bh - tip_margin;
+        var tip_h_max = max(tip_style.min_h, tip_bottom_limit - tip_y);
+        var tip_h = clamp(max(menu_tip_h, tip_h_needed), tip_style.min_h, tip_h_max);
         var tip_rect = Tooltip_ClampRect(tip_x, tip_y, tip_w, tip_h, tip_margin, tip_style.min_w, tip_style.min_h);
         Tooltip_DrawBox(tip_rect.x, tip_rect.y, tip_rect.w, tip_rect.h, tooltip_lines, menu_alpha, tip_style);
     }
