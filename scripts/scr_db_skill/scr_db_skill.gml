@@ -748,6 +748,25 @@ function Skill_EnemyUseChance(_skill) {
     return clamp(random_range(cmin, cmax), 0, 1);
 }
 
+function Skill_AdjustStatusTurns(_user, _target, _status_id, _base_turns) {
+    var turns = max(1, round(real(_base_turns)));
+    if (_status_id == STATUS_STUN) return turns;
+
+    var user_is_player = (is_struct(_user) && variable_struct_exists(_user, "is_player") && _user.is_player);
+    var target_is_player = (is_struct(_target) && variable_struct_exists(_target, "is_player") && _target.is_player);
+
+    // FUN-FIRST: statuses linger longer, with player-applied effects lasting longest.
+    var mult = 2.0;
+    if (user_is_player) mult = 3.0;
+    if (!user_is_player && target_is_player) mult = 2.0;
+    turns = max(2, round(turns * mult));
+
+    if (user_is_player && !target_is_player) {
+        turns += max(0, Equip_PlayerStatusTurnBonus(_user, _status_id));
+    }
+    return max(1, turns);
+}
+
 function Skill_Use(_user, _target, _skill_id) {
     var s = SkillDB_Get(_skill_id);
     var result = {
@@ -766,7 +785,12 @@ function Skill_Use(_user, _target, _skill_id) {
 
     var user_is_player = (variable_struct_exists(_user, "is_player") && _user.is_player);
 
-    if (user_is_player && _user.mp < s.mp_cost) {
+    var final_mp_cost = s.mp_cost;
+    if (user_is_player) {
+        final_mp_cost = Equip_PlayerSkillMPCost(_user, s, s.mp_cost);
+    }
+
+    if (user_is_player && _user.mp < final_mp_cost) {
         result.ok = false;
         result.msg = "Not enough MP.";
         return result;
@@ -780,7 +804,8 @@ function Skill_Use(_user, _target, _skill_id) {
         }
     }
 
-    if (user_is_player) _user.mp -= s.mp_cost;
+    if (user_is_player) _user.mp -= final_mp_cost;
+    if (user_is_player) _user = Equip_PassiveOnSkillUsed(_user, s);
 
     var status_turns_default = variable_struct_exists(s, "status_turns") ? max(1, round(real(s.status_turns))) : 1;
     var applied_status_names = [];
@@ -789,11 +814,21 @@ function Skill_Use(_user, _target, _skill_id) {
     // status-only skills
     if (s.effect == "status") {
         if (s.status != -1) {
-            _target = Status_Add(_target, s.status, status_turns_default, 1);
-            var cfg = StatusDB_Get(s.status);
-            if (is_struct(cfg) && variable_struct_exists(cfg, "name")) {
-                array_push(applied_status_names, cfg.name);
-                applied_any_status = true;
+            var st_turns = Skill_AdjustStatusTurns(_user, _target, s.status, status_turns_default);
+            var adj1 = Equip_PassiveAdjustIncomingStatus(_user, _target, s.status, st_turns);
+            if (adj1.apply) {
+                _target = Status_Add(_target, s.status, adj1.turns, 1);
+                var cfg = StatusDB_Get(s.status);
+                if (is_struct(cfg) && variable_struct_exists(cfg, "name")) {
+                    array_push(applied_status_names, cfg.name);
+                    applied_any_status = true;
+                }
+            }
+            if (adj1.reflect) {
+                _user = Status_Add(_user, s.status, adj1.turns, 1);
+            }
+            if (adj1.msg != "") {
+                result.msg = adj1.msg;
             }
         } else {
             if (variable_struct_exists(s, "use_msg")) result.msg = string(s.use_msg);
@@ -806,7 +841,8 @@ function Skill_Use(_user, _target, _skill_id) {
                 if (si > 0) msg_status += ", ";
                 msg_status += applied_status_names[si];
             }
-            result.msg = msg_status + ".";
+            if (result.msg != "") result.msg += " ";
+            result.msg += msg_status + ".";
         }
         return result;
     }
@@ -819,26 +855,32 @@ function Skill_Use(_user, _target, _skill_id) {
                 if (sid_m == -1) continue;
                 var turns_m = status_turns_default;
                 if (m < array_length(turns_list)) turns_m = max(1, round(real(turns_list[m])));
-                _target = Status_Add(_target, sid_m, turns_m, 1);
-                var cfg_m = StatusDB_Get(sid_m);
-                if (is_struct(cfg_m) && variable_struct_exists(cfg_m, "name")) {
-                    array_push(applied_status_names, cfg_m.name);
-                    applied_any_status = true;
+                turns_m = Skill_AdjustStatusTurns(_user, _target, sid_m, turns_m);
+                var adjm = Equip_PassiveAdjustIncomingStatus(_user, _target, sid_m, turns_m);
+                if (adjm.apply) {
+                    _target = Status_Add(_target, sid_m, adjm.turns, 1);
+                    var cfg_m = StatusDB_Get(sid_m);
+                    if (is_struct(cfg_m) && variable_struct_exists(cfg_m, "name")) {
+                        array_push(applied_status_names, cfg_m.name);
+                        applied_any_status = true;
+                    }
                 }
+                if (adjm.reflect) _user = Status_Add(_user, sid_m, adjm.turns, 1);
+                if (adjm.msg != "" && result.msg == "") result.msg = adjm.msg;
             }
         }
-
+        
         if (applied_any_status) {
             var msg_status2 = "Applied ";
             for (var sm = 0; sm < array_length(applied_status_names); sm++) {
                 if (sm > 0) msg_status2 += ", ";
                 msg_status2 += applied_status_names[sm];
             }
-            result.msg = msg_status2 + ".";
-        } else if (variable_struct_exists(s, "use_msg")) {
-            result.msg = string(s.use_msg);
-        } else {
-            result.msg = "Skill used.";
+            if (result.msg != "") result.msg += " ";
+            result.msg += msg_status2 + ".";
+        } else if (result.msg == "") {
+            if (variable_struct_exists(s, "use_msg")) result.msg = string(s.use_msg);
+            else result.msg = "Skill used.";
         }
         return result;
     }
@@ -884,8 +926,17 @@ function Skill_Use(_user, _target, _skill_id) {
             if (hit_res.hit) {
                 var weapon = { power: s.power, stat_type: s.stat_type, acc: s.acc };
                 var crit = Combat_CritCheck(_user, crit_bonus);
-                var dmg_pack = Combat_ApplyDamage(_user, _target, weapon, (crit ? 2 : 1), s.power_mult);
+                var dmg_pack = Combat_ApplyDamage(_user, _target, weapon, (crit ? 2 : 1), s.power_mult, { is_skill: true });
                 _target = dmg_pack.defender;
+                if (user_is_player && dmg_pack.dmg > 0) {
+                    // FUN-FIRST passives can amplify player skill damage.
+                    var bonus_skill_dmg = Equip_PlayerBonusDamage(_user, _target, dmg_pack.dmg, true, "");
+                    if (bonus_skill_dmg > 0) {
+                        var bonus_spend = min(bonus_skill_dmg, _target.hp);
+                        _target.hp = max(0, _target.hp - bonus_spend);
+                        dmg_pack.dmg += bonus_spend;
+                    }
+                }
 
                 any_hit = true;
                 if (crit) any_crit = true;
@@ -907,12 +958,18 @@ function Skill_Use(_user, _target, _skill_id) {
 
         if (s.status != -1 && any_hit) {
             if (status_chance >= 1 || random(1) <= status_chance) {
-                _target = Status_Add(_target, s.status, status_turns_default, 1);
-                var cfg2 = StatusDB_Get(s.status);
-                if (is_struct(cfg2) && variable_struct_exists(cfg2, "name")) {
-                    array_push(applied_status_names, cfg2.name);
-                    applied_any_status = true;
+                var turns_hit = Skill_AdjustStatusTurns(_user, _target, s.status, status_turns_default);
+                var adjh = Equip_PassiveAdjustIncomingStatus(_user, _target, s.status, turns_hit);
+                if (adjh.apply) {
+                    _target = Status_Add(_target, s.status, adjh.turns, 1);
+                    var cfg2 = StatusDB_Get(s.status);
+                    if (is_struct(cfg2) && variable_struct_exists(cfg2, "name")) {
+                        array_push(applied_status_names, cfg2.name);
+                        applied_any_status = true;
+                    }
                 }
+                if (adjh.reflect) _user = Status_Add(_user, s.status, adjh.turns, 1);
+                if (adjh.msg != "" && result.msg == "") result.msg = adjh.msg;
             }
         }
 
@@ -924,12 +981,18 @@ function Skill_Use(_user, _target, _skill_id) {
                     if (sid_d == -1) continue;
                     var turns_d = status_turns_default;
                     if (sd < array_length(turns_list_d)) turns_d = max(1, round(real(turns_list_d[sd])));
-                    _target = Status_Add(_target, sid_d, turns_d, 1);
-                    var cfg_d = StatusDB_Get(sid_d);
-                    if (is_struct(cfg_d) && variable_struct_exists(cfg_d, "name")) {
-                        array_push(applied_status_names, cfg_d.name);
-                        applied_any_status = true;
+                    turns_d = Skill_AdjustStatusTurns(_user, _target, sid_d, turns_d);
+                    var adjd = Equip_PassiveAdjustIncomingStatus(_user, _target, sid_d, turns_d);
+                    if (adjd.apply) {
+                        _target = Status_Add(_target, sid_d, adjd.turns, 1);
+                        var cfg_d = StatusDB_Get(sid_d);
+                        if (is_struct(cfg_d) && variable_struct_exists(cfg_d, "name")) {
+                            array_push(applied_status_names, cfg_d.name);
+                            applied_any_status = true;
+                        }
                     }
+                    if (adjd.reflect) _user = Status_Add(_user, sid_d, adjd.turns, 1);
+                    if (adjd.msg != "" && result.msg == "") result.msg = adjd.msg;
                 }
             }
         }
@@ -940,7 +1003,8 @@ function Skill_Use(_user, _target, _skill_id) {
                 if (sj > 0) msg_status3 += ", ";
                 msg_status3 += applied_status_names[sj];
             }
-            result.msg = msg_status3 + ".";
+            if (result.msg != "") result.msg += " ";
+            result.msg += msg_status3 + ".";
         } else if (variable_struct_exists(s, "use_msg")) {
             result.msg = string(s.use_msg);
         }

@@ -403,3 +403,30 @@ if (battle_state == BSTATE_ITEM_MENU) {
         }
     }
 }
+
+// Battle selection tooltip (small panel above the bottom command box, left-aligned).
+if (battle_state == BSTATE_SKILL_MENU || battle_state == BSTATE_ITEM_MENU) {
+    var battle_tip_lines = [];
+    if (battle_state == BSTATE_SKILL_MENU) {
+        var tip_skills = Battle_GetSkillList(self);
+        if (skill_index >= 0 && skill_index < array_length(tip_skills)) {
+            var tip_skill = SkillDB_Get(tip_skills[skill_index]);
+            battle_tip_lines = Menu_BuildSkillTooltipLines(tip_skill);
+        }
+    } else {
+        var tip_items = Battle_GetItemList(self);
+        if (item_index >= 0 && item_index < array_length(tip_items)) {
+            var tip_item = ItemDB_Get(tip_items[item_index].id);
+            battle_tip_lines = Menu_BuildItemTooltipLines(tip_item);
+        }
+    }
+
+    if (array_length(battle_tip_lines) > 0) {
+        var tip_w = min(round(w * 0.56), bw);
+        var tip_h = 48;
+        var tip_x = clamp(margin + gui_off_x, 0, max(0, w - tip_w));
+        var tip_y = by - tip_h - 4;
+        tip_y = clamp(tip_y, margin, max(margin, h - tip_h - margin));
+        Menu_DrawTooltipBox(tip_x, tip_y, tip_w, tip_h, battle_tip_lines, 1);
+    }
+}

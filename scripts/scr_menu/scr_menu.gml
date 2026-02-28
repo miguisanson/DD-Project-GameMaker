@@ -154,6 +154,301 @@ function Menu_IsEquipped(_ch, _item_id) {
     return false;
 }
 
+function Menu_StatShortName(_stat_id) {
+    switch (_stat_id) {
+        case STAT_STR:  return "STR";
+        case STAT_AGI:  return "AGI";
+        case STAT_DEF:  return "DEF";
+        case STAT_INT:  return "INT";
+        case STAT_LUCK: return "LUCK";
+    }
+    return "N/A";
+}
+
+function Menu_TargetName(_target_id) {
+    switch (_target_id) {
+        case TGT_SELF: return "Self";
+        case TGT_ENEMY: return "Opponent";
+        case TGT_ALL_ENEMIES: return "All Opponents";
+        case TGT_ALL_ALLIES: return "All Allies";
+        case TGT_ALL: return "All";
+    }
+    return "Unknown";
+}
+
+function Menu_ItemTypeName(_item) {
+    if (!is_struct(_item) || !variable_struct_exists(_item, "type")) return "Unknown";
+    if (Item_IsSkillbook(_item)) return "Skillbook";
+    switch (_item.type) {
+        case ITEM_WEAPON: return "Weapon";
+        case ITEM_ARMOR: return "Armor";
+        case ITEM_CONSUMABLE: return "Consumable";
+        case ITEM_KEY: return "Key";
+    }
+    return "Unknown";
+}
+
+function Menu_ClassListText(_class_list) {
+    if (!is_array(_class_list) || array_length(_class_list) <= 0) return "All Classes";
+    var txt = "";
+    for (var i = 0; i < array_length(_class_list); i++) {
+        if (i > 0) txt += "/";
+        txt += Equip_ClassName(_class_list[i]);
+    }
+    return txt;
+}
+
+function Menu_StatusName(_status_id) {
+    if (_status_id == -1) return "";
+    var cfg = StatusDB_Get(_status_id);
+    if (is_struct(cfg) && variable_struct_exists(cfg, "name")) return string(cfg.name);
+    return "Status";
+}
+
+function Menu_ItemFlavorText(_item) {
+    if (!is_struct(_item) || !variable_struct_exists(_item, "type")) return "";
+    if (_item.type == ITEM_WEAPON) {
+        var n = string_lower(string(_item.name));
+        if (string_pos("wooden", n) > 0) return "Worn training steel. Better than bare hands.";
+        if (string_pos("iron", n) > 0) return "Forged for hard roads and harder fights.";
+        if (string_pos("platinum", n) > 0 || string_pos("diamond", n) > 0 || string_pos("ruby", n) > 0) return "Rare craftsmanship tuned for lethal pressure.";
+        return "Battle-ready weaponry made to end fights fast.";
+    }
+    if (_item.type == ITEM_ARMOR) {
+        var n2 = string_lower(string(_item.name));
+        if (string_pos("leather", n2) > 0 || string_pos("cloth", n2) > 0) return "Light protection that still lets you move.";
+        if (string_pos("iron", n2) > 0) return "Heavy plating for surviving brutal hits.";
+        if (string_pos("platinum", n2) > 0 || string_pos("mithril", n2) > 0 || string_pos("silk", n2) > 0) return "Refined armor with hidden battlefield utility.";
+        return "Protective gear built for dungeon survival.";
+    }
+    if (_item.type == ITEM_CONSUMABLE && variable_struct_exists(_item, "use") && is_struct(_item.use)) {
+        var eff = variable_struct_exists(_item.use, "effect") ? string(_item.use.effect) : "";
+        switch (eff) {
+            case "heal": return "A quick remedy for when one more hit means death.";
+            case "mp": return "A sharp tonic that steadies the mind.";
+            case "cure": return "A bitter treatment against dungeon sickness.";
+            case "learn_skill": return "The pages feel wrong, yet the body obeys.";
+        }
+    }
+    return "";
+}
+
+function Menu_SkillFlavorText(_skill) {
+    if (!is_struct(_skill)) return "";
+    if (variable_struct_exists(_skill, "use_msg")) return string(_skill.use_msg);
+    if (variable_struct_exists(_skill, "effect")) {
+        switch (_skill.effect) {
+            case "damage": return "Direct offensive technique.";
+            case "heal": return "Recover and stabilize.";
+            case "status": return "Disrupt or empower through status.";
+            case "multi_status": return "Applies multiple status effects.";
+        }
+    }
+    return "Combat technique.";
+}
+
+function Menu_AddWrappedLines(_out_lines, _text, _max_w) {
+    var out_lines = is_array(_out_lines) ? _out_lines : [];
+    var wrapped = Dialogue_WrapToLines(string(_text), max(1, _max_w));
+    if (!is_array(wrapped) || array_length(wrapped) <= 0) {
+        array_push(out_lines, string(_text));
+        return out_lines;
+    }
+    for (var i = 0; i < array_length(wrapped); i++) {
+        array_push(out_lines, wrapped[i]);
+    }
+    return out_lines;
+}
+
+function Menu_ItemBonusText(_item) {
+    if (!is_struct(_item) || !variable_struct_exists(_item, "bonus") || !is_struct(_item.bonus)) return "";
+    var b = _item.bonus;
+    var parts = [];
+    if (variable_struct_exists(b, "str") && b.str != 0) array_push(parts, "STR " + ((b.str > 0) ? "+" : "") + string(b.str));
+    if (variable_struct_exists(b, "agi") && b.agi != 0) array_push(parts, "AGI " + ((b.agi > 0) ? "+" : "") + string(b.agi));
+    if (variable_struct_exists(b, "def") && b.def != 0) array_push(parts, "DEF " + ((b.def > 0) ? "+" : "") + string(b.def));
+    if (variable_struct_exists(b, "intt") && b.intt != 0) array_push(parts, "INT " + ((b.intt > 0) ? "+" : "") + string(b.intt));
+    if (variable_struct_exists(b, "luck") && b.luck != 0) array_push(parts, "LUCK " + ((b.luck > 0) ? "+" : "") + string(b.luck));
+    if (array_length(parts) <= 0) return "";
+    var txt = parts[0];
+    for (var i = 1; i < array_length(parts); i++) txt += ", " + parts[i];
+    return txt;
+}
+
+function Menu_BuildItemTooltipLines(_item) {
+    var lines = [];
+    if (!is_struct(_item) || _item.id == 0) return lines;
+
+    array_push(lines, string(_item.name));
+    var type_name = Menu_ItemTypeName(_item);
+    array_push(lines, type_name);
+
+    if (_item.type == ITEM_WEAPON || _item.type == ITEM_ARMOR) {
+        var flavor = Menu_ItemFlavorText(_item);
+        if (flavor != "") array_push(lines, flavor);
+
+        if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 0) {
+            for (var pd = 0; pd < array_length(_item.passive_desc); pd++) {
+                array_push(lines, string(_item.passive_desc[pd]));
+            }
+        }
+
+        var stat_line = "Power " + string(max(0, round(real(_item.power))));
+        if (variable_struct_exists(_item, "acc") && _item.acc != 0) {
+            stat_line += " | Acc " + ((_item.acc > 0) ? "+" : "") + string(_item.acc);
+        }
+        if (variable_struct_exists(_item, "stat_type")) {
+            stat_line += " | " + Menu_StatShortName(_item.stat_type);
+        }
+        array_push(lines, stat_line);
+
+        var class_txt = "All Classes";
+        if (variable_struct_exists(_item, "preferred_class") && _item.preferred_class != -1) {
+            class_txt = Equip_ClassName(_item.preferred_class);
+        } else if (variable_struct_exists(_item, "allowed_classes") && is_array(_item.allowed_classes)) {
+            class_txt = Menu_ClassListText(_item.allowed_classes);
+        }
+        if (class_txt != "All Classes") array_push(lines, "Class: " + class_txt);
+
+        var bonus_txt = Menu_ItemBonusText(_item);
+        if (bonus_txt != "") array_push(lines, "Bonus: " + bonus_txt);
+        return lines;
+    }
+
+    if (_item.type == ITEM_CONSUMABLE && variable_struct_exists(_item, "use") && is_struct(_item.use)) {
+        var use = _item.use;
+        var eff = variable_struct_exists(use, "effect") ? string(use.effect) : "none";
+        switch (eff) {
+            case "heal":
+                var hmin = variable_struct_exists(use, "min") ? round(real(use.min)) : round(real(use.power));
+                var hmax = variable_struct_exists(use, "max") ? round(real(use.max)) : hmin;
+                array_push(lines, "Restores HP " + string(hmin) + "-" + string(hmax));
+            break;
+            case "mp":
+                var mmin = variable_struct_exists(use, "min") ? round(real(use.min)) : round(real(use.power));
+                var mmax = variable_struct_exists(use, "max") ? round(real(use.max)) : mmin;
+                array_push(lines, "Restore MP " + string(mmin) + "-" + string(mmax));
+            break;
+            case "cure":
+                array_push(lines, "Cures: " + Menu_StatusName(use.status));
+            break;
+            case "learn_skill":
+                var skill = SkillDB_Get(use.skill_id);
+                if (is_struct(skill) && skill.id != -1) {
+                    array_push(lines, "Unlocks skill: " + string(skill.name));
+                    var sb_cls = Menu_ClassListText(skill.class_list);
+                    if (sb_cls != "All Classes") array_push(lines, "Class: " + sb_cls);
+                }
+            break;
+            default:
+                array_push(lines, "Effect: " + eff);
+            break;
+        }
+        var c_flavor = Menu_ItemFlavorText(_item);
+        if (c_flavor != "") array_push(lines, c_flavor);
+    }
+
+    return lines;
+}
+
+function Menu_BuildSkillTooltipLines(_skill) {
+    var lines = [];
+    if (!is_struct(_skill) || _skill.id == -1) return lines;
+
+    array_push(lines, string(_skill.name));
+    var mp_line = "MP " + string(max(0, round(real(_skill.mp_cost))));
+    var tgt = variable_struct_exists(_skill, "target") ? _skill.target : TGT_ENEMY;
+    mp_line += " | " + Menu_TargetName(tgt);
+    array_push(lines, mp_line);
+    var class_list = variable_struct_exists(_skill, "class_list") && is_array(_skill.class_list) ? _skill.class_list : [];
+    var class_txt = Menu_ClassListText(class_list);
+    if (class_txt != "All Classes") array_push(lines, "Class: " + class_txt);
+
+    if (_skill.effect == "damage") {
+        var dmg_line = "Damage " + string(max(0, round(real(_skill.power))));
+        var pm = variable_struct_exists(_skill, "power_mult") ? real(_skill.power_mult) : 1;
+        if (pm != 1) dmg_line += " x" + string_format(pm, 1, 2);
+        if (variable_struct_exists(_skill, "hits") && _skill.hits > 1) {
+            dmg_line += " | Hits " + string(round(real(_skill.hits)));
+        }
+        if (variable_struct_exists(_skill, "acc") && _skill.acc != 0) {
+            dmg_line += " | Acc " + ((_skill.acc > 0) ? "+" : "") + string(_skill.acc);
+        }
+        array_push(lines, dmg_line);
+    } else if (_skill.effect == "heal") {
+        array_push(lines, "Effect: Restore HP");
+    } else if (_skill.effect == "status" || _skill.effect == "multi_status") {
+        array_push(lines, "Effect: Status");
+    } else {
+        array_push(lines, "Effect: " + string(_skill.effect));
+    }
+
+    if (variable_struct_exists(_skill, "status") && _skill.status != -1) {
+        var turns = variable_struct_exists(_skill, "status_turns") ? max(1, round(real(_skill.status_turns))) : 1;
+        var chance = variable_struct_exists(_skill, "status_chance") ? clamp(real(_skill.status_chance), 0, 1) : 1;
+        array_push(lines, "Applies: " + Menu_StatusName(_skill.status) + " (" + string(round(chance * 100)) + "%, " + string(turns) + " turn)");
+    }
+
+    if (variable_struct_exists(_skill, "status_list") && is_array(_skill.status_list) && array_length(_skill.status_list) > 0) {
+        for (var i = 0; i < array_length(_skill.status_list); i++) {
+            var sid = _skill.status_list[i];
+            if (sid == -1) continue;
+            var turns2 = variable_struct_exists(_skill, "status_turns") ? max(1, round(real(_skill.status_turns))) : 1;
+            if (variable_struct_exists(_skill, "status_turns_list") && is_array(_skill.status_turns_list) && i < array_length(_skill.status_turns_list)) {
+                turns2 = max(1, round(real(_skill.status_turns_list[i])));
+            }
+            array_push(lines, "Applies: " + Menu_StatusName(sid) + " (" + string(turns2) + " turn)");
+        }
+    }
+
+    var skill_flavor = Menu_SkillFlavorText(_skill);
+    if (skill_flavor != "") array_push(lines, skill_flavor);
+
+    return lines;
+}
+
+function Menu_DrawTooltipBox(_bx, _by, _bw, _bh, _lines, _menu_alpha) {
+    if (!is_array(_lines) || array_length(_lines) <= 0) return;
+    if (_bw <= 8 || _bh <= 8) return;
+
+    var pad = 4;
+    var text_scale = 0.68;
+    var line_h = max(6, floor(string_height("A") * text_scale) + 1);
+    var max_text_w = max(1, floor((_bw - pad * 2) / text_scale));
+    var wrapped = [];
+    for (var i = 0; i < array_length(_lines); i++) {
+        var line_txt = string(_lines[i]);
+        if (line_txt == "") {
+            array_push(wrapped, "");
+            continue;
+        }
+        wrapped = Menu_AddWrappedLines(wrapped, line_txt, max_text_w);
+    }
+
+    var max_lines = max(1, floor((_bh - pad * 2) / line_h));
+    if (array_length(wrapped) > max_lines) {
+        var keep = max(1, max_lines - 1);
+        array_resize(wrapped, keep);
+        array_push(wrapped, "...");
+    }
+
+    draw_set_alpha(_menu_alpha * 0.88);
+    draw_set_color(c_black);
+    draw_rectangle(_bx, _by, _bx + _bw, _by + _bh, false);
+    draw_set_alpha(_menu_alpha);
+    draw_set_color(c_white);
+    draw_rectangle(_bx, _by, _bx + _bw, _by + _bh, true);
+    draw_set_alpha(_menu_alpha);
+
+    var draw_y = _by + pad;
+    draw_set_color(c_white);
+    for (var j = 0; j < array_length(wrapped); j++) {
+        draw_text_transformed(_bx + pad, draw_y, wrapped[j], text_scale, text_scale, 0);
+        draw_y += line_h;
+        if (draw_y > _by + _bh - pad) break;
+    }
+}
+
 function Menu_ClampInventoryCursor(_m, _inventory) {
     var inv_count = is_array(_inventory) ? array_length(_inventory) : 0;
     if (inv_count <= 0) {
@@ -189,6 +484,17 @@ function Menu_UseInventoryItem(_m, _ch, _item_id) {
     }
 
     if (item.type == ITEM_WEAPON || item.type == ITEM_ARMOR) {
+        var slot_name = variable_struct_exists(item, "equip_slot") ? string(item.equip_slot) : "";
+        if (slot_name != "" && Equip_SlotGet(_ch, slot_name) == item.id) {
+            Equip_SlotSet(_ch, slot_name, 0);
+            _ch = RecomputeResources(_ch);
+            _m = Menu_ClampInventoryCursor(_m, _ch.inventory);
+            out.menu = Menu_InvPopupOpenMessage(_m, "Unequipped " + item.name + ".");
+            out.ch = _ch;
+            out.changed = true;
+            return out;
+        }
+
         var can = Equip_CanEquip(_ch, item);
         if (!can.ok) {
             out.menu = Menu_InvPopupOpenMessage(_m, can.msg);
@@ -409,12 +715,27 @@ function Menu_HandleInput() {
             SFX_PlayUI("ui_move");
         }
         if (nav_down) {
-            m.header_focus = false;
-            if (m.tab == 2) {
-                if (!is_struct(m.pending_stats)) Menu_StatsSync();
-                m.stats_focus = true;
+            var can_enter_tab = false;
+            switch (m.tab) {
+                case 0:
+                    can_enter_tab = is_array(ch.inventory) && array_length(ch.inventory) > 0;
+                    break;
+                case 1:
+                    can_enter_tab = is_array(ch.skills) && array_length(ch.skills) > 0;
+                    break;
+                case 2:
+                    can_enter_tab = true;
+                    break;
             }
-            SFX_PlayUI("ui_move");
+
+            if (can_enter_tab) {
+                m.header_focus = false;
+                if (m.tab == 2) {
+                    if (!is_struct(m.pending_stats)) Menu_StatsSync();
+                    m.stats_focus = true;
+                }
+                SFX_PlayUI("ui_move");
+            }
         }
         return;
     }
@@ -426,8 +747,10 @@ function Menu_HandleInput() {
         var items = is_array(ch.inventory) ? ch.inventory : [];
         var count = array_length(items);
         if (count <= 0) {
+            m.header_focus = true;
+            m.inv_index = 0;
+            m.inv_scroll = 0;
             if (nav_up) {
-                m.header_focus = true;
                 SFX_PlayUI("ui_move");
             }
             return;
@@ -478,8 +801,10 @@ function Menu_HandleInput() {
         var skills = is_array(ch.skills) ? ch.skills : [];
         var scount = array_length(skills);
         if (scount <= 0) {
+            m.header_focus = true;
+            m.skill_index = 0;
+            m.skill_scroll = 0;
             if (nav_up) {
-                m.header_focus = true;
                 SFX_PlayUI("ui_move");
             }
             return;
@@ -623,6 +948,7 @@ function Menu_Draw() {
     var menu_closing = variable_struct_exists(m, "closing") && m.closing;
     var menu_close_frame = variable_struct_exists(m, "close_frame") ? m.close_frame : UI_OPENED_FRAME_NONE;
     var menu_alpha = UI_PopupAlpha(m.opened_frame, menu_closing, menu_close_frame, 1);
+    var tooltip_lines = [];
 
     draw_set_alpha(menu_alpha * 0.9);
     draw_set_color(c_black);
@@ -691,6 +1017,12 @@ function Menu_Draw() {
                 }
             }
         }
+
+        if (!m.header_focus && count > 0 && m.inv_index >= 0 && m.inv_index < count && is_struct(items[m.inv_index])) {
+            var sel_inv = items[m.inv_index];
+            var sel_item = ItemDB_Get(sel_inv.id);
+            tooltip_lines = Menu_BuildItemTooltipLines(sel_item);
+        }
     }
 
     // Skills tab
@@ -725,6 +1057,11 @@ function Menu_Draw() {
                 draw_set_color(sel2 ? c_black : c_white);
                 draw_text(tx2, y2, sk.name);
             }
+        }
+
+        if (!m.header_focus && scount > 0 && m.skill_index >= 0 && m.skill_index < scount) {
+            var sel_skill = SkillDB_Get(skills[m.skill_index]);
+            tooltip_lines = Menu_BuildSkillTooltipLines(sel_skill);
         }
     }
 
@@ -878,6 +1215,14 @@ function Menu_Draw() {
             draw_set_color((m.stats_focus && m.stats_row == action_row && m.stats_col == 1) ? c_black : c_white);
             draw_text(cancel_x, action_y, cancel_text);
             }
+    }
+
+    if (!(variable_struct_exists(m, "inv_popup_open") && m.inv_popup_open) && array_length(tooltip_lines) > 0) {
+        var tip_w = clamp(round(bw * 0.36), 64, max(64, bw - pad * 2));
+        var tip_h = clamp(round(bh * 0.24), 34, max(34, bh - pad * 2));
+        var tip_x = bx + bw - tip_w - pad;
+        var tip_y = by + bh - tip_h - pad;
+        Menu_DrawTooltipBox(tip_x, tip_y, tip_w, tip_h, tooltip_lines, menu_alpha);
     }
 
     if (variable_struct_exists(m, "inv_popup_open") && m.inv_popup_open) {
@@ -1108,6 +1453,9 @@ function ClassSelect_ApplyClass(_class_id) {
         if (variable_struct_exists(old, "stat_points")) ch.stat_points = old.stat_points;
         if (variable_struct_exists(old, "status")) ch.status = old.status;
     }
+
+    // FUN-FIRST: grant and auto-equip class starter weapon (no duplicates).
+    ch = Equip_GrantStarterWeapon(ch, _class_id, true);
 
     ch = Player_NormalizeProgression(ch, true);
     if (is_struct(old)) {

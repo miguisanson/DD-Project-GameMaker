@@ -7,6 +7,7 @@ var gs = GameState_Init();
 // LOAD PLAYER & ENEMY
 // --------------------
 p = gs.player_ch;
+p = Equip_PassiveBattleReset(p);
 e = EnemyCreate(gs.battle.enemy_id);
 
 // --------------------
@@ -69,6 +70,7 @@ skill_banner_name = "";
 enemy_actions_remaining = 0;
 enemy_turn_used_skills = [];
 player_bonus_actions_remaining = 0;
+player_turn_start_applied = false;
 
 menu_index = 0;
 battle_actions = [

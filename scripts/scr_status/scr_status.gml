@@ -256,6 +256,15 @@ function StatusDB_Init() {
         consume_on_hit: true
     };
 
+    global.status_db[? STATUS_SUNDER] = {
+        id: STATUS_SUNDER,
+        name: "Sundered",
+        icon_sprite: noone,
+        stat_mods: { str:0, agi:0, def:-1, intt:0, luck:0 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
+        stackable: false
+    };
+
     Status_AssignCoreIcons();
     Status_AssignPlayerBuffIconsFromFX();
     Status_AssignMissingIconsFromSkillFX();
@@ -451,6 +460,7 @@ function Status_IsNegative(_status_id) {
         case STATUS_BLEED:
         case STATUS_BURN:
         case STATUS_STUN:
+        case STATUS_SUNDER:
             return true;
     }
     return false;

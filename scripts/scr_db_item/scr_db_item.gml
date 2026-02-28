@@ -1,5 +1,6 @@
 function ItemDB_Init() {
     if (variable_global_exists("item_db") && ds_exists(global.item_db, ds_type_map)) {
+        ItemDB_AssignEquipPassives(global.item_db);
         return;
     }
 
@@ -694,6 +695,8 @@ function ItemDB_Init() {
     };
     ds_map_add(global.item_db, a5.id, a5);
 
+    ItemDB_AssignEquipPassives(global.item_db);
+
     if (variable_global_exists("state") && is_struct(global.state)) {
         global.state.item_db = global.item_db;
     }
@@ -708,8 +711,51 @@ function ItemDB_Get(_id) {
         db = global.state.item_db;
     }
 
+    ItemDB_AssignEquipPassives(db);
     if (ds_map_exists(db, _id)) return db[? _id];
     return { id: 0, name: "None", type: ITEM_KEY, stackable: false, max_stack: 0, equip_slot: "", power: 0, stat_type: -1, acc: 0, preferred_class: -1, sprite: noone, bonus: { str:0, agi:0, def:0, intt:0, luck:0 }, use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 }, value: 0 };
+}
+
+function ItemDB_GetPassiveTemplate(_item_id) {
+    switch (_item_id) {
+        // Weapons
+        case 1: return { id: "steady_strike", params: { once_per_turn: true }, desc: ["Steady Strike", "MISS->BAD, BAD->OKAY (1/turn)"] };
+        case 2: return { id: "sunder_edge", params: { first_hit_def_down: 1, turns: 2 }, desc: ["Sunder Edge", "1st hit: -1 DEF for 2 turns"] };
+        case 3: return { id: "executioner", params: { hp_ratio: 0.35, mult: 1.35 }, desc: ["Executioner", "+35% damage vs <35% HP"] };
+        case 4: return { id: "aim_assist", params: { upgrade_good_to_perfect_once_per_turn: true }, desc: ["Aim Assist", "GOOD->PERFECT (1/turn)"] };
+        case 5: return { id: "pinning_shot", params: { stun_chance: 0.15, stun_turns: 1, cooldown_turns: 3, requires_good_or_perfect: true }, desc: ["Pinning Shot", "GOOD+: may Stun (cd 3 turns)"] };
+        case 6: return { id: "predator", params: { mult: 1.30, requires_target_statused: true }, desc: ["Predator", "+30% damage vs statused foes"] };
+        case 7: return { id: "mana_trickle", params: { mp_gain: 1, every_n_turns: 2 }, desc: ["Mana Trickle", "+1 MP every 2 turns"] };
+        case 8: return { id: "ember_lens", params: { skill_mult: 1.15, status_turn_bonus: 1 }, desc: ["Ember Lens", "+15% skill damage, +1 status turn"] };
+        case 9: return { id: "arcane_surge", params: { skill_mult: 1.25, perfect_mp: 1 }, desc: ["Arcane Surge", "+25% skill damage, PERFECT +1 MP"] };
+
+        // Armor
+        case 20: return { id: "first_impact", params: { flat_reduction_first_hit: 3, once_per_battle: true }, desc: ["First Impact", "1st hit -3 damage (each battle)"] };
+        case 21: return { id: "brace", params: { guard_mult_next_hit: 0.60, cooldown_turns: 2, triggers_on_take_damage: true }, desc: ["Brace", "After hit: next hit -40% (cd2)"] };
+        case 22: return { id: "debt_plate", params: { big_hit_threshold: 6, big_hit_reduction: 0.30 }, desc: ["Debt Plate", "Big hits reduced by 30%"] };
+        case 23: return { id: "thin_veil", params: { mp_gain: 1, every_n_turns: 2, physical_vuln_flat: 1 }, desc: ["Thin Veil", "+1 MP/2 turns, take +1 phys damage"] };
+        case 24: return { id: "silk_flow", params: { skill_mult: 1.10, status_turn_bonus: 1 }, desc: ["Silk Flow", "+10% skill damage, +1 status turn"] };
+        case 25: return { id: "mirror_stitch", params: { reflect_first_status_once_per_battle: true, mp_cost_on_trigger: 1 }, desc: ["Mirror Stitch", "Reflect 1st status (cost 1 MP)"] };
+    }
+    return { id: "", params: {}, desc: [] };
+}
+
+function ItemDB_AssignEquipPassives(_db) {
+    if (!ds_exists(_db, ds_type_map)) return;
+    var ids = [1,2,3,4,5,6,7,8,9,20,21,22,23,24,25];
+    for (var i = 0; i < array_length(ids); i++) {
+        var iid = ids[i];
+        if (!ds_map_exists(_db, iid)) continue;
+        var item = _db[? iid];
+        if (!is_struct(item)) continue;
+        var tpl = ItemDB_GetPassiveTemplate(iid);
+        if (!is_struct(tpl)) continue;
+        if (!variable_struct_exists(tpl, "id") || string(tpl.id) == "") continue;
+
+        item.passive_id = tpl.id;
+        item.passive_params = variable_struct_exists(tpl, "params") && is_struct(tpl.params) ? tpl.params : {};
+        item.passive_desc = variable_struct_exists(tpl, "desc") && is_array(tpl.desc) ? tpl.desc : [];
+    }
 }
 
 function Item_IsConsumable(_item) {

@@ -102,8 +102,27 @@ function Combat_ApplyDamage(_attacker, _defender, _weapon, _crit_mult, _skill_mu
     var diff_mult = Combat_EffectiveDamageMult(_attacker);
     if (diff_mult != 1) dmg = floor(dmg * diff_mult);
 
+    var dmg_ctx = {};
+    if (argument_count >= 6 && is_struct(argument[5])) dmg_ctx = argument[5];
+    if (!variable_struct_exists(dmg_ctx, "is_skill")) dmg_ctx.is_skill = false;
+
+    // FUN-FIRST passives: let equipped armor mitigate incoming enemy damage.
+    if (is_struct(_attacker) && is_struct(_defender)
+    && variable_struct_exists(_attacker, "is_player") && !(_attacker.is_player)
+    && variable_struct_exists(_defender, "is_player") && _defender.is_player) {
+        dmg_ctx.from_enemy = true;
+        dmg_ctx.hp_before = _defender.hp;
+        dmg -= Equip_PlayerIncomingDamageReduction(_defender, dmg, dmg_ctx);
+    }
+
     dmg = max(0, dmg);
     _defender.hp = max(0, _defender.hp - dmg);
+
+    if (is_struct(_attacker) && is_struct(_defender)
+    && variable_struct_exists(_attacker, "is_player") && !(_attacker.is_player)
+    && variable_struct_exists(_defender, "is_player") && _defender.is_player) {
+        _defender = Equip_PlayerAfterTakeDamage(_defender, dmg, dmg_ctx);
+    }
 
     return { dmg: dmg, defender: _defender };
 }
@@ -291,6 +310,7 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
 function Player_OnDeath(_p) {
     var gs = GameState_Get();
     _p.hp = 0;
+    _p = Equip_PassiveBattleCleanup(_p);
     GameState_SetPlayer(_p);
     if (variable_struct_exists(gs, "pending_post_battle_dialogue_lines")) gs.pending_post_battle_dialogue_lines = [];
     gs.in_main_menu = false;
@@ -306,6 +326,7 @@ function Battle_CheckEnd(_bc, _p, _e) {
         _bc.battle_over = true;
         var rewards = Battle_GrantRewards(_p, _e);
         _p = rewards.player;
+        _p = Equip_PassiveBattleCleanup(_p);
         GameState_SetPlayer(_p);
         EnemyPersist_ResolveBattle(true);
         var gs = GameState_Get();
@@ -433,6 +454,13 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
     var timing_mult = variable_struct_exists(timing, "mult") ? clamp(real(timing.mult), 0, 1) : 0;
     var timing_hit = variable_struct_exists(timing, "hit") && timing.hit;
 
+    // Equipment passives can forgive/upgrade timing outcomes.
+    timing = Equip_ModifyTimedAttackResult(p, timing);
+    timing_label = variable_struct_exists(timing, "label") ? string(timing.label) : timing_label;
+    timing_key = variable_struct_exists(timing, "key") ? string(timing.key) : timing_key;
+    timing_mult = variable_struct_exists(timing, "mult") ? clamp(real(timing.mult), 0, 1) : timing_mult;
+    timing_hit = variable_struct_exists(timing, "hit") && timing.hit;
+
     _bc.attack_timing_active = false;
     _bc.attack_timing_started = false;
     _bc.attack_timing_result_text = timing_label;
@@ -471,8 +499,22 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
             e.hp = clamp(e.hp + refund, 0, e.max_hp);
         }
 
+        // FUN-FIRST gear passives add bonus pressure after timing result.
+        var bonus_dmg = Equip_PlayerBonusDamage(p, e, scaled_dmg, false, timing_key);
+        if (bonus_dmg > 0) {
+            var spend = min(bonus_dmg, e.hp);
+            e.hp = max(0, e.hp - spend);
+            scaled_dmg += spend;
+        }
+
         _bc.last_dmg = scaled_dmg;
+        p = Equip_PlayerPerfectHitApply(p, timing_key);
     }
+
+    var side_fx = Equip_PassiveOnAttackResolved(p, e, timing_key, timing_hit, _bc.last_dmg);
+    p = side_fx.attacker;
+    e = side_fx.defender;
+    var passive_msg = side_fx.msg;
 
     p = Status_ConsumeByField(p, "consume_on_attack");
 
@@ -480,17 +522,23 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
 
     if (!timing_hit) {
         SFX_PlayMissOrBlocked(false, -1);
-        Battle_Message(_bc, "You missed!", BSTATE_ENEMY_ACT);
+        var m0 = "You missed!";
+        if (passive_msg != "") m0 += " " + passive_msg;
+        Battle_Message(_bc, m0, BSTATE_ENEMY_ACT);
     } else if (_bc.last_crit) {
         if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        Battle_Message(_bc, "Critical hit! " + string(_bc.last_dmg) + " damage!", BSTATE_ENEMY_ACT);
+        var m1 = "Critical hit! " + string(_bc.last_dmg) + " damage!";
+        if (passive_msg != "") m1 += " " + passive_msg;
+        Battle_Message(_bc, m1, BSTATE_ENEMY_ACT);
     } else {
         if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        Battle_Message(_bc, "You hit for " + string(_bc.last_dmg) + " damage!", BSTATE_ENEMY_ACT);
+        var m2 = "You hit for " + string(_bc.last_dmg) + " damage!";
+        if (passive_msg != "") m2 += " " + passive_msg;
+        Battle_Message(_bc, m2, BSTATE_ENEMY_ACT);
     }
 
     if (Battle_PlayerFinalizeTurn(_bc, p, e, 0)) return;
@@ -667,6 +715,7 @@ function Battle_RunAttempt(_bc) {
 
 function Battle_EndRun(_bc) {
     _bc.battle_over = true;
+    _bc.p = Equip_PassiveBattleCleanup(_bc.p);
     GameState_SetPlayer(_bc.p);
 
     var gs = GameState_Get();
@@ -825,7 +874,7 @@ function Battle_EnemyAct(_bc) {
         if (_bc.last_hit) {
             var crit_bonus_e = Status_GetSum(e, "crit_bonus");
             _bc.last_crit = Combat_CritCheck(e, 1 + crit_bonus_e);
-            var dmg_pack_e = Combat_ApplyDamage(e, p, ew, (_bc.last_crit ? 2 : 1), 1);
+            var dmg_pack_e = Combat_ApplyDamage(e, p, ew, (_bc.last_crit ? 2 : 1), 1, { is_skill: false });
             _bc.last_dmg = dmg_pack_e.dmg;
             p = dmg_pack_e.defender;
         }

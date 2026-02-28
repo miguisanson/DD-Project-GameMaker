@@ -11,6 +11,15 @@ var k_back = Input_UIBack();
 
 if (attack_timing_result_timer > 0) attack_timing_result_timer -= 1;
 
+if (turn == TURN_PLAYER) {
+    if (!player_turn_start_applied) {
+        p = Equip_PlayerTurnStartApply(p);
+        player_turn_start_applied = true;
+    }
+} else {
+    player_turn_start_applied = false;
+}
+
 // --------------------
 // MESSAGE STATE
 // --------------------
