@@ -283,7 +283,7 @@ function Interact_Handle(_inst) {
         case INTERACT_CHECKPOINT: {
             GameState_SetCheckpoint(room, _inst.x, _inst.y);
             if (variable_instance_exists(_inst, "is_bed") && _inst.is_bed) {
-                SaveMenu_Open("save", "bed");
+                BedMenu_Open();
             }
         } break;
     }

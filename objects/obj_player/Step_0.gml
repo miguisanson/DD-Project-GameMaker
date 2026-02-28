@@ -33,8 +33,12 @@ if (auto_resolve_recover_timer > 0) {
 }
 
 if (UI_IsBlocking()) {
+    if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
+        Player_EnsureDialogueSettle(id, PLAYER_DIALOGUE_SETTLE_FRAMES);
+    }
     moving = false;
     move_timer = 0;
+    move_dir = -1;
     image_index = 0;
     sprite_index = sprite[face];
     exit;

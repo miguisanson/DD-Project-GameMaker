@@ -1,6 +1,7 @@
 Input_PreStep();
 var gs = GameState_Get();
 Transition_Update();
+UI_UpdateModalDimState();
 
 if (!variable_instance_exists(id, "hud_hurt_flash_timer")) hud_hurt_flash_timer = 0;
 if (!variable_instance_exists(id, "hud_prev_hp")) hud_prev_hp = -1;
@@ -66,6 +67,11 @@ if (gs.ui.mode == UI_CLASS_SELECT) {
 
 if (gs.ui.mode == UI_SAVE) {
     SaveMenu_Handle();
+    exit;
+}
+
+if (gs.ui.mode == UI_BED) {
+    BedMenu_Handle();
     exit;
 }
 

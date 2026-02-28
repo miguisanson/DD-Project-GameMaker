@@ -49,6 +49,7 @@ function Menu_Ensure() {
 function Menu_Open() {
     Menu_Ensure();
     var gs = GameState_Get();
+    UI_ModalRootBegin("menu");
     SFX_PlayUI("ui_openclose");
     gs.ui.mode = UI_MENU;
     gs.ui.menu.open = true;
@@ -65,6 +66,7 @@ function Menu_Close(_immediate = false) {
     var gs = GameState_Get();
     var m = gs.ui.menu;
     if (_immediate) {
+        UI_ModalRootEnd(false, true);
         Menu_StatsDiscard();
         gs.ui.menu.open = false;
         gs.ui.menu.closing = false;
@@ -74,6 +76,7 @@ function Menu_Close(_immediate = false) {
         return;
     }
     if (!m.open || m.closing) return;
+    UI_ModalRootEnd(false);
     Menu_StatsDiscard();
     m.closing = true;
     m.close_frame = Input_Frame();
@@ -612,10 +615,6 @@ function Menu_Draw() {
     var menu_closing = variable_struct_exists(m, "closing") && m.closing;
     var menu_close_frame = variable_struct_exists(m, "close_frame") ? m.close_frame : UI_OPENED_FRAME_NONE;
     var menu_alpha = UI_PopupAlpha(m.opened_frame, menu_closing, menu_close_frame, 1);
-
-    draw_set_alpha(menu_alpha * 0.6);
-    draw_set_color(c_black);
-    draw_rectangle(0, 0, w, h, false);
 
     draw_set_alpha(menu_alpha * 0.9);
     draw_set_color(c_black);
@@ -1492,10 +1491,14 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     var settings = GameSettings_Copy(sp.pending);
 
     if (_draw_backdrop) {
-        draw_set_alpha(popup_alpha * 0.85);
+        draw_set_alpha(popup_alpha * 0.6);
         draw_set_color(c_black);
-        draw_rectangle(sx, sy, sx + sw, sy + sh, false);
+        draw_rectangle(0, 0, w, h, false);
     }
+
+    draw_set_alpha(popup_alpha * 0.9);
+    draw_set_color(c_black);
+    draw_rectangle(sx, sy, sx + sw, sy + sh, false);
     draw_set_alpha(popup_alpha);
     draw_set_color(c_white);
     draw_rectangle(sx, sy, sx + sw, sy + sh, true);
@@ -1610,6 +1613,7 @@ function PauseMenu_Ensure() {
 function PauseMenu_Open() {
     PauseMenu_Ensure();
     var gs = GameState_Get();
+    UI_ModalRootBegin("pause");
     SFX_PlayUI("ui_openclose");
     gs.ui.mode = UI_PAUSE;
     var pm = gs.ui.pause_menu;
@@ -1627,6 +1631,7 @@ function PauseMenu_Close(_immediate = false) {
     var gs = GameState_Get();
     var pm = gs.ui.pause_menu;
     if (_immediate) {
+        UI_ModalRootEnd(false, true);
         SFX_PlayUI("ui_openclose");
         pm.open = false;
         pm.closing = false;
@@ -1638,6 +1643,7 @@ function PauseMenu_Close(_immediate = false) {
         return;
     }
     if (!pm.open || pm.closing) return;
+    UI_ModalRootEnd(false);
     SFX_PlayUI("ui_openclose");
     pm.closing = true;
     pm.close_frame = Input_Frame();
@@ -1757,14 +1763,6 @@ function PauseMenu_Draw() {
     if (!pm.open) return;
 
     if (SettingsPopup_IsOpen("pause")) {
-        UI_SetFont();
-        var layout_settings = Menu_GetLayout();
-        var w_settings = layout_settings.w;
-        var h_settings = layout_settings.h;
-        var popup_alpha_settings = UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
-        draw_set_alpha(popup_alpha_settings * 0.6);
-        draw_set_color(c_black);
-        draw_rectangle(0, 0, w_settings, h_settings, false);
         SettingsPopup_Draw(false);
         draw_set_alpha(1);
         return;
@@ -1789,10 +1787,6 @@ function PauseMenu_Draw() {
     var bx = (w - bw) * 0.5;
     var by = (h - bh) * 0.5;
     var popup_alpha = UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
-
-    draw_set_alpha(popup_alpha * 0.6);
-    draw_set_color(c_black);
-    draw_rectangle(0, 0, w, h, false);
 
     draw_set_alpha(popup_alpha * 0.9);
     draw_set_color(c_black);

@@ -50,6 +50,11 @@ function LevelUp_AddStat(_ch, _stat_id) {
     _ch = Player_NormalizeProgression(_ch, false, true);
     if (Level_IsAtCap(_ch.level)) return _ch;
 
+    var hp_before = variable_struct_exists(_ch, "hp") ? _ch.hp : 0;
+    var mp_before = variable_struct_exists(_ch, "mp") ? _ch.mp : 0;
+    var max_hp_before = variable_struct_exists(_ch, "max_hp") ? _ch.max_hp : hp_before;
+    var max_mp_before = variable_struct_exists(_ch, "max_mp") ? _ch.max_mp : mp_before;
+
     _ch.level += 1;
     if (!is_struct(_ch.stats)) _ch.stats = StatsCreateBase();
     switch (_stat_id) {
@@ -62,6 +67,8 @@ function LevelUp_AddStat(_ch, _stat_id) {
     if (!variable_struct_exists(_ch, "stat_points")) _ch.stat_points = 0;
     _ch.stat_points += 1;
     _ch = RecomputeResources(_ch);
+    _ch.hp = clamp(hp_before + max(0, _ch.max_hp - max_hp_before), 0, _ch.max_hp);
+    _ch.mp = clamp(mp_before + max(0, _ch.max_mp - max_mp_before), 0, _ch.max_mp);
     return _ch;
 }
 

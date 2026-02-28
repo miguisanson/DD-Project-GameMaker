@@ -207,6 +207,19 @@ function Player_StartAutoResolveRecover(_pl, _recover_frames = ENEMY_AUTO_RESOLV
     }
 }
 
+function Player_EnsureDialogueSettle(_pl, _recover_frames = PLAYER_DIALOGUE_SETTLE_FRAMES) {
+    if (!instance_exists(_pl)) return;
+    if (variable_instance_exists(_pl, "auto_resolve_recover_timer") && _pl.auto_resolve_recover_timer > 0) return;
+
+    var tile = GRID_TILE_SIZE;
+    if (variable_instance_exists(_pl, "tile_size")) tile = max(1, round(real(_pl.tile_size)));
+    var gx = round(_pl.x / tile) * tile;
+    var gy = round(_pl.y / tile) * tile;
+    if (abs(_pl.x - gx) <= 0.01 && abs(_pl.y - gy) <= 0.01) return;
+
+    Player_StartAutoResolveRecover(_pl, _recover_frames, false);
+}
+
 
 function UI_IsBlocking() {
     if (Transition_IsInputLocked()) return true;
@@ -237,6 +250,138 @@ function UI_PopupAlpha(_opened_frame, _closing = false, _close_frame = UI_OPENED
         a *= (1 - t);
     }
     return clamp(a, 0, 1);
+}
+
+function UI_ModalRootEnsure() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    if (!variable_struct_exists(gs.ui, "modal_root")) {
+        gs.ui.modal_root = {
+            active: false,
+            owner: "",
+            opened_frame: UI_OPENED_FRAME_NONE,
+            closing: false,
+            close_frame: UI_OPENED_FRAME_NONE,
+            hold_until_transition: false
+        };
+    }
+    return gs.ui.modal_root;
+}
+
+function UI_ModalRootBegin(_owner = "") {
+    var gs = GameState_Get();
+    var root = UI_ModalRootEnsure();
+    if (!root.active) {
+        root.active = true;
+        root.opened_frame = Input_Frame();
+    }
+    root.owner = string(_owner);
+    root.closing = false;
+    root.close_frame = UI_OPENED_FRAME_NONE;
+    root.hold_until_transition = false;
+    gs.ui.modal_root = root;
+}
+
+function UI_ModalRootTransfer(_owner = "") {
+    var gs = GameState_Get();
+    var root = UI_ModalRootEnsure();
+    if (!root.active) {
+        UI_ModalRootBegin(_owner);
+        return;
+    }
+    root.owner = string(_owner);
+    root.closing = false;
+    root.close_frame = UI_OPENED_FRAME_NONE;
+    root.hold_until_transition = false;
+    gs.ui.modal_root = root;
+}
+
+function UI_ModalRootEnd(_hold_until_transition = false, _immediate = false) {
+    var gs = GameState_Get();
+    var root = UI_ModalRootEnsure();
+    if (!root.active) return;
+
+    if (_immediate) {
+        root.active = false;
+        root.owner = "";
+        root.opened_frame = UI_OPENED_FRAME_NONE;
+        root.closing = false;
+        root.close_frame = UI_OPENED_FRAME_NONE;
+        root.hold_until_transition = false;
+        gs.ui.modal_root = root;
+        return;
+    }
+
+    if (_hold_until_transition) {
+        root.closing = false;
+        root.close_frame = UI_OPENED_FRAME_NONE;
+        root.hold_until_transition = true;
+        gs.ui.modal_root = root;
+        return;
+    }
+
+    if (root.closing) return;
+    root.closing = true;
+    root.close_frame = Input_Frame();
+    root.hold_until_transition = false;
+    gs.ui.modal_root = root;
+}
+
+function UI_UpdateModalDimState() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    if (!variable_struct_exists(gs.ui, "modal_dim_alpha")) gs.ui.modal_dim_alpha = 0;
+
+    var root = UI_ModalRootEnsure();
+    var alpha = 0;
+
+    if (root.active) {
+        if (root.hold_until_transition) {
+            alpha = 0.6;
+            if (Transition_IsActive()) {
+                root.active = false;
+                root.owner = "";
+                root.opened_frame = UI_OPENED_FRAME_NONE;
+                root.closing = false;
+                root.close_frame = UI_OPENED_FRAME_NONE;
+                root.hold_until_transition = false;
+                alpha = 0;
+            }
+        } else if (root.closing) {
+            alpha = UI_PopupAlpha(root.opened_frame, true, root.close_frame, 1) * 0.6;
+            if (Input_Frame() - root.close_frame >= UI_POPUP_FADE_FRAMES) {
+                root.active = false;
+                root.owner = "";
+                root.opened_frame = UI_OPENED_FRAME_NONE;
+                root.closing = false;
+                root.close_frame = UI_OPENED_FRAME_NONE;
+                root.hold_until_transition = false;
+                alpha = 0;
+            }
+        } else {
+            alpha = UI_PopupAlpha(root.opened_frame, false, UI_OPENED_FRAME_NONE, 1) * 0.6;
+        }
+    }
+
+    gs.ui.modal_root = root;
+    gs.ui.modal_dim_alpha = alpha;
+    return alpha;
+}
+
+function UI_DrawModalDim() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) return;
+    var alpha = 0;
+    if (variable_struct_exists(gs.ui, "modal_dim_alpha")) alpha = real(gs.ui.modal_dim_alpha);
+    if (alpha <= 0) return;
+
+    var w = display_get_gui_width();
+    var h = display_get_gui_height();
+    draw_set_alpha(alpha);
+    draw_set_color(c_black);
+    draw_rectangle(0, 0, w, h, false);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
 }
 
 function Action_CanAct(_pl) {

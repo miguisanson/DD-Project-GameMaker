@@ -374,6 +374,24 @@ function Save_Write(_slot) {
     gs.save_slot = _slot;
 }
 
+function Save_HealPlayerToFull() {
+    var gs = GameState_Get();
+    if (!is_struct(gs.player_ch)) return;
+
+    var ch = Player_NormalizeProgression(gs.player_ch, true, false);
+    ch.hp = ch.max_hp;
+    ch.mp = ch.max_mp;
+
+    gs.player_ch = ch;
+    GameState_SyncLegacy();
+
+    var pl = gs.player_inst;
+    if (!instance_exists(pl) && instance_exists(obj_player)) pl = instance_find(obj_player, 0);
+    if (instance_exists(pl) && variable_instance_exists(pl, "character")) {
+        pl.character = ch;
+    }
+}
+
 function Save_Read(_slot) {
     var snap = Save_TryLoadSnapshot(_slot, true);
     if (!is_struct(snap)) return false;

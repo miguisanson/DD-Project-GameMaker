@@ -64,6 +64,8 @@ if (room == rm_battle && is_struct(ch)) {
 
 }
 
+UI_DrawModalDim();
+
 if (gs.ui.mode == UI_PAUSE) {
     PauseMenu_Draw();
     exit;
@@ -196,6 +198,10 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
 
 if (gs.ui.mode == UI_SAVE) {
     SaveMenu_Draw();
+}
+
+if (gs.ui.mode == UI_BED) {
+    BedMenu_Draw();
 }
 
 Transition_DrawGUI();

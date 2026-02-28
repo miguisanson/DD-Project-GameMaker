@@ -4,6 +4,180 @@ function SaveMenu_Log(_msg) {
     }
 }
 
+function BedMenu_Open() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    var opened_with_confirm = (
+        Input_Held("confirm") || Input_Held("interact") ||
+        Input_Pressed("confirm") || Input_Pressed("interact")
+    );
+
+    UI_ModalRootBegin("bed");
+    SFX_PlayUI("ui_openclose");
+    gs.ui.mode = UI_BED;
+    gs.ui.bed_menu = {
+        open: true,
+        closing: false,
+        close_frame: UI_OPENED_FRAME_NONE,
+        opened_frame: Input_Frame(),
+        require_release: opened_with_confirm,
+        index: 0,
+        options: ["Rest", "Back"],
+        pending_action: ""
+    };
+}
+
+function BedMenu_Close(_immediate = false, _pending_action = "") {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "bed_menu")) return;
+    var bm = gs.ui.bed_menu;
+    if (_immediate) {
+        UI_ModalRootEnd(false, true);
+        bm.open = false;
+        bm.closing = false;
+        bm.close_frame = UI_OPENED_FRAME_NONE;
+        bm.pending_action = "";
+        gs.ui.bed_menu = bm;
+        gs.ui.mode = UI_NONE;
+        SFX_PlayUI("ui_openclose");
+        return;
+    }
+    if (!bm.open || bm.closing) return;
+    if (string(_pending_action) == "") {
+        UI_ModalRootEnd(false);
+    }
+    bm.closing = true;
+    bm.close_frame = Input_Frame();
+    bm.pending_action = string(_pending_action);
+    gs.ui.bed_menu = bm;
+    SFX_PlayUI("ui_openclose");
+}
+
+function BedMenu_Handle() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "bed_menu")) return;
+    var bm = gs.ui.bed_menu;
+    if (!bm.open) return;
+
+    var frame = Input_Frame();
+    if (bm.closing) {
+        if (frame - bm.close_frame >= UI_POPUP_FADE_FRAMES) {
+            var pending_action = string(bm.pending_action);
+            bm.open = false;
+            bm.closing = false;
+            bm.close_frame = UI_OPENED_FRAME_NONE;
+            bm.pending_action = "";
+            gs.ui.bed_menu = bm;
+
+            if (pending_action == "open_save") {
+                SaveMenu_Open("save", "bed");
+            } else {
+                gs.ui.mode = UI_NONE;
+            }
+        } else {
+            gs.ui.bed_menu = bm;
+        }
+        return;
+    }
+
+    if (variable_struct_exists(bm, "require_release") && bm.require_release) {
+        var confirm_active = (
+            Input_Held("confirm") || Input_Held("interact") ||
+            Input_Pressed("confirm") || Input_Pressed("interact")
+        );
+        if (confirm_active) {
+            gs.ui.bed_menu = bm;
+            return;
+        }
+        bm.require_release = false;
+        gs.ui.bed_menu = bm;
+        return;
+    }
+
+    if (frame <= bm.opened_frame) {
+        gs.ui.bed_menu = bm;
+        return;
+    }
+
+    var k_up = Input_UIPressed("menu_up");
+    var k_down = Input_UIPressed("menu_down");
+    var k_ok = Input_UIConfirm();
+    var k_back = Input_UIBack();
+
+    if (k_up || k_down) {
+        bm.index = 1 - bm.index;
+        SFX_PlayUI("ui_move");
+    }
+
+    if (k_back) {
+        SFX_PlayUI("ui_back");
+        BedMenu_Close(false);
+        return;
+    }
+
+    if (k_ok) {
+        SFX_PlayUI("ui_confirm");
+        if (bm.index == 0) {
+            BedMenu_Close(false, "open_save");
+            return;
+        }
+        BedMenu_Close(false);
+        return;
+    }
+
+    gs.ui.bed_menu = bm;
+}
+
+function BedMenu_Draw() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "bed_menu")) return;
+    var bm = gs.ui.bed_menu;
+    if (!bm.open) return;
+
+    UI_SetFont();
+
+    var w = display_get_gui_width();
+    var h = display_get_gui_height();
+    var line_h = string_height("A");
+    var inner_pad = 6;
+    var row_h = max(18, line_h + inner_pad * 2);
+    var popup_alpha = UI_PopupAlpha(bm.opened_frame, bm.closing, bm.close_frame, 1);
+
+    var max_w = 0;
+    for (var i = 0; i < array_length(bm.options); i++) {
+        max_w = max(max_w, string_width(bm.options[i]));
+    }
+
+    var bw = max_w + inner_pad * 6;
+    var bh = inner_pad * 2 + row_h * array_length(bm.options);
+    var bx = (w - bw) * 0.5;
+    var by = (h - bh) * 0.5;
+
+    draw_set_alpha(popup_alpha * 0.9);
+    draw_set_color(c_black);
+    draw_rectangle(bx, by, bx + bw, by + bh, false);
+    draw_set_alpha(popup_alpha);
+    draw_set_color(c_white);
+    draw_rectangle(bx, by, bx + bw, by + bh, true);
+
+    var start_y = by + inner_pad;
+    for (var j = 0; j < array_length(bm.options); j++) {
+        var yy = start_y + j * row_h;
+        var selected = (j == bm.index);
+        if (selected) {
+            draw_set_color(c_white);
+            draw_rectangle(bx + inner_pad, yy - 2, bx + bw - inner_pad, yy + row_h - 2, false);
+            draw_set_color(c_black);
+            draw_rectangle(bx + inner_pad, yy - 2, bx + bw - inner_pad, yy + row_h - 2, true);
+        }
+        draw_set_color(selected ? c_black : c_white);
+        draw_text(bx + inner_pad * 2, yy, bm.options[j]);
+    }
+
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
 function SaveMenu_BuildSlotInfoCache() {
     var out = array_create(3);
     for (var i = 0; i < 3; i++) {
@@ -19,6 +193,8 @@ function SaveMenu_Open(_mode, _context) {
         Input_Held("confirm") || Input_Held("interact") ||
         Input_Pressed("confirm") || Input_Pressed("interact")
     );
+    if (string(_context) == "bed") UI_ModalRootTransfer("save");
+    else UI_ModalRootBegin("save");
     SFX_PlayUI("ui_openclose");
     gs.ui.mode = UI_SAVE;
     gs.ui.save_menu = {
@@ -50,6 +226,7 @@ function SaveMenu_Open(_mode, _context) {
 function SaveMenu_OpenMessage(_message, _close_after = true) {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    UI_ModalRootTransfer("save_message");
     gs.ui.mode = UI_SAVE;
     gs.ui.save_menu = {
         open: true,
@@ -81,6 +258,7 @@ function SaveMenu_Close(_immediate = false, _pending_action = "", _pending_slot 
     if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "save_menu")) return;
     var sm = gs.ui.save_menu;
     if (_immediate) {
+        UI_ModalRootEnd(false, true);
         sm.open = false;
         sm.closing = false;
         sm.close_frame = UI_OPENED_FRAME_NONE;
@@ -95,6 +273,9 @@ function SaveMenu_Close(_immediate = false, _pending_action = "", _pending_slot 
         return;
     }
     if (!sm.open || sm.closing) return;
+    if (string(_pending_action) == "") {
+        UI_ModalRootEnd(false);
+    }
     sm.closing = true;
     sm.close_frame = Input_Frame();
     sm.pending_action = _pending_action;
@@ -129,19 +310,29 @@ function SaveMenu_Handle() {
 
             if (pending_action == "load_slot") {
                 if (pending_slot >= 1 && pending_slot <= 3 && Save_Read(pending_slot)) {
+                    UI_ModalRootEnd(true);
                     SFX_Play("load_confirm");
                     gs.save_slot = pending_slot;
                 } else {
+                    UI_ModalRootEnd(false);
                     SFX_PlayUI("ui_back");
                 }
             } else if (pending_action == "save_and_reload_slot") {
                 if (pending_slot >= 1 && pending_slot <= 3) {
+                    if (variable_struct_exists(sm, "context") && string(sm.context) == "bed") {
+                        Save_HealPlayerToFull();
+                    }
                     Save_Write(pending_slot);
                     SFX_Play("save_confirm");
                     gs.save_slot = pending_slot;
                     if (Save_Read(pending_slot)) {
+                        UI_ModalRootEnd(true);
                         gs.pending_save_success_popup = true;
+                    } else {
+                        UI_ModalRootEnd(false);
                     }
+                } else {
+                    UI_ModalRootEnd(false);
                 }
             } else if (pending_action == "show_no_saves_message") {
                 SaveMenu_OpenMessage("No saved games found.", true);
@@ -406,7 +597,7 @@ function SaveMenu_Draw() {
     var by = (h - bh) * 0.5;
 
     if (!hide_slots) {
-        draw_set_alpha(popup_alpha * 0.85);
+        draw_set_alpha(popup_alpha * 0.9);
         draw_set_color(c_black);
         draw_rectangle(bx, by, bx + bw, by + bh, false);
         draw_set_alpha(popup_alpha);
@@ -524,7 +715,7 @@ function SaveMenu_Draw() {
         var px2 = px1 + popup_w;
         var py2 = py1 + popup_h;
 
-        draw_set_alpha(confirm_alpha * 0.85);
+        draw_set_alpha(confirm_alpha * 0.9);
         draw_set_color(c_black);
         draw_rectangle(px1, py1, px2, py2, false);
         draw_set_alpha(confirm_alpha);
