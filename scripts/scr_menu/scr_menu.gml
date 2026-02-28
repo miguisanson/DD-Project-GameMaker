@@ -283,27 +283,11 @@ function Tooltip_EquippableNote(_item) {
         if (joined != "") return joined;
     }
 
-    var passive_id = variable_struct_exists(_item, "passive_id") ? string(_item.passive_id) : "";
-    switch (passive_id) {
-        case "steady_strike": return "Forgiving timing weapon.";
-        case "sunder_edge": return "Softens enemy DEF on opening hit.";
-        case "executioner": return "Strong finisher vs low HP.";
-        case "aim_assist": return "Forgiving timing for accurate shots.";
-        case "pinning_shot": return "Can stun on clean hits.";
-        case "predator": return "Bonus damage vs statused foes.";
-        case "mana_trickle": return "MP sustain for long fights.";
-        case "ember_lens": return "Boosts skill damage and status duration.";
-        case "arcane_surge": return "High skill burst with PERFECT MP refund.";
-        case "first_impact": return "Reduces first hit each battle.";
-        case "brace": return "After a hit, braces the next impact.";
-        case "debt_plate": return "Cuts damage from heavy hits.";
-        case "thin_veil": return "MP sustain, but weaker vs physical hits.";
-        case "silk_flow": return "Supports stronger, longer-lasting spells.";
-        case "mirror_stitch": return "Reflects the first status each battle.";
-    }
-
     if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 1) {
         return Tooltip_PassiveLineHuman(_item.passive_desc[1]);
+    }
+    if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 0) {
+        return Tooltip_PassiveLineHuman(_item.passive_desc[0]);
     }
     return "";
 }
