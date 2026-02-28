@@ -396,6 +396,7 @@ function SkillDB_Init() {
         fx_sprite: noone,
         sfx_key: "enemy_skill_bloodthirsty",
         sfx_candidates: ["Monster_Roar_5"],
+        sfx_gain: MONSTER_SFX_GAIN * 0.80,
         fx_frames: 12,
         fx_speed: 0.2,
         hits: 0,

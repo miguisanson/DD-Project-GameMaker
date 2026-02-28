@@ -438,7 +438,7 @@ function SFX_RegisterGainDefaults() {
     SFX_RegisterGain("enemy_spawn_spider", 1.00 * MONSTER_SFX_GAIN);
     SFX_RegisterGain("enemy_spawn_mad_whisp", 1.00 * MONSTER_SFX_GAIN);
     SFX_RegisterGain("enemy_spawn_ghost_sword", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_spawn_dire_wolf", 0.30 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_spawn_dire_wolf", 0.30 * MONSTER_SFX_GAIN * 0.90);
     SFX_RegisterGain("enemy_spawn_snake", 1.00 * MONSTER_SFX_GAIN);
     SFX_RegisterGain("enemy_spawn_killer_plant", 1.00 * MONSTER_SFX_GAIN);
     SFX_RegisterGain("enemy_spawn_stranger", 1.00 * MONSTER_SFX_GAIN);
@@ -450,7 +450,7 @@ function SFX_RegisterGainDefaults() {
     SFX_RegisterGain("enemy_special_spider", 1.00 * MONSTER_SFX_GAIN);
     SFX_RegisterGain("enemy_special_mad_whisp", 1.00 * MONSTER_SFX_GAIN);
     SFX_RegisterGain("enemy_special_ghost_sword", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_special_dire_wolf", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_special_dire_wolf", 1.00 * MONSTER_SFX_GAIN * 0.90);
     SFX_RegisterGain("enemy_special_snake", 1.00 * MONSTER_SFX_GAIN);
     SFX_RegisterGain("enemy_special_killer_plant", 1.00 * MONSTER_SFX_GAIN);
     SFX_RegisterGain("enemy_special_stranger", 1.00 * MONSTER_SFX_GAIN);
