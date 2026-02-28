@@ -56,6 +56,7 @@ if (state == "main") {
 
         SFX_PlayUI("ui_confirm");
         if (opt == "New Game") {
+            UI_ModalRootBegin("title_difficulty");
             var current_difficulty = DIFFICULTY_NORMAL;
             if (variable_struct_exists(gs, "difficulty")) current_difficulty = Difficulty_Normalize(gs.difficulty);
             difficulty_index = 1;
@@ -90,6 +91,7 @@ if (state == "difficulty") {
             difficulty_close_frame = UI_OPENED_FRAME_NONE;
             if (da == "start_intro") {
                 Difficulty_SetCurrent(difficulty_pending_value);
+                gs.in_main_menu = false;
                 Transition_RequestCutsceneById("intro");
             } else {
                 state = "main";
@@ -110,6 +112,7 @@ if (state == "difficulty") {
 
     if (k_back) {
         SFX_PlayUI("ui_back");
+        UI_ModalRootEnd(false);
         difficulty_closing = true;
         difficulty_close_frame = Input_Frame();
         difficulty_pending_action = "to_main";
@@ -119,11 +122,13 @@ if (state == "difficulty") {
     if (k_ok) {
         SFX_PlayUI("ui_confirm");
         if (difficulty_index >= 0 && difficulty_index < array_length(difficulty_values)) {
+            UI_ModalRootHold("title_room_change");
             difficulty_pending_value = difficulty_values[difficulty_index];
             difficulty_closing = true;
             difficulty_close_frame = Input_Frame();
             difficulty_pending_action = "start_intro";
         } else {
+            UI_ModalRootEnd(false);
             difficulty_closing = true;
             difficulty_close_frame = Input_Frame();
             difficulty_pending_action = "to_main";
