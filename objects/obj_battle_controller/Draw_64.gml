@@ -411,22 +411,40 @@ if (battle_state == BSTATE_SKILL_MENU || battle_state == BSTATE_ITEM_MENU) {
         var tip_skills = Battle_GetSkillList(self);
         if (skill_index >= 0 && skill_index < array_length(tip_skills)) {
             var tip_skill = SkillDB_Get(tip_skills[skill_index]);
-            battle_tip_lines = Menu_BuildSkillTooltipLines(tip_skill);
+            battle_tip_lines = Tooltip_BuildSkillLines(tip_skill);
         }
     } else {
         var tip_items = Battle_GetItemList(self);
         if (item_index >= 0 && item_index < array_length(tip_items)) {
             var tip_item = ItemDB_Get(tip_items[item_index].id);
-            battle_tip_lines = Menu_BuildItemTooltipLines(tip_item);
+            battle_tip_lines = Tooltip_BuildItemLines(tip_item);
         }
     }
 
     if (array_length(battle_tip_lines) > 0) {
-        var tip_w = min(round(w * 0.56), bw);
-        var tip_h = 48;
-        var tip_x = clamp(margin + gui_off_x, 0, max(0, w - tip_w));
-        var tip_y = by - tip_h - 4;
-        tip_y = clamp(tip_y, margin, max(margin, h - tip_h - margin));
-        Menu_DrawTooltipBox(tip_x, tip_y, tip_w, tip_h, battle_tip_lines, 1);
+        var tip_style_b = Tooltip_GetStyle("battle");
+        var tip_gap = 3;
+        var tip_w = bw;
+        var tip_h = tip_style_b.min_h;
+        var tip_x = bx;
+        var tip_y = by - tip_h - tip_gap;
+
+        if (instance_exists(enemy_inst)) {
+            var t_espr = enemy_inst.sprite_index;
+            if (t_espr != noone && t_espr != -1) {
+                var enemy_bottom_screen = (enemy_inst.y - sprite_get_yoffset(t_espr) + (sprite_get_height(t_espr) * abs(enemy_inst.image_yscale)) - vy) * sy;
+                var min_tip_y = enemy_bottom_screen + tip_gap;
+                if (tip_y < min_tip_y) tip_y = min_tip_y;
+                var max_tip_h = (by - tip_gap) - tip_y;
+                if (max_tip_h > 20) {
+                    tip_h = min(tip_h, max_tip_h);
+                }
+            }
+        }
+
+        var tip_margin = max(margin, tip_style_b.margin_px);
+        var tip_min_h = min(tip_style_b.min_h, max(20, tip_h));
+        var tip_rect = Tooltip_ClampRect(tip_x, tip_y, tip_w, tip_h, tip_margin, tip_style_b.min_w, tip_min_h);
+        Tooltip_DrawBox(tip_rect.x, tip_rect.y, tip_rect.w, tip_rect.h, battle_tip_lines, 1, tip_style_b);
     }
 }

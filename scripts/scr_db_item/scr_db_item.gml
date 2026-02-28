@@ -186,7 +186,7 @@ function ItemDB_Init() {
         preferred_class: -1,
         sprite: hp_potion,
         bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
-        use: { effect: "heal", min: 5, max: 10, scale: 0.5, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
+        use: { effect: "heal", min: 5, max: 10, scale: 1.0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 8
     };
     ds_map_add(global.item_db, c0.id, c0);
