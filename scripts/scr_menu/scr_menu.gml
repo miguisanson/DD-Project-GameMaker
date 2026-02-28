@@ -52,12 +52,26 @@ function Menu_Open() {
     UI_ModalRootBegin("menu");
     SFX_PlayUI("ui_openclose");
     gs.ui.mode = UI_MENU;
-    gs.ui.menu.open = true;
-    gs.ui.menu.closing = false;
-    gs.ui.menu.close_frame = UI_OPENED_FRAME_NONE;
-    gs.ui.menu.header_focus = true;
-    gs.ui.menu.stats_focus = false;
-    gs.ui.menu.opened_frame = Input_Frame();
+    var m = gs.ui.menu;
+    m.open = true;
+    m.closing = false;
+    m.close_frame = UI_OPENED_FRAME_NONE;
+    m.header_focus = true;
+    m.stats_focus = false;
+    m.opened_frame = Input_Frame();
+    // Reopen inventory from the top to avoid snap-to-old-selection behavior.
+    m.inv_index = 0;
+    m.inv_scroll = 0;
+    m.inv_popup_open = false;
+    m.inv_popup_closing = false;
+    m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
+    m.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
+    m.inv_popup_mode = "";
+    m.inv_popup_message = "";
+    m.inv_popup_item_id = -1;
+    m.inv_popup_choice = 1;
+    m.inv_popup_block_frame = UI_OPENED_FRAME_NONE;
+    gs.ui.menu = m;
     Menu_StatsSync();
 }
 
@@ -311,7 +325,9 @@ function Tooltip_BuildItemLines(_item) {
     if (!is_struct(_item) || !variable_struct_exists(_item, "id") || _item.id == 0) return lines;
 
     array_push(lines, string(_item.name));
-    array_push(lines, Tooltip_ItemTypeLine(_item));
+    if (!Item_IsSkillbook(_item)) {
+        array_push(lines, Tooltip_ItemTypeLine(_item));
+    }
 
     if (_item.type == ITEM_WEAPON || _item.type == ITEM_ARMOR) {
         var parts = ["Power " + string(max(0, round(real(_item.power))))];
@@ -325,9 +341,8 @@ function Tooltip_BuildItemLines(_item) {
         for (var i = 1; i < array_length(parts); i++) core += " | " + parts[i];
         array_push(lines, core);
         if (variable_struct_exists(_item, "equip_slot") && string(_item.equip_slot) == "weapon") {
-            array_push(lines, "Power adds to base attack damage before DEF.");
             if (variable_struct_exists(_item, "stat_type")) {
-                array_push(lines, Tooltip_StatShortName(_item.stat_type) + " scales this weapon's damage.");
+                array_push(lines, "Built around " + Tooltip_StatShortName(_item.stat_type) + " scaling.");
             }
         }
 
@@ -335,12 +350,14 @@ function Tooltip_BuildItemLines(_item) {
         if (bonus_txt != "") array_push(lines, "Bonus: " + bonus_txt);
 
         if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 0) {
-            var passive_title = string(_item.passive_desc[0]);
-            array_push(lines, "Passive: " + passive_title);
-            for (var pidx = 1; pidx < array_length(_item.passive_desc); pidx++) {
-                array_push(lines, "- " + Tooltip_PassiveLineHuman(_item.passive_desc[pidx]));
+            var passive_line = "Trait: " + string(_item.passive_desc[0]);
+            if (array_length(_item.passive_desc) > 1) {
+                passive_line += " - " + Tooltip_PassiveLineHuman(_item.passive_desc[1]);
             }
-            array_push(lines, "Passive effects trigger automatically while equipped.");
+            array_push(lines, passive_line);
+            for (var pidx = 2; pidx < array_length(_item.passive_desc); pidx++) {
+                array_push(lines, Tooltip_PassiveLineHuman(_item.passive_desc[pidx]));
+            }
         }
 
         var class_txt = "All Classes";
@@ -386,6 +403,35 @@ function Tooltip_BuildItemLines(_item) {
                 var skill = SkillDB_Get(use.skill_id);
                 if (is_struct(skill) && skill.id != -1) {
                     array_push(lines, "Teaches: " + string(skill.name));
+                    var mp_cost = variable_struct_exists(skill, "mp_cost") ? max(0, round(real(skill.mp_cost))) : 0;
+                    var target_txt = variable_struct_exists(skill, "target") ? Tooltip_TargetName(skill.target) : "Unknown";
+                    array_push(lines, "MP " + string(mp_cost) + " | Target: " + target_txt);
+                    if (variable_struct_exists(skill, "effect")) {
+                        var skill_eff = string(skill.effect);
+                        if (skill_eff == "damage") {
+                            var eff_line = "Effect: Damage";
+                            if (variable_struct_exists(skill, "hits") && skill.hits > 1) {
+                                eff_line += " (" + string(round(real(skill.hits))) + " hits)";
+                            }
+                            if (variable_struct_exists(skill, "status") && skill.status != -1) {
+                                eff_line += ", may inflict " + Tooltip_StatusName(skill.status);
+                            }
+                            array_push(lines, eff_line);
+                        } else if (skill_eff == "status") {
+                            if (variable_struct_exists(skill, "status") && skill.status != -1) {
+                                var turns = variable_struct_exists(skill, "status_turns") ? max(1, round(real(skill.status_turns))) : 1;
+                                array_push(lines, "Effect: Apply " + Tooltip_StatusName(skill.status) + " (" + string(turns) + " turns)");
+                            } else {
+                                array_push(lines, "Effect: Apply a buff");
+                            }
+                        } else if (skill_eff == "heal") {
+                            array_push(lines, "Effect: Restore HP");
+                        } else if (skill_eff == "multi_status") {
+                            array_push(lines, "Effect: Apply multiple statuses");
+                        } else if (skill_eff == "steal_item") {
+                            array_push(lines, "Effect: Steal one random item");
+                        }
+                    }
                     var sb_classes = Tooltip_ClassListText(skill.class_list);
                     if (sb_classes != "All Classes") array_push(lines, "Class: " + sb_classes);
                 } else {
@@ -1118,9 +1164,10 @@ function Menu_Draw() {
     var draw_arrow_h = max(1, sprite_get_height(draw_arrow_sprite));
     var draw_arrow_scale_x = 16 / draw_arrow_w;
     var draw_arrow_scale_y = 16 / draw_arrow_h;
-    var draw_arrow_x = round(bx + bw * 0.5);
-    var draw_arrow_top_y = round(layout.content_y + max(0, floor((list_top_inset - 16) * 0.5)));
-    var draw_arrow_bottom_y = round(content_list_y + content_list_h + max(0, floor((list_bottom_inset - 16) * 0.5)));
+    var draw_arrow_size = 16;
+    var draw_arrow_x = round(bx + bw * 0.5 - (draw_arrow_size * 0.5));
+    var draw_arrow_top_y = round(layout.content_y + max(0, floor((list_top_inset - draw_arrow_size) * 0.5)));
+    var draw_arrow_bottom_y = round(content_list_y + content_list_h + max(0, floor((list_bottom_inset - draw_arrow_size) * 0.5)));
 
     // Inventory tab
     if (m.tab == 0) {
@@ -1173,7 +1220,7 @@ function Menu_Draw() {
         if (count > rows_visible) {
             draw_set_color(c_white);
             if (start > 0) {
-                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_top_y, draw_arrow_scale_x, draw_arrow_scale_y, 180, c_white, menu_alpha);
+                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_top_y + draw_arrow_size, draw_arrow_scale_x, -draw_arrow_scale_y, 0, c_white, menu_alpha);
             }
             if (endv < count) {
                 draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_bottom_y, draw_arrow_scale_x, draw_arrow_scale_y, 0, c_white, menu_alpha);
@@ -1223,7 +1270,7 @@ function Menu_Draw() {
         if (scount > rows_visible) {
             draw_set_color(c_white);
             if (start2 > 0) {
-                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_top_y, draw_arrow_scale_x, draw_arrow_scale_y, 180, c_white, menu_alpha);
+                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_top_y + draw_arrow_size, draw_arrow_scale_x, -draw_arrow_scale_y, 0, c_white, menu_alpha);
             }
             if (end2 < scount) {
                 draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_bottom_y, draw_arrow_scale_x, draw_arrow_scale_y, 0, c_white, menu_alpha);
