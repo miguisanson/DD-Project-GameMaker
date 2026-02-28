@@ -387,7 +387,6 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
     _bc.attack_timing_result_key = timing_key;
     _bc.attack_timing_result_timer = ATTACK_TIMING_FEEDBACK_FRAMES;
 
-    Combat_Log("Player attacked. (" + timing_label + ")");
     var player_class_id = -1;
     if (variable_struct_exists(p, "class_id")) player_class_id = p.class_id;
     SFX_PlayClassAttack(player_class_id);
@@ -429,17 +428,17 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
 
     if (!timing_hit) {
         SFX_PlayMissOrBlocked(false, -1);
-        Battle_Message(_bc, timing_label + "! You missed!", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, "You missed!", BSTATE_ENEMY_ACT);
     } else if (_bc.last_crit) {
         if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        Battle_Message(_bc, timing_label + "! Critical hit! " + string(_bc.last_dmg) + " damage!", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, "Critical hit! " + string(_bc.last_dmg) + " damage!", BSTATE_ENEMY_ACT);
     } else {
         if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        Battle_Message(_bc, timing_label + "! You hit for " + string(_bc.last_dmg) + " damage!", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, "You hit for " + string(_bc.last_dmg) + " damage!", BSTATE_ENEMY_ACT);
     }
 
     p = Status_Tick(p);
@@ -567,10 +566,6 @@ function Battle_PlayerItem(_bc, _item_id) {
     var item = ItemDB_Get(_item_id);
     var target = (item.use.target == TGT_SELF) ? p : e;
     var res = Item_Use(_item_id, p, target);
-    if (res.ok) {
-        Combat_Log("Player used " + item.name);
-    }
-
     var fx = noone;
     if (res.fx_sprite != noone) {
         fx = FX_Spawn(res.fx_sprite, _bc.player_fx_x, _bc.player_fx_y, res.fx_frames, res.fx_speed);
