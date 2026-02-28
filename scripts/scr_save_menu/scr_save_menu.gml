@@ -310,7 +310,11 @@ function SaveMenu_Handle() {
 
             if (pending_action == "load_slot") {
                 if (pending_slot >= 1 && pending_slot <= 3 && Save_Read(pending_slot)) {
-                    UI_ModalRootEnd(true);
+                    if (variable_struct_exists(sm, "context") && string(sm.context) == "main") {
+                        UI_ModalRootHold("gameplay_load");
+                    } else {
+                        UI_ModalRootEnd(true);
+                    }
                     SFX_Play("load_confirm");
                     gs.save_slot = pending_slot;
                 } else {

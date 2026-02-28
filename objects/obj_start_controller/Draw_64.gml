@@ -2,6 +2,9 @@ var w = display_get_gui_width();
 var h = display_get_gui_height();
 var gs = GameState_Get();
 if (state == "cutscene") exit;
+var loading_into_game = Transition_IsActive()
+&& variable_struct_exists(gs, "in_main_menu")
+&& !gs.in_main_menu;
 
 if (room == rm_start && title_bg_sprite != noone) {
     draw_sprite_stretched(title_bg_sprite, 0, 0, 0, w, h);
@@ -26,7 +29,7 @@ if (!variable_instance_exists(id, "difficulty_index")) {
 var difficulty_row_count = array_length(difficulty_options) + 1; // + Back row
 difficulty_index = clamp(difficulty_index, 0, max(0, difficulty_row_count - 1));
 
-if (state == "main" && gs.ui.mode != UI_SAVE) {
+if (state == "main" && gs.ui.mode != UI_SAVE && !loading_into_game) {
     var can_load = true;
     if (variable_instance_exists(id, "load_available")) can_load = load_available;
     else can_load = Save_HasAnySlot();
@@ -61,7 +64,7 @@ if (state == "main" && gs.ui.mode != UI_SAVE) {
     }
 }
 
-if (state == "difficulty" && gs.ui.mode != UI_SAVE) {
+if (state == "difficulty" && gs.ui.mode != UI_SAVE && !loading_into_game) {
     var difficulty_alpha = UI_PopupAlpha(difficulty_opened_frame, difficulty_closing, difficulty_close_frame, 1);
     var dw = w * 0.62;
     var dh = h * 0.44;
@@ -110,7 +113,7 @@ if (state == "difficulty" && gs.ui.mode != UI_SAVE) {
     draw_text(dx + 18, back_y, "Back");
 }
 
-if (SettingsPopup_IsOpen("title")) {
+if (SettingsPopup_IsOpen("title") && !loading_into_game) {
     SettingsPopup_Draw();
 }
 draw_set_alpha(1);
