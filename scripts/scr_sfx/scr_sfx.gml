@@ -370,8 +370,16 @@ function SFX_RegisterGainDefaults() {
 function BGM_RegisterDefaults() {
     if (!variable_global_exists("bgm_db") || !ds_exists(global.bgm_db, ds_type_map)) return;
     ds_map_clear(global.bgm_db);
-    // BGM
+    // Base world tracks
     BGM_RegisterResolved("overall_bgm", [overall_bgm, "overall_bgm"]);
+    BGM_RegisterResolved("forest_bgm", [forest_bgm__for_everymap_with_trees, "forest_bgm__for_everymap_with_trees"]);
+
+    // Menu / cutscene tracks
+    BGM_RegisterResolved("arrival_bgm", [Arrival, "Arrival"]);
+    BGM_RegisterResolved("twilight_bgm", [The_Twilight_of_Camelot, "The_Twilight_of_Camelot"]);
+    BGM_RegisterResolved("haunting_bgm", [Ambience_haunting, "Ambience_haunting"]);
+    BGM_RegisterResolved("haunting2_bgm", [Ambience_haunting_2, "Ambience_haunting_2"]);
+
     BGM_RegisterGainDefaults();
 }
 
@@ -379,6 +387,11 @@ function BGM_RegisterGainDefaults() {
     SFX_EnsureGainMaps();
     ds_map_clear(global.bgm_gain_db);
     BGM_RegisterGain("overall_bgm", 1.00);
+    BGM_RegisterGain("forest_bgm", 1.00);
+    BGM_RegisterGain("arrival_bgm", 1.00);
+    BGM_RegisterGain("twilight_bgm", 1.00);
+    BGM_RegisterGain("haunting_bgm", 0.35);
+    BGM_RegisterGain("haunting2_bgm", 1.00);
 }
 
 function SFX_ClampVolumes() {
@@ -591,13 +604,174 @@ function BGM_GetSound(_key_or_asset) {
     return noone;
 }
 
+function BGM_MixConfigEnsure() {
+    if (variable_global_exists("bgm_mix_cfg") && is_struct(global.bgm_mix_cfg)) return global.bgm_mix_cfg;
+
+    global.bgm_mix_cfg = {
+        tracks: [
+            "overall_bgm",
+            "forest_bgm",
+            "arrival_bgm",
+            "twilight_bgm",
+            "haunting_bgm",
+            "haunting2_bgm"
+        ],
+        always_running_tracks: ["overall_bgm", "forest_bgm"],
+        forest_rooms: [rm_floor2, rm_floor4, rm_floor9, rm_floor9_5],
+        default_tracks: ["overall_bgm"],
+        forest_tracks: ["forest_bgm"],
+        main_menu_tracks: ["arrival_bgm", "haunting_bgm"],
+        intro_cutscene_tracks: ["arrival_bgm", "haunting2_bgm"],
+        ending_cutscene_tracks: ["twilight_bgm", "haunting_bgm"],
+        game_over_cutscene_tracks: ["overall_bgm"]
+    };
+    return global.bgm_mix_cfg;
+}
+
+function BGM_MixEnsureRuntime() {
+    if (!variable_global_exists("bgm_mix_handles") || !is_struct(global.bgm_mix_handles)) global.bgm_mix_handles = {};
+    if (!variable_global_exists("bgm_mix_active") || !is_struct(global.bgm_mix_active)) global.bgm_mix_active = {};
+}
+
+function BGM_MixFadeMsFromFrames(_frames) {
+    var game_fps = max(1, game_get_speed(gamespeed_fps));
+    var f = max(0, round(real(_frames)));
+    return max(0, round((f / game_fps) * 1000));
+}
+
+function BGM_MixFadeInMs() {
+    return BGM_MixFadeMsFromFrames(SKILLBOOK_MANA_AMBIENCE_FADE_IN_FRAMES);
+}
+
+function BGM_MixFadeOutMs() {
+    return BGM_MixFadeMsFromFrames(SKILLBOOK_MANA_AMBIENCE_FADE_OUT_FRAMES);
+}
+
+function BGM_ArrayContains(_arr, _value) {
+    if (!is_array(_arr)) return false;
+    for (var i = 0; i < array_length(_arr); i++) {
+        if (_arr[i] == _value) return true;
+    }
+    return false;
+}
+
+function BGM_GetCutsceneIdForMix() {
+    if (room != rm_cutscene) return "";
+    var gs = GameState_Get();
+    var cid = "";
+
+    if (instance_exists(obj_start_controller)) {
+        var sc = instance_find(obj_start_controller, 0);
+        if (instance_exists(sc) && variable_instance_exists(sc, "cutscene_id")) {
+            cid = string(sc.cutscene_id);
+        }
+    }
+
+    if (cid == "" && is_struct(gs) && variable_struct_exists(gs, "pending_cutscene_id")) {
+        cid = string(gs.pending_cutscene_id);
+    }
+
+    return string_lower(cid);
+}
+
+function BGM_GetMixTracksForRoom(_room_id) {
+    var cfg = BGM_MixConfigEnsure();
+
+    if (_room_id == rm_start) return cfg.main_menu_tracks;
+
+    if (_room_id == rm_cutscene) {
+        var cutscene_id = BGM_GetCutsceneIdForMix();
+        switch (cutscene_id) {
+            case "intro": return cfg.intro_cutscene_tracks;
+            case "ending": return cfg.ending_cutscene_tracks;
+            case "game_over": return cfg.game_over_cutscene_tracks;
+        }
+        return cfg.intro_cutscene_tracks;
+    }
+
+    if (BGM_ArrayContains(cfg.forest_rooms, _room_id)) return cfg.forest_tracks;
+    return cfg.default_tracks;
+}
+
+function BGM_MixEnsureTrackHandle(_key) {
+    BGM_MixEnsureRuntime();
+    if (!is_string(_key) || _key == "") return -1;
+
+    var handle = -1;
+    if (variable_struct_exists(global.bgm_mix_handles, _key)) {
+        handle = variable_struct_get(global.bgm_mix_handles, _key);
+    }
+
+    if (handle != -1 && audio_is_playing(handle)) return handle;
+
+    var snd = BGM_GetSound(_key);
+    if (!SFX_IsValidSoundAsset(snd)) return -1;
+
+    handle = audio_play_sound(snd, 10, true);
+    if (handle == -1) return -1;
+
+    variable_struct_set(global.bgm_mix_handles, _key, handle);
+    audio_sound_gain(handle, 0, 0);
+    return handle;
+}
+
+function BGM_MixApplyForRoom(_room_id, _fade_in_ms = -1, _fade_out_ms = -1) {
+    SFX_EnsureManager();
+    SFX_ClampVolumes();
+    var cfg = BGM_MixConfigEnsure();
+    BGM_MixEnsureRuntime();
+
+    var tracks = BGM_GetMixTracksForRoom(_room_id);
+    var in_ms = (_fade_in_ms >= 0) ? _fade_in_ms : BGM_MixFadeInMs();
+    var out_ms = (_fade_out_ms >= 0) ? _fade_out_ms : BGM_MixFadeOutMs();
+
+    for (var i = 0; i < array_length(cfg.tracks); i++) {
+        var key = cfg.tracks[i];
+        var active = BGM_ArrayContains(tracks, key);
+        var always_run = variable_struct_exists(cfg, "always_running_tracks") && BGM_ArrayContains(cfg.always_running_tracks, key);
+        var was_initialized = variable_struct_exists(global.bgm_mix_handles, key);
+        if (!active && !was_initialized && !always_run) continue;
+
+        var handle = BGM_MixEnsureTrackHandle(key);
+        if (handle == -1 || !audio_is_playing(handle)) continue;
+
+        variable_struct_set(global.bgm_mix_active, key, active);
+
+        var trim = BGM_GetGainByKey(key);
+        var target_gain = active ? (global.vol_master * global.vol_music * trim) : 0;
+        audio_sound_gain(handle, target_gain, active ? in_ms : out_ms);
+    }
+
+    // Keep compatibility fields coherent with the first active layer.
+    var primary = (is_array(tracks) && array_length(tracks) > 0) ? string(tracks[0]) : "";
+    if (primary != "") {
+        var primary_handle = variable_struct_exists(global.bgm_mix_handles, primary) ? variable_struct_get(global.bgm_mix_handles, primary) : -1;
+        global.bgm_current_key = primary;
+        global.bgm_current_handle = primary_handle;
+        global.bgm_current_sound = BGM_GetSound(primary);
+    } else {
+        global.bgm_current_key = "";
+        global.bgm_current_handle = -1;
+        global.bgm_current_sound = noone;
+    }
+}
+
 function BGM_ApplyGain(_fade_ms = 0) {
     SFX_ClampVolumes();
-    if (!variable_global_exists("bgm_current_handle")) return;
-    var h = global.bgm_current_handle;
-    if (h == -1 || !audio_is_playing(h)) return;
-    var trim = BGM_GetGainByKey(global.bgm_current_key);
-    audio_sound_gain(h, global.vol_master * global.vol_music * trim, max(0, _fade_ms));
+    BGM_MixEnsureRuntime();
+    if (!variable_global_exists("bgm_mix_handles") || !is_struct(global.bgm_mix_handles)) return;
+
+    var cfg = BGM_MixConfigEnsure();
+    for (var i = 0; i < array_length(cfg.tracks); i++) {
+        var key = cfg.tracks[i];
+        if (!variable_struct_exists(global.bgm_mix_handles, key)) continue;
+        var h = variable_struct_get(global.bgm_mix_handles, key);
+        if (h == -1 || !audio_is_playing(h)) continue;
+        var trim = BGM_GetGainByKey(key);
+        var active = variable_struct_exists(global.bgm_mix_active, key) && variable_struct_get(global.bgm_mix_active, key);
+        var target = active ? (global.vol_master * global.vol_music * trim) : 0;
+        audio_sound_gain(h, target, max(0, _fade_ms));
+    }
 }
 
 function BGM_Play(_key, _loop = true, _force_restart = false) {
@@ -767,7 +941,9 @@ function SFX_PlayMissOrBlocked(_attacker_is_monster, _defender_class_id) {
 }
 
 function BGM_GetTrackForRoom(_room_id) {
-    return "overall_bgm";
+    var tracks = BGM_GetMixTracksForRoom(_room_id);
+    if (is_array(tracks) && array_length(tracks) > 0) return string(tracks[0]);
+    return "";
 }
 
 function BGM_GetTrackNameForRoom(_room_id) {
@@ -775,11 +951,5 @@ function BGM_GetTrackNameForRoom(_room_id) {
 }
 
 function BGM_ApplyForRoom(_room_id) {
-    SFX_EnsureManager();
-    var track_key = BGM_GetTrackForRoom(_room_id);
-    if (track_key == "") {
-        BGM_Stop(250);
-        return;
-    }
-    BGM_Play(track_key, true, false);
+    BGM_MixApplyForRoom(_room_id);
 }

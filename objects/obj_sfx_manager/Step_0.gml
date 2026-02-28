@@ -81,24 +81,13 @@ if (hide_cursor != global.mouse_cursor_hidden) {
     global.mouse_cursor_hidden = hide_cursor;
 }
 
-var expected_key = BGM_GetTrackForRoom(room);
 if (group_loaded) {
-    if (!is_string(expected_key) || expected_key == "") {
-        if (global.bgm_current_handle != -1 && audio_is_playing(global.bgm_current_handle)) {
-            BGM_Stop(250);
-        }
-    } else {
-        var should_restart = false;
-        if (!variable_global_exists("bgm_current_key")) should_restart = true;
-        else if (global.bgm_current_key != expected_key) should_restart = true;
-        if (!variable_global_exists("bgm_current_handle")) should_restart = true;
-        else if (global.bgm_current_handle == -1 || !audio_is_playing(global.bgm_current_handle)) should_restart = true;
-
-        if (should_restart) {
-            BGM_Play(expected_key, true, true);
-        } else {
-            BGM_ApplyGain(0);
-        }
+    var need_bgm_bootstrap = true;
+    if (variable_global_exists("bgm_mix_handles") && is_struct(global.bgm_mix_handles)) {
+        need_bgm_bootstrap = (array_length(variable_struct_get_names(global.bgm_mix_handles)) <= 0);
+    }
+    if (need_bgm_bootstrap) {
+        BGM_ApplyForRoom(room);
     }
 }
 
