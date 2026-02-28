@@ -121,10 +121,15 @@ cutscene_definitions.game_over = [
 
 var gs = GameState_Get();
 load_available = Save_HasAnySlot();
+title_bg_sprite = noone;
+title_bg_layer_id = -1;
 
 if (room == rm_start) {
     gs.in_main_menu = true;
     state = "main";
+    title_bg_sprite = main_menu;
+    title_bg_layer_id = layer_get_id("Background");
+    if (title_bg_layer_id != -1) layer_set_visible(title_bg_layer_id, false);
 } else if (room == rm_cutscene) {
     state = "cutscene";
 } else {
