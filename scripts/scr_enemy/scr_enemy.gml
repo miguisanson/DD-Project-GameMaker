@@ -207,6 +207,10 @@ function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
     if (variable_instance_exists(_player_inst, "move_timer")) _player_inst.move_timer = 0;
     if (variable_instance_exists(_player_inst, "move_dir")) _player_inst.move_dir = -1;
 
+    // Encounter interruptions can happen while a modal is open (inventory/pause/save).
+    // Force-close all UI modals and let the shared modal root fade the dim out cleanly.
+    UI_InterruptCloseAll(true);
+
     gs.auto_resolve_pending = {
         enemy_inst: _enemy_inst,
         player_inst: _player_inst,

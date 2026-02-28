@@ -1,6 +1,6 @@
 {
   "$GMSound":"v2",
-  "%Name":"snake_spaawn_and_attack",
+  "%Name":"Monster_chatter_2",
   "audioGroupId":{
     "name":"audiogroup_default",
     "path":"audiogroups/audiogroup_default",
@@ -10,17 +10,17 @@
   "compression":0,
   "compressionQuality":4,
   "conversionMode":0,
-  "duration":2.471043,
+  "duration":2.9209976,
   "exportDir":"",
-  "name":"snake_spaawn_and_attack",
+  "name":"Monster_chatter_2",
   "parent":{
-    "name":"Snake",
-    "path":"folders/Sounds/Entities/Monsters/Snake.yy",
+    "name":"Stranger",
+    "path":"folders/Sounds/Entities/Monsters/Stranger.yy",
   },
   "preload":false,
   "resourceType":"GMSound",
   "resourceVersion":"2.0",
   "sampleRate":44100,
-  "soundFile":"snake_spaawn_and_attack.ogg",
+  "soundFile":"Monster_chatter_2.ogg",
   "volume":1.0,
 }

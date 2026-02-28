@@ -57,6 +57,12 @@ think_delay = irandom(think_rate);
 image_speed = 0.15;
 
 // --------------------
+// ENCOUNTER DEFER/SETTLE
+// --------------------
+encounter_pending = false;
+encounter_player = noone;
+
+// --------------------
 // FINALIZE LEASH
 // --------------------
 leash_radius = scan_radius * leash_mult;

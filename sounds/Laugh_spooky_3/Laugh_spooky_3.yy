@@ -1,6 +1,6 @@
 {
   "$GMSound":"v2",
-  "%Name":"stranger_attack",
+  "%Name":"Laugh_spooky_3",
   "audioGroupId":{
     "name":"audiogroup_default",
     "path":"audiogroups/audiogroup_default",
@@ -10,9 +10,9 @@
   "compression":0,
   "compressionQuality":4,
   "conversionMode":0,
-  "duration":0.6733787,
+  "duration":3.2935827,
   "exportDir":"",
-  "name":"stranger_attack",
+  "name":"Laugh_spooky_3",
   "parent":{
     "name":"Stranger",
     "path":"folders/Sounds/Entities/Monsters/Stranger.yy",
@@ -21,6 +21,6 @@
   "resourceType":"GMSound",
   "resourceVersion":"2.0",
   "sampleRate":44100,
-  "soundFile":"stranger_attack.ogg",
+  "soundFile":"Laugh_spooky_3.ogg",
   "volume":1.0,
 }

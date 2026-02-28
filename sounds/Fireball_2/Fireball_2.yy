@@ -1,6 +1,6 @@
 {
   "$GMSound":"v2",
-  "%Name":"snake_spaawn_and_attack",
+  "%Name":"Fireball_2",
   "audioGroupId":{
     "name":"audiogroup_default",
     "path":"audiogroups/audiogroup_default",
@@ -10,17 +10,17 @@
   "compression":0,
   "compressionQuality":4,
   "conversionMode":0,
-  "duration":2.471043,
+  "duration":2.3313606,
   "exportDir":"",
-  "name":"snake_spaawn_and_attack",
+  "name":"Fireball_2",
   "parent":{
-    "name":"Snake",
-    "path":"folders/Sounds/Entities/Monsters/Snake.yy",
+    "name":"Mad Whisp",
+    "path":"folders/Sounds/Entities/Monsters/Mad Whisp.yy",
   },
   "preload":false,
   "resourceType":"GMSound",
   "resourceVersion":"2.0",
   "sampleRate":44100,
-  "soundFile":"snake_spaawn_and_attack.ogg",
+  "soundFile":"Fireball_2.ogg",
   "volume":1.0,
 }

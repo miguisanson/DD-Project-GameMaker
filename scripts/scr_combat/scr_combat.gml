@@ -362,17 +362,49 @@ function Battle_AttackTimingJudge(_delta) {
     return { key: "MISS", label: "MISS", mult: 0.00, hit: false };
 }
 
+function Battle_PlayerStunSkip(_bc) {
+    var p = _bc.p;
+    var e = _bc.e;
+    p = Status_Tick(p);
+    if (Battle_CheckEnd(_bc, p, e)) return true;
+    _bc.player_bonus_actions_remaining = 0;
+    _bc.turn = TURN_ENEMY;
+    _bc.p = p;
+    _bc.e = e;
+    Battle_Message(_bc, "You are stunned!", BSTATE_ENEMY_ACT);
+    return false;
+}
+
+function Battle_PlayerFinalizeTurn(_bc, _p, _e, _granted_extra_actions = 0) {
+    var p = Status_Tick(_p);
+    var e = _e;
+    if (Battle_CheckEnd(_bc, p, e)) return true;
+
+    var grant = max(0, round(real(_granted_extra_actions)));
+    if (!variable_instance_exists(_bc, "player_bonus_actions_remaining")) _bc.player_bonus_actions_remaining = 0;
+
+    if (grant > 0) {
+        // The stun action itself is free, then grant extra player turns.
+        _bc.player_bonus_actions_remaining = max(_bc.player_bonus_actions_remaining, grant);
+        _bc.turn = TURN_PLAYER;
+    } else if (_bc.player_bonus_actions_remaining > 0) {
+        _bc.player_bonus_actions_remaining = max(0, _bc.player_bonus_actions_remaining - 1);
+        _bc.turn = (_bc.player_bonus_actions_remaining > 0) ? TURN_PLAYER : TURN_ENEMY;
+    } else {
+        _bc.turn = TURN_ENEMY;
+    }
+
+    _bc.p = p;
+    _bc.e = e;
+    return false;
+}
+
 function Battle_AttackTimingBegin(_bc) {
     var p = _bc.p;
     var e = _bc.e;
 
     if (!Status_CanAct(p)) {
-        p = Status_Tick(p);
-        if (Battle_CheckEnd(_bc, p, e)) return;
-        Battle_Message(_bc, "You are stunned!", BSTATE_ENEMY_ACT);
-        _bc.turn = TURN_ENEMY;
-        _bc.p = p;
-        _bc.e = e;
+        if (Battle_PlayerStunSkip(_bc)) return;
         _bc.attack_timing_active = false;
         _bc.attack_timing_started = false;
         return;
@@ -461,11 +493,7 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
         Battle_Message(_bc, "You hit for " + string(_bc.last_dmg) + " damage!", BSTATE_ENEMY_ACT);
     }
 
-    p = Status_Tick(p);
-    if (Battle_CheckEnd(_bc, p, e)) return;
-    _bc.turn = TURN_ENEMY;
-    _bc.p = p;
-    _bc.e = e;
+    if (Battle_PlayerFinalizeTurn(_bc, p, e, 0)) return;
 }
 
 function Battle_PlayerAttackTimingStep(_bc, _confirm_pressed) {
@@ -505,12 +533,7 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     var e = _bc.e;
 
     if (!Status_CanAct(p)) {
-        p = Status_Tick(p);
-        if (Battle_CheckEnd(_bc, p, e)) return;
-        Battle_Message(_bc, "You are stunned!", BSTATE_ENEMY_ACT);
-        _bc.turn = TURN_ENEMY;
-        _bc.p = p;
-        _bc.e = e;
+        if (Battle_PlayerStunSkip(_bc)) return;
         return;
     }
 
@@ -546,6 +569,13 @@ function Battle_PlayerSkill(_bc, _skill_id) {
 
     if (Battle_CheckEnd(_bc, p, e)) return;
 
+    var grant_extra_turns = 0;
+    var skill_targets_opponent = (skill.target != TGT_SELF);
+    if (res.ok && res.hit && skill_targets_opponent && Status_SkillAppliesStatus(skill, STATUS_STUN)) {
+        // Player stun skills: action is free and grants two additional player turns.
+        grant_extra_turns = 2;
+    }
+
     if (res.msg != "") {
         Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT, fx);
     } else if (!res.hit) {
@@ -562,11 +592,7 @@ function Battle_PlayerSkill(_bc, _skill_id) {
         Battle_Message(_bc, "Skill used.", BSTATE_ENEMY_ACT, fx);
     }
 
-    p = Status_Tick(p);
-    if (Battle_CheckEnd(_bc, p, e)) return;
-    _bc.turn = TURN_ENEMY;
-    _bc.p = p;
-    _bc.e = e;
+    if (Battle_PlayerFinalizeTurn(_bc, p, e, grant_extra_turns)) return;
 }
 
 function Battle_PlayerItem(_bc, _item_id) {
@@ -574,12 +600,7 @@ function Battle_PlayerItem(_bc, _item_id) {
     var e = _bc.e;
 
     if (!Status_CanAct(p)) {
-        p = Status_Tick(p);
-        if (Battle_CheckEnd(_bc, p, e)) return;
-        Battle_Message(_bc, "You are stunned!", BSTATE_ENEMY_ACT);
-        _bc.turn = TURN_ENEMY;
-        _bc.p = p;
-        _bc.e = e;
+        if (Battle_PlayerStunSkip(_bc)) return;
         return;
     }
 
@@ -604,11 +625,7 @@ function Battle_PlayerItem(_bc, _item_id) {
     if (Battle_CheckEnd(_bc, p, e)) return;
 
     Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT, fx);
-    p = Status_Tick(p);
-    if (Battle_CheckEnd(_bc, p, e)) return;
-    _bc.turn = TURN_ENEMY;
-    _bc.p = p;
-    _bc.e = e;
+    if (Battle_PlayerFinalizeTurn(_bc, p, e, 0)) return;
 }
 
 function Battle_GetSkillList(_bc) {
@@ -761,8 +778,8 @@ function Battle_EnemyAct(_bc) {
             if (!exists_used) array_push(_bc.enemy_turn_used_skills, skill_id);
             _bc.skill_banner_active = true;
             _bc.skill_banner_name = sk.name;
-            SFX_PlayEnemySpecial(e.id);
-            SFX_PlaySkill(skill_id);
+            var skill_sfx_h = SFX_PlaySkill(skill_id);
+            if (skill_sfx_h == -1) SFX_PlayEnemySpecial(e.id);
         }
         var fx2 = noone;
         // Enemy actions intentionally skip skill VFX; only player skills spawn battle FX.

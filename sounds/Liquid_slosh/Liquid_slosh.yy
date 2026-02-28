@@ -1,6 +1,6 @@
 {
   "$GMSound":"v2",
-  "%Name":"snake_spaawn_and_attack",
+  "%Name":"Liquid_slosh",
   "audioGroupId":{
     "name":"audiogroup_default",
     "path":"audiogroups/audiogroup_default",
@@ -10,17 +10,17 @@
   "compression":0,
   "compressionQuality":4,
   "conversionMode":0,
-  "duration":2.471043,
+  "duration":1.4181405,
   "exportDir":"",
-  "name":"snake_spaawn_and_attack",
+  "name":"Liquid_slosh",
   "parent":{
-    "name":"Snake",
-    "path":"folders/Sounds/Entities/Monsters/Snake.yy",
+    "name":"Slime",
+    "path":"folders/Sounds/Entities/Monsters/Slime.yy",
   },
   "preload":false,
   "resourceType":"GMSound",
   "resourceVersion":"2.0",
   "sampleRate":44100,
-  "soundFile":"snake_spaawn_and_attack.ogg",
+  "soundFile":"Liquid_slosh.ogg",
   "volume":1.0,
 }

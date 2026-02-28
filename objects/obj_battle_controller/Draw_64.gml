@@ -170,27 +170,6 @@ if (log_count > 0) {
     }
 }
 
-// Skill banner (full-width, below HP/MP + log)
-if (skill_banner_active && skill_banner_name != "") {
-    var bar_scale = UI_BAR_SCALE;
-    var hp_bar_h = sprite_get_height(hp_bar) * bar_scale;
-    var mp_bar_h = sprite_get_height(mp_bar) * bar_scale;
-    var hud_margin = 8;
-    var hud_top = hud_margin + gui_off_y;
-    var hud_bottom = hud_top + hp_bar_h + mp_bar_h + 4;
-    var banner_y = max(hud_bottom + 6, log_bottom + 6);
-    var banner_h = string_height("A") + 8;
-
-    draw_set_alpha(0.85);
-    draw_set_color(c_black);
-    draw_rectangle(0, banner_y, w, banner_y + banner_h, false);
-    draw_set_alpha(1);
-    draw_set_color(c_white);
-    var tx = (w - string_width(skill_banner_name)) * 0.5;
-    var ty = banner_y + (banner_h - string_height("A")) * 0.5;
-    draw_text(tx, ty, skill_banner_name);
-}
-
 // Enemy status icons below sprite (battle only)
 if (instance_exists(enemy_inst)) {
     var espr = enemy_inst.sprite_index;
@@ -272,6 +251,42 @@ with (obj_fx) {
         var fx_sy = image_yscale * sy;
         draw_sprite_ext(sprite_index, image_index, fx_x, fx_y, fx_sx, fx_sy, image_angle, image_blend, image_alpha * enemy_fade_alpha);
     }
+}
+
+// Skill banner (drawn after enemy/FX so it is always in front).
+if (skill_banner_active && skill_banner_name != "") {
+    var bar_scale = UI_BAR_SCALE;
+    var hp_bar_h = sprite_get_height(hp_bar) * bar_scale;
+    var mp_bar_h = sprite_get_height(mp_bar) * bar_scale;
+    var hud_margin = 8;
+    var hud_top = hud_margin + gui_off_y;
+    var hud_bottom = hud_top + hp_bar_h + mp_bar_h + 4;
+    var banner_h = string_height("A") + 8;
+
+    // Allow banner to sit under the battle log if needed; only keep clear of HP/MP HUD.
+    var min_banner_y = hud_bottom + 6;
+    var max_banner_y = h - box_h - margin - banner_h - 4;
+    var banner_y = min_banner_y;
+
+    if (instance_exists(enemy_inst)) {
+        var bspr = enemy_inst.sprite_index;
+        if (bspr != noone && bspr != -1) {
+            var boff = SpriteShake_Offset(enemy_inst);
+            var bbox_top_px = sprite_get_bbox_top(bspr);
+            var enemy_top_screen = (enemy_inst.y + boff.y - sprite_get_yoffset(bspr) + bbox_top_px - vy) * sy;
+            banner_y = enemy_top_screen - banner_h - 4;
+        }
+    }
+    banner_y = clamp(banner_y, min_banner_y, max_banner_y);
+
+    draw_set_alpha(0.85);
+    draw_set_color(c_black);
+    draw_rectangle(0, banner_y, w, banner_y + banner_h, false);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+    var tx = (w - string_width(skill_banner_name)) * 0.5;
+    var ty = banner_y + (banner_h - string_height("A")) * 0.5;
+    draw_text(tx, ty, skill_banner_name);
 }
 
 

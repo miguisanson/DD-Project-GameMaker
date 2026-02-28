@@ -63,6 +63,9 @@
 #macro TGT_ALL_ENEMIES 2
 #macro TGT_ALL_ALLIES  3
 #macro TGT_ALL         4
+// Relative target aliases for readability (especially enemy-authored skills).
+#macro TGT_OPPONENT       TGT_ENEMY
+#macro TGT_ALL_OPPONENTS  TGT_ALL_ENEMIES
 
 #macro STATUS_POISON     0
 #macro STATUS_BLEED      1
@@ -108,6 +111,7 @@
 #macro SKILL_FINAL_FURY   27
 
 #macro BATTLE_COOLDOWN_FRAMES 60
+#macro MONSTER_SFX_GAIN 0.80
 
 #macro ENEMY_IDLE   0
 #macro ENEMY_ALERT  1

@@ -1,6 +1,6 @@
 {
   "$GMSound":"v2",
-  "%Name":"snake_spaawn_and_attack",
+  "%Name":"Ghost_scream_3",
   "audioGroupId":{
     "name":"audiogroup_default",
     "path":"audiogroups/audiogroup_default",
@@ -10,17 +10,17 @@
   "compression":0,
   "compressionQuality":4,
   "conversionMode":0,
-  "duration":2.471043,
+  "duration":4.0959864,
   "exportDir":"",
-  "name":"snake_spaawn_and_attack",
+  "name":"Ghost_scream_3",
   "parent":{
-    "name":"Snake",
-    "path":"folders/Sounds/Entities/Monsters/Snake.yy",
+    "name":"Final Boss",
+    "path":"folders/Sounds/Entities/Monsters/Final Boss.yy",
   },
   "preload":false,
   "resourceType":"GMSound",
   "resourceVersion":"2.0",
   "sampleRate":44100,
-  "soundFile":"snake_spaawn_and_attack.ogg",
+  "soundFile":"Ghost_scream_3.ogg",
   "volume":1.0,
 }

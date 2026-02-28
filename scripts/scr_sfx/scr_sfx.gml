@@ -99,6 +99,73 @@ function BGM_RegisterResolved(_key, _candidates) {
     BGM_Register(_key, SFX_ResolveAsset(_candidates));
 }
 
+function SFX_EnsureVariantMaps() {
+    if (!variable_global_exists("sfx_variant_db") || !ds_exists(global.sfx_variant_db, ds_type_map)) {
+        global.sfx_variant_db = ds_map_create();
+    }
+    if (!variable_global_exists("sfx_variant_last") || !ds_exists(global.sfx_variant_last, ds_type_map)) {
+        global.sfx_variant_last = ds_map_create();
+    }
+}
+
+function SFX_RegisterVariantNoRepeat(_key, _candidates) {
+    SFX_EnsureVariantMaps();
+    var resolved = [];
+
+    if (is_array(_candidates)) {
+        for (var i = 0; i < array_length(_candidates); i++) {
+            var snd = SFX_ResolveAsset(_candidates[i]);
+            if (SFX_IsValidSoundAsset(snd)) array_push(resolved, snd);
+        }
+    } else {
+        var snd2 = SFX_ResolveAsset(_candidates);
+        if (SFX_IsValidSoundAsset(snd2)) array_push(resolved, snd2);
+    }
+
+    if (array_length(resolved) <= 0) {
+        if (ds_map_exists(global.sfx_variant_db, _key)) ds_map_delete(global.sfx_variant_db, _key);
+        if (ds_map_exists(global.sfx_variant_last, _key)) ds_map_delete(global.sfx_variant_last, _key);
+        SFX_Register(_key, noone);
+        return;
+    }
+
+    if (ds_map_exists(global.sfx_variant_db, _key)) ds_map_replace(global.sfx_variant_db, _key, resolved);
+    else ds_map_add(global.sfx_variant_db, _key, resolved);
+    if (ds_map_exists(global.sfx_variant_last, _key)) ds_map_replace(global.sfx_variant_last, _key, -1);
+    else ds_map_add(global.sfx_variant_last, _key, -1);
+
+    // Keep base key valid for legacy lookups/debug; playback will use variants.
+    SFX_Register(_key, resolved[0]);
+}
+
+function SFX_ResolvePlayAsset(_key) {
+    if (variable_global_exists("sfx_variant_db") && ds_exists(global.sfx_variant_db, ds_type_map) && ds_map_exists(global.sfx_variant_db, _key)) {
+        var list = global.sfx_variant_db[? _key];
+        if (is_array(list) && array_length(list) > 0) {
+            var count = array_length(list);
+            var pick = 0;
+            if (count > 1) {
+                var last = -1;
+                if (variable_global_exists("sfx_variant_last") && ds_exists(global.sfx_variant_last, ds_type_map) && ds_map_exists(global.sfx_variant_last, _key)) {
+                    last = round(real(global.sfx_variant_last[? _key]));
+                }
+                pick = irandom(count - 1);
+                if (pick == last) pick = (pick + 1 + irandom(max(0, count - 2))) mod count;
+                if (variable_global_exists("sfx_variant_last") && ds_exists(global.sfx_variant_last, ds_type_map)) {
+                    if (ds_map_exists(global.sfx_variant_last, _key)) ds_map_replace(global.sfx_variant_last, _key, pick);
+                    else ds_map_add(global.sfx_variant_last, _key, pick);
+                }
+            }
+            var snd = list[pick];
+            if (SFX_IsValidSoundAsset(snd)) return snd;
+        }
+    }
+
+    if (!variable_global_exists("sfx_db") || !ds_exists(global.sfx_db, ds_type_map)) return noone;
+    if (!ds_map_exists(global.sfx_db, _key)) return noone;
+    return global.sfx_db[? _key];
+}
+
 function SFX_EnsureManager() {
     if (instance_exists(obj_sfx_manager)) return;
     if (!object_exists(obj_sfx_manager)) return;
@@ -170,6 +237,9 @@ function SFX_ApplyActiveGains(_fade_ms = 0) {
 function SFX_RegisterDefaults() {
     if (!variable_global_exists("sfx_db") || !ds_exists(global.sfx_db, ds_type_map)) return;
     ds_map_clear(global.sfx_db);
+    SFX_EnsureVariantMaps();
+    ds_map_clear(global.sfx_variant_db);
+    ds_map_clear(global.sfx_variant_last);
 
     // UI_Soundpack
     SFX_RegisterResolved("ui_move", [Modern2, "Modern2", "ui_move"]);
@@ -231,21 +301,21 @@ function SFX_RegisterDefaults() {
     SFX_RegisterResolved("enemy_spawn_dire_wolf", ["dire_wolf_spawn"]);
     SFX_RegisterResolved("enemy_spawn_snake", ["snake_spawn", "snake_spaawn_and_attack"]);
     SFX_RegisterResolved("enemy_spawn_killer_plant", ["killer_plant_spawn"]);
-    SFX_RegisterResolved("enemy_spawn_stranger", ["stranger_spawn"]);
+    SFX_RegisterResolved("enemy_spawn_stranger", ["Laugh_spooky_3", "stranger_spawn"]);
     SFX_RegisterResolved("enemy_spawn_mini_boss", ["mini_boss_spawn"]);
     SFX_RegisterResolved("enemy_spawn_final_boss", ["final_boss_spawn"]);
 
     // Monsters - Special
     SFX_RegisterResolved("enemy_special_slime", ["slime_attack", "Slime_Attack__Nr__1__Minecraft_Sound____Sound_Effect_for_editing"]);
-    SFX_RegisterResolved("enemy_special_spider", ["spider_attack", "spider_both_attack_and_spawn"]);
+    SFX_RegisterResolved("enemy_special_spider", ["Hiss", "hiss"]);
     SFX_RegisterResolved("enemy_special_mad_whisp", ["mad_whisp_attack"]);
     SFX_RegisterResolved("enemy_special_ghost_sword", ["ghost_sword_attack"]);
     SFX_RegisterResolved("enemy_special_dire_wolf", ["dire_wolf_attack"]);
     SFX_RegisterResolved("enemy_special_snake", ["snake_attack", "snake_spaawn_and_attack"]);
     SFX_RegisterResolved("enemy_special_killer_plant", ["killer_plant_attack"]);
-    SFX_RegisterResolved("enemy_special_stranger", ["stranger_attack"]);
+    SFX_RegisterVariantNoRepeat("enemy_special_stranger", ["Monster_chatter", "Monster_chatter_2", "Monster_chatter_3", "Monster_chatter_4"]);
     SFX_RegisterResolved("enemy_special_mini_boss", ["mini_boss_attack"]);
-    SFX_RegisterResolved("enemy_special_final_boss", ["final_boss_attack"]);
+    SFX_RegisterVariantNoRepeat("enemy_special_final_boss", ["Punch_1", "Punch_2", "Punch_3", "Punch_crunchy"]);
 
     // Legacy/Fallback (safe no-op keys)
     SFX_Register("enemy_spawn_unknown", noone);
@@ -268,6 +338,43 @@ function SFX_RegisterDefaults() {
     SFX_Register("image_close", noone);
 
     SFX_RegisterGainDefaults();
+    SFX_RegisterSkillAudioFromDB();
+}
+
+function SFX_RegisterSkillAudioFromDB() {
+    if (!variable_global_exists("skill_db") || !ds_exists(global.skill_db, ds_type_map)) {
+        SkillDB_Init();
+    }
+    if (!variable_global_exists("skill_db") || !ds_exists(global.skill_db, ds_type_map)) return;
+
+    var ids = ds_map_keys_to_array(global.skill_db);
+    for (var i = 0; i < array_length(ids); i++) {
+        var sid = ids[i];
+        var sk = global.skill_db[? sid];
+        if (!is_struct(sk)) continue;
+        if (!variable_struct_exists(sk, "sfx_key")) continue;
+
+        var key = string(sk.sfx_key);
+        if (key == "") continue;
+
+        var candidates = [];
+        if (variable_struct_exists(sk, "sfx_candidates") && is_array(sk.sfx_candidates)) {
+            candidates = sk.sfx_candidates;
+        } else {
+            candidates = [key];
+        }
+
+        SFX_RegisterResolved(key, candidates);
+
+        var gain = 1;
+        if (variable_struct_exists(sk, "sfx_gain")) {
+            gain = real(sk.sfx_gain);
+        } else if (string_copy(key, 1, 11) == "enemy_skill") {
+            // Enemy skill audio defaults to the monster gain profile.
+            gain = MONSTER_SFX_GAIN;
+        }
+        SFX_RegisterGain(key, clamp(gain, 0, 1));
+    }
 }
 
 function SFX_RegisterGainDefaults() {
@@ -327,32 +434,32 @@ function SFX_RegisterGainDefaults() {
     SFX_RegisterGain("skill_take_aim", 1.00);
 
     // Enemy spawn
-    SFX_RegisterGain("enemy_spawn_slime", 1.00);
-    SFX_RegisterGain("enemy_spawn_spider", 1.00);
-    SFX_RegisterGain("enemy_spawn_mad_whisp", 1.00);
-    SFX_RegisterGain("enemy_spawn_ghost_sword", 1.00);
-    SFX_RegisterGain("enemy_spawn_dire_wolf", 0.30);
-    SFX_RegisterGain("enemy_spawn_snake", 1.00);
-    SFX_RegisterGain("enemy_spawn_killer_plant", 1.00);
-    SFX_RegisterGain("enemy_spawn_stranger", 1.00);
-    SFX_RegisterGain("enemy_spawn_mini_boss", 1.00);
-    SFX_RegisterGain("enemy_spawn_final_boss", 1.00);
+    SFX_RegisterGain("enemy_spawn_slime", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_spawn_spider", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_spawn_mad_whisp", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_spawn_ghost_sword", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_spawn_dire_wolf", 0.30 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_spawn_snake", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_spawn_killer_plant", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_spawn_stranger", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_spawn_mini_boss", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_spawn_final_boss", 1.00 * MONSTER_SFX_GAIN);
 
     // Enemy special
-    SFX_RegisterGain("enemy_special_slime", 1.00);
-    SFX_RegisterGain("enemy_special_spider", 1.00);
-    SFX_RegisterGain("enemy_special_mad_whisp", 1.00);
-    SFX_RegisterGain("enemy_special_ghost_sword", 1.00);
-    SFX_RegisterGain("enemy_special_dire_wolf", 1.00);
-    SFX_RegisterGain("enemy_special_snake", 1.00);
-    SFX_RegisterGain("enemy_special_killer_plant", 1.00);
-    SFX_RegisterGain("enemy_special_stranger", 1.00);
-    SFX_RegisterGain("enemy_special_mini_boss", 1.00);
-    SFX_RegisterGain("enemy_special_final_boss", 1.00);
+    SFX_RegisterGain("enemy_special_slime", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_special_spider", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_special_mad_whisp", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_special_ghost_sword", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_special_dire_wolf", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_special_snake", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_special_killer_plant", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_special_stranger", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_special_mini_boss", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_special_final_boss", 1.00 * MONSTER_SFX_GAIN);
 
     // Legacy/Fallback
-    SFX_RegisterGain("enemy_spawn_unknown", 1.00);
-    SFX_RegisterGain("enemy_special_unknown", 1.00);
+    SFX_RegisterGain("enemy_spawn_unknown", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_special_unknown", 1.00 * MONSTER_SFX_GAIN);
     SFX_RegisterGain("pickup", 1.00);
     SFX_RegisterGain("push_rock", 1.00);
     SFX_RegisterGain("dog_pet", 1.00);
@@ -416,14 +523,16 @@ function SFX_Play(_key, _vol = 1, _pitch = 1) {
         global.sfx_last_handle = -1;
         return -1;
     }
-    if (!ds_map_exists(global.sfx_db, _key)) {
+    var has_key = ds_map_exists(global.sfx_db, _key);
+    var has_variants = (variable_global_exists("sfx_variant_db") && ds_exists(global.sfx_variant_db, ds_type_map) && ds_map_exists(global.sfx_variant_db, _key));
+    if (!has_key && !has_variants) {
         global.sfx_last_key = _key;
         global.sfx_last_handle = -1;
         return -1;
     }
 
     SFX_ClampVolumes();
-    var snd = global.sfx_db[? _key];
+    var snd = SFX_ResolvePlayAsset(_key);
     if (!SFX_IsValidSoundAsset(snd)) {
         global.sfx_last_key = _key;
         global.sfx_last_handle = -1;
@@ -462,6 +571,17 @@ function SFX_Stop(_key = "") {
         }
         return;
     }
+    if (variable_global_exists("sfx_variant_db") && ds_exists(global.sfx_variant_db, ds_type_map) && ds_map_exists(global.sfx_variant_db, _key)) {
+        var list = global.sfx_variant_db[? _key];
+        if (is_array(list)) {
+            for (var i = 0; i < array_length(list); i++) {
+                var sndv = list[i];
+                if (SFX_IsValidSoundAsset(sndv)) audio_stop_sound(sndv);
+            }
+            return;
+        }
+    }
+
     if (!variable_global_exists("sfx_db") || !ds_exists(global.sfx_db, ds_type_map)) return;
     if (!ds_map_exists(global.sfx_db, _key)) return;
     var snd = global.sfx_db[? _key];
@@ -924,6 +1044,12 @@ function SFX_PlayClassAttack(_class_id) {
 }
 
 function SFX_SkillKey(_skill_id) {
+    var sk = SkillDB_Get(_skill_id);
+    if (is_struct(sk) && variable_struct_exists(sk, "sfx_key")) {
+        var from_db = string(sk.sfx_key);
+        if (from_db != "") return from_db;
+    }
+
     switch (_skill_id) {
         case SKILL_WOUND: return "skill_bleed";
         case SKILL_HILT_BASH: return "skill_stun";

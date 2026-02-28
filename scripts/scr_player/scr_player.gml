@@ -829,6 +829,87 @@ function UI_ModalRootEnd(_hold_until_transition = false, _immediate = false) {
     gs.ui.modal_root = root;
 }
 
+function UI_InterruptCloseAll(_fade_dim = true) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+
+    // Immediately hide all modal/popups to avoid stale mode locks during transitions.
+    if (variable_struct_exists(gs.ui, "menu") && is_struct(gs.ui.menu)) {
+        var m = gs.ui.menu;
+        m.open = false;
+        m.closing = false;
+        m.close_frame = UI_OPENED_FRAME_NONE;
+        m.inv_popup_open = false;
+        m.inv_popup_closing = false;
+        m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
+        m.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
+        gs.ui.menu = m;
+    }
+
+    if (variable_struct_exists(gs.ui, "pause_menu") && is_struct(gs.ui.pause_menu)) {
+        var pm = gs.ui.pause_menu;
+        pm.open = false;
+        pm.closing = false;
+        pm.close_frame = UI_OPENED_FRAME_NONE;
+        pm.opened_frame = UI_OPENED_FRAME_NONE;
+        gs.ui.pause_menu = pm;
+    }
+
+    if (variable_struct_exists(gs.ui, "save_menu") && is_struct(gs.ui.save_menu)) {
+        var sm = gs.ui.save_menu;
+        sm.open = false;
+        sm.closing = false;
+        sm.close_frame = UI_OPENED_FRAME_NONE;
+        sm.confirm = false;
+        sm.confirm_closing = false;
+        sm.confirm_close_frame = UI_OPENED_FRAME_NONE;
+        sm.pending_action = "";
+        sm.pending_slot = 0;
+        gs.ui.save_menu = sm;
+    }
+
+    if (variable_struct_exists(gs.ui, "bed_menu") && is_struct(gs.ui.bed_menu)) {
+        var bm = gs.ui.bed_menu;
+        bm.open = false;
+        bm.closing = false;
+        bm.close_frame = UI_OPENED_FRAME_NONE;
+        bm.pending_action = "";
+        gs.ui.bed_menu = bm;
+    }
+
+    if (variable_struct_exists(gs.ui, "class_select") && is_struct(gs.ui.class_select)) {
+        var cs = gs.ui.class_select;
+        cs.open = false;
+        cs.closing = false;
+        cs.close_frame = UI_OPENED_FRAME_NONE;
+        cs.pending_apply_class = -1;
+        cs.open_block_frame = UI_OPENED_FRAME_NONE;
+        cs.opened_frame = UI_OPENED_FRAME_NONE;
+        gs.ui.class_select = cs;
+    }
+
+    if (variable_struct_exists(gs.ui, "settings_popup") && is_struct(gs.ui.settings_popup)) {
+        var sp = gs.ui.settings_popup;
+        sp.open = false;
+        sp.owner = "";
+        sp.closing = false;
+        sp.close_frame = UI_OPENED_FRAME_NONE;
+        sp.opened_frame = UI_OPENED_FRAME_NONE;
+        sp.dirty = false;
+        sp.lr_hold_dir = 0;
+        sp.lr_hold_frames = 0;
+        gs.ui.settings_popup = sp;
+    }
+
+    if (gs.ui.mode != UI_DIALOGUE) {
+        gs.ui.mode = UI_NONE;
+    }
+
+    // Keep dim behavior consistent: either fade out (default) or clear instantly.
+    if (_fade_dim) UI_ModalRootEnd(false, false);
+    else UI_ModalRootEnd(false, true);
+}
+
 function UI_GetModalVisualAlpha() {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) return -1;
@@ -1510,8 +1591,8 @@ function GameState_SetBattleEnemy(_persist_id, _enemy_id, _enemy_level = 0) {
     global.battle_enemy_level = gs.battle.enemy_level;
     global.battle_enemy_room = room;
 
-    if (Menu_IsOpen()) Menu_Close();
-    if (PauseMenu_IsOpen()) PauseMenu_Close();
+    // Entering battle should not leave any lingering modal/dim state behind.
+    UI_InterruptCloseAll(true);
 }
 
 function GameState_SetJustReturned(_flag) {

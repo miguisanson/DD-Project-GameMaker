@@ -42,6 +42,12 @@ if (battle_state == BSTATE_MENU) {
         exit;
     }
 
+    // If player is stunned, skip player turn immediately (no menu interaction).
+    if (!Status_CanAct(p)) {
+        Battle_PlayerStunSkip(self);
+        exit;
+    }
+
     if (k_down) menu_index = (menu_index + 1) mod menu_count;
     if (k_up)   menu_index = (menu_index + menu_count - 1) mod menu_count;
 

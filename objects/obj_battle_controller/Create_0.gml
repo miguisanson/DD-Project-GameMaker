@@ -68,6 +68,7 @@ skill_banner_active = false;
 skill_banner_name = "";
 enemy_actions_remaining = 0;
 enemy_turn_used_skills = [];
+player_bonus_actions_remaining = 0;
 
 menu_index = 0;
 battle_actions = [
