@@ -873,6 +873,8 @@ function GameState_Init() {
     if (!variable_struct_exists(gs.ui, "cutscene_text_only")) gs.ui.cutscene_text_only = false;
     var skillbook_ui_key = Dialogue_SkillbookFirstReadUIActiveKey();
     if (!variable_struct_exists(gs.ui, skillbook_ui_key)) variable_struct_set(gs.ui, skillbook_ui_key, false);
+    var dialogue_ambience_key = Dialogue_ActiveAmbienceUIKey();
+    if (!variable_struct_exists(gs.ui, dialogue_ambience_key)) variable_struct_set(gs.ui, dialogue_ambience_key, "");
 
     if (!variable_struct_exists(gs, "in_main_menu")) {
         gs.in_main_menu = false;

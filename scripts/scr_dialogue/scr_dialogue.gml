@@ -120,11 +120,23 @@ function Dialogue_EventConfigEnsure() {
 
     global.dialogue_event_cfg = {
         class_chest_ids: class_chest_ids,
+        class_chest_ambience_keys: [
+            "", // archer
+            "", // knight
+            "@mana_pool", // mage
+            ""  // nobody
+        ],
         skillbook_first_ids: skillbook_first_ids,
         skillbook_done_flag: "skillbook_first_read_done",
         skillbook_pending_flag: "skillbook_first_read_pending",
         skillbook_ui_active_key: "skillbook_mana_dialogue_active",
-        skillbook_ambience_sfx_key: SKILLBOOK_MANA_AMBIENCE_KEY
+        dialogue_ambience_key: "dialogue_active_ambience_key",
+        skillbook_ambience_sfx_key: SKILLBOOK_MANA_AMBIENCE_KEY,
+        skillbook_ambience_sfx_keys: [
+            SKILLBOOK_MANA_AMBIENCE_KEY_1,
+            SKILLBOOK_MANA_AMBIENCE_KEY_2,
+            SKILLBOOK_MANA_AMBIENCE_KEY_3
+        ]
     };
     return global.dialogue_event_cfg;
 }
@@ -167,6 +179,50 @@ function Dialogue_SkillbookAmbienceSfxKey() {
     return variable_struct_exists(cfg, "skillbook_ambience_sfx_key") ? string(cfg.skillbook_ambience_sfx_key) : SKILLBOOK_MANA_AMBIENCE_KEY;
 }
 
+function Dialogue_SkillbookAmbienceSfxKeys() {
+    var cfg = Dialogue_EventConfigEnsure();
+    if (variable_struct_exists(cfg, "skillbook_ambience_sfx_keys") && is_array(cfg.skillbook_ambience_sfx_keys) && array_length(cfg.skillbook_ambience_sfx_keys) > 0) {
+        return cfg.skillbook_ambience_sfx_keys;
+    }
+    return [Dialogue_SkillbookAmbienceSfxKey()];
+}
+
+function Dialogue_PickSkillbookAmbienceSfxKey() {
+    var keys = Dialogue_SkillbookAmbienceSfxKeys();
+    var valid = [];
+    for (var i = 0; i < array_length(keys); i++) {
+        var k = string(keys[i]);
+        if (k != "") array_push(valid, k);
+    }
+    if (array_length(valid) <= 0) return "";
+    return valid[irandom(array_length(valid) - 1)];
+}
+
+function Dialogue_ActiveAmbienceUIKey() {
+    var cfg = Dialogue_EventConfigEnsure();
+    return variable_struct_exists(cfg, "dialogue_ambience_key") ? string(cfg.dialogue_ambience_key) : "dialogue_active_ambience_key";
+}
+
+function Dialogue_SetActiveAmbienceSfxKey(_sfx_key = "") {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) gs.ui = {};
+    variable_struct_set(gs.ui, Dialogue_ActiveAmbienceUIKey(), string(_sfx_key));
+}
+
+function Dialogue_GetActiveAmbienceSfxKey() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) return "";
+    var key = Dialogue_ActiveAmbienceUIKey();
+    if (!variable_struct_exists(gs.ui, key)) return "";
+    return string(variable_struct_get(gs.ui, key));
+}
+
+function Dialogue_ClassChestAmbienceSfxKey(_class_id) {
+    var key = Dialogue_ClassEventId("class_chest_ambience_keys", _class_id);
+    if (key == "@mana_pool") return Dialogue_PickSkillbookAmbienceSfxKey();
+    return key;
+}
+
 function Dialogue_SetSkillbookFirstReadUIActive(_active) {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) gs.ui = {};
@@ -185,6 +241,7 @@ function Dialogue_TryStartClassChestReaction(_class_id) {
     var did = Dialogue_ClassChestId(_class_id);
     if (did == "") return false;
     Dialogue_Start(did);
+    Dialogue_SetActiveAmbienceSfxKey(Dialogue_ClassChestAmbienceSfxKey(_class_id));
     return true;
 }
 
@@ -217,6 +274,7 @@ function Dialogue_SkillbookFirstReadMarkDone() {
     variable_struct_set(gs.flags, Dialogue_SkillbookFirstReadDoneFlagKey(), true);
     variable_struct_set(gs.flags, Dialogue_SkillbookFirstReadPendingFlagKey(), false);
     Dialogue_SetSkillbookFirstReadUIActive(false);
+    Dialogue_SetActiveAmbienceSfxKey("");
 }
 
 function Dialogue_TryStartSkillbookFirstRead(_class_id) {
@@ -230,6 +288,7 @@ function Dialogue_TryStartSkillbookFirstRead(_class_id) {
     Dialogue_SetSkillbookFirstReadUIActive(true);
 
     Dialogue_Start(did);
+    Dialogue_SetActiveAmbienceSfxKey(Dialogue_PickSkillbookAmbienceSfxKey());
     return true;
 }
 
@@ -627,6 +686,7 @@ function Dialogue_Start(_dialogue_id) {
     gs.ui.lines = [];
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
+    Dialogue_SetActiveAmbienceSfxKey("");
     if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
         gs.ui.cutscene_text_only = false;
     }
@@ -648,6 +708,7 @@ function Dialogue_StartLines(_lines) {
     gs.ui.lines = [];
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
+    Dialogue_SetActiveAmbienceSfxKey("");
     if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
         gs.ui.cutscene_text_only = false;
     }
@@ -709,6 +770,7 @@ function Dialogue_StartWithSpeaker(_speaker, _lines) {
     gs.ui.lines = [];
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
+    Dialogue_SetActiveAmbienceSfxKey("");
     if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
         gs.ui.cutscene_text_only = false;
     }
@@ -766,6 +828,7 @@ function Dialogue_Advance() {
         gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
         gs.ui.dialogue_lock = UI_DIALOGUE_REOPEN_LOCK;
         gs.ui.dialogue_require_release = true;
+        Dialogue_SetActiveAmbienceSfxKey("");
         if (Dialogue_IsSkillbookFirstReadUIActive()) {
             Dialogue_SkillbookFirstReadMarkDone();
         }

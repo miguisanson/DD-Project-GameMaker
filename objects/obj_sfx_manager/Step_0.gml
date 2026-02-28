@@ -106,28 +106,63 @@ if (group_loaded) {
 if (!variable_global_exists("skillbook_mana_ambience_handle")) global.skillbook_mana_ambience_handle = -1;
 if (!variable_global_exists("skillbook_mana_ambience_gain")) global.skillbook_mana_ambience_gain = 0;
 if (!variable_global_exists("skillbook_mana_ambience_playing")) global.skillbook_mana_ambience_playing = false;
+if (!variable_global_exists("skillbook_mana_ambience_tail_frames")) global.skillbook_mana_ambience_tail_frames = 0;
+if (!variable_global_exists("skillbook_mana_ambience_last_key")) global.skillbook_mana_ambience_last_key = "";
+if (!variable_global_exists("skillbook_mana_ambience_current_key")) global.skillbook_mana_ambience_current_key = "";
 
 var skillbook_should_play = false;
 var gs_audio = GameState_Get();
+var dialogue_active = false;
 if (is_struct(gs_audio) && variable_struct_exists(gs_audio, "ui") && is_struct(gs_audio.ui)) {
     var ui_audio = gs_audio.ui;
-    var mana_dialogue_active = Dialogue_IsSkillbookFirstReadUIActive();
-    if (mana_dialogue_active) {
-        var has_lines = variable_struct_exists(ui_audio, "lines") && is_array(ui_audio.lines) && array_length(ui_audio.lines) > 0;
-        skillbook_should_play = has_lines || (variable_struct_exists(ui_audio, "mode") && ui_audio.mode == UI_DIALOGUE);
-        var pending_key = Dialogue_SkillbookFirstReadPendingFlagKey();
-        if (!skillbook_should_play && variable_struct_exists(gs_audio, "flags") && is_struct(gs_audio.flags) && variable_struct_exists(gs_audio.flags, pending_key) && variable_struct_get(gs_audio.flags, pending_key)) {
-            Dialogue_SkillbookFirstReadMarkDone();
-        }
+    var has_lines = variable_struct_exists(ui_audio, "lines") && is_array(ui_audio.lines) && array_length(ui_audio.lines) > 0;
+    dialogue_active = has_lines || (variable_struct_exists(ui_audio, "mode") && ui_audio.mode == UI_DIALOGUE);
+
+    var pending_key = Dialogue_SkillbookFirstReadPendingFlagKey();
+    if (!dialogue_active && variable_struct_exists(gs_audio, "flags") && is_struct(gs_audio.flags) && variable_struct_exists(gs_audio.flags, pending_key) && variable_struct_get(gs_audio.flags, pending_key)) {
+        Dialogue_SkillbookFirstReadMarkDone();
+    }
+
+    var ambience_active_key = Dialogue_GetActiveAmbienceSfxKey();
+    skillbook_should_play = dialogue_active && ambience_active_key != "";
+    if (!dialogue_active && ambience_active_key != "") {
+        Dialogue_SetActiveAmbienceSfxKey("");
     }
 }
 
-var ambience_key = Dialogue_SkillbookAmbienceSfxKey();
+var ambience_key = Dialogue_GetActiveAmbienceSfxKey();
+if (dialogue_active && ambience_key != "") {
+    global.skillbook_mana_ambience_tail_frames = 0;
+    global.skillbook_mana_ambience_last_key = ambience_key;
+} else if (global.skillbook_mana_ambience_last_key != "" && (global.skillbook_mana_ambience_handle != -1 || global.skillbook_mana_ambience_gain > 0)) {
+    if (global.skillbook_mana_ambience_tail_frames <= 0) {
+        global.skillbook_mana_ambience_tail_frames = irandom_range(SKILLBOOK_MANA_AMBIENCE_POST_MIN_FRAMES, SKILLBOOK_MANA_AMBIENCE_POST_MAX_FRAMES);
+    } else {
+        global.skillbook_mana_ambience_tail_frames -= 1;
+    }
+
+    if (global.skillbook_mana_ambience_tail_frames > 0) {
+        ambience_key = global.skillbook_mana_ambience_last_key;
+        skillbook_should_play = true;
+    } else {
+        global.skillbook_mana_ambience_last_key = "";
+    }
+}
+
 var skillbook_asset = noone;
 if (variable_global_exists("sfx_db") && ds_exists(global.sfx_db, ds_type_map) && ds_map_exists(global.sfx_db, ambience_key)) {
     skillbook_asset = global.sfx_db[? ambience_key];
 }
 if (!SFX_IsValidSoundAsset(skillbook_asset)) skillbook_asset = noone;
+
+if (skillbook_should_play && ambience_key != "" && ambience_key != global.skillbook_mana_ambience_current_key) {
+    if (global.skillbook_mana_ambience_handle != -1 && audio_is_playing(global.skillbook_mana_ambience_handle)) {
+        audio_stop_sound(global.skillbook_mana_ambience_handle);
+    }
+    global.skillbook_mana_ambience_handle = -1;
+    global.skillbook_mana_ambience_gain = 0;
+    global.skillbook_mana_ambience_current_key = ambience_key;
+}
 
 if (skillbook_should_play && global.skillbook_mana_ambience_handle == -1 && skillbook_asset != noone) {
     global.skillbook_mana_ambience_handle = audio_play_sound(skillbook_asset, 0, true);
@@ -140,6 +175,7 @@ if (skillbook_should_play && global.skillbook_mana_ambience_handle == -1 && skil
 if (global.skillbook_mana_ambience_handle != -1 && !audio_is_playing(global.skillbook_mana_ambience_handle)) {
     global.skillbook_mana_ambience_handle = -1;
     global.skillbook_mana_ambience_gain = 0;
+    global.skillbook_mana_ambience_current_key = "";
 }
 
 SFX_ClampVolumes();
@@ -167,6 +203,7 @@ if (skillbook_should_play) {
             audio_stop_sound(global.skillbook_mana_ambience_handle);
         }
         global.skillbook_mana_ambience_handle = -1;
+        global.skillbook_mana_ambience_current_key = "";
     }
 }
 

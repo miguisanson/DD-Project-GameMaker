@@ -40,6 +40,9 @@ global.mouse_cursor_hidden = false;
 global.skillbook_mana_ambience_handle = -1;
 global.skillbook_mana_ambience_gain = 0;
 global.skillbook_mana_ambience_playing = false;
+global.skillbook_mana_ambience_tail_frames = 0;
+global.skillbook_mana_ambience_last_key = "";
+global.skillbook_mana_ambience_current_key = "";
 last_room_id = room;
 
 if (variable_global_exists("sfx_db") && ds_exists(global.sfx_db, ds_type_map)) {
