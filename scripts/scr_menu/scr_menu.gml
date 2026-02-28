@@ -132,28 +132,35 @@ function Menu_GetLayout() {
     var h = display_get_gui_height();
     UI_SetFont();
     var line_h = string_height("A");
-    var margin = min(w, h) * 0.05;
+    var margin = round(min(w, h) * 0.05);
     var bx = margin;
     var by = margin;
-    var bw = w - margin * 2;
-    var bh = h - margin * 2;
-    var header_h = max(line_h + 10, bh * 0.10);
-    var pad = max(6, min(w, h) * 0.02);
-    var row_h = max(line_h + 4, bh * 0.06);
+    var bw = round(w - margin * 2);
+    var bh = round(h - margin * 2);
+    var header_h = round(max(line_h + 10, bh * 0.10));
+    var pad = round(max(6, min(w, h) * 0.02));
+    var row_h = round(max(line_h + 4, bh * 0.06));
     var content_y = by + header_h + pad;
     var tip_style = Tooltip_GetStyle("menu");
-    var tip_gap = max(2, round(pad * 0.45));
+    var tip_gap = max(4, round(pad * 0.50));
+    var list_top_inset = 18;
+    var list_bottom_inset = 18;
     var inner_h = bh - pad * 2;
-    var avail_after_header = max(row_h * 2 + tip_style.min_h + tip_gap, inner_h - header_h);
-    var tooltip_h = clamp(round(bh * tip_style.height_ratio), tip_style.min_h, max(tip_style.min_h, floor(avail_after_header * 0.52)));
-    var content_h = max(row_h * 2, avail_after_header - tooltip_h - tip_gap);
-    var main_h = header_h + pad + content_h;
+    var body_h = max(row_h * 2 + tip_style.min_h + tip_gap + list_top_inset + list_bottom_inset, inner_h - header_h);
+    var tip_h_max = max(tip_style.min_h, body_h - (row_h * 2) - tip_gap);
+    var tooltip_h = clamp(round(body_h * tip_style.height_ratio), tip_style.min_h, tip_h_max);
+    var content_h = max(row_h * 2, body_h - tooltip_h - tip_gap);
+    var main_h = header_h + pad + content_h + pad;
     var tooltip_y = by + main_h + tip_gap;
-    var rows_visible = max(2, floor(content_h / row_h));
+    var content_list_y = content_y + list_top_inset;
+    var content_list_h = max(row_h, content_h - list_top_inset - list_bottom_inset);
+    var rows_visible = max(1, floor(content_list_h / row_h));
     return {
         w:w, h:h, bx:bx, by:by, bw:bw, bh:bh,
         header_h:header_h, pad:pad, row_h:row_h,
         content_y:content_y, content_h:content_h, rows_visible:rows_visible,
+        content_list_y:content_list_y, content_list_h:content_list_h,
+        list_top_inset:list_top_inset, list_bottom_inset:list_bottom_inset,
         tooltip_h:tooltip_h, tooltip_gap:tip_gap, tooltip_y:tooltip_y, main_h:main_h
     };
 }
@@ -470,7 +477,7 @@ function Tooltip_GetStyle(_context = "default") {
         s.line_gap = 1;
         s.min_w = 62;
         s.min_h = 72;
-        s.margin_px = 2;
+        s.margin_px = 0;
         s.width_ratio = 1.00;
         s.height_ratio = 0.36;
     } else if (_context == "battle") {
@@ -1068,6 +1075,10 @@ function Menu_Draw() {
     var pad = layout.pad;
     var row_h = layout.row_h;
     var rows_visible = layout.rows_visible;
+    var content_list_y = layout.content_list_y;
+    var content_list_h = layout.content_list_h;
+    var list_top_inset = layout.list_top_inset;
+    var list_bottom_inset = layout.list_bottom_inset;
     var menu_tip_h = layout.tooltip_h;
     var menu_tip_y = layout.tooltip_y;
     var menu_closing = variable_struct_exists(m, "closing") && m.closing;
@@ -1102,6 +1113,15 @@ function Menu_Draw() {
         draw_text(tx + 6, by + 6, m.tabs[i]);
     }
 
+    var draw_arrow_sprite = dialogue_arrow_down;
+    var draw_arrow_w = max(1, sprite_get_width(draw_arrow_sprite));
+    var draw_arrow_h = max(1, sprite_get_height(draw_arrow_sprite));
+    var draw_arrow_scale_x = 16 / draw_arrow_w;
+    var draw_arrow_scale_y = 16 / draw_arrow_h;
+    var draw_arrow_x = round(bx + bw * 0.5);
+    var draw_arrow_top_y = round(layout.content_y + max(0, floor((list_top_inset - 16) * 0.5)));
+    var draw_arrow_bottom_y = round(content_list_y + content_list_h + max(0, floor((list_bottom_inset - 16) * 0.5)));
+
     // Inventory tab
     if (m.tab == 0) {
         var items = is_array(ch.inventory) ? ch.inventory : [];
@@ -1111,11 +1131,11 @@ function Menu_Draw() {
 
         if (count == 0) {
             draw_set_color(c_white);
-            draw_text(bx + pad, by + header_h + pad, "No items.");
+            draw_text(bx + pad, content_list_y, "No items.");
         } else {
             for (var i2 = start; i2 < endv; i2++) {
                 var row = i2 - start;
-                var yy = layout.content_y + row * row_h;
+                var yy = content_list_y + row * row_h;
 
                 var sel = (i2 == m.inv_index) && !m.header_focus;
                 if (sel) {
@@ -1149,6 +1169,16 @@ function Menu_Draw() {
             var sel_item = ItemDB_Get(sel_inv.id);
             tooltip_lines = Tooltip_BuildItemLines(sel_item);
         }
+
+        if (count > rows_visible) {
+            draw_set_color(c_white);
+            if (start > 0) {
+                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_top_y, draw_arrow_scale_x, draw_arrow_scale_y, 180, c_white, menu_alpha);
+            }
+            if (endv < count) {
+                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_bottom_y, draw_arrow_scale_x, draw_arrow_scale_y, 0, c_white, menu_alpha);
+            }
+        }
     }
 
     // Skills tab
@@ -1160,11 +1190,11 @@ function Menu_Draw() {
 
         if (scount == 0) {
             draw_set_color(c_white);
-            draw_text(bx + pad, by + header_h + pad, "No skills.");
+            draw_text(bx + pad, content_list_y, "No skills.");
         } else {
             for (var s = start2; s < end2; s++) {
                 var row2 = s - start2;
-                var y2 = layout.content_y + row2 * row_h;
+                var y2 = content_list_y + row2 * row_h;
 
                 var sel2 = (s == m.skill_index) && !m.header_focus;
                 if (sel2) {
@@ -1188,6 +1218,16 @@ function Menu_Draw() {
         if (!m.header_focus && scount > 0 && m.skill_index >= 0 && m.skill_index < scount) {
             var sel_skill = SkillDB_Get(skills[m.skill_index]);
             tooltip_lines = Tooltip_BuildSkillLines(sel_skill);
+        }
+
+        if (scount > rows_visible) {
+            draw_set_color(c_white);
+            if (start2 > 0) {
+                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_top_y, draw_arrow_scale_x, draw_arrow_scale_y, 180, c_white, menu_alpha);
+            }
+            if (end2 < scount) {
+                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_bottom_y, draw_arrow_scale_x, draw_arrow_scale_y, 0, c_white, menu_alpha);
+            }
         }
     }
 
