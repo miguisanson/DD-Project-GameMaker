@@ -27,6 +27,38 @@
 						"...", 
 						"I knew it. there's something wrong about this place.",
 						"I need to get back."];
+    global.dialogue_db[? "after_class_chest_knight"] = [
+        "Heavy... but it fits.",
+        "Like it's been mine for years.",
+        "This chest shouldn't know me."
+    ];
+    global.dialogue_db[? "after_class_chest_archer"] = [
+        "Light. Balanced.",
+        "No rust. No wear.",
+        "Like it was waiting here."
+    ];
+    global.dialogue_db[? "after_class_chest_mage"] = [
+        "Why does it feel cold...?",
+        "...Did something just whisper?",
+        "No. That's not possible.",
+        "Stop calling to me."
+    ];
+    global.dialogue_db[? "after_skillbook_chest_knight"] = [
+        "Diagrams... simple forms.",
+        "I read it once.",
+        "Somehow... my hands already know."
+    ];
+    global.dialogue_db[? "after_skillbook_chest_archer"] = [
+        "Angles and breath marks.",
+        "I follow the first step...",
+        "Then my body finishes it. Odd."
+    ];
+    global.dialogue_db[? "after_skillbook_chest_mage"] = [
+        "I can't read this...",
+        "...The page is filled with symbols.",
+        "A voice folds into my thoughts.",
+        "And I understand. It shows me where to place my hands."
+    ];
 
     // interactables
     global.dialogue_db[? "tree"] = ["A sturdy tree."];
@@ -69,6 +101,136 @@ function DialogueDB_Get(_dialogue_id) {
     var lines = global.dialogue_db[? _dialogue_id];
     var vars = { interact: Input_Label("interact"), confirm: Input_Label("confirm"), cancel: Input_Label("cancel") };
     return Dialogue_FormatLines(lines, vars);
+}
+
+function Dialogue_EventConfigEnsure() {
+    if (variable_global_exists("dialogue_event_cfg") && is_struct(global.dialogue_event_cfg)) {
+        return global.dialogue_event_cfg;
+    }
+
+    var class_chest_ids = array_create(CLASS_NOBODY + 1, "");
+    class_chest_ids[CLASS_KNIGHT] = "after_class_chest_knight";
+    class_chest_ids[CLASS_ARCHER] = "after_class_chest_archer";
+    class_chest_ids[CLASS_MAGE] = "after_class_chest_mage";
+
+    var skillbook_first_ids = array_create(CLASS_NOBODY + 1, "");
+    skillbook_first_ids[CLASS_KNIGHT] = "after_skillbook_chest_knight";
+    skillbook_first_ids[CLASS_ARCHER] = "after_skillbook_chest_archer";
+    skillbook_first_ids[CLASS_MAGE] = "after_skillbook_chest_mage";
+
+    global.dialogue_event_cfg = {
+        class_chest_ids: class_chest_ids,
+        skillbook_first_ids: skillbook_first_ids,
+        skillbook_done_flag: "skillbook_first_read_done",
+        skillbook_pending_flag: "skillbook_first_read_pending",
+        skillbook_ui_active_key: "skillbook_mana_dialogue_active",
+        skillbook_ambience_sfx_key: SKILLBOOK_MANA_AMBIENCE_KEY
+    };
+    return global.dialogue_event_cfg;
+}
+
+function Dialogue_ClassEventId(_event_key, _class_id) {
+    var cfg = Dialogue_EventConfigEnsure();
+    if (!variable_struct_exists(cfg, _event_key)) return "";
+    var table = variable_struct_get(cfg, _event_key);
+    if (!is_array(table)) return "";
+    var idx = round(real(_class_id));
+    if (idx < 0 || idx >= array_length(table)) return "";
+    return string(table[idx]);
+}
+
+function Dialogue_ClassChestId(_class_id) {
+    return Dialogue_ClassEventId("class_chest_ids", _class_id);
+}
+
+function Dialogue_SkillbookFirstReadId(_class_id) {
+    return Dialogue_ClassEventId("skillbook_first_ids", _class_id);
+}
+
+function Dialogue_SkillbookFirstReadDoneFlagKey() {
+    var cfg = Dialogue_EventConfigEnsure();
+    return variable_struct_exists(cfg, "skillbook_done_flag") ? string(cfg.skillbook_done_flag) : "skillbook_first_read_done";
+}
+
+function Dialogue_SkillbookFirstReadPendingFlagKey() {
+    var cfg = Dialogue_EventConfigEnsure();
+    return variable_struct_exists(cfg, "skillbook_pending_flag") ? string(cfg.skillbook_pending_flag) : "skillbook_first_read_pending";
+}
+
+function Dialogue_SkillbookFirstReadUIActiveKey() {
+    var cfg = Dialogue_EventConfigEnsure();
+    return variable_struct_exists(cfg, "skillbook_ui_active_key") ? string(cfg.skillbook_ui_active_key) : "skillbook_mana_dialogue_active";
+}
+
+function Dialogue_SkillbookAmbienceSfxKey() {
+    var cfg = Dialogue_EventConfigEnsure();
+    return variable_struct_exists(cfg, "skillbook_ambience_sfx_key") ? string(cfg.skillbook_ambience_sfx_key) : SKILLBOOK_MANA_AMBIENCE_KEY;
+}
+
+function Dialogue_SetSkillbookFirstReadUIActive(_active) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) gs.ui = {};
+    variable_struct_set(gs.ui, Dialogue_SkillbookFirstReadUIActiveKey(), _active);
+}
+
+function Dialogue_IsSkillbookFirstReadUIActive() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) return false;
+    var key = Dialogue_SkillbookFirstReadUIActiveKey();
+    if (!variable_struct_exists(gs.ui, key)) return false;
+    return variable_struct_get(gs.ui, key);
+}
+
+function Dialogue_TryStartClassChestReaction(_class_id) {
+    var did = Dialogue_ClassChestId(_class_id);
+    if (did == "") return false;
+    Dialogue_Start(did);
+    return true;
+}
+
+function Dialogue_SkillbookFirstReadDone() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) return false;
+    var key = Dialogue_SkillbookFirstReadDoneFlagKey();
+    if (!variable_struct_exists(gs.flags, key)) return false;
+    return variable_struct_get(gs.flags, key);
+}
+
+function Dialogue_SkillbookFirstReadPending() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) return false;
+    var key = Dialogue_SkillbookFirstReadPendingFlagKey();
+    if (!variable_struct_exists(gs.flags, key)) return false;
+    return variable_struct_get(gs.flags, key);
+}
+
+function Dialogue_SkillbookFirstReadShouldTrigger(_class_id) {
+    if (Dialogue_SkillbookFirstReadId(_class_id) == "") return false;
+    if (Dialogue_SkillbookFirstReadDone()) return false;
+    if (Dialogue_SkillbookFirstReadPending()) return false;
+    return true;
+}
+
+function Dialogue_SkillbookFirstReadMarkDone() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
+    variable_struct_set(gs.flags, Dialogue_SkillbookFirstReadDoneFlagKey(), true);
+    variable_struct_set(gs.flags, Dialogue_SkillbookFirstReadPendingFlagKey(), false);
+    Dialogue_SetSkillbookFirstReadUIActive(false);
+}
+
+function Dialogue_TryStartSkillbookFirstRead(_class_id) {
+    if (!Dialogue_SkillbookFirstReadShouldTrigger(_class_id)) return false;
+    var did = Dialogue_SkillbookFirstReadId(_class_id);
+    if (did == "") return false;
+
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
+    variable_struct_set(gs.flags, Dialogue_SkillbookFirstReadPendingFlagKey(), true);
+    Dialogue_SetSkillbookFirstReadUIActive(true);
+
+    Dialogue_Start(did);
+    return true;
 }
 
 
@@ -604,6 +766,9 @@ function Dialogue_Advance() {
         gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
         gs.ui.dialogue_lock = UI_DIALOGUE_REOPEN_LOCK;
         gs.ui.dialogue_require_release = true;
+        if (Dialogue_IsSkillbookFirstReadUIActive()) {
+            Dialogue_SkillbookFirstReadMarkDone();
+        }
         if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
             gs.ui.cutscene_text_only = false;
         }

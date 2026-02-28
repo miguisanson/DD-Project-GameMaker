@@ -285,7 +285,12 @@ function Save_ApplySnapshot(_snap) {
         gs.player_ch = Player_NormalizeProgression(gs.player_ch, true);
         gs.selected_class = gs.player_ch.class_id;
     }
-    gs.flags = stat.flags;
+    if (variable_struct_exists(stat, "flags") && is_struct(stat.flags)) gs.flags = stat.flags;
+    else gs.flags = {};
+    var skillbook_done_key = Dialogue_SkillbookFirstReadDoneFlagKey();
+    var skillbook_pending_key = Dialogue_SkillbookFirstReadPendingFlagKey();
+    if (!variable_struct_exists(gs.flags, skillbook_done_key)) variable_struct_set(gs.flags, skillbook_done_key, false);
+    if (!variable_struct_exists(gs.flags, skillbook_pending_key)) variable_struct_set(gs.flags, skillbook_pending_key, false);
     gs.checkpoint = stat.checkpoint;
     if (variable_struct_exists(stat, "uid_counter")) gs.uid_counter = stat.uid_counter;
 

@@ -805,6 +805,11 @@ function GameState_Init() {
     if (!variable_struct_exists(gs, "flags")) {
         gs.flags = {};
     }
+    var skillbook_done_key = Dialogue_SkillbookFirstReadDoneFlagKey();
+    var skillbook_pending_key = Dialogue_SkillbookFirstReadPendingFlagKey();
+    if (!variable_struct_exists(gs.flags, skillbook_done_key)) variable_struct_set(gs.flags, skillbook_done_key, false);
+    if (!variable_struct_exists(gs.flags, skillbook_pending_key)) variable_struct_set(gs.flags, skillbook_pending_key, false);
+    if (variable_struct_get(gs.flags, skillbook_pending_key)) variable_struct_set(gs.flags, skillbook_pending_key, false);
 
     if (!variable_struct_exists(gs, "save_slot")) {
         gs.save_slot = 0;
@@ -866,6 +871,8 @@ function GameState_Init() {
     if (!variable_struct_exists(gs.ui, "dialogue_open_block_frame")) gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
     if (!variable_struct_exists(gs.ui, "lines_raw") || !is_array(gs.ui.lines_raw)) gs.ui.lines_raw = [];
     if (!variable_struct_exists(gs.ui, "cutscene_text_only")) gs.ui.cutscene_text_only = false;
+    var skillbook_ui_key = Dialogue_SkillbookFirstReadUIActiveKey();
+    if (!variable_struct_exists(gs.ui, skillbook_ui_key)) variable_struct_set(gs.ui, skillbook_ui_key, false);
 
     if (!variable_struct_exists(gs, "in_main_menu")) {
         gs.in_main_menu = false;

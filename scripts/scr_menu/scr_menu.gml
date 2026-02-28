@@ -353,6 +353,14 @@ function Menu_HandleInput() {
                         ch = RecomputeResources(ch);
                         GameState_SetPlayer(ch);
                         m = Menu_ClampInventoryCursor(m, ch.inventory);
+
+                        if (variable_struct_exists(use_result, "skillbook_first_read_dialogue") && use_result.skillbook_first_read_dialogue) {
+                            m = Menu_InvPopupClose(m, true);
+                            gs.ui.menu = m;
+                            Menu_Close(true);
+                            Dialogue_TryStartSkillbookFirstRead(ch.class_id);
+                            return;
+                        }
                     }
                     m = Menu_InvPopupOpenMessage(m, use_result.msg);
                 } else {
@@ -1121,6 +1129,7 @@ function ClassSelect_ApplyClass(_class_id) {
     }
 
     GameState_SyncLegacy();
+    Dialogue_TryStartClassChestReaction(_class_id);
 }
 
 function ClassSelect_HandleInput() {

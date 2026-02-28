@@ -203,6 +203,7 @@ function SFX_RegisterDefaults() {
 
     // Skill Effects
     SFX_Register("skill_generic", noone);
+    SFX_RegisterResolved(SKILLBOOK_MANA_AMBIENCE_KEY, ["Crying_moaning_ambience_3"]);
     SFX_RegisterResolved("skill_bleed", ["bleed"]);
     SFX_RegisterResolved("skill_double_shot", ["double_shot"]);
     SFX_RegisterResolved("skill_evasion_up", ["evasion_up"]);
@@ -301,6 +302,7 @@ function SFX_RegisterGainDefaults() {
 
     // Skills
     SFX_RegisterGain("skill_generic", 1.00);
+    SFX_RegisterGain(SKILLBOOK_MANA_AMBIENCE_KEY, 1.00);
     SFX_RegisterGain("skill_bleed", 1.00);
     SFX_RegisterGain("skill_double_shot", 1.00);
     SFX_RegisterGain("skill_evasion_up", 1.00);

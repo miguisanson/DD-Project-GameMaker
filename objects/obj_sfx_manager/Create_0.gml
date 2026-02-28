@@ -37,6 +37,9 @@ global.audio_debug_missing_count = 0;
 global.audio_debug_total_count = 0;
 global.audio_debug_map_report = [];
 global.mouse_cursor_hidden = false;
+global.skillbook_mana_ambience_handle = -1;
+global.skillbook_mana_ambience_gain = 0;
+global.skillbook_mana_ambience_playing = false;
 last_room_id = room;
 
 if (variable_global_exists("sfx_db") && ds_exists(global.sfx_db, ds_type_map)) {

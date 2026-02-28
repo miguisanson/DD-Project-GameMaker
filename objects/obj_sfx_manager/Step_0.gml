@@ -102,6 +102,78 @@ if (group_loaded) {
     }
 }
 
+// One-time skillbook ambience: loop only while the special dialogue is active.
+if (!variable_global_exists("skillbook_mana_ambience_handle")) global.skillbook_mana_ambience_handle = -1;
+if (!variable_global_exists("skillbook_mana_ambience_gain")) global.skillbook_mana_ambience_gain = 0;
+if (!variable_global_exists("skillbook_mana_ambience_playing")) global.skillbook_mana_ambience_playing = false;
+
+var skillbook_should_play = false;
+var gs_audio = GameState_Get();
+if (is_struct(gs_audio) && variable_struct_exists(gs_audio, "ui") && is_struct(gs_audio.ui)) {
+    var ui_audio = gs_audio.ui;
+    var mana_dialogue_active = Dialogue_IsSkillbookFirstReadUIActive();
+    if (mana_dialogue_active) {
+        var has_lines = variable_struct_exists(ui_audio, "lines") && is_array(ui_audio.lines) && array_length(ui_audio.lines) > 0;
+        skillbook_should_play = has_lines || (variable_struct_exists(ui_audio, "mode") && ui_audio.mode == UI_DIALOGUE);
+        var pending_key = Dialogue_SkillbookFirstReadPendingFlagKey();
+        if (!skillbook_should_play && variable_struct_exists(gs_audio, "flags") && is_struct(gs_audio.flags) && variable_struct_exists(gs_audio.flags, pending_key) && variable_struct_get(gs_audio.flags, pending_key)) {
+            Dialogue_SkillbookFirstReadMarkDone();
+        }
+    }
+}
+
+var ambience_key = Dialogue_SkillbookAmbienceSfxKey();
+var skillbook_asset = noone;
+if (variable_global_exists("sfx_db") && ds_exists(global.sfx_db, ds_type_map) && ds_map_exists(global.sfx_db, ambience_key)) {
+    skillbook_asset = global.sfx_db[? ambience_key];
+}
+if (!SFX_IsValidSoundAsset(skillbook_asset)) skillbook_asset = noone;
+
+if (skillbook_should_play && global.skillbook_mana_ambience_handle == -1 && skillbook_asset != noone) {
+    global.skillbook_mana_ambience_handle = audio_play_sound(skillbook_asset, 0, true);
+    global.skillbook_mana_ambience_gain = 0;
+    if (global.skillbook_mana_ambience_handle != -1) {
+        audio_sound_gain(global.skillbook_mana_ambience_handle, 0, 0);
+    }
+}
+
+if (global.skillbook_mana_ambience_handle != -1 && !audio_is_playing(global.skillbook_mana_ambience_handle)) {
+    global.skillbook_mana_ambience_handle = -1;
+    global.skillbook_mana_ambience_gain = 0;
+}
+
+SFX_ClampVolumes();
+var skillbook_trim = SFX_GetGain(ambience_key);
+var skillbook_target = clamp(SKILLBOOK_MANA_AMBIENCE_BASE_GAIN, 0, 1) * skillbook_trim * global.vol_master * global.vol_sfx;
+
+if (skillbook_should_play) {
+    if (global.skillbook_mana_ambience_gain < skillbook_target) {
+        var fade_step_in = max(0.0001, skillbook_target / max(1, SKILLBOOK_MANA_AMBIENCE_FADE_IN_FRAMES));
+        global.skillbook_mana_ambience_gain = min(skillbook_target, global.skillbook_mana_ambience_gain + fade_step_in);
+    } else {
+        // Follow SFX volume changes immediately while active.
+        global.skillbook_mana_ambience_gain = skillbook_target;
+    }
+    global.skillbook_mana_ambience_playing = true;
+} else {
+    if (global.skillbook_mana_ambience_gain > 0) {
+        var fade_step_out = max(0.0001, max(global.skillbook_mana_ambience_gain, skillbook_target) / max(1, SKILLBOOK_MANA_AMBIENCE_FADE_OUT_FRAMES));
+        global.skillbook_mana_ambience_gain = max(0, global.skillbook_mana_ambience_gain - fade_step_out);
+    }
+    if (global.skillbook_mana_ambience_gain <= 0.0001) {
+        global.skillbook_mana_ambience_gain = 0;
+        global.skillbook_mana_ambience_playing = false;
+        if (global.skillbook_mana_ambience_handle != -1 && audio_is_playing(global.skillbook_mana_ambience_handle)) {
+            audio_stop_sound(global.skillbook_mana_ambience_handle);
+        }
+        global.skillbook_mana_ambience_handle = -1;
+    }
+}
+
+if (global.skillbook_mana_ambience_handle != -1 && audio_is_playing(global.skillbook_mana_ambience_handle)) {
+    audio_sound_gain(global.skillbook_mana_ambience_handle, global.skillbook_mana_ambience_gain, 0);
+}
+
 if (global.bgm_pending_stop_frames > 0) {
     global.bgm_pending_stop_frames -= 1;
     if (global.bgm_pending_stop_frames <= 0) {

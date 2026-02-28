@@ -849,9 +849,13 @@ function Item_Use(_item_id, _user, _target) {
         if (!learn.ok) {
             result.ok = false;
             result.msg = learn.msg;
+            result.skillbook_first_read_dialogue = false;
         } else {
             _user = Player_LearnSkill(_user, learn.skill_id);
             result.msg = learn.msg;
+            var class_id = CLASS_NOBODY;
+            if (is_struct(_user) && variable_struct_exists(_user, "class_id")) class_id = _user.class_id;
+            result.skillbook_first_read_dialogue = Dialogue_SkillbookFirstReadShouldTrigger(class_id);
         }
     }
 
