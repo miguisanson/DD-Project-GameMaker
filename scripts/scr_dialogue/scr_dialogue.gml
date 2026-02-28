@@ -17,8 +17,16 @@ function DialogueDB_Init() {
     global.dialogue_db[? "sys_save_ok"] = ["Game saved."];
     global.dialogue_db[? "sys_load_ok"] = ["Game loaded."];
     global.dialogue_db[? "sys_load_missing"] = ["No save found."];
-    global.dialogue_db[? "sys_class_chest_prompt"] = ["How convenient..", "Just what I needed to get out of this place."];
-    global.dialogue_db[? "sys_floor1_intro"] = ["Where am I?", "...", "I knew it there's something wrong with this place."];
+    global.dialogue_db[? "sys_class_chest_prompt"] = 
+						["How convenient..", 
+						"Just what I needed to get out of this place."];
+    global.dialogue_db[? "sys_floor1_intro"] = 
+						["*Thud* *Crash*",
+						"Wha.. What just happened?",
+						"Where am I?", 
+						"...", 
+						"I knew it there's something wrong about this place.",
+						"I need to get back."];
 
     // interactables
     global.dialogue_db[? "tree"] = ["A sturdy tree."];

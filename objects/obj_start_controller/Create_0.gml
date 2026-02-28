@@ -21,15 +21,42 @@ cutscene_transition_switched = false;
 cutscene_definitions = {};
 cutscene_definitions.intro = [
     {
+        sprite: black_screen,
+        lines: [
+            "This is not a world of fantasy, magic, and dragons.",
+            "There were no monsters.",
+            "Only monsters among men.",
+            "This is a world of grit-medieval kingdoms and warring countries.",
+            "...",
+            "Or is it?",
+            "...",
+            "You are a mapmaker in a remote village, scraping by penny to penny.",
+            "There were rumors of conscription for the war between two kingdoms.",
+            "The reward was enough to set you up for a year..",
+            "It was worth it...",
+            "You signed up."
+        ],
+        hold_frames: 0,
+        transition_speed: "normal",
+        text_only: true
+    },
+    {
         sprite: very_first_cut_scene,
         lines: [
-            "You ventured deep in a tunnel heading towards a neighboring enemy castle...",
-            "The plan was to ambush the enemy using this shortcut.",
-            "You are just a porter for this raid party...",
-            "You knew this was a mistake...",
-            "You were from this area's village. However, this place never existed before...",
-            "You just knew the ground was weak and unsupported...",
-            "Cracking.. Small Tremors..."
+            "The plan was to ambush the enemy using a shortcut.",
+            "Good thing you knew the forest as you grew up here.",
+            "Then the scouts reported a tunnel near the mountain.",
+            "You'd never heard of such a tunnel in all your life.",
+            "You couldn't help thinking it was a joke...",
+            "But it wasn't.",
+            "There really was a tunnel. You could hardly believe it.",
+            "The group ventured deep into the tunnel, heading toward the enemy castle...",
+            "You're just the navigator for this raid party.",
+            "And this place never existed before...",
+            "You knew it was a mistake. You could feel it.",
+            "Before you could speak up.",
+            "You hear cracking...",
+            "Small tremors..."
         ],
         hold_frames: 0,
         transition_speed: "normal",
@@ -38,8 +65,8 @@ cutscene_definitions.intro = [
     {
         sprite: intro_scene,
         lines: [
-            "But it was already too late to speak up.",
-            "You fell down."
+            "But it was already too late.",
+            "You fell."
         ],
         hold_frames: 0,
         transition_speed: "normal",
@@ -51,7 +78,7 @@ cutscene_definitions.ending = [
     {
         sprite: ending_scene,
         lines: [
-            "Thank the almighty...",
+            "Thank the Almighty...",
             "An exit...",
             "I need to find out where I am."
         ],
@@ -65,7 +92,7 @@ cutscene_definitions.ending = [
             "Huh?",
             "...",
             "Isn't this the raid party?",
-            "They are all dead.",
+            "They're all dead.",
             "... What on earth..."
         ],
         hold_frames: 0,
@@ -76,7 +103,7 @@ cutscene_definitions.ending = [
         sprite: second_to_last_scene,
         lines: [
             "...",
-            "oh",
+            "Oh.",
             "...",
             "I wasn't so lucky after all."
         ],
