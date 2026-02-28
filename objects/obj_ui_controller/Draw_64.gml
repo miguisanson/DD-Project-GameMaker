@@ -64,7 +64,16 @@ if (room == rm_battle && is_struct(ch)) {
 
 }
 
-UI_DrawModalDim();
+var skip_shared_modal_dim = false;
+if (room == rm_start && instance_exists(obj_start_controller)) {
+    var start_ctrl = instance_find(obj_start_controller, 0);
+    if (instance_exists(start_ctrl)
+    && variable_instance_exists(start_ctrl, "state")
+    && string(start_ctrl.state) == "difficulty") {
+        skip_shared_modal_dim = true;
+    }
+}
+if (!skip_shared_modal_dim) UI_DrawModalDim();
 
 if (gs.ui.mode == UI_PAUSE) {
     PauseMenu_Draw();

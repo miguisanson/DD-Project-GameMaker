@@ -71,6 +71,9 @@ if (state == "difficulty" && gs.ui.mode != UI_SAVE && !loading_into_game) {
     var dx = (w - dw) * 0.5;
     var dy = (h - dh) * 0.5;
 
+    draw_set_alpha(difficulty_alpha * 0.6);
+    draw_set_color(c_black);
+    draw_rectangle(0, 0, w, h, false);
     draw_set_alpha(difficulty_alpha * 0.88);
     draw_set_color(c_black);
     draw_rectangle(dx, dy, dx + dw, dy + dh, false);
