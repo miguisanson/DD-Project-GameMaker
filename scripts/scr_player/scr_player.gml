@@ -55,9 +55,9 @@ function Difficulty_Label(_difficulty = -1) {
     if (argument_count <= 0 || d == -1) d = Difficulty_GetCurrent();
     d = Difficulty_Normalize(d);
     switch (d) {
-        case DIFFICULTY_EASY: return "Easy";
-        case DIFFICULTY_HARD: return "Hard";
-        default: return "Normal";
+        case DIFFICULTY_EASY: return Loc_T("settings.difficulty.option.0", "Easy");
+        case DIFFICULTY_HARD: return Loc_T("settings.difficulty.option.2", "Hard");
+        default: return Loc_T("settings.difficulty.option.1", "Normal");
     }
 }
 
@@ -714,7 +714,19 @@ function UI_IsBlocking() {
 }
 
 function UI_SetFont() {
-    draw_set_font(UI_FONT);
+    var font_to_use = UI_FONT;
+    if (Loc_GetLanguage() == "ko") {
+        if (!variable_global_exists("ui_font_ko")) global.ui_font_ko = -1;
+        if (global.ui_font_ko == -1) {
+            var ko_size = 8;
+            global.ui_font_ko = font_add("Malgun Gothic", ko_size, false, false, 32, 55203);
+            if (global.ui_font_ko == -1) {
+                global.ui_font_ko = font_add("Noto Sans CJK KR", ko_size, false, false, 32, 55203);
+            }
+        }
+        if (global.ui_font_ko != -1) font_to_use = global.ui_font_ko;
+    }
+    draw_set_font(font_to_use);
 }
 
 function UI_PopupFadeAlpha(_opened_frame, _target_alpha = 1, _fade_frames = UI_POPUP_FADE_FRAMES) {
@@ -1104,13 +1116,20 @@ function GameSettings_ToReal(_value, _fallback) {
     return _fallback;
 }
 
+function GameSettings_NormalizeLanguage(_lang) {
+    var code = string_lower(string(_lang));
+    if (code == "ko") return "ko";
+    return "en";
+}
+
 function GameSettings_Defaults() {
     return {
         audio_ui: VOL_UI_DEFAULT,
         audio_sfx: VOL_SFX_DEFAULT,
         audio_bgm: VOL_MUSIC_DEFAULT,
         display_scale: DISPLAY_SCALE_DEFAULT,
-        fit_screen: true
+        fit_screen: true,
+        language: "en"
     };
 }
 
@@ -1122,6 +1141,7 @@ function GameSettings_Normalize(_settings) {
         if (variable_struct_exists(_settings, "audio_bgm")) out.audio_bgm = _settings.audio_bgm;
         if (variable_struct_exists(_settings, "display_scale")) out.display_scale = _settings.display_scale;
         if (variable_struct_exists(_settings, "fit_screen")) out.fit_screen = _settings.fit_screen;
+        if (variable_struct_exists(_settings, "language")) out.language = _settings.language;
     }
 
     out.audio_ui = clamp(GameSettings_ToReal(out.audio_ui, VOL_UI_DEFAULT), 0, 1);
@@ -1129,6 +1149,7 @@ function GameSettings_Normalize(_settings) {
     out.audio_bgm = clamp(GameSettings_ToReal(out.audio_bgm, VOL_MUSIC_DEFAULT), 0, 1);
     out.display_scale = clamp(round(GameSettings_ToReal(out.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
     out.fit_screen = (GameSettings_ToReal(out.fit_screen, 1) != 0);
+    out.language = GameSettings_NormalizeLanguage(out.language);
     if (DISPLAY_FORCE_FIT_SCREEN != 0) out.fit_screen = true;
     return out;
 }
@@ -1226,6 +1247,8 @@ function GameSettings_ApplyDisplay() {
 }
 
 function GameSettings_ApplyAll() {
+    var settings = GameSettings_Ensure();
+    Loc_SetLanguage(settings.language);
     GameSettings_ApplyAudio();
     GameSettings_ApplyDisplay();
 }
@@ -1276,6 +1299,7 @@ function GameState_Init() {
     var gs = global.state;
 
     Input_Init();
+    Loc_Init();
 
     if (!variable_global_exists("rng_inited") || !global.rng_inited) {
         randomize();
@@ -1397,6 +1421,7 @@ function GameState_Init() {
         gs.settings_boot_loaded = true;
     }
     gs.settings = GameSettings_Normalize(gs.settings);
+    Loc_SetLanguage(gs.settings.language);
 
     if (!variable_struct_exists(gs, "ui")) {
         gs.ui = {

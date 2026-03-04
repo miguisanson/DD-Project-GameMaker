@@ -285,12 +285,12 @@ function EnemyDB_Get(_enemy_id) {
         EnemyDB_Init();
     }
     if (ds_map_exists(global.enemy_db, _enemy_id)) {
-        return global.enemy_db[? _enemy_id];
+        return Enemy_LocalizeRuntime(global.enemy_db[? _enemy_id], _enemy_id);
     }
 
     return {
         id: -1,
-        name: "Unknown",
+        name: Loc_T("enemy.name.unknown", "Unknown"),
         level: 1,
         stats: { str: 10, agi: 10, def: 10, intt: 10, luck: 10 },
         base_hp: 10,
@@ -314,6 +314,34 @@ function EnemyDB_Get(_enemy_id) {
         traits: [],
         is_boss: false
     };
+}
+
+function Enemy_LocalizationKey(_enemy_id) {
+    switch (_enemy_id) {
+        case ENEMY_SLIME: return "enemy_slime";
+        case ENEMY_DIREWOLF: return "enemy_direwolf";
+        case ENEMY_GHOSTSWORD: return "enemy_ghostsword";
+        case ENEMY_SPIDER: return "enemy_spider";
+        case ENEMY_MADWHISP: return "enemy_madwhisp";
+        case ENEMY_SNAKE: return "enemy_snake";
+        case ENEMY_KILLER_PLANT: return "enemy_killer_plant";
+        case ENEMY_STRANGER: return "enemy_stranger";
+        case ENEMY_MINI_BOSS: return "enemy_mini_boss";
+        case ENEMY_FINAL_BOSS: return "enemy_final_boss";
+    }
+    return "unknown";
+}
+
+function Enemy_LocalizeRuntime(_enemy, _enemy_id = -1) {
+    if (!is_struct(_enemy)) return _enemy;
+
+    var eid = _enemy_id;
+    if (eid == -1 && variable_struct_exists(_enemy, "id")) eid = _enemy.id;
+    var key_suffix = Enemy_LocalizationKey(eid);
+
+    if (!variable_struct_exists(_enemy, "name_en")) _enemy.name_en = string(_enemy.name);
+    _enemy.name = Loc_T("enemy.name." + key_suffix, string(_enemy.name_en));
+    return _enemy;
 }
 
 function DB_Enemy(_enemy_id) {

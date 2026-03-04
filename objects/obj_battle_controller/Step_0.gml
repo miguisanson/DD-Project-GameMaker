@@ -11,6 +11,18 @@ var k_back = Input_UIBack();
 
 if (attack_timing_result_timer > 0) attack_timing_result_timer -= 1;
 
+if (!variable_instance_exists(id, "loc_revision")) loc_revision = -1;
+var loc_rev = Loc_GetRevision();
+if (loc_revision != loc_rev) {
+    if (is_array(battle_actions) && array_length(battle_actions) >= 4) {
+        battle_actions[0].label = Loc_T("battle.action.attack", "ATTACK");
+        battle_actions[1].label = Loc_T("battle.action.skill", "SKILL");
+        battle_actions[2].label = Loc_T("battle.action.item", "ITEM");
+        battle_actions[3].label = Loc_T("battle.action.run", "RUN");
+    }
+    loc_revision = loc_rev;
+}
+
 if (turn == TURN_PLAYER) {
     if (!player_turn_start_applied) {
         p = Equip_PlayerTurnStartApply(p);
@@ -66,13 +78,13 @@ if (battle_state == BSTATE_MENU) {
             Battle_AttackTimingBegin(self);
         } else if (action.state == BSTATE_SKILL_MENU) {
             if (array_length(Battle_GetSkillList(self)) <= 0) {
-                Battle_Message(self, "No skills available.", BSTATE_MENU);
+                Battle_Message(self, Loc_T("battle.menu.no_skills", "No skills available."), BSTATE_MENU);
             } else {
                 battle_state = action.state;
             }
         } else if (action.state == BSTATE_ITEM_MENU) {
             if (array_length(Battle_GetItemList(self)) <= 0) {
-                Battle_Message(self, "No items available.", BSTATE_MENU);
+                Battle_Message(self, Loc_T("battle.menu.no_items", "No items available."), BSTATE_MENU);
             } else {
                 battle_state = action.state;
             }
@@ -90,7 +102,7 @@ if (battle_state == BSTATE_MENU) {
 if (battle_state == BSTATE_SKILL_MENU) {
     var skills = Battle_GetSkillList(self);
     if (array_length(skills) <= 0) {
-        Battle_Message(self, "No skills available.", BSTATE_MENU);
+        Battle_Message(self, Loc_T("battle.menu.no_skills", "No skills available."), BSTATE_MENU);
         exit;
     }
 
@@ -123,7 +135,7 @@ if (battle_state == BSTATE_SKILL_MENU) {
 if (battle_state == BSTATE_ITEM_MENU) {
     var items = Battle_GetItemList(self);
     if (array_length(items) <= 0) {
-        Battle_Message(self, "No items available.", BSTATE_MENU);
+        Battle_Message(self, Loc_T("battle.menu.no_items", "No items available."), BSTATE_MENU);
         exit;
     }
 

@@ -98,6 +98,8 @@ function Interact_Handle(_inst) {
     var name = "";
     if (variable_instance_exists(_inst, "interact_name")) name = _inst.interact_name;
     if (name == "") name = object_get_name(_inst.object_index);
+    var interact_key = "interact.name." + string_lower(object_get_name(_inst.object_index));
+    name = Loc_T(interact_key, name);
 
     var has_dialogue_id = false;
     var base_id = "default";
@@ -151,7 +153,7 @@ function Interact_Handle(_inst) {
 
     // Grave interaction: random text + optional ghost easter egg spawn.
     if (variable_instance_exists(_inst, "grave_interactable") && _inst.grave_interactable) {
-        var grave_line = "An old grave rests here.";
+        var grave_line = Loc_T("interact.grave.default", "An old grave rests here.");
         if (variable_instance_exists(_inst, "grave_lines") && is_array(_inst.grave_lines) && array_length(_inst.grave_lines) > 0) {
             grave_line = _inst.grave_lines[irandom(array_length(_inst.grave_lines) - 1)];
         }

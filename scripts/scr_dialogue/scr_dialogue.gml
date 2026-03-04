@@ -95,12 +95,20 @@ function DialogueDB_Get(_dialogue_id) {
     if (!variable_global_exists("dialogue_db") || !ds_exists(global.dialogue_db, ds_type_map)) {
         DialogueDB_Init();
     }
-    if (!ds_map_exists(global.dialogue_db, _dialogue_id)) {
-        _dialogue_id = "default";
+    var did = string(_dialogue_id);
+    if (!ds_map_exists(global.dialogue_db, did)) {
+        did = "default";
     }
-    var lines = global.dialogue_db[? _dialogue_id];
+    var lines = global.dialogue_db[? did];
+    var localized = [];
+    if (is_array(lines)) {
+        for (var i = 0; i < array_length(lines); i++) {
+            var fallback = string(lines[i]);
+            array_push(localized, Loc_T("dialogue." + did + "." + string(i), fallback));
+        }
+    }
     var vars = { interact: Input_Label("interact"), confirm: Input_Label("confirm"), cancel: Input_Label("cancel") };
-    return Dialogue_FormatLines(lines, vars);
+    return Dialogue_FormatLines(localized, vars);
 }
 
 function Dialogue_EventConfigEnsure() {

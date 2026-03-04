@@ -18,7 +18,11 @@ var pad_x = 6;
 var pad_y = 4;
 
 if (!variable_instance_exists(id, "difficulty_options") || !is_array(difficulty_options) || array_length(difficulty_options) <= 0) {
-    difficulty_options = ["Easy", "Normal", "Hard"];
+    difficulty_options = [
+        Loc_T("settings.difficulty.option.0", "Easy"),
+        Loc_T("settings.difficulty.option.1", "Normal"),
+        Loc_T("settings.difficulty.option.2", "Hard")
+    ];
 }
 if (!variable_instance_exists(id, "difficulty_values") || !is_array(difficulty_values) || array_length(difficulty_values) != array_length(difficulty_options)) {
     difficulty_values = [DIFFICULTY_EASY, DIFFICULTY_NORMAL, DIFFICULTY_HARD];
@@ -46,8 +50,11 @@ if (state == "main" && gs.ui.mode != UI_SAVE && !loading_into_game) {
 
     for (var i = 0; i < array_length(main_options); i++) {
         var label = main_options[i];
+        if (variable_instance_exists(id, "main_option_keys") && is_array(main_option_keys) && i < array_length(main_option_keys)) {
+            label = Loc_T(main_option_keys[i], label);
+        }
         var yy = start_y + i * row_gap;
-        var load_disabled = (label == "Load Game" && !can_load);
+        var load_disabled = (i == 1 && !can_load);
         var selected = (state == "main" && i == main_index && !load_disabled);
 
         if (selected) {
@@ -81,12 +88,15 @@ if (state == "difficulty" && gs.ui.mode != UI_SAVE && !loading_into_game) {
     draw_set_color(c_white);
     draw_rectangle(dx, dy, dx + dw, dy + dh, true);
     draw_set_alpha(difficulty_alpha);
-    draw_text(dx + 12, dy + 12, "Select Difficulty");
+    draw_text(dx + 12, dy + 12, Loc_T("menu.difficulty.title", "Select Difficulty"));
 
     var drow_gap = max(18, line_h + 6);
     var start_y2 = dy + 36;
     for (var di2 = 0; di2 < array_length(difficulty_options); di2++) {
         var dlabel = difficulty_options[di2];
+        if (variable_instance_exists(id, "difficulty_option_keys") && is_array(difficulty_option_keys) && di2 < array_length(difficulty_option_keys)) {
+            dlabel = Loc_T(difficulty_option_keys[di2], dlabel);
+        }
         var dyy = start_y2 + di2 * drow_gap;
         var dsel = (di2 == difficulty_index);
 
@@ -114,7 +124,7 @@ if (state == "difficulty" && gs.ui.mode != UI_SAVE && !loading_into_game) {
     } else {
         draw_set_color(c_white);
     }
-    draw_text(dx + 18, back_y, "Back");
+    draw_text(dx + 18, back_y, Loc_T("menu.common.back", "Back"));
 }
 
 if (SettingsPopup_IsOpen("title") && !loading_into_game) {

@@ -45,6 +45,7 @@ function Save_ReadSettingsConfig() {
     if (variable_struct_exists(raw, "display_scale")) out.display_scale = raw.display_scale;
     if (variable_struct_exists(raw, "fit_screen")) out.fit_screen = raw.fit_screen;
     else if (settings_version > 0) out.fit_screen = false;
+    if (variable_struct_exists(raw, "language")) out.language = raw.language;
 
     // Migrate older configs that defaulted to tiny 1x startup scale.
     if (settings_version < 2) {
@@ -59,12 +60,13 @@ function Save_ReadSettingsConfig() {
 function Save_WriteSettingsConfig(_settings) {
     var s = GameSettings_Normalize(_settings);
     var raw = {
-        settings_version: 4,
+        settings_version: 5,
         vol_ui: s.audio_ui,
         vol_sfx: s.audio_sfx,
         vol_bgm: s.audio_bgm,
         display_scale: s.display_scale,
-        fit_screen: s.fit_screen
+        fit_screen: s.fit_screen,
+        language: s.language
     };
 
     var json = json_stringify(raw);

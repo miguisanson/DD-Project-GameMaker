@@ -22,7 +22,10 @@ function BedMenu_Open() {
         opened_frame: Input_Frame(),
         require_release: opened_with_confirm,
         index: 0,
-        options: ["Rest", "Back"],
+        options: [
+            Loc_T("bed.option.rest", "Rest"),
+            Loc_T("bed.option.back", "Back")
+        ],
         pending_action: ""
     };
 }
@@ -145,7 +148,10 @@ function BedMenu_Draw() {
 
     var max_w = 0;
     for (var i = 0; i < array_length(bm.options); i++) {
-        max_w = max(max_w, string_width(bm.options[i]));
+        var opt_text = bm.options[i];
+        if (i == 0) opt_text = Loc_T("bed.option.rest", opt_text);
+        else if (i == 1) opt_text = Loc_T("bed.option.back", opt_text);
+        max_w = max(max_w, string_width(opt_text));
     }
 
     var bw = max_w + inner_pad * 6;
@@ -172,7 +178,10 @@ function BedMenu_Draw() {
             draw_rectangle(bx + inner_pad, yy - 2, bx + bw - inner_pad, yy + row_h - 2, true);
         }
         draw_set_color(selected ? c_black : c_white);
-        draw_text(bx + inner_pad * 2, yy, bm.options[j]);
+        var bed_label = bm.options[j];
+        if (j == 0) bed_label = Loc_T("bed.option.rest", bed_label);
+        else if (j == 1) bed_label = Loc_T("bed.option.back", bed_label);
+        draw_text(bx + inner_pad * 2, yy, bed_label);
     }
 
     draw_set_alpha(1);
@@ -345,7 +354,7 @@ function SaveMenu_Handle() {
                     UI_ModalRootEnd(false);
                 }
             } else if (pending_action == "show_no_saves_message") {
-                SaveMenu_OpenMessage("No saved games found.", true);
+                SaveMenu_OpenMessage(Loc_T("save.msg.no_saved_games_found", "No saved games found."), true);
             }
         } else {
             gs.ui.save_menu = sm;
@@ -511,7 +520,7 @@ function SaveMenu_Handle() {
                     sm.confirm_close_frame = UI_OPENED_FRAME_NONE;
                     sm.confirm_mode = "message";
                     sm.confirm_choice = 0;
-                    sm.message = "No game saves.";
+                    sm.message = Loc_T("save.msg.no_game_saves", "No game saves.");
                     sm.close_after_message = true;
                     sm.confirm_opened_frame = Input_Frame();
                     return;
@@ -573,7 +582,9 @@ function SaveMenu_Draw() {
     var popup_alpha = UI_PopupAlpha(sm.opened_frame, sm.closing, sm.close_frame, 1);
     var hide_slots = variable_struct_exists(sm, "hide_slots") && sm.hide_slots;
 
-    var title = (sm.mode == "load") ? "Load Game" : "Save Game";
+    var title = (sm.mode == "load")
+        ? Loc_T("save.title.load", "Load Game")
+        : Loc_T("save.title.save", "Save Game");
 
     var slot_labels = array_create(3, "");
     var longest_slot_w = 0;
@@ -584,15 +595,15 @@ function SaveMenu_Draw() {
         } else {
             info_l = Save_SlotInfo(li + 1);
         }
-        var label_l = "Slot " + string(li + 1);
+        var label_l = Loc_T("save.slot.prefix", "Slot ") + string(li + 1);
         if (info_l.exists) {
-            label_l += "  " + info_l.class_name + " Lv" + string(info_l.level) + "  " + info_l.room;
+            label_l += "  " + info_l.class_name + " " + Loc_T("save.level.short", "Lv") + string(info_l.level) + "  " + info_l.room;
         }
         slot_labels[li] = label_l;
         longest_slot_w = max(longest_slot_w, string_width(label_l));
     }
 
-    var delete_label = "Delete";
+    var delete_label = Loc_T("save.delete", "Delete");
     var delete_pad_x = 8;
     var delete_text_w = string_width(delete_label);
     var delete_btn_w = delete_text_w + delete_pad_x * 2;
@@ -671,7 +682,8 @@ function SaveMenu_Draw() {
     var back_y = by + bh - (line_h + 4);
     if (!hide_slots) {
         if (sm.slot == 3 && !sm.confirm) {
-            var bwid = string_width("Back");
+            var back_label = Loc_T("save.back", "Back");
+            var bwid = string_width(back_label);
             draw_set_color(c_white);
             draw_rectangle(back_x - 4, back_y - 2, back_x + bwid + 4, back_y + line_h + 2, false);
             draw_set_color(c_black);
@@ -680,7 +692,7 @@ function SaveMenu_Draw() {
         } else {
             draw_set_color(c_white);
         }
-        draw_text(back_x, back_y, "Back");
+        draw_text(back_x, back_y, Loc_T("save.back", "Back"));
     } else {
         draw_set_color(c_white);
     }
@@ -699,10 +711,10 @@ function SaveMenu_Draw() {
         var cx = bx + bw * 0.5;
         var cy = by + bh * 0.7;
         var msg = "";
-        if (sm.confirm_mode == "delete") msg = "Delete slot?";
-        else if (sm.confirm_mode == "load") msg = "Load save?";
-        else if (sm.confirm_mode == "overwrite") msg = "Overwrite save?";
-        else if (sm.confirm_mode == "save") msg = "Save to slot?";
+        if (sm.confirm_mode == "delete") msg = Loc_T("save.confirm.delete", "Delete slot?");
+        else if (sm.confirm_mode == "load") msg = Loc_T("save.confirm.load", "Load save?");
+        else if (sm.confirm_mode == "overwrite") msg = Loc_T("save.confirm.overwrite", "Overwrite save?");
+        else if (sm.confirm_mode == "save") msg = Loc_T("save.confirm.save", "Save to slot?");
         else msg = sm.message;
 
         var popup_pad_x = 12;
@@ -714,9 +726,9 @@ function SaveMenu_Draw() {
 
         var buttons_w = 0;
         if (sm.confirm_mode != "saved" && sm.confirm_mode != "message") {
-            buttons_w = (string_width("OK") + btn_pad_x * 2) + 14 + (string_width("Cancel") + btn_pad_x * 2);
+            buttons_w = (string_width(Loc_T("common.ok", "OK")) + btn_pad_x * 2) + 14 + (string_width(Loc_T("common.cancel", "Cancel")) + btn_pad_x * 2);
         } else {
-            buttons_w = string_width("OK") + btn_pad_x * 2;
+            buttons_w = string_width(Loc_T("common.ok", "OK")) + btn_pad_x * 2;
         }
 
         var popup_w = max(160, max(msg_w + popup_pad_x * 2, buttons_w + popup_pad_x * 2));
@@ -741,8 +753,8 @@ function SaveMenu_Draw() {
         var btn_y = msg_y + line_h + popup_gap_y;
 
         if (sm.confirm_mode != "saved" && sm.confirm_mode != "message") {
-            var yes_label = "OK";
-            var no_label = "Cancel";
+            var yes_label = Loc_T("common.ok", "OK");
+            var no_label = Loc_T("common.cancel", "Cancel");
             var yes_w = string_width(yes_label) + btn_pad_x * 2;
             var no_w = string_width(no_label) + btn_pad_x * 2;
             var btn_gap_x = 14;
@@ -771,7 +783,7 @@ function SaveMenu_Draw() {
             }
             draw_text(nox + (no_w - string_width(no_label)) * 0.5, btn_y + 2, no_label);
         } else {
-            var ok_label = "OK";
+            var ok_label = Loc_T("common.ok", "OK");
             var ok_w = string_width(ok_label) + btn_pad_x * 2;
             var ok_x = px1 + (popup_w - ok_w) * 0.5;
             draw_set_color(c_white);

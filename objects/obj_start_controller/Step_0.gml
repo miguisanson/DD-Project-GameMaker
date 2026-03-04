@@ -2,7 +2,11 @@ Input_PreStep();
 var gs = GameState_Get();
 
 if (!variable_instance_exists(id, "difficulty_options") || !is_array(difficulty_options) || array_length(difficulty_options) <= 0) {
-    difficulty_options = ["Easy", "Normal", "Hard"];
+    difficulty_options = [
+        Loc_T("settings.difficulty.option.0", "Easy"),
+        Loc_T("settings.difficulty.option.1", "Normal"),
+        Loc_T("settings.difficulty.option.2", "Hard")
+    ];
 }
 if (!variable_instance_exists(id, "difficulty_values") || !is_array(difficulty_values) || array_length(difficulty_values) != array_length(difficulty_options)) {
     difficulty_values = [DIFFICULTY_EASY, DIFFICULTY_NORMAL, DIFFICULTY_HARD];
@@ -24,8 +28,13 @@ var k_ok = Input_UIConfirm();
 var k_back = Input_UIBack();
 
 if (state == "main") {
+    var title_idx_new = 0;
+    var title_idx_load = 1;
+    var title_idx_settings = 2;
+    var title_idx_exit = 3;
+
     load_available = Save_HasAnySlot();
-    if (!load_available && main_options[main_index] == "Load Game") {
+    if (!load_available && main_index == title_idx_load) {
         main_index = (main_index + 1) mod array_length(main_options);
     }
 
@@ -33,7 +42,7 @@ if (state == "main") {
         var max_loop_up = array_length(main_options);
         repeat (max_loop_up) {
             main_index = (main_index + array_length(main_options) - 1) mod array_length(main_options);
-            if (load_available || main_options[main_index] != "Load Game") break;
+            if (load_available || main_index != title_idx_load) break;
         }
         SFX_PlayUI("ui_move");
     }
@@ -41,21 +50,21 @@ if (state == "main") {
         var max_loop_down = array_length(main_options);
         repeat (max_loop_down) {
             main_index = (main_index + 1) mod array_length(main_options);
-            if (load_available || main_options[main_index] != "Load Game") break;
+            if (load_available || main_index != title_idx_load) break;
         }
         SFX_PlayUI("ui_move");
     }
 
     if (k_ok) {
-        var opt = main_options[main_index];
-        if (opt == "Load Game" && !load_available) {
+        var opt = main_index;
+        if (opt == title_idx_load && !load_available) {
             main_index = (main_index + 1) mod array_length(main_options);
             SFX_PlayUI("ui_move");
             return;
         }
 
         SFX_PlayUI("ui_confirm");
-        if (opt == "New Game") {
+        if (opt == title_idx_new) {
             UI_ModalRootBegin("title_difficulty");
             var current_difficulty = DIFFICULTY_NORMAL;
             if (variable_struct_exists(gs, "difficulty")) current_difficulty = Difficulty_Normalize(gs.difficulty);
@@ -71,12 +80,12 @@ if (state == "main") {
             difficulty_close_frame = UI_OPENED_FRAME_NONE;
             difficulty_pending_action = "";
             state = "difficulty";
-        } else if (opt == "Load Game") {
+        } else if (opt == title_idx_load) {
             SaveMenu_Open("load", "main");
-        } else if (opt == "Settings") {
+        } else if (opt == title_idx_settings) {
             SettingsPopup_Open("title");
             state = "settings";
-        } else if (opt == "Exit Game") {
+        } else if (opt == title_idx_exit) {
             game_end();
         }
     }
@@ -160,6 +169,19 @@ if (state == "cutscene") {
         if (variable_struct_exists(cutscene_definitions, cutscene_id)) {
             var seq = variable_struct_get(cutscene_definitions, cutscene_id);
             if (is_array(seq)) cutscene_sequence = seq;
+        }
+
+        if (is_array(cutscene_sequence)) {
+            for (var segi = 0; segi < array_length(cutscene_sequence); segi++) {
+                var seg_loc = cutscene_sequence[segi];
+                if (!is_struct(seg_loc)) continue;
+                if (!variable_struct_exists(seg_loc, "lines") || !is_array(seg_loc.lines)) continue;
+                for (var li_loc = 0; li_loc < array_length(seg_loc.lines); li_loc++) {
+                    var fallback_loc = string(seg_loc.lines[li_loc]);
+                    seg_loc.lines[li_loc] = Loc_T("cutscene." + cutscene_id + "." + string(segi) + "." + string(li_loc), fallback_loc);
+                }
+                cutscene_sequence[segi] = seg_loc;
+            }
         }
 
         if (!is_array(cutscene_sequence) || array_length(cutscene_sequence) <= 0) {

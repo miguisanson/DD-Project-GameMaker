@@ -359,7 +359,7 @@ if (battle_state == BSTATE_SKILL_MENU) {
         var yy = my2 + row * row_h;
         if (s == skill_count) {
             if (s == skill_index) draw_text(mx2 - 10, yy, ">");
-            draw_text(mx2, yy, "Back");
+            draw_text(mx2, yy, Loc_T("battle.menu.back", "Back"));
         } else {
             var sk = SkillDB_Get(skills[s]);
             if (s == skill_index) draw_text(mx2 - 10, yy, ">");
@@ -368,7 +368,7 @@ if (battle_state == BSTATE_SKILL_MENU) {
                 draw_sprite(sk.icon_sprite, 0, mx2, yy + 2);
                 tx += 16;
             }
-            draw_text(tx, yy, sk.name + " (" + string(sk.mp_cost) + "MP)");
+            draw_text(tx, yy, Loc_T("battle.menu.skill_row", "{name} ({mp}MP)", { name: sk.name, mp: string(sk.mp_cost) }));
         }
     }
 }
@@ -390,7 +390,7 @@ if (battle_state == BSTATE_ITEM_MENU) {
         var yy2 = my3 + row * row_h;
         if (it == item_count) {
             if (it == item_index) draw_text(mx3 - 10, yy2, ">");
-            draw_text(mx3, yy2, "Back");
+            draw_text(mx3, yy2, Loc_T("battle.menu.back", "Back"));
         } else {
             var item = ItemDB_Get(items[it].id);
             if (it == item_index) draw_text(mx3 - 10, yy2, ">");
@@ -399,7 +399,7 @@ if (battle_state == BSTATE_ITEM_MENU) {
                 draw_sprite(item.sprite, 0, mx3, yy2 + 2);
                 tx2 += 16;
             }
-            draw_text(tx2, yy2, item.name + " x" + string(items[it].qty));
+            draw_text(tx2, yy2, Loc_T("battle.menu.item_row", "{name} x{qty}", { name: item.name, qty: string(items[it].qty) }));
         }
     }
 }

@@ -660,11 +660,11 @@ function SkillDB_Get(_skill_id) {
         SkillDB_Init();
     }
     if (ds_map_exists(global.skill_db, _skill_id)) {
-        return global.skill_db[? _skill_id];
+        return Skill_LocalizeRuntime(global.skill_db[? _skill_id], _skill_id);
     }
     return {
         id: -1,
-        name: "Unknown",
+        name: Loc_T("skill.name.unknown", "Unknown"),
         mp_cost: 0,
         power: 0,
         power_mult: 1,
@@ -690,6 +690,58 @@ function SkillDB_Get(_skill_id) {
         extra_turns: 0,
         set_enemy_actions: 0
     };
+}
+
+function Skill_LocalizationKey(_skill_id) {
+    switch (_skill_id) {
+        case SKILL_POWER_STRIKE: return "skill_power_strike";
+        case SKILL_WOUND: return "skill_wound";
+        case SKILL_HILT_BASH: return "skill_hilt_bash";
+        case SKILL_MUSCLE_UP: return "skill_muscle_up";
+        case SKILL_REV_UP: return "skill_rev_up";
+        case SKILL_HORIZ_SLASH: return "skill_horiz_slash";
+        case SKILL_POISON_ARROW: return "skill_poison_arrow";
+        case SKILL_EVASION: return "skill_evasion";
+        case SKILL_DOUBLE_SHOT: return "skill_double_shot";
+        case SKILL_TAKE_AIM: return "skill_take_aim";
+        case SKILL_FIREBALL: return "skill_fireball";
+        case SKILL_POISON_MIST: return "skill_poison_mist";
+        case SKILL_ICE_SPEAR: return "skill_ice_spear";
+        case SKILL_MEDITATION: return "skill_meditation";
+        case SKILL_FORESIGHT: return "skill_foresight";
+        case SKILL_POISON_FANGS: return "skill_poison_fangs";
+        case SKILL_SOLIDIFY: return "skill_solidify";
+        case SKILL_BITE: return "skill_bite";
+        case SKILL_BLOODTHIRSTY: return "skill_bloodthirsty";
+        case SKILL_VINE_TRAP: return "skill_vine_trap";
+        case SKILL_SCORCHING_TOUCH: return "skill_scorching_touch";
+        case SKILL_GHOST_CUT: return "skill_ghost_cut";
+        case SKILL_STEAL: return "skill_steal";
+        case SKILL_RAMMING: return "skill_ramming";
+        case SKILL_RAMPAGE: return "skill_rampage";
+        case SKILL_CURSE: return "skill_curse";
+        case SKILL_BLESSING: return "skill_blessing";
+        case SKILL_FINAL_FURY: return "skill_final_fury";
+    }
+    return "unknown";
+}
+
+function Skill_LocalizeRuntime(_skill, _skill_id = -1) {
+    if (!is_struct(_skill)) return _skill;
+
+    var sid = _skill_id;
+    if (sid == -1 && variable_struct_exists(_skill, "id")) sid = _skill.id;
+    var key_suffix = Skill_LocalizationKey(sid);
+
+    if (!variable_struct_exists(_skill, "name_en")) _skill.name_en = string(_skill.name);
+    _skill.name = Loc_T("skill.name." + key_suffix, string(_skill.name_en));
+
+    if (variable_struct_exists(_skill, "use_msg")) {
+        if (!variable_struct_exists(_skill, "use_msg_en")) _skill.use_msg_en = string(_skill.use_msg);
+        _skill.use_msg = Loc_T("combat.msg.skill.use." + key_suffix, string(_skill.use_msg_en));
+    }
+
+    return _skill;
 }
 
 function Skill_ClassAllowed(_skill, _class_id) {
@@ -792,14 +844,14 @@ function Skill_Use(_user, _target, _skill_id) {
 
     if (user_is_player && _user.mp < final_mp_cost) {
         result.ok = false;
-        result.msg = "Not enough MP.";
+        result.msg = Loc_T("combat.msg.not_enough_mp", "Not enough MP.");
         return result;
     }
 
     if (user_is_player) {
         if (variable_struct_exists(_user, "class_id") && !Skill_ClassAllowed(s, _user.class_id)) {
             result.ok = false;
-            result.msg = "Can't use that.";
+            result.msg = Loc_T("item.msg.cant_use", "Can't use that.");
             return result;
         }
     }
@@ -832,17 +884,17 @@ function Skill_Use(_user, _target, _skill_id) {
             }
         } else {
             if (variable_struct_exists(s, "use_msg")) result.msg = string(s.use_msg);
-            else result.msg = "Skill used.";
+            else result.msg = Loc_T("combat.msg.skill_used", "Skill used.");
         }
 
         if (applied_any_status) {
-            var msg_status = "Applied ";
+            var msg_status = Loc_T("combat.msg.applied_prefix", "Applied ");
             for (var si = 0; si < array_length(applied_status_names); si++) {
-                if (si > 0) msg_status += ", ";
+                if (si > 0) msg_status += Loc_T("combat.msg.list_separator", ", ");
                 msg_status += applied_status_names[si];
             }
             if (result.msg != "") result.msg += " ";
-            result.msg += msg_status + ".";
+            result.msg += msg_status + Loc_T("combat.msg.sentence_dot", ".");
         }
         return result;
     }
@@ -871,38 +923,38 @@ function Skill_Use(_user, _target, _skill_id) {
         }
         
         if (applied_any_status) {
-            var msg_status2 = "Applied ";
+            var msg_status2 = Loc_T("combat.msg.applied_prefix", "Applied ");
             for (var sm = 0; sm < array_length(applied_status_names); sm++) {
-                if (sm > 0) msg_status2 += ", ";
+                if (sm > 0) msg_status2 += Loc_T("combat.msg.list_separator", ", ");
                 msg_status2 += applied_status_names[sm];
             }
             if (result.msg != "") result.msg += " ";
-            result.msg += msg_status2 + ".";
+            result.msg += msg_status2 + Loc_T("combat.msg.sentence_dot", ".");
         } else if (result.msg == "") {
             if (variable_struct_exists(s, "use_msg")) result.msg = string(s.use_msg);
-            else result.msg = "Skill used.";
+            else result.msg = Loc_T("combat.msg.skill_used", "Skill used.");
         }
         return result;
     }
 
     if (s.effect == "steal_item") {
         if (!variable_struct_exists(_target, "inventory") || !is_array(_target.inventory) || array_length(_target.inventory) <= 0) {
-            result.msg = "Nothing to steal.";
+            result.msg = Loc_T("combat.msg.nothing_to_steal", "Nothing to steal.");
             return result;
         }
 
         var pick = irandom(array_length(_target.inventory) - 1);
         var inv = _target.inventory[pick];
         if (!is_struct(inv) || !variable_struct_exists(inv, "id")) {
-            result.msg = "Nothing to steal.";
+            result.msg = Loc_T("combat.msg.nothing_to_steal", "Nothing to steal.");
             return result;
         }
         var stolen_item = ItemDB_Get(inv.id);
         _target.inventory = Inv_Remove(_target.inventory, inv.id, 1);
         if (is_struct(stolen_item) && variable_struct_exists(stolen_item, "name")) {
-            result.msg = "Stole " + string(stolen_item.name) + ".";
+            result.msg = Loc_T("combat.msg.stole_item", "Stole {item}.", { item: string(stolen_item.name) });
         } else {
-            result.msg = "Stole an item.";
+            result.msg = Loc_T("combat.msg.stole_an_item", "Stole an item.");
         }
         return result;
     }
@@ -998,13 +1050,13 @@ function Skill_Use(_user, _target, _skill_id) {
         }
 
         if (applied_any_status) {
-            var msg_status3 = "Applied ";
+            var msg_status3 = Loc_T("combat.msg.applied_prefix", "Applied ");
             for (var sj = 0; sj < array_length(applied_status_names); sj++) {
-                if (sj > 0) msg_status3 += ", ";
+                if (sj > 0) msg_status3 += Loc_T("combat.msg.list_separator", ", ");
                 msg_status3 += applied_status_names[sj];
             }
             if (result.msg != "") result.msg += " ";
-            result.msg += msg_status3 + ".";
+            result.msg += msg_status3 + Loc_T("combat.msg.sentence_dot", ".");
         } else if (variable_struct_exists(s, "use_msg")) {
             result.msg = string(s.use_msg);
         }

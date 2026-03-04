@@ -263,7 +263,7 @@ function Battle_GrantRewards(_p, _e) {
 }
 
 function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
-    var enemy_name = "Enemy";
+    var enemy_name = Loc_T("enemy.name.unknown", "Enemy");
     if (is_struct(_enemy) && variable_struct_exists(_enemy, "name")) enemy_name = string(_enemy.name);
 
     var loot_gained = is_struct(_rewards) && variable_struct_exists(_rewards, "loot") && is_array(_rewards.loot) && array_length(_rewards.loot) > 0;
@@ -276,9 +276,9 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
         at_level_cap: (is_struct(_player) && variable_struct_exists(_player, "level")) ? Level_IsAtCap(_player.level) : false
     };
 
-    var lines = [Enemy_AutoResolveBuildMessage({ name: enemy_name }, result, "You defeated ")];
+    var lines = [Enemy_AutoResolveBuildMessage({ name: enemy_name }, result, Loc_T("combat.msg.victory_prefix", "You defeated "))];
     if (loot_gained) {
-        var loot_entries = Loot_BuildMessageEntries(_rewards.loot, "Loot: ");
+        var loot_entries = Loot_BuildMessageEntries(_rewards.loot, Loc_T("combat.msg.loot_prefix", "Loot: "));
         for (var i = 0; i < array_length(loot_entries); i++) {
             array_push(lines, loot_entries[i]);
         }
@@ -299,8 +299,8 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
     }
 
     if (!floor1_slime_done && killed_floor1_slime) {
-        array_push(lines, "How was that even alive?! I almost died.");
-        array_push(lines, "God, I just need to get out of here.");
+        array_push(lines, Loc_T("combat.msg.floor1_reaction.0", "How was that even alive?! I almost died."));
+        array_push(lines, Loc_T("combat.msg.floor1_reaction.1", "God, I just need to get out of here."));
         variable_struct_set(gs.flags, floor1_slime_key, true);
     }
 
@@ -332,7 +332,7 @@ function Battle_CheckEnd(_bc, _p, _e) {
         var gs = GameState_Get();
         gs.pending_post_battle_dialogue_lines = Battle_BuildVictoryDialogueLines(_e, rewards, _p);
 
-        Battle_Message(_bc, _e.name + " has been slain.", BSTATE_END_RUN);
+        Battle_Message(_bc, Loc_T("combat.msg.enemy_slain", "{enemy} has been slain.", { enemy: _e.name }), BSTATE_END_RUN);
         return true;
     }
 
@@ -376,11 +376,11 @@ function Battle_AttackTimingTarget(_bc) {
 
 function Battle_AttackTimingJudge(_delta) {
     var d = abs(_delta);
-    if (d <= ATTACK_WINDOW_PERFECT) return { key: "PERFECT", label: "PERFECT", mult: 1.00, hit: true };
-    if (d <= ATTACK_WINDOW_GOOD)    return { key: "GOOD",    label: "GOOD",    mult: 0.75, hit: true };
-    if (d <= ATTACK_WINDOW_OKAY)    return { key: "OKAY",    label: "OKAY",    mult: 0.50, hit: true };
-    if (d <= ATTACK_WINDOW_BAD)     return { key: "BAD",     label: "BAD",     mult: 0.25, hit: true };
-    return { key: "MISS", label: "MISS", mult: 0.00, hit: false };
+    if (d <= ATTACK_WINDOW_PERFECT) return { key: "PERFECT", label: Loc_T("battle.action.timing.perfect", "PERFECT"), mult: 1.00, hit: true };
+    if (d <= ATTACK_WINDOW_GOOD)    return { key: "GOOD",    label: Loc_T("battle.action.timing.good", "GOOD"),       mult: 0.75, hit: true };
+    if (d <= ATTACK_WINDOW_OKAY)    return { key: "OKAY",    label: Loc_T("battle.action.timing.okay", "OKAY"),       mult: 0.50, hit: true };
+    if (d <= ATTACK_WINDOW_BAD)     return { key: "BAD",     label: Loc_T("battle.action.timing.bad", "BAD"),         mult: 0.25, hit: true };
+    return { key: "MISS", label: Loc_T("battle.action.timing.miss", "MISS"), mult: 0.00, hit: false };
 }
 
 function Battle_PlayerStunSkip(_bc) {
@@ -392,7 +392,7 @@ function Battle_PlayerStunSkip(_bc) {
     _bc.turn = TURN_ENEMY;
     _bc.p = p;
     _bc.e = e;
-    Battle_Message(_bc, "You are stunned!", BSTATE_ENEMY_ACT);
+    Battle_Message(_bc, Loc_T("combat.msg.player_stunned", "You are stunned!"), BSTATE_ENEMY_ACT);
     return false;
 }
 
@@ -447,9 +447,9 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
     var p = _bc.p;
     var e = _bc.e;
     var timing = _timing;
-    if (!is_struct(timing)) timing = { key: "MISS", label: "MISS", mult: 0.00, hit: false };
+    if (!is_struct(timing)) timing = { key: "MISS", label: Loc_T("battle.action.timing.miss", "MISS"), mult: 0.00, hit: false };
 
-    var timing_label = variable_struct_exists(timing, "label") ? string(timing.label) : "MISS";
+    var timing_label = variable_struct_exists(timing, "label") ? string(timing.label) : Loc_T("battle.action.timing.miss", "MISS");
     var timing_key = variable_struct_exists(timing, "key") ? string(timing.key) : "MISS";
     var timing_mult = variable_struct_exists(timing, "mult") ? clamp(real(timing.mult), 0, 1) : 0;
     var timing_hit = variable_struct_exists(timing, "hit") && timing.hit;
@@ -522,21 +522,21 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
 
     if (!timing_hit) {
         SFX_PlayMissOrBlocked(false, -1);
-        var m0 = "You missed!";
+        var m0 = Loc_T("combat.msg.player_miss", "You missed!");
         if (passive_msg != "") m0 += " " + passive_msg;
         Battle_Message(_bc, m0, BSTATE_ENEMY_ACT);
     } else if (_bc.last_crit) {
         if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        var m1 = "Critical hit! " + string(_bc.last_dmg) + " damage!";
+        var m1 = Loc_T("combat.msg.player_crit", "Critical hit! {dmg} damage!", { dmg: _bc.last_dmg });
         if (passive_msg != "") m1 += " " + passive_msg;
         Battle_Message(_bc, m1, BSTATE_ENEMY_ACT);
     } else {
         if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        var m2 = "You hit for " + string(_bc.last_dmg) + " damage!";
+        var m2 = Loc_T("combat.msg.player_hit", "You hit for {dmg} damage!", { dmg: _bc.last_dmg });
         if (passive_msg != "") m2 += " " + passive_msg;
         Battle_Message(_bc, m2, BSTATE_ENEMY_ACT);
     }
@@ -567,13 +567,13 @@ function Battle_PlayerAttackTimingStep(_bc, _confirm_pressed) {
 
     var late_limit = _bc.attack_timing_target_y + ATTACK_WINDOW_BAD + ATTACK_TIMING_END_MARGIN;
     if (_bc.attack_timing_y >= late_limit) {
-        Battle_PlayerAttackResolveTimed(_bc, { key: "MISS", label: "MISS", mult: 0.00, hit: false });
+        Battle_PlayerAttackResolveTimed(_bc, { key: "MISS", label: Loc_T("battle.action.timing.miss", "MISS"), mult: 0.00, hit: false });
         return;
     }
 }
 
 function Battle_PlayerAttack(_bc) {
-    Battle_PlayerAttackResolveTimed(_bc, { key: "PERFECT", label: "PERFECT", mult: 1.00, hit: true });
+    Battle_PlayerAttackResolveTimed(_bc, { key: "PERFECT", label: Loc_T("battle.action.timing.perfect", "PERFECT"), mult: 1.00, hit: true });
 }
 
 function Battle_PlayerSkill(_bc, _skill_id) {
@@ -628,16 +628,16 @@ function Battle_PlayerSkill(_bc, _skill_id) {
         Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT, fx);
     } else if (!res.hit) {
         SFX_PlayMissOrBlocked(false, -1);
-        Battle_Message(_bc, "Skill missed!", BSTATE_ENEMY_ACT, fx);
+        Battle_Message(_bc, Loc_T("combat.msg.skill_miss", "Skill missed!"), BSTATE_ENEMY_ACT, fx);
     } else if (res.crit) {
-        Battle_Message(_bc, "Critical skill! " + string(res.dmg) + " damage!", BSTATE_ENEMY_ACT, fx);
+        Battle_Message(_bc, Loc_T("combat.msg.skill_crit", "Critical skill! {dmg} damage!", { dmg: res.dmg }), BSTATE_ENEMY_ACT, fx);
     } else if (res.dmg > 0) {
         if (instance_exists(_bc.enemy_inst)) {
             SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
         }
-        Battle_Message(_bc, "Skill hit for " + string(res.dmg) + " damage!", BSTATE_ENEMY_ACT, fx);
+        Battle_Message(_bc, Loc_T("combat.msg.skill_hit", "Skill hit for {dmg} damage!", { dmg: res.dmg }), BSTATE_ENEMY_ACT, fx);
     } else {
-        Battle_Message(_bc, "Skill used.", BSTATE_ENEMY_ACT, fx);
+        Battle_Message(_bc, Loc_T("combat.msg.skill_used", "Skill used."), BSTATE_ENEMY_ACT, fx);
     }
 
     if (Battle_PlayerFinalizeTurn(_bc, p, e, grant_extra_turns)) return;
@@ -706,10 +706,10 @@ function Battle_RunAttempt(_bc) {
 
     if (pr >= er) {
         EnemyPersist_ResolveBattle(false);
-        Battle_Message(_bc, "You ran away!", BSTATE_END_RUN);
+        Battle_Message(_bc, Loc_T("combat.msg.player_ran", "You ran away!"), BSTATE_END_RUN);
     } else {
         _bc.turn = TURN_ENEMY;
-        Battle_Message(_bc, "Couldn't escape!", BSTATE_ENEMY_ACT);
+        Battle_Message(_bc, Loc_T("combat.msg.player_couldnt_escape", "Couldn't escape!"), BSTATE_ENEMY_ACT);
     }
 }
 
@@ -782,7 +782,7 @@ function Battle_EnemyAct(_bc) {
     if (!Status_CanAct(e)) {
         e = Status_Tick(e);
         if (Battle_CheckEnd(_bc, p, e)) return;
-        Battle_Message(_bc, e.name + " is stunned!", BSTATE_MENU);
+        Battle_Message(_bc, Loc_T("combat.msg.enemy_stunned", "{enemy} is stunned!", { enemy: e.name }), BSTATE_MENU);
         _bc.enemy_actions_remaining = 0;
         _bc.turn = TURN_PLAYER;
         _bc.p = p;
@@ -841,18 +841,18 @@ function Battle_EnemyAct(_bc) {
         follow_state = (_bc.enemy_actions_remaining > 0) ? BSTATE_ENEMY_ACT : BSTATE_MENU;
 
         if (res.msg != "") {
-            Battle_Message(_bc, e.name + ": " + res.msg, follow_state, fx2);
+            Battle_Message(_bc, Loc_T("combat.msg.enemy_skill_message", "{enemy}: {msg}", { enemy: e.name, msg: res.msg }), follow_state, fx2);
         } else if (!res.hit) {
             var miss_class_id = -1;
             if (variable_struct_exists(p, "class_id")) miss_class_id = p.class_id;
             SFX_PlayMissOrBlocked(true, miss_class_id);
-            Battle_Message(_bc, e.name + " missed!", follow_state, fx2);
+            Battle_Message(_bc, Loc_T("combat.msg.enemy_miss", "{enemy} missed!", { enemy: e.name }), follow_state, fx2);
         } else if (res.crit) {
             if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " crit! " + string(res.dmg) + " damage!", follow_state, fx2);
+            Battle_Message(_bc, Loc_T("combat.msg.enemy_crit", "{enemy} crit! {dmg} damage!", { enemy: e.name, dmg: res.dmg }), follow_state, fx2);
         } else {
             if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " hits for " + string(res.dmg) + " damage!", follow_state, fx2);
+            Battle_Message(_bc, Loc_T("combat.msg.enemy_hit", "{enemy} hits for {dmg} damage!", { enemy: e.name, dmg: res.dmg }), follow_state, fx2);
         }
     } else {
         var ew = _bc.enemy_weapon;
@@ -889,13 +889,13 @@ function Battle_EnemyAct(_bc) {
             var miss_class_id2 = -1;
             if (variable_struct_exists(p, "class_id")) miss_class_id2 = p.class_id;
             SFX_PlayMissOrBlocked(true, miss_class_id2);
-            Battle_Message(_bc, e.name + " missed!", follow_state);
+            Battle_Message(_bc, Loc_T("combat.msg.enemy_miss", "{enemy} missed!", { enemy: e.name }), follow_state);
         } else if (_bc.last_crit) {
             if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " crit! " + string(_bc.last_dmg) + " damage!", follow_state);
+            Battle_Message(_bc, Loc_T("combat.msg.enemy_crit", "{enemy} crit! {dmg} damage!", { enemy: e.name, dmg: _bc.last_dmg }), follow_state);
         } else {
             if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, e.name + " hits for " + string(_bc.last_dmg) + " damage!", follow_state);
+            Battle_Message(_bc, Loc_T("combat.msg.enemy_hit", "{enemy} hits for {dmg} damage!", { enemy: e.name, dmg: _bc.last_dmg }), follow_state);
         }
     }
 

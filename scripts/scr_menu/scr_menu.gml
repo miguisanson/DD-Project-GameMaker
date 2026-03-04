@@ -11,7 +11,11 @@ function Menu_Ensure() {
             closing: false,
             close_frame: UI_OPENED_FRAME_NONE,
             tab: 0,
-            tabs: ["Inventory","Skills","Stats"],
+            tabs: [
+                Loc_T("menu.tab.inventory", "Inventory"),
+                Loc_T("menu.tab.skills", "Skills"),
+                Loc_T("menu.tab.stats", "Stats")
+            ],
             header_focus: true,
             opened_frame: UI_OPENED_FRAME_NONE,
             inv_index: 0,
@@ -200,17 +204,17 @@ function Tooltip_StatShortName(_stat_id) {
 
 function Tooltip_TargetName(_target_id) {
     switch (_target_id) {
-        case TGT_SELF: return "Self";
-        case TGT_ENEMY: return "Opponent";
-        case TGT_ALL_ENEMIES: return "All Opponents";
-        case TGT_ALL_ALLIES: return "All Allies";
-        case TGT_ALL: return "All";
+        case TGT_SELF: return Loc_T("menu.tooltip.target.self", "Self");
+        case TGT_ENEMY: return Loc_T("menu.tooltip.target.enemy", "Opponent");
+        case TGT_ALL_ENEMIES: return Loc_T("menu.tooltip.target.all_enemies", "All Opponents");
+        case TGT_ALL_ALLIES: return Loc_T("menu.tooltip.target.all_allies", "All Allies");
+        case TGT_ALL: return Loc_T("menu.tooltip.target.all", "All");
     }
-    return "Unknown";
+    return Loc_T("menu.tooltip.target.unknown", "Unknown");
 }
 
 function Tooltip_ClassListText(_class_list) {
-    if (!is_array(_class_list) || array_length(_class_list) <= 0) return "All Classes";
+    if (!is_array(_class_list) || array_length(_class_list) <= 0) return Loc_T("menu.tooltip.class.all", "All Classes");
     var txt = "";
     for (var i = 0; i < array_length(_class_list); i++) {
         if (i > 0) txt += "/";
@@ -222,15 +226,14 @@ function Tooltip_ClassListText(_class_list) {
 function Tooltip_ClassOnlyText(_class_list) {
     if (!is_array(_class_list) || array_length(_class_list) <= 0) return "";
     var class_txt = Tooltip_ClassListText(_class_list);
-    if (class_txt == "All Classes") return "";
-    return class_txt + " only";
+    return Loc_T("menu.tooltip.class.only", "{classes} only", { classes: class_txt });
 }
 
 function Tooltip_StatusName(_status_id) {
     if (_status_id == -1) return "";
     var cfg = StatusDB_Get(_status_id);
     if (is_struct(cfg) && variable_struct_exists(cfg, "name")) return string(cfg.name);
-    return "Status";
+    return Loc_T("menu.tooltip.status.default", "Status");
 }
 
 function Tooltip_AddWrappedLines(_out_lines, _text, _max_w) {
@@ -248,12 +251,12 @@ function Tooltip_AddWrappedLines(_out_lines, _text, _max_w) {
 
 function Tooltip_PassiveLineHuman(_line) {
     var txt = string(_line);
-    txt = string_replace_all(txt, "->", " to ");
-    txt = string_replace_all(txt, "1/turn", "once per turn");
-    txt = string_replace_all(txt, "(cd", "(cooldown");
-    txt = string_replace_all(txt, "cd ", "cooldown ");
-    txt = string_replace_all(txt, "GOOD+:", "GOOD or PERFECT:");
-    txt = string_replace_all(txt, "GOOD+", "GOOD or PERFECT");
+    txt = string_replace_all(txt, "->", Loc_T("menu.tooltip.passive.to", " to "));
+    txt = string_replace_all(txt, "1/turn", Loc_T("menu.tooltip.passive.once_per_turn", "once per turn"));
+    txt = string_replace_all(txt, "(cd", Loc_T("menu.tooltip.passive.cooldown_prefix", "(cooldown"));
+    txt = string_replace_all(txt, "cd ", Loc_T("menu.tooltip.passive.cooldown", "cooldown "));
+    txt = string_replace_all(txt, "GOOD+:", Loc_T("menu.tooltip.passive.good_plus_colon", "GOOD or PERFECT:"));
+    txt = string_replace_all(txt, "GOOD+", Loc_T("menu.tooltip.passive.good_plus", "GOOD or PERFECT"));
     return txt;
 }
 
@@ -293,21 +296,30 @@ function Tooltip_EquippableNote(_item) {
 }
 
 function Tooltip_SkillDamageLine(_skill) {
-    if (!is_struct(_skill)) return "Damage";
-    var parts = ["Power " + string(max(0, round(real(_skill.power))))];
+    if (!is_struct(_skill)) return Loc_T("menu.tooltip.damage", "Damage");
+    var parts = [
+        Loc_T("menu.tooltip.damage.power", "Power {power}", {
+            power: string(max(0, round(real(_skill.power))))
+        })
+    ];
 
     if (variable_struct_exists(_skill, "power_mult")) {
         var pm = real(_skill.power_mult);
         if (pm != 1) array_push(parts, "x" + string_format(pm, 1, 2));
     }
     if (variable_struct_exists(_skill, "hits") && _skill.hits > 1) {
-        array_push(parts, string(round(real(_skill.hits))) + " hits");
+        array_push(parts, Loc_T("menu.tooltip.damage.hits", "{hits} hits", {
+            hits: string(round(real(_skill.hits)))
+        }));
     }
     if (variable_struct_exists(_skill, "acc") && _skill.acc != 0) {
-        array_push(parts, "Acc " + ((_skill.acc > 0) ? "+" : "") + string(_skill.acc));
+        var acc_txt = ((_skill.acc > 0) ? "+" : "") + string(_skill.acc);
+        array_push(parts, Loc_T("menu.tooltip.damage.acc", "Acc {acc}", { acc: acc_txt }));
     }
     if (variable_struct_exists(_skill, "stat_type")) {
-        array_push(parts, "Stat " + Tooltip_StatShortName(_skill.stat_type));
+        array_push(parts, Loc_T("menu.tooltip.damage.stat", "Stat {stat}", {
+            stat: Tooltip_StatShortName(_skill.stat_type)
+        }));
     }
 
     var out = parts[0];
@@ -318,9 +330,16 @@ function Tooltip_SkillDamageLine(_skill) {
 function Tooltip_SkillSingleStatusLine(_status_id, _turns, _chance) {
     if (_status_id == -1) return "";
     var chance = clamp(real(_chance), 0, 1);
-    var line = "Status: " + Tooltip_StatusName(_status_id) + " " + string(round(chance * 100)) + "%";
+    var line = Loc_T("menu.tooltip.status.line", "Status: {status} {chance}%", {
+        status: Tooltip_StatusName(_status_id),
+        chance: string(round(chance * 100))
+    });
     var turns = max(0, round(real(_turns)));
-    if (turns > 0) line += " | " + string(turns) + " turns";
+    if (turns > 0) {
+        line += Loc_T("menu.tooltip.status.turns_suffix", " | {turns} turns", {
+            turns: string(turns)
+        });
+    }
     return line;
 }
 
@@ -346,16 +365,24 @@ function Tooltip_SkillMultiStatusLine(_skill, _max_entries = 3) {
         }
 
         var seg = Tooltip_StatusName(sid);
-        if (turns > 0) seg += " " + string(turns) + "t";
+        if (turns > 0) {
+            seg += Loc_T("menu.tooltip.status.turns_short", " {turns}t", {
+                turns: string(turns)
+            });
+        }
         array_push(shown, seg);
     }
 
     if (array_length(shown) <= 0) return "";
-    var line = "Statuses: " + shown[0];
+    var line = Loc_T("menu.tooltip.statuses.prefix", "Statuses: {first}", {
+        first: shown[0]
+    });
     for (var j = 1; j < array_length(shown); j++) line += ", " + shown[j];
     if (total_statuses > array_length(shown)) {
         var remaining = total_statuses - array_length(shown);
-        line += ", +" + string(remaining) + " more";
+        line += Loc_T("menu.tooltip.statuses.more", ", +{count} more", {
+            count: string(remaining)
+        });
     }
 
     var chance = variable_struct_exists(_skill, "status_chance") ? clamp(real(_skill.status_chance), 0, 1) : 1;
@@ -386,7 +413,7 @@ function Tooltip_SkillEffectLines(_skill, _compact = false) {
                 var status_line = Tooltip_SkillSingleStatusLine(_skill.status, turns, chance);
                 if (status_line != "") array_push(lines, status_line);
             } else {
-                array_push(lines, "Effect: Buff");
+                array_push(lines, Loc_T("menu.tooltip.effect.buff", "Effect: Buff"));
             }
         break;
 
@@ -394,19 +421,21 @@ function Tooltip_SkillEffectLines(_skill, _compact = false) {
             var max_status_entries = _compact ? 3 : 4;
             var multi_line = Tooltip_SkillMultiStatusLine(_skill, max_status_entries);
             if (multi_line != "") array_push(lines, multi_line);
-            else array_push(lines, "Effect: Multiple statuses");
+            else array_push(lines, Loc_T("menu.tooltip.effect.multi_status", "Effect: Multiple statuses"));
         break;
 
         case "heal":
-            array_push(lines, "Effect: Restore HP");
+            array_push(lines, Loc_T("menu.tooltip.effect.restore_hp", "Effect: Restore HP"));
         break;
 
         case "steal_item":
-            array_push(lines, "Effect: Steal one random item");
+            array_push(lines, Loc_T("menu.tooltip.effect.steal_item", "Effect: Steal one random item"));
         break;
 
         default:
-            if (effect != "" && effect != "none") array_push(lines, "Effect: " + effect);
+            if (effect != "" && effect != "none") {
+                array_push(lines, Loc_T("menu.tooltip.effect.named", "Effect: {effect}", { effect: effect }));
+            }
         break;
     }
 
@@ -418,29 +447,31 @@ function Tooltip_BuildStatLines(_stat_key, _stat_label, _cur, _base, _pending_pt
     array_push(lines, _stat_label + " (" + string(_cur) + ")");
     var delta = _cur - _base;
     if (delta > 0) {
-        array_push(lines, "Pending bonus: +" + string(delta));
+        array_push(lines, Loc_T("menu.tooltip.stat.pending_plus", "Pending bonus: +{delta}", {
+            delta: string(delta)
+        }));
     } else {
-        array_push(lines, "Pending bonus: +0");
+        array_push(lines, Loc_T("menu.tooltip.stat.pending_zero", "Pending bonus: +0"));
     }
 
     switch (_stat_key) {
         case "str":
-            array_push(lines, "Increases physical damage for weapon attacks.");
+            array_push(lines, Loc_T("menu.tooltip.stat.str.desc", "Increases physical damage for weapon attacks."));
         break;
         case "agi":
-            array_push(lines, "Improves turn order and evasion potential.");
+            array_push(lines, Loc_T("menu.tooltip.stat.agi.desc", "Improves turn order and evasion potential."));
         break;
         case "def":
-            array_push(lines, "Reduces incoming damage through mitigation.");
+            array_push(lines, Loc_T("menu.tooltip.stat.def.desc", "Reduces incoming damage through mitigation."));
         break;
         case "intt":
-            array_push(lines, "Increases skill damage and magical output.");
+            array_push(lines, Loc_T("menu.tooltip.stat.intt.desc", "Increases skill damage and magical output."));
         break;
         case "luck":
-            array_push(lines, "Improves critical chance and random checks.");
+            array_push(lines, Loc_T("menu.tooltip.stat.luck.desc", "Improves critical chance and random checks."));
         break;
         default:
-            array_push(lines, "Affects combat performance.");
+            array_push(lines, Loc_T("menu.tooltip.stat.default.desc", "Affects combat performance."));
         break;
     }
     return lines;
@@ -462,17 +493,24 @@ function Tooltip_ItemBonusText(_item) {
 }
 
 function Tooltip_ItemTypeLine(_item) {
-    if (!is_struct(_item) || !variable_struct_exists(_item, "type")) return "Unknown";
-    if (Item_IsSkillbook(_item)) return "Skillbook";
+    if (!is_struct(_item) || !variable_struct_exists(_item, "type")) return Loc_T("menu.tooltip.item.type.unknown", "Unknown");
+    if (Item_IsSkillbook(_item)) return Loc_T("menu.tooltip.item.type.skillbook", "Skillbook");
     if (_item.type == ITEM_WEAPON || _item.type == ITEM_ARMOR) {
         var slot_name = variable_struct_exists(_item, "equip_slot") ? string(_item.equip_slot) : "";
-        var type_name = (_item.type == ITEM_WEAPON) ? "Weapon" : "Armor";
-        if (slot_name != "") return type_name + " (slot: " + slot_name + ")";
+        var type_name = (_item.type == ITEM_WEAPON)
+            ? Loc_T("menu.tooltip.item.type.weapon", "Weapon")
+            : Loc_T("menu.tooltip.item.type.armor", "Armor");
+        if (slot_name != "") {
+            return Loc_T("menu.tooltip.item.type.with_slot", "{type} (slot: {slot})", {
+                type: type_name,
+                slot: slot_name
+            });
+        }
         return type_name;
     }
-    if (_item.type == ITEM_CONSUMABLE) return "Consumable";
-    if (_item.type == ITEM_KEY) return "Key Item";
-    return "Unknown";
+    if (_item.type == ITEM_CONSUMABLE) return Loc_T("menu.tooltip.item.type.consumable", "Consumable");
+    if (_item.type == ITEM_KEY) return Loc_T("menu.tooltip.item.type.key", "Key Item");
+    return Loc_T("menu.tooltip.item.type.unknown", "Unknown");
 }
 
 function Tooltip_BuildItemLines(_item) {
@@ -491,7 +529,7 @@ function Tooltip_BuildItemLines(_item) {
                 if (variable_struct_exists(_item, "stat_type")) {
                     armor_line = Tooltip_StatShortName(_item.stat_type);
                 } else {
-                    armor_line = "Armor";
+                    armor_line = Loc_T("menu.tooltip.item.type.armor", "Armor");
                 }
             }
             array_push(lines, armor_line);
@@ -501,7 +539,9 @@ function Tooltip_BuildItemLines(_item) {
 
             var armor_only = "";
             if (variable_struct_exists(_item, "preferred_class") && _item.preferred_class != -1) {
-                armor_only = Equip_ClassName(_item.preferred_class) + " only";
+                armor_only = Loc_T("menu.tooltip.class.only", "{classes} only", {
+                    classes: Equip_ClassName(_item.preferred_class)
+                });
             } else if (variable_struct_exists(_item, "allowed_classes") && is_array(_item.allowed_classes)) {
                 armor_only = Tooltip_ClassOnlyText(_item.allowed_classes);
             }
@@ -509,30 +549,41 @@ function Tooltip_BuildItemLines(_item) {
             return lines;
         }
 
-        var parts = ["Power " + string(max(0, round(real(_item.power))))];
+        var parts = [
+            Loc_T("menu.tooltip.damage.power", "Power {power}", {
+                power: string(max(0, round(real(_item.power))))
+            })
+        ];
         if (variable_struct_exists(_item, "acc") && _item.acc != 0) {
-            array_push(parts, "Acc " + ((_item.acc > 0) ? "+" : "") + string(_item.acc));
+            var acc_txt = ((_item.acc > 0) ? "+" : "") + string(_item.acc);
+            array_push(parts, Loc_T("menu.tooltip.damage.acc", "Acc {acc}", { acc: acc_txt }));
         }
         if (variable_struct_exists(_item, "stat_type")) {
-            array_push(parts, "Stat " + Tooltip_StatShortName(_item.stat_type));
+            array_push(parts, Loc_T("menu.tooltip.damage.stat", "Stat {stat}", {
+                stat: Tooltip_StatShortName(_item.stat_type)
+            }));
         }
         var core = parts[0];
         for (var i = 1; i < array_length(parts); i++) core += " | " + parts[i];
         array_push(lines, core);
 
         var bonus_txt = Tooltip_ItemBonusText(_item);
-        if (bonus_txt != "") array_push(lines, "Bonus: " + bonus_txt);
+        if (bonus_txt != "") {
+            array_push(lines, Loc_T("menu.tooltip.item.bonus", "Bonus: {bonus}", { bonus: bonus_txt }));
+        }
 
         var note_txt = Tooltip_EquippableNote(_item);
         if (note_txt != "") array_push(lines, note_txt);
 
-        var class_txt = "All Classes";
+        var class_txt = Loc_T("menu.tooltip.class.all", "All Classes");
         if (variable_struct_exists(_item, "preferred_class") && _item.preferred_class != -1) {
             class_txt = Equip_ClassName(_item.preferred_class);
         } else if (variable_struct_exists(_item, "allowed_classes") && is_array(_item.allowed_classes)) {
             class_txt = Tooltip_ClassListText(_item.allowed_classes);
         }
-        if (class_txt != "All Classes") array_push(lines, class_txt + " only");
+        if (class_txt != Loc_T("menu.tooltip.class.all", "All Classes")) {
+            array_push(lines, Loc_T("menu.tooltip.class.only", "{classes} only", { classes: class_txt }));
+        }
         return lines;
     }
 
@@ -543,10 +594,13 @@ function Tooltip_BuildItemLines(_item) {
             case "heal":
                 var hmin = variable_struct_exists(use, "min") ? round(real(use.min)) : round(real(use.power));
                 var hmax = variable_struct_exists(use, "max") ? round(real(use.max)) : hmin;
-                var hline = "Heal HP " + string(hmin) + "-" + string(hmax);
+                var hline = Loc_T("menu.tooltip.item.heal_hp", "Heal HP {min}-{max}", {
+                    min: string(hmin),
+                    max: string(hmax)
+                });
                 if (variable_struct_exists(use, "scale") && real(use.scale) > 0) {
                     array_push(lines, hline);
-                    array_push(lines, "Amount scales with level.");
+                    array_push(lines, Loc_T("menu.tooltip.item.scale_with_level", "Amount scales with level."));
                 } else {
                     array_push(lines, hline);
                 }
@@ -554,16 +608,21 @@ function Tooltip_BuildItemLines(_item) {
             case "mp":
                 var mmin = variable_struct_exists(use, "min") ? round(real(use.min)) : round(real(use.power));
                 var mmax = variable_struct_exists(use, "max") ? round(real(use.max)) : mmin;
-                var mline = "Restore MP " + string(mmin) + "-" + string(mmax);
+                var mline = Loc_T("menu.tooltip.item.restore_mp", "Restore MP {min}-{max}", {
+                    min: string(mmin),
+                    max: string(mmax)
+                });
                 if (variable_struct_exists(use, "scale") && real(use.scale) > 0) {
                     array_push(lines, mline);
-                    array_push(lines, "Amount scales with level.");
+                    array_push(lines, Loc_T("menu.tooltip.item.scale_with_level", "Amount scales with level."));
                 } else {
                     array_push(lines, mline);
                 }
             break;
             case "cure":
-                array_push(lines, "Cure: " + Tooltip_StatusName(use.status));
+                array_push(lines, Loc_T("menu.tooltip.item.cure", "Cure: {status}", {
+                    status: Tooltip_StatusName(use.status)
+                }));
             break;
             case "learn_skill":
                 var skill = SkillDB_Get(use.skill_id);
@@ -571,11 +630,18 @@ function Tooltip_BuildItemLines(_item) {
                     var skill_name = string(skill.name);
                     var item_name = variable_struct_exists(_item, "name") ? string(_item.name) : "";
                     if (!Tooltip_ContainsTextInsensitive(item_name, skill_name)) {
-                        array_push(lines, "Teaches: " + skill_name);
+                        array_push(lines, Loc_T("menu.tooltip.item.teaches", "Teaches: {skill}", {
+                            skill: skill_name
+                        }));
                     }
                     var mp_cost = variable_struct_exists(skill, "mp_cost") ? max(0, round(real(skill.mp_cost))) : 0;
-                    var target_txt = variable_struct_exists(skill, "target") ? Tooltip_TargetName(skill.target) : "Unknown";
-                    array_push(lines, "MP " + string(mp_cost) + " | Target: " + target_txt);
+                    var target_txt = variable_struct_exists(skill, "target")
+                        ? Tooltip_TargetName(skill.target)
+                        : Loc_T("menu.tooltip.target.unknown", "Unknown");
+                    array_push(lines, Loc_T("menu.tooltip.skill.mp_target", "MP {mp} | Target: {target}", {
+                        mp: string(mp_cost),
+                        target: target_txt
+                    }));
                     var skill_effect_lines = Tooltip_SkillEffectLines(skill, true);
                     for (var sei = 0; sei < array_length(skill_effect_lines); sei++) {
                         array_push(lines, skill_effect_lines[sei]);
@@ -583,11 +649,11 @@ function Tooltip_BuildItemLines(_item) {
                     var sb_only = Tooltip_ClassOnlyText(skill.class_list);
                     if (sb_only != "") array_push(lines, sb_only);
                 } else {
-                    array_push(lines, "Teaches: Unknown skill");
+                    array_push(lines, Loc_T("menu.tooltip.item.teaches_unknown", "Teaches: Unknown skill"));
                 }
             break;
             default:
-                array_push(lines, "Effect: " + eff);
+                array_push(lines, Loc_T("menu.tooltip.effect.named", "Effect: {effect}", { effect: eff }));
             break;
         }
     }
@@ -600,9 +666,13 @@ function Tooltip_BuildSkillLines(_skill) {
     if (!is_struct(_skill) || !variable_struct_exists(_skill, "id") || _skill.id == -1) return lines;
 
     array_push(lines, string(_skill.name));
-    var mp_line = "MP " + string(max(0, round(real(_skill.mp_cost))));
+    var mp_line = Loc_T("menu.tooltip.skill.mp", "MP {mp}", {
+        mp: string(max(0, round(real(_skill.mp_cost))))
+    });
     var tgt = variable_struct_exists(_skill, "target") ? _skill.target : TGT_ENEMY;
-    mp_line += " | Target: " + Tooltip_TargetName(tgt);
+    mp_line += Loc_T("menu.tooltip.skill.target_suffix", " | Target: {target}", {
+        target: Tooltip_TargetName(tgt)
+    });
     array_push(lines, mp_line);
 
     var effect_lines = Tooltip_SkillEffectLines(_skill, false);
@@ -781,7 +851,7 @@ function Menu_UseInventoryItem(_m, _ch, _item_id) {
     var out = { menu: _m, ch: _ch, changed: false };
 
     if (!is_struct(item) || item.id == 0) {
-        out.menu = Menu_InvPopupOpenMessage(_m, "Can't use that.");
+        out.menu = Menu_InvPopupOpenMessage(_m, Loc_T("item.msg.cant_use", "Can't use that."));
         return out;
     }
 
@@ -796,7 +866,7 @@ function Menu_UseInventoryItem(_m, _ch, _item_id) {
             Equip_SlotSet(_ch, slot_name, 0);
             _ch = RecomputeResources(_ch);
             _m = Menu_ClampInventoryCursor(_m, _ch.inventory);
-            out.menu = Menu_InvPopupOpenMessage(_m, "Unequipped " + item.name + ".");
+            out.menu = Menu_InvPopupOpenMessage(_m, Loc_T("menu.msg.unequipped", "Unequipped {item}.", { item: item.name }));
             out.ch = _ch;
             out.changed = true;
             return out;
@@ -811,13 +881,13 @@ function Menu_UseInventoryItem(_m, _ch, _item_id) {
         if (Equip_Item(_ch, item.id)) {
             _ch = RecomputeResources(_ch);
             _m = Menu_ClampInventoryCursor(_m, _ch.inventory);
-            out.menu = Menu_InvPopupOpenMessage(_m, "Equipped " + item.name + ".");
+            out.menu = Menu_InvPopupOpenMessage(_m, Loc_T("menu.msg.equipped", "Equipped {item}.", { item: item.name }));
             out.ch = _ch;
             out.changed = true;
             return out;
         }
 
-        out.menu = Menu_InvPopupOpenMessage(_m, "Can't equip that.");
+        out.menu = Menu_InvPopupOpenMessage(_m, Loc_T("menu.msg.cant_equip", "Can't equip that."));
         return out;
     }
 
@@ -839,7 +909,7 @@ function Menu_UseInventoryItem(_m, _ch, _item_id) {
         return out;
     }
 
-    out.menu = Menu_InvPopupOpenMessage(_m, "Can't use that.");
+    out.menu = Menu_InvPopupOpenMessage(_m, Loc_T("item.msg.cant_use", "Can't use that."));
     return out;
 }
 
@@ -849,7 +919,7 @@ function Menu_InvPopupOpenConfirm(_m, _item_id) {
     _m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
     _m.inv_popup_mode = "confirm";
     _m.inv_popup_choice = 1; // default to Cancel
-    _m.inv_popup_message = "Learn a skill";
+    _m.inv_popup_message = Loc_T("menu.popup.learn_skill", "Learn a skill");
     _m.inv_popup_item_id = _item_id;
     _m.inv_popup_block_frame = Input_Frame() + 1;
     _m.inv_popup_open_frame = Input_Frame();
@@ -1097,7 +1167,7 @@ function Menu_HandleInput() {
                     GameState_SetPlayer(ch);
                 }
             } else {
-                m = Menu_InvPopupOpenMessage(m, "Can't use that.");
+                m = Menu_InvPopupOpenMessage(m, Loc_T("item.msg.cant_use", "Can't use that."));
             }
             gs.ui.menu = m;
             return;
@@ -1279,6 +1349,10 @@ function Menu_Draw() {
         var tx = bx + i * tab_w;
         var tab_active = (i == m.tab);
         var tab_hi = tab_active && m.header_focus;
+        var tab_label = m.tabs[i];
+        if (i == 0) tab_label = Loc_T("menu.tab.inventory", tab_label);
+        else if (i == 1) tab_label = Loc_T("menu.tab.skills", tab_label);
+        else if (i == 2) tab_label = Loc_T("menu.tab.stats", tab_label);
         if (tab_hi) {
             draw_set_color(c_white);
             draw_rectangle(tx, by, tx + tab_w, by + header_h, false);
@@ -1288,7 +1362,7 @@ function Menu_Draw() {
         } else {
             draw_set_color(c_white);
         }
-        draw_text(tx + 6, by + 6, m.tabs[i]);
+        draw_text(tx + 6, by + 6, tab_label);
     }
 
     var draw_arrow_sprite = dialogue_arrow_down;
@@ -1310,7 +1384,7 @@ function Menu_Draw() {
 
         if (count == 0) {
             draw_set_color(c_white);
-            draw_text(bx + pad, content_list_y, "No items.");
+            draw_text(bx + pad, content_list_y, Loc_T("menu.msg.no_items", "No items."));
         } else {
             for (var i2 = start; i2 < endv; i2++) {
                 var row = i2 - start;
@@ -1332,13 +1406,15 @@ function Menu_Draw() {
                     tx += 16;
                 }
                 var label = item.name;
-                if (item.stackable) label += " x" + string(inv.qty);
+                if (item.stackable) {
+                    label += Loc_T("menu.label.stack_suffix", " x{qty}", { qty: string(inv.qty) });
+                }
                 draw_set_color(sel ? c_black : c_white);
                 draw_text(tx, yy, label);
 
                 if (Menu_IsEquipped(ch, inv.id)) {
                     draw_set_color(sel ? c_black : c_white);
-                    draw_text(bx + bw - pad - string_width("E"), yy, "E");
+                    draw_text(bx + bw - pad - string_width(Loc_T("menu.label.equipped_short", "E")), yy, Loc_T("menu.label.equipped_short", "E"));
                 }
             }
         }
@@ -1369,7 +1445,7 @@ function Menu_Draw() {
 
         if (scount == 0) {
             draw_set_color(c_white);
-            draw_text(bx + pad, content_list_y, "No skills.");
+            draw_text(bx + pad, content_list_y, Loc_T("menu.msg.no_skills", "No skills."));
         } else {
             for (var s = start2; s < end2; s++) {
                 var row2 = s - start2;
@@ -1414,7 +1490,13 @@ function Menu_Draw() {
     if (m.tab == 2) {
         if (!is_struct(m.pending_stats)) Menu_StatsSync();
 
-        var stat_names = ["STR","AGI","DEF","INT","LUCK"];
+        var stat_names = [
+            Loc_T("status.name.stat.str", "STR"),
+            Loc_T("status.name.stat.agi", "AGI"),
+            Loc_T("status.name.stat.def", "DEF"),
+            Loc_T("status.name.stat.int", "INT"),
+            Loc_T("status.name.stat.luck", "LUCK")
+        ];
         var stat_keys = ["str","agi","def","intt","luck"];
         var stat_count = array_length(stat_keys);
 
@@ -1444,16 +1526,16 @@ function Menu_Draw() {
         var mp_bar_h = sprite_get_height(mp_bar_sprite) * bar_scale;
 
         var level_capped = Level_IsAtCap(ch.level);
-        var exp_label_1 = level_capped ? "Level Cap" : "Required EXP";
-        var exp_value = level_capped ? "MAX" : (string(ch.exp) + "/" + string(ch.exp_next));
+        var exp_label_1 = level_capped ? Loc_T("menu.stats.level_cap", "Level Cap") : Loc_T("menu.stats.required_exp", "Required EXP");
+        var exp_value = level_capped ? Loc_T("menu.stats.max", "MAX") : (string(ch.exp) + "/" + string(ch.exp_next));
         var line_h = string_height("A") + 2;
 
         var left_content_w = max(
             bar_w,
-            string_width("Level: " + string(ch.level)),
+            string_width(Loc_T("menu.stats.level", "Level: {level}", { level: string(ch.level) })),
             string_width(exp_label_1),
             string_width(exp_value),
-            string_width("Available Points: " + string(m.pending_points))
+            string_width(Loc_T("menu.stats.available_points", "Available Points: {points}", { points: string(m.pending_points) }))
         ) + pad * 2;
         var left_w = min(bw * 0.55, left_content_w);
 
@@ -1471,13 +1553,13 @@ function Menu_Draw() {
 
         draw_set_color(c_white);
         var text_y = y0 + hp_bar_h + mp_bar_h + pad * 2;
-        draw_text(left_x, text_y, "Level: " + string(ch.level));
+        draw_text(left_x, text_y, Loc_T("menu.stats.level", "Level: {level}", { level: string(ch.level) }));
         text_y += line_h;
         draw_text(left_x, text_y, exp_label_1);
         text_y += line_h;
         draw_text(left_x, text_y, exp_value);
         text_y += line_h;
-        draw_text(left_x, text_y, "Available Points: " + string(m.pending_points));
+        draw_text(left_x, text_y, Loc_T("menu.stats.available_points", "Available Points: {points}", { points: string(m.pending_points) }));
 
         var row_h2 = row_h;
         var list_y = y0;
@@ -1536,8 +1618,8 @@ function Menu_Draw() {
         var action_row = stat_count;
         var action_y = list_y + stat_count * row_h2 + pad;
         var show_actions = (pending_total > 0);
-        var confirm_text = "Confirm";
-        var cancel_text = "Cancel";
+        var confirm_text = Loc_T("menu.common.confirm", "Confirm");
+        var cancel_text = Loc_T("menu.common.cancel", "Cancel");
         var confirm_w = string_width(confirm_text);
         var cancel_w = string_width(cancel_text);
         var action_h = string_height(confirm_text) + 4;
@@ -1585,7 +1667,7 @@ function Menu_Draw() {
         var inv_closing = variable_struct_exists(m, "inv_popup_closing") && m.inv_popup_closing;
         var inv_close_frame = variable_struct_exists(m, "inv_popup_close_frame") ? m.inv_popup_close_frame : UI_OPENED_FRAME_NONE;
         var popup_alpha = UI_PopupAlpha(m.inv_popup_open_frame, inv_closing, inv_close_frame, 1);
-        var popup_msg = "Learn a skill";
+        var popup_msg = Loc_T("menu.popup.learn_skill", "Learn a skill");
         if (m.inv_popup_mode == "message") popup_msg = string(m.inv_popup_message);
 
         var popup_pad_x = 12;
@@ -1603,8 +1685,8 @@ function Menu_Draw() {
         var py2 = 0;
 
         if (m.inv_popup_mode == "confirm") {
-            var yes_label = "Confirm";
-            var no_label = "Cancel";
+            var yes_label = Loc_T("menu.common.confirm", "Confirm");
+            var no_label = Loc_T("menu.common.cancel", "Cancel");
             var yes_w = string_width(yes_label) + btn_pad_x * 2;
             var no_w = string_width(no_label) + btn_pad_x * 2;
             var btn_gap_x = 14;
@@ -1656,7 +1738,7 @@ function Menu_Draw() {
             }
             draw_text(no_x + (no_w - string_width(no_label)) * 0.5, btn_y + 2, no_label);
         } else {
-            var ok_label = "OK";
+            var ok_label = Loc_T("common.ok", "OK");
             var ok_w = string_width(ok_label) + btn_pad_x * 2;
             popup_w = max(180, max(msg_w + popup_pad_x * 2, ok_w + popup_pad_x * 2));
             popup_h = popup_pad_y + line_h_popup + popup_gap_y + btn_h + popup_pad_y;
@@ -1701,7 +1783,11 @@ function ClassSelect_Ensure() {
             closing: false,
             close_frame: UI_OPENED_FRAME_NONE,
             index: 0,
-            choices: ["Warrior", "Archer", "Mage"],
+            choices: [
+                Loc_T("class.name.warrior", "Warrior"),
+                Loc_T("class.name.archer", "Archer"),
+                Loc_T("class.name.mage", "Mage")
+            ],
             choice_ids: [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE],
             allow_cancel: true,
             open_block_frame: UI_OPENED_FRAME_NONE,
@@ -1940,7 +2026,7 @@ function ClassSelect_Draw() {
     draw_set_alpha(popup_alpha);
 
     draw_set_color(c_white);
-    draw_text(bx + 12, by + 12, "Select Class");
+    draw_text(bx + 12, by + 12, Loc_T("class.select.title", "Select Class"));
 
     var cy = by + 40;
     for (var j = 0; j < array_length(cs.choices); j++) {
@@ -1955,7 +2041,14 @@ function ClassSelect_Draw() {
         } else {
             draw_set_color(c_white);
         }
-        draw_text(bx + 18, yy, cs.choices[j]);
+        var choice_label = cs.choices[j];
+        if (is_array(cs.choice_ids) && j < array_length(cs.choice_ids)) {
+            var class_cfg = DB_PlayerClass(cs.choice_ids[j]);
+            if (is_struct(class_cfg) && variable_struct_exists(class_cfg, "name")) {
+                choice_label = class_cfg.name;
+            }
+        }
+        draw_text(bx + 18, yy, choice_label);
     }
 
     if (cs.allow_cancel) {
@@ -1970,7 +2063,7 @@ function ClassSelect_Draw() {
         } else {
             draw_set_color(c_white);
         }
-        draw_text(bx + 18, back_y, "Back");
+        draw_text(bx + 18, back_y, Loc_T("menu.common.back", "Back"));
     }
     draw_set_alpha(1);
 }
@@ -2111,14 +2204,15 @@ function SettingsPopup_HandleInput() {
         SFX_PlayUI("ui_move");
     }
 
-    if (sp.index == 5 && k_left) {
-        sp.index = 4;
+    if (sp.index == 6 && k_left) {
+        sp.index = 5;
         SFX_PlayUI("ui_move");
     }
 
     if (k_back) {
         sp.pending = GameSettings_Copy(GameSettings_Ensure());
         sp.dirty = false;
+        Loc_SetLanguage(GameSettings_Ensure().language);
         gs.ui.settings_popup = sp;
         SettingsPopup_Close(false);
         return;
@@ -2127,7 +2221,7 @@ function SettingsPopup_HandleInput() {
     var pending = GameSettings_Copy(sp.pending);
     var changed = false;
     var step = sp.volume_step;
-    var can_hold_adjust = (sp.index >= 0 && sp.index <= 3);
+    var can_hold_adjust = (sp.index >= 0 && sp.index <= 4);
 
     // Local hold-repeat for slider/scale rows only.
     var hold_dir = 0;
@@ -2195,6 +2289,13 @@ function SettingsPopup_HandleInput() {
             }
             break;
         case 4:
+            if (k_left_step || k_right_step) {
+                pending.language = (pending.language == "ko") ? "en" : "ko";
+                Loc_SetLanguage(pending.language);
+                changed = true;
+            }
+            break;
+        case 5:
             if (k_ok) {
                 var committed = GameSettings_Commit(pending, true);
                 sp.pending = GameSettings_Copy(committed);
@@ -2204,10 +2305,11 @@ function SettingsPopup_HandleInput() {
                 return;
             }
             break;
-        case 5:
+        case 6:
             if (k_ok) {
                 sp.pending = GameSettings_Copy(GameSettings_Ensure());
                 sp.dirty = false;
+                Loc_SetLanguage(GameSettings_Ensure().language);
                 gs.ui.settings_popup = sp;
                 SFX_PlayUI("ui_confirm");
                 SettingsPopup_Close(false);
@@ -2257,7 +2359,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     draw_set_color(c_white);
     draw_rectangle(sx, sy, sx + sw, sy + sh, true);
     draw_set_alpha(popup_alpha);
-    draw_text(sx + 12, sy + 12, "Settings");
+    draw_text(sx + 12, sy + 12, Loc_T("settings.title", "Settings"));
 
     var row_gap_s = max(18, line_h + 6);
     var audio_header_y = sy + 32;
@@ -2272,10 +2374,11 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     row_y[3] = display_rows_y0;
     row_y[4] = display_rows_y0 + row_gap_s + 2;
     row_y[5] = display_rows_y0 + row_gap_s * 2 + 2;
+    row_y[6] = display_rows_y0 + row_gap_s * 3 + 2;
 
     draw_set_color(c_white);
-    draw_text(sx + 12, audio_header_y, "Audio");
-    draw_text(sx + 12, display_header_y, "Display");
+    draw_text(sx + 12, audio_header_y, Loc_T("settings.section.audio", "Audio"));
+    draw_text(sx + 12, display_header_y, Loc_T("settings.section.display", "Display"));
 
     for (var r = 0; r < SETTINGS_MENU_ROW_COUNT; r++) {
         var yy = row_y[r];
@@ -2285,32 +2388,36 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
 
         switch (r) {
             case 0:
-                label = "UI";
+                label = Loc_T("settings.row.ui", "UI");
                 value = string(clamp(round(settings.audio_ui * 100), 0, 100)) + "%";
                 break;
             case 1:
-                label = "SFX";
+                label = Loc_T("settings.row.sfx", "SFX");
                 value = string(clamp(round(settings.audio_sfx * 100), 0, 100)) + "%";
                 break;
             case 2:
-                label = "BGM";
+                label = Loc_T("settings.row.bgm", "BGM");
                 value = string(clamp(round(settings.audio_bgm * 100), 0, 100)) + "%";
                 break;
             case 3:
-                label = "Scale";
+                label = Loc_T("settings.row.scale", "Scale");
                 value = string(settings.display_scale) + "x";
                 break;
             case 4:
-                label = "Apply";
-                value = sp.dirty ? "Pending" : "Saved";
+                label = Loc_T("settings.row.language", "Language");
+                value = Loc_LanguageDisplayName(settings.language);
                 break;
             case 5:
-                label = "Back";
+                label = Loc_T("settings.row.apply", "Apply");
+                value = sp.dirty ? Loc_T("settings.value.pending", "Pending") : Loc_T("settings.value.saved", "Saved");
+                break;
+            case 6:
+                label = Loc_T("settings.row.back", "Back");
                 break;
         }
 
         if (selected_row) {
-            if (r == 4 || r == 5) {
+            if (r == 5 || r == 6) {
                 var row_x = sx + 16;
                 var row_w = string_width(label) + 8;
                 draw_set_color(c_white);
@@ -2328,7 +2435,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
         draw_set_color(selected_row ? c_black : c_white);
         draw_text(sx + 16, yy, label);
         if (value != "") {
-            if (r == 4) draw_set_color(c_white);
+            if (r == 5) draw_set_color(c_white);
             else draw_set_color(selected_row ? c_black : c_white);
             draw_set_halign(fa_right);
             draw_text(sx + sw - 16, yy, value);
@@ -2353,7 +2460,11 @@ function PauseMenu_Ensure() {
             close_frame: UI_OPENED_FRAME_NONE,
             pending_exit_main_menu: false,
             index: 0,
-            options: ["Resume","Settings","Exit to Main Menu"],
+            options: [
+                Loc_T("pause.option.resume", "Resume"),
+                Loc_T("pause.option.settings", "Settings"),
+                Loc_T("pause.option.exit_main", "Exit to Main Menu")
+            ],
             opened_frame: UI_OPENED_FRAME_NONE
         };
     } else {
@@ -2533,9 +2644,15 @@ function PauseMenu_Draw() {
     var inner_pad = max(4, pad * 0.6);
     var row_h = max(16, line_h + inner_pad * 2);
 
+    var option_labels = [
+        Loc_T("pause.option.resume", "Resume"),
+        Loc_T("pause.option.settings", "Settings"),
+        Loc_T("pause.option.exit_main", "Exit to Main Menu")
+    ];
     var max_w = 0;
     for (var i = 0; i < array_length(pm.options); i++) {
-        max_w = max(max_w, string_width(pm.options[i]));
+        var lbl = (i < array_length(option_labels)) ? option_labels[i] : pm.options[i];
+        max_w = max(max_w, string_width(lbl));
     }
     var bw = max_w + inner_pad * 4;
     var bh = (row_h * array_length(pm.options)) + inner_pad * 2;
@@ -2556,6 +2673,7 @@ function PauseMenu_Draw() {
     for (var i = 0; i < array_length(options); i++) {
         var yy = start_y + i * row_h;
         var sel = (i == pm.index);
+        var label = (i < array_length(option_labels)) ? option_labels[i] : options[i];
         if (sel) {
             draw_set_color(c_white);
             draw_rectangle(bx + inner_pad - 4, yy - 2, bx + bw - inner_pad + 4, yy + row_h - 2, false);
@@ -2563,7 +2681,7 @@ function PauseMenu_Draw() {
             draw_rectangle(bx + inner_pad - 4, yy - 2, bx + bw - inner_pad + 4, yy + row_h - 2, true);
         }
         draw_set_color(sel ? c_black : c_white);
-        draw_text(bx + inner_pad, yy, options[i]);
+        draw_text(bx + inner_pad, yy, label);
     }
     draw_set_alpha(1);
 }

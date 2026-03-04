@@ -278,9 +278,41 @@ function StatusDB_Get(_status_id) {
         StatusDB_Init();
     }
     if (ds_map_exists(global.status_db, _status_id)) {
-        return global.status_db[? _status_id];
+        return Status_LocalizeRuntime(global.status_db[? _status_id], _status_id);
     }
-    return { id: -1, name: "Unknown", icon_sprite: noone, stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 }, tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 }, stackable: false };
+    return { id: -1, name: Loc_T("status.name.unknown", "Unknown"), icon_sprite: noone, stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 }, tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 }, stackable: false };
+}
+
+function Status_LocalizationKey(_status_id) {
+    switch (_status_id) {
+        case STATUS_POISON: return "status_poison";
+        case STATUS_BLEED: return "status_bleed";
+        case STATUS_BURN: return "status_burn";
+        case STATUS_STUN: return "status_stun";
+        case STATUS_GUARD: return "status_guard";
+        case STATUS_DMG_UP: return "status_dmg_up";
+        case STATUS_EVASION: return "status_evasion";
+        case STATUS_CRIT_UP: return "status_crit_up";
+        case STATUS_HIT_UP: return "status_hit_up";
+        case STATUS_MEDITATION: return "status_meditation";
+        case STATUS_SOLIDIFY: return "status_solidify";
+        case STATUS_BLOODTHIRSTY: return "status_bloodthirsty";
+        case STATUS_BLESSING: return "status_blessing";
+        case STATUS_SUNDER: return "status_sunder";
+    }
+    return "unknown";
+}
+
+function Status_LocalizeRuntime(_status, _status_id = -1) {
+    if (!is_struct(_status)) return _status;
+
+    var sid = _status_id;
+    if (sid == -1 && variable_struct_exists(_status, "id")) sid = _status.id;
+    var key_suffix = Status_LocalizationKey(sid);
+
+    if (!variable_struct_exists(_status, "name_en")) _status.name_en = string(_status.name);
+    _status.name = Loc_T("status.name." + key_suffix, string(_status.name_en));
+    return _status;
 }
 
 function Status_Has(_ch, _status_id) {
@@ -467,7 +499,7 @@ function Status_IsNegative(_status_id) {
 }
 
 function Status_LabelWithSign(_cfg, _status_id) {
-    var name_txt = "Status";
+    var name_txt = Loc_T("status.name.default", "Status");
     if (is_struct(_cfg) && variable_struct_exists(_cfg, "name")) {
         name_txt = string(_cfg.name);
     }

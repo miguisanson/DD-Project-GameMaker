@@ -74,10 +74,10 @@ player_turn_start_applied = false;
 
 menu_index = 0;
 battle_actions = [
-    { label: "ATTACK", state: BSTATE_ATTACK_TIMING },
-    { label: "SKILL", state: BSTATE_SKILL_MENU },
-    { label: "ITEM",  state: BSTATE_ITEM_MENU },
-    { label: "RUN",   state: BSTATE_PLAYER_RUN }
+    { label: Loc_T("battle.action.attack", "ATTACK"), state: BSTATE_ATTACK_TIMING },
+    { label: Loc_T("battle.action.skill", "SKILL"), state: BSTATE_SKILL_MENU },
+    { label: Loc_T("battle.action.item",  "ITEM"),  state: BSTATE_ITEM_MENU },
+    { label: Loc_T("battle.action.run",   "RUN"),   state: BSTATE_PLAYER_RUN }
 ];
 menu_count = array_length(battle_actions);
 skill_index = 0;
@@ -100,7 +100,7 @@ attack_timing_falling_sprite = spr_attack_timing_falling;
 // --------------------
 // MESSAGE SETUP
 // --------------------
-message_text = e.name + " appeared!";
+message_text = Loc_T("combat.msg.enemy_appeared", "{enemy} appeared!", { enemy: e.name });
 Combat_Log(message_text);
 
 // camera shake base

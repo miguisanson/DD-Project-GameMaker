@@ -712,8 +712,34 @@ function ItemDB_Get(_id) {
     }
 
     ItemDB_AssignEquipPassives(db);
-    if (ds_map_exists(db, _id)) return db[? _id];
-    return { id: 0, name: "None", type: ITEM_KEY, stackable: false, max_stack: 0, equip_slot: "", power: 0, stat_type: -1, acc: 0, preferred_class: -1, sprite: noone, bonus: { str:0, agi:0, def:0, intt:0, luck:0 }, use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 }, value: 0 };
+    if (ds_map_exists(db, _id)) return Item_LocalizeRuntime(db[? _id]);
+    return { id: 0, name: Loc_T("item.name.0", "None"), type: ITEM_KEY, stackable: false, max_stack: 0, equip_slot: "", power: 0, stat_type: -1, acc: 0, preferred_class: -1, sprite: noone, bonus: { str:0, agi:0, def:0, intt:0, luck:0 }, use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 }, value: 0 };
+}
+
+function Item_LocalizeRuntime(_item) {
+    if (!is_struct(_item)) return _item;
+
+    if (!variable_struct_exists(_item, "name_en")) _item.name_en = string(_item.name);
+    _item.name = Loc_T("item.name." + string(_item.id), string(_item.name_en));
+
+    if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 0) {
+        if (!variable_struct_exists(_item, "passive_desc_en") || !is_array(_item.passive_desc_en)) {
+            var base_desc = [];
+            for (var i = 0; i < array_length(_item.passive_desc); i++) {
+                array_push(base_desc, string(_item.passive_desc[i]));
+            }
+            _item.passive_desc_en = base_desc;
+        }
+
+        if (array_length(_item.passive_desc_en) > 0) {
+            _item.passive_desc[0] = Loc_T("item.passive.name." + string(_item.id), string(_item.passive_desc_en[0]));
+        }
+        if (array_length(_item.passive_desc_en) > 1) {
+            _item.passive_desc[1] = Loc_T("item.passive.desc." + string(_item.id), string(_item.passive_desc_en[1]));
+        }
+    }
+
+    return _item;
 }
 
 function ItemDB_GetPassiveTemplate(_item_id) {
@@ -774,14 +800,14 @@ function Item_IsSkillbook(_item_or_id) {
 }
 
 function Item_SkillbookValidate(_item_or_id, _user) {
-    var out = { ok: false, msg: "Can't use that.", skill_id: -1, skill_name: "" };
+    var out = { ok: false, msg: Loc_T("item.msg.cant_use", "Can't use that."), skill_id: -1, skill_name: "" };
     var item = _item_or_id;
     if (!is_struct(item)) item = ItemDB_Get(_item_or_id);
     if (!Item_IsSkillbook(item)) return out;
 
     var skill_id = item.use.skill_id;
     var skill_cfg = SkillDB_Get(skill_id);
-    var skill_name = "that skill";
+    var skill_name = Loc_T("item.msg.that_skill", "that skill");
     if (is_struct(skill_cfg) && variable_struct_exists(skill_cfg, "name")) {
         skill_name = string(skill_cfg.name);
     }
@@ -790,18 +816,18 @@ function Item_SkillbookValidate(_item_or_id, _user) {
     out.skill_name = skill_name;
 
     if (!is_struct(_user) || !variable_struct_exists(_user, "class_id")) {
-        out.msg = "Can't use that.";
+        out.msg = Loc_T("item.msg.cant_use", "Can't use that.");
         return out;
     }
 
     var class_id = _user.class_id;
     if (class_id == CLASS_NOBODY) {
-        out.msg = "You are not ready to learn this yet.";
+        out.msg = Loc_T("item.msg.not_ready_skill", "You are not ready to learn this yet.");
         return out;
     }
 
     if (!Skill_ClassAllowed(skill_cfg, class_id)) {
-        out.msg = "Your class cannot learn " + skill_name + ".";
+        out.msg = Loc_T("item.msg.class_cannot_learn", "Your class cannot learn {skill}.", { skill: skill_name });
         return out;
     }
 
@@ -815,12 +841,12 @@ function Item_SkillbookValidate(_item_or_id, _user) {
         }
     }
     if (already_known) {
-        out.msg = "Already know " + skill_name + ".";
+        out.msg = Loc_T("item.msg.already_know", "Already know {skill}.", { skill: skill_name });
         return out;
     }
 
     out.ok = true;
-    out.msg = "Learned " + skill_name + ".";
+    out.msg = Loc_T("item.msg.learned", "Learned {skill}.", { skill: skill_name });
     return out;
 }
 
@@ -848,7 +874,7 @@ function Item_Use(_item_id, _user, _target) {
 
     if (!Item_IsConsumable(item)) {
         result.ok = false;
-        result.msg = "Can't use that.";
+        result.msg = Loc_T("item.msg.cant_use", "Can't use that.");
         return result;
     }
 
@@ -859,9 +885,9 @@ function Item_Use(_item_id, _user, _target) {
         _target.hp = clamp(_target.hp + amt, 0, _target.max_hp);
         if (_target.hp == before_hp) {
             result.ok = false;
-            result.msg = "Already full health.";
+            result.msg = Loc_T("item.msg.full_health", "Already full health.");
         } else {
-            result.msg = "Healed " + string(amt) + " HP.";
+            result.msg = Loc_T("item.msg.healed_hp", "Healed {amt} HP.", { amt: string(amt) });
         }
     } else if (eff == "mp") {
         var before_mp = _target.mp;
@@ -869,9 +895,9 @@ function Item_Use(_item_id, _user, _target) {
         _target.mp = clamp(_target.mp + amt2, 0, _target.max_mp);
         if (_target.mp == before_mp) {
             result.ok = false;
-            result.msg = "Already full mana.";
+            result.msg = Loc_T("item.msg.full_mana", "Already full mana.");
         } else {
-            result.msg = "Recovered " + string(amt2) + " MP.";
+            result.msg = Loc_T("item.msg.recovered_mp", "Recovered {amt} MP.", { amt: string(amt2) });
         }
     } else if (eff == "cure") {
         var cured_name = "";
@@ -885,10 +911,10 @@ function Item_Use(_item_id, _user, _target) {
             }
         }
         if (cured_name != "") {
-            result.msg = cured_name + " cured.";
+            result.msg = Loc_T("item.msg.status_cured", "{status} cured.", { status: cured_name });
         } else {
             result.ok = false;
-            result.msg = "No status to cure.";
+            result.msg = Loc_T("item.msg.no_status_cure", "No status to cure.");
         }
     } else if (eff == "learn_skill") {
         var learn = Item_SkillbookValidate(item, _user);
