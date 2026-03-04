@@ -79,6 +79,10 @@ if (room != rm_battle && variable_struct_exists(gs, "pending_post_battle_dialogu
     }
 }
 
+if (room != rm_battle) {
+    Dialogue_NarrativeTryStartPending();
+}
+
 // apply persistence once on initial room load
 if (room != rm_battle && variable_global_exists("room_state_ready") && global.room_state_ready) {
     var gs_apply = GameState_Get();

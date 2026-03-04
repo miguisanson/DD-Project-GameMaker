@@ -271,6 +271,7 @@ function Loot_Grant(_inv, _loot) {
             _inv = Inv_Add(_inv, it.item_id, max(1, qty));
         }
     }
+    Dialogue_NarrativeOnLootGranted(_loot);
     return _inv;
 }
 

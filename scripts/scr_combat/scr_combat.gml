@@ -314,6 +314,8 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
         at_level_cap: (is_struct(_player) && variable_struct_exists(_player, "level")) ? Level_IsAtCap(_player.level) : false
     };
 
+    Dialogue_NarrativeOnLevelUp(result.levels_gained);
+
     var lines = [Enemy_AutoResolveBuildMessage({ name: enemy_name }, result, Loc_T("combat.msg.victory_prefix", "You defeated "))];
     if (loot_gained) {
         var loot_entries = Loot_BuildMessageEntries(_rewards.loot, Loc_T("combat.msg.loot_prefix", "Loot: "));
@@ -329,11 +331,20 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
     var floor1_slime_done = variable_struct_exists(gs.flags, floor1_slime_key) && variable_struct_get(gs.flags, floor1_slime_key);
 
     var killed_floor1_slime = false;
+    var killed_floor2_dire_wolf = false;
     if (is_struct(gs) && variable_struct_exists(gs, "battle") && is_struct(gs.battle)) {
         if (variable_struct_exists(gs.battle, "enemy_room") && gs.battle.enemy_room == rm_floor1
         && variable_struct_exists(gs.battle, "enemy_id") && gs.battle.enemy_id == ENEMY_SLIME) {
             killed_floor1_slime = true;
         }
+        if (variable_struct_exists(gs.battle, "enemy_room") && gs.battle.enemy_room == rm_floor2
+        && variable_struct_exists(gs.battle, "enemy_id") && gs.battle.enemy_id == ENEMY_DIREWOLF) {
+            killed_floor2_dire_wolf = true;
+        }
+    }
+
+    if (killed_floor2_dire_wolf) {
+        Dialogue_NarrativeOnEnemyDefeated(ENEMY_DIREWOLF, rm_floor2);
     }
 
     if (!floor1_slime_done && killed_floor1_slime) {

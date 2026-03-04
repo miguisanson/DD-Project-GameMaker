@@ -59,6 +59,32 @@ function DialogueDB_Init() {
         "A voice folds into my thoughts.",
         "And I understand. It shows me where to place my hands."
     ];
+    global.dialogue_db[? "sys_floor2_dire_wolf_reaction"] = [
+        "*Pant*... Whew.",
+        "Now a bloody wolf?",
+        "Where did they come from?",
+        "...",
+        "I won't get any answers this way.",
+        "Let's keep going."
+    ];
+    global.dialogue_db[? "sys_first_level_up_reaction"] = [
+        "...",
+        "I'm feeling a bit dizzy.",
+        "I think I'm going to vomit...",
+        "Why does my body feel sore?",
+        "...",
+        "...and different."
+    ];
+    global.dialogue_db[? "sys_first_equippable_item_reaction"] = [
+        "This might come in handy.",
+        "...",
+        "How come there are so many treasures here?",
+        "As if...",
+        "...someone placed them here intentionally.",
+        "But why?",
+        "Why go the extra steps if their intentions were to have us killed?",
+        "It's not making sense, and it's creeping me out."
+    ];
 
     // interactables
     global.dialogue_db[? "tree"] = ["A sturdy tree."];
@@ -289,6 +315,159 @@ function Dialogue_TryStartSkillbookFirstRead(_class_id) {
     Dialogue_Start(did);
     Dialogue_SetActiveAmbienceSfxKey(Dialogue_PickSkillbookAmbienceSfxKey());
     return true;
+}
+
+function Dialogue_NarrativeDoneFlagKey(_event_id) {
+    return "narrative_event_done_" + string(_event_id);
+}
+
+function Dialogue_NarrativePendingFlagKey(_event_id) {
+    return "narrative_event_pending_" + string(_event_id);
+}
+
+function Dialogue_NarrativeDialogueId(_event_id) {
+    var eid = string(_event_id);
+    switch (eid) {
+        case "floor2_dire_wolf_reaction":
+            return "sys_floor2_dire_wolf_reaction";
+        case "first_level_up_reaction":
+            return "sys_first_level_up_reaction";
+        case "first_equippable_item_reaction":
+            return "sys_first_equippable_item_reaction";
+    }
+    return "";
+}
+
+function Dialogue_NarrativeAmbienceSfxKey(_event_id) {
+    if (string(_event_id) == "first_level_up_reaction") {
+        return Dialogue_PickSkillbookAmbienceSfxKey();
+    }
+    return "";
+}
+
+function Dialogue_NarrativeEnsureFlags() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
+    return gs.flags;
+}
+
+function Dialogue_NarrativeIsDone(_event_id) {
+    var flags = Dialogue_NarrativeEnsureFlags();
+    var key = Dialogue_NarrativeDoneFlagKey(_event_id);
+    if (!variable_struct_exists(flags, key)) return false;
+    return variable_struct_get(flags, key);
+}
+
+function Dialogue_NarrativeIsPending(_event_id) {
+    var flags = Dialogue_NarrativeEnsureFlags();
+    var key = Dialogue_NarrativePendingFlagKey(_event_id);
+    if (!variable_struct_exists(flags, key)) return false;
+    return variable_struct_get(flags, key);
+}
+
+function Dialogue_NarrativeSetPending(_event_id, _pending) {
+    var flags = Dialogue_NarrativeEnsureFlags();
+    variable_struct_set(flags, Dialogue_NarrativePendingFlagKey(_event_id), _pending);
+}
+
+function Dialogue_NarrativeMarkDone(_event_id) {
+    var flags = Dialogue_NarrativeEnsureFlags();
+    variable_struct_set(flags, Dialogue_NarrativeDoneFlagKey(_event_id), true);
+    variable_struct_set(flags, Dialogue_NarrativePendingFlagKey(_event_id), false);
+}
+
+function Dialogue_NarrativeQueueOnce(_event_id) {
+    if (Dialogue_NarrativeIsDone(_event_id)) return false;
+    if (Dialogue_NarrativeIsPending(_event_id)) return false;
+    Dialogue_NarrativeSetPending(_event_id, true);
+    return true;
+}
+
+function Dialogue_NarrativeOnEnemyDefeated(_enemy_id, _enemy_room) {
+    if (_enemy_id == ENEMY_DIREWOLF && _enemy_room == rm_floor2) {
+        return Dialogue_NarrativeQueueOnce("floor2_dire_wolf_reaction");
+    }
+    return false;
+}
+
+function Dialogue_NarrativeOnLevelUp(_levels_gained) {
+    var gained = max(0, round(real(_levels_gained)));
+    if (gained <= 0) return false;
+    return Dialogue_NarrativeQueueOnce("first_level_up_reaction");
+}
+
+function Dialogue_NarrativeOnLootGranted(_loot) {
+    if (!is_array(_loot) || array_length(_loot) <= 0) return false;
+    if (Dialogue_NarrativeIsDone("first_equippable_item_reaction")) return false;
+    if (Dialogue_NarrativeIsPending("first_equippable_item_reaction")) return false;
+
+    for (var i = 0; i < array_length(_loot); i++) {
+        var it = _loot[i];
+        if (!is_struct(it) || !variable_struct_exists(it, "item_id")) continue;
+        var qty = variable_struct_exists(it, "qty") ? max(0, round(real(it.qty))) : 1;
+        if (qty <= 0) continue;
+        var item = ItemDB_Get(it.item_id);
+        if (!is_struct(item) || !variable_struct_exists(item, "type")) continue;
+        if (item.type == ITEM_WEAPON || item.type == ITEM_ARMOR) {
+            return Dialogue_NarrativeQueueOnce("first_equippable_item_reaction");
+        }
+    }
+
+    return false;
+}
+
+function Dialogue_NarrativeCanStartNow() {
+    if (room == rm_battle) return false;
+    if (Transition_IsActive()) return false;
+
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) return false;
+    if (gs.ui.mode != UI_NONE) return false;
+    if (variable_struct_exists(gs.ui, "lines") && is_array(gs.ui.lines) && array_length(gs.ui.lines) > 0) return false;
+
+    var pl = noone;
+    if (variable_struct_exists(gs, "player_inst") && instance_exists(gs.player_inst)) pl = gs.player_inst;
+    else if (instance_exists(obj_player)) pl = instance_find(obj_player, 0);
+    if (!instance_exists(pl)) return false;
+    if (!Player_IsSettled(pl)) return false;
+    return true;
+}
+
+function Dialogue_NarrativeTryStartPending() {
+    if (!Dialogue_NarrativeCanStartNow()) return false;
+
+    var order = [
+        "floor2_dire_wolf_reaction",
+        "first_level_up_reaction",
+        "first_equippable_item_reaction"
+    ];
+
+    for (var i = 0; i < array_length(order); i++) {
+        var event_id = order[i];
+        if (!Dialogue_NarrativeIsPending(event_id)) continue;
+
+        var did = Dialogue_NarrativeDialogueId(event_id);
+        if (did == "") {
+            Dialogue_NarrativeMarkDone(event_id);
+            continue;
+        }
+
+        var lines = DialogueDB_Get(did);
+        if (!is_array(lines) || array_length(lines) <= 0) {
+            Dialogue_NarrativeMarkDone(event_id);
+            continue;
+        }
+
+        Dialogue_StartLines(lines);
+        var ambience_key = Dialogue_NarrativeAmbienceSfxKey(event_id);
+        if (ambience_key != "") {
+            Dialogue_SetActiveAmbienceSfxKey(ambience_key);
+        }
+        Dialogue_NarrativeMarkDone(event_id);
+        return true;
+    }
+
+    return false;
 }
 
 

@@ -131,6 +131,10 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
         loot_gained: is_array(loot) && array_length(loot) > 0,
         at_level_cap: at_cap_before || Level_IsAtCap(p.level)
     };
+
+    Dialogue_NarrativeOnLevelUp(result.levels_gained);
+    Dialogue_NarrativeOnEnemyDefeated(_enemy_id, room);
+
     if (variable_struct_exists(cfg, "name")) _enemy_name = cfg.name;
     var summary = Enemy_AutoResolveBuildMessage({ name: _enemy_name }, result);
     var loot_entries = Loot_BuildMessageEntries(loot, "Loot: ");
