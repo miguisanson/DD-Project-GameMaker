@@ -223,7 +223,7 @@ function EnemyDB_Init() {
 
     global.enemy_db[? ENEMY_MINI_BOSS] = {
         id: ENEMY_MINI_BOSS,
-        name: "Mini Boss",
+        name: "Palehorn",
         level: 8,
         stats: { str: 18, agi: 12, def: 16, intt: 14, luck: 12 },
         base_hp: 22,
@@ -250,7 +250,7 @@ function EnemyDB_Init() {
 
     global.enemy_db[? ENEMY_FINAL_BOSS] = {
         id: ENEMY_FINAL_BOSS,
-        name: "Final Boss",
+        name: "The Pale Choirbeast",
         level: 10,
         stats: { str: 21, agi: 14, def: 18, intt: 19, luck: 14 },
         base_hp: 30,

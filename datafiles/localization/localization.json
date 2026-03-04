@@ -960,8 +960,8 @@
       "ko": "다이어 울프"
     },
     "enemy.name.enemy_final_boss": {
-      "en": "Final Boss",
-      "ko": "최종보스"
+      "en": "The Pale Choirbeast",
+      "ko": "The Pale Choirbeast"
     },
     "enemy.name.enemy_ghostsword": {
       "en": "Ghost Sword",
@@ -976,8 +976,8 @@
       "ko": "미친 속삭임"
     },
     "enemy.name.enemy_mini_boss": {
-      "en": "Mini Boss",
-      "ko": "미니보스"
+      "en": "Palehorn",
+      "ko": "Palehorn"
     },
     "enemy.name.enemy_slime": {
       "en": "Slime",

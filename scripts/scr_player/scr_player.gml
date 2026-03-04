@@ -713,29 +713,69 @@ function UI_IsBlocking() {
     return false;
 }
 
+function UI_PathJoin(_base, _leaf) {
+    var base = string(_base);
+    var leaf = string(_leaf);
+    if (base == "") return leaf;
+    if (leaf == "") return base;
+
+    var last = string_char_at(base, string_length(base));
+    if (last == "/" || last == "\\") return base + leaf;
+    return base + "/" + leaf;
+}
+
 function UI_SetFont() {
     var font_to_use = UI_FONT;
     if (Loc_GetLanguage() == "ko") {
         if (!variable_global_exists("ui_font_ko")) global.ui_font_ko = -1;
-        if (!variable_global_exists("ui_font_ko_attempted")) global.ui_font_ko_attempted = false;
+        if (!variable_global_exists("ui_font_ko_warned")) global.ui_font_ko_warned = false;
 
-        if (!global.ui_font_ko_attempted) {
-            global.ui_font_ko_attempted = true;
+        // Retry until success so one failed early load doesn't permanently break Korean text.
+        if (global.ui_font_ko == -1) {
+            // Keep Korean a bit larger for readability in the existing UI.
+            var ko_size = 20;
+            var ko_paths = [];
+            var wd = working_directory;
+            var pd = program_directory;
 
-            // Korean UI font (bundled with project, no system font dependency).
-            var ko_size = 18;
-            var ko_paths = [
-                "datafiles/fonts/NotoSansCJKkr-Regular.otf",
-                working_directory + "datafiles/fonts/NotoSansCJKkr-Regular.otf",
-                "NotoSansCJKkr-Regular.otf",
-                working_directory + "NotoSansCJKkr-Regular.otf"
+            // Prefer deterministic absolute paths first, then relative fallbacks.
+            var base_dirs = [
+                UI_PathJoin(pd, "datafiles"),
+                UI_PathJoin(pd, "datafiles/fonts"),
+                UI_PathJoin(wd, "datafiles"),
+                UI_PathJoin(wd, "datafiles/fonts"),
+                "datafiles",
+                "datafiles/fonts",
+                "",
+                wd,
+                pd
             ];
+
+            var ko_files = [
+                "NanumGothic-Regular.ttf",
+                "NotoSansCJKkr-Regular.otf"
+            ];
+
+            for (var d = 0; d < array_length(base_dirs); d++) {
+                var b = string(base_dirs[d]);
+                for (var f = 0; f < array_length(ko_files); f++) {
+                    var candidate = (b == "") ? ko_files[f] : UI_PathJoin(b, ko_files[f]);
+                    array_push(ko_paths, candidate);
+                }
+            }
 
             for (var i = 0; i < array_length(ko_paths); i++) {
                 var p = ko_paths[i];
                 if (!file_exists(p)) continue;
                 global.ui_font_ko = font_add(p, ko_size, false, false, 32, 55203);
                 if (global.ui_font_ko != -1) break;
+            }
+
+            if (global.ui_font_ko == -1 && !global.ui_font_ko_warned) {
+                global.ui_font_ko_warned = true;
+                show_debug_message("UI_SetFont: failed to load Korean runtime font from all known paths.");
+            } else if (global.ui_font_ko != -1) {
+                global.ui_font_ko_warned = false;
             }
         }
 
