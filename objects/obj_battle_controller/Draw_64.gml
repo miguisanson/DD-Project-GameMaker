@@ -242,6 +242,70 @@ if (attack_timing_result_timer > 0 && attack_timing_result_text != "") {
     draw_text(txf, tyf, attack_timing_result_text);
 }
 
+// Enemy defensive QTE (for enemy damaging skills only).
+if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qte_total > 0) {
+    var q_alpha = clamp(enemy_def_qte_draw_alpha, 0, 1);
+    var q_scale = max(0.5, real(enemy_def_qte_draw_scale));
+    if (q_alpha > 0.001) {
+        var q_dir = UP;
+        if (is_array(enemy_def_qte_prompts) && enemy_def_qte_index >= 0 && enemy_def_qte_index < array_length(enemy_def_qte_prompts)) {
+            q_dir = enemy_def_qte_prompts[enemy_def_qte_index];
+        }
+
+        var qx = w * 0.5;
+        var qy = h * 0.28;
+        if (instance_exists(enemy_inst)) {
+            var qspr = enemy_inst.sprite_index;
+            if (qspr != noone && qspr != -1) {
+                var qox = SpriteShake_Offset(enemy_inst);
+                var qex = (enemy_inst.x + qox.x - sprite_get_xoffset(qspr) - vx) * sx;
+                var qey = (enemy_inst.y + qox.y - sprite_get_yoffset(qspr) - vy) * sy;
+                var qew = sprite_get_width(qspr) * sx;
+                qx = qex + (qew * 0.5);
+                qy = qey - 14;
+            }
+        }
+
+        var q_col = c_white;
+        if (enemy_def_qte_phase == 2) q_col = enemy_def_qte_feedback_ok ? c_lime : c_red;
+        Battle_DrawDirectionArrow(qx, qy, q_dir, DEF_QTE_ARROW_BASE_SIZE * q_scale, q_alpha, q_col);
+
+        var q_action = Battle_DefQTEActionForDir(q_dir);
+        var q_label = Input_Label(q_action);
+        var q_header = Loc_T("battle.def_qte.prompt", "Defend!");
+        var q_progress = string(enemy_def_qte_index + 1) + "/" + string(enemy_def_qte_total);
+        var q_key_line = Loc_T("battle.def_qte.key", "Press {key}", { key: q_label });
+        var q_top = qy - 18;
+
+        draw_set_alpha(q_alpha);
+        draw_set_color(c_black);
+        draw_text(qx - (string_width(q_header) * 0.5) + 1, q_top + 1, q_header);
+        draw_text(qx - (string_width(q_key_line) * 0.5) + 1, q_top + 10, q_key_line);
+        draw_text(qx - (string_width(q_progress) * 0.5) + 1, q_top + 20, q_progress);
+        draw_set_color(c_white);
+        draw_text(qx - (string_width(q_header) * 0.5), q_top, q_header);
+        draw_text(qx - (string_width(q_key_line) * 0.5), q_top + 9, q_key_line);
+        draw_text(qx - (string_width(q_progress) * 0.5), q_top + 19, q_progress);
+        draw_set_alpha(1);
+
+        if (enemy_def_qte_phase == 1 && enemy_def_qte_response_frames > 0) {
+            var q_ratio = clamp(enemy_def_qte_timer / max(1, enemy_def_qte_response_frames), 0, 1);
+            var qbw = 44;
+            var qbh = 4;
+            var qbx = qx - (qbw * 0.5);
+            var qby = qy + 12;
+            draw_set_alpha(q_alpha * 0.9);
+            draw_set_color(c_black);
+            draw_rectangle(qbx - 1, qby - 1, qbx + qbw + 1, qby + qbh + 1, false);
+            draw_set_color(c_white);
+            draw_rectangle(qbx, qby, qbx + qbw, qby + qbh, true);
+            draw_rectangle(qbx, qby, qbx + floor(qbw * q_ratio), qby + qbh, false);
+            draw_set_alpha(1);
+            draw_set_color(c_white);
+        }
+    }
+}
+
 // FX draw (battle-only), over enemy sprite
 with (obj_fx) {
     if (sprite_index != noone) {

@@ -98,6 +98,26 @@ attack_timing_marker_alpha = 0;
 attack_timing_target_sprite = spr_attack_timing_target;
 attack_timing_falling_sprite = spr_attack_timing_falling;
 
+enemy_def_qte_active = false;
+enemy_def_qte_prompts = [];
+enemy_def_qte_total = 0;
+enemy_def_qte_index = 0;
+enemy_def_qte_success = 0;
+enemy_def_qte_failure = 0;
+enemy_def_qte_phase = 0;
+enemy_def_qte_timer = 0;
+enemy_def_qte_draw_alpha = 0;
+enemy_def_qte_draw_scale = 1;
+enemy_def_qte_feedback_ok = false;
+enemy_def_qte_feedback_timed_out = false;
+enemy_def_qte_feedback_dir = -1;
+enemy_def_qte_input_dir = -1;
+enemy_def_qte_response_frames = 0;
+enemy_def_qte_fade_in_frames = 0;
+enemy_def_qte_feedback_frames = 0;
+enemy_def_qte_transition_frames = 0;
+enemy_def_qte_ctx = {};
+
 // --------------------
 // MESSAGE SETUP
 // --------------------

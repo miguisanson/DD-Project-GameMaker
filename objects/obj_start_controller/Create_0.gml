@@ -31,10 +31,10 @@ cutscene_transition_switched = false;
 boot_logo_phase = 0;
 boot_logo_timer = 0;
 boot_logo_alpha = 0;
-boot_logo_fade_in_frames = 24;
-boot_logo_hold_frames = 36;
-boot_logo_fade_out_frames = 28;
-boot_logo_black_hold_frames = 14;
+boot_logo_fade_in_frames = 36;
+boot_logo_hold_frames = 180;
+boot_logo_fade_out_frames = 36;
+boot_logo_black_hold_frames = 8;
 boot_logo_sprite = pale_rook_1;
 
 cutscene_definitions = {};

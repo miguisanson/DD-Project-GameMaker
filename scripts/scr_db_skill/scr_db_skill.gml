@@ -323,6 +323,7 @@ function SkillDB_Init() {
         fx_frames: 12,
         fx_speed: 0.2,
         hits: 1,
+        uses_defensive_qte: true,
         class_list: [],
         enemy_use_chance_min: 0.10,
         enemy_use_chance_max: 0.25
@@ -374,6 +375,7 @@ function SkillDB_Init() {
         fx_frames: 12,
         fx_speed: 0.2,
         hits: 1,
+        uses_defensive_qte: true,
         class_list: [],
         enemy_use_chance_min: 0.25,
         enemy_use_chance_max: 0.30
@@ -426,6 +428,7 @@ function SkillDB_Init() {
         fx_frames: 12,
         fx_speed: 0.2,
         hits: 1,
+        uses_defensive_qte: true,
         class_list: [],
         enemy_use_chance_min: 0.20,
         enemy_use_chance_max: 0.20
@@ -451,6 +454,7 @@ function SkillDB_Init() {
         fx_frames: 12,
         fx_speed: 0.2,
         hits: 1,
+        uses_defensive_qte: true,
         class_list: [],
         enemy_use_chance_min: 0.40,
         enemy_use_chance_max: 0.40
@@ -476,6 +480,7 @@ function SkillDB_Init() {
         fx_frames: 12,
         fx_speed: 0.2,
         hits: 1,
+        uses_defensive_qte: true,
         class_list: [],
         enemy_use_chance_min: 0.50,
         enemy_use_chance_max: 0.50
@@ -529,6 +534,7 @@ function SkillDB_Init() {
         fx_frames: 12,
         fx_speed: 0.2,
         hits: 1,
+        uses_defensive_qte: true,
         class_list: [],
         enemy_use_chance_min: 0.40,
         enemy_use_chance_max: 0.40
@@ -684,6 +690,7 @@ function SkillDB_Get(_skill_id) {
         class_list: [],
         sfx_key: "skill_generic",
         sfx_candidates: [],
+        uses_defensive_qte: false,
         enemy_use_chance_min: ENEMY_SKILL_USE_CHANCE_DEFAULT,
         enemy_use_chance_max: ENEMY_SKILL_USE_CHANCE_DEFAULT,
         free_action: false,

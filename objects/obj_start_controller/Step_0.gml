@@ -33,7 +33,9 @@ if (state == "boot_logo") {
     switch (boot_logo_phase) {
         case 0: // fade in
             boot_logo_timer += 1;
-            boot_logo_alpha = clamp(boot_logo_timer / max(1, boot_logo_fade_in_frames), 0, 1);
+            var in_t = clamp(boot_logo_timer / max(1, boot_logo_fade_in_frames), 0, 1);
+            // smoothstep easing keeps the intro logo fade seamless and bell-curved
+            boot_logo_alpha = in_t * in_t * (3 - (2 * in_t));
             if (boot_logo_timer >= max(1, boot_logo_fade_in_frames)) {
                 boot_logo_phase = 1;
                 boot_logo_timer = 0;
@@ -52,7 +54,9 @@ if (state == "boot_logo") {
 
         case 2: // fade out
             boot_logo_timer += 1;
-            boot_logo_alpha = 1 - clamp(boot_logo_timer / max(1, boot_logo_fade_out_frames), 0, 1);
+            var out_t = clamp(boot_logo_timer / max(1, boot_logo_fade_out_frames), 0, 1);
+            out_t = out_t * out_t * (3 - (2 * out_t));
+            boot_logo_alpha = 1 - out_t;
             if (boot_logo_timer >= max(1, boot_logo_fade_out_frames)) {
                 boot_logo_phase = 3;
                 boot_logo_timer = 0;

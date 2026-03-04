@@ -170,6 +170,11 @@ if (battle_state == BSTATE_ATTACK_TIMING) {
     exit;
 }
 
+if (battle_state == BSTATE_ENEMY_DEF_QTE) {
+    Battle_DefQTEStep(self);
+    exit;
+}
+
 // --------------------
 // PLAYER ATTACK
 // --------------------

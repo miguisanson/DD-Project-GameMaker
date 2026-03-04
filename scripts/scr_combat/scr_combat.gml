@@ -842,6 +842,536 @@ function Battle_EnemyChooseSkill(_e, _p, _actions_remaining = -1, _used_skills =
     return candidates[irandom(array_length(candidates) - 1)];
 }
 
+function Battle_StatusSnapshot(_ch) {
+    var out = [];
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "status") || !is_array(_ch.status)) return out;
+    for (var i = 0; i < array_length(_ch.status); i++) {
+        var st = _ch.status[i];
+        if (!is_struct(st) || !variable_struct_exists(st, "id")) continue;
+        var sid = round(real(st.id));
+        var turns = variable_struct_exists(st, "turns") ? max(0, round(real(st.turns))) : 0;
+        array_push(out, { id: sid, turns: turns });
+    }
+    return out;
+}
+
+function Battle_StatusSnapshotTurns(_snapshot, _status_id) {
+    if (!is_array(_snapshot)) return 0;
+    var sid = round(real(_status_id));
+    for (var i = 0; i < array_length(_snapshot); i++) {
+        var st = _snapshot[i];
+        if (!is_struct(st) || !variable_struct_exists(st, "id")) continue;
+        if (round(real(st.id)) != sid) continue;
+        return variable_struct_exists(st, "turns") ? max(0, round(real(st.turns))) : 0;
+    }
+    return 0;
+}
+
+function Battle_StatusCurrentTurns(_ch, _status_id) {
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "status") || !is_array(_ch.status)) return 0;
+    var sid = round(real(_status_id));
+    for (var i = 0; i < array_length(_ch.status); i++) {
+        var st = _ch.status[i];
+        if (!is_struct(st) || !variable_struct_exists(st, "id")) continue;
+        if (round(real(st.id)) != sid) continue;
+        return variable_struct_exists(st, "turns") ? max(0, round(real(st.turns))) : 0;
+    }
+    return 0;
+}
+
+function Battle_StatusSetTurns(_ch, _status_id, _turns) {
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "status") || !is_array(_ch.status)) return _ch;
+    var sid = round(real(_status_id));
+    var turns = max(0, round(real(_turns)));
+    for (var i = 0; i < array_length(_ch.status); i++) {
+        var st = _ch.status[i];
+        if (!is_struct(st) || !variable_struct_exists(st, "id")) continue;
+        if (round(real(st.id)) != sid) continue;
+        st.turns = turns;
+        _ch.status[i] = st;
+        break;
+    }
+    return _ch;
+}
+
+function Battle_SkillStatusSpecs(_skill) {
+    var specs = [];
+    if (!is_struct(_skill)) return specs;
+
+    var default_turns = variable_struct_exists(_skill, "status_turns") ? max(1, round(real(_skill.status_turns))) : 1;
+    if (variable_struct_exists(_skill, "status")) {
+        var sid = round(real(_skill.status));
+        if (sid != -1) array_push(specs, { id: sid, base_turns: default_turns });
+    }
+
+    if (variable_struct_exists(_skill, "status_list") && is_array(_skill.status_list)) {
+        var turns_list = (variable_struct_exists(_skill, "status_turns_list") && is_array(_skill.status_turns_list)) ? _skill.status_turns_list : [];
+        for (var i = 0; i < array_length(_skill.status_list); i++) {
+            var sid_m = round(real(_skill.status_list[i]));
+            if (sid_m == -1) continue;
+
+            var turns_m = default_turns;
+            if (i < array_length(turns_list)) turns_m = max(1, round(real(turns_list[i])));
+
+            var merged = false;
+            for (var j = 0; j < array_length(specs); j++) {
+                if (specs[j].id != sid_m) continue;
+                specs[j].base_turns = max(specs[j].base_turns, turns_m);
+                merged = true;
+                break;
+            }
+            if (!merged) array_push(specs, { id: sid_m, base_turns: turns_m });
+        }
+    }
+
+    return specs;
+}
+
+function Battle_DefQTEThreatRank(_enemy) {
+    var rank = 1;
+    if (is_struct(_enemy) && variable_struct_exists(_enemy, "threat_rank")) rank = max(1, round(real(_enemy.threat_rank)));
+    if (is_struct(_enemy) && variable_struct_exists(_enemy, "id")) {
+        var cfg = EnemyDB_Get(_enemy.id);
+        if (is_struct(cfg) && variable_struct_exists(cfg, "threat_rank")) {
+            rank = max(rank, max(1, round(real(cfg.threat_rank))));
+        }
+    }
+    return rank;
+}
+
+function Battle_DefQTEPromptCountForEnemy(_enemy) {
+    var rank = Battle_DefQTEThreatRank(_enemy);
+    var is_boss = is_struct(_enemy) && variable_struct_exists(_enemy, "is_boss") && _enemy.is_boss;
+    if (is_boss || rank >= 4) return irandom_range(3, 5);
+    if (rank >= 3) return irandom_range(2, 4);
+    if (rank >= 2) return irandom_range(1, 3);
+    return 1;
+}
+
+function Battle_DefQTERandomDir() {
+    return choose(UP, DOWN, LEFT, RIGHT);
+}
+
+function Battle_DefQTEActionForDir(_dir) {
+    switch (_dir) {
+        case UP: return "move_up";
+        case DOWN: return "move_down";
+        case LEFT: return "move_left";
+        case RIGHT: return "move_right";
+    }
+    return "move_up";
+}
+
+function Battle_DefQTEInputDir() {
+    if (Input_UIPressed("move_up")) return UP;
+    if (Input_UIPressed("move_down")) return DOWN;
+    if (Input_UIPressed("move_left")) return LEFT;
+    if (Input_UIPressed("move_right")) return RIGHT;
+    return -1;
+}
+
+function Battle_EnemySkillCanUseDefQTE(_skill, _res, _target) {
+    if (!is_struct(_skill) || !is_struct(_res) || !is_struct(_target)) return false;
+    if (!variable_struct_exists(_skill, "uses_defensive_qte") || !_skill.uses_defensive_qte) return false;
+    if (!variable_struct_exists(_skill, "effect") || string(_skill.effect) != "damage") return false;
+    if (!variable_struct_exists(_target, "is_player") || !_target.is_player) return false;
+    if (!variable_struct_exists(_res, "ok") || !_res.ok) return false;
+    if (!variable_struct_exists(_res, "hit") || !_res.hit) return false;
+    if (!variable_struct_exists(_res, "dmg") || round(real(_res.dmg)) <= 0) return false;
+    return true;
+}
+
+function Battle_EnemySkillComposeMessage(_enemy_name, _res, _dmg_override = -1, _status_msg = "", _extra_msg = "") {
+    var enemy_name = string(_enemy_name);
+    var res = is_struct(_res) ? _res : { hit: true, crit: false, dmg: 0, msg: "" };
+
+    var hit = variable_struct_exists(res, "hit") ? res.hit : false;
+    var crit = variable_struct_exists(res, "crit") ? res.crit : false;
+    var dmg_raw = variable_struct_exists(res, "dmg") ? max(0, round(real(res.dmg))) : 0;
+    var dmg = (argument_count >= 3 && _dmg_override >= 0) ? max(0, round(real(_dmg_override))) : dmg_raw;
+    var base_tail = variable_struct_exists(res, "msg") ? string(res.msg) : "";
+    var has_dmg_context = ((argument_count >= 3 && _dmg_override >= 0) || dmg_raw > 0);
+
+    var msg = "";
+    if (!hit) {
+        msg = Loc_T("combat.msg.enemy_miss", "{enemy} missed!", { enemy: enemy_name });
+    } else if (has_dmg_context) {
+        if (crit) msg = Loc_T("combat.msg.enemy_crit", "{enemy} crit! {dmg} damage!", { enemy: enemy_name, dmg: dmg });
+        else msg = Loc_T("combat.msg.enemy_hit", "{enemy} hits for {dmg} damage!", { enemy: enemy_name, dmg: dmg });
+    } else if (base_tail != "") {
+        msg = Loc_T("combat.msg.enemy_skill_message", "{enemy}: {msg}", { enemy: enemy_name, msg: base_tail });
+    } else {
+        msg = Loc_T("combat.msg.skill_used", "Skill used.");
+    }
+
+    if (string(_status_msg) != "") {
+        msg += " " + string(_status_msg);
+    } else if (hit && has_dmg_context && base_tail != "") {
+        msg += " " + base_tail;
+    }
+
+    if (string(_extra_msg) != "") {
+        msg += " " + string(_extra_msg);
+    }
+
+    return msg;
+}
+
+function Battle_EnemyFinalizeTurnState(_bc, _p, _e) {
+    var out = { ended: false, player: _p, enemy: _e };
+    var p = _p;
+    var e = _e;
+
+    var enemy_turn_finished = (_bc.enemy_actions_remaining <= 0);
+    if (enemy_turn_finished) {
+        e = Status_Tick(e);
+        if (Battle_CheckEnd(_bc, p, e)) {
+            _bc.p = p;
+            _bc.e = e;
+            out.ended = true;
+            out.player = p;
+            out.enemy = e;
+            return out;
+        }
+        _bc.turn = TURN_PLAYER;
+    } else {
+        _bc.turn = TURN_ENEMY;
+    }
+
+    _bc.p = p;
+    _bc.e = e;
+    out.player = p;
+    out.enemy = e;
+    return out;
+}
+
+function Battle_DefQTEClear(_bc) {
+    _bc.enemy_def_qte_active = false;
+    _bc.enemy_def_qte_prompts = [];
+    _bc.enemy_def_qte_total = 0;
+    _bc.enemy_def_qte_index = 0;
+    _bc.enemy_def_qte_success = 0;
+    _bc.enemy_def_qte_failure = 0;
+    _bc.enemy_def_qte_phase = 0;
+    _bc.enemy_def_qte_timer = 0;
+    _bc.enemy_def_qte_draw_alpha = 0;
+    _bc.enemy_def_qte_draw_scale = 1;
+    _bc.enemy_def_qte_feedback_ok = false;
+    _bc.enemy_def_qte_feedback_timed_out = false;
+    _bc.enemy_def_qte_feedback_dir = -1;
+    _bc.enemy_def_qte_input_dir = -1;
+    _bc.enemy_def_qte_ctx = {};
+}
+
+function Battle_DefQTEBeginPrompt(_bc) {
+    if (!_bc.enemy_def_qte_active) return;
+    if (_bc.enemy_def_qte_index >= _bc.enemy_def_qte_total) return;
+
+    _bc.enemy_def_qte_phase = 0;
+    _bc.enemy_def_qte_timer = max(1, _bc.enemy_def_qte_fade_in_frames);
+    _bc.enemy_def_qte_draw_alpha = 0;
+    _bc.enemy_def_qte_draw_scale = 1;
+    _bc.enemy_def_qte_feedback_ok = false;
+    _bc.enemy_def_qte_feedback_timed_out = false;
+    _bc.enemy_def_qte_feedback_dir = -1;
+    _bc.enemy_def_qte_input_dir = -1;
+
+    SFX_PlayUI("ui_move");
+}
+
+function Battle_DefQTEStart(_bc, _enemy, _skill, _res, _follow_state, _player_hp_before, _status_before_snapshot) {
+    var total = max(1, Battle_DefQTEPromptCountForEnemy(_enemy));
+    var prompts = [];
+    for (var i = 0; i < total; i++) {
+        array_push(prompts, Battle_DefQTERandomDir());
+    }
+
+    var qte_frame_rate = game_get_speed(gamespeed_fps);
+    if (!is_real(qte_frame_rate) || qte_frame_rate <= 0) qte_frame_rate = 60;
+    qte_frame_rate = max(1, round(qte_frame_rate));
+    _bc.enemy_def_qte_fade_in_frames = max(1, round(qte_frame_rate * DEF_QTE_PROMPT_FADE_IN_SEC));
+    _bc.enemy_def_qte_response_frames = max(1, round(qte_frame_rate * DEF_QTE_PROMPT_RESPONSE_SEC));
+    _bc.enemy_def_qte_feedback_frames = max(1, round(qte_frame_rate * DEF_QTE_PROMPT_FEEDBACK_SEC));
+    _bc.enemy_def_qte_transition_frames = max(1, round(qte_frame_rate * DEF_QTE_PROMPT_TRANSITION_SEC));
+
+    _bc.enemy_def_qte_active = true;
+    _bc.enemy_def_qte_prompts = prompts;
+    _bc.enemy_def_qte_total = total;
+    _bc.enemy_def_qte_index = 0;
+    _bc.enemy_def_qte_success = 0;
+    _bc.enemy_def_qte_failure = 0;
+    _bc.enemy_def_qte_ctx = {
+        skill: _skill,
+        res: _res,
+        follow_state: _follow_state,
+        hp_before: max(0, round(real(_player_hp_before))),
+        status_before: _status_before_snapshot,
+        status_specs: Battle_SkillStatusSpecs(_skill)
+    };
+
+    Battle_DefQTEBeginPrompt(_bc);
+    _bc.battle_state = BSTATE_ENEMY_DEF_QTE;
+    return true;
+}
+
+function Battle_DefQTEAdjustPlayerStatuses(_p, _status_specs, _before_snapshot, _success_ratio) {
+    var out = { player: _p, status_msg: "", blocked_stun: false };
+    var p = _p;
+    if (!is_array(_status_specs) || array_length(_status_specs) <= 0) {
+        out.player = p;
+        return out;
+    }
+
+    var ratio = clamp(real(_success_ratio), 0, 1);
+    var duration_mult = DEF_QTE_STATUS_MIN_MULT + ((DEF_QTE_STATUS_MAX_MULT - DEF_QTE_STATUS_MIN_MULT) * (1 - ratio));
+    var status_names = [];
+    var blocked_stun = false;
+
+    for (var i = 0; i < array_length(_status_specs); i++) {
+        var spec = _status_specs[i];
+        if (!is_struct(spec) || !variable_struct_exists(spec, "id")) continue;
+
+        var sid = round(real(spec.id));
+        var before_turns = Battle_StatusSnapshotTurns(_before_snapshot, sid);
+        var current_turns = Battle_StatusCurrentTurns(p, sid);
+        if (current_turns <= before_turns) continue;
+
+        if (sid == STATUS_STUN && ratio >= DEF_QTE_STATUS_STUN_BLOCK_RATIO) {
+            if (before_turns > 0) {
+                p = Battle_StatusSetTurns(p, sid, before_turns);
+            } else {
+                p = Status_Remove(p, sid);
+            }
+            blocked_stun = true;
+            continue;
+        }
+
+        var base_turns = variable_struct_exists(spec, "base_turns") ? max(1, round(real(spec.base_turns))) : 1;
+        var scaled_turns = max(1, round(base_turns * duration_mult));
+        if (before_turns > 0) scaled_turns = max(before_turns, scaled_turns);
+        p = Battle_StatusSetTurns(p, sid, scaled_turns);
+
+        var final_turns = Battle_StatusCurrentTurns(p, sid);
+        if (final_turns > before_turns) {
+            var cfg = StatusDB_Get(sid);
+            if (is_struct(cfg) && variable_struct_exists(cfg, "name")) {
+                var name = string(cfg.name);
+                var dup = false;
+                for (var n = 0; n < array_length(status_names); n++) {
+                    if (status_names[n] == name) { dup = true; break; }
+                }
+                if (!dup) array_push(status_names, name);
+            }
+        }
+    }
+
+    var status_msg = "";
+    if (array_length(status_names) > 0) status_msg = Skill_BuildAppliedStatusMessage(status_names);
+
+    out.player = p;
+    out.status_msg = status_msg;
+    out.blocked_stun = blocked_stun;
+    return out;
+}
+
+function Battle_DefQTEFinalize(_bc) {
+    if (!_bc.enemy_def_qte_active) return;
+
+    var p = _bc.p;
+    var e = _bc.e;
+    var ctx = is_struct(_bc.enemy_def_qte_ctx) ? _bc.enemy_def_qte_ctx : {};
+
+    var total = max(1, _bc.enemy_def_qte_total);
+    var success = clamp(_bc.enemy_def_qte_success, 0, total);
+    var ratio = success / total;
+
+    var base_res = variable_struct_exists(ctx, "res") && is_struct(ctx.res) ? ctx.res : { hit: true, crit: false, dmg: 0, msg: "" };
+    var base_dmg = variable_struct_exists(base_res, "dmg") ? max(0, round(real(base_res.dmg))) : 0;
+    var dmg_mult = clamp(1 - (DEF_QTE_DAMAGE_REDUCTION_MAX * ratio), 0, 1);
+    var final_dmg = max(0, floor(base_dmg * dmg_mult));
+
+    var hp_before = variable_struct_exists(ctx, "hp_before") ? max(0, round(real(ctx.hp_before))) : p.hp;
+    if (is_struct(p) && variable_struct_exists(p, "max_hp")) hp_before = clamp(hp_before, 0, p.max_hp);
+    if (is_struct(p) && variable_struct_exists(p, "max_hp")) p.hp = clamp(hp_before - final_dmg, 0, p.max_hp);
+    else p.hp = max(0, hp_before - final_dmg);
+
+    var status_before = variable_struct_exists(ctx, "status_before") ? ctx.status_before : [];
+    var status_specs = variable_struct_exists(ctx, "status_specs") ? ctx.status_specs : [];
+    var status_pack = Battle_DefQTEAdjustPlayerStatuses(p, status_specs, status_before, ratio);
+    p = status_pack.player;
+
+    var status_msg = status_pack.status_msg;
+    if (status_pack.blocked_stun) {
+        var block_msg = Loc_T("combat.msg.def_qte.stun_blocked", "Stun blocked.");
+        if (status_msg != "") status_msg += " " + block_msg;
+        else status_msg = block_msg;
+    }
+
+    var reduce_pct = round((1 - dmg_mult) * 100);
+    var qte_summary = Loc_T(
+        "combat.msg.def_qte.summary",
+        "Guarded {ok}/{total}. Damage -{reduce}%.",
+        { ok: success, total: total, reduce: reduce_pct }
+    );
+
+    var enemy_name = is_struct(e) && variable_struct_exists(e, "name") ? string(e.name) : Loc_T("enemy.name.unknown", "Enemy");
+    var msg_res = base_res;
+    msg_res.msg = ""; // Rebuilt after mitigation.
+    var final_msg = Battle_EnemySkillComposeMessage(enemy_name, msg_res, final_dmg, status_msg, qte_summary);
+
+    _bc.last_hit = true;
+    _bc.last_crit = variable_struct_exists(base_res, "crit") && base_res.crit;
+    _bc.last_dmg = final_dmg;
+
+    if (final_dmg > 0) {
+        CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
+    }
+
+    if (Battle_CheckEnd(_bc, p, e)) {
+        _bc.p = p;
+        _bc.e = e;
+        Battle_DefQTEClear(_bc);
+        return;
+    }
+
+    var turn_pack = Battle_EnemyFinalizeTurnState(_bc, p, e);
+    if (turn_pack.ended) {
+        Battle_DefQTEClear(_bc);
+        return;
+    }
+
+    var follow_state = BSTATE_MENU;
+    if (variable_struct_exists(ctx, "follow_state")) follow_state = ctx.follow_state;
+    Battle_Message(_bc, final_msg, follow_state);
+    Battle_DefQTEClear(_bc);
+}
+
+function Battle_DefQTEStep(_bc) {
+    if (!_bc.enemy_def_qte_active) {
+        _bc.battle_state = BSTATE_ENEMY_ACT;
+        return;
+    }
+
+    if (!is_array(_bc.enemy_def_qte_prompts) || _bc.enemy_def_qte_index >= array_length(_bc.enemy_def_qte_prompts)) {
+        Battle_DefQTEFinalize(_bc);
+        return;
+    }
+
+    var current_dir = _bc.enemy_def_qte_prompts[_bc.enemy_def_qte_index];
+    _bc.enemy_def_qte_feedback_dir = current_dir;
+
+    switch (_bc.enemy_def_qte_phase) {
+        case 0: { // fade in
+            _bc.enemy_def_qte_timer -= 1;
+            var fade_frames = max(1, _bc.enemy_def_qte_fade_in_frames);
+            var elapsed = fade_frames - max(0, _bc.enemy_def_qte_timer);
+            _bc.enemy_def_qte_draw_alpha = clamp(elapsed / fade_frames, 0, 1);
+            _bc.enemy_def_qte_draw_scale = 1;
+            if (_bc.enemy_def_qte_timer <= 0) {
+                _bc.enemy_def_qte_phase = 1;
+                _bc.enemy_def_qte_timer = max(1, _bc.enemy_def_qte_response_frames);
+                _bc.enemy_def_qte_draw_alpha = 1;
+            }
+            return;
+        }
+
+        case 1: { // input window
+            _bc.enemy_def_qte_draw_alpha = 1;
+            _bc.enemy_def_qte_draw_scale = 1;
+
+            var input_dir = Battle_DefQTEInputDir();
+            if (input_dir != -1) {
+                _bc.enemy_def_qte_input_dir = input_dir;
+                _bc.enemy_def_qte_feedback_ok = (input_dir == current_dir);
+                _bc.enemy_def_qte_feedback_timed_out = false;
+                if (_bc.enemy_def_qte_feedback_ok) {
+                    _bc.enemy_def_qte_success += 1;
+                    SFX_PlayUI("ui_confirm");
+                } else {
+                    _bc.enemy_def_qte_failure += 1;
+                    SFX_PlayUI("ui_back");
+                }
+                _bc.enemy_def_qte_phase = 2;
+                _bc.enemy_def_qte_timer = max(1, _bc.enemy_def_qte_feedback_frames);
+                return;
+            }
+
+            _bc.enemy_def_qte_timer -= 1;
+            if (_bc.enemy_def_qte_timer <= 0) {
+                _bc.enemy_def_qte_failure += 1;
+                _bc.enemy_def_qte_input_dir = -1;
+                _bc.enemy_def_qte_feedback_ok = false;
+                _bc.enemy_def_qte_feedback_timed_out = true;
+                _bc.enemy_def_qte_phase = 2;
+                _bc.enemy_def_qte_timer = max(1, _bc.enemy_def_qte_feedback_frames);
+                SFX_PlayUI("ui_back");
+            }
+            return;
+        }
+
+        case 2: { // feedback hold
+            _bc.enemy_def_qte_draw_alpha = 1;
+            _bc.enemy_def_qte_draw_scale = _bc.enemy_def_qte_feedback_ok ? 1.25 : 0.95;
+            _bc.enemy_def_qte_timer -= 1;
+            if (_bc.enemy_def_qte_timer <= 0) {
+                _bc.enemy_def_qte_phase = 3;
+                _bc.enemy_def_qte_timer = max(1, _bc.enemy_def_qte_transition_frames);
+            }
+            return;
+        }
+
+        case 3: { // fade out and advance
+            _bc.enemy_def_qte_timer -= 1;
+            var trans_frames = max(1, _bc.enemy_def_qte_transition_frames);
+            _bc.enemy_def_qte_draw_alpha = clamp(max(0, _bc.enemy_def_qte_timer) / trans_frames, 0, 1);
+            _bc.enemy_def_qte_draw_scale = 1;
+            if (_bc.enemy_def_qte_timer <= 0) {
+                _bc.enemy_def_qte_index += 1;
+                if (_bc.enemy_def_qte_index >= _bc.enemy_def_qte_total) {
+                    Battle_DefQTEFinalize(_bc);
+                } else {
+                    Battle_DefQTEBeginPrompt(_bc);
+                }
+            }
+            return;
+        }
+    }
+}
+
+function Battle_DirectionVector(_dir) {
+    switch (_dir) {
+        case UP: return { x: 0, y: -1 };
+        case DOWN: return { x: 0, y: 1 };
+        case LEFT: return { x: -1, y: 0 };
+        case RIGHT: return { x: 1, y: 0 };
+    }
+    return { x: 0, y: -1 };
+}
+
+function Battle_DrawDirectionArrow(_x, _y, _dir, _size, _alpha = 1, _color = c_white) {
+    var size = max(4, round(real(_size)));
+    var pos_x = round(real(_x));
+    var pos_y = round(real(_y));
+    var vec = Battle_DirectionVector(_dir);
+    var perp = { x: -vec.y, y: vec.x };
+
+    var tip_x = pos_x + vec.x * size;
+    var tip_y = pos_y + vec.y * size;
+    var base_x = pos_x - vec.x * round(size * 0.7);
+    var base_y = pos_y - vec.y * round(size * 0.7);
+    var wing = max(3, round(size * 0.65));
+    var half = max(2, round(size * 0.25));
+
+    draw_set_alpha(clamp(real(_alpha), 0, 1));
+    draw_set_color(_color);
+    draw_line(base_x, base_y, tip_x, tip_y);
+    draw_line(base_x + perp.x * half, base_y + perp.y * half, base_x - perp.x * half, base_y - perp.y * half);
+    draw_line(tip_x, tip_y, tip_x - vec.x * wing + perp.x * wing, tip_y - vec.y * wing + perp.y * wing);
+    draw_line(tip_x, tip_y, tip_x - vec.x * wing - perp.x * wing, tip_y - vec.y * wing - perp.y * wing);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
 function Battle_EnemyAct(_bc) {
     var p = _bc.p;
     var e = _bc.e;
@@ -870,11 +1400,16 @@ function Battle_EnemyAct(_bc) {
     var extra_turns = 0;
     var follow_state = BSTATE_MENU;
     var res = undefined;
+    var enemy_targets_self = false;
+    var qte_hp_before = -1;
+    var qte_status_before = [];
 
     if (use_skill) {
         if (!is_struct(sk)) sk = SkillDB_Get(skill_id);
-        var enemy_targets_self = (variable_struct_exists(sk, "target") && sk.target == TGT_SELF);
+        enemy_targets_self = (variable_struct_exists(sk, "target") && sk.target == TGT_SELF);
         var enemy_skill_target = enemy_targets_self ? e : p;
+        qte_hp_before = enemy_targets_self ? -1 : p.hp;
+        qte_status_before = enemy_targets_self ? [] : Battle_StatusSnapshot(p);
         res = Skill_Use(e, enemy_skill_target, skill_id);
         if (enemy_targets_self) e = enemy_skill_target; else p = enemy_skill_target;
         if (!res.ok) {
@@ -902,7 +1437,6 @@ function Battle_EnemyAct(_bc) {
         }
         var fx2 = noone;
         // Enemy actions intentionally skip skill VFX; only player skills spawn battle FX.
-        if (Battle_CheckEnd(_bc, p, e)) return;
 
         if (consumes_turn) _bc.enemy_actions_remaining = max(0, _bc.enemy_actions_remaining - 1);
         if (set_actions > 0) _bc.enemy_actions_remaining = max(_bc.enemy_actions_remaining, set_actions);
@@ -910,20 +1444,30 @@ function Battle_EnemyAct(_bc) {
         _bc.enemy_actions_remaining = clamp(_bc.enemy_actions_remaining, 0, ENEMY_ACTION_CHAIN_MAX);
         follow_state = (_bc.enemy_actions_remaining > 0) ? BSTATE_ENEMY_ACT : BSTATE_MENU;
 
-        if (res.msg != "") {
-            Battle_Message(_bc, Loc_T("combat.msg.enemy_skill_message", "{enemy}: {msg}", { enemy: e.name, msg: res.msg }), follow_state, fx2);
-        } else if (!res.hit) {
+        if (!enemy_targets_self && Battle_EnemySkillCanUseDefQTE(sk, res, p)) {
+            Battle_DefQTEStart(_bc, e, sk, res, follow_state, qte_hp_before, qte_status_before);
+            _bc.p = p;
+            _bc.e = e;
+            return;
+        }
+
+        if (!res.hit) {
             var miss_class_id = -1;
             if (variable_struct_exists(p, "class_id")) miss_class_id = p.class_id;
             SFX_PlayMissOrBlocked(true, miss_class_id);
-            Battle_Message(_bc, Loc_T("combat.msg.enemy_miss", "{enemy} missed!", { enemy: e.name }), follow_state, fx2);
-        } else if (res.crit) {
-            if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, Loc_T("combat.msg.enemy_crit", "{enemy} crit! {dmg} damage!", { enemy: e.name, dmg: res.dmg }), follow_state, fx2);
-        } else {
-            if (res.dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, Loc_T("combat.msg.enemy_hit", "{enemy} hits for {dmg} damage!", { enemy: e.name, dmg: res.dmg }), follow_state, fx2);
         }
+        if (res.hit && res.dmg > 0) {
+            CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
+        }
+
+        if (Battle_CheckEnd(_bc, p, e)) return;
+        var end_skill_pack = Battle_EnemyFinalizeTurnState(_bc, p, e);
+        if (end_skill_pack.ended) return;
+        p = end_skill_pack.player;
+        e = end_skill_pack.enemy;
+
+        var skill_msg = Battle_EnemySkillComposeMessage(e.name, res);
+        Battle_Message(_bc, skill_msg, follow_state, fx2);
     } else {
         var ew = _bc.enemy_weapon;
         if (!is_struct(ew) || !variable_struct_exists(ew, "power")) {
@@ -960,24 +1504,18 @@ function Battle_EnemyAct(_bc) {
             var miss_class_id2 = -1;
             if (variable_struct_exists(p, "class_id")) miss_class_id2 = p.class_id;
             SFX_PlayMissOrBlocked(true, miss_class_id2);
-            Battle_Message(_bc, Loc_T("combat.msg.enemy_miss", "{enemy} missed!", { enemy: e.name }), follow_state);
-        } else if (_bc.last_crit) {
-            if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, Loc_T("combat.msg.enemy_crit", "{enemy} crit! {dmg} damage!", { enemy: e.name, dmg: _bc.last_dmg }), follow_state);
-        } else {
-            if (_bc.last_dmg > 0) CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
-            Battle_Message(_bc, Loc_T("combat.msg.enemy_hit", "{enemy} hits for {dmg} damage!", { enemy: e.name, dmg: _bc.last_dmg }), follow_state);
         }
-    }
 
-    var enemy_turn_finished = (_bc.enemy_actions_remaining <= 0);
-    if (enemy_turn_finished) {
-        e = Status_Tick(e);
-        if (Battle_CheckEnd(_bc, p, e)) return;
-        _bc.turn = TURN_PLAYER;
-    } else {
-        _bc.turn = TURN_ENEMY;
+        if (_bc.last_hit && _bc.last_dmg > 0) {
+            CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
+        }
+
+        var end_attack_pack = Battle_EnemyFinalizeTurnState(_bc, p, e);
+        if (end_attack_pack.ended) return;
+        p = end_attack_pack.player;
+        e = end_attack_pack.enemy;
+
+        var basic_msg = Battle_EnemySkillComposeMessage(e.name, { hit: _bc.last_hit, crit: _bc.last_crit, dmg: _bc.last_dmg, msg: "" });
+        Battle_Message(_bc, basic_msg, follow_state);
     }
-    _bc.p = p;
-    _bc.e = e;
 }
