@@ -716,15 +716,20 @@ function UI_IsBlocking() {
 function UI_SetFont() {
     var font_to_use = UI_FONT;
     if (Loc_GetLanguage() == "ko") {
-        if (!variable_global_exists("ui_font_ko")) global.ui_font_ko = -1;
-        if (global.ui_font_ko == -1) {
-            var ko_size = 8;
-            global.ui_font_ko = font_add("Malgun Gothic", ko_size, false, false, 32, 55203);
+        var mulmaru_idx = asset_get_index("Mulmaru");
+        if (mulmaru_idx != -1) {
+            font_to_use = mulmaru_idx;
+        } else {
+            if (!variable_global_exists("ui_font_ko")) global.ui_font_ko = -1;
             if (global.ui_font_ko == -1) {
-                global.ui_font_ko = font_add("Noto Sans CJK KR", ko_size, false, false, 32, 55203);
+                var ko_size = 8;
+                global.ui_font_ko = font_add("Malgun Gothic", ko_size, false, false, 32, 55203);
+                if (global.ui_font_ko == -1) {
+                    global.ui_font_ko = font_add("Noto Sans CJK KR", ko_size, false, false, 32, 55203);
+                }
             }
+            if (global.ui_font_ko != -1) font_to_use = global.ui_font_ko;
         }
-        if (global.ui_font_ko != -1) font_to_use = global.ui_font_ko;
     }
     draw_set_font(font_to_use);
 }

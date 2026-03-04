@@ -69,6 +69,7 @@
   ],
   "ForcedPrefabProjectReferences":[],
   "IncludedFiles":[
+    {"$GMIncludedFile":"","%Name":"~$game_text.xlsx","CopyToMask":-1,"filePath":"datafiles/localization","name":"~$game_text.xlsx","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
     {"$GMIncludedFile":"","%Name":"game_text.xlsx","CopyToMask":-1,"filePath":"datafiles/localization","name":"game_text.xlsx","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
     {"$GMIncludedFile":"","%Name":"localization.json","CopyToMask":-1,"filePath":"datafiles/localization","name":"localization.json","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
   ],
@@ -154,6 +155,7 @@
     {"id":{"name":"rm_floor4","path":"rooms/rm_floor4/rm_floor4.yy",},},
     {"id":{"name":"rm_floor5","path":"rooms/rm_floor5/rm_floor5.yy",},},
     {"id":{"name":"rm_floor6_5","path":"rooms/rm_floor6_5/rm_floor6_5.yy",},},
+    {"id":{"name":"rm_floor6","path":"rooms/rm_floor6/rm_floor6.yy",},},
     {"id":{"name":"rm_floor7","path":"rooms/rm_floor7/rm_floor7.yy",},},
     {"id":{"name":"rm_floor8","path":"rooms/rm_floor8/rm_floor8.yy",},},
     {"id":{"name":"rm_floor9_5","path":"rooms/rm_floor9_5/rm_floor9_5.yy",},},
@@ -413,6 +415,7 @@
     {"roomId":{"name":"rm_floor3","path":"rooms/rm_floor3/rm_floor3.yy",},},
     {"roomId":{"name":"rm_floor4","path":"rooms/rm_floor4/rm_floor4.yy",},},
     {"roomId":{"name":"rm_floor5","path":"rooms/rm_floor5/rm_floor5.yy",},},
+    {"roomId":{"name":"rm_floor6","path":"rooms/rm_floor6/rm_floor6.yy",},},
     {"roomId":{"name":"rm_floor6_5","path":"rooms/rm_floor6_5/rm_floor6_5.yy",},},
     {"roomId":{"name":"rm_floor7","path":"rooms/rm_floor7/rm_floor7.yy",},},
     {"roomId":{"name":"rm_floor8","path":"rooms/rm_floor8/rm_floor8.yy",},},
