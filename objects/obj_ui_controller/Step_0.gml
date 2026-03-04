@@ -49,8 +49,8 @@ if (variable_struct_exists(gs.ui, "dialogue_require_release") && gs.ui.dialogue_
 }
 
 var k_ok = Input_UIConfirm();
-var k_back = Input_UIBack();
 var k_menu = Input_UIPressed("menu");
+var k_pause = Input_UIPressed("pause");
 
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     Dialogue_TypewriterStep();
@@ -80,8 +80,8 @@ if (SettingsPopup_IsOpen("pause")) {
     exit;
 }
 
-// Pause menu (Esc)
-if (k_back) {
+// Pause menu (Esc / controller top face button)
+if (k_pause) {
     if (gs.ui.mode == UI_PAUSE) {
         PauseMenu_Close();
         exit;

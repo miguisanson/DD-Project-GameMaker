@@ -326,44 +326,15 @@ if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qt
         if (enemy_def_qte_phase == 2) q_col = enemy_def_qte_feedback_ok ? c_lime : c_red;
         Battle_DrawDirectionArrow(qx, qy, q_dir, DEF_QTE_ARROW_BASE_SIZE * q_scale, q_alpha, q_col);
 
-        var q_header = Loc_T("battle.def_qte.prompt", "Defend!");
-        var q_progress = string(enemy_def_qte_index + 1) + "/" + string(enemy_def_qte_total);
-        var q_top = qy - 28;
-
-        draw_set_alpha(q_alpha);
-        draw_set_color(c_black);
-        draw_text(qx - (string_width(q_header) * 0.5) + 1, q_top + 1, q_header);
-        draw_set_color(c_white);
-        draw_text(qx - (string_width(q_header) * 0.5), q_top, q_header);
-
-        // Arrow-only input hint row (16x16-style directional icons).
-        var hint_dirs = [LEFT, UP, DOWN, RIGHT];
-        var hint_size = 8;
-        var hint_gap = 18;
-        var hint_row_y = qy - 12;
-        var hint_start_x = qx - ((array_length(hint_dirs) - 1) * hint_gap * 0.5);
-        for (var hidx = 0; hidx < array_length(hint_dirs); hidx++) {
-            var h_dir = hint_dirs[hidx];
-            var h_x = hint_start_x + (hidx * hint_gap);
-            var h_is_target = (h_dir == q_dir);
-            var h_alpha = q_alpha * (h_is_target ? 1.0 : 0.35);
-            var h_col = h_is_target ? q_col : c_white;
-            Battle_DrawDirectionArrow(h_x, hint_row_y, h_dir, hint_size, h_alpha, h_col);
-        }
-
-        draw_set_color(c_black);
-        draw_text(qx - (string_width(q_progress) * 0.5) + 1, qy + 12 + 1, q_progress);
-        draw_set_color(c_white);
-        draw_text(qx - (string_width(q_progress) * 0.5), qy + 12, q_progress);
-
+        // Progress bar only (kept below arrow so it never overlaps the prompt icon).
         if (enemy_def_qte_phase == 1 && enemy_def_qte_response_frames > 0) {
             var q_ratio = clamp(enemy_def_qte_timer / max(1, enemy_def_qte_response_frames), 0, 1);
             var qbw = 50;
             var qbh = 5;
             var qbx = qx - (qbw * 0.5);
-            var qby = qy + 24;
-            var qpct = string(round(q_ratio * 100)) + "%";
+            var qby = qy + 14;
 
+            draw_set_alpha(q_alpha * 0.95);
             draw_set_color(c_black);
             draw_rectangle(qbx - 2, qby - 2, qbx + qbw + 2, qby + qbh + 2, false);
             draw_set_color(c_white);
@@ -372,7 +343,6 @@ if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qt
             draw_rectangle(qbx, qby, qbx + qbw, qby + qbh, false);
             draw_set_color(c_white);
             draw_rectangle(qbx, qby, qbx + floor(qbw * q_ratio), qby + qbh, false);
-            draw_text(qx - (string_width(qpct) * 0.5), qby + qbh + 3, qpct);
         }
 
         draw_set_alpha(1);
