@@ -242,7 +242,56 @@ if (attack_timing_result_timer > 0 && attack_timing_result_text != "") {
     draw_text(txf, tyf, attack_timing_result_text);
 }
 
-// Enemy defensive QTE (for enemy damaging skills only).
+// FX draw (battle-only), over enemy sprite
+with (obj_fx) {
+    if (sprite_index != noone) {
+        var fx_x = (x - vx) * sx;
+        var fx_y = (y - vy) * sy;
+        var fx_sx = image_xscale * sx;
+        var fx_sy = image_yscale * sy;
+        draw_sprite_ext(sprite_index, image_index, fx_x, fx_y, fx_sx, fx_sy, image_angle, image_blend, image_alpha * enemy_fade_alpha);
+    }
+}
+
+// Skill banner (drawn after enemy/FX, but kept low to avoid QTE overlap).
+if (skill_banner_active && skill_banner_name != "") {
+    var bar_scale = UI_BAR_SCALE;
+    var hp_bar_h = sprite_get_height(hp_bar) * bar_scale;
+    var mp_bar_h = sprite_get_height(mp_bar) * bar_scale;
+    var hud_margin = 8;
+    var hud_top = hud_margin + gui_off_y;
+    var hud_bottom = hud_top + hp_bar_h + mp_bar_h + 4;
+    var banner_h = string_height("A") + 8;
+
+    // Keep the banner below enemy + status icons, and clear of HUD/menu.
+    var min_banner_y = hud_bottom + 6;
+    var max_banner_y = h - box_h - margin - banner_h - 4;
+    var banner_y = min_banner_y;
+
+    if (instance_exists(enemy_inst)) {
+        var bspr = enemy_inst.sprite_index;
+        if (bspr != noone && bspr != -1) {
+            var boff = SpriteShake_Offset(enemy_inst);
+            var enemy_top_screen = (enemy_inst.y + boff.y - sprite_get_yoffset(bspr) - vy) * sy;
+            var enemy_h_screen = sprite_get_height(bspr) * abs(enemy_inst.image_yscale) * sy;
+            var enemy_bottom_screen = enemy_top_screen + enemy_h_screen;
+            var status_bottom_screen = enemy_bottom_screen + 4 + 12;
+            banner_y = status_bottom_screen + 4;
+        }
+    }
+    banner_y = clamp(banner_y, min_banner_y, max_banner_y);
+
+    draw_set_alpha(0.85);
+    draw_set_color(c_black);
+    draw_rectangle(0, banner_y, w, banner_y + banner_h, false);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+    var tx = (w - string_width(skill_banner_name)) * 0.5;
+    var ty = banner_y + (banner_h - string_height("A")) * 0.5;
+    draw_text(tx, ty, skill_banner_name);
+}
+
+// Enemy defensive QTE (drawn late so it stays visible above banner/FX).
 if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qte_total > 0) {
     var q_alpha = clamp(enemy_def_qte_draw_alpha, 0, 1);
     var q_scale = max(0.5, real(enemy_def_qte_draw_scale));
@@ -265,6 +314,9 @@ if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qt
                 qy = qey - 14;
             }
         }
+        var qte_min_y = 30;
+        var qte_max_y = h - box_h - margin - 28;
+        qy = clamp(qy, qte_min_y, max(qte_min_y, qte_max_y));
 
         var q_col = c_white;
         if (enemy_def_qte_phase == 2) q_col = enemy_def_qte_feedback_ok ? c_lime : c_red;
@@ -286,71 +338,29 @@ if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qt
         draw_text(qx - (string_width(q_header) * 0.5), q_top, q_header);
         draw_text(qx - (string_width(q_key_line) * 0.5), q_top + 9, q_key_line);
         draw_text(qx - (string_width(q_progress) * 0.5), q_top + 19, q_progress);
-        draw_set_alpha(1);
 
         if (enemy_def_qte_phase == 1 && enemy_def_qte_response_frames > 0) {
             var q_ratio = clamp(enemy_def_qte_timer / max(1, enemy_def_qte_response_frames), 0, 1);
-            var qbw = 44;
-            var qbh = 4;
+            var qbw = 50;
+            var qbh = 5;
             var qbx = qx - (qbw * 0.5);
             var qby = qy + 12;
-            draw_set_alpha(q_alpha * 0.9);
+            var qpct = string(round(q_ratio * 100)) + "%";
+
             draw_set_color(c_black);
-            draw_rectangle(qbx - 1, qby - 1, qbx + qbw + 1, qby + qbh + 1, false);
+            draw_rectangle(qbx - 2, qby - 2, qbx + qbw + 2, qby + qbh + 2, false);
             draw_set_color(c_white);
-            draw_rectangle(qbx, qby, qbx + qbw, qby + qbh, true);
+            draw_rectangle(qbx - 1, qby - 1, qbx + qbw + 1, qby + qbh + 1, true);
+            draw_set_color(c_black);
+            draw_rectangle(qbx, qby, qbx + qbw, qby + qbh, false);
+            draw_set_color(c_white);
             draw_rectangle(qbx, qby, qbx + floor(qbw * q_ratio), qby + qbh, false);
-            draw_set_alpha(1);
-            draw_set_color(c_white);
+            draw_text(qx - (string_width(qpct) * 0.5), qby + qbh + 3, qpct);
         }
+
+        draw_set_alpha(1);
+        draw_set_color(c_white);
     }
-}
-
-// FX draw (battle-only), over enemy sprite
-with (obj_fx) {
-    if (sprite_index != noone) {
-        var fx_x = (x - vx) * sx;
-        var fx_y = (y - vy) * sy;
-        var fx_sx = image_xscale * sx;
-        var fx_sy = image_yscale * sy;
-        draw_sprite_ext(sprite_index, image_index, fx_x, fx_y, fx_sx, fx_sy, image_angle, image_blend, image_alpha * enemy_fade_alpha);
-    }
-}
-
-// Skill banner (drawn after enemy/FX so it is always in front).
-if (skill_banner_active && skill_banner_name != "") {
-    var bar_scale = UI_BAR_SCALE;
-    var hp_bar_h = sprite_get_height(hp_bar) * bar_scale;
-    var mp_bar_h = sprite_get_height(mp_bar) * bar_scale;
-    var hud_margin = 8;
-    var hud_top = hud_margin + gui_off_y;
-    var hud_bottom = hud_top + hp_bar_h + mp_bar_h + 4;
-    var banner_h = string_height("A") + 8;
-
-    // Allow banner to sit under the battle log if needed; only keep clear of HP/MP HUD.
-    var min_banner_y = hud_bottom + 6;
-    var max_banner_y = h - box_h - margin - banner_h - 4;
-    var banner_y = min_banner_y;
-
-    if (instance_exists(enemy_inst)) {
-        var bspr = enemy_inst.sprite_index;
-        if (bspr != noone && bspr != -1) {
-            var boff = SpriteShake_Offset(enemy_inst);
-            var bbox_top_px = sprite_get_bbox_top(bspr);
-            var enemy_top_screen = (enemy_inst.y + boff.y - sprite_get_yoffset(bspr) + bbox_top_px - vy) * sy;
-            banner_y = enemy_top_screen - banner_h - 4;
-        }
-    }
-    banner_y = clamp(banner_y, min_banner_y, max_banner_y);
-
-    draw_set_alpha(0.85);
-    draw_set_color(c_black);
-    draw_rectangle(0, banner_y, w, banner_y + banner_h, false);
-    draw_set_alpha(1);
-    draw_set_color(c_white);
-    var tx = (w - string_width(skill_banner_name)) * 0.5;
-    var ty = banner_y + (banner_h - string_height("A")) * 0.5;
-    draw_text(tx, ty, skill_banner_name);
 }
 
 

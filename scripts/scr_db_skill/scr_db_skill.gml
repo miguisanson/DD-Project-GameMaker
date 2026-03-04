@@ -852,15 +852,32 @@ function Skill_AdjustStatusTurns(_user, _target, _status_id, _base_turns) {
     var user_is_player = (is_struct(_user) && variable_struct_exists(_user, "is_player") && _user.is_player);
     var target_is_player = (is_struct(_target) && variable_struct_exists(_target, "is_player") && _target.is_player);
 
-    // FUN-FIRST: statuses linger longer, with player-applied effects lasting longest.
-    var mult = 2.0;
-    if (user_is_player) mult = 3.0;
-    if (!user_is_player && target_is_player) mult = 2.0;
-    turns = max(2, round(turns * mult));
+    var is_dot = (_status_id == STATUS_POISON || _status_id == STATUS_BLEED || _status_id == STATUS_BURN);
+
+    // DOT tuning pass: poison/bleed/burn should feel impactful and consistent.
+    // Player-applied DOTs lean toward 3+ turns, enemy-applied DOTs toward 2+ turns.
+    if (is_dot) {
+        var dot_mult = user_is_player ? 3.0 : 2.0;
+        turns = round(turns * dot_mult);
+        var dot_min = user_is_player ? 3 : 2;
+        turns = max(dot_min, turns);
+    } else {
+        // FUN-FIRST: other non-stun statuses keep the previous longer-duration behavior.
+        var mult = 2.0;
+        if (user_is_player) mult = 3.0;
+        if (!user_is_player && target_is_player) mult = 2.0;
+        turns = max(2, round(turns * mult));
+    }
 
     if (user_is_player && !target_is_player) {
         turns += max(0, Equip_PlayerStatusTurnBonus(_user, _status_id));
     }
+
+    if (is_dot) {
+        var clamp_min = user_is_player ? 3 : 2;
+        return clamp(turns, clamp_min, 5);
+    }
+
     return max(1, turns);
 }
 
