@@ -37,5 +37,5 @@
     "path":"sprites/bed_save/bed_save.yy",
   },
   "spriteMaskId":null,
-  "visible":false,
+  "visible":true,
 }

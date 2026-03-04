@@ -7,6 +7,15 @@ function DialogueDB_Init() {
 	
 	// in-game dialogues
 	global.dialogue_db[? "first_encounter_slime"] = ["What...", "...the hell is that?"];
+	global.dialogue_db[? "first_encounter_mini_boss"] = [
+	"...",
+	"Oh, what the hell is that?",
+	"Some sort of half-cow, half-man?",
+	"This is insane...",
+	"And he's blocking my only path forward.",
+	"...",
+	"Fuck."
+	];
 	global.dialogue_db[? "entering_second_floor"] = 
 	["I don't understand.", 
 	"How can such creatures exist?",

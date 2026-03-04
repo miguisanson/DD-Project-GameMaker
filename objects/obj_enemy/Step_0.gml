@@ -30,7 +30,21 @@ if (dialogue_active) {
 }
 
 var pl = gs.player_inst;
+if (!instance_exists(pl) && instance_exists(obj_player)) {
+    pl = instance_find(obj_player, 0);
+}
 if (!instance_exists(pl)) exit;
+
+// Safety net: collision events can occasionally be missed on long overlaps.
+// If player and enemy are currently overlapping, queue encounter directly.
+if (!encounter_pending) {
+    if (!variable_instance_exists(pl, "battle_cooldown") || pl.battle_cooldown <= 0) {
+        if (place_meeting(x, y, obj_player)) {
+            encounter_pending = true;
+            encounter_player = pl;
+        }
+    }
+}
 
 if (encounter_pending) {
     var pending_pl = encounter_player;
@@ -49,10 +63,13 @@ if (encounter_pending) {
         exit;
     }
 
-    // If player is still in post-battle cooldown, drop this pending request.
+    // While player cooldown is active, keep pending encounter queued.
+    // If overlap broke meanwhile, clear the pending request.
     if (variable_instance_exists(pending_pl, "battle_cooldown") && pending_pl.battle_cooldown > 0) {
-        encounter_pending = false;
-        encounter_player = noone;
+        if (!place_meeting(x, y, obj_player)) {
+            encounter_pending = false;
+            encounter_player = noone;
+        }
         exit;
     }
 

@@ -42,7 +42,34 @@ function Enemy_CanAutoResolve(_cfg, _player_level, _enemy_level) {
 }
 
 function Enemy_AutoResolveBuildMessage(_cfg, _result, _verb_prefix = "You overpower ") {
-    var msg = string(_verb_prefix) + string(_cfg.name) + ".";
+    var enemy_name = "";
+    if (is_struct(_cfg) && variable_struct_exists(_cfg, "name")) enemy_name = string(_cfg.name);
+    if (enemy_name == "") enemy_name = Loc_T("enemy.name.unknown", "Enemy");
+
+    var prefix_template = string(_verb_prefix);
+    var msg = "";
+    if (string_pos("{enemy}", prefix_template) > 0) {
+        msg = string_replace_all(prefix_template, "{enemy}", enemy_name);
+    } else {
+        var prefix = string_replace_all(prefix_template, "\n", " ");
+        while (string_length(prefix) > 0 && string_char_at(prefix, 1) == " ") {
+            prefix = string_delete(prefix, 1, 1);
+        }
+        while (string_length(prefix) > 0 && string_char_at(prefix, string_length(prefix)) == " ") {
+            prefix = string_delete(prefix, string_length(prefix), 1);
+        }
+        if (prefix == "") msg = enemy_name;
+        else msg = prefix + " " + enemy_name;
+    }
+
+    var msg_len = string_length(msg);
+    if (msg_len > 0) {
+        var tail = string_char_at(msg, msg_len);
+        if (tail != "." && tail != "!" && tail != "?") msg += ".";
+    } else {
+        msg = enemy_name + ".";
+    }
+
     if (!is_struct(_result)) return msg;
 
     var parts = [];

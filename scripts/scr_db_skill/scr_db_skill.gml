@@ -882,6 +882,8 @@ function Skill_BuildAppliedStatusMessage(_applied_status_names) {
 
 function Skill_Use(_user, _target, _skill_id) {
     var s = SkillDB_Get(_skill_id);
+    var user_is_player = (variable_struct_exists(_user, "is_player") && _user.is_player);
+    var fx_speed_mult = user_is_player ? PLAYER_SKILL_FX_SPEED_MULT : SKILL_FX_SPEED_MULT;
     var result = {
         ok: true,
         hit: true,
@@ -890,13 +892,11 @@ function Skill_Use(_user, _target, _skill_id) {
         msg: "",
         fx_sprite: s.fx_sprite,
         fx_frames: s.fx_frames,
-        fx_speed: s.fx_speed * SKILL_FX_SPEED_MULT,
+        fx_speed: s.fx_speed * fx_speed_mult,
         free_action: (variable_struct_exists(s, "free_action") && s.free_action),
         extra_turns: variable_struct_exists(s, "extra_turns") ? max(0, round(real(s.extra_turns))) : 0,
         set_enemy_actions: variable_struct_exists(s, "set_enemy_actions") ? max(0, round(real(s.set_enemy_actions))) : 0
     };
-
-    var user_is_player = (variable_struct_exists(_user, "is_player") && _user.is_player);
 
     var final_mp_cost = s.mp_cost;
     if (user_is_player) {

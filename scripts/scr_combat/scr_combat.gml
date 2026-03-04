@@ -750,6 +750,14 @@ function Battle_RunAttempt(_bc) {
     var p = _bc.p;
     var e = _bc.e;
 
+    var enemy_id = -1;
+    if (is_struct(e) && variable_struct_exists(e, "id")) enemy_id = e.id;
+    if (enemy_id == ENEMY_MINI_BOSS || enemy_id == ENEMY_FINAL_BOSS) {
+        _bc.turn = TURN_ENEMY;
+        Battle_Message(_bc, Loc_T("combat.msg.player_cant_escape_this", "You can't run away from this."), BSTATE_ENEMY_ACT);
+        return;
+    }
+
     var pr = RollD20() + StatMod(Combat_EffectiveStat(p, STAT_AGI));
     var er = RollD20() + StatMod(Combat_EffectiveStat(e, STAT_AGI));
 

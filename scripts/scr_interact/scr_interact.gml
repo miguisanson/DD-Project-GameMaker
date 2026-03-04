@@ -77,6 +77,145 @@ function Interact_GetTarget(_pl) {
     return best;
 }
 
+function GraveLoot_ProgressFlagKey() {
+    return "grave_loot_progress_stage";
+}
+
+function GraveLoot_GetStage() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
+    var key = GraveLoot_ProgressFlagKey();
+    if (!variable_struct_exists(gs.flags, key)) variable_struct_set(gs.flags, key, 0);
+    return clamp(round(real(variable_struct_get(gs.flags, key))), 0, 4);
+}
+
+function GraveLoot_SetStage(_stage) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
+    variable_struct_set(gs.flags, GraveLoot_ProgressFlagKey(), clamp(round(real(_stage)), 0, 4));
+}
+
+function GraveLoot_StageChance(_stage) {
+    var st = clamp(round(real(_stage)), 0, 4);
+    switch (st) {
+        case 0: return 0.50; // Lv2 item
+        case 1: return 0.25; // Lv2 item
+        case 2: return 0.10; // Lv3 item
+        case 3: return 0.05; // Lv3 item
+        default: return 0.01; // Skillbook
+    }
+}
+
+function GraveLoot_RollTierItem(_tier) {
+    var tier = clamp(round(real(_tier)), 1, 3);
+    var entries = Loot_TableGet("chest");
+    if (!is_array(entries) || array_length(entries) <= 0) return [];
+
+    var candidates = [];
+    var total_weight = 0;
+    for (var i = 0; i < array_length(entries); i++) {
+        var e = entries[i];
+        if (!is_struct(e)) continue;
+        if (!variable_struct_exists(e, "tier") || round(real(e.tier)) != tier) continue;
+        if (!variable_struct_exists(e, "item_id")) continue;
+        var item_id = round(real(e.item_id));
+        if (item_id <= 0) continue;
+
+        var w = variable_struct_exists(e, "weight") ? max(0, real(e.weight)) : 0;
+        if (w <= 0) continue;
+
+        array_push(candidates, e);
+        total_weight += w;
+    }
+
+    if (array_length(candidates) <= 0 || total_weight <= 0) return [];
+
+    var pick = candidates[0];
+    var roll = random(total_weight);
+    var acc = 0;
+    for (var j = 0; j < array_length(candidates); j++) {
+        var c = candidates[j];
+        var cw = variable_struct_exists(c, "weight") ? max(0, real(c.weight)) : 0;
+        acc += cw;
+        if (roll <= acc) {
+            pick = c;
+            break;
+        }
+    }
+
+    var pid = round(real(pick.item_id));
+    if (pid <= 0) return [];
+
+    var minv = 1;
+    var maxv = 1;
+    if (variable_struct_exists(pick, "qty_min")) minv = pick.qty_min;
+    else if (variable_struct_exists(pick, "min_qty")) minv = pick.min_qty;
+    else if (variable_struct_exists(pick, "min")) minv = pick.min;
+
+    if (variable_struct_exists(pick, "qty_max")) maxv = pick.qty_max;
+    else if (variable_struct_exists(pick, "max_qty")) maxv = pick.max_qty;
+    else if (variable_struct_exists(pick, "max")) maxv = pick.max;
+
+    minv = max(1, round(real(minv)));
+    maxv = max(minv, round(real(maxv)));
+    var qty = (minv == maxv) ? minv : irandom_range(minv, maxv);
+    qty = max(1, qty);
+
+    return [{ item_id: pid, qty: qty }];
+}
+
+function GraveLoot_RollRewardForStage(_stage, _class_id) {
+    var st = clamp(round(real(_stage)), 0, 4);
+    if (st <= 1) return GraveLoot_RollTierItem(2);
+    if (st <= 3) return GraveLoot_RollTierItem(3);
+
+    var class_id = round(real(_class_id));
+    if (class_id != CLASS_NOBODY) {
+        var sb = Loot_RollSkillbook(class_id);
+        if (is_struct(sb) && variable_struct_exists(sb, "item_id")) return [sb];
+    }
+
+    // Nobody class (or no valid skillbook): fallback to another Lv3 item.
+    return GraveLoot_RollTierItem(3);
+}
+
+function GraveLoot_TryRollReward(_class_id) {
+    var stage_before = GraveLoot_GetStage();
+    var chance = GraveLoot_StageChance(stage_before);
+    if (random(1) > chance) {
+        return {
+            awarded: false,
+            loot: [],
+            stage_before: stage_before,
+            stage_after: stage_before,
+            chance: chance
+        };
+    }
+
+    var loot = GraveLoot_RollRewardForStage(stage_before, _class_id);
+    if (!is_array(loot) || array_length(loot) <= 0) {
+        return {
+            awarded: false,
+            loot: [],
+            stage_before: stage_before,
+            stage_after: stage_before,
+            chance: chance
+        };
+    }
+
+    var stage_after = stage_before;
+    if (stage_after < 4) stage_after += 1;
+    GraveLoot_SetStage(stage_after);
+
+    return {
+        awarded: true,
+        loot: loot,
+        stage_before: stage_before,
+        stage_after: stage_after,
+        chance: chance
+    };
+}
+
 
 
 function Interact_Handle(_inst) {
@@ -155,11 +294,54 @@ function Interact_Handle(_inst) {
     if (variable_instance_exists(_inst, "grave_interactable") && _inst.grave_interactable) {
         var grave_line = Loc_T("interact.grave.default", "An old grave rests here.");
         if (variable_instance_exists(_inst, "grave_lines") && is_array(_inst.grave_lines) && array_length(_inst.grave_lines) > 0) {
-            grave_line = _inst.grave_lines[irandom(array_length(_inst.grave_lines) - 1)];
+            var grave_pick = _inst.grave_lines[irandom(array_length(_inst.grave_lines) - 1)];
+            if (is_struct(grave_pick)) {
+                var line_key = variable_struct_exists(grave_pick, "key") ? string(grave_pick.key) : "";
+                var line_fallback = variable_struct_exists(grave_pick, "text") ? string(grave_pick.text) : "";
+                if (line_key != "") {
+                    grave_line = Loc_T(line_key, line_fallback);
+                    // Guard against corrupted localization rows that return key-like text.
+                    if (grave_line == line_key || string_pos(".grave.line.obj_grave.", grave_line) > 0) {
+                        grave_line = line_fallback;
+                    }
+                } else if (line_fallback != "") {
+                    grave_line = line_fallback;
+                }
+            } else {
+                grave_line = string(grave_pick);
+            }
         }
-        Dialogue_StartWithSpeaker(name, [grave_line]);
+        if (grave_line == "") grave_line = "An old grave rests here.";
+        var grave_dialogue_lines = [grave_line];
 
-        var ghost_chance = 0.60;
+        var class_id = CLASS_NOBODY;
+        if (is_struct(gs.player_ch) && variable_struct_exists(gs.player_ch, "class_id")) {
+            class_id = gs.player_ch.class_id;
+        }
+
+        var grave_reward = GraveLoot_TryRollReward(class_id);
+        if (is_struct(grave_reward) && variable_struct_exists(grave_reward, "awarded") && grave_reward.awarded) {
+            var reward_loot = variable_struct_exists(grave_reward, "loot") ? grave_reward.loot : [];
+            if (is_array(reward_loot) && array_length(reward_loot) > 0 && is_struct(gs.player_ch) && variable_struct_exists(gs.player_ch, "inventory")) {
+                gs.player_ch.inventory = Loot_Grant(gs.player_ch.inventory, reward_loot);
+
+                for (var li = 0; li < array_length(reward_loot); li++) {
+                    var rit = reward_loot[li];
+                    if (!is_struct(rit) || !variable_struct_exists(rit, "item_id")) continue;
+                    var rqty = variable_struct_exists(rit, "qty") ? max(1, round(real(rit.qty))) : 1;
+                    var ritem = ItemDB_Get(rit.item_id);
+                    if (!is_struct(ritem)) continue;
+                    var gain_lines = DialogueDB_GetFormatted("loot_received", { item: ritem.name, qty: rqty });
+                    for (var gi = 0; gi < array_length(gain_lines); gi++) {
+                        array_push(grave_dialogue_lines, gain_lines[gi]);
+                    }
+                }
+            }
+        }
+
+        Dialogue_StartWithSpeaker(name, grave_dialogue_lines);
+
+        var ghost_chance = 0.15;
         if (variable_instance_exists(_inst, "ghost_spawn_chance")) {
             ghost_chance = clamp(real(_inst.ghost_spawn_chance), 0, 1);
         }
