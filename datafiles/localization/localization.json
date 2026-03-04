@@ -2304,16 +2304,16 @@
       "ko": "게임 저장"
     },
     "settings.difficulty.option.0": {
-      "en": "menu.main.option.0",
-      "ko": "menu.main.option.0"
+      "en": "Easy",
+      "ko": "쉬움"
     },
     "settings.difficulty.option.1": {
-      "en": "New Game",
-      "ko": "새로운 게임"
+      "en": "Normal",
+      "ko": "보통"
     },
     "settings.difficulty.option.2": {
       "en": "Hard",
-      "ko": "딱딱한"
+      "ko": "어려움"
     },
     "settings.row.apply": {
       "en": "Apply",

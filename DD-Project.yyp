@@ -69,10 +69,10 @@
   ],
   "ForcedPrefabProjectReferences":[],
   "IncludedFiles":[
-    {"$GMIncludedFile":"","%Name":"NanumGothic-Regular.ttf","CopyToMask":-1,"filePath":"datafiles","name":"NanumGothic-Regular.ttf","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
     {"$GMIncludedFile":"","%Name":"NotoSansCJKkr-Regular.otf","CopyToMask":-1,"filePath":"datafiles/fonts","name":"NotoSansCJKkr-Regular.otf","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
     {"$GMIncludedFile":"","%Name":"game_text.xlsx","CopyToMask":-1,"filePath":"datafiles/localization","name":"game_text.xlsx","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
     {"$GMIncludedFile":"","%Name":"localization.json","CopyToMask":-1,"filePath":"datafiles/localization","name":"localization.json","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
+    {"$GMIncludedFile":"","%Name":"NanumGothic-Regular.ttf","CopyToMask":-1,"filePath":"datafiles","name":"NanumGothic-Regular.ttf","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
   ],
   "isEcma":false,
   "LibraryEmitters":[],

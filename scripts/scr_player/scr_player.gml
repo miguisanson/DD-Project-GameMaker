@@ -732,8 +732,8 @@ function UI_SetFont() {
 
         // Retry until success so one failed early load doesn't permanently break Korean text.
         if (global.ui_font_ko == -1) {
-            // Keep Korean a bit larger for readability in the existing UI.
-            var ko_size = 20;
+            // Match English UI scale more closely.
+            var ko_size = 11;
             var ko_paths = [];
             var wd = working_directory;
             var pd = program_directory;
