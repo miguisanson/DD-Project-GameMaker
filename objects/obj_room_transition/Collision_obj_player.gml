@@ -17,6 +17,12 @@ if (require_move) {
 var entry = RoomDB_Get(transition_id);
 if (!is_struct(entry)) exit;
 
+if (transition_id == "floor9_5_to_ending" && variable_struct_exists(entry, "cutscene_id")) {
+    var ending_cutscene_id = string(entry.cutscene_id);
+    if (ending_cutscene_id == "") ending_cutscene_id = "ending";
+    if (EndingExitSequence_Begin(ending_cutscene_id)) exit;
+}
+
 RoomState_OnRoomExit();
 
 if (variable_struct_exists(entry, "cutscene_id")) {

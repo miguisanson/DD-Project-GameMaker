@@ -88,6 +88,83 @@ function RoomTransition_Apply() {
     RoomTransition_Clear();
 }
 
+function EndingExitSequence_Ensure() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ending_exit_sequence") || !is_struct(gs.ending_exit_sequence)) {
+        gs.ending_exit_sequence = {
+            active: false,
+            stage: 0,
+            cutscene_id: "ending"
+        };
+    }
+    return gs.ending_exit_sequence;
+}
+
+function EndingExitSequence_IsActive() {
+    var seq = EndingExitSequence_Ensure();
+    return variable_struct_exists(seq, "active") && seq.active;
+}
+
+function EndingExitSequence_Begin(_cutscene_id = "ending") {
+    var seq = EndingExitSequence_Ensure();
+    if (seq.active) return true;
+    seq.active = true;
+    seq.stage = 0;
+    seq.cutscene_id = string(_cutscene_id);
+    return true;
+}
+
+function EndingExitSequence_Clear() {
+    var seq = EndingExitSequence_Ensure();
+    seq.active = false;
+    seq.stage = 0;
+    seq.cutscene_id = "ending";
+}
+
+function EndingExitSequence_Update() {
+    var seq = EndingExitSequence_Ensure();
+    if (!seq.active) return false;
+    if (Transition_IsActive()) return true;
+
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) gs.ui = {};
+
+    var ui_busy = false;
+    if (variable_struct_exists(gs.ui, "mode") && gs.ui.mode != UI_NONE) ui_busy = true;
+    if (variable_struct_exists(gs.ui, "lines") && is_array(gs.ui.lines) && array_length(gs.ui.lines) > 0) ui_busy = true;
+
+    switch (seq.stage) {
+        case 0: {
+            if (ui_busy) return true;
+
+            var pl = noone;
+            if (instance_exists(obj_player)) pl = instance_find(obj_player, 0);
+            if (instance_exists(pl) && !Player_IsSettled(pl)) return true;
+
+            SFX_Play(SKILLBOOK_MANA_AMBIENCE_KEY_1);
+            SFX_Play(SKILLBOOK_MANA_AMBIENCE_KEY_2);
+            SFX_Play(SKILLBOOK_MANA_AMBIENCE_KEY_3);
+            Dialogue_Start("sys_floor9_5_exit_reaction");
+            seq.stage = 1;
+            return true;
+        }
+
+        case 1: {
+            if (ui_busy) return true;
+
+            RoomState_OnRoomExit();
+            var cid = string(seq.cutscene_id);
+            if (cid == "") cid = "ending";
+            if (Transition_RequestCutsceneById(cid)) {
+                EndingExitSequence_Clear();
+            }
+            return true;
+        }
+    }
+
+    return true;
+}
+
 function Transition_Init() {
     RoomTransition_Init();
     var gs = GameState_Get();

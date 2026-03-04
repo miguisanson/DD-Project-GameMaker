@@ -28,6 +28,14 @@ cutscene_segment_hold_timer = 0;
 cutscene_wait_transition = false;
 cutscene_transition_next_index = -1;
 cutscene_transition_switched = false;
+boot_logo_phase = 0;
+boot_logo_timer = 0;
+boot_logo_alpha = 0;
+boot_logo_fade_in_frames = 24;
+boot_logo_hold_frames = 36;
+boot_logo_fade_out_frames = 28;
+boot_logo_black_hold_frames = 14;
+boot_logo_sprite = pale_rook_1;
 
 cutscene_definitions = {};
 cutscene_definitions.intro = [
@@ -135,8 +143,12 @@ cutscene_definitions.ending = [
     {
         sprite: black_screen,
         lines: [
-            "Thank you for playing.",
-            "Please support our next development :)"
+            "Thank you for playing...",
+            "This was around 2 months of development, and I'm glad you were able to get through our prototype story.",
+            "We're looking to use what we learned from this game for our next title.",
+            "Please support our next development :)",
+            "by PaleRook",
+            "..."
         ],
         hold_frames: 0,
         transition_speed: "normal",
@@ -185,7 +197,16 @@ title_bg_layer_id = -1;
 
 if (room == rm_start) {
     gs.in_main_menu = true;
-    state = "main";
+    if (!variable_struct_exists(gs, "startup_logo_seen")) gs.startup_logo_seen = false;
+    if (!gs.startup_logo_seen) {
+        gs.startup_logo_seen = true;
+        state = "boot_logo";
+        boot_logo_phase = 0;
+        boot_logo_timer = 0;
+        boot_logo_alpha = 0;
+    } else {
+        state = "main";
+    }
     depth = 100000;
     title_bg_sprite = main_menu;
     title_bg_layer_id = layer_get_id("Background");

@@ -1,6 +1,27 @@
 var w = display_get_gui_width();
 var h = display_get_gui_height();
 var gs = GameState_Get();
+if (state == "boot_logo") {
+    draw_set_alpha(1);
+    draw_set_color(c_black);
+    draw_rectangle(0, 0, w, h, false);
+
+    var logo_spr = boot_logo_sprite;
+    if (logo_spr == noone || logo_spr == -1) logo_spr = pale_rook_1;
+    if (logo_spr != noone && logo_spr != -1 && boot_logo_alpha > 0) {
+        var lw = sprite_get_width(logo_spr);
+        var lh = sprite_get_height(logo_spr);
+        var lx = round((w - lw) * 0.5);
+        var ly = round((h - lh) * 0.5);
+        draw_set_alpha(clamp(boot_logo_alpha, 0, 1));
+        draw_set_color(c_white);
+        draw_sprite(logo_spr, 0, lx, ly);
+    }
+
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+    exit;
+}
 if (state == "cutscene") exit;
 var loading_into_game = Transition_IsActive()
 && variable_struct_exists(gs, "in_main_menu")

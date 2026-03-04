@@ -16,6 +16,14 @@ function DialogueDB_Init() {
 	"...",
 	"Fuck."
 	];
+    global.dialogue_db[? "first_encounter_final_boss"] = [
+        "...",
+        "Another demon.",
+        "This one seems different.",
+        "As if it's looking for something...",
+        "...",
+        "...someone."
+    ];
 	global.dialogue_db[? "entering_second_floor"] = 
 	["I don't understand.", 
 	"How can such creatures exist?",
@@ -76,6 +84,14 @@ function DialogueDB_Init() {
         "I won't get any answers this way.",
         "Let's keep going."
     ];
+    global.dialogue_db[? "sys_first_stranger_encounter_reaction"] = [
+        "Get your hands off me...",
+        "I can't believe such demons exist.",
+        "Are these demons?",
+        "I can only assume they are.",
+        "...",
+        "I have to move."
+    ];
     global.dialogue_db[? "sys_first_level_up_reaction"] = [
         "...",
         "I'm feeling a bit dizzy.",
@@ -93,6 +109,28 @@ function DialogueDB_Init() {
         "But why?",
         "Why go the extra steps if their intentions were to have us killed?",
         "It's not making sense, and it's creeping me out."
+    ];
+    global.dialogue_db[? "sys_final_boss_defeated_reaction"] = [
+        "*Huff*... *Wheeze*... Fuck.",
+        "...",
+        "I did it.",
+        "...",
+        "Still...",
+        "Nothing makes sense.",
+        "Am I the only one experiencing this?",
+        "Fuck. Who cares. The exit is here.",
+        "I'll be able to regroup with the others and find a way home."
+    ];
+    global.dialogue_db[? "sys_floor9_5_exit_reaction"] = [
+        "...",
+        "(You start to see vivid colors.)",
+        "(Black tendrils appear and disappear from your vision.)",
+        "(You snap back to reality.)",
+        "Huh?",
+        "...",
+        "My head...",
+        "It's about to burst...",
+        "(You clutch your head while walking toward the exit.)"
     ];
 
     // interactables
@@ -339,6 +377,8 @@ function Dialogue_NarrativeDialogueId(_event_id) {
     switch (eid) {
         case "floor2_dire_wolf_reaction":
             return "sys_floor2_dire_wolf_reaction";
+        case "first_stranger_encounter_reaction":
+            return "sys_first_stranger_encounter_reaction";
         case "first_level_up_reaction":
             return "sys_first_level_up_reaction";
         case "first_equippable_item_reaction":
@@ -392,7 +432,14 @@ function Dialogue_NarrativeQueueOnce(_event_id) {
     return true;
 }
 
+function Dialogue_NarrativeOnStrangerEncounterResolved() {
+    return Dialogue_NarrativeQueueOnce("first_stranger_encounter_reaction");
+}
+
 function Dialogue_NarrativeOnEnemyDefeated(_enemy_id, _enemy_room) {
+    if (_enemy_id == ENEMY_STRANGER) {
+        return Dialogue_NarrativeOnStrangerEncounterResolved();
+    }
     if (_enemy_id == ENEMY_DIREWOLF && _enemy_room == rm_floor2) {
         return Dialogue_NarrativeQueueOnce("floor2_dire_wolf_reaction");
     }
@@ -447,6 +494,7 @@ function Dialogue_NarrativeTryStartPending() {
 
     var order = [
         "floor2_dire_wolf_reaction",
+        "first_stranger_encounter_reaction",
         "first_level_up_reaction",
         "first_equippable_item_reaction"
     ];

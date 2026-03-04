@@ -331,26 +331,33 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
     var floor1_slime_done = variable_struct_exists(gs.flags, floor1_slime_key) && variable_struct_get(gs.flags, floor1_slime_key);
 
     var killed_floor1_slime = false;
-    var killed_floor2_dire_wolf = false;
+    var defeated_enemy_id = -1;
+    var defeated_enemy_room = -1;
     if (is_struct(gs) && variable_struct_exists(gs, "battle") && is_struct(gs.battle)) {
-        if (variable_struct_exists(gs.battle, "enemy_room") && gs.battle.enemy_room == rm_floor1
-        && variable_struct_exists(gs.battle, "enemy_id") && gs.battle.enemy_id == ENEMY_SLIME) {
+        if (variable_struct_exists(gs.battle, "enemy_id")) defeated_enemy_id = gs.battle.enemy_id;
+        if (variable_struct_exists(gs.battle, "enemy_room")) defeated_enemy_room = gs.battle.enemy_room;
+        if (defeated_enemy_room == rm_floor1 && defeated_enemy_id == ENEMY_SLIME) {
             killed_floor1_slime = true;
-        }
-        if (variable_struct_exists(gs.battle, "enemy_room") && gs.battle.enemy_room == rm_floor2
-        && variable_struct_exists(gs.battle, "enemy_id") && gs.battle.enemy_id == ENEMY_DIREWOLF) {
-            killed_floor2_dire_wolf = true;
         }
     }
 
-    if (killed_floor2_dire_wolf) {
-        Dialogue_NarrativeOnEnemyDefeated(ENEMY_DIREWOLF, rm_floor2);
+    if (defeated_enemy_id >= 0) {
+        Dialogue_NarrativeOnEnemyDefeated(defeated_enemy_id, defeated_enemy_room);
     }
 
     if (!floor1_slime_done && killed_floor1_slime) {
         array_push(lines, Loc_T("combat.msg.floor1_reaction.0", "How was that even alive?! I almost died."));
         array_push(lines, Loc_T("combat.msg.floor1_reaction.1", "God, I just need to get out of here."));
         variable_struct_set(gs.flags, floor1_slime_key, true);
+    }
+
+    if (defeated_enemy_id == ENEMY_FINAL_BOSS) {
+        var final_reaction = DialogueDB_Get("sys_final_boss_defeated_reaction");
+        if (is_array(final_reaction)) {
+            for (var fr = 0; fr < array_length(final_reaction); fr++) {
+                array_push(lines, final_reaction[fr]);
+            }
+        }
     }
 
     return lines;
@@ -763,6 +770,9 @@ function Battle_RunAttempt(_bc) {
 
     if (pr >= er) {
         EnemyPersist_ResolveBattle(false);
+        if (enemy_id == ENEMY_STRANGER) {
+            Dialogue_NarrativeOnStrangerEncounterResolved();
+        }
         Battle_Message(_bc, Loc_T("combat.msg.player_ran", "You ran away!"), BSTATE_END_RUN);
     } else {
         _bc.turn = TURN_ENEMY;

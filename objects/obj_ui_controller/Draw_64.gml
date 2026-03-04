@@ -91,6 +91,19 @@ if (cutscene_active) {
     if (bg_sprite != noone) {
         draw_sprite_stretched(bg_sprite, 0, 0, 0, w, h);
     }
+
+    var logo_sprite = variable_struct_exists(gs.ui, "cutscene_logo_sprite") ? gs.ui.cutscene_logo_sprite : noone;
+    var logo_alpha = variable_struct_exists(gs.ui, "cutscene_logo_alpha") ? clamp(real(gs.ui.cutscene_logo_alpha), 0, 1) : 0;
+    if (logo_sprite != noone && logo_sprite != -1 && logo_alpha > 0) {
+        var lw = sprite_get_width(logo_sprite);
+        var lh = sprite_get_height(logo_sprite);
+        var lx = round((w - lw) * 0.5);
+        var ly = round((h - lh) * 0.5);
+        draw_set_alpha(logo_alpha);
+        draw_set_color(c_white);
+        draw_sprite(logo_sprite, 0, lx, ly);
+        draw_set_alpha(1);
+    }
 }
 
 if (gs.ui.mode == UI_CLASS_SELECT) {

@@ -80,6 +80,7 @@ if (room != rm_battle && variable_struct_exists(gs, "pending_post_battle_dialogu
 }
 
 if (room != rm_battle) {
+    EndingExitSequence_Update();
     Dialogue_NarrativeTryStartPending();
 }
 

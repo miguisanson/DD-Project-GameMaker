@@ -27,6 +27,52 @@ var k_right = Input_UIPressed("menu_right");
 var k_ok = Input_UIConfirm();
 var k_back = Input_UIBack();
 
+if (state == "boot_logo") {
+    if (Transition_IsActive()) return;
+
+    switch (boot_logo_phase) {
+        case 0: // fade in
+            boot_logo_timer += 1;
+            boot_logo_alpha = clamp(boot_logo_timer / max(1, boot_logo_fade_in_frames), 0, 1);
+            if (boot_logo_timer >= max(1, boot_logo_fade_in_frames)) {
+                boot_logo_phase = 1;
+                boot_logo_timer = 0;
+                boot_logo_alpha = 1;
+            }
+            break;
+
+        case 1: // hold
+            boot_logo_timer += 1;
+            boot_logo_alpha = 1;
+            if (boot_logo_timer >= max(0, boot_logo_hold_frames)) {
+                boot_logo_phase = 2;
+                boot_logo_timer = 0;
+            }
+            break;
+
+        case 2: // fade out
+            boot_logo_timer += 1;
+            boot_logo_alpha = 1 - clamp(boot_logo_timer / max(1, boot_logo_fade_out_frames), 0, 1);
+            if (boot_logo_timer >= max(1, boot_logo_fade_out_frames)) {
+                boot_logo_phase = 3;
+                boot_logo_timer = 0;
+                boot_logo_alpha = 0;
+            }
+            break;
+
+        default: // black hold, then reveal title menu
+            boot_logo_timer += 1;
+            boot_logo_alpha = 0;
+            if (boot_logo_timer >= max(0, boot_logo_black_hold_frames)) {
+                state = "main";
+                Transition_RequestBlackFlash(1, TRANSITION_CUTSCENE_FADE_IN_FRAMES);
+            }
+            break;
+    }
+
+    return;
+}
+
 if (state == "main") {
     var title_idx_new = 0;
     var title_idx_load = 1;
@@ -198,6 +244,8 @@ if (state == "cutscene") {
 
         gs.ui.cutscene_active = true;
         gs.ui.dialogue_box_half = false;
+        gs.ui.cutscene_logo_sprite = noone;
+        gs.ui.cutscene_logo_alpha = 0;
 
         var seg0 = cutscene_sequence[cutscene_segment_index];
         var seg0_text_only = true;
@@ -313,6 +361,24 @@ if (state == "cutscene") {
         segment_done = (cutscene_segment_hold_timer <= 0);
     }
 
+    if (!variable_struct_exists(gs.ui, "cutscene_logo_sprite")) gs.ui.cutscene_logo_sprite = noone;
+    if (!variable_struct_exists(gs.ui, "cutscene_logo_alpha")) gs.ui.cutscene_logo_alpha = 0;
+    var logo_target = 0;
+    var logo_sprite = noone;
+    if (string(cutscene_id) == "ending" && cutscene_segment_index == 4) {
+        logo_sprite = pale_rook_1;
+        var logo_line_idx = variable_struct_exists(gs.ui, "index") ? max(0, round(real(gs.ui.index))) : 0;
+        if (logo_line_idx >= 3) logo_target = 1;
+    }
+    var logo_step = 1 / max(1, round(max(1, game_get_speed(gamespeed_fps)) * 0.30));
+    if (gs.ui.cutscene_logo_alpha < logo_target) {
+        gs.ui.cutscene_logo_alpha = min(logo_target, gs.ui.cutscene_logo_alpha + logo_step);
+    } else {
+        gs.ui.cutscene_logo_alpha = max(logo_target, gs.ui.cutscene_logo_alpha - logo_step);
+    }
+    if (gs.ui.cutscene_logo_alpha > 0.001 || logo_target > 0) gs.ui.cutscene_logo_sprite = logo_sprite;
+    else gs.ui.cutscene_logo_sprite = noone;
+
     if (!segment_done) return;
 
     var next_index = cutscene_segment_index + 1;
@@ -366,6 +432,8 @@ if (state == "cutscene") {
     gs.ui.dialogue_box_half = false;
     gs.ui.cutscene_text_only = false;
     gs.ui.cutscene_chars_per_sec = -1;
+    gs.ui.cutscene_logo_sprite = noone;
+    gs.ui.cutscene_logo_alpha = 0;
     gs.pending_cutscene_id = "";
 
     cutscene_started = false;
