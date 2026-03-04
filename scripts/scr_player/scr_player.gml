@@ -713,17 +713,6 @@ function UI_IsBlocking() {
     return false;
 }
 
-function UI_PathJoin(_base, _leaf) {
-    var base = string(_base);
-    var leaf = string(_leaf);
-    if (base == "") return leaf;
-    if (leaf == "") return base;
-
-    var last = string_char_at(base, string_length(base));
-    if (last == "/" || last == "\\") return base + leaf;
-    return base + "/" + leaf;
-}
-
 function UI_SetFont() {
     var font_to_use = UI_FONT;
     if (Loc_GetLanguage() == "ko") {
@@ -734,35 +723,15 @@ function UI_SetFont() {
         if (global.ui_font_ko == -1) {
             // Match English UI scale more closely.
             var ko_size = 11;
-            var ko_paths = [];
-            var wd = working_directory;
-            var pd = program_directory;
-
-            // Prefer deterministic absolute paths first, then relative fallbacks.
-            var base_dirs = [
-                UI_PathJoin(pd, "datafiles"),
-                UI_PathJoin(pd, "datafiles/fonts"),
-                UI_PathJoin(wd, "datafiles"),
-                UI_PathJoin(wd, "datafiles/fonts"),
-                "datafiles",
-                "datafiles/fonts",
-                "",
-                wd,
-                pd
-            ];
-
-            var ko_files = [
+            // Use only sandbox-safe relative paths (absolute paths are blocked by the runner).
+            var ko_paths = [
                 "NanumGothic-Regular.ttf",
-                "NotoSansCJKkr-Regular.otf"
+                "datafiles/NanumGothic-Regular.ttf",
+                "datafiles/fonts/NanumGothic-Regular.ttf",
+                "NotoSansCJKkr-Regular.otf",
+                "datafiles/NotoSansCJKkr-Regular.otf",
+                "datafiles/fonts/NotoSansCJKkr-Regular.otf"
             ];
-
-            for (var d = 0; d < array_length(base_dirs); d++) {
-                var b = string(base_dirs[d]);
-                for (var f = 0; f < array_length(ko_files); f++) {
-                    var candidate = (b == "") ? ko_files[f] : UI_PathJoin(b, ko_files[f]);
-                    array_push(ko_paths, candidate);
-                }
-            }
 
             for (var i = 0; i < array_length(ko_paths); i++) {
                 var p = ko_paths[i];

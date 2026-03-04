@@ -2,6 +2,36 @@ function RoomState_Key(_room, _persist_id) {
     return room_get_name(_room) + ":" + _persist_id;
 }
 
+function RoomState_IsEnemyInstance(_inst) {
+    if (!instance_exists(_inst)) return false;
+    var obj = _inst.object_index;
+    if (obj == obj_enemy) return true;
+    return object_is_ancestor(obj, obj_enemy);
+}
+
+function RoomState_IsEnemyPersistData(_data) {
+    if (!is_struct(_data)) return false;
+    if (variable_struct_exists(_data, "enemy_id")) return true;
+    if (variable_struct_exists(_data, "removed_reset_version")) return true;
+    if (variable_struct_exists(_data, "vars") && is_struct(_data.vars) && variable_struct_exists(_data.vars, "enemy_id")) return true;
+    return false;
+}
+
+function RoomState_SanitizeEnemyVars(_vars, _fallback_enemy_id = -1) {
+    var out = {};
+    if (is_struct(_vars)) {
+        if (variable_struct_exists(_vars, "x")) out.x = _vars.x;
+        if (variable_struct_exists(_vars, "y")) out.y = _vars.y;
+        if (variable_struct_exists(_vars, "enemy_id")) out.enemy_id = _vars.enemy_id;
+        if (variable_struct_exists(_vars, "enemy_uid")) out.enemy_uid = _vars.enemy_uid;
+        if (variable_struct_exists(_vars, "enemy_level")) out.enemy_level = _vars.enemy_level;
+    }
+    if (!variable_struct_exists(out, "enemy_id") && _fallback_enemy_id != -1) {
+        out.enemy_id = _fallback_enemy_id;
+    }
+    return out;
+}
+
 function RoomState_Init() {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "persist")) gs.persist = {};
@@ -103,12 +133,16 @@ function RoomState_SaveInstance(_inst, _vars, _removed) {
         RoomState_Warn("[Persist] Missing persist_id on " + object_get_name(_inst.object_index) + " in " + room_get_name(room));
         return;
     }
-    var data = { removed: _removed, vars: {} };
+    var data = { removed: _removed, vars: {}, obj_name: object_get_name(_inst.object_index) };
     for (var i = 0; i < array_length(_vars); i++) {
         var v = _vars[i];
         if (variable_instance_exists(_inst, v)) {
             variable_struct_set(data.vars, v, variable_instance_get(_inst, v));
         }
+    }
+    if (RoomState_IsEnemyInstance(_inst) && variable_instance_exists(_inst, "enemy_id")) {
+        data.enemy_id = _inst.enemy_id;
+        data.vars = RoomState_SanitizeEnemyVars(data.vars, _inst.enemy_id);
     }
     RoomState_Set(room, _inst.persist_id, data);
 }
@@ -130,10 +164,28 @@ function RoomState_SetAlive(_room, _persist_id) {
     if (_persist_id == "") return;
 
     var data = RoomState_Get(_room, _persist_id);
-    if (!is_struct(data)) data = { removed: false, vars: {} };
-    data.removed = false;
-    if (!variable_struct_exists(data, "vars")) data.vars = {};
-    RoomState_Set(_room, _persist_id, data);
+    if (!is_struct(data)) {
+        RoomState_Set(_room, _persist_id, { removed: false, vars: {} });
+        return;
+    }
+
+    var vars_in = variable_struct_exists(data, "vars") ? data.vars : {};
+    var enemy_id = -1;
+    if (variable_struct_exists(data, "enemy_id")) enemy_id = data.enemy_id;
+    else if (is_struct(vars_in) && variable_struct_exists(vars_in, "enemy_id")) enemy_id = vars_in.enemy_id;
+
+    var alive = { removed: false, vars: vars_in };
+    if (variable_struct_exists(data, "obj_name")) alive.obj_name = data.obj_name;
+
+    var is_enemy = RoomState_IsEnemyPersistData(data);
+    if (is_enemy) {
+        alive.vars = RoomState_SanitizeEnemyVars(vars_in, enemy_id);
+        if (enemy_id != -1) alive.enemy_id = enemy_id;
+    } else if (!is_struct(alive.vars)) {
+        alive.vars = {};
+    }
+
+    RoomState_Set(_room, _persist_id, alive);
 }
 
 function RoomState_ApplyInstance(_inst) {
@@ -142,7 +194,7 @@ function RoomState_ApplyInstance(_inst) {
         return;
     }
 
-    if (_inst.object_index == obj_enemy && variable_instance_exists(_inst, "enemy_id")) {
+    if (RoomState_IsEnemyInstance(_inst) && variable_instance_exists(_inst, "enemy_id")) {
         if (EnemyPersist_IsBossDefeated(_inst.enemy_id)) {
             instance_destroy(_inst);
             return;
@@ -151,8 +203,14 @@ function RoomState_ApplyInstance(_inst) {
 
     var data = RoomState_Get(room, _inst.persist_id);
     if (!is_struct(data)) return;
+    if (variable_struct_exists(data, "obj_name")) {
+        var obj_name = string(data.obj_name);
+        if (obj_name != "" && obj_name != object_get_name(_inst.object_index)) {
+            return;
+        }
+    }
     if (variable_struct_exists(data, "removed") && data.removed) {
-        if (_inst.object_index == obj_enemy) {
+        if (RoomState_IsEnemyInstance(_inst)) {
             var gs = GameState_Get();
             var rv = 0;
             if (variable_struct_exists(data, "removed_reset_version")) rv = data.removed_reset_version;
@@ -169,6 +227,16 @@ function RoomState_ApplyInstance(_inst) {
             var n = names[i];
             variable_instance_set(_inst, n, variable_struct_get(data.vars, n));
         }
+    }
+    if (RoomState_IsEnemyInstance(_inst)) {
+        if (variable_instance_exists(_inst, "defeated")) _inst.defeated = false;
+        if (variable_instance_exists(_inst, "encounter_pending")) _inst.encounter_pending = false;
+        if (variable_instance_exists(_inst, "encounter_player")) _inst.encounter_player = noone;
+        if (variable_instance_exists(_inst, "moving")) _inst.moving = false;
+        if (variable_instance_exists(_inst, "move_timer")) _inst.move_timer = 0;
+        if (variable_instance_exists(_inst, "move_dir")) _inst.move_dir = -1;
+        if (variable_instance_exists(_inst, "cine_lock_count")) _inst.cine_lock_count = 0;
+        if (variable_instance_exists(_inst, "cine_lock_owner")) _inst.cine_lock_owner = noone;
     }
 }
 

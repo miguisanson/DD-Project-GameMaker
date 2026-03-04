@@ -183,6 +183,15 @@ function Save_IsEnemyPersistEntry(_entry, _key = "") {
     if (!is_struct(_entry)) return false;
     if (Save_PersistEntryEnemyId(_entry, _key) != -1) return true;
     if (variable_struct_exists(_entry, "removed_reset_version")) return true;
+    if (variable_struct_exists(_entry, "obj_name")) {
+        var obj_name = string(_entry.obj_name);
+        if (obj_name != "") {
+            var obj_idx = asset_get_index(obj_name);
+            if (obj_idx != -1 && (obj_idx == obj_enemy || object_is_ancestor(obj_idx, obj_enemy))) {
+                return true;
+            }
+        }
+    }
     return false;
 }
 
@@ -358,7 +367,17 @@ function Save_ApplySnapshot(_snap) {
     GameState_SetBattleReturn(room_id, px, py, face, false);
     GameState_SetJustReturned(true);
     // Use a slower loading-style fade so loaded rooms stay hidden until the black screen fully owns the transition.
-    Transition_RequestLoadingRoomFade(room_id);
+    var load_transition_ok = Transition_RequestLoadingRoomFade(room_id);
+    if (!load_transition_ok) {
+        // If a previous transition is stuck active, force-finish and retry once.
+        Transition_Finish();
+        load_transition_ok = Transition_RequestLoadingRoomFade(room_id);
+    }
+    if (!load_transition_ok) {
+        // Last-resort fallback: still honor the loaded snapshot and room target.
+        Transition_PreRoomChange();
+        room_goto(room_id);
+    }
 }
 
 function Save_Path(_slot) {
