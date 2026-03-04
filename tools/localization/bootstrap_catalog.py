@@ -13,7 +13,10 @@ from typing import Iterable, List, Optional
 from openpyxl import Workbook
 
 SHEET_NAME = "strings"
-COLUMNS = [
+SCHEMA_LEGACY = "legacy"
+SCHEMA_MINIMAL = "minimal"
+
+LEGACY_COLUMNS = [
     "key",
     "group",
     "context",
@@ -27,6 +30,12 @@ COLUMNS = [
     "notes",
     "active",
     "char_limit",
+]
+
+MINIMAL_COLUMNS = [
+    "ref",
+    "en",
+    "ko",
 ]
 
 STRING_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
@@ -98,7 +107,14 @@ class Row:
     active: int = 1
     char_limit: str = ""
 
-    def to_list(self) -> list:
+    def to_sheet_row(self, schema: str) -> list:
+        if schema == SCHEMA_MINIMAL:
+            return [
+                self.key,         # ref
+                self.english_en,  # en
+                self.korean_ko,   # ko
+            ]
+
         return [
             self.key,
             self.group,
@@ -757,35 +773,44 @@ def extract_loc_t_calls(catalog: Catalog, root: Path) -> None:
                 )
 
 
-def write_workbook(catalog: Catalog, output_path: Path) -> None:
+def write_workbook(catalog: Catalog, output_path: Path, schema: str = SCHEMA_MINIMAL) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     wb = Workbook()
     ws = wb.active
     ws.title = SHEET_NAME
-    ws.append(COLUMNS)
+    columns = MINIMAL_COLUMNS if schema == SCHEMA_MINIMAL else LEGACY_COLUMNS
+    ws.append(columns)
 
     for row in catalog.sorted_rows():
-        ws.append(row.to_list())
+        ws.append(row.to_sheet_row(schema))
 
     ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:M{ws.max_row}"
+    last_col_letter = chr(ord("A") + len(columns) - 1)
+    ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
 
-    widths = {
-        "A": 42,
-        "B": 14,
-        "C": 42,
-        "D": 48,
-        "E": 10,
-        "F": 42,
-        "G": 56,
-        "H": 56,
-        "I": 24,
-        "J": 12,
-        "K": 28,
-        "L": 8,
-        "M": 10,
-    }
+    if schema == SCHEMA_MINIMAL:
+        widths = {
+            "A": 52,
+            "B": 72,
+            "C": 72,
+        }
+    else:
+        widths = {
+            "A": 42,
+            "B": 14,
+            "C": 42,
+            "D": 48,
+            "E": 10,
+            "F": 42,
+            "G": 56,
+            "H": 56,
+            "I": 24,
+            "J": 12,
+            "K": 28,
+            "L": 8,
+            "M": 10,
+        }
     for col, width in widths.items():
         ws.column_dimensions[col].width = width
 
@@ -810,14 +835,20 @@ def build_catalog(root: Path) -> Catalog:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bootstrap localization workbook from GML sources.")
     parser.add_argument("--xlsx", required=True, help="Output workbook path")
+    parser.add_argument(
+        "--schema",
+        choices=[SCHEMA_MINIMAL, SCHEMA_LEGACY],
+        default=SCHEMA_MINIMAL,
+        help="Workbook schema to emit (default: minimal).",
+    )
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[2]
     output_path = (root / args.xlsx).resolve() if not Path(args.xlsx).is_absolute() else Path(args.xlsx)
 
     catalog = build_catalog(root)
-    write_workbook(catalog, output_path)
-    print(f"Wrote {len(catalog.rows)} rows to {output_path}")
+    write_workbook(catalog, output_path, args.schema)
+    print(f"Wrote {len(catalog.rows)} rows to {output_path} (schema={args.schema})")
 
 
 if __name__ == "__main__":

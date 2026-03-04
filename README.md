@@ -6,13 +6,31 @@
 Canonical source of truth is a single workbook:
 - `datafiles/localization/game_text.xlsx` (sheet: `strings`)
 
+Canonical minimal columns (new):
+- `ref` (human-facing reference, also runtime key by default)
+- `en`
+- `ko`
+
+Legacy schema is still supported by tooling for compatibility.
+
 Build/runtime artifact:
 - `datafiles/localization/localization.json`
+
+Migrate legacy workbook -> minimal workbook (safe one-time conversion with mapping/report):
+
+```bash
+python tools/localization/migrate_legacy_sheet.py ^
+  --input-xlsx datafiles/localization/game_text.xlsx ^
+  --output-xlsx datafiles/localization/game_text.xlsx ^
+  --backup-xlsx datafiles/localization/game_text.legacy.xlsx ^
+  --mapping-csv datafiles/localization/migration_map.csv ^
+  --report-json datafiles/localization/migration_report.json
+```
 
 Generate or refresh the workbook from current scoped text sources:
 
 ```bash
-python tools/localization/bootstrap_catalog.py --xlsx datafiles/localization/game_text.xlsx
+python tools/localization/bootstrap_catalog.py --xlsx datafiles/localization/game_text.xlsx --schema minimal
 ```
 
 Validate workbook + build runtime JSON:

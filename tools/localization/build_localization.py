@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Validate/build localization JSON from the canonical workbook, with optional Korean autofill."""
 
 from __future__ import annotations
@@ -15,7 +15,11 @@ from typing import Dict, List, Tuple
 from openpyxl import load_workbook
 
 SHEET_NAME = "strings"
-REQUIRED_COLUMNS = [
+SCHEMA_LEGACY = "legacy"
+SCHEMA_MINIMAL = "minimal"
+
+# Legacy schema (still accepted for compatibility)
+LEGACY_REQUIRED_COLUMNS = [
     "key",
     "group",
     "context",
@@ -30,8 +34,41 @@ REQUIRED_COLUMNS = [
     "active",
     "char_limit",
 ]
+
+# New minimal schema (canonical)
+MINIMAL_REQUIRED_COLUMNS = [
+    "ref",
+    "en",
+    "ko",
+]
+
 VALID_STATUS = {"new", "autofilled", "reviewed", "approved"}
 PLACEHOLDER_RE = re.compile(r"\{([A-Za-z0-9_]+)\}")
+
+SCHEMA_COLUMN_MAP = {
+    SCHEMA_LEGACY: {
+        "key": "key",
+        "ref": "key",
+        "en": "english_en",
+        "ko": "korean_ko",
+        "status": "status",
+        "active": "active",
+        "context": "context",
+        "char_limit": "char_limit",
+        "placeholders": "placeholders",
+    },
+    SCHEMA_MINIMAL: {
+        "key": "key",  # optional; falls back to ref when absent/blank
+        "ref": "ref",
+        "en": "en",
+        "ko": "ko",
+        "status": "status",
+        "active": "active",
+        "context": "context",
+        "char_limit": "char_limit",
+        "placeholders": "placeholders",
+    },
+}
 
 
 @dataclass
@@ -44,6 +81,12 @@ def norm_str(value: object) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def text_str(value: object) -> str:
+    if value is None:
+        return ""
+    return str(value)
 
 
 def parse_active(value: object) -> int:
@@ -67,7 +110,54 @@ def extract_placeholders(text: str) -> List[str]:
     return out
 
 
-def load_sheet_rows(xlsx_path: Path) -> Tuple[object, object, Dict[str, int], List[SheetRow]]:
+def placeholders_csv(text: str) -> str:
+    return ",".join(extract_placeholders(text))
+
+
+def detect_schema(headers: Dict[str, int]) -> str:
+    if all(col in headers for col in LEGACY_REQUIRED_COLUMNS):
+        return SCHEMA_LEGACY
+    if all(col in headers for col in MINIMAL_REQUIRED_COLUMNS):
+        return SCHEMA_MINIMAL
+
+    missing_legacy = [c for c in LEGACY_REQUIRED_COLUMNS if c not in headers]
+    missing_minimal = [c for c in MINIMAL_REQUIRED_COLUMNS if c not in headers]
+    raise ValueError(
+        "Workbook schema not recognized.\n"
+        f"- Missing legacy columns: {', '.join(missing_legacy)}\n"
+        f"- Missing minimal columns: {', '.join(missing_minimal)}"
+    )
+
+
+def column_name(schema: str, logical_name: str) -> str:
+    mapping = SCHEMA_COLUMN_MAP.get(schema, {})
+    return mapping.get(logical_name, logical_name)
+
+
+def has_column(headers: Dict[str, int], schema: str, logical_name: str) -> bool:
+    col = column_name(schema, logical_name)
+    return col in headers
+
+
+def row_get(row: SheetRow, headers: Dict[str, int], schema: str, logical_name: str) -> str:
+    col = column_name(schema, logical_name)
+    value = row.values.get(col)
+    if logical_name in {"en", "ko", "context"}:
+        out = text_str(value)
+    else:
+        out = norm_str(value)
+    if logical_name == "key" and schema == SCHEMA_MINIMAL and out == "":
+        out = row_get(row, headers, schema, "ref")
+    return out
+
+
+def row_set(row: SheetRow, headers: Dict[str, int], schema: str, logical_name: str, value: object) -> None:
+    col = column_name(schema, logical_name)
+    if col in headers:
+        row.values[col] = value
+
+
+def load_sheet_rows(xlsx_path: Path) -> Tuple[object, object, Dict[str, int], List[SheetRow], str]:
     wb = load_workbook(xlsx_path)
     if SHEET_NAME not in wb.sheetnames:
         raise ValueError(f"Missing sheet '{SHEET_NAME}'")
@@ -79,50 +169,55 @@ def load_sheet_rows(xlsx_path: Path) -> Tuple[object, object, Dict[str, int], Li
         if h:
             headers[h] = c
 
-    missing = [c for c in REQUIRED_COLUMNS if c not in headers]
-    if missing:
-        raise ValueError(f"Workbook missing required columns: {', '.join(missing)}")
+    schema = detect_schema(headers)
 
     rows: List[SheetRow] = []
     for r in range(2, ws.max_row + 1):
         values = {name: ws.cell(row=r, column=col_idx).value for name, col_idx in headers.items()}
-        key = norm_str(values.get("key"))
-        english = norm_str(values.get("english_en"))
-        if key == "" and english == "":
+        row = SheetRow(row_index=r, values=values)
+        key = row_get(row, headers, schema, "key")
+        english = row_get(row, headers, schema, "en")
+        if key == "" and english.strip() == "":
             continue
-        rows.append(SheetRow(row_index=r, values=values))
+        rows.append(row)
 
-    return wb, ws, headers, rows
+    return wb, ws, headers, rows, schema
 
 
-def validate_rows(rows: List[SheetRow]) -> List[str]:
+def validate_rows(rows: List[SheetRow], headers: Dict[str, int], schema: str) -> List[str]:
     errors: List[str] = []
     seen_keys: Dict[str, int] = {}
 
+    has_status = has_column(headers, schema, "status")
+    has_active = has_column(headers, schema, "active")
+    has_char_limit = has_column(headers, schema, "char_limit")
+    has_placeholders = has_column(headers, schema, "placeholders")
+
     for row in rows:
-        key = norm_str(row.values.get("key"))
-        en = norm_str(row.values.get("english_en"))
-        ko = norm_str(row.values.get("korean_ko"))
-        status = norm_str(row.values.get("status")).lower() or "new"
-        active = parse_active(row.values.get("active"))
-        char_limit = norm_str(row.values.get("char_limit"))
+        key = row_get(row, headers, schema, "key")
+        en = row_get(row, headers, schema, "en")
+        ko = row_get(row, headers, schema, "ko")
+        status = row_get(row, headers, schema, "status").lower() or "new"
+        active = parse_active(row_get(row, headers, schema, "active")) if has_active else 1
+        char_limit = row_get(row, headers, schema, "char_limit")
+        declared_placeholders = row_get(row, headers, schema, "placeholders")
 
         if key == "":
-            errors.append(f"Row {row.row_index}: key is required")
+            errors.append(f"Row {row.row_index}: key/ref is required")
         elif key in seen_keys:
             errors.append(f"Row {row.row_index}: duplicate key '{key}' (first at row {seen_keys[key]})")
         else:
             seen_keys[key] = row.row_index
 
-        if en == "":
-            errors.append(f"Row {row.row_index}: english_en is required")
+        if en.strip() == "":
+            errors.append(f"Row {row.row_index}: en text is required")
 
-        if status not in VALID_STATUS:
+        if has_status and status not in VALID_STATUS:
             errors.append(
                 f"Row {row.row_index}: invalid status '{status}' (allowed: {', '.join(sorted(VALID_STATUS))})"
             )
 
-        if active not in (0, 1):
+        if has_active and active not in (0, 1):
             errors.append(f"Row {row.row_index}: active must be 0 or 1")
 
         en_ph = extract_placeholders(en)
@@ -132,12 +227,19 @@ def validate_rows(rows: List[SheetRow]) -> List[str]:
                 f"Row {row.row_index}: placeholder mismatch english={en_ph} korean={ko_ph}"
             )
 
-        if char_limit:
+        if has_placeholders and declared_placeholders:
+            canonical = placeholders_csv(en)
+            if canonical != declared_placeholders:
+                errors.append(
+                    f"Row {row.row_index}: placeholders should be '{canonical}' but got '{declared_placeholders}'"
+                )
+
+        if has_char_limit and char_limit.strip() != "":
             try:
                 max_chars = int(float(char_limit))
                 if max_chars > 0 and ko and len(ko) > max_chars:
                     errors.append(
-                        f"Row {row.row_index}: korean_ko length {len(ko)} exceeds char_limit {max_chars}"
+                        f"Row {row.row_index}: ko length {len(ko)} exceeds char_limit {max_chars}"
                     )
             except ValueError:
                 errors.append(f"Row {row.row_index}: char_limit must be a number or blank")
@@ -204,7 +306,7 @@ def translate_to_korean(client: object, model: str, english: str, placeholders: 
     return resp.choices[0].message.content.strip()
 
 
-def autofill_korean(rows: List[SheetRow], model: str) -> int:
+def autofill_korean(rows: List[SheetRow], headers: Dict[str, int], schema: str, model: str) -> int:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is required for --autofill-ko")
@@ -217,21 +319,26 @@ def autofill_korean(rows: List[SheetRow], model: str) -> int:
     client = OpenAI(api_key=api_key)
 
     updated = 0
+    has_active = has_column(headers, schema, "active")
+    has_status = has_column(headers, schema, "status")
+
     for row in rows:
-        active = parse_active(row.values.get("active"))
+        active = parse_active(row_get(row, headers, schema, "active")) if has_active else 1
         if active != 1:
             continue
 
-        ko = norm_str(row.values.get("korean_ko"))
-        if ko:
+        ko = row_get(row, headers, schema, "ko")
+        if ko.strip() != "":
             continue
 
-        en = norm_str(row.values.get("english_en"))
-        if not en:
+        en = row_get(row, headers, schema, "en")
+        if en.strip() == "":
             continue
 
         placeholders = extract_placeholders(en)
-        context = norm_str(row.values.get("context"))
+        context = row_get(row, headers, schema, "context")
+        if context == "":
+            context = row_get(row, headers, schema, "ref")
         translated = translate_to_korean(client, model, en, placeholders, context)
         translated = translated.strip()
 
@@ -243,10 +350,10 @@ def autofill_korean(rows: List[SheetRow], model: str) -> int:
                 f"Korean placeholders={extract_placeholders(translated)}"
             )
 
-        row.values["korean_ko"] = translated
-        status = norm_str(row.values.get("status")).lower() or "new"
-        if status in {"", "new"}:
-            row.values["status"] = "autofilled"
+        row_set(row, headers, schema, "ko", translated)
+        status = row_get(row, headers, schema, "status").lower() or "new"
+        if has_status and status in {"", "new"}:
+            row_set(row, headers, schema, "status", "autofilled")
         updated += 1
 
     return updated
@@ -260,22 +367,23 @@ def write_rows_back(ws: object, headers: Dict[str, int], rows: List[SheetRow]) -
             ws.cell(row=row.row_index, column=col_idx).value = row.values[col_name]
 
 
-def build_json_payload(rows: List[SheetRow], xlsx_path: Path) -> Dict[str, object]:
+def build_json_payload(rows: List[SheetRow], headers: Dict[str, int], schema: str, xlsx_path: Path) -> Dict[str, object]:
     strings: Dict[str, Dict[str, str]] = {}
+    has_active = has_column(headers, schema, "active")
 
     for row in rows:
-        active = parse_active(row.values.get("active"))
+        active = parse_active(row_get(row, headers, schema, "active")) if has_active else 1
         if active != 1:
             continue
 
-        key = norm_str(row.values.get("key"))
-        en = norm_str(row.values.get("english_en"))
-        ko = norm_str(row.values.get("korean_ko"))
-        if not key:
+        key = row_get(row, headers, schema, "key")
+        en = row_get(row, headers, schema, "en")
+        ko = row_get(row, headers, schema, "ko")
+        if key == "":
             continue
 
         entry: Dict[str, str] = {"en": en}
-        if ko:
+        if ko.strip() != "":
             entry["ko"] = ko
         strings[key] = entry
 
@@ -287,6 +395,7 @@ def build_json_payload(rows: List[SheetRow], xlsx_path: Path) -> Dict[str, objec
         "meta": {
             "version": 1,
             "source_sheet": SHEET_NAME,
+            "source_schema": schema,
             "generated_at_utc": workbook_stamp,
             "row_count": len(ordered),
         },
@@ -300,7 +409,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build localization JSON from workbook.")
     parser.add_argument("--xlsx", required=True, help="Input workbook path")
     parser.add_argument("--json", required=True, help="Output localization JSON path")
-    parser.add_argument("--autofill-ko", action="store_true", help="Autofill blank korean_ko entries using OpenAI API")
+    parser.add_argument("--autofill-ko", action="store_true", help="Autofill blank ko entries using OpenAI API")
     parser.add_argument("--model", default=os.getenv("LOCALIZATION_MODEL", "gpt-4.1-mini"), help="OpenAI model for --autofill-ko")
     args = parser.parse_args()
 
@@ -308,22 +417,23 @@ def main() -> None:
     xlsx_path = (root / args.xlsx).resolve() if not Path(args.xlsx).is_absolute() else Path(args.xlsx)
     json_path = (root / args.json).resolve() if not Path(args.json).is_absolute() else Path(args.json)
 
-    wb, ws, headers, rows = load_sheet_rows(xlsx_path)
+    wb, ws, headers, rows, schema = load_sheet_rows(xlsx_path)
+    print(f"Detected workbook schema: {schema}")
 
     if args.autofill_ko:
-        updated = autofill_korean(rows, args.model)
+        updated = autofill_korean(rows, headers, schema, args.model)
         write_rows_back(ws, headers, rows)
         wb.save(xlsx_path)
-        print(f"Autofilled korean_ko for {updated} row(s) using model {args.model}")
+        print(f"Autofilled ko for {updated} row(s) using model {args.model}")
 
-    errors = validate_rows(rows)
+    errors = validate_rows(rows, headers, schema)
     if errors:
         print("Validation failed:")
         for e in errors:
             print(f"- {e}")
         raise SystemExit(1)
 
-    payload = build_json_payload(rows, xlsx_path)
+    payload = build_json_payload(rows, headers, schema, xlsx_path)
     json_path.parent.mkdir(parents=True, exist_ok=True)
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 

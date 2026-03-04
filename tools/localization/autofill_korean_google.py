@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Autofill korean_ko cells in the localization workbook using Google Translate.
+"""Autofill Korean cells in the localization workbook using Google Translate.
 
 This is a draft-pass helper for localization; human review is still required.
 """
@@ -16,14 +16,83 @@ from deep_translator import GoogleTranslator
 from openpyxl import load_workbook
 
 SHEET_NAME = "strings"
-REQUIRED_COLUMNS = ("key", "english_en", "korean_ko", "status", "active", "context")
+SCHEMA_LEGACY = "legacy"
+SCHEMA_MINIMAL = "minimal"
+LEGACY_REQUIRED_COLUMNS = ("key", "english_en", "korean_ko")
+MINIMAL_REQUIRED_COLUMNS = ("ref", "en", "ko")
 PLACEHOLDER_RE = re.compile(r"\{([A-Za-z0-9_]+)\}")
+
+SCHEMA_COLUMN_MAP = {
+    SCHEMA_LEGACY: {
+        "key": "key",
+        "ref": "key",
+        "en": "english_en",
+        "ko": "korean_ko",
+        "status": "status",
+        "active": "active",
+        "context": "context",
+    },
+    SCHEMA_MINIMAL: {
+        "key": "key",  # optional
+        "ref": "ref",
+        "en": "en",
+        "ko": "ko",
+        "status": "status",
+        "active": "active",
+        "context": "context",
+    },
+}
 
 
 def norm_str(value: object) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def text_str(value: object) -> str:
+    if value is None:
+        return ""
+    return str(value)
+
+
+def detect_schema(headers: Dict[str, int]) -> str:
+    if all(col in headers for col in LEGACY_REQUIRED_COLUMNS):
+        return SCHEMA_LEGACY
+    if all(col in headers for col in MINIMAL_REQUIRED_COLUMNS):
+        return SCHEMA_MINIMAL
+    raise SystemExit(
+        "Workbook schema not recognized. Expected either legacy columns "
+        f"{LEGACY_REQUIRED_COLUMNS} or minimal columns {MINIMAL_REQUIRED_COLUMNS}."
+    )
+
+
+def col_name(schema: str, logical_name: str) -> str:
+    return SCHEMA_COLUMN_MAP[schema].get(logical_name, logical_name)
+
+
+def has_col(headers: Dict[str, int], schema: str, logical_name: str) -> bool:
+    return col_name(schema, logical_name) in headers
+
+
+def get_row_value(ws: object, headers: Dict[str, int], schema: str, row: int, logical_name: str) -> str:
+    col = col_name(schema, logical_name)
+    out = ""
+    if col in headers:
+        cell_value = ws.cell(row, headers[col]).value
+        if logical_name in {"en", "ko", "context"}:
+            out = text_str(cell_value)
+        else:
+            out = norm_str(cell_value)
+    if logical_name == "key" and schema == SCHEMA_MINIMAL and out == "":
+        out = get_row_value(ws, headers, schema, row, "ref")
+    return out
+
+
+def set_row_value(ws: object, headers: Dict[str, int], schema: str, row: int, logical_name: str, value: object) -> None:
+    col = col_name(schema, logical_name)
+    if col in headers:
+        ws.cell(row, headers[col]).value = value
 
 
 def parse_active(value: object) -> int:
@@ -70,10 +139,10 @@ def build_row_text_for_translation(english: str, context: str) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Autofill korean_ko in game_text.xlsx using Google Translate.")
+    parser = argparse.ArgumentParser(description="Autofill Korean in game_text.xlsx using Google Translate.")
     parser.add_argument("--xlsx", required=True, help="Workbook path (for example datafiles/localization/game_text.xlsx)")
     parser.add_argument("--sleep-ms", type=int, default=120, help="Delay between requests to reduce throttling risk")
-    parser.add_argument("--overwrite", action="store_true", help="Also overwrite non-empty korean_ko values")
+    parser.add_argument("--overwrite", action="store_true", help="Also overwrite non-empty ko values")
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[2]
@@ -89,9 +158,8 @@ def main() -> None:
         if h:
             headers[h] = c
 
-    missing = [c for c in REQUIRED_COLUMNS if c not in headers]
-    if missing:
-        raise SystemExit(f"Workbook missing required columns: {', '.join(missing)}")
+    schema = detect_schema(headers)
+    print(f"Detected workbook schema: {schema}")
 
     tr = GoogleTranslator(source="en", target="ko")
 
@@ -99,23 +167,26 @@ def main() -> None:
     skipped = 0
     failed = 0
 
-    for r in range(2, ws.max_row + 1):
-        key = norm_str(ws.cell(r, headers["key"]).value)
-        en = norm_str(ws.cell(r, headers["english_en"]).value)
-        ko = norm_str(ws.cell(r, headers["korean_ko"]).value)
-        context = norm_str(ws.cell(r, headers["context"]).value)
-        status = norm_str(ws.cell(r, headers["status"]).value).lower() or "new"
-        active = parse_active(ws.cell(r, headers["active"]).value)
+    has_active = has_col(headers, schema, "active")
+    has_status = has_col(headers, schema, "status")
 
-        if key == "" and en == "":
+    for r in range(2, ws.max_row + 1):
+        key = get_row_value(ws, headers, schema, r, "key")
+        en = get_row_value(ws, headers, schema, r, "en")
+        ko = get_row_value(ws, headers, schema, r, "ko")
+        context = get_row_value(ws, headers, schema, r, "context") or get_row_value(ws, headers, schema, r, "ref")
+        status = get_row_value(ws, headers, schema, r, "status").lower() or "new"
+        active = parse_active(get_row_value(ws, headers, schema, r, "active")) if has_active else 1
+
+        if key == "" and en.strip() == "":
             continue
         if active != 1:
             skipped += 1
             continue
-        if en == "":
+        if en.strip() == "":
             skipped += 1
             continue
-        if ko != "" and not args.overwrite:
+        if ko.strip() != "" and not args.overwrite:
             skipped += 1
             continue
 
@@ -133,9 +204,9 @@ def main() -> None:
                 failed += 1
                 continue
 
-            ws.cell(r, headers["korean_ko"]).value = translated
-            if status in ("", "new"):
-                ws.cell(r, headers["status"]).value = "autofilled"
+            set_row_value(ws, headers, schema, r, "ko", translated)
+            if has_status and status in ("", "new"):
+                set_row_value(ws, headers, schema, r, "status", "autofilled")
             updated += 1
         except Exception:
             failed += 1

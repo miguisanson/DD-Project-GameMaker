@@ -2,7 +2,8 @@
   "meta": {
     "version": 1,
     "source_sheet": "strings",
-    "generated_at_utc": "2026-03-04T15:49:51Z",
+    "source_schema": "minimal",
+    "generated_at_utc": "2026-03-04T17:49:44Z",
     "row_count": 663
   },
   "default_lang": "en",
