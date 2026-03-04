@@ -857,6 +857,29 @@ function Skill_AdjustStatusTurns(_user, _target, _status_id, _base_turns) {
     return max(1, turns);
 }
 
+function Skill_BuildAppliedStatusMessage(_applied_status_names) {
+    if (!is_array(_applied_status_names) || array_length(_applied_status_names) <= 0) return "";
+
+    var prefix = Loc_T("combat.msg.applied_prefix", "Applied ");
+    if (prefix == "") prefix = "Applied ";
+    var last = string_char_at(prefix, string_length(prefix));
+    if (last != " " && last != "\t" && last != "\n") prefix += " ";
+
+    var sep = Loc_T("combat.msg.list_separator", ", ");
+    if (sep == "" || sep == ",") sep = ", ";
+
+    var out = prefix;
+    for (var i = 0; i < array_length(_applied_status_names); i++) {
+        if (i > 0) out += sep;
+        out += _applied_status_names[i];
+    }
+
+    var dot = Loc_T("combat.msg.sentence_dot", ".");
+    if (dot == "") dot = ".";
+    out += dot;
+    return out;
+}
+
 function Skill_Use(_user, _target, _skill_id) {
     var s = SkillDB_Get(_skill_id);
     var result = {
@@ -926,13 +949,9 @@ function Skill_Use(_user, _target, _skill_id) {
         }
 
         if (applied_any_status) {
-            var msg_status = Loc_T("combat.msg.applied_prefix", "Applied ");
-            for (var si = 0; si < array_length(applied_status_names); si++) {
-                if (si > 0) msg_status += Loc_T("combat.msg.list_separator", ", ");
-                msg_status += applied_status_names[si];
-            }
-            if (result.msg != "") result.msg += " ";
-            result.msg += msg_status + Loc_T("combat.msg.sentence_dot", ".");
+            var msg_status = Skill_BuildAppliedStatusMessage(applied_status_names);
+            if (result.msg != "" && msg_status != "") result.msg += " ";
+            result.msg += msg_status;
         }
         return result;
     }
@@ -961,13 +980,9 @@ function Skill_Use(_user, _target, _skill_id) {
         }
         
         if (applied_any_status) {
-            var msg_status2 = Loc_T("combat.msg.applied_prefix", "Applied ");
-            for (var sm = 0; sm < array_length(applied_status_names); sm++) {
-                if (sm > 0) msg_status2 += Loc_T("combat.msg.list_separator", ", ");
-                msg_status2 += applied_status_names[sm];
-            }
-            if (result.msg != "") result.msg += " ";
-            result.msg += msg_status2 + Loc_T("combat.msg.sentence_dot", ".");
+            var msg_status2 = Skill_BuildAppliedStatusMessage(applied_status_names);
+            if (result.msg != "" && msg_status2 != "") result.msg += " ";
+            result.msg += msg_status2;
         } else if (result.msg == "") {
             if (variable_struct_exists(s, "use_msg")) result.msg = string(s.use_msg);
             else result.msg = Loc_T("combat.msg.skill_used", "Skill used.");
@@ -1131,13 +1146,9 @@ function Skill_Use(_user, _target, _skill_id) {
         }
 
         if (applied_any_status) {
-            var msg_status3 = Loc_T("combat.msg.applied_prefix", "Applied ");
-            for (var sj = 0; sj < array_length(applied_status_names); sj++) {
-                if (sj > 0) msg_status3 += Loc_T("combat.msg.list_separator", ", ");
-                msg_status3 += applied_status_names[sj];
-            }
-            if (result.msg != "") result.msg += " ";
-            result.msg += msg_status3 + Loc_T("combat.msg.sentence_dot", ".");
+            var msg_status3 = Skill_BuildAppliedStatusMessage(applied_status_names);
+            if (result.msg != "" && msg_status3 != "") result.msg += " ";
+            result.msg += msg_status3;
         } else if (variable_struct_exists(s, "use_msg")) {
             result.msg = string(s.use_msg);
         }

@@ -63,5 +63,6 @@ cine_hold_frames = 0;
 cine_target_inst = noone;
 cine_dialogue_started = false;
 cine_wait_dialogue_end = false;
+cine_input_lock_acquired = false;
 
 visible = false;

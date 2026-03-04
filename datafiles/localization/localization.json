@@ -240,7 +240,7 @@
       "ko": "수업 선택"
     },
     "combat.msg.applied_prefix": {
-      "en": "Applied",
+      "en": "Applied ",
       "ko": "적용된"
     },
     "combat.msg.battle_buildvictorydialoguelines.279.0": {
@@ -472,7 +472,7 @@
       "ko": "맙소사, 난 여기서 나가야만 해요."
     },
     "combat.msg.list_separator": {
-      "en": ",",
+      "en": ", ",
       "ko": ","
     },
     "combat.msg.loot_prefix": {

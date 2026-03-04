@@ -365,6 +365,26 @@ function DialogueTrigger_EnemyLockRelease(_enemy, _owner = noone) {
     }
 }
 
+function UI_CinematicInputLockPush(_owner = noone) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) gs.ui = {};
+    var count = 0;
+    if (variable_struct_exists(gs.ui, "cinematic_input_lock_count")) {
+        count = max(0, round(real(gs.ui.cinematic_input_lock_count)));
+    }
+    gs.ui.cinematic_input_lock_count = count + 1;
+}
+
+function UI_CinematicInputLockPop(_owner = noone) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) return;
+    var count = 0;
+    if (variable_struct_exists(gs.ui, "cinematic_input_lock_count")) {
+        count = max(0, round(real(gs.ui.cinematic_input_lock_count)));
+    }
+    gs.ui.cinematic_input_lock_count = max(0, count - 1);
+}
+
 function DialogueTrigger_CleanupCinematic(_tr, _release_enemy = true, _restore_follow = true) {
     if (!instance_exists(_tr)) return;
 
@@ -387,6 +407,10 @@ function DialogueTrigger_CleanupCinematic(_tr, _release_enemy = true, _restore_f
             DialogueTrigger_EnemyLockRelease(_tr.lock_enemy_runtime_target, _tr);
         }
         _tr.lock_enemy_acquired = false;
+    }
+    if (variable_instance_exists(_tr, "cine_input_lock_acquired") && _tr.cine_input_lock_acquired) {
+        UI_CinematicInputLockPop(_tr);
+        _tr.cine_input_lock_acquired = false;
     }
 
     if (variable_instance_exists(_tr, "cine_runtime_active")) _tr.cine_runtime_active = false;
@@ -479,6 +503,11 @@ function DialogueTrigger_StartCinematic(_tr) {
     if (!keep_enemy_locked
     && (!variable_instance_exists(_tr, "camera_focus_enabled") || !_tr.camera_focus_enabled)) {
         return;
+    }
+
+    if (!variable_instance_exists(_tr, "cine_input_lock_acquired") || !_tr.cine_input_lock_acquired) {
+        UI_CinematicInputLockPush(_tr);
+        _tr.cine_input_lock_acquired = true;
     }
 
     _tr.cine_runtime_active = true;
@@ -710,6 +739,7 @@ function UI_IsBlocking() {
     if (variable_struct_exists(gs.ui, "mode") && gs.ui.mode != UI_NONE) return true;
     if (variable_struct_exists(gs.ui, "lines") && is_array(gs.ui.lines) && array_length(gs.ui.lines) > 0) return true;
     if (variable_struct_exists(gs.ui, "dialogue_lock") && gs.ui.dialogue_lock > 0) return true;
+    if (variable_struct_exists(gs.ui, "cinematic_input_lock_count") && gs.ui.cinematic_input_lock_count > 0) return true;
     return false;
 }
 
@@ -1468,7 +1498,8 @@ function GameState_Init() {
             dialogue_hold_frames: 0,
             dialogue_hold_duration: 0,
             dialogue_tw_line_index: -1,
-            dialogue_open_block_frame: UI_OPENED_FRAME_NONE
+            dialogue_open_block_frame: UI_OPENED_FRAME_NONE,
+            cinematic_input_lock_count: 0
         };
     }
     if (!variable_struct_exists(gs.ui, "opened_frame")) gs.ui.opened_frame = UI_OPENED_FRAME_NONE;
@@ -1483,6 +1514,8 @@ function GameState_Init() {
     if (!variable_struct_exists(gs.ui, "dialogue_hold_duration")) gs.ui.dialogue_hold_duration = 0;
     if (!variable_struct_exists(gs.ui, "dialogue_tw_line_index")) gs.ui.dialogue_tw_line_index = -1;
     if (!variable_struct_exists(gs.ui, "dialogue_open_block_frame")) gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
+    if (!variable_struct_exists(gs.ui, "cinematic_input_lock_count")) gs.ui.cinematic_input_lock_count = 0;
+    gs.ui.cinematic_input_lock_count = max(0, round(real(gs.ui.cinematic_input_lock_count)));
     if (!variable_struct_exists(gs.ui, "lines_raw") || !is_array(gs.ui.lines_raw)) gs.ui.lines_raw = [];
     if (!variable_struct_exists(gs.ui, "cutscene_text_only")) gs.ui.cutscene_text_only = false;
     var skillbook_ui_key = Dialogue_SkillbookFirstReadUIActiveKey();

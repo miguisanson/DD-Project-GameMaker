@@ -213,6 +213,9 @@ function Transition_PreRoomChange() {
     if (is_struct(gs)) {
         gs.last_room = noone;
         gs.player_inst = noone;
+        if (variable_struct_exists(gs, "ui") && is_struct(gs.ui) && variable_struct_exists(gs.ui, "cinematic_input_lock_count")) {
+            gs.ui.cinematic_input_lock_count = 0;
+        }
     }
     global.player_inst = noone;
 }
