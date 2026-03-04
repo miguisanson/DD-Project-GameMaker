@@ -716,20 +716,31 @@ function UI_IsBlocking() {
 function UI_SetFont() {
     var font_to_use = UI_FONT;
     if (Loc_GetLanguage() == "ko") {
-        var mulmaru_idx = asset_get_index("Mulmaru");
-        if (mulmaru_idx != -1) {
-            font_to_use = mulmaru_idx;
-        } else {
-            if (!variable_global_exists("ui_font_ko")) global.ui_font_ko = -1;
-            if (global.ui_font_ko == -1) {
-                var ko_size = 8;
-                global.ui_font_ko = font_add("Malgun Gothic", ko_size, false, false, 32, 55203);
-                if (global.ui_font_ko == -1) {
-                    global.ui_font_ko = font_add("Noto Sans CJK KR", ko_size, false, false, 32, 55203);
-                }
+        if (!variable_global_exists("ui_font_ko")) global.ui_font_ko = -1;
+        if (!variable_global_exists("ui_font_ko_attempted")) global.ui_font_ko_attempted = false;
+
+        if (!global.ui_font_ko_attempted) {
+            global.ui_font_ko_attempted = true;
+            var ko_size = 8;
+            var ko_paths = [
+                "fonts/NotoSansCJKkr-Regular.otf",
+                "datafiles/fonts/NotoSansCJKkr-Regular.otf",
+                "NotoSansCJKkr-Regular.otf"
+            ];
+
+            for (var i = 0; i < array_length(ko_paths); i++) {
+                var p = ko_paths[i];
+                if (!file_exists(p)) continue;
+                global.ui_font_ko = font_add(p, ko_size, false, false, 32, 55203);
+                if (global.ui_font_ko != -1) break;
             }
-            if (global.ui_font_ko != -1) font_to_use = global.ui_font_ko;
         }
+
+        if (global.ui_font_ko == -1) {
+            var mulmaru_idx = asset_get_index("Mulmaru");
+            if (mulmaru_idx != -1) font_to_use = mulmaru_idx;
+        }
+        if (global.ui_font_ko != -1) font_to_use = global.ui_font_ko;
     }
     draw_set_font(font_to_use);
 }

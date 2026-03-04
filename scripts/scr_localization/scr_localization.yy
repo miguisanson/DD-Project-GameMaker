@@ -1,4 +1,4 @@
-﻿{
+{
   "$GMScript":"v1",
   "%Name":"scr_localization",
   "isCompatibility":false,
