@@ -34,6 +34,7 @@ function Input_Init() {
         inp.bindings.debug_levelup = [ord("L")];
         inp.bindings.debug_all_items = [ord("K")];
         inp.bindings.debug_kill = [ord("J")];
+        inp.bindings.debug_enemy_damage_skill = [ord("U")];
     }
 
     inp.bindings.debug_toggle = [ord("P")];
@@ -44,6 +45,7 @@ function Input_Init() {
     if (!variable_struct_exists(inp.bindings, "debug_save")) inp.bindings.debug_save = [vk_f5];
     if (!variable_struct_exists(inp.bindings, "debug_load")) inp.bindings.debug_load = [vk_f9];
     if (!variable_struct_exists(inp.bindings, "debug_kill")) inp.bindings.debug_kill = [ord("J")];
+    if (!variable_struct_exists(inp.bindings, "debug_enemy_damage_skill")) inp.bindings.debug_enemy_damage_skill = [ord("U")];
     if (!variable_struct_exists(inp, "state")) {
         inp.state = {};
     }

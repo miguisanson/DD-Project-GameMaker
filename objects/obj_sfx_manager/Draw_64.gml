@@ -52,8 +52,12 @@ if (is_struct(gs.player_ch)) {
 }
 
 var last_debug_cmd = "";
+var debug_enemy_damage_skill_only = false;
 if (variable_global_exists("debug") && is_struct(global.debug)) {
     if (variable_struct_exists(global.debug, "last_command")) last_debug_cmd = string(global.debug.last_command);
+    if (variable_struct_exists(global.debug, "enemy_damage_skill_only")) {
+        debug_enemy_damage_skill_only = global.debug.enemy_damage_skill_only;
+    }
 }
 
 var lines = [];
@@ -63,9 +67,11 @@ array_push(lines, "- Toggle Debug: " + Input_Label("debug_toggle"));
 array_push(lines, "- Kill Player (death test): " + Input_Label("debug_kill"));
 array_push(lines, "- Level Up: " + Input_Label("debug_levelup"));
 array_push(lines, "- Get All Items: " + Input_Label("debug_all_items"));
+array_push(lines, "- Enemy Damaging Skills Only: " + Input_Label("debug_enemy_damage_skill"));
 array_push(lines, "");
 array_push(lines, "active:");
 array_push(lines, "- debug_enabled: " + string(debug_enabled));
+array_push(lines, "- enemy_damage_skill_only: " + string(debug_enabled && debug_enemy_damage_skill_only));
 array_push(lines, "- audio_debug_enabled: " + string(audio_debug_enabled));
 array_push(lines, "- room: " + room_get_name(room));
 array_push(lines, "- ui_mode: " + string(ui_mode_id) + " (" + ui_mode_name + ")");

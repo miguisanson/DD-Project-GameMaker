@@ -814,7 +814,13 @@ function Battle_EnemyInitActionBudget(_bc, _e) {
     _bc.enemy_actions_remaining = clamp(actions, 1, ENEMY_ACTION_CHAIN_MAX);
 }
 
-function Battle_EnemyChooseSkill(_e, _p, _actions_remaining = -1, _used_skills = []) {
+function Battle_IsDamagingSkillForDebug(_sk) {
+    if (!is_struct(_sk)) return false;
+    if (!variable_struct_exists(_sk, "effect")) return false;
+    return (string(_sk.effect) == "damage");
+}
+
+function Battle_EnemyChooseSkill(_e, _p, _actions_remaining = -1, _used_skills = [], _force_damage_only = false) {
     if (!is_array(_e.skills) || array_length(_e.skills) <= 0) return -1;
 
     var candidates = [];
@@ -823,6 +829,7 @@ function Battle_EnemyChooseSkill(_e, _p, _actions_remaining = -1, _used_skills =
         var sk = SkillDB_Get(sid);
         if (!is_struct(sk) || sk.id == -1) continue;
         if (variable_struct_exists(sk, "enemy_passive_action_budget") && sk.enemy_passive_action_budget) continue;
+        if (_force_damage_only && !Battle_IsDamagingSkillForDebug(sk)) continue;
         if (variable_struct_exists(sk, "enemy_once_per_turn") && sk.enemy_once_per_turn) {
             var already_used = false;
             for (var us = 0; us < array_length(_used_skills); us++) {
@@ -832,6 +839,11 @@ function Battle_EnemyChooseSkill(_e, _p, _actions_remaining = -1, _used_skills =
         }
         if (!Skill_CanUse(_e, sk)) continue;
         if (!Skill_EnemyCanTrigger(sk, _e, _p, _actions_remaining)) continue;
+
+        if (_force_damage_only) {
+            array_push(candidates, sid);
+            continue;
+        }
 
         var chance = Skill_EnemyUseChance(sk);
         if (chance <= 0) continue;
@@ -1390,10 +1402,16 @@ function Battle_EnemyAct(_bc) {
     Battle_EnemyInitActionBudget(_bc, e);
 
     if (!variable_instance_exists(_bc, "enemy_last_action_used_skill")) _bc.enemy_last_action_used_skill = false;
-    var can_use_skill = !_bc.enemy_last_action_used_skill;
-    var skill_id = can_use_skill ? Battle_EnemyChooseSkill(e, p, _bc.enemy_actions_remaining, _bc.enemy_turn_used_skills) : -1;
+    var force_damage_skill_debug = Debug_EnemyForceDamageSkillOnly();
+    var can_use_skill = force_damage_skill_debug ? true : !_bc.enemy_last_action_used_skill;
+    var skill_id = can_use_skill ? Battle_EnemyChooseSkill(e, p, _bc.enemy_actions_remaining, _bc.enemy_turn_used_skills, force_damage_skill_debug) : -1;
     var use_skill = (skill_id != -1);
     var sk = use_skill ? SkillDB_Get(skill_id) : undefined;
+
+    if (force_damage_skill_debug && use_skill && is_struct(sk) && variable_struct_exists(sk, "mp_cost")) {
+        var forced_mp = max(0, round(real(sk.mp_cost)));
+        if (variable_struct_exists(e, "mp")) e.mp = max(e.mp, forced_mp);
+    }
     var consumes_turn = true;
     var free_action = false;
     var set_actions = 0;

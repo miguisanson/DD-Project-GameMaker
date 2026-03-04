@@ -253,7 +253,7 @@ with (obj_fx) {
     }
 }
 
-// Skill banner (drawn after enemy/FX, but kept low to avoid QTE overlap).
+// Skill banner (drawn after enemy/FX so it stays in front, above enemy sprite).
 if (skill_banner_active && skill_banner_name != "") {
     var bar_scale = UI_BAR_SCALE;
     var hp_bar_h = sprite_get_height(hp_bar) * bar_scale;
@@ -263,7 +263,7 @@ if (skill_banner_active && skill_banner_name != "") {
     var hud_bottom = hud_top + hp_bar_h + mp_bar_h + 4;
     var banner_h = string_height("A") + 8;
 
-    // Keep the banner below enemy + status icons, and clear of HUD/menu.
+    // Keep clear of HP/MP HUD; place above enemy sprite whenever possible.
     var min_banner_y = hud_bottom + 6;
     var max_banner_y = h - box_h - margin - banner_h - 4;
     var banner_y = min_banner_y;
@@ -272,11 +272,9 @@ if (skill_banner_active && skill_banner_name != "") {
         var bspr = enemy_inst.sprite_index;
         if (bspr != noone && bspr != -1) {
             var boff = SpriteShake_Offset(enemy_inst);
-            var enemy_top_screen = (enemy_inst.y + boff.y - sprite_get_yoffset(bspr) - vy) * sy;
-            var enemy_h_screen = sprite_get_height(bspr) * abs(enemy_inst.image_yscale) * sy;
-            var enemy_bottom_screen = enemy_top_screen + enemy_h_screen;
-            var status_bottom_screen = enemy_bottom_screen + 4 + 12;
-            banner_y = status_bottom_screen + 4;
+            var bbox_top_px = sprite_get_bbox_top(bspr);
+            var enemy_top_screen = (enemy_inst.y + boff.y - sprite_get_yoffset(bspr) + bbox_top_px - vy) * sy;
+            banner_y = enemy_top_screen - banner_h - 4;
         }
     }
     banner_y = clamp(banner_y, min_banner_y, max_banner_y);
@@ -291,7 +289,7 @@ if (skill_banner_active && skill_banner_name != "") {
     draw_text(tx, ty, skill_banner_name);
 }
 
-// Enemy defensive QTE (drawn late so it stays visible above banner/FX).
+// Enemy defensive QTE (drawn late; anchored below enemy/status icons).
 if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qte_total > 0) {
     var q_alpha = clamp(enemy_def_qte_draw_alpha, 0, 1);
     var q_scale = max(0.5, real(enemy_def_qte_draw_scale));
@@ -302,7 +300,7 @@ if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qt
         }
 
         var qx = w * 0.5;
-        var qy = h * 0.28;
+        var qy = h * 0.45;
         if (instance_exists(enemy_inst)) {
             var qspr = enemy_inst.sprite_index;
             if (qspr != noone && qspr != -1) {
@@ -310,41 +308,60 @@ if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qt
                 var qex = (enemy_inst.x + qox.x - sprite_get_xoffset(qspr) - vx) * sx;
                 var qey = (enemy_inst.y + qox.y - sprite_get_yoffset(qspr) - vy) * sy;
                 var qew = sprite_get_width(qspr) * sx;
+                var qeh = sprite_get_height(qspr) * abs(enemy_inst.image_yscale) * sy;
+                var enemy_bottom_screen = qey + qeh;
+                var status_bottom_screen = enemy_bottom_screen + 4 + 12;
                 qx = qex + (qew * 0.5);
-                qy = qey - 14;
+                qy = status_bottom_screen + 18;
             }
         }
-        var qte_min_y = 30;
-        var qte_max_y = h - box_h - margin - 28;
+        var qte_hud_margin = 8;
+        var qte_hud_top = qte_hud_margin + gui_off_y;
+        var qte_hud_bottom = qte_hud_top + (sprite_get_height(hp_bar) * UI_BAR_SCALE) + (sprite_get_height(mp_bar) * UI_BAR_SCALE) + 4;
+        var qte_min_y = qte_hud_bottom + 24;
+        var qte_max_y = h - box_h - margin - 40;
         qy = clamp(qy, qte_min_y, max(qte_min_y, qte_max_y));
 
         var q_col = c_white;
         if (enemy_def_qte_phase == 2) q_col = enemy_def_qte_feedback_ok ? c_lime : c_red;
         Battle_DrawDirectionArrow(qx, qy, q_dir, DEF_QTE_ARROW_BASE_SIZE * q_scale, q_alpha, q_col);
 
-        var q_action = Battle_DefQTEActionForDir(q_dir);
-        var q_label = Input_Label(q_action);
         var q_header = Loc_T("battle.def_qte.prompt", "Defend!");
         var q_progress = string(enemy_def_qte_index + 1) + "/" + string(enemy_def_qte_total);
-        var q_key_line = Loc_T("battle.def_qte.key", "Press {key}", { key: q_label });
-        var q_top = qy - 18;
+        var q_top = qy - 28;
 
         draw_set_alpha(q_alpha);
         draw_set_color(c_black);
         draw_text(qx - (string_width(q_header) * 0.5) + 1, q_top + 1, q_header);
-        draw_text(qx - (string_width(q_key_line) * 0.5) + 1, q_top + 10, q_key_line);
-        draw_text(qx - (string_width(q_progress) * 0.5) + 1, q_top + 20, q_progress);
         draw_set_color(c_white);
         draw_text(qx - (string_width(q_header) * 0.5), q_top, q_header);
-        draw_text(qx - (string_width(q_key_line) * 0.5), q_top + 9, q_key_line);
-        draw_text(qx - (string_width(q_progress) * 0.5), q_top + 19, q_progress);
+
+        // Arrow-only input hint row (16x16-style directional icons).
+        var hint_dirs = [LEFT, UP, DOWN, RIGHT];
+        var hint_size = 8;
+        var hint_gap = 18;
+        var hint_row_y = qy - 12;
+        var hint_start_x = qx - ((array_length(hint_dirs) - 1) * hint_gap * 0.5);
+        for (var hidx = 0; hidx < array_length(hint_dirs); hidx++) {
+            var h_dir = hint_dirs[hidx];
+            var h_x = hint_start_x + (hidx * hint_gap);
+            var h_is_target = (h_dir == q_dir);
+            var h_alpha = q_alpha * (h_is_target ? 1.0 : 0.35);
+            var h_col = h_is_target ? q_col : c_white;
+            Battle_DrawDirectionArrow(h_x, hint_row_y, h_dir, hint_size, h_alpha, h_col);
+        }
+
+        draw_set_color(c_black);
+        draw_text(qx - (string_width(q_progress) * 0.5) + 1, qy + 12 + 1, q_progress);
+        draw_set_color(c_white);
+        draw_text(qx - (string_width(q_progress) * 0.5), qy + 12, q_progress);
 
         if (enemy_def_qte_phase == 1 && enemy_def_qte_response_frames > 0) {
             var q_ratio = clamp(enemy_def_qte_timer / max(1, enemy_def_qte_response_frames), 0, 1);
             var qbw = 50;
             var qbh = 5;
             var qbx = qx - (qbw * 0.5);
-            var qby = qy + 12;
+            var qby = qy + 24;
             var qpct = string(round(q_ratio * 100)) + "%";
 
             draw_set_color(c_black);
