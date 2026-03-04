@@ -69,6 +69,7 @@ skill_banner_active = false;
 skill_banner_name = "";
 enemy_actions_remaining = 0;
 enemy_turn_used_skills = [];
+enemy_last_action_used_skill = false;
 player_bonus_actions_remaining = 0;
 player_turn_start_applied = false;
 

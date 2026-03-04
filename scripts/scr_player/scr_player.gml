@@ -721,11 +721,14 @@ function UI_SetFont() {
 
         if (!global.ui_font_ko_attempted) {
             global.ui_font_ko_attempted = true;
-            var ko_size = 8;
+
+            // Korean UI font (bundled with project, no system font dependency).
+            var ko_size = 18;
             var ko_paths = [
-                "fonts/NotoSansCJKkr-Regular.otf",
                 "datafiles/fonts/NotoSansCJKkr-Regular.otf",
-                "NotoSansCJKkr-Regular.otf"
+                working_directory + "datafiles/fonts/NotoSansCJKkr-Regular.otf",
+                "NotoSansCJKkr-Regular.otf",
+                working_directory + "NotoSansCJKkr-Regular.otf"
             ];
 
             for (var i = 0; i < array_length(ko_paths); i++) {
@@ -736,10 +739,6 @@ function UI_SetFont() {
             }
         }
 
-        if (global.ui_font_ko == -1) {
-            var mulmaru_idx = asset_get_index("Mulmaru");
-            if (mulmaru_idx != -1) font_to_use = mulmaru_idx;
-        }
         if (global.ui_font_ko != -1) font_to_use = global.ui_font_ko;
     }
     draw_set_font(font_to_use);

@@ -502,8 +502,8 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 0,
         class_list: [],
-        enemy_use_chance_min: 0.25,
-        enemy_use_chance_max: 0.25,
+        enemy_use_chance_min: 0.10,
+        enemy_use_chance_max: 0.20,
         enemy_require_target_inventory: true
     };
 
@@ -800,6 +800,44 @@ function Skill_EnemyUseChance(_skill) {
     return clamp(random_range(cmin, cmax), 0, 1);
 }
 
+function Skill_StealProtectedCount(_target, _item_id) {
+    if (!is_struct(_target) || !variable_struct_exists(_target, "equip") || !is_struct(_target.equip)) return 0;
+
+    var protected_qty = 0;
+    var slots = ["weapon", "head", "body", "ring1", "ring2"];
+    for (var i = 0; i < array_length(slots); i++) {
+        var slot = slots[i];
+        if (!variable_struct_exists(_target.equip, slot)) continue;
+        var equipped_id = round(real(variable_struct_get(_target.equip, slot)));
+        if (equipped_id == _item_id) protected_qty += 1;
+    }
+    return protected_qty;
+}
+
+function Skill_StealRecord(_user, _item_id, _qty = 1) {
+    if (!is_struct(_user)) return _user;
+    var qty = max(1, round(real(_qty)));
+
+    if (!variable_struct_exists(_user, "stolen_items") || !is_array(_user.stolen_items)) {
+        _user.stolen_items = [];
+    }
+
+    var list = _user.stolen_items;
+    var merged = false;
+    for (var i = 0; i < array_length(list); i++) {
+        if (!is_struct(list[i]) || !variable_struct_exists(list[i], "id")) continue;
+        if (list[i].id != _item_id) continue;
+        var prev_qty = variable_struct_exists(list[i], "qty") ? max(0, round(real(list[i].qty))) : 0;
+        list[i].qty = prev_qty + qty;
+        merged = true;
+        break;
+    }
+
+    if (!merged) array_push(list, { id: _item_id, qty: qty });
+    _user.stolen_items = list;
+    return _user;
+}
+
 function Skill_AdjustStatusTurns(_user, _target, _status_id, _base_turns) {
     var turns = max(1, round(real(_base_turns)));
     if (_status_id == STATUS_STUN) return turns;
@@ -943,14 +981,57 @@ function Skill_Use(_user, _target, _skill_id) {
             return result;
         }
 
-        var pick = irandom(array_length(_target.inventory) - 1);
-        var inv = _target.inventory[pick];
-        if (!is_struct(inv) || !variable_struct_exists(inv, "id")) {
+        var id_totals = [];
+        for (var i = 0; i < array_length(_target.inventory); i++) {
+            var inv_entry = _target.inventory[i];
+            if (!is_struct(inv_entry) || !variable_struct_exists(inv_entry, "id")) continue;
+
+            var iid = round(real(inv_entry.id));
+            var iqty = variable_struct_exists(inv_entry, "qty") ? max(0, round(real(inv_entry.qty))) : 0;
+            if (iqty <= 0) continue;
+
+            var found = false;
+            for (var t = 0; t < array_length(id_totals); t++) {
+                if (id_totals[t].id == iid) {
+                    id_totals[t].qty += iqty;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) array_push(id_totals, { id: iid, qty: iqty });
+        }
+
+        var candidates = [];
+        var total_stealable = 0;
+        for (var c = 0; c < array_length(id_totals); c++) {
+            var total_qty = max(0, round(real(id_totals[c].qty)));
+            if (total_qty <= 0) continue;
+            var protected_qty = Skill_StealProtectedCount(_target, id_totals[c].id);
+            var stealable_qty = max(0, total_qty - protected_qty);
+            if (stealable_qty <= 0) continue;
+
+            array_push(candidates, { id: id_totals[c].id, qty: stealable_qty });
+            total_stealable += stealable_qty;
+        }
+
+        if (array_length(candidates) <= 0 || total_stealable <= 0) {
             result.msg = Loc_T("combat.msg.nothing_to_steal", "Nothing to steal.");
             return result;
         }
-        var stolen_item = ItemDB_Get(inv.id);
-        _target.inventory = Inv_Remove(_target.inventory, inv.id, 1);
+
+        var roll = irandom(total_stealable - 1);
+        var stolen_id = candidates[0].id;
+        for (var r = 0; r < array_length(candidates); r++) {
+            if (roll < candidates[r].qty) {
+                stolen_id = candidates[r].id;
+                break;
+            }
+            roll -= candidates[r].qty;
+        }
+
+        var stolen_item = ItemDB_Get(stolen_id);
+        _target.inventory = Inv_Remove(_target.inventory, stolen_id, 1);
+        _user = Skill_StealRecord(_user, stolen_id, 1);
         if (is_struct(stolen_item) && variable_struct_exists(stolen_item, "name")) {
             result.msg = Loc_T("combat.msg.stole_item", "Stole {item}.", { item: string(stolen_item.name) });
         } else {

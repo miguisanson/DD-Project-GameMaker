@@ -80,7 +80,6 @@
   },
   "name":"DD-Project",
   "resources":[
-    {"id":{"name":"Mulmaru","path":"fonts/Mulmaru/Mulmaru.yy",},},
     {"id":{"name":"retro_gaming","path":"fonts/retro_gaming/retro_gaming.yy",},},
     {"id":{"name":"obj_archer","path":"objects/obj_archer/obj_archer.yy",},},
     {"id":{"name":"obj_barrel_broken","path":"objects/obj_barrel_broken/obj_barrel_broken.yy",},},

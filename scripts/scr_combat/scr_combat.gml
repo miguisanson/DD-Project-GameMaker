@@ -217,6 +217,34 @@ function Battle_Message(_bc, _text, _next_state, _fx = noone) {
     Combat_Log(_text);
 }
 
+function Battle_LootAppendNormalized(_dest, _src) {
+    var out = _dest;
+    if (!is_array(out)) out = [];
+    if (!is_array(_src)) return out;
+
+    for (var i = 0; i < array_length(_src); i++) {
+        var it = _src[i];
+        if (!is_struct(it) || !variable_struct_exists(it, "id")) continue;
+        var iid = round(real(it.id));
+        var qty = variable_struct_exists(it, "qty") ? max(0, round(real(it.qty))) : 0;
+        if (qty <= 0) continue;
+
+        var merged = false;
+        for (var j = 0; j < array_length(out); j++) {
+            if (!is_struct(out[j]) || !variable_struct_exists(out[j], "id")) continue;
+            if (out[j].id != iid) continue;
+            var prev_qty = variable_struct_exists(out[j], "qty") ? max(0, round(real(out[j].qty))) : 0;
+            out[j].qty = prev_qty + qty;
+            merged = true;
+            break;
+        }
+
+        if (!merged) array_push(out, { id: iid, qty: qty });
+    }
+
+    return out;
+}
+
 function Battle_GrantRewards(_p, _e) {
     var out = {
         player: _p,
@@ -254,8 +282,18 @@ function Battle_GrantRewards(_p, _e) {
 
         // shared loot system
         var loot = Loot_RollEnemy(_e);
+        var recovered_loot = [];
+        if (variable_struct_exists(_e, "stolen_items") && is_array(_e.stolen_items)) {
+            recovered_loot = Battle_LootAppendNormalized([], _e.stolen_items);
+            _e.stolen_items = [];
+        }
+
         _p.inventory = Loot_Grant(_p.inventory, loot);
-        out.loot = loot;
+        _p.inventory = Loot_Grant(_p.inventory, recovered_loot);
+
+        out.loot = [];
+        out.loot = Battle_LootAppendNormalized(out.loot, loot);
+        out.loot = Battle_LootAppendNormalized(out.loot, recovered_loot);
     }
 
     out.player = _p;
@@ -792,7 +830,9 @@ function Battle_EnemyAct(_bc) {
 
     Battle_EnemyInitActionBudget(_bc, e);
 
-    var skill_id = Battle_EnemyChooseSkill(e, p, _bc.enemy_actions_remaining, _bc.enemy_turn_used_skills);
+    if (!variable_instance_exists(_bc, "enemy_last_action_used_skill")) _bc.enemy_last_action_used_skill = false;
+    var can_use_skill = !_bc.enemy_last_action_used_skill;
+    var skill_id = can_use_skill ? Battle_EnemyChooseSkill(e, p, _bc.enemy_actions_remaining, _bc.enemy_turn_used_skills) : -1;
     var use_skill = (skill_id != -1);
     var sk = use_skill ? SkillDB_Get(skill_id) : undefined;
     var consumes_turn = true;
@@ -825,6 +865,7 @@ function Battle_EnemyAct(_bc) {
                 if (_bc.enemy_turn_used_skills[ui] == skill_id) { exists_used = true; break; }
             }
             if (!exists_used) array_push(_bc.enemy_turn_used_skills, skill_id);
+            _bc.enemy_last_action_used_skill = true;
             _bc.skill_banner_active = true;
             _bc.skill_banner_name = sk.name;
             var skill_sfx_h = SFX_PlaySkill(skill_id);
@@ -880,6 +921,7 @@ function Battle_EnemyAct(_bc) {
         }
 
         e = Status_ConsumeByField(e, "consume_on_attack");
+        _bc.enemy_last_action_used_skill = false;
 
         if (Battle_CheckEnd(_bc, p, e)) return;
         _bc.enemy_actions_remaining = max(0, _bc.enemy_actions_remaining - 1);
