@@ -61,8 +61,8 @@ if (room == rm_battle && is_struct(ch)) {
     draw_set_color(c_white);
     var hp_text = string(ch.hp) + " / " + string(ch.max_hp);
     var mp_text = string(ch.mp) + " / " + string(ch.max_mp);
-    draw_text(bar_x + bar_w + 6, bar_y, hp_text);
-    draw_text(bar_x + bar_w + 6, bar_y + bar_h + 4, mp_text);
+    UI_DrawText(bar_x + bar_w + 6, bar_y, hp_text);
+    UI_DrawText(bar_x + bar_w + 6, bar_y + bar_h + 4, mp_text);
 
     // Player status icons below MP bar
     var icon_y = bar_y + (bar_h * 2) + 10;
@@ -167,10 +167,10 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     if (speaker != "") {
         if (cutscene_text_only) {
             draw_set_color(c_black);
-            draw_text(layout.speaker_x + UI_CUTSCENE_TEXT_SHADOW_X, layout.speaker_y + UI_CUTSCENE_TEXT_SHADOW_Y, speaker + ":");
+            UI_DrawText(layout.speaker_x + UI_CUTSCENE_TEXT_SHADOW_X, layout.speaker_y + UI_CUTSCENE_TEXT_SHADOW_Y, speaker + ":");
             draw_set_color(c_white);
         }
-        draw_text(layout.speaker_x, layout.speaker_y, speaker + ":");
+        UI_DrawText(layout.speaker_x, layout.speaker_y, speaker + ":");
         Dialogue_TypewriterPrepareCurrentLine();
         var page_text0 = variable_struct_exists(gs.ui, "dialogue_full_text") ? gs.ui.dialogue_full_text : line;
         var visible_count0 = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text0);
@@ -179,10 +179,10 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
         if (icon_draw_w > 0) draw_sprite(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1);
         if (cutscene_text_only) {
             draw_set_color(c_black);
-            draw_text(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text0);
+            UI_DrawText(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text0);
             draw_set_color(c_white);
         }
-        draw_text(text_x, text_y, visible_text0);
+        UI_DrawText(text_x, text_y, visible_text0);
     } else {
         Dialogue_TypewriterPrepareCurrentLine();
         var page_text = variable_struct_exists(gs.ui, "dialogue_full_text") ? gs.ui.dialogue_full_text : line;
@@ -192,16 +192,16 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
         if (icon_draw_w > 0) draw_sprite(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1);
         if (cutscene_text_only) {
             draw_set_color(c_black);
-            draw_text(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text);
+            UI_DrawText(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text);
             draw_set_color(c_white);
         }
-        draw_text(text_x, text_y, visible_text);
+        UI_DrawText(text_x, text_y, visible_text);
     }
     if (gs.ui.mode == UI_DIALOGUE && array_length(gs.ui.lines) > 0
     && variable_struct_exists(gs.ui, "dialogue_state") && gs.ui.dialogue_state == UI_DIALOGUE_STATE_READY) {
         var icon = dialogue_arrow_down;
         if (icon != -1) {
-            var line_h = max(8, string_height("Ag"));
+            var line_h = max(8, UI_TextHeight("Ag"));
             var cue_w = max(6, round(line_h * 0.8));
             var cue_h = max(4, round(line_h * 0.4));
             var blink = (floor(gs.ui.icon_frame) mod 2);

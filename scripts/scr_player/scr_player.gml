@@ -743,6 +743,46 @@ function UI_IsBlocking() {
     return false;
 }
 
+function UI_GetTextScale() {
+    var gui_w = max(1, display_get_gui_width());
+    var gui_h = max(1, display_get_gui_height());
+    // Anchor 2x text at the project's highest fixed scale, then adapt with window size.
+    var ref_w = max(1, DISPLAY_BASE_W * DISPLAY_SCALE_MAX);
+    var ref_h = max(1, DISPLAY_BASE_H * DISPLAY_SCALE_MAX);
+    var dyn = min(gui_w / ref_w, gui_h / ref_h);
+    var scale = UI_TEXT_SCALE_BASE * dyn;
+    return clamp(scale, UI_TEXT_SCALE_MIN, UI_TEXT_SCALE_MAX);
+}
+
+function UI_TextWidth(_txt) {
+    var s = UI_GetTextScale();
+    return max(0, round(string_width(string(_txt)) * s));
+}
+
+function UI_TextHeight(_txt = "A") {
+    var s = UI_GetTextScale();
+    return max(1, round(string_height(string(_txt)) * s));
+}
+
+function UI_DrawText(_x, _y, _txt) {
+    var s = UI_GetTextScale();
+    draw_text_transformed(real(_x), real(_y), string(_txt), s, s, 0);
+}
+
+function UI_DrawTextTransformed(_x, _y, _txt, _xscale, _yscale, _angle) {
+    var s = UI_GetTextScale();
+    draw_text_transformed(real(_x), real(_y), string(_txt), real(_xscale) * s, real(_yscale) * s, real(_angle));
+}
+
+function UI_DrawTextExt(_x, _y, _txt, _sep, _w) {
+    var s = max(0.0001, UI_GetTextScale());
+    var sep = real(_sep);
+    var wrap_w = real(_w);
+    if (sep > 0) sep = max(1, round(sep / s));
+    if (wrap_w > 0) wrap_w = max(1, round(wrap_w / s));
+    draw_text_ext_transformed(real(_x), real(_y), string(_txt), sep, wrap_w, s, s, 0);
+}
+
 function UI_SetFont() {
     var font_to_use = UI_FONT;
     if (Loc_GetLanguage() == "ko") {

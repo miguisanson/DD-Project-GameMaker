@@ -32,7 +32,7 @@ if (room == rm_start && title_bg_sprite != noone) {
 }
 
 UI_SetFont();
-var line_h = string_height("A");
+var line_h = UI_TextHeight("A");
 
 var row_gap = max(18, line_h + 4);
 var pad_x = 6;
@@ -88,7 +88,7 @@ if (state == "main" && gs.ui.mode != UI_SAVE && !loading_into_game) {
             if (load_disabled) draw_set_color(c_gray);
             else draw_set_color(c_white);
         }
-        draw_text(bx1 + 8, yy, label);
+        UI_DrawText(bx1 + 8, yy, label);
     }
 }
 
@@ -109,7 +109,7 @@ if (state == "difficulty" && gs.ui.mode != UI_SAVE && !loading_into_game) {
     draw_set_color(c_white);
     draw_rectangle(dx, dy, dx + dw, dy + dh, true);
     draw_set_alpha(difficulty_alpha);
-    draw_text(dx + 12, dy + 12, Loc_T("menu.difficulty.title", "Select Difficulty"));
+    UI_DrawText(dx + 12, dy + 12, Loc_T("menu.difficulty.title", "Select Difficulty"));
 
     var drow_gap = max(18, line_h + 6);
     var start_y2 = dy + 36;
@@ -131,7 +131,7 @@ if (state == "difficulty" && gs.ui.mode != UI_SAVE && !loading_into_game) {
             draw_set_color(c_white);
         }
 
-        draw_text(dx + 18, dyy, dlabel);
+        UI_DrawText(dx + 18, dyy, dlabel);
     }
 
     var back_y = dy + dh - (line_h + 8);
@@ -145,7 +145,7 @@ if (state == "difficulty" && gs.ui.mode != UI_SAVE && !loading_into_game) {
     } else {
         draw_set_color(c_white);
     }
-    draw_text(dx + 18, back_y, Loc_T("menu.common.back", "Back"));
+    UI_DrawText(dx + 18, back_y, Loc_T("menu.common.back", "Back"));
 }
 
 if (SettingsPopup_IsOpen("title") && !loading_into_game) {

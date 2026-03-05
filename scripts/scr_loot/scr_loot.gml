@@ -104,6 +104,105 @@ function Loot_ConfigGet(_key) {
     return { table:"chest", chance:[0.5, 0.6, 0.7], max_items:1 };
 }
 
+function Loot_PlayerStruct(_player = undefined) {
+    if (is_struct(_player)) return _player;
+    var gs = GameState_Get();
+    if (is_struct(gs.player_ch)) return gs.player_ch;
+    return undefined;
+}
+
+function Loot_PlayerClassId(_player = undefined) {
+    var p = Loot_PlayerStruct(_player);
+    if (is_struct(p) && variable_struct_exists(p, "class_id")) return p.class_id;
+    var gs = GameState_Get();
+    if (variable_struct_exists(gs, "selected_class")) return gs.selected_class;
+    return CLASS_NOBODY;
+}
+
+function Loot_PlayerOwnsItem(_player, _item_id) {
+    if (!is_struct(_player)) return false;
+    if (variable_struct_exists(_player, "inventory") && is_array(_player.inventory) && Inv_Has(_player.inventory, _item_id, 1)) {
+        return true;
+    }
+
+    if (variable_struct_exists(_player, "equip") && is_struct(_player.equip)) {
+        var slots = ["weapon", "head", "body", "ring1", "ring2"];
+        for (var i = 0; i < array_length(slots); i++) {
+            var key = slots[i];
+            if (!variable_struct_exists(_player.equip, key)) continue;
+            if (round(real(variable_struct_get(_player.equip, key))) == _item_id) return true;
+        }
+    }
+
+    return false;
+}
+
+function Loot_ArrayHasItemId(_arr, _item_id) {
+    if (!is_array(_arr)) return false;
+    for (var i = 0; i < array_length(_arr); i++) {
+        if (round(real(_arr[i])) == _item_id) return true;
+    }
+    return false;
+}
+
+function Loot_ItemClassAllowed(_item, _class_id) {
+    if (!is_struct(_item)) return false;
+
+    var class_id = round(real(_class_id));
+    if (class_id < 0 || class_id == CLASS_NOBODY) return true;
+
+    if (variable_struct_exists(_item, "preferred_class") && _item.preferred_class != -1 && _item.preferred_class != class_id) {
+        return false;
+    }
+
+    if (variable_struct_exists(_item, "allowed_classes") && is_array(_item.allowed_classes) && array_length(_item.allowed_classes) > 0) {
+        var allowed = false;
+        for (var i = 0; i < array_length(_item.allowed_classes); i++) {
+            if (_item.allowed_classes[i] == class_id) {
+                allowed = true;
+                break;
+            }
+        }
+        if (!allowed) return false;
+    }
+
+    return true;
+}
+
+function Loot_ItemEligibleForPlayer(_item_id, _player = undefined, _class_id = -1, _exclude_ids = undefined) {
+    var item = ItemDB_Get(_item_id);
+    if (!is_struct(item) || item.id == 0) return false;
+
+    var p = Loot_PlayerStruct(_player);
+    var class_id = round(real(_class_id));
+    if (class_id < 0) class_id = Loot_PlayerClassId(p);
+
+    if (Loot_ArrayHasItemId(_exclude_ids, _item_id)) return false;
+
+    if (Item_IsSkillbook(item)) {
+        if (Loot_PlayerOwnsItem(p, _item_id)) return false;
+
+        var sid = variable_struct_exists(item, "use") && is_struct(item.use) && variable_struct_exists(item.use, "skill_id") ? item.use.skill_id : -1;
+        var skill = SkillDB_Get(sid);
+        if (class_id != CLASS_NOBODY && !Skill_ClassAllowed(skill, class_id)) return false;
+
+        if (is_struct(p) && variable_struct_exists(p, "skills") && is_array(p.skills)) {
+            for (var si = 0; si < array_length(p.skills); si++) {
+                if (p.skills[si] == sid) return false;
+            }
+        }
+        return true;
+    }
+
+    var is_equip = (variable_struct_exists(item, "type") && (item.type == ITEM_WEAPON || item.type == ITEM_ARMOR));
+    if (is_equip) {
+        if (!Loot_ItemClassAllowed(item, class_id)) return false;
+        if (Loot_PlayerOwnsItem(p, _item_id)) return false;
+    }
+
+    return true;
+}
+
 function Loot_BuildSkillbookLists() {
     if (!variable_global_exists("item_db") || !ds_exists(global.item_db, ds_type_map)) ItemDB_Init();
     if (!variable_global_exists("skill_db") || !ds_exists(global.skill_db, ds_type_map)) SkillDB_Init();
@@ -159,11 +258,26 @@ function Loot_SkillbookList(_class_id) {
     return [];
 }
 
-function Loot_RollSkillbook(_class_id) {
+function Loot_RollSkillbook(_class_id, _player = undefined, _exclude_ids = undefined) {
     var list = Loot_SkillbookList(_class_id);
     if (!is_array(list) || array_length(list) <= 0) return undefined;
-    var idx = irandom(array_length(list) - 1);
-    return { item_id: list[idx], qty: 1 };
+
+    var player = Loot_PlayerStruct(_player);
+    var class_id = round(real(_class_id));
+    if (class_id < 0) class_id = Loot_PlayerClassId(player);
+
+    var eligible = [];
+    for (var i = 0; i < array_length(list); i++) {
+        var iid = round(real(list[i]));
+        if (iid <= 0) continue;
+        if (Loot_ItemEligibleForPlayer(iid, player, class_id, _exclude_ids)) {
+            array_push(eligible, iid);
+        }
+    }
+
+    if (array_length(eligible) <= 0) return undefined;
+    var idx = irandom(array_length(eligible) - 1);
+    return { item_id: eligible[idx], qty: 1 };
 }
 
 function Loot_TierMult(_level, _tier) {
@@ -177,20 +291,35 @@ function Loot_TierMult(_level, _tier) {
     return 1;
 }
 
-function Loot_RollFromTable(_table_key, _level) {
+function Loot_RollFromTable(_table_key, _level, _player = undefined, _class_id = -1, _exclude_ids = undefined) {
     var entries = Loot_TableGet(_table_key);
+    var player = Loot_PlayerStruct(_player);
+    var class_id = round(real(_class_id));
+    if (class_id < 0) class_id = Loot_PlayerClassId(player);
+
+    var weighted = [];
     var total = 0;
     for (var i = 0; i < array_length(entries); i++) {
         var e = entries[i];
-        total += e.weight * Loot_TierMult(_level, e.tier);
+        var w = e.weight * Loot_TierMult(_level, e.tier);
+        if (w <= 0) continue;
+
+        if (variable_struct_exists(e, "item_id")) {
+            var iid = round(real(e.item_id));
+            if (iid > 0 && !Loot_ItemEligibleForPlayer(iid, player, class_id, _exclude_ids)) continue;
+        }
+
+        array_push(weighted, { entry: e, weight: w });
+        total += w;
     }
     if (total <= 0) return undefined;
 
     var r = random(total);
     var acc = 0;
-    for (var j = 0; j < array_length(entries); j++) {
-        var e2 = entries[j];
-        acc += e2.weight * Loot_TierMult(_level, e2.tier);
+    for (var j = 0; j < array_length(weighted); j++) {
+        var row = weighted[j];
+        var e2 = row.entry;
+        acc += row.weight;
         if (r <= acc) {
             var minv = 1;
             var maxv = 1;
@@ -211,12 +340,12 @@ function Loot_RollContainer(_level, _key) {
     var cfg = Loot_ConfigGet(_key);
     var lvl = clamp(round(_level), 1, 3);
     var chance = cfg.chance[lvl - 1];
+    var gs = GameState_Get();
+    var player = Loot_PlayerStruct(gs.player_ch);
+    var class_id = Loot_PlayerClassId(player);
 
     if (variable_struct_exists(cfg, "mode") && cfg.mode == "skillbook") {
-        var gs = GameState_Get();
-        var class_id = gs.selected_class;
-        if (is_struct(gs.player_ch) && variable_struct_exists(gs.player_ch, "class_id")) class_id = gs.player_ch.class_id;
-        var it_sb = Loot_RollSkillbook(class_id);
+        var it_sb = Loot_RollSkillbook(class_id, player, []);
         if (is_struct(it_sb)) return [it_sb];
         return [];
     }
@@ -225,9 +354,18 @@ function Loot_RollContainer(_level, _key) {
 
     var items = [];
     var count = max(1, cfg.max_items);
+    var exclude_ids = [];
     for (var i = 0; i < count; i++) {
-        var it = Loot_RollFromTable(cfg.table, lvl);
-        if (is_struct(it)) array_push(items, it);
+        var it = Loot_RollFromTable(cfg.table, lvl, player, class_id, exclude_ids);
+        if (is_struct(it)) {
+            array_push(items, it);
+
+            var item_cfg = ItemDB_Get(it.item_id);
+            var unique_drop = is_struct(item_cfg) && (Item_IsSkillbook(item_cfg) || item_cfg.type == ITEM_WEAPON || item_cfg.type == ITEM_ARMOR);
+            if (unique_drop && !Loot_ArrayHasItemId(exclude_ids, it.item_id)) {
+                array_push(exclude_ids, it.item_id);
+            }
+        }
     }
 
     return items;
@@ -256,7 +394,9 @@ function Loot_RollEnemy(_enemy_or_id) {
     var chance = cfg.chance[clamp(round(lvl), 1, 3) - 1];
     if (random(1) > chance) return [];
 
-    var it = Loot_RollFromTable(cfg.table, lvl);
+    var player = Loot_PlayerStruct();
+    var class_id = Loot_PlayerClassId(player);
+    var it = Loot_RollFromTable(cfg.table, lvl, player, class_id, []);
     if (is_struct(it)) return [it];
     return [];
 }

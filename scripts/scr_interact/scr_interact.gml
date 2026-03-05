@@ -106,10 +106,13 @@ function GraveLoot_StageChance(_stage) {
     }
 }
 
-function GraveLoot_RollTierItem(_tier) {
+function GraveLoot_RollTierItem(_tier, _class_id = CLASS_NOBODY, _player = undefined) {
     var tier = clamp(round(real(_tier)), 1, 3);
     var entries = Loot_TableGet("chest");
     if (!is_array(entries) || array_length(entries) <= 0) return [];
+
+    var class_id = round(real(_class_id));
+    var player = Loot_PlayerStruct(_player);
 
     var candidates = [];
     var total_weight = 0;
@@ -120,6 +123,7 @@ function GraveLoot_RollTierItem(_tier) {
         if (!variable_struct_exists(e, "item_id")) continue;
         var item_id = round(real(e.item_id));
         if (item_id <= 0) continue;
+        if (!Loot_ItemEligibleForPlayer(item_id, player, class_id, [])) continue;
 
         var w = variable_struct_exists(e, "weight") ? max(0, real(e.weight)) : 0;
         if (w <= 0) continue;
@@ -166,17 +170,18 @@ function GraveLoot_RollTierItem(_tier) {
 
 function GraveLoot_RollRewardForStage(_stage, _class_id) {
     var st = clamp(round(real(_stage)), 0, 4);
-    if (st <= 1) return GraveLoot_RollTierItem(2);
-    if (st <= 3) return GraveLoot_RollTierItem(3);
-
+    var player = Loot_PlayerStruct();
     var class_id = round(real(_class_id));
+    if (st <= 1) return GraveLoot_RollTierItem(2, class_id, player);
+    if (st <= 3) return GraveLoot_RollTierItem(3, class_id, player);
+
     if (class_id != CLASS_NOBODY) {
-        var sb = Loot_RollSkillbook(class_id);
+        var sb = Loot_RollSkillbook(class_id, player, []);
         if (is_struct(sb) && variable_struct_exists(sb, "item_id")) return [sb];
     }
 
     // Nobody class (or no valid skillbook): fallback to another Lv3 item.
-    return GraveLoot_RollTierItem(3);
+    return GraveLoot_RollTierItem(3, class_id, player);
 }
 
 function GraveLoot_TryRollReward(_class_id) {

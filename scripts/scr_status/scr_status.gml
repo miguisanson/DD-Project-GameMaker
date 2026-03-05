@@ -542,11 +542,11 @@ function Status_DrawFallbackLabel(_cfg, _status_id, _x, _y) {
     var text_scale = UI_STATUS_FALLBACK_TEXT_SCALE;
 
     draw_set_color(c_black);
-    draw_text_transformed(_x + 1, _y + 1, txt, text_scale, text_scale, 0);
+    UI_DrawTextTransformed(_x + 1, _y + 1, txt, text_scale, text_scale, 0);
     draw_set_color(c_white);
-    draw_text_transformed(_x, _y, txt, text_scale, text_scale, 0);
+    UI_DrawTextTransformed(_x, _y, txt, text_scale, text_scale, 0);
 
-    return max(1, round(string_width(txt) * text_scale));
+    return max(1, round(UI_TextWidth(txt) * text_scale));
 }
 
 function Status_DrawIcons(_ch, _x, _y, _spacing = 10, _rtl = false, _noncore_text_fallback = false) {

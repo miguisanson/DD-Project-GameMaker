@@ -605,7 +605,7 @@ function Dialogue_BoxRect() {
 
 function Dialogue_TextLayout(_speaker) {
     UI_SetFont();
-    var line_h = max(8, string_height("Ag"));
+    var line_h = max(8, UI_TextHeight("Ag"));
     var has_speaker = (string(_speaker) != "");
     var cutscene_text_only = Dialogue_IsCutsceneTextOnly();
 
@@ -677,7 +677,7 @@ function Dialogue_BreakWordToLines(_word, _max_w) {
     for (var i = 1; i <= len; i++) {
         var ch = string_char_at(word, i);
         var test = chunk + ch;
-        if (chunk == "" || string_width(test) <= max_w) {
+        if (chunk == "" || UI_TextWidth(test) <= max_w) {
             chunk = test;
         } else {
             array_push(out, chunk);
@@ -716,7 +716,7 @@ function Dialogue_WrapToLines(_text, _max_w) {
             if (word == "") continue;
 
             if (line == "") {
-                if (string_width(word) <= max_w) {
+                if (UI_TextWidth(word) <= max_w) {
                     line = word;
                 } else {
                     var split_head = Dialogue_BreakWordToLines(word, max_w);
@@ -727,11 +727,11 @@ function Dialogue_WrapToLines(_text, _max_w) {
                 }
             } else {
                 var candidate = line + " " + word;
-                if (string_width(candidate) <= max_w) {
+                if (UI_TextWidth(candidate) <= max_w) {
                     line = candidate;
                 } else {
                     array_push(out, line);
-                    if (string_width(word) <= max_w) {
+                    if (UI_TextWidth(word) <= max_w) {
                         line = word;
                     } else {
                         var split_tail = Dialogue_BreakWordToLines(word, max_w);

@@ -41,7 +41,7 @@ var sx = port_w / max(1, vw);
 var sy = port_h / max(1, vh);
 var gui_off_x = cam_off.x * sx;
 var gui_off_y = cam_off.y * sy;
-var row_h = max(16, string_height("A") + 2);
+var row_h = max(16, UI_TextHeight("A") + 2);
 
 var __wrap_for_width = function(_text, _max_width) {
     var wrapped = [];
@@ -55,13 +55,13 @@ var __wrap_for_width = function(_text, _max_width) {
     var safe_width = max(8, floor(_max_width));
 
     while (string_length(remain) > 0) {
-        if (string_width(remain) <= safe_width) {
+        if (UI_TextWidth(remain) <= safe_width) {
             array_push(wrapped, remain);
             break;
         }
 
         var cut = string_length(remain);
-        while (cut > 1 && string_width(string_copy(remain, 1, cut)) > safe_width) {
+        while (cut > 1 && UI_TextWidth(string_copy(remain, 1, cut)) > safe_width) {
             cut -= 1;
         }
 
@@ -114,7 +114,7 @@ if (!is_array(combat_log)) combat_log = [];
 var log_lines = combat_log;
 var log_count = array_length(log_lines);
 var log_visible_lines = 6;
-var log_line_h = max(12, string_height("A") + 1);
+var log_line_h = max(12, UI_TextHeight("A") + 1);
 var log_bottom = margin + (log_visible_lines * log_line_h);
 if (log_count > 0) {
     var max_w = w * 0.45;
@@ -167,7 +167,7 @@ if (log_count > 0) {
     for (var ri = draw_start; ri < row_count; ri++) {
         var row = ri - draw_start;
         var r = log_rows[ri];
-        var line_w = string_width(r.text) + (r.show_icon ? (r.icon_w + 4) : 0);
+        var line_w = UI_TextWidth(r.text) + (r.show_icon ? (r.icon_w + 4) : 0);
         var lx = log_base_x - line_w;
         var ly = log_base_y + row * log_line_h;
 
@@ -176,7 +176,7 @@ if (log_count > 0) {
             lx += r.icon_w + 4;
         }
 
-        draw_text(lx, ly, r.text);
+        UI_DrawText(lx, ly, r.text);
     }
 }
 
@@ -244,12 +244,12 @@ if (battle_state == BSTATE_ATTACK_TIMING && attack_timing_active) {
 if (attack_timing_result_timer > 0 && attack_timing_result_text != "") {
     var t_norm = clamp(attack_timing_result_timer / max(1, ATTACK_TIMING_FEEDBACK_FRAMES), 0, 1);
     var tyf = attack_timing_target_y - 12 - ((1 - t_norm) * 6);
-    var txf = attack_timing_target_x - (string_width(attack_timing_result_text) * 0.5);
+    var txf = attack_timing_target_x - (UI_TextWidth(attack_timing_result_text) * 0.5);
     draw_set_alpha(1);
     draw_set_color(c_black);
-    draw_text(txf + 1, tyf + 1, attack_timing_result_text);
+    UI_DrawText(txf + 1, tyf + 1, attack_timing_result_text);
     draw_set_color(c_white);
-    draw_text(txf, tyf, attack_timing_result_text);
+    UI_DrawText(txf, tyf, attack_timing_result_text);
 }
 
 // FX draw (battle-only), over enemy sprite
@@ -271,7 +271,7 @@ if (skill_banner_active && skill_banner_name != "") {
     var hud_margin = 8;
     var hud_top = hud_margin + gui_off_y;
     var hud_bottom = hud_top + hp_bar_h + mp_bar_h + 4;
-    var banner_h = string_height("A") + 8;
+    var banner_h = UI_TextHeight("A") + 8;
 
     // Keep clear of HP/MP HUD; place above enemy sprite whenever possible.
     var min_banner_y = hud_bottom + 6;
@@ -294,9 +294,9 @@ if (skill_banner_active && skill_banner_name != "") {
     draw_rectangle(0, banner_y, w, banner_y + banner_h, false);
     draw_set_alpha(1);
     draw_set_color(c_white);
-    var tx = (w - string_width(skill_banner_name)) * 0.5;
-    var ty = banner_y + (banner_h - string_height("A")) * 0.5;
-    draw_text(tx, ty, skill_banner_name);
+    var tx = (w - UI_TextWidth(skill_banner_name)) * 0.5;
+    var ty = banner_y + (banner_h - UI_TextHeight("A")) * 0.5;
+    UI_DrawText(tx, ty, skill_banner_name);
 }
 
 // Enemy defensive QTE (drawn late; anchored below enemy/status icons).
@@ -369,7 +369,7 @@ if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.e
         var ex2 = port_x + ((enemy_inst.x + off2.x - sprite_get_xoffset(espr2) - vx) * sx);
         var ey2 = port_y + ((enemy_inst.y + off2.y - sprite_get_yoffset(espr2) - vy) * sy);
         draw_set_color(c_white);
-        draw_text(ex2, ey2 - 12, string(e.hp));
+        UI_DrawText(ex2, ey2 - 12, string(e.hp));
     }
 }
 
@@ -379,7 +379,7 @@ if (battle_state == BSTATE_MENU || battle_state == BSTATE_SKILL_MENU || battle_s
     if (battle_state == BSTATE_MENU) {
         var max_label_w = 0;
         for (var i = 0; i < array_length(battle_actions); i++) {
-            max_label_w = max(max_label_w, string_width(battle_actions[i].label));
+            max_label_w = max(max_label_w, UI_TextWidth(battle_actions[i].label));
         }
         var selector_pad = 16;
         bw = max_label_w + box_pad * 2 + selector_pad;
@@ -407,9 +407,9 @@ if (battle_state == BSTATE_MENU && turn == TURN_PLAYER) {
     for (var i = 0; i < array_length(battle_actions); i++) {
         var yy = my + i * row_h;
         if (i == menu_index) {
-            draw_text(mx - 12, yy, ">");
+            UI_DrawText(mx - 12, yy, ">");
         }
-        draw_text(mx, yy, battle_actions[i].label);
+        UI_DrawText(mx, yy, battle_actions[i].label);
     }
 }
 
@@ -429,17 +429,17 @@ if (battle_state == BSTATE_SKILL_MENU) {
         var row = s - start;
         var yy = my2 + row * row_h;
         if (s == skill_count) {
-            if (s == skill_index) draw_text(mx2 - 10, yy, ">");
-            draw_text(mx2, yy, Loc_T("battle.menu.back", "Back"));
+            if (s == skill_index) UI_DrawText(mx2 - 10, yy, ">");
+            UI_DrawText(mx2, yy, Loc_T("battle.menu.back", "Back"));
         } else {
             var sk = SkillDB_Get(skills[s]);
-            if (s == skill_index) draw_text(mx2 - 10, yy, ">");
+            if (s == skill_index) UI_DrawText(mx2 - 10, yy, ">");
             var tx = mx2;
             if (sk.icon_sprite != noone) {
                 draw_sprite(sk.icon_sprite, 0, mx2, yy + 2);
                 tx += 16;
             }
-            draw_text(tx, yy, Loc_T("battle.menu.skill_row", "{name} ({mp}MP)", { name: sk.name, mp: string(sk.mp_cost) }));
+            UI_DrawText(tx, yy, Loc_T("battle.menu.skill_row", "{name} ({mp}MP)", { name: sk.name, mp: string(sk.mp_cost) }));
         }
     }
 }
@@ -460,17 +460,17 @@ if (battle_state == BSTATE_ITEM_MENU) {
         var row = it - start;
         var yy2 = my3 + row * row_h;
         if (it == item_count) {
-            if (it == item_index) draw_text(mx3 - 10, yy2, ">");
-            draw_text(mx3, yy2, Loc_T("battle.menu.back", "Back"));
+            if (it == item_index) UI_DrawText(mx3 - 10, yy2, ">");
+            UI_DrawText(mx3, yy2, Loc_T("battle.menu.back", "Back"));
         } else {
             var item = ItemDB_Get(items[it].id);
-            if (it == item_index) draw_text(mx3 - 10, yy2, ">");
+            if (it == item_index) UI_DrawText(mx3 - 10, yy2, ">");
             var tx2 = mx3;
             if (item.sprite != noone) {
                 draw_sprite(item.sprite, 0, mx3, yy2 + 2);
                 tx2 += 16;
             }
-            draw_text(tx2, yy2, Loc_T("battle.menu.item_row", "{name} x{qty}", { name: item.name, qty: string(items[it].qty) }));
+            UI_DrawText(tx2, yy2, Loc_T("battle.menu.item_row", "{name} x{qty}", { name: item.name, qty: string(items[it].qty) }));
         }
     }
 }

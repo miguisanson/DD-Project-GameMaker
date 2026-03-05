@@ -141,7 +141,7 @@ function BedMenu_Draw() {
 
     var w = display_get_gui_width();
     var h = display_get_gui_height();
-    var line_h = string_height("A");
+    var line_h = UI_TextHeight("A");
     var inner_pad = 6;
     var row_h = max(18, line_h + inner_pad * 2);
     var popup_alpha = UI_PopupAlpha(bm.opened_frame, bm.closing, bm.close_frame, 1);
@@ -151,7 +151,7 @@ function BedMenu_Draw() {
         var opt_text = bm.options[i];
         if (i == 0) opt_text = Loc_T("bed.option.rest", opt_text);
         else if (i == 1) opt_text = Loc_T("bed.option.back", opt_text);
-        max_w = max(max_w, string_width(opt_text));
+        max_w = max(max_w, UI_TextWidth(opt_text));
     }
 
     var bw = max_w + inner_pad * 6;
@@ -181,7 +181,7 @@ function BedMenu_Draw() {
         var bed_label = bm.options[j];
         if (j == 0) bed_label = Loc_T("bed.option.rest", bed_label);
         else if (j == 1) bed_label = Loc_T("bed.option.back", bed_label);
-        draw_text(bx + inner_pad * 2, yy, bed_label);
+        UI_DrawText(bx + inner_pad * 2, yy, bed_label);
     }
 
     draw_set_alpha(1);
@@ -575,7 +575,7 @@ function SaveMenu_Draw() {
 
     var w = display_get_gui_width();
     var h = display_get_gui_height();
-    var line_h = string_height("A");
+    var line_h = UI_TextHeight("A");
     var pad = 6;
     var side_margin = 12;
     var slot_text_left_pad = 14;
@@ -600,12 +600,12 @@ function SaveMenu_Draw() {
             label_l += "  " + info_l.class_name + " " + Loc_T("save.level.short", "Lv") + string(info_l.level) + "  " + info_l.room;
         }
         slot_labels[li] = label_l;
-        longest_slot_w = max(longest_slot_w, string_width(label_l));
+        longest_slot_w = max(longest_slot_w, UI_TextWidth(label_l));
     }
 
     var delete_label = Loc_T("save.delete", "Delete");
     var delete_pad_x = 8;
-    var delete_text_w = string_width(delete_label);
+    var delete_text_w = UI_TextWidth(delete_label);
     var delete_btn_w = delete_text_w + delete_pad_x * 2;
     var slot_delete_gap = 6;
 
@@ -627,7 +627,7 @@ function SaveMenu_Draw() {
         draw_set_alpha(popup_alpha);
 
         draw_set_color(c_white);
-        draw_text(bx + 12, by + 10, title);
+        UI_DrawText(bx + 12, by + 10, title);
     }
 
     var row_h = max(22, line_h + 8);
@@ -644,8 +644,8 @@ function SaveMenu_Draw() {
             var yy = row_y + i * row_h;
             var label = slot_labels[i];
             var draw_label = label;
-            if (string_width(draw_label) > slot_text_max_w) {
-                while (string_length(draw_label) > 0 && string_width(draw_label + "...") > slot_text_max_w) {
+            if (UI_TextWidth(draw_label) > slot_text_max_w) {
+                while (string_length(draw_label) > 0 && UI_TextWidth(draw_label + "...") > slot_text_max_w) {
                     draw_label = string_delete(draw_label, string_length(draw_label), 1);
                 }
                 draw_label += "...";
@@ -660,7 +660,7 @@ function SaveMenu_Draw() {
             } else {
                 draw_set_color(c_white);
             }
-            draw_text(slot_text_x, yy, draw_label);
+            UI_DrawText(slot_text_x, yy, draw_label);
 
             if (sm.mode == "load") {
                 if (i == sm.slot && sm.col == 1 && !sm.confirm) {
@@ -672,7 +672,7 @@ function SaveMenu_Draw() {
                 } else {
                     draw_set_color(c_white);
                 }
-                draw_text(delete_text_x, yy, delete_label);
+                UI_DrawText(delete_text_x, yy, delete_label);
             }
         }
     }
@@ -683,7 +683,7 @@ function SaveMenu_Draw() {
     if (!hide_slots) {
         if (sm.slot == 3 && !sm.confirm) {
             var back_label = Loc_T("save.back", "Back");
-            var bwid = string_width(back_label);
+            var bwid = UI_TextWidth(back_label);
             draw_set_color(c_white);
             draw_rectangle(back_x - 4, back_y - 2, back_x + bwid + 4, back_y + line_h + 2, false);
             draw_set_color(c_black);
@@ -692,7 +692,7 @@ function SaveMenu_Draw() {
         } else {
             draw_set_color(c_white);
         }
-        draw_text(back_x, back_y, Loc_T("save.back", "Back"));
+        UI_DrawText(back_x, back_y, Loc_T("save.back", "Back"));
     } else {
         draw_set_color(c_white);
     }
@@ -722,13 +722,13 @@ function SaveMenu_Draw() {
         var popup_gap_y = 8;
         var btn_pad_x = 8;
         var btn_h = line_h + 4;
-        var msg_w = string_width(msg);
+        var msg_w = UI_TextWidth(msg);
 
         var buttons_w = 0;
         if (sm.confirm_mode != "saved" && sm.confirm_mode != "message") {
-            buttons_w = (string_width(Loc_T("common.ok", "OK")) + btn_pad_x * 2) + 14 + (string_width(Loc_T("common.cancel", "Cancel")) + btn_pad_x * 2);
+            buttons_w = (UI_TextWidth(Loc_T("common.ok", "OK")) + btn_pad_x * 2) + 14 + (UI_TextWidth(Loc_T("common.cancel", "Cancel")) + btn_pad_x * 2);
         } else {
-            buttons_w = string_width(Loc_T("common.ok", "OK")) + btn_pad_x * 2;
+            buttons_w = UI_TextWidth(Loc_T("common.ok", "OK")) + btn_pad_x * 2;
         }
 
         var popup_w = max(160, max(msg_w + popup_pad_x * 2, buttons_w + popup_pad_x * 2));
@@ -749,14 +749,14 @@ function SaveMenu_Draw() {
 
         var msg_x = px1 + (popup_w - msg_w) * 0.5;
         var msg_y = py1 + popup_pad_y;
-        draw_text(msg_x, msg_y, msg);
+        UI_DrawText(msg_x, msg_y, msg);
         var btn_y = msg_y + line_h + popup_gap_y;
 
         if (sm.confirm_mode != "saved" && sm.confirm_mode != "message") {
             var yes_label = Loc_T("common.ok", "OK");
             var no_label = Loc_T("common.cancel", "Cancel");
-            var yes_w = string_width(yes_label) + btn_pad_x * 2;
-            var no_w = string_width(no_label) + btn_pad_x * 2;
+            var yes_w = UI_TextWidth(yes_label) + btn_pad_x * 2;
+            var no_w = UI_TextWidth(no_label) + btn_pad_x * 2;
             var btn_gap_x = 14;
             var total_btn_w = yes_w + btn_gap_x + no_w;
             var yesx = px1 + (popup_w - total_btn_w) * 0.5;
@@ -770,7 +770,7 @@ function SaveMenu_Draw() {
             } else {
                 draw_set_color(c_white);
             }
-            draw_text(yesx + (yes_w - string_width(yes_label)) * 0.5, btn_y + 2, yes_label);
+            UI_DrawText(yesx + (yes_w - UI_TextWidth(yes_label)) * 0.5, btn_y + 2, yes_label);
 
             if (sm.confirm_choice == 1) {
                 draw_set_color(c_white);
@@ -781,17 +781,17 @@ function SaveMenu_Draw() {
             } else {
                 draw_set_color(c_white);
             }
-            draw_text(nox + (no_w - string_width(no_label)) * 0.5, btn_y + 2, no_label);
+            UI_DrawText(nox + (no_w - UI_TextWidth(no_label)) * 0.5, btn_y + 2, no_label);
         } else {
             var ok_label = Loc_T("common.ok", "OK");
-            var ok_w = string_width(ok_label) + btn_pad_x * 2;
+            var ok_w = UI_TextWidth(ok_label) + btn_pad_x * 2;
             var ok_x = px1 + (popup_w - ok_w) * 0.5;
             draw_set_color(c_white);
             draw_rectangle(ok_x, btn_y, ok_x + ok_w, btn_y + btn_h, false);
             draw_set_color(c_black);
             draw_rectangle(ok_x, btn_y, ok_x + ok_w, btn_y + btn_h, true);
             draw_set_color(c_black);
-            draw_text(ok_x + (ok_w - string_width(ok_label)) * 0.5, btn_y + 2, ok_label);
+            UI_DrawText(ok_x + (ok_w - UI_TextWidth(ok_label)) * 0.5, btn_y + 2, ok_label);
         }
     }
     draw_set_alpha(1);
