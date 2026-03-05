@@ -2074,14 +2074,40 @@ function ClassSelect_Draw() {
 
     UI_SetFont();
     var line_h = UI_TextHeight("A");
-    var row_gap = max(18, line_h + 4);
+    var row_gap = max(18, line_h + max(6, round(line_h * 0.15)));
     var pad_x = 6;
     var pad_y = 4;
+    var title_pad_x = max(12, round(line_h * 0.30));
+    var title_pad_y = max(12, round(line_h * 0.30));
+    var side_pad = max(18, round(line_h * 0.45));
+    var section_gap = max(6, round(line_h * 0.25));
 
-    var bw = w * 0.6;
-    var bh = h * 0.5;
+    var title_txt = Loc_T("class.select.title", "Select Class");
+    var widest = max(UI_TextWidth(title_txt), UI_TextWidth(Loc_T("menu.common.back", "Back")));
+    for (var cw = 0; cw < array_length(cs.choices); cw++) {
+        var choice_w = cs.choices[cw];
+        if (is_array(cs.choice_ids) && cw < array_length(cs.choice_ids)) {
+            var class_cfg_w = DB_PlayerClass(cs.choice_ids[cw]);
+            if (is_struct(class_cfg_w) && variable_struct_exists(class_cfg_w, "name")) {
+                choice_w = class_cfg_w.name;
+            }
+        }
+        widest = max(widest, UI_TextWidth(choice_w));
+    }
+
+    var need_w = widest + side_pad * 2;
+    var need_h = title_pad_y + line_h + section_gap + (array_length(cs.choices) * row_gap);
+    if (cs.allow_cancel) need_h += section_gap + line_h;
+    need_h += title_pad_y;
+
+    var bw = min(w - 24, max(w * 0.6, need_w));
+    var bh = min(h - 24, max(h * 0.5, need_h));
     var bx = (w - bw) * 0.5;
     var by = (h - bh) * 0.5;
+    var title_y = by + title_pad_y;
+    var cy = title_y + line_h + section_gap;
+    var row_left = bx + max(10, round(line_h * 0.25));
+    var row_right = bx + bw - max(10, round(line_h * 0.25));
     var popup_alpha = UI_PopupAlpha(cs.opened_frame, cs.closing, cs.close_frame, 1);
 
     draw_set_alpha(popup_alpha * 0.85);
@@ -2093,17 +2119,16 @@ function ClassSelect_Draw() {
     draw_set_alpha(popup_alpha);
 
     draw_set_color(c_white);
-    UI_DrawText(bx + 12, by + 12, Loc_T("class.select.title", "Select Class"));
+    UI_DrawText(bx + title_pad_x, title_y, title_txt);
 
-    var cy = by + 40;
     for (var j = 0; j < array_length(cs.choices); j++) {
         var yy = cy + j * row_gap;
         var selected = (j == cs.index);
         if (selected) {
             draw_set_color(c_white);
-            draw_rectangle(bx + 10 - pad_x, yy - pad_y, bx + bw - 10 + pad_x, yy + line_h + pad_y, false);
+            draw_rectangle(row_left - pad_x, yy - pad_y, row_right + pad_x, yy + line_h + pad_y, false);
             draw_set_color(c_black);
-            draw_rectangle(bx + 10 - pad_x, yy - pad_y, bx + bw - 10 + pad_x, yy + line_h + pad_y, true);
+            draw_rectangle(row_left - pad_x, yy - pad_y, row_right + pad_x, yy + line_h + pad_y, true);
             draw_set_color(c_black);
         } else {
             draw_set_color(c_white);
@@ -2115,22 +2140,22 @@ function ClassSelect_Draw() {
                 choice_label = class_cfg.name;
             }
         }
-        UI_DrawText(bx + 18, yy, choice_label);
+        UI_DrawText(bx + side_pad, yy, choice_label);
     }
 
     if (cs.allow_cancel) {
-        var back_y = by + bh - (line_h + 4);
+        var back_y = by + bh - (title_pad_y + line_h);
         var back_selected = (cs.index == array_length(cs.choices));
         if (back_selected) {
             draw_set_color(c_white);
-            draw_rectangle(bx + 10 - pad_x, back_y - pad_y, bx + bw - 10 + pad_x, back_y + line_h + pad_y, false);
+            draw_rectangle(row_left - pad_x, back_y - pad_y, row_right + pad_x, back_y + line_h + pad_y, false);
             draw_set_color(c_black);
-            draw_rectangle(bx + 10 - pad_x, back_y - pad_y, bx + bw - 10 + pad_x, back_y + line_h + pad_y, true);
+            draw_rectangle(row_left - pad_x, back_y - pad_y, row_right + pad_x, back_y + line_h + pad_y, true);
             draw_set_color(c_black);
         } else {
             draw_set_color(c_white);
         }
-        UI_DrawText(bx + 18, back_y, Loc_T("menu.common.back", "Back"));
+        UI_DrawText(bx + side_pad, back_y, Loc_T("menu.common.back", "Back"));
     }
     draw_set_alpha(1);
 }
@@ -2407,11 +2432,63 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     UI_SetFont();
     var line_h = UI_TextHeight("A");
     var popup_alpha = UI_PopupAlpha(sp.opened_frame, sp.closing, sp.close_frame, 1);
-    var sw = w * 0.72;
-    var sh = h * 0.72;
+    var title_pad_x = max(12, round(line_h * 0.30));
+    var title_pad_y = max(12, round(line_h * 0.30));
+    var section_gap = max(6, round(line_h * 0.25));
+    var side_pad = max(16, title_pad_x + 4);
+    var row_gap_s = max(18, line_h + max(6, round(line_h * 0.15)));
+    var settings = GameSettings_Copy(sp.pending);
+
+    var title_txt = Loc_T("settings.title", "Settings");
+    var audio_txt = Loc_T("settings.section.audio", "Audio");
+    var display_txt = Loc_T("settings.section.display", "Display");
+    var labels_probe = [
+        Loc_T("settings.row.ui", "UI"),
+        Loc_T("settings.row.sfx", "SFX"),
+        Loc_T("settings.row.bgm", "BGM"),
+        Loc_T("settings.row.scale", "Scale"),
+        Loc_T("settings.row.language", "Language"),
+        Loc_T("settings.row.apply", "Apply"),
+        Loc_T("settings.row.back", "Back")
+    ];
+    var values_probe = [
+        "100%",
+        "100%",
+        "100%",
+        string(DISPLAY_SCALE_MAX) + "x",
+        max(UI_TextWidth(Loc_LanguageDisplayName("en")), UI_TextWidth(Loc_LanguageDisplayName("ko"))),
+        max(UI_TextWidth(Loc_T("settings.value.pending", "Pending")), UI_TextWidth(Loc_T("settings.value.saved", "Saved")))
+    ];
+
+    var max_label_w = 0;
+    for (var lpi = 0; lpi < array_length(labels_probe); lpi++) {
+        max_label_w = max(max_label_w, UI_TextWidth(labels_probe[lpi]));
+    }
+
+    var max_value_w = 0;
+    max_value_w = max(max_value_w, UI_TextWidth(values_probe[0]));
+    max_value_w = max(max_value_w, UI_TextWidth(values_probe[1]));
+    max_value_w = max(max_value_w, UI_TextWidth(values_probe[2]));
+    max_value_w = max(max_value_w, UI_TextWidth(values_probe[3]));
+    max_value_w = max(max_value_w, values_probe[4]);
+    max_value_w = max(max_value_w, values_probe[5]);
+
+    var row_split_gap = max(18, round(line_h * 0.8));
+    var need_w = max(UI_TextWidth(title_txt) + title_pad_x * 2, UI_TextWidth(audio_txt) + title_pad_x * 2, UI_TextWidth(display_txt) + title_pad_x * 2);
+    need_w = max(need_w, side_pad + max_label_w + row_split_gap + max_value_w + side_pad);
+
+    var title_y_local = title_pad_y;
+    var audio_header_y_local = title_y_local + line_h + section_gap;
+    var rows_y0_local = audio_header_y_local + line_h + section_gap;
+    var display_header_y_local = rows_y0_local + row_gap_s * 3 + section_gap;
+    var display_rows_y0_local = display_header_y_local + line_h + section_gap;
+    var last_row_y_local = display_rows_y0_local + row_gap_s * 3;
+    var need_h = last_row_y_local + line_h + title_pad_y;
+
+    var sw = min(w - 24, max(w * 0.72, need_w));
+    var sh = min(h - 24, max(h * 0.72, need_h));
     var sx = (w - sw) * 0.5;
     var sy = (h - sh) * 0.5;
-    var settings = GameSettings_Copy(sp.pending);
 
     if (_draw_backdrop) {
         draw_set_alpha(popup_alpha * 0.6);
@@ -2426,26 +2503,26 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     draw_set_color(c_white);
     draw_rectangle(sx, sy, sx + sw, sy + sh, true);
     draw_set_alpha(popup_alpha);
-    UI_DrawText(sx + 12, sy + 12, Loc_T("settings.title", "Settings"));
+    var title_y = sy + title_y_local;
+    UI_DrawText(sx + title_pad_x, title_y, title_txt);
 
-    var row_gap_s = max(18, line_h + 6);
-    var audio_header_y = sy + 32;
-    var rows_y0 = audio_header_y + row_gap_s;
-    var display_header_y = rows_y0 + row_gap_s * 3 + 2;
-    var display_rows_y0 = display_header_y + row_gap_s;
+    var audio_header_y = sy + audio_header_y_local;
+    var rows_y0 = sy + rows_y0_local;
+    var display_header_y = sy + display_header_y_local;
+    var display_rows_y0 = sy + display_rows_y0_local;
 
     var row_y = [];
     row_y[0] = rows_y0;
     row_y[1] = rows_y0 + row_gap_s;
     row_y[2] = rows_y0 + row_gap_s * 2;
     row_y[3] = display_rows_y0;
-    row_y[4] = display_rows_y0 + row_gap_s + 2;
-    row_y[5] = display_rows_y0 + row_gap_s * 2 + 2;
-    row_y[6] = display_rows_y0 + row_gap_s * 3 + 2;
+    row_y[4] = display_rows_y0 + row_gap_s;
+    row_y[5] = display_rows_y0 + row_gap_s * 2;
+    row_y[6] = display_rows_y0 + row_gap_s * 3;
 
     draw_set_color(c_white);
-    UI_DrawText(sx + 12, audio_header_y, Loc_T("settings.section.audio", "Audio"));
-    UI_DrawText(sx + 12, display_header_y, Loc_T("settings.section.display", "Display"));
+    UI_DrawText(sx + title_pad_x, audio_header_y, audio_txt);
+    UI_DrawText(sx + title_pad_x, display_header_y, display_txt);
 
     for (var r = 0; r < SETTINGS_MENU_ROW_COUNT; r++) {
         var yy = row_y[r];
@@ -2485,27 +2562,28 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
 
         if (selected_row) {
             if (r == 5 || r == 6) {
-                var row_x = sx + 16;
+                var row_x = sx + side_pad;
                 var row_w = UI_TextWidth(label) + 8;
                 draw_set_color(c_white);
                 draw_rectangle(row_x - 4, yy - 3, row_x + row_w, yy + line_h + 5, false);
                 draw_set_color(c_black);
                 draw_rectangle(row_x - 4, yy - 3, row_x + row_w, yy + line_h + 5, true);
             } else {
+                var row_pad = max(8, round(line_h * 0.25));
                 draw_set_color(c_white);
-                draw_rectangle(sx + 8, yy - 3, sx + sw - 8, yy + line_h + 5, false);
+                draw_rectangle(sx + row_pad, yy - 3, sx + sw - row_pad, yy + line_h + 5, false);
                 draw_set_color(c_black);
-                draw_rectangle(sx + 8, yy - 3, sx + sw - 8, yy + line_h + 5, true);
+                draw_rectangle(sx + row_pad, yy - 3, sx + sw - row_pad, yy + line_h + 5, true);
             }
         }
 
         draw_set_color(selected_row ? c_black : c_white);
-        UI_DrawText(sx + 16, yy, label);
+        UI_DrawText(sx + side_pad, yy, label);
         if (value != "") {
             if (r == 5) draw_set_color(c_white);
             else draw_set_color(selected_row ? c_black : c_white);
             draw_set_halign(fa_right);
-            UI_DrawText(sx + sw - 16, yy, value);
+            UI_DrawText(sx + sw - side_pad, yy, value);
             draw_set_halign(fa_left);
         }
     }
@@ -2708,8 +2786,8 @@ function PauseMenu_Draw() {
     var h = layout.h;
     var pad = layout.pad;
     var line_h = UI_TextHeight("A");
-    var inner_pad = max(4, pad * 0.6);
-    var row_h = max(16, line_h + inner_pad * 2);
+    var inner_pad = max(6, round(line_h * 0.30), round(pad * 0.6));
+    var row_h = max(18, line_h + inner_pad * 2);
 
     var option_labels = [
         Loc_T("pause.option.resume", "Resume"),
@@ -2721,8 +2799,10 @@ function PauseMenu_Draw() {
         var lbl = (i < array_length(option_labels)) ? option_labels[i] : pm.options[i];
         max_w = max(max_w, UI_TextWidth(lbl));
     }
-    var bw = max_w + inner_pad * 4;
-    var bh = (row_h * array_length(pm.options)) + inner_pad * 2;
+    var need_w = max_w + inner_pad * 4;
+    var need_h = (row_h * array_length(pm.options)) + inner_pad * 2;
+    var bw = min(w - 24, max(w * 0.35, need_w));
+    var bh = min(h - 24, max(h * 0.24, need_h));
     var bx = (w - bw) * 0.5;
     var by = (h - bh) * 0.5;
     var popup_alpha = UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
@@ -2737,10 +2817,18 @@ function PauseMenu_Draw() {
 
     var options = pm.options;
     var start_y = by + inner_pad;
+    var text_x = bx + inner_pad;
+    var text_max_w = max(24, bw - inner_pad * 2);
     for (var i = 0; i < array_length(options); i++) {
         var yy = start_y + i * row_h;
         var sel = (i == pm.index);
         var label = (i < array_length(option_labels)) ? option_labels[i] : options[i];
+        if (UI_TextWidth(label) > text_max_w) {
+            while (string_length(label) > 0 && UI_TextWidth(label + "...") > text_max_w) {
+                label = string_delete(label, string_length(label), 1);
+            }
+            label += "...";
+        }
         if (sel) {
             draw_set_color(c_white);
             draw_rectangle(bx + inner_pad - 4, yy - 2, bx + bw - inner_pad + 4, yy + row_h - 2, false);
@@ -2748,7 +2836,7 @@ function PauseMenu_Draw() {
             draw_rectangle(bx + inner_pad - 4, yy - 2, bx + bw - inner_pad + 4, yy + row_h - 2, true);
         }
         draw_set_color(sel ? c_black : c_white);
-        UI_DrawText(bx + inner_pad, yy, label);
+        UI_DrawText(text_x, yy, label);
     }
     draw_set_alpha(1);
 }

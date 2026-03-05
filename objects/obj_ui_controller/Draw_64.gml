@@ -101,13 +101,13 @@ if (cutscene_active) {
     var logo_sprite = variable_struct_exists(gs.ui, "cutscene_logo_sprite") ? gs.ui.cutscene_logo_sprite : noone;
     var logo_alpha = variable_struct_exists(gs.ui, "cutscene_logo_alpha") ? clamp(real(gs.ui.cutscene_logo_alpha), 0, 1) : 0;
     if (logo_sprite != noone && logo_sprite != -1 && logo_alpha > 0) {
-        var lw = sprite_get_width(logo_sprite);
-        var lh = sprite_get_height(logo_sprite);
+        var logo_scale = 3;
+        var lw = sprite_get_width(logo_sprite) * logo_scale;
+        var lh = sprite_get_height(logo_sprite) * logo_scale;
         var lx = round((w - lw) * 0.5);
         var ly = round((h - lh) * 0.5);
-        draw_set_alpha(logo_alpha);
         draw_set_color(c_white);
-        draw_sprite(logo_sprite, 0, lx, ly);
+        draw_sprite_ext(logo_sprite, 0, lx, ly, logo_scale, logo_scale, 0, c_white, logo_alpha);
         draw_set_alpha(1);
     }
 }

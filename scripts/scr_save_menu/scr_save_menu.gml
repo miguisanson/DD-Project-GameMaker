@@ -142,7 +142,7 @@ function BedMenu_Draw() {
     var w = display_get_gui_width();
     var h = display_get_gui_height();
     var line_h = UI_TextHeight("A");
-    var inner_pad = 6;
+    var inner_pad = max(6, round(line_h * 0.30));
     var row_h = max(18, line_h + inner_pad * 2);
     var popup_alpha = UI_PopupAlpha(bm.opened_frame, bm.closing, bm.close_frame, 1);
 
@@ -154,8 +154,10 @@ function BedMenu_Draw() {
         max_w = max(max_w, UI_TextWidth(opt_text));
     }
 
-    var bw = max_w + inner_pad * 6;
-    var bh = inner_pad * 2 + row_h * array_length(bm.options);
+    var need_w = max_w + inner_pad * 6;
+    var need_h = inner_pad * 2 + row_h * array_length(bm.options);
+    var bw = min(w - 24, max(w * 0.28, need_w));
+    var bh = min(h - 24, max(h * 0.18, need_h));
     var bx = (w - bw) * 0.5;
     var by = (h - bh) * 0.5;
 
@@ -168,6 +170,8 @@ function BedMenu_Draw() {
     draw_set_alpha(popup_alpha);
 
     var start_y = by + inner_pad;
+    var text_x = bx + inner_pad * 2;
+    var text_max_w = max(24, bw - inner_pad * 4);
     for (var j = 0; j < array_length(bm.options); j++) {
         var yy = start_y + j * row_h;
         var selected = (j == bm.index);
@@ -181,7 +185,13 @@ function BedMenu_Draw() {
         var bed_label = bm.options[j];
         if (j == 0) bed_label = Loc_T("bed.option.rest", bed_label);
         else if (j == 1) bed_label = Loc_T("bed.option.back", bed_label);
-        UI_DrawText(bx + inner_pad * 2, yy, bed_label);
+        if (UI_TextWidth(bed_label) > text_max_w) {
+            while (string_length(bed_label) > 0 && UI_TextWidth(bed_label + "...") > text_max_w) {
+                bed_label = string_delete(bed_label, string_length(bed_label), 1);
+            }
+            bed_label += "...";
+        }
+        UI_DrawText(text_x, yy, bed_label);
     }
 
     draw_set_alpha(1);
@@ -576,9 +586,12 @@ function SaveMenu_Draw() {
     var w = display_get_gui_width();
     var h = display_get_gui_height();
     var line_h = UI_TextHeight("A");
+    var title_pad_x = max(12, round(line_h * 0.30));
+    var title_pad_y = max(10, round(line_h * 0.25));
+    var section_gap = max(8, round(line_h * 0.25));
     var pad = 6;
-    var side_margin = 12;
-    var slot_text_left_pad = 14;
+    var side_margin = max(12, title_pad_x);
+    var slot_text_left_pad = side_margin + 2;
     var popup_alpha = UI_PopupAlpha(sm.opened_frame, sm.closing, sm.close_frame, 1);
     var hide_slots = variable_struct_exists(sm, "hide_slots") && sm.hide_slots;
 
@@ -612,8 +625,11 @@ function SaveMenu_Draw() {
     var min_content_w = slot_text_left_pad + longest_slot_w + side_margin;
     if (sm.mode == "load") min_content_w += slot_delete_gap + delete_btn_w + side_margin;
 
+    var row_h = max(22, line_h + 8);
+    var rows_block_h = hide_slots ? 0 : (row_h * 3 + section_gap + line_h);
+    var need_h = title_pad_y + line_h + section_gap + rows_block_h + title_pad_y;
     var bw = min(max(w * 0.7, min_content_w + 20), w - 24);
-    var bh = h * 0.6;
+    var bh = min(h - 24, max(h * 0.6, need_h));
     var bx = (w - bw) * 0.5;
     var by = (h - bh) * 0.5;
 
@@ -627,11 +643,10 @@ function SaveMenu_Draw() {
         draw_set_alpha(popup_alpha);
 
         draw_set_color(c_white);
-        UI_DrawText(bx + 12, by + 10, title);
+        UI_DrawText(bx + title_pad_x, by + title_pad_y, title);
     }
 
-    var row_h = max(22, line_h + 8);
-    var row_y = by + 36;
+    var row_y = by + title_pad_y + line_h + section_gap;
     var delete_right = bx + bw - side_margin;
     var delete_left = delete_right - delete_btn_w;
     var delete_text_x = delete_left + delete_pad_x;
@@ -678,8 +693,8 @@ function SaveMenu_Draw() {
     }
 
     // Back label
-    var back_x = bx + 12;
-    var back_y = by + bh - (line_h + 4);
+    var back_x = bx + title_pad_x;
+    var back_y = by + bh - (title_pad_y + line_h);
     if (!hide_slots) {
         if (sm.slot == 3 && !sm.confirm) {
             var back_label = Loc_T("save.back", "Back");

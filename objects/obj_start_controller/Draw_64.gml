@@ -9,13 +9,13 @@ if (state == "boot_logo") {
     var logo_spr = boot_logo_sprite;
     if (logo_spr == noone || logo_spr == -1) logo_spr = pale_rook_1;
     if (logo_spr != noone && logo_spr != -1 && boot_logo_alpha > 0) {
-        var lw = sprite_get_width(logo_spr);
-        var lh = sprite_get_height(logo_spr);
+        var logo_scale = 3;
+        var lw = sprite_get_width(logo_spr) * logo_scale;
+        var lh = sprite_get_height(logo_spr) * logo_scale;
         var lx = round((w - lw) * 0.5);
         var ly = round((h - lh) * 0.5);
-        draw_set_alpha(clamp(boot_logo_alpha, 0, 1));
         draw_set_color(c_white);
-        draw_sprite(logo_spr, 0, lx, ly);
+        draw_sprite_ext(logo_spr, 0, lx, ly, logo_scale, logo_scale, 0, c_white, clamp(boot_logo_alpha, 0, 1));
     }
 
     draw_set_alpha(1);
@@ -37,6 +37,7 @@ var line_h = UI_TextHeight("A");
 var row_gap = max(18, line_h + 4);
 var pad_x = 6;
 var pad_y = 4;
+var text_pad = max(8, round(line_h * 0.25));
 
 if (!variable_instance_exists(id, "difficulty_options") || !is_array(difficulty_options) || array_length(difficulty_options) <= 0) {
     difficulty_options = [
@@ -88,16 +89,39 @@ if (state == "main" && gs.ui.mode != UI_SAVE && !loading_into_game) {
             if (load_disabled) draw_set_color(c_gray);
             else draw_set_color(c_white);
         }
-        UI_DrawText(bx1 + 8, yy, label);
+        UI_DrawText(bx1 + text_pad, yy, label);
     }
 }
 
 if (state == "difficulty" && gs.ui.mode != UI_SAVE && !loading_into_game) {
     var difficulty_alpha = UI_PopupAlpha(difficulty_opened_frame, difficulty_closing, difficulty_close_frame, 1);
-    var dw = w * 0.62;
-    var dh = h * 0.44;
+    var title_txt = Loc_T("menu.difficulty.title", "Select Difficulty");
+    var side_pad = max(18, round(line_h * 0.45));
+    var title_pad_x = max(12, round(line_h * 0.30));
+    var title_pad_y = max(12, round(line_h * 0.30));
+    var section_gap = max(6, round(line_h * 0.25));
+    var drow_gap = max(18, line_h + max(6, round(line_h * 0.15)));
+
+    var widest = max(UI_TextWidth(title_txt), UI_TextWidth(Loc_T("menu.common.back", "Back")));
+    for (var diw = 0; diw < array_length(difficulty_options); diw++) {
+        var dlbl_w = difficulty_options[diw];
+        if (variable_instance_exists(id, "difficulty_option_keys") && is_array(difficulty_option_keys) && diw < array_length(difficulty_option_keys)) {
+            dlbl_w = Loc_T(difficulty_option_keys[diw], dlbl_w);
+        }
+        widest = max(widest, UI_TextWidth(dlbl_w));
+    }
+
+    var need_w = widest + side_pad * 2;
+    var need_h = title_pad_y + line_h + section_gap + (array_length(difficulty_options) * drow_gap) + section_gap + line_h + title_pad_y;
+    var dw = min(w - 24, max(w * 0.62, need_w));
+    var dh = min(h - 24, max(h * 0.44, need_h));
     var dx = (w - dw) * 0.5;
     var dy = (h - dh) * 0.5;
+    var title_y = dy + title_pad_y;
+    var start_y2 = title_y + line_h + section_gap;
+    var back_y = dy + dh - (title_pad_y + line_h);
+    var row_left = dx + max(10, round(line_h * 0.25));
+    var row_right = dx + dw - max(10, round(line_h * 0.25));
 
     draw_set_alpha(difficulty_alpha * 0.6);
     draw_set_color(c_black);
@@ -109,10 +133,8 @@ if (state == "difficulty" && gs.ui.mode != UI_SAVE && !loading_into_game) {
     draw_set_color(c_white);
     draw_rectangle(dx, dy, dx + dw, dy + dh, true);
     draw_set_alpha(difficulty_alpha);
-    UI_DrawText(dx + 12, dy + 12, Loc_T("menu.difficulty.title", "Select Difficulty"));
+    UI_DrawText(dx + title_pad_x, title_y, title_txt);
 
-    var drow_gap = max(18, line_h + 6);
-    var start_y2 = dy + 36;
     for (var di2 = 0; di2 < array_length(difficulty_options); di2++) {
         var dlabel = difficulty_options[di2];
         if (variable_instance_exists(id, "difficulty_option_keys") && is_array(difficulty_option_keys) && di2 < array_length(difficulty_option_keys)) {
@@ -123,29 +145,28 @@ if (state == "difficulty" && gs.ui.mode != UI_SAVE && !loading_into_game) {
 
         if (dsel) {
             draw_set_color(c_white);
-            draw_rectangle(dx + 10 - pad_x, dyy - pad_y, dx + dw - 10 + pad_x, dyy + line_h + pad_y, false);
+            draw_rectangle(row_left - pad_x, dyy - pad_y, row_right + pad_x, dyy + line_h + pad_y, false);
             draw_set_color(c_black);
-            draw_rectangle(dx + 10 - pad_x, dyy - pad_y, dx + dw - 10 + pad_x, dyy + line_h + pad_y, true);
+            draw_rectangle(row_left - pad_x, dyy - pad_y, row_right + pad_x, dyy + line_h + pad_y, true);
             draw_set_color(c_black);
         } else {
             draw_set_color(c_white);
         }
 
-        UI_DrawText(dx + 18, dyy, dlabel);
+        UI_DrawText(dx + side_pad, dyy, dlabel);
     }
 
-    var back_y = dy + dh - (line_h + 8);
     var back_sel = (difficulty_index == array_length(difficulty_options));
     if (back_sel) {
         draw_set_color(c_white);
-        draw_rectangle(dx + 10 - pad_x, back_y - pad_y, dx + dw - 10 + pad_x, back_y + line_h + pad_y, false);
+        draw_rectangle(row_left - pad_x, back_y - pad_y, row_right + pad_x, back_y + line_h + pad_y, false);
         draw_set_color(c_black);
-        draw_rectangle(dx + 10 - pad_x, back_y - pad_y, dx + dw - 10 + pad_x, back_y + line_h + pad_y, true);
+        draw_rectangle(row_left - pad_x, back_y - pad_y, row_right + pad_x, back_y + line_h + pad_y, true);
         draw_set_color(c_black);
     } else {
         draw_set_color(c_white);
     }
-    UI_DrawText(dx + 18, back_y, Loc_T("menu.common.back", "Back"));
+    UI_DrawText(dx + side_pad, back_y, Loc_T("menu.common.back", "Back"));
 }
 
 if (SettingsPopup_IsOpen("title") && !loading_into_game) {
