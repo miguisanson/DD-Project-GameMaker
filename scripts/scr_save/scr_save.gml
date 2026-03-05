@@ -54,13 +54,16 @@ function Save_ReadSettingsConfig() {
         if (loaded_scale <= 1) out.display_scale = DISPLAY_SCALE_DEFAULT;
     }
 
+    // Migration: disable legacy monitor-fit startup to prevent fullscreen-like launch on fresh/old configs.
+    if (settings_version < 6) out.fit_screen = false;
+
     return GameSettings_Normalize(out);
 }
 
 function Save_WriteSettingsConfig(_settings) {
     var s = GameSettings_Normalize(_settings);
     var raw = {
-        settings_version: 5,
+        settings_version: 6,
         vol_ui: s.audio_ui,
         vol_sfx: s.audio_sfx,
         vol_bgm: s.audio_bgm,

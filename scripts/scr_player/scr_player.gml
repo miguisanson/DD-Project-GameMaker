@@ -1227,7 +1227,7 @@ function GameSettings_Defaults() {
         audio_sfx: VOL_SFX_DEFAULT,
         audio_bgm: VOL_MUSIC_DEFAULT,
         display_scale: DISPLAY_SCALE_DEFAULT,
-        fit_screen: true,
+        fit_screen: false,
         language: "en"
     };
 }
@@ -1247,7 +1247,7 @@ function GameSettings_Normalize(_settings) {
     out.audio_sfx = clamp(GameSettings_ToReal(out.audio_sfx, VOL_SFX_DEFAULT), 0, 1);
     out.audio_bgm = clamp(GameSettings_ToReal(out.audio_bgm, VOL_MUSIC_DEFAULT), 0, 1);
     out.display_scale = clamp(round(GameSettings_ToReal(out.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-    out.fit_screen = (GameSettings_ToReal(out.fit_screen, 1) != 0);
+    out.fit_screen = (GameSettings_ToReal(out.fit_screen, 0) != 0);
     out.language = GameSettings_NormalizeLanguage(out.language);
     if (DISPLAY_FORCE_FIT_SCREEN != 0) out.fit_screen = true;
     return out;
@@ -1291,6 +1291,11 @@ function GameSettings_ApplyDisplay() {
 
     view_enabled = true;
     view_visible[0] = true;
+
+    // Keep desktop builds borderless to avoid title-bar/frame mismatch across PCs.
+    if (os_type == os_windows) {
+        window_set_showborder(false);
+    }
 
     var disp_w = max(1, display_get_width());
     var disp_h = max(1, display_get_height());
