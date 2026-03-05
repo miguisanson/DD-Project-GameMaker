@@ -367,6 +367,7 @@ function Player_OnDeath(_p) {
     var gs = GameState_Get();
     _p.hp = 0;
     _p = Equip_PassiveBattleCleanup(_p);
+    _p = Status_ClearAll(_p);
     GameState_SetPlayer(_p);
     if (variable_struct_exists(gs, "pending_post_battle_dialogue_lines")) gs.pending_post_battle_dialogue_lines = [];
     gs.in_main_menu = false;
@@ -383,6 +384,7 @@ function Battle_CheckEnd(_bc, _p, _e) {
         var rewards = Battle_GrantRewards(_p, _e);
         _p = rewards.player;
         _p = Equip_PassiveBattleCleanup(_p);
+        _p = Status_ClearAll(_p);
         GameState_SetPlayer(_p);
         EnemyPersist_ResolveBattle(true);
         var gs = GameState_Get();
@@ -613,7 +615,7 @@ function Battle_PlayerAttackTimingStep(_bc, _confirm_pressed) {
     _bc.attack_timing_marker_alpha = min(1, _bc.attack_timing_marker_alpha + 0.20);
 
     if (_bc.attack_timing_input_lock > 0) _bc.attack_timing_input_lock -= 1;
-    _bc.attack_timing_y += ATTACK_TIMING_SPEED;
+    _bc.attack_timing_y += Battle_AttackTimingSpeedForEnemy(_bc.e);
 
     if (_confirm_pressed && _bc.attack_timing_input_lock <= 0) {
         var d = abs(_bc.attack_timing_y - _bc.attack_timing_target_y);
@@ -783,6 +785,7 @@ function Battle_RunAttempt(_bc) {
 function Battle_EndRun(_bc) {
     _bc.battle_over = true;
     _bc.p = Equip_PassiveBattleCleanup(_bc.p);
+    _bc.p = Status_ClearAll(_bc.p);
     GameState_SetPlayer(_bc.p);
 
     var gs = GameState_Get();
@@ -960,6 +963,24 @@ function Battle_DefQTEPromptCountForEnemy(_enemy) {
     return 1;
 }
 
+function Battle_DefQTESpeedMultForEnemy(_enemy) {
+    var rank = Battle_DefQTEThreatRank(_enemy);
+    var extra_rank = max(0, rank - 1);
+    var mult = DEF_QTE_SPEED_BASE_MULT + (extra_rank * DEF_QTE_SPEED_RANK_STEP);
+    return clamp(mult, 1, DEF_QTE_SPEED_MULT_MAX);
+}
+
+function Battle_AttackTimingSpeedMultForEnemy(_enemy) {
+    var rank = Battle_DefQTEThreatRank(_enemy);
+    var extra_rank = max(0, rank - 1);
+    var mult = ATTACK_TIMING_SPEED_BASE_MULT + (extra_rank * ATTACK_TIMING_SPEED_RANK_STEP);
+    return clamp(mult, 1, ATTACK_TIMING_SPEED_MULT_MAX);
+}
+
+function Battle_AttackTimingSpeedForEnemy(_enemy) {
+    return ATTACK_TIMING_SPEED * Battle_AttackTimingSpeedMultForEnemy(_enemy);
+}
+
 function Battle_DefQTERandomDir() {
     return choose(UP, DOWN, LEFT, RIGHT);
 }
@@ -1101,10 +1122,11 @@ function Battle_DefQTEStart(_bc, _enemy, _skill, _res, _follow_state, _player_hp
     var qte_frame_rate = game_get_speed(gamespeed_fps);
     if (!is_real(qte_frame_rate) || qte_frame_rate <= 0) qte_frame_rate = 60;
     qte_frame_rate = max(1, round(qte_frame_rate));
-    _bc.enemy_def_qte_fade_in_frames = max(1, round(qte_frame_rate * DEF_QTE_PROMPT_FADE_IN_SEC));
-    _bc.enemy_def_qte_response_frames = max(1, round(qte_frame_rate * DEF_QTE_PROMPT_RESPONSE_SEC));
-    _bc.enemy_def_qte_feedback_frames = max(1, round(qte_frame_rate * DEF_QTE_PROMPT_FEEDBACK_SEC));
-    _bc.enemy_def_qte_transition_frames = max(1, round(qte_frame_rate * DEF_QTE_PROMPT_TRANSITION_SEC));
+    var qte_speed_mult = Battle_DefQTESpeedMultForEnemy(_enemy);
+    _bc.enemy_def_qte_fade_in_frames = max(1, round((qte_frame_rate * DEF_QTE_PROMPT_FADE_IN_SEC) / qte_speed_mult));
+    _bc.enemy_def_qte_response_frames = max(1, round((qte_frame_rate * DEF_QTE_PROMPT_RESPONSE_SEC) / qte_speed_mult));
+    _bc.enemy_def_qte_feedback_frames = max(1, round((qte_frame_rate * DEF_QTE_PROMPT_FEEDBACK_SEC) / qte_speed_mult));
+    _bc.enemy_def_qte_transition_frames = max(1, round((qte_frame_rate * DEF_QTE_PROMPT_TRANSITION_SEC) / qte_speed_mult));
 
     _bc.enemy_def_qte_active = true;
     _bc.enemy_def_qte_prompts = prompts;

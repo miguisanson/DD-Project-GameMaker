@@ -232,8 +232,15 @@ function Tooltip_ClassOnlyText(_class_list) {
 function Tooltip_StatusName(_status_id) {
     if (_status_id == -1) return "";
     var cfg = StatusDB_Get(_status_id);
-    if (is_struct(cfg) && variable_struct_exists(cfg, "name")) return string(cfg.name);
+    if (is_struct(cfg) && variable_struct_exists(cfg, "name")) return Status_LabelWithSign(cfg, _status_id);
     return Loc_T("menu.tooltip.status.default", "Status");
+}
+
+function Tooltip_StatusEffectLine(_status_id) {
+    if (_status_id == -1) return "";
+    var desc = Status_Description(_status_id);
+    if (desc == "") return "";
+    return Tooltip_StatusName(_status_id) + ": " + desc;
 }
 
 function Tooltip_AddWrappedLines(_out_lines, _text, _max_w) {
@@ -343,6 +350,32 @@ function Tooltip_SkillSingleStatusLine(_status_id, _turns, _chance) {
     return line;
 }
 
+function Tooltip_SkillMultiStatusDetailLines(_skill, _max_entries = 2) {
+    var lines = [];
+    if (!is_struct(_skill)) return lines;
+    if (!variable_struct_exists(_skill, "status_list") || !is_array(_skill.status_list)) return lines;
+
+    var seen = [];
+    var max_entries = max(1, round(real(_max_entries)));
+    for (var i = 0; i < array_length(_skill.status_list); i++) {
+        var sid = _skill.status_list[i];
+        if (sid == -1) continue;
+
+        var dup = false;
+        for (var j = 0; j < array_length(seen); j++) {
+            if (seen[j] == sid) { dup = true; break; }
+        }
+        if (dup) continue;
+        array_push(seen, sid);
+
+        var line = Tooltip_StatusEffectLine(sid);
+        if (line != "") array_push(lines, line);
+        if (array_length(lines) >= max_entries) break;
+    }
+
+    return lines;
+}
+
 function Tooltip_SkillMultiStatusLine(_skill, _max_entries = 3) {
     if (!is_struct(_skill)) return "";
     if (!variable_struct_exists(_skill, "status_list") || !is_array(_skill.status_list) || array_length(_skill.status_list) <= 0) return "";
@@ -403,6 +436,8 @@ function Tooltip_SkillEffectLines(_skill, _compact = false) {
                 var dmg_chance = variable_struct_exists(_skill, "status_chance") ? clamp(real(_skill.status_chance), 0, 1) : 1;
                 var dmg_status_line = Tooltip_SkillSingleStatusLine(_skill.status, dmg_turns, dmg_chance);
                 if (dmg_status_line != "") array_push(lines, dmg_status_line);
+                var dmg_status_desc = Tooltip_StatusEffectLine(_skill.status);
+                if (dmg_status_desc != "") array_push(lines, dmg_status_desc);
             }
         break;
 
@@ -412,6 +447,8 @@ function Tooltip_SkillEffectLines(_skill, _compact = false) {
                 var chance = variable_struct_exists(_skill, "status_chance") ? clamp(real(_skill.status_chance), 0, 1) : 1;
                 var status_line = Tooltip_SkillSingleStatusLine(_skill.status, turns, chance);
                 if (status_line != "") array_push(lines, status_line);
+                var status_desc = Tooltip_StatusEffectLine(_skill.status);
+                if (status_desc != "") array_push(lines, status_desc);
             } else {
                 array_push(lines, Loc_T("menu.tooltip.effect.buff", "Effect: Buff"));
             }
@@ -422,6 +459,11 @@ function Tooltip_SkillEffectLines(_skill, _compact = false) {
             var multi_line = Tooltip_SkillMultiStatusLine(_skill, max_status_entries);
             if (multi_line != "") array_push(lines, multi_line);
             else array_push(lines, Loc_T("menu.tooltip.effect.multi_status", "Effect: Multiple statuses"));
+            var detail_max = _compact ? 1 : 2;
+            var multi_details = Tooltip_SkillMultiStatusDetailLines(_skill, detail_max);
+            for (var md = 0; md < array_length(multi_details); md++) {
+                array_push(lines, multi_details[md]);
+            }
         break;
 
         case "heal":
@@ -826,8 +868,33 @@ function Menu_BuildItemTooltipLines(_item) { return Tooltip_BuildItemLines(_item
 function Menu_BuildSkillTooltipLines(_skill) { return Tooltip_BuildSkillLines(_skill); }
 function Menu_DrawTooltipBox(_bx, _by, _bw, _bh, _lines, _menu_alpha) { Tooltip_DrawBox(_bx, _by, _bw, _bh, _lines, _menu_alpha); }
 
+function Menu_InventoryDisplayItems(_inventory) {
+    var source = is_array(_inventory) ? _inventory : [];
+    var out = [];
+
+    for (var i = 0; i < array_length(source); i++) {
+        var inv = source[i];
+        if (!is_struct(inv) || !variable_struct_exists(inv, "id")) continue;
+
+        var item = ItemDB_Get(inv.id);
+        if (Item_IsSkillbook(item)) {
+            var dup = false;
+            for (var j = 0; j < array_length(out); j++) {
+                if (!is_struct(out[j]) || !variable_struct_exists(out[j], "id")) continue;
+                if (out[j].id == inv.id) { dup = true; break; }
+            }
+            if (dup) continue;
+        }
+
+        array_push(out, inv);
+    }
+
+    return out;
+}
+
 function Menu_ClampInventoryCursor(_m, _inventory) {
-    var inv_count = is_array(_inventory) ? array_length(_inventory) : 0;
+    var items = Menu_InventoryDisplayItems(_inventory);
+    var inv_count = array_length(items);
     if (inv_count <= 0) {
         _m.inv_index = 0;
         _m.inv_scroll = 0;
@@ -1121,7 +1188,7 @@ function Menu_HandleInput() {
     var rows_visible = layout.rows_visible;
 
     if (m.tab == 0) {
-        var items = is_array(ch.inventory) ? ch.inventory : [];
+        var items = Menu_InventoryDisplayItems(ch.inventory);
         var count = array_length(items);
         if (count <= 0) {
             m.header_focus = true;
@@ -1377,7 +1444,7 @@ function Menu_Draw() {
 
     // Inventory tab
     if (m.tab == 0) {
-        var items = is_array(ch.inventory) ? ch.inventory : [];
+        var items = Menu_InventoryDisplayItems(ch.inventory);
         var count = array_length(items);
         var start = clamp(m.inv_scroll, 0, max(0, count - rows_visible));
         var endv = min(count, start + rows_visible);

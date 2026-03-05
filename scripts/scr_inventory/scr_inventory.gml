@@ -18,6 +18,13 @@ function Inv_Add(_inv, _item_id, _qty) {
             _qty -= add_stack;
         }
     } else {
+        if (Item_IsSkillbook(item)) {
+            for (var sb = 0; sb < array_length(_inv); sb++) {
+                if (is_struct(_inv[sb]) && variable_struct_exists(_inv[sb], "id") && _inv[sb].id == _item_id) {
+                    return _inv;
+                }
+            }
+        }
         for (var k = 0; k < _qty; k++) array_push(_inv, { id: _item_id, qty: 1 });
     }
 

@@ -21,8 +21,8 @@ if (e.sprite != noone) {
 }
 
 // fixed battle resolution (GB-style)
-var cx = 160 div 2;
-var cy = 144 div 2;
+var cx = DISPLAY_BASE_W div 2;
+var cy = DISPLAY_BASE_H div 2;
 
 enemy_inst = instance_create_layer(
     cx - sw div 2,

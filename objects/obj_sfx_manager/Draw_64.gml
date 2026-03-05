@@ -53,10 +53,14 @@ if (is_struct(gs.player_ch)) {
 
 var last_debug_cmd = "";
 var debug_enemy_damage_skill_only = false;
+var debug_display_metrics = false;
 if (variable_global_exists("debug") && is_struct(global.debug)) {
     if (variable_struct_exists(global.debug, "last_command")) last_debug_cmd = string(global.debug.last_command);
     if (variable_struct_exists(global.debug, "enemy_damage_skill_only")) {
         debug_enemy_damage_skill_only = global.debug.enemy_damage_skill_only;
+    }
+    if (variable_struct_exists(global.debug, "display_metrics")) {
+        debug_display_metrics = global.debug.display_metrics;
     }
 }
 
@@ -68,10 +72,12 @@ array_push(lines, "- Kill Player (death test): " + Input_Label("debug_kill"));
 array_push(lines, "- Level Up: " + Input_Label("debug_levelup"));
 array_push(lines, "- Get All Items: " + Input_Label("debug_all_items"));
 array_push(lines, "- Enemy Damaging Skills Only: " + Input_Label("debug_enemy_damage_skill"));
+array_push(lines, "- Display Metrics: " + Input_Label("debug_display_metrics"));
 array_push(lines, "");
 array_push(lines, "active:");
 array_push(lines, "- debug_enabled: " + string(debug_enabled));
 array_push(lines, "- enemy_damage_skill_only: " + string(debug_enabled && debug_enemy_damage_skill_only));
+array_push(lines, "- display_metrics: " + string(debug_enabled && debug_display_metrics));
 array_push(lines, "- audio_debug_enabled: " + string(audio_debug_enabled));
 array_push(lines, "- room: " + room_get_name(room));
 array_push(lines, "- ui_mode: " + string(ui_mode_id) + " (" + ui_mode_name + ")");
@@ -138,6 +144,50 @@ if (audio_debug_enabled) {
     array_push(lines, "- direct_test_handle: " + string(direct_handle) + " playing=" + string(direct_playing));
     array_push(lines, "- current_bgm: key=" + bgm_key + " handle=" + string(bgm_handle) + " playing=" + string(bgm_playing));
     array_push(lines, "- status: " + last_status);
+}
+
+if (debug_enabled && debug_display_metrics) {
+    var win_w = max(1, window_get_width());
+    var win_h = max(1, window_get_height());
+    var disp_w = max(1, display_get_width());
+    var disp_h = max(1, display_get_height());
+    var gui_w_dbg = max(1, display_get_gui_width());
+    var gui_h_dbg = max(1, display_get_gui_height());
+
+    var vp_w = 0;
+    var vp_h = 0;
+    var vp_x = 0;
+    var vp_y = 0;
+    if (view_enabled) {
+        vp_x = round(view_xport[0]);
+        vp_y = round(view_yport[0]);
+        vp_w = max(1, round(view_wport[0]));
+        vp_h = max(1, round(view_hport[0]));
+    }
+
+    var cam_w = 0;
+    var cam_h = 0;
+    var cam = view_camera[0];
+    if (!is_undefined(cam) && cam != -1) {
+        cam_w = max(1, round(camera_get_view_width(cam)));
+        cam_h = max(1, round(camera_get_view_height(cam)));
+    }
+
+    var app_w = "n/a";
+    var app_h = "n/a";
+    if (surface_exists(application_surface)) {
+        app_w = string(surface_get_width(application_surface));
+        app_h = string(surface_get_height(application_surface));
+    }
+
+    array_push(lines, "");
+    array_push(lines, "display metrics:");
+    array_push(lines, "- window: " + string(win_w) + " x " + string(win_h));
+    array_push(lines, "- display: " + string(disp_w) + " x " + string(disp_h));
+    array_push(lines, "- gui: " + string(gui_w_dbg) + " x " + string(gui_h_dbg));
+    array_push(lines, "- viewport: " + string(vp_w) + " x " + string(vp_h) + " @ (" + string(vp_x) + ", " + string(vp_y) + ")");
+    array_push(lines, "- camera view: " + string(cam_w) + " x " + string(cam_h));
+    array_push(lines, "- application_surface: " + app_w + " x " + app_h);
 }
 
 var text_blob = "";

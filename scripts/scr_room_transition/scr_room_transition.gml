@@ -447,6 +447,9 @@ function Transition_Finish() {
     tr.flash_apply_class_pending = false;
     tr.flash_action = "";
     tr.flash_owner_inst = noone;
+
+    // Ensure viewport/gui/window scaling returns to shared settings after any transition.
+    GameSettings_ApplyDisplay();
 }
 
 function Transition_Update() {

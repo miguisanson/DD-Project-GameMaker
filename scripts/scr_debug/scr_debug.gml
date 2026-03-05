@@ -14,6 +14,9 @@ function Debug_Init() {
     if (!variable_struct_exists(global.debug, "enemy_damage_skill_only")) {
         global.debug.enemy_damage_skill_only = false;
     }
+    if (!variable_struct_exists(global.debug, "display_metrics")) {
+        global.debug.display_metrics = false;
+    }
 }
 
 function Debug_Record(_label) {
@@ -27,6 +30,7 @@ function Debug_Toggle() {
     global.debug.enabled = !global.debug.enabled;
     if (!global.debug.enabled) {
         global.debug.enemy_damage_skill_only = false;
+        global.debug.display_metrics = false;
     }
     Debug_Record("Toggle Debug: " + (global.debug.enabled ? "ON" : "OFF"));
 }
@@ -46,6 +50,13 @@ function Debug_ToggleEnemyDamageSkillOnly() {
     if (!global.debug.enabled) return;
     global.debug.enemy_damage_skill_only = !global.debug.enemy_damage_skill_only;
     Debug_Record("Enemy Damaging Skills Only: " + (global.debug.enemy_damage_skill_only ? "ON" : "OFF"));
+}
+
+function Debug_ToggleDisplayMetrics() {
+    Debug_Init();
+    if (!global.debug.enabled) return;
+    global.debug.display_metrics = !global.debug.display_metrics;
+    Debug_Record("Display Metrics Overlay: " + (global.debug.display_metrics ? "ON" : "OFF"));
 }
 
 function Debug_GiveAllItems() {
@@ -155,6 +166,7 @@ function Debug_Update() {
     if (Input_Pressed("debug_toggle")) Debug_Toggle();
     if (!Debug_IsEnabled()) return;
     if (Input_Pressed("debug_enemy_damage_skill")) Debug_ToggleEnemyDamageSkillOnly();
+    if (Input_Pressed("debug_display_metrics")) Debug_ToggleDisplayMetrics();
     if (Input_Pressed("debug_levelup")) Debug_LevelUp();
     if (Input_Pressed("debug_all_items")) Debug_GiveAllItems();
     if (Input_Pressed("debug_save")) Debug_Save();

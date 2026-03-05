@@ -41,6 +41,7 @@ function SkillDB_Init() {
         fx_sprite: stun_effect,
         fx_frames: 12,
         fx_speed: 0.2,
+        player_fx_speed_mult: 6.5,
         hits: 1,
         class_list: [CLASS_KNIGHT]
     };
@@ -253,6 +254,7 @@ function SkillDB_Init() {
         fx_sprite: ice_spear_effect,
         fx_frames: 12,
         fx_speed: 0.2,
+        player_fx_speed_mult: 6.5,
         hits: 1,
         class_list: [CLASS_MAGE]
     };
@@ -289,7 +291,7 @@ function SkillDB_Init() {
         target: TGT_SELF,
         effect: "status",
         status: STATUS_HIT_UP,
-        status_turns: 2,
+        status_turns: 3,
         status_chance: 1,
         icon_sprite: noone,
         fx_sprite: foresight_effect_Sheet,
@@ -907,7 +909,21 @@ function Skill_BuildAppliedStatusMessage(_applied_status_names) {
 function Skill_Use(_user, _target, _skill_id) {
     var s = SkillDB_Get(_skill_id);
     var user_is_player = (variable_struct_exists(_user, "is_player") && _user.is_player);
-    var fx_speed_mult = user_is_player ? PLAYER_SKILL_FX_SPEED_MULT : SKILL_FX_SPEED_MULT;
+    var player_vs_enemy_skill = user_is_player && (!variable_struct_exists(s, "target") || s.target != TGT_SELF);
+    var fx_speed_mult = SKILL_FX_SPEED_MULT;
+    if (user_is_player) {
+        fx_speed_mult = player_vs_enemy_skill ? PLAYER_SKILL_FX_SPEED_MULT : PLAYER_SKILL_FX_SPEED_MULT_NON_ENEMY;
+    }
+    var fx_speed = s.fx_speed * fx_speed_mult;
+    if (player_vs_enemy_skill && variable_struct_exists(s, "player_fx_speed_mult")) {
+        var per_skill_fx_mult = max(0, real(s.player_fx_speed_mult));
+        if (per_skill_fx_mult > 0) {
+            fx_speed = s.fx_speed * per_skill_fx_mult;
+        }
+    }
+    if (player_vs_enemy_skill) {
+        fx_speed = clamp(fx_speed, 0.01, PLAYER_SKILL_FX_SPEED_MAX);
+    }
     var result = {
         ok: true,
         hit: true,
@@ -916,7 +932,7 @@ function Skill_Use(_user, _target, _skill_id) {
         msg: "",
         fx_sprite: s.fx_sprite,
         fx_frames: s.fx_frames,
-        fx_speed: s.fx_speed * fx_speed_mult,
+        fx_speed: fx_speed,
         free_action: (variable_struct_exists(s, "free_action") && s.free_action),
         extra_turns: variable_struct_exists(s, "extra_turns") ? max(0, round(real(s.extra_turns))) : 0,
         set_enemy_actions: variable_struct_exists(s, "set_enemy_actions") ? max(0, round(real(s.set_enemy_actions))) : 0
@@ -1090,6 +1106,7 @@ function Skill_Use(_user, _target, _skill_id) {
 
         var crit_bonus = Status_GetSum(_user, "crit_bonus");
         var acc_bonus = s.acc + StatMod(Combat_EffectiveStat(_user, s.stat_type));
+        if (user_is_player) acc_bonus += PLAYER_SKILL_HIT_BONUS;
 
         for (var h = 0; h < hits; h++) {
             var hit_res = Combat_AttemptHit(_user, _target, acc_bonus);

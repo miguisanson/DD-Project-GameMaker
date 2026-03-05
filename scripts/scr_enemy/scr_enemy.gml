@@ -422,6 +422,13 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
         }
     }
 
+    if (variable_instance_exists(_inst, "ai_stationary") && _inst.ai_stationary) {
+        _inst.moving = false;
+        _inst.move_timer = 0;
+        _inst.move_dir = -1;
+        return;
+    }
+
     // --------------------
     // DECISION LOGIC
     // --------------------

@@ -67,6 +67,13 @@ if (!variable_instance_exists(id, "last_room_id")) {
     last_room_id = room;
 }
 
+if (!variable_instance_exists(id, "last_window_w")) last_window_w = max(1, window_get_width());
+if (!variable_instance_exists(id, "last_window_h")) last_window_h = max(1, window_get_height());
+if (!variable_instance_exists(id, "last_display_w")) last_display_w = max(1, display_get_width());
+if (!variable_instance_exists(id, "last_display_h")) last_display_h = max(1, display_get_height());
+if (!variable_instance_exists(id, "last_transition_active")) last_transition_active = Transition_IsActive();
+
+var need_display_refresh = false;
 if (room != last_room_id) {
     var prev_room = last_room_id;
     last_room_id = room;
@@ -74,8 +81,34 @@ if (room != last_room_id) {
         global.bgm_mix_restart_main_menu = true;
     }
     BGM_ApplyForRoom(room);
-    GameSettings_ApplyDisplay();
+    need_display_refresh = true;
 }
+
+var transition_now_active = Transition_IsActive();
+if (!transition_now_active && last_transition_active) {
+    need_display_refresh = true;
+}
+
+var cur_display_w = max(1, display_get_width());
+var cur_display_h = max(1, display_get_height());
+var cur_window_w = max(1, window_get_width());
+var cur_window_h = max(1, window_get_height());
+if (cur_display_w != last_display_w || cur_display_h != last_display_h || cur_window_w != last_window_w || cur_window_h != last_window_h) {
+    need_display_refresh = true;
+}
+
+if (need_display_refresh) {
+    GameSettings_ApplyDisplay();
+    cur_display_w = max(1, display_get_width());
+    cur_display_h = max(1, display_get_height());
+    cur_window_w = max(1, window_get_width());
+    cur_window_h = max(1, window_get_height());
+}
+last_display_w = cur_display_w;
+last_display_h = cur_display_h;
+last_window_w = cur_window_w;
+last_window_h = cur_window_h;
+last_transition_active = transition_now_active;
 
 if (!variable_global_exists("mouse_cursor_hidden")) global.mouse_cursor_hidden = false;
 var hide_cursor = window_has_focus();

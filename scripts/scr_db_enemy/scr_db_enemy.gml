@@ -242,7 +242,7 @@ function EnemyDB_Init() {
         auto_resolve_exp_mult: 0.35,
         auto_resolve_loot_mult: 1.00,
         loot_key: "enemy_boss",
-        ai: { scan_radius: 64, think_rate: 8, forget_delay: 60, leash_mult: 4, wander_chance: 2, move_speed: 1.15 },
+        ai: { scan_radius: 64, think_rate: 8, forget_delay: 60, leash_mult: 4, wander_chance: 0, move_speed: 1.15 },
         skills: [SKILL_RAMMING, SKILL_RAMPAGE],
         traits: [],
         is_boss: true

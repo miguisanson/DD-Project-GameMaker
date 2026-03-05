@@ -1230,8 +1230,8 @@ function GameSettings_ApplyAudio() {
 
 function GameSettings_ApplyDisplay() {
     var settings = GameSettings_Ensure();
-    var base_w = DISPLAY_BASE_W;
-    var base_h = DISPLAY_BASE_H;
+    var base_w = max(1, DISPLAY_BASE_W);
+    var base_h = max(1, DISPLAY_BASE_H);
 
     var scale_fixed = clamp(round(GameSettings_ToReal(settings.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
     settings.display_scale = scale_fixed;
@@ -1244,60 +1244,63 @@ function GameSettings_ApplyDisplay() {
         global.display_texfilter_init = true;
     }
 
-    var port_x = 0;
-    var port_y = 0;
-    var port_w = base_w;
-    var port_h = base_h;
+    view_enabled = true;
+    view_visible[0] = true;
 
+    var disp_w = max(1, display_get_width());
+    var disp_h = max(1, display_get_height());
     if (fit_screen) {
-        var disp_w = max(1, display_get_width());
-        var disp_h = max(1, display_get_height());
-
         if (window_get_width() != disp_w || window_get_height() != disp_h) {
             window_set_size(disp_w, disp_h);
         }
         if (window_get_x() != 0 || window_get_y() != 0) {
             window_set_position(0, 0);
         }
-
-        var fit_scale = min(disp_w / base_w, disp_h / base_h);
-        var scale_i = max(1, floor(fit_scale));
-        port_w = base_w * scale_i;
-        port_h = base_h * scale_i;
-        port_x = floor((disp_w - port_w) * 0.5);
-        port_y = floor((disp_h - port_h) * 0.5);
     } else {
-        var win_w = base_w * scale_fixed;
-        var win_h = base_h * scale_fixed;
-        if (window_get_width() != win_w || window_get_height() != win_h) {
-            window_set_size(win_w, win_h);
+        var fixed_w = base_w * scale_fixed;
+        var fixed_h = base_h * scale_fixed;
+        if (window_get_width() != fixed_w || window_get_height() != fixed_h) {
+            window_set_size(fixed_w, fixed_h);
             window_center();
         }
-
-        var target_w = max(1, window_get_width());
-        var target_h = max(1, window_get_height());
-        var used_scale = scale_fixed;
-
-        port_w = max(1, round(base_w * used_scale));
-        port_h = max(1, round(base_h * used_scale));
-        if (port_w > target_w) port_w = target_w;
-        if (port_h > target_h) port_h = target_h;
-        port_x = floor((target_w - port_w) * 0.5);
-        port_y = floor((target_h - port_h) * 0.5);
     }
 
-    if (view_enabled) {
-        view_visible[0] = true;
-        view_xport[0] = port_x;
-        view_yport[0] = port_y;
-        view_wport[0] = port_w;
-        view_hport[0] = port_h;
+    var win_w = max(1, window_get_width());
+    var win_h = max(1, window_get_height());
+    if (win_w <= 0 || win_h <= 0) {
+        win_w = disp_w;
+        win_h = disp_h;
     }
+
+    var fit_scale = min(win_w / base_w, win_h / base_h);
+    var used_scale = fit_screen ? max(1, floor(fit_scale)) : max(1, scale_fixed);
+    var port_w = max(1, round(base_w * used_scale));
+    var port_h = max(1, round(base_h * used_scale));
+    if (port_w > win_w || port_h > win_h) {
+        var dyn_scale = min(win_w / base_w, win_h / base_h);
+        port_w = max(1, round(base_w * dyn_scale));
+        port_h = max(1, round(base_h * dyn_scale));
+    }
+    var port_x = floor((win_w - port_w) * 0.5);
+    var port_y = floor((win_h - port_h) * 0.5);
+
+    view_xport[0] = port_x;
+    view_yport[0] = port_y;
+    view_wport[0] = port_w;
+    view_hport[0] = port_h;
 
     var cam = view_camera[0];
     if (!is_undefined(cam) && cam != -1) {
         camera_set_view_size(cam, base_w, base_h);
     }
+
+    if (surface_exists(application_surface)) {
+        if (surface_get_width(application_surface) != base_w || surface_get_height(application_surface) != base_h) {
+            surface_resize(application_surface, base_w, base_h);
+        }
+    }
+
+    display_set_gui_size(base_w, base_h);
 }
 
 function GameSettings_ApplyAll() {

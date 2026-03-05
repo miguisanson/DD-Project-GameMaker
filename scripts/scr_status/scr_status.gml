@@ -44,14 +44,14 @@ function Status_AssignPlayerBuffIconsFromFX() {
     var sp_dmg_up = Status_ResolveIcon("rev_up_effect", torch_asset_moving);
     var sp_evasion = Status_ResolveIcon("evasion_up_effect", tall_grass_asset);
     var sp_crit_up = Status_ResolveIcon("take_aim_effect", skull_2_asset);
-    var sp_hit_up = Status_ResolveIcon("foresight_effect_Sheet", horned_skull_asset);
+    var sp_hit_up = Status_ResolveIcon("foresight_effect_Sheet", Status_ResolveIcon("take_aim_effect", skull_2_asset));
     var sp_meditation = Status_ResolveIcon("meditation", mp_potion);
 
     Status_SetIcon(STATUS_GUARD, sp_guard, Status_LastFrame(sp_guard));
     Status_SetIcon(STATUS_DMG_UP, sp_dmg_up, Status_LastFrame(sp_dmg_up));
     Status_SetIcon(STATUS_EVASION, sp_evasion, Status_LastFrame(sp_evasion));
     Status_SetIcon(STATUS_CRIT_UP, sp_crit_up, Status_LastFrame(sp_crit_up));
-    Status_SetIcon(STATUS_HIT_UP, sp_hit_up, Status_LastFrame(sp_hit_up));
+    Status_SetIcon(STATUS_HIT_UP, sp_hit_up, 0);
     Status_SetIcon(STATUS_MEDITATION, sp_meditation, Status_LastFrame(sp_meditation));
 }
 
@@ -205,7 +205,8 @@ function StatusDB_Init() {
     global.status_db[? STATUS_HIT_UP] = {
         id: STATUS_HIT_UP,
         name: "Foresight",
-        icon_sprite: horned_skull_asset,
+        icon_sprite: Status_ResolveIcon("foresight_effect_Sheet", Status_ResolveIcon("take_aim_effect", skull_2_asset)),
+        icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
@@ -315,6 +316,26 @@ function Status_LocalizeRuntime(_status, _status_id = -1) {
     return _status;
 }
 
+function Status_Description(_status_id) {
+    switch (_status_id) {
+        case STATUS_POISON:      return Loc_T("status.desc.status_poison", "Lose 2-3 HP each turn.");
+        case STATUS_BLEED:       return Loc_T("status.desc.status_bleed", "Lose 2-4 HP each turn. AGI -2.");
+        case STATUS_BURN:        return Loc_T("status.desc.status_burn", "Lose 4-6 HP each turn. STR -1.");
+        case STATUS_STUN:        return Loc_T("status.desc.status_stun", "Cannot act.");
+        case STATUS_GUARD:       return Loc_T("status.desc.status_guard", "Blocks the next incoming hit.");
+        case STATUS_DMG_UP:      return Loc_T("status.desc.status_dmg_up", "Next attack deals double damage.");
+        case STATUS_EVASION:     return Loc_T("status.desc.status_evasion", "Dodges the next incoming attack.");
+        case STATUS_CRIT_UP:     return Loc_T("status.desc.status_crit_up", "Critical chance +25%.");
+        case STATUS_HIT_UP:      return Loc_T("status.desc.status_hit_up", "Next attack cannot miss.");
+        case STATUS_MEDITATION:  return Loc_T("status.desc.status_meditation", "Recover 2-4 MP each turn.");
+        case STATUS_SOLIDIFY:    return Loc_T("status.desc.status_solidify", "Dodges the next incoming attack.");
+        case STATUS_BLOODTHIRSTY:return Loc_T("status.desc.status_bloodthirsty", "Until hit: take -35%, deal +6% damage.");
+        case STATUS_BLESSING:    return Loc_T("status.desc.status_blessing", "Next incoming hit deals 20% less damage.");
+        case STATUS_SUNDER:      return Loc_T("status.desc.status_sunder", "DEF -1.");
+    }
+    return "";
+}
+
 function Status_Has(_ch, _status_id) {
     if (!is_array(_ch.status)) return false;
     for (var i = 0; i < array_length(_ch.status); i++) {
@@ -343,6 +364,11 @@ function Status_RemoveList(_ch, _list) {
             }
         }
     }
+    return _ch;
+}
+
+function Status_ClearAll(_ch) {
+    _ch.status = [];
     return _ch;
 }
 
@@ -451,13 +477,17 @@ function Status_Tick(_ch) {
             if (variable_struct_exists(t, "mp_max")) mp_max = t.mp_max;
         }
 
-        if (hp_min != 0 || hp_max != 0) {
-            var delta_hp = (hp_min == hp_max) ? hp_min : irandom_range(hp_min, hp_max);
+        var hp_low = min(hp_min, hp_max);
+        var hp_high = max(hp_min, hp_max);
+        if (hp_low != 0 || hp_high != 0) {
+            var delta_hp = (hp_low == hp_high) ? hp_low : irandom_range(hp_low, hp_high);
             _ch.hp = clamp(_ch.hp + delta_hp, 0, _ch.max_hp);
         }
 
-        if (mp_min != 0 || mp_max != 0) {
-            var delta_mp = (mp_min == mp_max) ? mp_min : irandom_range(mp_min, mp_max);
+        var mp_low = min(mp_min, mp_max);
+        var mp_high = max(mp_min, mp_max);
+        if (mp_low != 0 || mp_high != 0) {
+            var delta_mp = (mp_low == mp_high) ? mp_low : irandom_range(mp_low, mp_high);
             _ch.mp = clamp(_ch.mp + delta_mp, 0, _ch.max_mp);
         }
 
@@ -503,7 +533,7 @@ function Status_LabelWithSign(_cfg, _status_id) {
     if (is_struct(_cfg) && variable_struct_exists(_cfg, "name")) {
         name_txt = string(_cfg.name);
     }
-    var suffix = Status_IsNegative(_status_id) ? " -" : " +";
+    var suffix = Status_IsNegative(_status_id) ? "-" : "+";
     return name_txt + suffix;
 }
 
@@ -535,7 +565,7 @@ function Status_DrawIcons(_ch, _x, _y, _spacing = 10, _rtl = false, _noncore_tex
             var cfg = StatusDB_Get(_ch.status[i].id);
             var sid = _ch.status[i].id;
             var has_sprite = (variable_struct_exists(cfg, "icon_sprite") && cfg.icon_sprite != noone);
-            var use_text_fallback = noncore_text_fallback && (!has_sprite || !Status_UsesCoreIconSprite(sid, cfg.icon_sprite));
+            var use_text_fallback = (!has_sprite) || (noncore_text_fallback && !Status_UsesCoreIconSprite(sid, cfg.icon_sprite));
             if (use_text_fallback) {
                 var tag_w = Status_DrawFallbackLabel(cfg, sid, _x + off, _y);
                 off += max(spacing, tag_w + 4);
@@ -553,7 +583,7 @@ function Status_DrawIcons(_ch, _x, _y, _spacing = 10, _rtl = false, _noncore_tex
             var cfg2 = StatusDB_Get(_ch.status[i].id);
             var sid2 = _ch.status[i].id;
             var has_sprite2 = (variable_struct_exists(cfg2, "icon_sprite") && cfg2.icon_sprite != noone);
-            var use_text_fallback2 = noncore_text_fallback && (!has_sprite2 || !Status_UsesCoreIconSprite(sid2, cfg2.icon_sprite));
+            var use_text_fallback2 = (!has_sprite2) || (noncore_text_fallback && !Status_UsesCoreIconSprite(sid2, cfg2.icon_sprite));
             if (use_text_fallback2) {
                 var tag_w2 = Status_DrawFallbackLabel(cfg2, sid2, _x + off, _y);
                 off += max(spacing, tag_w2 + 4);

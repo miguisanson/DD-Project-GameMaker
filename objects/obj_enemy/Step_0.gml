@@ -37,6 +37,15 @@ if (!instance_exists(pl)) exit;
 
 // Safety net: collision events can occasionally be missed on long overlaps.
 // If player and enemy are currently overlapping, queue encounter directly.
+if (!encounter_pending && variable_instance_exists(id, "ai_stationary") && ai_stationary) {
+    if (!variable_instance_exists(pl, "battle_cooldown") || pl.battle_cooldown <= 0) {
+        if (abs(pl.x - x) <= scan_radius && abs(pl.y - y) <= scan_radius) {
+            encounter_pending = true;
+            encounter_player = pl;
+        }
+    }
+}
+
 if (!encounter_pending) {
     if (!variable_instance_exists(pl, "battle_cooldown") || pl.battle_cooldown <= 0) {
         if (place_meeting(x, y, obj_player)) {
