@@ -1300,7 +1300,9 @@ function GameSettings_ApplyDisplay() {
         }
     }
 
-    display_set_gui_size(base_w, base_h);
+    // Keep GUI virtual size synced to the active window so all menus/dialogue
+    // scale dynamically with resolution changes and aspect differences.
+    display_set_gui_size(win_w, win_h);
 }
 
 function GameSettings_ApplyAll() {

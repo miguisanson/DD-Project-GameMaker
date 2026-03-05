@@ -33,8 +33,14 @@ if (room == rm_battle && is_struct(ch)) {
     var bar_h = sprite_get_height(hp_bar_sprite) * scale;
 
     var cam = view_camera[0];
-    var sx = w / camera_get_view_width(cam);
-    var sy = h / camera_get_view_height(cam);
+    var vp_w = w;
+    var vp_h = h;
+    if (view_enabled) {
+        vp_w = max(1, view_wport[0]);
+        vp_h = max(1, view_hport[0]);
+    }
+    var sx = vp_w / max(1, camera_get_view_width(cam));
+    var sy = vp_h / max(1, camera_get_view_height(cam));
     var cam_off = CameraShake_Offset();
     var gui_off_x = cam_off.x * sx;
     var gui_off_y = cam_off.y * sy;

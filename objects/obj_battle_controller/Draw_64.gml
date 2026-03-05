@@ -27,8 +27,18 @@ var vy = base_y + cam_off.y;
 camera_set_view_pos(cam, vx, vy);
 var vw = camera_get_view_width(cam);
 var vh = camera_get_view_height(cam);
-var sx = w / vw;
-var sy = h / vh;
+var port_x = 0;
+var port_y = 0;
+var port_w = w;
+var port_h = h;
+if (view_enabled) {
+    port_x = view_xport[0];
+    port_y = view_yport[0];
+    port_w = max(1, view_wport[0]);
+    port_h = max(1, view_hport[0]);
+}
+var sx = port_w / max(1, vw);
+var sy = port_h / max(1, vh);
 var gui_off_x = cam_off.x * sx;
 var gui_off_y = cam_off.y * sy;
 var row_h = max(16, string_height("A") + 2);
@@ -173,8 +183,8 @@ if (log_count > 0) {
 // Enemy status icons below sprite (battle only)
 if (instance_exists(enemy_inst)) {
     var espr = enemy_inst.sprite_index;
-    var ex = (enemy_inst.x - sprite_get_xoffset(espr) - vx) * sx;
-    var ey = (enemy_inst.y - sprite_get_yoffset(espr) - vy) * sy;
+    var ex = port_x + ((enemy_inst.x - sprite_get_xoffset(espr) - vx) * sx);
+    var ey = port_y + ((enemy_inst.y - sprite_get_yoffset(espr) - vy) * sy);
     var ew = sprite_get_width(espr) * sx;
     var eh = sprite_get_height(espr) * sy;
     var icon_y = ey + eh + 4;
@@ -192,8 +202,8 @@ var bh = box_h;
 // enemy sprite draw with shake/flash
 if (instance_exists(enemy_inst)) {
     var off = SpriteShake_Offset(enemy_inst);
-    var exs = (enemy_inst.x + off.x - vx) * sx;
-    var eys = (enemy_inst.y + off.y - vy) * sy;
+    var exs = port_x + ((enemy_inst.x + off.x - vx) * sx);
+    var eys = port_y + ((enemy_inst.y + off.y - vy) * sy);
     var scx = enemy_inst.image_xscale * sx;
     var scy = enemy_inst.image_yscale * sy;
     if (off.flash) gpu_set_blendmode(bm_add);
@@ -245,8 +255,8 @@ if (attack_timing_result_timer > 0 && attack_timing_result_text != "") {
 // FX draw (battle-only), over enemy sprite
 with (obj_fx) {
     if (sprite_index != noone) {
-        var fx_x = (x - vx) * sx;
-        var fx_y = (y - vy) * sy;
+        var fx_x = port_x + ((x - vx) * sx);
+        var fx_y = port_y + ((y - vy) * sy);
         var fx_sx = image_xscale * sx;
         var fx_sy = image_yscale * sy;
         draw_sprite_ext(sprite_index, image_index, fx_x, fx_y, fx_sx, fx_sy, image_angle, image_blend, image_alpha * enemy_fade_alpha);
@@ -273,7 +283,7 @@ if (skill_banner_active && skill_banner_name != "") {
         if (bspr != noone && bspr != -1) {
             var boff = SpriteShake_Offset(enemy_inst);
             var bbox_top_px = sprite_get_bbox_top(bspr);
-            var enemy_top_screen = (enemy_inst.y + boff.y - sprite_get_yoffset(bspr) + bbox_top_px - vy) * sy;
+            var enemy_top_screen = port_y + ((enemy_inst.y + boff.y - sprite_get_yoffset(bspr) + bbox_top_px - vy) * sy);
             banner_y = enemy_top_screen - banner_h - 4;
         }
     }
@@ -305,8 +315,8 @@ if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qt
             var qspr = enemy_inst.sprite_index;
             if (qspr != noone && qspr != -1) {
                 var qox = SpriteShake_Offset(enemy_inst);
-                var qex = (enemy_inst.x + qox.x - sprite_get_xoffset(qspr) - vx) * sx;
-                var qey = (enemy_inst.y + qox.y - sprite_get_yoffset(qspr) - vy) * sy;
+                var qex = port_x + ((enemy_inst.x + qox.x - sprite_get_xoffset(qspr) - vx) * sx);
+                var qey = port_y + ((enemy_inst.y + qox.y - sprite_get_yoffset(qspr) - vy) * sy);
                 var qew = sprite_get_width(qspr) * sx;
                 var qeh = sprite_get_height(qspr) * abs(enemy_inst.image_yscale) * sy;
                 var enemy_bottom_screen = qey + qeh;
@@ -356,8 +366,8 @@ if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.e
     if (instance_exists(enemy_inst)) {
         var off2 = SpriteShake_Offset(enemy_inst);
         var espr2 = enemy_inst.sprite_index;
-        var ex2 = (enemy_inst.x + off2.x - sprite_get_xoffset(espr2) - vx) * sx;
-        var ey2 = (enemy_inst.y + off2.y - sprite_get_yoffset(espr2) - vy) * sy;
+        var ex2 = port_x + ((enemy_inst.x + off2.x - sprite_get_xoffset(espr2) - vx) * sx);
+        var ey2 = port_y + ((enemy_inst.y + off2.y - sprite_get_yoffset(espr2) - vy) * sy);
         draw_set_color(c_white);
         draw_text(ex2, ey2 - 12, string(e.hp));
     }

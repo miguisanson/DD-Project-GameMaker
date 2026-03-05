@@ -415,13 +415,23 @@ function Battle_AttackTimingTarget(_bc) {
         var vy = _bc.cam_base_y;
         var vw = max(1, camera_get_view_width(cam));
         var vh = max(1, camera_get_view_height(cam));
-        var sx = gui_w / vw;
-        var sy = gui_h / vh;
+        var port_x = 0;
+        var port_y = 0;
+        var port_w = gui_w;
+        var port_h = gui_h;
+        if (view_enabled) {
+            port_x = view_xport[0];
+            port_y = view_yport[0];
+            port_w = max(1, view_wport[0]);
+            port_h = max(1, view_hport[0]);
+        }
+        var sx = port_w / vw;
+        var sy = port_h / vh;
 
         var espr = _bc.enemy_inst.sprite_index;
         if (espr != noone) {
-            var ex = (_bc.enemy_inst.x - sprite_get_xoffset(espr) - vx) * sx;
-            var ey = (_bc.enemy_inst.y - sprite_get_yoffset(espr) - vy) * sy;
+            var ex = port_x + ((_bc.enemy_inst.x - sprite_get_xoffset(espr) - vx) * sx);
+            var ey = port_y + ((_bc.enemy_inst.y - sprite_get_yoffset(espr) - vy) * sy);
             var ew = sprite_get_width(espr) * abs(_bc.enemy_inst.image_xscale) * sx;
             var eh = sprite_get_height(espr) * abs(_bc.enemy_inst.image_yscale) * sy;
             tx = ex + (ew * 0.5);
