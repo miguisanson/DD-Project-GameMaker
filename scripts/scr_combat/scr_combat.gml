@@ -443,7 +443,7 @@ function Battle_AttackTimingTarget(_bc) {
 }
 
 function Battle_AttackTimingJudge(_delta) {
-    var d = abs(_delta);
+    var d = abs(_delta) / max(0.0001, UI_GetVisualScale());
     if (d <= ATTACK_WINDOW_PERFECT) return { key: "PERFECT", label: Loc_T("battle.action.timing.perfect", "PERFECT"), mult: 1.00, hit: true };
     if (d <= ATTACK_WINDOW_GOOD)    return { key: "GOOD",    label: Loc_T("battle.action.timing.good", "GOOD"),       mult: 0.75, hit: true };
     if (d <= ATTACK_WINDOW_OKAY)    return { key: "OKAY",    label: Loc_T("battle.action.timing.okay", "OKAY"),       mult: 0.50, hit: true };
@@ -503,7 +503,7 @@ function Battle_AttackTimingBegin(_bc) {
     _bc.attack_timing_target_x = target.x;
     _bc.attack_timing_target_y = target.y;
     _bc.attack_timing_x = target.x;
-    _bc.attack_timing_y = -ATTACK_TIMING_START_OFFSET;
+    _bc.attack_timing_y = -round(ATTACK_TIMING_START_OFFSET * UI_GetVisualScale());
     _bc.attack_timing_input_lock = max(0, ATTACK_TIMING_INPUT_LOCK_FRAMES);
     _bc.attack_timing_active = true;
     _bc.attack_timing_started = true;
@@ -633,7 +633,8 @@ function Battle_PlayerAttackTimingStep(_bc, _confirm_pressed) {
         return;
     }
 
-    var late_limit = _bc.attack_timing_target_y + ATTACK_WINDOW_BAD + ATTACK_TIMING_END_MARGIN;
+    var ui_visual = UI_GetVisualScale();
+    var late_limit = _bc.attack_timing_target_y + round(ATTACK_WINDOW_BAD * ui_visual) + round(ATTACK_TIMING_END_MARGIN * ui_visual);
     if (_bc.attack_timing_y >= late_limit) {
         Battle_PlayerAttackResolveTimed(_bc, { key: "MISS", label: Loc_T("battle.action.timing.miss", "MISS"), mult: 0.00, hit: false });
         return;
@@ -988,7 +989,7 @@ function Battle_AttackTimingSpeedMultForEnemy(_enemy) {
 }
 
 function Battle_AttackTimingSpeedForEnemy(_enemy) {
-    return ATTACK_TIMING_SPEED * Battle_AttackTimingSpeedMultForEnemy(_enemy);
+    return ATTACK_TIMING_SPEED * UI_GetVisualScale() * Battle_AttackTimingSpeedMultForEnemy(_enemy);
 }
 
 function Battle_DefQTERandomDir() {

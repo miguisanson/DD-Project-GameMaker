@@ -1,9 +1,10 @@
 var gs = GameState_Get();
 var w = display_get_gui_width();
 var h = display_get_gui_height();
-var margin = 8;
 
 UI_SetFont();
+var ui_visual = UI_GetVisualScale();
+var margin = max(6, round(8 * ui_visual));
 
 draw_set_alpha(1);
 
@@ -28,7 +29,9 @@ if (room == rm_battle && is_struct(ch)) {
     if (ch.max_mp > 0) mp_ratio = clamp(ch.mp / ch.max_mp, 0, 1);
     var mp_frame = clamp(floor(mp_ratio * max_frame), 0, max_frame);
 
-    var scale = UI_BAR_SCALE;
+    var scale = UI_BAR_SCALE * ui_visual;
+    var bar_gap = max(2, round(4 * ui_visual));
+    var text_gap = max(4, round(6 * ui_visual));
     var bar_w = sprite_get_width(hp_bar_sprite) * scale;
     var bar_h = sprite_get_height(hp_bar_sprite) * scale;
 
@@ -48,25 +51,25 @@ if (room == rm_battle && is_struct(ch)) {
     var bar_x = margin + gui_off_x;
     var bar_y = margin + gui_off_y;
     draw_sprite_ext(hp_bar_sprite, hp_frame, bar_x, bar_y, scale, scale, 0, c_white, 1);
-    draw_sprite_ext(mp_bar_sprite, mp_frame, bar_x, bar_y + bar_h + 4, scale, scale, 0, c_white, 1);
+    draw_sprite_ext(mp_bar_sprite, mp_frame, bar_x, bar_y + bar_h + bar_gap, scale, scale, 0, c_white, 1);
     if (variable_instance_exists(id, "hud_hurt_flash_timer") && hud_hurt_flash_timer > 0) {
         var flash_t = clamp(hud_hurt_flash_timer / max(1, UI_HUD_HURT_FLASH_FRAMES), 0, 1);
         var flash_a = UI_HUD_HURT_FLASH_ALPHA * flash_t;
         gpu_set_blendmode(bm_add);
         draw_sprite_ext(hp_bar_sprite, hp_frame, bar_x, bar_y, scale, scale, 0, c_white, flash_a);
-        draw_sprite_ext(mp_bar_sprite, mp_frame, bar_x, bar_y + bar_h + 4, scale, scale, 0, c_white, flash_a);
+        draw_sprite_ext(mp_bar_sprite, mp_frame, bar_x, bar_y + bar_h + bar_gap, scale, scale, 0, c_white, flash_a);
         gpu_set_blendmode(bm_normal);
     }
 
     draw_set_color(c_white);
     var hp_text = string(ch.hp) + " / " + string(ch.max_hp);
     var mp_text = string(ch.mp) + " / " + string(ch.max_mp);
-    UI_DrawText(bar_x + bar_w + 6, bar_y, hp_text);
-    UI_DrawText(bar_x + bar_w + 6, bar_y + bar_h + 4, mp_text);
+    UI_DrawText(bar_x + bar_w + text_gap, bar_y, hp_text);
+    UI_DrawText(bar_x + bar_w + text_gap, bar_y + bar_h + bar_gap, mp_text);
 
     // Player status icons below MP bar
-    var icon_y = bar_y + (bar_h * 2) + 10;
-    Status_DrawIcons(ch, bar_x, icon_y, 12, false);
+    var icon_y = bar_y + (bar_h * 2) + bar_gap + max(6, round(10 * ui_visual));
+    Status_DrawIcons(ch, bar_x, icon_y, 12, false, true);
 
 }
 
@@ -155,10 +158,12 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     if (variable_struct_exists(gs.ui, "speaker")) speaker = gs.ui.speaker;
     var layout = Dialogue_TextLayout(speaker);
     var icon_draw_w = 0;
+    var line_icon_scale = ui_visual;
+    var icon_text_gap = max(2, round(4 * ui_visual));
     if (line_icon_sprite != noone && line_icon_sprite != -1) {
         var icon_max_sub = max(0, sprite_get_number(line_icon_sprite) - 1);
         line_icon_subimg = clamp(line_icon_subimg, 0, icon_max_sub);
-        icon_draw_w = max(10, sprite_get_width(line_icon_sprite)) + 4;
+        icon_draw_w = max(round(10 * line_icon_scale), round(sprite_get_width(line_icon_sprite) * line_icon_scale)) + icon_text_gap;
     }
     var text_x = layout.text_x + icon_draw_w;
     var text_y = layout.text_y;
@@ -176,7 +181,7 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
         var visible_count0 = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text0);
         visible_count0 = clamp(visible_count0, 0, string_length(page_text0));
         var visible_text0 = string_copy(page_text0, 1, visible_count0);
-        if (icon_draw_w > 0) draw_sprite(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1);
+        if (icon_draw_w > 0) draw_sprite_ext(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1, line_icon_scale, line_icon_scale, 0, c_white, 1);
         if (cutscene_text_only) {
             draw_set_color(c_black);
             UI_DrawText(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text0);
@@ -189,7 +194,7 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
         var visible_count = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text);
         visible_count = clamp(visible_count, 0, string_length(page_text));
         var visible_text = string_copy(page_text, 1, visible_count);
-        if (icon_draw_w > 0) draw_sprite(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1);
+        if (icon_draw_w > 0) draw_sprite_ext(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1, line_icon_scale, line_icon_scale, 0, c_white, 1);
         if (cutscene_text_only) {
             draw_set_color(c_black);
             UI_DrawText(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text);

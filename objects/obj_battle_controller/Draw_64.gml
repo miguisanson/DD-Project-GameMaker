@@ -1,4 +1,5 @@
-var margin = 16;
+var ui_visual = UI_GetVisualScale();
+var margin = max(8, round(16 * ui_visual));
 var box_h = 96;
 
 var w = display_get_gui_width();
@@ -42,6 +43,7 @@ var sy = port_h / max(1, vh);
 var gui_off_x = cam_off.x * sx;
 var gui_off_y = cam_off.y * sy;
 var row_h = max(16, UI_TextHeight("A") + 2);
+box_h = max(round(96 * ui_visual), row_h * 5 + max(8, round(12 * ui_visual)));
 
 var __wrap_for_width = function(_text, _max_width) {
     var wrapped = [];
@@ -115,6 +117,7 @@ var log_lines = combat_log;
 var log_count = array_length(log_lines);
 var log_visible_lines = 6;
 var log_line_h = max(12, UI_TextHeight("A") + 1);
+var log_icon_gap = max(2, round(4 * ui_visual));
 var log_bottom = margin + (log_visible_lines * log_line_h);
 if (log_count > 0) {
     var max_w = w * 0.45;
@@ -138,12 +141,12 @@ if (log_count > 0) {
         var icon_w = 0;
         if (icon_sprite != noone && icon_sprite != -1) {
             var iw = max(1, sprite_get_width(icon_sprite));
-            icon_w = max(10, iw);
+            icon_w = max(round(10 * ui_visual), round(iw * ui_visual));
             var max_sub = max(0, sprite_get_number(icon_sprite) - 1);
             icon_subimg = clamp(icon_subimg, 0, max_sub);
         }
 
-        var max_text_w = max(24, max_w - ((icon_w > 0) ? (icon_w + 4) : 0));
+        var max_text_w = max(24, max_w - ((icon_w > 0) ? (icon_w + log_icon_gap) : 0));
         var wrapped_lines = __wrap_for_width(line, max_text_w);
 
         for (var wi = 0; wi < array_length(wrapped_lines); wi++) {
@@ -167,13 +170,13 @@ if (log_count > 0) {
     for (var ri = draw_start; ri < row_count; ri++) {
         var row = ri - draw_start;
         var r = log_rows[ri];
-        var line_w = UI_TextWidth(r.text) + (r.show_icon ? (r.icon_w + 4) : 0);
+        var line_w = UI_TextWidth(r.text) + (r.show_icon ? (r.icon_w + log_icon_gap) : 0);
         var lx = log_base_x - line_w;
         var ly = log_base_y + row * log_line_h;
 
         if (r.show_icon && r.icon_sprite != noone && r.icon_sprite != -1) {
-            draw_sprite(r.icon_sprite, r.icon_subimg, lx, ly + 1);
-            lx += r.icon_w + 4;
+            draw_sprite_ext(r.icon_sprite, r.icon_subimg, lx, ly + 1, ui_visual, ui_visual, 0, c_white, 1);
+            lx += r.icon_w + log_icon_gap;
         }
 
         UI_DrawText(lx, ly, r.text);
@@ -187,7 +190,7 @@ if (instance_exists(enemy_inst)) {
     var ey = port_y + ((enemy_inst.y - sprite_get_yoffset(espr) - vy) * sy);
     var ew = sprite_get_width(espr) * sx;
     var eh = sprite_get_height(espr) * sy;
-    var icon_y = ey + eh + 4;
+    var icon_y = ey + eh + max(2, round(4 * ui_visual));
     draw_set_alpha(enemy_fade_alpha);
     Status_DrawIcons(e, ex, icon_y, 12, false, true);
     draw_set_alpha(1);
@@ -220,7 +223,7 @@ if (battle_state == BSTATE_ATTACK_TIMING && attack_timing_active) {
     var marker_alpha = clamp(attack_timing_marker_alpha, 0, 1);
     var target_sp = attack_timing_target_sprite;
     var fall_sp = attack_timing_falling_sprite;
-    var s = ATTACK_TIMING_SPRITE_SCALE;
+    var s = ATTACK_TIMING_SPRITE_SCALE * ui_visual;
 
     if (target_sp != -1 && target_sp != noone) {
         var tw = sprite_get_width(target_sp) * s;
@@ -243,7 +246,7 @@ if (battle_state == BSTATE_ATTACK_TIMING && attack_timing_active) {
 // Timed ATTACK feedback text
 if (attack_timing_result_timer > 0 && attack_timing_result_text != "") {
     var t_norm = clamp(attack_timing_result_timer / max(1, ATTACK_TIMING_FEEDBACK_FRAMES), 0, 1);
-    var tyf = attack_timing_target_y - 12 - ((1 - t_norm) * 6);
+    var tyf = attack_timing_target_y - round(12 * ui_visual) - ((1 - t_norm) * round(6 * ui_visual));
     var txf = attack_timing_target_x - (UI_TextWidth(attack_timing_result_text) * 0.5);
     draw_set_alpha(1);
     draw_set_color(c_black);
@@ -265,17 +268,17 @@ with (obj_fx) {
 
 // Skill banner (drawn after enemy/FX so it stays in front, above enemy sprite).
 if (skill_banner_active && skill_banner_name != "") {
-    var bar_scale = UI_BAR_SCALE;
+    var bar_scale = UI_BAR_SCALE * ui_visual;
     var hp_bar_h = sprite_get_height(hp_bar) * bar_scale;
     var mp_bar_h = sprite_get_height(mp_bar) * bar_scale;
-    var hud_margin = 8;
+    var hud_margin = max(4, round(8 * ui_visual));
     var hud_top = hud_margin + gui_off_y;
-    var hud_bottom = hud_top + hp_bar_h + mp_bar_h + 4;
-    var banner_h = UI_TextHeight("A") + 8;
+    var hud_bottom = hud_top + hp_bar_h + mp_bar_h + max(2, round(4 * ui_visual));
+    var banner_h = UI_TextHeight("A") + max(6, round(8 * ui_visual));
 
     // Keep clear of HP/MP HUD; place above enemy sprite whenever possible.
-    var min_banner_y = hud_bottom + 6;
-    var max_banner_y = h - box_h - margin - banner_h - 4;
+    var min_banner_y = hud_bottom + max(4, round(6 * ui_visual));
+    var max_banner_y = h - box_h - margin - banner_h - max(2, round(4 * ui_visual));
     var banner_y = min_banner_y;
 
     if (instance_exists(enemy_inst)) {
@@ -284,7 +287,7 @@ if (skill_banner_active && skill_banner_name != "") {
             var boff = SpriteShake_Offset(enemy_inst);
             var bbox_top_px = sprite_get_bbox_top(bspr);
             var enemy_top_screen = port_y + ((enemy_inst.y + boff.y - sprite_get_yoffset(bspr) + bbox_top_px - vy) * sy);
-            banner_y = enemy_top_screen - banner_h - 4;
+            banner_y = enemy_top_screen - banner_h - max(2, round(4 * ui_visual));
         }
     }
     banner_y = clamp(banner_y, min_banner_y, max_banner_y);
@@ -320,33 +323,34 @@ if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qt
                 var qew = sprite_get_width(qspr) * sx;
                 var qeh = sprite_get_height(qspr) * abs(enemy_inst.image_yscale) * sy;
                 var enemy_bottom_screen = qey + qeh;
-                var status_bottom_screen = enemy_bottom_screen + 4 + 12;
+                var status_bottom_screen = enemy_bottom_screen + max(2, round(4 * ui_visual)) + max(10, round(12 * ui_visual));
                 qx = qex + (qew * 0.5);
-                qy = status_bottom_screen + 18;
+                qy = status_bottom_screen + max(12, round(18 * ui_visual));
             }
         }
-        var qte_hud_margin = 8;
+        var qte_hud_margin = max(4, round(8 * ui_visual));
         var qte_hud_top = qte_hud_margin + gui_off_y;
-        var qte_hud_bottom = qte_hud_top + (sprite_get_height(hp_bar) * UI_BAR_SCALE) + (sprite_get_height(mp_bar) * UI_BAR_SCALE) + 4;
-        var qte_min_y = qte_hud_bottom + 24;
-        var qte_max_y = h - box_h - margin - 40;
+        var qte_hud_bottom = qte_hud_top + (sprite_get_height(hp_bar) * UI_BAR_SCALE * ui_visual) + (sprite_get_height(mp_bar) * UI_BAR_SCALE * ui_visual) + max(2, round(4 * ui_visual));
+        var qte_min_y = qte_hud_bottom + max(12, round(24 * ui_visual));
+        var qte_max_y = h - box_h - margin - max(20, round(40 * ui_visual));
         qy = clamp(qy, qte_min_y, max(qte_min_y, qte_max_y));
 
         var q_col = c_white;
         if (enemy_def_qte_phase == 2) q_col = enemy_def_qte_feedback_ok ? c_lime : c_red;
-        Battle_DrawDirectionArrow(qx, qy, q_dir, DEF_QTE_ARROW_BASE_SIZE * q_scale, q_alpha, q_col);
+        Battle_DrawDirectionArrow(qx, qy, q_dir, DEF_QTE_ARROW_BASE_SIZE * q_scale * ui_visual, q_alpha, q_col);
 
         // Progress bar only (kept below arrow so it never overlaps the prompt icon).
         if (enemy_def_qte_phase == 1 && enemy_def_qte_response_frames > 0) {
             var q_ratio = clamp(enemy_def_qte_timer / max(1, enemy_def_qte_response_frames), 0, 1);
-            var qbw = 50;
-            var qbh = 5;
+            var qbw = max(24, round(50 * ui_visual));
+            var qbh = max(3, round(5 * ui_visual));
             var qbx = qx - (qbw * 0.5);
-            var qby = qy + 14;
+            var qby = qy + max(8, round(14 * ui_visual));
+            var q_border = max(1, round(2 * ui_visual));
 
             draw_set_alpha(q_alpha * 0.95);
             draw_set_color(c_black);
-            draw_rectangle(qbx - 2, qby - 2, qbx + qbw + 2, qby + qbh + 2, false);
+            draw_rectangle(qbx - q_border, qby - q_border, qbx + qbw + q_border, qby + qbh + q_border, false);
             draw_set_color(c_white);
             draw_rectangle(qbx - 1, qby - 1, qbx + qbw + 1, qby + qbh + 1, true);
             draw_set_color(c_black);
@@ -375,13 +379,13 @@ if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.e
 
 // MENU STATES ONLY
 if (battle_state == BSTATE_MENU || battle_state == BSTATE_SKILL_MENU || battle_state == BSTATE_ITEM_MENU) {
-    var box_pad = 12;
+    var box_pad = max(8, round(12 * ui_visual));
     if (battle_state == BSTATE_MENU) {
         var max_label_w = 0;
         for (var i = 0; i < array_length(battle_actions); i++) {
             max_label_w = max(max_label_w, UI_TextWidth(battle_actions[i].label));
         }
-        var selector_pad = 16;
+        var selector_pad = max(10, round(16 * ui_visual));
         bw = max_label_w + box_pad * 2 + selector_pad;
         bh = (array_length(battle_actions) * row_h) + box_pad * 2;
         bx = w - margin - bw + gui_off_x;
@@ -401,13 +405,16 @@ if (battle_state == BSTATE_MENU || battle_state == BSTATE_SKILL_MENU || battle_s
 
 // command menu
 if (battle_state == BSTATE_MENU && turn == TURN_PLAYER) {
-    var mx = bx + 16;
-    var my = by + 12;
+    var menu_pad_x = max(10, round(16 * ui_visual));
+    var menu_pad_y = max(8, round(12 * ui_visual));
+    var pointer_off = max(8, round(12 * ui_visual));
+    var mx = bx + menu_pad_x;
+    var my = by + menu_pad_y;
 
     for (var i = 0; i < array_length(battle_actions); i++) {
         var yy = my + i * row_h;
         if (i == menu_index) {
-            UI_DrawText(mx - 12, yy, ">");
+            UI_DrawText(mx - pointer_off, yy, ">");
         }
         UI_DrawText(mx, yy, battle_actions[i].label);
     }
@@ -416,8 +423,14 @@ if (battle_state == BSTATE_MENU && turn == TURN_PLAYER) {
 // skill menu
 if (battle_state == BSTATE_SKILL_MENU) {
     var skills = Battle_GetSkillList(self);
-    var mx2 = bx + 12;
-    var my2 = by + 12;
+    var menu_pad_x2 = max(8, round(12 * ui_visual));
+    var menu_pad_y2 = max(8, round(12 * ui_visual));
+    var pointer_off2 = max(7, round(10 * ui_visual));
+    var icon_scale2 = ui_visual;
+    var icon_min_w2 = max(10, round(16 * ui_visual));
+    var icon_y_off2 = max(1, round(2 * ui_visual));
+    var mx2 = bx + menu_pad_x2;
+    var my2 = by + menu_pad_y2;
 
     var skill_count = array_length(skills);
     var total = skill_count + 1;
@@ -429,15 +442,15 @@ if (battle_state == BSTATE_SKILL_MENU) {
         var row = s - start;
         var yy = my2 + row * row_h;
         if (s == skill_count) {
-            if (s == skill_index) UI_DrawText(mx2 - 10, yy, ">");
+            if (s == skill_index) UI_DrawText(mx2 - pointer_off2, yy, ">");
             UI_DrawText(mx2, yy, Loc_T("battle.menu.back", "Back"));
         } else {
             var sk = SkillDB_Get(skills[s]);
-            if (s == skill_index) UI_DrawText(mx2 - 10, yy, ">");
+            if (s == skill_index) UI_DrawText(mx2 - pointer_off2, yy, ">");
             var tx = mx2;
             if (sk.icon_sprite != noone) {
-                draw_sprite(sk.icon_sprite, 0, mx2, yy + 2);
-                tx += 16;
+                draw_sprite_ext(sk.icon_sprite, 0, mx2, yy + icon_y_off2, icon_scale2, icon_scale2, 0, c_white, 1);
+                tx += max(icon_min_w2, round(sprite_get_width(sk.icon_sprite) * icon_scale2));
             }
             UI_DrawText(tx, yy, Loc_T("battle.menu.skill_row", "{name} ({mp}MP)", { name: sk.name, mp: string(sk.mp_cost) }));
         }
@@ -447,8 +460,14 @@ if (battle_state == BSTATE_SKILL_MENU) {
 // item menu
 if (battle_state == BSTATE_ITEM_MENU) {
     var items = Battle_GetItemList(self);
-    var mx3 = bx + 12;
-    var my3 = by + 12;
+    var menu_pad_x3 = max(8, round(12 * ui_visual));
+    var menu_pad_y3 = max(8, round(12 * ui_visual));
+    var pointer_off3 = max(7, round(10 * ui_visual));
+    var icon_scale3 = ui_visual;
+    var icon_min_w3 = max(10, round(16 * ui_visual));
+    var icon_y_off3 = max(1, round(2 * ui_visual));
+    var mx3 = bx + menu_pad_x3;
+    var my3 = by + menu_pad_y3;
 
     var item_count = array_length(items);
     var total = item_count + 1;
@@ -460,15 +479,15 @@ if (battle_state == BSTATE_ITEM_MENU) {
         var row = it - start;
         var yy2 = my3 + row * row_h;
         if (it == item_count) {
-            if (it == item_index) UI_DrawText(mx3 - 10, yy2, ">");
+            if (it == item_index) UI_DrawText(mx3 - pointer_off3, yy2, ">");
             UI_DrawText(mx3, yy2, Loc_T("battle.menu.back", "Back"));
         } else {
             var item = ItemDB_Get(items[it].id);
-            if (it == item_index) UI_DrawText(mx3 - 10, yy2, ">");
+            if (it == item_index) UI_DrawText(mx3 - pointer_off3, yy2, ">");
             var tx2 = mx3;
             if (item.sprite != noone) {
-                draw_sprite(item.sprite, 0, mx3, yy2 + 2);
-                tx2 += 16;
+                draw_sprite_ext(item.sprite, 0, mx3, yy2 + icon_y_off3, icon_scale3, icon_scale3, 0, c_white, 1);
+                tx2 += max(icon_min_w3, round(sprite_get_width(item.sprite) * icon_scale3));
             }
             UI_DrawText(tx2, yy2, Loc_T("battle.menu.item_row", "{name} x{qty}", { name: item.name, qty: string(items[it].qty) }));
         }

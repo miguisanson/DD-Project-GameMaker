@@ -558,6 +558,9 @@ function Status_DrawIcons(_ch, _x, _y, _spacing = 10, _rtl = false, _noncore_tex
     if (argument_count >= 5) rtl = _rtl;
     var noncore_text_fallback = false;
     if (argument_count >= 6) noncore_text_fallback = _noncore_text_fallback;
+    var icon_scale = UI_GetVisualScale();
+    var spacing_px = max(1, round(real(spacing) * icon_scale));
+    var icon_gap = max(2, round(4 * icon_scale));
 
     var off = 0;
     if (rtl) {
@@ -568,14 +571,15 @@ function Status_DrawIcons(_ch, _x, _y, _spacing = 10, _rtl = false, _noncore_tex
             var use_text_fallback = (!has_sprite) || (noncore_text_fallback && !Status_UsesCoreIconSprite(sid, cfg.icon_sprite));
             if (use_text_fallback) {
                 var tag_w = Status_DrawFallbackLabel(cfg, sid, _x + off, _y);
-                off += max(spacing, tag_w + 4);
+                off += max(spacing_px, tag_w + icon_gap);
             } else if (has_sprite) {
                 var icon_sub = 0;
                 if (variable_struct_exists(cfg, "icon_subimg")) icon_sub = round(cfg.icon_subimg);
                 var icon_max = max(0, sprite_get_number(cfg.icon_sprite) - 1);
                 icon_sub = clamp(icon_sub, 0, icon_max);
-                draw_sprite(cfg.icon_sprite, icon_sub, _x + off, _y);
-                off += spacing;
+                draw_sprite_ext(cfg.icon_sprite, icon_sub, _x + off, _y, icon_scale, icon_scale, 0, c_white, 1);
+                var icon_w = round(sprite_get_width(cfg.icon_sprite) * icon_scale);
+                off += max(spacing_px, icon_w + icon_gap);
             }
         }
     } else {
@@ -586,14 +590,15 @@ function Status_DrawIcons(_ch, _x, _y, _spacing = 10, _rtl = false, _noncore_tex
             var use_text_fallback2 = (!has_sprite2) || (noncore_text_fallback && !Status_UsesCoreIconSprite(sid2, cfg2.icon_sprite));
             if (use_text_fallback2) {
                 var tag_w2 = Status_DrawFallbackLabel(cfg2, sid2, _x + off, _y);
-                off += max(spacing, tag_w2 + 4);
+                off += max(spacing_px, tag_w2 + icon_gap);
             } else if (has_sprite2) {
                 var icon_sub2 = 0;
                 if (variable_struct_exists(cfg2, "icon_subimg")) icon_sub2 = round(cfg2.icon_subimg);
                 var icon_max2 = max(0, sprite_get_number(cfg2.icon_sprite) - 1);
                 icon_sub2 = clamp(icon_sub2, 0, icon_max2);
-                draw_sprite(cfg2.icon_sprite, icon_sub2, _x + off, _y);
-                off += spacing;
+                draw_sprite_ext(cfg2.icon_sprite, icon_sub2, _x + off, _y, icon_scale, icon_scale, 0, c_white, 1);
+                var icon_w2 = round(sprite_get_width(cfg2.icon_sprite) * icon_scale);
+                off += max(spacing_px, icon_w2 + icon_gap);
             }
         }
     }

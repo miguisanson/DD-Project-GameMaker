@@ -754,6 +754,11 @@ function UI_GetTextScale() {
     return clamp(scale, UI_TEXT_SCALE_MIN, UI_TEXT_SCALE_MAX);
 }
 
+function UI_GetVisualScale() {
+    var base = max(0.0001, UI_TEXT_SCALE_BASE);
+    return max(0.5, UI_GetTextScale() / base);
+}
+
 function UI_TextWidth(_txt) {
     var s = UI_GetTextScale();
     return max(0, round(string_width(string(_txt)) * s));

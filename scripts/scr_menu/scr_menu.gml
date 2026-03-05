@@ -1399,6 +1399,7 @@ function Menu_Draw() {
     var menu_closing = variable_struct_exists(m, "closing") && m.closing;
     var menu_close_frame = variable_struct_exists(m, "close_frame") ? m.close_frame : UI_OPENED_FRAME_NONE;
     var menu_alpha = UI_PopupAlpha(m.opened_frame, menu_closing, menu_close_frame, 1);
+    var ui_visual = UI_GetVisualScale();
     var tooltip_lines = [];
 
     // Top main menu box (cropped to leave room for bottom tooltip box).
@@ -1429,15 +1430,16 @@ function Menu_Draw() {
         } else {
             draw_set_color(c_white);
         }
-        UI_DrawText(tx + 6, by + 6, tab_label);
+        var tab_pad = max(4, round(6 * ui_visual));
+        UI_DrawText(tx + tab_pad, by + tab_pad, tab_label);
     }
 
     var draw_arrow_sprite = dialogue_arrow_down;
     var draw_arrow_w = max(1, sprite_get_width(draw_arrow_sprite));
     var draw_arrow_h = max(1, sprite_get_height(draw_arrow_sprite));
-    var draw_arrow_scale_x = 16 / draw_arrow_w;
-    var draw_arrow_scale_y = 16 / draw_arrow_h;
-    var draw_arrow_size = 16;
+    var draw_arrow_size = max(10, round(16 * ui_visual));
+    var draw_arrow_scale_x = draw_arrow_size / draw_arrow_w;
+    var draw_arrow_scale_y = draw_arrow_size / draw_arrow_h;
     var draw_arrow_x = round(bx + bw * 0.5 - (draw_arrow_size * 0.5));
     var draw_arrow_top_y = round(layout.content_y + max(0, floor((list_top_inset - draw_arrow_size) * 0.5)));
     var draw_arrow_bottom_y = round(content_list_y + content_list_h + max(0, floor((list_bottom_inset - draw_arrow_size) * 0.5)));
@@ -1469,8 +1471,9 @@ function Menu_Draw() {
                 var item = ItemDB_Get(inv.id);
                 var tx = bx + pad;
                 if (item.sprite != noone) {
-                    draw_sprite(item.sprite, 0, tx, yy + 2);
-                    tx += 16;
+                    var icon_scale = ui_visual;
+                    draw_sprite_ext(item.sprite, 0, tx, yy + max(1, round(2 * ui_visual)), icon_scale, icon_scale, 0, c_white, 1);
+                    tx += max(round(16 * icon_scale), round(sprite_get_width(item.sprite) * icon_scale));
                 }
                 var label = item.name;
                 if (item.stackable) {
@@ -1529,8 +1532,9 @@ function Menu_Draw() {
                 var sk = SkillDB_Get(skills[s]);
                 var tx2 = bx + pad;
                 if (sk.icon_sprite != noone) {
-                    draw_sprite(sk.icon_sprite, 0, tx2, y2 + 2);
-                    tx2 += 16;
+                    var icon_scale2 = ui_visual;
+                    draw_sprite_ext(sk.icon_sprite, 0, tx2, y2 + max(1, round(2 * ui_visual)), icon_scale2, icon_scale2, 0, c_white, 1);
+                    tx2 += max(round(16 * icon_scale2), round(sprite_get_width(sk.icon_sprite) * icon_scale2));
                 }
                 draw_set_color(sel2 ? c_black : c_white);
                 UI_DrawText(tx2, y2, sk.name);
@@ -1587,7 +1591,7 @@ function Menu_Draw() {
         var hp_frame = clamp(floor(hp_ratio * max_frame), 0, max_frame);
         var mp_frame = clamp(floor(mp_ratio * max_frame), 0, max_frame);
 
-        var bar_scale = UI_BAR_SCALE;
+        var bar_scale = UI_BAR_SCALE * ui_visual;
         var bar_w = sprite_get_width(hp_bar_sprite) * bar_scale;
         var hp_bar_h = sprite_get_height(hp_bar_sprite) * bar_scale;
         var mp_bar_h = sprite_get_height(mp_bar_sprite) * bar_scale;
@@ -1615,8 +1619,9 @@ function Menu_Draw() {
         draw_set_color(c_white);
         var hp_text = string(ch.hp) + " / " + string(ch.max_hp);
         var mp_text = string(ch.mp) + " / " + string(ch.max_mp);
-        UI_DrawText(left_x + bar_w + 6, y0, hp_text);
-        UI_DrawText(left_x + bar_w + 6, y0 + hp_bar_h + pad, mp_text);
+        var stat_text_gap = max(4, round(6 * ui_visual));
+        UI_DrawText(left_x + bar_w + stat_text_gap, y0, hp_text);
+        UI_DrawText(left_x + bar_w + stat_text_gap, y0 + hp_bar_h + pad, mp_text);
 
         draw_set_color(c_white);
         var text_y = y0 + hp_bar_h + mp_bar_h + pad * 2;
