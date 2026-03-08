@@ -97,6 +97,37 @@ if (cur_display_w != last_display_w || cur_display_h != last_display_h || cur_wi
     need_display_refresh = true;
 }
 
+// Self-heal any stale/corrupt view state after room load/fullscreen transitions.
+if (!need_display_refresh && !transition_now_active && view_enabled) {
+    var view_bad = (view_wport[0] <= 0 || view_hport[0] <= 0);
+    for (var vi = 1; vi < 8; vi++) {
+        if (view_visible[vi]) {
+            view_bad = true;
+            break;
+        }
+    }
+
+    var cam = view_camera[0];
+    if (is_undefined(cam) || cam == -1) {
+        view_bad = true;
+    } else {
+        var cam_w = max(1, round(camera_get_view_width(cam)));
+        var cam_h = max(1, round(camera_get_view_height(cam)));
+        if (cam_w != DISPLAY_BASE_W || cam_h != DISPLAY_BASE_H) {
+            view_bad = true;
+        }
+        var cam_x = round(camera_get_view_x(cam));
+        var cam_y = round(camera_get_view_y(cam));
+        var cam_x_max = max(0, room_width - cam_w);
+        var cam_y_max = max(0, room_height - cam_h);
+        if (cam_x < 0 || cam_y < 0 || cam_x > cam_x_max || cam_y > cam_y_max) {
+            view_bad = true;
+        }
+    }
+
+    if (view_bad) need_display_refresh = true;
+}
+
 if (need_display_refresh) {
     GameSettings_ApplyDisplay();
     cur_display_w = max(1, display_get_width());

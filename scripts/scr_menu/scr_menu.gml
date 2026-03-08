@@ -2301,8 +2301,8 @@ function SettingsPopup_HandleInput() {
         SFX_PlayUI("ui_move");
     }
 
-    if (sp.index == 6 && k_left) {
-        sp.index = 5;
+    if (sp.index == 7 && k_left) {
+        sp.index = 6;
         SFX_PlayUI("ui_move");
     }
 
@@ -2318,7 +2318,7 @@ function SettingsPopup_HandleInput() {
     var pending = GameSettings_Copy(sp.pending);
     var changed = false;
     var step = sp.volume_step;
-    var can_hold_adjust = (sp.index >= 0 && sp.index <= 4);
+    var can_hold_adjust = (sp.index >= 0 && sp.index <= 5);
 
     // Local hold-repeat for slider/scale rows only.
     var hold_dir = 0;
@@ -2387,12 +2387,18 @@ function SettingsPopup_HandleInput() {
             break;
         case 4:
             if (k_left_step || k_right_step) {
+                pending.fit_screen = !pending.fit_screen;
+                changed = true;
+            }
+            break;
+        case 5:
+            if (k_left_step || k_right_step) {
                 pending.language = (pending.language == "ko") ? "en" : "ko";
                 Loc_SetLanguage(pending.language);
                 changed = true;
             }
             break;
-        case 5:
+        case 6:
             if (k_ok) {
                 var committed = GameSettings_Commit(pending, true);
                 sp.pending = GameSettings_Copy(committed);
@@ -2402,7 +2408,7 @@ function SettingsPopup_HandleInput() {
                 return;
             }
             break;
-        case 6:
+        case 7:
             if (k_ok) {
                 sp.pending = GameSettings_Copy(GameSettings_Ensure());
                 sp.dirty = false;
@@ -2452,6 +2458,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
         Loc_T("settings.row.sfx", "SFX"),
         Loc_T("settings.row.bgm", "BGM"),
         Loc_T("settings.row.scale", "Scale"),
+        Loc_T("settings.row.fullscreen", "Fullscreen"),
         Loc_T("settings.row.language", "Language"),
         Loc_T("settings.row.apply", "Apply"),
         Loc_T("settings.row.back", "Back")
@@ -2461,6 +2468,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
         "100%",
         "100%",
         string(DISPLAY_SCALE_MAX) + "x",
+        max(UI_TextWidth(Loc_T("settings.value.on", "On")), UI_TextWidth(Loc_T("settings.value.off", "Off"))),
         max(UI_TextWidth(Loc_LanguageDisplayName("en")), UI_TextWidth(Loc_LanguageDisplayName("ko"))),
         max(UI_TextWidth(Loc_T("settings.value.pending", "Pending")), UI_TextWidth(Loc_T("settings.value.saved", "Saved")))
     ];
@@ -2477,6 +2485,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     max_value_w = max(max_value_w, UI_TextWidth(values_probe[3]));
     max_value_w = max(max_value_w, values_probe[4]);
     max_value_w = max(max_value_w, values_probe[5]);
+    max_value_w = max(max_value_w, values_probe[6]);
 
     var row_split_gap = max(18, round(line_h * 0.8));
     var need_w = max(UI_TextWidth(title_txt) + title_pad_x * 2, UI_TextWidth(audio_txt) + title_pad_x * 2, UI_TextWidth(display_txt) + title_pad_x * 2);
@@ -2487,7 +2496,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     var rows_y0_local = audio_header_y_local + line_h + section_gap;
     var display_header_y_local = rows_y0_local + row_gap_s * 3 + section_gap;
     var display_rows_y0_local = display_header_y_local + line_h + section_gap;
-    var last_row_y_local = display_rows_y0_local + row_gap_s * 3;
+    var last_row_y_local = display_rows_y0_local + row_gap_s * 4;
     var need_h = last_row_y_local + line_h + title_pad_y;
 
     var sw = min(w - 24, max(w * 0.72, need_w));
@@ -2524,6 +2533,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     row_y[4] = display_rows_y0 + row_gap_s;
     row_y[5] = display_rows_y0 + row_gap_s * 2;
     row_y[6] = display_rows_y0 + row_gap_s * 3;
+    row_y[7] = display_rows_y0 + row_gap_s * 4;
 
     draw_set_color(c_white);
     UI_DrawText(sx + title_pad_x, audio_header_y, audio_txt);
@@ -2553,20 +2563,24 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
                 value = string(settings.display_scale) + "x";
                 break;
             case 4:
+                label = Loc_T("settings.row.fullscreen", "Fullscreen");
+                value = settings.fit_screen ? Loc_T("settings.value.on", "On") : Loc_T("settings.value.off", "Off");
+                break;
+            case 5:
                 label = Loc_T("settings.row.language", "Language");
                 value = Loc_LanguageDisplayName(settings.language);
                 break;
-            case 5:
+            case 6:
                 label = Loc_T("settings.row.apply", "Apply");
                 value = sp.dirty ? Loc_T("settings.value.pending", "Pending") : Loc_T("settings.value.saved", "Saved");
                 break;
-            case 6:
+            case 7:
                 label = Loc_T("settings.row.back", "Back");
                 break;
         }
 
         if (selected_row) {
-            if (r == 5 || r == 6) {
+            if (r == 6 || r == 7) {
                 var row_x = sx + side_pad;
                 var row_w = UI_TextWidth(label) + 8;
                 draw_set_color(c_white);
@@ -2585,7 +2599,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
         draw_set_color(selected_row ? c_black : c_white);
         UI_DrawText(sx + side_pad, yy, label);
         if (value != "") {
-            if (r == 5) draw_set_color(c_white);
+            if (r == 6) draw_set_color(c_white);
             else draw_set_color(selected_row ? c_black : c_white);
             draw_set_halign(fa_right);
             UI_DrawText(sx + sw - side_pad, yy, value);

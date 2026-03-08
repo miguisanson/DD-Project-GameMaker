@@ -1291,6 +1291,11 @@ function GameSettings_ApplyDisplay() {
 
     view_enabled = true;
     view_visible[0] = true;
+    for (var vi = 1; vi < 8; vi++) {
+        view_visible[vi] = false;
+    }
+    view_hborder[0] = max(1, floor(base_w * 0.5) - 1);
+    view_vborder[0] = max(1, floor(base_h * 0.5) - 1);
 
     // Keep desktop builds borderless to avoid title-bar/frame mismatch across PCs.
     if (os_type == os_windows) {
@@ -1299,12 +1304,20 @@ function GameSettings_ApplyDisplay() {
 
     var disp_w = max(1, display_get_width());
     var disp_h = max(1, display_get_height());
+
+    // Reuse fit_screen as the persisted fullscreen toggle.
+    if (window_get_fullscreen() != fit_screen) {
+        window_set_fullscreen(fit_screen);
+    }
+
     if (fit_screen) {
-        if (window_get_width() != disp_w || window_get_height() != disp_h) {
-            window_set_size(disp_w, disp_h);
-        }
-        if (window_get_x() != 0 || window_get_y() != 0) {
-            window_set_position(0, 0);
+        if (!window_get_fullscreen()) {
+            if (window_get_width() != disp_w || window_get_height() != disp_h) {
+                window_set_size(disp_w, disp_h);
+            }
+            if (window_get_x() != 0 || window_get_y() != 0) {
+                window_set_position(0, 0);
+            }
         }
     } else {
         var fixed_w = base_w * scale_fixed;
@@ -1322,17 +1335,22 @@ function GameSettings_ApplyDisplay() {
         win_h = disp_h;
     }
 
-    var fit_scale = min(win_w / base_w, win_h / base_h);
-    var used_scale = fit_screen ? max(1, floor(fit_scale)) : max(1, scale_fixed);
-    var port_w = max(1, round(base_w * used_scale));
-    var port_h = max(1, round(base_h * used_scale));
-    if (port_w > win_w || port_h > win_h) {
-        var dyn_scale = min(win_w / base_w, win_h / base_h);
-        port_w = max(1, round(base_w * dyn_scale));
-        port_h = max(1, round(base_h * dyn_scale));
+    var port_x = 0;
+    var port_y = 0;
+    var port_w = win_w;
+    var port_h = win_h;
+    if (!fit_screen) {
+        var used_scale = max(1, scale_fixed);
+        port_w = max(1, round(base_w * used_scale));
+        port_h = max(1, round(base_h * used_scale));
+        if (port_w > win_w || port_h > win_h) {
+            var dyn_scale = min(win_w / base_w, win_h / base_h);
+            port_w = max(1, round(base_w * dyn_scale));
+            port_h = max(1, round(base_h * dyn_scale));
+        }
+        port_x = floor((win_w - port_w) * 0.5);
+        port_y = floor((win_h - port_h) * 0.5);
     }
-    var port_x = floor((win_w - port_w) * 0.5);
-    var port_y = floor((win_h - port_h) * 0.5);
 
     view_xport[0] = port_x;
     view_yport[0] = port_y;
@@ -1342,6 +1360,9 @@ function GameSettings_ApplyDisplay() {
     var cam = view_camera[0];
     if (!is_undefined(cam) && cam != -1) {
         camera_set_view_size(cam, base_w, base_h);
+        var cam_x = clamp(camera_get_view_x(cam), 0, max(0, room_width - base_w));
+        var cam_y = clamp(camera_get_view_y(cam), 0, max(0, room_height - base_h));
+        camera_set_view_pos(cam, cam_x, cam_y);
     }
 
     if (surface_exists(application_surface)) {
