@@ -558,7 +558,7 @@ function Status_DrawIcons(_ch, _x, _y, _spacing = 10, _rtl = false, _noncore_tex
     if (argument_count >= 5) rtl = _rtl;
     var noncore_text_fallback = false;
     if (argument_count >= 6) noncore_text_fallback = _noncore_text_fallback;
-    var icon_scale = UI_GetVisualScale();
+    var icon_scale = UI_GetSpriteScale();
     var spacing_px = max(1, round(real(spacing) * icon_scale));
     var icon_gap = max(2, round(4 * icon_scale));
 

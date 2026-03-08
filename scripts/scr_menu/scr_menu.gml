@@ -1400,6 +1400,7 @@ function Menu_Draw() {
     var menu_close_frame = variable_struct_exists(m, "close_frame") ? m.close_frame : UI_OPENED_FRAME_NONE;
     var menu_alpha = UI_PopupAlpha(m.opened_frame, menu_closing, menu_close_frame, 1);
     var ui_visual = UI_GetVisualScale();
+    var ui_sprite = UI_GetSpriteScale();
     var tooltip_lines = [];
 
     // Top main menu box (cropped to leave room for bottom tooltip box).
@@ -1438,11 +1439,12 @@ function Menu_Draw() {
     var draw_arrow_w = max(1, sprite_get_width(draw_arrow_sprite));
     var draw_arrow_h = max(1, sprite_get_height(draw_arrow_sprite));
     var draw_arrow_size = max(10, round(16 * ui_visual));
-    var draw_arrow_scale_x = draw_arrow_size / draw_arrow_w;
-    var draw_arrow_scale_y = draw_arrow_size / draw_arrow_h;
-    var draw_arrow_x = round(bx + bw * 0.5 - (draw_arrow_size * 0.5));
-    var draw_arrow_top_y = round(layout.content_y + max(0, floor((list_top_inset - draw_arrow_size) * 0.5)));
-    var draw_arrow_bottom_y = round(content_list_y + content_list_h + max(0, floor((list_bottom_inset - draw_arrow_size) * 0.5)));
+    var draw_arrow_scale = max(1, round(draw_arrow_size / max(draw_arrow_w, draw_arrow_h)));
+    var draw_arrow_draw_w = draw_arrow_w * draw_arrow_scale;
+    var draw_arrow_draw_h = draw_arrow_h * draw_arrow_scale;
+    var draw_arrow_x = round(bx + bw * 0.5 - (draw_arrow_draw_w * 0.5));
+    var draw_arrow_top_y = round(layout.content_y + max(0, floor((list_top_inset - draw_arrow_draw_h) * 0.5)));
+    var draw_arrow_bottom_y = round(content_list_y + content_list_h + max(0, floor((list_bottom_inset - draw_arrow_draw_h) * 0.5)));
 
     // Inventory tab
     if (m.tab == 0) {
@@ -1471,7 +1473,7 @@ function Menu_Draw() {
                 var item = ItemDB_Get(inv.id);
                 var tx = bx + pad;
                 if (item.sprite != noone) {
-                    var icon_scale = ui_visual;
+                    var icon_scale = ui_sprite;
                     draw_sprite_ext(item.sprite, 0, tx, yy + max(1, round(2 * ui_visual)), icon_scale, icon_scale, 0, c_white, 1);
                     tx += max(round(16 * icon_scale), round(sprite_get_width(item.sprite) * icon_scale));
                 }
@@ -1498,10 +1500,10 @@ function Menu_Draw() {
         if (count > rows_visible) {
             draw_set_color(c_white);
             if (start > 0) {
-                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_top_y + draw_arrow_size, draw_arrow_scale_x, -draw_arrow_scale_y, 0, c_white, menu_alpha);
+                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_top_y + draw_arrow_draw_h, draw_arrow_scale, -draw_arrow_scale, 0, c_white, menu_alpha);
             }
             if (endv < count) {
-                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_bottom_y, draw_arrow_scale_x, draw_arrow_scale_y, 0, c_white, menu_alpha);
+                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_bottom_y, draw_arrow_scale, draw_arrow_scale, 0, c_white, menu_alpha);
             }
         }
     }
@@ -1532,7 +1534,7 @@ function Menu_Draw() {
                 var sk = SkillDB_Get(skills[s]);
                 var tx2 = bx + pad;
                 if (sk.icon_sprite != noone) {
-                    var icon_scale2 = ui_visual;
+                    var icon_scale2 = ui_sprite;
                     draw_sprite_ext(sk.icon_sprite, 0, tx2, y2 + max(1, round(2 * ui_visual)), icon_scale2, icon_scale2, 0, c_white, 1);
                     tx2 += max(round(16 * icon_scale2), round(sprite_get_width(sk.icon_sprite) * icon_scale2));
                 }
@@ -1549,10 +1551,10 @@ function Menu_Draw() {
         if (scount > rows_visible) {
             draw_set_color(c_white);
             if (start2 > 0) {
-                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_top_y + draw_arrow_size, draw_arrow_scale_x, -draw_arrow_scale_y, 0, c_white, menu_alpha);
+                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_top_y + draw_arrow_draw_h, draw_arrow_scale, -draw_arrow_scale, 0, c_white, menu_alpha);
             }
             if (end2 < scount) {
-                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_bottom_y, draw_arrow_scale_x, draw_arrow_scale_y, 0, c_white, menu_alpha);
+                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_bottom_y, draw_arrow_scale, draw_arrow_scale, 0, c_white, menu_alpha);
             }
         }
     }
@@ -1591,7 +1593,7 @@ function Menu_Draw() {
         var hp_frame = clamp(floor(hp_ratio * max_frame), 0, max_frame);
         var mp_frame = clamp(floor(mp_ratio * max_frame), 0, max_frame);
 
-        var bar_scale = UI_BAR_SCALE * ui_visual;
+        var bar_scale = UI_BAR_SCALE * ui_sprite;
         var bar_w = sprite_get_width(hp_bar_sprite) * bar_scale;
         var hp_bar_h = sprite_get_height(hp_bar_sprite) * bar_scale;
         var mp_bar_h = sprite_get_height(mp_bar_sprite) * bar_scale;

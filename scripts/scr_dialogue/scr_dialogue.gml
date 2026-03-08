@@ -579,17 +579,23 @@ function Dialogue_BoxRect() {
     var gs = GameState_Get();
     var w = display_get_gui_width();
     var h = display_get_gui_height();
+    var ui_visual = UI_GetVisualScale();
+    var line_h = max(8, UI_TextHeight("Ag"));
 
-    var margin = UI_DIALOGUE_BOX_MARGIN;
+    var margin = max(4, round(UI_DIALOGUE_BOX_MARGIN * ui_visual));
+    var box_h = max(
+        round(UI_DIALOGUE_BOX_HEIGHT * ui_visual),
+        (line_h * 3) + max(8, round(14 * ui_visual))
+    );
     var bx = margin;
-    var by = h - UI_DIALOGUE_BOX_HEIGHT - margin;
+    var by = h - box_h - margin;
     var bw = w - margin * 2;
-    var bh = UI_DIALOGUE_BOX_HEIGHT;
+    var bh = box_h;
 
     if (variable_struct_exists(gs.ui, "dialogue_box_half") && gs.ui.dialogue_box_half) {
         bx = 0;
         bw = w;
-        var min_h = max(1, UI_CUTSCENE_DIALOGUE_MIN_HEIGHT);
+        var min_h = max(1, round(UI_CUTSCENE_DIALOGUE_MIN_HEIGHT * ui_visual));
         by = floor(h * UI_CUTSCENE_DIALOGUE_TOP_RATIO);
         by = clamp(by, 0, max(0, h - min_h));
         bh = h - by;
@@ -606,24 +612,30 @@ function Dialogue_BoxRect() {
 function Dialogue_TextLayout(_speaker) {
     UI_SetFont();
     var line_h = max(8, UI_TextHeight("Ag"));
+    var ui_visual = UI_GetVisualScale();
     var has_speaker = (string(_speaker) != "");
     var cutscene_text_only = Dialogue_IsCutsceneTextOnly();
+    var pad_x = max(4, round(UI_DIALOGUE_TEXT_PAD_X * ui_visual));
+    var pad_y = max(4, round(UI_DIALOGUE_TEXT_PAD_Y * ui_visual));
+    var speaker_y_pad = max(2, round(UI_DIALOGUE_SPEAKER_Y * ui_visual));
+    var text_y_with_speaker = max(line_h, round(UI_DIALOGUE_TEXT_Y_WITH_SPEAKER * ui_visual));
+    var bottom_pad = max(4, round(UI_DIALOGUE_BOTTOM_PAD * ui_visual));
 
     var box = Dialogue_BoxRect();
-    var text_x = box.x + UI_DIALOGUE_TEXT_PAD_X;
-    var text_y = box.y + (has_speaker ? UI_DIALOGUE_TEXT_Y_WITH_SPEAKER : UI_DIALOGUE_TEXT_PAD_Y);
-    var text_w = max(1, box.w - (UI_DIALOGUE_TEXT_PAD_X * 2));
-    var speaker_x = box.x + UI_DIALOGUE_TEXT_PAD_X;
-    var speaker_y = box.y + UI_DIALOGUE_SPEAKER_Y;
-    var text_h = max(line_h, box.h - (text_y - box.y) - UI_DIALOGUE_BOTTOM_PAD);
+    var text_x = box.x + pad_x;
+    var text_y = box.y + (has_speaker ? text_y_with_speaker : pad_y);
+    var text_w = max(1, box.w - (pad_x * 2));
+    var speaker_x = box.x + pad_x;
+    var speaker_y = box.y + speaker_y_pad;
+    var text_h = max(line_h, box.h - (text_y - box.y) - bottom_pad);
 
     if (cutscene_text_only) {
         var w = display_get_gui_width();
         var h = display_get_gui_height();
         var margin_ratio = clamp(UI_CUTSCENE_TEXT_SIDE_PAD_RATIO, 0, 0.45);
-        var margin_x = max(max(0, UI_CUTSCENE_TEXT_MARGIN_X), floor(w * margin_ratio));
+        var margin_x = max(max(0, round(UI_CUTSCENE_TEXT_MARGIN_X * ui_visual)), floor(w * margin_ratio));
         var region_top = floor(h * UI_CUTSCENE_TEXT_TOP_RATIO);
-        var region_bottom = h - max(0, UI_CUTSCENE_TEXT_BOTTOM_PAD);
+        var region_bottom = h - max(0, round(UI_CUTSCENE_TEXT_BOTTOM_PAD * ui_visual));
         if (region_bottom <= region_top) {
             region_bottom = min(h, region_top + line_h);
         }

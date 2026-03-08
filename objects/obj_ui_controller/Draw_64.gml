@@ -4,6 +4,7 @@ var h = display_get_gui_height();
 
 UI_SetFont();
 var ui_visual = UI_GetVisualScale();
+var ui_sprite = UI_GetSpriteScale();
 var margin = max(6, round(8 * ui_visual));
 
 draw_set_alpha(1);
@@ -29,7 +30,7 @@ if (room == rm_battle && is_struct(ch)) {
     if (ch.max_mp > 0) mp_ratio = clamp(ch.mp / ch.max_mp, 0, 1);
     var mp_frame = clamp(floor(mp_ratio * max_frame), 0, max_frame);
 
-    var scale = UI_BAR_SCALE * ui_visual;
+    var scale = UI_BAR_SCALE * ui_sprite;
     var bar_gap = max(2, round(4 * ui_visual));
     var text_gap = max(4, round(6 * ui_visual));
     var bar_w = sprite_get_width(hp_bar_sprite) * scale;
@@ -104,7 +105,7 @@ if (cutscene_active) {
     var logo_sprite = variable_struct_exists(gs.ui, "cutscene_logo_sprite") ? gs.ui.cutscene_logo_sprite : noone;
     var logo_alpha = variable_struct_exists(gs.ui, "cutscene_logo_alpha") ? clamp(real(gs.ui.cutscene_logo_alpha), 0, 1) : 0;
     if (logo_sprite != noone && logo_sprite != -1 && logo_alpha > 0) {
-        var logo_scale = 3;
+        var logo_scale = UI_GetSpriteScale(3);
         var lw = sprite_get_width(logo_sprite) * logo_scale;
         var lh = sprite_get_height(logo_sprite) * logo_scale;
         var lx = round((w - lw) * 0.5);
@@ -158,7 +159,7 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     if (variable_struct_exists(gs.ui, "speaker")) speaker = gs.ui.speaker;
     var layout = Dialogue_TextLayout(speaker);
     var icon_draw_w = 0;
-    var line_icon_scale = ui_visual;
+    var line_icon_scale = ui_sprite;
     var icon_text_gap = max(2, round(4 * ui_visual));
     if (line_icon_sprite != noone && line_icon_sprite != -1) {
         var icon_max_sub = max(0, sprite_get_number(line_icon_sprite) - 1);
@@ -214,14 +215,15 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
 
             var iw = max(1, sprite_get_width(icon));
             var ih = max(1, sprite_get_height(icon));
-            var scale_x = cue_w / iw;
-            var scale_y = cue_h / ih;
+            var cue_scale = max(1, round(min(cue_w / iw, cue_h / ih)));
+            cue_w = iw * cue_scale;
+            cue_h = ih * cue_scale;
             var cue_pad = cutscene_text_only ? 2 : 8;
             var cue_right = cutscene_text_only ? (layout.box.x + layout.box.w) : (bx + bw);
             var cue_bottom = cutscene_text_only ? (layout.box.y + layout.box.h) : (by + bh);
             var dx = round(cue_right - cue_w - cue_pad);
             var dy = round(cue_bottom - cue_h - cue_pad + bob);
-            draw_sprite_ext(icon, 0, dx, dy, scale_x, scale_y, 0, c_white, 1);
+            draw_sprite_ext(icon, 0, dx, dy, cue_scale, cue_scale, 0, c_white, 1);
         }
     }
 

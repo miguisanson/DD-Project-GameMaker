@@ -1,4 +1,5 @@
 var ui_visual = UI_GetVisualScale();
+var ui_sprite = UI_GetSpriteScale();
 var margin = max(8, round(16 * ui_visual));
 var box_h = 96;
 
@@ -175,7 +176,7 @@ if (log_count > 0) {
         var ly = log_base_y + row * log_line_h;
 
         if (r.show_icon && r.icon_sprite != noone && r.icon_sprite != -1) {
-            draw_sprite_ext(r.icon_sprite, r.icon_subimg, lx, ly + 1, ui_visual, ui_visual, 0, c_white, 1);
+            draw_sprite_ext(r.icon_sprite, r.icon_subimg, lx, ly + 1, ui_sprite, ui_sprite, 0, c_white, 1);
             lx += r.icon_w + log_icon_gap;
         }
 
@@ -223,7 +224,7 @@ if (battle_state == BSTATE_ATTACK_TIMING && attack_timing_active) {
     var marker_alpha = clamp(attack_timing_marker_alpha, 0, 1);
     var target_sp = attack_timing_target_sprite;
     var fall_sp = attack_timing_falling_sprite;
-    var s = ATTACK_TIMING_SPRITE_SCALE * ui_visual;
+    var s = ATTACK_TIMING_SPRITE_SCALE * ui_sprite;
 
     if (target_sp != -1 && target_sp != noone) {
         var tw = sprite_get_width(target_sp) * s;
@@ -268,7 +269,7 @@ with (obj_fx) {
 
 // Skill banner (drawn after enemy/FX so it stays in front, above enemy sprite).
 if (skill_banner_active && skill_banner_name != "") {
-    var bar_scale = UI_BAR_SCALE * ui_visual;
+    var bar_scale = UI_BAR_SCALE * ui_sprite;
     var hp_bar_h = sprite_get_height(hp_bar) * bar_scale;
     var mp_bar_h = sprite_get_height(mp_bar) * bar_scale;
     var hud_margin = max(4, round(8 * ui_visual));
@@ -330,14 +331,14 @@ if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qt
         }
         var qte_hud_margin = max(4, round(8 * ui_visual));
         var qte_hud_top = qte_hud_margin + gui_off_y;
-        var qte_hud_bottom = qte_hud_top + (sprite_get_height(hp_bar) * UI_BAR_SCALE * ui_visual) + (sprite_get_height(mp_bar) * UI_BAR_SCALE * ui_visual) + max(2, round(4 * ui_visual));
+        var qte_hud_bottom = qte_hud_top + (sprite_get_height(hp_bar) * UI_BAR_SCALE * ui_sprite) + (sprite_get_height(mp_bar) * UI_BAR_SCALE * ui_sprite) + max(2, round(4 * ui_visual));
         var qte_min_y = qte_hud_bottom + max(12, round(24 * ui_visual));
         var qte_max_y = h - box_h - margin - max(20, round(40 * ui_visual));
         qy = clamp(qy, qte_min_y, max(qte_min_y, qte_max_y));
 
         var q_col = c_white;
         if (enemy_def_qte_phase == 2) q_col = enemy_def_qte_feedback_ok ? c_lime : c_red;
-        Battle_DrawDirectionArrow(qx, qy, q_dir, DEF_QTE_ARROW_BASE_SIZE * q_scale * ui_visual, q_alpha, q_col);
+        Battle_DrawDirectionArrow(qx, qy, q_dir, DEF_QTE_ARROW_BASE_SIZE * q_scale * ui_sprite, q_alpha, q_col);
 
         // Progress bar only (kept below arrow so it never overlaps the prompt icon).
         if (enemy_def_qte_phase == 1 && enemy_def_qte_response_frames > 0) {
@@ -426,7 +427,7 @@ if (battle_state == BSTATE_SKILL_MENU) {
     var menu_pad_x2 = max(8, round(12 * ui_visual));
     var menu_pad_y2 = max(8, round(12 * ui_visual));
     var pointer_off2 = max(7, round(10 * ui_visual));
-    var icon_scale2 = ui_visual;
+    var icon_scale2 = ui_sprite;
     var icon_min_w2 = max(10, round(16 * ui_visual));
     var icon_y_off2 = max(1, round(2 * ui_visual));
     var mx2 = bx + menu_pad_x2;
@@ -463,7 +464,7 @@ if (battle_state == BSTATE_ITEM_MENU) {
     var menu_pad_x3 = max(8, round(12 * ui_visual));
     var menu_pad_y3 = max(8, round(12 * ui_visual));
     var pointer_off3 = max(7, round(10 * ui_visual));
-    var icon_scale3 = ui_visual;
+    var icon_scale3 = ui_sprite;
     var icon_min_w3 = max(10, round(16 * ui_visual));
     var icon_y_off3 = max(1, round(2 * ui_visual));
     var mx3 = bx + menu_pad_x3;

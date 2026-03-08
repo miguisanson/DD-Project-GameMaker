@@ -9,7 +9,7 @@ if (state == "boot_logo") {
     var logo_spr = boot_logo_sprite;
     if (logo_spr == noone || logo_spr == -1) logo_spr = pale_rook_1;
     if (logo_spr != noone && logo_spr != -1 && boot_logo_alpha > 0) {
-        var logo_scale = 3;
+        var logo_scale = UI_GetSpriteScale(3);
         var lw = sprite_get_width(logo_spr) * logo_scale;
         var lh = sprite_get_height(logo_spr) * logo_scale;
         var lx = round((w - lw) * 0.5);

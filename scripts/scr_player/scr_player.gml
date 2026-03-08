@@ -746,17 +746,51 @@ function UI_IsBlocking() {
 function UI_GetTextScale() {
     var gui_w = max(1, display_get_gui_width());
     var gui_h = max(1, display_get_gui_height());
-    // Anchor 2x text at the project's highest fixed scale, then adapt with window size.
-    var ref_w = max(1, DISPLAY_BASE_W * DISPLAY_SCALE_MAX);
-    var ref_h = max(1, DISPLAY_BASE_H * DISPLAY_SCALE_MAX);
+    var fit_screen = false;
+    if (variable_global_exists("state")
+    && is_struct(global.state)
+    && variable_struct_exists(global.state, "settings")
+    && is_struct(global.state.settings)
+    && variable_struct_exists(global.state.settings, "fit_screen")) {
+        fit_screen = (global.state.settings.fit_screen != 0);
+    }
+
+    // Preserve legacy 3x/4x/5x windowed behavior, while allowing fullscreen UI to scale up.
+    var ref_scale = fit_screen ? DISPLAY_SCALE_DEFAULT : DISPLAY_SCALE_MAX;
+    var ref_w = max(1, DISPLAY_BASE_W * ref_scale);
+    var ref_h = max(1, DISPLAY_BASE_H * ref_scale);
     var dyn = min(gui_w / ref_w, gui_h / ref_h);
     var scale = UI_TEXT_SCALE_BASE * dyn;
+    if (fit_screen) {
+        // Fullscreen readability: keep pixel font stable.
+        scale = round(scale * 2) / 2;
+    }
     return clamp(scale, UI_TEXT_SCALE_MIN, UI_TEXT_SCALE_MAX);
 }
 
 function UI_GetVisualScale() {
     var base = max(0.0001, UI_TEXT_SCALE_BASE);
     return max(0.5, UI_GetTextScale() / base);
+}
+
+function UI_GetSpriteScale(_base = 1) {
+    var mul = max(0.0001, real(_base));
+    var visual = UI_GetVisualScale();
+    var fit_screen = false;
+    if (variable_global_exists("state")
+    && is_struct(global.state)
+    && variable_struct_exists(global.state, "settings")
+    && is_struct(global.state.settings)
+    && variable_struct_exists(global.state.settings, "fit_screen")) {
+        fit_screen = (global.state.settings.fit_screen != 0);
+    }
+
+    var step = max(1, ceil(visual));
+    if (fit_screen) {
+        // Slight fullscreen boost so bars/icons/logos don't stay tiny vs larger text.
+        step = max(1, ceil(visual + 0.25));
+    }
+    return max(1, round(mul * step));
 }
 
 function UI_TextWidth(_txt) {
