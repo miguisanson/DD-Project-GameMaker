@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Bow_Attack_",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":0.6250113,
+  "exportDir":"",
+  "name":"Bow_Attack_",
+  "parent":{
+    "name":"FIght",
+    "path":"folders/Sounds/FIght.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Bow_Attack_.ogg",
+  "volume":1.0,
+}

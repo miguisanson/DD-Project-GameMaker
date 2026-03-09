@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Punch_crunchy",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":0.40650794,
+  "exportDir":"",
+  "name":"Punch_crunchy",
+  "parent":{
+    "name":"Final Boss",
+    "path":"folders/Sounds/Entities/Monsters/Final Boss.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Punch_crunchy.ogg",
+  "volume":1.0,
+}

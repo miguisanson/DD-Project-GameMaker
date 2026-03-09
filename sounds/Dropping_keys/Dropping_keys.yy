@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Dropping_keys",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":0.65367347,
+  "exportDir":"",
+  "name":"Dropping_keys",
+  "parent":{
+    "name":"Stranger",
+    "path":"folders/Sounds/Entities/Monsters/Stranger.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Dropping_keys.ogg",
+  "volume":1.0,
+}

@@ -1,0 +1,2684 @@
+{
+  "meta": {
+    "version": 1,
+    "source_sheet": "strings",
+    "source_schema": "minimal",
+    "generated_at_utc": "2026-03-04T17:49:44Z",
+    "row_count": 663
+  },
+  "default_lang": "en",
+  "languages": [
+    "en",
+    "ko"
+  ],
+  "strings": {
+    "battle.action.attack": {
+      "en": "ATTACK",
+      "ko": "공격"
+    },
+    "battle.action.create_0.103.0": {
+      "en": "combat.msg.enemy_appeared",
+      "ko": "Combat.msg.enemy_appeared"
+    },
+    "battle.action.create_0.103.1": {
+      "en": "{enemy} appeared!",
+      "ko": "{enemy} 등장!"
+    },
+    "battle.action.item": {
+      "en": "ITEM",
+      "ko": "목"
+    },
+    "battle.action.run": {
+      "en": "RUN",
+      "ko": "달리다"
+    },
+    "battle.action.skill": {
+      "en": "SKILL",
+      "ko": "기능"
+    },
+    "battle.action.timing.bad": {
+      "en": "BAD",
+      "ko": "나쁜"
+    },
+    "battle.action.timing.good": {
+      "en": "GOOD",
+      "ko": "좋은"
+    },
+    "battle.action.timing.miss": {
+      "en": "MISS",
+      "ko": "놓치다"
+    },
+    "battle.action.timing.okay": {
+      "en": "OKAY",
+      "ko": "좋아요"
+    },
+    "battle.action.timing.perfect": {
+      "en": "PERFECT",
+      "ko": "완벽한"
+    },
+    "battle.menu.back": {
+      "en": "Back",
+      "ko": "뒤쪽에"
+    },
+    "battle.menu.draw_64.362.0": {
+      "en": "battle.menu.back",
+      "ko": "전투.메뉴.뒤로"
+    },
+    "battle.menu.draw_64.362.1": {
+      "en": "Back",
+      "ko": "뒤쪽에"
+    },
+    "battle.menu.draw_64.371.0": {
+      "en": "battle.menu.skill_row",
+      "ko": "Battle.menu.skill_row"
+    },
+    "battle.menu.draw_64.371.1": {
+      "en": "{name} ({mp}MP)",
+      "ko": "{name} ({mp}MP)"
+    },
+    "battle.menu.draw_64.393.0": {
+      "en": "battle.menu.back",
+      "ko": "전투.메뉴.뒤로"
+    },
+    "battle.menu.draw_64.393.1": {
+      "en": "Back",
+      "ko": "뒤쪽에"
+    },
+    "battle.menu.draw_64.402.0": {
+      "en": "battle.menu.item_row",
+      "ko": "Battle.menu.item_row"
+    },
+    "battle.menu.draw_64.402.1": {
+      "en": "{name} x{qty}",
+      "ko": "{name} x{qty}"
+    },
+    "battle.menu.item_row": {
+      "en": "{name} x{qty}",
+      "ko": "{name} x{qty}"
+    },
+    "battle.menu.no_items": {
+      "en": "No items available.",
+      "ko": "사용 가능한 항목이 없습니다."
+    },
+    "battle.menu.no_skills": {
+      "en": "No skills available.",
+      "ko": "사용할 수 있는 기술이 없습니다."
+    },
+    "battle.menu.skill_row": {
+      "en": "{name} ({mp}MP)",
+      "ko": "{name} ({mp}MP)"
+    },
+    "battle.menu.step_0.105.0": {
+      "en": "battle.menu.no_skills",
+      "ko": "Battle.menu.no_skills"
+    },
+    "battle.menu.step_0.105.1": {
+      "en": "No skills available.",
+      "ko": "사용할 수 있는 기술이 없습니다."
+    },
+    "battle.menu.step_0.138.0": {
+      "en": "battle.menu.no_items",
+      "ko": "Battle.menu.no_items"
+    },
+    "battle.menu.step_0.138.1": {
+      "en": "No items available.",
+      "ko": "사용 가능한 항목이 없습니다."
+    },
+    "battle.menu.step_0.18.0": {
+      "en": "battle.action.attack",
+      "ko": "전투.액션.공격"
+    },
+    "battle.menu.step_0.18.1": {
+      "en": "ATTACK",
+      "ko": "공격"
+    },
+    "battle.menu.step_0.19.0": {
+      "en": "battle.action.skill",
+      "ko": "전투.액션.스킬"
+    },
+    "battle.menu.step_0.19.1": {
+      "en": "SKILL",
+      "ko": "기능"
+    },
+    "battle.menu.step_0.20.0": {
+      "en": "battle.action.item",
+      "ko": "전투.액션.아이템"
+    },
+    "battle.menu.step_0.20.1": {
+      "en": "ITEM",
+      "ko": "목"
+    },
+    "battle.menu.step_0.21.0": {
+      "en": "battle.action.run",
+      "ko": "전투.액션.런"
+    },
+    "battle.menu.step_0.21.1": {
+      "en": "RUN",
+      "ko": "달리다"
+    },
+    "battle.menu.step_0.81.0": {
+      "en": "battle.menu.no_skills",
+      "ko": "Battle.menu.no_skills"
+    },
+    "battle.menu.step_0.81.1": {
+      "en": "No skills available.",
+      "ko": "사용할 수 있는 기술이 없습니다."
+    },
+    "battle.menu.step_0.87.0": {
+      "en": "battle.menu.no_items",
+      "ko": "Battle.menu.no_items"
+    },
+    "battle.menu.step_0.87.1": {
+      "en": "No items available.",
+      "ko": "사용 가능한 항목이 없습니다."
+    },
+    "bed.bedmenu_draw.182.0": {
+      "en": "bed.option.rest",
+      "ko": "침대.옵션.휴식"
+    },
+    "bed.bedmenu_draw.183.0": {
+      "en": "bed.option.back",
+      "ko": "침대.옵션.뒤"
+    },
+    "bed.option.back": {
+      "en": "Back",
+      "ko": "뒤쪽에"
+    },
+    "bed.option.rest": {
+      "en": "Rest",
+      "ko": "나머지"
+    },
+    "class.classselect_draw.2029.0": {
+      "en": "class.select.title",
+      "ko": "클래스.선택.제목"
+    },
+    "class.classselect_draw.2029.1": {
+      "en": "Select Class",
+      "ko": "수업 선택"
+    },
+    "class.classselect_draw.2066.0": {
+      "en": "menu.common.back",
+      "ko": "메뉴.공통.뒤로"
+    },
+    "class.classselect_draw.2066.1": {
+      "en": "Back",
+      "ko": "뒤쪽에"
+    },
+    "class.name.archer": {
+      "en": "Archer",
+      "ko": "궁수"
+    },
+    "class.name.class_archer": {
+      "en": "Archer",
+      "ko": "궁수"
+    },
+    "class.name.class_knight": {
+      "en": "Knight",
+      "ko": "기사"
+    },
+    "class.name.class_mage": {
+      "en": "Mage",
+      "ko": "마술사"
+    },
+    "class.name.class_nobody": {
+      "en": "Nobody",
+      "ko": "아무도"
+    },
+    "class.name.mage": {
+      "en": "Mage",
+      "ko": "마술사"
+    },
+    "class.name.unknown": {
+      "en": "Unknown",
+      "ko": "알려지지 않은"
+    },
+    "class.name.warrior": {
+      "en": "Warrior",
+      "ko": "전사"
+    },
+    "class.select.title": {
+      "en": "Select Class",
+      "ko": "수업 선택"
+    },
+    "combat.msg.applied_prefix": {
+      "en": "Applied ",
+      "ko": "적용된"
+    },
+    "combat.msg.battle_buildvictorydialoguelines.279.0": {
+      "en": "combat.msg.victory_prefix",
+      "ko": "Combat.msg.victory_prefix"
+    },
+    "combat.msg.battle_buildvictorydialoguelines.279.1": {
+      "en": "You defeated",
+      "ko": "당신이 패배했습니다"
+    },
+    "combat.msg.battle_buildvictorydialoguelines.281.0": {
+      "en": "combat.msg.loot_prefix",
+      "ko": "Combat.msg.loot_prefix"
+    },
+    "combat.msg.battle_buildvictorydialoguelines.281.1": {
+      "en": "Loot:",
+      "ko": "전리품:"
+    },
+    "combat.msg.battle_buildvictorydialoguelines.302.0": {
+      "en": "combat.msg.floor1_reaction.0",
+      "ko": "Combat.msg.floor1_reaction.0"
+    },
+    "combat.msg.battle_buildvictorydialoguelines.302.1": {
+      "en": "How was that even alive?! I almost died.",
+      "ko": "그게 어떻게 살아있었지?! 나는 거의 죽을 뻔했다."
+    },
+    "combat.msg.battle_buildvictorydialoguelines.303.0": {
+      "en": "combat.msg.floor1_reaction.1",
+      "ko": "Combat.msg.floor1_reaction.1"
+    },
+    "combat.msg.battle_buildvictorydialoguelines.303.1": {
+      "en": "God, I just need to get out of here.",
+      "ko": "맙소사, 난 여기서 나가야만 해요."
+    },
+    "combat.msg.battle_checkend.335.0": {
+      "en": "combat.msg.enemy_slain",
+      "ko": "Combat.msg.enemy_slain"
+    },
+    "combat.msg.battle_checkend.335.1": {
+      "en": "{enemy} has been slain.",
+      "ko": "{enemy}가 살해되었습니다."
+    },
+    "combat.msg.battle_enemyact.785.0": {
+      "en": "combat.msg.enemy_stunned",
+      "ko": "Combat.msg.enemy_stunned"
+    },
+    "combat.msg.battle_enemyact.785.1": {
+      "en": "{enemy} is stunned!",
+      "ko": "{enemy}는 깜짝 놀랐습니다!"
+    },
+    "combat.msg.battle_enemyact.844.0": {
+      "en": "combat.msg.enemy_skill_message",
+      "ko": "Combat.msg.enemy_skill_message"
+    },
+    "combat.msg.battle_enemyact.844.1": {
+      "en": "{enemy}: {msg}",
+      "ko": "{enemy}: {msg}"
+    },
+    "combat.msg.battle_enemyact.849.0": {
+      "en": "combat.msg.enemy_miss",
+      "ko": "Combat.msg.enemy_miss"
+    },
+    "combat.msg.battle_enemyact.849.1": {
+      "en": "{enemy} missed!",
+      "ko": "{enemy}가 놓쳤습니다!"
+    },
+    "combat.msg.battle_enemyact.852.0": {
+      "en": "combat.msg.enemy_crit",
+      "ko": "Combat.msg.enemy_crit"
+    },
+    "combat.msg.battle_enemyact.852.1": {
+      "en": "{enemy} crit! {dmg} damage!",
+      "ko": "{enemy} 치명타! {dmg} 손상!"
+    },
+    "combat.msg.battle_enemyact.855.0": {
+      "en": "combat.msg.enemy_hit",
+      "ko": "Combat.msg.enemy_hit"
+    },
+    "combat.msg.battle_enemyact.855.1": {
+      "en": "{enemy} hits for {dmg} damage!",
+      "ko": "{enemy}가 {dmg} 피해를 입혔습니다!"
+    },
+    "combat.msg.battle_enemyact.892.0": {
+      "en": "combat.msg.enemy_miss",
+      "ko": "Combat.msg.enemy_miss"
+    },
+    "combat.msg.battle_enemyact.892.1": {
+      "en": "{enemy} missed!",
+      "ko": "{enemy}가 놓쳤습니다!"
+    },
+    "combat.msg.battle_enemyact.895.0": {
+      "en": "combat.msg.enemy_crit",
+      "ko": "Combat.msg.enemy_crit"
+    },
+    "combat.msg.battle_enemyact.895.1": {
+      "en": "{enemy} crit! {dmg} damage!",
+      "ko": "{enemy} 치명타! {dmg} 손상!"
+    },
+    "combat.msg.battle_enemyact.898.0": {
+      "en": "combat.msg.enemy_hit",
+      "ko": "Combat.msg.enemy_hit"
+    },
+    "combat.msg.battle_enemyact.898.1": {
+      "en": "{enemy} hits for {dmg} damage!",
+      "ko": "{enemy}가 {dmg} 피해를 입혔습니다!"
+    },
+    "combat.msg.battle_playerattackresolvetimed.452.1": {
+      "en": "battle.action.timing.miss",
+      "ko": "전투.액션.타이밍.미스"
+    },
+    "combat.msg.battle_playerattackresolvetimed.452.2": {
+      "en": "MISS",
+      "ko": "놓치다"
+    },
+    "combat.msg.battle_playerattackresolvetimed.525.0": {
+      "en": "combat.msg.player_miss",
+      "ko": "Combat.msg.player_miss"
+    },
+    "combat.msg.battle_playerattackresolvetimed.525.1": {
+      "en": "You missed!",
+      "ko": "당신은 놓쳤어요!"
+    },
+    "combat.msg.battle_playerattackresolvetimed.532.0": {
+      "en": "combat.msg.player_crit",
+      "ko": "Combat.msg.player_crit"
+    },
+    "combat.msg.battle_playerattackresolvetimed.532.1": {
+      "en": "Critical hit! {dmg} damage!",
+      "ko": "크리티컬 히트! {dmg} 피해!"
+    },
+    "combat.msg.battle_playerattackresolvetimed.539.0": {
+      "en": "combat.msg.player_hit",
+      "ko": "Combat.msg.player_hit"
+    },
+    "combat.msg.battle_playerattackresolvetimed.539.1": {
+      "en": "You hit for {dmg} damage!",
+      "ko": "{dmg} 피해를 입었습니다!"
+    },
+    "combat.msg.battle_playerskill.631.0": {
+      "en": "combat.msg.skill_miss",
+      "ko": "Combat.msg.skill_miss"
+    },
+    "combat.msg.battle_playerskill.631.1": {
+      "en": "Skill missed!",
+      "ko": "스킬이 빠졌어요!"
+    },
+    "combat.msg.battle_playerskill.633.0": {
+      "en": "combat.msg.skill_crit",
+      "ko": "Combat.msg.skill_crit"
+    },
+    "combat.msg.battle_playerskill.633.1": {
+      "en": "Critical skill! {dmg} damage!",
+      "ko": "크리티컬 스킬! {dmg} 피해!"
+    },
+    "combat.msg.battle_playerskill.638.0": {
+      "en": "combat.msg.skill_hit",
+      "ko": "Combat.msg.skill_hit"
+    },
+    "combat.msg.battle_playerskill.638.1": {
+      "en": "Skill hit for {dmg} damage!",
+      "ko": "{dmg} 데미지 스킬 적중!"
+    },
+    "combat.msg.battle_playerskill.640.0": {
+      "en": "combat.msg.skill_used",
+      "ko": "Combat.msg.skill_used"
+    },
+    "combat.msg.battle_playerskill.640.1": {
+      "en": "Skill used.",
+      "ko": "사용된 스킬입니다."
+    },
+    "combat.msg.battle_playerstunskip.395.0": {
+      "en": "combat.msg.player_stunned",
+      "ko": "Combat.msg.player_stunned"
+    },
+    "combat.msg.battle_playerstunskip.395.1": {
+      "en": "You are stunned!",
+      "ko": "당신은 깜짝 놀랐습니다!"
+    },
+    "combat.msg.battle_runattempt.709.0": {
+      "en": "combat.msg.player_ran",
+      "ko": "Combat.msg.player_ran"
+    },
+    "combat.msg.battle_runattempt.709.1": {
+      "en": "You ran away!",
+      "ko": "당신은 도망 쳤어요!"
+    },
+    "combat.msg.battle_runattempt.712.0": {
+      "en": "combat.msg.player_couldnt_escape",
+      "ko": "Combat.msg.player_couldnt_escape"
+    },
+    "combat.msg.battle_runattempt.712.1": {
+      "en": "Couldn't escape!",
+      "ko": "탈출하지 못했습니다!"
+    },
+    "combat.msg.enemy_appeared": {
+      "en": "{enemy} appeared!",
+      "ko": "{enemy} 등장!"
+    },
+    "combat.msg.enemy_crit": {
+      "en": "{enemy} crit! {dmg} damage!",
+      "ko": "{enemy} 치명타! {dmg} 손상!"
+    },
+    "combat.msg.enemy_hit": {
+      "en": "{enemy} hits for {dmg} damage!",
+      "ko": "{enemy}가 {dmg} 피해를 입혔습니다!"
+    },
+    "combat.msg.enemy_miss": {
+      "en": "{enemy} missed!",
+      "ko": "{enemy}가 놓쳤습니다!"
+    },
+    "combat.msg.enemy_skill_message": {
+      "en": "{enemy}: {msg}",
+      "ko": "{enemy}: {msg}"
+    },
+    "combat.msg.enemy_slain": {
+      "en": "{enemy} has been slain.",
+      "ko": "{enemy}가 살해되었습니다."
+    },
+    "combat.msg.enemy_stunned": {
+      "en": "{enemy} is stunned!",
+      "ko": "{enemy}는 깜짝 놀랐습니다!"
+    },
+    "combat.msg.floor1_reaction.0": {
+      "en": "How was that even alive?! I almost died.",
+      "ko": "그게 어떻게 살아있었지?! 나는 거의 죽을 뻔했습니다."
+    },
+    "combat.msg.floor1_reaction.1": {
+      "en": "God, I just need to get out of here.",
+      "ko": "맙소사, 난 여기서 나가야만 해요."
+    },
+    "combat.msg.list_separator": {
+      "en": ", ",
+      "ko": ","
+    },
+    "combat.msg.loot_prefix": {
+      "en": "Loot:",
+      "ko": "전리품:"
+    },
+    "combat.msg.not_enough_mp": {
+      "en": "Not enough MP.",
+      "ko": "MP가 충분하지 않습니다."
+    },
+    "combat.msg.nothing_to_steal": {
+      "en": "Nothing to steal.",
+      "ko": "훔칠 것이 없습니다."
+    },
+    "combat.msg.player_couldnt_escape": {
+      "en": "Couldn't escape!",
+      "ko": "탈출하지 못했습니다!"
+    },
+    "combat.msg.player_crit": {
+      "en": "Critical hit! {dmg} damage!",
+      "ko": "크리티컬 히트! {dmg} 피해!"
+    },
+    "combat.msg.player_hit": {
+      "en": "You hit for {dmg} damage!",
+      "ko": "{dmg} 피해를 입었습니다!"
+    },
+    "combat.msg.player_miss": {
+      "en": "You missed!",
+      "ko": "당신은 놓쳤어요!"
+    },
+    "combat.msg.player_ran": {
+      "en": "You ran away!",
+      "ko": "당신은 도망 쳤어요!"
+    },
+    "combat.msg.player_stunned": {
+      "en": "You are stunned!",
+      "ko": "당신은 깜짝 놀랐습니다!"
+    },
+    "combat.msg.sentence_dot": {
+      "en": ".",
+      "ko": "."
+    },
+    "combat.msg.skill.use.skill_rampage": {
+      "en": "It goes berserk!",
+      "ko": "그것은 광포하다!"
+    },
+    "combat.msg.skill_crit": {
+      "en": "Critical skill! {dmg} damage!",
+      "ko": "크리티컬 스킬! {dmg} 피해!"
+    },
+    "combat.msg.skill_hit": {
+      "en": "Skill hit for {dmg} damage!",
+      "ko": "{dmg} 데미지 스킬 적중!"
+    },
+    "combat.msg.skill_miss": {
+      "en": "Skill missed!",
+      "ko": "스킬이 빠졌어요!"
+    },
+    "combat.msg.skill_used": {
+      "en": "Skill used.",
+      "ko": "사용된 스킬입니다."
+    },
+    "combat.msg.stole_an_item": {
+      "en": "Stole an item.",
+      "ko": "물건을 훔쳤습니다."
+    },
+    "combat.msg.stole_item": {
+      "en": "Stole {item}.",
+      "ko": "{item}를 훔쳤습니다."
+    },
+    "combat.msg.victory_prefix": {
+      "en": "You defeated",
+      "ko": "당신이 패배했습니다"
+    },
+    "common.cancel": {
+      "en": "Cancel",
+      "ko": "취소"
+    },
+    "common.ok": {
+      "en": "OK",
+      "ko": "좋아요"
+    },
+    "cutscene.ending.0.0": {
+      "en": "Thank the Almighty...",
+      "ko": "전능자께 감사하라..."
+    },
+    "cutscene.ending.0.1": {
+      "en": "An exit...",
+      "ko": "출구..."
+    },
+    "cutscene.ending.0.2": {
+      "en": "I need to find out where I am.",
+      "ko": "내가 어디에 있는지 알아내야 해요."
+    },
+    "cutscene.ending.1.0": {
+      "en": "Huh?",
+      "ko": "뭐?"
+    },
+    "cutscene.ending.1.1": {
+      "en": "...",
+      "ko": "..."
+    },
+    "cutscene.ending.1.2": {
+      "en": "Isn't this the raid party?",
+      "ko": "이거 습격파티 아닌가요?"
+    },
+    "cutscene.ending.1.3": {
+      "en": "They're all dead.",
+      "ko": "그들은 모두 죽었어."
+    },
+    "cutscene.ending.1.4": {
+      "en": "... What on earth...",
+      "ko": "... 도대체 무슨..."
+    },
+    "cutscene.ending.2.0": {
+      "en": "...",
+      "ko": "..."
+    },
+    "cutscene.ending.2.1": {
+      "en": "Oh.",
+      "ko": "오."
+    },
+    "cutscene.ending.2.2": {
+      "en": "...",
+      "ko": "..."
+    },
+    "cutscene.ending.2.3": {
+      "en": "I wasn't so lucky after all.",
+      "ko": "결국 나는 그렇게 운이 좋지 않았습니다."
+    },
+    "cutscene.ending.3.0": {
+      "en": "There is no hope.",
+      "ko": "희망이 없습니다."
+    },
+    "cutscene.ending.4.0": {
+      "en": "Thank you for playing...",
+      "ko": "플레이해 주셔서 감사합니다..."
+    },
+    "cutscene.ending.4.1": {
+      "en": "This was around 2 months of development, and I'm glad you were able to get through our prototype story.",
+      "ko": "이 게임은 약 2개월 동안 개발되었고, 여러분이 우리의 프로토타입 스토리를 끝까지 플레이해 주셔서 정말 기쁩니다."
+    },
+    "cutscene.ending.4.2": {
+      "en": "We're looking to use what we learned from this game for our next title.",
+      "ko": "우리는 이 게임에서 배운 점들을 다음 작품에 담아낼 계획입니다."
+    },
+    "cutscene.ending.4.3": {
+      "en": "Please support our next development :)",
+      "ko": "우리의 다음 개발도 응원해 주세요 :)"
+    },
+    "cutscene.ending.4.4": {
+      "en": "by PaleRook",
+      "ko": "PaleRook 제작"
+    },
+    "cutscene.ending.4.5": {
+      "en": "...",
+      "ko": "..."
+    },
+    "cutscene.game_over.0.0": {
+      "en": "GAME OVER.",
+      "ko": "게임이 끝났습니다."
+    },
+    "cutscene.intro.0.0": {
+      "en": "This is not a world of fantasy, magic, and dragons.",
+      "ko": "이곳은 환상과 마법과 용의 세계가 아닙니다."
+    },
+    "cutscene.intro.0.1": {
+      "en": "There were no monsters.",
+      "ko": "괴물은 없었습니다."
+    },
+    "cutscene.intro.0.10": {
+      "en": "It was worth it...",
+      "ko": "그만한 가치가 있었어..."
+    },
+    "cutscene.intro.0.11": {
+      "en": "You signed up.",
+      "ko": "가입하셨습니다."
+    },
+    "cutscene.intro.0.2": {
+      "en": "Only monsters among men.",
+      "ko": "인간들 사이에는 괴물뿐이다."
+    },
+    "cutscene.intro.0.3": {
+      "en": "This is a world of grit-medieval kingdoms and warring countries.",
+      "ko": "이것은 투지 넘치는 중세 왕국과 전쟁 국가의 세계입니다."
+    },
+    "cutscene.intro.0.4": {
+      "en": "...",
+      "ko": "..."
+    },
+    "cutscene.intro.0.5": {
+      "en": "Or is it?",
+      "ko": "아니면 그럴까요?"
+    },
+    "cutscene.intro.0.6": {
+      "en": "...",
+      "ko": "..."
+    },
+    "cutscene.intro.0.7": {
+      "en": "You are a mapmaker in a remote village, scraping by penny to penny.",
+      "ko": "당신은 외딴 마을의 지도 제작자로서 한 푼씩 긁어 모으고 있습니다."
+    },
+    "cutscene.intro.0.8": {
+      "en": "There were rumors of conscription for the war between two kingdoms.",
+      "ko": "두 왕국 사이의 전쟁을 위해 징집된다는 소문이 돌았습니다."
+    },
+    "cutscene.intro.0.9": {
+      "en": "The reward was enough to set you up for a year..",
+      "ko": "보상은 당신을 1년 동안 준비하기에 충분했습니다.."
+    },
+    "cutscene.intro.1.0": {
+      "en": "The plan was to ambush the enemy using a shortcut.",
+      "ko": "계획은 지름길을 이용해 적을 매복시키는 것이었다."
+    },
+    "cutscene.intro.1.1": {
+      "en": "Good thing you knew the forest as you grew up here.",
+      "ko": "당신이 여기서 자라면서 숲을 알게 된 것은 다행스러운 일입니다."
+    },
+    "cutscene.intro.1.10": {
+      "en": "You knew it was a mistake. You could feel it.",
+      "ko": "당신은 그것이 실수라는 것을 알고 있었습니다. 당신은 그것을 느낄 수 있습니다."
+    },
+    "cutscene.intro.1.11": {
+      "en": "Before you could speak up.",
+      "ko": "당신이 말하기 전에."
+    },
+    "cutscene.intro.1.12": {
+      "en": "You hear cracking...",
+      "ko": "깨지는 소리가 들린다..."
+    },
+    "cutscene.intro.1.13": {
+      "en": "Small tremors...",
+      "ko": "작은 흔들림..."
+    },
+    "cutscene.intro.1.2": {
+      "en": "Then the scouts reported a tunnel near the mountain.",
+      "ko": "그런 다음 정찰병들은 산 근처에 터널이 있다고 보고했습니다."
+    },
+    "cutscene.intro.1.3": {
+      "en": "You'd never heard of such a tunnel in all your life.",
+      "ko": "당신은 평생 그런 터널에 대해 들어 본 적이 없습니다."
+    },
+    "cutscene.intro.1.4": {
+      "en": "You couldn't help thinking it was a joke...",
+      "ko": "농담이라고 생각하지 않을 수 없었습니다..."
+    },
+    "cutscene.intro.1.5": {
+      "en": "But it wasn't.",
+      "ko": "하지만 그렇지 않았습니다."
+    },
+    "cutscene.intro.1.6": {
+      "en": "There really was a tunnel. You could hardly believe it.",
+      "ko": "정말 터널이 있었습니다. 당신은 그것을 거의 믿을 수 없었습니다."
+    },
+    "cutscene.intro.1.7": {
+      "en": "The group ventured deep into the tunnel, heading toward the enemy castle...",
+      "ko": "일행은 터널 깊숙한 곳으로 모험을 떠나 적의 성으로 향하는데…"
+    },
+    "cutscene.intro.1.8": {
+      "en": "You're just the navigator for this raid party.",
+      "ko": "당신은 이 레이드 파티의 항해사일 뿐입니다."
+    },
+    "cutscene.intro.1.9": {
+      "en": "And this place never existed before...",
+      "ko": "그리고 이런 곳은 예전에는 없었는데..."
+    },
+    "cutscene.intro.2.0": {
+      "en": "But it was already too late.",
+      "ko": "하지만 이미 너무 늦었습니다."
+    },
+    "cutscene.intro.2.1": {
+      "en": "You fell.",
+      "ko": "당신은 떨어졌습니다."
+    },
+    "dialogue.after_class_chest_archer.0": {
+      "en": "Light. Balanced.",
+      "ko": "빛. 균형."
+    },
+    "dialogue.after_class_chest_archer.1": {
+      "en": "No rust. No wear.",
+      "ko": "녹이 없습니다. 마모되지 않습니다."
+    },
+    "dialogue.after_class_chest_archer.2": {
+      "en": "Like it was waiting here.",
+      "ko": "마치 여기서 기다리고 있었던 것처럼."
+    },
+    "dialogue.after_class_chest_knight.0": {
+      "en": "Heavy... but it fits.",
+      "ko": "무겁지만...맞습니다."
+    },
+    "dialogue.after_class_chest_knight.1": {
+      "en": "Like it's been mine for years.",
+      "ko": "수년 동안 내 것이었던 것처럼."
+    },
+    "dialogue.after_class_chest_knight.2": {
+      "en": "This chest shouldn't know me.",
+      "ko": "이 가슴은 나를 몰라야 해."
+    },
+    "dialogue.after_class_chest_mage.0": {
+      "en": "Why does it feel cold...?",
+      "ko": "왜 추운 것 같지...?"
+    },
+    "dialogue.after_class_chest_mage.1": {
+      "en": "...Did something just whisper?",
+      "ko": "...뭔가 속삭였나요?"
+    },
+    "dialogue.after_class_chest_mage.2": {
+      "en": "No. That's not possible.",
+      "ko": "아니요. 그건 불가능합니다."
+    },
+    "dialogue.after_class_chest_mage.3": {
+      "en": "Stop calling to me.",
+      "ko": "나에게 전화하지 마세요."
+    },
+    "dialogue.after_skillbook_chest_archer.0": {
+      "en": "Angles and breath marks.",
+      "ko": "각도와 숨결 자국."
+    },
+    "dialogue.after_skillbook_chest_archer.1": {
+      "en": "I follow the first step...",
+      "ko": "나는 첫 번째 단계를 따릅니다 ..."
+    },
+    "dialogue.after_skillbook_chest_archer.2": {
+      "en": "Then my body finishes it. Odd.",
+      "ko": "그러면 내 몸이 그걸 끝낸다. 이상한."
+    },
+    "dialogue.after_skillbook_chest_knight.0": {
+      "en": "Diagrams... simple forms.",
+      "ko": "다이어그램... 간단한 형태."
+    },
+    "dialogue.after_skillbook_chest_knight.1": {
+      "en": "I read it once.",
+      "ko": "한번 읽어봤습니다."
+    },
+    "dialogue.after_skillbook_chest_knight.2": {
+      "en": "Somehow... my hands already know.",
+      "ko": "왠지... 내 손은 이미 알고 있다."
+    },
+    "dialogue.after_skillbook_chest_mage.0": {
+      "en": "I can't read this...",
+      "ko": "나는 이것을 읽을 수 없다 ..."
+    },
+    "dialogue.after_skillbook_chest_mage.1": {
+      "en": "...The page is filled with symbols.",
+      "ko": "...페이지가 기호로 가득 차 있습니다."
+    },
+    "dialogue.after_skillbook_chest_mage.2": {
+      "en": "A voice folds into my thoughts.",
+      "ko": "내 생각에 목소리가 접힌다."
+    },
+    "dialogue.after_skillbook_chest_mage.3": {
+      "en": "And I understand. It shows me where to place my hands.",
+      "ko": "그리고 나는 이해합니다. 손을 어디에 두어야 할지 알려줍니다."
+    },
+    "dialogue.barrel_break.0": {
+      "en": "You smash the barrel.",
+      "ko": "당신은 배럴을 부수고 있습니다."
+    },
+    "dialogue.barrel_broken.0": {
+      "en": "It's broken.",
+      "ko": "고장났어요."
+    },
+    "dialogue.bone.0": {
+      "en": "A pile of old bones.",
+      "ko": "오래된 뼈 더미."
+    },
+    "dialogue.chest_empty.0": {
+      "en": "It's empty.",
+      "ko": "비어 있습니다."
+    },
+    "dialogue.chest_open.0": {
+      "en": "You open the chest.",
+      "ko": "당신은 가슴을 엽니 다."
+    },
+    "dialogue.default.0": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.dung_pile.0": {
+      "en": "Better not touch that.",
+      "ko": "그건 건드리지 않는 게 좋을 것 같아요."
+    },
+    "dialogue.entering_second_floor.0": {
+      "en": "I don't understand.",
+      "ko": "모르겠어요."
+    },
+    "dialogue.entering_second_floor.1": {
+      "en": "How can such creatures exist?",
+      "ko": "어떻게 이런 생물이 존재할 수 있나요?"
+    },
+    "dialogue.entering_second_floor.2": {
+      "en": "Some sort of mutated animals...",
+      "ko": "일종의 돌연변이 동물..."
+    },
+    "dialogue.entering_second_floor.3": {
+      "en": "...Monsters?",
+      "ko": "...괴물?"
+    },
+    "dialogue.fire_stand_extinguish.0": {
+      "en": "You extinguish the flame.",
+      "ko": "당신은 불꽃을 진압합니다."
+    },
+    "dialogue.fire_stand_off.0": {
+      "en": "The flame is out.",
+      "ko": "불꽃이 꺼졌습니다."
+    },
+    "dialogue.first_encounter_slime.0": {
+      "en": "What...",
+      "ko": "무엇..."
+    },
+    "dialogue.first_encounter_slime.1": {
+      "en": "...the hell is that?",
+      "ko": "...대체 그게?"
+    },
+    "dialogue.horned_skull.0": {
+      "en": "It stares back at you.",
+      "ko": "그것은 당신을 다시 쳐다 봅니다."
+    },
+    "dialogue.loot_empty.0": {
+      "en": "Nothing was found.",
+      "ko": "아무것도 발견되지 않았습니다."
+    },
+    "dialogue.loot_received.0": {
+      "en": "Received {item} x{qty}.",
+      "ko": "{item} x{qty}를 받았습니다."
+    },
+    "dialogue.rock.0": {
+      "en": "Just a rock.",
+      "ko": "그냥 바위."
+    },
+    "dialogue.skull.0": {
+      "en": "A cracked skull.",
+      "ko": "금이 간 두개골."
+    },
+    "dialogue.sys_class_chest_prompt.0": {
+      "en": "How convenient...",
+      "ko": "얼마나 편리한데..."
+    },
+    "dialogue.sys_class_chest_prompt.1": {
+      "en": "Just what I need to get out of this place.",
+      "ko": "내가 이곳에서 나가기 위해 꼭 필요한 것."
+    },
+    "dialogue.sys_floor1_intro.0": {
+      "en": "*Thud* *Crash*",
+      "ko": "*쿵* *충돌*"
+    },
+    "dialogue.sys_floor1_intro.1": {
+      "en": "Wha... What just happened?",
+      "ko": "뭐... 방금 무슨 일이 일어난 거야?"
+    },
+    "dialogue.sys_floor1_intro.2": {
+      "en": "Where am I?",
+      "ko": "나는 어디에 있습니까?"
+    },
+    "dialogue.sys_floor1_intro.3": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.sys_floor1_intro.4": {
+      "en": "I knew it. there's something wrong about this place.",
+      "ko": "나는 그것을 알고 있었다. 이곳에 뭔가 문제가 있어요."
+    },
+    "dialogue.sys_floor1_intro.5": {
+      "en": "I need to get back.",
+      "ko": "나는 돌아 가야한다."
+    },
+    "dialogue.sys_load_missing.0": {
+      "en": "No save found.",
+      "ko": "저장 파일을 찾을 수 없습니다."
+    },
+    "dialogue.sys_load_ok.0": {
+      "en": "Game loaded.",
+      "ko": "게임이 로드되었습니다."
+    },
+    "dialogue.sys_save_ok.0": {
+      "en": "Game saved.",
+      "ko": "게임이 저장되었습니다."
+    },
+    "dialogue.tall_grass.0": {
+      "en": "It rustles in the wind.",
+      "ko": "바람에 바스락거린다."
+    },
+    "dialogue.torch_extinguish.0": {
+      "en": "You extinguish the torch.",
+      "ko": "당신은 횃불을 끈다."
+    },
+    "dialogue.torch_off.0": {
+      "en": "The torch is cold.",
+      "ko": "횃불이 차갑습니다."
+    },
+    "dialogue.tree.0": {
+      "en": "A sturdy tree.",
+      "ko": "튼튼한 나무."
+    },
+    "dialogue.tree_stump.0": {
+      "en": "A cut tree stump.",
+      "ko": "잘린 나무 그루터기."
+    },
+    "enemy.name.enemy_direwolf": {
+      "en": "Dire Wolf",
+      "ko": "다이어 울프"
+    },
+    "enemy.name.enemy_final_boss": {
+      "en": "The Pale Choirbeast",
+      "ko": "The Pale Choirbeast"
+    },
+    "enemy.name.enemy_ghostsword": {
+      "en": "Ghost Sword",
+      "ko": "유령검"
+    },
+    "enemy.name.enemy_killer_plant": {
+      "en": "Killer Plant",
+      "ko": "킬러 플랜트"
+    },
+    "enemy.name.enemy_madwhisp": {
+      "en": "Mad Whisp",
+      "ko": "미친 속삭임"
+    },
+    "enemy.name.enemy_mini_boss": {
+      "en": "Palehorn",
+      "ko": "Palehorn"
+    },
+    "enemy.name.enemy_slime": {
+      "en": "Slime",
+      "ko": "더러운 것"
+    },
+    "enemy.name.enemy_snake": {
+      "en": "Snake",
+      "ko": "뱀"
+    },
+    "enemy.name.enemy_spider": {
+      "en": "Spider",
+      "ko": "거미"
+    },
+    "enemy.name.enemy_stranger": {
+      "en": "Stranger",
+      "ko": "낯선 사람"
+    },
+    "enemy.name.unknown": {
+      "en": "Enemy",
+      "ko": "적"
+    },
+    "interact.grave.default": {
+      "en": "An old grave rests here.",
+      "ko": "여기에는 오래된 무덤이 있습니다."
+    },
+    "interact.grave.line.obj_grave.0": {
+      "en": "interact.grave.line.obj_grave.0",
+      "ko": "상호 작용.grave.line.obj_grave.0"
+    },
+    "interact.grave.line.obj_grave.1": {
+      "en": "A worn grave marker sinks into the soil.",
+      "ko": "낡은 묘표는 흙 속으로 가라앉습니다."
+    },
+    "interact.grave.line.obj_grave.10": {
+      "en": "interact.grave.line.obj_grave.5",
+      "ko": "상호 작용.grave.line.obj_grave.5"
+    },
+    "interact.grave.line.obj_grave.11": {
+      "en": "Moss creeps over the edge of this grave.",
+      "ko": "이 무덤 가장자리에는 이끼가 기어 다니고 있습니다."
+    },
+    "interact.grave.line.obj_grave.12": {
+      "en": "interact.grave.line.obj_grave.6",
+      "ko": "상호 작용.grave.line.obj_grave.6"
+    },
+    "interact.grave.line.obj_grave.13": {
+      "en": "The earth around this grave feels recently disturbed.",
+      "ko": "이 무덤 주변의 땅은 최근에 혼란스러운 느낌을 받았습니다."
+    },
+    "interact.grave.line.obj_grave.14": {
+      "en": "interact.grave.line.obj_grave.7",
+      "ko": "상호 작용.grave.line.obj_grave.7"
+    },
+    "interact.grave.line.obj_grave.15": {
+      "en": "A neglected grave marker leans to one side.",
+      "ko": "방치된 무덤 표시가 한쪽으로 기울어져 있습니다."
+    },
+    "interact.grave.line.obj_grave.16": {
+      "en": "interact.grave.line.obj_grave.8",
+      "ko": "상호작용.grave.line.obj_grave.8"
+    },
+    "interact.grave.line.obj_grave.17": {
+      "en": "This grave has been here for a long, long time.",
+      "ko": "이 무덤은 아주 오랫동안 여기에 있었습니다."
+    },
+    "interact.grave.line.obj_grave.18": {
+      "en": "interact.grave.line.obj_grave.9",
+      "ko": "상호작용.grave.line.obj_grave.9"
+    },
+    "interact.grave.line.obj_grave.19": {
+      "en": "Only silence answers from this old grave.",
+      "ko": "이 오래된 무덤에서는 오직 침묵만이 대답할 뿐입니다."
+    },
+    "interact.grave.line.obj_grave.2": {
+      "en": "interact.grave.line.obj_grave.1",
+      "ko": "상호 작용.grave.line.obj_grave.1"
+    },
+    "interact.grave.line.obj_grave.3": {
+      "en": "An old grave rests here, quiet and cold.",
+      "ko": "이곳에는 조용하고 추운 오래된 무덤이 잠들어 있습니다."
+    },
+    "interact.grave.line.obj_grave.4": {
+      "en": "interact.grave.line.obj_grave.2",
+      "ko": "상호 작용.grave.line.obj_grave.2"
+    },
+    "interact.grave.line.obj_grave.5": {
+      "en": "The stone is cracked, but the name is long gone.",
+      "ko": "돌에는 금이 갔지만 이름은 사라진 지 오래입니다."
+    },
+    "interact.grave.line.obj_grave.6": {
+      "en": "interact.grave.line.obj_grave.3",
+      "ko": "상호 작용.grave.line.obj_grave.3"
+    },
+    "interact.grave.line.obj_grave.7": {
+      "en": "You brush away dust from a weathered grave.",
+      "ko": "풍화된 무덤에서 먼지를 털어냅니다."
+    },
+    "interact.grave.line.obj_grave.8": {
+      "en": "interact.grave.line.obj_grave.4",
+      "ko": "상호 작용.grave.line.obj_grave.4"
+    },
+    "interact.grave.line.obj_grave.9": {
+      "en": "A faded grave stands in the silence.",
+      "ko": "빛바랜 무덤이 침묵 속에 서 있다."
+    },
+    "interact.name.obj_barrel": {
+      "en": "Barrel",
+      "ko": "통"
+    },
+    "interact.name.obj_barrel_broken": {
+      "en": "Broken Barrel",
+      "ko": "깨진 배럴"
+    },
+    "interact.name.obj_bed": {
+      "en": "Bed",
+      "ko": "침대"
+    },
+    "interact.name.obj_bone": {
+      "en": "Bones",
+      "ko": "뼈"
+    },
+    "interact.name.obj_chest": {
+      "en": "Chest",
+      "ko": "가슴"
+    },
+    "interact.name.obj_chest_opened": {
+      "en": "Chest",
+      "ko": "가슴"
+    },
+    "interact.name.obj_dung_pile": {
+      "en": "Dung Pile",
+      "ko": "똥 더미"
+    },
+    "interact.name.obj_fire_stand": {
+      "en": "Fire Stand",
+      "ko": "불 스탠드"
+    },
+    "interact.name.obj_fire_stand_off": {
+      "en": "Fire Stand",
+      "ko": "불 스탠드"
+    },
+    "interact.name.obj_grave": {
+      "en": "Grave",
+      "ko": "무덤"
+    },
+    "interact.name.obj_horned_skull": {
+      "en": "Horned Skull",
+      "ko": "뿔이 있는 해골"
+    },
+    "interact.name.obj_rock1": {
+      "en": "Rock",
+      "ko": "바위"
+    },
+    "interact.name.obj_rock2": {
+      "en": "Rock",
+      "ko": "바위"
+    },
+    "interact.name.obj_skull_1": {
+      "en": "Skull",
+      "ko": "두개골"
+    },
+    "interact.name.obj_skull_2": {
+      "en": "Skull",
+      "ko": "두개골"
+    },
+    "interact.name.obj_tall_grass": {
+      "en": "Tall Grass",
+      "ko": "키 큰 잔디"
+    },
+    "interact.name.obj_torch": {
+      "en": "Torch",
+      "ko": "토치"
+    },
+    "interact.name.obj_torch_off": {
+      "en": "Torch",
+      "ko": "토치"
+    },
+    "interact.name.obj_tree_1": {
+      "en": "Tree",
+      "ko": "나무"
+    },
+    "interact.name.obj_tree_2": {
+      "en": "Tree",
+      "ko": "나무"
+    },
+    "interact.name.obj_tree_stump1": {
+      "en": "Tree Stump",
+      "ko": "나무 그루터기"
+    },
+    "interact.name.obj_tree_stump2": {
+      "en": "Tree Stump",
+      "ko": "나무 그루터기"
+    },
+    "item.msg.already_know": {
+      "en": "Already know {skill}.",
+      "ko": "이미 {skill}를 알고 있습니다."
+    },
+    "item.msg.cant_use": {
+      "en": "Can't use that.",
+      "ko": "사용할 수 없습니다."
+    },
+    "item.msg.class_cannot_learn": {
+      "en": "Your class cannot learn {skill}.",
+      "ko": "귀하의 수업은 {skill}를 배울 수 없습니다."
+    },
+    "item.msg.full_health": {
+      "en": "Already full health.",
+      "ko": "이미 건강이 완전합니다."
+    },
+    "item.msg.full_mana": {
+      "en": "Already full mana.",
+      "ko": "이미 마나가 가득 찼습니다."
+    },
+    "item.msg.healed_hp": {
+      "en": "Healed {amt} HP.",
+      "ko": "{amt} HP를 치유했습니다."
+    },
+    "item.msg.learned": {
+      "en": "Learned {skill}.",
+      "ko": "{skill}를 배웠습니다."
+    },
+    "item.msg.no_status_cure": {
+      "en": "No status to cure.",
+      "ko": "치료할 상태가 아닙니다."
+    },
+    "item.msg.not_ready_skill": {
+      "en": "You are not ready to learn this yet.",
+      "ko": "당신은 아직 이것을 배울 준비가 되지 않았습니다."
+    },
+    "item.msg.recovered_mp": {
+      "en": "Recovered {amt} MP.",
+      "ko": "{amt} MP를 회복했습니다."
+    },
+    "item.msg.status_cured": {
+      "en": "{status} cured.",
+      "ko": "{status}가 치료되었습니다."
+    },
+    "item.msg.that_skill": {
+      "en": "that skill",
+      "ko": "그 기술"
+    },
+    "item.name.0": {
+      "en": "None",
+      "ko": "없음"
+    },
+    "item.name.1": {
+      "en": "Wooden Sword",
+      "ko": "목검"
+    },
+    "item.name.10": {
+      "en": "HP Potion Lv1",
+      "ko": "HP 포션 Lv1"
+    },
+    "item.name.101": {
+      "en": "Skillbook: Wound",
+      "ko": "스킬북: 상처"
+    },
+    "item.name.102": {
+      "en": "Skillbook: Hilt Bash",
+      "ko": "스킬북: 힐트 배쉬"
+    },
+    "item.name.103": {
+      "en": "Skillbook: Muscle Up",
+      "ko": "스킬북: 머슬업"
+    },
+    "item.name.104": {
+      "en": "Skillbook: Rev Up",
+      "ko": "스킬북: 레브 업"
+    },
+    "item.name.105": {
+      "en": "Skillbook: Horizontal Slash",
+      "ko": "스킬북: 가로베기"
+    },
+    "item.name.106": {
+      "en": "Skillbook: Poison Arrow",
+      "ko": "스킬북: 독화살"
+    },
+    "item.name.107": {
+      "en": "Skillbook: Evasion",
+      "ko": "스킬북: 회피"
+    },
+    "item.name.108": {
+      "en": "Skillbook: Double Shot",
+      "ko": "스킬북: 더블 샷"
+    },
+    "item.name.109": {
+      "en": "Skillbook: Take Aim",
+      "ko": "스킬북: 조준"
+    },
+    "item.name.11": {
+      "en": "MP Potion Lv1",
+      "ko": "MP 포션 Lv1"
+    },
+    "item.name.110": {
+      "en": "Skillbook: Fireball",
+      "ko": "스킬북: 파이어볼"
+    },
+    "item.name.111": {
+      "en": "Skillbook: Poison Mist",
+      "ko": "스킬북: 포이즌 미스트"
+    },
+    "item.name.112": {
+      "en": "Skillbook: Ice Spear",
+      "ko": "스킬북: 아이스 스피어"
+    },
+    "item.name.113": {
+      "en": "Skillbook: Meditation",
+      "ko": "스킬북: 명상"
+    },
+    "item.name.114": {
+      "en": "Skillbook: Foresight",
+      "ko": "스킬북: 예지력"
+    },
+    "item.name.12": {
+      "en": "Antidote",
+      "ko": "해독제"
+    },
+    "item.name.13": {
+      "en": "Bandage",
+      "ko": "붕대"
+    },
+    "item.name.14": {
+      "en": "HP Potion Lv2",
+      "ko": "HP 포션 Lv2"
+    },
+    "item.name.15": {
+      "en": "HP Potion Lv3",
+      "ko": "HP 포션 Lv3"
+    },
+    "item.name.17": {
+      "en": "MP Potion Lv2",
+      "ko": "MP 포션 Lv2"
+    },
+    "item.name.18": {
+      "en": "MP Potion Lv3",
+      "ko": "MP 포션 Lv3"
+    },
+    "item.name.2": {
+      "en": "Iron Sword",
+      "ko": "철검"
+    },
+    "item.name.20": {
+      "en": "Leather Armor",
+      "ko": "가죽 갑옷"
+    },
+    "item.name.21": {
+      "en": "Iron Armor",
+      "ko": "철갑옷"
+    },
+    "item.name.22": {
+      "en": "Platinum Armor",
+      "ko": "백금 갑옷"
+    },
+    "item.name.23": {
+      "en": "Cloth Robe",
+      "ko": "천 로브"
+    },
+    "item.name.24": {
+      "en": "Silk Robe",
+      "ko": "실크 로브"
+    },
+    "item.name.25": {
+      "en": "Mithril Robe",
+      "ko": "미스릴 로브"
+    },
+    "item.name.3": {
+      "en": "Platinum Sword",
+      "ko": "백금검"
+    },
+    "item.name.4": {
+      "en": "Wooden Bow",
+      "ko": "나무활"
+    },
+    "item.name.5": {
+      "en": "Iron Bow",
+      "ko": "철 활"
+    },
+    "item.name.6": {
+      "en": "Platinum Bow",
+      "ko": "백금 활"
+    },
+    "item.name.7": {
+      "en": "Wooden Staff",
+      "ko": "나무 지팡이"
+    },
+    "item.name.8": {
+      "en": "Ruby Staff",
+      "ko": "루비 지팡이"
+    },
+    "item.name.9": {
+      "en": "Diamond Staff",
+      "ko": "다이아몬드 지팡이"
+    },
+    "item.passive.desc.1": {
+      "en": "MISS->BAD, BAD->OKAY (1/turn)",
+      "ko": "MISS->BAD, BAD->OKAY (1/턴)"
+    },
+    "item.passive.desc.2": {
+      "en": "1st hit: -1 DEF for 2 turns",
+      "ko": "1타 : 2턴 동안 방어력 -1"
+    },
+    "item.passive.desc.20": {
+      "en": "1st hit -3 damage (each battle)",
+      "ko": "1타 -3 피해(매 전투)"
+    },
+    "item.passive.desc.21": {
+      "en": "After hit: next hit -40% (cd2)",
+      "ko": "적중 후: 다음 적중 -40% (cd2)"
+    },
+    "item.passive.desc.22": {
+      "en": "Big hits reduced by 30%",
+      "ko": "빅히트 30% 감소"
+    },
+    "item.passive.desc.23": {
+      "en": "+1 MP/2 turns, take +1 phys damage",
+      "ko": "MP +1/2턴, 물리 피해 +1 받음"
+    },
+    "item.passive.desc.24": {
+      "en": "+10% skill damage, +1 status turn",
+      "ko": "+10% 스킬 데미지, +1 상태 턴"
+    },
+    "item.passive.desc.25": {
+      "en": "Reflect 1st status (cost 1 MP)",
+      "ko": "1번째 상태 반영(MP 1 소모)"
+    },
+    "item.passive.desc.3": {
+      "en": "+35% damage vs <35% HP",
+      "ko": "<35% HP에 비해 피해량 +35%"
+    },
+    "item.passive.desc.4": {
+      "en": "GOOD->PERFECT (1/turn)",
+      "ko": "좋음->완벽함 (1/턴)"
+    },
+    "item.passive.desc.5": {
+      "en": "GOOD+: may Stun (cd 3 turns)",
+      "ko": "GOOD+: 기절 가능(CD 3턴)"
+    },
+    "item.passive.desc.6": {
+      "en": "+30% damage vs statused foes",
+      "ko": "상태가 있는 적에 대한 피해 +30%"
+    },
+    "item.passive.desc.7": {
+      "en": "+1 MP every 2 turns",
+      "ko": "2턴마다 MP +1"
+    },
+    "item.passive.desc.8": {
+      "en": "+15% skill damage, +1 status turn",
+      "ko": "+15% 스킬 데미지, +1 상태 턴"
+    },
+    "item.passive.desc.9": {
+      "en": "+25% skill damage, PERFECT +1 MP",
+      "ko": "+25% 스킬 대미지, PERFECT +1 MP"
+    },
+    "item.passive.name.1": {
+      "en": "Steady Strike",
+      "ko": "꾸준한 타격"
+    },
+    "item.passive.name.2": {
+      "en": "Sunder Edge",
+      "ko": "썬더 에지"
+    },
+    "item.passive.name.20": {
+      "en": "First Impact",
+      "ko": "퍼스트 임팩트"
+    },
+    "item.passive.name.21": {
+      "en": "Brace",
+      "ko": "중괄호"
+    },
+    "item.passive.name.22": {
+      "en": "Debt Plate",
+      "ko": "부채 판"
+    },
+    "item.passive.name.23": {
+      "en": "Thin Veil",
+      "ko": "얇은 베일"
+    },
+    "item.passive.name.24": {
+      "en": "Silk Flow",
+      "ko": "실크플로우"
+    },
+    "item.passive.name.25": {
+      "en": "Mirror Stitch",
+      "ko": "거울 스티치"
+    },
+    "item.passive.name.3": {
+      "en": "Executioner",
+      "ko": "실행자"
+    },
+    "item.passive.name.4": {
+      "en": "Aim Assist",
+      "ko": "조준 지원"
+    },
+    "item.passive.name.5": {
+      "en": "Pinning Shot",
+      "ko": "피닝샷"
+    },
+    "item.passive.name.6": {
+      "en": "Predator",
+      "ko": "포식자"
+    },
+    "item.passive.name.7": {
+      "en": "Mana Trickle",
+      "ko": "마나 트리클"
+    },
+    "item.passive.name.8": {
+      "en": "Ember Lens",
+      "ko": "엠버 렌즈"
+    },
+    "item.passive.name.9": {
+      "en": "Arcane Surge",
+      "ko": "비전 쇄도"
+    },
+    "menu.common.back": {
+      "en": "Back",
+      "ko": "뒤쪽에"
+    },
+    "menu.common.cancel": {
+      "en": "Cancel",
+      "ko": "취소"
+    },
+    "menu.common.confirm": {
+      "en": "Confirm",
+      "ko": "확인하다"
+    },
+    "menu.difficulty.title": {
+      "en": "Select Difficulty",
+      "ko": "난이도 선택"
+    },
+    "menu.draw_64.127.0": {
+      "en": "menu.common.back",
+      "ko": "메뉴.공통.뒤로"
+    },
+    "menu.draw_64.127.1": {
+      "en": "Back",
+      "ko": "뒤쪽에"
+    },
+    "menu.draw_64.91.0": {
+      "en": "menu.difficulty.title",
+      "ko": "메뉴.난이도.제목"
+    },
+    "menu.draw_64.91.1": {
+      "en": "Select Difficulty",
+      "ko": "난이도 선택"
+    },
+    "menu.label.equipped_short": {
+      "en": "E",
+      "ko": "이자형"
+    },
+    "menu.label.stack_suffix": {
+      "en": "x{qty}",
+      "ko": "x{qty}"
+    },
+    "menu.main.option.0": {
+      "en": "New Game",
+      "ko": "새로운 게임"
+    },
+    "menu.main.option.1": {
+      "en": "Load Game",
+      "ko": "게임 로드"
+    },
+    "menu.main.option.2": {
+      "en": "Settings",
+      "ko": "설정"
+    },
+    "menu.main.option.3": {
+      "en": "Exit Game",
+      "ko": "게임 종료"
+    },
+    "menu.menu_draw.1353.0": {
+      "en": "menu.tab.inventory",
+      "ko": "메뉴.탭.인벤토리"
+    },
+    "menu.menu_draw.1354.0": {
+      "en": "menu.tab.skills",
+      "ko": "메뉴.탭.스킬"
+    },
+    "menu.menu_draw.1355.0": {
+      "en": "menu.tab.stats",
+      "ko": "메뉴.탭.통계"
+    },
+    "menu.menu_draw.1387.0": {
+      "en": "menu.msg.no_items",
+      "ko": "menu.msg.no_items"
+    },
+    "menu.menu_draw.1387.1": {
+      "en": "No items.",
+      "ko": "항목이 없습니다."
+    },
+    "menu.menu_draw.1417.0": {
+      "en": "menu.label.equipped_short",
+      "ko": "menu.label.equipped_short"
+    },
+    "menu.menu_draw.1417.1": {
+      "en": "E",
+      "ko": "이자형"
+    },
+    "menu.menu_draw.1417.2": {
+      "en": "menu.label.equipped_short",
+      "ko": "menu.label.equipped_short"
+    },
+    "menu.menu_draw.1417.3": {
+      "en": "E",
+      "ko": "이자형"
+    },
+    "menu.menu_draw.1448.0": {
+      "en": "menu.msg.no_skills",
+      "ko": "menu.msg.no_skills"
+    },
+    "menu.menu_draw.1448.1": {
+      "en": "No skills.",
+      "ko": "기술이 없습니다."
+    },
+    "menu.menu_draw.1529.0": {
+      "en": "menu.stats.level_cap",
+      "ko": "menu.stats.level_cap"
+    },
+    "menu.menu_draw.1529.1": {
+      "en": "Level Cap",
+      "ko": "레벨 상한"
+    },
+    "menu.menu_draw.1529.2": {
+      "en": "menu.stats.required_exp",
+      "ko": "menu.stats.required_exp"
+    },
+    "menu.menu_draw.1529.3": {
+      "en": "Required EXP",
+      "ko": "필요 경험치"
+    },
+    "menu.menu_draw.1530.0": {
+      "en": "menu.stats.max",
+      "ko": "menu.stats.max"
+    },
+    "menu.menu_draw.1530.1": {
+      "en": "MAX",
+      "ko": "최대"
+    },
+    "menu.menu_draw.1556.0": {
+      "en": "menu.stats.level",
+      "ko": "메뉴.통계.레벨"
+    },
+    "menu.menu_draw.1556.1": {
+      "en": "Level: {level}",
+      "ko": "레벨: {level}"
+    },
+    "menu.menu_draw.1562.0": {
+      "en": "menu.stats.available_points",
+      "ko": "menu.stats.available_points"
+    },
+    "menu.menu_draw.1562.1": {
+      "en": "Available Points: {points}",
+      "ko": "사용 가능한 포인트: {points}"
+    },
+    "menu.menu_draw.1621.0": {
+      "en": "menu.common.confirm",
+      "ko": "메뉴.공통.확인"
+    },
+    "menu.menu_draw.1621.1": {
+      "en": "Confirm",
+      "ko": "확인하다"
+    },
+    "menu.menu_draw.1622.0": {
+      "en": "menu.common.cancel",
+      "ko": "메뉴.공통.취소"
+    },
+    "menu.menu_draw.1622.1": {
+      "en": "Cancel",
+      "ko": "취소"
+    },
+    "menu.menu_draw.1670.0": {
+      "en": "menu.popup.learn_skill",
+      "ko": "menu.popup.learn_skill"
+    },
+    "menu.menu_draw.1670.1": {
+      "en": "Learn a skill",
+      "ko": "기술을 배우세요"
+    },
+    "menu.menu_draw.1688.0": {
+      "en": "menu.common.confirm",
+      "ko": "메뉴.공통.확인"
+    },
+    "menu.menu_draw.1688.1": {
+      "en": "Confirm",
+      "ko": "확인하다"
+    },
+    "menu.menu_draw.1689.0": {
+      "en": "menu.common.cancel",
+      "ko": "메뉴.공통.취소"
+    },
+    "menu.menu_draw.1689.1": {
+      "en": "Cancel",
+      "ko": "취소"
+    },
+    "menu.menu_draw.1741.0": {
+      "en": "common.ok",
+      "ko": "공통.확인"
+    },
+    "menu.menu_draw.1741.1": {
+      "en": "OK",
+      "ko": "좋아요"
+    },
+    "menu.menu_handleinput.1170.0": {
+      "en": "item.msg.cant_use",
+      "ko": "item.msg.cant_use"
+    },
+    "menu.menu_handleinput.1170.1": {
+      "en": "Can't use that.",
+      "ko": "사용할 수 없습니다."
+    },
+    "menu.menu_useinventoryitem.854.0": {
+      "en": "item.msg.cant_use",
+      "ko": "item.msg.cant_use"
+    },
+    "menu.menu_useinventoryitem.854.1": {
+      "en": "Can't use that.",
+      "ko": "사용할 수 없습니다."
+    },
+    "menu.menu_useinventoryitem.869.0": {
+      "en": "menu.msg.unequipped",
+      "ko": "menu.msg.unequipped"
+    },
+    "menu.menu_useinventoryitem.869.1": {
+      "en": "Unequipped {item}.",
+      "ko": "장착되지 않은 {item}."
+    },
+    "menu.menu_useinventoryitem.884.0": {
+      "en": "menu.msg.equipped",
+      "ko": "menu.msg.equipped"
+    },
+    "menu.menu_useinventoryitem.884.1": {
+      "en": "Equipped {item}.",
+      "ko": "{item}를 장착했습니다."
+    },
+    "menu.menu_useinventoryitem.890.0": {
+      "en": "menu.msg.cant_equip",
+      "ko": "menu.msg.cant_equip"
+    },
+    "menu.menu_useinventoryitem.890.1": {
+      "en": "Can't equip that.",
+      "ko": "그거 장비할 수 없어요."
+    },
+    "menu.menu_useinventoryitem.912.0": {
+      "en": "item.msg.cant_use",
+      "ko": "item.msg.cant_use"
+    },
+    "menu.menu_useinventoryitem.912.1": {
+      "en": "Can't use that.",
+      "ko": "사용할 수 없습니다."
+    },
+    "menu.msg.cant_equip": {
+      "en": "Can't equip that.",
+      "ko": "그거 장비할 수 없어요."
+    },
+    "menu.msg.equipped": {
+      "en": "Equipped {item}.",
+      "ko": "{item}를 장착했습니다."
+    },
+    "menu.msg.no_items": {
+      "en": "No items.",
+      "ko": "항목이 없습니다."
+    },
+    "menu.msg.no_skills": {
+      "en": "No skills.",
+      "ko": "기술이 없습니다."
+    },
+    "menu.msg.unequipped": {
+      "en": "Unequipped {item}.",
+      "ko": "장착되지 않은 {item}."
+    },
+    "menu.popup.learn_skill": {
+      "en": "Learn a skill",
+      "ko": "기술을 배우세요"
+    },
+    "menu.stats.available_points": {
+      "en": "Available Points: {points}",
+      "ko": "사용 가능한 포인트: {points}"
+    },
+    "menu.stats.level": {
+      "en": "Level: {level}",
+      "ko": "레벨: {level}"
+    },
+    "menu.stats.level_cap": {
+      "en": "Level Cap",
+      "ko": "레벨 상한"
+    },
+    "menu.stats.max": {
+      "en": "MAX",
+      "ko": "최대"
+    },
+    "menu.stats.required_exp": {
+      "en": "Required EXP",
+      "ko": "필요 경험치"
+    },
+    "menu.tab.inventory": {
+      "en": "Inventory",
+      "ko": "목록"
+    },
+    "menu.tab.skills": {
+      "en": "Skills",
+      "ko": "기술"
+    },
+    "menu.tab.stats": {
+      "en": "Stats",
+      "ko": "통계"
+    },
+    "menu.tooltip.class.all": {
+      "en": "All Classes",
+      "ko": "모든 수업"
+    },
+    "menu.tooltip.class.only": {
+      "en": "{classes} only",
+      "ko": "{classes}만 해당"
+    },
+    "menu.tooltip.damage": {
+      "en": "Damage",
+      "ko": "손상"
+    },
+    "menu.tooltip.damage.acc": {
+      "en": "Acc {acc}",
+      "ko": "Acc {acc}"
+    },
+    "menu.tooltip.damage.hits": {
+      "en": "{hits} hits",
+      "ko": "{hits} 조회수"
+    },
+    "menu.tooltip.damage.power": {
+      "en": "Power {power}",
+      "ko": "전원 {power}"
+    },
+    "menu.tooltip.damage.stat": {
+      "en": "Stat {stat}",
+      "ko": "통계 {stat}"
+    },
+    "menu.tooltip.effect.buff": {
+      "en": "Effect: Buff",
+      "ko": "효과: 버프"
+    },
+    "menu.tooltip.effect.multi_status": {
+      "en": "Effect: Multiple statuses",
+      "ko": "효과: 여러 상태"
+    },
+    "menu.tooltip.effect.named": {
+      "en": "Effect: {effect}",
+      "ko": "효과: {effect}"
+    },
+    "menu.tooltip.effect.restore_hp": {
+      "en": "Effect: Restore HP",
+      "ko": "효과 : HP 회복"
+    },
+    "menu.tooltip.effect.steal_item": {
+      "en": "Effect: Steal one random item",
+      "ko": "효과: 무작위 아이템 1개를 훔칩니다."
+    },
+    "menu.tooltip.item.bonus": {
+      "en": "Bonus: {bonus}",
+      "ko": "보너스: {bonus}"
+    },
+    "menu.tooltip.item.cure": {
+      "en": "Cure: {status}",
+      "ko": "치료법: {status}"
+    },
+    "menu.tooltip.item.heal_hp": {
+      "en": "Heal HP {min}-{max}",
+      "ko": "힐 HP {min}-{max}"
+    },
+    "menu.tooltip.item.restore_mp": {
+      "en": "Restore MP {min}-{max}",
+      "ko": "MP 복원 {min}-{max}"
+    },
+    "menu.tooltip.item.scale_with_level": {
+      "en": "Amount scales with level.",
+      "ko": "레벨에 따라 금액이 조정됩니다."
+    },
+    "menu.tooltip.item.teaches": {
+      "en": "Teaches: {skill}",
+      "ko": "가르치다: {skill}"
+    },
+    "menu.tooltip.item.teaches_unknown": {
+      "en": "Teaches: Unknown skill",
+      "ko": "가르치는 것: 알 수 없는 기술"
+    },
+    "menu.tooltip.item.type.armor": {
+      "en": "Armor",
+      "ko": "갑옷"
+    },
+    "menu.tooltip.item.type.consumable": {
+      "en": "Consumable",
+      "ko": "소모품"
+    },
+    "menu.tooltip.item.type.key": {
+      "en": "Key Item",
+      "ko": "핵심 아이템"
+    },
+    "menu.tooltip.item.type.skillbook": {
+      "en": "Skillbook",
+      "ko": "스킬북"
+    },
+    "menu.tooltip.item.type.unknown": {
+      "en": "Unknown",
+      "ko": "알려지지 않은"
+    },
+    "menu.tooltip.item.type.weapon": {
+      "en": "Weapon",
+      "ko": "무기"
+    },
+    "menu.tooltip.item.type.with_slot": {
+      "en": "{type} (slot: {slot})",
+      "ko": "{type}(슬롯: {slot})"
+    },
+    "menu.tooltip.passive.cooldown": {
+      "en": "cooldown",
+      "ko": "쿨다운"
+    },
+    "menu.tooltip.passive.cooldown_prefix": {
+      "en": "(cooldown",
+      "ko": "(쿨타임"
+    },
+    "menu.tooltip.passive.good_plus": {
+      "en": "GOOD or PERFECT",
+      "ko": "좋음 또는 완벽함"
+    },
+    "menu.tooltip.passive.good_plus_colon": {
+      "en": "GOOD or PERFECT:",
+      "ko": "좋음 또는 완벽함:"
+    },
+    "menu.tooltip.passive.once_per_turn": {
+      "en": "once per turn",
+      "ko": "턴당 한 번"
+    },
+    "menu.tooltip.passive.to": {
+      "en": "to",
+      "ko": "에게"
+    },
+    "menu.tooltip.skill.mp": {
+      "en": "MP {mp}",
+      "ko": "MP {mp}"
+    },
+    "menu.tooltip.skill.mp_target": {
+      "en": "MP {mp} | Target: {target}",
+      "ko": "MP {mp} | 대상: {target}"
+    },
+    "menu.tooltip.skill.target_suffix": {
+      "en": "| Target: {target}",
+      "ko": "| 대상: {target}"
+    },
+    "menu.tooltip.stat.agi.desc": {
+      "en": "Improves turn order and evasion potential.",
+      "ko": "턴 순서와 회피 가능성이 향상됩니다."
+    },
+    "menu.tooltip.stat.def.desc": {
+      "en": "Reduces incoming damage through mitigation.",
+      "ko": "완화를 통해 들어오는 피해를 줄입니다."
+    },
+    "menu.tooltip.stat.default.desc": {
+      "en": "Affects combat performance.",
+      "ko": "전투 성능에 영향을 미칩니다."
+    },
+    "menu.tooltip.stat.intt.desc": {
+      "en": "Increases skill damage and magical output.",
+      "ko": "스킬 데미지와 마법 출력이 증가합니다."
+    },
+    "menu.tooltip.stat.luck.desc": {
+      "en": "Improves critical chance and random checks.",
+      "ko": "치명타 확률과 무작위 검사가 향상됩니다."
+    },
+    "menu.tooltip.stat.pending_plus": {
+      "en": "Pending bonus: +{delta}",
+      "ko": "보류 중인 보너스: +{delta}"
+    },
+    "menu.tooltip.stat.pending_zero": {
+      "en": "Pending bonus: +0",
+      "ko": "보류 중인 보너스: +0"
+    },
+    "menu.tooltip.stat.str.desc": {
+      "en": "Increases physical damage for weapon attacks.",
+      "ko": "무기 공격의 물리 피해가 증가합니다."
+    },
+    "menu.tooltip.status.default": {
+      "en": "Status",
+      "ko": "상태"
+    },
+    "menu.tooltip.status.line": {
+      "en": "Status: {status} {chance}%",
+      "ko": "상태: {status} {chance}%"
+    },
+    "menu.tooltip.status.turns_short": {
+      "en": "{turns}t",
+      "ko": "{turns}t"
+    },
+    "menu.tooltip.status.turns_suffix": {
+      "en": "| {turns} turns",
+      "ko": "| {turns} 회전"
+    },
+    "menu.tooltip.statuses.more": {
+      "en": ", +{count} more",
+      "ko": ", +{count} 더보기"
+    },
+    "menu.tooltip.statuses.prefix": {
+      "en": "Statuses: {first}",
+      "ko": "상태: {first}"
+    },
+    "menu.tooltip.target.all": {
+      "en": "All",
+      "ko": "모두"
+    },
+    "menu.tooltip.target.all_allies": {
+      "en": "All Allies",
+      "ko": "모든 동맹국"
+    },
+    "menu.tooltip.target.all_enemies": {
+      "en": "All Opponents",
+      "ko": "모든 반대자"
+    },
+    "menu.tooltip.target.enemy": {
+      "en": "Opponent",
+      "ko": "상대"
+    },
+    "menu.tooltip.target.self": {
+      "en": "Self",
+      "ko": "본인"
+    },
+    "menu.tooltip.target.unknown": {
+      "en": "Unknown",
+      "ko": "알려지지 않은"
+    },
+    "menu.tooltip_builditemlines.572.0": {
+      "en": "menu.tooltip.item.bonus",
+      "ko": "menu.tooltip.item.bonus"
+    },
+    "menu.tooltip_builditemlines.572.1": {
+      "en": "Bonus: {bonus}",
+      "ko": "보너스: {bonus}"
+    },
+    "menu.tooltip_builditemlines.585.0": {
+      "en": "menu.tooltip.class.only",
+      "ko": "menu.tooltip.class.only"
+    },
+    "menu.tooltip_builditemlines.585.1": {
+      "en": "{classes} only",
+      "ko": "{classes}만 해당"
+    },
+    "menu.tooltip_builditemlines.603.0": {
+      "en": "menu.tooltip.item.scale_with_level",
+      "ko": "menu.tooltip.item.scale_with_level"
+    },
+    "menu.tooltip_builditemlines.603.1": {
+      "en": "Amount scales with level.",
+      "ko": "레벨에 따라 금액이 조정됩니다."
+    },
+    "menu.tooltip_builditemlines.617.0": {
+      "en": "menu.tooltip.item.scale_with_level",
+      "ko": "menu.tooltip.item.scale_with_level"
+    },
+    "menu.tooltip_builditemlines.617.1": {
+      "en": "Amount scales with level.",
+      "ko": "레벨에 따라 금액이 조정됩니다."
+    },
+    "menu.tooltip_builditemlines.623.0": {
+      "en": "menu.tooltip.item.cure",
+      "ko": "menu.tooltip.item.cure"
+    },
+    "menu.tooltip_builditemlines.623.1": {
+      "en": "Cure: {status}",
+      "ko": "치료법: {status}"
+    },
+    "menu.tooltip_builditemlines.633.0": {
+      "en": "menu.tooltip.item.teaches",
+      "ko": "menu.tooltip.item.teaches"
+    },
+    "menu.tooltip_builditemlines.633.1": {
+      "en": "Teaches: {skill}",
+      "ko": "가르치다: {skill}"
+    },
+    "menu.tooltip_builditemlines.641.0": {
+      "en": "menu.tooltip.skill.mp_target",
+      "ko": "menu.tooltip.skill.mp_target"
+    },
+    "menu.tooltip_builditemlines.641.1": {
+      "en": "MP {mp} | Target: {target}",
+      "ko": "MP {mp} | 대상: {target}"
+    },
+    "menu.tooltip_builditemlines.652.0": {
+      "en": "menu.tooltip.item.teaches_unknown",
+      "ko": "menu.tooltip.item.teaches_unknown"
+    },
+    "menu.tooltip_builditemlines.652.1": {
+      "en": "Teaches: Unknown skill",
+      "ko": "가르치는 것: 알 수 없는 기술"
+    },
+    "menu.tooltip_builditemlines.656.0": {
+      "en": "menu.tooltip.effect.named",
+      "ko": "menu.tooltip.효과.이름 지정"
+    },
+    "menu.tooltip_builditemlines.656.1": {
+      "en": "Effect: {effect}",
+      "ko": "효과: {effect}"
+    },
+    "menu.tooltip_buildstatlines.450.0": {
+      "en": "menu.tooltip.stat.pending_plus",
+      "ko": "menu.tooltip.stat.pending_plus"
+    },
+    "menu.tooltip_buildstatlines.450.1": {
+      "en": "Pending bonus: +{delta}",
+      "ko": "보류 중인 보너스: +{delta}"
+    },
+    "menu.tooltip_buildstatlines.454.0": {
+      "en": "menu.tooltip.stat.pending_zero",
+      "ko": "menu.tooltip.stat.pending_zero"
+    },
+    "menu.tooltip_buildstatlines.454.1": {
+      "en": "Pending bonus: +0",
+      "ko": "보류 중인 보너스: +0"
+    },
+    "menu.tooltip_buildstatlines.459.0": {
+      "en": "menu.tooltip.stat.str.desc",
+      "ko": "menu.tooltip.stat.str.desc"
+    },
+    "menu.tooltip_buildstatlines.459.1": {
+      "en": "Increases physical damage for weapon attacks.",
+      "ko": "무기 공격의 물리 피해가 증가합니다."
+    },
+    "menu.tooltip_buildstatlines.462.0": {
+      "en": "menu.tooltip.stat.agi.desc",
+      "ko": "menu.tooltip.stat.agi.desc"
+    },
+    "menu.tooltip_buildstatlines.462.1": {
+      "en": "Improves turn order and evasion potential.",
+      "ko": "턴 순서와 회피 가능성이 향상됩니다."
+    },
+    "menu.tooltip_buildstatlines.465.0": {
+      "en": "menu.tooltip.stat.def.desc",
+      "ko": "menu.tooltip.stat.def.desc"
+    },
+    "menu.tooltip_buildstatlines.465.1": {
+      "en": "Reduces incoming damage through mitigation.",
+      "ko": "완화를 통해 들어오는 피해를 줄입니다."
+    },
+    "menu.tooltip_buildstatlines.468.0": {
+      "en": "menu.tooltip.stat.intt.desc",
+      "ko": "menu.tooltip.stat.intt.desc"
+    },
+    "menu.tooltip_buildstatlines.468.1": {
+      "en": "Increases skill damage and magical output.",
+      "ko": "스킬 데미지와 마법 출력이 증가합니다."
+    },
+    "menu.tooltip_buildstatlines.471.0": {
+      "en": "menu.tooltip.stat.luck.desc",
+      "ko": "menu.tooltip.stat.luck.desc"
+    },
+    "menu.tooltip_buildstatlines.471.1": {
+      "en": "Improves critical chance and random checks.",
+      "ko": "치명타 확률과 무작위 검사가 향상됩니다."
+    },
+    "menu.tooltip_buildstatlines.474.0": {
+      "en": "menu.tooltip.stat.default.desc",
+      "ko": "menu.tooltip.stat.default.desc"
+    },
+    "menu.tooltip_buildstatlines.474.1": {
+      "en": "Affects combat performance.",
+      "ko": "전투 성능에 영향을 미칩니다."
+    },
+    "menu.tooltip_skilleffectlines.416.0": {
+      "en": "menu.tooltip.effect.buff",
+      "ko": "메뉴.툴팁.효과.버프"
+    },
+    "menu.tooltip_skilleffectlines.416.1": {
+      "en": "Effect: Buff",
+      "ko": "효과: 버프"
+    },
+    "menu.tooltip_skilleffectlines.424.0": {
+      "en": "menu.tooltip.effect.multi_status",
+      "ko": "menu.tooltip.효과.multi_status"
+    },
+    "menu.tooltip_skilleffectlines.424.1": {
+      "en": "Effect: Multiple statuses",
+      "ko": "효과: 여러 상태"
+    },
+    "menu.tooltip_skilleffectlines.428.0": {
+      "en": "menu.tooltip.effect.restore_hp",
+      "ko": "menu.tooltip.효과.restore_hp"
+    },
+    "menu.tooltip_skilleffectlines.428.1": {
+      "en": "Effect: Restore HP",
+      "ko": "효과 : HP 회복"
+    },
+    "menu.tooltip_skilleffectlines.432.0": {
+      "en": "menu.tooltip.effect.steal_item",
+      "ko": "menu.tooltip.효과.steal_item"
+    },
+    "menu.tooltip_skilleffectlines.432.1": {
+      "en": "Effect: Steal one random item",
+      "ko": "효과: 무작위 아이템 1개를 훔칩니다."
+    },
+    "menu.tooltip_skilleffectlines.437.0": {
+      "en": "menu.tooltip.effect.named",
+      "ko": "menu.tooltip.효과.이름 지정"
+    },
+    "menu.tooltip_skilleffectlines.437.1": {
+      "en": "Effect: {effect}",
+      "ko": "효과: {effect}"
+    },
+    "pause.option.exit_main": {
+      "en": "Exit to Main Menu",
+      "ko": "메인 메뉴로 나가기"
+    },
+    "pause.option.resume": {
+      "en": "Resume",
+      "ko": "재개하다"
+    },
+    "pause.option.settings": {
+      "en": "Settings",
+      "ko": "설정"
+    },
+    "save.back": {
+      "en": "Back",
+      "ko": "뒤쪽에"
+    },
+    "save.confirm.delete": {
+      "en": "Delete slot?",
+      "ko": "슬롯을 삭제하시겠습니까?"
+    },
+    "save.confirm.load": {
+      "en": "Load save?",
+      "ko": "저장을 로드하시겠습니까?"
+    },
+    "save.confirm.overwrite": {
+      "en": "Overwrite save?",
+      "ko": "덮어쓰고 저장하시겠습니까?"
+    },
+    "save.confirm.save": {
+      "en": "Save to slot?",
+      "ko": "슬롯에 저장하시겠습니까?"
+    },
+    "save.delete": {
+      "en": "Delete",
+      "ko": "삭제"
+    },
+    "save.level.short": {
+      "en": "Lv",
+      "ko": "레벨"
+    },
+    "save.msg.no_game_saves": {
+      "en": "No game saves.",
+      "ko": "게임 저장이 없습니다."
+    },
+    "save.msg.no_saved_games_found": {
+      "en": "No saved games found.",
+      "ko": "저장된 게임이 없습니다."
+    },
+    "save.savemenu_draw.606.0": {
+      "en": "save.delete",
+      "ko": "저장.삭제"
+    },
+    "save.savemenu_draw.606.1": {
+      "en": "Delete",
+      "ko": "삭제"
+    },
+    "save.savemenu_draw.685.0": {
+      "en": "save.back",
+      "ko": "저장.뒤로"
+    },
+    "save.savemenu_draw.685.1": {
+      "en": "Back",
+      "ko": "뒤쪽에"
+    },
+    "save.savemenu_draw.695.0": {
+      "en": "save.back",
+      "ko": "저장.뒤로"
+    },
+    "save.savemenu_draw.695.1": {
+      "en": "Back",
+      "ko": "뒤쪽에"
+    },
+    "save.savemenu_draw.756.0": {
+      "en": "common.ok",
+      "ko": "공통.확인"
+    },
+    "save.savemenu_draw.756.1": {
+      "en": "OK",
+      "ko": "좋아요"
+    },
+    "save.savemenu_draw.757.0": {
+      "en": "common.cancel",
+      "ko": "공통.취소"
+    },
+    "save.savemenu_draw.757.1": {
+      "en": "Cancel",
+      "ko": "취소"
+    },
+    "save.savemenu_draw.786.0": {
+      "en": "common.ok",
+      "ko": "공통.확인"
+    },
+    "save.savemenu_draw.786.1": {
+      "en": "OK",
+      "ko": "좋아요"
+    },
+    "save.savemenu_handle.357.0": {
+      "en": "save.msg.no_saved_games_found",
+      "ko": "save.msg.no_saved_games_found"
+    },
+    "save.savemenu_handle.357.1": {
+      "en": "No saved games found.",
+      "ko": "저장된 게임이 없습니다."
+    },
+    "save.savemenu_handle.523.0": {
+      "en": "save.msg.no_game_saves",
+      "ko": "save.msg.no_game_saves"
+    },
+    "save.savemenu_handle.523.1": {
+      "en": "No game saves.",
+      "ko": "게임 저장이 없습니다."
+    },
+    "save.slot.prefix": {
+      "en": "Slot",
+      "ko": "슬롯"
+    },
+    "save.title.load": {
+      "en": "Load Game",
+      "ko": "게임 로드"
+    },
+    "save.title.save": {
+      "en": "Save Game",
+      "ko": "게임 저장"
+    },
+    "settings.difficulty.option.0": {
+      "en": "Easy",
+      "ko": "쉬움"
+    },
+    "settings.difficulty.option.1": {
+      "en": "Normal",
+      "ko": "보통"
+    },
+    "settings.difficulty.option.2": {
+      "en": "Hard",
+      "ko": "어려움"
+    },
+    "settings.row.apply": {
+      "en": "Apply",
+      "ko": "적용하다"
+    },
+    "settings.row.back": {
+      "en": "Back",
+      "ko": "뒤쪽에"
+    },
+    "settings.row.bgm": {
+      "en": "BGM",
+      "ko": "BGM"
+    },
+    "settings.row.language": {
+      "en": "Language",
+      "ko": "언어"
+    },
+    "settings.row.scale": {
+      "en": "Scale",
+      "ko": "규모"
+    },
+    "settings.row.sfx": {
+      "en": "SFX",
+      "ko": "특수효과"
+    },
+    "settings.row.ui": {
+      "en": "UI",
+      "ko": "UI"
+    },
+    "settings.section.audio": {
+      "en": "Audio",
+      "ko": "오디오"
+    },
+    "settings.section.display": {
+      "en": "Display",
+      "ko": "표시하다"
+    },
+    "settings.settingspopup_draw.2362.0": {
+      "en": "settings.title",
+      "ko": "설정.제목"
+    },
+    "settings.settingspopup_draw.2362.1": {
+      "en": "Settings",
+      "ko": "설정"
+    },
+    "settings.settingspopup_draw.2380.0": {
+      "en": "settings.section.audio",
+      "ko": "설정.섹션.오디오"
+    },
+    "settings.settingspopup_draw.2380.1": {
+      "en": "Audio",
+      "ko": "오디오"
+    },
+    "settings.settingspopup_draw.2381.0": {
+      "en": "settings.section.display",
+      "ko": "설정.섹션.표시"
+    },
+    "settings.settingspopup_draw.2381.1": {
+      "en": "Display",
+      "ko": "표시하다"
+    },
+    "settings.settingspopup_draw.2391.0": {
+      "en": "settings.row.ui",
+      "ko": "settings.row.ui"
+    },
+    "settings.settingspopup_draw.2391.1": {
+      "en": "UI",
+      "ko": "UI"
+    },
+    "settings.settingspopup_draw.2395.0": {
+      "en": "settings.row.sfx",
+      "ko": "settings.row.sfx"
+    },
+    "settings.settingspopup_draw.2395.1": {
+      "en": "SFX",
+      "ko": "특수효과"
+    },
+    "settings.settingspopup_draw.2399.0": {
+      "en": "settings.row.bgm",
+      "ko": "settings.row.bgm"
+    },
+    "settings.settingspopup_draw.2399.1": {
+      "en": "BGM",
+      "ko": "BGM"
+    },
+    "settings.settingspopup_draw.2403.0": {
+      "en": "settings.row.scale",
+      "ko": "설정.행.규모"
+    },
+    "settings.settingspopup_draw.2403.1": {
+      "en": "Scale",
+      "ko": "규모"
+    },
+    "settings.settingspopup_draw.2407.0": {
+      "en": "settings.row.language",
+      "ko": "설정.행.언어"
+    },
+    "settings.settingspopup_draw.2407.1": {
+      "en": "Language",
+      "ko": "언어"
+    },
+    "settings.settingspopup_draw.2411.0": {
+      "en": "settings.row.apply",
+      "ko": "설정.행.적용"
+    },
+    "settings.settingspopup_draw.2411.1": {
+      "en": "Apply",
+      "ko": "적용하다"
+    },
+    "settings.settingspopup_draw.2412.0": {
+      "en": "settings.value.pending",
+      "ko": "설정.값.보류 중"
+    },
+    "settings.settingspopup_draw.2412.1": {
+      "en": "Pending",
+      "ko": "보류 중"
+    },
+    "settings.settingspopup_draw.2412.2": {
+      "en": "settings.value.saved",
+      "ko": "설정.값.저장됨"
+    },
+    "settings.settingspopup_draw.2412.3": {
+      "en": "Saved",
+      "ko": "저장됨"
+    },
+    "settings.settingspopup_draw.2415.0": {
+      "en": "settings.row.back",
+      "ko": "설정.행.뒤로"
+    },
+    "settings.settingspopup_draw.2415.1": {
+      "en": "Back",
+      "ko": "뒤쪽에"
+    },
+    "settings.title": {
+      "en": "Settings",
+      "ko": "설정"
+    },
+    "settings.value.pending": {
+      "en": "Pending",
+      "ko": "보류 중"
+    },
+    "settings.value.saved": {
+      "en": "Saved",
+      "ko": "저장됨"
+    },
+    "skill.name.skill_bite": {
+      "en": "Bite",
+      "ko": "깨물다"
+    },
+    "skill.name.skill_blessing": {
+      "en": "Blessing",
+      "ko": "축복"
+    },
+    "skill.name.skill_bloodthirsty": {
+      "en": "Bloodthirsty",
+      "ko": "피에 굶주린"
+    },
+    "skill.name.skill_curse": {
+      "en": "Curse",
+      "ko": "저주"
+    },
+    "skill.name.skill_double_shot": {
+      "en": "Double Shot",
+      "ko": "더블샷"
+    },
+    "skill.name.skill_evasion": {
+      "en": "Evasion",
+      "ko": "회피"
+    },
+    "skill.name.skill_final_fury": {
+      "en": "Fury",
+      "ko": "격노"
+    },
+    "skill.name.skill_fireball": {
+      "en": "Fireball",
+      "ko": "화구"
+    },
+    "skill.name.skill_foresight": {
+      "en": "Foresight",
+      "ko": "선견"
+    },
+    "skill.name.skill_ghost_cut": {
+      "en": "Cut",
+      "ko": "자르다"
+    },
+    "skill.name.skill_hilt_bash": {
+      "en": "Hilt Bash",
+      "ko": "힐트 배쉬"
+    },
+    "skill.name.skill_horiz_slash": {
+      "en": "Horizontal Slash",
+      "ko": "수평 슬래시"
+    },
+    "skill.name.skill_ice_spear": {
+      "en": "Ice Spear",
+      "ko": "아이스 스피어"
+    },
+    "skill.name.skill_meditation": {
+      "en": "Meditation",
+      "ko": "심사 숙고"
+    },
+    "skill.name.skill_muscle_up": {
+      "en": "Muscle Up",
+      "ko": "머슬업"
+    },
+    "skill.name.skill_poison_arrow": {
+      "en": "Poison Arrow",
+      "ko": "독화살"
+    },
+    "skill.name.skill_poison_fangs": {
+      "en": "Poison Fangs",
+      "ko": "독송곳니"
+    },
+    "skill.name.skill_poison_mist": {
+      "en": "Poison Mist",
+      "ko": "포이즌 미스트"
+    },
+    "skill.name.skill_ramming": {
+      "en": "Ramming",
+      "ko": "래밍"
+    },
+    "skill.name.skill_rampage": {
+      "en": "Rampage",
+      "ko": "날 뛰기"
+    },
+    "skill.name.skill_rev_up": {
+      "en": "Rev Up",
+      "ko": "레브업"
+    },
+    "skill.name.skill_scorching_touch": {
+      "en": "Scorching Touch",
+      "ko": "뜨거운 손길"
+    },
+    "skill.name.skill_solidify": {
+      "en": "Solidify",
+      "ko": "굳히다"
+    },
+    "skill.name.skill_steal": {
+      "en": "Steal",
+      "ko": "훔치다"
+    },
+    "skill.name.skill_take_aim": {
+      "en": "Take Aim",
+      "ko": "조준"
+    },
+    "skill.name.skill_vine_trap": {
+      "en": "Vine Trap",
+      "ko": "덩굴 함정"
+    },
+    "skill.name.skill_wound": {
+      "en": "Wound",
+      "ko": "상처"
+    },
+    "skill.name.unknown": {
+      "en": "Unknown",
+      "ko": "알려지지 않은"
+    },
+    "status.name.default": {
+      "en": "Status",
+      "ko": "상태"
+    },
+    "status.name.stat.agi": {
+      "en": "AGI",
+      "ko": "AGI"
+    },
+    "status.name.stat.def": {
+      "en": "DEF",
+      "ko": "데프"
+    },
+    "status.name.stat.int": {
+      "en": "INT",
+      "ko": "정수"
+    },
+    "status.name.stat.luck": {
+      "en": "LUCK",
+      "ko": "운"
+    },
+    "status.name.stat.str": {
+      "en": "STR",
+      "ko": "STR"
+    },
+    "status.name.status_bleed": {
+      "en": "Bleeding",
+      "ko": "출혈"
+    },
+    "status.name.status_blessing": {
+      "en": "Blessing",
+      "ko": "축복"
+    },
+    "status.name.status_bloodthirsty": {
+      "en": "Bloodthirsty",
+      "ko": "피에 굶주린"
+    },
+    "status.name.status_burn": {
+      "en": "Burning",
+      "ko": "타고 있는"
+    },
+    "status.name.status_crit_up": {
+      "en": "Take Aim",
+      "ko": "조준"
+    },
+    "status.name.status_dmg_up": {
+      "en": "Rev Up",
+      "ko": "레브업"
+    },
+    "status.name.status_evasion": {
+      "en": "Evasion",
+      "ko": "회피"
+    },
+    "status.name.status_guard": {
+      "en": "Guard",
+      "ko": "경비원"
+    },
+    "status.name.status_hit_up": {
+      "en": "Foresight",
+      "ko": "선견"
+    },
+    "status.name.status_meditation": {
+      "en": "Meditation",
+      "ko": "심사 숙고"
+    },
+    "status.name.status_poison": {
+      "en": "Poison",
+      "ko": "독"
+    },
+    "status.name.status_solidify": {
+      "en": "Solidify",
+      "ko": "굳히다"
+    },
+    "status.name.status_stun": {
+      "en": "Stun",
+      "ko": "충격"
+    },
+    "status.name.status_sunder": {
+      "en": "Sundered",
+      "ko": "분리됨"
+    },
+    "status.name.unknown": {
+      "en": "Unknown",
+      "ko": "알려지지 않은"
+    },
+    "system.msg.create_0.3.0": {
+      "en": "interact.name.obj_grave",
+      "ko": "상호작용.이름.obj_grave"
+    },
+    "system.msg.create_0.3.1": {
+      "en": "Grave",
+      "ko": "무덤"
+    }
+  }
+}

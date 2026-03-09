@@ -37,5 +37,5 @@
     "path":"sprites/skull_1_asset/skull_1_asset.yy",
   },
   "spriteMaskId":null,
-  "visible":true,
+  "visible":false,
 }

@@ -1,0 +1,16 @@
+{
+  "input_row_count": 663,
+  "output_row_count": 663,
+  "duplicate_ref_resolutions": [],
+  "missing_en": [],
+  "missing_ko": [],
+  "placeholder_mismatch": [],
+  "markup_issues": [],
+  "summary": {
+    "duplicate_ref_resolutions": 0,
+    "missing_en": 0,
+    "missing_ko": 0,
+    "placeholder_mismatch": 0,
+    "markup_issues": 0
+  }
+}

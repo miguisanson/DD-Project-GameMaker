@@ -3,16 +3,45 @@ Player_EnsureSpriteSet();
 if (!is_real(face)) face = DOWN;
 if (face < 0 || face > 3) face = DOWN;
 
-if (UI_IsBlocking()) {
+if (battle_cooldown > 0) {
+    battle_cooldown -= 1;
+}
+
+if (auto_resolve_recover_timer > 0) {
+    auto_resolve_recover_timer -= 1;
+    auto_resolve_recover_progress += 1;
+    var recover_total = max(1, auto_resolve_recover_total);
+    var recover_t = clamp(auto_resolve_recover_progress / recover_total, 0, 1);
+    // Smoothstep easing prevents visible jerk at start/end.
+    var recover_e = recover_t * recover_t * (3 - (2 * recover_t));
+    x = lerp(auto_resolve_recover_start_x, auto_resolve_recover_target_x, recover_e);
+    y = lerp(auto_resolve_recover_start_y, auto_resolve_recover_target_y, recover_e);
+
     moving = false;
     move_timer = 0;
-    image_index = 0;
+    move_dir = -1;
+    if (auto_resolve_recover_timer <= 0) {
+        x = auto_resolve_recover_target_x;
+        y = auto_resolve_recover_target_y;
+        auto_resolve_recover_total = 0;
+        auto_resolve_recover_progress = 0;
+    }
     sprite_index = sprite[face];
+    image_index = 0;
+    mask_index = sprite[DOWN];
     exit;
 }
 
-if (battle_cooldown > 0) {
-    battle_cooldown -= 1;
+if (UI_IsBlocking()) {
+    if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
+        Player_EnsureDialogueSettle(id, PLAYER_DIALOGUE_SETTLE_FRAMES);
+    }
+    moving = false;
+    move_timer = 0;
+    move_dir = -1;
+    image_index = 0;
+    sprite_index = sprite[face];
+    exit;
 }
 
 interact_key = Input_Pressed("interact");

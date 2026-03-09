@@ -37,5 +37,5 @@
     "path":"sprites/tall_grass_asset/tall_grass_asset.yy",
   },
   "spriteMaskId":null,
-  "visible":true,
+  "visible":false,
 }

@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Liquid_slosh",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":1.4181405,
+  "exportDir":"",
+  "name":"Liquid_slosh",
+  "parent":{
+    "name":"Slime",
+    "path":"folders/Sounds/Entities/Monsters/Slime.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Liquid_slosh.ogg",
+  "volume":1.0,
+}

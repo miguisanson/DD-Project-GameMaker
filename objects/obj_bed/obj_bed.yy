@@ -33,9 +33,9 @@
   "resourceVersion":"2.0",
   "solid":false,
   "spriteId":{
-    "name":"spr_yellow",
-    "path":"sprites/spr_yellow/spr_yellow.yy",
+    "name":"bed_save",
+    "path":"sprites/bed_save/bed_save.yy",
   },
   "spriteMaskId":null,
-  "visible":false,
+  "visible":true,
 }

@@ -1,5 +1,6 @@
 function ItemDB_Init() {
     if (variable_global_exists("item_db") && ds_exists(global.item_db, ds_type_map)) {
+        ItemDB_AssignEquipPassives(global.item_db);
         return;
     }
 
@@ -185,7 +186,7 @@ function ItemDB_Init() {
         preferred_class: -1,
         sprite: hp_potion,
         bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
-        use: { effect: "heal", min: 5, max: 10, scale: 0.5, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
+        use: { effect: "heal", min: 5, max: 10, scale: 1.0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 8
     };
     ds_map_add(global.item_db, c0.id, c0);
@@ -694,6 +695,8 @@ function ItemDB_Init() {
     };
     ds_map_add(global.item_db, a5.id, a5);
 
+    ItemDB_AssignEquipPassives(global.item_db);
+
     if (variable_global_exists("state") && is_struct(global.state)) {
         global.state.item_db = global.item_db;
     }
@@ -708,12 +711,143 @@ function ItemDB_Get(_id) {
         db = global.state.item_db;
     }
 
-    if (ds_map_exists(db, _id)) return db[? _id];
-    return { id: 0, name: "None", type: ITEM_KEY, stackable: false, max_stack: 0, equip_slot: "", power: 0, stat_type: -1, acc: 0, preferred_class: -1, sprite: noone, bonus: { str:0, agi:0, def:0, intt:0, luck:0 }, use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 }, value: 0 };
+    ItemDB_AssignEquipPassives(db);
+    if (ds_map_exists(db, _id)) return Item_LocalizeRuntime(db[? _id]);
+    return { id: 0, name: Loc_T("item.name.0", "None"), type: ITEM_KEY, stackable: false, max_stack: 0, equip_slot: "", power: 0, stat_type: -1, acc: 0, preferred_class: -1, sprite: noone, bonus: { str:0, agi:0, def:0, intt:0, luck:0 }, use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 }, value: 0 };
+}
+
+function Item_LocalizeRuntime(_item) {
+    if (!is_struct(_item)) return _item;
+
+    if (!variable_struct_exists(_item, "name_en")) _item.name_en = string(_item.name);
+    _item.name = Loc_T("item.name." + string(_item.id), string(_item.name_en));
+
+    if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 0) {
+        if (!variable_struct_exists(_item, "passive_desc_en") || !is_array(_item.passive_desc_en)) {
+            var base_desc = [];
+            for (var i = 0; i < array_length(_item.passive_desc); i++) {
+                array_push(base_desc, string(_item.passive_desc[i]));
+            }
+            _item.passive_desc_en = base_desc;
+        }
+
+        if (array_length(_item.passive_desc_en) > 0) {
+            _item.passive_desc[0] = Loc_T("item.passive.name." + string(_item.id), string(_item.passive_desc_en[0]));
+        }
+        if (array_length(_item.passive_desc_en) > 1) {
+            _item.passive_desc[1] = Loc_T("item.passive.desc." + string(_item.id), string(_item.passive_desc_en[1]));
+        }
+    }
+
+    return _item;
+}
+
+function ItemDB_GetPassiveTemplate(_item_id) {
+    switch (_item_id) {
+        // Weapons
+        case 1: return { id: "steady_strike", params: { once_per_turn: true }, desc: ["Steady Strike", "MISS->BAD, BAD->OKAY (1/turn)"] };
+        case 2: return { id: "sunder_edge", params: { first_hit_def_down: 1, turns: 2 }, desc: ["Sunder Edge", "1st hit: -1 DEF for 2 turns"] };
+        case 3: return { id: "executioner", params: { hp_ratio: 0.35, mult: 1.35 }, desc: ["Executioner", "+35% damage vs <35% HP"] };
+        case 4: return { id: "aim_assist", params: { upgrade_good_to_perfect_once_per_turn: true }, desc: ["Aim Assist", "GOOD->PERFECT (1/turn)"] };
+        case 5: return { id: "pinning_shot", params: { stun_chance: 0.15, stun_turns: 1, cooldown_turns: 3, requires_good_or_perfect: true }, desc: ["Pinning Shot", "GOOD+: may Stun (cd 3 turns)"] };
+        case 6: return { id: "predator", params: { mult: 1.30, requires_target_statused: true }, desc: ["Predator", "+30% damage vs statused foes"] };
+        case 7: return { id: "mana_trickle", params: { mp_gain: 1, every_n_turns: 2 }, desc: ["Mana Trickle", "+1 MP every 2 turns"] };
+        case 8: return { id: "ember_lens", params: { skill_mult: 1.15, status_turn_bonus: 1 }, desc: ["Ember Lens", "+15% skill damage, +1 status turn"] };
+        case 9: return { id: "arcane_surge", params: { skill_mult: 1.25, perfect_mp: 1 }, desc: ["Arcane Surge", "+25% skill damage, PERFECT +1 MP"] };
+
+        // Armor
+        case 20: return { id: "first_impact", params: { flat_reduction_first_hit: 3, once_per_battle: true }, desc: ["First Impact", "1st hit -3 damage (each battle)"] };
+        case 21: return { id: "brace", params: { guard_mult_next_hit: 0.60, cooldown_turns: 2, triggers_on_take_damage: true }, desc: ["Brace", "After hit: next hit -40% (cd2)"] };
+        case 22: return { id: "debt_plate", params: { big_hit_threshold: 6, big_hit_reduction: 0.30 }, desc: ["Debt Plate", "Big hits reduced by 30%"] };
+        case 23: return { id: "thin_veil", params: { mp_gain: 1, every_n_turns: 2, physical_vuln_flat: 1 }, desc: ["Thin Veil", "+1 MP/2 turns, take +1 phys damage"] };
+        case 24: return { id: "silk_flow", params: { skill_mult: 1.10, status_turn_bonus: 1 }, desc: ["Silk Flow", "+10% skill damage, +1 status turn"] };
+        case 25: return { id: "mirror_stitch", params: { reflect_first_status_once_per_battle: true, mp_cost_on_trigger: 1 }, desc: ["Mirror Stitch", "Reflect 1st status (cost 1 MP)"] };
+    }
+    return { id: "", params: {}, desc: [] };
+}
+
+function ItemDB_AssignEquipPassives(_db) {
+    if (!ds_exists(_db, ds_type_map)) return;
+    var ids = [1,2,3,4,5,6,7,8,9,20,21,22,23,24,25];
+    for (var i = 0; i < array_length(ids); i++) {
+        var iid = ids[i];
+        if (!ds_map_exists(_db, iid)) continue;
+        var item = _db[? iid];
+        if (!is_struct(item)) continue;
+        var tpl = ItemDB_GetPassiveTemplate(iid);
+        if (!is_struct(tpl)) continue;
+        if (!variable_struct_exists(tpl, "id") || string(tpl.id) == "") continue;
+
+        item.passive_id = tpl.id;
+        item.passive_params = variable_struct_exists(tpl, "params") && is_struct(tpl.params) ? tpl.params : {};
+        item.passive_desc = variable_struct_exists(tpl, "desc") && is_array(tpl.desc) ? tpl.desc : [];
+    }
 }
 
 function Item_IsConsumable(_item) {
     return _item.type == ITEM_CONSUMABLE;
+}
+
+function Item_IsSkillbook(_item_or_id) {
+    var item = _item_or_id;
+    if (!is_struct(item)) item = ItemDB_Get(_item_or_id);
+    if (!is_struct(item)) return false;
+    if (!Item_IsConsumable(item)) return false;
+    if (!variable_struct_exists(item, "use") || !is_struct(item.use)) return false;
+    if (!variable_struct_exists(item.use, "effect") || item.use.effect != "learn_skill") return false;
+    if (!variable_struct_exists(item.use, "skill_id")) return false;
+    return true;
+}
+
+function Item_SkillbookValidate(_item_or_id, _user) {
+    var out = { ok: false, msg: Loc_T("item.msg.cant_use", "Can't use that."), skill_id: -1, skill_name: "" };
+    var item = _item_or_id;
+    if (!is_struct(item)) item = ItemDB_Get(_item_or_id);
+    if (!Item_IsSkillbook(item)) return out;
+
+    var skill_id = item.use.skill_id;
+    var skill_cfg = SkillDB_Get(skill_id);
+    var skill_name = Loc_T("item.msg.that_skill", "that skill");
+    if (is_struct(skill_cfg) && variable_struct_exists(skill_cfg, "name")) {
+        skill_name = string(skill_cfg.name);
+    }
+
+    out.skill_id = skill_id;
+    out.skill_name = skill_name;
+
+    if (!is_struct(_user) || !variable_struct_exists(_user, "class_id")) {
+        out.msg = Loc_T("item.msg.cant_use", "Can't use that.");
+        return out;
+    }
+
+    var class_id = _user.class_id;
+    if (class_id == CLASS_NOBODY) {
+        out.msg = Loc_T("item.msg.not_ready_skill", "You are not ready to learn this yet.");
+        return out;
+    }
+
+    if (!Skill_ClassAllowed(skill_cfg, class_id)) {
+        out.msg = Loc_T("item.msg.class_cannot_learn", "Your class cannot learn {skill}.", { skill: skill_name });
+        return out;
+    }
+
+    var already_known = false;
+    if (is_array(_user.skills)) {
+        for (var si = 0; si < array_length(_user.skills); si++) {
+            if (_user.skills[si] == skill_id) {
+                already_known = true;
+                break;
+            }
+        }
+    }
+    if (already_known) {
+        out.msg = Loc_T("item.msg.already_know", "Already know {skill}.", { skill: skill_name });
+        return out;
+    }
+
+    out.ok = true;
+    out.msg = Loc_T("item.msg.learned", "Learned {skill}.", { skill: skill_name });
+    return out;
 }
 
 function Item_ComputeAmount(_user, _use) {
@@ -740,7 +874,7 @@ function Item_Use(_item_id, _user, _target) {
 
     if (!Item_IsConsumable(item)) {
         result.ok = false;
-        result.msg = "Can't use that.";
+        result.msg = Loc_T("item.msg.cant_use", "Can't use that.");
         return result;
     }
 
@@ -751,9 +885,9 @@ function Item_Use(_item_id, _user, _target) {
         _target.hp = clamp(_target.hp + amt, 0, _target.max_hp);
         if (_target.hp == before_hp) {
             result.ok = false;
-            result.msg = "Already full health.";
+            result.msg = Loc_T("item.msg.full_health", "Already full health.");
         } else {
-            result.msg = "Healed " + string(amt) + " HP.";
+            result.msg = Loc_T("item.msg.healed_hp", "Healed {amt} HP.", { amt: string(amt) });
         }
     } else if (eff == "mp") {
         var before_mp = _target.mp;
@@ -761,9 +895,9 @@ function Item_Use(_item_id, _user, _target) {
         _target.mp = clamp(_target.mp + amt2, 0, _target.max_mp);
         if (_target.mp == before_mp) {
             result.ok = false;
-            result.msg = "Already full mana.";
+            result.msg = Loc_T("item.msg.full_mana", "Already full mana.");
         } else {
-            result.msg = "Recovered " + string(amt2) + " MP.";
+            result.msg = Loc_T("item.msg.recovered_mp", "Recovered {amt} MP.", { amt: string(amt2) });
         }
     } else if (eff == "cure") {
         var cured_name = "";
@@ -777,25 +911,23 @@ function Item_Use(_item_id, _user, _target) {
             }
         }
         if (cured_name != "") {
-            result.msg = cured_name + " cured.";
+            result.msg = Loc_T("item.msg.status_cured", "{status} cured.", { status: cured_name });
         } else {
             result.ok = false;
-            result.msg = "No status to cure.";
+            result.msg = Loc_T("item.msg.no_status_cure", "No status to cure.");
         }
     } else if (eff == "learn_skill") {
-        if (variable_struct_exists(item.use, "skill_id")) {
-            var sk = item.use.skill_id;
-            var already = false;
-            if (is_array(_user.skills) && array_index_of(_user.skills, sk) != -1) already = true;
-            if (already) {
-                var s_cfg = SkillDB_Get(sk);
-                result.ok = false;
-                result.msg = "Already know " + s_cfg.name + ".";
-            } else {
-                _user = Player_LearnSkill(_user, sk);
-                var s_cfg2 = SkillDB_Get(sk);
-                result.msg = "Learned " + s_cfg2.name + ".";
-            }
+        var learn = Item_SkillbookValidate(item, _user);
+        if (!learn.ok) {
+            result.ok = false;
+            result.msg = learn.msg;
+            result.skillbook_first_read_dialogue = false;
+        } else {
+            _user = Player_LearnSkill(_user, learn.skill_id);
+            result.msg = learn.msg;
+            var class_id = CLASS_NOBODY;
+            if (is_struct(_user) && variable_struct_exists(_user, "class_id")) class_id = _user.class_id;
+            result.skillbook_first_read_dialogue = Dialogue_SkillbookFirstReadShouldTrigger(class_id);
         }
     }
 

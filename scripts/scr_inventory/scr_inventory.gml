@@ -18,6 +18,22 @@ function Inv_Add(_inv, _item_id, _qty) {
             _qty -= add_stack;
         }
     } else {
+        var unique_once = Item_IsSkillbook(item) || item.type == ITEM_WEAPON || item.type == ITEM_ARMOR;
+        if (unique_once) {
+            if (Inv_Has(_inv, _item_id, 1)) return _inv;
+
+            if (Item_IsSkillbook(item) && variable_struct_exists(item, "use") && is_struct(item.use) && variable_struct_exists(item.use, "skill_id")) {
+                var sid = item.use.skill_id;
+                var gs = GameState_Get();
+                if (is_struct(gs.player_ch) && variable_struct_exists(gs.player_ch, "skills") && is_array(gs.player_ch.skills)) {
+                    for (var si = 0; si < array_length(gs.player_ch.skills); si++) {
+                        if (gs.player_ch.skills[si] == sid) return _inv;
+                    }
+                }
+            }
+
+            _qty = min(1, _qty);
+        }
         for (var k = 0; k < _qty; k++) array_push(_inv, { id: _item_id, qty: 1 });
     }
 

@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Body_falling_wood",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":0.9876644,
+  "exportDir":"",
+  "name":"Body_falling_wood",
+  "parent":{
+    "name":"Cutscenes_Dialogue",
+    "path":"folders/Sounds/Cutscenes_Dialogue.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Body_falling_wood.ogg",
+  "volume":1.0,
+}

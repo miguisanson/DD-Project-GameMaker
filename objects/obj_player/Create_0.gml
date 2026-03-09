@@ -37,7 +37,7 @@ Player_ApplyClassSprites(character.class_id);
 // --------------------
 xspeed = 0;
 yspeed = 0;
-move_speed = 1;
+move_speed = PLAYER_MOVE_SPEED_DEFAULT;
 
 if (!just_returned) {
     face = DOWN;
@@ -46,8 +46,11 @@ if (!just_returned) {
 moving = false;
 move_dir = -1;
 move_timer = 0;
-tile_size = 16;
-if (just_returned) {
-    x = round(x / tile_size) * tile_size;
-    y = round(y / tile_size) * tile_size;
-}
+tile_size = GRID_TILE_SIZE;
+auto_resolve_recover_timer = 0;
+auto_resolve_recover_total = 0;
+auto_resolve_recover_progress = 0;
+auto_resolve_recover_start_x = x;
+auto_resolve_recover_start_y = y;
+auto_resolve_recover_target_x = x;
+auto_resolve_recover_target_y = y;

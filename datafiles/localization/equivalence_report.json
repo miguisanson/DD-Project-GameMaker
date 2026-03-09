@@ -1,0 +1,68 @@
+{
+  "left_schema": "legacy",
+  "right_schema": "minimal",
+  "left_count": 663,
+  "right_count": 663,
+  "only_left_count": 0,
+  "only_right_count": 0,
+  "content_diff_count": 5,
+  "only_left_preview": [],
+  "only_right_preview": [],
+  "content_diff_preview": [
+    {
+      "key": "combat.msg.applied_prefix",
+      "left": {
+        "en": "Applied",
+        "ko": "적용된"
+      },
+      "right": {
+        "en": "Applied ",
+        "ko": "적용된"
+      }
+    },
+    {
+      "key": "combat.msg.list_separator",
+      "left": {
+        "en": ",",
+        "ko": ","
+      },
+      "right": {
+        "en": ", ",
+        "ko": ","
+      }
+    },
+    {
+      "key": "settings.difficulty.option.0",
+      "left": {
+        "en": "Easy",
+        "ko": "Easy"
+      },
+      "right": {
+        "en": "Easy",
+        "ko": "쉬움"
+      }
+    },
+    {
+      "key": "settings.difficulty.option.1",
+      "left": {
+        "en": "Normal",
+        "ko": "Normal"
+      },
+      "right": {
+        "en": "Normal",
+        "ko": "보통"
+      }
+    },
+    {
+      "key": "settings.difficulty.option.2",
+      "left": {
+        "en": "Hard",
+        "ko": "Hard"
+      },
+      "right": {
+        "en": "Hard",
+        "ko": "어려움"
+      }
+    }
+  ]
+}

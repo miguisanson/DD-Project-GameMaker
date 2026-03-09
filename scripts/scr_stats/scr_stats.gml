@@ -13,6 +13,12 @@ function StatsClampAll(_s) {
 
 function HPGainPerLevel(_hd) { return ceil(_hd / 2) + 1; }
 
+function ResourceStatWeight(_level) {
+    var lvl = max(1, round(_level));
+    // MP scaling remains tied to INT, with gentle level weighting.
+    return 1 + floor((lvl - 1) / 4);
+}
+
 function RecomputeResources(_ch) {
     var lvl = _ch.level;
     var cfg = _ch.class_cfg;
@@ -23,12 +29,21 @@ function RecomputeResources(_ch) {
 
     var hp_gain = HPGainPerLevel(cfg.hd);
     var mp_gain = cfg.mp_gain;
+    var stat_weight = ResourceStatWeight(lvl);
+    var hp_def_bonus = max(0, floor(max(0, def_mod) * PLAYER_HP_DEF_BONUS_FACTOR));
 
-    _ch.max_hp = cfg.base_hp + (lvl - 1) * (hp_gain + def_mod);
+    // Class level growth is the primary HP source; DEF only adds a small flat bonus.
+    _ch.max_hp = cfg.base_hp + (lvl - 1) * hp_gain + hp_def_bonus;
     _ch.max_hp = max(1, _ch.max_hp);
 
-    _ch.max_mp = cfg.base_mp + (lvl - 1) * (mp_gain + int_mod);
+    _ch.max_mp = cfg.base_mp + (lvl - 1) * mp_gain + (int_mod * stat_weight);
     _ch.max_mp = max(0, _ch.max_mp);
+
+    if (variable_struct_exists(_ch, "is_player") && _ch.is_player) {
+        var diff = Difficulty_Profile();
+        _ch.max_hp = max(1, round(_ch.max_hp * diff.player_hp_mult));
+        _ch.max_mp = max(0, round(_ch.max_mp * diff.player_mp_mult));
+    }
 
     _ch.hp = clamp(_ch.hp, 0, _ch.max_hp);
     _ch.mp = clamp(_ch.mp, 0, _ch.max_mp);

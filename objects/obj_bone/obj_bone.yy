@@ -37,5 +37,5 @@
     "path":"sprites/bone_asset/bone_asset.yy",
   },
   "spriteMaskId":null,
-  "visible":true,
+  "visible":false,
 }

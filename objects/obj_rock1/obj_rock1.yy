@@ -37,5 +37,5 @@
     "path":"sprites/rock1/rock1.yy",
   },
   "spriteMaskId":null,
-  "visible":true,
+  "visible":false,
 }

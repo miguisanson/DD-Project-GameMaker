@@ -37,5 +37,5 @@
     "path":"sprites/dung_pile_asset/dung_pile_asset.yy",
   },
   "spriteMaskId":null,
-  "visible":true,
+  "visible":false,
 }

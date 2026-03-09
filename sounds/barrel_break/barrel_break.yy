@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"barrel_break",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":1.5,
+  "exportDir":"",
+  "name":"barrel_break",
+  "parent":{
+    "name":"Interactable",
+    "path":"folders/Sounds/Interactable.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"barrel_break.ogg",
+  "volume":1.0,
+}

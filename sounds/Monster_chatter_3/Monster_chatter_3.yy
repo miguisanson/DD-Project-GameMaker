@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Monster_chatter_3",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":2.9159863,
+  "exportDir":"",
+  "name":"Monster_chatter_3",
+  "parent":{
+    "name":"Stranger",
+    "path":"folders/Sounds/Entities/Monsters/Stranger.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Monster_chatter_3.ogg",
+  "volume":1.0,
+}

@@ -1,18 +1,9 @@
 if (defeated) exit;
+if (Transition_IsActive()) exit;
 if (other.battle_cooldown > 0) exit;
+if (encounter_pending) exit;
 
-// SAVE RETURN LOCATION (BATTLE SAFE)
-GameState_Init();
-if (variable_global_exists("room_state_ready") && global.room_state_ready) {
-    RoomState_Save(room);
-    RoomState_SaveInstance(id, ["x", "y"], false);
-}
-GameState_SetBattleReturn(room, other.x, other.y, -1);
-
-// remember enemy instance + type
-GameState_SetBattleEnemy(persist_id, enemy_id);
-
-// tell player to reposition after return
-GameState_SetJustReturned(true);
-
-room_goto(rm_battle);
+// Match dialogue-trigger behavior: queue encounter and let player finish
+// the current grid step before starting battle/auto-resolve.
+encounter_pending = true;
+encounter_player = other;

@@ -7,6 +7,7 @@ var gs = GameState_Init();
 // LOAD PLAYER & ENEMY
 // --------------------
 p = gs.player_ch;
+p = Equip_PassiveBattleReset(p);
 e = EnemyCreate(gs.battle.enemy_id);
 
 // --------------------
@@ -20,8 +21,8 @@ if (e.sprite != noone) {
 }
 
 // fixed battle resolution (GB-style)
-var cx = 160 div 2;
-var cy = 144 div 2;
+var cx = DISPLAY_BASE_W div 2;
+var cy = DISPLAY_BASE_H div 2;
 
 enemy_inst = instance_create_layer(
     cx - sw div 2,
@@ -33,8 +34,9 @@ enemy_inst = instance_create_layer(
 if (e.sprite != noone) enemy_inst.sprite_index = e.sprite;
 enemy_inst.visible = false;
 
-enemy_fx_x = enemy_inst.x;
-enemy_fx_y = enemy_inst.y;
+var enemy_center = FX_CenterOn(noone, enemy_inst);
+enemy_fx_x = enemy_center.x;
+enemy_fx_y = enemy_center.y;
 player_fx_x = cx - 48;
 player_fx_y = cy + 24;
 
@@ -65,22 +67,61 @@ wait_timer = COMBAT_ACTION_DELAY;
 combat_log = [];
 skill_banner_active = false;
 skill_banner_name = "";
+enemy_actions_remaining = 0;
+enemy_turn_used_skills = [];
+enemy_last_action_used_skill = false;
+player_bonus_actions_remaining = 0;
+player_turn_start_applied = false;
 
 menu_index = 0;
 battle_actions = [
-    { label: "FIGHT", state: BSTATE_PLAYER_ATTACK },
-    { label: "SKILL", state: BSTATE_SKILL_MENU },
-    { label: "ITEM",  state: BSTATE_ITEM_MENU },
-    { label: "RUN",   state: BSTATE_PLAYER_RUN }
+    { label: Loc_T("battle.action.attack", "ATTACK"), state: BSTATE_ATTACK_TIMING },
+    { label: Loc_T("battle.action.skill", "SKILL"), state: BSTATE_SKILL_MENU },
+    { label: Loc_T("battle.action.item",  "ITEM"),  state: BSTATE_ITEM_MENU },
+    { label: Loc_T("battle.action.run",   "RUN"),   state: BSTATE_PLAYER_RUN }
 ];
 menu_count = array_length(battle_actions);
 skill_index = 0;
 item_index = 0;
 
+attack_timing_active = false;
+attack_timing_started = false;
+attack_timing_x = 0;
+attack_timing_y = 0;
+attack_timing_target_x = 0;
+attack_timing_target_y = 0;
+attack_timing_input_lock = 0;
+attack_timing_result_text = "";
+attack_timing_result_key = "";
+attack_timing_result_timer = 0;
+attack_timing_marker_alpha = 0;
+attack_timing_target_sprite = spr_attack_timing_target;
+attack_timing_falling_sprite = spr_attack_timing_falling;
+
+enemy_def_qte_active = false;
+enemy_def_qte_prompts = [];
+enemy_def_qte_total = 0;
+enemy_def_qte_index = 0;
+enemy_def_qte_success = 0;
+enemy_def_qte_failure = 0;
+enemy_def_qte_phase = 0;
+enemy_def_qte_timer = 0;
+enemy_def_qte_draw_alpha = 0;
+enemy_def_qte_draw_scale = 1;
+enemy_def_qte_feedback_ok = false;
+enemy_def_qte_feedback_timed_out = false;
+enemy_def_qte_feedback_dir = -1;
+enemy_def_qte_input_dir = -1;
+enemy_def_qte_response_frames = 0;
+enemy_def_qte_fade_in_frames = 0;
+enemy_def_qte_feedback_frames = 0;
+enemy_def_qte_transition_frames = 0;
+enemy_def_qte_ctx = {};
+
 // --------------------
 // MESSAGE SETUP
 // --------------------
-message_text = e.name + " appeared!";
+message_text = Loc_T("combat.msg.enemy_appeared", "{enemy} appeared!", { enemy: e.name });
 Combat_Log(message_text);
 
 // camera shake base

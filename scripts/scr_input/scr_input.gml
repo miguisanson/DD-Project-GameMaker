@@ -20,6 +20,7 @@ function Input_Init() {
         inp.bindings.interact = [vk_space];
         inp.bindings.confirm = [vk_space];
         inp.bindings.cancel = [vk_escape];
+        inp.bindings.pause = [vk_escape];
         inp.bindings.menu = [ord("I"), vk_tab];
 
         inp.bindings.menu_up = [ord("W"), vk_up];
@@ -33,14 +34,22 @@ function Input_Init() {
         inp.bindings.debug_load = [vk_f9];
         inp.bindings.debug_levelup = [ord("L")];
         inp.bindings.debug_all_items = [ord("K")];
+        inp.bindings.debug_kill = [ord("J")];
+        inp.bindings.debug_enemy_damage_skill = [ord("U")];
+        inp.bindings.debug_display_metrics = [ord("O")];
     }
 
-
     inp.bindings.debug_toggle = [ord("P")];
+    // UI confirm is intentionally space-only.
+    inp.bindings.confirm = [vk_space];
+    if (!variable_struct_exists(inp.bindings, "pause")) inp.bindings.pause = [vk_escape];
     if (!variable_struct_exists(inp.bindings, "debug_levelup")) inp.bindings.debug_levelup = [ord("L")];
     if (!variable_struct_exists(inp.bindings, "debug_all_items")) inp.bindings.debug_all_items = [ord("K")];
     if (!variable_struct_exists(inp.bindings, "debug_save")) inp.bindings.debug_save = [vk_f5];
     if (!variable_struct_exists(inp.bindings, "debug_load")) inp.bindings.debug_load = [vk_f9];
+    if (!variable_struct_exists(inp.bindings, "debug_kill")) inp.bindings.debug_kill = [ord("J")];
+    if (!variable_struct_exists(inp.bindings, "debug_enemy_damage_skill")) inp.bindings.debug_enemy_damage_skill = [ord("U")];
+    if (!variable_struct_exists(inp.bindings, "debug_display_metrics")) inp.bindings.debug_display_metrics = [ord("O")];
     if (!variable_struct_exists(inp, "state")) {
         inp.state = {};
     }
@@ -59,6 +68,9 @@ function Input_Init() {
     }
     if (!variable_struct_exists(inp, "cooldown")) {
         inp.cooldown = {};
+    }
+    if (!variable_struct_exists(inp, "repeat_state")) {
+        inp.repeat_state = {};
     }
     if (!variable_struct_exists(inp, "move_order")) {
         inp.move_order = [];
@@ -152,6 +164,78 @@ function Input_Label(_action) {
     return out;
 }
 
+function Input_IsDebugAction(_action) {
+    if (!is_string(_action)) return false;
+    return (string_length(_action) >= 6 && string_copy(_action, 1, 6) == "debug_");
+}
+
+function Input_GamepadDevice() {
+    for (var d = 0; d < 4; d++) {
+        if (gamepad_is_connected(d)) return d;
+    }
+    return -1;
+}
+
+function Input_GamepadAxisHeld(_device, _axis, _dir, _deadzone) {
+    var v = gamepad_axis_value(_device, _axis);
+    if (_dir > 0) return v >= _deadzone;
+    return v <= -_deadzone;
+}
+
+function Input_GamepadActionHeld(_device, _action, _deadzone) {
+    switch (_action) {
+        case "move_up":
+        case "menu_up":
+            return gamepad_button_check(_device, gp_padu) || Input_GamepadAxisHeld(_device, gp_axislv, -1, _deadzone);
+        case "move_down":
+        case "menu_down":
+            return gamepad_button_check(_device, gp_padd) || Input_GamepadAxisHeld(_device, gp_axislv, 1, _deadzone);
+        case "move_left":
+        case "menu_left":
+            return gamepad_button_check(_device, gp_padl) || Input_GamepadAxisHeld(_device, gp_axislh, -1, _deadzone);
+        case "move_right":
+        case "menu_right":
+            return gamepad_button_check(_device, gp_padr) || Input_GamepadAxisHeld(_device, gp_axislh, 1, _deadzone);
+        case "interact":
+        case "confirm":
+            return gamepad_button_check(_device, gp_face1);
+        case "cancel":
+            return gamepad_button_check(_device, gp_face2);
+        case "menu":
+            return gamepad_button_check(_device, gp_face3);
+        case "pause":
+            return gamepad_button_check(_device, gp_face4);
+    }
+    return false;
+}
+
+function Input_GamepadActionPressed(_device, _action, _prev_held, _deadzone) {
+    switch (_action) {
+        case "move_up":
+        case "menu_up":
+            return gamepad_button_check_pressed(_device, gp_padu) || (Input_GamepadAxisHeld(_device, gp_axislv, -1, _deadzone) && !_prev_held);
+        case "move_down":
+        case "menu_down":
+            return gamepad_button_check_pressed(_device, gp_padd) || (Input_GamepadAxisHeld(_device, gp_axislv, 1, _deadzone) && !_prev_held);
+        case "move_left":
+        case "menu_left":
+            return gamepad_button_check_pressed(_device, gp_padl) || (Input_GamepadAxisHeld(_device, gp_axislh, -1, _deadzone) && !_prev_held);
+        case "move_right":
+        case "menu_right":
+            return gamepad_button_check_pressed(_device, gp_padr) || (Input_GamepadAxisHeld(_device, gp_axislh, 1, _deadzone) && !_prev_held);
+        case "interact":
+        case "confirm":
+            return gamepad_button_check_pressed(_device, gp_face1);
+        case "cancel":
+            return gamepad_button_check_pressed(_device, gp_face2);
+        case "menu":
+            return gamepad_button_check_pressed(_device, gp_face3);
+        case "pause":
+            return gamepad_button_check_pressed(_device, gp_face4);
+    }
+    return false;
+}
+
 
 function Input_Update() {
     Input_Init();
@@ -161,6 +245,13 @@ function Input_Update() {
     var inp = global.input;
     inp.last_time = current_time;
     inp.frame += 1;
+    var gp_device = Input_GamepadDevice();
+    var pad_deadzone = 0.35;
+    if (variable_struct_exists(inp, "pad_deadzone")) {
+        pad_deadzone = clamp(real(inp.pad_deadzone), 0.1, 0.95);
+    } else {
+        inp.pad_deadzone = pad_deadzone;
+    }
 
     var names = variable_struct_get_names(inp.bindings);
     for (var i = 0; i < array_length(names); i++) {
@@ -169,13 +260,16 @@ function Input_Update() {
         var keys = bind;
         if (is_struct(bind) && variable_struct_exists(bind, "keys")) keys = bind.keys;
         var held = false;
+        var pressed = false;
 
         if (is_array(keys)) {
             for (var k = 0; k < array_length(keys); k++) {
                 var key = keys[k];
-                if (key != -1 && keyboard_check(key)) {
-                    held = true;
-                    break;
+                var key_code = key;
+                if (is_string(key_code)) key_code = Input_KeyCodeFromName(key_code);
+                if (key_code != -1) {
+                    if (keyboard_check(key_code)) held = true;
+                    if (keyboard_check_pressed(key_code)) pressed = true;
                 }
             }
         }
@@ -186,7 +280,13 @@ function Input_Update() {
             if (is_struct(st) && variable_struct_exists(st, "held")) prev = st.held;
         }
 
-        var pressed = held && !prev;
+        if (gp_device != -1 && !Input_IsDebugAction(action)) {
+            var gp_held = Input_GamepadActionHeld(gp_device, action, pad_deadzone);
+            var gp_pressed = Input_GamepadActionPressed(gp_device, action, prev, pad_deadzone);
+            held = held || gp_held;
+            pressed = pressed || gp_pressed;
+        }
+
         variable_struct_set(inp.state, action, { held: held, pressed: pressed });
 
         if (Input_IsMoveAction(action)) {
@@ -253,38 +353,54 @@ function Input_Frame() {
 }
 
 function Input_ActionBuffer(_action) {
-    Input_EnsureUpdated();
-    variable_struct_set(global.input.buffer, _action, global.input.frame);
+    // Input buffering disabled globally.
 }
 
 function Input_ActionBuffered(_action, _max_age) {
-    Input_EnsureUpdated();
-    if (!variable_struct_exists(global.input.buffer, _action)) return false;
-    var t = variable_struct_get(global.input.buffer, _action);
-    if (global.input.frame - t > _max_age) {
-        variable_struct_remove(global.input.buffer, _action);
-        return false;
-    }
-    return true;
+    // Input buffering disabled globally.
+    return false;
 }
 
 function Input_ActionConsume(_action) {
-    Input_EnsureUpdated();
-    if (variable_struct_exists(global.input.buffer, _action)) {
-        variable_struct_remove(global.input.buffer, _action);
-    }
+    // Input buffering disabled globally.
+}
+
+// Buffering disabled: always returns no action.
+function Input_BufferedLatest(_actions, _max_age) {
+    // Input buffering disabled globally.
+    return "";
 }
 
 function Input_ActionCooldownReady(_action) {
-    Input_EnsureUpdated();
-    if (!variable_struct_exists(global.input.cooldown, _action)) return true;
-    var t = variable_struct_get(global.input.cooldown, _action);
-    return global.input.frame >= t;
+    // Input cooldown disabled globally.
+    return true;
 }
 
 function Input_ActionSetCooldown(_action, _frames) {
-    Input_EnsureUpdated();
-    variable_struct_set(global.input.cooldown, _action, global.input.frame + _frames);
+    // Input cooldown disabled globally.
+}
+
+// Repeat behavior disabled: this is now discrete press only.
+function Input_ActionRepeat(_action, _initial_delay, _repeat_delay) {
+    // Hold-repeat disabled globally.
+    return Input_Pressed(_action);
+}
+
+function Input_UIPressed(_action) {
+    return Input_Pressed(_action);
+}
+
+function Input_UIRepeat(_action, _initial_delay = UI_NAV_REPEAT_DELAY, _repeat_delay = UI_NAV_REPEAT_RATE) {
+    // UI repeat disabled: discrete presses only.
+    return Input_Pressed(_action);
+}
+
+function Input_UIConfirm() {
+    return Input_UIPressed("confirm");
+}
+
+function Input_UIBack() {
+    return Input_UIPressed("cancel");
 }
 
 function Input_MoveX() {

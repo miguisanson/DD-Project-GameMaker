@@ -1,22 +1,137 @@
+function Status_ResolveIcon(_asset_name, _fallback_sprite) {
+    var spr = asset_get_index(_asset_name);
+    if (is_real(spr) && spr != -1) return spr;
+    return _fallback_sprite;
+}
+
+function Status_SetIcon(_status_id, _icon_sprite, _icon_subimg = 0) {
+    if (!variable_global_exists("status_db") || !ds_exists(global.status_db, ds_type_map)) return;
+    if (!ds_map_exists(global.status_db, _status_id)) return;
+
+    var s = global.status_db[? _status_id];
+    if (!is_struct(s)) return;
+
+    s.icon_sprite = _icon_sprite;
+
+    var sub = max(0, round(_icon_subimg));
+    if (is_real(_icon_sprite) && _icon_sprite != -1 && _icon_sprite != noone) {
+        var max_sub = max(0, sprite_get_number(_icon_sprite) - 1);
+        sub = clamp(sub, 0, max_sub);
+    } else {
+        sub = 0;
+    }
+    s.icon_subimg = sub;
+}
+
+function Status_LastFrame(_sprite) {
+    if (!is_real(_sprite) || _sprite == -1 || _sprite == noone) return 0;
+    return max(0, sprite_get_number(_sprite) - 1);
+}
+
+function Status_AssignCoreIcons() {
+    if (!variable_global_exists("status_db") || !ds_exists(global.status_db, ds_type_map)) return;
+
+    Status_SetIcon(STATUS_POISON, poison_status, 0);
+    Status_SetIcon(STATUS_BLEED, bleed_status, 0);
+    Status_SetIcon(STATUS_BURN, burn_status, 0);
+    Status_SetIcon(STATUS_STUN, stun_status, 0);
+}
+
+function Status_AssignPlayerBuffIconsFromFX() {
+    if (!variable_global_exists("status_db") || !ds_exists(global.status_db, ds_type_map)) return;
+
+    var sp_guard = Status_ResolveIcon("muscle_up_effect", rock1);
+    var sp_dmg_up = Status_ResolveIcon("rev_up_effect", torch_asset_moving);
+    var sp_evasion = Status_ResolveIcon("evasion_up_effect", tall_grass_asset);
+    var sp_crit_up = Status_ResolveIcon("take_aim_effect", skull_2_asset);
+    var sp_hit_up = Status_ResolveIcon("foresight_effect_Sheet", Status_ResolveIcon("take_aim_effect", skull_2_asset));
+    var sp_meditation = Status_ResolveIcon("meditation", mp_potion);
+
+    Status_SetIcon(STATUS_GUARD, sp_guard, Status_LastFrame(sp_guard));
+    Status_SetIcon(STATUS_DMG_UP, sp_dmg_up, Status_LastFrame(sp_dmg_up));
+    Status_SetIcon(STATUS_EVASION, sp_evasion, Status_LastFrame(sp_evasion));
+    Status_SetIcon(STATUS_CRIT_UP, sp_crit_up, Status_LastFrame(sp_crit_up));
+    Status_SetIcon(STATUS_HIT_UP, sp_hit_up, 0);
+    Status_SetIcon(STATUS_MEDITATION, sp_meditation, Status_LastFrame(sp_meditation));
+}
+
+function Status_SkillAppliesStatus(_skill, _status_id) {
+    if (!is_struct(_skill)) return false;
+    if (variable_struct_exists(_skill, "status") && _skill.status == _status_id) return true;
+    if (variable_struct_exists(_skill, "status_list") && is_array(_skill.status_list)) {
+        for (var i = 0; i < array_length(_skill.status_list); i++) {
+            if (_skill.status_list[i] == _status_id) return true;
+        }
+    }
+    return false;
+}
+
+function Status_FindIconFallbackFromSkillFX(_status_id) {
+    if (!variable_global_exists("skill_db") || !ds_exists(global.skill_db, ds_type_map)) {
+        SkillDB_Init();
+    }
+    if (!variable_global_exists("skill_db") || !ds_exists(global.skill_db, ds_type_map)) return noone;
+
+    var keys = ds_map_keys_to_array(global.skill_db);
+    for (var i = 0; i < array_length(keys); i++) {
+        var sid = keys[i];
+        var sk = global.skill_db[? sid];
+        if (!Status_SkillAppliesStatus(sk, _status_id)) continue;
+        if (is_struct(sk) && variable_struct_exists(sk, "fx_sprite") && sk.fx_sprite != noone) {
+            return sk.fx_sprite;
+        }
+    }
+
+    return noone;
+}
+
+function Status_AssignMissingIconsFromSkillFX() {
+    if (!variable_global_exists("status_db") || !ds_exists(global.status_db, ds_type_map)) return;
+
+    var keys = ds_map_keys_to_array(global.status_db);
+    for (var i = 0; i < array_length(keys); i++) {
+        var status_id = keys[i];
+        var cfg = global.status_db[? status_id];
+        if (!is_struct(cfg)) continue;
+
+        var has_icon = (variable_struct_exists(cfg, "icon_sprite") && cfg.icon_sprite != noone);
+        if (has_icon) continue;
+
+        var spr = Status_FindIconFallbackFromSkillFX(status_id);
+        if (spr == noone) continue;
+        Status_SetIcon(status_id, spr, Status_LastFrame(spr));
+    }
+}
+
 function StatusDB_Init() {
-    if (variable_global_exists("status_db") && ds_exists(global.status_db, ds_type_map)) return;
+    if (variable_global_exists("status_db") && ds_exists(global.status_db, ds_type_map)) {
+        Status_AssignCoreIcons();
+        Status_AssignPlayerBuffIconsFromFX();
+        Status_AssignMissingIconsFromSkillFX();
+        if (variable_global_exists("state") && is_struct(global.state)) {
+            global.state.status_db = global.status_db;
+        }
+        return;
+    }
     global.status_db = ds_map_create();
 
     global.status_db[? STATUS_POISON] = {
         id: STATUS_POISON,
         name: "Poison",
-        icon_sprite: antidote,
-        stat_mods: { str:0, agi:0, def:-1, intt:0, luck:0 },
-        tick: { hp_min:-4, hp_max:-2, mp_min:0, mp_max:0 },
+        icon_sprite: poison_status,
+        icon_subimg: 0,
+        stat_mods: { str:0, agi:0, def:0, intt:-1, luck:0 },
+        tick: { hp_min:-3, hp_max:-2, mp_min:0, mp_max:0 },
         stackable: false,
-        excludes: [STATUS_BLEED]
+        excludes: [STATUS_BLEED, STATUS_BURN]
     };
 
     global.status_db[? STATUS_BLEED] = {
         id: STATUS_BLEED,
         name: "Bleeding",
-        icon_sprite: bandage,
-        stat_mods: { str:0, agi:-1, def:0, intt:0, luck:0 },
+        icon_sprite: bleed_status,
+        icon_subimg: 0,
+        stat_mods: { str:0, agi:-2, def:0, intt:0, luck:0 },
         tick: { hp_min:-4, hp_max:-2, mp_min:0, mp_max:0 },
         stackable: false,
         excludes: [STATUS_POISON, STATUS_BURN]
@@ -25,17 +140,19 @@ function StatusDB_Init() {
     global.status_db[? STATUS_BURN] = {
         id: STATUS_BURN,
         name: "Burning",
-        icon_sprite: fire_stand_moving,
-        stat_mods: { str:0, agi:0, def:-1, intt:0, luck:0 },
-        tick: { hp_min:-5, hp_max:-3, mp_min:0, mp_max:0 },
+        icon_sprite: burn_status,
+        icon_subimg: 0,
+        stat_mods: { str:-1, agi:0, def:0, intt:0, luck:0 },
+        tick: { hp_min:-6, hp_max:-4, mp_min:0, mp_max:0 },
         stackable: false,
-        excludes: [STATUS_BLEED]
+        excludes: [STATUS_BLEED, STATUS_POISON]
     };
 
     global.status_db[? STATUS_STUN] = {
         id: STATUS_STUN,
         name: "Stun",
-        icon_sprite: skull_1_asset,
+        icon_sprite: stun_status,
+        icon_subimg: 0,
         stat_mods: { str:0, agi:-2, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
@@ -88,7 +205,8 @@ function StatusDB_Init() {
     global.status_db[? STATUS_HIT_UP] = {
         id: STATUS_HIT_UP,
         name: "Foresight",
-        icon_sprite: horned_skull_asset,
+        icon_sprite: Status_ResolveIcon("foresight_effect_Sheet", Status_ResolveIcon("take_aim_effect", skull_2_asset)),
+        icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
@@ -105,6 +223,52 @@ function StatusDB_Init() {
         stackable: false
     };
 
+    global.status_db[? STATUS_SOLIDIFY] = {
+        id: STATUS_SOLIDIFY,
+        name: "Solidify",
+        icon_sprite: Status_ResolveIcon("stun_status", rock1),
+        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
+        stackable: false,
+        force_dodge: true,
+        consume_on_defend: true
+    };
+
+    global.status_db[? STATUS_BLOODTHIRSTY] = {
+        id: STATUS_BLOODTHIRSTY,
+        name: "Bloodthirsty",
+        icon_sprite: Status_ResolveIcon("bleed_status", torch_asset_moving),
+        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
+        stackable: false,
+        guard_mult: 0.65,
+        dmg_mult: 1.06,
+        consume_on_hit: true
+    };
+
+    global.status_db[? STATUS_BLESSING] = {
+        id: STATUS_BLESSING,
+        name: "Blessing",
+        icon_sprite: Status_ResolveIcon("burn_status", mp_potion),
+        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
+        stackable: false,
+        guard_mult: 0.8,
+        consume_on_hit: true
+    };
+
+    global.status_db[? STATUS_SUNDER] = {
+        id: STATUS_SUNDER,
+        name: "Sundered",
+        icon_sprite: noone,
+        stat_mods: { str:0, agi:0, def:-1, intt:0, luck:0 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
+        stackable: false
+    };
+
+    Status_AssignCoreIcons();
+    Status_AssignPlayerBuffIconsFromFX();
+    Status_AssignMissingIconsFromSkillFX();
     if (variable_global_exists("state") && is_struct(global.state)) {
         global.state.status_db = global.status_db;
     }
@@ -115,9 +279,61 @@ function StatusDB_Get(_status_id) {
         StatusDB_Init();
     }
     if (ds_map_exists(global.status_db, _status_id)) {
-        return global.status_db[? _status_id];
+        return Status_LocalizeRuntime(global.status_db[? _status_id], _status_id);
     }
-    return { id: -1, name: "Unknown", icon_sprite: noone, stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 }, tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 }, stackable: false };
+    return { id: -1, name: Loc_T("status.name.unknown", "Unknown"), icon_sprite: noone, stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 }, tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 }, stackable: false };
+}
+
+function Status_LocalizationKey(_status_id) {
+    switch (_status_id) {
+        case STATUS_POISON: return "status_poison";
+        case STATUS_BLEED: return "status_bleed";
+        case STATUS_BURN: return "status_burn";
+        case STATUS_STUN: return "status_stun";
+        case STATUS_GUARD: return "status_guard";
+        case STATUS_DMG_UP: return "status_dmg_up";
+        case STATUS_EVASION: return "status_evasion";
+        case STATUS_CRIT_UP: return "status_crit_up";
+        case STATUS_HIT_UP: return "status_hit_up";
+        case STATUS_MEDITATION: return "status_meditation";
+        case STATUS_SOLIDIFY: return "status_solidify";
+        case STATUS_BLOODTHIRSTY: return "status_bloodthirsty";
+        case STATUS_BLESSING: return "status_blessing";
+        case STATUS_SUNDER: return "status_sunder";
+    }
+    return "unknown";
+}
+
+function Status_LocalizeRuntime(_status, _status_id = -1) {
+    if (!is_struct(_status)) return _status;
+
+    var sid = _status_id;
+    if (sid == -1 && variable_struct_exists(_status, "id")) sid = _status.id;
+    var key_suffix = Status_LocalizationKey(sid);
+
+    if (!variable_struct_exists(_status, "name_en")) _status.name_en = string(_status.name);
+    _status.name = Loc_T("status.name." + key_suffix, string(_status.name_en));
+    return _status;
+}
+
+function Status_Description(_status_id) {
+    switch (_status_id) {
+        case STATUS_POISON:      return Loc_T("status.desc.status_poison", "Lose 2-3 HP each turn.");
+        case STATUS_BLEED:       return Loc_T("status.desc.status_bleed", "Lose 2-4 HP each turn. AGI -2.");
+        case STATUS_BURN:        return Loc_T("status.desc.status_burn", "Lose 4-6 HP each turn. STR -1.");
+        case STATUS_STUN:        return Loc_T("status.desc.status_stun", "Cannot act.");
+        case STATUS_GUARD:       return Loc_T("status.desc.status_guard", "Blocks the next incoming hit.");
+        case STATUS_DMG_UP:      return Loc_T("status.desc.status_dmg_up", "Next attack deals double damage.");
+        case STATUS_EVASION:     return Loc_T("status.desc.status_evasion", "Dodges the next incoming attack.");
+        case STATUS_CRIT_UP:     return Loc_T("status.desc.status_crit_up", "Critical chance +25%.");
+        case STATUS_HIT_UP:      return Loc_T("status.desc.status_hit_up", "Next attack cannot miss.");
+        case STATUS_MEDITATION:  return Loc_T("status.desc.status_meditation", "Recover 2-4 MP each turn.");
+        case STATUS_SOLIDIFY:    return Loc_T("status.desc.status_solidify", "Dodges the next incoming attack.");
+        case STATUS_BLOODTHIRSTY:return Loc_T("status.desc.status_bloodthirsty", "Until hit: take -35%, deal +6% damage.");
+        case STATUS_BLESSING:    return Loc_T("status.desc.status_blessing", "Next incoming hit deals 20% less damage.");
+        case STATUS_SUNDER:      return Loc_T("status.desc.status_sunder", "DEF -1.");
+    }
+    return "";
 }
 
 function Status_Has(_ch, _status_id) {
@@ -148,6 +364,11 @@ function Status_RemoveList(_ch, _list) {
             }
         }
     }
+    return _ch;
+}
+
+function Status_ClearAll(_ch) {
+    _ch.status = [];
     return _ch;
 }
 
@@ -256,13 +477,17 @@ function Status_Tick(_ch) {
             if (variable_struct_exists(t, "mp_max")) mp_max = t.mp_max;
         }
 
-        if (hp_min != 0 || hp_max != 0) {
-            var delta_hp = (hp_min == hp_max) ? hp_min : irandom_range(hp_min, hp_max);
+        var hp_low = min(hp_min, hp_max);
+        var hp_high = max(hp_min, hp_max);
+        if (hp_low != 0 || hp_high != 0) {
+            var delta_hp = (hp_low == hp_high) ? hp_low : irandom_range(hp_low, hp_high);
             _ch.hp = clamp(_ch.hp + delta_hp, 0, _ch.max_hp);
         }
 
-        if (mp_min != 0 || mp_max != 0) {
-            var delta_mp = (mp_min == mp_max) ? mp_min : irandom_range(mp_min, mp_max);
+        var mp_low = min(mp_min, mp_max);
+        var mp_high = max(mp_min, mp_max);
+        if (mp_low != 0 || mp_high != 0) {
+            var delta_mp = (mp_low == mp_high) ? mp_low : irandom_range(mp_low, mp_high);
             _ch.mp = clamp(_ch.mp + delta_mp, 0, _ch.max_mp);
         }
 
@@ -280,29 +505,100 @@ function Status_CanAct(_ch) {
     return true;
 }
 
-function Status_DrawIcons(_ch, _x, _y, _spacing, _rtl) {
+function Status_UsesCoreIconSprite(_status_id, _icon_sprite) {
+    if (_icon_sprite == noone || _icon_sprite == -1) return false;
+    switch (_status_id) {
+        case STATUS_POISON: return (_icon_sprite == poison_status);
+        case STATUS_BLEED:  return (_icon_sprite == bleed_status);
+        case STATUS_BURN:   return (_icon_sprite == burn_status);
+        case STATUS_STUN:   return (_icon_sprite == stun_status);
+    }
+    return false;
+}
+
+function Status_IsNegative(_status_id) {
+    switch (_status_id) {
+        case STATUS_POISON:
+        case STATUS_BLEED:
+        case STATUS_BURN:
+        case STATUS_STUN:
+        case STATUS_SUNDER:
+            return true;
+    }
+    return false;
+}
+
+function Status_LabelWithSign(_cfg, _status_id) {
+    var name_txt = Loc_T("status.name.default", "Status");
+    if (is_struct(_cfg) && variable_struct_exists(_cfg, "name")) {
+        name_txt = string(_cfg.name);
+    }
+    var suffix = Status_IsNegative(_status_id) ? "-" : "+";
+    return name_txt + suffix;
+}
+
+function Status_DrawFallbackLabel(_cfg, _status_id, _x, _y) {
+    var txt = Status_LabelWithSign(_cfg, _status_id);
+    var text_scale = UI_STATUS_FALLBACK_TEXT_SCALE;
+
+    draw_set_color(c_black);
+    UI_DrawTextTransformed(_x + 1, _y + 1, txt, text_scale, text_scale, 0);
+    draw_set_color(c_white);
+    UI_DrawTextTransformed(_x, _y, txt, text_scale, text_scale, 0);
+
+    return max(1, round(UI_TextWidth(txt) * text_scale));
+}
+
+function Status_DrawIcons(_ch, _x, _y, _spacing = 10, _rtl = false, _noncore_text_fallback = false) {
     if (!is_array(_ch.status)) return;
 
     var spacing = 10;
     if (argument_count >= 4) spacing = _spacing;
     var rtl = false;
     if (argument_count >= 5) rtl = _rtl;
+    var noncore_text_fallback = false;
+    if (argument_count >= 6) noncore_text_fallback = _noncore_text_fallback;
+    var icon_scale = UI_GetSpriteScale();
+    var spacing_px = max(1, round(real(spacing) * icon_scale));
+    var icon_gap = max(2, round(4 * icon_scale));
 
     var off = 0;
     if (rtl) {
         for (var i = array_length(_ch.status) - 1; i >= 0; i--) {
             var cfg = StatusDB_Get(_ch.status[i].id);
-            if (variable_struct_exists(cfg, "icon_sprite") && cfg.icon_sprite != noone) {
-                draw_sprite(cfg.icon_sprite, 0, _x + off, _y);
-                off += spacing;
+            var sid = _ch.status[i].id;
+            var has_sprite = (variable_struct_exists(cfg, "icon_sprite") && cfg.icon_sprite != noone);
+            var use_text_fallback = (!has_sprite) || (noncore_text_fallback && !Status_UsesCoreIconSprite(sid, cfg.icon_sprite));
+            if (use_text_fallback) {
+                var tag_w = Status_DrawFallbackLabel(cfg, sid, _x + off, _y);
+                off += max(spacing_px, tag_w + icon_gap);
+            } else if (has_sprite) {
+                var icon_sub = 0;
+                if (variable_struct_exists(cfg, "icon_subimg")) icon_sub = round(cfg.icon_subimg);
+                var icon_max = max(0, sprite_get_number(cfg.icon_sprite) - 1);
+                icon_sub = clamp(icon_sub, 0, icon_max);
+                draw_sprite_ext(cfg.icon_sprite, icon_sub, _x + off, _y, icon_scale, icon_scale, 0, c_white, 1);
+                var icon_w = round(sprite_get_width(cfg.icon_sprite) * icon_scale);
+                off += max(spacing_px, icon_w + icon_gap);
             }
         }
     } else {
         for (var i = 0; i < array_length(_ch.status); i++) {
             var cfg2 = StatusDB_Get(_ch.status[i].id);
-            if (variable_struct_exists(cfg2, "icon_sprite") && cfg2.icon_sprite != noone) {
-                draw_sprite(cfg2.icon_sprite, 0, _x + off, _y);
-                off += spacing;
+            var sid2 = _ch.status[i].id;
+            var has_sprite2 = (variable_struct_exists(cfg2, "icon_sprite") && cfg2.icon_sprite != noone);
+            var use_text_fallback2 = (!has_sprite2) || (noncore_text_fallback && !Status_UsesCoreIconSprite(sid2, cfg2.icon_sprite));
+            if (use_text_fallback2) {
+                var tag_w2 = Status_DrawFallbackLabel(cfg2, sid2, _x + off, _y);
+                off += max(spacing_px, tag_w2 + icon_gap);
+            } else if (has_sprite2) {
+                var icon_sub2 = 0;
+                if (variable_struct_exists(cfg2, "icon_subimg")) icon_sub2 = round(cfg2.icon_subimg);
+                var icon_max2 = max(0, sprite_get_number(cfg2.icon_sprite) - 1);
+                icon_sub2 = clamp(icon_sub2, 0, icon_max2);
+                draw_sprite_ext(cfg2.icon_sprite, icon_sub2, _x + off, _y, icon_scale, icon_scale, 0, c_white, 1);
+                var icon_w2 = round(sprite_get_width(cfg2.icon_sprite) * icon_scale);
+                off += max(spacing_px, icon_w2 + icon_gap);
             }
         }
     }

@@ -37,5 +37,5 @@
     "path":"sprites/tree_stump1/tree_stump1.yy",
   },
   "spriteMaskId":null,
-  "visible":true,
+  "visible":false,
 }
