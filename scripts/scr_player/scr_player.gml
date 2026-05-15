@@ -1358,8 +1358,8 @@ function GameSettings_ApplyDisplay() {
         var fixed_h = base_h * scale_fixed;
         if (window_get_width() != fixed_w || window_get_height() != fixed_h) {
             window_set_size(fixed_w, fixed_h);
-            window_center();
         }
+        window_center();
     }
 
     var win_w = max(1, window_get_width());
@@ -1373,7 +1373,15 @@ function GameSettings_ApplyDisplay() {
     var port_y = 0;
     var port_w = win_w;
     var port_h = win_h;
-    if (!fit_screen) {
+    if (fit_screen) {
+        // Preserve the base game aspect in fullscreen so sprites/UI keep the
+        // same proportions as the fixed-size windowed mode.
+        var fit_scale = min(win_w / base_w, win_h / base_h);
+        port_w = max(1, floor(base_w * fit_scale));
+        port_h = max(1, floor(base_h * fit_scale));
+        port_x = floor((win_w - port_w) * 0.5);
+        port_y = floor((win_h - port_h) * 0.5);
+    } else {
         var used_scale = max(1, scale_fixed);
         port_w = max(1, round(base_w * used_scale));
         port_h = max(1, round(base_h * used_scale));
@@ -1405,9 +1413,10 @@ function GameSettings_ApplyDisplay() {
         }
     }
 
-    // Keep GUI virtual size synced to the active window so all menus/dialogue
-    // scale dynamically with resolution changes and aspect differences.
-    display_set_gui_size(win_w, win_h);
+    // Keep Draw GUI aligned to the application surface so fullscreen uses the
+    // same 10:9 aspect as gameplay instead of the monitor's aspect ratio.
+    display_set_gui_maximise(-1, -1);
+    display_set_gui_size(port_w, port_h);
 }
 
 function GameSettings_ApplyAll() {
