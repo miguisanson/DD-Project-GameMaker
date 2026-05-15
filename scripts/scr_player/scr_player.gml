@@ -1255,13 +1255,61 @@ function GameSettings_NormalizeLanguage(_lang) {
     return "en";
 }
 
+function Display_EnvFlag(_name) {
+    var value = string_lower(string(environment_get_variable(string(_name))));
+    return (value == "1" || value == "true" || value == "yes" || value == "on");
+}
+
+function Display_EnvReal(_name, _fallback) {
+    var value = string(environment_get_variable(string(_name)));
+    if (value == "") return _fallback;
+    return real(value);
+}
+
+function Display_IsPortMaster() {
+    return Display_EnvFlag("NOHOPE_PORTMASTER") || Display_EnvFlag("PORTMASTER");
+}
+
+function Display_CalcLayout(_win_w, _win_h, _base_w, _base_h, _scale_fixed, _fit_screen) {
+    var win_w = max(1, round(real(_win_w)));
+    var win_h = max(1, round(real(_win_h)));
+    var base_w = max(1, round(real(_base_w)));
+    var base_h = max(1, round(real(_base_h)));
+    var fixed_scale = max(1, round(real(_scale_fixed)));
+    var max_integer_scale = max(1, floor(min(win_w / base_w, win_h / base_h)));
+    var used_scale = fixed_scale;
+
+    if (_fit_screen) {
+        used_scale = min(fixed_scale, max_integer_scale);
+    }
+
+    used_scale = max(1, round(used_scale));
+    var port_w = base_w * used_scale;
+    var port_h = base_h * used_scale;
+
+    if (port_w > win_w || port_h > win_h) {
+        used_scale = max(1, max_integer_scale);
+        port_w = base_w * used_scale;
+        port_h = base_h * used_scale;
+    }
+
+    return {
+        x: floor((win_w - port_w) * 0.5),
+        y: floor((win_h - port_h) * 0.5),
+        w: port_w,
+        h: port_h,
+        scale: used_scale
+    };
+}
+
 function GameSettings_Defaults() {
+    var portmaster_mode = Display_IsPortMaster();
     return {
         audio_ui: VOL_UI_DEFAULT,
         audio_sfx: VOL_SFX_DEFAULT,
         audio_bgm: VOL_MUSIC_DEFAULT,
-        display_scale: DISPLAY_SCALE_DEFAULT,
-        fit_screen: false,
+        display_scale: Display_EnvReal("NOHOPE_DISPLAY_SCALE", DISPLAY_SCALE_DEFAULT),
+        fit_screen: portmaster_mode,
         language: "en"
     };
 }
@@ -1369,30 +1417,11 @@ function GameSettings_ApplyDisplay() {
         win_h = disp_h;
     }
 
-    var port_x = 0;
-    var port_y = 0;
-    var port_w = win_w;
-    var port_h = win_h;
-    if (fit_screen) {
-        // Preserve the base game aspect in fullscreen so sprites/UI keep the
-        // same proportions as the fixed-size windowed mode.
-        var fit_scale = min(win_w / base_w, win_h / base_h);
-        port_w = max(1, floor(base_w * fit_scale));
-        port_h = max(1, floor(base_h * fit_scale));
-        port_x = floor((win_w - port_w) * 0.5);
-        port_y = floor((win_h - port_h) * 0.5);
-    } else {
-        var used_scale = max(1, scale_fixed);
-        port_w = max(1, round(base_w * used_scale));
-        port_h = max(1, round(base_h * used_scale));
-        if (port_w > win_w || port_h > win_h) {
-            var dyn_scale = min(win_w / base_w, win_h / base_h);
-            port_w = max(1, round(base_w * dyn_scale));
-            port_h = max(1, round(base_h * dyn_scale));
-        }
-        port_x = floor((win_w - port_w) * 0.5);
-        port_y = floor((win_h - port_h) * 0.5);
-    }
+    var layout = Display_CalcLayout(win_w, win_h, base_w, base_h, scale_fixed, fit_screen);
+    var port_x = layout.x;
+    var port_y = layout.y;
+    var port_w = layout.w;
+    var port_h = layout.h;
 
     view_xport[0] = port_x;
     view_yport[0] = port_y;
@@ -1414,9 +1443,9 @@ function GameSettings_ApplyDisplay() {
     }
 
     // Keep Draw GUI aligned to the application surface so fullscreen uses the
-    // same 10:9 aspect as gameplay instead of the monitor's aspect ratio.
-    display_set_gui_maximise(-1, -1);
+    // centered integer-scaled viewport instead of stretching across the window.
     display_set_gui_size(port_w, port_h);
+    display_set_gui_maximise(1, 1, port_x, port_y);
 }
 
 function GameSettings_ApplyAll() {

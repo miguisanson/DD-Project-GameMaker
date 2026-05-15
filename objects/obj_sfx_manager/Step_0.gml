@@ -125,6 +125,24 @@ if (!need_display_refresh && !transition_now_active && view_enabled) {
         }
     }
 
+    var display_settings = GameSettings_Ensure();
+    var expected_layout = Display_CalcLayout(
+        cur_window_w,
+        cur_window_h,
+        DISPLAY_BASE_W,
+        DISPLAY_BASE_H,
+        display_settings.display_scale,
+        display_settings.fit_screen
+    );
+    if (round(view_xport[0]) != expected_layout.x
+    || round(view_yport[0]) != expected_layout.y
+    || round(view_wport[0]) != expected_layout.w
+    || round(view_hport[0]) != expected_layout.h
+    || round(display_get_gui_width()) != expected_layout.w
+    || round(display_get_gui_height()) != expected_layout.h) {
+        view_bad = true;
+    }
+
     if (view_bad) need_display_refresh = true;
 }
 

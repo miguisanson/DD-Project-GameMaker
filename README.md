@@ -1,6 +1,12 @@
 # DD-Project
 8bit turn based game
 
+## PortMaster / RG SP
+
+For Anbernic RG SP / PortMaster export and fixed-resolution display notes, see:
+
+- [docs/PORTMASTER_RG_SP.md](docs/PORTMASTER_RG_SP.md)
+
 ## Localization Workflow
 
 Canonical source of truth is a single workbook:
