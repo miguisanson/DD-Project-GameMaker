@@ -11,7 +11,7 @@ function StatsClampAll(_s) {
     return _s;
 }
 
-function HPGainPerLevel(_hd) { return ceil(_hd / 2) + 1; }
+function HPGainPerLevel(_hd) { return ceil(_hd / 2) + 2; }
 
 function ResourceStatWeight(_level) {
     var lvl = max(1, round(_level));

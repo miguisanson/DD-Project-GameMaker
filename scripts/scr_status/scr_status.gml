@@ -376,6 +376,16 @@ function Status_Add(_ch, _status_id, _turns, _power) {
     if (!is_array(_ch.status)) _ch.status = [];
     var cfg = StatusDB_Get(_status_id);
 
+    // Anti-stun-lock safety net: the player can never be chain-stunned.
+    // While a brief immunity window is active the stun is ignored outright,
+    // and any stun that does land is capped to a single turn.
+    if (_status_id == STATUS_STUN && is_struct(_ch)
+    && variable_struct_exists(_ch, "is_player") && _ch.is_player) {
+        var stun_immune = variable_struct_exists(_ch, "stun_immune_turns") ? max(0, _ch.stun_immune_turns) : 0;
+        if (stun_immune > 0) return _ch;
+        _turns = min(_turns, 1);
+    }
+
     if (variable_struct_exists(cfg, "excludes")) {
         _ch = Status_RemoveList(_ch, cfg.excludes);
     }
@@ -460,6 +470,12 @@ function Status_ConsumeByField(_ch, _field) {
 
 function Status_Tick(_ch) {
     if (!is_array(_ch.status)) return _ch;
+
+    // Decay the player's post-stun immunity window once per turn cycle.
+    if (is_struct(_ch) && variable_struct_exists(_ch, "is_player") && _ch.is_player
+    && variable_struct_exists(_ch, "stun_immune_turns") && _ch.stun_immune_turns > 0) {
+        _ch.stun_immune_turns -= 1;
+    }
 
     for (var i = array_length(_ch.status) - 1; i >= 0; i--) {
         var s = _ch.status[i];

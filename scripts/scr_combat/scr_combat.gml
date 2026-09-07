@@ -455,6 +455,9 @@ function Battle_PlayerStunSkip(_bc) {
     var p = _bc.p;
     var e = _bc.e;
     p = Status_Tick(p);
+    // Recovering from a stun grants a brief immunity window so the player can
+    // never lose two turns in a row to stun (anti-stun-lock guarantee).
+    p.stun_immune_turns = 2;
     if (Battle_CheckEnd(_bc, p, e)) return true;
     _bc.player_bonus_actions_remaining = 0;
     _bc.turn = TURN_ENEMY;
@@ -508,6 +511,10 @@ function Battle_AttackTimingBegin(_bc) {
     _bc.attack_timing_active = true;
     _bc.attack_timing_started = true;
     _bc.attack_timing_marker_alpha = 0;
+    // Roll this swing's speed once so it stays constant during the drop but
+    // varies between swings (random feel + skill), on top of the enemy tier.
+    var speed_var = random_range(ATTACK_TIMING_SPEED_VAR_MIN, ATTACK_TIMING_SPEED_VAR_MAX);
+    _bc.attack_timing_speed = Battle_AttackTimingSpeedForEnemy(e) * speed_var;
     _bc.battle_state = BSTATE_ATTACK_TIMING;
 }
 
@@ -625,7 +632,10 @@ function Battle_PlayerAttackTimingStep(_bc, _confirm_pressed) {
     _bc.attack_timing_marker_alpha = min(1, _bc.attack_timing_marker_alpha + 0.20);
 
     if (_bc.attack_timing_input_lock > 0) _bc.attack_timing_input_lock -= 1;
-    _bc.attack_timing_y += Battle_AttackTimingSpeedForEnemy(_bc.e);
+    if (!variable_instance_exists(_bc, "attack_timing_speed") || _bc.attack_timing_speed <= 0) {
+        _bc.attack_timing_speed = Battle_AttackTimingSpeedForEnemy(_bc.e);
+    }
+    _bc.attack_timing_y += _bc.attack_timing_speed;
 
     if (_confirm_pressed && _bc.attack_timing_input_lock <= 0) {
         var d = abs(_bc.attack_timing_y - _bc.attack_timing_target_y);

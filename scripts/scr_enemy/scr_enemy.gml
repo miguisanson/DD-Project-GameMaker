@@ -304,7 +304,9 @@ function EnemyCreate(_enemy_id) {
     var int_mod = StatMod(ch.stats.intt);
 
     var hp_gain = ceil(ch.hd / 2) + 1; // BG3 average
-    ch.max_hp = max(1, ch.base_hp + (ch.level - 1) * (hp_gain + def_mod));
+    // DEF adds a one-time flat bonus instead of compounding every level, so
+    // high-DEF enemies stay meaty without ballooning into HP sponges.
+    ch.max_hp = max(1, ch.base_hp + (ch.level - 1) * hp_gain + max(0, def_mod));
 
     ch.max_mp = max(0, ch.base_mp + (ch.level - 1) * (ch.mp_gain + int_mod));
     ch.max_hp = max(1, round(ch.max_hp * diff.enemy_hp_mult));

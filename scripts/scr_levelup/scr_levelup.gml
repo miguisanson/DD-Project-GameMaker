@@ -19,8 +19,11 @@ function Player_NormalizeProgression(_ch, _recompute_resources = true, _clamp_ex
     if (!variable_struct_exists(_ch.stats, "luck")) _ch.stats.luck = 10;
     _ch.stats = StatsClampAll(_ch.stats);
 
-    if (!variable_struct_exists(_ch, "stat_points")) _ch.stat_points = 0;
-    _ch.stat_points = max(0, round(_ch.stat_points));
+    // Stat allocation was removed; stats now grow automatically by class table.
+    _ch.stat_points = 0;
+
+    if (!variable_struct_exists(_ch, "stun_immune_turns")) _ch.stun_immune_turns = 0;
+    _ch.stun_immune_turns = max(0, round(_ch.stun_immune_turns));
 
     if (!variable_struct_exists(_ch, "exp")) _ch.exp = 0;
     _ch.exp = max(0, round(_ch.exp));
@@ -46,7 +49,31 @@ function Player_NormalizeProgression(_ch, _recompute_resources = true, _clamp_ex
     return _ch;
 }
 
-function LevelUp_AddStat(_ch, _stat_id) {
+function LevelUp_ClassGrowthGain(_class_id, _new_level) {
+    // Per-level stat growth table (replaces manual point allocation).
+    // Specialists raise their primary stat every level plus a secondary on
+    // even levels. Nobody is an even all-rounder with no specialization,
+    // rotating two stats per level so everything climbs at the same pace.
+    var lvl = max(2, round(_new_level));
+    var even = ((lvl mod 2) == 0);
+    switch (_class_id) {
+        case CLASS_KNIGHT: return { str:1, agi:0, def:(even ? 1 : 0), intt:0, luck:0 };
+        case CLASS_ARCHER: return { str:0, agi:1, def:0, intt:0, luck:(even ? 1 : 0) };
+        case CLASS_MAGE:   return { str:0, agi:0, def:0, intt:1, luck:(even ? 1 : 0) };
+        case CLASS_NOBODY:
+            var rot = [
+                { str:1, agi:1, def:0, intt:0, luck:0 },
+                { str:0, agi:0, def:1, intt:1, luck:0 },
+                { str:0, agi:0, def:0, intt:1, luck:1 },
+                { str:1, agi:0, def:1, intt:0, luck:0 },
+                { str:0, agi:1, def:0, intt:0, luck:1 }
+            ];
+            return rot[(lvl - 2) mod array_length(rot)];
+    }
+    return { str:0, agi:0, def:0, intt:0, luck:0 };
+}
+
+function LevelUp_ApplyLevel(_ch) {
     _ch = Player_NormalizeProgression(_ch, false, true);
     if (Level_IsAtCap(_ch.level)) return _ch;
 
@@ -57,19 +84,32 @@ function LevelUp_AddStat(_ch, _stat_id) {
 
     _ch.level += 1;
     if (!is_struct(_ch.stats)) _ch.stats = StatsCreateBase();
-    switch (_stat_id) {
-        case STAT_STR:  _ch.stats.str = StatClamp(_ch.stats.str + 1); break;
-        case STAT_AGI:  _ch.stats.agi = StatClamp(_ch.stats.agi + 1); break;
-        case STAT_DEF:  _ch.stats.def = StatClamp(_ch.stats.def + 1); break;
-        case STAT_INT:  _ch.stats.intt = StatClamp(_ch.stats.intt + 1); break;
-        case STAT_LUCK: _ch.stats.luck = StatClamp(_ch.stats.luck + 1); break;
-    }
-    if (!variable_struct_exists(_ch, "stat_points")) _ch.stat_points = 0;
-    _ch.stat_points += 1;
+
+    var class_id = variable_struct_exists(_ch, "class_id") ? _ch.class_id : CLASS_NOBODY;
+    var gain = LevelUp_ClassGrowthGain(class_id, _ch.level);
+    _ch.stats.str  = StatClamp(_ch.stats.str  + gain.str);
+    _ch.stats.agi  = StatClamp(_ch.stats.agi  + gain.agi);
+    _ch.stats.def  = StatClamp(_ch.stats.def  + gain.def);
+    _ch.stats.intt = StatClamp(_ch.stats.intt + gain.intt);
+    _ch.stats.luck = StatClamp(_ch.stats.luck + gain.luck);
+
+    if (!is_struct(_ch.last_growth)) _ch.last_growth = { str:0, agi:0, def:0, intt:0, luck:0 };
+    _ch.last_growth.str  += gain.str;
+    _ch.last_growth.agi  += gain.agi;
+    _ch.last_growth.def  += gain.def;
+    _ch.last_growth.intt += gain.intt;
+    _ch.last_growth.luck += gain.luck;
+
+    _ch.stat_points = 0;
     _ch = RecomputeResources(_ch);
     _ch.hp = clamp(hp_before + max(0, _ch.max_hp - max_hp_before), 0, _ch.max_hp);
     _ch.mp = clamp(mp_before + max(0, _ch.max_mp - max_mp_before), 0, _ch.max_mp);
     return _ch;
+}
+
+// Backwards-compatible shim: the stat id is ignored; growth follows the class table.
+function LevelUp_AddStat(_ch, _stat_id) {
+    return LevelUp_ApplyLevel(_ch);
 }
 
 function LevelUp_StatName(_stat_id) {
@@ -107,15 +147,20 @@ function LevelUp_AutoStatForClass(_ch) {
 }
 
 function LevelUp_AutoGainSummary(_ch) {
-    if (!is_struct(_ch)) return "";
-    var stat_id = -1;
-    var gained = 0;
-    if (variable_struct_exists(_ch, "last_auto_stat_id")) stat_id = round(real(_ch.last_auto_stat_id));
-    if (variable_struct_exists(_ch, "last_auto_stat_gained")) gained = max(0, round(real(_ch.last_auto_stat_gained)));
-    if (stat_id == -1 || gained <= 0) return "";
-    var nm = LevelUp_StatName(stat_id);
-    if (nm == "") return "";
-    return nm + " +" + string(gained);
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "last_growth") || !is_struct(_ch.last_growth)) return "";
+    var g = _ch.last_growth;
+    var parts = [];
+    if (g.str  > 0) array_push(parts, "STR +"  + string(g.str));
+    if (g.agi  > 0) array_push(parts, "AGI +"  + string(g.agi));
+    if (g.def  > 0) array_push(parts, "DEF +"  + string(g.def));
+    if (g.intt > 0) array_push(parts, "INT +"  + string(g.intt));
+    if (g.luck > 0) array_push(parts, "LUCK +" + string(g.luck));
+    var out = "";
+    for (var i = 0; i < array_length(parts); i++) {
+        if (i > 0) out += ", ";
+        out += parts[i];
+    }
+    return out;
 }
 
 function Exp_NextLevel(_level) {
@@ -138,16 +183,16 @@ function Exp_NextLevel(_level) {
 }
 
 function LevelUp_Auto(_ch) {
-    var pick = LevelUp_AutoStatForClass(_ch);
-    return LevelUp_AddStat(_ch, pick);
+    return LevelUp_ApplyLevel(_ch);
 }
 
 function LevelUp_FromExp(_ch) {
     _ch = Player_NormalizeProgression(_ch, false, false);
     _ch.last_levels_gained = 0;
     _ch.last_stat_points_gained = 0;
-    _ch.last_auto_stat_id = LevelUp_AutoStatForClass(_ch);
+    _ch.last_auto_stat_id = -1;
     _ch.last_auto_stat_gained = 0;
+    _ch.last_growth = { str:0, agi:0, def:0, intt:0, luck:0 };
 
     if (Level_IsAtCap(_ch.level)) {
         _ch.exp = 0;
@@ -159,11 +204,9 @@ function LevelUp_FromExp(_ch) {
     var guard = 0;
     while (_ch.exp_next > 0 && _ch.exp >= _ch.exp_next && !Level_IsAtCap(_ch.level)) {
         _ch.exp -= _ch.exp_next;
-        _ch = LevelUp_AddStat(_ch, _ch.last_auto_stat_id);
+        _ch = LevelUp_ApplyLevel(_ch);
         _ch.exp_next = Exp_NextLevel(_ch.level);
         _ch.last_levels_gained += 1;
-        _ch.last_stat_points_gained += 1;
-        if (_ch.last_auto_stat_id != -1) _ch.last_auto_stat_gained += 1;
 
         guard += 1;
         if (guard > 200) break;

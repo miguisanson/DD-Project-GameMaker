@@ -484,33 +484,25 @@ function Tooltip_SkillEffectLines(_skill, _compact = false) {
     return lines;
 }
 
-function Tooltip_BuildStatLines(_stat_key, _stat_label, _cur, _base, _pending_pts, _selected_col) {
+function Tooltip_BuildStatLines(_stat_key, _stat_label, _cur) {
     var lines = [];
     array_push(lines, _stat_label + " (" + string(_cur) + ")");
-    var delta = _cur - _base;
-    if (delta > 0) {
-        array_push(lines, Loc_T("menu.tooltip.stat.pending_plus", "Pending bonus: +{delta}", {
-            delta: string(delta)
-        }));
-    } else {
-        array_push(lines, Loc_T("menu.tooltip.stat.pending_zero", "Pending bonus: +0"));
-    }
 
     switch (_stat_key) {
         case "str":
-            array_push(lines, Loc_T("menu.tooltip.stat.str.desc", "Increases physical damage for weapon attacks."));
+            array_push(lines, Loc_T("menu.tooltip.stat.str.desc", "Increases physical damage with strength weapons (swords)."));
         break;
         case "agi":
-            array_push(lines, Loc_T("menu.tooltip.stat.agi.desc", "Improves turn order and evasion potential."));
+            array_push(lines, Loc_T("menu.tooltip.stat.agi.desc", "Improves turn order, dodge, and bow damage."));
         break;
         case "def":
-            array_push(lines, Loc_T("menu.tooltip.stat.def.desc", "Reduces incoming damage through mitigation."));
+            array_push(lines, Loc_T("menu.tooltip.stat.def.desc", "Reduces incoming damage and adds a little max HP."));
         break;
         case "intt":
-            array_push(lines, Loc_T("menu.tooltip.stat.intt.desc", "Increases skill damage and magical output."));
+            array_push(lines, Loc_T("menu.tooltip.stat.intt.desc", "Increases skill/staff damage and max MP."));
         break;
         case "luck":
-            array_push(lines, Loc_T("menu.tooltip.stat.luck.desc", "Improves critical chance and random checks."));
+            array_push(lines, Loc_T("menu.tooltip.stat.luck.desc", "Improves critical hit chance and random checks."));
         break;
         default:
             array_push(lines, Loc_T("menu.tooltip.stat.default.desc", "Affects combat performance."));
@@ -1177,6 +1169,7 @@ function Menu_HandleInput() {
                 if (m.tab == 2) {
                     if (!is_struct(m.pending_stats)) Menu_StatsSync();
                     m.stats_focus = true;
+                    m.stats_row = 0;
                 }
                 SFX_PlayUI("ui_move");
             }
@@ -1275,38 +1268,10 @@ function Menu_HandleInput() {
     }
 
     if (m.tab == 2) {
+        // Read-only stats: navigate the rows like the skills list (no editing).
         if (!is_struct(m.pending_stats)) Menu_StatsSync();
-        var stat_keys = ["str","agi","def","intt","luck"];
-        var stat_count = array_length(stat_keys);
-        var pending_total = 0;
-        for (var pidx = 0; pidx < stat_count; pidx++) {
-            var base_v = variable_struct_get(m.base_stats, stat_keys[pidx]);
-            var cur_v = variable_struct_get(m.pending_stats, stat_keys[pidx]);
-            if (cur_v > base_v) pending_total += (cur_v - base_v);
-        }
-        var show_actions = (pending_total > 0);
-        var action_row = stat_count;
-        var row_count = stat_count + (show_actions ? 1 : 0); // action row
-
-        // If Confirm/Cancel row just became unavailable, snap selection back to nearest stat row.
-        if (!show_actions && m.stats_row >= action_row) {
-            m.stats_row = max(0, stat_count - 1);
-            m.stats_col = 1;
-        }
-        m.stats_row = clamp(m.stats_row, 0, max(0, row_count - 1));
-        m.stats_col = clamp(m.stats_col, 0, 1);
-
-        if (!m.stats_focus) {
-            if (k_ok || nav_down || nav_up) {
-                m.stats_focus = true;
-                m.stats_row = 0;
-                m.stats_col = 1;
-                if (k_ok) SFX_PlayUI("ui_confirm");
-                else SFX_PlayUI("ui_move");
-            }
-            return;
-        }
-
+        var stat_rows = 5;
+        m.stats_row = clamp(m.stats_row, 0, stat_rows - 1);
         if (nav_up) {
             if (m.stats_row > 0) {
                 m.stats_row -= 1;
@@ -1318,53 +1283,10 @@ function Menu_HandleInput() {
                 return;
             }
         }
-
         if (nav_down) {
-            if (m.stats_row < row_count - 1) {
+            if (m.stats_row < stat_rows - 1) {
                 m.stats_row += 1;
                 SFX_PlayUI("ui_move");
-            }
-        }
-
-        if (m.stats_row < stat_count) {
-            if (k_left && m.stats_col != 0) {
-                m.stats_col = 0;
-                SFX_PlayUI("ui_move");
-            }
-            if (k_right && m.stats_col != 1) {
-                m.stats_col = 1;
-                SFX_PlayUI("ui_move");
-            }
-        } else {
-            if (k_left || k_right) {
-                m.stats_col = 1 - m.stats_col;
-                SFX_PlayUI("ui_move");
-            }
-        }
-
-        if (k_ok) {
-            SFX_PlayUI("ui_confirm");
-            if (m.stats_row < stat_count) {
-                var key = stat_keys[m.stats_row];
-                var base_v = variable_struct_get(m.base_stats, key);
-                var cur_v = variable_struct_get(m.pending_stats, key);
-
-                if (m.stats_col == 1 && m.pending_points > 0) {
-                    if (cur_v < STAT_MAX) {
-                        variable_struct_set(m.pending_stats, key, cur_v + 1);
-                        m.pending_points -= 1;
-                    }
-                }
-                if (m.stats_col == 0 && cur_v > base_v) {
-                    variable_struct_set(m.pending_stats, key, cur_v - 1);
-                    m.pending_points += 1;
-                }
-            } else if (show_actions) {
-                if (m.stats_col == 0) {
-                    Menu_StatsApply();
-                } else {
-                    Menu_StatsDiscard();
-                }
             }
         }
     }
@@ -1573,13 +1495,6 @@ function Menu_Draw() {
         var stat_keys = ["str","agi","def","intt","luck"];
         var stat_count = array_length(stat_keys);
 
-        var pending_total = 0;
-        for (var pidx = 0; pidx < stat_count; pidx++) {
-            var base_v = variable_struct_get(m.base_stats, stat_keys[pidx]);
-            var cur_v = variable_struct_get(m.pending_stats, stat_keys[pidx]);
-            if (cur_v > base_v) pending_total += (cur_v - base_v);
-        }
-
         var left_x = bx + pad;
         var y0 = by + header_h + pad;
 
@@ -1607,8 +1522,7 @@ function Menu_Draw() {
             bar_w,
             UI_TextWidth(Loc_T("menu.stats.level", "Level: {level}", { level: string(ch.level) })),
             UI_TextWidth(exp_label_1),
-            UI_TextWidth(exp_value),
-            UI_TextWidth(Loc_T("menu.stats.available_points", "Available Points: {points}", { points: string(m.pending_points) }))
+            UI_TextWidth(exp_value)
         ) + pad * 2;
         var left_w = min(bw * 0.55, left_content_w);
 
@@ -1632,95 +1546,32 @@ function Menu_Draw() {
         UI_DrawText(left_x, text_y, exp_label_1);
         text_y += line_h;
         UI_DrawText(left_x, text_y, exp_value);
-        text_y += line_h;
-        UI_DrawText(left_x, text_y, Loc_T("menu.stats.available_points", "Available Points: {points}", { points: string(m.pending_points) }));
 
         var row_h2 = row_h;
         var list_y = y0;
         var label_x = right_x;
-        var btn_w = max(12, row_h2 * 0.6);
-        var btn_h = row_h2 - 4;
-        var preview_w = max(btn_w, UI_TextWidth("+99"));
-        var preview_x = right_x + right_w - preview_w;
-        var plus_x = preview_x - btn_w - pad;
-        var minus_x = plus_x - btn_w - pad;
 
+        // Read-only stat list (growth is class-driven; no manual allocation).
+        // Selectable for viewing, like the skills list.
         for (var i3 = 0; i3 < stat_count; i3++) {
             var row_y = list_y + i3 * row_h2;
             var val = variable_struct_get(m.pending_stats, stat_keys[i3]);
-            var base_v = variable_struct_get(m.base_stats, stat_keys[i3]);
-            var preview = val - base_v;
-
-                var sel_minus = (m.stats_focus && m.stats_row == i3 && m.stats_col == 0);
-                var sel_plus = (m.stats_focus && m.stats_row == i3 && m.stats_col == 1);
-                var stat_selected = (m.stats_focus && m.stats_row == i3);
-
-            draw_set_color(c_white);
-            UI_DrawText(label_x, row_y, stat_names[i3] + ": " + string(val));
-
-            if (sel_minus) {
+            var row_txt = stat_names[i3] + ": " + string(val);
+            var row_sel = (m.stats_focus && m.stats_row == i3);
+            if (row_sel) {
+                var rtw = UI_TextWidth(row_txt);
                 draw_set_color(c_white);
-                draw_rectangle(minus_x - 2, row_y - 2, minus_x + btn_w + 2, row_y + btn_h + 2, false);
+                draw_rectangle(label_x - 4, row_y - 2, label_x + rtw + 4, row_y + row_h2 - 2, false);
                 draw_set_color(c_black);
-                draw_rectangle(minus_x - 2, row_y - 2, minus_x + btn_w + 2, row_y + btn_h + 2, true);
+                draw_rectangle(label_x - 4, row_y - 2, label_x + rtw + 4, row_y + row_h2 - 2, true);
             }
-            if (sel_plus) {
-                draw_set_color(c_white);
-                draw_rectangle(plus_x - 2, row_y - 2, plus_x + btn_w + 2, row_y + btn_h + 2, false);
-                draw_set_color(c_black);
-                draw_rectangle(plus_x - 2, row_y - 2, plus_x + btn_w + 2, row_y + btn_h + 2, true);
+            draw_set_color(row_sel ? c_black : c_white);
+            UI_DrawText(label_x, row_y, row_txt);
+
+            if (row_sel) {
+                tooltip_lines = Tooltip_BuildStatLines(stat_keys[i3], stat_names[i3], val);
             }
-
-            var minus_tx = minus_x + (btn_w - UI_TextWidth("-")) * 0.5;
-            var plus_tx = plus_x + (btn_w - UI_TextWidth("+")) * 0.5;
-
-            draw_set_color(sel_minus ? c_black : c_white);
-            UI_DrawText(minus_tx, row_y, "-");
-            draw_set_color(sel_plus ? c_black : c_white);
-            UI_DrawText(plus_tx, row_y, "+");
-
-                if (preview > 0) {
-                    draw_set_color(c_white);
-                    UI_DrawText(preview_x, row_y, "+" + string(preview));
-                }
-
-                if (stat_selected) {
-                    tooltip_lines = Tooltip_BuildStatLines(stat_keys[i3], stat_names[i3], val, base_v, m.pending_points, m.stats_col);
-                }
         }
-
-        var action_row = stat_count;
-        var action_y = list_y + stat_count * row_h2 + pad;
-        var show_actions = (pending_total > 0);
-        var confirm_text = Loc_T("menu.common.confirm", "Confirm");
-        var cancel_text = Loc_T("menu.common.cancel", "Cancel");
-        var confirm_w = UI_TextWidth(confirm_text);
-        var cancel_w = UI_TextWidth(cancel_text);
-        var action_h = UI_TextHeight(confirm_text) + 4;
-        var btn_pad = 6;
-
-        var confirm_x = right_x;
-        var cancel_x = confirm_x + confirm_w + btn_pad * 2 + pad;
-
-        if (show_actions) {
-        if (m.stats_focus && m.stats_row == action_row && m.stats_col == 0) {
-                draw_set_color(c_white);
-                draw_rectangle(confirm_x - btn_pad, action_y - 2, confirm_x + confirm_w + btn_pad, action_y + action_h, false);
-                draw_set_color(c_black);
-                draw_rectangle(confirm_x - btn_pad, action_y - 2, confirm_x + confirm_w + btn_pad, action_y + action_h, true);
-            }
-            draw_set_color((m.stats_focus && m.stats_row == action_row && m.stats_col == 0) ? c_black : c_white);
-            UI_DrawText(confirm_x, action_y, confirm_text);
-    
-            if (m.stats_focus && m.stats_row == action_row && m.stats_col == 1) {
-                draw_set_color(c_white);
-                draw_rectangle(cancel_x - btn_pad, action_y - 2, cancel_x + cancel_w + btn_pad, action_y + action_h, false);
-                draw_set_color(c_black);
-                draw_rectangle(cancel_x - btn_pad, action_y - 2, cancel_x + cancel_w + btn_pad, action_y + action_h, true);
-            }
-            draw_set_color((m.stats_focus && m.stats_row == action_row && m.stats_col == 1) ? c_black : c_white);
-            UI_DrawText(cancel_x, action_y, cancel_text);
-            }
     }
 
     if (!(variable_struct_exists(m, "inv_popup_open") && m.inv_popup_open) && array_length(tooltip_lines) > 0) {
@@ -1744,12 +1595,13 @@ function Menu_Draw() {
         var popup_msg = Loc_T("menu.popup.learn_skill", "Learn a skill");
         if (m.inv_popup_mode == "message") popup_msg = string(m.inv_popup_message);
 
-        var popup_pad_x = 12;
-        var popup_pad_y = 8;
-        var popup_gap_y = 8;
-        var btn_pad_x = 8;
-        var line_h_popup = UI_TextHeight("A");
-        var btn_h = line_h_popup + 4;
+        var pm = UI_PopupMetrics();
+        var popup_pad_x = pm.pad_x;
+        var popup_pad_y = pm.pad_y;
+        var popup_gap_y = pm.gap_y;
+        var btn_pad_x = pm.btn_pad_x;
+        var line_h_popup = pm.line_h;
+        var btn_h = pm.btn_h;
         var msg_w = UI_TextWidth(popup_msg);
         var popup_w = 0;
         var popup_h = 0;
@@ -1761,12 +1613,12 @@ function Menu_Draw() {
         if (m.inv_popup_mode == "confirm") {
             var yes_label = Loc_T("menu.common.confirm", "Confirm");
             var no_label = Loc_T("menu.common.cancel", "Cancel");
-            var yes_w = UI_TextWidth(yes_label) + btn_pad_x * 2;
-            var no_w = UI_TextWidth(no_label) + btn_pad_x * 2;
-            var btn_gap_x = 14;
+            var yes_w = UI_ButtonWidth(yes_label, btn_pad_x);
+            var no_w = UI_ButtonWidth(no_label, btn_pad_x);
+            var btn_gap_x = pm.btn_gap_x;
             var total_btn_w = yes_w + btn_gap_x + no_w;
 
-            popup_w = max(180, max(msg_w + popup_pad_x * 2, total_btn_w + popup_pad_x * 2));
+            popup_w = max(pm.min_w, max(msg_w + popup_pad_x * 2, total_btn_w + popup_pad_x * 2));
             popup_h = popup_pad_y + line_h_popup + popup_gap_y + btn_h + popup_pad_y;
             px1 = bx + (bw - popup_w) * 0.5;
             py1 = by + (bh - popup_h) * 0.62;
@@ -1779,42 +1631,22 @@ function Menu_Draw() {
             draw_set_alpha(popup_alpha);
             draw_set_color(c_white);
             draw_rectangle(px1, py1, px2, py2, true);
-            draw_set_alpha(popup_alpha);
 
             var msg_x = px1 + (popup_w - msg_w) * 0.5;
             var msg_y = py1 + popup_pad_y;
+            draw_set_alpha(popup_alpha);
             draw_set_color(c_white);
             UI_DrawText(msg_x, msg_y, popup_msg);
 
             var btn_y = msg_y + line_h_popup + popup_gap_y;
             var yes_x = px1 + (popup_w - total_btn_w) * 0.5;
             var no_x = yes_x + yes_w + btn_gap_x;
-
-            if (m.inv_popup_choice == 0) {
-                draw_set_color(c_white);
-                draw_rectangle(yes_x, btn_y, yes_x + yes_w, btn_y + btn_h, false);
-                draw_set_color(c_black);
-                draw_rectangle(yes_x, btn_y, yes_x + yes_w, btn_y + btn_h, true);
-                draw_set_color(c_black);
-            } else {
-                draw_set_color(c_white);
-            }
-            UI_DrawText(yes_x + (yes_w - UI_TextWidth(yes_label)) * 0.5, btn_y + 2, yes_label);
-
-            if (m.inv_popup_choice == 1) {
-                draw_set_color(c_white);
-                draw_rectangle(no_x, btn_y, no_x + no_w, btn_y + btn_h, false);
-                draw_set_color(c_black);
-                draw_rectangle(no_x, btn_y, no_x + no_w, btn_y + btn_h, true);
-                draw_set_color(c_black);
-            } else {
-                draw_set_color(c_white);
-            }
-            UI_DrawText(no_x + (no_w - UI_TextWidth(no_label)) * 0.5, btn_y + 2, no_label);
+            UI_DrawButton(yes_x, btn_y, yes_w, btn_h, yes_label, (m.inv_popup_choice == 0), popup_alpha);
+            UI_DrawButton(no_x, btn_y, no_w, btn_h, no_label, (m.inv_popup_choice == 1), popup_alpha);
         } else {
             var ok_label = Loc_T("common.ok", "OK");
-            var ok_w = UI_TextWidth(ok_label) + btn_pad_x * 2;
-            popup_w = max(180, max(msg_w + popup_pad_x * 2, ok_w + popup_pad_x * 2));
+            var ok_w = UI_ButtonWidth(ok_label, btn_pad_x);
+            popup_w = max(pm.min_w, max(msg_w + popup_pad_x * 2, ok_w + popup_pad_x * 2));
             popup_h = popup_pad_y + line_h_popup + popup_gap_y + btn_h + popup_pad_y;
             px1 = bx + (bw - popup_w) * 0.5;
             py1 = by + (bh - popup_h) * 0.62;
@@ -1827,21 +1659,16 @@ function Menu_Draw() {
             draw_set_alpha(popup_alpha);
             draw_set_color(c_white);
             draw_rectangle(px1, py1, px2, py2, true);
-            draw_set_alpha(popup_alpha);
 
             var msg_x2 = px1 + (popup_w - msg_w) * 0.5;
             var msg_y2 = py1 + popup_pad_y;
+            draw_set_alpha(popup_alpha);
             draw_set_color(c_white);
             UI_DrawText(msg_x2, msg_y2, popup_msg);
 
             var btn_y2 = msg_y2 + line_h_popup + popup_gap_y;
             var ok_x = px1 + (popup_w - ok_w) * 0.5;
-            draw_set_color(c_white);
-            draw_rectangle(ok_x, btn_y2, ok_x + ok_w, btn_y2 + btn_h, false);
-            draw_set_color(c_black);
-            draw_rectangle(ok_x, btn_y2, ok_x + ok_w, btn_y2 + btn_h, true);
-            draw_set_color(c_black);
-            UI_DrawText(ok_x + (ok_w - UI_TextWidth(ok_label)) * 0.5, btn_y2 + 2, ok_label);
+            UI_DrawButton(ok_x, btn_y2, ok_w, btn_h, ok_label, true, popup_alpha);
         }
     }
 
@@ -1866,7 +1693,11 @@ function ClassSelect_Ensure() {
             allow_cancel: true,
             open_block_frame: UI_OPENED_FRAME_NONE,
             opened_frame: UI_OPENED_FRAME_NONE,
-            pending_apply_class: -1
+            pending_apply_class: -1,
+            confirming: false,
+            confirm_class: -1,
+            confirm_index: 1,
+            confirm_open_frame: UI_OPENED_FRAME_NONE
         };
     } else {
         var cs0 = gs.ui.class_select;
@@ -1874,6 +1705,10 @@ function ClassSelect_Ensure() {
         if (!variable_struct_exists(cs0, "closing")) cs0.closing = false;
         if (!variable_struct_exists(cs0, "close_frame")) cs0.close_frame = UI_OPENED_FRAME_NONE;
         if (!variable_struct_exists(cs0, "pending_apply_class")) cs0.pending_apply_class = -1;
+        if (!variable_struct_exists(cs0, "confirming")) cs0.confirming = false;
+        if (!variable_struct_exists(cs0, "confirm_class")) cs0.confirm_class = -1;
+        if (!variable_struct_exists(cs0, "confirm_index")) cs0.confirm_index = 1;
+        if (!variable_struct_exists(cs0, "confirm_open_frame")) cs0.confirm_open_frame = UI_OPENED_FRAME_NONE;
     }
 }
 
@@ -1894,6 +1729,10 @@ function ClassSelect_Open(_allow_cancel = true) {
     cs.closing = false;
     cs.close_frame = UI_OPENED_FRAME_NONE;
     cs.pending_apply_class = -1;
+    cs.confirming = false;
+    cs.confirm_class = -1;
+    cs.confirm_index = 1;
+    cs.confirm_open_frame = UI_OPENED_FRAME_NONE;
     cs.index = 0;
     cs.allow_cancel = _allow_cancel;
     cs.open_block_frame = Input_Frame() + 1;
@@ -2021,6 +1860,44 @@ function ClassSelect_HandleInput() {
         return;
     }
 
+    // "Are you sure?" confirmation for the chosen class.
+    if (variable_struct_exists(cs, "confirming") && cs.confirming) {
+        if (Input_UIPressed("menu_left") || Input_UIPressed("menu_right")) {
+            cs.confirm_index = 1 - cs.confirm_index;
+            SFX_PlayUI("ui_move");
+        }
+        if (Input_UIBack()) {
+            SFX_PlayUI("ui_back");
+            cs.confirming = false;
+            cs.confirm_class = -1;
+            gs.ui.class_select = cs;
+            return;
+        }
+        if (Input_UIConfirm()) {
+            // Small delay before accept is allowed (anti-misclick).
+            if (frame - cs.confirm_open_frame < CLASS_SELECT_CONFIRM_ACCEPT_DELAY) {
+                gs.ui.class_select = cs;
+                return;
+            }
+            if (cs.confirm_index == 0) {
+                SFX_PlayUI("ui_confirm");
+                cs.pending_apply_class = cs.confirm_class;
+                cs.confirming = false;
+                gs.ui.class_select = cs;
+                ClassSelect_Close(false);
+                return;
+            } else {
+                SFX_PlayUI("ui_back");
+                cs.confirming = false;
+                cs.confirm_class = -1;
+                gs.ui.class_select = cs;
+                return;
+            }
+        }
+        gs.ui.class_select = cs;
+        return;
+    }
+
     var k_up = Input_UIPressed("menu_up");
     var k_down = Input_UIPressed("menu_down");
     var k_ok = Input_UIConfirm();
@@ -2050,18 +1927,21 @@ function ClassSelect_HandleInput() {
     }
 
     if (k_ok) {
-        SFX_PlayUI("ui_confirm");
         if (cs.allow_cancel && cs.index >= choice_count) {
+            SFX_PlayUI("ui_confirm");
             gs.ui.class_select = cs;
             ClassSelect_Close(false);
             return;
         }
 
         if (cs.index >= 0 && cs.index < choice_count && cs.index < array_length(cs.choice_ids)) {
-            var class_id = cs.choice_ids[cs.index];
-            cs.pending_apply_class = class_id;
+            // Open the "Are you sure?" confirmation instead of applying immediately.
+            SFX_PlayUI("ui_confirm");
+            cs.confirming = true;
+            cs.confirm_class = cs.choice_ids[cs.index];
+            cs.confirm_index = 1; // default to "No" for safety
+            cs.confirm_open_frame = Input_Frame();
             gs.ui.class_select = cs;
-            ClassSelect_Close(false);
             return;
         }
     }
@@ -2164,6 +2044,46 @@ function ClassSelect_Draw() {
         }
         UI_DrawText(bx + side_pad, back_y, Loc_T("menu.common.back", "Back"));
     }
+
+    // "Are you sure?" confirmation overlay (drawn on top of the class list).
+    if (variable_struct_exists(cs, "confirming") && cs.confirming) {
+        var pm = UI_PopupMetrics();
+        var sure_line = Loc_T("class.select.confirm_sure", "Are you sure?");
+        var yes_txt = Loc_T("menu.common.yes", "Yes");
+        var no_txt = Loc_T("menu.common.no", "No");
+
+        var yes_w = UI_ButtonWidth(yes_txt, pm.btn_pad_x);
+        var no_w = UI_ButtonWidth(no_txt, pm.btn_pad_x);
+        var total_btn_w = yes_w + pm.btn_gap_x + no_w;
+        var msg_w = UI_TextWidth(sure_line);
+
+        var cbw = max(pm.min_w, max(msg_w + pm.pad_x * 2, total_btn_w + pm.pad_x * 2));
+        var cbh = pm.pad_y + pm.line_h + pm.gap_y + pm.btn_h + pm.pad_y;
+        var cbx = (w - cbw) * 0.5;
+        var cby = (h - cbh) * 0.5;
+
+        draw_set_alpha(popup_alpha * 0.85);
+        draw_set_color(c_black);
+        draw_rectangle(cbx, cby, cbx + cbw, cby + cbh, false);
+        draw_set_alpha(popup_alpha);
+        draw_set_color(c_white);
+        draw_rectangle(cbx, cby, cbx + cbw, cby + cbh, true);
+
+        var msg_y = cby + pm.pad_y;
+        draw_set_alpha(popup_alpha);
+        draw_set_color(c_white);
+        UI_DrawText(cbx + (cbw - msg_w) * 0.5, msg_y, sure_line);
+
+        var btn_y = msg_y + pm.line_h + pm.gap_y;
+        var yes_x = cbx + (cbw - total_btn_w) * 0.5;   // Yes on the left
+        var no_x = yes_x + yes_w + pm.btn_gap_x;        // No on the right
+
+        var accept_locked = (Input_Frame() - cs.confirm_open_frame) < CLASS_SELECT_CONFIRM_ACCEPT_DELAY;
+        var yes_alpha = popup_alpha * (accept_locked ? 0.4 : 1); // dim "Yes" while locked
+        UI_DrawButton(yes_x, btn_y, yes_w, pm.btn_h, yes_txt, (cs.confirm_index == 0), yes_alpha);
+        UI_DrawButton(no_x, btn_y, no_w, pm.btn_h, no_txt, (cs.confirm_index == 1), popup_alpha);
+    }
+
     draw_set_alpha(1);
 }
 

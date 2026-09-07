@@ -56,13 +56,6 @@ function Save_ReadSettingsConfig() {
 
     // Migration: disable legacy monitor-fit startup to prevent fullscreen-like launch on fresh/old configs.
     if (settings_version < 6) out.fit_screen = false;
-    // PortMaster handhelds should boot fullscreen, but only as an integer-scaled viewport.
-    if (settings_version < 7 && Display_IsPortMaster()) {
-        out.fit_screen = true;
-        var portmaster_scale = DISPLAY_SCALE_DEFAULT;
-        if (variable_struct_exists(out, "display_scale")) portmaster_scale = out.display_scale;
-        out.display_scale = Display_EnvReal("NOHOPE_DISPLAY_SCALE", portmaster_scale);
-    }
 
     return GameSettings_Normalize(out);
 }

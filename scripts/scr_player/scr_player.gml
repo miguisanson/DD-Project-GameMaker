@@ -881,6 +881,45 @@ function UI_PopupAlpha(_opened_frame, _closing = false, _close_frame = UI_OPENED
     return clamp(a, 0, 1);
 }
 
+// --- Shared popup styling (keeps every dialog/confirm box consistent + scaled) ---
+function UI_PopupMetrics() {
+    var v = UI_GetVisualScale();
+    var line_h = UI_TextHeight("A");
+    return {
+        scale: v,
+        line_h: line_h,
+        pad_x: max(8, round(12 * v)),
+        pad_y: max(6, round(8 * v)),
+        gap_y: max(6, round(8 * v)),
+        btn_pad_x: max(6, round(8 * v)),
+        btn_gap_x: max(10, round(14 * v)),
+        btn_h: line_h + max(4, round(6 * v)),
+        min_w: max(160, round(180 * v))
+    };
+}
+
+function UI_ButtonWidth(_label, _btn_pad_x) {
+    return UI_TextWidth(_label) + _btn_pad_x * 2;
+}
+
+function UI_DrawButton(_x, _y, _w, _h, _label, _selected, _alpha) {
+    if (_selected) {
+        draw_set_alpha(_alpha);
+        draw_set_color(c_white);
+        draw_rectangle(_x, _y, _x + _w, _y + _h, false);
+        draw_set_color(c_black);
+        draw_rectangle(_x, _y, _x + _w, _y + _h, true);
+        draw_set_color(c_black);
+    } else {
+        draw_set_alpha(_alpha);
+        draw_set_color(c_white);
+    }
+    var tx = _x + (_w - UI_TextWidth(_label)) * 0.5;
+    var ty = _y + (_h - UI_TextHeight("A")) * 0.5;
+    UI_DrawText(tx, ty, _label);
+    draw_set_alpha(1);
+}
+
 function UI_ModalRootEnsure() {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
@@ -1255,21 +1294,6 @@ function GameSettings_NormalizeLanguage(_lang) {
     return "en";
 }
 
-function Display_EnvFlag(_name) {
-    var value = string_lower(string(environment_get_variable(string(_name))));
-    return (value == "1" || value == "true" || value == "yes" || value == "on");
-}
-
-function Display_EnvReal(_name, _fallback) {
-    var value = string(environment_get_variable(string(_name)));
-    if (value == "") return _fallback;
-    return real(value);
-}
-
-function Display_IsPortMaster() {
-    return Display_EnvFlag("NOHOPE_PORTMASTER") || Display_EnvFlag("PORTMASTER");
-}
-
 function Display_CalcLayout(_win_w, _win_h, _base_w, _base_h, _scale_fixed, _fit_screen) {
     var win_w = max(1, round(real(_win_w)));
     var win_h = max(1, round(real(_win_h)));
@@ -1303,13 +1327,12 @@ function Display_CalcLayout(_win_w, _win_h, _base_w, _base_h, _scale_fixed, _fit
 }
 
 function GameSettings_Defaults() {
-    var portmaster_mode = Display_IsPortMaster();
     return {
         audio_ui: VOL_UI_DEFAULT,
         audio_sfx: VOL_SFX_DEFAULT,
         audio_bgm: VOL_MUSIC_DEFAULT,
-        display_scale: Display_EnvReal("NOHOPE_DISPLAY_SCALE", DISPLAY_SCALE_DEFAULT),
-        fit_screen: portmaster_mode,
+        display_scale: DISPLAY_SCALE_DEFAULT,
+        fit_screen: false,
         language: "en"
     };
 }

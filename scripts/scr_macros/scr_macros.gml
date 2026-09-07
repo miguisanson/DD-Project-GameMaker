@@ -212,17 +212,23 @@
 #macro PLAYER_SKILL_FX_SPEED_MAX 1.30
 #macro PLAYER_SKILL_HIT_BONUS 4
 #macro SKILL_FX_SCALE 2
-#macro ATTACK_TIMING_SPEED 2.4
-#macro ATTACK_TIMING_SPEED_BASE_MULT 1.12
-#macro ATTACK_TIMING_SPEED_RANK_STEP 0.06
-#macro ATTACK_TIMING_SPEED_MULT_MAX 1.32
+// Faster base speed with a per-attack random variation roll (ATTACK_TIMING_SPEED_VAR_*)
+// so every swing differs and can't be memorized. A gentle threat_rank tier mult
+// keeps elites/bosses a touch quicker on top of the randomness.
+#macro ATTACK_TIMING_SPEED 2.8
+#macro ATTACK_TIMING_SPEED_BASE_MULT 1.00
+#macro ATTACK_TIMING_SPEED_RANK_STEP 0.10
+#macro ATTACK_TIMING_SPEED_MULT_MAX 1.35
+// Per-attack random speed multiplier range (rolled once when the swing starts).
+#macro ATTACK_TIMING_SPEED_VAR_MIN 0.80
+#macro ATTACK_TIMING_SPEED_VAR_MAX 1.30
 #macro ATTACK_TIMING_START_OFFSET 10
 #macro ATTACK_TIMING_END_MARGIN 14
 #macro ATTACK_TIMING_INPUT_LOCK_FRAMES 2
 #macro ATTACK_TIMING_FEEDBACK_FRAMES 24
 #macro ATTACK_TIMING_RING_RADIUS 16
 #macro ATTACK_TIMING_TARGET_RADIUS 16
-#macro ATTACK_TIMING_SPRITE_SCALE 2
+#macro ATTACK_TIMING_SPRITE_SCALE 4
 #macro ATTACK_WINDOW_PERFECT 2
 #macro ATTACK_WINDOW_GOOD 4
 #macro ATTACK_WINDOW_OKAY 7
@@ -300,6 +306,9 @@
 #macro TRANSITION_FLASH_FADE_IN_FRAMES 14
 #macro TRANSITION_CLASS_SELECT_FADE_OUT_FRAMES 22
 #macro TRANSITION_CLASS_SELECT_FADE_IN_FRAMES 24
+// Frames the "Yes" option is greyed out / locked after the class confirm prompt
+// appears (~2s at 60fps), so the player can't accidentally accept the wrong class.
+#macro CLASS_SELECT_CONFIRM_ACCEPT_DELAY 120
 #macro TRANSITION_CUTSCENE_SEGMENT_FADE_OUT_FRAMES 14
 #macro TRANSITION_CUTSCENE_SEGMENT_FADE_IN_FRAMES 16
 #macro TRANSITION_CUTSCENE_SEGMENT_SLOW_FADE_OUT_FRAMES 44
