@@ -1,6 +1,7 @@
 # Rules for any agent working on this repo
 
 These apply to every agent — Claude Code, Codex, a local model, or a human.
+<<<<<<< Updated upstream
 DD-Project is an 8-bit turn-based RPG built in GameMaker
 (`DD-Project.yyp`). There is no separate design doc or roadmap file yet —
 `README.md` covers the localization workflow, and `.planning/STATE.md` (GSD
@@ -38,12 +39,70 @@ underspecified.
 
 Run the one GML assertion block, checklist step, or Python script for the
 thing you're changing while working. The full gate (below) once, at the end.
+=======
+
+**DD-Project** — an 8-bit turn-based game built in **GameMaker** (`DD-Project.yyp`),
+with a PortMaster / Anbernic RG SP export target and an xlsx-driven localization
+pipeline. Notes: [docs/PORTMASTER_RG_SP.md](docs/PORTMASTER_RG_SP.md).
+
+---
+
+## Rule 1 — Write the check first. Always.
+
+GameMaker has no test runner here, so "the test" is whichever of these fits the
+item — but it is still **written first, and watched failing first**:
+
+1. Read the goal of the item.
+2. Write the check from that goal.
+3. **Run it and watch it fail** for the right reason. Show the output, or for an
+   acceptance check-list, have the owner confirm the current behaviour is wrong.
+4. Implement until it passes. Run the same check again.
+5. Then the gate.
+
+Never write the check afterwards to describe what you built, and never soften one
+to make it pass. If you cannot state a check for the goal, the goal is
+underspecified — stop and say so.
+
+| Work | The check you write first |
+|---|---|
+| Localization strings, keys, a new language | A run of `tools/localization/build_localization.py`, which validates the workbook and fails on a bad schema or missing key |
+| A tooling or pipeline script under `tools/` | A Python assertion or a `--report-json` output compared against an expected file |
+| Game logic in `scripts/` or `objects/` | A written acceptance check-list in the item: exact inputs, exact expected on-screen result. The owner runs it in the IDE and confirms |
+| A room or encounter | The check-list plus a screenshot of the intended state |
+| A bug | The reproduction steps, written down and confirmed failing, before the fix |
+
+**Choosing a real test runner for the GML side is an early roadmap item.** Until
+it exists, do not claim a change is "tested" — say which check-list was run and
+who confirmed it.
+
+## Rule 2 — Run only the checks that matter
+
+```bash
+python3 tools/localization/build_localization.py \
+  --xlsx datafiles/localization/game_text.xlsx \
+  --json datafiles/localization/localization.json
+```
+
+That is the fast one. The GameMaker build and the acceptance check-lists happen
+once, at the end.
+
+## Rule 4 — The workbook is the source of truth for text
+
+`datafiles/localization/game_text.xlsx` (sheet `strings`, columns `ref` / `en` /
+`ko`) is canonical. `datafiles/localization/localization.json` is a **build
+artifact** — generated, never hand-edited. Editing the JSON gets silently
+overwritten on the next build and the change is lost.
+
+What enforces it: `build_localization.py` regenerates the JSON from the workbook
+every run, so any hand edit disappears the moment anyone builds.
+>>>>>>> Stashed changes
 
 ## Rule 3 — Stay inside the item
 
 Do the item you were given. Noticing adjacent work is good; doing it is not —
 list it at the end. Read the files the item needs, not the whole repo.
 
+<<<<<<< Updated upstream
 ## Rule 4 — The IDE owns resource identity
 
 Never hand-edit `DD-Project.yyp`, any `*.yy` file, or `DD-Project.resource_order`
@@ -58,12 +117,15 @@ something in the IDE), keep every reference to that resource — `.yyp`,
 `.yy`, `resource_order`, and every `.gml` call site — consistent in the same
 change. If you are not certain an edit keeps them consistent, stop and ask.
 
+=======
+>>>>>>> Stashed changes
 ## Rule 5 — Leave the repo ready for whoever comes next
 
 Any session can end without warning (usage limit, crash, the owner switching
 agents), so an agent never waits until the end to write things down. Keep
 `.planning/STATE.md` current as you go:
 
+<<<<<<< Updated upstream
 - **After every step that lands** (a check written, an implementation
   passing, a review done, a commit), update STATE.md's *Current Position*:
   what is done, what is in progress and on which branch or worktree, the
@@ -83,11 +145,30 @@ agents), so an agent never waits until the end to write things down. Keep
 The next agent starts with `/continue_DD-Project-GameMaker`, or, outside
 Claude, by reading this file and `.planning/STATE.md` and running
 `git status`.
+=======
+- **After every step that lands** (a check written, an implementation passing,
+  a review done, a commit), update STATE.md's *Current Position*: what is
+  done, what is in progress and on which branch or worktree, the exact next
+  action, and anything learned that is not obvious from the code. Commit it
+  with the work, or on its own if nothing else changed.
+- **Before a long or risky step** (a delegated packet, a big refactor, a run
+  in the background), write down first what you are about to do and where the
+  output will go, so a session that dies halfway through can be picked up.
+- **Never leave work only in your context.** Half-finished code gets a WIP
+  commit on a branch (not the main branch) or a note in STATE.md naming the
+  files it touched. Worktrees and background jobs are listed by path.
+- **If you know the session is ending**, run `/gsd-pause-work` (Claude) or
+  write the same thing by hand into STATE.md (any other agent).
+
+The next agent starts with `/continue_DD-Project`, or, outside Claude, by reading
+this file and `.planning/STATE.md` and running `git status`.
+>>>>>>> Stashed changes
 
 ---
 
 ## The gate
 
+<<<<<<< Updated upstream
 No headless/CLI build (Igor) is available on this machine — no runtime is
 cached under `%APPDATA%\GameMakerStudio2\Cache\runtimes`, only the IDE
 itself at `E:\GameMaker`. The gate is:
@@ -101,11 +182,54 @@ itself at `E:\GameMaker`. The gate is:
 
 If Igor becomes available locally later (a runtime gets cached), prefer it
 for a real headless compile check and update this section.
+=======
+Nothing merges that has not passed all three:
+
+```bash
+# 1. Localization workbook validates and the runtime JSON rebuilds
+python3 tools/localization/build_localization.py \
+  --xlsx datafiles/localization/game_text.xlsx \
+  --json datafiles/localization/localization.json
+```
+
+2. **The project compiles in the GameMaker IDE** — the owner runs it, because
+   GameMaker has no headless build on this machine.
+3. **The item's acceptance check-list passes**, confirmed by the owner.
+
+Steps 2 and 3 are the owner's; ask for them, do not claim them.
+
+## Where things are
+
+| | |
+|---|---|
+| `DD-Project.yyp` | The GameMaker project. Open this. |
+| `objects/` (65) | Game objects and their events. |
+| `scripts/` (28) | GML scripts. |
+| `rooms/` (14) | Rooms. |
+| `sprites/` (134), `sounds/` (126) | Art and audio. |
+| `datafiles/localization/game_text.xlsx` | **Canonical** game text. |
+| `tools/localization/` | The workbook → JSON pipeline and the legacy migrator. |
+| `docs/PORTMASTER_RG_SP.md` | Fixed-resolution and handheld export notes. |
+
+## Traps
+
+- **Never hand-edit `localization.json`.** It is regenerated from the workbook.
+- The README's tool commands use Windows `^` line continuations. On the Mac use
+  `\` instead, or put the command on one line.
+- The xlsx has a **legacy schema** still supported by the tooling. New work uses
+  the minimal `ref` / `en` / `ko` columns; check which one a sheet is in before
+  editing it.
+- GameMaker rewrites `.yy` files wholesale when it saves. Do not hand-edit them
+  while the IDE is open, and expect noisy diffs.
+- The Korean autofill pass uses OpenAI and is a **draft only** — every generated
+  string needs review before it ships.
+>>>>>>> Stashed changes
 
 ## How the team splits work
 
 | Agent | Does | Does not |
 |---|---|---|
+<<<<<<< Updated upstream
 | **Claude** | Architecture, contracts, writing the failing check, reviewing and merging, anything touching save data or licensing | Grind through bulk mechanical work |
 | **Codex** | Makes a written failing check pass; implements a script or object behavior against a stated contract; works in its own git worktree | Change a check to match its code; widen scope; create/rename resources outside the IDE |
 | **Local model** (Ollama, `mcp__ollama__ask_local`) | Mechanical work: dialogue/string drafts, commit messages, summarizing long files | Design, multi-file reasoning, anything unverified |
@@ -144,10 +268,63 @@ Note in `.planning/STATE.md` which rung a packet used.
 Several installed skill sets overlap if used naively, so every job has
 exactly one owner. When a skill's default disagrees with this file, this
 file wins.
+=======
+| **Claude** | Architecture, types and contracts, writing the failing check, reviewing and merging, anything touching security, data or licensing | Grind through bulk mechanical work |
+| **Codex** | Makes a written failing check pass; implements a module or screen against a stated contract; works in its own git worktree | Change a check to match its code; widen scope |
+| **Local model** (Ollama, `mcp__ollama__ask_local`, qwen2.5-coder:7b) | Free mechanical work: boilerplate, summaries of long text, commit messages, docstrings | Design, multi-file reasoning, anything unverified |
+
+All three run on both machines — the MacBook (M3, 16 GB) and the Windows PC both
+serve qwen2.5-coder:7b through Ollama. The failing check is the handoff: a precise,
+checkable spec. Every delegated result is reviewed and gated before it merges.
+
+### When an agent is unavailable — the fallback ladder
+
+If one is out — Codex at its usage limit or erroring, Ollama not running — the
+work moves down the ladder instead of stopping:
+
+1. **Codex unavailable:** implementation goes to a **Claude subagent on a
+   cheaper model** (`Agent` with `model: "sonnet"`) in the same worktree, with
+   the same brief Codex would get. Independent packets run in parallel.
+   The main Claude session keeps to checks, contracts, review and the gate.
+2. **Local model unavailable** (Ollama not running, or the model not pulled):
+   its mechanical work goes to a Claude subagent on `haiku` (or `sonnet` when it
+   needs judgement). Start it with `open -a Ollama` before falling back.
+3. **Both unavailable:** Claude subagents do both, cheapest model that can.
+4. **Only the main session:** it implements inline, in the smallest packets.
+
+Every rung keeps the same shape: failing check first, review, gate, commit the
+check and the implementation together. Return to Codex as soon as it is back.
+Note in `.planning/STATE.md` which rung a packet used.
+
+- **Pilot before a batch.** Repetitive delegated work goes out as one item
+  first; the rest follow only after that one is reviewed.
+- **Escalate, don't retry.** If a packet fails twice, or passing it would
+  change a locked type, contract or check, it comes back to Claude.
+
+### Parallel Codex packets
+
+```bash
+git worktree add -b <branch> /Users/miguelsanson/Projects/DD-Project-wt/<short> HEAD
+codex exec -C "/Users/miguelsanson/Projects/DD-Project-wt/<short>" -s workspace-write \
+  --add-dir "/Users/miguelsanson/Projects/DD-Project/.git" --skip-git-repo-check \
+  -o <short>.out.md - < <short>.prompt.md
+```
+
+The prompt starts with: read `AGENTS.md`; the check is the spec, **do not modify
+it**; stop and explain if something looks wrong; touch only the named files.
+**Codex's sandbox cannot spawn processes** — it cannot run the checks. Always run
+them yourself before landing a packet. Remove the worktree after landing.
+
+### The process: one owner per job
+
+Several installed skill sets overlap if used naively, so every job has exactly
+one owner. When a skill's default disagrees with this file, this file wins.
+>>>>>>> Stashed changes
 
 | Job | Owner | Not used for this job |
 |---|---|---|
 | Memory across sessions, the phase loop, context rot | **GSD Core** (local install, `budget` model profile). `/gsd-progress` or `/gsd-resume-work` to start; per phase `/gsd-discuss-phase` → `/gsd-plan-phase` → `/gsd-execute-phase` → `/gsd-verify-work`; `/gsd-pause-work` to stop; `/gsd-complete-milestone` | Superpowers `brainstorming`, `writing-plans`, `executing-plans`, `subagent-driven-development`, `dispatching-parallel-agents`; hand-written handoff files |
+<<<<<<< Updated upstream
 | Discipline inside a task: check first, debugging, proving it works, code review, worktrees, closing a branch | **Superpowers**: `test-driven-development` (applied per Rule 1's table, not literal unit tests), `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `receiving-code-review`, `using-git-worktrees`, `finishing-a-development-branch` | GSD `/gsd-add-tests`, `/gsd-debug`, `/gsd-code-review`, `/gsd-audit-fix` |
 | Stress-testing a design decision that is the owner's to make | **grill-me** (user-level skill, never committed here: it has no licence) | ad-hoc question batches |
 | Writing implementation code | **Codex**, with Superpowers installed in Codex too; when Codex is unavailable, the fallback ladder above | Claude subagents writing implementations while Codex is available, including GSD's executor |
@@ -215,3 +392,18 @@ options/    per-platform GameMaker build options (android, etc.)
 - **`.claude/commands/` already holds GSD's own commands** (`gsd-*.md`) —
   this repo's own command lives alongside them as
   `continue_DD-Project-GameMaker.md`.
+=======
+| Discipline inside a task: check first, debugging, proving it works, code review, worktrees, closing a branch | **Superpowers**: `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `receiving-code-review`, `using-git-worktrees`, `finishing-a-development-branch` | GSD `/gsd-add-tests`, `/gsd-debug`, `/gsd-code-review`, `/gsd-audit-fix` |
+| Stress-testing a design decision that is the owner's to make | **grill-me** (user-level skill, never committed: it has no licence) | ad-hoc question batches |
+| Writing implementation code | **Codex**, else the fallback ladder above | Claude subagents writing implementations while Codex is available, including GSD's executor |
+| Mechanical text work | **Local model** (Ollama, `mcp__ollama__ask_local`); a `haiku` subagent only if Ollama is down | Opus |
+| Domain craft: HUD and menus, game feel, saves, audio, art | **Game-dev skills**: `game-ui-ux`, `game-feel`, `save-systems`, `audio-design`, `create-game-assets` | guessing at feel or layout |
+
+**The task shape inside `/gsd-execute-phase` is fixed:** (1) Claude writes the
+failing check and watches it fail for the right reason; (2) Claude writes the
+contract and hands implementation to Codex in a worktree; (3) Claude runs the
+targeted checks and the gate itself; (4) `requesting-code-review` on the diff;
+(5) `verification-before-completion`; (6) commit the check and the implementation
+together. If GSD's executor starts writing the implementation in a Claude
+subagent while Codex is available, stop and route the task to Codex.
+>>>>>>> Stashed changes

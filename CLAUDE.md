@@ -1,5 +1,6 @@
 # Claude Code — project notes
 
+<<<<<<< Updated upstream
 **Read [`AGENTS.md`](AGENTS.md) first.** It holds the rules every agent
 follows (check first, targeted checks, scope, resource ownership, the gate)
 and how work is split between Claude, Codex and the local model. Do not
@@ -37,3 +38,25 @@ Commands: `/continue_DD-Project-GameMaker` (start any session with it).
   `tools/localization/build_localization.py` → `localization.json`. Never
   hand-edit `localization.json`; never hardcode new player-facing English
   text without running `tools/localization/lint_hardcoded_text.py`.
+=======
+**Read [`AGENTS.md`](AGENTS.md) first.** It holds the rules every agent follows
+and how work is split between Claude, Codex and the cheaper subagents. Do not
+restate them here.
+
+[README.md](README.md) covers the localization pipeline;
+[docs/PORTMASTER_RG_SP.md](docs/PORTMASTER_RG_SP.md) covers the handheld export.
+There is no work queue document yet — building one is an early item.
+
+Commands: **`/continue_DD-Project`** — start every session with it.
+
+## Claude-specific conventions
+
+- Load the game-dev skills for the matching work: `game-feel` for anything the
+  player feels, `game-ui-ux` for HUD and menus, `save-systems` for persistence,
+  `audio-design` for sound, `create-game-assets` for art.
+- You cannot build or run GameMaker here. When an item needs the IDE, write the
+  acceptance check-list and hand it to the owner — never claim it passed.
+- `.yy` and `.yyp` files are rewritten wholesale by the IDE. Expect noisy diffs
+  and do not hand-edit them while GameMaker is open.
+- The README's tool commands use Windows `^` continuations; on this Mac use `\`.
+>>>>>>> Stashed changes
