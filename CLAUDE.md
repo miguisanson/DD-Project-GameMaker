@@ -37,3 +37,4 @@ Commands: `/continue_DD-Project-GameMaker` (start any session with it).
   `tools/localization/build_localization.py` → `localization.json`. Never
   hand-edit `localization.json`; never hardcode new player-facing English
   text without running `tools/localization/lint_hardcoded_text.py`.
+- The README's tool commands use Windows `^` line continuations; on a Mac use `\`.
