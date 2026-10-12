@@ -15,11 +15,11 @@ something only the owner can do.
    repo has to a roadmap — there is no separate `docs/ROADMAP.md`. Keep it
    current; it is the only handoff between sessions.
 3. Keep Opus usage low. You write the checks and contracts, review, run the
-   gate and commit. **Codex writes implementations** (`mcp__codex__codex`
-   for one packet; `codex exec` in git worktrees for several at once). The
+   gate and commit. **Sonnet subagents write implementations** (`Agent` with
+   `model: "sonnet"`, in git worktrees, several at once when independent). The
    **local Ollama model** (`mcp__ollama__ask_local`) does mechanical text
-   work. If Codex or the local model is unavailable, follow the fallback
-   ladder in AGENTS.md (Claude subagents on Sonnet/Haiku) instead of
+   work. If the local model or subagents are unavailable, follow the fallback
+   ladder in AGENTS.md (Haiku subagent, then inline in small packets) instead of
    stopping. GSD stays on the `balanced` profile. Keep replies to the owner
    short.
 
@@ -57,8 +57,8 @@ c. `/gsd-plan-phase`, then `/gsd-execute-phase`. Every task follows the
       table: write the check (GML assertion block, acceptance checklist, or
       Python check) and confirm it fails/flags for the right reason.
    2. Write the contract.
-   3. Implementation to Codex in a worktree (`superpowers:using-git-worktrees`).
-      Independent packets in parallel; pilot one before a batch. Codex edits
+   3. Implementation to a `sonnet` subagent in a worktree (`superpowers:using-git-worktrees`).
+      Independent packets in parallel; pilot one before a batch. The subagent edits
       `.gml` freely but never creates/renames/deletes a resource or hand-edits
       `.yyp`/`.yy`/`.resource_order` (AGENTS.md Rule 4).
    4. Run the targeted check yourself, then the gate: the check passes, and

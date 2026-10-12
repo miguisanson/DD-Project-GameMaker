@@ -2,7 +2,7 @@
 
 **Read [`AGENTS.md`](AGENTS.md) first.** It holds the rules every agent
 follows (check first, targeted checks, scope, resource ownership, the gate)
-and how work is split between Claude, Codex and the local model. Do not
+and how work is split between Claude, Sonnet subagents and the local model. Do not
 restate them here.
 
 - **There is no separate design doc or roadmap file.** `README.md` documents

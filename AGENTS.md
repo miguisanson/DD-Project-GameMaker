@@ -1,6 +1,6 @@
 # Rules for any agent working on this repo
 
-These apply to every agent — Claude Code, Codex, a local model, or a human.
+These apply to every agent — Claude Code, a Claude subagent, a local model, or a human.
 DD-Project is an 8-bit turn-based RPG built in GameMaker
 (`DD-Project.yyp`). There is no separate design doc or roadmap file yet —
 `README.md` covers the localization workflow, and `.planning/STATE.md` (GSD
@@ -51,7 +51,7 @@ to create, rename, delete, or relink a resource (object, sprite, sound, room,
 script, font). Those files encode GUIDs and cross-references the IDE
 maintains; a hand edit that goes out of sync silently breaks the project and
 often isn't caught until GameMaker fails to open it. `.gml` code files are
-fair game for direct editing — Codex or any agent can edit `.gml` freely.
+fair game for direct editing — any agent can edit `.gml` freely.
 Resource creation/rename/deletion goes through the GameMaker IDE, and if a
 `.yy`/`.yyp` entry must change to match (e.g. after the owner renames
 something in the IDE), keep every reference to that resource — `.yyp`,
@@ -107,37 +107,32 @@ for a real headless compile check and update this section.
 | Agent | Does | Does not |
 |---|---|---|
 | **Claude** | Architecture, contracts, writing the failing check, reviewing and merging, anything touching save data or licensing | Grind through bulk mechanical work |
-| **Codex** | Makes a written failing check pass; implements a script or object behavior against a stated contract; works in its own git worktree | Change a check to match its code; widen scope; create/rename resources outside the IDE |
+| **Sonnet subagent** (`Agent`, `model: "sonnet"`) | Makes a written failing check pass; implements a script or object behavior against a stated contract; works in its own git worktree | Change a check to match its code; widen scope; create/rename resources outside the IDE |
 | **Local model** (Ollama, `mcp__ollama__ask_local`) | Mechanical work: dialogue/string drafts, commit messages, summarizing long files | Design, multi-file reasoning, anything unverified |
 
 The failing check is the handoff: a precise, as-machine-checkable-as-possible
 spec. Every delegated result is reviewed and gated before it merges.
 
-### When an agent is unavailable — the fallback ladder
+### When a helper is unavailable — the fallback ladder
 
-Best is all three. If one is out — Codex at its usage limit or erroring,
-Ollama not running — the work moves down the ladder instead of stopping:
+If one is out — Ollama not running, subagents unavailable — the work moves
+down the ladder instead of stopping:
 
-1. **Codex unavailable:** implementation goes to a **Claude subagent on a
-   cheaper model** (`Agent` with `model: "sonnet"`) in the same worktree,
-   with the same brief Codex would get. Independent packets run in parallel.
-   The main Claude session keeps to checks, contracts, review and the gate.
-2. **Local model unavailable:** its mechanical work goes to a Claude
-   subagent on `haiku` (or `sonnet` when it needs judgement).
-3. **Both unavailable:** Claude subagents do both, cheapest model that can.
-4. **Only the main session:** it implements inline, in the smallest
-   packets.
+1. **Local model unavailable (Ollama down):** its mechanical work goes to a
+   Claude subagent on `haiku` (or `sonnet` when it needs judgement).
+2. **Subagents unavailable:** the main session implements inline, in the
+   smallest packets.
 
 Every rung keeps the same shape: failing check first, review, gate, commit
-check and implementation together. Return to Codex as soon as it is back.
-Note in `.planning/STATE.md` which rung a packet used.
+check and implementation together. Note in `.planning/STATE.md` which rung a
+packet used.
 
 - **Pilot before a batch.** Repetitive delegated work (e.g. a batch of enemy
   stat tweaks) goes out as one item first; the rest follow only after that
   one is reviewed.
 - **Escalate, don't retry.** If a packet fails twice, or passing it would
   mean editing a `.yyp`/`.yy` file directly, or changing a locked contract,
-  it comes back to Claude.
+  it comes back to the main session.
 
 ### The process: one owner per job
 
@@ -150,7 +145,7 @@ file wins.
 | Memory across sessions, the phase loop, context rot | **GSD Core** (local install, `balanced` model profile). `/gsd-progress` or `/gsd-resume-work` to start; per phase `/gsd-discuss-phase` → `/gsd-plan-phase` → `/gsd-execute-phase` → `/gsd-verify-work`; `/gsd-pause-work` to stop; `/gsd-complete-milestone` | Superpowers `brainstorming`, `writing-plans`, `executing-plans`, `subagent-driven-development`, `dispatching-parallel-agents`; hand-written handoff files |
 | Discipline inside a task: check first, debugging, proving it works, code review, worktrees, closing a branch | **Superpowers**: `test-driven-development` (applied per Rule 1's table, not literal unit tests), `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `receiving-code-review`, `using-git-worktrees`, `finishing-a-development-branch` | GSD `/gsd-add-tests`, `/gsd-debug`, `/gsd-code-review`, `/gsd-audit-fix` |
 | Stress-testing a design decision that is the owner's to make | **grill-me** (user-level skill, never committed here: it has no licence) | ad-hoc question batches |
-| Writing implementation code | **Codex**, with Superpowers installed in Codex too; when Codex is unavailable, the fallback ladder above | Claude subagents writing implementations while Codex is available, including GSD's executor |
+| Writing implementation code | **Sonnet subagent** in a worktree, else the fallback ladder above | The main Opus session writing implementations |
 | Mechanical text work | **Local model** (Ollama) | Opus |
 | Domain craft: HUD/menus, game feel, saves, audio, art | User-level skills `game-ui-ux` (HUD/menu layout, anchors, resolution scaling, input focus — load for any screen or overlay work), `game-feel` (screen shake, hit-stop, tweened motion, squash & stretch — load when a hit, jump, pickup, or death should feel more responsive), `save-systems` (load for `scr_save`/`scr_save_menu` work: slot format, atomic writes, schema versioning), `audio-design` (load for `scr_sfx`/`scr_debug`-adjacent sound-bus work: mixing, ducking, SFX variation), `create-game-assets` (load when new sprites/tiles/UI art are being planned, not just placed) | Rules questions specific to this game's own systems win over generic game-design advice from a skill |
 
@@ -159,12 +154,12 @@ file wins.
   owner starts one, update this row.
 - **The task shape inside `/gsd-execute-phase` is fixed:** (1) Claude writes
   the failing check per Rule 1 and confirms it fails for the right reason;
-  (2) Claude writes the contract and hands implementation to Codex in a
-  worktree; (3) Claude runs the targeted check and the gate itself; (4)
-  `requesting-code-review` on the diff; (5) `verification-before-completion`;
-  (6) commit check and implementation together. If GSD's executor starts
-  writing the implementation in a Claude subagent while Codex is available,
-  stop and route the task to Codex.
+  (2) Claude writes the contract and hands implementation to a `sonnet`
+  subagent in a worktree; (3) Claude runs the targeted check and the gate
+  itself; (4) `requesting-code-review` on the diff; (5)
+  `verification-before-completion`; (6) commit check and implementation
+  together. Implementation goes to a `sonnet` subagent in a worktree; GSD's
+  executor on the `balanced` profile is acceptable.
 - **grill-me runs only on decisions that change a save format, a shipped
   balance number set (stat curves, difficulty profiles), or the game's
   design itself** — not routine bug fixes or content additions.
