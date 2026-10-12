@@ -1,0 +1,15 @@
+id,macro,name,tick_hp_min,tick_hp_max,tick_mp_min,tick_mp_max,mod_str,mod_agi,mod_def,mod_int,mod_luck,flags,multipliers,excludes_(removed_when_applied),icon_sprite_db_default
+0,STATUS_POISON,Poison,-3,-2,0,0,0,0,0,-1,0,,{},Bleeding|Burning,poison_status
+1,STATUS_BLEED,Bleeding,-4,-2,0,0,0,-2,0,0,0,,{},Poison|Burning,bleed_status
+2,STATUS_BURN,Burning,-6,-4,0,0,-1,0,0,0,0,,{},Bleeding|Poison,burn_status
+3,STATUS_STUN,Stun,0,0,0,0,0,-2,0,0,0,skip_turn,{},,stun_status
+4,STATUS_GUARD,Guard,0,0,0,0,0,0,0,0,0,consume_on_hit,"{""guard_mult"": 0}",,rock1
+5,STATUS_DMG_UP,Rev Up,0,0,0,0,0,0,0,0,0,consume_on_attack,"{""dmg_mult"": 2}",,torch_asset_moving
+6,STATUS_EVASION,Evasion,0,0,0,0,0,0,0,0,0,force_dodge|consume_on_defend,{},,tall_grass_asset
+7,STATUS_CRIT_UP,Take Aim,0,0,0,0,0,0,0,0,0,,"{""crit_bonus"": 25}",,skull_2_asset
+8,STATUS_HIT_UP,Foresight,0,0,0,0,0,0,0,0,0,always_hit|consume_on_attack,{},,"Status_ResolveIcon(""foresight_effect_Sheet"", Status_ResolveIcon(""take_aim_effect"", skull_2_asset))"
+9,STATUS_MEDITATION,Meditation,0,0,2,4,0,0,0,0,0,,{},,mp_potion
+10,STATUS_SOLIDIFY,Solidify,0,0,0,0,0,0,0,0,0,force_dodge|consume_on_defend,{},,"Status_ResolveIcon(""stun_status"", rock1)"
+11,STATUS_BLOODTHIRSTY,Bloodthirsty,0,0,0,0,0,0,0,0,0,consume_on_hit,"{""guard_mult"": 0.65, ""dmg_mult"": 1.06}",,"Status_ResolveIcon(""bleed_status"", torch_asset_moving)"
+12,STATUS_BLESSING,Blessing,0,0,0,0,0,0,0,0,0,consume_on_hit,"{""guard_mult"": 0.8}",,"Status_ResolveIcon(""burn_status"", mp_potion)"
+13,STATUS_SUNDER,Sundered,0,0,0,0,0,0,-1,0,0,,{},,noone
