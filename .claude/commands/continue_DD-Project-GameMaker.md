@@ -20,7 +20,7 @@ something only the owner can do.
    **local Ollama model** (`mcp__ollama__ask_local`) does mechanical text
    work. If Codex or the local model is unavailable, follow the fallback
    ladder in AGENTS.md (Claude subagents on Sonnet/Haiku) instead of
-   stopping. GSD stays on the `budget` profile. Keep replies to the owner
+   stopping. GSD stays on the `balanced` profile. Keep replies to the owner
    short.
 
 ## Start of every session
