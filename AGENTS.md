@@ -74,7 +74,7 @@ agents), so an agent never waits until the end to write things down. Keep
   the output will go, so a session that dies halfway through can be picked
   up.
 - **Never leave work only in your context.** Half-finished code gets a WIP
-  commit on a branch (not `v1.8`, the current working branch) or a note in
+  commit on a branch (not `v1.9`, the current working branch) or a note in
   STATE.md naming the files it touched. Worktrees and background jobs are
   listed by path.
 - **If you know the session is ending**, run `/gsd-pause-work` (Claude) or
