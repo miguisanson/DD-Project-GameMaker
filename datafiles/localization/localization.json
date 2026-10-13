@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-13T21:11:17Z",
-    "row_count": 677
+    "generated_at_utc": "2026-10-13T21:35:25Z",
+    "row_count": 678
   },
   "default_lang": "en",
   "languages": [
@@ -563,6 +563,10 @@
     "combat.msg.stat_points_many": {
       "en": "+{n} stat points",
       "ko": "스탯 포인트 +{n}"
+    },
+    "combat.msg.status_tick": {
+      "en": "{status} hurts you for {dmg}.",
+      "ko": "{status} 때문에 {dmg}의 피해를 입었습니다."
     },
     "combat.msg.stole_an_item": {
       "en": "Stole an item.",
