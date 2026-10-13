@@ -15,9 +15,11 @@ function Array_ToDSList(_arr) {
 
 function Save_ToReal(_value, _fallback) {
     if (is_real(_value)) return _value;
-    if (is_string(_value)) return real(_value);
-    if (_value == true) return 1;
-    if (_value == false) return 0;
+    if (is_string(_value)) {
+        // real() throws on non-numeric text (SAVE-05); a corrupt value must fall back instead.
+        try { return real(_value); } catch (_e) { return _fallback; }
+    }
+    if (is_bool(_value)) return _value ? 1 : 0;
     return _fallback;
 }
 
