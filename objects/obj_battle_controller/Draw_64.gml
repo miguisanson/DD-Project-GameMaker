@@ -1,10 +1,11 @@
+Display_DrawFrame();   // first Draw GUI of the frame draws the world
 var ui_visual = UI_GetVisualScale();
 var ui_sprite = UI_GetSpriteScale();
 var margin = max(8, round(16 * ui_visual));
 var box_h = 96;
 
-var w = display_get_gui_width();
-var h = display_get_gui_height();
+var w = Display_GuiW();
+var h = Display_GuiH();
 
 var gs = GameState_Get();
 var transition_alpha = 0;
@@ -27,20 +28,10 @@ var cam_off = CameraShake_Offset();
 var vx = base_x + cam_off.x;
 var vy = base_y + cam_off.y;
 camera_set_view_pos(cam, vx, vy);
-var vw = camera_get_view_width(cam);
-var vh = camera_get_view_height(cam);
-var port_x = 0;
+var port_x = 0;   // the GUI origin is the picture's corner, so there is no port offset
 var port_y = 0;
-var port_w = w;
-var port_h = h;
-if (view_enabled) {
-    port_x = view_xport[0];
-    port_y = view_yport[0];
-    port_w = max(1, view_wport[0]);
-    port_h = max(1, view_hport[0]);
-}
-var sx = port_w / max(1, vw);
-var sy = port_h / max(1, vh);
+var sx = Display_WorldScale();
+var sy = sx;
 var gui_off_x = cam_off.x * sx;
 var gui_off_y = cam_off.y * sy;
 var row_h = max(16, UI_TextHeight("A") + 2);

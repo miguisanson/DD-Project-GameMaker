@@ -1,3 +1,4 @@
+Display_DrawFrame();   // first Draw GUI of the frame draws the world (whichever object draws first)
 var debug_enabled = variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled;
 var audio_debug_enabled = variable_global_exists("audio_debug_enabled") && global.audio_debug_enabled;
 if (!debug_enabled && !audio_debug_enabled) exit;
@@ -5,8 +6,8 @@ if (!debug_enabled && !audio_debug_enabled) exit;
 var ui_x = 8;
 var ui_y = 8;
 var line_h = 14;
-var gui_w = display_get_gui_width();
-var gui_h = display_get_gui_height();
+var gui_w = Display_GuiW();
+var gui_h = Display_GuiH();
 var ui_w = max(180, gui_w - 16);
 
 draw_set_alpha(1);
@@ -147,32 +148,9 @@ if (audio_debug_enabled) {
 }
 
 if (debug_enabled && debug_display_metrics) {
-    var win_w = max(1, window_get_width());
-    var win_h = max(1, window_get_height());
+    var dl = Display_Layout();
     var disp_w = max(1, display_get_width());
     var disp_h = max(1, display_get_height());
-    var gui_w_dbg = max(1, display_get_gui_width());
-    var gui_h_dbg = max(1, display_get_gui_height());
-
-    var vp_w = 0;
-    var vp_h = 0;
-    var vp_x = 0;
-    var vp_y = 0;
-    if (view_enabled) {
-        vp_x = round(view_xport[0]);
-        vp_y = round(view_yport[0]);
-        vp_w = max(1, round(view_wport[0]));
-        vp_h = max(1, round(view_hport[0]));
-    }
-
-    var cam_w = 0;
-    var cam_h = 0;
-    var cam = view_camera[0];
-    if (!is_undefined(cam) && cam != -1) {
-        cam_w = max(1, round(camera_get_view_width(cam)));
-        cam_h = max(1, round(camera_get_view_height(cam)));
-    }
-
     var app_w = "n/a";
     var app_h = "n/a";
     if (surface_exists(application_surface)) {
@@ -182,12 +160,12 @@ if (debug_enabled && debug_display_metrics) {
 
     array_push(lines, "");
     array_push(lines, "display metrics:");
-    array_push(lines, "- window: " + string(win_w) + " x " + string(win_h));
+    array_push(lines, "- window: " + string(dl.win_w) + " x " + string(dl.win_h) + " fullscreen=" + string(dl.fullscreen));
     array_push(lines, "- display: " + string(disp_w) + " x " + string(disp_h));
-    array_push(lines, "- gui: " + string(gui_w_dbg) + " x " + string(gui_h_dbg));
-    array_push(lines, "- viewport: " + string(vp_w) + " x " + string(vp_h) + " @ (" + string(vp_x) + ", " + string(vp_y) + ")");
-    array_push(lines, "- camera view: " + string(cam_w) + " x " + string(cam_h));
+    array_push(lines, "- picture: " + string(dl.game_w) + " x " + string(dl.game_h) + " @ (" + string(dl.game_x) + ", " + string(dl.game_y) + ") scale " + string(dl.scale));
+    array_push(lines, "- gui grid: " + string(dl.gui_w) + " x " + string(dl.gui_h) + " ui_scale " + string(dl.ui_scale));
     array_push(lines, "- application_surface: " + app_w + " x " + app_h);
+    array_push(lines, "- relayouts since boot: " + string(Display_ApplyCount()));
 }
 
 var text_blob = "";

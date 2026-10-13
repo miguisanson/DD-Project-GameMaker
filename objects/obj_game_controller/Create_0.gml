@@ -4,4 +4,6 @@ Test_Boot();
 Scenario_Boot();
 // Create globals once (safe in any room)
 GameState_Init();
+Display_Init();      // once per run: the display owner (scr_display); needs the settings GameState_Init loaded
+Display_BindRoom();  // every room start: the room's own view and camera replaced by the one design (scr_display)
 SFX_EnsureManager();

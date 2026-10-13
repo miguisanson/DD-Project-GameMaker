@@ -431,13 +431,9 @@ if (state == "cutscene") {
         return;
     }
 
-    gs.ui.cutscene_active = false;
-    gs.ui.cutscene_bg_sprite = noone;
-    gs.ui.dialogue_box_half = false;
-    gs.ui.cutscene_text_only = false;
+    // I-051 / H2: cutscene_active, the picture, the text mode and the logo stay set while the exit transition fades to black, so the
+    // last image fades out with the screen instead of vanishing first. Transition_PreRoomChange (Cutscene_ClearUiState) clears them.
     gs.ui.cutscene_chars_per_sec = -1;
-    gs.ui.cutscene_logo_sprite = noone;
-    gs.ui.cutscene_logo_alpha = 0;
     gs.pending_cutscene_id = "";
 
     cutscene_started = false;

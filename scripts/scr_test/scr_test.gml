@@ -799,4 +799,84 @@ function Test_Suite_Display() {
     var _wsz = Display_WindowSizeForScale(4);
     Test_Eq("DISP-03 window for scale 4: w", _wsz.w, 640);
     Test_Eq("DISP-03 window for scale 4: h", _wsz.h, 576);
+
+    // Display_RequestStep (DISP-05/08/11): the pure state machine behind Settings Apply. One call per frame; returns { req, cmd }.
+    // cmd.kind is "none", "fullscreen" (set the flag, then wait: it lands over several frames) or "size" (set the window size and re-centre).
+    var _obs = { fullscreen: false, win_w: 480, win_h: 432 };
+    var _q = Display_RequestNew(false, 480, 432);
+    var _st = Display_RequestStep(_q, _obs);
+    Test_Eq("DISP-08 request already satisfied: no command", _st.cmd.kind, "none");
+    Test_Eq("DISP-08 request already satisfied: done at once (no window call, so no re-centre)", _st.req.phase, "done");
+
+    _q = Display_RequestNew(false, 640, 576);   // scale 3 -> 4
+    _st = Display_RequestStep(_q, _obs);
+    Test_Eq("DISP-05 size change: command is size", _st.cmd.kind, "size");
+    Test_Eq("DISP-05 size change: w", _st.cmd.w, 640);
+    Test_Eq("DISP-05 size change: h", _st.cmd.h, 576);
+    Test_Eq("DISP-05 size change: centres the window", _st.cmd.center, true);
+    Test_Eq("DISP-05 size change: waits for the window", _st.req.phase, "size");
+    _q = _st.req;
+    _st = Display_RequestStep(_q, _obs);   // the window has not changed yet
+    Test_Eq("DISP-05 size change: no second command while waiting", _st.cmd.kind, "none");
+    Test_Eq("DISP-05 size change: still waiting", _st.req.phase, "size");
+    _q = _st.req;
+    _obs = { fullscreen: false, win_w: 640, win_h: 576 };   // the window arrived
+    _st = Display_RequestStep(_q, _obs);
+    Test_Eq("DISP-05 size change: settles one more frame", _st.req.phase, "settle");
+    _q = _st.req;
+    _st = Display_RequestStep(_q, _obs);
+    _q = _st.req;
+    _st = Display_RequestStep(_q, _obs);
+    Test_Eq("DISP-05 size change: done after the settle frames (the caller lays out once)", _st.req.phase, "done");
+    Test_Eq("DISP-05 size change: no command at the end", _st.cmd.kind, "none");
+
+    _q = Display_RequestNew(false, 640, 576);   // the window never gets there: give up after DISPLAY_REQUEST_TIMEOUT frames
+    _obs = { fullscreen: false, win_w: 480, win_h: 432 };
+    _st = Display_RequestStep(_q, _obs);
+    for (var _k = 0; _k < DISPLAY_REQUEST_TIMEOUT + 2; _k++) _st = Display_RequestStep(_st.req, _obs);
+    Test_Eq("DISP-05 size change that never lands times out", _st.req.phase, "done");
+
+    // Fullscreen on: set the flag, wait at least DISPLAY_FS_WAIT frames and for the flag, then done (no size command: the window is the display).
+    _q = Display_RequestNew(true, 480, 432);
+    _obs = { fullscreen: false, win_w: 480, win_h: 432 };
+    _st = Display_RequestStep(_q, _obs);
+    Test_Eq("DISP-05 fullscreen on: command", _st.cmd.kind, "fullscreen");
+    Test_Eq("DISP-05 fullscreen on: flag", _st.cmd.fullscreen, true);
+    _q = _st.req;
+    _obs = { fullscreen: true, win_w: 1920, win_h: 1080 };
+    for (var _k = 0; _k < DISPLAY_FS_WAIT - 1; _k++) {
+        _st = Display_RequestStep(_q, _obs);
+        _q = _st.req;
+    }
+    Test_Eq("DISP-05 fullscreen on: still waiting before DISPLAY_FS_WAIT frames", _q.phase, "fs");
+    _st = Display_RequestStep(_q, _obs);
+    Test_Eq("DISP-05 fullscreen on: no size command, the window is the display", _st.cmd.kind, "none");
+    Test_Eq("DISP-05 fullscreen on: done", _st.req.phase, "done");
+
+    // Fullscreen off: clear the flag, wait, then put the windowed size back and re-centre, then done.
+    _q = Display_RequestNew(false, 640, 576);
+    _obs = { fullscreen: true, win_w: 1920, win_h: 1080 };
+    _st = Display_RequestStep(_q, _obs);
+    Test_Eq("DISP-05 fullscreen off: command", _st.cmd.kind, "fullscreen");
+    Test_Eq("DISP-05 fullscreen off: flag", _st.cmd.fullscreen, false);
+    _q = _st.req;
+    _obs = { fullscreen: false, win_w: 1920, win_h: 1080 };   // flag has changed, window still has the old size
+    var _got_size = false;
+    for (var _k = 0; _k < DISPLAY_FS_WAIT + 3; _k++) {
+        _st = Display_RequestStep(_q, _obs);
+        _q = _st.req;
+        if (_st.cmd.kind == "size") { _got_size = true; Test_Eq("DISP-05 fullscreen off: windowed size is 640", _st.cmd.w, 640); Test_Eq("DISP-05 fullscreen off: re-centres", _st.cmd.center, true); break; }
+    }
+    Test_Eq("DISP-05 fullscreen off: issues the windowed size", _got_size, true);
+
+    // Five fast toggles: every request is its own state machine; none of them can leave the flag stuck. The last request wins.
+    var _fs = false;
+    for (var _k = 0; _k < 5; _k++) {
+        var _rq = Display_RequestNew(!_fs, 480, 432);
+        var _o2 = { fullscreen: _fs, win_w: 480, win_h: 432 };
+        var _s2 = Display_RequestStep(_rq, _o2);
+        Test_Eq("DISP-05 toggle " + string(_k) + " asks for the opposite flag", _s2.cmd.fullscreen, !_fs);
+        _fs = !_fs;
+    }
+    Test_Eq("DISP-05 five toggles end fullscreen", _fs, true);
 }

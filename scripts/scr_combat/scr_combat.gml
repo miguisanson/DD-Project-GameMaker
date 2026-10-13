@@ -448,34 +448,19 @@ function Battle_CheckEnd(_bc, _p, _e) {
 }
 
 function Battle_AttackTimingTarget(_bc) {
-    var gui_w = max(1, display_get_gui_width());
-    var gui_h = max(1, display_get_gui_height());
+    var gui_w = max(1, Display_GuiW());
+    var gui_h = max(1, Display_GuiH());
     var tx = gui_w * 0.5;
     var ty = gui_h * 0.5;
 
     if (instance_exists(_bc.enemy_inst)) {
-        var cam = view_camera[0];
-        var vx = _bc.cam_base_x;
-        var vy = _bc.cam_base_y;
-        var vw = max(1, camera_get_view_width(cam));
-        var vh = max(1, camera_get_view_height(cam));
-        var port_x = 0;
-        var port_y = 0;
-        var port_w = gui_w;
-        var port_h = gui_h;
-        if (view_enabled) {
-            port_x = view_xport[0];
-            port_y = view_yport[0];
-            port_w = max(1, view_wport[0]);
-            port_h = max(1, view_hport[0]);
-        }
-        var sx = port_w / vw;
-        var sy = port_h / vh;
-
         var espr = _bc.enemy_inst.sprite_index;
         if (espr != noone) {
-            var ex = port_x + ((_bc.enemy_inst.x - sprite_get_xoffset(espr) - vx) * sx);
-            var ey = port_y + ((_bc.enemy_inst.y - sprite_get_yoffset(espr) - vy) * sy);
+            // The camera is 1:1 with the picture, so a world point is (point - camera) * Display_WorldScale() GUI units from the picture's corner.
+            var sx = Display_WorldScale();
+            var sy = sx;
+            var ex = (_bc.enemy_inst.x - sprite_get_xoffset(espr) - _bc.cam_base_x) * sx;
+            var ey = (_bc.enemy_inst.y - sprite_get_yoffset(espr) - _bc.cam_base_y) * sy;
             var ew = sprite_get_width(espr) * abs(_bc.enemy_inst.image_xscale) * sx;
             var eh = sprite_get_height(espr) * abs(_bc.enemy_inst.image_yscale) * sy;
             tx = ex + (ew * 0.5);

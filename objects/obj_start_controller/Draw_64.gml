@@ -1,5 +1,6 @@
-var w = display_get_gui_width();
-var h = display_get_gui_height();
+Display_DrawFrame();   // first Draw GUI of the frame draws the world
+var w = Display_GuiW();
+var h = Display_GuiH();
 var gs = GameState_Get();
 if (state == "boot_logo") {
     draw_set_alpha(1);

@@ -747,28 +747,12 @@ function UI_IsBlocking() {
 }
 
 function UI_GetTextScale() {
-    var gui_w = max(1, display_get_gui_width());
-    var gui_h = max(1, display_get_gui_height());
-    var fit_screen = false;
-    if (variable_global_exists("state")
-    && is_struct(global.state)
-    && variable_struct_exists(global.state, "settings")
-    && is_struct(global.state.settings)
-    && variable_struct_exists(global.state.settings, "fit_screen")) {
-        fit_screen = (global.state.settings.fit_screen != 0);
-    }
-
-    // Preserve legacy 3x/4x/5x windowed behavior, while allowing fullscreen UI to scale up.
-    var ref_scale = fit_screen ? DISPLAY_SCALE_DEFAULT : DISPLAY_SCALE_MAX;
-    var ref_w = max(1, DISPLAY_BASE_W * ref_scale);
-    var ref_h = max(1, DISPLAY_BASE_H * ref_scale);
-    var dyn = min(gui_w / ref_w, gui_h / ref_h);
-    var scale = UI_TEXT_SCALE_BASE * dyn;
-    if (fit_screen) {
-        // Fullscreen readability: keep pixel font stable.
-        scale = round(scale * 2) / 2;
-    }
-    return clamp(scale, UI_TEXT_SCALE_MIN, UI_TEXT_SCALE_MAX);
+    // Integer UI-grid rule (display-design.md section 2): the pixel font lands on whole window pixels.
+    // n = window pixels per font pixel, a multiple of the GUI unit (ui_scale); the text scale follows from the font's own pixel (DISPLAY_FONT_PX).
+    var _l = Display_Layout();
+    var _u = _l.ui_scale;
+    var _n = max(_u, round(round(0.8 * _l.scale) / _u) * _u);
+    return clamp(_n / (DISPLAY_FONT_PX * _u), UI_TEXT_SCALE_MIN, UI_TEXT_SCALE_MAX);
 }
 
 function UI_GetVisualScale() {
@@ -778,21 +762,7 @@ function UI_GetVisualScale() {
 
 function UI_GetSpriteScale(_base = 1) {
     var mul = max(0.0001, real(_base));
-    var visual = UI_GetVisualScale();
-    var fit_screen = false;
-    if (variable_global_exists("state")
-    && is_struct(global.state)
-    && variable_struct_exists(global.state, "settings")
-    && is_struct(global.state.settings)
-    && variable_struct_exists(global.state.settings, "fit_screen")) {
-        fit_screen = (global.state.settings.fit_screen != 0);
-    }
-
-    var step = max(1, ceil(visual));
-    if (fit_screen) {
-        // Slight fullscreen boost so bars/icons/logos don't stay tiny vs larger text.
-        step = max(1, ceil(visual + 0.25));
-    }
+    var step = max(1, ceil(UI_GetVisualScale()));
     return max(1, round(mul * step));
 }
 
@@ -1248,11 +1218,10 @@ function UI_DrawModalDim() {
     if (variable_struct_exists(gs.ui, "modal_dim_alpha")) alpha = real(gs.ui.modal_dim_alpha);
     if (alpha <= 0) return;
 
-    var w = display_get_gui_width();
-    var h = display_get_gui_height();
+    var wr = Display_WindowRectInGui(Display_Layout());   // the whole window, bars included
     draw_set_alpha(alpha);
     draw_set_color(c_black);
-    draw_rectangle(0, 0, w, h, false);
+    draw_rectangle(wr.x, wr.y, wr.x + wr.w, wr.y + wr.h, false);
     draw_set_alpha(1);
     draw_set_color(c_white);
 }
@@ -1295,38 +1264,6 @@ function GameSettings_NormalizeLanguage(_lang) {
     var code = string_lower(string(_lang));
     if (code == "ko") return "ko";
     return "en";
-}
-
-function Display_CalcLayoutLegacy(_win_w, _win_h, _base_w, _base_h, _scale_fixed, _fit_screen) {
-    var win_w = max(1, round(real(_win_w)));
-    var win_h = max(1, round(real(_win_h)));
-    var base_w = max(1, round(real(_base_w)));
-    var base_h = max(1, round(real(_base_h)));
-    var fixed_scale = max(1, round(real(_scale_fixed)));
-    var max_integer_scale = max(1, floor(min(win_w / base_w, win_h / base_h)));
-    var used_scale = fixed_scale;
-
-    if (_fit_screen) {
-        used_scale = min(fixed_scale, max_integer_scale);
-    }
-
-    used_scale = max(1, round(used_scale));
-    var port_w = base_w * used_scale;
-    var port_h = base_h * used_scale;
-
-    if (port_w > win_w || port_h > win_h) {
-        used_scale = max(1, max_integer_scale);
-        port_w = base_w * used_scale;
-        port_h = base_h * used_scale;
-    }
-
-    return {
-        x: floor((win_w - port_w) * 0.5),
-        y: floor((win_h - port_h) * 0.5),
-        w: port_w,
-        h: port_h,
-        scale: used_scale
-    };
 }
 
 function GameSettings_Defaults() {
@@ -1381,104 +1318,16 @@ function GameSettings_ApplyAudio() {
     Audio_SetMusicVolume(settings.audio_bgm);
 }
 
-function GameSettings_ApplyDisplay() {
-    var settings = GameSettings_Ensure();
-    var base_w = max(1, DISPLAY_BASE_W);
-    var base_h = max(1, DISPLAY_BASE_H);
-
-    var scale_fixed = clamp(round(GameSettings_ToReal(settings.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-    settings.display_scale = scale_fixed;
-    var fit_screen = settings.fit_screen;
-
-    // This project does not use a manual application surface pipeline.
-    application_surface_draw_enable(true);
-    if (!variable_global_exists("display_texfilter_init") || !global.display_texfilter_init) {
-        gpu_set_texfilter(false);
-        global.display_texfilter_init = true;
-    }
-
-    view_enabled = true;
-    view_visible[0] = true;
-    for (var vi = 1; vi < 8; vi++) {
-        view_visible[vi] = false;
-    }
-    view_hborder[0] = max(1, floor(base_w * 0.5) - 1);
-    view_vborder[0] = max(1, floor(base_h * 0.5) - 1);
-
-    // Keep desktop builds borderless to avoid title-bar/frame mismatch across PCs.
-    if (os_type == os_windows) {
-        window_set_showborder(false);
-    }
-
-    var disp_w = max(1, display_get_width());
-    var disp_h = max(1, display_get_height());
-
-    // Reuse fit_screen as the persisted fullscreen toggle.
-    if (window_get_fullscreen() != fit_screen) {
-        window_set_fullscreen(fit_screen);
-    }
-
-    if (fit_screen) {
-        if (!window_get_fullscreen()) {
-            if (window_get_width() != disp_w || window_get_height() != disp_h) {
-                window_set_size(disp_w, disp_h);
-            }
-            if (window_get_x() != 0 || window_get_y() != 0) {
-                window_set_position(0, 0);
-            }
-        }
-    } else {
-        var fixed_w = base_w * scale_fixed;
-        var fixed_h = base_h * scale_fixed;
-        if (window_get_width() != fixed_w || window_get_height() != fixed_h) {
-            window_set_size(fixed_w, fixed_h);
-        }
-        window_center();
-    }
-
-    var win_w = max(1, window_get_width());
-    var win_h = max(1, window_get_height());
-    if (win_w <= 0 || win_h <= 0) {
-        win_w = disp_w;
-        win_h = disp_h;
-    }
-
-    var layout = Display_CalcLayoutLegacy(win_w, win_h, base_w, base_h, scale_fixed, fit_screen);
-    var port_x = layout.x;
-    var port_y = layout.y;
-    var port_w = layout.w;
-    var port_h = layout.h;
-
-    view_xport[0] = port_x;
-    view_yport[0] = port_y;
-    view_wport[0] = port_w;
-    view_hport[0] = port_h;
-
-    var cam = view_camera[0];
-    if (!is_undefined(cam) && cam != -1) {
-        camera_set_view_size(cam, base_w, base_h);
-        var cam_x = clamp(camera_get_view_x(cam), 0, max(0, room_width - base_w));
-        var cam_y = clamp(camera_get_view_y(cam), 0, max(0, room_height - base_h));
-        camera_set_view_pos(cam, cam_x, cam_y);
-    }
-
-    if (surface_exists(application_surface)) {
-        if (surface_get_width(application_surface) != base_w || surface_get_height(application_surface) != base_h) {
-            surface_resize(application_surface, base_w, base_h);
-        }
-    }
-
-    // Keep Draw GUI aligned to the application surface so fullscreen uses the
-    // centered integer-scaled viewport instead of stretching across the window.
-    display_set_gui_size(port_w, port_h);
-    display_set_gui_maximise(1, 1, port_x, port_y);
-}
-
 function GameSettings_ApplyAll() {
     var settings = GameSettings_Ensure();
     Loc_SetLanguage(settings.language);
     GameSettings_ApplyAudio();
-    GameSettings_ApplyDisplay();
+}
+
+// Settings > Apply: the only caller that asks the display for something (boot does the same from Display_Init).
+function GameSettings_ApplyDisplayRequest() {
+    var settings = GameSettings_Ensure();
+    Display_Request({ fullscreen: settings.fit_screen, scale: settings.display_scale });
 }
 
 function GameSettings_Commit(_settings, _save_config = false) {
@@ -1486,6 +1335,7 @@ function GameSettings_Commit(_settings, _save_config = false) {
     gs.settings = GameSettings_Normalize(_settings);
     GameState_SyncLegacy();
     GameSettings_ApplyAll();
+    GameSettings_ApplyDisplayRequest();
     if (_save_config) {
         Save_WriteSettingsConfig(gs.settings);
     }
@@ -1513,7 +1363,7 @@ function GameSettings_SetBGMVolume(_v) {
 function GameSettings_SetScale(_scale) {
     var settings = GameSettings_Ensure();
     settings.display_scale = clamp(round(GameSettings_ToReal(_scale, settings.display_scale)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-    GameSettings_ApplyDisplay();
+    GameSettings_ApplyDisplayRequest();
 }
 
 // --------------------

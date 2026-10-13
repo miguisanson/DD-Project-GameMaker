@@ -22,7 +22,7 @@ $GameModes = @(
     @{ Name = 'runtests'; Flag = '-runtests'; Timeout = 30;  Impl = $true;  Strict = $true  }
     @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 60;  Impl = $true;  Strict = $false }
     @{ Name = 'bot';      Flag = '-bot';      Timeout = 300; Impl = $true;  Strict = $false }
-    @{ Name = 'shots';    Flag = '-shots';    Timeout = 120; Impl = $true;  Strict = $false; Shots = 23 }   # Shots = number of [SHOT] lines required. Not yet verified minimized: run it when the owner is not using the PC and check the PNGs are not blank.
+    @{ Name = 'shots';    Flag = '-shots';    Timeout = 300; Impl = $true;  Strict = $false; Shots = 58 }   # Shots = number of [SHOT] lines required. Not yet verified minimized: run it when the owner is not using the PC and check the PNGs are not blank.
 )
 $BuildTimeout = 300
 $ResultFile = 'test_results.txt'
@@ -132,11 +132,88 @@ function Get-TreeHash([string]$dir) {       # names + times + SHA256 of every fi
     [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($bytes))
 }
 
-# VER-09: copy the PNGs out of the save dir, then check each [SHOT] line: file exists, size == reported window size, not mostly one colour.
+# DISP-04/06/07: pixel checks on a screenshot against the picture rectangle the game predicted (Display_CalcLayout).
+# Works on raw pixels (LockBits), so a 1920x1080 picture costs milliseconds, not minutes.
+$shotCheckOk = $true
+try {
+    Add-Type -ReferencedAssemblies 'System.Drawing' -TypeDefinition @'
+using System;
+using System.Drawing;
+using System.Drawing.Imaging;
+public static class ShotCheck {
+    // Rect (rx, ry, rw, rh) is in PNG pixels. Black = all channels <= 2.
+    // Returns: [0] width, [1] height, [2] non-black pixels outside the rect, [3] non-black share inside (0..1),
+    //          [4..7] non-black share along the top, bottom, left, right edge line of the rect (0..1), [8] share that differs from the rect's main colour.
+    public static double[] Analyze(string path, int rx, int ry, int rw, int rh) {
+        using (Bitmap bmp = new Bitmap(path)) {
+            int W = bmp.Width, H = bmp.Height;
+            BitmapData d = bmp.LockBits(new Rectangle(0, 0, W, H), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try {
+                byte[] buf = new byte[Math.Abs(d.Stride) * H];
+                System.Runtime.InteropServices.Marshal.Copy(d.Scan0, buf, 0, buf.Length);
+                int stride = d.Stride;
+                long outside = 0, inside = 0, insideTotal = 0;
+                for (int y = 0; y < H; y++) {
+                    for (int x = 0; x < W; x++) {
+                        int o = y * stride + x * 4;
+                        bool nb = buf[o] > 2 || buf[o + 1] > 2 || buf[o + 2] > 2;
+                        bool inr = x >= rx && x < rx + rw && y >= ry && y < ry + rh;
+                        if (inr) { insideTotal++; if (nb) inside++; } else if (nb) outside++;
+                    }
+                }
+                double[] r = new double[9];
+                // [8] share of the rect that differs from its most common colour by more than 30 (L1) = "there is a picture", even on a dark-blue background
+                System.Collections.Generic.Dictionary<int, int> hist = new System.Collections.Generic.Dictionary<int, int>();
+                int best = 0, bestN = 0;
+                for (int y = Math.Max(0, ry); y < Math.Min(H, ry + rh); y += 2) for (int x = Math.Max(0, rx); x < Math.Min(W, rx + rw); x += 2) {
+                    int o = y * stride + x * 4; int key = (buf[o] << 16) | (buf[o + 1] << 8) | buf[o + 2];
+                    int c; hist.TryGetValue(key, out c); c++; hist[key] = c; if (c > bestN) { bestN = c; best = key; }
+                }
+                long diff = 0, tot = 0;
+                for (int y = Math.Max(0, ry); y < Math.Min(H, ry + rh); y += 2) for (int x = Math.Max(0, rx); x < Math.Min(W, rx + rw); x += 2) {
+                    int o = y * stride + x * 4; tot++;
+                    int dd = Math.Abs(buf[o] - ((best >> 16) & 255)) + Math.Abs(buf[o + 1] - ((best >> 8) & 255)) + Math.Abs(buf[o + 2] - (best & 255));
+                    if (dd > 30) diff++;
+                }
+                r[8] = tot > 0 ? (double)diff / tot : 0;
+                r[0] = W; r[1] = H; r[2] = outside;
+                r[3] = insideTotal > 0 ? (double)inside / insideTotal : 0;
+                r[4] = Line(buf, stride, W, H, rx, ry, rw, 1);
+                r[5] = Line(buf, stride, W, H, rx, ry + rh - 1, rw, 1);
+                r[6] = Line(buf, stride, W, H, rx, ry, 1, rh);
+                r[7] = Line(buf, stride, W, H, rx + rw - 1, ry, 1, rh);
+                return r;
+            } finally { bmp.UnlockBits(d); }
+        }
+    }
+    static double Line(byte[] buf, int stride, int W, int H, int x0, int y0, int w, int h) {
+        long n = 0, nb = 0;
+        for (int y = y0; y < y0 + h; y++) for (int x = x0; x < x0 + w; x++) {
+            if (x < 0 || y < 0 || x >= W || y >= H) continue;
+            int o = y * stride + x * 4; n++;
+            if (buf[o] > 2 || buf[o + 1] > 2 || buf[o + 2] > 2) nb++;
+        }
+        return n > 0 ? (double)nb / n : 0;
+    }
+}
+'@
+} catch { $shotCheckOk = $false; Write-Host "FAIL shot pixel checker did not compile: $($_.Exception.Message)"; $script:failed = $true }
+
+# VER-09 + DISP-04/06/07: copy the PNGs out of the save dir, then check each [SHOT] line: file exists; PNG is the whole window (or, with the
+# Windows Scaling option on "keep aspect", the engine's application rectangle); not mostly one colour; and, when the line carries the
+# game's predicted picture rectangle (gx gy gw gh): nothing but black outside it, picture on all four of its edges (edge=1), the last
+# cutscene art still visible during the exit fade (art=1).
 function Test-Shots([string[]]$lines, [int]$expect) {
     $problems = @()
     Get-ChildItem $D.save -Recurse -Filter 'shot_*.png' -File -ErrorAction SilentlyContinue | ForEach-Object { Copy-Item $_.FullName $D.shots -Force }
-    $rows = @($lines | Where-Object { $_ -match '^\[SHOT\] file=(\S+) w=(\d+) h=(\d+)' } | ForEach-Object { [pscustomobject]@{ File = $Matches[1]; W = [int]$Matches[2]; H = [int]$Matches[3] } })
+    $rows = @($lines | Where-Object { $_ -match '^\[SHOT\] file=(\S+) w=(\d+) h=(\d+)' } | ForEach-Object {
+        $line = $_
+        $o = [ordered]@{ File = $null; W = 0; H = 0; Rect = $null; App = $null; Edge = $false; Art = $false; Fade = $false }
+        $null = $line -match '^\[SHOT\] file=(\S+) w=(\d+) h=(\d+)'; $o.File = $Matches[1]; $o.W = [int]$Matches[2]; $o.H = [int]$Matches[3]
+        if ($line -match ' gx=(-?\d+) gy=(-?\d+) gw=(\d+) gh=(\d+)') { $o.Rect = @([int]$Matches[1], [int]$Matches[2], [int]$Matches[3], [int]$Matches[4]) }
+        if ($line -match ' app=(-?\d+),(-?\d+),(-?\d+),(-?\d+)') { $o.App = @([int]$Matches[1], [int]$Matches[2], [int]$Matches[3], [int]$Matches[4]) }
+        $o.Edge = ($line -match ' edge=1'); $o.Art = ($line -match ' art=1'); $o.Fade = ($line -match ' fade=1')
+        [pscustomobject]$o })
     if ($rows.Count -ne $expect) { $problems += "expected $expect [SHOT] lines, got $($rows.Count)" }
     Add-Type -AssemblyName System.Drawing
     foreach ($r in $rows) {
@@ -145,14 +222,26 @@ function Test-Shots([string[]]$lines, [int]$expect) {
         $bmp = $null
         try {
             $bmp = New-Object System.Drawing.Bitmap $path
-            if ($bmp.Width -ne $r.W -or $bmp.Height -ne $r.H) { $problems += "$($r.File) is $($bmp.Width)x$($bmp.Height), window said $($r.W)x$($r.H)" }
+            $pw = $bmp.Width; $ph = $bmp.Height
+            $ox = 0; $oy = 0; $sizeOk = ($pw -eq $r.W -and $ph -eq $r.H)
+            if (-not $sizeOk -and $r.App -and $pw -eq ($r.App[2] - $r.App[0]) -and $ph -eq ($r.App[3] - $r.App[1])) { $sizeOk = $true; $ox = $r.App[0]; $oy = $r.App[1] }   # keep-aspect: PNG = the application rectangle
+            if (-not $sizeOk) { $problems += "$($r.File) is ${pw}x${ph}, window said $($r.W)x$($r.H)" }
             $seen = @{}; $n = 0
-            for ($y = 0; $y -lt $bmp.Height; $y += 8) { for ($x = 0; $x -lt $bmp.Width; $x += 8) {
+            for ($y = 0; $y -lt $ph; $y += 8) { for ($x = 0; $x -lt $pw; $x += 8) {
                 $k = $bmp.GetPixel($x, $y).ToArgb(); $seen[$k] = 1 + [int]$seen[$k]; $n++ } }
             $top = ($seen.Values | Measure-Object -Maximum).Maximum / [double]$n
-            if ($top -gt $ShotMaxOneColour) { $problems += ('{0} is {1:P0} one colour' -f $r.File, $top) }
-        } catch { $problems += "$($r.File) unreadable: $($_.Exception.Message)" }
+            if ($top -gt $ShotMaxOneColour -and -not $r.Fade) { $problems += ('{0} is {1:P0} one colour' -f $r.File, $top) }
+        } catch { $problems += "$($r.File) unreadable: $($_.Exception.Message)"; $sizeOk = $false }
         finally { if ($bmp) { $bmp.Dispose() } }
+        if ($sizeOk -and $r.Rect -and $shotCheckOk) {
+            $a = [ShotCheck]::Analyze($path, $r.Rect[0] - $ox, $r.Rect[1] - $oy, $r.Rect[2], $r.Rect[3])
+            if ($a[2] -gt 0) { $problems += ('{0}: {1} non-black pixels outside the predicted picture rectangle {2},{3} {4}x{5}' -f $r.File, [int]$a[2], $r.Rect[0], $r.Rect[1], $r.Rect[2], $r.Rect[3]) }
+            if ($r.Edge -and -not $r.Fade) {
+                $names = 'top', 'bottom', 'left', 'right'
+                for ($i = 0; $i -lt 4; $i++) { if ($a[4 + $i] -lt 0.4) { $problems += ('{0}: the {1} edge of the predicted rectangle carries picture on only {2:P0} of its length (offset or wrong size)' -f $r.File, $names[$i], $a[4 + $i]) } }
+            }
+            if ($r.Art -and $a[8] -lt 0.05) { $problems += ('{0}: the cutscene art is gone (only {1:P1} of the picture differs from the background)' -f $r.File, $a[8]) }
+        }
     }
     $problems
 }
@@ -200,6 +289,21 @@ function Finish {
     Write-Host ('total     {0:N1}s' -f $Total.Elapsed.TotalSeconds)
     if ($script:failed) { Write-Host 'GATE FAIL'; exit 1 }
     Write-Host 'GATE PASS'; exit 0
+}
+
+# ---- display source guard (DISP-02 / DISP-09): only scr_display / obj_display may call the window, surface, GUI-size, view and camera-size
+# functions, and nobody may read display_get_gui_*. -NegativeControl plants a violation, so this step (and the gate) must go red.
+$lintPy = Join-Path $ProjectDir 'tools\display\lint_display_calls.py'
+if (Test-Path $lintPy) {
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $pyExe = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $pyExe) { Fail 'lint: python not found (the display source guard needs it)' }
+    else {
+        $lintArgs = @($lintPy, '--root', $ProjectDir); if ($NegativeControl) { $lintArgs += '--plant' }
+        $lintOut = @(& $pyExe.Source @lintArgs)
+        if ($LASTEXITCODE -ne 0) { $lintOut | Select-Object -First 12 | ForEach-Object { Write-Host "  $_" }; Fail 'lint: display source guard found violations' }
+    }
+    Step 'lint' $(if ($script:failed) { 'FAIL' } else { 'OK' }) $sw
 }
 
 # ---- fresh work dirs; copy working tree (tracked + untracked-not-ignored) -----------------------
