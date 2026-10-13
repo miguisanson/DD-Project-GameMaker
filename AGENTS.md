@@ -95,7 +95,7 @@ Run `tools/automation/run_tests.ps1` (Igor, runtime 2024.14.3.260; details in
 7. If localization tooling or keys changed: `python tools/localization/build_localization.py --xlsx datafiles/localization/game_text.xlsx --json datafiles/localization/localization.json` runs clean, and `python tools/localization/lint_hardcoded_text.py` reports no new hardcoded strings.
 8. Feel, audio, art and controller input: ask the owner for a specific L5 check.
 
-A green compile alone is not enough. Automated runs set `LOCALAPPDATA` to a scratch folder and never touch `%LOCALAPPDATA%\DD_Project`.
+Run only what the change touches (D62): `-Mode fast` plus the one relevant `-Only <mode>`; `-Only shots` only for screen/UI work; plain `-Mode full` once per merge to `next` and before a playtest stop, never while the owner is using the PC. A green compile alone is not enough. Automated runs set `LOCALAPPDATA` to a scratch folder and never touch `%LOCALAPPDATA%\DD_Project`.
 
 ## Improvement mode, regressions, issues
 
