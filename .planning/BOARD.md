@@ -27,7 +27,7 @@ Build: d312bfb-20261014 (branch next) | Unplayed: 9/15 | Open P1: 0 | Updated: 2
 - **PLAYTEST NOW:** run `E:\Games\DD-Project Playtest\d312bfb-20261014\DD-Project.exe` and follow `.planning/PLAYTEST-QUEUE.md` (9 short checks, ~30-40 min). Then say which are good/bad, and "merge the good ones".
 - Review the starting numbers the agents chose (QTE bar speeds, arrow sequences, defence %, enemy sight/speeds) — listed in STATE.md "Numbers to review".
 - After the playtest: grill on the turn-order bar details.
-- In GameMaker (when convenient, then close it): add Create / Begin Step / Draw GUI events to `obj_display`; Game Options > Windows: scaling to full window, allow window resize; fix `rm_floor6_5` width; delete unused sprites `spr_attack_timing_target` and `spr_attack_timing_falling`.
+- In GameMaker (when convenient, then close it): add Create / Begin Step / Draw GUI events to `obj_display`; Game Options > Windows: scaling to full window, allow window resize; fix `rm_floor6_5` width; delete unused sprites `spr_attack_timing_target` and `spr_attack_timing_falling`; add `datafiles/data/game_data.json` as an Included File (right-click Included Files > add existing) so game numbers can move into one data file.
 - Ask the friend which build they played. ("Bone" is answered: Foresight's icon looks like a bone; it should be an eye — D24.) [I-039]
 - Soon (item 4): in the IDE create `obj_display` and `scr_display`, set every room's view 0 to 160x144, widen `rm_floor6_5`, set the window colour to black. [DISP-02, 04, 10]
 - Send the creator names for the sounds/music you got (for the credits). [GAP-05]
