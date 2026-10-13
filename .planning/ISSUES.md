@@ -95,4 +95,6 @@ Found by audits and reviews (no person's words):
 | I-050 | owner 2026-10-14: "make sure the game is optimized and pathfinding is really good" | FEEL | P2 | unknown | profile (audit/movement.md) | steady frame rate; good pathfinding | open |
 
 ---
-*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-051.*
+| I-051 | owner 2026-10-14: "the screen/resolution breaks whenever i do the cutscene, im not sure even if the way i built the game with the scenes and rooms and cutscene are optimal" | BUG+QUESTION | P1 | unknown | audit/resolution.md H1-H6 | screen stays correct through every cutscene end; display rebuild reviews room/cutscene flow and simplifies only where it causes bugs | open |
+
+*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-052.*
