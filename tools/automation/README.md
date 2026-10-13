@@ -30,7 +30,7 @@ Full logs: `E:\Temp\dd-gate\logs\build.log` and `<mode>.log`.
 ## Game modes (in `scripts/scr_debug/scr_debug.gml`, inert without a flag)
 - `-runtests`: assertion suites (`scr_test.gml`).
 - `-smoke`: boots, then rm_start (logo, then the menu) -> rm_floor1 -> rm_battle for a fixed number of frames each. Any runtime error is `[TEST] ERROR UNHANDLED` + `CRASH` (Igor alone does not catch unknown functions).
-- `-bot`: Knight vs Slime. "perfect" variant confirms the menu, times the attack drop and answers the defence arrows from the battle controller's own data and must win; "fail" variant never presses in a QTE and must end (or only the no-error and HP-bounds checks apply). 2000-frame cap for the perfect variant.
+- `-bot`: Knight vs Slime. "perfect" variant confirms the menu, presses the attack bar on its zone and must win; "fail" variant never presses and must end (or only the no-error and HP-bounds checks apply). After each variant: one skill per class (Knight, Archer, Mage) typed through the arrow input and one defended big attack (mini boss Ramming), asserting grade, multiplier, damage, and that the status is resisted (perfect) or not lengthened (fail). Then every skill animation. About 100 s in total.
 - `-shots`: `screen_save` of rm_start, rm_floor1 and rm_battle at display scales 3, 4, 5 (9 PNGs, copied to `<WorkRoot>\shots`). The wrapper checks file exists, PNG size = reported window size, and not more than 97% one colour. `fit_screen` is not captured.
 - Build id: `#macro BUILD_ID "dev"` in the repo; the wrapper stamps `<git short hash>-<yyyyMMdd>[-dirty]` into the scratch copy only. The game prints `[TEST-BUILD] <id>`, the wrapper checks it, and the title screen draws it bottom-right.
 

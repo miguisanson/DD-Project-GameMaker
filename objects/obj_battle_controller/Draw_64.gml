@@ -212,13 +212,7 @@ if (battle_state == BSTATE_ATTACK_TIMING && qte_active) {
     var bar_w = round(QTE_BAR_W * sx);
     var bar_h = round(QTE_BAR_H * sx);
     var bar_x = round((w - bar_w) * 0.5);
-    var bar_y = round(h * 0.72);
-    if (instance_exists(enemy_inst) && enemy_inst.sprite_index != noone) {
-        var bspr = enemy_inst.sprite_index;
-        var enemy_bottom = port_y + ((enemy_inst.y - sprite_get_yoffset(bspr) - vy) * sy) + (sprite_get_height(bspr) * abs(enemy_inst.image_yscale) * sy);
-        bar_y = round(enemy_bottom + (22 * sx));
-    }
-    bar_y = min(bar_y, h - bar_h - round(16 * sx));
+    var bar_y = Battle_QteAnchorY(self, bar_h);
     var bar_alpha = clamp((qte_ms + QTE_LEAD_IN_MS) / 100, 0, 1);
     Qte_DrawBar(bar_x, bar_y, bar_w, bar_h, qte_params, qte_assist, qte_ms, sx, bar_alpha);
 }
@@ -275,68 +269,32 @@ if (skill_banner_active && skill_banner_name != "") {
     UI_DrawText(tx, ty, skill_banner_name);
 }
 
-// Enemy defensive QTE (drawn late; anchored below enemy/status icons).
-if (battle_state == BSTATE_ENEMY_DEF_QTE && enemy_def_qte_active && enemy_def_qte_total > 0) {
-    var q_alpha = clamp(enemy_def_qte_draw_alpha, 0, 1);
-    var q_scale = max(0.5, real(enemy_def_qte_draw_scale));
-    if (q_alpha > 0.001) {
-        var q_dir = UP;
-        if (is_array(enemy_def_qte_prompts) && enemy_def_qte_index >= 0 && enemy_def_qte_index < array_length(enemy_def_qte_prompts)) {
-            q_dir = enemy_def_qte_prompts[enemy_def_qte_index];
-        }
-
-        var qx = w * 0.5;
-        var qy = h * 0.45;
-        if (instance_exists(enemy_inst)) {
-            var qspr = enemy_inst.sprite_index;
-            if (qspr != noone && qspr != -1) {
-                var qox = SpriteShake_Offset(enemy_inst);
-                var qex = port_x + ((enemy_inst.x + qox.x - sprite_get_xoffset(qspr) - vx) * sx);
-                var qey = port_y + ((enemy_inst.y + qox.y - sprite_get_yoffset(qspr) - vy) * sy);
-                var qew = sprite_get_width(qspr) * sx;
-                var qeh = sprite_get_height(qspr) * abs(enemy_inst.image_yscale) * sy;
-                var enemy_bottom_screen = qey + qeh;
-                var status_bottom_screen = enemy_bottom_screen + max(2, round(4 * ui_visual)) + max(10, round(12 * ui_visual));
-                qx = qex + (qew * 0.5);
-                qy = status_bottom_screen + max(12, round(18 * ui_visual));
-            }
-        }
-        var qte_hud_margin = max(4, round(8 * ui_visual));
-        var qte_hud_top = qte_hud_margin + gui_off_y;
-        var qte_hud_bottom = qte_hud_top + (sprite_get_height(hp_bar) * UI_BAR_SCALE * ui_sprite) + (sprite_get_height(mp_bar) * UI_BAR_SCALE * ui_sprite) + max(2, round(4 * ui_visual));
-        var qte_min_y = qte_hud_bottom + max(12, round(24 * ui_visual));
-        var qte_max_y = h - box_h - margin - max(20, round(40 * ui_visual));
-        qy = clamp(qy, qte_min_y, max(qte_min_y, qte_max_y));
-
-        var q_col = c_white;
-        if (enemy_def_qte_phase == 2) q_col = enemy_def_qte_feedback_ok ? c_lime : c_red;
-        Battle_DrawDirectionArrow(qx, qy, q_dir, DEF_QTE_ARROW_BASE_SIZE * q_scale * ui_sprite, q_alpha, q_col);
-
-        // Progress bar only (kept below arrow so it never overlaps the prompt icon).
-        if (enemy_def_qte_phase == 1 && enemy_def_qte_response_frames > 0) {
-            var q_ratio = clamp(enemy_def_qte_timer / max(1, enemy_def_qte_response_frames), 0, 1);
-            var qbw = max(24, round(50 * ui_visual));
-            var qbh = max(3, round(5 * ui_visual));
-            var qbx = qx - (qbw * 0.5);
-            var qby = qy + max(8, round(14 * ui_visual));
-            var q_border = max(1, round(2 * ui_visual));
-
-            draw_set_alpha(q_alpha * 0.95);
-            draw_set_color(c_black);
-            draw_rectangle(qbx - q_border, qby - q_border, qbx + qbw + q_border, qby + qbh + q_border, false);
-            draw_set_color(c_white);
-            draw_rectangle(qbx - 1, qby - 1, qbx + qbw + 1, qby + qbh + 1, true);
-            draw_set_color(c_black);
-            draw_rectangle(qbx, qby, qbx + qbw, qby + qbh, false);
-            draw_set_color(c_white);
-            draw_rectangle(qbx, qby, qbx + floor(qbw * q_ratio), qby + qbh, false);
-        }
-
-        draw_set_alpha(1);
-        draw_set_color(c_white);
-    }
+// A player skill's arrow sequence (D57) and its time bar, in the same place as the attack bar.
+if (battle_state == BSTATE_SKILL_QTE && sq_active) {
+    Qte_DrawSequence(round(w * 0.5), Battle_QteAnchorY(self, Qte_SequenceHeight(sx)), sq_st, sq_wrong_ms, sq_pop_ms, sq_pop_idx, sx, clamp((sq_ms + QTE_SEQ_LEAD_IN_MS) / 100, 0, 1));
 }
 
+// A big enemy attack (D59): "!" over the enemy while it winds up (its name is the skill banner), then the defence bar.
+if (battle_state == BSTATE_ENEMY_DEFENCE && def_active) {
+    if (def_ms < -QTE_LEAD_IN_MS) {
+        var tele_x = round(w * 0.5);
+        var tele_y = round(h * 0.3);
+        if (instance_exists(enemy_inst) && enemy_inst.sprite_index != noone) {
+            var tspr = enemy_inst.sprite_index;
+            // beside the enemy's upper right, clear of the skill banner that runs across its top
+            var tele_left = port_x + ((enemy_inst.x - sprite_get_xoffset(tspr) - vx) * sx);
+            var tele_top = port_y + ((enemy_inst.y - sprite_get_yoffset(tspr) - vy) * sy);
+            tele_x = tele_left + (sprite_get_width(tspr) * abs(enemy_inst.image_xscale) * sx) + (8 * sx);
+            tele_y = tele_top + (sprite_get_height(tspr) * abs(enemy_inst.image_yscale) * sy * 0.3);
+        }
+        Qte_DrawTelegraph(tele_x, tele_y, def_ms + QTE_TELEGRAPH_MS + QTE_LEAD_IN_MS, sx);
+    } else {
+        var dbar_w = round(QTE_BAR_W * sx);
+        var dbar_h = round(QTE_BAR_H * sx);
+        var dbar_alpha = clamp((def_ms + QTE_LEAD_IN_MS) / 100, 0, 1);
+        Qte_DrawBar(round((w - dbar_w) * 0.5), Battle_QteAnchorY(self, dbar_h), dbar_w, dbar_h, def_params, def_assist, def_ms, sx, dbar_alpha);
+    }
+}
 
 // DEBUG ENEMY HP
 if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.enabled) {

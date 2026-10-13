@@ -98,25 +98,23 @@ qte_word_x = 0;
 qte_word_y = 0;
 hitstop_ms = 0;
 
-enemy_def_qte_active = false;
-enemy_def_qte_prompts = [];
-enemy_def_qte_total = 0;
-enemy_def_qte_index = 0;
-enemy_def_qte_success = 0;
-enemy_def_qte_failure = 0;
-enemy_def_qte_phase = 0;
-enemy_def_qte_timer = 0;
-enemy_def_qte_draw_alpha = 0;
-enemy_def_qte_draw_scale = 1;
-enemy_def_qte_feedback_ok = false;
-enemy_def_qte_feedback_timed_out = false;
-enemy_def_qte_feedback_dir = -1;
-enemy_def_qte_input_dir = -1;
-enemy_def_qte_response_frames = 0;
-enemy_def_qte_fade_in_frames = 0;
-enemy_def_qte_feedback_frames = 0;
-enemy_def_qte_transition_frames = 0;
-enemy_def_qte_ctx = {};
+// A player skill's arrow sequence (D57, D58). sq_st is the pure state (Qte_SeqNew); sq_ms is the clock, negative in the lead-in.
+sq_active = false;
+sq_skill = -1;
+sq_st = {};
+sq_ms = 0;
+sq_wrong_ms = 0;
+sq_pop_ms = 0;
+sq_pop_idx = -1;
+
+// The defence bar against a big enemy attack (D59). def_ms is its clock: the telegraph, then the lead-in (both negative), then the sweep from 0.
+def_active = false;
+def_skill_id = -1;
+def_params = Qte_BarParams("default");
+def_assist = 1;
+def_ms = 0;
+def_press_ms = QTE_NO_PRESS;
+def_ctx = {};
 
 // --------------------
 // MESSAGE SETUP

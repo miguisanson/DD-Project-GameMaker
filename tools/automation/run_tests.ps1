@@ -22,7 +22,7 @@ $GameModes = @(
     @{ Name = 'runtests'; Flag = '-runtests'; Timeout = 30;  Impl = $true;  Strict = $true  }
     @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 60;  Impl = $true;  Strict = $false }
     @{ Name = 'bot';      Flag = '-bot';      Timeout = 300; Impl = $true;  Strict = $false }
-    @{ Name = 'shots';    Flag = '-shots';    Timeout = 300; Impl = $true;  Strict = $false; Shots = 60 }   # Shots = number of [SHOT] lines required. Not yet verified minimized: run it when the owner is not using the PC and check the PNGs are not blank.
+    @{ Name = 'shots';    Flag = '-shots';    Timeout = 300; Impl = $true;  Strict = $false; Shots = 63 }   # Shots = number of [SHOT] lines required. Not yet verified minimized: run it when the owner is not using the PC and check the PNGs are not blank.
 )
 $BuildTimeout = 300
 $ResultFile = 'test_results.txt'
