@@ -184,6 +184,7 @@ function StatusDB_Init() {
     global.status_db[? STATUS_EVASION] = {
         id: STATUS_EVASION,
         name: "Evasion",
+        // TODO(D24, STAT rework): force_dodge only means something against ENEMY attacks now; the player never rolls to hit (D6/D20).
         icon_sprite: tall_grass_asset,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
@@ -205,6 +206,7 @@ function StatusDB_Init() {
     global.status_db[? STATUS_HIT_UP] = {
         id: STATUS_HIT_UP,
         name: "Foresight",
+        // TODO(D24, STAT rework): "cannot miss" has no effect on the player's own attacks (they never miss, D6/D20). Redesign or retire.
         icon_sprite: Status_ResolveIcon("foresight_effect_Sheet", Status_ResolveIcon("take_aim_effect", skull_2_asset)),
         icon_subimg: 0,
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
@@ -226,6 +228,7 @@ function StatusDB_Init() {
     global.status_db[? STATUS_SOLIDIFY] = {
         id: STATUS_SOLIDIFY,
         name: "Solidify",
+        // TODO(D24, STAT rework): forcing a dodge on the player's attacks no longer works; they never roll to hit (D6/D20). Redesign or retire.
         icon_sprite: Status_ResolveIcon("stun_status", rock1),
         stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },

@@ -189,7 +189,7 @@ function Build_DrawId() {
     draw_set_valign(fa_top);
     draw_set_color(c_white);
     draw_set_alpha(0.7);
-    UI_DrawText(display_get_gui_width() - UI_TextWidth(BUILD_ID) - 4, display_get_gui_height() - UI_TextHeight(BUILD_ID) - 2, BUILD_ID);
+    UI_DrawText(Display_GuiW() - UI_TextWidth(BUILD_ID) - 4, Display_GuiH() - UI_TextHeight(BUILD_ID) - 2, BUILD_ID);
     draw_set_color(_c);
     draw_set_alpha(_a);
     draw_set_halign(_h);
@@ -222,7 +222,7 @@ function Scenario_Boot() {
     else if (Scenario_HasFlag("-shots")) _mode = "shots";
     if (_mode != "" || Scenario_HasFlag("-runtests")) {
         show_debug_message("[TEST-BUILD] " + BUILD_ID);
-        window_set_fullscreen(false);   // tests are always windowed, whatever the saved setting says; no focus / foreground calls anywhere
+        // tests are always windowed whatever the saved setting says (Display_Init checks Display_TestRun); no focus / foreground calls anywhere
     }
     if (_mode == "") return;
 
@@ -240,7 +240,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 6000 : 2500), vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, fxi: 0, mp: 0, mv: {}, holds: [] };
+                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : 6000), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [] };
 }
 
 function Scenario_Finish() {
@@ -287,7 +287,7 @@ function Scenario_Release() {
 function Scenario_InputOverride() {
     if (!variable_global_exists("scn")) return;
     var _s = global.scn;
-    if (_s.mode != "bot" && _s.mode != "smoke") return;
+    if (_s.mode != "bot" && _s.mode != "smoke" && _s.mode != "shots") return;   // shots taps through the dialogues of the display flow
     if (_s.tap_action != "" && _s.f == _s.last_tap) {
         variable_struct_set(global.input.state, _s.tap_action, { held: true, pressed: true });
     }
@@ -326,7 +326,6 @@ function Scenario_Step() {
     if (_s.done) return;
     _s.f++;
     _s.t++;
-    if (window_get_fullscreen()) window_set_fullscreen(false);   // a saved fit_screen must not put a test run in fullscreen
     var _gs = GameState_Get();
     if (is_struct(_gs) && variable_struct_exists(_gs, "settings") && is_struct(_gs.settings)) _gs.settings.fit_screen = false;
     if (_s.f > _s.cap) {
@@ -349,6 +348,7 @@ function Scenario_StepSmoke(_s) {
                 Scenario_Check("smoke_rm_start", room == rm_start && instance_exists(obj_start_controller));
                 with (obj_start_controller) { if (state == "boot_logo") state = "main"; }
             }
+            if (_s.t == 60) _s.ap0 = Display_ApplyCount();   // after the boot layout (frame 30): nothing below may re-lay-out the display (DISP-08)
             if (_s.t == 90) {
                 Scenario_Check("smoke_title_menu", obj_start_controller.state == "main");
                 Scenario_NewKnight();
@@ -391,12 +391,30 @@ function Scenario_StepSmoke(_s) {
             }
             if (_s.t == 210) {
                 Scenario_Check("smoke_mini_boss_stationary_180_frames", room == rm_floor5 && _s.mb_drift == 0, "room=" + room_get_name(room) + " max_drift=" + string(_s.mb_drift));
-                Scenario_NewKnight();
-                room_goto(rm_floor1);
+                Scenario_Check("smoke_display_room_changes_no_relayout", Display_ApplyCount() == _s.ap0, "re-laid-out " + string(Display_ApplyCount() - _s.ap0) + " times over 4 room changes");
                 Scenario_Next(_s, 4);
             }
             break;
-        case 4: case 5: case 6: case 7:
+        case 4:   // DISP-08: a steady stretch of 300 frames must not touch the display
+            if (_s.t == 1) _s.ap0 = Display_ApplyCount();
+            if (_s.t == 301) {
+                Scenario_Check("smoke_display_steady_300_frames_no_relayout", Display_ApplyCount() == _s.ap0, "re-laid-out " + string(Display_ApplyCount() - _s.ap0) + " times");
+                Transition_RequestRoomFade(rm_floor1);
+                Scenario_Next(_s, 5);
+            }
+            break;
+        case 5:   // DISP-08: a whole transition (fade out, room change, fade in, Transition_Finish) must not touch the display
+            if (_s.t > 300) {
+                Scenario_Check("smoke_display_transition_ends", false, "room=" + room_get_name(room) + " active=" + string(Transition_IsActive()));
+                Scenario_Finish();
+                break;
+            }
+            if (_s.t > 5 && room == rm_floor1 && !Transition_IsActive()) {
+                Scenario_Check("smoke_display_transition_no_relayout", Display_ApplyCount() == _s.ap0, "re-laid-out " + string(Display_ApplyCount() - _s.ap0) + " times during one transition");
+                Scenario_Next(_s, 6);   // already in rm_floor1 with the player (arrived by the transition above)
+            }
+            break;
+        case 6: case 7: case 8: case 9:
             Scenario_StepSmokeSnap(_s);
             break;
     }
@@ -414,7 +432,7 @@ function Scenario_CanSaveSlot() {
 // I-048 snap: the player and the enemies always rest on the 16 px grid, also after a quick-load taken mid-step and after a room restore.
 function Scenario_StepSmokeSnap(_s) {
     switch (_s.step) {
-        case 4:
+        case 6:
             if (_s.t == 60) {
                 var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
                 var _sl = instance_exists(obj_slime) ? instance_find(obj_slime, 0) : noone;
@@ -432,7 +450,7 @@ function Scenario_StepSmokeSnap(_s) {
                 Scenario_Check("snap_enemy_back_on_grid", Scenario_Aligned(_sl2), "x=" + string(_sl2.x) + " y=" + string(_sl2.y));
                 if (!Scenario_CanSaveSlot()) {
                     show_debug_message("[TEST] SKIP snap_quickload (LOCALAPPDATA is not the gate scratch folder)");
-                    Scenario_Next(_s, 6);
+                    Scenario_Next(_s, 8);
                     break;
                 }
                 _pl2.x += 6;   // F5 pressed mid-step stores this raw position
@@ -441,10 +459,10 @@ function Scenario_StepSmokeSnap(_s) {
                 Save_Write(0);
                 var _ok = Save_Read(0);
                 Scenario_Check("snap_quickload_started", _ok);
-                Scenario_Next(_s, 5);
+                Scenario_Next(_s, 7);
             }
             break;
-        case 5:
+        case 7:
             if (_s.t == 240) {
                 var _pl3 = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
                 Scenario_Check("snap_quickload_back_in_rm_floor1", room == rm_floor1 && _pl3 != noone);
@@ -452,10 +470,10 @@ function Scenario_StepSmokeSnap(_s) {
                     Scenario_Check("snap_quickload_player_on_grid", Scenario_Aligned(_pl3), "x=" + string(_pl3.x) + " y=" + string(_pl3.y));
                     Scenario_Check("snap_quickload_player_on_saved_tile", _pl3.x == _s.sn_saved_x && _pl3.y == _s.sn_saved_y, "x=" + string(_pl3.x) + " y=" + string(_pl3.y) + " want " + string(_s.sn_saved_x) + "," + string(_s.sn_saved_y));
                 }
-                Scenario_Next(_s, 6);
+                Scenario_Next(_s, 8);
             }
             break;
-        case 6:   // enemy position stored mid-step, then restored on re-entering the room
+        case 8:   // enemy position stored mid-step, then restored on re-entering the room
             if (_s.t == 5 && instance_exists(obj_slime)) {
                 var _sl3 = instance_find(obj_slime, 0);
                 _sl3.x += 5; _sl3.y += 3;
@@ -464,10 +482,10 @@ function Scenario_StepSmokeSnap(_s) {
             }
             if (_s.t == 50) {
                 room_goto(rm_floor1);
-                Scenario_Next(_s, 7);
+                Scenario_Next(_s, 9);
             }
             break;
-        case 7:
+        case 9:
             if (_s.t == 50) {
                 var _sl4 = instance_exists(obj_slime) ? instance_find(obj_slime, 0) : noone;
                 Scenario_Check("snap_enemy_restored_on_grid", _sl4 != noone && room == rm_floor1 && Scenario_Aligned(_sl4), (_sl4 != noone) ? ("x=" + string(_sl4.x) + " y=" + string(_sl4.y)) : "no slime");
@@ -495,6 +513,7 @@ function Scenario_StepBot(_s) {
             if (_s.t == 10) {
                 _s.vstart = _s.f;
                 _s.hits = 0;
+                _s.qlog = [];
                 _s.tries = 0;
                 _s.attacking = false;
                 Scenario_EnterBattle(_name);
@@ -662,20 +681,30 @@ function Scenario_StepBotSkill(_s) {
 function Scenario_BotDrive(_s, _bc) {
     var _ready = (_s.f - _s.last_tap) >= 4;
     var _perfect = (_s.v == 0);
-    if (_s.attacking && _bc.battle_state != BSTATE_ATTACK_TIMING) {   // the swing resolved: tally its judgement
+    if (_bc.battle_state != BSTATE_ATTACK_TIMING && _bc.hitstop_ms > 0) _s.qhitstop = true;   // the freeze after a Perfect
+    if (_s.attacking && _bc.battle_state != BSTATE_ATTACK_TIMING) {   // the swing resolved: log what the bar did (QTE part 1)
         _s.attacking = false;
         _s.tries++;
-        if (_bc.attack_timing_result_key != "MISS") _s.hits++;
+        _s.hits++;   // a basic attack always lands (D20)
+        array_push(_s.qlog, {
+            key: _bc.qte_result_key, press_ms: _bc.qte_press_ms, mult: _bc.qte_result_mult, dmg: _bc.last_dmg, crit: _bc.last_crit,
+            base: _s.qbase, params: _bc.qte_params, assist: _bc.qte_assist, sfx: global.sfx_last_key, word: _bc.qte_result_text,
+            hitstop: _s.qhitstop
+        });
     }
     switch (_bc.battle_state) {
         case BSTATE_MENU:
             if (_bc.turn == TURN_PLAYER && _ready) Scenario_Tap("confirm");   // menu_index 0 = ATTACK
             break;
         case BSTATE_ATTACK_TIMING:
-            if (_bc.attack_timing_active) _s.attacking = true;
-            // The drop moves attack_timing_speed per step and the press is read one step later: confirm when one step is left.
-            if (_perfect && _ready && _bc.attack_timing_active && _bc.attack_timing_input_lock <= 0
-                && (_bc.attack_timing_target_y - _bc.attack_timing_y) <= _bc.attack_timing_speed * 1.5) {
+            if (_bc.qte_active && !_s.attacking) {   // a new swing
+                _s.attacking = true;
+                _s.qhitstop = false;
+            }
+            if (_bc.qte_active) _s.qbase = Combat_Damage(_bc.p, _bc.e, _bc.player_weapon);
+            // The press is read by the controller in this frame or the next, so it is judged one or two frames of the clock later:
+            // press when the zone centre is within 1.5 frames, which lands it within a frame and a half of the centre.
+            if (_perfect && _ready && _bc.qte_active && (Qte_ZoneCentreMs(_bc.qte_params) - _bc.qte_ms) <= Qte_StepMs(delta_time) * 1.5) {
                 Scenario_Tap("confirm");
             }
             break;
@@ -697,18 +726,93 @@ function Scenario_BotEvaluate(_s, _bc, _name) {
         + " swings=" + string(_s.tries) + " non_miss=" + string(_s.hits));
     Scenario_Check(_name + "_ended", true);
     Scenario_Check(_name + "_hp_in_bounds", _pl.hp >= 0 && _pl.hp <= _pl.max_hp, "hp=" + string(_pl.hp) + " max=" + string(_pl.max_hp));
+
+    // QTE part 1: what the bar did on every swing. The bot recomputes the grade and the damage from its own pure-function inputs.
+    var _want_key = (_s.v == 0) ? "PERFECT" : "WEAK";
+    var _want_mult = (_s.v == 0) ? 1.30 : 0.75;
+    var _n = array_length(_s.qlog);
+    var _all_key = (_n > 0), _all_fn = (_n > 0), _all_mult = (_n > 0), _all_dmg = (_n > 0), _all_snd = (_n > 0), _all_word = (_n > 0), _all_hs = (_n > 0), _all_press = (_n > 0);
+    var _detail = "";
+    for (var _i = 0; _i < _n; _i++) {
+        var _q = _s.qlog[_i];
+        var _centre = Qte_ZoneCentreMs(_q.params);
+        var _crit_mult = _q.crit ? 2 : 1;
+        var _exp = max(1, floor(floor(_q.base * _crit_mult) * Qte_GradeMult(_q.key)));
+        show_debug_message("[BOT] " + _name + " swing " + string(_i) + " grade=" + _q.key + " press_ms=" + string(_q.press_ms) + " centre_ms=" + string(_centre)
+            + " off_ms=" + string(abs(_q.press_ms - _centre)) + " sweep_ms=" + string(_q.params.sweep_ms) + " mult=" + string(_q.mult)
+            + " base=" + string(_q.base) + " crit=" + string(_q.crit) + " dmg=" + string(_q.dmg) + " expected_min=" + string(_exp) + " sfx=" + string(_q.sfx) + " hitstop=" + string(_q.hitstop));
+        if (_q.key != _want_key) { _all_key = false; _detail += " swing" + string(_i) + "=" + _q.key; }
+        if (Qte_Grade(_q.press_ms, _q.params, _q.assist) != _q.key) _all_fn = false;   // the grade is the pure function of the press
+        if (abs(_q.mult - _want_mult) > 0.0001) _all_mult = false;
+        if (_q.dmg < _exp || _q.dmg < 1) _all_dmg = false;   // base x grade multiplier at least (gear bonuses only add)
+        if (_q.sfx != Qte_GradeSfxKey(_q.key)) _all_snd = false;
+        if (_q.word != Qte_GradeLabel(_q.key)) _all_word = false;
+        if (_q.hitstop != (_q.key == "PERFECT")) _all_hs = false;   // hit-stop on Perfect only
+        if (_s.v == 0 && abs(_q.press_ms - _centre) > _q.params.perfect_half_width) _all_press = false;
+        if (_s.v == 1 && _q.press_ms != QTE_NO_PRESS) _all_press = false;   // the fail variant never presses
+    }
+    Scenario_Check(_name + "_qte_swings_ge_1", _n >= 1, "swings=" + string(_n));
+    Scenario_Check(_name + "_qte_every_grade_" + _want_key, _all_key, _detail);
+    Scenario_Check(_name + "_qte_grade_matches_pure_function", _all_fn);
+    Scenario_Check(_name + "_qte_multiplier_" + string(_want_mult), _all_mult);
+    Scenario_Check(_name + "_qte_damage_at_least_base_x_multiplier_and_never_0", _all_dmg);
+    Scenario_Check(_name + "_qte_grade_sound_fired", _all_snd);
+    Scenario_Check(_name + "_qte_grade_word_shown", _all_word);
+    Scenario_Check(_name + "_qte_hitstop_on_perfect_only", _all_hs);
+    Scenario_Check(_name + (_s.v == 0 ? "_qte_press_inside_perfect_zone" : "_qte_never_pressed"), _all_press);
     if (_s.v == 0) {
         Scenario_Check("bot_perfect_player_won", _pl.hp > 0, "hp=" + string(_pl.hp));
         // _bc.e is the enemy before the killing blow; the blow's damage must account for all of its hp.
         Scenario_Check("bot_perfect_enemy_hp_zero", _bc.e.hp - _bc.last_dmg <= 0, "enemy_hp_before=" + string(_bc.e.hp) + " last_dmg=" + string(_bc.last_dmg));
         Scenario_Check("bot_perfect_exp_gained", _pl.exp > _s.exp0 || _pl.level > 1, "exp=" + string(_pl.exp));
     } else {
-        Scenario_Check("bot_fail_player_lost", _pl.hp == 0, "hp=" + string(_pl.hp));
+        // D20: a player who never presses still deals 75% damage every swing, so the fight is won, not lost (the old fail variant lost because every swing missed).
+        Scenario_Check("bot_fail_weak_hits_still_win", _bc.e.hp - _bc.last_dmg <= 0 && _pl.hp > 0, "enemy_hp_before=" + string(_bc.e.hp) + " last_dmg=" + string(_bc.last_dmg) + " hp=" + string(_pl.hp));
     }
 }
 
-// ---- -shots: screen_save of rm_start / rm_floor1 / rm_battle at display scales 3, 4, 5 ----
+// ---- -shots: screen_save of rm_start / rm_floor1 / rm_battle at display scales 3, 4, 5, then the screen after a cutscene end,
+// a dialogue end and a room transition at several window sizes (I-051, DISP-04/06/07/08), then one picture per skill animation ----
 // fit_screen is not captured: it needs a real fullscreen switch, which is not safe in an unattended run.
+
+// The window sizes of the display flow. [w, h]
+function Scenario_DispSize(_i) {
+    var _sizes = [[480, 432], [1000, 700], [1920, 1080]];
+    return _sizes[clamp(_i, 0, array_length(_sizes) - 1)];
+}
+
+function Scenario_DispSizeCount() {
+    return 3;
+}
+
+// Put the window at a size and let the display owner lay it out (windowed, any size: DISP-11).
+function Scenario_SetWindow(_w, _h) {
+    GameSettings_Ensure().fit_screen = false;
+    Display_Request({ fullscreen: false, window_w: _w, window_h: _h });
+}
+
+function Scenario_SetWindowScale(_scale) {
+    var _sz = Display_WindowSizeForScale(_scale);
+    Scenario_SetWindow(_sz.w, _sz.h);
+}
+
+// One picture plus the layout the game predicts for the window it is in. The wrapper (Test-Shots) reads the extra keys:
+//   gx gy gw gh = Display_CalcLayout's picture rectangle, app = application_get_position() (screen_save writes the whole window,
+//   or only that rectangle when the Windows Scaling option is "keep aspect"), applies = display re-layout count (DISP-08),
+//   edge=1 the four edges of the rectangle must carry picture (not for fades or cutscene art), fade=1 a fade was on screen,
+//   art=1 the picture must not be all black (H2: the last cutscene image fades out, it does not vanish first).
+function Scenario_ShotLayout(_file, _flags = "") {
+    var _w = window_get_width(), _h = window_get_height();
+    var _l = Display_CalcLayout(_w, _h);
+    var _ap = application_get_position();
+    var _fade = Transition_IsActive() && GameState_Get().transition_fx.alpha > 0.001;
+    screen_save(_file);
+    show_debug_message("[SHOT] file=" + _file + " w=" + string(_w) + " h=" + string(_h) + " scale=" + string(_l.scale)
+        + " gx=" + string(_l.game_x) + " gy=" + string(_l.game_y) + " gw=" + string(_l.game_w) + " gh=" + string(_l.game_h)
+        + " app=" + string(_ap[0]) + "," + string(_ap[1]) + "," + string(_ap[2]) + "," + string(_ap[3])
+        + " applies=" + string(Display_ApplyCount()) + (_fade ? " fade=1" : "") + ((_flags != "") ? " " + _flags : ""));
+}
+
 function Scenario_StepShots(_s) {
     var _rooms = [rm_start, rm_floor1, rm_battle];
     var _scales = [3, 4, 5];
@@ -716,7 +820,8 @@ function Scenario_StepShots(_s) {
         case 0:   // enter room _s.ri and settle
             if (_s.ri >= array_length(_rooms)) {
                 _s.fxi = 0;
-                Scenario_Next(_s, 10);   // I-052: one picture per skill animation
+                _s.di = 0;
+                Scenario_Next(_s, 20);   // I-051: the screen after a cutscene end, a dialogue end and a room change
                 break;
             }
             if (_s.t == 1) {
@@ -731,19 +836,13 @@ function Scenario_StepShots(_s) {
             }
             break;
         case 1:   // apply the display scale and wait for the window and camera to settle
-            if (_s.t == 1) {
-                var _st = GameSettings_Ensure();
-                _st.display_scale = _scales[_s.si];
-                _st.fit_screen = false;
-                GameSettings_ApplyDisplay();
-            }
+            if (_s.t == 1) Scenario_SetWindowScale(_scales[_s.si]);
             if (_s.t >= 30) Scenario_Next(_s, 2);
             break;
         case 2:
             var _w = window_get_width(), _h = window_get_height();
             _s.shot = "shot_" + room_get_name(room) + "_" + string(_w) + "x" + string(_h) + ".png";
-            screen_save(_s.shot);
-            show_debug_message("[SHOT] file=" + _s.shot + " w=" + string(_w) + " h=" + string(_h) + " scale=" + string(_scales[_s.si]));
+            Scenario_ShotLayout(_s.shot, (room == rm_floor1) ? "edge=1" : "");
             Scenario_Next(_s, 3);
             break;
         case 3:
@@ -753,8 +852,229 @@ function Scenario_StepShots(_s) {
                 if (_s.si >= array_length(_scales)) { _s.ri++; Scenario_Next(_s, 0); } else Scenario_Next(_s, 1);
             }
             break;
-        default:
+        case 10:
+        case 11:
+        case 12:
             Scenario_StepShotsFx(_s);
+            break;
+        default:
+            Scenario_StepShotsDisp(_s);
+            break;
+    }
+}
+
+// I-051 / DISP-04, 06, 07, 08. Per window size, one continuous run through the real input path:
+// new game -> intro cutscene (every line confirmed) -> exit fade -> rm_floor1 -> its intro dialogue (confirmed) -> plain room fade.
+// Pictures: before the cutscene's last line ends, in the middle of the exit fade (the art must still show), +1/+10/+40 frames after the
+// cutscene's last Transition_Finish, before the dialogue ends, +1/+10/+40 frames after it, +1/+10 after the room fade.
+// Counter: the display must not be re-laid-out by any of it.
+function Scenario_StepShotsDisp(_s) {
+    var _gs = GameState_Get();
+    var _sz = Scenario_DispSize(_s.di);
+    var _tag = string(_sz[0]) + "x" + string(_sz[1]);
+    var _tapnow = ((_s.f - _s.last_tap) >= 8);
+    switch (_s.step) {
+        case 20:   // window size, settle, then a fresh game into the intro cutscene
+            if (_s.t == 1) {
+                Scenario_SetWindow(_sz[0], _sz[1]);
+                Scenario_NewKnight();
+                _s.cut_shot = false;
+                _s.fade_shot = false;
+                _s.dlg_seen = false;
+                _s.dlg_t = 0;
+            }
+            if (_s.t == 45) {
+                Scenario_Check("shots_disp_window_" + _tag, window_get_width() == _sz[0] && window_get_height() == _sz[1], "window=" + string(window_get_width()) + "x" + string(window_get_height()));
+                _s.ap0 = Display_ApplyCount();
+                Transition_RequestCutsceneById("intro");
+                Scenario_Next(_s, 21);
+            }
+            break;
+        case 21:   // in the cutscene: confirm every line
+            if (_s.t > 3000) {
+                Scenario_Check("shots_disp_cutscene_ends_" + _tag, false, "still in " + room_get_name(room) + " after 3000 frames");
+                Scenario_Finish();
+                break;
+            }
+            if (room == rm_cutscene && instance_exists(obj_start_controller) && obj_start_controller.cutscene_started) {
+                var _sc = obj_start_controller;
+                var _last = (_sc.cutscene_segment_index == array_length(_sc.cutscene_sequence) - 1);
+                var _in_dlg = (_gs.ui.mode == UI_DIALOGUE && array_length(_gs.ui.lines) > 0);
+                if (_last && _in_dlg && !_s.cut_shot && _gs.ui.index >= array_length(_gs.ui.lines) - 1 && !Transition_IsActive()) {
+                    _s.dlg_t++;
+                    if (_s.dlg_t >= 20) {   // the last line has been on screen for 20 frames
+                        Scenario_ShotLayout("shot_disp_cut_before_" + _tag + ".png");
+                        _s.cut_shot = true;
+                        _s.dlg_t = 0;
+                    }
+                } else if (_tapnow) {
+                    Scenario_Tap("confirm");
+                }
+                if (_s.cut_shot && _tapnow) Scenario_Tap("confirm");
+            }
+            if (Transition_IsActive() && _gs.transition_fx.type == TRANSITION_TYPE_CUTSCENE && _gs.transition_fx.target_room == rm_floor1) {
+                Scenario_Check("shots_disp_last_line_pictured_" + _tag, _s.cut_shot);
+                Scenario_Next(_s, 22);
+            }
+            break;
+        case 22:   // the exit fade: the last cutscene picture must still be there while it darkens (H2)
+            if (_s.t > 600) {
+                Scenario_Check("shots_disp_floor1_reached_" + _tag, false, "room=" + room_get_name(room));
+                Scenario_Finish();
+                break;
+            }
+            if (!_s.fade_shot && Transition_IsActive() && _gs.transition_fx.phase == 0 && _gs.transition_fx.timer >= 8 && room == rm_cutscene) {
+                Scenario_ShotLayout("shot_disp_cut_fade_" + _tag + ".png", "art=1");
+                _s.fade_shot = true;
+            }
+            if (room == rm_floor1 && !Transition_IsActive()) {
+                Scenario_Check("shots_disp_cut_fade_pictured_" + _tag, _s.fade_shot);
+                _s.fin_f = _s.f;
+                Scenario_Next(_s, 23);
+            }
+            break;
+        case 23: {   // +1 / +10 / +40 frames after the cutscene exit's Transition_Finish
+            var _d = _s.f - _s.fin_f;
+            if (_d == 1 || _d == 10 || _d == 40) Scenario_ShotLayout("shot_disp_cut_end_p" + string(_d) + "_" + _tag + ".png", "edge=1");
+            if (_d >= 40) {
+                Scenario_Check("shots_disp_in_floor1_" + _tag, room == rm_floor1);
+                Scenario_Next(_s, 24);
+            }
+        } break;
+        case 24:   // rm_floor1's intro dialogue: let it be on screen, then confirm through it
+            if (_s.t > 1500) {
+                Scenario_Check("shots_disp_dialogue_ends_" + _tag, false, "mode=" + string(_gs.ui.mode));
+                Scenario_Finish();
+                break;
+            }
+            if (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0) {
+                _s.dlg_seen = true;
+                _s.dlg_t++;
+                if (_s.dlg_t == 30) Scenario_ShotLayout("shot_disp_dlg_before_" + _tag + ".png");
+                if (_s.dlg_t > 30 && _tapnow) Scenario_Tap("confirm");
+            } else if (_s.dlg_seen) {
+                _s.fin_f = _s.f;
+                Scenario_Next(_s, 25);
+            } else if (_s.t > 300) {
+                Scenario_Check("shots_disp_dialogue_seen_" + _tag, false, "no dialogue opened in rm_floor1");
+                Scenario_Finish();
+            }
+            break;
+        case 25: {   // +1 / +10 / +40 frames after the dialogue closed
+            var _d2 = _s.f - _s.fin_f;
+            if (_d2 == 1 || _d2 == 10 || _d2 == 40) Scenario_ShotLayout("shot_disp_dlg_end_p" + string(_d2) + "_" + _tag + ".png", "edge=1");
+            if (_d2 >= 40) Scenario_Next(_s, 26);
+        } break;
+        case 26:   // a plain room fade
+            if (_s.t == 1) Transition_RequestRoomFade(rm_floor2);
+            if (_s.t > 600) {
+                Scenario_Check("shots_disp_room_fade_" + _tag, false, "room=" + room_get_name(room));
+                Scenario_Finish();
+                break;
+            }
+            if (_s.t > 5 && room == rm_floor2 && !Transition_IsActive()) {
+                _s.fin_f = _s.f;
+                Scenario_Next(_s, 27);
+            }
+            break;
+        case 27: {   // +1 / +10 after the room fade, then the counter
+            var _d3 = _s.f - _s.fin_f;
+            if (_d3 == 1 || _d3 == 10) Scenario_ShotLayout("shot_disp_room_end_p" + string(_d3) + "_" + _tag + ".png", "edge=1");
+            if (_d3 >= 10) {
+                Scenario_Check("shots_disp_no_relayout_" + _tag, Display_ApplyCount() == _s.ap0, "re-laid-out " + string(Display_ApplyCount() - _s.ap0) + " times during cutscene end, dialogue end and room fade");
+                _s.di++;
+                if (_s.di >= Scenario_DispSizeCount()) Scenario_Next(_s, 28); else Scenario_Next(_s, 20);
+            }
+        } break;
+        case 28:   // the encounter zoom (a draw-time zoom of the picture, nothing resized) at the last window size, then the battle room
+            if (_s.t == 1) {
+                _s.fade_shot = false;
+                GameState_SetBattleReturn(room, 0, 0, 0);
+                GameState_SetBattleEnemy("disp_zoom_slime", ENEMY_SLIME, 1);
+                Transition_RequestEncounterBattle(rm_battle, 80, 72);
+            }
+            if (_s.t > 600) {
+                Scenario_Check("shots_disp_encounter_ends", false, "room=" + room_get_name(room));
+                Scenario_Finish();
+                break;
+            }
+            if (!_s.fade_shot && Transition_IsActive() && _gs.transition_fx.type == TRANSITION_TYPE_ENCOUNTER && _gs.transition_fx.phase == 1 && _gs.transition_fx.timer >= 3) {
+                Scenario_Check("shots_disp_encounter_zoom_active", global.display.zoom > 1.2, "zoom=" + string(global.display.zoom));
+                Scenario_ShotLayout("shot_disp_encounter_zoom.png", "edge=1");
+                _s.fade_shot = true;
+            }
+            if (room == rm_battle && !Transition_IsActive()) {
+                Scenario_Check("shots_disp_encounter_zoom_cleared", global.display.zoom == 1, "zoom=" + string(global.display.zoom));
+                Scenario_Check("shots_disp_encounter_zoom_pictured", _s.fade_shot);
+                _s.fin_f = _s.f;
+                Scenario_Next(_s, 29);
+            }
+            break;
+        case 29:
+            if (_s.f - _s.fin_f == 10) {
+                Scenario_ShotLayout("shot_disp_encounter_battle.png", "edge=1");
+                Scenario_Check("shots_disp_encounter_no_relayout", Display_ApplyCount() == _s.ap0, "re-laid-out " + string(Display_ApplyCount() - _s.ap0) + " times");
+                Scenario_Next(_s, 30);
+            }
+            break;
+        case 30:   // QTE part 1: the sliding bar mid-sweep, at display scale 3 (480 x 432)
+        case 31:
+        case 32:
+        case 33:
+        case 34:
+            Scenario_StepShotsQte(_s);
+            break;
+    }
+}
+
+// QTE part 1 (D56): the bar with the cursor on its way to the zone (shot_qte_bar.png), then the Perfect word over the enemy (shot_qte_perfect.png).
+function Scenario_StepShotsQte(_s) {
+    switch (_s.step) {
+        case 30:
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(3);
+                Scenario_GotoBattle("shots_qte_bar");
+            }
+            if (_s.t >= 25) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_qte_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                var _bc = instance_find(obj_battle_controller, 0);
+                Battle_AttackTimingBegin(_bc);
+                _bc.qte_ms = 520;   // 47% of the Wooden Sword's 1100 ms sweep: the cursor is approaching the zone at 70%
+                Scenario_Next(_s, 31);
+            }
+            break;
+        case 31:
+            if (_s.t >= 2) {
+                var _bc = instance_find(obj_battle_controller, 0);
+                Scenario_Check("shots_qte_bar_mid_sweep", _bc.battle_state == BSTATE_ATTACK_TIMING && _bc.qte_active && _bc.qte_ms > 520 && _bc.qte_ms < _bc.qte_params.sweep_ms, "state=" + string(_bc.battle_state) + " ms=" + string(_bc.qte_ms));
+                _s.shot = "shot_qte_bar.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 32);
+            }
+            break;
+        case 32:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                var _bc = instance_find(obj_battle_controller, 0);
+                Battle_PlayerAttackResolveTimed(_bc, Qte_Result(QTE_PERFECT));
+                Scenario_Next(_s, 33);
+            }
+            break;
+        case 33:
+            if (_s.t >= 12) {   // the freeze (60 ms) is over and the word is in its pop
+                _s.shot = "shot_qte_perfect.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 34);
+            }
+            break;
+        case 34:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_Next(_s, 10);
+            }
             break;
     }
 }
@@ -774,10 +1094,7 @@ function Scenario_StepShotsFx(_s) {
         case 10:   // a character of the skill's class, into a battle at display scale 3
             if (_s.t == 1) {
                 var _gs = Scenario_NewKnight(_skill.class_list[0]);
-                var _st = GameSettings_Ensure();
-                _st.display_scale = 3;
-                _st.fit_screen = false;
-                GameSettings_ApplyDisplay();
+                Scenario_SetWindowScale(3);
                 Scenario_GotoBattle("shots_fx_" + _slug);
             }
             if (_s.t >= 25) {
@@ -799,8 +1116,7 @@ function Scenario_StepShotsFx(_s) {
         case 11:   // let the frozen frame be drawn, then save it
             if (_s.t >= 3) {
                 _s.shot = "shot_fx_" + _slug + ".png";
-                screen_save(_s.shot);
-                show_debug_message("[SHOT] file=" + _s.shot + " w=" + string(window_get_width()) + " h=" + string(window_get_height()) + " scale=3 fx_scale=" + string(instance_exists(obj_fx) ? obj_fx.image_xscale : -1));
+                Scenario_ShotLayout(_s.shot, "fx_scale=" + string(instance_exists(obj_fx) ? obj_fx.image_xscale : -1));
                 Scenario_Next(_s, 12);
             }
             break;

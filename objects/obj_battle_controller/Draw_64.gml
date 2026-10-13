@@ -1,10 +1,11 @@
+Display_DrawFrame();   // first Draw GUI of the frame draws the world
 var ui_visual = UI_GetVisualScale();
 var ui_sprite = UI_GetSpriteScale();
 var margin = max(8, round(16 * ui_visual));
 var box_h = 96;
 
-var w = display_get_gui_width();
-var h = display_get_gui_height();
+var w = Display_GuiW();
+var h = Display_GuiH();
 
 var gs = GameState_Get();
 var transition_alpha = 0;
@@ -27,20 +28,10 @@ var cam_off = CameraShake_Offset();
 var vx = base_x + cam_off.x;
 var vy = base_y + cam_off.y;
 camera_set_view_pos(cam, vx, vy);
-var vw = camera_get_view_width(cam);
-var vh = camera_get_view_height(cam);
-var port_x = 0;
+var port_x = 0;   // the GUI origin is the picture's corner, so there is no port offset
 var port_y = 0;
-var port_w = w;
-var port_h = h;
-if (view_enabled) {
-    port_x = view_xport[0];
-    port_y = view_yport[0];
-    port_w = max(1, view_wport[0]);
-    port_h = max(1, view_hport[0]);
-}
-var sx = port_w / max(1, vw);
-var sy = port_h / max(1, vh);
+var sx = Display_WorldScale();
+var sy = sx;
 var gui_off_x = cam_off.x * sx;
 var gui_off_y = cam_off.y * sy;
 var row_h = max(16, UI_TextHeight("A") + 2);
@@ -215,45 +206,26 @@ if (instance_exists(enemy_inst)) {
     if (off.flash) gpu_set_blendmode(bm_normal);
 }
 
-// Timed ATTACK UI
-if (battle_state == BSTATE_ATTACK_TIMING && attack_timing_active) {
-    var tx_t = round(attack_timing_target_x);
-    var ty_t = round(attack_timing_target_y);
-    var cx_t = round(attack_timing_x);
-    var cy_t = round(attack_timing_y);
-    var marker_alpha = clamp(attack_timing_marker_alpha, 0, 1);
-    var target_sp = attack_timing_target_sprite;
-    var fall_sp = attack_timing_falling_sprite;
-    var s = ATTACK_TIMING_SPRITE_SCALE * ui_sprite;
-
-    if (target_sp != -1 && target_sp != noone) {
-        var tw = sprite_get_width(target_sp) * s;
-        var th = sprite_get_height(target_sp) * s;
-        draw_set_alpha(1);
-        draw_sprite_ext(target_sp, 0, tx_t - (tw * 0.5), ty_t - (th * 0.5), s, s, 0, c_white, marker_alpha);
+// The basic attack's sliding bar (D56), sized in world pixels (sx GUI units each) so it is crisp at every window scale: below the enemy and its
+// status icons (no menu box is up during the bar). Fades in during the lead-in.
+if (battle_state == BSTATE_ATTACK_TIMING && qte_active) {
+    var bar_w = round(QTE_BAR_W * sx);
+    var bar_h = round(QTE_BAR_H * sx);
+    var bar_x = round((w - bar_w) * 0.5);
+    var bar_y = round(h * 0.72);
+    if (instance_exists(enemy_inst) && enemy_inst.sprite_index != noone) {
+        var bspr = enemy_inst.sprite_index;
+        var enemy_bottom = port_y + ((enemy_inst.y - sprite_get_yoffset(bspr) - vy) * sy) + (sprite_get_height(bspr) * abs(enemy_inst.image_yscale) * sy);
+        bar_y = round(enemy_bottom + (22 * sx));
     }
-
-    if (fall_sp != -1 && fall_sp != noone) {
-        var fw = sprite_get_width(fall_sp) * s;
-        var fh = sprite_get_height(fall_sp) * s;
-        draw_set_alpha(1);
-        draw_sprite_ext(fall_sp, 0, cx_t - (fw * 0.5), cy_t - (fh * 0.5), s, s, 0, c_white, 1);
-    }
-
-    draw_set_alpha(1);
-    draw_set_color(c_white);
+    bar_y = min(bar_y, h - bar_h - round(16 * sx));
+    var bar_alpha = clamp((qte_ms + QTE_LEAD_IN_MS) / 100, 0, 1);
+    Qte_DrawBar(bar_x, bar_y, bar_w, bar_h, qte_params, qte_assist, qte_ms, sx, bar_alpha);
 }
 
-// Timed ATTACK feedback text
-if (attack_timing_result_timer > 0 && attack_timing_result_text != "") {
-    var t_norm = clamp(attack_timing_result_timer / max(1, ATTACK_TIMING_FEEDBACK_FRAMES), 0, 1);
-    var tyf = attack_timing_target_y - round(12 * ui_visual) - ((1 - t_norm) * round(6 * ui_visual));
-    var txf = attack_timing_target_x - (UI_TextWidth(attack_timing_result_text) * 0.5);
-    draw_set_alpha(1);
-    draw_set_color(c_black);
-    UI_DrawText(txf + 1, tyf + 1, attack_timing_result_text);
-    draw_set_color(c_white);
-    UI_DrawText(txf, tyf, attack_timing_result_text);
+// The grade word over the enemy, in its own colour and size.
+if (qte_result_ms > 0 && qte_result_text != "") {
+    Qte_DrawGradeWord(qte_result_key, qte_result_text, qte_word_x, qte_word_y - round(8 * sx), qte_result_ms, sx);
 }
 
 // FX draw (battle-only), over enemy sprite

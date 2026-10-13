@@ -1,4 +1,5 @@
 Input_PreStep();
+Display_Update();   // the display owner's per-frame check (applies only on a real window change); moves to obj_display's Begin Step
 var gs = GameState_Get();
 Transition_Update();
 UI_UpdateModalDimState();

@@ -62,6 +62,9 @@ function Combat_Damage(_attacker, _defender, _weapon) {
     return final;
 }
 
+// D6/D20: this roll is for ENEMY attacks only; the player's basic attack and skills never roll to hit (Skill_Use skips it).
+// TODO(D24, STAT rework): "force_dodge" (Evasion, Solidify) and "always_hit" (Foresight) only made sense with player misses. They still
+// work against enemy attacks and do nothing for the player's own attacks. Redesign them in the STAT rework, not here.
 function Combat_AttemptHit(_attacker, _defender, _acc_bonus) {
     var res = { hit: false, forced: false, attacker: _attacker, defender: _defender };
 
@@ -93,6 +96,15 @@ function Combat_ApplyDamage(_attacker, _defender, _weapon, _crit_mult, _skill_mu
     if (argument_count >= 5) dmg = floor(dmg * _skill_mult);
     if (argument_count >= 4) dmg = floor(dmg * _crit_mult);
 
+    // D61: the QTE grade scales the hit, and a hit that was going to deal damage never drops to 0 (D20). A Guard below still blocks it.
+    var dmg_ctx = {};
+    if (argument_count >= 6 && is_struct(argument[5])) dmg_ctx = argument[5];
+    if (variable_struct_exists(dmg_ctx, "grade_mult") && dmg_ctx.grade_mult != 1) {
+        var ungraded = dmg;
+        dmg = floor(dmg * dmg_ctx.grade_mult);
+        if (ungraded > 0 && dmg < 1) dmg = 1;
+    }
+
     var guard_mult = Status_GetMul(_defender, "guard_mult");
     if (guard_mult != 1) {
         dmg = floor(dmg * guard_mult);
@@ -102,8 +114,6 @@ function Combat_ApplyDamage(_attacker, _defender, _weapon, _crit_mult, _skill_mu
     var diff_mult = Combat_EffectiveDamageMult(_attacker);
     if (diff_mult != 1) dmg = floor(dmg * diff_mult);
 
-    var dmg_ctx = {};
-    if (argument_count >= 6 && is_struct(argument[5])) dmg_ctx = argument[5];
     if (!variable_struct_exists(dmg_ctx, "is_skill")) dmg_ctx.is_skill = false;
 
     // FUN-FIRST passives: let equipped armor mitigate incoming enemy damage.
@@ -448,34 +458,19 @@ function Battle_CheckEnd(_bc, _p, _e) {
 }
 
 function Battle_AttackTimingTarget(_bc) {
-    var gui_w = max(1, display_get_gui_width());
-    var gui_h = max(1, display_get_gui_height());
+    var gui_w = max(1, Display_GuiW());
+    var gui_h = max(1, Display_GuiH());
     var tx = gui_w * 0.5;
     var ty = gui_h * 0.5;
 
     if (instance_exists(_bc.enemy_inst)) {
-        var cam = view_camera[0];
-        var vx = _bc.cam_base_x;
-        var vy = _bc.cam_base_y;
-        var vw = max(1, camera_get_view_width(cam));
-        var vh = max(1, camera_get_view_height(cam));
-        var port_x = 0;
-        var port_y = 0;
-        var port_w = gui_w;
-        var port_h = gui_h;
-        if (view_enabled) {
-            port_x = view_xport[0];
-            port_y = view_yport[0];
-            port_w = max(1, view_wport[0]);
-            port_h = max(1, view_hport[0]);
-        }
-        var sx = port_w / vw;
-        var sy = port_h / vh;
-
         var espr = _bc.enemy_inst.sprite_index;
         if (espr != noone) {
-            var ex = port_x + ((_bc.enemy_inst.x - sprite_get_xoffset(espr) - vx) * sx);
-            var ey = port_y + ((_bc.enemy_inst.y - sprite_get_yoffset(espr) - vy) * sy);
+            // The camera is 1:1 with the picture, so a world point is (point - camera) * Display_WorldScale() GUI units from the picture's corner.
+            var sx = Display_WorldScale();
+            var sy = sx;
+            var ex = (_bc.enemy_inst.x - sprite_get_xoffset(espr) - _bc.cam_base_x) * sx;
+            var ey = (_bc.enemy_inst.y - sprite_get_yoffset(espr) - _bc.cam_base_y) * sy;
             var ew = sprite_get_width(espr) * abs(_bc.enemy_inst.image_xscale) * sx;
             var eh = sprite_get_height(espr) * abs(_bc.enemy_inst.image_yscale) * sy;
             tx = ex + (ew * 0.5);
@@ -486,13 +481,110 @@ function Battle_AttackTimingTarget(_bc) {
     return { x: round(tx), y: round(ty) };
 }
 
-function Battle_AttackTimingJudge(_delta) {
-    var d = abs(_delta) / max(0.0001, UI_GetVisualScale());
-    if (d <= ATTACK_WINDOW_PERFECT) return { key: "PERFECT", label: Loc_T("battle.action.timing.perfect", "PERFECT"), mult: 1.00, hit: true };
-    if (d <= ATTACK_WINDOW_GOOD)    return { key: "GOOD",    label: Loc_T("battle.action.timing.good", "GOOD"),       mult: 0.75, hit: true };
-    if (d <= ATTACK_WINDOW_OKAY)    return { key: "OKAY",    label: Loc_T("battle.action.timing.okay", "OKAY"),       mult: 0.50, hit: true };
-    if (d <= ATTACK_WINDOW_BAD)     return { key: "BAD",     label: Loc_T("battle.action.timing.bad", "BAD"),         mult: 0.25, hit: true };
-    return { key: "MISS", label: Loc_T("battle.action.timing.miss", "MISS"), mult: 0.00, hit: false };
+// ---- QTE part 1: the sliding bar (D56, D60, D61). Everything from here to Qte_Result is pure and checked by Test_Suite_Qte. ----
+// A cursor sweeps the bar once, left to right, in params.sweep_ms. The bright zone is centred at QTE_ZONE_CENTRE_PCT of the sweep and
+// has three nested half widths in ms (Perfect inside Good inside OK). A press outside the OK zone, or no press before the cursor ends, is Weak.
+// Nothing here misses: Weak is 0.75 x damage, never 0 (D5, D20).
+
+// Starting numbers per weapon kind (D60: daggers and bows fast + wide, heavy slow + narrow, everything else medium). Tuned by playtest.
+function Qte_BarParams(_kind) {
+    switch (_kind) {
+        case "bow":    return { sweep_ms: 850,  perfect_half_width: 60, good_half_width: 130, ok_half_width: 220 };
+        case "dagger": return { sweep_ms: 750,  perfect_half_width: 55, good_half_width: 120, ok_half_width: 200 };
+        case "staff":  return { sweep_ms: 1200, perfect_half_width: 55, good_half_width: 115, ok_half_width: 190 };
+        case "heavy":  return { sweep_ms: 1500, perfect_half_width: 50, good_half_width: 100, ok_half_width: 170 };
+    }
+    return { sweep_ms: 1100, perfect_half_width: 60, good_half_width: 120, ok_half_width: 200 };   // "default" and "sword"
+}
+
+// Which row of Qte_BarParams a weapon uses (the weapon_kind field of its ItemDB entry).
+function Qte_WeaponKind(_weapon) {
+    if (is_struct(_weapon) && variable_struct_exists(_weapon, "weapon_kind")) return string(_weapon.weapon_kind);
+    return "default";
+}
+
+// D35: the one accessibility setting, a multiplier that widens every zone. 1 until the settings screen stores one (GAP-09).
+function Qte_AssistMult() {
+    var gs = GameState_Get();
+    if (is_struct(gs) && variable_struct_exists(gs, "settings") && is_struct(gs.settings) && variable_struct_exists(gs.settings, "qte_window_mult")) {
+        return clamp(real(gs.settings.qte_window_mult), 1, 3);
+    }
+    return 1;
+}
+
+// Milliseconds one frame adds to the QTE clock, from delta_time (microseconds). Capped so a hitch cannot skip the bar (QTE-01, QTE-14).
+function Qte_StepMs(_delta_us) {
+    return clamp(_delta_us, 0, QTE_MAX_STEP_US) / 1000;
+}
+
+// Cursor position along the bar, 0..1, from elapsed ms (negative during the lead-in).
+function Qte_CursorPos(_ms, _params) {
+    return clamp(_ms / max(1, _params.sweep_ms), 0, 1);
+}
+
+function Qte_ZoneCentreMs(_params) {
+    return _params.sweep_ms * QTE_ZONE_CENTRE_PCT / 100;
+}
+
+// The press time to judge. A press more than QTE_EARLY_BUFFER_MS before the sweep starts is dropped (it is the press that chose ATTACK, or mashing);
+// one closer than that is kept and judged at 0. Returns QTE_NO_PRESS for a dropped press.
+function Qte_BufferPress(_ms) {
+    if (_ms < -QTE_EARLY_BUFFER_MS) return QTE_NO_PRESS;
+    return max(0, _ms);
+}
+
+// Grade of a press at _press_ms (QTE_NO_PRESS = none). _assist widens every zone (>= 1).
+function Qte_Grade(_press_ms, _params, _assist = 1) {
+    if (_press_ms < 0 || _press_ms >= _params.sweep_ms) return QTE_WEAK;
+    var widen = max(1, _assist);
+    var d = abs(_press_ms - Qte_ZoneCentreMs(_params));
+    if (d <= _params.perfect_half_width * widen) return QTE_PERFECT;
+    if (d <= _params.good_half_width * widen) return QTE_GOOD;
+    if (d <= _params.ok_half_width * widen) return QTE_OK;
+    return QTE_WEAK;
+}
+
+// D61 starting numbers, tuned by playtest.
+function Qte_GradeMult(_key) {
+    switch (_key) {
+        case QTE_PERFECT: return 1.30;
+        case QTE_GOOD:    return 1.10;
+        case QTE_OK:      return 1.00;
+    }
+    return 0.75;
+}
+
+function Qte_GradeRank(_key) {
+    switch (_key) {
+        case QTE_PERFECT: return 3;
+        case QTE_GOOD:    return 2;
+        case QTE_OK:      return 1;
+    }
+    return 0;
+}
+
+function Qte_GradeLabel(_key) {
+    switch (_key) {
+        case QTE_PERFECT: return Loc_T("battle.action.timing.perfect", QTE_PERFECT);
+        case QTE_GOOD:    return Loc_T("battle.action.timing.good", QTE_GOOD);
+        case QTE_OK:      return Loc_T("battle.action.timing.ok", QTE_OK);
+    }
+    return Loc_T("battle.action.timing.weak", QTE_WEAK);
+}
+
+// A distinct existing sound per grade (SFX_RegisterDefaults maps these keys to existing assets).
+function Qte_GradeSfxKey(_key) {
+    switch (_key) {
+        case QTE_PERFECT: return "qte_perfect";
+        case QTE_GOOD:    return "qte_good";
+        case QTE_OK:      return "qte_ok";
+    }
+    return "qte_weak";
+}
+
+// The grade as the struct the equipment passives and the resolver pass around.
+function Qte_Result(_key) {
+    return { key: _key, label: Qte_GradeLabel(_key), mult: Qte_GradeMult(_key), hit: true };
 }
 
 function Battle_PlayerStunSkip(_bc) {
@@ -537,58 +629,53 @@ function Battle_PlayerFinalizeTurn(_bc, _p, _e, _granted_extra_actions = 0) {
 
 function Battle_AttackTimingBegin(_bc) {
     var p = _bc.p;
-    var e = _bc.e;
 
     if (!Status_CanAct(p)) {
         if (Battle_PlayerStunSkip(_bc)) return;
-        _bc.attack_timing_active = false;
-        _bc.attack_timing_started = false;
+        _bc.qte_active = false;
         return;
     }
 
-    var target = Battle_AttackTimingTarget(_bc);
-    _bc.attack_timing_target_x = target.x;
-    _bc.attack_timing_target_y = target.y;
-    _bc.attack_timing_x = target.x;
-    _bc.attack_timing_y = -round(ATTACK_TIMING_START_OFFSET * UI_GetVisualScale());
-    _bc.attack_timing_input_lock = max(0, ATTACK_TIMING_INPUT_LOCK_FRAMES);
-    _bc.attack_timing_active = true;
-    _bc.attack_timing_started = true;
-    _bc.attack_timing_marker_alpha = 0;
-    // Roll this swing's speed once so it stays constant during the drop but
-    // varies between swings (random feel + skill), on top of the enemy tier.
-    var speed_var = random_range(ATTACK_TIMING_SPEED_VAR_MIN, ATTACK_TIMING_SPEED_VAR_MAX);
-    _bc.attack_timing_speed = Battle_AttackTimingSpeedForEnemy(e) * speed_var;
+    // The bar is fixed per weapon so it can be learned (D60). The clock starts in the lead-in, so the press that chose ATTACK cannot count.
+    _bc.qte_params = Qte_BarParams(Qte_WeaponKind(_bc.player_weapon));
+    _bc.qte_assist = Qte_AssistMult();
+    _bc.qte_ms = -QTE_LEAD_IN_MS;
+    _bc.qte_press_ms = QTE_NO_PRESS;
+    _bc.qte_active = true;
     _bc.battle_state = BSTATE_ATTACK_TIMING;
 }
 
+// The enemy shake and the small camera shakes of a landed hit. After a Perfect's hit-stop Step_0 calls this again, so the freeze comes first.
+function Battle_QteImpactFeedback(_bc) {
+    if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
+        SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
+    }
+    if (_bc.qte_result_key == QTE_PERFECT) CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_FRAMES, SHAKE_DIR_H);
+    if (_bc.qte_result_key == QTE_GOOD) CameraShake_Start(QTE_SHAKE_GOOD_MAG, QTE_SHAKE_GOOD_FRAMES, SHAKE_DIR_H);
+}
+
+// The player's basic attack always lands (D20): damage = base x the grade's multiplier, never 0.
 function Battle_PlayerAttackResolveTimed(_bc, _timing) {
     var p = _bc.p;
     var e = _bc.e;
-    var timing = _timing;
-    if (!is_struct(timing)) timing = { key: "MISS", label: Loc_T("battle.action.timing.miss", "MISS"), mult: 0.00, hit: false };
 
-    var timing_label = variable_struct_exists(timing, "label") ? string(timing.label) : Loc_T("battle.action.timing.miss", "MISS");
-    var timing_key = variable_struct_exists(timing, "key") ? string(timing.key) : "MISS";
-    var timing_mult = variable_struct_exists(timing, "mult") ? clamp(real(timing.mult), 0, 1) : 0;
-    var timing_hit = variable_struct_exists(timing, "hit") && timing.hit;
+    // Equipment passives can forgive/upgrade the grade.
+    var timing = Equip_ModifyTimedAttackResult(p, _timing);
+    var timing_key = timing.key;
 
-    // Equipment passives can forgive/upgrade timing outcomes.
-    timing = Equip_ModifyTimedAttackResult(p, timing);
-    timing_label = variable_struct_exists(timing, "label") ? string(timing.label) : timing_label;
-    timing_key = variable_struct_exists(timing, "key") ? string(timing.key) : timing_key;
-    timing_mult = variable_struct_exists(timing, "mult") ? clamp(real(timing.mult), 0, 1) : timing_mult;
-    timing_hit = variable_struct_exists(timing, "hit") && timing.hit;
-
-    _bc.attack_timing_active = false;
-    _bc.attack_timing_started = false;
-    _bc.attack_timing_result_text = timing_label;
-    _bc.attack_timing_result_key = timing_key;
-    _bc.attack_timing_result_timer = ATTACK_TIMING_FEEDBACK_FRAMES;
+    _bc.qte_active = false;
+    _bc.qte_result_text = timing.label;
+    _bc.qte_result_key = timing_key;
+    _bc.qte_result_mult = timing.mult;
+    _bc.qte_result_ms = QTE_RESULT_MS;
+    var word_pos = Battle_AttackTimingTarget(_bc);
+    _bc.qte_word_x = word_pos.x;
+    _bc.qte_word_y = word_pos.y;
 
     var player_class_id = -1;
     if (variable_struct_exists(p, "class_id")) player_class_id = p.class_id;
     SFX_PlayClassAttack(player_class_id);
+    SFX_Play(Qte_GradeSfxKey(timing_key));
 
     var w = _bc.player_weapon;
     if (!is_struct(w) || !variable_struct_exists(w, "power")) {
@@ -598,105 +685,73 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
         _bc.player_weapon = w;
     }
 
-    _bc.last_hit = timing_hit;
-    _bc.last_dmg = 0;
-    _bc.last_crit = false;
+    _bc.last_hit = true;
+    var crit_bonus = Status_GetSum(p, "crit_bonus");
+    _bc.last_crit = Combat_CritCheck(p, 1 + crit_bonus);
+    var dmg_pack = Combat_ApplyDamage(p, e, w, (_bc.last_crit ? 2 : 1), 1, { is_skill: false, grade_mult: timing.mult });
+    e = dmg_pack.defender;
+    var dealt = max(0, dmg_pack.dmg);
 
-    if (timing_hit) {
-        var crit_bonus = Status_GetSum(p, "crit_bonus");
-        _bc.last_crit = Combat_CritCheck(p, 1 + crit_bonus);
-        var dmg_pack = Combat_ApplyDamage(p, e, w, (_bc.last_crit ? 2 : 1), 1);
-
-        var base_dmg = max(0, dmg_pack.dmg);
-        var scaled_dmg = floor(base_dmg * timing_mult);
-        if (base_dmg > 0 && scaled_dmg < 1) scaled_dmg = 1;
-        scaled_dmg = clamp(scaled_dmg, 0, base_dmg);
-
-        var refund = base_dmg - scaled_dmg;
-        e = dmg_pack.defender;
-        if (refund > 0) {
-            e.hp = clamp(e.hp + refund, 0, e.max_hp);
-        }
-
-        // FUN-FIRST gear passives add bonus pressure after timing result.
-        var bonus_dmg = Equip_PlayerBonusDamage(p, e, scaled_dmg, false, timing_key);
-        if (bonus_dmg > 0) {
-            var spend = min(bonus_dmg, e.hp);
-            e.hp = max(0, e.hp - spend);
-            scaled_dmg += spend;
-        }
-
-        _bc.last_dmg = scaled_dmg;
-        p = Equip_PlayerPerfectHitApply(p, timing_key);
+    // FUN-FIRST gear passives add bonus pressure after the grade.
+    var bonus_dmg = Equip_PlayerBonusDamage(p, e, dealt, false, timing_key);
+    if (bonus_dmg > 0) {
+        var spend = min(bonus_dmg, e.hp);
+        e.hp = max(0, e.hp - spend);
+        dealt += spend;
     }
 
-    var side_fx = Equip_PassiveOnAttackResolved(p, e, timing_key, timing_hit, _bc.last_dmg);
+    _bc.last_dmg = dealt;
+    p = Equip_PlayerPerfectHitApply(p, timing_key);
+
+    var side_fx = Equip_PassiveOnAttackResolved(p, e, timing_key, true, _bc.last_dmg);
     p = side_fx.attacker;
     e = side_fx.defender;
     var passive_msg = side_fx.msg;
 
     p = Status_ConsumeByField(p, "consume_on_attack");
 
+    // D61 feedback: a Perfect freezes the picture for QTE_HITSTOP_PERFECT_MS first (also on a killing blow); the shakes follow it.
+    if (timing_key == QTE_PERFECT) {
+        _bc.hitstop_ms = QTE_HITSTOP_PERFECT_MS;
+    } else {
+        Battle_QteImpactFeedback(_bc);
+    }
+
     if (Battle_CheckEnd(_bc, p, e)) return;
 
-    if (!timing_hit) {
-        SFX_PlayMissOrBlocked(false, -1);
-        var m0 = Loc_T("combat.msg.player_miss", "You missed!");
-        if (passive_msg != "") m0 += " " + passive_msg;
-        Battle_Message(_bc, m0, BSTATE_ENEMY_ACT);
-    } else if (_bc.last_crit) {
-        if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
-            SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
-        }
-        var m1 = Loc_T("combat.msg.player_crit", "Critical hit! {dmg} damage!", { dmg: _bc.last_dmg });
-        if (passive_msg != "") m1 += " " + passive_msg;
-        Battle_Message(_bc, m1, BSTATE_ENEMY_ACT);
+    var msg;
+    if (_bc.last_crit) {
+        msg = Loc_T("combat.msg.player_crit", "Critical hit! {dmg} damage!", { dmg: _bc.last_dmg });
     } else {
-        if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
-            SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
-        }
-        var m2 = Loc_T("combat.msg.player_hit", "You hit for {dmg} damage!", { dmg: _bc.last_dmg });
-        if (passive_msg != "") m2 += " " + passive_msg;
-        Battle_Message(_bc, m2, BSTATE_ENEMY_ACT);
+        msg = Loc_T("combat.msg.player_hit", "You hit for {dmg} damage!", { dmg: _bc.last_dmg });
     }
+    if (passive_msg != "") msg += " " + passive_msg;
+    Battle_Message(_bc, msg, BSTATE_ENEMY_ACT);
 
     if (Battle_PlayerFinalizeTurn(_bc, p, e, 0)) return;
 }
 
+// One Step of the bar. The clock is ms from delta_time; a press is stamped at the top of the Step that sees it (QTE-01).
 function Battle_PlayerAttackTimingStep(_bc, _confirm_pressed) {
-    if (!_bc.attack_timing_started || !_bc.attack_timing_active) {
+    if (!_bc.qte_active) {
         Battle_AttackTimingBegin(_bc);
         return;
     }
 
-    var target = Battle_AttackTimingTarget(_bc);
-    _bc.attack_timing_target_x = target.x;
-    _bc.attack_timing_target_y = target.y;
-    _bc.attack_timing_x = target.x;
-    _bc.attack_timing_marker_alpha = min(1, _bc.attack_timing_marker_alpha + 0.20);
+    _bc.qte_ms += Qte_StepMs(delta_time);
 
-    if (_bc.attack_timing_input_lock > 0) _bc.attack_timing_input_lock -= 1;
-    if (!variable_instance_exists(_bc, "attack_timing_speed") || _bc.attack_timing_speed <= 0) {
-        _bc.attack_timing_speed = Battle_AttackTimingSpeedForEnemy(_bc.e);
-    }
-    _bc.attack_timing_y += _bc.attack_timing_speed;
-
-    if (_confirm_pressed && _bc.attack_timing_input_lock <= 0) {
-        var d = abs(_bc.attack_timing_y - _bc.attack_timing_target_y);
-        Battle_PlayerAttackResolveTimed(_bc, Battle_AttackTimingJudge(d));
-        return;
+    if (_confirm_pressed) {
+        var press_ms = Qte_BufferPress(_bc.qte_ms);
+        if (press_ms != QTE_NO_PRESS) {   // one press per attack: the first kept press ends the bar
+            _bc.qte_press_ms = press_ms;
+            Battle_PlayerAttackResolveTimed(_bc, Qte_Result(Qte_Grade(press_ms, _bc.qte_params, _bc.qte_assist)));
+            return;
+        }
     }
 
-    var ui_visual = UI_GetVisualScale();
-    var late_limit = _bc.attack_timing_target_y + round(ATTACK_WINDOW_BAD * ui_visual) + round(ATTACK_TIMING_END_MARGIN * ui_visual);
-    if (_bc.attack_timing_y >= late_limit) {
-        Battle_PlayerAttackResolveTimed(_bc, { key: "MISS", label: Loc_T("battle.action.timing.miss", "MISS"), mult: 0.00, hit: false });
-        return;
+    if (_bc.qte_ms >= _bc.qte_params.sweep_ms) {   // the cursor reached the end with no press
+        Battle_PlayerAttackResolveTimed(_bc, Qte_Result(Qte_Grade(QTE_NO_PRESS, _bc.qte_params, _bc.qte_assist)));
     }
-}
-
-function Battle_PlayerAttack(_bc) {
-    Battle_PlayerAttackResolveTimed(_bc, { key: "PERFECT", label: Loc_T("battle.action.timing.perfect", "PERFECT"), mult: 1.00, hit: true });
 }
 
 // Where a player skill's animation plays (BUG-21): self-targeted skills (the buffs) on the player, the rest on the enemy.
@@ -753,7 +808,7 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     }
 
     var fx = noone;
-    if (res.ok && res.fx_sprite != noone && (skill.effect != "damage" || res.hit)) {
+    if (res.ok && res.fx_sprite != noone) {   // D6: a player skill always lands, so its animation always plays
         fx = Battle_SkillFxSpawn(_bc, _skill_id, res.fx_sprite, res.fx_frames, res.fx_speed);
     }
 
@@ -777,9 +832,6 @@ function Battle_PlayerSkill(_bc, _skill_id) {
 
     if (res.msg != "") {
         Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT, fx);
-    } else if (!res.hit) {
-        SFX_PlayMissOrBlocked(false, -1);
-        Battle_Message(_bc, Loc_T("combat.msg.skill_miss", "Skill missed!"), BSTATE_ENEMY_ACT, fx);
     } else if (res.crit) {
         Battle_Message(_bc, Loc_T("combat.msg.skill_crit", "Critical skill! {dmg} damage!", { dmg: res.dmg }), BSTATE_ENEMY_ACT, fx);
     } else if (res.dmg > 0) {
@@ -1061,17 +1113,6 @@ function Battle_DefQTESpeedMultForEnemy(_enemy) {
     var extra_rank = max(0, rank - 1);
     var mult = DEF_QTE_SPEED_BASE_MULT + (extra_rank * DEF_QTE_SPEED_RANK_STEP);
     return clamp(mult, 1, DEF_QTE_SPEED_MULT_MAX);
-}
-
-function Battle_AttackTimingSpeedMultForEnemy(_enemy) {
-    var rank = Battle_DefQTEThreatRank(_enemy);
-    var extra_rank = max(0, rank - 1);
-    var mult = ATTACK_TIMING_SPEED_BASE_MULT + (extra_rank * ATTACK_TIMING_SPEED_RANK_STEP);
-    return clamp(mult, 1, ATTACK_TIMING_SPEED_MULT_MAX);
-}
-
-function Battle_AttackTimingSpeedForEnemy(_enemy) {
-    return ATTACK_TIMING_SPEED * UI_GetVisualScale() * Battle_AttackTimingSpeedMultForEnemy(_enemy);
 }
 
 function Battle_DefQTERandomDir() {
@@ -1495,6 +1536,94 @@ function Battle_DrawDirectionArrow(_x, _y, _dir, _size, _alpha = 1, _color = c_w
     draw_line(base_x + perp.x * half, base_y + perp.y * half, base_x - perp.x * half, base_y - perp.y * half);
     draw_line(tip_x, tip_y, tip_x - vec.x * wing + perp.x * wing, tip_y - vec.y * wing + perp.y * wing);
     draw_line(tip_x, tip_y, tip_x - vec.x * wing - perp.x * wing, tip_y - vec.y * wing - perp.y * wing);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
+// ---- QTE drawing (GUI layer, GUI units from Display_GuiW/H through the caller's ui_visual) ----
+// Only the four palette colours (QTE_COL_*): zones differ by brightness, the Perfect zone also by a pointer above the bar.
+function Qte_FillRect(_x, _y, _w, _h, _col) {
+    draw_set_color(_col);
+    draw_rectangle(_x, _y, _x + _w - 1, _y + _h - 1, false);
+}
+
+// The sliding bar at (_x, _y), size _w x _h, with the cursor at _ms. _unit = one design pixel in GUI units (the outline thickness).
+function Qte_DrawBar(_x, _y, _w, _h, _params, _assist, _ms, _unit, _alpha = 1) {
+    var o = max(1, round(_unit));
+    var a = clamp(_alpha, 0, 1);
+    var sweep = max(1, _params.sweep_ms);
+    var centre_x = _x + (_w * Qte_ZoneCentreMs(_params) / sweep);
+    var widen = max(1, _assist);
+    draw_set_alpha(a);
+
+    Qte_FillRect(_x - o, _y - o, _w + 2 * o, _h + 2 * o, QTE_COL_LIGHTEST);   // frame
+    Qte_FillRect(_x, _y, _w, _h, QTE_COL_DARK);                                 // track
+
+    // zones, widest first; each is clipped to the track
+    var halves = [_params.ok_half_width, _params.good_half_width, _params.perfect_half_width];
+    var cols = [QTE_COL_LIGHT, QTE_COL_LIGHTEST, QTE_COL_LIGHTEST];
+    for (var i = 0; i < 3; i++) {
+        var hw = _w * halves[i] * widen / sweep;
+        var zx0 = max(_x, round(centre_x - hw));
+        var zx1 = min(_x + _w, round(centre_x + hw));
+        if (zx1 > zx0) Qte_FillRect(zx0, _y, zx1 - zx0, _h, cols[i]);
+    }
+    // the Perfect zone: dark edges and a pointer above the bar
+    var phw = _w * _params.perfect_half_width * widen / sweep;
+    var px0 = round(centre_x - phw);
+    var px1 = round(centre_x + phw);
+    Qte_FillRect(px0, _y, o, _h, QTE_COL_DARKEST);
+    Qte_FillRect(px1 - o, _y, o, _h, QTE_COL_DARKEST);
+    var cx = round(centre_x);
+    for (var t = 0; t < 3; t++) {   // a small downward triangle over the zone's centre
+        Qte_FillRect(cx - (2 - t) * o, _y - o - (3 - t) * o, (2 - t) * 2 * o + o, o, QTE_COL_LIGHTEST);
+    }
+
+    // cursor: a light line with a dark outline, taller than the bar
+    var cur_x = round(_x + Qte_CursorPos(_ms, _params) * _w);
+    var ext = 2 * o;
+    Qte_FillRect(cur_x - o - o, _y - ext - o, 3 * o + o, _h + 2 * ext + 2 * o, QTE_COL_DARKEST);
+    Qte_FillRect(cur_x - o, _y - ext, 2 * o, _h + 2 * ext, QTE_COL_LIGHTEST);
+
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
+// The grade word, centred on (_x, _y). Four colours only, so grades differ by size and motion too:
+// PERFECT biggest and pops, GOOD big, OK plain, WEAK small, hollow (dark with a light outline) and sinks. _left_ms counts down from QTE_RESULT_MS.
+function Qte_DrawGradeWord(_key, _text, _x, _y, _left_ms, _unit) {
+    var elapsed = QTE_RESULT_MS - _left_ms;
+    var scale = 1;
+    var rise = 1;
+    var fill = QTE_COL_LIGHTEST;
+    var edge = QTE_COL_DARKEST;
+    switch (_key) {
+        case QTE_PERFECT: scale = 2.0; break;
+        case QTE_GOOD:    scale = 1.5; fill = QTE_COL_LIGHT; break;
+        case QTE_OK:      scale = 1.0; break;
+        default:        scale = 0.75; rise = -1; fill = QTE_COL_DARK; edge = QTE_COL_LIGHT; break;
+    }
+    if (_key == QTE_PERFECT && elapsed < 120) scale *= 1 + 0.35 * (1 - elapsed / 120);   // pop, then settle
+    var ease = 1 - sqr(1 - clamp(elapsed / 250, 0, 1));
+    var yy = _y - rise * ease * 6 * _unit;
+    var a = clamp(_left_ms / 150, 0, 1);
+
+    var tw = UI_TextWidth(_text) * scale;
+    var th = UI_TextHeight(_text) * scale;
+    var tx = _x - tw * 0.5;
+    var ty = yy - th * 0.5;
+    var o = max(1, round(_unit));
+    draw_set_alpha(a);
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+    draw_set_color(edge);
+    for (var ox = -1; ox <= 1; ox++) {
+        for (var oy = -1; oy <= 1; oy++) {
+            if (ox != 0 || oy != 0) UI_DrawTextTransformed(tx + ox * o, ty + oy * o, _text, scale, scale, 0);
+        }
+    }
+    draw_set_color(fill);
+    UI_DrawTextTransformed(tx, ty, _text, scale, scale, 0);
     draw_set_alpha(1);
     draw_set_color(c_white);
 }

@@ -1,6 +1,7 @@
+Display_DrawFrame();   // first Draw GUI of the frame draws the world (moves to obj_display's Draw GUI Begin)
 var gs = GameState_Get();
-var w = display_get_gui_width();
-var h = display_get_gui_height();
+var w = Display_GuiW();
+var h = Display_GuiH();
 
 UI_SetFont();
 var ui_visual = UI_GetVisualScale();
@@ -36,15 +37,8 @@ if (room == rm_battle && is_struct(ch)) {
     var bar_w = sprite_get_width(hp_bar_sprite) * scale;
     var bar_h = sprite_get_height(hp_bar_sprite) * scale;
 
-    var cam = view_camera[0];
-    var vp_w = w;
-    var vp_h = h;
-    if (view_enabled) {
-        vp_w = max(1, view_wport[0]);
-        vp_h = max(1, view_hport[0]);
-    }
-    var sx = vp_w / max(1, camera_get_view_width(cam));
-    var sy = vp_h / max(1, camera_get_view_height(cam));
+    var sx = Display_WorldScale();
+    var sy = sx;
     var cam_off = CameraShake_Offset();
     var gui_off_x = cam_off.x * sx;
     var gui_off_y = cam_off.y * sy;
