@@ -12,7 +12,7 @@ The order follows `research/plan-review.md`:
 3. Ask the owner only the questions for the thing about to be built (5-10 per topic), never 100 at once.
 4. Put game data in JSON that the game and the simulator both read, and settle the profile/run save split before any combat-data or save code.
 5. Build the combat core with the simulator available from the start, then runs and progression, then balance, screens and icons.
-6. Last: web export, Korean, release-candidate playtest. Then stop.
+6. Last: Windows release (zip), credits, Korean, release-candidate playtest. Then stop.
 
 Rules for every phase:
 - Test first. Write the failing check, watch it fail for the right reason, then build. (AGENTS.md Rule 1)
@@ -27,13 +27,13 @@ Rules for every phase:
 ## Phases
 
 - [ ] **Phase 1: Safe-now foundations** - test harness, old-bug repros and fixes, safe save writes, localization text fix
-- [ ] **Phase 2: Display and UI kit** - one display manager, cutscene/dialogue-end screen bug, HTML5 canvas fit, 9-slice/font/shared module, icon pipeline
+- [ ] **Phase 2: Display and UI kit** - one display manager, cutscene/dialogue-end screen bug, window and fullscreen handling, 9-slice/font/shared module, icon pipeline
 - [ ] **Phase 3: Sketches and run frame** - four throwaway sketches the owner plays; grills for the run frame and the save contract
 - [ ] **Phase 4: Data and saves** - game data in JSON, profile/run save split, seeded streams, memory cleanup
 - [ ] **Phase 5: Combat core** - formulas and simulator (5A), QTE (5B), turn-order bar (5C)
 - [ ] **Phase 6: Runs and progression** - run loop, death, unlocks, story flags, shuffles, cards, gold, shop, Nobody class
 - [ ] **Phase 7: Balance, screens, icons** - simulator pass with owner approval, styled screens, real icons
-- [ ] **Phase 8: Release** - web export, Korean, release-candidate playtest, then development stops
+- [ ] **Phase 8: Release** - Windows zip (Igor PackageZip), credits, Korean, release-candidate playtest, then development stops
 
 **Lanes (what can run at the same time).** Phases 1, 2 and 3 start together after the owner's go. They share no files: Phase 1 is tooling and a few bug fixes, Phase 2 is display and UI plumbing, Phase 3 is sketches in a scratch copy plus questions. Phase 4 needs Phase 1 (tests) and the save contract from Phase 3. Phases 5 and 6 need Phase 4. Phase 7 needs 5 and 6. Phase 8 needs everything. Icon pipeline work (Phase 2) touches no game code and runs in the background.
 
@@ -68,11 +68,11 @@ Rules for every phase:
 **Plans**: 5 waves
 
 ### Phase 2: Display and UI kit
-**Goal**: The picture is always the right size and never snaps, on every window size, in fullscreen, in the browser canvas, and when a cutscene or dialogue ends. The shared UI pieces exist. The icon pipeline is ready.
+**Goal**: The picture is always the right size and never snaps, on every window size, in fullscreen, and when a cutscene or dialogue ends. The shared UI pieces exist. The icon pipeline is ready.
 **Depends on**: Phase 1 waves 1A-1C (needs the screenshot matrix and the bot to repro the screen bug). The UI kit part needs the D8 text rule (G1). The icon pipeline needs only Phase 1's checker.
 **Requirements**: DISP-01 to DISP-15, UI-01, UI-02, UI-12, ART-01, ART-02, ART-07 (and the pointer bugs BUG-01, 10, 11, 29)
 **Order of work** (from `audit/resolution.md` section 4b):
-1. **Spike first** (`research/resolution-gamemaker.md` section 8): the six points with a screenshot or a logged number, plus (7) can Igor build HTML5 at all.
+1. **Spike first** (`research/resolution-gamemaker.md` section 8): the six points with a screenshot or a logged number.
 2. **Measure** the current screen bug: the bot records window, display, GUI, port and camera values around a cutscene end and a dialogue end, with screenshots (settles hypotheses H1-H4).
 3. **Cheap safe fixes**: keep the cutscene art until the exit fade is black (H2); window colour to black; stop calling `GameSettings_ApplyDisplay` from `Transition_Finish`; `window_center()` only when the size changed.
 4. **One display manager** (`obj_display` + `scr_display`), view 0 as 160x144, app surface drawn in Post Draw at an integer scale, GUI via `Display_GuiW/H`.
@@ -84,11 +84,11 @@ Rules for every phase:
   2. The screenshot matrix (all sizes, windowed and fullscreen) passes the pixel checker `tools/display/check_display.py`, run with `python -I`: exact rectangle, black bars, no blur (L4).
   3. Bot run of "cutscene ends" and "dialogue ends" in floor 1, 5 and 9.5: before and after screenshots have the same geometry, the last cutscene image fades out, and the display-apply counter does not move during the transition (L3 + L4).
   4. Five quick fullscreen toggles end in a correct layout with no coloured bars (L3 + L4).
-  5. In a browser the canvas fits at several browser sizes and stays sharp (L4).
+  5. Drag-resizing, maximising, minimising/restoring and moving the window leave the picture correct and sharp (L3 + L4).
   6. A source guard finds no `display_get_gui_*` call outside `scr_display` (L2).
   7. The owner walks the 4c checklist in `audit/resolution.md` once and signs off the cutscene-end and dialogue-end rows (L5).
   8. One screen uses the shared panel and font in English and Korean (L4).
-**Owner / IDE tasks**: create `obj_display` and `scr_display`; set every room's view 0 port to 160x144; fix `rm_floor6_5` (only 144 wide) and the floor view borders; set `option_window_colour` to black; import the 9-slice sprite and add the pixel font; set the 9-slice flag. Removing the Opera GX target waits for Phase 8.
+**Owner / IDE tasks**: create `obj_display` and `scr_display`; set every room's view 0 port to 160x144; fix `rm_floor6_5` (only 144 wide) and the floor view borders; set `option_window_colour` to black; import the 9-slice sprite and add the pixel font; set the 9-slice flag.
 **Domain skills**: `game-ui-ux`, `create-game-assets`.
 **grill-me needed?**: G1 (3 decisions): how text is drawn on the 640x576 grid at windowed scales 3-5; fullscreen at integer scale only or fit-to-window; the result of the Korean legibility spike. **Decided here once and not asked again in Phase 7.**
 **Plans**: TBD
@@ -124,7 +124,7 @@ Rules for every phase:
   2. The Python tools read the same files (a read-back test) (L2).
   3. An old-format save fixture is rejected with the friendly message and no crash; a new run save round-trips exactly (L2 + L3).
   4. A corrupt run file leaves the profile intact and the reverse does not crash (L2).
-  5. The golden-sequence test passes on Windows (the web run is in Phase 8) (L2).
+  5. The golden-sequence test passes on Windows (L2).
   6. A bot loop of 20 runs shows no growth in live ds structures (L3).
 **Owner / IDE tasks**: none expected.
 **Domain skills**: `save-systems`.
@@ -204,19 +204,20 @@ Rules for every phase:
 **Plans**: TBD
 
 ### Phase 8: Release
-**Goal**: A friend can open a web link or a Windows zip, play the whole game in English or Korean, and nothing in the owner's last playtest blocks them. Then development stops (D28).
+**Goal**: A friend can unzip one Windows download, play the whole game in English or Korean with keyboard or controller, and nothing in the owner's last playtest blocks them. Then development stops (D28, D52).
 **Depends on**: Phases 1-7.
-**Requirements**: WEB-01 to WEB-09, LOC-01, LOC-02, LOC-04, ROB-01 (and the old pointer bug BUG-26)
-**Work**: HTML5 export through Igor (from the Phase 2 spike result); the namespace patch script; the hand-off zip and note for `live-miguisanson-dev`; remove the Opera GX target in the IDE; the golden-sequence test and a mid-run reload in the browser; the time-based timer conversion and a frame-throttled bot run (ROB-01); Korean batch and the missing-translation check; strip debug keys in release; Windows zip; size and load-time numbers; release-candidate playtest.
+**Requirements**: REL-01 to REL-07, LOC-01, LOC-02, LOC-04, ROB-01 (and the old pointer bug BUG-26)
+**Work**: Igor `PackageZip` release build from the wrapper; zip contents check (exe, `data.win`, licences, credits); credits screen with the owner's list (GAP-05); clean-profile start test; the time-based timer conversion and a frame-throttled bot run (ROB-01); Korean batch and the missing-translation check; strip debug keys in release; zip size and start-up numbers; release-candidate playtest on a named build id.
 **Success Criteria** (what must be TRUE):
-  1. One command produces the HTML5 export and the patch check finds the namespace string in `DD-Project.js` (L1 + L2).
-  2. In a browser: start, keyboard input, sound after first click, a save and load round trip for both parts, a page reload mid-run, and the seed golden test (L3 + L4).
+  1. One command produces the release zip, and the contents check passes: exe, `data.win`, licences and credits, nothing extra (L1 + L2).
+  2. The zip, unpacked into a fresh folder under a clean Windows user profile, starts, writes its saves to `%LOCALAPPDATA%\DD_Project`, and resumes a run after quitting (L3 + L5).
   3. The missing-translation check lists zero Korean gaps (L2); Korean screenshots of every screen fit (L4).
   4. Release builds have debug keys off (L2).
-  5. The owner (and a friend if possible) plays a named release-candidate build: one full winning run to the credits and at least two other runs including a death, and no P1 is open in `ISSUES.md` (L5).
-**Owner / IDE tasks**: remove the Opera GX target; confirm the project opens clean; run the HTML5 export in the IDE if Igor cannot.
-**Domain skills**: `save-systems` (browser storage), `audio-design` (browser audio start).
-**grill-me needed?**: No design decisions. The owner decides if the download size is acceptable and reviews the Korean batch.
+  5. The whole game plays with keyboard alone and with a controller alone (L5).
+  6. The owner (and a friend if possible) plays a named release-candidate build: one full winning run to the credits and at least two other runs including a death, and no P1 is open in `ISSUES.md`. Then development stops (L5).
+**Owner / IDE tasks**: confirm the project opens clean; hand the zip to the `live-miguisanson-dev` site (its job: swap the play page for a download link).
+**Domain skills**: `save-systems` (save folder), `audio-design` (credits and final levels).
+**grill-me needed?**: No design decisions. The owner decides if the zip size is acceptable and reviews the Korean batch.
 **Plans**: TBD
 
 ## Grill-me topics (one place)

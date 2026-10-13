@@ -49,7 +49,7 @@ Rules: L5 alone is never enough for anything L1-L4 can see. A requirement may li
 
 ### DISP - Display and resolution (Phase 2)
 
-- [ ] **DISP-01**: The six unverified points in `research/resolution-gamemaker.md` section 8 are each answered with evidence (a screenshot or a logged number) in a spike note before any rebuild. A seventh point is added: can Igor build HTML5. *Check: L4.*
+- [ ] **DISP-01**: The six unverified points in `research/resolution-gamemaker.md` section 8 are each answered with evidence (a screenshot or a logged number) in a spike note before any rebuild. *Check: L4.*
 - [ ] **DISP-02**: One persistent display manager (`obj_display` + `scr_display`) is the only code that calls window, view, camera, surface or GUI-size functions. `obj_sfx_manager` no longer owns display. *Check: L2 (source guard) + L4.*
 - [ ] **DISP-03**: `Display_CalcLayout` is a pure function; for the window sizes in `resolution-gamemaker.md` section 7.1 it returns the expected scale and offsets (largest whole-number scale that fits, centred). *Check: L2.*
 - [ ] **DISP-04**: At every size in the matrix the picture is exactly `160*s x 144*s`, centred; everything outside is pure black; downsampling the picture reproduces the 1x reference (no blur). The window colour is black, not red (`options_main.yy` is 255 today). *Check: L4.*
@@ -59,7 +59,7 @@ Rules: L5 alone is never enough for anything L1-L4 can see. A requirement may li
 - [ ] **DISP-08**: The display is re-applied only on boot, on Settings Apply, on a real window or display size change, and on focus regain. Never on transition end, cutscene end, save load or run start. A counter in the scenario run proves it. *Check: L3.*
 - [ ] **DISP-09**: UI and text are authored on a 640x576 grid (D8) through `Display_GuiW()` / `Display_GuiH()`. All 18 `display_get_gui_width/height` call pairs (36 calls in 11 files; the audit's own list in `audit/resolution.md` section 1d, whose "17" is an undercount) are replaced; a source guard fails if any remains. *Check: L2 (source guard) + L4.*
 - [ ] **DISP-10**: `rm_floor6_5` (144 wide) and the floor view borders are fixed in the IDE by the owner, and no area outside the room is visible. *Check: L4.*
-- [ ] **DISP-11**: HTML5 build: the canvas fits the browser window at several browser sizes with the correct aspect and a sharp picture (no blur), and the game stays correct after a browser resize and after fullscreen. *Check: L4 (browser screenshots).*
+- [ ] **DISP-11**: **CHANGED (D52).** Window handling on Windows: the player can drag-resize or maximise the window, minimise and restore it, and move it to another monitor; the picture stays the largest whole-number scale that fits, sharp, centred, with black bars, and is still correct after fullscreen on and off. *Check: L3 + L4.*
 - [ ] **DISP-12**: Layout uses anchors and `Display_GuiW/H` only, so odd aspect ratios (tall 600x1000, ultrawide 3440x1440) show a correct picture with black bars. No Android work is done (D28). Cut first if time runs short. *Check: L4.*
 - [ ] **DISP-13**: Screen shake moves the camera from a Step event with whole-pixel offsets, not from Draw GUI. *Check: L3.*
 - [ ] **DISP-14**: Settings migrate `fit_screen` to a clear `fullscreen` flag. The current `settings_version` is 7 (`scr_save.gml:66`; the "6" in `audit/resolution.md` is stale), so this bumps it to 8. Settings live in the profile save (SAVE-01). *Check: L2.*
@@ -147,7 +147,7 @@ Source: `research/roguelike-design.md` option A and `research/roguelike-cases.md
 - [ ] **RUN-08**: Skipping a story moment that was already seen leaves the world exactly as playing it would (flags set, items given, doors changed, camera and player in place). No screen jump (DISP-06/07). *Check: L3 + L4.*
 - [ ] **RUN-09**: Beating the final boss shows the ending and credits the first time (D31). Later wins go to the run-end screen and do not repeat the story (inferred from D26 + D31; confirm in G2). There are no credits in the code today, so they are drawn text in an existing room (no new room). *Check: L3 + L4.* [GRILL: G2]
 - [ ] **RUN-10**: Run length (D30): a bot run through a full game measures walking, cutscene and fight time, and the owner-played winning run lands in 45-60 minutes with all ~10 floors in one sitting. If it is longer, cut walking before content. *Check: L3 (measure) + L5.*
-- [ ] **RUN-11**: Seeded randomness (D33). One run seed. Separate counter-based streams per purpose (card offers, shop stock, enemy placement, elite variants, chest/loot, combat/QTE); cosmetic effects use plain `random()` and never touch them. The run save stores the seed and one counter per stream, not generator state. The generator uses no 64-bit or sign-dependent bit operations (HTML5 hazard, `roguelike-cases.md` section 4.2). A golden-sequence test (seed 12345, first 100 outputs per stream) passes on Windows and on the web export. Saving and reloading at an offer shows the same cards. *Check: L2 + L3 (+ browser run in Phase 8).*
+- [ ] **RUN-11**: Seeded randomness (D33). One run seed. Separate counter-based streams per purpose (card offers, shop stock, enemy placement, elite variants, chest/loot, combat/QTE); cosmetic effects use plain `random()` and never touch them. The run save stores the seed and one counter per stream, not generator state. The generator uses no 64-bit or sign-dependent bit operations (kept simple on purpose; `roguelike-cases.md` section 4.2). A golden-sequence test (seed 12345, first 100 outputs per stream) passes on Windows. Saving and reloading at an offer shows the same cards. *Check: L2 + L3.*
 - [ ] **RUN-12**: Per-run shuffles (D33), all from data tables and the streams above: card offers and shop stock; which enemies appear at which spawn point (per-floor pools); chest contents and loot (per-floor tables). Rooms are not changed. Spawning a different kind at an existing spawn point may need an owner IDE step (decided by prototype P1). *Check: L2.*
 - [ ] **RUN-13**: Elite variants (D33): an enemy can spawn as an elite through data modifiers (for example armored, swift) with a better reward. No new sprites or objects. Chance and modifier list are in data. *Check: L2.*
 - [ ] **RUN-14**: A run can be saved and resumed. Where saving is possible (beds only as today, or a pause-menu "save and quit" at any safe moment) is decided in G2; whichever is chosen, resume continues with the same seed and counters. *Check: L3.* [GRILL: G2]
@@ -169,9 +169,9 @@ Source: `research/roguelike-design.md` option A and `research/roguelike-cases.md
 
 ### ROB - Robustness (new from the plan review; Phases 4, 5, 8)
 
-Only the audit items that still matter for a game where one session plays many runs and the web build drops frames more than Windows.
+Only the audit items that still matter for a game where one session plays many runs.
 
-- [ ] **ROB-01**: About 352 step-counted timers exist outside the QTE and turn code (fades, dialogue typing, skill hold, effects; `codebase/CONCERNS.md`). The ones that change gameplay feel or flow run on a clock, not on Step counts, and a frame-throttled bot run gives the same outcomes. The rest are listed and left. *Check: L3.* (Phase 8, with the web test.)
+- [ ] **ROB-01**: About 352 step-counted timers exist outside the QTE and turn code (fades, dialogue typing, skill hold, effects; `codebase/CONCERNS.md`). The ones that change gameplay feel or flow run on a clock, not on Step counts, and a frame-throttled bot run (simulated frame hitches, for example a dragged window) gives the same outcomes. The rest are listed and left. *Check: L3.* (Phase 8.)
 - [ ] **ROB-02**: Input is forgiving and consistent: one early press is buffered for the next prompt; no dead frames between arrows; a wrong key does not fail the sequence at once; `Input_Update` no longer returns early on the same millisecond (`scr_input.gml:242`); held keys repeat in every list (`audit/ui.md` P9). *Check: L3.* (Phases 5 and 7.)
 - [ ] **ROB-03**: Memory does not grow over repeated runs. Every `ds_*` create has a destroy path (18 creates against 6 destroys today; add CleanUp events or destroy at room/run end), and globals are not re-created every Step. A bot loop of 20 runs shows no growth in live ds structures. *Check: L2 + L3.* (Phase 4.)
 
@@ -216,17 +216,15 @@ The text-size rule on the 640x576 grid (D8) is decided once, in Phase 2 (grill G
 - [ ] **ART-07**: Every icon is hand-cleaned at 16x16 (expect to redraw most; `icons-comfyui.md` section 8). A checker script confirms each file is 16x16 with only the four colours plus transparent. *Check: L2.*
 - [ ] **ART-08**: The owner imports sprites through the IDE. After that, code points `icon_sprite` at them and the placeholder helper functions (`Status_AssignPlayerBuffIconsFromFX`, `Status_AssignMissingIconsFromSkillFX`) are removed. *Check: L1 + L4.*
 
-### WEB - Release builds (Phase 8)
+### REL - Release build, Windows only (Phase 8; was WEB, D52)
 
-- [ ] **WEB-01**: The HTML5 export builds from the wrapper using Igor, with no IDE. This is unverified today (only Windows was tried); the spike is in Phase 2. *Check: L1.*
-- [ ] **WEB-02**: The Opera GX target is removed in the IDE by the owner (D15). *Check: L1.*
-- [ ] **WEB-03**: After each export, a script re-applies the account-namespace hook in `DD-Project.js` where `_V9._U54=_Q54()` is assigned: append `(window.__MIGUISANSON_GAME_INSTANCE__||"guest")+"."` to the prefix (`live-miguisanson-dev/games/dd-project/README.md`). A check confirms the string is present in the output. The exported `index.html` is not copied. *Check: L2.*
-- [ ] **WEB-04**: The hand-off to `live-miguisanson-dev` is a zip of `html5game/` plus a short note with the exact steps from that README. This repo does not deploy. *Check: L1 + review.*
-- [ ] **WEB-05**: In a browser, the game starts, takes keyboard input, plays sound after the first interaction, and a save and load round trip works for both save parts (profile and run), including a page reload in the middle of a run. `screen_save` does not work on HTML5, so browser screenshots are taken from outside the game. The RUN-11 golden-sequence test passes in the browser. *Check: L3 (browser) + L4.*
-- [ ] **WEB-06**: Download size and first-load time are measured and reported (the Windows `data.win` was 78 MB, `automation-igor.md` section 2.4). The owner decides if it is acceptable. *Check: measurement.*
-- [ ] **WEB-07**: Debug keys and debug overlays are off in release exports (closes old BUG-26). *Check: L2.*
-- [ ] **WEB-08**: A Windows zip for friends is built with Igor `PackageZip` (`automation-igor.md` section 2.4). *Check: L1.*
-- [ ] **WEB-09**: A release-candidate playtest by the owner (and a friend, if possible) on a named build id has no open P1. One run is a sample of one, so it covers a full winning run to the credits plus at least two other runs including a death. *Check: L5.*
+- [ ] **REL-01**: **From WEB-08 and WEB-01.** The Windows release zip is built with Igor `PackageZip` from the wrapper, with no IDE and no installer (`automation-igor.md` section 2.4); `--cache`, `--temp` and the output are on E:. *Check: L1.*
+- [ ] **REL-02**: Zip contents check (new): the zip holds the .exe, `data.win`, and the licences and credits files (fonts, MIT libraries, sound and music creators; GAP-05), and no debug leftovers, test fixtures or scratch saves. A script lists the zip and fails on a missing or extra file. *Check: L2.*
+- [ ] **REL-03**: Clean start (new): the zip is unpacked into a fresh folder and run under a clean Windows user profile (or a fresh `LOCALAPPDATA`). It starts, creates its saves in `%LOCALAPPDATA%\DD_Project`, plays, quits and resumes. Nothing is written next to the .exe or on C: outside the save folder. *Check: L3 + L5.*
+- [ ] **REL-04**: Input (new): the whole game, from title to credits, is played with the keyboard alone and with a controller alone on the release build. *Check: L5.*
+- [ ] **REL-05**: **From WEB-06.** The zip size and the start-up time are measured and reported (the Windows `data.win` was 78 MB, `automation-igor.md` section 2.4). The owner decides if it is acceptable. *Check: measurement.*
+- [ ] **REL-06**: **From WEB-07.** Debug keys and debug overlays are off in the release build (closes old BUG-26). *Check: L2.*
+- [ ] **REL-07**: **From WEB-09.** A release-candidate playtest by the owner (and a friend, if possible) on a named build id has no open P1. One run is a sample of one, so it covers a full winning run to the credits plus at least two other runs including a death. After it passes, development stops (D28). *Check: L5.*
 
 ### LOC - Localization (text fixes in Phase 1, batch in Phase 8)
 
@@ -254,14 +252,14 @@ Two save parts, each with its own schema version. The field lists are fixed in g
 - [ ] **GAP-01**: Every new feedback moment (QTE grades, arrow presses, card pick, shop buy, turn-bar stun, death, unlock) has a sound: existing sounds reused first, jsfxr-style SFX only for gaps (D41); levels on the existing buses (`audio-design`). Each place uses a fitting existing music track with fades (D42). No feature ships silent. *Check: L3 (sound id fired per event, logged) + L5.*
 - [ ] **GAP-02**: New sprite work outside icons is listed and sized before Phase 6: Nobody skill animations, merchant sprite, an elite marker that reads in 4 colours (outline/aura/badge), card frame art. Reuse/recolour first, ComfyUI only for gaps (D43). *Check: L4 screenshot of each in game.*
 - [ ] **GAP-03**: Just-in-time prompts teach the turn bar, each QTE type, card picks, the shop and beds (one prompt per mechanic, first time only, stored in the profile); a Help page in the pause menu repeats them (D45). *Check: L3 (prompt shows once, never on run 2) + L5.*
-- [ ] **GAP-04**: Every run writes a small local run log (build id, seed, class, floor reached, cause of death, cards taken, gold spent, QTE grade counts). Windows: file in the save folder; web: "copy run log" button on the run-end screen; no upload (D51). The simulator reads it. *Check: L2 (log schema) + L3 (bot run produces a log).*
+- [ ] **GAP-04**: Every run writes a small local run log (build id, seed, class, floor reached, cause of death, cards taken, gold spent, QTE grade counts). The log is a local file in the save folder (`%LOCALAPPDATA%\DD_Project`); no upload, no in-game button (D51, amended by D52). The simulator reads it. *Check: L2 (log schema) + L3 (bot run produces a log).*
 
 - [ ] **GAP-05**: Credits screen lists every sound/music creator supplied by the owner (D40), plus fonts/tools/licences used (Galmuri OFL, MIT libraries). *Check: L4 screenshot + list matches `datafiles/credits` source.*
 - [ ] **GAP-06**: Auto-save on room change, after each fight and on quit; "Continue run" on launch; no reload after death (D46). *Check: L3 (bot quits mid-run, relaunch resumes same room/HP; death deletes the run save).*
 - [ ] **GAP-07**: Beds are rest sites: once per run per bed, choose heal OR upgrade one owned skill (D47). *Check: L3 + L5.*
 - [ ] **GAP-08**: Hold confirm ~1 s skips a cutscene/camera pan and marks it seen; a tap only advances text (D48). *Check: L3.*
-- [ ] **GAP-09**: Settings: QTE assist, key rebinding (keyboard; works in the browser), text speed, screen shake on/off, plus existing volume/language/window size (D49). Saved in the profile. *Check: L2 + L3.*
-- [ ] **GAP-10**: Web: play page warns that clearing browser data erases saves; phones get an "unsupported" message; full run passes on desktop Chrome, Firefox and Edge (D50). If any of these can't be met, the Windows download becomes the only offering (D39). *Check: L5 per browser + WEB rows.*
+- [ ] **GAP-09**: Settings: QTE assist, key rebinding (keyboard), text speed, screen shake on/off, plus existing volume/language/window size (D49). Saved in the profile. *Check: L2 + L3.*
+- [ ] **GAP-10**: **RETIRED (D52).** Was the web play-page warning, the phone message and the Chrome/Firefox/Edge matrix. The Windows release rows REL-01 to REL-07 replace it.
 
 ## Cut order (D28)
 
@@ -270,7 +268,7 @@ The must-haves are card picks, the turn-order bar, gold and shop, and the new QT
 ## Not built, ever (D28: no post-release)
 
 There is no "later". These were listed as later before; they are now simply out:
-- Android, porting, phone browsers, touch controls (D38, D50).
+- Android, porting, touch controls (D38). Web/HTML5 build and browser play (D52).
 - Bestiary and enemy-skill icons (the 13 optional enemy icons in `audit/icons-needed.md` section 3).
 - QTE calibration screen, auto-success and QTE-off options (QTE-13 is narrowed).
 - A post-win difficulty ladder, daily or entered seeds, run modifiers, a node map or procedural floors (`roguelike-design.md` options A+, B, C). Not decided, so not built.
@@ -281,13 +279,14 @@ There is no "later". These were listed as later before; they are now simply out:
 |---------|--------|
 | Android / porting | Never (D38) |
 | Porting to other engines or platforms | Never (D38) |
-| GX.games / Opera GX | D15: own site instead |
+| GX.games / Opera GX | D15, D52: Windows only |
+| Web / HTML5 build, browser saves, browser test matrix | D52: Windows only; a zip linked from the owner's site |
 | Old save compatibility | D16: clean break |
 | New floors, new story, new content beyond the decisions | D1, D28. The only new class is the Nobody (D34, already in the game) |
 | Easy/Normal/Hard | D35: one difficulty plus a QTE assist |
 | Permanent stat power between runs | D32: unlocks and a death gift only |
 | Store and legal work | D2: free release |
-| Deploying the website | D15: other repo's job |
+| Deploying the website or its download page | D52: other repo's job |
 
 ## Replaced or changed by D25-D36 and the plan review
 
@@ -307,6 +306,24 @@ There is no "later". These were listed as later before; they are now simply out:
 | Death reloads the latest save slot | REPLACED by RUN-02 | D26 |
 | "Classic JRPG grind" / respawn farming | REPLACED by resource management inside a run (RUN-15 decides respawns) | D14 amended by D25 |
 | VER-14 (whole gate in ~40 s) | SPLIT into fast and full gate | plan review 1b item 4 |
+| WEB category (9 rows) | RENAMED to REL (Windows release), 7 rows | D52 |
+| WEB-01 (HTML5 export through Igor) | REMOVED; its "Igor builds from the wrapper" part lives on in REL-01 | D52 |
+| WEB-02 (remove the Opera GX target) | REMOVED | D52 |
+| WEB-03 (account-namespace hook) | REMOVED | D52 |
+| WEB-04 (hand-off zip to `live-miguisanson-dev`) | REMOVED | D52 |
+| WEB-05 (browser start, sound unlock, browser saves, reload mid-run) | REMOVED; save round trips stay in SAVE-03 and GAP-06, golden test in RUN-11 on Windows | D52 |
+| WEB-06 (size and first-load time) | CHANGED to REL-05 (zip size and start-up time) | D52 |
+| WEB-07 (debug keys off) | RENAMED to REL-06 | D52 |
+| WEB-08 (Windows zip) | RENAMED to REL-01 | D52 |
+| WEB-09 (release-candidate playtest) | RENAMED to REL-07 | D52 |
+| REL-02, REL-03, REL-04 | NEW: zip contents, clean-profile start, keyboard and controller | D52 |
+| DISP-01 (seventh point: Igor HTML5) | CHANGED: the seventh point is dropped | D52 |
+| DISP-11 (HTML5 canvas fit) | CHANGED to Windows window resize, move and fullscreen handling | D52 |
+| RUN-11 (golden test on the web export) | CHANGED: Windows only | D52 |
+| ROB-01 (web frame drops) | CHANGED: simulated frame hitches on Windows | D52 |
+| GAP-04 ("copy run log" button) | CHANGED: local file only | D52 |
+| GAP-09 (rebinding works in the browser) | CHANGED: keyboard only | D52 |
+| GAP-10 (web warnings, phones, browser matrix) | RETIRED | D52 |
 
 ## Traceability
 
@@ -326,7 +343,7 @@ Each requirement maps to one primary phase (`ROADMAP.md`). Where a later phase r
 | TURN-01 to TURN-07 | Phase 5 (5C) | Pending |
 | RUN-01 to RUN-16, PROG-01 to PROG-10, SAVE-07, UI-15 (plain), PROG-09 | Phase 6 | Pending |
 | BAL-03 to BAL-06, UI-03 to UI-11, UI-13 to UI-15 (styled), ART-03 to ART-06, ART-08, LOC-05, ROB-02 (UI part) | Phase 7 | Pending |
-| WEB-01 to WEB-09, LOC-01, LOC-02, LOC-04, ROB-01 | Phase 8 | Pending |
+| REL-01 to REL-07, LOC-01, LOC-02, LOC-04, ROB-01 | Phase 8 | Pending |
 
 **Closed-by map for the 17 pointer rows moved out** (not requirements; each still has its `ISSUES.md` row):
 
@@ -344,14 +361,16 @@ Each requirement maps to one primary phase (`ROADMAP.md`). Where a later phase r
 | BUG-22 | STAT-07 |
 | BUG-23 | STAT-11 |
 | BUG-25 | QTE-11 |
-| BUG-26 | WEB-07 |
+| BUG-26 | REL-06 |
 | BUG-28 | UI-09 |
 
 **Coverage**
 - Before this revision: 154 requirements (16 VER + 15 DISP + 29 BUG + 13 STAT + 7 TURN + 15 QTE + 9 PROG + 7 BAL + 14 UI + 8 ART + 9 WEB + 5 LOC + 7 SAVE), of which 17 were pointer rows, so about 137 real.
 - After this revision: **159** requirements = 16 VER + 15 DISP + 12 BUG + 13 STAT + 7 TURN + 15 QTE + 16 RUN + 10 PROG + 3 ROB + 7 BAL + 15 UI + 8 ART + 9 WEB + 5 LOC + 8 SAVE. (154 - 17 pointer rows - 1 retired STAT-13 + 23 new: RUN 16, ROB 3, SAVE-08, PROG-10, UI-15, STAT-14.) Eight requirements marked REPLACED, CHANGED, REWRITTEN, MOVED, RESHAPED or NARROWED keep their IDs.
-- Mapped to phases: 159. Unmapped: 0.
+- **After D52 (2026-10-14): 157** requirements = the same as above with WEB 9 replaced by REL 7 (WEB-01 to WEB-05 removed, REL-01 to REL-07 in place; REL-02, 03, 04 are new). 159 - 9 + 7 = 157. DISP-11 stays as a changed row, so DISP is still 15.
+- The GAP rows (GAP-01 to GAP-10, added after the count above) were never in the 159. After D52, GAP-10 is retired, so 9 GAP rows remain open: listed total 166 (157 + 9); before D52 it was 169 (159 + 10).
+- Mapped to phases: 157 (plus the 9 GAP rows, which are built in the phase their feature lands in). Unmapped: 0.
 
 ---
 *Requirements defined: 2026-10-13*
-*Last updated: 2026-10-14 for D25-D36 (roguelike) and the plan review*
+*Last updated: 2026-10-14 for D25-D36 (roguelike), the plan review and D52 (Windows only)*

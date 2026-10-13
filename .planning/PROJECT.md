@@ -16,10 +16,10 @@ If a choice has to be made between a new feature and a fight that feels fair, th
 
 ## Audience and platforms
 
-- **Audience:** the owner's friends and the owner's portfolio. Free release, itch.io style. No store or legal work. (D2)
-- **Platforms:** Windows and web (HTML5). (D3)
-- **Android / porting:** never (D38). Web is the main way to play; a Windows download is always offered and is the fallback if web fails (D39).
-- **Web hosting:** the owner's own site, repo `live-miguisanson-dev`, page `/play/dd-project`. This repo only produces the HTML5 export; deploying is that repo's job. Not GX.games; the Opera GX target is dropped (removed in the IDE, never by hand-editing). (D15)
+- **Audience:** the owner's friends and the owner's portfolio. Free release. No store or legal work. (D2)
+- **Platform:** Windows only (D52, which amends D3 and D39). The game ships as a zip with the .exe, built with Igor `PackageZip`, no installer. There is no web or HTML5 build at all.
+- **Android / porting:** never (D38).
+- **Download page:** the owner's own site (repo `live-miguisanson-dev`) links the zip. This repo only produces the zip; the site is that repo's job. (D52)
 
 ## Requirements
 
@@ -29,20 +29,21 @@ If a choice has to be made between a new feature and a fight that feels fair, th
 
 ### Active
 
-All v2.0 requirements are in `REQUIREMENTS.md` (159 requirements in categories VER, DISP, BUG, STAT, TURN, QTE, RUN, PROG, ROB, BAL, UI, ART, WEB, LOC, SAVE). Phases are in `ROADMAP.md` (8 phases). The owner's one-page view is `BOARD.md`.
+All v2.0 requirements are in `REQUIREMENTS.md` (157 requirements in categories VER, DISP, BUG, STAT, TURN, QTE, RUN, PROG, ROB, BAL, UI, ART, REL, LOC, SAVE). Phases are in `ROADMAP.md` (8 phases). The owner's one-page view is `BOARD.md`.
 
 ### Out of Scope
 
-- **Android, porting, any phone support.** (D38, D50)
+- **Android, porting, any phone support.** (D38)
+- **Web / HTML5 build, browser play, browser saves.** The game is Windows-only. (D52)
 - **Porting to other engines or consoles: dropped for good (D38).** The old porting branches are history only; `v1.8` already contains all of them (`STATE.md`). (D1)
-- **GX.games / Opera GX.** (D15)
+- **GX.games / Opera GX.** (D15, D52)
 - **Old save compatibility.** Old saves are rejected with a friendly message. (D16)
 - **New floors, new story, new content beyond the decisions.** The only new class is the Nobody, which already exists in the game. (D1, D28)
 - **Easy / Normal / Hard.** One difficulty plus a QTE assist option (wider windows). (D35)
 - **Permanent stat power between runs.** Unlocks and a death gift only. (D32)
 - **A node map, procedural floors, a post-win difficulty ladder, daily or entered seeds.** Researched (`roguelike-design.md`), not decided, so not built. (D25, D28)
 - **Store and legal work.** (D2)
-- **Deploying the website.** That is the `live-miguisanson-dev` repo's job. (D15)
+- **Deploying the website or its download page.** That is the `live-miguisanson-dev` repo's job. (D52)
 - **Full touch controls.** (D28)
 
 ## Context
@@ -62,23 +63,23 @@ All v2.0 requirements are in `REQUIREMENTS.md` (159 requirements in categories V
 - **Two grids:** the world is 160x144 pixels. UI and text are authored on a 640x576 grid (4x). (D8)
 - **Korean is kept, English first.** Korean is filled in one batch before release and a check flags missing translations. All player-facing text goes through `datafiles/localization/game_text.xlsx`; never hand-edit `localization.json`. New text (death lines, unlock names, credits) is kept minimal (D28). (D9; `CLAUDE.md`)
 - **Game data is JSON under `datafiles/`,** read by the game and by the Python simulator. Names and descriptions are localization keys, not JSON text. (BAL-01)
-- **Randomness is seeded per run** through the game's own streams, not the built-in global generator, and must give the same numbers on Windows and the web export. (RUN-11)
+- **Randomness is seeded per run** through the game's own streams, not the built-in global generator, and give the same numbers for the same seed on every run. (RUN-11)
 - **Drive C: must keep 80-90 GB free.** It was 71 GB on 2026-10-13 and about 80-82 GB after a cleanup on 2026-10-14 (rule still not fully met). Builds, caches, temp files, ComfyUI output and screenshots go on E:. Igor must always be run with `--cache` and `--temp` on E:.
 - **Real saves are never touched by automation.** The game's save area is `%LOCALAPPDATA%\DD_Project`. Every automated run sets `LOCALAPPDATA` to a scratch folder (`automation-igor.md` section 2.8).
 - **Never print `%APPDATA%\GameMakerStudio2\um.json`.** It holds live tokens (`automation-igor.md` section 2.1).
 - **Test first.** The failing check comes before the implementation. Never weaken a check to get green. (AGENTS.md Rule 1; global `CLAUDE.md`)
 - **Design decisions are the owner's.** Agents ask with grill-me, one decision at a time, with a recommendation. They do not "take the recommended option" for player-facing design while the owner is away. (`lessons-from-past-projects.md` 4.5)
-- **Tooling limits (verified):** only the Windows VM Release build was proven with Igor; YYC, `--debug`, HTML5 and Android were not tried (`automation-igor.md` section 5). Igor catches syntax errors but not unknown functions (section 2.6).
+- **Tooling limits (verified):** only the Windows VM Release build was proven with Igor; YYC and `--debug` were not tried (`automation-igor.md` section 5). Igor catches syntax errors but not unknown functions (section 2.6).
 
 ## Key Decisions
 
-The full, locked list is `.planning/research/DECISIONS.md` (D1-D36: D1-D24 grill-me 2026-10-13, D25-D36 grill-me 2026-10-14). Changing one needs a new grill-me. Summary:
+The full, locked list is `.planning/research/DECISIONS.md` (D1-D52: D1-D24 grill-me 2026-10-13, D25-D36 and later grill-me 2026-10-14; this table lists D1-D36 plus D39 and D52). Changing one needs a new grill-me. Summary:
 
 | Decision | Topic | Outcome |
 |----------|-------|---------|
 | D1 | Same game done right; combat core open for rework; porting dropped (D38) | Locked (amended by D25, D28, D38) |
 | D2 | Friends + portfolio, free release | Locked |
-| D3 | Windows + web (Android removed by D38) | Locked |
+| D3 | Windows + web (Android removed by D38) | SUPERSEDED by D52: Windows only |
 | D4, D5 | QTE mixed per skill (ring/bar and arrow sequences); graded results, never a full miss | Locked |
 | D6, D20 | Skills always hit; basic attack is a graded QTE, never 0 damage | Locked (see tension 1) |
 | D7 | Defence QTE only on big or telegraphed enemy attacks | Locked |
@@ -88,7 +89,7 @@ The full, locked list is `.planning/research/DECISIONS.md` (D1-D36: D1-D24 grill
 | D11, D12, D17 | Owner plays in big sessions; ~8 unplayed features then bug-hunt only; live session, work on `next` | Locked; see `IMPROVE.md` |
 | D13 | Auto-balance PROPOSES, owner approves in a batch | Locked |
 | D14 | Grind feel: now resource management and leveling inside one run | Locked, amended by D25/D27 |
-| D15 | Web target: own site, HTML5, account-namespace hook, drop Opera GX | Locked |
+| D15 | Web target: own site, HTML5, account-namespace hook, drop Opera GX | SUPERSEDED by D52 |
 | D16 | Clean break for old saves; schema version from now on | Locked (see D36) |
 | D18 | Hades-style card picks (1 of 3) replace random skill books | Locked |
 | D19 | Turn-order bar; stun delays; bosses need stun resistance | Locked |
@@ -108,6 +109,8 @@ The full, locked list is `.planning/research/DECISIONS.md` (D1-D36: D1-D24 grill
 | D34 | Nobody is the 4th class with its own card pool | Locked |
 | D35 | One difficulty plus a QTE assist (wider windows) | Locked |
 | D36 | Two save parts: profile and run, each versioned | Locked |
+| D39 | Windows download alongside web | Amended by D52: the Windows zip is the only release |
+| D52 | Platform: Windows only; zip with the .exe via Igor PackageZip, linked from the owner's site; no web/HTML5 build (also supersedes D50) | Locked 2026-10-14 |
 
 ### Tensions between locked decisions and the research (to settle in the matching phase, not now)
 
@@ -117,9 +120,9 @@ The full, locked list is `.planning/research/DECISIONS.md` (D1-D36: D1-D24 grill
 4. **D18 vs `audit/icons-needed.md`.** That audit asked for 3 new skill-book icons. Skill books are replaced by cards, so those are dropped from the art list.
 5. **D22 vs `audit/icons-needed.md`.** The optional stat icons were for STR/AGI/DEF/INT/LUCK. They become ATK/DEF/SPD/MAG. Also LUCK (the only crit source for Archer/Mage per `balance-data.md` S8) disappears, so crit needs a new home (G5).
 6. **D21 vs current code.** Today the defensive QTE can lengthen a status from 2 to 8 ticks (`audit/combat-bugs.md` section 1). D21 says it may only shorten.
-7. **D3 vs D28 — resolved 2026-10-14:** Android is never built (D38).
+7. **D3 vs D28 â€” resolved 2026-10-14:** Android is never built (D38).
 8. **D18 pool size vs replay (new).** About 5 skills + 5-8 upgrades per class means one run sees almost the whole pool, so runs may look alike. D18 and D28 fix the pool size; what keeps picks meaningful (an equipped-skill cap, exclusive upgrade branches, a bad-luck guard, skip) is a rules question for grill G7, not extra content.
 9. **D14 grind vs a replayable run (resolved by D25/D27).** Leveling and potion/MP management now live inside one run. Whether enemies respawn inside a run is decided in G2 (RUN-15).
 
 ---
-*Last updated: 2026-10-14 for the roguelike direction (D25-D36) and the plan review*
+*Last updated: 2026-10-14 for the roguelike direction (D25-D36), the plan review and D52 (Windows only)*

@@ -16,10 +16,11 @@ Build: none yet | Unplayed: 0/8 | Open P1: 0 | Updated: 2026-10-14 | Release the
 7. QTE for real: ring/bar and arrow types, graded, never a full miss. Then the turn-order bar. [QTE, TURN, ROB-02]
 8. The run: class pick (4 classes), die and return to the entrance, death line and gift, unlocks, stories never repeat, shuffles, cards, gold, shop, ending and credits. [RUN, PROG, SAVE-07]
 9. You approve balance numbers; every screen styled; every icon real; sounds, tutorial, run logs. [BAL-03..07, UI, ART, GAP-01..10]
-10. Web link (Chrome/Firefox/Edge) + Windows download + credits + Korean + release-candidate playtest, then development stops. [WEB, LOC, ROB-01]
+10. Windows zip (built with Igor PackageZip, linked from your site) + credits + Korean + release-candidate playtest, then development stops. Windows only, no web version (D52). [REL, LOC, ROB-01]
 
 ## Done
 - Audit, research, 36 decisions (D1-D36), plan review, plan rewritten for the roguelike (2026-10-14)
+- D52 applied: Windows only, no web version (2026-10-14)
 
 ## Waiting on you
 - Say "go" to start items 1 and 2.

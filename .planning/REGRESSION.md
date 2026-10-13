@@ -54,10 +54,10 @@ Levels L1-L5 are in `REQUIREMENTS.md`. "Test" names are placeholders until Phase
 | R-032 | Foresight icon is an eye, and all 10 new status icons are 16x16 with only the four palette colours | UI, art | L2: art checker; L4 | PENDING (Phase 7) | 2026-10-13 | never |
 | R-033 | Display layout is not re-applied on transition end, cutscene end or save load | UI-scale | L3: apply counter | PENDING (Phase 2) | 2026-10-13 | never |
 | R-034 | The build id is visible on the title screen and printed in the test summary | harness | L2 + L4 | PENDING (Phase 1) | 2026-10-13 | never |
-| R-035 | Release export has debug keys off; HTML5 export contains the account-namespace string | web, release | L2 | PENDING (Phase 8) | 2026-10-13 | never |
+| R-035 | Release build has debug keys off; the release zip holds exactly the exe, data.win, licences and credits (D52) | release | L2 | PENDING (Phase 8; REL-02, REL-06) | 2026-10-13 | never |
 | R-036 | Death returns to the entrance room with run state cleared (cards, gold, items, level 1, statuses, enemies) and the profile kept; it does not reload a save slot. Dying in a battle, a status tick, the shop, a dialogue or a transition all end the same way | run, save/load | L3: bot kills the player in each state, then compares state with a fresh run | PENDING (Phase 6; D26, D31) | 2026-10-14 | never |
 | R-037 | Story moment never repeats after death: cutscenes, camera pans to an enemy and story dialogue play once per save file, survive save/load and a new run, and skipping leaves the world identical (flags, items, doors, camera) | run, dialogue/cutscene, save/load | L3 + L4: bot plays run 1, dies, plays run 2; no cutscene or pan starts; before/after state equal | PENDING (Phase 6; D26) | 2026-10-14 | never |
-| R-038 | Run seed reproduces the same shuffles: same seed gives the same card offers, shop stock, enemy pools, elite rolls and chest loot; saving and reloading at an offer shows the same cards; golden sequence (seed 12345, first 100 per stream) matches on Windows and the web export | run, save/load, RNG | L2 on Windows; L3 in the browser (Phase 8) | PENDING (Phase 4 generator, Phase 6 shuffles) | 2026-10-14 | never |
+| R-038 | Run seed reproduces the same shuffles: same seed gives the same card offers, shop stock, enemy pools, elite rolls and chest loot; saving and reloading at an offer shows the same cards; golden sequence (seed 12345, first 100 per stream) matches on Windows | run, save/load, RNG | L2 | PENDING (Phase 4 generator, Phase 6 shuffles) | 2026-10-14 | never |
 | R-039 | Cosmetic randomness (shake, particles) never changes the run: two runs with the same seed give the same offers even if effects differ | run, RNG | L2: run with effects on and off | PENDING (Phase 4) | 2026-10-14 | never |
 | R-040 | Run/profile split: a corrupt or missing run file never damages the profile; death clears only the run part; unlocks, story flags and the death gift survive; old-format saves are rejected with the friendly message | save/load, run | L2 + L3 | PENDING (Phase 4; D36, D16) | 2026-10-14 | never |
 | R-041 | Death gift: each death leaves exactly one gift, the next run starts with it, the following death replaces it; no unlock changes a base stat | run, progression | L2 | PENDING (Phase 6; D32) | 2026-10-14 | never |
@@ -67,7 +67,7 @@ Levels L1-L5 are in `REQUIREMENTS.md`. "Test" names are placeholders until Phase
 | R-045 | First win shows the ending and credits once; later wins show the run-end screen and do not repeat the story | run, dialogue/cutscene | L3 + L4 | PENDING (Phase 6; D31) | 2026-10-14 | never |
 | R-046 | The bot drives every QTE type (ring/bar and arrows) from the QTE's own data and the grades match what was pressed | harness, QTE | L3 | PENDING (Phase 5B) | 2026-10-14 | never |
 | R-047 | The simulator and the GML formulas both pass the same JSON test vectors | balance, harness | L2 | PENDING (Phase 5A) | 2026-10-14 | never |
-| R-048 | A frame-throttled bot run (simulated web frame drops) gives the same fight and fade outcomes as a normal run | harness, web | L3 | PENDING (Phase 8; ROB-01) | 2026-10-14 | never |
+| R-048 | A frame-throttled bot run (simulated frame hitches) gives the same fight and fade outcomes as a normal run | harness | L3 | PENDING (Phase 8; ROB-01) | 2026-10-14 | never |
 
 ## Manual walk (L5), run on each playtest build
 
