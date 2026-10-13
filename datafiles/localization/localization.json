@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-03-04T17:49:44Z",
-    "row_count": 663
+    "generated_at_utc": "2026-10-13T21:11:17Z",
+    "row_count": 677
   },
   "default_lang": "en",
   "languages": [
@@ -244,6 +244,10 @@
       "en": "Applied ",
       "ko": "적용된"
     },
+    "combat.msg.auto_stats": {
+      "en": "auto {summary}",
+      "ko": "자동 {summary}"
+    },
     "combat.msg.battle_buildvictorydialoguelines.279.0": {
       "en": "combat.msg.victory_prefix",
       "ko": "Combat.msg.victory_prefix"
@@ -464,6 +468,10 @@
       "en": "{enemy} is stunned!",
       "ko": "{enemy}는 깜짝 놀랐습니다!"
     },
+    "combat.msg.exp_gain": {
+      "en": "(+{exp} EXP)",
+      "ko": "(+{exp} 경험치)"
+    },
     "combat.msg.floor1_reaction.0": {
       "en": "How was that even alive?! I almost died.",
       "ko": "그게 어떻게 살아있었지?! 나는 거의 죽을 뻔했습니다."
@@ -472,13 +480,25 @@
       "en": "God, I just need to get out of here.",
       "ko": "맙소사, 난 여기서 나가야만 해요."
     },
+    "combat.msg.level_up": {
+      "en": "Level up x{levels}!",
+      "ko": "레벨 업 x{levels}!"
+    },
     "combat.msg.list_separator": {
       "en": ", ",
       "ko": ","
     },
+    "combat.msg.loot_gained": {
+      "en": "Loot gained.",
+      "ko": "전리품을 획득했습니다."
+    },
     "combat.msg.loot_prefix": {
       "en": "Loot:",
       "ko": "전리품:"
+    },
+    "combat.msg.max_level": {
+      "en": "Max level reached.",
+      "ko": "최대 레벨에 도달했습니다."
     },
     "combat.msg.not_enough_mp": {
       "en": "Not enough MP.",
@@ -535,6 +555,14 @@
     "combat.msg.skill_used": {
       "en": "Skill used.",
       "ko": "사용된 스킬입니다."
+    },
+    "combat.msg.stat_point_one": {
+      "en": "+{n} stat point",
+      "ko": "스탯 포인트 +{n}"
+    },
+    "combat.msg.stat_points_many": {
+      "en": "+{n} stat points",
+      "ko": "스탯 포인트 +{n}"
     },
     "combat.msg.stole_an_item": {
       "en": "Stole an item.",
@@ -1744,9 +1772,17 @@
       "en": "Can't use that.",
       "ko": "사용할 수 없습니다."
     },
+    "menu.msg.already_equipped": {
+      "en": "Already equipped.",
+      "ko": "이미 장착 중입니다."
+    },
     "menu.msg.cant_equip": {
       "en": "Can't equip that.",
       "ko": "그거 장비할 수 없어요."
+    },
+    "menu.msg.class_only": {
+      "en": "{class_name} only.",
+      "ko": "{class_name} 전용입니다."
     },
     "menu.msg.equipped": {
       "en": "Equipped {item}.",
@@ -1759,6 +1795,10 @@
     "menu.msg.no_skills": {
       "en": "No skills.",
       "ko": "기술이 없습니다."
+    },
+    "menu.msg.not_in_inventory": {
+      "en": "Item not in inventory.",
+      "ko": "인벤토리에 없는 아이템입니다."
     },
     "menu.msg.unequipped": {
       "en": "Unequipped {item}.",
