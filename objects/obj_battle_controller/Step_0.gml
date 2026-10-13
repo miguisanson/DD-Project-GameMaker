@@ -9,7 +9,17 @@ var k_down = Input_UIPressed("menu_down");
 var k_ok = Input_UIConfirm();
 var k_back = Input_UIBack();
 
-if (attack_timing_result_timer > 0) attack_timing_result_timer -= 1;
+// The grade word runs on real time, also through a hit-stop.
+if (qte_result_ms > 0) qte_result_ms = max(0, qte_result_ms - Qte_StepMs(delta_time));
+
+// Hit-stop (D61, Perfect): the battle logic waits; input and drawing carry on. The shakes start when it ends.
+if (hitstop_ms > 0) {
+    hitstop_ms -= Qte_StepMs(delta_time);
+    if (hitstop_ms > 0) exit;
+    hitstop_ms = 0;
+    Battle_QteImpactFeedback(self);
+    exit;
+}
 
 if (!variable_instance_exists(id, "loc_revision")) loc_revision = -1;
 var loc_rev = Loc_GetRevision();
@@ -163,7 +173,7 @@ if (battle_state == BSTATE_ITEM_MENU) {
 }
 
 // --------------------
-// PLAYER ATTACK TIMING
+// PLAYER ATTACK: THE SLIDING BAR
 // --------------------
 if (battle_state == BSTATE_ATTACK_TIMING) {
     Battle_PlayerAttackTimingStep(self, k_ok);
@@ -172,14 +182,6 @@ if (battle_state == BSTATE_ATTACK_TIMING) {
 
 if (battle_state == BSTATE_ENEMY_DEF_QTE) {
     Battle_DefQTEStep(self);
-    exit;
-}
-
-// --------------------
-// PLAYER ATTACK
-// --------------------
-if (battle_state == BSTATE_PLAYER_ATTACK) {
-    Battle_PlayerAttack(self);
     exit;
 }
 

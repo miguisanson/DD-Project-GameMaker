@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-13T21:35:25Z",
-    "row_count": 678
+    "generated_at_utc": "2026-10-13T22:46:04Z",
+    "row_count": 677
   },
   "default_lang": "en",
   "languages": [
@@ -36,25 +36,21 @@
       "en": "SKILL",
       "ko": "기능"
     },
-    "battle.action.timing.bad": {
-      "en": "BAD",
-      "ko": "나쁜"
-    },
     "battle.action.timing.good": {
       "en": "GOOD",
       "ko": "좋은"
     },
-    "battle.action.timing.miss": {
-      "en": "MISS",
-      "ko": "놓치다"
-    },
-    "battle.action.timing.okay": {
-      "en": "OKAY",
+    "battle.action.timing.ok": {
+      "en": "OK",
       "ko": "좋아요"
     },
     "battle.action.timing.perfect": {
       "en": "PERFECT",
       "ko": "완벽한"
+    },
+    "battle.action.timing.weak": {
+      "en": "WEAK",
+      "ko": "약한"
     },
     "battle.menu.back": {
       "en": "Back",

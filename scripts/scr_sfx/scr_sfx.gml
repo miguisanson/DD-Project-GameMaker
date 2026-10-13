@@ -273,6 +273,12 @@ function SFX_RegisterDefaults() {
     SFX_RegisterResolved("miss_effect", ["miss_effect"]);
     SFX_RegisterResolved("blocked", ["Blocked", "blocked"]);
 
+    // QTE grades (D61): one distinct existing sound each, from heavy and crunchy (Perfect) down to a dull knock (Weak)
+    SFX_RegisterResolved("qte_perfect", ["Punch_crunchy_2"]);
+    SFX_RegisterResolved("qte_good", ["sword_impact"]);
+    SFX_RegisterResolved("qte_ok", ["Punch_1"]);
+    SFX_RegisterResolved("qte_weak", ["Body_falling_wood"]);
+
     // Skill Effects
     SFX_Register("skill_generic", noone);
     SFX_RegisterResolved(SKILLBOOK_MANA_AMBIENCE_KEY_1, ["Crying_moaning_ambience"]);
@@ -412,6 +418,12 @@ function SFX_RegisterGainDefaults() {
     // Miss/Blocked
     SFX_RegisterGain("miss_effect", 1.00);
     SFX_RegisterGain("blocked", 1.00);
+
+    // QTE grades
+    SFX_RegisterGain("qte_perfect", 1.00);
+    SFX_RegisterGain("qte_good", 1.00);
+    SFX_RegisterGain("qte_ok", 1.00);
+    SFX_RegisterGain("qte_weak", 1.00);
 
     // Skills
     SFX_RegisterGain("skill_generic", 1.00);

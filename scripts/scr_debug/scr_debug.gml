@@ -240,7 +240,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : 3500), vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0 };
+                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : 3500), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0 };
 }
 
 function Scenario_Finish() {
@@ -399,6 +399,7 @@ function Scenario_StepBot(_s) {
             if (_s.t == 10) {
                 _s.vstart = _s.f;
                 _s.hits = 0;
+                _s.qlog = [];
                 _s.tries = 0;
                 _s.attacking = false;
                 Scenario_EnterBattle(_name);
@@ -566,20 +567,30 @@ function Scenario_StepBotSkill(_s) {
 function Scenario_BotDrive(_s, _bc) {
     var _ready = (_s.f - _s.last_tap) >= 4;
     var _perfect = (_s.v == 0);
-    if (_s.attacking && _bc.battle_state != BSTATE_ATTACK_TIMING) {   // the swing resolved: tally its judgement
+    if (_bc.battle_state != BSTATE_ATTACK_TIMING && _bc.hitstop_ms > 0) _s.qhitstop = true;   // the freeze after a Perfect
+    if (_s.attacking && _bc.battle_state != BSTATE_ATTACK_TIMING) {   // the swing resolved: log what the bar did (QTE part 1)
         _s.attacking = false;
         _s.tries++;
-        if (_bc.attack_timing_result_key != "MISS") _s.hits++;
+        _s.hits++;   // a basic attack always lands (D20)
+        array_push(_s.qlog, {
+            key: _bc.qte_result_key, press_ms: _bc.qte_press_ms, mult: _bc.qte_result_mult, dmg: _bc.last_dmg, crit: _bc.last_crit,
+            base: _s.qbase, params: _bc.qte_params, assist: _bc.qte_assist, sfx: global.sfx_last_key, word: _bc.qte_result_text,
+            hitstop: _s.qhitstop
+        });
     }
     switch (_bc.battle_state) {
         case BSTATE_MENU:
             if (_bc.turn == TURN_PLAYER && _ready) Scenario_Tap("confirm");   // menu_index 0 = ATTACK
             break;
         case BSTATE_ATTACK_TIMING:
-            if (_bc.attack_timing_active) _s.attacking = true;
-            // The drop moves attack_timing_speed per step and the press is read one step later: confirm when one step is left.
-            if (_perfect && _ready && _bc.attack_timing_active && _bc.attack_timing_input_lock <= 0
-                && (_bc.attack_timing_target_y - _bc.attack_timing_y) <= _bc.attack_timing_speed * 1.5) {
+            if (_bc.qte_active && !_s.attacking) {   // a new swing
+                _s.attacking = true;
+                _s.qhitstop = false;
+            }
+            if (_bc.qte_active) _s.qbase = Combat_Damage(_bc.p, _bc.e, _bc.player_weapon);
+            // The press is read by the controller in this frame or the next, so it is judged one or two frames of the clock later:
+            // press when the zone centre is within 1.5 frames, which lands it within a frame and a half of the centre.
+            if (_perfect && _ready && _bc.qte_active && (Qte_ZoneCentreMs(_bc.qte_params) - _bc.qte_ms) <= Qte_StepMs(delta_time) * 1.5) {
                 Scenario_Tap("confirm");
             }
             break;
@@ -601,13 +612,48 @@ function Scenario_BotEvaluate(_s, _bc, _name) {
         + " swings=" + string(_s.tries) + " non_miss=" + string(_s.hits));
     Scenario_Check(_name + "_ended", true);
     Scenario_Check(_name + "_hp_in_bounds", _pl.hp >= 0 && _pl.hp <= _pl.max_hp, "hp=" + string(_pl.hp) + " max=" + string(_pl.max_hp));
+
+    // QTE part 1: what the bar did on every swing. The bot recomputes the grade and the damage from its own pure-function inputs.
+    var _want_key = (_s.v == 0) ? "PERFECT" : "WEAK";
+    var _want_mult = (_s.v == 0) ? 1.30 : 0.75;
+    var _n = array_length(_s.qlog);
+    var _all_key = (_n > 0), _all_fn = (_n > 0), _all_mult = (_n > 0), _all_dmg = (_n > 0), _all_snd = (_n > 0), _all_word = (_n > 0), _all_hs = (_n > 0), _all_press = (_n > 0);
+    var _detail = "";
+    for (var _i = 0; _i < _n; _i++) {
+        var _q = _s.qlog[_i];
+        var _centre = Qte_ZoneCentreMs(_q.params);
+        var _crit_mult = _q.crit ? 2 : 1;
+        var _exp = max(1, floor(floor(_q.base * _crit_mult) * Qte_GradeMult(_q.key)));
+        show_debug_message("[BOT] " + _name + " swing " + string(_i) + " grade=" + _q.key + " press_ms=" + string(_q.press_ms) + " centre_ms=" + string(_centre)
+            + " off_ms=" + string(abs(_q.press_ms - _centre)) + " sweep_ms=" + string(_q.params.sweep_ms) + " mult=" + string(_q.mult)
+            + " base=" + string(_q.base) + " crit=" + string(_q.crit) + " dmg=" + string(_q.dmg) + " expected_min=" + string(_exp) + " sfx=" + string(_q.sfx) + " hitstop=" + string(_q.hitstop));
+        if (_q.key != _want_key) { _all_key = false; _detail += " swing" + string(_i) + "=" + _q.key; }
+        if (Qte_Grade(_q.press_ms, _q.params, _q.assist) != _q.key) _all_fn = false;   // the grade is the pure function of the press
+        if (abs(_q.mult - _want_mult) > 0.0001) _all_mult = false;
+        if (_q.dmg < _exp || _q.dmg < 1) _all_dmg = false;   // base x grade multiplier at least (gear bonuses only add)
+        if (_q.sfx != Qte_GradeSfxKey(_q.key)) _all_snd = false;
+        if (_q.word != Qte_GradeLabel(_q.key)) _all_word = false;
+        if (_q.hitstop != (_q.key == "PERFECT")) _all_hs = false;   // hit-stop on Perfect only
+        if (_s.v == 0 && abs(_q.press_ms - _centre) > _q.params.perfect_half_width) _all_press = false;
+        if (_s.v == 1 && _q.press_ms != QTE_NO_PRESS) _all_press = false;   // the fail variant never presses
+    }
+    Scenario_Check(_name + "_qte_swings_ge_1", _n >= 1, "swings=" + string(_n));
+    Scenario_Check(_name + "_qte_every_grade_" + _want_key, _all_key, _detail);
+    Scenario_Check(_name + "_qte_grade_matches_pure_function", _all_fn);
+    Scenario_Check(_name + "_qte_multiplier_" + string(_want_mult), _all_mult);
+    Scenario_Check(_name + "_qte_damage_at_least_base_x_multiplier_and_never_0", _all_dmg);
+    Scenario_Check(_name + "_qte_grade_sound_fired", _all_snd);
+    Scenario_Check(_name + "_qte_grade_word_shown", _all_word);
+    Scenario_Check(_name + "_qte_hitstop_on_perfect_only", _all_hs);
+    Scenario_Check(_name + (_s.v == 0 ? "_qte_press_inside_perfect_zone" : "_qte_never_pressed"), _all_press);
     if (_s.v == 0) {
         Scenario_Check("bot_perfect_player_won", _pl.hp > 0, "hp=" + string(_pl.hp));
         // _bc.e is the enemy before the killing blow; the blow's damage must account for all of its hp.
         Scenario_Check("bot_perfect_enemy_hp_zero", _bc.e.hp - _bc.last_dmg <= 0, "enemy_hp_before=" + string(_bc.e.hp) + " last_dmg=" + string(_bc.last_dmg));
         Scenario_Check("bot_perfect_exp_gained", _pl.exp > _s.exp0 || _pl.level > 1, "exp=" + string(_pl.exp));
     } else {
-        Scenario_Check("bot_fail_player_lost", _pl.hp == 0, "hp=" + string(_pl.hp));
+        // D20: a player who never presses still deals 75% damage every swing, so the fight is won, not lost (the old fail variant lost because every swing missed).
+        Scenario_Check("bot_fail_weak_hits_still_win", _bc.e.hp - _bc.last_dmg <= 0 && _pl.hp > 0, "enemy_hp_before=" + string(_bc.e.hp) + " last_dmg=" + string(_bc.last_dmg) + " hp=" + string(_pl.hp));
     }
 }
 
@@ -854,6 +900,65 @@ function Scenario_StepShotsDisp(_s) {
             if (_s.f - _s.fin_f == 10) {
                 Scenario_ShotLayout("shot_disp_encounter_battle.png", "edge=1");
                 Scenario_Check("shots_disp_encounter_no_relayout", Display_ApplyCount() == _s.ap0, "re-laid-out " + string(Display_ApplyCount() - _s.ap0) + " times");
+                Scenario_Next(_s, 30);
+            }
+            break;
+        case 30:   // QTE part 1: the sliding bar mid-sweep, at display scale 3 (480 x 432)
+        case 31:
+        case 32:
+        case 33:
+        case 34:
+            Scenario_StepShotsQte(_s);
+            break;
+    }
+}
+
+// QTE part 1 (D56): the bar with the cursor on its way to the zone (shot_qte_bar.png), then the Perfect word over the enemy (shot_qte_perfect.png).
+function Scenario_StepShotsQte(_s) {
+    switch (_s.step) {
+        case 30:
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(3);
+                Scenario_GotoBattle("shots_qte_bar");
+            }
+            if (_s.t >= 25) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_qte_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                var _bc = instance_find(obj_battle_controller, 0);
+                Battle_AttackTimingBegin(_bc);
+                _bc.qte_ms = 520;   // 47% of the Wooden Sword's 1100 ms sweep: the cursor is approaching the zone at 70%
+                Scenario_Next(_s, 31);
+            }
+            break;
+        case 31:
+            if (_s.t >= 2) {
+                var _bc = instance_find(obj_battle_controller, 0);
+                Scenario_Check("shots_qte_bar_mid_sweep", _bc.battle_state == BSTATE_ATTACK_TIMING && _bc.qte_active && _bc.qte_ms > 520 && _bc.qte_ms < _bc.qte_params.sweep_ms, "state=" + string(_bc.battle_state) + " ms=" + string(_bc.qte_ms));
+                _s.shot = "shot_qte_bar.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 32);
+            }
+            break;
+        case 32:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                var _bc = instance_find(obj_battle_controller, 0);
+                Battle_PlayerAttackResolveTimed(_bc, Qte_Result(QTE_PERFECT));
+                Scenario_Next(_s, 33);
+            }
+            break;
+        case 33:
+            if (_s.t >= 12) {   // the freeze (60 ms) is over and the word is in its pop
+                _s.shot = "shot_qte_perfect.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 34);
+            }
+            break;
+        case 34:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Scenario_Next(_s, 10);
             }
             break;

@@ -282,7 +282,7 @@ function SkillDB_Init() {
 
     global.skill_db[? SKILL_FORESIGHT] = {
         id: SKILL_FORESIGHT,
-        name: "Foresight",
+        name: "Foresight",   // TODO(D24, STAT rework): its Foresight status ("cannot miss") does nothing for the player now (D6/D20)
         mp_cost: 3,
         power: 0,
         power_mult: 1,
@@ -948,7 +948,8 @@ function Skill_PlayerFxIds() {
     return ids;
 }
 
-function Skill_Use(_user, _target, _skill_id) {
+// _grade_mult is the QTE grade's damage multiplier (D61). 1.00 = grade OK, which is what every player skill uses until the arrow QTE (D57) lands.
+function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
     var s = SkillDB_Get(_skill_id);
     var user_is_player = (variable_struct_exists(_user, "is_player") && _user.is_player);
     var fx_speed = Skill_FxSpeed(s, user_is_player);
@@ -1134,16 +1135,21 @@ function Skill_Use(_user, _target, _skill_id) {
 
         var crit_bonus = Status_GetSum(_user, "crit_bonus");
         var acc_bonus = s.acc + StatMod(Combat_EffectiveStat(_user, s.stat_type));
-        if (user_is_player) acc_bonus += PLAYER_SKILL_HIT_BONUS;
 
         for (var h = 0; h < hits; h++) {
-            var hit_res = Combat_AttemptHit(_user, _target, acc_bonus);
-            _target = hit_res.defender;
+            // D6: player skills always hit. TODO(D24, STAT rework): Evasion / Solidify on the target and Foresight on the user are ignored here.
+            var hit_res = { hit: true, defender: _target };
+            if (!user_is_player) {
+                hit_res = Combat_AttemptHit(_user, _target, acc_bonus);
+                _target = hit_res.defender;
+            }
 
             if (hit_res.hit) {
                 var weapon = { power: s.power, stat_type: s.stat_type, acc: s.acc };
                 var crit = Combat_CritCheck(_user, crit_bonus);
-                var dmg_pack = Combat_ApplyDamage(_user, _target, weapon, (crit ? 2 : 1), s.power_mult, { is_skill: true });
+                var dmg_ctx_skill = { is_skill: true };
+                if (user_is_player) dmg_ctx_skill.grade_mult = _grade_mult;
+                var dmg_pack = Combat_ApplyDamage(_user, _target, weapon, (crit ? 2 : 1), s.power_mult, dmg_ctx_skill);
                 _target = dmg_pack.defender;
                 if (user_is_player && dmg_pack.dmg > 0) {
                     // FUN-FIRST passives can amplify player skill damage.
