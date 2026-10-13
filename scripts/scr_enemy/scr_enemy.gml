@@ -359,10 +359,6 @@ function Enemy_ApplyConfig(_inst) {
 // --------------------
 // ENEMY AI
 // --------------------
-function EnemyAI_BuildContext(_inst, _cfg) {
-    return { move_speed_mult: 1 };
-}
-
 function EnemyAI_ApplyTraits(_inst, _cfg, _ctx, _hook) {
     if (!is_struct(_cfg) || !variable_struct_exists(_cfg, "traits")) return;
 
@@ -378,12 +374,223 @@ function EnemyAI_ApplyTraits(_inst, _cfg, _ctx, _hook) {
     }
 }
 
- function EnemyAI_CanStep(_inst, _mx, _my) {
-    var nx = _inst.x + _mx;
-    var ny = _inst.y + _my;
-    return !place_meeting(nx, ny, obj_wall)
-        && !place_meeting(nx, ny, obj_interactable)
-        && !place_meeting(nx, ny, obj_room_transition);
+// True when the whole 16 px tile one step away is free (wall, interactable, exit tile), tested with the enemy's own mask.
+function EnemyAI_CanStep(_inst, _mx, _my) {
+    return Grid_TileFree(_inst, _inst.x + _mx * GRID_TILE_SIZE, _inst.y + _my * GRID_TILE_SIZE);
+}
+
+// ----------------------------------------------------------------------------
+// Per-type overworld personality (D63 sight, D66 idle personalities, D67 chase speed). Data, not code paths.
+// Speeds are pixels per frame; the player walks at 1 and runs at 2, so chase < 1 means "you can walk away" and wolves (1.0) keep up.
+//   sight       tiles; an enemy notices the player inside this circle when no wall is between (see_through ignores walls)
+//   chase       speed while chasing / walking to the last seen spot
+//   idle        "wander" (pause, one step, pause), "drift" (steps almost without pause), "patrol" (walks legs to far spots),
+//               "still" (ambusher: stays on its post)
+//   idle_speed  speed while idling;  pause_min..pause_max frames between idle steps;  roam tiles from home
+//   search      frames spent looking at the last seen spot;  react frames between spotting the player and moving
+//   pass        true = ignores walls and objects (ghosts), only the room edge stops it
+//   fixed       true = never moves (bosses): the old square-trigger rules still apply to ai_stationary enemies
+// The numbers are first guesses for the owner to tune by playing (reported in the packet notes).
+// ----------------------------------------------------------------------------
+function EnemyAI_Profile(_enemy_id) {
+    var _p = { sight: 4, chase: 0.8, idle: "wander", idle_speed: 0.6, pause_min: 40, pause_max: 100, roam: 3,
+               search: 90, react: 14, pass: false, see_through: false, fixed: false, ret_speed: 0.8 };
+    switch (_enemy_id) {
+        case ENEMY_SLIME:        _p.chase = 0.7;  _p.idle_speed = 0.4; _p.pause_min = 60; _p.pause_max = 140; _p.roam = 2; _p.ret_speed = 0.6; break;
+        case ENEMY_SPIDER:       _p.chase = 0.85; _p.idle_speed = 0.8; _p.pause_min = 25; _p.pause_max = 70; break;
+        case ENEMY_SNAKE:        _p.chase = 0.85; _p.idle_speed = 0.7; _p.pause_min = 30; _p.pause_max = 80; break;
+        case ENEMY_MADWHISP:     _p.sight = 5; _p.chase = 0.85; _p.idle = "drift"; _p.idle_speed = 0.5; _p.pause_min = 0; _p.pause_max = 8; _p.roam = 4; break;
+        case ENEMY_KILLER_PLANT: _p.sight = 3; _p.chase = 0.8; _p.idle = "still"; _p.roam = 0; _p.search = 60; _p.react = 20; break;
+        case ENEMY_DIREWOLF:     _p.sight = 5; _p.chase = 1.0; _p.idle = "patrol"; _p.idle_speed = 0.9; _p.pause_min = 20; _p.pause_max = 50; _p.roam = 5; _p.react = 8; _p.ret_speed = 0.9; break;
+        case ENEMY_GHOSTSWORD:   _p.chase = 0.85; _p.idle = "drift"; _p.idle_speed = 0.6; _p.pause_min = 0; _p.pause_max = 10; _p.roam = 4; _p.pass = true; _p.see_through = true; break;
+        case ENEMY_STRANGER:     _p.sight = 5; _p.chase = 0.9; _p.idle_speed = 0.7; _p.pause_min = 40; _p.pause_max = 90; _p.react = 20; break;
+        case ENEMY_MINI_BOSS:
+        case ENEMY_FINAL_BOSS:   _p.sight = 0; _p.idle = "still"; _p.roam = 0; _p.fixed = true; break;
+    }
+    return _p;
+}
+
+// ----------------------------------------------------------------------------
+// Room integration of the pure Nav code: one grid and one reservation table per loaded room, built lazily from the instances.
+// Rebuilt when a blocker appears or disappears (barrel broken, chest opened and replaced). Nothing hooks into the game controller.
+// ----------------------------------------------------------------------------
+function Nav_MarkInstance(_g, _block, _sight) {
+    // runs in the scope of the instance being marked
+    var _t = GRID_TILE_SIZE;
+    var _x0 = floor(bbox_left / _t);
+    var _x1 = floor((bbox_right - 0.01) / _t);
+    var _y0 = floor(bbox_top / _t);
+    var _y1 = floor((bbox_bottom - 0.01) / _t);
+    for (var _cx = _x0; _cx <= _x1; _cx++) {
+        for (var _cy = _y0; _cy <= _y1; _cy++) Nav_GridSet(_g, _cx, _cy, _block, _sight);
+    }
+}
+
+function Nav_BuildGrid() {
+    var _g = Nav_GridCreate(ceil(room_width / GRID_TILE_SIZE), ceil(room_height / GRID_TILE_SIZE));
+    with (obj_wall) Nav_MarkInstance(_g, true, true);
+    with (obj_interactable) Nav_MarkInstance(_g, true, false);
+    with (obj_room_transition) Nav_MarkInstance(_g, true, false);   // enemies never park on an exit
+    return _g;
+}
+
+// Gives back the cells of enemies that no longer exist (defeated, destroyed). Called when the number of enemies changes.
+function Nav_ResPruneDead(_r) {
+    var _names = variable_struct_get_names(_r.cells);
+    for (var _i = 0; _i < array_length(_names); _i++) {
+        if (!instance_exists(variable_struct_get(_r.cells, _names[_i]))) variable_struct_remove(_r.cells, _names[_i]);
+    }
+}
+
+function Nav_Get() {
+    var _wall0 = instance_exists(obj_wall) ? instance_find(obj_wall, 0) : noone;
+    var _nw = instance_number(obj_wall);
+    var _ni = instance_number(obj_interactable);
+    var _nt = instance_number(obj_room_transition);
+    var _fresh = !variable_global_exists("nav") || global.nav.room != room || global.nav.wall0 != _wall0;
+    if (_fresh) {
+        global.nav = { room: room, wall0: _wall0, nw: -1, ni: -1, nt: -1, ne: -1, grid: undefined, res: Nav_ResCreate(), fx_set: false, builds: 0 };
+    }
+    var _n = global.nav;
+    var _ne = instance_number(obj_enemy);
+    if (_n.ne != _ne) {
+        Nav_ResPruneDead(_n.res);
+        _n.ne = _ne;
+    }
+    if (_n.nw != _nw || _n.ni != _ni || _n.nt != _nt) {
+        _n.grid = Nav_BuildGrid();
+        _n.nw = _nw;
+        _n.ni = _ni;
+        _n.nt = _nt;
+        _n.builds++;
+    }
+    return _n;
+}
+
+function Nav_Stats() {
+    if (!variable_global_exists("nav_stats")) global.nav_stats = { stuck_events: 0, spots: 0, repaths: 0 };
+    return global.nav_stats;
+}
+
+// ----------------------------------------------------------------------------
+// Overworld AI (D63, D66, D67). Modes: idle -> chase (sees the player) -> search (lost sight: wait at the last seen spot)
+// -> return (walk home) -> idle. Movement is always a 16 px step toward a path cell; the enemy rests on the grid between steps.
+// ----------------------------------------------------------------------------
+function EnemyAI_BuildContext(_inst, _cfg) {
+    return { move_speed_mult: 1 };
+}
+
+function EnemyAI_Init(_inst) {
+    if (variable_instance_exists(_inst, "ai_mode")) return;
+    var _p = EnemyAI_Profile(_inst.enemy_id);
+    _inst.prof = _p;
+    _inst.ai_mode = "idle";
+    _inst.last_seen_cx = 0;
+    _inst.last_seen_cy = 0;
+    _inst.search_timer = 0;
+    _inst.alert_pop = 0;
+    _inst.react_timer = 0;
+    _inst.spot_cooldown = 0;
+    _inst.idle_timer = irandom_range(0, max(1, _p.pause_max));
+    _inst.patrol_cx = -1;
+    _inst.patrol_cy = -1;
+    _inst.step_tx = _inst.x;
+    _inst.step_ty = _inst.y;
+    _inst.cur_speed = 0.5;
+    _inst.last_dir = -1;
+    _inst.retry_timer = 0;
+    _inst.stuck_frames = 0;
+    _inst.stuck_max = 0;
+    _inst.stuck_events = 0;
+    _inst.home_cx = Nav_CellOf(Grid_Snap(_inst.home_x) + GRID_TILE_SIZE / 2);
+    _inst.home_cy = Nav_CellOf(Grid_Snap(_inst.home_y) + GRID_TILE_SIZE / 2);
+}
+
+// Notices the player: inside the sight circle and (unless see_through) no wall on the line between the two cells.
+function EnemyAI_CanSee(_inst, _pl, _nav, _tiles) {
+    if (_tiles <= 0) return false;
+    var _half = GRID_TILE_SIZE / 2;
+    if (point_distance(_inst.x, _inst.y, _pl.x, _pl.y) > _tiles * GRID_TILE_SIZE) return false;
+    if (_inst.prof.see_through) return true;
+    return Nav_LineClear(_nav.grid, Nav_CellOf(_inst.x + _half), Nav_CellOf(_inst.y + _half), Nav_CellOf(_pl.x + _half), Nav_CellOf(_pl.y + _half));
+}
+
+function EnemyAI_BeginStep(_inst, _dir, _speed) {
+    var _t = GRID_TILE_SIZE;
+    var _mx = (_dir == RIGHT) - (_dir == LEFT);
+    var _my = (_dir == DOWN) - (_dir == UP);
+    _inst.move_dir = _dir;
+    _inst.last_dir = _dir;
+    _inst.moving = true;
+    _inst.move_timer = _t;
+    _inst.step_tx = _inst.x + _mx * _t;
+    _inst.step_ty = _inst.y + _my * _t;
+    _inst.cur_speed = _speed;
+    _inst.stuck_frames = 0;
+}
+
+// Keeps the reservation table in step with where the enemy is: its own cell while resting.
+function EnemyAI_HoldOwnCell(_inst, _nav) {
+    Nav_ResRelease(_nav.res, _inst.id);
+    Nav_ResClaim(_nav.res, _inst.id, Nav_CellOf(_inst.x + GRID_TILE_SIZE / 2), Nav_CellOf(_inst.y + GRID_TILE_SIZE / 2));
+}
+
+// Ghost step: straight toward the goal along the longer axis, then the other; walls and objects do not matter, the room edge does.
+function EnemyAI_TryPassStep(_inst, _nav, _ecx, _ecy, _gx, _gy, _speed) {
+    var _dx = _gx - _ecx;
+    var _dy = _gy - _ecy;
+    if (_dx == 0 && _dy == 0) return false;
+    var _dirs = [];
+    var _hdir = (_dx > 0) ? RIGHT : LEFT;
+    var _vdir = (_dy > 0) ? DOWN : UP;
+    if (abs(_dx) >= abs(_dy)) { if (_dx != 0) array_push(_dirs, _hdir); if (_dy != 0) array_push(_dirs, _vdir); }
+    else { array_push(_dirs, _vdir); if (_dx != 0) array_push(_dirs, _hdir); }
+    for (var _i = 0; _i < array_length(_dirs); _i++) {
+        var _d = _dirs[_i];
+        var _tcx = _ecx + (_d == RIGHT) - (_d == LEFT);
+        var _tcy = _ecy + (_d == DOWN) - (_d == UP);
+        if (!Nav_GridInside(_nav.grid, _tcx, _tcy)) continue;
+        if (!(_tcx == _gx && _tcy == _gy) && !Nav_ResClaim(_nav.res, _inst.id, _tcx, _tcy)) continue;
+        EnemyAI_BeginStep(_inst, _d, _speed);
+        return true;
+    }
+    return false;
+}
+
+// One step toward a goal cell along the A* path. Returns true when a step started.
+function EnemyAI_TryStepToCell(_inst, _nav, _gx, _gy, _speed) {
+    var _t = GRID_TILE_SIZE;
+    var _ecx = Nav_CellOf(_inst.x + _t / 2);
+    var _ecy = Nav_CellOf(_inst.y + _t / 2);
+    if (_inst.prof.pass) return EnemyAI_TryPassStep(_inst, _nav, _ecx, _ecy, _gx, _gy, _speed);
+    Nav_Stats().repaths++;
+    var _st = Nav_StepToward(_nav.grid, _nav.res, _inst.id, _ecx, _ecy, _gx, _gy);
+    if (!_st.ok) return false;
+    var _mx = (_st.dir == RIGHT) - (_st.dir == LEFT);
+    var _my = (_st.dir == DOWN) - (_st.dir == UP);
+    if (!(_st.cx == _gx && _st.cy == _gy) && !EnemyAI_CanStep(_inst, _mx, _my)) {
+        // the live instances disagree with the grid (something moved or was just created): give the claim back and wait
+        EnemyAI_HoldOwnCell(_inst, _nav);
+        _nav.nw = -1;   // rebuild the grid next frame
+        return false;
+    }
+    EnemyAI_BeginStep(_inst, _st.dir, _speed);
+    return true;
+}
+
+// The shared "walk toward a goal" with the stuck watchdog. Returns true while a step is running or just started.
+function EnemyAI_Pursue(_inst, _nav, _gx, _gy, _speed) {
+    if (_inst.retry_timer > 0) {
+        _inst.retry_timer--;
+        _inst.stuck_frames++;
+    } else if (EnemyAI_TryStepToCell(_inst, _nav, _gx, _gy, _speed)) {
+        return true;
+    } else {
+        _inst.retry_timer = 6;
+        _inst.stuck_frames++;
+    }
+    _inst.stuck_max = max(_inst.stuck_max, _inst.stuck_frames);
+    return false;
 }
 
 function EnemyAI_Update(_inst, _cfg, _pl) {
@@ -395,122 +602,249 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
     var ctx = EnemyAI_BuildContext(_inst, _cfg);
     EnemyAI_ApplyTraits(_inst, _cfg, ctx, "on_update");
 
-    // --------------------
-    // LEASH CHECK
-    // --------------------
-    if (_inst.leash_radius > 0) {
-        if (point_distance(_inst.x, _inst.y, _inst.home_x, _inst.home_y) > _inst.leash_radius) {
-            _inst.ai_state = ENEMY_IDLE;
-            _inst.forget_time = 0;
-        }
-    }
-
-    // --------------------
-    // PLAYER VALIDATION
-    // --------------------
     if (!instance_exists(_pl)) return;
 
-    var dx = _pl.x - _inst.x;
-    var dy = _pl.y - _inst.y;
+    EnemyAI_Init(_inst);
+    var _p = _inst.prof;
 
-    // --------------------
-    // DETECTION + MEMORY
-    // --------------------
-    if (abs(dx) <= _inst.scan_radius && abs(dy) <= _inst.scan_radius) {
-        _inst.ai_state = ENEMY_ALERT;
-        _inst.forget_time = _inst.forget_delay;
-    } else {
-        if (_inst.forget_time > 0) {
+    // Bosses on their post (the old square trigger lives in obj_enemy Step for ai_stationary): they never walk.
+    if (_p.fixed || (variable_instance_exists(_inst, "ai_stationary") && _inst.ai_stationary)) {
+        var sdx = _pl.x - _inst.x;
+        var sdy = _pl.y - _inst.y;
+        if (abs(sdx) <= _inst.scan_radius && abs(sdy) <= _inst.scan_radius) {
+            _inst.ai_state = ENEMY_ALERT;
+            _inst.forget_time = _inst.forget_delay;
+        } else if (_inst.forget_time > 0) {
             _inst.forget_time--;
             _inst.ai_state = ENEMY_ALERT;
         } else {
             _inst.ai_state = ENEMY_IDLE;
         }
-    }
-
-    if (variable_instance_exists(_inst, "ai_stationary") && _inst.ai_stationary) {
         _inst.moving = false;
         _inst.move_timer = 0;
         _inst.move_dir = -1;
         return;
     }
 
-    // --------------------
-    // DECISION LOGIC
-    // --------------------
+    var _nav = Nav_Get();
+    if (!_nav.fx_set) {   // the "!" and the sight circle are drawn by a layer script: objects have no Draw event (no .yy edits)
+        _nav.fx_set = true;
+        if (layer_exists(_inst.layer)) layer_script_end(_inst.layer, Nav_DrawWorldFx);
+    }
+
+    var _t = GRID_TILE_SIZE;
+    if (_inst.alert_pop > 0) _inst.alert_pop--;
+    if (_inst.spot_cooldown > 0) _inst.spot_cooldown--;
+
+    // ---- senses ----
+    var _pcx = Nav_CellOf(_pl.x + _t / 2);
+    var _pcy = Nav_CellOf(_pl.y + _t / 2);
+    var _sees = (_inst.spot_cooldown <= 0) && EnemyAI_CanSee(_inst, _pl, _nav, _p.sight);
+    if (_inst.ai_mode == "chase") {
+        // a little extra range once chasing so the edge of the circle does not flicker
+        if (_sees || EnemyAI_CanSee(_inst, _pl, _nav, _p.sight + 1)) {
+            _inst.last_seen_cx = _pcx;
+            _inst.last_seen_cy = _pcy;
+            _inst.search_timer = 0;
+            _sees = true;
+        }
+    } else if (_sees) {
+        _inst.ai_mode = "chase";
+        _inst.last_seen_cx = _pcx;
+        _inst.last_seen_cy = _pcy;
+        _inst.alert_pop = 50;
+        _inst.react_timer = _p.react;
+        _inst.patrol_cx = -1;
+        _inst.stuck_frames = 0;
+        Nav_Stats().spots++;
+        SFX_Play("ui_confirm", 0.5, 1.5);   // existing sound, small and high: "!"
+    }
+    _inst.ai_state = (_inst.ai_mode == "chase" || _inst.ai_mode == "search") ? ENEMY_ALERT : ENEMY_IDLE;
+    if (_inst.ai_state == ENEMY_ALERT) _inst.forget_time = _inst.forget_delay;
+
+    // ---- decide (only between steps) ----
     if (!_inst.moving) {
-        if (_inst.think_delay > 0) {
-            _inst.think_delay--;
+        EnemyAI_HoldOwnCell(_inst, _nav);
+        var _ecx = Nav_CellOf(_inst.x + _t / 2);
+        var _ecy = Nav_CellOf(_inst.y + _t / 2);
+
+        if (_inst.react_timer > 0) {
+            _inst.react_timer--;
         } else {
-            _inst.think_delay = _inst.think_rate;
-
-            // IDLE (OPTIONAL WANDER)
-            if (_inst.ai_state == ENEMY_IDLE && _inst.wander_chance > 0) {
-                if (irandom(_inst.wander_chance - 1) == 0) {
-                    _inst.move_dir = choose(UP, DOWN, LEFT, RIGHT);
-                    var mxw = (_inst.move_dir == RIGHT) - (_inst.move_dir == LEFT);
-                    var myw = (_inst.move_dir == DOWN) - (_inst.move_dir == UP);
-                    if (EnemyAI_CanStep(_inst, mxw, myw)) {
-                        _inst.move_timer = _inst.tile_size;
-                        _inst.moving = true;
+            switch (_inst.ai_mode) {
+                case "chase":
+                    var _gx = _inst.last_seen_cx;
+                    var _gy = _inst.last_seen_cy;
+                    if (!_sees && _ecx == _gx && _ecy == _gy) {
+                        _inst.ai_mode = "search";
+                        _inst.search_timer = _p.search;
+                    } else if (_ecx != _gx || _ecy != _gy) {
+                        EnemyAI_Pursue(_inst, _nav, _gx, _gy, _p.chase);
                     }
-                }
+                    break;
+                case "search":
+                    _inst.stuck_frames = 0;
+                    _inst.search_timer--;
+                    if (_inst.search_timer <= 0) _inst.ai_mode = "return";
+                    break;
+                case "return":
+                    if (_ecx == _inst.home_cx && _ecy == _inst.home_cy) {
+                        _inst.stuck_frames = 0;
+                        _inst.ai_mode = "idle";
+                        _inst.idle_timer = irandom_range(_p.pause_min, max(_p.pause_min, _p.pause_max));
+                    } else {
+                        EnemyAI_Pursue(_inst, _nav, _inst.home_cx, _inst.home_cy, _p.ret_speed);
+                    }
+                    break;
+                default:
+                    EnemyAI_Idle(_inst, _nav, _ecx, _ecy);
+                    break;
             }
+        }
 
-            // ALERT (CHASE)
-            if (_inst.ai_state == ENEMY_ALERT) {
-                EnemyAI_ApplyTraits(_inst, _cfg, ctx, "on_alert");
-
-                if (abs(dx) > abs(dy)) {
-                    if (dx > 0) _inst.move_dir = RIGHT;
-                    else        _inst.move_dir = LEFT;
-                } else {
-                    if (dy > 0) _inst.move_dir = DOWN;
-                    else        _inst.move_dir = UP;
-                }
-
-                var mxa = (_inst.move_dir == RIGHT) - (_inst.move_dir == LEFT);
-                var mya = (_inst.move_dir == DOWN) - (_inst.move_dir == UP);
-                if (EnemyAI_CanStep(_inst, mxa, mya)) {
-                    _inst.move_timer = _inst.tile_size;
-                    _inst.moving = true;
-                }
+        // watchdog: wanted to move and could not for more than a second
+        if (_inst.stuck_frames > 60) {
+            _inst.stuck_events++;
+            Nav_Stats().stuck_events++;
+            show_debug_message("[NAV] stuck enemy_uid=" + string(_inst.enemy_uid) + " room=" + room_get_name(room) + " mode=" + _inst.ai_mode + " cell=" + string(_ecx) + "," + string(_ecy));
+            _inst.stuck_frames = 0;
+            _inst.retry_timer = 0;
+            if (_inst.ai_mode == "chase") {
+                _inst.ai_mode = "search";
+                _inst.search_timer = _p.search;
+                _inst.spot_cooldown = 180;
+            } else if (_inst.ai_mode == "return") {
+                _inst.home_cx = _ecx;   // cannot get home from here: make here the new home
+                _inst.home_cy = _ecy;
+                _inst.home_x = _inst.x;
+                _inst.home_y = _inst.y;
+            } else {
+                _inst.patrol_cx = -1;
             }
         }
     }
 
-    // --------------------
-    // MOVEMENT
-    // --------------------
+    // ---- move ----
     if (_inst.moving) {
-        var mx = 0;
-        var my = 0;
-
-        switch (_inst.move_dir) {
-            case RIGHT: mx = 1; break;
-            case LEFT:  mx = -1; break;
-            case DOWN:  my = 1; break;
-            case UP:    my = -1; break;
-        }
-
-        if (EnemyAI_CanStep(_inst, mx, my)) {
-            var step = _inst.move_speed * ctx.move_speed_mult;
-            if (step > _inst.move_timer) step = _inst.move_timer;
-
-            _inst.x += mx * step;
-            _inst.y += my * step;
-            _inst.move_timer -= step;
-        } else {
+        var _mx = (_inst.move_dir == RIGHT) - (_inst.move_dir == LEFT);
+        var _my = (_inst.move_dir == DOWN) - (_inst.move_dir == UP);
+        var _step = min(_inst.cur_speed * ctx.move_speed_mult, _inst.move_timer);
+        _inst.x += _mx * _step;
+        _inst.y += _my * _step;
+        _inst.move_timer -= _step;
+        if (_inst.move_timer <= 0.0001) {
+            _inst.x = _inst.step_tx;
+            _inst.y = _inst.step_ty;
             _inst.moving = false;
             _inst.move_timer = 0;
+            _inst.move_dir = -1;
+            EnemyAI_HoldOwnCell(_inst, _nav);
         }
-
-        if (_inst.move_timer <= 0) {
-            _inst.moving = false;
-        }
-        if (!_inst.moving) Enemy_SnapToGrid(_inst);
     }
 }
+
+// Idle personalities. Picks the next idle step (or does nothing) when the pause is over.
+function EnemyAI_Idle(_inst, _nav, _ecx, _ecy) {
+    var _p = _inst.prof;
+    if (_p.idle == "still") return;
+    // pushed or displaced beyond the roaming range: walk home first
+    if (max(abs(_ecx - _inst.home_cx), abs(_ecy - _inst.home_cy)) > _p.roam + 1) {
+        _inst.ai_mode = "return";
+        return;
+    }
+    if (_inst.idle_timer > 0) {
+        _inst.idle_timer--;
+        return;
+    }
+    if (_p.idle == "patrol") {
+        if (_inst.patrol_cx < 0 || (_ecx == _inst.patrol_cx && _ecy == _inst.patrol_cy) || _inst.stuck_frames > 20) {
+            var _arrived = (_inst.patrol_cx >= 0 && _ecx == _inst.patrol_cx && _ecy == _inst.patrol_cy);
+            _inst.patrol_cx = -1;
+            _inst.stuck_frames = 0;
+            if (_arrived) {
+                _inst.idle_timer = irandom_range(_p.pause_min, max(_p.pause_min, _p.pause_max));
+                return;
+            }
+            for (var _try = 0; _try < 8; _try++) {
+                var _cx = _inst.home_cx + irandom_range(-_p.roam, _p.roam);
+                var _cy = _inst.home_cy + irandom_range(-_p.roam, _p.roam);
+                if (abs(_cx - _ecx) + abs(_cy - _ecy) < 2) continue;
+                if (Nav_CellBlocked(_nav.grid, _cx, _cy)) continue;
+                _inst.patrol_cx = _cx;
+                _inst.patrol_cy = _cy;
+                break;
+            }
+            if (_inst.patrol_cx < 0) { _inst.idle_timer = 30; return; }
+        }
+        EnemyAI_Pursue(_inst, _nav, _inst.patrol_cx, _inst.patrol_cy, _p.idle_speed);
+        return;
+    }
+    // wander / drift: one neighbouring cell inside the roaming range that is free right now
+    var _order = [];
+    if (_p.idle == "drift" && _inst.last_dir != -1 && irandom(9) < 7) array_push(_order, _inst.last_dir);   // drift keeps its heading
+    var _dirs4 = [RIGHT, UP, LEFT, DOWN];
+    var _base = irandom(3);
+    for (var _j = 0; _j < 4; _j++) array_push(_order, _dirs4[(_base + _j) mod 4]);
+    for (var _i = 0; _i < array_length(_order); _i++) {
+        var _d = _order[_i];
+        var _tcx = _ecx + (_d == RIGHT) - (_d == LEFT);
+        var _tcy = _ecy + (_d == DOWN) - (_d == UP);
+        if (max(abs(_tcx - _inst.home_cx), abs(_tcy - _inst.home_cy)) > _p.roam) continue;
+        if (!Nav_GridInside(_nav.grid, _tcx, _tcy)) continue;
+        if (!_p.pass) {
+            if (Nav_CellBlocked(_nav.grid, _tcx, _tcy)) continue;
+            if (!EnemyAI_CanStep(_inst, (_d == RIGHT) - (_d == LEFT), (_d == DOWN) - (_d == UP))) continue;
+        }
+        if (!Nav_ResClaim(_nav.res, _inst.id, _tcx, _tcy)) continue;
+        EnemyAI_BeginStep(_inst, _d, _p.idle_speed);
+        _inst.idle_timer = irandom_range(_p.pause_min, max(_p.pause_min, _p.pause_max));
+        return;
+    }
+    _inst.idle_timer = 20;   // nowhere to go right now
+}
+
+// Drawn by a layer script (registered once per room by the first enemy that updates): the "!" over an enemy that just spotted the
+// player and a faint dotted ring of its sight range while the player is near. 4-colour palette, no new assets.
+function Nav_DrawWorldFx() {
+    if (!variable_global_exists("nav_fx_calls")) global.nav_fx_calls = 0;
+    global.nav_fx_calls++;
+    if (!instance_exists(obj_enemy)) return;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _c0 = make_color_rgb(7, 24, 33);
+    var _c1 = make_color_rgb(48, 104, 80);
+    var _c2 = make_color_rgb(134, 192, 108);
+    var _c3 = make_color_rgb(224, 248, 207);
+    var _oc = draw_get_color();
+    var _oa = draw_get_alpha();
+    draw_set_alpha(1);
+    with (obj_enemy) {
+        if (!defeated && variable_instance_exists(id, "prof")) {
+            var _cx = x + GRID_TILE_SIZE / 2;
+            var _cy = y + GRID_TILE_SIZE / 2;
+            if (instance_exists(_pl) && prof.sight > 0 && !prof.fixed && point_distance(_cx, _cy, _pl.x + 8, _pl.y + 8) <= (prof.sight + 2) * GRID_TILE_SIZE) {
+                var _r = prof.sight * GRID_TILE_SIZE;
+                var _n = max(12, round(2 * pi * _r / 6));
+                for (var _k = 0; _k < _n; _k++) {
+                    draw_set_color((_k mod 2 == 0) ? _c1 : _c2);   // two greens: faint on both a light and a dark floor
+                    var _a = (_k / _n) * 2 * pi;
+                    draw_rectangle(floor(_cx + cos(_a) * _r), floor(_cy + sin(_a) * _r), floor(_cx + cos(_a) * _r), floor(_cy + sin(_a) * _r), false);
+                }
+            }
+            if (alert_pop > 0) {
+                var _bx = floor(_cx);
+                var _by = floor(y) - 11;
+                draw_set_color(_c0);
+                draw_rectangle(_bx - 2, _by, _bx + 2, _by + 10, false);
+                draw_set_color(_c3);
+                draw_rectangle(_bx - 1, _by + 1, _bx + 1, _by + 6, false);
+                draw_rectangle(_bx - 1, _by + 8, _bx + 1, _by + 9, false);
+            }
+        }
+    }
+    draw_set_color(_oc);
+    draw_set_alpha(_oa);
+}
+
 
 // ============================================================================
 // NAV (D63, I-047): pure grid pathfinding, line of sight and cell reservations.

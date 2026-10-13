@@ -240,7 +240,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 6000 : 2500), vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, fxi: 0, hold_action: "", hold_start: 0, hold_until: -1 };
+                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 6000 : 2500), vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, fxi: 0, mp: 0, mv: {}, hold_action: "", hold_start: 0, hold_until: -1 };
 }
 
 function Scenario_Finish() {
@@ -372,6 +372,9 @@ function Scenario_StepSmoke(_s) {
                 var _mb = instance_exists(obj_mini_boss) ? instance_find(obj_mini_boss, 0) : noone;
                 Scenario_Check("smoke_rm_floor5_mini_boss", room == rm_floor5 && _mb != noone);
                 if (_mb == noone) { Scenario_Finish(); break; }
+                // The room's snake and wolf now really hunt the player (D63) and would start a battle inside these 180 frames;
+                // this check is about the mini boss only, so the other enemies are taken out of the room first.
+                with (obj_enemy) { if (id != _mb) instance_destroy(); }
                 _s.mb_x = _mb.x;
                 _s.mb_y = _mb.y;
                 _s.mb_drift = 0;
@@ -473,6 +476,10 @@ function Scenario_StepSmokeSnap(_s) {
 // v=0 "perfect": confirms the menu, times the attack drop and answers the defence arrows from the battle controller's own data.
 // v=1 "fail": confirms the menu but never presses during a QTE.
 function Scenario_StepBot(_s) {
+    if (_s.v == 3) {
+        Scenario_StepMove(_s);
+        return;
+    }
     if (_s.v >= 2) {
         Scenario_StepBotSkill(_s);
         return;
@@ -640,7 +647,7 @@ function Scenario_StepBotSkill(_s) {
         case 2:   // measured: start the next skill (the battle is simply abandoned) or the fail variant
             if (_s.t == 5) {
                 _s.ski++;
-                if (_s.ski >= array_length(_ids)) _s.v = 1;
+                if (_s.ski >= array_length(_ids)) _s.v = 3;   // skills -> movement and AI -> fail
                 Scenario_Next(_s, 0);
             }
             break;
@@ -800,5 +807,199 @@ function Scenario_StepShotsFx(_s) {
                 Scenario_Next(_s, 10);
             }
             break;
+    }
+}
+
+
+// ============================================================================
+// v=3 movement and enemy AI (I-047, I-048, D63, D66, D67, D69, D70). Runs in rm_floor1 with the real objects; the stage is built by
+// creating a dire wolf (or ghost), rocks (block movement, not sight), walls (block both) and extra enemies. Cells are 16 px.
+// Open stage: rows 9 and 10 (and row 8 from column 14) between columns 14 and 20 are free; the slime stands at (15,9), the player at (19,9).
+// Each part checks the OUTCOME (position, state), so it also runs, and fails, against the old greedy AI.
+// ============================================================================
+function Scenario_PlaceEnemy(_e, _cx, _cy) {
+    _e.x = _cx * GRID_TILE_SIZE;
+    _e.y = _cy * GRID_TILE_SIZE;
+    _e.home_x = _e.x;
+    _e.home_y = _e.y;
+    _e.moving = false;
+    _e.move_timer = 0;
+    _e.move_dir = -1;
+    _e.cine_lock_count = 0;   // the cinematic trigger in rm_floor1 freezes the slime until it fires
+    _e.ai_state = ENEMY_IDLE;
+    _e.forget_time = 0;
+    if (variable_instance_exists(_e, "ai_mode")) {
+        _e.ai_mode = "idle";
+        _e.home_cx = _cx;
+        _e.home_cy = _cy;
+        _e.react_timer = 0;
+        _e.spot_cooldown = 0;
+        _e.stuck_frames = 0;
+        _e.stuck_max = 0;
+    }
+}
+
+function Scenario_PlacePlayer(_cx, _cy) {
+    var _pl = instance_find(obj_player, 0);
+    _pl.x = _cx * GRID_TILE_SIZE;
+    _pl.y = _cy * GRID_TILE_SIZE;
+    _pl.moving = false;
+    _pl.move_timer = 0;
+    return _pl;
+}
+
+function Scenario_Block(_obj, _cx, _cy) {
+    return instance_create_layer(_cx * GRID_TILE_SIZE, _cy * GRID_TILE_SIZE, "Instances", _obj);
+}
+
+function Scenario_StepMove(_s) {
+    var _mv = _s.mv;
+    switch (_s.step) {
+        case 0:   // fresh room for the next part (first let any battle fade that an encounter already started finish)
+            if (_s.t < 30 || Transition_IsActive()) break;
+            _s.mv = { sl: noone, other: noone, reached: false, spotted: false, run: 0, run_max: 0, mind: 9999, frames: 0, phase: 0, t0: 0 };
+            Scenario_NewKnight();
+            room_goto(rm_floor2);   // via another room: the controller only spawns the player on a room change
+            Scenario_Next(_s, 1);
+            break;
+        case 1:
+            if (_s.t < 20) break;
+            room_goto(rm_floor1);
+            Scenario_Next(_s, 2);
+            break;
+        case 2:   // build the stage
+            if (_s.t < 45) break;
+            if (!instance_exists(obj_player)) {
+                Scenario_Check("move_stage_" + string(_s.mp), false, "room=" + room_get_name(room));
+                Scenario_MoveNext(_s);
+                break;
+            }
+            with (obj_enemy) instance_destroy();   // the room's own slime is not part of the stage
+            _mv.sl = instance_create_layer(15 * GRID_TILE_SIZE, 9 * GRID_TILE_SIZE, "Instances", (_s.mp == 4) ? obj_ghost_sword : obj_dire_wolf);
+            Scenario_PlaceEnemy(_mv.sl, 15, 9);
+            Scenario_PlacePlayer(19, 9);
+            switch (_s.mp) {
+                case 0:   // A: a rock on the straight line, sight is clear
+                    Scenario_Block(obj_rock1, 17, 9);
+                    Scenario_Block(obj_rock1, 17, 8);
+                    break;
+                case 1:   // B: a wall across the whole corridor, sight is blocked
+                    Scenario_Block(obj_wall, 17, 8);
+                    Scenario_Block(obj_wall, 17, 9);
+                    Scenario_Block(obj_wall, 17, 10);
+                    break;
+                case 2:   // C: rocks across the whole corridor: seen but unreachable
+                    Scenario_Block(obj_rock1, 17, 8);
+                    Scenario_Block(obj_rock1, 17, 9);
+                    Scenario_Block(obj_rock1, 17, 10);
+                    break;
+                case 3:   // D: a one-tile gap at (17,9) in a rock line, a wolf on each side of the approach: both want the same cells
+                    Scenario_Block(obj_rock1, 17, 8);
+                    Scenario_Block(obj_rock1, 17, 10);
+                    Scenario_PlaceEnemy(_mv.sl, 16, 8);
+                    _mv.other = instance_create_layer(16 * GRID_TILE_SIZE, 10 * GRID_TILE_SIZE, "Instances", obj_dire_wolf);
+                    Scenario_PlaceEnemy(_mv.other, 16, 10);
+                    break;
+                case 4:   // E: a ghost behind a wall: sees through it and flies over it
+                    Scenario_Block(obj_wall, 17, 8);
+                    Scenario_Block(obj_wall, 17, 9);
+                    Scenario_Block(obj_wall, 17, 10);
+                    break;
+                case 5:   // F: lose sight, search the last seen spot, walk home
+                    break;
+            }
+            Scenario_Next(_s, 3);
+            break;
+        case 3:   // run the part and judge it
+            Scenario_StepMovePart(_s, _mv);
+            break;
+    }
+}
+
+function Scenario_StepMovePart(_s, _mv) {
+    var _sl = _mv.sl;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    _mv.frames++;
+    if (!instance_exists(_sl) || _pl == noone) {
+        Scenario_Check("move_part_" + string(_s.mp) + "_alive", false, "room=" + room_get_name(room));
+        Scenario_MoveNext(_s);
+        return;
+    }
+    var _near = point_distance(_sl.x, _sl.y, _pl.x, _pl.y) <= 20;
+    if (_sl.ai_state == ENEMY_ALERT) _mv.spotted = true;
+    if (_sl.ai_state == ENEMY_ALERT && !_sl.moving) _mv.run++; else _mv.run = 0;
+    _mv.run_max = max(_mv.run_max, _mv.run);
+    switch (_s.mp) {
+        case 0:   // A: reaches the player around the rock
+            if (_near || _mv.frames >= 520) {
+                Scenario_Check("move_A_spots_player", _mv.spotted);
+                Scenario_Check("move_A_reaches_player_around_rock_in_520_frames", _near, "frames=" + string(_mv.frames) + " at " + string(_sl.x) + "," + string(_sl.y));
+                Scenario_Check("move_A_never_stuck_over_60_frames", _mv.run_max <= 60, "max_run=" + string(_mv.run_max));
+                Scenario_Check("move_fx_layer_script_draws_the_alert", variable_global_exists("nav_fx_calls") && global.nav_fx_calls > 20, "calls=" + string(variable_global_exists("nav_fx_calls") ? global.nav_fx_calls : -1));
+                Scenario_MoveNext(_s);
+            }
+            break;
+        case 1:   // B: a wall hides the player: the enemy stays calm
+            if (_mv.spotted || _mv.frames >= 150) {
+                Scenario_Check("move_B_wall_blocks_sight_150_frames", !_mv.spotted, "frames=" + string(_mv.frames));
+                Scenario_MoveNext(_s);
+            }
+            break;
+        case 2:   // C: sealed with rocks: sees but cannot pass; it must not cross and must stay on the grid
+            if (_sl.x > 17 * GRID_TILE_SIZE - 8) _mv.reached = true;
+            if (_mv.frames >= 360) {
+                Scenario_Check("move_C_sealed_rocks_not_crossed", !_mv.reached, "x=" + string(_sl.x));
+                Scenario_Check("move_C_sealed_enemy_on_grid", Scenario_Aligned(_sl) || _sl.moving, "x=" + string(_sl.x) + " y=" + string(_sl.y));
+                Scenario_MoveNext(_s);
+            }
+            break;
+        case 3:   // D: two enemies, one goal: never on the same tile
+            if (instance_exists(_mv.other)) _mv.mind = min(_mv.mind, point_distance(_sl.x, _sl.y, _mv.other.x, _mv.other.y));
+            var _near2 = instance_exists(_mv.other) && point_distance(_mv.other.x, _mv.other.y, _pl.x, _pl.y) <= 20;
+            if ((_near || _near2) && _mv.t0 == 0) _mv.t0 = _mv.frames;   // keep watching a little after the first one arrives
+            if ((_mv.t0 > 0 && _mv.frames - _mv.t0 >= 40) || _mv.frames >= 520) {
+                Scenario_Check("move_D_one_of_two_reaches_player", _mv.t0 > 0, "frames=" + string(_mv.frames));
+                Scenario_Check("move_D_enemies_never_share_a_tile", _mv.mind >= GRID_TILE_SIZE - 0.5, "min_distance=" + string(_mv.mind));
+                Scenario_MoveNext(_s);
+            }
+            break;
+        case 4:   // E: the ghost passes the wall
+            if (_near || _mv.frames >= 420) {
+                Scenario_Check("move_E_ghost_passes_wall_to_player_in_420_frames", _near, "frames=" + string(_mv.frames) + " at " + string(_sl.x) + "," + string(_sl.y));
+                Scenario_MoveNext(_s);
+            }
+            break;
+        case 5:   // F: out of sight -> last seen spot -> home
+            if (_mv.phase == 0) {
+                if (_mv.spotted && _mv.frames >= 30) {
+                    _pl.x = 3 * GRID_TILE_SIZE;   // gone, far out of sight
+                    _pl.y = 6 * GRID_TILE_SIZE;
+                    _mv.phase = 1;
+                    _mv.mind = 9999;
+                    _mv.t0 = _mv.frames;
+                } else if (_mv.frames >= 120) {
+                    Scenario_Check("move_F_spots_player", false);
+                    Scenario_MoveNext(_s);
+                }
+            } else {
+                _mv.mind = min(_mv.mind, point_distance(_sl.x, _sl.y, 19 * GRID_TILE_SIZE, 9 * GRID_TILE_SIZE));
+                var _home = (_sl.x == 15 * GRID_TILE_SIZE && _sl.y == 9 * GRID_TILE_SIZE && !_sl.moving && _sl.ai_state == ENEMY_IDLE && _mv.frames - _mv.t0 > 60);
+                if (_home || _mv.frames - _mv.t0 >= 900) {
+                    Scenario_Check("move_F_visits_last_seen_spot", _mv.mind <= GRID_TILE_SIZE, "closest=" + string(_mv.mind));
+                    Scenario_Check("move_F_returns_home_in_900_frames", _home, "at " + string(_sl.x) + "," + string(_sl.y) + " state=" + string(_sl.ai_state));
+                    Scenario_MoveNext(_s);
+                }
+            }
+            break;
+    }
+}
+
+function Scenario_MoveNext(_s) {
+    with (obj_enemy) instance_destroy();   // no late encounter may leak into the next part
+    _s.mp++;
+    Scenario_Next(_s, 0);
+    if (_s.mp > 5) {
+        _s.v = 1;   // on to the fail variant
+        Scenario_Next(_s, 0);
     }
 }
