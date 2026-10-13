@@ -126,7 +126,7 @@ if (!need_display_refresh && !transition_now_active && view_enabled) {
     }
 
     var display_settings = GameSettings_Ensure();
-    var expected_layout = Display_CalcLayout(
+    var expected_layout = Display_CalcLayoutLegacy(
         cur_window_w,
         cur_window_h,
         DISPLAY_BASE_W,

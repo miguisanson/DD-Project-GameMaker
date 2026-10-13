@@ -67,6 +67,7 @@ function Test_RunAll() {
     Test_RunSuite("Data", Test_Suite_Data);
     Test_RunSuite("Player", Test_Suite_Player);
     Test_RunSuite("Loc", Test_Suite_Loc);
+    Test_RunSuite("Display", Test_Suite_Display);
     Test_RunSuite("SaveAtomic", Test_Suite_SaveAtomic);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     if (Test_HasFlag("-testcontrol")) {
@@ -620,4 +621,123 @@ function Test_Suite_Loc() {
     Loc_SetLanguage("en");
     Test_Eq("LOC-03 save-ok text (en)", Save_SuccessText(), "Game saved.");
     Loc_SetLanguage(_lang0);
+}
+
+
+// DISP-03: Display_CalcLayout is pure. Expected values follow the rule in .planning/research/resolution-gamemaker.md 1.2 and 7.1:
+// scale = max(1, floor(min(win_w / 160, win_h / 144))), game rectangle centred, offsets rounded down (GML div, windows >= base).
+// The UI rule (D8, display-design.md): ui_scale is the integer u whose grid width game_w / u is closest to 640 (compared as a ratio).
+function Test_DisplayCase(_w, _h, _scale, _x, _y) {
+    var _n = "DISP-03 " + string(_w) + "x" + string(_h);
+    var _l = Display_CalcLayout(_w, _h);
+    Test_Eq(_n + " scale", _l.scale, _scale);
+    Test_Eq(_n + " game_w", _l.game_w, 160 * _scale);
+    Test_Eq(_n + " game_h", _l.game_h, 144 * _scale);
+    Test_Eq(_n + " game_x", _l.game_x, _x);
+    Test_Eq(_n + " game_y", _l.game_y, _y);
+}
+
+function Test_Suite_Display() {
+    // Window sizes from resolution-gamemaker.md 7.1 (arithmetic redone: 481x433 is scale 3, not 2).
+    Test_DisplayCase(160, 144, 1, 0, 0);
+    Test_DisplayCase(320, 288, 2, 0, 0);
+    Test_DisplayCase(480, 432, 3, 0, 0);
+    Test_DisplayCase(1280, 720, 5, 240, 0);
+    Test_DisplayCase(1920, 1080, 7, 400, 36);
+    Test_DisplayCase(2560, 1440, 10, 480, 0);
+    Test_DisplayCase(3840, 2160, 15, 720, 0);
+    Test_DisplayCase(3440, 1440, 10, 920, 0);
+    Test_DisplayCase(1920, 1200, 8, 320, 24);
+    Test_DisplayCase(1024, 768, 5, 112, 24);
+    Test_DisplayCase(600, 1000, 3, 60, 284);
+    Test_DisplayCase(481, 433, 3, 0, 0);
+    Test_DisplayCase(479, 431, 2, 79, 71);
+    Test_DisplayCase(319, 287, 1, 79, 71);
+    Test_DisplayCase(1919, 1079, 7, 399, 35);
+    // Smaller than the base: scale never drops below 1; the picture is cropped evenly, not shrunk.
+    Test_DisplayCase(100, 100, 1, -30, -22);
+    Test_Eq("DISP-03 0x0 window is clamped, scale 1", Display_CalcLayout(0, 0).scale, 1);
+
+    // Windowed cap (the Settings scale row) applies only when not fullscreen.
+    var _c = Display_CalcLayout(1920, 1080, 160, 144, false, 5);
+    Test_Eq("DISP-03 windowed cap 5: scale", _c.scale, 5);
+    Test_Eq("DISP-03 windowed cap 5: game_x", _c.game_x, 560);
+    Test_Eq("DISP-03 windowed cap 5: game_y", _c.game_y, 180);
+    _c = Display_CalcLayout(1920, 1080, 160, 144, true, 5);
+    Test_Eq("DISP-03 fullscreen ignores the cap", _c.scale, 7);
+    _c = Display_CalcLayout(1920, 1080, 160, 144, false, 99);
+    Test_Eq("DISP-03 cap above the fit changes nothing", _c.scale, 7);
+
+    // The base size is a parameter, not a baked-in 160x144.
+    _c = Display_CalcLayout(1000, 1000, 100, 50);
+    Test_Eq("DISP-03 base 100x50 in 1000x1000: scale", _c.scale, 10);
+    Test_Eq("DISP-03 base 100x50 in 1000x1000: game_y", _c.game_y, 250);
+
+    // D8 UI grid: windowed 3/4/5 give 480x432, 640x576 (the 4x grid), 800x720; 1080p fullscreen halves to 560x504.
+    var _ui = [[3, 1, 480, 432], [4, 1, 640, 576], [5, 1, 800, 720], [6, 2, 480, 432], [7, 2, 560, 504], [9, 2, 720, 648],
+               [10, 3, 533, 480], [13, 3, 693, 624], [14, 4, 560, 504], [15, 4, 600, 540]];
+    for (var _i = 0; _i < array_length(_ui); _i++) {
+        var _r = _ui[_i];
+        var _l = Display_CalcLayout(160 * _r[0], 144 * _r[0]);
+        var _n = "DISP-09 scale " + string(_r[0]);
+        Test_Eq(_n + " ui_scale", _l.ui_scale, _r[1]);
+        Test_Eq(_n + " gui_w", _l.gui_w, _r[2]);
+        Test_Eq(_n + " gui_h", _l.gui_h, _r[3]);
+    }
+    // gui_x/gui_y: where GUI (0,0) sits in the window. It is always the picture's top-left corner; when ui_scale does not
+    // divide the picture, the 1-2 spare pixels are on the right/bottom (so the surface blit in GUI space is at exactly 0,0).
+    _c = Display_CalcLayout(1920, 1080);
+    Test_Eq("DISP-09 1080p gui_x", _c.gui_x, 400);
+    Test_Eq("DISP-09 1080p gui_y", _c.gui_y, 36);
+    _c = Display_CalcLayout(2560, 1440);
+    Test_Eq("DISP-09 1440p ui_scale", _c.ui_scale, 3);
+    Test_Eq("DISP-09 1440p gui_x", _c.gui_x, 480);
+    Test_Eq("DISP-09 1440p gui_y", _c.gui_y, 0);
+    _c = Display_CalcLayout(1760, 1584);   // scale 11, ui_scale 3: 1760 = 586 * 3 + 2 spare pixels
+    Test_Eq("DISP-09 1760x1584 gui_w", _c.gui_w, 586);
+    Test_Eq("DISP-09 1760x1584 gui_x stays at the picture corner", _c.gui_x, 0);
+    Test_Eq("DISP-09 1760x1584 gui_h", _c.gui_h, 528);
+
+    // Display_WindowRectInGui: the whole window in GUI units (fades and dims must cover the black bars too).
+    _c = Display_CalcLayout(1920, 1080);   // GUI origin at window (400,36), 2 window px per GUI unit
+    var _wr = Display_WindowRectInGui(_c);
+    Test_Eq("DISP-09 window rect in gui: x", _wr.x, -200);
+    Test_Eq("DISP-09 window rect in gui: y", _wr.y, -18);
+    Test_Eq("DISP-09 window rect in gui: w", _wr.w, 960);
+    Test_Eq("DISP-09 window rect in gui: h", _wr.h, 540);
+    _c = Display_CalcLayout(480, 432);
+    _wr = Display_WindowRectInGui(_c);
+    Test_Eq("DISP-09 window rect in gui, no bars: x", _wr.x, 0);
+    Test_Eq("DISP-09 window rect in gui, no bars: w", _wr.w, 480);
+
+    // Display_MaxScale: the largest whole-number scale a monitor/window area allows (never below 1).
+    Test_Eq("DISP-03 MaxScale 2560x1440", Display_MaxScale(2560, 1440), 10);
+    Test_Eq("DISP-03 MaxScale 1366x768", Display_MaxScale(1366, 768), 5);
+    Test_Eq("DISP-03 MaxScale 100x100", Display_MaxScale(100, 100), 1);
+
+    // Display_NeedsRelayout (DISP-08): true only when the window size or fullscreen flag really differs.
+    var _a = Display_CalcLayout(1920, 1080);
+    Test_Eq("DISP-08 same size, same mode: no relayout", Display_NeedsRelayout(_a, 1920, 1080, false), false);
+    Test_Eq("DISP-08 other width: relayout", Display_NeedsRelayout(_a, 1921, 1080, false), true);
+    Test_Eq("DISP-08 other height: relayout", Display_NeedsRelayout(_a, 1920, 1079, false), true);
+    Test_Eq("DISP-08 fullscreen flag flips: relayout", Display_NeedsRelayout(_a, 1920, 1080, true), true);
+    Test_Eq("DISP-08 no layout yet: relayout", Display_NeedsRelayout(undefined, 1920, 1080, false), true);
+
+    // Display_WorldToGui: world point -> GUI coordinates (QTE targets, shake, HUD that follows a sprite). One world pixel = scale / ui_scale GUI units.
+    _c = Display_CalcLayout(1920, 1080);   // scale 7, ui_scale 2 -> 3.5 GUI units per world pixel
+    var _p = Display_WorldToGui(_c, 80, 72, 0, 0);
+    Test_Eq("DISP-09 world centre -> gui x", _p.x, 280);
+    Test_Eq("DISP-09 world centre -> gui y", _p.y, 252);
+    _p = Display_WorldToGui(_c, 100, 90, 20, 18);   // camera at (20,18): 80,72 on screen
+    Test_Eq("DISP-09 camera offset is subtracted", _p.x, 280);
+    Test_Eq("DISP-09 camera offset is subtracted (y)", _p.y, 252);
+    _c = Display_CalcLayout(480, 432);     // scale 3, ui_scale 1 -> 3 GUI units per world pixel
+    _p = Display_WorldToGui(_c, 10, 5, 0, 0);
+    Test_Eq("DISP-09 windowed 3x world -> gui x", _p.x, 30);
+    Test_Eq("DISP-09 windowed 3x world -> gui y", _p.y, 15);
+
+    // Display_WindowSizeForScale: the windowed size the Settings scale row asks for.
+    var _wsz = Display_WindowSizeForScale(4);
+    Test_Eq("DISP-03 window for scale 4: w", _wsz.w, 640);
+    Test_Eq("DISP-03 window for scale 4: h", _wsz.h, 576);
 }
