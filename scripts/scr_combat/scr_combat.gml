@@ -127,12 +127,49 @@ function Combat_ApplyDamage(_attacker, _defender, _weapon, _crit_mult, _skill_mu
     return { dmg: dmg, defender: _defender };
 }
 
-function FX_Spawn(_sprite, _x, _y, _frames, _speed) {
+// I-052: how big an effect animation is drawn, and how long it plays. Pure helpers (Test_Suite_Fx checks them for every player skill).
+// Scale that draws the sprite's canvas at FX_TARGET_FIT x the target's longest side, never more than FX_MAX_DRAW_PX world px.
+function FX_ScaleFor(_sprite, _target_px) {
+    var side = max(sprite_get_width(_sprite), sprite_get_height(_sprite));
+    if (side <= 0) return 1;
+    return min(FX_MAX_DRAW_PX, max(1, _target_px) * FX_TARGET_FIT) / side;
+}
+
+// World px of the longest side of an object's sprite (an enemy in battle), 0 when it has none.
+function FX_TargetSize(_inst) {
+    if (!instance_exists(_inst) || _inst.sprite_index == noone) return 0;
+    return max(sprite_get_width(_inst.sprite_index) * abs(_inst.image_xscale), sprite_get_height(_inst.sprite_index) * abs(_inst.image_yscale));
+}
+
+// Sprite frames that pass per game frame at image_speed 1 (the sprite's own playback speed).
+function FX_FramesPerStep(_sprite) {
+    var game_fps = game_get_speed(gamespeed_fps);
+    if (!is_real(game_fps) || game_fps <= 0) game_fps = 60;
+    var spd = sprite_get_speed(_sprite);
+    if (sprite_get_speed_type(_sprite) == SPR_SPEED_FPS) spd = spd / game_fps;
+    return spd;
+}
+
+// Game frames an effect takes to play once through at this image_speed.
+function FX_PlaybackFrames(_sprite, _image_speed) {
+    var per_step = FX_FramesPerStep(_sprite) * _image_speed;
+    if (per_step <= 0) return 9999;
+    return ceil(sprite_get_number(_sprite) / per_step);
+}
+
+// _image_speed, raised if needed so the effect plays in no more than _max_frames game frames.
+function FX_SpeedForMaxFrames(_sprite, _image_speed, _max_frames) {
+    var per_step = FX_FramesPerStep(_sprite);
+    if (_max_frames <= 0 || per_step <= 0) return _image_speed;
+    return max(_image_speed, (sprite_get_number(_sprite) / (per_step * _max_frames)) * 1.001);
+}
+
+function FX_Spawn(_sprite, _x, _y, _frames, _speed, _scale = SKILL_FX_SCALE) {
     if (_sprite == noone) return noone;
     var fx = instance_create_layer(_x, _y, "Instances", obj_fx);
     fx.sprite_index = _sprite;
-    fx.image_xscale = SKILL_FX_SCALE;
-    fx.image_yscale = SKILL_FX_SCALE;
+    fx.image_xscale = _scale;
+    fx.image_yscale = _scale;
     if (room == rm_battle) fx.visible = false;
 
     var spd = _speed;
@@ -153,7 +190,7 @@ function FX_Spawn(_sprite, _x, _y, _frames, _speed) {
     return fx;
 }
 
-function FX_CenterOn(_sprite, _inst) {
+function FX_CenterOn(_sprite, _inst, _scale = SKILL_FX_SCALE) {
     var cx = _inst.x;
     var cy = _inst.y;
     if (instance_exists(_inst)) {
@@ -170,7 +207,7 @@ function FX_CenterOn(_sprite, _inst) {
         }
     }
     if (_sprite == noone) return { x: cx, y: cy };
-    var fx_scale = max(0.01, abs(SKILL_FX_SCALE));
+    var fx_scale = max(0.01, abs(_scale));
     var w = sprite_get_width(_sprite);
     var h = sprite_get_height(_sprite);
     var ox = sprite_get_xoffset(_sprite);
@@ -669,13 +706,32 @@ function Battle_SkillFxOnPlayer(_skill_id) {
 }
 
 // Top-left spawn position that puts the middle of an fx sprite on the point (_px, _py).
-function FX_CenterAtPoint(_sprite, _px, _py) {
+function FX_CenterAtPoint(_sprite, _px, _py, _scale = SKILL_FX_SCALE) {
     if (_sprite == noone) return { x: _px, y: _py };
-    var fx_scale = max(0.01, abs(SKILL_FX_SCALE));
+    var fx_scale = max(0.01, abs(_scale));
     return {
         x: _px - ((sprite_get_width(_sprite) * 0.5 - sprite_get_xoffset(_sprite)) * fx_scale),
         y: _py - ((sprite_get_height(_sprite) * 0.5 - sprite_get_yoffset(_sprite)) * fx_scale)
     };
+}
+
+// Spawns a player skill's animation on its target (BUG-21 anchor, I-052 size) and returns the fx instance.
+function Battle_SkillFxSpawn(_bc, _skill_id, _sprite, _frames, _speed) {
+    var tx = _bc.enemy_fx_x;
+    var ty = _bc.enemy_fx_y;
+    var target_px = FX_PLAYER_TARGET_PX;
+    if (!Battle_SkillFxOnPlayer(_skill_id) && instance_exists(_bc.enemy_inst)) target_px = FX_TargetSize(_bc.enemy_inst);
+    var scale = FX_ScaleFor(_sprite, target_px);
+    if (Battle_SkillFxOnPlayer(_skill_id)) {
+        var ppos = FX_CenterAtPoint(_sprite, _bc.player_fx_x, _bc.player_fx_y, scale);
+        tx = ppos.x;
+        ty = ppos.y;
+    } else if (instance_exists(_bc.enemy_inst)) {
+        var pos = FX_CenterOn(_sprite, _bc.enemy_inst, scale);
+        tx = pos.x;
+        ty = pos.y;
+    }
+    return FX_Spawn(_sprite, tx, ty, _frames, _speed, scale);
 }
 
 function Battle_PlayerSkill(_bc, _skill_id) {
@@ -698,18 +754,7 @@ function Battle_PlayerSkill(_bc, _skill_id) {
 
     var fx = noone;
     if (res.ok && res.fx_sprite != noone && (skill.effect != "damage" || res.hit)) {
-        var tx = _bc.enemy_fx_x;
-        var ty = _bc.enemy_fx_y;
-        if (Battle_SkillFxOnPlayer(_skill_id)) {
-            var ppos = FX_CenterAtPoint(res.fx_sprite, _bc.player_fx_x, _bc.player_fx_y);
-            tx = ppos.x;
-            ty = ppos.y;
-        } else if (instance_exists(_bc.enemy_inst)) {
-            var pos = FX_CenterOn(res.fx_sprite, _bc.enemy_inst);
-            tx = pos.x;
-            ty = pos.y;
-        }
-        fx = FX_Spawn(res.fx_sprite, tx, ty, res.fx_frames, res.fx_speed);
+        fx = Battle_SkillFxSpawn(_bc, _skill_id, res.fx_sprite, res.fx_frames, res.fx_speed);
     }
 
     if (!res.ok) {

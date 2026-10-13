@@ -910,24 +910,48 @@ function Skill_BuildAppliedStatusMessage(_applied_status_names) {
     return out;
 }
 
-function Skill_Use(_user, _target, _skill_id) {
-    var s = SkillDB_Get(_skill_id);
-    var user_is_player = (variable_struct_exists(_user, "is_player") && _user.is_player);
-    var player_vs_enemy_skill = user_is_player && (!variable_struct_exists(s, "target") || s.target != TGT_SELF);
+// Image speed a skill's animation plays at. Player skills (D55) are also capped so they play in no more than PLAYER_SKILL_FX_MAX_FRAMES game frames.
+function Skill_FxSpeed(_s, _user_is_player) {
+    var player_vs_enemy_skill = _user_is_player && (!variable_struct_exists(_s, "target") || _s.target != TGT_SELF);
     var fx_speed_mult = SKILL_FX_SPEED_MULT;
-    if (user_is_player) {
+    if (_user_is_player) {
         fx_speed_mult = player_vs_enemy_skill ? PLAYER_SKILL_FX_SPEED_MULT : PLAYER_SKILL_FX_SPEED_MULT_NON_ENEMY;
     }
-    var fx_speed = s.fx_speed * fx_speed_mult;
-    if (player_vs_enemy_skill && variable_struct_exists(s, "player_fx_speed_mult")) {
-        var per_skill_fx_mult = max(0, real(s.player_fx_speed_mult));
+    var fx_speed = _s.fx_speed * fx_speed_mult;
+    if (player_vs_enemy_skill && variable_struct_exists(_s, "player_fx_speed_mult")) {
+        var per_skill_fx_mult = max(0, real(_s.player_fx_speed_mult));
         if (per_skill_fx_mult > 0) {
-            fx_speed = s.fx_speed * per_skill_fx_mult;
+            fx_speed = _s.fx_speed * per_skill_fx_mult;
         }
     }
     if (player_vs_enemy_skill) {
         fx_speed = clamp(fx_speed, 0.01, PLAYER_SKILL_FX_SPEED_MAX);
     }
+    if (_user_is_player && _s.fx_sprite != noone) {
+        fx_speed = FX_SpeedForMaxFrames(_s.fx_sprite, fx_speed, PLAYER_SKILL_FX_MAX_FRAMES);
+    }
+    return fx_speed;
+}
+
+// Skill ids a player can learn that have an animation, in id order (the ones the animation timing and size checks cover).
+function Skill_PlayerFxIds() {
+    SkillDB_Init();
+    var ids = [];
+    var keys = ds_map_keys_to_array(global.skill_db);
+    array_sort(keys, true);
+    for (var i = 0; i < array_length(keys); i++) {
+        var s = global.skill_db[? keys[i]];
+        if (!is_struct(s) || s.fx_sprite == noone) continue;
+        if (!is_array(s.class_list) || array_length(s.class_list) == 0) continue;
+        array_push(ids, keys[i]);
+    }
+    return ids;
+}
+
+function Skill_Use(_user, _target, _skill_id) {
+    var s = SkillDB_Get(_skill_id);
+    var user_is_player = (variable_struct_exists(_user, "is_player") && _user.is_player);
+    var fx_speed = Skill_FxSpeed(s, user_is_player);
     var result = {
         ok: true,
         hit: true,

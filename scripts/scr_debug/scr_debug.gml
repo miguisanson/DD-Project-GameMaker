@@ -240,7 +240,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 9000 : 2500, vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_flash: false, sk_mp0: 0 };
+                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 6000 : 2500), vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, fxi: 0 };
 }
 
 function Scenario_Finish() {
@@ -414,7 +414,7 @@ function Scenario_StepBot(_s) {
                 if (_s.v == 1) {   // the fail variant runs last: its lost battle leaves a game-over transition behind
                     Scenario_Finish();
                 } else {
-                    _s.v = 2;   // 0 perfect -> 2 Hilt Bash timing -> 3 Ice Spear timing -> 4 Foresight placement -> 1 fail
+                    _s.v = 2;   // 0 perfect -> 2 every player skill, one battle each (_s.ski) -> 1 fail
                     Scenario_Next(_s, 0);
                 }
             }
@@ -422,27 +422,35 @@ function Scenario_StepBot(_s) {
     }
 }
 
-// v=2 / v=3: BUG-05/06 / D55. A Knight casts Hilt Bash, a Mage casts Ice Spear, both through the menu keys. Measured: game frames from the
-// frame the battle controller leaves the skill menu for BSTATE_MESSAGE (the confirm) to the frame the message state ends (battle_state
-// is MENU or ENEMY_ACT again: the point where the next choice or the enemy's reply starts). The player is given Foresight (always hits)
-// so the skill animation plays; the action must take no more than SCN_SKILL_ACTION_MAX_FRAMES (D55: about 1 s, 60 fps).
+// v=2: BUG-05/06 / D55 / BUG-21 / I-052, once for EVERY player skill with an animation (Skill_PlayerFxIds, in id order; _s.ski is the index).
+// A character of the skill's class casts it through the menu keys. Measured: game frames from the frame the battle controller leaves the
+// skill menu for BSTATE_MESSAGE (the confirm) to the frame the message state ends (battle_state is MENU or ENEMY_ACT again: the point where
+// the next choice or the enemy's reply starts). The player has Foresight (always hits) so the animation plays and the enemy is sturdy so
+// the skill cannot kill it. Each action must take no more than SCN_SKILL_ACTION_MAX_FRAMES (D55: about 1 s, 60 fps), play on the right
+// side (BUG-21) and be drawn within the size rule (I-052).
 #macro SCN_SKILL_ACTION_MAX_FRAMES 66
+function Scenario_SkillName(_sid) {
+    return "bot_skill_" + string_lower(string_replace_all(SkillDB_Get(_sid).name, " ", "_"));
+}
+
 function Scenario_StepBotSkill(_s) {
-    var _knight = (_s.v == 2);
-    var _name = _knight ? "bot_skill_hilt_bash" : ((_s.v == 3) ? "bot_skill_ice_spear" : "bot_skill_foresight");
-    var _sid = _knight ? SKILL_HILT_BASH : ((_s.v == 3) ? SKILL_ICE_SPEAR : SKILL_FORESIGHT);
-    var _timed = (_s.v != 4);   // v=4 (BUG-21): a self-buff; only where its animation plays is checked, not how long it takes
+    var _ids = Skill_PlayerFxIds();
+    var _sid = _ids[_s.ski];
+    var _skill = SkillDB_Get(_sid);
+    var _name = Scenario_SkillName(_sid);
     switch (_s.step) {
         case 0:
             if (_s.t == 10) {
-                var _gs = Scenario_NewKnight(_knight ? CLASS_KNIGHT : CLASS_MAGE);
-                var _ch = Player_LearnSkill(_gs.player_ch, _sid);
-                _ch.mp = _ch.max_mp;
+                var _gs = Scenario_NewKnight(_skill.class_list[0]);
+                var _ch = _gs.player_ch;
+                _ch.skills = [_sid];   // the only skill in the menu
+                _ch.max_mp = 99;
+                _ch.mp = 99;
                 _ch = Status_Add(_ch, STATUS_HIT_UP, 9, 0);
-                if (_knight) _ch = Status_Add(_ch, STATUS_POISON, 3, 0);   // BUG-08: the tick after the skill must reach the log and the HUD
+                if (_sid == SKILL_HILT_BASH) _ch = Status_Add(_ch, STATUS_POISON, 3, 0);   // BUG-08: the tick after the skill must reach the log and the HUD
                 GameState_SetPlayer(_ch);
                 _s.vstart = _s.f;
-                _s.sk = 0;
+                _s.sk = -1;
                 _s.sk_fx = false;
                 _s.sk_mp0 = _ch.mp;
                 Scenario_GotoBattle(_name);
@@ -472,6 +480,7 @@ function Scenario_StepBotSkill(_s) {
                 if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {
                     Scenario_Tap((_bc.menu_index != 1) ? "menu_down" : "confirm");
                 } else if (_bc.battle_state == BSTATE_SKILL_MENU && _ready) {
+                    _bc.e.status = [];   // an enemy that used Solidify or Evasion on its turn would turn Foresight into a miss and skip the animation
                     Scenario_Tap("confirm");
                     _s.sk = 1;
                 } else if (_bc.battle_state == BSTATE_ENEMY_DEF_QTE && _ready && _bc.enemy_def_qte_active && _bc.enemy_def_qte_phase == 1
@@ -482,13 +491,22 @@ function Scenario_StepBotSkill(_s) {
             } else if (_s.sk == 1) {   // the confirm was read: the controller is in the message state
                 if (_bc.battle_state == BSTATE_MESSAGE) {
                     _s.sk_start = _s.f;
+                    _s.sk_cast = _bc.skill_banner_active && _bc.skill_banner_name == _skill.name;   // Skill_Use succeeded (Meditation gives MP back, so MP alone cannot show it)
                     _s.sk_fx = instance_exists(_bc.wait_fx);
+                    _s.sk_fx_on_player = false;
+                    _s.sk_fx_on_enemy = false;
+                    _s.sk_fx_px = 0;
+                    _s.sk_fx_limit = 0;
                     if (_s.sk_fx) {   // BUG-21: where did the animation spawn, relative to the player and enemy anchor points?
                         var _fxi = _bc.wait_fx;
-                        var _pp = FX_CenterAtPoint(_fxi.sprite_index, _bc.player_fx_x, _bc.player_fx_y);
-                        var _pe = FX_CenterOn(_fxi.sprite_index, _bc.enemy_inst);
+                        var _pp = FX_CenterAtPoint(_fxi.sprite_index, _bc.player_fx_x, _bc.player_fx_y, _fxi.image_xscale);
+                        var _pe = FX_CenterOn(_fxi.sprite_index, _bc.enemy_inst, _fxi.image_xscale);
                         _s.sk_fx_on_player = point_distance(_fxi.x, _fxi.y, _pp.x, _pp.y) < 1;
                         _s.sk_fx_on_enemy = point_distance(_fxi.x, _fxi.y, _pe.x, _pe.y) < 1;
+                        // I-052: longest drawn side against the target's (the enemy's sprite, or the player's 32 px reference)
+                        var _target = Battle_SkillFxOnPlayer(_sid) ? FX_PLAYER_TARGET_PX : FX_TargetSize(_bc.enemy_inst);
+                        _s.sk_fx_px = max(sprite_get_width(_fxi.sprite_index), sprite_get_height(_fxi.sprite_index)) * abs(_fxi.image_xscale);
+                        _s.sk_fx_limit = min(64, 1.5 * _target);
                     }
                     _s.sk_flash = instance_exists(obj_ui_controller) && obj_ui_controller.hud_hurt_flash_timer > 0;   // the tick ran in this same frame
                     _s.sk = 2;
@@ -496,12 +514,13 @@ function Scenario_StepBotSkill(_s) {
             } else if (_s.sk == 2) {
                 if (_bc.battle_state != BSTATE_MESSAGE) {
                     var _frames = _s.f - _s.sk_start;
-                    show_debug_message("[BOT] " + _name + " action_frames=" + string(_frames) + " fx=" + string(_s.sk_fx) + " next_state=" + string(_bc.battle_state));
-                    Scenario_Check(_name + "_skill_was_cast", _bc.p.mp < _s.sk_mp0, "mp=" + string(_bc.p.mp) + " mp0=" + string(_s.sk_mp0));
+                    show_debug_message("[BOT] " + _name + " action_frames=" + string(_frames) + " fx=" + string(_s.sk_fx) + " fx_px=" + string(_s.sk_fx_px) + " limit=" + string(_s.sk_fx_limit) + " next_state=" + string(_bc.battle_state) + " msg=" + string(_bc.message_text));
+                    Scenario_Check(_name + "_skill_was_cast", _s.sk_cast, "mp=" + string(_bc.p.mp) + " mp0=" + string(_s.sk_mp0));
                     Scenario_Check(_name + "_fx_played", _s.sk_fx);
                     Scenario_Check(_name + "_fx_on_" + (Battle_SkillFxOnPlayer(_sid) ? "player" : "enemy"),
                         Battle_SkillFxOnPlayer(_sid) ? (_s.sk_fx_on_player && !_s.sk_fx_on_enemy) : (_s.sk_fx_on_enemy && !_s.sk_fx_on_player));
-                    if (_knight) {
+                    Scenario_Check(_name + "_fx_size_fits_target", _s.sk_fx && _s.sk_fx_px <= _s.sk_fx_limit + 0.01, "drawn=" + string(_s.sk_fx_px) + " limit=" + string(_s.sk_fx_limit));
+                    if (_sid == SKILL_HILT_BASH) {
                         var _logged = false;
                         for (var _li = 0; _li < array_length(_bc.combat_log); _li++) {
                             if (string_pos("Poison", _bc.combat_log[_li].text) > 0 && string_pos("hurts you", _bc.combat_log[_li].text) > 0) _logged = true;
@@ -509,14 +528,15 @@ function Scenario_StepBotSkill(_s) {
                         Scenario_Check(_name + "_poison_tick_logged", _logged);
                         Scenario_Check(_name + "_poison_tick_flashes_hud", _s.sk_flash);
                     }
-                    if (_timed) Scenario_Check(_name + "_action_le_" + string(SCN_SKILL_ACTION_MAX_FRAMES) + "_frames", _frames <= SCN_SKILL_ACTION_MAX_FRAMES, "frames=" + string(_frames));
+                    Scenario_Check(_name + "_action_le_" + string(SCN_SKILL_ACTION_MAX_FRAMES) + "_frames", _frames <= SCN_SKILL_ACTION_MAX_FRAMES, "frames=" + string(_frames));
                     Scenario_Next(_s, 2);
                 }
             }
             break;
-        case 2:   // measured: start the next variant (the battle is simply abandoned) or finish
+        case 2:   // measured: start the next skill (the battle is simply abandoned) or the fail variant
             if (_s.t == 5) {
-                _s.v = (_s.v == 2) ? 3 : ((_s.v == 3) ? 4 : 1);
+                _s.ski++;
+                if (_s.ski >= array_length(_ids)) _s.v = 1;
                 Scenario_Next(_s, 0);
             }
             break;
@@ -579,7 +599,8 @@ function Scenario_StepShots(_s) {
     switch (_s.step) {
         case 0:   // enter room _s.ri and settle
             if (_s.ri >= array_length(_rooms)) {
-                Scenario_Finish();
+                _s.fxi = 0;
+                Scenario_Next(_s, 10);   // I-052: one picture per skill animation
                 break;
             }
             if (_s.t == 1) {
@@ -614,6 +635,65 @@ function Scenario_StepShots(_s) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 _s.si++;
                 if (_s.si >= array_length(_scales)) { _s.ri++; Scenario_Next(_s, 0); } else Scenario_Next(_s, 1);
+            }
+            break;
+        default:
+            Scenario_StepShotsFx(_s);
+            break;
+    }
+}
+
+// I-052: one screenshot per player skill animation, in rm_battle at display scale 3 (480 x 432), file shot_fx_<skill>.png.
+// Each skill is spawned through Battle_SkillFxSpawn (the same placement, scale and speed the battle uses) and frozen on its middle frame.
+function Scenario_StepShotsFx(_s) {
+    var _ids = Skill_PlayerFxIds();
+    if (_s.fxi >= array_length(_ids)) {
+        Scenario_Finish();
+        return;
+    }
+    var _sid = _ids[_s.fxi];
+    var _skill = SkillDB_Get(_sid);
+    var _slug = string_lower(string_replace_all(_skill.name, " ", "_"));
+    switch (_s.step) {
+        case 10:   // a character of the skill's class, into a battle at display scale 3
+            if (_s.t == 1) {
+                var _gs = Scenario_NewKnight(_skill.class_list[0]);
+                var _st = GameSettings_Ensure();
+                _st.display_scale = 3;
+                _st.fit_screen = false;
+                GameSettings_ApplyDisplay();
+                Scenario_GotoBattle("shots_fx_" + _slug);
+            }
+            if (_s.t >= 25) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_fx_" + _slug + "_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.wait_timer = 9999;   // stay on the intro message while the picture is taken
+                _bc.skill_banner_active = true;
+                _bc.skill_banner_name = _skill.name;
+                var _fx = Battle_SkillFxSpawn(_bc, _sid, _skill.fx_sprite, _skill.fx_frames, Skill_FxSpeed(_skill, true));
+                _bc.wait_fx = noone;
+                _fx.image_index = sprite_get_number(_skill.fx_sprite) div 2;
+                _fx.image_speed = 0;
+                _fx.fx_prev_frame = floor(_fx.image_index);
+                Scenario_Next(_s, 11);
+            }
+            break;
+        case 11:   // let the frozen frame be drawn, then save it
+            if (_s.t >= 3) {
+                _s.shot = "shot_fx_" + _slug + ".png";
+                screen_save(_s.shot);
+                show_debug_message("[SHOT] file=" + _s.shot + " w=" + string(window_get_width()) + " h=" + string(window_get_height()) + " scale=3 fx_scale=" + string(instance_exists(obj_fx) ? obj_fx.image_xscale : -1));
+                Scenario_Next(_s, 12);
+            }
+            break;
+        case 12:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                with (obj_fx) instance_destroy();
+                _s.fxi++;
+                Scenario_Next(_s, 10);
             }
             break;
     }

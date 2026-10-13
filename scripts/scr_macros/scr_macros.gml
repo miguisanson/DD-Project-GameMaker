@@ -212,7 +212,11 @@
 #macro PLAYER_SKILL_FX_SPEED_MULT_NON_ENEMY 3.00
 #macro PLAYER_SKILL_FX_SPEED_MAX 2.00   // D55: Ice Spear and Hilt Bash must finish in about 0.75 s
 #macro PLAYER_SKILL_HIT_BONUS 4
-#macro SKILL_FX_SCALE 2
+#macro PLAYER_SKILL_FX_MAX_FRAMES 42   // D55: a player skill's animation plays through in at most this many game frames (0.7 s); the 0.3 s hold follows
+#macro SKILL_FX_SCALE 2   // old fixed draw scale; battle animations now use FX_ScaleFor (I-052)
+#macro FX_TARGET_FIT 1.5   // I-052: an effect is drawn at most this many times the target sprite's longest side
+#macro FX_MAX_DRAW_PX 64   // I-052: and never more than this many world px on its longest side (the screen is 160 x 144)
+#macro FX_PLAYER_TARGET_PX 32   // the player has no battle sprite; its effects are sized as for a 32 px target
 // Faster base speed with a per-attack random variation roll (ATTACK_TIMING_SPEED_VAR_*)
 // so every swing differs and can't be memorized. A gentle threat_rank tier mult
 // keeps elites/bosses a touch quicker on top of the randomness.
