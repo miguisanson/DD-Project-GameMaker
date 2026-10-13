@@ -233,6 +233,7 @@ function RoomState_ApplyInstance(_inst) {
         if (variable_instance_exists(_inst, "encounter_pending")) _inst.encounter_pending = false;
         if (variable_instance_exists(_inst, "encounter_player")) _inst.encounter_player = noone;
         if (variable_instance_exists(_inst, "moving")) _inst.moving = false;
+        Enemy_SnapToGrid(_inst);   // I-048: a snapshot taken mid-step must not restore between tiles
         if (variable_instance_exists(_inst, "move_timer")) _inst.move_timer = 0;
         if (variable_instance_exists(_inst, "move_dir")) _inst.move_dir = -1;
         if (variable_instance_exists(_inst, "cine_lock_count")) _inst.cine_lock_count = 0;
@@ -254,6 +255,7 @@ function RoomState_Save(_room) {
 function RoomState_OnRoomExit() {
     RoomState_Init();
     if (room == rm_battle) return;
+    global.room_exit_count = (variable_global_exists("room_exit_count") ? global.room_exit_count : 0) + 1;   // I-049: counted so a scenario can prove an exit fires once per entry
     RoomState_Save(room);
 }
 

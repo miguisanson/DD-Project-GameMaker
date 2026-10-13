@@ -1,5 +1,11 @@
 if (transition_id == "") exit;
 
+// I-049: one exit per entry. Once a fade or another exit is under way, further overlap frames do nothing.
+if (Transition_IsActive()) exit;
+
+// D64: the player arrived standing on this tile; it ignores them until they step off it (no bounce-back).
+if (variable_instance_exists(other, "exit_ignore") && other.exit_ignore == id) exit;
+
 // Require intentional movement into the transition direction
 if (require_move) {
     var requested_dir = -1;

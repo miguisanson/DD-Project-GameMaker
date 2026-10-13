@@ -72,6 +72,8 @@ function Test_RunAll() {
     Test_RunSuite("Player", Test_Suite_Player);
     Test_RunSuite("Loc", Test_Suite_Loc);
     Test_RunSuite("Display", Test_Suite_Display);
+    Test_RunSuite("Nav", Test_Suite_Nav);
+    Test_RunSuite("Snap", Test_Suite_Snap);
     Test_RunSuite("SaveAtomic", Test_Suite_SaveAtomic);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     if (Test_HasFlag("-testcontrol")) {
@@ -1259,4 +1261,101 @@ function Test_Suite_Display() {
         _fs = !_fs;
     }
     Test_Eq("DISP-05 five toggles end fullscreen", _fs, true);
+}
+
+
+// NAV-01 (D63, D65, I-047): pure grid pathfinding on hand-made maps, no room needed. Maps are ASCII: "." free, "#" wall (blocks
+// movement and sight), "~" blocks movement only (rock, chest). Expected lengths are counted by hand (4-direction steps).
+function Test_PathIsValid(_g, _p, _sx, _sy, _gx, _gy) {
+    if (array_length(_p) == 0) return false;
+    var _px = _sx, _py = _sy;
+    for (var _i = 0; _i < array_length(_p); _i++) {
+        var _c = _p[_i];
+        if (abs(_c[0] - _px) + abs(_c[1] - _py) != 1) return false;
+        if (Nav_CellBlocked(_g, _c[0], _c[1])) return false;
+        _px = _c[0];
+        _py = _c[1];
+    }
+    return (_px == _gx && _py == _gy);
+}
+
+function Test_Suite_Nav() {
+    // cell <-> world conversion (16 px cells, origin 0,0)
+    Test_Eq("NAV-01 world 33 is cell 2", Nav_CellOf(33), 2);
+    Test_Eq("NAV-01 world 0 is cell 0", Nav_CellOf(0), 0);
+    Test_Eq("NAV-01 world 15.9 is cell 0", Nav_CellOf(15.9), 0);
+    Test_Eq("NAV-01 world -1 is cell -1", Nav_CellOf(-1), -1);
+    Test_Eq("NAV-01 cell 3 is world 48", Nav_WorldOf(3), 48);
+
+    // open ground: shortest path is the Manhattan distance
+    var _g = Nav_GridFromRows([".....", ".....", "....."]);
+    var _p = Nav_FindPath(_g, 0, 0, 4, 2);
+    Test_Eq("NAV-01 open ground: length 6", array_length(_p), 6);
+    Test_True("NAV-01 open ground: path is contiguous and ends on the goal", Test_PathIsValid(_g, _p, 0, 0, 4, 2));
+    Test_Eq("NAV-01 start equals goal: no steps", array_length(Nav_FindPath(_g, 2, 1, 2, 1)), 0);
+
+    // path around a wall: wall column x=2 open only on row 2
+    _g = Nav_GridFromRows(["..#..", "..#..", "....."]);
+    _p = Nav_FindPath(_g, 0, 0, 4, 0);
+    Test_Eq("NAV-01 around a wall: length 8", array_length(_p), 8);
+    Test_True("NAV-01 around a wall: path is contiguous, avoids walls, ends on the goal", Test_PathIsValid(_g, _p, 0, 0, 4, 0));
+
+    // no way through: the goal is sealed off
+    _g = Nav_GridFromRows(["..#..", "..#..", "..#.."]);
+    Test_Eq("NAV-01 no path: empty", array_length(Nav_FindPath(_g, 0, 0, 4, 0)), 0);
+    var _r = Nav_ResCreate();
+    var _st = Nav_StepToward(_g, _r, 1, 0, 0, 4, 0);
+    Test_Eq("NAV-01 no path: StepToward says stay", _st.ok, false);
+
+    // movement-only blockers also stop paths; the goal cell may be blocked terrain (target stands next to a chest) only if free
+    _g = Nav_GridFromRows([".~.", ".~.", ".~."]);
+    Test_Eq("NAV-01 rock column seals the map", array_length(Nav_FindPath(_g, 0, 1, 2, 1)), 0);
+    Test_Eq("NAV-01 goal outside the map: no path", array_length(Nav_FindPath(_g, 0, 1, 9, 9)), 0);
+
+    // line of sight: only "#" blocks it
+    _g = Nav_GridFromRows(["....#....", ".........", "....~...."]);
+    Test_Eq("NAV-01 sight along a clear row", Nav_LineClear(_g, 0, 1, 8, 1), true);
+    Test_Eq("NAV-01 sight blocked by a wall", Nav_LineClear(_g, 0, 0, 8, 0), false);
+    Test_Eq("NAV-01 sight blocked by a wall is symmetric", Nav_LineClear(_g, 8, 0, 0, 0), false);
+    Test_Eq("NAV-01 a rock does not block sight", Nav_LineClear(_g, 0, 2, 8, 2), true);
+    Test_Eq("NAV-01 sight to the own cell", Nav_LineClear(_g, 3, 1, 3, 1), true);
+    Test_Eq("NAV-01 sight under a wall, diagonal", Nav_LineClear(_g, 3, 1, 5, 2), true);
+    var _g2 = Nav_GridFromRows([".....", "..#..", "....."]);
+    Test_Eq("NAV-01 sight blocked diagonally through a wall", Nav_LineClear(_g2, 0, 0, 4, 2), false);
+    Test_Eq("NAV-01 sight diagonal clear of the wall", Nav_LineClear(_g2, 0, 2, 4, 2), true);
+
+    // reservations: two enemies never take the same cell
+    _g = Nav_GridFromRows(["..", "..", ".#"]);
+    _r = Nav_ResCreate();
+    Test_Eq("NAV-01 reserve a free cell", Nav_ResClaim(_r, 1, 0, 0), true);
+    Test_Eq("NAV-01 reserve again by the same owner", Nav_ResClaim(_r, 1, 0, 0), true);
+    Test_Eq("NAV-01 another owner cannot take it", Nav_ResClaim(_r, 2, 0, 0), false);
+    Test_Eq("NAV-01 owner of a cell", Nav_ResOwnerAt(_r, 0, 0), 1);
+    Nav_ResClaim(_r, 2, 1, 1);   // enemy 2 stands at (1,1), enemy 1 at (0,0), the target is at (0,2)
+    var _a = Nav_StepToward(_g, _r, 1, 0, 0, 0, 2);
+    Test_True("NAV-01 enemy 1 steps to (0,1)", _a.ok && _a.cx == 0 && _a.cy == 1);
+    Test_Eq("NAV-01 enemy 1 faces DOWN", _a.dir, DOWN);
+    var _b = Nav_StepToward(_g, _r, 2, 1, 1, 0, 2);
+    Test_Eq("NAV-01 enemy 2 waits: its only way, (0,1), is taken", _b.ok, false);
+    Nav_ResRelease(_r, 1);
+    _b = Nav_StepToward(_g, _r, 2, 1, 1, 0, 2);
+    Test_True("NAV-01 enemy 2 steps once the cell is free", _b.ok && _b.cx == 0 && _b.cy == 1);
+    Test_Eq("NAV-01 release frees all cells of an owner", Nav_ResOwnerAt(_r, 0, 0), -1);
+}
+
+// SNAP-01 (I-048, D69): everything that walks lives on the 16 px grid; the snap is "nearest multiple of 16".
+function Test_Suite_Snap() {
+    Test_Eq("SNAP-01 0.4 snaps to 0", Grid_Snap(0.4), 0);
+    Test_Eq("SNAP-01 15.6 snaps to 16", Grid_Snap(15.6), 16);
+    Test_Eq("SNAP-01 8.4 snaps to 16", Grid_Snap(8.4), 16);
+    Test_Eq("SNAP-01 7.6 snaps to 0", Grid_Snap(7.6), 0);
+    Test_Eq("SNAP-01 an aligned value stays", Grid_Snap(48), 48);
+    Test_Eq("SNAP-01 -3 snaps to 0", Grid_Snap(-3), 0);
+    Test_Eq("SNAP-01 -9 snaps to -16", Grid_Snap(-9), -16);
+    var _p = Grid_SnapPoint(0.4, 15.6);
+    Test_True("SNAP-01 point (0.4, 15.6) is (0, 16)", _p.x == 0 && _p.y == 16);
+    Test_Eq("SNAP-01 32 is aligned", Grid_IsAligned(32), true);
+    Test_Eq("SNAP-01 32.4 is not aligned", Grid_IsAligned(32.4), false);
+    Test_Eq("SNAP-01 -16 is aligned", Grid_IsAligned(-16), true);
+    Test_Eq("SNAP-01 float noise below 0.001 counts as aligned", Grid_IsAligned(32.000000001), true);
 }
