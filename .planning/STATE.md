@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | 1E old bugs, landing on branch `next`: p1e-battle (worktree ../DD-Project-GameMaker-wt/p1ea: action time D55, poison feedback, self-buff anim) + p1e-save (worktree ../DD-Project-GameMaker-wt/p1eb: atomic save, 9999 temp, mini boss check, LOC-03). Then: QTE + turn-bar sketch on top, then first playtest stop. |
+| WIP | next: p1e-save + loc merged. In flight: p1e-battle (worktree ../DD-Project-GameMaker-wt/p1ea); display rebuild step A (worktree ../DD-Project-GameMaker-wt/disp, branch disp-a: spike + pure layout functions + tests). Queued: display step B, movement/pathfinding (audit/movement.md, D63-D65), QTE+turn-bar prototype, then first playtest stop. |
 | Unplayed features | 0 / 15 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
