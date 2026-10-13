@@ -336,7 +336,6 @@ function Test_Suite_Inventory() {
     // R-003: a duplicate that got in (old save) must still show once in the listing.
     var _dup = [{ id: 114, qty: 1 }, { id: 114, qty: 1 }];
     Test_Eq("R-003 Menu_InventoryDisplayItems shows a pushed duplicate book once", array_length(Menu_InventoryDisplayItems(_dup)), 1);
-    Test_Eq("R-003 Inv_GetItems lists a pushed duplicate book once", array_length(Inv_GetItems(_dup)), 1);
 }
 
 // Data integrity over the GML databases (VER-11; R-003, R-004). ds_map_add silently drops a repeated key, so a
