@@ -67,6 +67,9 @@ Locked by the owner. Changing any of these needs a new grill-me.
 | D60 | Bar variety | Bar speed/zone is fixed per source so it is learnable: per weapon type for attacks (fast+wide for daggers/bows, slow+narrow for heavy), per heavy enemy attack for defence; upgrades/perks can widen the Perfect zone. |
 | D61 | Grade effects | Starting numbers: Perfect 130 %, Good 110 %, OK 100 %, Weak 75 % (attacks and skills). Perfect may add a small extra where a skill has one (e.g. status chance). Tuned by playtest. |
 | D62 | Testing scope | Run only the checks related to a change (`-Mode fast` + the one relevant `-Only` mode). `-Only shots` (resizes windows) only for screen/UI changes. Plain `-Mode full` once per merge to `next` and before a playtest stop — never while the owner is using the PC. |
+| D63 | Enemy AI | Enemies idle until the player is within ~4 tiles with no wall between (line of sight), then path to the player with real pathfinding (mp_grid per room, enemies avoid each other). Touching starts the fight. Sprites flip to face horizontal movement (no new art). |
+| D64 | Room arrival | The player appears ON the exit tile in the new room; the exit ignores the player until they step off it (no bounce-back, no re-trigger). |
+| D65 | Map grid check | Owner unsure whether backgrounds sit on a 16 px grid: produce a grid-overlay screenshot per room and show the owner before changing room sizes/offsets. |
 
 ## Notes
 - Three of the friend's bugs (skill books twice, mini boss moving, maybe poison) look already fixed in code since commit f39236b (2026-03-05) — the friend probably played an older build. From now on every build shows a build id, and every note records it.
