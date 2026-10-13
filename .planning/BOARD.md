@@ -15,8 +15,8 @@ Build: none yet | Unplayed: 0/8 | Open P1: 0 | Updated: 2026-10-14 | Release the
 6. Fair fights: 4 stats, no misses, poison/burn with a turn counter, one difficulty, a simulator to check numbers. [STAT, BAL-02]
 7. QTE for real: ring/bar and arrow types, graded, never a full miss. Then the turn-order bar. [QTE, TURN, ROB-02]
 8. The run: class pick (4 classes), die and return to the entrance, death line and gift, unlocks, stories never repeat, shuffles, cards, gold, shop, ending and credits. [RUN, PROG, SAVE-07]
-9. You approve balance numbers; every screen styled; every icon real; sounds, tutorial, run logs. [BAL-03..07, UI, ART, GAP-01..04]
-10. Web link + Windows zip + Korean + release-candidate playtest, then development stops. [WEB, LOC, ROB-01]
+9. You approve balance numbers; every screen styled; every icon real; sounds, tutorial, run logs. [BAL-03..07, UI, ART, GAP-01..10]
+10. Web link (Chrome/Firefox/Edge) + Windows download + credits + Korean + release-candidate playtest, then development stops. [WEB, LOC, ROB-01]
 
 ## Done
 - Audit, research, 36 decisions (D1-D36), plan review, plan rewritten for the roguelike (2026-10-14)
@@ -26,4 +26,5 @@ Build: none yet | Unplayed: 0/8 | Open P1: 0 | Updated: 2026-10-14 | Release the
 - Create script asset `scr_test` in the IDE (1 minute). [VER-02]
 - Ask the friend which build they played. ("Bone" is answered: Foresight's icon looks like a bone; it should be an eye — D24.) [I-039]
 - Soon (item 4): in the IDE create `obj_display` and `scr_display`, set every room's view 0 to 160x144, widen `rm_floor6_5`, set the window colour to black. [DISP-02, 04, 10]
+- Send the creator names for the sounds/music you got (for the credits). [GAP-05]
 - Item 2: play the sketches when I say they are ready (~10 min each).

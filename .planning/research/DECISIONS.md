@@ -42,7 +42,20 @@ Locked by the owner. Changing any of these needs a new grill-me.
 | D35 | Difficulty modes | One difficulty only + a QTE assist option (wider windows) for accessibility. Easy/Normal/Hard are removed. |
 | D36 | Save split | Two save parts, each versioned: profile (story seen, unlocks, death gift, settings) and run (seed, RNG stream counters, class, level, cards, gold, items, floor). Clean break from old saves (D16). |
 | D37 | Releases | One release at the end. No public halfway "safety build". |
-| D38 | Android | Never. Windows + web only. Drop Android from this project. |
+| D38 | Android / porting | Never. No Android, no porting — delete that idea everywhere. Web (HTML5 on miguisanson.dev) is the main way to play. |
+| D39 | Windows download | A Windows download (exe in a zip) is always offered alongside web, and becomes the only way to play if the web version can't meet D48. |
+| D40 | Existing sounds | All 126 existing sounds/music are licensed for use (free, some paid for with the creators' permission). Keep them. Credits must list every sound/music creator — the owner supplies the names. |
+| D41 | New sounds | Reuse existing sounds first (Retro/Minimalist/Modern sets etc.) for QTE grades, arrow presses, card pick, shop, stun, death, unlock; generate jsfxr-style 8-bit SFX only for what's missing. Owner approves by ear in playtest. |
+| D42 | Music | Keep current music; no new tracks. Make sure each place (floors, battle, boss, shop, run end) uses a fitting existing track, with fades. |
+| D43 | New art | Reuse and recolour first: Nobody skills reuse existing effect animations (retimed/flipped); merchant = an existing NPC sprite variant; elite marker = code-drawn outline/aura; cards = 9-slice frame. ComfyUI only for remaining gaps. |
+| D44 | Icon cleanup | Agents run ComfyUI → downscale → force 4-colour palette → scripted outline fix, then show the owner a contact sheet; owner marks keep/redo; hand pixel fixes only for rejected ones. |
+| D45 | Tutorial | Just-in-time prompts: first time each mechanic appears, a short pop-up (what to press, what it does). Once per save. Re-readable in a Help page from the pause menu. |
+| D46 | Run saving | Auto-save (room change, after each fight, on quit). "Continue run" on launch. No reloading to undo a death. Beds stop being save points. |
+| D47 | Beds | Beds become rest sites: once per run per bed, choose heal OR upgrade one owned skill (Slay the Spire campfire). |
+| D48 | Skip scenes | Hold confirm ~1 s to skip a cutscene/camera pan (still counts as seen); tap advances text as now. |
+| D49 | Settings | Volume, language, window size (existing) + QTE assist, key rebinding, text speed, screen shake on/off. |
+| D50 | Web saves / support | Saves stay in browser storage per site account (existing hook); the play page warns that clearing browser data erases progress. Supported: desktop Chrome, Firefox, Edge — a full run at steady speed, sound after first click, correct scaling in the site's player, keyboard + controller, save/resume. Phones unsupported (message shown). |
+| D51 | Run logs | Each run writes a small local log (build id, seed, class, floor, cause of death, cards, gold, QTE grades). Windows: file in the save folder; web: "copy run log" button on the run-end screen. Playtesters send it; no auto-upload. |
 
 ## Notes
 - Three of the friend's bugs (skill books twice, mini boss moving, maybe poison) look already fixed in code since commit f39236b (2026-03-05) — the friend probably played an older build. From now on every build shows a build id, and every note records it.

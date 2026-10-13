@@ -48,7 +48,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-14)
 3. Phase 2 display spike and measurements (needs Phase 1 waves 1A-1C for the screenshot bot).
 Do not start Phase 4 until the G3 save contract is written. Do not start any combat or card code before its grill-me topic (`ROADMAP.md`, "Grill-me topics").
 
-**Owner tasks waiting:** create script asset `scr_test` in the IDE (1 minute; fallback `scr_debug.gml`); ask the friend which build they played (I-039); later, the Phase 2 IDE tasks listed on `BOARD.md`. Open question: D3 (Android later) vs D28 (no post-release) (I-046).
+**Owner tasks waiting:** create script asset `scr_test` in the IDE (1 minute; fallback `scr_debug.gml`); send sound/music creator names for the credits; ask the friend which build they played (I-039); later, the Phase 2 IDE tasks listed on `BOARD.md`. Open question: D3 (Android later) vs D28 (no post-release) (I-046).
 
 **Progress:** [░░░░░░░░░░] 0% (0 of 8 phases)
 
@@ -89,11 +89,10 @@ Locked in `research/DECISIONS.md` (D1-D36). Summary table in `PROJECT.md`. Proce
 ### Blockers / Concerns
 
 - Igor and the IDE running together is untested (`automation-igor.md` section 5).
-- HTML5 and Android builds through Igor are untested; the Phase 2 spike checks HTML5.
+- HTML5 builds through Igor are untested (Android dropped, D38); the Phase 2 spike checks HTML5.
 - Several balance findings are model results, never run in the game (`balance-data.md` tags [model]).
 - Seeded randomness on the web export is unproven until the golden-sequence test runs there (Phase 8).
 - Card pools of about 5 skills + 5-8 upgrades per class may make runs look alike (PROJECT.md tension 8); G7 decides the rules that keep picks meaningful.
-- D3 vs D28 (Android) is an open owner question.
 
 ## Deferred Items
 

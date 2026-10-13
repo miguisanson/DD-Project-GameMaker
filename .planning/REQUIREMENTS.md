@@ -251,10 +251,17 @@ Two save parts, each with its own schema version. The field lists are fixed in g
 
 ### GAP - Found 2026-10-14 after the plan rework (grill each right before building it)
 
-- [ ] **GAP-01**: Sound sources for every new feedback moment (QTE grades, card pick, shop buy, turn-bar stun, death, unlock) come from one place: 8-bit SFX made with jsfxr/ChipTone or CC0 packs, levels set on the existing buses (`audio-design`). No feature ships silent. *Check: L3 (sound id fired per event, logged) + L5.*
-- [ ] **GAP-02**: New sprite work outside icons is listed and sized before Phase 6: Nobody skill animations, merchant sprite, an elite marker that reads in 4 colours (outline/aura/badge), card frame art. Each item says AI-sketch or hand-drawn. *Check: L4 screenshot of each in game.*
-- [ ] **GAP-03**: A first-run tutorial teaches the turn bar, each QTE type, card picks and the shop in play (one prompt per mechanic, first time only, stored in the profile). *Check: L3 (prompt shows once, never on run 2) + L5.*
-- [ ] **GAP-04**: Every run writes a small local run log (build id, seed, class, floor reached, cause of death, cards taken, gold spent, QTE grade counts). The simulator can read it, so playtests feed balance with numbers. *Check: L2 (log schema) + L3 (bot run produces a log).*
+- [ ] **GAP-01**: Every new feedback moment (QTE grades, arrow presses, card pick, shop buy, turn-bar stun, death, unlock) has a sound: existing sounds reused first, jsfxr-style SFX only for gaps (D41); levels on the existing buses (`audio-design`). Each place uses a fitting existing music track with fades (D42). No feature ships silent. *Check: L3 (sound id fired per event, logged) + L5.*
+- [ ] **GAP-02**: New sprite work outside icons is listed and sized before Phase 6: Nobody skill animations, merchant sprite, an elite marker that reads in 4 colours (outline/aura/badge), card frame art. Reuse/recolour first, ComfyUI only for gaps (D43). *Check: L4 screenshot of each in game.*
+- [ ] **GAP-03**: Just-in-time prompts teach the turn bar, each QTE type, card picks, the shop and beds (one prompt per mechanic, first time only, stored in the profile); a Help page in the pause menu repeats them (D45). *Check: L3 (prompt shows once, never on run 2) + L5.*
+- [ ] **GAP-04**: Every run writes a small local run log (build id, seed, class, floor reached, cause of death, cards taken, gold spent, QTE grade counts). Windows: file in the save folder; web: "copy run log" button on the run-end screen; no upload (D51). The simulator reads it. *Check: L2 (log schema) + L3 (bot run produces a log).*
+
+- [ ] **GAP-05**: Credits screen lists every sound/music creator supplied by the owner (D40), plus fonts/tools/licences used (Galmuri OFL, MIT libraries). *Check: L4 screenshot + list matches `datafiles/credits` source.*
+- [ ] **GAP-06**: Auto-save on room change, after each fight and on quit; "Continue run" on launch; no reload after death (D46). *Check: L3 (bot quits mid-run, relaunch resumes same room/HP; death deletes the run save).*
+- [ ] **GAP-07**: Beds are rest sites: once per run per bed, choose heal OR upgrade one owned skill (D47). *Check: L3 + L5.*
+- [ ] **GAP-08**: Hold confirm ~1 s skips a cutscene/camera pan and marks it seen; a tap only advances text (D48). *Check: L3.*
+- [ ] **GAP-09**: Settings: QTE assist, key rebinding (keyboard; works in the browser), text speed, screen shake on/off, plus existing volume/language/window size (D49). Saved in the profile. *Check: L2 + L3.*
+- [ ] **GAP-10**: Web: play page warns that clearing browser data erases saves; phones get an "unsupported" message; full run passes on desktop Chrome, Firefox and Edge (D50). If any of these can't be met, the Windows download becomes the only offering (D39). *Check: L5 per browser + WEB rows.*
 
 ## Cut order (D28)
 
@@ -263,7 +270,7 @@ The must-haves are card picks, the turn-order bar, gold and shop, and the new QT
 ## Not built, ever (D28: no post-release)
 
 There is no "later". These were listed as later before; they are now simply out:
-- Android build and touch testing (see the open question about D3 in `PROJECT.md`).
+- Android, porting, phone browsers, touch controls (D38, D50).
 - Bestiary and enemy-skill icons (the 13 optional enemy icons in `audit/icons-needed.md` section 3).
 - QTE calibration screen, auto-success and QTE-off options (QTE-13 is narrowed).
 - A post-win difficulty ladder, daily or entered seeds, run modifiers, a node map or procedural floors (`roguelike-design.md` options A+, B, C). Not decided, so not built.
@@ -272,8 +279,8 @@ There is no "later". These were listed as later before; they are now simply out:
 
 | Feature | Reason |
 |---------|--------|
-| Android testing and release | D28: no post-release. D3's "design must not block it" survives only where free |
-| Porting to other engines or platforms | D1: parked |
+| Android / porting | Never (D38) |
+| Porting to other engines or platforms | Never (D38) |
 | GX.games / Opera GX | D15: own site instead |
 | Old save compatibility | D16: clean break |
 | New floors, new story, new content beyond the decisions | D1, D28. The only new class is the Nobody (D34, already in the game) |

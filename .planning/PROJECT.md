@@ -18,7 +18,7 @@ If a choice has to be made between a new feature and a fight that feels fair, th
 
 - **Audience:** the owner's friends and the owner's portfolio. Free release, itch.io style. No store or legal work. (D2)
 - **Platforms:** Windows and web (HTML5). (D3)
-- **Android:** not built, not tested. D3 says "later", but D28 says there is no post-release, so "later" never comes. Display and input should still avoid blocking it where that costs nothing. **Open question for the owner** (on `BOARD.md`).
+- **Android / porting:** never (D38). Web is the main way to play; a Windows download is always offered and is the fallback if web fails (D39).
 - **Web hosting:** the owner's own site, repo `live-miguisanson-dev`, page `/play/dd-project`. This repo only produces the HTML5 export; deploying is that repo's job. Not GX.games; the Opera GX target is dropped (removed in the IDE, never by hand-editing). (D15)
 
 ## Requirements
@@ -33,8 +33,8 @@ All v2.0 requirements are in `REQUIREMENTS.md` (159 requirements in categories V
 
 ### Out of Scope
 
-- **Android testing and release.** (D28; D3 survives only where free)
-- **Porting to other engines or consoles.** The porting branches are parked; `v1.8` already contains all of them (`STATE.md`). (D1)
+- **Android, porting, any phone support.** (D38, D50)
+- **Porting to other engines or consoles: dropped for good (D38).** The old porting branches are history only; `v1.8` already contains all of them (`STATE.md`). (D1)
 - **GX.games / Opera GX.** (D15)
 - **Old save compatibility.** Old saves are rejected with a friendly message. (D16)
 - **New floors, new story, new content beyond the decisions.** The only new class is the Nobody, which already exists in the game. (D1, D28)
@@ -76,9 +76,9 @@ The full, locked list is `.planning/research/DECISIONS.md` (D1-D36: D1-D24 grill
 
 | Decision | Topic | Outcome |
 |----------|-------|---------|
-| D1 | Same game done right; combat core open for rework; porting parked | Locked (amended by D25, D28) |
+| D1 | Same game done right; combat core open for rework; porting dropped (D38) | Locked (amended by D25, D28, D38) |
 | D2 | Friends + portfolio, free release | Locked |
-| D3 | Windows + web now, Android later (not blocked) | Locked; open question vs D28 |
+| D3 | Windows + web (Android removed by D38) | Locked |
 | D4, D5 | QTE mixed per skill (ring/bar and arrow sequences); graded results, never a full miss | Locked |
 | D6, D20 | Skills always hit; basic attack is a graded QTE, never 0 damage | Locked (see tension 1) |
 | D7 | Defence QTE only on big or telegraphed enemy attacks | Locked |
@@ -117,7 +117,7 @@ The full, locked list is `.planning/research/DECISIONS.md` (D1-D36: D1-D24 grill
 4. **D18 vs `audit/icons-needed.md`.** That audit asked for 3 new skill-book icons. Skill books are replaced by cards, so those are dropped from the art list.
 5. **D22 vs `audit/icons-needed.md`.** The optional stat icons were for STR/AGI/DEF/INT/LUCK. They become ATK/DEF/SPD/MAG. Also LUCK (the only crit source for Archer/Mage per `balance-data.md` S8) disappears, so crit needs a new home (G5).
 6. **D21 vs current code.** Today the defensive QTE can lengthen a status from 2 to 8 ticks (`audit/combat-bugs.md` section 1). D21 says it may only shorten.
-7. **D3 vs D28 (new).** "Android later" versus "no post-release". This plan treats Android as never built; the owner confirms on `BOARD.md`.
+7. **D3 vs D28 — resolved 2026-10-14:** Android is never built (D38).
 8. **D18 pool size vs replay (new).** About 5 skills + 5-8 upgrades per class means one run sees almost the whole pool, so runs may look alike. D18 and D28 fix the pool size; what keeps picks meaningful (an equipped-skill cap, exclusive upgrade branches, a bad-luck guard, skip) is a rules question for grill G7, not extra content.
 9. **D14 grind vs a replayable run (resolved by D25/D27).** Leveling and potion/MP management now live inside one run. Whether enemies respawn inside a run is decided in G2 (RUN-15).
 
