@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Owner asleep from 2026-10-14 night. AWAY BUDGET: stop all work when weekly usage reaches 23% (was 3% at start; owner allows +20%). In flight: display step A (worktree ../DD-Project-GameMaker-wt/disp), fx-fix (worktree ../DD-Project-GameMaker-wt/fx). Queue while away: display step B → movement/AI (D63-D70) → QTE bar+arrows + turn-bar prototype → STOP for first playtest (write PLAYTEST-QUEUE.md + BOARD). |
+| WIP | Owner asleep from 2026-10-14 night. AWAY BUDGET: building the queue has NO usage cap. Once the queue is done and only improvement mode is left (waiting for the playtest), note the weekly % at that moment and cap improvement mode at that +20%. In flight: display step A (worktree ../DD-Project-GameMaker-wt/disp), fx-fix (worktree ../DD-Project-GameMaker-wt/fx). Queue while away: display step B → movement/AI (D63-D70) → QTE bar+arrows + turn-bar prototype → STOP for first playtest (write PLAYTEST-QUEUE.md + BOARD). |
 | Unplayed features | 0 / 15 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
