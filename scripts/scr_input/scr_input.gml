@@ -30,6 +30,7 @@ function Input_Init() {
         inp.bindings.menu_left = [ord("A"), vk_left];
         inp.bindings.menu_right = [ord("D"), vk_right];
 
+        inp.bindings.run = [vk_shift];   // D70: hold to run
         inp.bindings.debug_save = [vk_f5];
         inp.bindings.debug_load = [vk_f9];
         inp.bindings.debug_levelup = [ord("L")];
@@ -43,6 +44,7 @@ function Input_Init() {
     // UI confirm is intentionally space-only.
     inp.bindings.confirm = [vk_space];
     if (!variable_struct_exists(inp.bindings, "pause")) inp.bindings.pause = [vk_escape];
+    if (!variable_struct_exists(inp.bindings, "run")) inp.bindings.run = [vk_shift];
     if (!variable_struct_exists(inp.bindings, "debug_levelup")) inp.bindings.debug_levelup = [ord("L")];
     if (!variable_struct_exists(inp.bindings, "debug_all_items")) inp.bindings.debug_all_items = [ord("K")];
     if (!variable_struct_exists(inp.bindings, "debug_save")) inp.bindings.debug_save = [vk_f5];
@@ -201,6 +203,8 @@ function Input_GamepadActionHeld(_device, _action, _deadzone) {
             return gamepad_button_check(_device, gp_face1);
         case "cancel":
             return gamepad_button_check(_device, gp_face2);
+        case "run":
+            return gamepad_button_check(_device, gp_shoulderl) || gamepad_button_check(_device, gp_shoulderr);
         case "menu":
             return gamepad_button_check(_device, gp_face3);
         case "pause":

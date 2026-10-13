@@ -1103,3 +1103,36 @@ function Enemy_SnapToGrid(_inst) {
     _inst.y = _p.y;
     return true;
 }
+
+// ============================================================================
+// PLAYER WORLD FX (D70): the interact prompt. A small bobbing arrow over the interactable the player faces, drawn by a layer
+// script registered from obj_player Step (objects have no Draw event, and .yy files are not edited).
+// ============================================================================
+function Player_PromptWorthy(_t) {
+    if (!instance_exists(_t)) return false;
+    if (_t.visible) return true;
+    return (variable_instance_exists(_t, "interact_kind") && _t.interact_kind != INTERACT_NONE);
+}
+
+function Player_DrawWorldFx() {
+    if (!variable_global_exists("player_fx_calls")) global.player_fx_calls = 0;
+    global.player_fx_calls++;
+    if (!instance_exists(obj_player)) return;
+    var _pl = instance_find(obj_player, 0);
+    if (!variable_instance_exists(_pl, "prompt_target") || !instance_exists(_pl.prompt_target)) return;
+    var _t = _pl.prompt_target;
+    var _c0 = make_color_rgb(7, 24, 33);
+    var _c3 = make_color_rgb(224, 248, 207);
+    var _oc = draw_get_color();
+    var _oa = draw_get_alpha();
+    draw_set_alpha(1);
+    var _bob = (current_time div 260) mod 2;
+    var _cx = floor((_t.bbox_left + _t.bbox_right) / 2);
+    var _y = floor(_t.bbox_top) - 7 - _bob;
+    draw_set_color(_c0);   // outline: a down-pointing triangle one pixel bigger than the light one
+    for (var _r = 0; _r < 4; _r++) draw_rectangle(_cx - (3 - _r), _y - 1 + _r, _cx + (3 - _r), _y - 1 + _r, false);
+    draw_set_color(_c3);
+    for (var _r2 = 0; _r2 < 3; _r2++) draw_rectangle(_cx - (2 - _r2), _y + _r2, _cx + (2 - _r2), _y + _r2, false);
+    draw_set_color(_oc);
+    draw_set_alpha(_oa);
+}

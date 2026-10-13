@@ -50,6 +50,23 @@ tile_size = GRID_TILE_SIZE;
 step_from_x = x;
 step_from_y = y;
 exit_ignore = noone;   // D64: the exit tile the player arrived on; it does not fire until the player has stepped off it
+// D69 / D70: turn on a tap, buffered corner, run, bump, interact prompt
+walk_speed = (16 mod max(1, move_speed) == 0) ? move_speed : 1;   // pixels per frame; must divide the 16 px tile
+run_speed = 2;
+step_speed = walk_speed;
+turn_frames = 6;       // a direction held for this long after turning starts the walk; a shorter tap only turns
+turn_timer = 0;
+buffer_frames = 10;    // a direction pressed during a step is remembered this many frames for the next step
+buf_dir = -1;
+buf_age = 99;
+bump_dir = -1;         // direction already bumped for this press
+bump_count = 0;
+bump_timer = 0;
+bump_dx = 0;
+bump_dy = 0;
+bump_applied = false;
+prompt_target = noone; // interactable the player faces right now (drives the prompt)
+fx_set = false;
 auto_resolve_recover_timer = 0;
 auto_resolve_recover_total = 0;
 auto_resolve_recover_progress = 0;

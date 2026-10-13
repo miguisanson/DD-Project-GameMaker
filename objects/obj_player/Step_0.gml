@@ -1,3 +1,15 @@
+// D70: the bump nudge is a 1 px display offset; take it back before any logic sees the position.
+if (bump_applied) {
+    x -= bump_dx;
+    y -= bump_dy;
+    bump_applied = false;
+}
+prompt_target = noone;
+if (!fx_set) {   // the interact prompt is drawn by a layer script: objects have no Draw event (no .yy edits)
+    fx_set = true;
+    if (layer_exists(layer)) layer_script_end(layer, Player_DrawWorldFx);
+}
+
 var gs = GameState_Get();
 Player_EnsureSpriteSet();
 if (!is_real(face)) face = DOWN;
@@ -59,22 +71,65 @@ if (UI_IsBlocking()) {
 
 interact_key = Input_Pressed("interact");
 
+// D69: a direction pressed while a step is running is remembered for a few frames: the next step starts at once.
+var pressed_dir = -1;
+if (Input_Pressed("move_up")) pressed_dir = UP;
+else if (Input_Pressed("move_down")) pressed_dir = DOWN;
+else if (Input_Pressed("move_left")) pressed_dir = LEFT;
+else if (Input_Pressed("move_right")) pressed_dir = RIGHT;
+if (moving && pressed_dir != -1) {
+    buf_dir = pressed_dir;
+    buf_age = 0;
+} else if (buf_age < 99) {
+    buf_age += 1;
+}
+
 if (!moving) {
     move_dir = -1;
+    var want = -1;
+    var from_buffer = false;
     if (!interact_key) {
         var act = Input_MoveAction();
-        var tx = x;
-        var ty = y;
-        if (act == "move_up") { move_dir = UP; face = UP; ty = y - tile_size; }
-        else if (act == "move_down") { move_dir = DOWN; face = DOWN; ty = y + tile_size; }
-        else if (act == "move_left") { move_dir = LEFT; face = LEFT; tx = x - tile_size; }
-        else if (act == "move_right") { move_dir = RIGHT; face = RIGHT; tx = x + tile_size; }
+        if (act == "move_up") want = UP;
+        else if (act == "move_down") want = DOWN;
+        else if (act == "move_left") want = LEFT;
+        else if (act == "move_right") want = RIGHT;
+        if (want == -1 && buf_dir != -1 && buf_age <= buffer_frames) {
+            want = buf_dir;          // tapped during the last step
+            from_buffer = true;
+        } else if (want != -1 && want == buf_dir && buf_age <= buffer_frames) {
+            from_buffer = true;      // pressed during the last step and still held
+        }
+    }
 
-        if (move_dir != -1) {
+    if (want != -1) {
+        buf_dir = -1;
+        move_dir = want;
+        if (face != want) {
+            // D69: the turn is instant; walking starts only if the key is still held after turn_frames (a tap just turns)
+            face = want;
+            turn_timer = from_buffer ? 0 : turn_frames;
+        } else if (turn_timer > 0) {
+            turn_timer -= 1;
+        }
+        if (turn_timer <= 0) {
+            var tx = x + ((want == RIGHT) - (want == LEFT)) * tile_size;
+            var ty = y + ((want == DOWN) - (want == UP)) * tile_size;
             if (!place_meeting(tx, ty, obj_wall) && !place_meeting(tx, ty, obj_interactable)) {
                 moving = true;
+            } else if (bump_dir != want) {
+                // D70: soft sound and a tiny nudge, once per press (not once per frame)
+                bump_dir = want;
+                bump_count += 1;
+                bump_timer = 3;
+                bump_dx = (want == RIGHT) - (want == LEFT);
+                bump_dy = (want == DOWN) - (want == UP);
+                SFX_Play("blocked", 0.4);
             }
         }
+    } else {
+        turn_timer = 0;
+        bump_dir = -1;   // key released: the next press may bump again
     }
 
     if (moving) {
@@ -82,15 +137,17 @@ if (!moving) {
         move_timer = tile_size;
         step_from_x = x;
         step_from_y = y;
+        // D70: the run key doubles the speed; fixed for the whole step so the step always ends exactly on a tile
+        step_speed = (Input_Held("run") && (tile_size mod run_speed) == 0) ? run_speed : walk_speed;
     }
 }
 
 if (moving) {
     switch (move_dir) {
-        case UP:    y -= 1; break;
-        case DOWN:  y += 1; break;
-        case LEFT:  x -= 1; break;
-        case RIGHT: x += 1; break;
+        case UP:    y -= step_speed; break;
+        case DOWN:  y += step_speed; break;
+        case LEFT:  x -= step_speed; break;
+        case RIGHT: x += step_speed; break;
     }
 
     if (place_meeting(x, y, obj_wall) || place_meeting(x, y, obj_interactable)) {
@@ -104,13 +161,13 @@ if (moving) {
     }
 
     if (moving) {
-        move_timer -= 1;
+        move_timer -= step_speed;
         if (move_timer <= 0) {
             moving = false;
             move_timer = 0;
             image_index = 0;
-            x = round(x / tile_size) * tile_size;
-            y = round(y / tile_size) * tile_size;
+            x = Grid_Snap(x);
+            y = Grid_Snap(y);
         }
     }
 }
@@ -118,6 +175,18 @@ if (moving) {
 if (!moving) {
     sprite_index = sprite[face];
     image_index = 0;
+
+    // D70: what the player faces, for the prompt (only when standing still and free)
+    var facing_target = Interact_GetTarget(id);
+    if (facing_target != noone && Player_PromptWorthy(facing_target)) prompt_target = facing_target;
 }
 
 mask_index = sprite[DOWN];
+
+// D70: apply the bump nudge last (taken back at the top of the next step)
+if (bump_timer > 0) {
+    bump_timer -= 1;
+    x += bump_dx;
+    y += bump_dy;
+    bump_applied = true;
+}
