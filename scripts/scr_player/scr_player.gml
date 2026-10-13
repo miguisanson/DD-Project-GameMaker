@@ -1382,6 +1382,7 @@ function GameSettings_ApplyAudio() {
 }
 
 function GameSettings_ApplyDisplay() {
+    global.display_apply_count = (variable_global_exists("display_apply_count") ? global.display_apply_count : 0) + 1;   // TEMP (red run of the DISP-08 check), removed with this function
     var settings = GameSettings_Ensure();
     var base_w = max(1, DISPLAY_BASE_W);
     var base_h = max(1, DISPLAY_BASE_H);

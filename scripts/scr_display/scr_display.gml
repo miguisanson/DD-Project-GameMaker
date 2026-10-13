@@ -77,3 +77,8 @@ function Display_WindowRectInGui(_layout) {
     var _u = _layout.ui_scale;
     return { x: -_layout.gui_x / _u, y: -_layout.gui_y / _u, w: _layout.win_w / _u, h: _layout.win_h / _u };
 }
+
+// TEMP stub for the red run: how many times the display was (re)applied since boot. Replaced by global.display.apply_count.
+function Display_ApplyCount() {
+    return variable_global_exists("display_apply_count") ? global.display_apply_count : 0;
+}
