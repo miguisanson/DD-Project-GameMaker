@@ -255,6 +255,7 @@ function RoomState_Save(_room) {
 function RoomState_OnRoomExit() {
     RoomState_Init();
     if (room == rm_battle) return;
+    global.room_exit_count = (variable_global_exists("room_exit_count") ? global.room_exit_count : 0) + 1;   // I-049: counted so a scenario can prove an exit fires once per entry
     RoomState_Save(room);
 }
 

@@ -853,6 +853,10 @@ function Scenario_Block(_obj, _cx, _cy) {
 }
 
 function Scenario_StepMove(_s) {
+    if (_s.mp >= 6) {
+        Scenario_StepMovePlayer(_s);
+        return;
+    }
     var _mv = _s.mv;
     switch (_s.step) {
         case 0:   // fresh room for the next part (first let any battle fade that an encounter already started finish)
@@ -998,8 +1002,85 @@ function Scenario_MoveNext(_s) {
     with (obj_enemy) instance_destroy();   // no late encounter may leak into the next part
     _s.mp++;
     Scenario_Next(_s, 0);
-    if (_s.mp > 5) {
-        _s.v = 1;   // on to the fail variant
-        Scenario_Next(_s, 0);
+    if (_s.mp >= 6) _s.mv = { phase: 0 };   // the player parts keep their own phases
+}
+
+
+// ---- parts 6+: the player (I-049 exit guard, D64 arrival, D69 / D70 movement) through held keys ----
+function Scenario_ExitCount() {
+    return variable_global_exists("room_exit_count") ? global.room_exit_count : 0;
+}
+
+function Scenario_StepMovePlayer(_s) {
+    switch (_s.mp) {
+        case 6: Scenario_StepMoveExit(_s); break;
+        default: _s.v = 1; Scenario_Next(_s, 0); break;   // done: on to the fail variant
     }
+}
+
+// G: rm_floor2 left exit -> rm_floor1 arrival ON the exit tile (D64).
+// Exit fires once per entry (I-049); arriving on the exit tile does not fire it until the player steps off and comes back.
+function Scenario_StepMoveExit(_s) {
+    var _mv = _s.mv;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    switch (_mv.phase) {
+        case 0:
+            if (_s.t < 30 || Transition_IsActive()) break;
+            _s.mv = { phase: 1, f0: _s.f, c0: 0, c1: 0, frames: 0 };
+            Scenario_NewKnight();
+            room_goto(rm_floor2);
+            break;
+        case 1:   // walk left onto the exit tile of rm_floor2
+            if (_s.f - _mv.f0 < 50 || _pl == noone) break;
+            with (obj_enemy) instance_destroy();
+            Scenario_PlacePlayer(2, 5);
+            _mv.c0 = Scenario_ExitCount();
+            Scenario_Hold("move_left", 60);
+            _mv.phase = 2;
+            _mv.f0 = _s.f;
+            break;
+        case 2:   // wait for the arrival in rm_floor1
+            if (room == rm_floor1 && _pl != noone && !Transition_IsActive() && _s.f - _mv.f0 > 20) {
+                _mv.c1 = Scenario_ExitCount();
+                Scenario_Check("exit_G1_fires_once_per_entry", _mv.c1 - _mv.c0 == 1, "exit snapshots=" + string(_mv.c1 - _mv.c0));
+                Scenario_Check("exit_G2_arrives_on_the_exit_tile", _pl.x == 18 * GRID_TILE_SIZE && _pl.y == 3 * GRID_TILE_SIZE, "at " + string(_pl.x) + "," + string(_pl.y));
+                with (obj_enemy) instance_destroy();
+                Scenario_Hold("move_right", 45);   // pressing toward the exit while standing on it
+                _mv.phase = 3;
+                _mv.f0 = _s.f;
+            } else if (_s.f - _mv.f0 > 400) {
+                Scenario_Check("exit_G1_arrival_in_rm_floor1", false, "room=" + room_get_name(room));
+                Scenario_MoveNext6(_s);
+            }
+            break;
+        case 3:   // still in rm_floor1: the exit ignores the player standing on it
+            if (_s.f - _mv.f0 >= 50) {
+                Scenario_Check("exit_G3_standing_on_the_exit_does_not_fire", room == rm_floor1 && Scenario_ExitCount() == _mv.c1 && !Transition_IsActive(), "room=" + room_get_name(room) + " fires=" + string(Scenario_ExitCount() - _mv.c1));
+                Scenario_Hold("move_left", 15);   // step off: the player reads last frame's input, so 15 held frames = exactly one 16 px tile
+                _mv.phase = 4;
+                _mv.f0 = _s.f;
+            }
+            break;
+        case 4:
+            if (_s.f - _mv.f0 >= 24) {
+                Scenario_Check("exit_G4_stepped_off_the_exit_tile", _pl != noone && _pl.x == 17 * GRID_TILE_SIZE && _pl.y == 3 * GRID_TILE_SIZE, "at " + ((_pl != noone) ? (string(_pl.x) + "," + string(_pl.y)) : "no player"));
+                Scenario_Hold("move_right", 30);   // and back on
+                _mv.phase = 5;
+                _mv.f0 = _s.f;
+            }
+            break;
+        case 5:
+            if (room == rm_floor2 || _s.f - _mv.f0 > 300) {
+                Scenario_Check("exit_G5_fires_again_after_stepping_off", room == rm_floor2 && Scenario_ExitCount() - _mv.c1 == 1, "room=" + room_get_name(room) + " fires=" + string(Scenario_ExitCount() - _mv.c1));
+                Scenario_MoveNext6(_s);
+            }
+            break;
+    }
+}
+
+function Scenario_MoveNext6(_s) {
+    with (obj_enemy) instance_destroy();
+    _s.mp++;
+    _s.mv = { phase: 0 };
+    Scenario_Next(_s, 0);
 }

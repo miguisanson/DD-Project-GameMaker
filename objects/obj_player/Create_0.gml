@@ -49,6 +49,7 @@ move_timer = 0;
 tile_size = GRID_TILE_SIZE;
 step_from_x = x;
 step_from_y = y;
+exit_ignore = noone;   // D64: the exit tile the player arrived on; it does not fire until the player has stepped off it
 auto_resolve_recover_timer = 0;
 auto_resolve_recover_total = 0;
 auto_resolve_recover_progress = 0;

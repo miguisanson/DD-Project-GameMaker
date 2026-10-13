@@ -231,6 +231,13 @@ function Player_StartAutoResolveRecover(_pl, _recover_frames = ENEMY_AUTO_RESOLV
     if (_apply_battle_cooldown && variable_instance_exists(_pl, "battle_cooldown")) {
         _pl.battle_cooldown = max(_pl.battle_cooldown, BATTLE_COOLDOWN_FRAMES);
     }
+
+    // D64: placed (arrival, battle return) standing on an exit tile: that exit ignores the player until they step off it.
+    if (variable_instance_exists(_pl, "exit_ignore")) {
+        // a point test on the cell centre: it uses the exit's mask only (a fresh player has no mask until its first Step)
+        var _exit_here = instance_position(gx + tile / 2, gy + tile / 2, obj_room_transition);
+        if (_exit_here != noone) _pl.exit_ignore = _exit_here;
+    }
 }
 
 function Player_EnsureDialogueSettle(_pl, _recover_frames = PLAYER_DIALOGUE_SETTLE_FRAMES) {

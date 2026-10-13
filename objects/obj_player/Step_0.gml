@@ -32,6 +32,16 @@ if (auto_resolve_recover_timer > 0) {
     exit;
 }
 
+// D64: re-arm the exit the player arrived on once they are fully off it. Plain rectangle test on the 16 px footprint: a fresh player
+// has no mask yet on its first frames, so place_meeting would say "not touching" and re-arm the exit at once.
+if (exit_ignore != noone) {
+    if (!instance_exists(exit_ignore)
+        || x + tile_size <= exit_ignore.bbox_left || x > exit_ignore.bbox_right
+        || y + tile_size <= exit_ignore.bbox_top || y > exit_ignore.bbox_bottom) {
+        exit_ignore = noone;
+    }
+}
+
 // I-048: never rest between tiles (quick-load mid-step, aborted step, odd spawn).
 if (!moving) Player_SnapIfOffGrid(id);
 
