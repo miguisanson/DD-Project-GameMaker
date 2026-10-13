@@ -64,6 +64,8 @@ function Test_RunAll() {
     Test_RunSuite("Combat", Test_Suite_Combat);
     Test_RunSuite("Fx", Test_Suite_Fx);
     Test_RunSuite("Qte", Test_Suite_Qte);
+    Test_RunSuite("QteArrows", Test_Suite_QteArrows);
+    Test_RunSuite("QteDefence", Test_Suite_QteDefence);
     Test_RunSuite("Status", Test_Suite_Status);
     Test_RunSuite("Inventory", Test_Suite_Inventory);
     Test_RunSuite("Data", Test_Suite_Data);
@@ -369,7 +371,7 @@ function Test_Suite_Qte() {
     var _k = Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL);
     var _w = Test_Wpn(3, STAT_STR, 0);
     var _mults = [1.30, 1.10, 1.00, 0.75];
-    var _want = [5, 4, 4, 3];   // floor(4 * 1.30) 5, floor(4 * 1.10) 4, 4, floor(4 * 0.75) 3
+    var _want = [5, 5, 4, 3];   // round-half-up(4 x 1.30) 5; 4 x 1.10 rounds to 4 but a multiplier other than 1.00 moves it by at least 1, so 5; OK 4; 4 x 0.75 = 3
     for (var _g = 0; _g < 4; _g++) {
         var _d = Combat_ApplyDamage(_k, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: false, grade_mult: _mults[_g] }).dmg;
         Test_Eq("Combat_ApplyDamage grade x" + string(_mults[_g]) + ": 4 -> " + string(_want[_g]), _d, _want[_g]);
@@ -402,6 +404,260 @@ function Test_Suite_Qte() {
     // enemies still roll against the player (this packet changes the player's side only)
     var _evader = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_EVASION, 3, 0);
     Test_False("Combat_AttemptHit: an Evasion player still dodges an enemy", Combat_AttemptHit(EnemyCreate(ENEMY_SLIME), _evader, 0).hit);
+}
+
+// QTE part 2a: the arrow sequence for a player skill (D57, D58, D61). Pure grader first: scripted presses with times in ms.
+// Sequence [UP, LEFT, DOWN] is 3 long: the bar drains over 3400 ms, Perfect needs it finished by 1500 ms with no mistake,
+// a wrong press costs 250 ms of that bar. Expected values come from the packet spec (D58), not from the code.
+function Test_Suite_QteArrows() {
+    var _seq = [UP, LEFT, DOWN];
+    var _par = Qte_SeqParams(3);
+    Test_Eq("QteArrows 3 arrows: the bar lasts 3400 ms", _par.limit_ms, 3400);
+    Test_Eq("QteArrows 3 arrows: Perfect needs <= 1500 ms", _par.fast_ms, 1500);
+    Test_Eq("QteArrows a wrong press costs 250 ms", _par.penalty_ms, 250);
+    Test_Eq("QteArrows 4 arrows: the bar lasts 4200 ms", Qte_SeqParams(4).limit_ms, 4200);
+    Test_Eq("QteArrows 4 arrows: Perfect needs <= 1950 ms", Qte_SeqParams(4).fast_ms, 1950);
+    Test_Eq("QteArrows 5 arrows: the bar lasts 5000 ms", Qte_SeqParams(5).limit_ms, 5000);
+    Test_Eq("QteArrows 5 arrows: Perfect needs <= 2400 ms", Qte_SeqParams(5).fast_ms, 2400);
+    Test_Eq("QteArrows assist x2 doubles the bar", Qte_SeqParams(3, 2).limit_ms, 6800);
+    Test_Eq("QteArrows assist x2 doubles the Perfect time", Qte_SeqParams(3, 2).fast_ms, 3000);
+    Test_Eq("QteArrows assist x2 leaves the wrong-press cost alone", Qte_SeqParams(3, 2).penalty_ms, 250);
+
+    // no mistakes: fast = PERFECT, slower = GOOD
+    var _r = Qte_SeqRun(_seq, [{ t: 300, dir: UP }, { t: 600, dir: LEFT }, { t: 900, dir: DOWN }]);
+    Test_Eq("QteArrows clean and fast == PERFECT", _r.key, "PERFECT");
+    Test_Eq("QteArrows clean and fast: 0 mistakes", _r.mistakes, 0);
+    Test_Eq("QteArrows clean and fast: finished at 900 ms", _r.finish_ms, 900);
+    Test_False("QteArrows clean and fast: not a timeout", _r.timed_out);
+    _r = Qte_SeqRun(_seq, [{ t: 500, dir: UP }, { t: 1000, dir: LEFT }, { t: 1500, dir: DOWN }]);
+    Test_Eq("QteArrows finished exactly on the fast limit (1500 ms) == PERFECT", _r.key, "PERFECT");
+    _r = Qte_SeqRun(_seq, [{ t: 500, dir: UP }, { t: 1000, dir: LEFT }, { t: 1501, dir: DOWN }]);
+    Test_Eq("QteArrows finished 1 ms after the fast limit == GOOD", _r.key, "GOOD");
+    _r = Qte_SeqRun(_seq, [{ t: 1000, dir: UP }, { t: 2000, dir: LEFT }, { t: 3399, dir: DOWN }]);
+    Test_Eq("QteArrows clean but slow, finished 1 ms before the bar ran out == GOOD", _r.key, "GOOD");
+    // the bar empties at 3400 ms: an arrow at that moment is too late
+    _r = Qte_SeqRun(_seq, [{ t: 1000, dir: UP }, { t: 2000, dir: LEFT }, { t: 3400, dir: DOWN }]);
+    Test_Eq("QteArrows the last arrow as the bar empties == WEAK", _r.key, "WEAK");
+    Test_True("QteArrows the last arrow as the bar empties is a timeout", _r.timed_out);
+
+    // mistakes: a wrong press does not advance the sequence and costs 250 ms
+    _r = Qte_SeqRun(_seq, [{ t: 300, dir: UP }, { t: 500, dir: RIGHT }, { t: 700, dir: LEFT }, { t: 900, dir: DOWN }]);
+    Test_Eq("QteArrows one wrong press, then finished == OK", _r.key, "OK");
+    Test_Eq("QteArrows one wrong press: 1 mistake", _r.mistakes, 1);
+    Test_Eq("QteArrows one wrong press: finished at 900 + 250 ms of the bar", _r.finish_ms, 1150);
+    _r = Qte_SeqRun(_seq, [{ t: 300, dir: DOWN }, { t: 600, dir: UP }, { t: 900, dir: LEFT }, { t: 1200, dir: DOWN }]);
+    Test_Eq("QteArrows a wrong first arrow does not advance: UP is still wanted", _r.mistakes, 1);
+    Test_Eq("QteArrows ... and finishing afterwards is still OK", _r.key, "OK");
+    _r = Qte_SeqRun(_seq, [{ t: 100, dir: UP }, { t: 200, dir: RIGHT }, { t: 300, dir: RIGHT }, { t: 400, dir: LEFT }, { t: 500, dir: DOWN }]);
+    Test_Eq("QteArrows two wrong presses == WEAK", _r.key, "WEAK");
+    Test_Eq("QteArrows two wrong presses: 2 mistakes", _r.mistakes, 2);
+    Test_False("QteArrows two wrong presses is not a timeout (the skill is still done)", _r.timed_out);
+    // the 250 ms is taken from the bar: 1 mistake at real 3200 ms is 3450 of 3400
+    _r = Qte_SeqRun(_seq, [{ t: 100, dir: UP }, { t: 200, dir: RIGHT }, { t: 3000, dir: LEFT }, { t: 3100, dir: DOWN }]);
+    Test_Eq("QteArrows one mistake, done at real 3100 ms (3350 of 3400) == OK", _r.key, "OK");
+    _r = Qte_SeqRun(_seq, [{ t: 100, dir: UP }, { t: 200, dir: RIGHT }, { t: 3000, dir: LEFT }, { t: 3200, dir: DOWN }]);
+    Test_Eq("QteArrows one mistake, done at real 3200 ms (3450 of 3400) == WEAK", _r.key, "WEAK");
+    Test_True("QteArrows ... because the bar ran out", _r.timed_out);
+    // a mistake that spends the whole bar ends it at once
+    _r = Qte_SeqRun(_seq, [{ t: 100, dir: UP }, { t: 3200, dir: RIGHT }, { t: 3300, dir: LEFT }]);
+    Test_Eq("QteArrows a wrong press that empties the bar ends it", _r.key, "WEAK");
+    Test_True("QteArrows ... as a timeout", _r.timed_out);
+    // no input at all
+    _r = Qte_SeqRun(_seq, []);
+    Test_Eq("QteArrows no presses == WEAK", _r.key, "WEAK");
+    Test_True("QteArrows no presses is a timeout", _r.timed_out);
+    Test_Eq("QteArrows no presses: no arrow done", _r.idx, 0);
+    // presses after the end are ignored
+    _r = Qte_SeqRun(_seq, [{ t: 300, dir: UP }, { t: 600, dir: LEFT }, { t: 900, dir: DOWN }, { t: 1000, dir: RIGHT }, { t: 1100, dir: RIGHT }]);
+    Test_Eq("QteArrows presses after the sequence is done change nothing", _r.key, "PERFECT");
+    Test_Eq("QteArrows presses after the sequence is done add no mistakes", _r.mistakes, 0);
+
+    // the live bar: Qte_SeqLeft is 1 at the start and falls with time and mistakes
+    var _st = Qte_SeqNew(_seq);
+    Test_Eq("QteArrows the bar starts full", Qte_SeqLeft(_st), 1);
+    Qte_SeqTick(_st, 1700);
+    Test_Eq("QteArrows the bar is half full at 1700 of 3400 ms", Qte_SeqLeft(_st), 0.5);
+    Qte_SeqPress(_st, DOWN, 1700);   // wrong: UP is wanted
+    Test_Eq("QteArrows a wrong press takes 250 ms off the bar at once", Qte_SeqLeft(_st), (3400 - 1950) / 3400);
+    Test_Eq("QteArrows a wrong press reports 'wrong'", _st.last, "wrong");
+    Qte_SeqPress(_st, UP, 1800);
+    Test_Eq("QteArrows a right press reports 'ok'", _st.last, "ok");
+    Test_Eq("QteArrows a right press advances one arrow", _st.idx, 1);
+    Qte_SeqTick(_st, 99999);
+    Test_Eq("QteArrows the bar ends at 0 with time out", Qte_SeqLeft(_st), 0);
+    Test_True("QteArrows time out is done", _st.done);
+    Test_Eq("QteArrows time out == WEAK", _st.key, "WEAK");
+    // assist x2: the bar and the Perfect time are twice as long
+    _r = Qte_SeqRun(_seq, [{ t: 1000, dir: UP }, { t: 2000, dir: LEFT }, { t: 3000, dir: DOWN }], 2);
+    Test_Eq("QteArrows assist x2: finished at 3000 ms is PERFECT (limit 3000)", _r.key, "PERFECT");
+    _r = Qte_SeqRun(_seq, [{ t: 1000, dir: UP }, { t: 2000, dir: LEFT }, { t: 3001, dir: DOWN }], 2);
+    Test_Eq("QteArrows assist x2: finished at 3001 ms is GOOD", _r.key, "GOOD");
+
+    // grade -> multiplier is the same table the bar uses (D61): 1.30 / 1.10 / 1.00 / 0.75 for skills too
+    Test_Eq("QteArrows PERFECT multiplier", Qte_GradeMult(Qte_SeqRun(_seq, [{ t: 300, dir: UP }, { t: 600, dir: LEFT }, { t: 900, dir: DOWN }]).key), 1.30);
+    Test_Eq("QteArrows no-press multiplier", Qte_GradeMult(Qte_SeqRun(_seq, []).key), 0.75);
+
+    // the fixed sequence of every player skill (D57): length by cost (3 cheap, 4 mid, 5 strongest), valid, memorable (all different)
+    SkillDB_Init();
+    var _ids = ds_map_keys_to_array(global.skill_db);
+    array_sort(_ids, true);
+    var _seen = [];
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_ids); _i++) {
+        var _sk = global.skill_db[? _ids[_i]];
+        if (!is_struct(_sk) || !is_array(_sk.class_list) || array_length(_sk.class_list) == 0) continue;
+        _n++;
+        var _q = Qte_SkillSequence(_ids[_i]);
+        var _want = (_sk.mp_cost <= 3) ? 3 : ((_sk.mp_cost == 4) ? 4 : 5);
+        Test_Eq("QteArrows " + _sk.name + " (" + string(_sk.mp_cost) + " MP) has " + string(_want) + " arrows", array_length(_q), _want);
+        var _ok = true;
+        var _txt = "";
+        for (var _j = 0; _j < array_length(_q); _j++) {
+            if (_q[_j] < 0 || _q[_j] > 3) _ok = false;
+            _txt += string(_q[_j]);
+        }
+        Test_True("QteArrows " + _sk.name + " uses only the four arrows", _ok);
+        Test_False("QteArrows " + _sk.name + " has its own sequence", array_contains(_seen, _txt));
+        array_push(_seen, _txt);
+    }
+    Test_Eq("QteArrows all 14 player skills are covered", _n, 14);
+    Test_Eq("QteArrows an unknown skill still gets a 3-arrow sequence", array_length(Qte_SkillSequence(999)), 3);
+    Test_Eq("QteArrows the sequence is the same every time (fixed per skill, D57)", string(Qte_SkillSequence(SKILL_FIREBALL)), string(Qte_SkillSequence(SKILL_FIREBALL)));
+
+    // rounding after a grade multiplier: round half up, at least 1 apart from OK, and a hit that deals damage never drops below 1 (D20)
+    Test_Eq("QteArrows scale 4 x 1.30 == 5", Qte_ScaleAmount(4, 1.30, 1), 5);
+    Test_Eq("QteArrows scale 4 x 1.10 == 5 (4.4 rounds to 4, but Good is at least 1 above OK)", Qte_ScaleAmount(4, 1.10, 1), 5);
+    Test_Eq("QteArrows scale 4 x 1.00 == 4", Qte_ScaleAmount(4, 1.00, 1), 4);
+    Test_Eq("QteArrows scale 4 x 0.75 == 3", Qte_ScaleAmount(4, 0.75, 1), 3);
+    Test_Eq("QteArrows scale 1 x 1.30 == 2 (Perfect is visible at 1)", Qte_ScaleAmount(1, 1.30, 1), 2);
+    Test_Eq("QteArrows scale 1 x 0.75 == 1 (never 0 on a hit, D20)", Qte_ScaleAmount(1, 0.75, 1), 1);
+    Test_Eq("QteArrows scale 2 x 0.75 == 1 (1.5 rounds up to 2, but Weak is at least 1 below OK)", Qte_ScaleAmount(2, 0.75, 1), 1);
+    Test_Eq("QteArrows scale 6 x 0.75 == 5 (4.5 rounds half up to 5)", Qte_ScaleAmount(6, 0.75, 1), 5);
+    Test_Eq("QteArrows scale 10 x 1.30 == 13", Qte_ScaleAmount(10, 1.30, 1), 13);
+    Test_Eq("QteArrows scale 10 x 1.10 == 11", Qte_ScaleAmount(10, 1.10, 1), 11);
+    Test_Eq("QteArrows scale 10 x 0.75 == 8 (7.5 rounds half up)", Qte_ScaleAmount(10, 0.75, 1), 8);
+    Test_Eq("QteArrows scale 0 stays 0", Qte_ScaleAmount(0, 1.30, 1), 0);
+    var _distinct = true;
+    for (var _b = 3; _b <= 40; _b++) {   // Perfect is above OK and Weak below it at every size from 3 up
+        if (Qte_ScaleAmount(_b, 1.30, 1) <= _b) _distinct = false;
+        if (Qte_ScaleAmount(_b, 0.75, 1) >= _b) _distinct = false;
+    }
+    Test_True("QteArrows Perfect beats OK and Weak trails it at every base from 3 to 40", _distinct);
+    // the damage path uses it: Knight STR11 pow3 vs Slime DEF7 deals 4 at OK, 5 at Perfect AND at Good
+    var _k = Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL);
+    var _w = Test_Wpn(3, STAT_STR, 0);
+    var _ok_d = Combat_ApplyDamage(_k, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: true, grade_mult: 1.00 }).dmg;
+    var _pf_d = Combat_ApplyDamage(_k, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: true, grade_mult: 1.30 }).dmg;
+    var _go_d = Combat_ApplyDamage(_k, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: true, grade_mult: 1.10 }).dmg;
+    Test_True("QteArrows a skill hit at Perfect is above the same hit at OK", _pf_d > _ok_d);
+    Test_True("QteArrows a skill hit at Good is above the same hit at OK", _go_d > _ok_d);
+    Test_Eq("QteArrows a hit of 1 at Perfect through Combat_ApplyDamage == 2", Combat_ApplyDamage(EnemyCreate(ENEMY_SLIME), EnemyCreate(ENEMY_FINAL_BOSS), Test_Wpn(1, STAT_STR, 0), 1, 1, { is_skill: false, grade_mult: 1.30 }).dmg, 2);
+}
+
+// QTE part 2b: the defence sliding bar (D59, D60, D21). Grades come from the same Qte_Grade as the attack bar; these checks cover what is new:
+// per-attack bar numbers, how much each grade blocks, and that a status can only get shorter.
+function Test_Suite_QteDefence() {
+    var _big = [SKILL_POISON_FANGS, SKILL_BITE, SKILL_VINE_TRAP, SKILL_SCORCHING_TOUCH, SKILL_GHOST_CUT, SKILL_RAMMING];
+    var _def = Qte_BarParams("default");
+    for (var _i = 0; _i < array_length(_big); _i++) {
+        var _sk = SkillDB_Get(_big[_i]);
+        var _q = Qte_DefenceParams(_big[_i]);
+        Test_True("QteDefence " + _sk.name + " is flagged as a big attack", _sk.uses_defensive_qte);
+        Test_True("QteDefence " + _sk.name + ": zones nest (perfect < good < ok)", _q.perfect_half_width > 0 && _q.perfect_half_width < _q.good_half_width && _q.good_half_width < _q.ok_half_width);
+        Test_True("QteDefence " + _sk.name + ": the OK zone ends before the cursor does", Qte_ZoneCentreMs(_q) + _q.ok_half_width < _q.sweep_ms);
+        Test_True("QteDefence " + _sk.name + ": the perfect zone is at least 100 ms wide", _q.perfect_half_width * 2 >= 100);
+        Test_Eq("QteDefence " + _sk.name + " has the same bar every time (D60: learnable)", string(Qte_DefenceParams(_big[_i])), string(_q));
+    }
+    // heavy hitters are slower and narrower, quick ones faster (D60)
+    var _ram = Qte_DefenceParams(SKILL_RAMMING);
+    var _cut = Qte_DefenceParams(SKILL_GHOST_CUT);
+    var _bit = Qte_DefenceParams(SKILL_BITE);
+    Test_True("QteDefence Ramming (mini boss) sweeps slower than every other big attack", _ram.sweep_ms > Qte_DefenceParams(SKILL_VINE_TRAP).sweep_ms && _ram.sweep_ms > _cut.sweep_ms && _ram.sweep_ms > _bit.sweep_ms);
+    Test_True("QteDefence Ramming's perfect zone is the narrowest on the bar", _ram.perfect_half_width / _ram.sweep_ms < _cut.perfect_half_width / _cut.sweep_ms && _ram.perfect_half_width / _ram.sweep_ms < _bit.perfect_half_width / _bit.sweep_ms);
+    Test_True("QteDefence Ghost Cut sweeps faster than the attack default", _cut.sweep_ms < _def.sweep_ms);
+    Test_Eq("QteDefence an attack with no row uses the default bar", Qte_DefenceParams(SKILL_SOLIDIFY).sweep_ms, _def.sweep_ms);
+    // only damaging enemy hits on the player that are flagged big get the bar
+    var _spider = EnemyCreate(ENEMY_SPIDER);
+    var _player = CharacterCreate_Player(CLASS_KNIGHT);
+    var _fangs = SkillDB_Get(SKILL_POISON_FANGS);
+    Test_True("QteDefence a landed Poison Fangs is defended", Battle_EnemySkillCanBeDefended(_fangs, { ok: true, hit: true, dmg: 3 }, _player));
+    Test_False("QteDefence a Poison Fangs that missed is not", Battle_EnemySkillCanBeDefended(_fangs, { ok: true, hit: false, dmg: 0 }, _player));
+    Test_False("QteDefence a hit for 0 is not", Battle_EnemySkillCanBeDefended(_fangs, { ok: true, hit: true, dmg: 0 }, _player));
+    Test_False("QteDefence Solidify (no damage) is not", Battle_EnemySkillCanBeDefended(SkillDB_Get(SKILL_SOLIDIFY), { ok: true, hit: true, dmg: 3 }, _player));
+    Test_False("QteDefence Bloodthirsty (not a big attack) is not", Battle_EnemySkillCanBeDefended(SkillDB_Get(SKILL_BLOODTHIRSTY), { ok: true, hit: true, dmg: 3 }, _player));
+    Test_False("QteDefence a hit on the enemy is not", Battle_EnemySkillCanBeDefended(_fangs, { ok: true, hit: true, dmg: 3 }, _spider));
+
+    // how much each grade lets through (starting numbers, tuned by playtest)
+    Test_Eq("QteDefence Perfect takes 25%", Qte_DefenceMult("PERFECT"), 0.25);
+    Test_Eq("QteDefence Good takes 50%", Qte_DefenceMult("GOOD"), 0.50);
+    Test_Eq("QteDefence OK takes 75%", Qte_DefenceMult("OK"), 0.75);
+    Test_Eq("QteDefence Weak takes 100%", Qte_DefenceMult("WEAK"), 1.00);
+    Test_Eq("QteDefence a hit of 8: Perfect takes 2", Qte_DefenceDamage(8, "PERFECT"), 2);
+    Test_Eq("QteDefence a hit of 8: Good takes 4", Qte_DefenceDamage(8, "GOOD"), 4);
+    Test_Eq("QteDefence a hit of 8: OK takes 6", Qte_DefenceDamage(8, "OK"), 6);
+    Test_Eq("QteDefence a hit of 8: Weak takes 8", Qte_DefenceDamage(8, "WEAK"), 8);
+    Test_Eq("QteDefence a hit of 10: Perfect takes 3 (2.5 rounds half up)", Qte_DefenceDamage(10, "PERFECT"), 3);
+    Test_Eq("QteDefence a hit of 3: Perfect takes 1", Qte_DefenceDamage(3, "PERFECT"), 1);
+    Test_Eq("QteDefence a hit of 3: OK takes 2 (never the full 3)", Qte_DefenceDamage(3, "OK"), 2);
+    Test_Eq("QteDefence a hit of 3: Weak takes 3", Qte_DefenceDamage(3, "WEAK"), 3);
+    Test_Eq("QteDefence a hit of 1: Perfect blocks it", Qte_DefenceDamage(1, "PERFECT"), 0);
+    Test_Eq("QteDefence a hit of 0 stays 0", Qte_DefenceDamage(0, "PERFECT"), 0);
+    var _ordered = true;
+    for (var _b = 2; _b <= 40; _b++) {   // a better block never lets more through, and anything above Weak is below the full hit
+        if (!(Qte_DefenceDamage(_b, "PERFECT") <= Qte_DefenceDamage(_b, "GOOD") && Qte_DefenceDamage(_b, "GOOD") <= Qte_DefenceDamage(_b, "OK") && Qte_DefenceDamage(_b, "OK") < Qte_DefenceDamage(_b, "WEAK"))) _ordered = false;
+        if (Qte_DefenceDamage(_b, "WEAK") != _b) _ordered = false;
+    }
+    Test_True("QteDefence blocks are ordered Perfect <= Good <= OK < Weak == the full hit, for hits of 2 to 40", _ordered);
+
+    // D21: a status can only get shorter. Perfect resists it; Weak leaves it as it was applied, never longer (the old rule made it up to 4x).
+    Test_Eq("QteDefence Perfect resists a 4-turn status (0 turns)", Qte_DefenceStatusTurns("PERFECT", 4), 0);
+    Test_Eq("QteDefence Good halves a 4-turn status", Qte_DefenceStatusTurns("GOOD", 4), 2);
+    Test_Eq("QteDefence OK takes a 4-turn status to 3", Qte_DefenceStatusTurns("OK", 4), 3);
+    Test_Eq("QteDefence Weak leaves a 4-turn status at 4", Qte_DefenceStatusTurns("WEAK", 4), 4);
+    Test_Eq("QteDefence a 1-turn status stays 1 at Good (never 0 unless resisted)", Qte_DefenceStatusTurns("GOOD", 1), 1);
+    Test_Eq("QteDefence a 2-turn status at OK: 1.5 rounds half up to 2", Qte_DefenceStatusTurns("OK", 2), 2);
+    var _never_longer = true;
+    var _keys = ["PERFECT", "GOOD", "OK", "WEAK"];
+    for (var _t = 0; _t <= 12; _t++) {
+        for (var _g = 0; _g < 4; _g++) {
+            if (Qte_DefenceStatusTurns(_keys[_g], _t) > _t) _never_longer = false;
+            if (_t >= 1 && _keys[_g] != "PERFECT" && Qte_DefenceStatusTurns(_keys[_g], _t) < 1) _never_longer = false;
+        }
+    }
+    Test_True("QteDefence no grade ever makes a status longer, and only Perfect removes it (turns 0 to 12)", _never_longer);
+
+    // the same rule on a real character: Poison applied for 4 turns by the hit
+    var _specs = [STATUS_POISON];
+    for (var _g2 = 0; _g2 < 4; _g2++) {
+        var _p = CharacterCreate_Player(CLASS_KNIGHT);
+        var _before = Battle_StatusSnapshot(_p);
+        _p = Status_Add(_p, STATUS_POISON, 4, 1);
+        var _pack = Battle_DefenceAdjustStatuses(_p, _specs, _before, _keys[_g2]);
+        var _after = Battle_StatusCurrentTurns(_pack.player, STATUS_POISON);
+        var _want_t = [0, 2, 3, 4][_g2];
+        Test_Eq("QteDefence " + _keys[_g2] + ": a 4-turn Poison ends at " + string(_want_t), _after, _want_t);
+        if (_g2 == 0) Test_False("QteDefence Perfect: the character is not poisoned at all", Status_Has(_pack.player, STATUS_POISON));
+        if (_g2 == 0) Test_True("QteDefence Perfect: the message names what was resisted", string_pos(StatusDB_Get(STATUS_POISON).name, _pack.resist_msg) > 0);
+    }
+    // a status the player already had keeps its old turns: Perfect puts it back, nothing makes it longer than the hit left it
+    var _p2 = CharacterCreate_Player(CLASS_KNIGHT);
+    _p2 = Status_Add(_p2, STATUS_POISON, 3, 1);
+    var _before2 = Battle_StatusSnapshot(_p2);
+    _p2 = Status_Add(_p2, STATUS_POISON, 5, 1);   // the hit refreshed it to 5
+    var _pack2 = Battle_DefenceAdjustStatuses(_p2, _specs, _before2, "PERFECT");
+    Test_Eq("QteDefence Perfect puts a refreshed Poison back to the 3 turns it had", Battle_StatusCurrentTurns(_pack2.player, STATUS_POISON), 3);
+    var _p3 = CharacterCreate_Player(CLASS_KNIGHT);
+    _p3 = Status_Add(_p3, STATUS_POISON, 3, 1);
+    var _before3 = Battle_StatusSnapshot(_p3);
+    _p3 = Status_Add(_p3, STATUS_POISON, 5, 1);
+    var _pack3 = Battle_DefenceAdjustStatuses(_p3, _specs, _before3, "WEAK");
+    Test_Eq("QteDefence Weak leaves a refreshed Poison at the 5 the hit gave it", Battle_StatusCurrentTurns(_pack3.player, STATUS_POISON), 5);
+    // a status the hit did not touch is not touched here
+    var _p4 = CharacterCreate_Player(CLASS_KNIGHT);
+    _p4 = Status_Add(_p4, STATUS_POISON, 3, 1);
+    var _before4 = Battle_StatusSnapshot(_p4);
+    var _pack4 = Battle_DefenceAdjustStatuses(_p4, _specs, _before4, "OK");
+    Test_Eq("QteDefence a status the hit did not change is left alone", Battle_StatusCurrentTurns(_pack4.player, STATUS_POISON), 3);
 }
 
 // Status rules (balance-data.md section 4 "Status effects"; combat-bugs.md section 1; R-005, R-022).

@@ -96,13 +96,12 @@ function Combat_ApplyDamage(_attacker, _defender, _weapon, _crit_mult, _skill_mu
     if (argument_count >= 5) dmg = floor(dmg * _skill_mult);
     if (argument_count >= 4) dmg = floor(dmg * _crit_mult);
 
-    // D61: the QTE grade scales the hit, and a hit that was going to deal damage never drops to 0 (D20). A Guard below still blocks it.
+    // D61: the QTE grade scales the hit (round half up, at least 1 apart from grade OK: Qte_ScaleAmount), and a hit that was going to deal
+    // damage never drops to 0 (D20). A Guard below still blocks it.
     var dmg_ctx = {};
     if (argument_count >= 6 && is_struct(argument[5])) dmg_ctx = argument[5];
     if (variable_struct_exists(dmg_ctx, "grade_mult") && dmg_ctx.grade_mult != 1) {
-        var ungraded = dmg;
-        dmg = floor(dmg * dmg_ctx.grade_mult);
-        if (ungraded > 0 && dmg < 1) dmg = 1;
+        dmg = Qte_ScaleAmount(dmg, dmg_ctx.grade_mult, 1);
     }
 
     var guard_mult = Status_GetMul(_defender, "guard_mult");
@@ -587,6 +586,246 @@ function Qte_Result(_key) {
     return { key: _key, label: Qte_GradeLabel(_key), mult: Qte_GradeMult(_key), hit: true };
 }
 
+// ---- QTE part 2: arrow sequences for player skills (D57, D58) and the defence bar (D59, D60, D21). Pure up to Battle_DefenceAdjustStatuses;
+// checked by Test_Suite_QteArrows and Test_Suite_QteDefence. ----
+
+// A whole-number amount after a grade multiplier: round half up, but a multiplier other than 1.00 always moves a base of 1 or more by at
+// least 1 (so Perfect is visibly above OK and Weak below it at small numbers). _min_result is the floor: 1 for a player's hit (D20, a hit that
+// was going to deal damage never drops to 0), 0 for damage let through a defence.
+function Qte_ScaleAmount(_base, _mult, _min_result) {
+    var b = round(real(_base));
+    if (b < 1 || _mult == 1) return b;
+    var r = floor(b * _mult + 0.5);
+    if (_mult > 1) r = max(r, b + 1);
+    else r = min(r, b - 1);
+    return max(_min_result, r);
+}
+
+// The fixed arrow sequence of a player skill (D57): 3 arrows for the cheap skills (3 MP), 4 for the mid ones (4 MP), 5 for the strongest (5 MP).
+// Learned like spells: the same every cast. An unknown skill gets a plain 3.
+function Qte_SkillSequence(_skill_id) {
+    switch (_skill_id) {
+        case SKILL_WOUND:          return [DOWN, RIGHT, UP];
+        case SKILL_MUSCLE_UP:      return [UP, DOWN, UP];
+        case SKILL_REV_UP:         return [LEFT, UP, RIGHT];
+        case SKILL_EVASION:        return [LEFT, DOWN, LEFT];
+        case SKILL_TAKE_AIM:       return [RIGHT, UP, RIGHT];
+        case SKILL_MEDITATION:     return [DOWN, DOWN, UP];
+        case SKILL_FORESIGHT:      return [UP, LEFT, DOWN];
+        case SKILL_HILT_BASH:      return [DOWN, LEFT, RIGHT, UP];
+        case SKILL_POISON_ARROW:   return [RIGHT, RIGHT, DOWN, LEFT];
+        case SKILL_POISON_MIST:    return [LEFT, DOWN, RIGHT, DOWN];
+        case SKILL_FIREBALL:       return [UP, RIGHT, DOWN, LEFT];
+        case SKILL_HORIZ_SLASH:    return [LEFT, RIGHT, LEFT, RIGHT, DOWN];
+        case SKILL_DOUBLE_SHOT:    return [RIGHT, UP, RIGHT, DOWN, RIGHT];
+        case SKILL_ICE_SPEAR:      return [UP, DOWN, LEFT, DOWN, UP];
+    }
+    return [UP, DOWN, LEFT];
+}
+
+// The time bar of a sequence _len arrows long. limit_ms = the bar drains over it; fast_ms = finish with no mistake within it for Perfect.
+// _assist (D35) stretches both; the cost of a wrong press stays.
+function Qte_SeqParams(_len, _assist = 1) {
+    var widen = max(1, _assist);
+    return {
+        limit_ms: (QTE_SEQ_BASE_MS + QTE_SEQ_PER_ARROW_MS * _len) * widen,
+        fast_ms: (QTE_SEQ_FAST_BASE_MS + QTE_SEQ_FAST_PER_ARROW_MS * _len) * widen,
+        penalty_ms: QTE_SEQ_PENALTY_MS
+    };
+}
+
+// The state of one arrow sequence. clock is real ms since the sequence started; a wrong press adds penalty_ms to what the bar has used.
+// last = what the latest press did ("ok", "wrong", or "" for none / ignored); key is "" until done, then the grade.
+function Qte_SeqNew(_seq, _assist = 1) {
+    var par = Qte_SeqParams(array_length(_seq), _assist);
+    return {
+        seq: _seq, len: array_length(_seq), idx: 0, clock: 0, mistakes: 0,
+        limit_ms: par.limit_ms, fast_ms: par.fast_ms, penalty_ms: par.penalty_ms,
+        done: false, key: "", timed_out: false, finish_ms: 0, last: ""
+    };
+}
+
+// Milliseconds of the time bar used so far.
+function Qte_SeqElapsed(_st) {
+    return _st.clock + _st.mistakes * _st.penalty_ms;
+}
+
+// The time bar's fill, 1 (full) to 0 (empty).
+function Qte_SeqLeft(_st) {
+    return clamp((_st.limit_ms - Qte_SeqElapsed(_st)) / _st.limit_ms, 0, 1);
+}
+
+function Qte_SeqTimeOut(_st) {
+    _st.done = true;
+    _st.timed_out = true;
+    _st.key = QTE_WEAK;
+    _st.finish_ms = _st.limit_ms;
+}
+
+// Time passes to _ms (real ms since the start). Ends the sequence as Weak when the bar is empty.
+function Qte_SeqTick(_st, _ms) {
+    if (_st.done) return _st;
+    _st.clock = max(_st.clock, _ms);
+    _st.last = "";
+    if (Qte_SeqElapsed(_st) >= _st.limit_ms) Qte_SeqTimeOut(_st);
+    return _st;
+}
+
+// An arrow press at _ms. The right arrow advances; a wrong one does not and costs penalty_ms. Done after the last arrow:
+// no mistakes and within fast_ms = Perfect, no mistakes and slower = Good, one mistake = OK, two or more = Weak. An empty bar = Weak.
+function Qte_SeqPress(_st, _dir, _ms) {
+    Qte_SeqTick(_st, _ms);
+    if (_st.done) return _st;
+    if (_dir == _st.seq[_st.idx]) {
+        _st.idx++;
+        _st.last = "ok";
+        if (_st.idx >= _st.len) {
+            _st.done = true;
+            _st.finish_ms = Qte_SeqElapsed(_st);
+            if (_st.mistakes == 0) _st.key = (_st.finish_ms <= _st.fast_ms) ? QTE_PERFECT : QTE_GOOD;
+            else if (_st.mistakes == 1) _st.key = QTE_OK;
+            else _st.key = QTE_WEAK;
+        }
+    } else {
+        _st.mistakes++;
+        _st.last = "wrong";
+        if (Qte_SeqElapsed(_st) >= _st.limit_ms) Qte_SeqTimeOut(_st);
+    }
+    return _st;
+}
+
+// Replays scripted presses [{ t: ms, dir }] and returns the finished state (no press in time = timed out). The live battle calls
+// Qte_SeqPress / Qte_SeqTick one frame at a time instead; this is the same grader for tests.
+function Qte_SeqRun(_seq, _presses, _assist = 1) {
+    var st = Qte_SeqNew(_seq, _assist);
+    for (var i = 0; i < array_length(_presses); i++) {
+        if (st.done) break;
+        Qte_SeqPress(st, _presses[i].dir, _presses[i].t);
+    }
+    if (!st.done) Qte_SeqTick(st, 1000000);
+    return st;
+}
+
+// The arrows pressed this frame, in UP, DOWN, LEFT, RIGHT order (the move actions: WASD, arrow keys, d-pad, left stick).
+function Battle_ArrowPresses() {
+    var out = [];
+    if (Input_UIPressed("move_up")) array_push(out, UP);
+    if (Input_UIPressed("move_down")) array_push(out, DOWN);
+    if (Input_UIPressed("move_left")) array_push(out, LEFT);
+    if (Input_UIPressed("move_right")) array_push(out, RIGHT);
+    return out;
+}
+
+// The defence bar of a big enemy attack (D60: fixed per attack so it can be learned; quick bites are fast, the mini boss's Ramming is slow and narrow).
+// Same widget and same Qte_Grade as the attack bar. Tuned by playtest.
+function Qte_DefenceParams(_skill_id) {
+    switch (_skill_id) {
+        case SKILL_POISON_FANGS:    return { sweep_ms: 900,  perfect_half_width: 55, good_half_width: 120, ok_half_width: 200 };
+        case SKILL_BITE:            return { sweep_ms: 800,  perfect_half_width: 55, good_half_width: 115, ok_half_width: 190 };
+        case SKILL_VINE_TRAP:       return { sweep_ms: 1300, perfect_half_width: 60, good_half_width: 125, ok_half_width: 200 };
+        case SKILL_SCORCHING_TOUCH: return { sweep_ms: 1000, perfect_half_width: 55, good_half_width: 120, ok_half_width: 195 };
+        case SKILL_GHOST_CUT:       return { sweep_ms: 750,  perfect_half_width: 50, good_half_width: 110, ok_half_width: 180 };
+        case SKILL_RAMMING:         return { sweep_ms: 1500, perfect_half_width: 50, good_half_width: 100, ok_half_width: 170 };
+    }
+    return Qte_BarParams("default");
+}
+
+// Share of the hit that gets through (D59 starting numbers): Perfect blocks most of it, Weak none.
+function Qte_DefenceMult(_key) {
+    switch (_key) {
+        case QTE_PERFECT: return 0.25;
+        case QTE_GOOD:    return 0.50;
+        case QTE_OK:      return 0.75;
+    }
+    return 1.00;
+}
+
+// Damage that gets through the defence. Round half up, and anything above Weak lets through at least 1 less than the full hit.
+function Qte_DefenceDamage(_base, _key) {
+    return Qte_ScaleAmount(_base, Qte_DefenceMult(_key), 0);
+}
+
+// Turns a status keeps after the defence (D21: it can only get shorter, never longer). Perfect resists it (0). Good halves it, OK takes a
+// quarter off (round half up, never below 1 turn), Weak leaves it as the hit applied it.
+function Qte_DefenceStatusTurns(_key, _turns) {
+    if (_turns <= 0) return 0;
+    var r = _turns;
+    switch (_key) {
+        case QTE_PERFECT: return 0;
+        case QTE_GOOD:    r = floor(_turns * 0.5 + 0.5); break;
+        case QTE_OK:      r = floor(_turns * 0.75 + 0.5); break;
+    }
+    return clamp(r, 1, _turns);
+}
+
+// Whether an enemy skill that just landed on the player gets the defence bar: a damaging skill flagged as a big attack (D7, D59).
+// To make another enemy attack defendable, set uses_defensive_qte on its skill and add a row to Qte_DefenceParams.
+function Battle_EnemySkillCanBeDefended(_skill, _res, _target) {
+    if (!is_struct(_skill) || !is_struct(_res) || !is_struct(_target)) return false;
+    if (!variable_struct_exists(_skill, "uses_defensive_qte") || !_skill.uses_defensive_qte) return false;
+    if (!variable_struct_exists(_skill, "effect") || string(_skill.effect) != "damage") return false;
+    if (!variable_struct_exists(_target, "is_player") || !_target.is_player) return false;
+    if (!variable_struct_exists(_res, "ok") || !_res.ok) return false;
+    if (!variable_struct_exists(_res, "hit") || !_res.hit) return false;
+    if (!variable_struct_exists(_res, "dmg") || round(real(_res.dmg)) <= 0) return false;
+    return true;
+}
+
+// The ids of the statuses a skill applies.
+function Battle_SkillStatusIds(_skill) {
+    var ids = [];
+    if (!is_struct(_skill)) return ids;
+    if (variable_struct_exists(_skill, "status")) {
+        var sid = round(real(_skill.status));
+        if (sid != -1) array_push(ids, sid);
+    }
+    if (variable_struct_exists(_skill, "status_list") && is_array(_skill.status_list)) {
+        for (var i = 0; i < array_length(_skill.status_list); i++) {
+            var sid_m = round(real(_skill.status_list[i]));
+            if (sid_m != -1 && !array_contains(ids, sid_m)) array_push(ids, sid_m);
+        }
+    }
+    return ids;
+}
+
+// Applies the defence grade to the statuses the hit put on the player (D21). _status_ids: the skill's statuses; _before_snapshot:
+// Battle_StatusSnapshot of the player before the skill. A status the hit lengthened is cut to Qte_DefenceStatusTurns of what the hit left it,
+// never below the turns the player had before; Perfect puts it back as it was. Nothing here can make a status longer.
+// Returns { player, status_msg (what is still applied), resist_msg (what was resisted) }.
+function Battle_DefenceAdjustStatuses(_p, _status_ids, _before_snapshot, _key) {
+    var p = _p;
+    var applied_names = [];
+    var resisted_names = [];
+    for (var i = 0; i < array_length(_status_ids); i++) {
+        var sid = round(real(_status_ids[i]));
+        var before_turns = Battle_StatusSnapshotTurns(_before_snapshot, sid);
+        var hit_turns = Battle_StatusCurrentTurns(p, sid);
+        if (hit_turns <= before_turns) continue;   // the hit added nothing to this status
+
+        var kept = Qte_DefenceStatusTurns(_key, hit_turns);
+        var cfg = StatusDB_Get(sid);
+        var name = (is_struct(cfg) && variable_struct_exists(cfg, "name")) ? string(cfg.name) : "";
+        if (kept <= 0) {   // resisted: back to how it was
+            if (before_turns > 0) p = Battle_StatusSetTurns(p, sid, before_turns);
+            else p = Status_Remove(p, sid);
+            if (name != "" && !array_contains(resisted_names, name)) array_push(resisted_names, name);
+            continue;
+        }
+        kept = max(before_turns, kept);
+        if (kept < hit_turns) p = Battle_StatusSetTurns(p, sid, kept);
+        if (kept > before_turns && name != "" && !array_contains(applied_names, name)) array_push(applied_names, name);
+    }
+
+    var out = { player: p, status_msg: "", resist_msg: "" };
+    if (array_length(applied_names) > 0) out.status_msg = Skill_BuildAppliedStatusMessage(applied_names);
+    if (array_length(resisted_names) > 0) {
+        var list = "";
+        for (var n = 0; n < array_length(resisted_names); n++) list += ((n > 0) ? ", " : "") + resisted_names[n];
+        out.resist_msg = Loc_T("combat.msg.defence.resisted", "Resisted {status}.", { status: list });
+    }
+    return out;
+}
+
 function Battle_PlayerStunSkip(_bc) {
     var p = _bc.p;
     var e = _bc.e;
@@ -789,9 +1028,101 @@ function Battle_SkillFxSpawn(_bc, _skill_id, _sprite, _frames, _speed) {
     return FX_Spawn(_sprite, tx, ty, _frames, _speed, scale);
 }
 
-function Battle_PlayerSkill(_bc, _skill_id) {
+// A player skill is cast in two steps (D57, D58, D61): the arrow sequence, then the skill with the grade's multiplier.
+// The MP is checked first, so a skill you cannot pay for never asks for arrows. Nothing is spent until the sequence ends.
+function Battle_SkillQteBegin(_bc, _skill_id) {
+    var p = _bc.p;
+    if (!Status_CanAct(p)) {
+        Battle_PlayerStunSkip(_bc);
+        return;
+    }
+
+    var skill = SkillDB_Get(_skill_id);
+    var cost = Equip_PlayerSkillMPCost(p, skill, skill.mp_cost);
+    if (p.mp < cost) {
+        Battle_Message(_bc, Loc_T("combat.msg.not_enough_mp", "Not enough MP."), BSTATE_SKILL_MENU);
+        return;
+    }
+
+    _bc.sq_skill = _skill_id;
+    _bc.sq_st = Qte_SeqNew(Qte_SkillSequence(_skill_id), Qte_AssistMult());
+    _bc.sq_ms = -QTE_SEQ_LEAD_IN_MS;   // the arrows are up and the clock waits; the press that chose the skill cannot count
+    _bc.sq_wrong_ms = 0;
+    _bc.sq_pop_ms = 0;
+    _bc.sq_pop_idx = -1;
+    _bc.sq_active = true;
+    _bc.skill_banner_active = true;
+    _bc.skill_banner_name = skill.name;
+    _bc.battle_state = BSTATE_SKILL_QTE;
+}
+
+// One Step of the sequence. Presses are read like the attack bar's: stamped with the clock at the top of the Step that sees them.
+// Two arrows in the same frame (a diagonal on the stick) count as the right one if it is among them, else as one mistake.
+function Battle_SkillQteStep(_bc) {
+    if (!_bc.sq_active) {
+        _bc.battle_state = BSTATE_SKILL_MENU;
+        return;
+    }
+
+    var dt = Qte_StepMs(delta_time);
+    _bc.sq_ms += dt;
+    _bc.sq_wrong_ms = max(0, _bc.sq_wrong_ms - dt);
+    _bc.sq_pop_ms = max(0, _bc.sq_pop_ms - dt);
+    if (_bc.sq_ms < 0) return;
+
+    var st = _bc.sq_st;
+    var presses = Battle_ArrowPresses();
+    if (array_length(presses) > 0) {
+        var want = st.seq[st.idx];
+        Qte_SeqPress(st, array_contains(presses, want) ? want : presses[0], _bc.sq_ms);
+        if (st.last == "ok") {
+            SFX_PlayUI("ui_move");
+            _bc.sq_pop_ms = QTE_SEQ_POP_MS;
+            _bc.sq_pop_idx = st.idx - 1;
+        } else if (st.last == "wrong") {
+            SFX_PlayUI("ui_back");
+            _bc.sq_wrong_ms = QTE_SEQ_SHAKE_MS;
+        }
+    } else {
+        Qte_SeqTick(st, _bc.sq_ms);
+    }
+
+    if (st.done) {
+        _bc.sq_active = false;
+        Battle_PlayerSkill(_bc, _bc.sq_skill, Qte_Result(st.key));
+    }
+}
+
+// The grade word's position: over the enemy, or over the player for a skill cast on yourself.
+function Battle_QteWordPos(_bc, _on_player) {
+    if (!_on_player) return Battle_AttackTimingTarget(_bc);
+    var sx = Display_WorldScale();
+    return { x: round((_bc.player_fx_x - _bc.cam_base_x) * sx), y: round((_bc.player_fx_y - _bc.cam_base_y) * sx) };
+}
+
+// D61 feedback for a cast skill: the grade word and sound, then (damaging skills only) the same freeze-on-Perfect and shakes as the basic attack.
+function Battle_SkillGradeFeedback(_bc, _skill, _grade, _res) {
+    var word_pos = Battle_QteWordPos(_bc, _skill.target == TGT_SELF);
+    _bc.qte_result_text = _grade.label;
+    _bc.qte_result_key = _grade.key;
+    _bc.qte_result_mult = _grade.mult;
+    _bc.qte_result_ms = QTE_RESULT_MS;
+    _bc.qte_word_x = word_pos.x;
+    _bc.qte_word_y = word_pos.y;
+    SFX_Play(Qte_GradeSfxKey(_grade.key));
+
+    _bc.last_dmg = max(0, _res.dmg);
+    if (_res.dmg > 0) {
+        if (_grade.key == QTE_PERFECT) _bc.hitstop_ms = QTE_HITSTOP_PERFECT_MS;
+        else Battle_QteImpactFeedback(_bc);
+    }
+}
+
+// Casts the skill. _grade is the arrow sequence's result (Qte_Result); a damaging skill's hit is scaled by its multiplier and never misses (D6).
+function Battle_PlayerSkill(_bc, _skill_id, _grade = undefined) {
     var p = _bc.p;
     var e = _bc.e;
+    var grade = is_struct(_grade) ? _grade : Qte_Result(QTE_OK);
 
     if (!Status_CanAct(p)) {
         if (Battle_PlayerStunSkip(_bc)) return;
@@ -800,11 +1131,12 @@ function Battle_PlayerSkill(_bc, _skill_id) {
 
     var skill = SkillDB_Get(_skill_id);
     var target = (skill.target == TGT_SELF) ? p : e;
-    var res = Skill_Use(p, target, _skill_id);
+    var res = Skill_Use(p, target, _skill_id, grade.mult);
     if (res.ok) {
         _bc.skill_banner_active = true;
         _bc.skill_banner_name = skill.name;
         SFX_PlaySkill(_skill_id);
+        Battle_SkillGradeFeedback(_bc, skill, grade, res);
     }
 
     var fx = noone;
@@ -835,9 +1167,6 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     } else if (res.crit) {
         Battle_Message(_bc, Loc_T("combat.msg.skill_crit", "Critical skill! {dmg} damage!", { dmg: res.dmg }), BSTATE_ENEMY_ACT, fx);
     } else if (res.dmg > 0) {
-        if (instance_exists(_bc.enemy_inst)) {
-            SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
-        }
         Battle_Message(_bc, Loc_T("combat.msg.skill_hit", "Skill hit for {dmg} damage!", { dmg: res.dmg }), BSTATE_ENEMY_ACT, fx);
     } else {
         Battle_Message(_bc, Loc_T("combat.msg.skill_used", "Skill used."), BSTATE_ENEMY_ACT, fx);
@@ -1054,100 +1383,6 @@ function Battle_StatusSetTurns(_ch, _status_id, _turns) {
     return _ch;
 }
 
-function Battle_SkillStatusSpecs(_skill) {
-    var specs = [];
-    if (!is_struct(_skill)) return specs;
-
-    var default_turns = variable_struct_exists(_skill, "status_turns") ? max(1, round(real(_skill.status_turns))) : 1;
-    if (variable_struct_exists(_skill, "status")) {
-        var sid = round(real(_skill.status));
-        if (sid != -1) array_push(specs, { id: sid, base_turns: default_turns });
-    }
-
-    if (variable_struct_exists(_skill, "status_list") && is_array(_skill.status_list)) {
-        var turns_list = (variable_struct_exists(_skill, "status_turns_list") && is_array(_skill.status_turns_list)) ? _skill.status_turns_list : [];
-        for (var i = 0; i < array_length(_skill.status_list); i++) {
-            var sid_m = round(real(_skill.status_list[i]));
-            if (sid_m == -1) continue;
-
-            var turns_m = default_turns;
-            if (i < array_length(turns_list)) turns_m = max(1, round(real(turns_list[i])));
-
-            var merged = false;
-            for (var j = 0; j < array_length(specs); j++) {
-                if (specs[j].id != sid_m) continue;
-                specs[j].base_turns = max(specs[j].base_turns, turns_m);
-                merged = true;
-                break;
-            }
-            if (!merged) array_push(specs, { id: sid_m, base_turns: turns_m });
-        }
-    }
-
-    return specs;
-}
-
-function Battle_DefQTEThreatRank(_enemy) {
-    var rank = 1;
-    if (is_struct(_enemy) && variable_struct_exists(_enemy, "threat_rank")) rank = max(1, round(real(_enemy.threat_rank)));
-    if (is_struct(_enemy) && variable_struct_exists(_enemy, "id")) {
-        var cfg = EnemyDB_Get(_enemy.id);
-        if (is_struct(cfg) && variable_struct_exists(cfg, "threat_rank")) {
-            rank = max(rank, max(1, round(real(cfg.threat_rank))));
-        }
-    }
-    return rank;
-}
-
-function Battle_DefQTEPromptCountForEnemy(_enemy) {
-    var rank = Battle_DefQTEThreatRank(_enemy);
-    var is_boss = is_struct(_enemy) && variable_struct_exists(_enemy, "is_boss") && _enemy.is_boss;
-    if (is_boss || rank >= 4) return irandom_range(3, 5);
-    if (rank >= 3) return irandom_range(2, 4);
-    if (rank >= 2) return irandom_range(1, 3);
-    return 1;
-}
-
-function Battle_DefQTESpeedMultForEnemy(_enemy) {
-    var rank = Battle_DefQTEThreatRank(_enemy);
-    var extra_rank = max(0, rank - 1);
-    var mult = DEF_QTE_SPEED_BASE_MULT + (extra_rank * DEF_QTE_SPEED_RANK_STEP);
-    return clamp(mult, 1, DEF_QTE_SPEED_MULT_MAX);
-}
-
-function Battle_DefQTERandomDir() {
-    return choose(UP, DOWN, LEFT, RIGHT);
-}
-
-function Battle_DefQTEActionForDir(_dir) {
-    switch (_dir) {
-        case UP: return "move_up";
-        case DOWN: return "move_down";
-        case LEFT: return "move_left";
-        case RIGHT: return "move_right";
-    }
-    return "move_up";
-}
-
-function Battle_DefQTEInputDir() {
-    if (Input_UIPressed("move_up")) return UP;
-    if (Input_UIPressed("move_down")) return DOWN;
-    if (Input_UIPressed("move_left")) return LEFT;
-    if (Input_UIPressed("move_right")) return RIGHT;
-    return -1;
-}
-
-function Battle_EnemySkillCanUseDefQTE(_skill, _res, _target) {
-    if (!is_struct(_skill) || !is_struct(_res) || !is_struct(_target)) return false;
-    if (!variable_struct_exists(_skill, "uses_defensive_qte") || !_skill.uses_defensive_qte) return false;
-    if (!variable_struct_exists(_skill, "effect") || string(_skill.effect) != "damage") return false;
-    if (!variable_struct_exists(_target, "is_player") || !_target.is_player) return false;
-    if (!variable_struct_exists(_res, "ok") || !_res.ok) return false;
-    if (!variable_struct_exists(_res, "hit") || !_res.hit) return false;
-    if (!variable_struct_exists(_res, "dmg") || round(real(_res.dmg)) <= 0) return false;
-    return true;
-}
-
 function Battle_EnemySkillComposeMessage(_enemy_name, _res, _dmg_override = -1, _status_msg = "", _extra_msg = "") {
     var enemy_name = string(_enemy_name);
     var res = is_struct(_res) ? _res : { hit: true, crit: false, dmg: 0, msg: "" };
@@ -1212,332 +1447,124 @@ function Battle_EnemyFinalizeTurnState(_bc, _p, _e) {
     return out;
 }
 
-function Battle_DefQTEClear(_bc) {
-    _bc.enemy_def_qte_active = false;
-    _bc.enemy_def_qte_prompts = [];
-    _bc.enemy_def_qte_total = 0;
-    _bc.enemy_def_qte_index = 0;
-    _bc.enemy_def_qte_success = 0;
-    _bc.enemy_def_qte_failure = 0;
-    _bc.enemy_def_qte_phase = 0;
-    _bc.enemy_def_qte_timer = 0;
-    _bc.enemy_def_qte_draw_alpha = 0;
-    _bc.enemy_def_qte_draw_scale = 1;
-    _bc.enemy_def_qte_feedback_ok = false;
-    _bc.enemy_def_qte_feedback_timed_out = false;
-    _bc.enemy_def_qte_feedback_dir = -1;
-    _bc.enemy_def_qte_input_dir = -1;
-    _bc.enemy_def_qte_ctx = {};
+// ---- The defence bar (D7, D59, D60, D21) ----
+// A big enemy attack has already been rolled and applied by Skill_Use when this starts. The bar then decides how much of it stays: the player's HP
+// is put back to what it was before the hit while the bar is up (the HUD must not show the damage you are trying to stop), and
+// Battle_DefenceResolve takes the damage and the status turns that get through.
+
+function Battle_DefenceClear(_bc) {
+    _bc.def_active = false;
+    _bc.def_skill_id = -1;
+    _bc.def_ms = 0;
+    _bc.def_press_ms = QTE_NO_PRESS;
+    _bc.def_ctx = {};
 }
 
-function Battle_DefQTEBeginPrompt(_bc) {
-    if (!_bc.enemy_def_qte_active) return;
-    if (_bc.enemy_def_qte_index >= _bc.enemy_def_qte_total) return;
-
-    _bc.enemy_def_qte_phase = 0;
-    _bc.enemy_def_qte_timer = max(1, _bc.enemy_def_qte_fade_in_frames);
-    _bc.enemy_def_qte_draw_alpha = 0;
-    _bc.enemy_def_qte_draw_scale = 1;
-    _bc.enemy_def_qte_feedback_ok = false;
-    _bc.enemy_def_qte_feedback_timed_out = false;
-    _bc.enemy_def_qte_feedback_dir = -1;
-    _bc.enemy_def_qte_input_dir = -1;
-
-    SFX_PlayUI("ui_move");
-}
-
-function Battle_DefQTEStart(_bc, _enemy, _skill, _res, _follow_state, _player_hp_before, _status_before_snapshot) {
-    var total = max(1, Battle_DefQTEPromptCountForEnemy(_enemy));
-    var prompts = [];
-    for (var i = 0; i < total; i++) {
-        array_push(prompts, Battle_DefQTERandomDir());
-    }
-
-    var qte_frame_rate = game_get_speed(gamespeed_fps);
-    if (!is_real(qte_frame_rate) || qte_frame_rate <= 0) qte_frame_rate = 60;
-    qte_frame_rate = max(1, round(qte_frame_rate));
-    var qte_speed_mult = Battle_DefQTESpeedMultForEnemy(_enemy);
-    _bc.enemy_def_qte_fade_in_frames = max(1, round((qte_frame_rate * DEF_QTE_PROMPT_FADE_IN_SEC) / qte_speed_mult));
-    _bc.enemy_def_qte_response_frames = max(1, round((qte_frame_rate * DEF_QTE_PROMPT_RESPONSE_SEC) / qte_speed_mult));
-    _bc.enemy_def_qte_feedback_frames = max(1, round((qte_frame_rate * DEF_QTE_PROMPT_FEEDBACK_SEC) / qte_speed_mult));
-    _bc.enemy_def_qte_transition_frames = max(1, round((qte_frame_rate * DEF_QTE_PROMPT_TRANSITION_SEC) / qte_speed_mult));
-
-    _bc.enemy_def_qte_active = true;
-    _bc.enemy_def_qte_prompts = prompts;
-    _bc.enemy_def_qte_total = total;
-    _bc.enemy_def_qte_index = 0;
-    _bc.enemy_def_qte_success = 0;
-    _bc.enemy_def_qte_failure = 0;
-    _bc.enemy_def_qte_ctx = {
-        skill: _skill,
+// Telegraph ("!" and the attack's name, QTE_TELEGRAPH_MS), then the lead-in, then the bar sweeps. All on one clock that starts negative.
+function Battle_DefenceStart(_bc, _skill, _res, _follow_state, _player_hp_before, _status_before_snapshot) {
+    _bc.def_active = true;
+    _bc.def_skill_id = _skill.id;
+    _bc.def_params = Qte_DefenceParams(_skill.id);   // fixed per attack, so it can be learned (D60)
+    _bc.def_assist = Qte_AssistMult();
+    _bc.def_ms = -(QTE_TELEGRAPH_MS + QTE_LEAD_IN_MS);
+    _bc.def_press_ms = QTE_NO_PRESS;
+    _bc.def_ctx = {
         res: _res,
         follow_state: _follow_state,
         hp_before: max(0, round(real(_player_hp_before))),
         status_before: _status_before_snapshot,
-        status_specs: Battle_SkillStatusSpecs(_skill)
+        status_ids: Battle_SkillStatusIds(_skill)
     };
-
-    Battle_DefQTEBeginPrompt(_bc);
-    _bc.battle_state = BSTATE_ENEMY_DEF_QTE;
-    return true;
+    if (instance_exists(_bc.enemy_inst)) {   // the enemy flashes as it winds up
+        SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, QTE_TELEGRAPH_MS * 60 div 1000, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
+    }
+    _bc.battle_state = BSTATE_ENEMY_DEFENCE;
 }
 
-function Battle_DefQTEAdjustPlayerStatuses(_p, _status_specs, _before_snapshot, _success_ratio) {
-    var out = { player: _p, status_msg: "", blocked_stun: false };
-    var p = _p;
-    if (!is_array(_status_specs) || array_length(_status_specs) <= 0) {
-        out.player = p;
-        return out;
+// One Step: the same bar rules as the basic attack. A press before the sweep (the telegraph, mashing) is dropped; no press at all is Weak.
+function Battle_DefenceStep(_bc, _confirm_pressed) {
+    if (!_bc.def_active) {
+        _bc.battle_state = BSTATE_ENEMY_ACT;
+        return;
     }
 
-    var ratio = clamp(real(_success_ratio), 0, 1);
-    var duration_mult = DEF_QTE_STATUS_MIN_MULT + ((DEF_QTE_STATUS_MAX_MULT - DEF_QTE_STATUS_MIN_MULT) * (1 - ratio));
-    var status_names = [];
-    var blocked_stun = false;
+    _bc.def_ms += Qte_StepMs(delta_time);
 
-    for (var i = 0; i < array_length(_status_specs); i++) {
-        var spec = _status_specs[i];
-        if (!is_struct(spec) || !variable_struct_exists(spec, "id")) continue;
-
-        var sid = round(real(spec.id));
-        var before_turns = Battle_StatusSnapshotTurns(_before_snapshot, sid);
-        var current_turns = Battle_StatusCurrentTurns(p, sid);
-        if (current_turns <= before_turns) continue;
-
-        if (sid == STATUS_STUN && ratio >= DEF_QTE_STATUS_STUN_BLOCK_RATIO) {
-            if (before_turns > 0) {
-                p = Battle_StatusSetTurns(p, sid, before_turns);
-            } else {
-                p = Status_Remove(p, sid);
-            }
-            blocked_stun = true;
-            continue;
-        }
-
-        var base_turns = variable_struct_exists(spec, "base_turns") ? max(1, round(real(spec.base_turns))) : 1;
-        var scaled_turns = max(1, round(base_turns * duration_mult));
-        if (before_turns > 0) scaled_turns = max(before_turns, scaled_turns);
-        p = Battle_StatusSetTurns(p, sid, scaled_turns);
-
-        var final_turns = Battle_StatusCurrentTurns(p, sid);
-        if (final_turns > before_turns) {
-            var cfg = StatusDB_Get(sid);
-            if (is_struct(cfg) && variable_struct_exists(cfg, "name")) {
-                var name = string(cfg.name);
-                var dup = false;
-                for (var n = 0; n < array_length(status_names); n++) {
-                    if (status_names[n] == name) { dup = true; break; }
-                }
-                if (!dup) array_push(status_names, name);
-            }
+    if (_confirm_pressed) {
+        var press_ms = Qte_BufferPress(_bc.def_ms);
+        if (press_ms != QTE_NO_PRESS) {
+            _bc.def_press_ms = press_ms;
+            Battle_DefenceResolve(_bc, Qte_Grade(press_ms, _bc.def_params, _bc.def_assist));
+            return;
         }
     }
 
-    var status_msg = "";
-    if (array_length(status_names) > 0) status_msg = Skill_BuildAppliedStatusMessage(status_names);
-
-    out.player = p;
-    out.status_msg = status_msg;
-    out.blocked_stun = blocked_stun;
-    return out;
+    if (_bc.def_ms >= _bc.def_params.sweep_ms) {
+        Battle_DefenceResolve(_bc, Qte_Grade(QTE_NO_PRESS, _bc.def_params, _bc.def_assist));
+    }
 }
 
-function Battle_DefQTEFinalize(_bc) {
-    if (!_bc.enemy_def_qte_active) return;
+function Battle_DefenceResolve(_bc, _key) {
+    if (!_bc.def_active) return;
 
     var p = _bc.p;
     var e = _bc.e;
-    var ctx = is_struct(_bc.enemy_def_qte_ctx) ? _bc.enemy_def_qte_ctx : {};
+    var ctx = _bc.def_ctx;
+    _bc.def_active = false;
 
-    var total = max(1, _bc.enemy_def_qte_total);
-    var success = clamp(_bc.enemy_def_qte_success, 0, total);
-    var ratio = success / total;
+    var base_res = ctx.res;
+    var base_dmg = max(0, round(real(base_res.dmg)));
+    var final_dmg = Qte_DefenceDamage(base_dmg, _key);
+    p.hp = clamp(ctx.hp_before - final_dmg, 0, p.max_hp);
 
-    var base_res = variable_struct_exists(ctx, "res") && is_struct(ctx.res) ? ctx.res : { hit: true, crit: false, dmg: 0, msg: "" };
-    var base_dmg = variable_struct_exists(base_res, "dmg") ? max(0, round(real(base_res.dmg))) : 0;
-    var dmg_mult = clamp(1 - (DEF_QTE_DAMAGE_REDUCTION_MAX * ratio), 0, 1);
-    var final_dmg = max(0, floor(base_dmg * dmg_mult));
-
-    var hp_before = variable_struct_exists(ctx, "hp_before") ? max(0, round(real(ctx.hp_before))) : p.hp;
-    if (is_struct(p) && variable_struct_exists(p, "max_hp")) hp_before = clamp(hp_before, 0, p.max_hp);
-    if (is_struct(p) && variable_struct_exists(p, "max_hp")) p.hp = clamp(hp_before - final_dmg, 0, p.max_hp);
-    else p.hp = max(0, hp_before - final_dmg);
-
-    var status_before = variable_struct_exists(ctx, "status_before") ? ctx.status_before : [];
-    var status_specs = variable_struct_exists(ctx, "status_specs") ? ctx.status_specs : [];
-    var status_pack = Battle_DefQTEAdjustPlayerStatuses(p, status_specs, status_before, ratio);
+    var status_pack = Battle_DefenceAdjustStatuses(p, ctx.status_ids, ctx.status_before, _key);
     p = status_pack.player;
 
-    var status_msg = status_pack.status_msg;
-    if (status_pack.blocked_stun) {
-        var block_msg = Loc_T("combat.msg.def_qte.stun_blocked", "Stun blocked.");
-        if (status_msg != "") status_msg += " " + block_msg;
-        else status_msg = block_msg;
+    var summary;
+    if (_key == QTE_WEAK) {
+        summary = Loc_T("combat.msg.defence.weak", "Not blocked.");
+    } else {
+        summary = Loc_T("combat.msg.defence.summary", "{grade} block! Damage -{reduce}%.", { grade: Qte_GradeLabel(_key), reduce: round((1 - Qte_DefenceMult(_key)) * 100) });
     }
-
-    var reduce_pct = round((1 - dmg_mult) * 100);
-    var qte_summary = Loc_T(
-        "combat.msg.def_qte.summary",
-        "Guarded {ok}/{total}. Damage -{reduce}%.",
-        { ok: success, total: total, reduce: reduce_pct }
-    );
+    if (status_pack.resist_msg != "") summary += " " + status_pack.resist_msg;
 
     var enemy_name = is_struct(e) && variable_struct_exists(e, "name") ? string(e.name) : Loc_T("enemy.name.unknown", "Enemy");
-    var msg_res = base_res;
-    msg_res.msg = ""; // Rebuilt after mitigation.
-    var final_msg = Battle_EnemySkillComposeMessage(enemy_name, msg_res, final_dmg, status_msg, qte_summary);
+    var crit = variable_struct_exists(base_res, "crit") && base_res.crit;
+    var final_msg = Battle_EnemySkillComposeMessage(enemy_name, { hit: true, crit: crit, dmg: base_dmg, msg: "" }, final_dmg, status_pack.status_msg, summary);
+
+    // Grade word over the bar and its sound. A Perfect is a clean block: no shake. Anything that gets through shakes the picture as a hit does.
+    var sx = Display_WorldScale();
+    _bc.qte_result_text = Qte_GradeLabel(_key);
+    _bc.qte_result_key = _key;
+    _bc.qte_result_mult = Qte_DefenceMult(_key);
+    _bc.qte_result_ms = QTE_RESULT_MS;
+    _bc.qte_word_x = round(Display_GuiW() * 0.5);
+    _bc.qte_word_y = Battle_QteAnchorY(_bc, round(QTE_BAR_H * sx));
+    SFX_Play(Qte_GradeSfxKey(_key));
 
     _bc.last_hit = true;
-    _bc.last_crit = variable_struct_exists(base_res, "crit") && base_res.crit;
+    _bc.last_crit = crit;
     _bc.last_dmg = final_dmg;
-
-    if (final_dmg > 0) {
+    if (final_dmg > 0 && _key != QTE_PERFECT) {
         CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
     }
 
     if (Battle_CheckEnd(_bc, p, e)) {
         _bc.p = p;
         _bc.e = e;
-        Battle_DefQTEClear(_bc);
+        Battle_DefenceClear(_bc);
         return;
     }
 
     var turn_pack = Battle_EnemyFinalizeTurnState(_bc, p, e);
     if (turn_pack.ended) {
-        Battle_DefQTEClear(_bc);
+        Battle_DefenceClear(_bc);
         return;
     }
 
-    var follow_state = BSTATE_MENU;
-    if (variable_struct_exists(ctx, "follow_state")) follow_state = ctx.follow_state;
+    var follow_state = variable_struct_exists(ctx, "follow_state") ? ctx.follow_state : BSTATE_MENU;
     Battle_Message(_bc, final_msg, follow_state);
-    Battle_DefQTEClear(_bc);
-}
-
-function Battle_DefQTEStep(_bc) {
-    if (!_bc.enemy_def_qte_active) {
-        _bc.battle_state = BSTATE_ENEMY_ACT;
-        return;
-    }
-
-    if (!is_array(_bc.enemy_def_qte_prompts) || _bc.enemy_def_qte_index >= array_length(_bc.enemy_def_qte_prompts)) {
-        Battle_DefQTEFinalize(_bc);
-        return;
-    }
-
-    var current_dir = _bc.enemy_def_qte_prompts[_bc.enemy_def_qte_index];
-    _bc.enemy_def_qte_feedback_dir = current_dir;
-
-    switch (_bc.enemy_def_qte_phase) {
-        case 0: { // fade in
-            _bc.enemy_def_qte_timer -= 1;
-            var fade_frames = max(1, _bc.enemy_def_qte_fade_in_frames);
-            var elapsed = fade_frames - max(0, _bc.enemy_def_qte_timer);
-            _bc.enemy_def_qte_draw_alpha = clamp(elapsed / fade_frames, 0, 1);
-            _bc.enemy_def_qte_draw_scale = 1;
-            if (_bc.enemy_def_qte_timer <= 0) {
-                _bc.enemy_def_qte_phase = 1;
-                _bc.enemy_def_qte_timer = max(1, _bc.enemy_def_qte_response_frames);
-                _bc.enemy_def_qte_draw_alpha = 1;
-            }
-            return;
-        }
-
-        case 1: { // input window
-            _bc.enemy_def_qte_draw_alpha = 1;
-            _bc.enemy_def_qte_draw_scale = 1;
-
-            var input_dir = Battle_DefQTEInputDir();
-            if (input_dir != -1) {
-                _bc.enemy_def_qte_input_dir = input_dir;
-                _bc.enemy_def_qte_feedback_ok = (input_dir == current_dir);
-                _bc.enemy_def_qte_feedback_timed_out = false;
-                if (_bc.enemy_def_qte_feedback_ok) {
-                    _bc.enemy_def_qte_success += 1;
-                    SFX_PlayUI("ui_confirm");
-                } else {
-                    _bc.enemy_def_qte_failure += 1;
-                    SFX_PlayUI("ui_back");
-                }
-                _bc.enemy_def_qte_phase = 2;
-                _bc.enemy_def_qte_timer = max(1, _bc.enemy_def_qte_feedback_frames);
-                return;
-            }
-
-            _bc.enemy_def_qte_timer -= 1;
-            if (_bc.enemy_def_qte_timer <= 0) {
-                _bc.enemy_def_qte_failure += 1;
-                _bc.enemy_def_qte_input_dir = -1;
-                _bc.enemy_def_qte_feedback_ok = false;
-                _bc.enemy_def_qte_feedback_timed_out = true;
-                _bc.enemy_def_qte_phase = 2;
-                _bc.enemy_def_qte_timer = max(1, _bc.enemy_def_qte_feedback_frames);
-                SFX_PlayUI("ui_back");
-            }
-            return;
-        }
-
-        case 2: { // feedback hold
-            _bc.enemy_def_qte_draw_alpha = 1;
-            _bc.enemy_def_qte_draw_scale = _bc.enemy_def_qte_feedback_ok ? 1.25 : 0.95;
-            _bc.enemy_def_qte_timer -= 1;
-            if (_bc.enemy_def_qte_timer <= 0) {
-                _bc.enemy_def_qte_phase = 3;
-                _bc.enemy_def_qte_timer = max(1, _bc.enemy_def_qte_transition_frames);
-            }
-            return;
-        }
-
-        case 3: { // fade out and advance
-            _bc.enemy_def_qte_timer -= 1;
-            var trans_frames = max(1, _bc.enemy_def_qte_transition_frames);
-            _bc.enemy_def_qte_draw_alpha = clamp(max(0, _bc.enemy_def_qte_timer) / trans_frames, 0, 1);
-            _bc.enemy_def_qte_draw_scale = 1;
-            if (_bc.enemy_def_qte_timer <= 0) {
-                _bc.enemy_def_qte_index += 1;
-                if (_bc.enemy_def_qte_index >= _bc.enemy_def_qte_total) {
-                    Battle_DefQTEFinalize(_bc);
-                } else {
-                    Battle_DefQTEBeginPrompt(_bc);
-                }
-            }
-            return;
-        }
-    }
-}
-
-function Battle_DirectionVector(_dir) {
-    switch (_dir) {
-        case UP: return { x: 0, y: -1 };
-        case DOWN: return { x: 0, y: 1 };
-        case LEFT: return { x: -1, y: 0 };
-        case RIGHT: return { x: 1, y: 0 };
-    }
-    return { x: 0, y: -1 };
-}
-
-function Battle_DrawDirectionArrow(_x, _y, _dir, _size, _alpha = 1, _color = c_white) {
-    var size = max(4, round(real(_size)));
-    var pos_x = round(real(_x));
-    var pos_y = round(real(_y));
-    var vec = Battle_DirectionVector(_dir);
-    var perp = { x: -vec.y, y: vec.x };
-
-    var tip_x = pos_x + vec.x * size;
-    var tip_y = pos_y + vec.y * size;
-    var base_x = pos_x - vec.x * round(size * 0.7);
-    var base_y = pos_y - vec.y * round(size * 0.7);
-    var wing = max(3, round(size * 0.65));
-    var half = max(2, round(size * 0.25));
-
-    draw_set_alpha(clamp(real(_alpha), 0, 1));
-    draw_set_color(_color);
-    draw_line(base_x, base_y, tip_x, tip_y);
-    draw_line(base_x + perp.x * half, base_y + perp.y * half, base_x - perp.x * half, base_y - perp.y * half);
-    draw_line(tip_x, tip_y, tip_x - vec.x * wing + perp.x * wing, tip_y - vec.y * wing + perp.y * wing);
-    draw_line(tip_x, tip_y, tip_x - vec.x * wing - perp.x * wing, tip_y - vec.y * wing - perp.y * wing);
-    draw_set_alpha(1);
-    draw_set_color(c_white);
+    Battle_DefenceClear(_bc);
 }
 
 // ---- QTE drawing (GUI layer, GUI units from Display_GuiW/H through the caller's ui_visual) ----
@@ -1628,6 +1655,123 @@ function Qte_DrawGradeWord(_key, _text, _x, _y, _left_ms, _unit) {
     draw_set_color(c_white);
 }
 
+// Where the QTE widgets (the bar, the arrows) sit: centred, under the enemy and its status icons, kept on screen. Returns the top y in GUI units.
+function Battle_QteAnchorY(_bc, _widget_h) {
+    var sx = Display_WorldScale();
+    var ay = round(Display_GuiH() * 0.72);
+    if (instance_exists(_bc.enemy_inst) && _bc.enemy_inst.sprite_index != noone) {
+        var spr = _bc.enemy_inst.sprite_index;
+        var enemy_bottom = ((_bc.enemy_inst.y - sprite_get_yoffset(spr) - _bc.cam_base_y) * sx) + (sprite_get_height(spr) * abs(_bc.enemy_inst.image_yscale) * sx);
+        ay = round(enemy_bottom + (22 * sx));
+    }
+    return min(ay, Display_GuiH() - _widget_h - round(16 * sx));
+}
+
+// One arrow, 9 x 9 design pixels (_unit GUI units each), top-left at (_x, _y), pointing _dir (RIGHT, UP, LEFT, DOWN macros): _fill inside, a 1-pixel _edge.
+function Qte_DrawArrowGlyph(_x, _y, _dir, _unit, _fill, _edge) {
+    var u = max(1, round(_unit));
+    var up = [[4, 0, 1, 1], [3, 1, 3, 1], [2, 2, 5, 1], [1, 3, 7, 1], [0, 4, 9, 1], [3, 5, 3, 4]];   // the up arrow as [x, y, w, h]
+    var n = array_length(up);
+    var rects = array_create(n);
+    for (var i = 0; i < n; i++) {
+        var r = up[i];
+        var rx = r[0], ry = r[1], rw = r[2], rh = r[3];
+        switch (_dir) {
+            case DOWN:  ry = 9 - ry - rh; break;
+            case LEFT:  { var tx = rx; rx = ry; ry = tx; var tw = rw; rw = rh; rh = tw; } break;
+            case RIGHT: { var tx2 = rx; rx = ry; ry = tx2; var tw2 = rw; rw = rh; rh = tw2; rx = 9 - rx - rw; } break;
+        }
+        rects[i] = [rx, ry, rw, rh];
+    }
+    for (var e = 0; e < n; e++) Qte_FillRect(_x + (rects[e][0] - 1) * u, _y + (rects[e][1] - 1) * u, (rects[e][2] + 2) * u, (rects[e][3] + 2) * u, _edge);
+    for (var f = 0; f < n; f++) Qte_FillRect(_x + rects[f][0] * u, _y + rects[f][1] * u, rects[f][2] * u, rects[f][3] * u, _fill);
+}
+
+// Height of the arrow row and its time bar, in GUI units (for placing it).
+function Qte_SequenceHeight(_unit) {
+    return 21 * max(1, round(_unit));
+}
+
+// The arrow sequence of a skill and its time bar, centred on _cx, top at _top. Done arrows sink dark, the wanted one is lit in a bright box, the
+// next ones wait. A wrong press shakes the row (_wrong_ms left) and a right one hops its arrow (_pop_ms left, _pop_idx). The time bar drains
+// to the left; its brightest part is the Perfect window (finish with some of it left, no mistakes) and the tick marks where it ends. _unit = GUI units per design pixel.
+function Qte_DrawSequence(_cx, _top, _st, _wrong_ms, _pop_ms, _pop_idx, _unit, _alpha = 1) {
+    var u = max(1, round(_unit));
+    var cell = 13 * u;
+    var gap = 3 * u;
+    var n = _st.len;
+    var row_w = n * cell + (n - 1) * gap;
+    var x0 = round(_cx - row_w * 0.5);
+    var shake = 0;
+    if (_wrong_ms > 0) shake = round(sin(_wrong_ms * 0.09) * 2 * (_wrong_ms / QTE_SEQ_SHAKE_MS)) * u;
+    draw_set_alpha(clamp(_alpha, 0, 1));
+
+    for (var i = 0; i < n; i++) {
+        var bx = x0 + i * (cell + gap) + shake;
+        var by = _top;
+        var done = (i < _st.idx);
+        var current = (i == _st.idx && !_st.done);
+        var box_fill = QTE_COL_DARK;
+        var arrow_fill = QTE_COL_LIGHT;
+        var arrow_edge = QTE_COL_DARKEST;
+        if (done) {
+            arrow_fill = QTE_COL_DARKEST;
+            arrow_edge = QTE_COL_DARK;
+        } else if (current) {
+            box_fill = QTE_COL_LIGHTEST;
+            arrow_fill = QTE_COL_DARKEST;
+            arrow_edge = QTE_COL_LIGHTEST;
+        }
+        if (i == _pop_idx && _pop_ms > 0) {   // the arrow just done hops, bright
+            by -= round(3 * _pop_ms / QTE_SEQ_POP_MS) * u;
+            box_fill = QTE_COL_LIGHT;
+            arrow_fill = QTE_COL_DARKEST;
+            arrow_edge = QTE_COL_LIGHT;
+        }
+        Qte_FillRect(bx - u, by - u, cell + 2 * u, cell + 2 * u, QTE_COL_DARKEST);   // frame
+        Qte_FillRect(bx, by, cell, cell, box_fill);
+        Qte_DrawArrowGlyph(bx + 2 * u, by + 2 * u, _st.seq[i], u, arrow_fill, arrow_edge);
+    }
+
+    // time bar
+    var bar_y = _top + cell + 4 * u;
+    var bar_h = 4 * u;
+    var perfect_x = x0 + round(row_w * (1 - _st.fast_ms / _st.limit_ms));
+    var fill_w = round(row_w * Qte_SeqLeft(_st));
+    Qte_FillRect(x0 - u, bar_y - u, row_w + 2 * u, bar_h + 2 * u, QTE_COL_LIGHTEST);
+    Qte_FillRect(x0, bar_y, row_w, bar_h, QTE_COL_DARK);
+    Qte_FillRect(x0, bar_y, min(fill_w, perfect_x - x0), bar_h, QTE_COL_LIGHT);   // the slower part: finishing here is Good at best
+    if (fill_w > perfect_x - x0) Qte_FillRect(perfect_x, bar_y, fill_w - (perfect_x - x0), bar_h, QTE_COL_LIGHTEST);   // the fast part: finish while any of it is left for Perfect
+    Qte_FillRect(perfect_x - u, bar_y - 2 * u, u, bar_h + 4 * u, QTE_COL_DARKEST);   // where the Perfect window ends
+    Qte_FillRect(perfect_x, bar_y - 2 * u, u, bar_h + 4 * u, QTE_COL_LIGHTEST);
+
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
+// The "!" over a big enemy attack, centred on (_x, _y): pops in big and settles, then holds until the bar comes up. _elapsed_ms since the telegraph began.
+function Qte_DrawTelegraph(_x, _y, _elapsed_ms, _unit) {
+    var scale = 3;
+    if (_elapsed_ms < 120) scale *= 1 + 0.5 * (1 - _elapsed_ms / 120);
+    var o = max(1, round(_unit));
+    var text = "!";
+    var tw = UI_TextWidth(text) * scale;
+    var th = UI_TextHeight(text) * scale;
+    var tx = _x - tw * 0.5;
+    var ty = _y - th * 0.5;
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+    draw_set_color(QTE_COL_DARKEST);
+    for (var ox = -1; ox <= 1; ox++) {
+        for (var oy = -1; oy <= 1; oy++) {
+            if (ox != 0 || oy != 0) UI_DrawTextTransformed(tx + ox * o, ty + oy * o, text, scale, scale, 0);
+        }
+    }
+    draw_set_color(QTE_COL_LIGHTEST);
+    UI_DrawTextTransformed(tx, ty, text, scale, scale, 0);
+    draw_set_color(c_white);
+}
+
 function Battle_EnemyAct(_bc) {
     var p = _bc.p;
     var e = _bc.e;
@@ -1706,8 +1850,9 @@ function Battle_EnemyAct(_bc) {
         _bc.enemy_actions_remaining = clamp(_bc.enemy_actions_remaining, 0, ENEMY_ACTION_CHAIN_MAX);
         follow_state = (_bc.enemy_actions_remaining > 0) ? BSTATE_ENEMY_ACT : BSTATE_MENU;
 
-        if (!enemy_targets_self && Battle_EnemySkillCanUseDefQTE(sk, res, p)) {
-            Battle_DefQTEStart(_bc, e, sk, res, follow_state, qte_hp_before, qte_status_before);
+        if (!enemy_targets_self && Battle_EnemySkillCanBeDefended(sk, res, p)) {
+            Battle_DefenceStart(_bc, sk, res, follow_state, qte_hp_before, qte_status_before);
+            p.hp = qte_hp_before;   // the HUD keeps the HP from before the hit while the bar is up; Battle_DefenceResolve takes what gets through
             _bc.p = p;
             _bc.e = e;
             return;
