@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | none. Phase 1 harness DONE (1A-1D): full gate 118 s GATE PASS (140 tests + smoke + bot 8 asserts + 9 shots), negative control red, smoke catches an unknown-function crash Igor misses. Next: /improve command, then 1E old bugs. |
+| WIP | 1E old bugs, landing on branch `next`: p1e-battle (worktree ../DD-Project-GameMaker-wt/p1ea: action time D55, poison feedback, self-buff anim) + p1e-save (worktree ../DD-Project-GameMaker-wt/p1eb: atomic save, 9999 temp, mini boss check, LOC-03). Then: QTE + turn-bar sketch on top, then first playtest stop. |
 | Unplayed features | 0 / 15 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
