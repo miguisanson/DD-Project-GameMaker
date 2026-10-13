@@ -240,7 +240,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 9000 : 2500, vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_flash: false, sk_mp0: 0 };
+                   cap: (_mode == "bot") ? 9000 : 2500, vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_flash: false, sk_mp0: 0 };
 }
 
 function Scenario_Finish() {
@@ -392,7 +392,7 @@ function Scenario_StepBot(_s) {
                 if (_s.v == 1) {   // the fail variant runs last: its lost battle leaves a game-over transition behind
                     Scenario_Finish();
                 } else {
-                    _s.v = 2;   // 0 perfect -> 2 Hilt Bash timing -> 3 Ice Spear timing -> 1 fail
+                    _s.v = 2;   // 0 perfect -> 2 Hilt Bash timing -> 3 Ice Spear timing -> 4 Foresight placement -> 1 fail
                     Scenario_Next(_s, 0);
                 }
             }
@@ -407,8 +407,9 @@ function Scenario_StepBot(_s) {
 #macro SCN_SKILL_ACTION_MAX_FRAMES 66
 function Scenario_StepBotSkill(_s) {
     var _knight = (_s.v == 2);
-    var _name = _knight ? "bot_skill_hilt_bash" : "bot_skill_ice_spear";
-    var _sid = _knight ? SKILL_HILT_BASH : SKILL_ICE_SPEAR;
+    var _name = _knight ? "bot_skill_hilt_bash" : ((_s.v == 3) ? "bot_skill_ice_spear" : "bot_skill_foresight");
+    var _sid = _knight ? SKILL_HILT_BASH : ((_s.v == 3) ? SKILL_ICE_SPEAR : SKILL_FORESIGHT);
+    var _timed = (_s.v != 4);   // v=4 (BUG-21): a self-buff; only where its animation plays is checked, not how long it takes
     switch (_s.step) {
         case 0:
             if (_s.t == 10) {
@@ -460,6 +461,13 @@ function Scenario_StepBotSkill(_s) {
                 if (_bc.battle_state == BSTATE_MESSAGE) {
                     _s.sk_start = _s.f;
                     _s.sk_fx = instance_exists(_bc.wait_fx);
+                    if (_s.sk_fx) {   // BUG-21: where did the animation spawn, relative to the player and enemy anchor points?
+                        var _fxi = _bc.wait_fx;
+                        var _pp = FX_CenterAtPoint(_fxi.sprite_index, _bc.player_fx_x, _bc.player_fx_y);
+                        var _pe = FX_CenterOn(_fxi.sprite_index, _bc.enemy_inst);
+                        _s.sk_fx_on_player = point_distance(_fxi.x, _fxi.y, _pp.x, _pp.y) < 1;
+                        _s.sk_fx_on_enemy = point_distance(_fxi.x, _fxi.y, _pe.x, _pe.y) < 1;
+                    }
                     _s.sk_flash = instance_exists(obj_ui_controller) && obj_ui_controller.hud_hurt_flash_timer > 0;   // the tick ran in this same frame
                     _s.sk = 2;
                 }
@@ -469,6 +477,8 @@ function Scenario_StepBotSkill(_s) {
                     show_debug_message("[BOT] " + _name + " action_frames=" + string(_frames) + " fx=" + string(_s.sk_fx) + " next_state=" + string(_bc.battle_state));
                     Scenario_Check(_name + "_skill_was_cast", _bc.p.mp < _s.sk_mp0, "mp=" + string(_bc.p.mp) + " mp0=" + string(_s.sk_mp0));
                     Scenario_Check(_name + "_fx_played", _s.sk_fx);
+                    Scenario_Check(_name + "_fx_on_" + (Battle_SkillFxOnPlayer(_sid) ? "player" : "enemy"),
+                        Battle_SkillFxOnPlayer(_sid) ? (_s.sk_fx_on_player && !_s.sk_fx_on_enemy) : (_s.sk_fx_on_enemy && !_s.sk_fx_on_player));
                     if (_knight) {
                         var _logged = false;
                         for (var _li = 0; _li < array_length(_bc.combat_log); _li++) {
@@ -477,14 +487,14 @@ function Scenario_StepBotSkill(_s) {
                         Scenario_Check(_name + "_poison_tick_logged", _logged);
                         Scenario_Check(_name + "_poison_tick_flashes_hud", _s.sk_flash);
                     }
-                    Scenario_Check(_name + "_action_le_" + string(SCN_SKILL_ACTION_MAX_FRAMES) + "_frames", _frames <= SCN_SKILL_ACTION_MAX_FRAMES, "frames=" + string(_frames));
+                    if (_timed) Scenario_Check(_name + "_action_le_" + string(SCN_SKILL_ACTION_MAX_FRAMES) + "_frames", _frames <= SCN_SKILL_ACTION_MAX_FRAMES, "frames=" + string(_frames));
                     Scenario_Next(_s, 2);
                 }
             }
             break;
         case 2:   // measured: start the next variant (the battle is simply abandoned) or finish
             if (_s.t == 5) {
-                _s.v = (_s.v == 2) ? 3 : 1;
+                _s.v = (_s.v == 2) ? 3 : ((_s.v == 3) ? 4 : 1);
                 Scenario_Next(_s, 0);
             }
             break;

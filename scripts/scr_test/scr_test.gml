@@ -197,6 +197,15 @@ function Test_Suite_Combat() {
     Test_Eq("Combat_DodgeBonus slime AGI9 == -1", Combat_DodgeBonus(_slime), -1);
     _a = Status_Add(_a, STATUS_BLEED, 3, 0);
     Test_Eq("Combat_DodgeBonus archer bleeding (AGI-2) == 0", Combat_DodgeBonus(_a), 0);
+    // BUG-21: self-buff animations play on the player, damaging skills on the enemy.
+    var _buffs = [SKILL_MUSCLE_UP, SKILL_REV_UP, SKILL_EVASION, SKILL_TAKE_AIM, SKILL_MEDITATION, SKILL_FORESIGHT];
+    var _attacks = [SKILL_HILT_BASH, SKILL_ICE_SPEAR, SKILL_HORIZ_SLASH, SKILL_FIREBALL, SKILL_WOUND, SKILL_POISON_ARROW, SKILL_DOUBLE_SHOT, SKILL_POISON_MIST];
+    for (var _bi = 0; _bi < array_length(_buffs); _bi++) {
+        Test_True("BUG-21 self-buff skill " + SkillDB_Get(_buffs[_bi]).name + " animates on the player", Battle_SkillFxOnPlayer(_buffs[_bi]));
+    }
+    for (var _ai = 0; _ai < array_length(_attacks); _ai++) {
+        Test_False("BUG-21 attack skill " + SkillDB_Get(_attacks[_ai]).name + " animates on the enemy", Battle_SkillFxOnPlayer(_attacks[_ai]));
+    }
     // Hit rules: force_dodge (Evasion, Solidify) is consumed and beats always_hit (Foresight); Foresight alone always hits.
     var _evader = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_EVASION, 3, 0);
     var _r = Combat_AttemptHit(_k, _evader, 0);

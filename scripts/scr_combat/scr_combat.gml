@@ -662,6 +662,22 @@ function Battle_PlayerAttack(_bc) {
     Battle_PlayerAttackResolveTimed(_bc, { key: "PERFECT", label: Loc_T("battle.action.timing.perfect", "PERFECT"), mult: 1.00, hit: true });
 }
 
+// Where a player skill's animation plays (BUG-21): self-targeted skills (the buffs) on the player, the rest on the enemy.
+function Battle_SkillFxOnPlayer(_skill_id) {
+    var sk = SkillDB_Get(_skill_id);
+    return (is_struct(sk) && variable_struct_exists(sk, "target") && sk.target == TGT_SELF);
+}
+
+// Top-left spawn position that puts the middle of an fx sprite on the point (_px, _py).
+function FX_CenterAtPoint(_sprite, _px, _py) {
+    if (_sprite == noone) return { x: _px, y: _py };
+    var fx_scale = max(0.01, abs(SKILL_FX_SCALE));
+    return {
+        x: _px - ((sprite_get_width(_sprite) * 0.5 - sprite_get_xoffset(_sprite)) * fx_scale),
+        y: _py - ((sprite_get_height(_sprite) * 0.5 - sprite_get_yoffset(_sprite)) * fx_scale)
+    };
+}
+
 function Battle_PlayerSkill(_bc, _skill_id) {
     var p = _bc.p;
     var e = _bc.e;
@@ -684,7 +700,11 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     if (res.ok && res.fx_sprite != noone && (skill.effect != "damage" || res.hit)) {
         var tx = _bc.enemy_fx_x;
         var ty = _bc.enemy_fx_y;
-        if (instance_exists(_bc.enemy_inst)) {
+        if (Battle_SkillFxOnPlayer(_skill_id)) {
+            var ppos = FX_CenterAtPoint(res.fx_sprite, _bc.player_fx_x, _bc.player_fx_y);
+            tx = ppos.x;
+            ty = ppos.y;
+        } else if (instance_exists(_bc.enemy_inst)) {
             var pos = FX_CenterOn(res.fx_sprite, _bc.enemy_inst);
             tx = pos.x;
             ty = pos.y;
