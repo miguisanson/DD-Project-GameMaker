@@ -468,8 +468,33 @@ function Status_ConsumeByField(_ch, _field) {
     return _ch;
 }
 
+// BUG-08: what the player sees and hears when a damage-over-time status ticks on them. Pure: no instances, no sound.
+function Status_TickFeedbackInfo(_status_id, _hp_lost) {
+    var cfg = StatusDB_Get(_status_id);
+    var status_name = (is_struct(cfg) && variable_struct_exists(cfg, "name")) ? string(cfg.name) : "Status";
+    return {
+        line: Loc_T("combat.msg.status_tick", "{status} hurts you for {dmg}.", { status: status_name, dmg: _hp_lost }),
+        sfx: "skill_bleed",   // existing bleed sound; no new assets
+        flash_frames: UI_HUD_HURT_FLASH_FRAMES * 2
+    };
+}
+
+// Applies it in a battle: log line, sound, longer HUD bar flash. Always records the last event in global.status_tick_last (tests read it).
+function Status_TickFeedback(_status_id, _hp_lost) {
+    var info = Status_TickFeedbackInfo(_status_id, _hp_lost);
+    global.status_tick_last = info;
+    if (room != rm_battle || !instance_exists(obj_battle_controller)) return info;
+    Combat_Log(info.line);
+    SFX_Play(info.sfx);
+    if (instance_exists(obj_ui_controller)) {
+        with (obj_ui_controller) hud_hurt_flash_timer = max(hud_hurt_flash_timer, info.flash_frames);
+    }
+    return info;
+}
+
 function Status_Tick(_ch) {
     if (!is_array(_ch.status)) return _ch;
+    var tick_is_player = (is_struct(_ch) && variable_struct_exists(_ch, "is_player") && _ch.is_player);
 
     // Decay the player's post-stun immunity window once per turn cycle.
     if (is_struct(_ch) && variable_struct_exists(_ch, "is_player") && _ch.is_player
@@ -497,7 +522,9 @@ function Status_Tick(_ch) {
         var hp_high = max(hp_min, hp_max);
         if (hp_low != 0 || hp_high != 0) {
             var delta_hp = (hp_low == hp_high) ? hp_low : irandom_range(hp_low, hp_high);
+            var hp_before_tick = _ch.hp;
             _ch.hp = clamp(_ch.hp + delta_hp, 0, _ch.max_hp);
+            if (tick_is_player && _ch.hp < hp_before_tick) Status_TickFeedback(s.id, hp_before_tick - _ch.hp);
         }
 
         var mp_low = min(mp_min, mp_max);

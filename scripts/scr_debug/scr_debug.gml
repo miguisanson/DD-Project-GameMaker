@@ -240,7 +240,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 9000 : 2500, vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_mp0: 0 };
+                   cap: (_mode == "bot") ? 9000 : 2500, vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_flash: false, sk_mp0: 0 };
 }
 
 function Scenario_Finish() {
@@ -416,6 +416,7 @@ function Scenario_StepBotSkill(_s) {
                 var _ch = Player_LearnSkill(_gs.player_ch, _sid);
                 _ch.mp = _ch.max_mp;
                 _ch = Status_Add(_ch, STATUS_HIT_UP, 9, 0);
+                if (_knight) _ch = Status_Add(_ch, STATUS_POISON, 3, 0);   // BUG-08: the tick after the skill must reach the log and the HUD
                 GameState_SetPlayer(_ch);
                 _s.vstart = _s.f;
                 _s.sk = 0;
@@ -459,6 +460,7 @@ function Scenario_StepBotSkill(_s) {
                 if (_bc.battle_state == BSTATE_MESSAGE) {
                     _s.sk_start = _s.f;
                     _s.sk_fx = instance_exists(_bc.wait_fx);
+                    _s.sk_flash = instance_exists(obj_ui_controller) && obj_ui_controller.hud_hurt_flash_timer > 0;   // the tick ran in this same frame
                     _s.sk = 2;
                 }
             } else if (_s.sk == 2) {
@@ -467,6 +469,14 @@ function Scenario_StepBotSkill(_s) {
                     show_debug_message("[BOT] " + _name + " action_frames=" + string(_frames) + " fx=" + string(_s.sk_fx) + " next_state=" + string(_bc.battle_state));
                     Scenario_Check(_name + "_skill_was_cast", _bc.p.mp < _s.sk_mp0, "mp=" + string(_bc.p.mp) + " mp0=" + string(_s.sk_mp0));
                     Scenario_Check(_name + "_fx_played", _s.sk_fx);
+                    if (_knight) {
+                        var _logged = false;
+                        for (var _li = 0; _li < array_length(_bc.combat_log); _li++) {
+                            if (string_pos("Poison", _bc.combat_log[_li].text) > 0 && string_pos("hurts you", _bc.combat_log[_li].text) > 0) _logged = true;
+                        }
+                        Scenario_Check(_name + "_poison_tick_logged", _logged);
+                        Scenario_Check(_name + "_poison_tick_flashes_hud", _s.sk_flash);
+                    }
                     Scenario_Check(_name + "_action_le_" + string(SCN_SKILL_ACTION_MAX_FRAMES) + "_frames", _frames <= SCN_SKILL_ACTION_MAX_FRAMES, "frames=" + string(_frames));
                     Scenario_Next(_s, 2);
                 }
