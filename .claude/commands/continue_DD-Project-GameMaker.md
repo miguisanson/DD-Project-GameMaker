@@ -30,10 +30,10 @@ something only the owner can do.
    (it maps the codebase with parallel agents, reads existing docs and asks
    the owner about goals), then continue below. Do not invent goals.
 2. Run `/gsd-progress` (or `/gsd-resume-work` if a pause handoff exists).
-3. Run `git status`, `git worktree list`. There is no automated gate command
-   (AGENTS.md "The gate") — confirm you know what the targeted check and
-   the IDE-open verification look like for whatever is in progress. If
-   worktrees are left over, land them or say why you can't.
+3. Read `.planning/BOARD.md`. Run `git status`, `git worktree list`, and the
+   fast gate (`powershell -NoProfile -ExecutionPolicy Bypass -File
+   tools/automation/run_tests.ps1 -Mode fast`); it must say GATE PASS before
+   new work starts. If worktrees are left over, land them or say why you can't.
 4. Recover from a hard stop: if STATE.md names work in progress, or
    `git status`, WIP branches or worktrees show changes it doesn't mention,
    the last session ended abruptly. Work out what that work was, finish or
@@ -61,10 +61,9 @@ c. `/gsd-plan-phase`, then `/gsd-execute-phase`. Every task follows the
       Independent packets in parallel; pilot one before a batch. The subagent edits
       `.gml` freely but never creates/renames/deletes a resource or hand-edits
       `.yyp`/`.yy`/`.resource_order` (AGENTS.md Rule 4).
-   4. Run the targeted check yourself, then the gate: the check passes, and
-      the project opens and runs in the GameMaker IDE without errors
-      (ask the owner to confirm, or watch the output log if remote-
-      controlling the IDE).
+   4. Run the targeted check yourself, then the gate (`run_tests.ps1`, full
+      mode before a playtest stop). Ask the owner only for feel, art, audio
+      and controller checks (L5).
    5. `superpowers:requesting-code-review`, then
       `superpowers:receiving-code-review`.
    6. `superpowers:verification-before-completion`.
@@ -80,8 +79,11 @@ e. When a milestone is done: `/gsd-audit-milestone`, then
   lines.
 - You need a design decision, credentials or API keys, a deploy, a git push,
   a history rewrite, or anything that deletes data: ask.
-- You need the project actually opened and run in the GameMaker IDE and
-  can't do it yourself: ask the owner to confirm it opens clean.
+- You need the IDE (creating/renaming a resource) or an L5 feel check.
+- 15 unplayed features, or right after a combat-feel feature (D54): stop,
+  update `.planning/PLAYTEST-QUEUE.md` and BOARD.md, report in five lines.
+- Tight mode (D53): short replies, no optional research, smallest agent that
+  can do the job.
 - **Never:** weaken, skip, or quietly drop a check to call something done;
   hand-edit `DD-Project.yyp`/`*.yy`/`DD-Project.resource_order` to add,
   rename, or delete a resource; hand-edit `datafiles/localization/localization.json`
