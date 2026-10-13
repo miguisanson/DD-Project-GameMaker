@@ -16,6 +16,17 @@ Every note from the friend, the owner, a review or a bug hunt becomes one row he
 
 ## Open P1s: 0 (none confirmed; nothing has a repro yet)
 
+## Changes on 2026-10-14 (roguelike direction D25-D36, plan review)
+
+Phases were renumbered (8 phases now, `ROADMAP.md`). Requirement ids named in the table below still point to `REQUIREMENTS.md`; the ones that changed meaning:
+
+- **Difficulty (I-019):** D35 removes Easy/Normal/Hard, so STAT-09 is now "one difficulty". I-019 closes when the difficulty switch and the dead multipliers are deleted.
+- **I-031 (level 8 vs level 10 at the boss):** superseded by D27/D30. Levels reset each run; the curve is built for one 45-60 minute run (PROG-08 replaced). Closes when PROG-08 passes in the simulator.
+- **I-030, I-004, I-036:** now served by the per-floor tables (PROG-07), card picks (PROG-04) and the profile/run save split (SAVE-01, SAVE-02).
+- **I-007 (mini boss):** its "stays removed" check now means stays removed within a run; a new run brings him back (RUN-03).
+- **I-010 (cutscene-end screen bug):** still needed for the first viewing; cutscenes now play once per save (RUN-07/08).
+- **New rows I-040 to I-046 below** record roguelike-related findings from the plan review.
+
 ## Table
 
 Reporter notes (friend, before 2026-10-13):
@@ -25,7 +36,7 @@ Reporter notes (friend, before 2026-10-13):
 | I-001 | "scale problem. screen bug" | BUG | P2 | unknown | needs-repro: bot + screenshots at supported sizes; see I-010, I-011 | picture is the right size and stable | needs-repro; REQ DISP-04..08, R-001, R-002 |
 | I-002 | "foresight skills idk what it does" | FEEL | P2 | unknown | audit: tooltip says "Next attack cannot miss" for "3 turns"; real duration 9; a basic attack burns it and never rolls to hit; the buff is a tiny text tag; the cast animation plays on the enemy (`combat-bugs.md` section 2) | Foresight has a clear effect and tooltip (D24) | open; REQ STAT-10, UI-06; R-012 |
 | I-003 | "(bone shud be foresight +)" | QUESTION | P3 | unknown | ask the friend: was "bone" an icon, the floor-8 bones prop, or a skill name? There is no bone item or skill (`combat-bugs.md` section 3) | D24 reads it as: Foresight's icon should be an eye | question; REQ ART-03 |
-| I-004 | "skill books appear in books twice" | BUG | P2 | unknown | audit: not reproducible at HEAD; guards exist since `f39236b`; suspects: old build, a save with two entries, or the Skills tab (`combat-bugs.md` section 4) | one entry per book; no duplicate skill ids | needs-repro; REQ BUG-04, R-003; ends in Phase 7 (books removed) |
+| I-004 | "skill books appear in books twice" | BUG | P2 | unknown | audit: not reproducible at HEAD; guards exist since `f39236b`; suspects: old build, a save with two entries, or the Skills tab (`combat-bugs.md` section 4) | one entry per book; no duplicate skill ids | needs-repro; REQ BUG-04, R-003; ends in Phase 6 (books removed) |
 | I-005 | "ice spear animation is slow" | FEEL | P3 | unknown | audit: Ice Spear is at the speed cap, 1.15 s plus a fixed 1 s hold (`combat-bugs.md` section 5) | total skill time at the owner's target (to be set) | open; REQ BUG-05, R-013 |
 | I-006 | "hilt bash animation slow" | FEEL | P3 | unknown | audit: 0.86 s plus 1 s hold; last two frames empty; grants 2 free actions so it feels longest | same as I-005 | open; REQ BUG-06, R-014 |
 | I-007 | "mini boss moves around so he isnt blocking tje way" | BUG | P2 | unknown | audit: stationary at HEAD (`ai_stationary = true` since `f39236b`); likely an old build | mini boss stays at (224,32) | needs-repro; REQ BUG-07, R-007 |
@@ -69,8 +80,15 @@ Found by audits and reviews (no person's words):
 | I-035 | audit: `ch.hp = 9999; // temp` at `scr_player.gml:20` | QUESTION | P3 | HEAD `0b6e2f8` | `codebase/CONCERNS.md`; find out whether it runs | no cheat value in play | question; REQ BUG-27 |
 | I-036 | audit: old snapshot versions are rejected with no migration and no friendly message; the save write is not atomic; `Save_ToReal` throws on non-numeric text | BUG | P2 | HEAD `0b6e2f8` | `codebase/CONCERNS.md` Fragile Areas; `scr_save.gml:85-87` | D16: friendly rejection; safe write | open; REQ SAVE-02, SAVE-04, SAVE-05 |
 | I-037 | audit: `rm_floor6_5` is only 144 px wide, narrower than the view | BUG | P3 | HEAD `0b6e2f8` | `resolution.md` section 4b step 9 | no area outside the room visible | open; REQ DISP-10 |
-| I-038 | audit: slime Solidify makes the next player skill auto-miss; this breaks "skills always hit" | BALANCE | P3 | HEAD `0b6e2f8` | `balance-data.md` S13; `combat-bugs.md` section 7 | rule redefined in Phase 4 | superseded by D6; REQ STAT-06 |
-| I-039 | The friend probably played an old build. Which build or APK did they play? | QUESTION | P2 | unknown | `combat-bugs.md` top note | answer recorded before any code change for I-004, I-007, I-008 | question |
+| I-038 | audit: slime Solidify makes the next player skill auto-miss; this breaks "skills always hit" | BALANCE | P3 | HEAD `0b6e2f8` | `balance-data.md` S13; `combat-bugs.md` section 7 | rule redefined in Phase 5 (G5) | superseded by D6; REQ STAT-06 |
+| I-039 | The friend probably played an old build. Which build or APK did they play? | QUESTION | P2 | unknown | `combat-bugs.md` top note | answer recorded before any code change for I-004, I-007, I-008. If no answer comes, the repros run on the current build and that is the answer (plan review 1b item 6) | question |
+| I-040 | plan review: death reloads the latest save slot (`obj_start_controller/Step_0.gml`, case `game_over`) | FEATURE | P2 | HEAD `0b6e2f8` | `plan-review.md` 1d | death ends the run and returns to the entrance room (D26, D31) | open; REQ RUN-02, RUN-16, R-036 |
+| I-041 | plan review: saving respawns every regular enemy (`Save_Write` calls `Enemy_ResetAll`, `scr_save.gml:394`), a farming loop | BALANCE | P3 | HEAD `0b6e2f8` | `plan-review.md` 1d | the owner decides respawns inside a run (G2); a test proves it | open; REQ RUN-15 |
+| I-042 | plan review: about 352 step-counted timers; web builds drop frames more than Windows | BUG | P3 | HEAD `0b6e2f8` | `codebase/CONCERNS.md` lines 24-30 | gameplay timers run on a clock | open; REQ ROB-01 |
+| I-043 | plan review: input buffering disabled, dead frames between arrows, wrong key fails at once, `Input_Update` returns early on the same ms, no hold-repeat in lists | FEEL | P2 | HEAD `0b6e2f8` | `audit/qte.md` 2.4; `audit/ui.md` P9; `scr_input.gml:242` | forgiving, consistent input | open; REQ ROB-02, QTE-05, UI-10 |
+| I-044 | plan review: 18 `ds_*` creates against 6 destroys, no CleanUp events, globals re-created every Step. Repeated runs in one session would make this grow | BUG | P3 | HEAD `0b6e2f8` | `codebase/CONCERNS.md` lines 32-51 | no growth over 20 runs | open; REQ ROB-03 |
+| I-045 | plan review: the pause menu has no Save; saving only at beds. A 45-60 minute run needs a chosen way to stop and resume | FEATURE | P3 | HEAD `0b6e2f8` | `audit/ui.md` P8 | G2 decides; RUN-14 proves it | question; REQ RUN-14 |
+| I-046 | plan review: D3 "Android later" conflicts with D28 "no post-release" | QUESTION | P3 | n/a | `DECISIONS.md` | owner confirmed 2026-10-14: Android never built (D38) | closed |
 
 ---
-*Created: 2026-10-13. Next free id: I-040.*
+*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-047.*

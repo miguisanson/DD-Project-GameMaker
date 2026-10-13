@@ -6,7 +6,7 @@ Locked by the owner. Changing any of these needs a new grill-me.
 |---|---|---|
 | D1 | Scope (amended by D25, D28) | Same game (floors, story, classes) done right. All reported problems fixed. Combat core is open for rework (each rework decision gets its own grill-me). Porting parked. |
 | D2 | Audience | Friends + portfolio, free release (itch.io-style). No store/legal work. |
-| D3 | Platforms | Windows + web now; Android later. Display/input architecture must not block Android (touch, aspect ratios) but Android is not tested this milestone. |
+| D3 | Platforms (amended by D38) | Windows + web now; Android later. Display/input architecture must not block Android (touch, aspect ratios) but Android is not tested this milestone. |
 | D4 | QTE style | Mixed per skill type: timing ring/bar for some skills, Helldivers-style arrow sequences (↑←↓→ / WASD) for others. |
 | D5 | QTE stakes | Graded result (e.g. Perfect/Good/OK/Bad scale effect). Failing scales power down but never a full miss. |
 | D6 | Hit rolls | Skills always hit. (Superseded for the basic attack by D20: it never misses either.) |
@@ -41,6 +41,8 @@ Locked by the owner. Changing any of these needs a new grill-me.
 | D34 | Nobody | The Nobody becomes a 4th playable class (classless; own card pool). Today the player starts as Nobody and picks a class from a chest — the class chest flow changes accordingly (detail in the progression grill). |
 | D35 | Difficulty modes | One difficulty only + a QTE assist option (wider windows) for accessibility. Easy/Normal/Hard are removed. |
 | D36 | Save split | Two save parts, each versioned: profile (story seen, unlocks, death gift, settings) and run (seed, RNG stream counters, class, level, cards, gold, items, floor). Clean break from old saves (D16). |
+| D37 | Releases | One release at the end. No public halfway "safety build". |
+| D38 | Android | Never. Windows + web only. Drop Android from this project. |
 
 ## Notes
 - Three of the friend's bugs (skill books twice, mini boss moving, maybe poison) look already fixed in code since commit f39236b (2026-03-05) — the friend probably played an older build. From now on every build shows a build id, and every note records it.

@@ -6,6 +6,8 @@ Plain version: the owner starts a session and leaves it running. The agents work
 
 **Starts only after Phase 1 is done** (the verification ladder works, the negative control is red, `REGRESSION.md` is green on the current build).
 
+**Updated 2026-10-14 for the roguelike direction (D25-D36).** The scope is closed (D28): improvement mode fixes bugs and polishes what is decided; it never adds content, classes, floors, modes or systems that are not in `DECISIONS.md`. The owner's tracker is `BOARD.md`; every commit that lands updates it together with `STATE.md`.
+
 ## What the owner decided (do not change without a new grill-me)
 
 | Decision | Meaning here |
@@ -14,6 +16,8 @@ Plain version: the owner starts a session and leaves it running. The agents work
 | D12 | About 8 unplayed features and the loop switches to bug-hunt only (checks, simulator, tidy) until the owner plays. Each feature is its own revertable commit with its playtest steps. |
 | D13 | The loop PROPOSES balance changes with simulator before and after numbers. The owner approves in a batch. It never changes a balance number on its own. |
 | D17 | The owner starts a live session and leaves it running. No scheduled autopilot. Unattended work lands on `next`, one commit per feature, each with automated checks and playtest steps. After the owner plays, good features merge to `v1.9` and bad ones are reverted. |
+| D28 | Scope limit: nothing beyond the decisions; no post-release. Priority is removing bugs and improving. Idle improvement mode never invents a feature to fill time. |
+| D35 | One difficulty. Balance proposals therefore describe one curve (per fight and per whole run), not three. |
 
 ## Differences from the old lessons (and why)
 
@@ -26,10 +30,10 @@ Plain version: the owner starts a session and leaves it running. The agents work
 1. **ISSUES inbox**: rows in `ISSUES.md` with status `open` or `confirmed` (the friend's and owner's words, verbatim). Highest severity first.
 2. **Failing regression checks**: any `REGRESSION.md` entry that fails on the current build.
 3. **Compile or runtime errors** from the gate (`tools/automation/run_tests.ps1`).
-4. **Simulator out-of-band numbers** (after Phase 8 exists): these become balance PROPOSALS only (see "Balance" below). They are never applied.
+4. **Simulator out-of-band numbers** (from Phase 5A on, when the simulator exists): these become balance PROPOSALS only (see "Balance" below). They are never applied. Run-level numbers count too: run win rate, run length, variance between seeds, a card that is never picked or always wins.
 5. **Bug-hunt findings with evidence** (bounded, see below).
 
-Not inputs: ideas for improvement with no evidence; new design; polish that nobody asked for. If the top of the queue is polish with no owner quote and no failing check, the correct result is "nothing to do" (`lessons` 4.7 #7).
+Not inputs: ideas for improvement with no evidence; new design; new content; polish that nobody asked for. If the top of the queue is polish with no owner quote and no failing check, the correct result is "nothing to do" (`lessons` 4.7 #7).
 
 Features that come from the roadmap (the GSD phase loop) also land on `next` under these rules and count toward the unplayed total. Improvement mode never invents player-facing design. A question the research and DECISIONS cannot answer becomes a `QUESTION` row in `ISSUES.md` and a line under "Questions for the owner" in `PLAYTEST-QUEUE.md`, and the loop continues with other work.
 
@@ -50,12 +54,12 @@ Features that come from the roadmap (the GSD phase loop) also land on `next` und
 
 Run these steps, then check the stop conditions. One feature or fix per pass.
 
-0. **Preflight.** Read `STATE.md` and the queue. Confirm: the gate is green on `next`; the negative control is red; the unplayed count is below 8 (else bug-hunt only); no stop file `.planning/IMPROVE_STOP`; usage is below 80% of the window and week. If not, stop and report in 5 lines.
+0. **Preflight.** Read `STATE.md`, `BOARD.md` and the queue. Confirm: the fast gate is green on `next`; the negative control is red; the unplayed count is below 8 (else bug-hunt only); no stop file `.planning/IMPROVE_STOP`; usage is below 80% of the window and week. If not, stop and report in 5 lines.
 1. **Pick.** The top input from the list above. If it is a design question, park it and pick the next.
 2. **Check first.** Write the repro or the failing check (an `R-###` entry for a bug; 1-3 entries for a feature's Done-when). Run it. It must fail for the right reason (a wrong value, not a typo).
 3. **Delegate.** Write the contract and hand the implementation to a Sonnet subagent in a worktree. Pilot first when the work is repetitive.
 4. **Review** (the Opus session, in this order, evidence pasted into the commit message):
-   1. Run the checks yourself on the candidate (compile, `-runtests`, scenario if relevant). A report that says "green" is not evidence.
+   1. Run the checks yourself on the candidate (the fast gate: compile, `-runtests`, `-smoke`; the full gate with bot and shots for a playtest build). Say which gate ran. A report that says "green" is not evidence.
    2. Check the Done-when clause by clause with a pointer (file and line, log line, screenshot name). A clause not met means not done. Split it into a new row now.
    3. Could the new check fail? Revert the fix or flip the key line and see it go red. Expected values must come from the spec or the owner, not from the code's own output.
    4. List removed or changed assertions by name and justify each (rpg-gm lost neighbour tests this way).
@@ -66,7 +70,7 @@ Run these steps, then check the stop conditions. One feature or fix per pass.
    9. Fix small findings in the same session; send bigger ones back as new rows.
 5. **Merge** to `next` as one commit: code, checks, the `REGRESSION.md` entries, and the playtest entry together.
 6. **After every merge** (not once after several): rebuild and re-run the gate on the merged tree, plus the entries for the touched systems. If red, revert at once and log it.
-7. **Record.** Add the entry to `PLAYTEST-QUEUE.md` (exact steps, expected result, build id). Update `STATE.md` (header counters, WIP, next action) and `ISSUES.md`.
+7. **Record.** Add the entry to `PLAYTEST-QUEUE.md` (exact steps, expected result, build id). Update `STATE.md` (header counters, WIP, next action), `BOARD.md` and `ISSUES.md`. For anything about runs, the steps say "play two runs" and the seed is in the entry: one run is a sample of one.
 8. **Stop check** (below), then loop.
 
 ## Feature, fix and the unplayed count
@@ -83,11 +87,12 @@ The owner asked for continuous bug catching. This is how, without the old "an au
 **Passes.** One bug-hunt pass per loop cycle when features are capped, otherwise one pass after every 3 merged commits. **At most 5 findings are filed per pass** (this number is a proposal; the owner may change it). An empty pass is a correct result. **Three empty passes in a row: stop and wait for the owner** (the old idle-stop rule, `lessons` 1a).
 
 **Methods:**
-1. **Scripted scenarios and bot runs**: the fixed-seed matrix (3 classes x a few enemies x 3 difficulties, 2000-frame cap each, about 60 frames per second so keep it small; `automation-igor.md` section 3.4). Assert no runtime error, the battle ends, HP stays within [0, max].
+1. **Scripted scenarios and bot runs**: the fixed-seed matrix (4 classes x a few enemies, one difficulty, 2000-frame cap each, about 60 frames per second so keep it small; `automation-igor.md` section 3.4). Assert no runtime error, the battle ends, HP stays within [0, max]. From Phase 6, add seeded run loops: start, fight, die, return to the entrance, start again. Assert the run state is clean, the profile is kept, no story moment repeats (R-036, R-037), the same seed gives the same offers (R-038), and live ds structures do not grow over 20 runs (R-042).
 2. **Screenshot matrix review**: Opus opens the `-shots` images at every supported size for title, floor, battle, menus, cutscene end and dialogue end.
 3. **Static sweeps for known bug classes** found in this codebase:
-   - frame-rate-dependent timers (about 352 step-counted lines, `codebase/CONCERNS.md`);
-   - `ds_*` leaks (18 creates against 6 destroys, no CleanUp events, CONCERNS);
+   - frame-rate-dependent timers (about 352 step-counted lines, `codebase/CONCERNS.md`; ROB-01);
+   - `ds_*` leaks (18 creates against 6 destroys, no CleanUp events, CONCERNS; ROB-03). Repeated runs in one session make leaks grow;
+   - gameplay randomness that bypasses the seeded streams (any new `random`, `irandom`, `choose` or `randomize` in run logic; RUN-11);
    - global state not reset on room change;
    - hard-coded English (run `lint_hardcoded_text.py`);
    - the sibling sweep for any bug fixed since the last pass.
@@ -96,7 +101,7 @@ The owner asked for continuous bug catching. This is how, without the old "an au
 
 ## Balance (D13)
 
-When the simulator (Phase 8 onward) shows a number outside its band, the loop writes a **proposal** in the "Balance proposals" section of `PLAYTEST-QUEUE.md`: what, why, before and after simulator numbers. It does not edit balance data files. The owner approves in a batch, and only then does a commit apply the approved ids. A commit that changes balance data without an approved id fails review.
+When the simulator (Phase 5A onward) shows a number outside its band, the loop writes a **proposal** in the "Balance proposals" section of `PLAYTEST-QUEUE.md`: what, why, before and after simulator numbers. It does not edit balance data files. The owner approves in a batch, and only then does a commit apply the approved ids. A commit that changes balance data without an approved id fails review.
 
 ## Stop conditions
 
@@ -118,7 +123,7 @@ Round limits: at most 3 consecutive waves on one theme; at most 1 wave per owner
 ## Practical notes
 
 - Automated runs open a real game window for a few seconds and take focus (`automation-igor.md` section 5). Leave the PC logged in. Do not start the bot matrix while the owner is gaming or recording.
-- Builds go on E:. Check `df -h /c` first; C: was 71 GB free on 2026-10-13, below the 80-90 GB rule.
+- Builds go on E:. Check `df -h /c` first; C: was 71 GB free on 2026-10-13 and about 80 GB after a cleanup on 2026-10-14, still at or below the 80-90 GB rule.
 - Never use Igor `Run` without an outer kill (`-t` does not stop the game). Never print `um.json`. Crash detection reads the log, not the exit code (`automation-igor.md` section 4).
 - Commit before ending any session. A background subagent dies with the session, so write what it was doing into `STATE.md` first (`lessons` 2g).
 
@@ -131,4 +136,4 @@ Round limits: at most 3 consecutive waves on one theme; at most 1 wave per owner
 5. When you come back: open `.planning/PLAYTEST-QUEUE.md`, play the build with the id shown at the top, mark each entry `good`, `bad` or `change`, answer the "Questions for the owner", and say `merge the good ones` when you want them on `v1.9`.
 
 ---
-*Created: 2026-10-13*
+*Created: 2026-10-13. Updated 2026-10-14 (roguelike direction, closed scope, two gates, BOARD.md).*
