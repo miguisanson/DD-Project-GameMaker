@@ -1,3 +1,4 @@
+Scenario_Step();   // scr_debug: inert without -smoke / -bot / -shots; runs before Input_PreStep so simulated keys are seen this frame
 Input_PreStep();
 Debug_Update();
 if (!instance_exists(obj_ui_controller)) {

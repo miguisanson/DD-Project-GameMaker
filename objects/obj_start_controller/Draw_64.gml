@@ -173,3 +173,4 @@ if (SettingsPopup_IsOpen("title") && !loading_into_game) {
     SettingsPopup_Draw();
 }
 draw_set_alpha(1);
+Build_DrawId();

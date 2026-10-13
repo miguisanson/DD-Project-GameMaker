@@ -10,6 +10,7 @@
 param(
     [ValidateSet('fast', 'full', 'compile')][string]$Mode = 'fast',
     [switch]$NegativeControl,
+    [ValidateSet('', 'runtests', 'smoke', 'bot', 'shots')][string]$Only = '',   # run just this game mode (with fast/full)
     [string]$ProjectDir = '',                  # default: repo root of this script
     [string]$WorkRoot = 'E:\Temp\dd-gate'      # test hook: point at C:\ to see the drive guard refuse
 )
@@ -19,12 +20,13 @@ $ErrorActionPreference = 'Stop'
 # Strict = also require exit code 0 and the result file (only -runtests; crash exit codes are unreliable).
 $GameModes = @(
     @{ Name = 'runtests'; Flag = '-runtests'; Timeout = 30;  Impl = $true;  Strict = $true  }
-    @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 60;  Impl = $false; Strict = $false }
-    @{ Name = 'bot';      Flag = '-bot';      Timeout = 120; Impl = $false; Strict = $false }
-    @{ Name = 'shots';    Flag = '-shots';    Timeout = 60;  Impl = $false; Strict = $false }
+    @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 60;  Impl = $true;  Strict = $false }
+    @{ Name = 'bot';      Flag = '-bot';      Timeout = 120; Impl = $true;  Strict = $false; Focus = $true }
+    @{ Name = 'shots';    Flag = '-shots';    Timeout = 60;  Impl = $true;  Strict = $false; Shots = 9 }   # Shots = number of [SHOT] lines required
 )
 $BuildTimeout = 300
 $ResultFile = 'test_results.txt'
+$ShotMaxOneColour = 0.97   # a screenshot where more than this share of sampled pixels is one colour counts as blank
 $BadLine = 'UNHANDLED|CRASH|\[TEST\] ERROR'
 
 # ---- helpers ----------------------------------------------------------------------------------
@@ -47,11 +49,30 @@ function Get-DriveRoots([string]$path) {   # the path's own drive, plus the targ
     $roots
 }
 
-function Invoke-Proc([string]$exe, [string]$argStr, [string]$wd, [string]$log, [int]$timeout, [string]$style) {
+# The runner drops keyboard input (GML keyboard_key_press included) while its window is not in front, so a -bot run keeps
+# pulling the game window to the foreground while it waits (the Alt tap is the usual way past the foreground lock).
+Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class DDWin {
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra); }'
+function Set-Foreground([IntPtr]$h) {
+    if ([DDWin]::GetForegroundWindow() -eq $h) { return }
+    [DDWin]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [DDWin]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+    $null = [DDWin]::SetForegroundWindow($h)
+}
+
+function Invoke-Proc([string]$exe, [string]$argStr, [string]$wd, [string]$log, [int]$timeout, [string]$style, [bool]$focus = $false) {
     $p = Start-Process -FilePath $exe -ArgumentList $argStr -WorkingDirectory $wd -PassThru -WindowStyle $style `
         -RedirectStandardOutput $log -RedirectStandardError "$log.err"
     $null = $p.Handle                       # needed or ExitCode comes back empty in PS 5.1
-    $timedOut = -not $p.WaitForExit($timeout * 1000)
+    if ($focus) {
+        $deadline = [DateTime]::UtcNow.AddSeconds($timeout); $timedOut = $false
+        while (-not $p.WaitForExit(250)) {
+            if ([DateTime]::UtcNow -gt $deadline) { $timedOut = $true; break }
+            $p.Refresh()
+            if ($p.MainWindowHandle -ne [IntPtr]::Zero) { Set-Foreground $p.MainWindowHandle }
+        }
+    } else { $timedOut = -not $p.WaitForExit($timeout * 1000) }
     if ($timedOut) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; $null = $p.WaitForExit(5000) }
     $code = $null; if (-not $timedOut) { $code = $p.ExitCode }
     if ((Test-Path "$log.err") -and (Get-Item "$log.err").Length -gt 0) { Get-Content "$log.err" | Add-Content -Path $log }
@@ -78,11 +99,36 @@ function Get-TreeHash([string]$dir) {       # names + times + SHA256 of every fi
     [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($bytes))
 }
 
+# VER-09: copy the PNGs out of the save dir, then check each [SHOT] line: file exists, size == reported window size, not mostly one colour.
+function Test-Shots([string[]]$lines, [int]$expect) {
+    $problems = @()
+    Get-ChildItem $D.save -Recurse -Filter 'shot_*.png' -File -ErrorAction SilentlyContinue | ForEach-Object { Copy-Item $_.FullName $D.shots -Force }
+    $rows = @($lines | Where-Object { $_ -match '^\[SHOT\] file=(\S+) w=(\d+) h=(\d+)' } | ForEach-Object { [pscustomobject]@{ File = $Matches[1]; W = [int]$Matches[2]; H = [int]$Matches[3] } })
+    if ($rows.Count -ne $expect) { $problems += "expected $expect [SHOT] lines, got $($rows.Count)" }
+    Add-Type -AssemblyName System.Drawing
+    foreach ($r in $rows) {
+        $path = Join-Path $D.shots $r.File
+        if (-not (Test-Path -LiteralPath $path)) { $problems += "$($r.File) missing"; continue }
+        $bmp = $null
+        try {
+            $bmp = New-Object System.Drawing.Bitmap $path
+            if ($bmp.Width -ne $r.W -or $bmp.Height -ne $r.H) { $problems += "$($r.File) is $($bmp.Width)x$($bmp.Height), window said $($r.W)x$($r.H)" }
+            $seen = @{}; $n = 0
+            for ($y = 0; $y -lt $bmp.Height; $y += 8) { for ($x = 0; $x -lt $bmp.Width; $x += 8) {
+                $k = $bmp.GetPixel($x, $y).ToArgb(); $seen[$k] = 1 + [int]$seen[$k]; $n++ } }
+            $top = ($seen.Values | Measure-Object -Maximum).Maximum / [double]$n
+            if ($top -gt $ShotMaxOneColour) { $problems += ('{0} is {1:P0} one colour' -f $r.File, $top) }
+        } catch { $problems += "$($r.File) unreadable: $($_.Exception.Message)" }
+        finally { if ($bmp) { $bmp.Dispose() } }
+    }
+    $problems
+}
+
 # ---- drive guard (VER-15): must run before anything is created or deleted ----------------------
 $WorkRoot = [IO.Path]::GetFullPath($WorkRoot).TrimEnd('\')
 if ($WorkRoot.Length -le 3) { Refuse "work root '$WorkRoot' is a drive root" }
 $D = @{}
-foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs') {
+foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots') {
     $D[$n] = Join-Path $WorkRoot $n
     foreach ($r in (Get-DriveRoots $D[$n])) {
         if ($r -ieq 'C:\' -or $r -ieq "$env:SystemDrive\") { Refuse "$n dir '$($D[$n])' is on drive C: (everything must live on E:)" }
@@ -125,8 +171,8 @@ function Finish {
 
 # ---- fresh work dirs; copy working tree (tracked + untracked-not-ignored) -----------------------
 $sw = [Diagnostics.Stopwatch]::StartNew()
-foreach ($n in 'src', 'out', 'save', 'logs') { if (Test-Path $D[$n]) { Remove-Item $D[$n] -Recurse -Force } }
-foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs') { $null = New-Item -ItemType Directory -Force -Path $D[$n] }
+foreach ($n in 'src', 'out', 'save', 'logs', 'shots') { if (Test-Path $D[$n]) { Remove-Item $D[$n] -Recurse -Force } }
+foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots') { $null = New-Item -ItemType Directory -Force -Path $D[$n] }
 
 $psi = New-Object Diagnostics.ProcessStartInfo 'git'
 $psi.Arguments = 'ls-files -co --exclude-standard -z'
@@ -148,6 +194,20 @@ foreach ($rel in ($listing -split "`0")) {
     [IO.File]::Copy($from, $to, $true); $count++
 }
 Step 'copy' "$count" $sw
+
+# ---- build id (VER-10): stamped into the SCRATCH copy only; the repo's macro stays "dev" -------------
+$BuildId = 'nogit'
+try {
+    $h = (& git -C $ProjectDir rev-parse --short HEAD) | Out-String
+    $dirty = (& git -C $ProjectDir status --porcelain) | Out-String
+    if ($h.Trim()) { $BuildId = '{0}-{1}{2}' -f $h.Trim(), (Get-Date -Format 'yyyyMMdd'), $(if ($dirty.Trim()) { '-dirty' } else { '' }) }
+} catch { }
+$macroFile = Join-Path $D.src 'scripts\scr_macros\scr_macros.gml'
+$macroText = [IO.File]::ReadAllText($macroFile)
+$stamped = [regex]::Replace($macroText, '(?m)^#macro BUILD_ID "[^"\r\n]*"', "#macro BUILD_ID `"$BuildId`"")
+if ($stamped -eq $macroText -and $macroText -notmatch ('#macro BUILD_ID "' + [regex]::Escape($BuildId) + '"')) { Fail 'BUILD_ID macro not found in scr_macros.gml'; Finish }
+[IO.File]::WriteAllText($macroFile, $stamped, (New-Object Text.UTF8Encoding $false))
+Write-Host "build id  $BuildId"
 
 # ---- build (VER-01): the exact command proven in automation-igor.md 2.4 -------------------------
 $sw = [Diagnostics.Stopwatch]::StartNew()
@@ -173,6 +233,7 @@ if (-not $buildOk -or $Mode -eq 'compile') { Finish }
 
 # ---- game runs (VER-02/03/05) -------------------------------------------------------------------
 $runs = if ($Mode -eq 'full') { $GameModes } else { @($GameModes | Where-Object { $_.Name -eq 'runtests' }) }
+if ($Only) { $runs = @($GameModes | Where-Object { $_.Name -eq $Only }) }
 foreach ($m in $runs) {
     if (-not $m.Impl) { Write-Host "SKIP $($m.Name) (not implemented)"; continue }
     $sw = [Diagnostics.Stopwatch]::StartNew()
@@ -182,7 +243,7 @@ foreach ($m in $runs) {
     $gameArgs = "-game data.win $($m.Flag)"
     if ($NegativeControl) { $gameArgs += ' -testcontrol' }
     $env:LOCALAPPDATA = $D.save                 # VER-06: the game must never see the real save area
-    try { $r = Invoke-Proc $exe $gameArgs $D.out $log $m.Timeout 'Minimized' } finally { $env:LOCALAPPDATA = $RealLocal }
+    try { $r = Invoke-Proc $exe $gameArgs $D.out $log $m.Timeout $(if ($m.Focus) { 'Normal' } else { 'Minimized' }) ([bool]$m.Focus) } finally { $env:LOCALAPPDATA = $RealLocal }
     $lines = Get-LogLines $log
     $why = @()
     if ($r.TimedOut) { $why += "timeout after $($m.Timeout)s" }
@@ -199,8 +260,13 @@ foreach ($m in $runs) {
     $bad = @($lines | Where-Object { $_ -match "$BadLine|\[TEST\] FAIL" })
     if (@($bad | Where-Object { $_ -match $BadLine }).Count -gt 0) { $why += 'UNHANDLED/CRASH/ERROR line in log' }
     if ($m.Strict -and -not (Get-ChildItem $D.save -Recurse -Filter $ResultFile -File -ErrorAction SilentlyContinue)) { $why += "missing $ResultFile in save area" }
+    $bid = @($lines | Where-Object { $_ -match '^\[TEST-BUILD\]\s+(\S+)' } | ForEach-Object { $Matches[1] })   # VER-10
+    if ($bid.Count -eq 0) { $why += 'missing [TEST-BUILD]' }
+    elseif ($bid[0] -ne $BuildId) { $why += "build id in game '$($bid[0])' differs from stamped '$BuildId'" }
+    if ($m.Shots) { $why += @(Test-Shots $lines $m.Shots) }
     $bad | Select-Object -First 20 | ForEach-Object { Write-Host "  $($_.Trim())" }
     if ($why.Count -gt 0) { Fail "$($m.Name): $($why -join '; ')" }
     Step $m.Name $(if ($why.Count -eq 0) { 'OK' } else { 'FAIL' }) $sw
+    if ($m.Name -eq 'runtests' -and $bid.Count -gt 0) { Write-Host "          build=$($bid[0])" }
 }
 Finish
