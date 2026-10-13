@@ -208,12 +208,19 @@ function Combat_Log(_text, _icon_sprite = noone, _icon_subimg = 0) {
     bc.combat_log = log;
 }
 
-function Battle_Message(_bc, _text, _next_state, _fx = noone) {
+// Seconds -> game frames at the current room speed (frame-rate independent waits).
+function Combat_SecToFrames(_seconds) {
+    var game_fps = game_get_speed(gamespeed_fps);
+    if (!is_real(game_fps) || game_fps <= 0) game_fps = 60;
+    return max(1, round(_seconds * game_fps));
+}
+
+function Battle_Message(_bc, _text, _next_state, _fx = noone, _hold_frames = -1) {
     _bc.message_text = _text;
     _bc.message_next_state = _next_state;
     _bc.battle_state = BSTATE_MESSAGE;
     _bc.wait_fx = _fx;
-    _bc.wait_timer = COMBAT_ACTION_DELAY;
+    _bc.wait_timer = (_hold_frames >= 0) ? _hold_frames : Combat_SecToFrames(COMBAT_ACTION_HOLD_SEC);
     Combat_Log(_text);
 }
 
@@ -390,7 +397,7 @@ function Battle_CheckEnd(_bc, _p, _e) {
         var gs = GameState_Get();
         gs.pending_post_battle_dialogue_lines = Battle_BuildVictoryDialogueLines(_e, rewards, _p);
 
-        Battle_Message(_bc, Loc_T("combat.msg.enemy_slain", "{enemy} has been slain.", { enemy: _e.name }), BSTATE_END_RUN);
+        Battle_Message(_bc, Loc_T("combat.msg.enemy_slain", "{enemy} has been slain.", { enemy: _e.name }), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY);
         return true;
     }
 
@@ -796,7 +803,7 @@ function Battle_RunAttempt(_bc) {
         if (enemy_id == ENEMY_STRANGER) {
             Dialogue_NarrativeOnStrangerEncounterResolved();
         }
-        Battle_Message(_bc, Loc_T("combat.msg.player_ran", "You ran away!"), BSTATE_END_RUN);
+        Battle_Message(_bc, Loc_T("combat.msg.player_ran", "You ran away!"), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY);
     } else {
         _bc.turn = TURN_ENEMY;
         Battle_Message(_bc, Loc_T("combat.msg.player_couldnt_escape", "Couldn't escape!"), BSTATE_ENEMY_ACT);

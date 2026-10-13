@@ -204,12 +204,13 @@
 #macro MENU_REPEAT_INTERVAL 2
 #macro SETTINGS_HOLD_REPEAT_DELAY 10
 #macro SETTINGS_HOLD_REPEAT_INTERVAL 5
-#macro COMBAT_ACTION_DELAY 60
+#macro COMBAT_ACTION_DELAY 60   // long hold: battle intro, kill and run-away messages
+#macro COMBAT_ACTION_HOLD_SEC 0.3   // D55: hold after a player or enemy action, in seconds (use Combat_SecToFrames)
 #macro COMBAT_LOG_MAX 30
 #macro SKILL_FX_SPEED_MULT 2.50
 #macro PLAYER_SKILL_FX_SPEED_MULT 6.00
 #macro PLAYER_SKILL_FX_SPEED_MULT_NON_ENEMY 3.00
-#macro PLAYER_SKILL_FX_SPEED_MAX 1.30
+#macro PLAYER_SKILL_FX_SPEED_MAX 2.00   // D55: Ice Spear and Hilt Bash must finish in about 0.75 s
 #macro PLAYER_SKILL_HIT_BONUS 4
 #macro SKILL_FX_SCALE 2
 // Faster base speed with a per-attack random variation roll (ATTACK_TIMING_SPEED_VAR_*)

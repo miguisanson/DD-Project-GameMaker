@@ -240,7 +240,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 7000 : 2500, vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "" };
+                   cap: (_mode == "bot") ? 9000 : 2500, vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_mp0: 0 };
 }
 
 function Scenario_Finish() {
@@ -273,18 +273,22 @@ function Scenario_InputOverride() {
     variable_struct_set(global.input.state, _s.tap_action, { held: true, pressed: true });
 }
 
-function Scenario_NewKnight() {
+function Scenario_NewKnight(_class = CLASS_KNIGHT) {
     var _gs = GameState_Init();
-    _gs.player_ch = CharacterCreate_Player(CLASS_KNIGHT);
+    _gs.player_ch = CharacterCreate_Player(_class);
     _gs.in_main_menu = false;   // lets obj_game_controller spawn obj_player in a floor room
     return _gs;
 }
 
-function Scenario_EnterBattle(_persist_id) {
-    Scenario_NewKnight();
+function Scenario_GotoBattle(_persist_id) {
     GameState_SetBattleReturn(rm_floor1, 0, 0, 0);
     GameState_SetBattleEnemy(_persist_id, ENEMY_SLIME, 1);
     room_goto(rm_battle);
+}
+
+function Scenario_EnterBattle(_persist_id) {
+    Scenario_NewKnight();
+    Scenario_GotoBattle(_persist_id);
 }
 
 function Scenario_Step() {
@@ -343,6 +347,10 @@ function Scenario_StepSmoke(_s) {
 // v=0 "perfect": confirms the menu, times the attack drop and answers the defence arrows from the battle controller's own data.
 // v=1 "fail": confirms the menu but never presses during a QTE.
 function Scenario_StepBot(_s) {
+    if (_s.v >= 2) {
+        Scenario_StepBotSkill(_s);
+        return;
+    }
     var _name = (_s.v == 0) ? "bot_perfect" : "bot_fail";
     switch (_s.step) {
         case 0:   // short pause in rm_start, then start the battle
@@ -381,12 +389,93 @@ function Scenario_StepBot(_s) {
         case 2:   // let the end-of-battle flow (return fade / game-over cutscene) run
             if (_s.t == 180) {
                 if (_s.v == 0) Scenario_Check("bot_perfect_returns_to_floor", room == rm_floor1, "room=" + room_get_name(room));
-                if (_s.v == 0) {
-                    _s.v = 1;
-                    Scenario_Next(_s, 0);
+                if (_s.v == 1) {   // the fail variant runs last: its lost battle leaves a game-over transition behind
+                    Scenario_Finish();
                 } else {
+                    _s.v = 2;   // 0 perfect -> 2 Hilt Bash timing -> 3 Ice Spear timing -> 1 fail
+                    Scenario_Next(_s, 0);
+                }
+            }
+            break;
+    }
+}
+
+// v=2 / v=3: BUG-05/06 / D55. A Knight casts Hilt Bash, a Mage casts Ice Spear, both through the menu keys. Measured: game frames from the
+// frame the battle controller leaves the skill menu for BSTATE_MESSAGE (the confirm) to the frame the message state ends (battle_state
+// is MENU or ENEMY_ACT again: the point where the next choice or the enemy's reply starts). The player is given Foresight (always hits)
+// so the skill animation plays; the action must take no more than SCN_SKILL_ACTION_MAX_FRAMES (D55: about 1 s, 60 fps).
+#macro SCN_SKILL_ACTION_MAX_FRAMES 66
+function Scenario_StepBotSkill(_s) {
+    var _knight = (_s.v == 2);
+    var _name = _knight ? "bot_skill_hilt_bash" : "bot_skill_ice_spear";
+    var _sid = _knight ? SKILL_HILT_BASH : SKILL_ICE_SPEAR;
+    switch (_s.step) {
+        case 0:
+            if (_s.t == 10) {
+                var _gs = Scenario_NewKnight(_knight ? CLASS_KNIGHT : CLASS_MAGE);
+                var _ch = Player_LearnSkill(_gs.player_ch, _sid);
+                _ch.mp = _ch.max_mp;
+                _ch = Status_Add(_ch, STATUS_HIT_UP, 9, 0);
+                GameState_SetPlayer(_ch);
+                _s.vstart = _s.f;
+                _s.sk = 0;
+                _s.sk_fx = false;
+                _s.sk_mp0 = _ch.mp;
+                Scenario_GotoBattle(_name);
+                Scenario_Next(_s, 1);
+            }
+            break;
+        case 1:
+            if (room != rm_battle || !instance_exists(obj_battle_controller)) {
+                if (_s.t > 20) {
+                    Scenario_Check(_name + "_in_battle", false, "room=" + room_get_name(room));
                     Scenario_Finish();
                 }
+                break;
+            }
+            var _bc = instance_find(obj_battle_controller, 0);
+            var _ready = (_s.f - _s.last_tap) >= 4;
+            if (_s.f - _s.vstart > 900) {
+                Scenario_Check(_name + "_action_measured", false, "sk=" + string(_s.sk) + " state=" + string(_bc.battle_state));
+                Scenario_Next(_s, 2);
+                break;
+            }
+            if (_s.sk == -1) {   // a sturdy enemy, so the skill cannot kill it (a kill skips the animation) whatever the dice say
+                _bc.e.max_hp = 99;
+                _bc.e.hp = 99;
+                _s.sk = 0;
+            } else if (_s.sk == 0) {   // reach the skill menu and confirm the skill (answer any enemy attack first)
+                if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {
+                    Scenario_Tap((_bc.menu_index != 1) ? "menu_down" : "confirm");
+                } else if (_bc.battle_state == BSTATE_SKILL_MENU && _ready) {
+                    Scenario_Tap("confirm");
+                    _s.sk = 1;
+                } else if (_bc.battle_state == BSTATE_ENEMY_DEF_QTE && _ready && _bc.enemy_def_qte_active && _bc.enemy_def_qte_phase == 1
+                    && _bc.enemy_def_qte_index < array_length(_bc.enemy_def_qte_prompts)) {
+                    var _keys = ["move_right", "move_up", "move_left", "move_down"];
+                    Scenario_Tap(_keys[_bc.enemy_def_qte_prompts[_bc.enemy_def_qte_index]]);
+                }
+            } else if (_s.sk == 1) {   // the confirm was read: the controller is in the message state
+                if (_bc.battle_state == BSTATE_MESSAGE) {
+                    _s.sk_start = _s.f;
+                    _s.sk_fx = instance_exists(_bc.wait_fx);
+                    _s.sk = 2;
+                }
+            } else if (_s.sk == 2) {
+                if (_bc.battle_state != BSTATE_MESSAGE) {
+                    var _frames = _s.f - _s.sk_start;
+                    show_debug_message("[BOT] " + _name + " action_frames=" + string(_frames) + " fx=" + string(_s.sk_fx) + " next_state=" + string(_bc.battle_state));
+                    Scenario_Check(_name + "_skill_was_cast", _bc.p.mp < _s.sk_mp0, "mp=" + string(_bc.p.mp) + " mp0=" + string(_s.sk_mp0));
+                    Scenario_Check(_name + "_fx_played", _s.sk_fx);
+                    Scenario_Check(_name + "_action_le_" + string(SCN_SKILL_ACTION_MAX_FRAMES) + "_frames", _frames <= SCN_SKILL_ACTION_MAX_FRAMES, "frames=" + string(_frames));
+                    Scenario_Next(_s, 2);
+                }
+            }
+            break;
+        case 2:   // measured: start the next variant (the battle is simply abandoned) or finish
+            if (_s.t == 5) {
+                _s.v = (_s.v == 2) ? 3 : 1;
+                Scenario_Next(_s, 0);
             }
             break;
     }
