@@ -230,12 +230,20 @@ function Display_Update() {
     var _focus = window_has_focus();
     var _regained = (_focus && !_d.had_focus && _d.frame > DISPLAY_BOOT_RELAYOUT_FRAME * 2);
     _d.had_focus = _focus;
-    var _need = Display_NeedsRelayout(_d.layout, _ww, _wh, _fs) || _regained;
+    // Focus regained (alt-tab, minimise/restore): re-lay-out only if the engine's GUI state really went stale; most of the time nothing changed.
+    var _need = Display_NeedsRelayout(_d.layout, _ww, _wh, _fs) || (_regained && Display_GuiStateStale());
     if (!_d.boot_relayout_done && _d.frame >= DISPLAY_BOOT_RELAYOUT_FRAME) {
         _d.boot_relayout_done = true;   // the first ~20 frames after boot lag behind the window (measured), so lay out once more
         _need = true;
     }
     if (_need) Display_Relayout();
+}
+
+// Did the engine lose our GUI scale? With display_set_gui_maximise the engine reports window / ui_scale as the GUI size.
+function Display_GuiStateStale() {
+    var _l = global.display.layout;
+    if (!is_struct(_l)) return true;
+    return abs(display_get_gui_width() - _l.win_w / _l.ui_scale) > 1.01 || abs(display_get_gui_height() - _l.win_h / _l.ui_scale) > 1.01;
 }
 
 // The one place the window size becomes a layout: CalcLayout, then the GUI scale and origin. Counted (DISP-08).

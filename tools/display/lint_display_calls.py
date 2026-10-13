@@ -65,10 +65,10 @@ def scan_text(text, rel, allowed):
                 line = head
                 in_block = True
         code = strip_comment(line)
+        if allowed:
+            continue   # scr_display / obj_display: the owner may call anything, incl. display_get_gui_* (Display_GuiStateStale)
         if GUI_READ_RE.search(code):
             problems.append((rel, n, "display_get_gui_* is forbidden: use Display_GuiW()/Display_GuiH()", raw.strip()))
-        if allowed:
-            continue
         if OWNER_RE.search(code) or VIEW_WRITE_RE.search(code):
             problems.append((rel, n, "display-owner call outside scr_display: use Display_Request/Display_BindRoom/...", raw.strip()))
     return problems

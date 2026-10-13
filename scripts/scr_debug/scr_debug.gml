@@ -823,9 +823,40 @@ function Scenario_StepShotsDisp(_s) {
             if (_d3 >= 10) {
                 Scenario_Check("shots_disp_no_relayout_" + _tag, Display_ApplyCount() == _s.ap0, "re-laid-out " + string(Display_ApplyCount() - _s.ap0) + " times during cutscene end, dialogue end and room fade");
                 _s.di++;
-                if (_s.di >= Scenario_DispSizeCount()) Scenario_Next(_s, 10); else Scenario_Next(_s, 20);
+                if (_s.di >= Scenario_DispSizeCount()) Scenario_Next(_s, 28); else Scenario_Next(_s, 20);
             }
         } break;
+        case 28:   // the encounter zoom (a draw-time zoom of the picture, nothing resized) at the last window size, then the battle room
+            if (_s.t == 1) {
+                _s.fade_shot = false;
+                GameState_SetBattleReturn(room, 0, 0, 0);
+                GameState_SetBattleEnemy("disp_zoom_slime", ENEMY_SLIME, 1);
+                Transition_RequestEncounterBattle(rm_battle, 80, 72);
+            }
+            if (_s.t > 600) {
+                Scenario_Check("shots_disp_encounter_ends", false, "room=" + room_get_name(room));
+                Scenario_Finish();
+                break;
+            }
+            if (!_s.fade_shot && Transition_IsActive() && _gs.transition_fx.type == TRANSITION_TYPE_ENCOUNTER && _gs.transition_fx.phase == 1 && _gs.transition_fx.timer >= 3) {
+                Scenario_Check("shots_disp_encounter_zoom_active", global.display.zoom > 1.2, "zoom=" + string(global.display.zoom));
+                Scenario_ShotLayout("shot_disp_encounter_zoom.png", "edge=1");
+                _s.fade_shot = true;
+            }
+            if (room == rm_battle && !Transition_IsActive()) {
+                Scenario_Check("shots_disp_encounter_zoom_cleared", global.display.zoom == 1, "zoom=" + string(global.display.zoom));
+                Scenario_Check("shots_disp_encounter_zoom_pictured", _s.fade_shot);
+                _s.fin_f = _s.f;
+                Scenario_Next(_s, 29);
+            }
+            break;
+        case 29:
+            if (_s.f - _s.fin_f == 10) {
+                Scenario_ShotLayout("shot_disp_encounter_battle.png", "edge=1");
+                Scenario_Check("shots_disp_encounter_no_relayout", Display_ApplyCount() == _s.ap0, "re-laid-out " + string(Display_ApplyCount() - _s.ap0) + " times");
+                Scenario_Next(_s, 10);
+            }
+            break;
     }
 }
 
