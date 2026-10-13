@@ -10,7 +10,7 @@ What the owner needs to play, test or decide after the agents worked while the o
 - When you play, mark each entry `good`, `bad` or `change` (and add a few words). Then say "merge the good ones". Good ones go from `next` to `v1.9` only on your word. Bad ones are reverted on `next` and become a row in `ISSUES.md`.
 - The agents never write a verdict for you. A line saying `played` or `good` is written by you (or by the agent only because you said it in chat, with the date).
 
-**Build to play:** `E:\Games\DD-Project Playtest\bcedf32-20261014\DD-Project.exe` (build id shown bottom-right of the title screen) | **Branch:** `next` | **Unplayed:** 9 / 15
+**Build to play:** `E:\Games\DD-Project Playtest\d312bfb-20261014\DD-Project.exe` (build id shown bottom-right of the title screen) | **Branch:** `next` | **Unplayed:** 9 / 15
 
 **Before you play:** your real saves are backed up in `E:\Games\DD-Project Playtest\save-backup-2026-10-14`. Keep GameMaker closed. About 30-40 minutes in total. Write notes in chat or under each entry.
 
@@ -53,7 +53,7 @@ Numbers the agents think should change, with simulator before and after. Nothing
 |---|---|---|---|---|---|
 | (none yet) | | | | | |
 
-### Q-001 | Screen never breaks after cutscenes/dialogue | build bcedf32-20261014
+### Q-001 | Screen never breaks after cutscenes/dialogue | build d312bfb-20261014
 - Status: unplayed
 - Issue: I-051 (DISP), H1/H2
 - Automated proof: smoke display steps (0 re-layouts over room changes, transitions, cutscene end, dialogue end), shots at 480x432 / 1000x700 / 1920x1080.
@@ -62,7 +62,7 @@ Numbers the agents think should change, with simulator before and after. Nothing
 - Look out for: anything odd at your usual window size; text size (now 1.0/1.5/2.0x at window scale 3/4/5 — readable?).
 - Your note:
 
-### Q-002 | Sliding bar for the basic attack | build bcedf32-20261014
+### Q-002 | Sliding bar for the basic attack | build d312bfb-20261014
 - Status: unplayed
 - Decision: D56, D60, D61, D20
 - Automated proof: Test_Suite_Qte, bot perfect/fail variants, shot_qte_bar.png.
@@ -71,7 +71,7 @@ Numbers the agents think should change, with simulator before and after. Nothing
 - Look out for: is the sweep speed right (sword 1.1 s)? Perfect zone too tight/loose? Does it feel better than the ring?
 - Your note:
 
-### Q-003 | Arrow sequences for skills | build bcedf32-20261014
+### Q-003 | Arrow sequences for skills | build d312bfb-20261014
 - Status: unplayed
 - Decision: D57, D58, D61
 - Automated proof: Test_Suite_Qte arrow grader, bot casts per class, shot_qte_arrows.png.
@@ -80,7 +80,7 @@ Numbers the agents think should change, with simulator before and after. Nothing
 - Look out for: time limits (3.4/4.2/5.0 s for 3/4/5 arrows) and the Perfect cut-off; are sequences memorable?
 - Your note:
 
-### Q-004 | Defence bar on big enemy attacks | build bcedf32-20261014
+### Q-004 | Defence bar on big enemy attacks | build d312bfb-20261014
 - Status: unplayed
 - Decision: D7, D59, D21
 - Automated proof: bot defended Ramming, shot_qte_telegraph.png, shot_qte_defence.png.
@@ -89,7 +89,7 @@ Numbers the agents think should change, with simulator before and after. Nothing
 - Look out for: is the warning long enough (0.4 s)? Is blocking satisfying?
 - Your note:
 
-### Q-005 | Skills are fast (~1 s) and effects sized right | build bcedf32-20261014
+### Q-005 | Skills are fast (~1 s) and effects sized right | build d312bfb-20261014
 - Status: unplayed
 - Decision: D55; issues BUG-05/06, I-052
 - Automated proof: bot measures every skill ≤66 frames; shot_fx_* per skill.
@@ -98,14 +98,14 @@ Numbers the agents think should change, with simulator before and after. Nothing
 - Look out for: anything that now feels too rushed.
 - Your note:
 
-### Q-006 | Poison you can feel | build bcedf32-20261014
+### Q-006 | Poison you can feel | build d312bfb-20261014
 - Status: unplayed
 - Issue: BUG-08
 - Steps: get poisoned (Spider) and take a few turns.
 - Expected: each tick shows a log line, a sound and an HP-bar flash.
 - Your note:
 
-### Q-007 | Enemies: sight, "!", pathfinding, personalities | build bcedf32-20261014
+### Q-007 | Enemies: sight, "!", pathfinding, personalities | build d312bfb-20261014
 - Status: unplayed
 - Decision: D63, D66, D67; issues I-047, I-050
 - Automated proof: Test_Suite_Nav, bot parts A-F (path around walls, no overlap, sight blocked by walls, search then go home).
@@ -114,7 +114,7 @@ Numbers the agents think should change, with simulator before and after. Nothing
 - Look out for: sight range (3-5 tiles) and speeds feel fair? Any enemy still stuck?
 - Your note:
 
-### Q-008 | Player movement polish + run + bump + prompt | build bcedf32-20261014
+### Q-008 | Player movement polish + run + bump + prompt | build d312bfb-20261014
 - Status: unplayed
 - Decision: D69, D70; issue I-048
 - Steps: tap a direction (turns only), hold to walk, turn at corners, hold Shift (or a shoulder button) to run, walk into a wall, face a chest/NPC/bed/door.
@@ -122,7 +122,7 @@ Numbers the agents think should change, with simulator before and after. Nothing
 - Look out for: does movement feel better? Do maps still look misaligned anywhere? (Tell me which room.)
 - Your note:
 
-### Q-009 | Doors and saves | build bcedf32-20261014
+### Q-009 | Doors and saves | build d312bfb-20261014
 - Status: unplayed
 - Decision: D64; issues SAVE-04, BUG-27, LOC-03
 - Steps: go through doors back and forth; save at a bed, quit, load.

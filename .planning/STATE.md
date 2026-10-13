@@ -24,8 +24,8 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Owner asleep from 2026-10-14 night. AWAY BUDGET: building the queue has NO usage cap. Once the queue is done and only improvement mode is left (waiting for the playtest), note the weekly % at that moment and cap improvement mode at that +20%. Merged to next: p1e-battle, p1e-save, loc, fx-fix, disp-a, disp-b (I-051 fixed), qte-1 (sliding bar, never-miss). In flight: move-ai (worktree ../DD-Project-GameMaker-wt/move), qte-2 (worktree ../DD-Project-GameMaker-wt/qte2: arrows + defence bar). Queue while away: display step B → movement/AI (D63-D70) → QTE bar+arrows + turn-bar prototype → STOP for first playtest (write PLAYTEST-QUEUE.md + BOARD). |
-| Unplayed features | 0 / 15 |
+| WIP | WAITING FOR OWNER PLAYTEST (build d312bfb-20261014 = next). Improvement packets done (I-053 hidden-desktop runs, D65 grid overlays, sfx/input perf). Next after playtest: owner verdicts on Q-001..Q-009 → merge good ones to v1.9; grill turn-order bar (D19) + stats (D22); owner IDE tasks on BOARD (obj_display events, Included File game_data.json, options). Phase 4 (data to JSON, run/profile save split, RNG streams) needs the Included File first. |
+| Unplayed features | 9 / 15 (Q-001..Q-009) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
 
@@ -59,6 +59,14 @@ Do not start Phase 4 until the G3 save contract is written. Do not start any com
 3. `PROJECT.md`, `REQUIREMENTS.md` (157 requirements, check levels L1-L5, two gates), `ROADMAP.md` (8 phases, grill topics G0-G10).
 4. `IMPROVE.md`, `REGRESSION.md`, `ISSUES.md`, `PLAYTEST-QUEUE.md`: the improvement-mode process.
 5. `research/SUMMARY.md`: index of every research and audit file, including `roguelike-design.md`, `roguelike-cases.md` and `plan-review.md`. `research/AGENTS-CHANGES.md`: proposed AGENTS.md text.
+
+## Numbers to review (agent-chosen starting values; owner approves after playing)
+
+- QTE bar (sweep / perfect / good / ok half-widths, ms): sword 1100/60/120/200, bow 850/60/130/220, staff 1200/55/115/190 (dagger 750, heavy 1500 unused). Grades 1.30/1.10/1.00/0.75; round-half-up, min change 1.
+- Arrows: 3 (3.4 s, Perfect <=1.5 s) Wound DRU, Muscle Up UDU, Rev Up LUR, Evasion LDL, Take Aim RUR, Meditation DDU, Foresight ULD; 4 (4.2 s, <=1.95 s) Hilt Bash DLRU, Poison Arrow RRDL, Poison Mist LDRD, Fireball URDL; 5 (5.0 s, <=2.4 s) Horizontal Slash LRLRD, Double Shot RURDR, Ice Spear UDLDU. Wrong press -250 ms.
+- Defence: 400 ms telegraph; damage taken 25/50/75/100 %; status kept 0/half/3-4/full. Bite 800/55, Ghost Cut 750/50, Poison Fangs 900/55, Scorching Touch 1000/55, Vine Trap 1300/60, Ramming 1500/50.
+- Map AI: sight 3-5 tiles; chase speed slime .7, spider/snake/whisp/ghost .85, plant .8, stranger .9, wolf 1.0; search 90 frames. Player: turn 6 frames, buffer 10, run 2 px/frame (Shift / shoulders).
+- Text scale 1.0/1.5/2.0 at window scale 3/4/5.
 
 ## Learned, not obvious from code
 
