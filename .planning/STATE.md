@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Phase 1: 1A+1B pilot MERGED (gate green 14.5 s, negative control red). Now 1B-suites (worktree ../DD-Project-GameMaker-wt/p1b2, scr_test.gml only) + 1C scenarios/build id (worktree ../DD-Project-GameMaker-wt/p1c: scr_debug.gml, obj_game_controller, scr_macros BUILD_ID, run_tests.ps1). |
+| WIP | Phase 1: 1A, 1B (140 tests, gate green 14.6 s), 1D rules MERGED on v1.9. In flight: 1C scenarios/build id (worktree ../DD-Project-GameMaker-wt/p1c, branch p1c-scenarios). Next: /improve command, 1E old bugs. |
 | Unplayed features | 0 / 15 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
@@ -61,6 +61,8 @@ Do not start Phase 4 until the G3 save contract is written. Do not start any com
 5. `research/SUMMARY.md`: index of every research and audit file, including `roguelike-design.md`, `roguelike-cases.md` and `plan-review.md`. `research/AGENTS-CHANGES.md`: proposed AGENTS.md text.
 
 ## Learned, not obvious from code
+
+- **An open GameMaker IDE overwrites .gml files with its stale in-memory copy** (2026-10-14: it reverted scr_test.gml to the placeholder on close). The owner keeps the IDE closed while agents work; before merging, check `git status` is clean.
 
 - **Igor works.** The headless build CLI exists at `C:\ProgramData\GameMakerStudio2\Cache\runtimes\runtime-2024.14.3.260\bin\igor\windows\x64\Igor.exe`. A compile took about 9-13 s; the built game ran and its output was captured (`research/automation-igor.md`). AGENTS.md "Traps" and "The gate" still say it does not exist; they are updated in Phase 1 (wave 1D).
 - **Igor catches syntax errors but not unknown functions** (exit 0). Only a run catches those (`automation-igor.md` section 2.6). `game_end(n)` inside the unhandled-error handler returns exit code 0, so detect crashes from the log.
