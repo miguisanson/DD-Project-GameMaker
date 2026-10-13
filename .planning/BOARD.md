@@ -1,6 +1,6 @@
 # DD-Project board
 Phases are internal bookkeeping; this board is what matters. Updated after every step that lands.
-Build: none yet | Unplayed: 0/8 | Open P1: 0 | Updated: 2026-10-14 | Release then stop (D28)
+Build: none yet | Unplayed: 0/15 | Open P1: 0 | Updated: 2026-10-14 | Release then stop (D28)
 
 ## Now (after your go)
 1. The game tests itself: one command builds, runs tests, plays a bot fight, takes screenshots, shows a build id. [VER-01..16]

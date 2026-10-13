@@ -2,7 +2,7 @@
 
 A standing way of working, not a phase. It keeps building and keeps catching bugs while the owner is away, without letting unplayed work pile up. It is based on `research/lessons-from-past-projects.md` sections 4.2-4.7 and adjusted to the owner's decisions D11, D12, D13 and D17.
 
-Plain version: the owner starts a session and leaves it running. The agents work on a separate branch called `next`, one small commit per feature. Every commit comes with automated proof and a list of steps the owner can play. When there are 8 features the owner has not played yet, or the owner must check or decide something, the agents STOP and wait (D53). Nothing reaches `v1.9` until the owner has played it and said yes.
+Plain version: the owner starts a session and leaves it running. The agents work on a separate branch called `next`, one small commit per feature. Every commit comes with automated proof and a list of steps the owner can play. When there are 15 features the owner has not played yet, or the owner must check or decide something, the agents STOP and wait (D53). Nothing reaches `v1.9` until the owner has played it and said yes.
 
 **Starts only after Phase 1 is done** (the verification ladder works, the negative control is red, `REGRESSION.md` is green on the current build).
 
@@ -13,7 +13,7 @@ Plain version: the owner starts a session and leaves it running. The agents work
 | Decision | Meaning here |
 |---|---|
 | D11 | The owner plays when free, in big sessions. Agents keep building and run improvement mode while away. |
-| D12/D53 | At 8 unplayed features, or any owner check/decision, STOP and wait. Each feature is its own revertable commit with its playtest steps. |
+| D12/D53 | At 15 unplayed features (combat-feel features stop early, D54), or any owner check/decision, STOP and wait. Each feature is its own revertable commit with its playtest steps. |
 | D13 | The loop PROPOSES balance changes with simulator before and after numbers. The owner approves in a batch. It never changes a balance number on its own. |
 | D17 | The owner starts a live session and leaves it running. No scheduled autopilot. Unattended work lands on `next`, one commit per feature, each with automated checks and playtest steps. After the owner plays, good features merge to `v1.9` and bad ones are reverted. |
 | D28 | Scope limit: nothing beyond the decisions; no post-release. Priority is removing bugs and improving. Idle improvement mode never invents a feature to fill time. |
@@ -54,7 +54,7 @@ Features that come from the roadmap (the GSD phase loop) also land on `next` und
 
 Run these steps, then check the stop conditions. One feature or fix per pass.
 
-0. **Preflight.** Read `STATE.md`, `BOARD.md` and the queue. Confirm: the fast gate is green on `next`; the negative control is red; the unplayed count is below 8 (else stop and wait); no stop file `.planning/IMPROVE_STOP`; usage is below 80% of the window and week. If not, stop and report in 5 lines.
+0. **Preflight.** Read `STATE.md`, `BOARD.md` and the queue. Confirm: the fast gate is green on `next`; the negative control is red; the unplayed count is below 15 (else stop and wait); no stop file `.planning/IMPROVE_STOP`; usage is below 80% of the window and week. If not, stop and report in 5 lines.
 1. **Pick.** The top input from the list above. If it is a design question, park it and pick the next.
 2. **Check first.** Write the repro or the failing check (an `R-###` entry for a bug; 1-3 entries for a feature's Done-when). Run it. It must fail for the right reason (a wrong value, not a typo).
 3. **Delegate.** Write the contract and hand the implementation to a Sonnet subagent in a worktree. Pilot first when the work is repetitive.
@@ -77,7 +77,7 @@ Run these steps, then check the stop conditions. One feature or fix per pass.
 
 - A **feature** is any commit whose result the owner has to play to judge (new screen, new move, feel change, balance change). It adds 1 to "unplayed features" in the `STATE.md` header.
 - A **fix** with an automated regression check that fully proves it adds 0. A fix whose proof is "looks right" or "feels right" counts as 1.
-- At **8**, stop and wait for the owner (D53). No filler work.
+- At **15** (or right after a combat-feel feature, D54), stop and wait for the owner (D53). No filler work.
 - When the owner plays, they mark each entry in `PLAYTEST-QUEUE.md` as `good`, `bad` or `change`. Good ones merge to `v1.9` (only on the owner's word, as a separate merge). Bad ones are reverted on `next` and get an `ISSUES.md` row. The unplayed count goes back to 0 for what was played.
 
 ## Bug hunt (bounded, evidence only)
