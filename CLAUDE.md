@@ -5,10 +5,9 @@ follows (check first, targeted checks, scope, resource ownership, the gate)
 and how work is split between Claude, Sonnet subagents and the local model. Do not
 restate them here.
 
-- **There is no separate design doc or roadmap file.** `README.md` documents
-  the localization workflow; `.planning/STATE.md` (GSD Core) is the working
-  plan and session handoff, and is the single source of truth for where work
-  stands.
+- **Plan and state:** `.planning/BOARD.md` is the owner's tracker,
+  `.planning/ROADMAP.md` the plan, `.planning/STATE.md` (GSD Core) the session
+  handoff, `.planning/research/DECISIONS.md` the owner's locked decisions.
 - **Domain skills** — load before the matching work, per the AGENTS.md
   "domain craft" row: `game-ui-ux` for HUDs/menus/overlays, `game-feel` for
   hit/jump/pickup/death feedback, `save-systems` for `scr_save`/
@@ -19,17 +18,14 @@ Commands: `/continue_DD-Project-GameMaker` (start any session with it).
 
 ## Claude-specific conventions
 
-- No automated test runner exists. Follow AGENTS.md Rule 1's table for what
-  counts as "the check" for a given kind of change (a GML assertion block
-  run from a debug entry point, a written acceptance checklist walked
-  through in the IDE, or a Python check for `tools/localization/`).
+- **The check** is a `Test_Suite_*` in `scripts/scr_test/scr_test.gml`, a
+  scenario/screenshot run, or an owner checklist for feel (AGENTS.md Rule 1).
 - `.gml` files are plain text and safe to edit directly with normal tools.
   `.yyp`/`.yy`/`.resource_order` files are IDE-owned — never hand-edit them
   to add, rename, or delete a resource (AGENTS.md Rule 4).
-- No headless build (Igor) is available on this machine right now — the
-  gate's build-verification step is the owner (or a remote-controlled IDE
-  session) opening the project in GameMaker and confirming no compile or
-  runtime errors, not a CLI command.
+- **The gate** is `powershell -NoProfile -ExecutionPolicy Bypass -File
+  tools/automation/run_tests.ps1 -Mode fast` (Igor headless build + tests);
+  see AGENTS.md "The gate".
 - Match the file's existing naming: `obj_`/`scr_`/`rm_` prefixes are
   consistent; sprites and sounds are not — follow the sibling assets in the
   same folder rather than inventing a prefix.
