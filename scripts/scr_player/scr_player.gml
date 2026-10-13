@@ -1297,7 +1297,7 @@ function GameSettings_NormalizeLanguage(_lang) {
     return "en";
 }
 
-function Display_CalcLayout(_win_w, _win_h, _base_w, _base_h, _scale_fixed, _fit_screen) {
+function Display_CalcLayoutLegacy(_win_w, _win_h, _base_w, _base_h, _scale_fixed, _fit_screen) {
     var win_w = max(1, round(real(_win_w)));
     var win_h = max(1, round(real(_win_h)));
     var base_w = max(1, round(real(_base_w)));
@@ -1443,7 +1443,7 @@ function GameSettings_ApplyDisplay() {
         win_h = disp_h;
     }
 
-    var layout = Display_CalcLayout(win_w, win_h, base_w, base_h, scale_fixed, fit_screen);
+    var layout = Display_CalcLayoutLegacy(win_w, win_h, base_w, base_h, scale_fixed, fit_screen);
     var port_x = layout.x;
     var port_y = layout.y;
     var port_w = layout.w;
