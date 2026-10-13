@@ -65,6 +65,7 @@ function Test_RunAll() {
     Test_RunSuite("Status", Test_Suite_Status);
     Test_RunSuite("Inventory", Test_Suite_Inventory);
     Test_RunSuite("Data", Test_Suite_Data);
+    Test_RunSuite("Player", Test_Suite_Player);
     Test_RunSuite("SaveAtomic", Test_Suite_SaveAtomic);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     if (Test_HasFlag("-testcontrol")) {
@@ -572,4 +573,17 @@ function Test_Suite_SaveAtomic() {
     Test_Eq("atomic settings: a truncated file reads the previous good settings", is_struct(_cfg) ? _cfg.audio_bgm : -1, 0.25);
     Save_DeleteFileSet(_s);
     Test_Eq("atomic settings: nothing to read after delete", is_undefined(Save_ReadSettingsConfig(_s)), true);
+}
+
+// BUG-27: a fresh character starts at full HP/MP with real numbers; no 9999 placeholder survives creation.
+function Test_Suite_Player() {
+    var _classes = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE];
+    for (var _i = 0; _i < array_length(_classes); _i++) {
+        var _c = CharacterCreate_Player(_classes[_i]);
+        var _n = "BUG-27 class " + string(_classes[_i]);
+        Test_Eq(_n + " starts at full HP", _c.hp, _c.max_hp);
+        Test_Eq(_n + " starts at full MP", _c.mp, _c.max_mp);
+        Test_True(_n + " HP is a real value (< 1000)", _c.hp < 1000 && _c.hp >= 1);
+        Test_True(_n + " MP is a real value (< 1000)", _c.mp < 1000 && _c.mp >= 0);
+    }
 }
