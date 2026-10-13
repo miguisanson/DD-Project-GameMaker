@@ -14,6 +14,7 @@ function ItemDB_Init() {
         stackable: false,
         max_stack: 1,
         equip_slot: "weapon",
+        weapon_kind: "sword",   // row of Qte_BarParams (D60)
         power: 3,
         stat_type: STAT_STR,
         acc: 0,
@@ -32,6 +33,7 @@ function ItemDB_Init() {
         stackable: false,
         max_stack: 1,
         equip_slot: "weapon",
+        weapon_kind: "sword",   // row of Qte_BarParams (D60)
         power: 6,
         stat_type: STAT_STR,
         acc: 0,
@@ -50,6 +52,7 @@ function ItemDB_Init() {
         stackable: false,
         max_stack: 1,
         equip_slot: "weapon",
+        weapon_kind: "sword",   // row of Qte_BarParams (D60)
         power: 9,
         stat_type: STAT_STR,
         acc: 1,
@@ -69,6 +72,7 @@ function ItemDB_Init() {
         stackable: false,
         max_stack: 1,
         equip_slot: "weapon",
+        weapon_kind: "bow",   // row of Qte_BarParams (D60)
         power: 3,
         stat_type: STAT_AGI,
         acc: 1,
@@ -87,6 +91,7 @@ function ItemDB_Init() {
         stackable: false,
         max_stack: 1,
         equip_slot: "weapon",
+        weapon_kind: "bow",   // row of Qte_BarParams (D60)
         power: 6,
         stat_type: STAT_AGI,
         acc: 1,
@@ -105,6 +110,7 @@ function ItemDB_Init() {
         stackable: false,
         max_stack: 1,
         equip_slot: "weapon",
+        weapon_kind: "bow",   // row of Qte_BarParams (D60)
         power: 9,
         stat_type: STAT_AGI,
         acc: 2,
@@ -124,6 +130,7 @@ function ItemDB_Init() {
         stackable: false,
         max_stack: 1,
         equip_slot: "weapon",
+        weapon_kind: "staff",   // row of Qte_BarParams (D60)
         power: 3,
         stat_type: STAT_INT,
         acc: 0,
@@ -142,6 +149,7 @@ function ItemDB_Init() {
         stackable: false,
         max_stack: 1,
         equip_slot: "weapon",
+        weapon_kind: "staff",   // row of Qte_BarParams (D60)
         power: 6,
         stat_type: STAT_INT,
         acc: 0,
@@ -160,6 +168,7 @@ function ItemDB_Init() {
         stackable: false,
         max_stack: 1,
         equip_slot: "weapon",
+        weapon_kind: "staff",   // row of Qte_BarParams (D60)
         power: 9,
         stat_type: STAT_INT,
         acc: 1,
@@ -745,7 +754,7 @@ function Item_LocalizeRuntime(_item) {
 function ItemDB_GetPassiveTemplate(_item_id) {
     switch (_item_id) {
         // Weapons
-        case 1: return { id: "steady_strike", params: { once_per_turn: true }, desc: ["Steady Strike", "MISS->BAD, BAD->OKAY (1/turn)"] };
+        case 1: return { id: "steady_strike", params: { once_per_turn: true }, desc: ["Steady Strike", "WEAK->OK (1/turn)"] };
         case 2: return { id: "sunder_edge", params: { first_hit_def_down: 1, turns: 2 }, desc: ["Sunder Edge", "1st hit: -1 DEF for 2 turns"] };
         case 3: return { id: "executioner", params: { hp_ratio: 0.35, mult: 1.35 }, desc: ["Executioner", "+35% damage vs <35% HP"] };
         case 4: return { id: "aim_assist", params: { upgrade_good_to_perfect_once_per_turn: true }, desc: ["Aim Assist", "GOOD->PERFECT (1/turn)"] };

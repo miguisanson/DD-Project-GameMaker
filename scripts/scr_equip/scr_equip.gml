@@ -267,45 +267,32 @@ function Equip_PassiveAdjustIncomingStatus(_source, _target, _status_id, _turns)
     return out;
 }
 
+// Passives that forgive or upgrade the bar's grade (D61 grades). steady_strike: a WEAK press counts as OK, once per turn.
+// aim_assist: a GOOD press counts as PERFECT, once per turn. Both rebuild the result from Qte_Result so the multiplier follows the grade.
 function Equip_ModifyTimedAttackResult(_ch, _timing) {
     var t = _timing;
     if (!is_struct(t)) return t;
 
-    var key = variable_struct_exists(t, "key") ? string_upper(string(t.key)) : "MISS";
-    var mult = variable_struct_exists(t, "mult") ? real(t.mult) : 0;
+    var key = variable_struct_exists(t, "key") ? string_upper(string(t.key)) : QTE_WEAK;
     var rt = Equip_PassiveRuntimeEnsure(_ch);
 
     if (Equip_HasPassive(_ch, "steady_strike") && rt.steady_strike_turn != rt.battle_turn) {
         var can_once = Equip_GetPassiveParam(_ch, "steady_strike", "once_per_turn", 1);
-        if (can_once) {
-            if (key == "MISS") {
-                key = "BAD";
-                mult = 0.25;
-                rt.steady_strike_turn = rt.battle_turn;
-            } else if (key == "BAD") {
-                key = "OKAY";
-                mult = 0.50;
-                rt.steady_strike_turn = rt.battle_turn;
-            }
+        if (can_once && key == QTE_WEAK) {
+            key = QTE_OK;
+            rt.steady_strike_turn = rt.battle_turn;
         }
     }
 
     if (Equip_HasPassive(_ch, "aim_assist") && rt.aim_assist_turn != rt.battle_turn) {
         var can_promote = Equip_GetPassiveParam(_ch, "aim_assist", "upgrade_good_to_perfect_once_per_turn", 1);
-        if (can_promote && key == "GOOD") {
-            key = "PERFECT";
-            mult = 1.00;
+        if (can_promote && key == QTE_GOOD) {
+            key = QTE_PERFECT;
             rt.aim_assist_turn = rt.battle_turn;
         }
     }
 
-    switch (key) {
-        case "PERFECT": return { key: "PERFECT", label: "PERFECT", mult: clamp(mult, 0, 1), hit: true };
-        case "GOOD":    return { key: "GOOD",    label: "GOOD",    mult: clamp(mult, 0, 1), hit: true };
-        case "OKAY":    return { key: "OKAY",    label: "OKAY",    mult: clamp(mult, 0, 1), hit: true };
-        case "BAD":     return { key: "BAD",     label: "BAD",     mult: clamp(mult, 0, 1), hit: true };
-    }
-    return { key: "MISS", label: "MISS", mult: 0.00, hit: false };
+    return Qte_Result(key);
 }
 
 function Equip_PlayerBonusDamage(_attacker, _defender, _base_damage, _is_skill = false, _timing_key = "") {
@@ -426,7 +413,7 @@ function Equip_PlayerTurnStartApply(_ch) {
 
 function Equip_PlayerPerfectHitApply(_ch, _timing_key) {
     if (!is_struct(_ch)) return _ch;
-    if (string_upper(string(_timing_key)) != "PERFECT") return _ch;
+    if (string_upper(string(_timing_key)) != QTE_PERFECT) return _ch;
     if (!variable_struct_exists(_ch, "max_mp") || !variable_struct_exists(_ch, "mp")) return _ch;
 
     if (Equip_HasPassive(_ch, "arcane_surge")) {
@@ -456,7 +443,7 @@ function Equip_PassiveOnAttackResolved(_attacker, _defender, _timing_key, _timin
     if (_timing_hit && _damage_done > 0 && Equip_HasPassive(_attacker, "pinning_shot")) {
         var key = string_upper(string(_timing_key));
         var req_gp = Equip_GetPassiveParam(_attacker, "pinning_shot", "requires_good_or_perfect", 1);
-        var timing_ok = (!req_gp || key == "GOOD" || key == "PERFECT");
+        var timing_ok = (!req_gp || key == QTE_GOOD || key == QTE_PERFECT);
         if (timing_ok && rt.pinning_cooldown <= 0) {
             var chance = clamp(Equip_GetPassiveParam(_attacker, "pinning_shot", "stun_chance", 0.15), 0, 1);
             if (random(1) <= chance) {

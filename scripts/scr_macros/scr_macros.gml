@@ -34,7 +34,6 @@
 
 #macro BSTATE_MESSAGE       0
 #macro BSTATE_MENU          1
-#macro BSTATE_PLAYER_ATTACK 2
 #macro BSTATE_PLAYER_RUN    3
 #macro BSTATE_ENEMY_ACT     4
 #macro BSTATE_END_RUN       5
@@ -211,33 +210,33 @@
 #macro PLAYER_SKILL_FX_SPEED_MULT 6.00
 #macro PLAYER_SKILL_FX_SPEED_MULT_NON_ENEMY 3.00
 #macro PLAYER_SKILL_FX_SPEED_MAX 2.00   // D55: Ice Spear and Hilt Bash must finish in about 0.75 s
-#macro PLAYER_SKILL_HIT_BONUS 4
 #macro PLAYER_SKILL_FX_MAX_FRAMES 42   // D55: a player skill's animation plays through in at most this many game frames (0.7 s); the 0.3 s hold follows
 #macro SKILL_FX_SCALE 2   // old fixed draw scale; battle animations now use FX_ScaleFor (I-052)
 #macro FX_TARGET_FIT 1.5   // I-052: an effect is drawn at most this many times the target sprite's longest side
 #macro FX_MAX_DRAW_PX 64   // I-052: and never more than this many world px on its longest side (the screen is 160 x 144)
 #macro FX_PLAYER_TARGET_PX 32   // the player has no battle sprite; its effects are sized as for a 32 px target
-// Faster base speed with a per-attack random variation roll (ATTACK_TIMING_SPEED_VAR_*)
-// so every swing differs and can't be memorized. A gentle threat_rank tier mult
-// keeps elites/bosses a touch quicker on top of the randomness.
-#macro ATTACK_TIMING_SPEED 2.8
-#macro ATTACK_TIMING_SPEED_BASE_MULT 1.00
-#macro ATTACK_TIMING_SPEED_RANK_STEP 0.10
-#macro ATTACK_TIMING_SPEED_MULT_MAX 1.35
-// Per-attack random speed multiplier range (rolled once when the swing starts).
-#macro ATTACK_TIMING_SPEED_VAR_MIN 0.80
-#macro ATTACK_TIMING_SPEED_VAR_MAX 1.30
-#macro ATTACK_TIMING_START_OFFSET 10
-#macro ATTACK_TIMING_END_MARGIN 14
-#macro ATTACK_TIMING_INPUT_LOCK_FRAMES 2
-#macro ATTACK_TIMING_FEEDBACK_FRAMES 24
-#macro ATTACK_TIMING_RING_RADIUS 16
-#macro ATTACK_TIMING_TARGET_RADIUS 16
-#macro ATTACK_TIMING_SPRITE_SCALE 4
-#macro ATTACK_WINDOW_PERFECT 2
-#macro ATTACK_WINDOW_GOOD 4
-#macro ATTACK_WINDOW_OKAY 7
-#macro ATTACK_WINDOW_BAD 10
+// QTE part 1 (D56, D60, D61): the basic attack's sliding bar. All times are ms, counted from delta_time (QTE-01).
+#macro QTE_PERFECT "PERFECT"   // grade keys (equipment passives, the bot and the tests compare them)
+#macro QTE_GOOD "GOOD"
+#macro QTE_OK "OK"
+#macro QTE_WEAK "WEAK"
+#macro QTE_NO_PRESS -1             // a press time below 0 means "no press" (Weak)
+#macro QTE_ZONE_CENTRE_PCT 70      // the bright zone's centre, in percent of the sweep
+#macro QTE_LEAD_IN_MS 250          // the bar is up and the cursor is parked at 0 before the sweep starts
+#macro QTE_EARLY_BUFFER_MS 80      // a press this close before the sweep starts is kept (judged at 0); earlier ones are dropped
+#macro QTE_MAX_STEP_US 50000       // one frame never adds more than 50 ms to the clock, so a hitch cannot skip the bar
+#macro QTE_RESULT_MS 700           // how long the grade word stays up
+#macro QTE_HITSTOP_PERFECT_MS 60   // D61 feedback: freeze on a Perfect hit
+#macro QTE_SHAKE_PERFECT_MAG 0.8   // camera shake (world px), subtle: PLAYER_SHAKE_MAG is 0.3
+#macro QTE_SHAKE_PERFECT_FRAMES 10
+#macro QTE_SHAKE_GOOD_MAG 0.4
+#macro QTE_SHAKE_GOOD_FRAMES 8
+#macro QTE_BAR_W 96                // bar size in base units (the picture is 160 x 144)
+#macro QTE_BAR_H 8
+#macro QTE_COL_DARKEST $211807     // the four palette colours (D10) as GameMaker BGR: #071821 #306850 #86C06C #E0F8CF
+#macro QTE_COL_DARK $506830
+#macro QTE_COL_LIGHT $6CC086
+#macro QTE_COL_LIGHTEST $CFF8E0
 #macro DEF_QTE_PROMPT_FADE_IN_SEC 0.12
 #macro DEF_QTE_PROMPT_RESPONSE_SEC 2.00
 #macro DEF_QTE_PROMPT_FEEDBACK_SEC 0.18

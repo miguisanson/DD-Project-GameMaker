@@ -63,6 +63,7 @@ function Test_RunAll() {
     Test_RunSuite("Math", Test_Suite_Math);
     Test_RunSuite("Combat", Test_Suite_Combat);
     Test_RunSuite("Fx", Test_Suite_Fx);
+    Test_RunSuite("Qte", Test_Suite_Qte);
     Test_RunSuite("Status", Test_Suite_Status);
     Test_RunSuite("Inventory", Test_Suite_Inventory);
     Test_RunSuite("Data", Test_Suite_Data);
@@ -278,6 +279,129 @@ function Test_Suite_Fx() {
     Test_Eq("Fx: ice spear at image_speed 2 plays in 45 game frames", FX_PlaybackFrames(ice_spear_effect, 2), 45);
     Test_True("Fx: SpeedForMaxFrames never slows an effect down", FX_SpeedForMaxFrames(ice_spear_effect, 5, 42) == 5);
     Test_True("Fx: SpeedForMaxFrames raises a slow effect to fit", FX_PlaybackFrames(ice_spear_effect, FX_SpeedForMaxFrames(ice_spear_effect, 0.1, 42)) <= 42);
+}
+
+// QTE part 1 (D5, D6, D20, D35, D56, D60, D61; QTE-01, 03, 07, 14). Expected values are the owner's decisions written out, not read from the macros:
+// grade multipliers 1.30 / 1.10 / 1.00 / 0.75, a sliding bar judged in ms, zones widened by one assist multiplier, nothing the player does misses.
+// The zone sits at 70% of the sweep (the design number this suite pins); half widths are +/- ms around it.
+function Test_Suite_Qte() {
+    var _p = { sweep_ms: 1000, perfect_half_width: 50, good_half_width: 100, ok_half_width: 200 };
+    // cursor position from elapsed ms
+    Test_Eq("Qte cursor at 0 ms == 0", Qte_CursorPos(0, _p), 0);
+    Test_Eq("Qte cursor at 500 ms of 1000 == 0.5", Qte_CursorPos(500, _p), 0.5);
+    Test_Eq("Qte cursor at the end == 1", Qte_CursorPos(1000, _p), 1);
+    Test_Eq("Qte cursor past the end stays at 1", Qte_CursorPos(1500, _p), 1);
+    Test_Eq("Qte cursor during the lead-in (negative ms) stays at 0", Qte_CursorPos(-100, _p), 0);
+    Test_Eq("Qte zone centre == 700 ms", Qte_ZoneCentreMs(_p), 700);
+    // the clock: microseconds from delta_time, a long frame cannot skip the bar (QTE-01, QTE-14)
+    Test_Eq("Qte step of 16667 us == 16.667 ms", Qte_StepMs(16667), 16.667);
+    Test_Eq("Qte step of a 200 ms hitch is capped at 50 ms", Qte_StepMs(200000), 50);
+    // grade from the press position
+    Test_Eq("Qte press on the centre == PERFECT", Qte_Grade(700, _p), "PERFECT");
+    Test_Eq("Qte press 50 ms early == PERFECT (edge is inside)", Qte_Grade(650, _p), "PERFECT");
+    Test_Eq("Qte press 50 ms late == PERFECT (edge is inside)", Qte_Grade(750, _p), "PERFECT");
+    Test_Eq("Qte press 51 ms early == GOOD", Qte_Grade(649, _p), "GOOD");
+    Test_Eq("Qte press 100 ms late == GOOD", Qte_Grade(800, _p), "GOOD");
+    Test_Eq("Qte press 101 ms late == OK", Qte_Grade(801, _p), "OK");
+    Test_Eq("Qte press 200 ms early == OK", Qte_Grade(500, _p), "OK");
+    Test_Eq("Qte press 201 ms early == WEAK", Qte_Grade(499, _p), "WEAK");
+    Test_Eq("Qte press at 0 ms == WEAK", Qte_Grade(0, _p), "WEAK");
+    Test_Eq("Qte press as the cursor ends == WEAK", Qte_Grade(1000, _p), "WEAK");
+    Test_Eq("Qte no press before the cursor ends == WEAK", Qte_Grade(QTE_NO_PRESS, _p), "WEAK");
+    // assist: one multiplier widens every zone (D35)
+    Test_Eq("Qte assist x1.5: 75 ms off is PERFECT", Qte_Grade(775, _p, 1.5), "PERFECT");
+    Test_Eq("Qte assist x1.5: 76 ms off is GOOD", Qte_Grade(776, _p, 1.5), "GOOD");
+    Test_Eq("Qte no assist: 75 ms off is GOOD", Qte_Grade(775, _p, 1), "GOOD");
+    Test_Eq("Qte assist x2: 100 ms off is PERFECT", Qte_Grade(800, _p, 2), "PERFECT");
+    Test_Eq("Qte assist x2: 200 ms off is GOOD", Qte_Grade(900, _p, 2), "GOOD");
+    Test_Eq("Qte assist x2: 201 ms off is OK", Qte_Grade(901, _p, 2), "OK");
+    Test_Eq("Qte assist x2: 400 ms off is OK (zone edge)", Qte_Grade(300, _p, 2), "OK");
+    Test_Eq("Qte assist x2: 401 ms off is WEAK", Qte_Grade(299, _p, 2), "WEAK");
+    // grade -> damage multiplier (D61) and order
+    Test_Eq("Qte PERFECT multiplier 1.30", Qte_GradeMult("PERFECT"), 1.30);
+    Test_Eq("Qte GOOD multiplier 1.10", Qte_GradeMult("GOOD"), 1.10);
+    Test_Eq("Qte OK multiplier 1.00", Qte_GradeMult("OK"), 1.00);
+    Test_Eq("Qte WEAK multiplier 0.75", Qte_GradeMult("WEAK"), 0.75);
+    Test_True("Qte grades are ordered WEAK < OK < GOOD < PERFECT", Qte_GradeRank("PERFECT") > Qte_GradeRank("GOOD") && Qte_GradeRank("GOOD") > Qte_GradeRank("OK") && Qte_GradeRank("OK") > Qte_GradeRank("WEAK"));
+    // early presses (the press that chose ATTACK, mashing) are dropped; a press up to 80 ms before the sweep starts is kept and judged at 0
+    Test_Eq("Qte press 81 ms before the sweep is ignored", Qte_BufferPress(-81), QTE_NO_PRESS);
+    Test_Eq("Qte press 80 ms before the sweep is buffered, judged at 0", Qte_BufferPress(-80), 0);
+    Test_Eq("Qte press 30 ms before the sweep is judged at 0", Qte_BufferPress(-30), 0);
+    Test_Eq("Qte press during the sweep keeps its time", Qte_BufferPress(612.5), 612.5);
+    // per-weapon starting numbers (D60): daggers and bows fast + wide, heavy slow + narrow, the rest medium
+    var _def = Qte_BarParams("default");
+    var _bow = Qte_BarParams("bow");
+    var _dag = Qte_BarParams("dagger");
+    var _hvy = Qte_BarParams("heavy");
+    Test_True("Qte bow sweeps faster than the default", _bow.sweep_ms < _def.sweep_ms);
+    Test_True("Qte bow's perfect zone is wider on the bar than the default's", _bow.perfect_half_width / _bow.sweep_ms > _def.perfect_half_width / _def.sweep_ms);
+    Test_True("Qte dagger sweeps faster than the default", _dag.sweep_ms < _def.sweep_ms);
+    Test_True("Qte dagger's perfect zone is wider on the bar than the default's", _dag.perfect_half_width / _dag.sweep_ms > _def.perfect_half_width / _def.sweep_ms);
+    Test_True("Qte heavy sweeps slower than the default", _hvy.sweep_ms > _def.sweep_ms);
+    Test_True("Qte heavy's perfect zone is narrower on the bar than the default's", _hvy.perfect_half_width / _hvy.sweep_ms < _def.perfect_half_width / _def.sweep_ms);
+    Test_Eq("Qte an unknown weapon kind uses the default numbers", Qte_BarParams("no_such_kind").sweep_ms, _def.sweep_ms);
+    var _kinds = ["default", "bow", "dagger", "staff", "heavy"];
+    for (var _ki = 0; _ki < array_length(_kinds); _ki++) {
+        var _q = Qte_BarParams(_kinds[_ki]);
+        Test_True("Qte " + _kinds[_ki] + ": zones nest (perfect < good < ok)", _q.perfect_half_width > 0 && _q.perfect_half_width < _q.good_half_width && _q.good_half_width < _q.ok_half_width);
+        Test_True("Qte " + _kinds[_ki] + ": the OK zone ends before the cursor does, so a late press can be WEAK", Qte_ZoneCentreMs(_q) + _q.ok_half_width < _q.sweep_ms);
+        Test_True("Qte " + _kinds[_ki] + ": the perfect zone is at least 100 ms wide in total (human timing scatter)", _q.perfect_half_width * 2 >= 100);
+    }
+    Test_Eq("Qte Wooden Sword uses the default bar", Qte_BarParams(Qte_WeaponKind(ItemDB_Get(1))).sweep_ms, _def.sweep_ms);
+    Test_Eq("Qte Wooden Bow is a bow", Qte_WeaponKind(ItemDB_Get(4)), "bow");
+    Test_Eq("Qte Wooden Staff is a staff", Qte_WeaponKind(ItemDB_Get(7)), "staff");
+    Test_Eq("Qte an item with no kind falls back to default", Qte_WeaponKind({ power: 1 }), "default");
+    Test_Eq("Qte no assist setting means a multiplier of 1", Qte_AssistMult(), 1);
+    // feedback: each grade has its own word and its own existing sound (QTE-12, GAP-01)
+    SFX_EnsureManager();
+    var _grades = ["PERFECT", "GOOD", "OK", "WEAK"];
+    var _words = ["PERFECT", "GOOD", "OK", "WEAK"];
+    var _seen = [];
+    for (var _gi = 0; _gi < 4; _gi++) {
+        var _sk = Qte_GradeSfxKey(_grades[_gi]);
+        Test_True("Qte " + _grades[_gi] + " sound " + _sk + " is a real sound asset", ds_map_exists(global.sfx_db, _sk) && SFX_IsValidSoundAsset(global.sfx_db[? _sk]));
+        Test_False("Qte " + _grades[_gi] + " sound differs from the other grades", array_contains(_seen, global.sfx_db[? _sk]));
+        array_push(_seen, global.sfx_db[? _sk]);
+        Test_Eq("Qte " + _grades[_gi] + " word", Qte_GradeLabel(_grades[_gi]), _words[_gi]);
+    }
+
+    // never miss (D5, D6, D20): the grade scales damage and never takes it to 0. Knight STR11 pow3 vs slime DEF7 deals 4 at grade OK.
+    var _k = Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL);
+    var _w = Test_Wpn(3, STAT_STR, 0);
+    var _mults = [1.30, 1.10, 1.00, 0.75];
+    var _want = [5, 4, 4, 3];   // floor(4 * 1.30) 5, floor(4 * 1.10) 4, 4, floor(4 * 0.75) 3
+    for (var _g = 0; _g < 4; _g++) {
+        var _d = Combat_ApplyDamage(_k, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: false, grade_mult: _mults[_g] }).dmg;
+        Test_Eq("Combat_ApplyDamage grade x" + string(_mults[_g]) + ": 4 -> " + string(_want[_g]), _d, _want[_g]);
+    }
+    var _weak_boss = Combat_ApplyDamage(EnemyCreate(ENEMY_SLIME), EnemyCreate(ENEMY_FINAL_BOSS), Test_Wpn(1, STAT_STR, 0), 1, 1, { is_skill: false, grade_mult: 0.75 }).dmg;
+    Test_Eq("Combat_ApplyDamage a WEAK hit of 1 stays 1, never 0 (D20)", _weak_boss, 1);
+    var _guarded = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_GUARD, 6, 0);
+    Test_Eq("Combat_ApplyDamage Guard still blocks a PERFECT hit", Combat_ApplyDamage(_k, _guarded, _w, 1, 1, { is_skill: false, grade_mult: 1.30 }).dmg, 0);
+
+    // player skills no longer roll to hit: a boss that would force a dodge (Evasion) is hit every time
+    var _hit_all = true;
+    var _dmg_all = true;
+    for (var _i = 0; _i < 60; _i++) {
+        var _user = CharacterCreate_Player(CLASS_KNIGHT);
+        _user.mp = 99;
+        var _foe = Status_Add(EnemyCreate(ENEMY_FINAL_BOSS), STATUS_EVASION, 3, 0);
+        var _res = Skill_Use(_user, _foe, SKILL_HORIZ_SLASH);
+        if (!_res.hit) _hit_all = false;
+        if (_res.dmg <= 0) _dmg_all = false;
+    }
+    Test_True("Skill_Use: a player skill hits an Evasion boss 60 times in 60 (D6)", _hit_all);
+    Test_True("Skill_Use: every one of those hits does damage", _dmg_all);
+    var _user2 = CharacterCreate_Player(CLASS_KNIGHT);
+    _user2.mp = 99;
+    var _res_ok = Skill_Use(_user2, EnemyCreate(ENEMY_SLIME), SKILL_HORIZ_SLASH);
+    var _user3 = CharacterCreate_Player(CLASS_KNIGHT);
+    _user3.mp = 99;
+    var _res_perfect = Skill_Use(_user3, EnemyCreate(ENEMY_SLIME), SKILL_HORIZ_SLASH, 1.30);
+    Test_True("Skill_Use: a PERFECT multiplier never lowers the damage of grade OK", _res_perfect.dmg >= _res_ok.dmg);
+    // enemies still roll against the player (this packet changes the player's side only)
+    var _evader = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_EVASION, 3, 0);
+    Test_False("Combat_AttemptHit: an Evasion player still dodges an enemy", Combat_AttemptHit(EnemyCreate(ENEMY_SLIME), _evader, 0).hit);
 }
 
 // Status rules (balance-data.md section 4 "Status effects"; combat-bugs.md section 1; R-005, R-022).

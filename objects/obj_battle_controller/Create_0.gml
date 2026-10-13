@@ -84,20 +84,19 @@ menu_count = array_length(battle_actions);
 skill_index = 0;
 item_index = 0;
 
-attack_timing_active = false;
-attack_timing_started = false;
-attack_timing_x = 0;
-attack_timing_y = 0;
-attack_timing_target_x = 0;
-attack_timing_target_y = 0;
-attack_timing_input_lock = 0;
-attack_timing_result_text = "";
-attack_timing_result_key = "";
-attack_timing_result_timer = 0;
-attack_timing_marker_alpha = 0;
-attack_timing_speed = 0;
-attack_timing_target_sprite = spr_attack_timing_target;
-attack_timing_falling_sprite = spr_attack_timing_falling;
+// The basic attack's sliding bar (D56). qte_ms is the bar's own clock in ms: negative in the lead-in, 0 when the cursor starts.
+qte_active = false;
+qte_params = Qte_BarParams("default");
+qte_assist = 1;
+qte_ms = 0;
+qte_press_ms = QTE_NO_PRESS;
+qte_result_text = "";
+qte_result_key = "";
+qte_result_mult = 1;
+qte_result_ms = 0;
+qte_word_x = 0;
+qte_word_y = 0;
+hitstop_ms = 0;
 
 enemy_def_qte_active = false;
 enemy_def_qte_prompts = [];
