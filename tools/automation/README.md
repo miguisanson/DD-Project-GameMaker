@@ -4,7 +4,7 @@
 Background and the proven commands: `.planning/research/automation-igor.md`.
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File tools\automation\run_tests.ps1 [-Mode fast|full|compile] [-Only runtests|smoke|bot|shots] [-NegativeControl]
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\automation\run_tests.ps1 [-Mode fast|full|compile] [-Only runtests|smoke|bot|shots|gridshots] [-NegativeControl]
 ```
 
 | Mode | What runs |
@@ -32,14 +32,16 @@ Full logs: `E:\Temp\dd-gate\logs\build.log` and `<mode>.log`.
 - `-smoke`: boots, then rm_start (logo, then the menu) -> rm_floor1 -> rm_battle for a fixed number of frames each. Any runtime error is `[TEST] ERROR UNHANDLED` + `CRASH` (Igor alone does not catch unknown functions).
 - `-bot`: Knight vs Slime. "perfect" variant confirms the menu, presses the attack bar on its zone and must win; "fail" variant never presses and must end (or only the no-error and HP-bounds checks apply). After each variant: one skill per class (Knight, Archer, Mage) typed through the arrow input and one defended big attack (mini boss Ramming), asserting grade, multiplier, damage, and that the status is resisted (perfect) or not lengthened (fail). Then every skill animation. About 100 s in total.
 - `-shots`: `screen_save` of rm_start, rm_floor1 and rm_battle at display scales 3, 4, 5 (9 PNGs, copied to `<WorkRoot>\shots`). The wrapper checks file exists, PNG size = reported window size, and not more than 97% one colour. `fit_screen` is not captured.
+- `-gridshots` (D65, only with `-Only gridshots`, not in `full`): visits rm_floor1..9, 6_5 and 9_5 at display scale 4 and saves `shot_grid_<room>.png` with a 16 px grid over the world: green = multiples of 16 from the room origin, violet = from the camera view's corner (only when it is off the room grid), red = the room edges. The PNGs are copied to `<WorkRoot>\gridshots`. Nothing in the rooms changes.
 - Build id: `#macro BUILD_ID "dev"` in the repo; the wrapper stamps `<git short hash>-<yyyyMMdd>[-dirty]` into the scratch copy only. The game prints `[TEST-BUILD] <id>`, the wrapper checks it, and the title screen draws it bottom-right.
 
 ## Focus, fullscreen, and the owner's PC
-- **Do not run the gate while the owner is gaming or typing.** A run opens real game windows for up to a few minutes.
-- Tests never take focus and never use a focus or foreground API. Game windows start minimized and not activated (`SW_SHOWMINNOACTIVE` through a small `CreateProcess` call; falls back to `Start-Process -WindowStyle Minimized` if that fails).
+- **Do not run the gate while the owner is gaming or typing**: it still uses CPU and the GPU for a few minutes. It no longer takes focus (I-053).
+- Game windows are created on their own hidden desktop (`CreateDesktop`, `STARTUPINFO.lpDesktop`), minimized and not activated (`SW_SHOWMINNOACTIVE`). A window on another desktop can never become the owner's foreground window. Falls back to `Start-Process -WindowStyle Minimized` if the launch helper fails to compile.
+- The focus probe is built in: while a game runs, the wrapper polls `GetForegroundWindow` every 10 ms. If the game's process ever owns the foreground it prints `FAIL <mode>: game window took the foreground after N ms (I-053)`. The game itself calls no focus or foreground API.
 - Tests always run windowed: with any test flag the game calls `window_set_fullscreen(false)` at boot (and every frame in smoke, bot and shots), ignoring a saved fullscreen setting.
-- The runner ignores `keyboard_key_press` while its window is not in front, so `-bot` does not use the keyboard. It writes the game's own input state: `Input_Update()` ends with `Scenario_InputOverride()`, a no-op unless `-bot`. The menu, the attack timing and the defence arrows read that state like a real key press.
-- `-shots` has not yet been verified with a minimized window: run it when the owner is not using the PC and check the PNGs are not blank. If `screen_save` is blank when minimized, that needs a decision then.
+- The runner ignores `keyboard_key_press` while its window is not in front, so `-bot` does not use the keyboard. It writes the game's own input state: `Input_Update()` ends with `Scenario_InputOverride()`, a no-op unless a scenario flag is set. The menu, the attack timing and the defence arrows read that state like a real key press.
+- `-shots` works on the hidden desktop (the PNGs are the full picture, not blank).
 
 ## Adding a game mode
 Edit the `$GameModes` table at the top of the script: set `Impl = $true` on the row (flag, timeout and strictness are in the same row).

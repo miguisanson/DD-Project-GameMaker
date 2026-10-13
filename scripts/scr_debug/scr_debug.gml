@@ -220,6 +220,7 @@ function Scenario_Boot() {
     if (Scenario_HasFlag("-smoke")) _mode = "smoke";
     else if (Scenario_HasFlag("-bot")) _mode = "bot";
     else if (Scenario_HasFlag("-shots")) _mode = "shots";
+    else if (Scenario_HasFlag("-gridshots")) _mode = "gridshots";
     if (_mode != "" || Scenario_HasFlag("-runtests")) {
         show_debug_message("[TEST-BUILD] " + BUILD_ID);
         // tests are always windowed whatever the saved setting says (Display_Init checks Display_TestRun); no focus / foreground calls anywhere
@@ -240,7 +241,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : 6000), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [] };
+                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : ((_mode == "gridshots") ? 8000 : 6000)), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [] };
 }
 
 function Scenario_Finish() {
@@ -287,7 +288,7 @@ function Scenario_Release() {
 function Scenario_InputOverride() {
     if (!variable_global_exists("scn")) return;
     var _s = global.scn;
-    if (_s.mode != "bot" && _s.mode != "smoke" && _s.mode != "shots") return;   // shots taps through the dialogues of the display flow
+    if (_s.mode != "bot" && _s.mode != "smoke" && _s.mode != "shots" && _s.mode != "gridshots") return;   // shots taps through the dialogues of the display flow
     if (_s.tap_action != "" && _s.f == _s.last_tap) {
         variable_struct_set(global.input.state, _s.tap_action, { held: true, pressed: true });
     }
@@ -337,6 +338,7 @@ function Scenario_Step() {
         case "smoke": Scenario_StepSmoke(_s); break;
         case "bot": Scenario_StepBot(_s); break;
         case "shots": Scenario_StepShots(_s); break;
+        case "gridshots": Scenario_StepGridShots(_s); break;
     }
 }
 
@@ -1835,6 +1837,91 @@ function Scenario_StepMovePlayerFeel(_s) {
                 var _t2 = variable_instance_exists(_pl, "prompt_target") ? _pl.prompt_target : noone;
                 Scenario_Check("feel_H6_prompt_hides_when_facing_away", !instance_exists(_t2), "target=" + string(_t2));
                 Scenario_MoveNext6(_s);
+            }
+            break;
+    }
+}
+
+
+// ---- -gridshots (D65): every floor room once, 16 px grid drawn over the world, one PNG each (shot_grid_<room>.png) ----
+// Window at display scale 4. The grid is drawn by a layer script (world coordinates, so it sits exactly on the room's pixels):
+//   green  (#86C06C, 50%) = lines at multiples of 16 from the ROOM origin (0,0)
+//   violet (50%)          = lines at multiples of 16 from the CAMERA view's top-left corner (only when that corner is off the room grid)
+//   red    (50%)          = the room's own edges (x=0, x=room_width, y=0, y=room_height)
+// No room, object or sprite is changed. Floor rooms have no HUD; the intro dialogue / room fade is confirmed or waited out before the shot.
+function Scenario_GridRooms() {
+    return [rm_floor1, rm_floor2, rm_floor3, rm_floor4, rm_floor5, rm_floor6, rm_floor6_5, rm_floor7, rm_floor8, rm_floor9, rm_floor9_5];
+}
+
+function Scenario_GridOverlay() {
+    var _cam = view_camera[0];
+    var _vx = camera_get_view_x(_cam), _vy = camera_get_view_y(_cam), _vw = camera_get_view_width(_cam), _vh = camera_get_view_height(_cam);
+    var _c0 = draw_get_colour(), _a0 = draw_get_alpha();
+    draw_set_alpha(0.5);
+    var _ox = ((_vx mod 16) + 16) mod 16, _oy = ((_vy mod 16) + 16) mod 16;
+    if (_ox != 0 || _oy != 0) {   // camera grid, under the room grid
+        draw_set_colour(make_colour_rgb(208, 108, 192));
+        for (var _x = _vx; _x <= _vx + _vw; _x += 16) draw_rectangle(_x, _vy, _x, _vy + _vh, false);
+        for (var _y = _vy; _y <= _vy + _vh; _y += 16) draw_rectangle(_vx, _y, _vx + _vw, _y, false);
+    }
+    draw_set_colour(make_colour_rgb($86, $C0, $6C));
+    for (var _x2 = _vx - _ox; _x2 <= _vx + _vw; _x2 += 16) draw_rectangle(_x2, _vy, _x2, _vy + _vh, false);
+    for (var _y2 = _vy - _oy; _y2 <= _vy + _vh; _y2 += 16) draw_rectangle(_vx, _y2, _vx + _vw, _y2, false);
+    draw_set_colour(make_colour_rgb(224, 48, 48));
+    draw_rectangle(0, 0, room_width - 1, room_height - 1, true);
+    draw_set_colour(_c0);
+    draw_set_alpha(_a0);
+}
+
+function Scenario_StepGridShots(_s) {
+    var _rooms = Scenario_GridRooms();
+    var _gs = GameState_Get();
+    var _tapnow = ((_s.f - _s.last_tap) >= 8);
+    switch (_s.step) {
+        case 0:   // enter room _s.ri
+            if (_s.ri >= array_length(_rooms)) { Scenario_Finish(); break; }
+            if (_s.t == 1) {
+                if (_s.ri == 0) Scenario_SetWindowScale(4);
+                Scenario_NewKnight();
+                room_goto(_rooms[_s.ri]);
+            }
+            if (_s.t >= 40) {
+                Scenario_Check("gridshots_in_" + room_get_name(_rooms[_s.ri]), room == _rooms[_s.ri]);
+                Scenario_Next(_s, 1);
+            }
+            break;
+        case 1: {   // overlay layer, then clear the dialogue / fade
+            if (_s.t == 1) {
+                var _l = layer_create(-100000, "grid_overlay");
+                var _el = layer_sprite_create(_l, 0, 0, archer_down);   // an invisible element: the layer is only drawn (and its script run) when it holds one
+                layer_sprite_alpha(_el, 0);
+                layer_script_end(_l, Scenario_GridOverlay);
+                with (obj_enemy) instance_destroy();   // enemies near the spawn would start a battle before the shot (rm_floor5); the room asset is untouched
+            }
+            var _talk = (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0);
+            if (_talk && _tapnow) Scenario_Tap("confirm");
+            if (_s.t >= 30 && !_talk && !Transition_IsActive()) { _s.dlg_t = 0; Scenario_Next(_s, 2); }
+            else if (_s.t > 900) {
+                Scenario_Check("gridshots_clear_" + room_get_name(room), false, "dialogue or fade still up");
+                Scenario_Next(_s, 2);
+            }
+        } break;
+        case 2:   // let the last confirm settle, then the picture
+            if (_s.t >= 10) {
+                var _cam = view_camera[0];
+                Scenario_Check("gridshots_still_in_" + room_get_name(_rooms[_s.ri]), room == _rooms[_s.ri], "room=" + room_get_name(room));
+                _s.shot = "shot_grid_" + room_get_name(room) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                show_debug_message("[GRID] room=" + room_get_name(room) + " size=" + string(room_width) + "x" + string(room_height)
+                    + " cam=" + string(camera_get_view_x(_cam)) + "," + string(camera_get_view_y(_cam)) + "," + string(camera_get_view_width(_cam)) + "," + string(camera_get_view_height(_cam)));
+                Scenario_Next(_s, 3);
+            }
+            break;
+        case 3:
+            if (_s.t >= 3) {
+                Scenario_Check("gridshots_saved_" + _s.shot, file_exists(_s.shot));
+                _s.ri++;
+                Scenario_Next(_s, 0);
             }
             break;
     }

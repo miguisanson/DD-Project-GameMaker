@@ -10,7 +10,7 @@
 param(
     [ValidateSet('fast', 'full', 'compile')][string]$Mode = 'fast',
     [switch]$NegativeControl,
-    [ValidateSet('', 'runtests', 'smoke', 'bot', 'shots')][string]$Only = '',   # run just this game mode (with fast/full)
+    [ValidateSet('', 'runtests', 'smoke', 'bot', 'shots', 'gridshots')][string]$Only = '',   # run just this game mode (with fast/full)
     [string]$ProjectDir = '',                  # default: repo root of this script
     [string]$WorkRoot = 'E:\Temp\dd-gate'      # test hook: point at C:\ to see the drive guard refuse
 )
@@ -22,7 +22,8 @@ $GameModes = @(
     @{ Name = 'runtests'; Flag = '-runtests'; Timeout = 30;  Impl = $true;  Strict = $true  }
     @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 60;  Impl = $true;  Strict = $false }
     @{ Name = 'bot';      Flag = '-bot';      Timeout = 300; Impl = $true;  Strict = $false }
-    @{ Name = 'shots';    Flag = '-shots';    Timeout = 300; Impl = $true;  Strict = $false; Shots = 63 }   # Shots = number of [SHOT] lines required. Not yet verified minimized: run it when the owner is not using the PC and check the PNGs are not blank.
+    @{ Name = 'shots';    Flag = '-shots';    Timeout = 300; Impl = $true;  Strict = $false; Shots = 63 }   # Shots = number of [SHOT] lines required.
+    @{ Name = 'gridshots'; Flag = '-gridshots'; Timeout = 120; Impl = $true;  Strict = $false; Shots = 11; ShotDir = 'gridshots'; Explicit = $true }   # D65: 16 px grid over every floor room -> <WorkRoot>\gridshots. Not part of -Mode full: run with -Only gridshots.
 )
 $BuildTimeout = 300
 $ResultFile = 'test_results.txt'
@@ -73,7 +74,22 @@ public static class DDLaunch {
     static extern bool CreateProcess(string app, StringBuilder cmd, IntPtr pa, IntPtr ta, bool inherit, uint flags, IntPtr env, string cwd, ref STARTUPINFO si, out PROCESS_INFORMATION pi);
     [DllImport("kernel32.dll", SetLastError = true)] static extern bool SetHandleInformation(IntPtr h, int mask, int flags);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
-    // Starts exe with stdout+stderr going to logFile, window shown minimized and not activated. Returns the process id.
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern IntPtr CreateDesktop(string name, IntPtr dev, IntPtr devmode, int flags, uint access, IntPtr sa);
+    [DllImport("user32.dll")] static extern bool CloseDesktop(IntPtr d);
+    static IntPtr desk = IntPtr.Zero;
+    // I-053: a window created on its own desktop can never be the owner's foreground window. Call after the game has exited.
+    public static void ReleaseDesktop() { if (desk != IntPtr.Zero) { CloseDesktop(desk); desk = IntPtr.Zero; } }
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+    // I-053 probe: process id that owns the foreground window of the owner's desktop (0 when none).
+    public static int ForegroundPid() {
+        IntPtr w = GetForegroundWindow(); uint pid;
+        if (w == IntPtr.Zero) return 0;
+        GetWindowThreadProcessId(w, out pid); return (int)pid;
+    }
+    // Starts exe with stdout+stderr going to logFile, on a private desktop (when it can be created) with the window shown minimized and
+    // not activated. Returns the process id.
     public static int Start(string exe, string args, string cwd, string logFile) {
         using (FileStream fs = new FileStream(logFile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) {
             IntPtr h = fs.SafeFileHandle.DangerousGetHandle();
@@ -83,6 +99,10 @@ public static class DDLaunch {
             si.dwFlags = 0x101;                                 // STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES
             si.wShowWindow = 7;                                 // SW_SHOWMINNOACTIVE
             si.hStdOutput = h; si.hStdError = h;
+            ReleaseDesktop();
+            string dn = "ddgate_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            desk = CreateDesktop(dn, IntPtr.Zero, IntPtr.Zero, 0, 0x10000000, IntPtr.Zero);   // GENERIC_ALL
+            if (desk != IntPtr.Zero) si.lpDesktop = "winsta0\\" + dn;
             PROCESS_INFORMATION pi;
             StringBuilder cmd = new StringBuilder("\"" + exe + "\" " + args);
             if (!CreateProcess(null, cmd, IntPtr.Zero, IntPtr.Zero, true, 0, IntPtr.Zero, cwd, ref si, out pi))
@@ -105,12 +125,19 @@ function Invoke-Proc([string]$exe, [string]$argStr, [string]$wd, [string]$log, [
             -RedirectStandardOutput $log -RedirectStandardError "$log.err"
     }
     $null = $p.Handle                       # needed or ExitCode comes back empty in PS 5.1
-    $timedOut = -not $p.WaitForExit($timeout * 1000)
+    # I-053 focus probe: poll the foreground window every 10 ms; FocusMs = first time this process owned it (-1 = never).
+    $focusMs = -1; $t0 = [Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        if ($p.WaitForExit(10)) { $timedOut = $false; break }
+        if ($focusMs -lt 0 -and $ddLaunchOk -and [DDLaunch]::ForegroundPid() -eq $p.Id) { $focusMs = [int]$t0.ElapsedMilliseconds }
+        if ($t0.Elapsed.TotalSeconds -ge $timeout) { $timedOut = $true; break }
+    }
     if ($timedOut) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; $null = $p.WaitForExit(5000) }
     $code = $null; if (-not $timedOut) { $code = $p.ExitCode }
+    if ($ddLaunchOk) { [DDLaunch]::ReleaseDesktop() }
     if ((Test-Path "$log.err") -and (Get-Item "$log.err").Length -gt 0) { Get-Content "$log.err" | Add-Content -Path $log }
     Remove-Item "$log.err" -Force -ErrorAction SilentlyContinue
-    [pscustomobject]@{ Code = $code; TimedOut = $timedOut }
+    [pscustomobject]@{ Code = $code; TimedOut = $timedOut; FocusMs = $focusMs }
 }
 
 function Get-LogLines([string]$log) { if (Test-Path $log) { @(Get-Content -LiteralPath $log -ErrorAction SilentlyContinue) } else { @() } }
@@ -203,9 +230,10 @@ public static class ShotCheck {
 # Windows Scaling option on "keep aspect", the engine's application rectangle); not mostly one colour; and, when the line carries the
 # game's predicted picture rectangle (gx gy gw gh): nothing but black outside it, picture on all four of its edges (edge=1), the last
 # cutscene art still visible during the exit fade (art=1).
-function Test-Shots([string[]]$lines, [int]$expect) {
+function Test-Shots([string[]]$lines, [int]$expect, [string]$dirKey = 'shots') {
     $problems = @()
-    Get-ChildItem $D.save -Recurse -Filter 'shot_*.png' -File -ErrorAction SilentlyContinue | ForEach-Object { Copy-Item $_.FullName $D.shots -Force }
+    $shotDir = $D[$dirKey]
+    Get-ChildItem $D.save -Recurse -Filter 'shot_*.png' -File -ErrorAction SilentlyContinue | ForEach-Object { Copy-Item $_.FullName $shotDir -Force }
     $rows = @($lines | Where-Object { $_ -match '^\[SHOT\] file=(\S+) w=(\d+) h=(\d+)' } | ForEach-Object {
         $line = $_
         $o = [ordered]@{ File = $null; W = 0; H = 0; Rect = $null; App = $null; Edge = $false; Art = $false; Fade = $false }
@@ -217,7 +245,7 @@ function Test-Shots([string[]]$lines, [int]$expect) {
     if ($rows.Count -ne $expect) { $problems += "expected $expect [SHOT] lines, got $($rows.Count)" }
     Add-Type -AssemblyName System.Drawing
     foreach ($r in $rows) {
-        $path = Join-Path $D.shots $r.File
+        $path = Join-Path $shotDir $r.File
         if (-not (Test-Path -LiteralPath $path)) { $problems += "$($r.File) missing"; continue }
         $bmp = $null
         try {
@@ -250,7 +278,7 @@ function Test-Shots([string[]]$lines, [int]$expect) {
 $WorkRoot = [IO.Path]::GetFullPath($WorkRoot).TrimEnd('\')
 if ($WorkRoot.Length -le 3) { Refuse "work root '$WorkRoot' is a drive root" }
 $D = @{}
-foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots') {
+foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots', 'gridshots') {
     $D[$n] = Join-Path $WorkRoot $n
     foreach ($r in (Get-DriveRoots $D[$n])) {
         if ($r -ieq 'C:\' -or $r -ieq "$env:SystemDrive\") { Refuse "$n dir '$($D[$n])' is on drive C: (everything must live on E:)" }
@@ -308,8 +336,8 @@ if (Test-Path $lintPy) {
 
 # ---- fresh work dirs; copy working tree (tracked + untracked-not-ignored) -----------------------
 $sw = [Diagnostics.Stopwatch]::StartNew()
-foreach ($n in 'src', 'out', 'save', 'logs', 'shots') { if (Test-Path $D[$n]) { Remove-Item $D[$n] -Recurse -Force } }
-foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots') { $null = New-Item -ItemType Directory -Force -Path $D[$n] }
+foreach ($n in 'src', 'out', 'save', 'logs', 'shots', 'gridshots') { if (Test-Path $D[$n]) { Remove-Item $D[$n] -Recurse -Force } }
+foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots', 'gridshots') { $null = New-Item -ItemType Directory -Force -Path $D[$n] }
 
 $psi = New-Object Diagnostics.ProcessStartInfo 'git'
 $psi.Arguments = 'ls-files -co --exclude-standard -z'
@@ -369,7 +397,7 @@ Step 'build' $(if ($buildOk) { 'OK' } else { 'FAIL' }) $sw
 if (-not $buildOk -or $Mode -eq 'compile') { Finish }
 
 # ---- game runs (VER-02/03/05) -------------------------------------------------------------------
-$runs = if ($Mode -eq 'full') { $GameModes } else { @($GameModes | Where-Object { $_.Name -eq 'runtests' }) }
+$runs = if ($Mode -eq 'full') { @($GameModes | Where-Object { -not $_.Explicit }) } else { @($GameModes | Where-Object { $_.Name -eq 'runtests' }) }
 if ($Only) { $runs = @($GameModes | Where-Object { $_.Name -eq $Only }) }
 foreach ($m in $runs) {
     if (-not $m.Impl) { Write-Host "SKIP $($m.Name) (not implemented)"; continue }
@@ -400,7 +428,8 @@ foreach ($m in $runs) {
     $bid = @($lines | Where-Object { $_ -match '^\[TEST-BUILD\]\s+(\S+)' } | ForEach-Object { $Matches[1] })   # VER-10
     if ($bid.Count -eq 0) { $why += 'missing [TEST-BUILD]' }
     elseif ($bid[0] -ne $BuildId) { $why += "build id in game '$($bid[0])' differs from stamped '$BuildId'" }
-    if ($m.Shots) { $why += @(Test-Shots $lines $m.Shots) }
+    if ($r.FocusMs -ge 0) { $why += "game window took the foreground after $($r.FocusMs) ms (I-053)" }
+    if ($m.Shots) { $why += @(Test-Shots $lines $m.Shots $(if ($m.ShotDir) { $m.ShotDir } else { 'shots' })) }
     $bad | Select-Object -First 20 | ForEach-Object { Write-Host "  $($_.Trim())" }
     if ($why.Count -gt 0) { Fail "$($m.Name): $($why -join '; ')" }
     Step $m.Name $(if ($why.Count -eq 0) { 'OK' } else { 'FAIL' }) $sw
