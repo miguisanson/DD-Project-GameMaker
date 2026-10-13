@@ -189,7 +189,7 @@ function Build_DrawId() {
     draw_set_valign(fa_top);
     draw_set_color(c_white);
     draw_set_alpha(0.7);
-    UI_DrawText(display_get_gui_width() - UI_TextWidth(BUILD_ID) - 4, display_get_gui_height() - UI_TextHeight(BUILD_ID) - 2, BUILD_ID);
+    UI_DrawText(Display_GuiW() - UI_TextWidth(BUILD_ID) - 4, Display_GuiH() - UI_TextHeight(BUILD_ID) - 2, BUILD_ID);
     draw_set_color(_c);
     draw_set_alpha(_a);
     draw_set_halign(_h);
@@ -222,7 +222,7 @@ function Scenario_Boot() {
     else if (Scenario_HasFlag("-shots")) _mode = "shots";
     if (_mode != "" || Scenario_HasFlag("-runtests")) {
         show_debug_message("[TEST-BUILD] " + BUILD_ID);
-        window_set_fullscreen(false);   // tests are always windowed, whatever the saved setting says; no focus / foreground calls anywhere
+        // tests are always windowed whatever the saved setting says (Display_Init checks Display_TestRun); no focus / foreground calls anywhere
     }
     if (_mode == "") return;
 
@@ -297,7 +297,6 @@ function Scenario_Step() {
     if (_s.done) return;
     _s.f++;
     _s.t++;
-    if (window_get_fullscreen()) window_set_fullscreen(false);   // a saved fit_screen must not put a test run in fullscreen
     var _gs = GameState_Get();
     if (is_struct(_gs) && variable_struct_exists(_gs, "settings") && is_struct(_gs.settings)) _gs.settings.fit_screen = false;
     if (_s.f > _s.cap) {
@@ -618,7 +617,7 @@ function Scenario_BotEvaluate(_s, _bc, _name) {
 
 // The window sizes of the display flow. [w, h]
 function Scenario_DispSize(_i) {
-    var _sizes = [[480, 432], [640, 576], [800, 720]];
+    var _sizes = [[480, 432], [1000, 700], [1920, 1080]];
     return _sizes[clamp(_i, 0, array_length(_sizes) - 1)];
 }
 
@@ -626,12 +625,10 @@ function Scenario_DispSizeCount() {
     return 3;
 }
 
-// Put the window at a size and let the display owner lay it out.
+// Put the window at a size and let the display owner lay it out (windowed, any size: DISP-11).
 function Scenario_SetWindow(_w, _h) {
-    var _st = GameSettings_Ensure();
-    _st.display_scale = clamp(_w div DISPLAY_BASE_W, DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-    _st.fit_screen = false;
-    GameSettings_ApplyDisplay();
+    GameSettings_Ensure().fit_screen = false;
+    Display_Request({ fullscreen: false, window_w: _w, window_h: _h });
 }
 
 function Scenario_SetWindowScale(_scale) {

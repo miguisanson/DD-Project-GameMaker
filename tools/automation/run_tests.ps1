@@ -291,6 +291,21 @@ function Finish {
     Write-Host 'GATE PASS'; exit 0
 }
 
+# ---- display source guard (DISP-02 / DISP-09): only scr_display / obj_display may call the window, surface, GUI-size, view and camera-size
+# functions, and nobody may read display_get_gui_*. -NegativeControl plants a violation, so this step (and the gate) must go red.
+$lintPy = Join-Path $ProjectDir 'tools\display\lint_display_calls.py'
+if (Test-Path $lintPy) {
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $pyExe = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $pyExe) { Fail 'lint: python not found (the display source guard needs it)' }
+    else {
+        $lintArgs = @($lintPy, '--root', $ProjectDir); if ($NegativeControl) { $lintArgs += '--plant' }
+        $lintOut = @(& $pyExe.Source @lintArgs)
+        if ($LASTEXITCODE -ne 0) { $lintOut | Select-Object -First 12 | ForEach-Object { Write-Host "  $_" }; Fail 'lint: display source guard found violations' }
+    }
+    Step 'lint' $(if ($script:failed) { 'FAIL' } else { 'OK' }) $sw
+}
+
 # ---- fresh work dirs; copy working tree (tracked + untracked-not-ignored) -----------------------
 $sw = [Diagnostics.Stopwatch]::StartNew()
 foreach ($n in 'src', 'out', 'save', 'logs', 'shots') { if (Test-Path $D[$n]) { Remove-Item $D[$n] -Recurse -Force } }

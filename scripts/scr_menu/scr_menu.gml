@@ -146,8 +146,8 @@ function Menu_IsOpen() {
 }
 
 function Menu_GetLayout() {
-    var w = display_get_gui_width();
-    var h = display_get_gui_height();
+    var w = Display_GuiW();
+    var h = Display_GuiH();
     UI_SetFont();
     var line_h = UI_TextHeight("A");
     var margin = round(min(w, h) * 0.05);
@@ -784,8 +784,8 @@ function Tooltip_GetStyle(_context = "default") {
 }
 
 function Tooltip_ClampRect(_x, _y, _w, _h, _margin = 0, _min_w = 12, _min_h = 12) {
-    var gui_w = max(1, display_get_gui_width());
-    var gui_h = max(1, display_get_gui_height());
+    var gui_w = max(1, Display_GuiW());
+    var gui_h = max(1, Display_GuiH());
     var rect_margin = max(0, round(real(_margin)));
     var rect_min_w = max(12, round(real(_min_w)));
     var rect_min_h = max(12, round(real(_min_h)));
@@ -1956,8 +1956,8 @@ function ClassSelect_Draw() {
     var cs = gs.ui.class_select;
     if (!cs.open) return;
 
-    var w = display_get_gui_width();
-    var h = display_get_gui_height();
+    var w = Display_GuiW();
+    var h = Display_GuiH();
 
     UI_SetFont();
     var line_h = UI_TextHeight("A");
@@ -2360,8 +2360,8 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     var sp = gs.ui.settings_popup;
     if (!sp.open) return;
 
-    var w = display_get_gui_width();
-    var h = display_get_gui_height();
+    var w = Display_GuiW();
+    var h = Display_GuiH();
     UI_SetFont();
     var line_h = UI_TextHeight("A");
     var popup_alpha = UI_PopupAlpha(sp.opened_frame, sp.closing, sp.close_frame, 1);

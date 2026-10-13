@@ -139,8 +139,8 @@ function BedMenu_Draw() {
 
     UI_SetFont();
 
-    var w = display_get_gui_width();
-    var h = display_get_gui_height();
+    var w = Display_GuiW();
+    var h = Display_GuiH();
     var line_h = UI_TextHeight("A");
     var inner_pad = max(6, round(line_h * 0.30));
     var row_h = max(18, line_h + inner_pad * 2);
@@ -583,8 +583,8 @@ function SaveMenu_Draw() {
 
     UI_SetFont();
 
-    var w = display_get_gui_width();
-    var h = display_get_gui_height();
+    var w = Display_GuiW();
+    var h = Display_GuiH();
     var line_h = UI_TextHeight("A");
     var title_pad_x = max(12, round(line_h * 0.30));
     var title_pad_y = max(10, round(line_h * 0.25));

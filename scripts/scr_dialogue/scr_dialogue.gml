@@ -577,8 +577,8 @@ function Dialogue_CopyLineEntryWithText(_line_entry, _text) {
 
 function Dialogue_BoxRect() {
     var gs = GameState_Get();
-    var w = display_get_gui_width();
-    var h = display_get_gui_height();
+    var w = Display_GuiW();
+    var h = Display_GuiH();
     var ui_visual = UI_GetVisualScale();
     var line_h = max(8, UI_TextHeight("Ag"));
 
@@ -630,8 +630,8 @@ function Dialogue_TextLayout(_speaker) {
     var text_h = max(line_h, box.h - (text_y - box.y) - bottom_pad);
 
     if (cutscene_text_only) {
-        var w = display_get_gui_width();
-        var h = display_get_gui_height();
+        var w = Display_GuiW();
+        var h = Display_GuiH();
         var margin_ratio = clamp(UI_CUTSCENE_TEXT_SIDE_PAD_RATIO, 0, 0.45);
         var margin_x = max(max(0, round(UI_CUTSCENE_TEXT_MARGIN_X * ui_visual)), floor(w * margin_ratio));
         var region_top = floor(h * UI_CUTSCENE_TEXT_TOP_RATIO);

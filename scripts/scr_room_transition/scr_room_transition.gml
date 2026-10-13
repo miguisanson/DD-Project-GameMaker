@@ -185,16 +185,6 @@ function Transition_Init() {
             encounter_zoom: 0,
             encounter_shake_x: 0,
             encounter_shake_y: 0,
-            encounter_cam: -1,
-            encounter_cam_valid: false,
-            encounter_cam_x: 0,
-            encounter_cam_y: 0,
-            encounter_cam_w: 0,
-            encounter_cam_h: 0,
-            encounter_port_x: 0,
-            encounter_port_y: 0,
-            encounter_port_w: 0,
-            encounter_port_h: 0,
             encounter_focus_x: 0,
             encounter_focus_y: 0,
             encounter_has_focus: false,
@@ -216,76 +206,40 @@ function Transition_IsInputLocked() {
     return Transition_IsActive();
 }
 
-function Transition_CaptureEncounterViewport(_tr) {
-    _tr.encounter_cam = -1;
-    _tr.encounter_cam_valid = false;
-    _tr.encounter_cam_x = 0;
-    _tr.encounter_cam_y = 0;
-    _tr.encounter_cam_w = 0;
-    _tr.encounter_cam_h = 0;
-
-    if (!view_enabled) return;
-    _tr.encounter_port_x = view_xport[0];
-    _tr.encounter_port_y = view_yport[0];
-    _tr.encounter_port_w = max(1, view_wport[0]);
-    _tr.encounter_port_h = max(1, view_hport[0]);
-
+// The encounter zoom is drawn, not set up in the view: the camera, view port and surface stay 160x144 (Display_DrawFrame magnifies the
+// picture). The zoom centre is the view centre pulled 35 percent toward the focus point, in view-local world pixels, plus the shake.
+function Transition_ApplyEncounterZoom(_tr) {
     var cam = view_camera[0];
+    var cam_x = 0;
+    var cam_y = 0;
     if (!is_undefined(cam) && cam != -1) {
-        _tr.encounter_cam = cam;
-        _tr.encounter_cam_x = camera_get_view_x(cam);
-        _tr.encounter_cam_y = camera_get_view_y(cam);
-        _tr.encounter_cam_w = max(1, camera_get_view_width(cam));
-        _tr.encounter_cam_h = max(1, camera_get_view_height(cam));
-        _tr.encounter_cam_valid = true;
+        cam_x = camera_get_view_x(cam);
+        cam_y = camera_get_view_y(cam);
     }
-}
-
-function Transition_ApplyEncounterViewport(_tr) {
-    if (!view_enabled) return;
-    if (!_tr.encounter_cam_valid) return;
-
-    var cam = _tr.encounter_cam;
-    if (is_undefined(cam) || cam == -1) return;
-
-    var scale = 1 + max(0, _tr.encounter_zoom);
-    var view_w = max(1, round(_tr.encounter_cam_w / scale));
-    var view_h = max(1, round(_tr.encounter_cam_h / scale));
-
-    var center_x = _tr.encounter_cam_x + (_tr.encounter_cam_w * 0.5);
-    var center_y = _tr.encounter_cam_y + (_tr.encounter_cam_h * 0.5);
+    var cx = DISPLAY_BASE_W * 0.5;
+    var cy = DISPLAY_BASE_H * 0.5;
     if (_tr.encounter_has_focus) {
-        center_x = lerp(center_x, _tr.encounter_focus_x, 0.35);
-        center_y = lerp(center_y, _tr.encounter_focus_y, 0.35);
+        cx = lerp(cx, _tr.encounter_focus_x - cam_x, 0.35);
+        cy = lerp(cy, _tr.encounter_focus_y - cam_y, 0.35);
     }
-
-    var cam_x = round(center_x - (view_w * 0.5) + _tr.encounter_shake_x);
-    var cam_y = round(center_y - (view_h * 0.5) + _tr.encounter_shake_y);
-
-    camera_set_view_size(cam, view_w, view_h);
-    camera_set_view_pos(cam, cam_x, cam_y);
+    Display_SetZoom(1 + max(0, _tr.encounter_zoom), cx + _tr.encounter_shake_x, cy + _tr.encounter_shake_y);
 }
 
-function Transition_RestoreEncounterViewport(_tr) {
-    if (!view_enabled) return;
-
-    if (_tr.encounter_port_w > 0 && _tr.encounter_port_h > 0) {
-        view_xport[0] = _tr.encounter_port_x;
-        view_yport[0] = _tr.encounter_port_y;
-        view_wport[0] = _tr.encounter_port_w;
-        view_hport[0] = _tr.encounter_port_h;
-    }
-
-    if (_tr.encounter_cam_valid) {
-        var cam = _tr.encounter_cam;
-        if (!is_undefined(cam) && cam != -1) {
-            camera_set_view_size(cam, _tr.encounter_cam_w, _tr.encounter_cam_h);
-            camera_set_view_pos(cam, _tr.encounter_cam_x, _tr.encounter_cam_y);
-        }
-    }
+// H2 / H6: the cutscene's picture, text mode and logo stay up until the exit fade is fully black, so the last image fades out with the
+// screen. This clears them at the room change (every transition's room_goto passes Transition_PreRoomChange).
+function Cutscene_ClearUiState() {
+    var gs = GameState_Get();
+    if (!is_struct(gs) || !variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) return;
+    gs.ui.cutscene_active = false;
+    gs.ui.cutscene_bg_sprite = noone;
+    gs.ui.dialogue_box_half = false;
+    gs.ui.cutscene_text_only = false;
+    gs.ui.cutscene_logo_sprite = noone;
+    gs.ui.cutscene_logo_alpha = 0;
 }
 
 function Transition_PreRoomChange() {
+    Cutscene_ClearUiState();
     var gs = GameState_Get();
     if (is_struct(gs)) {
         gs.last_room = noone;
@@ -319,12 +273,6 @@ function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus
     tr.flash_apply_class_pending = false;
     tr.flash_action = "";
     tr.flash_owner_inst = noone;
-    tr.encounter_cam = -1;
-    tr.encounter_cam_valid = false;
-    tr.encounter_cam_x = 0;
-    tr.encounter_cam_y = 0;
-    tr.encounter_cam_w = 0;
-    tr.encounter_cam_h = 0;
 
     if (_type == TRANSITION_TYPE_CUTSCENE) {
         tr.fade_out_frames = max(1, TRANSITION_CUTSCENE_FADE_OUT_FRAMES);
@@ -342,7 +290,6 @@ function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus
             tr.encounter_focus_x = _enc_focus_x;
             tr.encounter_focus_y = _enc_focus_y;
         }
-        Transition_CaptureEncounterViewport(tr);
     } else {
         tr.fade_out_frames = max(1, TRANSITION_ROOM_FADE_OUT_FRAMES);
         tr.black_hold_frames = max(0, TRANSITION_ROOM_BLACK_HOLD_FRAMES);
@@ -419,7 +366,7 @@ function Transition_Finish() {
     var gs = GameState_Get();
     var tr = gs.transition_fx;
     if (tr.type == TRANSITION_TYPE_ENCOUNTER) {
-        Transition_RestoreEncounterViewport(tr);
+        Display_ClearZoom();
     }
     tr.active = false;
     tr.type = TRANSITION_TYPE_NONE;
@@ -434,12 +381,6 @@ function Transition_Finish() {
     tr.black_hold_frames = 0;
     tr.encounter_shake_x = 0;
     tr.encounter_shake_y = 0;
-    tr.encounter_cam = -1;
-    tr.encounter_cam_valid = false;
-    tr.encounter_cam_x = 0;
-    tr.encounter_cam_y = 0;
-    tr.encounter_cam_w = 0;
-    tr.encounter_cam_h = 0;
     tr.encounter_focus_x = 0;
     tr.encounter_focus_y = 0;
     tr.encounter_has_focus = false;
@@ -447,9 +388,7 @@ function Transition_Finish() {
     tr.flash_apply_class_pending = false;
     tr.flash_action = "";
     tr.flash_owner_inst = noone;
-
-    // Ensure viewport/gui/window scaling returns to shared settings after any transition.
-    GameSettings_ApplyDisplay();
+    // The display is NOT re-applied here (I-051, DISP-08): a transition changes the room, not the window.
 }
 
 function Transition_Update() {
@@ -497,7 +436,7 @@ function Transition_Update() {
                 var shake_mag = max(0, round(TRANSITION_ENCOUNTER_SHAKE_PX * (1 - (pe * 0.85))));
                 tr.encounter_shake_x = irandom_range(-shake_mag, shake_mag);
                 tr.encounter_shake_y = irandom_range(-shake_mag, shake_mag);
-                Transition_ApplyEncounterViewport(tr);
+                Transition_ApplyEncounterZoom(tr);
                 tr.alpha = 0;
 
                 if (tr.timer >= max(1, TRANSITION_ENCOUNTER_ZOOM_FRAMES)) {
@@ -512,7 +451,7 @@ function Transition_Update() {
                 tr.encounter_zoom = TRANSITION_ENCOUNTER_ZOOM_MAX;
                 tr.encounter_shake_x = 0;
                 tr.encounter_shake_y = 0;
-                Transition_ApplyEncounterViewport(tr);
+                Transition_ApplyEncounterZoom(tr);
                 tr.alpha = 0;
 
                 if (tr.timer >= max(0, TRANSITION_ENCOUNTER_ZOOM_HOLD_FRAMES)) {
@@ -524,13 +463,11 @@ function Transition_Update() {
                 tr.encounter_zoom = TRANSITION_ENCOUNTER_ZOOM_MAX;
                 tr.encounter_shake_x = 0;
                 tr.encounter_shake_y = 0;
-                Transition_ApplyEncounterViewport(tr);
+                Transition_ApplyEncounterZoom(tr);
                 tr.alpha = clamp(tr.timer / tr.fade_out_frames, 0, 1);
                 if (tr.timer >= tr.fade_out_frames) {
                     tr.alpha = 1;
-                    Transition_RestoreEncounterViewport(tr);
-                    tr.encounter_port_w = 0;
-                    tr.encounter_port_h = 0;
+                    Display_ClearZoom();
                     tr.phase = 3;
                     tr.timer = 0;
                     Transition_PreRoomChange();
@@ -625,13 +562,11 @@ function Transition_DrawGUI() {
     var gs = GameState_Get();
     var tr = gs.transition_fx;
 
-    var w = display_get_gui_width();
-    var h = display_get_gui_height();
-
     if (tr.alpha > 0) {
+        var wr = Display_WindowRectInGui(Display_Layout());   // the whole window, bars included
         draw_set_alpha(clamp(tr.alpha, 0, 1));
         draw_set_color(c_black);
-        draw_rectangle(0, 0, w, h, false);
+        draw_rectangle(wr.x, wr.y, wr.x + wr.w, wr.y + wr.h, false);
     }
 
     draw_set_alpha(1);
