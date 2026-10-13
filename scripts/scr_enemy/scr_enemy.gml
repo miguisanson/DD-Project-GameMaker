@@ -507,3 +507,205 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
         }
     }
 }
+
+// ============================================================================
+// NAV (D63, I-047): pure grid pathfinding, line of sight and cell reservations.
+// A grid is a struct { w, h, block[], sight[] } of 16 px cells with the origin at world (0,0) (D65: room sizes are not changed).
+// block = movement blocked (wall, rock, chest, exit tile); sight = line of sight blocked (wall only).
+// Nothing here touches instances, so Test_Suite_Nav can run it on hand-made maps. Room integration is Nav_Get() further down.
+// ============================================================================
+function Nav_CellOf(_v) {
+    return floor(_v / GRID_TILE_SIZE);
+}
+
+function Nav_WorldOf(_c) {
+    return _c * GRID_TILE_SIZE;
+}
+
+function Nav_GridCreate(_w, _h) {
+    _w = max(1, _w);
+    _h = max(1, _h);
+    return { w: _w, h: _h, block: array_create(_w * _h, 0), sight: array_create(_w * _h, 0) };
+}
+
+// rows: array of strings. "." free, "#" wall (blocks movement and sight), "~" blocks movement only.
+function Nav_GridFromRows(_rows) {
+    var _h = array_length(_rows);
+    var _w = 1;
+    for (var _y = 0; _y < _h; _y++) _w = max(_w, string_length(_rows[_y]));
+    var _g = Nav_GridCreate(_w, _h);
+    for (var _y2 = 0; _y2 < _h; _y2++) {
+        for (var _x = 0; _x < string_length(_rows[_y2]); _x++) {
+            var _ch = string_char_at(_rows[_y2], _x + 1);
+            if (_ch == "#") Nav_GridSet(_g, _x, _y2, true, true);
+            else if (_ch == "~") Nav_GridSet(_g, _x, _y2, true, false);
+        }
+    }
+    return _g;
+}
+
+function Nav_GridInside(_g, _cx, _cy) {
+    return (_cx >= 0 && _cy >= 0 && _cx < _g.w && _cy < _g.h);
+}
+
+function Nav_GridSet(_g, _cx, _cy, _block, _sight) {
+    if (!Nav_GridInside(_g, _cx, _cy)) return;
+    var _i = _cy * _g.w + _cx;
+    if (_block) _g.block[_i] = 1;
+    if (_sight) _g.sight[_i] = 1;
+}
+
+// Outside the map counts as blocked.
+function Nav_CellBlocked(_g, _cx, _cy) {
+    if (!Nav_GridInside(_g, _cx, _cy)) return true;
+    return (_g.block[_cy * _g.w + _cx] != 0);
+}
+
+function Nav_SightBlocked(_g, _cx, _cy) {
+    if (!Nav_GridInside(_g, _cx, _cy)) return true;
+    return (_g.sight[_cy * _g.w + _cx] != 0);
+}
+
+// Line of sight between two cells (Bresenham on cell centres). Only the cells strictly between the ends can block.
+function Nav_LineClear(_g, _x0, _y0, _x1, _y1) {
+    var _dx = abs(_x1 - _x0);
+    var _dy = abs(_y1 - _y0);
+    var _sx = (_x0 < _x1) ? 1 : -1;
+    var _sy = (_y0 < _y1) ? 1 : -1;
+    var _err = _dx - _dy;
+    var _x = _x0;
+    var _y = _y0;
+    var _guard = _dx + _dy + 2;
+    while (_guard-- > 0) {
+        if (_x == _x1 && _y == _y1) return true;
+        if ((_x != _x0 || _y != _y0) && Nav_SightBlocked(_g, _x, _y)) return false;
+        var _e2 = 2 * _err;
+        if (_e2 > -_dy) { _err -= _dy; _x += _sx; }
+        if (_e2 < _dx) { _err += _dx; _y += _sy; }
+    }
+    return true;
+}
+
+// ---- reservations: which enemy holds which cell (its own cell and the one it is stepping into) ----
+function Nav_ResCreate() {
+    return { cells: {} };
+}
+
+function Nav_ResKey(_cx, _cy) {
+    return string(_cx) + "," + string(_cy);
+}
+
+// -1 when nobody holds the cell.
+function Nav_ResOwnerAt(_r, _cx, _cy) {
+    var _k = Nav_ResKey(_cx, _cy);
+    if (!variable_struct_exists(_r.cells, _k)) return -1;
+    return variable_struct_get(_r.cells, _k);
+}
+
+function Nav_ResClaim(_r, _owner, _cx, _cy) {
+    var _o = Nav_ResOwnerAt(_r, _cx, _cy);
+    if (_o != -1 && _o != _owner) return false;
+    variable_struct_set(_r.cells, Nav_ResKey(_cx, _cy), _owner);
+    return true;
+}
+
+function Nav_ResRelease(_r, _owner) {
+    var _names = variable_struct_get_names(_r.cells);
+    for (var _i = 0; _i < array_length(_names); _i++) {
+        if (variable_struct_get(_r.cells, _names[_i]) == _owner) variable_struct_remove(_r.cells, _names[_i]);
+    }
+}
+
+// ---- A* on the 4-neighbour cell grid ----
+// Returns the cells to walk as [[cx,cy], ...], first step first, the goal last; [] when already there or no way.
+// The goal cell is always enterable (it is where the target stands: contact starts the fight). Cells held by another owner
+// in _res are walls for this query.
+function Nav_FindPath(_g, _sx, _sy, _gx, _gy, _res = undefined, _owner = -1) {
+    if (!Nav_GridInside(_g, _sx, _sy) || !Nav_GridInside(_g, _gx, _gy)) return [];
+    if (_sx == _gx && _sy == _gy) return [];
+    var _w = _g.w;
+    var _n = _w * _g.h;
+    var _cost = array_create(_n, -1);
+    var _par = array_create(_n, -1);
+    var _done = array_create(_n, false);
+    var _open = [];
+    var _s = _sy * _w + _sx;
+    var _goal = _gy * _w + _gx;
+    _cost[_s] = 0;
+    array_push(_open, _s);
+    var _dxs = [1, 0, -1, 0];
+    var _dys = [0, -1, 0, 1];
+    while (array_length(_open) > 0) {
+        // cheapest f = cost + Manhattan distance; ties go to the cell nearer the goal, then to the lower index
+        var _bi = 0;
+        var _bf = -1;
+        for (var _i = 0; _i < array_length(_open); _i++) {
+            var _idx = _open[_i];
+            var _h = abs((_idx mod _w) - _gx) + abs((_idx div _w) - _gy);
+            var _f = (_cost[_idx] + _h) * 1000 + _h;
+            if (_bf < 0 || _f < _bf || (_f == _bf && _idx < _open[_bi])) { _bf = _f; _bi = _i; }
+        }
+        var _cur = _open[_bi];
+        _open[_bi] = _open[array_length(_open) - 1];
+        array_pop(_open);
+        if (_cur == _goal) {
+            var _rev = [];
+            var _c = _cur;
+            while (_c != _s) {
+                array_push(_rev, [_c mod _w, _c div _w]);
+                _c = _par[_c];
+            }
+            var _out = [];
+            for (var _j = array_length(_rev) - 1; _j >= 0; _j--) array_push(_out, _rev[_j]);
+            return _out;
+        }
+        _done[_cur] = true;
+        var _cx = _cur mod _w;
+        var _cy = _cur div _w;
+        for (var _d = 0; _d < 4; _d++) {
+            var _nx = _cx + _dxs[_d];
+            var _ny = _cy + _dys[_d];
+            if (!Nav_GridInside(_g, _nx, _ny)) continue;
+            var _ni = _ny * _w + _nx;
+            if (_done[_ni]) continue;
+            if (_ni != _goal) {
+                if (_g.block[_ni] != 0) continue;
+                if (!is_undefined(_res)) {
+                    var _o = Nav_ResOwnerAt(_res, _nx, _ny);
+                    if (_o != -1 && _o != _owner) continue;
+                }
+            }
+            var _ng = _cost[_cur] + 1;
+            if (_cost[_ni] == -1) {
+                _cost[_ni] = _ng;
+                _par[_ni] = _cur;
+                array_push(_open, _ni);
+            } else if (_ng < _cost[_ni]) {
+                _cost[_ni] = _ng;
+                _par[_ni] = _cur;
+            }
+        }
+    }
+    return [];
+}
+
+// One step for an enemy at cell (_sx,_sy) toward (_gx,_gy): { ok, cx, cy, dir, len }. ok=false means stay (no way, or every way
+// is held by another enemy). On ok the next cell is claimed for _owner (except the target's own cell: touching it is the fight).
+function Nav_StepToward(_g, _r, _owner, _sx, _sy, _gx, _gy) {
+    var _res = { ok: false, cx: _sx, cy: _sy, dir: -1, len: 0 };
+    var _p = Nav_FindPath(_g, _sx, _sy, _gx, _gy, _r, _owner);
+    if (array_length(_p) == 0) return _res;
+    var _c = _p[0];
+    if (!(_c[0] == _gx && _c[1] == _gy)) {
+        if (!Nav_ResClaim(_r, _owner, _c[0], _c[1])) return _res;
+    }
+    _res.ok = true;
+    _res.cx = _c[0];
+    _res.cy = _c[1];
+    _res.len = array_length(_p);
+    if (_c[0] > _sx) _res.dir = RIGHT;
+    else if (_c[0] < _sx) _res.dir = LEFT;
+    else if (_c[1] > _sy) _res.dir = DOWN;
+    else _res.dir = UP;
+    return _res;
+}
