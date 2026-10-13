@@ -40,7 +40,8 @@
 #macro BSTATE_SKILL_MENU    6
 #macro BSTATE_ITEM_MENU     7
 #macro BSTATE_ATTACK_TIMING 8
-#macro BSTATE_ENEMY_DEF_QTE 9
+#macro BSTATE_ENEMY_DEFENCE 9
+#macro BSTATE_SKILL_QTE     10
 
 #macro STAT_STR  0
 #macro STAT_AGI  1
@@ -237,18 +238,16 @@
 #macro QTE_COL_DARK $506830
 #macro QTE_COL_LIGHT $6CC086
 #macro QTE_COL_LIGHTEST $CFF8E0
-#macro DEF_QTE_PROMPT_FADE_IN_SEC 0.12
-#macro DEF_QTE_PROMPT_RESPONSE_SEC 2.00
-#macro DEF_QTE_PROMPT_FEEDBACK_SEC 0.18
-#macro DEF_QTE_PROMPT_TRANSITION_SEC 0.10
-#macro DEF_QTE_SPEED_BASE_MULT 1.15
-#macro DEF_QTE_SPEED_RANK_STEP 0.08
-#macro DEF_QTE_SPEED_MULT_MAX 1.45
-#macro DEF_QTE_DAMAGE_REDUCTION_MAX 0.50
-#macro DEF_QTE_STATUS_MIN_MULT 1.00
-#macro DEF_QTE_STATUS_MAX_MULT 4.00
-#macro DEF_QTE_STATUS_STUN_BLOCK_RATIO 1.00
-#macro DEF_QTE_ARROW_BASE_SIZE 9
+// QTE part 2 (D57-D59): the arrow sequence for a player skill and the defence bar. All times are ms from delta_time.
+#macro QTE_SEQ_LEAD_IN_MS 300      // the arrows are up and the bar is full before the clock starts; presses in it are dropped
+#macro QTE_SEQ_PENALTY_MS 250      // a wrong arrow takes this much off the time bar
+#macro QTE_SEQ_BASE_MS 1000        // time bar = this + QTE_SEQ_PER_ARROW_MS per arrow
+#macro QTE_SEQ_PER_ARROW_MS 800
+#macro QTE_SEQ_FAST_BASE_MS 150    // Perfect (no mistakes) needs the sequence done within this + QTE_SEQ_FAST_PER_ARROW_MS per arrow
+#macro QTE_SEQ_FAST_PER_ARROW_MS 450
+#macro QTE_SEQ_SHAKE_MS 250        // how long the arrows shake after a wrong press
+#macro QTE_SEQ_POP_MS 140          // how long a completed arrow hops
+#macro QTE_TELEGRAPH_MS 400        // the "!" and the attack's name before the defence bar starts
 #macro PLAYER_HP_DEF_BONUS_FACTOR 0.25
 #macro ENEMY_SKILL_USE_CHANCE_DEFAULT 0.35
 #macro ENEMY_ACTION_CHAIN_MAX 3

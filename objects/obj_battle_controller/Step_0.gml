@@ -132,7 +132,7 @@ if (battle_state == BSTATE_SKILL_MENU) {
         if (skill_index == skill_count) {
             battle_state = BSTATE_MENU;
         } else {
-            Battle_PlayerSkill(self, skills[skill_index]);
+            Battle_SkillQteBegin(self, skills[skill_index]);
         }
     }
 
@@ -180,8 +180,19 @@ if (battle_state == BSTATE_ATTACK_TIMING) {
     exit;
 }
 
-if (battle_state == BSTATE_ENEMY_DEF_QTE) {
-    Battle_DefQTEStep(self);
+// --------------------
+// PLAYER SKILL: THE ARROW SEQUENCE
+// --------------------
+if (battle_state == BSTATE_SKILL_QTE) {
+    Battle_SkillQteStep(self);
+    exit;
+}
+
+// --------------------
+// BIG ENEMY ATTACK: THE DEFENCE BAR
+// --------------------
+if (battle_state == BSTATE_ENEMY_DEFENCE) {
+    Battle_DefenceStep(self, k_ok);
     exit;
 }
 

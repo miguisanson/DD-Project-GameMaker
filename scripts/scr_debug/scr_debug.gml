@@ -240,7 +240,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : 6000), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [] };
+                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : 6000), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [] };
 }
 
 function Scenario_Finish() {
@@ -309,9 +309,9 @@ function Scenario_NewKnight(_class = CLASS_KNIGHT) {
     return _gs;
 }
 
-function Scenario_GotoBattle(_persist_id) {
+function Scenario_GotoBattle(_persist_id, _enemy = ENEMY_SLIME) {
     GameState_SetBattleReturn(rm_floor1, 0, 0, 0);
-    GameState_SetBattleEnemy(_persist_id, ENEMY_SLIME, 1);
+    GameState_SetBattleEnemy(_persist_id, _enemy, 1);
     room_goto(rm_battle);
 }
 
@@ -496,15 +496,20 @@ function Scenario_StepSmokeSnap(_s) {
 }
 
 // ---- -bot: Knight vs Slime through simulated key presses (the real input path) ----
-// v=0 "perfect": confirms the menu, times the attack drop and answers the defence arrows from the battle controller's own data.
-// v=1 "fail": confirms the menu but never presses during a QTE.
+// v=0 "perfect": confirms the menu and presses the attack bar on its zone. Then v=3: one skill per class through the arrows and one defended
+// big attack, all Perfect. Then v=2: every skill animation. v=1 "fail": confirms the menu but never presses the bar. Then v=4: the same
+// skill casts and defence, all failed (Weak).
 function Scenario_StepBot(_s) {
-    if (_s.v == 3) {
+    if (_s.v == 5) {
         Scenario_StepMove(_s);
         return;
     }
-    if (_s.v >= 2) {
+    if (_s.v == 2) {
         Scenario_StepBotSkill(_s);
+        return;
+    }
+    if (_s.v >= 3) {
+        Scenario_StepBotExtras(_s);
         return;
     }
     var _name = (_s.v == 0) ? "bot_perfect" : "bot_fail";
@@ -546,12 +551,209 @@ function Scenario_StepBot(_s) {
         case 2:   // let the end-of-battle flow (return fade / game-over cutscene) run
             if (_s.t == 180) {
                 if (_s.v == 0) Scenario_Check("bot_perfect_returns_to_floor", room == rm_floor1, "room=" + room_get_name(room));
-                if (_s.v == 1) {   // the fail variant runs last: its lost battle leaves a game-over transition behind
-                    Scenario_Finish();
+                _s.xi = 0;
+                _s.v = (_s.v == 0) ? 3 : 4;   // 0 perfect -> 3 skill casts + defence -> 2 every player skill, one battle each (_s.ski) -> 1 fail -> 4 skill casts + defence
+                Scenario_Next(_s, 0);
+            }
+            break;
+    }
+}
+
+// ---- QTE part 2 in the bot: one skill per class through the arrow input, and one defended big attack ----
+// Run after the basic-attack battle of each variant (v=3 after "perfect", v=4 after "fail"). Everything is typed through Scenario_Tap, the same
+// input path as a player's move_up/down/left/right and confirm. Perfect variant: right arrows at a steady pace, the defence bar pressed on its
+// zone. Fail variant: two wrong arrows then the right ones (Weak, not a timeout) for the Knight and Mage, no arrow at all for the Archer
+// (the bar runs out), and no press on the defence bar.
+function Scenario_ArrowAction(_dir) {
+    var _keys = ["move_right", "move_up", "move_left", "move_down"];   // RIGHT, UP, LEFT, DOWN macro order
+    return _keys[_dir];
+}
+
+// The classes whose skill is cast: [class, skill]. The Nobody has no skills yet (D34).
+function Scenario_ExtraSkill(_i) {
+    var _rows = [[CLASS_KNIGHT, SKILL_HORIZ_SLASH], [CLASS_ARCHER, SKILL_POISON_ARROW], [CLASS_MAGE, SKILL_FIREBALL]];
+    return _rows[_i];
+}
+
+// Types the open arrow sequence. _mode: "right" = the wanted arrow every 5 frames, "wrong2" = two wrong arrows first, "none" = nothing.
+function Scenario_BotArrows(_s, _bc, _mode) {
+    if (_mode == "none" || _bc.battle_state != BSTATE_SKILL_QTE || !_bc.sq_active || _bc.sq_ms < 0 || (_s.f - _s.last_tap) < 5) return;
+    var _st = _bc.sq_st;
+    if (_st.done) return;
+    var _want = _st.seq[_st.idx];
+    if (_mode == "wrong2" && _s.xwrong < 2) {
+        _s.xwrong++;
+        Scenario_Tap(Scenario_ArrowAction((_want + 1) mod 4));
+    } else {
+        Scenario_Tap(Scenario_ArrowAction(_want));
+    }
+}
+
+// Presses confirm on the defence bar's zone centre (to within a frame and a half), once the sweep is under way.
+function Scenario_BotDefend(_s, _bc) {
+    if (_bc.battle_state != BSTATE_ENEMY_DEFENCE || !_bc.def_active || _bc.def_ms < 0 || (_s.f - _s.last_tap) < 4) return;
+    if ((Qte_ZoneCentreMs(_bc.def_params) - _bc.def_ms) <= Qte_StepMs(delta_time) * 1.5) Scenario_Tap("confirm");
+}
+
+function Scenario_StepBotExtras(_s) {
+    var _fail = (_s.v == 4);
+    var _who = _fail ? "bot_fail" : "bot_perfect";
+    if (_s.xi >= 4) {   // all four done: leave the debug switches and the Ramming status chance as they were
+        global.debug.enabled = false;
+        global.debug.enemy_damage_skill_only = false;
+        SkillDB_Get(SKILL_RAMMING).status_chance = 0.60;
+        if (_fail) Scenario_Finish();
+        else { _s.v = 2; Scenario_Next(_s, 0); }   // on to the per-skill animation checks
+        return;
+    }
+    var _is_defence = (_s.xi == 3);
+    var _row = _is_defence ? [CLASS_KNIGHT, SKILL_RAMMING] : Scenario_ExtraSkill(_s.xi);
+    var _sid = _row[1];
+    var _skill = SkillDB_Get(_sid);
+    var _name = _who + (_is_defence ? "_defence_" : "_arrows_") + string_lower(string_replace_all(_skill.name, " ", "_"));
+    switch (_s.step) {
+        case 0:
+            if (_s.t == 10) {
+                var _gs = Scenario_NewKnight(_row[0]);
+                var _ch = _gs.player_ch;
+                if (!_is_defence) {
+                    _ch.skills = [_sid];   // the only skill in the menu
+                    _ch.max_mp = 99;
+                    _ch.mp = 99;
+                    GameState_SetPlayer(_ch);
+                    _s.sk_mp0 = _ch.mp;
                 } else {
-                    _s.v = 2;   // 0 perfect -> 2 every player skill, one battle each (_s.ski) -> 1 fail
-                    Scenario_Next(_s, 0);
+                    _ch.max_hp = 99;   // a big hit must not end the battle
+                    _ch.hp = 99;
+                    GameState_SetPlayer(_ch);
+                    Debug_Init();
+                    global.debug.enabled = true;   // an enemy that only uses damaging skills: the mini boss's Ramming, every turn
+                    global.debug.enemy_damage_skill_only = true;
+                    SkillDB_Get(SKILL_RAMMING).status_chance = 1;   // so the Bleeding is always applied and there is something to resist
+                    _s.d_tries = 0;
+                    _s.d_seen = false;
                 }
+                _s.vstart = _s.f;
+                _s.sk = -1;
+                _s.xwrong = 0;
+                Scenario_GotoBattle(_name, _is_defence ? ENEMY_MINI_BOSS : ENEMY_SLIME);
+                Scenario_Next(_s, 1);
+            }
+            break;
+        case 1:
+            if (room != rm_battle || !instance_exists(obj_battle_controller)) {
+                if (_s.t > 20) {
+                    Scenario_Check(_name + "_in_battle", false, "room=" + room_get_name(room));
+                    Scenario_Finish();
+                }
+                break;
+            }
+            var _bc = instance_find(obj_battle_controller, 0);
+            var _ready = (_s.f - _s.last_tap) >= 4;
+            if (_s.f - _s.vstart > 1500) {
+                Scenario_Check(_name + "_finished", false, "sk=" + string(_s.sk) + " state=" + string(_bc.battle_state));
+                Scenario_Next(_s, 2);
+                break;
+            }
+            if (!_is_defence) {
+                var _mode = (!_fail) ? "right" : ((_s.xi == 1) ? "none" : "wrong2");
+                if (_s.sk == -1) {   // a sturdy enemy, so the skill cannot kill it
+                    _bc.e.max_hp = 99;
+                    _bc.e.hp = 99;
+                    _s.sk = 0;
+                } else if (_s.sk == 0) {   // reach the skill menu and confirm the skill
+                    if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {
+                        Scenario_Tap((_bc.menu_index != 1) ? "menu_down" : "confirm");
+                    } else if (_bc.battle_state == BSTATE_SKILL_MENU && _ready) {
+                        _bc.e.status = [];
+                        Scenario_Tap("confirm");
+                        _s.sk = 1;
+                    }
+                } else if (_s.sk == 1) {   // the confirm was read: the arrows are up and nothing is spent yet
+                    if (_bc.battle_state == BSTATE_SKILL_QTE) {
+                        Scenario_Check(_name + "_arrows_shown_in_the_skills_fixed_order", string(_bc.sq_st.seq) == string(Qte_SkillSequence(_sid)));
+                        Scenario_Check(_name + "_mp_not_spent_before_the_arrows_end", _bc.p.mp == _s.sk_mp0);
+                        _s.sk = 2;
+                    }
+                } else if (_s.sk == 2) {
+                    Scenario_BotArrows(_s, _bc, _mode);
+                    if (_bc.battle_state != BSTATE_SKILL_QTE) {   // the sequence ended and the skill was cast (message state)
+                        var _st = _bc.sq_st;
+                        var _want_key = _fail ? QTE_WEAK : QTE_PERFECT;
+                        var _want_mult = _fail ? 0.75 : 1.30;
+                        var _dealt = 99 - _bc.e.hp;
+                        // what the skill deals at grade OK, with and without a crit, from a fresh copy of the same enemy
+                        var _w = { power: _skill.power, stat_type: _skill.stat_type, acc: _skill.acc };
+                        var _b1 = Combat_ApplyDamage(_bc.p, EnemyCreate(ENEMY_SLIME), _w, 1, _skill.power_mult, { is_skill: true, grade_mult: 1 }).dmg;
+                        var _min = Qte_ScaleAmount(_b1, _want_mult, 1);
+                        show_debug_message("[BOT] " + _name + " grade=" + _st.key + " mult=" + string(_bc.qte_result_mult) + " arrows=" + string(_st.len) + " mistakes=" + string(_st.mistakes)
+                            + " timed_out=" + string(_st.timed_out) + " finish_ms=" + string(_st.finish_ms) + "/" + string(_st.limit_ms) + " dealt=" + string(_dealt) + " base=" + string(_b1) + " expected_min=" + string(_min));
+                        Scenario_Check(_name + "_grade_" + _want_key, _st.key == _want_key && _bc.qte_result_key == _want_key, "got " + _st.key);
+                        Scenario_Check(_name + "_multiplier_" + string(_want_mult), abs(_bc.qte_result_mult - _want_mult) < 0.0001);
+                        Scenario_Check(_name + "_all_arrows_" + (_mode == "none" ? "missed_timed_out" : "typed"), (_mode == "none") ? (_st.timed_out && _st.idx == 0) : (_st.idx == _st.len && !_st.timed_out));
+                        Scenario_Check(_name + "_mistakes_" + string((_mode == "wrong2") ? 2 : 0), _st.mistakes == ((_mode == "wrong2") ? 2 : 0), "mistakes=" + string(_st.mistakes));
+                        Scenario_Check(_name + "_damage_is_base_x_multiplier_or_more_and_never_0", _dealt >= _min && _dealt >= 1, "dealt=" + string(_dealt) + " min=" + string(_min));
+                        Scenario_Check(_name + "_damage_taken_off_the_enemy_matches_the_log", _dealt == _bc.last_dmg, "dealt=" + string(_dealt) + " last_dmg=" + string(_bc.last_dmg));
+                        Scenario_Check(_name + "_mp_spent_once", _s.sk_mp0 - _bc.p.mp == _skill.mp_cost, "mp0=" + string(_s.sk_mp0) + " mp=" + string(_bc.p.mp));
+                        Scenario_Check(_name + "_grade_word_shown", _bc.qte_result_text == Qte_GradeLabel(_want_key) && _bc.qte_result_ms > 0);
+                        Scenario_Check(_name + "_grade_sound_fired", global.sfx_last_key == Qte_GradeSfxKey(_want_key), "last=" + string(global.sfx_last_key));
+                        Scenario_Check(_name + "_hitstop_on_perfect_only", (_bc.hitstop_ms > 0) == (_want_key == QTE_PERFECT), "hitstop=" + string(_bc.hitstop_ms));
+                        Scenario_Next(_s, 2);
+                    }
+                }
+            } else {
+                if (_s.sk == -1) {
+                    _bc.e = Status_Add(_bc.e, STATUS_HIT_UP, 99, 0);   // the mini boss cannot miss, so every forced attack reaches the bar
+                    _s.sk = 0;
+                } else if (_s.sk == 0) {   // hand the turn to the enemy until its bar comes up
+                    if (_bc.battle_state == BSTATE_ENEMY_DEFENCE && _bc.def_active) {
+                        _s.d_hp_before = _bc.def_ctx.hp_before;
+                        _s.d_hp_shown = _bc.p.hp;
+                        _s.d_base = _bc.def_ctx.res.dmg;
+                        _s.d_bleed = Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED);
+                        _s.d_clock0 = _bc.def_ms;
+                        _s.d_mp_ok = true;
+                        _s.sk = 1;
+                    } else if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {
+                        _s.d_tries++;
+                        _bc.e = Status_Add(_bc.e, STATUS_HIT_UP, 99, 0);
+                        _bc.turn = TURN_ENEMY;
+                        _bc.battle_state = BSTATE_ENEMY_ACT;
+                    }
+                    if (_s.d_tries > 8) {
+                        Scenario_Check(_name + "_big_attack_reached_the_bar", false, "tries=" + string(_s.d_tries));
+                        Scenario_Next(_s, 2);
+                    }
+                } else if (_s.sk == 1) {
+                    if (!_fail) Scenario_BotDefend(_s, _bc);
+                    if (_bc.battle_state != BSTATE_ENEMY_DEFENCE) {   // the bar ended and the hit was settled
+                        var _key = _bc.qte_result_key;
+                        var _want_key2 = _fail ? QTE_WEAK : QTE_PERFECT;
+                        var _hp_now = _bc.p.hp;
+                        var _bleed_now = Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED);
+                        var _took = _s.d_hp_before - _hp_now;
+                        show_debug_message("[BOT] " + _name + " grade=" + _key + " base_dmg=" + string(_s.d_base) + " took=" + string(_took)
+                            + " expected=" + string(Qte_DefenceDamage(_s.d_base, _want_key2)) + " bleed_when_hit=" + string(_s.d_bleed) + " bleed_after=" + string(_bleed_now) + " telegraph_clock0=" + string(_s.d_clock0));
+                        Scenario_Check(_name + "_telegraph_then_bar_clock", _s.d_clock0 <= -(QTE_TELEGRAPH_MS + QTE_LEAD_IN_MS) + 100, "clock0=" + string(_s.d_clock0));
+                        Scenario_Check(_name + "_hp_not_lowered_while_the_bar_is_up", _s.d_hp_shown == _s.d_hp_before, "shown=" + string(_s.d_hp_shown) + " before=" + string(_s.d_hp_before));
+                        Scenario_Check(_name + "_grade_" + _want_key2, _key == _want_key2, "got " + string(_key));
+                        Scenario_Check(_name + "_damage_taken_matches_the_grade", _took == Qte_DefenceDamage(_s.d_base, _want_key2), "took=" + string(_took) + " base=" + string(_s.d_base));
+                        Scenario_Check(_name + "_status_was_applied_by_the_hit", _s.d_bleed > 0, "bleed=" + string(_s.d_bleed));
+                        Scenario_Check(_name + "_base_damage_is_4_or_more", _s.d_base >= 4, "base=" + string(_s.d_base));
+                        Scenario_Check(_name + "_status_not_lengthened", _bleed_now <= _s.d_bleed, "after=" + string(_bleed_now) + " applied=" + string(_s.d_bleed));
+                        if (_fail) Scenario_Check(_name + "_weak_leaves_the_status_as_applied", _bleed_now == _s.d_bleed, "after=" + string(_bleed_now) + " applied=" + string(_s.d_bleed));
+                        else Scenario_Check(_name + "_perfect_resists_the_status", _bleed_now == 0, "after=" + string(_bleed_now));
+                        Scenario_Check(_name + "_grade_word_shown", _bc.qte_result_text == Qte_GradeLabel(_want_key2) && _bc.qte_result_ms > 0);
+                        Scenario_Check(_name + "_grade_sound_fired", global.sfx_last_key == Qte_GradeSfxKey(_want_key2), "last=" + string(global.sfx_last_key));
+                        Scenario_Next(_s, 2);
+                    }
+                }
+            }
+            break;
+        case 2:   // measured: the next one (the battle is simply abandoned)
+            if (_s.t == 5) {
+                _s.xi++;
+                Scenario_Next(_s, 0);
             }
             break;
     }
@@ -588,6 +790,7 @@ function Scenario_StepBotSkill(_s) {
                 _s.sk = -1;
                 _s.sk_fx = false;
                 _s.sk_mp0 = _ch.mp;
+                _s.xwrong = 0;
                 Scenario_GotoBattle(_name);
                 Scenario_Next(_s, 1);
             }
@@ -618,12 +821,11 @@ function Scenario_StepBotSkill(_s) {
                     _bc.e.status = [];   // an enemy that used Solidify or Evasion on its turn would turn Foresight into a miss and skip the animation
                     Scenario_Tap("confirm");
                     _s.sk = 1;
-                } else if (_bc.battle_state == BSTATE_ENEMY_DEF_QTE && _ready && _bc.enemy_def_qte_active && _bc.enemy_def_qte_phase == 1
-                    && _bc.enemy_def_qte_index < array_length(_bc.enemy_def_qte_prompts)) {
-                    var _keys = ["move_right", "move_up", "move_left", "move_down"];
-                    Scenario_Tap(_keys[_bc.enemy_def_qte_prompts[_bc.enemy_def_qte_index]]);
+                } else {
+                    Scenario_BotDefend(_s, _bc);
                 }
-            } else if (_s.sk == 1) {   // the confirm was read: the controller is in the message state
+            } else if (_s.sk == 1) {   // the confirm was read: the arrows are up, then (once they are typed) the controller is in the message state
+                Scenario_BotArrows(_s, _bc, "right");
                 if (_bc.battle_state == BSTATE_MESSAGE) {
                     _s.sk_start = _s.f;
                     _s.sk_cast = _bc.skill_banner_active && _bc.skill_banner_name == _skill.name;   // Skill_Use succeeded (Meditation gives MP back, so MP alone cannot show it)
@@ -671,7 +873,7 @@ function Scenario_StepBotSkill(_s) {
         case 2:   // measured: start the next skill (the battle is simply abandoned) or the fail variant
             if (_s.t == 5) {
                 _s.ski++;
-                if (_s.ski >= array_length(_ids)) _s.v = 3;   // skills -> movement and AI -> fail
+                if (_s.ski >= array_length(_ids)) _s.v = 5;   // skills -> movement and AI (v=5) -> fail (v=1)
                 Scenario_Next(_s, 0);
             }
             break;
@@ -708,12 +910,8 @@ function Scenario_BotDrive(_s, _bc) {
                 Scenario_Tap("confirm");
             }
             break;
-        case BSTATE_ENEMY_DEF_QTE:
-            if (_perfect && _ready && _bc.enemy_def_qte_active && _bc.enemy_def_qte_phase == 1
-                && _bc.enemy_def_qte_index < array_length(_bc.enemy_def_qte_prompts)) {
-                var _keys = ["move_right", "move_up", "move_left", "move_down"];   // RIGHT, UP, LEFT, DOWN macro order
-                Scenario_Tap(_keys[_bc.enemy_def_qte_prompts[_bc.enemy_def_qte_index]]);
-            }
+        case BSTATE_ENEMY_DEFENCE:
+            if (_perfect) Scenario_BotDefend(_s, _bc);
             break;
     }
 }
@@ -1022,6 +1220,14 @@ function Scenario_StepShotsDisp(_s) {
         case 32:
         case 33:
         case 34:
+        case 35:
+        case 36:
+        case 37:
+        case 38:
+        case 39:
+        case 40:
+        case 41:
+        case 42:
             Scenario_StepShotsQte(_s);
             break;
     }
@@ -1071,6 +1277,96 @@ function Scenario_StepShotsQte(_s) {
             }
             break;
         case 34:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_Next(_s, 35);
+            }
+            break;
+        case 35:   // QTE part 2: a Mage's Fireball sequence (4 arrows) after one right and one wrong press, at display scale 3
+            if (_s.t == 1) {
+                var _gs = Scenario_NewKnight(CLASS_MAGE);
+                Scenario_SetWindowScale(3);
+                Scenario_GotoBattle("shots_qte_arrows");
+            }
+            if (_s.t >= 25) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_qte_arrows_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                var _bc = instance_find(obj_battle_controller, 0);
+                Battle_SkillQteBegin(_bc, SKILL_FIREBALL);
+                Scenario_Check("shots_qte_arrows_started", _bc.battle_state == BSTATE_SKILL_QTE && _bc.sq_active);
+                var _st = _bc.sq_st;
+                _bc.sq_ms = 1000;
+                Qte_SeqPress(_st, _st.seq[0], 600);    // right: the first arrow is done
+                Qte_SeqPress(_st, DOWN, 900);          // wrong: the second wanted is RIGHT, so it shakes and the bar loses 250 ms
+                Qte_SeqTick(_st, 1000);
+                _bc.sq_pop_ms = 0;
+                _bc.sq_wrong_ms = 0;
+                Scenario_Next(_s, 36);
+            }
+            break;
+        case 36:
+            if (_s.t >= 3) {
+                var _bc = instance_find(obj_battle_controller, 0);
+                Scenario_Check("shots_qte_arrows_mid_entry", _bc.battle_state == BSTATE_SKILL_QTE && _bc.sq_st.idx == 1 && _bc.sq_st.mistakes == 1 && !_bc.sq_st.done, "idx=" + string(_bc.sq_st.idx));
+                _s.shot = "shot_qte_arrows.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 37);
+            }
+            break;
+        case 37:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_Next(_s, 38);
+            }
+            break;
+        case 38:   // the telegraph of the mini boss's Ramming, then its defence bar, at display scale 3
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(3);
+                Scenario_GotoBattle("shots_qte_defence", ENEMY_MINI_BOSS);
+            }
+            if (_s.t >= 25) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_qte_defence_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                var _bc = instance_find(obj_battle_controller, 0);
+                var _sk = SkillDB_Get(SKILL_RAMMING);
+                _bc.skill_banner_active = true;
+                _bc.skill_banner_name = _sk.name;
+                Battle_DefenceStart(_bc, _sk, { ok: true, hit: true, dmg: 8, crit: false, msg: "" }, BSTATE_MENU, _bc.p.hp, Battle_StatusSnapshot(_bc.p));
+                _bc.wait_timer = 9999;
+                _bc.def_ms = -QTE_LEAD_IN_MS - 300;   // 100 ms into the telegraph
+                Scenario_Next(_s, 39);
+            }
+            break;
+        case 39:
+            if (_s.t >= 2) {
+                var _bc = instance_find(obj_battle_controller, 0);
+                Scenario_Check("shots_qte_telegraph_up", _bc.battle_state == BSTATE_ENEMY_DEFENCE && _bc.def_active && _bc.def_ms < -QTE_LEAD_IN_MS, "ms=" + string(_bc.def_ms));
+                _s.shot = "shot_qte_telegraph.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 40);
+            }
+            break;
+        case 40:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.def_ms = 880;   // 59% of Ramming's 1500 ms sweep: the cursor is on its way to the zone at 70%
+                Scenario_Next(_s, 41);
+            }
+            break;
+        case 41:
+            if (_s.t >= 2) {
+                var _bc = instance_find(obj_battle_controller, 0);
+                Scenario_Check("shots_qte_defence_bar_mid_sweep", _bc.battle_state == BSTATE_ENEMY_DEFENCE && _bc.def_active && _bc.def_ms > 880 && _bc.def_ms < _bc.def_params.sweep_ms, "ms=" + string(_bc.def_ms));
+                _s.shot = "shot_qte_defence.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 42);
+            }
+            break;
+        case 42:
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Scenario_Next(_s, 10);
