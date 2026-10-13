@@ -3,7 +3,6 @@ Phases are internal bookkeeping; this board is what matters. Updated after every
 Build: none yet | Unplayed: 0/15 | Open P1: 0 | Updated: 2026-10-14 | Release then stop (D28)
 
 ## Now (after your go)
-1. The game tests itself: one command builds, runs tests, plays a bot fight, takes screenshots, shows a build id. [VER-01..16]
 2. Four throwaway sketches you play ~10 min each: the run loop first, then QTE timing, turn bar, card picks. [no code kept; RUN, QTE, TURN, PROG]
 
 ## Next
@@ -19,12 +18,11 @@ Build: none yet | Unplayed: 0/15 | Open P1: 0 | Updated: 2026-10-14 | Release th
 10. Windows zip (built with Igor PackageZip, linked from your site) + credits + Korean + release-candidate playtest, then development stops. Windows only, no web version (D52). [REL, LOC, ROB-01]
 
 ## Done
+- The game tests itself: one command builds, runs 140 checks, plays a bot fight, takes screenshots, stamps a build id (2026-10-14).
 - Audit, research, 36 decisions (D1-D36), plan review, plan rewritten for the roguelike (2026-10-14)
 - D52 applied: Windows only, no web version (2026-10-14)
 
 ## Waiting on you
-- Say "go" to start items 1 and 2.
-- Create script asset `scr_test` in the IDE (1 minute). [VER-02]
 - Ask the friend which build they played. ("Bone" is answered: Foresight's icon looks like a bone; it should be an eye — D24.) [I-039]
 - Soon (item 4): in the IDE create `obj_display` and `scr_display`, set every room's view 0 to 160x144, widen `rm_floor6_5`, set the window colour to black. [DISP-02, 04, 10]
 - Send the creator names for the sounds/music you got (for the credits). [GAP-05]

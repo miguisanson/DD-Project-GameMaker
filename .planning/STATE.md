@@ -19,12 +19,12 @@ progress:
 
 | Field | Value |
 |---|---|
-| Build id | none yet (Phase 1 adds the build id stamp) |
+| Build id | stamped per gate run (`<hash>-<date>`), shown bottom-right of the title screen |
 | Working branch | `v1.9` (cut from `v1.8` 2026-10-13; game code identical to `0b6e2f8`, which the audits cite). Unattended work goes on `next` (`IMPROVE.md`). |
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PAUSED (owner gaming; test windows stole input). 1C on branch p1c-scenarios @dd0848a (worktree ../DD-Project-GameMaker-wt/p1c): code done, NOT compiled/run. When owner says done: compile, -Only smoke (+mutation), -Only shots (minimized no-activate, PNG check), -Only bot (input override), full, -NegativeControl; then merge. Rule: never run tests while the owner is using the PC; never fullscreen/focus-steal. |
+| WIP | none. Phase 1 harness DONE (1A-1D): full gate 118 s GATE PASS (140 tests + smoke + bot 8 asserts + 9 shots), negative control red, smoke catches an unknown-function crash Igor misses. Next: /improve command, then 1E old bugs. |
 | Unplayed features | 0 / 15 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
