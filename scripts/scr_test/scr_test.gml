@@ -62,6 +62,7 @@ function Test_RunAll() {
     Test_Reset();
     Test_RunSuite("Math", Test_Suite_Math);
     Test_RunSuite("Combat", Test_Suite_Combat);
+    Test_RunSuite("Fx", Test_Suite_Fx);
     Test_RunSuite("Status", Test_Suite_Status);
     Test_RunSuite("Inventory", Test_Suite_Inventory);
     Test_RunSuite("Data", Test_Suite_Data);
@@ -249,6 +250,33 @@ function Test_Suite_Combat() {
     Test_Eq("Easy: enemy dmg floor(9*0.9) == 8", Test_Hit(EnemyCreate(ENEMY_FINAL_BOSS), CharacterCreate_Player(CLASS_KNIGHT), _ew).dmg, 8);
     Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL);
     Test_Eq("Normal: enemy dmg == 9", Test_Hit(EnemyCreate(ENEMY_FINAL_BOSS), CharacterCreate_Player(CLASS_KNIGHT), _ew).dmg, 9);
+}
+
+// D55 / I-052: every player skill animation plays in at most 0.75 s (45 game frames at 60 fps; with the 0.3 s hold that is under the 66-frame
+// action limit) and is drawn no bigger than 1.5 x its target's longest side and 64 world px (the screen is 160 x 144), whatever enemy it hits.
+// Limits are the owner's numbers written out here, not read from the macros.
+function Test_Suite_Fx() {
+    var _ids = Skill_PlayerFxIds();
+    Test_Eq("Fx: 14 player skills have an animation", array_length(_ids), 14);
+    var _targets = [32, 48, 64];   // slime-sized enemies, the mini boss, the final boss; 32 is also the player's reference size
+    for (var _i = 0; _i < array_length(_ids); _i++) {
+        var _s = SkillDB_Get(_ids[_i]);
+        var _frames = FX_PlaybackFrames(_s.fx_sprite, Skill_FxSpeed(_s, true));
+        Test_True("D55 " + _s.name + " animation <= 45 frames (got " + string(_frames) + ")", _frames <= 45);
+        var _side = max(sprite_get_width(_s.fx_sprite), sprite_get_height(_s.fx_sprite));
+        for (var _t = 0; _t < array_length(_targets); _t++) {
+            var _drawn = _side * FX_ScaleFor(_s.fx_sprite, _targets[_t]);
+            Test_True("I-052 " + _s.name + " vs " + string(_targets[_t]) + " px target: drawn " + string(_drawn) + " px <= 1.5 x target and <= 64",
+                _drawn <= _targets[_t] * 1.5 + 0.01 && _drawn <= 64.01);
+            Test_True("I-052 " + _s.name + " vs " + string(_targets[_t]) + " px target: drawn " + string(_drawn) + " px >= 32 (still readable)", _drawn >= 32);
+        }
+    }
+    Test_Eq("D55 hold after an action is 18 frames", Combat_SecToFrames(COMBAT_ACTION_HOLD_SEC), 18);
+    // The pure helpers themselves: a 48 px sprite at 8 fps, 12 frames... uses the real sprites: ice_spear_effect has 12 frames at 8 fps.
+    Test_Eq("Fx: ice spear at image_speed 1 plays 12 frames in 90 game frames", FX_PlaybackFrames(ice_spear_effect, 1), 90);
+    Test_Eq("Fx: ice spear at image_speed 2 plays in 45 game frames", FX_PlaybackFrames(ice_spear_effect, 2), 45);
+    Test_True("Fx: SpeedForMaxFrames never slows an effect down", FX_SpeedForMaxFrames(ice_spear_effect, 5, 42) == 5);
+    Test_True("Fx: SpeedForMaxFrames raises a slow effect to fit", FX_PlaybackFrames(ice_spear_effect, FX_SpeedForMaxFrames(ice_spear_effect, 0.1, 42)) <= 42);
 }
 
 // Status rules (balance-data.md section 4 "Status effects"; combat-bugs.md section 1; R-005, R-022).
@@ -638,6 +666,12 @@ function Test_Suite_Loc() {
     Test_Eq("LOC-03 max-level row resolves in ko", Loc_T("combat.msg.max_level", "Max level reached."), Loc_GetRaw("combat.msg.max_level", "ko"));
     Test_True("LOC-03 max-level ko row differs from English", Loc_GetRaw("combat.msg.max_level", "ko") != "Max level reached.");
     Test_True("LOC-03 ko auto-resolve loot line is not English", string_pos("Loot gained.", Enemy_AutoResolveBuildMessage({ name: "Slime" }, { loot_gained: true })) == 0);
+    // BUG-08: the poison / burn / bleed tick line has a Korean row that keeps both placeholders.
+    var _tick_ko = Loc_GetRaw("combat.msg.status_tick", "ko");
+    Test_True("BUG-08 status_tick ko row is not the English text", _tick_ko != "" && _tick_ko != "{status} hurts you for {dmg}.");
+    Test_True("BUG-08 status_tick ko row keeps {status} and {dmg}", string_pos("{status}", _tick_ko) > 0 && string_pos("{dmg}", _tick_ko) > 0);
+    Loc_SetLanguage("en");
+    Test_Eq("BUG-08 status_tick (en)", Loc_T("combat.msg.status_tick", "x", { status: "Poison", dmg: 2 }), "Poison hurts you for 2.");
     Loc_SetLanguage(_lang0);
     // The save confirmation uses the existing dialogue key sys_save_ok (scr_dialogue.gml).
     Loc_SetLanguage("ko");
