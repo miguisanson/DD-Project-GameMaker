@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Owner asleep from 2026-10-14 night. AWAY BUDGET: building the queue has NO usage cap. Once the queue is done and only improvement mode is left (waiting for the playtest), note the weekly % at that moment and cap improvement mode at that +20%. In flight: display step A (worktree ../DD-Project-GameMaker-wt/disp), fx-fix (worktree ../DD-Project-GameMaker-wt/fx). Queue while away: display step B → movement/AI (D63-D70) → QTE bar+arrows + turn-bar prototype → STOP for first playtest (write PLAYTEST-QUEUE.md + BOARD). |
+| WIP | Owner asleep from 2026-10-14 night. AWAY BUDGET: building the queue has NO usage cap. Once the queue is done and only improvement mode is left (waiting for the playtest), note the weekly % at that moment and cap improvement mode at that +20%. Merged to next: p1e-battle, p1e-save, loc, fx-fix (all skills ~1 s, effect size rule), disp-a (layout math). In flight: disp-b (worktree ../DD-Project-GameMaker-wt/dispb, display manager hosted on obj_ui_controller), move-ai (worktree ../DD-Project-GameMaker-wt/move, D63-D70). Queue while away: display step B → movement/AI (D63-D70) → QTE bar+arrows + turn-bar prototype → STOP for first playtest (write PLAYTEST-QUEUE.md + BOARD). |
 | Unplayed features | 0 / 15 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
@@ -61,6 +61,9 @@ Do not start Phase 4 until the G3 save contract is written. Do not start any com
 5. `research/SUMMARY.md`: index of every research and audit file, including `roguelike-design.md`, `roguelike-cases.md` and `plan-review.md`. `research/AGENTS-CHANGES.md`: proposed AGENTS.md text.
 
 ## Learned, not obvious from code
+
+- **Test runs still take focus**: the game window becomes foreground ~273 ms after a minimized launch (display spike). Never run window modes while the owner uses the PC until fixed (I-053).
+- **Owner IDE tasks for the next stop**: add Create/Begin Step/Draw GUI events to obj_display (then move display logic from obj_ui_controller); options: window colour black, Windows scaling -1, allow window resize (DISP-11).
 
 - **An open GameMaker IDE overwrites .gml files with its stale in-memory copy** (2026-10-14: it reverted scr_test.gml to the placeholder on close). The owner keeps the IDE closed while agents work; before merging, check `git status` is clean.
 
