@@ -76,6 +76,9 @@ function Test_RunAll() {
     Test_RunSuite("Snap", Test_Suite_Snap);
     Test_RunSuite("SaveAtomic", Test_Suite_SaveAtomic);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
+    Test_RunSuite("Mem", Test_Suite_Mem);
+    Test_RunSuite("Input", Test_Suite_Input);
+    Test_RunSuite("SfxInit", Test_Suite_SfxInit);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -1358,4 +1361,113 @@ function Test_Suite_Snap() {
     Test_Eq("SNAP-01 32.4 is not aligned", Grid_IsAligned(32.4), false);
     Test_Eq("SNAP-01 -16 is aligned", Grid_IsAligned(-16), true);
     Test_Eq("SNAP-01 float noise below 0.001 counts as aligned", Grid_IsAligned(32.000000001), true);
+}
+
+
+// ---- ROB-03 memory hygiene -----------------------------------------------------------------------
+// GameMaker has no "count live ds structures" call, so this scans the id space with ds_exists. Ids are small
+// integers that are reused after a destroy, so a leak shows up as a count that keeps growing.
+// Mem_DsLiveCount() is also meant for the -smoke / -bot run: read it before and after N room changes or battles and
+// assert Mem_DsGrowthSince(baseline) == 0 (the scan costs a few thousand cheap calls; do not call it every frame).
+function Mem_DsLiveCount(_max_id = 1024) {
+    var _types = [ds_type_map, ds_type_list, ds_type_grid, ds_type_queue, ds_type_stack, ds_type_priority];
+    var _n = 0;
+    for (var _t = 0; _t < array_length(_types); _t++) {
+        for (var _i = 0; _i < _max_id; _i++) {
+            if (ds_exists(_i, _types[_t])) _n++;
+        }
+    }
+    return _n;
+}
+
+function Mem_DsGrowthSince(_baseline) {
+    return Mem_DsLiveCount() - _baseline;
+}
+
+// One "room or battle worth" of init paths that are re-entered on every room change / battle start / load.
+function Test_MemCycle() {
+    GameState_Init();
+    ItemDB_Init();
+    SkillDB_Init();
+    EnemyDB_Init();
+    StatusDB_Init();
+    DialogueDB_Init();
+    Loot_Init();
+    Loot_BuildSkillbookLists();
+    SFX_EnsureGainMaps();
+    SFX_EnsureVariantMaps();
+    // a re-created persistent audio manager destroys and rebuilds its four maps in Create
+    if (instance_exists(obj_sfx_manager)) instance_destroy(obj_sfx_manager);
+    SFX_EnsureManager();
+    var _snap = json_parse(json_stringify(Save_BuildSnapshot()));
+    Save_ApplySnapshot(_snap);
+}
+
+function Test_Suite_Mem() {
+    // the counter itself works: a created map is counted, a destroyed one is not
+    var _c0 = Mem_DsLiveCount();
+    var _m = ds_map_create();
+    Test_Eq("ROB-03 counter sees a new ds_map", Mem_DsGrowthSince(_c0), 1);
+    var _l = ds_list_create();
+    Test_Eq("ROB-03 counter sees a new ds_list", Mem_DsGrowthSince(_c0), 2);
+    ds_map_destroy(_m);
+    ds_list_destroy(_l);
+    Test_Eq("ROB-03 counter drops after destroy", Mem_DsGrowthSince(_c0), 0);
+
+    var _fx = Test_FixBegin(DIFFICULTY_NORMAL);
+    Test_MemCycle();   // warm-up: first pass creates the long-lived databases
+    var _base = Mem_DsLiveCount();
+    for (var _n = 0; _n < 20; _n++) Test_MemCycle();
+    Test_Log("[MEM] live ds structures: baseline=" + string(_base) + " after20=" + string(Mem_DsLiveCount()));
+    Test_Eq("ROB-03 live ds structures after 20 room/battle init cycles (baseline " + string(_base) + ")", Mem_DsGrowthSince(_base), 0);
+    Test_FixRestore();
+}
+
+// ---- ROB-03 input: no per-frame allocation ------------------------------------------------------
+function Test_Suite_Input() {
+    Input_Init();
+    var _inp = global.input;
+    keyboard_clear(ord("W"));
+    _inp.last_step_time = -1;
+    Input_Update();
+    var _a = variable_struct_get(_inp.state, "move_up");
+    var _f0 = _inp.frame;
+    _inp.last_step_time = -1;
+    Input_Update();
+    var _b = variable_struct_get(_inp.state, "move_up");
+    Test_Eq("ROB-03 Input_Update advances the frame once per call", _inp.frame, _f0 + 1);
+    Test_True("ROB-03 Input_Update reuses the same state struct for an action", _a == _b);
+    Test_Eq("ROB-03 idle: move_up not held", _b.held, false);
+    Test_Eq("ROB-03 idle: move_up not pressed", _b.pressed, false);
+
+    // a held action that is no longer down is released, and leaves the move order (needs the previous state)
+    variable_struct_set(_inp.state, "move_up", { held: true, pressed: false });
+    _inp.move_order = ["move_up"];
+    _inp.last_step_time = -1;
+    Input_Update();
+    var _d = variable_struct_get(_inp.state, "move_up");
+    Test_Eq("ROB-03 released key: move_up held cleared", _d.held, false);
+    Test_Eq("ROB-03 released key: move_up pressed cleared", _d.pressed, false);
+    Test_Eq("ROB-03 released key leaves the move order", array_length(_inp.move_order), 0);
+    // a foreign struct written into the state (the bot does this) is overwritten in place with fresh values
+    var _e = { held: true, pressed: true };
+    variable_struct_set(_inp.state, "move_up", _e);
+    _inp.last_step_time = -1;
+    Input_Update();
+    Test_Eq("ROB-03 override then update: held reset", variable_struct_get(_inp.state, "move_up").held, false);
+    Test_Eq("ROB-03 override then update: pressed reset", variable_struct_get(_inp.state, "move_up").pressed, false);
+    _inp.last_step_time = -1;
+}
+
+// ---- ROB-03 obj_sfx_manager: audio globals are created once, not every Step -----------------------
+function Test_Suite_SfxInit() {
+    global.audio_globals_ready = false;
+    global.sfx_globals_init_runs = 0;
+    for (var _f = 0; _f < 300; _f++) SFX_EnsureAudioGlobals();   // what obj_sfx_manager Step does each frame
+    Test_Eq("ROB-03 audio globals init runs once over 300 frames", global.sfx_globals_init_runs, 1);
+    global.audio_debug_missing_count = 0;
+    global.audio_debug_missing_count = 5;
+    SFX_EnsureAudioGlobals();
+    Test_Eq("ROB-03 later calls do not overwrite live audio state", global.audio_debug_missing_count, 5);
+    global.audio_debug_missing_count = 0;
 }

@@ -1,18 +1,4 @@
-if (!variable_global_exists("audio_debug_enabled")) global.audio_debug_enabled = false;
-if (!variable_global_exists("audio_debug_test_key")) global.audio_debug_test_key = "ui_confirm";
-if (!variable_global_exists("audio_debug_last_key")) global.audio_debug_last_key = global.audio_debug_test_key;
-if (!variable_global_exists("audio_debug_last_channel")) global.audio_debug_last_channel = -1;
-if (!variable_global_exists("audio_debug_last_status")) global.audio_debug_last_status = "Audio debug OFF";
-if (!variable_global_exists("audio_debug_last_ok")) global.audio_debug_last_ok = false;
-if (!variable_global_exists("audio_debug_last_asset")) global.audio_debug_last_asset = noone;
-if (!variable_global_exists("audio_debug_last_asset_name")) global.audio_debug_last_asset_name = "";
-if (!variable_global_exists("audio_debug_last_reason")) global.audio_debug_last_reason = "";
-if (!variable_global_exists("audio_debug_direct_handle")) global.audio_debug_direct_handle = -1;
-if (!variable_global_exists("audio_debug_direct_playing")) global.audio_debug_direct_playing = false;
-if (!variable_global_exists("audio_debug_group_loaded")) global.audio_debug_group_loaded = false;
-if (!variable_global_exists("audio_group_load_requested")) global.audio_group_load_requested = false;
-if (!variable_global_exists("audio_debug_missing_count")) global.audio_debug_missing_count = 0;
-if (!variable_global_exists("audio_debug_total_count")) global.audio_debug_total_count = 0;
+SFX_EnsureAudioGlobals();
 
 var group_loaded = audio_group_is_loaded(audiogroup_default);
 global.audio_debug_group_loaded = group_loaded;
