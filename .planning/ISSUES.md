@@ -93,8 +93,10 @@ Found by audits and reviews (no person's words):
 | I-048 | owner 2026-10-14: "player is not aligned"; "AI and players get easily stuck"; "the maps dont align properly with the grid" | BUG | P2 | unknown | needs repro (audit/movement.md) | player snaps cleanly to the tile grid | open |
 | I-049 | owner 2026-10-14: "the trigger interactables like when moving room to room or scene, i want to see" | BUG/FEATURE | P2 | unknown | needs repro (audit/movement.md) | room/scene triggers fire reliably and can be shown in a debug view | open |
 | I-050 | owner 2026-10-14: "make sure the game is optimized and pathfinding is really good" | FEEL | P2 | unknown | profile (audit/movement.md) | steady frame rate; good pathfinding | open |
-| I-051 | owner 2026-10-14: "the screen/resolution breaks whenever i do the cutscene, im not sure even if the way i built the game with the scenes and rooms and cutscene are optimal" | BUG+QUESTION | P1 | unknown | audit/resolution.md H1-H6 | screen stays correct through every cutscene end; display rebuild reviews room/cutscene flow and simplifies only where it causes bugs | fixed on `disp-b` (H1: no re-apply at transition end; H2: last cutscene image fades), not merged; owner L5 check pending |
+| I-051 | owner 2026-10-14: "the screen/resolution breaks whenever i do the cutscene, im not sure even if the way i built the game with the scenes and rooms and cutscene are optimal" | BUG+QUESTION | P1 | unknown | audit/resolution.md H1-H6 | screen stays correct through every cutscene end; display rebuild reviews room/cutscene flow and simplifies only where it causes bugs | fixed on next (disp-b: no relayout on transitions/cutscenes, art kept through fade), awaiting owner play |
+| I-052 | owner 2026-10-14: "some animations are Large and not sized well like the foresight the eyeball was half of the screen" | BUG | P2 | unknown | cast Foresight in battle; check every skill/status effect animation | every battle effect animation fits its target at the right scale (L4 screenshot per skill) | fixed on next (fx-fix, R-0xx), awaiting owner play |
+| I-053 | display spike 2026-10-14: test game window takes foreground ~273 ms after a minimized launch | BUG (tooling) | P2 | n/a | run any window mode while using another app | test runs never take focus | open |
 
 ---
 
-*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-052.*
+*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-054.*

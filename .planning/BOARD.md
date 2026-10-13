@@ -1,6 +1,6 @@
 # DD-Project board
 Phases are internal bookkeeping; this board is what matters. Updated after every step that lands.
-Build: none yet | Unplayed: 0/15 | Open P1: 0 | Updated: 2026-10-14 | Release then stop (D28)
+Build: bcedf32-20261014 (branch next) | Unplayed: 9/15 | Open P1: 0 | Updated: 2026-10-14 | Release then stop (D28)
 
 ## Now (after your go)
 2. Four throwaway sketches you play ~10 min each: the run loop first, then QTE timing, turn bar, card picks. [no code kept; RUN, QTE, TURN, PROG]
@@ -23,6 +23,10 @@ Build: none yet | Unplayed: 0/15 | Open P1: 0 | Updated: 2026-10-14 | Release th
 - D52 applied: Windows only, no web version (2026-10-14)
 
 ## Waiting on you
+- **PLAYTEST NOW:** run `E:\Games\DD-Project Playtest\bcedf32-20261014\DD-Project.exe` and follow `.planning/PLAYTEST-QUEUE.md` (9 short checks, ~30-40 min). Then say which are good/bad, and "merge the good ones".
+- Review the starting numbers the agents chose (QTE bar speeds, arrow sequences, defence %, enemy sight/speeds) — listed in STATE.md "Numbers to review".
+- After the playtest: grill on the turn-order bar details.
+- In GameMaker (when convenient, then close it): add Create / Begin Step / Draw GUI events to `obj_display`; Game Options > Windows: scaling to full window, allow window resize; fix `rm_floor6_5` width; delete unused sprites `spr_attack_timing_target` and `spr_attack_timing_falling`.
 - Ask the friend which build they played. ("Bone" is answered: Foresight's icon looks like a bone; it should be an eye — D24.) [I-039]
 - Soon (item 4): in the IDE create `obj_display` and `scr_display`, set every room's view 0 to 160x144, widen `rm_floor6_5`, set the window colour to black. [DISP-02, 04, 10]
 - Send the creator names for the sounds/music you got (for the credits). [GAP-05]
