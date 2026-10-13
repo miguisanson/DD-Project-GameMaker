@@ -208,12 +208,19 @@ function Combat_Log(_text, _icon_sprite = noone, _icon_subimg = 0) {
     bc.combat_log = log;
 }
 
-function Battle_Message(_bc, _text, _next_state, _fx = noone) {
+// Seconds -> game frames at the current room speed (frame-rate independent waits).
+function Combat_SecToFrames(_seconds) {
+    var game_fps = game_get_speed(gamespeed_fps);
+    if (!is_real(game_fps) || game_fps <= 0) game_fps = 60;
+    return max(1, round(_seconds * game_fps));
+}
+
+function Battle_Message(_bc, _text, _next_state, _fx = noone, _hold_frames = -1) {
     _bc.message_text = _text;
     _bc.message_next_state = _next_state;
     _bc.battle_state = BSTATE_MESSAGE;
     _bc.wait_fx = _fx;
-    _bc.wait_timer = COMBAT_ACTION_DELAY;
+    _bc.wait_timer = (_hold_frames >= 0) ? _hold_frames : Combat_SecToFrames(COMBAT_ACTION_HOLD_SEC);
     Combat_Log(_text);
 }
 
@@ -390,7 +397,7 @@ function Battle_CheckEnd(_bc, _p, _e) {
         var gs = GameState_Get();
         gs.pending_post_battle_dialogue_lines = Battle_BuildVictoryDialogueLines(_e, rewards, _p);
 
-        Battle_Message(_bc, Loc_T("combat.msg.enemy_slain", "{enemy} has been slain.", { enemy: _e.name }), BSTATE_END_RUN);
+        Battle_Message(_bc, Loc_T("combat.msg.enemy_slain", "{enemy} has been slain.", { enemy: _e.name }), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY);
         return true;
     }
 
@@ -655,6 +662,22 @@ function Battle_PlayerAttack(_bc) {
     Battle_PlayerAttackResolveTimed(_bc, { key: "PERFECT", label: Loc_T("battle.action.timing.perfect", "PERFECT"), mult: 1.00, hit: true });
 }
 
+// Where a player skill's animation plays (BUG-21): self-targeted skills (the buffs) on the player, the rest on the enemy.
+function Battle_SkillFxOnPlayer(_skill_id) {
+    var sk = SkillDB_Get(_skill_id);
+    return (is_struct(sk) && variable_struct_exists(sk, "target") && sk.target == TGT_SELF);
+}
+
+// Top-left spawn position that puts the middle of an fx sprite on the point (_px, _py).
+function FX_CenterAtPoint(_sprite, _px, _py) {
+    if (_sprite == noone) return { x: _px, y: _py };
+    var fx_scale = max(0.01, abs(SKILL_FX_SCALE));
+    return {
+        x: _px - ((sprite_get_width(_sprite) * 0.5 - sprite_get_xoffset(_sprite)) * fx_scale),
+        y: _py - ((sprite_get_height(_sprite) * 0.5 - sprite_get_yoffset(_sprite)) * fx_scale)
+    };
+}
+
 function Battle_PlayerSkill(_bc, _skill_id) {
     var p = _bc.p;
     var e = _bc.e;
@@ -677,7 +700,11 @@ function Battle_PlayerSkill(_bc, _skill_id) {
     if (res.ok && res.fx_sprite != noone && (skill.effect != "damage" || res.hit)) {
         var tx = _bc.enemy_fx_x;
         var ty = _bc.enemy_fx_y;
-        if (instance_exists(_bc.enemy_inst)) {
+        if (Battle_SkillFxOnPlayer(_skill_id)) {
+            var ppos = FX_CenterAtPoint(res.fx_sprite, _bc.player_fx_x, _bc.player_fx_y);
+            tx = ppos.x;
+            ty = ppos.y;
+        } else if (instance_exists(_bc.enemy_inst)) {
             var pos = FX_CenterOn(res.fx_sprite, _bc.enemy_inst);
             tx = pos.x;
             ty = pos.y;
@@ -796,7 +823,7 @@ function Battle_RunAttempt(_bc) {
         if (enemy_id == ENEMY_STRANGER) {
             Dialogue_NarrativeOnStrangerEncounterResolved();
         }
-        Battle_Message(_bc, Loc_T("combat.msg.player_ran", "You ran away!"), BSTATE_END_RUN);
+        Battle_Message(_bc, Loc_T("combat.msg.player_ran", "You ran away!"), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY);
     } else {
         _bc.turn = TURN_ENEMY;
         Battle_Message(_bc, Loc_T("combat.msg.player_couldnt_escape", "Couldn't escape!"), BSTATE_ENEMY_ACT);

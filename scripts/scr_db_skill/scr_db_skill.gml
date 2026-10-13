@@ -41,7 +41,7 @@ function SkillDB_Init() {
         fx_sprite: stun_effect,
         fx_frames: 12,
         fx_speed: 0.2,
-        player_fx_speed_mult: 6.5,
+        player_fx_speed_mult: 10,
         hits: 1,
         class_list: [CLASS_KNIGHT]
     };
@@ -254,7 +254,7 @@ function SkillDB_Init() {
         fx_sprite: ice_spear_effect,
         fx_frames: 12,
         fx_speed: 0.2,
-        player_fx_speed_mult: 6.5,
+        player_fx_speed_mult: 10,
         hits: 1,
         class_list: [CLASS_MAGE]
     };

@@ -200,6 +200,15 @@ function Test_Suite_Combat() {
     Test_Eq("Combat_DodgeBonus slime AGI9 == -1", Combat_DodgeBonus(_slime), -1);
     _a = Status_Add(_a, STATUS_BLEED, 3, 0);
     Test_Eq("Combat_DodgeBonus archer bleeding (AGI-2) == 0", Combat_DodgeBonus(_a), 0);
+    // BUG-21: self-buff animations play on the player, damaging skills on the enemy.
+    var _buffs = [SKILL_MUSCLE_UP, SKILL_REV_UP, SKILL_EVASION, SKILL_TAKE_AIM, SKILL_MEDITATION, SKILL_FORESIGHT];
+    var _attacks = [SKILL_HILT_BASH, SKILL_ICE_SPEAR, SKILL_HORIZ_SLASH, SKILL_FIREBALL, SKILL_WOUND, SKILL_POISON_ARROW, SKILL_DOUBLE_SHOT, SKILL_POISON_MIST];
+    for (var _bi = 0; _bi < array_length(_buffs); _bi++) {
+        Test_True("BUG-21 self-buff skill " + SkillDB_Get(_buffs[_bi]).name + " animates on the player", Battle_SkillFxOnPlayer(_buffs[_bi]));
+    }
+    for (var _ai = 0; _ai < array_length(_attacks); _ai++) {
+        Test_False("BUG-21 attack skill " + SkillDB_Get(_attacks[_ai]).name + " animates on the enemy", Battle_SkillFxOnPlayer(_attacks[_ai]));
+    }
     // Hit rules: force_dodge (Evasion, Solidify) is consumed and beats always_hit (Foresight); Foresight alone always hits.
     var _evader = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_EVASION, 3, 0);
     var _r = Combat_AttemptHit(_k, _evader, 0);
@@ -258,6 +267,22 @@ function Test_Suite_Status() {
     _p = Status_Tick(_p);
     Test_True("R-005 three ticks cost 6-9 HP in total", (_hp0 - _p.hp) >= 6 && (_hp0 - _p.hp) <= 9);
     Test_False("poison is removed when its turns reach 0", Status_Has(_p, STATUS_POISON));
+    // BUG-08: a poison tick on the player must be seen and heard (log line, sound, HUD flash), not just change the HP number.
+    var _fp = Status_Add(Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL), STATUS_POISON, 3, 0);
+    var _fhp = _fp.hp;
+    global.status_tick_last = undefined;
+    _fp = Status_Tick(_fp);
+    var _fb = variable_global_exists("status_tick_last") ? global.status_tick_last : undefined;
+    Test_True("BUG-08 player poison tick raises feedback", is_struct(_fb));
+    Test_True("BUG-08 tick log line names Poison and the HP lost", is_struct(_fb) && string_pos("Poison", _fb.line) > 0 && string_pos(string(_fhp - _fp.hp), _fb.line) > 0);
+    Test_True("BUG-08 tick plays a sound", is_struct(_fb) && _fb.sfx != "");
+    Test_True("BUG-08 tick flashes the HP bar", is_struct(_fb) && _fb.flash_frames > 0);
+    global.status_tick_last = undefined;
+    var _fe = Status_Tick(Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_POISON, 2, 0));
+    Test_True("BUG-08 an enemy poison tick raises no player feedback", !(variable_global_exists("status_tick_last") && is_struct(global.status_tick_last)));
+    global.status_tick_last = undefined;
+    var _fm = Status_Tick(Status_Add(CharacterCreate_Player(CLASS_MAGE), STATUS_MEDITATION, 2, 0));
+    Test_True("BUG-08 a healing tick (Meditation) raises no damage feedback", !(variable_global_exists("status_tick_last") && is_struct(global.status_tick_last)));
     // HP and MP clamp to [0, max].
     var _low = Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL);
     _low.hp = 1;

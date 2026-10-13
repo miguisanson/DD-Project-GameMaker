@@ -13,7 +13,7 @@ if (room == rm_battle && instance_exists(obj_battle_controller)) {
     if (instance_exists(hud_bc) && is_struct(hud_bc.p)) hud_ch = hud_bc.p;
 }
 if (is_struct(hud_ch)) {
-    if (hud_prev_hp >= 0 && hud_ch.hp < hud_prev_hp) hud_hurt_flash_timer = UI_HUD_HURT_FLASH_FRAMES;
+    if (hud_prev_hp >= 0 && hud_ch.hp < hud_prev_hp) hud_hurt_flash_timer = max(hud_hurt_flash_timer, UI_HUD_HURT_FLASH_FRAMES);
     hud_prev_hp = hud_ch.hp;
     hud_prev_mp = hud_ch.mp;
 } else {
