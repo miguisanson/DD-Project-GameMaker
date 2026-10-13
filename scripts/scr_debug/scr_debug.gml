@@ -333,6 +333,28 @@ function Scenario_StepSmoke(_s) {
         case 2:
             if (_s.t == 60) {
                 Scenario_Check("smoke_rm_battle", room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_NewKnight();
+                room_goto(rm_floor5);
+                Scenario_Next(_s, 3);
+            }
+            break;
+        case 3:
+            // BUG-07: the mini boss in rm_floor5 must stay on its start tile (it is stationary; ai_stationary = true).
+            if (_s.t == 30) {
+                var _mb = instance_exists(obj_mini_boss) ? instance_find(obj_mini_boss, 0) : noone;
+                Scenario_Check("smoke_rm_floor5_mini_boss", room == rm_floor5 && _mb != noone);
+                if (_mb == noone) { Scenario_Finish(); break; }
+                _s.mb_x = _mb.x;
+                _s.mb_y = _mb.y;
+                _s.mb_drift = 0;
+                Scenario_Check("smoke_mini_boss_at_start_tile", _mb.x == _mb.xstart && _mb.y == _mb.ystart, "x=" + string(_mb.x) + " y=" + string(_mb.y) + " xstart=" + string(_mb.xstart) + " ystart=" + string(_mb.ystart));
+            }
+            if (_s.t > 30 && instance_exists(obj_mini_boss)) {
+                var _mb2 = instance_find(obj_mini_boss, 0);
+                _s.mb_drift = max(_s.mb_drift, abs(_mb2.x - _s.mb_x) + abs(_mb2.y - _s.mb_y));
+            }
+            if (_s.t == 210) {
+                Scenario_Check("smoke_mini_boss_stationary_180_frames", room == rm_floor5 && _s.mb_drift == 0, "room=" + room_get_name(room) + " max_drift=" + string(_s.mb_drift));
                 Scenario_Finish();
             }
             break;

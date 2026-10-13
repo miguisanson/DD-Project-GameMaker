@@ -74,19 +74,20 @@ function Enemy_AutoResolveBuildMessage(_cfg, _result, _verb_prefix = "You overpo
 
     var parts = [];
     if (variable_struct_exists(_result, "exp_gain") && _result.exp_gain > 0) {
-        array_push(parts, "(+" + string(_result.exp_gain) + " EXP)");
+        array_push(parts, Loc_T("combat.msg.exp_gain", "(+{exp} EXP)", { exp: _result.exp_gain }));
     }
 
     var levels = (variable_struct_exists(_result, "levels_gained")) ? max(0, round(real(_result.levels_gained))) : 0;
     var stat_points = (variable_struct_exists(_result, "stat_points_gained")) ? max(0, round(real(_result.stat_points_gained))) : 0;
     var auto_summary = (variable_struct_exists(_result, "auto_stat_summary")) ? string(_result.auto_stat_summary) : "";
     if (levels > 0) {
-        var lvl_msg = "Level up x" + string(levels) + "!";
+        var lvl_msg = Loc_T("combat.msg.level_up", "Level up x{levels}!", { levels: levels });
         if (stat_points > 0 || auto_summary != "") {
             lvl_msg += " (";
             var sub = [];
-            if (stat_points > 0) array_push(sub, "+" + string(stat_points) + " stat point" + ((stat_points == 1) ? "" : "s"));
-            if (auto_summary != "") array_push(sub, "auto " + auto_summary);
+            if (stat_points == 1) array_push(sub, Loc_T("combat.msg.stat_point_one", "+{n} stat point", { n: stat_points }));
+            else if (stat_points > 1) array_push(sub, Loc_T("combat.msg.stat_points_many", "+{n} stat points", { n: stat_points }));
+            if (auto_summary != "") array_push(sub, Loc_T("combat.msg.auto_stats", "auto {summary}", { summary: auto_summary }));
             for (var si = 0; si < array_length(sub); si++) {
                 if (si > 0) lvl_msg += ", ";
                 lvl_msg += sub[si];
@@ -95,11 +96,11 @@ function Enemy_AutoResolveBuildMessage(_cfg, _result, _verb_prefix = "You overpo
         }
         array_push(parts, lvl_msg);
     } else if (variable_struct_exists(_result, "at_level_cap") && _result.at_level_cap) {
-        array_push(parts, "Max level reached.");
+        array_push(parts, Loc_T("combat.msg.max_level", "Max level reached."));
     }
 
     if (variable_struct_exists(_result, "loot_gained") && _result.loot_gained) {
-        array_push(parts, "Loot gained.");
+        array_push(parts, Loc_T("combat.msg.loot_gained", "Loot gained."));
     }
 
     if (array_length(parts) <= 0) return msg;

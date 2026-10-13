@@ -17,10 +17,13 @@ function CharacterCreate_Player(_class_id) {
     ch.stats.luck += ch.class_cfg.bonus.luck;
     ch.stats = StatsClampAll(ch.stats);
 
-    ch.hp = 9999; // temp; will clamp after compute
-    ch.mp = 9999;
+    // RecomputeResources reads hp/mp, so they must exist first; a new character then starts full.
+    ch.hp = 0;
+    ch.mp = 0;
 
     ch = RecomputeResources(ch);
+    ch.hp = ch.max_hp;
+    ch.mp = ch.max_mp;
 
     // inventory/equip (later sections)
     ch.inventory = [];

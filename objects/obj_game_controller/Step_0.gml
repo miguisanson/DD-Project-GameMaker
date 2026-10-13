@@ -68,7 +68,7 @@ if (variable_struct_exists(gs, "load_spawn_pending") && gs.load_spawn_pending) {
 if (variable_struct_exists(gs, "pending_save_success_popup") && gs.pending_save_success_popup) {
     if (!Transition_IsActive() && gs.ui.mode == UI_NONE) {
         gs.pending_save_success_popup = false;
-        SaveMenu_OpenMessage("Game saved.", true);
+        SaveMenu_OpenMessage(Save_SuccessText(), true);
     }
 }
 
