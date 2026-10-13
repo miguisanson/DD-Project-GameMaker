@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Phase 1: 1A, 1B (140 tests, gate green 14.6 s), 1D rules MERGED on v1.9. In flight: 1C scenarios/build id (worktree ../DD-Project-GameMaker-wt/p1c, branch p1c-scenarios). Next: /improve command, 1E old bugs. |
+| WIP | PAUSED (owner gaming; test windows stole input). 1C on branch p1c-scenarios @dd0848a (worktree ../DD-Project-GameMaker-wt/p1c): code done, NOT compiled/run. When owner says done: compile, -Only smoke (+mutation), -Only shots (minimized no-activate, PNG check), -Only bot (input override), full, -NegativeControl; then merge. Rule: never run tests while the owner is using the PC; never fullscreen/focus-steal. |
 | Unplayed features | 0 / 15 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
