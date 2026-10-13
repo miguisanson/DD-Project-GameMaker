@@ -169,6 +169,23 @@ function Player_CanAcceptMove(_pl) {
     return true;
 }
 
+// I-048: the player never rests between tiles. Called each step when not mid-step (save/load, aborted step, odd spawn).
+// Picks the nearest cell that is not a wall or an interactable. Returns true when it moved the player.
+function Player_TileBlocked(_inst, _x, _y) {
+    var _hit = false;
+    with (_inst) _hit = place_meeting(_x, _y, obj_wall) || place_meeting(_x, _y, obj_interactable);
+    return _hit;
+}
+
+function Player_SnapIfOffGrid(_pl) {
+    if (!instance_exists(_pl)) return false;
+    if (Grid_IsAligned(_pl.x) && Grid_IsAligned(_pl.y)) return false;
+    var _p = Grid_FindFreeSnap(_pl, _pl.x, _pl.y, function(_inst, _x, _y) { return !Player_TileBlocked(_inst, _x, _y); });
+    _pl.x = _p.x;
+    _pl.y = _p.y;
+    return true;
+}
+
 function Player_StartAutoResolveRecover(_pl, _recover_frames = ENEMY_AUTO_RESOLVE_RECOVER_FRAMES, _apply_battle_cooldown = true) {
     if (!instance_exists(_pl)) return;
 
@@ -177,6 +194,12 @@ function Player_StartAutoResolveRecover(_pl, _recover_frames = ENEMY_AUTO_RESOLV
     var gx = round(_pl.x / tile) * tile;
     var gy = round(_pl.y / tile) * tile;
     var frames = max(0, round(real(_recover_frames)));
+    // I-048: never settle into a wall or a chest; take the nearest free cell instead.
+    if (Player_TileBlocked(_pl, gx, gy)) {
+        var _free_cell = Grid_FindFreeSnap(_pl, _pl.x, _pl.y, function(_inst, _x, _y) { return !Player_TileBlocked(_inst, _x, _y); });
+        gx = _free_cell.x;
+        gy = _free_cell.y;
+    }
 
     if (variable_instance_exists(_pl, "moving")) _pl.moving = false;
     if (variable_instance_exists(_pl, "move_timer")) _pl.move_timer = 0;

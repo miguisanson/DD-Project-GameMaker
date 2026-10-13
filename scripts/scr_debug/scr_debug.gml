@@ -240,7 +240,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 6000 : 2500), vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, fxi: 0 };
+                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 6000 : 2500), vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, fxi: 0, hold_action: "", hold_start: 0, hold_until: -1 };
 }
 
 function Scenario_Finish() {
@@ -266,11 +266,35 @@ function Scenario_Tap(_action) {
     if (variable_global_exists("input")) global.input.last_step_time = -1;   // make the next Input_Update recompute, with the press
 }
 
+// Holds an action (a movement key, "run", ...) for _frames game frames starting with this one: held every frame, pressed on the first.
+// A held move key is also kept last in move_order, as the real keyboard path does (Input_MoveAction reads move_order).
+function Scenario_Hold(_action, _frames) {
+    var _s = global.scn;
+    _s.hold_action = _action;
+    _s.hold_start = _s.f;
+    _s.hold_until = _s.f + _frames - 1;
+    if (variable_global_exists("input")) global.input.last_step_time = -1;   // make the next Input_Update recompute, with the press
+}
+
+function Scenario_Release() {
+    global.scn.hold_action = "";
+    global.scn.hold_until = -1;
+}
+
 function Scenario_InputOverride() {
     if (!variable_global_exists("scn")) return;
     var _s = global.scn;
-    if (_s.mode != "bot" || _s.tap_action == "" || _s.f != _s.last_tap) return;
-    variable_struct_set(global.input.state, _s.tap_action, { held: true, pressed: true });
+    if (_s.mode != "bot" && _s.mode != "smoke") return;
+    if (_s.tap_action != "" && _s.f == _s.last_tap) {
+        variable_struct_set(global.input.state, _s.tap_action, { held: true, pressed: true });
+    }
+    if (_s.hold_action != "" && _s.f <= _s.hold_until) {
+        variable_struct_set(global.input.state, _s.hold_action, { held: true, pressed: (_s.f == _s.hold_start) });
+        if (Input_IsMoveAction(_s.hold_action)) {
+            global.input.move_order = Input_ArrayRemove(global.input.move_order, _s.hold_action);
+            array_push(global.input.move_order, _s.hold_action);
+        }
+    }
 }
 
 function Scenario_NewKnight(_class = CLASS_KNIGHT) {
@@ -359,6 +383,86 @@ function Scenario_StepSmoke(_s) {
             }
             if (_s.t == 210) {
                 Scenario_Check("smoke_mini_boss_stationary_180_frames", room == rm_floor5 && _s.mb_drift == 0, "room=" + room_get_name(room) + " max_drift=" + string(_s.mb_drift));
+                Scenario_NewKnight();
+                room_goto(rm_floor1);
+                Scenario_Next(_s, 4);
+            }
+            break;
+        case 4: case 5: case 6: case 7:
+            Scenario_StepSmokeSnap(_s);
+            break;
+    }
+}
+
+function Scenario_Aligned(_inst) {
+    return (instance_exists(_inst) && Grid_IsAligned(_inst.x) && Grid_IsAligned(_inst.y));
+}
+
+function Scenario_CanSaveSlot() {
+    // Save_Write(0) writes the real quick-save slot: only inside the gate, which points LOCALAPPDATA at its scratch folder.
+    return (string_pos("dd-gate", string_lower(environment_get_variable("LOCALAPPDATA"))) > 0);
+}
+
+// I-048 snap: the player and the enemies always rest on the 16 px grid, also after a quick-load taken mid-step and after a room restore.
+function Scenario_StepSmokeSnap(_s) {
+    switch (_s.step) {
+        case 4:
+            if (_s.t == 60) {
+                var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+                var _sl = instance_exists(obj_slime) ? instance_find(obj_slime, 0) : noone;
+                Scenario_Check("snap_rm_floor1_player_and_slime", room == rm_floor1 && _pl != noone && _sl != noone);
+                if (_pl == noone || _sl == noone) { Scenario_Finish(); break; }
+                _s.sn_pl = _pl.id;
+                _pl.x += 5; _pl.y += 3;   // as if caught between tiles
+                _sl.cine_lock_count = 0;   // rm_floor1's cinematic trigger freezes this slime until it fires; free it for the check
+                _sl.x += 3; _sl.y += 5;
+            }
+            if (_s.t == 64) {
+                var _pl2 = instance_find(obj_player, 0);
+                var _sl2 = instance_find(obj_slime, 0);
+                Scenario_Check("snap_player_back_on_grid", Scenario_Aligned(_pl2), "x=" + string(_pl2.x) + " y=" + string(_pl2.y));
+                Scenario_Check("snap_enemy_back_on_grid", Scenario_Aligned(_sl2), "x=" + string(_sl2.x) + " y=" + string(_sl2.y));
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP snap_quickload (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_Next(_s, 6);
+                    break;
+                }
+                _pl2.x += 6;   // F5 pressed mid-step stores this raw position
+                _s.sn_saved_x = Grid_Snap(_pl2.x);
+                _s.sn_saved_y = Grid_Snap(_pl2.y);
+                Save_Write(0);
+                var _ok = Save_Read(0);
+                Scenario_Check("snap_quickload_started", _ok);
+                Scenario_Next(_s, 5);
+            }
+            break;
+        case 5:
+            if (_s.t == 240) {
+                var _pl3 = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+                Scenario_Check("snap_quickload_back_in_rm_floor1", room == rm_floor1 && _pl3 != noone);
+                if (_pl3 != noone) {
+                    Scenario_Check("snap_quickload_player_on_grid", Scenario_Aligned(_pl3), "x=" + string(_pl3.x) + " y=" + string(_pl3.y));
+                    Scenario_Check("snap_quickload_player_on_saved_tile", _pl3.x == _s.sn_saved_x && _pl3.y == _s.sn_saved_y, "x=" + string(_pl3.x) + " y=" + string(_pl3.y) + " want " + string(_s.sn_saved_x) + "," + string(_s.sn_saved_y));
+                }
+                Scenario_Next(_s, 6);
+            }
+            break;
+        case 6:   // enemy position stored mid-step, then restored on re-entering the room
+            if (_s.t == 5 && instance_exists(obj_slime)) {
+                var _sl3 = instance_find(obj_slime, 0);
+                _sl3.x += 5; _sl3.y += 3;
+                RoomState_OnRoomExit();
+                room_goto(rm_floor2);
+            }
+            if (_s.t == 50) {
+                room_goto(rm_floor1);
+                Scenario_Next(_s, 7);
+            }
+            break;
+        case 7:
+            if (_s.t == 50) {
+                var _sl4 = instance_exists(obj_slime) ? instance_find(obj_slime, 0) : noone;
+                Scenario_Check("snap_enemy_restored_on_grid", _sl4 != noone && room == rm_floor1 && Scenario_Aligned(_sl4), (_sl4 != noone) ? ("x=" + string(_sl4.x) + " y=" + string(_sl4.y)) : "no slime");
                 Scenario_Finish();
             }
             break;

@@ -389,6 +389,9 @@ function EnemyAI_ApplyTraits(_inst, _cfg, _ctx, _hook) {
 function EnemyAI_Update(_inst, _cfg, _pl) {
     if (_inst.defeated) return;
 
+    // I-048: never stay between tiles (aborted step, save/load, room restore).
+    if (!_inst.moving) Enemy_SnapToGrid(_inst);
+
     var ctx = EnemyAI_BuildContext(_inst, _cfg);
     EnemyAI_ApplyTraits(_inst, _cfg, ctx, "on_update");
 
@@ -505,6 +508,7 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
         if (_inst.move_timer <= 0) {
             _inst.moving = false;
         }
+        if (!_inst.moving) Enemy_SnapToGrid(_inst);
     }
 }
 
@@ -708,4 +712,60 @@ function Nav_StepToward(_g, _r, _owner, _sx, _sy, _gx, _gy) {
     else if (_c[1] > _sy) _res.dir = DOWN;
     else _res.dir = UP;
     return _res;
+}
+
+// ============================================================================
+// SNAP (I-048, D69): everything that walks lives on the 16 px grid (origin 0,0 in every room, D65). Nearest multiple of 16.
+// ============================================================================
+function Grid_Snap(_v) {
+    return round(_v / GRID_TILE_SIZE) * GRID_TILE_SIZE;
+}
+
+function Grid_SnapPoint(_x, _y) {
+    return { x: Grid_Snap(_x), y: Grid_Snap(_y) };
+}
+
+function Grid_IsAligned(_v) {
+    return (abs(_v - Grid_Snap(_v)) < 0.001);
+}
+
+// True when the 16 px tile at (_x,_y) is free for _inst (wall, interactable, exit tile), tested with the instance's own mask.
+function Grid_TileFree(_inst, _x, _y) {
+    var _free = true;
+    with (_inst) {
+        _free = !place_meeting(_x, _y, obj_wall) && !place_meeting(_x, _y, obj_interactable) && !place_meeting(_x, _y, obj_room_transition);
+    }
+    return _free;
+}
+
+// The nearest grid cell that is free for _inst: the rounded cell first, then the other three cells touching the point
+// (nearest first). Falls back to the rounded cell when all are blocked, so a snap never leaves the instance off-grid.
+function Grid_FindFreeSnap(_inst, _x, _y, _is_free = Grid_TileFree) {
+    var _fx = floor(_x / GRID_TILE_SIZE) * GRID_TILE_SIZE;
+    var _fy = floor(_y / GRID_TILE_SIZE) * GRID_TILE_SIZE;
+    var _best = Grid_SnapPoint(_x, _y);
+    if (_is_free(_inst, _best.x, _best.y)) return _best;
+    var _cand = [];
+    for (var _ix = 0; _ix < 2; _ix++) {
+        for (var _iy = 0; _iy < 2; _iy++) {
+            var _cx = _fx + _ix * GRID_TILE_SIZE;
+            var _cy = _fy + _iy * GRID_TILE_SIZE;
+            if (_cx == _best.x && _cy == _best.y) continue;
+            array_push(_cand, { x: _cx, y: _cy, d: point_distance(_x, _y, _cx, _cy) });
+        }
+    }
+    array_sort(_cand, function(_a, _b) { return _a.d - _b.d; });
+    for (var _i = 0; _i < array_length(_cand); _i++) {
+        if (_is_free(_inst, _cand[_i].x, _cand[_i].y)) return { x: _cand[_i].x, y: _cand[_i].y };
+    }
+    return _best;
+}
+
+// Moves an enemy (or the player) onto the grid. Returns true when it had to move. Never called mid-step.
+function Enemy_SnapToGrid(_inst) {
+    if (Grid_IsAligned(_inst.x) && Grid_IsAligned(_inst.y)) return false;
+    var _p = Grid_FindFreeSnap(_inst, _inst.x, _inst.y);
+    _inst.x = _p.x;
+    _inst.y = _p.y;
+    return true;
 }

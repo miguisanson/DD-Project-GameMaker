@@ -233,6 +233,7 @@ function RoomState_ApplyInstance(_inst) {
         if (variable_instance_exists(_inst, "encounter_pending")) _inst.encounter_pending = false;
         if (variable_instance_exists(_inst, "encounter_player")) _inst.encounter_player = noone;
         if (variable_instance_exists(_inst, "moving")) _inst.moving = false;
+        Enemy_SnapToGrid(_inst);   // I-048: a snapshot taken mid-step must not restore between tiles
         if (variable_instance_exists(_inst, "move_timer")) _inst.move_timer = 0;
         if (variable_instance_exists(_inst, "move_dir")) _inst.move_dir = -1;
         if (variable_instance_exists(_inst, "cine_lock_count")) _inst.cine_lock_count = 0;

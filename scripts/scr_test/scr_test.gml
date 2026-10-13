@@ -70,6 +70,7 @@ function Test_RunAll() {
     Test_RunSuite("Loc", Test_Suite_Loc);
     Test_RunSuite("Display", Test_Suite_Display);
     Test_RunSuite("Nav", Test_Suite_Nav);
+    Test_RunSuite("Snap", Test_Suite_Snap);
     Test_RunSuite("SaveAtomic", Test_Suite_SaveAtomic);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     if (Test_HasFlag("-testcontrol")) {
@@ -880,4 +881,21 @@ function Test_Suite_Nav() {
     _b = Nav_StepToward(_g, _r, 2, 1, 1, 0, 2);
     Test_True("NAV-01 enemy 2 steps once the cell is free", _b.ok && _b.cx == 0 && _b.cy == 1);
     Test_Eq("NAV-01 release frees all cells of an owner", Nav_ResOwnerAt(_r, 0, 0), -1);
+}
+
+// SNAP-01 (I-048, D69): everything that walks lives on the 16 px grid; the snap is "nearest multiple of 16".
+function Test_Suite_Snap() {
+    Test_Eq("SNAP-01 0.4 snaps to 0", Grid_Snap(0.4), 0);
+    Test_Eq("SNAP-01 15.6 snaps to 16", Grid_Snap(15.6), 16);
+    Test_Eq("SNAP-01 8.4 snaps to 16", Grid_Snap(8.4), 16);
+    Test_Eq("SNAP-01 7.6 snaps to 0", Grid_Snap(7.6), 0);
+    Test_Eq("SNAP-01 an aligned value stays", Grid_Snap(48), 48);
+    Test_Eq("SNAP-01 -3 snaps to 0", Grid_Snap(-3), 0);
+    Test_Eq("SNAP-01 -9 snaps to -16", Grid_Snap(-9), -16);
+    var _p = Grid_SnapPoint(0.4, 15.6);
+    Test_True("SNAP-01 point (0.4, 15.6) is (0, 16)", _p.x == 0 && _p.y == 16);
+    Test_Eq("SNAP-01 32 is aligned", Grid_IsAligned(32), true);
+    Test_Eq("SNAP-01 32.4 is not aligned", Grid_IsAligned(32.4), false);
+    Test_Eq("SNAP-01 -16 is aligned", Grid_IsAligned(-16), true);
+    Test_Eq("SNAP-01 float noise below 0.001 counts as aligned", Grid_IsAligned(32.000000001), true);
 }

@@ -32,6 +32,9 @@ if (auto_resolve_recover_timer > 0) {
     exit;
 }
 
+// I-048: never rest between tiles (quick-load mid-step, aborted step, odd spawn).
+if (!moving) Player_SnapIfOffGrid(id);
+
 if (UI_IsBlocking()) {
     if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
         Player_EnsureDialogueSettle(id, PLAYER_DIALOGUE_SETTLE_FRAMES);
@@ -67,6 +70,8 @@ if (!moving) {
     if (moving) {
         sprite_index = sprite[face];
         move_timer = tile_size;
+        step_from_x = x;
+        step_from_y = y;
     }
 }
 
@@ -82,12 +87,9 @@ if (moving) {
         moving = false;
         move_timer = 0;
 
-        switch (move_dir) {
-            case UP:    y += 1; break;
-            case DOWN:  y -= 1; break;
-            case LEFT:  x += 1; break;
-            case RIGHT: x -= 1; break;
-        }
+        // I-048: an aborted step returns to the tile it started on, never rests between tiles.
+        x = step_from_x;
+        y = step_from_y;
         image_index = 0;
     }
 
