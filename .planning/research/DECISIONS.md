@@ -7,7 +7,7 @@ Locked by the owner. Changing any of these needs a new grill-me.
 | D1 | Scope (amended by D25, D28) | Same game (floors, story, classes) done right. All reported problems fixed. Combat core is open for rework (each rework decision gets its own grill-me). Porting parked. |
 | D2 | Audience | Friends + portfolio, free release (itch.io-style). No store/legal work. |
 | D3 | Platforms (amended by D38) | Windows + web now; Android later. Display/input architecture must not block Android (touch, aspect ratios) but Android is not tested this milestone. |
-| D4 | QTE style | Mixed per skill type: timing ring/bar for some skills, Helldivers-style arrow sequences (↑←↓→ / WASD) for others. |
+| D4 | QTE style (refined by D56-D61) | Mixed per skill type: timing ring/bar for some skills, Helldivers-style arrow sequences (↑←↓→ / WASD) for others. |
 | D5 | QTE stakes | Graded result (e.g. Perfect/Good/OK/Bad scale effect). Failing scales power down but never a full miss. |
 | D6 | Hit rolls | Skills always hit. (Superseded for the basic attack by D20: it never misses either.) |
 | D7 | Defence QTE | Only on big/telegraphed enemy attacks (bosses, mini-bosses, heavy moves). Normal hits just happen. |
@@ -60,6 +60,13 @@ Locked by the owner. Changing any of these needs a new grill-me.
 | D53 | Tight mode (2026-10-14) | Target: finish in 1-2 weeks; keep token use low (short replies, no optional research, smallest agents that can do the job). At 8 unplayed features — or whenever the owner must check or decide something — STOP and wait (no bug-hunt filler). Supersedes the bug-hunt part of D12. |
 | D54 | Batch size | Cap is 15 unplayed features (~3 playtest stops), not 8. Exception: a feature that changes combat feel (QTE, turn bar, cards) stops early so the owner plays it before more is built on top. Supersedes the number in D12/D53. |
 | D55 | Skill action time (G0) | About 1 second total from press to next choice: animation at full speed, post-action pause cut from 1 s to ~0.3 s. |
+| D56 | Basic attack QTE | The falling ring is removed. Basic attack = SLIDING BAR: a cursor sweeps a bar, press in the bright zone. Time-based (ms), not frame-counted. |
+| D57 | Skill QTE | Every skill = Helldivers-style ARROW SEQUENCE (↑←↓→ / WASD / d-pad), FIXED per skill (memorized like spells); stronger skills have longer sequences; upgrades (e.g. Ice Spear+) may shorten/change it. |
+| D58 | Arrow grading | Speed + mistakes: a time bar drains while typing; no mistakes in the fast zone = Perfect, slower = Good, wrong presses or timeout = OK/Weak (the skill still fires). A wrong press shakes the arrows and costs time. |
+| D59 | Defence QTE | On big/telegraphed enemy attacks (D7): a SLIDING BAR block (same widget as attacking). Perfect blocks most damage and resists the status; Weak takes full. |
+| D60 | Bar variety | Bar speed/zone is fixed per source so it is learnable: per weapon type for attacks (fast+wide for daggers/bows, slow+narrow for heavy), per heavy enemy attack for defence; upgrades/perks can widen the Perfect zone. |
+| D61 | Grade effects | Starting numbers: Perfect 130 %, Good 110 %, OK 100 %, Weak 75 % (attacks and skills). Perfect may add a small extra where a skill has one (e.g. status chance). Tuned by playtest. |
+| D62 | Testing scope | Run only the checks related to a change (`-Mode fast` + the one relevant `-Only` mode). `-Only shots` (resizes windows) only for screen/UI changes. Plain `-Mode full` once per merge to `next` and before a playtest stop — never while the owner is using the PC. |
 
 ## Notes
 - Three of the friend's bugs (skill books twice, mini boss moving, maybe poison) look already fixed in code since commit f39236b (2026-03-05) — the friend probably played an older build. From now on every build shows a build id, and every note records it.

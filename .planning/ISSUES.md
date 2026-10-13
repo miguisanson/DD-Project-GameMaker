@@ -89,6 +89,10 @@ Found by audits and reviews (no person's words):
 | I-044 | plan review: 18 `ds_*` creates against 6 destroys, no CleanUp events, globals re-created every Step. Repeated runs in one session would make this grow | BUG | P3 | HEAD `0b6e2f8` | `codebase/CONCERNS.md` lines 32-51 | no growth over 20 runs | open; REQ ROB-03 |
 | I-045 | plan review: the pause menu has no Save; saving only at beds. A 45-60 minute run needs a chosen way to stop and resume | FEATURE | P3 | HEAD `0b6e2f8` | `audit/ui.md` P8 | G2 decides; RUN-14 proves it | question; REQ RUN-14 |
 | I-046 | plan review: D3 "Android later" conflicts with D28 "no post-release" | QUESTION | P3 | n/a | `DECISIONS.md` | owner confirmed 2026-10-14: Android never built (D38) | closed |
+| I-047 | owner 2026-10-14: "enemies get stuck" | BUG | P2 | unknown | needs repro (audit/movement.md) | enemies path around walls and never get stuck | open |
+| I-048 | owner 2026-10-14: "player is not aligned"; "AI and players get easily stuck"; "the maps dont align properly with the grid" | BUG | P2 | unknown | needs repro (audit/movement.md) | player snaps cleanly to the tile grid | open |
+| I-049 | owner 2026-10-14: "the trigger interactables like when moving room to room or scene, i want to see" | BUG/FEATURE | P2 | unknown | needs repro (audit/movement.md) | room/scene triggers fire reliably and can be shown in a debug view | open |
+| I-050 | owner 2026-10-14: "make sure the game is optimized and pathfinding is really good" | FEEL | P2 | unknown | profile (audit/movement.md) | steady frame rate; good pathfinding | open |
 
 ---
-*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-047.*
+*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-051.*
