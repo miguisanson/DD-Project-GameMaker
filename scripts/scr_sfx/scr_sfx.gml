@@ -1106,3 +1106,27 @@ function BGM_GetTrackNameForRoom(_room_id) {
 function BGM_ApplyForRoom(_room_id) {
     BGM_MixApplyForRoom(_room_id);
 }
+
+// ROB-03: defaults for the audio debug globals. Runs its body once (flag), so obj_sfx_manager Step can call it every frame
+// at the cost of one boolean test. Set global.audio_globals_ready = false to force a re-run.
+function SFX_EnsureAudioGlobals() {
+    if (variable_global_exists("audio_globals_ready") && global.audio_globals_ready) return;
+    global.audio_globals_ready = true;
+    if (!variable_global_exists("sfx_globals_init_runs")) global.sfx_globals_init_runs = 0;
+    global.sfx_globals_init_runs += 1;
+    if (!variable_global_exists("audio_debug_enabled")) global.audio_debug_enabled = false;
+    if (!variable_global_exists("audio_debug_test_key")) global.audio_debug_test_key = "ui_confirm";
+    if (!variable_global_exists("audio_debug_last_key")) global.audio_debug_last_key = global.audio_debug_test_key;
+    if (!variable_global_exists("audio_debug_last_channel")) global.audio_debug_last_channel = -1;
+    if (!variable_global_exists("audio_debug_last_status")) global.audio_debug_last_status = "Audio debug OFF";
+    if (!variable_global_exists("audio_debug_last_ok")) global.audio_debug_last_ok = false;
+    if (!variable_global_exists("audio_debug_last_asset")) global.audio_debug_last_asset = noone;
+    if (!variable_global_exists("audio_debug_last_asset_name")) global.audio_debug_last_asset_name = "";
+    if (!variable_global_exists("audio_debug_last_reason")) global.audio_debug_last_reason = "";
+    if (!variable_global_exists("audio_debug_direct_handle")) global.audio_debug_direct_handle = -1;
+    if (!variable_global_exists("audio_debug_direct_playing")) global.audio_debug_direct_playing = false;
+    if (!variable_global_exists("audio_debug_group_loaded")) global.audio_debug_group_loaded = false;
+    if (!variable_global_exists("audio_group_load_requested")) global.audio_group_load_requested = false;
+    if (!variable_global_exists("audio_debug_missing_count")) global.audio_debug_missing_count = 0;
+    if (!variable_global_exists("audio_debug_total_count")) global.audio_debug_total_count = 0;
+}

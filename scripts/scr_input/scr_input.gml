@@ -257,7 +257,14 @@ function Input_Update() {
         inp.pad_deadzone = pad_deadzone;
     }
 
-    var names = variable_struct_get_names(inp.bindings);
+    // ROB-03: binding names are cached (rebuilt only when the number of bindings changes) and each action keeps one
+    // {held, pressed} struct that is rewritten in place, so a frame allocates nothing here.
+    var bind_count = variable_struct_names_count(inp.bindings);
+    if (!variable_struct_exists(inp, "names_cache") || inp.names_cache_count != bind_count) {
+        inp.names_cache = variable_struct_get_names(inp.bindings);
+        inp.names_cache_count = bind_count;
+    }
+    var names = inp.names_cache;
     for (var i = 0; i < array_length(names); i++) {
         var action = names[i];
         var bind = variable_struct_get(inp.bindings, action);
@@ -279,8 +286,9 @@ function Input_Update() {
         }
 
         var prev = false;
+        var st = undefined;
         if (variable_struct_exists(inp.state, action)) {
-            var st = variable_struct_get(inp.state, action);
+            st = variable_struct_get(inp.state, action);
             if (is_struct(st) && variable_struct_exists(st, "held")) prev = st.held;
         }
 
@@ -291,7 +299,12 @@ function Input_Update() {
             pressed = pressed || gp_pressed;
         }
 
-        variable_struct_set(inp.state, action, { held: held, pressed: pressed });
+        if (is_struct(st) && variable_struct_exists(st, "held") && variable_struct_exists(st, "pressed")) {
+            st.held = held;
+            st.pressed = pressed;
+        } else {
+            variable_struct_set(inp.state, action, { held: held, pressed: pressed });
+        }
 
         if (Input_IsMoveAction(action)) {
             var order = inp.move_order;
