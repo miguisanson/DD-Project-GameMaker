@@ -194,6 +194,7 @@
     {"id":{"name":"scr_sfx","path":"scripts/scr_sfx/scr_sfx.yy",},},
     {"id":{"name":"scr_stats","path":"scripts/scr_stats/scr_stats.yy",},},
     {"id":{"name":"scr_status","path":"scripts/scr_status/scr_status.yy",},},
+    {"id":{"name":"scr_test","path":"scripts/scr_test/scr_test.yy",},},
     {"id":{"name":"Abstract1","path":"sounds/Abstract1/Abstract1.yy",},},
     {"id":{"name":"Ambience_haunting_2","path":"sounds/Ambience_haunting_2/Ambience_haunting_2.yy",},},
     {"id":{"name":"Ambience_haunting","path":"sounds/Ambience_haunting/Ambience_haunting.yy",},},
