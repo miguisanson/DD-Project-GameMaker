@@ -220,7 +220,10 @@ function Scenario_Boot() {
     if (Scenario_HasFlag("-smoke")) _mode = "smoke";
     else if (Scenario_HasFlag("-bot")) _mode = "bot";
     else if (Scenario_HasFlag("-shots")) _mode = "shots";
-    if (_mode != "" || Scenario_HasFlag("-runtests")) show_debug_message("[TEST-BUILD] " + BUILD_ID);
+    if (_mode != "" || Scenario_HasFlag("-runtests")) {
+        show_debug_message("[TEST-BUILD] " + BUILD_ID);
+        window_set_fullscreen(false);   // tests are always windowed, whatever the saved setting says; no focus / foreground calls anywhere
+    }
     if (_mode == "") return;
 
     // Unhandled GML error: log it and end. game_end(n) inside the handler still gives exit code 0 (VER-05).
@@ -236,14 +239,13 @@ function Scenario_Boot() {
 
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
-    global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap: -1, last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 7000 : 2500, vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "", refocus: 0 };
+    global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
+                   cap: (_mode == "bot") ? 7000 : 2500, vstart: 0, hits: 0, tries: 0, attacking: false, exp0: 0, shot: "" };
 }
 
 function Scenario_Finish() {
     var _s = global.scn;
     _s.done = true;
-    show_debug_message("[DBG4] refocus=" + string(_s.refocus));
     show_debug_message("[TEST-SUMMARY] pass=" + string(_s.pass) + " fail=" + string(_s.fail) + " errors=" + string(_s.errors));
     game_end((_s.fail > 0 || _s.errors > 0) ? 1 : 0);
 }
@@ -253,12 +255,22 @@ function Scenario_Next(_s, _step) {
     _s.t = 0;
 }
 
-// Press a key through the real input path (Input_Update reads keyboard_check_pressed). The runner only accepts it while its
-// window is in front; run_tests.ps1 keeps the game window foreground during -bot. Released two frames later by Scenario_Step.
-function Scenario_Tap(_key) {
-    keyboard_key_press(_key);
-    global.scn.tap = _key;
+// -bot input. The runner ignores keyboard_key_press while its window is not in front (measured), and tests never take focus,
+// so the bot presses by writing the game's own input state: Input_Update ends with Scenario_InputOverride(), after which
+// Input_Pressed / Input_UIConfirm (what every menu, QTE and the battle controller read) see the press.
+// The press is visible from this step until the next Scenario_Step (global.scn.f changes), i.e. for exactly one game frame
+// of the controllers that run before this one and for the rest of this frame for those that run after it.
+function Scenario_Tap(_action) {
+    global.scn.tap_action = _action;
     global.scn.last_tap = global.scn.f;
+    if (variable_global_exists("input")) global.input.last_step_time = -1;   // make the next Input_Update recompute, with the press
+}
+
+function Scenario_InputOverride() {
+    if (!variable_global_exists("scn")) return;
+    var _s = global.scn;
+    if (_s.mode != "bot" || _s.tap_action == "" || _s.f != _s.last_tap) return;
+    variable_struct_set(global.input.state, _s.tap_action, { held: true, pressed: true });
 }
 
 function Scenario_NewKnight() {
@@ -281,11 +293,9 @@ function Scenario_Step() {
     if (_s.done) return;
     _s.f++;
     _s.t++;
-    if (_s.tap != -1 && _s.f - _s.last_tap >= 2) {
-        keyboard_key_release(_s.tap);
-        _s.tap = -1;
-    }
-    if (_s.mode == "bot" && !window_has_focus()) _s.refocus = _s.refocus + 1;
+    if (window_get_fullscreen()) window_set_fullscreen(false);   // a saved fit_screen must not put a test run in fullscreen
+    var _gs = GameState_Get();
+    if (is_struct(_gs) && variable_struct_exists(_gs, "settings") && is_struct(_gs.settings)) _gs.settings.fit_screen = false;
     if (_s.f > _s.cap) {
         Scenario_Check(_s.mode + "_within_" + string(_s.cap) + "_frames", false, "step=" + string(_s.step));
         Scenario_Finish();
@@ -384,9 +394,7 @@ function Scenario_StepBot(_s) {
 
 function Scenario_BotDrive(_s, _bc) {
     var _ready = (_s.f - _s.last_tap) >= 4;
-    if (_s.f - _s.last_tap < 5 && _s.f < 120) show_debug_message("[DBG2] f=" + string(_s.f) + " dt=" + string(_s.f - _s.last_tap) + " kc=" + string(keyboard_check(vk_space)) + " kp=" + string(keyboard_check_pressed(vk_space)) + " ip=" + string(global.input.state.confirm.pressed) + " ih=" + string(global.input.state.confirm.held) + " frame=" + string(global.input.frame));
     var _perfect = (_s.v == 0);
-    if (_s.f mod 20 == 0) show_debug_message("[DBG] f=" + string(_s.f) + " st=" + string(_bc.battle_state) + " turn=" + string(_bc.turn) + " tap=" + string(_s.last_tap) + " cc=" + string(Status_CanAct(_bc.p)) + " ui=" + string(GameState_Get().ui.mode) + " tr=" + string(Transition_IsActive()) + " pc=" + string(Input_Pressed("confirm")) + " y=" + string(_bc.attack_timing_y));
     if (_s.attacking && _bc.battle_state != BSTATE_ATTACK_TIMING) {   // the swing resolved: tally its judgement
         _s.attacking = false;
         _s.tries++;
@@ -394,20 +402,20 @@ function Scenario_BotDrive(_s, _bc) {
     }
     switch (_bc.battle_state) {
         case BSTATE_MENU:
-            if (_bc.turn == TURN_PLAYER && _ready) Scenario_Tap(vk_space);   // menu_index 0 = ATTACK
+            if (_bc.turn == TURN_PLAYER && _ready) Scenario_Tap("confirm");   // menu_index 0 = ATTACK
             break;
         case BSTATE_ATTACK_TIMING:
             if (_bc.attack_timing_active) _s.attacking = true;
             // The drop moves attack_timing_speed per step and the press is read one step later: confirm when one step is left.
             if (_perfect && _ready && _bc.attack_timing_active && _bc.attack_timing_input_lock <= 0
                 && (_bc.attack_timing_target_y - _bc.attack_timing_y) <= _bc.attack_timing_speed * 1.5) {
-                Scenario_Tap(vk_space);
+                Scenario_Tap("confirm");
             }
             break;
         case BSTATE_ENEMY_DEF_QTE:
             if (_perfect && _ready && _bc.enemy_def_qte_active && _bc.enemy_def_qte_phase == 1
                 && _bc.enemy_def_qte_index < array_length(_bc.enemy_def_qte_prompts)) {
-                var _keys = [vk_right, vk_up, vk_left, vk_down];   // RIGHT, UP, LEFT, DOWN macro order
+                var _keys = ["move_right", "move_up", "move_left", "move_down"];   // RIGHT, UP, LEFT, DOWN macro order
                 Scenario_Tap(_keys[_bc.enemy_def_qte_prompts[_bc.enemy_def_qte_index]]);
             }
             break;

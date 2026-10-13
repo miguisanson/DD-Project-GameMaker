@@ -300,6 +300,7 @@ function Input_Update() {
             inp.move_order = order;
         }
     }
+    Scenario_InputOverride();   // scr_debug: no-op unless run with -bot
 }
 
 

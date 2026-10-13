@@ -21,8 +21,8 @@ $ErrorActionPreference = 'Stop'
 $GameModes = @(
     @{ Name = 'runtests'; Flag = '-runtests'; Timeout = 30;  Impl = $true;  Strict = $true  }
     @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 60;  Impl = $true;  Strict = $false }
-    @{ Name = 'bot';      Flag = '-bot';      Timeout = 120; Impl = $true;  Strict = $false; Focus = $true }
-    @{ Name = 'shots';    Flag = '-shots';    Timeout = 60;  Impl = $true;  Strict = $false; Shots = 9 }   # Shots = number of [SHOT] lines required
+    @{ Name = 'bot';      Flag = '-bot';      Timeout = 120; Impl = $true;  Strict = $false }
+    @{ Name = 'shots';    Flag = '-shots';    Timeout = 60;  Impl = $true;  Strict = $false; Shots = 9 }   # Shots = number of [SHOT] lines required. Not yet verified minimized: run it when the owner is not using the PC and check the PNGs are not blank.
 )
 $BuildTimeout = 300
 $ResultFile = 'test_results.txt'
@@ -49,30 +49,63 @@ function Get-DriveRoots([string]$path) {   # the path's own drive, plus the targ
     $roots
 }
 
-# The runner drops keyboard input (GML keyboard_key_press included) while its window is not in front, so a -bot run keeps
-# pulling the game window to the foreground while it waits (the Alt tap is the usual way past the foreground lock).
-Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class DDWin {
-  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
-  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-  [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra); }'
-function Set-Foreground([IntPtr]$h) {
-    if ([DDWin]::GetForegroundWindow() -eq $h) { return }
-    [DDWin]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [DDWin]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
-    $null = [DDWin]::SetForegroundWindow($h)
-}
-
-function Invoke-Proc([string]$exe, [string]$argStr, [string]$wd, [string]$log, [int]$timeout, [string]$style, [bool]$focus = $false) {
-    $p = Start-Process -FilePath $exe -ArgumentList $argStr -WorkingDirectory $wd -PassThru -WindowStyle $style `
-        -RedirectStandardOutput $log -RedirectStandardError "$log.err"
-    $null = $p.Handle                       # needed or ExitCode comes back empty in PS 5.1
-    if ($focus) {
-        $deadline = [DateTime]::UtcNow.AddSeconds($timeout); $timedOut = $false
-        while (-not $p.WaitForExit(250)) {
-            if ([DateTime]::UtcNow -gt $deadline) { $timedOut = $true; break }
-            $p.Refresh()
-            if ($p.MainWindowHandle -ne [IntPtr]::Zero) { Set-Foreground $p.MainWindowHandle }
+# Game runs are started WITHOUT activating their window (SW_SHOWMINNOACTIVE through CreateProcess), so a gate run never takes
+# keyboard focus from whatever the owner is doing. Start-Process -WindowStyle Minimized (SW_SHOWMINIMIZED) is the fallback;
+# the Igor build uses it too (hidden). No focus / foreground API is called anywhere in this script.
+$ddLaunchOk = $true
+try {
+    Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Text;
+using System.Runtime.InteropServices;
+public static class DDLaunch {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct STARTUPINFO {
+        public int cb; public string lpReserved; public string lpDesktop; public string lpTitle;
+        public int dwX; public int dwY; public int dwXSize; public int dwYSize; public int dwXCountChars; public int dwYCountChars;
+        public int dwFillAttribute; public int dwFlags; public short wShowWindow; public short cbReserved2;
+        public IntPtr lpReserved2; public IntPtr hStdInput; public IntPtr hStdOutput; public IntPtr hStdError;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    struct PROCESS_INFORMATION { public IntPtr hProcess; public IntPtr hThread; public int dwProcessId; public int dwThreadId; }
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern bool CreateProcess(string app, StringBuilder cmd, IntPtr pa, IntPtr ta, bool inherit, uint flags, IntPtr env, string cwd, ref STARTUPINFO si, out PROCESS_INFORMATION pi);
+    [DllImport("kernel32.dll", SetLastError = true)] static extern bool SetHandleInformation(IntPtr h, int mask, int flags);
+    [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+    // Starts exe with stdout+stderr going to logFile, window shown minimized and not activated. Returns the process id.
+    public static int Start(string exe, string args, string cwd, string logFile) {
+        using (FileStream fs = new FileStream(logFile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) {
+            IntPtr h = fs.SafeFileHandle.DangerousGetHandle();
+            SetHandleInformation(h, 1, 1);                      // HANDLE_FLAG_INHERIT
+            STARTUPINFO si = new STARTUPINFO();
+            si.cb = Marshal.SizeOf(typeof(STARTUPINFO));
+            si.dwFlags = 0x101;                                 // STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES
+            si.wShowWindow = 7;                                 // SW_SHOWMINNOACTIVE
+            si.hStdOutput = h; si.hStdError = h;
+            PROCESS_INFORMATION pi;
+            StringBuilder cmd = new StringBuilder("\"" + exe + "\" " + args);
+            if (!CreateProcess(null, cmd, IntPtr.Zero, IntPtr.Zero, true, 0, IntPtr.Zero, cwd, ref si, out pi))
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
+            return pi.dwProcessId;
         }
-    } else { $timedOut = -not $p.WaitForExit($timeout * 1000) }
+    }
+}
+'@
+} catch { $ddLaunchOk = $false }
+
+function Invoke-Proc([string]$exe, [string]$argStr, [string]$wd, [string]$log, [int]$timeout, [string]$style, [bool]$noActivate = $false) {
+    $p = $null
+    if ($noActivate -and $ddLaunchOk) {
+        try { $p = Get-Process -Id ([DDLaunch]::Start($exe, $argStr, $wd, $log)) } catch { $p = $null }
+    }
+    if (-not $p) {
+        $p = Start-Process -FilePath $exe -ArgumentList $argStr -WorkingDirectory $wd -PassThru -WindowStyle $style `
+            -RedirectStandardOutput $log -RedirectStandardError "$log.err"
+    }
+    $null = $p.Handle                       # needed or ExitCode comes back empty in PS 5.1
+    $timedOut = -not $p.WaitForExit($timeout * 1000)
     if ($timedOut) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; $null = $p.WaitForExit(5000) }
     $code = $null; if (-not $timedOut) { $code = $p.ExitCode }
     if ((Test-Path "$log.err") -and (Get-Item "$log.err").Length -gt 0) { Get-Content "$log.err" | Add-Content -Path $log }
@@ -243,7 +276,7 @@ foreach ($m in $runs) {
     $gameArgs = "-game data.win $($m.Flag)"
     if ($NegativeControl) { $gameArgs += ' -testcontrol' }
     $env:LOCALAPPDATA = $D.save                 # VER-06: the game must never see the real save area
-    try { $r = Invoke-Proc $exe $gameArgs $D.out $log $m.Timeout $(if ($m.Focus) { 'Normal' } else { 'Minimized' }) ([bool]$m.Focus) } finally { $env:LOCALAPPDATA = $RealLocal }
+    try { $r = Invoke-Proc $exe $gameArgs $D.out $log $m.Timeout 'Minimized' $true } finally { $env:LOCALAPPDATA = $RealLocal }
     $lines = Get-LogLines $log
     $why = @()
     if ($r.TimedOut) { $why += "timeout after $($m.Timeout)s" }
