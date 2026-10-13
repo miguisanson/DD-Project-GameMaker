@@ -8,7 +8,7 @@ function Equip_CanEquip(_ch, _item_or_id) {
     var item = _item_or_id;
     if (!is_struct(item)) item = ItemDB_Get(_item_or_id);
 
-    var out = { ok: false, msg: "Can't equip that.", item: item };
+    var out = { ok: false, msg: Loc_T("menu.msg.cant_equip", "Can't equip that."), item: item };
 
     if (!is_struct(_ch)) return out;
     if (!is_struct(item) || item.id == 0) return out;
@@ -17,19 +17,19 @@ function Equip_CanEquip(_ch, _item_or_id) {
     if (!variable_struct_exists(_ch, "class_id")) return out;
 
     if (!variable_struct_exists(_ch, "inventory") || !is_array(_ch.inventory) || !Inv_Has(_ch.inventory, item.id, 1)) {
-        out.msg = "Item not in inventory.";
+        out.msg = Loc_T("menu.msg.not_in_inventory", "Item not in inventory.");
         return out;
     }
 
     var slot = string(item.equip_slot);
     if (Equip_SlotGet(_ch, slot) == item.id) {
-        out.msg = "Already equipped.";
+        out.msg = Loc_T("menu.msg.already_equipped", "Already equipped.");
         return out;
     }
 
     if (variable_struct_exists(item, "preferred_class") && item.preferred_class != -1) {
         if (_ch.class_id != item.preferred_class) {
-            out.msg = Equip_ClassName(item.preferred_class) + " only.";
+            out.msg = Loc_T("menu.msg.class_only", "{class_name} only.", { class_name: Equip_ClassName(item.preferred_class) });
             return out;
         }
     }
@@ -49,14 +49,14 @@ function Equip_CanEquip(_ch, _item_or_id) {
                 if (j > 0) class_text += "/";
                 class_text += Equip_ClassName(item.allowed_classes[j]);
             }
-            if (class_text == "") class_text = "That";
-            out.msg = class_text + " only.";
+            if (class_text == "") out.msg = Loc_T("menu.msg.cant_equip", "Can't equip that.");
+            else out.msg = Loc_T("menu.msg.class_only", "{class_name} only.", { class_name: class_text });
             return out;
         }
     }
 
     out.ok = true;
-    out.msg = "Equipped " + string(item.name) + ".";
+    out.msg = Loc_T("menu.msg.equipped", "Equipped {item}.", { item: string(item.name) });
     return out;
 }
 

@@ -66,6 +66,7 @@ function Test_RunAll() {
     Test_RunSuite("Inventory", Test_Suite_Inventory);
     Test_RunSuite("Data", Test_Suite_Data);
     Test_RunSuite("Player", Test_Suite_Player);
+    Test_RunSuite("Loc", Test_Suite_Loc);
     Test_RunSuite("SaveAtomic", Test_Suite_SaveAtomic);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     if (Test_HasFlag("-testcontrol")) {
@@ -586,4 +587,32 @@ function Test_Suite_Player() {
         Test_True(_n + " HP is a real value (< 1000)", _c.hp < 1000 && _c.hp >= 1);
         Test_True(_n + " MP is a real value (< 1000)", _c.mp < 1000 && _c.mp >= 0);
     }
+}
+
+// LOC-03: player-facing messages come from the localization table. Korean expectations are read from the table itself
+// (Loc_GetRaw ... "ko"); English wording is pinned so the move to keys does not change what English players see.
+function Test_Suite_Loc() {
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("ko");
+    var _k = Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL);
+    Test_Eq("LOC-03 Equip_CanEquip refusal follows the language (ko)", Equip_CanEquip(_k, 0).msg, Loc_GetRaw("menu.msg.cant_equip", "ko"));
+    Test_True("LOC-03 ko refusal is not the English text", Equip_CanEquip(_k, 0).msg != "Can't equip that.");
+    Loc_SetLanguage("en");
+    Test_Eq("LOC-03 Equip_CanEquip refusal (en)", Equip_CanEquip(_k, 0).msg, "Can't equip that.");
+    Test_Eq("LOC-03 Equip_CanEquip item not owned (en)", Equip_CanEquip(_k, 2).msg, "Item not in inventory.");
+    _k.inventory = Inv_Add(_k.inventory, 2, 1);
+    var _can = Equip_CanEquip(_k, 2);
+    Test_True("LOC-03 Equip_CanEquip owned weapon is ok", _can.ok);
+    Test_Eq("LOC-03 Equip_CanEquip success text (en)", _can.msg, "Equipped " + string(_can.item.name) + ".");
+    // Auto-resolve result line: exp, level up, loot.
+    var _msg = Enemy_AutoResolveBuildMessage({ name: "Slime" }, { exp_gain: 5, levels_gained: 1, loot_gained: true });
+    Test_Eq("LOC-03 auto-resolve line (en)", _msg, "You overpower Slime. (+5 EXP) Level up x1! Loot gained.");
+    Test_Eq("LOC-03 auto-resolve max level line (en)", Enemy_AutoResolveBuildMessage({ name: "Slime" }, { at_level_cap: true }), "You overpower Slime. Max level reached.");
+    Loc_SetLanguage(_lang0);
+    // The save confirmation uses the existing dialogue key sys_save_ok (scr_dialogue.gml).
+    Loc_SetLanguage("ko");
+    Test_Eq("LOC-03 save-ok text follows the language (ko)", Save_SuccessText(), Loc_GetRaw("dialogue.sys_save_ok.0", "ko"));
+    Loc_SetLanguage("en");
+    Test_Eq("LOC-03 save-ok text (en)", Save_SuccessText(), "Game saved.");
+    Loc_SetLanguage(_lang0);
 }

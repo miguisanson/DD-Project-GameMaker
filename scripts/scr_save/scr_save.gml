@@ -442,6 +442,11 @@ function Save_ApplySnapshot(_snap) {
     }
 }
 
+// Text of the "game saved" popup: the existing dialogue key sys_save_ok (scr_dialogue.gml), so it follows the language.
+function Save_SuccessText() {
+    return Loc_T("dialogue.sys_save_ok.0", "Game saved.");
+}
+
 function Save_Path(_slot) {
     var idx = _slot;
     if (idx <= 0) idx = 0; else idx = _slot - 1;
