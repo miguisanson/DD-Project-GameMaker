@@ -65,6 +65,7 @@ function Test_RunAll() {
     Test_RunSuite("Status", Test_Suite_Status);
     Test_RunSuite("Inventory", Test_Suite_Inventory);
     Test_RunSuite("Data", Test_Suite_Data);
+    Test_RunSuite("SaveAtomic", Test_Suite_SaveAtomic);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
@@ -470,4 +471,105 @@ function Test_Suite_Save() {
     Test_Eq("R-008 round trip keeps selected class", _gs.selected_class, CLASS_MAGE);
     Test_Eq("R-008 round trip keeps flags", variable_struct_get(_gs.flags, "test_flag"), 42);
     Test_Eq("R-008 round trip keeps difficulty", _gs.difficulty, DIFFICULTY_HARD);
+}
+
+// ---- SAVE-04 atomic save ----------------------------------------------------------------------
+// Uses test-only file names in the save area (never savedata*.sav / settings_config.json), so even a run outside the
+// gate wrapper cannot touch a real save. "Crashes" are simulated by writing the broken files by hand.
+function Test_RawWrite(_path, _text) {
+    var _b = buffer_create(string_length(_text) + 1, buffer_fixed, 1);
+    buffer_write(_b, buffer_string, _text);
+    buffer_save(_b, _path);
+    buffer_delete(_b);
+}
+
+function Test_RawRead(_path) {
+    if (!file_exists(_path)) return "";
+    var _b = buffer_load(_path);
+    var _t = buffer_read(_b, buffer_string);
+    buffer_delete(_b);
+    return _t;
+}
+
+function Test_SnapText(_marker) {
+    return json_stringify({ save_version: SAVE_SNAPSHOT_VERSION, statData: { marker: _marker } });
+}
+
+function Test_SnapMarker(_snap) {
+    if (!is_struct(_snap)) return "none";
+    return string(_snap.statData.marker);
+}
+
+function Test_Suite_SaveAtomic() {
+    var _p = "test_atomic.sav";
+    Save_DeleteFileSet(_p);
+    Test_False("atomic: clean start, no main file", file_exists(_p));
+
+    // First save: file written, no leftovers, nothing to back up yet.
+    Test_True("atomic: first write reports success", Save_WriteFileAtomic(_p, Test_SnapText("A"), Save_IsCurrentSnapshot));
+    Test_Eq("atomic: first write loads back", Test_SnapMarker(Save_LoadSnapshotFile(_p)), "A");
+    Test_False("atomic: no .tmp left after a write", file_exists(_p + ".tmp"));
+    Test_False("atomic: first write makes no .bak", file_exists(_p + ".bak"));
+
+    // Second save: the previous good save is kept as .bak.
+    Test_True("atomic: second write reports success", Save_WriteFileAtomic(_p, Test_SnapText("B"), Save_IsCurrentSnapshot));
+    Test_Eq("atomic: second write loads back", Test_SnapMarker(Save_LoadSnapshotFile(_p)), "B");
+    Test_Eq("atomic: .bak holds the previous good save", Test_SnapMarker(json_parse(Test_RawRead(_p + ".bak"))), "A");
+    Test_False("atomic: no .tmp left after the second write", file_exists(_p + ".tmp"));
+
+    // A write whose verification fails leaves the good save alone and cleans up its temp file.
+    Test_False("atomic: a write that fails verification reports failure", Save_WriteFileAtomic(_p, "{ not a snapshot", Save_IsCurrentSnapshot));
+    Test_Eq("atomic: failed verification keeps the good save", Test_SnapMarker(Save_LoadSnapshotFile(_p)), "B");
+    Test_False("atomic: failed verification leaves no .tmp", file_exists(_p + ".tmp"));
+    Test_Eq("atomic: failed verification leaves .bak alone", Test_SnapMarker(json_parse(Test_RawRead(_p + ".bak"))), "A");
+
+    // A crash while writing: a leftover .tmp (complete or half-written) never replaces the good save.
+    Test_RawWrite(_p + ".tmp", Test_SnapText("CRASH"));
+    Test_Eq("atomic: a leftover complete .tmp does not replace the save", Test_SnapMarker(Save_LoadSnapshotFile(_p)), "B");
+    Test_RawWrite(_p + ".tmp", string_copy(Test_SnapText("CRASH"), 1, 20));
+    Test_Eq("atomic: a leftover half-written .tmp does not replace the save", Test_SnapMarker(Save_LoadSnapshotFile(_p)), "B");
+    Test_True("atomic: the next write replaces a stale .tmp", Save_WriteFileAtomic(_p, Test_SnapText("C"), Save_IsCurrentSnapshot));
+    Test_Eq("atomic: write after a stale .tmp loads back", Test_SnapMarker(Save_LoadSnapshotFile(_p)), "C");
+    Test_False("atomic: stale .tmp is gone after the next write", file_exists(_p + ".tmp"));
+
+    // Corrupt main file: truncated, then garbage. Load falls back to .bak (the save before "C", i.e. "B"), no crash.
+    var _good = Test_RawRead(_p);
+    Test_RawWrite(_p, string_copy(_good, 1, string_length(_good) div 2));
+    var _threw = false; var _snap = undefined;
+    try { _snap = Save_LoadSnapshotFile(_p); } catch (_e) { _threw = true; }
+    Test_False("atomic: a truncated main file does not throw", _threw);
+    Test_Eq("atomic: a truncated main file loads from .bak", Test_SnapMarker(_snap), "B");
+    Test_RawWrite(_p, " garbage {{{ ]]");
+    _threw = false; _snap = undefined;
+    try { _snap = Save_LoadSnapshotFile(_p); } catch (_e2) { _threw = true; }
+    Test_False("atomic: a garbage main file does not throw", _threw);
+    Test_Eq("atomic: a garbage main file loads from .bak", Test_SnapMarker(_snap), "B");
+
+    // Both files bad: no snapshot, no crash.
+    Test_RawWrite(_p + ".bak", "also garbage");
+    _threw = false; _snap = 1;
+    try { _snap = Save_LoadSnapshotFile(_p); } catch (_e3) { _threw = true; }
+    Test_False("atomic: main and .bak both corrupt does not throw", _threw);
+    Test_False("atomic: main and .bak both corrupt gives no snapshot", is_struct(_snap));
+
+    // Deleting a save removes its backup too, so a deleted slot cannot come back from .bak.
+    Test_RawWrite(_p + ".tmp", "x");
+    Save_DeleteFileSet(_p);
+    Test_True("atomic: delete removes main, .bak and .tmp", !file_exists(_p) && !file_exists(_p + ".bak") && !file_exists(_p + ".tmp"));
+
+    // settings_config.json takes the same path: write twice, corrupt, read from .bak.
+    var _s = "test_settings.json";
+    Save_DeleteFileSet(_s);
+    Save_WriteSettingsConfig({ audio_bgm: 0.25 }, _s);
+    Save_WriteSettingsConfig({ audio_bgm: 0.75 }, _s);
+    var _cfg = Save_ReadSettingsConfig(_s);
+    Test_Eq("atomic settings: latest value read back", is_struct(_cfg) ? _cfg.audio_bgm : -1, 0.75);
+    Test_False("atomic settings: no .tmp left", file_exists(_s + ".tmp"));
+    Test_RawWrite(_s, "{\"vol_bgm\": 0.7");
+    _threw = false; _cfg = undefined;
+    try { _cfg = Save_ReadSettingsConfig(_s); } catch (_e4) { _threw = true; }
+    Test_False("atomic settings: a truncated file does not throw", _threw);
+    Test_Eq("atomic settings: a truncated file reads the previous good settings", is_struct(_cfg) ? _cfg.audio_bgm : -1, 0.25);
+    Save_DeleteFileSet(_s);
+    Test_Eq("atomic settings: nothing to read after delete", is_undefined(Save_ReadSettingsConfig(_s)), true);
 }

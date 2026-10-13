@@ -23,19 +23,92 @@ function Save_ToReal(_value, _fallback) {
     return _fallback;
 }
 
+// ---- SAVE-04: atomic, crash-safe file helpers (used by save slots and settings_config.json) ----
+// Layout for a file F: F (current), F.bak (previous good copy), F.tmp (in-flight write; never loaded).
+function Save_ReadTextFile(_path) {
+    if (!file_exists(_path)) return undefined;
+    var buf = buffer_load(_path);
+    if (buf == -1) return undefined;
+    var text = undefined;
+    if (buffer_get_size(buf) > 0) {
+        try { text = buffer_read(buf, buffer_string); } catch (_e) { text = undefined; }
+    }
+    buffer_delete(buf);
+    return text;
+}
+
+// Parses JSON text; undefined when the text is empty, is not JSON, or fails the optional validator.
+function Save_ParseJsonText(_text, _validate = undefined) {
+    if (!is_string(_text) || string_length(_text) == 0) return undefined;
+    var c0 = string_char_at(_text, 1);
+    if (c0 != "{" && c0 != "[") return undefined;
+    var value = undefined;
+    try { value = json_parse(_text); } catch (_e) { return undefined; }
+    if (!is_undefined(_validate)) {
+        var good = false;
+        try { good = _validate(value); } catch (_e2) { good = false; }
+        if (!good) return undefined;
+    }
+    return value;
+}
+
+// Reads F; if F is missing, unparsable or invalid, reads F.bak instead. Never throws; undefined if neither is usable.
+function Save_ReadJsonFile(_path, _validate = undefined) {
+    var value = Save_ParseJsonText(Save_ReadTextFile(_path), _validate);
+    if (!is_undefined(value)) return value;
+    return Save_ParseJsonText(Save_ReadTextFile(_path + ".bak"), _validate);
+}
+
+function Save_DeleteFileSet(_path) {
+    if (file_exists(_path)) file_delete(_path);
+    if (file_exists(_path + ".bak")) file_delete(_path + ".bak");
+    if (file_exists(_path + ".tmp")) file_delete(_path + ".tmp");
+}
+
+// Writes _text to F.tmp, re-reads and parses it, then swaps it in: the old good F becomes F.bak, F.tmp becomes F.
+// Returns true when F now holds _text. On any failure F and F.bak are left as they were and F.tmp is removed.
+function Save_WriteFileAtomic(_path, _text, _validate = undefined) {
+    var tmp = _path + ".tmp";
+    var bak = _path + ".bak";
+    if (file_exists(tmp)) file_delete(tmp);
+
+    var buf = buffer_create(string_length(_text) + 1, buffer_grow, 1);
+    buffer_write(buf, buffer_string, _text);
+    buffer_save(buf, tmp);
+    buffer_delete(buf);
+
+    var back = Save_ReadTextFile(tmp);
+    if (!is_string(back) || back != _text || is_undefined(Save_ParseJsonText(back, _validate))) {
+        if (file_exists(tmp)) file_delete(tmp);
+        return false;
+    }
+
+    // Keep the previous save as .bak, but only if it is itself good (never replace a good .bak with a bad file).
+    if (file_exists(_path) && !is_undefined(Save_ParseJsonText(Save_ReadTextFile(_path), _validate))) {
+        if (file_exists(bak)) file_delete(bak);
+        file_copy(_path, bak);
+    }
+
+    if (file_exists(_path)) file_delete(_path);
+    var ok = file_rename(tmp, _path);
+    if (!ok || !file_exists(_path)) {
+        ok = file_copy(tmp, _path);
+        if (file_exists(tmp)) file_delete(tmp);
+    }
+    return ok && file_exists(_path);
+}
+
+function Save_IsStructValue(_value) {
+    return is_struct(_value);
+}
+
 function Save_SettingsPath() {
     return "settings_config.json";
 }
 
-function Save_ReadSettingsConfig() {
-    var path = Save_SettingsPath();
-    if (!file_exists(path)) return undefined;
-
-    var buf = buffer_load(path);
-    var json = buffer_read(buf, buffer_string);
-    buffer_delete(buf);
-
-    var raw = json_parse(json);
+function Save_ReadSettingsConfig(_path = undefined) {
+    var path = is_undefined(_path) ? Save_SettingsPath() : _path;
+    var raw = Save_ReadJsonFile(path, Save_IsStructValue);   // falls back to settings_config.json.bak
     if (!is_struct(raw)) return undefined;
     var settings_version = 0;
     if (variable_struct_exists(raw, "settings_version")) settings_version = Save_ToReal(raw.settings_version, 0);
@@ -62,7 +135,7 @@ function Save_ReadSettingsConfig() {
     return GameSettings_Normalize(out);
 }
 
-function Save_WriteSettingsConfig(_settings) {
+function Save_WriteSettingsConfig(_settings, _path = undefined) {
     var s = GameSettings_Normalize(_settings);
     var raw = {
         settings_version: 7,
@@ -74,12 +147,8 @@ function Save_WriteSettingsConfig(_settings) {
         language: s.language
     };
 
-    var json = json_stringify(raw);
-    var path = Save_SettingsPath();
-    var buf = buffer_create(string_length(json) + 1, buffer_fixed, 1);
-    buffer_write(buf, buffer_string, json);
-    buffer_save(buf, path);
-    buffer_delete(buf);
+    var path = is_undefined(_path) ? Save_SettingsPath() : _path;
+    return Save_WriteFileAtomic(path, json_stringify(raw), Save_IsStructValue);
 }
 
 function Save_IsCurrentSnapshot(_snap) {
@@ -91,31 +160,19 @@ function Save_IsCurrentSnapshot(_snap) {
     return is_struct(_snap.statData);
 }
 
-function Save_TryLoadSnapshot(_slot, _delete_legacy = true) {
-    var path = Save_Path(_slot);
-    if (!file_exists(path)) return undefined;
-
-    var snap = undefined;
-    var ok = false;
-
-    var buf = buffer_load(path);
-    if (buf != -1) {
-        var json = buffer_read(buf, buffer_string);
-        buffer_delete(buf);
-        if (is_string(json) && string_length(json) > 0) {
-            var c0 = string_char_at(json, 1);
-            if (c0 == "{" || c0 == "[") {
-                snap = json_parse(json);
-                ok = Save_IsCurrentSnapshot(snap);
-            }
-        }
-    }
-
-    if (!ok) {
-        if (_delete_legacy && file_exists(path)) file_delete(path);
+// Loads a snapshot from F, or from F.bak when F is corrupt or not a current snapshot. Never throws.
+// With _delete_legacy, a file set where nothing is usable is removed (old behaviour for unreadable/old-format saves).
+function Save_LoadSnapshotFile(_path, _delete_legacy = false) {
+    var snap = Save_ReadJsonFile(_path, Save_IsCurrentSnapshot);
+    if (is_undefined(snap)) {
+        if (_delete_legacy) Save_DeleteFileSet(_path);
         return undefined;
     }
     return snap;
+}
+
+function Save_TryLoadSnapshot(_slot, _delete_legacy = true) {
+    return Save_LoadSnapshotFile(Save_Path(_slot), _delete_legacy);
 }
 
 function Save_LoadSlotStat(_slot) {
@@ -395,14 +452,10 @@ function Save_Write(_slot) {
     // Saving resets regular enemies globally; boss defeat flags remain authoritative.
     Enemy_ResetAll();
     var snap = Save_BuildSnapshot();
-    var json = json_stringify(snap);
-    var path = Save_Path(_slot);
-    var buf = buffer_create(string_length(json) + 1, buffer_fixed, 1);
-    buffer_write(buf, buffer_string, json);
-    buffer_save(buf, path);
-    buffer_delete(buf);
+    var ok = Save_WriteFileAtomic(Save_Path(_slot), json_stringify(snap), Save_IsCurrentSnapshot);
     var gs = GameState_Get();
     gs.save_slot = _slot;
+    return ok;
 }
 
 function Save_HealPlayerToFull() {
@@ -433,8 +486,8 @@ function Save_Read(_slot) {
 }
 
 function Save_Delete(_slot) {
-    var path = Save_Path(_slot);
-    if (file_exists(path)) file_delete(path);
+    // Also removes .bak/.tmp, otherwise a deleted slot would come back from its backup.
+    Save_DeleteFileSet(Save_Path(_slot));
 }
 
 function Save_SlotInfo(_slot) {
