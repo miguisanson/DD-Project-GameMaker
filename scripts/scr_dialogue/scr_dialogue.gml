@@ -577,25 +577,20 @@ function Dialogue_CopyLineEntryWithText(_line_entry, _text) {
 
 function Dialogue_BoxRect() {
     var gs = GameState_Get();
-    var w = Display_GuiW();
-    var h = Display_GuiH();
-    var ui_visual = UI_GetVisualScale();
-    var line_h = max(8, UI_TextHeight("Ag"));
-
-    var margin = max(4, round(UI_DIALOGUE_BOX_MARGIN * ui_visual));
-    var box_h = max(
-        round(UI_DIALOGUE_BOX_HEIGHT * ui_visual),
-        (line_h * 3) + max(8, round(14 * ui_visual))
-    );
-    var bx = margin;
-    var by = h - box_h - margin;
-    var bw = w - margin * 2;
+    var mt = Ui_Metrics();
+    var w = mt.gw;
+    var h = mt.gh;
+    // D101: the shared frame (1p light edge + 1p dark band + 2p of air on every side) round three lines of text
+    var box_h = 8 * mt.p + 3 * mt.line_h;
+    var bx = mt.margin;
+    var by = h - box_h - mt.margin;
+    var bw = w - mt.margin * 2;
     var bh = box_h;
 
     if (variable_struct_exists(gs.ui, "dialogue_box_half") && gs.ui.dialogue_box_half) {
         bx = 0;
         bw = w;
-        var min_h = max(1, round(UI_CUTSCENE_DIALOGUE_MIN_HEIGHT * ui_visual));
+        var min_h = max(1, round(UI_CUTSCENE_DIALOGUE_MIN_HEIGHT * UI_GetVisualScale()));
         by = floor(h * UI_CUTSCENE_DIALOGUE_TOP_RATIO);
         by = clamp(by, 0, max(0, h - min_h));
         bh = h - by;
@@ -611,23 +606,20 @@ function Dialogue_BoxRect() {
 
 function Dialogue_TextLayout(_speaker) {
     UI_SetFont();
+    var mt = Ui_Metrics();
     var line_h = max(8, UI_TextHeight("Ag"));
-    var ui_visual = UI_GetVisualScale();
     var has_speaker = (string(_speaker) != "");
     var cutscene_text_only = Dialogue_IsCutsceneTextOnly();
-    var pad_x = max(4, round(UI_DIALOGUE_TEXT_PAD_X * ui_visual));
-    var pad_y = max(4, round(UI_DIALOGUE_TEXT_PAD_Y * ui_visual));
-    var speaker_y_pad = max(2, round(UI_DIALOGUE_SPEAKER_Y * ui_visual));
-    var text_y_with_speaker = max(line_h, round(UI_DIALOGUE_TEXT_Y_WITH_SPEAKER * ui_visual));
-    var bottom_pad = max(4, round(UI_DIALOGUE_BOTTOM_PAD * ui_visual));
+    var ui_visual = UI_GetVisualScale();
 
+    // The speaker's name sits on a tab above the frame (Ui_DrawNameTab), so the text starts at the same place with or without one.
     var box = Dialogue_BoxRect();
-    var text_x = box.x + pad_x;
-    var text_y = box.y + (has_speaker ? text_y_with_speaker : pad_y);
-    var text_w = max(1, box.w - (pad_x * 2));
-    var speaker_x = box.x + pad_x;
-    var speaker_y = box.y + speaker_y_pad;
-    var text_h = max(line_h, box.h - (text_y - box.y) - bottom_pad);
+    var text_x = box.x + 4 * mt.p;
+    var text_y = box.y + 4 * mt.p;
+    var text_w = max(1, box.w - 14 * mt.p);   // 4p of frame and air on the left, 10p on the right: the blinking arrow lives there
+    var speaker_x = box.x + 4 * mt.p;
+    var speaker_y = box.y;
+    var text_h = max(line_h, box.h - 8 * mt.p);
 
     if (cutscene_text_only) {
         var w = Display_GuiW();
@@ -864,7 +856,7 @@ function Dialogue_TypewriterPrepareCurrentLine() {
         }
     }
     gs.ui.dialogue_chars_per_sec = max(1, chars_per_sec * Settings_TextSpeedMul(GameSettings_Ensure().text_speed));   // D0: the Text speed setting
-    gs.ui.dialogue_hold_duration = max(1, round(UI_DIALOGUE_ADVANCE_HOLD_SEC * game_fps));
+    gs.ui.dialogue_hold_duration = max(1, round((Dialogue_IsCutsceneTextOnly() ? UI_DIALOGUE_ADVANCE_HOLD_SEC : UI_DIALOGUE_BOX_HOLD_SEC) * game_fps));   // D101: a boxed line is ready almost at once
 
     var line_text = Dialogue_LineText(gs.ui.lines[gs.ui.index]);
     var line_changed = (!variable_struct_exists(gs.ui, "dialogue_tw_line_index") || gs.ui.dialogue_tw_line_index != gs.ui.index
@@ -937,6 +929,8 @@ function Dialogue_Start(_dialogue_id) {
     if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
         gs.ui.cutscene_text_only = false;
     }
+    gs.ui.dialogue_open_ms = current_time;   // D97: the box slides in
+    gs.ui.choice = undefined;
     gs.ui.opened_frame = Input_Frame();
     var open_block_frames = Dialogue_IsCutsceneTextOnly() ? max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES) : 0;
     gs.ui.dialogue_open_block_frame = gs.ui.opened_frame + open_block_frames;
@@ -959,6 +953,8 @@ function Dialogue_StartLines(_lines) {
     if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
         gs.ui.cutscene_text_only = false;
     }
+    gs.ui.dialogue_open_ms = current_time;   // D97: the box slides in
+    gs.ui.choice = undefined;
     gs.ui.opened_frame = Input_Frame();
     var open_block_frames = Dialogue_IsCutsceneTextOnly() ? max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES) : 0;
     gs.ui.dialogue_open_block_frame = gs.ui.opened_frame + open_block_frames;
@@ -1021,6 +1017,8 @@ function Dialogue_StartWithSpeaker(_speaker, _lines) {
     if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
         gs.ui.cutscene_text_only = false;
     }
+    gs.ui.dialogue_open_ms = current_time;   // D97: the box slides in
+    gs.ui.choice = undefined;
     gs.ui.opened_frame = Input_Frame();
     var open_block_frames = Dialogue_IsCutsceneTextOnly() ? max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES) : 0;
     gs.ui.dialogue_open_block_frame = gs.ui.opened_frame + open_block_frames;
@@ -1065,6 +1063,11 @@ function Dialogue_Advance() {
     }
 
     if (gs.ui.index >= array_length(gs.ui.lines)) {
+        if (is_struct(Dialogue_Choice())) {   // D101: the last line is read, the choices open above the box
+            gs.ui.index = max(0, array_length(gs.ui.lines) - 1);
+            Dialogue_ChoiceOpen();
+            return;
+        }
         Dialogue_CloseNow();
     }
 }
@@ -1083,6 +1086,7 @@ function Dialogue_CloseNow() {
     gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
     gs.ui.dialogue_lock = UI_DIALOGUE_REOPEN_LOCK;
     gs.ui.dialogue_require_release = true;
+    gs.ui.choice = undefined;
     Dialogue_SetActiveAmbienceSfxKey("");
     if (Dialogue_IsSkillbookFirstReadUIActive()) {
         Dialogue_SkillbookFirstReadMarkDone();
@@ -1092,6 +1096,157 @@ function Dialogue_CloseNow() {
     }
 }
 
+
+// ---- D101: the dialogue box. The shared frame with a speaker name tab, the typewriter text, a blinking arrow when a line is complete, and
+// choices as a small menu of the shared kind above the box. Dialogue_Start* opens it; confirm completes the line, then moves on. ----
+// _choices = the labels; _on_pick(index) runs after the box closes (Back picks the last choice when _allow_back).
+function Dialogue_StartChoice(_speaker, _lines, _choices, _on_pick, _allow_back = false) {
+    if (string(_speaker) != "") Dialogue_StartWithSpeaker(_speaker, _lines);
+    else Dialogue_StartLines(_lines);
+    GameState_Get().ui.choice = { labels: _choices, on_pick: _on_pick, menu: undefined, allow_back: _allow_back };
+}
+
+function Dialogue_Choice() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "choice")) return undefined;
+    return is_struct(gs.ui.choice) ? gs.ui.choice : undefined;
+}
+
+function Dialogue_ChoiceIsOpen() {
+    var ch = Dialogue_Choice();
+    return is_struct(ch) && is_struct(ch.menu);
+}
+
+function Dialogue_ChoiceItems(_ch) {
+    var items = [];
+    for (var i = 0; i < array_length(_ch.labels); i++) array_push(items, { label: string(_ch.labels[i]), enabled: true });
+    return items;
+}
+
+function Dialogue_ChoiceOpen() {
+    var ch = Dialogue_Choice();
+    if (!is_struct(ch)) return;
+    var box = Dialogue_BoxRect();
+    var mt = Ui_Metrics();
+    var m = Ui_MenuNew("dialogue_choice", Dialogue_ChoiceItems(ch), {
+        on_confirm: Dialogue_ChoicePick, on_back: ch.allow_back ? Dialogue_ChoiceBack : undefined,
+        layout: { x_anchor: "right", y_bottom: box.y - mt.p * 2 }
+    });
+    Ui_MenuFixCursor(m, 0);   // a new question starts on its first answer (the shared memory is for the fixed menus)
+    ch.menu = m;
+    SFX_PlayUI("ui_openclose");
+}
+
+function Dialogue_ChoicePick(_m, _i) {
+    var ch = Dialogue_Choice();
+    var cb = is_struct(ch) ? ch.on_pick : undefined;
+    Dialogue_CloseNow();
+    if (is_callable(cb)) cb(_i);
+}
+
+function Dialogue_ChoiceBack(_m, _res) {
+    Dialogue_ChoicePick(_m, array_length(_m.items) - 1);
+}
+
+// One frame of the open choice menu (obj_ui_controller Step calls it instead of Dialogue_Advance while it is up).
+function Dialogue_ChoiceStep() {
+    var ch = Dialogue_Choice();
+    if (is_struct(ch) && is_struct(ch.menu)) Ui_MenuUpdate(ch.menu);
+}
+
+// A 5 x 3 arrow pointing down, cells _p x _p, top-left at (_x, _y).
+function Dialogue_DrawArrowDown(_x, _y, _p, _col) {
+    Ui_Box(_x, _y, _x + 5 * _p, _y + _p, _col);
+    Ui_Box(_x + _p, _y + _p, _x + 4 * _p, _y + 2 * _p, _col);
+    Ui_Box(_x + 2 * _p, _y + 2 * _p, _x + 3 * _p, _y + 3 * _p, _col);
+}
+
+function Dialogue_Draw() {
+    var gs = GameState_Get();
+    if (!(gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0)) return;
+    UI_SetFont();
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var box = Dialogue_BoxRect();
+    var cutscene_text_only = Dialogue_IsCutsceneTextOnly();
+
+    var line = "";
+    var line_entry = "";
+    var line_icon_sprite = noone;
+    var line_icon_subimg = 0;
+    if (array_length(gs.ui.lines) > 0 && gs.ui.index >= 0 && gs.ui.index < array_length(gs.ui.lines)) {
+        line_entry = gs.ui.lines[gs.ui.index];
+        line = Dialogue_LineText(line_entry);
+        if (is_struct(line_entry) && variable_struct_exists(line_entry, "icon_sprite")) line_icon_sprite = line_entry.icon_sprite;
+        if (is_struct(line_entry) && variable_struct_exists(line_entry, "icon_subimg")) line_icon_subimg = round(line_entry.icon_subimg);
+    }
+    var speaker = variable_struct_exists(gs.ui, "speaker") ? gs.ui.speaker : "";
+    var layout = Dialogue_TextLayout(speaker);
+
+    // D97: the framed box slides up into place in three pixel steps and fades in
+    var open_t = variable_struct_exists(gs.ui, "dialogue_open_ms") ? Ui_AnimT(gs.ui.dialogue_open_ms, current_time) : 1;
+    var rise = cutscene_text_only ? 0 : p * round((1 - open_t) * 3);
+
+    if (!cutscene_text_only) {
+        Ui_DrawFrame(box.x, box.y + rise, box.w, box.h, open_t, p);
+        if (speaker != "") Ui_DrawNameTab(box.x, box.y + rise, speaker, open_t);
+    }
+
+    var icon_draw_w = 0;
+    var icon_scale = max(1, floor(mt.line_h / 16));
+    var icon_gap = 2 * p;
+    if (line_icon_sprite != noone && line_icon_sprite != -1) {
+        line_icon_subimg = clamp(line_icon_subimg, 0, max(0, sprite_get_number(line_icon_sprite) - 1));
+        icon_draw_w = max(round(10 * icon_scale), round(sprite_get_width(line_icon_sprite) * icon_scale)) + icon_gap;
+    }
+    var text_x = layout.text_x + icon_draw_w;
+    var text_y = layout.text_y + rise;
+
+    Dialogue_TypewriterPrepareCurrentLine();
+    var page_text = variable_struct_exists(gs.ui, "dialogue_full_text") ? gs.ui.dialogue_full_text : line;
+    var visible_count = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text);
+    var visible_text = string_copy(page_text, 1, clamp(visible_count, 0, string_length(page_text)));
+
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+    if (cutscene_text_only) {   // over the cutscene's art: plain text with a 1 px shadow, as before
+        if (speaker != "") {
+            draw_set_color(c_black);
+            UI_DrawText(layout.speaker_x + UI_CUTSCENE_TEXT_SHADOW_X, layout.speaker_y + UI_CUTSCENE_TEXT_SHADOW_Y, speaker + ":");
+            draw_set_color(c_white);
+            UI_DrawText(layout.speaker_x, layout.speaker_y, speaker + ":");
+        }
+        if (icon_draw_w > 0) draw_sprite_ext(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1, icon_scale, icon_scale, 0, c_white, 1);
+        draw_set_color(c_black);
+        UI_DrawText(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text);
+        draw_set_color(c_white);
+        UI_DrawText(text_x, text_y, visible_text);
+    } else {
+        var a0 = draw_get_alpha();
+        draw_set_alpha(open_t);
+        if (icon_draw_w > 0) draw_sprite_ext(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1, icon_scale, icon_scale, 0, c_white, open_t);
+        draw_set_color(UI_C_LIGHTEST);
+        UI_DrawText(text_x, text_y, visible_text);
+        draw_set_alpha(a0);
+    }
+
+    // the blinking arrow: the line is complete and the player may go on (not while a choice is up)
+    if (gs.ui.mode == UI_DIALOGUE && array_length(gs.ui.lines) > 0 && !Dialogue_ChoiceIsOpen()
+    && variable_struct_exists(gs.ui, "dialogue_state") && gs.ui.dialogue_state == UI_DIALOGUE_STATE_READY) {
+        var blink = (floor(gs.ui.icon_frame) mod 2);
+        if (cutscene_text_only) {
+            draw_set_color(c_white);
+            Dialogue_DrawArrowDown(round(layout.box.x + layout.box.w - 6 * p), round(layout.box.y + layout.box.h - 4 * p + (blink ? 0 : p)), p, c_white);
+        } else {
+            Dialogue_DrawArrowDown(box.x + box.w - 10 * p, box.y + rise + box.h - 8 * p + (blink ? 0 : p), p, UI_C_LIGHTEST);
+        }
+    }
+
+    var ch = Dialogue_Choice();
+    if (is_struct(ch) && is_struct(ch.menu)) Ui_MenuDraw(ch.menu, Ui_MenuAlpha(ch.menu, current_time));
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
 
 // ============================================================================
 // C5 STORY (D102-D107, D40, D105): death lines, the wake line, the boss banner, lore notes, the closing text and the credits.
@@ -1357,7 +1512,7 @@ function Note_Defs() {
             "A letter that stops in the middle of a sentence.",
             "\"The others went ahead. Or I did. I can't tell anymore.\"",
             "\"I keep calling for them. Only the walls answer.\"" ] },
-        { id: "carved_arrow", room: "rm_floor8", tx: 2, ty: 3, min_deaths: 0, title: "Carved arrow", lines: [
+        { id: "carved_arrow", room: "rm_floor8", tx: 1, ty: 3, min_deaths: 0, title: "Carved arrow", lines: [
             "An arrow is carved here, pointing up.",
             "Someone crossed it out. Beneath it, one word:",
             "\"Don't.\"" ] },

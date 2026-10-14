@@ -544,25 +544,32 @@ function Item_IsConsumable(_item) {
     return _item.type == ITEM_CONSUMABLE;
 }
 
-function Item_ComputeAmount(_user, _use) {
-    var minv = 0;
-    var maxv = 0;
-
-    if (variable_struct_exists(_use, "min")) minv = _use.min; else minv = _use.power;
-    if (variable_struct_exists(_use, "max")) maxv = _use.max; else maxv = _use.power;
-    if (maxv < minv) maxv = minv;
-
-    var amt = (minv == maxv) ? minv : RunRng_Range("combat", minv, maxv);
-
+// A base amount after the user's level scaling and potion passives (the part of a roll that is not random).
+function Item_AdjustAmount(_user, _use, _base) {
+    var amt = _base;
     if (is_struct(_user) && variable_struct_exists(_user, "level") && variable_struct_exists(_use, "scale")) {
         var lvl = max(0, _user.level - 1);
         amt += floor(lvl * _use.scale);
     }
-
     var power_bonus = Card_PassiveSum(_user, "item_power");   // C2: Potion Lore, Apothecary
     if (power_bonus > 0) amt = max(amt, round(amt * (1 + power_bonus)));
-
     return amt;
+}
+
+// The smallest and largest amount a use can give this user right now (the battle's details panel shows it, D100).
+function Item_AmountRange(_user, _use) {
+    var minv = variable_struct_exists(_use, "min") ? _use.min : _use.power;
+    var maxv = variable_struct_exists(_use, "max") ? _use.max : _use.power;
+    if (maxv < minv) maxv = minv;
+    return { lo: Item_AdjustAmount(_user, _use, minv), hi: Item_AdjustAmount(_user, _use, maxv) };
+}
+
+function Item_ComputeAmount(_user, _use) {
+    var minv = variable_struct_exists(_use, "min") ? _use.min : _use.power;
+    var maxv = variable_struct_exists(_use, "max") ? _use.max : _use.power;
+    if (maxv < minv) maxv = minv;
+    var amt = (minv == maxv) ? minv : RunRng_Range("combat", minv, maxv);
+    return Item_AdjustAmount(_user, _use, amt);
 }
 
 function Item_Use(_item_id, _user, _target) {

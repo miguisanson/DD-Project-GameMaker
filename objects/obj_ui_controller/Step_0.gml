@@ -47,7 +47,9 @@ var k_pause = Input_UIPressed("pause");
 
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     Dialogue_TypewriterStep();
-    if (k_ok) {
+    if (Dialogue_ChoiceIsOpen()) {
+        Dialogue_ChoiceStep();   // D101: the choices above the box answer to the shared menu controls
+    } else if (k_ok) {
         Dialogue_Advance();
     }
     exit;

@@ -709,15 +709,6 @@ function Tooltip_GetStyle(_context = "default") {
         s.margin_px = 0;
         s.width_ratio = 1.00;
         s.height_ratio = 0.36;
-    } else if (_context == "battle") {
-        s.pad = 5;
-        s.text_scale = 0.93;
-        s.line_gap = 1;
-        s.min_w = 72;
-        s.min_h = 56;
-        s.margin_px = 6;
-        s.width_ratio = 1.00;
-        s.height_ratio = 0.0; // battle tooltip uses fixed pixel height
     }
 
     // Optional runtime override hook for future balancing/UI tuning.
@@ -2961,13 +2952,19 @@ function Ui_ReadInput() {
 // ---- menus and the stack ----------------------------------------------------------------------------------------------------
 // _opts may set on_confirm(menu, index), on_adjust(menu, index, dir) -> changed, on_back(menu, "pop"|"root"), owner, data and layout
 // fields: title, anchor ("center" | "bottom"), y_frac, center (centre the labels), details (D100 panel under the list), hides_below.
+// Battle (D99) fields: x_anchor ("center" | "left" | "right"), panel_w (fixed width), y_bottom (the block's bottom edge), max_h (most height it may
+// take), details_pos ("below" | "above"), details_cols (number lines side by side), rows_max (most rows shown).
+// Item fields besides label / value / help / lines / enabled / kind: icon { cat, frame } (an Icon_Get picture) or { spr, sub }, seq (arrow
+// directions drawn in the details panel under the sentence), dim (greyed but still selectable). After a draw m.rect and m.det_rect hold the panel and details rectangles.
 function Ui_MenuNew(_id, _items, _opts) {
     var m = {
         id: _id, items: _items, cursor: 0, top: 0, rects: [],
         rep_v: Ui_RepeatNew(), rep_h: Ui_RepeatNew(),
         on_confirm: undefined, on_back: undefined, on_adjust: undefined,
         owner: noone, data: {},
-        layout: { title: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false },
+        layout: { title: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false,
+                  x_anchor: "center", panel_w: 0, y_bottom: -1, max_h: 0, details_pos: "below", details_cols: 1, rows_max: 0 },
+        rect: { x: 0, y: 0, w: 0, h: 0 }, det_rect: { x: 0, y: 0, w: 0, h: 0 },
         opened_ms: current_time, closed_ms: -1, cur_y: -1, last_draw_ms: current_time
     };
     if (is_struct(_opts)) {
@@ -3215,15 +3212,24 @@ function Ui_TextBlock(_x, _y, _txt, _w, _col) {
 }
 
 // D100 details panel: one plain sentence, then number lines [{ label, value }] (generated from the real game data by the caller).
-function Ui_DetailsHeight(_w, _sentence, _lines) {
+// The text of _txt, cut with ".." so it is no wider than _max_w GUI units.
+function Ui_FitText(_txt, _max_w) {
+    var t = string(_txt);
+    if (UI_TextWidth(t) <= _max_w) return t;
+    while (string_length(t) > 1 && UI_TextWidth(t + "..") > _max_w) t = string_copy(t, 1, string_length(t) - 1);
+    return t + "..";
+}
+
+function Ui_DetailsHeight(_w, _sentence, _lines, _cols = 1, _seq_n = 0) {
     var mt = Ui_Metrics();
     var inner = _w - 2 * (4 * mt.p);
     var h = 2 * (2 * mt.p + mt.pad) + Ui_TextBlockH(_sentence, inner);
-    if (array_length(_lines) > 0) h += mt.p * 2 + array_length(_lines) * (mt.line_h + mt.p);
+    if (_seq_n > 0) h += 13 * max(1, round(mt.p / 2)) + mt.p;
+    if (array_length(_lines) > 0) h += mt.p * 2 + ceil(array_length(_lines) / max(1, _cols)) * (mt.line_h + mt.p);
     return h;
 }
 
-function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1) {
+function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1, _cols = 1, _seq = []) {
     var mt = Ui_Metrics();
     var p = mt.p;
     Ui_DrawFrame(_x, _y, _w, _h, _alpha, p);
@@ -3234,14 +3240,21 @@ function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1) {
     var ty0 = _y + 4 * p;
     Ui_TextBlock(x0, ty0, _sentence, x1 - x0, UI_C_LIGHTEST);
     ty0 += Ui_TextBlockH(_sentence, x1 - x0);
+    if (array_length(_seq) > 0) {   // the arrows to press (D100), in a dark strip like the card's
+        ty0 += p;
+        ty0 += CardsUi_DrawArrows(x0, ty0, x1 - x0, _seq, max(1, round(p / 2)));
+    }
     if (array_length(_lines) > 0) {
         ty0 += p;
         Ui_Box(x0, ty0, x1, ty0 + p, UI_C_DARK);
         ty0 += p;
+        var cols = max(1, _cols);
+        var col_w = (x1 - x0 - (cols - 1) * 3 * p) / cols;
         for (var i = 0; i < array_length(_lines); i++) {
-            Ui_Text(x0, ty0, _lines[i].label, UI_C_LIGHT);
-            Ui_Text(x1, ty0, _lines[i].value, UI_C_LIGHTEST, fa_right);
-            ty0 += mt.line_h + p;
+            var cx0 = x0 + (i mod cols) * (col_w + 3 * p);
+            Ui_Text(cx0, ty0, _lines[i].label, UI_C_LIGHT);
+            Ui_Text(cx0 + col_w, ty0, _lines[i].value, UI_C_LIGHTEST, fa_right);
+            if ((i mod cols) == cols - 1 || i == array_length(_lines) - 1) ty0 += mt.line_h + p;
         }
     }
     draw_set_alpha(a0);
@@ -3264,9 +3277,11 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     // widths
     var label_w = 0;
     var val_w = 0;
+    var icon_px = 0;     // the icon column (battle lists): one icon pixel is k GUI units, k = whole units that fit a row
     for (var i = 0; i < n; i++) {
         var it = _m.items[i];
         label_w = max(label_w, UI_TextWidth(it.label));
+        if (variable_struct_exists(it, "icon") && is_struct(it.icon)) icon_px = 16 * max(1, floor(mt.row_h / 16));
         var kind = variable_struct_exists(it, "kind") ? it.kind : "button";
         var vw = 0;
         if (kind == "slider") {
@@ -3279,39 +3294,53 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         val_w = max(val_w, vw);
     }
     var title_w = (L.title != "") ? UI_TextWidth(L.title) : 0;
-    var inner_w = max(5 * p + label_w + ((val_w > 0) ? 4 * p + val_w : 0), title_w);
+    var icon_col = (icon_px > 0) ? icon_px + 2 * p : 0;
+    var inner_w = max(5 * p + icon_col + label_w + ((val_w > 0) ? 4 * p + val_w : 0), title_w);
     var chrome_x = 2 * (4 * p);
     var panel_w = min(inner_w + chrome_x, mt.gw - 2 * mt.margin);
-    if (L.details) panel_w = min(max(panel_w, round(mt.gw * 0.78)), mt.gw - 2 * mt.margin);
+    if (L.details && L.panel_w <= 0) panel_w = min(max(panel_w, round(mt.gw * 0.78)), mt.gw - 2 * mt.margin);
+    if (L.panel_w > 0) panel_w = min(L.panel_w, mt.gw - 2 * mt.margin);
     var header_h = (L.title != "") ? (mt.line_h + 3 * p) : 0;
     var chrome_y = 2 * (4 * p) + header_h;
 
     // the details panel's height is the tallest sentence, so the list does not jump between items
     var det_h = 0;
-    if (L.details) {
+    if (L.details && L.details_pos == "above" && n > 0) {   // a panel above the list (battle) is as tall as the highlighted item needs: it grows upward
+        var dc = _m.items[clamp(_m.cursor, 0, n - 1)];
+        if (variable_struct_exists(dc, "help")) det_h = Ui_DetailsHeight(panel_w, dc.help, variable_struct_exists(dc, "lines") ? dc.lines : [], L.details_cols, variable_struct_exists(dc, "seq") ? array_length(dc.seq) : 0);
+    } else if (L.details) {
         for (var d = 0; d < n; d++) {
             var di = _m.items[d];
-            if (variable_struct_exists(di, "help")) det_h = max(det_h, Ui_DetailsHeight(panel_w, di.help, variable_struct_exists(di, "lines") ? di.lines : []));
+            if (variable_struct_exists(di, "help")) det_h = max(det_h, Ui_DetailsHeight(panel_w, di.help, variable_struct_exists(di, "lines") ? di.lines : [], L.details_cols, variable_struct_exists(di, "seq") ? array_length(di.seq) : 0));
         }
     }
-    var avail_h = mt.gh - 2 * mt.margin - ((det_h > 0) ? det_h + mt.margin : 0);
+    var avail_h = ((L.max_h > 0) ? L.max_h : (mt.gh - 2 * mt.margin)) - ((det_h > 0) ? det_h + mt.margin : 0);
     var rows_vis = clamp(floor((avail_h - chrome_y) / mt.row_h), 1, max(1, n));
+    if (L.rows_max > 0) rows_vis = min(rows_vis, L.rows_max);
     var panel_h = chrome_y + rows_vis * mt.row_h;
     var total_h = panel_h + ((det_h > 0) ? mt.margin + det_h : 0);
     var px = round((mt.gw - panel_w) / 2);
+    if (L.x_anchor == "right") px = mt.gw - mt.margin - panel_w;
+    else if (L.x_anchor == "left") px = mt.margin;
     var py;
-    if (L.anchor == "bottom") py = clamp(round(mt.gh * L.y_frac), mt.margin, max(mt.margin, mt.gh - mt.margin - total_h));
+    if (L.y_bottom >= 0) py = max(mt.margin, round(L.y_bottom - total_h));
+    else if (L.anchor == "bottom") py = clamp(round(mt.gh * L.y_frac), mt.margin, max(mt.margin, mt.gh - mt.margin - total_h));
     else py = max(mt.margin, round((mt.gh - total_h) / 2));
     var slide = p * round((1 - _alpha) * 3);   // slides down into place in three pixel steps
     py += -slide;
+    var det_above = (det_h > 0 && L.details_pos == "above");
+    var list_y = det_above ? (py + det_h + mt.margin) : py;     // the list panel's top; the details panel is above or below it
+    var det_y = det_above ? py : (py + panel_h + mt.margin);
+    _m.rect = { x: px, y: list_y, w: panel_w, h: panel_h };
+    _m.det_rect = (det_h > 0) ? { x: px, y: det_y, w: panel_w, h: det_h } : { x: 0, y: 0, w: 0, h: 0 };
 
     _m.top = Ui_ScrollTop(_m.cursor, _m.top, rows_vis, n);
-    Ui_DrawFrame(px, py, panel_w, panel_h, _alpha, p);
+    Ui_DrawFrame(px, list_y, panel_w, panel_h, _alpha, p);
     draw_set_alpha(_alpha);
 
     var x0 = px + 4 * p;
     var x1 = px + panel_w - 4 * p;
-    var ty0 = py + 4 * p;
+    var ty0 = list_y + 4 * p;
     if (L.title != "") {
         Ui_Text(x0, ty0, L.title, UI_C_LIGHT);
         Ui_Box(px + 3 * p, ty0 + mt.line_h + p, px + panel_w - 3 * p, ty0 + mt.line_h + 2 * p, UI_C_DARK);
@@ -3342,10 +3371,26 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         var sel = (k == _m.cursor);
         var en = Ui_ItemEnabled(row);
         var kd = variable_struct_exists(row, "kind") ? row.kind : "button";
-        var col = !en ? UI_C_DARK : (sel ? UI_C_LIGHTEST : UI_C_LIGHT);
+        var dim = variable_struct_exists(row, "dim") && row.dim;
+        var col = (!en || dim) ? (sel ? UI_C_LIGHT : UI_C_DARK) : (sel ? UI_C_LIGHTEST : UI_C_LIGHT);
         var label_x = x0 + 5 * p;
+        if (icon_px > 0) {
+            if (variable_struct_exists(row, "icon") && is_struct(row.icon)) {
+                var ic = variable_struct_exists(row.icon, "spr") ? row.icon : Icon_Get(row.icon.cat, row.icon.frame);   // { cat, frame } an Icon_Get picture, or { spr, sub } a sprite
+                if (is_struct(ic)) {
+                    var isc = icon_px / max(16, max(sprite_get_width(ic.spr), sprite_get_height(ic.spr)));
+                    draw_sprite_ext(ic.spr, ic.sub, label_x + sprite_get_xoffset(ic.spr) * isc, ry + (mt.row_h - icon_px) div 2 + sprite_get_yoffset(ic.spr) * isc, isc, isc, 0, c_white, (dim && !sel) ? _alpha * 0.55 : _alpha);
+                }
+            }
+            label_x += icon_px + 2 * p;
+        }
+        var shown_label = row.label;
+        if (!L.center) {   // a fixed-width panel (battle): a long name gives way to ".." before it reaches the value
+            var vroom = x1 - label_x - ((variable_struct_exists(row, "value") && row.value != "") ? UI_TextWidth(row.value) + 3 * p : 0);
+            shown_label = Ui_FitText(row.label, vroom);
+        }
         if (L.center) Ui_Text((x0 + x1) / 2, ty, row.label, col, fa_center);
-        else Ui_Text(label_x, ty, row.label, col);
+        else Ui_Text(label_x, ty, shown_label, col);
         var vx = x1;
         if (kd == "choice" && variable_struct_exists(row, "value")) {
             if (sel && en) {
@@ -3380,7 +3425,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     if (det_h > 0 && n > 0) {
         var cur = _m.items[_m.cursor];
         if (variable_struct_exists(cur, "help")) {
-            Ui_DrawDetails(px, py + panel_h + mt.margin, panel_w, det_h, cur.help, variable_struct_exists(cur, "lines") ? cur.lines : [], _alpha);
+            Ui_DrawDetails(px, det_y, panel_w, det_h, cur.help, variable_struct_exists(cur, "lines") ? cur.lines : [], _alpha, L.details_cols, variable_struct_exists(cur, "seq") ? cur.seq : []);
         }
     }
     draw_set_alpha(a0);

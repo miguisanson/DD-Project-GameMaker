@@ -260,6 +260,7 @@ function Combat_Log(_text, _icon_sprite = noone, _icon_subimg = 0) {
             icon_subimg: _icon_subimg
         };
     }
+    if (!variable_struct_exists(entry, "at")) entry.at = current_time;   // the HUD shows an entry for a few seconds (Battle_DrawLog)
 
     var bc = instance_find(obj_battle_controller, 0);
     if (!instance_exists(bc)) return;
@@ -1024,10 +1025,7 @@ function Battle_ArrowPresses() {
 // Same widget and same Qte_Grade as the attack bar. Tuned by playtest.
 function Qte_DefenceParams(_skill_id) {
     switch (_skill_id) {
-        case SKILL_POISON_FANGS:    return { sweep_ms: 900,  perfect_half_width: 55, good_half_width: 120, ok_half_width: 200 };
-        case SKILL_BITE:            return { sweep_ms: 800,  perfect_half_width: 55, good_half_width: 115, ok_half_width: 190 };
         case SKILL_VINE_TRAP:       return { sweep_ms: 1300, perfect_half_width: 60, good_half_width: 125, ok_half_width: 200 };
-        case SKILL_SCORCHING_TOUCH: return { sweep_ms: 1000, perfect_half_width: 55, good_half_width: 120, ok_half_width: 195 };
         case SKILL_GHOST_CUT:       return { sweep_ms: 750,  perfect_half_width: 50, good_half_width: 110, ok_half_width: 180 };
         case SKILL_RAMMING:         return { sweep_ms: 1500, perfect_half_width: 50, good_half_width: 100, ok_half_width: 170 };
         case SKILL_PALE_HYMN:       return { sweep_ms: 1400, perfect_half_width: 50, good_half_width: 105, ok_half_width: 175 };
@@ -1063,11 +1061,12 @@ function Qte_DefenceStatusTurns(_key, _turns) {
     return clamp(r, 1, _turns);
 }
 
-// Whether an enemy skill that just landed on the player gets the defence bar: a damaging skill flagged as a big attack (D7, D59).
-// To make another enemy attack defendable, set uses_defensive_qte on its skill and add a row to Qte_DefenceParams.
+// Whether an enemy skill that just landed on the player gets the defence bar: a damaging, telegraphed heavy move (D7, D59). Plain moves just hit (I-066).
+// To make another enemy attack defendable, set uses_defensive_qte and telegraphed on its skill and add a row to Qte_DefenceParams.
 function Battle_EnemySkillCanBeDefended(_skill, _res, _target) {
     if (!is_struct(_skill) || !is_struct(_res) || !is_struct(_target)) return false;
     if (!variable_struct_exists(_skill, "uses_defensive_qte") || !_skill.uses_defensive_qte) return false;
+    if (!variable_struct_exists(_skill, "telegraphed") || !_skill.telegraphed) return false;
     if (!variable_struct_exists(_skill, "effect") || string(_skill.effect) != "damage") return false;
     if (!variable_struct_exists(_target, "is_player") || !_target.is_player) return false;
     if (!variable_struct_exists(_res, "ok") || !_res.ok) return false;
@@ -1502,18 +1501,7 @@ function Battle_GetSkillList(_bc) {
 }
 
 function Battle_GetItemList(_bc) {
-    var p = _bc.p;
-    if (!is_array(p.inventory)) return [];
-
-    var out = [];
-    for (var i = 0; i < array_length(p.inventory); i++) {
-        var inv = p.inventory[i];
-        var item = ItemDB_Get(inv.id);
-        if (item.type == ITEM_CONSUMABLE && variable_struct_exists(item, "usable_battle") && item.usable_battle) {
-            array_push(out, inv);
-        }
-    }
-    return out;
+    return Battle_ItemList(_bc.p);
 }
 
 // Spec section 8: the one random roll left in a flee. Bosses are checked before this.
@@ -2007,16 +1995,17 @@ function Qte_DrawGradeWord(_key, _text, _x, _y, _left_ms, _unit) {
     draw_set_color(c_white);
 }
 
-// Where the QTE widgets (the bar, the arrows) sit: centred, under the enemy and its status icons, kept on screen. Returns the top y in GUI units.
+// Where the QTE widgets (the bar, the arrows) sit: centred, just under the enemy, kept above the bottom panels (D99). Returns the top y in GUI units.
 function Battle_QteAnchorY(_bc, _widget_h) {
     var sx = Display_WorldScale();
+    var z = Battle_Zones();
     var ay = round(Display_GuiH() * 0.72);
     if (instance_exists(_bc.enemy_inst) && _bc.enemy_inst.sprite_index != noone) {
         var spr = _bc.enemy_inst.sprite_index;
         var enemy_bottom = ((_bc.enemy_inst.y - sprite_get_yoffset(spr) - _bc.cam_base_y) * sx) + (sprite_get_height(spr) * abs(_bc.enemy_inst.image_yscale) * sx);
-        ay = round(enemy_bottom + (22 * sx));
+        ay = round(enemy_bottom + (8 * sx));
     }
-    return min(ay, Display_GuiH() - _widget_h - round(16 * sx));
+    return min(ay, z.band_top - _widget_h - z.m);
 }
 
 // One arrow, 9 x 9 design pixels (_unit GUI units each), top-left at (_x, _y), pointing _dir (RIGHT, UP, LEFT, DOWN macros): _fill inside, a 1-pixel _edge.
@@ -2309,31 +2298,417 @@ function Battle_EnemyAct(_bc) {
     }
 }
 
-// ---- Turn timeline strip, enemy header (name, HP, stagger), floating numbers and the BREAK word (D74 D75 D92 D97 D99) ----
-// GUI layer, the four palette colours only (UI_C_*), the Ui_* kit of D0 (Ui_Metrics, Ui_Box, Ui_DrawFrame, Ui_Text, Ui_AnimT, Ui_Bob, Ui_Glide).
+// ---- The battle HUD (D74 D75 D92 D97 D99 D100): turn strip, enemy header, player panel, log, banner and the command / skill / item menus ----
+// GUI layer, the four palette colours only (UI_C_*), built on the Ui_* kit of D0 (Ui_Metrics, Ui_Box, Ui_DrawFrame, Ui_Text, Ui_Menu*, Ui_AnimT, Ui_Bob, Ui_Glide).
+// Every size is a whole multiple of Ui_Px (one font pixel), so every edge lands on whole window pixels at every window size.
 #macro TURN_SLIDE_MS 120
+#macro LOG_TOAST_MS 2200
 
+// One icon pixel in GUI units for chips and strip portraits: a whole multiple of the window pixel, so the 16 x 16 art stays crisp.
+function Battle_IconK() {
+    return max(1, round(Display_WorldScale() * 0.6));
+}
+
+// The screen in zones (pure; Test_Suite_BattleUi checks that nothing overlaps at every size). _tl_bottom = the turn strip's bottom edge,
+// _icon = a status chip's icon edge. player = the HP / MP / status panel (bottom left); right = the column of the command menu and lists
+// (bottom right, bottom edge list_bottom); msg = where the log toast and the skill banner's plate may sit (above both bottom panels).
+function BattleHud_Zones(_gw, _gh, _p, _lh, _tl_bottom, _icon) {
+    var m = 3 * _p;
+    var row = _lh + 2 * _p;
+    var pl_w = round(_gw * 0.40);
+    var pl_h = 8 * _p + 3 * _lh + 6 * _p + _icon;
+    var cmd_h = 8 * _p + 5 * row;
+    var band_h = max(pl_h, cmd_h);
+    var band_top = _gh - m - band_h;
+    var msg_h = 8 * _p + 2 * _lh + _p;
+    var rx = m + pl_w + m;
+    return {
+        m: m, row: row, band_h: band_h, band_top: band_top, cmd_h: cmd_h,
+        player: { x: m, y: band_top, w: pl_w, h: band_h },
+        right: { x: rx, w: _gw - rx - m },
+        list_bottom: _gh - m,
+        msg: { x: m, y: band_top - 2 * _p - msg_h, w: _gw - 2 * m, h: msg_h }
+    };
+}
+
+function Battle_Zones() {
+    var mt = Ui_Metrics();
+    return BattleHud_Zones(mt.gw, mt.gh, mt.p, mt.line_h, Battle_TimelineBottom(), 16 * Battle_IconK());
+}
+
+// ---- 3 x 5 digits and a plus sign for the chips (retro-ui.md section 3). Every cell is _p x _p. ----
+function Battle_GlyphRows(_ch) {
+    switch (_ch) {
+        case "0": return [7, 5, 5, 5, 7];
+        case "1": return [2, 6, 2, 2, 7];
+        case "2": return [7, 1, 7, 4, 7];
+        case "3": return [7, 1, 7, 1, 7];
+        case "4": return [5, 5, 7, 1, 1];
+        case "5": return [7, 4, 7, 1, 7];
+        case "6": return [7, 4, 7, 5, 7];
+        case "7": return [7, 1, 1, 2, 2];
+        case "8": return [7, 5, 7, 5, 7];
+        case "9": return [7, 5, 7, 1, 7];
+        case "+": return [0, 2, 7, 2, 0];
+    }
+    return [0, 0, 0, 0, 0];
+}
+
+function Battle_DigitsWidth(_text, _p) {
+    var n = string_length(_text);
+    return (n <= 0) ? 0 : (n * 3 + (n - 1)) * _p;
+}
+
+function Battle_DrawDigits(_x, _y, _text, _p, _col) {
+    for (var i = 1; i <= string_length(_text); i++) {
+        var rows = Battle_GlyphRows(string_char_at(_text, i));
+        var gx = _x + (i - 1) * 4 * _p;
+        for (var r = 0; r < 5; r++) {
+            for (var c = 0; c < 3; c++) {
+                if (((rows[r] >> (2 - c)) & 1) == 1) Ui_Box(gx + c * _p, _y + r * _p, gx + (c + 1) * _p, _y + (r + 1) * _p, _col);
+            }
+        }
+    }
+}
+
+// ---- status chips (D99): what a fighter is under, with the number the player needs ----
+// { id, frame (the strip frame of art/strips_v2/status), text (turns left, or a poison's stacks), corner (the stacks of a bleed), negative, name, line, last (1 turn left) }
+function Battle_StatusChips(_ch) {
+    var out = [];
+    var list = Status_DisplayList(_ch);
+    for (var i = 0; i < array_length(list); i++) {
+        var d = list[i];
+        var cfg = StatusDB_Get(d.id);
+        var dot = variable_struct_exists(cfg, "dot_kind") ? cfg.dot_kind : "";
+        array_push(out, {
+            id: d.id, frame: Icon_StatusFrame(d.id),
+            text: (d.turns > 0) ? string(d.turns) : "",
+            corner: (dot == "bleed" && d.stacks > 1) ? string(d.stacks) : "",
+            negative: d.negative, name: d.name, line: d.line, last: (d.turns == 1 && dot != "poison")
+        });
+    }
+    return out;
+}
+
+// Chips for the HUD: the real statuses, then Steadfast (turns left) and BREAK, which live on the turn timeline and the stagger meter.
+function Battle_FighterChips(_bc, _who) {
+    var ch = (_who == TL_PLAYER) ? _bc.p : _bc.e;
+    var chips = Battle_StatusChips(ch);
+    var f = Turn_Find(_bc.tl, _who);
+    if (is_struct(f) && f.steadfast > 0) {
+        array_push(chips, { id: -2, frame: Icon_Frame("status", "steadfast"), text: string(f.steadfast), corner: "", negative: false, last: (f.steadfast == 1),
+                            name: Loc_T("battle.chip.steadfast", "Steadfast"), line: Loc_T("battle.chip.steadfast.line", "Cannot be stunned.") });
+    }
+    if (_who == TL_ENEMY && variable_struct_exists(ch, "broken") && ch.broken) {
+        array_push(chips, { id: -3, frame: Icon_Frame("status", "break"), text: "", corner: "", negative: true, last: false,
+                            name: Loc_T("battle.hud.break", "BREAK!"), line: Loc_T("battle.chip.break.line", "Takes +50% damage until its next turn.") });
+    }
+    return chips;
+}
+
+// Width of a row of chips, and how many fit in _max_w (the rest become one plus-count chip).
+function Battle_ChipMetrics(_n, _ic, _p, _max_w) {
+    var c = _ic + 2 * _p;
+    var fit = max(1, floor((_max_w + _p) / (c + _p)));
+    var shown = (_n <= fit) ? _n : max(1, fit - 1);
+    var cells = shown + ((_n > shown) ? 1 : 0);
+    return { c: c, shown: shown, more: _n - shown, w: (cells <= 0) ? 0 : cells * c + (cells - 1) * _p };
+}
+
+// Draws the row; returns its width. _align: fa_left (x = left edge), fa_center, fa_right (x = right edge).
+function Battle_DrawChips(_chips, _x, _y, _ic, _p, _max_w, _alpha, _align = fa_left) {
+    var n = array_length(_chips);
+    if (n <= 0) return 0;
+    var cm = Battle_ChipMetrics(n, _ic, _p, _max_w);
+    var x0 = _x;
+    if (_align == fa_center) x0 = _x - cm.w * 0.5;
+    else if (_align == fa_right) x0 = _x - cm.w;
+    x0 = round(x0);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    var k = _ic div 16;
+    for (var i = 0; i < cm.shown; i++) {
+        var ch = _chips[i];
+        var cx = x0 + i * (cm.c + _p);
+        Ui_Box(cx, _y, cx + cm.c, _y + cm.c, ch.negative ? UI_C_LIGHT : UI_C_DARK);
+        Ui_Box(cx + _p, _y + _p, cx + cm.c - _p, _y + cm.c - _p, UI_C_DARKEST);
+        if (ch.frame >= 0) Icon_Draw("status", ch.frame, cx + _p, _y + _p, k, _alpha);
+        else Ui_Text(cx + cm.c * 0.5, _y + (cm.c - UI_TextHeight("A")) * 0.5, string_upper(string_copy(ch.name, 1, 1)), UI_C_LIGHTEST, fa_center);
+        if (ch.text != "") {
+            var dw = Battle_DigitsWidth(ch.text, _p);
+            var pw = dw + 2 * _p;
+            var ph = 7 * _p;
+            var px = cx + cm.c - pw;
+            var py = _y + cm.c - ph;
+            var inv = ch.last && (floor(current_time / 250) mod 2 == 0);   // blinks while 1 turn is left
+            Ui_Box(px, py, px + pw, py + ph, inv ? UI_C_LIGHTEST : UI_C_DARKEST);
+            Ui_Box(px, py, px + pw, py + _p, UI_C_DARK);
+            Battle_DrawDigits(px + _p, py + _p, ch.text, _p, inv ? UI_C_DARKEST : UI_C_LIGHTEST);
+        }
+        if (ch.corner != "") {
+            var cw = Battle_DigitsWidth(ch.corner, _p) + 2 * _p;
+            Ui_Box(cx, _y, cx + cw, _y + 7 * _p, UI_C_DARKEST);
+            Battle_DrawDigits(cx + _p, _y + _p, ch.corner, _p, UI_C_LIGHTEST);
+        }
+    }
+    if (cm.more > 0) {
+        var mx = x0 + cm.shown * (cm.c + _p);
+        Ui_Box(mx, _y, mx + cm.c, _y + cm.c, UI_C_DARK);
+        Ui_Box(mx + _p, _y + _p, mx + cm.c - _p, _y + cm.c - _p, UI_C_DARKEST);
+        var mt2 = "+" + string(cm.more);
+        Battle_DrawDigits(mx + (cm.c - Battle_DigitsWidth(mt2, _p)) div 2, _y + (cm.c - 5 * _p) div 2, mt2, _p, UI_C_LIGHTEST);
+    }
+    draw_set_alpha(a0);
+    return cm.w;
+}
+
+// ---- details (D100): one plain sentence and the exact numbers, generated from the real data ----
+function Battle_SkillDetails(_skill, _cost = -1) {
+    var lines = [];
+    var sentence = Card_SkillSentence(_skill);
+    if (_skill.effect == "damage") {
+        array_push(lines, { label: Loc_T("card.lbl.power", "Power"), value: string(round(_skill.power)) });
+        if (variable_struct_exists(_skill, "hits") && _skill.hits > 1) array_push(lines, { label: Loc_T("battle.det.hits", "Hits"), value: string(round(_skill.hits)) });
+    }
+    array_push(lines, { label: Loc_T("card.lbl.mp", "MP"), value: string((_cost >= 0) ? _cost : round(_skill.mp_cost)) });
+    if (_skill.status != -1) {
+        var poison = (_skill.status == STATUS_POISON);
+        if (poison && variable_struct_exists(_skill, "status_stacks")) array_push(lines, { label: Loc_T("card.lbl.stacks", "Stacks"), value: string(round(_skill.status_stacks)) });
+        else array_push(lines, { label: Loc_T("card.lbl.turns", "Turns"), value: string(round(_skill.status_turns)) });
+        if (_skill.effect == "damage" && _skill.status_chance < 1) array_push(lines, { label: Loc_T("card.lbl.chance", "Chance"), value: string(round(_skill.status_chance * 100)) + "%" });
+    }
+    return { sentence: sentence, lines: lines };
+}
+
+function Battle_ItemDetails(_item, _user) {
+    var lines = [];
+    var sentence = Loc_T("battle.item.other", "A useful item.");
+    if (_item.type == ITEM_CONSUMABLE && variable_struct_exists(_item, "use") && is_struct(_item.use)) {
+        var use = _item.use;
+        switch (use.effect) {
+            case "heal":
+                sentence = Loc_T("battle.item.heal", "Restores your HP.");
+                var rh = Item_AmountRange(_user, use);
+                array_push(lines, { label: Loc_T("battle.det.hp", "HP"), value: (rh.lo == rh.hi) ? string(rh.lo) : (string(rh.lo) + "-" + string(rh.hi)) });
+                break;
+            case "mp":
+                sentence = Loc_T("battle.item.mp", "Restores your MP.");
+                var rm = Item_AmountRange(_user, use);
+                array_push(lines, { label: Loc_T("battle.det.mp", "MP"), value: (rm.lo == rm.hi) ? string(rm.lo) : (string(rm.lo) + "-" + string(rm.hi)) });
+                break;
+            case "cure":
+                sentence = Loc_T("battle.item.cure", "Cures {status}.", { status: Card_StatusNameSafe(use.status) });
+                break;
+        }
+    }
+    return { sentence: sentence, lines: lines };
+}
+
+// ---- the lists (D99): one row per skill / item, as Ui_Menu items ----
+function Battle_SkillRows(_p) {
+    var out = [];
+    var ids = is_array(_p.skills) ? _p.skills : [];
+    for (var i = 0; i < array_length(ids); i++) {
+        var sk = SkillDB_Get(ids[i]);
+        var cost = Equip_PlayerSkillMPCost(_p, sk, sk.mp_cost);
+        var det = Battle_SkillDetails(sk, cost);
+        var fr = Icon_SkillFrame(ids[i]);
+        array_push(out, {
+            label: sk.name, value: Loc_T("battle.menu.mp", "{mp} MP", { mp: string(cost) }), skill_id: ids[i], cost: cost, seq: Qte_SkillSequence(ids[i]),
+            dim: (_p.mp < cost), help: det.sentence, lines: det.lines, icon: (fr >= 0) ? { cat: "skill", frame: fr } : undefined, enabled: true
+        });
+    }
+    return out;
+}
+
+// The battle's consumables, as inventory entries { id, qty } (one place for the rule; the menu and the bot read it).
+function Battle_ItemList(_p) {
+    var out = [];
+    if (!is_array(_p.inventory)) return out;
+    for (var i = 0; i < array_length(_p.inventory); i++) {
+        var inv = _p.inventory[i];
+        var item = ItemDB_Get(inv.id);
+        if (item.type == ITEM_CONSUMABLE && variable_struct_exists(item, "usable_battle") && item.usable_battle) array_push(out, inv);
+    }
+    return out;
+}
+
+function Battle_ItemRows(_p) {
+    var out = [];
+    var list = Battle_ItemList(_p);
+    for (var i = 0; i < array_length(list); i++) {
+        var item = ItemDB_Get(list[i].id);
+        var det = Battle_ItemDetails(item, _p);
+        array_push(out, {
+            label: item.name, value: "x" + string(list[i].qty), item_id: list[i].id, qty: list[i].qty, help: det.sentence, lines: det.lines,
+            icon: (item.sprite != noone) ? { spr: item.sprite, sub: 0 } : undefined, enabled: true
+        });
+    }
+    return out;
+}
+
+// ---- the Guard command (D99): the turn is spent, the next hit deals half ----
+function Battle_GuardApply(_p) {
+    return Status_Add(_p, STATUS_BRACE, Status_Cfg(STATUS_BRACE, "duration", 2), 0);
+}
+
+function Battle_PlayerGuard(_bc) {
+    var p = Battle_GuardApply(_bc.p);
+    SFX_PlaySkill(SKILL_MUSCLE_UP);
+    Battle_Message(_bc, Loc_T("combat.msg.guard", "You brace yourself."), BSTATE_ENEMY_ACT);
+    Battle_PlayerFinalizeTurn(_bc, p, _bc.e);
+}
+
+// ---- the menus: Ui_Menu objects the controller owns; the cursor and the open animation live there ----
+function Battle_CmdItems() {
+    return [
+        { id: "attack", label: Loc_T("battle.action.attack", "ATTACK"), enabled: true },
+        { id: "skill", label: Loc_T("battle.action.skill", "SKILL"), enabled: true },
+        { id: "item", label: Loc_T("battle.action.item", "ITEM"), enabled: true },
+        { id: "guard", label: Loc_T("battle.action.guard", "GUARD"), enabled: true },
+        { id: "run", label: Loc_T("battle.action.run", "RUN"), enabled: true }
+    ];
+}
+
+function Battle_CmdConfirm(_m, _i) {
+    var bc = _m.owner;
+    switch (_m.items[_i].id) {
+        case "attack": Battle_AttackTimingBegin(bc); break;
+        case "skill":
+            if (array_length(Battle_GetSkillList(bc)) <= 0) Battle_Message(bc, Loc_T("battle.menu.no_skills", "No skills available."), BSTATE_MENU);
+            else Battle_OpenList(bc, BSTATE_SKILL_MENU);
+            break;
+        case "item":
+            if (array_length(Battle_GetItemList(bc)) <= 0) Battle_Message(bc, Loc_T("battle.menu.no_items", "No items available."), BSTATE_MENU);
+            else Battle_OpenList(bc, BSTATE_ITEM_MENU);
+            break;
+        case "guard": Battle_PlayerGuard(bc); break;
+        case "run": bc.battle_state = BSTATE_PLAYER_RUN; break;
+    }
+}
+
+function Battle_SkillConfirm(_m, _i) {
+    Battle_SkillQteBegin(_m.owner, _m.items[_i].skill_id);
+}
+
+function Battle_ItemConfirm(_m, _i) {
+    Battle_PlayerItem(_m.owner, _m.items[_i].item_id);
+}
+
+function Battle_ListBack(_m, _res) {
+    var bc = _m.owner;
+    bc.battle_state = BSTATE_MENU;
+    if (is_struct(bc.ui_cmd)) bc.ui_cmd.opened_ms = current_time;
+}
+
+// Builds (or rebuilds) the three menus. The lists keep their cursor through Ui_MemGlobal (D95).
+function Battle_MenusBuild(_bc) {
+    var z = Battle_Zones();
+    _bc.ui_cmd = Ui_MenuNew("battle_cmd", Battle_CmdItems(), {
+        owner: _bc, on_confirm: Battle_CmdConfirm,
+        layout: { x_anchor: "right", panel_w: round(z.right.w * 0.5), y_bottom: z.list_bottom }
+    });
+    _bc.ui_skill = Ui_MenuNew("battle_skill", Battle_SkillRows(_bc.p), {
+        owner: _bc, on_confirm: Battle_SkillConfirm, on_back: Battle_ListBack,
+        layout: { x_anchor: "right", panel_w: z.right.w, y_bottom: z.list_bottom, details: true, details_pos: "above", details_cols: 2, rows_max: 3 }
+    });
+    _bc.ui_item = Ui_MenuNew("battle_item", Battle_ItemRows(_bc.p), {
+        owner: _bc, on_confirm: Battle_ItemConfirm, on_back: Battle_ListBack,
+        layout: { x_anchor: "right", panel_w: z.right.w, y_bottom: z.list_bottom, details: true, details_pos: "above", details_cols: 2, rows_max: 3 }
+    });
+    _bc.ui_sig = { mp: _bc.p.mp, items: Battle_ItemSig(_bc.p), rev: Loc_GetRevision() };
+}
+
+// The menus' place follows the window (the zones change with the size): set every frame before a menu is stepped or drawn.
+function Battle_MenusLayout(_bc) {
+    var z = Battle_Zones();
+    _bc.ui_cmd.layout.panel_w = round(z.right.w * 0.5);
+    _bc.ui_cmd.layout.y_bottom = z.list_bottom;
+    _bc.ui_skill.layout.panel_w = z.right.w;
+    _bc.ui_skill.layout.y_bottom = z.list_bottom;
+    _bc.ui_item.layout.panel_w = z.right.w;
+    _bc.ui_item.layout.y_bottom = z.list_bottom;
+}
+
+function Battle_ItemSig(_p) {
+    var s = "";
+    var list = Battle_ItemList(_p);
+    for (var i = 0; i < array_length(list); i++) s += string(list[i].id) + ":" + string(list[i].qty) + ",";
+    return s;
+}
+
+// Opens a list: fresh rows (MP and quantities moved on), the open animation restarts, the cursor comes back from memory.
+function Battle_OpenList(_bc, _state) {
+    _bc.battle_state = _state;
+    var m = (_state == BSTATE_SKILL_MENU) ? _bc.ui_skill : _bc.ui_item;
+    m.items = (_state == BSTATE_SKILL_MENU) ? Battle_SkillRows(_bc.p) : Battle_ItemRows(_bc.p);
+    m.opened_ms = current_time;
+    m.closed_ms = -1;
+    Ui_MenuFixCursor(m, Ui_MemGet(Ui_MemGlobal(), m.id, array_length(m.items)));
+    m.rep_v = Ui_RepeatNew();
+}
+
+// One frame of whichever menu is up. Keeps the rows in step with the fight (MP spent, items used, language changed).
+function Battle_MenusStep(_bc) {
+    if (!is_struct(_bc.ui_cmd)) Battle_MenusBuild(_bc);
+    var sig = { mp: _bc.p.mp, items: Battle_ItemSig(_bc.p), rev: Loc_GetRevision() };
+    if (sig.mp != _bc.ui_sig.mp || sig.items != _bc.ui_sig.items || sig.rev != _bc.ui_sig.rev) {
+        var c1 = _bc.ui_cmd.cursor, c2 = _bc.ui_skill.cursor, c3 = _bc.ui_item.cursor;
+        var t1 = _bc.ui_cmd.opened_ms, t2 = _bc.ui_skill.opened_ms, t3 = _bc.ui_item.opened_ms;
+        Battle_MenusBuild(_bc);
+        Ui_MenuFixCursor(_bc.ui_cmd, c1);
+        Ui_MenuFixCursor(_bc.ui_skill, c2);
+        Ui_MenuFixCursor(_bc.ui_item, c3);
+        _bc.ui_cmd.opened_ms = t1;
+        _bc.ui_skill.opened_ms = t2;
+        _bc.ui_item.opened_ms = t3;
+    }
+    Battle_MenusLayout(_bc);
+    switch (_bc.battle_state) {
+        case BSTATE_MENU:
+            Ui_MenuUpdate(_bc.ui_cmd);
+            _bc.menu_index = _bc.ui_cmd.cursor;   // the bot and the tests read the command cursor here
+            break;
+        case BSTATE_SKILL_MENU:
+            if (array_length(_bc.ui_skill.items) <= 0) { Battle_Message(_bc, Loc_T("battle.menu.no_skills", "No skills available."), BSTATE_MENU); break; }
+            _bc.skill_index = _bc.ui_skill.cursor;
+            Ui_MenuUpdate(_bc.ui_skill);
+            if (_bc.battle_state == BSTATE_SKILL_MENU) _bc.skill_index = _bc.ui_skill.cursor;
+            break;
+        case BSTATE_ITEM_MENU:
+            if (array_length(_bc.ui_item.items) <= 0) { Battle_Message(_bc, Loc_T("battle.menu.no_items", "No items available."), BSTATE_MENU); break; }
+            Ui_MenuUpdate(_bc.ui_item);
+            if (_bc.battle_state == BSTATE_ITEM_MENU) _bc.item_index = _bc.ui_item.cursor;
+            break;
+    }
+}
+
+function Battle_DrawMenus(_bc) {
+    if (!is_struct(_bc.ui_cmd)) return;
+    var now = current_time;
+    switch (_bc.battle_state) {
+        case BSTATE_MENU: if (_bc.turn == TURN_PLAYER) Ui_MenuDraw(_bc.ui_cmd, Ui_MenuAlpha(_bc.ui_cmd, now)); break;
+        case BSTATE_SKILL_MENU: Ui_MenuDraw(_bc.ui_skill, Ui_MenuAlpha(_bc.ui_skill, now)); break;
+        case BSTATE_ITEM_MENU: Ui_MenuDraw(_bc.ui_item, Ui_MenuAlpha(_bc.ui_item, now)); break;
+    }
+}
+
+// ---- the turn strip (D74): a plate with the current actor first (ringed, gently bobbing), then the next four ----
 // Sizes of the strip in GUI units. Sprites are drawn at a whole multiple (k) of the window pixel so they stay crisp at every window size.
 function Battle_TimelineMetrics(_bc = noone) {
     var mt = Ui_Metrics();
     var p = mt.p;
-    var sx = Display_WorldScale();
-    var k = max(1, round(sx * 0.6));
+    var k = Battle_IconK();
     var icon = 16 * k;
-    var slot = icon + 6 * p;
-    var gap = 2 * p;
+    var slot = icon + 4 * p;
+    var gap = p;
     var n = TURN_PREVIEW_COUNT;
-    var w = n * slot + (n - 1) * gap;
+    var w = n * slot + (n - 1) * gap + 8 * p;
+    var plate_h = slot + 8 * p;
     var caption_h = mt.line_h + p;
-    // Centred, unless the player's HP / MP bars and numbers (top left, drawn by obj_ui_controller) reach into it: then it moves right of them.
-    var x0 = round((mt.gw - w) * 0.5);
-    if (_bc != noone && instance_exists(_bc)) {
-        var vis = UI_GetVisualScale();
-        var hud_right = max(6, round(8 * vis)) + sprite_get_width(hp_bar) * UI_BAR_SCALE * UI_GetSpriteScale() + max(4, round(6 * vis))
-            + max(UI_TextWidth(string(_bc.p.hp) + " / " + string(_bc.p.max_hp)), UI_TextWidth(string(_bc.p.mp) + " / " + string(_bc.p.max_mp)));
-        x0 = clamp(max(x0, round(hud_right + 3 * p)), 0, max(0, mt.gw - w - mt.margin));
-    }
-    return { p: p, k: k, icon: icon, slot: slot, gap: gap, w: w, x0: x0, y0: mt.margin, caption_h: caption_h, h: slot + 2 * p + caption_h, line_h: mt.line_h };
+    var fore = (_bc != noone && instance_exists(_bc) && Status_Has(_bc.p, STATUS_HIT_UP));   // the Foresight caption needs a line under the plate
+    return { p: p, k: k, icon: icon, slot: slot, gap: gap, w: w, x0: round((mt.gw - w) * 0.5), y0: mt.margin, plate_h: plate_h, caption_h: caption_h,
+             h: plate_h + (fore ? p + caption_h : 0), line_h: mt.line_h };
 }
 
 // 9 x 5 eye (Foresight, D24): a pupil in an almond. Cells are p x p.
@@ -2355,7 +2730,6 @@ function Battle_TimelineSprite(_bc, _who) {
     return noone;
 }
 
-// One slot at (_x, _y). The player's portrait sits on mid green, the enemy's on the darkest, so the two read apart at a glance.
 // 3 x 7 "!" (B4): the big attack that follows a wind-up. Cells are p x p.
 function Battle_DrawBang(_x, _y, _p, _col) {
     var rows = [2, 2, 2, 2, 2, 0, 2];   // bit 2 = the left column of the 3 wide picture
@@ -2366,13 +2740,14 @@ function Battle_DrawBang(_x, _y, _p, _col) {
     }
 }
 
+// One slot at (_x, _y): a 1p border (lightest on the current actor), the player's portrait on mid green and the enemy's on the darkest, so the two read apart.
 function Battle_DrawTimelineSlot(_bc, _x, _y, _m, _who, _current, _alpha, _eye, _windup = false) {
     var p = _m.p;
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
-    if (_current) Ui_Box(_x - p, _y - p, _x + _m.slot + p, _y + _m.slot + p, UI_C_LIGHTEST);
-    Ui_DrawFrame(_x, _y, _m.slot, _m.slot, _alpha, p);
-    Ui_Box(_x + 2 * p, _y + 2 * p, _x + _m.slot - 2 * p, _y + _m.slot - 2 * p, (_who == TL_PLAYER) ? UI_C_DARK : UI_C_DARKEST);
+    Ui_Box(_x, _y, _x + _m.slot, _y + _m.slot, _current ? UI_C_LIGHTEST : UI_C_DARK);
+    Ui_Box(_x + p, _y + p, _x + _m.slot - p, _y + _m.slot - p, (_who == TL_PLAYER) ? UI_C_DARK : UI_C_DARKEST);
+    if (_current) Ui_Box(_x + p, _y + p, _x + _m.slot - p, _y + 2 * p, UI_C_LIGHT);
     var spr = Battle_TimelineSprite(_bc, _who);
     var cx = _x + _m.slot * 0.5;
     var cy = _y + _m.slot * 0.5;
@@ -2394,9 +2769,8 @@ function Battle_DrawTimelineSlot(_bc, _x, _y, _m, _who, _current, _alpha, _eye, 
     draw_set_alpha(a0);
 }
 
-// The strip across the top: the current actor first (ringed, gently bobbing), then the next four. When the order changes it slides for
-// TURN_SLIDE_MS: after a turn the row moves left one slot and the new last one fades in; after a push-back (stun, BREAK) the row fades in place.
-// With Foresight, the first upcoming enemy slot wears an eye and the caption under it names the action (a big attack gets "!").
+// When the order changes it slides for TURN_SLIDE_MS: after a turn the row moves left one slot and the new last one fades in; after a push-back
+// (stun, BREAK) the row fades in place. With Foresight, the first upcoming enemy slot wears an eye and the caption under the plate names the action.
 function Battle_DrawTimeline(_bc) {
     var m = Battle_TimelineMetrics(_bc);
     var p = m.p;
@@ -2408,14 +2782,17 @@ function Battle_DrawTimeline(_bc) {
     var fore_x = -1;
     var fore = undefined;
     var n = array_length(slots);
+    var base = m.x0 + 4 * p;
+    var sy = m.y0 + 4 * p;
 
-    if (shift_mode && t < 1) {   // the actor that just went leaves to the left
-        Battle_DrawTimelineSlot(_bc, m.x0 - pitch + shift, m.y0 + p, m, _bc.tl_prev_who, false, 1 - t, false);
+    Ui_DrawFrame(m.x0, m.y0, m.w, m.plate_h, 1, p);
+    if (shift_mode && t < 1) {   // the actor that just went fades out as the row moves
+        Battle_DrawTimelineSlot(_bc, base - pitch + shift, sy, m, _bc.tl_prev_who, false, (1 - t) * 0.6, false);
     }
     for (var i = 0; i < n; i++) {
         var s = slots[i];
-        var xx = m.x0 + i * pitch + shift;
-        var yy = m.y0 + (s.current ? Ui_Bob(current_time, p) : p);
+        var xx = base + i * pitch + shift;
+        var yy = sy + (s.current ? -Ui_Bob(current_time, p) + p : p);
         var al = 1;
         if (shift_mode && i == n - 1) al = t;
         if (!shift_mode) al = 0.4 + 0.6 * t;
@@ -2426,80 +2803,249 @@ function Battle_DrawTimeline(_bc) {
         var label = fore.name + (fore.big ? " !" : "");
         var tw = UI_TextWidth(label) + 9 * p + 2 * p;
         var tx = clamp(fore_x - tw * 0.5, p, Display_GuiW() - tw - p);
-        var ty = m.y0 + m.slot + 3 * p;
-        Ui_Box(tx - p, ty - p div 2, tx + tw + p, ty + m.line_h + p div 2, UI_C_DARKEST);
+        var ty = m.y0 + m.plate_h + p + p;
+        Ui_Box(tx - 2 * p, ty - p, tx + tw + 2 * p, ty + m.line_h + p, UI_C_LIGHTEST);
+        Ui_Box(tx - p, ty, tx + tw + p, ty + m.line_h, UI_C_DARKEST);
         Battle_DrawEye(tx, ty + (m.line_h - 5 * p) * 0.5, p, UI_C_LIGHTEST);
         Ui_Text(tx + 9 * p + 2 * p, ty, label, UI_C_LIGHTEST);
     }
 }
 
 function Battle_TimelineBottom() {
-    var m = Battle_TimelineMetrics();
+    var m = Battle_TimelineMetrics(instance_exists(obj_battle_controller) ? instance_find(obj_battle_controller, 0) : noone);
     return m.y0 + m.h;
 }
 
-// Where the header block sits: { cx, x1, y1, bw, h }. Also used to keep the BREAK word clear of it.
+// ---- the skill banner: a plate under the strip with the name of the move (or the wind-up / phase line) while it is up ----
+function Battle_BannerRect(_bc) {
+    if (!_bc.skill_banner_active || _bc.skill_banner_name == "") return undefined;
+    // while a message is up the log plate says the same thing: the banner is for the bars (the move's name stays on screen while you answer it)
+    if (_bc.battle_state != BSTATE_ENEMY_DEFENCE && _bc.battle_state != BSTATE_SKILL_QTE && _bc.battle_state != BSTATE_ATTACK_TIMING) return undefined;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var w = min(UI_TextWidth(_bc.skill_banner_name) + 12 * p, mt.gw - 2 * mt.margin);
+    var h = mt.line_h + 8 * p;
+    return { x: round((mt.gw - w) * 0.5), y: Battle_TimelineBottom() + p, w: w, h: h };
+}
+
+function Battle_DrawBanner(_bc, _alpha) {
+    var r = Battle_BannerRect(_bc);
+    if (!is_struct(r)) return;
+    var p = Ui_Px();
+    Ui_DrawFrame(r.x, r.y, r.w, r.h, _alpha, p);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    Ui_Text(r.x + r.w * 0.5, r.y + 4 * p, _bc.skill_banner_name, UI_C_LIGHTEST, fa_center);
+    draw_set_alpha(a0);
+}
+
+// ---- the enemy header (D99, D75): a plate above the enemy with its name, HP bar and stagger meter; its status chips sit on top of it ----
+// Where the block sits: { cx, x1, y1 (plate top), bw (plate width), h (plate height), chips_x, chips_y, chips_align }. The status chips sit beside
+// the plate (right of it, or left when there is no room), so the block is no taller than the plate. Also keeps the BREAK word clear of it.
 function Battle_EnemyHeaderRect(_bc) {
     var mt = Ui_Metrics();
     var p = mt.p;
     var sx = Display_WorldScale();
-    var out = { cx: Display_GuiW() * 0.5, x1: 0, y1: round(Display_GuiH() * 0.3), bw: round(36 * sx), h: 0 };
+    var out = { cx: Display_GuiW() * 0.5, x1: 0, y1: round(Display_GuiH() * 0.3), bw: round(36 * sx), h: 0, chips_x: 0, chips_y: 0, chips_align: fa_left };
     if (!instance_exists(_bc.enemy_inst) || _bc.enemy_inst.sprite_index == noone) return out;
     var inst = _bc.enemy_inst;
     var spr = inst.sprite_index;
     out.cx = ((inst.x - sprite_get_xoffset(spr) - _bc.cam_base_x) + sprite_get_width(spr) * abs(inst.image_xscale) * 0.5) * sx;
     var top = (inst.y - sprite_get_yoffset(spr) + sprite_get_bbox_top(spr) * abs(inst.image_yscale) - _bc.cam_base_y) * sx;
-    out.bw = clamp(round(sprite_get_width(spr) * abs(inst.image_xscale) * sx), round(36 * sx), mt.gw - 4 * mt.margin);
-    out.h = mt.line_h + p + 4 * p + p + 3 * p + 2 * p;
+    var name_w = UI_TextWidth(_bc.e.name) + 10 * p;
+    out.bw = clamp(max(name_w, round(sprite_get_width(spr) * abs(inst.image_xscale) * sx * 0.9), 30 * p), 30 * p, mt.gw - 4 * mt.margin);
+    out.h = 8 * p + mt.line_h + p + 4 * p + p + 3 * p;
     out.x1 = round(out.cx - out.bw * 0.5);
-    out.y1 = round(max(Battle_TimelineBottom() + p, top - out.h - 2 * p));
+    var ban = Battle_BannerRect(_bc);
+    var floor_y = Battle_TimelineBottom() + p + (is_struct(ban) ? ban.h + p : 0);
+    var want_y = top - out.h - 2 * p;
+    out.y1 = round(max(floor_y, want_y));
+    out.chips_y = out.y1 + p;
+    var chip_w = Battle_ChipMetrics(array_length(Battle_FighterChips(_bc, TL_ENEMY)), 16 * Battle_IconK(), p, mt.gw).w;
+    if (want_y < floor_y) {   // a big enemy: no room over its head, so the plate stands beside it (left, else right) and its chips go under the plate
+        var spr_w = sprite_get_width(spr) * abs(inst.image_xscale) * sx;
+        var left_x = round(out.cx - spr_w * 0.5 - out.bw - 2 * p);
+        out.x1 = (left_x >= mt.margin) ? left_x : round(out.cx + spr_w * 0.5 + 2 * p);
+        out.x1 = clamp(out.x1, mt.margin, mt.gw - mt.margin - out.bw);
+        out.chips_x = out.x1;
+        out.chips_y = out.y1 + out.h + p;
+        out.chips_align = fa_left;
+    } else if (out.x1 + out.bw + p + chip_w <= mt.gw - mt.margin) {
+        out.chips_x = out.x1 + out.bw + p;
+        out.chips_align = fa_left;
+    } else {
+        out.chips_x = out.x1 - p;
+        out.chips_align = fa_right;
+    }
     return out;
 }
 
-// Name, HP and stagger meter above the enemy (D99). The stagger bar flashes when a hit lands and pulses while the enemy is BROKEN.
+// A bar: a 1p border, a dark inside, the fill in _col up to _ratio. _shown (the glided value) leaves a bright trail behind a falling bar (or a
+// bright lead on a rising one). _stripe draws every other column dark (the MP bar), so the two bars differ without a colour of their own.
+function Battle_DrawBar(_x, _y, _w, _h, _p, _ratio, _shown, _col, _trail, _stripe = false) {
+    Ui_Box(_x, _y, _x + _w, _y + _h, UI_C_DARK);
+    Ui_Box(_x + _p, _y + _p, _x + _w - _p, _y + _h - _p, UI_C_DARKEST);
+    var iw = _w - 2 * _p;
+    var cur = round(iw * clamp(_ratio, 0, 1) / _p) * _p;
+    var shown = round(iw * clamp(_shown, 0, 1) / _p) * _p;
+    var lo = min(cur, shown);
+    var hi = max(cur, shown);
+    if (hi > lo) Ui_Box(_x + _p + lo, _y + _p, _x + _p + hi, _y + _h - _p, _trail);
+    if (lo > 0) Ui_Box(_x + _p, _y + _p, _x + _p + lo, _y + _h - _p, _col);
+    if (_stripe && lo > 0) {
+        for (var cx = 2 * _p; cx < lo; cx += 3 * _p) Ui_Box(_x + _p + cx, _y + _p, _x + _p + min(lo, cx + _p), _y + _h - _p, UI_C_DARK);
+    }
+}
+
+// Name, HP and stagger meter above the enemy. The stagger bar flashes when a hit lands and pulses while the enemy is BROKEN; chips above the plate.
 function Battle_DrawEnemyHeader(_bc, _alpha) {
     if (!instance_exists(_bc.enemy_inst) || _bc.enemy_inst.sprite_index == noone) return;
     var e = _bc.e;
     var mt = Ui_Metrics();
     var p = mt.p;
     var hdr = Battle_EnemyHeaderRect(_bc);
-    var cx = hdr.cx;
-    var bw = hdr.bw;
-    var x1 = hdr.x1;
-    var y1 = hdr.y1;
-    var hp_h = 4 * p;
-    var sg_h = 3 * p;
-    var name_h = mt.line_h;
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
-
-    Ui_Text(cx, y1, e.name, UI_C_LIGHTEST, fa_center);
-    var hy = y1 + name_h + p;
+    Ui_DrawFrame(hdr.x1, hdr.y1, hdr.bw, hdr.h, _alpha, p);
+    var x0 = hdr.x1 + 4 * p;
+    var bw = hdr.bw - 8 * p;
+    var yy = hdr.y1 + 4 * p;
+    Ui_Text(hdr.x1 + hdr.bw * 0.5, yy, e.name, UI_C_LIGHTEST, fa_center);
+    yy += mt.line_h + p;
     _bc.enemy_hp_shown = Ui_Glide(_bc.enemy_hp_shown, e.hp, current_time - _bc.enemy_hp_clock, 120);
     _bc.enemy_hp_clock = current_time;
-    var hp_ratio = (e.max_hp > 0) ? clamp(_bc.enemy_hp_shown / e.max_hp, 0, 1) : 0;
-    Ui_Box(x1, hy, x1 + bw, hy + hp_h, UI_C_LIGHTEST);
-    Ui_Box(x1 + p, hy + p, x1 + bw - p, hy + hp_h - p, UI_C_DARKEST);
-    Ui_Box(x1 + p, hy + p, x1 + p + round((bw - 2 * p) * hp_ratio), hy + hp_h - p, UI_C_LIGHT);
-
-    var sy = hy + hp_h + p;
+    var hp_ratio = (e.max_hp > 0) ? clamp(e.hp / e.max_hp, 0, 1) : 0;
+    var hp_shown = (e.max_hp > 0) ? clamp(_bc.enemy_hp_shown / e.max_hp, 0, 1) : 0;
+    Battle_DrawBar(x0, yy, bw, 4 * p, p, hp_ratio, hp_shown, UI_C_LIGHT, UI_C_LIGHTEST);
+    yy += 4 * p + p;
     var broken = (variable_struct_exists(e, "broken") && e.broken);
     var smax = variable_struct_exists(e, "stagger_max") ? e.stagger_max : 0;
     if (smax > 0) {
         var flash = (current_time - _bc.stagger_flash_start) < 120;
         var since_break = current_time - _bc.break_start;
-        Ui_Box(x1, sy, x1 + bw, sy + sg_h, UI_C_LIGHTEST);
-        Ui_Box(x1 + p, sy + p div 2, x1 + bw - p, sy + sg_h - p div 2, UI_C_DARKEST);
+        Ui_Box(x0, yy, x0 + bw, yy + 3 * p, UI_C_DARK);
+        Ui_Box(x0 + p, yy + p, x0 + bw - p, yy + 2 * p, UI_C_DARKEST);
         var inner_w = bw - 2 * p;
         if (broken) {   // full and pulsing until the enemy's next turn
-            var pulse = (floor(current_time / 120) mod 2 == 0) ? UI_C_LIGHTEST : UI_C_DARK;
-            Ui_Box(x1 + p, sy + p div 2, x1 + p + inner_w, sy + sg_h - p div 2, pulse);
+            var pulse = (floor(current_time / 120) mod 2 == 0) ? UI_C_LIGHTEST : UI_C_LIGHT;
+            Ui_Box(x0 + p, yy + p, x0 + p + inner_w, yy + 2 * p, pulse);
         } else {
-            var fill_col = (flash || since_break < 400) ? UI_C_LIGHT : UI_C_LIGHTEST;
-            Ui_Box(x1 + p, sy + p div 2, x1 + p + round(inner_w * clamp(e.stagger / smax, 0, 1)), sy + sg_h - p div 2, fill_col);
+            var fill_col = (flash || since_break < 400) ? UI_C_LIGHTEST : UI_C_LIGHT;
+            Ui_Box(x0 + p, yy + p, x0 + p + round(inner_w * clamp(e.stagger / smax, 0, 1) / p) * p, yy + 2 * p, fill_col);
         }
     }
+    var chips = Battle_FighterChips(_bc, TL_ENEMY);
+    if (array_length(chips) > 0) {
+        Battle_DrawChips(chips, hdr.chips_x, hdr.chips_y, 16 * Battle_IconK(), p, mt.gw - 4 * mt.margin, _alpha, hdr.chips_align);
+    }
     draw_set_alpha(a0);
+}
+
+// ---- the player's panel (D99): name and level, HP and MP bars with their numbers, the statuses ----
+function Battle_DrawPlayerPanel(_bc, _z, _alpha) {
+    var ch = _bc.p;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var lh = mt.line_h;
+    var hud = _bc.hud;
+    var now = current_time;
+    var dt = now - hud.clock;
+    hud.clock = now;
+    hud.hp_shown = Ui_Glide(hud.hp_shown, ch.hp, dt, 140);
+    hud.mp_shown = Ui_Glide(hud.mp_shown, ch.mp, dt, 140);
+    var hurt = instance_exists(obj_ui_controller) ? obj_ui_controller.hud_hurt_flash_timer : 0;   // set by a hit or a poison / burn tick (frames)
+    var shake = (hurt > 0) ? (((hurt mod 4) < 2) ? p : -p) : 0;
+
+    var r = _z.player;
+    var rx = r.x + shake;
+    var ex = (r.h - (8 * p + 3 * lh + 6 * p + 16 * Battle_IconK())) div 3;   // the panel is as tall as the command menu: the spare height goes between the rows
+    ex = max(0, ex);
+    Ui_DrawFrame(rx, r.y, r.w, r.h, _alpha, p);
+    var x0 = rx + 4 * p;
+    var x1 = rx + r.w - 4 * p;
+    var yy = r.y + 4 * p;
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    var nm = (is_struct(ch.class_cfg) && variable_struct_exists(ch.class_cfg, "name")) ? ch.class_cfg.name : "";
+    Ui_Text(x0, yy, nm, UI_C_LIGHTEST);
+    Ui_Text(x1, yy, Loc_T("battle.hud.level", "Lv {n}", { n: string(ch.level) }), UI_C_LIGHT, fa_right);
+    yy += lh + p + ex;
+
+    var lab_w = max(UI_TextWidth(Loc_T("battle.hud.hp", "HP")), UI_TextWidth(Loc_T("battle.hud.mp", "MP")));
+    var val_w = max(UI_TextWidth(string(ch.max_hp) + "/" + string(ch.max_hp)), UI_TextWidth(string(ch.max_mp) + "/" + string(ch.max_mp)));
+    var bx = x0 + lab_w + 2 * p;
+    var bw = x1 - val_w - 2 * p - bx;
+    var bar_h = max(3 * p, (lh div (2 * p)) * 2 * p);
+    var by = yy + (lh - bar_h) div 2;
+
+    var hp_ratio = (ch.max_hp > 0) ? ch.hp / ch.max_hp : 0;
+    var low = (hp_ratio <= 0.25 && ch.hp > 0);
+    var hp_col = (hurt > 0 || (low && floor(now / 300) mod 2 == 0)) ? UI_C_LIGHTEST : UI_C_LIGHT;
+    Ui_Text(x0, yy, Loc_T("battle.hud.hp", "HP"), UI_C_LIGHT);
+    Battle_DrawBar(bx, by, bw, bar_h, p, hp_ratio, (ch.max_hp > 0) ? hud.hp_shown / ch.max_hp : 0, hp_col, UI_C_LIGHTEST);
+    Ui_Text(x1, yy, string(ch.hp) + "/" + string(ch.max_hp), low ? UI_C_LIGHTEST : UI_C_LIGHT, fa_right);
+    yy += lh + p + ex;
+
+    var mp_ratio = (ch.max_mp > 0) ? ch.mp / ch.max_mp : 0;
+    Ui_Text(x0, yy, Loc_T("battle.hud.mp", "MP"), UI_C_LIGHT);
+    Battle_DrawBar(bx, yy + (lh - bar_h) div 2, bw, bar_h, p, mp_ratio, (ch.max_mp > 0) ? hud.mp_shown / ch.max_mp : 0, UI_C_LIGHT, UI_C_LIGHTEST, true);
+    Ui_Text(x1, yy, string(ch.mp) + "/" + string(ch.max_mp), UI_C_LIGHT, fa_right);
+    yy += lh + 2 * p + ex;
+
+    var chips = Battle_FighterChips(_bc, TL_PLAYER);
+    var ic = 16 * Battle_IconK();
+    var slot_n = clamp(floor((x1 - x0 + p) / (ic + 3 * p)), 1, 4);   // a tray of status slots: the empty ones are drawn as dark outlines
+    for (var sl = array_length(chips); sl < slot_n; sl++) {
+        var sx0 = x0 + sl * (ic + 3 * p);
+        Ui_Box(sx0, yy, sx0 + ic + 2 * p, yy + ic + 2 * p, UI_C_DARK);
+        Ui_Box(sx0 + p, yy + p, sx0 + ic + p, yy + ic + p, UI_C_DARKEST);
+    }
+    Battle_DrawChips(chips, x0, yy, ic, p, x1 - x0, _alpha, fa_left);
+    draw_set_alpha(a0);
+}
+
+// ---- the log (I-067): the latest lines of the combat log as a small plate above the bottom panels, gone after a few seconds ----
+function Battle_LogWrap(_text, _w) {
+    return Dialogue_WrapToLines(_text, _w);
+}
+
+// The lines to show: the newest entry if it is still fresh, at most its last 2 lines. Returns { lines, age (ms of the entry) }.
+function Battle_LogLines(_log, _w, _now) {
+    var pool = [];
+    var age = 100000;
+    for (var i = array_length(_log) - 1; i >= 0; i--) {
+        var en = _log[i];
+        if (!is_struct(en) || !variable_struct_exists(en, "at")) continue;
+        age = _now - en.at;
+        if (age > LOG_TOAST_MS) break;
+        var wrapped = Battle_LogWrap(string(en.text), _w);
+        for (var w = max(0, array_length(wrapped) - 2); w < array_length(wrapped); w++) array_push(pool, wrapped[w]);
+        break;
+    }
+    return { lines: pool, age: age };
+}
+
+function Battle_DrawLog(_bc, _z) {
+    if (!is_array(_bc.combat_log) || array_length(_bc.combat_log) <= 0) return;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var inner = _z.msg.w - 8 * p;
+    var res = Battle_LogLines(_bc.combat_log, inner, current_time);
+    var n = array_length(res.lines);
+    if (n <= 0) return;
+    var alpha = clamp((LOG_TOAST_MS - res.age) / 400, 0, 1) * clamp(res.age / 60 + 0.4, 0, 1);
+    var tw = 0;
+    for (var i = 0; i < n; i++) tw = max(tw, UI_TextWidth(res.lines[i]));
+    var w = min(tw + 8 * p, _z.msg.w);
+    var h = 8 * p + n * mt.line_h + (n - 1) * p;
+    var lx = round(_z.msg.x + (_z.msg.w - w) * 0.5);
+    var ly = _z.msg.y + _z.msg.h - h;
+    Ui_DrawFrame(lx, ly, w, h, alpha, p);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(alpha);
+    for (var j = 0; j < n; j++) Ui_Text(lx + w * 0.5, ly + 4 * p + j * (mt.line_h + p), res.lines[j], UI_C_LIGHTEST, fa_center);
+    draw_set_alpha(a0);
+    _bc.hud.rects.log = { x: lx, y: ly, w: w, h: h };
 }
 
 // Floating numbers (D92). Pop in (+35% for 100 ms), rise ~14 design pixels, fade in the last 200 ms. Perfect largest, Weak smallest and dimmest.
@@ -2556,13 +3102,13 @@ function Battle_DrawPops(_bc) {
     if (bel >= 0 && bel < 1000) {
         var txt = Loc_T("battle.hud.break", "BREAK!");
         var bsc = 2.0 * ((bel < 150) ? (1 + 0.6 * (1 - bel / 150)) : 1);
-        var hdr = Battle_EnemyHeaderRect(_bc);
         var mt = Ui_Metrics();
         var brise = (1 - sqr(1 - clamp(bel / 600, 0, 1))) * 10 * sx;
         var bw2 = UI_TextWidth(txt) * bsc;
         var bh2 = UI_TextHeight(txt) * bsc;
         var bx2 = ex - bw2 * 0.5;
-        var by2 = max(Battle_TimelineBottom() + mt.p, hdr.y1 - bh2 - 2 * mt.p) - brise;
+        var sph = (instance_exists(_bc.enemy_inst) && _bc.enemy_inst.sprite_index != noone) ? sprite_get_height(_bc.enemy_inst.sprite_index) * abs(_bc.enemy_inst.image_yscale) * sx : 24 * sx;
+        var by2 = max(Battle_TimelineBottom() + mt.p, ey - sph * 0.3 - bh2 * 0.5) - brise;   // over the enemy's upper body, clear of the plate and the strip
         var bfill = (bel < 500 && (floor(bel / 90) mod 2 == 1)) ? UI_C_LIGHT : UI_C_LIGHTEST;
         draw_set_alpha(clamp((1000 - bel) / 250, 0, 1));
         draw_set_halign(fa_left);

@@ -328,7 +328,7 @@ function SkillDB_Init() {
         fx_frames: 12,
         fx_speed: 0.2,
         hits: 1,
-        uses_defensive_qte: true,
+        uses_defensive_qte: false,   // D7 (I-066): a plain move just hits; only telegraphed heavy moves get the defence bar
         class_list: []
     };
 
@@ -376,7 +376,7 @@ function SkillDB_Init() {
         fx_frames: 12,
         fx_speed: 0.2,
         hits: 1,
-        uses_defensive_qte: true,
+        uses_defensive_qte: false,   // D7 (I-066): a plain move just hits; only telegraphed heavy moves get the defence bar
         class_list: []
     };
 
@@ -451,7 +451,7 @@ function SkillDB_Init() {
         fx_frames: 12,
         fx_speed: 0.2,
         hits: 1,
-        uses_defensive_qte: true,
+        uses_defensive_qte: false,   // D7 (I-066): a plain move just hits; only telegraphed heavy moves get the defence bar
         class_list: []
     };
 
