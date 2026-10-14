@@ -496,6 +496,34 @@ function DialogueTrigger_BeginFollowRestoreBlend(_tr) {
     return true;
 }
 
+// The camera pan is skipped: follow comes back and the camera is put on the player at once. The cinematic then waits for its dialogue to end
+// (like a trigger with no pan), which releases the enemy lock and the input lock as usual. Not a cut for the dialogue itself.
+function DialogueTrigger_SkipPan(_tr) {
+    if (!instance_exists(_tr)) return;
+    var cam = _tr.cine_cam_id;
+    if (!is_undefined(cam) && cam != -1) {
+        if (variable_instance_exists(_tr, "cine_follow_suspended") && _tr.cine_follow_suspended) {
+            var restore_obj = obj_player;
+            if (variable_instance_exists(_tr, "camera_restore_target_object")) {
+                var ro = _tr.camera_restore_target_object;
+                if (is_real(ro) && object_exists(ro)) restore_obj = ro;
+            }
+            camera_set_view_target(cam, restore_obj);
+            _tr.cine_follow_suspended = false;
+        }
+        var pl = DialogueTrigger_GetPlayerInst();
+        if (instance_exists(pl)) {
+            var pt = DialogueTrigger_GetTargetPoint(pl);
+            var pos = DialogueTrigger_CameraPosForPoint(cam, pt.x, pt.y);
+            camera_set_view_pos(cam, pos.x, pos.y);
+        }
+    }
+    _tr.cine_cam_id = -1;
+    _tr.cine_target_inst = noone;
+    _tr.cine_phase = "wait_dialogue_end";
+    Skip_Reset();
+}
+
 function DialogueTrigger_ApplyBlackHandoff(_tr) {
     if (!instance_exists(_tr)) return;
     DialogueTrigger_CleanupCinematic(_tr, true, true);
@@ -640,6 +668,16 @@ function DialogueTrigger_UpdateCinematic(_tr) {
     }
 
     var cam = _tr.cine_cam_id;
+
+    // D48 / I-055: holding confirm for about a second ends the camera pan (it counts as seen; a tap only advances text).
+    if (_tr.cine_phase == "pan_in" || _tr.cine_phase == "hold" || _tr.cine_phase == "pan_out") {
+        Skip_Claim();
+        if (Skip_Consume()) {
+            DialogueTrigger_SkipPan(_tr);
+            return;
+        }
+    }
+
     var ease_name = DIALOGUE_TRIGGER_EASE_DEFAULT;
     if (variable_instance_exists(_tr, "camera_ease")) ease_name = string(_tr.camera_ease);
 
@@ -1302,7 +1340,7 @@ function GameSettings_Defaults() {
         audio_sfx: VOL_SFX_DEFAULT,
         audio_bgm: VOL_MUSIC_DEFAULT,
         display_scale: DISPLAY_SCALE_DEFAULT,
-        fit_screen: false,
+        window_mode: WINDOW_MODE_BORDERLESS,   // D91: first launch is borderless fullscreen (settings_version 8 replaced fit_screen)
         language: "en"
     };
 }
@@ -1314,7 +1352,8 @@ function GameSettings_Normalize(_settings) {
         if (variable_struct_exists(_settings, "audio_sfx")) out.audio_sfx = _settings.audio_sfx;
         if (variable_struct_exists(_settings, "audio_bgm")) out.audio_bgm = _settings.audio_bgm;
         if (variable_struct_exists(_settings, "display_scale")) out.display_scale = _settings.display_scale;
-        if (variable_struct_exists(_settings, "fit_screen")) out.fit_screen = _settings.fit_screen;
+        if (variable_struct_exists(_settings, "window_mode")) out.window_mode = _settings.window_mode;
+        else if (variable_struct_exists(_settings, "fit_screen")) out.window_mode = Display_ModeFromLegacy(GameSettings_ToReal(_settings.fit_screen, 0) != 0);   // an old struct
         if (variable_struct_exists(_settings, "language")) out.language = _settings.language;
     }
 
@@ -1322,9 +1361,8 @@ function GameSettings_Normalize(_settings) {
     out.audio_sfx = clamp(GameSettings_ToReal(out.audio_sfx, VOL_SFX_DEFAULT), 0, 1);
     out.audio_bgm = clamp(GameSettings_ToReal(out.audio_bgm, VOL_MUSIC_DEFAULT), 0, 1);
     out.display_scale = clamp(round(GameSettings_ToReal(out.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-    out.fit_screen = (GameSettings_ToReal(out.fit_screen, 0) != 0);
+    out.window_mode = Display_NormalizeMode(out.window_mode);
     out.language = GameSettings_NormalizeLanguage(out.language);
-    if (DISPLAY_FORCE_FIT_SCREEN != 0) out.fit_screen = true;
     return out;
 }
 
@@ -1357,7 +1395,7 @@ function GameSettings_ApplyAll() {
 // Settings > Apply: the only caller that asks the display for something (boot does the same from Display_Init).
 function GameSettings_ApplyDisplayRequest() {
     var settings = GameSettings_Ensure();
-    Display_Request({ fullscreen: settings.fit_screen, scale: settings.display_scale });
+    Display_Request({ mode: settings.window_mode, scale: settings.display_scale });
 }
 
 function GameSettings_Commit(_settings, _save_config = false) {

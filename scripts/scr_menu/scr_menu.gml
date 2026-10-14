@@ -2297,20 +2297,23 @@ function SettingsPopup_HandleInput() {
                 changed = true;
             }
             break;
-        case 3:
-            if (k_left_step) {
-                pending.display_scale = clamp(pending.display_scale - 1, DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-                changed = true;
-            }
-            if (k_right_step) {
-                pending.display_scale = clamp(pending.display_scale + 1, DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
+        case 3:   // window mode (D91): windowed / borderless / exclusive, wrapping
+            if (k_left_step || k_right_step) {
+                pending.window_mode = (pending.window_mode + (k_right_step ? 1 : WINDOW_MODE_COUNT - 1)) mod WINDOW_MODE_COUNT;
                 changed = true;
             }
             break;
-        case 4:
-            if (k_left_step || k_right_step) {
-                pending.fit_screen = !pending.fit_screen;
-                changed = true;
+        case 4:   // scale: the size choices that fit the monitor; only windowed uses it
+            if (pending.window_mode == WINDOW_MODE_WINDOWED) {
+                var scale_max = clamp(Display_WindowedMaxScaleNow(), 1, DISPLAY_SCALE_MAX);
+                if (k_left_step) {
+                    pending.display_scale = clamp(pending.display_scale - 1, min(DISPLAY_SCALE_MIN, scale_max), scale_max);
+                    changed = true;
+                }
+                if (k_right_step) {
+                    pending.display_scale = clamp(pending.display_scale + 1, min(DISPLAY_SCALE_MIN, scale_max), scale_max);
+                    changed = true;
+                }
             }
             break;
         case 5:
@@ -2379,8 +2382,8 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
         Loc_T("settings.row.ui", "UI"),
         Loc_T("settings.row.sfx", "SFX"),
         Loc_T("settings.row.bgm", "BGM"),
+        Loc_T("settings.row.window_mode", "Window"),
         Loc_T("settings.row.scale", "Scale"),
-        Loc_T("settings.row.fullscreen", "Fullscreen"),
         Loc_T("settings.row.language", "Language"),
         Loc_T("settings.row.apply", "Apply"),
         Loc_T("settings.row.back", "Back")
@@ -2390,7 +2393,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
         "100%",
         "100%",
         string(DISPLAY_SCALE_MAX) + "x",
-        max(UI_TextWidth(Loc_T("settings.value.on", "On")), UI_TextWidth(Loc_T("settings.value.off", "Off"))),
+        max(UI_TextWidth(Loc_T("settings.value.window_windowed", "Windowed")), UI_TextWidth(Loc_T("settings.value.window_borderless", "Borderless")), UI_TextWidth(Loc_T("settings.value.window_exclusive", "Exclusive"))),
         max(UI_TextWidth(Loc_LanguageDisplayName("en")), UI_TextWidth(Loc_LanguageDisplayName("ko"))),
         max(UI_TextWidth(Loc_T("settings.value.pending", "Pending")), UI_TextWidth(Loc_T("settings.value.saved", "Saved")))
     ];
@@ -2481,12 +2484,14 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
                 value = string(clamp(round(settings.audio_bgm * 100), 0, 100)) + "%";
                 break;
             case 3:
-                label = Loc_T("settings.row.scale", "Scale");
-                value = string(settings.display_scale) + "x";
+                label = Loc_T("settings.row.window_mode", "Window");
+                if (settings.window_mode == WINDOW_MODE_WINDOWED) value = Loc_T("settings.value.window_windowed", "Windowed");
+                else if (settings.window_mode == WINDOW_MODE_BORDERLESS) value = Loc_T("settings.value.window_borderless", "Borderless");
+                else value = Loc_T("settings.value.window_exclusive", "Exclusive");
                 break;
             case 4:
-                label = Loc_T("settings.row.fullscreen", "Fullscreen");
-                value = settings.fit_screen ? Loc_T("settings.value.on", "On") : Loc_T("settings.value.off", "Off");
+                label = Loc_T("settings.row.scale", "Scale");
+                value = (settings.window_mode == WINDOW_MODE_WINDOWED) ? (string(settings.display_scale) + "x") : Loc_T("settings.value.auto", "Auto");
                 break;
             case 5:
                 label = Loc_T("settings.row.language", "Language");

@@ -434,3 +434,120 @@ function Input_Bind(_action, _keys) {
     if (!is_array(_keys)) _keys = [_keys];
     variable_struct_set(global.input.bindings, _action, _keys);
 }
+
+// ---- hold-to-skip (D48, I-055) ----------------------------------------------------------------------------------------------------
+// Holding confirm for SKIP_HOLD_FRAMES (1.0 s) skips a cutscene or a camera pan and it still counts as seen; a tap only advances text.
+// The count starts only on a fresh press (a key already held when the scene starts never skips), and a small "hold to skip" fill
+// shows for SKIP_HINT_FRAMES after the first press. Skip_Step is the pure core (tested by Test_Suite_Skip); Skip_Update steps the live one.
+function Skip_StateNew() {
+    return { armed: false, held_frames: 0, hint: 0, fired: false };
+}
+
+function Skip_Step(_st, _allowed, _pressed, _held) {
+    var _r = { armed: _st.armed, held_frames: _st.held_frames, hint: _st.hint, fired: false };
+    if (!_allowed) {
+        _r.armed = false;
+        _r.held_frames = 0;
+        _r.hint = 0;
+        return _r;
+    }
+    if (_pressed) {
+        _r.armed = true;
+        _r.held_frames = 0;
+        _r.hint = SKIP_HINT_FRAMES;
+    } else if (_r.hint > 0) {
+        _r.hint--;
+    }
+    if (_r.armed && _held) {
+        _r.held_frames++;
+        if (_r.held_frames >= SKIP_HOLD_FRAMES) {
+            _r.fired = true;
+            _r.armed = false;
+            _r.held_frames = 0;
+            _r.hint = 0;
+        }
+    } else {
+        _r.armed = false;
+        _r.held_frames = 0;
+    }
+    return _r;
+}
+
+function Skip_Fraction(_held_frames) {
+    return clamp(_held_frames / SKIP_HOLD_FRAMES, 0, 1);
+}
+
+// A skippable scene (a cutscene, a camera pan) calls Skip_Claim every frame it runs and asks Skip_Consume whether the hold completed;
+// obj_ui_controller calls Skip_Tick once per frame (after Display_Update), which steps the hold only while a scene claimed it
+// this frame or the one before. Nothing claimed = the count and the hint reset.
+function Skip_Ensure() {
+    if (!variable_global_exists("skip")) global.skip = { st: Skip_StateNew(), claim: -100, latched: false };
+}
+
+function Skip_Frame() {
+    return (variable_global_exists("display") && is_struct(global.display)) ? global.display.frame : 0;
+}
+
+function Skip_Claim() {
+    Skip_Ensure();
+    global.skip.claim = Skip_Frame();
+}
+
+function Skip_Tick() {
+    Skip_Ensure();
+    var _g = global.skip;
+    _g.st = Skip_Step(_g.st, (Skip_Frame() - _g.claim) <= 1, Input_Pressed("confirm"), Input_Held("confirm"));
+    if (_g.st.fired) _g.latched = true;
+}
+
+// True once per completed hold.
+function Skip_Consume() {
+    Skip_Ensure();
+    var _g = global.skip;
+    if (!_g.latched) return false;
+    _g.latched = false;
+    return true;
+}
+
+function Skip_Reset() {
+    Skip_Ensure();
+    global.skip.st = Skip_StateNew();
+    global.skip.latched = false;
+    global.skip.claim = -100;
+}
+
+// The "hold to skip" hint: top right, a line of text over a fill that grows while confirm is held. Drawn last by obj_ui_controller.
+function Skip_DrawHint() {
+    if (!variable_global_exists("skip")) return;
+    var _g = global.skip;
+    if (_g.st.hint <= 0) return;
+    var _c = draw_get_color(), _a = draw_get_alpha(), _h = draw_get_halign(), _v = draw_get_valign();
+    UI_SetFont();
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+    var _txt = Loc_T("ui.skip_hold", "Hold to skip");
+    var _tw = UI_TextWidth(_txt);
+    var _th = UI_TextHeight(_txt);
+    var _pad = max(3, round(_th * 0.25));
+    var _bar_h = max(2, round(_th * 0.2));
+    var _w = _tw + _pad * 2;
+    var _hh = _th + _bar_h + _pad * 3;
+    var _x = Display_GuiW() - _w - max(4, _pad);
+    var _y = max(4, _pad);
+    var _fade = clamp(_g.st.hint / 20, 0, 1);
+    draw_set_alpha(0.65 * _fade);
+    draw_set_color(c_black);
+    draw_rectangle(_x, _y, _x + _w, _y + _hh, false);
+    draw_set_alpha(_fade);
+    draw_set_color(c_white);
+    UI_DrawText(_x + _pad, _y + _pad, _txt);
+    var _by = _y + _pad * 2 + _th;
+    draw_set_alpha(0.35 * _fade);
+    draw_rectangle(_x + _pad, _by, _x + _pad + _tw, _by + _bar_h, false);
+    draw_set_alpha(_fade);
+    draw_rectangle(_x + _pad, _by, _x + _pad + round(_tw * Skip_Fraction(_g.st.held_frames)), _by + _bar_h, false);
+    draw_set_color(_c);
+    draw_set_alpha(_a);
+    draw_set_halign(_h);
+    draw_set_valign(_v);
+}

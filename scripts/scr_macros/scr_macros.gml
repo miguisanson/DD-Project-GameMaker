@@ -280,9 +280,18 @@
 #macro DISPLAY_BASE_W 160
 #macro DISPLAY_BASE_H 144
 #macro DISPLAY_SCALE_MIN 3
-#macro DISPLAY_SCALE_MAX 5
+#macro DISPLAY_SCALE_MAX 16
 #macro DISPLAY_SCALE_DEFAULT 3
-#macro DISPLAY_FORCE_FIT_SCREEN 0
+// D91 window modes (settings_version 8): the Settings "Window mode" row and the window_mode field. First launch = borderless.
+#macro WINDOW_MODE_WINDOWED 0
+#macro WINDOW_MODE_BORDERLESS 1
+#macro WINDOW_MODE_EXCLUSIVE 2
+#macro WINDOW_MODE_COUNT 3
+// Room left on the monitor's height for a windowed window's title bar, border and the taskbar (Display_WindowedMaxScale).
+#macro DISPLAY_WINDOW_MARGIN_H 80
+// D48 hold-to-skip: frames of holding confirm (1.0 s at 60 fps) and how long the "hold to skip" hint stays after a press.
+#macro SKIP_HOLD_FRAMES 60
+#macro SKIP_HINT_FRAMES 150
 #macro SETTINGS_VOLUME_STEP 0.05
 #macro SETTINGS_MENU_ROW_COUNT 8
 #macro AUDIO_DEBUG_TOOLS 0

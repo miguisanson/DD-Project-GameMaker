@@ -1065,22 +1065,29 @@ function Dialogue_Advance() {
     }
 
     if (gs.ui.index >= array_length(gs.ui.lines)) {
-        SFX_Play("dialogue_close");
-        gs.ui.mode = UI_NONE;
-        gs.ui.lines = [];
-        gs.ui.lines_raw = [];
-        gs.ui.index = 0;
-        gs.ui.speaker = "";
-        gs.ui.confirm_action = "";
-        gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
-        gs.ui.dialogue_lock = UI_DIALOGUE_REOPEN_LOCK;
-        gs.ui.dialogue_require_release = true;
-        Dialogue_SetActiveAmbienceSfxKey("");
-        if (Dialogue_IsSkillbookFirstReadUIActive()) {
-            Dialogue_SkillbookFirstReadMarkDone();
-        }
-        if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
-            gs.ui.cutscene_text_only = false;
-        }
+        Dialogue_CloseNow();
+    }
+}
+
+// Closes the dialogue that is open, as if its last line had just been confirmed (the end of Dialogue_Advance; also hold-to-skip, D48).
+function Dialogue_CloseNow() {
+    var gs = GameState_Get();
+    if (gs.ui.mode != UI_DIALOGUE) return;
+    SFX_Play("dialogue_close");
+    gs.ui.mode = UI_NONE;
+    gs.ui.lines = [];
+    gs.ui.lines_raw = [];
+    gs.ui.index = 0;
+    gs.ui.speaker = "";
+    gs.ui.confirm_action = "";
+    gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
+    gs.ui.dialogue_lock = UI_DIALOGUE_REOPEN_LOCK;
+    gs.ui.dialogue_require_release = true;
+    Dialogue_SetActiveAmbienceSfxKey("");
+    if (Dialogue_IsSkillbookFirstReadUIActive()) {
+        Dialogue_SkillbookFirstReadMarkDone();
+    }
+    if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
+        gs.ui.cutscene_text_only = false;
     }
 }

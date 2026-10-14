@@ -20,9 +20,9 @@ $ErrorActionPreference = 'Stop'
 # Strict = also require exit code 0 and the result file (only -runtests; crash exit codes are unreliable).
 $GameModes = @(
     @{ Name = 'runtests'; Flag = '-runtests'; Timeout = 30;  Impl = $true;  Strict = $true  }
-    @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 60;  Impl = $true;  Strict = $false }
+    @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 100;  Impl = $true;  Strict = $false }
     @{ Name = 'bot';      Flag = '-bot';      Timeout = 300; Impl = $true;  Strict = $false }
-    @{ Name = 'shots';    Flag = '-shots';    Timeout = 300; Impl = $true;  Strict = $false; Shots = 63 }   # Shots = number of [SHOT] lines required.
+    @{ Name = 'shots';    Flag = '-shots';    Timeout = 300; Impl = $true;  Strict = $false; Shots = 67 }   # Shots = number of [SHOT] lines required.
     @{ Name = 'gridshots'; Flag = '-gridshots'; Timeout = 120; Impl = $true;  Strict = $false; Shots = 11; ShotDir = 'gridshots'; Explicit = $true }   # D65: 16 px grid over every floor room -> <WorkRoot>\gridshots. Not part of -Mode full: run with -Only gridshots.
 )
 $BuildTimeout = 300

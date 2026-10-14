@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-13T22:46:04Z",
-    "row_count": 677
+    "generated_at_utc": "2026-10-14T08:38:07Z",
+    "row_count": 683
   },
   "default_lang": "en",
   "languages": [
@@ -2400,6 +2400,10 @@
       "en": "UI",
       "ko": "UI"
     },
+    "settings.row.window_mode": {
+      "en": "Window",
+      "ko": "창 모드"
+    },
     "settings.section.audio": {
       "en": "Audio",
       "ko": "오디오"
@@ -2508,6 +2512,10 @@
       "en": "Settings",
       "ko": "설정"
     },
+    "settings.value.auto": {
+      "en": "Auto",
+      "ko": "자동"
+    },
     "settings.value.pending": {
       "en": "Pending",
       "ko": "보류 중"
@@ -2515,6 +2523,18 @@
     "settings.value.saved": {
       "en": "Saved",
       "ko": "저장됨"
+    },
+    "settings.value.window_borderless": {
+      "en": "Borderless",
+      "ko": "테두리 없음"
+    },
+    "settings.value.window_exclusive": {
+      "en": "Exclusive",
+      "ko": "전체 화면"
+    },
+    "settings.value.window_windowed": {
+      "en": "Windowed",
+      "ko": "창"
     },
     "skill.name.skill_bite": {
       "en": "Bite",
@@ -2719,6 +2739,10 @@
     "system.msg.create_0.3.1": {
       "en": "Grave",
       "ko": "무덤"
+    },
+    "ui.skip_hold": {
+      "en": "Hold to skip",
+      "ko": "길게 눌러 건너뛰기"
     }
   }
 }
