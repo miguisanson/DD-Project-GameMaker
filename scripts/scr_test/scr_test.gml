@@ -78,6 +78,10 @@ function Test_RunAll() {
     Test_RunSuite("Snap", Test_Suite_Snap);
     Test_RunSuite("SaveAtomic", Test_Suite_SaveAtomic);
     Test_RunSuite("SettingsMigration", Test_Suite_SettingsMigration);
+    Test_RunSuite("Rng", Test_Suite_Rng);
+    Test_RunSuite("Profile", Test_Suite_Profile);
+    Test_RunSuite("RunSave", Test_Suite_RunSave);
+    Test_RunSuite("RunLoop", Test_Suite_RunLoop);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     Test_RunSuite("Mem", Test_Suite_Mem);
     Test_RunSuite("Input", Test_Suite_Input);
@@ -1738,4 +1742,471 @@ function Test_Suite_SfxInit() {
     SFX_EnsureAudioGlobals();
     Test_Eq("ROB-03 later calls do not overwrite live audio state", global.audio_debug_missing_count, 5);
     global.audio_debug_missing_count = 0;
+}
+
+
+// ============================================================================================================
+// C1 run loop (D25-D27, D33, D36, D46, D87, D88). Expected numbers below were computed by a separate Python
+// script that follows the written spec, not by this game's code:
+//   Park-Miller (minstd, multiplier 48271, modulus 2147483647): state = state * 48271 mod 2147483647.
+//   Stream start state = int(first 8 hex digits of md5("<seed>:<label>")) mod 2147483646 + 1.
+//   Float = (state - 1) / 2147483646, Int(n) = floor(Float * n).
+// ============================================================================================================
+function Test_RngSeq(_r, _n) {
+    var _a = [];
+    repeat (_n) array_push(_a, Rng_Next(_r));
+    return _a;
+}
+
+function Test_SameArray(_a, _b) {
+    if (!is_array(_a) || !is_array(_b) || array_length(_a) != array_length(_b)) return false;
+    for (var _i = 0; _i < array_length(_a); _i++) {
+        if (_a[_i] != _b[_i]) return false;
+    }
+    return true;
+}
+
+function Test_Suite_Rng() {
+    // the published minstd (48271) sequence from seed 1, and its textbook check value after 10000 steps
+    var _r = Rng_NewRaw(1);
+    Test_Eq("rng: raw seed 1, value 1", Rng_Next(_r), 48271);
+    Test_Eq("rng: raw seed 1, value 2", Rng_Next(_r), 182605794);
+    Test_Eq("rng: raw seed 1, value 3", Rng_Next(_r), 1291394886);
+    Test_Eq("rng: raw seed 1, value 4", Rng_Next(_r), 1914720637);
+    Test_Eq("rng: raw seed 1, value 5", Rng_Next(_r), 2078669041);
+    Test_Eq("rng: raw seed 1, value 6", Rng_Next(_r), 407355683);
+    var _v = 0;
+    repeat (9994) _v = Rng_Next(_r);
+    Test_Eq("rng: raw seed 1, value 10000 is the textbook 399268537", _v, 399268537);
+    Test_Eq("rng: the stream counts its calls", _r.calls, 10000);
+
+    // derived streams: seed 12345, each label (start state, first 3 values, value 100)
+    var _want = [
+        ["map",    168073364,  [2023618925, 1667961233, 699784819],   45419093],
+        ["loot",   744441128,  [1073824437, 766610788, 1778626091],   935948468],
+        ["shop",   1305116111, [679525689, 719309441, 1270421815],    830619925],
+        ["enemy",  329470954,  [1776014499, 301209342, 1211857492],   323682109],
+        ["cards",  1361448276, [1175165302, 623757337, 1669683387],   365053478],
+        ["combat", 1182911836, [894545473, 1150836954, 943625938],    1122180848]
+    ];
+    for (var _i = 0; _i < array_length(_want); _i++) {
+        var _w = _want[_i];
+        Test_Eq("rng: derive(12345, " + _w[0] + ") start state", Rng_Derive(12345, _w[0]), _w[1]);
+        var _s = Rng_New(12345, _w[0]);
+        var _seq = Test_RngSeq(_s, 100);
+        Test_True("rng: stream " + _w[0] + " first 3 values", _seq[0] == _w[2][0] && _seq[1] == _w[2][1] && _seq[2] == _w[2][2]);
+        Test_Eq("rng: stream " + _w[0] + " value 100", _seq[99], _w[3]);
+        var _again = Test_RngSeq(Rng_New(12345, _w[0]), 100);
+        Test_True("rng: stream " + _w[0] + " same seed gives the same first 100 values", Test_SameArray(_seq, _again));
+    }
+    Test_Eq("rng: derive(777, loot) differs from seed 12345", Rng_Derive(777, "loot"), 1414312338);
+    Test_Eq("rng: seed 777 loot first value", Rng_Next(Rng_New(777, "loot")), 1765729468);
+    Test_True("rng: different labels give different first values", Rng_Next(Rng_New(12345, "loot")) != Rng_Next(Rng_New(12345, "shop")));
+    Test_True("rng: different seeds give different first values", Rng_Next(Rng_New(12345, "loot")) != Rng_Next(Rng_New(12346, "loot")));
+    Test_True("rng: derived start state is in 1..2147483646", Rng_Derive(0, "x") >= 1 && Rng_Derive(0, "x") <= 2147483646 && Rng_Derive(2147483646, "y") >= 1);
+
+    // floats, ints, ranges
+    var _f = Rng_New(12345, "loot");
+    Test_Eq("rng: float of loot value 1 is 0.5000384696759642 (to 6 places)", round(Rng_Float(_f) * 1000000), 500038);
+    var _digits = [5, 3, 8, 8, 6, 7, 4, 4, 3, 0];   // floor(float * 10) of loot values 1..10 (Python)
+    var _t = Rng_New(12345, "loot");
+    var _got = [];
+    for (var _k = 0; _k < 10; _k++) array_push(_got, Rng_Int(_t, 10));
+    Test_True("rng: Rng_Int(10) of loot values 1..10", Test_SameArray(_got, _digits));
+    var _u = Rng_New(99, "range");
+    var _seen = [0, 0, 0, 0, 0];
+    var _in = true;
+    for (var _m = 0; _m < 1000; _m++) {
+        var _x = Rng_Range(_u, 3, 7);
+        if (_x < 3 || _x > 7 || _x != floor(_x)) _in = false; else _seen[_x - 3]++;
+    }
+    Test_True("rng: Rng_Range(3, 7) stays inside and is whole", _in);
+    Test_True("rng: Rng_Range(3, 7) reaches every value", _seen[0] > 100 && _seen[1] > 100 && _seen[2] > 100 && _seen[3] > 100 && _seen[4] > 100);
+    Test_Eq("rng: Rng_Int(0) is 0", Rng_Int(Rng_New(1, "z"), 0), 0);
+    Test_False("rng: Rng_Chance(0) is never true", Rng_Chance(Rng_New(5, "c"), 0));
+    Test_True("rng: Rng_Chance(1) is always true", Rng_Chance(Rng_New(5, "c"), 1));
+    var _hits = 0;
+    var _c = Rng_New(31, "chance");
+    repeat (2000) { if (Rng_Chance(_c, 0.25)) _hits++; }
+    Test_True("rng: Rng_Chance(0.25) hits about a quarter", _hits > 400 && _hits < 600);
+
+    // pick and shuffle (shuffle returns a copy; same seed, same order)
+    var _src = [10, 20, 30, 40, 50, 60];
+    var _p1 = Rng_Shuffle(Rng_New(4, "shuf"), _src);
+    var _p2 = Rng_Shuffle(Rng_New(4, "shuf"), _src);
+    Test_True("rng: shuffle is repeatable", Test_SameArray(_p1, _p2));
+    Test_True("rng: shuffle leaves the input alone", Test_SameArray(_src, [10, 20, 30, 40, 50, 60]));
+    var _sorted = [];
+    for (var _q = 0; _q < array_length(_p1); _q++) array_push(_sorted, _p1[_q]);
+    array_sort(_sorted, true);
+    Test_True("rng: shuffle keeps every element once", Test_SameArray(_sorted, _src));
+    var _pk = Rng_Pick(Rng_New(8, "pick"), _src);
+    Test_True("rng: pick returns an element", _pk == 10 || _pk == 20 || _pk == 30 || _pk == 40 || _pk == 50 || _pk == 60);
+    Test_True("rng: pick of an empty array is undefined", is_undefined(Rng_Pick(Rng_New(8, "pick"), [])));
+
+    // save and restore: only integers are stored, the restored stream continues exactly
+    var _a = Rng_New(12345, "loot");
+    Test_RngSeq(_a, 37);
+    var _d = json_parse(json_stringify(Rng_Save(_a)));
+    var _rest_a = Test_RngSeq(_a, 20);
+    var _b = Rng_Load(_d);
+    Test_Eq("rng: restored stream has the saved call count", _b.calls, 37);
+    var _rest_b = Test_RngSeq(_b, 20);
+    Test_True("rng: a restored stream continues the same sequence", Test_SameArray(_rest_a, _rest_b));
+    Test_Eq("rng: save keeps whole numbers (state)", _d.state, floor(_d.state));
+    Test_True("rng: Rng_Load of garbage gives a usable stream", is_struct(Rng_Load("nope")) && Rng_Next(Rng_Load(undefined)) > 0);
+
+    // the six run streams are independent
+    var _names = Run_StreamNames();
+    Test_True("rng: the run has the six named streams", array_length(_names) == 6 && _names[0] == "map" && _names[1] == "loot" && _names[2] == "shop" && _names[3] == "enemy" && _names[4] == "cards" && _names[5] == "combat");
+    var _run = Run_Create(12345);
+    Test_Eq("run: Run_Create keeps the seed", _run.seed, 12345);
+    Test_Eq("run: stream map first value", Rng_Next(_run.rng.map), 2023618925);
+    repeat (10) Rng_Next(_run.rng.loot);
+    Test_Eq("run: using loot does not move shop", Rng_Next(_run.rng.shop), 679525689);
+    Test_Eq("run: Run_Create is active", _run.active, true);
+}
+
+function Test_Suite_Profile() {
+    var _p = Profile_Default();
+    Test_True("profile: default has a version", _p.profile_version == PROFILE_VERSION);
+    Test_Eq("profile: default has no deaths", _p.deaths, 0);
+    Test_Eq("profile: default has no wins", _p.wins, 0);
+    Test_Eq("profile: default history is empty", array_length(_p.history), 0);
+    Test_Eq("profile: default has no echo", _p.echo.kind, "");
+    Test_False("profile: story not seen at first", Profile_StorySeen(_p, "cutscene:intro"));
+    Profile_StoryMark(_p, "cutscene:intro");
+    Profile_StoryMark(_p, "cutscene:intro");
+    Test_True("profile: story seen after marking", Profile_StorySeen(_p, "cutscene:intro"));
+    Test_False("profile: another story key is still unseen", Profile_StorySeen(_p, "cutscene:ending"));
+    Test_False("profile: nobody_class starts locked", Profile_IsUnlocked(_p, "nobody_class"));
+    Profile_Unlock(_p, "nobody_class");
+    Test_True("profile: nobody_class unlocked after the grant", Profile_IsUnlocked(_p, "nobody_class"));
+    Test_False("profile: other unlocks stay locked", Profile_IsUnlocked(_p, "item_9"));
+    Test_Eq("story: the cutscene key", Story_CutsceneKey("intro"), "cutscene:intro");
+
+    // run history: deaths, wins, best floor, the first win grants the nobody class
+    var _q = Profile_Default();
+    Profile_RecordRun(_q, { seed: 5, class_id: CLASS_KNIGHT, level: 4, floor: 3, room: "rm_floor3", result: "died", cause: "enemy 0", kills: 6, gold: 0 });
+    Test_Eq("profile: a death counts", _q.deaths, 1);
+    Test_Eq("profile: a death adds one history entry", array_length(_q.history), 1);
+    Test_Eq("profile: best floor follows the run", _q.best_floor, 3);
+    Test_False("profile: a death does not grant nobody_class", Profile_IsUnlocked(_q, "nobody_class"));
+    Profile_RecordRun(_q, { seed: 6, class_id: CLASS_MAGE, level: 2, floor: 2, room: "rm_floor2", result: "abandoned", cause: "abandoned", kills: 1, gold: 0 });
+    Test_Eq("profile: an abandoned run counts as a death", _q.deaths, 2);
+    Test_Eq("profile: best floor does not go down", _q.best_floor, 3);
+    Profile_RecordRun(_q, { seed: 7, class_id: CLASS_KNIGHT, level: 9, floor: 9.5, room: "rm_floor9_5", result: "won", cause: "", kills: 40, gold: 0 });
+    Test_Eq("profile: a win counts", _q.wins, 1);
+    Test_Eq("profile: a win is not a death", _q.deaths, 2);
+    Test_True("profile: the first win grants nobody_class", Profile_IsUnlocked(_q, "nobody_class"));
+    Test_Eq("profile: the newest history entry is last", _q.history[2].result, "won");
+    Test_Eq("profile: history keeps the cause", _q.history[0].cause, "enemy 0");
+    var _long = Profile_Default();
+    for (var _i = 0; _i < PROFILE_HISTORY_MAX + 10; _i++) Profile_RecordRun(_long, { seed: _i, class_id: 0, level: 1, floor: 1, room: "rm_floor1", result: "died", cause: "x", kills: 0, gold: 0 });
+    Test_Eq("profile: history is capped", array_length(_long.history), PROFILE_HISTORY_MAX);
+    Test_Eq("profile: the cap keeps the newest entry", _long.history[PROFILE_HISTORY_MAX - 1].seed, PROFILE_HISTORY_MAX + 9);
+    Test_Eq("profile: deaths are not capped", _long.deaths, PROFILE_HISTORY_MAX + 10);
+
+    // file: round trip, version rejection, corrupt files (test-only names, never profile.sav)
+    var _f = "test_profile.sav";
+    Save_DeleteFileSet(_f);
+    var _r0 = Profile_Load(_f);
+    Test_Eq("profile file: missing file is reported as missing", _r0.status, "missing");
+    Test_True("profile file: a missing file still gives a usable profile", _r0.profile.profile_version == PROFILE_VERSION);
+    var _w = Profile_Default();
+    Profile_StoryMark(_w, "cutscene:intro");
+    Profile_Unlock(_w, "nobody_class");
+    _w.echo = { kind: "item", id: 11 };
+    _w.runs_started = 4;
+    Profile_RecordRun(_w, { seed: 9, class_id: CLASS_ARCHER, level: 5, floor: 4, room: "rm_floor4", result: "died", cause: "enemy 5", kills: 8, gold: 0 });
+    Test_True("profile file: write reports success", Profile_SaveTo(_f, _w));
+    var _r1 = Profile_Load(_f);
+    Test_Eq("profile file: reads back ok", _r1.status, "ok");
+    Test_True("profile file: story survives", Profile_StorySeen(_r1.profile, "cutscene:intro"));
+    Test_True("profile file: unlock survives", Profile_IsUnlocked(_r1.profile, "nobody_class"));
+    Test_True("profile file: echo survives", _r1.profile.echo.kind == "item" && _r1.profile.echo.id == 11);
+    Test_Eq("profile file: deaths survive", _r1.profile.deaths, 1);
+    Test_Eq("profile file: runs started survives", _r1.profile.runs_started, 4);
+    Test_Eq("profile file: history survives", _r1.profile.history[0].room, "rm_floor4");
+    Test_False("profile file: no .tmp left", file_exists(_f + ".tmp"));
+    // a second write keeps the first as .bak; a truncated main file loads from it
+    _w.deaths = 5;
+    Test_True("profile file: second write", Profile_SaveTo(_f, _w));
+    var _good = Test_RawRead(_f);
+    Test_RawWrite(_f, string_copy(_good, 1, string_length(_good) div 2));
+    var _threw = false; var _r2 = undefined;
+    try { _r2 = Profile_Load(_f); } catch (_e) { _threw = true; }
+    Test_False("profile file: a truncated file does not throw", _threw);
+    Test_Eq("profile file: a truncated file loads from .bak", is_struct(_r2) ? _r2.status : "none", "ok");
+    Test_Eq("profile file: .bak holds the earlier profile", is_struct(_r2) ? _r2.profile.deaths : -1, 1);
+
+    // newer version: rejected, file left alone, writing refused
+    Save_DeleteFileSet(_f);
+    var _newer = json_stringify({ profile_version: PROFILE_VERSION + 50, deaths: 3, marker: "keep me" });
+    Test_RawWrite(_f, _newer);
+    var _r3 = Profile_Load(_f);
+    Test_Eq("profile file: a newer version is rejected", _r3.status, "newer");
+    Test_True("profile file: a rejected file still gives a default profile", _r3.profile.profile_version == PROFILE_VERSION && _r3.profile.deaths == 0);
+    Test_False("profile file: a rejected profile is not written", Profile_SaveTo(_f, _r3.profile));
+    Test_Eq("profile file: a newer file is not overwritten", Test_RawRead(_f), _newer);
+    Test_False("profile file: a newer file leaves no .bak or .tmp", file_exists(_f + ".bak") || file_exists(_f + ".tmp"));
+    // no version at all: old
+    Save_DeleteFileSet(_f);
+    var _old = json_stringify({ deaths: 3 });
+    Test_RawWrite(_f, _old);
+    var _r4 = Profile_Load(_f);
+    Test_Eq("profile file: no version is rejected as old", _r4.status, "old");
+    Test_False("profile file: an old profile is not written", Profile_SaveTo(_f, _r4.profile));
+    Test_Eq("profile file: an old file is not overwritten", Test_RawRead(_f), _old);
+    // garbage: a fresh profile is usable, the bad file is kept aside as .corrupt
+    Save_DeleteFileSet(_f);
+    if (file_exists(_f + ".corrupt")) file_delete(_f + ".corrupt");
+    Test_RawWrite(_f, " garbage {{{ ]]");
+    _threw = false; var _r5 = undefined;
+    try { _r5 = Profile_Load(_f); } catch (_e2) { _threw = true; }
+    Test_False("profile file: garbage does not throw", _threw);
+    Test_Eq("profile file: garbage is reported as corrupt", is_struct(_r5) ? _r5.status : "none", "corrupt");
+    Test_True("profile file: garbage still gives a writable default", is_struct(_r5) && _r5.profile.profile_version == PROFILE_VERSION && Profile_SaveTo(_f, _r5.profile));
+    Test_True("profile file: the corrupt file was kept as .corrupt", file_exists(_f + ".corrupt"));
+    // a valid file that lacks keys is filled in
+    Save_DeleteFileSet(_f);
+    Test_RawWrite(_f, json_stringify({ profile_version: PROFILE_VERSION, deaths: 2 }));
+    var _r6 = Profile_Load(_f);
+    Test_True("profile file: missing keys are filled", _r6.status == "ok" && _r6.profile.deaths == 2 && is_array(_r6.profile.history) && is_struct(_r6.profile.story_seen) && is_struct(_r6.profile.unlocks));
+    Save_DeleteFileSet(_f);
+    if (file_exists(_f + ".corrupt")) file_delete(_f + ".corrupt");
+}
+
+function Test_Suite_RunSave() {
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_cp = _gs.checkpoint;
+    var _old_persist = _gs.persist;
+
+    _gs.run = Run_Create(12345);
+    repeat (5) RunRng_Float("loot");
+    _gs.run.gold = 7;
+    _gs.run.kills = 3;
+    var _p = CharacterCreate_Player(CLASS_MAGE);
+    _p.level = 3; _p.exp = 5;
+    _p = Player_NormalizeProgression(_p, true);
+    _p.hp = 7; _p.mp = 4;
+    _p.skills = [SKILL_FIREBALL];
+    _p.inventory = Inv_Add(_p.inventory, 11, 2);
+    _p = Status_Add(_p, STATUS_POISON, 3, 0);
+    _gs.player_ch = _p;
+    _gs.selected_class = CLASS_MAGE;
+    _gs.flags = { test_flag: 42 };
+    _gs.checkpoint = { room: rm_floor3, x: 48, y: 64 };
+    _gs.persist = { "rm_floor3:chest_a": { opened: true }, "rm_floor3:e1": { removed: true, enemy_id: 0, removed_reset_version: 0 } };
+
+    var _predicted = Rng_Next(Rng_Load(Rng_Save(_gs.run.rng.loot)));
+    var _raw = RunSave_Build();
+    Test_Eq("runsave: run_version is current", _raw.run_version, RUN_SAVE_VERSION);
+    Test_Eq("runsave: seed", _raw.seed, 12345);
+    Test_Eq("runsave: loot stream counter", _raw.rng.loot.calls, 5);
+    Test_Eq("runsave: untouched stream counter", _raw.rng.map.calls, 0);
+    Test_Eq("runsave: gold", _raw.gold, 7);
+    Test_Eq("runsave: kills", _raw.kills, 3);
+    Test_Eq("runsave: room name", _raw.statData.save_room_name, "rm_floor3");
+    Test_Eq("runsave: floor number", _raw.floor, 3);
+    Test_Eq("runsave: class", _raw.statData.selected_class, CLASS_MAGE);
+    Test_Eq("runsave: level", _raw.statData.player.level, 3);
+    Test_Eq("runsave: check says ok", RunSave_Check(json_parse(json_stringify(_raw))), "ok");
+
+    var _f = "test_run.sav";
+    Save_DeleteFileSet(_f);
+    Test_False("runsave: no file yet", RunSave_ExistsAt(_f));
+    Test_True("runsave: write reports success", RunSave_WriteTo(_f));
+    Test_True("runsave: file exists after the write", RunSave_ExistsAt(_f));
+    var _l = RunSave_LoadFrom(_f);
+    Test_Eq("runsave: reads back ok", _l.status, "ok");
+
+    // clobber the live state, then apply the loaded save
+    _gs.run = Run_Create(99);
+    _gs.player_ch = CharacterCreate_Player(CLASS_KNIGHT);
+    _gs.selected_class = CLASS_KNIGHT;
+    _gs.flags = {};
+    _gs.persist = {};
+    var _info = RunSave_ApplyState(_l.run);
+    var _r = _gs.player_ch;
+    Test_Eq("runsave: restored seed", _gs.run.seed, 12345);
+    Test_True("runsave: restored run is active", _gs.run.active);
+    Test_Eq("runsave: restored gold", _gs.run.gold, 7);
+    Test_Eq("runsave: restored kills", _gs.run.kills, 3);
+    Test_Eq("runsave: restored loot counter", _gs.run.rng.loot.calls, 5);
+    Test_Eq("runsave: the restored loot stream continues where it stopped", Rng_Next(_gs.run.rng.loot), _predicted);
+    Test_Eq("runsave: restored class", _r.class_id, CLASS_MAGE);
+    Test_Eq("runsave: restored level", _r.level, 3);
+    Test_Eq("runsave: restored HP", _r.hp, 7);
+    Test_Eq("runsave: restored MP", _r.mp, 4);
+    Test_True("runsave: restored skills", array_length(_r.skills) == 1 && _r.skills[0] == SKILL_FIREBALL);
+    Test_True("runsave: restored inventory (MP potion x2)", Inv_Has(_r.inventory, 11, 2));
+    Test_True("runsave: restored Poison with 3 turns", Status_Has(_r, STATUS_POISON) && _r.status[0].turns == 3);
+    Test_Eq("runsave: restored flags", variable_struct_get(_gs.flags, "test_flag"), 42);
+    Test_Eq("runsave: the room to enter", _info.room_id, rm_floor3);
+    Test_True("runsave: the position to enter", _info.x == 48 && _info.y == 64);
+    Test_True("runsave: restored room state keeps a defeated enemy (enemies defeated this run)", variable_struct_exists(_gs.persist, "rm_floor3:e1"));
+    Test_True("runsave: restored room state keeps an opened chest", variable_struct_exists(_gs.persist, "rm_floor3:chest_a"));
+
+    // a second write keeps the first as .bak; a truncated main file loads from it
+    _gs.run.gold = 8;
+    Test_True("runsave: second write", RunSave_WriteTo(_f));
+    var _good = Test_RawRead(_f);
+    Test_RawWrite(_f, string_copy(_good, 1, string_length(_good) div 2));
+    var _threw = false; var _l2 = undefined;
+    try { _l2 = RunSave_LoadFrom(_f); } catch (_e) { _threw = true; }
+    Test_False("runsave: a truncated file does not throw", _threw);
+    Test_Eq("runsave: a truncated file loads from .bak", is_struct(_l2) ? _l2.status : "none", "ok");
+    Test_Eq("runsave: .bak holds the earlier gold", is_struct(_l2) ? _l2.run.gold : -1, 7);
+
+    // newer / old / garbage: rejected without a crash and without touching the file
+    Save_DeleteFileSet(_f);
+    var _newer = json_stringify({ run_version: RUN_SAVE_VERSION + 50, seed: 1, marker: "keep me" });
+    Test_RawWrite(_f, _newer);
+    var _l3 = RunSave_LoadFrom(_f);
+    Test_Eq("runsave: a newer version is rejected", _l3.status, "newer");
+    Test_Eq("runsave: a newer file is not overwritten", Test_RawRead(_f), _newer);
+    Save_DeleteFileSet(_f);
+    var _old = json_stringify({ save_version: 1, statData: { selected_class: 1 } });   // an old-format slot file
+    Test_RawWrite(_f, _old);
+    var _l4 = RunSave_LoadFrom(_f);
+    Test_Eq("runsave: an old-format file is rejected", _l4.status, "old");
+    Test_Eq("runsave: an old file is not overwritten", Test_RawRead(_f), _old);
+    Save_DeleteFileSet(_f);
+    var _slot = Test_SnapText("slot");   // the last slot format (D16): a perfectly good old save, but not a run
+    Test_RawWrite(_f, _slot);
+    Test_Eq("runsave: a last-version slot file is rejected as old", RunSave_LoadFrom(_f).status, "old");
+    Test_Eq("runsave: a slot file is not overwritten either", Test_RawRead(_f), _slot);
+    Save_DeleteFileSet(_f);
+    Test_RawWrite(_f, "{{ not json");
+    var _l5 = RunSave_LoadFrom(_f);
+    Test_Eq("runsave: garbage is corrupt", _l5.status, "corrupt");
+    Save_DeleteFileSet(_f);
+    Test_Eq("runsave: a missing file is missing", RunSave_LoadFrom(_f).status, "missing");
+    Test_False("runsave: delete leaves nothing", RunSave_ExistsAt(_f) || file_exists(_f + ".bak"));
+
+    // D16: the old slot files are never the new files, and are recognised, not deleted
+    Test_True("runsave: run.sav is not an old slot file", RunSave_Path() != Save_Path(0) && RunSave_Path() != Save_Path(1) && RunSave_Path() != Save_Path(2) && RunSave_Path() != Save_Path(3));
+    Test_True("runsave: profile.sav is not an old slot file", Profile_Path() != Save_Path(0) && Profile_Path() != Save_Path(1) && Profile_Path() != Save_Path(2) && Profile_Path() != Save_Path(3));
+    var _lg = "test_legacy0.sav";
+    Test_RawWrite(_lg, _old);
+    Test_True("legacy: an old slot file is recognised", Save_LegacyFilesExist([_lg]));
+    Test_False("legacy: no old files means no notice", Save_LegacyFilesExist(["test_legacy_none.sav"]));
+    Test_True("legacy: the friendly message is not empty", string_length(Save_LegacyNotice()) > 20);
+    Test_False("legacy: an old file is not a current snapshot", is_struct(Save_LoadSnapshotFile(_lg)));
+    Test_True("legacy: loading the old file does not delete it", file_exists(_lg));
+    var _slot1 = file_exists(Save_Path(1));
+    Test_False("legacy: the retired slot writer reports nothing written", Save_Write(1));
+    Test_Eq("legacy: the retired slot writer creates no slot file", file_exists(Save_Path(1)), _slot1);
+    Test_False("legacy: the retired slot loader loads nothing", Save_Read(1));
+    Test_Eq("legacy: the old file is unchanged", Test_RawRead(_lg), _old);
+    file_delete(_lg);
+
+    // restore the borrowed state
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+    _gs.checkpoint = _old_cp;
+    _gs.persist = _old_persist;
+}
+
+function Test_LootSig(_seed) {
+    var _gs = GameState_Get();
+    _gs.run = Run_Create(_seed);
+    var _sig = "";
+    for (var _i = 0; _i < 30; _i++) {
+        var _items = Loot_RollContainer(2, "chest_basic");
+        for (var _k = 0; _k < array_length(_items); _k++) _sig += string(_items[_k].item_id) + "x" + string(_items[_k].qty) + ",";
+        _sig += "|";
+        var _drop = Loot_RollEnemy({ id: ENEMY_SLIME, level: 3, loot_key: "enemy_elite" });
+        for (var _j = 0; _j < array_length(_drop); _j++) _sig += string(_drop[_j].item_id) + "x" + string(_drop[_j].qty) + ",";
+        _sig += ";";
+    }
+    return _sig;
+}
+
+function Test_Suite_RunLoop() {
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    _gs.player_ch = CharacterCreate_Player(CLASS_KNIGHT);
+
+    // D33: loot goes through the loot stream, so the same seed gives the same loot and another seed another
+    var _a = Test_LootSig(4242);
+    var _b = Test_LootSig(4242);
+    var _c = Test_LootSig(4243);
+    Test_True("run: the loot signature is not empty", string_length(_a) > 60);
+    Test_Eq("run: the same seed gives the same loot", _a, _b);
+    Test_True("run: another seed gives other loot", _a != _c);
+    // disturbing the global random generator does not change the run's loot
+    random_set_seed(1);
+    repeat (50) random(1);
+    var _d = Test_LootSig(4242);
+    Test_Eq("run: global random() calls do not change the loot", _a, _d);
+
+    // floors from room names
+    Test_Eq("run: floor of rm_floor1", Run_FloorOfRoomName("rm_floor1"), 1);
+    Test_Eq("run: floor of rm_floor9", Run_FloorOfRoomName("rm_floor9"), 9);
+    Test_Eq("run: floor of rm_floor6_5", Run_FloorOfRoomName("rm_floor6_5"), 6.5);
+    Test_Eq("run: floor of rm_start", Run_FloorOfRoomName("rm_start"), 0);
+
+    // D87 echo: 1 of 3 from what you had
+    var _ch = CharacterCreate_Player(CLASS_KNIGHT);   // starts with item 10 x2
+    _ch.skills = [SKILL_HORIZ_SLASH, SKILL_FIREBALL];
+    _ch.inventory = Inv_Add(_ch.inventory, 11, 1);
+    _ch.inventory = Inv_Add(_ch.inventory, 2, 1);
+    var _opts = Run_EchoOptions(_ch, Rng_New(4242, "loot"));
+    Test_Eq("echo: three options when the run had plenty", array_length(_opts), 3);
+    var _ok = true; var _dup = false;
+    for (var _i = 0; _i < array_length(_opts); _i++) {
+        var _o = _opts[_i];
+        var _had = (_o.kind == "skill" && (_o.id == SKILL_HORIZ_SLASH || _o.id == SKILL_FIREBALL))
+                || (_o.kind == "item" && (_o.id == 10 || _o.id == 11 || _o.id == 2));
+        if (!_had) _ok = false;
+        for (var _j = _i + 1; _j < array_length(_opts); _j++) { if (_opts[_j].kind == _o.kind && _opts[_j].id == _o.id) _dup = true; }
+    }
+    Test_True("echo: every option is something the run had", _ok);
+    Test_False("echo: no option twice", _dup);
+    var _opts2 = Run_EchoOptions(_ch, Rng_New(4242, "loot"));
+    Test_True("echo: same seed, same options", array_length(_opts2) == 3 && _opts2[0].id == _opts[0].id && _opts2[1].id == _opts[1].id && _opts2[2].id == _opts[2].id);
+    var _few = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_Eq("echo: a run with only the potion offers just that", array_length(Run_EchoOptions(_few, Rng_New(1, "loot"))), 1);
+    var _none = CharacterCreate_Player(CLASS_KNIGHT);
+    _none.inventory = [];
+    _none.skills = [];
+    var _fb = Run_EchoOptions(_none, Rng_New(1, "loot"));
+    Test_True("echo: a run with nothing still offers one fallback item", array_length(_fb) == 1 && _fb[0].kind == "item" && _fb[0].id == 10);
+    var _t1 = Run_ApplyEcho(CharacterCreate_Player(CLASS_KNIGHT), { kind: "item", id: 11 });
+    Test_True("echo: an item echo goes into the inventory", Inv_Has(_t1.inventory, 11, 1));
+    var _t2 = Run_ApplyEcho(CharacterCreate_Player(CLASS_KNIGHT), { kind: "skill", id: SKILL_FIREBALL });
+    Test_True("echo: a skill echo is learned", array_length(_t2.skills) == 1 && _t2.skills[0] == SKILL_FIREBALL);
+    var _t3 = Run_ApplyEcho(CharacterCreate_Player(CLASS_KNIGHT), { kind: "", id: -1 });
+    Test_Eq("echo: no echo changes nothing", array_length(_t3.skills), 0);
+
+    // enemies defeated this run are counted when the enemy is removed from its room
+    _gs.run = Run_Create(5);
+    RoomState_SetRemoved(rm_floor1, "c1_test_enemy", obj_enemy, ENEMY_SLIME);
+    RoomState_SetRemoved(rm_floor1, "c1_test_pickup", noone);
+    Test_Eq("run: a defeated enemy counts as a kill, a pickup does not", _gs.run.kills, 1);
+    variable_struct_remove(_gs.persist, RoomState_Key(rm_floor1, "c1_test_enemy"));
+    variable_struct_remove(_gs.persist, RoomState_Key(rm_floor1, "c1_test_pickup"));
+
+    // history entry
+    var _hr = Run_MakeHistoryEntry(Run_Create(77), _ch, "rm_floor4", "died", "enemy 5");
+    Test_True("history: entry fields", _hr.seed == 77 && _hr.class_id == CLASS_KNIGHT && _hr.level == _ch.level && _hr.floor == 4 && _hr.room == "rm_floor4" && _hr.result == "died" && _hr.cause == "enemy 5");
+
+    // story flags that live in the run's flags are copied to the profile and back (D26)
+    var _prof = Profile_Default();
+    var _fl = { floor1_slime_kill_reaction_done: true, skillbook_first_read_done: false, narrative_event_done_first_level_up_reaction: true, GraveLoot_progress: 2 };
+    Story_CopyFlagsToProfile(_prof, _fl);
+    Test_True("story: a done reaction flag reaches the profile", Profile_StorySeen(_prof, "flag:floor1_slime_kill_reaction_done"));
+    Test_True("story: a narrative event flag reaches the profile", Profile_StorySeen(_prof, "flag:narrative_event_done_first_level_up_reaction"));
+    Test_False("story: a flag that is false stays unseen", Profile_StorySeen(_prof, "flag:skillbook_first_read_done"));
+    var _nf = {};
+    Story_CopyProfileToFlags(_prof, _nf);
+    Test_True("story: a new run's flags get the seen events", variable_struct_exists(_nf, "floor1_slime_kill_reaction_done") && variable_struct_get(_nf, "floor1_slime_kill_reaction_done") == true);
+    Test_True("story: a new run's flags get the narrative events", variable_struct_exists(_nf, "narrative_event_done_first_level_up_reaction"));
+    Test_False("story: unseen events are not set", variable_struct_exists(_nf, "skillbook_first_read_done") && variable_struct_get(_nf, "skillbook_first_read_done") == true);
+
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }

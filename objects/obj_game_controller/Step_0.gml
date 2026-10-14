@@ -31,6 +31,8 @@ if (gs.last_room != room) {
             instance_create_layer(0, 0, "Instances", obj_player);
         }
     }
+
+    Run_AutoSave();   // C1 (D46): the run is saved on every room change; coming back from a fight is one too
 }
 
 // Safety: keep cutscene room free of stray player instance to avoid one-frame flash.
@@ -84,6 +86,8 @@ if (room != rm_battle) {
     EndingExitSequence_Update();
     Dialogue_NarrativeTryStartPending();
 }
+
+Run_AutosaveTick();   // C1 (D46): also every few seconds of a quiet moment, so closing the window loses almost nothing
 
 // apply persistence once on initial room load
 if (room != rm_battle && variable_global_exists("room_state_ready") && global.room_state_ready) {

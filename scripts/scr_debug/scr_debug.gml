@@ -125,13 +125,13 @@ function Debug_LevelUp() {
 }
 
 function Debug_Save() {
-    Save_Write(0);
+    RunSave_WriteTo();
     Dialogue_Start("sys_save_ok");
     Debug_Record("Quick Save");
 }
 
 function Debug_Load() {
-    if (Save_Read(0)) {
+    if (Run_Continue().ok) {
         Dialogue_Start("sys_load_ok");
     } else {
         Dialogue_Start("sys_load_missing");
@@ -156,7 +156,7 @@ function Debug_KillPlayer() {
     }
 
     if (!Transition_IsActive()) {
-        Transition_RequestCutsceneById("game_over");
+        Run_OnPlayerDeath();
     }
     Debug_Record("Kill Player");
 }
@@ -422,6 +422,9 @@ function Scenario_StepSmoke(_s) {
         case 10: case 11: case 12: case 13: case 14: case 15: case 16: case 17:
             Scenario_StepSmokeSkip(_s);
             break;
+        case 20: case 21: case 22: case 23: case 24: case 25: case 26: case 27: case 28: case 29: case 30: case 31: case 32:
+            Scenario_StepSmokeRun(_s);   // C1: the run loop through the real flows
+            break;
     }
 }
 
@@ -507,7 +510,7 @@ function Scenario_StepSmokeSkip(_s) {
             if (room == rm_floor1 && !Transition_IsActive() && instance_exists(obj_player) && _gs.ui.mode == UI_DIALOGUE) {
                 var _fp = Scenario_IntroFingerprint();
                 Scenario_Check("skip_state_equals_watched_state", _fp == _s.skp_fp_skip, "watched=[" + _fp + "] skipped=[" + _s.skp_fp_skip + "]");
-                Scenario_Finish();
+                Scenario_Next(_s, 20);   // on to the run loop (C1)
             }
             if (_s.t > 600) { Scenario_Check("skip_watched_reaches_floor1", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
             break;
@@ -519,7 +522,7 @@ function Scenario_Aligned(_inst) {
 }
 
 function Scenario_CanSaveSlot() {
-    // Save_Write(0) writes the real quick-save slot: only inside the gate, which points LOCALAPPDATA at its scratch folder.
+    // The run-loop scenario writes the real profile.sav / run.sav: only inside the gate, which points LOCALAPPDATA at its scratch folder.
     return (string_pos("dd-gate", string_lower(environment_get_variable("LOCALAPPDATA"))) > 0);
 }
 
@@ -550,8 +553,8 @@ function Scenario_StepSmokeSnap(_s) {
                 _pl2.x += 6;   // F5 pressed mid-step stores this raw position
                 _s.sn_saved_x = Grid_Snap(_pl2.x);
                 _s.sn_saved_y = Grid_Snap(_pl2.y);
-                Save_Write(0);
-                var _ok = Save_Read(0);
+                RunSave_WriteTo();
+                var _ok = Run_Continue().ok;
                 Scenario_Check("snap_quickload_started", _ok);
                 Scenario_Next(_s, 7);
             }
@@ -2300,6 +2303,298 @@ function Scenario_StepShotsWorld(_s) {
             break;
         case 68:
             if (_s.t >= 10) Scenario_Next(_s, 61);
+            break;
+    }
+}
+
+// ---- C1 run loop through the real flows (D25, D26, D36, D46, D87, D88, D92). Writes profile.sav / run.sav: only inside the gate's scratch folder. ----
+// New run (known seed) -> story trigger fires and is remembered -> death -> death scene -> run summary -> echo pick -> new run at level 1 with
+// another seed, death count +1, echo applied, the same trigger not replayed -> room change autosaves -> "relaunch" (state wiped, profile reloaded
+// from disk) -> title Continue restores room, HP, position, seed and the loot stream -> pause menu Abandon run -> echo pick -> new run ->
+// the win: the ending plays once, wins + 1, the first win unlocks the Nobody class; a second win skips the ending.
+function Scenario_ItemCount(_ch, _id) {
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_ch.inventory); _i++) {
+        if (_ch.inventory[_i].id == _id) _n += _ch.inventory[_i].qty;
+    }
+    return _n;
+}
+
+function Scenario_FloorReady(_room) {
+    return room == _room && instance_exists(obj_player) && !Transition_IsActive();
+}
+
+// Taps confirm every 8 frames while a cutscene line is on screen (the death scene's text).
+function Scenario_TapCutscene(_s) {
+    var _gs = GameState_Get();
+    if (room == rm_cutscene && _gs.ui.mode == UI_DIALOGUE && !Transition_IsActive() && (_s.f - _s.last_tap) >= 8) Scenario_Tap("confirm");
+}
+
+function Scenario_EchoMatches(_ch, _o, _items_before) {
+    if (_o.kind == "item") return Scenario_ItemCount(_ch, _o.id) == _items_before + 1;
+    for (var _i = 0; _i < array_length(_ch.skills); _i++) { if (_ch.skills[_i] == _o.id) return true; }
+    return false;
+}
+
+function Scenario_StepSmokeRun(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    if (!variable_struct_exists(_s, "rl")) _s.rl = {};
+    var _rl = _s.rl;
+    switch (_s.step) {
+        case 20:   // run 1: clean profile, known seed, started the way the title starts a run
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP runloop (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_Finish();
+                    break;
+                }
+                if (Transition_IsActive()) { _s.t = 0; break; }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Profile_ResetForTest();
+                RunSave_Delete();
+                Run_StartNew(false, 1111);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                var _ch0 = _gs.player_ch;
+                Scenario_Check("run_new_run_is_active_with_its_seed", Run_IsActive() && _gs.run.seed == 1111, "seed=" + string(_gs.run.seed));
+                Scenario_Check("run_new_run_starts_at_level_1_as_nobody", _ch0.level == 1 && _ch0.class_id == CLASS_NOBODY && _ch0.hp == _ch0.max_hp, "level=" + string(_ch0.level));
+                Scenario_Check("run_profile_counts_the_started_run", Profile_Get().runs_started == 1, "runs_started=" + string(Profile_Get().runs_started));
+                Scenario_Check("run_room_change_autosaved_the_run", RunSave_HasSave() && RunSave_LoadFrom().status == "ok");
+                Scenario_Next(_s, 21);
+            }
+            if (_s.t > 600) { Scenario_Check("run_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 21:   // a story trigger fires on first contact and is remembered in the profile
+            if (_s.t == 1) {
+                var _trg = instance_exists(obj_dialogue_trigger) ? instance_find(obj_dialogue_trigger, 0) : noone;
+                Scenario_Check("run_floor1_has_a_story_trigger", _trg != noone);
+                if (_trg == noone) { Scenario_Finish(); break; }
+                _rl.trg = _trg.id;
+                Scenario_ClearUi();
+                var _pl = instance_find(obj_player, 0);
+                _pl.x = _trg.x;
+                _pl.y = _trg.y;
+                _pl.moving = false;
+                _pl.move_timer = 0;
+            }
+            if (_s.t > 2 && instance_exists(_rl.trg) && _rl.trg.triggered) {
+                _rl.story_key = _rl.trg.story_key;
+                Scenario_Check("story_trigger_fired_and_has_a_key", _rl.story_key != "", "key=" + _rl.story_key);
+                Scenario_Check("story_trigger_is_marked_seen_in_the_profile", Story_Seen(_rl.story_key));
+                Scenario_Check("story_trigger_dialogue_played_on_first_contact", _gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0);
+                Scenario_Next(_s, 22);
+            }
+            if (_s.t > 240) { Scenario_Check("story_trigger_fires", false, "triggered=" + string(instance_exists(_rl.trg) ? _rl.trg.triggered : "gone")); Scenario_Finish(); }
+            break;
+        case 22:   // die (the same hook the battle end calls); the death scene plays
+            if (_s.t == 1) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                var _chd = _gs.player_ch;
+                _chd.level = 5;
+                _chd.inventory = Inv_Add(_chd.inventory, 11, 1);
+                GameState_SetPlayer(_chd);
+                _gs.run.kills = 4;
+                Player_OnDeath(_gs.player_ch);
+            }
+            if (_s.t > 3) Scenario_TapCutscene(_s);
+            if (_s.t > 3 && _sc != noone && _sc.state == "run_flow") {
+                var _pf = Profile_Get();
+                Scenario_Check("death_profile_counts_one_death", _pf.deaths == 1, "deaths=" + string(_pf.deaths));
+                Scenario_Check("death_history_entry_has_the_run", array_length(_pf.history) == 1 && _pf.history[0].result == "died" && _pf.history[0].seed == 1111 && _pf.history[0].level == 5 && _pf.history[0].floor == 1 && _pf.history[0].kills == 4);
+                Scenario_Check("death_run_save_is_deleted_no_reload", !RunSave_HasSave());
+                Scenario_Check("death_run_is_over", !Run_IsActive());
+                Scenario_Check("death_flow_starts_with_the_summary", global.run_flow.phase == "summary");
+                var _okopts = array_length(_pf.echo_offer) == 2;   // the run had two things: potion (10) and MP potion (11)
+                for (var _i = 0; _i < array_length(_pf.echo_offer); _i++) {
+                    if (_pf.echo_offer[_i].kind != "item" || (_pf.echo_offer[_i].id != 10 && _pf.echo_offer[_i].id != 11)) _okopts = false;
+                }
+                Scenario_Check("death_echo_offer_is_1_of_what_the_run_had", _okopts, "offer=" + json_stringify(_pf.echo_offer));
+                Scenario_Next(_s, 23);
+            }
+            if (_s.t > 1200) { Scenario_Check("death_reaches_the_run_summary", false, "room=" + room_get_name(room) + " state=" + (_sc != noone ? string(_sc.state) : "none")); Scenario_Finish(); }
+            break;
+        case 23:   // summary -> echo pick: down once, confirm
+            if (_s.t == 20) Scenario_Tap("confirm");
+            if (_s.t == 40) {
+                Scenario_Check("death_confirm_moves_on_to_the_echo_pick", global.run_flow.phase == "echo", "phase=" + string(global.run_flow.phase));
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 60) {
+                Scenario_Check("death_echo_cursor_moved_down", global.run_flow.index == 1, "index=" + string(global.run_flow.index));
+                _rl.pick = global.run_flow.options[global.run_flow.index];
+                _rl.items_before = Scenario_ItemCount(CharacterCreate_Player(CLASS_NOBODY), _rl.pick.kind == "item" ? _rl.pick.id : -1);
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 62 && Transition_IsActive()) Scenario_Next(_s, 24);
+            if (_s.t > 300) { Scenario_Check("death_echo_pick_starts_the_next_run", false, "phase=" + string(global.run_flow.phase)); Scenario_Finish(); }
+            break;
+        case 24:   // run 2: level 1, another seed, the echo, the trigger not replayed
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                var _ch2 = _gs.player_ch;
+                var _pf2 = Profile_Get();
+                _rl.seed2 = _gs.run.seed;
+                Scenario_Check("newrun_has_another_seed", Run_IsActive() && _gs.run.seed != 1111, "seed=" + string(_gs.run.seed));
+                Scenario_Check("newrun_starts_at_level_1_again", _ch2.level == 1 && _ch2.class_id == CLASS_NOBODY && _ch2.hp == _ch2.max_hp, "level=" + string(_ch2.level));
+                Scenario_Check("newrun_death_count_stays_1", _pf2.deaths == 1, "deaths=" + string(_pf2.deaths));
+                Scenario_Check("newrun_counts_2_started_runs", _pf2.runs_started == 2, "runs_started=" + string(_pf2.runs_started));
+                Scenario_Check("newrun_echo_is_consumed", _pf2.echo.kind == "" && array_length(_pf2.echo_offer) == 0);
+                Scenario_Check("newrun_echo_is_applied", Scenario_EchoMatches(_ch2, _rl.pick, _rl.items_before) && _gs.run.echo_used.kind == _rl.pick.kind && _gs.run.echo_used.id == _rl.pick.id, "pick=" + json_stringify(_rl.pick));
+                Scenario_Check("newrun_does_not_replay_the_fall_dialogue", !_gs.pending_floor1_intro_dialogue);
+                Scenario_Check("newrun_carries_no_gold_or_kills", _gs.run.gold == 0 && _gs.run.kills == 0);
+                Scenario_Check("newrun_autosaved_with_the_new_seed", RunSave_HasSave() && RunSave_LoadFrom().run.seed == _rl.seed2);
+                var _trg2 = instance_find(obj_dialogue_trigger, 0);
+                _rl.trg = _trg2.id;
+                Scenario_ClearUi();
+                var _pl2 = instance_find(obj_player, 0);
+                _pl2.x = _trg2.x;
+                _pl2.y = _trg2.y;
+                _pl2.moving = false;
+                _pl2.move_timer = 0;
+                Scenario_Next(_s, 25);
+            }
+            if (_s.t > 600) { Scenario_Check("newrun_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 25:   // standing on the trigger of run 1: nothing plays (seen once per profile)
+            if (_s.t == 60) {
+                Scenario_Check("story_trigger_is_done_in_the_new_run", instance_exists(_rl.trg) && _rl.trg.triggered);
+                Scenario_Check("story_trigger_does_not_replay", _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0, "mode=" + string(_gs.ui.mode));
+                Scenario_Next(_s, 26);
+            }
+            break;
+        case 26:   // a quiet room change to rm_floor2 with 3 HP, loot stream advanced; the run is saved on arrival and again
+            if (_s.t == 1) {
+                var _ch3 = _gs.player_ch;
+                _ch3.hp = 3;
+                GameState_SetPlayer(_ch3);
+                room_goto(rm_floor2);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor2) && _s.t > 40) {
+                Scenario_Check("quit_arrived_in_rm_floor2_with_3_hp", _gs.player_ch.hp == 3, "hp=" + string(_gs.player_ch.hp));
+                var _pl3 = instance_find(obj_player, 0);
+                _rl.px = _pl3.x;
+                _rl.py = _pl3.y;
+                repeat (3) RunRng_Float("loot");
+                _rl.loot_calls = Run_Stream("loot").calls;
+                _rl.next_loot = Rng_Next(Rng_Load(Rng_Save(Run_Stream("loot"))));
+                Scenario_Check("quit_autosave_writes_the_run", Run_AutoSave() && RunSave_HasSave());
+                Scenario_Check("quit_save_holds_the_room_and_hp", RunSave_LoadFrom().run.statData.save_room_name == "rm_floor2" && RunSave_LoadFrom().run.statData.player.hp == 3);
+                // "quit": the live state goes away, the profile is dropped from memory (it is read from disk again), back to the title
+                variable_struct_remove(_gs, "run");
+                _gs.player_ch = CharacterCreate_Player(CLASS_KNIGHT);
+                _gs.flags = {};
+                _gs.persist = {};
+                global.profile = undefined;
+                _gs.in_main_menu = true;
+                room_goto(rm_start);
+                Scenario_Next(_s, 27);
+            }
+            if (_s.t > 600) { Scenario_Check("quit_reaches_rm_floor2", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 27:   // relaunch: the title's Continue row
+            if (_s.t > 40 && room == rm_start && _sc != noone && _sc.state == "main" && !Transition_IsActive() && _gs.ui.mode == UI_NONE) {
+                Scenario_Check("continue_row_is_on_when_a_run_save_exists", _sc.load_available);
+                Scenario_Check("continue_no_run_in_memory_before", !Run_IsActive());
+                _sc.main_index = 1;
+                Scenario_Tap("confirm");
+                Scenario_Next(_s, 28);
+            }
+            if (_s.t > 600) { Scenario_Check("continue_reaches_the_title_menu", false, "room=" + room_get_name(room) + " state=" + (_sc != noone ? string(_sc.state) : "none")); Scenario_Finish(); }
+            break;
+        case 28:   // Continue restores the room, HP, position, seed and the loot stream
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor2) && _s.t > 30) {
+                var _pl4 = instance_find(obj_player, 0);
+                Scenario_Check("continue_restores_the_room", room == rm_floor2);
+                Scenario_Check("continue_restores_hp", _gs.player_ch.hp == 3, "hp=" + string(_gs.player_ch.hp));
+                Scenario_Check("continue_restores_the_position", _pl4.x == _rl.px && _pl4.y == _rl.py, "x=" + string(_pl4.x) + " y=" + string(_pl4.y) + " want " + string(_rl.px) + "," + string(_rl.py));
+                Scenario_Check("continue_restores_the_seed", Run_IsActive() && _gs.run.seed == _rl.seed2, "seed=" + string(_gs.run.seed));
+                Scenario_Check("continue_restores_the_loot_stream_counter", Run_Stream("loot").calls == _rl.loot_calls, "calls=" + string(Run_Stream("loot").calls) + " want " + string(_rl.loot_calls));
+                Scenario_Check("continue_loot_stream_goes_on_where_it_stopped", Rng_Next(Rng_Load(Rng_Save(Run_Stream("loot")))) == _rl.next_loot);
+                Scenario_Check("continue_reads_the_profile_from_disk", Profile_Get().deaths == 1 && Story_Seen(_rl.story_key), "deaths=" + string(Profile_Get().deaths));
+                Scenario_Check("continue_class_is_the_runs_not_the_wiped_state", _gs.player_ch.class_id == CLASS_NOBODY && _gs.selected_class == CLASS_NOBODY);
+                Scenario_Next(_s, 29);
+            }
+            if (_s.t > 600) { Scenario_Check("continue_enters_the_saved_room", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 29:   // pause menu > Abandon run: down x3, confirm twice
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                PauseMenu_Open();
+            }
+            if (_s.t == 12 || _s.t == 24 || _s.t == 36) Scenario_Tap("menu_down");
+            if (_s.t == 48) {
+                Scenario_Check("abandon_cursor_is_on_the_abandon_row", _gs.ui.pause_menu.index == 3, "index=" + string(_gs.ui.pause_menu.index));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 60) {
+                Scenario_Check("abandon_asks_before_it_acts", _gs.ui.pause_menu.abandon_armed && Run_IsActive());
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 62) Scenario_TapCutscene(_s);
+            if (_s.t > 62 && _sc != noone && _sc.state == "run_flow") {
+                var _pf3 = Profile_Get();
+                Scenario_Check("abandon_counts_as_a_death", _pf3.deaths == 2, "deaths=" + string(_pf3.deaths));
+                Scenario_Check("abandon_history_says_abandoned", array_length(_pf3.history) == 2 && _pf3.history[1].result == "abandoned" && _pf3.history[1].floor == 2, "history=" + json_stringify(_pf3.history));
+                Scenario_Check("abandon_keeps_the_echo_offer", array_length(_pf3.echo_offer) >= 1);
+                Scenario_Check("abandon_deletes_the_run_save", !RunSave_HasSave() && !Run_IsActive());
+                Scenario_Next(_s, 30);
+            }
+            if (_s.t > 1200) { Scenario_Check("abandon_reaches_the_run_summary", false, "room=" + room_get_name(room) + " state=" + (_sc != noone ? string(_sc.state) : "none") + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+            break;
+        case 30:   // summary + pick (first option) -> run 3
+            if (_s.t == 20) Scenario_Tap("confirm");
+            if (_s.t == 40) Scenario_Tap("confirm");
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && _s.t > 60) {
+                Scenario_Check("abandon_next_run_starts_at_level_1", _gs.player_ch.level == 1 && Run_IsActive() && Profile_Get().runs_started == 3, "runs_started=" + string(Profile_Get().runs_started));
+                Scenario_Next(_s, 31);
+            }
+            if (_s.t > 600) { Scenario_Check("abandon_next_run_reaches_rm_floor1", false, "room=" + room_get_name(room) + " phase=" + string(global.run_flow.phase)); Scenario_Finish(); }
+            break;
+        case 31:   // the first win: the ending plays (skipped by holding confirm), wins + 1, the Nobody class unlocks
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                _rl.held = false;
+                Scenario_Check("win_nobody_class_is_locked_before", !Profile_IsUnlocked(Profile_Get(), "nobody_class"));
+                Transition_RequestCutsceneById("ending");
+            }
+            if (_s.t > 2 && room == rm_cutscene && _sc != noone && _sc.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE && !_rl.held) {
+                _rl.held = true;
+                Scenario_Hold("confirm", 120);
+            }
+            if (_s.t > 2 && room == rm_start && !Transition_IsActive()) {
+                Scenario_Release();
+                var _pf4 = Profile_Get();
+                Scenario_Check("win_ending_cutscene_played_once", _rl.held && Story_Seen(Story_CutsceneKey("ending")));
+                Scenario_Check("win_counts_one_win", _pf4.wins == 1 && _pf4.deaths == 2, "wins=" + string(_pf4.wins) + " deaths=" + string(_pf4.deaths));
+                Scenario_Check("win_first_win_unlocks_the_nobody_class", Profile_IsUnlocked(_pf4, "nobody_class"));
+                Scenario_Check("win_history_says_won", _pf4.history[array_length(_pf4.history) - 1].result == "won");
+                Scenario_Check("win_ends_the_run_and_deletes_its_save", !Run_IsActive() && !RunSave_HasSave());
+                _rl.saw_cutscene = false;
+                Scenario_Next(_s, 32);
+            }
+            if (_s.t > 1500) { Scenario_Check("win_ending_returns_to_the_title", false, "room=" + room_get_name(room) + " held=" + string(_rl.held)); Scenario_Finish(); }
+            break;
+        case 32:   // a second win: the ending is not shown again, the win still counts
+            if (_s.t == 1) {
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 2222);
+            }
+            if (_s.t > 5 && _s.t < 400 && Scenario_FloorReady(rm_floor1) && !variable_struct_exists(_rl, "second")) {
+                _rl.second = true;
+                Scenario_ClearUi();
+                Transition_RequestCutsceneById("ending");
+            }
+            if (room == rm_cutscene) _rl.saw_cutscene = true;
+            if (variable_struct_exists(_rl, "second") && _s.t > 10 && room == rm_start && !Transition_IsActive()) {
+                var _pf5 = Profile_Get();
+                Scenario_Check("win2_ending_is_not_shown_again", !_rl.saw_cutscene);
+                Scenario_Check("win2_counts_the_second_win", _pf5.wins == 2, "wins=" + string(_pf5.wins));
+                Scenario_Check("win2_nobody_class_stays_unlocked", Profile_IsUnlocked(_pf5, "nobody_class"));
+                Scenario_Finish();
+            }
+            if (_s.t > 900) { Scenario_Check("win2_returns_to_the_title", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
     }
 }

@@ -77,13 +77,33 @@ if (state == "boot_logo") {
     return;
 }
 
+if (state == "run_flow") {   // C1: run summary, echo pick, new run (scr_room_state RunFlow_*)
+    RunFlow_Step();
+    return;
+}
+
 if (state == "main") {
     var title_idx_new = 0;
     var title_idx_load = 1;
     var title_idx_settings = 2;
     var title_idx_exit = 3;
 
-    load_available = Save_HasAnySlot();
+    if (!legacy_notice_checked) {   // C1 (D16): say once why old saves are not loaded; also tell about a profile file that was not usable
+        legacy_notice_checked = true;
+        var notice_text = Profile_NoticeText();
+        var notice_prof = Profile_Get();
+        if (notice_text == "" && Save_LegacyFilesExist() && !notice_prof.legacy_notice_seen) {
+            notice_prof.legacy_notice_seen = true;
+            Profile_Flush();
+            notice_text = Save_LegacyNotice();
+        }
+        if (notice_text != "") {
+            SaveMenu_OpenMessage(notice_text, true);
+            return;
+        }
+    }
+
+    load_available = RunSave_HasSave();
     if (!load_available && main_index == title_idx_load) {
         main_index = (main_index + 1) mod array_length(main_options);
     }
@@ -131,7 +151,8 @@ if (state == "main") {
             difficulty_pending_action = "";
             state = "difficulty";
         } else if (opt == title_idx_load) {
-            SaveMenu_Open("load", "main");
+            var cont = Run_Continue();   // C1 (D46): Continue run
+            if (!cont.ok) SaveMenu_OpenMessage(Run_ContinueFailText(cont.status), true);
         } else if (opt == title_idx_settings) {
             SettingsPopup_Open("title");
             state = "settings";
@@ -151,7 +172,7 @@ if (state == "difficulty") {
             if (da == "start_intro") {
                 Difficulty_SetCurrent(difficulty_pending_value);
                 gs.in_main_menu = false;
-                Transition_RequestCutsceneById("intro");
+                Run_BeginNewGame();   // C1: the intro cutscene plays once per profile, later runs start at once
             } else {
                 state = "main";
             }
@@ -466,45 +487,20 @@ if (state == "cutscene") {
 
     switch (cutscene_id) {
         case "intro":
-            // reset core state for new game
-            if (ds_exists(gs.defeated_enemies, ds_type_list)) ds_list_clear(gs.defeated_enemies);
-            gs.room_states = {};
-            gs.persist = {};
-            gs.persist_applied = {};
-            gs.uid_counter = 1;
-            gs.enemy_reset_version = 0;
-            gs.boss_defeated = { mini_boss: false, final_boss: false };
-
-            GameState_SetSelectedClass(CLASS_NOBODY);
-            gs.player_ch = CharacterCreate_Player(CLASS_NOBODY);
-            GameState_SetPlayer(gs.player_ch);
-
-            gs.in_main_menu = false;
-            gs.pending_floor1_intro_dialogue = true;
-            GameSettings_ApplyAll();
-            Transition_RequestCutsceneFade(rm_floor1, "start", -1, true);
+            // C1: the intro is story (D26): marked seen, then the first run starts (the reset of core state moved into Run_StartNew)
+            Story_Mark(Story_CutsceneKey("intro"));
+            Run_StartNew(true);
             break;
         case "ending":
+            Run_OnWin();   // C1: wins + 1; the first win unlocks the Nobody class
             gs.in_main_menu = true;
             Transition_RequestCutsceneFade(rm_start);
             break;
         case "game_over":
+            // C1 (D46, D103): no reload after a death. The run is already over in the profile; show the summary, the echo pick, then a new run.
             gs.in_main_menu = false;
-            var load_slot = 0;
-            if (variable_struct_exists(gs, "save_slot")) {
-                var preferred_slot = round(real(gs.save_slot));
-                if (preferred_slot >= 1 && preferred_slot <= 3 && Save_HasSlot(preferred_slot)) {
-                    load_slot = preferred_slot;
-                }
-            }
-            if (load_slot <= 0) load_slot = Save_FindLatestSlot();
-
-            if (load_slot > 0 && Save_Read(load_slot)) {
-                // Save_Read handles transition to the loaded room.
-            } else {
-                gs.in_main_menu = true;
-                Transition_RequestCutsceneFade(rm_start);
-            }
+            RunFlow_Begin();
+            state = "run_flow";
             break;
         default:
             Transition_RequestRoomFade(rm_start);

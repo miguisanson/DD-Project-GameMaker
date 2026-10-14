@@ -442,7 +442,7 @@ function Player_OnDeath(_p) {
     if (variable_struct_exists(gs, "pending_post_battle_dialogue_lines")) gs.pending_post_battle_dialogue_lines = [];
     gs.in_main_menu = false;
     GameState_SetJustReturned(false);
-    Transition_RequestCutsceneById("game_over");
+    Run_OnPlayerDeath();   // C1: ends the run in the profile, deletes the run save, then plays the death scene
 }
 
 // --------------------

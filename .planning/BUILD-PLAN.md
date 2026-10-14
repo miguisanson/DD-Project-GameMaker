@@ -13,7 +13,7 @@ game exports JSON with `-exportdata` for the Python simulator (no Included File 
 | B2 | Statuses (poison stacks, burn, bleed), no dice anywhere, Evasion/Solidify, Foresight | D78, D79, D80, D21 | todo |
 | B3 | Turn timeline (next 5), stun push-back + Steadfast, stagger meter + BREAK, damage numbers | D74, D75, D92 | todo |
 | B4 | Battle AI rule lists, telegraphed big attacks, boss phases | D68, D7 | todo |
-| C1 | Run loop: run/profile save split, seeded RNG streams, death → entrance, echo gift, abandon run, auto-save + continue, story seen once, run history, unlocks | D25-D27, D30-D33, D36, D46, D87, D88, D92 | todo |
+| C1 | Run loop: run/profile save split, seeded RNG streams, death → entrance, echo gift, abandon run, auto-save + continue, story seen once, run history, unlocks | D25-D27, D30-D33, D36, D46, D87, D88, D92 | done on branch c1-run (awaiting review and merge) |
 | C2 | Chests (class first, then cards), class pick (Nobody locked), cards 1-of-3 at chests + level-ups, upgrades, passives (shared + class), max 3 skills equipped | D73, D81, D82, D34, D83 | todo |
 | C3 | Gold, merchant after floors 2/5/8, throwables (all classes, Nobody stronger), accessory slot, elites, per-run shuffles | D23, D33, D84, D85, D86, D92 | todo |
 | C4 | Beds (heal or upgrade), tutorial prompts + Help page, settings (QTE assist, key rebinding, text speed, shake), device button prompts | D45, D47, D49, D92 | todo |

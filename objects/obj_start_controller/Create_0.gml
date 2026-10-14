@@ -1,11 +1,11 @@
 main_index = 0;
 main_options = [
     Loc_T("menu.main.option.0", "New Game"),
-    Loc_T("menu.main.option.1", "Load Game"),
+    Loc_T("menu.main.option.continue", "Continue"),
     Loc_T("menu.main.option.2", "Settings"),
     Loc_T("menu.main.option.3", "Exit Game")
 ];
-main_option_keys = ["menu.main.option.0", "menu.main.option.1", "menu.main.option.2", "menu.main.option.3"];
+main_option_keys = ["menu.main.option.0", "menu.main.option.continue", "menu.main.option.2", "menu.main.option.3"];
 difficulty_options = [
     Loc_T("settings.difficulty.option.0", "Easy"),
     Loc_T("settings.difficulty.option.1", "Normal"),
@@ -192,7 +192,8 @@ __localize_cutscene("ending");
 __localize_cutscene("game_over");
 
 var gs = GameState_Get();
-load_available = Save_HasAnySlot();
+load_available = RunSave_HasSave();   // C1 (D46): the Continue row is on when a run save exists
+legacy_notice_checked = false;
 title_bg_sprite = noone;
 title_bg_layer_id = -1;
 

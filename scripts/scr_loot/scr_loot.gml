@@ -276,7 +276,7 @@ function Loot_RollSkillbook(_class_id, _player = undefined, _exclude_ids = undef
     }
 
     if (array_length(eligible) <= 0) return undefined;
-    var idx = irandom(array_length(eligible) - 1);
+    var idx = RunRng_Int("loot", array_length(eligible));
     return { item_id: eligible[idx], qty: 1 };
 }
 
@@ -314,7 +314,7 @@ function Loot_RollFromTable(_table_key, _level, _player = undefined, _class_id =
     }
     if (total <= 0) return undefined;
 
-    var r = random(total);
+    var r = RunRng_Float("loot") * total;
     var acc = 0;
     for (var j = 0; j < array_length(weighted); j++) {
         var row = weighted[j];
@@ -326,7 +326,7 @@ function Loot_RollFromTable(_table_key, _level, _player = undefined, _class_id =
             if (variable_struct_exists(e2, "qty_min")) minv = e2.qty_min; else if (variable_struct_exists(e2, "min_qty")) minv = e2.min_qty; else if (variable_struct_exists(e2, "min")) minv = e2.min;
             if (variable_struct_exists(e2, "qty_max")) maxv = e2.qty_max; else if (variable_struct_exists(e2, "max_qty")) maxv = e2.max_qty; else if (variable_struct_exists(e2, "max")) maxv = e2.max;
             if (maxv < minv) maxv = minv;
-            var qty = (minv == maxv) ? minv : irandom_range(minv, maxv);
+            var qty = (minv == maxv) ? minv : RunRng_Range("loot", minv, maxv);
             if (qty <= 0) return undefined;
             if (variable_struct_exists(e2, "item_id") && e2.item_id <= 0) return undefined;
             return { item_id: e2.item_id, qty: qty };
@@ -350,7 +350,7 @@ function Loot_RollContainer(_level, _key) {
         return [];
     }
 
-    if (random(1) > chance) return [];
+    if (RunRng_Float("loot") > chance) return [];
 
     var items = [];
     var count = max(1, cfg.max_items);
@@ -392,7 +392,7 @@ function Loot_RollEnemy(_enemy_or_id) {
 
     var cfg = Loot_ConfigGet(key);
     var chance = cfg.chance[clamp(round(lvl), 1, 3) - 1];
-    if (random(1) > chance) return [];
+    if (RunRng_Float("loot") > chance) return [];
 
     var player = Loot_PlayerStruct();
     var class_id = Loot_PlayerClassId(player);

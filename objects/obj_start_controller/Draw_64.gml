@@ -24,6 +24,12 @@ if (state == "boot_logo") {
     exit;
 }
 if (state == "cutscene") exit;
+if (state == "run_flow") {   // C1: run summary and echo pick after the death scene (placeholder screens, packet C5 polishes)
+    RunFlow_Draw();
+    draw_set_alpha(1);
+    Build_DrawId();
+    exit;
+}
 var loading_into_game = Transition_IsActive()
 && variable_struct_exists(gs, "in_main_menu")
 && !gs.in_main_menu;
@@ -59,7 +65,7 @@ difficulty_index = clamp(difficulty_index, 0, max(0, difficulty_row_count - 1));
 if (state == "main" && gs.ui.mode != UI_SAVE && !loading_into_game) {
     var can_load = true;
     if (variable_instance_exists(id, "load_available")) can_load = load_available;
-    else can_load = Save_HasAnySlot();
+    else can_load = RunSave_HasSave();
 
     // main menu
     var bx1 = w * 0.3;
