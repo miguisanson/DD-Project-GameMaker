@@ -1,49 +1,56 @@
+// Stats (D22): ATK DEF SPD MAG plus HP and MP. Formulas: .planning/research/combat-spec.md sections 1-3.
 function StatsCreateBase() {
-    return { str:10, agi:10, def:10, intt:10, luck:10 };
+    return { atk:10, def:10, spd:10, mag:10 };
 }
 
 function StatsClampAll(_s) {
-    _s.str  = StatClamp(_s.str);
-    _s.agi  = StatClamp(_s.agi);
-    _s.def  = StatClamp(_s.def);
-    _s.intt = StatClamp(_s.intt);
-    _s.luck = StatClamp(_s.luck);
+    _s.atk = StatClamp(_s.atk);
+    _s.def = StatClamp(_s.def);
+    _s.spd = StatClamp(_s.spd);
+    _s.mag = StatClamp(_s.mag);
     return _s;
+}
+
+function Stat_IsValid(_stat_id) {
+    return (_stat_id == STAT_ATK || _stat_id == STAT_DEF || _stat_id == STAT_SPD || _stat_id == STAT_MAG);
+}
+
+function Stat_Key(_stat_id) {
+    switch (_stat_id) {
+        case STAT_ATK: return "atk";
+        case STAT_DEF: return "def";
+        case STAT_SPD: return "spd";
+        case STAT_MAG: return "mag";
+    }
+    return "";
+}
+
+function Stat_ShortName(_stat_id) {
+    switch (_stat_id) {
+        case STAT_ATK: return "ATK";
+        case STAT_DEF: return "DEF";
+        case STAT_SPD: return "SPD";
+        case STAT_MAG: return "MAG";
+    }
+    return "";
 }
 
 function HPGainPerLevel(_hd) { return ceil(_hd / 2) + 2; }
 
-function ResourceStatWeight(_level) {
-    var lvl = max(1, round(_level));
-    // MP scaling remains tied to INT, with gentle level weighting.
-    return 1 + floor((lvl - 1) / 4);
+// Spec section 3. No stat adds HP; MAG adds to MP (raw MAG, equipment not included).
+function Resource_MaxHp(_hd, _level) {
+    return PLAYER_BASE_HP + (max(1, round(_level)) - 1) * HPGainPerLevel(_hd);
+}
+
+function Resource_MaxMp(_mp_gain, _level, _mag) {
+    return PLAYER_BASE_MP + (max(1, round(_level)) - 1) * _mp_gain + floor(_mag / 2);
 }
 
 function RecomputeResources(_ch) {
-    var lvl = _ch.level;
     var cfg = _ch.class_cfg;
-    var s = _ch.stats;
 
-    var def_mod = StatMod(s.def);
-    var int_mod = StatMod(s.intt);
-
-    var hp_gain = HPGainPerLevel(cfg.hd);
-    var mp_gain = cfg.mp_gain;
-    var stat_weight = ResourceStatWeight(lvl);
-    var hp_def_bonus = max(0, floor(max(0, def_mod) * PLAYER_HP_DEF_BONUS_FACTOR));
-
-    // Class level growth is the primary HP source; DEF only adds a small flat bonus.
-    _ch.max_hp = cfg.base_hp + (lvl - 1) * hp_gain + hp_def_bonus;
-    _ch.max_hp = max(1, _ch.max_hp);
-
-    _ch.max_mp = cfg.base_mp + (lvl - 1) * mp_gain + (int_mod * stat_weight);
-    _ch.max_mp = max(0, _ch.max_mp);
-
-    if (variable_struct_exists(_ch, "is_player") && _ch.is_player) {
-        var diff = Difficulty_Profile();
-        _ch.max_hp = max(1, round(_ch.max_hp * diff.player_hp_mult));
-        _ch.max_mp = max(0, round(_ch.max_mp * diff.player_mp_mult));
-    }
+    _ch.max_hp = max(1, Resource_MaxHp(cfg.hd, _ch.level));
+    _ch.max_mp = max(0, Resource_MaxMp(cfg.mp_gain, _ch.level, _ch.stats.mag));
 
     _ch.hp = clamp(_ch.hp, 0, _ch.max_hp);
     _ch.mp = clamp(_ch.mp, 0, _ch.max_mp);
@@ -54,11 +61,10 @@ function RecomputeResources(_ch) {
 function Stat_Get(_ch, _stat_id) {
     var base = 0;
     switch (_stat_id) {
-        case STAT_STR:  base = _ch.stats.str; break;
-        case STAT_AGI:  base = _ch.stats.agi; break;
-        case STAT_DEF:  base = _ch.stats.def; break;
-        case STAT_INT:  base = _ch.stats.intt; break;
-        case STAT_LUCK: base = _ch.stats.luck; break;
+        case STAT_ATK: base = _ch.stats.atk; break;
+        case STAT_DEF: base = _ch.stats.def; break;
+        case STAT_SPD: base = _ch.stats.spd; break;
+        case STAT_MAG: base = _ch.stats.mag; break;
     }
 
     var equip_bonus = Equip_GetStatBonus(_ch, _stat_id);

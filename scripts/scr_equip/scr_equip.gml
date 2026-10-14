@@ -98,11 +98,10 @@ function Equip_GetStatBonus(_ch, _stat_id) {
         if (is_struct(item) && variable_struct_exists(item, "bonus")) {
             var b = item.bonus;
             switch (_stat_id) {
-                case STAT_STR:  if (variable_struct_exists(b, "str")) total += b.str; break;
-                case STAT_AGI:  if (variable_struct_exists(b, "agi")) total += b.agi; break;
-                case STAT_DEF:  if (variable_struct_exists(b, "def")) total += b.def; break;
-                case STAT_INT:  if (variable_struct_exists(b, "intt")) total += b.intt; break;
-                case STAT_LUCK: if (variable_struct_exists(b, "luck")) total += b.luck; break;
+                case STAT_ATK: if (variable_struct_exists(b, "atk")) total += b.atk; break;
+                case STAT_DEF: if (variable_struct_exists(b, "def")) total += b.def; break;
+                case STAT_SPD: if (variable_struct_exists(b, "spd")) total += b.spd; break;
+                case STAT_MAG: if (variable_struct_exists(b, "mag")) total += b.mag; break;
             }
         }
     }

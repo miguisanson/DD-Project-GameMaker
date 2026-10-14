@@ -1,117 +1,117 @@
+// Combat maths (D22, D77, D80). Spec: .planning/research/combat-spec.md. Everything in this block is a pure function of its inputs
+// (plus the character structs) so the vectors in combat-vectors.json can pin it down.
+
+// Spec section 1/8: initiative is SPD; the higher SPD acts first, a tie goes to the player (until the turn timeline, D74).
 function Combat_Initiative(_ch) {
-    return RollD20() + StatMod(Combat_EffectiveStat(_ch, STAT_AGI));
+    return Combat_EffectiveStat(_ch, STAT_SPD);
+}
+
+function Combat_PlayerActsFirst(_spd_player, _spd_enemy) {
+    return (_spd_player >= _spd_enemy);
 }
 
 function Combat_EffectiveStat(_ch, _stat_id) {
     return max(1, round(Stat_Get(_ch, _stat_id)));
 }
 
-function Combat_EffectiveDamageMult(_attacker) {
-    var diff = Difficulty_Profile();
-    if (variable_struct_exists(_attacker, "is_player") && _attacker.is_player) {
-        return diff.player_damage_mult;
+// D35: the only difficulty knob left: the QTE assist multiplier on damage the player takes (1 = off).
+function Combat_AssistMult(_defender) {
+    if (is_struct(_defender) && variable_struct_exists(_defender, "is_player") && _defender.is_player) {
+        return Difficulty_Profile().assist_damage_taken_mult;
     }
-    return diff.enemy_damage_mult;
+    return 1;
 }
 
-function Combat_EffectiveEnemyStatusChanceMult() {
-    var diff = Difficulty_Profile();
-    return diff.enemy_status_chance_mult;
+// Spec section 4. Power of an attack before the stat ratio:
+function Combat_PowerBasic(_weapon_power) {
+    return COMBAT_POWER_SCALE * _weapon_power;
 }
 
-function Combat_AttackBonus(_attacker, _weapon) {
-    // Minimal version: MOD(relevant) + weapon.acc
-    var rel_mod = 0;
-    switch (_weapon.stat_type) {
-        case STAT_STR:  rel_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_STR)); break;
-        case STAT_AGI:  rel_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_AGI)); break;
-        case STAT_INT:  rel_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_INT)); break;
-        default:        rel_mod = 0; break;
+function Combat_PowerSkill(_skill_power, _power_mult, _weapon_power) {
+    return COMBAT_POWER_SCALE * (_skill_power + COMBAT_WEAPON_SKILL_SHARE * _weapon_power) * _power_mult;
+}
+
+function Combat_PowerEnemySkill(_skill_power, _power_mult) {
+    return COMBAT_POWER_SCALE * _skill_power * _power_mult;
+}
+
+// Power of the equipped weapon (D22); no weapon counts as COMBAT_UNARMED_POWER.
+function Combat_WeaponPower(_ch) {
+    if (is_struct(_ch) && variable_struct_exists(_ch, "equip") && is_struct(_ch.equip) && variable_struct_exists(_ch.equip, "weapon") && _ch.equip.weapon != 0) {
+        var w = ItemDB_Get(_ch.equip.weapon);
+        if (is_struct(w) && variable_struct_exists(w, "power")) return w.power;
     }
-    return rel_mod + _weapon.acc;
+    return COMBAT_UNARMED_POWER;
 }
 
-function Combat_DodgeBonus(_defender) {
-    return StatMod(Combat_EffectiveStat(_defender, STAT_AGI)) + Status_GetSum(_defender, "dodge_bonus");
+// A basic attack's damage source from a weapon item: { power (final formula power), stat_type }.
+function Combat_BasicSource(_weapon) {
+    return { power: Combat_PowerBasic(_weapon.power), stat_type: _weapon.stat_type, acc: 0 };
+}
+
+// The one damage formula (spec section 4). mult = every multiplier except the QTE grade; 0 means "blocked" (Guard).
+// grade 1.00 -> round_half_up(raw), at least 1. Another grade is moved at least 1 away from that (D61: Perfect is visibly above OK), then at least 1.
+function Combat_RatioDamage(_power, _atk, _def, _grade = 1, _mult = 1) {
+    if (_power <= 0 || _mult == 0) return 0;
+    var raw = _power * max(1, _atk) * _mult / (max(1, _atk) + max(1, _def));
+    var ok = max(1, RoundHalfUp(raw));
+    if (_grade == 1) return ok;
+    var g = RoundHalfUp(raw * _grade);
+    if (_grade > 1) g = max(g, ok + 1);
+    else g = min(g, ok - 1);
+    return max(1, g);
+}
+
+function Combat_AttackStat(_attacker, _src) {
+    var stat_id = (variable_struct_exists(_src, "stat_type") && Stat_IsValid(_src.stat_type)) ? _src.stat_type : STAT_ATK;
+    return Combat_EffectiveStat(_attacker, stat_id);
+}
+
+// Grade-OK damage of one hit with no statuses: what the hit is "worth" (the bot and tooltips use it).
+function Combat_Damage(_attacker, _defender, _src) {
+    return Combat_RatioDamage(_src.power, Combat_AttackStat(_attacker, _src), Combat_EffectiveStat(_defender, STAT_DEF), 1, 1);
+}
+
+function Combat_HealAmount(_power, _stat) {
+    return _power + floor(_stat / 4);
+}
+
+// Spec section 4, crit rule: no base chance, no LUCK; only a crit_bonus (percent) from statuses/passives.
+function Combat_CritChance(_crit_bonus) {
+    return clamp(_crit_bonus / 100, 0, COMBAT_CRIT_CHANCE_MAX);
 }
 
 function Combat_CritCheck(_attacker, _crit_bonus) {
-    // Base 5% crit, bonus from LUCK and any explicit crit bonus (percent).
-    var luck_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_LUCK));
-    if (luck_mod < 0) luck_mod = 0;
-    var crit_chance = 0.05 + (luck_mod * 0.01) + (_crit_bonus * 0.01);
-    crit_chance = clamp(crit_chance, 0.05, 0.50); // 5% to 50% max
-    return (random(1) < crit_chance);
+    var chance = Combat_CritChance(_crit_bonus);
+    if (chance <= 0) return false;
+    return (random(1) < chance);
 }
 
-function Combat_Damage(_attacker, _defender, _weapon) {
-    var rel_mod = 0;
-    switch (_weapon.stat_type) {
-        case STAT_STR: rel_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_STR)); break;
-        case STAT_AGI: rel_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_AGI)); break;
-        case STAT_INT: rel_mod = StatMod(Combat_EffectiveStat(_attacker, STAT_INT)); break;
-        default: rel_mod = 0; break;
-    }
-
-    var raw = _weapon.power + rel_mod;
-
-    // softened mitigation: use half of DEF mod (rounded down)
-    var mitig = floor(StatMod(Combat_EffectiveStat(_defender, STAT_DEF)) / 2);
-
-    var final = max(1, raw - mitig);
-    return final;
-}
-
-// D6/D20: this roll is for ENEMY attacks only; the player's basic attack and skills never roll to hit (Skill_Use skips it).
-// TODO(D24, STAT rework): "force_dodge" (Evasion, Solidify) and "always_hit" (Foresight) only made sense with player misses. They still
-// work against enemy attacks and do nothing for the player's own attacks. Redesign them in the STAT rework, not here.
-function Combat_AttemptHit(_attacker, _defender, _acc_bonus) {
-    var res = { hit: false, forced: false, attacker: _attacker, defender: _defender };
-
-    if (Status_HasFlag(_defender, "force_dodge")) {
-        res.hit = false;
-        res.forced = true;
+// D80: no dice. The only way an enemy action fails to land is Evasion on the PLAYER: the next damaging enemy action is fully dodged and Evasion is used up.
+// An Evasion status on an enemy does nothing (the player never misses, D6).
+function Combat_TryDodge(_attacker, _defender) {
+    var res = { dodged: false, defender: _defender };
+    if (is_struct(_defender) && variable_struct_exists(_defender, "is_player") && _defender.is_player && Status_HasFlag(_defender, "force_dodge")) {
+        res.dodged = true;
         res.defender = Status_ConsumeByField(_defender, "consume_on_defend");
-        return res;
     }
-
-    if (Status_HasFlag(_attacker, "always_hit")) {
-        res.hit = true;
-        res.forced = true;
-        return res;
-    }
-
-    var hit_roll = RollD20() + _acc_bonus;
-    var dodge_roll = RollD20() + Combat_DodgeBonus(_defender);
-    res.hit = (hit_roll >= dodge_roll);
     return res;
 }
 
-function Combat_ApplyDamage(_attacker, _defender, _weapon, _crit_mult, _skill_mult) {
-    var dmg = Combat_Damage(_attacker, _defender, _weapon);
+// _src = { power (final formula power), stat_type }. _ctx: { grade_mult, is_skill }. Statuses: dmg_mult (attacker), guard_mult (defender, consumed on hit).
+function Combat_ApplyDamage(_attacker, _defender, _src, _crit_mult = 1, _skill_mult = 1, _ctx = undefined) {
+    var dmg_ctx = is_struct(_ctx) ? _ctx : {};
+    var grade = variable_struct_exists(dmg_ctx, "grade_mult") ? dmg_ctx.grade_mult : 1;
 
-    var dmg_mult = Status_GetMul(_attacker, "dmg_mult");
-    if (dmg_mult != 1) dmg = floor(dmg * dmg_mult);
-
-    if (argument_count >= 5) dmg = floor(dmg * _skill_mult);
-    if (argument_count >= 4) dmg = floor(dmg * _crit_mult);
-
-    // D61: the QTE grade scales the hit (round half up, at least 1 apart from grade OK: Qte_ScaleAmount), and a hit that was going to deal
-    // damage never drops to 0 (D20). A Guard below still blocks it.
-    var dmg_ctx = {};
-    if (argument_count >= 6 && is_struct(argument[5])) dmg_ctx = argument[5];
-    if (variable_struct_exists(dmg_ctx, "grade_mult") && dmg_ctx.grade_mult != 1) {
-        dmg = Qte_ScaleAmount(dmg, dmg_ctx.grade_mult, 1);
-    }
-
+    var mult = Status_GetMul(_attacker, "dmg_mult") * _crit_mult * _skill_mult;
     var guard_mult = Status_GetMul(_defender, "guard_mult");
     if (guard_mult != 1) {
-        dmg = floor(dmg * guard_mult);
+        mult *= guard_mult;
         _defender = Status_ConsumeByField(_defender, "consume_on_hit");
     }
+    mult *= Combat_AssistMult(_defender);
 
-    var diff_mult = Combat_EffectiveDamageMult(_attacker);
-    if (diff_mult != 1) dmg = floor(dmg * diff_mult);
+    var dmg = Combat_RatioDamage(_src.power, Combat_AttackStat(_attacker, _src), Combat_EffectiveStat(_defender, STAT_DEF), grade, mult);
 
     if (!variable_struct_exists(dmg_ctx, "is_skill")) dmg_ctx.is_skill = false;
 
@@ -920,14 +920,14 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
     if (!is_struct(w) || !variable_struct_exists(w, "power")) {
         var wid = p.equip.weapon;
         w = ItemDB_Get(wid);
-        if (w.id == 0) w = { power:1, stat_type:STAT_STR, acc:0, preferred_class:-1 };
+        if (w.id == 0) w = { power:COMBAT_UNARMED_POWER, stat_type:STAT_ATK, acc:0, preferred_class:-1 };
         _bc.player_weapon = w;
     }
 
     _bc.last_hit = true;
     var crit_bonus = Status_GetSum(p, "crit_bonus");
-    _bc.last_crit = Combat_CritCheck(p, 1 + crit_bonus);
-    var dmg_pack = Combat_ApplyDamage(p, e, w, (_bc.last_crit ? 2 : 1), 1, { is_skill: false, grade_mult: timing.mult });
+    _bc.last_crit = Combat_CritCheck(p, crit_bonus);
+    var dmg_pack = Combat_ApplyDamage(p, e, Combat_BasicSource(w), (_bc.last_crit ? COMBAT_CRIT_MULT : 1), 1, { is_skill: false, grade_mult: timing.mult });
     e = dmg_pack.defender;
     var dealt = max(0, dmg_pack.dmg);
 
@@ -1229,6 +1229,11 @@ function Battle_GetItemList(_bc) {
     return out;
 }
 
+// Spec section 8: the one random roll left in a flee. Bosses are checked before this.
+function Battle_RunChance(_spd_player, _spd_enemy) {
+    return clamp(0.5 + 0.05 * (_spd_player - _spd_enemy), 0.10, 0.95);
+}
+
 function Battle_RunAttempt(_bc) {
     var p = _bc.p;
     var e = _bc.e;
@@ -1241,10 +1246,7 @@ function Battle_RunAttempt(_bc) {
         return;
     }
 
-    var pr = RollD20() + StatMod(Combat_EffectiveStat(p, STAT_AGI));
-    var er = RollD20() + StatMod(Combat_EffectiveStat(e, STAT_AGI));
-
-    if (pr >= er) {
+    if (random(1) < Battle_RunChance(Combat_EffectiveStat(p, STAT_SPD), Combat_EffectiveStat(e, STAT_SPD))) {
         EnemyPersist_ResolveBattle(false);
         if (enemy_id == ENEMY_STRANGER) {
             Dialogue_NarrativeOnStrangerEncounterResolved();
@@ -1878,24 +1880,25 @@ function Battle_EnemyAct(_bc) {
     } else {
         var ew = _bc.enemy_weapon;
         if (!is_struct(ew) || !variable_struct_exists(ew, "power")) {
-            ew = { power:2, stat_type:STAT_STR, acc:0, preferred_class:-1 };
+            ew = { power: e.basic_power, stat_type:STAT_ATK, acc:0, preferred_class:-1 };
             _bc.enemy_weapon = ew;
         }
 
         // Enemy basic attack SFX (non-skill turn).
         SFX_PlayEnemySpecial(e.id);
 
-        var hit_res_e = Combat_AttemptHit(e, p, Combat_AttackBonus(e, ew));
+        // D80: enemies never miss; the only way the hit fails is Evasion on the player.
+        var hit_res_e = Combat_TryDodge(e, p);
 
-        _bc.last_hit = hit_res_e.hit;
+        _bc.last_hit = !hit_res_e.dodged;
         _bc.last_dmg = 0;
         _bc.last_crit = false;
         p = hit_res_e.defender;
 
         if (_bc.last_hit) {
             var crit_bonus_e = Status_GetSum(e, "crit_bonus");
-            _bc.last_crit = Combat_CritCheck(e, 1 + crit_bonus_e);
-            var dmg_pack_e = Combat_ApplyDamage(e, p, ew, (_bc.last_crit ? 2 : 1), 1, { is_skill: false });
+            _bc.last_crit = Combat_CritCheck(e, crit_bonus_e);
+            var dmg_pack_e = Combat_ApplyDamage(e, p, ew, (_bc.last_crit ? COMBAT_CRIT_MULT : 1), 1, { is_skill: false });
             _bc.last_dmg = dmg_pack_e.dmg;
             p = dmg_pack_e.defender;
         }

@@ -120,7 +120,7 @@ function StatusDB_Init() {
         name: "Poison",
         icon_sprite: poison_status,
         icon_subimg: 0,
-        stat_mods: { str:0, agi:0, def:0, intt:-1, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:-1 },
         tick: { hp_min:-3, hp_max:-2, mp_min:0, mp_max:0 },
         stackable: false,
         excludes: [STATUS_BLEED, STATUS_BURN]
@@ -131,7 +131,7 @@ function StatusDB_Init() {
         name: "Bleeding",
         icon_sprite: bleed_status,
         icon_subimg: 0,
-        stat_mods: { str:0, agi:-2, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:-2, mag:0 },
         tick: { hp_min:-4, hp_max:-2, mp_min:0, mp_max:0 },
         stackable: false,
         excludes: [STATUS_POISON, STATUS_BURN]
@@ -142,7 +142,7 @@ function StatusDB_Init() {
         name: "Burning",
         icon_sprite: burn_status,
         icon_subimg: 0,
-        stat_mods: { str:-1, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:-1, def:0, spd:0, mag:0 },
         tick: { hp_min:-6, hp_max:-4, mp_min:0, mp_max:0 },
         stackable: false,
         excludes: [STATUS_BLEED, STATUS_POISON]
@@ -153,7 +153,7 @@ function StatusDB_Init() {
         name: "Stun",
         icon_sprite: stun_status,
         icon_subimg: 0,
-        stat_mods: { str:0, agi:-2, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:-2, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         skip_turn: true
@@ -163,7 +163,7 @@ function StatusDB_Init() {
         id: STATUS_GUARD,
         name: "Guard",
         icon_sprite: rock1,
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         guard_mult: 0,
@@ -174,7 +174,7 @@ function StatusDB_Init() {
         id: STATUS_DMG_UP,
         name: "Rev Up",
         icon_sprite: torch_asset_moving,
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         dmg_mult: 2,
@@ -184,9 +184,9 @@ function StatusDB_Init() {
     global.status_db[? STATUS_EVASION] = {
         id: STATUS_EVASION,
         name: "Evasion",
-        // TODO(D24, STAT rework): force_dodge only means something against ENEMY attacks now; the player never rolls to hit (D6/D20).
+        // D80: the next damaging enemy action against the PLAYER is fully dodged (Combat_TryDodge); no effect on an enemy.
         icon_sprite: tall_grass_asset,
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         force_dodge: true,
@@ -197,7 +197,7 @@ function StatusDB_Init() {
         id: STATUS_CRIT_UP,
         name: "Take Aim",
         icon_sprite: skull_2_asset,
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         crit_bonus: 25
@@ -206,10 +206,10 @@ function StatusDB_Init() {
     global.status_db[? STATUS_HIT_UP] = {
         id: STATUS_HIT_UP,
         name: "Foresight",
-        // TODO(D24, STAT rework): "cannot miss" has no effect on the player's own attacks (they never miss, D6/D20). Redesign or retire.
+        // always_hit does nothing now that nobody rolls to hit (D80); the Foresight rework is D79 / packet B2.
         icon_sprite: Status_ResolveIcon("foresight_effect_Sheet", Status_ResolveIcon("take_aim_effect", skull_2_asset)),
         icon_subimg: 0,
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         always_hit: true,
@@ -220,7 +220,7 @@ function StatusDB_Init() {
         id: STATUS_MEDITATION,
         name: "Meditation",
         icon_sprite: mp_potion,
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:2, mp_max:4 },
         stackable: false
     };
@@ -228,20 +228,20 @@ function StatusDB_Init() {
     global.status_db[? STATUS_SOLIDIFY] = {
         id: STATUS_SOLIDIFY,
         name: "Solidify",
-        // TODO(D24, STAT rework): forcing a dodge on the player's attacks no longer works; they never roll to hit (D6/D20). Redesign or retire.
+        // D80: the Slime takes 75% less from the next hit (a guard_mult, consumed by that hit).
         icon_sprite: Status_ResolveIcon("stun_status", rock1),
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
-        force_dodge: true,
-        consume_on_defend: true
+        guard_mult: 0.25,
+        consume_on_hit: true
     };
 
     global.status_db[? STATUS_BLOODTHIRSTY] = {
         id: STATUS_BLOODTHIRSTY,
         name: "Bloodthirsty",
         icon_sprite: Status_ResolveIcon("bleed_status", torch_asset_moving),
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         guard_mult: 0.65,
@@ -253,7 +253,7 @@ function StatusDB_Init() {
         id: STATUS_BLESSING,
         name: "Blessing",
         icon_sprite: Status_ResolveIcon("burn_status", mp_potion),
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         guard_mult: 0.8,
@@ -264,7 +264,7 @@ function StatusDB_Init() {
         id: STATUS_SUNDER,
         name: "Sundered",
         icon_sprite: noone,
-        stat_mods: { str:0, agi:0, def:-1, intt:0, luck:0 },
+        stat_mods: { atk:0, def:-1, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false
     };
@@ -284,7 +284,7 @@ function StatusDB_Get(_status_id) {
     if (ds_map_exists(global.status_db, _status_id)) {
         return Status_LocalizeRuntime(global.status_db[? _status_id], _status_id);
     }
-    return { id: -1, name: Loc_T("status.name.unknown", "Unknown"), icon_sprite: noone, stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 }, tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 }, stackable: false };
+    return { id: -1, name: Loc_T("status.name.unknown", "Unknown"), icon_sprite: noone, stat_mods: { atk:0, def:0, spd:0, mag:0 }, tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 }, stackable: false };
 }
 
 function Status_LocalizationKey(_status_id) {
@@ -416,11 +416,10 @@ function Status_ModStat(_ch, _stat_id) {
         var cfg = StatusDB_Get(s.id);
         var mods = cfg.stat_mods;
         switch (_stat_id) {
-            case STAT_STR:  total += mods.str; break;
-            case STAT_AGI:  total += mods.agi; break;
-            case STAT_DEF:  total += mods.def; break;
-            case STAT_INT:  total += mods.intt; break;
-            case STAT_LUCK: total += mods.luck; break;
+            case STAT_ATK: total += mods.atk; break;
+            case STAT_DEF: total += mods.def; break;
+            case STAT_SPD: total += mods.spd; break;
+            case STAT_MAG: total += mods.mag; break;
         }
     }
 

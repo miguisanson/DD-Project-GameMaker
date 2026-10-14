@@ -10,7 +10,7 @@
 param(
     [ValidateSet('fast', 'full', 'compile')][string]$Mode = 'fast',
     [switch]$NegativeControl,
-    [ValidateSet('', 'runtests', 'smoke', 'bot', 'shots', 'gridshots')][string]$Only = '',   # run just this game mode (with fast/full)
+    [ValidateSet('', 'runtests', 'smoke', 'bot', 'shots', 'gridshots', 'exportdata')][string]$Only = '',   # run just this game mode (with fast/full)
     [string]$ProjectDir = '',                  # default: repo root of this script
     [string]$WorkRoot = 'E:\Temp\dd-gate'      # test hook: point at C:\ to see the drive guard refuse
 )
@@ -23,6 +23,7 @@ $GameModes = @(
     @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 100;  Impl = $true;  Strict = $false }
     @{ Name = 'bot';      Flag = '-bot';      Timeout = 300; Impl = $true;  Strict = $false }
     @{ Name = 'shots';    Flag = '-shots';    Timeout = 300; Impl = $true;  Strict = $false; Shots = 67 }   # Shots = number of [SHOT] lines required.
+    @{ Name = 'exportdata'; Flag = '-exportdata'; Timeout = 60; Impl = $true;  Strict = $false; Export = $true; Explicit = $true }   # B1: the game's classes/enemies/skills/items/statuses/level table as JSON -> <WorkRoot>\export\export_data.json. Run with -Only exportdata.
     @{ Name = 'gridshots'; Flag = '-gridshots'; Timeout = 120; Impl = $true;  Strict = $false; Shots = 11; ShotDir = 'gridshots'; Explicit = $true }   # D65: 16 px grid over every floor room -> <WorkRoot>\gridshots. Not part of -Mode full: run with -Only gridshots.
 )
 $BuildTimeout = 300
@@ -278,7 +279,7 @@ function Test-Shots([string[]]$lines, [int]$expect, [string]$dirKey = 'shots') {
 $WorkRoot = [IO.Path]::GetFullPath($WorkRoot).TrimEnd('\')
 if ($WorkRoot.Length -le 3) { Refuse "work root '$WorkRoot' is a drive root" }
 $D = @{}
-foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots', 'gridshots') {
+foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots', 'gridshots', 'export') {
     $D[$n] = Join-Path $WorkRoot $n
     foreach ($r in (Get-DriveRoots $D[$n])) {
         if ($r -ieq 'C:\' -or $r -ieq "$env:SystemDrive\") { Refuse "$n dir '$($D[$n])' is on drive C: (everything must live on E:)" }
@@ -337,7 +338,8 @@ if (Test-Path $lintPy) {
 # ---- fresh work dirs; copy working tree (tracked + untracked-not-ignored) -----------------------
 $sw = [Diagnostics.Stopwatch]::StartNew()
 foreach ($n in 'src', 'out', 'save', 'logs', 'shots', 'gridshots') { if (Test-Path $D[$n]) { Remove-Item $D[$n] -Recurse -Force } }
-foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots', 'gridshots') { $null = New-Item -ItemType Directory -Force -Path $D[$n] }
+# 'export' is created but never emptied: the last data export stays available for the simulator between runs
+foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots', 'gridshots', 'export') { $null = New-Item -ItemType Directory -Force -Path $D[$n] }
 
 $psi = New-Object Diagnostics.ProcessStartInfo 'git'
 $psi.Arguments = 'ls-files -co --exclude-standard -z'
@@ -429,6 +431,20 @@ foreach ($m in $runs) {
     if ($bid.Count -eq 0) { $why += 'missing [TEST-BUILD]' }
     elseif ($bid[0] -ne $BuildId) { $why += "build id in game '$($bid[0])' differs from stamped '$BuildId'" }
     if ($r.FocusMs -ge 0) { $why += "game window took the foreground after $($r.FocusMs) ms (I-053)" }
+    if ($m.Export) {   # B1: copy the data export out of the save dir and check that it parses and every id list is unique
+        $ef = Get-ChildItem $D.save -Recurse -Filter 'export_data.json' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $ef) { $why += 'missing export_data.json in save area' }
+        else {
+            Copy-Item $ef.FullName $D.export -Force
+            try {
+                $j = Get-Content -Raw -LiteralPath $ef.FullName | ConvertFrom-Json
+                foreach ($sec in 'classes', 'enemies', 'skills', 'items', 'statuses') {
+                    $ids = @($j.$sec | ForEach-Object { $_.id })
+                    if ($ids.Count -eq 0 -or @($ids | Select-Object -Unique).Count -ne $ids.Count) { $why += "export_data.json: $sec ids empty or not unique" }
+                }
+            } catch { $why += "export_data.json does not parse: $($_.Exception.Message)" }
+        }
+    }
     if ($m.Shots) { $why += @(Test-Shots $lines $m.Shots $(if ($m.ShotDir) { $m.ShotDir } else { 'shots' })) }
     $bad | Select-Object -First 20 | ForEach-Object { Write-Host "  $($_.Trim())" }
     if ($why.Count -gt 0) { Fail "$($m.Name): $($why -join '; ')" }

@@ -1,5 +1,5 @@
 function Menu_StatsCopy(_s) {
-    return { str: _s.str, agi: _s.agi, def: _s.def, intt: _s.intt, luck: _s.luck };
+    return { atk: _s.atk, def: _s.def, spd: _s.spd, mag: _s.mag };
 }
 
 function Menu_Ensure() {
@@ -192,14 +192,8 @@ function Menu_IsEquipped(_ch, _item_id) {
 }
 
 function Tooltip_StatShortName(_stat_id) {
-    switch (_stat_id) {
-        case STAT_STR:  return "STR";
-        case STAT_AGI:  return "AGI";
-        case STAT_DEF:  return "DEF";
-        case STAT_INT:  return "INT";
-        case STAT_LUCK: return "LUCK";
-    }
-    return "N/A";
+    var short_name = Stat_ShortName(_stat_id);
+    return (short_name != "") ? short_name : "N/A";
 }
 
 function Tooltip_TargetName(_target_id) {
@@ -489,20 +483,17 @@ function Tooltip_BuildStatLines(_stat_key, _stat_label, _cur) {
     array_push(lines, _stat_label + " (" + string(_cur) + ")");
 
     switch (_stat_key) {
-        case "str":
-            array_push(lines, Loc_T("menu.tooltip.stat.str.desc", "Increases physical damage with strength weapons (swords)."));
-        break;
-        case "agi":
-            array_push(lines, Loc_T("menu.tooltip.stat.agi.desc", "Improves turn order, dodge, and bow damage."));
+        case "atk":
+            array_push(lines, Loc_T("menu.tooltip.stat.atk.desc", "Increases physical damage (basic attacks and ATK skills)."));
         break;
         case "def":
-            array_push(lines, Loc_T("menu.tooltip.stat.def.desc", "Reduces incoming damage and adds a little max HP."));
+            array_push(lines, Loc_T("menu.tooltip.stat.def_all.desc", "Reduces all damage you take."));
         break;
-        case "intt":
-            array_push(lines, Loc_T("menu.tooltip.stat.intt.desc", "Increases skill/staff damage and max MP."));
+        case "spd":
+            array_push(lines, Loc_T("menu.tooltip.stat.spd.desc", "Decides who acts first."));
         break;
-        case "luck":
-            array_push(lines, Loc_T("menu.tooltip.stat.luck.desc", "Improves critical hit chance and random checks."));
+        case "mag":
+            array_push(lines, Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage and max MP."));
         break;
         default:
             array_push(lines, Loc_T("menu.tooltip.stat.default.desc", "Affects combat performance."));
@@ -515,11 +506,10 @@ function Tooltip_ItemBonusText(_item) {
     if (!is_struct(_item) || !variable_struct_exists(_item, "bonus") || !is_struct(_item.bonus)) return "";
     var b = _item.bonus;
     var parts = [];
-    if (variable_struct_exists(b, "str") && b.str != 0) array_push(parts, "STR " + ((b.str > 0) ? "+" : "") + string(b.str));
-    if (variable_struct_exists(b, "agi") && b.agi != 0) array_push(parts, "AGI " + ((b.agi > 0) ? "+" : "") + string(b.agi));
+    if (variable_struct_exists(b, "atk") && b.atk != 0) array_push(parts, "ATK " + ((b.atk > 0) ? "+" : "") + string(b.atk));
     if (variable_struct_exists(b, "def") && b.def != 0) array_push(parts, "DEF " + ((b.def > 0) ? "+" : "") + string(b.def));
-    if (variable_struct_exists(b, "intt") && b.intt != 0) array_push(parts, "INT " + ((b.intt > 0) ? "+" : "") + string(b.intt));
-    if (variable_struct_exists(b, "luck") && b.luck != 0) array_push(parts, "LUCK " + ((b.luck > 0) ? "+" : "") + string(b.luck));
+    if (variable_struct_exists(b, "spd") && b.spd != 0) array_push(parts, "SPD " + ((b.spd > 0) ? "+" : "") + string(b.spd));
+    if (variable_struct_exists(b, "mag") && b.mag != 0) array_push(parts, "MAG " + ((b.mag > 0) ? "+" : "") + string(b.mag));
     if (array_length(parts) <= 0) return "";
     var txt = parts[0];
     for (var i = 1; i < array_length(parts); i++) txt += ", " + parts[i];
@@ -1486,13 +1476,12 @@ function Menu_Draw() {
         if (!is_struct(m.pending_stats)) Menu_StatsSync();
 
         var stat_names = [
-            Loc_T("status.name.stat.str", "STR"),
-            Loc_T("status.name.stat.agi", "AGI"),
+            Loc_T("status.name.stat.atk", "ATK"),
             Loc_T("status.name.stat.def", "DEF"),
-            Loc_T("status.name.stat.int", "INT"),
-            Loc_T("status.name.stat.luck", "LUCK")
+            Loc_T("status.name.stat.spd", "SPD"),
+            Loc_T("status.name.stat.mag", "MAG")
         ];
-        var stat_keys = ["str","agi","def","intt","luck"];
+        var stat_keys = ["atk","def","spd","mag"];
         var stat_count = array_length(stat_keys);
 
         var left_x = bx + pad;

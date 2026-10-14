@@ -41,17 +41,9 @@ player_fx_x = cx - 48;
 player_fx_y = cy + 24;
 
 // --------------------
-// INITIATIVE (REROLL TIES)
+// INITIATIVE (D80 no dice: the higher SPD acts first, a tie goes to the player; the turn timeline of D74 replaces this)
 // --------------------
-var playeri;
-var enemyi;
-
-do {
-    playeri = Combat_Initiative(p);
-    enemyi  = Combat_Initiative(e);
-} until (playeri != enemyi);
-
-if (playeri > enemyi) {
+if (Combat_PlayerActsFirst(Combat_Initiative(p), Combat_Initiative(e))) {
     turn = TURN_PLAYER;
 } else {
     turn = TURN_ENEMY;
@@ -143,9 +135,10 @@ last_crit = false;
 // CACHE WEAPONS
 // --------------------
 player_weapon = ItemDB_Get(p.equip.weapon);
-if (player_weapon.id == 0) player_weapon = { power:1, stat_type:STAT_STR, acc:0, preferred_class:-1 };
+if (player_weapon.id == 0) player_weapon = { power:COMBAT_UNARMED_POWER, stat_type:STAT_ATK, acc:0, preferred_class:-1 };
 
-enemy_weapon = { power:2, stat_type:STAT_STR, acc:0, preferred_class:-1 };
+// Enemy basic attacks use the formula power straight from the enemy data (spec section 4); a weapon item would go through the player's rule.
+enemy_weapon = { power:e.basic_power, stat_type:STAT_ATK, acc:0, preferred_class:-1 };
 if (e.weapon_id != 0) {
-    enemy_weapon = ItemDB_Get(e.weapon_id);
+    enemy_weapon = Combat_BasicSource(ItemDB_Get(e.weapon_id));
 }
