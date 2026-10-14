@@ -602,8 +602,19 @@ function Merchant_SpotFor(_room) {
     return undefined;
 }
 
+// The merchant's sprite (D113, candidate A: art/merchant/spr_merchant_idle, two idle frames, imported by the owner). Looked up by name (D94).
+function Merchant_SpriteName() {
+    return "spr_merchant_idle";
+}
+
+// The pulse of the gold glow round the merchant (D113): alpha 0.35..1.0, a cosine with a 1.2 s period, brightest at 0 ms. Pure: ms in, alpha out.
+function Merchant_GlowAlpha(_ms) {
+    var _phase = (_ms mod 1200) / 1200;
+    return 0.675 + 0.325 * cos(_phase * 2 * pi);
+}
+
 // Puts the merchant of this room (if it has one) in place with an obj_npc (no new resource): called once per room start in a run.
-// The sprite is looked up by name (D94: "merchant_down" once the owner imports it) and falls back to the Nobody sprite tinted gold.
+// Until the owner imports spr_merchant_idle it falls back to the Nobody sprite, untinted (D113: no gold tint; the glow carries the highlight).
 function Merchant_EnsureInRoom() {
     var spot = Merchant_SpotFor(room);
     if (is_undefined(spot) || !Run_IsActive()) return noone;
@@ -616,16 +627,38 @@ function Merchant_EnsureInRoom() {
     inst.merchant = true;
     inst.shop_index = spot.shop;
     inst.interact_name = Loc_T("merchant.name", "Merchant");
-    var spr = asset_get_index("merchant_down");
-    if (spr == -1) {
-        spr = nobody_down;
-        inst.image_blend = make_color_rgb(240, 200, 90);
-    }
+    var spr = asset_get_index(Merchant_SpriteName());
+    if (spr == -1) spr = nobody_down;
     inst.sprite_index = spr;
-    inst.image_speed = 0;
+    inst.image_speed = 0;   // the frame is chosen in Merchant_DrawWorldFx (2 frames a second), whatever playback speed the sprite was imported with
     inst.image_index = 0;
     inst.persist_id = "merchant_" + string(spot.shop);
     return inst;
+}
+
+// The gold glow round the merchant on the map (World_DrawFx, scr_enemy): the sprite's silhouette in #E8C547 one pixel out in 8 directions,
+// pulsing with Merchant_GlowAlpha, then the sprite itself on top. obj_npc has no Draw event, so this also steps the 2-frame idle (2 fps).
+function Merchant_DrawWorldFx() {
+    if (!Fx_IsWorldPass()) return;
+    if (!instance_exists(obj_npc)) return;
+    var _gold = make_color_rgb(232, 197, 71);
+    var _idle = asset_get_index(Merchant_SpriteName());
+    var _alpha = Merchant_GlowAlpha(current_time);
+    var _oa = draw_get_alpha();
+    with (obj_npc) {
+        if (!variable_instance_exists(id, "merchant") || !merchant) continue;
+        if (sprite_index == _idle && _idle != -1) image_index = (current_time div 500) mod max(1, sprite_get_number(_idle));
+        gpu_set_fog(true, _gold, 0, 1);
+        for (var _dy = -1; _dy <= 1; _dy++) {
+            for (var _dx = -1; _dx <= 1; _dx++) {
+                if (_dx == 0 && _dy == 0) continue;
+                draw_sprite_ext(sprite_index, image_index, x + _dx, y + _dy, 1, 1, 0, c_white, _alpha);
+            }
+        }
+        gpu_set_fog(false, c_white, 0, 1);
+        draw_sprite_ext(sprite_index, image_index, x, y, 1, 1, 0, c_white, 1);
+    }
+    draw_set_alpha(_oa);
 }
 
 // ---- elites (D86) ----

@@ -4472,6 +4472,8 @@ function Test_Suite_BattleUi() {
     var _sk2 = [[SKILL_WOUND, 0], [SKILL_HILT_BASH, 1], [SKILL_MUSCLE_UP, 2], [SKILL_REV_UP, 3], [SKILL_HORIZ_SLASH, 4], [SKILL_POWER_STRIKE, 5], [SKILL_POISON_ARROW, 6], [SKILL_EVASION, 7],
                 [SKILL_DOUBLE_SHOT, 8], [SKILL_TAKE_AIM, 9], [SKILL_FIREBALL, 10], [SKILL_POISON_MIST, 11], [SKILL_ICE_SPEAR, 12], [SKILL_MEDITATION, 13], [SKILL_FORESIGHT, 14]];
     for (var _k2 = 0; _k2 < array_length(_sk2); _k2++) Test_Eq("BattleUi skill " + string(_sk2[_k2][0]) + " icon frame", Icon_SkillFrame(_sk2[_k2][0]), _sk2[_k2][1]);
+    Test_Eq("BattleUi throwable poison_pot icon frame (D114 redo)", Icon_Frame("throwable", "poison_pot"), 1);
+    Test_Eq("BattleUi status bloodthirsty and solidify frames (D114 redo)", Icon_Frame("status", "bloodthirsty") * 100 + Icon_Frame("status", "solidify"), 1312);
     var _rows_ok = true;
     for (var _f = 0; _f < 17; _f++) {
         var _r = Icon_Rows("status", _f);
@@ -5307,6 +5309,16 @@ function Test_Suite_Economy() {
     Test_True("C3 merchant: after floors 2, 5 and 8, shop 0, 1, 2", is_struct(_sp2) && is_struct(_sp5) && is_struct(_sp8) && _sp2.shop == 0 && _sp5.shop == 1 && _sp8.shop == 2);
     Test_True("C3 merchant: other rooms have none", is_undefined(Merchant_SpotFor(rm_floor3)) && is_undefined(Merchant_SpotFor(rm_floor1)) && is_undefined(Merchant_SpotFor(rm_floor6_5)));
     Test_True("C3 merchant: spots sit on the 16 px grid", _sp2.x mod 16 == 0 && _sp2.y mod 16 == 0 && _sp5.x mod 16 == 0 && _sp8.y mod 16 == 0);
+
+    // ---- the merchant's pulsing gold glow (D113): alpha 0.35..1.0, a 1.2 s cosine pulse starting at its brightest ----
+    Test_True("D113 glow: at 0 ms it is at full strength", abs(Merchant_GlowAlpha(0) - 1.0) < 0.0001);
+    Test_True("D113 glow: half a period later (600 ms) it is at its dimmest, 0.35", abs(Merchant_GlowAlpha(600) - 0.35) < 0.0001);
+    Test_True("D113 glow: a quarter period (300 ms) is the middle, 0.675", abs(Merchant_GlowAlpha(300) - 0.675) < 0.0001);
+    Test_True("D113 glow: it repeats every 1200 ms", abs(Merchant_GlowAlpha(300) - Merchant_GlowAlpha(300 + 1200 * 7)) < 0.0001);
+    var _glow_ok = true;
+    for (var _gm = 0; _gm < 3600; _gm += 37) { var _ga2 = Merchant_GlowAlpha(_gm); if (_ga2 < 0.35 - 0.0001 || _ga2 > 1.0 + 0.0001) _glow_ok = false; }
+    Test_True("D113 glow: every alpha stays inside 0.35 to 1.0", _glow_ok);
+    Test_Eq("D113 glow: the merchant sprite is looked up as spr_merchant_idle", Merchant_SpriteName(), "spr_merchant_idle");
 
     var _kz = Test_Hero(CLASS_KNIGHT);
     var _ssa = Shop_StockGenerate(4321, 0, _kz);

@@ -852,6 +852,7 @@ function World_DrawFx() {
     Nav_DrawWorldFx();
     Player_DrawWorldFx();
     Elite_DrawWorldFx();   // C3 (D86): the pulsing outline round elites
+    Merchant_DrawWorldFx();   // D113: the pulsing gold glow round the merchant
 }
 
 // Called by World_DrawFx (a layer script, see World_RegisterFx): the "!" over an enemy that just spotted the
