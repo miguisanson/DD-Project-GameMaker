@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PAUSED by owner again 2026-10-15 (session 2, owner playing a game: run NO builds/tests until the owner says OK). READ .planning/RESUME.md FIRST. d1a: gate green except one flaky smoke check, root-cause evidence in RESUME (input double press). bal-apply: WIP d47014e, agent stopped before gates, unreviewed. art-final: not started. New item 4: monster sound variation (D116, CC0 downloads approved). |
+| WIP | RESUMED 2026-10-15 session 3 (owner OK to run). d1a: agent fixing input double-press flake (wt d1a). bal-apply: reviewed vs D111 = exact match; gates running (E:/Temp/dd-gate-bal). Then art-final, monster sound variation (RESUME item 4), D1b, D3, F1, E2. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
