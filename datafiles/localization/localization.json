@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T09:19:34Z",
-    "row_count": 663
+    "generated_at_utc": "2026-10-14T09:46:02Z",
+    "row_count": 685
   },
   "default_lang": "en",
   "languages": [
@@ -235,6 +235,14 @@
     "class.select.title": {
       "en": "Select Class",
       "ko": "수업 선택"
+    },
+    "combat.foresee.attack": {
+      "en": "a plain attack",
+      "ko": "일반 공격"
+    },
+    "combat.foresee.stunned": {
+      "en": "nothing, it is stunned",
+      "ko": "기절해서 아무것도 못 합니다"
     },
     "combat.msg.applied_prefix": {
       "en": "Applied ",
@@ -476,6 +484,10 @@
       "en": "God, I just need to get out of here.",
       "ko": "맙소사, 난 여기서 나가야만 해요."
     },
+    "combat.msg.foresee": {
+      "en": "You foresee: {action}",
+      "ko": "예견: {action}"
+    },
     "combat.msg.level_up": {
       "en": "Level up x{levels}!",
       "ko": "레벨 업 x{levels}!"
@@ -495,6 +507,10 @@
     "combat.msg.max_level": {
       "en": "Max level reached.",
       "ko": "최대 레벨에 도달했습니다."
+    },
+    "combat.msg.multi_status_none": {
+      "en": "Nothing took hold.",
+      "ko": "아무 효과도 없었습니다."
     },
     "combat.msg.not_enough_mp": {
       "en": "Not enough MP.",
@@ -563,6 +579,10 @@
     "combat.msg.status_tick": {
       "en": "{status} hurts you for {dmg}.",
       "ko": "{status} 때문에 {dmg}의 피해를 입었습니다."
+    },
+    "combat.msg.status_tick_enemy": {
+      "en": "{status} hurts {enemy} for {dmg}.",
+      "ko": "{status} 때문에 {enemy}가 {dmg}의 피해를 입었습니다."
     },
     "combat.msg.stole_an_item": {
       "en": "Stole an item.",
@@ -2571,6 +2591,74 @@
     "skill.name.unknown": {
       "en": "Unknown",
       "ko": "알려지지 않은"
+    },
+    "status.desc.bleed": {
+      "en": "Lose {tick} HP per stack each time you act. Stacks up to {max}, lasts {dur} turns.{mods}",
+      "ko": "행동할 때마다 중첩당 {tick} HP를 잃습니다. 최대 {max}중첩, {dur}턴 지속.{mods}"
+    },
+    "status.desc.bleed.data": {
+      "en": "Lose {tick} HP each time you act ({stacks} stacks, max {max}), for {turns} more turns.{mods}",
+      "ko": "행동할 때마다 {tick} HP를 잃습니다 ({stacks}중첩, 최대 {max}). {turns}턴 더 지속.{mods}"
+    },
+    "status.desc.burn": {
+      "en": "Lose a fixed amount of HP (it grows with the caster's MAG) each turn for {dur} turns. Does not stack.{mods}",
+      "ko": "매 턴 정해진 HP(시전자의 MAG에 비례)를 {dur}턴 동안 잃습니다. 중첩되지 않습니다.{mods}"
+    },
+    "status.desc.burn.data": {
+      "en": "Lose {tick} HP each turn for {turns} more turns.{mods}",
+      "ko": "매 턴 {tick} HP를 잃습니다. {turns}턴 더 지속.{mods}"
+    },
+    "status.desc.poison": {
+      "en": "Lose HP equal to its stacks each turn, then 1 stack fades. Stacks up to {max}.{mods}",
+      "ko": "매 턴 중첩 수만큼 HP를 잃고, 중첩이 1 줄어듭니다. 최대 {max}중첩.{mods}"
+    },
+    "status.desc.poison.data": {
+      "en": "Lose {tick} HP each turn, then 1 stack fades ({stacks} stacks, max {max}).{mods}",
+      "ko": "매 턴 {tick} HP를 잃고, 중첩이 1 줄어듭니다 ({stacks}중첩, 최대 {max}).{mods}"
+    },
+    "status.desc.status_blessing": {
+      "en": "Next incoming hit deals {pct}% less damage.",
+      "ko": "다음에 받는 공격의 피해가 {pct}% 줄어듭니다."
+    },
+    "status.desc.status_bloodthirsty": {
+      "en": "Until hit: take {take}% less, deal {deal}% more damage.",
+      "ko": "맞을 때까지: 받는 피해 {take}% 감소, 주는 피해 {deal}% 증가."
+    },
+    "status.desc.status_crit_up": {
+      "en": "Critical chance +{pct}%.",
+      "ko": "치명타 확률 +{pct}%."
+    },
+    "status.desc.status_dmg_up": {
+      "en": "Next attack deals {mult} times the damage.",
+      "ko": "다음 공격이 {mult}배의 피해를 줍니다."
+    },
+    "status.desc.status_evasion": {
+      "en": "Dodges the next incoming attack.",
+      "ko": "다음에 받는 공격을 피합니다."
+    },
+    "status.desc.status_guard": {
+      "en": "Blocks the next incoming hit.",
+      "ko": "다음에 받는 공격을 막습니다."
+    },
+    "status.desc.status_hit_up": {
+      "en": "For {turns} turns: you see the enemy's next move and every Perfect zone is {pct}% wider.",
+      "ko": "{turns}턴 동안 적의 다음 행동이 보이고 모든 퍼펙트 구간이 {pct}% 넓어집니다."
+    },
+    "status.desc.status_meditation": {
+      "en": "Recover {lo}-{hi} MP each turn.",
+      "ko": "매 턴 MP를 {lo}-{hi} 회복합니다."
+    },
+    "status.desc.status_solidify": {
+      "en": "Takes {pct}% less damage from the next hit.",
+      "ko": "다음 공격에서 받는 피해가 {pct}% 줄어듭니다."
+    },
+    "status.desc.status_stun": {
+      "en": "Cannot act.",
+      "ko": "행동할 수 없습니다."
+    },
+    "status.desc.status_sunder": {
+      "en": "Lose defence.{mods}",
+      "ko": "방어력이 떨어집니다.{mods}"
     },
     "status.name.default": {
       "en": "Status",

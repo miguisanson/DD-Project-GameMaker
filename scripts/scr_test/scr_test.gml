@@ -68,6 +68,7 @@ function Test_RunAll() {
     Test_RunSuite("QteArrows", Test_Suite_QteArrows);
     Test_RunSuite("QteDefence", Test_Suite_QteDefence);
     Test_RunSuite("Status", Test_Suite_Status);
+    Test_RunSuite("StatusRules", Test_Suite_StatusRules);
     Test_RunSuite("Inventory", Test_Suite_Inventory);
     Test_RunSuite("Data", Test_Suite_Data);
     Test_RunSuite("Export", Test_Suite_Export);
@@ -401,13 +402,14 @@ function Test_Suite_Combat() {
     Test_Eq("Combat_Damage uses the weapon stat: mage MAG12 power6 vs slime == 4", Combat_Damage(_m, _slime, Test_Wpn(6, STAT_MAG, 0)), 4);
     Test_Eq("Combat_Damage uses the weapon stat: mage ATK5 power6 vs slime == 3", Combat_Damage(_m, _slime, Test_Wpn(6, STAT_ATK, 0)), 3);
     Test_Eq("Combat_Damage a stronger ATK hits harder: boss ATK21 power9 vs knight DEF12 == 6", Combat_Damage(_boss, _k, Test_Wpn(9, STAT_ATK, 0)), 6);
-    // Statuses change the effective stat: Poison MAG-1 (power20: MAG12 -> 13, MAG11 -> 12); Burning ATK-1.
+    // Statuses change the effective stat: Poison MAG-1 (power20: MAG12 -> 13, MAG11 -> 12); Burning DEF x0.75 (packet B2, spec section 10).
     Test_Eq("Combat_Damage mage MAG12 power20 vs slime == 13", Combat_Damage(_m, _slime, Test_Wpn(20, STAT_MAG, 0)), 13);
     _m = Status_Add(_m, STATUS_POISON, 3, 0);
     Test_Eq("Combat_EffectiveStat mage poisoned MAG == 11", Combat_EffectiveStat(_m, STAT_MAG), 11);
     Test_Eq("Combat_Damage mage poisoned (MAG11) power20 vs slime == 12", Combat_Damage(_m, _slime, Test_Wpn(20, STAT_MAG, 0)), 12);
     var _burnt = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_BURN, 2, 0);
-    Test_Eq("Combat_EffectiveStat knight burning ATK == 10", Combat_EffectiveStat(_burnt, STAT_ATK), 10);
+    Test_Eq("Combat_EffectiveStat knight burning ATK is untouched == 11", Combat_EffectiveStat(_burnt, STAT_ATK), 11);
+    Test_Eq("Combat_EffectiveStat knight burning DEF == 9 (12 x 0.75)", Combat_EffectiveStat(_burnt, STAT_DEF), 9);
     Test_Eq("Combat_EffectiveStat knight DEF == 12", Combat_EffectiveStat(_k, STAT_DEF), 12);
     // BUG-21: self-buff animations play on the player, damaging skills on the enemy.
     var _buffs = [SKILL_MUSCLE_UP, SKILL_REV_UP, SKILL_EVASION, SKILL_TAKE_AIM, SKILL_MEDITATION, SKILL_FORESIGHT];
@@ -892,58 +894,104 @@ function Test_Suite_QteDefence() {
     }
     Test_True("QteDefence no grade ever makes a status longer, and only Perfect removes it (turns 0 to 12)", _never_longer);
 
-    // the same rule on a real character: Poison applied for 4 turns by the hit
+    // the same rule on a real character: Poison with 4 stacks added by the hit (a Poison has stacks, not turns: spec section 10)
     var _specs = [STATUS_POISON];
     for (var _g2 = 0; _g2 < 4; _g2++) {
         var _p = CharacterCreate_Player(CLASS_KNIGHT);
         var _before = Battle_StatusSnapshot(_p);
-        _p = Status_Add(_p, STATUS_POISON, 4, 1);
+        _p = Status_Add(_p, STATUS_POISON, 0, 1, 4);
         var _pack = Battle_DefenceAdjustStatuses(_p, _specs, _before, _keys[_g2]);
-        var _after = Battle_StatusCurrentTurns(_pack.player, STATUS_POISON);
+        var _after = Status_Stacks(_pack.player, STATUS_POISON);
         var _want_t = [0, 2, 3, 4][_g2];
-        Test_Eq("QteDefence " + _keys[_g2] + ": a 4-turn Poison ends at " + string(_want_t), _after, _want_t);
+        Test_Eq("QteDefence " + _keys[_g2] + ": a hit adding 4 Poison stacks leaves " + string(_want_t), _after, _want_t);
         if (_g2 == 0) Test_False("QteDefence Perfect: the character is not poisoned at all", Status_Has(_pack.player, STATUS_POISON));
         if (_g2 == 0) Test_True("QteDefence Perfect: the message names what was resisted", string_pos(StatusDB_Get(STATUS_POISON).name, _pack.resist_msg) > 0);
     }
-    // a status the player already had keeps its old turns: Perfect puts it back, nothing makes it longer than the hit left it
-    var _p2 = CharacterCreate_Player(CLASS_KNIGHT);
-    _p2 = Status_Add(_p2, STATUS_POISON, 3, 1);
+    // a Poison the player already had keeps its stacks: Perfect puts it back, a lesser grade only cuts what the hit added (D21: never more than the hit gave)
+    var _p2 = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_POISON, 0, 1, 3);
     var _before2 = Battle_StatusSnapshot(_p2);
-    _p2 = Status_Add(_p2, STATUS_POISON, 5, 1);   // the hit refreshed it to 5
+    _p2 = Status_Add(_p2, STATUS_POISON, 0, 1, 3);   // the hit added 3 more: 6
     var _pack2 = Battle_DefenceAdjustStatuses(_p2, _specs, _before2, "PERFECT");
-    Test_Eq("QteDefence Perfect puts a refreshed Poison back to the 3 turns it had", Battle_StatusCurrentTurns(_pack2.player, STATUS_POISON), 3);
-    var _p3 = CharacterCreate_Player(CLASS_KNIGHT);
-    _p3 = Status_Add(_p3, STATUS_POISON, 3, 1);
+    Test_Eq("QteDefence Perfect puts a poison hit back to the 3 stacks it had", Status_Stacks(_pack2.player, STATUS_POISON), 3);
+    var _p3 = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_POISON, 0, 1, 3);
     var _before3 = Battle_StatusSnapshot(_p3);
-    _p3 = Status_Add(_p3, STATUS_POISON, 5, 1);
+    _p3 = Status_Add(_p3, STATUS_POISON, 0, 1, 3);
     var _pack3 = Battle_DefenceAdjustStatuses(_p3, _specs, _before3, "WEAK");
-    Test_Eq("QteDefence Weak leaves a refreshed Poison at the 5 the hit gave it", Battle_StatusCurrentTurns(_pack3.player, STATUS_POISON), 5);
+    Test_Eq("QteDefence Weak leaves the 6 stacks the hit made", Status_Stacks(_pack3.player, STATUS_POISON), 6);
+    var _p3b = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_POISON, 0, 1, 3);
+    var _before3b = Battle_StatusSnapshot(_p3b);
+    _p3b = Status_Add(_p3b, STATUS_POISON, 0, 1, 3);
+    var _pack3b = Battle_DefenceAdjustStatuses(_p3b, _specs, _before3b, "GOOD");
+    Test_Eq("QteDefence Good halves what the hit added (3 -> 2): 3 + 2 = 5 stacks", Status_Stacks(_pack3b.player, STATUS_POISON), 5);
+    Test_Eq("QteDefence the poison turns follow the stacks", Battle_StatusCurrentTurns(_pack3b.player, STATUS_POISON), 5);
     // a status the hit did not touch is not touched here
-    var _p4 = CharacterCreate_Player(CLASS_KNIGHT);
-    _p4 = Status_Add(_p4, STATUS_POISON, 3, 1);
+    var _p4 = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_POISON, 0, 1, 3);
     var _before4 = Battle_StatusSnapshot(_p4);
     var _pack4 = Battle_DefenceAdjustStatuses(_p4, _specs, _before4, "OK");
-    Test_Eq("QteDefence a status the hit did not change is left alone", Battle_StatusCurrentTurns(_pack4.player, STATUS_POISON), 3);
+    Test_Eq("QteDefence a status the hit did not change is left alone", Status_Stacks(_pack4.player, STATUS_POISON), 3);
+    // Bleeding: the hit adds a stack and 3 turns. Perfect resists it, Good/OK cut the turns of a NEW bleed, Weak leaves it; it never gets longer or bigger
+    var _bspec = [STATUS_BLEED];
+    var _bw = [0, 2, 2, 3];   // PERFECT resisted, GOOD floor(3 x 0.5 + 0.5) = 2, OK floor(3 x 0.75 + 0.5) = 2, WEAK 3
+    for (var _g3 = 0; _g3 < 4; _g3++) {
+        var _pb = CharacterCreate_Player(CLASS_KNIGHT);
+        var _bb = Battle_StatusSnapshot(_pb);
+        _pb = Status_Add(_pb, STATUS_BLEED, 3, 1, 1);
+        var _packb = Battle_DefenceAdjustStatuses(_pb, _bspec, _bb, _keys[_g3]);
+        Test_Eq("QteDefence " + _keys[_g3] + ": a new 3-turn Bleeding ends at " + string(_bw[_g3]) + " turns", Battle_StatusCurrentTurns(_packb.player, STATUS_BLEED), _bw[_g3]);
+        if (_g3 == 0) Test_False("QteDefence Perfect: no Bleeding at all", Status_Has(_packb.player, STATUS_BLEED));
+        else Test_Eq("QteDefence " + _keys[_g3] + ": the stack stays", Status_Stacks(_packb.player, STATUS_BLEED), 1);
+    }
+    var _pb2 = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_BLEED, 1, 1, 2);   // 2 stacks, 1 turn left
+    var _bb2 = Battle_StatusSnapshot(_pb2);
+    _pb2 = Status_Add(_pb2, STATUS_BLEED, 3, 1, 1);   // the hit: 3 stacks, 3 turns
+    var _packb2 = Battle_DefenceAdjustStatuses(_pb2, _bspec, _bb2, "PERFECT");
+    Test_True("QteDefence Perfect puts a refreshed Bleeding back to 2 stacks, 1 turn", Status_Stacks(_packb2.player, STATUS_BLEED) == 2 && Battle_StatusCurrentTurns(_packb2.player, STATUS_BLEED) == 1);
+    // Burning: 2 turns and a tick of 4. Good cuts the turns to 1, Perfect resists it and puts an older Burning back (turns and tick)
+    var _pu = CharacterCreate_Player(CLASS_KNIGHT);
+    var _bu = Battle_StatusSnapshot(_pu);
+    _pu = Status_Add(_pu, STATUS_BURN, 2, 4);
+    var _packu = Battle_DefenceAdjustStatuses(_pu, [STATUS_BURN], _bu, "GOOD");
+    Test_Eq("QteDefence Good cuts a new 2-turn Burning to 1", Battle_StatusCurrentTurns(_packu.player, STATUS_BURN), 1);
+    var _pu2 = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_BURN, 1, 3);
+    var _bu2 = Battle_StatusSnapshot(_pu2);
+    _pu2 = Status_Add(_pu2, STATUS_BURN, 2, 6);
+    var _packu2 = Battle_DefenceAdjustStatuses(_pu2, [STATUS_BURN], _bu2, "PERFECT");
+    Test_True("QteDefence Perfect puts the old Burning back (1 turn, tick 3)", Battle_StatusCurrentTurns(_packu2.player, STATUS_BURN) == 1 && Status_Find(_packu2.player, STATUS_BURN).power == 3);
+    // no grade ever makes any DoT longer or bigger than the hit left it
+    var _never_more = true;
+    for (var _g4 = 0; _g4 < 4; _g4++) {
+        var _pm = Status_Add(Status_Add(Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_POISON, 0, 1, 2), STATUS_BLEED, 3, 1, 1), STATUS_BURN, 2, 4);
+        var _bm = Battle_StatusSnapshot(CharacterCreate_Player(CLASS_KNIGHT));
+        var _hit_snapshot = Battle_StatusSnapshot(_pm);
+        var _packm = Battle_DefenceAdjustStatuses(_pm, [STATUS_POISON, STATUS_BLEED, STATUS_BURN], _bm, _keys[_g4]);
+        for (var _k4 = 0; _k4 < array_length(_hit_snapshot); _k4++) {
+            var _e4 = Status_Find(_packm.player, _hit_snapshot[_k4].id);
+            if (is_struct(_e4) && (_e4.turns > _hit_snapshot[_k4].turns || _e4.stacks > _hit_snapshot[_k4].stacks)) _never_more = false;
+        }
+    }
+    Test_True("QteDefence no grade makes Poison, Bleeding or Burning longer or bigger than the hit left it (D21)", _never_more);
 }
 
 // Status rules (balance-data.md section 4 "Status effects"; combat-bugs.md section 1; R-005, R-022).
 function Test_Suite_Status() {
     var _p = Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL); // 10 HP, 10 MP at L1
     Test_Eq("player starts at full HP (10)", _p.hp, _p.max_hp);
-    // R-005: a poisoned PLAYER loses 2-3 HP per tick (the friend saw none).
-    _p = Status_Add(_p, STATUS_POISON, 3, 0);
+    // R-005 / D78: a poisoned PLAYER loses his poison stacks each tick (3, then 2, then 1: 6 HP in all), the friend saw none.
+    _p.max_hp = 30;
+    _p.hp = 30;
+    _p = Status_Add(_p, STATUS_POISON, 0, 0, 3);
     Test_True("Status_Has Poison after Status_Add", Status_Has(_p, STATUS_POISON));
     Test_True("Status_CanAct while poisoned", Status_CanAct(_p));
     var _hp0 = _p.hp;
     _p = Status_Tick(_p);
-    Test_True("R-005 player poison tick costs 2-3 HP", (_hp0 - _p.hp) >= 2 && (_hp0 - _p.hp) <= 3);
-    Test_Eq("poison turns 3 -> 2 after one tick", _p.status[0].turns, 2);
+    Test_Eq("R-005 player poison tick costs the 3 stacks", _hp0 - _p.hp, 3);
+    Test_Eq("poison stacks 3 -> 2 after one tick", _p.status[0].stacks, 2);
     _p = Status_Tick(_p);
     _p = Status_Tick(_p);
-    Test_True("R-005 three ticks cost 6-9 HP in total", (_hp0 - _p.hp) >= 6 && (_hp0 - _p.hp) <= 9);
-    Test_False("poison is removed when its turns reach 0", Status_Has(_p, STATUS_POISON));
+    Test_Eq("R-005 three ticks cost 3 + 2 + 1 = 6 HP in total", _hp0 - _p.hp, 6);
+    Test_False("poison is removed when its stacks reach 0", Status_Has(_p, STATUS_POISON));
     // BUG-08: a poison tick on the player must be seen and heard (log line, sound, HUD flash), not just change the HP number.
-    var _fp = Status_Add(Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL), STATUS_POISON, 3, 0);
+    var _fp = Status_Add(Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL), STATUS_POISON, 0, 0, 3);
     var _fhp = _fp.hp;
     global.status_tick_last = undefined;
     _fp = Status_Tick(_fp);
@@ -961,7 +1009,7 @@ function Test_Suite_Status() {
     // HP and MP clamp to [0, max].
     var _low = Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL);
     _low.hp = 1;
-    _low = Status_Tick(Status_Add(_low, STATUS_BURN, 2, 0));
+    _low = Status_Tick(Status_Add(_low, STATUS_BURN, 2, 4));
     Test_Eq("burn tick clamps HP at 0", _low.hp, 0);
     var _med = Status_Add(CharacterCreate_Player(CLASS_MAGE), STATUS_MEDITATION, 3, 0);
     _med.mp = _med.max_mp - 1;
@@ -970,21 +1018,22 @@ function Test_Suite_Status() {
     _med.mp = 0;
     _med = Status_Tick(_med);
     Test_True("meditation tick restores 2-4 MP", _med.mp >= 2 && _med.mp <= 4);
-    // Non-stackable re-apply refreshes to the longer duration; DoTs exclude each other.
+    // Non-stackable re-apply refreshes to the longer duration (Guard); the three DoTs no longer exclude each other (D78, StatusRules covers them).
     var _r = CharacterCreate_Player(CLASS_KNIGHT);
-    _r = Status_Add(_r, STATUS_POISON, 2, 0);
-    _r = Status_Add(_r, STATUS_POISON, 4, 0);
-    _r = Status_Add(_r, STATUS_POISON, 1, 0);
+    _r = Status_Add(_r, STATUS_GUARD, 2, 0);
+    _r = Status_Add(_r, STATUS_GUARD, 4, 0);
+    _r = Status_Add(_r, STATUS_GUARD, 1, 0);
     Test_Eq("non-stackable status keeps one entry", array_length(_r.status), 1);
     Test_Eq("non-stackable refresh keeps the longest duration (4)", _r.status[0].turns, 4);
-    _r = Status_Add(_r, STATUS_BURN, 2, 0);
-    Test_True("applying Burn removes Poison", Status_Has(_r, STATUS_BURN) && !Status_Has(_r, STATUS_POISON));
-    _r = Status_Add(_r, STATUS_BLEED, 2, 0);
-    Test_True("applying Bleeding removes Burn", Status_Has(_r, STATUS_BLEED) && !Status_Has(_r, STATUS_BURN));
-    // Stat mods (renamed, same size): Poison MAG-1, Bleeding SPD-2, Burning ATK-1, Stun SPD-2, Sundered DEF-1.
+    _r = Status_Add(_r, STATUS_POISON, 0, 0, 2);
+    _r = Status_Add(_r, STATUS_BURN, 2, 3);
+    _r = Status_Add(_r, STATUS_BLEED, 3, 0);
+    Test_True("D78 Poison, Burning and Bleeding on one character: all three stay", Status_Has(_r, STATUS_POISON) && Status_Has(_r, STATUS_BURN) && Status_Has(_r, STATUS_BLEED));
+    // Stat mods (renamed, same size): Poison MAG-1, Bleeding SPD-2, Stun SPD-2, Sundered DEF-1. Burning has no flat mod: DEF x0.75.
     Test_Eq("Poison gives MAG-1", Status_ModStat(Status_Add(CharacterCreate_Player(CLASS_MAGE), STATUS_POISON, 2, 0), STAT_MAG), -1);
     Test_Eq("Bleeding gives SPD-2", Status_ModStat(_r, STAT_SPD), -2);
-    Test_Eq("Burning gives ATK-1", Status_ModStat(Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_BURN, 2, 0), STAT_ATK), -1);
+    Test_Eq("Burning gives no flat ATK change", Status_ModStat(Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_BURN, 2, 3), STAT_ATK), 0);
+    Test_Eq("Burning gives DEF x0.75", Status_StatMult(Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_BURN, 2, 3), STAT_DEF), 0.75);
     // Stun: skip_turn; the player's stun is capped at 1 turn and ignored during the 2-turn immunity window.
     var _s = CharacterCreate_Player(CLASS_KNIGHT);
     Test_True("Status_CanAct on a clean character", Status_CanAct(_s));
@@ -1002,6 +1051,275 @@ function Test_Suite_Status() {
     var _foe = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_STUN, 3, 0);
     Test_Eq("enemy stun is not capped (3)", _foe.status[0].turns, 3);
     Test_True("Guard does not stop the owner acting", Status_CanAct(Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_GUARD, 2, 0)));
+}
+
+// Status rules of packet B2 (combat-spec.md section 10; D21 D24 D59 D78 D79 D100). Expected numbers are worked out from the spec text.
+function Test_Suite_StatusRules() {
+    // ---- the formulas (combat-vectors.json holds the same cases) ----
+    Test_Eq("vec burn_tick_1", Status_BurnTick(1), 2);
+    Test_Eq("vec burn_tick_3", Status_BurnTick(3), 2);
+    Test_Eq("vec burn_tick_5", Status_BurnTick(5), 2);
+    Test_Eq("vec burn_tick_12", Status_BurnTick(12), 4);
+    Test_Eq("vec burn_tick_13", Status_BurnTick(13), 4);
+    Test_Eq("vec burn_tick_15", Status_BurnTick(15), 5);
+    Test_Eq("vec burn_tick_19", Status_BurnTick(19), 6);
+    Test_Eq("vec burn_tick_39", Status_BurnTick(39), 12);
+    Test_Eq("vec burn_def_1", Status_BurnDef(1), 1);
+    Test_Eq("vec burn_def_2", Status_BurnDef(2), 2);
+    Test_Eq("vec burn_def_7", Status_BurnDef(7), 5);
+    Test_Eq("vec burn_def_12", Status_BurnDef(12), 9);
+    Test_Eq("vec burn_def_18", Status_BurnDef(18), 14);
+    Test_Eq("vec poison_total_1", Status_PoisonTotal(1), 1);
+    Test_Eq("vec poison_total_3", Status_PoisonTotal(3), 6);
+    Test_Eq("vec poison_total_5", Status_PoisonTotal(5), 15);
+    Test_Eq("vec poison_total_10", Status_PoisonTotal(10), 55);
+    Test_Eq("vec poison_add_0_3", Status_PoisonAdd(0, 3), 3);
+    Test_Eq("vec poison_add_3_3", Status_PoisonAdd(3, 3), 6);
+    Test_Eq("vec poison_add_8_4", Status_PoisonAdd(8, 4), 10);
+    Test_Eq("vec bleed_tick_1", Status_BleedTick(1), 2);
+    Test_Eq("vec bleed_tick_2", Status_BleedTick(2), 4);
+    Test_Eq("vec bleed_tick_3", Status_BleedTick(3), 6);
+    Test_Eq("vec widen_55_1_5", Qte_WidenedHalfWidth(55, 1.5), 82.5);
+    Test_Eq("vec widen_60_1_5", Qte_WidenedHalfWidth(60, 1.5), 90.0);
+    Test_Eq("vec widen_50_1_0", Qte_WidenedHalfWidth(50, 1.0), 50.0);
+
+    // ---- Poison stacks (D78) ----
+    var _k = Test_Hero(CLASS_KNIGHT);
+    _k.max_hp = 99;
+    _k.hp = 99;
+    _k = Status_Add(_k, STATUS_POISON, 0, 0, 3);
+    Test_Eq("Poison: 3 stacks", Status_Stacks(_k, STATUS_POISON), 3);
+    Test_Eq("Poison: the turns mirror the stacks", Battle_StatusCurrentTurns(_k, STATUS_POISON), 3);
+    _k = Status_Add(_k, STATUS_POISON, 0, 0, 3);
+    Test_Eq("Poison: reapply adds stacks (3 + 3)", Status_Stacks(_k, STATUS_POISON), 6);
+    _k = Status_Add(_k, STATUS_POISON, 0, 0, 9);
+    Test_Eq("Poison: stacks stop at 10", Status_Stacks(_k, STATUS_POISON), 10);
+    var _hp_a = _k.hp;
+    _k = Status_Tick(_k);
+    Test_Eq("Poison: 10 stacks hurt for 10", _hp_a - _k.hp, 10);
+    Test_Eq("Poison: then one stack fades (9)", Status_Stacks(_k, STATUS_POISON), 9);
+    Test_Eq("Poison: only one entry", array_length(_k.status), 1);
+    var _total = 0;
+    var _guard = 0;
+    var _hp_b = _k.hp;
+    while (Status_Has(_k, STATUS_POISON) && _guard < 20) { _k = Status_Tick(_k); _guard++; }
+    Test_Eq("Poison: from 9 stacks the rest costs 9+8+...+1 = 45", _hp_b - _k.hp, 45);
+    var _pe = Status_Tick(Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_POISON, 0, 0, 3));
+    Test_Eq("Poison: an ENEMY loses the stacks too (slime 9 -> 6)", _pe.hp, 6);
+
+    // ---- Burning (D78) ----
+    var _b = Status_Add(Test_Hero(CLASS_KNIGHT), STATUS_BURN, 2, 4);
+    _b.max_hp = 99;
+    _b.hp = 99;
+    Test_Eq("Burning: the knight's DEF 12 is 9 while it burns", Combat_EffectiveStat(_b, STAT_DEF), 9);
+    Test_Eq("Burning: the knight's ATK stays 11", Combat_EffectiveStat(_b, STAT_ATK), 11);
+    _b = Status_Tick(_b);
+    Test_Eq("Burning: a fixed tick of 4", _b.hp, 95);
+    Test_Eq("Burning: 2 turns -> 1", Battle_StatusCurrentTurns(_b, STATUS_BURN), 1);
+    _b = Status_Add(_b, STATUS_BURN, 2, 6);
+    Test_Eq("Burning: reapply never stacks (one entry)", array_length(_b.status), 1);
+    Test_Eq("Burning: reapply refreshes the turns to 2", Battle_StatusCurrentTurns(_b, STATUS_BURN), 2);
+    Test_Eq("Burning: reapply takes the newer tick (6)", Status_Find(_b, STATUS_BURN).power, 6);
+    _b = Status_Tick(Status_Tick(_b));
+    Test_Eq("Burning: 6 + 6 more HP gone after its 2 turns", _b.hp, 83);
+    Test_False("Burning ends after its 2 turns", Status_Has(_b, STATUS_BURN));
+    Test_Eq("Burning over: DEF back to 12", Combat_EffectiveStat(_b, STAT_DEF), 12);
+    // the tick comes from the CASTER's MAG when a skill applies it
+    var _mage = CharacterCreate_Player(CLASS_MAGE);
+    _mage.mp = 99;
+    var _burn_target = EnemyCreate(ENEMY_SLIME);
+    var _fb_chance = SkillDB_Get(SKILL_FIREBALL).status_chance;
+    SkillDB_Get(SKILL_FIREBALL).status_chance = 1;
+    Skill_Use(_mage, _burn_target, SKILL_FIREBALL);
+    SkillDB_Get(SKILL_FIREBALL).status_chance = _fb_chance;
+    Test_Eq("Fireball by a MAG 12 mage burns for 4 per tick (0.3 x 12 = 3.6 -> 4)", Status_Find(_burn_target, STATUS_BURN).power, 4);
+    Test_Eq("Fireball's Burning lasts 2 turns", Battle_StatusCurrentTurns(_burn_target, STATUS_BURN), 2);
+
+    // ---- Bleeding (D78): hurts only when its owner ACTS, 3 stacks, 3 turns ----
+    var _d = Status_Add(Test_Hero(CLASS_KNIGHT), STATUS_BLEED, 3, 0);
+    _d.max_hp = 99;
+    _d.hp = 99;
+    Test_Eq("Bleeding: 1 stack", Status_Stacks(_d, STATUS_BLEED), 1);
+    _d = Status_Add(_d, STATUS_BLEED, 3, 0);
+    _d = Status_Add(_d, STATUS_BLEED, 3, 0);
+    _d = Status_Add(_d, STATUS_BLEED, 3, 0);
+    Test_Eq("Bleeding: stacks stop at 3", Status_Stacks(_d, STATUS_BLEED), 3);
+    Test_Eq("Bleeding: one entry", array_length(_d.status), 1);
+    _d = Status_Tick(_d, false);
+    Test_Eq("Bleeding: a stunned turn (no action) costs no HP", _d.hp, 99);
+    Test_Eq("Bleeding: but the turn is counted (3 -> 2)", Battle_StatusCurrentTurns(_d, STATUS_BLEED), 2);
+    _d = Status_ActionTick(_d);
+    Test_Eq("Bleeding: an action costs 2 per stack = 6", _d.hp, 93);
+    Test_Eq("Bleeding: the per-action tick does not count a turn", Battle_StatusCurrentTurns(_d, STATUS_BLEED), 2);
+    _d = Status_Tick(_d);
+    Test_Eq("Bleeding: a turn with an action costs 6 more", _d.hp, 87);
+    Test_Eq("Bleeding: 2 -> 1 turn", Battle_StatusCurrentTurns(_d, STATUS_BLEED), 1);
+    _d = Status_Add(_d, STATUS_BLEED, 3, 0);
+    Test_Eq("Bleeding: reapply refreshes the turns to 3", Battle_StatusCurrentTurns(_d, STATUS_BLEED), 3);
+    Test_Eq("Bleeding: and the stacks stay at the cap 3", Status_Stacks(_d, STATUS_BLEED), 3);
+    _d = Status_Tick(Status_Tick(Status_Tick(_d)));
+    Test_False("Bleeding ends after 3 turns", Status_Has(_d, STATUS_BLEED));
+
+    // ---- all three at once ----
+    var _all = Test_Hero(CLASS_KNIGHT);
+    _all.max_hp = 99;
+    _all.hp = 99;
+    _all = Status_Add(Status_Add(Status_Add(_all, STATUS_POISON, 0, 0, 2), STATUS_BURN, 2, 3), STATUS_BLEED, 3, 0);
+    Test_Eq("D78: Poison, Burning and Bleeding are three entries", array_length(_all.status), 3);
+    _all = Status_Tick(_all);
+    Test_Eq("D78: one turn costs poison 2 + burning 3 + bleeding 2 = 7", _all.hp, 92);
+    Test_True("D78: afterwards poison 1 stack, burning 1 turn, bleeding 2 turns",
+        Status_Stacks(_all, STATUS_POISON) == 1 && Battle_StatusCurrentTurns(_all, STATUS_BURN) == 1 && Battle_StatusCurrentTurns(_all, STATUS_BLEED) == 2);
+    var _list = Status_DisplayList(_all);
+    Test_Eq("HUD data: three rows", array_length(_list), 3);
+    Test_True("HUD data: the poison row shows its stacks", _list[0].id == STATUS_POISON && _list[0].stacks == 1 && _list[0].label == "x1" && _list[0].tick == 1);
+    Test_True("HUD data: the burning row shows the turns left", _list[1].id == STATUS_BURN && _list[1].label == "1t" && _list[1].turns == 1 && _list[1].tick == 3);
+    Test_True("HUD data: the bleeding row shows stacks and turns left", _list[2].id == STATUS_BLEED && _list[2].label == "x1 2t" && _list[2].tick == 2);
+    Test_True("HUD data: every row is a negative status with an icon sprite entry", _list[0].negative && _list[1].negative && _list[2].negative && variable_struct_exists(_list[0], "icon_sprite"));
+
+    // ---- skills apply the new numbers ----
+    var _sp = EnemyCreate(ENEMY_SPIDER);
+    var _hero = Test_Hero(CLASS_KNIGHT);
+    var _fangs_chance = SkillDB_Get(SKILL_POISON_FANGS).status_chance;
+    SkillDB_Get(SKILL_POISON_FANGS).status_chance = 1;
+    Skill_Use(_sp, _hero, SKILL_POISON_FANGS);
+    SkillDB_Get(SKILL_POISON_FANGS).status_chance = _fangs_chance;
+    Test_Eq("Poison Fangs puts 2 Poison stacks on the player", Status_Stacks(_hero, STATUS_POISON), 2);
+    var _arch = CharacterCreate_Player(CLASS_ARCHER);
+    _arch.mp = 99;
+    var _arrow_foe = EnemyCreate(ENEMY_SLIME);
+    var _pa_chance = SkillDB_Get(SKILL_POISON_ARROW).status_chance;
+    SkillDB_Get(SKILL_POISON_ARROW).status_chance = 1;
+    Skill_Use(_arch, _arrow_foe, SKILL_POISON_ARROW);
+    Skill_Use(_arch, _arrow_foe, SKILL_POISON_ARROW);
+    SkillDB_Get(SKILL_POISON_ARROW).status_chance = _pa_chance;
+    Test_Eq("Poison Arrow twice: 3 + 3 = 6 stacks on the enemy", Status_Stacks(_arrow_foe, STATUS_POISON), 6);
+    var _kn = CharacterCreate_Player(CLASS_KNIGHT);
+    _kn.mp = 99;
+    var _wound_foe = EnemyCreate(ENEMY_SLIME);
+    var _wound_chance = SkillDB_Get(SKILL_WOUND).status_chance;
+    SkillDB_Get(SKILL_WOUND).status_chance = 1;
+    Skill_Use(_kn, _wound_foe, SKILL_WOUND);
+    SkillDB_Get(SKILL_WOUND).status_chance = _wound_chance;
+    Test_True("Wound puts 1 Bleeding stack for 3 turns", Status_Stacks(_wound_foe, STATUS_BLEED) == 1 && Battle_StatusCurrentTurns(_wound_foe, STATUS_BLEED) == 3);
+
+    // ---- BUG-17: Curse respects its chance, applies the three DoTs together and the log tells the truth ----
+    var _casts = 240;
+    var _landed = [0, 0, 0];
+    var _nothing = 0;
+    var _all_three = 0;
+    var _log_ok = true;
+    var _sids = [STATUS_BURN, STATUS_POISON, STATUS_BLEED];
+    for (var _c = 0; _c < _casts; _c++) {
+        var _victim = CharacterCreate_Player(CLASS_KNIGHT);
+        var _cr = Skill_Use(EnemyCreate(ENEMY_FINAL_BOSS), _victim, SKILL_CURSE);
+        var _n = 0;
+        for (var _si = 0; _si < 3; _si++) {
+            var _has = Status_Has(_victim, _sids[_si]);
+            if (_has) { _landed[_si]++; _n++; }
+            var _named = (string_pos(StatusDB_Get(_sids[_si]).name, _cr.msg) > 0);
+            if (_has != _named) _log_ok = false;
+        }
+        if (_n == 0) { _nothing++; if (string_pos("Applied", _cr.msg) > 0) _log_ok = false; }
+        if (_n == 3) _all_three++;
+        if (array_length(_victim.status) != _n) _log_ok = false;
+    }
+    Test_True("Curse: each status lands about half the time (240 casts: 85..155 each: " + string(_landed[0]) + "/" + string(_landed[1]) + "/" + string(_landed[2]) + ")",
+        _landed[0] >= 85 && _landed[0] <= 155 && _landed[1] >= 85 && _landed[1] <= 155 && _landed[2] >= 85 && _landed[2] <= 155);
+    Test_True("Curse: sometimes nothing lands, sometimes all three coexist", _nothing > 0 && _all_three > 0);
+    Test_True("Curse: the log names exactly the statuses that landed, and a miss says nothing was applied", _log_ok);
+    var _cv = CharacterCreate_Player(CLASS_KNIGHT);
+    var _curse_chance = SkillDB_Get(SKILL_CURSE).status_chance;
+    SkillDB_Get(SKILL_CURSE).status_chance = 1;
+    var _cr1 = Skill_Use(EnemyCreate(ENEMY_FINAL_BOSS), _cv, SKILL_CURSE);
+    SkillDB_Get(SKILL_CURSE).status_chance = _curse_chance;
+    Test_True("Curse at 100%: Burning (tick 6 from MAG 19), Poison 2 stacks, Bleeding 1 stack all there",
+        Status_Find(_cv, STATUS_BURN).power == 6 && Status_Stacks(_cv, STATUS_POISON) == 2 && Status_Stacks(_cv, STATUS_BLEED) == 1);
+    Test_Eq("Curse at 100%: Burning 2 turns, Bleeding 3 turns", Battle_StatusCurrentTurns(_cv, STATUS_BURN) * 10 + Battle_StatusCurrentTurns(_cv, STATUS_BLEED), 23);
+
+    // ---- Foresight (D79, D24) ----
+    var _fm = CharacterCreate_Player(CLASS_MAGE);
+    _fm.mp = 99;
+    Skill_Use(_fm, _fm, SKILL_FORESIGHT);
+    Test_Eq("Foresight: the skill gives exactly 3 turns (no x3 any more)", Battle_StatusCurrentTurns(_fm, STATUS_HIT_UP), 3);
+    Test_True("Foresight reveals the next action", Status_HasFlag(_fm, "reveals_action"));
+    Test_Eq("Foresight widens the Perfect zones x1.5", Qte_PerfectWiden(_fm), 1.5);
+    Test_Eq("No Foresight: no widening", Qte_PerfectWiden(CharacterCreate_Player(CLASS_MAGE)), 1);
+    Test_False("Foresight has no always_hit flag any more", variable_struct_exists(StatusDB_Get(STATUS_HIT_UP), "always_hit"));
+    _fm = Status_ConsumeByField(_fm, "consume_on_attack");
+    Test_True("Foresight is not used up by an attack", Status_Has(_fm, STATUS_HIT_UP));
+    _fm = Status_Tick(_fm);
+    Test_Eq("Foresight: the turn it is cast does not count (still 3)", Battle_StatusCurrentTurns(_fm, STATUS_HIT_UP), 3);
+    _fm = Status_Tick(_fm);
+    Test_Eq("Foresight: next turn 2 left", Battle_StatusCurrentTurns(_fm, STATUS_HIT_UP), 2);
+    _fm = Status_Tick(Status_Tick(_fm));
+    Test_False("Foresight is over after 3 of the player's turns", Status_Has(_fm, STATUS_HIT_UP));
+    Test_Eq("Foresight over: Perfect zones back to normal", Qte_PerfectWiden(_fm), 1);
+    // the bar: dagger Perfect half width 55 ms; 70 ms off the centre is Good, with Foresight (82.5 ms) it is Perfect; 90 ms stays Good
+    var _bar = Qte_BarParams("dagger");
+    var _centre = Qte_ZoneCentreMs(_bar);
+    var _wbar = Qte_WidenPerfect(_bar, 1.5);
+    Test_Eq("Foresight bar: 70 ms off the centre is Good without it", Qte_Grade(_centre + 70, _bar), QTE_GOOD);
+    Test_Eq("Foresight bar: 70 ms off the centre is Perfect with it", Qte_Grade(_centre + 70, _wbar), QTE_PERFECT);
+    Test_Eq("Foresight bar: 90 ms off the centre is still only Good", Qte_Grade(_centre + 90, _wbar), QTE_GOOD);
+    Test_True("Foresight bar: only the Perfect zone changed", _wbar.sweep_ms == _bar.sweep_ms && _wbar.good_half_width == _bar.good_half_width && _wbar.ok_half_width == _bar.ok_half_width);
+    // arrows: [UP, LEFT, DOWN] must be done in 1500 ms for Perfect (spec D58); x1.5 gives 2250 ms. A finish at 1800 ms is Good, with Foresight Perfect.
+    var _seq = [UP, LEFT, DOWN];
+    var _slow = [{ t: 600, dir: UP }, { t: 1200, dir: LEFT }, { t: 1800, dir: DOWN }];
+    Test_Eq("Foresight arrows: 1800 ms is Good without it", Qte_SeqRun(_seq, _slow).key, QTE_GOOD);
+    Test_Eq("Foresight arrows: 1800 ms is Perfect with it", Qte_SeqRun(_seq, _slow, 1, 1.5).key, QTE_PERFECT);
+    Test_Eq("Foresight arrows: the time bar itself is not longer", Qte_SeqNew(_seq, 1, 1.5).limit_ms, Qte_SeqNew(_seq).limit_ms);
+    Test_Eq("Foresight arrows: the Perfect window is x1.5", Qte_SeqNew(_seq, 1, 1.5).fast_ms, Qte_SeqNew(_seq).fast_ms * 1.5);
+    // the preview (pure part): a visible plan shows the action, an invisible one gives nothing away
+    var _pv = Battle_ActionPreviewOf({ skill_id: SKILL_POISON_FANGS, announced: false }, true);
+    Test_True("Preview: a skill shows its name and that it is a big attack", _pv.visible && _pv.kind == "skill" && _pv.name == SkillDB_Get(SKILL_POISON_FANGS).name && _pv.big);
+    Test_Eq("Preview: the log line", _pv.text, "You foresee: " + SkillDB_Get(SKILL_POISON_FANGS).name);
+    var _pa = Battle_ActionPreviewOf({ skill_id: -1, announced: false }, true);
+    Test_True("Preview: a plain attack", _pa.visible && _pa.kind == "attack" && !_pa.big);
+    var _ps = Battle_ActionPreviewOf({ skill_id: -1, announced: false }, true, true);
+    Test_Eq("Preview: a stunned enemy does nothing", _ps.kind, "stunned");
+    var _pn = Battle_ActionPreviewOf({ skill_id: SKILL_POISON_FANGS, announced: false }, false);
+    Test_True("Preview: without Foresight nothing is given away", !_pn.visible && _pn.name == "" && _pn.skill_id == -1 && _pn.text == "");
+    Test_False("Preview: no battle, no preview", Battle_EnemyNextActionPreview().visible);
+
+    // ---- D100 / BUG-16: the text comes from the real numbers ----
+    var _dp = Status_Describe(STATUS_POISON, { id: STATUS_POISON, turns: 3, power: 0, stacks: 3 });
+    Test_True("Describe: Poison with 3 stacks says it hurts for 3", string_pos("3 HP", _dp.line) > 0 && _dp.tick == 3 && _dp.stacks == 3);
+    var _db = Status_Describe(STATUS_BURN, { id: STATUS_BURN, turns: 2, power: 4, stacks: 1 });
+    Test_True("Describe: Burning says 4 HP, 2 turns and its DEF change", string_pos("4 HP", _db.line) > 0 && string_pos("2 more turns", _db.line) > 0 && string_pos("DEF -25%", _db.line) > 0);
+    var _dl = Status_Describe(STATUS_BLEED, { id: STATUS_BLEED, turns: 3, power: 0, stacks: 2 });
+    Test_True("Describe: Bleeding with 2 stacks says 4 HP per action", string_pos("4 HP", _dl.line) > 0 && _dl.tick == 4);
+    var _df = Status_Describe(STATUS_HIT_UP);
+    Test_True("Describe: Foresight says 3 turns and +50%", string_pos("3 turns", _df.line) > 0 && string_pos("50%", _df.line) > 0);
+    var _burn_cfg = StatusDB_Get(STATUS_BURN);
+    var _old_dur = _burn_cfg.duration;
+    _burn_cfg.duration = 5;
+    Test_True("Describe: change the data and the text follows (Burning 5 turns)", string_pos("5 turns", Status_Describe(STATUS_BURN).line) > 0);
+    _burn_cfg.duration = _old_dur;
+    Test_True("Describe: every status has a sentence", Status_Description(STATUS_POISON) != "" && Status_Description(STATUS_BLEED) != "" && Status_Description(STATUS_STUN) != "" && Status_Description(STATUS_SOLIDIFY) != "");
+    Test_True("Describe: Solidify says 75% less, from its data", string_pos("75%", Status_Description(STATUS_SOLIDIFY)) > 0);
+    // tooltips cannot disagree with the game: every skill's status_turns is what is really applied; DoT skills match the status data
+    var _sk_ok = true;
+    var _sk_bad = "";
+    var _skills = ds_map_keys_to_array(global.skill_db);
+    for (var _ki = 0; _ki < array_length(_skills); _ki++) {
+        var _sk = SkillDB_Get(_skills[_ki]);
+        var _list_ids = Battle_SkillStatusIds(_sk);
+        var _cl = variable_struct_exists(_sk, "class_list") ? _sk.class_list : [];
+        var _user_is_p = (array_length(_cl) > 0);
+        var _u = _user_is_p ? CharacterCreate_Player(_cl[0]) : EnemyCreate(ENEMY_SLIME);
+        var _t = (_sk.target == TGT_SELF) ? _u : (_user_is_p ? EnemyCreate(ENEMY_SLIME) : CharacterCreate_Player(CLASS_KNIGHT));
+        for (var _li = 0; _li < array_length(_list_ids); _li++) {
+            var _sid = _list_ids[_li];
+            var _shown = _sk.status_turns;
+            if (variable_struct_exists(_sk, "status_turns_list") && _li < array_length(_sk.status_turns_list) && _sk.status == -1) _shown = _sk.status_turns_list[_li];
+            if (_sid == STATUS_POISON) continue;   // a poison lasts as many turns as it has stacks (checked below)
+            if (_sid == STATUS_STUN) continue;
+            if (Skill_AdjustStatusTurns(_u, _t, _sid, _shown) != _shown) { _sk_ok = false; _sk_bad += " " + _sk.name + "/" + string(_sid); }
+        }
+        if (_sk.status == STATUS_POISON && _sk.status_turns != _sk.status_stacks) { _sk_ok = false; _sk_bad += " " + _sk.name + " stacks"; }
+    }
+    Test_True("BUG-16: the turns a skill tooltip shows are the turns the skill applies (bad:" + _sk_bad + ")", _sk_ok);
 }
 
 // Inventory rules (balance-data.md section 6; combat-bugs.md section 4; R-003 skill books appear twice).
@@ -1175,7 +1493,7 @@ function Test_Suite_Save() {
     _p.hp = 7; _p.mp = 4;
     _p.skills = [SKILL_FIREBALL];
     _p.inventory = Inv_Add(_p.inventory, 11, 2);
-    _p = Status_Add(_p, STATUS_POISON, 3, 0);
+    _p = Status_Add(_p, STATUS_POISON, 0, 0, 3);
     _gs.player_ch = _p;
     _gs.selected_class = CLASS_MAGE;
     _gs.flags = { test_flag: 42 };
@@ -1194,7 +1512,7 @@ function Test_Suite_Save() {
     Test_Eq("R-008 round trip keeps EXP", _r.exp, 5);
     Test_True("R-008 round trip keeps skills", array_length(_r.skills) == 1 && _r.skills[0] == SKILL_FIREBALL);
     Test_True("R-008 round trip keeps inventory (MP potion x2)", Inv_Has(_r.inventory, 11, 2));
-    Test_True("R-008 round trip keeps Poison with 3 turns", Status_Has(_r, STATUS_POISON) && _r.status[0].turns == 3);
+    Test_True("R-008 round trip keeps Poison with 3 stacks", Status_Has(_r, STATUS_POISON) && _r.status[0].stacks == 3 && _r.status[0].turns == 3);
     Test_Eq("R-008 round trip keeps selected class", _gs.selected_class, CLASS_MAGE);
     Test_Eq("R-008 round trip keeps flags", variable_struct_get(_gs.flags, "test_flag"), 42);
     Test_Eq("R-008 round trip keeps difficulty", _gs.difficulty, DIFFICULTY_HARD);

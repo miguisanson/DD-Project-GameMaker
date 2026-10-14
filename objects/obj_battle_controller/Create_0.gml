@@ -64,6 +64,10 @@ enemy_turn_used_skills = [];
 enemy_last_action_used_skill = false;
 player_bonus_actions_remaining = 0;
 player_turn_start_applied = false;
+enemy_plan = undefined;          // Foresight (D79): { skill_id, announced }, the enemy's next action once decided
+enemy_last_skill_id = -1;
+qte_perfect_widen = 1;
+def_perfect_widen = 1;
 
 menu_index = 0;
 battle_actions = [

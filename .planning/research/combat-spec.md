@@ -1,4 +1,4 @@
-# Combat spec (packet B1: STAT-01..06, 11, 12; D20 D22 D27 D35 D61 D76 D77 D80)
+# Combat spec (packet B1: STAT-01..06, 11, 12; D20 D22 D27 D35 D61 D76 D77 D80; packet B2: section 10, D21 D24 D59 D78 D79)
 
 Written BEFORE the code. Numbers are starting values for the simulator (BAL-02), not final balance; the FORMULAS are fixed and
 `combat-vectors.json` holds the expected outputs (derived from this text by `tools/balance/check_combat_vectors.py`, not from game output).
@@ -9,7 +9,7 @@ Test_Suite_Stats / Test_Suite_Combat in `scr_test.gml` hard-code the same cases 
 Effective stat = max(1, base + equipment bonus + status mod). Equipment/status structs use keys `atk def spd mag`.
 - ATK: physical damage (basic attacks with swords/bows, ATK skills). MAG: spell damage and max MP. DEF: damage taken (all sources).
 - SPD: turn order. Until the turn timeline (D74) lands: the higher effective SPD acts first in a battle, a tie goes to the player. Run: section 8.
-- Status mods (rename only): Poison MAG-1, Bleeding SPD-2, Burning ATK-1, Stun SPD-2, Sundered DEF-1.
+- Status mods (rename only): Poison MAG-1, Bleeding SPD-2, Stun SPD-2, Sundered DEF-1. Burning has no flat mod any more: it takes DEF x0.75 (section 10).
 
 ## 2. Classes (level 1) and fixed growth per level (D76)
 | class | ATK | DEF | SPD | MAG | hd | mp_gain | fixed growth each level 2..10 | free point default (auto) |
@@ -47,10 +47,10 @@ damage = 0 when power <= 0 or mult == 0 (Guard blocks, nothing else may);
          grade < 1 gives <= ok - 1 (D61 "Perfect is visibly above OK"), then max(1, .)   [D61 grades: Perfect 1.30 Good 1.10 OK 1.00 Weak 0.75]
 ```
 Armor/equipment passives (`Equip_PlayerIncomingDamageReduction`, `Equip_PlayerBonusDamage`) still apply after this, as flat amounts.
-Multi-hit skills run the formula once per hit. DoT tick numbers are untouched (packet B2).
+Multi-hit skills run the formula once per hit. DoT tick numbers: section 10.
 **No dice (D80):** nothing rolls to hit. Enemies never miss, the player never misses. Evasion (a status on the player) fully dodges the next
 damaging enemy action: damage 0, `hit=false` (no defence bar), status consumed. Solidify (Slime) is `guard_mult 0.25`, consumed by the next hit.
-Foresight's `always_hit` flag has no use now; its redesign is D79 (packet B2).
+Foresight's old `always_hit` flag is gone; Foresight is redesigned in section 10 (D79).
 **Crit (LUCK removed):** no base chance. `crit_chance = clamp(crit_bonus / 100, 0, 0.5)` where `crit_bonus` sums statuses/passives (Take Aim = 25).
 Basic attacks and skills use the same rule (no more +1 on basic attacks). Crit damage x2 (it is in `mult`).
 **Heal skills** (none in use): `power + floor(A / 4)`.
@@ -91,3 +91,45 @@ Run (flee) succeeds with `clamp(0.5 + 0.05 * (SPD_player - SPD_enemy), 0.10, 0.9
 ## 9. Data export (`-exportdata`)
 `DD-Project.exe -game data.win -exportdata` writes `export_data.json` (classes, enemies, skills, items, statuses, level table, constants) to the save area
 and exits; the gate wrapper (`-Only exportdata`) copies it to `<WorkRoot>\export`. The simulator reads that file plus `combat-vectors.json`.
+
+## 10. Statuses (packet B2: D21, D24, D59, D78, D79)
+Player and enemy use the same rules. **All three damage-over-time statuses coexist** (the old `excludes` rule is gone). A status entry is
+`{ id, turns, power, stacks }`; `Status_Add(ch, id, turns, power, stacks = 1)`. Fixed durations are data on the status (`StatusDB_Get(id)`), not
+multiplied per skill any more, so a skill tooltip shows the real number (BUG-16). The defence bar (D59/D21) can only shorten or reduce, never lengthen.
+When a status ticks: `Status_Tick(ch, acted = true)` runs once per TURN of its owner: the player after each of his own actions (a stunned turn counts, `acted = false`),
+an enemy after its last action of the turn. `Status_ActionTick(ch)` is the per-ACTION part (bleed only); an enemy with a chain of actions bleeds after every action.
+
+| status | applies | tick | duration / stacks | other effect |
+|---|---|---|---|---|
+| Poison | `stacks` per hit (skill field `status_stacks`, default 1; Poison Arrow 3, Poison Mist 4, Poison Fangs 2, Curse 2) | HP -= stacks, then stacks -= 1 (the entry is removed at 0). Total from n stacks = n(n+1)/2 | no turn limit; max 10 stacks; reapply ADDS stacks (clamped to 10); `turns` mirrors `stacks` (ticks left) | MAG -1 |
+| Burning | refreshes | HP -= `power` = `burn_tick(caster MAG)` (below), fixed at the moment it is applied | 2 turns; no stacking; reapply refreshes turns to 2 and power to the newer value | DEF x0.75 while it burns |
+| Bleeding | +1 stack per hit (`status_stacks`) | only when the bleeder ACTS: HP -= 2 x stacks (once per action, `Status_ActionTick`); a stunned turn does not hurt | 3 turns (counted per turn, acting or not); max 3 stacks; reapply adds a stack and refreshes the turns to 3 | SPD -2 |
+| Foresight | self buff (Mage) | none | exactly 3 of the player's turns: it is not ticked on the turn it is cast (`no_tick_on_apply`) | reveals the enemy's next action (below) and widens every Perfect zone of the player's QTEs x1.5 |
+
+```
+burn_tick(MAG)   = max(2, round_half_up(0.3 * MAG))           MAG = the caster's effective MAG when the hit lands
+burning_def(DEF) = max(1, round_half_up(DEF * 0.75))          effective DEF while Burning (Combat_EffectiveStat)
+poison_total(n)  = n * (n + 1) / 2                            HP lost by n stacks left alone; n clamped to 1..10
+bleed_tick(s)    = 2 * s                                      HP per action of the bleeder with s stacks (1..3)
+```
+Examples: Mage L1 (MAG 12) Fireball burns 4 x 2 turns; MAG 39 (L10) burns 12 x 2. A Slime (DEF 7) burning has DEF 5. Poison Arrow 3 stacks = 3+2+1 = 6 HP; a second
+Arrow on the 2nd tick adds 3: 2+3 = 5 stacks -> 5+4+3+2+1 = 15. Bleeding with 3 stacks hits for 6 per action. Starting numbers, tuned by BAL-02.
+Equipment `status_turn_bonus` (+1 status turn): +1 to burn/bleed turns, +1 poison stack when the player applies it.
+
+**Defence bar and statuses (D21, D59):** the grade acts on what the hit ADDED, never on what the player already had. Poison: added stacks go through
+`Qte_DefenceStatusTurns(grade, added)` (Perfect 0 = resisted, Good halves, OK takes a quarter off, Weak all; never below 1 unless resisted). Burn and Bleed: the turns
+are shortened by the same function; Perfect puts the status (stacks, power, turns) back to how it was before the hit. Nothing here can lengthen a status.
+
+**Curse (final boss):** `status_chance` (0.50) is rolled once PER status (Burning, Poison 2 stacks, Bleeding). The log names only the statuses that really landed;
+if none did, it says the curse fails. Curse has no defence bar.
+
+**Foresight (D79, D24):** `Battle_EnemyNextActionPreview()` returns `{ visible, kind ("skill" | "attack" | "stunned"), skill_id, name, big, text }` and is `visible` only
+while the player has a status with `reveals_action` (Foresight). The enemy's action is decided once, ahead of time, and stored in the battle (`enemy_plan`); the enemy then does
+exactly that, unless it is no longer allowed (an HP-gated skill, no MP) in which case it chooses again. Until the turn bar (D74/D99) shows it, the log gets one line
+"You foresee: <action>" per enemy action (at the start of each player turn while Foresight lasts, and at once when it is cast). Perfect zones: the attack bar and the defence bar get
+`perfect_half_width x 1.5` (`Qte_WidenPerfect`); an arrow sequence gets `fast_ms x 1.5` (`Qte_SeqNew(seq, assist, perfect_widen)`). The `always_hit` flag and the
+"consumed by the next attack" rule are gone.
+
+**HUD data (pure, no drawing):** `Status_DisplayList(ch)` -> `[{ id, name, turns, stacks, tick, label, negative, icon_sprite, icon_subimg }]` (one row per status; `label`
+is "x3" for stacks, "2t" otherwise); `Status_Describe(id, data = undefined)` -> `{ id, name, line, turns, stacks, tick, ... }` where `line` is the plain sentence with the real numbers (D100).
+

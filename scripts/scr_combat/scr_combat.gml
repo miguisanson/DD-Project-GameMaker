@@ -11,7 +11,10 @@ function Combat_PlayerActsFirst(_spd_player, _spd_enemy) {
 }
 
 function Combat_EffectiveStat(_ch, _stat_id) {
-    return max(1, round(Stat_Get(_ch, _stat_id)));
+    var v = Stat_Get(_ch, _stat_id);
+    var m = Status_StatMult(_ch, _stat_id);   // Burning: DEF x0.75 (spec section 10)
+    if (m != 1) v = RoundHalfUp(v * m);
+    return max(1, round(v));
 }
 
 // D35: the only difficulty knob left: the QTE assist multiplier on damage the player takes (1 = off).
@@ -549,6 +552,23 @@ function Qte_BufferPress(_ms) {
     return max(0, _ms);
 }
 
+// Foresight (D79): the player's Perfect zones are x1.5 wider while he has a status with `perfect_widen`. 1 without one.
+function Qte_PerfectWiden(_ch) {
+    if (!is_struct(_ch)) return 1;
+    return max(1, Status_GetMul(_ch, "perfect_widen"));
+}
+
+// A Perfect half width after the widening (ms).
+function Qte_WidenedHalfWidth(_half_width, _widen) {
+    return _half_width * max(1, _widen);
+}
+
+// The bar's params with the Perfect zone widened (the Good and OK zones, the sweep and the centre stay as they are).
+function Qte_WidenPerfect(_params, _widen) {
+    var par = { sweep_ms: _params.sweep_ms, perfect_half_width: Qte_WidenedHalfWidth(_params.perfect_half_width, _widen), good_half_width: _params.good_half_width, ok_half_width: _params.ok_half_width };
+    return par;
+}
+
 // Grade of a press at _press_ms (QTE_NO_PRESS = none). _assist widens every zone (>= 1).
 function Qte_Grade(_press_ms, _params, _assist = 1) {
     if (_press_ms < 0 || _press_ms >= _params.sweep_ms) return QTE_WEAK;
@@ -642,19 +662,20 @@ function Qte_SkillSequence(_skill_id) {
 
 // The time bar of a sequence _len arrows long. limit_ms = the bar drains over it; fast_ms = finish with no mistake within it for Perfect.
 // _assist (D35) stretches both; the cost of a wrong press stays.
-function Qte_SeqParams(_len, _assist = 1) {
+// _perfect_widen (Foresight, D79) stretches only the Perfect window (fast_ms), not the time bar.
+function Qte_SeqParams(_len, _assist = 1, _perfect_widen = 1) {
     var widen = max(1, _assist);
     return {
         limit_ms: (QTE_SEQ_BASE_MS + QTE_SEQ_PER_ARROW_MS * _len) * widen,
-        fast_ms: (QTE_SEQ_FAST_BASE_MS + QTE_SEQ_FAST_PER_ARROW_MS * _len) * widen,
+        fast_ms: (QTE_SEQ_FAST_BASE_MS + QTE_SEQ_FAST_PER_ARROW_MS * _len) * widen * max(1, _perfect_widen),
         penalty_ms: QTE_SEQ_PENALTY_MS
     };
 }
 
 // The state of one arrow sequence. clock is real ms since the sequence started; a wrong press adds penalty_ms to what the bar has used.
 // last = what the latest press did ("ok", "wrong", or "" for none / ignored); key is "" until done, then the grade.
-function Qte_SeqNew(_seq, _assist = 1) {
-    var par = Qte_SeqParams(array_length(_seq), _assist);
+function Qte_SeqNew(_seq, _assist = 1, _perfect_widen = 1) {
+    var par = Qte_SeqParams(array_length(_seq), _assist, _perfect_widen);
     return {
         seq: _seq, len: array_length(_seq), idx: 0, clock: 0, mistakes: 0,
         limit_ms: par.limit_ms, fast_ms: par.fast_ms, penalty_ms: par.penalty_ms,
@@ -713,8 +734,8 @@ function Qte_SeqPress(_st, _dir, _ms) {
 
 // Replays scripted presses [{ t: ms, dir }] and returns the finished state (no press in time = timed out). The live battle calls
 // Qte_SeqPress / Qte_SeqTick one frame at a time instead; this is the same grader for tests.
-function Qte_SeqRun(_seq, _presses, _assist = 1) {
-    var st = Qte_SeqNew(_seq, _assist);
+function Qte_SeqRun(_seq, _presses, _assist = 1, _perfect_widen = 1) {
+    var st = Qte_SeqNew(_seq, _assist, _perfect_widen);
     for (var i = 0; i < array_length(_presses); i++) {
         if (st.done) break;
         Qte_SeqPress(st, _presses[i].dir, _presses[i].t);
@@ -805,9 +826,10 @@ function Battle_SkillStatusIds(_skill) {
     return ids;
 }
 
-// Applies the defence grade to the statuses the hit put on the player (D21). _status_ids: the skill's statuses; _before_snapshot:
-// Battle_StatusSnapshot of the player before the skill. A status the hit lengthened is cut to Qte_DefenceStatusTurns of what the hit left it,
-// never below the turns the player had before; Perfect puts it back as it was. Nothing here can make a status longer.
+// Applies the defence grade to the statuses the hit put on the player (D21, D59). _status_ids: the skill's statuses; _before_snapshot:
+// Battle_StatusSnapshot of the player before the skill. What the hit ADDED is cut and never what the player already had; nothing here can make
+// a status longer or bigger. Poison: the added stacks go through Qte_DefenceStatusTurns. Others: the turns the hit left are cut the same way
+// (never below the turns the player had before). Perfect puts the status back as it was (turns, stacks, burn power), or removes it.
 // Returns { player, status_msg (what is still applied), resist_msg (what was resisted) }.
 function Battle_DefenceAdjustStatuses(_p, _status_ids, _before_snapshot, _key) {
     var p = _p;
@@ -815,22 +837,38 @@ function Battle_DefenceAdjustStatuses(_p, _status_ids, _before_snapshot, _key) {
     var resisted_names = [];
     for (var i = 0; i < array_length(_status_ids); i++) {
         var sid = round(real(_status_ids[i]));
-        var before_turns = Battle_StatusSnapshotTurns(_before_snapshot, sid);
-        var hit_turns = Battle_StatusCurrentTurns(p, sid);
-        if (hit_turns <= before_turns) continue;   // the hit added nothing to this status
-
-        var kept = Qte_DefenceStatusTurns(_key, hit_turns);
+        var before = Battle_StatusSnapshotEntry(_before_snapshot, sid);
+        var now = Status_Find(p, sid);
+        if (!is_struct(now)) continue;
+        var before_turns = is_struct(before) ? before.turns : 0;
+        var before_stacks = is_struct(before) ? before.stacks : 0;
+        var now_stacks = variable_struct_exists(now, "stacks") ? now.stacks : 1;
         var cfg = StatusDB_Get(sid);
+        var is_poison = (variable_struct_exists(cfg, "dot_kind") && cfg.dot_kind == "poison");
+        var added_stacks = max(0, now_stacks - before_stacks);
+        var changed = (now.turns > before_turns) || (added_stacks > 0) || (!is_struct(before));
+        if (!changed) continue;   // the hit added nothing to this status
+
         var name = (is_struct(cfg) && variable_struct_exists(cfg, "name")) ? string(cfg.name) : "";
-        if (kept <= 0) {   // resisted: back to how it was
-            if (before_turns > 0) p = Battle_StatusSetTurns(p, sid, before_turns);
-            else p = Status_Remove(p, sid);
+        var kept_added = is_poison ? Qte_DefenceStatusTurns(_key, added_stacks) : Qte_DefenceStatusTurns(_key, now.turns);
+        if (kept_added <= 0) {   // resisted: back to how it was
+            if (is_struct(before)) {
+                now.turns = before.turns;
+                now.stacks = before.stacks;
+                now.power = before.power;
+            } else {
+                p = Status_Remove(p, sid);
+            }
             if (name != "" && !array_contains(resisted_names, name)) array_push(resisted_names, name);
             continue;
         }
-        kept = max(before_turns, kept);
-        if (kept < hit_turns) p = Battle_StatusSetTurns(p, sid, kept);
-        if (kept > before_turns && name != "" && !array_contains(applied_names, name)) array_push(applied_names, name);
+        if (is_poison) {
+            now.stacks = before_stacks + min(added_stacks, kept_added);
+            now.turns = now.stacks;
+        } else {
+            now.turns = min(now.turns, max(before_turns, kept_added));   // a Bleeding stack the hit added stays; only the turns are cut
+        }
+        if (name != "" && !array_contains(applied_names, name)) array_push(applied_names, name);
     }
 
     var out = { player: p, status_msg: "", resist_msg: "" };
@@ -846,7 +884,7 @@ function Battle_DefenceAdjustStatuses(_p, _status_ids, _before_snapshot, _key) {
 function Battle_PlayerStunSkip(_bc) {
     var p = _bc.p;
     var e = _bc.e;
-    p = Status_Tick(p);
+    p = Status_Tick(p, false);   // D78: a stunned turn is not an action, so Bleeding does not hurt
     // Recovering from a stun grants a brief immunity window so the player can
     // never lose two turns in a row to stun (anti-stun-lock guarantee).
     p.stun_immune_turns = 2;
@@ -880,6 +918,7 @@ function Battle_PlayerFinalizeTurn(_bc, _p, _e, _granted_extra_actions = 0) {
 
     _bc.p = p;
     _bc.e = e;
+    if (_bc.turn == TURN_ENEMY) Battle_ForesightAnnounce(_bc);   // Foresight cast just now: the enemy acts next, show what it will do
     return false;
 }
 
@@ -893,7 +932,8 @@ function Battle_AttackTimingBegin(_bc) {
     }
 
     // The bar is fixed per weapon so it can be learned (D60). The clock starts in the lead-in, so the press that chose ATTACK cannot count.
-    _bc.qte_params = Qte_BarParams(Qte_WeaponKind(_bc.player_weapon));
+    _bc.qte_perfect_widen = Qte_PerfectWiden(p);   // Foresight (D79)
+    _bc.qte_params = Qte_WidenPerfect(Qte_BarParams(Qte_WeaponKind(_bc.player_weapon)), _bc.qte_perfect_widen);
     _bc.qte_assist = Qte_AssistMult();
     _bc.qte_ms = -QTE_LEAD_IN_MS;
     _bc.qte_press_ms = QTE_NO_PRESS;
@@ -1062,7 +1102,7 @@ function Battle_SkillQteBegin(_bc, _skill_id) {
     }
 
     _bc.sq_skill = _skill_id;
-    _bc.sq_st = Qte_SeqNew(Qte_SkillSequence(_skill_id), Qte_AssistMult());
+    _bc.sq_st = Qte_SeqNew(Qte_SkillSequence(_skill_id), Qte_AssistMult(), Qte_PerfectWiden(p));
     _bc.sq_ms = -QTE_SEQ_LEAD_IN_MS;   // the arrows are up and the clock waits; the press that chose the skill cannot count
     _bc.sq_wrong_ms = 0;
     _bc.sq_pop_ms = 0;
@@ -1287,13 +1327,8 @@ function Battle_EndRun(_bc) {
     Transition_RequestRoomFade(gs.battle.return_room);
 }
 
-function Battle_EnemyInitActionBudget(_bc, _e) {
-    if (!variable_instance_exists(_bc, "enemy_actions_remaining")) _bc.enemy_actions_remaining = 0;
-    if (!variable_instance_exists(_bc, "enemy_turn_used_skills") || !is_array(_bc.enemy_turn_used_skills)) _bc.enemy_turn_used_skills = [];
-    if (_bc.enemy_actions_remaining > 0) return;
-
-    _bc.enemy_turn_used_skills = [];
-
+// Actions the enemy takes in its next turn (1, or more with a passive-budget skill such as Rampage).
+function Battle_EnemyActionBudget(_e) {
     var actions = 1;
     if (is_array(_e.skills) && array_length(_e.skills) > 0) {
         for (var i = 0; i < array_length(_e.skills); i++) {
@@ -1306,8 +1341,16 @@ function Battle_EnemyInitActionBudget(_bc, _e) {
             actions = max(actions, max(1, round(real(sk.set_enemy_actions))));
         }
     }
+    return clamp(actions, 1, ENEMY_ACTION_CHAIN_MAX);
+}
 
-    _bc.enemy_actions_remaining = clamp(actions, 1, ENEMY_ACTION_CHAIN_MAX);
+function Battle_EnemyInitActionBudget(_bc, _e) {
+    if (!variable_instance_exists(_bc, "enemy_actions_remaining")) _bc.enemy_actions_remaining = 0;
+    if (!variable_instance_exists(_bc, "enemy_turn_used_skills") || !is_array(_bc.enemy_turn_used_skills)) _bc.enemy_turn_used_skills = [];
+    if (_bc.enemy_actions_remaining > 0) return;
+
+    _bc.enemy_turn_used_skills = [];
+    _bc.enemy_actions_remaining = Battle_EnemyActionBudget(_e);
 }
 
 function Battle_IsDamagingSkillForDebug(_sk) {
@@ -1350,6 +1393,83 @@ function Battle_EnemyChooseSkill(_e, _p, _actions_remaining = -1, _used_skills =
     return candidates[irandom(array_length(candidates) - 1)];
 }
 
+// ---- Foresight (D79): the enemy's next action is decided ahead of time and kept in the battle (enemy_plan), so what it shows is what happens ----
+// plan = { skill_id (-1 = the basic attack), announced }.
+function Battle_EnemyPlanLeft(_bc) {
+    return (_bc.enemy_actions_remaining > 0) ? _bc.enemy_actions_remaining : Battle_EnemyActionBudget(_bc.e);
+}
+
+function Battle_EnemyPlanChoose(_bc) {
+    var used = (_bc.enemy_actions_remaining > 0) ? _bc.enemy_turn_used_skills : [];
+    var force = Debug_EnemyForceDamageSkillOnly();
+    var can_use = force ? true : !_bc.enemy_last_action_used_skill;
+    var sid = can_use ? Battle_EnemyChooseSkill(_bc.e, _bc.p, Battle_EnemyPlanLeft(_bc), used, force) : -1;
+    return { skill_id: sid, announced: false };
+}
+
+// A plan made a turn ago may no longer be allowed (an HP-gated skill, the enemy ran out of what it needs): then the enemy chooses again.
+function Battle_EnemyPlanValid(_bc, _plan) {
+    if (!is_struct(_plan) || !variable_struct_exists(_plan, "skill_id")) return false;
+    if (_plan.skill_id == -1) return true;
+    var sk = SkillDB_Get(_plan.skill_id);
+    if (!is_struct(sk) || sk.id == -1) return false;
+    return Skill_CanUse(_bc.e, sk) && Skill_EnemyCanTrigger(sk, _bc.e, _bc.p, Battle_EnemyPlanLeft(_bc));
+}
+
+function Battle_EnemyPlanGet(_bc) {
+    if (!variable_instance_exists(_bc, "enemy_plan") || !Battle_EnemyPlanValid(_bc, _bc.enemy_plan)) _bc.enemy_plan = Battle_EnemyPlanChoose(_bc);
+    return _bc.enemy_plan;
+}
+
+// The enemy acts on its plan: returns the skill id (-1 = basic attack) and clears the plan.
+function Battle_EnemyPlanTake(_bc) {
+    var plan = Battle_EnemyPlanGet(_bc);
+    _bc.enemy_plan = undefined;
+    return plan.skill_id;
+}
+
+// Pure: what Foresight shows for a plan. Nothing is given away while _visible is false.
+function Battle_ActionPreviewOf(_plan, _visible, _stunned = false) {
+    var out = { visible: false, kind: "none", skill_id: -1, name: "", big: false, text: "" };
+    if (!_visible || !is_struct(_plan)) return out;
+    out.visible = true;
+    if (_stunned) {
+        out.kind = "stunned";
+        out.name = Loc_T("combat.foresee.stunned", "nothing, it is stunned");
+    } else if (_plan.skill_id == -1) {
+        out.kind = "attack";
+        out.name = Loc_T("combat.foresee.attack", "a plain attack");
+    } else {
+        var sk = SkillDB_Get(_plan.skill_id);
+        out.kind = "skill";
+        out.skill_id = _plan.skill_id;
+        out.name = string(sk.name);
+        out.big = (variable_struct_exists(sk, "uses_defensive_qte") && sk.uses_defensive_qte);   // a big, telegraphed attack (D7)
+    }
+    out.text = Loc_T("combat.msg.foresee", "You foresee: {action}", { action: out.name });
+    return out;
+}
+
+// For the turn bar / HUD (D79, D99): the enemy's next action while the player has Foresight; { visible: false } otherwise.
+function Battle_EnemyNextActionPreview(_bc = noone) {
+    var bc = _bc;
+    if (bc == noone) bc = instance_find(obj_battle_controller, 0);
+    if (!instance_exists(bc)) return Battle_ActionPreviewOf(undefined, false);
+    if (!Status_HasFlag(bc.p, "reveals_action")) return Battle_ActionPreviewOf(undefined, false);
+    return Battle_ActionPreviewOf(Battle_EnemyPlanGet(bc), true, !Status_CanAct(bc.e));
+}
+
+// Until the turn bar exists: one battle-log line per enemy action, "You foresee: <action>". Returns true when it wrote one.
+function Battle_ForesightAnnounce(_bc) {
+    if (_bc.battle_over || !Status_HasFlag(_bc.p, "reveals_action")) return false;
+    var pv = Battle_EnemyNextActionPreview(_bc);
+    var plan = _bc.enemy_plan;
+    if (!pv.visible || !is_struct(plan) || plan.announced) return false;
+    plan.announced = true;
+    Combat_Log(pv.text);
+    return true;
+}
+
 function Battle_StatusSnapshot(_ch) {
     var out = [];
     if (!is_struct(_ch) || !variable_struct_exists(_ch, "status") || !is_array(_ch.status)) return out;
@@ -1358,9 +1478,22 @@ function Battle_StatusSnapshot(_ch) {
         if (!is_struct(st) || !variable_struct_exists(st, "id")) continue;
         var sid = round(real(st.id));
         var turns = variable_struct_exists(st, "turns") ? max(0, round(real(st.turns))) : 0;
-        array_push(out, { id: sid, turns: turns });
+        var stacks = variable_struct_exists(st, "stacks") ? max(1, round(real(st.stacks))) : 1;
+        var st_power = variable_struct_exists(st, "power") ? st.power : 0;
+        array_push(out, { id: sid, turns: turns, stacks: stacks, power: st_power });
     }
     return out;
+}
+
+// The snapshot entry of a status, or undefined.
+function Battle_StatusSnapshotEntry(_snapshot, _status_id) {
+    if (!is_array(_snapshot)) return undefined;
+    var sid = round(real(_status_id));
+    for (var i = 0; i < array_length(_snapshot); i++) {
+        var st = _snapshot[i];
+        if (is_struct(st) && variable_struct_exists(st, "id") && round(real(st.id)) == sid) return st;
+    }
+    return undefined;
 }
 
 function Battle_StatusSnapshotTurns(_snapshot, _status_id) {
@@ -1444,25 +1577,23 @@ function Battle_EnemyFinalizeTurnState(_bc, _p, _e) {
     var e = _e;
 
     var enemy_turn_finished = (_bc.enemy_actions_remaining <= 0);
-    if (enemy_turn_finished) {
-        e = Status_Tick(e);
-        if (Battle_CheckEnd(_bc, p, e)) {
-            _bc.p = p;
-            _bc.e = e;
-            out.ended = true;
-            out.player = p;
-            out.enemy = e;
-            return out;
-        }
-        _bc.turn = TURN_PLAYER;
-    } else {
-        _bc.turn = TURN_ENEMY;
+    if (enemy_turn_finished) e = Status_Tick(e);        // the turn's tick, which includes this last action's bleeding
+    else e = Status_ActionTick(e);                       // D78: Bleeding hurts after every action of a chain
+    if (Battle_CheckEnd(_bc, p, e)) {
+        _bc.p = p;
+        _bc.e = e;
+        out.ended = true;
+        out.player = p;
+        out.enemy = e;
+        return out;
     }
+    _bc.turn = enemy_turn_finished ? TURN_PLAYER : TURN_ENEMY;
 
     _bc.p = p;
     _bc.e = e;
     out.player = p;
     out.enemy = e;
+    if (enemy_turn_finished) Battle_ForesightAnnounce(_bc);   // the player's turn starts: what will the enemy do after it?
     return out;
 }
 
@@ -1483,7 +1614,8 @@ function Battle_DefenceClear(_bc) {
 function Battle_DefenceStart(_bc, _skill, _res, _follow_state, _player_hp_before, _status_before_snapshot) {
     _bc.def_active = true;
     _bc.def_skill_id = _skill.id;
-    _bc.def_params = Qte_DefenceParams(_skill.id);   // fixed per attack, so it can be learned (D60)
+    _bc.def_perfect_widen = Qte_PerfectWiden(_bc.p);   // Foresight (D79)
+    _bc.def_params = Qte_WidenPerfect(Qte_DefenceParams(_skill.id), _bc.def_perfect_widen);   // fixed per attack, so it can be learned (D60)
     _bc.def_assist = Qte_AssistMult();
     _bc.def_ms = -(QTE_TELEGRAPH_MS + QTE_LEAD_IN_MS);
     _bc.def_press_ms = QTE_NO_PRESS;
@@ -1796,7 +1928,7 @@ function Battle_EnemyAct(_bc) {
     var e = _bc.e;
 
     if (!Status_CanAct(e)) {
-        e = Status_Tick(e);
+        e = Status_Tick(e, false);
         if (Battle_CheckEnd(_bc, p, e)) return;
         Battle_Message(_bc, Loc_T("combat.msg.enemy_stunned", "{enemy} is stunned!", { enemy: e.name }), BSTATE_MENU);
         _bc.enemy_actions_remaining = 0;
@@ -1810,8 +1942,7 @@ function Battle_EnemyAct(_bc) {
 
     if (!variable_instance_exists(_bc, "enemy_last_action_used_skill")) _bc.enemy_last_action_used_skill = false;
     var force_damage_skill_debug = Debug_EnemyForceDamageSkillOnly();
-    var can_use_skill = force_damage_skill_debug ? true : !_bc.enemy_last_action_used_skill;
-    var skill_id = can_use_skill ? Battle_EnemyChooseSkill(e, p, _bc.enemy_actions_remaining, _bc.enemy_turn_used_skills, force_damage_skill_debug) : -1;
+    var skill_id = Battle_EnemyPlanTake(_bc);   // what Foresight showed (D79), or a fresh choice when nothing was planned
     var use_skill = (skill_id != -1);
     var sk = use_skill ? SkillDB_Get(skill_id) : undefined;
 
@@ -1846,6 +1977,8 @@ function Battle_EnemyAct(_bc) {
             consumes_turn = !free_action;
         }
     }
+
+    _bc.enemy_last_skill_id = use_skill ? skill_id : -1;   // what it really did (tests compare it with the Foresight preview)
 
     if (use_skill) {
         if (res.ok) {

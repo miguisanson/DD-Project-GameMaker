@@ -600,6 +600,10 @@ function Scenario_StepBot(_s) {
         Scenario_StepMove(_s);
         return;
     }
+    if (_s.v == 6) {
+        Scenario_StepBotStatus(_s);
+        return;
+    }
     if (_s.v == 2) {
         Scenario_StepBotSkill(_s);
         return;
@@ -800,7 +804,6 @@ function Scenario_StepBotExtras(_s) {
                 }
             } else {
                 if (_s.sk == -1) {
-                    _bc.e = Status_Add(_bc.e, STATUS_HIT_UP, 99, 0);   // the mini boss cannot miss, so every forced attack reaches the bar
                     _s.sk = 0;
                 } else if (_s.sk == 0) {   // hand the turn to the enemy until its bar comes up
                     if (_bc.battle_state == BSTATE_ENEMY_DEFENCE && _bc.def_active) {
@@ -813,7 +816,6 @@ function Scenario_StepBotExtras(_s) {
                         _s.sk = 1;
                     } else if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {
                         _s.d_tries++;
-                        _bc.e = Status_Add(_bc.e, STATUS_HIT_UP, 99, 0);
                         _bc.turn = TURN_ENEMY;
                         _bc.battle_state = BSTATE_ENEMY_ACT;
                     }
@@ -880,8 +882,7 @@ function Scenario_StepBotSkill(_s) {
                 _ch.skills = [_sid];   // the only skill in the menu
                 _ch.max_mp = 99;
                 _ch.mp = 99;
-                _ch = Status_Add(_ch, STATUS_HIT_UP, 9, 0);
-                if (_sid == SKILL_HILT_BASH) _ch = Status_Add(_ch, STATUS_POISON, 3, 0);   // BUG-08: the tick after the skill must reach the log and the HUD
+                if (_sid == SKILL_HILT_BASH) _ch = Status_Add(_ch, STATUS_POISON, 0, 0, 3);   // BUG-08: the tick after the skill must reach the log and the HUD
                 GameState_SetPlayer(_ch);
                 _s.vstart = _s.f;
                 _s.sk = -1;
@@ -972,7 +973,246 @@ function Scenario_StepBotSkill(_s) {
         case 2:   // measured: start the next skill (the battle is simply abandoned) or the fail variant
             if (_s.t == 5) {
                 _s.ski++;
-                if (_s.ski >= array_length(_ids)) _s.v = 5;   // skills -> movement and AI (v=5) -> fail (v=1)
+                if (_s.ski >= array_length(_ids)) _s.v = 6;   // skills -> statuses (v=6, B2) -> movement and AI (v=5) -> fail (v=1)
+                Scenario_Next(_s, 0);
+            }
+            break;
+    }
+}
+
+// ---- v=6 (packet B2): the status rules through the real battle flow ----
+// Battle A: a Mage against a Slime that stays stunned, 99 HP: Poison stacks tick down (3, 2, 1), Burning lowers DEF and ends after its 2 turns,
+// Bleeding does not hurt on a stunned turn but does on each action. Battle B: the Mage casts Foresight against a Spider that only uses its big
+// attack (Poison Fangs): the preview names it, the enemy really does it, the log says so, the Perfect zones are x1.5 for 3 turns and back to normal after.
+function Scenario_BotLogCount(_bc, _needle) {
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_bc.combat_log); _i++) {
+        if (string_pos(_needle, _bc.combat_log[_i].text) > 0) _n++;
+    }
+    return _n;
+}
+
+// One basic attack with no press (Weak is enough). _t.pa: 0 wait for the menu, 1 wait for the bar, 2 wait for the bar to end, 3 wait for the menu again.
+// Returns true on the frame the player is back at the menu. Records what the bar looked like (_t.widen, _t.pw) and the HP before the action.
+function Scenario_BotOneAttack(_s, _bc) {
+    var _t = _s.stt;
+    var _ready = (_s.f - _s.last_tap) >= 4;
+    switch (_t.pa) {
+        case 0:
+            if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {
+                if (_bc.menu_index != 0) {
+                    Scenario_Tap("menu_up");   // the cursor is remembered: back to ATTACK
+                } else {
+                    _t.hp_before = _bc.p.hp;
+                    Scenario_Tap("confirm");
+                    _t.pa = 1;
+                }
+            }
+            break;
+        case 1:
+            if (_bc.battle_state == BSTATE_ATTACK_TIMING) {
+                _t.widen = _bc.qte_perfect_widen;
+                _t.pw = _bc.qte_params.perfect_half_width;
+                _t.pa = 2;
+            }
+            break;
+        case 2:
+            if (_bc.battle_state != BSTATE_ATTACK_TIMING) _t.pa = 3;
+            break;
+        case 3:
+            if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) {
+                _t.pa = 0;
+                show_debug_message("[BOT] bot_status k=" + string(_t.k) + " hp=" + string(_bc.p.hp) + "/" + string(_bc.p.max_hp) + " (before " + string(_t.hp_before) + ") status=" + json_stringify(_bc.p.status) + " enemy_hp=" + string(_bc.e.hp));
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+
+function Scenario_StepBotStatus(_s) {
+    var _name = "bot_status";
+    switch (_s.step) {
+        case 0:   // battle A
+        case 3:   // battle B
+            if (_s.t == 10) {
+                var _gs = Scenario_NewKnight(CLASS_MAGE);
+                var _ch = _gs.player_ch;
+                _ch.max_hp = 99;
+                _ch.hp = 99;
+                _ch.max_mp = 99;
+                _ch.mp = 99;
+                var _b_battle = (_s.step == 3);
+                if (_b_battle) _ch.skills = [SKILL_FORESIGHT];
+                GameState_SetPlayer(_ch);
+                _s.stt = { pa: 0, k: 0, widen: 1, pw: 0, hp_before: 0, def0: 0, sk: 0, pv_id: -99, def_widen: 0, def_pw: 0, waited: false };
+                _s.vstart = _s.f;
+                _s.xwrong = 0;
+                if (_b_battle) {
+                    Debug_Init();
+                    global.debug.enabled = true;   // an enemy that only uses its damaging skill: the Spider's Poison Fangs, every turn
+                    global.debug.enemy_damage_skill_only = true;
+                }
+                Scenario_GotoBattle(_name + (_b_battle ? "_b" : "_a"), _b_battle ? ENEMY_SPIDER : ENEMY_SLIME);
+                Scenario_Next(_s, _b_battle ? 4 : 1);
+            }
+            break;
+        case 1:   // battle A
+            if (room != rm_battle || !instance_exists(obj_battle_controller)) {
+                if (_s.t > 20) { Scenario_Check(_name + "_a_in_battle", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+                break;
+            }
+            var _bc = instance_find(obj_battle_controller, 0);
+            var _t = _s.stt;
+            if (_s.f - _s.vstart > 4000) {
+                Scenario_Check(_name + "_a_finished", false, "k=" + string(_t.k) + " state=" + string(_bc.battle_state) + " pa=" + string(_t.pa));
+                Scenario_Next(_s, 2);
+                break;
+            }
+            var _ready_a = (_s.f - _s.last_tap) >= 4;
+            if (_t.k == 0) {   // set up: a sturdy enemy that never acts, 3 Poison stacks on the player
+                if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) {
+                    _bc.e.max_hp = 999;
+                    _bc.e.hp = 999;
+                    _bc.p.max_hp = 99;   // the battle starts with the class's real HP, so raise it here
+                    _bc.p.hp = 99;
+                    _bc.e = Status_Add(_bc.e, STATUS_STUN, 99, 1);
+                    _bc.p = Status_Add(_bc.p, STATUS_POISON, 0, 0, 3);
+                    Scenario_Check(_name + "_poison_3_stacks_applied", Status_Stacks(_bc.p, STATUS_POISON) == 3);
+                    _t.k = 1;
+                }
+            } else if (_t.k >= 1 && _t.k <= 3) {   // three actions: Poison costs 3, 2, 1 and loses a stack each time
+                if (Scenario_BotOneAttack(_s, _bc)) {
+                    var _loss = _t.hp_before - _bc.p.hp;
+                    var _want_loss = 4 - _t.k;
+                    Scenario_Check(_name + "_poison_tick_" + string(_t.k) + "_costs_" + string(_want_loss), _loss == _want_loss, "lost " + string(_loss));
+                    Scenario_Check(_name + "_poison_stacks_after_action_" + string(_t.k) + "_is_" + string(3 - _t.k), Status_Stacks(_bc.p, STATUS_POISON) == 3 - _t.k, "stacks=" + string(Status_Stacks(_bc.p, STATUS_POISON)));
+                    if (_t.k == 3) {
+                        Scenario_Check(_name + "_poison_gone_at_0_stacks", !Status_Has(_bc.p, STATUS_POISON));
+                        Scenario_Check(_name + "_poison_tick_logged", Scenario_BotLogCount(_bc, "Poison hurts you") >= 3);
+                        _t.def0 = Combat_EffectiveStat(_bc.p, STAT_DEF);
+                        _bc.p = Status_Add(_bc.p, STATUS_BURN, 2, 4);   // Burning: a fixed tick of 4 for 2 turns, DEF x0.75
+                        Scenario_Check(_name + "_burn_lowers_def", Combat_EffectiveStat(_bc.p, STAT_DEF) == Status_BurnDef(_t.def0) && Combat_EffectiveStat(_bc.p, STAT_DEF) < _t.def0,
+                            "def0=" + string(_t.def0) + " now=" + string(Combat_EffectiveStat(_bc.p, STAT_DEF)));
+                        _bc.p = Status_Add(_bc.p, STATUS_BURN, 2, 4);
+                        Scenario_Check(_name + "_burn_reapply_does_not_stack", array_length(_bc.p.status) == 1 && Battle_StatusCurrentTurns(_bc.p, STATUS_BURN) == 2);
+                    }
+                    _t.k++;
+                }
+            } else if (_t.k == 4 || _t.k == 5) {   // Burning: 4 HP per action for 2 turns, DEF back afterwards
+                if (Scenario_BotOneAttack(_s, _bc)) {
+                    var _bloss = _t.hp_before - _bc.p.hp;
+                    Scenario_Check(_name + "_burn_tick_" + string(_t.k - 3) + "_costs_4", _bloss == 4, "lost " + string(_bloss));
+                    if (_t.k == 4) Scenario_Check(_name + "_burn_1_turn_left", Battle_StatusCurrentTurns(_bc.p, STATUS_BURN) == 1, "turns=" + string(Battle_StatusCurrentTurns(_bc.p, STATUS_BURN)));
+                    if (_t.k == 5) {
+                        Scenario_Check(_name + "_burn_ends_after_2_turns", !Status_Has(_bc.p, STATUS_BURN));
+                        Scenario_Check(_name + "_def_restored_after_burn", Combat_EffectiveStat(_bc.p, STAT_DEF) == _t.def0);
+                        // Bleeding (2 stacks, 3 turns) and a stun on the player at once: the stunned turn is skipped and costs no HP
+                        _bc.p = Status_Add(_bc.p, STATUS_BLEED, 3, 0, 2);
+                        _bc.p = Status_Add(_bc.p, STATUS_STUN, 1, 1);
+                        _t.hp_before = _bc.p.hp;
+                        _t.waited = false;
+                    }
+                    _t.k++;
+                }
+            } else if (_t.k == 6) {   // the stunned turn goes by on its own (the controller skips it)
+                if (_bc.battle_state != BSTATE_MENU) _t.waited = true;
+                if (_t.waited && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) {
+                    Scenario_Check(_name + "_bleed_does_not_hurt_on_a_stunned_turn", _bc.p.hp == _t.hp_before, "hp " + string(_t.hp_before) + " -> " + string(_bc.p.hp));
+                    Scenario_Check(_name + "_stun_was_used_up", !Status_Has(_bc.p, STATUS_STUN));
+                    Scenario_Check(_name + "_bleed_turn_counted_while_stunned", Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED) == 2, "turns=" + string(Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED)));
+                    _t.k = 7;
+                }
+            } else if (_t.k == 7 || _t.k == 8) {   // two actions: Bleeding costs 2 x 2 stacks each, and ends after its 3rd turn
+                if (Scenario_BotOneAttack(_s, _bc)) {
+                    var _dloss = _t.hp_before - _bc.p.hp;
+                    Scenario_Check(_name + "_bleed_action_" + string(_t.k - 6) + "_costs_4", _dloss == 4, "lost " + string(_dloss));
+                    if (_t.k == 7) Scenario_Check(_name + "_bleed_1_turn_left", Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED) == 1);
+                    if (_t.k == 8) Scenario_Check(_name + "_bleed_ends_after_3_turns", !Status_Has(_bc.p, STATUS_BLEED));
+                    _t.k++;
+                }
+            } else {
+                Scenario_Next(_s, 2);
+            }
+            break;
+        case 2:   // measured: battle B next (the battle is simply abandoned)
+            if (_s.t == 5) Scenario_Next(_s, 3);
+            break;
+        case 4:   // battle B
+            if (room != rm_battle || !instance_exists(obj_battle_controller)) {
+                if (_s.t > 20) { Scenario_Check(_name + "_b_in_battle", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+                break;
+            }
+            var _bcb = instance_find(obj_battle_controller, 0);
+            var _tb = _s.stt;
+            if (_s.f - _s.vstart > 4500) {
+                Scenario_Check(_name + "_b_finished", false, "k=" + string(_tb.k) + " state=" + string(_bcb.battle_state) + " sk=" + string(_tb.sk));
+                global.debug.enabled = false;
+                global.debug.enemy_damage_skill_only = false;
+                _s.v = 5;
+                Scenario_Next(_s, 0);
+                break;
+            }
+            var _ready_b = (_s.f - _s.last_tap) >= 4;
+            if (_tb.k == 0) {   // cast Foresight through the menu and the arrows
+                if (_tb.sk == 0) {
+                    if (_bcb.battle_state == BSTATE_MENU && _bcb.turn == TURN_PLAYER && _ready_b) {
+                        _bcb.e.max_hp = 999;
+                        _bcb.e.hp = 999;
+                        _bcb.p.max_hp = 99;
+                        _bcb.p.hp = 99;
+                        _bcb.p.max_mp = 99;
+                        _bcb.p.mp = 99;
+                        Scenario_Tap((_bcb.menu_index != 1) ? "menu_down" : "confirm");
+                    } else if (_bcb.battle_state == BSTATE_SKILL_MENU && _ready_b) {
+                        Scenario_Tap("confirm");
+                        _tb.sk = 1;
+                    }
+                } else if (_tb.sk == 1) {
+                    Scenario_BotArrows(_s, _bcb, "right");
+                    if (_bcb.battle_state == BSTATE_SKILL_QTE) _tb.sk = 2;
+                } else if (_tb.sk == 2) {
+                    Scenario_BotArrows(_s, _bcb, "right");
+                    if (_bcb.battle_state != BSTATE_SKILL_QTE) {   // the sequence ended and Foresight was cast
+                        var _pv = Battle_EnemyNextActionPreview(_bcb);
+                        Scenario_Check(_name + "_foresight_cast_with_3_turns", Battle_StatusCurrentTurns(_bcb.p, STATUS_HIT_UP) == 3, "turns=" + string(Battle_StatusCurrentTurns(_bcb.p, STATUS_HIT_UP)));
+                        Scenario_Check(_name + "_preview_visible_and_names_the_big_attack", _pv.visible && _pv.kind == "skill" && _pv.skill_id == SKILL_POISON_FANGS && _pv.big, "kind=" + _pv.kind + " id=" + string(_pv.skill_id));
+                        Scenario_Check(_name + "_foresee_line_in_the_log", Scenario_BotLogCount(_bcb, _pv.text) == 1 && string_pos("You foresee: " + SkillDB_Get(SKILL_POISON_FANGS).name, _pv.text) > 0, _pv.text);
+                        _tb.pv_id = _pv.skill_id;
+                        _tb.k = 1;
+                    }
+                }
+            } else if (_tb.k == 1) {   // the enemy acts; its defence bar is up for a while: Foresight widens it too
+                if (_bcb.battle_state == BSTATE_ENEMY_DEFENCE && _bcb.def_active && _tb.def_widen == 0) {
+                    _tb.def_widen = _bcb.def_perfect_widen;
+                    _tb.def_pw = _bcb.def_params.perfect_half_width;
+                }
+                if (_bcb.battle_state == BSTATE_MENU && _bcb.turn == TURN_PLAYER) {
+                    Scenario_Check(_name + "_enemy_did_what_foresight_showed", _bcb.enemy_last_skill_id == _tb.pv_id, "did=" + string(_bcb.enemy_last_skill_id) + " showed=" + string(_tb.pv_id));
+                    Scenario_Check(_name + "_defence_bar_perfect_zone_x1.5", _tb.def_widen == 1.5 && abs(_tb.def_pw - Qte_DefenceParams(SKILL_POISON_FANGS).perfect_half_width * 1.5) < 0.001, "widen=" + string(_tb.def_widen) + " pw=" + string(_tb.def_pw));
+                    Scenario_Check(_name + "_foresee_line_for_the_next_action", Scenario_BotLogCount(_bcb, "You foresee:") == 2 && Battle_EnemyNextActionPreview(_bcb).visible, "lines=" + string(Scenario_BotLogCount(_bcb, "You foresee:")));
+                    Scenario_Check(_name + "_foresight_still_3_turns_after_the_cast_turn", Battle_StatusCurrentTurns(_bcb.p, STATUS_HIT_UP) == 3);
+                    _tb.k = 2;
+                }
+            } else if (_tb.k >= 2 && _tb.k <= 5) {   // four actions: Foresight on for the first three (bar x1.5, turns 2, 1, gone), off for the fourth
+                if (Scenario_BotOneAttack(_s, _bcb)) {
+                    var _on = (_tb.k <= 4);
+                    var _base_pw = Qte_BarParams(Qte_WeaponKind(_bcb.player_weapon)).perfect_half_width;
+                    Scenario_Check(_name + "_attack_" + string(_tb.k - 1) + "_perfect_zone_" + (_on ? "x1.5" : "normal"), abs(_tb.pw - _base_pw * (_on ? 1.5 : 1)) < 0.001 && _tb.widen == (_on ? 1.5 : 1), "pw=" + string(_tb.pw) + " base=" + string(_base_pw));
+                    if (_tb.k == 2) Scenario_Check(_name + "_foresight_2_turns_left", Battle_StatusCurrentTurns(_bcb.p, STATUS_HIT_UP) == 2);
+                    if (_tb.k == 3) Scenario_Check(_name + "_foresight_1_turn_left", Battle_StatusCurrentTurns(_bcb.p, STATUS_HIT_UP) == 1);
+                    if (_tb.k == 4) {
+                        Scenario_Check(_name + "_foresight_over_after_3_turns", !Status_Has(_bcb.p, STATUS_HIT_UP));
+                        Scenario_Check(_name + "_preview_hidden_again", !Battle_EnemyNextActionPreview(_bcb).visible);
+                        _tb.lines = Scenario_BotLogCount(_bcb, "You foresee:");
+                    }
+                    if (_tb.k == 5) Scenario_Check(_name + "_no_foresee_line_after_it_ended", Scenario_BotLogCount(_bcb, "You foresee:") == _tb.lines, "was " + string(_tb.lines) + " now " + string(Scenario_BotLogCount(_bcb, "You foresee:")));
+                    _tb.k++;
+                }
+            } else {
+                global.debug.enabled = false;
+                global.debug.enemy_damage_skill_only = false;
+                _s.v = 5;   // on to movement and AI
                 Scenario_Next(_s, 0);
             }
             break;
