@@ -2590,7 +2590,7 @@ function Test_Suite_RunSave() {
     _p.hp = 7; _p.mp = 4;
     _p.skills = [SKILL_FIREBALL];
     _p.inventory = Inv_Add(_p.inventory, 11, 2);
-    _p = Status_Add(_p, STATUS_POISON, 3, 0);
+    _p = Status_Add(_p, STATUS_POISON, 0, 1, 3);   // D78: poison is stacks
     _gs.player_ch = _p;
     _gs.selected_class = CLASS_MAGE;
     _gs.flags = { test_flag: 42 };
@@ -2639,7 +2639,7 @@ function Test_Suite_RunSave() {
     Test_Eq("runsave: restored MP", _r.mp, 4);
     Test_True("runsave: restored skills", array_length(_r.skills) == 1 && _r.skills[0] == SKILL_FIREBALL);
     Test_True("runsave: restored inventory (MP potion x2)", Inv_Has(_r.inventory, 11, 2));
-    Test_True("runsave: restored Poison with 3 turns", Status_Has(_r, STATUS_POISON) && _r.status[0].turns == 3);
+    Test_True("runsave: restored Poison with 3 stacks (D78)", Status_Has(_r, STATUS_POISON) && Status_Stacks(_r, STATUS_POISON) == 3);
     Test_Eq("runsave: restored flags", variable_struct_get(_gs.flags, "test_flag"), 42);
     Test_Eq("runsave: the room to enter", _info.room_id, rm_floor3);
     Test_True("runsave: the position to enter", _info.x == 48 && _info.y == 64);
@@ -3011,7 +3011,7 @@ function Test_Suite_UI() {
     // --- the same keys everywhere: confirm / back / arrows come from the game's input actions
     Input_Init();
     var _inp = global.input;
-    _inp.last_step_time = current_time;   // freeze Input_Update for this check
+    _inp.frozen = true;   // freeze Input_Update for this check (a same-millisecond check raced the clock)
     variable_struct_set(_inp.state, "confirm", { held: true, pressed: true });
     variable_struct_set(_inp.state, "cancel", { held: true, pressed: true });
     variable_struct_set(_inp.state, "menu_up", { held: true, pressed: true });
@@ -3028,7 +3028,7 @@ function Test_Suite_UI() {
     variable_struct_set(_inp.state, "cancel", { held: false, pressed: false });
     variable_struct_set(_inp.state, "menu_up", { held: false, pressed: false });
     variable_struct_set(_inp.state, "menu_right", { held: false, pressed: false });
-    _inp.last_step_time = -1;
+    _inp.frozen = false;
 
     // --- motion helpers (D97): 120 ms panels, gliding cursor, gentle bob
     Test_Eq("D97 panel animation starts at 0", Ui_AnimT(1000, 1000), 0);

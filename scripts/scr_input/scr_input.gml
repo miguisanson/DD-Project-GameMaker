@@ -253,6 +253,7 @@ function Input_GamepadActionPressed(_device, _action, _prev_held, _deadzone) {
 
 function Input_Update() {
     Input_Init();
+    if (variable_struct_exists(global.input, "frozen") && global.input.frozen) return;   // tests inject state (no clock race)
     if (global.input.last_step_time == current_time) return;
     global.input.last_step_time = current_time;
 
