@@ -481,14 +481,14 @@ def main():
     w("")
     w("1. **The game is far too easy and far too short for the plan.** Greedy Knight / Archer / Mage win 90-100% of runs at every skill profile (target 35-55%), "
       "the median winning run is about 20 minutes (target 45-60), a floor drains 18-32% of HP (advisory target 60-80%) and a whole run uses 0.2-1.0 HP potions. "
-      "Gold is not a decision: about 600 of the 700 earned is left at the end.")
+      "Gold is not a decision: about 600 of the 750 earned is left at the end.")
     w("2. **Elites and bosses are too short.** Elites last about as long as a normal fight; Palehorn 5-7 turns; the Pale Choirbeast 3.7 turns for a Mage, 6-7 for the others.")
     w("3. **SPD decides the class order.** The Knight (SPD 8) gets 0.67 actions per Palehorn action, the Archer (SPD 13+) 1.3. A fast Archer or any multi-hit user also breaks the boss meter "
       "before the wind-up lands (BREAK cancels it, D75), so in the traces the Archer rarely eats a heavy hit: it wins 99-100% at every skill profile while the Knight loses at Palehorn (8 of 400 average runs).")
     w("4. **Class gap.** Mage: strongest burst (Fireball burn is 12 damage on top of the hit) and the squishiest at Palehorn. Nobody: no skills, weakest growth; "
       "it stalls on Palehorn (17-18 player turns) and survives only through throwables.")
-    w("5. **The MP economy is one passive.** MP does not regenerate between fights, a Knight has 11-20 MP, skills cost 3-5. Mana Spring (+1 MP every own turn) is taken in nearly every run "
-      "because it is the only MP source; the first skill card is Wound or Fireball and most players never get to use a second skill.")
+    w("5. **The MP economy is one passive.** MP does not regenerate between fights, a Knight has 11-20 MP, skills cost 3-5. Mana Spring (+1 MP every own turn) is the highest-valued passive for Knight and Archer (gain 64 and 49 HP-equivalents, the next passive 36) "
+      "because it is the only MP source; a winning run ends with only 1.3-1.5 of its 3 skill slots filled, the first skill card is almost always taken and the rest lose to passives.")
     w("6. **Bug, found while porting Skill_AdjustStatusTurns:** a status with a fixed `duration` ignores the skill's own turns, so **Foresight+ (+2 turns) does nothing** (stays 3). "
       "Muscle Up+/Rev Up+/Evasion+/Take Aim+/Meditation+ are fine (those statuses have no fixed duration). Not a balance number: a one-line fix in `Skill_AdjustStatusTurns` "
       "(use `max(fixed, skill turns)` or put `status_turns` on the upgrade into `duration`).")
@@ -621,7 +621,7 @@ def main():
     w("")
     w("- **Run length.** The plan says 45-60 minutes; the map holds 19 free enemies plus Palehorn, 3 Strangers and the Choirbeast on one-screen rooms. Longer fights add a few minutes; the other 25 need "
       "content (more enemies per room, enemy respawn, optional rooms) or a shorter promise. D28 forbids new content, so this needs a grill-me.")
-    w("- **Archer.** Even with every proposal the Archer wins 85-95%: SPD plus BREAK-cancelled wind-ups let it avoid the heavy hits that defence bars are meant to price. Options: "
+    w("- **Archer.** Even with every proposal the Archer wins 90-96% at every skill profile: SPD plus BREAK-cancelled wind-ups let it avoid the heavy hits that defence bars are meant to price. Options: "
       "boss meters that refill after a cancel, a wind-up that cannot be cancelled twice in a row, or heavy moves that hit before the first player turn. All are rule changes.")
     w("- **Gold.** Numbers alone only trade income for prices; the game needs either more things to buy (cards, rerolls, removal, as in the research) or less gold.")
     w("- **Foresight** needs its information used before it can be judged (the sim does not read wind-up previews).")
