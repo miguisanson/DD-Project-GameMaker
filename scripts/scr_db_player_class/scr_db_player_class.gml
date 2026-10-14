@@ -4,7 +4,7 @@ function DB_PlayerClass(_class_id) {
     switch (_class_id) {
         case CLASS_KNIGHT:
             return { name:Loc_T("class.name.class_knight", "Knight"), hd:10, mp_gain:1, base_hp:PLAYER_BASE_HP, base_mp:PLAYER_BASE_MP, free_default: STAT_DEF,
-                     stats:{ atk:11, def:12, spd:8, mag:3 },
+                     stats:{ atk:11, def:12, spd:10, mag:3 },
                      sprites:{ right:knight_right, left:knight_left, up:knight_up, down:knight_down } };
 
         case CLASS_ARCHER:

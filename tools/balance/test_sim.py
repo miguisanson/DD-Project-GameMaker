@@ -205,7 +205,7 @@ class Economy(unittest.TestCase):
     def test_tweak_changes_the_what_if_data_only(self):
         d2 = sim.Data(sim.DEFAULT_DATA, [("enemies[palehorn].base_hp", 99)])
         self.assertEqual(d2.enemies[8]["base_hp"], 99)
-        self.assertEqual(D.enemies[8]["base_hp"], 25)
+        self.assertEqual(D.enemies[8]["base_hp"], 55)   # the game's Palehorn since D111 (it was 25)
 
 
 def ref_burn(mag):
