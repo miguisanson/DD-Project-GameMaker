@@ -13,6 +13,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\automation\run_tests.p
 | `fast` (default) | Build + `-runtests` (timeout 30 s). |
 | `full` | `fast` + `-smoke` (60 s) + `-bot` (120 s) + `-shots` (60 s). |
 
+`-Only exportdata` (not part of `full`) runs `-exportdata`: the game writes `export_data.json` (classes with per-level stats, enemies, skills, items, statuses, level table, loot, constants) and exits; the wrapper checks it parses and every id list is unique, then copies it to `<WorkRoot>\export\` (that folder is never emptied, so the last export stays for the simulator).
+
 `-Only <mode>` runs just that game mode after the build (e.g. `-Mode full -Only smoke`).
 
 Exit code: 0 = `GATE PASS`, 1 = `GATE FAIL`, 2 = refused to start (a work dir is on C:, or Igor/git missing).

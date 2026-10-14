@@ -9,7 +9,7 @@ function SkillDB_Init() {
         mp_cost: 3,
         power: 4,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_ENEMY,
         effect: "damage",
@@ -30,7 +30,7 @@ function SkillDB_Init() {
         mp_cost: 4,
         power: 4,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_ENEMY,
         effect: "damage",
@@ -52,7 +52,7 @@ function SkillDB_Init() {
         mp_cost: 3,
         power: 0,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_SELF,
         effect: "status",
@@ -73,7 +73,7 @@ function SkillDB_Init() {
         mp_cost: 3,
         power: 0,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_SELF,
         effect: "status",
@@ -94,7 +94,7 @@ function SkillDB_Init() {
         mp_cost: 5,
         power: 5,
         power_mult: 1.5,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_ENEMY,
         effect: "damage",
@@ -116,7 +116,7 @@ function SkillDB_Init() {
         mp_cost: 4,
         power: 5,
         power_mult: 1,
-        stat_type: STAT_AGI,
+        stat_type: STAT_ATK,
         acc: 1,
         target: TGT_ENEMY,
         effect: "damage",
@@ -137,7 +137,7 @@ function SkillDB_Init() {
         mp_cost: 3,
         power: 0,
         power_mult: 1,
-        stat_type: STAT_AGI,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_SELF,
         effect: "status",
@@ -158,7 +158,7 @@ function SkillDB_Init() {
         mp_cost: 5,
         power: 4,
         power_mult: 1,
-        stat_type: STAT_AGI,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_ENEMY,
         effect: "damage",
@@ -179,7 +179,7 @@ function SkillDB_Init() {
         mp_cost: 3,
         power: 0,
         power_mult: 1,
-        stat_type: STAT_AGI,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_SELF,
         effect: "status",
@@ -201,7 +201,7 @@ function SkillDB_Init() {
         mp_cost: 4,
         power: 6,
         power_mult: 1,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 0,
         target: TGT_ENEMY,
         effect: "damage",
@@ -222,7 +222,7 @@ function SkillDB_Init() {
         mp_cost: 4,
         power: 4,
         power_mult: 1,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 0,
         target: TGT_ENEMY,
         effect: "damage",
@@ -243,7 +243,7 @@ function SkillDB_Init() {
         mp_cost: 5,
         power: 5,
         power_mult: 1,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 0,
         target: TGT_ENEMY,
         effect: "damage",
@@ -265,7 +265,7 @@ function SkillDB_Init() {
         mp_cost: 3,
         power: 0,
         power_mult: 1,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 0,
         target: TGT_SELF,
         effect: "status",
@@ -286,7 +286,7 @@ function SkillDB_Init() {
         mp_cost: 3,
         power: 0,
         power_mult: 1,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 0,
         target: TGT_SELF,
         effect: "status",
@@ -311,7 +311,7 @@ function SkillDB_Init() {
         mp_cost: 0,
         power: 2,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_OPPONENT,
         effect: "damage",
@@ -363,7 +363,7 @@ function SkillDB_Init() {
         mp_cost: 0,
         power: 2,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_OPPONENT,
         effect: "damage",
@@ -389,7 +389,7 @@ function SkillDB_Init() {
         mp_cost: 0,
         power: 0,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_SELF,
         effect: "status",
@@ -416,7 +416,7 @@ function SkillDB_Init() {
         mp_cost: 0,
         power: 2,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_OPPONENT,
         effect: "damage",
@@ -442,7 +442,7 @@ function SkillDB_Init() {
         mp_cost: 0,
         power: 3,
         power_mult: 1,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 0,
         target: TGT_OPPONENT,
         effect: "damage",
@@ -468,7 +468,7 @@ function SkillDB_Init() {
         mp_cost: 0,
         power: 3,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_OPPONENT,
         effect: "damage",
@@ -494,7 +494,7 @@ function SkillDB_Init() {
         mp_cost: 0,
         power: 0,
         power_mult: 1,
-        stat_type: STAT_AGI,
+        stat_type: STAT_SPD,
         acc: 0,
         target: TGT_OPPONENT,
         effect: "steal_item",
@@ -520,7 +520,7 @@ function SkillDB_Init() {
         mp_cost: 0,
         power: 4,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_OPPONENT,
         effect: "damage",
@@ -548,7 +548,7 @@ function SkillDB_Init() {
         mp_cost: 0,
         power: 0,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_SELF,
         effect: "status",
@@ -579,7 +579,7 @@ function SkillDB_Init() {
         mp_cost: 0,
         power: 0,
         power_mult: 1,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 0,
         target: TGT_OPPONENT,
         effect: "multi_status",
@@ -637,7 +637,7 @@ function SkillDB_Init() {
         mp_cost: 0,
         power: 0,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_SELF,
         effect: "status",
@@ -680,7 +680,7 @@ function SkillDB_Get(_skill_id) {
         mp_cost: 0,
         power: 0,
         power_mult: 1,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         target: TGT_ENEMY,
         effect: "damage",
@@ -1134,22 +1134,24 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
         var total_dmg = 0;
 
         var crit_bonus = Status_GetSum(_user, "crit_bonus");
-        var acc_bonus = s.acc + StatMod(Combat_EffectiveStat(_user, s.stat_type));
+        // Spec section 4: the formula power. A player's weapon adds to it (D22); power_mult is part of it.
+        var skill_power = user_is_player ? Combat_PowerSkill(s.power, s.power_mult, Combat_WeaponPower(_user)) : Combat_PowerEnemySkill(s.power, s.power_mult);
 
         for (var h = 0; h < hits; h++) {
-            // D6: player skills always hit. TODO(D24, STAT rework): Evasion / Solidify on the target and Foresight on the user are ignored here.
+            // D6/D80: nothing rolls to hit. A player skill always lands; an enemy skill lands unless the player's Evasion dodges it.
             var hit_res = { hit: true, defender: _target };
             if (!user_is_player) {
-                hit_res = Combat_AttemptHit(_user, _target, acc_bonus);
+                var dodge_res = Combat_TryDodge(_user, _target);
+                hit_res = { hit: !dodge_res.dodged, defender: dodge_res.defender };
                 _target = hit_res.defender;
             }
 
             if (hit_res.hit) {
-                var weapon = { power: s.power, stat_type: s.stat_type, acc: s.acc };
+                var weapon = { power: skill_power, stat_type: s.stat_type, acc: s.acc };
                 var crit = Combat_CritCheck(_user, crit_bonus);
                 var dmg_ctx_skill = { is_skill: true };
                 if (user_is_player) dmg_ctx_skill.grade_mult = _grade_mult;
-                var dmg_pack = Combat_ApplyDamage(_user, _target, weapon, (crit ? 2 : 1), s.power_mult, dmg_ctx_skill);
+                var dmg_pack = Combat_ApplyDamage(_user, _target, weapon, (crit ? COMBAT_CRIT_MULT : 1), 1, dmg_ctx_skill);
                 _target = dmg_pack.defender;
                 if (user_is_player && dmg_pack.dmg > 0) {
                     // FUN-FIRST passives can amplify player skill damage.
@@ -1175,9 +1177,6 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
         _user = Status_ConsumeByField(_user, "consume_on_attack");
 
         var status_chance = variable_struct_exists(s, "status_chance") ? real(s.status_chance) : 1;
-        if (!variable_struct_exists(_user, "is_player") || !_user.is_player) {
-            status_chance = clamp(status_chance * Combat_EffectiveEnemyStatusChanceMult(), 0, 1);
-        }
 
         if (s.status != -1 && any_hit) {
             if (status_chance >= 1 || random(1) <= status_chance) {
@@ -1230,7 +1229,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
     }
 
     if (s.effect == "heal") {
-        var amt = s.power + max(0, StatMod(Combat_EffectiveStat(_user, s.stat_type)));
+        var amt = Combat_HealAmount(s.power, Combat_EffectiveStat(_user, s.stat_type));
         _target.hp = clamp(_target.hp + amt, 0, _target.max_hp);
         result.dmg = -amt;
         if (variable_struct_exists(s, "use_msg")) result.msg = string(s.use_msg);
