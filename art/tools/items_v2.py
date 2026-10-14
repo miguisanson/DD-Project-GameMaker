@@ -53,25 +53,22 @@ def _(c):
     c.P([(12, 7), (10, 10), (13, 10)], "w"); c.C(11, 11, 2, "w"); c.px(10, 11, "g")
 
 
-@item("skill/hilt_bash", shade=False)
+@item("skill/hilt_bash", shade=True)
 def _(c):
-    # impact burst on top, sword hilt below
-    for (x, y) in ((6, 0), (1, 1), (11, 1), (2, 2), (10, 2), (0, 4), (12, 4)):
-        c.px(x, y, "w")
-    c.L(3, 3, 9, 3, "w"); c.L(6, 1, 6, 5, "w"); c.L(3, 1, 9, 5, "g"); c.L(9, 1, 3, 5, "g")
-    c.C(6, 3, 1, "w")
-    c.R(3, 7, 9, 8, "o"); c.px(3, 7, "w"); c.px(4, 7, "w")
-    c.R(5, 9, 7, 11, "g"); c.px(5, 9, "w"); c.px(5, 10, "w"); c.px(5, 11, "w")
-    c.C(6, 12, 1, "w")
+    # v2b (D114): sword turned pommel-first, a pommel ball with impact sparks
+    c.L(7, 8, 13, 2, "g", 2)
+    c.L(3, 8, 9, 12, "o", 2)
+    c.L(6, 9, 4, 11, "g", 2)
+    c.C(3, 12, 2, "w"); c.px(2, 11, "w"); c.px(4, 13, "o")
+    for p in ((0, 9), (0, 15), (1, 6), (6, 15), (0, 12), (5, 14)):
+        c.px(p[0], p[1], "w")
 
 
-@item("skill/muscle_up", shade=False)
+@item("skill/muscle_up", shade=True)
 def _(c):
-    # clenched fist (front view) + up arrow
-    c.A(["gggggggg.", "gogogogg.", "gogogogg.", "gggggggg.", "wgggggggg", "wgggggg..", ".gggggg..", ".ooooo..."], 0, 5)
-    for x in (0, 2, 4, 6): c.px(x, 5, "w")
-    arrow_up(c, 11, 0, 6, 3, "w")
-    for y in range(4, 7): c.px(12, y, "g")
+    # v2b (D114): raised clenched fist (knuckles, thumb across) + up arrow
+    c.A(["..........w..", ".........www.", "........wwwww", ".........w...", ".wwwwww..w...", "wgwgwgwo.w...", "wgogogoo.....",
+         "wggggggo.....", "wwwwwggo.....", "wgggggoo.....", "wgggggoo.....", ".ogggoo......", "..oooo......."])
 
 
 @item("skill/rev_up")
@@ -177,9 +174,9 @@ def _(c):
 
 @item("throwable/poison_pot", shade=False)
 def _(c):
-    c.A([".wwwwww.", ".gggggg.", "..gggg..", ".gggggg.", "gwggggggo", "gg#gg#ggo", "gg#gg#ggo", "ggg##gggo", "gggwwgggo", ".ggggggo.", "..oooo.."], 2, 3)
-    c.R(5, 1, 10, 2, "o"); c.px(5, 1, "w"); c.px(9, 0, "w")
-    c.px(12, 8, "g"); c.px(12, 9, "w")
+    # v2b (D114): round jug with a cork, a skull on the belly, a drip at the lip
+    c.A(["...oooooo....", "..wwwwwwwo...", "...gggggo..w.", "..wggggggo.w.", ".wgggggggggw.", "wgggwwwggggo.", "wggwwwwwggoo.",
+         "wggw#w#wgooo.", "wgggwwwggooo.", "wggggwgwgooo.", ".wgggggggooo.", "..ooooooooo.."])
 
 
 @item("throwable/ice_flask", shade=False)
