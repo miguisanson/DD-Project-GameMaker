@@ -2201,6 +2201,25 @@ function Test_Suite_UI() {
     _ev = Ui_MenuStep(_ma, _s, 4400);
     Test_Eq("D95 left reports an adjust of -1", _ev.adjust, -1);
 
+    // --- D95 bindings: every menu action has its keys and pad buttons
+    Input_Init();
+    var _bd = global.input.bindings;
+    Test_True("D95 confirm: Space", array_contains(_bd.confirm, vk_space));
+    Test_True("D95 confirm: Z", array_contains(_bd.confirm, ord("Z")));
+    Test_True("D95 confirm: Enter", array_contains(_bd.confirm, vk_enter));
+    Test_True("D95 confirm: pad A", array_contains(Input_GamepadButtons("confirm"), gp_face1));
+    Test_True("D95 back: Esc", array_contains(_bd.cancel, vk_escape));
+    Test_True("D95 back: X", array_contains(_bd.cancel, ord("X")));
+    Test_True("D95 back: pad B", array_contains(Input_GamepadButtons("cancel"), gp_face2));
+    Test_True("D95 tab_prev: Q", array_contains(_bd.tab_prev, ord("Q")));
+    Test_True("D95 tab_next: E", array_contains(_bd.tab_next, ord("E")));
+    Test_True("D95 tab_prev: pad left shoulder", array_contains(Input_GamepadButtons("tab_prev"), gp_shoulderl));
+    Test_True("D95 tab_next: pad right shoulder", array_contains(Input_GamepadButtons("tab_next"), gp_shoulderr));
+    Test_True("D95 run stays on Shift", array_contains(_bd.run, vk_shift));
+    Test_False("D95 run no longer uses the shoulder buttons", array_contains(Input_GamepadButtons("run"), gp_shoulderl) || array_contains(Input_GamepadButtons("run"), gp_shoulderr));
+    Test_True("D95 run is on the pad triggers", array_contains(Input_GamepadButtons("run"), gp_shoulderlb) && array_contains(Input_GamepadButtons("run"), gp_shoulderrb));
+    Test_True("D95 interact stays on Space", array_contains(_bd.interact, vk_space));
+
     // --- the same keys everywhere: confirm / back / arrows come from the game's input actions
     Input_Init();
     var _inp = global.input;

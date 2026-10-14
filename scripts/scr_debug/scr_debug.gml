@@ -1358,7 +1358,7 @@ function Scenario_StepShots(_s) {
         case 60: case 61: case 62: case 63: case 64: case 65: case 66: case 67: case 68:
             Scenario_StepShotsWorld(_s);
             break;
-        case 80: case 81: case 82: case 83: case 84: case 85: case 86: case 87:
+        case 80: case 81: case 82: case 83: case 84: case 85: case 86: case 87: case 88: case 89:
             Scenario_StepShotsUi(_s);
             break;
         default:
@@ -1849,6 +1849,24 @@ function Scenario_StepShotsUi(_s) {
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 global.scn.uikit = false;
+                Scenario_Next(_s, 88);
+            }
+            break;
+        case 88:   // the Tab menu's Stats tab in rm_floor1 (B1 saw the ATK label overlap the HP numbers)
+            if (_s.t == 1) { Scenario_NewKnight(); room_goto(rm_floor1); }
+            if (_s.t == 90) {
+                Menu_Open();
+                GameState_Get().ui.menu.tab = 2;
+            }
+            if (_s.t == 130) {
+                Scenario_ShotUi(_s, "stats_tab");
+                Scenario_Next(_s, 89);
+            }
+            break;
+        case 89:
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Menu_Close(true);
                 Scenario_Next(_s, 54);   // on to the intro cutscene / skip hint shots
             }
             break;

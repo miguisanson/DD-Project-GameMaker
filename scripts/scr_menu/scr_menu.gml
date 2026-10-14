@@ -1507,13 +1507,19 @@ function Menu_Draw() {
         var exp_value = level_capped ? Loc_T("menu.stats.max", "MAX") : (string(ch.exp) + "/" + string(ch.exp_next));
         var line_h = UI_TextHeight("A") + 2;
 
+        // The HP / MP numbers sit to the right of their bars, so the left block is as wide as the bar plus the wider number
+        // (before this the stat list started under "10 / 10" and the two overlapped).
+        var stat_text_gap = max(4, round(6 * ui_visual));
+        var hp_text = string(ch.hp) + " / " + string(ch.max_hp);
+        var mp_text = string(ch.mp) + " / " + string(ch.max_mp);
+        var bars_w = bar_w + stat_text_gap + max(UI_TextWidth(hp_text), UI_TextWidth(mp_text));
         var left_content_w = max(
-            bar_w,
+            bars_w,
             UI_TextWidth(Loc_T("menu.stats.level", "Level: {level}", { level: string(ch.level) })),
             UI_TextWidth(exp_label_1),
             UI_TextWidth(exp_value)
         ) + pad * 2;
-        var left_w = min(bw * 0.55, left_content_w);
+        var left_w = min(bw * 0.7, left_content_w);
 
         var right_x = bx + left_w + pad;
         var right_w = (bx + bw - pad) - right_x;
@@ -1522,9 +1528,6 @@ function Menu_Draw() {
         draw_sprite_ext(mp_bar_sprite, mp_frame, left_x, y0 + hp_bar_h + pad, bar_scale, bar_scale, 0, c_white, menu_alpha);
 
         draw_set_color(c_white);
-        var hp_text = string(ch.hp) + " / " + string(ch.max_hp);
-        var mp_text = string(ch.mp) + " / " + string(ch.max_mp);
-        var stat_text_gap = max(4, round(6 * ui_visual));
         UI_DrawText(left_x + bar_w + stat_text_gap, y0, hp_text);
         UI_DrawText(left_x + bar_w + stat_text_gap, y0 + hp_bar_h + pad, mp_text);
 
