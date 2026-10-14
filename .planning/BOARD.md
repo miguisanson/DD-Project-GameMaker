@@ -12,7 +12,7 @@ Build: none in progress | Mode: BIG BUILD, then one big playtest (D71) | Release
 - All design decisions made (D1-D94).
 
 ## Waiting on you (whenever convenient; close GameMaker afterwards)
-- In GameMaker: Game Options > Windows: tick "Allow window resize"; set scaling to "full scale"; widen `rm_floor6_5` to at least 160 px; delete unused sprites `spr_attack_timing_target`, `spr_attack_timing_falling`.
+- Final cleanup (optional, at the end): delete unused sprites `spr_attack_timing_target`, `spr_attack_timing_falling` in GameMaker.
 - Send the creator names for the sounds/music (credits).
 - Ask the friend which build they played (I-039).
 - Later: import the generated icon strips (a checklist will be on this board).
