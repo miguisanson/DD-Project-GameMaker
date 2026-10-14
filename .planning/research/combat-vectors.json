@@ -937,5 +937,180 @@
    "arg2": 1.0,
    "want": 50.0
   }
+ ],
+ "stagger": [
+  {
+   "id": "stagger_gain_6_no",
+   "kind": "gain",
+   "power": 6,
+   "stun": false,
+   "perfect": false,
+   "want": 3
+  },
+  {
+   "id": "stagger_gain_6_np",
+   "kind": "gain",
+   "power": 6,
+   "stun": false,
+   "perfect": true,
+   "want": 5
+  },
+  {
+   "id": "stagger_gain_11_so",
+   "kind": "gain",
+   "power": 11,
+   "stun": true,
+   "perfect": false,
+   "want": 11
+  },
+  {
+   "id": "stagger_gain_11_sp",
+   "kind": "gain",
+   "power": 11,
+   "stun": true,
+   "perfect": true,
+   "want": 17
+  },
+  {
+   "id": "stagger_gain_1_no",
+   "kind": "gain",
+   "power": 1,
+   "stun": false,
+   "perfect": false,
+   "want": 1
+  },
+  {
+   "id": "stagger_gain_2_np",
+   "kind": "gain",
+   "power": 2,
+   "stun": false,
+   "perfect": true,
+   "want": 2
+  },
+  {
+   "id": "stagger_max_1_norm",
+   "kind": "max",
+   "rank": 1,
+   "boss": false,
+   "want": 8
+  },
+  {
+   "id": "stagger_max_2_norm",
+   "kind": "max",
+   "rank": 2,
+   "boss": false,
+   "want": 12
+  },
+  {
+   "id": "stagger_max_3_boss",
+   "kind": "max",
+   "rank": 3,
+   "boss": true,
+   "want": 32
+  },
+  {
+   "id": "stagger_max_4_boss",
+   "kind": "max",
+   "rank": 4,
+   "boss": true,
+   "want": 40
+  },
+  {
+   "id": "stagger_max_4_norm",
+   "kind": "max",
+   "rank": 4,
+   "boss": false,
+   "want": 20
+  }
+ ],
+ "timeline": [
+  {
+   "id": "turn_13_9",
+   "spd_player": 13,
+   "spd_enemy": 9,
+   "boss": false,
+   "script": "n n n n n n n n n",
+   "want": "PEPEPPEPE"
+  },
+  {
+   "id": "turn_2x",
+   "spd_player": 20,
+   "spd_enemy": 10,
+   "boss": false,
+   "script": "n n n n n n n n n n n n",
+   "want": "PPEPPEPPEPPE"
+  },
+  {
+   "id": "turn_tie",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "boss": false,
+   "script": "n n n n",
+   "want": "PEPE"
+  },
+  {
+   "id": "turn_slow_player",
+   "spd_player": 9,
+   "spd_enemy": 13,
+   "boss": false,
+   "script": "n n n n n n",
+   "want": "EPEPEE"
+  },
+  {
+   "id": "turn_preview",
+   "spd_player": 13,
+   "spd_enemy": 9,
+   "boss": false,
+   "script": "p5 n n p5 n n n",
+   "want": "(PEPEP)PE(PEPPE)PEP"
+  },
+  {
+   "id": "turn_stun",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "boss": false,
+   "script": "n sE p5 n n n n n n",
+   "want": "P!(PEPEP)PEPEPE"
+  },
+  {
+   "id": "turn_stun_steadfast",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "boss": false,
+   "script": "n sE n sE n sE n n sE n",
+   "want": "P!P~E~PE!P"
+  },
+  {
+   "id": "turn_stun_boss",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "boss": true,
+   "script": "n sE n n n n",
+   "want": "P!EPEP"
+  },
+  {
+   "id": "turn_stun_player",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "boss": false,
+   "script": "n n sP n n n n",
+   "want": "PE!EPEP"
+  },
+  {
+   "id": "turn_break",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "boss": false,
+   "script": "n bE n n n n",
+   "want": "PBPEPE"
+  },
+  {
+   "id": "turn_fast_double",
+   "spd_player": 20,
+   "spd_enemy": 8,
+   "boss": false,
+   "script": "n n n n n n n",
+   "want": "PPEPPPE"
+  }
  ]
 }
