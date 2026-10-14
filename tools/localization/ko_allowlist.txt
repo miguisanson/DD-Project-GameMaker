@@ -1,0 +1,6 @@
+# Rows the missing-Korean check lets through (D9). One ref per line, or "token:" lines of Latin words
+# that stay in Latin letters inside Korean text (see .planning/research/ko-glossary.md).
+credits.title          # NO HOPE
+settings.lang.english  # the language names are shown in their own language
+token: HP MP ATK DEF SPD MAG EXP Lv BGM SFX UI QTE Esc PaleRook GameMaker x t
+credits.font_galmuri    # font credit line stays in Latin letters

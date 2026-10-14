@@ -56,6 +56,12 @@ def alternatives(cat, iid):
     if cat != "status":
         for n, im in enumerate(kenney.candidates(key)[:2]):
             out[f"kenney{n}"] = im
+    if not RAW:
+        # no raw SDXL renders on this machine: reuse the committed 16x16 AI candidates so the sheet and PICK stay complete
+        for k in range(4):
+            p = f"{ART}/candidates_v2/{cat}/{iid}_ai{k}.png"
+            if os.path.exists(p):
+                out[f"ai{k}"] = Image.open(p).convert("RGBA")
     if RAW:
         for k in range(4):
             p = f"{RAW}/{cat}_{iid}_{k}.png"
@@ -120,6 +126,8 @@ def main():
         for (cat, iid), s in srcs.items():
             f.write(f"{cat}/{iid}\t{s}\n")
     contact_sheet(order, finals, alts, srcs)
+    from checklist import write_checklist_v2
+    write_checklist_v2(order, ART)
     print({c: len(v) for c, v in order.items()})
 
 

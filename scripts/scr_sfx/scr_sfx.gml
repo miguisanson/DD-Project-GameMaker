@@ -108,6 +108,56 @@ function SFX_EnsureVariantMaps() {
     }
 }
 
+// ---- D116: monster sound variation -----------------------------------------------------------------------------------
+// Every enemy_* sound (spawn, special, enemy_skill_*) plays with a small random pitch and volume, and a key with 2+ takes
+// never plays the same take twice in a row. The draws come from a cosmetic stream of their own (global.sfx_rng), so audio
+// never moves a run stream; a test injects its own seeded stream by assigning global.sfx_rng.
+#macro SFX_ENEMY_PITCH_VAR 0.06
+#macro SFX_ENEMY_VOL_VAR 0.10
+#macro SFX_ENEMY_EXTRA_TAKES 4
+
+function SFX_Rng() {
+    if (!variable_global_exists("sfx_rng") || !is_struct(global.sfx_rng)) {
+        global.sfx_rng = Rng_New(floor(date_current_datetime() * 86400), "sfx");
+    }
+    return global.sfx_rng;
+}
+
+function SFX_IsEnemyKey(_key) {
+    return is_string(_key) && string_copy(_key, 1, 6) == "enemy_";
+}
+
+// { pitch, vol } multipliers for one play of _key: 1 and 1 for anything that is not an enemy sound (nothing is drawn then).
+function SFX_EnemyVariation(_key) {
+    if (!SFX_IsEnemyKey(_key)) return { pitch: 1, vol: 1 };
+    var _r = SFX_Rng();
+    return {
+        pitch: 1 + (Rng_Float(_r) * 2 - 1) * SFX_ENEMY_PITCH_VAR,
+        vol: 1 + (Rng_Float(_r) * 2 - 1) * SFX_ENEMY_VOL_VAR
+    };
+}
+
+// Register an enemy key with its listed sounds plus extra takes found by name: <_extra_prefix>_2, _3, _4 (D94 pattern, so
+// the new takes join in as soon as the owner imports them in the IDE and cost nothing before that). The same sound listed
+// twice counts once; with one take left the key still works as a plain sound.
+function SFX_RegisterEnemyVariants(_key, _candidates, _extra_prefix = "") {
+    var _list = is_array(_candidates) ? array_create(array_length(_candidates)) : [_candidates];
+    if (is_array(_candidates)) array_copy(_list, 0, _candidates, 0, array_length(_candidates));
+    if (_extra_prefix != "") {
+        for (var _n = 2; _n < 2 + SFX_ENEMY_EXTRA_TAKES; _n++) array_push(_list, _extra_prefix + "_" + string(_n));
+    }
+    var _seen = [];
+    var _uniq = [];
+    for (var _i = 0; _i < array_length(_list); _i++) {
+        var _snd = SFX_ResolveAsset(_list[_i]);
+        if (!SFX_IsValidSoundAsset(_snd)) continue;
+        if (array_contains(_seen, _snd)) continue;
+        array_push(_seen, _snd);
+        array_push(_uniq, _snd);
+    }
+    SFX_RegisterVariantNoRepeat(_key, _uniq);
+}
+
 function SFX_RegisterVariantNoRepeat(_key, _candidates) {
     SFX_EnsureVariantMaps();
     var resolved = [];
@@ -149,8 +199,9 @@ function SFX_ResolvePlayAsset(_key) {
                 if (variable_global_exists("sfx_variant_last") && ds_exists(global.sfx_variant_last, ds_type_map) && ds_map_exists(global.sfx_variant_last, _key)) {
                     last = round(real(global.sfx_variant_last[? _key]));
                 }
-                pick = irandom(count - 1);
-                if (pick == last) pick = (pick + 1 + irandom(max(0, count - 2))) mod count;
+                var _vr = SFX_Rng();
+                pick = Rng_Int(_vr, count);
+                if (pick == last) pick = (pick + 1 + Rng_Int(_vr, max(1, count - 1))) mod count;
                 if (variable_global_exists("sfx_variant_last") && ds_exists(global.sfx_variant_last, ds_type_map)) {
                     if (ds_map_exists(global.sfx_variant_last, _key)) ds_map_replace(global.sfx_variant_last, _key, pick);
                     else ds_map_add(global.sfx_variant_last, _key, pick);
@@ -229,7 +280,8 @@ function SFX_ApplyActiveGains(_fade_ms = 0) {
         var trim = SFX_GetGain(key);
         var cat = SFX_CategoryForKey(key);
         var cat_gain = (cat == "ui") ? global.vol_ui : global.vol_sfx;
-        var gain = clamp(base, 0, 1) * trim * global.vol_master * cat_gain;
+        var vary = variable_struct_exists(rec, "vary") ? rec.vary : 1;
+        var gain = clamp(base, 0, 1) * trim * global.vol_master * cat_gain * vary;
         audio_sound_gain(h, gain, max(0, _fade_ms));
     }
 }
@@ -299,29 +351,30 @@ function SFX_RegisterDefaults() {
     SFX_RegisterResolved("skill_stun", ["stun"]);
     SFX_RegisterResolved("skill_take_aim", ["take_aim"]);
 
+    // Monsters (D116): each key lists the existing sound(s) and also picks up <monster>_spawn_2.. / <monster>_attack_2.. once the owner has imported them (art/sfx_new/IMPORT.md)
     // Monsters - Spawn
-    SFX_RegisterResolved("enemy_spawn_slime", ["slime_spawn", "Slime_Attack__Nr__1__Minecraft_Sound____Sound_Effect_for_editing"]);
-    SFX_RegisterResolved("enemy_spawn_spider", ["spider_spawn", "spider_both_attack_and_spawn"]);
-    SFX_RegisterResolved("enemy_spawn_mad_whisp", ["mad_whisp_spawn"]);
-    SFX_RegisterResolved("enemy_spawn_ghost_sword", ["ghost_sword_spawn"]);
-    SFX_RegisterResolved("enemy_spawn_dire_wolf", ["dire_wolf_spawn"]);
-    SFX_RegisterResolved("enemy_spawn_snake", ["snake_spawn", "snake_spaawn_and_attack"]);
-    SFX_RegisterResolved("enemy_spawn_killer_plant", ["killer_plant_spawn"]);
-    SFX_RegisterResolved("enemy_spawn_stranger", ["Laugh_spooky_3", "stranger_spawn"]);
-    SFX_RegisterResolved("enemy_spawn_mini_boss", ["mini_boss_spawn"]);
-    SFX_RegisterResolved("enemy_spawn_final_boss", ["final_boss_spawn"]);
+    SFX_RegisterEnemyVariants("enemy_spawn_slime", ["slime_spawn", "Slime_Attack__Nr__1__Minecraft_Sound____Sound_Effect_for_editing"], "slime_spawn");
+    SFX_RegisterEnemyVariants("enemy_spawn_spider", ["spider_spawn", "spider_both_attack_and_spawn"], "spider_spawn");
+    SFX_RegisterEnemyVariants("enemy_spawn_mad_whisp", ["mad_whisp_spawn"], "mad_whisp_spawn");
+    SFX_RegisterEnemyVariants("enemy_spawn_ghost_sword", ["ghost_sword_spawn"], "ghost_sword_spawn");
+    SFX_RegisterEnemyVariants("enemy_spawn_dire_wolf", ["dire_wolf_spawn"], "dire_wolf_spawn");
+    SFX_RegisterEnemyVariants("enemy_spawn_snake", ["snake_spawn", "snake_spaawn_and_attack"], "snake_spawn");
+    SFX_RegisterEnemyVariants("enemy_spawn_killer_plant", ["killer_plant_spawn"], "killer_plant_spawn");
+    SFX_RegisterEnemyVariants("enemy_spawn_stranger", ["Laugh_spooky_3", "stranger_spawn"], "stranger_spawn");
+    SFX_RegisterEnemyVariants("enemy_spawn_mini_boss", ["mini_boss_spawn"], "mini_boss_spawn");
+    SFX_RegisterEnemyVariants("enemy_spawn_final_boss", ["final_boss_spawn"], "final_boss_spawn");
 
     // Monsters - Special
-    SFX_RegisterResolved("enemy_special_slime", ["slime_attack", "Slime_Attack__Nr__1__Minecraft_Sound____Sound_Effect_for_editing"]);
-    SFX_RegisterResolved("enemy_special_spider", ["Hiss", "hiss"]);
-    SFX_RegisterResolved("enemy_special_mad_whisp", ["mad_whisp_attack"]);
-    SFX_RegisterResolved("enemy_special_ghost_sword", ["ghost_sword_attack"]);
-    SFX_RegisterResolved("enemy_special_dire_wolf", ["dire_wolf_attack"]);
-    SFX_RegisterResolved("enemy_special_snake", ["snake_attack", "snake_spaawn_and_attack"]);
-    SFX_RegisterResolved("enemy_special_killer_plant", ["killer_plant_attack"]);
-    SFX_RegisterVariantNoRepeat("enemy_special_stranger", ["Monster_chatter", "Monster_chatter_2", "Monster_chatter_3", "Monster_chatter_4"]);
-    SFX_RegisterResolved("enemy_special_mini_boss", ["mini_boss_attack"]);
-    SFX_RegisterVariantNoRepeat("enemy_special_final_boss", ["Punch_1", "Punch_2", "Punch_3", "Punch_crunchy"]);
+    SFX_RegisterEnemyVariants("enemy_special_slime", ["slime_attack", "Slime_Attack__Nr__1__Minecraft_Sound____Sound_Effect_for_editing"], "slime_attack");
+    SFX_RegisterEnemyVariants("enemy_special_spider", ["Hiss", "hiss"], "spider_attack");
+    SFX_RegisterEnemyVariants("enemy_special_mad_whisp", ["mad_whisp_attack"], "mad_whisp_attack");
+    SFX_RegisterEnemyVariants("enemy_special_ghost_sword", ["ghost_sword_attack"], "ghost_sword_attack");
+    SFX_RegisterEnemyVariants("enemy_special_dire_wolf", ["dire_wolf_attack"], "dire_wolf_attack");
+    SFX_RegisterEnemyVariants("enemy_special_snake", ["snake_attack", "snake_spaawn_and_attack"], "snake_attack");
+    SFX_RegisterEnemyVariants("enemy_special_killer_plant", ["killer_plant_attack"], "killer_plant_attack");
+    SFX_RegisterEnemyVariants("enemy_special_stranger", ["Monster_chatter", "Monster_chatter_2", "Monster_chatter_3", "Monster_chatter_4"], "stranger_attack");
+    SFX_RegisterEnemyVariants("enemy_special_mini_boss", ["mini_boss_attack"], "mini_boss_attack");
+    SFX_RegisterEnemyVariants("enemy_special_final_boss", ["Punch_1", "Punch_2", "Punch_3", "Punch_crunchy"], "final_boss_attack");
 
     // Legacy/Fallback (safe no-op keys)
     SFX_Register("enemy_spawn_unknown", noone);
@@ -551,6 +604,12 @@ function SFX_Play(_key, _vol = 1, _pitch = 1) {
         return -1;
     }
 
+    // D116: enemy sounds get a small random pitch/volume per play (recorded before the play, so a test can read it with no sound device)
+    var vary = SFX_EnemyVariation(_key);
+    var play_pitch = _pitch * vary.pitch;
+    global.sfx_last_pitch = play_pitch;
+    global.sfx_last_vary = vary.vol;
+
     var snd_handle = audio_play_sound(snd, 0, false);
     if (snd_handle == -1) {
         global.sfx_last_key = _key;
@@ -563,13 +622,13 @@ function SFX_Play(_key, _vol = 1, _pitch = 1) {
     if (category == "ui") cat_gain = global.vol_ui;
     var base_gain = clamp(_vol, 0, 1);
     var trim = SFX_GetGain(_key);
-    var gain = base_gain * trim * global.vol_master * cat_gain;
+    var gain = clamp(base_gain * trim * global.vol_master * cat_gain * vary.vol, 0, 1);
     audio_sound_gain(snd_handle, gain, 0);
-    audio_sound_pitch(snd_handle, max(0.01, _pitch));
+    audio_sound_pitch(snd_handle, max(0.01, play_pitch));
 
     if (!variable_global_exists("sfx_active") || !is_array(global.sfx_active)) global.sfx_active = [];
     SFX_CleanupActive();
-    array_push(global.sfx_active, { handle: snd_handle, key: _key, base: base_gain });
+    array_push(global.sfx_active, { handle: snd_handle, key: _key, base: base_gain, vary: vary.vol });
 
     global.sfx_last_key = _key;
     global.sfx_last_handle = snd_handle;

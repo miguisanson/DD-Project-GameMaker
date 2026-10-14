@@ -318,7 +318,7 @@ function Interact_Handle(_inst) {
                 grave_line = string(grave_pick);
             }
         }
-        if (grave_line == "") grave_line = "An old grave rests here.";
+        if (grave_line == "") grave_line = Loc_T("interact.grave.default", "An old grave rests here.");
         var grave_dialogue_lines = [grave_line];
 
         var class_id = CLASS_NOBODY;

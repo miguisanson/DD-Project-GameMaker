@@ -258,7 +258,7 @@ function Equip_PassiveAdjustIncomingStatus(_source, _target, _status_id, _turns)
         rt.mirror_used = true;
         out.apply = false;
         out.reflect = true;
-        out.msg = "Mirror Stitch repelled a status!";
+        out.msg = Loc_T("combat.msg.passive.mirror_stitch", "Mirror Stitch repelled a status!");
         if (variable_struct_exists(_target, "mp")) {
             var mp_cost = max(0, round(Equip_GetPassiveParam(_target, "mirror_stitch", "mp_cost_on_trigger", 1)));
             _target.mp = max(0, _target.mp - mp_cost);
@@ -451,7 +451,7 @@ function Equip_PassiveOnAttackResolved(_attacker, _defender, _timing_key, _timin
                 var stun_turns = max(1, round(Equip_GetPassiveParam(_attacker, "pinning_shot", "stun_turns", 1)));
                 _defender = Status_Add(_defender, STATUS_STUN, stun_turns, 1);
                 rt.pinning_cooldown = max(1, round(Equip_GetPassiveParam(_attacker, "pinning_shot", "cooldown_turns", 3)));
-                out.msg = "Pinning Shot stunned the enemy!";
+                out.msg = Loc_T("combat.msg.passive.pinning_shot", "Pinning Shot stunned the enemy!");
             }
         }
     }

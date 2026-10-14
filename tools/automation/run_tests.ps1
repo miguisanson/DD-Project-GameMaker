@@ -407,6 +407,19 @@ if (Test-Path $lintPy) {
     Step 'lint' $(if ($script:failed) { 'FAIL' } else { 'OK' }) $sw
 }
 
+# ---- missing Korean (D9): every workbook row needs a real ko (tools/localization/check_missing_ko.py, allowlist in ko_allowlist.txt).
+$koPy = Join-Path $ProjectDir 'tools\localization\check_missing_ko.py'
+if (Test-Path $koPy) {
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $pyExe = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $pyExe) { Fail 'ko check: python not found' }
+    else {
+        $koOut = @(& $pyExe.Source $koPy)
+        if ($LASTEXITCODE -ne 0) { $koOut | Select-Object -First 12 | ForEach-Object { Write-Host "  $_" }; Fail 'ko check: rows without a Korean translation' }
+    }
+    Step 'ko-check' $(if ($script:failed) { 'FAIL' } else { 'OK' }) $sw
+}
+
 # ---- fresh work dirs; copy working tree (tracked + untracked-not-ignored) -----------------------
 $sw = [Diagnostics.Stopwatch]::StartNew()
 foreach ($n in 'src', 'out', 'save', 'logs', 'shots', 'gridshots') { if (Test-Path $D[$n]) { Remove-Item $D[$n] -Recurse -Force } }

@@ -104,6 +104,7 @@ function Test_RunAll() {
     Test_RunSuite("Input", Test_Suite_Input);
     Test_RunSuite("UI", Test_Suite_UI);
     Test_RunSuite("SfxInit", Test_Suite_SfxInit);
+    Test_RunSuite("Audio", Test_Suite_Audio);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -2912,6 +2913,118 @@ function Test_Suite_SfxInit() {
     global.audio_debug_missing_count = 0;
 }
 
+// ---- D116 monster sound variation: every enemy_* play gets a small random pitch and volume, and a key with 2+ takes never repeats the last take
+function Test_Suite_Audio() {
+    if (asset_get_index("SFX_EnemyVariation") == -1 || asset_get_index("SFX_RegisterEnemyVariants") == -1) {
+        Test_True("audio: SFX_EnemyVariation and SFX_RegisterEnemyVariants exist (D116)", false);
+        return;
+    }
+    if (!variable_global_exists("sfx_db") || !ds_exists(global.sfx_db, ds_type_map)) global.sfx_db = ds_map_create();   // the manager object may not exist yet in a -runtests boot
+    SFX_RegisterDefaults();
+    var _keep_rng = variable_global_exists("sfx_rng") ? global.sfx_rng : undefined;
+
+    // the band: pitch +-6 %, volume +-10 %, drawn from the injected RNG
+    global.sfx_rng = Rng_New(116, "sfx");
+    var _pmin = 99, _pmax = 0, _vmin = 99, _vmax = 0, _inside = true;
+    var _keys = ["enemy_spawn_slime", "enemy_special_snake", "enemy_special_final_boss", "enemy_skill_bite", "enemy_spawn_unknown"];
+    for (var _i = 0; _i < 500; _i++) {
+        var _v = SFX_EnemyVariation(_keys[_i mod array_length(_keys)]);
+        if (_v.pitch < 0.94 || _v.pitch > 1.06 || _v.vol < 0.90 || _v.vol > 1.10) _inside = false;
+        _pmin = min(_pmin, _v.pitch); _pmax = max(_pmax, _v.pitch);
+        _vmin = min(_vmin, _v.vol);   _vmax = max(_vmax, _v.vol);
+    }
+    Test_True("audio: 500 enemy plays stay inside pitch 0.94..1.06 and volume 0.90..1.10", _inside);
+    Test_True("audio: enemy pitch is not always the same (spread over 0.08)", _pmax - _pmin > 0.08);
+    Test_True("audio: enemy volume is not always the same (spread over 0.10)", _vmax - _vmin > 0.10);
+    Test_True("audio: enemy pitch reaches both sides of 1", _pmin < 0.97 && _pmax > 1.03);
+
+    // same injected seed, same variation; another seed, another one
+    global.sfx_rng = Rng_New(7, "sfx");
+    var _a1 = SFX_EnemyVariation("enemy_spawn_spider");
+    var _a2 = SFX_EnemyVariation("enemy_spawn_spider");
+    global.sfx_rng = Rng_New(7, "sfx");
+    var _b1 = SFX_EnemyVariation("enemy_spawn_spider");
+    var _b2 = SFX_EnemyVariation("enemy_spawn_spider");
+    Test_True("audio: same seed repeats the same variation", _a1.pitch == _b1.pitch && _a1.vol == _b1.vol && _a2.pitch == _b2.pitch && _a2.vol == _b2.vol);
+    Test_True("audio: two plays in a row differ", _a1.pitch != _a2.pitch);
+    global.sfx_rng = Rng_New(8, "sfx");
+    Test_True("audio: another seed gives another variation", SFX_EnemyVariation("enemy_spawn_spider").pitch != _a1.pitch);
+
+    // only enemy_ keys vary
+    global.sfx_rng = Rng_New(116, "sfx");
+    var _calls = global.sfx_rng.calls;
+    var _ui = SFX_EnemyVariation("ui_move");
+    Test_True("audio: a UI key keeps pitch 1 and volume 1", _ui.pitch == 1 && _ui.vol == 1);
+    Test_Eq("audio: a UI key draws nothing from the RNG", global.sfx_rng.calls, _calls);
+    Test_True("audio: SFX_IsEnemyKey is true for enemy_ keys only", SFX_IsEnemyKey("enemy_special_dire_wolf") && !SFX_IsEnemyKey("sword_attack") && !SFX_IsEnemyKey("ui_enemy_x"));
+
+    // SFX_Play applies it (pitch recorded in sfx_last_pitch / sfx_last_vary, even without a sound device)
+    global.sfx_rng = Rng_New(116, "sfx");
+    var _seen = {};
+    var _all_in = true;
+    repeat (40) {
+        SFX_Play("enemy_special_stranger");
+        var _p = global.sfx_last_pitch;
+        if (_p < 0.94 || _p > 1.06 || global.sfx_last_vary < 0.90 || global.sfx_last_vary > 1.10) _all_in = false;
+        variable_struct_set(_seen, string(round(_p * 100000)), 1);
+    }
+    Test_True("audio: SFX_Play on an enemy key records a pitch inside the band", _all_in);
+    Test_True("audio: SFX_Play on an enemy key gives many different pitches", variable_struct_names_count(_seen) > 20);
+    SFX_Play("ui_move");
+    Test_True("audio: SFX_Play on a UI key is unvaried", global.sfx_last_pitch == 1 && global.sfx_last_vary == 1);
+    SFX_Play("enemy_special_stranger", 1, 2);
+    Test_True("audio: a caller pitch is multiplied, not replaced", global.sfx_last_pitch >= 1.88 && global.sfx_last_pitch <= 2.12);
+
+    // rotation: a key with 2+ takes never plays the same take twice in a row, and uses every take
+    SFX_RegisterEnemyVariants("enemy_test_three", ["Punch_1", "Punch_2", "Punch_3"], "");
+    Test_Eq("audio: three listed takes are registered", array_length(global.sfx_variant_db[? "enemy_test_three"]), 3);
+    var _last = noone, _repeat = false, _used = {};
+    repeat (400) {
+        var _snd = SFX_ResolvePlayAsset("enemy_test_three");
+        if (_snd == _last) _repeat = true;
+        _last = _snd;
+        variable_struct_set(_used, string(_snd), 1);
+    }
+    Test_False("audio: three takes never repeat the previous one (400 plays)", _repeat);
+    Test_Eq("audio: three takes all get used", variable_struct_names_count(_used), 3);
+
+    SFX_RegisterEnemyVariants("enemy_test_two", ["Punch_1", "Punch_2"], "");
+    _last = noone; _repeat = false; _used = {};
+    repeat (200) {
+        var _snd2 = SFX_ResolvePlayAsset("enemy_test_two");
+        if (_snd2 == _last) _repeat = true;
+        _last = _snd2;
+        variable_struct_set(_used, string(_snd2), 1);
+    }
+    Test_False("audio: two takes alternate (200 plays)", _repeat);
+    Test_Eq("audio: two takes both get used", variable_struct_names_count(_used), 2);
+
+    // extra takes are found by name (D94 pattern): <prefix>_2, _3, _4 join the listed ones when they exist
+    SFX_RegisterEnemyVariants("enemy_test_extra", ["Punch_1"], "Punch");
+    Test_Eq("audio: listed take plus Punch_2 and Punch_3 found by name", array_length(global.sfx_variant_db[? "enemy_test_extra"]), 3);
+    SFX_RegisterEnemyVariants("enemy_test_missing", ["Punch_1"], "no_such_sound");
+    Test_Eq("audio: extra takes that are not imported yet are skipped", array_length(global.sfx_variant_db[? "enemy_test_missing"]), 1);
+    SFX_RegisterEnemyVariants("enemy_test_dupe", ["Hiss", "Hiss"], "");
+    Test_Eq("audio: the same sound listed twice counts once", array_length(global.sfx_variant_db[? "enemy_test_dupe"]), 1);
+
+    // the real enemy keys: every monster has its spawn and special key, and they all go through the variant path
+    var _ids = [ENEMY_SLIME, ENEMY_SPIDER, ENEMY_MADWHISP, ENEMY_GHOSTSWORD, ENEMY_DIREWOLF, ENEMY_SNAKE, ENEMY_KILLER_PLANT, ENEMY_STRANGER, ENEMY_MINI_BOSS, ENEMY_FINAL_BOSS];
+    var _ok = true, _bad = "";
+    SFX_RegisterDefaults();
+    for (var _m = 0; _m < array_length(_ids); _m++) {
+        var _suffix = SFX_EnemyKeySuffix(_ids[_m]);
+        var _ev = ["enemy_spawn_" + _suffix, "enemy_special_" + _suffix];
+        for (var _e = 0; _e < 2; _e++) {
+            if (!ds_map_exists(global.sfx_variant_db, _ev[_e])) { _ok = false; _bad += _ev[_e] + " "; }
+        }
+    }
+    Test_True("audio: all 10 monsters have spawn and special registered as variant keys " + _bad, _ok);
+
+    global.sfx_rng = _keep_rng;
+    if (is_undefined(_keep_rng)) variable_global_set("sfx_rng", undefined);
+    SFX_RegisterDefaults();
+}
+
 
 // ============================================================================================================
 // C1 run loop (D25-D27, D33, D36, D46, D87, D88). Expected numbers below were computed by a separate Python
@@ -3582,7 +3695,24 @@ function Test_Suite_Story() {
     Test_True("D40 sounds the game plays are in the list", asset_get_index("Body_falling_wood") != -1 && _snd[array_length(_snd) - 1].asset != "" && string_pos("Body_falling_wood", _cr) > 0 && string_pos("Metal_resonance", _cr) > 0);
     Test_False("D40 no sound listed twice", _snd_dup);
     Test_Eq("D40 every credited sound appears in the credits text", _snd_missing, "");
-    Test_Eq("D40 all 126 sounds and music tracks are listed", array_length(_snd), 126);
+    var _old_n = 0, _new_n = 0, _new_bad = "", _creators_ok = true;
+    for (var _ni = 0; _ni < array_length(_snd); _ni++) {
+        if (_snd[_ni].creator == CREDITS_CREATOR_TBD) { _old_n++; continue; }
+        _new_n++;
+        if (_snd[_ni].creator != "rubberduck" && _snd[_ni].creator != "Ogrebane" && _snd[_ni].creator != "Darsycho") _creators_ok = false;
+        var _nm = _snd[_ni].asset;   // <monster>_spawn_N or <monster>_attack_N, N = 2..4 (D116)
+        var _us = string_last_pos("_", _nm);
+        var _n_ok = _us > 0 && string_digits(string_copy(_nm, _us + 1, 9)) != "" && real(string_copy(_nm, _us + 1, 9)) >= 2 && real(string_copy(_nm, _us + 1, 9)) <= 4;
+        var _stem = _us > 0 ? string_copy(_nm, 1, _us - 1) : _nm;
+        var _ev_ok = string_pos("_spawn", _stem) == string_length(_stem) - 5 || string_pos("_attack", _stem) == string_length(_stem) - 6;
+        if (!_n_ok || !_ev_ok) _new_bad += _nm + " ";
+    }
+    Test_Eq("D40 all 126 original sounds and music tracks are listed (creator still to supply)", _old_n, 126);
+    Test_Eq("D116 the 30 new CC0 monster takes are credited by name", _new_n, 30);
+    Test_True("D116 each new take is credited to rubberduck, Ogrebane or Darsycho", _creators_ok);
+    Test_Eq("D116 new take names follow <monster>_spawn_N / <monster>_attack_N", _new_bad, "");
+    Test_True("D116 the credits name rubberduck, Ogrebane and Darsycho", string_pos("rubberduck", _cr) > 0 && string_pos("Ogrebane", _cr) > 0 && string_pos("Darsycho", _cr) > 0);
+    Test_True("D116 the credited takes run from slime_spawn_2 to final_boss_attack_3", _new_n == 30 && string_pos("slime_spawn_2", _cr) > 0 && string_pos("final_boss_attack_3", _cr) > 0);
     Test_Eq("D40 until the owner sends names the creator is the marked placeholder", _snd[0].creator, CREDITS_CREATOR_TBD);
     Test_True("D105 credits come with headings and spacing", array_length(Credits_Lines()) > array_length(Credits_PlainLines()));
 }
@@ -4473,6 +4603,8 @@ function Test_Suite_BattleUi() {
     var _sk2 = [[SKILL_WOUND, 0], [SKILL_HILT_BASH, 1], [SKILL_MUSCLE_UP, 2], [SKILL_REV_UP, 3], [SKILL_HORIZ_SLASH, 4], [SKILL_POWER_STRIKE, 5], [SKILL_POISON_ARROW, 6], [SKILL_EVASION, 7],
                 [SKILL_DOUBLE_SHOT, 8], [SKILL_TAKE_AIM, 9], [SKILL_FIREBALL, 10], [SKILL_POISON_MIST, 11], [SKILL_ICE_SPEAR, 12], [SKILL_MEDITATION, 13], [SKILL_FORESIGHT, 14]];
     for (var _k2 = 0; _k2 < array_length(_sk2); _k2++) Test_Eq("BattleUi skill " + string(_sk2[_k2][0]) + " icon frame", Icon_SkillFrame(_sk2[_k2][0]), _sk2[_k2][1]);
+    Test_Eq("BattleUi throwable poison_pot icon frame (D114 redo)", Icon_Frame("throwable", "poison_pot"), 1);
+    Test_Eq("BattleUi status bloodthirsty and solidify frames (D114 redo)", Icon_Frame("status", "bloodthirsty") * 100 + Icon_Frame("status", "solidify"), 1312);
     var _rows_ok = true;
     for (var _f = 0; _f < 17; _f++) {
         var _r = Icon_Rows("status", _f);
@@ -5502,6 +5634,16 @@ function Test_Suite_Economy() {
     Test_True("C3 merchant: after floors 2, 5 and 8, shop 0, 1, 2", is_struct(_sp2) && is_struct(_sp5) && is_struct(_sp8) && _sp2.shop == 0 && _sp5.shop == 1 && _sp8.shop == 2);
     Test_True("C3 merchant: other rooms have none", is_undefined(Merchant_SpotFor(rm_floor3)) && is_undefined(Merchant_SpotFor(rm_floor1)) && is_undefined(Merchant_SpotFor(rm_floor6_5)));
     Test_True("C3 merchant: spots sit on the 16 px grid", _sp2.x mod 16 == 0 && _sp2.y mod 16 == 0 && _sp5.x mod 16 == 0 && _sp8.y mod 16 == 0);
+
+    // ---- the merchant's pulsing gold glow (D113): alpha 0.35..1.0, a 1.2 s cosine pulse starting at its brightest ----
+    Test_True("D113 glow: at 0 ms it is at full strength", abs(Merchant_GlowAlpha(0) - 1.0) < 0.0001);
+    Test_True("D113 glow: half a period later (600 ms) it is at its dimmest, 0.35", abs(Merchant_GlowAlpha(600) - 0.35) < 0.0001);
+    Test_True("D113 glow: a quarter period (300 ms) is the middle, 0.675", abs(Merchant_GlowAlpha(300) - 0.675) < 0.0001);
+    Test_True("D113 glow: it repeats every 1200 ms", abs(Merchant_GlowAlpha(300) - Merchant_GlowAlpha(300 + 1200 * 7)) < 0.0001);
+    var _glow_ok = true;
+    for (var _gm = 0; _gm < 3600; _gm += 37) { var _ga2 = Merchant_GlowAlpha(_gm); if (_ga2 < 0.35 - 0.0001 || _ga2 > 1.0 + 0.0001) _glow_ok = false; }
+    Test_True("D113 glow: every alpha stays inside 0.35 to 1.0", _glow_ok);
+    Test_Eq("D113 glow: the merchant sprite is looked up as spr_merchant_idle", Merchant_SpriteName(), "spr_merchant_idle");
 
     var _kz = Test_Hero(CLASS_KNIGHT);
     var _ssa = Shop_StockGenerate(4321, 0, _kz);

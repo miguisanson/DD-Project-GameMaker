@@ -6246,8 +6246,9 @@ function Scenario_StepBotEconomy(_s) {
                     } else if (_t.b == 1) {
                         Scenario_Check(_pfx + "_weak_gives_3_stacks", Status_Stacks(_bc.e, STATUS_POISON) == 3, "stacks=" + string(Status_Stacks(_bc.e, STATUS_POISON)));
                     } else {
-                        Scenario_Check(_pfx + "_nobody_deals_8", _dmg == 8, "dmg=" + string(_dmg));
-                        Scenario_Check(_pfx + "_nobody_burns_8", Status_Find(_bc.e, STATUS_BURN).power == 8);
+                        var _nb_want = RoundHalfUp(5 * THROW_NOBODY_MULT);   // D111: Nobody throws x THROW_NOBODY_MULT (was a hard-coded 8 for x1.5)
+                        Scenario_Check(_pfx + "_nobody_deals_base_x_mult", _dmg == _nb_want, "dmg=" + string(_dmg) + " want=" + string(_nb_want));
+                        Scenario_Check(_pfx + "_nobody_burns_base_x_mult", Status_Find(_bc.e, STATUS_BURN).power == _nb_want);
                     }
                     _t.n++;
                     if (_t.b == 0 && _t.n < 4) _t.ph = 5;       // the next throw once it is the player's turn again
