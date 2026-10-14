@@ -328,7 +328,7 @@
    "level": 1,
    "atk": 11,
    "df": 12,
-   "spd": 8,
+   "spd": 10,
    "mag": 3,
    "hp": 10,
    "mp": 11
@@ -339,7 +339,7 @@
    "level": 2,
    "atk": 12,
    "df": 14,
-   "spd": 8,
+   "spd": 10,
    "mag": 3,
    "hp": 17,
    "mp": 12
@@ -350,7 +350,7 @@
    "level": 3,
    "atk": 13,
    "df": 16,
-   "spd": 8,
+   "spd": 10,
    "mag": 3,
    "hp": 24,
    "mp": 13
@@ -361,7 +361,7 @@
    "level": 5,
    "atk": 15,
    "df": 20,
-   "spd": 8,
+   "spd": 10,
    "mag": 3,
    "hp": 38,
    "mp": 15
@@ -372,7 +372,7 @@
    "level": 10,
    "atk": 20,
    "df": 30,
-   "spd": 8,
+   "spd": 10,
    "mag": 3,
    "hp": 73,
    "mp": 20
@@ -504,7 +504,7 @@
    "level": 2,
    "atk": 10,
    "df": 8,
-   "spd": 9,
+   "spd": 10,
    "mag": 3,
    "hp": 16,
    "mp": 12
@@ -515,19 +515,19 @@
    "level": 3,
    "atk": 11,
    "df": 9,
-   "spd": 9,
-   "mag": 3,
+   "spd": 10,
+   "mag": 4,
    "hp": 22,
-   "mp": 13
+   "mp": 14
   },
   {
    "id": "cls_nobody_5",
    "cls": "nobody",
    "level": 5,
-   "atk": 13,
-   "df": 9,
-   "spd": 10,
-   "mag": 4,
+   "atk": 14,
+   "df": 10,
+   "spd": 11,
+   "mag": 5,
    "hp": 34,
    "mp": 16
   },
@@ -535,12 +535,12 @@
    "id": "cls_nobody_10",
    "cls": "nobody",
    "level": 10,
-   "atk": 20,
-   "df": 10,
-   "spd": 11,
-   "mag": 5,
+   "atk": 22,
+   "df": 12,
+   "spd": 14,
+   "mag": 7,
    "hp": 64,
-   "mp": 21
+   "mp": 22
   }
  ],
  "exp_next": [
@@ -681,20 +681,20 @@
    "enemy": "palehorn",
    "level": 8,
    "atk": 18,
-   "df": 16,
+   "df": 18,
    "spd": 12,
    "mag": 14,
-   "hp": 67
+   "hp": 97
   },
   {
    "id": "en_choirbeast_10",
    "enemy": "choirbeast",
    "level": 10,
    "atk": 21,
-   "df": 18,
+   "df": 24,
    "spd": 14,
    "mag": 19,
-   "hp": 88
+   "hp": 194
   }
  ],
  "run_chance": [

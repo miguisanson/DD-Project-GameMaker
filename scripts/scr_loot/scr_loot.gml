@@ -373,9 +373,10 @@ function Loot_BuildMessageEntries(_loot, _prefix = "Loot: ") {
 #macro ELITE_ATK_BONUS 4
 #macro ELITE_VENOM_STACKS 2
 #macro ELITE_REGEN_FRAC 0.10
+#macro ELITE_HP_MULT 1.8
 #macro THROW_CAP 5
 #macro THROW_CAP_NOBODY 8
-#macro THROW_NOBODY_MULT 1.5
+#macro THROW_NOBODY_MULT 2
 #macro THROW_STAT_BASE 12
 
 // ---- gold ----
@@ -662,6 +663,8 @@ function Elite_Apply(_e, _mod) {
     _e.is_elite = (_mod != "");
     if (_mod == "") return _e;
     _e.name = Elite_Name(_mod) + " " + _e.name;
+    _e.max_hp = max(1, RoundHalfUp(_e.max_hp * ELITE_HP_MULT));   // D111 (E1-2): every elite is tougher, whatever the modifier
+    _e.hp = _e.max_hp;
     switch (_mod) {
         case "armored": _e.stats.def += ELITE_DEF_BONUS; break;
         case "swift": _e.stats.spd += ELITE_SPD_BONUS; break;
