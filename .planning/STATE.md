@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Session 3: MERGED to next: D1a, bal-apply (D111/D112), art-final (merchant A + gold outline, icons). Bot flake gone (input fix). In flight: sfx-variety (wt sfx, D116), d1b-menus (wt d1b: Tab menu, pause, codex, white text D115). Then D3 text, F1 optimisation, E2 playtest build. |
+| WIP | PAUSED end of session 3 (owner moving to a new session). ALL feature packets merged to next (e1a322d). READ .planning/RESUME.md: 1) full gate on next (not yet run after the d1b merge), 2) F1 optimisation, 3) E2 playtest build + big PLAYTEST-QUEUE, 4) owner IDE import, 5) sound credits. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
