@@ -42,7 +42,7 @@ function DialogueDB_Init() {
 						"Wha... What just happened?",
 						"Where am I?", 
 						"...", 
-						"I knew it. there's something wrong about this place.",
+						"I knew it. There's something wrong about this place.",
 						"I need to get back."];
     global.dialogue_db[? "after_class_chest_knight"] = [
         "Heavy... but it fits.",

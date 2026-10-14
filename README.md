@@ -45,6 +45,18 @@ Autofill blank Korean cells using OpenAI (draft pass only, requires review):
 python tools/localization/build_localization.py --xlsx datafiles/localization/game_text.xlsx --json datafiles/localization/localization.json --autofill-ko --model gpt-4.1-mini
 ```
 
+Check that every row has a real Korean translation (exit 1 otherwise; part of `run_tests.ps1`, every mode). Proper nouns and Latin tokens that stay Latin are listed in `tools/localization/ko_allowlist.txt`; the terms and register are in `.planning/research/ko-glossary.md`:
+
+```bash
+python tools/localization/check_missing_ko.py
+```
+
+The D3 text pass (English consistency, Korean rewrite, merchant lines) is kept as a re-runnable script. After a merge that conflicts on the workbook, take the other branch's workbook and run it again (it only touches the rows it names), then rebuild the JSON:
+
+```bash
+python tools/localization/text_pass_d3.py
+```
+
 Lint for newly introduced hardcoded player-facing English text in scoped files:
 
 ```bash
