@@ -7,9 +7,9 @@ game exports JSON with `-exportdata` for the Python simulator (no Included File 
 
 | # | Packet | Decisions / issues | Status |
 |---|---|---|---|
-| A1 | Draw-space bugs: sight ring + prompt drawn top-left, ring gone after battle; arrow outline; run animation; effects ≥ target size | I-056, I-058, I-059, I-060, I-063 | todo |
-| A2 | Window modes (windowed sizes / borderless / exclusive), resize, rm_floor6_5 clamp, hold-to-skip intro & scenes | D91, D48, I-054, I-055, DISP-10/11 | todo |
-| B1 | Stats ATK/DEF/SPD/MAG + HP/MP, ratio damage, level-up (class growth + 1 free point), `-exportdata` JSON | D22, D76, D77 | todo |
+| A1 | Draw-space bugs: sight ring + prompt drawn top-left, ring gone after battle; arrow outline; run animation; effects ≥ target size | I-056, I-058, I-059, I-060, I-063 | in flight (wt a1) |
+| A2 | Window modes (windowed sizes / borderless / exclusive), resize, rm_floor6_5 clamp, hold-to-skip intro & scenes | D91, D48, I-054, I-055, DISP-10/11 | MERGED to next |
+| B1 | Stats ATK/DEF/SPD/MAG + HP/MP, ratio damage, level-up (class growth + 1 free point), `-exportdata` JSON | D22, D76, D77 | in flight (wt b1) |
 | B2 | Statuses (poison stacks, burn, bleed), no dice anywhere, Evasion/Solidify, Foresight | D78, D79, D80, D21 | todo |
 | B3 | Turn timeline (next 5), stun push-back + Steadfast, stagger meter + BREAK, damage numbers | D74, D75, D92 | todo |
 | B4 | Battle AI rule lists, telegraphed big attacks, boss phases | D68, D7 | todo |
@@ -17,7 +17,7 @@ game exports JSON with `-exportdata` for the Python simulator (no Included File 
 | C2 | Chests (class first, then cards), class pick (Nobody locked), cards 1-of-3 at chests + level-ups, upgrades, passives (shared + class), max 3 skills equipped | D73, D81, D82, D34, D83 | todo |
 | C3 | Gold, merchant after floors 2/5/8, throwables (all classes, Nobody stronger), accessory slot, elites, per-run shuffles | D23, D33, D84, D85, D86, D92 | todo |
 | C4 | Beds (heal or upgrade), tutorial prompts + Help page, settings (QTE assist, key rebinding, text speed, shake), device button prompts | D45, D47, D49, D92 | todo |
-| D0 | Shared UI framework: one menu component (wrap-around, hold-to-scroll, same confirm/back, back = one level, remembered cursor, mouse hover/click/wheel), frames, fonts, motion, details panel with data-generated text; migrate the title menu first as the pilot | D95-D98, D100 | todo |
+| D0 | Shared UI framework: one menu component (wrap-around, hold-to-scroll, same confirm/back, back = one level, remembered cursor, mouse hover/click/wheel), frames, fonts, motion, details panel with data-generated text; migrate the title menu first as the pilot | D95-D98, D100 | in flight (wt d0) |
 | D1 | Every screen on the framework: settings, credits, battle HUD (D99) + battle menus, Tab menu (Status/Skills/Items/Gear/Codex/Settings) + pause, class pick, card pick, shop, bed, level-up, run end, echo pick, dialogue box (D101), prompts; remove the old per-screen menu code | D89, D90, D96, D99, D101, I-061, I-062 | todo |
 | D2 | Art: ComfyUI icons (status, skills, items, throwables, passives) + card frame, PNG strips + owner import checklist; code fallbacks until imported | D10, D43, D44, D94 | todo |
 | C5 | Story in runs: death scene (D103) + rotating death lines, wake at tunnel entrance, seen-once story with boss name banners (D106), lore notes in existing rooms incl. death-count notes (D107), credits text update (D105) | D102-D107, D26 | todo |
