@@ -310,7 +310,7 @@ function Enemy_ResetAll() {
 
 // ============================================================================================================
 // C1: the run (D25-D27, D31, D33, D46, D87, D88, D92, D102, D103).
-//   gs.run = { active, seed, rng: { map, loot, shop, enemy, cards, combat }, gold, kills, started_at, echo_used }
+//   gs.run = { active, seed, rng: { map, loot, shop, enemy, cards, combat }, gold, cards { pity, last, offers }, kills, started_at, echo_used }
 // A run starts at level 1 in rm_floor1 (where you fell in), is saved on every room change and every few seconds, and ends in
 // death, abandon or a win. Death deletes the run save: there is no reload to undo it (D46). The profile (scr_save) outlives runs.
 // ============================================================================================================
@@ -334,7 +334,8 @@ function Run_Create(_seed) {
         active: true,
         seed: _seed,
         rng: Run_RngCreate(_seed),
-        gold: 0,                 // placeholder until the shop packet
+        gold: 0,                 // placeholder until the shop packet (C2: a skipped card pick pays into it)
+        cards: Card_StateNew(),  // C2: the offer generator's pity counter and the last offer (scr_db_skill)
         kills: 0,
         started_at: date_current_datetime(),
         echo_used: { kind: "", id: -1 }

@@ -369,6 +369,7 @@ function Battle_GrantRewards(_p, _e) {
         out.loot = Battle_LootAppendNormalized(out.loot, recovered_loot);
     }
 
+    _p = Card_OnVictory(_p);   // C2: Field Medic, Second Wind, Scrounger
     out.player = _p;
     return out;
 }
@@ -555,7 +556,7 @@ function Qte_BufferPress(_ms) {
 // Foresight (D79): the player's Perfect zones are x1.5 wider while he has a status with `perfect_widen`. 1 without one.
 function Qte_PerfectWiden(_ch) {
     if (!is_struct(_ch)) return 1;
-    return max(1, Status_GetMul(_ch, "perfect_widen"));
+    return max(1, Status_GetMul(_ch, "perfect_widen")) * (1 + Card_PassiveSum(_ch, "perfect_widen"));   // Foresight (D79) x Steady Hands (C2)
 }
 
 // A Perfect half width after the widening (ms).
@@ -641,6 +642,10 @@ function Qte_ScaleAmount(_base, _mult, _min_result) {
 // The fixed arrow sequence of a player skill (D57): 3 arrows for the cheap skills (3 MP), 4 for the mid ones (4 MP), 5 for the strongest (5 MP).
 // Learned like spells: the same every cast. An unknown skill gets a plain 3.
 function Qte_SkillSequence(_skill_id) {
+    return Card_TrimSequence(_skill_id, Qte_SkillSequenceBase(_skill_id));   // C2: a held upgrade can shorten it
+}
+
+function Qte_SkillSequenceBase(_skill_id) {
     switch (_skill_id) {
         case SKILL_WOUND:          return [DOWN, RIGHT, UP];
         case SKILL_MUSCLE_UP:      return [UP, DOWN, UP];

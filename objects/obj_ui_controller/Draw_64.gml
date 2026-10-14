@@ -110,9 +110,7 @@ if (cutscene_active) {
     }
 }
 
-if (gs.ui.mode == UI_CLASS_SELECT) {
-    ClassSelect_Draw();
-}
+CardsUi_Draw();   // C2: class choice, stat point, card pick, replace a skill
 
 // Dialogue box
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {

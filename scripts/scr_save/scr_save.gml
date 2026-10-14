@@ -892,6 +892,7 @@ function RunSave_Build() {
         seed: run.seed,
         rng: rng,
         gold: run.gold,
+        cards: run.cards,
         kills: run.kills,
         started_at: run.started_at,
         floor: Run_FloorOfRoomName(where.room_name),
@@ -920,6 +921,7 @@ function RunSave_ApplyState(_raw) {
         }
     }
     if (variable_struct_exists(_raw, "gold")) run.gold = Save_ToReal(_raw.gold, 0);
+    if (variable_struct_exists(_raw, "cards")) run.cards = Card_StateNormalize(_raw.cards);
     if (variable_struct_exists(_raw, "kills")) run.kills = Save_ToReal(_raw.kills, 0);
     if (variable_struct_exists(_raw, "started_at")) run.started_at = Save_ToReal(_raw.started_at, run.started_at);
     gs.run = run;

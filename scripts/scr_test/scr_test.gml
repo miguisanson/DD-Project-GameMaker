@@ -85,6 +85,7 @@ function Test_RunAll() {
     Test_RunSuite("Profile", Test_Suite_Profile);
     Test_RunSuite("RunSave", Test_Suite_RunSave);
     Test_RunSuite("RunLoop", Test_Suite_RunLoop);
+    Test_RunSuite("Cards", Test_Suite_Cards);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     Test_RunSuite("Mem", Test_Suite_Mem);
     Test_RunSuite("Input", Test_Suite_Input);
@@ -1348,33 +1349,23 @@ function Test_Suite_Inventory() {
     Test_False("Inv_Has false after removal", Inv_Has(_inv, 10, 1));
     Test_Eq("Inv_Add qty 0 is a no-op", array_length(Inv_Add([], 10, 0)), 0);
     Test_Eq("Inv_Add negative qty is a no-op", array_length(Inv_Add([], 10, -2)), 0);
-    // One-copy rule: weapons, armor and skill books are never duplicated.
+    // One-copy rule: weapons and armor are never duplicated (skill books are gone, D18).
     Test_Eq("weapon (Iron Sword 2) added twice -> 1 copy", array_length(Inv_Add(Inv_Add([], 2, 1), 2, 1)), 1);
     Test_Eq("weapon qty 3 in one call -> 1 copy", array_length(Inv_Add([], 2, 3)), 1);
     Test_Eq("armor (Leather Armor 20) added twice -> 1 copy", array_length(Inv_Add(Inv_Add([], 20, 1), 20, 1)), 1);
-    var _book = Inv_Add(Inv_Add([], 114, 1), 114, 1);
-    Test_Eq("R-003 skill book 114 added twice -> listed once", array_length(Inv_GetItems(_book)), 1);
-    Test_Eq("R-003 skill book 114 qty stays 1", _book[0].qty, 1);
-    // A book for a skill the player already knows is refused.
-    var _gs = GameState_Get();
-    _gs.player_ch.skills = [SKILL_WOUND];
-    Test_Eq("book for an already-known skill is not added", array_length(Inv_Add([], 101, 1)), 0);
-    _gs.player_ch.skills = [];
-    // R-003: a duplicate that got in (old save) must still show once in the listing.
-    var _dup = [{ id: 114, qty: 1 }, { id: 114, qty: 1 }];
-    Test_Eq("R-003 Menu_InventoryDisplayItems shows a pushed duplicate book once", array_length(Menu_InventoryDisplayItems(_dup)), 1);
+    Test_True("C2 the old skill book ids (101..114) are not items any more", !ds_map_exists(global.item_db, 101) && !ds_map_exists(global.item_db, 114) && ItemDB_Get(101).id == 0);
 }
 
 // Data integrity over the GML databases (VER-11; R-003, R-004). ds_map_add silently drops a repeated key, so a
-// duplicate id shows up as a wrong record count; counts come from balance-data.md (37 items, 27 skills, 14 statuses, 10 enemies).
+// duplicate id shows up as a wrong record count; counts come from balance-data.md (23 items after the skill books went with D18, 27 skills, 14 statuses, 10 enemies).
 function Test_Suite_Data() {
     GameState_Get();
     ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init();
-    Test_Eq("item count == 37 (no lost duplicate ids)", ds_map_size(global.item_db), 37);
+    Test_Eq("item count == 23 (no lost duplicate ids; 14 skill books removed, D18)", ds_map_size(global.item_db), 23);
     Test_Eq("skill count == 27", ds_map_size(global.skill_db), 27);
     Test_Eq("status count == 14", ds_map_size(global.status_db), 14);
     Test_Eq("enemy count == 10", ds_map_size(global.enemy_db), 10);
-    var _bad = 0; var _names = {}; var _dupnames = 0; var _book_skills = {}; var _dupbooks = 0; var _books = 0;
+    var _bad = 0; var _names = {}; var _dupnames = 0;
     var _key = ds_map_find_first(global.item_db);
     while (!is_undefined(_key)) {
         var _it = ItemDB_Get(_key);
@@ -1382,28 +1373,10 @@ function Test_Suite_Data() {
         if (variable_struct_exists(_names, string(_it.name))) _dupnames++;
         variable_struct_set(_names, string(_it.name), true);
         if (_it.use.status != -1 && StatusDB_Get(_it.use.status).id != _it.use.status) _bad++;
-        if (Item_IsSkillbook(_it)) {
-            _books++;
-            if (SkillDB_Get(_it.use.skill_id).id != _it.use.skill_id) _bad++;
-            if (variable_struct_exists(_book_skills, string(_it.use.skill_id))) _dupbooks++;
-            variable_struct_set(_book_skills, string(_it.use.skill_id), true);
-        }
         _key = ds_map_find_next(global.item_db, _key);
     }
-    Test_Eq("every item id matches its record; item statuses and book skills resolve", _bad, 0);
+    Test_Eq("every item id matches its record; item statuses resolve", _bad, 0);
     Test_Eq("R-003 no two items share a display name", _dupnames, 0);
-    Test_Eq("14 skill books exist", _books, 14);
-    Test_Eq("R-003 no two skill books teach the same skill", _dupbooks, 0);
-    var _classes = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE];
-    for (var _c = 0; _c < 3; _c++) {
-        var _list = Loot_SkillbookList(_classes[_c]);
-        var _seen = {}; var _dups = 0;
-        for (var _i = 0; _i < array_length(_list); _i++) {
-            if (variable_struct_exists(_seen, string(_list[_i]))) _dups++;
-            variable_struct_set(_seen, string(_list[_i]), true);
-        }
-        Test_Eq("R-003 class " + string(_classes[_c]) + " skill book pool has 5 distinct books", array_length(_list) - _dups, 5);
-    }
     var _sbad = 0;
     for (var _s = 1; _s <= 27; _s++) {
         var _sk = SkillDB_Get(_s);
@@ -1460,7 +1433,8 @@ function Test_Suite_Export() {
     Test_Eq("Export: 4 classes", array_length(_back.classes), 4);
     Test_Eq("Export: 10 enemies", array_length(_back.enemies), 10);
     Test_Eq("Export: 27 skills", array_length(_back.skills), 27);
-    Test_Eq("Export: 37 items", array_length(_back.items), 37);
+    Test_Eq("Export: 23 items", array_length(_back.items), 23);
+    Test_Eq("Export: 50 cards (14 skills, 14 upgrades, 19 passives, 3 fallbacks)", array_length(_back.cards), 50);
     Test_Eq("Export: 14 statuses", array_length(_back.statuses), 14);
     Test_Eq("Export: 10 level rows", array_length(_back.levels), 10);
     Test_True("Export: class ids are unique", Export_IdsUnique(_back.classes));
@@ -2261,7 +2235,6 @@ function Test_MemCycle() {
     StatusDB_Init();
     DialogueDB_Init();
     Loot_Init();
-    Loot_BuildSkillbookLists();
     SFX_EnsureGainMaps();
     SFX_EnsureVariantMaps();
     // a re-created persistent audio manager destroys and rebuilds its four maps in Create
@@ -3141,4 +3114,448 @@ function Test_Suite_UI() {
     Test_Eq("D0 title menu has four items", array_length(_tm), 4);
     Test_False("D0 Load Game is greyed with no save", _tm[1].enabled);
     Test_True("D0 Load Game is live with a save", Title_MainItems(true)[1].enabled);
+}
+
+// ---- C2: cards (D18, D34, D73, D76, D81-D83, D88, D100) ----------------------------------------------------------------------
+// Expected values are the packet's card table (each upgrade's numbers below), D82 (5 skills + 1 upgrade each, 6-8 shared passives, 2-3
+// class passives, max 3 skills), D81 (1 of 3, skip for gold), D73 (first class or skill chest = class choice), D83 (Nobody locked until the
+// first win) and the offer rules of roguelike-cases.md 2.2 (3 distinct cards, quota, pity, decline memory, same seed = same offers).
+function Test_CardPlayer(_class, _skills = [], _upgrades = [], _passives = []) {
+    var _ch = CharacterCreate_Player(_class);
+    _ch.skills = _skills;
+    _ch.upgrades = _upgrades;
+    _ch.passives = _passives;
+    return _ch;
+}
+
+function Test_CardKinds(_ids) {
+    var _out = { skill: 0, upgrade: 0, passive: 0, fallback: 0 };
+    for (var _i = 0; _i < array_length(_ids); _i++) {
+        var _k = CardDB_Get(_ids[_i]).kind;
+        variable_struct_set(_out, _k, variable_struct_get(_out, _k) + 1);
+    }
+    return _out;
+}
+
+function Test_CardDistinct(_ids) {
+    for (var _i = 0; _i < array_length(_ids); _i++) {
+        for (var _j = _i + 1; _j < array_length(_ids); _j++) if (_ids[_i] == _ids[_j]) return false;
+    }
+    return true;
+}
+
+function Test_CardLineValue(_card, _label) {
+    var _lines = Card_Lines(_card);
+    for (var _i = 0; _i < array_length(_lines); _i++) if (_lines[_i].label == _label) return _lines[_i].value;
+    return "";
+}
+
+// One run's worth of offers for a build that takes the first card each time (replacing the first skill past 3); a signature string.
+function Test_CardRun(_class, _seed, _count) {
+    var _ch = Test_CardPlayer(_class);
+    var _rng = Rng_New(_seed, "cards");
+    var _st = Card_StateNew();
+    var _sig = "";
+    for (var _i = 0; _i < _count; _i++) {
+        var _off = Card_OfferGenerate(_rng, _ch, _st);
+        _st = _off.state;
+        _sig += _off.cards[0] + "," + _off.cards[1] + "," + _off.cards[2] + "|";
+        var _tk = Card_Take(_ch, _off.cards[0]);
+        if (_tk.needs_replace) _ch = Card_ReplaceSkill(_ch, _ch.skills[0], CardDB_Get(_off.cards[0]).skill_id);
+        else _ch = _tk.ch;
+    }
+    return _sig;
+}
+
+function Test_Suite_Cards() {
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_player = _gs.player_ch;
+    ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init();
+    CardDB_Init();
+
+    // ---- the card pool (D82): per class 5 skills, each with 1 upgrade; 7 shared passives; 3 class passives each ----
+    var _classes = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE];
+    var _want_skills = [
+        [SKILL_WOUND, SKILL_HILT_BASH, SKILL_MUSCLE_UP, SKILL_REV_UP, SKILL_HORIZ_SLASH],
+        [SKILL_WOUND, SKILL_POISON_ARROW, SKILL_EVASION, SKILL_DOUBLE_SHOT, SKILL_TAKE_AIM],
+        [SKILL_FIREBALL, SKILL_POISON_MIST, SKILL_ICE_SPEAR, SKILL_MEDITATION, SKILL_FORESIGHT]
+    ];
+    for (var _c = 0; _c < 3; _c++) {
+        var _pool = Card_Pool(_classes[_c]);
+        var _sk = 0; var _up = 0; var _pa = 0; var _shared = 0; var _own = 0; var _skill_ok = true; var _up_ok = true;
+        for (var _i = 0; _i < array_length(_pool); _i++) {
+            var _cd = _pool[_i];
+            if (_cd.kind == "skill") {
+                _sk++;
+                var _in = false;
+                for (var _w = 0; _w < 5; _w++) if (_want_skills[_c][_w] == _cd.skill_id) _in = true;
+                if (!_in) _skill_ok = false;
+            }
+            if (_cd.kind == "upgrade") {
+                _up++;
+                var _has_base = false;
+                for (var _j = 0; _j < array_length(_pool); _j++) if (_pool[_j].kind == "skill" && _pool[_j].skill_id == _cd.skill_id) _has_base = true;
+                if (!_has_base) _up_ok = false;
+            }
+            if (_cd.kind == "passive") {
+                _pa++;
+                if (array_length(_cd.classes) == 0) _shared++; else _own++;
+            }
+        }
+        var _cn = "C2 class " + string(_classes[_c]);
+        Test_Eq(_cn + " pool: 5 skill cards", _sk, 5);
+        Test_Eq(_cn + " pool: 5 upgrade cards (one per skill)", _up, 5);
+        Test_True(_cn + " pool: exactly the class skills", _skill_ok);
+        Test_True(_cn + " pool: every upgrade belongs to a skill of the pool", _up_ok);
+        Test_Eq(_cn + " pool: 7 shared passives", _shared, 7);
+        Test_Eq(_cn + " pool: 3 class passives", _own, 3);
+        Test_Eq(_cn + " pool: no fallback cards inside the pool", Test_CardKinds(Card_PoolIds(_classes[_c])).fallback, 0);
+    }
+    var _nk = Test_CardKinds(Card_PoolIds(CLASS_NOBODY));
+    Test_Eq("C2 Nobody pool: no skills (D83)", _nk.skill, 0);
+    Test_Eq("C2 Nobody pool: no upgrades (D83)", _nk.upgrade, 0);
+    Test_Eq("C2 Nobody pool: 7 shared + 3 item passives", _nk.passive, 10);
+    Test_True("C2 card ids are unique over the whole database", Test_CardDistinct(Card_AllIds()));
+    Test_Eq("C2 three fallback cards exist so an offer can always be filled", array_length(Card_FallbackIds()), 3);
+
+    // ---- upgrades, concretely (numbers are data; the text is generated from them, D100) ----
+    var _ice = SkillDB_Get(SKILL_ICE_SPEAR);
+    var _iceu = Skill_WithUpgrade(_ice, CardDB_Get(Card_UpgradeId(SKILL_ICE_SPEAR)));
+    Test_Eq("C2 Ice Spear+ power 5 -> 7", _iceu.power, 7);
+    Test_Eq("C2 Ice Spear base power stays 5 (the upgrade works on a copy)", _ice.power, 5);
+    Test_Eq("C2 Ice Spear+ is named with a plus", _iceu.name, _ice.name + "+");
+    Test_Eq("C2 Ice Spear arrows 5", array_length(Qte_SkillSequence(SKILL_ICE_SPEAR)), 5);
+    Test_Eq("C2 Ice Spear+ needs 1 arrow less", Card_UpgradedSequenceLength(SKILL_ICE_SPEAR, [SKILL_ICE_SPEAR]), 4);
+    Test_Eq("C2 an upgrade of another skill leaves the arrows alone", Card_UpgradedSequenceLength(SKILL_ICE_SPEAR, [SKILL_FIREBALL]), 5);
+    var _wu = Skill_WithUpgrade(SkillDB_Get(SKILL_WOUND), CardDB_Get(Card_UpgradeId(SKILL_WOUND)));
+    Test_True("C2 Wound+ power 4 -> 6 and bleed chance 75% -> 100%", _wu.power == 6 && _wu.status_chance == 1);
+    var _hu = Skill_WithUpgrade(SkillDB_Get(SKILL_HILT_BASH), CardDB_Get(Card_UpgradeId(SKILL_HILT_BASH)));
+    Test_True("C2 Hilt Bash+ power 4 -> 5 and stun chance 60% -> 85%", _hu.power == 5 && abs(_hu.status_chance - 0.85) < 0.0001);
+    var _mu = Skill_WithUpgrade(SkillDB_Get(SKILL_MUSCLE_UP), CardDB_Get(Card_UpgradeId(SKILL_MUSCLE_UP)));
+    Test_True("C2 Muscle Up+ costs 2 MP and guards 8 turns", _mu.mp_cost == 2 && _mu.status_turns == 8);
+    var _pu = Skill_WithUpgrade(SkillDB_Get(SKILL_POISON_ARROW), CardDB_Get(Card_UpgradeId(SKILL_POISON_ARROW)));
+    Test_True("C2 Poison Arrow+ gives 4 stacks at 100%", _pu.status_stacks == 4 && _pu.status_chance == 1);
+    var _fu = Skill_WithUpgrade(SkillDB_Get(SKILL_FORESIGHT), CardDB_Get(Card_UpgradeId(SKILL_FORESIGHT)));
+    Test_Eq("C2 Foresight+ lasts 5 turns", _fu.status_turns, 5);
+    var _ups_ok = true; var _ups_n = 0;
+    for (var _c2 = 0; _c2 < 3; _c2++) {
+        var _pl = Card_Pool(_classes[_c2]);
+        for (var _k = 0; _k < array_length(_pl); _k++) {
+            if (_pl[_k].kind != "upgrade") continue;
+            _ups_n++;
+            var _base = SkillDB_Get(_pl[_k].skill_id);
+            var _upg = Skill_WithUpgrade(_base, _pl[_k]);
+            var _bs = variable_struct_exists(_base, "status_stacks") ? _base.status_stacks : 0;
+            var _us = variable_struct_exists(_upg, "status_stacks") ? _upg.status_stacks : 0;
+            var _changed = (_upg.power != _base.power) || (_upg.mp_cost != _base.mp_cost) || (_upg.status_chance != _base.status_chance) || (_upg.status_turns != _base.status_turns)
+                        || (_us != _bs) || (variable_struct_exists(_pl[_k].up, "seq_trim") && _pl[_k].up.seq_trim > 0);
+            if (!_changed || _upg.name != _base.name + "+") _ups_ok = false;
+            if (array_length(Card_Lines(_pl[_k])) <= 0) _ups_ok = false;
+        }
+    }
+    Test_Eq("C2 15 upgrade cards over the three classes", _ups_n, 15);
+    Test_True("C2 every upgrade changes at least one number, is named with + and has number lines", _ups_ok);
+    Test_Eq("C2 Ice Spear+ text shows power 5 > 7 (from the data)", Test_CardLineValue(CardDB_Get(Card_UpgradeId(SKILL_ICE_SPEAR)), Loc_T("card.lbl.power", "Power")), "5 > 7");
+    Test_Eq("C2 Ice Spear+ text shows arrows 5 > 4", Test_CardLineValue(CardDB_Get(Card_UpgradeId(SKILL_ICE_SPEAR)), Loc_T("card.lbl.arrows", "Arrows")), "5 > 4");
+    // the upgrade follows the equipped player: SkillDB_Get and Qte_SkillSequence read the player's upgrades
+    _gs.player_ch = Test_CardPlayer(CLASS_MAGE, [SKILL_ICE_SPEAR], [SKILL_ICE_SPEAR]);
+    Test_Eq("C2 SkillDB_Get gives the upgraded power to a player who took Ice Spear+", SkillDB_Get(SKILL_ICE_SPEAR).power, 7);
+    Test_Eq("C2 Qte_SkillSequence gives 4 arrows to that player", array_length(Qte_SkillSequence(SKILL_ICE_SPEAR)), 4);
+    Test_Eq("C2 the other skills stay as they were", SkillDB_Get(SKILL_FIREBALL).power, 6);
+    _gs.player_ch = Test_CardPlayer(CLASS_MAGE, [SKILL_ICE_SPEAR]);
+    Test_Eq("C2 without the upgrade the skill is the base one", SkillDB_Get(SKILL_ICE_SPEAR).power, 5);
+
+    // ---- text from data (D100): a plain line with the numbers in it, and number lines ----
+    var _all_text = true;
+    var _ids = Card_AllIds();
+    for (var _t = 0; _t < array_length(_ids); _t++) {
+        var _cdt = CardDB_Get(_ids[_t]);
+        if (string_length(Card_Name(_cdt)) < 2 || string_length(Card_Sentence(_cdt)) < 8 || string_length(Card_TypeTag(_cdt)) < 2) _all_text = false;
+        if (string_pos("{", Card_Sentence(_cdt)) > 0) _all_text = false;   // every placeholder was filled
+    }
+    Test_True("C2 every card has a name, a type tag and a sentence with no open placeholder", _all_text);
+    Test_True("C2 Field Medic's sentence carries its number (3 HP) from the data", string_pos("3", Card_Sentence(CardDB_Get("pas:field_medic"))) > 0);
+    Test_Eq("C2 a skill card shows its arrow sequence (Ice Spear = 5 arrows)", array_length(Card_Sequence(CardDB_Get(Card_SkillId(SKILL_ICE_SPEAR)))), 5);
+    Test_Eq("C2 an upgrade card shows the upgraded sequence (4 arrows)", array_length(Card_Sequence(CardDB_Get(Card_UpgradeId(SKILL_ICE_SPEAR)))), 4);
+    Test_Eq("C2 a passive card has no sequence", array_length(Card_Sequence(CardDB_Get("pas:field_medic"))), 0);
+
+    // ---- the offer (roguelike-cases.md 2.2): 3 distinct, eligible, quota, pity, decline memory, deterministic ----
+    var _mage0 = Test_CardPlayer(CLASS_MAGE);
+    var _st = Card_StateNew();
+    var _o1 = Card_OfferGenerate(Rng_New(777, "cards"), _mage0, _st);
+    Test_Eq("C2 an offer has 3 cards", array_length(_o1.cards), 3);
+    Test_True("C2 an offer has 3 distinct cards", Test_CardDistinct(_o1.cards));
+    Test_True("C2 a mage with no skills sees at least one new skill (quota)", Test_CardKinds(_o1.cards).skill >= 1);
+    Test_Eq("C2 no upgrade is offered for a skill the player does not own", Test_CardKinds(_o1.cards).upgrade, 0);
+    // same seed -> same offers over a whole run of picks; another seed -> other offers
+    var _sigA = Test_CardRun(CLASS_MAGE, 4242, 12);
+    var _sigB = Test_CardRun(CLASS_MAGE, 4242, 12);
+    var _sigC = Test_CardRun(CLASS_MAGE, 4243, 12);
+    Test_True("C2 the run signature is not empty", string_length(_sigA) > 40);
+    Test_Eq("C2 the same seed gives the same offers (D33)", _sigA, _sigB);
+    Test_True("C2 another seed gives other offers", _sigA != _sigC);
+    random_set_seed(5);
+    repeat (40) random(1);
+    Test_Eq("C2 global random() calls do not change the offers", Test_CardRun(CLASS_MAGE, 4242, 12), _sigA);
+    // the offers come from the cards stream of the run
+    _gs.run = Run_Create(31337);
+    var _viaRun = Card_OfferFromRun(_mage0);
+    var _copy = Run_Create(31337);
+    var _viaDirect = Card_OfferGenerate(_copy.rng.cards, _mage0, Card_StateNew());
+    Test_True("C2 Card_OfferFromRun uses the run's cards stream", _viaRun.cards[0] == _viaDirect.cards[0] && _viaRun.cards[1] == _viaDirect.cards[1] && _viaRun.cards[2] == _viaDirect.cards[2]);
+    Test_True("C2 drawing an offer advances only the cards stream", _gs.run.rng.cards.calls > 0 && _gs.run.rng.loot.calls == 0 && _gs.run.rng.map.calls == 0);
+
+    // invariants over many offers and builds (what the owner cannot see by playing): eligible, distinct, never three dead options
+    var _bad_elig = 0; var _bad_dup = 0; var _bad_size = 0; var _dead3 = 0; var _n_offers = 0;
+    var _rng = Rng_New(9, "cards");
+    var _builds = [
+        [CLASS_KNIGHT, []], [CLASS_KNIGHT, [SKILL_WOUND]], [CLASS_KNIGHT, [SKILL_WOUND, SKILL_HILT_BASH, SKILL_REV_UP]],
+        [CLASS_ARCHER, [SKILL_POISON_ARROW, SKILL_EVASION, SKILL_TAKE_AIM]], [CLASS_MAGE, [SKILL_FIREBALL, SKILL_ICE_SPEAR, SKILL_FORESIGHT]],
+        [CLASS_MAGE, [SKILL_MEDITATION]], [CLASS_NOBODY, []]
+    ];
+    for (var _b = 0; _b < array_length(_builds); _b++) {
+        var _chb = Test_CardPlayer(_builds[_b][0], _builds[_b][1]);
+        var _stb = Card_StateNew();
+        for (var _n = 0; _n < 14; _n++) {
+            var _off = Card_OfferGenerate(_rng, _chb, _stb);
+            _stb = _off.state;
+            _n_offers++;
+            if (array_length(_off.cards) != 3) _bad_size++;
+            if (!Test_CardDistinct(_off.cards)) _bad_dup++;
+            var _live = 0;
+            for (var _x = 0; _x < array_length(_off.cards); _x++) {
+                var _cdx = CardDB_Get(_off.cards[_x]);
+                if (!Card_Eligible(_chb, _cdx)) _bad_elig++;
+                if (!(_cdx.kind == "skill" && array_length(_chb.skills) >= 3)) _live++;
+            }
+            if (_live == 0) _dead3++;
+            // take the first card the way the player would, so the build grows through the whole run
+            var _tk = Card_Take(_chb, _off.cards[0]);
+            if (_tk.needs_replace) _chb = Card_ReplaceSkill(_chb, _chb.skills[0], CardDB_Get(_off.cards[0]).skill_id);
+            else _chb = _tk.ch;
+        }
+    }
+    Test_Eq("C2 all " + string(_n_offers) + " generated offers have 3 cards", _bad_size, 0);
+    Test_Eq("C2 no offer shows a card twice", _bad_dup, 0);
+    Test_Eq("C2 every offered card is eligible (owned skills, unowned passives, upgrades of owned skills)", _bad_elig, 0);
+    Test_Eq("C2 no offer is three cards that all need a swap", _dead3, 0);
+
+    // 3 skills equipped: at most one new-skill card per offer, and an upgrade shows up when one exists (the max-3 rule, D82)
+    var _full = Test_CardPlayer(CLASS_KNIGHT, [SKILL_WOUND, SKILL_HILT_BASH, SKILL_REV_UP]);
+    var _most_skills = 0; var _with_up = 0; var _rn = Rng_New(3, "cards"); var _sf = Card_StateNew();
+    for (var _m = 0; _m < 40; _m++) {
+        var _of = Card_OfferGenerate(_rn, _full, _sf);
+        _sf = _of.state;
+        var _kk = Test_CardKinds(_of.cards);
+        _most_skills = max(_most_skills, _kk.skill);
+        if (_kk.upgrade > 0) _with_up++;
+    }
+    Test_True("C2 with 3 skills equipped an offer holds at most 1 new-skill card", _most_skills <= 1);
+    Test_True("C2 with 3 skills equipped upgrades keep showing up (more than a third of offers)", _with_up >= 14);
+
+    // pity (roguelike-cases.md 2.2 step 5): after 2 offers without an upgrade the next one has one
+    var _pity = Card_StateNew();
+    _pity.pity = CARD_PITY_OFFERS;
+    var _poff = Card_OfferGenerate(Rng_New(11, "cards"), _full, _pity);
+    Test_True("C2 pity: the offer after 2 upgrade-less offers holds an upgrade", Test_CardKinds(_poff.cards).upgrade >= 1);
+    Test_Eq("C2 pity: the counter resets once an upgrade was shown", _poff.state.pity, 0);
+    var _forced_ok = true; var _unforced_ok = true; var _quota_ok = true; var _quota1_ok = true;
+    var _one = Test_CardPlayer(CLASS_MAGE, [SKILL_FIREBALL]);
+    for (var _sd = 1; _sd <= 40; _sd++) {
+        var _pf = Card_StateNew(); _pf.pity = CARD_PITY_OFFERS;
+        var _pu = Card_StateNew(); _pu.pity = CARD_PITY_OFFERS - 1;
+        var _of2 = Card_OfferGenerate(Rng_New(_sd, "cards"), _full, _pf);
+        if (!_of2.forced || Test_CardKinds(_of2.cards).upgrade < 1) _forced_ok = false;
+        if (Card_OfferGenerate(Rng_New(_sd, "cards"), _full, _pu).forced) _unforced_ok = false;
+        if (Test_CardKinds(Card_OfferGenerate(Rng_New(_sd, "cards"), _mage0, Card_StateNew()).cards).skill < 1) _quota_ok = false;
+        if (Test_CardKinds(Card_OfferGenerate(Rng_New(_sd, "cards"), _one, Card_StateNew()).cards).skill < 1) _quota1_ok = false;
+    }
+    Test_True("C2 pity: at the limit the upgrade is forced, for 40 seeds", _forced_ok);
+    Test_True("C2 pity: one offer before the limit nothing is forced", _unforced_ok);
+    Test_True("C2 quota: a class with no skill always sees a new skill, for 40 seeds", _quota_ok);
+    Test_True("C2 quota: a class with one skill still always sees a new skill, for 40 seeds", _quota1_ok);
+    var _nopity = Card_OfferGenerate(Rng_New(11, "cards"), Test_CardPlayer(CLASS_KNIGHT), _pity);
+    Test_True("C2 pity: with no skill owned there is nothing to force and the counter only counts offers that could have had an upgrade", _nopity.state.pity == CARD_PITY_OFFERS && Test_CardKinds(_nopity.cards).upgrade == 0);
+    var _ph = Card_StateNew();
+    var _pcount = 0; var _pmax = 0;
+    var _rp = Rng_New(21, "cards");
+    for (var _q = 0; _q < 60; _q++) {
+        var _po = Card_OfferGenerate(_rp, _full, _ph);
+        _ph = _po.state;
+        _pcount = (Test_CardKinds(_po.cards).upgrade > 0) ? 0 : _pcount + 1;
+        _pmax = max(_pmax, _pcount);
+    }
+    Test_True("C2 pity: the longest upgrade-less streak over 60 offers is at most 2", _pmax <= CARD_PITY_OFFERS);
+
+    // decline memory: a card refused in the previous offer is not shown again right away (when other cards exist)
+    var _d1 = Card_OfferGenerate(Rng_New(5, "cards"), _mage0, Card_StateNew());
+    var _d2 = Card_OfferGenerate(Rng_New(6, "cards"), _mage0, _d1.state);
+    var _overlap = 0;
+    for (var _a = 0; _a < 3; _a++) for (var _bb = 0; _bb < 3; _bb++) if (_d1.cards[_a] == _d2.cards[_bb]) _overlap++;
+    Test_Eq("C2 decline memory: nothing from the previous offer comes back", _overlap, 0);
+
+    // owned things are not offered; a pool that ran dry is filled with fallbacks, still 3 distinct
+    var _ownall = Test_CardPlayer(CLASS_NOBODY, [], [], Card_PoolPassiveIds(CLASS_NOBODY));
+    var _fo = Card_OfferGenerate(Rng_New(1, "cards"), _ownall, Card_StateNew());
+    Test_True("C2 Nobody with every passive: 3 distinct fallback cards", array_length(_fo.cards) == 3 && Test_CardDistinct(_fo.cards) && Test_CardKinds(_fo.cards).fallback == 3);
+    var _some = Test_CardPlayer(CLASS_NOBODY, [], [], ["pas:quick_feet", "pas:field_medic", "pas:mana_spring"]);
+    var _so = Card_OfferGenerate(Rng_New(2, "cards"), _some, Card_StateNew());
+    var _dupown = false;
+    for (var _z = 0; _z < 3; _z++) if (_so.cards[_z] == "pas:quick_feet" || _so.cards[_z] == "pas:field_medic" || _so.cards[_z] == "pas:mana_spring") _dupown = true;
+    Test_False("C2 an owned passive is not offered again", _dupown);
+    Test_True("C2 Nobody's offers hold passives only (no skills, no upgrades)", Test_CardKinds(_so.cards).skill == 0 && Test_CardKinds(_so.cards).upgrade == 0);
+    var _owned_sk = Test_CardPlayer(CLASS_MAGE, [SKILL_FIREBALL, SKILL_ICE_SPEAR]);
+    var _sk_dup = false; var _rs = Rng_New(8, "cards"); var _ss = Card_StateNew();
+    for (var _y = 0; _y < 30; _y++) {
+        var _os = Card_OfferGenerate(_rs, _owned_sk, _ss);
+        _ss = _os.state;
+        for (var _v = 0; _v < 3; _v++) if (_os.cards[_v] == Card_SkillId(SKILL_FIREBALL) || _os.cards[_v] == Card_SkillId(SKILL_ICE_SPEAR)) _sk_dup = true;
+    }
+    Test_False("C2 an owned skill is never offered as a new skill", _sk_dup);
+    var _foreign = false;
+    var _kn = Test_CardPlayer(CLASS_KNIGHT);
+    for (var _y2 = 0; _y2 < 30; _y2++) {
+        var _om = Card_OfferGenerate(_rs, _kn, Card_StateNew());
+        for (var _v2 = 0; _v2 < 3; _v2++) if (!Card_Eligible(_kn, CardDB_Get(_om.cards[_v2]))) _foreign = true;
+    }
+    Test_False("C2 a knight is never offered another class's cards", _foreign);
+
+    // ---- taking a card ----
+    var _t0 = Test_CardPlayer(CLASS_MAGE);
+    var _tk1 = Card_Take(_t0, Card_SkillId(SKILL_FIREBALL));
+    Test_True("C2 taking a skill card learns the skill", !_tk1.needs_replace && array_length(_tk1.ch.skills) == 1 && _tk1.ch.skills[0] == SKILL_FIREBALL);
+    var _tk2 = Card_Take(_tk1.ch, Card_UpgradeId(SKILL_FIREBALL));
+    Test_True("C2 taking an upgrade card records it", array_length(_tk2.ch.upgrades) == 1 && _tk2.ch.upgrades[0] == SKILL_FIREBALL);
+    var _tk3 = Card_Take(_t0, "pas:quick_feet");
+    Test_Eq("C2 Quick Feet: +1 SPD at once", _tk3.ch.stats.spd, _t0.stats.spd + 1);
+    Test_True("C2 a taken passive is remembered", Card_HasPassive(_tk3.ch, "pas:quick_feet"));
+    var _three = Test_CardPlayer(CLASS_MAGE, [SKILL_FIREBALL, SKILL_ICE_SPEAR, SKILL_FORESIGHT], [SKILL_FORESIGHT]);
+    var _tk4 = Card_Take(_three, Card_SkillId(SKILL_MEDITATION));
+    Test_True("C2 a 4th skill asks which to replace and changes nothing yet (D82)", _tk4.needs_replace && array_length(_tk4.ch.skills) == 3 && _tk4.ch.skills[2] == SKILL_FORESIGHT);
+    var _rep = Card_ReplaceSkill(_three, SKILL_FORESIGHT, SKILL_MEDITATION);
+    Test_True("C2 replacing swaps the skill in place and keeps 3", array_length(_rep.skills) == 3 && _rep.skills[2] == SKILL_MEDITATION && _rep.skills[0] == SKILL_FIREBALL);
+    Test_Eq("C2 the replaced skill's upgrade goes with it", array_length(_rep.upgrades), 0);
+    var _fb_hp = Test_CardPlayer(CLASS_KNIGHT);
+    _fb_hp.hp = 2;
+    var _tk5 = Card_Take(_fb_hp, "fb:rest");
+    Test_Eq("C2 Second Wind (fallback) heals half of max HP", _tk5.ch.hp, min(_fb_hp.max_hp, 2 + floor(_fb_hp.max_hp / 2)));
+    Test_Eq("C2 Skip pays a small gold amount", Card_SkipGold(), 5);
+    _gs.run = Run_Create(1);
+    Card_SkipOffer();
+    Test_Eq("C2 skipping adds the gold to the run", _gs.run.gold, 5);
+
+    // ---- passives that act in the game ----
+    var _pm = Test_CardPlayer(CLASS_KNIGHT, [], [], ["pas:field_medic"]);
+    _pm.hp = 4;
+    Test_Eq("C2 Field Medic: +3 HP after a won fight", Card_OnVictory(_pm).hp, 7);
+    var _pm2 = Test_CardPlayer(CLASS_KNIGHT, [], [], ["pas:field_medic"]);
+    Test_Eq("C2 Field Medic never heals above max HP", Card_OnVictory(_pm2).hp, _pm2.max_hp);
+    var _ms = Test_CardPlayer(CLASS_MAGE, [], [], ["pas:mana_spring"]);
+    _ms.mp = 0;
+    Test_Eq("C2 Mana Spring: +1 MP at the start of the turn (through the equipment passive hook)", Equip_PassiveOnTurnStart(_ms).mp, 1);
+    var _sh = Test_CardPlayer(CLASS_KNIGHT, [], [], ["pas:steady_hands"]);
+    Test_True("C2 Steady Hands: Perfect zone x1.1", abs(Qte_PerfectWiden(_sh) - 1.1) < 0.0001);
+    Test_Eq("C2 no passive: Perfect zone x1", Qte_PerfectWiden(Test_CardPlayer(CLASS_KNIGHT)), 1);
+    var _vc = Test_CardPlayer(CLASS_ARCHER, [], [], ["pas:venom_coat"]);
+    var _foe = EnemyCreate(ENEMY_SLIME);
+    Test_Eq("C2 Venom Coat: poison you apply gets +1 stack", Skill_StatusStacks(_vc, _foe, STATUS_POISON, 3), 4);
+    Test_Eq("C2 Venom Coat does not touch bleeding", Skill_StatusStacks(_vc, _foe, STATUS_BLEED, 1), 1);
+    Test_Eq("C2 without it poison stacks are as before", Skill_StatusStacks(Test_CardPlayer(CLASS_ARCHER), _foe, STATUS_POISON, 3), 3);
+    var _pl2 = Test_CardPlayer(CLASS_KNIGHT, [], [], ["pas:potion_lore"]);
+    Test_Eq("C2 Potion Lore: potions work 15% better (20 -> 23)", Item_ComputeAmount(_pl2, { power: 20 }), 23);
+    Test_Eq("C2 no passive: a potion of 20 stays 20", Item_ComputeAmount(Test_CardPlayer(CLASS_KNIGHT), { power: 20 }), 20);
+    Test_True("C2 Coin Sense: gold x1.1 (for the shop packet to call)", abs(Card_GoldMult(Test_CardPlayer(CLASS_KNIGHT, [], [], ["pas:coin_sense"])) - 1.1) < 0.0001);
+    Test_Eq("C2 no Coin Sense: gold x1", Card_GoldMult(Test_CardPlayer(CLASS_KNIGHT)), 1);
+    var _bw = Test_CardPlayer(CLASS_KNIGHT, [], [], ["pas:k_bulwark"]);
+    var _plain = Test_CardPlayer(CLASS_KNIGHT);
+    Test_Eq("C2 Bulwark: Guard cast on yourself lasts 3 turns longer", Skill_AdjustStatusTurns(_bw, _bw, STATUS_GUARD, 6), Skill_AdjustStatusTurns(_plain, _plain, STATUS_GUARD, 6) + 3);
+    var _ba = Test_CardPlayer(CLASS_ARCHER, [SKILL_POISON_ARROW], [], ["pas:a_barbed"]);
+    _gs.player_ch = _ba;
+    Test_Eq("C2 Barbed Arrows: +1 power on your damage skills (Poison Arrow 5 -> 6)", SkillDB_Get(SKILL_POISON_ARROW).power, 6);
+    Test_Eq("C2 Barbed Arrows leave buff skills alone", SkillDB_Get(SKILL_EVASION).power, 0);
+    var _sw = Test_CardPlayer(CLASS_MAGE, [SKILL_FIREBALL, SKILL_MEDITATION], [SKILL_MEDITATION], ["pas:m_spellweave"]);
+    _gs.player_ch = _sw;
+    Test_Eq("C2 Spellweave: skills cost 1 MP less (Fireball 4 -> 3)", SkillDB_Get(SKILL_FIREBALL).mp_cost, 3);
+    Test_Eq("C2 Spellweave never takes a skill below 1 MP (Meditation+ 2 -> 1)", SkillDB_Get(SKILL_MEDITATION).mp_cost, 1);
+    Test_Eq("C2 the MP the game charges follows (Equip_PlayerSkillMPCost of the held skill)", Equip_PlayerSkillMPCost(_sw, SkillDB_Get(SKILL_FIREBALL), SkillDB_Get(SKILL_FIREBALL).mp_cost), 3);
+    var _an = Test_CardPlayer(CLASS_NOBODY, [], [], ["pas:n_tonic"]);
+    var _tgt = Test_CardPlayer(CLASS_NOBODY, [], [], ["pas:n_tonic"]);
+    _tgt.hp = 1;
+    _tgt.mp = 0;
+    var _pot = Item_Use(10, _an, _tgt);
+    Test_True("C2 Tonic Blend: a potion also gives 2 MP", _pot.ok && _tgt.mp == 2, "mp=" + string(_tgt.mp));
+
+    // ---- the owed screens: class choice (D73), free stat point (D76), card pick (D81) ----
+    _gs.player_ch = _old_player;
+    _gs.run = Run_Create(5);
+    Test_False("C2 with a run going, level-up points are not auto-placed (the player places them)", Level_AutoPlaceEnabled());
+    var _lv = Test_CardPlayer(CLASS_KNIGHT);
+    var _lv_atk = _lv.stats.atk;
+    _lv = LevelUp_ApplyLevel(_lv);
+    Test_Eq("C2 a level-up keeps the free point banked for the stat prompt", _lv.stat_points, 1);
+    Test_Eq("C2 a level-up owes one card pick (D81)", _lv.card_picks, 1);
+    Test_Eq("C2 class growth still applies (Knight ATK +1)", _lv.stats.atk, _lv_atk + 1);
+    Test_Eq("C2 the owed screens come in order: stat point first", Cards_NextOwed(_lv), "stat");
+    _lv = Level_ApplyFreePoint(_lv, STAT_MAG);
+    Test_Eq("C2 then the card pick", Cards_NextOwed(_lv), "cards");
+    _lv = Cards_ConsumePick(_lv);
+    Test_Eq("C2 nothing owed after the pick", Cards_NextOwed(_lv), "");
+    var _two = LevelUp_ApplyLevel(LevelUp_ApplyLevel(Test_CardPlayer(CLASS_MAGE)));
+    Test_Eq("C2 two levels at once owe two card picks", _two.card_picks, 2);
+    variable_struct_remove(_gs, "run");
+    var _auto = LevelUp_ApplyLevel(Test_CardPlayer(CLASS_KNIGHT));
+    Test_True("C2 outside a run (tests, tools) the point is still auto-placed", Level_AutoPlaceEnabled() && _auto.stat_points == 0);
+    var _opts = Cards_StatOptions(Test_CardPlayer(CLASS_KNIGHT));
+    Test_True("C2 the stat prompt offers ATK, DEF, SPD, MAG with from > to values", array_length(_opts) == 4 && _opts[0].stat == STAT_ATK && _opts[3].stat == STAT_MAG && _opts[0].to == _opts[0].from + 1);
+
+    // chests (D73, fixes I-057): the first class or skill chest gives the class choice, later ones a pick
+    var _fresh = Test_CardPlayer(CLASS_NOBODY);
+    Test_False("C2 a new run has not chosen a class", _fresh.class_chosen);
+    var _c1 = Cards_ChestOpened(_fresh);
+    Test_True("C2 the first class/skill chest owes the class choice, not cards", _c1.class_pick && _c1.card_picks == 0);
+    Test_Eq("C2 the class choice comes before everything", Cards_NextOwed(_c1), "class");
+    var _c1b = Cards_ChestOpened(_c1);
+    Test_True("C2 an unanswered class choice is not owed twice", _c1b.class_pick && _c1b.card_picks == 0);
+    var _picked = Card_ClassCharacter(_c1, CLASS_MAGE);
+    Test_True("C2 choosing a class sets it, marks it chosen and clears the owed choice", _picked.class_id == CLASS_MAGE && _picked.class_chosen && !_picked.class_pick);
+    Test_True("C2 the new class keeps level and items", _picked.level == _c1.level && array_length(_picked.inventory) == array_length(_c1.inventory));
+    var _c2 = Cards_ChestOpened(_picked);
+    Test_True("C2 every later class/skill chest owes a 1-of-3 pick", !_c2.class_pick && _c2.card_picks == 1);
+    var _echo = Test_CardPlayer(CLASS_NOBODY, [SKILL_FIREBALL, SKILL_WOUND]);
+    var _kept = Card_ClassCharacter(_echo, CLASS_MAGE);
+    Test_True("C2 an echo skill the new class can use is kept, one it cannot is dropped", array_length(_kept.skills) == 1 && _kept.skills[0] == SKILL_FIREBALL);
+    var _nob = Card_ClassCharacter(_echo, CLASS_NOBODY);
+    Test_Eq("C2 Nobody has no skills (D83)", array_length(_nob.skills), 0);
+
+    // Nobody is locked until the first win (D83, D88)
+    var _prof = Profile_Default();
+    var _ch0 = Card_ClassChoices(_prof);
+    Test_Eq("C2 the class screen lists Knight, Archer, Mage, Nobody", array_length(_ch0), 4);
+    Test_True("C2 Knight, Archer and Mage are open from the start", !_ch0[0].locked && !_ch0[1].locked && !_ch0[2].locked);
+    Test_True("C2 Nobody is shown locked with a hint before the first win", _ch0[3].class_id == CLASS_NOBODY && _ch0[3].locked && string_length(_ch0[3].hint) > 5);
+    Profile_Unlock(_prof, "nobody_class");
+    Test_False("C2 Nobody is open once the profile has won", Card_ClassChoices(_prof)[3].locked);
+
+    // the pick screen's cursor model (D95: wrap-around): cards left/right, Skip below
+    Test_Eq("C2 pick cursor: right moves to the next card", Cards_PickMove(0, 3, 1, 0, 0), 1);
+    Test_Eq("C2 pick cursor: left from the first card wraps to the last", Cards_PickMove(0, 3, -1, 0, 0), 2);
+    Test_Eq("C2 pick cursor: right from the last card wraps to the first", Cards_PickMove(2, 3, 1, 0, 2), 0);
+    Test_Eq("C2 pick cursor: down goes to Skip", Cards_PickMove(1, 3, 0, 1, 1), 3);
+    Test_Eq("C2 pick cursor: up from Skip returns to the card it left", Cards_PickMove(3, 3, 0, -1, 1), 1);
+    Test_Eq("C2 pick cursor: left/right on Skip stay on Skip", Cards_PickMove(3, 3, 1, 0, 1), 3);
+
+    // skill books are gone (D18)
+    var _books = 0;
+    var _ik = ds_map_find_first(global.item_db);
+    while (!is_undefined(_ik)) {
+        var _iti = ItemDB_Get(_ik);
+        if (variable_struct_exists(_iti, "use") && is_struct(_iti.use) && variable_struct_exists(_iti.use, "effect") && _iti.use.effect == "learn_skill") _books++;
+        _ik = ds_map_find_next(global.item_db, _ik);
+    }
+    Test_Eq("C2 no skill book is left in the item database (D18)", _books, 0);
+
+    _gs.player_ch = _old_player;
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }

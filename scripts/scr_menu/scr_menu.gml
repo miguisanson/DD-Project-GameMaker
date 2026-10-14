@@ -518,7 +518,6 @@ function Tooltip_ItemBonusText(_item) {
 
 function Tooltip_ItemTypeLine(_item) {
     if (!is_struct(_item) || !variable_struct_exists(_item, "type")) return Loc_T("menu.tooltip.item.type.unknown", "Unknown");
-    if (Item_IsSkillbook(_item)) return Loc_T("menu.tooltip.item.type.skillbook", "Skillbook");
     if (_item.type == ITEM_WEAPON || _item.type == ITEM_ARMOR) {
         var slot_name = variable_struct_exists(_item, "equip_slot") ? string(_item.equip_slot) : "";
         var type_name = (_item.type == ITEM_WEAPON)
@@ -542,7 +541,7 @@ function Tooltip_BuildItemLines(_item) {
     if (!is_struct(_item) || !variable_struct_exists(_item, "id") || _item.id == 0) return lines;
 
     array_push(lines, string(_item.name));
-    if (!Item_IsSkillbook(_item) && _item.type != ITEM_ARMOR) {
+    if (_item.type != ITEM_ARMOR) {
         array_push(lines, Tooltip_ItemTypeLine(_item));
     }
 
@@ -647,34 +646,6 @@ function Tooltip_BuildItemLines(_item) {
                 array_push(lines, Loc_T("menu.tooltip.item.cure", "Cure: {status}", {
                     status: Tooltip_StatusName(use.status)
                 }));
-            break;
-            case "learn_skill":
-                var skill = SkillDB_Get(use.skill_id);
-                if (is_struct(skill) && skill.id != -1) {
-                    var skill_name = string(skill.name);
-                    var item_name = variable_struct_exists(_item, "name") ? string(_item.name) : "";
-                    if (!Tooltip_ContainsTextInsensitive(item_name, skill_name)) {
-                        array_push(lines, Loc_T("menu.tooltip.item.teaches", "Teaches: {skill}", {
-                            skill: skill_name
-                        }));
-                    }
-                    var mp_cost = variable_struct_exists(skill, "mp_cost") ? max(0, round(real(skill.mp_cost))) : 0;
-                    var target_txt = variable_struct_exists(skill, "target")
-                        ? Tooltip_TargetName(skill.target)
-                        : Loc_T("menu.tooltip.target.unknown", "Unknown");
-                    array_push(lines, Loc_T("menu.tooltip.skill.mp_target", "MP {mp} | Target: {target}", {
-                        mp: string(mp_cost),
-                        target: target_txt
-                    }));
-                    var skill_effect_lines = Tooltip_SkillEffectLines(skill, true);
-                    for (var sei = 0; sei < array_length(skill_effect_lines); sei++) {
-                        array_push(lines, skill_effect_lines[sei]);
-                    }
-                    var sb_only = Tooltip_ClassOnlyText(skill.class_list);
-                    if (sb_only != "") array_push(lines, sb_only);
-                } else {
-                    array_push(lines, Loc_T("menu.tooltip.item.teaches_unknown", "Teaches: Unknown skill"));
-                }
             break;
             default:
                 array_push(lines, Loc_T("menu.tooltip.effect.named", "Effect: {effect}", { effect: eff }));
@@ -858,16 +829,6 @@ function Menu_InventoryDisplayItems(_inventory) {
         var inv = source[i];
         if (!is_struct(inv) || !variable_struct_exists(inv, "id")) continue;
 
-        var item = ItemDB_Get(inv.id);
-        if (Item_IsSkillbook(item)) {
-            var dup = false;
-            for (var j = 0; j < array_length(out); j++) {
-                if (!is_struct(out[j]) || !variable_struct_exists(out[j], "id")) continue;
-                if (out[j].id == inv.id) { dup = true; break; }
-            }
-            if (dup) continue;
-        }
-
         array_push(out, inv);
     }
 
@@ -901,11 +862,6 @@ function Menu_UseInventoryItem(_m, _ch, _item_id) {
 
     if (!is_struct(item) || item.id == 0) {
         out.menu = Menu_InvPopupOpenMessage(_m, Loc_T("item.msg.cant_use", "Can't use that."));
-        return out;
-    }
-
-    if (Item_IsSkillbook(item)) {
-        out.menu = Menu_InvPopupOpenConfirm(_m, item.id);
         return out;
     }
 
@@ -1086,13 +1042,6 @@ function Menu_HandleInput() {
                         GameState_SetPlayer(ch);
                         m = Menu_ClampInventoryCursor(m, ch.inventory);
 
-                        if (variable_struct_exists(use_result, "skillbook_first_read_dialogue") && use_result.skillbook_first_read_dialogue) {
-                            m = Menu_InvPopupClose(m, true);
-                            gs.ui.menu = m;
-                            Menu_Close(true);
-                            Dialogue_TryStartSkillbookFirstRead(ch.class_id);
-                            return;
-                        }
                     }
                     m = Menu_InvPopupOpenMessage(m, use_result.msg);
                 } else {
@@ -1667,148 +1616,159 @@ function Menu_Draw() {
     draw_set_alpha(1);
 }
 
-function ClassSelect_Ensure() {
+// ==========================================================================================================================
+// C2: the card screens, on the shared UI framework (D0, D95-D100): class choice (D73, D83), free stat point (D76), 1-of-3 card pick (D81),
+// replace a skill (D82). What a character owes is kept on the character (Cards_NextOwed, scr_levelup), so a save, a reload or an interrupted
+// screen loses nothing; CardsUi_Step (obj_ui_controller Step) opens the next owed screen when nothing else is on screen.
+// global.cards_ui = { kind, stk, pick, opened_frame, opened_ms } while a screen is open, with gs.ui.mode = UI_CARDS. Class, stat and replace
+// are Ui menus on a Ui stack (list + details panel); the pick is three cards side by side, drawn with the same frame and text kit.
+// ==========================================================================================================================
+#macro CARDS_UI_INPUT_DELAY_FRAMES 10   // keys are ignored this long after a screen opens (the press that opened it must not answer it)
+
+function CardsUi_IsOpen() {
+    return variable_global_exists("cards_ui") && is_struct(global.cards_ui);
+}
+
+function CardsUi_Kind() {
+    return CardsUi_IsOpen() ? global.cards_ui.kind : "";
+}
+
+function CardsUi_Close() {
     var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
-    if (!variable_struct_exists(gs.ui, "class_select")) {
-        gs.ui.class_select = {
-            open: false,
-            closing: false,
-            close_frame: UI_OPENED_FRAME_NONE,
-            index: 0,
-            choices: [
-                Loc_T("class.name.warrior", "Warrior"),
-                Loc_T("class.name.archer", "Archer"),
-                Loc_T("class.name.mage", "Mage")
-            ],
-            choice_ids: [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE],
-            allow_cancel: true,
-            open_block_frame: UI_OPENED_FRAME_NONE,
-            opened_frame: UI_OPENED_FRAME_NONE,
-            pending_apply_class: -1,
-            confirming: false,
-            confirm_class: -1,
-            confirm_index: 1,
-            confirm_open_frame: UI_OPENED_FRAME_NONE
-        };
-    } else {
-        var cs0 = gs.ui.class_select;
-        if (!variable_struct_exists(cs0, "opened_frame")) cs0.opened_frame = UI_OPENED_FRAME_NONE;
-        if (!variable_struct_exists(cs0, "closing")) cs0.closing = false;
-        if (!variable_struct_exists(cs0, "close_frame")) cs0.close_frame = UI_OPENED_FRAME_NONE;
-        if (!variable_struct_exists(cs0, "pending_apply_class")) cs0.pending_apply_class = -1;
-        if (!variable_struct_exists(cs0, "confirming")) cs0.confirming = false;
-        if (!variable_struct_exists(cs0, "confirm_class")) cs0.confirm_class = -1;
-        if (!variable_struct_exists(cs0, "confirm_index")) cs0.confirm_index = 1;
-        if (!variable_struct_exists(cs0, "confirm_open_frame")) cs0.confirm_open_frame = UI_OPENED_FRAME_NONE;
+    global.cards_ui = undefined;
+    if (variable_struct_exists(gs, "ui") && gs.ui.mode == UI_CARDS) gs.ui.mode = UI_NONE;
+}
+
+// A room change or a battle closes whatever is open; what is owed stays owed and opens again.
+function CardsUi_Interrupt() {
+    if (CardsUi_IsOpen()) CardsUi_Close();
+}
+
+// A changed copy of the character becomes the player (the world object keeps pointing at the live one).
+function CardsUi_Commit(_ch) {
+    GameState_SetPlayer(_ch);
+    if (instance_exists(obj_player)) obj_player.character = global.player_ch;
+    GameState_SyncLegacy();
+}
+
+// Opens the next owed screen when nothing else is going on. Returns true when a screen is open this frame (the caller stops there).
+function CardsUi_Step() {
+    var gs = GameState_Get();
+    if (CardsUi_IsOpen()) {
+        CardsUi_HandleInput();
+        return CardsUi_IsOpen();
     }
+    if (!Run_IsActive()) return false;
+    if (Transition_IsActive() || Transition_IsInputLocked()) return false;
+    if (gs.ui.mode != UI_NONE || array_length(gs.ui.lines) > 0) return false;
+    if (room == rm_battle || room == rm_start || room == rm_cutscene) return false;
+    if (!is_struct(gs.player_ch)) return false;
+    if (instance_exists(gs.player_inst) && !Player_IsSettled(gs.player_inst)) return false;
+    var owed = Cards_NextOwed(gs.player_ch);
+    if (owed == "") return false;
+    CardsUi_Open(owed);
+    return CardsUi_IsOpen();
 }
 
-function ClassSelect_IsOpen() {
+function CardsUi_Open(_kind) {
     var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui")) return false;
-    return gs.ui.mode == UI_CLASS_SELECT;
-}
-
-function ClassSelect_Open(_allow_cancel = true) {
-    ClassSelect_Ensure();
-    var gs = GameState_Get();
-    if (Transition_IsInputLocked()) return false;
-    if (gs.ui.mode != UI_NONE) return false;
-
-    var cs = gs.ui.class_select;
-    cs.open = true;
-    cs.closing = false;
-    cs.close_frame = UI_OPENED_FRAME_NONE;
-    cs.pending_apply_class = -1;
-    cs.confirming = false;
-    cs.confirm_class = -1;
-    cs.confirm_index = 1;
-    cs.confirm_open_frame = UI_OPENED_FRAME_NONE;
-    cs.index = 0;
-    cs.allow_cancel = _allow_cancel;
-    cs.open_block_frame = Input_Frame() + 1;
-    cs.opened_frame = Input_Frame();
-    gs.ui.class_select = cs;
-    gs.ui.mode = UI_CLASS_SELECT;
+    var u = { kind: _kind, stk: Ui_StackNew(), pick: undefined, opened_frame: Input_Frame(), opened_ms: current_time };
+    switch (_kind) {
+        case "class": Ui_StackPush(u.stk, CardsUi_ClassMenu()); break;
+        case "stat": Ui_StackPush(u.stk, CardsUi_StatMenu()); break;
+        case "replace": Ui_StackPush(u.stk, CardsUi_ReplaceMenu()); break;
+        case "cards": u.pick = CardsUi_PickNew(); break;
+        default: return false;
+    }
+    global.cards_ui = u;
+    gs.ui.mode = UI_CARDS;
     SFX_PlayUI("ui_openclose");
     return true;
 }
 
-function ClassSelect_Close(_play_sfx = true, _immediate = false) {
-    ClassSelect_Ensure();
-    var gs = GameState_Get();
-    var cs = gs.ui.class_select;
-    if (_immediate) {
-        cs.open = false;
-        cs.closing = false;
-        cs.close_frame = UI_OPENED_FRAME_NONE;
-        cs.pending_apply_class = -1;
-        cs.open_block_frame = UI_OPENED_FRAME_NONE;
-        cs.opened_frame = UI_OPENED_FRAME_NONE;
-        gs.ui.class_select = cs;
-        if (gs.ui.mode == UI_CLASS_SELECT) gs.ui.mode = UI_NONE;
-        if (_play_sfx) SFX_PlayUI("ui_openclose");
+function CardsUi_HandleInput() {
+    var u = global.cards_ui;
+    if (Input_Frame() - u.opened_frame < CARDS_UI_INPUT_DELAY_FRAMES) return;
+    if (u.kind == "cards") {
+        CardsUi_PickUpdate(u);
+    } else {
+        var top = Ui_StackTop(u.stk);
+        if (is_struct(top)) Ui_MenuUpdate(top, u.stk);
+    }
+}
+
+// Back does nothing on a screen that must be answered.
+function CardsUi_NoBack(_m, _res) {
+}
+
+// ---- class choice -------------------------------------------------------------------------------------------------------------
+function CardsUi_ClassMenu() {
+    var choices = Card_ClassChoices();
+    var items = [];
+    for (var i = 0; i < array_length(choices); i++) {
+        var cid = choices[i].class_id;
+        var cfg = DB_PlayerClass(cid);
+        var lines = [
+            { label: Stat_ShortName(STAT_ATK), value: string(cfg.stats.atk) },
+            { label: Stat_ShortName(STAT_DEF), value: string(cfg.stats.def) },
+            { label: Stat_ShortName(STAT_SPD), value: string(cfg.stats.spd) },
+            { label: Stat_ShortName(STAT_MAG), value: string(cfg.stats.mag) },
+            { label: Loc_T("card.lbl.skills", "Skills"), value: (cid == CLASS_NOBODY) ? Loc_T("class.lbl.none", "None") : Loc_T("class.lbl.five", "5 to find") }
+        ];
+        array_push(items, {
+            label: cfg.name, value: choices[i].locked ? Loc_T("class.nobody.locked", "Locked") : "",
+            help: choices[i].locked ? choices[i].hint : Card_ClassSentence(cid), lines: lines, class_id: cid, locked: choices[i].locked
+        });
+    }
+    var m = Ui_MenuNew("cards_class", items, {
+        on_confirm: CardsUi_ClassConfirm, on_back: CardsUi_NoBack,
+        layout: { title: Loc_T("class.select.title", "Select Class"), anchor: "center", details: true }
+    });
+    Ui_MenuFixCursor(m, 0);
+    return m;
+}
+
+function CardsUi_ClassConfirm(_m, _i) {
+    var it = _m.items[_i];
+    if (it.locked) {
+        SFX_PlayUI("ui_back");
         return;
     }
-    if (!cs.open || cs.closing) return;
-    cs.closing = true;
-    cs.close_frame = Input_Frame();
-    cs.open_block_frame = Input_Frame() + 1;
-    gs.ui.class_select = cs;
-    if (_play_sfx) SFX_PlayUI("ui_openclose");
+    var yes = { label: Loc_T("menu.common.yes", "Yes"), yes: true, class_id: it.class_id };
+    var no = { label: Loc_T("menu.common.no", "No"), yes: false, class_id: it.class_id };
+    var sure = Ui_MenuNew("cards_class_sure", [yes, no], {
+        on_confirm: CardsUi_ClassSure, on_back: CardsUi_NoBack,
+        layout: { title: Loc_T("class.select.become", "Become {cls}?", { cls: it.label }), anchor: "center", center: true }
+    });
+    Ui_MenuFixCursor(sure, 1);   // No first, for safety
+    Ui_StackPush(global.cards_ui.stk, sure);
 }
 
-function ClassSelect_CloseFinalize() {
-    var gs = GameState_Get();
-    var cs = gs.ui.class_select;
-    var apply_class_id = cs.pending_apply_class;
-
-    cs.open = false;
-    cs.closing = false;
-    cs.close_frame = UI_OPENED_FRAME_NONE;
-    cs.pending_apply_class = -1;
-    cs.open_block_frame = UI_OPENED_FRAME_NONE;
-    cs.opened_frame = UI_OPENED_FRAME_NONE;
-    gs.ui.class_select = cs;
-    if (gs.ui.mode == UI_CLASS_SELECT) gs.ui.mode = UI_NONE;
-
-    if (is_real(apply_class_id) && apply_class_id >= 0) {
-        var queued = Transition_RequestBlackFlash(
-            TRANSITION_CLASS_SELECT_FADE_OUT_FRAMES,
-            TRANSITION_CLASS_SELECT_FADE_IN_FRAMES,
-            apply_class_id
-        );
-        if (!queued) {
-            // Fallback when another transition is already active.
-            ClassSelect_ApplyClass(apply_class_id);
-        }
+function CardsUi_ClassSure(_m, _i) {
+    var it = _m.items[_i];
+    if (!it.yes) {
+        Ui_StackBack(global.cards_ui.stk);
+        return;
     }
+    var cid = it.class_id;
+    CardsUi_Close();
+    // the black flash covers the swap of the character, as it did with the old popup
+    var queued = Transition_RequestBlackFlash(TRANSITION_CLASS_SELECT_FADE_OUT_FRAMES, TRANSITION_CLASS_SELECT_FADE_IN_FRAMES, cid);
+    if (!queued) ClassSelect_ApplyClass(cid);
 }
 
+// Makes the chosen class the player (called mid-flash by the transition, or at once when no flash could start).
 function ClassSelect_ApplyClass(_class_id) {
     var gs = GameState_Get();
-    var old = gs.player_ch;
-    var ch = CharacterCreate_Player(_class_id);
-
-    if (is_struct(old)) {
-        if (variable_struct_exists(old, "level")) ch.level = old.level;
-        if (variable_struct_exists(old, "exp")) ch.exp = old.exp;
-        if (variable_struct_exists(old, "exp_next")) ch.exp_next = old.exp_next;
-        if (variable_struct_exists(old, "inventory")) ch.inventory = old.inventory;
-        if (variable_struct_exists(old, "equip")) ch.equip = old.equip;
-        if (variable_struct_exists(old, "stat_points")) ch.stat_points = old.stat_points;
-        if (variable_struct_exists(old, "status")) ch.status = old.status;
-    }
+    var ch = Card_ClassCharacter(gs.player_ch, _class_id);
 
     // FUN-FIRST: grant and auto-equip class starter weapon (no duplicates).
     ch = Equip_GrantStarterWeapon(ch, _class_id, true);
-
+    var hp0 = ch.hp;
+    var mp0 = ch.mp;
     ch = Player_NormalizeProgression(ch, true);
-    if (is_struct(old)) {
-        if (variable_struct_exists(old, "hp")) ch.hp = clamp(old.hp, 0, ch.max_hp);
-        if (variable_struct_exists(old, "mp")) ch.mp = clamp(old.mp, 0, ch.max_mp);
-    }
+    ch.hp = clamp(hp0, 1, ch.max_hp);
+    ch.mp = clamp(mp0, 0, ch.max_mp);
 
     GameState_SetSelectedClass(_class_id);
     GameState_SetPlayer(ch);
@@ -1827,256 +1787,278 @@ function ClassSelect_ApplyClass(_class_id) {
     Dialogue_TryStartClassChestReaction(_class_id);
 }
 
-function ClassSelect_HandleInput() {
-    var gs = GameState_Get();
-    if (gs.ui.mode != UI_CLASS_SELECT) return;
-    ClassSelect_Ensure();
-
-    var cs = gs.ui.class_select;
-    if (!cs.open) {
-        gs.ui.mode = UI_NONE;
-        return;
+// ---- free stat point (D76) ------------------------------------------------------------------------------------------------------
+function CardsUi_StatHelp(_stat_id) {
+    switch (_stat_id) {
+        case STAT_ATK: return Loc_T("menu.tooltip.stat.atk.desc", "Increases physical damage (basic attacks and ATK skills).");
+        case STAT_DEF: return Loc_T("menu.tooltip.stat.def.desc", "Reduces all damage you take.");
+        case STAT_SPD: return Loc_T("menu.tooltip.stat.spd.desc", "Decides who acts first.");
+        case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage and max MP.");
     }
-
-    var frame = Input_Frame();
-    if (variable_struct_exists(cs, "closing") && cs.closing) {
-        if (frame - cs.close_frame >= UI_POPUP_FADE_FRAMES) {
-            ClassSelect_CloseFinalize();
-        } else {
-            gs.ui.class_select = cs;
-        }
-        return;
-    }
-    if (cs.open_block_frame != UI_OPENED_FRAME_NONE && frame <= cs.open_block_frame) {
-        gs.ui.class_select = cs;
-        return;
-    }
-
-    // "Are you sure?" confirmation for the chosen class.
-    if (variable_struct_exists(cs, "confirming") && cs.confirming) {
-        if (Input_UIPressed("menu_left") || Input_UIPressed("menu_right")) {
-            cs.confirm_index = 1 - cs.confirm_index;
-            SFX_PlayUI("ui_move");
-        }
-        if (Input_UIBack()) {
-            SFX_PlayUI("ui_back");
-            cs.confirming = false;
-            cs.confirm_class = -1;
-            gs.ui.class_select = cs;
-            return;
-        }
-        if (Input_UIConfirm()) {
-            // Small delay before accept is allowed (anti-misclick).
-            if (frame - cs.confirm_open_frame < CLASS_SELECT_CONFIRM_ACCEPT_DELAY) {
-                gs.ui.class_select = cs;
-                return;
-            }
-            if (cs.confirm_index == 0) {
-                SFX_PlayUI("ui_confirm");
-                cs.pending_apply_class = cs.confirm_class;
-                cs.confirming = false;
-                gs.ui.class_select = cs;
-                ClassSelect_Close(false);
-                return;
-            } else {
-                SFX_PlayUI("ui_back");
-                cs.confirming = false;
-                cs.confirm_class = -1;
-                gs.ui.class_select = cs;
-                return;
-            }
-        }
-        gs.ui.class_select = cs;
-        return;
-    }
-
-    var k_up = Input_UIPressed("menu_up");
-    var k_down = Input_UIPressed("menu_down");
-    var k_ok = Input_UIConfirm();
-    var k_back = Input_UIBack();
-
-    var choice_count = array_length(cs.choices);
-    var total = choice_count + (cs.allow_cancel ? 1 : 0);
-    if (total <= 0) {
-        ClassSelect_Close(false);
-        return;
-    }
-
-    if (k_up) {
-        cs.index = (cs.index + total - 1) mod total;
-        SFX_PlayUI("ui_move");
-    }
-    if (k_down) {
-        cs.index = (cs.index + 1) mod total;
-        SFX_PlayUI("ui_move");
-    }
-
-    if (cs.allow_cancel && k_back) {
-        SFX_PlayUI("ui_back");
-        gs.ui.class_select = cs;
-        ClassSelect_Close(false);
-        return;
-    }
-
-    if (k_ok) {
-        if (cs.allow_cancel && cs.index >= choice_count) {
-            SFX_PlayUI("ui_confirm");
-            gs.ui.class_select = cs;
-            ClassSelect_Close(false);
-            return;
-        }
-
-        if (cs.index >= 0 && cs.index < choice_count && cs.index < array_length(cs.choice_ids)) {
-            // Open the "Are you sure?" confirmation instead of applying immediately.
-            SFX_PlayUI("ui_confirm");
-            cs.confirming = true;
-            cs.confirm_class = cs.choice_ids[cs.index];
-            cs.confirm_index = 1; // default to "No" for safety
-            cs.confirm_open_frame = Input_Frame();
-            gs.ui.class_select = cs;
-            return;
-        }
-    }
-
-    gs.ui.class_select = cs;
+    return "";
 }
 
-function ClassSelect_Draw() {
+function CardsUi_StatMenu() {
+    var ch = GameState_Get().player_ch;
+    var opts = Cards_StatOptions(ch);
+    var items = [];
+    for (var i = 0; i < array_length(opts); i++) {
+        var o = opts[i];
+        array_push(items, {
+            label: o.label, value: string(o.from) + " > " + string(o.to), help: CardsUi_StatHelp(o.stat),
+            lines: [ { label: Loc_T("cards.stat.now", "Now"), value: string(o.from) }, { label: Loc_T("cards.stat.after", "After"), value: string(o.to) } ],
+            stat: o.stat
+        });
+    }
+    var m = Ui_MenuNew("cards_stat", items, {
+        on_confirm: CardsUi_StatConfirm, on_back: CardsUi_NoBack,
+        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: place 1 point", { lvl: string(ch.level) }), anchor: "center", details: true }
+    });
+    Ui_MenuFixCursor(m, clamp(DB_PlayerClass(ch.class_id).free_default, 0, 3));   // the class's usual stat first
+    return m;
+}
+
+function CardsUi_StatConfirm(_m, _i) {
     var gs = GameState_Get();
-    if (gs.ui.mode != UI_CLASS_SELECT) return;
-    ClassSelect_Ensure();
-    var cs = gs.ui.class_select;
-    if (!cs.open) return;
+    CardsUi_Commit(Cards_PlaceStat(gs.player_ch, _m.items[_i].stat));
+    CardsUi_Close();
+}
 
-    var w = Display_GuiW();
-    var h = Display_GuiH();
+// ---- replace a skill (D82) ------------------------------------------------------------------------------------------------------
+function CardsUi_CompareLines(_old_id, _new_id) {
+    var a = SkillDB_Get(_old_id);
+    var b = SkillDB_GetBase(_new_id);
+    var lines = [];
+    if (a.effect == "damage" || b.effect == "damage") array_push(lines, Card_NumLine(Loc_T("card.lbl.power", "Power"), round(a.power), round(b.power)));
+    array_push(lines, Card_NumLine(Loc_T("card.lbl.mp", "MP"), round(a.mp_cost), round(b.mp_cost)));
+    array_push(lines, Card_NumLine(Loc_T("card.lbl.arrows", "Arrows"), array_length(Qte_SkillSequence(_old_id)), array_length(Qte_SkillSequenceBase(_new_id))));
+    return lines;
+}
 
+function CardsUi_ReplaceMenu() {
+    var ch = GameState_Get().player_ch;
+    var new_id = ch.skill_pending;
+    var items = [];
+    for (var i = 0; i < array_length(ch.skills); i++) {
+        var sk = SkillDB_Get(ch.skills[i]);
+        array_push(items, { label: sk.name, value: Loc_T("card.mp_short", "{mp} MP", { mp: string(round(sk.mp_cost)) }), help: Loc_T("cards.replace.lose", "Gives up: {line}", { line: Card_SkillSentence(sk) }), lines: CardsUi_CompareLines(ch.skills[i], new_id), skill_id: ch.skills[i] });
+    }
+    array_push(items, { label: Loc_T("cards.replace.keep", "Keep my skills"), value: "", help: Loc_T("cards.replace.keep_help", "Go back to the cards and choose again."), lines: [], skill_id: -1 });
+    var m = Ui_MenuNew("cards_replace", items, {
+        on_confirm: CardsUi_ReplaceConfirm, on_back: CardsUi_ReplaceBack,
+        layout: { title: Loc_T("cards.replace.title", "Learn {skill}: replace which?", { skill: SkillDB_GetBase(new_id).name }), anchor: "center", details: true }
+    });
+    Ui_MenuFixCursor(m, 0);
+    return m;
+}
+
+function CardsUi_ReplaceConfirm(_m, _i) {
+    var gs = GameState_Get();
+    var ch = gs.player_ch;
+    var old_id = _m.items[_i].skill_id;
+    if (old_id < 0) {
+        CardsUi_ReplaceBack(_m, "root");
+        return;
+    }
+    var out = Card_ReplaceSkill(ch, old_id, ch.skill_pending);
+    out = Cards_ConsumePick(out);
+    CardsUi_Commit(out);
+    CardsUi_Close();
+}
+
+// Keeping the skills puts the card back: the pick is still owed and the same offer comes up again.
+function CardsUi_ReplaceBack(_m, _res) {
+    var gs = GameState_Get();
+    gs.player_ch.skill_pending = -1;
+    CardsUi_Close();
+}
+
+// ---- the card pick (D81) --------------------------------------------------------------------------------------------------------
+function CardsUi_PickNew() {
+    var ch = GameState_Get().player_ch;
+    if (!is_array(ch.offer) || array_length(ch.offer) != CARD_OFFER_SIZE) ch.offer = Card_OfferFromRun(ch).cards;
+    return { ids: ch.offer, cursor: 0, last: 0, rects: [] };
+}
+
+function CardsUi_Take(_card_id) {
+    var gs = GameState_Get();
+    var r = Card_Take(gs.player_ch, _card_id);
+    if (r.needs_replace) {
+        // every slot is full: ask which skill goes; the pick stays owed until it is answered
+        gs.player_ch.skill_pending = r.card.skill_id;
+        CardsUi_Close();
+        return;
+    }
+    var run = Run_Get();
+    if (r.gold > 0 && is_struct(run)) run.gold += r.gold;
+    CardsUi_Commit(Cards_ConsumePick(r.ch));
+    CardsUi_Close();
+}
+
+function CardsUi_SkipPick() {
+    var gs = GameState_Get();
+    Card_SkipOffer();
+    CardsUi_Commit(Cards_ConsumePick(gs.player_ch));
+    CardsUi_Close();
+}
+
+function CardsUi_PickUpdate(_u) {
+    var pk = _u.pick;
+    var snap = Ui_ReadInput();
+    var n = array_length(pk.ids);
+    var dx = (snap.right_p ? 1 : 0) - (snap.left_p ? 1 : 0);
+    var dy = (snap.down_p ? 1 : 0) - (snap.up_p ? 1 : 0);
+    var hover = Ui_HoverIndex(pk.rects, snap.mx, snap.my);
+    var cur = pk.cursor;
+    if (snap.mouse_moved && hover >= 0) cur = hover;
+    if (dx != 0 || dy != 0) cur = Cards_PickMove(cur, n, dx, dy, pk.last);
+    if (cur != pk.cursor) {
+        pk.cursor = cur;
+        if (cur < n) pk.last = cur;
+        SFX_PlayUI("ui_move");
+    }
+    var go = snap.confirm || (snap.click && hover == pk.cursor);
+    if (go) {
+        SFX_PlayUI("ui_confirm");
+        if (pk.cursor < n) CardsUi_Take(pk.ids[pk.cursor]);
+        else CardsUi_SkipPick();
+    }
+}
+
+// ---- drawing -----------------------------------------------------------------------------------------------------------------
+// The arrows of a skill or upgrade card, centred in a dark box, width _w. Returns the height used.
+function CardsUi_DrawArrows(_x, _y, _w, _seq, _unit) {
+    var n = array_length(_seq);
+    if (n <= 0) return 0;
+    var u = max(1, _unit);
+    var cell = 11 * u;
+    var h = 13 * u;
+    var total = n * cell;
+    Ui_Box(_x, _y, _x + _w, _y + h, UI_C_DARK);
+    var x0 = _x + round((_w - total) / 2);
+    for (var i = 0; i < n; i++) Qte_DrawArrowGlyph(x0 + i * cell + u, _y + 2 * u, _seq[i], u, UI_C_LIGHTEST, UI_C_DARKEST);
+    return h;
+}
+
+// A number line whose label and value do not fit side by side: the value goes on the row below.
+function CardsUi_LineStacked(_line, _iw, _mt) {
+    return UI_TextWidth(_line.label) + 3 * _mt.p + UI_TextWidth(_line.value) > _iw;
+}
+
+function CardsUi_CardHeight(_c, _w, _mt) {
+    var p = _mt.p;
+    var iw = _w - 8 * p;
+    var h = 8 * p;
+    h += max(Ui_TextBlockH(Card_Name(_c), iw - 5 * p), _mt.line_h) + 2 * p;
+    h += _mt.line_h + 3 * p;
+    h += Ui_TextBlockH(Card_Sentence(_c), iw) + 2 * p;
+    var seq = Card_Sequence(_c);
+    if (array_length(seq) > 0) h += 13 * clamp(floor(iw / 60), 1, 3) + 2 * p;
+    var lines = Card_Lines(_c);
+    for (var i = 0; i < array_length(lines); i++) h += (CardsUi_LineStacked(lines[i], iw, _mt) ? 2 : 1) * (_mt.line_h + p);
+    return h;
+}
+
+function CardsUi_DrawCard(_x, _y, _w, _h, _c, _sel, _a) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var iw = _w - 8 * p;
+    if (_sel) {   // a bright halo outside the frame
+        Ui_Box(_x + p, _y - p, _x + _w - p, _y, UI_C_LIGHT);
+        Ui_Box(_x + p, _y + _h, _x + _w - p, _y + _h + p, UI_C_LIGHT);
+        Ui_Box(_x - p, _y + p, _x, _y + _h - p, UI_C_LIGHT);
+        Ui_Box(_x + _w, _y + p, _x + _w + p, _y + _h - p, UI_C_LIGHT);
+    }
+    Ui_DrawFrame(_x, _y, _w, _h, _a, p);
+    var x0 = _x + 4 * p;
+    var ty = _y + 4 * p;
+    var name = Card_Name(_c);
+    var nh = max(Ui_TextBlockH(name, iw - 5 * p), mt.line_h);
+    if (_sel) {
+        Ui_Box(_x + 3 * p, ty - p, _x + _w - 3 * p, ty + nh + p, UI_C_DARK);
+        Ui_Arrow(x0 + Ui_Bob(current_time) * p, ty + (mt.line_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
+    }
+    Ui_TextBlock(x0 + 5 * p, ty, name, iw - 5 * p, _sel ? UI_C_LIGHTEST : UI_C_LIGHT);
+    ty += nh + 2 * p;
+    Ui_Text(x0 + 5 * p, ty, Card_TypeTag(_c), UI_C_LIGHT);
+    ty += mt.line_h + p;
+    Ui_Box(_x + 3 * p, ty, _x + _w - 3 * p, ty + p, UI_C_DARK);
+    ty += 2 * p;
+    var sentence = Card_Sentence(_c);
+    Ui_TextBlock(x0, ty, sentence, iw, UI_C_LIGHTEST);
+    ty += Ui_TextBlockH(sentence, iw) + 2 * p;
+    var seq = Card_Sequence(_c);
+    if (array_length(seq) > 0) {
+        var u = clamp(floor(iw / 60), 1, 3);
+        ty += CardsUi_DrawArrows(x0, ty, iw, seq, u) + 2 * p;
+    }
+    var lines = Card_Lines(_c);
+    for (var i = 0; i < array_length(lines); i++) {
+        Ui_Text(x0, ty, lines[i].label, UI_C_LIGHT);
+        if (CardsUi_LineStacked(lines[i], iw, mt)) ty += mt.line_h + p;
+        Ui_Text(x0 + iw, ty, lines[i].value, UI_C_LIGHTEST, fa_right);
+        ty += mt.line_h + p;
+    }
+}
+
+function CardsUi_DrawPick(_u, _a) {
+    var pk = _u.pick;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var n = array_length(pk.ids);
+    var gap = 4 * p;
+    var margin = mt.margin;
+    var cw = floor((mt.gw - 2 * margin - (n - 1) * gap) / n);
+    var cards = [];
+    var ch_max = 0;
+    for (var i = 0; i < n; i++) {
+        var c = CardDB_Get(pk.ids[i]);
+        array_push(cards, c);
+        ch_max = max(ch_max, CardsUi_CardHeight(c, cw, mt));
+    }
+    var picks = GameState_Get().player_ch.card_picks;
+    var title = Loc_T("cards.pick.title", "Choose a card");
+    if (picks > 1) title += "  " + Loc_T("cards.pick.left", "({n} picks left)", { n: string(picks) });
+    var skip_label = Loc_T("cards.pick.skip", "Skip: +{gold} gold", { gold: string(Card_SkipGold()) });
+    var skip_w = UI_TextWidth(skip_label) + 24 * p;
+    var skip_h = mt.row_h + 4 * p;
+    var hint = Loc_T("cards.pick.hint", "Left / Right to choose, confirm to take it");
+    var total = mt.line_h + 3 * p + ch_max + 3 * p + skip_h + 2 * p + mt.line_h;
+    var y0 = max(margin, round((mt.gh - total) / 2));
+    var slide = p * round((1 - _a) * 3);
+    Ui_Text(mt.gw / 2, y0 - slide, title, UI_C_LIGHTEST, fa_center);
+    var cy = y0 + mt.line_h + 3 * p - slide;
+    var rects = [];
+    for (var k = 0; k < n; k++) {
+        var cx = margin + k * (cw + gap);
+        CardsUi_DrawCard(cx, cy, cw, ch_max, cards[k], k == pk.cursor, _a);
+        array_push(rects, { x: cx, y: cy, w: cw, h: ch_max });
+    }
+    var sx = round((mt.gw - skip_w) / 2);
+    var sy = cy + ch_max + 3 * p;
+    var skip_sel = (pk.cursor >= n);
+    if (skip_sel) {
+        Ui_Box(sx - p, sy - p, sx + skip_w + p, sy + skip_h + p, UI_C_LIGHT);
+    }
+    Ui_DrawFrame(sx, sy, skip_w, skip_h, _a, p);
+    if (skip_sel) Ui_Arrow(sx + 5 * p + Ui_Bob(current_time) * p, sy + (skip_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
+    Ui_Text(sx + skip_w / 2, sy + (skip_h - mt.line_h) div 2, skip_label, skip_sel ? UI_C_LIGHTEST : UI_C_LIGHT, fa_center);
+    array_push(rects, { x: sx, y: sy, w: skip_w, h: skip_h });
+    pk.rects = rects;
+    Ui_Text(mt.gw / 2, sy + skip_h + 2 * p, hint, UI_C_LIGHT, fa_center);
+}
+
+function CardsUi_Draw() {
+    if (!CardsUi_IsOpen()) return;
+    var u = global.cards_ui;
+    var a = Ui_AnimT(u.opened_ms, current_time);
     UI_SetFont();
-    var line_h = UI_TextHeight("A");
-    var row_gap = max(18, line_h + max(6, round(line_h * 0.15)));
-    var pad_x = 6;
-    var pad_y = 4;
-    var title_pad_x = max(12, round(line_h * 0.30));
-    var title_pad_y = max(12, round(line_h * 0.30));
-    var side_pad = max(18, round(line_h * 0.45));
-    var section_gap = max(6, round(line_h * 0.25));
-
-    var title_txt = Loc_T("class.select.title", "Select Class");
-    var widest = max(UI_TextWidth(title_txt), UI_TextWidth(Loc_T("menu.common.back", "Back")));
-    for (var cw = 0; cw < array_length(cs.choices); cw++) {
-        var choice_w = cs.choices[cw];
-        if (is_array(cs.choice_ids) && cw < array_length(cs.choice_ids)) {
-            var class_cfg_w = DB_PlayerClass(cs.choice_ids[cw]);
-            if (is_struct(class_cfg_w) && variable_struct_exists(class_cfg_w, "name")) {
-                choice_w = class_cfg_w.name;
-            }
-        }
-        widest = max(widest, UI_TextWidth(choice_w));
-    }
-
-    var need_w = widest + side_pad * 2;
-    var need_h = title_pad_y + line_h + section_gap + (array_length(cs.choices) * row_gap);
-    if (cs.allow_cancel) need_h += section_gap + line_h;
-    need_h += title_pad_y;
-
-    var bw = min(w - 24, max(w * 0.6, need_w));
-    var bh = min(h - 24, max(h * 0.5, need_h));
-    var bx = (w - bw) * 0.5;
-    var by = (h - bh) * 0.5;
-    var title_y = by + title_pad_y;
-    var cy = title_y + line_h + section_gap;
-    var row_left = bx + max(10, round(line_h * 0.25));
-    var row_right = bx + bw - max(10, round(line_h * 0.25));
-    var popup_alpha = UI_PopupAlpha(cs.opened_frame, cs.closing, cs.close_frame, 1);
-
-    draw_set_alpha(popup_alpha * 0.85);
-    draw_set_color(c_black);
-    draw_rectangle(bx, by, bx + bw, by + bh, false);
-    draw_set_alpha(popup_alpha);
-    draw_set_color(c_white);
-    draw_rectangle(bx, by, bx + bw, by + bh, true);
-    draw_set_alpha(popup_alpha);
-
-    draw_set_color(c_white);
-    UI_DrawText(bx + title_pad_x, title_y, title_txt);
-
-    for (var j = 0; j < array_length(cs.choices); j++) {
-        var yy = cy + j * row_gap;
-        var selected = (j == cs.index);
-        if (selected) {
-            draw_set_color(c_white);
-            draw_rectangle(row_left - pad_x, yy - pad_y, row_right + pad_x, yy + line_h + pad_y, false);
-            draw_set_color(c_black);
-            draw_rectangle(row_left - pad_x, yy - pad_y, row_right + pad_x, yy + line_h + pad_y, true);
-            draw_set_color(c_black);
-        } else {
-            draw_set_color(c_white);
-        }
-        var choice_label = cs.choices[j];
-        if (is_array(cs.choice_ids) && j < array_length(cs.choice_ids)) {
-            var class_cfg = DB_PlayerClass(cs.choice_ids[j]);
-            if (is_struct(class_cfg) && variable_struct_exists(class_cfg, "name")) {
-                choice_label = class_cfg.name;
-            }
-        }
-        UI_DrawText(bx + side_pad, yy, choice_label);
-    }
-
-    if (cs.allow_cancel) {
-        var back_y = by + bh - (title_pad_y + line_h);
-        var back_selected = (cs.index == array_length(cs.choices));
-        if (back_selected) {
-            draw_set_color(c_white);
-            draw_rectangle(row_left - pad_x, back_y - pad_y, row_right + pad_x, back_y + line_h + pad_y, false);
-            draw_set_color(c_black);
-            draw_rectangle(row_left - pad_x, back_y - pad_y, row_right + pad_x, back_y + line_h + pad_y, true);
-            draw_set_color(c_black);
-        } else {
-            draw_set_color(c_white);
-        }
-        UI_DrawText(bx + side_pad, back_y, Loc_T("menu.common.back", "Back"));
-    }
-
-    // "Are you sure?" confirmation overlay (drawn on top of the class list).
-    if (variable_struct_exists(cs, "confirming") && cs.confirming) {
-        var pm = UI_PopupMetrics();
-        var sure_line = Loc_T("class.select.confirm_sure", "Are you sure?");
-        var yes_txt = Loc_T("menu.common.yes", "Yes");
-        var no_txt = Loc_T("menu.common.no", "No");
-
-        var yes_w = UI_ButtonWidth(yes_txt, pm.btn_pad_x);
-        var no_w = UI_ButtonWidth(no_txt, pm.btn_pad_x);
-        var total_btn_w = yes_w + pm.btn_gap_x + no_w;
-        var msg_w = UI_TextWidth(sure_line);
-
-        var cbw = max(pm.min_w, max(msg_w + pm.pad_x * 2, total_btn_w + pm.pad_x * 2));
-        var cbh = pm.pad_y + pm.line_h + pm.gap_y + pm.btn_h + pm.pad_y;
-        var cbx = (w - cbw) * 0.5;
-        var cby = (h - cbh) * 0.5;
-
-        draw_set_alpha(popup_alpha * 0.85);
-        draw_set_color(c_black);
-        draw_rectangle(cbx, cby, cbx + cbw, cby + cbh, false);
-        draw_set_alpha(popup_alpha);
-        draw_set_color(c_white);
-        draw_rectangle(cbx, cby, cbx + cbw, cby + cbh, true);
-
-        var msg_y = cby + pm.pad_y;
-        draw_set_alpha(popup_alpha);
-        draw_set_color(c_white);
-        UI_DrawText(cbx + (cbw - msg_w) * 0.5, msg_y, sure_line);
-
-        var btn_y = msg_y + pm.line_h + pm.gap_y;
-        var yes_x = cbx + (cbw - total_btn_w) * 0.5;   // Yes on the left
-        var no_x = yes_x + yes_w + pm.btn_gap_x;        // No on the right
-
-        var accept_locked = (Input_Frame() - cs.confirm_open_frame) < CLASS_SELECT_CONFIRM_ACCEPT_DELAY;
-        var yes_alpha = popup_alpha * (accept_locked ? 0.4 : 1); // dim "Yes" while locked
-        UI_DrawButton(yes_x, btn_y, yes_w, pm.btn_h, yes_txt, (cs.confirm_index == 0), yes_alpha);
-        UI_DrawButton(no_x, btn_y, no_w, pm.btn_h, no_txt, (cs.confirm_index == 1), popup_alpha);
-    }
-
     draw_set_alpha(1);
+    Ui_DimBackdrop(0.8 * a);
+    if (u.kind == "cards") CardsUi_DrawPick(u, a);
+    else Ui_StackDraw(u.stk, 0.5);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
 }
 
 // --------------------

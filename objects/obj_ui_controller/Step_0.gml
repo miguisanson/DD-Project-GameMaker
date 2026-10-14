@@ -26,18 +26,8 @@ if (hud_hurt_flash_timer > 0) hud_hurt_flash_timer -= 1;
 
 if (Transition_IsInputLocked()) exit;
 
-if (variable_struct_exists(gs, "pending_class_select_open") && gs.pending_class_select_open) {
-    if (!variable_struct_exists(gs, "pending_class_select_block_frame")) gs.pending_class_select_block_frame = UI_OPENED_FRAME_NONE;
-    var frame = Input_Frame();
-    var block_ok = (gs.pending_class_select_block_frame == UI_OPENED_FRAME_NONE || frame > gs.pending_class_select_block_frame);
-    if (block_ok && gs.ui.mode == UI_NONE && array_length(gs.ui.lines) <= 0) {
-        if (ClassSelect_Open(true)) {
-            gs.pending_class_select_open = false;
-            gs.pending_class_select_block_frame = UI_OPENED_FRAME_NONE;
-            exit;
-        }
-    }
-}
+// C2: the screens a character owes (class choice, free stat point, card pick, replace a skill) open and run here.
+if (CardsUi_Step()) exit;
 
 var game_fps = max(1, game_get_speed(gamespeed_fps));
 gs.ui.icon_frame += max(0, UI_DIALOGUE_ARROW_FPS) / game_fps;
@@ -59,11 +49,6 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     if (k_ok) {
         Dialogue_Advance();
     }
-    exit;
-}
-
-if (gs.ui.mode == UI_CLASS_SELECT) {
-    ClassSelect_HandleInput();
     exit;
 }
 
