@@ -9,6 +9,7 @@ var gs = GameState_Init();
 p = gs.player_ch;
 p = Equip_PassiveBattleReset(p);
 e = EnemyCreate(gs.battle.enemy_id);
+Card_OnBattleStart(p, e);   // C2: Opening Blow
 
 // --------------------
 // CREATE ENEMY VISUAL (CENTERED)
@@ -41,13 +42,25 @@ player_fx_x = cx - 48;
 player_fx_y = cy + 24;
 
 // --------------------
-// INITIATIVE (D80 no dice: the higher SPD acts first, a tie goes to the player; the turn timeline of D74 replaces this)
+// TURN TIMELINE (D74, spec section 11): a gauge per fighter fills by SPD; the one that fills acts. The higher SPD is first, a tie goes to the player.
+// The player acts twice before a slow enemy; nothing alternates and no skill grants extra actions.
 // --------------------
-if (Combat_PlayerActsFirst(Combat_Initiative(p), Combat_Initiative(e))) {
-    turn = TURN_PLAYER;
-} else {
-    turn = TURN_ENEMY;
-}
+tl = Turn_New([
+    Turn_Fighter(TL_PLAYER, Combat_EffectiveStat(p, STAT_SPD)),
+    Turn_Fighter(TL_ENEMY, Combat_EffectiveStat(e, STAT_SPD), e.is_boss)
+]);
+tl_who = Turn_Next(tl);                       // whose turn it is now (the first slot of the strip)
+turn = (tl_who == TL_PLAYER) ? TURN_PLAYER : TURN_ENEMY;
+tl_prev_who = tl_who;
+turn_log = [tl_who];                          // every turn taken, in order (TL_PLAYER / TL_ENEMY): the bot checks the real flow against the timeline model
+enemy_action_pending = (tl_who == TL_ENEMY);   // the enemy's turn has started but it has not acted yet (Foresight shows its plan on the current slot)
+tl_slide_kind = 1;
+tl_slide_start = current_time - 100000;       // D97: the strip slides TURN_SLIDE_MS when the order changes
+pops = [];                                    // D92: floating damage numbers
+break_start = current_time - 100000;          // the BREAK word and the meter flash
+stagger_flash_start = current_time - 100000;
+enemy_hp_shown = e.hp;                        // the HP bar glides to the real value (D97)
+enemy_hp_clock = current_time;
 
 // --------------------
 // BATTLE STATE
@@ -62,7 +75,6 @@ skill_banner_name = "";
 enemy_actions_remaining = 0;
 enemy_turn_used_skills = [];
 enemy_last_action_used_skill = false;
-player_bonus_actions_remaining = 0;
 player_turn_start_applied = false;
 enemy_plan = undefined;          // Foresight (D79): { skill_id, announced }, the enemy's next action once decided
 enemy_last_skill_id = -1;

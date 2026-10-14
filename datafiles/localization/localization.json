@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T11:16:44Z",
-    "row_count": 836
+    "generated_at_utc": "2026-10-14T11:32:25Z",
+    "row_count": 845
   },
   "default_lang": "en",
   "languages": [
@@ -51,6 +51,10 @@
     "battle.action.timing.weak": {
       "en": "WEAK",
       "ko": "약한"
+    },
+    "battle.hud.break": {
+      "en": "BREAK!",
+      "ko": "브레이크!"
     },
     "battle.menu.back": {
       "en": "Back",
@@ -304,6 +308,10 @@
       "en": "Stacks",
       "ko": "중첩"
     },
+    "card.lbl.stagger": {
+      "en": "Stagger",
+      "ko": "경직"
+    },
     "card.lbl.status_turns": {
       "en": "Status turns",
       "ko": "상태 턴"
@@ -435,6 +443,14 @@
     "card.pas.n_tonic.name": {
       "en": "Tonic Blend",
       "ko": "강장제 배합"
+    },
+    "card.pas.opening_blow.line": {
+      "en": "Enemies start each fight with {n} stagger.",
+      "ko": "전투가 시작될 때 적의 경직이 {n} 쌓여 있다."
+    },
+    "card.pas.opening_blow.name": {
+      "en": "Opening Blow",
+      "ko": "선제 일격"
     },
     "card.pas.potion_lore.line": {
       "en": "Potions work {n}% better.",
@@ -864,6 +880,10 @@
       "en": "Couldn't escape!",
       "ko": "탈출하지 못했습니다!"
     },
+    "combat.msg.break": {
+      "en": "BREAK! {name} takes +50% damage!",
+      "ko": "브레이크! {name}이(가) 받는 피해 +50%!"
+    },
     "combat.msg.enemy_appeared": {
       "en": "{enemy} appeared!",
       "ko": "{enemy} 등장!"
@@ -964,6 +984,14 @@
       "en": "You are stunned!",
       "ko": "당신은 깜짝 놀랐습니다!"
     },
+    "combat.msg.pushed_back": {
+      "en": "{name} is pushed back!",
+      "ko": "{name}의 차례가 뒤로 밀렸습니다!"
+    },
+    "combat.msg.pushed_back_you": {
+      "en": "You are pushed back!",
+      "ko": "당신의 차례가 뒤로 밀렸습니다!"
+    },
     "combat.msg.sentence_dot": {
       "en": ".",
       "ko": "."
@@ -1003,6 +1031,14 @@
     "combat.msg.status_tick_enemy": {
       "en": "{status} hurts {enemy} for {dmg}.",
       "ko": "{status} 때문에 {enemy}가 {dmg}의 피해를 입었습니다."
+    },
+    "combat.msg.steadfast": {
+      "en": "{name} is Steadfast!",
+      "ko": "{name}은(는) 버티고 있습니다!"
+    },
+    "combat.msg.steadfast_you": {
+      "en": "You are Steadfast!",
+      "ko": "당신은 버티고 있습니다!"
     },
     "combat.msg.stole_an_item": {
       "en": "Stole an item.",
@@ -3257,8 +3293,8 @@
       "ko": "다음 공격에서 받는 피해가 {pct}% 줄어듭니다."
     },
     "status.desc.status_stun": {
-      "en": "Cannot act.",
-      "ko": "행동할 수 없습니다."
+      "en": "Pushed back on the turn bar. Then Steadfast: cannot be stunned for 2 turns.",
+      "ko": "차례가 뒤로 밀립니다. 그 뒤 2턴 동안은 기절하지 않습니다."
     },
     "status.desc.status_sunder": {
       "en": "Lose defence.{mods}",

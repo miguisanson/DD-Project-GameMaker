@@ -113,6 +113,7 @@ function Combat_ApplyDamage(_attacker, _defender, _src, _crit_mult = 1, _skill_m
         _defender = Status_ConsumeByField(_defender, "consume_on_hit");
     }
     mult *= Combat_AssistMult(_defender);
+    mult *= Combat_BreakMult(_defender);   // spec section 11: a BROKEN enemy takes +50% until its next turn
 
     var dmg = Combat_RatioDamage(_src.power, Combat_AttackStat(_attacker, _src), Combat_EffectiveStat(_defender, STAT_DEF), grade, mult);
 
@@ -447,6 +448,255 @@ function Player_OnDeath(_p) {
     gs.in_main_menu = false;
     GameState_SetJustReturned(false);
     Run_OnPlayerDeath();   // C1: ends the run in the profile, deletes the run save, then plays the death scene
+}
+
+// ---- The turn timeline, stun push-back, stagger and BREAK (spec section 11; D19 D74 D75 D79 D92) ----
+// Pure: the numbers live in these functions so check_combat_vectors.py can pin them down. The battle owns one timeline (bc.tl) with two fighters,
+// TL_PLAYER (listed first, so it wins ties) and TL_ENEMY.
+#macro TURN_GAUGE_MAX 100          // a fighter acts when its gauge reaches this; one tick adds its SPD
+#macro TURN_STEADFAST_TURNS 2      // after a stun the fighter is stun-immune for this many of its own turns
+#macro TURN_PREVIEW_COUNT 5        // the strip shows the next 5 turns (D74)
+#macro TURN_BOSS_PUSH 0.5          // a boss as the target of a stun is pushed back half as far (D75)
+#macro TL_PLAYER 0
+#macro TL_ENEMY 1
+#macro BREAK_DAMAGE_MULT 1.5       // a BROKEN enemy takes +50% damage until its next turn
+#macro STAGGER_PERFECT_MULT 1.5
+#macro STAGGER_STUN_MULT 2
+
+function Turn_Fighter(_id, _spd, _boss = false) {
+    return { id: _id, spd: max(1, round(_spd)), gauge: 0, steadfast: 0, boss: _boss };
+}
+
+function Turn_New(_fighters) {
+    return { fighters: _fighters };
+}
+
+function Turn_Find(_tl, _id) {
+    for (var i = 0; i < array_length(_tl.fighters); i++) {
+        if (_tl.fighters[i].id == _id) return _tl.fighters[i];
+    }
+    return undefined;
+}
+
+function Turn_Copy(_tl) {
+    var out = [];
+    for (var i = 0; i < array_length(_tl.fighters); i++) {
+        var f = _tl.fighters[i];
+        array_push(out, { id: f.id, spd: f.spd, gauge: f.gauge, steadfast: f.steadfast, boss: f.boss });
+    }
+    return { fighters: out };
+}
+
+function Turn_SetSpd(_tl, _id, _spd) {
+    var f = Turn_Find(_tl, _id);
+    if (is_struct(f)) f.spd = max(1, round(_spd));
+}
+
+// Who acts next. Nobody ready: tick (every gauge += SPD) until somebody is. The highest gauge acts, a tie goes to the first in the list (the player).
+// The actor pays TURN_GAUGE_MAX (the overflow is kept) and its Steadfast counts down by one.
+function Turn_Next(_tl) {
+    var fs = _tl.fighters;
+    var n = array_length(fs);
+    var ready = false;
+    for (var i = 0; i < n; i++) { if (fs[i].gauge >= TURN_GAUGE_MAX) ready = true; }
+    if (!ready) {
+        var ticks = 1000000;
+        for (var j = 0; j < n; j++) {
+            var need = max(1, (TURN_GAUGE_MAX - fs[j].gauge + fs[j].spd - 1) div fs[j].spd);
+            ticks = min(ticks, need);
+        }
+        for (var k = 0; k < n; k++) fs[k].gauge += fs[k].spd * ticks;
+    }
+    var best = -1;
+    for (var m = 0; m < n; m++) {
+        if (fs[m].gauge >= TURN_GAUGE_MAX && (best < 0 || fs[m].gauge > fs[best].gauge)) best = m;
+    }
+    var actor = fs[best];
+    actor.gauge -= TURN_GAUGE_MAX;
+    actor.steadfast = max(0, actor.steadfast - 1);
+    return actor.id;
+}
+
+// The next _n actors' ids, on a copy: nothing in the real timeline moves.
+function Turn_Preview(_tl, _n = TURN_PREVIEW_COUNT) {
+    var c = Turn_Copy(_tl);
+    var out = [];
+    for (var i = 0; i < _n; i++) array_push(out, Turn_Next(c));
+    return out;
+}
+
+// A stun lands: the fighter is pushed back (a boss half as far) and becomes Steadfast. Returns false, changing nothing, while it is Steadfast.
+function Turn_Stun(_tl, _id) {
+    var f = Turn_Find(_tl, _id);
+    if (!is_struct(f) || f.steadfast > 0) return false;
+    f.gauge -= f.boss ? floor(TURN_GAUGE_MAX * TURN_BOSS_PUSH) : TURN_GAUGE_MAX;
+    f.steadfast = TURN_STEADFAST_TURNS;
+    return true;
+}
+
+// A plain push-back (BREAK): one full turn, bosses too.
+function Turn_Push(_tl, _id, _amount = TURN_GAUGE_MAX) {
+    var f = Turn_Find(_tl, _id);
+    if (is_struct(f)) f.gauge -= _amount;
+}
+
+function Stagger_Gain(_power, _stun_skill, _perfect) {
+    var v = _power * 0.5;
+    if (_stun_skill) v *= STAGGER_STUN_MULT;
+    if (_perfect) v *= STAGGER_PERFECT_MULT;
+    return max(1, RoundHalfUp(v));
+}
+
+function Stagger_Max(_rank, _boss) {
+    return (4 + 4 * max(1, _rank)) * (_boss ? 2 : 1);
+}
+
+// Adds to the enemy's meter. Returns true when this fills it: BREAK (meter back to 0, broken until its next turn). Nothing fills while broken.
+function Stagger_Add(_ch, _amount) {
+    if (!variable_struct_exists(_ch, "stagger_max") || _ch.stagger_max <= 0 || _ch.broken) return false;
+    _ch.stagger = min(_ch.stagger_max, _ch.stagger + max(0, round(_amount)));
+    if (_ch.stagger < _ch.stagger_max) return false;
+    _ch.stagger = 0;
+    _ch.broken = true;
+    return true;
+}
+
+function Stagger_EndBreak(_ch) {
+    if (variable_struct_exists(_ch, "broken")) _ch.broken = false;
+}
+
+// Spec section 4's mult: +50% while BROKEN.
+function Combat_BreakMult(_ch) {
+    return (is_struct(_ch) && variable_struct_exists(_ch, "broken") && _ch.broken) ? BREAK_DAMAGE_MULT : 1;
+}
+
+// A skill that stuns leaves a Stun status on its target; this turns it into the push-back at once and removes the marker.
+// Returns "pushed", "steadfast" (resisted) or "none" (there was no marker).
+function Battle_ConsumeStun(_tl, _ch, _id) {
+    if (!is_struct(_ch) || !Status_Has(_ch, STATUS_STUN)) return "none";
+    Status_Remove(_ch, STATUS_STUN);
+    return Turn_Stun(_tl, _id) ? "pushed" : "steadfast";
+}
+
+// ---- Battle glue for the timeline (B3). These touch the battle controller _bc (fields set in its Create event). ----
+
+// The player's or enemy's turn is over: SPD is read again (Bleeding slows), then the timeline picks who is next. Returns TL_PLAYER or TL_ENEMY.
+function Battle_TurnAdvance(_bc) {
+    Turn_SetSpd(_bc.tl, TL_PLAYER, Combat_EffectiveStat(_bc.p, STAT_SPD));
+    Turn_SetSpd(_bc.tl, TL_ENEMY, Combat_EffectiveStat(_bc.e, STAT_SPD));
+    _bc.tl_prev_who = _bc.tl_who;
+    var who = Turn_Next(_bc.tl);
+    _bc.tl_who = who;
+    array_push(_bc.turn_log, who);
+    _bc.tl_slide_start = current_time;   // D97: the strip slides for TURN_SLIDE_MS
+    _bc.tl_slide_kind = 0;               // 0 = the row moves left one slot, 1 = it fades in place (a push-back reordered it)
+    _bc.player_turn_start_applied = false;   // a fast player gets his start-of-turn effects again
+    _bc.enemy_action_pending = (who == TL_ENEMY);
+    if (who == TL_ENEMY) {
+        Stagger_EndBreak(_bc.e);   // BROKEN lasts until the enemy's next turn starts
+        _bc.turn = TURN_ENEMY;
+    } else {
+        _bc.turn = TURN_PLAYER;
+    }
+    return who;
+}
+
+// The Stun markers a skill left on either fighter become push-backs on the timeline (D75). Returns the text to add to the battle message.
+function Battle_StunResolve(_bc) {
+    var note = "";
+    var re = Battle_ConsumeStun(_bc.tl, _bc.e, TL_ENEMY);
+    if (re == "pushed") {
+        note += " " + Loc_T("combat.msg.pushed_back", "{name} is pushed back!", { name: _bc.e.name });
+        _bc.tl_slide_start = current_time;
+        _bc.tl_slide_kind = 1;
+    } else if (re == "steadfast") {
+        note += " " + Loc_T("combat.msg.steadfast", "{name} is Steadfast!", { name: _bc.e.name });
+    }
+    var rp = Battle_ConsumeStun(_bc.tl, _bc.p, TL_PLAYER);
+    if (rp == "pushed") {
+        note += " " + Loc_T("combat.msg.pushed_back_you", "You are pushed back!");
+        _bc.tl_slide_start = current_time;
+        _bc.tl_slide_kind = 1;
+    } else if (rp == "steadfast") {
+        note += " " + Loc_T("combat.msg.steadfast_you", "You are Steadfast!");
+    }
+    return note;
+}
+
+// A landed player hit fills the enemy's stagger meter; a full meter is a BREAK (D75, D92). Returns the text to add to the battle message.
+function Battle_StaggerHit(_bc, _power, _stun_skill, _perfect, _hits = 1) {
+    var e = _bc.e;
+    if (!is_struct(e) || e.hp <= 0) return "";
+    var gain = Stagger_Gain(_power, _stun_skill, _perfect) * max(1, _hits);
+    _bc.stagger_flash_start = current_time;
+    if (!Stagger_Add(e, gain)) return "";
+    Turn_Push(_bc.tl, TL_ENEMY);   // pushed back one turn
+    _bc.tl_slide_start = current_time;
+    _bc.tl_slide_kind = 1;
+    _bc.break_start = current_time;
+    var last_key = global.sfx_last_key;   // the BREAK sound is a second layer on top of the grade sound: the grade stays the "last key" the bot checks
+    SFX_Play(Qte_GradeSfxKey(QTE_PERFECT));
+    global.sfx_last_key = last_key;
+    CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_FRAMES, SHAKE_DIR_H);
+    return " " + Loc_T("combat.msg.break", "BREAK! {name} takes +50% damage!", { name: e.name });
+}
+
+// For the strip (D74, D79, D99): the current actor first, then the next four. The Foresight preview (the enemy's next action, D79) rides on the
+// enemy slot that holds that action: the current slot while it is the enemy's turn and it has not acted yet, else the first upcoming enemy slot.
+// While the enemy is in the middle of an action nothing is shown (the action after it is not planned yet).
+// slot = { who, current, foresight (the Battle_EnemyNextActionPreview struct, or undefined) }
+function Battle_TimelineSlots(_bc) {
+    var out = [{ who: _bc.tl_who, current: true, foresight: undefined }];
+    var next = Turn_Preview(_bc.tl, TURN_PREVIEW_COUNT - 1);
+    var fore = undefined;
+    var show_fore = (_bc.tl_who == TL_PLAYER) || _bc.enemy_action_pending;
+    if (show_fore) {
+        var pv = Battle_EnemyNextActionPreview(_bc);
+        if (pv.visible) fore = pv;
+    }
+    if (_bc.tl_who == TL_ENEMY && is_struct(fore)) { out[0].foresight = fore; fore = undefined; }
+    for (var i = 0; i < array_length(next); i++) {
+        var f = undefined;
+        if (next[i] == TL_ENEMY && is_struct(fore)) { f = fore; fore = undefined; }
+        array_push(out, { who: next[i], current: false, foresight: f });
+    }
+    return out;
+}
+
+// ---- Floating numbers (D92): one per landed hit, size and colour by the QTE grade. Times are real ms (current_time), so a hit-stop does not freeze them. ----
+#macro POP_MS 900
+function Battle_PopAdd(_bc, _text, _on_player, _style, _scale) {
+    var keep = [];
+    for (var i = 0; i < array_length(_bc.pops); i++) {
+        if (current_time - _bc.pops[i].start < POP_MS) array_push(keep, _bc.pops[i]);
+    }
+    array_push(keep, { text: _text, on_player: _on_player, style: _style, scale: _scale, start: current_time, n: array_length(keep) });
+    _bc.pops = keep;
+}
+
+// A hit of the player on the enemy. style = the grade key (Perfect biggest and brightest, Weak small and dim).
+function Battle_HitPop(_bc, _dmg, _key, _crit = false) {
+    if (_dmg <= 0) return;
+    var sc = 1;
+    switch (_key) {
+        case QTE_PERFECT: sc = 2.0; break;
+        case QTE_GOOD:    sc = 1.5; break;
+        case QTE_OK:      sc = 1.0; break;
+        default:          sc = 0.75; break;
+    }
+    if (_crit) sc += 0.5;
+    Battle_PopAdd(_bc, string(_dmg), false, _key, sc);
+}
+
+// A hit of the enemy on the player.
+function Battle_PlayerHitPop(_bc, _dmg, _crit = false) {
+    if (_dmg <= 0) return;
+    Battle_PopAdd(_bc, string(_dmg), true, "hurt", _crit ? 1.75 : 1.25);
+}
+
+function Battle_HealPop(_bc, _amount) {
+    if (_amount <= 0) return;
+    Battle_PopAdd(_bc, "+" + string(_amount), true, "heal", 1.0);
 }
 
 // --------------------
@@ -886,55 +1136,20 @@ function Battle_DefenceAdjustStatuses(_p, _status_ids, _before_snapshot, _key) {
     return out;
 }
 
-function Battle_PlayerStunSkip(_bc) {
-    var p = _bc.p;
-    var e = _bc.e;
-    p = Status_Tick(p, false);   // D78: a stunned turn is not an action, so Bleeding does not hurt
-    // Recovering from a stun grants a brief immunity window so the player can
-    // never lose two turns in a row to stun (anti-stun-lock guarantee).
-    p.stun_immune_turns = 2;
-    if (Battle_CheckEnd(_bc, p, e)) return true;
-    _bc.player_bonus_actions_remaining = 0;
-    _bc.turn = TURN_ENEMY;
-    _bc.p = p;
-    _bc.e = e;
-    Battle_Message(_bc, Loc_T("combat.msg.player_stunned", "You are stunned!"), BSTATE_ENEMY_ACT);
-    return false;
-}
-
-function Battle_PlayerFinalizeTurn(_bc, _p, _e, _granted_extra_actions = 0) {
+// The player's turn is over: his statuses tick (Poison, Burning, Bleeding, Foresight), then the timeline says who is next. A fast player is next
+// again; nothing a skill does grants extra actions (D19: the old rule that a stun gave extra actions is gone, it was exploitable, S1).
+function Battle_PlayerFinalizeTurn(_bc, _p, _e) {
     var p = Status_Tick(_p);
     var e = _e;
     if (Battle_CheckEnd(_bc, p, e)) return true;
-
-    var grant = max(0, round(real(_granted_extra_actions)));
-    if (!variable_instance_exists(_bc, "player_bonus_actions_remaining")) _bc.player_bonus_actions_remaining = 0;
-
-    if (grant > 0) {
-        // The stun action itself is free, then grant extra player turns.
-        _bc.player_bonus_actions_remaining = max(_bc.player_bonus_actions_remaining, grant);
-        _bc.turn = TURN_PLAYER;
-    } else if (_bc.player_bonus_actions_remaining > 0) {
-        _bc.player_bonus_actions_remaining = max(0, _bc.player_bonus_actions_remaining - 1);
-        _bc.turn = (_bc.player_bonus_actions_remaining > 0) ? TURN_PLAYER : TURN_ENEMY;
-    } else {
-        _bc.turn = TURN_ENEMY;
-    }
-
     _bc.p = p;
     _bc.e = e;
-    if (_bc.turn == TURN_ENEMY) Battle_ForesightAnnounce(_bc);   // Foresight cast just now: the enemy acts next, show what it will do
+    Battle_TurnAdvance(_bc);
     return false;
 }
 
 function Battle_AttackTimingBegin(_bc) {
     var p = _bc.p;
-
-    if (!Status_CanAct(p)) {
-        if (Battle_PlayerStunSkip(_bc)) return;
-        _bc.qte_active = false;
-        return;
-    }
 
     // The bar is fixed per weapon so it can be learned (D60). The clock starts in the lead-in, so the press that chose ATTACK cannot count.
     _bc.qte_perfect_widen = Qte_PerfectWiden(p);   // Foresight (D79)
@@ -1002,6 +1217,7 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
     }
 
     _bc.last_dmg = dealt;
+    Battle_HitPop(_bc, dealt, timing_key, _bc.last_crit);
     p = Equip_PlayerPerfectHitApply(p, timing_key);
 
     var side_fx = Equip_PassiveOnAttackResolved(p, e, timing_key, true, _bc.last_dmg);
@@ -1020,6 +1236,10 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
 
     if (Battle_CheckEnd(_bc, p, e)) return;
 
+    // D75: every hit fills the stagger meter (a Perfect +50%); a full meter is a BREAK. A passive's stun (Pinning Shot) pushes the enemy back.
+    var break_note = Battle_StaggerHit(_bc, Combat_BasicSource(w).power, false, timing_key == QTE_PERFECT);
+    var stun_note = Battle_StunResolve(_bc);
+
     var msg;
     if (_bc.last_crit) {
         msg = Loc_T("combat.msg.player_crit", "Critical hit! {dmg} damage!", { dmg: _bc.last_dmg });
@@ -1027,9 +1247,10 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
         msg = Loc_T("combat.msg.player_hit", "You hit for {dmg} damage!", { dmg: _bc.last_dmg });
     }
     if (passive_msg != "") msg += " " + passive_msg;
+    msg += stun_note + break_note;
     Battle_Message(_bc, msg, BSTATE_ENEMY_ACT);
 
-    if (Battle_PlayerFinalizeTurn(_bc, p, e, 0)) return;
+    if (Battle_PlayerFinalizeTurn(_bc, p, e)) return;
 }
 
 // One Step of the bar. The clock is ms from delta_time; a press is stamped at the top of the Step that sees it (QTE-01).
@@ -1094,10 +1315,6 @@ function Battle_SkillFxSpawn(_bc, _skill_id, _sprite, _frames, _speed) {
 // The MP is checked first, so a skill you cannot pay for never asks for arrows. Nothing is spent until the sequence ends.
 function Battle_SkillQteBegin(_bc, _skill_id) {
     var p = _bc.p;
-    if (!Status_CanAct(p)) {
-        Battle_PlayerStunSkip(_bc);
-        return;
-    }
 
     var skill = SkillDB_Get(_skill_id);
     var cost = Equip_PlayerSkillMPCost(p, skill, skill.mp_cost);
@@ -1174,6 +1391,8 @@ function Battle_SkillGradeFeedback(_bc, _skill, _grade, _res) {
     SFX_Play(Qte_GradeSfxKey(_grade.key));
 
     _bc.last_dmg = max(0, _res.dmg);
+    if (_res.dmg > 0) Battle_HitPop(_bc, _res.dmg, _grade.key, _res.crit);
+    if (_res.dmg < 0) Battle_HealPop(_bc, -_res.dmg);
     if (_res.dmg > 0) {
         if (_grade.key == QTE_PERFECT) _bc.hitstop_ms = QTE_HITSTOP_PERFECT_MS;
         else Battle_QteImpactFeedback(_bc);
@@ -1185,11 +1404,6 @@ function Battle_PlayerSkill(_bc, _skill_id, _grade = undefined) {
     var p = _bc.p;
     var e = _bc.e;
     var grade = is_struct(_grade) ? _grade : Qte_Result(QTE_OK);
-
-    if (!Status_CanAct(p)) {
-        if (Battle_PlayerStunSkip(_bc)) return;
-        return;
-    }
 
     var skill = SkillDB_Get(_skill_id);
     var target = (skill.target == TGT_SELF) ? p : e;
@@ -1217,34 +1431,33 @@ function Battle_PlayerSkill(_bc, _skill_id, _grade = undefined) {
 
     if (Battle_CheckEnd(_bc, p, e)) return;
 
-    var grant_extra_turns = 0;
-    var skill_targets_opponent = (skill.target != TGT_SELF);
-    if (res.ok && res.hit && skill_targets_opponent && Status_SkillAppliesStatus(skill, STATUS_STUN)) {
-        // Player stun skills: action is free and grants two additional player turns.
-        grant_extra_turns = 2;
+    // D75: a damaging skill fills the stagger meter once per hit (stun skills x2, a Perfect +50%); a stun it lands is a push-back, never extra actions.
+    var skill_note = "";
+    if (skill.target != TGT_SELF && res.hit) {
+        if (res.dmg > 0) {
+            var hits_n = variable_struct_exists(skill, "hits") ? max(1, round(real(skill.hits))) : 1;
+            var skill_power = Combat_PowerSkill(skill.power, skill.power_mult, Combat_WeaponPower(p));
+            skill_note += Battle_StaggerHit(_bc, skill_power, Status_SkillAppliesStatus(skill, STATUS_STUN), grade.key == QTE_PERFECT, hits_n);
+        }
+        skill_note = Battle_StunResolve(_bc) + skill_note;
     }
 
     if (res.msg != "") {
-        Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT, fx);
+        Battle_Message(_bc, res.msg + skill_note, BSTATE_ENEMY_ACT, fx);
     } else if (res.crit) {
-        Battle_Message(_bc, Loc_T("combat.msg.skill_crit", "Critical skill! {dmg} damage!", { dmg: res.dmg }), BSTATE_ENEMY_ACT, fx);
+        Battle_Message(_bc, Loc_T("combat.msg.skill_crit", "Critical skill! {dmg} damage!", { dmg: res.dmg }) + skill_note, BSTATE_ENEMY_ACT, fx);
     } else if (res.dmg > 0) {
-        Battle_Message(_bc, Loc_T("combat.msg.skill_hit", "Skill hit for {dmg} damage!", { dmg: res.dmg }), BSTATE_ENEMY_ACT, fx);
+        Battle_Message(_bc, Loc_T("combat.msg.skill_hit", "Skill hit for {dmg} damage!", { dmg: res.dmg }) + skill_note, BSTATE_ENEMY_ACT, fx);
     } else {
-        Battle_Message(_bc, Loc_T("combat.msg.skill_used", "Skill used."), BSTATE_ENEMY_ACT, fx);
+        Battle_Message(_bc, Loc_T("combat.msg.skill_used", "Skill used.") + skill_note, BSTATE_ENEMY_ACT, fx);
     }
 
-    if (Battle_PlayerFinalizeTurn(_bc, p, e, grant_extra_turns)) return;
+    if (Battle_PlayerFinalizeTurn(_bc, p, e)) return;
 }
 
 function Battle_PlayerItem(_bc, _item_id) {
     var p = _bc.p;
     var e = _bc.e;
-
-    if (!Status_CanAct(p)) {
-        if (Battle_PlayerStunSkip(_bc)) return;
-        return;
-    }
 
     var item = ItemDB_Get(_item_id);
     var target = (item.use.target == TGT_SELF) ? p : e;
@@ -1267,7 +1480,7 @@ function Battle_PlayerItem(_bc, _item_id) {
     if (Battle_CheckEnd(_bc, p, e)) return;
 
     Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT, fx);
-    if (Battle_PlayerFinalizeTurn(_bc, p, e, 0)) return;
+    if (Battle_PlayerFinalizeTurn(_bc, p, e)) return;
 }
 
 function Battle_GetSkillList(_bc) {
@@ -1303,7 +1516,7 @@ function Battle_RunAttempt(_bc) {
     var enemy_id = -1;
     if (is_struct(e) && variable_struct_exists(e, "id")) enemy_id = e.id;
     if (enemy_id == ENEMY_MINI_BOSS || enemy_id == ENEMY_FINAL_BOSS) {
-        _bc.turn = TURN_ENEMY;
+        Battle_TurnAdvance(_bc);
         Battle_Message(_bc, Loc_T("combat.msg.player_cant_escape_this", "You can't run away from this."), BSTATE_ENEMY_ACT);
         return;
     }
@@ -1315,7 +1528,7 @@ function Battle_RunAttempt(_bc) {
         }
         Battle_Message(_bc, Loc_T("combat.msg.player_ran", "You ran away!"), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY);
     } else {
-        _bc.turn = TURN_ENEMY;
+        Battle_TurnAdvance(_bc);
         Battle_Message(_bc, Loc_T("combat.msg.player_couldnt_escape", "Couldn't escape!"), BSTATE_ENEMY_ACT);
     }
 }
@@ -1461,18 +1674,7 @@ function Battle_EnemyNextActionPreview(_bc = noone) {
     if (bc == noone) bc = instance_find(obj_battle_controller, 0);
     if (!instance_exists(bc)) return Battle_ActionPreviewOf(undefined, false);
     if (!Status_HasFlag(bc.p, "reveals_action")) return Battle_ActionPreviewOf(undefined, false);
-    return Battle_ActionPreviewOf(Battle_EnemyPlanGet(bc), true, !Status_CanAct(bc.e));
-}
-
-// Until the turn bar exists: one battle-log line per enemy action, "You foresee: <action>". Returns true when it wrote one.
-function Battle_ForesightAnnounce(_bc) {
-    if (_bc.battle_over || !Status_HasFlag(_bc.p, "reveals_action")) return false;
-    var pv = Battle_EnemyNextActionPreview(_bc);
-    var plan = _bc.enemy_plan;
-    if (!pv.visible || !is_struct(plan) || plan.announced) return false;
-    plan.announced = true;
-    Combat_Log(pv.text);
-    return true;
+    return Battle_ActionPreviewOf(Battle_EnemyPlanGet(bc), true);
 }
 
 function Battle_StatusSnapshot(_ch) {
@@ -1592,13 +1794,15 @@ function Battle_EnemyFinalizeTurnState(_bc, _p, _e) {
         out.enemy = e;
         return out;
     }
-    _bc.turn = enemy_turn_finished ? TURN_PLAYER : TURN_ENEMY;
-
     _bc.p = p;
     _bc.e = e;
     out.player = p;
     out.enemy = e;
-    if (enemy_turn_finished) Battle_ForesightAnnounce(_bc);   // the player's turn starts: what will the enemy do after it?
+    if (enemy_turn_finished) Battle_TurnAdvance(_bc);   // the timeline decides: the player, or the enemy again if it is much faster
+    else {
+        _bc.turn = TURN_ENEMY;
+        _bc.enemy_action_pending = true;   // the next action of the same turn
+    }
     return out;
 }
 
@@ -1704,6 +1908,7 @@ function Battle_DefenceResolve(_bc, _key) {
     if (final_dmg > 0 && _key != QTE_PERFECT) {
         CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
     }
+    if (final_dmg > 0) Battle_PlayerHitPop(_bc, final_dmg, crit);
 
     if (Battle_CheckEnd(_bc, p, e)) {
         _bc.p = p;
@@ -1711,6 +1916,8 @@ function Battle_DefenceResolve(_bc, _key) {
         Battle_DefenceClear(_bc);
         return;
     }
+    _bc.p = p;
+    final_msg += Battle_StunResolve(_bc);   // a defended Vine Trap that still stunned (Perfect resists it above)
 
     var turn_pack = Battle_EnemyFinalizeTurnState(_bc, p, e);
     if (turn_pack.ended) {
@@ -1932,22 +2139,12 @@ function Battle_EnemyAct(_bc) {
     var p = _bc.p;
     var e = _bc.e;
 
-    if (!Status_CanAct(e)) {
-        e = Status_Tick(e, false);
-        if (Battle_CheckEnd(_bc, p, e)) return;
-        Battle_Message(_bc, Loc_T("combat.msg.enemy_stunned", "{enemy} is stunned!", { enemy: e.name }), BSTATE_MENU);
-        _bc.enemy_actions_remaining = 0;
-        _bc.turn = TURN_PLAYER;
-        _bc.p = p;
-        _bc.e = e;
-        return;
-    }
-
     Battle_EnemyInitActionBudget(_bc, e);
 
     if (!variable_instance_exists(_bc, "enemy_last_action_used_skill")) _bc.enemy_last_action_used_skill = false;
     var force_damage_skill_debug = Debug_EnemyForceDamageSkillOnly();
     var skill_id = Battle_EnemyPlanTake(_bc);   // what Foresight showed (D79), or a fresh choice when nothing was planned
+    _bc.enemy_action_pending = false;           // it is acting now: the strip must not plan (or show) the action after this one
     var use_skill = (skill_id != -1);
     var sk = use_skill ? SkillDB_Get(skill_id) : undefined;
 
@@ -2022,15 +2219,17 @@ function Battle_EnemyAct(_bc) {
         }
         if (res.hit && res.dmg > 0) {
             CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
+            Battle_PlayerHitPop(_bc, res.dmg, res.crit);
         }
 
         if (Battle_CheckEnd(_bc, p, e)) return;
+        var enemy_stun_note = Battle_StunResolve(_bc);   // Vine Trap and the like: a push-back on the timeline (D75)
         var end_skill_pack = Battle_EnemyFinalizeTurnState(_bc, p, e);
         if (end_skill_pack.ended) return;
         p = end_skill_pack.player;
         e = end_skill_pack.enemy;
 
-        var skill_msg = Battle_EnemySkillComposeMessage(e.name, res);
+        var skill_msg = Battle_EnemySkillComposeMessage(e.name, res) + enemy_stun_note;
         Battle_Message(_bc, skill_msg, follow_state, fx2);
     } else {
         var ew = _bc.enemy_weapon;
@@ -2073,6 +2272,7 @@ function Battle_EnemyAct(_bc) {
 
         if (_bc.last_hit && _bc.last_dmg > 0) {
             CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
+            Battle_PlayerHitPop(_bc, _bc.last_dmg, _bc.last_crit);
         }
 
         var end_attack_pack = Battle_EnemyFinalizeTurnState(_bc, p, e);
@@ -2083,4 +2283,261 @@ function Battle_EnemyAct(_bc) {
         var basic_msg = Battle_EnemySkillComposeMessage(e.name, { hit: _bc.last_hit, crit: _bc.last_crit, dmg: _bc.last_dmg, msg: "" });
         Battle_Message(_bc, basic_msg, follow_state);
     }
+}
+
+// ---- Turn timeline strip, enemy header (name, HP, stagger), floating numbers and the BREAK word (D74 D75 D92 D97 D99) ----
+// GUI layer, the four palette colours only (UI_C_*), the Ui_* kit of D0 (Ui_Metrics, Ui_Box, Ui_DrawFrame, Ui_Text, Ui_AnimT, Ui_Bob, Ui_Glide).
+#macro TURN_SLIDE_MS 120
+
+// Sizes of the strip in GUI units. Sprites are drawn at a whole multiple (k) of the window pixel so they stay crisp at every window size.
+function Battle_TimelineMetrics(_bc = noone) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var sx = Display_WorldScale();
+    var k = max(1, round(sx * 0.6));
+    var icon = 16 * k;
+    var slot = icon + 6 * p;
+    var gap = 2 * p;
+    var n = TURN_PREVIEW_COUNT;
+    var w = n * slot + (n - 1) * gap;
+    var caption_h = mt.line_h + p;
+    // Centred, unless the player's HP / MP bars and numbers (top left, drawn by obj_ui_controller) reach into it: then it moves right of them.
+    var x0 = round((mt.gw - w) * 0.5);
+    if (_bc != noone && instance_exists(_bc)) {
+        var vis = UI_GetVisualScale();
+        var hud_right = max(6, round(8 * vis)) + sprite_get_width(hp_bar) * UI_BAR_SCALE * UI_GetSpriteScale() + max(4, round(6 * vis))
+            + max(UI_TextWidth(string(_bc.p.hp) + " / " + string(_bc.p.max_hp)), UI_TextWidth(string(_bc.p.mp) + " / " + string(_bc.p.max_mp)));
+        x0 = clamp(max(x0, round(hud_right + 3 * p)), 0, max(0, mt.gw - w - mt.margin));
+    }
+    return { p: p, k: k, icon: icon, slot: slot, gap: gap, w: w, x0: x0, y0: mt.margin, caption_h: caption_h, h: slot + 2 * p + caption_h, line_h: mt.line_h };
+}
+
+// 9 x 5 eye (Foresight, D24): a pupil in an almond. Cells are p x p.
+function Battle_DrawEye(_x, _y, _p, _col) {
+    var rows = [124, 186, 313, 186, 124];   // bit 8 = the left column of the 9 wide picture
+    for (var r = 0; r < 5; r++) {
+        for (var c = 0; c < 9; c++) {
+            if (((rows[r] >> (8 - c)) & 1) == 1) Ui_Box(_x + c * _p, _y + r * _p, _x + (c + 1) * _p, _y + (r + 1) * _p, _col);
+        }
+    }
+}
+
+function Battle_TimelineSprite(_bc, _who) {
+    if (_who == TL_ENEMY) return _bc.e.sprite;
+    if (is_struct(_bc.p) && variable_struct_exists(_bc.p, "class_cfg") && is_struct(_bc.p.class_cfg) && variable_struct_exists(_bc.p.class_cfg, "sprites")) {
+        var sp = _bc.p.class_cfg.sprites;
+        if (is_struct(sp) && variable_struct_exists(sp, "down") && sp.down != noone && sp.down != -1) return sp.down;
+    }
+    return noone;
+}
+
+// One slot at (_x, _y). The player's portrait sits on mid green, the enemy's on the darkest, so the two read apart at a glance.
+function Battle_DrawTimelineSlot(_bc, _x, _y, _m, _who, _current, _alpha, _eye) {
+    var p = _m.p;
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    if (_current) Ui_Box(_x - p, _y - p, _x + _m.slot + p, _y + _m.slot + p, UI_C_LIGHTEST);
+    Ui_DrawFrame(_x, _y, _m.slot, _m.slot, _alpha, p);
+    Ui_Box(_x + 2 * p, _y + 2 * p, _x + _m.slot - 2 * p, _y + _m.slot - 2 * p, (_who == TL_PLAYER) ? UI_C_DARK : UI_C_DARKEST);
+    var spr = Battle_TimelineSprite(_bc, _who);
+    var cx = _x + _m.slot * 0.5;
+    var cy = _y + _m.slot * 0.5;
+    if (spr != noone && spr != -1) {
+        var sw = max(1, sprite_get_width(spr));
+        var sh = max(1, sprite_get_height(spr));
+        var sc = min(_m.icon / sw, _m.icon / sh);
+        var dx = round(cx - sw * sc * 0.5 + sprite_get_xoffset(spr) * sc);
+        var dy = round(cy - sh * sc * 0.5 + sprite_get_yoffset(spr) * sc);
+        draw_sprite_ext(spr, 0, dx, dy, sc, sc, 0, c_white, _alpha);
+    } else {
+        Ui_Text(cx, cy - _m.line_h * 0.5, (_who == TL_PLAYER) ? "P" : "E", UI_C_LIGHTEST, fa_center);
+    }
+    if (_eye) Battle_DrawEye(_x + _m.slot - 2 * p - 9 * p, _y + 2 * p, p, UI_C_LIGHTEST);
+    draw_set_alpha(a0);
+}
+
+// The strip across the top: the current actor first (ringed, gently bobbing), then the next four. When the order changes it slides for
+// TURN_SLIDE_MS: after a turn the row moves left one slot and the new last one fades in; after a push-back (stun, BREAK) the row fades in place.
+// With Foresight, the first upcoming enemy slot wears an eye and the caption under it names the action (a big attack gets "!").
+function Battle_DrawTimeline(_bc) {
+    var m = Battle_TimelineMetrics(_bc);
+    var p = m.p;
+    var t = Ui_AnimT(_bc.tl_slide_start, current_time, TURN_SLIDE_MS);
+    var pitch = m.slot + m.gap;
+    var slots = Battle_TimelineSlots(_bc);
+    var shift_mode = (_bc.tl_slide_kind == 0);
+    var shift = shift_mode ? round((1 - t) * pitch) : 0;
+    var fore_x = -1;
+    var fore = undefined;
+    var n = array_length(slots);
+
+    if (shift_mode && t < 1) {   // the actor that just went leaves to the left
+        Battle_DrawTimelineSlot(_bc, m.x0 - pitch + shift, m.y0 + p, m, _bc.tl_prev_who, false, 1 - t, false);
+    }
+    for (var i = 0; i < n; i++) {
+        var s = slots[i];
+        var xx = m.x0 + i * pitch + shift;
+        var yy = m.y0 + (s.current ? Ui_Bob(current_time, p) : p);
+        var al = 1;
+        if (shift_mode && i == n - 1) al = t;
+        if (!shift_mode) al = 0.4 + 0.6 * t;
+        Battle_DrawTimelineSlot(_bc, xx, yy, m, s.who, s.current, al, is_struct(s.foresight));
+        if (is_struct(s.foresight)) { fore = s.foresight; fore_x = xx + m.slot * 0.5; }
+    }
+    if (is_struct(fore)) {
+        var label = fore.name + (fore.big ? " !" : "");
+        var tw = UI_TextWidth(label) + 9 * p + 2 * p;
+        var tx = clamp(fore_x - tw * 0.5, p, Display_GuiW() - tw - p);
+        var ty = m.y0 + m.slot + 3 * p;
+        Ui_Box(tx - p, ty - p div 2, tx + tw + p, ty + m.line_h + p div 2, UI_C_DARKEST);
+        Battle_DrawEye(tx, ty + (m.line_h - 5 * p) * 0.5, p, UI_C_LIGHTEST);
+        Ui_Text(tx + 9 * p + 2 * p, ty, label, UI_C_LIGHTEST);
+    }
+}
+
+function Battle_TimelineBottom() {
+    var m = Battle_TimelineMetrics();
+    return m.y0 + m.h;
+}
+
+// Where the header block sits: { cx, x1, y1, bw, h }. Also used to keep the BREAK word clear of it.
+function Battle_EnemyHeaderRect(_bc) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var sx = Display_WorldScale();
+    var out = { cx: Display_GuiW() * 0.5, x1: 0, y1: round(Display_GuiH() * 0.3), bw: round(36 * sx), h: 0 };
+    if (!instance_exists(_bc.enemy_inst) || _bc.enemy_inst.sprite_index == noone) return out;
+    var inst = _bc.enemy_inst;
+    var spr = inst.sprite_index;
+    out.cx = ((inst.x - sprite_get_xoffset(spr) - _bc.cam_base_x) + sprite_get_width(spr) * abs(inst.image_xscale) * 0.5) * sx;
+    var top = (inst.y - sprite_get_yoffset(spr) + sprite_get_bbox_top(spr) * abs(inst.image_yscale) - _bc.cam_base_y) * sx;
+    out.bw = clamp(round(sprite_get_width(spr) * abs(inst.image_xscale) * sx), round(36 * sx), mt.gw - 4 * mt.margin);
+    out.h = mt.line_h + p + 4 * p + p + 3 * p + 2 * p;
+    out.x1 = round(out.cx - out.bw * 0.5);
+    out.y1 = round(max(Battle_TimelineBottom() + p, top - out.h - 2 * p));
+    return out;
+}
+
+// Name, HP and stagger meter above the enemy (D99). The stagger bar flashes when a hit lands and pulses while the enemy is BROKEN.
+function Battle_DrawEnemyHeader(_bc, _alpha) {
+    if (!instance_exists(_bc.enemy_inst) || _bc.enemy_inst.sprite_index == noone) return;
+    var e = _bc.e;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var hdr = Battle_EnemyHeaderRect(_bc);
+    var cx = hdr.cx;
+    var bw = hdr.bw;
+    var x1 = hdr.x1;
+    var y1 = hdr.y1;
+    var hp_h = 4 * p;
+    var sg_h = 3 * p;
+    var name_h = mt.line_h;
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+
+    Ui_Text(cx, y1, e.name, UI_C_LIGHTEST, fa_center);
+    var hy = y1 + name_h + p;
+    _bc.enemy_hp_shown = Ui_Glide(_bc.enemy_hp_shown, e.hp, current_time - _bc.enemy_hp_clock, 120);
+    _bc.enemy_hp_clock = current_time;
+    var hp_ratio = (e.max_hp > 0) ? clamp(_bc.enemy_hp_shown / e.max_hp, 0, 1) : 0;
+    Ui_Box(x1, hy, x1 + bw, hy + hp_h, UI_C_LIGHTEST);
+    Ui_Box(x1 + p, hy + p, x1 + bw - p, hy + hp_h - p, UI_C_DARKEST);
+    Ui_Box(x1 + p, hy + p, x1 + p + round((bw - 2 * p) * hp_ratio), hy + hp_h - p, UI_C_LIGHT);
+
+    var sy = hy + hp_h + p;
+    var broken = (variable_struct_exists(e, "broken") && e.broken);
+    var smax = variable_struct_exists(e, "stagger_max") ? e.stagger_max : 0;
+    if (smax > 0) {
+        var flash = (current_time - _bc.stagger_flash_start) < 120;
+        var since_break = current_time - _bc.break_start;
+        Ui_Box(x1, sy, x1 + bw, sy + sg_h, UI_C_LIGHTEST);
+        Ui_Box(x1 + p, sy + p div 2, x1 + bw - p, sy + sg_h - p div 2, UI_C_DARKEST);
+        var inner_w = bw - 2 * p;
+        if (broken) {   // full and pulsing until the enemy's next turn
+            var pulse = (floor(current_time / 120) mod 2 == 0) ? UI_C_LIGHTEST : UI_C_DARK;
+            Ui_Box(x1 + p, sy + p div 2, x1 + p + inner_w, sy + sg_h - p div 2, pulse);
+        } else {
+            var fill_col = (flash || since_break < 400) ? UI_C_LIGHT : UI_C_LIGHTEST;
+            Ui_Box(x1 + p, sy + p div 2, x1 + p + round(inner_w * clamp(e.stagger / smax, 0, 1)), sy + sg_h - p div 2, fill_col);
+        }
+    }
+    draw_set_alpha(a0);
+}
+
+// Floating numbers (D92). Pop in (+35% for 100 ms), rise ~14 design pixels, fade in the last 200 ms. Perfect largest, Weak smallest and dimmest.
+function Battle_DrawPops(_bc) {
+    var sx = Display_WorldScale();
+    var o = max(1, round(sx / 2));
+    var a0 = draw_get_alpha();
+    var ex = Display_GuiW() * 0.5;
+    var ey = Display_GuiH() * 0.4;
+    if (instance_exists(_bc.enemy_inst) && _bc.enemy_inst.sprite_index != noone) {
+        var inst = _bc.enemy_inst;
+        var spr = inst.sprite_index;
+        ex = ((inst.x - sprite_get_xoffset(spr) - _bc.cam_base_x) + sprite_get_width(spr) * abs(inst.image_xscale) * 0.5) * sx;
+        ey = ((inst.y - sprite_get_yoffset(spr) - _bc.cam_base_y) + sprite_get_height(spr) * abs(inst.image_yscale) * 0.5) * sx;
+    }
+    var px = (_bc.player_fx_x - _bc.cam_base_x) * sx;
+    var py = (_bc.player_fx_y - _bc.cam_base_y) * sx;
+
+    for (var i = 0; i < array_length(_bc.pops); i++) {
+        var pp = _bc.pops[i];
+        var el = current_time - pp.start;
+        if (el < 0 || el >= POP_MS) continue;
+        var fill = UI_C_LIGHTEST;
+        var edge = UI_C_DARKEST;
+        switch (pp.style) {
+            case QTE_GOOD: fill = UI_C_LIGHT; break;
+            case QTE_WEAK: fill = UI_C_DARK; edge = UI_C_LIGHT; break;
+            case "heal":   fill = UI_C_LIGHT; break;
+        }
+        var sc = pp.scale * ((el < 100) ? (1 + 0.35 * (1 - el / 100)) : 1);
+        var rise = (1 - sqr(1 - clamp(el / 500, 0, 1))) * 14 * sx;
+        var bx = pp.on_player ? px : ex;
+        var by = pp.on_player ? (py - 6 * sx) : ey;
+        var jitter = ((pp.n mod 2 == 1) ? 1 : -1) * 14 * sx * ceil(pp.n / 2);   // the first is centred, the next ones step aside so they stay readable
+        var tw = UI_TextWidth(pp.text) * sc;
+        var th = UI_TextHeight(pp.text) * sc;
+        var tx = bx + jitter - tw * 0.5;
+        var ty = by - rise - th * 0.5;
+        draw_set_alpha(clamp((POP_MS - el) / 200, 0, 1));
+        draw_set_halign(fa_left);
+        draw_set_valign(fa_top);
+        draw_set_color(edge);
+        for (var ox = -1; ox <= 1; ox++) {
+            for (var oy = -1; oy <= 1; oy++) {
+                if (ox != 0 || oy != 0) UI_DrawTextTransformed(tx + ox * o, ty + oy * o, pp.text, sc, sc, 0);
+            }
+        }
+        draw_set_color(fill);
+        UI_DrawTextTransformed(tx, ty, pp.text, sc, sc, 0);
+    }
+
+    // The BREAK word over the enemy: pops in big, blinks, rises, fades (D92).
+    var bel = current_time - _bc.break_start;
+    if (bel >= 0 && bel < 1000) {
+        var txt = Loc_T("battle.hud.break", "BREAK!");
+        var bsc = 2.0 * ((bel < 150) ? (1 + 0.6 * (1 - bel / 150)) : 1);
+        var hdr = Battle_EnemyHeaderRect(_bc);
+        var mt = Ui_Metrics();
+        var brise = (1 - sqr(1 - clamp(bel / 600, 0, 1))) * 10 * sx;
+        var bw2 = UI_TextWidth(txt) * bsc;
+        var bh2 = UI_TextHeight(txt) * bsc;
+        var bx2 = ex - bw2 * 0.5;
+        var by2 = max(Battle_TimelineBottom() + mt.p, hdr.y1 - bh2 - 2 * mt.p) - brise;
+        var bfill = (bel < 500 && (floor(bel / 90) mod 2 == 1)) ? UI_C_LIGHT : UI_C_LIGHTEST;
+        draw_set_alpha(clamp((1000 - bel) / 250, 0, 1));
+        draw_set_halign(fa_left);
+        draw_set_valign(fa_top);
+        draw_set_color(UI_C_DARKEST);
+        for (var bx3 = -1; bx3 <= 1; bx3++) {
+            for (var by3 = -1; by3 <= 1; by3++) {
+                if (bx3 != 0 || by3 != 0) UI_DrawTextTransformed(bx2 + bx3 * o * 2, by2 + by3 * o * 2, txt, bsc, bsc, 0);
+            }
+        }
+        draw_set_color(bfill);
+        UI_DrawTextTransformed(bx2, by2, txt, bsc, bsc, 0);
+    }
+    draw_set_alpha(a0);
+    draw_set_color(c_white);
 }

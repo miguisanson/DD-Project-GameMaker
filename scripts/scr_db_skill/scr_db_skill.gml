@@ -1360,6 +1360,7 @@ function CardDB_Init() {
         ["coin_sense",    "Coin Sense",    "Find {n}% more gold.",                                      [], "gold_mult",        { gold_mult: 0.10 }],
         ["mana_spring",   "Mana Spring",   "Regain {n} MP at the start of each of your turns.",         [], "mp_gain",          { mp_gain: 1, every_n_turns: 1 }],
         ["potion_lore",   "Potion Lore",   "Potions work {n}% better.",                                 [], "item_power",       { item_power: 0.15 }],
+        ["opening_blow",  "Opening Blow",  "Enemies start each fight with {n} stagger.",                [], "start_stagger",    { start_stagger: 1 }],
         ["k_iron_hide",   "Iron Hide",     "Thick armour sense: +{n} DEF for good.",                    K,  "stat_def",         { stat_def: 2 }],
         ["k_bulwark",     "Bulwark",       "Guard on yourself lasts {n} turns longer.",                 K,  "guard_turns",      { guard_turns: 3 }],
         ["k_heavy_hands", "Heavy Hands",   "A harder swing: +{n} ATK for good.",                        K,  "stat_atk",         { stat_atk: 2 }],
@@ -1500,6 +1501,13 @@ function Card_OnVictory(_ch) {
     var find = Card_PassiveSum(_ch, "find_potion_pct");
     if (find > 0 && variable_struct_exists(_ch, "inventory") && RunRng_Chance("loot", find)) _ch.inventory = Inv_Add(_ch.inventory, 10, 1);
     return _ch;
+}
+
+// At the start of a fight (obj_battle_controller Create): Opening Blow gives the enemy's stagger meter a head start.
+function Card_OnBattleStart(_p, _e) {
+    var n = round(Card_PassiveSum(_p, "start_stagger"));
+    if (n > 0 && is_struct(_e)) Stagger_Add(_e, n);
+    return _e;
 }
 
 function Card_StatusTurnBonus(_user, _status_id) {
@@ -1684,6 +1692,7 @@ function Card_Lines(_c) {
             case "skill_power": array_push(lines, Card_NumLine(Loc_T("card.lbl.skill_power", "Skill power"), "+" + string(round(val)))); break;
             case "mp_cost_less": array_push(lines, Card_NumLine(Loc_T("card.lbl.skill_mp", "Skill MP"), "-" + string(round(val)))); break;
             case "status_turn_bonus": array_push(lines, Card_NumLine(Loc_T("card.lbl.status_turns", "Status turns"), "+" + string(round(val)))); break;
+            case "start_stagger": array_push(lines, Card_NumLine(Loc_T("card.lbl.stagger", "Stagger"), "+" + string(round(val)))); break;
             case "potion_mp": array_push(lines, Card_NumLine(Loc_T("card.lbl.potion_mp", "Potion MP"), "+" + string(round(val)))); break;
             case "heal_pct": array_push(lines, Card_NumLine(Loc_T("card.lbl.restores", "Restores"), Loc_T("card.val.restores", "{pct} HP, MP", { pct: Card_Pct(val) }))); break;
             case "gold": array_push(lines, Card_NumLine(Loc_T("card.lbl.gold", "Gold"), "+" + string(round(val)))); break;

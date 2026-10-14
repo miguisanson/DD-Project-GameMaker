@@ -25,9 +25,6 @@ function Player_NormalizeProgression(_ch, _recompute_resources = true, _clamp_ex
 
     Card_EnsureFields(_ch);
 
-    if (!variable_struct_exists(_ch, "stun_immune_turns")) _ch.stun_immune_turns = 0;
-    _ch.stun_immune_turns = max(0, round(_ch.stun_immune_turns));
-
     if (!variable_struct_exists(_ch, "exp")) _ch.exp = 0;
     _ch.exp = max(0, round(_ch.exp));
 

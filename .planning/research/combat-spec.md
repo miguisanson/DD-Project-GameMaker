@@ -1,4 +1,4 @@
-# Combat spec (packet B1: STAT-01..06, 11, 12; D20 D22 D27 D35 D61 D76 D77 D80; packet B2: section 10, D21 D24 D59 D78 D79)
+# Combat spec (packet B1: STAT-01..06, 11, 12; D20 D22 D27 D35 D61 D76 D77 D80; packet B2: section 10, D21 D24 D59 D78 D79; packet B3: section 11, D19 D74 D75 D92)
 
 Written BEFORE the code. Numbers are starting values for the simulator (BAL-02), not final balance; the FORMULAS are fixed and
 `combat-vectors.json` holds the expected outputs (derived from this text by `tools/balance/check_combat_vectors.py`, not from game output).
@@ -8,7 +8,7 @@ Test_Suite_Stats / Test_Suite_Combat in `scr_test.gml` hard-code the same cases 
 `ATK DEF SPD MAG` + `HP MP` (STR/AGI/INT/LUCK removed). Ids: `STAT_ATK 0, STAT_DEF 1, STAT_SPD 2, STAT_MAG 3`. Range 1..60.
 Effective stat = max(1, base + equipment bonus + status mod). Equipment/status structs use keys `atk def spd mag`.
 - ATK: physical damage (basic attacks with swords/bows, ATK skills). MAG: spell damage and max MP. DEF: damage taken (all sources).
-- SPD: turn order. Until the turn timeline (D74) lands: the higher effective SPD acts first in a battle, a tie goes to the player. Run: section 8.
+- SPD: turn order (the timeline, section 11): a fighter with twice the SPD acts twice as often. Run: section 8.
 - Status mods (rename only): Poison MAG-1, Bleeding SPD-2, Stun SPD-2, Sundered DEF-1. Burning has no flat mod any more: it takes DEF x0.75 (section 10).
 
 ## 2. Classes (level 1) and fixed growth per level (D76)
@@ -86,7 +86,7 @@ EXP per kill is unchanged (`enemy.exp` x level factor). One clean pass of the te
 This is the number to check in the run simulator; a full winning run is 45-60 minutes.
 
 ## 8. Run and initiative
-Run (flee) succeeds with `clamp(0.5 + 0.05 * (SPD_player - SPD_enemy), 0.10, 0.95)` (one `random(1)`; bosses still cannot be fled). Initiative = SPD (section 1).
+Run (flee) succeeds with `clamp(0.5 + 0.05 * (SPD_player - SPD_enemy), 0.10, 0.95)` (one `random(1)`; bosses still cannot be fled). The first actor is whoever the timeline (section 11) picks first, which is the higher SPD; a tie goes to the player (`Combat_PlayerActsFirst` states the same rule).
 
 ## 9. Data export (`-exportdata`)
 `DD-Project.exe -game data.win -exportdata` writes `export_data.json` (classes, enemies, skills, items, statuses, level table, constants) to the save area
@@ -133,3 +133,37 @@ exactly that, unless it is no longer allowed (an HP-gated skill, no MP) in which
 **HUD data (pure, no drawing):** `Status_DisplayList(ch)` -> `[{ id, name, turns, stacks, tick, label, negative, icon_sprite, icon_subimg }]` (one row per status; `label`
 is "x3" for stacks, "2t" otherwise); `Status_Describe(id, data = undefined)` -> `{ id, name, line, turns, stacks, tick, ... }` where `line` is the plain sentence with the real numbers (D100).
 
+
+## 11. Turn timeline, stun push-back, stagger and BREAK (packet B3: D19 D74 D75 D79 D92)
+Replaces the old "higher SPD acts first, then alternate" flow and the old rule "a stun gives the player extra actions" (S1 exploit). Nothing in a battle
+alternates any more: `Turn_Next` says who acts.
+
+**Gauge.** Each fighter has an integer gauge, start 0. `TURN_GAUGE_MAX = 100`. One tick adds the fighter's effective SPD (`max(1, SPD)`, read again before every turn,
+so Bleeding SPD-2 slows it) to its gauge. `Turn_Next`: if nobody's gauge is >= 100, tick until somebody's is. Then the fighter with the HIGHEST gauge acts; equal gauges go to the
+player (the first fighter in the list). The actor's gauge loses 100 (the overflow is kept), so a fighter with 2x SPD acts about 2x as often and one with 3x SPD about 3x.
+`Turn_Preview(n = 5)` runs the same on a copy and returns the next n actors' ids; it changes nothing, and it is exactly what the next n `Turn_Next` calls will return
+unless something (a stun, a BREAK, an SPD change) happens in between.
+```
+ticks_needed(f) = ceil((100 - gauge) / SPD)        advance every gauge by SPD x min over fighters of max(1, ticks_needed)
+first actor (both gauges 0): the higher SPD; a tie -> the player
+```
+Examples: Archer 13 vs Slime 9: P E P P E P P E P ...; 20 vs 10: P P E P P E; 10 vs 10: P E P E.
+
+**Stun (D75).** A stun that lands on a fighter (a skill's `status_chance` roll, the Stun status, Hilt Bash, Ice Spear, Vine Trap) is not a lost turn any more:
+`gauge -= 100` (a boss as the TARGET: `gauge -= 50`, "half as far"), and the fighter becomes **Steadfast** for 2 of its own turns: a stun that lands while `steadfast > 0` does
+nothing. `steadfast` goes down by 1 each time the fighter is picked by `Turn_Next` (its turn starts). Pushing back never gives anybody an extra action. A stun that hits
+a fighter whose turn is far off simply pushes it further back.
+
+**Stagger (D75, D92).** Only the enemy has a meter. Every damaging hit of the player adds
+```
+stagger_gain(power, stun_skill, perfect) = max(1, round_half_up(power x 0.5 x (2 if the skill stuns) x (1.5 if the grade is Perfect)))
+   power = the hit's formula power (section 4, before the grade); a multi-hit skill adds it once per hit
+stagger_max(rank, boss) = (4 + 4 x rank) x (2 if boss)       rank = threat rank 1..4 (basic_power 3/5/7/9)
+```
+Slime/Spider/Snake/Wolf 8, Mad Whisp/Killer Plant/Ghost Sword/Stranger 12, Palehorn (rank 3, boss) 32, Pale Choirbeast (rank 4, boss) 40.
+When `stagger >= stagger_max` the enemy is **BROKEN**: the meter resets to 0, its gauge loses 100 (pushed back one turn, bosses too), and until its next turn starts it
+takes **+50% damage** (`mult x 1.5` in section 4's product). While broken the meter does not fill. The enemy's next turn clears BROKEN. A hit that causes the BREAK is not
+itself boosted. Examples: a Wooden Sword basic hit (power 6) adds 3 (OK) or 5 (Perfect: 4.5 -> 5); Hilt Bash (power 11, stuns) adds 11, or 17 on a Perfect (16.5 -> 17).
+
+**HUD data (pure):** `Battle_TimelineSlots(bc)` -> up to 5 `{ who (0 player, 1 enemy), current (the first), foresight (the Foresight preview, only on the first enemy slot while Foresight lasts) }`.
+Animation: when the order changes the strip slides for 120 ms (D97).
