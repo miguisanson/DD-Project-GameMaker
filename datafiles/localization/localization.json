@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T12:46:59Z",
-    "row_count": 936
+    "generated_at_utc": "2026-10-14T12:48:34Z",
+    "row_count": 1033
   },
   "default_lang": "en",
   "languages": [
@@ -680,6 +680,10 @@
       "en": "nothing, it is stunned",
       "ko": "기절해서 아무것도 못 합니다"
     },
+    "combat.foresee.windup": {
+      "en": "winding up {skill}",
+      "ko": "{skill}을(를) 준비 중"
+    },
     "combat.msg.applied_prefix": {
       "en": "Applied ",
       "ko": "적용된"
@@ -964,6 +968,22 @@
       "en": "Nothing to steal.",
       "ko": "훔칠 것이 없습니다."
     },
+    "combat.msg.phase.final_boss.1": {
+      "en": "{enemy} sings a second voice!",
+      "ko": "{enemy}이(가) 두 번째 목소리로 노래합니다!"
+    },
+    "combat.msg.phase.final_boss.2": {
+      "en": "{enemy} howls in fury!",
+      "ko": "{enemy}이(가) 격노하여 울부짖습니다!"
+    },
+    "combat.msg.phase.mini_boss.1": {
+      "en": "{enemy} paws the ground, snorting!",
+      "ko": "{enemy}이(가) 콧김을 내뿜으며 땅을 긁습니다!"
+    },
+    "combat.msg.phase.mini_boss.2": {
+      "en": "{enemy} bellows in a blind rage!",
+      "ko": "{enemy}이(가) 분노에 눈이 멀어 포효합니다!"
+    },
     "combat.msg.player_couldnt_escape": {
       "en": "Couldn't escape!",
       "ko": "탈출하지 못했습니다!"
@@ -1003,6 +1023,14 @@
     "combat.msg.skill.use.skill_rampage": {
       "en": "It goes berserk!",
       "ko": "그것은 광포하다!"
+    },
+    "combat.msg.skill.use.skill_regrow": {
+      "en": "It regrows its wounds!",
+      "ko": "상처가 아물어 갑니다!"
+    },
+    "combat.msg.skill.use.skill_snuff": {
+      "en": "Your enchantments are snuffed out!",
+      "ko": "당신의 강화 효과가 꺼졌습니다!"
     },
     "combat.msg.skill_crit": {
       "en": "Critical skill! {dmg} damage!",
@@ -1056,6 +1084,26 @@
       "en": "You defeated",
       "ko": "당신이 패배했습니다"
     },
+    "combat.msg.windup.skill_ghost_cut": {
+      "en": "{enemy} raises its blade!",
+      "ko": "{enemy}이(가) 칼날을 치켜듭니다!"
+    },
+    "combat.msg.windup.skill_pale_hymn": {
+      "en": "{enemy} draws a deep breath!",
+      "ko": "{enemy}이(가) 숨을 크게 들이쉽니다!"
+    },
+    "combat.msg.windup.skill_ramming": {
+      "en": "{enemy} lowers its horns!",
+      "ko": "{enemy}이(가) 뿔을 낮춥니다!"
+    },
+    "combat.msg.windup.skill_vine_trap": {
+      "en": "{enemy} coils its vines!",
+      "ko": "{enemy}이(가) 덩굴을 감아 올립니다!"
+    },
+    "combat.msg.windup_broken": {
+      "en": "{enemy}'s {skill} is broken off!",
+      "ko": "{enemy}의 {skill}이(가) 끊겼습니다!"
+    },
     "common.cancel": {
       "en": "Cancel",
       "ko": "취소"
@@ -1063,6 +1111,50 @@
     "common.ok": {
       "en": "OK",
       "ko": "좋아요"
+    },
+    "credits.by": {
+      "en": "by PaleRook",
+      "ko": "PaleRook 제작"
+    },
+    "credits.creator": {
+      "en": "creator: {name}",
+      "ko": "제작자: {name}"
+    },
+    "credits.font_galmuri": {
+      "en": "Galmuri by Lee Minseo (OFL-1.1)",
+      "ko": "Galmuri - Lee Minseo (OFL-1.1)"
+    },
+    "credits.font_pixel": {
+      "en": "Retro Gaming pixel font",
+      "ko": "Retro Gaming 픽셀 글꼴"
+    },
+    "credits.fonts": {
+      "en": "Fonts",
+      "ko": "글꼴"
+    },
+    "credits.game_by": {
+      "en": "Game and art by PaleRook",
+      "ko": "게임과 그림: PaleRook"
+    },
+    "credits.sounds": {
+      "en": "Sound and music",
+      "ko": "효과음과 음악"
+    },
+    "credits.thanks": {
+      "en": "Thank you for playing.",
+      "ko": "플레이해 주셔서 감사합니다."
+    },
+    "credits.title": {
+      "en": "NO HOPE",
+      "ko": "NO HOPE"
+    },
+    "credits.tool_gamemaker": {
+      "en": "Made with GameMaker",
+      "ko": "GameMaker로 제작"
+    },
+    "credits.tools": {
+      "en": "Tools",
+      "ko": "도구"
     },
     "cutscene.ending.0.0": {
       "en": "Thank the Almighty...",
@@ -1121,8 +1213,8 @@
       "ko": "플레이해 주셔서 감사합니다..."
     },
     "cutscene.ending.4.1": {
-      "en": "This was around 2 months of development, and I'm glad you were able to get through our prototype story.",
-      "ko": "이 게임은 약 2개월 동안 개발되었고, 여러분이 우리의 프로토타입 스토리를 끝까지 플레이해 주셔서 정말 기쁩니다."
+      "en": "We're glad you made it all the way to the end.",
+      "ko": "끝까지 함께해 주셔서 정말 기쁩니다."
     },
     "cutscene.ending.4.2": {
       "en": "We're looking to use what we learned from this game for our next title.",
@@ -1255,6 +1347,126 @@
     "cutscene.intro.2.1": {
       "en": "You fell.",
       "ko": "당신은 떨어졌습니다."
+    },
+    "death.killer.abandoned": {
+      "en": "You let go. The tunnel did not mind.",
+      "ko": "당신은 손을 놓았다. 터널은 개의치 않았다."
+    },
+    "death.killer.enemy_direwolf": {
+      "en": "The wolf was faster than your fear.",
+      "ko": "늑대는 당신의 두려움보다 빨랐다."
+    },
+    "death.killer.enemy_final_boss": {
+      "en": "The choir sings. You were its last note.",
+      "ko": "성가대가 노래한다. 당신은 그 마지막 음이었다."
+    },
+    "death.killer.enemy_ghostsword": {
+      "en": "A blade with no hand to hold it.",
+      "ko": "손도 없이 휘둘러지는 검."
+    },
+    "death.killer.enemy_killer_plant": {
+      "en": "Even the plants here want you gone.",
+      "ko": "여기선 식물조차 당신을 죽이려 든다."
+    },
+    "death.killer.enemy_madwhisp": {
+      "en": "The glow led you here. It always does.",
+      "ko": "그 빛이 여기까지 이끌었다. 언제나 그렇다."
+    },
+    "death.killer.enemy_mini_boss": {
+      "en": "{killer} did not even slow down.",
+      "ko": "{killer}은(는) 속도조차 늦추지 않았다."
+    },
+    "death.killer.enemy_slime": {
+      "en": "A slime. You were beaten by a slime.",
+      "ko": "고작 더러운 것에게 당했다."
+    },
+    "death.killer.enemy_snake": {
+      "en": "A hiss. Then nothing.",
+      "ko": "쉬익. 그리고 아무것도 없다."
+    },
+    "death.killer.enemy_spider": {
+      "en": "Eight eyes. The last thing you saw.",
+      "ko": "여덟 개의 눈. 마지막으로 본 것."
+    },
+    "death.killer.enemy_stranger": {
+      "en": "The stranger smiled the whole time.",
+      "ko": "낯선 이는 내내 웃고 있었다."
+    },
+    "death.killer.status_bleed": {
+      "en": "You bled out, counting the drops.",
+      "ko": "방울을 세며 피를 흘렸다."
+    },
+    "death.killer.status_burn": {
+      "en": "The fire was warm, at least.",
+      "ko": "적어도 불은 따뜻했다."
+    },
+    "death.killer.status_poison": {
+      "en": "The poison finished what the fight began.",
+      "ko": "독이 싸움이 남긴 일을 끝냈다."
+    },
+    "death.killer.unknown_name": {
+      "en": "Something",
+      "ko": "무언가"
+    },
+    "death.t1.0": {
+      "en": "The dark takes you. Quietly.",
+      "ko": "어둠이 당신을 조용히 데려간다."
+    },
+    "death.t1.1": {
+      "en": "So this is how it ends.",
+      "ko": "결국 이렇게 끝나는구나."
+    },
+    "death.t1.2": {
+      "en": "The floor gives way beneath you.",
+      "ko": "발밑의 바닥이 꺼진다."
+    },
+    "death.t2.0": {
+      "en": "You were sure that was the end.",
+      "ko": "분명 이게 끝이라고 생각했다."
+    },
+    "death.t2.1": {
+      "en": "The tunnel is not finished with you.",
+      "ko": "터널은 아직 당신을 놓아주지 않는다."
+    },
+    "death.t2.2": {
+      "en": "Cold stone. A fall. Again.",
+      "ko": "차가운 돌. 추락. 또다시."
+    },
+    "death.t3.0": {
+      "en": "You know this fall by heart now.",
+      "ko": "이 추락은 이제 눈 감고도 안다."
+    },
+    "death.t3.1": {
+      "en": "How many times has it been?",
+      "ko": "벌써 몇 번째일까?"
+    },
+    "death.t3.2": {
+      "en": "Dying is starting to feel like routine.",
+      "ko": "죽는 일이 일상처럼 느껴지기 시작한다."
+    },
+    "death.t4.0": {
+      "en": "You stopped counting. The walls didn't.",
+      "ko": "세는 건 그만뒀다. 벽은 아니었다."
+    },
+    "death.t4.1": {
+      "en": "{killer}. You don't even flinch anymore.",
+      "ko": "{killer}. 이제 놀라지도 않는다."
+    },
+    "death.t4.2": {
+      "en": "Nobody is coming. Nobody ever did.",
+      "ko": "아무도 오지 않는다. 한 번도 온 적 없다."
+    },
+    "death.t5.0": {
+      "en": "Even wanting to leave has gone quiet.",
+      "ko": "떠나고 싶다는 마음마저 조용해졌다."
+    },
+    "death.t5.1": {
+      "en": "{killer}. Of course it was.",
+      "ko": "{killer}. 역시 그랬다."
+    },
+    "death.t5.2": {
+      "en": "Down here, at least, you know what to expect.",
+      "ko": "적어도 여기서는 무엇이 올지 안다."
     },
     "dialogue.after_class_chest_archer.0": {
       "en": "Light. Balanced.",
@@ -2832,6 +3044,130 @@
       "en": "Merchant",
       "ko": "상인"
     },
+    "note.carved_arrow.0": {
+      "en": "An arrow is carved here, pointing up.",
+      "ko": "위쪽을 가리키는 화살표가 새겨져 있다."
+    },
+    "note.carved_arrow.1": {
+      "en": "Someone crossed it out. Beneath it, one word:",
+      "ko": "누군가 그 위에 줄을 긋고, 아래에 한 단어를 남겼다."
+    },
+    "note.carved_arrow.2": {
+      "en": "\"Don't.\"",
+      "ko": "\"가지 마.\""
+    },
+    "note.carved_arrow.title": {
+      "en": "Carved arrow",
+      "ko": "새겨진 화살표"
+    },
+    "note.lost_others.0": {
+      "en": "A letter that stops in the middle of a sentence.",
+      "ko": "문장 중간에서 끊긴 편지."
+    },
+    "note.lost_others.1": {
+      "en": "\"The others went ahead. Or I did. I can't tell anymore.\"",
+      "ko": "\"다른 이들이 먼저 갔다. 아니면 내가. 이제 모르겠다.\""
+    },
+    "note.lost_others.2": {
+      "en": "\"I keep calling for them. Only the walls answer.\"",
+      "ko": "\"계속 불러보지만 벽만 대답한다.\""
+    },
+    "note.lost_others.title": {
+      "en": "Unfinished letter",
+      "ko": "쓰다 만 편지"
+    },
+    "note.map_page.0": {
+      "en": "A page torn from a survey book. Your handwriting.",
+      "ko": "측량 수첩에서 뜯긴 한 장. 당신의 필체다."
+    },
+    "note.map_page.1": {
+      "en": "\"No tunnel here. Not on any map I ever drew.\"",
+      "ko": "\"이곳에 터널은 없다. 내가 그린 어떤 지도에도.\""
+    },
+    "note.map_page.2": {
+      "en": "The ink still looks wet. You don't remember writing it.",
+      "ko": "잉크가 아직 젖어 있다. 쓴 기억은 없다."
+    },
+    "note.map_page.title": {
+      "en": "Torn survey page",
+      "ko": "찢어진 측량 기록"
+    },
+    "note.mapmaker_scrap.0": {
+      "en": "A scrap of paper in your own hand:",
+      "ko": "당신의 필체로 쓰인 쪽지."
+    },
+    "note.mapmaker_scrap.1": {
+      "en": "\"The fall was no accident. It wanted a mapmaker.\"",
+      "ko": "\"추락은 사고가 아니었다. 터널은 지도 제작자를 원했다.\""
+    },
+    "note.mapmaker_scrap.2": {
+      "en": "\"Someone who would map it, and come back to map it again.\"",
+      "ko": "\"그리고 돌아와서 다시 지도를 그릴 사람을.\""
+    },
+    "note.mapmaker_scrap.title": {
+      "en": "Mapmaker's scrap",
+      "ko": "지도 제작자의 쪽지"
+    },
+    "note.six_marks.0": {
+      "en": "Six scratches in a row, tidy as a ledger.",
+      "ko": "장부처럼 가지런한 긁힘 여섯 개."
+    },
+    "note.six_marks.1": {
+      "en": "Beside them, in a shakier hand: \"Stop counting.\"",
+      "ko": "그 옆에 떨리는 필체로: \"세지 마.\""
+    },
+    "note.six_marks.2": {
+      "en": "\"It only counts you back.\"",
+      "ko": "\"세면, 터널도 너를 센다.\""
+    },
+    "note.six_marks.title": {
+      "en": "Six marks",
+      "ko": "여섯 줄의 흔적"
+    },
+    "note.three_marks.0": {
+      "en": "Three short scratches in the stone.",
+      "ko": "돌에 짧은 긁힘이 세 개 있다."
+    },
+    "note.three_marks.1": {
+      "en": "You made these. You don't remember making them.",
+      "ko": "당신이 새긴 것이다. 새긴 기억은 없다."
+    },
+    "note.three_marks.title": {
+      "en": "Three marks",
+      "ko": "세 줄의 흔적"
+    },
+    "note.wall_breath.0": {
+      "en": "Scratched deep into the stone, slowly and carefully:",
+      "ko": "돌에 깊고 신중하게 새겨져 있다."
+    },
+    "note.wall_breath.1": {
+      "en": "\"It breathes. Hold still and you can feel it.\"",
+      "ko": "\"숨을 쉰다. 가만히 있으면 느껴진다.\""
+    },
+    "note.wall_breath.2": {
+      "en": "\"Every step goes deeper. None of them go back.\"",
+      "ko": "\"한 걸음마다 더 깊어진다. 돌아가는 길은 없다.\""
+    },
+    "note.wall_breath.title": {
+      "en": "Wall scratches",
+      "ko": "벽의 긁힌 자국"
+    },
+    "note.wall_of_marks.0": {
+      "en": "Ten scratches. Then more, far older than yours.",
+      "ko": "긁힘 열 개. 그 너머로 훨씬 오래된 자국들."
+    },
+    "note.wall_of_marks.1": {
+      "en": "Some are in other hands.",
+      "ko": "일부는 다른 사람의 손길이다."
+    },
+    "note.wall_of_marks.2": {
+      "en": "You are not the first to wake down here.",
+      "ko": "여기서 눈을 뜬 사람은 당신이 처음이 아니다."
+    },
+    "note.wall_of_marks.title": {
+      "en": "A wall of marks",
+      "ko": "흔적으로 가득한 벽"
+    },
     "pause.option.abandon": {
       "en": "Abandon Run",
       "ko": "도전 포기"
@@ -2915,6 +3251,26 @@
     "runflow.floor": {
       "en": "Floor reached: {n}",
       "ko": "도달한 층: {n}"
+    },
+    "runflow.sum.class": {
+      "en": "Class",
+      "ko": "직업"
+    },
+    "runflow.sum.falls": {
+      "en": "Falls so far",
+      "ko": "지금까지 추락"
+    },
+    "runflow.sum.floor": {
+      "en": "Floor reached",
+      "ko": "도달한 층"
+    },
+    "runflow.sum.kills": {
+      "en": "Foes beaten",
+      "ko": "쓰러뜨린 적"
+    },
+    "runflow.sum.level": {
+      "en": "Level",
+      "ko": "레벨"
     },
     "runflow.title": {
       "en": "The tunnel keeps you.",
@@ -3500,6 +3856,10 @@
       "en": "Cut",
       "ko": "자르다"
     },
+    "skill.name.skill_gore": {
+      "en": "Gore",
+      "ko": "뿔치기"
+    },
     "skill.name.skill_hilt_bash": {
       "en": "Hilt Bash",
       "ko": "힐트 배쉬"
@@ -3519,6 +3879,10 @@
     "skill.name.skill_muscle_up": {
       "en": "Muscle Up",
       "ko": "머슬업"
+    },
+    "skill.name.skill_pale_hymn": {
+      "en": "Pale Hymn",
+      "ko": "창백한 찬가"
     },
     "skill.name.skill_poison_arrow": {
       "en": "Poison Arrow",
@@ -3540,6 +3904,10 @@
       "en": "Rampage",
       "ko": "날 뛰기"
     },
+    "skill.name.skill_regrow": {
+      "en": "Regrow",
+      "ko": "재생"
+    },
     "skill.name.skill_rev_up": {
       "en": "Rev Up",
       "ko": "레브업"
@@ -3547,6 +3915,10 @@
     "skill.name.skill_scorching_touch": {
       "en": "Scorching Touch",
       "ko": "뜨거운 손길"
+    },
+    "skill.name.skill_snuff": {
+      "en": "Snuff",
+      "ko": "꺼뜨리기"
     },
     "skill.name.skill_solidify": {
       "en": "Solidify",
@@ -3755,6 +4127,22 @@
     "ui.skip_hold": {
       "en": "Hold to skip",
       "ko": "길게 눌러 건너뛰기"
+    },
+    "wake.t1": {
+      "en": "You wake where you first fell. Alive.",
+      "ko": "처음 떨어진 곳에서 눈을 뜬다. 살아 있다."
+    },
+    "wake.t2": {
+      "en": "The same stone. The same cold. You wake again.",
+      "ko": "같은 돌바닥. 같은 냉기. 다시 눈을 뜬다."
+    },
+    "wake.t3": {
+      "en": "You wake at the entrance. It almost feels like home.",
+      "ko": "입구에서 눈을 뜬다. 어쩐지 집처럼 느껴진다."
+    },
+    "wake.t4": {
+      "en": "You wake. You no longer ask why.",
+      "ko": "눈을 뜬다. 더는 이유를 묻지 않는다."
     }
   }
 }

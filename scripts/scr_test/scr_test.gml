@@ -70,6 +70,7 @@ function Test_RunAll() {
     Test_RunSuite("Status", Test_Suite_Status);
     Test_RunSuite("StatusRules", Test_Suite_StatusRules);
     Test_RunSuite("Turns", Test_Suite_Turns);
+    Test_RunSuite("EnemyAI", Test_Suite_EnemyAI);
     Test_RunSuite("Inventory", Test_Suite_Inventory);
     Test_RunSuite("Data", Test_Suite_Data);
     Test_RunSuite("Export", Test_Suite_Export);
@@ -86,6 +87,7 @@ function Test_RunAll() {
     Test_RunSuite("Profile", Test_Suite_Profile);
     Test_RunSuite("RunSave", Test_Suite_RunSave);
     Test_RunSuite("RunLoop", Test_Suite_RunLoop);
+    Test_RunSuite("Story", Test_Suite_Story);
     Test_RunSuite("Cards", Test_Suite_Cards);
     Test_RunSuite("Economy", Test_Suite_Economy);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
@@ -1484,6 +1486,404 @@ function Test_Suite_Turns() {
 }
 
 // Inventory rules (balance-data.md section 6; combat-bugs.md section 4; R-003 skill books appear twice).
+// Packet B4 (combat-spec.md section 12; D7 D59 D68 D75 D79). Expected values come from the spec text (rule table, phases, formulas), not from the code.
+function Test_AICtx(_turn = 1, _phase = 0) {
+    return { turn: _turn, phase: _phase, uses: {}, windup: -1, used_turn: [], actions_left: 1, force_damage_only: false };
+}
+
+// _n choices from one stream (nothing changes between them): the skill ids, -1 for the basic attack.
+function Test_AIDraws(_e, _p, _ctx, _seed, _n) {
+    var _rng = Rng_New(_seed, "combat");
+    var _out = [];
+    for (var _i = 0; _i < _n; _i++) array_push(_out, EnemyAI_Choose(_e, _p, _ctx, _rng).skill_id);
+    return _out;
+}
+
+function Test_AICount(_arr, _v) {
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_arr); _i++) { if (_arr[_i] == _v) _n++; }
+    return _n;
+}
+
+function Test_AICond(_c, _v = 0, _status = -1) {
+    return { c: _c, v: _v, status: _status };
+}
+
+// Does a one-rule brain (cond -> Bite, no weights) fire for this enemy / player / context?
+function Test_AIRuleFires(_cond, _e, _p, _ctx) {
+    _e.skills = [SKILL_BITE];
+    _e.brain = { rules: [ { label: "t", when: [_cond], act: "skill", skill: SKILL_BITE, chance: 1, max_uses: -1 } ], weights: [], phases: [] };
+    return EnemyAI_Choose(_e, _p, _ctx, Rng_New(1, "combat")).skill_id == SKILL_BITE;
+}
+
+function Test_Suite_EnemyAI() {
+    GameState_Get();
+    EnemyDB_Init(); SkillDB_Init(); StatusDB_Init();
+    var _p = CharacterCreate_Player(CLASS_KNIGHT);
+
+    // ---- the brain is data on every enemy, and it only names what exists ----
+    var _ids = [ENEMY_SLIME, ENEMY_SPIDER, ENEMY_SNAKE, ENEMY_DIREWOLF, ENEMY_MADWHISP, ENEMY_KILLER_PLANT, ENEMY_GHOSTSWORD, ENEMY_STRANGER, ENEMY_MINI_BOSS, ENEMY_FINAL_BOSS];
+    var _data_bad = "";
+    for (var _i = 0; _i < array_length(_ids); _i++) {
+        var _en = EnemyCreate(_ids[_i]);
+        if (!variable_struct_exists(_en, "brain")) { _data_bad += " " + _en.name + ":no-brain"; continue; }
+        var _b = _en.brain;
+        var _prev_at = 2;
+        Test_Eq("AI data: " + _en.name + " has " + (_en.is_boss ? "2 phases" : "no phases"), array_length(_b.phases), _en.is_boss ? 2 : 0);
+        for (var _k = 0; _k <= array_length(_b.phases); _k++) {
+            var _lists = EnemyAI_Lists(_b, _k);
+            var _labels = {};   // a label is unique within one list (a phase may keep a rule of the base list)
+            var _wsum = 0;
+            for (var _r = 0; _r < array_length(_lists.rules); _r++) {
+                var _rule = _lists.rules[_r];
+                if (variable_struct_exists(_labels, _rule.label)) _data_bad += " " + _en.name + ":dup-label-" + _rule.label;
+                variable_struct_set(_labels, _rule.label, true);
+                for (var _c = 0; _c < array_length(_rule.when); _c++) {
+                    if (!EnemyAI_KnownCond(_rule.when[_c].c)) _data_bad += " " + _en.name + ":cond-" + string(_rule.when[_c].c);
+                    if (_rule.when[_c].c == "every_nth" && _rule.when[_c].v < 2) _data_bad += " " + _en.name + ":nth<2";
+                }
+                if (_rule.act == "skill" && !array_contains(_en.skills, _rule.skill)) _data_bad += " " + _en.name + ":rule-skill-" + string(_rule.skill);
+                if (_rule.act != "skill" && _rule.act != "attack") _data_bad += " " + _en.name + ":do-" + string(_rule.act);
+            }
+            for (var _w = 0; _w < array_length(_lists.weights); _w++) {
+                var _wt = _lists.weights[_w];
+                _wsum += _wt.w;
+                if (_wt.act == "skill" && !array_contains(_en.skills, _wt.skill)) _data_bad += " " + _en.name + ":weight-skill-" + string(_wt.skill);
+            }
+            if (_wsum <= 0) _data_bad += " " + _en.name + ":no-weights-in-list-" + string(_k);
+            if (_k >= 1) {
+                if (_b.phases[_k - 1].at >= _prev_at) _data_bad += " " + _en.name + ":phases-not-falling";
+                _prev_at = _b.phases[_k - 1].at;
+            }
+        }
+    }
+    Test_Eq("AI data: every brain is complete (bad:" + _data_bad + ")", _data_bad, "");
+
+    // ---- each condition type fires when true and not when false ----
+    var _low = EnemyCreate(ENEMY_SLIME);
+    _low.hp = 3;   // 3 / 9
+    var _pl = CharacterCreate_Player(CLASS_KNIGHT);
+    _pl.hp = floor(_pl.max_hp * 0.4);
+    var _pbuff = CharacterCreate_Player(CLASS_KNIGHT);
+    _pbuff = Status_Add(_pbuff, STATUS_CRIT_UP, 3, 0);
+    var _ppoi = CharacterCreate_Player(CLASS_KNIGHT);
+    _ppoi = Status_Add(_ppoi, STATUS_POISON, 2, 0, 2);
+    var _sbleed = EnemyCreate(ENEMY_SLIME);
+    _sbleed = Status_Add(_sbleed, STATUS_BLEED, 3, 0);
+    Test_True("AI cond always: fires", Test_AIRuleFires(Test_AICond("always"), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_True("AI cond hp_below 0.5: fires at 3/9", Test_AIRuleFires(Test_AICond("hp_below", 0.5), _low, _p, Test_AICtx()));
+    Test_False("AI cond hp_below 0.5: not at full HP", Test_AIRuleFires(Test_AICond("hp_below", 0.5), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_True("AI cond hp_above 0.5: fires at full HP", Test_AIRuleFires(Test_AICond("hp_above", 0.5), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_False("AI cond hp_above 0.5: not at 3/9", Test_AIRuleFires(Test_AICond("hp_above", 0.5), _low, _p, Test_AICtx()));
+    Test_True("AI cond player_hp_below 0.5: fires at 40%", Test_AIRuleFires(Test_AICond("player_hp_below", 0.5), EnemyCreate(ENEMY_SLIME), _pl, Test_AICtx()));
+    Test_False("AI cond player_hp_below 0.5: not at full HP", Test_AIRuleFires(Test_AICond("player_hp_below", 0.5), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_True("AI cond player_buffed: fires with Take Aim", Test_AIRuleFires(Test_AICond("player_buffed"), EnemyCreate(ENEMY_SLIME), _pbuff, Test_AICtx()));
+    Test_False("AI cond player_buffed: not with nothing", Test_AIRuleFires(Test_AICond("player_buffed"), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_False("AI cond player_buffed: a debuff (Poison) is not a buff", Test_AIRuleFires(Test_AICond("player_buffed"), EnemyCreate(ENEMY_SLIME), _ppoi, Test_AICtx()));
+    Test_True("AI cond player_has_status Poison: fires when poisoned", Test_AIRuleFires(Test_AICond("player_has_status", 0, STATUS_POISON), EnemyCreate(ENEMY_SLIME), _ppoi, Test_AICtx()));
+    Test_False("AI cond player_has_status Poison: not when clean", Test_AIRuleFires(Test_AICond("player_has_status", 0, STATUS_POISON), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_True("AI cond player_missing_status Poison: fires when clean", Test_AIRuleFires(Test_AICond("player_missing_status", 0, STATUS_POISON), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_False("AI cond player_missing_status Poison: not when poisoned", Test_AIRuleFires(Test_AICond("player_missing_status", 0, STATUS_POISON), EnemyCreate(ENEMY_SLIME), _ppoi, Test_AICtx()));
+    Test_True("AI cond player_status_at_least Poison 2: fires with 2 stacks", Test_AIRuleFires(Test_AICond("player_status_at_least", 2, STATUS_POISON), EnemyCreate(ENEMY_SLIME), _ppoi, Test_AICtx()));
+    Test_False("AI cond player_status_at_least Poison 3: not with 2 stacks", Test_AIRuleFires(Test_AICond("player_status_at_least", 3, STATUS_POISON), EnemyCreate(ENEMY_SLIME), _ppoi, Test_AICtx()));
+    Test_True("AI cond self_has_status Bleeding: fires when bleeding", Test_AIRuleFires(Test_AICond("self_has_status", 0, STATUS_BLEED), _sbleed, _p, Test_AICtx()));
+    Test_False("AI cond self_has_status Bleeding: not when clean", Test_AIRuleFires(Test_AICond("self_has_status", 0, STATUS_BLEED), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_True("AI cond self_missing_status Bleeding: fires when clean", Test_AIRuleFires(Test_AICond("self_missing_status", 0, STATUS_BLEED), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_False("AI cond self_missing_status Bleeding: not when bleeding", Test_AIRuleFires(Test_AICond("self_missing_status", 0, STATUS_BLEED), _sbleed, _p, Test_AICtx()));
+    Test_True("AI cond every_nth 2: fires on turn 2", Test_AIRuleFires(Test_AICond("every_nth", 2), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx(2)));
+    Test_False("AI cond every_nth 2: not on turn 3", Test_AIRuleFires(Test_AICond("every_nth", 2), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx(3)));
+    Test_True("AI cond every_nth 2: fires on turn 4", Test_AIRuleFires(Test_AICond("every_nth", 2), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx(4)));
+    Test_False("AI an unknown condition never fires", Test_AIRuleFires(Test_AICond("no_such_cond"), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_False("AI EnemyAI_KnownCond says no to a made-up name", EnemyAI_KnownCond("no_such_cond"));
+
+    // ---- Slime: defend when hurt (spec table) ----
+    var _sl = EnemyCreate(ENEMY_SLIME);
+    _sl.hp = 4;   // 4 / 9 = 44% <= 50%
+    var _ch = EnemyAI_Choose(_sl, _p, Test_AICtx(), Rng_New(5, "combat"));
+    Test_True("AI Slime at 44% HP uses Solidify by rule solidify_when_hurt", _ch.kind == "skill" && _ch.skill_id == SKILL_SOLIDIFY && _ch.rule == "solidify_when_hurt");
+    var _sl_ok = EnemyCreate(ENEMY_SLIME);
+    var _d = Test_AIDraws(_sl_ok, _p, Test_AICtx(), 5, 300);
+    Test_True("AI Slime at full HP: Solidify only from the weights (about 1 in 5), attack otherwise", Test_AICount(_d, SKILL_SOLIDIFY) >= 30 && Test_AICount(_d, SKILL_SOLIDIFY) <= 90 && Test_AICount(_d, -1) >= 210);
+    var _sl_solid = EnemyCreate(ENEMY_SLIME);
+    _sl_solid.hp = 4;
+    _sl_solid = Status_Add(_sl_solid, STATUS_SOLIDIFY, 2, 0);
+    Test_Eq("AI Slime that is already Solid never casts Solidify again", Test_AICount(Test_AIDraws(_sl_solid, _p, Test_AICtx(), 5, 100), SKILL_SOLIDIFY), 0);
+
+    // ---- Spider: a poison stack cap and an opener (spec table) ----
+    var _sp = EnemyCreate(ENEMY_SPIDER);
+    var _p4 = CharacterCreate_Player(CLASS_KNIGHT);
+    _p4 = Status_Add(_p4, STATUS_POISON, 4, 0, 4);
+    var _c4 = EnemyAI_Choose(_sp, _p4, Test_AICtx(), Rng_New(2, "combat"));
+    Test_True("AI Spider vs 4 Poison stacks: plain attack by rule no_stacking_past_4", _c4.skill_id == -1 && _c4.rule == "no_stacking_past_4");
+    Test_Eq("AI Spider vs 4 Poison stacks never uses Poison Fangs", Test_AICount(Test_AIDraws(_sp, _p4, Test_AICtx(), 2, 100), SKILL_POISON_FANGS), 0);
+    var _p3 = CharacterCreate_Player(CLASS_KNIGHT);
+    _p3 = Status_Add(_p3, STATUS_POISON, 3, 0, 3);
+    var _d3 = Test_AIDraws(_sp, _p3, Test_AICtx(), 2, 200);
+    Test_True("AI Spider vs 3 stacks: Poison Fangs from the weights only (about 1 in 4)", Test_AICount(_d3, SKILL_POISON_FANGS) >= 25 && Test_AICount(_d3, SKILL_POISON_FANGS) <= 80);
+    var _d0 = Test_AIDraws(_sp, _p, Test_AICtx(), 2, 300);
+    Test_True("AI Spider vs a clean player: Poison Fangs about 70% (60% rule, then the weights)", Test_AICount(_d0, SKILL_POISON_FANGS) >= 150 && Test_AICount(_d0, SKILL_POISON_FANGS) <= 250);
+    Test_True("AI Spider keeps some randomness: the plain attack still happens", Test_AICount(_d0, -1) >= 30);
+
+    // ---- Snake ----
+    var _sn = EnemyCreate(ENEMY_SNAKE);
+    var _pb3 = CharacterCreate_Player(CLASS_KNIGHT);
+    _pb3 = Status_Add(_pb3, STATUS_BLEED, 3, 0, 3);
+    Test_Eq("AI Snake vs 3 Bleeding stacks never bites", Test_AICount(Test_AIDraws(_sn, _pb3, Test_AICtx(), 4, 100), SKILL_BITE), 0);
+    var _dsn = Test_AIDraws(_sn, _p, Test_AICtx(), 4, 300);
+    Test_True("AI Snake vs a clean player: Bite about 67% (50% rule, then 1 in 3)", Test_AICount(_dsn, SKILL_BITE) >= 150 && Test_AICount(_dsn, SKILL_BITE) <= 250);
+
+    // ---- Dire Wolf: howl first, then fight ----
+    var _wo = EnemyCreate(ENEMY_DIREWOLF);
+    var _dwo = Test_AIDraws(_wo, _p, Test_AICtx(), 9, 300);
+    Test_True("AI Dire Wolf without Bloodthirsty: howls about half the time", Test_AICount(_dwo, SKILL_BLOODTHIRSTY) >= 110 && Test_AICount(_dwo, SKILL_BLOODTHIRSTY) <= 190);
+    var _wo2 = EnemyCreate(ENEMY_DIREWOLF);
+    _wo2 = Status_Add(_wo2, STATUS_BLOODTHIRSTY, 4, 0);
+    Test_Eq("AI Dire Wolf with Bloodthirsty never howls again", Test_AICount(Test_AIDraws(_wo2, _p, Test_AICtx(), 9, 100), SKILL_BLOODTHIRSTY), 0);
+
+    // ---- Mad Whisp: a buffed player gets Snuffed ----
+    var _wi = EnemyCreate(ENEMY_MADWHISP);
+    var _cb = EnemyAI_Choose(_wi, _pbuff, Test_AICtx(), Rng_New(3, "combat"));
+    Test_True("AI Mad Whisp vs a buffed player: Snuff by rule snuff_buffs", _cb.kind == "skill" && _cb.skill_id == SKILL_SNUFF && _cb.rule == "snuff_buffs");
+    Test_Eq("AI Mad Whisp vs a buffed player: every one of 30 choices is Snuff", Test_AICount(Test_AIDraws(_wi, _pbuff, Test_AICtx(), 3, 30), SKILL_SNUFF), 30);
+    var _pguard = CharacterCreate_Player(CLASS_KNIGHT);
+    _pguard = Status_Add(_pguard, STATUS_GUARD, 2, 0);
+    Test_Eq("AI Mad Whisp also answers Guard", EnemyAI_Choose(_wi, _pguard, Test_AICtx(), Rng_New(3, "combat")).skill_id, SKILL_SNUFF);
+    Test_Eq("AI Mad Whisp vs a poisoned (not buffed) player never Snuffs", Test_AICount(Test_AIDraws(_wi, _ppoi, Test_AICtx(), 3, 100), SKILL_SNUFF), 0);
+    var _dwi = Test_AIDraws(_wi, _p, Test_AICtx(), 3, 300);
+    Test_True("AI Mad Whisp default: Scorching Touch about 40%, attack about 60%", Test_AICount(_dwi, SKILL_SCORCHING_TOUCH) >= 90 && Test_AICount(_dwi, SKILL_SCORCHING_TOUCH) <= 150 && Test_AICount(_dwi, -1) >= 150);
+
+    // ---- Killer Plant: heal when low (once), a telegraphed Vine Trap every 3rd turn ----
+    var _kp = EnemyCreate(ENEMY_KILLER_PLANT);
+    var _kp_low = EnemyCreate(ENEMY_KILLER_PLANT);
+    _kp_low.hp = floor(_kp_low.max_hp * 0.3);
+    var _ck = EnemyAI_Choose(_kp_low, _p, Test_AICtx(), Rng_New(1, "combat"));
+    Test_True("AI Killer Plant at 30% HP: Regrow by rule low_hp_heal", _ck.kind == "skill" && _ck.skill_id == SKILL_REGROW && _ck.rule == "low_hp_heal");
+    var _ctx_used = Test_AICtx();
+    variable_struct_set(_ctx_used.uses, "low_hp_heal", 1);
+    Test_True("AI Killer Plant already healed once: the heal rule is spent (max_uses 1)", EnemyAI_Choose(_kp_low, _p, _ctx_used, Rng_New(1, "combat")).rule != "low_hp_heal");
+    Test_Eq("AI Killer Plant at full HP never heals", Test_AICount(Test_AIDraws(_kp, _p, Test_AICtx(), 1, 60), SKILL_REGROW), 0);
+    var _kp_expect = ["attack", "attack", "windup", "attack", "attack", "windup", "attack", "attack", "windup"];
+    var _kp_got = true;
+    var _kp_txt = "";
+    for (var _t = 1; _t <= 9; _t++) {
+        var _ct = EnemyAI_Choose(_kp, _p, Test_AICtx(_t), Rng_New(1, "combat"));
+        _kp_txt += " " + _ct.kind;
+        if (_ct.kind != _kp_expect[_t - 1]) _kp_got = false;
+        if (_ct.kind == "windup" && (_ct.skill_id != SKILL_VINE_TRAP || _ct.rule != "vine_every_3rd")) _kp_got = false;
+    }
+    Test_True("AI Killer Plant turns 1..9: attack attack WINDUP (Vine Trap) every 3rd (got:" + _kp_txt + ")", _kp_got);
+    Test_True("AI Killer Plant: a hurt plant on turn 3 heals first (the rules are a priority list)", EnemyAI_Choose(_kp_low, _p, Test_AICtx(3), Rng_New(1, "combat")).skill_id == SKILL_REGROW);
+
+    // ---- Ghost Sword ----
+    var _gs = EnemyCreate(ENEMY_GHOSTSWORD);
+    var _gs_ok = true;
+    for (var _tg = 1; _tg <= 7; _tg++) {
+        var _cg = EnemyAI_Choose(_gs, _p, Test_AICtx(_tg), Rng_New(1, "combat"));
+        var _want_w = (_tg mod 3 == 0);
+        if ((_cg.kind == "windup") != _want_w) _gs_ok = false;
+        if (_want_w && _cg.skill_id != SKILL_GHOST_CUT) _gs_ok = false;
+    }
+    Test_True("AI Ghost Sword: a telegraphed Cut on turns 3 and 6 only", _gs_ok);
+
+    // ---- Stranger: grabs when hurt, once; Steal needs something to steal ----
+    var _st = EnemyCreate(ENEMY_STRANGER);
+    _st.hp = floor(_st.max_hp * 0.4);
+    var _pinv = CharacterCreate_Player(CLASS_KNIGHT);
+    _pinv.inventory = Inv_Add([], 10, 2);
+    var _cs = EnemyAI_Choose(_st, _pinv, Test_AICtx(), Rng_New(1, "combat"));
+    Test_True("AI Stranger at 40% HP vs a player with items: Steal by rule grab_when_hurt", _cs.skill_id == SKILL_STEAL && _cs.rule == "grab_when_hurt");
+    var _pnone = CharacterCreate_Player(CLASS_KNIGHT);
+    _pnone.inventory = [];
+    Test_Eq("AI Stranger vs a player with nothing to steal never uses Steal", Test_AICount(Test_AIDraws(_st, _pnone, Test_AICtx(), 1, 100), SKILL_STEAL), 0);
+    var _ctx_grab = Test_AICtx();
+    variable_struct_set(_ctx_grab.uses, "grab_when_hurt", 1);
+    Test_True("AI Stranger: the grab rule is once per battle", EnemyAI_Choose(_st, _pinv, _ctx_grab, Rng_New(1, "combat")).rule != "grab_when_hurt");
+
+    // ---- rule mechanics: skip what the enemy does not have, chance, telegraph, wind-up resolution, force ----
+    var _x = EnemyCreate(ENEMY_SLIME);
+    _x.skills = [];
+    _x.brain = { rules: [ { label: "r", when: [Test_AICond("always")], act: "skill", skill: SKILL_BITE, chance: 1, max_uses: -1 } ], weights: [ { act: "skill", skill: SKILL_BITE, w: 5 } ], phases: [] };
+    Test_Eq("AI a rule and a weight naming a skill the enemy lacks fall back to the basic attack", EnemyAI_Choose(_x, _p, Test_AICtx(), Rng_New(1, "combat")).skill_id, -1);
+    _x.skills = [SKILL_BITE];
+    _x.brain.rules[0].chance = 0.3;
+    _x.brain.weights = [];
+    var _dch = Test_AIDraws(_x, _p, Test_AICtx(), 11, 400);
+    Test_True("AI a rule with chance 0.3 fires about 30% of the time", Test_AICount(_dch, SKILL_BITE) >= 90 && Test_AICount(_dch, SKILL_BITE) <= 150);
+    var _y = EnemyCreate(ENEMY_SLIME);
+    _y.skills = [SKILL_VINE_TRAP];
+    _y.brain = { rules: [], weights: [ { act: "skill", skill: SKILL_VINE_TRAP, w: 1 } ], phases: [] };
+    var _cy = EnemyAI_Choose(_y, _p, Test_AICtx(), Rng_New(1, "combat"));
+    Test_True("AI a telegraphed skill chosen from the weights starts as a wind-up", _cy.kind == "windup" && _cy.skill_id == SKILL_VINE_TRAP);
+    var _ctx_w = Test_AICtx();
+    _ctx_w.windup = SKILL_VINE_TRAP;
+    var _rw = Rng_New(1, "combat");
+    var _cw = EnemyAI_Choose(_y, _p, _ctx_w, _rw);
+    Test_True("AI after a wind-up the big attack comes (rule windup_attack)", _cw.kind == "skill" && _cw.skill_id == SKILL_VINE_TRAP && _cw.rule == "windup_attack");
+    Test_Eq("AI resolving a wind-up draws no random number", _rw.calls, 0);
+    var _ctx_f = Test_AICtx();
+    _ctx_f.force_damage_only = true;
+    var _cf = EnemyAI_Choose(_y, _p, _ctx_f, Rng_New(1, "combat"));
+    Test_True("AI the debug damage-only switch skips the wind-up", _cf.kind == "skill" && _cf.skill_id == SKILL_VINE_TRAP);
+    var _pal = EnemyCreate(ENEMY_MINI_BOSS);
+    var _ctx_pf0 = Test_AICtx(1, 0);
+    _ctx_pf0.force_damage_only = true;
+    var _ctx_pf1 = Test_AICtx(1, 1);
+    _ctx_pf1.force_damage_only = true;
+    var _pf0 = Test_AIDraws(_pal, _p, _ctx_pf0, 3, 60);
+    var _pf1 = Test_AIDraws(_pal, _p, _ctx_pf1, 3, 60);
+    Test_Eq("AI the damage-only switch uses only the skills of the lists in force: Palehorn phase 0 is always Ramming", Test_AICount(_pf0, SKILL_RAMMING), 60);
+    Test_True("AI the damage-only switch in phase 1 also uses Gore", Test_AICount(_pf1, SKILL_GORE) > 0 && Test_AICount(_pf1, SKILL_RAMMING) > 0);
+    var _ctx_once = Test_AICtx();
+    _ctx_once.used_turn = [SKILL_BLESSING];
+    var _bl = EnemyCreate(ENEMY_FINAL_BOSS);
+    _bl.hp = floor(_bl.max_hp * 0.5);
+    _bl.brain = { rules: [ { label: "b", when: [Test_AICond("always")], act: "skill", skill: SKILL_BLESSING, chance: 1, max_uses: -1 } ], weights: [], phases: [] };
+    Test_Eq("AI a once-per-turn skill already used this turn is not chosen again", EnemyAI_Choose(_bl, _p, _ctx_once, Rng_New(1, "combat")).skill_id, -1);
+    Test_Eq("AI the same skill is fine when it was not used yet this turn", EnemyAI_Choose(_bl, _p, Test_AICtx(), Rng_New(1, "combat")).skill_id, SKILL_BLESSING);
+
+    // ---- determinism (the "combat" stream) ----
+    var _s1 = Test_AIDraws(_sp, _p, Test_AICtx(), 7, 100);
+    var _s2 = Test_AIDraws(_sp, _p, Test_AICtx(), 7, 100);
+    var _s3 = Test_AIDraws(_sp, _p, Test_AICtx(), 8, 100);
+    Test_True("AI the same seed gives the same 100 choices", Test_SameArray(_s1, _s2));
+    Test_False("AI another seed gives another sequence", Test_SameArray(_s1, _s3));
+    var _rs = Rng_New(7, "combat");
+    EnemyAI_Choose(_sp, _p, Test_AICtx(), _rs);
+    Test_True("AI the choice draws from the stream it is given", _rs.calls >= 1);
+
+    // ---- pure state: turn counter, wind-up, BREAK ----
+    var _stt = EnemyAI_StateNew();
+    Test_True("AI state starts at turn 1, phase 0, no wind-up", EnemyAI_Ctx(_stt).turn == 1 && EnemyAI_Ctx(_stt).phase == 0 && EnemyAI_Ctx(_stt).windup == -1);
+    Test_Eq("AI BREAK with no wind-up cancels nothing", EnemyAI_Break(_stt), -1);
+    EnemyAI_Take(_stt, { kind: "windup", skill_id: SKILL_RAMMING, rule: "ram_every_3rd" });
+    Test_Eq("AI a wind-up is remembered", EnemyAI_Ctx(_stt).windup, SKILL_RAMMING);
+    Test_Eq("AI a wind-up counts as a use of its rule", variable_struct_get(_stt.uses, "ram_every_3rd"), 1);
+    Test_Eq("AI BREAK during the wind-up cancels the big attack and says which", EnemyAI_Break(_stt), SKILL_RAMMING);
+    Test_Eq("AI after the cancel there is no wind-up", EnemyAI_Ctx(_stt).windup, -1);
+    Test_Eq("AI a second BREAK cancels nothing", EnemyAI_Break(_stt), -1);
+    EnemyAI_Take(_stt, { kind: "windup", skill_id: SKILL_RAMMING, rule: "ram_every_3rd" });
+    EnemyAI_Take(_stt, { kind: "skill", skill_id: SKILL_RAMMING, rule: "windup_attack" });
+    Test_Eq("AI the big attack ends the wind-up", EnemyAI_Ctx(_stt).windup, -1);
+    Test_Eq("AI the big attack is not counted as another use of the rule (2 wind-ups so far)", variable_struct_get(_stt.uses, "ram_every_3rd"), 2);
+    EnemyAI_EndTurn(_stt);
+    Test_Eq("AI a finished enemy turn moves the counter on", EnemyAI_Ctx(_stt).turn, 2);
+
+    // ---- skills: the heavy moves, the new moves ----
+    var _heavy = [SKILL_VINE_TRAP, SKILL_GHOST_CUT, SKILL_RAMMING, SKILL_PALE_HYMN];
+    var _light = [SKILL_POISON_FANGS, SKILL_BITE, SKILL_SCORCHING_TOUCH, SKILL_GORE, SKILL_REGROW, SKILL_SNUFF, SKILL_SOLIDIFY, SKILL_BLOODTHIRSTY, SKILL_STEAL, SKILL_CURSE, SKILL_BLESSING];
+    for (var _hi = 0; _hi < array_length(_heavy); _hi++) {
+        var _hs = SkillDB_Get(_heavy[_hi]);
+        Test_True("AI " + _hs.name + " is a telegraphed heavy move with a defence bar", variable_struct_exists(_hs, "telegraphed") && _hs.telegraphed && _hs.uses_defensive_qte);
+        Test_True("AI " + _hs.name + " hits harder than a plain move (power_mult 1.5)", _hs.power_mult == 1.5);
+        Test_True("AI " + _hs.name + " has its own bar", Qte_DefenceParams(_heavy[_hi]).sweep_ms != Qte_BarParams("default").sweep_ms);
+        Test_True("AI " + _hs.name + " has a wind-up line that names the enemy", string_pos("Slimey", Skill_WindupText(_hs, "Slimey")) > 0);
+    }
+    for (var _li = 0; _li < array_length(_light); _li++) {
+        var _ls = SkillDB_Get(_light[_li]);
+        Test_False("AI " + _ls.name + " is not telegraphed", variable_struct_exists(_ls, "telegraphed") && _ls.telegraphed);
+    }
+    Test_Eq("AI Regrow heals the user: effect heal on self", SkillDB_Get(SKILL_REGROW).effect + string(SkillDB_Get(SKILL_REGROW).target), "heal" + string(TGT_SELF));
+    var _rg = EnemyCreate(ENEMY_KILLER_PLANT);
+    _rg.hp = 5;
+    var _rgr = Skill_Use(_rg, _rg, SKILL_REGROW);
+    Test_True("AI Regrow gives power 5 + floor(MAG/4) HP back (MAG 10 -> 7)", _rgr.ok && _rg.hp == 12);
+    var _rg2 = EnemyCreate(ENEMY_KILLER_PLANT);
+    _rg2.hp = _rg2.max_hp - 1;
+    Skill_Use(_rg2, _rg2, SKILL_REGROW);
+    Test_Eq("AI Regrow never heals past max HP", _rg2.hp, _rg2.max_hp);
+    var _sn_p = CharacterCreate_Player(CLASS_KNIGHT);
+    _sn_p = Status_Add(_sn_p, STATUS_CRIT_UP, 3, 0);
+    _sn_p = Status_Add(_sn_p, STATUS_GUARD, 2, 0);
+    _sn_p = Status_Add(_sn_p, STATUS_POISON, 2, 0, 2);
+    var _snr = Skill_Use(EnemyCreate(ENEMY_MADWHISP), _sn_p, SKILL_SNUFF);
+    Test_True("AI Snuff removes every buff of the player", _snr.ok && !Status_Has(_sn_p, STATUS_CRIT_UP) && !Status_Has(_sn_p, STATUS_GUARD));
+    Test_True("AI Snuff leaves the player's debuffs alone", Status_Has(_sn_p, STATUS_POISON));
+    Test_True("AI Snuff does no damage and says something", _snr.dmg == 0 && _snr.msg != "");
+    Test_True("AI Gore is a plain move with Bleeding and no bar", SkillDB_Get(SKILL_GORE).effect == "damage" && SkillDB_Get(SKILL_GORE).status == STATUS_BLEED && !Battle_EnemySkillCanBeDefended(SkillDB_Get(SKILL_GORE), { ok: true, hit: true, dmg: 5 }, _p));
+    Test_True("AI Pale Hymn is a MAG attack", SkillDB_Get(SKILL_PALE_HYMN).stat_type == STAT_MAG && SkillDB_Get(SKILL_PALE_HYMN).effect == "damage");
+
+    // ---- bosses: phases ----
+    var _bosses = [ENEMY_MINI_BOSS, ENEMY_FINAL_BOSS];
+    for (var _bi = 0; _bi < 2; _bi++) {
+        var _bb = EnemyCreate(_bosses[_bi]).brain;
+        var _bn = EnemyCreate(_bosses[_bi]).name;
+        Test_Eq("AI " + _bn + " at 100% is phase 0", EnemyAI_PhaseFor(_bb, 1.0), 0);
+        Test_Eq("AI " + _bn + " at 61% is still phase 0", EnemyAI_PhaseFor(_bb, 0.61), 0);
+        Test_Eq("AI " + _bn + " at 60% is phase 1", EnemyAI_PhaseFor(_bb, 0.60), 1);
+        Test_Eq("AI " + _bn + " at 31% is phase 1", EnemyAI_PhaseFor(_bb, 0.31), 1);
+        Test_Eq("AI " + _bn + " at 30% is phase 2", EnemyAI_PhaseFor(_bb, 0.30), 2);
+        Test_Eq("AI " + _bn + " at 1% is phase 2", EnemyAI_PhaseFor(_bb, 0.01), 2);
+    }
+    // Palehorn: the lists change with the phase
+    var _ph = EnemyCreate(ENEMY_MINI_BOSS);
+    Test_Eq("AI Palehorn phase 0 never uses Gore", Test_AICount(Test_AIDraws(_ph, _p, Test_AICtx(1, 0), 3, 300), SKILL_GORE), 0);
+    var _g1 = Test_AICount(Test_AIDraws(_ph, _p, Test_AICtx(1, 1), 3, 300), SKILL_GORE);
+    var _g2 = Test_AICount(Test_AIDraws(_ph, _p, Test_AICtx(1, 2), 3, 300), SKILL_GORE);
+    Test_True("AI Palehorn phase 1: Gore about 1 in 3", _g1 >= 60 && _g1 <= 140);
+    Test_True("AI Palehorn phase 2: Gore about 2 in 3", _g2 >= 160 && _g2 <= 240);
+    Test_True("AI Palehorn phase 0: Ramming is telegraphed on turn 3, not on turn 2", EnemyAI_Choose(_ph, _p, Test_AICtx(3, 0), Rng_New(1, "combat")).kind == "windup" && EnemyAI_Choose(_ph, _p, Test_AICtx(2, 0), Rng_New(1, "combat")).kind != "windup");
+    var _c2 = EnemyAI_Choose(_ph, _p, Test_AICtx(2, 2), Rng_New(1, "combat"));
+    Test_True("AI Palehorn phase 2: Ramming is telegraphed every 2nd turn", _c2.kind == "windup" && _c2.skill_id == SKILL_RAMMING && _c2.rule == "ram_every_2nd");
+    var _hy = EnemyCreate(ENEMY_FINAL_BOSS);
+    Test_True("AI Choirbeast phase 0: Pale Hymn telegraphed on turn 4 only", EnemyAI_Choose(_hy, _p, Test_AICtx(4, 0), Rng_New(1, "combat")).skill_id == SKILL_PALE_HYMN && EnemyAI_Choose(_hy, _p, Test_AICtx(3, 0), Rng_New(1, "combat")).kind != "windup");
+    Test_True("AI Choirbeast phase 1: Pale Hymn on turn 3", EnemyAI_Choose(_hy, _p, Test_AICtx(3, 1), Rng_New(1, "combat")).rule == "hymn_every_3rd");
+    Test_True("AI Choirbeast phase 2: Pale Hymn on turn 2", EnemyAI_Choose(_hy, _p, Test_AICtx(2, 2), Rng_New(1, "combat")).rule == "hymn_every_2nd");
+    var _hy_bless = EnemyCreate(ENEMY_FINAL_BOSS);
+    _hy_bless.hp = floor(_hy_bless.max_hp * 0.55);
+    var _bl_n = Test_AICount(Test_AIDraws(_hy_bless, _p, Test_AICtx(1, 1), 3, 300), SKILL_BLESSING);
+    Test_True("AI Choirbeast phase 1 without Blessing: casts it about half the time", _bl_n >= 110 && _bl_n <= 190);
+
+    // PhaseSync: forward only, SPD / ATK added, banner on the change, a skipped phase still counts
+    var _pst = EnemyAI_StateNew();
+    var _pb = EnemyCreate(ENEMY_MINI_BOSS);
+    var _spd0 = _pb.stats.spd;
+    var _atk0 = _pb.stats.atk;
+    Test_False("AI Palehorn at full HP: no phase change", EnemyAI_PhaseSync(_pst, _pb).changed);
+    _pb.hp = floor(_pb.max_hp * 0.55);
+    var _r1 = EnemyAI_PhaseSync(_pst, _pb);
+    Test_True("AI Palehorn at 55%: phase 1 with a banner", _r1.changed && _r1.phase == 1 && _r1.banner != "" && _pst.phase == 1);
+    Test_Eq("AI Palehorn phase 1: SPD +2", _pb.stats.spd, _spd0 + 2);
+    Test_Eq("AI Palehorn phase 1: ATK unchanged", _pb.stats.atk, _atk0);
+    Test_False("AI the same phase twice is not a change (no second SPD bonus)", EnemyAI_PhaseSync(_pst, _pb).changed || _pb.stats.spd != _spd0 + 2);
+    _pb.hp = _pb.max_hp;
+    Test_False("AI healing does not send a boss back a phase", EnemyAI_PhaseSync(_pst, _pb).changed || _pst.phase != 1);
+    _pb.hp = floor(_pb.max_hp * 0.2);
+    var _r2 = EnemyAI_PhaseSync(_pst, _pb);
+    Test_True("AI Palehorn at 20%: phase 2", _r2.changed && _r2.phase == 2 && _pst.phase == 2);
+    Test_Eq("AI Palehorn phase 2: SPD +4 in all", _pb.stats.spd, _spd0 + 4);
+    Test_Eq("AI Palehorn phase 2: ATK +3 (enrage)", _pb.stats.atk, _atk0 + 3);
+    var _fst = EnemyAI_StateNew();
+    var _fb = EnemyCreate(ENEMY_FINAL_BOSS);
+    var _fspd = _fb.stats.spd;
+    _fb.hp = floor(_fb.max_hp * 0.2);
+    var _rf = EnemyAI_PhaseSync(_fst, _fb);
+    Test_True("AI Choirbeast jumping from 100% to 20% reaches phase 2 at once", _rf.changed && _rf.phase == 2);
+    Test_Eq("AI Choirbeast skipping phase 1 still gets both SPD bonuses (+2 +3)", _fb.stats.spd, _fspd + 5);
+    Test_Eq("AI Choirbeast Fury is replaced by SPD: it has one action per turn even at 20% HP", Battle_EnemyActionBudget(_fb), 1);
+    Test_False("AI no enemy has Rampage any more", array_contains(EnemyCreate(ENEMY_MINI_BOSS).skills, SKILL_RAMPAGE));
+    Test_False("AI no enemy has Fury any more", array_contains(EnemyCreate(ENEMY_FINAL_BOSS).skills, SKILL_FINAL_FURY));
+    Test_True("AI Curse stays with the Choirbeast (B2)", array_contains(EnemyCreate(ENEMY_FINAL_BOSS).skills, SKILL_CURSE));
+    // the extra SPD is really more turns on the timeline
+    var _tl_a = Turn_New([Turn_Fighter(TL_PLAYER, 10), Turn_Fighter(TL_ENEMY, _spd0)]);
+    var _tl_b = Turn_New([Turn_Fighter(TL_PLAYER, 10), Turn_Fighter(TL_ENEMY, _spd0 + 4)]);
+    var _ea = 0; var _eb = 0;
+    for (var _tn = 0; _tn < 40; _tn++) {
+        if (Turn_Next(_tl_a) == TL_ENEMY) _ea++;
+        if (Turn_Next(_tl_b) == TL_ENEMY) _eb++;
+    }
+    Test_True("AI Palehorn in phase 2 gets more turns than in phase 0 (" + string(_ea) + " -> " + string(_eb) + " of 40)", _eb > _ea);
+
+    // ---- Foresight (D79): the wind-up is shown, and so is the big attack ----
+    var _pw = Battle_ActionPreviewOf({ skill_id: SKILL_RAMMING, kind: "windup" }, true);
+    Test_True("AI Foresight: a wind-up shows as kind windup, big, with the skill's name", _pw.visible && _pw.kind == "windup" && _pw.big && string_pos(SkillDB_Get(SKILL_RAMMING).name, _pw.name) > 0);
+    var _pa = Battle_ActionPreviewOf({ skill_id: SKILL_RAMMING, kind: "skill" }, true);
+    Test_True("AI Foresight: the big attack after it shows as a skill, big", _pa.visible && _pa.kind == "skill" && _pa.big && _pa.skill_id == SKILL_RAMMING);
+    Test_False("AI Foresight shows nothing without the status", Battle_ActionPreviewOf({ skill_id: SKILL_RAMMING, kind: "windup" }, false).visible);
+
+    // ---- the old per-skill use chances are gone (the weights replace them, D68) ----
+    Test_False("AI the old per-skill use chance is gone from the skill data", variable_struct_exists(SkillDB_Get(SKILL_BITE), "enemy_use_chance_min"));
+}
+
 function Test_Suite_Inventory() {
     Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL); // no skills learned yet
     var _max = ItemDB_Get(10).max_stack;
@@ -1512,12 +1912,12 @@ function Test_Suite_Inventory() {
 }
 
 // Data integrity over the GML databases (VER-11; R-003, R-004). ds_map_add silently drops a repeated key, so a
-// duplicate id shows up as a wrong record count; counts come from balance-data.md (23 items after the skill books went with D18, 27 skills, 14 statuses, 10 enemies).
+// duplicate id shows up as a wrong record count; counts come from balance-data.md (23 items after the skill books went with D18, 27 skills + 4 of packet B4, 14 statuses, 10 enemies).
 function Test_Suite_Data() {
     GameState_Get();
     ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init();
     Test_Eq("item count == 34 (23 + 4 throwables + 7 accessories, C3; no lost duplicate ids)", ds_map_size(global.item_db), 34);
-    Test_Eq("skill count == 27", ds_map_size(global.skill_db), 27);
+    Test_Eq("skill count == 31 (27 + Regrow, Snuff, Gore, Pale Hymn of packet B4)", ds_map_size(global.skill_db), 31);
     Test_Eq("status count == 14", ds_map_size(global.status_db), 14);
     Test_Eq("enemy count == 10", ds_map_size(global.enemy_db), 10);
     var _bad = 0; var _names = {}; var _dupnames = 0;
@@ -1587,7 +1987,7 @@ function Test_Suite_Export() {
     Test_True("Export: the data survives a JSON round trip", is_struct(_back) && _back.version == 1);
     Test_Eq("Export: 4 classes", array_length(_back.classes), 4);
     Test_Eq("Export: 10 enemies", array_length(_back.enemies), 10);
-    Test_Eq("Export: 27 skills", array_length(_back.skills), 27);
+    Test_Eq("Export: 31 skills (27 + the 4 of packet B4)", array_length(_back.skills), 31);
     Test_Eq("Export: 34 items (C3 adds 4 throwables and 7 accessories)", array_length(_back.items), 34);
     Test_Eq("Export: 51 cards (14 skills, 14 upgrades, 20 passives, 3 fallbacks)", array_length(_back.cards), 51);
     Test_Eq("Export: 14 statuses", array_length(_back.statuses), 14);
@@ -2933,6 +3333,214 @@ function Test_Suite_RunLoop() {
     Test_False("story: unseen events are not set", variable_struct_exists(_nf, "skillbook_first_read_done") && variable_struct_get(_nf, "skillbook_first_read_done") == true);
 
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+// ---- C5 story: death lines (D102-D104), wake line, boss banner (D106), lore notes (D107), closing text and credits (D105, D40) ----------
+// Expected values come from the decisions: tiers 1st / 2-3 / 4-6 / 7-10 / 11+, a killer line while the tone is still light, never a spoiler
+// of the ending (the raid party, the world outside), 2-4 s on screen, a ~1 s banner, 4 notes always plus 2 / 1 / 1 after 3 / 6 / 10 deaths.
+function Test_StoryJoin(_arr) {
+    var _s = "";
+    for (var _i = 0; _i < array_length(_arr); _i++) _s += string(_arr[_i]) + "\n";
+    return _s;
+}
+
+function Test_StoryVisibleNotes(_deaths) {
+    var _c = 0;
+    var _rooms = ["rm_floor1", "rm_floor2", "rm_floor3", "rm_floor4", "rm_floor5", "rm_floor6", "rm_floor6_5", "rm_floor7", "rm_floor8", "rm_floor9", "rm_floor9_5"];
+    for (var _r = 0; _r < array_length(_rooms); _r++) _c += array_length(Note_ForRoom(_rooms[_r], _deaths));
+    return _c;
+}
+
+function Test_Suite_Story() {
+    // --- death tiers (pure)
+    Test_Eq("D103 tier of the 1st death", DeathLine_Tier(1), 1);
+    Test_Eq("D103 tier of the 2nd death", DeathLine_Tier(2), 2);
+    Test_Eq("D103 tier of the 3rd death", DeathLine_Tier(3), 2);
+    Test_Eq("D103 tier of the 4th death", DeathLine_Tier(4), 3);
+    Test_Eq("D103 tier of the 6th death", DeathLine_Tier(6), 3);
+    Test_Eq("D103 tier of the 7th death", DeathLine_Tier(7), 4);
+    Test_Eq("D103 tier of the 10th death", DeathLine_Tier(10), 4);
+    Test_Eq("D103 tier of the 11th death", DeathLine_Tier(11), 5);
+    Test_Eq("D103 tier of the 80th death", DeathLine_Tier(80), 5);
+    Test_Eq("D103 tier of a count of 0 is the first", DeathLine_Tier(0), 1);
+
+    // --- the pick: tier first, killer second
+    var _p1 = DeathLine_Pick(1, "enemy_slime", 0);
+    Test_Eq("D103 1st death, slime: the slime line", _p1.key, "death.killer.enemy_slime");
+    Test_Eq("D103 1st death picks tier 1", _p1.tier, 1);
+    var _p1g = DeathLine_Pick(1, "enemy_slime", 1);
+    Test_True("D103 1st death, another salt: a tier 1 line", string_pos("death.t1.", _p1g.key) == 1);
+    var _p2 = DeathLine_Pick(2, "status_poison", 0);
+    Test_Eq("D103 2nd death, poison: the poison line", _p2.key, "death.killer.status_poison");
+    var _p3 = DeathLine_Pick(5, "enemy_spider", 0);
+    Test_Eq("D103 5th death, spider: the spider line", _p3.key, "death.killer.enemy_spider");
+    var _pa = DeathLine_Pick(2, "abandoned", 0);
+    Test_Eq("D103 abandoning has its own line", _pa.key, "death.killer.abandoned");
+    var _pu = DeathLine_Pick(1, "", 0);
+    Test_True("D103 no known killer: a plain tier 1 line", string_pos("death.t1.", _pu.key) == 1);
+    var _late = DeathLine_Pick(12, "enemy_spider", 0);
+    Test_True("D103 12th death never gets a light killer line", string_pos("death.killer.", _late.key) != 1);
+    Test_Eq("D103 12th death picks tier 5", _late.tier, 5);
+    var _tiers_ok = true;
+    for (var _d = 1; _d <= 14; _d++) {
+        for (var _salt = 0; _salt < 6; _salt++) {
+            var _pk = DeathLine_Pick(_d, (_salt mod 2 == 0) ? "enemy_snake" : "", _salt);
+            if (_pk.tier != DeathLine_Tier(_d) || _pk.text == "") _tiers_ok = false;
+            if (_pk.tier >= 4 && string_pos("death.killer.", _pk.key) == 1) _tiers_ok = false;
+        }
+    }
+    Test_True("D103 every count and salt gives a line of its tier, none light at 7+", _tiers_ok);
+    var _no_slot = true;
+    for (var _s1 = 0; _s1 < 6; _s1++) { if (string_pos("{killer}", DeathLine_Pick(11, "", _s1).text) > 0) _no_slot = false; }
+    for (var _s1b = 0; _s1b < 6; _s1b++) { if (string_pos("{killer}", DeathLine_Pick(11, "abandoned", _s1b).text) > 0) _no_slot = false; }
+    Test_True("D103 a {killer} line is not offered without a killer", _no_slot);
+    var _killer_line_late = false;
+    for (var _s2 = 0; _s2 < 6; _s2++) { if (string_pos("{killer}", DeathLine_Pick(8, "enemy_snake", _s2).text) > 0) _killer_line_late = true; }
+    Test_True("D103 late deaths still name what killed you", _killer_line_late);
+
+    // --- the lines themselves
+    var _all = DeathLine_All();
+    Test_True("D103 about 25 death lines are written", array_length(_all) >= 20 && array_length(_all) <= 36);
+    var _keys = {};
+    var _dup = false;
+    var _spoil = "";
+    var _long = "";
+    var _words = ["raid", "party", "outside", "apocal", "escape", "exit", "hope", "ending", "surface"];
+    for (var _i = 0; _i < array_length(_all); _i++) {
+        var _l = _all[_i];
+        if (variable_struct_exists(_keys, _l.key)) _dup = true;
+        variable_struct_set(_keys, _l.key, true);
+        var _low = string_lower(_l.text);
+        for (var _w = 0; _w < array_length(_words); _w++) { if (string_pos(_words[_w], _low) > 0) _spoil = _l.key; }
+        if (string_length(_l.text) > 48) _long = _l.key;
+    }
+    Test_False("D103 no death line key twice", _dup);
+    Test_Eq("D104 no death line gives the ending away", _spoil, "");
+    Test_Eq("D103 every death line is terse (48 characters)", _long, "");
+    var _early_in_late = false;
+    var _pool1 = DeathLine_Pool(1, "");
+    var _pool5 = DeathLine_Pool(11, "");
+    for (var _i2 = 0; _i2 < array_length(_pool1); _i2++) {
+        for (var _j2 = 0; _j2 < array_length(_pool5); _j2++) {
+            if (_pool1[_i2].key == _pool5[_j2].key) _early_in_late = true;
+        }
+    }
+    Test_False("D102 the lines darken: tier 1 and tier 5 share no line", _early_in_late);
+    Test_True("D102 every tier has at least two lines", array_length(DeathLine_Pool(1, "")) >= 2 && array_length(DeathLine_Pool(3, "")) >= 2 && array_length(DeathLine_Pool(5, "")) >= 2);
+    Test_Eq("D103 the {killer} slot is filled with the name", DeathLine_Format({ key: "x", text: "{killer} came." }, "Slime"), "Slime came.");
+
+    // --- on screen 2-4 s (60 fps assumed by the caller)
+    Test_Eq("D103 a short line holds the 2 s minimum", DeathScene_Frames("Short.", 60), 120);
+    Test_Eq("D103 a long line holds the 4 s maximum", DeathScene_Frames(string_repeat("long ", 60), 60), 240);
+    var _mid = DeathScene_Frames("The tunnel is not finished with you.", 60);
+    Test_True("D103 a normal line is between 2 and 4 s", _mid >= 120 && _mid <= 240);
+
+    // --- what killed you: a poison tick that takes the last HP is noted (scr_status), read once by Death_KillerKey
+    Death_KillerKey("died");             // clears any note an earlier suite left (a status test can take a player to 0 HP)
+    var _k0 = Death_KillerKey("died");   // what the battle context alone says
+    var _pz = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_POISON, 0, 1, 4);
+    _pz.hp = 50;
+    _pz = Status_Tick(_pz);
+    _pz = Status_Tick(_pz);
+    Test_Eq("D103 a tick that leaves you alive is no killer", Death_KillerKey("died"), _k0);
+    var _py = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_POISON, 0, 1, 4);
+    _py.hp = 1;
+    _py = Status_Tick(_py);
+    _py = Status_Tick(_py);
+    Test_Eq("D103 the poison tick that finishes you is the killer", Death_KillerKey("died"), "status_poison");
+    Test_Eq("D103 the killer note is used up once read", Death_KillerKey("died"), _k0);
+    Test_Eq("D103 giving up the run is its own killer", Death_KillerKey("abandoned"), "abandoned");
+
+    // --- the wake line
+    Test_True("D102 a wake line for every count", WakeLine_Pick(1).text != "" && WakeLine_Pick(3).text != "" && WakeLine_Pick(8).text != "" && WakeLine_Pick(40).text != "");
+    Test_True("D102 the wake lines darken too", WakeLine_Pick(1).key != WakeLine_Pick(8).key);
+
+    // --- banner (D106)
+    var _bf = Banner_Frames(60);
+    Test_True("D106 the boss banner lasts about 1 s", _bf >= 54 && _bf <= 72);
+    Test_Eq("D106 banner is clear before it starts", Banner_Alpha(0, _bf), 0);
+    Test_Eq("D106 banner is full in the middle", Banner_Alpha(round(_bf / 2), _bf), 1);
+    Test_Eq("D106 banner is clear when it ends", Banner_Alpha(_bf, _bf), 0);
+    Test_True("D106 banner fades in", Banner_Alpha(4, _bf) > 0 && Banner_Alpha(4, _bf) < 1);
+
+    // --- notes (D107)
+    var _defs = Note_Defs();
+    Test_Eq("D107 eight notes", array_length(_defs), 8);
+    var _n0 = 0; var _n3 = 0; var _n6 = 0; var _n10 = 0; var _ids = {}; var _iddup = false; var _bad_pos = ""; var _bad_room = "";
+    for (var _n = 0; _n < array_length(_defs); _n++) {
+        var _d2 = _defs[_n];
+        if (_d2.min_deaths == 0) _n0++;
+        if (_d2.min_deaths == 3) _n3++;
+        if (_d2.min_deaths == 6) _n6++;
+        if (_d2.min_deaths == 10) _n10++;
+        if (variable_struct_exists(_ids, _d2.id)) _iddup = true;
+        variable_struct_set(_ids, _d2.id, true);
+        if (_d2.tx < 0 || _d2.ty < 0) _bad_pos = _d2.id;
+        if (asset_get_index(_d2.room) == -1) _bad_room = _d2.id;
+        if (array_length(_d2.lines) < 2) _bad_pos = _d2.id;
+    }
+    Test_Eq("D107 four notes are always there", _n0, 4);
+    Test_Eq("D107 two notes after 3 deaths", _n3, 2);
+    Test_Eq("D107 one note after 6 deaths", _n6, 1);
+    Test_Eq("D107 one note after 10 deaths", _n10, 1);
+    Test_False("D107 note ids are unique", _iddup);
+    Test_Eq("D107 every note has a place and a text", _bad_pos, "");
+    Test_Eq("D107 every note is in a room that exists", _bad_room, "");
+    Test_Eq("D107 no deaths: 4 notes in the world", Test_StoryVisibleNotes(0), 4);
+    Test_Eq("D107 2 deaths: still 4", Test_StoryVisibleNotes(2), 4);
+    Test_Eq("D107 3 deaths: 6", Test_StoryVisibleNotes(3), 6);
+    Test_Eq("D107 5 deaths: 6", Test_StoryVisibleNotes(5), 6);
+    Test_Eq("D107 6 deaths: 7", Test_StoryVisibleNotes(6), 7);
+    Test_Eq("D107 9 deaths: 7", Test_StoryVisibleNotes(9), 7);
+    Test_Eq("D107 10 deaths: 8", Test_StoryVisibleNotes(10), 8);
+    Test_Eq("D107 rm_floor1 has a note from the start", array_length(Note_ForRoom("rm_floor1", 0)), 1);
+    Test_Eq("D107 a room without notes gives none", array_length(Note_ForRoom("rm_battle", 99)), 0);
+    var _prof = Profile_Default();
+    Test_Eq("D107 nothing collected in a new profile", array_length(Note_Collected(_prof)), 0);
+    Note_MarkCollected(_prof, _defs[2].id);
+    Note_MarkCollected(_prof, _defs[0].id);
+    Note_MarkCollected(_prof, _defs[0].id);
+    var _col = Note_Collected(_prof);
+    Test_True("D107 collected notes are recorded once, in note order", array_length(_col) == 2 && _col[0].id == _defs[0].id && _col[1].id == _defs[2].id);
+    Test_True("D107 the Codex data has a title and lines", _col[0].title != "" && array_length(_col[0].lines) >= 2);
+    var _note_text = "";
+    for (var _n2 = 0; _n2 < array_length(_defs); _n2++) { _note_text += string_lower(Test_StoryJoin(_defs[_n2].lines)); }
+    Test_True("D104 no note gives the ending away", string_pos("apocal", _note_text) == 0 && string_pos("raid party", _note_text) == 0 && string_pos("end of the world", _note_text) == 0);
+
+    // --- closing text and credits (D105, D40)
+    var _close = Story_ClosingLines();
+    var _cj = Test_StoryJoin(_close);
+    Test_True("D105 the closing text keeps 'Thank you for playing...'", _close[0] == "Thank you for playing...");
+    Test_True("D105 the closing text keeps 'by PaleRook'", string_pos("by PaleRook", _cj) > 0);
+    Test_True("D105 no prototype wording", string_pos("prototype", string_lower(_cj)) == 0);
+    Test_True("D105 no 2 months wording", string_pos("months", string_lower(_cj)) == 0);
+    var _loc_ok = true;
+    for (var _ci = 0; _ci < array_length(_close); _ci++) {
+        var _en = Loc_GetRaw("cutscene.ending.4." + string(_ci), "en");
+        var _ko = Loc_GetRaw("cutscene.ending.4." + string(_ci), "ko");
+        if (_en != _close[_ci] || _ko == "" || string_digits(_ko) != "") _loc_ok = false;   // the old Korean line named "2 months" (a digit)
+    }
+    Test_True("D105 the localization workbook has the same closing text in English and Korean", _loc_ok);
+    var _cr = Test_StoryJoin(Credits_PlainLines());
+    Test_True("D105 credits: game by PaleRook", string_pos("PaleRook", _cr) > 0);
+    Test_True("D105 credits: Galmuri by Lee Minseo", string_pos("Galmuri", _cr) > 0 && string_pos("Lee Minseo", _cr) > 0);
+    Test_True("D105 credits: the OFL-1.1 licence", string_pos("OFL-1.1", _cr) > 0);
+    Test_True("D105 credits: GameMaker", string_pos("GameMaker", _cr) > 0);
+    Test_True("D105 credits: the existing pixel font", string_pos("Retro Gaming", _cr) > 0);
+    var _snd = Credits_SoundAssets();
+    var _snd_missing = "";
+    var _snd_dup = false;
+    for (var _si = 0; _si < array_length(_snd); _si++) {
+        if (string_pos(_snd[_si].asset, _cr) == 0) _snd_missing = _snd[_si].asset;
+        for (var _sj = _si + 1; _sj < array_length(_snd); _sj++) { if (_snd[_sj].asset == _snd[_si].asset) _snd_dup = true; }
+    }
+    // (asset_get_index cannot vouch for every name: a build leaves out sounds no code uses. The list was generated from the sounds/ folder; a Python comparison of the two ran when it was written.)
+    Test_True("D40 sounds the game plays are in the list", asset_get_index("Body_falling_wood") != -1 && _snd[array_length(_snd) - 1].asset != "" && string_pos("Body_falling_wood", _cr) > 0 && string_pos("Metal_resonance", _cr) > 0);
+    Test_False("D40 no sound listed twice", _snd_dup);
+    Test_Eq("D40 every credited sound appears in the credits text", _snd_missing, "");
+    Test_Eq("D40 all 126 sounds and music tracks are listed", array_length(_snd), 126);
+    Test_Eq("D40 until the owner sends names the creator is the marked placeholder", _snd[0].creator, CREDITS_CREATOR_TBD);
+    Test_True("D105 credits come with headings and spacing", array_length(Credits_Lines()) > array_length(Credits_PlainLines()));
 }
 
 // ---- D0 shared UI framework (D95-D98): the pure menu model in scr_menu.gml ("UI FRAMEWORK") ----------------------------------------

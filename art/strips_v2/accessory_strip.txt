@@ -1,0 +1,3 @@
+# sprite: spr_icons_accessory   frames: 2   16x16 each, left to right = subimage 0..1   (v2)
+0	ring
+1	charm

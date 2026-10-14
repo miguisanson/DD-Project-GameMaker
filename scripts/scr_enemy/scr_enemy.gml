@@ -324,6 +324,7 @@ function EnemyCreate(_enemy_id) {
     ch.skills = base.skills;
     ch.status = [];
     ch.is_boss = base.is_boss;
+    ch.brain = variable_struct_exists(base, "brain") ? base.brain : AI_Brain([], [ AI_Weight("attack", -1, 1) ]);   // B4: the battle AI's rules (read only; a phase changes the stats above, not this)
     ch.threat_rank = variable_struct_exists(base, "threat_rank") ? base.threat_rank : 1;
     ch.stagger_max = Stagger_Max(ch.threat_rank, ch.is_boss);   // spec section 11: the BREAK meter
     ch.stagger = 0;
@@ -847,6 +848,7 @@ function World_RegisterFx(_inst) {
 }
 
 function World_DrawFx() {
+    Note_DrawWorldFx();   // C5 (D107): the lore notes lie under everything else
     Nav_DrawWorldFx();
     Player_DrawWorldFx();
     Elite_DrawWorldFx();   // C3 (D86): the pulsing outline round elites

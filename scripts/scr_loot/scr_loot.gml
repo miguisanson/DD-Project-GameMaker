@@ -597,7 +597,7 @@ function Merchant_SpotFor(_room) {
     switch (_room) {
         case rm_floor2: return { x: 192, y: 64, shop: 0 };
         case rm_floor5: return { x: 240, y: 64, shop: 1 };
-        case rm_floor8: return { x: 16, y: 48, shop: 2 };
+        case rm_floor8: return { x: 128, y: 64, shop: 2 };   // an alcove off the stair (its only free side is the cell below); (16,48) was behind the carved-arrow note
     }
     return undefined;
 }

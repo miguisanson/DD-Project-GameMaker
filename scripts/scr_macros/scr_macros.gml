@@ -121,6 +121,10 @@
 #macro SKILL_CURSE        25
 #macro SKILL_BLESSING     26
 #macro SKILL_FINAL_FURY   27
+#macro SKILL_REGROW       28   // B4: enemy heal (Killer Plant)
+#macro SKILL_SNUFF        29   // B4: enemy strips the player's buffs (Mad Whisp)
+#macro SKILL_GORE         30   // B4: Palehorn phase 1+
+#macro SKILL_PALE_HYMN    31   // B4: Pale Choirbeast heavy move
 
 #macro BATTLE_COOLDOWN_FRAMES 60
 #macro MONSTER_SFX_GAIN 0.80
@@ -258,7 +262,6 @@
 #macro QTE_SEQ_SHAKE_MS 250        // how long the arrows shake after a wrong press
 #macro QTE_SEQ_POP_MS 140          // how long a completed arrow hops
 #macro QTE_TELEGRAPH_MS 400        // the "!" and the attack's name before the defence bar starts
-#macro ENEMY_SKILL_USE_CHANCE_DEFAULT 0.35
 #macro ENEMY_ACTION_CHAIN_MAX 3
 #macro ENEMY_AUTO_RESOLVE_LEVEL_DELTA 3
 #macro ENEMY_AUTO_RESOLVE_EXP_MULT_DEFAULT 0.35

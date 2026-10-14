@@ -242,12 +242,13 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : ((_mode == "gridshots") ? 8000 : 9000)), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 12000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined };
 }
 
 function Scenario_Finish() {
     var _s = global.scn;
     _s.done = true;
+    show_debug_message("[TEST-FRAMES] " + _s.mode + " frames=" + string(_s.f) + " of " + string(_s.cap));
     show_debug_message("[TEST-SUMMARY] pass=" + string(_s.pass) + " fail=" + string(_s.fail) + " errors=" + string(_s.errors));
     game_end((_s.fail > 0 || _s.errors > 0) ? 1 : 0);
 }
@@ -424,6 +425,9 @@ function Scenario_StepSmoke(_s) {
             break;
         case 100: case 101: case 102: case 103: case 104: case 105: case 106: case 107: case 108: case 109: case 110: case 111: case 112:
             Scenario_StepSmokeRun(_s);   // C1: the run loop through the real flows
+            break;
+        case 113: case 114: case 115: case 116: case 117: case 118: case 119: case 120: case 121: case 122:
+            Scenario_StepSmokeStory(_s);   // C5: death scene, wake line, notes, boss banner, credits
             break;
         case 133: case 134: case 135: case 136: case 137: case 138: case 139: case 140: case 141:
             Scenario_StepSmokeCards(_s);   // C2: class screen, card pick, stat point, replace a skill
@@ -806,7 +810,8 @@ function Scenario_StepBot(_s) {
         return;
     }
     if (_s.v == 7) {
-        Scenario_StepBotTurns(_s);
+        if (_s.step >= 20) Scenario_StepBotAI(_s);   // B4 (steps 20..33): the battle AI
+        else Scenario_StepBotTurns(_s);
         return;
     }
     if (_s.v == 8) {
@@ -1577,8 +1582,7 @@ function Scenario_StepBotTurns(_s) {
             if (_s.f - _s.vstart > 7000) {
                 Scenario_Check(_name + "_b_finished", false, "k=" + string(_tb.k) + " state=" + string(_bcb.battle_state));
                 SkillDB_Get(SKILL_HILT_BASH).status_chance = 0.6;
-                _s.v = 5;
-                Scenario_Next(_s, 0);
+                Scenario_Next(_s, 20);   // on to the battle AI (B4), then movement and AI (v=5)
                 break;
             }
             if (_tb.k == 0) {   // set up: a sturdy Slime whose BREAK meter is out of the way for now
@@ -1697,8 +1701,330 @@ function Scenario_StepBotTurns(_s) {
                 }
             } else {
                 SkillDB_Get(SKILL_HILT_BASH).status_chance = 0.6;
-                _s.v = 8;   // C3: the throwables (v=8), then on to movement and AI (v=5)
+                Scenario_Next(_s, 20);   // on to the battle AI (B4), then movement and AI (v=5)
+            }
+            break;
+    }
+}
+
+// ---- B4: the battle AI through the real battle flow (bot v=7, steps 20..33; combat-spec.md section 12) ----
+// A: Killer Plant at 30% HP heals once (rule low_hp_heal), then the 3rd turn is a wind-up (strip "!"), the 4th the big attack through the defence bar (Perfect).
+// B: the same wind-up cancelled by a BREAK: the enemy does a plain attack instead and the bar never comes.
+// C: Mad Whisp vs a buffed player Snuffs the buff; unbuffed it does not.
+// D: Palehorn crosses 60% and 30%, then the Pale Choirbeast starts at 20%: banners, +SPD/+ATK in the stats and on the timeline, no double action.
+function Scenario_BotAIBegin(_s, _name, _enemy, _step_next) {
+    Scenario_NewKnight(CLASS_KNIGHT);
+    _s.stt = { ac: 0, k: 0, n: 0, hp0: 0, def_seen: false, len0: 0, max_actions: 0, base_hp: 0, dmg_base: 0, took: 0, last: "" };
+    _s.vstart = _s.f;
+    Scenario_GotoBattle(_name, _enemy);
+    Scenario_Next(_s, _step_next);
+}
+
+// The battle controller once the battle is up, else noone (and a failed check plus Finish if it never comes).
+function Scenario_BotAIController(_s, _name) {
+    if (room != rm_battle || !instance_exists(obj_battle_controller)) {
+        if (_s.t > 40) { Scenario_Check(_name + "_in_battle", false, "room=" + room_get_name(room) + " k=" + string(_s.stt.k) + " last: " + _s.stt.last); Scenario_Finish(); }
+        return noone;
+    }
+    var _bc = instance_find(obj_battle_controller, 0);
+    _s.stt.last = "p.hp=" + string(_bc.p.hp) + "/" + string(_bc.p.max_hp) + " e.hp=" + string(_bc.e.hp) + "/" + string(_bc.e.max_hp) + " state=" + string(_bc.battle_state) + " turns=" + string(_bc.ai.turns) + " over=" + string(_bc.battle_over);
+    return _bc;
+}
+
+// A sturdy enemy at the given HP share, with its BREAK meter out of the way, and a player nothing can kill (the battle copy: a Knight is rebuilt at 10 HP when the battle starts).
+function Scenario_BotAISturdy(_bc, _hp_ratio) {
+    _bc.p.max_hp = 9999;
+    _bc.p.hp = 9999;
+    _bc.e.max_hp = 1000;
+    _bc.e.hp = round(1000 * _hp_ratio);
+    _bc.enemy_hp_shown = _bc.e.hp;
+    _bc.e.stagger_max = 99999;
+}
+
+// The slot of the strip that carries the wind-up "!" (or undefined).
+function Scenario_BotWindupSlot(_bc) {
+    var _slots = Battle_TimelineSlots(_bc);
+    for (var _i = 0; _i < array_length(_slots); _i++) {
+        if (_slots[_i].windup) return _slots[_i];
+    }
+    return undefined;
+}
+
+function Scenario_BotLogIndex(_bc, _needle) {
+    for (var _i = 0; _i < array_length(_bc.combat_log); _i++) {
+        if (string_pos(_needle, _bc.combat_log[_i].text) > 0) return _i;
+    }
+    return -1;
+}
+
+function Scenario_BotLogTail(_bc, _n) {
+    var _out = "";
+    for (var _i = max(0, array_length(_bc.combat_log) - _n); _i < array_length(_bc.combat_log); _i++) _out += "[" + _bc.combat_log[_i].text + "] ";
+    return _out;
+}
+
+function Scenario_BotTurnsSince(_bc, _from) {
+    var _out = "";
+    for (var _i = _from; _i < array_length(_bc.turn_log); _i++) _out += (_bc.turn_log[_i] == TL_PLAYER) ? "P" : "E";
+    return _out;
+}
+
+function Scenario_StepBotAI(_s) {
+    switch (_s.step) {
+        case 20:   // A: Killer Plant
+        case 23:   // B: Killer Plant, BREAK
+        case 26:   // C: Mad Whisp
+        case 29:   // D1: Palehorn
+        case 32:   // D2: Pale Choirbeast
+            if (_s.t == 10) {
+                var _names = { s20: "bot_ai_plant", s23: "bot_ai_break", s26: "bot_ai_whisp", s29: "bot_ai_palehorn", s32: "bot_ai_choirbeast" };
+                var _enemies = { s20: ENEMY_KILLER_PLANT, s23: ENEMY_KILLER_PLANT, s26: ENEMY_MADWHISP, s29: ENEMY_MINI_BOSS, s32: ENEMY_FINAL_BOSS };
+                var _key = "s" + string(_s.step);
+                Scenario_BotAIBegin(_s, variable_struct_get(_names, _key), variable_struct_get(_enemies, _key), _s.step + 1);
+            }
+            break;
+        case 22: case 25: case 28: case 31:   // measured: the next battle (the battle is simply abandoned)
+            if (_s.t == 5) Scenario_Next(_s, _s.step + 1);
+            break;
+
+        case 21:   // A
+            var _bcA = Scenario_BotAIController(_s, "bot_ai_plant");
+            if (_bcA == noone) break;
+            var _a = _s.stt;
+            if (_s.f - _s.vstart > 3500) {
+                Scenario_Check("bot_ai_plant_finished", false, "k=" + string(_a.k) + " turns=" + string(_bcA.ai.turns) + " state=" + string(_bcA.battle_state));
+                Scenario_Next(_s, 22);
+                break;
+            }
+            var _a_menu = (_bcA.battle_state == BSTATE_MENU && _bcA.turn == TURN_PLAYER);
+            if (_a.k == 0) {   // 30 / 100 HP, the BREAK meter out of the way
+                Scenario_BotAISturdy(_bcA, 0.30);
+                _a.k = 1;
+            } else if (_a.k == 1) {   // the first enemy turn: the heal
+                if (_bcA.ai.turns >= 1 && _a_menu) {
+                    var _heal_ok = (_bcA.enemy_last_skill_id == SKILL_REGROW);
+                    Scenario_Check("bot_ai_plant_low_hp_enemy_heals_first", _heal_ok, "last skill " + string(_bcA.enemy_last_skill_id) + " rule uses " + json_stringify(_bcA.ai.uses));
+                    Scenario_Check("bot_ai_plant_heal_raised_its_hp", _bcA.e.hp > 300, "hp=" + string(_bcA.e.hp));
+                    Scenario_Check("bot_ai_plant_heal_logged", Scenario_BotLogCount(_bcA, "regrows") == 1);
+                    Scenario_Check("bot_ai_plant_heal_rule_counted_once", variable_struct_exists(_bcA.ai.uses, "low_hp_heal") && variable_struct_get(_bcA.ai.uses, "low_hp_heal") == 1);
+                    _bcA.e.hp = 200;   // still below 40%: the heal rule is spent, it must not heal again
+                    _bcA.enemy_hp_shown = 200;
+                    _a.k = 2;
+                } else if (_a.ac != 0 || _a_menu) {
+                    Scenario_BotAct(_s, _bcA, "attack", false);
+                }
+            } else if (_a.k == 2) {   // turn 2 is a plain attack; remember the player's HP before turn 3
+                if (_bcA.ai.turns == 2 && _a_menu && _a.ac == 0) {
+                    _a.hp0 = _bcA.p.hp;
+                    _a.k = 3;
+                } else if (_a.ac != 0 || _a_menu) {
+                    Scenario_BotAct(_s, _bcA, "attack", false);
+                }
+            } else if (_a.k == 3) {   // turn 3: the wind-up
+                if (_bcA.ai.turns >= 3 && _a_menu && _a.ac == 0) {
+                    var _mark = Scenario_BotWindupSlot(_bcA);
+                    Scenario_Check("bot_ai_plant_third_turn_is_a_windup_of_vine_trap", _bcA.ai.windup == SKILL_VINE_TRAP && _bcA.enemy_last_windup == SKILL_VINE_TRAP, "windup=" + string(_bcA.ai.windup));
+                    Scenario_Check("bot_ai_plant_windup_does_no_damage", _bcA.p.hp == _a.hp0, "hp " + string(_a.hp0) + " -> " + string(_bcA.p.hp));
+                    Scenario_Check("bot_ai_plant_windup_line_logged", Scenario_BotLogCount(_bcA, "coils its vines") == 1);
+                    Scenario_Check("bot_ai_plant_windup_mark_on_an_enemy_slot_of_the_strip", is_struct(_mark) && _mark.who == TL_ENEMY);
+                    Scenario_Check("bot_ai_plant_no_second_heal", Scenario_BotLogCount(_bcA, "regrows") == 1);
+                    Scenario_Check("bot_ai_plant_windup_used_no_skill", _bcA.enemy_last_skill_id == -1);
+                    _a.k = 4;
+                } else if (_a.ac != 0 || _a_menu) {
+                    Scenario_BotAct(_s, _bcA, "attack", false);
+                }
+            } else if (_a.k == 4) {   // turn 4: the big attack through the defence bar
+                if (_bcA.battle_state == BSTATE_ENEMY_DEFENCE && _bcA.def_active) {
+                    _a.base_hp = _bcA.def_ctx.hp_before;
+                    _a.dmg_base = _bcA.def_ctx.res.dmg;
+                    Scenario_Check("bot_ai_plant_big_attack_is_vine_trap_on_the_bar", _bcA.def_skill_id == SKILL_VINE_TRAP, "skill " + string(_bcA.def_skill_id));
+                    _a.k = 5;
+                } else if (_a.ac != 0 || _a_menu) {
+                    Scenario_BotAct(_s, _bcA, "attack", false);
+                }
+            } else if (_a.k == 5) {   // defend on the Perfect zone
+                Scenario_BotDefend(_s, _bcA);
+                if (_bcA.battle_state != BSTATE_ENEMY_DEFENCE) {
+                    Scenario_Check("bot_ai_plant_big_attack_defended_perfect", _bcA.qte_result_key == QTE_PERFECT, "grade " + string(_bcA.qte_result_key));
+                    Scenario_Check("bot_ai_plant_defended_damage_follows_the_grade", (_a.base_hp - _bcA.p.hp) == Qte_DefenceDamage(_a.dmg_base, QTE_PERFECT), "took " + string(_a.base_hp - _bcA.p.hp) + " of " + string(_a.dmg_base));
+                    Scenario_Check("bot_ai_plant_windup_is_over_after_the_big_attack", _bcA.ai.windup == -1);
+                    Scenario_Next(_s, 22);
+                }
+            }
+            break;
+
+        case 24:   // B
+            var _bcB = Scenario_BotAIController(_s, "bot_ai_break");
+            if (_bcB == noone) break;
+            var _b = _s.stt;
+            if (_s.f - _s.vstart > 3000) {
+                Scenario_Check("bot_ai_break_finished", false, "k=" + string(_b.k) + " turns=" + string(_bcB.ai.turns) + " state=" + string(_bcB.battle_state));
+                Scenario_Next(_s, 25);
+                break;
+            }
+            var _b_menu = (_bcB.battle_state == BSTATE_MENU && _bcB.turn == TURN_PLAYER);
+            if (_bcB.battle_state == BSTATE_ENEMY_DEFENCE) _b.def_seen = true;
+            if (_b.k == 0) {   // the next enemy turn is its 3rd: a wind-up of Vine Trap
+                Scenario_BotAISturdy(_bcB, 1);
+                _bcB.ai.turns = 2;
+                _b.k = 1;
+            } else if (_b.k == 1) {
+                if (_bcB.ai.windup == SKILL_VINE_TRAP && _b_menu && _b.ac == 0) {   // the wind-up is up: one hit away from a BREAK
+                    _bcB.e.stagger_max = 6;
+                    _bcB.e.stagger = 5;
+                    Scenario_Check("bot_ai_break_windup_pending_before_the_hit", true);
+                    _b.k = 2;
+                } else if (_b.ac != 0 || _b_menu) {
+                    Scenario_BotAct(_s, _bcB, "attack", false);
+                }
+            } else if (_b.k == 2) {   // the hit that breaks it
+                if (Scenario_BotAct(_s, _bcB, "attack", false)) {
+                    Scenario_Check("bot_ai_break_enemy_is_broken", _bcB.e.broken);
+                    Scenario_Check("bot_ai_break_cancels_the_windup", _bcB.ai.windup == -1, "windup=" + string(_bcB.ai.windup));
+                    Scenario_Check("bot_ai_break_cancel_logged", Scenario_BotLogCount(_bcB, "broken off") == 1);
+                    Scenario_Check("bot_ai_break_message_logged", Scenario_BotLogCount(_bcB, "BREAK") >= 1);
+                    Scenario_Check("bot_ai_break_cached_plan_dropped", is_undefined(_bcB.enemy_plan));
+                    Scenario_Check("bot_ai_break_no_windup_mark_left_on_the_strip", !is_struct(Scenario_BotWindupSlot(_bcB)));
+                    _bcB.e.stagger_max = 99999;
+                    _b.k = 3;
+                }
+            } else if (_b.k == 3) {   // play on until its 4th turn is done: a plain attack, never the big one
+                if (_bcB.ai.turns >= 4 && _b_menu && _b.ac == 0) {
+                    Scenario_Check("bot_ai_break_enemy_turn_4_is_a_plain_attack", _bcB.enemy_last_skill_id == -1, "skill " + string(_bcB.enemy_last_skill_id));
+                    Scenario_Check("bot_ai_break_the_defence_bar_never_came", !_b.def_seen);
+                    Scenario_Check("bot_ai_break_no_wind_up_pending_afterwards", _bcB.ai.windup == -1);
+                    Scenario_Next(_s, 25);
+                } else if (_b.ac != 0 || _b_menu) {
+                    Scenario_BotAct(_s, _bcB, "attack", false);
+                }
+            }
+            break;
+
+        case 27:   // C
+            var _bcC = Scenario_BotAIController(_s, "bot_ai_whisp");
+            if (_bcC == noone) break;
+            var _c = _s.stt;
+            if (_s.f - _s.vstart > 2500) {
+                Scenario_Check("bot_ai_whisp_finished", false, "k=" + string(_c.k) + " turns=" + string(_bcC.ai.turns));
+                Scenario_Next(_s, 28);
+                break;
+            }
+            var _c_menu = (_bcC.battle_state == BSTATE_MENU && _bcC.turn == TURN_PLAYER);
+            if (_c.k == 0) {   // the player is buffed before the Whisp acts
+                Scenario_BotAISturdy(_bcC, 1);
+                Status_Add(_bcC.p, STATUS_CRIT_UP, 3, 0);
+                _c.k = 1;
+            } else if (_c.k == 1) {
+                if (_bcC.ai.turns >= 1 && _c_menu && _c.ac == 0) {
+                    Scenario_Check("bot_ai_whisp_snuffs_a_buffed_player", _bcC.enemy_last_skill_id == SKILL_SNUFF, "skill " + string(_bcC.enemy_last_skill_id));
+                    Scenario_Check("bot_ai_whisp_buff_is_gone", !Status_Has(_bcC.p, STATUS_CRIT_UP));
+                    Scenario_Check("bot_ai_whisp_snuff_logged", Scenario_BotLogCount(_bcC, "snuffed") == 1);
+                    Scenario_Check("bot_ai_whisp_snuff_rule_counted", variable_struct_exists(_bcC.ai.uses, "snuff_buffs") && variable_struct_get(_bcC.ai.uses, "snuff_buffs") == 1);
+                    _c.n = _bcC.ai.turns;
+                    _c.k = 2;
+                } else if (_c.ac != 0 || _c_menu) {
+                    Scenario_BotAct(_s, _bcC, "attack", false);
+                }
+            } else if (_c.k == 2) {   // unbuffed: no Snuff on the next turn
+                if (_bcC.ai.turns > _c.n && _c_menu && _c.ac == 0) {
+                    Scenario_Check("bot_ai_whisp_unbuffed_player_is_left_alone", _bcC.enemy_last_skill_id != SKILL_SNUFF, "skill " + string(_bcC.enemy_last_skill_id));
+                    Scenario_Next(_s, 28);
+                } else if (_c.ac != 0 || _c_menu) {
+                    Scenario_BotAct(_s, _bcC, "attack", false);
+                }
+            }
+            break;
+
+        case 30:   // D1: Palehorn, 55% then 20%
+            var _bcD = Scenario_BotAIController(_s, "bot_ai_palehorn");
+            if (_bcD == noone) break;
+            var _d = _s.stt;
+            if (_s.f - _s.vstart > 4500) {
+                Scenario_Check("bot_ai_palehorn_finished", false, "k=" + string(_d.k) + " phase=" + string(_bcD.ai.phase) + " turns=" + string(_bcD.ai.turns));
+                Scenario_Next(_s, 31);
+                break;
+            }
+            var _d_menu = (_bcD.battle_state == BSTATE_MENU && _bcD.turn == TURN_PLAYER);
+            if (_d.k == 0) {
+                Scenario_BotAISturdy(_bcD, 0.55);
+                _d.base_hp = EnemyDB_Get(ENEMY_MINI_BOSS).stats.spd;
+                _d.dmg_base = EnemyDB_Get(ENEMY_MINI_BOSS).stats.atk;
+                _d.k = 1;
+            } else if (_d.k == 1) {   // at its first action: phase 1
+                if (_bcD.ai.phase == 1 && Scenario_BotLogCount(_bcD, "paws the ground") >= 1) {
+                    Scenario_Check("bot_ai_palehorn_phase_1_banner_logged", Scenario_BotLogCount(_bcD, "paws the ground") == 1);
+                    Scenario_Check("bot_ai_palehorn_phase_1_spd_plus_2_in_the_stats", _bcD.e.stats.spd == _d.base_hp + 2, "spd " + string(_bcD.e.stats.spd));
+                    Scenario_Check("bot_ai_palehorn_phase_1_spd_plus_2_on_the_timeline", Turn_Find(_bcD.tl, TL_ENEMY).spd == _d.base_hp + 2, "tl spd " + string(Turn_Find(_bcD.tl, TL_ENEMY).spd));
+                    Scenario_Check("bot_ai_palehorn_phase_1_atk_unchanged", _bcD.e.stats.atk == _d.dmg_base);
+                    Scenario_Check("bot_ai_palehorn_phase_1_banner_shown_as_the_skill_banner", _bcD.skill_banner_active && string_pos("paws the ground", _bcD.skill_banner_name) > 0);
+                    _d.k = 2;
+                }
+            } else if (_d.k == 2) {   // the player acts once, then Palehorn is dropped to 20%
+                if (_d_menu && _d.ac == 0) {
+                    _bcD.e.hp = 200;
+                    _bcD.enemy_hp_shown = 200;
+                    _d.k = 3;
+                }
+            } else if (_d.k == 3) {
+                if (_bcD.ai.phase == 2 && Scenario_BotLogCount(_bcD, "blind rage") >= 1) {
+                    Scenario_Check("bot_ai_palehorn_phase_2_banner_logged", Scenario_BotLogCount(_bcD, "blind rage") == 1);
+                    Scenario_Check("bot_ai_palehorn_phase_2_spd_plus_4_in_all", _bcD.e.stats.spd == _d.base_hp + 4, "spd " + string(_bcD.e.stats.spd));
+                    Scenario_Check("bot_ai_palehorn_phase_2_atk_plus_3_enrage", _bcD.e.stats.atk == _d.dmg_base + 3, "atk " + string(_bcD.e.stats.atk));
+                    Scenario_Check("bot_ai_palehorn_phase_2_timeline_spd", Turn_Find(_bcD.tl, TL_ENEMY).spd == _d.base_hp + 4);
+                    _d.len0 = array_length(_bcD.turn_log);
+                    _d.k = 4;
+                } else if (_d_menu || _d.ac != 0) {
+                    Scenario_BotAct(_s, _bcD, "attack", false);
+                }
+            } else if (_d.k == 4) {   // SPD 16 against the Knight's 8: the enemy acts twice in a row on the real timeline
+                if (array_length(_bcD.turn_log) >= _d.len0 + 5) {
+                    var _seq = Scenario_BotTurnsSince(_bcD, _d.len0);
+                    Scenario_Check("bot_ai_palehorn_phase_2_real_turns_show_the_faster_enemy", string_pos("EE", _seq) > 0, "turns " + _seq);
+                    Scenario_Next(_s, 31);
+                } else if (_d_menu || _d.ac != 0) {
+                    Scenario_BotAct(_s, _bcD, "attack", false);
+                }
+            }
+            break;
+
+        case 33:   // D2: the Pale Choirbeast starts at 20%
+            var _bcE = Scenario_BotAIController(_s, "bot_ai_choirbeast");
+            if (_bcE == noone) break;
+            var _e = _s.stt;
+            if (_s.f - _s.vstart > 4500) {
+                Scenario_Check("bot_ai_choirbeast_finished", false, "k=" + string(_e.k) + " phase=" + string(_bcE.ai.phase) + " turns=" + string(_bcE.ai.turns));
+                _s.v = 8;   // C3: the throwables (v=8), then movement and AI (v=5)
                 Scenario_Next(_s, 0);
+                break;
+            }
+            var _e_menu = (_bcE.battle_state == BSTATE_MENU && _bcE.turn == TURN_PLAYER);
+            _e.max_actions = max(_e.max_actions, _bcE.enemy_actions_remaining);
+            if (_e.k == 0) {
+                Scenario_BotAISturdy(_bcE, 0.20);
+                _e.base_hp = EnemyDB_Get(ENEMY_FINAL_BOSS).stats.spd;
+                _e.dmg_base = EnemyDB_Get(ENEMY_FINAL_BOSS).stats.atk;
+                _e.k = 1;
+            } else if (_e.k == 1) {
+                if (_bcE.ai.phase == 2 && Scenario_BotLogCount(_bcE, "howls in fury") >= 1) {
+                    Scenario_Check("bot_ai_choirbeast_skips_to_phase_2", true);
+                    Scenario_Check("bot_ai_choirbeast_both_spd_bonuses", _bcE.e.stats.spd == _e.base_hp + 5, "spd " + string(_bcE.e.stats.spd));
+                    Scenario_Check("bot_ai_choirbeast_enrage_atk_plus_3", _bcE.e.stats.atk == _e.dmg_base + 3, "atk " + string(_bcE.e.stats.atk));
+                    Scenario_Check("bot_ai_choirbeast_phase_banner_logged", Scenario_BotLogCount(_bcE, "howls in fury") == 1);
+                    Scenario_Check("bot_ai_choirbeast_fury_is_speed_not_a_double_action", Battle_EnemyActionBudget(_bcE.e) == 1);
+                    _e.k = 2;
+                }
+            } else if (_e.k == 2) {   // its 2nd turn is the Pale Hymn wind-up (phase 2: every 2nd), its 3rd the big attack on the bar
+                if (_bcE.ai.turns >= 3 && _e_menu && _e.ac == 0) {
+                    var _i_wind = Scenario_BotLogIndex(_bcE, "draws a deep breath");
+                    var _i_bar = Scenario_BotLogIndex(_bcE, "Not blocked");   // the bot never presses: the bar ends as Weak
+                    Scenario_Check("bot_ai_choirbeast_hymn_windup_logged", _i_wind >= 0, "log " + Scenario_BotLogTail(_bcE, 12));
+                    Scenario_Check("bot_ai_choirbeast_big_attack_came_after_the_windup_through_the_bar", _i_bar > _i_wind && _i_wind >= 0, "wind " + string(_i_wind) + " bar " + string(_i_bar));
+                    Scenario_Check("bot_ai_choirbeast_never_more_than_one_action_per_turn", _e.max_actions <= 1, "max " + string(_e.max_actions));
+                    _s.v = 5;   // on to movement and AI
+                    Scenario_Next(_s, 0);
+                } else if (_e_menu || _e.ac != 0) {
+                    Scenario_BotAct(_s, _bcE, "attack", false);
+                }
             }
             break;
     }
@@ -1900,7 +2226,13 @@ function Scenario_StepShots(_s) {
         case 120: case 121: case 122: case 123: case 124: case 125: case 126: case 127: case 128:
             Scenario_StepShotsCards(_s);
             break;
-        case 150: case 151: case 152: case 153: case 154: case 155: case 156: case 157: case 158: case 159:
+        case 140: case 141: case 142: case 143: case 144: case 145: case 146: case 147: case 148: case 149:
+            Scenario_StepShotsAI(_s);   // B4: wind-up, Foresight on it, phase banner
+            break;
+        case 150: case 151: case 152: case 153: case 154: case 155: case 156: case 157: case 158: case 159: case 160:
+            Scenario_StepShotsStory(_s);   // C5: death line, summary, echo, wake line, notes, banner, credits
+            break;
+        case 170: case 171: case 172: case 173: case 174: case 175: case 176: case 177: case 178: case 179:
             Scenario_StepShotsEconomy(_s);   // C3: shop, throwables, elite, merchant, gold
             break;
         default:
@@ -2314,6 +2646,123 @@ function Scenario_StepShotsTurns(_s) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 _s.si = 0;
                 Scenario_Next(_s, 120);   // C2: the card screens (120-128), then the D91 / DISP-10 / D48 pictures (step 50), then the skill animations
+            }
+            break;
+    }
+}
+
+// B4 pictures (steps 140..148): Palehorn has just lowered its horns (banner, log line and the "!" on the strip), Foresight shows the wind-up two actions ahead,
+// and a phase banner. All three are set up on a real battle controller; the pictures are of the real draw code.
+function Scenario_StepShotsAI(_s) {
+    switch (_s.step) {
+        case 140:   // the wind-up has just happened: the player's turn, the banner over the enemy, the "!" on the enemy's slot
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(3);
+                Scenario_GotoBattle("shots_ai_windup", ENEMY_MINI_BOSS);
+            }
+            if (_s.t >= 25) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_ai_windup_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.ai.turns = 2;
+                EnemyAI_Take(_bc.ai, EnemyAI_Choose(_bc.e, _bc.p, EnemyAI_Ctx(_bc.ai), Run_Stream("combat")));   // its 3rd turn: Ramming is telegraphed
+                EnemyAI_EndTurn(_bc.ai);
+                Scenario_Check("shots_ai_windup_is_ramming", _bc.ai.windup == SKILL_RAMMING, "windup=" + string(_bc.ai.windup));
+                var _text = Skill_WindupText(SkillDB_Get(SKILL_RAMMING), _bc.e.name);
+                _bc.tl_who = TL_PLAYER;
+                _bc.turn = TURN_PLAYER;
+                _bc.enemy_action_pending = false;
+                _bc.message_text = _text;
+                _bc.message_next_state = BSTATE_MENU;
+                _bc.battle_state = BSTATE_MESSAGE;
+                _bc.wait_timer = 9999;
+                _bc.skill_banner_active = true;
+                _bc.skill_banner_name = _text;
+                _bc.combat_log = [];   // the log (top right) is checked by the bot; two wrapped rows of it would sit on the enemy name in this picture
+                Scenario_Check("shots_ai_windup_text_names_the_enemy", string_pos("Palehorn", _text) > 0 && string_pos("horns", _text) > 0, _text);
+                Scenario_Check("shots_ai_windup_mark_on_the_strip", is_struct(Scenario_BotWindupSlot(_bc)));
+                Scenario_Next(_s, 141);
+            }
+            break;
+        case 141:
+            if (_s.t >= 10) {
+                _s.shot = "shot_ai_windup.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 142);
+            }
+            break;
+        case 142:   // Foresight: a Mage sees the wind-up before it happens
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_NewKnight(CLASS_MAGE);
+                Scenario_GotoBattle("shots_ai_foresight", ENEMY_MINI_BOSS);
+                Scenario_Next(_s, 143);
+            }
+            break;
+        case 143:
+            if (_s.t >= 25) {
+                var _inb2 = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_ai_foresight_in_battle", _inb2, "room=" + room_get_name(room));
+                if (!_inb2) { Scenario_Finish(); return; }
+                var _bc2 = instance_find(obj_battle_controller, 0);
+                _bc2.wait_timer = 9999;
+                _bc2.ai.turns = 2;   // its next turn is the 3rd
+                _bc2.p = Status_Add(_bc2.p, STATUS_HIT_UP, 3, 0);
+                var _fs = Scenario_BotForesightSlot(_bc2);
+                Scenario_Check("shots_ai_foresight_shows_the_windup", is_struct(_fs) && _fs.slot.foresight.kind == "windup" && _fs.slot.foresight.skill_id == SKILL_RAMMING && _fs.slot.foresight.big, is_struct(_fs) ? _fs.slot.foresight.kind : "none");
+                Scenario_Next(_s, 144);
+            }
+            break;
+        case 144:
+            if (_s.t >= 8) {
+                _s.shot = "shot_ai_foresight.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 145);
+            }
+            break;
+        case 145:   // a phase banner: Palehorn at 40% HP
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_NewKnight();
+                Scenario_GotoBattle("shots_ai_phase", ENEMY_MINI_BOSS);
+                Scenario_Next(_s, 146);
+            }
+            break;
+        case 146:
+            if (_s.t >= 25) {
+                var _inb3 = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_ai_phase_in_battle", _inb3, "room=" + room_get_name(room));
+                if (!_inb3) { Scenario_Finish(); return; }
+                var _bc3 = instance_find(obj_battle_controller, 0);
+                _bc3.e.hp = floor(_bc3.e.max_hp * 0.4);
+                _bc3.enemy_hp_shown = _bc3.e.hp;
+                _bc3.e.stagger = 12;
+                Battle_PhaseSync(_bc3);
+                Scenario_Check("shots_ai_phase_reached_1", _bc3.ai.phase == 1 && _bc3.phase_banner != "", "phase=" + string(_bc3.ai.phase));
+                var _banner = _bc3.phase_banner;
+                _bc3.phase_banner = "";
+                _bc3.skill_banner_active = true;
+                _bc3.skill_banner_name = _banner;
+                Battle_Message(_bc3, _banner, BSTATE_ENEMY_ACT);
+                _bc3.combat_log = [];
+                _bc3.wait_timer = 9999;
+                Scenario_Next(_s, 147);
+            }
+            break;
+        case 147:
+            if (_s.t >= 10) {
+                _s.shot = "shot_ai_phase.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 148);
+            }
+            break;
+        case 148:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _s.si = 0;
+                Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
             }
             break;
     }
@@ -3380,7 +3829,7 @@ function Scenario_StepShotsWorld(_s) {
         case 65:
             if (_s.t >= 4) {
                 Scenario_Check("shots_world_saved_" + _w.shot, file_exists(_w.shot));
-                if (_w.pass >= 1) { Scenario_Finish(); break; }
+                if (_w.pass >= 1) { Scenario_Next(_s, 150); break; }   // C5: the story pictures
                 Scenario_Next(_s, 66);
             }
             break;
@@ -3499,6 +3948,8 @@ function Scenario_StepSmokeRun(_s) {
                 _gs.run.kills = 4;
                 _gs.run.gold = 37;   // C3: gold is lost with the run (checked in newrun_carries_no_gold_or_kills below)
                 Player_OnDeath(_gs.player_ch);
+                Scenario_Check("death_hook_plays_the_fall_sound", global.sfx_last_key == "body_falling_wood", "key=" + string(global.sfx_last_key));
+                Scenario_Check("death_hook_has_the_context_ready", is_struct(global.death_ctx) && global.death_ctx.deaths == 1 && global.death_ctx.pick.tier == 1);
             }
             if (_s.t > 3) Scenario_TapCutscene(_s);
             if (_s.t > 3 && _sc != noone && _sc.state == "run_flow") {
@@ -3507,13 +3958,13 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Check("death_history_entry_has_the_run", array_length(_pf.history) == 1 && _pf.history[0].result == "died" && _pf.history[0].seed == 1111 && _pf.history[0].level == 5 && _pf.history[0].floor == 1 && _pf.history[0].kills == 4 && _pf.history[0].gold == 37);
                 Scenario_Check("death_run_save_is_deleted_no_reload", !RunSave_HasSave());
                 Scenario_Check("death_run_is_over", !Run_IsActive());
-                Scenario_Check("death_flow_starts_with_the_summary", global.run_flow.phase == "summary");
+                Scenario_Check("death_flow_starts_with_the_death_scene", global.run_flow.phase == "death", "phase=" + string(global.run_flow.phase));
                 var _okopts = array_length(_pf.echo_offer) == 2;   // the run had two things: potion (10) and MP potion (11)
                 for (var _i = 0; _i < array_length(_pf.echo_offer); _i++) {
                     if (_pf.echo_offer[_i].kind != "item" || (_pf.echo_offer[_i].id != 10 && _pf.echo_offer[_i].id != 11)) _okopts = false;
                 }
                 Scenario_Check("death_echo_offer_is_1_of_what_the_run_had", _okopts, "offer=" + json_stringify(_pf.echo_offer));
-                Scenario_Next(_s, 103);
+                Scenario_Next(_s, 120);   // C5: the death line first, then the summary (step 103)
             }
             if (_s.t > 1200) { Scenario_Check("death_reaches_the_run_summary", false, "room=" + room_get_name(room) + " state=" + (_sc != noone ? string(_sc.state) : "none")); Scenario_Finish(); }
             break;
@@ -3548,20 +3999,14 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Check("newrun_autosaved_with_the_new_seed", RunSave_HasSave() && RunSave_LoadFrom().run.seed == _rl.seed2);
                 var _trg2 = instance_find(obj_dialogue_trigger, 0);
                 _rl.trg = _trg2.id;
-                Scenario_ClearUi();
-                var _pl2 = instance_find(obj_player, 0);
-                _pl2.x = _trg2.x;
-                _pl2.y = _trg2.y;
-                _pl2.moving = false;
-                _pl2.move_timer = 0;
-                Scenario_Next(_s, 105);
+                Scenario_Next(_s, 121);   // C5: the wake line first (it is cleared there, then the trigger is walked onto and step 105 goes on)
             }
             if (_s.t > 600) { Scenario_Check("newrun_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
         case 105:   // standing on the trigger of run 1: nothing plays (seen once per profile)
             if (_s.t == 60) {
                 Scenario_Check("story_trigger_is_done_in_the_new_run", instance_exists(_rl.trg) && _rl.trg.triggered);
-                Scenario_Check("story_trigger_does_not_replay", _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0, "mode=" + string(_gs.ui.mode));
+                Scenario_Check("story_trigger_does_not_replay", _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0, "mode=" + string(_gs.ui.mode) + " raw=" + json_stringify(_gs.ui.lines_raw));
                 Scenario_Next(_s, 106);
             }
             break;
@@ -3644,11 +4089,26 @@ function Scenario_StepSmokeRun(_s) {
             }
             if (_s.t > 1200) { Scenario_Check("abandon_reaches_the_run_summary", false, "room=" + room_get_name(room) + " state=" + (_sc != noone ? string(_sc.state) : "none") + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
             break;
-        case 110:   // summary + pick (first option) -> run 3
-            if (_s.t == 20) Scenario_Tap("confirm");
-            if (_s.t == 40) Scenario_Tap("confirm");
-            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && _s.t > 60) {
+        case 110:   // death scene skipped by holding confirm (D48), summary + pick (first option) -> run 3
+            if (_s.t == 10) { Scenario_Tap("confirm"); _rl.tap_t = _s.f; }   // a tap does not skip the death line
+            if (_s.t == 40) {
+                Scenario_Check("abandon_a_tap_does_not_skip_the_death_line", global.run_flow.phase == "death", "phase=" + string(global.run_flow.phase));
+                Scenario_Hold("confirm", 100);
+            }
+            if (!variable_struct_exists(_rl, "sum_t") && global.run_flow.phase == "summary") {
+                _rl.sum_t = _s.t;
+                Scenario_Release();
+                Scenario_Check("abandon_holding_confirm_skips_the_death_line", _s.t < 150, "t=" + string(_s.t));
+            }
+            if (variable_struct_exists(_rl, "sum_t")) {
+                if (_s.t == _rl.sum_t + 20) Scenario_Tap("confirm");
+                if (_s.t == _rl.sum_t + 40) Scenario_Tap("confirm");
+            }
+            if (variable_struct_exists(_rl, "sum_t") && _s.t > _rl.sum_t + 60 && Scenario_FloorReady(rm_floor1)) {
                 Scenario_Check("abandon_next_run_starts_at_level_1", _gs.player_ch.level == 1 && Run_IsActive() && Profile_Get().runs_started == 3, "runs_started=" + string(Profile_Get().runs_started));
+                _gs.pending_wake_line = false;   // C5: the wake line (checked in step 121) is dropped here so the card steps start clean
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
                 Scenario_Next(_s, 133);   // C2: the card screens in this run (step 111, the win, follows them)
             }
             if (_s.t > 600) { Scenario_Check("abandon_next_run_reaches_rm_floor1", false, "room=" + room_get_name(room) + " phase=" + string(global.run_flow.phase)); Scenario_Finish(); }
@@ -3657,6 +4117,7 @@ function Scenario_StepSmokeRun(_s) {
             if (_s.t == 1) {
                 Scenario_ClearUi();
                 _rl.held = false;
+                _rl.credits = false;
                 Scenario_Check("win_nobody_class_is_locked_before", !Profile_IsUnlocked(Profile_Get(), "nobody_class"));
                 Transition_RequestCutsceneById("ending");
             }
@@ -3664,9 +4125,16 @@ function Scenario_StepSmokeRun(_s) {
                 _rl.held = true;
                 Scenario_Hold("confirm", 120);
             }
+            if (_s.t > 2 && room == rm_cutscene && _sc != noone && _sc.state == "credits" && !_rl.credits) {   // C5 (D105): the credits roll after the closing text; hold confirm skips it
+                _rl.credits = true;
+                Scenario_Release();
+                Scenario_Check("win_credits_roll_follows_the_closing_text", Credits_TotalFrames() > 600 && _sc.credits_t < 30, "frames=" + string(Credits_TotalFrames()));
+                Scenario_Hold("confirm", 120);
+            }
             if (_s.t > 2 && room == rm_start && !Transition_IsActive()) {
                 Scenario_Release();
                 var _pf4 = Profile_Get();
+                Scenario_Check("win_credits_were_shown_and_skipped_by_holding", _rl.credits);
                 Scenario_Check("win_ending_cutscene_played_once", _rl.held && Story_Seen(Story_CutsceneKey("ending")));
                 Scenario_Check("win_counts_one_win", _pf4.wins == 1 && _pf4.deaths == 2, "wins=" + string(_pf4.wins) + " deaths=" + string(_pf4.deaths));
                 Scenario_Check("win_first_win_unlocks_the_nobody_class", Profile_IsUnlocked(_pf4, "nobody_class"));
@@ -3694,9 +4162,457 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Check("win2_ending_is_not_shown_again", !_rl.saw_cutscene);
                 Scenario_Check("win2_counts_the_second_win", _pf5.wins == 2, "wins=" + string(_pf5.wins));
                 Scenario_Check("win2_nobody_class_stays_unlocked", Profile_IsUnlocked(_pf5, "nobody_class"));
-                Scenario_Finish();
+                Scenario_Next(_s, 113);   // C5: notes, boss banner, a killer-specific death line
             }
             if (_s.t > 900) { Scenario_Check("win2_returns_to_the_title", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+    }
+}
+
+// ---- C5 story through the real flows (D102-D107). Runs after the C1 run loop, inside the same profile (the gate's scratch folder). ----
+// Death scene (one line, 2-4 s, hold to skip) -> summary; the wake line on run 2; the 8 notes (4 always, 2 / 1 / 1 after 3 / 6 / 10 deaths): each
+// stands on a free tile you can walk up to, reading one records it; the boss name banner replaces the camera pan on a later run; a killer-specific line.
+function Scenario_FindNote(_id) {
+    var _n = instance_number(obj_interactable);
+    for (var _i = 0; _i < _n; _i++) {
+        var _o = instance_find(obj_interactable, _i);
+        if (variable_instance_exists(_o, "note_id") && _o.note_id == _id) return _o;
+    }
+    return noone;
+}
+
+function Scenario_NoteCount() {
+    var _c = 0;
+    var _n = instance_number(obj_interactable);
+    for (var _i = 0; _i < _n; _i++) {
+        if (variable_instance_exists(instance_find(obj_interactable, _i), "note_id")) _c++;
+    }
+    return _c;
+}
+
+// True when a tile next to the note can be reached on foot from the player's tile (the game's own wall / interactable rule, four-way steps).
+function Scenario_NoteReachable(_pl, _nt) {
+    var _t = GRID_TILE_SIZE;
+    var _gw = ceil(room_width / _t);
+    var _gh = ceil(room_height / _t);
+    var _reach = array_create(_gw * _gh, false);
+    var _qx = [round(_pl.x / _t)];
+    var _qy = [round(_pl.y / _t)];
+    _reach[_qy[0] * _gw + _qx[0]] = true;
+    var _head = 0;
+    var _dx = [1, -1, 0, 0];
+    var _dy = [0, 0, 1, -1];
+    while (_head < array_length(_qx)) {
+        var _cx = _qx[_head];
+        var _cy = _qy[_head];
+        _head++;
+        for (var _d = 0; _d < 4; _d++) {
+            var _nx = _cx + _dx[_d];
+            var _ny = _cy + _dy[_d];
+            if (_nx < 0 || _ny < 0 || _nx >= _gw || _ny >= _gh) continue;
+            if (_reach[_ny * _gw + _nx]) continue;
+            if (Player_TileBlocked(_pl, _nx * _t, _ny * _t)) continue;
+            _reach[_ny * _gw + _nx] = true;
+            array_push(_qx, _nx);
+            array_push(_qy, _ny);
+        }
+    }
+    var _tx = round(_nt.x / _t);
+    var _ty = round(_nt.y / _t);
+    for (var _k = 0; _k < 4; _k++) {
+        var _ax = _tx + _dx[_k];
+        var _ay = _ty + _dy[_k];
+        if (_ax < 0 || _ay < 0 || _ax >= _gw || _ay >= _gh) continue;
+        if (_reach[_ay * _gw + _ax]) return true;
+    }
+    return false;
+}
+
+function Scenario_StepSmokeStory(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "st")) _s.st = {};
+    var _st = _s.st;
+    switch (_s.step) {
+        case 120:   // the first death: the line plays by itself for 2-4 s, then the summary (D103)
+            if (_s.t == 1) {
+                var _ctx = global.run_flow.ctx;
+                _st.crack = false;
+                Scenario_Check("death_scene_has_a_line_of_the_first_tier", _ctx.pick.tier == 1 && _ctx.text != "" && _ctx.deaths == 1, "deaths=" + string(_ctx.deaths) + " text=" + string(_ctx.text));
+                Scenario_Check("death_scene_line_is_not_game_over", string_pos("GAME OVER", string_upper(_ctx.text)) == 0);
+                var _fps = game_get_speed(gamespeed_fps);
+                Scenario_Check("death_scene_is_2_to_4_seconds", _ctx.frames >= 2 * _fps && _ctx.frames <= 4 * _fps, "frames=" + string(_ctx.frames));
+            }
+            if (_s.t <= 8 && global.sfx_last_key == "metal_resonance") _st.crack = true;
+            if (global.run_flow.phase == "summary") {
+                Scenario_Check("death_scene_cracks_as_the_line_comes", _st.crack);
+                Scenario_Check("death_scene_runs_by_itself_before_the_summary", _s.t >= 110 && _s.t <= 250, "t=" + string(_s.t));
+                Scenario_Next(_s, 103);
+            }
+            if (_s.t > 600) { Scenario_Check("death_scene_ends_in_the_summary", false, "phase=" + string(global.run_flow.phase)); Scenario_Finish(); }
+            break;
+        case 121:   // run 2 starts at the tunnel entrance with the short wake line (D102)
+            if (_gs.ui.mode != UI_DIALOGUE) {
+                if (_s.t > 240) { Scenario_Check("wake_line_plays_when_the_next_run_starts", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+                break;
+            }
+            var _wk = WakeLine_Pick(Profile_Get().deaths);
+            Scenario_Check("wake_line_is_the_first_death_one", _wk.key == "wake.t1" && array_length(_gs.ui.lines_raw) == 1 && _gs.ui.lines_raw[0] == Loc_T(_wk.key, _wk.text), "lines=" + json_stringify(_gs.ui.lines_raw));
+            var _sp = RoomTransition_FindSpawn("start");
+            var _plw = instance_find(obj_player, 0);
+            Scenario_Check("wake_is_at_the_entrance_spawn_of_rm_floor1", room == rm_floor1 && _sp != noone && _plw.x == _sp.x && _plw.y == _sp.y, "player " + string(_plw.x) + "," + string(_plw.y));
+            Scenario_Check("wake_line_is_a_one_shot", !_gs.pending_wake_line);
+            Dialogue_CloseNow();
+            Scenario_ClearUi();
+            var _trg2 = instance_find(obj_dialogue_trigger, 0);
+            _plw.x = _trg2.x;
+            _plw.y = _trg2.y;
+            _plw.moving = false;
+            _plw.move_timer = 0;
+            Scenario_Next(_s, 105);
+            break;
+        case 113:   // a new run with 2 deaths on record: rm_floor1 has its note from the start, on a free tile
+            if (_s.t == 1) {
+                _gs.in_main_menu = false;
+                Profile_Get().deaths = 2;
+                Run_StartNew(false, 3333);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && _s.t > 30) {
+                Scenario_Check("note_floor1_has_one_note_from_the_start", Scenario_NoteCount() == 1, "notes=" + string(Scenario_NoteCount()));
+                var _nt = Scenario_FindNote("map_page");
+                Scenario_Check("note_map_page_stands_at_its_tile", instance_exists(_nt) && _nt.x == 16 && _nt.y == 96);
+                Scenario_Check("note_is_not_collected_yet", !Note_IsCollected(Profile_Get(), "map_page"));
+                Scenario_ClearUi();
+                var _plr = Scenario_PlacePlayer(2, 6);   // right of the note
+                _plr.face = LEFT;
+                Scenario_Next(_s, 114);
+            }
+            if (_s.t > 600) { Scenario_Check("note_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 114:   // read it through the real interact key
+            if (_s.t == 10) Scenario_Tap("interact");
+            if (_s.t == 30) {
+                var _nd = Note_Find("map_page");
+                Scenario_Check("note_interact_opens_the_note", _gs.ui.mode == UI_DIALOGUE && _gs.ui.speaker == _nd.title && array_length(_gs.ui.lines_raw) == array_length(_nd.lines) && _gs.ui.lines_raw[0] == _nd.lines[0], "mode=" + string(_gs.ui.mode) + " speaker=" + string(_gs.ui.speaker));
+                Scenario_Check("note_read_is_recorded_in_the_profile", Note_IsCollected(Profile_Get(), "map_page"));
+                var _cod = Note_Collected(Profile_Get());
+                Scenario_Check("note_codex_data_lists_the_read_note", array_length(_cod) == 1 && _cod[0].id == "map_page");
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_Next(_s, 115);
+            }
+            break;
+        case 115:   // 2 deaths: rm_floor2 has no note yet (they come after 3 deaths)
+            if (_s.t == 1) room_goto(rm_floor2);
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor2) && _s.t > 30) {
+                Scenario_Check("note_floor2_has_none_with_2_deaths", Scenario_NoteCount() == 0, "notes=" + string(Scenario_NoteCount()));
+                Profile_Get().deaths = 3;
+                Scenario_Next(_s, 116);
+            }
+            if (_s.t > 600) { Scenario_Check("note_reaches_rm_floor2", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 116:   // 3 deaths: the other room with a 3-death note has it
+            if (_s.t == 1) room_goto(rm_floor4);
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor4) && _s.t > 30) {
+                Scenario_Check("note_floor4_has_its_note_after_3_deaths", Scenario_NoteCount() == 1 && instance_exists(Scenario_FindNote("mapmaker_scrap")), "notes=" + string(Scenario_NoteCount()));
+                _st.ni = 0;
+                Profile_Get().deaths = 99;
+                Scenario_Next(_s, 117);
+            }
+            if (_s.t > 600) { Scenario_Check("note_reaches_rm_floor4", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 117: {   // every note, in its own room: it exists, its tile is clear of walls and other objects, and it can be walked up to
+            var _defs = Note_Defs();
+            if (_st.ni >= array_length(_defs)) {
+                Profile_Get().deaths = 2;
+                Scenario_Next(_s, 118);
+                break;
+            }
+            var _d = _defs[_st.ni];
+            var _rmn = asset_get_index(_d.room);
+            if (_s.t == 1) room_goto(_rmn);
+            if (_s.t > 5 && Scenario_FloorReady(_rmn) && _s.t > 30) {
+                var _n1 = Scenario_FindNote(_d.id);
+                var _ok1 = instance_exists(_n1);
+                Scenario_Check("note_" + _d.id + "_stands_in_" + _d.room, _ok1);
+                if (_ok1) {
+                    var _wall = false;
+                    var _other = noone;
+                    with (_n1) {
+                        _wall = place_meeting(x, y, obj_wall);
+                        _other = instance_place(x, y, obj_interactable);
+                    }
+                    Scenario_Check("note_" + _d.id + "_tile_has_no_wall_or_object", !_wall && _other == noone, "wall=" + string(_wall));
+                    var _plb = instance_find(obj_player, 0);
+                    Scenario_Check("note_" + _d.id + "_can_be_walked_up_to", Scenario_NoteReachable(_plb, _n1));
+                    Scenario_Check("note_" + _d.id + "_prompt_counts_it_as_interactable", Player_PromptWorthy(_n1));
+                }
+                _st.ni++;
+                _s.t = 0;
+            }
+            if (_s.t > 600) { Scenario_Check("note_" + _d.id + "_room_is_reached", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+        } break;
+        case 118:   // D106 prep: rm_floor5's boss trigger is marked as seen on an earlier run
+            if (_s.t == 1) { Scenario_ClearUi(); room_goto(rm_floor5); }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor5) && _s.t > 40) {
+                var _tg = instance_find(obj_dialogue_trigger, 0);
+                Scenario_Check("banner_floor5_has_its_boss_trigger", _tg != noone);
+                if (_tg == noone) { Scenario_Finish(); break; }
+                Scenario_Check("banner_names_the_mini_boss", DialogueTrigger_BannerName(_tg) == EnemyDB_Get(ENEMY_MINI_BOSS).name && DialogueTrigger_BannerName(_tg) != "", "name=" + DialogueTrigger_BannerName(_tg));
+                Scenario_Check("banner_not_before_the_pan_was_seen", !_tg.triggered && !variable_instance_exists(_tg, "story_prev_seen"));
+                Story_Mark(_tg.story_key);   // as if the pan had played in an earlier run
+                Scenario_Next(_s, 122);
+            }
+            if (_s.t > 600) { Scenario_Check("banner_reaches_rm_floor5", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 122:   // D106: a later run walks into the trigger: a ~1 s name banner, no camera pan, no dialogue
+            if (_s.t == 1) { Scenario_ClearUi(); room_goto(rm_floor4); _st.placed = false; _st.seen = false; _st.hop = false; }   // leave and come back: a room_goto to the room you are in restarts it without a player
+            if (!_st.hop && _s.t > 5 && Scenario_FloorReady(rm_floor4) && _s.t > 30) { _st.hop = true; _st.h0 = _s.t; room_goto(rm_floor5); }
+            if (_st.hop && !_st.placed && _s.t > _st.h0 + 40 && Scenario_FloorReady(rm_floor5)) {
+                var _tg2 = instance_find(obj_dialogue_trigger, 0);
+                with (obj_enemy) instance_destroy();
+                Scenario_ClearUi();
+                Scenario_Check("banner_trigger_remembers_the_earlier_run", _tg2.triggered && _tg2.story_prev_seen);
+                Scenario_Check("banner_not_showing_before_contact", !Banner_Active());
+                var _plz = instance_find(obj_player, 0);
+                _plz.x = _tg2.x;
+                _plz.y = _tg2.y;
+                _plz.moving = false;
+                _plz.move_timer = 0;
+                _st.placed = true;
+                _st.tg = _tg2.id;
+            }
+            if (_st.placed && !_st.seen && Banner_Active()) {
+                _st.seen = true;
+                _st.b0 = _s.t;
+                Scenario_Check("banner_shows_the_boss_name", global.banner.text == EnemyDB_Get(ENEMY_MINI_BOSS).name, "text=" + global.banner.text);
+                Scenario_Check("banner_replaces_the_pan_and_dialogue", !_st.tg.cine_runtime_active && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && (!variable_struct_exists(_gs.ui, "cinematic_input_lock_count") || _gs.ui.cinematic_input_lock_count == 0));
+            }
+            if (_st.seen && !Banner_Active()) {
+                var _len = _s.t - _st.b0;
+                Scenario_Check("banner_lasts_about_one_second", _len >= 50 && _len <= 75, "frames=" + string(_len));
+                Scenario_Check("banner_does_not_come_back_on_the_same_visit", !DialogueTrigger_TryBanner(_st.tg));
+                _st.tg.banner_done = false;
+                _gs.boss_defeated.mini_boss = true;
+                Scenario_Check("banner_not_for_a_boss_already_beaten", !DialogueTrigger_TryBanner(_st.tg));
+                _gs.boss_defeated.mini_boss = false;
+                Scenario_Next(_s, 119);
+            }
+            if (_s.t > 900) { Scenario_Check("banner_shows_on_the_later_run", false, "placed=" + string(_st.placed) + " blocking=" + string(UI_IsBlocking()) + " done=" + string(variable_instance_exists(_st.tg, "banner_done")) + " prev=" + string(variable_instance_exists(_st.tg, "story_prev_seen")) + " en=" + string(_st.tg.trigger_enabled) + " cd=" + string(_st.tg.trigger_cooldown) + " pos=" + string(instance_find(obj_player, 0).x) + "," + string(instance_find(obj_player, 0).y) + " trg=" + string(_st.tg.x) + "," + string(_st.tg.y) + " overlap=" + string(place_meeting(instance_find(obj_player, 0).x, instance_find(obj_player, 0).y, _st.tg)) + " lock=" + string(_gs.ui.dialogue_lock) + " mode=" + string(_gs.ui.mode) + " tr=" + string(Transition_IsInputLocked()) + " raw=" + json_stringify(_gs.ui.lines_raw)); Scenario_Finish(); }
+            break;
+        case 119:   // a death with a killer: the spider's own line on the first fall (seed picks it), hold to skip
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Profile_Get().deaths = 0;
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 4443);
+            }
+            if (!variable_struct_exists(_st, "dying") && _s.t > 5 && Scenario_FloorReady(rm_floor1) && _s.t > 30) {
+                _st.dying = true;
+                Scenario_ClearUi();
+                GameState_SetBattleEnemy("c5_death_test", ENEMY_SPIDER, 1);
+                Player_OnDeath(_gs.player_ch);
+                Scenario_Check("death_hook_plays_the_falling_sound", global.sfx_last_key == "body_falling_wood", "key=" + string(global.sfx_last_key));
+                Scenario_Check("death_hook_decides_the_line_by_the_killer", is_struct(global.death_ctx) && global.death_ctx.killer == "enemy_spider" && global.death_ctx.pick.key == "death.killer.enemy_spider", "ctx=" + (is_struct(global.death_ctx) ? json_stringify(global.death_ctx.pick) : "none"));
+                Scenario_Check("death_hook_names_the_enemy_in_the_line", global.death_ctx.text == "Eight eyes. The last thing you saw.", "text=" + global.death_ctx.text);
+                _st.t0 = _s.t;
+            }
+            if (variable_struct_exists(_st, "dying") && instance_exists(obj_start_controller) && obj_start_controller.state == "run_flow" && !variable_struct_exists(_st, "flow0")) {
+                _st.flow0 = _s.t;
+                Scenario_Check("death_scene_starts_with_the_line", global.run_flow.phase == "death" && global.run_flow.ctx.text == "Eight eyes. The last thing you saw.");
+            }
+            if (variable_struct_exists(_st, "flow0")) {
+                var _u = _s.t - _st.flow0;
+                if (_u == 20) Scenario_Tap("confirm");
+                if (_u == 40) {
+                    Scenario_Check("death_scene_a_tap_does_not_skip", global.run_flow.phase == "death");
+                    Scenario_Hold("confirm", 100);
+                }
+                if (_u > 40 && global.run_flow.phase == "summary") {
+                    Scenario_Release();
+                    Scenario_Check("death_scene_holding_confirm_skips_to_the_summary", _u < 130, "u=" + string(_u));
+                    Scenario_Check("death_scene_summary_shows_the_run", global.run_flow.entry.result == "died" && global.run_flow.entry.cause == EnemyDB_Get(ENEMY_SPIDER).name, "cause=" + string(global.run_flow.entry.cause));
+                    Scenario_Finish();
+                }
+            }
+            if (_s.t > 900) { Scenario_Check("death_scene_with_a_killer_reaches_the_summary", false, "state=" + (instance_exists(obj_start_controller) ? string(obj_start_controller.state) : "none")); Scenario_Finish(); }
+            break;
+    }
+}
+
+// ---- C5 pictures (D103, D102, D107, D106, D105): the death line, the run summary, the echo pick, the wake line, a note in the world and being read,
+// the boss banner, the credits. One continuous run through the real flows at display scale 3. Writes profile.sav / run.sav in the gate's scratch folder.
+function Scenario_ShotStory(_s, _name, _flags = "") {
+    _s.shot = "shot_story_" + _name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+    Scenario_ShotLayout(_s.shot, _flags);
+}
+
+function Scenario_StepShotsStory(_s) {
+    var _gs = GameState_Get();
+    var _flow = (variable_global_exists("run_flow") && is_struct(global.run_flow)) ? global.run_flow : undefined;
+    var _scn = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    switch (_s.step) {
+        case 150:   // a run on a clean profile, then a death by a slime
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP story shots (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_Finish();
+                    break;
+                }
+                Scenario_ClearUi();
+                Profile_ResetForTest();
+                RunSave_Delete();
+                Scenario_SetWindowScale(3);
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 5551);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && _s.t > 40) {
+                Scenario_ClearUi();
+                GameState_SetBattleEnemy("c5_shot", ENEMY_SLIME, 1);
+                var _chd = _gs.player_ch;
+                _chd.level = 4;
+                _chd.inventory = Inv_Add(_chd.inventory, 11, 1);
+                GameState_SetPlayer(_chd);
+                _gs.run.kills = 3;
+                Player_OnDeath(_gs.player_ch);
+                Scenario_Next(_s, 151);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_story_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 151:   // the death line, faded in
+            if (is_struct(_flow) && _scn != noone && _scn.state == "run_flow" && _flow.phase == "death" && _flow.t >= 70) {
+                Scenario_Check("shots_story_death_line_text", _flow.ctx.text == "A slime. You were beaten by a slime.", "text=" + _flow.ctx.text);
+                Scenario_ShotStory(_s, "death_line", "fade=1");   // a line of text on a dark screen: the "mostly one colour" check does not apply
+                Scenario_Next(_s, 152);
+            }
+            if (_s.t > 900) { Scenario_Check("shots_story_reaches_the_death_line", false, "state=" + (_scn != noone ? string(_scn.state) : "none")); Scenario_Finish(); }
+            break;
+        case 152:   // jump to the summary (the skip itself is a smoke check)
+            if (_s.t == 4) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _flow.phase = "summary";
+                _flow.t = 0;
+            }
+            if (_s.t == 30) {
+                Scenario_ShotStory(_s, "summary");
+                Scenario_Next(_s, 153);
+            }
+            break;
+        case 153:   // confirm -> the echo pick
+            if (_s.t == 4) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+            if (_s.t == 10) Scenario_Tap("confirm");
+            if (_s.t == 50) {
+                Scenario_Check("shots_story_echo_pick_is_up", _flow.phase == "echo" && is_struct(_flow.menu), "phase=" + string(_flow.phase));
+                Scenario_ShotStory(_s, "echo");
+                Scenario_Next(_s, 154);
+            }
+            break;
+        case 154:   // take the first option -> run 2 at the tunnel entrance with the wake line
+            if (_s.t == 4) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Tap("confirm"); }
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor1) && _gs.ui.mode == UI_DIALOGUE) {
+                Scenario_Next(_s, 155);
+            }
+            if (_s.t > 900) { Scenario_Check("shots_story_wake_line_comes_up", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+            break;
+        case 155:   // the wake line, typed out
+            if (_s.t == 90) {
+                Scenario_Check("shots_story_wake_line_text", array_length(_gs.ui.lines_raw) == 1 && _gs.ui.lines_raw[0] == Loc_T("wake.t1", "x"), "lines=" + json_stringify(_gs.ui.lines_raw));
+                Scenario_ShotStory(_s, "wake");
+                Scenario_Next(_s, 156);
+            }
+            break;
+        case 156:   // a note in the world, then read
+            if (_s.t == 4) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                var _pl = Scenario_PlacePlayer(3, 6);
+                _pl.face = LEFT;
+            }
+            if (_s.t == 10) {
+                var _pl2 = instance_find(obj_player, 0);
+                Scenario_PlacePlayer(2, 6);
+                _pl2.face = LEFT;
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_story_note_is_the_prompt_target", instance_exists(instance_find(obj_player, 0).prompt_target) && variable_instance_exists(instance_find(obj_player, 0).prompt_target, "note_id"));
+                Scenario_ShotStory(_s, "note_world");
+                Scenario_Next(_s, 157);
+            }
+            break;
+        case 157:
+            if (_s.t == 4) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Tap("interact"); }
+            if (_s.t == 140) {
+                Scenario_Check("shots_story_note_is_open", _gs.ui.mode == UI_DIALOGUE && _gs.ui.speaker == Note_Find("map_page").title, "speaker=" + string(_gs.ui.speaker));
+                Scenario_ShotStory(_s, "note_read");
+                Scenario_Next(_s, 158);
+            }
+            break;
+        case 158:   // rm_floor5: the boss trigger was played on an earlier run -> the banner (leave and come back through rm_floor4)
+            if (room == rm_floor5 || room == rm_floor4) with (obj_enemy) instance_destroy();   // the room's hunters would start a battle
+            if (_s.t == 4) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                room_goto(rm_floor5);
+                _s.bn = 0;
+            }
+            if (variable_struct_exists(_s, "bn") && _s.bn == 0 && _s.t > 50 && Scenario_FloorReady(rm_floor5)) {
+                var _tg = instance_find(obj_dialogue_trigger, 0);
+                Story_Mark(_tg.story_key);
+                _s.bn = 1;
+                room_goto(rm_floor4);
+                _s.t = 9;
+            }
+            if (variable_struct_exists(_s, "bn") && _s.bn == 1 && _s.t > 50 && Scenario_FloorReady(rm_floor4)) {
+                _s.bn = 2;
+                room_goto(rm_floor5);
+                _s.t = 9;
+            }
+            if (variable_struct_exists(_s, "bn") && _s.bn == 2 && _s.t > 50 && Scenario_FloorReady(rm_floor5)) {
+                with (obj_enemy) instance_destroy();
+                Scenario_ClearUi();
+                var _tg2 = instance_find(obj_dialogue_trigger, 0);
+                var _pl3 = instance_find(obj_player, 0);
+                _pl3.x = _tg2.x;
+                _pl3.y = _tg2.y;
+                _pl3.moving = false;
+                _pl3.move_timer = 0;
+                _s.bn = 3;
+            }
+            if (variable_struct_exists(_s, "bn") && _s.bn == 3 && Banner_Active() && global.banner.t >= 28) {
+                Scenario_Check("shots_story_banner_names_the_boss", global.banner.text == EnemyDB_Get(ENEMY_MINI_BOSS).name, "text=" + global.banner.text);
+                Scenario_ShotStory(_s, "banner");
+                _s.held = false;
+                Scenario_Next(_s, 159);
+            }
+            if (_s.t > 900) { Scenario_Check("shots_story_banner_comes_up", false, "bn=" + string(variable_struct_exists(_s, "bn") ? _s.bn : -1)); Scenario_Finish(); }
+            break;
+        case 159:   // the ending, its closing text skipped, the credits roll
+            if (_s.t == 4) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_ClearUi();
+                _s.held = false;
+                Transition_RequestCutsceneById("ending");
+            }
+            if (_s.t > 6 && room == rm_cutscene && _scn != noone && _scn.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE && !_s.held) {
+                _s.held = true;
+                Scenario_Hold("confirm", 90);
+            }
+            if (_s.held && _scn != noone && _scn.state == "credits" && !variable_struct_exists(_s, "cr0")) {
+                Scenario_Release();
+                _s.cr0 = _s.t;
+            }
+            if (variable_struct_exists(_s, "cr0") && _scn.state == "credits") {
+                if (_scn.credits_t == 260) Scenario_ShotStory(_s, "credits_title", "fade=1");
+                if (_scn.credits_t == 760) { Scenario_ShotStory(_s, "credits_roll", "fade=1"); Scenario_Next(_s, 160); }
+            }
+            if (_s.t > 3000) { Scenario_Check("shots_story_credits_roll", false, "state=" + (_scn != noone ? string(_scn.state) : "none")); Scenario_Finish(); }
+            break;
+        case 160:
+            if (_s.t == 4) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_Finish();
+            }
             break;
     }
 }
@@ -4004,7 +4920,7 @@ function Scenario_StepShotsCards(_s) {
                 _gs.player_ch.stat_points = 0;
                 _gs.player_ch.offer = [];
                 CardsUi_Close();
-                Scenario_Next(_s, 150);   // C3: the economy pictures (150-159), then the D91 / DISP-10 / D48 pictures (step 50), then the skill animations
+                Scenario_Next(_s, 170);   // C3: the economy pictures (170-179), then the B4 pictures (140..148), then the D91 / DISP-10 / D48 pictures and the skill animations
             }
             break;
     }
@@ -4450,7 +5366,7 @@ function Scenario_StepBotEconomy(_s) {
 function Scenario_StepShotsEconomy(_s) {
     var _gs = GameState_Get();
     switch (_s.step) {
-        case 150:   // the shop's first screen
+        case 170:   // the shop's first screen
             if (_s.t == 1) {
                 var _g0 = Scenario_NewKnight(CLASS_KNIGHT);
                 _g0.run = Run_Create(2468);
@@ -4473,10 +5389,10 @@ function Scenario_StepShotsEconomy(_s) {
             if (_s.t == 140) {
                 Scenario_Check("shots_shop_open", ShopUi_IsOpen() && _gs.ui.mode == UI_SHOP);
                 Scenario_ShotUi(_s, "shop_root");
-                Scenario_Next(_s, 151);
+                Scenario_Next(_s, 171);
             }
             break;
-        case 151:   // the Buy list, the cursor on a throwable: sentence and numbers
+        case 171:   // the Buy list, the cursor on a throwable: sentence and numbers
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 ShopUi_RootConfirm(Ui_StackTop(global.shop_ui.stk), 0);
@@ -4485,10 +5401,10 @@ function Scenario_StepShotsEconomy(_s) {
             if (_s.t == 60) {
                 Scenario_Check("shots_shop_buy_open", Ui_StackTop(global.shop_ui.stk).id == "shop_buy");
                 Scenario_ShotUi(_s, "shop_buy");
-                Scenario_Next(_s, 152);
+                Scenario_Next(_s, 172);
             }
             break;
-        case 152:   // scale 5, a gear row, and the "not enough gold" line
+        case 172:   // scale 5, a gear row, and the "not enough gold" line
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Scenario_SetWindowScale(5);
@@ -4498,10 +5414,10 @@ function Scenario_StepShotsEconomy(_s) {
             if (_s.t == 50) {
                 global.shop_ui.msg_ms = current_time;
                 Scenario_ShotUi(_s, "shop_buy_s5");
-                Scenario_Next(_s, 153);
+                Scenario_Next(_s, 173);
             }
             break;
-        case 153:   // Korean, on a card
+        case 173:   // Korean, on a card
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Scenario_SetWindowScale(3);
@@ -4512,10 +5428,10 @@ function Scenario_StepShotsEconomy(_s) {
             }
             if (_s.t == 50) {
                 Scenario_ShotUi(_s, "shop_buy_ko");
-                Scenario_Next(_s, 154);
+                Scenario_Next(_s, 174);
             }
             break;
-        case 154:   // the Sell list (a worn charm is dimmed)
+        case 174:   // the Sell list (a worn charm is dimmed)
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Loc_SetLanguage("en");
@@ -4525,10 +5441,10 @@ function Scenario_StepShotsEconomy(_s) {
             if (_s.t == 50) {
                 Scenario_Check("shots_shop_sell_open", Ui_StackTop(global.shop_ui.stk).id == "shop_sell");
                 Scenario_ShotUi(_s, "shop_sell");
-                Scenario_Next(_s, 155);
+                Scenario_Next(_s, 175);
             }
             break;
-        case 155:   // the battle's Items menu with the four throwables, then the bar of an Ice Flask throw
+        case 175:   // the battle's Items menu with the four throwables, then the bar of an Ice Flask throw
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 ShopUi_Close();
@@ -4567,10 +5483,10 @@ function Scenario_StepShotsEconomy(_s) {
                 Scenario_Check("shots_throw_bar_is_up", _bc3.battle_state == BSTATE_ATTACK_TIMING && _bc3.qte_active && _bc3.throw_item == 32);
                 _s.shot = "shot_throw_bar.png";
                 Scenario_ShotLayout(_s.shot);
-                Scenario_Next(_s, 156);
+                Scenario_Next(_s, 176);
             }
             break;
-        case 156:   // an Armored elite Spider: the tag above its name
+        case 176:   // an Armored elite Spider: the tag above its name
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Scenario_GotoBattle("shots_eco_elite", ENEMY_SPIDER);
@@ -4589,10 +5505,10 @@ function Scenario_StepShotsEconomy(_s) {
             if (_s.t == 52) {
                 _s.shot = "shot_elite_tag.png";
                 Scenario_ShotLayout(_s.shot);
-                Scenario_Next(_s, 157);
+                Scenario_Next(_s, 177);
             }
             break;
-        case 157:   // an elite on the map (the pulsing outline, scale 4), then the merchant in his room with the gold counter
+        case 177:   // an elite on the map (the pulsing outline, scale 4), then the merchant in his room with the gold counter
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 var _g3 = Scenario_NewKnight(CLASS_KNIGHT);
@@ -4631,10 +5547,10 @@ function Scenario_StepShotsEconomy(_s) {
             if (_s.t == 215) {
                 _s.shot = "shot_merchant_world.png";
                 Scenario_ShotLayout(_s.shot);
-                Scenario_Next(_s, 158);
+                Scenario_Next(_s, 178);
             }
             break;
-        case 158:   // the Tab menu: a worn charm and the gold
+        case 178:   // the Tab menu: a worn charm and the gold
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 var _k4 = _gs.player_ch;
@@ -4655,16 +5571,16 @@ function Scenario_StepShotsEconomy(_s) {
             }
             if (_s.t == 50) {
                 Scenario_ShotUi(_s, "menu_gold");
-                Scenario_Next(_s, 159);
+                Scenario_Next(_s, 179);
             }
             break;
-        case 159:
+        case 179:
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Menu_Close(true);
                 Scenario_ClearUi();
                 variable_struct_remove(_gs, "run");   // the pictures after this one are of a game with no run going (the gold counter is a run thing)
-                Scenario_Next(_s, 50);   // on to the D91 / DISP-10 / D48 pictures, then the skill animations
+                Scenario_Next(_s, 140);   // B4 pictures (140..148), then the D91 / DISP-10 / D48 pictures and the skill animations
             }
             break;
     }

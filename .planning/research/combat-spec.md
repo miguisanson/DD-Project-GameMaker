@@ -167,3 +167,73 @@ itself boosted. Examples: a Wooden Sword basic hit (power 6) adds 3 (OK) or 5 (P
 
 **HUD data (pure):** `Battle_TimelineSlots(bc)` -> up to 5 `{ who (0 player, 1 enemy), current (the first), foresight (the Foresight preview, only on the first enemy slot while Foresight lasts) }`.
 Animation: when the order changes the strip slides for 120 ms (D97).
+
+
+## 12. Battle AI, telegraphed big attacks, boss phases (packet B4: D7 D59 D68 D75 D79 D80)
+Replaces "every skill rolls its own use chance, then the basic attack" (`Battle_EnemyChooseSkill`, `enemy_use_chance_*`) and the boss "double action" skills
+(Rampage, Fury). Readable and learnable (D68): a short priority list per enemy, with a weighted default so it is never fully predictable.
+
+**Brain (data).** Every enemy record has `brain = { rules, weights, phases }`, copied to the battle enemy (`e.brain`).
+```
+rule   = { label, when: [cond, ...], act: "attack" | "skill", skill, chance (default 1), max_uses (default -1 = no limit) }
+cond   = { c, v, status }      all conds of a rule must hold
+weight = { act: "attack" | "skill", skill, w }
+phase  = { at, spd_add, atk_add, banner (localization key suffix), banner_text (English), rules, weights }     bosses only
+```
+Conditions (`c`): `always`; `hp_below v` (own HP / max <= v); `hp_above v` (>= v); `player_hp_below v`; `player_buffed` (the player has any status that is not
+negative: `Status_IsNegative`); `player_has_status` / `player_missing_status` (`status`); `player_status_at_least` (`status`, `v` = stacks; a status
+without stacks counts 1); `self_has_status` / `self_missing_status`; `every_nth v` (this is the enemy's own turn number T and `T mod v == 0`; v >= 2).
+
+**`EnemyAI_Choose(e, p, ctx, rng)`** is pure (no globals except the databases) and returns `{ kind: "attack" | "skill" | "windup", skill_id (-1 = basic attack), rule (label) }`.
+`ctx = { turn (1-based own turn number), phase, uses (label -> times used), windup (-1 or a skill id), used_turn (skills used this turn), actions_left,
+force_damage_only }`; `rng` is a stream from `Rng_New` (the game passes the "combat" stream), so a seed gives the same choices.
+1. `ctx.windup >= 0`: the wind-up is paid, the big attack comes: `{ skill, windup, rule "windup_attack" }`. No random number is drawn.
+2. Lists = the rules and weights of phase `ctx.phase` (0 = the base lists; phase n replaces them completely).
+3. Rules in order: the first rule whose conds all hold, whose action is usable and whose `uses < max_uses` wins; if `chance < 1` one `Rng_Float` is drawn and the rule fires
+   only when it is below `chance` (otherwise the next rule is tried).
+4. Else one `Rng_Float` picks from the weights that are usable, in proportion to `w`. Nothing usable = the basic attack.
+5. A skill is usable when the enemy has it in `e.skills` (a rule naming a skill the enemy does not have is skipped, so `e.skills = []` means basic attacks only),
+   `Skill_CanUse`, `Skill_EnemyCanTrigger` (the skill's own gates: HP ratio, status missing, inventory, actions left) and not `enemy_once_per_turn` already used this turn.
+6. If the chosen skill has `telegraphed` the result is `kind "windup"` instead (same `skill_id`), unless step 1 produced it or `force_damage_only` (debug) is on.
+`force_damage_only` picks, with `Rng_Int`, one usable damaging skill (basic attack if none).
+
+**Telegraph (D7, D59).** A skill with `telegraphed: true` is a heavy move: it is announced for one turn, then it is used with the defence bar. It also has
+`uses_defensive_qte` and a row in `Qte_DefenceParams`. Starting value: heavy moves have `power_mult 1.5` (so they are really heavier than a basic hit; E1 tunes it).
+- The wind-up turn: the enemy does no damage and no status. `ai.windup = skill`, the log/banner says `windup_msg` ("Palehorn lowers its horns!"), the enemy's slots on the turn strip
+  wear a "!" mark while the wind-up is pending. The enemy's turn counter still advances.
+- The next enemy turn is the big attack (step 1), through the defence bar; `ai.windup` becomes -1.
+- **BREAK during the wind-up cancels it** (D75): `EnemyAI_Break(st)` clears `windup` and returns the cancelled skill; the cached plan is dropped, the log says
+  "{enemy}'s {skill} is broken off!". The BREAK push-back and +50% damage still apply. A stun does not cancel it.
+- Foresight (D79): the preview shows the wind-up turn ("winding up X") two actions ahead and then the big attack itself, both marked big.
+
+**Own turn counter.** `ai.turns` counts finished enemy turns (a free action does not end the turn; a wind-up does). `ctx.turn = ai.turns + 1`.
+
+**Phases (bosses).** `EnemyAI_PhaseFor(brain, hp_ratio)` = how many phases have `at >= hp_ratio` (phases are ordered by falling `at`). `EnemyAI_PhaseSync(st, e)` moves
+`st.phase` forward only (healing never goes back), applies `spd_add` / `atk_add` to `e.stats` for every phase reached (so a hit that skips a phase still gets both), drops the cached plan,
+and returns `{ changed, phase, banner }` (the banner of the last phase reached). The game calls it when the timeline advances and when a plan is made; the banner
+is shown as a battle message at the start of the enemy's next action. SPD is read again every turn (section 11), so a phase's extra SPD is simply more turns.
+No boss has a double action any more: Rampage and Fury stay in the skill table (ids are stable) but no enemy has them; Curse and Blessing stay as in B2.
+
+**New skills** (starting numbers): Regrow 28 (heal self, power 5, MAG: +5 + floor(MAG/4)); Snuff 29 (removes every non-negative status of the player); Gore 30 (ATK power 4, Bleeding 70%,
+3 turns, no bar); Pale Hymn 31 (MAG power 5 x1.5, telegraphed, defence bar). Telegraphed: Vine Trap, Cut, Ramming, Pale Hymn (all at `power_mult 1.5`).
+
+**Rule lists** (turn T = the enemy's own turn; "windup X" = X is telegraphed):
+| enemy | rules (in order) | default weights |
+|---|---|---|
+| Slime | `solidify_when_hurt`: hp <= 50% and no Solidify -> Solidify | attack 4, Solidify 1 |
+| Spider | `no_stacking_past_4`: player Poison >= 4 stacks -> attack; `open_with_poison`: player not poisoned, 60% -> Poison Fangs | attack 3, Poison Fangs 1 |
+| Snake | `no_stacking_past_3`: player Bleeding >= 3 -> attack; `open_with_bite`: player not bleeding, 50% -> Bite | attack 2, Bite 1 |
+| Dire Wolf | `howl_first`: no Bloodthirsty, 50% -> Bloodthirsty | attack 1 |
+| Mad Whisp | `snuff_buffs`: player buffed -> Snuff | attack 3, Scorching Touch 2 |
+| Killer Plant | `low_hp_heal`: hp <= 40%, once per battle -> Regrow; `vine_every_3rd`: every 3rd turn -> windup Vine Trap | attack 1 |
+| Ghost Sword | `cut_every_3rd`: every 3rd turn -> windup Cut | attack 1 |
+| Stranger | `grab_when_hurt`: hp <= 50%, once -> Steal | attack 5, Steal 1 |
+| Palehorn | `ram_every_3rd`: every 3rd turn -> windup Ramming | attack 1 |
+| Palehorn phase 1 (<= 60%: SPD +2) | `ram_every_3rd` | attack 2, Gore 1 |
+| Palehorn phase 2 (<= 30%: SPD +2, ATK +3) | `ram_every_2nd`: every 2nd turn -> windup Ramming | attack 1, Gore 2 |
+| Pale Choirbeast | `hymn_every_4th`: every 4th turn -> windup Pale Hymn | attack 3, Curse 1 (Curse keeps its own gate: HP <= 70%) |
+| Choirbeast phase 1 (<= 60%: SPD +2) | `bless_when_bare`: no Blessing, 50% -> Blessing (free action); `hymn_every_3rd` | attack 2, Curse 1 |
+| Choirbeast phase 2 (<= 30%: SPD +3, ATK +3) | `hymn_every_2nd` | attack 2, Curse 1 |
+Banners (English draft, Korean in the workbook): Palehorn 1 "Palehorn paws the ground, snorting!", 2 "Palehorn bellows in a blind rage!"; Choirbeast 1 "The Pale Choirbeast sings a second voice!",
+2 "The Pale Choirbeast howls in fury!". Wind-up lines: Vine Trap "{enemy} coils its vines!", Cut "{enemy} raises its blade!", Ramming "{enemy} lowers its horns!", Pale Hymn "{enemy} draws a deep breath!".
+No enemy heals, defends or flees beyond these (no such skills exist; "flee" is not built).
