@@ -83,6 +83,7 @@ function Test_RunAll() {
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     Test_RunSuite("Mem", Test_Suite_Mem);
     Test_RunSuite("Input", Test_Suite_Input);
+    Test_RunSuite("UI", Test_Suite_UI);
     Test_RunSuite("SfxInit", Test_Suite_SfxInit);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
@@ -1797,7 +1798,7 @@ function Test_Suite_SettingsMigration() {
     Save_DeleteFileSet(_f);
     Save_WriteSettingsConfig({ window_mode: WINDOW_MODE_BORDERLESS, display_scale: 6, audio_bgm: 0.4 }, _f);
     var _raw = json_parse(Test_RawRead(_f));
-    Test_Eq("DISP-14 written settings_version", _raw.settings_version, 8);
+    Test_Eq("DISP-14 written settings_version", _raw.settings_version, 9);   // 9 adds text_speed, screen_shake, qte_assist (D0)
     Test_Eq("DISP-14 written window_mode", _raw.window_mode, WINDOW_MODE_BORDERLESS);
     Test_False("DISP-14 written file has no fit_screen", variable_struct_exists(_raw, "fit_screen"));
     var _back = Save_ReadSettingsConfig(_f);
@@ -2015,4 +2016,341 @@ function Test_Suite_SfxInit() {
     SFX_EnsureAudioGlobals();
     Test_Eq("ROB-03 later calls do not overwrite live audio state", global.audio_debug_missing_count, 5);
     global.audio_debug_missing_count = 0;
+}
+
+
+// ---- D0 shared UI framework (D95-D98): the pure menu model in scr_menu.gml ("UI FRAMEWORK") ----------------------------------------
+// Expected values come from the decisions: D95 (wrap-around, hold-to-scroll after about 300 ms and accelerating, back = ONE level,
+// cursor remembered per menu id, hover/click/right-click/wheel), D97 (panels 120 ms) and the Galmuri native sizes (9 and 11 px).
+function Test_UiFireTimes(_dir, _ms_total) {
+    var _r = Ui_RepeatNew();
+    var _t0 = 5000;
+    var _times = [];
+    if (Ui_RepeatStep(_r, _dir, true, _t0) > 0) array_push(_times, 0);
+    for (var _ms = 4; _ms <= _ms_total; _ms += 4) {
+        if (Ui_RepeatStep(_r, _dir, false, _t0 + _ms) > 0) array_push(_times, _ms);
+    }
+    return _times;
+}
+
+function Test_Suite_UI() {
+    // --- list cursor with wrap-around
+    var _all = [true, true, true, true];
+    Test_Eq("D95 up from the first item wraps to the last", Ui_CursorMove(0, -1, _all), 3);
+    Test_Eq("D95 down from the last item wraps to the first", Ui_CursorMove(3, 1, _all), 0);
+    Test_Eq("D95 down moves one item", Ui_CursorMove(1, 1, _all), 2);
+    Test_Eq("D95 up moves one item", Ui_CursorMove(2, -1, _all), 1);
+    Test_Eq("D95 without wrap, up on the first stays", Ui_CursorMove(0, -1, _all, false), 0);
+    Test_Eq("D95 without wrap, down on the last stays", Ui_CursorMove(3, 1, _all, false), 3);
+    var _gap = [true, false, true, false];
+    Test_Eq("D95 a disabled item is skipped going down", Ui_CursorMove(0, 1, _gap), 2);
+    Test_Eq("D95 wrapping down past a disabled last item lands on the first", Ui_CursorMove(2, 1, _gap), 0);
+    Test_Eq("D95 wrapping up from the first skips a disabled last item", Ui_CursorMove(0, -1, _gap), 2);
+    Test_Eq("D95 without wrap, a disabled item at the end leaves the cursor", Ui_CursorMove(2, 1, _gap, false), 2);
+    Test_Eq("D95 when nothing is enabled the cursor stays", Ui_CursorMove(1, 1, [false, false]), 1);
+    Test_Eq("D95 an empty list gives index 0", Ui_CursorMove(0, 1, []), 0);
+
+    // --- hold to scroll: fires on the press, then after 300 ms, then faster (time based, not frames)
+    var _ft = Test_UiFireTimes(1, 2400);
+    Test_Eq("D95 holding fires on the press", (array_length(_ft) > 0) ? _ft[0] : -1, 0);
+    Test_True("D95 nothing repeats before 300 ms", array_length(_ft) > 1 && _ft[1] >= 300);
+    Test_True("D95 the first repeat comes soon after 300 ms", array_length(_ft) > 1 && _ft[1] <= 320);
+    Test_True("D95 hold repeats at least 8 times in 2.4 s", array_length(_ft) >= 9);
+    Test_True("D95 hold does not flood (under 70 steps in 2.4 s)", array_length(_ft) < 70);
+    if (array_length(_ft) >= 9) {
+        var _first_gap = _ft[2] - _ft[1];
+        var _late_gap = _ft[8] - _ft[7];
+        Test_True("D95 the repeat accelerates (later gaps are shorter)", _late_gap < _first_gap);
+        Test_True("D95 the repeat never goes below 20 ms per step", _late_gap >= 20);
+    }
+    var _rs = Ui_RepeatNew();
+    Ui_RepeatStep(_rs, 1, true, 100);
+    Test_Eq("D95 releasing stops repeating", Ui_RepeatStep(_rs, 0, false, 500), 0);
+    Test_Eq("D95 a new press after a release fires at once", Ui_RepeatStep(_rs, 1, true, 520), 1);
+    Test_Eq("D95 reversing direction fires at once", Ui_RepeatStep(_rs, -1, false, 530), 1);
+    Test_Eq("D95 held with no new press and no time passed: no step", Ui_RepeatStep(_rs, -1, false, 540), 0);
+
+    // --- remembered cursor per menu id
+    var _mem = Ui_MemNew();
+    Test_Eq("D95 an unknown menu starts at 0", Ui_MemGet(_mem, "title", 4), 0);
+    Ui_MemSet(_mem, "title", 2);
+    Ui_MemSet(_mem, "settings", 5);
+    Test_Eq("D95 title cursor is remembered", Ui_MemGet(_mem, "title", 4), 2);
+    Test_Eq("D95 settings cursor is remembered separately", Ui_MemGet(_mem, "settings", 10), 5);
+    Test_Eq("D95 a remembered cursor is clamped when the menu got shorter", Ui_MemGet(_mem, "settings", 3), 2);
+
+    // --- mouse hover mapping from rectangles
+    var _rects = [{ x: 10, y: 10, w: 100, h: 20 }, { x: 10, y: 30, w: 100, h: 20 }, { x: 10, y: 50, w: 100, h: 20 }];
+    Test_Eq("D95 hover inside the second row", Ui_HoverIndex(_rects, 50, 35), 1);
+    Test_Eq("D95 hover outside every row", Ui_HoverIndex(_rects, 200, 35), -1);
+    Test_Eq("D95 the top edge belongs to the row below", Ui_HoverIndex(_rects, 50, 30), 1);
+    Test_Eq("D95 one pixel above that edge is the row above", Ui_HoverIndex(_rects, 50, 29), 0);
+    Test_Eq("D95 the right edge is outside", Ui_HoverIndex(_rects, 110, 35), -1);
+    Test_Eq("D95 a disabled row is not hovered", Ui_HoverIndex(_rects, 50, 35, [true, false, true]), -1);
+
+    // --- scrolling window for lists longer than the panel
+    Test_Eq("UI scroll: a list that fits never scrolls", Ui_ScrollTop(3, 0, 6, 5), 0);
+    Test_Eq("UI scroll: the cursor below the window pulls it down", Ui_ScrollTop(5, 0, 4, 10), 2);
+    Test_Eq("UI scroll: the cursor above the window pulls it up", Ui_ScrollTop(0, 2, 4, 10), 0);
+    Test_Eq("UI scroll: the last item shows the last full window", Ui_ScrollTop(9, 0, 4, 10), 6);
+    Test_Eq("UI scroll: a cursor inside the window leaves it alone", Ui_ScrollTop(4, 3, 4, 10), 3);
+
+    // --- menu stack: Back always goes up ONE level
+    var _items = [
+        { id: "new", label: "New Game", kind: "button", enabled: true },
+        { id: "load", label: "Load Game", kind: "button", enabled: true },
+        { id: "settings", label: "Settings", kind: "button", enabled: true },
+        { id: "exit", label: "Exit Game", kind: "button", enabled: true }
+    ];
+    var _stk = Ui_StackNew();
+    Ui_StackPush(_stk, Ui_MenuNew("title", _items, {}));
+    Ui_StackPush(_stk, Ui_MenuNew("difficulty", _items, {}));
+    Test_Eq("D95 two menus deep", Ui_StackDepth(_stk), 2);
+    Test_Eq("D95 the top menu is the last pushed", Ui_StackTop(_stk).id, "difficulty");
+    Test_Eq("D95 back pops one level", Ui_StackBack(_stk), "pop");
+    Test_Eq("D95 after back the parent is on top", Ui_StackTop(_stk).id, "title");
+    Test_Eq("D95 after back one level remains", Ui_StackDepth(_stk), 1);
+    Test_Eq("D95 back at the root pops nothing", Ui_StackBack(_stk), "root");
+    Test_Eq("D95 the root stays", Ui_StackDepth(_stk), 1);
+
+    // --- one menu step from a snapshot (what the bot drives through the real input)
+    var _m = Ui_MenuNew("test_menu", _items, {});
+    var _s = Ui_SnapNew();
+    _s.up = true; _s.up_p = true;
+    var _ev = Ui_MenuStep(_m, _s, 1000);
+    Test_Eq("D95 up on the first item lands on the last", _m.cursor, 3);
+    Test_True("D95 that move is reported (for the blip)", _ev.moved);
+    Ui_MenuStep(_m, Ui_SnapNew(), 1016);   // released
+    _s = Ui_SnapNew();
+    _s.down = true; _s.down_p = true;
+    Ui_MenuStep(_m, _s, 1032);
+    Test_Eq("D95 down on the last item wraps to the first", _m.cursor, 0);
+    Ui_MenuStep(_m, Ui_SnapNew(), 1048);
+    _s = Ui_SnapNew();
+    _s.confirm = true;
+    _ev = Ui_MenuStep(_m, _s, 1064);
+    Test_True("D95 confirm is reported", _ev.confirm);
+    Test_Eq("D95 confirm names the item under the cursor", _ev.index, 0);
+    _s = Ui_SnapNew();
+    _s.back = true;
+    _ev = Ui_MenuStep(_m, _s, 1080);
+    Test_True("D95 back is reported", _ev.back);
+    Test_False("D95 back is not a confirm", _ev.confirm);
+    _items[1].enabled = false;
+    var _m2 = Ui_MenuNew("test_menu2", _items, {});
+    _m2.cursor = 0;
+    _s = Ui_SnapNew();
+    _s.down = true; _s.down_p = true;
+    Ui_MenuStep(_m2, _s, 2000);
+    Test_Eq("D95 a disabled item is skipped by the cursor", _m2.cursor, 2);
+    _m2.cursor = 1;
+    _s = Ui_SnapNew();
+    _s.confirm = true;
+    _ev = Ui_MenuStep(_m2, _s, 2016);
+    Test_False("D95 confirm on a disabled item does nothing", _ev.confirm);
+    _items[1].enabled = true;
+
+    // --- mouse: hover moves the cursor, click = confirm, right-click = back, wheel scrolls
+    var _mm = Ui_MenuNew("mouse_menu", _items, {});
+    _mm.rects = [{ x: 0, y: 0, w: 100, h: 20 }, { x: 0, y: 20, w: 100, h: 20 }, { x: 0, y: 40, w: 100, h: 20 }, { x: 0, y: 60, w: 100, h: 20 }];
+    _s = Ui_SnapNew();
+    _s.mouse_moved = true; _s.mx = 50; _s.my = 45;
+    _ev = Ui_MenuStep(_mm, _s, 3000);
+    Test_Eq("D95 hover moves the cursor to the row under the mouse", _mm.cursor, 2);
+    Test_True("D95 hover reports a move", _ev.moved);
+    Test_False("D95 hover alone does not confirm", _ev.confirm);
+    _s = Ui_SnapNew();
+    _s.mx = 50; _s.my = 65; _s.click = true;
+    _ev = Ui_MenuStep(_mm, _s, 3016);
+    Test_True("D95 left click on a row confirms", _ev.confirm);
+    Test_Eq("D95 the click selects the clicked row", _ev.index, 3);
+    _s = Ui_SnapNew();
+    _s.mx = 500; _s.my = 500; _s.click = true;
+    _ev = Ui_MenuStep(_mm, _s, 3032);
+    Test_False("D95 a click on empty space does nothing", _ev.confirm);
+    _s = Ui_SnapNew();
+    _s.rclick = true;
+    _ev = Ui_MenuStep(_mm, _s, 3048);
+    Test_True("D95 right click is back", _ev.back);
+    _mm.cursor = 1;
+    _s = Ui_SnapNew();
+    _s.wheel = -1;   // wheel down
+    Ui_MenuStep(_mm, _s, 3064);
+    Test_Eq("D95 wheel down moves to the next row", _mm.cursor, 2);
+    _s = Ui_SnapNew();
+    _s.wheel = 1;
+    Ui_MenuStep(_mm, _s, 3080);
+    Ui_MenuStep(_mm, _s, 3096);
+    Ui_MenuStep(_mm, _s, 3112);
+    Test_Eq("D95 wheel up stops at the first row (no wrap)", _mm.cursor, 0);
+
+    // --- left/right adjust (sliders, choices) hold-repeats like the vertical move
+    var _ma = Ui_MenuNew("adjust_menu", _items, {});
+    _s = Ui_SnapNew();
+    _s.right = true; _s.right_p = true;
+    _ev = Ui_MenuStep(_ma, _s, 4000);
+    Test_Eq("D95 right reports an adjust of +1", _ev.adjust, 1);
+    _s = Ui_SnapNew();
+    _s.right = true;
+    _ev = Ui_MenuStep(_ma, _s, 4100);
+    Test_Eq("D95 holding right does not adjust before 300 ms", _ev.adjust, 0);
+    _ev = Ui_MenuStep(_ma, _s, 4310);
+    Test_Eq("D95 holding right adjusts again after 300 ms", _ev.adjust, 1);
+    _s = Ui_SnapNew();
+    _s.left = true; _s.left_p = true;
+    _ev = Ui_MenuStep(_ma, _s, 4400);
+    Test_Eq("D95 left reports an adjust of -1", _ev.adjust, -1);
+
+    // --- D95 bindings: every menu action has its keys and pad buttons
+    Input_Init();
+    var _bd = global.input.bindings;
+    Test_True("D95 confirm: Space", array_contains(_bd.confirm, vk_space));
+    Test_True("D95 confirm: Z", array_contains(_bd.confirm, ord("Z")));
+    Test_True("D95 confirm: Enter", array_contains(_bd.confirm, vk_enter));
+    Test_True("D95 confirm: pad A", array_contains(Input_GamepadButtons("confirm"), gp_face1));
+    Test_True("D95 back: Esc", array_contains(_bd.cancel, vk_escape));
+    Test_True("D95 back: X", array_contains(_bd.cancel, ord("X")));
+    Test_True("D95 back: pad B", array_contains(Input_GamepadButtons("cancel"), gp_face2));
+    Test_True("D95 tab_prev: Q", array_contains(_bd.tab_prev, ord("Q")));
+    Test_True("D95 tab_next: E", array_contains(_bd.tab_next, ord("E")));
+    Test_True("D95 tab_prev: pad left shoulder", array_contains(Input_GamepadButtons("tab_prev"), gp_shoulderl));
+    Test_True("D95 tab_next: pad right shoulder", array_contains(Input_GamepadButtons("tab_next"), gp_shoulderr));
+    Test_True("D95 run stays on Shift", array_contains(_bd.run, vk_shift));
+    Test_False("D95 run no longer uses the shoulder buttons", array_contains(Input_GamepadButtons("run"), gp_shoulderl) || array_contains(Input_GamepadButtons("run"), gp_shoulderr));
+    Test_True("D95 run is on the pad triggers", array_contains(Input_GamepadButtons("run"), gp_shoulderlb) && array_contains(Input_GamepadButtons("run"), gp_shoulderrb));
+    Test_True("D95 interact stays on Space", array_contains(_bd.interact, vk_space));
+
+    // --- the same keys everywhere: confirm / back / arrows come from the game's input actions
+    Input_Init();
+    var _inp = global.input;
+    _inp.last_step_time = current_time;   // freeze Input_Update for this check
+    variable_struct_set(_inp.state, "confirm", { held: true, pressed: true });
+    variable_struct_set(_inp.state, "cancel", { held: true, pressed: true });
+    variable_struct_set(_inp.state, "menu_up", { held: true, pressed: true });
+    variable_struct_set(_inp.state, "menu_right", { held: true, pressed: false });
+    var _sn = Ui_ReadInput();
+    Test_True("D95 snapshot: confirm comes from the confirm action", _sn.confirm);
+    Test_True("D95 snapshot: back comes from the cancel action", _sn.back);
+    Test_True("D95 snapshot: up held", _sn.up);
+    Test_True("D95 snapshot: up pressed", _sn.up_p);
+    Test_True("D95 snapshot: right held", _sn.right);
+    Test_False("D95 snapshot: right not freshly pressed", _sn.right_p);
+    Test_False("D95 snapshot: down not held", _sn.down);
+    variable_struct_set(_inp.state, "confirm", { held: false, pressed: false });
+    variable_struct_set(_inp.state, "cancel", { held: false, pressed: false });
+    variable_struct_set(_inp.state, "menu_up", { held: false, pressed: false });
+    variable_struct_set(_inp.state, "menu_right", { held: false, pressed: false });
+    _inp.last_step_time = -1;
+
+    // --- motion helpers (D97): 120 ms panels, gliding cursor, gentle bob
+    Test_Eq("D97 panel animation starts at 0", Ui_AnimT(1000, 1000), 0);
+    Test_Eq("D97 panel animation is done after 120 ms", Ui_AnimT(1000, 1120), 1);
+    Test_Eq("D97 panel animation is 0 before its start", Ui_AnimT(1000, 900), 0);
+    Test_Eq("D97 panel animation stays at 1", Ui_AnimT(1000, 5000), 1);
+    var _mid = Ui_AnimT(1000, 1060);
+    Test_True("D97 halfway through it is strictly between 0 and 1", _mid > 0 && _mid < 1);
+    var _g1 = Ui_Glide(0, 100, 16);
+    Test_True("D97 the cursor glides toward its target without jumping", _g1 > 0 && _g1 < 100);
+    Test_True("D97 the cursor keeps gliding (monotonic)", Ui_Glide(_g1, 100, 16) > _g1);
+    Test_Eq("D97 the cursor arrives after a long time", Ui_Glide(0, 100, 2000), 100);
+    Test_Eq("D97 the cursor glides down too", Ui_Glide(100, 0, 2000), 0);
+    Test_Eq("D97 at its target it stays", Ui_Glide(40, 40, 16), 40);
+    var _lo = 99, _hi = -99;
+    for (var _bt = 0; _bt < 2000; _bt += 20) {
+        var _bv = Ui_Bob(_bt);
+        _lo = min(_lo, _bv);
+        _hi = max(_hi, _bv);
+    }
+    Test_Eq("D97 the bob never goes below 0", _lo, 0);
+    Test_Eq("D97 the bob is one UI pixel at most", _hi, 1);
+
+    // --- tabs header
+    Test_Eq("UI tabs: previous from the first wraps to the last", Ui_TabStep(0, 3, -1), 2);
+    Test_Eq("UI tabs: next from the last wraps to the first", Ui_TabStep(2, 3, 1), 0);
+    Test_Eq("UI tabs: no direction keeps the tab", Ui_TabStep(1, 3, 0), 1);
+
+    // --- Korean pixel font (D98): Galmuri's native sizes are 9 and 11 px, only whole multiples stay crisp
+    Test_Eq("D98 18 px target: Galmuri9 x2", Ui_KoFontChoice(18).px, 18);
+    Test_Eq("D98 22 px target: Galmuri11 x2", Ui_KoFontChoice(22).px, 22);
+    Test_Eq("D98 27 px target: Galmuri9 x3", Ui_KoFontChoice(27).px, 27);
+    Test_Eq("D98 33 px target: Galmuri11 x3", Ui_KoFontChoice(33).px, 33);
+    var _kc = Ui_KoFontChoice(25);
+    Test_True("D98 any target gives a whole multiple of a native size", (_kc.px mod _kc.face) == 0 && (_kc.face == 9 || _kc.face == 11));
+    Test_True("D98 any target lands within 3 px of it", abs(_kc.px - 25) <= 3);
+    Test_True("D98 tiny targets never go below 1x", Ui_KoFontChoice(3).px >= 9);
+
+    // --- settings model (the new rows persist; the window rows keep D91's logic)
+    var _def = GameSettings_Defaults();
+    Test_Eq("D0 text speed defaults to normal", _def.text_speed, 1);
+    Test_Eq("D0 screen shake defaults to on", _def.screen_shake, 1);
+    Test_Eq("D0 QTE assist defaults to off", _def.qte_assist, 0);
+    Test_Eq("D0 text speed is clamped high", GameSettings_Normalize({ text_speed: 9 }).text_speed, SETTINGS_TEXT_SPEED_MAX);
+    Test_Eq("D0 text speed is clamped low", GameSettings_Normalize({ text_speed: -3 }).text_speed, 0);
+    Test_Eq("D0 screen shake is a 0/1 flag", GameSettings_Normalize({ screen_shake: 5 }).screen_shake, 1);
+    Test_Eq("D0 QTE assist reads a boolean", GameSettings_Normalize({ qte_assist: true }).qte_assist, 1);
+    Test_True("D0 slower text speed is a smaller multiplier", Settings_TextSpeedMul(0) < Settings_TextSpeedMul(1) && Settings_TextSpeedMul(1) < Settings_TextSpeedMul(2));
+    Test_Eq("D0 normal text speed leaves the typewriter as it was", Settings_TextSpeedMul(1), 1);
+    var _sf = "test_settings_ui.json";
+    Save_DeleteFileSet(_sf);
+    Save_WriteSettingsConfig({ text_speed: 2, screen_shake: 0, qte_assist: 1 }, _sf);
+    var _sb = Save_ReadSettingsConfig(_sf);
+    Test_Eq("D0 text speed survives a save", is_struct(_sb) ? _sb.text_speed : -1, 2);
+    Test_Eq("D0 screen shake off survives a save", is_struct(_sb) ? _sb.screen_shake : -1, 0);
+    Test_Eq("D0 QTE assist on survives a save", is_struct(_sb) ? _sb.qte_assist : -1, 1);
+    Save_DeleteFileSet(_sf);
+    Test_RawWrite(_sf, "{\"settings_version\":8,\"display_scale\":4,\"window_mode\":0}");
+    var _s8 = Save_ReadSettingsConfig(_sf);
+    Test_Eq("D0 a version 8 file gets the default text speed", is_struct(_s8) ? _s8.text_speed : -1, 1);
+    Test_Eq("D0 a version 8 file gets screen shake on", is_struct(_s8) ? _s8.screen_shake : -1, 1);
+    Save_DeleteFileSet(_sf);
+
+    var _p = GameSettings_Defaults();
+    _p.audio_ui = 0.5;
+    Test_True("D0 volume + steps up", Settings_Adjust(_p, "vol_ui", 1, 16));
+    Test_True("D0 volume steps by 5 points", abs(_p.audio_ui - 0.55) < 0.0001);
+    _p.audio_ui = 1;
+    Test_False("D0 volume stops at 100", Settings_Adjust(_p, "vol_ui", 1, 16));
+    _p.window_mode = WINDOW_MODE_WINDOWED;
+    Settings_Adjust(_p, "window", -1, 16);
+    Test_Eq("D91 window mode wraps backwards to the last", _p.window_mode, WINDOW_MODE_EXCLUSIVE);
+    Settings_Adjust(_p, "window", 1, 16);
+    Test_Eq("D91 window mode wraps forwards to the first", _p.window_mode, WINDOW_MODE_WINDOWED);
+    _p.display_scale = 3;
+    Test_True("D91 windowed scale + goes up one", Settings_Adjust(_p, "scale", 1, 6));
+    Test_Eq("D91 scale is now 4", _p.display_scale, 4);
+    _p.display_scale = 6;
+    Test_False("D91 scale stops at the monitor's largest", Settings_Adjust(_p, "scale", 1, 6));
+    _p.window_mode = WINDOW_MODE_BORDERLESS;
+    _p.display_scale = 4;
+    Test_False("D91 scale does nothing outside windowed", Settings_Adjust(_p, "scale", 1, 6));
+    Test_Eq("D91 scale is untouched outside windowed", _p.display_scale, 4);
+    _p.language = "en";
+    Settings_Adjust(_p, "language", 1, 16);
+    Test_Eq("D0 language toggles to Korean", _p.language, "ko");
+    Settings_Adjust(_p, "language", 1, 16);
+    Test_Eq("D0 language toggles back", _p.language, "en");
+    _p.text_speed = 1;
+    Test_True("D0 text speed + goes faster", Settings_Adjust(_p, "text_speed", 1, 16));
+    Test_Eq("D0 text speed is now fast", _p.text_speed, 2);
+    Test_False("D0 text speed stops at the fastest", Settings_Adjust(_p, "text_speed", 1, 16));
+    Test_True("D0 screen shake toggles", Settings_Adjust(_p, "shake", 1, 16));
+    Test_Eq("D0 screen shake is now off", _p.screen_shake, 0);
+    Test_True("D0 QTE assist toggles", Settings_Adjust(_p, "qte_assist", -1, 16));
+    Test_Eq("D0 QTE assist is now on", _p.qte_assist, 1);
+
+    var _si = SettingsMenu_Items(GameSettings_Defaults(), 16);
+    var _ids = "";
+    for (var _i = 0; _i < array_length(_si); _i++) _ids += ((_i > 0) ? "," : "") + _si[_i].id;
+    Test_Eq("D0 settings rows, in order", _ids, "vol_ui,vol_sfx,vol_bgm,text_speed,shake,qte_assist,window,scale,language,apply");
+    Test_Eq("D0 settings volume row shows a percentage", _si[2].value, "60%");
+    Test_Eq("D0 settings volume row carries its slider fill", _si[2].amount, 0.6);
+    Test_False("D0 scale row is greyed outside windowed (borderless is the default)", _si[7].enabled);
+    var _pw = GameSettings_Defaults();
+    _pw.window_mode = WINDOW_MODE_WINDOWED;
+    Test_True("D0 scale row is live while windowed", SettingsMenu_Items(_pw, 16)[7].enabled);
+    Test_True("D100 every settings row has a plain help sentence", string_length(_si[0].help) > 0 && string_length(_si[6].help) > 0 && string_length(_si[9].help) > 0);
+    var _tm = Title_MainItems(false);
+    Test_Eq("D0 title menu has four items", array_length(_tm), 4);
+    Test_False("D0 Load Game is greyed with no save", _tm[1].enabled);
+    Test_True("D0 Load Game is live with a save", Title_MainItems(true)[1].enabled);
 }

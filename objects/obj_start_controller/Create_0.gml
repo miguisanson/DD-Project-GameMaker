@@ -1,25 +1,7 @@
-main_index = 0;
-main_options = [
-    Loc_T("menu.main.option.0", "New Game"),
-    Loc_T("menu.main.option.1", "Load Game"),
-    Loc_T("menu.main.option.2", "Settings"),
-    Loc_T("menu.main.option.3", "Exit Game")
-];
-main_option_keys = ["menu.main.option.0", "menu.main.option.1", "menu.main.option.2", "menu.main.option.3"];
-difficulty_options = [
-    Loc_T("settings.difficulty.option.0", "Easy"),
-    Loc_T("settings.difficulty.option.1", "Normal"),
-    Loc_T("settings.difficulty.option.2", "Hard")
-];
-difficulty_option_keys = ["settings.difficulty.option.0", "settings.difficulty.option.1", "settings.difficulty.option.2"];
-difficulty_values = [DIFFICULTY_EASY, DIFFICULTY_NORMAL, DIFFICULTY_HARD];
-difficulty_index = 1;
-difficulty_closing = false;
-difficulty_close_frame = UI_OPENED_FRAME_NONE;
-difficulty_pending_action = "";
-difficulty_pending_value = DIFFICULTY_NORMAL;
-
-difficulty_opened_frame = UI_OPENED_FRAME_NONE;
+// Title menu (D0 UI framework, scr_menu.gml Title_*): the stack is built on the first Step in state "main".
+title_stk = undefined;
+title_exit = undefined;      // { value, at }: the difficulty was chosen, the intro starts when the panel has faded
+title_refresh = true;        // relabel the title items (language or save files may have changed)
 cutscene_id = "";
 cutscene_started = false;
 cutscene_sequence = [];
@@ -192,7 +174,6 @@ __localize_cutscene("ending");
 __localize_cutscene("game_over");
 
 var gs = GameState_Get();
-load_available = Save_HasAnySlot();
 title_bg_sprite = noone;
 title_bg_layer_id = -1;
 
