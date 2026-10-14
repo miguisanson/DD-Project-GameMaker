@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T10:55:55Z",
-    "row_count": 736
+    "generated_at_utc": "2026-10-14T11:32:25Z",
+    "row_count": 845
   },
   "default_lang": "en",
   "languages": [
@@ -192,6 +192,398 @@
       "en": "You rest for a moment.",
       "ko": "잠시 쉬었다."
     },
+    "card.fb.focus.line": {
+      "en": "Your main stat grows by {n} for good.",
+      "ko": "주력 능력치가 영구히 {n} 오른다."
+    },
+    "card.fb.focus.name": {
+      "en": "Whetstone",
+      "ko": "숫돌"
+    },
+    "card.fb.gold.line": {
+      "en": "Take {n} gold.",
+      "ko": "골드 {n}을 얻는다."
+    },
+    "card.fb.gold.name": {
+      "en": "Coin Purse",
+      "ko": "동전 주머니"
+    },
+    "card.fb.rest.line": {
+      "en": "Restore {n}% of your HP and MP now.",
+      "ko": "지금 HP와 MP를 {n}% 회복한다."
+    },
+    "card.fb.rest.name": {
+      "en": "Second Breath",
+      "ko": "숨 고르기"
+    },
+    "card.lbl.after_fight": {
+      "en": "After fight",
+      "ko": "전투 후"
+    },
+    "card.lbl.arrows": {
+      "en": "Arrows",
+      "ko": "화살표"
+    },
+    "card.lbl.atk": {
+      "en": "ATK",
+      "ko": "ATK"
+    },
+    "card.lbl.chance": {
+      "en": "Chance",
+      "ko": "확률"
+    },
+    "card.lbl.def": {
+      "en": "DEF",
+      "ko": "DEF"
+    },
+    "card.lbl.each_turn": {
+      "en": "Each turn",
+      "ko": "매 턴"
+    },
+    "card.lbl.gold": {
+      "en": "Gold",
+      "ko": "골드"
+    },
+    "card.lbl.guard": {
+      "en": "Guard",
+      "ko": "방어"
+    },
+    "card.lbl.mag": {
+      "en": "MAG",
+      "ko": "MAG"
+    },
+    "card.lbl.main_stat": {
+      "en": "Main stat",
+      "ko": "주력 능력치"
+    },
+    "card.lbl.mp": {
+      "en": "MP",
+      "ko": "MP"
+    },
+    "card.lbl.perfect": {
+      "en": "Perfect zone",
+      "ko": "퍼펙트 구간"
+    },
+    "card.lbl.poison_stacks": {
+      "en": "Poison stacks",
+      "ko": "독 중첩"
+    },
+    "card.lbl.potion_find": {
+      "en": "Potion find",
+      "ko": "물약 발견"
+    },
+    "card.lbl.potion_mp": {
+      "en": "Potion MP",
+      "ko": "물약 MP"
+    },
+    "card.lbl.potions": {
+      "en": "Potions",
+      "ko": "물약"
+    },
+    "card.lbl.power": {
+      "en": "Power",
+      "ko": "위력"
+    },
+    "card.lbl.restores": {
+      "en": "Restores",
+      "ko": "회복량"
+    },
+    "card.lbl.skill_mp": {
+      "en": "Skill MP",
+      "ko": "스킬 MP"
+    },
+    "card.lbl.skill_power": {
+      "en": "Skill power",
+      "ko": "스킬 위력"
+    },
+    "card.lbl.skills": {
+      "en": "Skills",
+      "ko": "스킬"
+    },
+    "card.lbl.spd": {
+      "en": "SPD",
+      "ko": "SPD"
+    },
+    "card.lbl.stacks": {
+      "en": "Stacks",
+      "ko": "중첩"
+    },
+    "card.lbl.stagger": {
+      "en": "Stagger",
+      "ko": "경직"
+    },
+    "card.lbl.status_turns": {
+      "en": "Status turns",
+      "ko": "상태 턴"
+    },
+    "card.lbl.turns": {
+      "en": "Turns",
+      "ko": "턴"
+    },
+    "card.mp_short": {
+      "en": "{mp} MP",
+      "ko": "{mp} MP"
+    },
+    "card.pas.a_barbed.line": {
+      "en": "Your damage skills hit for {n} more power.",
+      "ko": "내 공격 스킬의 위력이 {n} 높아진다."
+    },
+    "card.pas.a_barbed.name": {
+      "en": "Barbed Arrows",
+      "ko": "가시 화살"
+    },
+    "card.pas.a_fleet_foot.line": {
+      "en": "Quicker than the wind: +{n} SPD for good.",
+      "ko": "바람보다 빠르게: 영구히 SPD +{n}."
+    },
+    "card.pas.a_fleet_foot.name": {
+      "en": "Fleet Foot",
+      "ko": "날랜 발"
+    },
+    "card.pas.a_second_wind.line": {
+      "en": "Regain {n} MP after each fight you win.",
+      "ko": "전투에서 이길 때마다 MP를 {n} 회복한다."
+    },
+    "card.pas.a_second_wind.name": {
+      "en": "Second Wind",
+      "ko": "두 번째 숨"
+    },
+    "card.pas.coin_sense.line": {
+      "en": "Find {n}% more gold.",
+      "ko": "골드를 {n}% 더 얻는다."
+    },
+    "card.pas.coin_sense.name": {
+      "en": "Coin Sense",
+      "ko": "돈 냄새"
+    },
+    "card.pas.field_medic.line": {
+      "en": "Heal {n} HP after each fight you win.",
+      "ko": "전투에서 이길 때마다 HP를 {n} 회복한다."
+    },
+    "card.pas.field_medic.name": {
+      "en": "Field Medic",
+      "ko": "야전 의무병"
+    },
+    "card.pas.k_bulwark.line": {
+      "en": "Guard on yourself lasts {n} turns longer.",
+      "ko": "나에게 건 방어 효과가 {n}턴 더 오래간다."
+    },
+    "card.pas.k_bulwark.name": {
+      "en": "Bulwark",
+      "ko": "방벽"
+    },
+    "card.pas.k_heavy_hands.line": {
+      "en": "A harder swing: +{n} ATK for good.",
+      "ko": "더 묵직한 일격: 영구히 ATK +{n}."
+    },
+    "card.pas.k_heavy_hands.name": {
+      "en": "Heavy Hands",
+      "ko": "묵직한 손"
+    },
+    "card.pas.k_iron_hide.line": {
+      "en": "Thick armour sense: +{n} DEF for good.",
+      "ko": "단단한 감각: 영구히 DEF +{n}."
+    },
+    "card.pas.k_iron_hide.name": {
+      "en": "Iron Hide",
+      "ko": "강철 가죽"
+    },
+    "card.pas.m_arcane_well.line": {
+      "en": "A deeper well: +{n} MAG for good.",
+      "ko": "더 깊은 샘: 영구히 MAG +{n}."
+    },
+    "card.pas.m_arcane_well.name": {
+      "en": "Arcane Well",
+      "ko": "비전의 샘"
+    },
+    "card.pas.m_cold_focus.line": {
+      "en": "Statuses you inflict last {n} turn longer.",
+      "ko": "내가 거는 상태 이상이 {n}턴 더 오래간다."
+    },
+    "card.pas.m_cold_focus.name": {
+      "en": "Cold Focus",
+      "ko": "차가운 집중"
+    },
+    "card.pas.m_spellweave.line": {
+      "en": "Your skills cost {n} MP less (never below 1).",
+      "ko": "스킬의 MP 소모가 {n} 줄어든다 (최소 1)."
+    },
+    "card.pas.m_spellweave.name": {
+      "en": "Spellweave",
+      "ko": "주문 엮기"
+    },
+    "card.pas.mana_spring.line": {
+      "en": "Regain {n} MP at the start of each of your turns.",
+      "ko": "내 턴이 시작될 때마다 MP를 {n} 회복한다."
+    },
+    "card.pas.mana_spring.name": {
+      "en": "Mana Spring",
+      "ko": "마나의 샘"
+    },
+    "card.pas.n_apothecary.line": {
+      "en": "Potions work {n}% better.",
+      "ko": "물약의 효과가 {n}% 커진다."
+    },
+    "card.pas.n_apothecary.name": {
+      "en": "Apothecary",
+      "ko": "약제사"
+    },
+    "card.pas.n_scrounger.line": {
+      "en": "{n}% chance to find a potion after each fight you win.",
+      "ko": "전투에서 이길 때마다 {n}% 확률로 물약을 줍는다."
+    },
+    "card.pas.n_scrounger.name": {
+      "en": "Scrounger",
+      "ko": "주워 모으는 자"
+    },
+    "card.pas.n_tonic.line": {
+      "en": "Healing potions also restore {n} MP.",
+      "ko": "회복 물약이 MP도 {n} 회복시킨다."
+    },
+    "card.pas.n_tonic.name": {
+      "en": "Tonic Blend",
+      "ko": "강장제 배합"
+    },
+    "card.pas.opening_blow.line": {
+      "en": "Enemies start each fight with {n} stagger.",
+      "ko": "전투가 시작될 때 적의 경직이 {n} 쌓여 있다."
+    },
+    "card.pas.opening_blow.name": {
+      "en": "Opening Blow",
+      "ko": "선제 일격"
+    },
+    "card.pas.potion_lore.line": {
+      "en": "Potions work {n}% better.",
+      "ko": "물약의 효과가 {n}% 커진다."
+    },
+    "card.pas.potion_lore.name": {
+      "en": "Potion Lore",
+      "ko": "물약 지식"
+    },
+    "card.pas.quick_feet.line": {
+      "en": "Light on your feet: +{n} SPD for good.",
+      "ko": "가벼운 발걸음: 영구히 SPD +{n}."
+    },
+    "card.pas.quick_feet.name": {
+      "en": "Quick Feet",
+      "ko": "빠른 발"
+    },
+    "card.pas.steady_hands.line": {
+      "en": "Perfect zones are {n}% wider.",
+      "ko": "퍼펙트 구간이 {n}% 넓어진다."
+    },
+    "card.pas.steady_hands.name": {
+      "en": "Steady Hands",
+      "ko": "흔들림 없는 손"
+    },
+    "card.pas.venom_coat.line": {
+      "en": "Poison you apply lands {n} extra stack.",
+      "ko": "내가 거는 독이 {n}중첩 더 쌓인다."
+    },
+    "card.pas.venom_coat.name": {
+      "en": "Venom Coat",
+      "ko": "독 바르기"
+    },
+    "card.skill.buff": {
+      "en": "Gain {status} for {turns} turns.",
+      "ko": "{status} 효과를 {turns}턴 동안 얻는다."
+    },
+    "card.skill.hit": {
+      "en": "Strike for {power} power.",
+      "ko": "위력 {power}로 공격한다."
+    },
+    "card.skill.hit_status": {
+      "en": "{chance}% to inflict {status}.",
+      "ko": "{chance}% 확률로 {status} 부여."
+    },
+    "card.skill.hits": {
+      "en": "Strike {hits} times for {power} power each.",
+      "ko": "{hits}번 공격한다. 한 번에 위력 {power}."
+    },
+    "card.skill.other": {
+      "en": "A special technique.",
+      "ko": "특수한 기술."
+    },
+    "card.tag.boon": {
+      "en": "Boon",
+      "ko": "은총"
+    },
+    "card.tag.class_passive": {
+      "en": "Class passive",
+      "ko": "직업 패시브"
+    },
+    "card.tag.passive": {
+      "en": "Passive",
+      "ko": "패시브"
+    },
+    "card.tag.skill": {
+      "en": "Skill",
+      "ko": "스킬"
+    },
+    "card.tag.upgrade": {
+      "en": "Upgrade",
+      "ko": "강화"
+    },
+    "card.val.hp": {
+      "en": "+{n} HP",
+      "ko": "HP +{n}"
+    },
+    "card.val.mp": {
+      "en": "+{n} MP",
+      "ko": "MP +{n}"
+    },
+    "card.val.restores": {
+      "en": "{pct} HP, MP",
+      "ko": "HP, MP {pct}"
+    },
+    "card.val.turns": {
+      "en": "+{n} turns",
+      "ko": "+{n}턴"
+    },
+    "cards.pick.hint": {
+      "en": "Left / Right to choose, confirm to take it",
+      "ko": "좌/우로 고르고, 확인으로 받는다"
+    },
+    "cards.pick.left": {
+      "en": "({n} picks left)",
+      "ko": "(남은 선택 {n}번)"
+    },
+    "cards.pick.skip": {
+      "en": "Skip: +{gold} gold",
+      "ko": "건너뛰기: +{gold} 골드"
+    },
+    "cards.pick.title": {
+      "en": "Choose a card",
+      "ko": "카드를 고르세요"
+    },
+    "cards.replace.keep": {
+      "en": "Keep my skills",
+      "ko": "스킬 유지"
+    },
+    "cards.replace.keep_help": {
+      "en": "Go back to the cards and choose again.",
+      "ko": "카드 화면으로 돌아가 다시 고릅니다."
+    },
+    "cards.replace.lose": {
+      "en": "Gives up: {line}",
+      "ko": "잃는 것: {line}"
+    },
+    "cards.replace.title": {
+      "en": "Learn {skill}: replace which?",
+      "ko": "{skill} 배우기: 무엇을 바꿀까요?"
+    },
+    "cards.stat.after": {
+      "en": "After",
+      "ko": "이후"
+    },
+    "cards.stat.now": {
+      "en": "Now",
+      "ko": "현재"
+    },
+    "cards.stat.title": {
+      "en": "Level {lvl}: place 1 point",
+      "ko": "레벨 {lvl}: 포인트 1개 배분"
+    },
     "class.classselect_draw.2029.0": {
       "en": "class.select.title",
       "ko": "클래스.선택.제목"
@@ -207,6 +599,30 @@
     "class.classselect_draw.2066.1": {
       "en": "Back",
       "ko": "뒤쪽에"
+    },
+    "class.lbl.five": {
+      "en": "5 to find",
+      "ko": "5개 발견 가능"
+    },
+    "class.lbl.none": {
+      "en": "None",
+      "ko": "없음"
+    },
+    "class.line.archer": {
+      "en": "Fast and sharp. High speed, poison and double shots to find.",
+      "ko": "빠르고 날카롭다. 높은 속도, 독과 연속 사격을 찾아보자."
+    },
+    "class.line.knight": {
+      "en": "A sturdy fighter. Strong attack and defence, five skills to find.",
+      "ko": "듬직한 전사. 강한 공격과 방어, 찾아야 할 스킬 5개."
+    },
+    "class.line.mage": {
+      "en": "A spell caster. Great magic and mana, five spells to find.",
+      "ko": "주문 시전자. 뛰어난 마법과 마나, 찾아야 할 주문 5개."
+    },
+    "class.line.nobody": {
+      "en": "No skills at all. Fight with your blade, your passives and your items.",
+      "ko": "스킬이 전혀 없다. 칼, 패시브, 아이템으로 싸운다."
     },
     "class.name.archer": {
       "en": "Archer",
@@ -239,6 +655,18 @@
     "class.name.warrior": {
       "en": "Warrior",
       "ko": "전사"
+    },
+    "class.nobody.locked": {
+      "en": "Locked",
+      "ko": "잠김"
+    },
+    "class.nobody.locked_hint": {
+      "en": "Win a run to unlock this path.",
+      "ko": "한 번 승리하면 이 길이 열립니다."
+    },
+    "class.select.become": {
+      "en": "Become {cls}?",
+      "ko": "{cls}(이)가 될까요?"
     },
     "class.select.title": {
       "en": "Select Class",
@@ -1595,6 +2023,14 @@
     "menu.common.confirm": {
       "en": "Confirm",
       "ko": "확인하다"
+    },
+    "menu.common.no": {
+      "en": "No",
+      "ko": "아니오"
+    },
+    "menu.common.yes": {
+      "en": "Yes",
+      "ko": "예"
     },
     "menu.difficulty.title": {
       "en": "Select Difficulty",

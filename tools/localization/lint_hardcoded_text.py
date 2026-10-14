@@ -88,6 +88,12 @@ ALLOW_PREFIX = (
     "enemy_skill_",
     "dialogue_",
     "interact.name.",
+    "skill:",   # C2 card ids (scr_db_skill)
+    "up:",
+    "pas:",
+    "fb:",
+    "card.pas.",
+    "card.fb.",
 )
 
 SKIP_LINE_TOKENS = (
@@ -108,7 +114,7 @@ SKIP_LINE_TOKENS = (
 SKIP_FUNCTIONS_BY_FILE = {
     "scripts/scr_dialogue/scr_dialogue.gml": {"DialogueDB_Init"},
     "scripts/scr_db_item/scr_db_item.gml": {"ItemDB_Init", "ItemDB_GetPassiveTemplate"},
-    "scripts/scr_db_skill/scr_db_skill.gml": {"SkillDB_Init"},
+    "scripts/scr_db_skill/scr_db_skill.gml": {"SkillDB_Init", "CardDB_Init"},   # C2: the card table is data; Card_Name and Card_Sentence look the text up with Loc_T
     "scripts/scr_db_enemy/scr_db_enemy.gml": {"EnemyDB_Init"},
     "scripts/scr_status/scr_status.gml": {"StatusDB_Init"},
 }

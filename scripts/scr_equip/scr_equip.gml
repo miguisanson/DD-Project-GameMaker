@@ -134,6 +134,8 @@ function Equip_GetPassives(_ch) {
         if (variable_struct_exists(it, "passive_params") && is_struct(it.passive_params)) pparams = it.passive_params;
         array_push(out, { id: pid, params: pparams, item_id: it.id, item_name: it.name });
     }
+    var card_passives = Card_EquipPassives(_ch);   // C2: passive cards read like equipment passives (Mana Spring)
+    for (var c = 0; c < array_length(card_passives); c++) array_push(out, card_passives[c]);
     return out;
 }
 

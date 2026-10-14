@@ -23,8 +23,7 @@ function Player_NormalizeProgression(_ch, _recompute_resources = true, _clamp_ex
     if (!variable_struct_exists(_ch, "stat_points")) _ch.stat_points = 0;
     _ch.stat_points = max(0, round(_ch.stat_points));
 
-    if (!variable_struct_exists(_ch, "stun_immune_turns")) _ch.stun_immune_turns = 0;
-    _ch.stun_immune_turns = max(0, round(_ch.stun_immune_turns));
+    Card_EnsureFields(_ch);
 
     if (!variable_struct_exists(_ch, "exp")) _ch.exp = 0;
     _ch.exp = max(0, round(_ch.exp));
@@ -70,10 +69,10 @@ function LevelUp_ClassGrowthGain(_class_id, _new_level) {
     return { atk:0, def:0, spd:0, mag:0 };
 }
 
-// Free points are placed by the player (level-up UI, later); until then they go to the class default at once.
+// Free points are placed by the player in a run (the stat prompt, CardsUi); outside a run (tests, tools) they go to the class default at once.
 function Level_AutoPlaceEnabled() {
     if (!variable_global_exists("levelup_auto_place")) global.levelup_auto_place = true;
-    return global.levelup_auto_place;
+    return global.levelup_auto_place && !Run_IsActive();   // C2: during a run the player places the point (the stat prompt); tests and tools still auto-place
 }
 
 // D76: spends one banked free point on _stat_id (STAT_ATK/DEF/SPD/MAG). Does nothing without a point or with an unknown stat.
@@ -112,6 +111,9 @@ function LevelUp_ApplyLevel(_ch) {
     _ch.last_growth.def += gain.def;
     _ch.last_growth.spd += gain.spd;
     _ch.last_growth.mag += gain.mag;
+
+    // D81: a 1-of-3 card pick at every level-up.
+    _ch.card_picks = max(0, _ch.card_picks) + 1;
 
     // D76: one free point per level.
     _ch.stat_points = max(0, _ch.stat_points) + LEVEL_FREE_POINTS_PER_LEVEL;
@@ -241,4 +243,68 @@ function Player_AddExp(_ch, _amount) {
     _ch.exp += grant;
     _ch = LevelUp_FromExp(_ch);
     return _ch;
+}
+
+// ==========================================================================================================================
+// C2: what a character owes the player (D73, D76, D81, D82): a class choice, a place for a taken skill, a free stat point, a 1-of-3
+// card pick. The debts live on the character (class_pick, skill_pending, stat_points, card_picks), so a save or a reload cannot lose them;
+// the screens (scr_menu: CardsUi_*) open them one by one, in the order below.
+// ==========================================================================================================================
+function Cards_NextOwed(_ch) {
+    if (!is_struct(_ch)) return "";
+    Card_EnsureFields(_ch);
+    if (_ch.class_pick) return "class";
+    if (_ch.skill_pending >= 0) return "replace";
+    if (!Level_AutoPlaceEnabled() && _ch.stat_points > 0) return "stat";
+    if (_ch.card_picks > 0 && _ch.class_chosen) return "cards";   // picks wait for the class (so they come from its pool)
+    return "";
+}
+
+// A pick was answered (a card taken or skipped): one less owed, the shown offer forgotten.
+function Cards_ConsumePick(_ch) {
+    Card_EnsureFields(_ch);
+    _ch.card_picks = max(0, _ch.card_picks - 1);
+    _ch.offer = [];
+    _ch.skill_pending = -1;
+    return _ch;
+}
+
+// A class or skill chest was opened (D73): the first one owes the class choice, every later one a 1-of-3 pick. Returns a changed copy.
+function Cards_ChestOpened(_ch) {
+    var ch = Card_EnsureFields(variable_clone(_ch));
+    if (!ch.class_chosen) ch.class_pick = true;
+    else ch.card_picks += 1;
+    return ch;
+}
+
+// The four rows of the free-point prompt: the stat, its value now and after the point.
+function Cards_StatOptions(_ch) {
+    var ids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG];
+    var out = [];
+    for (var i = 0; i < 4; i++) {
+        var from = variable_struct_get(_ch.stats, Stat_Key(ids[i]));
+        array_push(out, { stat: ids[i], label: Stat_ShortName(ids[i]), from: from, to: StatClamp(from + 1) });
+    }
+    return out;
+}
+
+// Spends one banked point on _stat_id (Level_ApplyFreePoint) and gives the extra MP a MAG point adds.
+function Cards_PlaceStat(_ch, _stat_id) {
+    var max_mp0 = _ch.max_mp;
+    _ch = Level_ApplyFreePoint(_ch, _stat_id);
+    _ch = RecomputeResources(_ch);
+    _ch.mp = clamp(_ch.mp + max(0, _ch.max_mp - max_mp0), 0, _ch.max_mp);
+    return _ch;
+}
+
+// The pick screen's cursor: positions 0.._n-1 are the cards, _n is Skip. Left / right walk the cards (wrapping, D95); down goes to Skip; up
+// returns to the card it came from (_last).
+function Cards_PickMove(_cur, _n, _dx, _dy, _last) {
+    if (_cur >= _n) {
+        if (_dy < 0) return clamp(_last, 0, _n - 1);
+        return _n;
+    }
+    if (_dy > 0) return _n;
+    if (_dx != 0) return (_cur + ((_dx < 0) ? -1 : 1) + _n) mod _n;
+    return _cur;
 }

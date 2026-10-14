@@ -242,7 +242,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : ((_mode == "gridshots") ? 8000 : 6000)), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined };
+                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : ((_mode == "gridshots") ? 8000 : 9000)), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined };
 }
 
 function Scenario_Finish() {
@@ -424,6 +424,9 @@ function Scenario_StepSmoke(_s) {
             break;
         case 100: case 101: case 102: case 103: case 104: case 105: case 106: case 107: case 108: case 109: case 110: case 111: case 112:
             Scenario_StepSmokeRun(_s);   // C1: the run loop through the real flows
+            break;
+        case 133: case 134: case 135: case 136: case 137: case 138: case 139: case 140: case 141:
+            Scenario_StepSmokeCards(_s);   // C2: class screen, card pick, stat point, replace a skill
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -1887,6 +1890,9 @@ function Scenario_StepShots(_s) {
         case 90: case 91: case 92: case 93: case 94: case 95: case 96: case 97:
             Scenario_StepShotsTurns(_s);
             break;
+        case 120: case 121: case 122: case 123: case 124: case 125: case 126: case 127: case 128:
+            Scenario_StepShotsCards(_s);
+            break;
         default:
             Scenario_StepShotsDisp(_s);
             break;
@@ -2297,7 +2303,7 @@ function Scenario_StepShotsTurns(_s) {
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 _s.si = 0;
-                Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
+                Scenario_Next(_s, 120);   // C2: the card screens (120-128), then the D91 / DISP-10 / D48 pictures (step 50), then the skill animations
             }
             break;
     }
@@ -3148,6 +3154,14 @@ function Export_Build() {
         var seq = Qte_SkillSequence(data.skills[si].id);
         data.skills[si].sequence_length = is_array(seq) ? array_length(seq) : 0;
     }
+    // C2: the cards (D82), with the numbers the game reads and the text it shows, for the simulator's build rules
+    data.cards = [];
+    var card_all = CardDB_All();
+    for (var cdi = 0; cdi < array_length(card_all); cdi++) {
+        var cd = card_all[cdi];
+        array_push(data.cards, Export_Clean({ id: cd.id, kind: cd.kind, skill_id: cd.skill_id, classes: cd.classes, params: cd.params, up: cd.up, name: Card_Name(cd), sentence: Card_Sentence(cd) }));
+    }
+    data.constants.cards = { pity_offers: CARD_PITY_OFFERS, max_skills: CARD_MAX_SKILLS, offer_size: CARD_OFFER_SIZE, skip_gold: CARD_SKIP_GOLD };
     data.items = Export_MapRecords(global.item_db, ItemDB_Get);
     data.statuses = Export_MapRecords(global.status_db, StatusDB_Get);
     data.loot = { tables: {}, configs: {}, tier_weights: Export_Clean(global.loot_tier_weights) };
@@ -3193,7 +3207,8 @@ function Scenario_StepExportData(_s) {
         Scenario_Check("exportdata_classes_4_unique", array_length(parsed.classes) == 4 && Export_IdsUnique(parsed.classes));
         Scenario_Check("exportdata_enemies_10_unique", array_length(parsed.enemies) == 10 && Export_IdsUnique(parsed.enemies));
         Scenario_Check("exportdata_skills_27_unique", array_length(parsed.skills) == 27 && Export_IdsUnique(parsed.skills));
-        Scenario_Check("exportdata_items_37_unique", array_length(parsed.items) == 37 && Export_IdsUnique(parsed.items));
+        Scenario_Check("exportdata_items_23_unique", array_length(parsed.items) == 23 && Export_IdsUnique(parsed.items));
+        Scenario_Check("exportdata_cards_51", array_length(parsed.cards) == 51);
         Scenario_Check("exportdata_statuses_14_unique", array_length(parsed.statuses) == 14 && Export_IdsUnique(parsed.statuses));
         Scenario_Check("exportdata_level_table_10_rows", array_length(parsed.levels) == LEVEL_CAP_TECHNICAL && parsed.levels[0].exp_next == 12);
         Scenario_Check("exportdata_class_table_matches_the_game", parsed.classes[0].by_level[LEVEL_CAP_TECHNICAL - 1].hp > 0);
@@ -3615,7 +3630,7 @@ function Scenario_StepSmokeRun(_s) {
             if (_s.t == 40) Scenario_Tap("confirm");
             if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && _s.t > 60) {
                 Scenario_Check("abandon_next_run_starts_at_level_1", _gs.player_ch.level == 1 && Run_IsActive() && Profile_Get().runs_started == 3, "runs_started=" + string(Profile_Get().runs_started));
-                Scenario_Next(_s, 111);
+                Scenario_Next(_s, 133);   // C2: the card screens in this run (step 111, the win, follows them)
             }
             if (_s.t > 600) { Scenario_Check("abandon_next_run_reaches_rm_floor1", false, "room=" + room_get_name(room) + " phase=" + string(global.run_flow.phase)); Scenario_Finish(); }
             break;
@@ -3636,6 +3651,7 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Check("win_ending_cutscene_played_once", _rl.held && Story_Seen(Story_CutsceneKey("ending")));
                 Scenario_Check("win_counts_one_win", _pf4.wins == 1 && _pf4.deaths == 2, "wins=" + string(_pf4.wins) + " deaths=" + string(_pf4.deaths));
                 Scenario_Check("win_first_win_unlocks_the_nobody_class", Profile_IsUnlocked(_pf4, "nobody_class"));
+                Scenario_Check("win_nobody_is_open_on_the_class_screen_after", !CardsUi_ClassMenu().items[3].locked && !Card_ClassChoices()[3].locked);
                 Scenario_Check("win_history_says_won", _pf4.history[array_length(_pf4.history) - 1].result == "won");
                 Scenario_Check("win_ends_the_run_and_deletes_its_save", !Run_IsActive() && !RunSave_HasSave());
                 _rl.saw_cutscene = false;
@@ -3662,6 +3678,315 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Finish();
             }
             if (_s.t > 900) { Scenario_Check("win2_returns_to_the_title", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+    }
+}
+
+// ============================================================================
+// C2: the card screens through the real flows (smoke steps 133-141, between the third run's start and the first win):
+// a class chest opened by the interact key -> the class screen (Nobody locked, wrap-around, "are you sure") -> Mage; a skill chest -> a 1-of-3
+// pick -> a skill taken; a level-up -> the stat point prompt -> the card pick -> Skip pays gold; a 4th skill -> replace prompt, Keep returns to
+// the same cards, then replace Ice Spear (its upgrade goes with it). Every key goes through Scenario_Tap, the game's own input path.
+// ============================================================================
+function Scenario_CardsTapQueue(_s, _cd) {
+    var _settled = !CardsUi_IsOpen() || (Input_Frame() - global.cards_ui.opened_frame) >= CARDS_UI_INPUT_DELAY_FRAMES + 4;   // a key inside the screen's input delay is ignored by design
+    if (array_length(_cd.q) > 0 && (_s.f - _s.last_tap) >= 14 && _settled) {
+        Scenario_Tap(_cd.q[0]);
+        array_delete(_cd.q, 0, 1);
+    }
+}
+
+function Scenario_CardsTalk(_s) {
+    var _gs = GameState_Get();
+    var _talk = (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0);
+    if (_talk && (_s.f - _s.last_tap) >= 12) Scenario_Tap("confirm");
+    return _talk;
+}
+
+function Scenario_CardsChest(_cd, _obj, _pid) {
+    with (obj_enemy) instance_destroy();
+    if (instance_exists(_cd.chest)) with (_cd.chest) instance_destroy();
+    _cd.chest = Scenario_Block(_obj, 5, 7);
+    _cd.chest.persist_id = _pid;
+    var _pl = Scenario_PlacePlayer(4, 7);
+    _pl.face = RIGHT;
+}
+
+function Scenario_StepSmokeCards(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "cd")) _s.cd = { q: [], chest: noone, gold0: 0, spd0: 0, take: -1 };
+    var _cd = _s.cd;
+    var _ch = _gs.player_ch;
+    Scenario_CardsTapQueue(_s, _cd);
+    switch (_s.step) {
+        case 133:   // the first class chest of the run: it owes the class choice (D73)
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Scenario_Check("cards_new_run_has_not_chosen_a_class", !_ch.class_chosen && _ch.class_id == CLASS_NOBODY && Cards_NextOwed(_ch) == "");
+                Scenario_CardsChest(_cd, obj_chest_class_select, "c2_chest_class");
+            }
+            if (_s.t == 20) Scenario_Tap("interact");
+            Scenario_CardsTalk(_s);
+            if (_s.t > 30 && CardsUi_Kind() == "class") {
+                var _m = Ui_StackTop(global.cards_ui.stk);
+                Scenario_Check("cards_class_chest_opened", _cd.chest.swapped);
+                Scenario_Check("cards_first_chest_gives_the_class_screen", _gs.ui.mode == UI_CARDS && _m.id == "cards_class");
+                Scenario_Check("cards_class_screen_lists_four_classes", array_length(_m.items) == 4 && _m.items[0].class_id == CLASS_KNIGHT && _m.items[3].class_id == CLASS_NOBODY);
+                Scenario_Check("cards_nobody_is_locked_before_a_win", _m.items[3].locked && !Profile_IsUnlocked(Profile_Get(), "nobody_class") && string_length(_m.items[3].help) > 5);
+                Scenario_Check("cards_class_cursor_starts_on_the_first_row", _m.cursor == 0);
+                _cd.q = ["menu_up", "confirm", "menu_up", "confirm", "menu_up", "confirm"];   // wrap to Nobody (locked: nothing), up to Mage, confirm, up to Yes, confirm
+                Scenario_Next(_s, 134);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_class_chest_opens_the_class_screen", false, "kind=" + CardsUi_Kind() + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+            break;
+        case 134:   // locked Nobody does nothing; Mage asks "are you sure"; Yes applies it
+            if (array_length(_cd.q) == 5 && !variable_struct_exists(_cd, "c1") && (_s.f - _s.last_tap) >= 6) {
+                _cd.c1 = true;
+                var _m1 = Ui_StackTop(global.cards_ui.stk);
+                Scenario_Check("cards_class_up_from_the_top_wraps_to_nobody", _m1.cursor == 3, "cursor=" + string(_m1.cursor));
+            }
+            if (array_length(_cd.q) == 4 && !variable_struct_exists(_cd, "c2") && (_s.f - _s.last_tap) >= 6) {
+                _cd.c2 = true;
+                Scenario_Check("cards_confirm_on_locked_nobody_does_nothing", Ui_StackDepth(global.cards_ui.stk) == 1 && _ch.class_pick && _ch.class_id == CLASS_NOBODY);
+            }
+            if (array_length(_cd.q) == 2 && !variable_struct_exists(_cd, "c3") && (_s.f - _s.last_tap) >= 6) {
+                _cd.c3 = true;
+                var _m3 = Ui_StackTop(global.cards_ui.stk);
+                Scenario_Check("cards_class_asks_are_you_sure", Ui_StackDepth(global.cards_ui.stk) == 2 && _m3.id == "cards_class_sure", "depth=" + string(Ui_StackDepth(global.cards_ui.stk)));
+                Scenario_Check("cards_are_you_sure_starts_on_no", _m3.cursor == 1, "cursor=" + string(_m3.cursor));
+            }
+            if (array_length(_cd.q) == 0 && _s.t > 150) Scenario_Next(_s, 135);
+            if (_s.t > 900) { Scenario_Check("cards_class_screen_answers", false, "kind=" + CardsUi_Kind()); Scenario_Finish(); }
+            break;
+        case 135:   // the class is applied behind the flash; its chest line is read; then the skill chest
+            var _talk = Scenario_CardsTalk(_s);
+            if (_ch.class_id == CLASS_MAGE && !_talk && !Transition_IsActive() && !CardsUi_IsOpen() && _s.t > 30) {
+                Scenario_Check("cards_class_choice_makes_a_mage", _ch.class_id == CLASS_MAGE && _gs.selected_class == CLASS_MAGE && _ch.class_chosen && !_ch.class_pick);
+                Scenario_Check("cards_mage_has_the_starter_weapon", Equip_SlotGet(_ch, "weapon") != 0);
+                Scenario_Check("cards_nothing_is_owed_after_the_class", Cards_NextOwed(_ch) == "" && _ch.card_picks == 0);
+                Scenario_CardsChest(_cd, obj_chest_skillbook, "c2_chest_skill");
+                Scenario_Next(_s, 136);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_class_gets_applied", false, "class=" + string(_ch.class_id)); Scenario_Finish(); }
+            break;
+        case 136:   // the second chest: a 1-of-3 pick (I-057: no more "nothing is there")
+            if (_s.t == 20) Scenario_Tap("interact");
+            Scenario_CardsTalk(_s);
+            if (_s.t > 30 && CardsUi_Kind() == "cards") {
+                var _pk = global.cards_ui.pick;
+                Scenario_Check("cards_second_chest_gives_three_cards", array_length(_pk.ids) == 3 && _cd.chest.swapped);
+                Scenario_Check("cards_the_offer_is_kept_on_the_character", array_length(_ch.offer) == 3 && _ch.offer[0] == _pk.ids[0]);
+                var _k = -1;
+                for (var _i = 0; _i < 3; _i++) { if (CardDB_Get(_pk.ids[_i]).kind == "skill" && _k < 0) _k = _i; }
+                Scenario_Check("cards_a_new_mage_is_offered_a_skill", _k >= 0);
+                _cd.take = (_k >= 0) ? CardDB_Get(_pk.ids[_k]).skill_id : -1;
+                _cd.q = [];
+                repeat (max(0, _k)) array_push(_cd.q, "menu_right");
+                array_push(_cd.q, "confirm");
+                Scenario_Next(_s, 137);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_skill_chest_opens_the_pick", false, "kind=" + CardsUi_Kind()); Scenario_Finish(); }
+            break;
+        case 137:   // the skill is learned, the pick answered
+            if (array_length(_cd.q) == 0 && _s.t > 120 && !CardsUi_IsOpen()) {
+                Scenario_Check("cards_taking_a_skill_learns_it", array_length(_ch.skills) == 1 && _ch.skills[0] == _cd.take, "skills=" + json_stringify(_ch.skills));
+                Scenario_Check("cards_the_pick_is_answered", _ch.card_picks == 0 && array_length(_ch.offer) == 0 && Cards_NextOwed(_ch) == "");
+                Scenario_Check("cards_the_run_pity_state_moved_on", _gs.run.cards.offers == 1);
+                // level-up through the game's own path: 12 EXP is level 2
+                _cd.spd0 = _ch.stats.spd;
+                _cd.gold0 = _gs.run.gold;
+                _gs.player_ch = Player_AddExp(_gs.player_ch, 12);
+                GameState_SetPlayer(_gs.player_ch);
+                Scenario_Next(_s, 138);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_pick_closes", false, "q=" + string(array_length(_cd.q)) + " open=" + string(CardsUi_IsOpen())); Scenario_Finish(); }
+            break;
+        case 138:   // level-up: first the free stat point
+            if (_s.t > 5 && CardsUi_Kind() == "stat") {
+                var _ms = Ui_StackTop(global.cards_ui.stk);
+                Scenario_Check("cards_level_up_owes_a_stat_point_and_a_pick", _ch.level == 2 && _ch.stat_points == 1 && _ch.card_picks == 1);
+                Scenario_Check("cards_level_up_opens_the_stat_prompt_first", _ms.id == "cards_stat" && array_length(_ms.items) == 4);
+                Scenario_Check("cards_stat_prompt_starts_on_the_class_stat", _ms.cursor == STAT_MAG, "cursor=" + string(_ms.cursor));
+                _cd.q = ["menu_up", "confirm"];   // MAG -> SPD, place the point
+                Scenario_Next(_s, 139);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_level_up_opens_the_stat_prompt", false, "kind=" + CardsUi_Kind()); Scenario_Finish(); }
+            break;
+        case 139:   // the point is placed; the card pick comes next; Skip pays gold
+            if (_s.t > 30 && array_length(_cd.q) == 0 && CardsUi_Kind() == "cards" && !variable_struct_exists(_cd, "p1")) {
+                _cd.p1 = true;
+                Scenario_Check("cards_stat_point_goes_to_spd", _ch.stats.spd == _cd.spd0 + 1 + LevelUp_ClassGrowthGain(CLASS_MAGE, 2).spd && _ch.stat_points == 0, "spd=" + string(_ch.stats.spd) + " was " + string(_cd.spd0));
+                Scenario_Check("cards_the_pick_follows_the_stat_point", _ch.card_picks == 1 && array_length(global.cards_ui.pick.ids) == 3);
+                _cd.q = ["menu_down", "confirm"];   // Skip
+            }
+            if (variable_struct_exists(_cd, "p1") && array_length(_cd.q) == 0 && _s.t > 150 && !CardsUi_IsOpen()) {
+                Scenario_Check("cards_skip_pays_5_gold", _gs.run.gold == _cd.gold0 + 5, "gold=" + string(_gs.run.gold));
+                Scenario_Check("cards_skip_answers_the_pick", _ch.card_picks == 0 && array_length(_ch.offer) == 0 && Cards_NextOwed(_ch) == "");
+                // the 4th skill: three held (Ice Spear upgraded), a pick offering Meditation
+                _ch.skills = [SKILL_FIREBALL, SKILL_ICE_SPEAR, SKILL_FORESIGHT];
+                _ch.upgrades = [SKILL_ICE_SPEAR];
+                _ch.card_picks = 1;
+                _ch.offer = [Card_SkillId(SKILL_MEDITATION), "pas:quick_feet", "fb:gold"];
+                Scenario_Next(_s, 140);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_stat_and_pick_flow", false, "kind=" + CardsUi_Kind() + " q=" + string(array_length(_cd.q))); Scenario_Finish(); }
+            break;
+        case 140:   // take the 4th skill -> which one goes? Keep returns to the same cards
+            if (_s.t > 20 && CardsUi_Kind() == "cards" && !variable_struct_exists(_cd, "r1")) {
+                _cd.r1 = true;
+                Scenario_Check("cards_the_given_offer_is_shown_as_it_was", global.cards_ui.pick.ids[0] == Card_SkillId(SKILL_MEDITATION) && array_length(global.cards_ui.pick.ids) == 3);
+                _cd.q = ["confirm"];
+            }
+            if (variable_struct_exists(_cd, "r1") && array_length(_cd.q) == 0 && _s.t > 60 && CardsUi_Kind() == "replace" && !variable_struct_exists(_cd, "r2")) {
+                _cd.r2 = true;
+                var _mr = Ui_StackTop(global.cards_ui.stk);
+                Scenario_Check("cards_4th_skill_asks_which_to_replace", _mr.id == "cards_replace" && array_length(_mr.items) == 4 && _ch.skill_pending == SKILL_MEDITATION);
+                Scenario_Check("cards_the_pick_is_not_spent_before_the_answer", _ch.card_picks == 1 && array_length(_ch.skills) == 3);
+                _cd.q = ["menu_up", "confirm"];   // wrap to "Keep my skills"
+            }
+            if (variable_struct_exists(_cd, "r2") && array_length(_cd.q) == 0 && _s.t > 120 && CardsUi_Kind() == "cards" && !variable_struct_exists(_cd, "r3")) {
+                _cd.r3 = true;
+                Scenario_Check("cards_keep_returns_to_the_same_cards", global.cards_ui.pick.ids[0] == Card_SkillId(SKILL_MEDITATION) && _ch.skill_pending == -1 && _ch.card_picks == 1 && array_length(_ch.skills) == 3);
+                _cd.q = ["confirm"];   // take Meditation again
+                Scenario_Next(_s, 141);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_replace_prompt_flow", false, "kind=" + CardsUi_Kind() + " r1=" + string(variable_struct_exists(_cd, "r1")) + " r2=" + string(variable_struct_exists(_cd, "r2"))); Scenario_Finish(); }
+            break;
+        case 141:   // replace Ice Spear (second row); its upgrade goes with it
+            if (_s.t > 60 && array_length(_cd.q) == 0 && CardsUi_Kind() == "replace" && !variable_struct_exists(_cd, "r4")) {
+                _cd.r4 = true;
+                _cd.q = ["menu_down", "confirm"];
+            }
+            if (variable_struct_exists(_cd, "r4") && array_length(_cd.q) == 0 && _s.t > 120 && !CardsUi_IsOpen()) {
+                Scenario_Check("cards_replace_swaps_ice_spear_for_meditation", array_length(_ch.skills) == 3 && _ch.skills[0] == SKILL_FIREBALL && _ch.skills[1] == SKILL_MEDITATION && _ch.skills[2] == SKILL_FORESIGHT, "skills=" + json_stringify(_ch.skills));
+                Scenario_Check("cards_replaced_skills_upgrade_is_gone", array_length(_ch.upgrades) == 0);
+                Scenario_Check("cards_replace_answers_the_pick", _ch.card_picks == 0 && _ch.skill_pending == -1 && array_length(_ch.offer) == 0 && Cards_NextOwed(_ch) == "");
+                Scenario_Check("cards_nobody_still_locked_before_the_first_win", Card_ClassChoices()[3].locked);
+                Scenario_Next(_s, 111);   // on to the first win: the Nobody class unlocks
+            }
+            if (_s.t > 900) { Scenario_Check("cards_replace_ends", false, "kind=" + CardsUi_Kind()); Scenario_Finish(); }
+            break;
+    }
+}
+
+// C2: one picture of each card screen (class choice, "are you sure", 1-of-3 pick at 3 sizes of text and in Korean, stat point, replace a skill).
+// Each screen is opened directly (CardsUi_Open) on a mage in rm_floor1; the flows themselves are checked in the smoke run.
+function Scenario_StepShotsCards(_s) {
+    var _gs = GameState_Get();
+    switch (_s.step) {
+        case 120:   // the class screen
+            if (_s.t == 1) { Scenario_NewKnight(CLASS_MAGE); Scenario_SetWindowScale(3); room_goto(rm_floor1); }
+            if (_s.t == 90) { Scenario_ClearUi(); CardsUi_Open("class"); }
+            if (_s.t == 135) {
+                Scenario_Check("shots_cards_class_open", CardsUi_Kind() == "class" && _gs.ui.mode == UI_CARDS, "kind=" + CardsUi_Kind());
+                Scenario_ShotUi(_s, "cards_class");
+                Scenario_Next(_s, 121);
+            }
+            break;
+        case 121:   // "Become a Mage?"
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                var _top = Ui_StackTop(global.cards_ui.stk);
+                CardsUi_ClassConfirm(_top, 2);
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_cards_class_sure_open", Ui_StackDepth(global.cards_ui.stk) == 2);
+                Scenario_ShotUi(_s, "cards_class_sure");
+                Scenario_Next(_s, 122);
+            }
+            break;
+        case 122:   // the card pick: a skill, an upgrade, a passive; two picks left
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                CardsUi_Close();
+                var _ch = _gs.player_ch;
+                _ch.skills = [SKILL_FIREBALL];
+                _ch.card_picks = 2;
+                _ch.offer = [Card_SkillId(SKILL_ICE_SPEAR), Card_UpgradeId(SKILL_FIREBALL), "pas:field_medic"];
+                CardsUi_Open("cards");
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_cards_pick_open", CardsUi_Kind() == "cards" && array_length(global.cards_ui.pick.ids) == 3);
+                Scenario_ShotUi(_s, "cards_pick");
+                Scenario_Next(_s, 123);
+            }
+            break;
+        case 123:   // the cursor on the middle card
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.cards_ui.pick.cursor = 1;
+                global.cards_ui.pick.last = 1;
+            }
+            if (_s.t == 12) {
+                Scenario_ShotUi(_s, "cards_pick_mid");
+                Scenario_Next(_s, 124);
+            }
+            break;
+        case 124:   // Skip selected, at scale 5
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.cards_ui.pick.cursor = 3;
+                Scenario_SetWindowScale(5);
+            }
+            if (_s.t == 50) {
+                Scenario_ShotUi(_s, "cards_pick_skip");
+                Scenario_Next(_s, 125);
+            }
+            break;
+        case 125:   // the same pick in Korean at scale 3
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.cards_ui.pick.cursor = 0;
+                Scenario_SetWindowScale(3);
+                Loc_SetLanguage("ko");
+            }
+            if (_s.t == 50) {
+                Scenario_ShotUi(_s, "cards_pick_ko");
+                Scenario_Next(_s, 126);
+            }
+            break;
+        case 126:   // the free stat point
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Loc_SetLanguage("en");
+                CardsUi_Close();
+                _gs.player_ch.stat_points = 1;
+                CardsUi_Open("stat");
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_cards_stat_open", CardsUi_Kind() == "stat");
+                Scenario_ShotUi(_s, "cards_stat");
+                Scenario_Next(_s, 127);
+            }
+            break;
+        case 127:   // replace a skill
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                CardsUi_Close();
+                var _ch2 = _gs.player_ch;
+                _ch2.stat_points = 0;
+                _ch2.skills = [SKILL_FIREBALL, SKILL_ICE_SPEAR, SKILL_FORESIGHT];
+                _ch2.upgrades = [SKILL_ICE_SPEAR];
+                _ch2.skill_pending = SKILL_MEDITATION;
+                CardsUi_Open("replace");
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_cards_replace_open", CardsUi_Kind() == "replace");
+                Scenario_ShotUi(_s, "cards_replace");
+                Scenario_Next(_s, 128);
+            }
+            break;
+        case 128:
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                // nothing may stay owed: a run left active by an earlier shot would open the screen again
+                _gs.player_ch.skill_pending = -1;
+                _gs.player_ch.card_picks = 0;
+                _gs.player_ch.stat_points = 0;
+                _gs.player_ch.offer = [];
+                CardsUi_Close();
+                Scenario_Next(_s, 50);   // on to the D91 / DISP-10 / D48 pictures, then the skill animations
+            }
             break;
     }
 }

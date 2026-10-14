@@ -149,6 +149,7 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
         loot = kept;
     }
     p.inventory = Loot_Grant(p.inventory, loot);
+    p = Card_OnVictory(p);   // C2: Field Medic, Second Wind, Scrounger
     GameState_SetPlayer(p);
 
     var result = {

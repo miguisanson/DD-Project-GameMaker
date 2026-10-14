@@ -335,259 +335,6 @@ function ItemDB_Init() {
     };
     ds_map_add(global.item_db, c7.id, c7);
 
-    // Skillbooks (one per skill, shared sprite)
-    var sb1 = {
-        id: 101,
-        name: "Skillbook: Wound",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_WOUND },
-        value: 25
-    };
-    ds_map_add(global.item_db, sb1.id, sb1);
-
-    var sb2 = {
-        id: 102,
-        name: "Skillbook: Hilt Bash",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_HILT_BASH },
-        value: 30
-    };
-    ds_map_add(global.item_db, sb2.id, sb2);
-
-    var sb3 = {
-        id: 103,
-        name: "Skillbook: Muscle Up",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_MUSCLE_UP },
-        value: 30
-    };
-    ds_map_add(global.item_db, sb3.id, sb3);
-
-    var sb4 = {
-        id: 104,
-        name: "Skillbook: Rev Up",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_REV_UP },
-        value: 30
-    };
-    ds_map_add(global.item_db, sb4.id, sb4);
-
-    var sb5 = {
-        id: 105,
-        name: "Skillbook: Horizontal Slash",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_HORIZ_SLASH },
-        value: 35
-    };
-    ds_map_add(global.item_db, sb5.id, sb5);
-
-    var sb6 = {
-        id: 106,
-        name: "Skillbook: Poison Arrow",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_POISON_ARROW },
-        value: 30
-    };
-    ds_map_add(global.item_db, sb6.id, sb6);
-
-    var sb7 = {
-        id: 107,
-        name: "Skillbook: Evasion",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_EVASION },
-        value: 28
-    };
-    ds_map_add(global.item_db, sb7.id, sb7);
-
-    var sb8 = {
-        id: 108,
-        name: "Skillbook: Double Shot",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_DOUBLE_SHOT },
-        value: 35
-    };
-    ds_map_add(global.item_db, sb8.id, sb8);
-
-    var sb9 = {
-        id: 109,
-        name: "Skillbook: Take Aim",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_TAKE_AIM },
-        value: 30
-    };
-    ds_map_add(global.item_db, sb9.id, sb9);
-
-    var sb10 = {
-        id: 110,
-        name: "Skillbook: Fireball",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_FIREBALL },
-        value: 35
-    };
-    ds_map_add(global.item_db, sb10.id, sb10);
-
-    var sb11 = {
-        id: 111,
-        name: "Skillbook: Poison Mist",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_POISON_MIST },
-        value: 35
-    };
-    ds_map_add(global.item_db, sb11.id, sb11);
-
-    var sb12 = {
-        id: 112,
-        name: "Skillbook: Ice Spear",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_ICE_SPEAR },
-        value: 40
-    };
-    ds_map_add(global.item_db, sb12.id, sb12);
-
-    var sb13 = {
-        id: 113,
-        name: "Skillbook: Meditation",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_MEDITATION },
-        value: 35
-    };
-    ds_map_add(global.item_db, sb13.id, sb13);
-
-    var sb14 = {
-        id: 114,
-        name: "Skillbook: Foresight",
-        type: ITEM_CONSUMABLE,
-        stackable: false,
-        max_stack: 1,
-        equip_slot: "",
-        power: 0,
-        stat_type: STAT_ATK,
-        acc: 0,
-        preferred_class: -1,
-        sprite: skill_book,
-        bonus: { atk:0, def:0, spd:0, mag:0 },
-        use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_FORESIGHT },
-        value: 35
-    };
-    ds_map_add(global.item_db, sb14.id, sb14);
-
     // Armor - Warrior/Archer
     var a0 = {
         id: 20,
@@ -797,68 +544,6 @@ function Item_IsConsumable(_item) {
     return _item.type == ITEM_CONSUMABLE;
 }
 
-function Item_IsSkillbook(_item_or_id) {
-    var item = _item_or_id;
-    if (!is_struct(item)) item = ItemDB_Get(_item_or_id);
-    if (!is_struct(item)) return false;
-    if (!Item_IsConsumable(item)) return false;
-    if (!variable_struct_exists(item, "use") || !is_struct(item.use)) return false;
-    if (!variable_struct_exists(item.use, "effect") || item.use.effect != "learn_skill") return false;
-    if (!variable_struct_exists(item.use, "skill_id")) return false;
-    return true;
-}
-
-function Item_SkillbookValidate(_item_or_id, _user) {
-    var out = { ok: false, msg: Loc_T("item.msg.cant_use", "Can't use that."), skill_id: -1, skill_name: "" };
-    var item = _item_or_id;
-    if (!is_struct(item)) item = ItemDB_Get(_item_or_id);
-    if (!Item_IsSkillbook(item)) return out;
-
-    var skill_id = item.use.skill_id;
-    var skill_cfg = SkillDB_Get(skill_id);
-    var skill_name = Loc_T("item.msg.that_skill", "that skill");
-    if (is_struct(skill_cfg) && variable_struct_exists(skill_cfg, "name")) {
-        skill_name = string(skill_cfg.name);
-    }
-
-    out.skill_id = skill_id;
-    out.skill_name = skill_name;
-
-    if (!is_struct(_user) || !variable_struct_exists(_user, "class_id")) {
-        out.msg = Loc_T("item.msg.cant_use", "Can't use that.");
-        return out;
-    }
-
-    var class_id = _user.class_id;
-    if (class_id == CLASS_NOBODY) {
-        out.msg = Loc_T("item.msg.not_ready_skill", "You are not ready to learn this yet.");
-        return out;
-    }
-
-    if (!Skill_ClassAllowed(skill_cfg, class_id)) {
-        out.msg = Loc_T("item.msg.class_cannot_learn", "Your class cannot learn {skill}.", { skill: skill_name });
-        return out;
-    }
-
-    var already_known = false;
-    if (is_array(_user.skills)) {
-        for (var si = 0; si < array_length(_user.skills); si++) {
-            if (_user.skills[si] == skill_id) {
-                already_known = true;
-                break;
-            }
-        }
-    }
-    if (already_known) {
-        out.msg = Loc_T("item.msg.already_know", "Already know {skill}.", { skill: skill_name });
-        return out;
-    }
-
-    out.ok = true;
-    out.msg = Loc_T("item.msg.learned", "Learned {skill}.", { skill: skill_name });
-    return out;
-}
-
 function Item_ComputeAmount(_user, _use) {
     var minv = 0;
     var maxv = 0;
@@ -873,6 +558,9 @@ function Item_ComputeAmount(_user, _use) {
         var lvl = max(0, _user.level - 1);
         amt += floor(lvl * _use.scale);
     }
+
+    var power_bonus = Card_PassiveSum(_user, "item_power");   // C2: Potion Lore, Apothecary
+    if (power_bonus > 0) amt = max(amt, round(amt * (1 + power_bonus)));
 
     return amt;
 }
@@ -897,6 +585,8 @@ function Item_Use(_item_id, _user, _target) {
             result.msg = Loc_T("item.msg.full_health", "Already full health.");
         } else {
             result.msg = Loc_T("item.msg.healed_hp", "Healed {amt} HP.", { amt: string(amt) });
+            var potion_mp = round(Card_PassiveSum(_user, "potion_mp"));   // C2: Tonic Blend
+            if (potion_mp > 0 && variable_struct_exists(_target, "mp") && variable_struct_exists(_target, "max_mp")) _target.mp = clamp(_target.mp + potion_mp, 0, _target.max_mp);
         }
     } else if (eff == "mp") {
         var before_mp = _target.mp;
@@ -924,19 +614,6 @@ function Item_Use(_item_id, _user, _target) {
         } else {
             result.ok = false;
             result.msg = Loc_T("item.msg.no_status_cure", "No status to cure.");
-        }
-    } else if (eff == "learn_skill") {
-        var learn = Item_SkillbookValidate(item, _user);
-        if (!learn.ok) {
-            result.ok = false;
-            result.msg = learn.msg;
-            result.skillbook_first_read_dialogue = false;
-        } else {
-            _user = Player_LearnSkill(_user, learn.skill_id);
-            result.msg = learn.msg;
-            var class_id = CLASS_NOBODY;
-            if (is_struct(_user) && variable_struct_exists(_user, "class_id")) class_id = _user.class_id;
-            result.skillbook_first_read_dialogue = Dialogue_SkillbookFirstReadShouldTrigger(class_id);
         }
     }
 

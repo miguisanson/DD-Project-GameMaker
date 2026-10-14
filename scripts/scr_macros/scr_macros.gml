@@ -143,6 +143,7 @@
 #macro UI_PAUSE 4
 #macro UI_CLASS_SELECT 5
 #macro UI_BED 6
+#macro UI_CARDS 7   // C2: class choice, stat point, card pick, replace-a-skill screens (CardsUi_*)
 #macro UI_BAR_SCALE 3
 #macro UI_FONT retro_gaming
 #macro GRID_TILE_SIZE 16
