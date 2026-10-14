@@ -25,6 +25,7 @@ function RoomState_SanitizeEnemyVars(_vars, _fallback_enemy_id = -1) {
         if (variable_struct_exists(_vars, "enemy_id")) out.enemy_id = _vars.enemy_id;
         if (variable_struct_exists(_vars, "enemy_uid")) out.enemy_uid = _vars.enemy_uid;
         if (variable_struct_exists(_vars, "enemy_level")) out.enemy_level = _vars.enemy_level;
+        if (variable_struct_exists(_vars, "elite_mod")) out.elite_mod = _vars.elite_mod;   // C3 (D86)
     }
     if (!variable_struct_exists(out, "enemy_id") && _fallback_enemy_id != -1) {
         out.enemy_id = _fallback_enemy_id;
@@ -235,6 +236,7 @@ function RoomState_ApplyInstance(_inst) {
         if (variable_instance_exists(_inst, "encounter_pending")) _inst.encounter_pending = false;
         if (variable_instance_exists(_inst, "encounter_player")) _inst.encounter_player = noone;
         if (variable_instance_exists(_inst, "moving")) _inst.moving = false;
+        if (variable_instance_exists(_inst, "enemy_id") && _inst.enemy_id != -1 && !EnemyPersist_IsBossEnemyId(_inst.enemy_id)) Enemy_ReapplyConfig(_inst);   // C3: a shuffled type has its own sprite and AI
         Enemy_SnapToGrid(_inst);   // I-048: a snapshot taken mid-step must not restore between tiles
         if (variable_instance_exists(_inst, "move_timer")) _inst.move_timer = 0;
         if (variable_instance_exists(_inst, "move_dir")) _inst.move_dir = -1;
@@ -250,7 +252,7 @@ function RoomState_Save(_room) {
 
     // Enemy positions are the single source of truth for overworld battle return.
     with (obj_enemy) {
-        RoomState_SaveInstance(id, ["x", "y", "enemy_id", "enemy_uid", "enemy_level"], false);
+        RoomState_SaveInstance(id, ["x", "y", "enemy_id", "enemy_uid", "enemy_level", "elite_mod"], false);
     }
 }
 
@@ -270,6 +272,7 @@ function EnemyPersist_BeginEncounter(_enemy_inst, _player_inst) {
     GameState_SetBattleReturn(room, _player_inst.x, _player_inst.y, -1);
     var lvl = variable_instance_exists(_enemy_inst, "enemy_level") ? _enemy_inst.enemy_level : 0;
     GameState_SetBattleEnemy(_enemy_inst.persist_id, _enemy_inst.enemy_id, lvl);
+    GameState_Get().battle.enemy_elite = variable_instance_exists(_enemy_inst, "elite_mod") ? _enemy_inst.elite_mod : "";   // C3 (D86)
     return true;
 }
 
@@ -296,6 +299,7 @@ function RoomState_Apply(_room) {
     if (variable_struct_exists(gs.persist_applied, rname) && variable_struct_get(gs.persist_applied, rname) == true) return;
     variable_struct_set(gs.persist_applied, rname, true);
 
+    Shuffle_ApplyRoom();   // C3 (D33): this run's enemy layout, for the enemies the room has no saved state for
     with (obj_enemy) RoomState_ApplyInstance(self);
     with (obj_interactable) RoomState_ApplyInstance(self);
     if (object_exists(obj_dialogue_trigger)) with (obj_dialogue_trigger) RoomState_ApplyInstance(self);
@@ -334,7 +338,8 @@ function Run_Create(_seed) {
         active: true,
         seed: _seed,
         rng: Run_RngCreate(_seed),
-        gold: 0,                 // placeholder until the shop packet (C2: a skipped card pick pays into it)
+        gold: 0,                 // C3 (D23): enemies pay it, the merchant takes it; it is gone with the run
+        shop: {},                // C3 (D85): the stock of each shop visited, { s0: [rows], ... }, so what was bought stays bought
         cards: Card_StateNew(),  // C2: the offer generator's pity counter and the last offer (scr_db_skill)
         kills: 0,
         started_at: date_current_datetime(),

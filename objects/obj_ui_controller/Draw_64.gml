@@ -111,6 +111,8 @@ if (cutscene_active) {
 }
 
 CardsUi_Draw();   // C2: class choice, stat point, card pick, replace a skill
+ShopUi_Draw();    // C3 (D85): the merchant's shop
+Hud_DrawGold();   // C3 (D23): the run's gold, in the world and in battle
 
 // Dialogue box
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {

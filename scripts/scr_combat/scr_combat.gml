@@ -137,6 +137,12 @@ function Combat_ApplyDamage(_attacker, _defender, _src, _crit_mult = 1, _skill_m
         _defender = Equip_PlayerAfterTakeDamage(_defender, dmg, dmg_ctx);
     }
 
+    // C3 (D86): a Venomous elite poisons what it hurts
+    if (dmg > 0 && is_struct(_attacker) && is_struct(_defender) && variable_struct_exists(_attacker, "elite") && _attacker.elite == "venomous"
+    && variable_struct_exists(_defender, "is_player") && _defender.is_player) {
+        _defender = Status_Add(_defender, STATUS_POISON, 1, 1, ELITE_VENOM_STACKS);
+    }
+
     return { dmg: dmg, defender: _defender };
 }
 
@@ -328,7 +334,9 @@ function Battle_GrantRewards(_p, _e) {
         auto_stat_id: -1,
         auto_stat_gained: 0,
         auto_stat_summary: "",
-        loot: []
+        loot: [],
+        gold: 0,           // C3 (D23)
+        card_pick: false   // C3 (D86): an elite always leaves a card pick
     };
 
     if (is_struct(_e)) {
@@ -368,6 +376,14 @@ function Battle_GrantRewards(_p, _e) {
         out.loot = [];
         out.loot = Battle_LootAppendNormalized(out.loot, loot);
         out.loot = Battle_LootAppendNormalized(out.loot, recovered_loot);
+
+        // C3: gold from every win (Coin Sense and the Lucky Charm in Gold_Scale); an elite also owes a card pick (D86)
+        out.gold = Gold_ForEnemy(Run_Stream("loot"), _e, _p);
+        Gold_Add(Run_Get(), out.gold);
+        if (variable_struct_exists(_e, "is_elite") && _e.is_elite) {
+            _p = Elite_GrantPick(_p);
+            out.card_pick = true;
+        }
     }
 
     _p = Card_OnVictory(_p);   // C2: Field Medic, Second Wind, Scrounger
@@ -384,6 +400,7 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
         exp_gain: (is_struct(_rewards) && variable_struct_exists(_rewards, "exp_gain")) ? max(0, round(real(_rewards.exp_gain))) : 0,
         levels_gained: (is_struct(_rewards) && variable_struct_exists(_rewards, "levels_gained")) ? max(0, round(real(_rewards.levels_gained))) : 0,
         stat_points_gained: (is_struct(_rewards) && variable_struct_exists(_rewards, "stat_points_gained")) ? max(0, round(real(_rewards.stat_points_gained))) : 0,
+        gold_gain: (is_struct(_rewards) && variable_struct_exists(_rewards, "gold")) ? max(0, round(real(_rewards.gold))) : 0,   // C3
         auto_stat_summary: (is_struct(_rewards) && variable_struct_exists(_rewards, "auto_stat_summary")) ? string(_rewards.auto_stat_summary) : "",
         loot_gained: loot_gained,
         at_level_cap: (is_struct(_player) && variable_struct_exists(_player, "level")) ? Level_IsAtCap(_player.level) : false
@@ -594,6 +611,8 @@ function Battle_TurnAdvance(_bc) {
     _bc.enemy_action_pending = (who == TL_ENEMY);
     if (who == TL_ENEMY) {
         Stagger_EndBreak(_bc.e);   // BROKEN lasts until the enemy's next turn starts
+        var regen = Elite_Regen(_bc.e);   // C3 (D86): a Regenerating elite heals as its turn starts
+        if (regen > 0) Battle_PopAdd(_bc, "+" + string(regen), false, "heal", 1);
         _bc.turn = TURN_ENEMY;
     } else {
         _bc.turn = TURN_PLAYER;
@@ -1172,6 +1191,10 @@ function Battle_QteImpactFeedback(_bc) {
 
 // The player's basic attack always lands (D20): damage = base x the grade's multiplier, never 0.
 function Battle_PlayerAttackResolveTimed(_bc, _timing) {
+    if (_bc.throw_item > 0) {   // C3 (D84): this bar was started by a throw, not an attack
+        Battle_ThrowResolve(_bc, _timing);
+        return;
+    }
     var p = _bc.p;
     var e = _bc.e;
 
@@ -1460,6 +1483,10 @@ function Battle_PlayerItem(_bc, _item_id) {
     var e = _bc.e;
 
     var item = ItemDB_Get(_item_id);
+    if (Item_IsThrowable(item)) {   // C3 (D84): a throwable uses the sliding bar first
+        Battle_ThrowBegin(_bc, _item_id);
+        return;
+    }
     var target = (item.use.target == TGT_SELF) ? p : e;
     var res = Item_Use(_item_id, p, target);
     var fx = noone;
@@ -1480,6 +1507,58 @@ function Battle_PlayerItem(_bc, _item_id) {
     if (Battle_CheckEnd(_bc, p, e)) return;
 
     Battle_Message(_bc, res.msg, BSTATE_ENEMY_ACT, fx);
+    if (Battle_PlayerFinalizeTurn(_bc, p, e)) return;
+}
+
+// C3 (D84): a throw. The Items menu picks a throwable, the sliding bar runs (the default bar, widened by Foresight like every bar), the press sets the
+// grade, Throw_Resolve (scr_db_item) does the maths, the item is used up and the throw costs the turn. A Perfect smoke bomb ends the fight like a run.
+function Battle_ThrowBegin(_bc, _item_id) {
+    _bc.throw_item = _item_id;
+    _bc.qte_perfect_widen = Qte_PerfectWiden(_bc.p);
+    _bc.qte_params = Qte_WidenPerfect(Qte_BarParams("default"), _bc.qte_perfect_widen);
+    _bc.qte_assist = Qte_AssistMult();
+    _bc.qte_ms = -QTE_LEAD_IN_MS;
+    _bc.qte_press_ms = QTE_NO_PRESS;
+    _bc.qte_active = true;
+    _bc.battle_state = BSTATE_ATTACK_TIMING;
+}
+
+function Battle_ThrowResolve(_bc, _timing) {
+    var p = _bc.p;
+    var e = _bc.e;
+    var iid = _bc.throw_item;
+    _bc.throw_item = -1;
+    _bc.qte_active = false;
+    _bc.qte_result_text = _timing.label;
+    _bc.qte_result_key = _timing.key;
+    _bc.qte_result_mult = _timing.mult;
+    _bc.qte_result_ms = QTE_RESULT_MS;
+    var word_pos = Battle_AttackTimingTarget(_bc);
+    _bc.qte_word_x = word_pos.x;
+    _bc.qte_word_y = word_pos.y;
+    SFX_Play(Qte_GradeSfxKey(_timing.key));
+
+    var res = Throw_Resolve(iid, p, e, _timing.key);
+    p.inventory = Inv_Remove(p.inventory, iid, 1);
+    _bc.last_hit = true;
+    _bc.last_dmg = res.dmg;
+    _bc.last_crit = false;
+    Battle_HitPop(_bc, res.dmg, _timing.key);
+    if (_timing.key == QTE_PERFECT) _bc.hitstop_ms = QTE_HITSTOP_PERFECT_MS; else Battle_QteImpactFeedback(_bc);
+
+    if (Battle_CheckEnd(_bc, p, e)) return;
+
+    var note = "";
+    if (res.dmg > 0) note += Battle_StaggerHit(_bc, COMBAT_POWER_SCALE * ItemDB_Get(iid).use.power, res.stun, _timing.key == QTE_PERFECT);
+    note += Battle_StunResolve(_bc);
+    if (res.escape) {
+        EnemyPersist_ResolveBattle(false);
+        _bc.p = p;
+        _bc.e = e;
+        Battle_Message(_bc, res.msg, BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY);
+        return;
+    }
+    Battle_Message(_bc, res.msg + note, BSTATE_ENEMY_ACT);
     if (Battle_PlayerFinalizeTurn(_bc, p, e)) return;
 }
 
@@ -2413,6 +2492,7 @@ function Battle_EnemyHeaderRect(_bc) {
     var top = (inst.y - sprite_get_yoffset(spr) + sprite_get_bbox_top(spr) * abs(inst.image_yscale) - _bc.cam_base_y) * sx;
     out.bw = clamp(round(sprite_get_width(spr) * abs(inst.image_xscale) * sx), round(36 * sx), mt.gw - 4 * mt.margin);
     out.h = mt.line_h + p + 4 * p + p + 3 * p + 2 * p;
+    if (variable_struct_exists(_bc, "e") && is_struct(_bc.e) && variable_struct_exists(_bc.e, "is_elite") && _bc.e.is_elite) out.h += mt.line_h + p;   // C3 (D86): room for the ELITE tag
     out.x1 = round(out.cx - out.bw * 0.5);
     out.y1 = round(max(Battle_TimelineBottom() + p, top - out.h - 2 * p));
     return out;
@@ -2435,6 +2515,11 @@ function Battle_DrawEnemyHeader(_bc, _alpha) {
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
 
+    if (variable_struct_exists(e, "is_elite") && e.is_elite) {   // C3 (D86): the tag above the name, pulsing like the outline on the map
+        var pulse_col = (floor(current_time / 250) mod 2 == 0) ? UI_C_LIGHTEST : UI_C_LIGHT;
+        Ui_Text(cx, y1, Loc_T("elite.tag", "ELITE"), pulse_col, fa_center);
+        y1 += name_h + p;
+    }
     Ui_Text(cx, y1, e.name, UI_C_LIGHTEST, fa_center);
     var hy = y1 + name_h + p;
     _bc.enemy_hp_shown = Ui_Glide(_bc.enemy_hp_shown, e.hp, current_time - _bc.enemy_hp_clock, 120);

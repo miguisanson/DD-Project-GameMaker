@@ -9,6 +9,8 @@ var gs = GameState_Init();
 p = gs.player_ch;
 p = Equip_PassiveBattleReset(p);
 e = EnemyCreate(gs.battle.enemy_id);
+e = Elite_Apply(e, Elite_BattleMod());   // C3 (D86): the map enemy's modifier (stats, name, tag)
+throw_item = -1;                          // C3 (D84): the throwable whose bar is running, -1 = a plain attack
 Card_OnBattleStart(p, e);   // C2: Opening Blow
 
 // --------------------
@@ -129,6 +131,7 @@ def_ctx = {};
 // --------------------
 message_text = Loc_T("combat.msg.enemy_appeared", "{enemy} appeared!", { enemy: e.name });
 Combat_Log(message_text);
+if (e.is_elite) Combat_Log(Elite_Sentence(e.elite));   // C3 (D86): what the modifier does, in plain words
 
 // camera shake base
 cam_base_x = camera_get_view_x(view_camera[0]);

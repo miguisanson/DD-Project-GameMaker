@@ -262,6 +262,13 @@ function Interact_Handle(_inst) {
         }
     }
 
+    // C3 (D85): the merchant (an obj_npc placed by Merchant_EnsureInRoom) opens the shop instead of a dialogue
+    if (variable_instance_exists(_inst, "merchant") && _inst.merchant) {
+        ShopUi_Open(_inst.shop_index);
+        GameState_SyncLegacy();
+        return;
+    }
+
     // Class chest and skill chest (D73, fixes I-057): the first one opened in a run gives the class choice, every later one a 1-of-3 card
     // pick. The choice or pick is owed by the character and opens as a screen (CardsUi_Step) once the chest's line is read.
     if ((variable_instance_exists(_inst, "class_select_chest") && _inst.class_select_chest) || (variable_instance_exists(_inst, "card_chest") && _inst.card_chest)) {
@@ -411,7 +418,10 @@ function Interact_Handle(_inst) {
                 }
 
                 var loot = [];
-                if (key != "") loot = Loot_RollContainer(lvl, key);
+                if (key != "") {
+                    if (Run_IsActive() && RoomState_EnsurePersistId(_inst)) loot = Shuffle_ChestLoot(Run_Get().seed, room_get_name(room), _inst.persist_id, lvl, key, gs.player_ch);   // C3 (D33): contents come from the seed and this chest
+                    else loot = Loot_RollContainer(lvl, key);
+                }
                 if (is_array(loot) && array_length(loot) > 0) {
                     gs.player_ch.inventory = Loot_Grant(gs.player_ch.inventory, loot);
 

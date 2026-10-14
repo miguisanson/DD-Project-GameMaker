@@ -17,7 +17,7 @@ if (Transition_IsActive()) {
 var gs = GameState_Get();
 var dialogue_active = false;
 if (variable_struct_exists(gs, "ui") && is_struct(gs.ui)) {
-    if ((variable_struct_exists(gs.ui, "mode") && gs.ui.mode == UI_DIALOGUE)
+    if ((variable_struct_exists(gs.ui, "mode") && (gs.ui.mode == UI_DIALOGUE || gs.ui.mode == UI_SHOP))   // C3: nothing hunts the player while he shops
     || (variable_struct_exists(gs.ui, "lines") && is_array(gs.ui.lines) && array_length(gs.ui.lines) > 0)) {
         dialogue_active = true;
     }

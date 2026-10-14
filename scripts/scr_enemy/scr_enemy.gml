@@ -76,6 +76,9 @@ function Enemy_AutoResolveBuildMessage(_cfg, _result, _verb_prefix = "You overpo
     if (variable_struct_exists(_result, "exp_gain") && _result.exp_gain > 0) {
         array_push(parts, Loc_T("combat.msg.exp_gain", "(+{exp} EXP)", { exp: _result.exp_gain }));
     }
+    if (variable_struct_exists(_result, "gold_gain") && _result.gold_gain > 0) {   // C3 (D23)
+        array_push(parts, Loc_T("combat.msg.gold_gain", "(+{gold} gold)", { gold: _result.gold_gain }));
+    }
 
     var levels = (variable_struct_exists(_result, "levels_gained")) ? max(0, round(real(_result.levels_gained))) : 0;
     var stat_points = (variable_struct_exists(_result, "stat_points_gained")) ? max(0, round(real(_result.stat_points_gained))) : 0;
@@ -150,6 +153,8 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
     }
     p.inventory = Loot_Grant(p.inventory, loot);
     p = Card_OnVictory(p);   // C2: Field Medic, Second Wind, Scrounger
+    var gold_gain = Gold_ForEnemy(Run_Stream("loot"), { level: _enemy_level, threat_rank: variable_struct_exists(cfg, "threat_rank") ? cfg.threat_rank : 1, is_boss: false, is_elite: false }, p);   // C3 (D23)
+    Gold_Add(Run_Get(), gold_gain);
     GameState_SetPlayer(p);
 
     var result = {
@@ -157,6 +162,7 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
         levels_gained: variable_struct_exists(p, "last_levels_gained") ? max(0, round(real(p.last_levels_gained))) : 0,
         stat_points_gained: variable_struct_exists(p, "last_stat_points_gained") ? max(0, round(real(p.last_stat_points_gained))) : 0,
         auto_stat_summary: LevelUp_AutoGainSummary(p),
+        gold_gain: gold_gain,
         loot_gained: is_array(loot) && array_length(loot) > 0,
         at_level_cap: at_cap_before || Level_IsAtCap(p.level)
     };
@@ -228,6 +234,7 @@ function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
     var p = gs.player_ch;
 
     if (!Enemy_CanAutoResolve(cfg, p.level, enemy_level)) return false;
+    if (variable_instance_exists(_enemy_inst, "elite_mod") && _enemy_inst.elite_mod != "") return false;   // C3 (D86): an elite is always fought (its card pick)
     if (!RoomState_EnsurePersistId(_enemy_inst)) return false;
 
     if (variable_instance_exists(_enemy_inst, "moving")) _enemy_inst.moving = false;
@@ -350,6 +357,21 @@ function Enemy_ApplyConfig(_inst) {
 
     _inst.leash_radius = _inst.scan_radius * _inst.leash_mult;
     _inst.think_delay = irandom(_inst.think_rate);
+}
+
+// C3 (D33): an enemy whose type was changed by the run's shuffle (or restored with a changed type) takes the new type's sprite, AI numbers and profile.
+function Enemy_ReapplyConfig(_inst) {
+    if (!variable_instance_exists(_inst, "enemy_id") || _inst.enemy_id == -1) return;
+    Enemy_ApplyConfig(_inst);
+    if (variable_instance_exists(_inst, "prof")) {   // the AI had started already: its profile follows the type
+        _inst.prof = EnemyAI_Profile(_inst.enemy_id);
+        _inst.step_tx = _inst.x;
+        _inst.step_ty = _inst.y;
+        _inst.patrol_cx = -1;
+        _inst.patrol_cy = -1;
+        _inst.home_cx = Nav_CellOf(Grid_Snap(_inst.home_x) + GRID_TILE_SIZE / 2);
+        _inst.home_cy = Nav_CellOf(Grid_Snap(_inst.home_y) + GRID_TILE_SIZE / 2);
+    }
 }
 
 // --------------------
@@ -827,6 +849,7 @@ function World_RegisterFx(_inst) {
 function World_DrawFx() {
     Nav_DrawWorldFx();
     Player_DrawWorldFx();
+    Elite_DrawWorldFx();   // C3 (D86): the pulsing outline round elites
 }
 
 // Called by World_DrawFx (a layer script, see World_RegisterFx): the "!" over an enemy that just spotted the

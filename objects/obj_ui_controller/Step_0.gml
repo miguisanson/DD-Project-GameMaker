@@ -28,6 +28,7 @@ if (Transition_IsInputLocked()) exit;
 
 // C2: the screens a character owes (class choice, free stat point, card pick, replace a skill) open and run here.
 if (CardsUi_Step()) exit;
+if (ShopUi_Step()) exit;   // C3 (D85): the merchant's shop
 
 var game_fps = max(1, game_get_speed(gamespeed_fps));
 gs.ui.icon_frame += max(0, UI_DIALOGUE_ARROW_FPS) / game_fps;
