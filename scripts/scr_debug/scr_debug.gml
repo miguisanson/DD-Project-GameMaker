@@ -242,12 +242,13 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 12000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 12000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined };
 }
 
 function Scenario_Finish() {
     var _s = global.scn;
     _s.done = true;
+    show_debug_message("[TEST-FRAMES] " + _s.mode + " frames=" + string(_s.f) + " of " + string(_s.cap));
     show_debug_message("[TEST-SUMMARY] pass=" + string(_s.pass) + " fail=" + string(_s.fail) + " errors=" + string(_s.errors));
     game_end((_s.fail > 0 || _s.errors > 0) ? 1 : 0);
 }
@@ -806,7 +807,8 @@ function Scenario_StepBot(_s) {
         return;
     }
     if (_s.v == 7) {
-        Scenario_StepBotTurns(_s);
+        if (_s.step >= 20) Scenario_StepBotAI(_s);   // B4 (steps 20..33): the battle AI
+        else Scenario_StepBotTurns(_s);
         return;
     }
     if (_s.v == 2) {
@@ -1573,8 +1575,7 @@ function Scenario_StepBotTurns(_s) {
             if (_s.f - _s.vstart > 7000) {
                 Scenario_Check(_name + "_b_finished", false, "k=" + string(_tb.k) + " state=" + string(_bcb.battle_state));
                 SkillDB_Get(SKILL_HILT_BASH).status_chance = 0.6;
-                _s.v = 5;
-                Scenario_Next(_s, 0);
+                Scenario_Next(_s, 20);   // on to the battle AI (B4), then movement and AI (v=5)
                 break;
             }
             if (_tb.k == 0) {   // set up: a sturdy Slime whose BREAK meter is out of the way for now
@@ -1693,8 +1694,330 @@ function Scenario_StepBotTurns(_s) {
                 }
             } else {
                 SkillDB_Get(SKILL_HILT_BASH).status_chance = 0.6;
-                _s.v = 5;   // on to movement and AI
+                Scenario_Next(_s, 20);   // on to the battle AI (B4), then movement and AI (v=5)
+            }
+            break;
+    }
+}
+
+// ---- B4: the battle AI through the real battle flow (bot v=7, steps 20..33; combat-spec.md section 12) ----
+// A: Killer Plant at 30% HP heals once (rule low_hp_heal), then the 3rd turn is a wind-up (strip "!"), the 4th the big attack through the defence bar (Perfect).
+// B: the same wind-up cancelled by a BREAK: the enemy does a plain attack instead and the bar never comes.
+// C: Mad Whisp vs a buffed player Snuffs the buff; unbuffed it does not.
+// D: Palehorn crosses 60% and 30%, then the Pale Choirbeast starts at 20%: banners, +SPD/+ATK in the stats and on the timeline, no double action.
+function Scenario_BotAIBegin(_s, _name, _enemy, _step_next) {
+    Scenario_NewKnight(CLASS_KNIGHT);
+    _s.stt = { ac: 0, k: 0, n: 0, hp0: 0, def_seen: false, len0: 0, max_actions: 0, base_hp: 0, dmg_base: 0, took: 0, last: "" };
+    _s.vstart = _s.f;
+    Scenario_GotoBattle(_name, _enemy);
+    Scenario_Next(_s, _step_next);
+}
+
+// The battle controller once the battle is up, else noone (and a failed check plus Finish if it never comes).
+function Scenario_BotAIController(_s, _name) {
+    if (room != rm_battle || !instance_exists(obj_battle_controller)) {
+        if (_s.t > 40) { Scenario_Check(_name + "_in_battle", false, "room=" + room_get_name(room) + " k=" + string(_s.stt.k) + " last: " + _s.stt.last); Scenario_Finish(); }
+        return noone;
+    }
+    var _bc = instance_find(obj_battle_controller, 0);
+    _s.stt.last = "p.hp=" + string(_bc.p.hp) + "/" + string(_bc.p.max_hp) + " e.hp=" + string(_bc.e.hp) + "/" + string(_bc.e.max_hp) + " state=" + string(_bc.battle_state) + " turns=" + string(_bc.ai.turns) + " over=" + string(_bc.battle_over);
+    return _bc;
+}
+
+// A sturdy enemy at the given HP share, with its BREAK meter out of the way, and a player nothing can kill (the battle copy: a Knight is rebuilt at 10 HP when the battle starts).
+function Scenario_BotAISturdy(_bc, _hp_ratio) {
+    _bc.p.max_hp = 9999;
+    _bc.p.hp = 9999;
+    _bc.e.max_hp = 1000;
+    _bc.e.hp = round(1000 * _hp_ratio);
+    _bc.enemy_hp_shown = _bc.e.hp;
+    _bc.e.stagger_max = 99999;
+}
+
+// The slot of the strip that carries the wind-up "!" (or undefined).
+function Scenario_BotWindupSlot(_bc) {
+    var _slots = Battle_TimelineSlots(_bc);
+    for (var _i = 0; _i < array_length(_slots); _i++) {
+        if (_slots[_i].windup) return _slots[_i];
+    }
+    return undefined;
+}
+
+function Scenario_BotLogIndex(_bc, _needle) {
+    for (var _i = 0; _i < array_length(_bc.combat_log); _i++) {
+        if (string_pos(_needle, _bc.combat_log[_i].text) > 0) return _i;
+    }
+    return -1;
+}
+
+function Scenario_BotLogTail(_bc, _n) {
+    var _out = "";
+    for (var _i = max(0, array_length(_bc.combat_log) - _n); _i < array_length(_bc.combat_log); _i++) _out += "[" + _bc.combat_log[_i].text + "] ";
+    return _out;
+}
+
+function Scenario_BotTurnsSince(_bc, _from) {
+    var _out = "";
+    for (var _i = _from; _i < array_length(_bc.turn_log); _i++) _out += (_bc.turn_log[_i] == TL_PLAYER) ? "P" : "E";
+    return _out;
+}
+
+function Scenario_StepBotAI(_s) {
+    switch (_s.step) {
+        case 20:   // A: Killer Plant
+        case 23:   // B: Killer Plant, BREAK
+        case 26:   // C: Mad Whisp
+        case 29:   // D1: Palehorn
+        case 32:   // D2: Pale Choirbeast
+            if (_s.t == 10) {
+                var _names = { s20: "bot_ai_plant", s23: "bot_ai_break", s26: "bot_ai_whisp", s29: "bot_ai_palehorn", s32: "bot_ai_choirbeast" };
+                var _enemies = { s20: ENEMY_KILLER_PLANT, s23: ENEMY_KILLER_PLANT, s26: ENEMY_MADWHISP, s29: ENEMY_MINI_BOSS, s32: ENEMY_FINAL_BOSS };
+                var _key = "s" + string(_s.step);
+                Scenario_BotAIBegin(_s, variable_struct_get(_names, _key), variable_struct_get(_enemies, _key), _s.step + 1);
+            }
+            break;
+        case 22: case 25: case 28: case 31:   // measured: the next battle (the battle is simply abandoned)
+            if (_s.t == 5) Scenario_Next(_s, _s.step + 1);
+            break;
+
+        case 21:   // A
+            var _bcA = Scenario_BotAIController(_s, "bot_ai_plant");
+            if (_bcA == noone) break;
+            var _a = _s.stt;
+            if (_s.f - _s.vstart > 3500) {
+                Scenario_Check("bot_ai_plant_finished", false, "k=" + string(_a.k) + " turns=" + string(_bcA.ai.turns) + " state=" + string(_bcA.battle_state));
+                Scenario_Next(_s, 22);
+                break;
+            }
+            var _a_menu = (_bcA.battle_state == BSTATE_MENU && _bcA.turn == TURN_PLAYER);
+            if (_a.k == 0) {   // 30 / 100 HP, the BREAK meter out of the way
+                Scenario_BotAISturdy(_bcA, 0.30);
+                _a.k = 1;
+            } else if (_a.k == 1) {   // the first enemy turn: the heal
+                if (_bcA.ai.turns >= 1 && _a_menu) {
+                    var _heal_ok = (_bcA.enemy_last_skill_id == SKILL_REGROW);
+                    Scenario_Check("bot_ai_plant_low_hp_enemy_heals_first", _heal_ok, "last skill " + string(_bcA.enemy_last_skill_id) + " rule uses " + json_stringify(_bcA.ai.uses));
+                    Scenario_Check("bot_ai_plant_heal_raised_its_hp", _bcA.e.hp > 300, "hp=" + string(_bcA.e.hp));
+                    Scenario_Check("bot_ai_plant_heal_logged", Scenario_BotLogCount(_bcA, "regrows") == 1);
+                    Scenario_Check("bot_ai_plant_heal_rule_counted_once", variable_struct_exists(_bcA.ai.uses, "low_hp_heal") && variable_struct_get(_bcA.ai.uses, "low_hp_heal") == 1);
+                    _bcA.e.hp = 200;   // still below 40%: the heal rule is spent, it must not heal again
+                    _bcA.enemy_hp_shown = 200;
+                    _a.k = 2;
+                } else if (_a.ac != 0 || _a_menu) {
+                    Scenario_BotAct(_s, _bcA, "attack", false);
+                }
+            } else if (_a.k == 2) {   // turn 2 is a plain attack; remember the player's HP before turn 3
+                if (_bcA.ai.turns == 2 && _a_menu && _a.ac == 0) {
+                    _a.hp0 = _bcA.p.hp;
+                    _a.k = 3;
+                } else if (_a.ac != 0 || _a_menu) {
+                    Scenario_BotAct(_s, _bcA, "attack", false);
+                }
+            } else if (_a.k == 3) {   // turn 3: the wind-up
+                if (_bcA.ai.turns >= 3 && _a_menu && _a.ac == 0) {
+                    var _mark = Scenario_BotWindupSlot(_bcA);
+                    Scenario_Check("bot_ai_plant_third_turn_is_a_windup_of_vine_trap", _bcA.ai.windup == SKILL_VINE_TRAP && _bcA.enemy_last_windup == SKILL_VINE_TRAP, "windup=" + string(_bcA.ai.windup));
+                    Scenario_Check("bot_ai_plant_windup_does_no_damage", _bcA.p.hp == _a.hp0, "hp " + string(_a.hp0) + " -> " + string(_bcA.p.hp));
+                    Scenario_Check("bot_ai_plant_windup_line_logged", Scenario_BotLogCount(_bcA, "coils its vines") == 1);
+                    Scenario_Check("bot_ai_plant_windup_mark_on_an_enemy_slot_of_the_strip", is_struct(_mark) && _mark.who == TL_ENEMY);
+                    Scenario_Check("bot_ai_plant_no_second_heal", Scenario_BotLogCount(_bcA, "regrows") == 1);
+                    Scenario_Check("bot_ai_plant_windup_used_no_skill", _bcA.enemy_last_skill_id == -1);
+                    _a.k = 4;
+                } else if (_a.ac != 0 || _a_menu) {
+                    Scenario_BotAct(_s, _bcA, "attack", false);
+                }
+            } else if (_a.k == 4) {   // turn 4: the big attack through the defence bar
+                if (_bcA.battle_state == BSTATE_ENEMY_DEFENCE && _bcA.def_active) {
+                    _a.base_hp = _bcA.def_ctx.hp_before;
+                    _a.dmg_base = _bcA.def_ctx.res.dmg;
+                    Scenario_Check("bot_ai_plant_big_attack_is_vine_trap_on_the_bar", _bcA.def_skill_id == SKILL_VINE_TRAP, "skill " + string(_bcA.def_skill_id));
+                    _a.k = 5;
+                } else if (_a.ac != 0 || _a_menu) {
+                    Scenario_BotAct(_s, _bcA, "attack", false);
+                }
+            } else if (_a.k == 5) {   // defend on the Perfect zone
+                Scenario_BotDefend(_s, _bcA);
+                if (_bcA.battle_state != BSTATE_ENEMY_DEFENCE) {
+                    Scenario_Check("bot_ai_plant_big_attack_defended_perfect", _bcA.qte_result_key == QTE_PERFECT, "grade " + string(_bcA.qte_result_key));
+                    Scenario_Check("bot_ai_plant_defended_damage_follows_the_grade", (_a.base_hp - _bcA.p.hp) == Qte_DefenceDamage(_a.dmg_base, QTE_PERFECT), "took " + string(_a.base_hp - _bcA.p.hp) + " of " + string(_a.dmg_base));
+                    Scenario_Check("bot_ai_plant_windup_is_over_after_the_big_attack", _bcA.ai.windup == -1);
+                    Scenario_Next(_s, 22);
+                }
+            }
+            break;
+
+        case 24:   // B
+            var _bcB = Scenario_BotAIController(_s, "bot_ai_break");
+            if (_bcB == noone) break;
+            var _b = _s.stt;
+            if (_s.f - _s.vstart > 3000) {
+                Scenario_Check("bot_ai_break_finished", false, "k=" + string(_b.k) + " turns=" + string(_bcB.ai.turns) + " state=" + string(_bcB.battle_state));
+                Scenario_Next(_s, 25);
+                break;
+            }
+            var _b_menu = (_bcB.battle_state == BSTATE_MENU && _bcB.turn == TURN_PLAYER);
+            if (_bcB.battle_state == BSTATE_ENEMY_DEFENCE) _b.def_seen = true;
+            if (_b.k == 0) {   // the next enemy turn is its 3rd: a wind-up of Vine Trap
+                Scenario_BotAISturdy(_bcB, 1);
+                _bcB.ai.turns = 2;
+                _b.k = 1;
+            } else if (_b.k == 1) {
+                if (_bcB.ai.windup == SKILL_VINE_TRAP && _b_menu && _b.ac == 0) {   // the wind-up is up: one hit away from a BREAK
+                    _bcB.e.stagger_max = 6;
+                    _bcB.e.stagger = 5;
+                    Scenario_Check("bot_ai_break_windup_pending_before_the_hit", true);
+                    _b.k = 2;
+                } else if (_b.ac != 0 || _b_menu) {
+                    Scenario_BotAct(_s, _bcB, "attack", false);
+                }
+            } else if (_b.k == 2) {   // the hit that breaks it
+                if (Scenario_BotAct(_s, _bcB, "attack", false)) {
+                    Scenario_Check("bot_ai_break_enemy_is_broken", _bcB.e.broken);
+                    Scenario_Check("bot_ai_break_cancels_the_windup", _bcB.ai.windup == -1, "windup=" + string(_bcB.ai.windup));
+                    Scenario_Check("bot_ai_break_cancel_logged", Scenario_BotLogCount(_bcB, "broken off") == 1);
+                    Scenario_Check("bot_ai_break_message_logged", Scenario_BotLogCount(_bcB, "BREAK") >= 1);
+                    Scenario_Check("bot_ai_break_cached_plan_dropped", is_undefined(_bcB.enemy_plan));
+                    Scenario_Check("bot_ai_break_no_windup_mark_left_on_the_strip", !is_struct(Scenario_BotWindupSlot(_bcB)));
+                    _bcB.e.stagger_max = 99999;
+                    _b.k = 3;
+                }
+            } else if (_b.k == 3) {   // play on until its 4th turn is done: a plain attack, never the big one
+                if (_bcB.ai.turns >= 4 && _b_menu && _b.ac == 0) {
+                    Scenario_Check("bot_ai_break_enemy_turn_4_is_a_plain_attack", _bcB.enemy_last_skill_id == -1, "skill " + string(_bcB.enemy_last_skill_id));
+                    Scenario_Check("bot_ai_break_the_defence_bar_never_came", !_b.def_seen);
+                    Scenario_Check("bot_ai_break_no_wind_up_pending_afterwards", _bcB.ai.windup == -1);
+                    Scenario_Next(_s, 25);
+                } else if (_b.ac != 0 || _b_menu) {
+                    Scenario_BotAct(_s, _bcB, "attack", false);
+                }
+            }
+            break;
+
+        case 27:   // C
+            var _bcC = Scenario_BotAIController(_s, "bot_ai_whisp");
+            if (_bcC == noone) break;
+            var _c = _s.stt;
+            if (_s.f - _s.vstart > 2500) {
+                Scenario_Check("bot_ai_whisp_finished", false, "k=" + string(_c.k) + " turns=" + string(_bcC.ai.turns));
+                Scenario_Next(_s, 28);
+                break;
+            }
+            var _c_menu = (_bcC.battle_state == BSTATE_MENU && _bcC.turn == TURN_PLAYER);
+            if (_c.k == 0) {   // the player is buffed before the Whisp acts
+                Scenario_BotAISturdy(_bcC, 1);
+                Status_Add(_bcC.p, STATUS_CRIT_UP, 3, 0);
+                _c.k = 1;
+            } else if (_c.k == 1) {
+                if (_bcC.ai.turns >= 1 && _c_menu && _c.ac == 0) {
+                    Scenario_Check("bot_ai_whisp_snuffs_a_buffed_player", _bcC.enemy_last_skill_id == SKILL_SNUFF, "skill " + string(_bcC.enemy_last_skill_id));
+                    Scenario_Check("bot_ai_whisp_buff_is_gone", !Status_Has(_bcC.p, STATUS_CRIT_UP));
+                    Scenario_Check("bot_ai_whisp_snuff_logged", Scenario_BotLogCount(_bcC, "snuffed") == 1);
+                    Scenario_Check("bot_ai_whisp_snuff_rule_counted", variable_struct_exists(_bcC.ai.uses, "snuff_buffs") && variable_struct_get(_bcC.ai.uses, "snuff_buffs") == 1);
+                    _c.n = _bcC.ai.turns;
+                    _c.k = 2;
+                } else if (_c.ac != 0 || _c_menu) {
+                    Scenario_BotAct(_s, _bcC, "attack", false);
+                }
+            } else if (_c.k == 2) {   // unbuffed: no Snuff on the next turn
+                if (_bcC.ai.turns > _c.n && _c_menu && _c.ac == 0) {
+                    Scenario_Check("bot_ai_whisp_unbuffed_player_is_left_alone", _bcC.enemy_last_skill_id != SKILL_SNUFF, "skill " + string(_bcC.enemy_last_skill_id));
+                    Scenario_Next(_s, 28);
+                } else if (_c.ac != 0 || _c_menu) {
+                    Scenario_BotAct(_s, _bcC, "attack", false);
+                }
+            }
+            break;
+
+        case 30:   // D1: Palehorn, 55% then 20%
+            var _bcD = Scenario_BotAIController(_s, "bot_ai_palehorn");
+            if (_bcD == noone) break;
+            var _d = _s.stt;
+            if (_s.f - _s.vstart > 4500) {
+                Scenario_Check("bot_ai_palehorn_finished", false, "k=" + string(_d.k) + " phase=" + string(_bcD.ai.phase) + " turns=" + string(_bcD.ai.turns));
+                Scenario_Next(_s, 31);
+                break;
+            }
+            var _d_menu = (_bcD.battle_state == BSTATE_MENU && _bcD.turn == TURN_PLAYER);
+            if (_d.k == 0) {
+                Scenario_BotAISturdy(_bcD, 0.55);
+                _d.base_hp = EnemyDB_Get(ENEMY_MINI_BOSS).stats.spd;
+                _d.dmg_base = EnemyDB_Get(ENEMY_MINI_BOSS).stats.atk;
+                _d.k = 1;
+            } else if (_d.k == 1) {   // at its first action: phase 1
+                if (_bcD.ai.phase == 1 && Scenario_BotLogCount(_bcD, "paws the ground") >= 1) {
+                    Scenario_Check("bot_ai_palehorn_phase_1_banner_logged", Scenario_BotLogCount(_bcD, "paws the ground") == 1);
+                    Scenario_Check("bot_ai_palehorn_phase_1_spd_plus_2_in_the_stats", _bcD.e.stats.spd == _d.base_hp + 2, "spd " + string(_bcD.e.stats.spd));
+                    Scenario_Check("bot_ai_palehorn_phase_1_spd_plus_2_on_the_timeline", Turn_Find(_bcD.tl, TL_ENEMY).spd == _d.base_hp + 2, "tl spd " + string(Turn_Find(_bcD.tl, TL_ENEMY).spd));
+                    Scenario_Check("bot_ai_palehorn_phase_1_atk_unchanged", _bcD.e.stats.atk == _d.dmg_base);
+                    Scenario_Check("bot_ai_palehorn_phase_1_banner_shown_as_the_skill_banner", _bcD.skill_banner_active && string_pos("paws the ground", _bcD.skill_banner_name) > 0);
+                    _d.k = 2;
+                }
+            } else if (_d.k == 2) {   // the player acts once, then Palehorn is dropped to 20%
+                if (_d_menu && _d.ac == 0) {
+                    _bcD.e.hp = 200;
+                    _bcD.enemy_hp_shown = 200;
+                    _d.k = 3;
+                }
+            } else if (_d.k == 3) {
+                if (_bcD.ai.phase == 2 && Scenario_BotLogCount(_bcD, "blind rage") >= 1) {
+                    Scenario_Check("bot_ai_palehorn_phase_2_banner_logged", Scenario_BotLogCount(_bcD, "blind rage") == 1);
+                    Scenario_Check("bot_ai_palehorn_phase_2_spd_plus_4_in_all", _bcD.e.stats.spd == _d.base_hp + 4, "spd " + string(_bcD.e.stats.spd));
+                    Scenario_Check("bot_ai_palehorn_phase_2_atk_plus_3_enrage", _bcD.e.stats.atk == _d.dmg_base + 3, "atk " + string(_bcD.e.stats.atk));
+                    Scenario_Check("bot_ai_palehorn_phase_2_timeline_spd", Turn_Find(_bcD.tl, TL_ENEMY).spd == _d.base_hp + 4);
+                    _d.len0 = array_length(_bcD.turn_log);
+                    _d.k = 4;
+                } else if (_d_menu || _d.ac != 0) {
+                    Scenario_BotAct(_s, _bcD, "attack", false);
+                }
+            } else if (_d.k == 4) {   // SPD 16 against the Knight's 8: the enemy acts twice in a row on the real timeline
+                if (array_length(_bcD.turn_log) >= _d.len0 + 5) {
+                    var _seq = Scenario_BotTurnsSince(_bcD, _d.len0);
+                    Scenario_Check("bot_ai_palehorn_phase_2_real_turns_show_the_faster_enemy", string_pos("EE", _seq) > 0, "turns " + _seq);
+                    Scenario_Next(_s, 31);
+                } else if (_d_menu || _d.ac != 0) {
+                    Scenario_BotAct(_s, _bcD, "attack", false);
+                }
+            }
+            break;
+
+        case 33:   // D2: the Pale Choirbeast starts at 20%
+            var _bcE = Scenario_BotAIController(_s, "bot_ai_choirbeast");
+            if (_bcE == noone) break;
+            var _e = _s.stt;
+            if (_s.f - _s.vstart > 4500) {
+                Scenario_Check("bot_ai_choirbeast_finished", false, "k=" + string(_e.k) + " phase=" + string(_bcE.ai.phase) + " turns=" + string(_bcE.ai.turns));
+                _s.v = 5;   // movement and AI
                 Scenario_Next(_s, 0);
+                break;
+            }
+            var _e_menu = (_bcE.battle_state == BSTATE_MENU && _bcE.turn == TURN_PLAYER);
+            _e.max_actions = max(_e.max_actions, _bcE.enemy_actions_remaining);
+            if (_e.k == 0) {
+                Scenario_BotAISturdy(_bcE, 0.20);
+                _e.base_hp = EnemyDB_Get(ENEMY_FINAL_BOSS).stats.spd;
+                _e.dmg_base = EnemyDB_Get(ENEMY_FINAL_BOSS).stats.atk;
+                _e.k = 1;
+            } else if (_e.k == 1) {
+                if (_bcE.ai.phase == 2 && Scenario_BotLogCount(_bcE, "howls in fury") >= 1) {
+                    Scenario_Check("bot_ai_choirbeast_skips_to_phase_2", true);
+                    Scenario_Check("bot_ai_choirbeast_both_spd_bonuses", _bcE.e.stats.spd == _e.base_hp + 5, "spd " + string(_bcE.e.stats.spd));
+                    Scenario_Check("bot_ai_choirbeast_enrage_atk_plus_3", _bcE.e.stats.atk == _e.dmg_base + 3, "atk " + string(_bcE.e.stats.atk));
+                    Scenario_Check("bot_ai_choirbeast_phase_banner_logged", Scenario_BotLogCount(_bcE, "howls in fury") == 1);
+                    Scenario_Check("bot_ai_choirbeast_fury_is_speed_not_a_double_action", Battle_EnemyActionBudget(_bcE.e) == 1);
+                    _e.k = 2;
+                }
+            } else if (_e.k == 2) {   // its 2nd turn is the Pale Hymn wind-up (phase 2: every 2nd), its 3rd the big attack on the bar
+                if (_bcE.ai.turns >= 3 && _e_menu && _e.ac == 0) {
+                    var _i_wind = Scenario_BotLogIndex(_bcE, "draws a deep breath");
+                    var _i_bar = Scenario_BotLogIndex(_bcE, "Not blocked");   // the bot never presses: the bar ends as Weak
+                    Scenario_Check("bot_ai_choirbeast_hymn_windup_logged", _i_wind >= 0, "log " + Scenario_BotLogTail(_bcE, 12));
+                    Scenario_Check("bot_ai_choirbeast_big_attack_came_after_the_windup_through_the_bar", _i_bar > _i_wind && _i_wind >= 0, "wind " + string(_i_wind) + " bar " + string(_i_bar));
+                    Scenario_Check("bot_ai_choirbeast_never_more_than_one_action_per_turn", _e.max_actions <= 1, "max " + string(_e.max_actions));
+                    _s.v = 5;   // on to movement and AI
+                    Scenario_Next(_s, 0);
+                } else if (_e_menu || _e.ac != 0) {
+                    Scenario_BotAct(_s, _bcE, "attack", false);
+                }
             }
             break;
     }
@@ -1895,6 +2218,9 @@ function Scenario_StepShots(_s) {
             break;
         case 120: case 121: case 122: case 123: case 124: case 125: case 126: case 127: case 128:
             Scenario_StepShotsCards(_s);
+            break;
+        case 140: case 141: case 142: case 143: case 144: case 145: case 146: case 147: case 148: case 149:
+            Scenario_StepShotsAI(_s);   // B4: wind-up, Foresight on it, phase banner
             break;
         case 150: case 151: case 152: case 153: case 154: case 155: case 156: case 157: case 158: case 159: case 160:
             Scenario_StepShotsStory(_s);   // C5: death line, summary, echo, wake line, notes, banner, credits
@@ -2310,6 +2636,123 @@ function Scenario_StepShotsTurns(_s) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 _s.si = 0;
                 Scenario_Next(_s, 120);   // C2: the card screens (120-128), then the D91 / DISP-10 / D48 pictures (step 50), then the skill animations
+            }
+            break;
+    }
+}
+
+// B4 pictures (steps 140..148): Palehorn has just lowered its horns (banner, log line and the "!" on the strip), Foresight shows the wind-up two actions ahead,
+// and a phase banner. All three are set up on a real battle controller; the pictures are of the real draw code.
+function Scenario_StepShotsAI(_s) {
+    switch (_s.step) {
+        case 140:   // the wind-up has just happened: the player's turn, the banner over the enemy, the "!" on the enemy's slot
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(3);
+                Scenario_GotoBattle("shots_ai_windup", ENEMY_MINI_BOSS);
+            }
+            if (_s.t >= 25) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_ai_windup_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.ai.turns = 2;
+                EnemyAI_Take(_bc.ai, EnemyAI_Choose(_bc.e, _bc.p, EnemyAI_Ctx(_bc.ai), Run_Stream("combat")));   // its 3rd turn: Ramming is telegraphed
+                EnemyAI_EndTurn(_bc.ai);
+                Scenario_Check("shots_ai_windup_is_ramming", _bc.ai.windup == SKILL_RAMMING, "windup=" + string(_bc.ai.windup));
+                var _text = Skill_WindupText(SkillDB_Get(SKILL_RAMMING), _bc.e.name);
+                _bc.tl_who = TL_PLAYER;
+                _bc.turn = TURN_PLAYER;
+                _bc.enemy_action_pending = false;
+                _bc.message_text = _text;
+                _bc.message_next_state = BSTATE_MENU;
+                _bc.battle_state = BSTATE_MESSAGE;
+                _bc.wait_timer = 9999;
+                _bc.skill_banner_active = true;
+                _bc.skill_banner_name = _text;
+                _bc.combat_log = [];   // the log (top right) is checked by the bot; two wrapped rows of it would sit on the enemy name in this picture
+                Scenario_Check("shots_ai_windup_text_names_the_enemy", string_pos("Palehorn", _text) > 0 && string_pos("horns", _text) > 0, _text);
+                Scenario_Check("shots_ai_windup_mark_on_the_strip", is_struct(Scenario_BotWindupSlot(_bc)));
+                Scenario_Next(_s, 141);
+            }
+            break;
+        case 141:
+            if (_s.t >= 10) {
+                _s.shot = "shot_ai_windup.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 142);
+            }
+            break;
+        case 142:   // Foresight: a Mage sees the wind-up before it happens
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_NewKnight(CLASS_MAGE);
+                Scenario_GotoBattle("shots_ai_foresight", ENEMY_MINI_BOSS);
+                Scenario_Next(_s, 143);
+            }
+            break;
+        case 143:
+            if (_s.t >= 25) {
+                var _inb2 = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_ai_foresight_in_battle", _inb2, "room=" + room_get_name(room));
+                if (!_inb2) { Scenario_Finish(); return; }
+                var _bc2 = instance_find(obj_battle_controller, 0);
+                _bc2.wait_timer = 9999;
+                _bc2.ai.turns = 2;   // its next turn is the 3rd
+                _bc2.p = Status_Add(_bc2.p, STATUS_HIT_UP, 3, 0);
+                var _fs = Scenario_BotForesightSlot(_bc2);
+                Scenario_Check("shots_ai_foresight_shows_the_windup", is_struct(_fs) && _fs.slot.foresight.kind == "windup" && _fs.slot.foresight.skill_id == SKILL_RAMMING && _fs.slot.foresight.big, is_struct(_fs) ? _fs.slot.foresight.kind : "none");
+                Scenario_Next(_s, 144);
+            }
+            break;
+        case 144:
+            if (_s.t >= 8) {
+                _s.shot = "shot_ai_foresight.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 145);
+            }
+            break;
+        case 145:   // a phase banner: Palehorn at 40% HP
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_NewKnight();
+                Scenario_GotoBattle("shots_ai_phase", ENEMY_MINI_BOSS);
+                Scenario_Next(_s, 146);
+            }
+            break;
+        case 146:
+            if (_s.t >= 25) {
+                var _inb3 = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_ai_phase_in_battle", _inb3, "room=" + room_get_name(room));
+                if (!_inb3) { Scenario_Finish(); return; }
+                var _bc3 = instance_find(obj_battle_controller, 0);
+                _bc3.e.hp = floor(_bc3.e.max_hp * 0.4);
+                _bc3.enemy_hp_shown = _bc3.e.hp;
+                _bc3.e.stagger = 12;
+                Battle_PhaseSync(_bc3);
+                Scenario_Check("shots_ai_phase_reached_1", _bc3.ai.phase == 1 && _bc3.phase_banner != "", "phase=" + string(_bc3.ai.phase));
+                var _banner = _bc3.phase_banner;
+                _bc3.phase_banner = "";
+                _bc3.skill_banner_active = true;
+                _bc3.skill_banner_name = _banner;
+                Battle_Message(_bc3, _banner, BSTATE_ENEMY_ACT);
+                _bc3.combat_log = [];
+                _bc3.wait_timer = 9999;
+                Scenario_Next(_s, 147);
+            }
+            break;
+        case 147:
+            if (_s.t >= 10) {
+                _s.shot = "shot_ai_phase.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 148);
+            }
+            break;
+        case 148:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _s.si = 0;
+                Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
             }
             break;
     }
@@ -4458,7 +4901,7 @@ function Scenario_StepShotsCards(_s) {
                 _gs.player_ch.stat_points = 0;
                 _gs.player_ch.offer = [];
                 CardsUi_Close();
-                Scenario_Next(_s, 50);   // on to the D91 / DISP-10 / D48 pictures, then the skill animations
+                Scenario_Next(_s, 140);   // B4 pictures (140..148), then the D91 / DISP-10 / D48 pictures and the skill animations
             }
             break;
     }

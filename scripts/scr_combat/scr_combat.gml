@@ -582,6 +582,7 @@ function Battle_ConsumeStun(_tl, _ch, _id) {
 
 // The player's or enemy's turn is over: SPD is read again (Bleeding slows), then the timeline picks who is next. Returns TL_PLAYER or TL_ENEMY.
 function Battle_TurnAdvance(_bc) {
+    Battle_PhaseSync(_bc);   // B4: a boss that crossed an HP threshold has its new SPD from this turn on
     Turn_SetSpd(_bc.tl, TL_PLAYER, Combat_EffectiveStat(_bc.p, STAT_SPD));
     Turn_SetSpd(_bc.tl, TL_ENEMY, Combat_EffectiveStat(_bc.e, STAT_SPD));
     _bc.tl_prev_who = _bc.tl_who;
@@ -638,16 +639,23 @@ function Battle_StaggerHit(_bc, _power, _stun_skill, _perfect, _hits = 1) {
     SFX_Play(Qte_GradeSfxKey(QTE_PERFECT));
     global.sfx_last_key = last_key;
     CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_FRAMES, SHAKE_DIR_H);
-    return " " + Loc_T("combat.msg.break", "BREAK! {name} takes +50% damage!", { name: e.name });
+    var note = " " + Loc_T("combat.msg.break", "BREAK! {name} takes +50% damage!", { name: e.name });
+    var cancelled = EnemyAI_Break(_bc.ai);   // B4 (D75): a BREAK during a wind-up cancels the big attack
+    if (cancelled >= 0) {
+        _bc.enemy_plan = undefined;          // the cached plan was that attack
+        note += " " + Loc_T("combat.msg.windup_broken", "{enemy}'s {skill} is broken off!", { enemy: e.name, skill: SkillDB_Get(cancelled).name });
+    }
+    return note;
 }
 
 // For the strip (D74, D79, D99): the current actor first, then the next four. The Foresight preview (the enemy's next action, D79) rides on the
 // enemy slot that holds that action: the current slot while it is the enemy's turn and it has not acted yet, else the first upcoming enemy slot.
 // While the enemy is in the middle of an action nothing is shown (the action after it is not planned yet).
-// slot = { who, current, foresight (the Battle_EnemyNextActionPreview struct, or undefined) }
+// slot = { who, current, foresight (the Battle_EnemyNextActionPreview struct, or undefined), windup (B4: the slot of the big attack that follows a wind-up) }
 function Battle_TimelineSlots(_bc) {
-    var out = [{ who: _bc.tl_who, current: true, foresight: undefined }];
+    var out = [{ who: _bc.tl_who, current: true, foresight: undefined, windup: false }];
     var next = Turn_Preview(_bc.tl, TURN_PREVIEW_COUNT - 1);
+    var wind = (_bc.ai.windup >= 0) && ((_bc.tl_who == TL_PLAYER) || _bc.enemy_action_pending);   // B4: the big attack that follows a wind-up is on the first enemy slot still to come
     var fore = undefined;
     var show_fore = (_bc.tl_who == TL_PLAYER) || _bc.enemy_action_pending;
     if (show_fore) {
@@ -655,10 +663,13 @@ function Battle_TimelineSlots(_bc) {
         if (pv.visible) fore = pv;
     }
     if (_bc.tl_who == TL_ENEMY && is_struct(fore)) { out[0].foresight = fore; fore = undefined; }
+    if (_bc.tl_who == TL_ENEMY && wind) { out[0].windup = true; wind = false; }
     for (var i = 0; i < array_length(next); i++) {
         var f = undefined;
+        var wm = false;
         if (next[i] == TL_ENEMY && is_struct(fore)) { f = fore; fore = undefined; }
-        array_push(out, { who: next[i], current: false, foresight: f });
+        if (next[i] == TL_ENEMY && wind) { wm = true; wind = false; }
+        array_push(out, { who: next[i], current: false, foresight: f, windup: wm });
     }
     return out;
 }
@@ -1019,6 +1030,7 @@ function Qte_DefenceParams(_skill_id) {
         case SKILL_SCORCHING_TOUCH: return { sweep_ms: 1000, perfect_half_width: 55, good_half_width: 120, ok_half_width: 195 };
         case SKILL_GHOST_CUT:       return { sweep_ms: 750,  perfect_half_width: 50, good_half_width: 110, ok_half_width: 180 };
         case SKILL_RAMMING:         return { sweep_ms: 1500, perfect_half_width: 50, good_half_width: 100, ok_half_width: 170 };
+        case SKILL_PALE_HYMN:       return { sweep_ms: 1400, perfect_half_width: 50, good_half_width: 105, ok_half_width: 175 };
     }
     return Qte_BarParams("default");
 }
@@ -1571,79 +1583,54 @@ function Battle_EnemyInitActionBudget(_bc, _e) {
     _bc.enemy_actions_remaining = Battle_EnemyActionBudget(_e);
 }
 
-function Battle_IsDamagingSkillForDebug(_sk) {
-    if (!is_struct(_sk)) return false;
-    if (!variable_struct_exists(_sk, "effect")) return false;
-    return (string(_sk.effect) == "damage");
-}
-
-function Battle_EnemyChooseSkill(_e, _p, _actions_remaining = -1, _used_skills = [], _force_damage_only = false) {
-    if (!is_array(_e.skills) || array_length(_e.skills) <= 0) return -1;
-
-    var candidates = [];
-    for (var i = 0; i < array_length(_e.skills); i++) {
-        var sid = _e.skills[i];
-        var sk = SkillDB_Get(sid);
-        if (!is_struct(sk) || sk.id == -1) continue;
-        if (variable_struct_exists(sk, "enemy_passive_action_budget") && sk.enemy_passive_action_budget) continue;
-        if (_force_damage_only && !Battle_IsDamagingSkillForDebug(sk)) continue;
-        if (variable_struct_exists(sk, "enemy_once_per_turn") && sk.enemy_once_per_turn) {
-            var already_used = false;
-            for (var us = 0; us < array_length(_used_skills); us++) {
-                if (_used_skills[us] == sid) { already_used = true; break; }
-            }
-            if (already_used) continue;
-        }
-        if (!Skill_CanUse(_e, sk)) continue;
-        if (!Skill_EnemyCanTrigger(sk, _e, _p, _actions_remaining)) continue;
-
-        if (_force_damage_only) {
-            array_push(candidates, sid);
-            continue;
-        }
-
-        var chance = Skill_EnemyUseChance(sk);
-        if (chance <= 0) continue;
-        if (RunRng_Float("combat") <= chance) array_push(candidates, sid);
-    }
-
-    if (array_length(candidates) <= 0) return -1;
-    return candidates[RunRng_Int("combat", array_length(candidates))];
-}
-
 // ---- Foresight (D79): the enemy's next action is decided ahead of time and kept in the battle (enemy_plan), so what it shows is what happens ----
-// plan = { skill_id (-1 = the basic attack), announced }.
+// plan = { skill_id (-1 = the basic attack), kind ("attack" | "skill" | "windup"), rule (the label that chose it), announced }.
+// The choice itself is EnemyAI_Choose (scr_db_enemy, combat-spec.md section 12): the enemy's rule list, then a weighted draw from the "combat" stream.
 function Battle_EnemyPlanLeft(_bc) {
     return (_bc.enemy_actions_remaining > 0) ? _bc.enemy_actions_remaining : Battle_EnemyActionBudget(_bc.e);
 }
 
 function Battle_EnemyPlanChoose(_bc) {
     var used = (_bc.enemy_actions_remaining > 0) ? _bc.enemy_turn_used_skills : [];
-    var force = Debug_EnemyForceDamageSkillOnly();
-    var can_use = force ? true : !_bc.enemy_last_action_used_skill;
-    var sid = can_use ? Battle_EnemyChooseSkill(_bc.e, _bc.p, Battle_EnemyPlanLeft(_bc), used, force) : -1;
-    return { skill_id: sid, announced: false };
+    var ctx = EnemyAI_Ctx(_bc.ai, Battle_EnemyPlanLeft(_bc), used, Debug_EnemyForceDamageSkillOnly());
+    var ch = EnemyAI_Choose(_bc.e, _bc.p, ctx, Run_Stream("combat"));
+    return { skill_id: ch.skill_id, kind: ch.kind, rule: ch.rule, announced: false };
 }
 
-// A plan made a turn ago may no longer be allowed (an HP-gated skill, the enemy ran out of what it needs): then the enemy chooses again.
+// A plan made a turn ago may no longer be allowed (an HP-gated skill, a wind-up that a BREAK cancelled): then the enemy chooses again.
 function Battle_EnemyPlanValid(_bc, _plan) {
     if (!is_struct(_plan) || !variable_struct_exists(_plan, "skill_id")) return false;
+    var pending = _bc.ai.windup;
+    if (variable_struct_exists(_plan, "rule") && _plan.rule == "windup_attack" && pending != _plan.skill_id) return false;
+    if (pending >= 0 && !(variable_struct_exists(_plan, "rule") && _plan.rule == "windup_attack")) return false;   // the big attack is due, whatever was planned before
     if (_plan.skill_id == -1) return true;
     var sk = SkillDB_Get(_plan.skill_id);
     if (!is_struct(sk) || sk.id == -1) return false;
     return Skill_CanUse(_bc.e, sk) && Skill_EnemyCanTrigger(sk, _bc.e, _bc.p, Battle_EnemyPlanLeft(_bc));
 }
 
+// A boss that crossed an HP threshold: new SPD / ATK at once (the strip shows it), the old plan is dropped, the banner waits for the enemy's next action.
+function Battle_PhaseSync(_bc) {
+    var r = EnemyAI_PhaseSync(_bc.ai, _bc.e);
+    if (!r.changed) return false;
+    _bc.enemy_plan = undefined;
+    _bc.phase_banner = r.banner;
+    Turn_SetSpd(_bc.tl, TL_ENEMY, Combat_EffectiveStat(_bc.e, STAT_SPD));
+    return true;
+}
+
 function Battle_EnemyPlanGet(_bc) {
+    Battle_PhaseSync(_bc);
     if (!variable_instance_exists(_bc, "enemy_plan") || !Battle_EnemyPlanValid(_bc, _bc.enemy_plan)) _bc.enemy_plan = Battle_EnemyPlanChoose(_bc);
     return _bc.enemy_plan;
 }
 
-// The enemy acts on its plan: returns the skill id (-1 = basic attack) and clears the plan.
+// The enemy acts on its plan: returns the plan (skill_id, kind, rule) and clears it. The AI state learns what was done (rule uses, the wind-up).
 function Battle_EnemyPlanTake(_bc) {
     var plan = Battle_EnemyPlanGet(_bc);
     _bc.enemy_plan = undefined;
-    return plan.skill_id;
+    EnemyAI_Take(_bc.ai, plan);
+    return plan;
 }
 
 // Pure: what Foresight shows for a plan. Nothing is given away while _visible is false.
@@ -1659,10 +1646,11 @@ function Battle_ActionPreviewOf(_plan, _visible, _stunned = false) {
         out.name = Loc_T("combat.foresee.attack", "a plain attack");
     } else {
         var sk = SkillDB_Get(_plan.skill_id);
-        out.kind = "skill";
+        var winding = (variable_struct_exists(_plan, "kind") && _plan.kind == "windup");
+        out.kind = winding ? "windup" : "skill";
         out.skill_id = _plan.skill_id;
-        out.name = string(sk.name);
-        out.big = (variable_struct_exists(sk, "uses_defensive_qte") && sk.uses_defensive_qte);   // a big, telegraphed attack (D7)
+        out.name = winding ? Loc_T("combat.foresee.windup", "winding up {skill}", { skill: string(sk.name) }) : string(sk.name);
+        out.big = winding || (variable_struct_exists(sk, "uses_defensive_qte") && sk.uses_defensive_qte) || (variable_struct_exists(sk, "telegraphed") && sk.telegraphed);   // a big, telegraphed attack (D7)
     }
     out.text = Loc_T("combat.msg.foresee", "You foresee: {action}", { action: out.name });
     return out;
@@ -1784,6 +1772,7 @@ function Battle_EnemyFinalizeTurnState(_bc, _p, _e) {
     var e = _e;
 
     var enemy_turn_finished = (_bc.enemy_actions_remaining <= 0);
+    if (enemy_turn_finished) EnemyAI_EndTurn(_bc.ai);   // B4: the enemy's own turn number (every_nth rules)
     if (enemy_turn_finished) e = Status_Tick(e);        // the turn's tick, which includes this last action's bleeding
     else e = Status_ActionTick(e);                       // D78: Bleeding hurts after every action of a chain
     if (Battle_CheckEnd(_bc, p, e)) {
@@ -2135,16 +2124,53 @@ function Qte_DrawTelegraph(_x, _y, _elapsed_ms, _unit) {
     draw_set_color(c_white);
 }
 
+// The enemy spends its turn winding up a telegraphed move (D7, D59): no damage and no status. The line, the banner and the strip's "!" say what comes next turn.
+function Battle_EnemyWindup(_bc, _skill_id) {
+    var e = _bc.e;
+    var sk = SkillDB_Get(_skill_id);
+    var text = Skill_WindupText(sk, e.name);
+    _bc.enemy_last_skill_id = -1;
+    _bc.enemy_last_windup = _skill_id;
+    _bc.skill_banner_active = true;
+    _bc.skill_banner_name = text;
+    SFX_PlayEnemySpecial(e.id);
+    if (instance_exists(_bc.enemy_inst)) {
+        SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, QTE_TELEGRAPH_MS * 60 div 1000, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
+    }
+    _bc.enemy_actions_remaining = max(0, _bc.enemy_actions_remaining - 1);
+    var follow_state = (_bc.enemy_actions_remaining > 0) ? BSTATE_ENEMY_ACT : BSTATE_MENU;
+    var fin = Battle_EnemyFinalizeTurnState(_bc, _bc.p, e);
+    if (fin.ended) return;
+    Battle_Message(_bc, text, follow_state);
+}
+
 function Battle_EnemyAct(_bc) {
     var p = _bc.p;
     var e = _bc.e;
 
+    // B4: a boss that crossed an HP threshold announces its new phase before it acts (its stats changed with the HP, Battle_PhaseSync)
+    Battle_PhaseSync(_bc);
+    if (_bc.phase_banner != "") {
+        var phase_text = _bc.phase_banner;
+        _bc.phase_banner = "";
+        _bc.skill_banner_active = true;
+        _bc.skill_banner_name = phase_text;
+        SFX_PlayEnemySpecial(e.id);
+        CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_FRAMES, SHAKE_DIR_H);
+        Battle_Message(_bc, phase_text, BSTATE_ENEMY_ACT);
+        return;
+    }
+
     Battle_EnemyInitActionBudget(_bc, e);
 
-    if (!variable_instance_exists(_bc, "enemy_last_action_used_skill")) _bc.enemy_last_action_used_skill = false;
     var force_damage_skill_debug = Debug_EnemyForceDamageSkillOnly();
-    var skill_id = Battle_EnemyPlanTake(_bc);   // what Foresight showed (D79), or a fresh choice when nothing was planned
+    var plan = Battle_EnemyPlanTake(_bc);       // what Foresight showed (D79), or a fresh choice when nothing was planned
+    var skill_id = plan.skill_id;
     _bc.enemy_action_pending = false;           // it is acting now: the strip must not plan (or show) the action after this one
+    if (plan.kind == "windup") {                // B4: a telegraphed move is announced first, used next turn
+        Battle_EnemyWindup(_bc, skill_id);
+        return;
+    }
     var use_skill = (skill_id != -1);
     var sk = use_skill ? SkillDB_Get(skill_id) : undefined;
 
@@ -2189,7 +2215,6 @@ function Battle_EnemyAct(_bc) {
                 if (_bc.enemy_turn_used_skills[ui] == skill_id) { exists_used = true; break; }
             }
             if (!exists_used) array_push(_bc.enemy_turn_used_skills, skill_id);
-            _bc.enemy_last_action_used_skill = true;
             _bc.skill_banner_active = true;
             _bc.skill_banner_name = sk.name;
             var skill_sfx_h = SFX_PlaySkill(skill_id);
@@ -2258,7 +2283,6 @@ function Battle_EnemyAct(_bc) {
         }
 
         e = Status_ConsumeByField(e, "consume_on_attack");
-        _bc.enemy_last_action_used_skill = false;
 
         if (Battle_CheckEnd(_bc, p, e)) return;
         _bc.enemy_actions_remaining = max(0, _bc.enemy_actions_remaining - 1);
@@ -2332,7 +2356,17 @@ function Battle_TimelineSprite(_bc, _who) {
 }
 
 // One slot at (_x, _y). The player's portrait sits on mid green, the enemy's on the darkest, so the two read apart at a glance.
-function Battle_DrawTimelineSlot(_bc, _x, _y, _m, _who, _current, _alpha, _eye) {
+// 3 x 7 "!" (B4): the big attack that follows a wind-up. Cells are p x p.
+function Battle_DrawBang(_x, _y, _p, _col) {
+    var rows = [2, 2, 2, 2, 2, 0, 2];   // bit 2 = the left column of the 3 wide picture
+    for (var r = 0; r < 7; r++) {
+        for (var c = 0; c < 3; c++) {
+            if (((rows[r] >> (2 - c)) & 1) == 1) Ui_Box(_x + c * _p, _y + r * _p, _x + (c + 1) * _p, _y + (r + 1) * _p, _col);
+        }
+    }
+}
+
+function Battle_DrawTimelineSlot(_bc, _x, _y, _m, _who, _current, _alpha, _eye, _windup = false) {
     var p = _m.p;
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
@@ -2353,6 +2387,10 @@ function Battle_DrawTimelineSlot(_bc, _x, _y, _m, _who, _current, _alpha, _eye) 
         Ui_Text(cx, cy - _m.line_h * 0.5, (_who == TL_PLAYER) ? "P" : "E", UI_C_LIGHTEST, fa_center);
     }
     if (_eye) Battle_DrawEye(_x + _m.slot - 2 * p - 9 * p, _y + 2 * p, p, UI_C_LIGHTEST);
+    if (_windup) {   // a light box with a dark "!" in the top left corner of the slot: this turn is the big attack
+        Ui_Box(_x + 2 * p, _y + 2 * p, _x + 7 * p, _y + 11 * p, UI_C_LIGHTEST);
+        Battle_DrawBang(_x + 3 * p, _y + 3 * p, p, UI_C_DARKEST);
+    }
     draw_set_alpha(a0);
 }
 
@@ -2381,7 +2419,7 @@ function Battle_DrawTimeline(_bc) {
         var al = 1;
         if (shift_mode && i == n - 1) al = t;
         if (!shift_mode) al = 0.4 + 0.6 * t;
-        Battle_DrawTimelineSlot(_bc, xx, yy, m, s.who, s.current, al, is_struct(s.foresight));
+        Battle_DrawTimelineSlot(_bc, xx, yy, m, s.who, s.current, al, is_struct(s.foresight), s.windup);
         if (is_struct(s.foresight)) { fore = s.foresight; fore_x = xx + m.slot * 0.5; }
     }
     if (is_struct(fore)) {
