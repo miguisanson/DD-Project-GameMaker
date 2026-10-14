@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T10:55:55Z",
-    "row_count": 736
+    "generated_at_utc": "2026-10-14T11:49:28Z",
+    "row_count": 752
   },
   "default_lang": "en",
   "languages": [
@@ -251,6 +251,10 @@
     "combat.foresee.stunned": {
       "en": "nothing, it is stunned",
       "ko": "기절해서 아무것도 못 합니다"
+    },
+    "combat.foresee.windup": {
+      "en": "winding up {skill}",
+      "ko": "{skill}을(를) 준비 중"
     },
     "combat.msg.applied_prefix": {
       "en": "Applied ",
@@ -532,6 +536,22 @@
       "en": "Nothing to steal.",
       "ko": "훔칠 것이 없습니다."
     },
+    "combat.msg.phase.final_boss.1": {
+      "en": "{enemy} sings a second voice!",
+      "ko": "{enemy}이(가) 두 번째 목소리로 노래합니다!"
+    },
+    "combat.msg.phase.final_boss.2": {
+      "en": "{enemy} howls in fury!",
+      "ko": "{enemy}이(가) 격노하여 울부짖습니다!"
+    },
+    "combat.msg.phase.mini_boss.1": {
+      "en": "{enemy} paws the ground, snorting!",
+      "ko": "{enemy}이(가) 콧김을 내뿜으며 땅을 긁습니다!"
+    },
+    "combat.msg.phase.mini_boss.2": {
+      "en": "{enemy} bellows in a blind rage!",
+      "ko": "{enemy}이(가) 분노에 눈이 멀어 포효합니다!"
+    },
     "combat.msg.player_couldnt_escape": {
       "en": "Couldn't escape!",
       "ko": "탈출하지 못했습니다!"
@@ -571,6 +591,14 @@
     "combat.msg.skill.use.skill_rampage": {
       "en": "It goes berserk!",
       "ko": "그것은 광포하다!"
+    },
+    "combat.msg.skill.use.skill_regrow": {
+      "en": "It regrows its wounds!",
+      "ko": "상처가 아물어 갑니다!"
+    },
+    "combat.msg.skill.use.skill_snuff": {
+      "en": "Your enchantments are snuffed out!",
+      "ko": "당신의 강화 효과가 꺼졌습니다!"
     },
     "combat.msg.skill_crit": {
       "en": "Critical skill! {dmg} damage!",
@@ -623,6 +651,26 @@
     "combat.msg.victory_prefix": {
       "en": "You defeated",
       "ko": "당신이 패배했습니다"
+    },
+    "combat.msg.windup.skill_ghost_cut": {
+      "en": "{enemy} raises its blade!",
+      "ko": "{enemy}이(가) 칼날을 치켜듭니다!"
+    },
+    "combat.msg.windup.skill_pale_hymn": {
+      "en": "{enemy} draws a deep breath!",
+      "ko": "{enemy}이(가) 숨을 크게 들이쉽니다!"
+    },
+    "combat.msg.windup.skill_ramming": {
+      "en": "{enemy} lowers its horns!",
+      "ko": "{enemy}이(가) 뿔을 낮춥니다!"
+    },
+    "combat.msg.windup.skill_vine_trap": {
+      "en": "{enemy} coils its vines!",
+      "ko": "{enemy}이(가) 덩굴을 감아 올립니다!"
+    },
+    "combat.msg.windup_broken": {
+      "en": "{enemy}'s {skill} is broken off!",
+      "ko": "{enemy}의 {skill}이(가) 끊겼습니다!"
     },
     "common.cancel": {
       "en": "Cancel",
@@ -2724,6 +2772,10 @@
       "en": "Cut",
       "ko": "자르다"
     },
+    "skill.name.skill_gore": {
+      "en": "Gore",
+      "ko": "뿔치기"
+    },
     "skill.name.skill_hilt_bash": {
       "en": "Hilt Bash",
       "ko": "힐트 배쉬"
@@ -2743,6 +2795,10 @@
     "skill.name.skill_muscle_up": {
       "en": "Muscle Up",
       "ko": "머슬업"
+    },
+    "skill.name.skill_pale_hymn": {
+      "en": "Pale Hymn",
+      "ko": "창백한 찬가"
     },
     "skill.name.skill_poison_arrow": {
       "en": "Poison Arrow",
@@ -2764,6 +2820,10 @@
       "en": "Rampage",
       "ko": "날 뛰기"
     },
+    "skill.name.skill_regrow": {
+      "en": "Regrow",
+      "ko": "재생"
+    },
     "skill.name.skill_rev_up": {
       "en": "Rev Up",
       "ko": "레브업"
@@ -2771,6 +2831,10 @@
     "skill.name.skill_scorching_touch": {
       "en": "Scorching Touch",
       "ko": "뜨거운 손길"
+    },
+    "skill.name.skill_snuff": {
+      "en": "Snuff",
+      "ko": "꺼뜨리기"
     },
     "skill.name.skill_solidify": {
       "en": "Solidify",

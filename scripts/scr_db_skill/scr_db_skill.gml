@@ -329,9 +329,7 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 1,
         uses_defensive_qte: true,
-        class_list: [],
-        enemy_use_chance_min: 0.10,
-        enemy_use_chance_max: 0.25
+        class_list: []
     };
 
     global.skill_db[? SKILL_SOLIDIFY] = {
@@ -355,9 +353,7 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 0,
         class_list: [],
-        enemy_require_status_missing: STATUS_SOLIDIFY,
-        enemy_use_chance_min: 0.10,
-        enemy_use_chance_max: 0.25
+        enemy_require_status_missing: STATUS_SOLIDIFY
     };
 
     global.skill_db[? SKILL_BITE] = {
@@ -381,9 +377,7 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 1,
         uses_defensive_qte: true,
-        class_list: [],
-        enemy_use_chance_min: 0.25,
-        enemy_use_chance_max: 0.30
+        class_list: []
     };
 
     global.skill_db[? SKILL_BLOODTHIRSTY] = {
@@ -408,9 +402,7 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 0,
         class_list: [],
-        enemy_require_status_missing: STATUS_BLOODTHIRSTY,
-        enemy_use_chance_min: 0.20,
-        enemy_use_chance_max: 0.30
+        enemy_require_status_missing: STATUS_BLOODTHIRSTY
     };
 
     global.skill_db[? SKILL_VINE_TRAP] = {
@@ -418,7 +410,7 @@ function SkillDB_Init() {
         name: "Vine Trap",
         mp_cost: 0,
         power: 2,
-        power_mult: 1,
+        power_mult: 1.5,
         stat_type: STAT_ATK,
         acc: 0,
         target: TGT_OPPONENT,
@@ -434,9 +426,9 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 1,
         uses_defensive_qte: true,
-        class_list: [],
-        enemy_use_chance_min: 0.20,
-        enemy_use_chance_max: 0.20
+        telegraphed: true,
+        windup_msg: "{enemy} coils its vines!",
+        class_list: []
     };
 
     global.skill_db[? SKILL_SCORCHING_TOUCH] = {
@@ -460,9 +452,7 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 1,
         uses_defensive_qte: true,
-        class_list: [],
-        enemy_use_chance_min: 0.40,
-        enemy_use_chance_max: 0.40
+        class_list: []
     };
 
     global.skill_db[? SKILL_GHOST_CUT] = {
@@ -470,7 +460,7 @@ function SkillDB_Init() {
         name: "Cut",
         mp_cost: 0,
         power: 3,
-        power_mult: 1,
+        power_mult: 1.5,
         stat_type: STAT_ATK,
         acc: 0,
         target: TGT_OPPONENT,
@@ -486,9 +476,9 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 1,
         uses_defensive_qte: true,
-        class_list: [],
-        enemy_use_chance_min: 0.50,
-        enemy_use_chance_max: 0.50
+        telegraphed: true,
+        windup_msg: "{enemy} raises its blade!",
+        class_list: []
     };
 
     global.skill_db[? SKILL_STEAL] = {
@@ -512,8 +502,6 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 0,
         class_list: [],
-        enemy_use_chance_min: 0.10,
-        enemy_use_chance_max: 0.20,
         enemy_require_target_inventory: true
     };
 
@@ -522,7 +510,7 @@ function SkillDB_Init() {
         name: "Ramming",
         mp_cost: 0,
         power: 4,
-        power_mult: 1,
+        power_mult: 1.5,
         stat_type: STAT_ATK,
         acc: 0,
         target: TGT_OPPONENT,
@@ -540,9 +528,9 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 1,
         uses_defensive_qte: true,
-        class_list: [],
-        enemy_use_chance_min: 0.40,
-        enemy_use_chance_max: 0.40
+        telegraphed: true,
+        windup_msg: "{enemy} lowers its horns!",
+        class_list: []
     };
 
     global.skill_db[? SKILL_RAMPAGE] = {
@@ -571,9 +559,7 @@ function SkillDB_Init() {
         set_enemy_actions: 2,
         enemy_require_actions_below: 2,
         enemy_once_per_turn: true,
-        enemy_hp_below_ratio: 0.80,
-        enemy_use_chance_min: 0.18,
-        enemy_use_chance_max: 0.24
+        enemy_hp_below_ratio: 0.80
     };
 
     global.skill_db[? SKILL_CURSE] = {
@@ -601,9 +587,7 @@ function SkillDB_Init() {
         hits: 0,
         class_list: [],
         enemy_hp_below_ratio: 0.70,
-        enemy_once_per_turn: true,
-        enemy_use_chance_min: 0.30,
-        enemy_use_chance_max: 0.30
+        enemy_once_per_turn: true
     };
 
     global.skill_db[? SKILL_BLESSING] = {
@@ -630,8 +614,6 @@ function SkillDB_Init() {
         free_action: true,
         enemy_require_status_missing: STATUS_BLESSING,
         enemy_once_per_turn: true,
-        enemy_use_chance_min: 0.25,
-        enemy_use_chance_max: 0.25,
         enemy_hp_below_ratio: 0.8
     };
 
@@ -661,9 +643,105 @@ function SkillDB_Init() {
         set_enemy_actions: 2,
         enemy_require_actions_below: 2,
         enemy_once_per_turn: true,
-        enemy_hp_below_ratio: 0.45,
-        enemy_use_chance_min: 0.35,
-        enemy_use_chance_max: 0.35
+        enemy_hp_below_ratio: 0.45
+    };
+
+    // ---- packet B4 (combat-spec.md section 12): enemy moves for the rule lists. No use chances: the enemy's brain (scr_db_enemy) decides. ----
+    global.skill_db[? SKILL_REGROW] = {
+        id: SKILL_REGROW,
+        name: "Regrow",
+        mp_cost: 0,
+        power: 5,
+        power_mult: 1,
+        stat_type: STAT_MAG,
+        acc: 0,
+        target: TGT_SELF,
+        effect: "heal",
+        status: -1,
+        status_turns: 0,
+        status_chance: 0,
+        icon_sprite: noone,
+        fx_sprite: noone,
+        sfx_key: "enemy_skill_regrow",
+        sfx_candidates: ["Liquid_slosh"],
+        fx_frames: 12,
+        fx_speed: 0.2,
+        hits: 0,
+        class_list: [],
+        use_msg: "It regrows its wounds!"
+    };
+
+    global.skill_db[? SKILL_SNUFF] = {
+        id: SKILL_SNUFF,
+        name: "Snuff",
+        mp_cost: 0,
+        power: 0,
+        power_mult: 1,
+        stat_type: STAT_MAG,
+        acc: 0,
+        target: TGT_OPPONENT,
+        effect: "dispel",
+        status: -1,
+        status_turns: 0,
+        status_chance: 1,
+        icon_sprite: noone,
+        fx_sprite: noone,
+        sfx_key: "enemy_skill_snuff",
+        sfx_candidates: ["Laugh_spooky_4"],
+        fx_frames: 12,
+        fx_speed: 0.2,
+        hits: 0,
+        class_list: [],
+        use_msg: "Your enchantments are snuffed out!"
+    };
+
+    global.skill_db[? SKILL_GORE] = {
+        id: SKILL_GORE,
+        name: "Gore",
+        mp_cost: 0,
+        power: 4,
+        power_mult: 1,
+        stat_type: STAT_ATK,
+        acc: 0,
+        target: TGT_OPPONENT,
+        effect: "damage",
+        status: STATUS_BLEED,
+        status_turns: 3,
+        status_chance: 0.70,
+        icon_sprite: noone,
+        fx_sprite: noone,
+        sfx_key: "enemy_skill_gore",
+        sfx_candidates: ["Punch_crunchy_2"],
+        fx_frames: 12,
+        fx_speed: 0.2,
+        hits: 1,
+        class_list: []
+    };
+
+    global.skill_db[? SKILL_PALE_HYMN] = {
+        id: SKILL_PALE_HYMN,
+        name: "Pale Hymn",
+        mp_cost: 0,
+        power: 5,
+        power_mult: 1.5,
+        stat_type: STAT_MAG,
+        acc: 0,
+        target: TGT_OPPONENT,
+        effect: "damage",
+        status: -1,
+        status_turns: 0,
+        status_chance: 0,
+        icon_sprite: noone,
+        fx_sprite: noone,
+        sfx_key: "enemy_skill_pale_hymn",
+        sfx_candidates: ["Ghost_scream_3"],
+        fx_frames: 12,
+        fx_speed: 0.2,
+        hits: 1,
+        uses_defensive_qte: true,
+        telegraphed: true,
+        windup_msg: "{enemy} draws a deep breath!",
+        class_list: []
     };
 
     if (variable_global_exists("state") && is_struct(global.state)) {
@@ -701,8 +779,7 @@ function SkillDB_Get(_skill_id) {
         sfx_key: "skill_generic",
         sfx_candidates: [],
         uses_defensive_qte: false,
-        enemy_use_chance_min: ENEMY_SKILL_USE_CHANCE_DEFAULT,
-        enemy_use_chance_max: ENEMY_SKILL_USE_CHANCE_DEFAULT,
+        telegraphed: false,
         free_action: false,
         extra_turns: 0,
         set_enemy_actions: 0
@@ -739,6 +816,10 @@ function Skill_LocalizationKey(_skill_id) {
         case SKILL_CURSE: return "skill_curse";
         case SKILL_BLESSING: return "skill_blessing";
         case SKILL_FINAL_FURY: return "skill_final_fury";
+        case SKILL_REGROW: return "skill_regrow";
+        case SKILL_SNUFF: return "skill_snuff";
+        case SKILL_GORE: return "skill_gore";
+        case SKILL_PALE_HYMN: return "skill_pale_hymn";
     }
     return "unknown";
 }
@@ -804,17 +885,11 @@ function Skill_EnemyCanTrigger(_skill, _user, _target, _actions_remaining = -1) 
     return true;
 }
 
-function Skill_EnemyUseChance(_skill) {
-    var cmin = ENEMY_SKILL_USE_CHANCE_DEFAULT;
-    var cmax = ENEMY_SKILL_USE_CHANCE_DEFAULT;
-    if (variable_struct_exists(_skill, "enemy_use_chance_min")) cmin = real(_skill.enemy_use_chance_min);
-    if (variable_struct_exists(_skill, "enemy_use_chance_max")) cmax = real(_skill.enemy_use_chance_max);
-    if (cmax < cmin) {
-        var tmp = cmin;
-        cmin = cmax;
-        cmax = tmp;
-    }
-    return clamp(random_range(cmin, cmax), 0, 1);
+// The line shown when an enemy winds up a telegraphed move (B4, D7): the skill's own text, or a plain one.
+function Skill_WindupText(_skill, _enemy_name) {
+    var key = Skill_LocalizationKey(_skill.id);
+    var def = variable_struct_exists(_skill, "windup_msg") ? string(_skill.windup_msg) : "{enemy} is winding up {skill}!";
+    return Loc_T("combat.msg.windup." + key, def, { enemy: string(_enemy_name), skill: string(_skill.name) });
 }
 
 function Skill_StealProtectedCount(_target, _item_id) {
@@ -1076,6 +1151,21 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
         } else if (result.msg == "") {
             result.msg = Loc_T("combat.msg.multi_status_none", "Nothing took hold.");
         }
+        return result;
+    }
+
+    if (s.effect == "dispel") {
+        // B4 (Snuff): every buff on the target goes (anything that is not negative); debuffs stay. No damage.
+        var removed_names = [];
+        if (variable_struct_exists(_target, "status") && is_array(_target.status)) {
+            for (var di = array_length(_target.status) - 1; di >= 0; di--) {
+                var dsid = _target.status[di].id;
+                if (Status_IsNegative(dsid)) continue;
+                array_push(removed_names, StatusDB_Get(dsid).name);
+                array_delete(_target.status, di, 1);
+            }
+        }
+        result.msg = variable_struct_exists(s, "use_msg") ? string(s.use_msg) : Loc_T("combat.msg.skill_used", "Skill used.");
         return result;
     }
 
