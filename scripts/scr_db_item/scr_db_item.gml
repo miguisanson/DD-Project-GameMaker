@@ -791,6 +791,21 @@ function Throw_Resolve(_item_id, _user, _target, _key) {
 }
 
 // ---- text generated from the item data (D100): a plain sentence and number lines, so the screen can never disagree with the game ----
+// "ATK +1, DEF +2" for the stat bonus an item gives, "" when it gives none.
+function Item_BonusText(_item) {
+    if (!is_struct(_item) || !variable_struct_exists(_item, "bonus") || !is_struct(_item.bonus)) return "";
+    var b = _item.bonus;
+    var parts = [];
+    if (variable_struct_exists(b, "atk") && b.atk != 0) array_push(parts, "ATK " + ((b.atk > 0) ? "+" : "") + string(b.atk));
+    if (variable_struct_exists(b, "def") && b.def != 0) array_push(parts, "DEF " + ((b.def > 0) ? "+" : "") + string(b.def));
+    if (variable_struct_exists(b, "spd") && b.spd != 0) array_push(parts, "SPD " + ((b.spd > 0) ? "+" : "") + string(b.spd));
+    if (variable_struct_exists(b, "mag") && b.mag != 0) array_push(parts, "MAG " + ((b.mag > 0) ? "+" : "") + string(b.mag));
+    if (array_length(parts) <= 0) return "";
+    var txt = parts[0];
+    for (var i = 1; i < array_length(parts); i++) txt += ", " + parts[i];
+    return txt;
+}
+
 function Item_Sentence(_item) {
     if (!is_struct(_item) || !variable_struct_exists(_item, "id") || _item.id == 0) return "";
     if (Item_IsThrowable(_item)) {
@@ -804,7 +819,7 @@ function Item_Sentence(_item) {
         return Loc_T("item.sent.throw", "Throw it at the enemy. Costs your turn.");
     }
     if (_item.type == ITEM_ACCESSORY) {
-        var bonus = Tooltip_ItemBonusText(_item);
+        var bonus = Item_BonusText(_item);
         if (bonus != "") return Loc_T("item.sent.accessory_stat", "Wear it for {bonus}.", { bonus: bonus });
         if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 1) return Loc_T("item.sent.accessory_passive", "Wear it: {line}.", { line: string(_item.passive_desc[1]) });
         return Loc_T("item.sent.accessory", "A ring or charm worn in the accessory slot.");
@@ -819,7 +834,7 @@ function Item_Sentence(_item) {
     }
     if (_item.type == ITEM_WEAPON) return Loc_T("item.sent.weapon", "A weapon with {power} power.", { power: string(_item.power) });
     if (_item.type == ITEM_ARMOR) {
-        var ab = Tooltip_ItemBonusText(_item);
+        var ab = Item_BonusText(_item);
         return Loc_T("item.sent.armor", "Armor: {bonus}.", { bonus: ab });
     }
     return string(_item.name);
@@ -867,7 +882,7 @@ function Item_NumberLines(_item, _ch) {
         array_push(lines, { label: Loc_T("shop.lbl.power", "Power"), value: string(_item.power) });
         array_push(lines, { label: Loc_T("shop.lbl.stat", "Uses"), value: Stat_ShortName(_item.stat_type) });
     }
-    var ib = Tooltip_ItemBonusText(_item);
+    var ib = Item_BonusText(_item);
     if (_item.type == ITEM_ARMOR && ib != "") array_push(lines, { label: Loc_T("shop.lbl.bonus", "Bonus"), value: ib });
     return lines;
 }

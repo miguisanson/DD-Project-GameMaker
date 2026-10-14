@@ -1225,7 +1225,7 @@ function Dialogue_Draw() {
         var a0 = draw_get_alpha();
         draw_set_alpha(open_t);
         if (icon_draw_w > 0) draw_sprite_ext(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1, icon_scale, icon_scale, 0, c_white, open_t);
-        draw_set_color(UI_C_LIGHTEST);
+        draw_set_color(UI_C_TEXT);
         UI_DrawText(text_x, text_y, visible_text);
         draw_set_alpha(a0);
     }

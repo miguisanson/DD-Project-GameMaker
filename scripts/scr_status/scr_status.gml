@@ -531,7 +531,7 @@ function Status_Describe(_status_id, _data = undefined) {
     };
 }
 
-// The line the existing tooltips use (Tooltip_StatusEffectLine): the status in general, numbers from the data.
+// The one-line description of a status (the details panels, D100): the status in general, numbers from the data.
 function Status_Description(_status_id) {
     return Status_Describe(_status_id).line;
 }

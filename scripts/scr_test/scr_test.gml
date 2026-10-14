@@ -97,6 +97,7 @@ function Test_RunAll() {
     Test_RunSuite("Bed", Test_Suite_Bed);
     Test_RunSuite("Economy", Test_Suite_Economy);
     Test_RunSuite("BattleUi", Test_Suite_BattleUi);
+    Test_RunSuite("TabMenu", Test_Suite_TabMenu);
     Test_RunSuite("BalanceD111", Test_Suite_BalanceD111);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     Test_RunSuite("Mem", Test_Suite_Mem);
@@ -348,13 +349,12 @@ function Test_Suite_Stats() {
     var _run9 = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), 624);
     Test_Eq("EXP 624 (a clean pass to the final boss) is level 9", _run9.level, 9);
     // The stat names the menus print (scr_menu helpers that read the stats).
-    Test_Eq("Tooltip_StatShortName(STAT_MAG) == MAG", Tooltip_StatShortName(STAT_MAG), "MAG");
-    Test_Eq("Tooltip_StatShortName(STAT_SPD) == SPD", Tooltip_StatShortName(STAT_SPD), "SPD");
-    Test_Eq("Tooltip_ItemBonusText(Platinum Armor) == DEF +3", Tooltip_ItemBonusText(ItemDB_Get(22)), "DEF +3");
-    Test_Eq("Tooltip_ItemBonusText(Mithril Robe) == MAG +3", Tooltip_ItemBonusText(ItemDB_Get(25)), "MAG +3");
-    Test_Eq("Tooltip_BuildStatLines gives a title and a description", array_length(Tooltip_BuildStatLines("spd", "SPD", 8)), 2);
-    var _cp = Menu_StatsCopy(_k.stats);
-    Test_Eq("Menu_StatsCopy copies the four stats", _cp.atk + _cp.def + _cp.spd + _cp.mag, 11 + 12 + 10 + 3);
+    Test_Eq("Stat_ShortName(STAT_MAG) == MAG", Stat_ShortName(STAT_MAG), "MAG");
+    Test_Eq("Stat_ShortName(STAT_SPD) == SPD", Stat_ShortName(STAT_SPD), "SPD");
+    Test_Eq("Item_BonusText(Platinum Armor) == DEF +3", Item_BonusText(ItemDB_Get(22)), "DEF +3");
+    Test_Eq("Item_BonusText(Mithril Robe) == MAG +3", Item_BonusText(ItemDB_Get(25)), "MAG +3");
+    Test_Eq("Item_BonusText of a sword with no bonus is empty", Item_BonusText(ItemDB_Get(1)), "");
+    Test_True("Stat_Sentence gives every stat a plain description", string_length(Stat_Sentence(STAT_SPD)) > 0 && Stat_Sentence(STAT_SPD) != Stat_Sentence(STAT_DEF));
     // Enemies carry the same four stats and a basic power by rank (spec section 6).
     var _sl = EnemyCreate(ENEMY_SLIME);
     Test_False("STAT-01 enemies have no luck/intt", variable_struct_exists(_sl.stats, "luck") || variable_struct_exists(_sl.stats, "intt"));
@@ -4565,6 +4565,200 @@ function Test_Suite_BattleUi() {
     Test_Eq("BattleUi (I-065) normalising keeps max HP", _lv2.max_hp, _lv_before.max_hp);
     Test_Eq("BattleUi (I-065) normalising keeps HP", _lv2.hp, _lv_before.hp);
     Test_Eq("BattleUi (I-065) normalising keeps the stats", string(_lv2.stats.atk) + "/" + string(_lv2.stats.def) + "/" + string(_lv2.stats.spd) + "/" + string(_lv2.stats.mag), string(_lv_before.atk) + "/" + string(_lv_before.def) + "/" + string(_lv_before.spd) + "/" + string(_lv_before.mag));
+}
+
+// ---- D1b: the Tab menu (D90), the pause menu (D92, D95), the Codex (D88, D107), white text (D115) ----------------------------------------
+// Expected values come from the decisions and the game data: D90 (Status, Skills, Items, Gear, Codex, Settings), D92 (a pause menu with Abandon run,
+// an accessory slot), D95 (wrap-around), D100 (numbers from the data), D115 (item names and list text white, #FFFFFF), D88/D107 (bestiary, notes,
+// run history, unlocks). The screens themselves are driven through real input in smoke 181-195.
+function Test_RowById(_items, _key, _val) {
+    for (var _i = 0; _i < array_length(_items); _i++) {
+        if (variable_struct_exists(_items[_i], _key) && variable_struct_get(_items[_i], _key) == _val) return _items[_i];
+    }
+    return undefined;
+}
+
+function Test_LineDelta(_lines, _label) {
+    for (var _i = 0; _i < array_length(_lines); _i++) if (_lines[_i].label == _label) return _lines[_i].delta;
+    return 0;
+}
+
+function Test_FirstPassive() {
+    var _all = CardDB_All();
+    for (var _i = 0; _i < array_length(_all); _i++) if (_all[_i].kind == "passive") return _all[_i].id;
+    return -1;
+}
+
+function Test_Suite_TabMenu() {
+    ItemDB_Init(); SkillDB_Init(); EnemyDB_Init();
+
+    // ---- D90: six tabs, in this order; Q / E wrap (D95) ----
+    var _ids = TabMenu_Ids();
+    Test_Eq("D90 six tabs", array_length(_ids), 6);
+    Test_Eq("D90 tab order", _ids[0] + "/" + _ids[1] + "/" + _ids[2] + "/" + _ids[3] + "/" + _ids[4] + "/" + _ids[5], "status/skills/items/gear/codex/settings");
+    var _lb = TabMenu_Labels();
+    Test_Eq("D90 tab labels", _lb[0] + "," + _lb[1] + "," + _lb[2] + "," + _lb[3] + "," + _lb[4] + "," + _lb[5], "Status,Skills,Items,Gear,Codex,Settings");
+    Test_Eq("D95 Q on the first tab wraps to the last", Ui_TabStep(0, 6, -1), 5);
+    Test_Eq("D95 E on the last tab wraps to the first", Ui_TabStep(5, 6, 1), 0);
+
+    // ---- D115: white text, one place ----
+    Test_Eq("D115 the text colour is #FFFFFF", UI_C_TEXT, $FFFFFF);
+    Test_Eq("D115 the palette's pale text role is drawn white", Ui_TextColor(UI_C_LIGHTEST), $FFFFFF);
+    Test_Eq("D115 the light green accent is left alone", Ui_TextColor(UI_C_LIGHT), UI_C_LIGHT);
+    Test_Eq("D115 the dark green is left alone", Ui_TextColor(UI_C_DARK), UI_C_DARK);
+    Test_Eq("D115 a list row that is not selected is white", Ui_RowColor(false, true, false), $FFFFFF);
+    Test_Eq("D115 the selected row is white too", Ui_RowColor(true, true, false), $FFFFFF);
+    Test_Eq("D115 a row you cannot afford is the light green", Ui_RowColor(false, true, true), UI_C_LIGHT);
+    Test_Eq("D115 a greyed row is the dark green", Ui_RowColor(false, false, false), UI_C_DARK);
+
+    // ---- Status: ATK DEF SPD MAG with plain descriptions, then statuses ----
+    var _k = CharacterCreate_Player(CLASS_KNIGHT);
+    var _base_atk = _k.stats.atk;
+    var _st = TabStatus_Items(_k);
+    Test_Eq("D90 Status lists ATK, DEF, SPD, MAG first", _st[0].label + _st[1].label + _st[2].label + _st[3].label, "ATKDEFSPDMAG");
+    Test_Eq("D90 Status shows the character's ATK", _st[0].value, string(_base_atk));
+    Test_Eq("D90 Status ATK has a plain description", _st[0].help, Loc_T("menu.tooltip.stat.atk.desc", "Increases physical damage (basic attacks and ATK skills)."));
+    Test_Eq("D90 a character with no status has four rows", array_length(_st), 4);
+    _k.inventory = Inv_Add(_k.inventory, 40, 1);
+    Test_True("D92 the Copper Ring (ATK +1) equips in the accessory slot", Equip_Item(_k, 40) && Equip_SlotGet(_k, "accessory") == 40);
+    _st = TabStatus_Items(_k);
+    Test_Eq("D92 Status ATK counts the ring (+1)", _st[0].value, string(_base_atk + 1));
+    Test_Eq("D100 Status ATK says where the +1 comes from", Test_RowValue(_st[0].lines, Loc_T("tab.lbl.gear", "Gear")), "+1");
+    Test_Eq("D100 Status ATK shows the base", Test_RowValue(_st[0].lines, Loc_T("tab.lbl.base", "Base")), string(_base_atk));
+    _k = Status_Add(_k, STATUS_POISON, 0, 0, 2);
+    _st = TabStatus_Items(_k);
+    Test_Eq("D90 a status is listed after the four stats", array_length(_st), 5);
+    Test_Eq("D90 the status row is the status's name", _st[4].label, StatusDB_Get(STATUS_POISON).name);
+
+    // ---- Skills: the equipped skills with MP, arrows and numbers from the data (D100); passives after them ----
+    var _sk = CharacterCreate_Player(CLASS_KNIGHT);
+    var _none = TabSkills_Items(_sk);
+    Test_True("D90 no skills: one greyed row says so", array_length(_none) == 1 && !_none[0].enabled);
+    _sk.skills = [SKILL_WOUND, SKILL_MUSCLE_UP, SKILL_HILT_BASH];
+    var _srows = TabSkills_Items(_sk);
+    Test_Eq("D90 one row per equipped skill", array_length(_srows), 3);
+    Test_Eq("D90 skill row label is the skill's name", _srows[2].label, SkillDB_Get(SKILL_HILT_BASH).name);
+    Test_Eq("D100 skill row shows the real arrows", string(_srows[2].seq), string(Qte_SkillSequence(SKILL_HILT_BASH)));
+    Test_Eq("D100 skill power is the data's power", Test_RowValue(_srows[2].lines, Loc_T("card.lbl.power", "Power")), string(round(SkillDB_Get(SKILL_HILT_BASH).power)));
+    Test_Eq("D100 skill MP is the data's cost", Test_RowValue(_srows[2].lines, Loc_T("card.lbl.mp", "MP")), string(round(SkillDB_Get(SKILL_HILT_BASH).mp_cost)));
+    Test_Eq("D90 a skill with no upgrade says None", Test_RowValue(_srows[0].lines, Loc_T("tab.lbl.upgrade", "Upgrade")), Loc_T("tab.val.none", "None"));
+    _sk.upgrades = [SKILL_WOUND];
+    Test_Eq("D90 an upgraded skill says Applied", Test_RowValue(TabSkills_Items(_sk)[0].lines, Loc_T("tab.lbl.upgrade", "Upgrade")), Loc_T("tab.val.applied", "Applied"));
+    _sk.passives = [Test_FirstPassive()];
+    var _prows = TabSkills_Items(_sk);
+    Test_Eq("D90 a passive is listed after the skills, under its own heading", array_length(_prows), 5);
+    Test_True("D90 the heading is not a row to pick", _prows[3].kind == "head" && !_prows[3].enabled);
+    Test_Eq("D90 the passive row is the card's name", _prows[4].label, Card_Name(CardDB_Get(Test_FirstPassive())));
+
+    // ---- Items: potions and throwables with counts; equipment is not listed here ----
+    var _ik = CharacterCreate_Player(CLASS_KNIGHT);
+    _ik.inventory = Inv_Add(_ik.inventory, 1, 1);
+    var _irows = TabItems_Items(_ik);
+    Test_Eq("D90 Items lists the two starting potions as one row", array_length(_irows), 1);
+    Test_Eq("D90 Items row is the potion", _irows[0].label, ItemDB_Get(10).name);
+    Test_Eq("D90 Items row shows the count", _irows[0].value, "x2");
+    Test_Eq("D100 Items row sentence is the item's", _irows[0].help, Item_Sentence(ItemDB_Get(10)));
+    var _hurt = CharacterCreate_Player(CLASS_KNIGHT);
+    _hurt.hp = 1;
+    var _used = TabItems_Use(_hurt, 10);
+    Test_True("D90 a potion can be used from the menu", _used.ok);
+    Test_True("D90 the potion healed (5-10 at level 1)", _used.ch.hp >= 6 && _used.ch.hp <= _used.ch.max_hp);
+    Test_Eq("D90 using it spends one", Inv_Count(_used.ch.inventory, 10), 1);
+    var _full = CharacterCreate_Player(CLASS_KNIGHT);
+    var _refused = TabItems_Use(_full, 10);
+    Test_False("D90 a potion is refused at full HP", _refused.ok);
+    Test_Eq("D90 a refused potion is not spent", Inv_Count(_full.inventory, 10), 2);
+    var _th = CharacterCreate_Player(CLASS_KNIGHT);
+    _th.inventory = Inv_Add(_th.inventory, 30, 1);
+    var _tr = TabItems_Use(_th, 30);
+    Test_False("D84 a throwable is not used from the menu", _tr.ok);
+    Test_Eq("D84 a throwable stays in the bag", Inv_Count(_th.inventory, 30), 1);
+    Test_Eq("D90 Items lists potions and the throwable", array_length(TabItems_Items(_th)), 2);
+
+    // ---- Gear: weapon, armor and accessory slots; equip with a before / after comparison (D90, D92) ----
+    var _g = CharacterCreate_Player(CLASS_KNIGHT);
+    _g.inventory = Inv_Add(_g.inventory, 1, 1);
+    _g.inventory = Inv_Add(_g.inventory, 2, 1);
+    _g.inventory = Inv_Add(_g.inventory, 22, 1);
+    _g.inventory = Inv_Add(_g.inventory, 40, 1);
+    _g.inventory = Inv_Add(_g.inventory, 23, 1);
+    Equip_Item(_g, 1);
+    var _def0 = _g.stats.def;
+    var _gi = TabGear_Items(_g);
+    var _wrow = Test_RowById(_gi, "item_id", 1);
+    Test_True("D90 the worn Wooden Sword is listed as worn", is_struct(_wrow) && _wrow.worn);
+    var _iron = Test_RowById(_gi, "item_id", 2);
+    Test_True("D90 the Iron Sword is in the bag, not worn", is_struct(_iron) && !_iron.worn);
+    Test_Eq("D90 weapon comparison: power 3 to 6", Test_RowValue(_iron.lines, Loc_T("card.lbl.power", "Power")), "3 > 6");
+    Test_Eq("D90 weapon comparison marks the rise", Test_LineDelta(_iron.lines, Loc_T("card.lbl.power", "Power")), 1);
+    var _plat = Test_RowById(_gi, "item_id", 22);
+    Test_Eq("D90 armor comparison: DEF " + string(_def0) + " to " + string(_def0 + 3), Test_RowValue(_plat.lines, "DEF"), string(_def0) + " > " + string(_def0 + 3));
+    Test_Eq("D90 armor comparison marks the rise", Test_LineDelta(_plat.lines, "DEF"), 1);
+    var _ring = Test_RowById(_gi, "item_id", 40);
+    Test_Eq("D92 accessory comparison: ATK +1", Test_RowValue(_ring.lines, "ATK"), string(_g.stats.atk) + " > " + string(_g.stats.atk + 1));
+    var _robe = Test_RowById(_gi, "item_id", 23);
+    Test_True("D90 a robe the Knight cannot wear is greyed", _robe.dim);
+    var _eq = Gear_Toggle(_g, 22);
+    Test_True("D90 equipping armor works", _eq.ok && _eq.equipped);
+    Test_Eq("D90 equipping armor raises DEF by its bonus", Stat_Get(_eq.ch, STAT_DEF), _def0 + 3);
+    var _off = Gear_Toggle(_eq.ch, 22);
+    Test_True("D90 confirming a worn item takes it off", _off.ok && !_off.equipped && Equip_SlotGet(_off.ch, "body") == 0);
+    Test_Eq("D90 taking it off brings DEF back", Stat_Get(_off.ch, STAT_DEF), _def0);
+    var _bad = Gear_Toggle(_g, 23);
+    Test_False("D90 a robe cannot be equipped by the Knight", _bad.ok);
+    Test_True("D90 the three slots come first, then the bag", _gi[0].kind == "head" && _gi[1].slot == "weapon" && _gi[2].slot == "body" && _gi[3].slot == "accessory");
+    Test_Eq("D90 an empty slot says what is missing", _gi[2].label + "/" + _gi[3].label, Loc_T("tab.gear.no_armor", "No armor") + "/" + Loc_T("tab.gear.no_accessory", "No accessory"));
+    Test_True("D90 a bag item's sentence says what it replaces", string_pos(ItemDB_Get(1).name, _iron.help) > 0);
+    Test_False("D90 an item for an empty slot replaces nothing", string_pos(Loc_T("tab.gear.replaces", "Replaces {item}.", { item: "" }), _plat.help) > 0);
+
+    // ---- Codex (D88, D107) ----
+    var _p = Profile_Default();
+    var _b0 = Codex_BestiaryRows(_p);
+    Test_Eq("D88 the bestiary has a row for every enemy", array_length(_b0), 10);
+    Test_Eq("D88 an enemy not met yet is ???", _b0[0].label, "???");
+    Codex_Met(_p, ENEMY_SLIME, false);
+    var _b1 = Codex_BestiaryRows(_p);
+    var _slime = EnemyDB_Get(ENEMY_SLIME);
+    Test_Eq("D88 a met enemy shows its name", _b1[0].label, _slime.name);
+    Test_Eq("D88 a met enemy shows its ATK from the data", Test_RowValue(_b1[0].lines, "ATK"), string(_slime.stats.atk));
+    Test_Eq("D88 a met enemy shows its HP from the data", Test_RowValue(_b1[0].lines, Loc_T("tab.lbl.hp", "HP")), string(_slime.base_hp));
+    Test_Eq("D88 the others stay ???", _b1[1].label, "???");
+    Test_Eq("D88 one meeting is counted", Test_RowValue(_b1[0].lines, Loc_T("tab.lbl.met", "Met")), "1");
+    Codex_Met(_p, ENEMY_SLIME, true);
+    Test_Eq("D88 meeting it again counts", Test_RowValue(Codex_BestiaryRows(_p)[0].lines, Loc_T("tab.lbl.met", "Met")), "2");
+    Test_Eq("D88 an elite seen is noted", Test_RowValue(Codex_BestiaryRows(_p)[0].lines, Loc_T("tab.lbl.elite", "Elite")), Loc_T("tab.val.seen", "Seen"));
+    Test_Eq("D88 the bestiary count", Codex_BestiaryCount(_p), 1);
+    var _pn = Profile_Normalize(json_parse(json_stringify(_p)));
+    Test_Eq("D88 the bestiary survives the profile file", Codex_BestiaryCount(_pn), 1);
+    Test_Eq("D88 an old profile with no bestiary is fine", Codex_BestiaryCount(Profile_Normalize({ profile_version: PROFILE_VERSION })), 0);
+    var _n0 = Codex_NoteRows(_p);
+    Test_Eq("D107 one row for each of the 8 notes", array_length(_n0), 8);
+    Test_Eq("D107 an unread note is ???", _n0[0].label, "???");
+    Note_MarkCollected(_p, "map_page");
+    var _n1 = Codex_NoteRows(_p);
+    Test_Eq("D107 a note read shows its title", _n1[0].label, Note_Find("map_page").title);
+    Test_True("D107 a note read shows its text", string_pos(Note_Find("map_page").lines[1], _n1[0].help) > 0);
+    Test_Eq("D107 notes found count", Codex_NoteCount(_p), 1);
+    Test_Eq("D88 no history: no rows to open", array_length(Codex_HistoryRows(_p)), 0);
+    Profile_RecordRun(_p, { seed: 1111, class_id: CLASS_KNIGHT, level: 4, floor: 3, room: "rm_floor3", result: "died", cause: "Spider", kills: 7, gold: 52, at: 0 });
+    Profile_RecordRun(_p, { seed: 2222, class_id: CLASS_MAGE, level: 6, floor: 9, room: "rm_floor9_5", result: "won", cause: "", kills: 20, gold: 300, at: 0 });
+    var _h = Codex_HistoryRows(_p);
+    Test_Eq("D88 history has a row per finished run", array_length(_h), 2);
+    Test_Eq("D88 the newest run is first", Test_RowValue(_h[0].lines, Loc_T("tab.lbl.seed", "Seed")), "2222");
+    Test_Eq("D88 a death shows its floor", Test_RowValue(_h[1].lines, Loc_T("tab.lbl.floor", "Floor")), "3");
+    Test_True("D88 a death names what killed you", string_pos("Spider", _h[1].help) > 0);
+    var _u = Codex_UnlockRows(_p);
+    Test_True("D88 the Nobody class is unlocked by the first win", _u[0].value == Loc_T("tab.val.unlocked", "Unlocked"));
+    var _u2 = Codex_UnlockRows(Profile_Default());
+    Test_True("D88 before any win it is locked and says how", _u2[0].value == Loc_T("tab.val.locked", "Locked") && _u2[0].help != "");
+
+    // ---- the pause menu (D92, D95): Resume, Help, Settings, Abandon run (two presses), Quit to title ----
+    var _pm = PauseMenu_Items(false);
+    Test_Eq("D92 pause rows", _pm[0].id + "/" + _pm[1].id + "/" + _pm[2].id + "/" + _pm[3].id + "/" + _pm[4].id, "resume/help/settings/abandon/quit");
+    Test_Eq("D92 pause labels", _pm[0].label + "," + _pm[1].label + "," + _pm[2].label + "," + _pm[3].label + "," + _pm[4].label, "Resume,Help,Settings,Abandon Run,Quit to Title");
+    Test_Eq("D92 Abandon is where the constant says", PAUSE_ABANDON_INDEX, 3);
+    Test_Eq("D92 the armed Abandon row asks again", PauseMenu_Items(true)[3].label, Loc_T("pause.option.abandon_confirm", "Sure? Confirm again"));
+    Test_True("D100 every pause row explains itself", string_length(_pm[0].help) > 0 && string_length(_pm[3].help) > 0 && string_length(_pm[4].help) > 0);
 }
 
 // ---- C4: QTE assist (D35), key rebinding (D49), button prompts (D92), tutorial prompts (D45), beds (D47) ----------------------------------

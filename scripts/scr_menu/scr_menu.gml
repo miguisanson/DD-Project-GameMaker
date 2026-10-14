@@ -1,186 +1,31 @@
-function Menu_StatsCopy(_s) {
-    return { atk: _s.atk, def: _s.def, spd: _s.spd, mag: _s.mag };
+// ==========================================================================================================================
+// THE TAB MENU (D90, D92, D95, D96, D97, D100, D115): Status · Skills · Items · Gear · Codex · Settings on the UI framework.
+// Q / E (or LB / RB) switch tabs and wrap; each tab is a list on the left with icons and a details panel on the right (one plain sentence and
+// the numbers from the data, a before / after comparison for gear). Back goes up ONE level (a Codex page to the Codex list, a tab to the game);
+// the cursor of every tab is remembered. The rows come from pure functions (Tab*_Items, Gear_*, Codex_*), tested without a screen.
+// global.tab_ui = { tab, pages (one { stk } per tab), opened_ms, closed_ms, toast, toast_ms } while it is open, with gs.ui.mode = UI_MENU.
+// ==========================================================================================================================
+function TabMenu_Ids() {
+    return ["status", "skills", "items", "gear", "codex", "settings"];
 }
 
-function Menu_Ensure() {
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
-    if (!variable_struct_exists(gs.ui, "menu")) {
-        gs.ui.menu = {
-            open: false,
-            closing: false,
-            close_frame: UI_OPENED_FRAME_NONE,
-            tab: 0,
-            tabs: [
-                Loc_T("menu.tab.inventory", "Inventory"),
-                Loc_T("menu.tab.skills", "Skills"),
-                Loc_T("menu.tab.stats", "Stats")
-            ],
-            header_focus: true,
-            opened_frame: UI_OPENED_FRAME_NONE,
-            inv_index: 0,
-            inv_scroll: 0,
-            inv_popup_open: false,
-            inv_popup_mode: "",
-            inv_popup_choice: 1,
-            inv_popup_message: "",
-            inv_popup_item_id: -1,
-            inv_popup_block_frame: UI_OPENED_FRAME_NONE,
-            inv_popup_open_frame: UI_OPENED_FRAME_NONE,
-            inv_popup_closing: false,
-            inv_popup_close_frame: UI_OPENED_FRAME_NONE,
-            skill_index: 0,
-            skill_scroll: 0,
-            stats_focus: false,
-            stats_row: 0,
-            stats_col: 1,
-            stats_index: 0,
-            base_stats: undefined,
-            pending_stats: undefined,
-            pending_points: 0
-        };
-    } else {
-        var m0 = gs.ui.menu;
-        if (!variable_struct_exists(m0, "opened_frame")) m0.opened_frame = UI_OPENED_FRAME_NONE;
-        if (!variable_struct_exists(m0, "inv_popup_open_frame")) m0.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
-        if (!variable_struct_exists(m0, "closing")) m0.closing = false;
-        if (!variable_struct_exists(m0, "close_frame")) m0.close_frame = UI_OPENED_FRAME_NONE;
-        if (!variable_struct_exists(m0, "inv_popup_closing")) m0.inv_popup_closing = false;
-        if (!variable_struct_exists(m0, "inv_popup_close_frame")) m0.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
-    }
+// One 8 x 8 icon per tab: a bust, a sparkle, a flask, a shield, a page, a cog.
+function TabMenu_Icons() {
+    return [
+        ["..3333..", ".333333.", ".333333.", "..3333..", ".333333.", "33333333", "33333333", "33333333"],
+        ["...33...", "...33...", "..3333..", "33333333", "33333333", "..3333..", "...33...", "...33..."],
+        ["..3333..", "...33...", "...33...", "..3333..", ".333333.", "33333333", "33333333", ".333333."],
+        ["33333333", "33333333", "33333333", "33333333", ".333333.", ".333333.", "..3333..", "...33..."],
+        ["33333333", "3......3", "3.3333.3", "3......3", "3.3333.3", "3......3", "3.33...3", "33333333"],
+        ["...33...", ".3.33.3.", "..3333..", "333..333", "333..333", "..3333..", ".3.33.3.", "...33..."]
+    ];
 }
 
-function Menu_Open() {
-    Menu_Ensure();
-    var gs = GameState_Get();
-    UI_ModalRootBegin("menu");
-    SFX_PlayUI("ui_openclose");
-    gs.ui.mode = UI_MENU;
-    var m = gs.ui.menu;
-    m.open = true;
-    m.closing = false;
-    m.close_frame = UI_OPENED_FRAME_NONE;
-    m.header_focus = true;
-    m.stats_focus = false;
-    m.opened_frame = Input_Frame();
-    // Reopen inventory from the top to avoid snap-to-old-selection behavior.
-    m.inv_index = 0;
-    m.inv_scroll = 0;
-    m.inv_popup_open = false;
-    m.inv_popup_closing = false;
-    m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
-    m.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
-    m.inv_popup_mode = "";
-    m.inv_popup_message = "";
-    m.inv_popup_item_id = -1;
-    m.inv_popup_choice = 1;
-    m.inv_popup_block_frame = UI_OPENED_FRAME_NONE;
-    gs.ui.menu = m;
-    Menu_StatsSync();
-}
-
-function Menu_Close(_immediate = false) {
-    Menu_Ensure();
-    var gs = GameState_Get();
-    var m = gs.ui.menu;
-    if (_immediate) {
-        UI_ModalRootEnd(false, true);
-        Menu_StatsDiscard();
-        gs.ui.menu.open = false;
-        gs.ui.menu.closing = false;
-        gs.ui.menu.close_frame = UI_OPENED_FRAME_NONE;
-        gs.ui.mode = UI_NONE;
-        SFX_PlayUI("ui_openclose");
-        return;
-    }
-    if (!m.open || m.closing) return;
-    UI_ModalRootEnd(false);
-    Menu_StatsDiscard();
-    m.closing = true;
-    m.close_frame = Input_Frame();
-    m.inv_popup_closing = false;
-    m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
-    gs.ui.menu = m;
-    SFX_PlayUI("ui_openclose");
-}
-
-function Menu_CloseFinalize() {
-    Menu_Ensure();
-    var gs = GameState_Get();
-    var m = gs.ui.menu;
-    m.open = false;
-    m.closing = false;
-    m.close_frame = UI_OPENED_FRAME_NONE;
-    m.inv_popup_open = false;
-    m.inv_popup_closing = false;
-    m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
-    m.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
-    gs.ui.menu = m;
-    gs.ui.mode = UI_NONE;
-}
-
-function Menu_InvPopupClose(_m, _immediate = false) {
-    if (_immediate) {
-        _m.inv_popup_open = false;
-        _m.inv_popup_closing = false;
-        _m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
-        _m.inv_popup_mode = "";
-        _m.inv_popup_choice = 1;
-        _m.inv_popup_message = "";
-        _m.inv_popup_item_id = -1;
-        _m.inv_popup_block_frame = UI_OPENED_FRAME_NONE;
-        _m.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
-        return _m;
-    }
-    if (!_m.inv_popup_open || _m.inv_popup_closing) return _m;
-    _m.inv_popup_closing = true;
-    _m.inv_popup_close_frame = Input_Frame();
-    _m.inv_popup_block_frame = Input_Frame() + 1;
-    return _m;
-}
-
-function Menu_IsOpen() {
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui")) return false;
-    return gs.ui.mode == UI_MENU;
-}
-
-function Menu_GetLayout() {
-    var w = Display_GuiW();
-    var h = Display_GuiH();
-    UI_SetFont();
-    var line_h = UI_TextHeight("A");
-    var margin = round(min(w, h) * 0.05);
-    var bx = margin;
-    var by = margin;
-    var bw = round(w - margin * 2);
-    var bh = round(h - margin * 2);
-    var header_h = round(max(line_h + 10, bh * 0.10));
-    var pad = round(max(6, min(w, h) * 0.02));
-    var row_h = round(max(line_h + 4, bh * 0.06));
-    var content_y = by + header_h + pad;
-    var tip_style = Tooltip_GetStyle("menu");
-    var tip_gap = max(4, round(pad * 0.50));
-    var list_top_inset = 18;
-    var list_bottom_inset = 18;
-    var inner_h = bh - pad * 2;
-    var body_h = max(row_h * 2 + tip_style.min_h + tip_gap + list_top_inset + list_bottom_inset, inner_h - header_h);
-    var tip_h_max = max(tip_style.min_h, body_h - (row_h * 2) - tip_gap);
-    var tooltip_h = clamp(round(body_h * tip_style.height_ratio), tip_style.min_h, tip_h_max);
-    var content_h = max(row_h * 2, body_h - tooltip_h - tip_gap);
-    var main_h = header_h + pad + content_h + pad;
-    var tooltip_y = by + main_h + tip_gap;
-    var content_list_y = content_y + list_top_inset;
-    var content_list_h = max(row_h, content_h - list_top_inset - list_bottom_inset);
-    var rows_visible = max(1, floor(content_list_h / row_h));
-    return {
-        w:w, h:h, bx:bx, by:by, bw:bw, bh:bh,
-        header_h:header_h, pad:pad, row_h:row_h,
-        content_y:content_y, content_h:content_h, rows_visible:rows_visible,
-        content_list_y:content_list_y, content_list_h:content_list_h,
-        list_top_inset:list_top_inset, list_bottom_inset:list_bottom_inset,
-        tooltip_h:tooltip_h, tooltip_gap:tip_gap, tooltip_y:tooltip_y, main_h:main_h
-    };
+function TabMenu_Labels() {
+    return [
+        Loc_T("tab.status", "Status"), Loc_T("tab.skills", "Skills"), Loc_T("tab.items", "Items"),
+        Loc_T("tab.gear", "Gear"), Loc_T("tab.codex", "Codex"), Loc_T("tab.settings", "Settings")
+    ];
 }
 
 function Menu_IsEquipped(_ch, _item_id) {
@@ -192,1437 +37,864 @@ function Menu_IsEquipped(_ch, _item_id) {
     return false;
 }
 
-function Tooltip_StatShortName(_stat_id) {
-    var short_name = Stat_ShortName(_stat_id);
-    return (short_name != "") ? short_name : "N/A";
+function TabMenu_Signed(_n) {
+    return ((_n > 0) ? "+" : "") + string(_n);
 }
 
-function Tooltip_TargetName(_target_id) {
-    switch (_target_id) {
-        case TGT_SELF: return Loc_T("menu.tooltip.target.self", "Self");
-        case TGT_ENEMY: return Loc_T("menu.tooltip.target.enemy", "Opponent");
-        case TGT_ALL_ENEMIES: return Loc_T("menu.tooltip.target.all_enemies", "All Opponents");
-        case TGT_ALL_ALLIES: return Loc_T("menu.tooltip.target.all_allies", "All Allies");
-        case TGT_ALL: return Loc_T("menu.tooltip.target.all", "All");
+// ---- Status: ATK DEF SPD MAG with what each does, then the statuses on the character ----
+function Stat_Sentence(_stat_id) {
+    switch (_stat_id) {
+        case STAT_ATK: return Loc_T("menu.tooltip.stat.atk.desc", "Increases physical damage (basic attacks and ATK skills).");
+        case STAT_DEF: return Loc_T("menu.tooltip.stat.def.desc", "Reduces all damage you take.");
+        case STAT_SPD: return Loc_T("menu.tooltip.stat.spd.desc", "Decides who acts first.");
+        case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage and max MP.");
     }
-    return Loc_T("menu.tooltip.target.unknown", "Unknown");
+    return Loc_T("menu.tooltip.stat.default.desc", "Affects combat performance.");
 }
 
-function Tooltip_ClassListText(_class_list) {
-    if (!is_array(_class_list) || array_length(_class_list) <= 0) return Loc_T("menu.tooltip.class.all", "All Classes");
-    var txt = "";
-    for (var i = 0; i < array_length(_class_list); i++) {
-        if (i > 0) txt += "/";
-        txt += Equip_ClassName(_class_list[i]);
+function TabStatus_Items(_ch) {
+    var items = [];
+    var sids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG];
+    for (var i = 0; i < 4; i++) {
+        var sid = sids[i];
+        var base = variable_struct_get(_ch.stats, Stat_Key(sid));
+        var gear = Equip_GetStatBonus(_ch, sid);
+        var fx = Status_ModStat(_ch, sid);
+        var lines = [{ label: Loc_T("tab.lbl.base", "Base"), value: string(base) }];
+        if (gear != 0) array_push(lines, { label: Loc_T("tab.lbl.gear", "Gear"), value: TabMenu_Signed(gear) });
+        if (fx != 0) array_push(lines, { label: Loc_T("tab.lbl.effects", "Effects"), value: TabMenu_Signed(fx) });
+        array_push(lines, { label: Loc_T("tab.lbl.total", "Total"), value: string(Stat_Get(_ch, sid)) });
+        var row = { id: Stat_Key(sid), label: Stat_ShortName(sid), value: string(Stat_Get(_ch, sid)), kind: "button", enabled: true, help: Stat_Sentence(sid), lines: lines, hint: "" };
+        if (is_struct(_ch.class_cfg) && variable_struct_exists(_ch.class_cfg, "sprites") && sprite_exists(_ch.class_cfg.sprites.down)) row.pic = { spr: _ch.class_cfg.sprites.down, sub: 0 };
+        array_push(items, row);
     }
-    return txt;
-}
-
-function Tooltip_ClassOnlyText(_class_list) {
-    if (!is_array(_class_list) || array_length(_class_list) <= 0) return "";
-    var class_txt = Tooltip_ClassListText(_class_list);
-    return Loc_T("menu.tooltip.class.only", "{classes} only", { classes: class_txt });
-}
-
-function Tooltip_StatusName(_status_id) {
-    if (_status_id == -1) return "";
-    var cfg = StatusDB_Get(_status_id);
-    if (is_struct(cfg) && variable_struct_exists(cfg, "name")) return Status_LabelWithSign(cfg, _status_id);
-    return Loc_T("menu.tooltip.status.default", "Status");
-}
-
-function Tooltip_StatusEffectLine(_status_id) {
-    if (_status_id == -1) return "";
-    var desc = Status_Description(_status_id);
-    if (desc == "") return "";
-    return Tooltip_StatusName(_status_id) + ": " + desc;
-}
-
-function Tooltip_AddWrappedLines(_out_lines, _text, _max_w) {
-    var out_lines = is_array(_out_lines) ? _out_lines : [];
-    var wrapped = Dialogue_WrapToLines(string(_text), max(1, _max_w));
-    if (!is_array(wrapped) || array_length(wrapped) <= 0) {
-        array_push(out_lines, string(_text));
-        return out_lines;
+    var sl = Status_DisplayList(_ch);
+    for (var s = 0; s < array_length(sl); s++) {
+        var d = sl[s];
+        var fr = Icon_StatusFrame(d.id);
+        array_push(items, { id: "status_" + string(d.id), label: d.name, value: d.label, kind: "button", enabled: true, help: d.line, lines: [], hint: "", icon: (fr >= 0) ? { cat: "status", frame: fr } : undefined });
     }
-    for (var i = 0; i < array_length(wrapped); i++) {
-        array_push(out_lines, wrapped[i]);
+    return items;
+}
+
+// ---- Skills: the equipped skills (arrows, MP, numbers from the data, upgrade state), then the passives ----
+function TabSkills_Items(_ch) {
+    var items = [];
+    var ids = is_array(_ch.skills) ? _ch.skills : [];
+    for (var i = 0; i < array_length(ids); i++) {
+        var sk = SkillDB_Get(ids[i]);
+        var cost = Equip_PlayerSkillMPCost(_ch, sk, sk.mp_cost);
+        var det = Battle_SkillDetails(sk, cost);
+        var up = is_array(_ch.upgrades) && Card_ArrayHas(_ch.upgrades, ids[i]);
+        array_push(det.lines, { label: Loc_T("tab.lbl.upgrade", "Upgrade"), value: up ? Loc_T("tab.val.applied", "Applied") : Loc_T("tab.val.none", "None") });
+        var fr = Icon_SkillFrame(ids[i]);
+        array_push(items, {
+            id: "skill_" + string(ids[i]), label: sk.name, value: Loc_T("battle.menu.mp", "{mp} MP", { mp: string(cost) }), kind: "button", enabled: true,
+            skill_id: ids[i], seq: Qte_SkillSequence(ids[i]), help: det.sentence, lines: det.lines, hint: "", icon: (fr >= 0) ? { cat: "skill", frame: fr } : undefined
+        });
     }
-    return out_lines;
-}
-
-function Tooltip_PassiveLineHuman(_line) {
-    var txt = string(_line);
-    txt = string_replace_all(txt, "->", Loc_T("menu.tooltip.passive.to", " to "));
-    txt = string_replace_all(txt, "1/turn", Loc_T("menu.tooltip.passive.once_per_turn", "once per turn"));
-    txt = string_replace_all(txt, "(cd", Loc_T("menu.tooltip.passive.cooldown_prefix", "(cooldown"));
-    txt = string_replace_all(txt, "cd ", Loc_T("menu.tooltip.passive.cooldown", "cooldown "));
-    txt = string_replace_all(txt, "GOOD+:", Loc_T("menu.tooltip.passive.good_plus_colon", "GOOD or PERFECT:"));
-    txt = string_replace_all(txt, "GOOD+", Loc_T("menu.tooltip.passive.good_plus", "GOOD or PERFECT"));
-    return txt;
-}
-
-function Tooltip_ContainsTextInsensitive(_haystack, _needle) {
-    var hay = string_lower(string(_haystack));
-    var needle = string_lower(string(_needle));
-    if (needle == "") return false;
-    return string_pos(needle, hay) > 0;
-}
-
-function Tooltip_EquippableNote(_item) {
-    if (!is_struct(_item)) return "";
-
-    if (variable_struct_exists(_item, "tooltip_note")) {
-        var single = string(_item.tooltip_note);
-        if (single != "") return single;
+    if (array_length(items) == 0) {
+        array_push(items, { id: "none", label: Loc_T("tab.skills.none", "No skills yet"), value: "", kind: "button", enabled: false, help: Loc_T("tab.skills.none_help", "Cards and chests teach skills. They appear here with the arrows to press."), lines: [], hint: "" });
     }
+    var ps = is_array(_ch.passives) ? _ch.passives : [];
+    var passives = [];
+    for (var j = 0; j < array_length(ps); j++) {
+        var c = CardDB_Get(ps[j]);
+        if (!is_struct(c)) continue;
+        array_push(passives, { id: "passive_" + string(ps[j]), label: Card_Name(c), value: "", kind: "button", enabled: true, help: Card_Sentence(c), lines: Card_Lines(c), hint: "" });
+    }
+    if (array_length(passives) > 0) {
+        array_push(items, { id: "head_passives", kind: "head", label: Loc_T("tab.skills.passives", "Passives"), value: "", enabled: false, help: "", lines: [], hint: "" });
+        for (var q = 0; q < array_length(passives); q++) array_push(items, passives[q]);
+    }
+    return items;
+}
 
-    if (variable_struct_exists(_item, "tooltip_notes") && is_array(_item.tooltip_notes) && array_length(_item.tooltip_notes) > 0) {
-        var joined = "";
-        for (var ni = 0; ni < array_length(_item.tooltip_notes); ni++) {
-            var note = string(_item.tooltip_notes[ni]);
-            if (note == "") continue;
-            if (joined != "") joined += "; ";
-            joined += note;
+// ---- Items: potions, throwables and key items with counts; equipment lives in Gear ----
+function TabItems_Items(_ch) {
+    var items = [];
+    var groups = [0, 1, 2];   // potions, throwables, key items
+    for (var g = 0; g < 3; g++) {
+        for (var i = 0; i < array_length(_ch.inventory); i++) {
+            var inv = _ch.inventory[i];
+            var it = ItemDB_Get(inv.id);
+            if (!is_struct(it) || it.id == 0) continue;
+            var grp = (it.type == ITEM_KEY) ? 2 : (Item_IsThrowable(it) ? 1 : ((it.type == ITEM_CONSUMABLE) ? 0 : -1));
+            if (grp != g) continue;
+            var sentence = (it.type == ITEM_KEY) ? Loc_T("tab.items.key", "An item you keep for the way ahead.") : Item_Sentence(it);
+            var lines = (it.type == ITEM_KEY) ? [] : Item_NumberLines(it, _ch);
+            array_push(lines, { label: Loc_T("shop.lbl.have", "You have"), value: string(inv.qty) });
+            array_push(items, {
+                id: "item_" + string(it.id), label: it.name, value: "x" + string(inv.qty), kind: "button", enabled: true, item_id: it.id, throwable: Item_IsThrowable(it),
+                help: sentence, lines: lines, icon_item: it, hint: (grp == 0) ? Loc_T("tab.hint.use", "{confirm} Use") : ""
+            });
         }
-        if (joined != "") return joined;
     }
+    if (array_length(items) == 0) {
+        array_push(items, { id: "none", label: Loc_T("tab.items.none", "Nothing in your bag"), value: "", kind: "button", enabled: false, help: Loc_T("tab.items.none_help", "Potions, throwables and keys you find show up here."), lines: [], hint: "" });
+    }
+    return items;
+}
 
-    if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 1) {
-        return Tooltip_PassiveLineHuman(_item.passive_desc[1]);
+// Uses a potion or an antidote from the menu. Returns { ok, msg, ch }; the item is spent only when it did something.
+function TabItems_Use(_ch, _item_id) {
+    var item = ItemDB_Get(_item_id);
+    var out = { ok: false, msg: Loc_T("item.msg.cant_use", "Can't use that."), ch: _ch };
+    if (!is_struct(item) || item.id == 0 || !Inv_Has(_ch.inventory, _item_id, 1)) return out;
+    var r = Item_Use(_item_id, _ch, _ch);
+    out.msg = r.msg;
+    if (!r.ok) return out;
+    _ch.inventory = Inv_Remove(_ch.inventory, _item_id, 1);
+    out.ch = RecomputeResources(_ch);
+    out.ok = true;
+    return out;
+}
+
+// ---- Gear: weapon, armor and accessory slots, then the bag; equip with a before / after comparison ----
+function Gear_Slots() {
+    return ["weapon", "body", "accessory"];
+}
+
+function Gear_EmptyLabel(_slot) {
+    switch (_slot) {
+        case "weapon": return Loc_T("tab.gear.no_weapon", "No weapon");
+        case "body": return Loc_T("tab.gear.no_armor", "No armor");
+        case "accessory": return Loc_T("tab.gear.no_accessory", "No accessory");
     }
-    if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 0) {
-        return Tooltip_PassiveLineHuman(_item.passive_desc[0]);
+    return Loc_T("tab.gear.empty", "Nothing worn");
+}
+
+// The four stats as they would be with _item worn (or taken off, when it is worn) in its slot. The character is left as it was.
+function Gear_StatsAfter(_ch, _item) {
+    var slot = string(_item.equip_slot);
+    var old = Equip_SlotGet(_ch, slot);
+    Equip_SlotSet(_ch, slot, (old == _item.id) ? 0 : _item.id);
+    var out = { atk: Stat_Get(_ch, STAT_ATK), def: Stat_Get(_ch, STAT_DEF), spd: Stat_Get(_ch, STAT_SPD), mag: Stat_Get(_ch, STAT_MAG) };
+    Equip_SlotSet(_ch, slot, old);
+    return out;
+}
+
+// [{ label, value "a > b", delta }] for putting _item on (D90): the weapon's power, then every stat that changes, then what else it does.
+function Gear_CompareLines(_ch, _item) {
+    var lines = [];
+    var cur_id = Equip_SlotGet(_ch, string(_item.equip_slot));
+    var after = Gear_StatsAfter(_ch, _item);
+    if (_item.type == ITEM_WEAPON) {
+        var cur_power = (cur_id != 0) ? ItemDB_Get(cur_id).power : 0;
+        array_push(lines, { label: Loc_T("card.lbl.power", "Power"), value: string(cur_power) + " > " + string(_item.power), delta: sign(_item.power - cur_power) });
+    }
+    var sids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG];
+    for (var i = 0; i < 4; i++) {
+        var before = Stat_Get(_ch, sids[i]);
+        var now = variable_struct_get(after, Stat_Key(sids[i]));
+        if (now != before) array_push(lines, { label: Stat_ShortName(sids[i]), value: string(before) + " > " + string(now), delta: sign(now - before) });
+    }
+    var nl = Item_NumberLines(_item, _ch);   // what the comparison does not say (a passive's numbers); the stat and power lines are already above
+    for (var n = 0; n < array_length(nl); n++) {
+        var lb = nl[n].label;
+        if (lb == Stat_ShortName(STAT_ATK) || lb == Stat_ShortName(STAT_DEF) || lb == Stat_ShortName(STAT_SPD) || lb == Stat_ShortName(STAT_MAG)) continue;
+        if (lb == Loc_T("shop.lbl.power", "Power") || lb == Loc_T("shop.lbl.bonus", "Bonus")) continue;
+        array_push(lines, nl[n]);
+    }
+    return lines;
+}
+
+function TabGear_Row(_ch, _item, _slot, _worn) {
+    var can = _worn ? { ok: true, msg: "" } : Equip_CanEquip(_ch, _item);
+    var sentence = Item_Sentence(_item);
+    if (!_worn && !can.ok) sentence += " " + can.msg;
+    var cur_id = _worn ? 0 : Equip_SlotGet(_ch, string(_item.equip_slot));
+    if (!_worn && can.ok && cur_id != 0) sentence += " " + Loc_T("tab.gear.replaces", "Replaces {item}.", { item: ItemDB_Get(cur_id).name });
+    return {
+        id: "gear_" + string(_item.id), label: _item.name, value: "", kind: "button", enabled: true, item_id: _item.id, slot: _slot, worn: _worn,
+        dim: (!_worn && !can.ok), help: sentence, lines: _worn ? Item_NumberLines(_item, _ch) : Gear_CompareLines(_ch, _item), icon_item: _item,
+        hint: _worn ? Loc_T("tab.hint.takeoff", "{confirm} Take off") : (can.ok ? Loc_T("tab.hint.equip", "{confirm} Equip") : "")
+    };
+}
+
+function TabGear_Items(_ch) {
+    var items = [];
+    array_push(items, { id: "head_worn", kind: "head", label: Loc_T("tab.gear.worn", "Worn"), value: "", enabled: false, help: "", lines: [], hint: "" });
+    var slots = Gear_Slots();
+    for (var s = 0; s < array_length(slots); s++) {
+        var wid = Equip_SlotGet(_ch, slots[s]);
+        var wit = (wid != 0) ? ItemDB_Get(wid) : undefined;
+        if (is_struct(wit) && wit.id != 0) {
+            array_push(items, TabGear_Row(_ch, wit, slots[s], true));
+        } else {
+            array_push(items, {
+                id: "empty_" + slots[s], label: Gear_EmptyLabel(slots[s]), value: "", kind: "button", enabled: true, dim: true, slot: slots[s], worn: false, item_id: -1,
+                help: Loc_T("tab.gear.empty_help", "Nothing is worn in this slot."), lines: [], hint: ""
+            });
+        }
+    }
+    var bag = [];
+    for (var i = 0; i < array_length(_ch.inventory); i++) {
+        var it = ItemDB_Get(_ch.inventory[i].id);
+        if (!is_struct(it) || it.id == 0) continue;
+        if (it.type != ITEM_WEAPON && it.type != ITEM_ARMOR && it.type != ITEM_ACCESSORY) continue;
+        if (Menu_IsEquipped(_ch, it.id)) continue;
+        array_push(bag, TabGear_Row(_ch, it, string(it.equip_slot), false));
+    }
+    if (array_length(bag) > 0) {
+        array_push(items, { id: "head_bag", kind: "head", label: Loc_T("tab.gear.bag", "Bag"), value: "", enabled: false, help: "", lines: [], hint: "" });
+        for (var b = 0; b < array_length(bag); b++) array_push(items, bag[b]);
+    }
+    return items;
+}
+
+// Puts a bag item on, or takes a worn one off. Returns { ok, equipped, msg, ch }.
+function Gear_Toggle(_ch, _item_id) {
+    var item = ItemDB_Get(_item_id);
+    var out = { ok: false, equipped: false, msg: Loc_T("menu.msg.cant_equip", "Can't equip that."), ch: _ch };
+    if (!is_struct(item) || item.id == 0) return out;
+    var slot = variable_struct_exists(item, "equip_slot") ? string(item.equip_slot) : "";
+    if (slot != "" && Equip_SlotGet(_ch, slot) == item.id) {
+        Equip_SlotSet(_ch, slot, 0);
+        out.ch = RecomputeResources(_ch);
+        out.ok = true;
+        out.msg = Loc_T("menu.msg.unequipped", "Unequipped {item}.", { item: item.name });
+        return out;
+    }
+    var can = Equip_CanEquip(_ch, item);
+    out.msg = can.msg;
+    if (!can.ok) return out;
+    if (!Equip_Item(_ch, item.id)) return out;
+    out.ch = RecomputeResources(_ch);
+    out.ok = true;
+    out.equipped = true;
+    return out;
+}
+
+// ---- Codex (D88, D107): the bestiary, the notes, the run history and the unlocks ----
+function Codex_EnemyIds() {
+    return [ENEMY_SLIME, ENEMY_DIREWOLF, ENEMY_GHOSTSWORD, ENEMY_SPIDER, ENEMY_MADWHISP, ENEMY_SNAKE, ENEMY_KILLER_PLANT, ENEMY_STRANGER, ENEMY_MINI_BOSS, ENEMY_FINAL_BOSS];
+}
+
+function Codex_Key(_enemy_id) {
+    return "e" + string(_enemy_id);
+}
+
+// An enemy was met in a fight (or an auto-resolved one). _elite marks an elite version.
+function Codex_Met(_prof, _enemy_id, _elite) {
+    if (!variable_struct_exists(_prof, "bestiary") || !is_struct(_prof.bestiary)) _prof.bestiary = {};
+    var k = Codex_Key(_enemy_id);
+    var e = variable_struct_exists(_prof.bestiary, k) ? variable_struct_get(_prof.bestiary, k) : { met: 0, elite: false };
+    e.met += 1;
+    if (_elite) e.elite = true;
+    variable_struct_set(_prof.bestiary, k, e);
+}
+
+// A fight with this enemy starts (or is settled without one): the Codex remembers it. The profile file is written when something new is learned
+// (a first meeting, a first elite), not on every fight.
+function Codex_RecordMeeting(_enemy_id, _elite) {
+    var prof = Profile_Get();
+    var ent = Codex_Entry(prof, _enemy_id);
+    var fresh = !is_struct(ent) || (_elite && !ent.elite);
+    Codex_Met(prof, _enemy_id, _elite);
+    if (fresh) Profile_Flush();
+}
+
+function Codex_Entry(_prof, _enemy_id) {
+    if (!variable_struct_exists(_prof, "bestiary") || !is_struct(_prof.bestiary)) return undefined;
+    var k = Codex_Key(_enemy_id);
+    return variable_struct_exists(_prof.bestiary, k) ? variable_struct_get(_prof.bestiary, k) : undefined;
+}
+
+function Codex_BestiaryCount(_prof) {
+    var n = 0;
+    var ids = Codex_EnemyIds();
+    for (var i = 0; i < array_length(ids); i++) if (is_struct(Codex_Entry(_prof, ids[i]))) n++;
+    return n;
+}
+
+// The enemy as a fight would make it at _level (stats do not change with level; HP does).
+function Codex_EnemyAt(_enemy_id, _level) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "battle") || !is_struct(gs.battle)) return EnemyCreate(_enemy_id);
+    var lv0 = gs.battle.enemy_level;
+    gs.battle.enemy_level = _level;
+    var e = EnemyCreate(_enemy_id);
+    gs.battle.enemy_level = lv0;
+    return e;
+}
+
+function Codex_BestiaryRows(_prof) {
+    var rows = [];
+    var ids = Codex_EnemyIds();
+    for (var i = 0; i < array_length(ids); i++) {
+        var eid = ids[i];
+        var ent = Codex_Entry(_prof, eid);
+        if (!is_struct(ent)) {
+            array_push(rows, { id: "enemy_" + string(eid), label: "???", value: "", kind: "button", enabled: true, enemy_id: eid, help: Loc_T("tab.bestiary.unknown", "You have not met this one yet."), lines: [], hint: "" });
+            continue;
+        }
+        var cfg = EnemyDB_Get(eid);
+        var lo = max(1, round(cfg.species_min_level));
+        var hi = max(lo, round(cfg.species_max_level));
+        var e_lo = Codex_EnemyAt(eid, lo);
+        var e_hi = Codex_EnemyAt(eid, hi);
+        var lvl = (lo == hi) ? string(lo) : (string(lo) + "-" + string(hi));
+        var hp = (e_lo.max_hp == e_hi.max_hp) ? string(e_lo.max_hp) : (string(e_lo.max_hp) + "-" + string(e_hi.max_hp));
+        var moves = Loc_T("tab.bestiary.attack", "Attack");
+        for (var s = 0; s < array_length(cfg.skills); s++) moves += ", " + SkillDB_Get(cfg.skills[s]).name;
+        var sentence = Loc_T("tab.bestiary.moves", "Moves: {list}.", { list: moves });
+        if (cfg.is_boss) sentence = Loc_T("tab.bestiary.boss", "A boss.") + " " + sentence;
+        var lines = [
+            { label: Loc_T("tab.lbl.level", "Level"), value: lvl },
+            { label: Loc_T("tab.lbl.hp", "HP"), value: hp },
+            { label: Stat_ShortName(STAT_ATK), value: string(e_lo.stats.atk) },
+            { label: Stat_ShortName(STAT_DEF), value: string(e_lo.stats.def) },
+            { label: Stat_ShortName(STAT_SPD), value: string(e_lo.stats.spd) },
+            { label: Stat_ShortName(STAT_MAG), value: string(e_lo.stats.mag) },
+            { label: Loc_T("tab.lbl.met", "Met"), value: string(ent.met) }
+        ];
+        if (ent.elite) array_push(lines, { label: Loc_T("tab.lbl.elite", "Elite"), value: Loc_T("tab.val.seen", "Seen") });
+        array_push(rows, {
+            id: "enemy_" + string(eid), label: cfg.name, value: Loc_T("tab.bestiary.lv", "Lv {n}", { n: lvl }), kind: "button", enabled: true, enemy_id: eid,
+            help: sentence, lines: lines, hint: "", pic: { spr: cfg.sprite, sub: 0 }
+        });
+    }
+    return rows;
+}
+
+function Codex_NoteCount(_prof) {
+    return array_length(Note_Collected(_prof));
+}
+
+function Codex_NoteRows(_prof) {
+    var rows = [];
+    var defs = Note_Defs();
+    for (var i = 0; i < array_length(defs); i++) {
+        var d = defs[i];
+        if (Note_IsCollected(_prof, d.id)) {
+            var txt = "";
+            for (var j = 0; j < array_length(d.lines); j++) txt += ((j > 0) ? "\n" : "") + d.lines[j];
+            array_push(rows, { id: "note_" + d.id, label: d.title, value: "", kind: "button", enabled: true, help: txt, hint: "",
+                               lines: [{ label: Loc_T("tab.lbl.floor", "Floor"), value: string(Run_FloorOfRoomName(d.room)) }] });
+        } else {
+            array_push(rows, { id: "note_" + d.id, label: "???", value: "", kind: "button", enabled: true, help: Loc_T("tab.notes.unknown", "A note you have not found yet. Look at the walls."), lines: [], hint: "" });
+        }
+    }
+    return rows;
+}
+
+// Newest run first.
+function Codex_HistoryRows(_prof) {
+    var rows = [];
+    for (var i = array_length(_prof.history) - 1; i >= 0; i--) {
+        var h = _prof.history[i];
+        var cname = DB_PlayerClass(h.class_id).name;
+        var fl = variable_struct_exists(h, "floor") ? h.floor : 0;
+        var res = variable_struct_exists(h, "result") ? string(h.result) : "died";
+        var cause = variable_struct_exists(h, "cause") ? string(h.cause) : "";
+        var sentence;
+        var value;
+        if (res == "won") {
+            sentence = Loc_T("tab.hist.won", "You climbed out of the tunnel.");
+            value = Loc_T("tab.val.won", "Won");
+        } else if (res == "abandoned") {
+            sentence = Loc_T("tab.hist.abandoned", "You gave this run up on floor {n}.", { n: string(fl) });
+            value = Loc_T("tab.val.abandoned", "Gave up");
+        } else {
+            sentence = (cause != "") ? Loc_T("tab.hist.died_to", "Felled by {name} on floor {n}.", { name: cause, n: string(fl) }) : Loc_T("tab.hist.died", "You fell on floor {n}.", { n: string(fl) });
+            value = Loc_T("tab.val.floor", "Floor {n}", { n: string(fl) });
+        }
+        array_push(rows, {
+            id: "run_" + string(i), label: Loc_T("tab.hist.row", "{cls} Lv {n}", { cls: string(cname), n: string(h.level) }), value: value, kind: "button", enabled: true, help: sentence, hint: "",
+            lines: [
+                { label: Loc_T("tab.lbl.floor", "Floor"), value: string(fl) },
+                { label: Loc_T("tab.lbl.level", "Level"), value: string(h.level) },
+                { label: Loc_T("tab.lbl.kills", "Foes beaten"), value: string(variable_struct_exists(h, "kills") ? h.kills : 0) },
+                { label: Loc_T("tab.lbl.gold", "Gold"), value: string(variable_struct_exists(h, "gold") ? h.gold : 0) },
+                { label: Loc_T("tab.lbl.seed", "Seed"), value: string(variable_struct_exists(h, "seed") ? h.seed : 0) }
+            ]
+        });
+    }
+    return rows;
+}
+
+function Codex_UnlockRows(_prof) {
+    var rows = [];
+    var on = Profile_IsUnlocked(_prof, "nobody_class");
+    array_push(rows, {
+        id: "unlock_nobody", label: Loc_T("tab.unlock.nobody", "The Nobody"), value: on ? Loc_T("tab.val.unlocked", "Unlocked") : Loc_T("tab.val.locked", "Locked"), kind: "button", enabled: true, dim: !on, hint: "",
+        help: on ? Loc_T("tab.unlock.nobody_on", "A fighter with no class. Throws {m}x as hard and carries {cap} of each throwable.", { m: string_format(THROW_NOBODY_MULT, 1, 1), cap: string(THROW_CAP_NOBODY) })
+                 : Loc_T("tab.unlock.nobody_off", "Win a run to unlock a fighter with no class."),
+        lines: []
+    });
+    return rows;
+}
+
+// The Codex list: one row per page, with how much of it you have.
+function TabCodex_Items(_prof) {
+    var ids = Codex_EnemyIds();
+    var runs = array_length(_prof.history);
+    return [
+        { id: "bestiary", label: Loc_T("tab.codex.bestiary", "Bestiary"), value: string(Codex_BestiaryCount(_prof)) + "/" + string(array_length(ids)), kind: "button", enabled: true,
+          help: Loc_T("tab.codex.bestiary_help", "The enemies you have met: their numbers and their moves."), lines: [], hint: Loc_T("tab.hint.open", "{confirm} Open") },
+        { id: "notes", label: Loc_T("tab.codex.notes", "Notes"), value: string(Codex_NoteCount(_prof)) + "/" + string(array_length(Note_Defs())), kind: "button", enabled: true,
+          help: Loc_T("tab.codex.notes_help", "The notes you have read in the tunnel."), lines: [], hint: Loc_T("tab.hint.open", "{confirm} Open") },
+        { id: "history", label: Loc_T("tab.codex.history", "Run history"), value: string(runs), kind: "button", enabled: (runs > 0), dim: (runs <= 0),
+          help: Loc_T("tab.codex.history_help", "Every run you have finished, newest first."),
+          lines: [{ label: Loc_T("tab.lbl.wins", "Wins"), value: string(_prof.wins) }, { label: Loc_T("tab.lbl.falls", "Falls"), value: string(_prof.deaths) }, { label: Loc_T("tab.lbl.best_floor", "Best floor"), value: string(_prof.best_floor) }],
+          hint: Loc_T("tab.hint.open", "{confirm} Open") },
+        { id: "unlocks", label: Loc_T("tab.codex.unlocks", "Unlocks"), value: string(Profile_IsUnlocked(_prof, "nobody_class") ? 1 : 0) + "/1", kind: "button", enabled: true,
+          help: Loc_T("tab.codex.unlocks_help", "What winning has opened up for later runs."), lines: [], hint: Loc_T("tab.hint.open", "{confirm} Open") }
+    ];
+}
+
+// ---- the screen: state, input, drawing ----
+#macro TAB_TOAST_MS 1800
+
+function TabMenu_Get() {
+    return (variable_global_exists("tab_ui") && is_struct(global.tab_ui)) ? global.tab_ui : undefined;
+}
+
+function Menu_IsOpen() {
+    var gs = GameState_Get();
+    return variable_struct_exists(gs, "ui") && gs.ui.mode == UI_MENU;
+}
+
+// Where everything stands on the GUI grid: tabs header on top, the body (list left, details right), a footer line for prompts and gold.
+function TabMenu_ListShare(_tid) {
+    switch (_tid) {
+        case "codex_bestiary": case "codex_notes": return 0.4;   // the page on the right has the long text and the numbers
+        case "codex_history": return 0.46;
+        case "gear": case "items": case "skills": return 0.55;   // long names with icons
+        case "settings": return 0.6;                              // a name and a value on every row
+        case "status": return 0.48;
+    }
+    return 0.52;
+}
+
+function TabMenu_Zones(_tid = "") {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var z = { mt: mt };
+    z.x = mt.margin;
+    z.w = mt.gw - 2 * mt.margin;
+    z.tabs_y = mt.margin;
+    z.tabs_h = mt.line_h + 2 * p;
+    z.body_y = z.tabs_y + z.tabs_h + 2 * p;
+    z.foot_h = max(Prompt_GlyphH(), mt.line_h);
+    z.foot_y = mt.gh - mt.margin - z.foot_h;
+    z.body_h = z.foot_y - 2 * p - z.body_y;
+    z.list_w = floor((z.w - mt.margin) * TabMenu_ListShare(_tid) / p) * p;
+    z.det_w = z.w - mt.margin - z.list_w;
+    return z;
+}
+
+// Fits a list menu into the Tab menu's body; _top_extra is room kept above the list (the Status card).
+function TabMenu_FitMenu(_m, _z, _top_extra = 0) {
+    var L = _m.layout;
+    L.x_anchor = "left";
+    L.panel_w = _z.list_w;
+    L.y_top = _z.body_y + _top_extra;
+    L.max_h = _z.body_h - _top_extra;
+    L.details = true;
+    L.details_pos = "right";
+    L.det_w = _z.det_w;
+    L.det_top = _z.body_y;
+    L.det_h = _z.body_h;
+    L.det_art = true;
+    L.hides_below = true;
+}
+
+function TabMenu_Title(_id, _ch) {
+    switch (_id) {
+        case "status": return Loc_T("tab.title.status", "Stats");
+        case "skills": return Loc_T("tab.title.skills", "Skills {n}/{max}", { n: string(array_length(_ch.skills)), max: string(CARD_MAX_SKILLS) });
+        case "items": return Loc_T("tab.title.items", "Items");
+        case "gear": return Loc_T("tab.title.gear", "Gear");
+        case "codex": return Loc_T("tab.title.codex", "Codex");
     }
     return "";
 }
 
-function Tooltip_SkillDamageLine(_skill) {
-    if (!is_struct(_skill)) return Loc_T("menu.tooltip.damage", "Damage");
-    var parts = [
-        Loc_T("menu.tooltip.damage.power", "Power {power}", {
-            power: string(max(0, round(real(_skill.power))))
-        })
-    ];
-
-    if (variable_struct_exists(_skill, "power_mult")) {
-        var pm = real(_skill.power_mult);
-        if (pm != 1) array_push(parts, "x" + string_format(pm, 1, 2));
+function TabMenu_ItemsFor(_id, _ch) {
+    switch (_id) {
+        case "status": return TabStatus_Items(_ch);
+        case "skills": return TabSkills_Items(_ch);
+        case "items": return TabItems_Items(_ch);
+        case "gear": return TabGear_Items(_ch);
+        case "codex": return TabCodex_Items(Profile_Get());
     }
-    if (variable_struct_exists(_skill, "hits") && _skill.hits > 1) {
-        array_push(parts, Loc_T("menu.tooltip.damage.hits", "{hits} hits", {
-            hits: string(round(real(_skill.hits)))
-        }));
-    }
-    if (variable_struct_exists(_skill, "acc") && _skill.acc != 0) {
-        var acc_txt = ((_skill.acc > 0) ? "+" : "") + string(_skill.acc);
-        array_push(parts, Loc_T("menu.tooltip.damage.acc", "Acc {acc}", { acc: acc_txt }));
-    }
-    if (variable_struct_exists(_skill, "stat_type")) {
-        array_push(parts, Loc_T("menu.tooltip.damage.stat", "Stat {stat}", {
-            stat: Tooltip_StatShortName(_skill.stat_type)
-        }));
-    }
-
-    var out = parts[0];
-    for (var i = 1; i < array_length(parts); i++) out += " | " + parts[i];
-    return out;
+    return [];
 }
 
-function Tooltip_SkillSingleStatusLine(_status_id, _turns, _chance) {
-    if (_status_id == -1) return "";
-    var chance = clamp(real(_chance), 0, 1);
-    var line = Loc_T("menu.tooltip.status.line", "Status: {status} {chance}%", {
-        status: Tooltip_StatusName(_status_id),
-        chance: string(round(chance * 100))
+function TabMenu_RootMenu(_id) {
+    var ch = GameState_Get().player_ch;
+    var m = Ui_MenuNew("tab_" + _id, TabMenu_ItemsFor(_id, ch), {
+        on_confirm: TabMenu_OnConfirm, on_back: TabMenu_OnBack, data: { tab: _id },
+        layout: { title: TabMenu_Title(_id, ch), anchor: "center", details: true, details_pos: "right", det_art: true, hides_below: true }
     });
-    var turns = max(0, round(real(_turns)));
-    if (turns > 0) {
-        line += Loc_T("menu.tooltip.status.turns_suffix", " | {turns} turns", {
-            turns: string(turns)
-        });
-    }
-    return line;
+    Ui_MenuFixCursor(m, m.cursor);
+    return m;
 }
 
-function Tooltip_SkillMultiStatusDetailLines(_skill, _max_entries = 2) {
-    var lines = [];
-    if (!is_struct(_skill)) return lines;
-    if (!variable_struct_exists(_skill, "status_list") || !is_array(_skill.status_list)) return lines;
-
-    var seen = [];
-    var max_entries = max(1, round(real(_max_entries)));
-    for (var i = 0; i < array_length(_skill.status_list); i++) {
-        var sid = _skill.status_list[i];
-        if (sid == -1) continue;
-
-        var dup = false;
-        for (var j = 0; j < array_length(seen); j++) {
-            if (seen[j] == sid) { dup = true; break; }
-        }
-        if (dup) continue;
-        array_push(seen, sid);
-
-        var line = Tooltip_StatusEffectLine(sid);
-        if (line != "") array_push(lines, line);
-        if (array_length(lines) >= max_entries) break;
-    }
-
-    return lines;
+function TabMenu_BuildPage(_id) {
+    var pg = { stk: Ui_StackNew() };
+    Ui_StackPush(pg.stk, TabMenu_RootMenu(_id));
+    return pg;
 }
 
-function Tooltip_SkillMultiStatusLine(_skill, _max_entries = 3) {
-    if (!is_struct(_skill)) return "";
-    if (!variable_struct_exists(_skill, "status_list") || !is_array(_skill.status_list) || array_length(_skill.status_list) <= 0) return "";
-
-    var base_turns = variable_struct_exists(_skill, "status_turns") ? max(1, round(real(_skill.status_turns))) : 1;
-    var has_turn_list = variable_struct_exists(_skill, "status_turns_list") && is_array(_skill.status_turns_list);
-    var shown = [];
-    var total_statuses = 0;
-    var max_entries = max(1, round(real(_max_entries)));
-
-    for (var i = 0; i < array_length(_skill.status_list); i++) {
-        var sid = _skill.status_list[i];
-        if (sid == -1) continue;
-        total_statuses += 1;
-        if (array_length(shown) >= max_entries) continue;
-
-        var turns = base_turns;
-        if (has_turn_list && i < array_length(_skill.status_turns_list)) {
-            turns = max(1, round(real(_skill.status_turns_list[i])));
-        }
-
-        var seg = Tooltip_StatusName(sid);
-        if (turns > 0) {
-            seg += Loc_T("menu.tooltip.status.turns_short", " {turns}t", {
-                turns: string(turns)
-            });
-        }
-        array_push(shown, seg);
+// The settings are the existing screen (D0), opened as a tab: the same list, rows and Controls page, fitted to the body.
+function TabSettings_Popup() {
+    SettingsPopup_Ensure();
+    var sp = GameState_Get().ui.settings_popup;
+    if (!sp.open || sp.owner != "tab") {
+        SettingsPopup_Open("tab", true);
+        sp = GameState_Get().ui.settings_popup;
+        sp.menu.on_back = TabSettings_OnBack;
     }
-
-    if (array_length(shown) <= 0) return "";
-    var line = Loc_T("menu.tooltip.statuses.prefix", "Statuses: {first}", {
-        first: shown[0]
-    });
-    for (var j = 1; j < array_length(shown); j++) line += ", " + shown[j];
-    if (total_statuses > array_length(shown)) {
-        var remaining = total_statuses - array_length(shown);
-        line += Loc_T("menu.tooltip.statuses.more", ", +{count} more", {
-            count: string(remaining)
-        });
-    }
-
-    var chance = variable_struct_exists(_skill, "status_chance") ? clamp(real(_skill.status_chance), 0, 1) : 1;
-    if (chance < 1) line += " (" + string(round(chance * 100)) + "%)";
-    return line;
+    return sp;
 }
 
-function Tooltip_SkillEffectLines(_skill, _compact = false) {
-    var lines = [];
-    if (!is_struct(_skill)) return lines;
+// Leaving the Tab menu throws away settings that were not applied (the preview language comes back too).
+function TabSettings_Discard() {
+    if (!SettingsPopup_IsOpen("tab")) return;
+    var sp = GameState_Get().ui.settings_popup;
+    sp.pending = GameSettings_Copy(GameSettings_Ensure());
+    sp.dirty = false;
+    sp.controls = undefined;
+    Loc_SetLanguage(GameSettings_Ensure().language);
+    SettingsPopup_Close(true);
+}
 
-    var effect = variable_struct_exists(_skill, "effect") ? string(_skill.effect) : "";
-    switch (effect) {
-        case "damage":
-            array_push(lines, Tooltip_SkillDamageLine(_skill));
-            if (variable_struct_exists(_skill, "status") && _skill.status != -1) {
-                var dmg_turns = variable_struct_exists(_skill, "status_turns") ? max(1, round(real(_skill.status_turns))) : 1;
-                var dmg_chance = variable_struct_exists(_skill, "status_chance") ? clamp(real(_skill.status_chance), 0, 1) : 1;
-                var dmg_status_line = Tooltip_SkillSingleStatusLine(_skill.status, dmg_turns, dmg_chance);
-                if (dmg_status_line != "") array_push(lines, dmg_status_line);
-                var dmg_status_desc = Tooltip_StatusEffectLine(_skill.status);
-                if (dmg_status_desc != "") array_push(lines, dmg_status_desc);
-            }
-        break;
+function TabSettings_OnBack(_m, _res) {
+    Menu_Close();
+}
 
-        case "status":
-            if (variable_struct_exists(_skill, "status") && _skill.status != -1) {
-                var turns = variable_struct_exists(_skill, "status_turns") ? max(1, round(real(_skill.status_turns))) : 1;
-                var chance = variable_struct_exists(_skill, "status_chance") ? clamp(real(_skill.status_chance), 0, 1) : 1;
-                var status_line = Tooltip_SkillSingleStatusLine(_skill.status, turns, chance);
-                if (status_line != "") array_push(lines, status_line);
-                var status_desc = Tooltip_StatusEffectLine(_skill.status);
-                if (status_desc != "") array_push(lines, status_desc);
-            } else {
-                array_push(lines, Loc_T("menu.tooltip.effect.buff", "Effect: Buff"));
-            }
-        break;
+function TabMenu_OnBack(_m, _res) {
+    Menu_Close();
+}
 
-        case "multi_status":
-            var max_status_entries = _compact ? 3 : 4;
-            var multi_line = Tooltip_SkillMultiStatusLine(_skill, max_status_entries);
-            if (multi_line != "") array_push(lines, multi_line);
-            else array_push(lines, Loc_T("menu.tooltip.effect.multi_status", "Effect: Multiple statuses"));
-            var detail_max = _compact ? 1 : 2;
-            var multi_details = Tooltip_SkillMultiStatusDetailLines(_skill, detail_max);
-            for (var md = 0; md < array_length(multi_details); md++) {
-                array_push(lines, multi_details[md]);
-            }
-        break;
+function TabMenu_Toast(_text) {
+    var u = TabMenu_Get();
+    if (!is_struct(u)) return;
+    u.toast = _text;
+    u.toast_ms = current_time;
+}
 
-        case "heal":
-            array_push(lines, Loc_T("menu.tooltip.effect.restore_hp", "Effect: Restore HP"));
-        break;
+// New items for the page on screen (after a potion, an equip): the cursor stays where it was, or on the nearest row.
+function TabMenu_Refresh() {
+    var u = TabMenu_Get();
+    if (!is_struct(u)) return;
+    var tid = TabMenu_Ids()[u.tab];
+    if (tid == "settings" || !is_struct(u.pages[u.tab])) return;
+    var root = u.pages[u.tab].stk.menus[0];
+    var ch = GameState_Get().player_ch;
+    var keep = root.cursor;
+    root.items = TabMenu_ItemsFor(tid, ch);
+    root.layout.title = TabMenu_Title(tid, ch);
+    Ui_MenuFixCursor(root, min(keep, array_length(root.items) - 1));
+}
 
-        case "steal_item":
-            array_push(lines, Loc_T("menu.tooltip.effect.steal_item", "Effect: Steal one random item"));
-        break;
+function TabMenu_Switch(_u, _tab) {
+    _u.tab = _tab;
+    Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", _tab);
+    var tid = TabMenu_Ids()[_tab];
+    if (tid == "settings") TabSettings_Popup();
+    else _u.pages[_tab] = TabMenu_BuildPage(tid);
+}
 
+// Opens the Tab menu on the tab you used last (or _tab).
+function Menu_Open(_tab = -1) {
+    var gs = GameState_Get();
+    var tab = (_tab >= 0) ? _tab : Ui_MemGet(Ui_MemGlobal(), "tab_menu_active", 6);
+    var u = { tab: tab, pages: array_create(6, undefined), opened_ms: current_time, opened_frame: Input_Frame(), closed_ms: -1, toast: "", toast_ms: -100000 };
+    global.tab_ui = u;
+    gs.ui.mode = UI_MENU;
+    TabMenu_Switch(u, tab);
+    SFX_PlayUI("ui_openclose");
+}
+
+function Menu_Close(_immediate = false) {
+    var u = TabMenu_Get();
+    if (!is_struct(u)) return;
+    var gs = GameState_Get();
+    if (_immediate) {
+        TabSettings_Discard();
+        global.tab_ui = undefined;
+        if (gs.ui.mode == UI_MENU) gs.ui.mode = UI_NONE;
+        SFX_PlayUI("ui_openclose");
+        return;
+    }
+    if (u.closed_ms >= 0) return;
+    TabSettings_Discard();
+    u.closed_ms = current_time;
+    SFX_PlayUI("ui_openclose");
+}
+
+function Menu_CloseFinalize() {
+    var gs = GameState_Get();
+    global.tab_ui = undefined;
+    if (gs.ui.mode == UI_MENU) gs.ui.mode = UI_NONE;
+}
+
+// 0..1 for the whole screen's fade (in while opening, out once closing).
+function Menu_Alpha() {
+    var u = TabMenu_Get();
+    if (!is_struct(u)) return 0;
+    return (u.closed_ms >= 0) ? (1 - Ui_AnimT(u.closed_ms, current_time)) : Ui_AnimT(u.opened_ms, current_time);
+}
+
+// True while the Controls page waits for a key: Q, E and the menu key belong to the rebinding then.
+function Menu_CaptureActive() {
+    if (!SettingsPopup_IsOpen("tab")) return false;
+    var sp = GameState_Get().ui.settings_popup;
+    return is_struct(sp.controls) && sp.controls.capture != "";
+}
+
+// The menu on top of the page that is on screen (the settings list or the Controls page, a Codex page, a tab's list).
+function TabMenu_TopMenu() {
+    var u = TabMenu_Get();
+    if (!is_struct(u)) return undefined;
+    if (TabMenu_Ids()[u.tab] == "settings") {
+        var sp = GameState_Get().ui.settings_popup;
+        return is_struct(sp.controls) ? sp.controls.menu : sp.menu;
+    }
+    return is_struct(u.pages[u.tab]) ? Ui_StackTop(u.pages[u.tab].stk) : undefined;
+}
+
+// How many levels deep the page is (1 = a tab's own list).
+function TabMenu_Depth() {
+    var u = TabMenu_Get();
+    if (!is_struct(u)) return 0;
+    if (TabMenu_Ids()[u.tab] == "settings") return is_struct(GameState_Get().ui.settings_popup.controls) ? 2 : 1;
+    return is_struct(u.pages[u.tab]) ? Ui_StackDepth(u.pages[u.tab].stk) : 1;
+}
+
+function TabCodex_Open(_kind) {
+    var u = TabMenu_Get();
+    var pg = u.pages[u.tab];
+    var prof = Profile_Get();
+    var rows;
+    var title;
+    var cols = 1;
+    switch (_kind) {
+        case "bestiary":
+            rows = Codex_BestiaryRows(prof);
+            title = Loc_T("tab.codex.bestiary_title", "Bestiary {n}/{max}", { n: string(Codex_BestiaryCount(prof)), max: string(array_length(rows)) });
+            cols = 2;
+            break;
+        case "notes":
+            rows = Codex_NoteRows(prof);
+            title = Loc_T("tab.codex.notes_title", "Notes {n}/{max}", { n: string(Codex_NoteCount(prof)), max: string(array_length(rows)) });
+            break;
+        case "history":
+            rows = Codex_HistoryRows(prof);
+            title = Loc_T("tab.codex.history", "Run history");
+            break;
         default:
-            if (effect != "" && effect != "none") {
-                array_push(lines, Loc_T("menu.tooltip.effect.named", "Effect: {effect}", { effect: effect }));
-            }
-        break;
-    }
-
-    return lines;
-}
-
-function Tooltip_BuildStatLines(_stat_key, _stat_label, _cur) {
-    var lines = [];
-    array_push(lines, _stat_label + " (" + string(_cur) + ")");
-
-    switch (_stat_key) {
-        case "atk":
-            array_push(lines, Loc_T("menu.tooltip.stat.atk.desc", "Increases physical damage (basic attacks and ATK skills)."));
-        break;
-        case "def":
-            array_push(lines, Loc_T("menu.tooltip.stat.def.desc", "Reduces all damage you take."));
-        break;
-        case "spd":
-            array_push(lines, Loc_T("menu.tooltip.stat.spd.desc", "Decides who acts first."));
-        break;
-        case "mag":
-            array_push(lines, Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage and max MP."));
-        break;
-        default:
-            array_push(lines, Loc_T("menu.tooltip.stat.default.desc", "Affects combat performance."));
-        break;
-    }
-    return lines;
-}
-
-function Tooltip_ItemBonusText(_item) {
-    if (!is_struct(_item) || !variable_struct_exists(_item, "bonus") || !is_struct(_item.bonus)) return "";
-    var b = _item.bonus;
-    var parts = [];
-    if (variable_struct_exists(b, "atk") && b.atk != 0) array_push(parts, "ATK " + ((b.atk > 0) ? "+" : "") + string(b.atk));
-    if (variable_struct_exists(b, "def") && b.def != 0) array_push(parts, "DEF " + ((b.def > 0) ? "+" : "") + string(b.def));
-    if (variable_struct_exists(b, "spd") && b.spd != 0) array_push(parts, "SPD " + ((b.spd > 0) ? "+" : "") + string(b.spd));
-    if (variable_struct_exists(b, "mag") && b.mag != 0) array_push(parts, "MAG " + ((b.mag > 0) ? "+" : "") + string(b.mag));
-    if (array_length(parts) <= 0) return "";
-    var txt = parts[0];
-    for (var i = 1; i < array_length(parts); i++) txt += ", " + parts[i];
-    return txt;
-}
-
-function Tooltip_ItemTypeLine(_item) {
-    if (!is_struct(_item) || !variable_struct_exists(_item, "type")) return Loc_T("menu.tooltip.item.type.unknown", "Unknown");
-    if (_item.type == ITEM_WEAPON || _item.type == ITEM_ARMOR) {
-        var slot_name = variable_struct_exists(_item, "equip_slot") ? string(_item.equip_slot) : "";
-        var type_name = (_item.type == ITEM_WEAPON)
-            ? Loc_T("menu.tooltip.item.type.weapon", "Weapon")
-            : Loc_T("menu.tooltip.item.type.armor", "Armor");
-        if (slot_name != "") {
-            return Loc_T("menu.tooltip.item.type.with_slot", "{type} (slot: {slot})", {
-                type: type_name,
-                slot: slot_name
-            });
-        }
-        return type_name;
-    }
-    if (_item.type == ITEM_CONSUMABLE) return Loc_T("menu.tooltip.item.type.consumable", "Consumable");
-    if (_item.type == ITEM_ACCESSORY) return Loc_T("menu.tooltip.item.type.accessory", "Accessory");   // C3 (D92)
-    if (_item.type == ITEM_KEY) return Loc_T("menu.tooltip.item.type.key", "Key Item");
-    return Loc_T("menu.tooltip.item.type.unknown", "Unknown");
-}
-
-function Tooltip_BuildItemLines(_item) {
-    var lines = [];
-    if (!is_struct(_item) || !variable_struct_exists(_item, "id") || _item.id == 0) return lines;
-
-    array_push(lines, string(_item.name));
-    if (_item.type != ITEM_ARMOR) {
-        array_push(lines, Tooltip_ItemTypeLine(_item));
-    }
-
-    if (_item.type == ITEM_WEAPON || _item.type == ITEM_ARMOR) {
-        if (_item.type == ITEM_ARMOR) {
-            var armor_line = Tooltip_ItemBonusText(_item);
-            if (armor_line == "") {
-                if (variable_struct_exists(_item, "stat_type")) {
-                    armor_line = Tooltip_StatShortName(_item.stat_type);
-                } else {
-                    armor_line = Loc_T("menu.tooltip.item.type.armor", "Armor");
-                }
-            }
-            array_push(lines, armor_line);
-
-            var armor_note = Tooltip_EquippableNote(_item);
-            if (armor_note != "") array_push(lines, armor_note);
-
-            var armor_only = "";
-            if (variable_struct_exists(_item, "preferred_class") && _item.preferred_class != -1) {
-                armor_only = Loc_T("menu.tooltip.class.only", "{classes} only", {
-                    classes: Equip_ClassName(_item.preferred_class)
-                });
-            } else if (variable_struct_exists(_item, "allowed_classes") && is_array(_item.allowed_classes)) {
-                armor_only = Tooltip_ClassOnlyText(_item.allowed_classes);
-            }
-            if (armor_only != "") array_push(lines, armor_only);
-            return lines;
-        }
-
-        var parts = [
-            Loc_T("menu.tooltip.damage.power", "Power {power}", {
-                power: string(max(0, round(real(_item.power))))
-            })
-        ];
-        if (variable_struct_exists(_item, "acc") && _item.acc != 0) {
-            var acc_txt = ((_item.acc > 0) ? "+" : "") + string(_item.acc);
-            array_push(parts, Loc_T("menu.tooltip.damage.acc", "Acc {acc}", { acc: acc_txt }));
-        }
-        if (variable_struct_exists(_item, "stat_type")) {
-            array_push(parts, Loc_T("menu.tooltip.damage.stat", "Stat {stat}", {
-                stat: Tooltip_StatShortName(_item.stat_type)
-            }));
-        }
-        var core = parts[0];
-        for (var i = 1; i < array_length(parts); i++) core += " | " + parts[i];
-        array_push(lines, core);
-
-        var bonus_txt = Tooltip_ItemBonusText(_item);
-        if (bonus_txt != "") {
-            array_push(lines, Loc_T("menu.tooltip.item.bonus", "Bonus: {bonus}", { bonus: bonus_txt }));
-        }
-
-        var note_txt = Tooltip_EquippableNote(_item);
-        if (note_txt != "") array_push(lines, note_txt);
-
-        var class_txt = Loc_T("menu.tooltip.class.all", "All Classes");
-        if (variable_struct_exists(_item, "preferred_class") && _item.preferred_class != -1) {
-            class_txt = Equip_ClassName(_item.preferred_class);
-        } else if (variable_struct_exists(_item, "allowed_classes") && is_array(_item.allowed_classes)) {
-            class_txt = Tooltip_ClassListText(_item.allowed_classes);
-        }
-        if (class_txt != Loc_T("menu.tooltip.class.all", "All Classes")) {
-            array_push(lines, Loc_T("menu.tooltip.class.only", "{classes} only", { classes: class_txt }));
-        }
-        return lines;
-    }
-
-    if (_item.type == ITEM_ACCESSORY || Item_IsThrowable(_item)) {   // C3: the sentence and the numbers come from the item data (D100)
-        array_push(lines, Item_Sentence(_item));
-        var tn = Item_NumberLines(_item, GameState_Get().player_ch);
-        for (var tni = 0; tni < array_length(tn); tni++) array_push(lines, tn[tni].label + ": " + tn[tni].value);
-        return lines;
-    }
-
-    if (_item.type == ITEM_CONSUMABLE && variable_struct_exists(_item, "use") && is_struct(_item.use)) {
-        var use = _item.use;
-        var eff = variable_struct_exists(use, "effect") ? string(use.effect) : "none";
-        switch (eff) {
-            case "heal":
-                var hmin = variable_struct_exists(use, "min") ? round(real(use.min)) : round(real(use.power));
-                var hmax = variable_struct_exists(use, "max") ? round(real(use.max)) : hmin;
-                var hline = Loc_T("menu.tooltip.item.heal_hp", "Heal HP {min}-{max}", {
-                    min: string(hmin),
-                    max: string(hmax)
-                });
-                if (variable_struct_exists(use, "scale") && real(use.scale) > 0) {
-                    array_push(lines, hline);
-                    array_push(lines, Loc_T("menu.tooltip.item.scale_with_level", "Amount scales with level."));
-                } else {
-                    array_push(lines, hline);
-                }
+            rows = Codex_UnlockRows(prof);
+            title = Loc_T("tab.codex.unlocks", "Unlocks");
             break;
-            case "mp":
-                var mmin = variable_struct_exists(use, "min") ? round(real(use.min)) : round(real(use.power));
-                var mmax = variable_struct_exists(use, "max") ? round(real(use.max)) : mmin;
-                var mline = Loc_T("menu.tooltip.item.restore_mp", "Restore MP {min}-{max}", {
-                    min: string(mmin),
-                    max: string(mmax)
-                });
-                if (variable_struct_exists(use, "scale") && real(use.scale) > 0) {
-                    array_push(lines, mline);
-                    array_push(lines, Loc_T("menu.tooltip.item.scale_with_level", "Amount scales with level."));
-                } else {
-                    array_push(lines, mline);
-                }
-            break;
-            case "cure":
-                array_push(lines, Loc_T("menu.tooltip.item.cure", "Cure: {status}", {
-                    status: Tooltip_StatusName(use.status)
-                }));
-            break;
-            default:
-                array_push(lines, Loc_T("menu.tooltip.effect.named", "Effect: {effect}", { effect: eff }));
-            break;
-        }
     }
-
-    return lines;
-}
-
-function Tooltip_BuildSkillLines(_skill) {
-    var lines = [];
-    if (!is_struct(_skill) || !variable_struct_exists(_skill, "id") || _skill.id == -1) return lines;
-
-    array_push(lines, string(_skill.name));
-    var mp_line = Loc_T("menu.tooltip.skill.mp", "MP {mp}", {
-        mp: string(max(0, round(real(_skill.mp_cost))))
+    if (array_length(rows) <= 0) return;
+    var m = Ui_MenuNew("codex_" + _kind, rows, {
+        data: { tab: "codex_page" },
+        layout: { title: title, anchor: "center", details: true, details_pos: "right", details_cols: cols, det_art: true, hides_below: true }
     });
-    var tgt = variable_struct_exists(_skill, "target") ? _skill.target : TGT_ENEMY;
-    mp_line += Loc_T("menu.tooltip.skill.target_suffix", " | Target: {target}", {
-        target: Tooltip_TargetName(tgt)
-    });
-    array_push(lines, mp_line);
-
-    var effect_lines = Tooltip_SkillEffectLines(_skill, false);
-    for (var i = 0; i < array_length(effect_lines); i++) {
-        array_push(lines, effect_lines[i]);
-    }
-
-    var class_list = variable_struct_exists(_skill, "class_list") && is_array(_skill.class_list) ? _skill.class_list : [];
-    var class_only = Tooltip_ClassOnlyText(class_list);
-    if (class_only != "") array_push(lines, class_only);
-
-    return lines;
+    Ui_MenuFixCursor(m, m.cursor);
+    Ui_StackPush(pg.stk, m);
 }
 
-// DEV_NOTE (tooltip audit, 2026-03-01):
-// Kept the shared tooltip pipeline in this file:
-// Tooltip_BuildItemLines / Tooltip_BuildSkillLines + Tooltip_DrawBox.
-// Reason: both Menu_Draw and obj_battle_controller/Draw_64.gml already reuse it cleanly.
-// Changed only where useful: compact text scale, data-driven equippable Notes, skillbook de-duplication, and content-fit tooltip sizing.
-function Tooltip_GetStyle(_context = "default") {
-    var s = {
-        pad: 4,
-        text_scale: 0.90,
-        line_gap: 1,
-        frame_alpha_mult: 0.88,
-        min_w: 12,
-        min_h: 12,
-        margin_px: 0,
-        width_ratio: 0.36,
-        height_ratio: 0.24
-    };
-
-    if (_context == "menu") {
-        s.pad = 5;
-        s.text_scale = 0.93;
-        s.line_gap = 1;
-        s.min_w = 62;
-        s.min_h = 72;
-        s.margin_px = 0;
-        s.width_ratio = 1.00;
-        s.height_ratio = 0.36;
-    }
-
-    // Optional runtime override hook for future balancing/UI tuning.
-    if (variable_global_exists("tooltip_style") && is_struct(global.tooltip_style)) {
-        var root = global.tooltip_style;
-        var ov = undefined;
-        if (variable_struct_exists(root, _context) && is_struct(variable_struct_get(root, _context))) {
-            ov = variable_struct_get(root, _context);
-        } else if (variable_struct_exists(root, "default") && is_struct(variable_struct_get(root, "default"))) {
-            ov = variable_struct_get(root, "default");
-        }
-        if (is_struct(ov)) {
-            if (variable_struct_exists(ov, "pad")) s.pad = max(1, round(real(ov.pad)));
-            if (variable_struct_exists(ov, "text_scale")) s.text_scale = max(0.1, real(ov.text_scale));
-            if (variable_struct_exists(ov, "line_gap")) s.line_gap = max(0, round(real(ov.line_gap)));
-            if (variable_struct_exists(ov, "frame_alpha_mult")) s.frame_alpha_mult = clamp(real(ov.frame_alpha_mult), 0, 1);
-            if (variable_struct_exists(ov, "min_w")) s.min_w = max(12, round(real(ov.min_w)));
-            if (variable_struct_exists(ov, "min_h")) s.min_h = max(12, round(real(ov.min_h)));
-            if (variable_struct_exists(ov, "margin_px")) s.margin_px = max(0, round(real(ov.margin_px)));
-            if (variable_struct_exists(ov, "width_ratio")) s.width_ratio = clamp(real(ov.width_ratio), 0.1, 0.95);
-            if (variable_struct_exists(ov, "height_ratio")) s.height_ratio = clamp(real(ov.height_ratio), 0, 0.95);
-        }
-    }
-    return s;
-}
-
-function Tooltip_ClampRect(_x, _y, _w, _h, _margin = 0, _min_w = 12, _min_h = 12) {
-    var gui_w = max(1, Display_GuiW());
-    var gui_h = max(1, Display_GuiH());
-    var rect_margin = max(0, round(real(_margin)));
-    var rect_min_w = max(12, round(real(_min_w)));
-    var rect_min_h = max(12, round(real(_min_h)));
-    var rect_w = clamp(round(real(_w)), rect_min_w, max(rect_min_w, gui_w - rect_margin * 2));
-    var rect_h = clamp(round(real(_h)), rect_min_h, max(rect_min_h, gui_h - rect_margin * 2));
-    var rect_x = clamp(round(real(_x)), rect_margin, max(rect_margin, gui_w - rect_margin - rect_w));
-    var rect_y = clamp(round(real(_y)), rect_margin, max(rect_margin, gui_h - rect_margin - rect_h));
-    return { x: rect_x, y: rect_y, w: rect_w, h: rect_h };
-}
-
-function Tooltip_DrawBox(_x, _y, _w, _h, _lines, _alpha = 1, _style = undefined) {
-    if (!is_array(_lines) || array_length(_lines) <= 0) return;
-    var style = is_struct(_style) ? _style : Tooltip_GetStyle("default");
-    var rect = Tooltip_ClampRect(_x, _y, _w, _h, style.margin_px, style.min_w, style.min_h);
-    var pad = style.pad;
-    var text_scale = style.text_scale;
-    var line_h = max(5, floor(UI_TextHeight("A") * text_scale) + style.line_gap);
-    var max_text_w = max(1, floor((rect.w - pad * 2) / text_scale));
-    var wrapped = Tooltip_WrapLines(_lines, max_text_w);
-
-    var a = clamp(real(_alpha), 0, 1);
-    draw_set_alpha(a * style.frame_alpha_mult);
-    draw_set_color(c_black);
-    draw_rectangle(rect.x, rect.y, rect.x + rect.w, rect.y + rect.h, false);
-    draw_set_alpha(a);
-    draw_set_color(c_white);
-    draw_rectangle(rect.x, rect.y, rect.x + rect.w, rect.y + rect.h, true);
-
-    var draw_y = rect.y + pad;
-    for (var j = 0; j < array_length(wrapped); j++) {
-        UI_DrawTextTransformed(rect.x + pad, draw_y, wrapped[j], text_scale, text_scale, 0);
-        draw_y += line_h;
-        if (draw_y > rect.y + rect.h - pad) break;
-    }
-}
-
-function Tooltip_WrapLines(_lines, _max_text_w) {
-    var wrapped = [];
-    if (!is_array(_lines)) return wrapped;
-    var w = max(1, floor(real(_max_text_w)));
-    for (var i = 0; i < array_length(_lines); i++) {
-        var line_txt = string(_lines[i]);
-        if (line_txt == "") {
-            array_push(wrapped, "");
-            continue;
-        }
-        wrapped = Tooltip_AddWrappedLines(wrapped, line_txt, w);
-    }
-    return wrapped;
-}
-
-function Tooltip_RequiredHeight(_lines, _box_w, _style = undefined) {
-    var style = is_struct(_style) ? _style : Tooltip_GetStyle("default");
-    var box_w = max(style.min_w, round(real(_box_w)));
-    var pad = style.pad;
-    var text_scale = style.text_scale;
-    var line_h = max(5, floor(UI_TextHeight("A") * text_scale) + style.line_gap);
-    var max_text_w = max(1, floor((box_w - pad * 2) / text_scale));
-    var wrapped = Tooltip_WrapLines(_lines, max_text_w);
-    var line_count = max(1, array_length(wrapped));
-    return (pad * 2) + (line_count * line_h);
-}
-
-// Backward-compat wrappers (call sites can migrate to Tooltip_* progressively).
-function Menu_StatShortName(_stat_id) { return Tooltip_StatShortName(_stat_id); }
-function Menu_TargetName(_target_id) { return Tooltip_TargetName(_target_id); }
-function Menu_ClassListText(_class_list) { return Tooltip_ClassListText(_class_list); }
-function Menu_StatusName(_status_id) { return Tooltip_StatusName(_status_id); }
-function Menu_AddWrappedLines(_out_lines, _text, _max_w) { return Tooltip_AddWrappedLines(_out_lines, _text, _max_w); }
-function Menu_ItemBonusText(_item) { return Tooltip_ItemBonusText(_item); }
-function Menu_BuildItemTooltipLines(_item) { return Tooltip_BuildItemLines(_item); }
-function Menu_BuildSkillTooltipLines(_skill) { return Tooltip_BuildSkillLines(_skill); }
-function Menu_DrawTooltipBox(_bx, _by, _bw, _bh, _lines, _menu_alpha) { Tooltip_DrawBox(_bx, _by, _bw, _bh, _lines, _menu_alpha); }
-
-function Menu_InventoryDisplayItems(_inventory) {
-    var source = is_array(_inventory) ? _inventory : [];
-    var out = [];
-
-    for (var i = 0; i < array_length(source); i++) {
-        var inv = source[i];
-        if (!is_struct(inv) || !variable_struct_exists(inv, "id")) continue;
-
-        array_push(out, inv);
-    }
-
-    return out;
-}
-
-function Menu_ClampInventoryCursor(_m, _inventory) {
-    var items = Menu_InventoryDisplayItems(_inventory);
-    var inv_count = array_length(items);
-    if (inv_count <= 0) {
-        _m.inv_index = 0;
-        _m.inv_scroll = 0;
-        return _m;
-    }
-
-    _m.inv_index = clamp(_m.inv_index, 0, inv_count - 1);
-    if (_m.inv_index < _m.inv_scroll) _m.inv_scroll = _m.inv_index;
-
-    var visible_rows = Menu_GetLayout().rows_visible;
-    if (_m.inv_index >= _m.inv_scroll + visible_rows) {
-        _m.inv_scroll = _m.inv_index - visible_rows + 1;
-    }
-
-    _m.inv_scroll = clamp(_m.inv_scroll, 0, max(0, inv_count - visible_rows));
-    return _m;
-}
-
-function Menu_UseInventoryItem(_m, _ch, _item_id) {
-    var item = ItemDB_Get(_item_id);
-    var out = { menu: _m, ch: _ch, changed: false };
-
-    if (!is_struct(item) || item.id == 0) {
-        out.menu = Menu_InvPopupOpenMessage(_m, Loc_T("item.msg.cant_use", "Can't use that."));
-        return out;
-    }
-
-    if (item.type == ITEM_WEAPON || item.type == ITEM_ARMOR || item.type == ITEM_ACCESSORY) {   // C3: accessories equip like gear (D92)
-        var slot_name = variable_struct_exists(item, "equip_slot") ? string(item.equip_slot) : "";
-        if (slot_name != "" && Equip_SlotGet(_ch, slot_name) == item.id) {
-            Equip_SlotSet(_ch, slot_name, 0);
-            _ch = RecomputeResources(_ch);
-            _m = Menu_ClampInventoryCursor(_m, _ch.inventory);
-            out.menu = Menu_InvPopupOpenMessage(_m, Loc_T("menu.msg.unequipped", "Unequipped {item}.", { item: item.name }));
-            out.ch = _ch;
-            out.changed = true;
-            return out;
-        }
-
-        var can = Equip_CanEquip(_ch, item);
-        if (!can.ok) {
-            out.menu = Menu_InvPopupOpenMessage(_m, can.msg);
-            return out;
-        }
-
-        if (Equip_Item(_ch, item.id)) {
-            _ch = RecomputeResources(_ch);
-            _m = Menu_ClampInventoryCursor(_m, _ch.inventory);
-            out.menu = Menu_InvPopupOpenMessage(_m, Loc_T("menu.msg.equipped", "Equipped {item}.", { item: item.name }));
-            out.ch = _ch;
-            out.changed = true;
-            return out;
-        }
-
-        out.menu = Menu_InvPopupOpenMessage(_m, Loc_T("menu.msg.cant_equip", "Can't equip that."));
-        return out;
-    }
-
-    if (Item_IsConsumable(item)) {
-        var target = _ch;
-        var use_result = Item_Use(item.id, _ch, target);
-
-        if (use_result.ok) {
-            _ch.inventory = Inv_Remove(_ch.inventory, item.id, 1);
-            _ch = RecomputeResources(_ch);
-            _m = Menu_ClampInventoryCursor(_m, _ch.inventory);
-            out.menu = Menu_InvPopupOpenMessage(_m, use_result.msg);
-            out.ch = _ch;
-            out.changed = true;
-            return out;
-        }
-
-        out.menu = Menu_InvPopupOpenMessage(_m, use_result.msg);
-        return out;
-    }
-
-    out.menu = Menu_InvPopupOpenMessage(_m, Loc_T("item.msg.cant_use", "Can't use that."));
-    return out;
-}
-
-function Menu_InvPopupOpenConfirm(_m, _item_id) {
-    _m.inv_popup_open = true;
-    _m.inv_popup_closing = false;
-    _m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
-    _m.inv_popup_mode = "confirm";
-    _m.inv_popup_choice = 1; // default to Cancel
-    _m.inv_popup_message = Loc_T("menu.popup.learn_skill", "Learn a skill");
-    _m.inv_popup_item_id = _item_id;
-    _m.inv_popup_block_frame = Input_Frame() + 1;
-    _m.inv_popup_open_frame = Input_Frame();
-    return _m;
-}
-
-function Menu_InvPopupOpenMessage(_m, _msg) {
-    _m.inv_popup_open = true;
-    _m.inv_popup_closing = false;
-    _m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
-    _m.inv_popup_mode = "message";
-    _m.inv_popup_choice = 0;
-    _m.inv_popup_message = _msg;
-    _m.inv_popup_block_frame = Input_Frame() + 1;
-    _m.inv_popup_open_frame = Input_Frame();
-    return _m;
-}
-
-function Menu_StatsSync() {
+function TabMenu_OnConfirm(_m, _i) {
+    var u = TabMenu_Get();
     var gs = GameState_Get();
-    if (!is_struct(gs.player_ch)) return;
     var ch = gs.player_ch;
-    Menu_Ensure();
-    if (!variable_struct_exists(ch, "stat_points")) ch.stat_points = 0;
-    ch.stats = StatsClampAll(ch.stats);
-    gs.ui.menu.base_stats = Menu_StatsCopy(ch.stats);
-    gs.ui.menu.pending_stats = Menu_StatsCopy(ch.stats);
-    gs.ui.menu.pending_points = ch.stat_points;
-}
-
-function Menu_StatsDiscard() {
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "menu")) return;
-    var m = gs.ui.menu;
-    if (!is_struct(gs.player_ch)) return;
-    var ch = gs.player_ch;
-    if (variable_struct_exists(m, "base_stats") && is_struct(m.base_stats)) {
-        m.pending_stats = Menu_StatsCopy(m.base_stats);
-        m.pending_points = ch.stat_points;
+    var it = _m.items[_i];
+    switch (_m.data.tab) {
+        case "items":
+            if (variable_struct_exists(it, "throwable") && it.throwable) {
+                SFX_PlayUI("ui_back");
+                TabMenu_Toast(Loc_T("item.msg.throw_in_battle", "Throw it at an enemy in battle."));
+                break;
+            }
+            var r = TabItems_Use(ch, it.item_id);
+            if (r.ok) CardsUi_Commit(r.ch); else SFX_PlayUI("ui_back");
+            TabMenu_Toast(r.msg);
+            TabMenu_Refresh();
+            break;
+        case "gear":
+            if (it.item_id < 0) break;
+            var g = Gear_Toggle(ch, it.item_id);
+            if (g.ok) CardsUi_Commit(g.ch); else SFX_PlayUI("ui_back");
+            TabMenu_Toast(g.msg);
+            TabMenu_Refresh();
+            break;
+        case "codex":
+            TabCodex_Open(it.id);
+            break;
     }
-}
-
-function Menu_StatsApply() {
-    var gs = GameState_Get();
-    var m = gs.ui.menu;
-    if (!is_struct(gs.player_ch)) return;
-    var ch = gs.player_ch;
-    if (!is_struct(m.pending_stats)) return;
-    ch.stats = StatsClampAll(Menu_StatsCopy(m.pending_stats));
-    ch.stat_points = m.pending_points;
-    ch = RecomputeResources(ch);
-    GameState_SetPlayer(ch);
-    Menu_StatsSync();
-}
-
-function Menu_NavPressed(_action) {
-    return Input_UIPressed(_action);
 }
 
 function Menu_HandleInput() {
     var gs = GameState_Get();
-    var m = gs.ui.menu;
-    var ch = gs.player_ch;
-    var frame = Input_Frame();
-
-    if (variable_struct_exists(m, "closing") && m.closing) {
-        if (frame - m.close_frame >= UI_POPUP_FADE_FRAMES) {
-            Menu_CloseFinalize();
-        } else {
-            gs.ui.menu = m;
-        }
+    var u = TabMenu_Get();
+    if (!is_struct(u)) {
+        if (gs.ui.mode == UI_MENU) gs.ui.mode = UI_NONE;
         return;
     }
-
-    var nav_up = Menu_NavPressed("menu_up");
-    var nav_down = Menu_NavPressed("menu_down");
-    var k_left = Input_UIPressed("menu_left");
-    var k_right = Input_UIPressed("menu_right");
-    var k_ok = Input_UIConfirm();
-    var k_back = Input_UIBack();
-
-    if (variable_struct_exists(m, "inv_popup_open") && m.inv_popup_open) {
-        if (variable_struct_exists(m, "inv_popup_closing") && m.inv_popup_closing) {
-            if (frame - m.inv_popup_close_frame >= UI_POPUP_FADE_FRAMES) {
-                m = Menu_InvPopupClose(m, true);
-            }
-            gs.ui.menu = m;
-            return;
-        }
-        if (m.inv_popup_block_frame != UI_OPENED_FRAME_NONE && frame <= m.inv_popup_block_frame) {
-            gs.ui.menu = m;
-            return;
-        }
-
-        if (m.inv_popup_mode == "confirm") {
-            if (k_left || k_right) {
-                m.inv_popup_choice = 1 - m.inv_popup_choice;
-                SFX_PlayUI("ui_move");
-            }
-
-            if (k_back) {
-                SFX_PlayUI("ui_back");
-                m = Menu_InvPopupClose(m);
-                gs.ui.menu = m;
-                return;
-            }
-
-            if (k_ok) {
-                SFX_PlayUI("ui_confirm");
-                if (m.inv_popup_choice == 0) {
-                    var use_result = Item_Use(m.inv_popup_item_id, ch, ch);
-                    if (use_result.ok) {
-                        ch.inventory = Inv_Remove(ch.inventory, m.inv_popup_item_id, 1);
-                        ch = RecomputeResources(ch);
-                        GameState_SetPlayer(ch);
-                        m = Menu_ClampInventoryCursor(m, ch.inventory);
-
-                    }
-                    m = Menu_InvPopupOpenMessage(m, use_result.msg);
-                } else {
-                    m = Menu_InvPopupClose(m);
-                }
-            }
-
-            gs.ui.menu = m;
-            return;
-        }
-
-        if (m.inv_popup_mode == "message") {
-            if (k_ok || k_back) {
-                if (k_ok) SFX_PlayUI("ui_confirm"); else SFX_PlayUI("ui_back");
-                m = Menu_InvPopupClose(m);
-            }
-            gs.ui.menu = m;
-            return;
-        }
-
-        m = Menu_InvPopupClose(m);
-        gs.ui.menu = m;
+    if (u.closed_ms >= 0) {
+        if (current_time - u.closed_ms >= UI_PANEL_MS) Menu_CloseFinalize();
         return;
     }
-
-    if (k_back) {
-        SFX_PlayUI("ui_back");
-        if (m.tab == 2 && m.stats_focus) {
-            m.stats_focus = false;
-            m.header_focus = true;
-            return;
+    var tid = TabMenu_Ids()[u.tab];
+    // Q / E (or the shoulder buttons) change the tab and wrap; a click on a label goes straight to it
+    if (!Menu_CaptureActive() && current_time - u.opened_ms >= UI_INPUT_LOCK_MS) {
+        var d = (Input_Pressed("tab_next") ? 1 : 0) - (Input_Pressed("tab_prev") ? 1 : 0);
+        var to = (d != 0) ? Ui_TabStep(u.tab, 6, d) : u.tab;
+        if (d == 0 && mouse_check_button_pressed(mb_left) && variable_global_exists("ui_tabs_rects")) {
+            var mp = Ui_MousePos();
+            var hi = Ui_HoverIndex(global.ui_tabs_rects, mp.x, mp.y);
+            if (hi >= 0) to = hi;
         }
-        Menu_Close();
-        return;
-    }
-
-    if (m.header_focus) {
-        if (k_left) {
-            m.tab = (m.tab + array_length(m.tabs) - 1) mod array_length(m.tabs);
-            if (m.tab == 2) Menu_StatsSync();
+        if (to != u.tab) {
             SFX_PlayUI("ui_move");
+            TabMenu_Switch(u, to);
+            return;
         }
-        if (k_right) {
-            m.tab = (m.tab + 1) mod array_length(m.tabs);
-            if (m.tab == 2) Menu_StatsSync();
-            SFX_PlayUI("ui_move");
-        }
-        if (nav_down) {
-            var can_enter_tab = false;
-            switch (m.tab) {
-                case 0:
-                    can_enter_tab = is_array(ch.inventory) && array_length(ch.inventory) > 0;
-                    break;
-                case 1:
-                    can_enter_tab = is_array(ch.skills) && array_length(ch.skills) > 0;
-                    break;
-                case 2:
-                    can_enter_tab = true;
-                    break;
-            }
-
-            if (can_enter_tab) {
-                m.header_focus = false;
-                if (m.tab == 2) {
-                    if (!is_struct(m.pending_stats)) Menu_StatsSync();
-                    m.stats_focus = true;
-                    m.stats_row = 0;
-                }
-                SFX_PlayUI("ui_move");
-            }
-        }
+    }
+    if (tid == "settings") {
+        var sp = TabSettings_Popup();
+        if (is_struct(sp.controls)) ControlsPage_Handle(sp);
+        else Ui_MenuUpdate(sp.menu);
         return;
     }
-
-    var layout = Menu_GetLayout();
-    var rows_visible = layout.rows_visible;
-
-    if (m.tab == 0) {
-        var items = Menu_InventoryDisplayItems(ch.inventory);
-        var count = array_length(items);
-        if (count <= 0) {
-            m.header_focus = true;
-            m.inv_index = 0;
-            m.inv_scroll = 0;
-            if (nav_up) {
-                SFX_PlayUI("ui_move");
-            }
-            return;
-        }
-        if (nav_up) {
-            if (m.inv_index > 0) {
-                m.inv_index -= 1;
-                SFX_PlayUI("ui_move");
-            } else {
-                m.header_focus = true;
-                SFX_PlayUI("ui_move");
-                return;
-            }
-        }
-        if (nav_down) {
-            if (m.inv_index < count - 1) {
-                m.inv_index += 1;
-                SFX_PlayUI("ui_move");
-            }
-        }
-
-        if (m.inv_index < m.inv_scroll) m.inv_scroll = m.inv_index;
-        if (m.inv_index >= m.inv_scroll + rows_visible) m.inv_scroll = m.inv_index - rows_visible + 1;
-
-        if (k_ok) {
-            var selected_item_id = -1;
-            if (m.inv_index >= 0 && m.inv_index < count && is_struct(items[m.inv_index]) && variable_struct_exists(items[m.inv_index], "id")) {
-                selected_item_id = items[m.inv_index].id;
-            }
-
-            SFX_PlayUI("ui_confirm");
-            if (selected_item_id != -1) {
-                var use_out = Menu_UseInventoryItem(m, ch, selected_item_id);
-                m = use_out.menu;
-                ch = use_out.ch;
-                if (use_out.changed) {
-                    GameState_SetPlayer(ch);
-                }
-            } else {
-                m = Menu_InvPopupOpenMessage(m, Loc_T("item.msg.cant_use", "Can't use that."));
-            }
-            gs.ui.menu = m;
-            return;
-        }
-    }
-
-    if (m.tab == 1) {
-        var skills = is_array(ch.skills) ? ch.skills : [];
-        var scount = array_length(skills);
-        if (scount <= 0) {
-            m.header_focus = true;
-            m.skill_index = 0;
-            m.skill_scroll = 0;
-            if (nav_up) {
-                SFX_PlayUI("ui_move");
-            }
-            return;
-        }
-        if (nav_up) {
-            if (m.skill_index > 0) {
-                m.skill_index -= 1;
-                SFX_PlayUI("ui_move");
-            } else {
-                m.header_focus = true;
-                SFX_PlayUI("ui_move");
-                return;
-            }
-        }
-        if (nav_down) {
-            if (m.skill_index < scount - 1) {
-                m.skill_index += 1;
-                SFX_PlayUI("ui_move");
-            }
-        }
-
-        if (m.skill_index < m.skill_scroll) m.skill_scroll = m.skill_index;
-        if (m.skill_index >= m.skill_scroll + rows_visible) m.skill_scroll = m.skill_index - rows_visible + 1;
-    }
-
-    if (m.tab == 2) {
-        // Read-only stats: navigate the rows like the skills list (no editing).
-        if (!is_struct(m.pending_stats)) Menu_StatsSync();
-        var stat_rows = 5;
-        m.stats_row = clamp(m.stats_row, 0, stat_rows - 1);
-        if (nav_up) {
-            if (m.stats_row > 0) {
-                m.stats_row -= 1;
-                SFX_PlayUI("ui_move");
-            } else {
-                m.stats_focus = false;
-                m.header_focus = true;
-                SFX_PlayUI("ui_move");
-                return;
-            }
-        }
-        if (nav_down) {
-            if (m.stats_row < stat_rows - 1) {
-                m.stats_row += 1;
-                SFX_PlayUI("ui_move");
-            }
-        }
-    }
+    var pg = u.pages[u.tab];
+    Ui_MenuUpdate(Ui_StackTop(pg.stk), pg.stk);
 }
 
+// The prompts for the footer: what Confirm does on the row under the cursor, then what Back does.
+function TabMenu_Hint() {
+    var m = TabMenu_TopMenu();
+    var txt = "";
+    if (is_struct(m) && array_length(m.items) > 0) {
+        var it = m.items[clamp(m.cursor, 0, array_length(m.items) - 1)];
+        if (variable_struct_exists(it, "hint")) txt = it.hint;
+        else if (variable_struct_exists(it, "kind") && (it.kind == "choice" || it.kind == "slider")) txt = Loc_T("tab.hint.change", "{left}{right} Change");
+        else if (TabMenu_Ids()[TabMenu_Get().tab] == "settings") txt = Loc_T("tab.hint.select", "{confirm} Select");
+    }
+    if (txt != "") txt += "    ";
+    return txt + ((TabMenu_Depth() > 1) ? Loc_T("tab.hint.back", "{back} Back") : Loc_T("tab.hint.close", "{back} Close"));
+}
+
+// The Status card (class, level, HP, MP, XP, gold, the run's seed small).
+function TabMenu_StatusCardH(_z) {
+    return 12 * _z.mt.p + 6 * _z.mt.line_h;
+}
+
+function TabMenu_DrawStatusCard(_x, _y, _w, _h, _ch, _alpha) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var lh = mt.line_h;
+    Ui_DrawFrame(_x, _y, _w, _h, _alpha, p);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    var x0 = _x + 4 * p;
+    var x1 = _x + _w - 4 * p;
+    var yy = _y + 4 * p;
+    var nm = (is_struct(_ch.class_cfg) && variable_struct_exists(_ch.class_cfg, "name")) ? _ch.class_cfg.name : "";
+    Ui_Text(x0, yy, nm, UI_C_LIGHTEST);
+    Ui_Text(x1, yy, Loc_T("battle.hud.level", "Lv {n}", { n: string(_ch.level) }), UI_C_LIGHT, fa_right);
+    yy += lh + p;
+    var lab_w = max(UI_TextWidth(Loc_T("battle.hud.hp", "HP")), max(UI_TextWidth(Loc_T("battle.hud.mp", "MP")), UI_TextWidth(Loc_T("tab.lbl.xp", "XP"))));
+    var val_w = UI_TextWidth(string(_ch.max_hp) + "/" + string(_ch.max_hp));
+    val_w = max(val_w, UI_TextWidth(string(_ch.max_mp) + "/" + string(_ch.max_mp)));
+    val_w = max(val_w, UI_TextWidth(string(_ch.exp_next) + "/" + string(_ch.exp_next)));
+    var bx = x0 + lab_w + 2 * p;
+    var bw = x1 - val_w - 2 * p - bx;
+    var bar_h = max(3 * p, (lh div (2 * p)) * 2 * p);
+    var rows = [
+        { lab: Loc_T("battle.hud.hp", "HP"), cur: _ch.hp, mx: _ch.max_hp, txt: string(_ch.hp) + "/" + string(_ch.max_hp), stripe: false },
+        { lab: Loc_T("battle.hud.mp", "MP"), cur: _ch.mp, mx: _ch.max_mp, txt: string(_ch.mp) + "/" + string(_ch.max_mp), stripe: true },
+        { lab: Loc_T("tab.lbl.xp", "XP"), cur: _ch.exp, mx: _ch.exp_next, txt: (_ch.exp_next > 0) ? (string(_ch.exp) + "/" + string(_ch.exp_next)) : Loc_T("tab.val.max", "MAX"), stripe: false }
+    ];
+    for (var r = 0; r < 3; r++) {
+        var row = rows[r];
+        var ratio = (row.mx > 0) ? clamp(row.cur / row.mx, 0, 1) : 1;
+        Ui_Text(x0, yy, row.lab, UI_C_LIGHT);
+        Battle_DrawBar(bx, yy + (lh - bar_h) div 2, bw, bar_h, p, ratio, ratio, UI_C_LIGHT, UI_C_LIGHTEST, row.stripe);
+        Ui_Text(x1, yy, row.txt, UI_C_LIGHT, fa_right);
+        yy += lh + p;
+    }
+    Hud_DrawCoin(x0, yy + (lh - 6 * p) div 2, p);
+    Ui_Text(x0 + 8 * p, yy, string(Gold_Get()), UI_C_LIGHTEST);
+    yy += lh + p;
+    var run = Run_Get();
+    if (is_struct(run)) Ui_Text(x0, yy, Loc_T("tab.lbl.seed_small", "Seed {n}", { n: string(run.seed) }), UI_C_LIGHT);
+    draw_set_alpha(a0);
+}
+
+function TabMenu_DrawFooter(_z, _alpha) {
+    var mt = _z.mt;
+    var p = mt.p;
+    var gold = string(Gold_Get());
+    var gw = 8 * p + UI_TextWidth(gold);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    Prompt_RichDraw(_z.x, _z.foot_y + (_z.foot_h - mt.line_h) div 2, TabMenu_Hint(), _z.w - gw - 4 * p, UI_C_LIGHT, fa_left, _alpha);
+    var gx = _z.x + _z.w - gw;
+    Hud_DrawCoin(gx, _z.foot_y + (_z.foot_h - 6 * p) div 2, p);
+    Ui_Text(gx + 8 * p, _z.foot_y + (_z.foot_h - mt.line_h) div 2, gold, UI_C_LIGHTEST);
+    draw_set_alpha(a0);
+}
 
 function Menu_Draw() {
+    var u = TabMenu_Get();
+    if (!is_struct(u)) return;
+    var now = current_time;
+    var a = Menu_Alpha();
+    var tid = TabMenu_Ids()[u.tab];
+    var topm = TabMenu_TopMenu();
+    var z = TabMenu_Zones((is_struct(topm) && string_pos("codex_", topm.id) == 1) ? topm.id : tid);
+    var mt = z.mt;
+    var p = mt.p;
     var gs = GameState_Get();
-    var m = gs.ui.menu;
     var ch = gs.player_ch;
-
     UI_SetFont();
-
-    var layout = Menu_GetLayout();
-    var w = layout.w;
-    var h = layout.h;
-    var bx = layout.bx;
-    var by = layout.by;
-    var bw = layout.bw;
-    var bh = layout.bh;
-    var main_h = layout.main_h;
-    var header_h = layout.header_h;
-    var pad = layout.pad;
-    var row_h = layout.row_h;
-    var rows_visible = layout.rows_visible;
-    var content_list_y = layout.content_list_y;
-    var content_list_h = layout.content_list_h;
-    var list_top_inset = layout.list_top_inset;
-    var list_bottom_inset = layout.list_bottom_inset;
-    var menu_tip_h = layout.tooltip_h;
-    var menu_tip_y = layout.tooltip_y;
-    var menu_closing = variable_struct_exists(m, "closing") && m.closing;
-    var menu_close_frame = variable_struct_exists(m, "close_frame") ? m.close_frame : UI_OPENED_FRAME_NONE;
-    var menu_alpha = UI_PopupAlpha(m.opened_frame, menu_closing, menu_close_frame, 1);
-    var ui_visual = UI_GetVisualScale();
-    var ui_sprite = UI_GetSpriteScale();
-    var tooltip_lines = [];
-
-    // Top main menu box (cropped to leave room for bottom tooltip box).
-    draw_set_alpha(menu_alpha * 0.9);
-    draw_set_color(c_black);
-    draw_rectangle(bx, by, bx + bw, by + main_h, false);
-    draw_set_alpha(menu_alpha);
-    draw_set_color(c_white);
-    draw_rectangle(bx, by, bx + bw, by + main_h, true);
-    draw_set_alpha(menu_alpha);
-
-    // tabs
-    var tab_w = bw / array_length(m.tabs);
-    for (var i = 0; i < array_length(m.tabs); i++) {
-        var tx = bx + i * tab_w;
-        var tab_active = (i == m.tab);
-        var tab_hi = tab_active && m.header_focus;
-        var tab_label = m.tabs[i];
-        if (i == 0) tab_label = Loc_T("menu.tab.inventory", tab_label);
-        else if (i == 1) tab_label = Loc_T("menu.tab.skills", tab_label);
-        else if (i == 2) tab_label = Loc_T("menu.tab.stats", tab_label);
-        if (tab_hi) {
-            draw_set_color(c_white);
-            draw_rectangle(tx, by, tx + tab_w, by + header_h, false);
-            draw_set_color(c_black);
-            draw_rectangle(tx, by, tx + tab_w, by + header_h, true);
-            draw_set_color(c_black);
-        } else {
-            draw_set_color(c_white);
-        }
-        var tab_pad = max(4, round(6 * ui_visual));
-        UI_DrawText(tx + tab_pad, by + tab_pad, tab_label);
-    }
-
-    if (Run_IsActive()) {   // C3 (D23): the run's gold, bottom right of the menu box
-        var gold_txt = Loc_T("menu.gold", "Gold: {n}", { n: string(Gold_Get()) });
-        draw_set_color(c_white);
-        UI_DrawText(bx + bw - max(4, round(6 * ui_visual)) - UI_TextWidth(gold_txt), by + main_h - UI_TextHeight("A") - max(4, round(6 * ui_visual)), gold_txt);
-    }
-
-    var draw_arrow_sprite = dialogue_arrow_down;
-    var draw_arrow_w = max(1, sprite_get_width(draw_arrow_sprite));
-    var draw_arrow_h = max(1, sprite_get_height(draw_arrow_sprite));
-    var draw_arrow_size = max(10, round(16 * ui_visual));
-    var draw_arrow_scale = max(1, round(draw_arrow_size / max(draw_arrow_w, draw_arrow_h)));
-    var draw_arrow_draw_w = draw_arrow_w * draw_arrow_scale;
-    var draw_arrow_draw_h = draw_arrow_h * draw_arrow_scale;
-    var draw_arrow_x = round(bx + bw * 0.5 - (draw_arrow_draw_w * 0.5));
-    var draw_arrow_top_y = round(layout.content_y + max(0, floor((list_top_inset - draw_arrow_draw_h) * 0.5)));
-    var draw_arrow_bottom_y = round(content_list_y + content_list_h + max(0, floor((list_bottom_inset - draw_arrow_draw_h) * 0.5)));
-
-    // Inventory tab
-    if (m.tab == 0) {
-        var items = Menu_InventoryDisplayItems(ch.inventory);
-        var count = array_length(items);
-        var start = clamp(m.inv_scroll, 0, max(0, count - rows_visible));
-        var endv = min(count, start + rows_visible);
-
-        if (count == 0) {
-            draw_set_color(c_white);
-            UI_DrawText(bx + pad, content_list_y, Loc_T("menu.msg.no_items", "No items."));
-        } else {
-            for (var i2 = start; i2 < endv; i2++) {
-                var row = i2 - start;
-                var yy = content_list_y + row * row_h;
-
-                var sel = (i2 == m.inv_index) && !m.header_focus;
-                if (sel) {
-                    draw_set_color(c_white);
-                    draw_rectangle(bx + pad - 4, yy - 2, bx + bw - pad + 4, yy + row_h - 2, false);
-                    draw_set_color(c_black);
-                    draw_rectangle(bx + pad - 4, yy - 2, bx + bw - pad + 4, yy + row_h - 2, true);
-                }
-
-                var inv = items[i2];
-                var item = ItemDB_Get(inv.id);
-                var tx = bx + pad;
-                if (item.sprite != noone) {
-                    var icon_scale = ui_sprite;
-                    draw_sprite_ext(item.sprite, 0, tx, yy + max(1, round(2 * ui_visual)), icon_scale, icon_scale, 0, c_white, 1);
-                    tx += max(round(16 * icon_scale), round(sprite_get_width(item.sprite) * icon_scale));
-                } else if (variable_struct_exists(item, "icon_kind")) {   // C3 (D94): the strip sprite or a code glyph
-                    Item_DrawIcon(item, tx, yy + max(1, round(2 * ui_visual)), round(16 * ui_sprite), menu_alpha);
-                    tx += round(16 * ui_sprite) + max(2, round(3 * ui_visual));
-                }
-                var label = item.name;
-                if (item.stackable) {
-                    label += Loc_T("menu.label.stack_suffix", " x{qty}", { qty: string(inv.qty) });
-                }
-                draw_set_color(sel ? c_black : c_white);
-                UI_DrawText(tx, yy, label);
-
-                if (Menu_IsEquipped(ch, inv.id)) {
-                    draw_set_color(sel ? c_black : c_white);
-                    UI_DrawText(bx + bw - pad - UI_TextWidth(Loc_T("menu.label.equipped_short", "E")), yy, Loc_T("menu.label.equipped_short", "E"));
-                }
-            }
-        }
-
-        if (!m.header_focus && count > 0 && m.inv_index >= 0 && m.inv_index < count && is_struct(items[m.inv_index])) {
-            var sel_inv = items[m.inv_index];
-            var sel_item = ItemDB_Get(sel_inv.id);
-            tooltip_lines = Tooltip_BuildItemLines(sel_item);
-        }
-
-        if (count > rows_visible) {
-            draw_set_color(c_white);
-            if (start > 0) {
-                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_top_y + draw_arrow_draw_h, draw_arrow_scale, -draw_arrow_scale, 0, c_white, menu_alpha);
-            }
-            if (endv < count) {
-                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_bottom_y, draw_arrow_scale, draw_arrow_scale, 0, c_white, menu_alpha);
-            }
-        }
-    }
-
-    // Skills tab
-    if (m.tab == 1) {
-        var skills = is_array(ch.skills) ? ch.skills : [];
-        var scount = array_length(skills);
-        var start2 = clamp(m.skill_scroll, 0, max(0, scount - rows_visible));
-        var end2 = min(scount, start2 + rows_visible);
-
-        if (scount == 0) {
-            draw_set_color(c_white);
-            UI_DrawText(bx + pad, content_list_y, Loc_T("menu.msg.no_skills", "No skills."));
-        } else {
-            for (var s = start2; s < end2; s++) {
-                var row2 = s - start2;
-                var y2 = content_list_y + row2 * row_h;
-
-                var sel2 = (s == m.skill_index) && !m.header_focus;
-                if (sel2) {
-                    draw_set_color(c_white);
-                    draw_rectangle(bx + pad - 4, y2 - 2, bx + bw - pad + 4, y2 + row_h - 2, false);
-                    draw_set_color(c_black);
-                    draw_rectangle(bx + pad - 4, y2 - 2, bx + bw - pad + 4, y2 + row_h - 2, true);
-                }
-
-                var sk = SkillDB_Get(skills[s]);
-                var tx2 = bx + pad;
-                if (sk.icon_sprite != noone) {
-                    var icon_scale2 = ui_sprite;
-                    draw_sprite_ext(sk.icon_sprite, 0, tx2, y2 + max(1, round(2 * ui_visual)), icon_scale2, icon_scale2, 0, c_white, 1);
-                    tx2 += max(round(16 * icon_scale2), round(sprite_get_width(sk.icon_sprite) * icon_scale2));
-                }
-                draw_set_color(sel2 ? c_black : c_white);
-                UI_DrawText(tx2, y2, sk.name);
-            }
-        }
-
-        if (!m.header_focus && scount > 0 && m.skill_index >= 0 && m.skill_index < scount) {
-            var sel_skill = SkillDB_Get(skills[m.skill_index]);
-            tooltip_lines = Tooltip_BuildSkillLines(sel_skill);
-        }
-
-        if (scount > rows_visible) {
-            draw_set_color(c_white);
-            if (start2 > 0) {
-                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_top_y + draw_arrow_draw_h, draw_arrow_scale, -draw_arrow_scale, 0, c_white, menu_alpha);
-            }
-            if (end2 < scount) {
-                draw_sprite_ext(draw_arrow_sprite, 0, draw_arrow_x, draw_arrow_bottom_y, draw_arrow_scale, draw_arrow_scale, 0, c_white, menu_alpha);
-            }
-        }
-    }
-
-    // Stats tab (main layout)
-    if (m.tab == 2) {
-        if (!is_struct(m.pending_stats)) Menu_StatsSync();
-
-        var stat_names = [
-            Loc_T("status.name.stat.atk", "ATK"),
-            Loc_T("status.name.stat.def", "DEF"),
-            Loc_T("status.name.stat.spd", "SPD"),
-            Loc_T("status.name.stat.mag", "MAG")
-        ];
-        var stat_keys = ["atk","def","spd","mag"];
-        var stat_count = array_length(stat_keys);
-
-        var left_x = bx + pad;
-        var y0 = by + header_h + pad;
-
-        var hp_bar_sprite = hp_bar;
-        var mp_bar_sprite = mp_bar;
-        var max_frame = min(10, sprite_get_number(hp_bar_sprite) - 1);
-        if (max_frame < 0) max_frame = 0;
-
-        var hp_ratio = (ch.max_hp > 0) ? clamp(ch.hp / ch.max_hp, 0, 1) : 0;
-        var mp_ratio = (ch.max_mp > 0) ? clamp(ch.mp / ch.max_mp, 0, 1) : 0;
-        var hp_frame = clamp(floor(hp_ratio * max_frame), 0, max_frame);
-        var mp_frame = clamp(floor(mp_ratio * max_frame), 0, max_frame);
-
-        var bar_scale = UI_BAR_SCALE * ui_sprite;
-        var bar_w = sprite_get_width(hp_bar_sprite) * bar_scale;
-        var hp_bar_h = sprite_get_height(hp_bar_sprite) * bar_scale;
-        var mp_bar_h = sprite_get_height(mp_bar_sprite) * bar_scale;
-
-        var level_capped = Level_IsAtCap(ch.level);
-        var exp_label_1 = level_capped ? Loc_T("menu.stats.level_cap", "Level Cap") : Loc_T("menu.stats.required_exp", "Required EXP");
-        var exp_value = level_capped ? Loc_T("menu.stats.max", "MAX") : (string(ch.exp) + "/" + string(ch.exp_next));
-        var line_h = UI_TextHeight("A") + 2;
-
-        // The HP / MP numbers sit to the right of their bars, so the left block is as wide as the bar plus the wider number
-        // (before this the stat list started under "10 / 10" and the two overlapped).
-        var stat_text_gap = max(4, round(6 * ui_visual));
-        var hp_text = string(ch.hp) + " / " + string(ch.max_hp);
-        var mp_text = string(ch.mp) + " / " + string(ch.max_mp);
-        var bars_w = bar_w + stat_text_gap + max(UI_TextWidth(hp_text), UI_TextWidth(mp_text));
-        var left_content_w = max(
-            bars_w,
-            UI_TextWidth(Loc_T("menu.stats.level", "Level: {level}", { level: string(ch.level) })),
-            UI_TextWidth(exp_label_1),
-            UI_TextWidth(exp_value)
-        ) + pad * 2;
-        var left_w = min(bw * 0.7, left_content_w);
-
-        var right_x = bx + left_w + pad;
-        var right_w = (bx + bw - pad) - right_x;
-
-        draw_sprite_ext(hp_bar_sprite, hp_frame, left_x, y0, bar_scale, bar_scale, 0, c_white, menu_alpha);
-        draw_sprite_ext(mp_bar_sprite, mp_frame, left_x, y0 + hp_bar_h + pad, bar_scale, bar_scale, 0, c_white, menu_alpha);
-
-        draw_set_color(c_white);
-        UI_DrawText(left_x + bar_w + stat_text_gap, y0, hp_text);
-        UI_DrawText(left_x + bar_w + stat_text_gap, y0 + hp_bar_h + pad, mp_text);
-
-        draw_set_color(c_white);
-        var text_y = y0 + hp_bar_h + mp_bar_h + pad * 2;
-        UI_DrawText(left_x, text_y, Loc_T("menu.stats.level", "Level: {level}", { level: string(ch.level) }));
-        text_y += line_h;
-        UI_DrawText(left_x, text_y, exp_label_1);
-        text_y += line_h;
-        UI_DrawText(left_x, text_y, exp_value);
-
-        var row_h2 = row_h;
-        var list_y = y0;
-        var label_x = right_x;
-
-        // Read-only stat list (growth is class-driven; no manual allocation).
-        // Selectable for viewing, like the skills list.
-        for (var i3 = 0; i3 < stat_count; i3++) {
-            var row_y = list_y + i3 * row_h2;
-            var val = variable_struct_get(m.pending_stats, stat_keys[i3]);
-            var row_txt = stat_names[i3] + ": " + string(val);
-            var row_sel = (m.stats_focus && m.stats_row == i3);
-            if (row_sel) {
-                var rtw = UI_TextWidth(row_txt);
-                draw_set_color(c_white);
-                draw_rectangle(label_x - 4, row_y - 2, label_x + rtw + 4, row_y + row_h2 - 2, false);
-                draw_set_color(c_black);
-                draw_rectangle(label_x - 4, row_y - 2, label_x + rtw + 4, row_y + row_h2 - 2, true);
-            }
-            draw_set_color(row_sel ? c_black : c_white);
-            UI_DrawText(label_x, row_y, row_txt);
-
-            if (row_sel) {
-                tooltip_lines = Tooltip_BuildStatLines(stat_keys[i3], stat_names[i3], val);
-            }
-        }
-    }
-
-    if (!(variable_struct_exists(m, "inv_popup_open") && m.inv_popup_open) && array_length(tooltip_lines) > 0) {
-        var tip_style = Tooltip_GetStyle("menu");
-        var tip_w = bw;
-        var tip_x = bx;
-        var tip_y = menu_tip_y;
-        var tip_margin = max(tip_style.margin_px, max(2, floor(pad * 0.5)));
-        var tip_h_needed = Tooltip_RequiredHeight(tooltip_lines, tip_w, tip_style);
-        var tip_bottom_limit = by + bh - tip_margin;
-        var tip_h_max = max(tip_style.min_h, tip_bottom_limit - tip_y);
-        var tip_h = clamp(max(menu_tip_h, tip_h_needed), tip_style.min_h, tip_h_max);
-        var tip_rect = Tooltip_ClampRect(tip_x, tip_y, tip_w, tip_h, tip_margin, tip_style.min_w, tip_style.min_h);
-        Tooltip_DrawBox(tip_rect.x, tip_rect.y, tip_rect.w, tip_rect.h, tooltip_lines, menu_alpha, tip_style);
-    }
-
-    if (variable_struct_exists(m, "inv_popup_open") && m.inv_popup_open) {
-        var inv_closing = variable_struct_exists(m, "inv_popup_closing") && m.inv_popup_closing;
-        var inv_close_frame = variable_struct_exists(m, "inv_popup_close_frame") ? m.inv_popup_close_frame : UI_OPENED_FRAME_NONE;
-        var popup_alpha = UI_PopupAlpha(m.inv_popup_open_frame, inv_closing, inv_close_frame, 1);
-        var popup_msg = Loc_T("menu.popup.learn_skill", "Learn a skill");
-        if (m.inv_popup_mode == "message") popup_msg = string(m.inv_popup_message);
-
-        var pm = UI_PopupMetrics();
-        var popup_pad_x = pm.pad_x;
-        var popup_pad_y = pm.pad_y;
-        var popup_gap_y = pm.gap_y;
-        var btn_pad_x = pm.btn_pad_x;
-        var line_h_popup = pm.line_h;
-        var btn_h = pm.btn_h;
-        var msg_w = UI_TextWidth(popup_msg);
-        var popup_w = 0;
-        var popup_h = 0;
-        var px1 = 0;
-        var py1 = 0;
-        var px2 = 0;
-        var py2 = 0;
-
-        if (m.inv_popup_mode == "confirm") {
-            var yes_label = Loc_T("menu.common.confirm", "Confirm");
-            var no_label = Loc_T("menu.common.cancel", "Cancel");
-            var yes_w = UI_ButtonWidth(yes_label, btn_pad_x);
-            var no_w = UI_ButtonWidth(no_label, btn_pad_x);
-            var btn_gap_x = pm.btn_gap_x;
-            var total_btn_w = yes_w + btn_gap_x + no_w;
-
-            popup_w = max(pm.min_w, max(msg_w + popup_pad_x * 2, total_btn_w + popup_pad_x * 2));
-            popup_h = popup_pad_y + line_h_popup + popup_gap_y + btn_h + popup_pad_y;
-            px1 = bx + (bw - popup_w) * 0.5;
-            py1 = by + (bh - popup_h) * 0.62;
-            px2 = px1 + popup_w;
-            py2 = py1 + popup_h;
-
-            draw_set_alpha(popup_alpha * 0.85);
-            draw_set_color(c_black);
-            draw_rectangle(px1, py1, px2, py2, false);
-            draw_set_alpha(popup_alpha);
-            draw_set_color(c_white);
-            draw_rectangle(px1, py1, px2, py2, true);
-
-            var msg_x = px1 + (popup_w - msg_w) * 0.5;
-            var msg_y = py1 + popup_pad_y;
-            draw_set_alpha(popup_alpha);
-            draw_set_color(c_white);
-            UI_DrawText(msg_x, msg_y, popup_msg);
-
-            var btn_y = msg_y + line_h_popup + popup_gap_y;
-            var yes_x = px1 + (popup_w - total_btn_w) * 0.5;
-            var no_x = yes_x + yes_w + btn_gap_x;
-            UI_DrawButton(yes_x, btn_y, yes_w, btn_h, yes_label, (m.inv_popup_choice == 0), popup_alpha);
-            UI_DrawButton(no_x, btn_y, no_w, btn_h, no_label, (m.inv_popup_choice == 1), popup_alpha);
-        } else {
-            var ok_label = Loc_T("common.ok", "OK");
-            var ok_w = UI_ButtonWidth(ok_label, btn_pad_x);
-            popup_w = max(pm.min_w, max(msg_w + popup_pad_x * 2, ok_w + popup_pad_x * 2));
-            popup_h = popup_pad_y + line_h_popup + popup_gap_y + btn_h + popup_pad_y;
-            px1 = bx + (bw - popup_w) * 0.5;
-            py1 = by + (bh - popup_h) * 0.62;
-            px2 = px1 + popup_w;
-            py2 = py1 + popup_h;
-
-            draw_set_alpha(popup_alpha * 0.85);
-            draw_set_color(c_black);
-            draw_rectangle(px1, py1, px2, py2, false);
-            draw_set_alpha(popup_alpha);
-            draw_set_color(c_white);
-            draw_rectangle(px1, py1, px2, py2, true);
-
-            var msg_x2 = px1 + (popup_w - msg_w) * 0.5;
-            var msg_y2 = py1 + popup_pad_y;
-            draw_set_alpha(popup_alpha);
-            draw_set_color(c_white);
-            UI_DrawText(msg_x2, msg_y2, popup_msg);
-
-            var btn_y2 = msg_y2 + line_h_popup + popup_gap_y;
-            var ok_x = px1 + (popup_w - ok_w) * 0.5;
-            UI_DrawButton(ok_x, btn_y2, ok_w, btn_h, ok_label, true, popup_alpha);
-        }
-    }
-
     draw_set_alpha(1);
+    Ui_DimBackdrop(0.9 * a);
+    Ui_DrawTabs(z.x, z.tabs_y, z.w, TabMenu_Labels(), u.tab, a, TabMenu_Icons());
+    var extra = 0;
+    if (tid == "status") {
+        var ch_h = TabMenu_StatusCardH(z);
+        TabMenu_DrawStatusCard(z.x, z.body_y, z.list_w, ch_h, ch, a);
+        extra = ch_h + 2 * p;
+    }
+    if (tid == "settings") {
+        if (SettingsPopup_IsOpen("tab")) {   // (closed already while the screen fades out)
+            var sp = GameState_Get().ui.settings_popup;
+            var sm = is_struct(sp.controls) ? sp.controls.menu : sp.menu;
+            TabMenu_FitMenu(sm, z);
+            Ui_MenuDraw(sm, a * Ui_MenuAlpha(sm, now));
+        }
+    } else {
+        var stk = u.pages[u.tab].stk;
+        if (is_struct(stk.leaving) && Ui_MenuAlpha(stk.leaving, now) <= 0) stk.leaving = undefined;
+        var top = Ui_StackTop(stk);
+        TabMenu_FitMenu(top, z, (Ui_StackDepth(stk) == 1) ? extra : 0);
+        Ui_MenuDraw(top, a * Ui_MenuAlpha(top, now));
+        if (is_struct(stk.leaving)) {
+            TabMenu_FitMenu(stk.leaving, z, 0);
+            Ui_MenuDraw(stk.leaving, a * Ui_MenuAlpha(stk.leaving, now));
+        }
+    }
+    TabMenu_DrawFooter(z, a);
+    if (u.toast != "" && now - u.toast_ms < TAB_TOAST_MS) {
+        var tw = UI_TextWidth(u.toast) + 8 * p;
+        var th = mt.line_h + 6 * p;
+        var tx = round((mt.gw - tw) / 2);
+        var ty = z.foot_y - 2 * p - th;
+        Ui_DrawFrame(tx, ty, tw, th, a, p);
+        draw_set_alpha(a);
+        Ui_Text(tx + 4 * p, ty + 3 * p, u.toast, UI_C_LIGHTEST);
+    }
+    draw_set_alpha(1);
+    draw_set_color(c_white);
 }
 
 // ==========================================================================================================================
@@ -2906,7 +2178,7 @@ function SettingsPopup_Alpha() {
     return is_struct(sp.menu) ? Ui_MenuAlpha(sp.menu, current_time) : 0;
 }
 
-function SettingsPopup_Open(_owner = "") {
+function SettingsPopup_Open(_owner = "", _quiet = false) {
     SettingsPopup_Ensure();
     var sp = GameState_Get().ui.settings_popup;
     sp.open = true;
@@ -2921,7 +2193,7 @@ function SettingsPopup_Open(_owner = "") {
         on_confirm: SettingsMenu_OnConfirm, on_adjust: SettingsMenu_OnAdjust, on_back: SettingsMenu_OnBack,
         layout: { title: Loc_T("settings.title", "Settings"), anchor: "center", details: true, hides_below: true }
     });
-    SFX_PlayUI("ui_openclose");
+    if (!_quiet) SFX_PlayUI("ui_openclose");
 }
 
 function SettingsPopup_Close(_immediate = false) {
@@ -3174,116 +2446,83 @@ function Title_ModalAlpha(_c) {
 }
 
 // --------------------
-// PAUSE MENU (inventory-style popup)
+// PAUSE MENU (D92, D95): Resume, Help, Settings, Abandon Run (two presses), Quit to Title, on the UI framework
 // --------------------
-#macro PAUSE_ABANDON_INDEX 4   // Resume, Settings, Help, Exit to Main Menu, Abandon Run
+// global.pause_ui = { stk, opened_ms, closed_ms, armed, pending } while it is open, with gs.ui.mode = UI_PAUSE. Settings and Help open above it
+// (their own screens). A choice that leaves the game (Abandon, Quit) fades the menu out first, then acts (PauseMenu_CloseFinalize).
+#macro PAUSE_ABANDON_INDEX 3   // Resume, Help, Settings, Abandon Run, Quit to Title
 
-function PauseMenu_Ensure() {
+function PauseMenu_Items(_armed) {
+    return [
+        { id: "resume", label: Loc_T("pause.option.resume", "Resume"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.resume", "Back to the game.") },
+        { id: "help", label: Loc_T("pause.option.help", "Help"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.help", "Every hint the game has: the ones you have seen and the ones still to come.") },
+        { id: "settings", label: Loc_T("pause.option.settings", "Settings"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.settings", "Sound, text, window, language and keys.") },
+        { id: "abandon", value: "", kind: "button", enabled: true, lines: [],
+          label: _armed ? Loc_T("pause.option.abandon_confirm", "Sure? Confirm again") : Loc_T("pause.option.abandon", "Abandon Run"),
+          help: _armed ? Loc_T("pause.help.abandon_armed", "Confirm once more to end this run now. Back or another row cancels.")
+                       : Loc_T("pause.help.abandon", "Ends this run now. It counts as a death, but you keep the echo.") },
+        { id: "quit", label: Loc_T("pause.option.quit", "Quit to Title"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.quit", "Saves the run and goes to the title. Continue picks it up again.") }
+    ];
+}
+
+function PauseMenu_Get() {
+    return (variable_global_exists("pause_ui") && is_struct(global.pause_ui)) ? global.pause_ui : undefined;
+}
+
+function PauseMenu_IsOpen() {
     var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
-    if (!variable_struct_exists(gs.ui, "pause_menu")) {
-        gs.ui.pause_menu = {
-            open: false,
-            closing: false,
-            close_frame: UI_OPENED_FRAME_NONE,
-            pending_exit_main_menu: false,
-            pending_abandon: false,
-            abandon_armed: false,
-            index: 0,
-            options: [
-                Loc_T("pause.option.resume", "Resume"),
-                Loc_T("pause.option.settings", "Settings"),
-                Loc_T("pause.option.help", "Help"),
-                Loc_T("pause.option.exit_main", "Exit to Main Menu"),
-                Loc_T("pause.option.abandon", "Abandon Run")
-            ],
-            opened_frame: UI_OPENED_FRAME_NONE
-        };
-    } else {
-        var pm0 = gs.ui.pause_menu;
-        if (!variable_struct_exists(pm0, "opened_frame")) pm0.opened_frame = UI_OPENED_FRAME_NONE;
-        if (!variable_struct_exists(pm0, "closing")) pm0.closing = false;
-        if (!variable_struct_exists(pm0, "close_frame")) pm0.close_frame = UI_OPENED_FRAME_NONE;
-        if (!variable_struct_exists(pm0, "pending_exit_main_menu")) pm0.pending_exit_main_menu = false;
-        if (!variable_struct_exists(pm0, "pending_abandon")) pm0.pending_abandon = false;
-        if (!variable_struct_exists(pm0, "abandon_armed")) pm0.abandon_armed = false;
-    }
+    return variable_struct_exists(gs, "ui") && gs.ui.mode == UI_PAUSE;
+}
+
+// The row under the cursor, for the scripted runs.
+function PauseMenu_Cursor() {
+    var u = PauseMenu_Get();
+    return is_struct(u) ? Ui_StackTop(u.stk).cursor : -1;
 }
 
 function PauseMenu_Open() {
-    PauseMenu_Ensure();
     var gs = GameState_Get();
-    UI_ModalRootBegin("pause");
-    SFX_PlayUI("ui_openclose");
+    var u = { stk: Ui_StackNew(), opened_ms: current_time, closed_ms: -1, armed: false, pending: "" };
+    var m = Ui_MenuNew("pause", PauseMenu_Items(false), {
+        on_confirm: PauseMenu_OnConfirm, on_back: PauseMenu_OnBack,
+        layout: { title: Loc_T("pause.title", "Paused"), anchor: "center", details: true }
+    });
+    Ui_MenuFixCursor(m, 0);   // a pause always starts on Resume
+    Ui_StackPush(u.stk, m);
+    global.pause_ui = u;
     gs.ui.mode = UI_PAUSE;
-    var pm = gs.ui.pause_menu;
-    pm.open = true;
-    pm.closing = false;
-    pm.close_frame = UI_OPENED_FRAME_NONE;
-    pm.pending_exit_main_menu = false;
-    pm.pending_abandon = false;
-    pm.abandon_armed = false;
-    pm.options[PAUSE_ABANDON_INDEX] = Loc_T("pause.option.abandon", "Abandon Run");
-    pm.index = 0;
-    pm.opened_frame = Input_Frame();
-    gs.ui.pause_menu = pm;
+    SFX_PlayUI("ui_openclose");
 }
 
 function PauseMenu_Close(_immediate = false) {
-    PauseMenu_Ensure();
+    var u = PauseMenu_Get();
+    if (!is_struct(u)) return;
     var gs = GameState_Get();
-    var pm = gs.ui.pause_menu;
     if (_immediate) {
-        UI_ModalRootEnd(false, true);
+        global.pause_ui = undefined;
+        if (gs.ui.mode == UI_PAUSE) gs.ui.mode = UI_NONE;
         SFX_PlayUI("ui_openclose");
-        pm.open = false;
-        pm.closing = false;
-        pm.close_frame = UI_OPENED_FRAME_NONE;
-        pm.pending_exit_main_menu = false;
-        pm.opened_frame = UI_OPENED_FRAME_NONE;
-        gs.ui.pause_menu = pm;
-        gs.ui.mode = UI_NONE;
         return;
     }
-    if (!pm.open || pm.closing) return;
-    UI_ModalRootEnd(false);
+    if (u.closed_ms >= 0) return;
+    u.closed_ms = current_time;
+    Ui_MenuClose(Ui_StackTop(u.stk));
     SFX_PlayUI("ui_openclose");
-    pm.closing = true;
-    pm.close_frame = Input_Frame();
-    gs.ui.pause_menu = pm;
 }
 
-function PauseMenu_ExitToMainMenu() {
-    PauseMenu_Ensure();
-    var gs = GameState_Get();
-    var pm = gs.ui.pause_menu;
-    pm.pending_exit_main_menu = true;
-    gs.ui.pause_menu = pm;
-    PauseMenu_Close(false);
-}
-
+// Once the fade is over: Abandon Run ends the run (a fall that keeps the echo); Quit to Title saves it and goes to the title.
 function PauseMenu_CloseFinalize() {
-    PauseMenu_Ensure();
     var gs = GameState_Get();
-    var pm = gs.ui.pause_menu;
-    var do_exit = pm.pending_exit_main_menu;
-    var do_abandon = pm.pending_abandon;
-
-    pm.open = false;
-    pm.closing = false;
-    pm.close_frame = UI_OPENED_FRAME_NONE;
-    pm.pending_exit_main_menu = false;
-    pm.pending_abandon = false;
-    pm.opened_frame = UI_OPENED_FRAME_NONE;
-    gs.ui.pause_menu = pm;
+    var u = PauseMenu_Get();
+    var pending = is_struct(u) ? u.pending : "";
+    global.pause_ui = undefined;
     if (gs.ui.mode == UI_PAUSE) gs.ui.mode = UI_NONE;
 
-    if (do_abandon) {
+    if (pending == "abandon") {
         Run_Abandon();   // C1 (D92): counts as a death, keeps the echo; the death scene and the echo pick follow
         return;
     }
-
-    if (do_exit) {
+    if (pending == "quit") {
         Run_AutoSave();   // C1 (D46): leaving to the title keeps the run; Continue picks it up
         gs.in_main_menu = true;
         gs.player_inst = noone;
@@ -3301,23 +2540,54 @@ function PauseMenu_CloseFinalize() {
     }
 }
 
-function PauseMenu_IsOpen() {
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui")) return false;
-    return gs.ui.mode == UI_PAUSE;
+function PauseMenu_Disarm() {
+    var u = PauseMenu_Get();
+    if (!is_struct(u) || !u.armed) return;
+    u.armed = false;
+    Ui_StackTop(u.stk).items = PauseMenu_Items(false);
 }
 
-function PauseMenu_NavPressed(_action) {
-    return Input_UIPressed(_action);
+function PauseMenu_OnBack(_m, _res) {
+    PauseMenu_Close();
+}
+
+function PauseMenu_OnConfirm(_m, _i) {
+    var u = PauseMenu_Get();
+    var rid = _m.items[_i].id;
+    if (rid != "abandon") PauseMenu_Disarm();
+    switch (rid) {
+        case "resume":
+            PauseMenu_Close();
+            break;
+        case "help":
+            HelpUi_Open();
+            break;
+        case "settings":
+            SettingsPopup_Open("pause");
+            break;
+        case "abandon":
+            if (!u.armed) {   // the first press asks, the second abandons the run
+                u.armed = true;
+                _m.items = PauseMenu_Items(true);
+            } else {
+                u.pending = "abandon";
+                PauseMenu_Close();
+            }
+            break;
+        case "quit":
+            u.pending = "quit";
+            PauseMenu_Close();
+            break;
+    }
 }
 
 function PauseMenu_HandleInput() {
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "pause_menu")) return;
-    var pm = gs.ui.pause_menu;
-    if (!pm.open) return;
-    var frame = Input_Frame();
-
+    var u = PauseMenu_Get();
+    if (!is_struct(u)) {
+        var gs = GameState_Get();
+        if (gs.ui.mode == UI_PAUSE) gs.ui.mode = UI_NONE;
+        return;
+    }
     if (SettingsPopup_IsOpen("pause")) {
         SettingsPopup_HandleInput();
         return;
@@ -3326,148 +2596,34 @@ function PauseMenu_HandleInput() {
         HelpUi_Handle();
         return;
     }
-
-    if (pm.closing) {
-        if (frame - pm.close_frame >= UI_POPUP_FADE_FRAMES) {
-            PauseMenu_CloseFinalize();
-        } else {
-            gs.ui.pause_menu = pm;
-        }
+    if (u.closed_ms >= 0) {
+        if (current_time - u.closed_ms >= UI_PANEL_MS) PauseMenu_CloseFinalize();
         return;
     }
-
-    var nav_up = PauseMenu_NavPressed("menu_up");
-    var nav_down = PauseMenu_NavPressed("menu_down");
-    var k_ok = Input_UIConfirm();
-    var k_back = Input_UIBack();
-
-    if (k_back) {
-        SFX_PlayUI("ui_back");
-        PauseMenu_Close();
-        return;
-    }
-
-    var count = array_length(pm.options);
-    var prev_idx = pm.index;
-    if (nav_up && pm.index > 0) pm.index -= 1;
-    if (nav_down && pm.index < count - 1) pm.index += 1;
-    if (pm.index != prev_idx) {
-        SFX_PlayUI("ui_move");
-        pm.abandon_armed = false;
-        pm.options[PAUSE_ABANDON_INDEX] = Loc_T("pause.option.abandon", "Abandon Run");
-    }
-
-    if (k_ok) {
-        SFX_PlayUI("ui_confirm");
-        if (pm.index == 0) {
-            PauseMenu_Close();
-            return;
-        } else if (pm.index == 1) {
-            SettingsPopup_Open("pause");
-            gs.ui.pause_menu = pm;
-            return;
-        } else if (pm.index == 2) {
-            HelpUi_Open();
-            gs.ui.pause_menu = pm;
-            return;
-        } else if (pm.index == 3) {
-            PauseMenu_ExitToMainMenu();
-            return;
-        } else if (pm.index == PAUSE_ABANDON_INDEX) {
-            // two presses: the first asks, the second abandons the run
-            if (!pm.abandon_armed) {
-                pm.abandon_armed = true;
-                pm.options[PAUSE_ABANDON_INDEX] = Loc_T("pause.option.abandon_confirm", "Sure? Confirm again");
-            } else {
-                pm.pending_abandon = true;
-                gs.ui.pause_menu = pm;
-                PauseMenu_Close();
-                return;
-            }
-        }
-    }
-
-    gs.ui.pause_menu = pm;
+    var ev = Ui_MenuUpdate(Ui_StackTop(u.stk));
+    if (ev.moved) PauseMenu_Disarm();
 }
 
 function PauseMenu_Draw() {
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui") || !variable_struct_exists(gs.ui, "pause_menu")) return;
-    var pm = gs.ui.pause_menu;
-    if (!pm.open) return;
-
+    var u = PauseMenu_Get();
+    if (!is_struct(u)) return;
+    var now = current_time;
+    var a = (u.closed_ms >= 0) ? (1 - Ui_AnimT(u.closed_ms, now)) : Ui_AnimT(u.opened_ms, now);
+    UI_SetFont();
+    draw_set_alpha(1);
+    Ui_DimBackdrop(0.6 * a);
     if (SettingsPopup_IsOpen("pause")) {
         SettingsPopup_Draw(false);
-        draw_set_alpha(1);
-        return;
-    }
-    if (HelpUi_IsOpen()) {
+    } else if (HelpUi_IsOpen()) {
         HelpUi_Draw();
-        return;
-    }
-
-    UI_SetFont();
-
-    var layout = Menu_GetLayout();
-    var w = layout.w;
-    var h = layout.h;
-    var pad = layout.pad;
-    var line_h = UI_TextHeight("A");
-    var inner_pad = max(6, round(line_h * 0.30), round(pad * 0.6));
-    var row_h = max(18, line_h + inner_pad * 2);
-
-    var option_labels = [
-        Loc_T("pause.option.resume", "Resume"),
-        Loc_T("pause.option.settings", "Settings"),
-        Loc_T("pause.option.help", "Help"),
-        Loc_T("pause.option.exit_main", "Exit to Main Menu")
-    ];
-    var max_w = 0;
-    for (var i = 0; i < array_length(pm.options); i++) {
-        var lbl = (i < array_length(option_labels)) ? option_labels[i] : pm.options[i];
-        max_w = max(max_w, UI_TextWidth(lbl));
-    }
-    var need_w = max_w + inner_pad * 4;
-    var need_h = (row_h * array_length(pm.options)) + inner_pad * 2;
-    var bw = min(w - 24, max(w * 0.35, need_w));
-    var bh = min(h - 24, max(h * 0.24, need_h));
-    var bx = (w - bw) * 0.5;
-    var by = (h - bh) * 0.5;
-    var popup_alpha = UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
-
-    draw_set_alpha(popup_alpha * 0.9);
-    draw_set_color(c_black);
-    draw_rectangle(bx, by, bx + bw, by + bh, false);
-    draw_set_alpha(popup_alpha);
-    draw_set_color(c_white);
-    draw_rectangle(bx, by, bx + bw, by + bh, true);
-    draw_set_alpha(popup_alpha);
-
-    var options = pm.options;
-    var start_y = by + inner_pad;
-    var text_x = bx + inner_pad;
-    var text_max_w = max(24, bw - inner_pad * 2);
-    for (var i = 0; i < array_length(options); i++) {
-        var yy = start_y + i * row_h;
-        var sel = (i == pm.index);
-        var label = (i < array_length(option_labels)) ? option_labels[i] : options[i];
-        if (UI_TextWidth(label) > text_max_w) {
-            while (string_length(label) > 0 && UI_TextWidth(label + "...") > text_max_w) {
-                label = string_delete(label, string_length(label), 1);
-            }
-            label += "...";
-        }
-        if (sel) {
-            draw_set_color(c_white);
-            draw_rectangle(bx + inner_pad - 4, yy - 2, bx + bw - inner_pad + 4, yy + row_h - 2, false);
-            draw_set_color(c_black);
-            draw_rectangle(bx + inner_pad - 4, yy - 2, bx + bw - inner_pad + 4, yy + row_h - 2, true);
-        }
-        draw_set_color(sel ? c_black : c_white);
-        UI_DrawText(text_x, yy, label);
+    } else {
+        var m = Ui_StackTop(u.stk);
+        Ui_MenuDraw(m, Ui_MenuAlpha(m, now));
     }
     draw_set_alpha(1);
+    draw_set_color(c_white);
 }
+
 
 // ==========================================================================================================================
 // UI FRAMEWORK (D0: D95 menu controls, D96 one shared component, D97 motion, D98 fonts, D100 details panel, D101 name tab)
@@ -3481,6 +2637,7 @@ function PauseMenu_Draw() {
 #macro UI_C_DARK $506830         // #306850
 #macro UI_C_LIGHT $6CC086        // #86C06C
 #macro UI_C_LIGHTEST $CFF8E0     // #E0F8CF
+#macro UI_C_TEXT $FFFFFF         // #FFFFFF (D115): item names and list / name text are white; frames, bars and accents keep the four palette colours
 #macro UI_REPEAT_DELAY_MS 300    // D95: hold this long before the list starts to scroll
 #macro UI_REPEAT_START_MS 140    // the first repeat gap; each next one is 20 percent shorter ...
 #macro UI_REPEAT_MIN_MS 45       // ... down to this
@@ -3634,6 +2791,12 @@ function Ui_SnapNew() {
     };
 }
 
+// The mouse in GUI units from our own layout (window pixels minus the picture's corner, over the integer UI scale).
+function Ui_MousePos() {
+    var lay = Display_Layout();
+    return { x: (window_mouse_get_x() - lay.gui_x) / lay.ui_scale, y: (window_mouse_get_y() - lay.gui_y) / lay.ui_scale };
+}
+
 // From the game's own input actions, so the keyboard, the pad and the bot all drive menus the same way. Confirm / back are
 // Input_UIConfirm / Input_UIBack (today Space / Esc and pad A / B: see the report on D95's Z, Enter, X).
 function Ui_ReadInput() {
@@ -3649,9 +2812,9 @@ function Ui_ReadInput() {
     s.confirm = Input_UIConfirm();
     s.back = Input_UIBack();
     s.tab = (Input_Pressed("tab_next") ? 1 : 0) - (Input_Pressed("tab_prev") ? 1 : 0);   // bound by the screens that have tabs
-    var lay = Display_Layout();   // the mouse in GUI units from our own layout (window pixels minus the picture's corner, over the integer UI scale)
-    s.mx = (window_mouse_get_x() - lay.gui_x) / lay.ui_scale;
-    s.my = (window_mouse_get_y() - lay.gui_y) / lay.ui_scale;
+    var mp = Ui_MousePos();
+    s.mx = mp.x;
+    s.my = mp.y;
     if (!variable_global_exists("ui_mouse") || !is_struct(global.ui_mouse)) global.ui_mouse = { x: s.mx, y: s.my };
     s.mouse_moved = (s.mx != global.ui_mouse.x || s.my != global.ui_mouse.y);
     global.ui_mouse.x = s.mx;
@@ -3668,7 +2831,11 @@ function Ui_ReadInput() {
 // Battle (D99) fields: x_anchor ("center" | "left" | "right"), panel_w (fixed width), y_bottom (the block's bottom edge), max_h (most height it may
 // take), details_pos ("below" | "above"), details_cols (number lines side by side), rows_max (most rows shown).
 // Item fields besides label / value / help / lines / enabled / kind: icon { cat, frame } (an Icon_Get picture) or { spr, sub }, seq (arrow
-// directions drawn in the details panel under the sentence), dim (greyed but still selectable). After a draw m.rect and m.det_rect hold the panel and details rectangles.
+// directions drawn in the details panel under the sentence), dim (greyed but still selectable), kind "head" (a section title: light green, never selected).
+// Tab menu (D90) fields: y_top (the list's top edge), details_pos "right" (the details panel stands beside the list, det_w wide (0 = the rest of the
+// width), from det_top (default: the list's top) and det_h tall (default: as tall as the list)), det_art (the details panel starts with the item's or enemy's picture: item field pic { spr, sub } or icon_item).
+// Number lines may carry delta (-1 / 0 / +1): a small arrow shows before the value (a better or worse number).
+// After a draw m.rect and m.det_rect hold the panel and details rectangles.
 function Ui_MenuNew(_id, _items, _opts) {
     var m = {
         id: _id, items: _items, cursor: 0, top: 0, rects: [],
@@ -3676,7 +2843,8 @@ function Ui_MenuNew(_id, _items, _opts) {
         on_confirm: undefined, on_back: undefined, on_adjust: undefined,
         owner: noone, data: {}, lock_ms: current_time,
         layout: { title: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false,
-                  x_anchor: "center", panel_w: 0, y_bottom: -1, max_h: 0, details_pos: "below", details_cols: 1, rows_max: 0 },
+                  x_anchor: "center", panel_w: 0, y_bottom: -1, max_h: 0, details_pos: "below", details_cols: 1, rows_max: 0,
+                  y_top: -1, det_w: 0, det_art: false, det_top: -1, det_h: -1 },
         rect: { x: 0, y: 0, w: 0, h: 0 }, det_rect: { x: 0, y: 0, w: 0, h: 0 },
         opened_ms: current_time, closed_ms: -1, cur_y: -1, last_draw_ms: current_time
     };
@@ -3829,10 +2997,23 @@ function Ui_Box(_x1, _y1, _x2, _y2, _col) {
     draw_rectangle(_x1, _y1, _x2 - 1, _y2 - 1, false);
 }
 
+// D115: THE text style, in one place. The palette's pale colour is the "main text" role and is drawn white (readability); every other colour
+// (the light green accents and labels, the dark green of a greyed row, the dark text on a light plate) is drawn as asked.
+function Ui_TextColor(_col) {
+    return (_col == UI_C_LIGHTEST) ? UI_C_TEXT : _col;
+}
+
+// The colour of a list row's text: white (selected or not); the light green when it cannot be afforded but may be read; the dark green when it is greyed.
+function Ui_RowColor(_sel, _enabled, _dim) {
+    if (!_enabled) return UI_C_DARK;
+    if (_dim) return UI_C_LIGHT;
+    return UI_C_TEXT;
+}
+
 function Ui_Text(_x, _y, _txt, _col, _halign = fa_left) {
     draw_set_halign(_halign);
     draw_set_valign(fa_top);
-    draw_set_color(_col);
+    draw_set_color(Ui_TextColor(_col));
     UI_DrawText(round(_x), round(_y), _txt);
     draw_set_halign(fa_left);
 }
@@ -3887,27 +3068,67 @@ function Ui_DrawNameTab(_x, _y, _name, _alpha = 1) {
     return { x: tx, y: ty, w: w, h: h };
 }
 
-// Tabs header (Q / E, or the shoulder buttons with a pad): labels left to right, the active one filled. Returns its height.
-function Ui_DrawTabs(_x, _y, _w, _labels, _active, _alpha = 1) {
+// An 8 x 8 pixel mask ('.' clear, anything else set) drawn in one colour, _p GUI units per pixel.
+function Ui_DrawMask(_x, _y, _rows, _p, _col) {
+    for (var r = 0; r < array_length(_rows); r++) {
+        var row = _rows[r];
+        var c = 1;
+        var n = string_length(row);
+        while (c <= n) {
+            if (string_char_at(row, c) == ".") { c++; continue; }
+            var c1 = c;
+            while (c1 < n && string_char_at(row, c1 + 1) != ".") c1++;
+            Ui_Box(_x + (c - 1) * _p, _y + r * _p, _x + c1 * _p, _y + (r + 1) * _p, _col);
+            c = c1 + 1;
+        }
+    }
+}
+
+// Tabs header (Q / E, or the shoulder buttons with a pad), the active tab filled light. Returns its height. The rectangle of each tab is kept in
+// global.ui_tabs_rects for the mouse. With _icons (one 8 x 8 mask per tab) only the active tab shows its name and every other tab is its icon, so
+// the row fits at every text size; without them every label is drawn (white on the dark ones, D115).
+function Ui_DrawTabs(_x, _y, _w, _labels, _active, _alpha = 1, _icons = undefined) {
     var mt = Ui_Metrics();
     var p = mt.p;
     var info_l = Prompt_Info("tab_prev");   // D92: Q / E, or LB / RB with a pad in hand
     var info_r = Prompt_Info("tab_next");
     var th = mt.line_h + 2 * p;
+    var n = array_length(_labels);
+    var use_icons = is_array(_icons);
+    var gl = Prompt_GlyphW(info_l);
+    var gr = Prompt_GlyphW(info_r);
+    var avail = _w - gl - gr - 4 * p;
+    var pad = 2 * p;   // each side of a tab's content
+    var widths = array_create(n);
+    var total = 0;
+    for (var i = 0; i < n; i++) {
+        widths[i] = use_icons ? (8 * p + 2 * pad + ((i == _active) ? 2 * p + UI_TextWidth(_labels[i]) : 0)) : (UI_TextWidth(_labels[i]) + 2 * pad);
+        total += widths[i] + ((i > 0) ? p : 0);
+    }
+    if (!use_icons && total > avail) {   // text tabs: thinner padding first, then it is what it is
+        pad = p;
+        total = 0;
+        for (var i2 = 0; i2 < n; i2++) { widths[i2] = UI_TextWidth(_labels[i2]) + 2 * pad; total += widths[i2] + ((i2 > 0) ? p : 0); }
+    }
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
-    var tx = _x;
-    tx += Prompt_DrawGlyph(tx, _y + (th - Prompt_GlyphH()) div 2, info_l, _alpha) + 2 * p;
-    for (var i = 0; i < array_length(_labels); i++) {
-        var lw = UI_TextWidth(_labels[i]) + 4 * p;
-        var on = (i == _active);
-        Ui_Box(tx, _y, tx + lw, _y + th, on ? UI_C_LIGHTEST : UI_C_DARK);
-        Ui_Text(tx + 2 * p, _y + p, _labels[i], on ? UI_C_DARKEST : UI_C_LIGHT);
-        tx += lw + p;
+    Prompt_DrawGlyph(_x, _y + (th - Prompt_GlyphH()) div 2, info_l, _alpha);
+    var tx = _x + gl + 2 * p + max(0, floor((avail - total) / 2 / p) * p);
+    var rects = array_create(n);
+    for (var j = 0; j < n; j++) {
+        var on = (j == _active);
+        Ui_Box(tx, _y, tx + widths[j], _y + th, on ? UI_C_LIGHTEST : UI_C_DARK);
+        if (use_icons) {
+            Ui_DrawMask(tx + pad, _y + (th - 8 * p) div 2, _icons[j], p, on ? UI_C_DARKEST : UI_C_TEXT);
+            if (on) Ui_Text(tx + pad + 10 * p, _y + p, _labels[j], UI_C_DARKEST);
+        } else {
+            Ui_Text(tx + pad, _y + p, _labels[j], on ? UI_C_DARKEST : UI_C_TEXT);
+        }
+        rects[j] = { x: tx, y: _y, w: widths[j], h: th };
+        tx += widths[j] + p;
     }
-    var rw = Prompt_GlyphW(info_r);
-    tx = max(tx + p, _x + _w - rw);
-    Prompt_DrawGlyph(tx, _y + (th - Prompt_GlyphH()) div 2, info_r, _alpha);
+    global.ui_tabs_rects = rects;
+    Prompt_DrawGlyph(_x + _w - gr, _y + (th - Prompt_GlyphH()) div 2, info_r, _alpha);
     draw_set_alpha(a0);
     return th;
 }
@@ -3924,7 +3145,7 @@ function Ui_TextBlock(_x, _y, _txt, _w, _col) {
     var s = max(0.0001, UI_GetFontScale());
     draw_set_halign(fa_left);
     draw_set_valign(fa_top);
-    draw_set_color(_col);
+    draw_set_color(Ui_TextColor(_col));
     draw_text_ext_transformed(round(_x), round(_y), string(_txt), -1, max(1, round(_w / s)), s, s, 0);
 }
 
@@ -3937,16 +3158,67 @@ function Ui_FitText(_txt, _max_w) {
     return t + "..";
 }
 
-function Ui_DetailsHeight(_w, _sentence, _lines, _cols = 1, _seq_n = 0) {
+// The picture a menu item brings to a details panel (D90): an enemy portrait { spr, sub } in item.pic, or an item's icon in item.icon_item.
+function Ui_ArtKind(_it) {
+    if (!is_struct(_it)) return "";
+    if (variable_struct_exists(_it, "pic") && is_struct(_it.pic) && sprite_exists(_it.pic.spr)) return "pic";
+    if (variable_struct_exists(_it, "icon_item") && is_struct(_it.icon_item)) {
+        var ic = Item_IconSprite(_it.icon_item);
+        if (ic.spr != noone || array_length(Item_GlyphRows(_it.icon_item)) > 0) return "item";
+    }
+    return "";
+}
+
+// Side of the square picture box, in GUI units (32 font pixels).
+function Ui_ArtSize() {
+    return 32 * Ui_Px();
+}
+
+// Draws the item's picture in a dark box centred on _cx with its top at _y. Returns the height used.
+function Ui_DrawArt(_cx, _y, _it, _alpha = 1) {
+    var kind = Ui_ArtKind(_it);
+    if (kind == "") return 0;
+    var p = Ui_Px();
+    var side = Ui_ArtSize();
+    var bx = round(_cx - side / 2);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    Ui_Box(bx, _y, bx + side, _y + side, UI_C_DARK);
+    Ui_Box(bx + p, _y + p, bx + side - p, _y + side - p, UI_C_DARKEST);
+    if (kind == "pic") {
+        var spr = _it.pic.spr;
+        var dim = max(1, max(sprite_get_width(spr), sprite_get_height(spr)));
+        var sc = max(1, floor((side - 4 * p) / dim));   // whole multiples only: the pixels stay square
+        var dw = sprite_get_width(spr) * sc;
+        var dh = sprite_get_height(spr) * sc;
+        draw_sprite_ext(spr, _it.pic.sub, bx + round((side - dw) / 2) + sprite_get_xoffset(spr) * sc, _y + round((side - dh) / 2) + sprite_get_yoffset(spr) * sc, sc, sc, 0, c_white, _alpha);   // the origin is where the picture is placed
+    } else {
+        var isz = side - 8 * p;
+        Item_DrawIcon(_it.icon_item, bx + round((side - isz) / 2), _y + round((side - isz) / 2), isz, _alpha);
+    }
+    draw_set_alpha(a0);
+    return side;
+}
+
+// A small arrow before a number: up when the number gets better, down when it gets worse. 5p wide, 3p tall.
+function Ui_DeltaMark(_x, _y, _dir, _p, _col) {
+    for (var i = 0; i < 3; i++) {
+        var row = (_dir > 0) ? i : (2 - i);
+        Ui_Box(_x + (2 - row) * _p, _y + i * _p, _x + (3 + row) * _p, _y + (i + 1) * _p, _col);
+    }
+}
+
+function Ui_DetailsHeight(_w, _sentence, _lines, _cols = 1, _seq_n = 0, _art = undefined) {
     var mt = Ui_Metrics();
     var inner = _w - 2 * (4 * mt.p);
     var h = 2 * (2 * mt.p + mt.pad) + Ui_TextBlockH(_sentence, inner);
+    if (Ui_ArtKind(_art) != "") h += Ui_ArtSize() + 2 * mt.p;
     if (_seq_n > 0) h += 13 * max(1, round(mt.p / 2)) + mt.p;
     if (array_length(_lines) > 0) h += mt.p * 2 + ceil(array_length(_lines) / max(1, _cols)) * (mt.line_h + mt.p);
     return h;
 }
 
-function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1, _cols = 1, _seq = []) {
+function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1, _cols = 1, _seq = [], _art = undefined) {
     var mt = Ui_Metrics();
     var p = mt.p;
     Ui_DrawFrame(_x, _y, _w, _h, _alpha, p);
@@ -3955,6 +3227,7 @@ function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1, _cols = 1
     var x0 = _x + 4 * p;
     var x1 = _x + _w - 4 * p;
     var ty0 = _y + 4 * p;
+    if (Ui_ArtKind(_art) != "") ty0 += Ui_DrawArt((x0 + x1) / 2, ty0, _art, _alpha) + 2 * p;
     Ui_TextBlock(x0, ty0, _sentence, x1 - x0, UI_C_LIGHTEST);
     ty0 += Ui_TextBlockH(_sentence, x1 - x0);
     if (array_length(_seq) > 0) {   // the arrows to press (D100), in a dark strip like the card's
@@ -3969,8 +3242,12 @@ function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1, _cols = 1
         var col_w = (x1 - x0 - (cols - 1) * 3 * p) / cols;
         for (var i = 0; i < array_length(_lines); i++) {
             var cx0 = x0 + (i mod cols) * (col_w + 3 * p);
-            Ui_Text(cx0, ty0, _lines[i].label, UI_C_LIGHT);
+            var vtxt = string(_lines[i].value);
+            Ui_Text(cx0, ty0, Ui_FitText(_lines[i].label, col_w - UI_TextWidth(vtxt) - 4 * p), UI_C_LIGHT);   // a long label gives way to the number
             Ui_Text(cx0 + col_w, ty0, _lines[i].value, UI_C_LIGHTEST, fa_right);
+            if (variable_struct_exists(_lines[i], "delta") && _lines[i].delta != 0) {
+                Ui_DeltaMark(cx0 + col_w - UI_TextWidth(_lines[i].value) - 7 * p, ty0 + (mt.line_h - 3 * p) div 2, _lines[i].delta, p, (_lines[i].delta > 0) ? UI_C_LIGHTEST : UI_C_LIGHT);
+            }
             if ((i mod cols) == cols - 1 || i == array_length(_lines) - 1) ty0 += mt.line_h + p;
         }
     }
@@ -4022,7 +3299,10 @@ function Ui_MenuDraw(_m, _alpha = 1) {
 
     // the details panel's height is the tallest sentence, so the list does not jump between items
     var det_h = 0;
-    if (L.details && L.details_pos == "above" && n > 0) {   // a panel above the list (battle) is as tall as the highlighted item needs: it grows upward
+    var det_right = (L.details && L.details_pos == "right");   // D90: beside the list, as tall as the list (the Tab menu)
+    if (det_right) {
+        det_h = 0;
+    } else if (L.details && L.details_pos == "above" && n > 0) {   // a panel above the list (battle) is as tall as the highlighted item needs: it grows upward
         var dc = _m.items[clamp(_m.cursor, 0, n - 1)];
         if (variable_struct_exists(dc, "help")) det_h = Ui_DetailsHeight(panel_w, dc.help, variable_struct_exists(dc, "lines") ? dc.lines : [], L.details_cols, variable_struct_exists(dc, "seq") ? array_length(dc.seq) : 0);
     } else if (L.details) {
@@ -4033,14 +3313,16 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     }
     var avail_h = ((L.max_h > 0) ? L.max_h : (mt.gh - 2 * mt.margin)) - ((det_h > 0) ? det_h + mt.margin : 0);
     var rows_vis = clamp(floor((avail_h - chrome_y) / mt.row_h), 1, max(1, n));
+    if (det_right) rows_vis = max(1, floor((avail_h - chrome_y) / mt.row_h));   // the panel keeps its size whatever the row count
     if (L.rows_max > 0) rows_vis = min(rows_vis, L.rows_max);
-    var panel_h = chrome_y + rows_vis * mt.row_h;
+    var panel_h = det_right ? avail_h : (chrome_y + rows_vis * mt.row_h);
     var total_h = panel_h + ((det_h > 0) ? mt.margin + det_h : 0);
     var px = round((mt.gw - panel_w) / 2);
     if (L.x_anchor == "right") px = mt.gw - mt.margin - panel_w;
     else if (L.x_anchor == "left") px = mt.margin;
     var py;
-    if (L.y_bottom >= 0) py = max(mt.margin, round(L.y_bottom - total_h));
+    if (L.y_top >= 0) py = L.y_top;
+    else if (L.y_bottom >= 0) py = max(mt.margin, round(L.y_bottom - total_h));
     else if (L.anchor == "bottom") py = clamp(round(mt.gh * L.y_frac), mt.margin, max(mt.margin, mt.gh - mt.margin - total_h));
     else py = max(mt.margin, round((mt.gh - total_h) / 2));
     var slide = p * round((1 - _alpha) * 3);   // slides down into place in three pixel steps
@@ -4050,6 +3332,10 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var det_y = det_above ? py : (py + panel_h + mt.margin);
     _m.rect = { x: px, y: list_y, w: panel_w, h: panel_h };
     _m.det_rect = (det_h > 0) ? { x: px, y: det_y, w: panel_w, h: det_h } : { x: 0, y: 0, w: 0, h: 0 };
+    if (det_right) {
+        var dx = px + panel_w + mt.margin;
+        _m.det_rect = { x: dx, y: ((L.det_top >= 0) ? L.det_top - slide : list_y), w: (L.det_w > 0) ? L.det_w : max(0, mt.gw - mt.margin - dx), h: (L.det_h >= 0) ? L.det_h : panel_h };
+    }
 
     _m.top = Ui_ScrollTop(_m.cursor, _m.top, rows_vis, n);
     Ui_DrawFrame(px, list_y, panel_w, panel_h, _alpha, p);
@@ -4059,7 +3345,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var x1 = px + panel_w - 4 * p;
     var ty0 = list_y + 4 * p;
     if (L.title != "") {
-        Ui_Text(x0, ty0, L.title, UI_C_LIGHT);
+        Ui_Text(x0, ty0, L.title, UI_C_LIGHTEST);
         Ui_Box(px + 3 * p, ty0 + mt.line_h + p, px + panel_w - 3 * p, ty0 + mt.line_h + 2 * p, UI_C_DARK);
         ty0 += header_h;
     }
@@ -4089,7 +3375,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         var en = Ui_ItemEnabled(row);
         var kd = variable_struct_exists(row, "kind") ? row.kind : "button";
         var dim = variable_struct_exists(row, "dim") && row.dim;   // looks unavailable but can be selected (a shop row you cannot pay for, a skill you lack the MP for)
-        var col = !en ? UI_C_DARK : (dim ? (sel ? UI_C_LIGHT : UI_C_DARK) : (sel ? UI_C_LIGHTEST : UI_C_LIGHT));
+        var col = (kd == "head") ? UI_C_LIGHT : Ui_RowColor(sel, en, dim);   // D115: names are white, selected or not
         var label_x = x0 + 5 * p;
         if (icon_px > 0) {   // { cat, frame }: an Icon_Get picture (skills, statuses)
             if (variable_struct_exists(row, "icon") && is_struct(row.icon)) {
@@ -4144,6 +3430,13 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         var cur = _m.items[_m.cursor];
         if (variable_struct_exists(cur, "help")) {
             Ui_DrawDetails(px, det_y, panel_w, det_h, cur.help, variable_struct_exists(cur, "lines") ? cur.lines : [], _alpha, L.details_cols, variable_struct_exists(cur, "seq") ? cur.seq : []);
+        }
+    }
+    if (det_right && n > 0 && _m.det_rect.w > 0) {
+        var rc = _m.items[clamp(_m.cursor, 0, n - 1)];
+        if (variable_struct_exists(rc, "help")) {
+            var dr = _m.det_rect;
+            Ui_DrawDetails(dr.x, dr.y, dr.w, dr.h, rc.help, variable_struct_exists(rc, "lines") ? rc.lines : [], _alpha, L.details_cols, variable_struct_exists(rc, "seq") ? rc.seq : [], L.det_art ? rc : undefined);
         }
     }
     draw_set_alpha(a0);

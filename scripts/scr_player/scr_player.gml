@@ -1028,26 +1028,11 @@ function UI_InterruptCloseAll(_fade_dim = true) {
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
 
     // Immediately hide all modal/popups to avoid stale mode locks during transitions.
-    if (variable_struct_exists(gs.ui, "menu") && is_struct(gs.ui.menu)) {
-        var m = gs.ui.menu;
-        m.open = false;
-        m.closing = false;
-        m.close_frame = UI_OPENED_FRAME_NONE;
-        m.inv_popup_open = false;
-        m.inv_popup_closing = false;
-        m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
-        m.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
-        gs.ui.menu = m;
+    if (is_struct(TabMenu_Get())) {   // D1b: the Tab menu and the pause menu are framework screens held in globals
+        TabSettings_Discard();
+        global.tab_ui = undefined;
     }
-
-    if (variable_struct_exists(gs.ui, "pause_menu") && is_struct(gs.ui.pause_menu)) {
-        var pm = gs.ui.pause_menu;
-        pm.open = false;
-        pm.closing = false;
-        pm.close_frame = UI_OPENED_FRAME_NONE;
-        pm.opened_frame = UI_OPENED_FRAME_NONE;
-        gs.ui.pause_menu = pm;
-    }
+    if (is_struct(PauseMenu_Get())) global.pause_ui = undefined;
 
     if (variable_struct_exists(gs.ui, "save_menu") && is_struct(gs.ui.save_menu)) {
         var sm = gs.ui.save_menu;
@@ -1109,34 +1094,7 @@ function UI_GetModalVisualAlpha() {
         }
     }
 
-    if (SettingsPopup_IsOpen("pause") && variable_struct_exists(gs.ui, "settings_popup")) {
-        var sp_alpha = SettingsPopup_Alpha();
-
-        // Linked modal chain: while pause owns the stack and opens Settings,
-        // keep dim sourced from the stronger of parent/child alpha so dim
-        // never drops during handoff frames.
-        if (gs.ui.mode == UI_PAUSE && variable_struct_exists(gs.ui, "pause_menu")) {
-            var pm = gs.ui.pause_menu;
-            var pm_alpha = UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
-            return max(sp_alpha, pm_alpha);
-        }
-
-        return sp_alpha;
-    }
-
     switch (gs.ui.mode) {
-        case UI_MENU:
-            if (variable_struct_exists(gs.ui, "menu")) {
-                var m = gs.ui.menu;
-                return UI_PopupAlpha(m.opened_frame, m.closing, m.close_frame, 1);
-            }
-            break;
-        case UI_PAUSE:
-            if (variable_struct_exists(gs.ui, "pause_menu")) {
-                var pm = gs.ui.pause_menu;
-                return UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
-            }
-            break;
         case UI_SAVE:
             if (variable_struct_exists(gs.ui, "save_menu")) {
                 var sm = gs.ui.save_menu;
