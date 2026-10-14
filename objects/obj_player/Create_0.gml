@@ -66,7 +66,6 @@ bump_dx = 0;
 bump_dy = 0;
 bump_applied = false;
 prompt_target = noone; // interactable the player faces right now (drives the prompt)
-fx_set = false;
 auto_resolve_recover_timer = 0;
 auto_resolve_recover_total = 0;
 auto_resolve_recover_progress = 0;

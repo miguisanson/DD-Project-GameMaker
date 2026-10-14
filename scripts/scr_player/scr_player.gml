@@ -8,14 +8,8 @@ function CharacterCreate_Player(_class_id) {
     ch.exp = 0;
     ch.exp_next = Exp_NextLevel(ch.level);
 
-    ch.stats = StatsCreateBase();
-    // apply class bonus
-    ch.stats.str  += ch.class_cfg.bonus.str;
-    ch.stats.agi  += ch.class_cfg.bonus.agi;
-    ch.stats.def  += ch.class_cfg.bonus.def;
-    ch.stats.intt += ch.class_cfg.bonus.intt;
-    ch.stats.luck += ch.class_cfg.bonus.luck;
-    ch.stats = StatsClampAll(ch.stats);
+    // Level-1 stats of the class (combat-spec.md section 2).
+    ch.stats = StatsClampAll({ atk: ch.class_cfg.stats.atk, def: ch.class_cfg.stats.def, spd: ch.class_cfg.stats.spd, mag: ch.class_cfg.stats.mag });
 
     // RecomputeResources reads hp/mp, so they must exist first; a new character then starts full.
     ch.hp = 0;
@@ -64,55 +58,17 @@ function Difficulty_Label(_difficulty = -1) {
     }
 }
 
+// D35: ONE difficulty. Whatever difficulty id is saved (the id only survives for the title screen and the save format until the UI
+// packets drop it), the profile is the same. The single knob is the QTE assist multiplier on damage the PLAYER takes (1 = off);
+// the assist setting writes global.assist_damage_taken_mult (combat-spec.md section 5).
 function Difficulty_Profile(_difficulty = -1) {
-    var d = _difficulty;
-    if (argument_count <= 0 || d == -1) d = Difficulty_GetCurrent();
-    d = Difficulty_Normalize(d);
-
-    switch (d) {
-        case DIFFICULTY_EASY:
-            return {
-                id: DIFFICULTY_EASY,
-                player_stat_mult: 1.00,
-                enemy_stat_mult: 1.00,
-                player_hp_mult: 1.15,
-                player_mp_mult: 1.05,
-                enemy_hp_mult: 0.90,
-                enemy_mp_mult: 0.95,
-                player_damage_mult: 1.08,
-                enemy_damage_mult: 0.90,
-                enemy_status_chance_mult: 0.90,
-                player_exp_mult: 1.20
-            };
-        case DIFFICULTY_HARD:
-            return {
-                id: DIFFICULTY_HARD,
-                player_stat_mult: 1.00,
-                enemy_stat_mult: 1.00,
-                player_hp_mult: 0.92,
-                player_mp_mult: 0.95,
-                enemy_hp_mult: 1.12,
-                enemy_mp_mult: 1.00,
-                player_damage_mult: 0.94,
-                enemy_damage_mult: 1.12,
-                enemy_status_chance_mult: 1.08,
-                player_exp_mult: 0.85
-            };
-        default:
-            return {
-                id: DIFFICULTY_NORMAL,
-                player_stat_mult: 1.00,
-                enemy_stat_mult: 1.00,
-                player_hp_mult: 1.00,
-                player_mp_mult: 1.00,
-                enemy_hp_mult: 1.00,
-                enemy_mp_mult: 1.00,
-                player_damage_mult: 1.00,
-                enemy_damage_mult: 1.00,
-                enemy_status_chance_mult: 1.00,
-                player_exp_mult: 1.00
-            };
-    }
+    var assist = 1;
+    if (variable_global_exists("assist_damage_taken_mult")) assist = clamp(real(global.assist_damage_taken_mult), 0, 1);
+    return {
+        id: DIFFICULTY_NORMAL,
+        assist_damage_taken_mult: assist,
+        player_exp_mult: 1.00
+    };
 }
 
 function Difficulty_SetCurrent(_difficulty) {

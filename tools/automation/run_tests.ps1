@@ -10,7 +10,7 @@
 param(
     [ValidateSet('fast', 'full', 'compile')][string]$Mode = 'fast',
     [switch]$NegativeControl,
-    [ValidateSet('', 'runtests', 'smoke', 'bot', 'shots', 'gridshots')][string]$Only = '',   # run just this game mode (with fast/full)
+    [ValidateSet('', 'runtests', 'smoke', 'bot', 'shots', 'gridshots', 'exportdata')][string]$Only = '',   # run just this game mode (with fast/full)
     [string]$ProjectDir = '',                  # default: repo root of this script
     [string]$WorkRoot = 'E:\Temp\dd-gate'      # test hook: point at C:\ to see the drive guard refuse
 )
@@ -22,7 +22,8 @@ $GameModes = @(
     @{ Name = 'runtests'; Flag = '-runtests'; Timeout = 30;  Impl = $true;  Strict = $true  }
     @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 130;  Impl = $true;  Strict = $false }
     @{ Name = 'bot';      Flag = '-bot';      Timeout = 300; Impl = $true;  Strict = $false }
-    @{ Name = 'shots';    Flag = '-shots';    Timeout = 300; Impl = $true;  Strict = $false; Shots = 73 }   # Shots = number of [SHOT] lines required.
+    @{ Name = 'shots';    Flag = '-shots';    Timeout = 300; Impl = $true;  Strict = $false; Shots = 77 }   # Shots = number of [SHOT] lines required.
+    @{ Name = 'exportdata'; Flag = '-exportdata'; Timeout = 60; Impl = $true;  Strict = $false; Export = $true; Explicit = $true }   # B1: the game's classes/enemies/skills/items/statuses/level table as JSON -> <WorkRoot>\export\export_data.json. Run with -Only exportdata.
     @{ Name = 'gridshots'; Flag = '-gridshots'; Timeout = 120; Impl = $true;  Strict = $false; Shots = 11; ShotDir = 'gridshots'; Explicit = $true }   # D65: 16 px grid over every floor room -> <WorkRoot>\gridshots. Not part of -Mode full: run with -Only gridshots.
 )
 $BuildTimeout = 300
@@ -213,6 +214,59 @@ public static class ShotCheck {
             } finally { bmp.UnlockBits(d); }
         }
     }
+    // A1 (I-056/I-058/I-059): picture A (world marks on) against picture B (marks off), both in PNG pixels, offset (ox, oy) removed from every coordinate.
+    //   boxes = x,y,w,h ... (places where a difference is allowed); ring = cx,cy,r,tol (an annulus where one is allowed); corner = x,y,n.
+    //   rp / bp = probe x,y ... that must DIFFER between A and B (within 1 px); ap = x,y ... that must be exactly the outline colour #071821 in A.
+    // Returns: [0] differing pixels outside every allowed place, [1] differing pixels in the corner square, [2],[3] first stray pixel,
+    //          [4] ring probes that differ, [5] ring probes, [6] "!" probes that differ, [7] "!" probes, [8] outline probes that match (best bob group), [9] outline probes per group, [10] differing pixels in all.
+    public static double[] World(string pa, string pb, int ox, int oy, int[] boxes, double[] ring, int[] corner, int[] rp, int[] bp, int[] ap) {
+        using (Bitmap A = new Bitmap(pa)) using (Bitmap B = new Bitmap(pb)) {
+            int W = A.Width, H = A.Height;
+            if (B.Width != W || B.Height != H) return new double[] { -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+            BitmapData da = A.LockBits(new Rectangle(0, 0, W, H), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            BitmapData db = B.LockBits(new Rectangle(0, 0, W, H), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try {
+                byte[] a = new byte[Math.Abs(da.Stride) * H]; byte[] b = new byte[Math.Abs(db.Stride) * H];
+                System.Runtime.InteropServices.Marshal.Copy(da.Scan0, a, 0, a.Length);
+                System.Runtime.InteropServices.Marshal.Copy(db.Scan0, b, 0, b.Length);
+                int stride = da.Stride;
+                double[] r = new double[11];
+                r[2] = -1; r[3] = -1;
+                for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) {
+                    int o = y * stride + x * 4;
+                    if (a[o] == b[o] && a[o + 1] == b[o + 1] && a[o + 2] == b[o + 2]) continue;
+                    r[10]++;
+                    int px = x + ox, py = y + oy;   // back to window pixels, the game's coordinates
+                    if (px >= corner[0] && px < corner[0] + corner[2] && py >= corner[1] && py < corner[1] + corner[2]) r[1]++;
+                    bool ok = false;
+                    for (int i = 0; i + 3 < boxes.Length && !ok; i += 4) ok = px >= boxes[i] && px < boxes[i] + boxes[i + 2] && py >= boxes[i + 1] && py < boxes[i + 1] + boxes[i + 3];
+                    if (!ok && ring.Length == 4) { double d = Math.Sqrt((px - ring[0]) * (px - ring[0]) + (py - ring[1]) * (py - ring[1])); ok = Math.Abs(d - ring[2]) <= ring[3]; }
+                    if (!ok) { r[0]++; if (r[2] < 0) { r[2] = px; r[3] = py; } }
+                }
+                for (int i = 0; i + 1 < rp.Length; i += 2) { r[5]++; if (Differs(a, b, stride, W, H, rp[i] - ox, rp[i + 1] - oy)) r[4]++; }
+                for (int i = 0; i + 1 < bp.Length; i += 2) { r[7]++; if (Differs(a, b, stride, W, H, bp[i] - ox, bp[i + 1] - oy)) r[6]++; }
+                // ap = groups of 7 probes (14 ints), one group per arrow bob height: the picture shows one of them, so the best group counts
+                r[9] = 7;
+                for (int g = 0; g + 13 < ap.Length; g += 14) {
+                    int hit = 0;
+                    for (int i = g; i < g + 14; i += 2) {
+                        int x = ap[i] - ox, y = ap[i + 1] - oy;
+                        if (x >= 0 && y >= 0 && x < W && y < H) { int o = y * stride + x * 4; if (a[o + 2] == 7 && a[o + 1] == 24 && a[o] == 33) hit++; }   // BGRA
+                    }
+                    if (hit > r[8]) r[8] = hit;
+                }
+                return r;
+            } finally { A.UnlockBits(da); B.UnlockBits(db); }
+        }
+    }
+    static bool Differs(byte[] a, byte[] b, int stride, int W, int H, int cx, int cy) {
+        for (int y = cy - 1; y <= cy + 1; y++) for (int x = cx - 1; x <= cx + 1; x++) {
+            if (x < 0 || y < 0 || x >= W || y >= H) continue;
+            int o = y * stride + x * 4;
+            if (a[o] != b[o] || a[o + 1] != b[o + 1] || a[o + 2] != b[o + 2]) return true;
+        }
+        return false;
+    }
     static double Line(byte[] buf, int stride, int W, int H, int x0, int y0, int w, int h) {
         long n = 0, nb = 0;
         for (int y = y0; y < y0 + h; y++) for (int x = x0; x < x0 + w; x++) {
@@ -236,11 +290,13 @@ function Test-Shots([string[]]$lines, [int]$expect, [string]$dirKey = 'shots') {
     Get-ChildItem $D.save -Recurse -Filter 'shot_*.png' -File -ErrorAction SilentlyContinue | ForEach-Object { Copy-Item $_.FullName $shotDir -Force }
     $rows = @($lines | Where-Object { $_ -match '^\[SHOT\] file=(\S+) w=(\d+) h=(\d+)' } | ForEach-Object {
         $line = $_
-        $o = [ordered]@{ File = $null; W = 0; H = 0; Rect = $null; App = $null; Edge = $false; Art = $false; Fade = $false }
+        $o = [ordered]@{ File = $null; W = 0; H = 0; Rect = $null; App = $null; Edge = $false; Art = $false; Fade = $false; Pair = $null; cornerxy = $null; ringc = $null; rp = $null; bp = $null; ap = $null; boxes = $null }
         $null = $line -match '^\[SHOT\] file=(\S+) w=(\d+) h=(\d+)'; $o.File = $Matches[1]; $o.W = [int]$Matches[2]; $o.H = [int]$Matches[3]
         if ($line -match ' gx=(-?\d+) gy=(-?\d+) gw=(\d+) gh=(\d+)') { $o.Rect = @([int]$Matches[1], [int]$Matches[2], [int]$Matches[3], [int]$Matches[4]) }
         if ($line -match ' app=(-?\d+),(-?\d+),(-?\d+),(-?\d+)') { $o.App = @([int]$Matches[1], [int]$Matches[2], [int]$Matches[3], [int]$Matches[4]) }
         $o.Edge = ($line -match ' edge=1'); $o.Art = ($line -match ' art=1'); $o.Fade = ($line -match ' fade=1')
+        if ($line -match ' pair=(\S+)') { $o.Pair = $Matches[1] }
+        foreach ($k in 'cornerxy', 'ringc', 'rp', 'bp', 'ap', 'boxes') { if ($line -match " $k=(\S+)") { $o[$k] = $Matches[1] } }
         [pscustomobject]$o })
     if ($rows.Count -ne $expect) { $problems += "expected $expect [SHOT] lines, got $($rows.Count)" }
     Add-Type -AssemblyName System.Drawing
@@ -270,6 +326,23 @@ function Test-Shots([string[]]$lines, [int]$expect, [string]$dirKey = 'shots') {
             }
             if ($r.Art -and $a[8] -lt 0.05) { $problems += ('{0}: the cutscene art is gone (only {1:P1} of the picture differs from the background)' -f $r.File, $a[8]) }
         }
+        if ($sizeOk -and $r.Pair -and $shotCheckOk) {
+            $pb = Join-Path $shotDir $r.Pair
+            if (-not (Test-Path -LiteralPath $pb)) { $problems += "$($r.File): partner picture $($r.Pair) missing"; continue }
+            $ints = { param($t) if (-not $t) { [int[]]@() } else { [int[]]@($t -split '[;,]' | ForEach-Object { [int]$_ }) } }
+            $cxy = & $ints $r.cornerxy
+            $rc = [double[]]@(($r.ringc -split ',') | ForEach-Object { [double]$_ })
+            $w = [ShotCheck]::World((Join-Path $shotDir $r.File), $pb, $ox, $oy, (& $ints $r.boxes), $rc, [int[]]@($cxy[0], $cxy[1], 24), (& $ints $r.rp), (& $ints $r.bp), (& $ints $r.ap))
+            if ($w[0] -lt 0) { $problems += "$($r.File) and $($r.Pair) differ in size" }
+            else {
+                if ($w[1] -gt 0) { $problems += ('{0}: {1} pixels differ in the top-left 24x24 corner of the picture (a world mark drawn at the corner)' -f $r.File, [int]$w[1]) }
+                if ($w[0] -gt 0) { $problems += ('{0}: {1} marked pixels outside the places the marks belong (first at window {2},{3})' -f $r.File, [int]$w[0], [int]$w[2], [int]$w[3]) }
+                if ($w[5] -lt 4) { $problems += ('{0}: only {1} sight-ring probes on the picture (stage wrong)' -f $r.File, [int]$w[5]) }
+                elseif ($w[4] -lt [math]::Ceiling(0.75 * $w[5])) { $problems += ('{0}: sight ring missing or not centred on the enemy ({1} of {2} ring dots found where Display_WorldToGui puts them)' -f $r.File, [int]$w[4], [int]$w[5]) }
+                if ($w[6] -lt $w[7]) { $problems += ('{0}: the "!" is not where it belongs' -f $r.File) }
+                if ($w[8] -lt $w[9]) { $problems += ('{0}: the interact arrow has no #071821 outline where expected ({1} of {2} probes)' -f $r.File, [int]$w[8], [int]$w[9]) }
+            }
+        }
     }
     $problems
 }
@@ -278,7 +351,7 @@ function Test-Shots([string[]]$lines, [int]$expect, [string]$dirKey = 'shots') {
 $WorkRoot = [IO.Path]::GetFullPath($WorkRoot).TrimEnd('\')
 if ($WorkRoot.Length -le 3) { Refuse "work root '$WorkRoot' is a drive root" }
 $D = @{}
-foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots', 'gridshots') {
+foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots', 'gridshots', 'export') {
     $D[$n] = Join-Path $WorkRoot $n
     foreach ($r in (Get-DriveRoots $D[$n])) {
         if ($r -ieq 'C:\' -or $r -ieq "$env:SystemDrive\") { Refuse "$n dir '$($D[$n])' is on drive C: (everything must live on E:)" }
@@ -337,7 +410,8 @@ if (Test-Path $lintPy) {
 # ---- fresh work dirs; copy working tree (tracked + untracked-not-ignored) -----------------------
 $sw = [Diagnostics.Stopwatch]::StartNew()
 foreach ($n in 'src', 'out', 'save', 'logs', 'shots', 'gridshots') { if (Test-Path $D[$n]) { Remove-Item $D[$n] -Recurse -Force } }
-foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots', 'gridshots') { $null = New-Item -ItemType Directory -Force -Path $D[$n] }
+# 'export' is created but never emptied: the last data export stays available for the simulator between runs
+foreach ($n in 'src', 'cache', 'tmp', 'out', 'save', 'logs', 'shots', 'gridshots', 'export') { $null = New-Item -ItemType Directory -Force -Path $D[$n] }
 
 $psi = New-Object Diagnostics.ProcessStartInfo 'git'
 $psi.Arguments = 'ls-files -co --exclude-standard -z'
@@ -429,6 +503,20 @@ foreach ($m in $runs) {
     if ($bid.Count -eq 0) { $why += 'missing [TEST-BUILD]' }
     elseif ($bid[0] -ne $BuildId) { $why += "build id in game '$($bid[0])' differs from stamped '$BuildId'" }
     if ($r.FocusMs -ge 0) { $why += "game window took the foreground after $($r.FocusMs) ms (I-053)" }
+    if ($m.Export) {   # B1: copy the data export out of the save dir and check that it parses and every id list is unique
+        $ef = Get-ChildItem $D.save -Recurse -Filter 'export_data.json' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $ef) { $why += 'missing export_data.json in save area' }
+        else {
+            Copy-Item $ef.FullName $D.export -Force
+            try {
+                $j = Get-Content -Raw -LiteralPath $ef.FullName | ConvertFrom-Json
+                foreach ($sec in 'classes', 'enemies', 'skills', 'items', 'statuses') {
+                    $ids = @($j.$sec | ForEach-Object { $_.id })
+                    if ($ids.Count -eq 0 -or @($ids | Select-Object -Unique).Count -ne $ids.Count) { $why += "export_data.json: $sec ids empty or not unique" }
+                }
+            } catch { $why += "export_data.json does not parse: $($_.Exception.Message)" }
+        }
+    }
     if ($m.Shots) { $why += @(Test-Shots $lines $m.Shots $(if ($m.ShotDir) { $m.ShotDir } else { 'shots' })) }
     $bad | Select-Object -First 20 | ForEach-Object { Write-Host "  $($_.Trim())" }
     if ($why.Count -gt 0) { Fail "$($m.Name): $($why -join '; ')" }

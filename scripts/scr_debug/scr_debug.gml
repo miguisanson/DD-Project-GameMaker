@@ -221,6 +221,7 @@ function Scenario_Boot() {
     else if (Scenario_HasFlag("-bot")) _mode = "bot";
     else if (Scenario_HasFlag("-shots")) _mode = "shots";
     else if (Scenario_HasFlag("-gridshots")) _mode = "gridshots";
+    else if (Scenario_HasFlag("-exportdata")) _mode = "exportdata";
     if (_mode != "" || Scenario_HasFlag("-runtests")) {
         show_debug_message("[TEST-BUILD] " + BUILD_ID);
         // tests are always windowed whatever the saved setting says (Display_Init checks Display_TestRun); no focus / foreground calls anywhere
@@ -241,7 +242,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : ((_mode == "gridshots") ? 8000 : 6000)), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [] };
+                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : ((_mode == "gridshots") ? 8000 : 6000)), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined };
 }
 
 function Scenario_Finish() {
@@ -339,6 +340,7 @@ function Scenario_Step() {
         case "bot": Scenario_StepBot(_s); break;
         case "shots": Scenario_StepShots(_s); break;
         case "gridshots": Scenario_StepGridShots(_s); break;
+        case "exportdata": Scenario_StepExportData(_s); break;
     }
 }
 
@@ -969,9 +971,10 @@ function Scenario_StepBotExtras(_s) {
                         var _want_mult = _fail ? 0.75 : 1.30;
                         var _dealt = 99 - _bc.e.hp;
                         // what the skill deals at grade OK, with and without a crit, from a fresh copy of the same enemy
-                        var _w = { power: _skill.power, stat_type: _skill.stat_type, acc: _skill.acc };
-                        var _b1 = Combat_ApplyDamage(_bc.p, EnemyCreate(ENEMY_SLIME), _w, 1, _skill.power_mult, { is_skill: true, grade_mult: 1 }).dmg;
-                        var _min = Qte_ScaleAmount(_b1, _want_mult, 1);
+                        // B1: the grade is part of the single damage rounding now (spec section 4), so the expectation is the formula at that grade.
+                        var _w = { power: Combat_PowerSkill(_skill.power, _skill.power_mult, Combat_WeaponPower(_bc.p)), stat_type: _skill.stat_type, acc: _skill.acc };
+                        var _b1 = Combat_ApplyDamage(_bc.p, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: true, grade_mult: 1 }).dmg;
+                        var _min = Combat_ApplyDamage(_bc.p, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: true, grade_mult: _want_mult }).dmg;
                         show_debug_message("[BOT] " + _name + " grade=" + _st.key + " mult=" + string(_bc.qte_result_mult) + " arrows=" + string(_st.len) + " mistakes=" + string(_st.mistakes)
                             + " timed_out=" + string(_st.timed_out) + " finish_ms=" + string(_st.finish_ms) + "/" + string(_st.limit_ms) + " dealt=" + string(_dealt) + " base=" + string(_b1) + " expected_min=" + string(_min));
                         Scenario_Check(_name + "_grade_" + _want_key, _st.key == _want_key && _bc.qte_result_key == _want_key, "got " + _st.key);
@@ -1120,16 +1123,18 @@ function Scenario_StepBotSkill(_s) {
                     _s.sk_fx_on_enemy = false;
                     _s.sk_fx_px = 0;
                     _s.sk_fx_limit = 0;
+                    _s.sk_fx_min = 0;
                     if (_s.sk_fx) {   // BUG-21: where did the animation spawn, relative to the player and enemy anchor points?
                         var _fxi = _bc.wait_fx;
                         var _pp = FX_CenterAtPoint(_fxi.sprite_index, _bc.player_fx_x, _bc.player_fx_y, _fxi.image_xscale);
                         var _pe = FX_CenterOn(_fxi.sprite_index, _bc.enemy_inst, _fxi.image_xscale);
                         _s.sk_fx_on_player = point_distance(_fxi.x, _fxi.y, _pp.x, _pp.y) < 1;
                         _s.sk_fx_on_enemy = point_distance(_fxi.x, _fxi.y, _pe.x, _pe.y) < 1;
-                        // I-052: longest drawn side against the target's (the enemy's sprite, or the player's 32 px reference)
+                        // I-052 / I-060: the drawn VISIBLE side (sprite bounding box x scale) against the target's (the enemy's sprite, or the player's 32 px reference)
                         var _target = Battle_SkillFxOnPlayer(_sid) ? FX_PLAYER_TARGET_PX : FX_TargetSize(_bc.enemy_inst);
-                        _s.sk_fx_px = max(sprite_get_width(_fxi.sprite_index), sprite_get_height(_fxi.sprite_index)) * abs(_fxi.image_xscale);
+                        _s.sk_fx_px = FX_ContentSide(_fxi.sprite_index) * abs(_fxi.image_xscale);
                         _s.sk_fx_limit = min(64, 1.5 * _target);
+                        _s.sk_fx_min = min(64, _target);
                     }
                     _s.sk_flash = instance_exists(obj_ui_controller) && obj_ui_controller.hud_hurt_flash_timer > 0;   // the tick ran in this same frame
                     _s.sk = 2;
@@ -1142,7 +1147,7 @@ function Scenario_StepBotSkill(_s) {
                     Scenario_Check(_name + "_fx_played", _s.sk_fx);
                     Scenario_Check(_name + "_fx_on_" + (Battle_SkillFxOnPlayer(_sid) ? "player" : "enemy"),
                         Battle_SkillFxOnPlayer(_sid) ? (_s.sk_fx_on_player && !_s.sk_fx_on_enemy) : (_s.sk_fx_on_enemy && !_s.sk_fx_on_player));
-                    Scenario_Check(_name + "_fx_size_fits_target", _s.sk_fx && _s.sk_fx_px <= _s.sk_fx_limit + 0.01, "drawn=" + string(_s.sk_fx_px) + " limit=" + string(_s.sk_fx_limit));
+                    Scenario_Check(_name + "_fx_size_fits_target", _s.sk_fx && _s.sk_fx_px <= _s.sk_fx_limit + 0.01 && _s.sk_fx_px >= _s.sk_fx_min - 0.01, "drawn=" + string(_s.sk_fx_px) + " min=" + string(_s.sk_fx_min) + " max=" + string(_s.sk_fx_limit));
                     if (_sid == SKILL_HILT_BASH) {
                         var _logged = false;
                         for (var _li = 0; _li < array_length(_bc.combat_log); _li++) {
@@ -1189,7 +1194,7 @@ function Scenario_BotDrive(_s, _bc) {
                 _s.attacking = true;
                 _s.qhitstop = false;
             }
-            if (_bc.qte_active) _s.qbase = Combat_Damage(_bc.p, _bc.e, _bc.player_weapon);
+            if (_bc.qte_active) _s.qbase = Combat_Damage(_bc.p, _bc.e, Combat_BasicSource(_bc.player_weapon));
             // The press is read by the controller in this frame or the next, so it is judged one or two frames of the clock later:
             // press when the zone centre is within 1.5 frames, which lands it within a frame and a half of the centre.
             if (_perfect && _ready && _bc.qte_active && (Qte_ZoneCentreMs(_bc.qte_params) - _bc.qte_ms) <= Qte_StepMs(delta_time) * 1.5) {
@@ -1350,7 +1355,10 @@ function Scenario_StepShots(_s) {
         case 50: case 51: case 52: case 53: case 54: case 55: case 56: case 57: case 58:
             Scenario_StepShotsWindow(_s);
             break;
-        case 60: case 61: case 62: case 63: case 64: case 65: case 66: case 67:
+        case 60: case 61: case 62: case 63: case 64: case 65: case 66: case 67: case 68:
+            Scenario_StepShotsWorld(_s);
+            break;
+        case 80: case 81: case 82: case 83: case 84: case 85: case 86: case 87:
             Scenario_StepShotsUi(_s);
             break;
         default:
@@ -1727,7 +1735,7 @@ function Scenario_StepShotsWindow(_s) {
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 SettingsPopup_Close(true);
-                Scenario_Next(_s, 60);
+                Scenario_Next(_s, 80);
             }
             break;
         case 54:   // the intro cutscene, confirm held for about half the skip time
@@ -1776,23 +1784,23 @@ function Scenario_StepShotsUi(_s) {
     var _c = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
     var _sp = GameState_Get().ui.settings_popup;
     switch (_s.step) {
-        case 60:   // the title menu
+        case 80:   // the title menu
             if (_s.t == 1) { Scenario_SetWindowScale(3); room_goto(rm_start); }
             if (_s.t == 90) {
                 Scenario_Check("shots_ui_title_state", _c != noone && _c.state == "main", "state=" + ((_c != noone) ? string(_c.state) : "no controller"));
                 Scenario_ShotUi(_s, "title");
-                Scenario_Next(_s, 61);
+                Scenario_Next(_s, 81);
             }
             break;
-        case 61:   // New Game -> the difficulty panel
+        case 81:   // New Game -> the difficulty panel
             if (_s.t == 3) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Tap("confirm"); }
             if (_s.t == 40) {
                 Scenario_Check("shots_ui_difficulty_state", _c.state == "difficulty", "state=" + string(_c.state));
                 Scenario_ShotUi(_s, "difficulty");
-                Scenario_Next(_s, 62);
+                Scenario_Next(_s, 82);
             }
             break;
-        case 62:   // Back -> down to Settings -> confirm
+        case 82:   // Back -> down to Settings -> confirm
             if (_s.t == 3) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Tap("cancel"); }
             if (_s.t == 30) Scenario_Tap("menu_down");
             if (_s.t == 36) Scenario_Tap("confirm");
@@ -1800,44 +1808,44 @@ function Scenario_StepShotsUi(_s) {
             if (_s.t == 80) {
                 Scenario_Check("shots_ui_settings_state", _c.state == "settings" && SettingsPopup_IsOpen("title"), "state=" + string(_c.state));
                 Scenario_ShotUi(_s, "settings");
-                Scenario_Next(_s, 63);
+                Scenario_Next(_s, 83);
             }
             break;
-        case 63:   // text speed row: the details panel with its number line
+        case 83:   // text speed row: the details panel with its number line
             if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
             if (_s.t == 4 || _s.t == 10 || _s.t == 16) Scenario_Tap("menu_down");
             if (_s.t == 60) {
                 Scenario_Check("shots_ui_settings_on_text_speed", _sp.menu.items[_sp.menu.cursor].id == "text_speed", "row=" + string(_sp.menu.items[_sp.menu.cursor].id));
                 Scenario_ShotUi(_s, "settings_details");
-                Scenario_Next(_s, 64);
+                Scenario_Next(_s, 84);
             }
             break;
-        case 64:   // language row, right: Korean
+        case 84:   // language row, right: Korean
             if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
             if (_s.t == 4 || _s.t == 10 || _s.t == 16 || _s.t == 22 || _s.t == 28) Scenario_Tap("menu_down");
             if (_s.t == 34) Scenario_Tap("menu_right");
             if (_s.t == 90) {
                 Scenario_Check("shots_ui_settings_is_korean", Loc_GetLanguage() == "ko" && _sp.menu.items[_sp.menu.cursor].id == "language", "lang=" + Loc_GetLanguage());
                 Scenario_ShotUi(_s, "settings_ko");
-                Scenario_Next(_s, 65);
+                Scenario_Next(_s, 85);
             }
             break;
-        case 65:   // Back restores English and leaves the settings
+        case 85:   // Back restores English and leaves the settings
             if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
             if (_s.t == 4) Scenario_Tap("cancel");
             if (_s.t == 50) {
                 Scenario_Check("shots_ui_back_restores_english", Loc_GetLanguage() == "en" && _c.state == "main", "lang=" + Loc_GetLanguage() + " state=" + string(_c.state));
                 global.scn.uikit = true;
-                Scenario_Next(_s, 66);
+                Scenario_Next(_s, 86);
             }
             break;
-        case 66:   // the component kit
+        case 86:   // the component kit
             if (_s.t == 15) {
                 Scenario_ShotUi(_s, "kit");
-                Scenario_Next(_s, 67);
+                Scenario_Next(_s, 87);
             }
             break;
-        case 67:
+        case 87:
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 global.scn.uikit = false;
@@ -1875,7 +1883,7 @@ function Scenario_DrawUiKit() {
 function Scenario_StepShotsFx(_s) {
     var _ids = Skill_PlayerFxIds();
     if (_s.fxi >= array_length(_ids)) {
-        Scenario_Finish();
+        Scenario_Next(_s, 60);   // A1: the world-space marks (sight ring, "!", interact arrow)
         return;
     }
     var _sid = _ids[_s.fxi];
@@ -1898,7 +1906,7 @@ function Scenario_StepShotsFx(_s) {
                 _bc.skill_banner_name = _skill.name;
                 var _fx = Battle_SkillFxSpawn(_bc, _sid, _skill.fx_sprite, _skill.fx_frames, Skill_FxSpeed(_skill, true));
                 _bc.wait_fx = noone;
-                _fx.image_index = sprite_get_number(_skill.fx_sprite) div 2;
+                _fx.image_index = (sprite_get_number(_skill.fx_sprite) * 3) div 4;   // late in the animation, where most effects are at their biggest (Ice Spear: 43 px wide at frame 9 of 12, 22 px at frame 6)
                 _fx.image_speed = 0;
                 _fx.fx_prev_frame = floor(_fx.image_index);
                 Scenario_Next(_s, 11);
@@ -2298,6 +2306,10 @@ function Scenario_StepMovePlayerFeel(_s) {
             }
             break;
         case 7:   // H5: the run key covers the ground faster
+            // I-063: and plays the same walk animation faster: per step it must get as far through the frames as a walking step does
+            if (_mv.n == 2) { _mv.wmax = 0; _mv.wspd = 0; _mv.rmax = 0; _mv.rspd = 0; }
+            if (_mv.n >= 3 && _mv.n <= 38 && _pl.moving) { _mv.wmax = max(_mv.wmax, _pl.image_index); _mv.wspd = max(_mv.wspd, _pl.image_speed); }
+            if (_mv.n >= 46 && _mv.n <= 88 && _pl.moving) { _mv.rmax = max(_mv.rmax, _pl.image_index); _mv.rspd = max(_mv.rspd, _pl.image_speed); }
             if (_mv.n == 2) { Scenario_PlacePlayer(9, 9); _pl.face = RIGHT; _mv.x1 = _pl.x; Scenario_Hold("move_right", 23); }
             if (_mv.n == 40) {
                 _mv.walk = _pl.x - _mv.x1;
@@ -2311,6 +2323,8 @@ function Scenario_StepMovePlayerFeel(_s) {
                 Scenario_Check("feel_H5_walk_is_one_pixel_a_frame", _mv.walk == 32, "walked=" + string(_mv.walk));
                 Scenario_Check("feel_H5_run_covers_more_ground_in_the_same_frames", _mv.runx >= 48, "ran=" + string(_mv.runx) + " walked=" + string(_mv.walk));
                 Scenario_Check("feel_H5_run_rests_on_the_grid", Grid_IsAligned(_pl.x) && !_pl.moving, "x=" + string(_pl.x));
+                Scenario_Check("feel_I063_run_animation_speed_is_double_the_walk", abs(_mv.rspd - 2 * _mv.wspd) < 0.01 && _mv.wspd > 0, "walk=" + string(_mv.wspd) + " run=" + string(_mv.rspd));
+                Scenario_Check("feel_I063_run_step_gets_as_far_through_the_frames_as_a_walk_step", _mv.wmax > 1.5 && _mv.rmax >= 0.9 * _mv.wmax, "walk_max_frame=" + string(_mv.wmax) + " run_max_frame=" + string(_mv.rmax));
                 _mv.phase = 8;
                 _mv.n = 0;
             }
@@ -2347,6 +2361,7 @@ function Scenario_GridRooms() {
 }
 
 function Scenario_GridOverlay() {
+    if (!Fx_IsWorldPass()) return;
     var _cam = view_camera[0];
     var _vx = camera_get_view_x(_cam), _vy = camera_get_view_y(_cam), _vw = camera_get_view_width(_cam), _vh = camera_get_view_height(_cam);
     var _c0 = draw_get_colour(), _a0 = draw_get_alpha();
@@ -2416,6 +2431,305 @@ function Scenario_StepGridShots(_s) {
                 _s.ri++;
                 Scenario_Next(_s, 0);
             }
+            break;
+    }
+}
+
+// ---- -exportdata (B1): the game's own data as JSON for the balance simulator (BAL-01, BAL-02). Pure data, no instances. ----
+// A copy of a struct/array with every asset reference (any key containing "sprite") and method left out; keys sorted so the file diffs cleanly.
+function Export_Clean(_v, _depth = 0) {
+    if (_depth > 8) return undefined;
+    if (is_struct(_v)) {
+        var out = {};
+        var keys = variable_struct_get_names(_v);
+        array_sort(keys, true);
+        for (var i = 0; i < array_length(keys); i++) {
+            var k = keys[i];
+            if (string_pos("sprite", k) > 0) continue;
+            var val = variable_struct_get(_v, k);
+            if (is_undefined(val) || is_method(val)) continue;
+            variable_struct_set(out, k, Export_Clean(val, _depth + 1));
+        }
+        return out;
+    }
+    if (is_array(_v)) {
+        var arr = [];
+        for (var j = 0; j < array_length(_v); j++) array_push(arr, Export_Clean(_v[j], _depth + 1));
+        return arr;
+    }
+    return _v;
+}
+
+// Records of an id-keyed ds_map as an array sorted by id; _get turns an id into the record (the game's own getter, so names are the runtime ones).
+function Export_MapRecords(_map, _get) {
+    var ids = ds_map_keys_to_array(_map);
+    array_sort(ids, true);
+    var out = [];
+    for (var i = 0; i < array_length(ids); i++) array_push(out, Export_Clean(_get(ids[i])));
+    return out;
+}
+
+function Export_Build() {
+    GameState_Get();
+    ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init();
+    var data = { version: 1, build: BUILD_ID, spec: ".planning/research/combat-spec.md" };
+    data.constants = {
+        stat_ids: { atk: STAT_ATK, def: STAT_DEF, spd: STAT_SPD, mag: STAT_MAG },
+        stat_min: STAT_MIN, stat_max: STAT_MAX, level_cap: LEVEL_CAP_TECHNICAL,
+        power_scale: COMBAT_POWER_SCALE, weapon_skill_share: COMBAT_WEAPON_SKILL_SHARE, unarmed_power: COMBAT_UNARMED_POWER,
+        crit_mult: COMBAT_CRIT_MULT, crit_chance_max: COMBAT_CRIT_CHANCE_MAX, free_points_per_level: LEVEL_FREE_POINTS_PER_LEVEL,
+        player_base_hp: PLAYER_BASE_HP, player_base_mp: PLAYER_BASE_MP,
+        grades: { perfect: Qte_GradeMult(QTE_PERFECT), good: Qte_GradeMult(QTE_GOOD), ok: Qte_GradeMult(QTE_OK), weak: Qte_GradeMult(QTE_WEAK) },
+        assist_damage_taken_mult: Difficulty_Profile().assist_damage_taken_mult
+    };
+    // Level table: EXP to leave each level, and every class's stats/HP/MP by level as the game itself builds them (fixed growth + the auto-placed free point).
+    data.levels = [];
+    for (var lv = 1; lv <= LEVEL_CAP_TECHNICAL; lv++) array_push(data.levels, { level: lv, exp_next: Exp_NextLevel(lv) });
+    data.classes = [];
+    var class_ids = [CLASS_ARCHER, CLASS_KNIGHT, CLASS_MAGE, CLASS_NOBODY];   // ascending id
+    for (var ci = 0; ci < array_length(class_ids); ci++) {
+        var cfg = Export_Clean(DB_PlayerClass(class_ids[ci]));
+        cfg.id = class_ids[ci];
+        cfg.growth_per_level = [];
+        cfg.by_level = [];
+        var ch = CharacterCreate_Player(class_ids[ci]);
+        for (var lv2 = 1; lv2 <= LEVEL_CAP_TECHNICAL; lv2++) {
+            if (lv2 > 1) {
+                array_push(cfg.growth_per_level, { level: lv2, gain: LevelUp_ClassGrowthGain(class_ids[ci], lv2) });
+                ch = LevelUp_ApplyLevel(ch);
+            }
+            array_push(cfg.by_level, { level: lv2, atk: ch.stats.atk, def: ch.stats.def, spd: ch.stats.spd, mag: ch.stats.mag, hp: ch.max_hp, mp: ch.max_mp });
+        }
+        array_push(data.classes, cfg);
+    }
+    data.enemies = Export_MapRecords(global.enemy_db, EnemyDB_Get);
+    data.skills = Export_MapRecords(global.skill_db, SkillDB_Get);
+    for (var si = 0; si < array_length(data.skills); si++) {
+        var seq = Qte_SkillSequence(data.skills[si].id);
+        data.skills[si].sequence_length = is_array(seq) ? array_length(seq) : 0;
+    }
+    data.items = Export_MapRecords(global.item_db, ItemDB_Get);
+    data.statuses = Export_MapRecords(global.status_db, StatusDB_Get);
+    data.loot = { tables: {}, configs: {}, tier_weights: Export_Clean(global.loot_tier_weights) };
+    var tk = ds_map_keys_to_array(global.loot_tables);
+    for (var ti = 0; ti < array_length(tk); ti++) variable_struct_set(data.loot.tables, string(tk[ti]), Export_Clean(global.loot_tables[? tk[ti]]));
+    var ck = ds_map_keys_to_array(global.loot_configs);
+    for (var cj = 0; cj < array_length(ck); cj++) variable_struct_set(data.loot.configs, string(ck[cj]), Export_Clean(global.loot_configs[? ck[cj]]));
+    return data;
+}
+
+// Writes export_data.json to the save area (the working directory, like test_results.txt). Returns the JSON text.
+function Export_WriteFile(_data) {
+    var text = json_stringify(_data, true);
+    var f = file_text_open_write("export_data.json");
+    if (f != -1) {
+        file_text_write_string(f, text);
+        file_text_close(f);
+    }
+    return text;
+}
+
+// True when every record in the array has a distinct numeric id.
+function Export_IdsUnique(_records) {
+    var seen = {};
+    for (var i = 0; i < array_length(_records); i++) {
+        var key = string(_records[i].id);
+        if (variable_struct_exists(seen, key)) return false;
+        variable_struct_set(seen, key, true);
+    }
+    return array_length(_records) > 0;
+}
+
+function Scenario_StepExportData(_s) {
+    if (_s.t < 5) return;
+    var text = Export_WriteFile(Export_Build());
+    Scenario_Check("exportdata_file_exists", file_exists("export_data.json"));
+    var back = Test_RawRead("export_data.json");
+    Scenario_Check("exportdata_file_matches_the_text_written", (string_length(string_replace_all(back, "\r", "")) == string_length(text)) && (string_length(text) > 1000), "file=" + string(string_length(back)) + " text=" + string(string_length(text)) + " bytes=" + string(string_byte_length(text)));
+    var parsed = undefined;
+    try { parsed = json_parse(back); } catch (_e) { parsed = undefined; }
+    Scenario_Check("exportdata_parses", is_struct(parsed));
+    if (is_struct(parsed)) {
+        Scenario_Check("exportdata_classes_4_unique", array_length(parsed.classes) == 4 && Export_IdsUnique(parsed.classes));
+        Scenario_Check("exportdata_enemies_10_unique", array_length(parsed.enemies) == 10 && Export_IdsUnique(parsed.enemies));
+        Scenario_Check("exportdata_skills_27_unique", array_length(parsed.skills) == 27 && Export_IdsUnique(parsed.skills));
+        Scenario_Check("exportdata_items_37_unique", array_length(parsed.items) == 37 && Export_IdsUnique(parsed.items));
+        Scenario_Check("exportdata_statuses_14_unique", array_length(parsed.statuses) == 14 && Export_IdsUnique(parsed.statuses));
+        Scenario_Check("exportdata_level_table_10_rows", array_length(parsed.levels) == LEVEL_CAP_TECHNICAL && parsed.levels[0].exp_next == 12);
+        Scenario_Check("exportdata_class_table_matches_the_game", parsed.classes[0].by_level[LEVEL_CAP_TECHNICAL - 1].hp > 0);
+    }
+    Scenario_Finish();
+}
+
+// ============================================================================
+// A1 (I-056, I-058, I-059): the world-space marks (the sight ring, the "!" and the interact arrow) must land on the picture where
+// the thing they belong to is, never at its top-left corner, and must come back after a battle. Two passes in rm_floor1 with a
+// slime and a chest near the player:  pass 0 = first visit at display scale 3,  pass 1 = back from a battle at scale 4.
+// Each pass saves picture A (marks on) and picture B (slime hidden and "defeated", player turned away from the chest: no marks).
+// Test-Shots (run_tests.ps1) diffs A and B: every differing pixel must lie on a place the game says the marks belong (the slime,
+// the ring annulus, the "!", the arrow, the player), the 24x24 corner of the picture must not differ at all, the ring probes (dots
+// computed from Display_WorldToGui) must differ, and the arrow outline probes must be the outline colour #071821.
+// ============================================================================
+function Scenario_WorldWin(_wx, _wy) {   // a world point as a window pixel (what screen_save writes), via Display_WorldToGui
+    var _l = Display_CalcLayout(window_get_width(), window_get_height());
+    var _cam = view_camera[0];
+    var _g = Display_WorldToGui(_l, _wx, _wy, camera_get_view_x(_cam), camera_get_view_y(_cam));
+    return { x: _l.game_x + _g.x * _l.ui_scale, y: _l.game_y + _g.y * _l.ui_scale, s: _l.scale };
+}
+
+function Scenario_WorldInView(_wx, _wy, _m = 2) {
+    var _cam = view_camera[0];
+    var _vx = camera_get_view_x(_cam), _vy = camera_get_view_y(_cam);
+    return (_wx >= _vx + _m && _wx < _vx + DISPLAY_BASE_W - _m && _wy >= _vy + _m && _wy < _vy + DISPLAY_BASE_H - _m);
+}
+
+// The extra [SHOT] keys for picture A. Window pixels throughout. A probe is the middle of one world pixel.
+function Scenario_WorldFlags(_w, _fileB) {
+    var _sl = _w.sl, _ch = _w.chest, _pl = instance_find(obj_player, 0);
+    var _t = GRID_TILE_SIZE;
+    var _cx = _sl.x + _t / 2, _cy = _sl.y + _t / 2;
+    var _r = _sl.prof.sight * _t;
+    var _n = max(12, round(2 * pi * _r / 6));
+    var _cn = Scenario_WorldWin(_cx, _cy);
+    var _sc = _cn.s;
+    var _rp = "";
+    for (var _k = 0; _k < _n; _k += max(1, _n div 24)) {   // about 24 dots round the ring, those on the picture
+        var _ang = (_k / _n) * 2 * pi;
+        var _dx = floor(_cx + cos(_ang) * _r), _dy = floor(_cy + sin(_ang) * _r);
+        if (!Scenario_WorldInView(_dx, _dy, 3)) continue;
+        var _p = Scenario_WorldWin(_dx + 0.5, _dy + 0.5);
+        _rp += ((_rp == "") ? "" : ";") + string(round(_p.x)) + "," + string(round(_p.y));
+    }
+    // "!" (alert_pop is held on): same numbers as Nav_DrawWorldFx
+    var _bx = floor(_cx), _by = floor(_sl.y) - 11;
+    var _b0 = Scenario_WorldWin(_bx - 3, _by - 1);
+    var _bp1 = Scenario_WorldWin(_bx - 2 + 0.5, _by + 3.5), _bp2 = Scenario_WorldWin(_bx + 2 + 0.5, _by + 3.5);   // the dark outline either side of the bar
+    var _boxes = string(round(_b0.x)) + "," + string(round(_b0.y)) + "," + string(7 * _sc) + "," + string(13 * _sc);
+    // the slime itself
+    var _s0 = Scenario_WorldWin(_sl.bbox_left - 3, _sl.bbox_top - 3);
+    _boxes += ";" + string(round(_s0.x)) + "," + string(round(_s0.y)) + "," + string((_sl.bbox_right - _sl.bbox_left + 7) * _sc) + "," + string((_sl.bbox_bottom - _sl.bbox_top + 7) * _sc);
+    // the player (B turns it round)
+    var _p0 = Scenario_WorldWin(_pl.bbox_left - 3, _pl.bbox_top - 3);
+    _boxes += ";" + string(round(_p0.x)) + "," + string(round(_p0.y)) + "," + string((_pl.bbox_right - _pl.bbox_left + 7) * _sc) + "," + string((_pl.bbox_bottom - _pl.bbox_top + 7) * _sc);
+    // the arrow over the chest: both bob heights
+    var _ax = floor((_ch.bbox_left + _ch.bbox_right) / 2), _at = floor(_ch.bbox_top);
+    var _a0 = Scenario_WorldWin(_ax - 4, _at - 13);
+    _boxes += ";" + string(round(_a0.x)) + "," + string(round(_a0.y)) + "," + string(9 * _sc) + "," + string(10 * _sc);
+    // arrow outline probes, one group of 7 per bob height (the arrow bobs with the wall clock; the picture shows one of the two): see Player_DrawWorldFx
+    var _ap = "";
+    var _offs = [[-2, -1], [2, -1], [-3, 0], [3, 0], [-2, 1], [2, 1], [0, 3]];
+    for (var _bb = 0; _bb < 2; _bb++) {
+        var _y0 = _at - 7 - _bb;
+        for (var _o = 0; _o < array_length(_offs); _o++) {
+            var _q = Scenario_WorldWin(_ax + _offs[_o][0] + 0.5, _y0 + _offs[_o][1] + 0.5);
+            _ap += ((_ap == "") ? "" : ";") + string(round(_q.x)) + "," + string(round(_q.y));
+        }
+    }
+    var _cc = Scenario_WorldWin(camera_get_view_x(view_camera[0]), camera_get_view_y(view_camera[0]));
+    return "pair=" + _fileB + " corner=24 cornerxy=" + string(round(_cc.x)) + "," + string(round(_cc.y))
+        + " ringc=" + string(round(_cn.x)) + "," + string(round(_cn.y)) + "," + string(_r * _sc) + "," + string(2.5 * _sc)
+        + " rp=" + _rp + " bp=" + string(round(_bp1.x)) + "," + string(round(_bp1.y)) + ";" + string(round(_bp2.x)) + "," + string(round(_bp2.y))
+        + " ap=" + _ap
+        + " boxes=" + _boxes;
+}
+
+function Scenario_WorldStage(_w) {
+    with (obj_enemy) instance_destroy();
+    _w.sl = instance_create_layer(1 * GRID_TILE_SIZE, 7 * GRID_TILE_SIZE, "Instances", obj_slime);   // in the open lit part of the room, over light and dark floor (frozen, so its sight does not matter)
+    Scenario_PlaceEnemy(_w.sl, 1, 7);
+    EnemyAI_Init(_w.sl);   // freeze it before its first update (that update may be late after a battle, and would pick a wander step): no wandering, no spotting, "!" held on
+    _w.sl.idle_timer = 1000000;
+    _w.sl.spot_cooldown = 1000000;
+    _w.sl.alert_pop = 1000000;
+    _w.chest = Scenario_Block(obj_chest_lv1, 5, 7);   // right of the player and clear of the room's light shaft (it dims what is under it)
+    var _pl = Scenario_PlacePlayer(4, 7);
+    _pl.face = RIGHT;
+    _w.calls0 = variable_global_exists("nav_fx_calls") ? global.nav_fx_calls : 0;
+}
+
+function Scenario_StepShotsWorld(_s) {
+    var _gs = GameState_Get();
+    if (!is_struct(_s.wd)) _s.wd = { pass: 0, sl: noone, chest: noone, calls0: 0, shot: "" };
+    var _w = _s.wd;
+    var _tapnow = ((_s.f - _s.last_tap) >= 8);
+    switch (_s.step) {
+        case 60:   // pass 0: a fresh knight into rm_floor1
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(3);
+                room_goto(rm_floor1);
+            }
+            var _talk = (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0);
+            if (_talk && _tapnow) Scenario_Tap("confirm");
+            if (_s.t >= 45 && !_talk && !Transition_IsActive()) Scenario_Next(_s, 61);
+            else if (_s.t > 900) { Scenario_Check("shots_world_floor1_ready", false, "dialogue or fade still up"); Scenario_Finish(); }
+            break;
+        case 61:   // build the stage (the slime frozen, "!" held on)
+            if (_s.t == 1) {
+                Scenario_Check("shots_world_in_floor1_" + string(_w.pass), room == rm_floor1 && instance_exists(obj_player), "room=" + room_get_name(room));
+                Scenario_WorldStage(_w);
+                if (_w.pass == 1) Scenario_SetWindowScale(4);
+            }
+            if (_s.t == 6) {
+                with (all) image_speed = 0;   // nothing animates between picture A and B (torches, the slime), so any difference is a mark
+            }
+            if (_s.t >= 50) {
+                // the marks are drawn: this room's layer scripts have been running since the stage was built
+                var _calls = variable_global_exists("nav_fx_calls") ? global.nav_fx_calls - _w.calls0 : 0;
+                Scenario_Check("shots_world_ring_script_runs_pass_" + string(_w.pass), _calls >= 5, "calls=" + string(_calls));
+                Scenario_Next(_s, 62);
+            }
+            break;
+        case 62:   // picture A
+            _w.shot = "shot_world_" + string(_w.pass) + "_a.png";
+            var _pl = instance_find(obj_player, 0);
+            Scenario_Check("shots_world_prompt_target_pass_" + string(_w.pass), instance_exists(_pl.prompt_target) && _pl.prompt_target.id == _w.chest.id);
+            Scenario_Check("shots_world_alert_still_on_pass_" + string(_w.pass), _w.sl.alert_pop > 0 && _w.sl.x == 1 * GRID_TILE_SIZE && _w.sl.y == 7 * GRID_TILE_SIZE, "pop=" + string(_w.sl.alert_pop) + " at " + string(_w.sl.x) + "," + string(_w.sl.y) + " mode=" + string(_w.sl.ai_mode));
+            Scenario_ShotLayout(_w.shot, Scenario_WorldFlags(_w, "shot_world_" + string(_w.pass) + "_b.png"));
+            Scenario_Next(_s, 63);
+            break;
+        case 63:   // turn the marks off: slime hidden and defeated, the player faces away from the chest
+            if (_s.t >= 4) {
+                Scenario_Check("shots_world_saved_" + _w.shot, file_exists(_w.shot));
+                _w.sl.defeated = true;
+                _w.sl.visible = false;
+                instance_find(obj_player, 0).face = LEFT;
+                Scenario_Next(_s, 64);
+            }
+            break;
+        case 64:   // picture B
+            if (_s.t >= 8) {
+                _w.shot = "shot_world_" + string(_w.pass) + "_b.png";
+                Scenario_ShotLayout(_w.shot);
+                Scenario_Next(_s, 65);
+            }
+            break;
+        case 65:
+            if (_s.t >= 4) {
+                Scenario_Check("shots_world_saved_" + _w.shot, file_exists(_w.shot));
+                if (_w.pass >= 1) { Scenario_Finish(); break; }
+                Scenario_Next(_s, 66);
+            }
+            break;
+        case 66:   // into a battle ...
+            if (_s.t == 1) Scenario_GotoBattle("shots_world");
+            if (_s.t >= 30) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_world_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); break; }
+                instance_find(obj_battle_controller, 0).battle_state = BSTATE_END_RUN;   // the end of a won battle and of a successful run: Battle_EndRun
+                Scenario_Next(_s, 67);
+            }
+            break;
+        case 67:   // ... and back (the real return path: room fade to the battle's return room)
+            if (room == rm_floor1 && _s.t >= 20 && !Transition_IsActive()) {
+                _w.pass = 1;
+                Scenario_ClearUi();
+                Scenario_Next(_s, 68);
+            } else if (_s.t > 900) { Scenario_Check("shots_world_back_from_battle", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 68:
+            if (_s.t >= 10) Scenario_Next(_s, 61);
             break;
     }
 }

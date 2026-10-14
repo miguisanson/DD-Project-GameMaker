@@ -43,11 +43,20 @@
 #macro BSTATE_ENEMY_DEFENCE 9
 #macro BSTATE_SKILL_QTE     10
 
-#macro STAT_STR  0
-#macro STAT_AGI  1
-#macro STAT_DEF  2
-#macro STAT_INT  3
-#macro STAT_LUCK 4
+// D22: ATK DEF SPD MAG (+ HP/MP). Spec: .planning/research/combat-spec.md
+#macro STAT_ATK 0
+#macro STAT_DEF 1
+#macro STAT_SPD 2
+#macro STAT_MAG 3
+#macro LEVEL_FREE_POINTS_PER_LEVEL 1   // D76
+#macro PLAYER_BASE_HP 10
+#macro PLAYER_BASE_MP 10
+#macro COMBAT_UNARMED_POWER 2           // weapon power of a character with no weapon equipped
+#macro COMBAT_POWER_SCALE 2           // spec section 4: weapon/skill power x this = formula power
+#macro COMBAT_WEAPON_SKILL_SHARE 0.5  // D22: how much of the weapon's power adds to a player's skill power
+#macro COMBAT_CRIT_MULT 2
+#macro COMBAT_CRIT_CHANCE_MAX 0.5
+#macro ROUND_HALF_UP_EPS 0.000001
 
 #macro ACTION_ATTACK 0
 #macro ACTION_SKILL  1
@@ -246,7 +255,6 @@
 #macro QTE_SEQ_SHAKE_MS 250        // how long the arrows shake after a wrong press
 #macro QTE_SEQ_POP_MS 140          // how long a completed arrow hops
 #macro QTE_TELEGRAPH_MS 400        // the "!" and the attack's name before the defence bar starts
-#macro PLAYER_HP_DEF_BONUS_FACTOR 0.25
 #macro ENEMY_SKILL_USE_CHANCE_DEFAULT 0.35
 #macro ENEMY_ACTION_CHAIN_MAX 3
 #macro ENEMY_AUTO_RESOLVE_LEVEL_DELTA 3

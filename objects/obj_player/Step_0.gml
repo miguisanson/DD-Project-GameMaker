@@ -5,10 +5,7 @@ if (bump_applied) {
     bump_applied = false;
 }
 prompt_target = noone;
-if (!fx_set) {   // the interact prompt is drawn by a layer script: objects have no Draw event (no .yy edits)
-    fx_set = true;
-    if (layer_exists(layer)) layer_script_end(layer, Player_DrawWorldFx);
-}
+World_RegisterFx(id);   // the interact prompt is drawn by the world layer script: objects have no Draw event (no .yy edits)
 
 var gs = GameState_Get();
 Player_EnsureSpriteSet();
@@ -139,6 +136,7 @@ if (!moving) {
         step_from_y = y;
         // D70: the run key doubles the speed; fixed for the whole step so the step always ends exactly on a tile
         step_speed = (Input_Held("run") && (tile_size mod run_speed) == 0) ? run_speed : walk_speed;
+        image_speed = step_speed / max(1, walk_speed);   // I-063: running plays the same walk animation, faster (twice as fast at twice the speed), it never freezes
     }
 }
 

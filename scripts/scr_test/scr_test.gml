@@ -61,6 +61,7 @@ function Test_RunSuite(_name, _fn) {
 function Test_RunAll() {
     Test_Reset();
     Test_RunSuite("Math", Test_Suite_Math);
+    Test_RunSuite("Stats", Test_Suite_Stats);
     Test_RunSuite("Combat", Test_Suite_Combat);
     Test_RunSuite("Fx", Test_Suite_Fx);
     Test_RunSuite("Qte", Test_Suite_Qte);
@@ -69,6 +70,7 @@ function Test_RunAll() {
     Test_RunSuite("Status", Test_Suite_Status);
     Test_RunSuite("Inventory", Test_Suite_Inventory);
     Test_RunSuite("Data", Test_Suite_Data);
+    Test_RunSuite("Export", Test_Suite_Export);
     Test_RunSuite("Player", Test_Suite_Player);
     Test_RunSuite("Loc", Test_Suite_Loc);
     Test_RunSuite("Display", Test_Suite_Display);
@@ -118,31 +120,230 @@ function Test_Boot() {
     game_end((_t.fail > 0 || _t.errors > 0) ? 1 : 0);
 }
 
-// Pure stat/level functions. Expected values come from the documented rules
-// (.planning/research/audit/balance-data.md sections 2-3, audit/data/progression.csv), not from running the code.
+// Pure stat/level functions. Expected values come from .planning/research/combat-spec.md (sections 1-3, 7), not from running the code.
 function Test_Suite_Math() {
-    // StatMod = floor((stat - 10) / 2), D&D style.
-    Test_Eq("StatMod(10)==0", StatMod(10), 0);
-    Test_Eq("StatMod(12)==1", StatMod(12), 1);
-    Test_Eq("StatMod(9)==-1", StatMod(9), -1);
-    Test_Eq("StatMod(20)==5", StatMod(20), 5);
-    // StatClamp keeps stats in 1..60.
+    // StatClamp keeps stats in 1..60. StatMod and RollD20 are gone (D22, D80): stats are used directly.
     Test_Eq("StatClamp(0)==1", StatClamp(0), 1);
     Test_Eq("StatClamp(99)==60", StatClamp(99), 60);
+    Test_Eq("StatClamp(25)==25", StatClamp(25), 25);
     // HP per level = ceil(hd/2)+2: Knight hd10 -> 7, Archer hd8 -> 6, Mage hd6 -> 5.
     Test_Eq("HPGainPerLevel(10)==7", HPGainPerLevel(10), 7);
     Test_Eq("HPGainPerLevel(8)==6", HPGainPerLevel(8), 6);
     Test_Eq("HPGainPerLevel(6)==5", HPGainPerLevel(6), 5);
-    // EXP curve: 15,30,50,75,105,140,180,225,275 (L1..L9), 0 at the cap; cumulative to L10 = 1095.
-    Test_Eq("Exp_NextLevel(1)==15", Exp_NextLevel(1), 15);
-    Test_Eq("Exp_NextLevel(9)==275", Exp_NextLevel(9), 275);
+    // EXP curve (spec section 7): 12,24,40,58,80,105,135,170,210 (L1..L9), 0 at the cap; cumulative to L9 = 624, to L10 = 834.
+    Test_Eq("Exp_NextLevel(1)==12", Exp_NextLevel(1), 12);
+    Test_Eq("Exp_NextLevel(9)==210", Exp_NextLevel(9), 210);
     Test_Eq("Exp_NextLevel(10)==0", Exp_NextLevel(10), 0);
     var _cum = 0;
     for (var _l = 1; _l < 10; _l++) _cum += Exp_NextLevel(_l);
-    Test_Eq("EXP cumulative L1..L10==1095", _cum, 1095);
-    // Level cap is 10; MP stat weight = 1 + floor((lvl-1)/4).
+    Test_Eq("EXP cumulative L1..L10==834", _cum, 834);
+    Test_Eq("EXP cumulative L1..L9==624", _cum - Exp_NextLevel(9), 624);
+    // Level cap is 10.
     Test_True("Level_IsAtCap(10)", Level_IsAtCap(10));
-    Test_Eq("ResourceStatWeight(5)==2", ResourceStatWeight(5), 2);
+    Test_False("Level_IsAtCap(9)", Level_IsAtCap(9));
+}
+
+// Stats (combat-spec.md sections 1-3, 5-8; STAT-01, STAT-02, STAT-12). The "vec" lines are the cases of
+// .planning/research/combat-vectors.json written out by hand (tools/balance/check_combat_vectors.py fails if one is missing or differs).
+function Test_ClassAt(_name, _class, _level, _atk, _def, _spd, _mag, _hp, _mp) {
+    var _c = CharacterCreate_Player(_class);
+    for (var _i = 1; _i < _level; _i++) _c = LevelUp_ApplyLevel(_c);
+    Test_Eq(_name + " level", _c.level, _level);
+    Test_Eq(_name + " ATK", _c.stats.atk, _atk);
+    Test_Eq(_name + " DEF", _c.stats.def, _def);
+    Test_Eq(_name + " SPD", _c.stats.spd, _spd);
+    Test_Eq(_name + " MAG", _c.stats.mag, _mag);
+    Test_Eq(_name + " max HP", _c.max_hp, _hp);
+    Test_Eq(_name + " max MP", _c.max_mp, _mp);
+}
+
+function Test_EnemyAt(_name, _enemy_id, _level, _atk, _def, _spd, _mag, _hp) {
+    var _gs = GameState_Get();
+    var _lv0 = _gs.battle.enemy_level;
+    _gs.battle.enemy_level = _level;
+    var _e = EnemyCreate(_enemy_id);
+    _gs.battle.enemy_level = _lv0;
+    Test_Eq(_name + " level", _e.level, _level);
+    Test_Eq(_name + " ATK", _e.stats.atk, _atk);
+    Test_Eq(_name + " DEF", _e.stats.def, _def);
+    Test_Eq(_name + " SPD", _e.stats.spd, _spd);
+    Test_Eq(_name + " MAG", _e.stats.mag, _mag);
+    Test_Eq(_name + " max HP", _e.max_hp, _hp);
+}
+
+function Test_Suite_Stats() {
+    Test_Hero(CLASS_KNIGHT);
+    Test_Eq("vec dmg_01", Combat_RatioDamage(6, 11, 7, 1.0, 1.0), 4);
+    Test_Eq("vec dmg_02", Combat_RatioDamage(7, 5, 5, 1.0, 1.0), 4);
+    Test_Eq("vec dmg_03", Combat_RatioDamage(1, 1, 60, 1.0, 1.0), 1);
+    Test_Eq("vec dmg_04", Combat_RatioDamage(6, 11, 7, 1.3, 1.0), 5);
+    Test_Eq("vec dmg_05", Combat_RatioDamage(6, 11, 7, 1.1, 1.0), 5);
+    Test_Eq("vec dmg_06", Combat_RatioDamage(6, 11, 7, 0.75, 1.0), 3);
+    Test_Eq("vec dmg_07", Combat_RatioDamage(1, 1, 60, 0.75, 1.0), 1);
+    Test_Eq("vec dmg_08", Combat_RatioDamage(1, 1, 60, 1.3, 1.0), 2);
+    Test_Eq("vec dmg_09", Combat_RatioDamage(6, 11, 7, 1.0, 0.0), 0);
+    Test_Eq("vec dmg_10", Combat_RatioDamage(6, 11, 7, 1.0, 0.8), 3);
+    Test_Eq("vec dmg_11", Combat_RatioDamage(6, 8, 7, 1.0, 0.25), 1);
+    Test_Eq("vec dmg_12", Combat_RatioDamage(6, 11, 7, 1.0, 2.0), 7);
+    Test_Eq("vec dmg_13", Combat_RatioDamage(19.5, 11, 7, 1.0, 1.0), 12);
+    Test_Eq("vec dmg_14", Combat_RatioDamage(22, 29, 18, 1.0, 1.0), 14);
+    Test_Eq("vec dmg_15", Combat_RatioDamage(0, 11, 7, 1.0, 1.0), 0);
+    Test_Eq("vec dmg_16", Combat_RatioDamage(4, 8, 12, 1.0, 1.0), 2);
+    Test_Eq("vec dmg_17", Combat_RatioDamage(12, 12, 12, 1.3, 1.0), 8);
+    Test_Eq("vec dmg_18", Combat_RatioDamage(18, 6, 6, 0.75, 1.0), 7);
+    Test_Eq("vec dmg_19", Combat_RatioDamage(9, 21, 18, 1.0, 1.0), 5);
+    Test_Eq("vec dmg_20", Combat_RatioDamage(13, 5, 60, 1.0, 1.0), 1);
+    Test_Eq("vec dmg_21", Combat_RatioDamage(6, 11, 7, 1.0, 4.0), 15);
+    Test_Eq("vec dmg_22", Combat_RatioDamage(6, 11, 7, 1.0, 0.65), 2);
+    Test_Eq("vec pow_01", Combat_PowerBasic(3), 6.0);
+    Test_Eq("vec pow_02", Combat_PowerBasic(6), 12.0);
+    Test_Eq("vec pow_03", Combat_PowerBasic(1), 2.0);
+    Test_Eq("vec pow_04", Combat_PowerSkill(5, 1.5, 3), 19.5);
+    Test_Eq("vec pow_05", Combat_PowerSkill(4, 1.0, 9), 17.0);
+    Test_Eq("vec pow_06", Combat_PowerEnemySkill(4, 1.0), 8.0);
+    Test_Eq("vec hp_10_1", Resource_MaxHp(10, 1), 10);
+    Test_Eq("vec hp_10_10", Resource_MaxHp(10, 10), 73);
+    Test_Eq("vec hp_8_5", Resource_MaxHp(8, 5), 34);
+    Test_Eq("vec hp_6_10", Resource_MaxHp(6, 10), 55);
+    Test_Eq("vec hp_8_3", Resource_MaxHp(8, 3), 22);
+    Test_Eq("vec mp_1_1_3", Resource_MaxMp(1, 1, 3), 11);
+    Test_Eq("vec mp_2_10_39", Resource_MaxMp(2, 10, 39), 47);
+    Test_Eq("vec mp_2_1_12", Resource_MaxMp(2, 1, 12), 16);
+    Test_Eq("vec mp_1_5_4", Resource_MaxMp(1, 5, 4), 16);
+    Test_ClassAt("vec cls_knight_1", CLASS_KNIGHT, 1, 11, 12, 8, 3, 10, 11);
+    Test_ClassAt("vec cls_knight_2", CLASS_KNIGHT, 2, 12, 14, 8, 3, 17, 12);
+    Test_ClassAt("vec cls_knight_3", CLASS_KNIGHT, 3, 13, 16, 8, 3, 24, 13);
+    Test_ClassAt("vec cls_knight_5", CLASS_KNIGHT, 5, 15, 20, 8, 3, 38, 15);
+    Test_ClassAt("vec cls_knight_10", CLASS_KNIGHT, 10, 20, 30, 8, 3, 73, 20);
+    Test_ClassAt("vec cls_archer_1", CLASS_ARCHER, 1, 9, 8, 13, 4, 10, 12);
+    Test_ClassAt("vec cls_archer_2", CLASS_ARCHER, 2, 11, 8, 14, 4, 16, 14);
+    Test_ClassAt("vec cls_archer_3", CLASS_ARCHER, 3, 13, 8, 15, 4, 22, 16);
+    Test_ClassAt("vec cls_archer_5", CLASS_ARCHER, 5, 17, 8, 17, 4, 34, 20);
+    Test_ClassAt("vec cls_archer_10", CLASS_ARCHER, 10, 27, 8, 22, 4, 64, 30);
+    Test_ClassAt("vec cls_mage_1", CLASS_MAGE, 1, 5, 7, 10, 12, 10, 16);
+    Test_ClassAt("vec cls_mage_2", CLASS_MAGE, 2, 5, 7, 10, 15, 15, 19);
+    Test_ClassAt("vec cls_mage_3", CLASS_MAGE, 3, 5, 7, 10, 18, 20, 23);
+    Test_ClassAt("vec cls_mage_5", CLASS_MAGE, 5, 5, 7, 10, 24, 30, 30);
+    Test_ClassAt("vec cls_mage_10", CLASS_MAGE, 10, 5, 7, 10, 39, 55, 47);
+    Test_ClassAt("vec cls_nobody_1", CLASS_NOBODY, 1, 8, 8, 9, 3, 10, 11);
+    Test_ClassAt("vec cls_nobody_2", CLASS_NOBODY, 2, 10, 8, 9, 3, 16, 12);
+    Test_ClassAt("vec cls_nobody_3", CLASS_NOBODY, 3, 11, 9, 9, 3, 22, 13);
+    Test_ClassAt("vec cls_nobody_5", CLASS_NOBODY, 5, 13, 9, 10, 4, 34, 16);
+    Test_ClassAt("vec cls_nobody_10", CLASS_NOBODY, 10, 20, 10, 11, 5, 64, 21);
+    Test_Eq("vec exp_1", Exp_NextLevel(1), 12);
+    Test_Eq("vec exp_2", Exp_NextLevel(2), 24);
+    Test_Eq("vec exp_3", Exp_NextLevel(3), 40);
+    Test_Eq("vec exp_4", Exp_NextLevel(4), 58);
+    Test_Eq("vec exp_5", Exp_NextLevel(5), 80);
+    Test_Eq("vec exp_6", Exp_NextLevel(6), 105);
+    Test_Eq("vec exp_7", Exp_NextLevel(7), 135);
+    Test_Eq("vec exp_8", Exp_NextLevel(8), 170);
+    Test_Eq("vec exp_9", Exp_NextLevel(9), 210);
+    Test_Eq("vec exp_10", Exp_NextLevel(10), 0);
+    Test_EnemyAt("vec en_slime_1", ENEMY_SLIME, 1, 8, 7, 9, 5, 9);
+    Test_EnemyAt("vec en_spider_3", ENEMY_SPIDER, 3, 8, 7, 10, 5, 20);
+    Test_EnemyAt("vec en_snake_4", ENEMY_SNAKE, 4, 9, 7, 10, 5, 25);
+    Test_EnemyAt("vec en_mad_whisp_6", ENEMY_MADWHISP, 6, 10, 9, 12, 13, 32);
+    Test_EnemyAt("vec en_killer_plant_5", ENEMY_KILLER_PLANT, 5, 12, 11, 9, 10, 34);
+    Test_EnemyAt("vec en_dire_wolf_4", ENEMY_DIREWOLF, 4, 11, 9, 11, 6, 27);
+    Test_EnemyAt("vec en_ghost_sword_6", ENEMY_GHOSTSWORD, 6, 14, 12, 12, 10, 40);
+    Test_EnemyAt("vec en_stranger_8", ENEMY_STRANGER, 8, 16, 14, 13, 15, 53);
+    Test_EnemyAt("vec en_palehorn_8", ENEMY_MINI_BOSS, 8, 18, 16, 12, 14, 67);
+    Test_EnemyAt("vec en_choirbeast_10", ENEMY_FINAL_BOSS, 10, 21, 18, 14, 19, 88);
+    Test_Eq("vec run_8_9", Battle_RunChance(8, 9), 0.45);
+    Test_Eq("vec run_13_9", Battle_RunChance(13, 9), 0.7);
+    Test_Eq("vec run_30_5", Battle_RunChance(30, 5), 0.95);
+    Test_Eq("vec run_1_40", Battle_RunChance(1, 40), 0.1);
+    Test_Eq("vec run_10_10", Battle_RunChance(10, 10), 0.5);
+    Test_Eq("vec crit_0", Combat_CritChance(0), 0.0);
+    Test_Eq("vec crit_25", Combat_CritChance(25), 0.25);
+    Test_Eq("vec crit_80", Combat_CritChance(80), 0.5);
+    Test_Eq("vec heal_5_12", Combat_HealAmount(5, 12), 8);
+    Test_Eq("vec first_8_9", Combat_PlayerActsFirst(8, 9), false);
+    Test_Eq("vec first_9_9", Combat_PlayerActsFirst(9, 9), true);
+    Test_Eq("vec first_13_9", Combat_PlayerActsFirst(13, 9), true);
+    // The old stats are gone from the character (STAT-01): four stats only.
+    var _k = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_True("STAT-01 stats are atk, def, spd, mag", variable_struct_exists(_k.stats, "atk") && variable_struct_exists(_k.stats, "def") && variable_struct_exists(_k.stats, "spd") && variable_struct_exists(_k.stats, "mag"));
+    Test_False("STAT-01 STR/AGI/INT/LUCK are gone", variable_struct_exists(_k.stats, "str") || variable_struct_exists(_k.stats, "agi") || variable_struct_exists(_k.stats, "intt") || variable_struct_exists(_k.stats, "luck"));
+    // Each stat has a felt effect (STAT-01): ATK -> damage dealt, DEF -> damage taken, MAG -> damage and max MP, SPD -> who acts first.
+    var _hi = CharacterCreate_Player(CLASS_KNIGHT); _hi.stats.atk = 22;
+    var _lo = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_True("STAT-01 more ATK deals more damage", Combat_Damage(_hi, EnemyCreate(ENEMY_SLIME), Test_Wpn(10, STAT_ATK, 0)) > Combat_Damage(_lo, EnemyCreate(ENEMY_SLIME), Test_Wpn(10, STAT_ATK, 0)));
+    var _tank = CharacterCreate_Player(CLASS_KNIGHT); _tank.stats.def = 30;
+    Test_True("STAT-01 more DEF takes less damage", Combat_Damage(EnemyCreate(ENEMY_FINAL_BOSS), _tank, Test_Wpn(9, STAT_ATK, 0)) < Combat_Damage(EnemyCreate(ENEMY_FINAL_BOSS), _lo, Test_Wpn(9, STAT_ATK, 0)));
+    var _wiz = CharacterCreate_Player(CLASS_KNIGHT); _wiz.stats.mag = 21; _wiz = RecomputeResources(_wiz);
+    Test_True("STAT-01 more MAG gives more max MP", _wiz.max_mp > _lo.max_mp);
+    Test_True("STAT-01 more MAG gives more spell damage", Combat_Damage(_wiz, EnemyCreate(ENEMY_SLIME), Test_Wpn(10, STAT_MAG, 0)) > Combat_Damage(_lo, EnemyCreate(ENEMY_SLIME), Test_Wpn(10, STAT_MAG, 0)));
+    Test_True("STAT-01 SPD decides who acts first (Archer 13 vs Slime 9)", Combat_PlayerActsFirst(Combat_EffectiveStat(CharacterCreate_Player(CLASS_ARCHER), STAT_SPD), Combat_EffectiveStat(EnemyCreate(ENEMY_SLIME), STAT_SPD)));
+    Test_False("STAT-01 SPD decides who acts first (Knight 8 vs Slime 9)", Combat_PlayerActsFirst(Combat_EffectiveStat(_lo, STAT_SPD), Combat_EffectiveStat(EnemyCreate(ENEMY_SLIME), STAT_SPD)));
+    // Equipment: a bonus struct with atk/def/spd/mag keys counts as stats; a weapon's power adds to skill power too (D22).
+    var _gear = CharacterCreate_Player(CLASS_KNIGHT);
+    _gear.inventory = Inv_Add(_gear.inventory, 22, 1);
+    Test_True("Equip: Platinum Armor equips", Equip_Item(_gear, 22));
+    Test_Eq("Equip: Platinum Armor adds DEF +3 -> effective DEF 15", Combat_EffectiveStat(_gear, STAT_DEF), 15);
+    Test_Eq("Equip: Platinum Armor has no ATK bonus", Combat_EffectiveStat(_gear, STAT_ATK), 11);
+    var _robed = CharacterCreate_Player(CLASS_MAGE);
+    _robed.inventory = Inv_Add(_robed.inventory, 25, 1);
+    Test_True("Equip: Mithril Robe equips", Equip_Item(_robed, 25));
+    Test_Eq("Equip: Mithril Robe adds MAG +3 -> effective MAG 15", Combat_EffectiveStat(_robed, STAT_MAG), 15);
+    var _staffer = CharacterCreate_Player(CLASS_MAGE);
+    _staffer.inventory = Inv_Add(_staffer.inventory, 7, 1);
+    Test_True("Equip: Wooden Staff equips", Equip_Item(_staffer, 7));
+    Test_Eq("D22 weapon power: Wooden Staff (power 3) is the equipped weapon power", Combat_WeaponPower(_staffer), 3);
+    Test_Eq("D22 weapon power: no weapon counts as 2 (fists)", Combat_WeaponPower(CharacterCreate_Player(CLASS_MAGE)), 2);
+    // D22: the same skill hits harder with a weapon equipped. Fireball (power 6) on a Stranger (DEF14), Mage MAG12: fists 2*(6+1)=14 -> 6.46 = 6; Wooden Staff 2*(6+1.5)=15 -> 6.92 = 7.
+    var _bare = CharacterCreate_Player(CLASS_MAGE); _bare.mp = 99;
+    var _armed = _staffer; _armed.mp = 99;
+    var _fb_bare = Skill_Use(_bare, EnemyCreate(ENEMY_STRANGER), SKILL_FIREBALL);
+    var _fb_armed = Skill_Use(_armed, EnemyCreate(ENEMY_STRANGER), SKILL_FIREBALL);
+    Test_Eq("D22 Fireball without a weapon deals 6", _fb_bare.dmg, 6);
+    Test_Eq("D22 Fireball with the Wooden Staff deals 7", _fb_armed.dmg, 7);
+    // STAT-12 / D76: fixed growth plus ONE free point per level. Spending it: Level_ApplyFreePoint.
+    var _c = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_Eq("D76 a new character has no free points", _c.stat_points, 0);
+    Test_True("D76 free points auto-place until the level-up UI exists", Level_AutoPlaceEnabled());
+    _c.stat_points = 1;
+    var _c2 = Level_ApplyFreePoint(_c, STAT_SPD);
+    Test_Eq("Level_ApplyFreePoint adds +1 to the chosen stat", _c2.stats.spd, 9);
+    Test_Eq("Level_ApplyFreePoint spends the point", _c2.stat_points, 0);
+    var _c3 = Level_ApplyFreePoint(_c2, STAT_SPD);
+    Test_Eq("Level_ApplyFreePoint with no points left changes nothing", _c3.stats.spd, 9);
+    var _c4 = CharacterCreate_Player(CLASS_KNIGHT); _c4.stat_points = 1;
+    _c4 = Level_ApplyFreePoint(_c4, 17);
+    Test_Eq("Level_ApplyFreePoint rejects an unknown stat and keeps the point", _c4.stat_points, 1);
+    var _cap = CharacterCreate_Player(CLASS_KNIGHT); _cap.stats.mag = 60; _cap.stat_points = 1;
+    _cap = Level_ApplyFreePoint(_cap, STAT_MAG);
+    Test_Eq("Level_ApplyFreePoint clamps at the stat maximum (60)", _cap.stats.mag, 60);
+    // With auto-placement off the level-up banks the point; the UI packet then spends it.
+    var _bank = CharacterCreate_Player(CLASS_ARCHER);
+    global.levelup_auto_place = false;
+    _bank = LevelUp_ApplyLevel(_bank);
+    global.levelup_auto_place = true;
+    Test_Eq("D76 level-up with auto-place off banks 1 free point", _bank.stat_points, 1);
+    Test_Eq("D76 level-up with auto-place off still applies the fixed growth (Archer SPD+1 ATK+1)", _bank.stats.spd + _bank.stats.atk, 13 + 9 + 2);
+    Test_Eq("LevelUp_ApplyLevel gives the HP gain as current HP (Archer L2 = 16)", _bank.hp, 16);
+    // EXP: 834 exactly reaches the cap; 624 (a clean pass to the final boss) is level 9.
+    var _run = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), 834);
+    Test_Eq("EXP 834 takes a Knight to the cap (10)", _run.level, 10);
+    Test_Eq("Knight L10 via EXP matches the class table (ATK 20 DEF 30)", _run.stats.atk * 100 + _run.stats.def, 2030);
+    var _run9 = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), 624);
+    Test_Eq("EXP 624 (a clean pass to the final boss) is level 9", _run9.level, 9);
+    // The stat names the menus print (scr_menu helpers that read the stats).
+    Test_Eq("Tooltip_StatShortName(STAT_MAG) == MAG", Tooltip_StatShortName(STAT_MAG), "MAG");
+    Test_Eq("Tooltip_StatShortName(STAT_SPD) == SPD", Tooltip_StatShortName(STAT_SPD), "SPD");
+    Test_Eq("Tooltip_ItemBonusText(Platinum Armor) == DEF +3", Tooltip_ItemBonusText(ItemDB_Get(22)), "DEF +3");
+    Test_Eq("Tooltip_ItemBonusText(Mithril Robe) == MAG +3", Tooltip_ItemBonusText(ItemDB_Get(25)), "MAG +3");
+    Test_Eq("Tooltip_BuildStatLines gives a title and a description", array_length(Tooltip_BuildStatLines("spd", "SPD", 8)), 2);
+    var _cp = Menu_StatsCopy(_k.stats);
+    Test_Eq("Menu_StatsCopy copies the four stats", _cp.atk + _cp.def + _cp.spd + _cp.mag, 11 + 12 + 8 + 3);
+    // Enemies carry the same four stats and a basic power by rank (spec section 6).
+    var _sl = EnemyCreate(ENEMY_SLIME);
+    Test_False("STAT-01 enemies have no luck/intt", variable_struct_exists(_sl.stats, "luck") || variable_struct_exists(_sl.stats, "intt"));
+    Test_Eq("Enemy basic power: Slime (rank 1) = 3", _sl.basic_power, 3);
+    Test_Eq("Enemy basic power: Mad Whisp (rank 2) = 5", EnemyCreate(ENEMY_MADWHISP).basic_power, 5);
+    Test_Eq("Enemy basic power: Palehorn (rank 3) = 7", EnemyCreate(ENEMY_MINI_BOSS).basic_power, 7);
+    Test_Eq("Enemy basic power: Pale Choirbeast (rank 4) = 9", EnemyCreate(ENEMY_FINAL_BOSS).basic_power, 9);
 }
 
 // ---- Fixtures: shared game state is borrowed and put back by Test_RunSuite (Test_FixRestore). ----
@@ -166,7 +367,7 @@ function Test_FixRestore() {
 }
 
 // Fresh class character at the given difficulty; also installed as the game's player so Inv_Add sees its skills.
-function Test_Hero(_class, _diff) {
+function Test_Hero(_class, _diff = DIFFICULTY_NORMAL) {
     var _gs = Test_FixBegin(_diff);
     var _p = CharacterCreate_Player(_class);
     _gs.player_ch = _p;
@@ -186,34 +387,29 @@ function Test_False(_name, _cond) {
     Test_Eq(_name, bool(_cond), false);
 }
 
-// Combat formulas (balance-data.md section 7). Start stats (class bonus on base 10): Knight STR11 DEF12, Archer AGI12,
-// Mage INT12; Slime STR8 AGI9 DEF7 HP9; Pale Choirbeast (final boss, L10) STR21 DEF18 HP88.
-// No dice: Combat_AttemptHit is only asserted for the deterministic force_dodge / always_hit branches.
-// R-031 will remove difficulty; the Hard/Easy rows then go away (D35).
+// Combat formulas (combat-spec.md sections 1, 4, 5). Start values: Knight ATK11 DEF12 HP10; Slime ATK8 DEF7 HP9 basic power 3 (rank 1);
+// Pale Choirbeast (final boss, L10) ATK21 DEF18 HP88; Mage MAG12 ATK5. A Test_Wpn power is the FINAL formula power (spec section 4).
+// No dice anywhere (D80): the only avoidance is Evasion on the player. Expected values are worked out from the spec, not read from the code.
 function Test_Suite_Combat() {
-    var _k = Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL);
-    var _a = CharacterCreate_Player(CLASS_ARCHER);
+    var _k = Test_Hero(CLASS_KNIGHT);
     var _m = CharacterCreate_Player(CLASS_MAGE);
     var _slime = EnemyCreate(ENEMY_SLIME);
     var _boss = EnemyCreate(ENEMY_FINAL_BOSS);
-    // Damage = max(1, power + StatMod(atk stat) - floor(StatMod(def DEF)/2)); low DEF gives bonus damage.
-    Test_Eq("Combat_Damage knight(STR11) pow3 vs slime(DEF7) == 4", Combat_Damage(_k, _slime, Test_Wpn(3, STAT_STR, 0)), 4);
-    Test_Eq("Combat_Damage slime basic(pow2,STR8) vs knight(DEF12) == 1", Combat_Damage(_slime, _k, Test_Wpn(2, STAT_STR, 0)), 1);
-    Test_Eq("Combat_Damage never below 1 (pow1 slime vs boss DEF18)", Combat_Damage(_slime, _boss, Test_Wpn(1, STAT_STR, 0)), 1);
-    Test_Eq("Combat_Damage uses weapon stat: mage INT12 pow5 vs slime == 7", Combat_Damage(_m, _slime, Test_Wpn(5, STAT_INT, 0)), 7);
-    Test_Eq("Combat_Damage uses weapon stat: mage STR10 pow5 vs slime == 6", Combat_Damage(_m, _slime, Test_Wpn(5, STAT_STR, 0)), 6);
-    // Attack bonus = StatMod(weapon stat) + weapon.acc; statuses change stats (Poison INT-1).
-    Test_Eq("Combat_AttackBonus knight STR11 acc2 == 2", Combat_AttackBonus(_k, Test_Wpn(0, STAT_STR, 2)), 2);
-    Test_Eq("Combat_AttackBonus archer AGI12 acc1 == 2", Combat_AttackBonus(_a, Test_Wpn(0, STAT_AGI, 1)), 2);
-    Test_Eq("Combat_AttackBonus mage INT12 acc0 == 1", Combat_AttackBonus(_m, Test_Wpn(0, STAT_INT, 0)), 1);
+    // Combat_Damage = the grade-OK ratio damage of one hit, no statuses: round_half_up(power x A / (A + D)), at least 1.
+    Test_Eq("Combat_Damage knight(ATK11) power6 vs slime(DEF7) == 4", Combat_Damage(_k, _slime, Test_Wpn(6, STAT_ATK, 0)), 4);
+    Test_Eq("Combat_Damage slime basic(power3,ATK8) vs knight(DEF12) == 1", Combat_Damage(_slime, _k, Test_Wpn(3, STAT_ATK, 0)), 1);
+    Test_Eq("Combat_Damage never below 1 (power1 slime vs boss DEF18)", Combat_Damage(_slime, _boss, Test_Wpn(1, STAT_ATK, 0)), 1);
+    Test_Eq("Combat_Damage uses the weapon stat: mage MAG12 power6 vs slime == 4", Combat_Damage(_m, _slime, Test_Wpn(6, STAT_MAG, 0)), 4);
+    Test_Eq("Combat_Damage uses the weapon stat: mage ATK5 power6 vs slime == 3", Combat_Damage(_m, _slime, Test_Wpn(6, STAT_ATK, 0)), 3);
+    Test_Eq("Combat_Damage a stronger ATK hits harder: boss ATK21 power9 vs knight DEF12 == 6", Combat_Damage(_boss, _k, Test_Wpn(9, STAT_ATK, 0)), 6);
+    // Statuses change the effective stat: Poison MAG-1 (power20: MAG12 -> 13, MAG11 -> 12); Burning ATK-1.
+    Test_Eq("Combat_Damage mage MAG12 power20 vs slime == 13", Combat_Damage(_m, _slime, Test_Wpn(20, STAT_MAG, 0)), 13);
     _m = Status_Add(_m, STATUS_POISON, 3, 0);
-    Test_Eq("Combat_AttackBonus mage poisoned (INT-1) == 0", Combat_AttackBonus(_m, Test_Wpn(0, STAT_INT, 0)), 0);
-    // Dodge bonus = StatMod(AGI) (+ dodge_bonus from statuses, which no status defines).
-    Test_Eq("Combat_DodgeBonus knight AGI10 == 0", Combat_DodgeBonus(_k), 0);
-    Test_Eq("Combat_DodgeBonus archer AGI12 == 1", Combat_DodgeBonus(_a), 1);
-    Test_Eq("Combat_DodgeBonus slime AGI9 == -1", Combat_DodgeBonus(_slime), -1);
-    _a = Status_Add(_a, STATUS_BLEED, 3, 0);
-    Test_Eq("Combat_DodgeBonus archer bleeding (AGI-2) == 0", Combat_DodgeBonus(_a), 0);
+    Test_Eq("Combat_EffectiveStat mage poisoned MAG == 11", Combat_EffectiveStat(_m, STAT_MAG), 11);
+    Test_Eq("Combat_Damage mage poisoned (MAG11) power20 vs slime == 12", Combat_Damage(_m, _slime, Test_Wpn(20, STAT_MAG, 0)), 12);
+    var _burnt = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_BURN, 2, 0);
+    Test_Eq("Combat_EffectiveStat knight burning ATK == 10", Combat_EffectiveStat(_burnt, STAT_ATK), 10);
+    Test_Eq("Combat_EffectiveStat knight DEF == 12", Combat_EffectiveStat(_k, STAT_DEF), 12);
     // BUG-21: self-buff animations play on the player, damaging skills on the enemy.
     var _buffs = [SKILL_MUSCLE_UP, SKILL_REV_UP, SKILL_EVASION, SKILL_TAKE_AIM, SKILL_MEDITATION, SKILL_FORESIGHT];
     var _attacks = [SKILL_HILT_BASH, SKILL_ICE_SPEAR, SKILL_HORIZ_SLASH, SKILL_FIREBALL, SKILL_WOUND, SKILL_POISON_ARROW, SKILL_DOUBLE_SHOT, SKILL_POISON_MIST];
@@ -223,67 +419,129 @@ function Test_Suite_Combat() {
     for (var _ai = 0; _ai < array_length(_attacks); _ai++) {
         Test_False("BUG-21 attack skill " + SkillDB_Get(_attacks[_ai]).name + " animates on the enemy", Battle_SkillFxOnPlayer(_attacks[_ai]));
     }
-    // Hit rules: force_dodge (Evasion, Solidify) is consumed and beats always_hit (Foresight); Foresight alone always hits.
-    var _evader = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_EVASION, 3, 0);
-    var _r = Combat_AttemptHit(_k, _evader, 0);
-    Test_False("Combat_AttemptHit Evasion defender -> miss", _r.hit);
-    Test_False("Combat_AttemptHit Evasion is consumed", Status_Has(_evader, STATUS_EVASION));
-    var _solid = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_SOLIDIFY, 2, 0);
-    Test_False("Combat_AttemptHit Solidify defender -> miss", Combat_AttemptHit(_k, _solid, 0).hit);
-    var _seer = Status_Add(CharacterCreate_Player(CLASS_MAGE), STATUS_HIT_UP, 9, 0);
-    Test_True("Combat_AttemptHit Foresight attacker always hits", Combat_AttemptHit(_seer, EnemyCreate(ENEMY_SLIME), -99).hit);
-    var _both = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_EVASION, 3, 0);
-    Test_False("Combat_AttemptHit Evasion beats Foresight", Combat_AttemptHit(_seer, _both, 0).hit);
-    // ApplyDamage order: dmg_mult, skill_mult, crit, guard_mult, difficulty; result clamps HP at 0.
+    // D80: Evasion on the PLAYER fully dodges the next damaging enemy action and is consumed; it does nothing on an enemy (D6: the player never misses).
+    var _evader = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_EVASION, 3, 0);
+    var _dodge = Combat_TryDodge(EnemyCreate(ENEMY_SLIME), _evader);
+    Test_True("Combat_TryDodge Evasion on the player dodges", _dodge.dodged);
+    Test_False("Combat_TryDodge Evasion is consumed", Status_Has(_dodge.defender, STATUS_EVASION));
+    Test_False("Combat_TryDodge a second attack is not dodged", Combat_TryDodge(EnemyCreate(ENEMY_SLIME), _dodge.defender).dodged);
+    Test_False("Combat_TryDodge a player without Evasion is never dodging", Combat_TryDodge(EnemyCreate(ENEMY_SLIME), CharacterCreate_Player(CLASS_KNIGHT)).dodged);
+    Test_False("Combat_TryDodge Evasion on an ENEMY does not dodge the player (D6)", Combat_TryDodge(_k, Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_EVASION, 3, 0)).dodged);
+    var _bite_foe = EnemyCreate(ENEMY_SNAKE);
+    var _bite_hero = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_EVASION, 3, 0);
+    var _bite1 = Skill_Use(_bite_foe, _bite_hero, SKILL_BITE);
+    Test_False("Skill_Use: an enemy skill against Evasion misses (hit=false)", _bite1.hit);
+    Test_Eq("Skill_Use: the dodged skill deals 0", _bite1.dmg, 0);
+    Test_Eq("Skill_Use: the dodging player keeps full HP", _bite_hero.hp, _bite_hero.max_hp);
+    Test_False("Skill_Use: Evasion was used up by the dodge", Status_Has(_bite_hero, STATUS_EVASION));
+    Test_True("Skill_Use: the next enemy skill lands", Skill_Use(_bite_foe, _bite_hero, SKILL_BITE).hit);
+    // ApplyDamage: Rev Up (dmg_mult 2), Guard (0, consumed), Blessing (0.8), Solidify (0.25, consumed by the next hit, D80).
     Test_Eq("slime max_hp (L1) == 9", _slime.max_hp, 9);
-    Test_Eq("Combat_ApplyDamage knight pow3 vs slime dealt 4", Test_Hit(_k, _slime, Test_Wpn(3, STAT_STR, 0)).dmg, 4);
+    Test_Eq("Combat_ApplyDamage knight power6 vs slime dealt 4", Test_Hit(_k, _slime, Test_Wpn(6, STAT_ATK, 0)).dmg, 4);
     Test_Eq("Combat_ApplyDamage slime hp 9 -> 5", _slime.hp, 5);
     var _rev = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_DMG_UP, 6, 0);
-    Test_Eq("Combat_ApplyDamage Rev Up doubles 4 -> 8", Test_Hit(_rev, EnemyCreate(ENEMY_SLIME), Test_Wpn(3, STAT_STR, 0)).dmg, 8);
+    Test_Eq("Combat_ApplyDamage Rev Up doubles the ratio: 7", Test_Hit(_rev, EnemyCreate(ENEMY_SLIME), Test_Wpn(6, STAT_ATK, 0)).dmg, 7);
     var _guarded = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_GUARD, 6, 0);
-    Test_Eq("Combat_ApplyDamage Guard blocks the hit (0)", Test_Hit(_k, _guarded, Test_Wpn(3, STAT_STR, 0)).dmg, 0);
+    Test_Eq("Combat_ApplyDamage Guard blocks the hit (0)", Test_Hit(_k, _guarded, Test_Wpn(6, STAT_ATK, 0)).dmg, 0);
     Test_Eq("Combat_ApplyDamage Guard leaves HP untouched", _guarded.hp, _guarded.max_hp);
     Test_False("Combat_ApplyDamage Guard is consumed by the hit", Status_Has(_guarded, STATUS_GUARD));
     var _blessed = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_BLESSING, 4, 0);
-    Test_Eq("Combat_ApplyDamage Blessing x0.8: 4 -> 3", Test_Hit(_k, _blessed, Test_Wpn(3, STAT_STR, 0)).dmg, 3);
+    Test_Eq("Combat_ApplyDamage Blessing x0.8: 3", Test_Hit(_k, _blessed, Test_Wpn(6, STAT_ATK, 0)).dmg, 3);
+    var _solid = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_SOLIDIFY, 2, 0);
+    Test_Eq("Combat_ApplyDamage Solidify takes 75% less: power20 12 -> 3", Test_Hit(_k, _solid, Test_Wpn(20, STAT_ATK, 0)).dmg, 3);
+    Test_False("Combat_ApplyDamage Solidify is consumed by the next hit", Status_Has(_solid, STATUS_SOLIDIFY));
+    Test_Eq("Combat_ApplyDamage after Solidify the next hit is full: 12", Test_Hit(_k, _solid, Test_Wpn(20, STAT_ATK, 0)).dmg, 12);
     Test_Eq("boss max_hp (L10) == 88", _boss.max_hp, 88);
-    Test_Eq("Combat_ApplyDamage skill x1.5 then crit x2: 4 -> 6 -> 12", Combat_ApplyDamage(_k, _boss, Test_Wpn(6, STAT_STR, 0), 2, 1.5).dmg, 12);
-    Test_Eq("Combat_ApplyDamage boss hp 88 -> 76", _boss.hp, 76);
+    Test_Eq("Combat_ApplyDamage crit x2: power12 vs boss(DEF18) == 9", Combat_ApplyDamage(_k, _boss, Test_Wpn(12, STAT_ATK, 0), 2).dmg, 9);
+    Test_Eq("Combat_ApplyDamage boss hp 88 -> 79", _boss.hp, 79);
     var _tiny = EnemyCreate(ENEMY_SLIME);
-    Test_Hit(_k, _tiny, Test_Wpn(100, STAT_STR, 0));
+    Test_Hit(_k, _tiny, Test_Wpn(100, STAT_ATK, 0));
     Test_Eq("Combat_ApplyDamage HP clamps at 0, never negative", _tiny.hp, 0);
-    // Difficulty (Difficulty_Profile), floored: player dmg Hard x0.94 / Easy x1.08; enemy dmg Hard x1.12 / Easy x0.9.
-    var _pw = Test_Wpn(3, STAT_STR, 0);
-    var _ew = Test_Wpn(4, STAT_STR, 0);
+    // D35: one difficulty. Whatever id is saved, the profile and the damage are the same; the only knob is the assist multiplier (default 1).
+    var _prof_e = Difficulty_Profile(DIFFICULTY_EASY);
+    var _prof_h = Difficulty_Profile(DIFFICULTY_HARD);
+    Test_Eq("D35 profile: assist_damage_taken_mult is 1 on Easy", _prof_e.assist_damage_taken_mult, 1);
+    Test_Eq("D35 profile: assist_damage_taken_mult is 1 on Hard", _prof_h.assist_damage_taken_mult, 1);
+    Test_False("D35 profile: no enemy HP multiplier left", variable_struct_exists(_prof_h, "enemy_hp_mult"));
+    Test_False("D35 profile: no damage multiplier left", variable_struct_exists(_prof_h, "player_damage_mult") || variable_struct_exists(_prof_h, "enemy_damage_mult"));
+    Test_False("D35 profile: no dead stat multipliers left", variable_struct_exists(_prof_h, "player_stat_mult") || variable_struct_exists(_prof_h, "enemy_stat_mult"));
     Test_Hero(CLASS_KNIGHT, DIFFICULTY_HARD);
-    Test_Eq("Hard: player dmg floor(4*0.94) == 3", Test_Hit(CharacterCreate_Player(CLASS_KNIGHT), EnemyCreate(ENEMY_SLIME), _pw).dmg, 3);
-    Test_Eq("Hard: enemy dmg floor(9*1.12) == 10", Test_Hit(EnemyCreate(ENEMY_FINAL_BOSS), CharacterCreate_Player(CLASS_KNIGHT), _ew).dmg, 10);
-    Test_Hero(CLASS_KNIGHT, DIFFICULTY_EASY);
-    Test_Eq("Easy: player dmg floor(4*1.08) == 4", Test_Hit(CharacterCreate_Player(CLASS_KNIGHT), EnemyCreate(ENEMY_SLIME), _pw).dmg, 4);
-    Test_Eq("Easy: enemy dmg floor(9*0.9) == 8", Test_Hit(EnemyCreate(ENEMY_FINAL_BOSS), CharacterCreate_Player(CLASS_KNIGHT), _ew).dmg, 8);
-    Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL);
-    Test_Eq("Normal: enemy dmg == 9", Test_Hit(EnemyCreate(ENEMY_FINAL_BOSS), CharacterCreate_Player(CLASS_KNIGHT), _ew).dmg, 9);
+    Test_Eq("D35: Hard deals the same damage as Normal (4)", Test_Hit(CharacterCreate_Player(CLASS_KNIGHT), EnemyCreate(ENEMY_SLIME), Test_Wpn(6, STAT_ATK, 0)).dmg, 4);
+    Test_Eq("D35: Hard enemy damage equals Normal (boss power9 vs knight: 6)", Test_Hit(EnemyCreate(ENEMY_FINAL_BOSS), CharacterCreate_Player(CLASS_KNIGHT), Test_Wpn(9, STAT_ATK, 0)).dmg, 6);
+    Test_Hero(CLASS_KNIGHT);
+    global.assist_damage_taken_mult = 0.5;
+    Test_Eq("D35 assist hook: x0.5 on damage taken: slime power20 vs knight 8 -> 4", Test_Hit(EnemyCreate(ENEMY_SLIME), CharacterCreate_Player(CLASS_KNIGHT), Test_Wpn(20, STAT_ATK, 0)).dmg, 4);
+    Test_Eq("D35 assist hook: does not weaken the player's own hits", Test_Hit(CharacterCreate_Player(CLASS_KNIGHT), EnemyCreate(ENEMY_SLIME), Test_Wpn(6, STAT_ATK, 0)).dmg, 4);
+    global.assist_damage_taken_mult = 1;
+    Test_Eq("D35 assist hook back to 1: slime power20 vs knight 8", Test_Hit(EnemyCreate(ENEMY_SLIME), CharacterCreate_Player(CLASS_KNIGHT), Test_Wpn(20, STAT_ATK, 0)).dmg, 8);
+    // Crit has no base chance and no LUCK (spec section 4): only a crit_bonus from statuses.
+    var _plain = CharacterCreate_Player(CLASS_KNIGHT);
+    var _any_crit = false;
+    for (var _ci = 0; _ci < 300; _ci++) if (Combat_CritCheck(_plain, 0)) _any_crit = true;
+    Test_False("Crit: 300 rolls with no bonus never crit (no base chance)", _any_crit);
+    var _aimed = Status_Add(CharacterCreate_Player(CLASS_ARCHER), STATUS_CRIT_UP, 3, 0);
+    Test_Eq("Crit: Take Aim adds a 25 crit bonus", Status_GetSum(_aimed, "crit_bonus"), 25);
+    var _crits = 0;
+    for (var _cj = 0; _cj < 400; _cj++) if (Combat_CritCheck(_aimed, Status_GetSum(_aimed, "crit_bonus"))) _crits++;
+    Test_True("Crit: Take Aim crits roughly 1 in 4 (400 rolls: 60..140)", _crits >= 60 && _crits <= 140);
+    // STAT-04 / D6 / D80: nobody misses. Every damaging player skill, 20 casts against every enemy: always a hit with damage; every enemy skill against a plain player too.
+    var _never_missed = true;
+    var _always_dmg = true;
+    var _zero_at = "";
+    var _foes = [ENEMY_SLIME, ENEMY_DIREWOLF, ENEMY_GHOSTSWORD, ENEMY_SPIDER, ENEMY_MADWHISP, ENEMY_SNAKE, ENEMY_KILLER_PLANT, ENEMY_STRANGER, ENEMY_MINI_BOSS, ENEMY_FINAL_BOSS];
+    for (var _si = 0; _si < array_length(_attacks); _si++) {
+        for (var _fi = 0; _fi < array_length(_foes); _fi++) {
+            for (var _rep = 0; _rep < 20; _rep++) {
+                var _caster = CharacterCreate_Player(SkillDB_Get(_attacks[_si]).class_list[0]);
+                _caster.mp = 99;
+                var _r = Skill_Use(_caster, EnemyCreate(_foes[_fi]), _attacks[_si]);
+                if (!_r.hit) _never_missed = false;
+                if (_r.dmg <= 0) { _always_dmg = false; if (_zero_at == "") _zero_at = SkillDB_Get(_attacks[_si]).name + " vs enemy " + string(_foes[_fi]) + " dmg=" + string(_r.dmg) + " ok=" + string(_r.ok); }
+            }
+        }
+    }
+    Test_True("STAT-04 player damage skills never miss (8 skills x 10 enemies x 20 casts)", _never_missed);
+    Test_True("STAT-04 and every one of those hits deals damage (first zero: " + _zero_at + ")", _always_dmg);
+    var _enemy_missed = false;
+    for (var _ei = 0; _ei < array_length(_foes); _ei++) {
+        var _cfg = EnemyDB_Get(_foes[_ei]);
+        for (var _ek = 0; _ek < array_length(_cfg.skills); _ek++) {
+            var _sk = SkillDB_Get(_cfg.skills[_ek]);
+            if (_sk.effect != "damage") continue;
+            for (var _er = 0; _er < 10; _er++) {
+                var _target = CharacterCreate_Player(CLASS_KNIGHT);
+                if (!Skill_Use(EnemyCreate(_foes[_ei]), _target, _cfg.skills[_ek]).hit) _enemy_missed = true;
+            }
+        }
+    }
+    Test_False("D80 enemy damage skills never miss a player without Evasion", _enemy_missed);
 }
 
-// D55 / I-052: every player skill animation plays in at most 0.75 s (45 game frames at 60 fps; with the 0.3 s hold that is under the 66-frame
-// action limit) and is drawn no bigger than 1.5 x its target's longest side and 64 world px (the screen is 160 x 144), whatever enemy it hits.
-// Limits are the owner's numbers written out here, not read from the macros.
+// D55 / I-052 / I-060: every player skill animation plays in at most 0.75 s (45 game frames at 60 fps; with the 0.3 s hold that is under the 66-frame
+// action limit); its VISIBLE part (sprite bounding box x scale) is at least as big as its target's longest side, at most 1.5 x that, and never over 64 world px
+// (the screen is 160 x 144), whatever enemy it hits. Limits are the owner's numbers written out here, not read from the macros.
 function Test_Suite_Fx() {
     var _ids = Skill_PlayerFxIds();
     Test_Eq("Fx: 14 player skills have an animation", array_length(_ids), 14);
-    var _targets = [32, 48, 64];   // slime-sized enemies, the mini boss, the final boss; 32 is also the player's reference size
+    var _targets = [16, 32, 48, 64, 80];   // a small enemy, slime-sized (also the player's reference size), the mini boss, the final boss, one bigger than the cap
     for (var _i = 0; _i < array_length(_ids); _i++) {
         var _s = SkillDB_Get(_ids[_i]);
         var _frames = FX_PlaybackFrames(_s.fx_sprite, Skill_FxSpeed(_s, true));
         Test_True("D55 " + _s.name + " animation <= 45 frames (got " + string(_frames) + ")", _frames <= 45);
-        var _side = max(sprite_get_width(_s.fx_sprite), sprite_get_height(_s.fx_sprite));
+        var _side = FX_ContentSide(_s.fx_sprite);
+        Test_True("I-060 " + _s.name + " has a visible box (" + string(_side) + " px)", _side > 0 && _side <= 48);
         for (var _t = 0; _t < array_length(_targets); _t++) {
-            var _drawn = _side * FX_ScaleFor(_s.fx_sprite, _targets[_t]);
-            Test_True("I-052 " + _s.name + " vs " + string(_targets[_t]) + " px target: drawn " + string(_drawn) + " px <= 1.5 x target and <= 64",
-                _drawn <= _targets[_t] * 1.5 + 0.01 && _drawn <= 64.01);
-            Test_True("I-052 " + _s.name + " vs " + string(_targets[_t]) + " px target: drawn " + string(_drawn) + " px >= 32 (still readable)", _drawn >= 32);
+            var _tp = _targets[_t];
+            var _drawn = _side * FX_ScaleFor(_s.fx_sprite, _tp);
+            var _lo = min(_tp, 64);
+            var _hi = min(_tp * 1.5, 64);
+            Test_True("I-060 " + _s.name + " vs " + string(_tp) + " px target: visible effect " + string(_drawn) + " px >= the target (min " + string(_lo) + ")", _drawn >= _lo - 0.01);
+            Test_True("I-060 " + _s.name + " vs " + string(_tp) + " px target: visible effect " + string(_drawn) + " px <= 1.5 x target and <= 64 (max " + string(_hi) + ")", _drawn <= _hi + 0.01);
         }
     }
+    Test_True("I-060 Ice Spear on a 32 px slime is drawn 48 px (1.5 x) of visible effect", abs(FX_ContentSide(ice_spear_effect) * FX_ScaleFor(ice_spear_effect, 32) - 48) < 0.01);
+    Test_True("I-060 an effect on a 64 px target is drawn 64 px", abs(FX_ContentSide(ice_spear_effect) * FX_ScaleFor(ice_spear_effect, 64) - 64) < 0.01);
+    Test_True("I-060 an effect on an 80 px target is capped at 64 px", abs(FX_ContentSide(ice_spear_effect) * FX_ScaleFor(ice_spear_effect, 80) - 64) < 0.01);
     Test_Eq("D55 hold after an action is 18 frames", Combat_SecToFrames(COMBAT_ACTION_HOLD_SEC), 18);
     // The pure helpers themselves: a 48 px sprite at 8 fps, 12 frames... uses the real sprites: ice_spear_effect has 12 frames at 8 fps.
     Test_Eq("Fx: ice spear at image_speed 1 plays 12 frames in 90 game frames", FX_PlaybackFrames(ice_spear_effect, 1), 90);
@@ -376,16 +634,16 @@ function Test_Suite_Qte() {
         Test_Eq("Qte " + _grades[_gi] + " word", Qte_GradeLabel(_grades[_gi]), _words[_gi]);
     }
 
-    // never miss (D5, D6, D20): the grade scales damage and never takes it to 0. Knight STR11 pow3 vs slime DEF7 deals 4 at grade OK.
+    // never miss (D5, D6, D20): the grade scales damage and never takes it to 0. Knight ATK11 power6 vs slime DEF7 deals 4 at grade OK.
     var _k = Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL);
-    var _w = Test_Wpn(3, STAT_STR, 0);
+    var _w = Test_Wpn(6, STAT_ATK, 0);
     var _mults = [1.30, 1.10, 1.00, 0.75];
     var _want = [5, 5, 4, 3];   // round-half-up(4 x 1.30) 5; 4 x 1.10 rounds to 4 but a multiplier other than 1.00 moves it by at least 1, so 5; OK 4; 4 x 0.75 = 3
     for (var _g = 0; _g < 4; _g++) {
         var _d = Combat_ApplyDamage(_k, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: false, grade_mult: _mults[_g] }).dmg;
         Test_Eq("Combat_ApplyDamage grade x" + string(_mults[_g]) + ": 4 -> " + string(_want[_g]), _d, _want[_g]);
     }
-    var _weak_boss = Combat_ApplyDamage(EnemyCreate(ENEMY_SLIME), EnemyCreate(ENEMY_FINAL_BOSS), Test_Wpn(1, STAT_STR, 0), 1, 1, { is_skill: false, grade_mult: 0.75 }).dmg;
+    var _weak_boss = Combat_ApplyDamage(EnemyCreate(ENEMY_SLIME), EnemyCreate(ENEMY_FINAL_BOSS), Test_Wpn(1, STAT_ATK, 0), 1, 1, { is_skill: false, grade_mult: 0.75 }).dmg;
     Test_Eq("Combat_ApplyDamage a WEAK hit of 1 stays 1, never 0 (D20)", _weak_boss, 1);
     var _guarded = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_GUARD, 6, 0);
     Test_Eq("Combat_ApplyDamage Guard still blocks a PERFECT hit", Combat_ApplyDamage(_k, _guarded, _w, 1, 1, { is_skill: false, grade_mult: 1.30 }).dmg, 0);
@@ -410,9 +668,9 @@ function Test_Suite_Qte() {
     _user3.mp = 99;
     var _res_perfect = Skill_Use(_user3, EnemyCreate(ENEMY_SLIME), SKILL_HORIZ_SLASH, 1.30);
     Test_True("Skill_Use: a PERFECT multiplier never lowers the damage of grade OK", _res_perfect.dmg >= _res_ok.dmg);
-    // enemies still roll against the player (this packet changes the player's side only)
+    // D80: an Evasion player still dodges the next enemy attack (the only avoidance left)
     var _evader = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_EVASION, 3, 0);
-    Test_False("Combat_AttemptHit: an Evasion player still dodges an enemy", Combat_AttemptHit(EnemyCreate(ENEMY_SLIME), _evader, 0).hit);
+    Test_True("Combat_TryDodge: an Evasion player dodges an enemy", Combat_TryDodge(EnemyCreate(ENEMY_SLIME), _evader).dodged);
 }
 
 // QTE part 2a: the arrow sequence for a player skill (D57, D58, D61). Pure grader first: scripted presses with times in ms.
@@ -552,15 +810,15 @@ function Test_Suite_QteArrows() {
         if (Qte_ScaleAmount(_b, 0.75, 1) >= _b) _distinct = false;
     }
     Test_True("QteArrows Perfect beats OK and Weak trails it at every base from 3 to 40", _distinct);
-    // the damage path uses it: Knight STR11 pow3 vs Slime DEF7 deals 4 at OK, 5 at Perfect AND at Good
+    // the damage path uses it: Knight ATK11 power6 vs Slime DEF7 deals 4 at OK, 5 at Perfect AND at Good
     var _k = Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL);
-    var _w = Test_Wpn(3, STAT_STR, 0);
+    var _w = Test_Wpn(6, STAT_ATK, 0);
     var _ok_d = Combat_ApplyDamage(_k, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: true, grade_mult: 1.00 }).dmg;
     var _pf_d = Combat_ApplyDamage(_k, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: true, grade_mult: 1.30 }).dmg;
     var _go_d = Combat_ApplyDamage(_k, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: true, grade_mult: 1.10 }).dmg;
     Test_True("QteArrows a skill hit at Perfect is above the same hit at OK", _pf_d > _ok_d);
     Test_True("QteArrows a skill hit at Good is above the same hit at OK", _go_d > _ok_d);
-    Test_Eq("QteArrows a hit of 1 at Perfect through Combat_ApplyDamage == 2", Combat_ApplyDamage(EnemyCreate(ENEMY_SLIME), EnemyCreate(ENEMY_FINAL_BOSS), Test_Wpn(1, STAT_STR, 0), 1, 1, { is_skill: false, grade_mult: 1.30 }).dmg, 2);
+    Test_Eq("QteArrows a hit of 1 at Perfect through Combat_ApplyDamage == 2", Combat_ApplyDamage(EnemyCreate(ENEMY_SLIME), EnemyCreate(ENEMY_FINAL_BOSS), Test_Wpn(1, STAT_ATK, 0), 1, 1, { is_skill: false, grade_mult: 1.30 }).dmg, 2);
 }
 
 // QTE part 2b: the defence sliding bar (D59, D60, D21). Grades come from the same Qte_Grade as the attack bar; these checks cover what is new:
@@ -724,9 +982,10 @@ function Test_Suite_Status() {
     Test_True("applying Burn removes Poison", Status_Has(_r, STATUS_BURN) && !Status_Has(_r, STATUS_POISON));
     _r = Status_Add(_r, STATUS_BLEED, 2, 0);
     Test_True("applying Bleeding removes Burn", Status_Has(_r, STATUS_BLEED) && !Status_Has(_r, STATUS_BURN));
-    // Stat mods: Poison INT-1, Bleeding AGI-2.
-    Test_Eq("Poison gives INT-1", Status_ModStat(Status_Add(CharacterCreate_Player(CLASS_MAGE), STATUS_POISON, 2, 0), STAT_INT), -1);
-    Test_Eq("Bleeding gives AGI-2", Status_ModStat(_r, STAT_AGI), -2);
+    // Stat mods (renamed, same size): Poison MAG-1, Bleeding SPD-2, Burning ATK-1, Stun SPD-2, Sundered DEF-1.
+    Test_Eq("Poison gives MAG-1", Status_ModStat(Status_Add(CharacterCreate_Player(CLASS_MAGE), STATUS_POISON, 2, 0), STAT_MAG), -1);
+    Test_Eq("Bleeding gives SPD-2", Status_ModStat(_r, STAT_SPD), -2);
+    Test_Eq("Burning gives ATK-1", Status_ModStat(Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_BURN, 2, 0), STAT_ATK), -1);
     // Stun: skip_turn; the player's stun is capped at 1 turn and ignored during the 2-turn immunity window.
     var _s = CharacterCreate_Player(CLASS_KNIGHT);
     Test_True("Status_CanAct on a clean character", Status_CanAct(_s));
@@ -869,6 +1128,30 @@ function Test_Suite_Data() {
         Test_Eq("R-004 loot table '" + string(_tk) + "' rows resolve (item exists, weight > 0, qty_min <= qty_max)", _tbad, 0);
         _tk = ds_map_find_next(global.loot_tables, _tk);
     }
+}
+
+// -exportdata (B1, spec section 9): the data the simulator reads. Built in memory here (the real file is written and re-read by `-Only exportdata`).
+function Test_Suite_Export() {
+    var _d = Export_Build();
+    var _back = json_parse(json_stringify(_d));
+    Test_True("Export: the data survives a JSON round trip", is_struct(_back) && _back.version == 1);
+    Test_Eq("Export: 4 classes", array_length(_back.classes), 4);
+    Test_Eq("Export: 10 enemies", array_length(_back.enemies), 10);
+    Test_Eq("Export: 27 skills", array_length(_back.skills), 27);
+    Test_Eq("Export: 37 items", array_length(_back.items), 37);
+    Test_Eq("Export: 14 statuses", array_length(_back.statuses), 14);
+    Test_Eq("Export: 10 level rows", array_length(_back.levels), 10);
+    Test_True("Export: class ids are unique", Export_IdsUnique(_back.classes));
+    Test_True("Export: enemy ids are unique", Export_IdsUnique(_back.enemies));
+    Test_True("Export: skill ids are unique", Export_IdsUnique(_back.skills));
+    Test_True("Export: item ids are unique", Export_IdsUnique(_back.items));
+    Test_True("Export: status ids are unique", Export_IdsUnique(_back.statuses));
+    Test_False("Export: duplicate ids are detected", Export_IdsUnique([{ id: 1 }, { id: 1 }]));
+    Test_Eq("Export: level table row 1 needs 12 EXP", _back.levels[0].exp_next, 12);
+    Test_Eq("Export: Knight level 10 HP matches the vector (73)", _back.classes[1].by_level[9].hp, 73);
+    Test_Eq("Export: constants carry the power scale", _back.constants.power_scale, 2);
+    Test_Eq("Export: the final boss exports its basic power (9)", _back.enemies[9].basic_power, 9);
+    Test_False("Export: no asset references leak into the data", string_pos("sprite", json_stringify(_back.enemies)) > 0);
 }
 
 // Save: SAVE-05 and the R-008 round trip. Never touches savedata*.sav: the snapshot goes through JSON text only.
