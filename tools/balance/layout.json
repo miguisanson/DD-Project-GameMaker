@@ -1,0 +1,180 @@
+{
+ "floors": {
+  "1": {
+   "barrels": [
+    1,
+    1
+   ],
+   "beds": 1,
+   "card_chests": 1,
+   "chests": [],
+   "class_chests": 1,
+   "enemies_fixed": [],
+   "enemies_free": [
+    "slime"
+   ],
+   "floor": 1
+  },
+  "2": {
+   "barrels": [
+    1,
+    1
+   ],
+   "beds": 0,
+   "card_chests": 0,
+   "chests": [],
+   "class_chests": 0,
+   "enemies_fixed": [],
+   "enemies_free": [
+    "slime",
+    "dire_wolf"
+   ],
+   "floor": 2
+  },
+  "3": {
+   "barrels": [
+    1
+   ],
+   "beds": 1,
+   "card_chests": 0,
+   "chests": [
+    2
+   ],
+   "class_chests": 0,
+   "enemies_fixed": [],
+   "enemies_free": [
+    "spider",
+    "snake"
+   ],
+   "floor": 3
+  },
+  "4": {
+   "barrels": [],
+   "beds": 0,
+   "card_chests": 1,
+   "chests": [
+    2
+   ],
+   "class_chests": 0,
+   "enemies_fixed": [],
+   "enemies_free": [
+    "dire_wolf",
+    "killer_plant",
+    "killer_plant"
+   ],
+   "floor": 4
+  },
+  "5": {
+   "barrels": [],
+   "beds": 0,
+   "card_chests": 1,
+   "chests": [],
+   "class_chests": 0,
+   "enemies_fixed": [
+    "palehorn"
+   ],
+   "enemies_free": [
+    "snake",
+    "dire_wolf"
+   ],
+   "floor": 5
+  },
+  "6": {
+   "barrels": [
+    2,
+    2
+   ],
+   "beds": 1,
+   "card_chests": 0,
+   "chests": [
+    2
+   ],
+   "class_chests": 0,
+   "enemies_fixed": [],
+   "enemies_free": [
+    "ghost_sword",
+    "mad_whisp",
+    "mad_whisp",
+    "ghost_sword",
+    "slime"
+   ],
+   "floor": 6
+  },
+  "6.5": {
+   "barrels": [],
+   "beds": 0,
+   "card_chests": 0,
+   "chests": [],
+   "class_chests": 0,
+   "enemies_fixed": [],
+   "enemies_free": [],
+   "floor": 6.5
+  },
+  "7": {
+   "barrels": [
+    2,
+    3,
+    2
+   ],
+   "beds": 0,
+   "card_chests": 1,
+   "chests": [
+    3
+   ],
+   "class_chests": 0,
+   "enemies_fixed": [
+    "stranger"
+   ],
+   "enemies_free": [
+    "spider",
+    "mad_whisp",
+    "ghost_sword"
+   ],
+   "floor": 7
+  },
+  "8": {
+   "barrels": [
+    3,
+    3
+   ],
+   "beds": 0,
+   "card_chests": 0,
+   "chests": [],
+   "class_chests": 0,
+   "enemies_fixed": [
+    "stranger"
+   ],
+   "enemies_free": [
+    "mad_whisp"
+   ],
+   "floor": 8
+  },
+  "9": {
+   "barrels": [],
+   "beds": 1,
+   "card_chests": 1,
+   "chests": [
+    3
+   ],
+   "class_chests": 0,
+   "enemies_fixed": [
+    "stranger"
+   ],
+   "enemies_free": [],
+   "floor": 9
+  },
+  "9.5": {
+   "barrels": [],
+   "beds": 0,
+   "card_chests": 0,
+   "chests": [],
+   "class_chests": 0,
+   "enemies_fixed": [
+    "choirbeast"
+   ],
+   "enemies_free": [],
+   "floor": 9.5
+  }
+ },
+ "generated_from": "rooms/rm_floor*/*.yy"
+}

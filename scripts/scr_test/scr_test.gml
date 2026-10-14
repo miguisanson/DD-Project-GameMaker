@@ -2009,6 +2009,19 @@ function Test_Suite_Export() {
     Test_Eq("Export: constants carry the power scale", _back.constants.power_scale, 2);
     Test_Eq("Export: the final boss exports its basic power (9)", _back.enemies[9].basic_power, 9);
     Test_False("Export: no asset references leak into the data", string_pos("sprite", json_stringify(_back.enemies)) > 0);
+    // E1 (balance simulator): the timeline / stagger constants, the QTE bar numbers, each heavy enemy move's defence bar and the floor pools
+    Test_Eq("Export E1: timeline gauge max 100", _back.constants.timeline.gauge_max, 100);
+    Test_Eq("Export E1: steadfast lasts 2 turns", _back.constants.timeline.steadfast_turns, 2);
+    Test_Eq("Export E1: a boss is pushed half as far", _back.constants.timeline.boss_push, 0.5);
+    Test_Eq("Export E1: BREAK takes +50%", _back.constants.timeline.break_mult, 1.5);
+    Test_Eq("Export E1: bow bar sweeps 850 ms", _back.qte.bar_params.bow.sweep_ms, 850);
+    Test_Eq("Export E1: a Perfect block lets 25% through", _back.qte.defence_mult.perfect, 0.25);
+    Test_Eq("Export E1: nine floor pools", array_length(_back.floors), 9);
+    Test_True("Export E1: floor 1 only has the Slime", array_length(_back.floors[0].pool) == 1 && _back.floors[0].pool[0] == ENEMY_SLIME);
+    Test_Eq("Export E1: floor 6 draws from 4 enemy types", array_length(_back.floors[5].pool), 4);
+    var _ram = undefined;
+    for (var _ri = 0; _ri < array_length(_back.skills); _ri++) if (_back.skills[_ri].id == SKILL_RAMMING) _ram = _back.skills[_ri];
+    Test_True("Export E1: Ramming carries its defence bar (1500 ms sweep)", is_struct(_ram) && variable_struct_exists(_ram, "defence") && _ram.defence.sweep_ms == 1500);
 }
 
 // Save: SAVE-05 and the R-008 round trip. Never touches savedata*.sav: the snapshot goes through JSON text only.
