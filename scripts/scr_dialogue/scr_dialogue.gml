@@ -1664,7 +1664,7 @@ function Story_ClosingLines() {
 // arrive, set the creator of each asset in Credits_SoundAssets below (the roll groups sounds by creator by itself).
 #macro CREDITS_CREATOR_TBD "(owner to supply)"
 
-// All 126 sound and music assets, by asset name. TODO-OWNER: creator per asset.
+// All 126 original sound and music assets, by asset name (TODO-OWNER: creator per asset), then the 30 new D116 takes with their creators.
 function Credits_SoundAssets() {
     var names = [
         "Abstract1", "Abstract2", "African1", "African2", "African3", "African4", "Ambience_haunting",
@@ -1690,6 +1690,28 @@ function Credits_SoundAssets() {
     ];
     var out = [];
     for (var i = 0; i < array_length(names); i++) array_push(out, { asset: names[i], creator: CREDITS_CREATOR_TBD });   // TODO-OWNER
+    var extra = Credits_NewSfxAssets();
+    for (var j = 0; j < array_length(extra); j++) array_push(out, extra[j]);
+    return out;
+}
+
+// D116: the extra monster takes (CC0, OpenGameArt) the owner imports from art/sfx_new/. The names are known now, so the creators are too.
+// rubberduck = "80 CC0 creature SFX" 1 and 2; Ogrebane = "Monster Sound Effects Pack"; Darsycho = "Monster snarls". Source of each file: art/sfx_new/README.md.
+function Credits_NewSfxAssets() {
+    var takes = [
+        ["rubberduck", "slime_spawn_2"], ["rubberduck", "slime_attack_2"], ["rubberduck", "slime_attack_3"],
+        ["rubberduck", "spider_spawn_2"], ["rubberduck", "spider_attack_2"], ["rubberduck", "spider_attack_3"],
+        ["rubberduck", "snake_spawn_2"], ["rubberduck", "snake_attack_2"], ["rubberduck", "snake_attack_3"],
+        ["rubberduck", "dire_wolf_spawn_2"], ["rubberduck", "dire_wolf_attack_2"], ["Darsycho", "dire_wolf_attack_3"],
+        ["rubberduck", "killer_plant_spawn_2"], ["rubberduck", "killer_plant_attack_2"], ["rubberduck", "killer_plant_attack_3"],
+        ["rubberduck", "mad_whisp_spawn_2"], ["rubberduck", "mad_whisp_attack_2"], ["rubberduck", "mad_whisp_attack_3"],
+        ["rubberduck", "ghost_sword_spawn_2"], ["rubberduck", "ghost_sword_attack_2"], ["rubberduck", "ghost_sword_attack_3"],
+        ["rubberduck", "stranger_spawn_2"], ["rubberduck", "stranger_attack_2"], ["rubberduck", "stranger_attack_3"],
+        ["rubberduck", "mini_boss_spawn_2"], ["Ogrebane", "mini_boss_attack_2"], ["Ogrebane", "mini_boss_attack_3"],
+        ["rubberduck", "final_boss_spawn_2"], ["rubberduck", "final_boss_attack_2"], ["Darsycho", "final_boss_attack_3"]
+    ];
+    var out = [];
+    for (var i = 0; i < array_length(takes); i++) array_push(out, { asset: takes[i][1], creator: takes[i][0] });
     return out;
 }
 

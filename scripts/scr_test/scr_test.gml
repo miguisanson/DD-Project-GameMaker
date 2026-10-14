@@ -3695,7 +3695,24 @@ function Test_Suite_Story() {
     Test_True("D40 sounds the game plays are in the list", asset_get_index("Body_falling_wood") != -1 && _snd[array_length(_snd) - 1].asset != "" && string_pos("Body_falling_wood", _cr) > 0 && string_pos("Metal_resonance", _cr) > 0);
     Test_False("D40 no sound listed twice", _snd_dup);
     Test_Eq("D40 every credited sound appears in the credits text", _snd_missing, "");
-    Test_Eq("D40 all 126 sounds and music tracks are listed", array_length(_snd), 126);
+    var _old_n = 0, _new_n = 0, _new_bad = "", _creators_ok = true;
+    for (var _ni = 0; _ni < array_length(_snd); _ni++) {
+        if (_snd[_ni].creator == CREDITS_CREATOR_TBD) { _old_n++; continue; }
+        _new_n++;
+        if (_snd[_ni].creator != "rubberduck" && _snd[_ni].creator != "Ogrebane" && _snd[_ni].creator != "Darsycho") _creators_ok = false;
+        var _nm = _snd[_ni].asset;   // <monster>_spawn_N or <monster>_attack_N, N = 2..4 (D116)
+        var _us = string_last_pos("_", _nm);
+        var _n_ok = _us > 0 && string_digits(string_copy(_nm, _us + 1, 9)) != "" && real(string_copy(_nm, _us + 1, 9)) >= 2 && real(string_copy(_nm, _us + 1, 9)) <= 4;
+        var _stem = _us > 0 ? string_copy(_nm, 1, _us - 1) : _nm;
+        var _ev_ok = string_pos("_spawn", _stem) == string_length(_stem) - 5 || string_pos("_attack", _stem) == string_length(_stem) - 6;
+        if (!_n_ok || !_ev_ok) _new_bad += _nm + " ";
+    }
+    Test_Eq("D40 all 126 original sounds and music tracks are listed (creator still to supply)", _old_n, 126);
+    Test_Eq("D116 the 30 new CC0 monster takes are credited by name", _new_n, 30);
+    Test_True("D116 each new take is credited to rubberduck, Ogrebane or Darsycho", _creators_ok);
+    Test_Eq("D116 new take names follow <monster>_spawn_N / <monster>_attack_N", _new_bad, "");
+    Test_True("D116 the credits name rubberduck, Ogrebane and Darsycho", string_pos("rubberduck", _cr) > 0 && string_pos("Ogrebane", _cr) > 0 && string_pos("Darsycho", _cr) > 0);
+    Test_True("D116 the credited takes run from slime_spawn_2 to final_boss_attack_3", _new_n == 30 && string_pos("slime_spawn_2", _cr) > 0 && string_pos("final_boss_attack_3", _cr) > 0);
     Test_Eq("D40 until the owner sends names the creator is the marked placeholder", _snd[0].creator, CREDITS_CREATOR_TBD);
     Test_True("D105 credits come with headings and spacing", array_length(Credits_Lines()) > array_length(Credits_PlainLines()));
 }
