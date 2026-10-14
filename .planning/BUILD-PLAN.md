@@ -11,8 +11,8 @@ game exports JSON with `-exportdata` for the Python simulator (no Included File 
 | A2 | Window modes (windowed sizes / borderless / exclusive), resize, rm_floor6_5 clamp, hold-to-skip intro & scenes | D91, D48, I-054, I-055, DISP-10/11 | MERGED to next |
 | B1 | Stats ATK/DEF/SPD/MAG + HP/MP, ratio damage, level-up (class growth + 1 free point), `-exportdata` JSON | D22, D76, D77 | MERGED to next |
 | B2 | Statuses (poison stacks, burn, bleed), no dice anywhere, Evasion/Solidify, Foresight | D78, D79, D80, D21 | MERGED to next |
-| B3 | Turn timeline (next 5), stun push-back + Steadfast, stagger meter + BREAK, damage numbers | D74, D75, D92 | in flight (wt b3) |
-| B4 | Battle AI rule lists, telegraphed big attacks, boss phases | D68, D7 | todo |
+| B3 | Turn timeline (next 5), stun push-back + Steadfast, stagger meter + BREAK, damage numbers | D74, D75, D92 | MERGED to next |
+| B4 | Battle AI rule lists, telegraphed big attacks, boss phases | D68, D7 | in flight (wt b4) |
 | C1 | Run loop: run/profile save split, seeded RNG streams, death → entrance, echo gift, abandon run, auto-save + continue, story seen once, run history, unlocks | D25-D27, D30-D33, D36, D46, D87, D88, D92 | MERGED to next |
 | C2 | Chests (class first, then cards), class pick (Nobody locked), cards 1-of-3 at chests + level-ups, upgrades, passives (shared + class), max 3 skills equipped | D73, D81, D82, D34, D83 | in flight (wt c2) |
 | C3 | Gold, merchant after floors 2/5/8, throwables (all classes, Nobody stronger), accessory slot, elites, per-run shuffles | D23, D33, D84, D85, D86, D92 | todo |
@@ -27,3 +27,5 @@ game exports JSON with `-exportdata` for the Python simulator (no Included File 
 | E2 | Full gate, regression list run, playtest build + one big PLAYTEST-QUEUE | D71 | todo |
 
 Order: A1+A2 → (B1 ∥ D0) → (B2 ∥ C1) → B3 → (B4 ∥ C2) → C3 → C4 → C5 → D1 (∥ D2 art) → D3 → F1 → E1 → E2.
+
+Step-number ranges (avoid scenario clashes): smoke C1 100-112, C5 113-121, C2 133-141; shots UI 80-89, B3 90-97, C2 120-128, B4 140-149, C3 150-159, C4 160-169, D1 170-199.
