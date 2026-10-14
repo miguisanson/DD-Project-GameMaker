@@ -103,6 +103,7 @@ function Test_RunAll() {
     Test_RunSuite("Input", Test_Suite_Input);
     Test_RunSuite("UI", Test_Suite_UI);
     Test_RunSuite("SfxInit", Test_Suite_SfxInit);
+    Test_RunSuite("Audio", Test_Suite_Audio);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -2910,6 +2911,118 @@ function Test_Suite_SfxInit() {
     SFX_EnsureAudioGlobals();
     Test_Eq("ROB-03 later calls do not overwrite live audio state", global.audio_debug_missing_count, 5);
     global.audio_debug_missing_count = 0;
+}
+
+// ---- D116 monster sound variation: every enemy_* play gets a small random pitch and volume, and a key with 2+ takes never repeats the last take
+function Test_Suite_Audio() {
+    if (asset_get_index("SFX_EnemyVariation") == -1 || asset_get_index("SFX_RegisterEnemyVariants") == -1) {
+        Test_True("audio: SFX_EnemyVariation and SFX_RegisterEnemyVariants exist (D116)", false);
+        return;
+    }
+    if (!variable_global_exists("sfx_db") || !ds_exists(global.sfx_db, ds_type_map)) global.sfx_db = ds_map_create();   // the manager object may not exist yet in a -runtests boot
+    SFX_RegisterDefaults();
+    var _keep_rng = variable_global_exists("sfx_rng") ? global.sfx_rng : undefined;
+
+    // the band: pitch +-6 %, volume +-10 %, drawn from the injected RNG
+    global.sfx_rng = Rng_New(116, "sfx");
+    var _pmin = 99, _pmax = 0, _vmin = 99, _vmax = 0, _inside = true;
+    var _keys = ["enemy_spawn_slime", "enemy_special_snake", "enemy_special_final_boss", "enemy_skill_bite", "enemy_spawn_unknown"];
+    for (var _i = 0; _i < 500; _i++) {
+        var _v = SFX_EnemyVariation(_keys[_i mod array_length(_keys)]);
+        if (_v.pitch < 0.94 || _v.pitch > 1.06 || _v.vol < 0.90 || _v.vol > 1.10) _inside = false;
+        _pmin = min(_pmin, _v.pitch); _pmax = max(_pmax, _v.pitch);
+        _vmin = min(_vmin, _v.vol);   _vmax = max(_vmax, _v.vol);
+    }
+    Test_True("audio: 500 enemy plays stay inside pitch 0.94..1.06 and volume 0.90..1.10", _inside);
+    Test_True("audio: enemy pitch is not always the same (spread over 0.08)", _pmax - _pmin > 0.08);
+    Test_True("audio: enemy volume is not always the same (spread over 0.10)", _vmax - _vmin > 0.10);
+    Test_True("audio: enemy pitch reaches both sides of 1", _pmin < 0.97 && _pmax > 1.03);
+
+    // same injected seed, same variation; another seed, another one
+    global.sfx_rng = Rng_New(7, "sfx");
+    var _a1 = SFX_EnemyVariation("enemy_spawn_spider");
+    var _a2 = SFX_EnemyVariation("enemy_spawn_spider");
+    global.sfx_rng = Rng_New(7, "sfx");
+    var _b1 = SFX_EnemyVariation("enemy_spawn_spider");
+    var _b2 = SFX_EnemyVariation("enemy_spawn_spider");
+    Test_True("audio: same seed repeats the same variation", _a1.pitch == _b1.pitch && _a1.vol == _b1.vol && _a2.pitch == _b2.pitch && _a2.vol == _b2.vol);
+    Test_True("audio: two plays in a row differ", _a1.pitch != _a2.pitch);
+    global.sfx_rng = Rng_New(8, "sfx");
+    Test_True("audio: another seed gives another variation", SFX_EnemyVariation("enemy_spawn_spider").pitch != _a1.pitch);
+
+    // only enemy_ keys vary
+    global.sfx_rng = Rng_New(116, "sfx");
+    var _calls = global.sfx_rng.calls;
+    var _ui = SFX_EnemyVariation("ui_move");
+    Test_True("audio: a UI key keeps pitch 1 and volume 1", _ui.pitch == 1 && _ui.vol == 1);
+    Test_Eq("audio: a UI key draws nothing from the RNG", global.sfx_rng.calls, _calls);
+    Test_True("audio: SFX_IsEnemyKey is true for enemy_ keys only", SFX_IsEnemyKey("enemy_special_dire_wolf") && !SFX_IsEnemyKey("sword_attack") && !SFX_IsEnemyKey("ui_enemy_x"));
+
+    // SFX_Play applies it (pitch recorded in sfx_last_pitch / sfx_last_vary, even without a sound device)
+    global.sfx_rng = Rng_New(116, "sfx");
+    var _seen = {};
+    var _all_in = true;
+    repeat (40) {
+        SFX_Play("enemy_special_stranger");
+        var _p = global.sfx_last_pitch;
+        if (_p < 0.94 || _p > 1.06 || global.sfx_last_vary < 0.90 || global.sfx_last_vary > 1.10) _all_in = false;
+        variable_struct_set(_seen, string(round(_p * 100000)), 1);
+    }
+    Test_True("audio: SFX_Play on an enemy key records a pitch inside the band", _all_in);
+    Test_True("audio: SFX_Play on an enemy key gives many different pitches", variable_struct_names_count(_seen) > 20);
+    SFX_Play("ui_move");
+    Test_True("audio: SFX_Play on a UI key is unvaried", global.sfx_last_pitch == 1 && global.sfx_last_vary == 1);
+    SFX_Play("enemy_special_stranger", 1, 2);
+    Test_True("audio: a caller pitch is multiplied, not replaced", global.sfx_last_pitch >= 1.88 && global.sfx_last_pitch <= 2.12);
+
+    // rotation: a key with 2+ takes never plays the same take twice in a row, and uses every take
+    SFX_RegisterEnemyVariants("enemy_test_three", ["Punch_1", "Punch_2", "Punch_3"], "");
+    Test_Eq("audio: three listed takes are registered", array_length(global.sfx_variant_db[? "enemy_test_three"]), 3);
+    var _last = noone, _repeat = false, _used = {};
+    repeat (400) {
+        var _snd = SFX_ResolvePlayAsset("enemy_test_three");
+        if (_snd == _last) _repeat = true;
+        _last = _snd;
+        variable_struct_set(_used, string(_snd), 1);
+    }
+    Test_False("audio: three takes never repeat the previous one (400 plays)", _repeat);
+    Test_Eq("audio: three takes all get used", variable_struct_names_count(_used), 3);
+
+    SFX_RegisterEnemyVariants("enemy_test_two", ["Punch_1", "Punch_2"], "");
+    _last = noone; _repeat = false; _used = {};
+    repeat (200) {
+        var _snd2 = SFX_ResolvePlayAsset("enemy_test_two");
+        if (_snd2 == _last) _repeat = true;
+        _last = _snd2;
+        variable_struct_set(_used, string(_snd2), 1);
+    }
+    Test_False("audio: two takes alternate (200 plays)", _repeat);
+    Test_Eq("audio: two takes both get used", variable_struct_names_count(_used), 2);
+
+    // extra takes are found by name (D94 pattern): <prefix>_2, _3, _4 join the listed ones when they exist
+    SFX_RegisterEnemyVariants("enemy_test_extra", ["Punch_1"], "Punch");
+    Test_Eq("audio: listed take plus Punch_2 and Punch_3 found by name", array_length(global.sfx_variant_db[? "enemy_test_extra"]), 3);
+    SFX_RegisterEnemyVariants("enemy_test_missing", ["Punch_1"], "no_such_sound");
+    Test_Eq("audio: extra takes that are not imported yet are skipped", array_length(global.sfx_variant_db[? "enemy_test_missing"]), 1);
+    SFX_RegisterEnemyVariants("enemy_test_dupe", ["Hiss", "Hiss"], "");
+    Test_Eq("audio: the same sound listed twice counts once", array_length(global.sfx_variant_db[? "enemy_test_dupe"]), 1);
+
+    // the real enemy keys: every monster has its spawn and special key, and they all go through the variant path
+    var _ids = [ENEMY_SLIME, ENEMY_SPIDER, ENEMY_MADWHISP, ENEMY_GHOSTSWORD, ENEMY_DIREWOLF, ENEMY_SNAKE, ENEMY_KILLER_PLANT, ENEMY_STRANGER, ENEMY_MINI_BOSS, ENEMY_FINAL_BOSS];
+    var _ok = true, _bad = "";
+    SFX_RegisterDefaults();
+    for (var _m = 0; _m < array_length(_ids); _m++) {
+        var _suffix = SFX_EnemyKeySuffix(_ids[_m]);
+        var _ev = ["enemy_spawn_" + _suffix, "enemy_special_" + _suffix];
+        for (var _e = 0; _e < 2; _e++) {
+            if (!ds_map_exists(global.sfx_variant_db, _ev[_e])) { _ok = false; _bad += _ev[_e] + " "; }
+        }
+    }
+    Test_True("audio: all 10 monsters have spawn and special registered as variant keys " + _bad, _ok);
+
+    global.sfx_rng = _keep_rng;
+    if (is_undefined(_keep_rng)) variable_global_set("sfx_rng", undefined);
+    SFX_RegisterDefaults();
 }
 
 
