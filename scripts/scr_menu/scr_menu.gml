@@ -2383,6 +2383,7 @@ function ControlsPage_OnConfirm(_m, _i) {
 function ControlsPage_OnBack(_m, _res) {
     var sp = GameState_Get().ui.settings_popup;
     sp.controls = undefined;
+    if (is_struct(sp.menu)) sp.menu.lock_ms = current_time;
 }
 
 // A key for the row being captured (also the entry point the smoke run uses in place of a real key press).
@@ -3003,6 +3004,7 @@ function SettingsMenu_OnConfirm(_m, _i) {
 
 // Back: leave without saving, restoring the saved language.
 function SettingsMenu_OnBack(_m, _res) {
+
     var sp = GameState_Get().ui.settings_popup;
     sp.pending = GameSettings_Copy(GameSettings_Ensure());
     sp.dirty = false;
@@ -3498,6 +3500,7 @@ function PauseMenu_Draw() {
 #macro UI_REPEAT_START_MS 140    // the first repeat gap; each next one is 20 percent shorter ...
 #macro UI_REPEAT_MIN_MS 45       // ... down to this
 #macro UI_PANEL_MS 120           // D97: panels slide and fade in this long
+#macro UI_INPUT_LOCK_MS 60       // C4: a menu ignores confirm and back this long after it opens or becomes the top one again (a key seen on two frames cannot answer two menus)
 #macro SETTINGS_TEXT_SPEED_MAX 2
 
 // ---- pure model ------------------------------------------------------------------------------------------------------------
@@ -3682,7 +3685,7 @@ function Ui_MenuNew(_id, _items, _opts) {
         id: _id, items: _items, cursor: 0, top: 0, rects: [],
         rep_v: Ui_RepeatNew(), rep_h: Ui_RepeatNew(),
         on_confirm: undefined, on_back: undefined, on_adjust: undefined,
-        owner: noone, data: {},
+        owner: noone, data: {}, lock_ms: current_time,
         layout: { title: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false },
         opened_ms: current_time, closed_ms: -1, cur_y: -1, last_draw_ms: current_time
     };
@@ -3758,6 +3761,7 @@ function Ui_StackNew() {
 
 function Ui_StackPush(_stk, _menu) {
     _menu.opened_ms = current_time;
+    _menu.lock_ms = current_time;
     array_push(_stk.menus, _menu);
     return _menu;
 }
@@ -3777,12 +3781,17 @@ function Ui_StackBack(_stk) {
     Ui_MemSet(Ui_MemGlobal(), m.id, m.cursor);
     m.closed_ms = current_time;
     _stk.leaving = m;
+    _stk.menus[array_length(_stk.menus) - 1].lock_ms = current_time;
     return "pop";
 }
 
 // Step + sounds + callbacks for the top menu of a stack (or a lone menu when _stk is undefined). Returns the event.
 function Ui_MenuUpdate(_m, _stk = undefined) {
     var ev = Ui_MenuStep(_m, Ui_ReadInput(), current_time);
+    if (current_time - _m.lock_ms < UI_INPUT_LOCK_MS) {   // the press that opened (or came back to) this menu must not answer it
+        ev.confirm = false;
+        ev.back = false;
+    }
     if (ev.moved) {
         SFX_PlayUI("ui_move");
         Ui_MemSet(Ui_MemGlobal(), _m.id, _m.cursor);

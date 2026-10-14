@@ -5237,7 +5237,8 @@ function Scenario_StepSmokeRest(_s) {
                 Scenario_Check("popup_confirm_shows_the_queued_one", Tutorial_QueueLength() == 0);
             }
             if (variable_struct_exists(_rc, "p1") && Tutorial_IsOpen()) Scenario_TutorialTap(_s);
-            if (variable_struct_exists(_rc, "p1") && !Tutorial_IsOpen() && !variable_struct_exists(_rc, "p2")) {
+            if (variable_struct_exists(_rc, "p1") && !Tutorial_IsOpen() && !variable_struct_exists(_rc, "p2t")) _rc.p2t = _s.t;
+            if (variable_struct_exists(_rc, "p2t") && _s.t >= _rc.p2t + 5 && !variable_struct_exists(_rc, "p2")) {   // the frame it closes in (and the next) still block: the closing press must not reach the world
                 _rc.p2 = true;
                 var _pf = Profile_Load(Profile_Path()).profile;
                 Scenario_Check("popup_closes_and_the_world_runs_again", !UI_IsBlocking());

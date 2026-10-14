@@ -4499,6 +4499,20 @@ function Test_Suite_Binds() {
     Test_True("D49 capture: the model is changed", _cr.ok && _cr.keys.confirm[0] == ord("X"));
     Test_True("D49 capture: the message names the swapped action", string_pos(Binds_RowLabel("back"), _cr.message) > 0);
     Test_False("D49 capture of a reserved key says why", Controls_Capture(_d, "confirm", vk_f5).ok);
+
+    // a menu ignores confirm / back for a moment after it opens or becomes the top one again (a key seen on two frames cannot answer two menus)
+    var _stk = Ui_StackNew();
+    var _m1 = Ui_MenuNew("lock_a", [{ label: "A" }], {});
+    var _m2 = Ui_MenuNew("lock_b", [{ label: "B" }], {});
+    _m1.lock_ms = current_time - 1000;
+    Ui_StackPush(_stk, _m1);
+    Ui_StackPush(_stk, _m2);
+    _m1.lock_ms = current_time - 1000;
+    _m2.lock_ms = current_time - 1000;
+    Test_True("UI lock: a new menu starts locked", Ui_MenuNew("lock_c", [{ label: "C" }], {}).lock_ms >= current_time - 1);
+    Test_True("UI lock: a pushed menu is locked", abs(Ui_StackPush(Ui_StackNew(), Ui_MenuNew("lock_d", [], {})).lock_ms - current_time) <= 3);
+    Ui_StackBack(_stk);
+    Test_True("UI lock: the menu that comes back is locked again", abs(_m1.lock_ms - current_time) <= 3);
 }
 
 function Test_Suite_Prompt() {
