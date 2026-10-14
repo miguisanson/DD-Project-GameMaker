@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T13:52:40Z",
-    "row_count": 1051
+    "generated_at_utc": "2026-10-14T14:45:39Z",
+    "row_count": 1116
   },
   "default_lang": "en",
   "languages": [
@@ -79,6 +79,10 @@
     "battle.det.mp": {
       "en": "MP",
       "ko": "MP"
+    },
+    "battle.hint.list": {
+      "en": "{confirm} Choose   {back} Back",
+      "ko": "{confirm} 선택   {back} 뒤로"
     },
     "battle.hud.break": {
       "en": "BREAK!",
@@ -240,17 +244,77 @@
       "en": "bed.option.back",
       "ko": "침대.옵션.뒤"
     },
+    "bed.help.back": {
+      "en": "Go back without choosing.",
+      "ko": "고르지 않고 돌아갑니다."
+    },
+    "bed.help.heal": {
+      "en": "Sleep a while and wake with all your HP and MP.",
+      "ko": "잠시 자고 나면 HP와 MP가 가득 찹니다."
+    },
+    "bed.help.leave": {
+      "en": "Walk away. The bed stays free for later.",
+      "ko": "그냥 떠납니다. 침대는 나중을 위해 비어 있습니다."
+    },
+    "bed.help.upgrade": {
+      "en": "Think over one of your skills and make it better for good.",
+      "ko": "기술 하나를 곰곰이 되짚어 영구히 더 강하게 만듭니다."
+    },
+    "bed.help.upgrade_none": {
+      "en": "None of your skills can be upgraded any more.",
+      "ko": "더 강화할 수 있는 기술이 없습니다."
+    },
+    "bed.lbl.hp": {
+      "en": "HP",
+      "ko": "HP"
+    },
+    "bed.lbl.mp": {
+      "en": "MP",
+      "ko": "MP"
+    },
+    "bed.msg.heal": {
+      "en": "You sleep a while. HP and MP are full again.",
+      "ko": "잠시 잠들었습니다. HP와 MP가 다시 가득 찼습니다."
+    },
+    "bed.msg.upgrade": {
+      "en": "{skill} is better now.",
+      "ko": "{skill}이(가) 더 강해졌습니다."
+    },
     "bed.option.back": {
       "en": "Back",
-      "ko": "뒤쪽에"
+      "ko": "뒤로"
+    },
+    "bed.option.heal": {
+      "en": "Rest",
+      "ko": "쉬기"
+    },
+    "bed.option.leave": {
+      "en": "Leave",
+      "ko": "떠나기"
     },
     "bed.option.rest": {
       "en": "Rest",
       "ko": "나머지"
     },
+    "bed.option.upgrade": {
+      "en": "Upgrade a skill",
+      "ko": "기술 강화"
+    },
     "bed.rest_moment": {
       "en": "You rest for a moment.",
       "ko": "잠시 쉬었다."
+    },
+    "bed.title": {
+      "en": "Bed",
+      "ko": "침대"
+    },
+    "bed.upgrade_title": {
+      "en": "Upgrade which skill?",
+      "ko": "어떤 기술을 강화할까요?"
+    },
+    "bed.used": {
+      "en": "You have rested here already. The bed is still warm.",
+      "ko": "이미 여기서 쉬었습니다. 침대는 아직 따뜻합니다."
     },
     "card.fb.focus.line": {
       "en": "Your main stat grows by {n} for good.",
@@ -601,8 +665,8 @@
       "ko": "+{n}턴"
     },
     "cards.pick.hint": {
-      "en": "Left / Right to choose, confirm to take it",
-      "ko": "좌/우로 고르고, 확인으로 받는다"
+      "en": "{left}{right} Choose   {confirm} Take",
+      "ko": "{left}{right} 고르기   {confirm} 받기"
     },
     "cards.pick.left": {
       "en": "({n} picks left)",
@@ -1175,6 +1239,90 @@
     "common.ok": {
       "en": "OK",
       "ko": "좋아요"
+    },
+    "controls.help.reset": {
+      "en": "Puts every keyboard key back to how it was. The controller is never changed.",
+      "ko": "키보드 키를 모두 처음대로 되돌립니다. 컨트롤러는 바뀌지 않습니다."
+    },
+    "controls.help.row": {
+      "en": "Confirm, then press the new key. If another action already uses it, the two swap. Esc cancels.",
+      "ko": "확인을 누른 뒤 새 키를 누르세요. 다른 동작이 이미 쓰는 키면 둘이 서로 바뀝니다. Esc로 취소합니다."
+    },
+    "controls.press_key": {
+      "en": "Press a key...",
+      "ko": "키를 누르세요..."
+    },
+    "controls.reserved": {
+      "en": "That key is reserved.",
+      "ko": "그 키는 따로 쓰이고 있습니다."
+    },
+    "controls.reset": {
+      "en": "Reset to defaults",
+      "ko": "기본값으로"
+    },
+    "controls.reset_done": {
+      "en": "Keys are back to the defaults. Apply saves them.",
+      "ko": "키가 기본값으로 돌아갔습니다. 적용을 누르면 저장됩니다."
+    },
+    "controls.row.back": {
+      "en": "Back",
+      "ko": "뒤로"
+    },
+    "controls.row.confirm": {
+      "en": "Confirm",
+      "ko": "확인"
+    },
+    "controls.row.down": {
+      "en": "Down",
+      "ko": "아래"
+    },
+    "controls.row.interact": {
+      "en": "Interact",
+      "ko": "상호작용"
+    },
+    "controls.row.left": {
+      "en": "Left",
+      "ko": "왼쪽"
+    },
+    "controls.row.right": {
+      "en": "Right",
+      "ko": "오른쪽"
+    },
+    "controls.row.run": {
+      "en": "Run",
+      "ko": "달리기"
+    },
+    "controls.row.tab_next": {
+      "en": "Next tab",
+      "ko": "다음 탭"
+    },
+    "controls.row.tab_prev": {
+      "en": "Previous tab",
+      "ko": "이전 탭"
+    },
+    "controls.row.up": {
+      "en": "Up",
+      "ko": "위"
+    },
+    "controls.set": {
+      "en": "Key changed. Apply saves it.",
+      "ko": "키가 바뀌었습니다. 적용을 누르면 저장됩니다."
+    },
+    "controls.swapped": {
+      "en": "{other} had that key, so the two swapped.",
+      "ko": "{other}이(가) 그 키를 쓰고 있어 서로 바꿨습니다."
+    },
+    "controls.title": {
+      "en": "Controls",
+      "ko": "조작"
+    },
+    "controls.unusable": {
+      "en": "That key cannot be used.",
+      "ko": "그 키는 쓸 수 없습니다."
+    },
+    "controls.waiting": {
+      "en": "Press the new key for {action}. Esc cancels.",
+      "ko": "{action}에 쓸 새 키를 누르세요. Esc로 취소합니다."
     },
     "credits.by": {
       "en": "by PaleRook",
@@ -1843,6 +1991,10 @@
     "enemy.name.unknown": {
       "en": "Enemy",
       "ko": "적"
+    },
+    "help.title": {
+      "en": "Help",
+      "ko": "도움말"
     },
     "interact.grave.default": {
       "en": "An old grave rests here.",
@@ -3244,6 +3396,10 @@
       "en": "Exit to Main Menu",
       "ko": "메인 메뉴로 나가기"
     },
+    "pause.option.help": {
+      "en": "Help",
+      "ko": "도움말"
+    },
     "pause.option.resume": {
       "en": "Resume",
       "ko": "재개하다"
@@ -3472,13 +3628,17 @@
       "en": "Saves your changes and applies them now. Back leaves without saving.",
       "ko": "변경 사항을 저장하고 지금 적용합니다. 뒤로 가면 저장하지 않습니다."
     },
+    "settings.help.controls": {
+      "en": "Change the keyboard keys. The controller stays as it is.",
+      "ko": "키보드 키를 바꿉니다. 컨트롤러는 그대로입니다."
+    },
     "settings.help.language": {
       "en": "Language of all text in the game.",
       "ko": "게임의 모든 글자 언어입니다."
     },
     "settings.help.qte_assist": {
-      "en": "Planned: more forgiving timing on button prompts.",
-      "ko": "예정: 버튼 입력 타이밍 판정을 더 너그럽게 합니다."
+      "en": "Wider bar zones and more time on arrow skills.",
+      "ko": "막대 판정 구간이 넓어지고 화살표 기술의 시간이 늘어납니다."
     },
     "settings.help.scale": {
       "en": "How many times the picture is enlarged in a window. Only used when windowed.",
@@ -3539,6 +3699,10 @@
     "settings.row.bgm": {
       "en": "BGM",
       "ko": "BGM"
+    },
+    "settings.row.controls": {
+      "en": "Controls",
+      "ko": "조작"
     },
     "settings.row.language": {
       "en": "Language",
@@ -4195,6 +4359,102 @@
     "throw.msg.thrown": {
       "en": "You throw the {item}!",
       "ko": "{item}을(를) 던졌다!"
+    },
+    "tutorial.arrows.body": {
+      "en": "Skills show a row of arrows. Press {up}{down}{left}{right} in that order before the time bar runs out. A wrong press costs time.",
+      "ko": "기술을 쓰면 화살표 줄이 나옵니다. 시간 막대가 다 줄기 전에 {up}{down}{left}{right}으로 순서대로 누르세요. 틀리면 시간이 깎입니다."
+    },
+    "tutorial.arrows.title": {
+      "en": "Arrow skills",
+      "ko": "화살표 기술"
+    },
+    "tutorial.bar.body": {
+      "en": "A cursor slides along the bar. Press {confirm} when it is over the bright zone. The closer to the middle, the harder you hit.",
+      "ko": "커서가 막대를 따라 움직입니다. 밝은 구간 위에 왔을 때 {confirm}을(를) 누르세요. 가운데에 가까울수록 더 세게 때립니다."
+    },
+    "tutorial.bar.title": {
+      "en": "The sliding bar",
+      "ko": "움직이는 막대"
+    },
+    "tutorial.bed.body": {
+      "en": "Each bed can be used once per run. Rest to restore all your HP and MP, or use it to upgrade one of your skills.",
+      "ko": "침대는 도전마다 한 번씩만 쓸 수 있습니다. 쉬어서 HP와 MP를 모두 채우거나, 기술 하나를 강화하세요."
+    },
+    "tutorial.bed.title": {
+      "en": "Beds",
+      "ko": "침대"
+    },
+    "tutorial.cards.body": {
+      "en": "Level-ups and skill chests offer 3 cards: a new skill, an upgrade or a passive. Take one, or skip for a little gold.",
+      "ko": "레벨업과 기술 상자는 카드 3장을 보여 줍니다. 새 기술, 강화, 패시브 중 하나를 고르거나, 건너뛰고 약간의 골드를 받으세요."
+    },
+    "tutorial.cards.title": {
+      "en": "Cards",
+      "ko": "카드"
+    },
+    "tutorial.defence.body": {
+      "en": "When an enemy winds up a big attack, a bar appears. Press {confirm} on the bright zone to take less damage and shake off its effects.",
+      "ko": "적이 큰 공격을 준비하면 막대가 나타납니다. 밝은 구간에서 {confirm}을(를) 누르면 피해가 줄고 부가 효과도 털어냅니다."
+    },
+    "tutorial.defence.title": {
+      "en": "Defending",
+      "ko": "막기"
+    },
+    "tutorial.elite.body": {
+      "en": "Marked enemies are Elites. They are tougher than normal ones, but their rewards are better.",
+      "ko": "표시가 붙은 적은 정예입니다. 일반 적보다 강하지만 보상이 더 좋습니다."
+    },
+    "tutorial.elite.title": {
+      "en": "Elites",
+      "ko": "정예"
+    },
+    "tutorial.footer": {
+      "en": "{confirm} Continue",
+      "ko": "{confirm} 계속"
+    },
+    "tutorial.more": {
+      "en": "+{n} more",
+      "ko": "+{n}개 더"
+    },
+    "tutorial.shop.body": {
+      "en": "The merchant sells potions and gear. Gold is kept for the whole run, and the stock changes with every run.",
+      "ko": "상인은 물약과 장비를 팝니다. 골드는 한 번의 도전 동안 유지되고, 상품은 도전마다 바뀝니다."
+    },
+    "tutorial.shop.title": {
+      "en": "The shop",
+      "ko": "상점"
+    },
+    "tutorial.stagger.body": {
+      "en": "Good hits fill the enemy's stagger meter. When it is full the enemy is BROKEN: it loses a turn and takes +50% damage.",
+      "ko": "좋은 공격은 적의 경직 게이지를 채웁니다. 가득 차면 적이 BREAK 상태가 되어 한 턴을 잃고 피해를 50% 더 받습니다."
+    },
+    "tutorial.stagger.title": {
+      "en": "Stagger and BREAK",
+      "ko": "경직과 BREAK"
+    },
+    "tutorial.status.body": {
+      "en": "Poison, Burning, Bleeding and Stun last a few turns. The icons under a name show which ones a fighter has.",
+      "ko": "독, 화상, 출혈, 기절은 몇 턴 동안 이어집니다. 이름 아래 아이콘이 걸려 있는 상태를 보여 줍니다."
+    },
+    "tutorial.status.title": {
+      "en": "Statuses",
+      "ko": "상태 이상"
+    },
+    "tutorial.throwables.body": {
+      "en": "Throwable items hurt an enemy straight from the item menu. Each one is used up when thrown, so save them for hard fights.",
+      "ko": "투척 도구는 아이템 메뉴에서 바로 적에게 피해를 줍니다. 던지면 사라지니 어려운 싸움을 위해 아껴 두세요."
+    },
+    "tutorial.throwables.title": {
+      "en": "Throwables",
+      "ko": "투척 도구"
+    },
+    "tutorial.timeline.body": {
+      "en": "The strip at the top shows who acts next. Faster fighters act more often, and some skills push an enemy back a turn.",
+      "ko": "위쪽 띠는 다음에 행동할 상대를 보여 줍니다. 빠른 쪽이 더 자주 행동하고, 어떤 기술은 적을 한 턴 뒤로 밀어냅니다."
+    },
+    "tutorial.timeline.title": {
+      "en": "Turn order",
+      "ko": "턴 순서"
     },
     "ui.skip_hold": {
       "en": "Hold to skip",

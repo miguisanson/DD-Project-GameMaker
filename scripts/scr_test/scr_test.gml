@@ -14,6 +14,7 @@ function Test_HasFlag(_flag) {
 
 function Test_Reset() {
     global.test = { lines: [], pass: 0, fail: 0, errors: 0 };
+    global.tutorial_off = true;   // C4 (D45): no first-time pop-up opens inside a suite (Test_Suite_Tutorial switches it on for itself)
 }
 
 function Test_Log(_line) {
@@ -89,6 +90,11 @@ function Test_RunAll() {
     Test_RunSuite("RunLoop", Test_Suite_RunLoop);
     Test_RunSuite("Story", Test_Suite_Story);
     Test_RunSuite("Cards", Test_Suite_Cards);
+    Test_RunSuite("Assist", Test_Suite_Assist);
+    Test_RunSuite("Binds", Test_Suite_Binds);
+    Test_RunSuite("Prompt", Test_Suite_Prompt);
+    Test_RunSuite("Tutorial", Test_Suite_Tutorial);
+    Test_RunSuite("Bed", Test_Suite_Bed);
     Test_RunSuite("Economy", Test_Suite_Economy);
     Test_RunSuite("BattleUi", Test_Suite_BattleUi);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
@@ -2006,6 +2012,19 @@ function Test_Suite_Export() {
     Test_Eq("Export: constants carry the power scale", _back.constants.power_scale, 2);
     Test_Eq("Export: the final boss exports its basic power (9)", _back.enemies[9].basic_power, 9);
     Test_False("Export: no asset references leak into the data", string_pos("sprite", json_stringify(_back.enemies)) > 0);
+    // E1 (balance simulator): the timeline / stagger constants, the QTE bar numbers, each heavy enemy move's defence bar and the floor pools
+    Test_Eq("Export E1: timeline gauge max 100", _back.constants.timeline.gauge_max, 100);
+    Test_Eq("Export E1: steadfast lasts 2 turns", _back.constants.timeline.steadfast_turns, 2);
+    Test_Eq("Export E1: a boss is pushed half as far", _back.constants.timeline.boss_push, 0.5);
+    Test_Eq("Export E1: BREAK takes +50%", _back.constants.timeline.break_mult, 1.5);
+    Test_Eq("Export E1: bow bar sweeps 850 ms", _back.qte.bar_params.bow.sweep_ms, 850);
+    Test_Eq("Export E1: a Perfect block lets 25% through", _back.qte.defence_mult.perfect, 0.25);
+    Test_Eq("Export E1: nine floor pools", array_length(_back.floors), 9);
+    Test_True("Export E1: floor 1 only has the Slime", array_length(_back.floors[0].pool) == 1 && _back.floors[0].pool[0] == ENEMY_SLIME);
+    Test_Eq("Export E1: floor 6 draws from 4 enemy types", array_length(_back.floors[5].pool), 4);
+    var _ram = undefined;
+    for (var _ri = 0; _ri < array_length(_back.skills); _ri++) if (_back.skills[_ri].id == SKILL_RAMMING) _ram = _back.skills[_ri];
+    Test_True("Export E1: Ramming carries its defence bar (1500 ms sweep)", is_struct(_ram) && variable_struct_exists(_ram, "defence") && _ram.defence.sweep_ms == 1500);
 }
 
 // Save: SAVE-05 and the R-008 round trip. Never touches savedata*.sav: the snapshot goes through JSON text only.
@@ -2652,7 +2671,7 @@ function Test_Suite_SettingsMigration() {
     Save_DeleteFileSet(_f);
     Save_WriteSettingsConfig({ window_mode: WINDOW_MODE_BORDERLESS, display_scale: 6, audio_bgm: 0.4 }, _f);
     var _raw = json_parse(Test_RawRead(_f));
-    Test_Eq("DISP-14 written settings_version", _raw.settings_version, 9);   // 9 adds text_speed, screen_shake, qte_assist (D0)
+    Test_Eq("DISP-14 written settings_version", _raw.settings_version, 10);   // 9 added text_speed, screen_shake, qte_assist (D0); 10 adds keys (D49)
     Test_Eq("DISP-14 written window_mode", _raw.window_mode, WINDOW_MODE_BORDERLESS);
     Test_False("DISP-14 written file has no fit_screen", variable_struct_exists(_raw, "fit_screen"));
     var _back = Save_ReadSettingsConfig(_f);
@@ -3868,7 +3887,7 @@ function Test_Suite_UI() {
     var _si = SettingsMenu_Items(GameSettings_Defaults(), 16);
     var _ids = "";
     for (var _i = 0; _i < array_length(_si); _i++) _ids += ((_i > 0) ? "," : "") + _si[_i].id;
-    Test_Eq("D0 settings rows, in order", _ids, "vol_ui,vol_sfx,vol_bgm,text_speed,shake,qte_assist,window,scale,language,apply");
+    Test_Eq("D0 settings rows, in order", _ids, "vol_ui,vol_sfx,vol_bgm,text_speed,shake,qte_assist,window,scale,language,controls,apply");   // C4 adds Controls (D49)
     Test_Eq("D0 settings volume row shows a percentage", _si[2].value, "60%");
     Test_Eq("D0 settings volume row carries its slider fill", _si[2].amount, 0.6);
     Test_False("D0 scale row is greyed outside windowed (borderless is the default)", _si[7].enabled);
@@ -4482,6 +4501,350 @@ function Test_Suite_BattleUi() {
     Test_Eq("BattleUi (I-065) normalising keeps max HP", _lv2.max_hp, _lv_before.max_hp);
     Test_Eq("BattleUi (I-065) normalising keeps HP", _lv2.hp, _lv_before.hp);
     Test_Eq("BattleUi (I-065) normalising keeps the stats", string(_lv2.stats.atk) + "/" + string(_lv2.stats.def) + "/" + string(_lv2.stats.spd) + "/" + string(_lv2.stats.mag), string(_lv_before.atk) + "/" + string(_lv_before.def) + "/" + string(_lv_before.spd) + "/" + string(_lv_before.mag));
+}
+
+// ---- C4: QTE assist (D35), key rebinding (D49), button prompts (D92), tutorial prompts (D45), beds (D47) ----------------------------------
+// Expected values come from the decisions: D35 (one assist option widening the zones; the packet's numbers: zones x1.5, arrow time x1.3),
+// D49 (rebind keyboard keys; conflicts swap; reset to defaults; gamepad stays default), D92 (prompts match the last-used device),
+// D45 (once per profile, 11 mechanics, a Help page lists them all), D47 (a bed: heal OR upgrade one owned skill, once per run per bed).
+function Test_Suite_Assist() {
+    Test_Eq("D35 assist off: zones x1", Qte_AssistZoneMult(false), 1);
+    Test_Eq("D35 assist on: zones x1.5", Qte_AssistZoneMult(true), 1.5);
+    Test_Eq("D35 assist off: arrow time x1", Qte_AssistTimeMult(false), 1);
+    Test_Eq("D35 assist on: arrow time x1.3", Qte_AssistTimeMult(true), 1.3);
+    var _bar = Qte_BarParams("default");   // 1100 ms sweep, Perfect +-60, Good +-120, OK +-200, centre at 770
+    var _c = Qte_ZoneCentreMs(_bar);
+    Test_Eq("D35 off: 80 ms from the centre is GOOD", Qte_Grade(_c + 80, _bar, Qte_AssistZoneMult(false)), "GOOD");
+    Test_Eq("D35 on: 80 ms from the centre is PERFECT (+-90)", Qte_Grade(_c + 80, _bar, Qte_AssistZoneMult(true)), "PERFECT");
+    Test_Eq("D35 off: 150 ms from the centre is OK", Qte_Grade(_c - 150, _bar, Qte_AssistZoneMult(false)), "OK");
+    Test_Eq("D35 on: 150 ms from the centre is GOOD (+-180)", Qte_Grade(_c - 150, _bar, Qte_AssistZoneMult(true)), "GOOD");
+    Test_Eq("D35 off: 250 ms from the centre is WEAK", Qte_Grade(_c - 250, _bar, Qte_AssistZoneMult(false)), "WEAK");
+    Test_Eq("D35 on: 250 ms from the centre is OK (+-300)", Qte_Grade(_c - 250, _bar, Qte_AssistZoneMult(true)), "OK");
+    // the defence bars use the same grader, so they widen too
+    var _def = Qte_DefenceParams(SKILL_BITE);
+    Test_Eq("D35 off: a Bite bar press 70 ms off is GOOD", Qte_Grade(Qte_ZoneCentreMs(_def) + 70, _def, 1), "GOOD");
+    Test_Eq("D35 on: a Bite bar press 70 ms off is PERFECT (+-82.5)", Qte_Grade(Qte_ZoneCentreMs(_def) + 70, _def, Qte_AssistZoneMult(true)), "PERFECT");
+    // the arrow time bar and its Perfect window stretch by x1.3; a wrong press still costs 250 ms
+    var _p1 = Qte_SeqParams(3, Qte_AssistTimeMult(false));
+    var _p2 = Qte_SeqParams(3, Qte_AssistTimeMult(true));
+    Test_Eq("D35 off: 3 arrows keep 3400 ms", _p1.limit_ms, 3400);
+    Test_True("D35 on: 3 arrows get 3400 x 1.3 = 4420 ms", abs(_p2.limit_ms - 4420) < 0.001);
+    Test_True("D35 on: the Perfect window is 1500 x 1.3 = 1950 ms", abs(_p2.fast_ms - 1950) < 0.001);
+    Test_Eq("D35 on: a wrong press still costs 250 ms", _p2.penalty_ms, 250);
+    // a slow but clean 3-arrow run: Good without the assist, Perfect with it
+    var _slow = [{ t: 600, dir: UP }, { t: 1200, dir: LEFT }, { t: 1800, dir: DOWN }];
+    Test_Eq("D35 off: finishing at 1800 ms is only GOOD", Qte_SeqRun([UP, LEFT, DOWN], _slow, Qte_AssistTimeMult(false)).key, "GOOD");
+    Test_Eq("D35 on: finishing at 1800 ms is PERFECT", Qte_SeqRun([UP, LEFT, DOWN], _slow, Qte_AssistTimeMult(true)).key, "PERFECT");
+    // the live setting: the hooks the battle reads
+    var _st = GameSettings_Ensure();
+    var _was = _st.qte_assist;
+    _st.qte_assist = 0;
+    Test_Eq("D35 live: setting off gives x1 zones", Qte_AssistMult(), 1);
+    Test_Eq("D35 live: setting off gives x1 arrow time", Qte_AssistTimeMultNow(), 1);
+    _st.qte_assist = 1;
+    Test_Eq("D35 live: setting on gives x1.5 zones", Qte_AssistMult(), 1.5);
+    Test_Eq("D35 live: setting on gives x1.3 arrow time", Qte_AssistTimeMultNow(), 1.3);
+    _st.qte_assist = _was;
+}
+
+function Test_Suite_Binds() {
+    var _ids = Binds_RowIds();
+    var _txt = "";
+    for (var _i = 0; _i < array_length(_ids); _i++) _txt += ((_i > 0) ? "," : "") + _ids[_i];
+    Test_Eq("D49 rebindable rows, in order", _txt, "confirm,back,up,down,left,right,run,tab_prev,tab_next,interact");
+    var _d = Binds_Defaults();
+    Test_True("D49 default confirm: Space, Z, Enter", Test_SameArray(_d.confirm, [vk_space, ord("Z"), vk_enter]));
+    Test_True("D49 default back: Esc, X", Test_SameArray(_d.back, [vk_escape, ord("X")]));
+    Test_True("D49 default up: W, Up", Test_SameArray(_d.up, [ord("W"), vk_up]));
+    Test_True("D49 default down: S, Down", Test_SameArray(_d.down, [ord("S"), vk_down]));
+    Test_True("D49 default left: A, Left", Test_SameArray(_d.left, [ord("A"), vk_left]));
+    Test_True("D49 default right: D, Right", Test_SameArray(_d.right, [ord("D"), vk_right]));
+    Test_True("D49 default run: Shift", Test_SameArray(_d.run, [vk_shift]));
+    Test_True("D49 default tabs: Q and E", Test_SameArray(_d.tab_prev, [ord("Q")]) && Test_SameArray(_d.tab_next, [ord("E")]));
+    Test_True("D49 default interact: Space", Test_SameArray(_d.interact, [vk_space]));
+    Test_Eq("D49 key text of the default confirm", Binds_KeysText(_d.confirm), "Space / Z / Enter");
+
+    // assigning: the new key replaces the first key (a key the action already has swaps places with it); the others stay
+    var _r = Binds_Assign(_d, "confirm", ord("T"));
+    Test_True("D49 assign: ok", _r.ok);
+    Test_True("D49 assign: the new key replaces the first, the others stay", Test_SameArray(_r.keys.confirm, [ord("T"), ord("Z"), vk_enter]));
+    Test_Eq("D49 assign: no swap when the key was free", _r.swapped, "");
+    Test_True("D49 assign: the input table is untouched", Test_SameArray(_d.confirm, [vk_space, ord("Z"), vk_enter]));
+    // a key the action already has swaps places with the first key
+    var _r2 = Binds_Assign(_d, "confirm", ord("Z"));
+    Test_True("D49 an owned key moves to the front", _r2.ok && Test_SameArray(_r2.keys.confirm, [ord("Z"), vk_space, vk_enter]));
+    Test_Eq("D49 an unrelated key list keeps its length", array_length(_r.keys.confirm), 3);
+    Test_Eq("D49 an owned key swaps nothing", _r2.swapped, "");
+    // conflicts swap: confirm takes X, back gets confirm's old first key in its place
+    var _r3 = Binds_Assign(_d, "confirm", ord("X"));
+    Test_Eq("D49 conflict: X was Back's, so Back is swapped", _r3.swapped, "back");
+    Test_Eq("D49 conflict: Confirm now starts with X", _r3.keys.confirm[0], ord("X"));
+    Test_True("D49 conflict: Back lost X and got Space instead", Test_SameArray(_r3.keys.back, [vk_escape, vk_space]));
+    Test_True("D49 conflict: Confirm lost Space (it moved to Back)", Test_SameArray(_r3.keys.confirm, [ord("X"), ord("Z"), vk_enter]));
+    Test_Eq("D49 conflict: X is no longer Back's", Binds_Conflict(_r3.keys, "confirm", ord("X")), "");
+    // directions are used everywhere, so they conflict with everything
+    var _r4 = Binds_Assign(_d, "run", ord("W"));
+    Test_Eq("D49 conflict: Run wants W, Up is swapped", _r4.swapped, "up");
+    Test_True("D49 conflict: Up got Shift in W's place", Test_SameArray(_r4.keys.up, [vk_shift, vk_up]));
+    var _r5 = Binds_Assign(_d, "up", ord("A"));
+    Test_Eq("D49 conflict: Up wants A, Left is swapped", _r5.swapped, "left");
+    Test_True("D49 conflict: Left got W in A's place", Test_SameArray(_r5.keys.left, [ord("W"), vk_left]));
+    // menu-only and world-only actions never meet, so Interact and Confirm may share a key
+    var _r6 = Binds_Assign(_d, "interact", ord("Z"));
+    Test_Eq("D49 Interact on Z does not touch Confirm (different places)", _r6.swapped, "");
+    Test_True("D49 Confirm keeps Z", Test_SameArray(_r6.keys.confirm, [vk_space, ord("Z"), vk_enter]));
+    // reserved keys
+    var _res = [vk_escape, vk_f5, vk_f9, ord("P"), ord("I"), vk_tab];
+    for (var _k = 0; _k < array_length(_res); _k++) {
+        var _rr = Binds_Assign(_d, "confirm", _res[_k]);
+        Test_False("D49 reserved key " + string(_res[_k]) + " is refused", _rr.ok);
+    }
+    Test_False("D49 a missing key is refused", Binds_Assign(_d, "confirm", -1).ok);
+    Test_False("D49 an unknown action is refused", Binds_Assign(_d, "dance", ord("T")).ok);
+    Test_True("D49 letters can be captured", Binds_CanCapture(ord("T")));
+    Test_False("D49 Esc cannot be captured (it cancels the capture)", Binds_CanCapture(vk_escape));
+
+    // normalising: bad data falls back to defaults row by row
+    var _n0 = Binds_Normalize(undefined);
+    Test_True("D49 normalize(nothing) is the defaults", Test_SameArray(_n0.confirm, _d.confirm) && Test_SameArray(_n0.run, _d.run));
+    var _n1 = Binds_Normalize({ confirm: [ord("T"), ord("T"), 0, "x", ord("G")], run: "oops", up: [] });
+    Test_True("D49 normalize drops duplicates and junk", Test_SameArray(_n1.confirm, [ord("T"), ord("G")]));
+    Test_True("D49 normalize: a wrong-typed row gets its default", Test_SameArray(_n1.run, _d.run));
+    Test_True("D49 normalize: an empty row gets its default", Test_SameArray(_n1.up, _d.up));
+    Test_True("D49 normalize: a missing row gets its default", Test_SameArray(_n1.back, _d.back));
+    var _n2 = Binds_Normalize({ confirm: [ord("A"), ord("B"), ord("C"), ord("D"), ord("E")] });
+    Test_Eq("D49 normalize keeps at most 3 keys", array_length(_n2.confirm), 3);
+
+    // bindings for the input system: one row feeds several actions
+    var _a = Binds_ToActions(_r.keys);
+    Test_True("D49 confirm feeds the confirm action", Test_SameArray(_a.confirm, _r.keys.confirm));
+    Test_True("D49 back feeds the cancel action", Test_SameArray(_a.cancel, _r.keys.back));
+    Test_True("D49 up feeds the world and the menu", Test_SameArray(_a.move_up, _r.keys.up) && Test_SameArray(_a.menu_up, _r.keys.up));
+    Test_True("D49 interact feeds the interact action", Test_SameArray(_a.interact, _r.keys.interact));
+
+    // settings: persisted with a version bump; old files get the defaults
+    Test_True("D49 settings defaults carry the default keys", Test_SameArray(GameSettings_Defaults().keys.confirm, _d.confirm));
+    var _norm = GameSettings_Normalize({ keys: { confirm: [ord("T")] } });
+    Test_True("D49 settings normalize keeps a custom row", Test_SameArray(_norm.keys.confirm, [ord("T")]));
+    Test_True("D49 settings normalize defaults the other rows", Test_SameArray(_norm.keys.back, _d.back));
+    var _f = "test_settings_keys.json";
+    Save_DeleteFileSet(_f);
+    var _cust = GameSettings_Defaults();
+    _cust.keys = _r3.keys;
+    Save_WriteSettingsConfig(_cust, _f);
+    var _raw = json_parse(Test_RawRead(_f));
+    Test_Eq("D49 the file is version 10", _raw.settings_version, 10);
+    var _back = Save_ReadSettingsConfig(_f);
+    Test_True("D49 custom keys survive a save", is_struct(_back) && Test_SameArray(_back.keys.confirm, _r3.keys.confirm) && Test_SameArray(_back.keys.back, _r3.keys.back));
+    Save_DeleteFileSet(_f);
+    Test_RawWrite(_f, "{\"settings_version\":9,\"text_speed\":2,\"qte_assist\":1}");
+    var _old = Save_ReadSettingsConfig(_f);
+    Test_True("D49 a version 9 file gets the default keys", is_struct(_old) && Test_SameArray(_old.keys.confirm, _d.confirm) && Test_SameArray(_old.keys.interact, _d.interact));
+    Test_Eq("D49 a version 9 file keeps its other settings", is_struct(_old) ? _old.text_speed : -1, 2);
+    Save_DeleteFileSet(_f);
+
+    // the live table and the labels
+    Binds_Apply(_r.keys);
+    Test_True("D49 apply: the confirm action has the new keys", Test_SameArray(global.input.bindings.confirm, _r.keys.confirm));
+    Test_True("D49 apply: the cancel action follows Back", Test_SameArray(global.input.bindings.cancel, _r.keys.back));
+    Test_True("D49 apply: menu_up and move_up share the Up row", Test_SameArray(global.input.bindings.menu_up, _r.keys.up) && Test_SameArray(global.input.bindings.move_up, _r.keys.up));
+    Input_Init();
+    Test_True("D49 apply: a later Input_Init does not put the old keys back", Test_SameArray(global.input.bindings.confirm, _r.keys.confirm));
+    Test_Eq("D49 apply: labels follow the keys", Input_Label("confirm"), "T / Z / Enter");
+    Binds_Apply(_d);
+    Test_Eq("D49 apply the defaults: the labels are back", Input_Label("confirm"), "Space / Z / Enter");
+    Test_True("D49 apply the defaults: the pause key is untouched", Test_SameArray(global.input.bindings.pause, [vk_escape]));
+
+    // the Controls page rows
+    var _items = Controls_Items(_d, "");
+    var _cid = "";
+    for (var _j = 0; _j < array_length(_items); _j++) _cid += ((_j > 0) ? "," : "") + _items[_j].id;
+    Test_Eq("D49 controls page rows", _cid, "confirm,back,up,down,left,right,run,tab_prev,tab_next,interact,reset");
+    Test_Eq("D49 a controls row shows its keys", _items[0].value, "Space / Z / Enter");
+    Test_Eq("D49 the row being captured says so", Controls_Items(_d, "back")[1].value, Loc_T("controls.press_key", "Press a key..."));
+    var _cr = Controls_Capture(_d, "confirm", ord("X"));
+    Test_True("D49 capture: the model is changed", _cr.ok && _cr.keys.confirm[0] == ord("X"));
+    Test_True("D49 capture: the message names the swapped action", string_pos(Binds_RowLabel("back"), _cr.message) > 0);
+    Test_False("D49 capture of a reserved key says why", Controls_Capture(_d, "confirm", vk_f5).ok);
+
+    // a menu ignores confirm / back for a moment after it opens or becomes the top one again (a key seen on two frames cannot answer two menus)
+    var _stk = Ui_StackNew();
+    var _m1 = Ui_MenuNew("lock_a", [{ label: "A" }], {});
+    var _m2 = Ui_MenuNew("lock_b", [{ label: "B" }], {});
+    _m1.lock_ms = current_time - 1000;
+    Ui_StackPush(_stk, _m1);
+    Ui_StackPush(_stk, _m2);
+    _m1.lock_ms = current_time - 1000;
+    _m2.lock_ms = current_time - 1000;
+    Test_True("UI lock: a new menu starts locked", Ui_MenuNew("lock_c", [{ label: "C" }], {}).lock_ms >= current_time - 1);
+    Test_True("UI lock: a pushed menu is locked", abs(Ui_StackPush(Ui_StackNew(), Ui_MenuNew("lock_d", [], {})).lock_ms - current_time) <= 3);
+    Ui_StackBack(_stk);
+    Test_True("UI lock: the menu that comes back is locked again", abs(_m1.lock_ms - current_time) <= 3);
+}
+
+function Test_Suite_Prompt() {
+    Test_Eq("D92 a pad press switches to the pad", Prompt_DeviceStep("keyboard", false, true), "gamepad");
+    Test_Eq("D92 a key press switches to the keyboard", Prompt_DeviceStep("gamepad", true, false), "keyboard");
+    Test_Eq("D92 no input keeps the keyboard", Prompt_DeviceStep("keyboard", false, false), "keyboard");
+    Test_Eq("D92 no input keeps the pad", Prompt_DeviceStep("gamepad", false, false), "gamepad");
+    Test_Eq("D92 both in one frame keeps what it was (pad)", Prompt_DeviceStep("gamepad", true, true), "gamepad");
+    Test_Eq("D92 both in one frame keeps what it was (keyboard)", Prompt_DeviceStep("keyboard", true, true), "keyboard");
+    Binds_Apply(Binds_Defaults());
+    var _k = Prompt_Info("confirm", "keyboard");
+    Test_True("D92 keyboard confirm: a keycap with the first key", _k.kind == "key" && _k.label == "Space");
+    var _p = Prompt_Info("confirm", "gamepad");
+    Test_True("D92 pad confirm: a round A", _p.kind == "pad" && _p.label == "A");
+    Test_Eq("D92 pad back is B", Prompt_Info("cancel", "gamepad").label, "B");
+    Test_Eq("D92 pad interact is A", Prompt_Info("interact", "gamepad").label, "A");
+    Test_Eq("D92 pad menu is X", Prompt_Info("menu", "gamepad").label, "X");
+    Test_Eq("D92 pad pause is Y", Prompt_Info("pause", "gamepad").label, "Y");
+    Test_Eq("D92 pad tab_prev is LB", Prompt_Info("tab_prev", "gamepad").label, "LB");
+    Test_Eq("D92 pad tab_next is RB", Prompt_Info("tab_next", "gamepad").label, "RB");
+    Test_Eq("D92 pad run is LT", Prompt_Info("run", "gamepad").label, "LT");
+    Test_Eq("D92 pad up is the D-pad", Prompt_Info("move_up", "gamepad").label, "D-Pad");
+    Test_Eq("D92 keyboard up is W", Prompt_Info("move_up", "keyboard").label, "W");
+    Test_Eq("D92 keyboard back is Esc", Prompt_Info("cancel", "keyboard").label, "Esc");
+    Test_Eq("D92 keyboard tab_prev is Q", Prompt_Info("tab_prev", "keyboard").label, "Q");
+    Test_Eq("D92 the row names work too (back)", Prompt_Info("back", "keyboard").label, "Esc");
+    Test_Eq("D92 the row names work too (up)", Prompt_Info("up", "keyboard").label, "W");
+    Test_Eq("D92 text of a pad prompt", Prompt_Text("confirm", "gamepad"), "A");
+    Test_Eq("D92 text of a keyboard prompt", Prompt_Text("run", "keyboard"), "Shift");
+    Test_Eq("D92 an unknown action shows its own name", Prompt_Info("dance", "keyboard").label, "dance");
+    // rebinding changes the keyboard prompt only
+    var _kb = Binds_Assign(Binds_Defaults(), "confirm", ord("T")).keys;
+    Binds_Apply(_kb);
+    Test_Eq("D92 a rebound key shows on the keyboard prompt", Prompt_Info("confirm", "keyboard").label, "T");
+    Test_Eq("D92 the pad prompt stays default", Prompt_Info("confirm", "gamepad").label, "A");
+    Binds_Apply(Binds_Defaults());
+    // the live device
+    global.input.last_device = "gamepad";
+    Test_Eq("D92 the live device decides the glyph", Prompt_Info("confirm").label, "A");
+    global.input.last_device = "keyboard";
+    Test_Eq("D92 the live device decides the glyph (keyboard)", Prompt_Info("confirm").label, "Space");
+
+    // text with prompts inside
+    var _t = Prompt_Tokens("Press {confirm} to go, {back} to leave.");
+    Test_Eq("D92 tokens: five parts", array_length(_t), 5);
+    Test_True("D92 tokens: text, action, text, action, text", _t[0].kind == "text" && _t[1].kind == "action" && _t[2].kind == "text" && _t[3].kind == "action" && _t[4].kind == "text");
+    Test_True("D92 tokens: the action names", _t[1].s == "confirm" && _t[3].s == "back");
+    Test_Eq("D92 tokens: text between is kept", _t[2].s, " to go, ");
+    Test_Eq("D92 tokens: plain text is one part", array_length(Prompt_Tokens("No prompts here.")), 1);
+    Test_Eq("D92 tokens: empty text is none", array_length(Prompt_Tokens("")), 0);
+    Test_Eq("D92 tokens: a lone action", array_length(Prompt_Tokens("{interact}")), 1);
+    Test_Eq("D92 tokens: an unclosed brace is plain text", Prompt_Tokens("a {b")[0].s, "a {b");
+    Test_Eq("D92 plain text of a line with prompts", Prompt_Plain("Press {confirm}.", "gamepad"), "Press A.");
+    Test_True("D92 has-prompts tells the two apart", Prompt_HasTokens("Press {confirm}.") && !Prompt_HasTokens("Press it."));
+}
+
+function Test_Suite_Tutorial() {
+    var _ids = Tutorial_Ids();
+    var _txt = "";
+    for (var _i = 0; _i < array_length(_ids); _i++) _txt += ((_i > 0) ? "," : "") + _ids[_i];
+    Test_Eq("D45 the eleven mechanics, in order", _txt, "timeline,bar,arrows,defence,stagger,cards,shop,throwables,bed,elite,status");
+    for (var _j = 0; _j < array_length(_ids); _j++) {
+        var _e = Tutorial_Get(_ids[_j]);
+        Test_True("D45 " + _ids[_j] + " has a title and a short text", is_struct(_e) && string_length(_e.title) > 2 && string_length(_e.body) > 20 && string_length(_e.body) < 260);
+    }
+    Test_True("D45 the bar text says what to press", string_pos("{confirm}", Tutorial_Get("bar").body) > 0);
+    Test_True("D45 the arrows text names the arrow keys", string_pos("{up}", Tutorial_Get("arrows").body) > 0);
+    Test_True("D45 the defence text says what to press", string_pos("{confirm}", Tutorial_Get("defence").body) > 0);
+    Test_False("D45 an unknown tutorial is nothing", is_struct(Tutorial_Get("dance")));
+
+    var _was_off = variable_global_exists("tutorial_off") ? global.tutorial_off : true;
+    Profile_ResetForTest();
+    global.tutorial_ui = undefined;
+    global.tutorial_off = false;
+    Test_False("D45 nothing is seen on a fresh profile", Tutorial_Seen("bar"));
+    Test_False("D45 nothing is open at first", Tutorial_IsOpen());
+    Test_True("D45 the first trigger opens the pop-up", Tutorial_Trigger("bar"));
+    Test_True("D45 the pop-up is open and is the one asked for", Tutorial_IsOpen() && Tutorial_CurrentId() == "bar");
+    Test_True("D45 it is marked as seen at once", Tutorial_Seen("bar") && Story_Seen("tutorial:bar"));
+    Test_True("D45 a pop-up blocks the world", UI_IsBlocking());
+    Test_False("D45 the same one never opens twice", Tutorial_Trigger("bar"));
+    Test_True("D45 a second mechanic waits behind the first", Tutorial_Trigger("arrows") && Tutorial_CurrentId() == "bar" && Tutorial_QueueLength() == 1);
+    Tutorial_Dismiss();
+    Test_True("D45 dismissing shows the queued one", Tutorial_IsOpen() && Tutorial_CurrentId() == "arrows" && Tutorial_QueueLength() == 0);
+    Tutorial_Dismiss();
+    Test_False("D45 dismissing the last one closes it", Tutorial_IsOpen());
+    Test_True("D45 the frame it closes in still blocks (the closing press must not answer what is behind)", Tutorial_JustClosed() && UI_IsBlocking());
+    global.tutorial_closed_frame = Input_Frame() - 5;   // the next frame
+    Test_False("D45 a closed pop-up does not block", UI_IsBlocking());
+    Test_False("D45 an unknown id opens nothing", Tutorial_Trigger("dance"));
+    Test_False("D45 an unknown id marks nothing", Story_Seen("tutorial:dance"));
+    // persisted: the flags are in the profile file
+    var _disk = Profile_Load(Profile_Path()).profile;
+    Test_True("D45 the profile on disk has the flags", Profile_StorySeen(_disk, "tutorial:arrows") && Profile_StorySeen(_disk, "tutorial:bar"));
+    Test_False("D45 seen once, never again (same profile)", Tutorial_Trigger("arrows"));
+    // the switch for the scripted runs
+    global.tutorial_off = true;
+    Test_False("D45 off: nothing opens", Tutorial_Trigger("shop"));
+    Test_False("D45 off: nothing is marked", Tutorial_Seen("shop"));
+    global.tutorial_off = false;
+    // the Help page lists all eleven, seen or not
+    var _help = Tutorial_HelpItems();
+    Test_Eq("D45 the Help page lists all eleven", array_length(_help), 11);
+    Test_Eq("D45 the Help rows carry the titles", _help[1].label, Tutorial_Get("bar").title);
+    Test_Eq("D45 the Help rows carry the text for the details panel", _help[1].help, Tutorial_Get("bar").body);
+    Test_True("D45 the pop-up footer has a prompt", Prompt_HasTokens(Tutorial_Footer()));
+    global.tutorial_ui = undefined;
+    Profile_ResetForTest();
+    global.tutorial_off = _was_off;
+}
+
+function Test_Suite_Bed() {
+    Test_Eq("D47 a bed's key is its room and place", Bed_Key("rm_floor3", 48, 64), "bed:rm_floor3:48,64");
+    var _flags = {};
+    var _key = Bed_Key("rm_floor3", 48, 64);
+    Test_False("D47 a bed starts unused", Bed_Used(_flags, _key));
+    Bed_MarkUsed(_flags, _key);
+    Test_True("D47 used once, it is used", Bed_Used(_flags, _key));
+    Test_False("D47 another bed is not used", Bed_Used(_flags, Bed_Key("rm_floor3", 80, 64)));
+
+    var _ch = Test_CardPlayer(CLASS_MAGE, [SKILL_FIREBALL, SKILL_ICE_SPEAR], [SKILL_ICE_SPEAR]);
+    _ch.hp = 3;
+    _ch.mp = 1;
+    var _up = Bed_UpgradableSkills(_ch);
+    Test_True("D47 only owned skills without their upgrade can be upgraded", array_length(_up) == 1 && _up[0] == SKILL_FIREBALL);
+    Test_Eq("D47 a character with no skills has nothing to upgrade", array_length(Bed_UpgradableSkills(Test_CardPlayer(CLASS_MAGE, [], []))), 0);
+    Test_Eq("D47 everything already upgraded: nothing", array_length(Bed_UpgradableSkills(Test_CardPlayer(CLASS_MAGE, [SKILL_FIREBALL], [SKILL_FIREBALL]))), 0);
+
+    var _h = Bed_Heal(_ch);
+    Test_True("D47 heal gives full HP and MP", _h.hp == _h.max_hp && _h.mp == _h.max_mp);
+    Test_True("D47 heal changes a copy", _ch.hp == 3 && _ch.mp == 1);
+
+    var _u = Bed_Upgrade(_ch, SKILL_FIREBALL);
+    Test_True("D47 upgrade adds the skill to the upgrades", _u.ok && array_contains(_u.ch.upgrades, SKILL_FIREBALL) && array_contains(_u.ch.upgrades, SKILL_ICE_SPEAR));
+    Test_True("D47 upgrade leaves the original alone", !array_contains(_ch.upgrades, SKILL_FIREBALL));
+    Test_False("D47 a skill he does not own cannot be upgraded", Bed_Upgrade(_ch, SKILL_WOUND).ok);
+    Test_False("D47 an upgraded skill cannot be upgraded twice", Bed_Upgrade(_ch, SKILL_ICE_SPEAR).ok);
+
+    // the whole choice: once per run per bed
+    var _f2 = {};
+    var _r = Bed_Choose(_ch, _f2, _key, "heal", -1);
+    Test_True("D47 choose heal works", _r.ok && _r.ch.hp == _r.ch.max_hp);
+    Test_True("D47 the bed is used after a heal", Bed_Used(_f2, _key));
+    var _r2 = Bed_Choose(_r.ch, _f2, _key, "heal", -1);
+    Test_False("D47 the same bed cannot be used again", _r2.ok);
+    var _r3 = Bed_Choose(_ch, _f2, _key, "upgrade", SKILL_FIREBALL);
+    Test_False("D47 not even for the other choice", _r3.ok);
+    var _f3 = {};
+    var _r4 = Bed_Choose(_ch, _f3, _key, "upgrade", SKILL_WOUND);
+    Test_False("D47 a refused upgrade does not use the bed up", _r4.ok || Bed_Used(_f3, _key));
+    var _r5 = Bed_Choose(_ch, _f3, _key, "upgrade", SKILL_FIREBALL);
+    Test_True("D47 a good upgrade works and uses the bed", _r5.ok && Bed_Used(_f3, _key) && array_contains(_r5.ch.upgrades, SKILL_FIREBALL));
+    Test_True("D47 an upgrade leaves HP as it was", _r5.ch.hp == 3);
+    Test_True("D47 another bed in the same run is still free", Bed_CanUse(_f3, Bed_Key("rm_floor6", 16, 16)));
+
+    // the menu
+    var _items = Bed_MenuItems(_ch);
+    Test_Eq("D47 bed menu: heal, upgrade, leave", _items[0].id + "," + _items[1].id + "," + _items[2].id, "heal,upgrade,leave");
+    Test_True("D47 bed menu: upgrade is live with something to upgrade", _items[1].enabled);
+    Test_False("D47 bed menu: upgrade is greyed with nothing to upgrade", Bed_MenuItems(Test_CardPlayer(CLASS_MAGE, [], []))[1].enabled);
+    Test_True("D47 bed menu: heal shows what it restores", array_length(_items[0].lines) == 2 && string_length(_items[0].help) > 5);
+    var _sub = Bed_UpgradeItems(_ch);
+    Test_Eq("D47 upgrade menu: one row per upgradable skill, then Back", array_length(_sub), 2);
+    Test_Eq("D47 upgrade menu: the row is the skill", _sub[0].skill_id, SKILL_FIREBALL);
+    Test_True("D47 upgrade menu: the details panel shows what changes", string_length(_sub[0].help) > 5 && array_length(_sub[0].lines) >= 1);
 }
 
 // ============================================================================================================

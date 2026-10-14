@@ -477,8 +477,7 @@ function Interact_Handle(_inst) {
         case INTERACT_CHECKPOINT: {
             GameState_SetCheckpoint(room, _inst.x, _inst.y);
             if (variable_instance_exists(_inst, "is_bed") && _inst.is_bed) {
-                // D46: beds are not save points any more. What a bed does instead is packet C4 (rest site); until then, one line.
-                Dialogue_StartLines([Loc_T("bed.rest_moment", "You rest for a moment.")]);
+                BedUi_Open(_inst);   // D46 / D47: a rest site, once per run per bed (heal, or upgrade one skill)
             }
         } break;
     }

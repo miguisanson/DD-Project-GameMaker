@@ -180,7 +180,7 @@ function DialogueDB_Get(_dialogue_id) {
             array_push(localized, Loc_T("dialogue." + did + "." + string(i), fallback));
         }
     }
-    var vars = { interact: Input_Label("interact"), confirm: Input_Label("confirm"), cancel: Input_Label("cancel") };
+    var vars = { interact: Prompt_Text("interact"), confirm: Prompt_Text("confirm"), cancel: Prompt_Text("cancel") };   // D92: the last-used device's label
     return Dialogue_FormatLines(localized, vars);
 }
 
@@ -1791,4 +1791,133 @@ function Credits_Draw(_t) {
             } break;
         }
     }
+}
+
+// ==========================================================================================================================
+// C4 (D45): just-in-time tutorial prompts. The first time a mechanic shows up a short pop-up says what to press and what it does; it is
+// remembered in the profile (a story_seen key, TUTORIAL_KEY_PREFIX plus the id, so once per profile, across runs) and every one can be re-read on the Help page
+// in the pause menu. Eleven of them: the turn strip, the sliding bar, arrow skills, the defence bar, stagger / BREAK, the card pick, the shop,
+// throwables, beds, elites, statuses. Text is {action} tokens (Prompt_*, scr_input) so the glyphs follow the last-used device and the player's keys.
+// The game calls Tutorial_Trigger with the mechanic id at the moment the mechanic appears; the pop-up (Tutorial_* UI in scr_menu) blocks the world and
+// the battle until it is dismissed. global.tutorial_off silences it (the scripted test runs).
+// Hooks in: timeline and elite (battle menu), bar, arrows, defence (the QTE begin functions), throwables (Battle_ThrowBegin), shop (ShopUi_Open), stagger (Battle_StaggerHit), status
+// (Status_Add in battle), cards (CardsUi_Open), bed (BedUi_Open).
+// ==========================================================================================================================
+#macro TUTORIAL_INPUT_DELAY_FRAMES 12   // keys are ignored this long after a pop-up opens (the press that caused it must not close it)
+
+function Tutorial_Ids() {
+    return ["timeline", "bar", "arrows", "defence", "stagger", "cards", "shop", "throwables", "bed", "elite", "status"];
+}
+
+// { id, title, body } in the current language, or undefined. English is the fallback of Loc_T; the workbook holds EN and KO.
+function Tutorial_Get(_id) {
+    switch (_id) {
+        case "timeline":
+            return { id: _id, title: Loc_T("tutorial.timeline.title", "Turn order"),
+                body: Loc_T("tutorial.timeline.body", "The strip at the top shows who acts next. Faster fighters act more often, and some skills push an enemy back a turn.") };
+        case "bar":
+            return { id: _id, title: Loc_T("tutorial.bar.title", "The sliding bar"),
+                body: Loc_T("tutorial.bar.body", "A cursor slides along the bar. Press {confirm} when it is over the bright zone. The closer to the middle, the harder you hit.") };
+        case "arrows":
+            return { id: _id, title: Loc_T("tutorial.arrows.title", "Arrow skills"),
+                body: Loc_T("tutorial.arrows.body", "Skills show a row of arrows. Press {up}{down}{left}{right} in that order before the time bar runs out. A wrong press costs time.") };
+        case "defence":
+            return { id: _id, title: Loc_T("tutorial.defence.title", "Defending"),
+                body: Loc_T("tutorial.defence.body", "When an enemy winds up a big attack, a bar appears. Press {confirm} on the bright zone to take less damage and shake off its effects.") };
+        case "stagger":
+            return { id: _id, title: Loc_T("tutorial.stagger.title", "Stagger and BREAK"),
+                body: Loc_T("tutorial.stagger.body", "Good hits fill the enemy's stagger meter. When it is full the enemy is BROKEN: it loses a turn and takes +50% damage.") };
+        case "cards":
+            return { id: _id, title: Loc_T("tutorial.cards.title", "Cards"),
+                body: Loc_T("tutorial.cards.body", "Level-ups and skill chests offer 3 cards: a new skill, an upgrade or a passive. Take one, or skip for a little gold.") };
+        case "shop":
+            return { id: _id, title: Loc_T("tutorial.shop.title", "The shop"),
+                body: Loc_T("tutorial.shop.body", "The merchant sells potions and gear. Gold is kept for the whole run, and the stock changes with every run.") };
+        case "throwables":
+            return { id: _id, title: Loc_T("tutorial.throwables.title", "Throwables"),
+                body: Loc_T("tutorial.throwables.body", "Throwable items hurt an enemy straight from the item menu. Each one is used up when thrown, so save them for hard fights.") };
+        case "bed":
+            return { id: _id, title: Loc_T("tutorial.bed.title", "Beds"),
+                body: Loc_T("tutorial.bed.body", "Each bed can be used once per run. Rest to restore all your HP and MP, or use it to upgrade one of your skills.") };
+        case "elite":
+            return { id: _id, title: Loc_T("tutorial.elite.title", "Elites"),
+                body: Loc_T("tutorial.elite.body", "Marked enemies are Elites. They are tougher than normal ones, but their rewards are better.") };
+        case "status":
+            return { id: _id, title: Loc_T("tutorial.status.title", "Statuses"),
+                body: Loc_T("tutorial.status.body", "Poison, Burning, Bleeding and Stun last a few turns. The icons under a name show which ones a fighter has.") };
+    }
+    return undefined;
+}
+
+function Tutorial_Footer() {
+    return Loc_T("tutorial.footer", "{confirm} Continue");
+}
+
+function Tutorial_Seen(_id) {
+    return Story_Seen(TUTORIAL_KEY_PREFIX + string(_id));
+}
+
+function Tutorial_Enabled() {
+    return !(variable_global_exists("tutorial_off") && global.tutorial_off);
+}
+
+function Tutorial_IsOpen() {
+    return variable_global_exists("tutorial_ui") && is_struct(global.tutorial_ui);
+}
+
+function Tutorial_CurrentId() {
+    return Tutorial_IsOpen() ? global.tutorial_ui.id : "";
+}
+
+function Tutorial_QueueLength() {
+    return Tutorial_IsOpen() ? array_length(global.tutorial_ui.queue) : 0;
+}
+
+// The mechanic _id just appeared. Opens its pop-up the first time ever (this profile), queues it behind one that is open. Returns true when
+// it was new. Marks it seen at once, so a session that ends with the pop-up up does not show it again.
+function Tutorial_Trigger(_id) {
+    if (!Tutorial_Enabled()) return false;
+    if (!is_struct(Tutorial_Get(_id))) return false;
+    if (Tutorial_Seen(_id)) return false;
+    Story_Mark(TUTORIAL_KEY_PREFIX + string(_id));
+    if (Tutorial_IsOpen()) {
+        array_push(global.tutorial_ui.queue, _id);
+        return true;
+    }
+    global.tutorial_ui = { id: _id, queue: [], opened_frame: Input_Frame(), opened_ms: current_time };
+    SFX_PlayUI("ui_openclose");
+    return true;
+}
+
+// True during the frame a pop-up was dismissed in and the next one: the press that closed it must not also answer whatever is behind it (the
+// battle menu, an interact in the world). A controller that steps before the ui controller sees the press one frame late (the scripted runs
+// show it: a simulated key stays visible to it for the next frame too), so the guard covers two frames (about 33 ms).
+function Tutorial_JustClosed() {
+    return variable_global_exists("tutorial_closed_frame") && (Input_Frame() - global.tutorial_closed_frame) <= 1;
+}
+
+// Closes the pop-up that is up; the next queued one takes its place.
+function Tutorial_Dismiss() {
+    if (!Tutorial_IsOpen()) return;
+    global.tutorial_closed_frame = Input_Frame();
+    var t = global.tutorial_ui;
+    if (array_length(t.queue) > 0) {
+        t.id = t.queue[0];
+        array_delete(t.queue, 0, 1);
+        t.opened_frame = Input_Frame();
+        t.opened_ms = current_time;
+        return;
+    }
+    global.tutorial_ui = undefined;
+}
+
+// The Help page's rows: every tutorial in order, seen or not (Ui framework items; the details panel shows the text).
+function Tutorial_HelpItems() {
+    var ids = Tutorial_Ids();
+    var out = [];
+    for (var i = 0; i < array_length(ids); i++) {
+        var e = Tutorial_Get(ids[i]);
+        array_push(out, { id: ids[i], label: e.title, value: "", kind: "button", enabled: true, help: e.body, lines: [] });
+    }
+    return out;
 }

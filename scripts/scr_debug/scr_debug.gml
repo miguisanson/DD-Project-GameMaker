@@ -241,6 +241,7 @@ function Scenario_Boot() {
 
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
+    global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
                    cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 12000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
@@ -448,6 +449,9 @@ function Scenario_StepSmoke(_s) {
             break;
         case 133: case 134: case 135: case 136: case 137: case 138: case 139: case 140: case 141:
             Scenario_StepSmokeCards(_s);   // C2: class screen, card pick, stat point, replace a skill
+            break;
+        case 161: case 162: case 163: case 164: case 165: case 166: case 167: case 168:
+            Scenario_StepSmokeRest(_s);   // C4: beds, tutorial pop-ups, the Help page, the Controls page
             break;
         case 142: case 143: case 144: case 145: case 146:
             Scenario_StepSmokeEconomy(_s);   // C3: the merchant and shop, the run's enemy layout, a seeded chest, an elite fight
@@ -821,6 +825,10 @@ function Scenario_StepSmokeSnap(_s) {
 // big attack, all Perfect. Then v=2: every skill animation. v=1 "fail": confirms the menu but never presses the bar. Then v=4: the same
 // skill casts and defence, all failed (Weak).
 function Scenario_StepBot(_s) {
+    if (_s.v == 9) {
+        Scenario_StepBotAssist(_s);   // C4: QTE assist and the first-time pop-ups in real battles; the last part
+        return;
+    }
     if (_s.v == 5) {
         Scenario_StepMove(_s);
         return;
@@ -897,6 +905,324 @@ function Scenario_StepBot(_s) {
     }
 }
 
+// ---- C4 in the bot (v=9): QTE assist (D35) and the first-time pop-ups (D45) inside real battles ----
+// Four battles through the game's own input path. A: assist ON + pop-ups ON: the turn strip pop-up when the first menu comes up (the battle waits,
+// the closing press does not choose ATTACK), then ATTACK -> the sliding bar's pop-up (the clock is frozen at -250 ms behind it), a press 250 ms
+// past the zone centre is OK with the assist (WEAK without), then the stagger pop-up on the first hit. B: the arrow skill's pop-up, the time bar
+// x1.3, the clock frozen behind it. C: assist OFF, pop-ups OFF: the same press is WEAK and no pop-up opens. D: assist ON: the defence bar's
+// pop-up (the telegraph clock frozen), and a press 200 ms past the centre is OK (WEAK without). The bot dismisses other pop-ups it meets.
+#macro SCN_ASSIST_PRESS_BAR_MS 250      // past the zone centre: beyond the plain OK zone (200), inside the assisted one (300)
+#macro SCN_ASSIST_PRESS_DEF_MS 200      // past the Ramming bar's centre: beyond its plain OK zone (170), inside the assisted one (255)
+
+function Scenario_BotAssistFinishBattle(_s, _ba) {
+    _ba.n++;
+    _ba.phase = {};
+    Scenario_Next(_s, 0);
+}
+
+function Scenario_StepBotAssist(_s) {
+    if (!variable_struct_exists(_s, "ba")) _s.ba = { n: 0, phase: {}, expect: [] };
+    var _ba = _s.ba;
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+    if (Tutorial_IsOpen() && !array_contains(_ba.expect, Tutorial_CurrentId())) Scenario_TutorialTap(_s);   // a pop-up this part does not check
+    switch (_ba.n) {
+        case 0: Scenario_BotAssistBar(_s, _ba, _bc); break;
+        case 1: Scenario_BotAssistArrows(_s, _ba, _bc); break;
+        case 2: Scenario_BotAssistOff(_s, _ba, _bc); break;
+        case 3: Scenario_BotAssistDefence(_s, _ba, _bc); break;
+        default:
+            global.tutorial_off = true;
+            GameSettings_Ensure().qte_assist = 0;
+            Scenario_Finish();
+            break;
+    }
+}
+
+// A: the timeline pop-up, the bar pop-up, the assisted press, the stagger pop-up.
+function Scenario_BotAssistBar(_s, _ba, _bc) {
+    var _ph = _ba.phase;
+    var _ready = (_s.f - _s.last_tap) >= 4;
+    switch (_s.step) {
+        case 0:
+            if (_s.t == 10) {
+                Scenario_TutorialForget();
+                global.tutorial_off = false;
+                GameSettings_Ensure().qte_assist = 1;
+                _ba.expect = ["timeline", "bar", "stagger"];
+                Scenario_NewKnight();
+                _s.vstart = _s.f;
+                Scenario_GotoBattle("bot_assist_bar");
+                Scenario_Next(_s, 1);
+            }
+            break;
+        case 1:
+            if (_bc == noone) {
+                if (_s.t > 90) { Scenario_Check("assist_bar_battle_starts", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+                break;
+            }
+            if (_s.f - _s.vstart > 3000) { Scenario_Check("assist_bar_battle_ends_in_time", false, "state=" + string(_bc.battle_state)); Scenario_Finish(); break; }
+            // the turn strip pop-up comes with the first menu; the battle waits behind it
+            if (!variable_struct_exists(_ph, "tl") && Tutorial_IsOpen() && Tutorial_CurrentId() == "timeline") {
+                _ph.tl = true;
+                _ph.t0 = _s.f;
+                Scenario_Check("assist_timeline_popup_opens_with_the_first_menu", _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER);
+                Scenario_Check("assist_timeline_popup_blocks_the_world", UI_IsBlocking());
+            }
+            if (variable_struct_exists(_ph, "tl") && !variable_struct_exists(_ph, "tl_closed")) {
+                if (_s.f == _ph.t0 + 3) Scenario_Tap("confirm");   // inside the input delay: it must not close the pop-up
+                if (_s.f == _ph.t0 + 8) Scenario_Check("assist_popup_ignores_a_press_inside_its_input_delay", Tutorial_CurrentId() == "timeline");
+                if (_s.f >= _ph.t0 + 30) Scenario_TutorialTap(_s);
+                if (_s.f > _ph.t0 + 8 && !Tutorial_IsOpen()) {
+                    _ph.tl_closed = true;
+                    _ph.c0 = _s.f;
+                    Scenario_Check("assist_the_battle_waited_behind_the_popup", _bc.battle_state == BSTATE_MENU);
+                }
+            }
+            if (variable_struct_exists(_ph, "tl_closed") && !variable_struct_exists(_ph, "atk")) {
+                if (_s.f == _ph.c0 + 6) {
+                    Scenario_Check("assist_the_closing_press_did_not_choose_attack", _bc.battle_state == BSTATE_MENU, "state=" + string(_bc.battle_state));
+                }
+                if (_s.f > _ph.c0 + 8 && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {
+                    _ph.atk = true;
+                    Scenario_Tap("confirm");   // ATTACK
+                }
+            }
+            // ATTACK: the bar's pop-up; the clock does not run behind it
+            if (variable_struct_exists(_ph, "atk") && !variable_struct_exists(_ph, "bar") && Tutorial_IsOpen() && Tutorial_CurrentId() == "bar") {
+                _ph.bar = true;
+                _ph.b0 = _s.f;
+                Scenario_Check("assist_bar_popup_opens_when_the_bar_begins", _bc.battle_state == BSTATE_ATTACK_TIMING && _bc.qte_active);
+                Scenario_Check("assist_the_bar_starts_in_its_lead_in", _bc.qte_ms == -QTE_LEAD_IN_MS, "ms=" + string(_bc.qte_ms));
+                Scenario_Check("assist_the_bar_zones_are_x1_5", _bc.qte_assist == QTE_ASSIST_ZONE_MULT, "assist=" + string(_bc.qte_assist));
+            }
+            if (variable_struct_exists(_ph, "bar") && !variable_struct_exists(_ph, "bar_closed")) {
+                if (_s.f == _ph.b0 + 40) Scenario_Check("assist_the_bar_clock_is_frozen_behind_the_popup", _bc.qte_ms == -QTE_LEAD_IN_MS && Tutorial_IsOpen(), "ms=" + string(_bc.qte_ms));
+                if (_s.f >= _ph.b0 + 41) Scenario_TutorialTap(_s);
+                if (_s.f > _ph.b0 + 41 && !Tutorial_IsOpen()) {
+                    _ph.bar_closed = true;
+                    _ph.c1 = _s.f;
+                }
+            }
+            if (variable_struct_exists(_ph, "bar_closed") && !variable_struct_exists(_ph, "pressed")) {
+                if (_s.f == _ph.c1 + 8) Scenario_Check("assist_the_bar_clock_runs_after_the_popup", _bc.qte_ms > -QTE_LEAD_IN_MS, "ms=" + string(_bc.qte_ms));
+                var _target = Qte_ZoneCentreMs(_bc.qte_params) + SCN_ASSIST_PRESS_BAR_MS;
+                if (_bc.battle_state == BSTATE_ATTACK_TIMING && _bc.qte_active && _ready && (_target - _bc.qte_ms) <= Qte_StepMs(delta_time) * 1.5 && _bc.qte_ms > 0) {
+                    _ph.pressed = true;
+                    Scenario_Tap("confirm");
+                }
+            }
+            if (variable_struct_exists(_ph, "pressed") && !variable_struct_exists(_ph, "res") && _bc.battle_state != BSTATE_ATTACK_TIMING) {
+                _ph.res = true;
+                _ph.r0 = _s.f;
+                var _press = _bc.qte_press_ms;
+                show_debug_message("[BOT] assist bar press_ms=" + string(_press) + " centre=" + string(Qte_ZoneCentreMs(_bc.qte_params)) + " grade=" + _bc.qte_result_key);
+                Scenario_Check("assist_press_past_the_zone_is_OK_with_the_assist", _bc.qte_result_key == QTE_OK, "key=" + _bc.qte_result_key);
+                Scenario_Check("assist_the_same_press_is_WEAK_without_it", Qte_Grade(_press, _bc.qte_params, 1) == QTE_WEAK);
+                Scenario_Check("assist_the_grade_is_the_pure_function_of_the_widened_zones", Qte_Grade(_press, _bc.qte_params, _bc.qte_assist) == _bc.qte_result_key);
+            }
+            // the first hit fills the stagger meter: its pop-up
+            if (variable_struct_exists(_ph, "res") && !variable_struct_exists(_ph, "stg")) {
+                if (Tutorial_IsOpen() && Tutorial_CurrentId() == "stagger") {
+                    _ph.stg = true;
+                    _ph.s0 = _s.f;
+                    Scenario_Check("assist_stagger_popup_opens_on_the_first_hit", true);
+                } else if (_s.f > _ph.r0 + 400) {
+                    Scenario_Check("assist_stagger_popup_opens_on_the_first_hit", false, "state=" + string(_bc.battle_state));
+                    Scenario_BotAssistFinishBattle(_s, _ba);
+                }
+            }
+            if (variable_struct_exists(_ph, "stg")) {
+                if (_s.f >= _ph.s0 + 20) Scenario_TutorialTap(_s);
+                if (_s.f > _ph.s0 + 20 && !Tutorial_IsOpen()) {
+                    Scenario_Check("assist_all_three_popups_are_remembered", Tutorial_Seen("timeline") && Tutorial_Seen("bar") && Tutorial_Seen("stagger"));
+                    Scenario_BotAssistFinishBattle(_s, _ba);
+                }
+            }
+            break;
+    }
+}
+
+// B: the arrow skill's pop-up and the x1.3 time bar.
+function Scenario_BotAssistArrows(_s, _ba, _bc) {
+    var _ph = _ba.phase;
+    var _ready = (_s.f - _s.last_tap) >= 4;
+    switch (_s.step) {
+        case 0:
+            if (_s.t == 10) {
+                Scenario_TutorialForget();
+                global.tutorial_off = false;
+                GameSettings_Ensure().qte_assist = 1;
+                _ba.expect = ["arrows"];
+                var _gs = Scenario_NewKnight(CLASS_KNIGHT);
+                var _ch = _gs.player_ch;
+                _ch.skills = [SKILL_WOUND];
+                _ch.max_mp = 99;
+                _ch.mp = 99;
+                GameState_SetPlayer(_ch);
+                _s.vstart = _s.f;
+                Scenario_GotoBattle("bot_assist_arrows");
+                Scenario_Next(_s, 1);
+            }
+            break;
+        case 1:
+            if (_bc == noone) {
+                if (_s.t > 90) { Scenario_Check("assist_arrows_battle_starts", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+                break;
+            }
+            if (_s.f - _s.vstart > 1500) { Scenario_Check("assist_arrows_popup_in_time", false, "state=" + string(_bc.battle_state)); Scenario_Finish(); break; }
+            if (!variable_struct_exists(_ph, "sturdy")) {
+                _ph.sturdy = true;
+                _bc.e.max_hp = 99;
+                _bc.e.hp = 99;
+            }
+            if (!variable_struct_exists(_ph, "open")) {
+                if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) Scenario_Tap((_bc.menu_index != 1) ? "menu_down" : "confirm");
+                else if (_bc.battle_state == BSTATE_SKILL_MENU && _ready) Scenario_Tap("confirm");
+                if (Tutorial_IsOpen() && Tutorial_CurrentId() == "arrows") {
+                    _ph.open = true;
+                    _ph.a0 = _s.f;
+                    Scenario_Check("assist_arrows_popup_opens_when_the_sequence_begins", _bc.battle_state == BSTATE_SKILL_QTE && _bc.sq_active);
+                    Scenario_Check("assist_arrows_time_bar_is_x1_3", abs(_bc.sq_st.limit_ms - (QTE_SEQ_BASE_MS + QTE_SEQ_PER_ARROW_MS * 3) * QTE_ASSIST_TIME_MULT) < 0.01, "limit=" + string(_bc.sq_st.limit_ms));
+                    Scenario_Check("assist_arrows_perfect_window_is_x1_3", abs(_bc.sq_st.fast_ms - (QTE_SEQ_FAST_BASE_MS + QTE_SEQ_FAST_PER_ARROW_MS * 3) * QTE_ASSIST_TIME_MULT) < 0.01, "fast=" + string(_bc.sq_st.fast_ms));
+                    Scenario_Check("assist_arrows_wrong_press_still_costs_250", _bc.sq_st.penalty_ms == QTE_SEQ_PENALTY_MS);
+                    Scenario_Check("assist_arrows_clock_starts_in_the_lead_in", _bc.sq_ms == -QTE_SEQ_LEAD_IN_MS, "ms=" + string(_bc.sq_ms));
+                }
+            } else if (!variable_struct_exists(_ph, "closed")) {
+                if (_s.f == _ph.a0 + 40) Scenario_Check("assist_arrows_clock_is_frozen_behind_the_popup", _bc.sq_ms == -QTE_SEQ_LEAD_IN_MS && Tutorial_IsOpen(), "ms=" + string(_bc.sq_ms));
+                if (_s.f >= _ph.a0 + 41) Scenario_TutorialTap(_s);
+                if (_s.f > _ph.a0 + 41 && !Tutorial_IsOpen()) {
+                    _ph.closed = true;
+                    _ph.c0 = _s.f;
+                }
+            } else if (_s.f == _ph.c0 + 8) {
+                Scenario_Check("assist_arrows_clock_runs_after_the_popup", _bc.sq_ms > -QTE_SEQ_LEAD_IN_MS, "ms=" + string(_bc.sq_ms));
+                Scenario_BotAssistFinishBattle(_s, _ba);
+            }
+            break;
+    }
+}
+
+// C: assist OFF, pop-ups OFF: the same press is WEAK and nothing pops up.
+function Scenario_BotAssistOff(_s, _ba, _bc) {
+    var _ph = _ba.phase;
+    var _ready = (_s.f - _s.last_tap) >= 4;
+    switch (_s.step) {
+        case 0:
+            if (_s.t == 10) {
+                Scenario_TutorialForget();
+                global.tutorial_off = true;
+                GameSettings_Ensure().qte_assist = 0;
+                _ba.expect = [];
+                Scenario_NewKnight();
+                _s.vstart = _s.f;
+                Scenario_GotoBattle("bot_assist_off");
+                Scenario_Next(_s, 1);
+            }
+            break;
+        case 1:
+            if (_bc == noone) {
+                if (_s.t > 90) { Scenario_Check("assist_off_battle_starts", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+                break;
+            }
+            if (_s.f - _s.vstart > 2000) { Scenario_Check("assist_off_press_in_time", false, "state=" + string(_bc.battle_state)); Scenario_Finish(); break; }
+            if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready && !variable_struct_exists(_ph, "atk")) {
+                _ph.atk = true;
+                Scenario_Tap("confirm");
+            }
+            if (variable_struct_exists(_ph, "atk") && !variable_struct_exists(_ph, "pressed") && _bc.battle_state == BSTATE_ATTACK_TIMING && _bc.qte_active) {
+                if (!variable_struct_exists(_ph, "seen")) {
+                    _ph.seen = true;
+                    Scenario_Check("assist_off_no_popup_when_they_are_off", !Tutorial_IsOpen() && !Tutorial_Seen("bar") && !Tutorial_Seen("timeline"));
+                    Scenario_Check("assist_off_the_bar_zones_are_x1", _bc.qte_assist == 1, "assist=" + string(_bc.qte_assist));
+                }
+                var _target = Qte_ZoneCentreMs(_bc.qte_params) + SCN_ASSIST_PRESS_BAR_MS;
+                if (_ready && (_target - _bc.qte_ms) <= Qte_StepMs(delta_time) * 1.5 && _bc.qte_ms > 0) {
+                    _ph.pressed = true;
+                    Scenario_Tap("confirm");
+                }
+            }
+            if (variable_struct_exists(_ph, "pressed") && _bc.battle_state != BSTATE_ATTACK_TIMING) {
+                Scenario_Check("assist_off_the_same_press_is_WEAK", _bc.qte_result_key == QTE_WEAK, "key=" + _bc.qte_result_key + " press=" + string(_bc.qte_press_ms));
+                Scenario_BotAssistFinishBattle(_s, _ba);
+            }
+            break;
+    }
+}
+
+// D: the defence bar: its pop-up, the frozen telegraph, the widened zones.
+function Scenario_BotAssistDefence(_s, _ba, _bc) {
+    var _ph = _ba.phase;
+    var _ready = (_s.f - _s.last_tap) >= 4;
+    switch (_s.step) {
+        case 0:
+            if (_s.t == 10) {
+                Scenario_TutorialForget();
+                global.tutorial_off = false;
+                GameSettings_Ensure().qte_assist = 1;
+                _ba.expect = ["defence"];
+                var _gs = Scenario_NewKnight(CLASS_KNIGHT);
+                var _ch = _gs.player_ch;
+                _ch.max_hp = 99;
+                _ch.hp = 99;
+                GameState_SetPlayer(_ch);
+                Debug_Init();
+                global.debug.enabled = true;   // an enemy that only uses damaging skills: the mini boss's Ramming, every turn
+                global.debug.enemy_damage_skill_only = true;
+                SkillDB_Get(SKILL_RAMMING).status_chance = 1;
+                _ph.tries = 0;
+                _s.vstart = _s.f;
+                Scenario_GotoBattle("bot_assist_defence", ENEMY_MINI_BOSS);
+                Scenario_Next(_s, 1);
+            }
+            break;
+        case 1:
+            if (_bc == noone) {
+                if (_s.t > 90) { Scenario_Check("assist_defence_battle_starts", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+                break;
+            }
+            if (_s.f - _s.vstart > 2500) { Scenario_Check("assist_defence_popup_in_time", false, "state=" + string(_bc.battle_state)); Scenario_Finish(); break; }
+            if (!variable_struct_exists(_ph, "open")) {
+                if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {   // hand the turn to the enemy until its bar comes up
+                    _ph.tries++;
+                    _bc.turn = TURN_ENEMY;
+                    _bc.battle_state = BSTATE_ENEMY_ACT;
+                }
+                if (Tutorial_IsOpen() && Tutorial_CurrentId() == "defence") {
+                    _ph.open = true;
+                    _ph.d0 = _s.f;
+                    Scenario_Check("assist_defence_popup_opens_when_the_bar_begins", _bc.battle_state == BSTATE_ENEMY_DEFENCE && _bc.def_active);
+                    Scenario_Check("assist_defence_zones_are_x1_5", _bc.def_assist == QTE_ASSIST_ZONE_MULT, "assist=" + string(_bc.def_assist));
+                    Scenario_Check("assist_defence_telegraph_clock_starts_at_its_beginning", _bc.def_ms == -(QTE_TELEGRAPH_MS + QTE_LEAD_IN_MS), "ms=" + string(_bc.def_ms));
+                }
+                if (_ph.tries > 12) { Scenario_Check("assist_defence_big_attack_reached_the_bar", false, "tries=" + string(_ph.tries)); Scenario_Finish(); }
+            } else if (!variable_struct_exists(_ph, "closed")) {
+                if (_s.f == _ph.d0 + 40) Scenario_Check("assist_defence_clock_is_frozen_behind_the_popup", _bc.def_ms == -(QTE_TELEGRAPH_MS + QTE_LEAD_IN_MS) && Tutorial_IsOpen(), "ms=" + string(_bc.def_ms));
+                if (_s.f >= _ph.d0 + 41) Scenario_TutorialTap(_s);
+                if (_s.f > _ph.d0 + 41 && !Tutorial_IsOpen()) {
+                    _ph.closed = true;
+                    global.tutorial_off = true;   // the hit's status would bring its own pop-up; it is not what this part checks
+                }
+            } else if (!variable_struct_exists(_ph, "pressed")) {
+                if (_bc.battle_state == BSTATE_ENEMY_DEFENCE && _bc.def_active && _bc.def_ms > 0 && _ready) {
+                    var _target = Qte_ZoneCentreMs(_bc.def_params) + SCN_ASSIST_PRESS_DEF_MS;
+                    if ((_target - _bc.def_ms) <= Qte_StepMs(delta_time) * 1.5) {
+                        _ph.pressed = true;
+                        Scenario_Tap("confirm");
+                    }
+                }
+            } else if (_bc.battle_state != BSTATE_ENEMY_DEFENCE) {
+                var _press = _bc.def_press_ms;
+                Scenario_Check("assist_defence_press_past_the_zone_is_OK_with_the_assist", _bc.qte_result_key == QTE_OK, "key=" + string(_bc.qte_result_key) + " press=" + string(_press));
+                Scenario_Check("assist_defence_the_same_press_is_WEAK_without_it", Qte_Grade(_press, _bc.def_params, 1) == QTE_WEAK);
+                global.debug.enabled = false;
+                global.debug.enemy_damage_skill_only = false;
+                SkillDB_Get(SKILL_RAMMING).status_chance = 0.60;
+                Scenario_BotAssistFinishBattle(_s, _ba);
+            }
+            break;
+    }
+}
+
 // ---- QTE part 2 in the bot: one skill per class through the arrow input, and one defended big attack ----
 // Run after the basic-attack battle of each variant (v=3 after "perfect", v=4 after "fail"). Everything is typed through Scenario_Tap, the same
 // input path as a player's move_up/down/left/right and confirm. Perfect variant: right arrows at a steady pace, the defence bar pressed on its
@@ -940,7 +1266,7 @@ function Scenario_StepBotExtras(_s) {
         global.debug.enabled = false;
         global.debug.enemy_damage_skill_only = false;
         SkillDB_Get(SKILL_RAMMING).status_chance = 0.60;
-        if (_fail) Scenario_Finish();
+        if (_fail) { _s.v = 9; Scenario_Next(_s, 0); }   // C4: QTE assist + pop-ups (v=9), then done
         else { _s.v = 2; Scenario_Next(_s, 0); }   // on to the per-skill animation checks
         return;
     }
@@ -2248,6 +2574,9 @@ function Scenario_StepShots(_s) {
             break;
         case 150: case 151: case 152: case 153: case 154: case 155: case 156: case 157: case 158: case 159: case 160:
             Scenario_StepShotsStory(_s);   // C5: death line, summary, echo, wake line, notes, banner, credits
+            break;
+        case 161: case 162: case 163: case 164: case 165: case 166: case 167: case 168: case 169:
+            Scenario_StepShotsRest(_s);   // C4: bed menu, tutorial pop-ups (keyboard, pad, Korean, over a battle), Help, Controls
             break;
         case 170: case 171: case 172: case 173: case 174: case 175: case 176: case 177: case 178: case 179:
             Scenario_StepShotsEconomy(_s);   // C3: shop, throwables, elite, merchant, gold
@@ -3633,6 +3962,8 @@ function Export_Build() {
     for (var si = 0; si < array_length(data.skills); si++) {
         var seq = Qte_SkillSequence(data.skills[si].id);
         data.skills[si].sequence_length = is_array(seq) ? array_length(seq) : 0;
+        // E1: the defence bar of an enemy move that gets one (fixed per move, D60)
+        if (variable_struct_exists(data.skills[si], "uses_defensive_qte") && data.skills[si].uses_defensive_qte) data.skills[si].defence = Export_Clean(Qte_DefenceParams(data.skills[si].id));
     }
     // C2: the cards (D82), with the numbers the game reads and the text it shows, for the simulator's build rules
     data.cards = [];
@@ -3650,6 +3981,16 @@ function Export_Build() {
         elite_chance: ELITE_CHANCE, elite_def: ELITE_DEF_BONUS, elite_spd: ELITE_SPD_BONUS, elite_atk: ELITE_ATK_BONUS, elite_venom_stacks: ELITE_VENOM_STACKS, elite_regen_frac: ELITE_REGEN_FRAC,
         merchant_floors: [2, 5, 8]
     };
+    // E1: the timeline / stagger rules, the QTE bar numbers (attack bars per weapon kind, the defence grades) and which enemies each floor draws from (D33)
+    data.constants.timeline = { gauge_max: TURN_GAUGE_MAX, steadfast_turns: TURN_STEADFAST_TURNS, boss_push: TURN_BOSS_PUSH, break_mult: BREAK_DAMAGE_MULT, stagger_perfect_mult: STAGGER_PERFECT_MULT, stagger_stun_mult: STAGGER_STUN_MULT };
+    data.qte = {
+        zone_centre_pct: QTE_ZONE_CENTRE_PCT,
+        bar_params: { bow: Qte_BarParams("bow"), dagger: Qte_BarParams("dagger"), staff: Qte_BarParams("staff"), heavy: Qte_BarParams("heavy"), sword: Qte_BarParams("sword"), "default": Qte_BarParams("default") },
+        defence_mult: { perfect: Qte_DefenceMult(QTE_PERFECT), good: Qte_DefenceMult(QTE_GOOD), ok: Qte_DefenceMult(QTE_OK), weak: Qte_DefenceMult(QTE_WEAK) },
+        defence_status_turns: { perfect: Qte_DefenceStatusTurns(QTE_PERFECT, 4), good: Qte_DefenceStatusTurns(QTE_GOOD, 4), ok: Qte_DefenceStatusTurns(QTE_OK, 4), weak: Qte_DefenceStatusTurns(QTE_WEAK, 4) }
+    };
+    data.floors = [];
+    for (var fl = 1; fl <= 9; fl++) array_push(data.floors, { floor: fl, pool: Shuffle_EnemyPool(fl) });
     data.items = Export_MapRecords(global.item_db, ItemDB_Get);
     data.statuses = Export_MapRecords(global.status_db, StatusDB_Get);
     data.loot = { tables: {}, configs: {}, tier_weights: Export_Clean(global.loot_tier_weights) };
@@ -3694,8 +4035,8 @@ function Scenario_StepExportData(_s) {
     if (is_struct(parsed)) {
         Scenario_Check("exportdata_classes_4_unique", array_length(parsed.classes) == 4 && Export_IdsUnique(parsed.classes));
         Scenario_Check("exportdata_enemies_10_unique", array_length(parsed.enemies) == 10 && Export_IdsUnique(parsed.enemies));
-        Scenario_Check("exportdata_skills_27_unique", array_length(parsed.skills) == 27 && Export_IdsUnique(parsed.skills));
-        Scenario_Check("exportdata_items_23_unique", array_length(parsed.items) == 23 && Export_IdsUnique(parsed.items));
+        Scenario_Check("exportdata_skills_31_unique", array_length(parsed.skills) == 31 && Export_IdsUnique(parsed.skills));
+        Scenario_Check("exportdata_items_34_unique", array_length(parsed.items) == 34 && Export_IdsUnique(parsed.items));
         Scenario_Check("exportdata_cards_51", array_length(parsed.cards) == 51);
         Scenario_Check("exportdata_statuses_15_unique", array_length(parsed.statuses) == 15 && Export_IdsUnique(parsed.statuses));
         Scenario_Check("exportdata_level_table_10_rows", array_length(parsed.levels) == LEVEL_CAP_TECHNICAL && parsed.levels[0].exp_next == 12);
@@ -4090,17 +4431,17 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_ClearUi();
                 PauseMenu_Open();
             }
-            if (_s.t == 12 || _s.t == 24 || _s.t == 36) Scenario_Tap("menu_down");
-            if (_s.t == 48) {
-                Scenario_Check("abandon_cursor_is_on_the_abandon_row", _gs.ui.pause_menu.index == 3, "index=" + string(_gs.ui.pause_menu.index));
+            if (_s.t == 12 || _s.t == 24 || _s.t == 36 || _s.t == 48) Scenario_Tap("menu_down");   // Resume, Settings, Help, Exit, Abandon (C4 added Help)
+            if (_s.t == 60) {
+                Scenario_Check("abandon_cursor_is_on_the_abandon_row", _gs.ui.pause_menu.index == PAUSE_ABANDON_INDEX, "index=" + string(_gs.ui.pause_menu.index));
                 Scenario_Tap("confirm");
             }
-            if (_s.t == 60) {
+            if (_s.t == 72) {
                 Scenario_Check("abandon_asks_before_it_acts", _gs.ui.pause_menu.abandon_armed && Run_IsActive());
                 Scenario_Tap("confirm");
             }
-            if (_s.t > 62) Scenario_TapCutscene(_s);
-            if (_s.t > 62 && _sc != noone && _sc.state == "run_flow") {
+            if (_s.t > 74) Scenario_TapCutscene(_s);
+            if (_s.t > 74 && _sc != noone && _sc.state == "run_flow") {
                 var _pf3 = Profile_Get();
                 Scenario_Check("abandon_counts_as_a_death", _pf3.deaths == 2, "deaths=" + string(_pf3.deaths));
                 Scenario_Check("abandon_history_says_abandoned", array_length(_pf3.history) == 2 && _pf3.history[1].result == "abandoned" && _pf3.history[1].floor == 2, "history=" + json_stringify(_pf3.history));
@@ -4183,7 +4524,7 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Check("win2_ending_is_not_shown_again", !_rl.saw_cutscene);
                 Scenario_Check("win2_counts_the_second_win", _pf5.wins == 2, "wins=" + string(_pf5.wins));
                 Scenario_Check("win2_nobody_class_stays_unlocked", Profile_IsUnlocked(_pf5, "nobody_class"));
-                Scenario_Next(_s, 113);   // C5: notes, boss banner, a killer-specific death line
+                Scenario_Next(_s, 161);   // C4: beds, pop-ups, Help, Controls (161-168), then on to step 113
             }
             if (_s.t > 900) { Scenario_Check("win2_returns_to_the_title", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
@@ -4657,8 +4998,325 @@ function Scenario_StepShotsStory(_s) {
         case 160:
             if (_s.t == 4) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
-                Scenario_Finish();
+                Scenario_Next(_s, 161);   // C4: the bed, pop-up, Help and Controls pictures (161-169) finish the run
             }
+            break;
+    }
+}
+
+// ============================================================================
+// C4 through the real flows (smoke steps 161-168, between the second win and the C5 story steps): a bed in the world opened with the interact
+// key (its tutorial pop-up first, then the menu: Rest heals, a used bed says so, Upgrade picks a skill, a bed with nothing to upgrade greys the
+// row, Leave keeps the bed free), the Help page from the pause menu, the Controls page of the settings (rebind one key, Apply, reset), and the
+// pop-up queue. Every key goes through Scenario_Tap, the game's own input path. The first-time pop-ups are switched on for these steps only.
+// ============================================================================
+function Scenario_TutorialForget() {
+    var _ss = Profile_Get().story_seen;
+    var _names = variable_struct_get_names(_ss);
+    for (var _i = 0; _i < array_length(_names); _i++) {
+        if (string_pos("tutorial:", _names[_i]) == 1) variable_struct_remove(_ss, _names[_i]);
+    }
+}
+
+function Scenario_TutorialTap(_s) {
+    if (Tutorial_IsOpen() && (Input_Frame() - global.tutorial_ui.opened_frame) >= TUTORIAL_INPUT_DELAY_FRAMES + 2 && (_s.f - _s.last_tap) >= 8) {
+        Scenario_Tap("confirm");
+        return true;
+    }
+    return false;
+}
+
+// A bed on tile (_cx, _cy) with the player next to it, facing it.
+function Scenario_RestBed(_rc, _cx, _cy) {
+    with (obj_enemy) instance_destroy();
+    if (instance_exists(_rc.bed)) with (_rc.bed) instance_destroy();
+    _rc.bed = Scenario_Block(obj_bed, _cx, _cy);
+    _rc.bed.persist_id = "c4_bed_" + string(_cx) + "_" + string(_cy);
+    var _pl = Scenario_PlacePlayer(_cx - 1, _cy);
+    _pl.face = RIGHT;
+    _rc.key = Bed_Key(room_get_name(room), _rc.bed.x, _rc.bed.y);
+    _rc.set_t = -1;
+}
+
+function Scenario_StepSmokeRest(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    if (!variable_struct_exists(_s, "rc")) _s.rc = { q: [], bed: noone, key: "", key1: "", key2: "", set_t: -1 };
+    var _rc = _s.rc;
+    var _gate = !(BedUi_IsOpen() && (Input_Frame() - global.bed_ui.opened_frame) < CARDS_UI_INPUT_DELAY_FRAMES + 4);   // keys inside a screen's input delay are ignored by design
+    if (array_length(_rc.q) > 0 && (_s.f - _s.last_tap) >= 12 && _gate) {   // queued keys, one every 12 frames
+        Scenario_Tap(_rc.q[0]);
+        array_delete(_rc.q, 0, 1);
+    }
+    var _idle = (array_length(_rc.q) == 0 && (_s.f - _s.last_tap) >= 14);
+    switch (_s.step) {
+        case 161:   // a fresh run in rm_floor1, hurt, with two skills; the first bed
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 7771);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && _s.t > 40 && !variable_struct_exists(_rc, "s1")) {
+                _rc.s1 = true;
+                Scenario_ClearUi();
+                Scenario_TutorialForget();
+                global.tutorial_off = false;
+                var _c1 = _gs.player_ch;
+                _c1.hp = 2;
+                _c1.mp = 0;
+                _c1.skills = [SKILL_FIREBALL, SKILL_ICE_SPEAR];
+                _c1.upgrades = [];
+                Scenario_RestBed(_rc, 5, 7);
+                _rc.key1 = _rc.key;
+                _rc.set_t = _s.t;
+            }
+            if (_rc.set_t > 0 && _s.t >= _rc.set_t + 20) {
+                Scenario_Tap("interact");
+                _rc.set_t = -1;
+                Scenario_Next(_s, 162);
+            }
+            if (_s.t > 600) { Scenario_Check("rest_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 162:   // interact: the bed's tutorial pop-up first, then the menu; Rest heals and uses the bed up
+            Scenario_TutorialTap(_s);
+            Scenario_CardsTalk(_s);
+            if (BedUi_IsOpen() && !variable_struct_exists(_rc, "a1")) {
+                _rc.a1 = true;
+                Scenario_Check("rest_interact_opens_the_bed_menu_mode", _gs.ui.mode == UI_BED);
+                Scenario_Check("rest_first_bed_shows_its_tutorial_first", Tutorial_IsOpen() && Tutorial_CurrentId() == "bed" && Story_Seen("tutorial:bed"));
+                Scenario_Check("rest_the_pop_up_blocks_the_menu", UI_IsBlocking());
+            }
+            if (variable_struct_exists(_rc, "a1") && !Tutorial_IsOpen() && !variable_struct_exists(_rc, "a2")) {
+                _rc.a2 = true;
+                var _top = Ui_StackTop(global.bed_ui.stk);
+                Scenario_Check("rest_menu_is_heal_upgrade_leave", _top.id == "bed_main" && _top.items[0].id == "heal" && _top.items[1].id == "upgrade" && _top.items[2].id == "leave");
+                Scenario_Check("rest_upgrade_is_live_with_two_skills", _top.items[1].enabled && _top.cursor == 0);
+                Scenario_Check("rest_the_bed_is_free_before_the_choice", Bed_CanUse(_gs.flags, _rc.key));
+                Scenario_Check("rest_player_is_hurt_before", _gs.player_ch.hp == 2 && _gs.player_ch.mp == 0);
+                _rc.q = ["confirm"];
+            }
+            if (variable_struct_exists(_rc, "a2") && !BedUi_IsOpen() && !variable_struct_exists(_rc, "a3")) {
+                _rc.a3 = true;
+                Scenario_Check("rest_heal_gives_full_hp_and_mp", _gs.player_ch.hp == _gs.player_ch.max_hp && _gs.player_ch.mp == _gs.player_ch.max_mp, "hp=" + string(_gs.player_ch.hp) + "/" + string(_gs.player_ch.max_hp));
+                Scenario_Check("rest_the_bed_is_used_up_in_the_run_flags", Bed_Used(_gs.flags, _rc.key));
+                Scenario_Check("rest_heal_upgrades_nothing", array_length(_gs.player_ch.upgrades) == 0);
+                Scenario_Check("rest_heal_says_so", _gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0);
+            }
+            if (variable_struct_exists(_rc, "a3") && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && _idle && _s.t > 60) Scenario_Next(_s, 163);
+            if (_s.t > 900) { Scenario_Check("rest_first_bed_flow", false, "a1=" + string(variable_struct_exists(_rc, "a1")) + " a2=" + string(variable_struct_exists(_rc, "a2")) + " bed=" + string(BedUi_IsOpen()) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+            break;
+        case 163:   // the used bed says so; a second bed: Upgrade, pick Fireball
+            Scenario_CardsTalk(_s);
+            if (_s.t == 10) Scenario_Tap("interact");
+            if (_s.t > 12 && !variable_struct_exists(_rc, "b1") && (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0)) {
+                _rc.b1 = true;
+                Scenario_Check("rest_a_used_bed_opens_no_menu", !BedUi_IsOpen());
+                Scenario_Check("rest_a_used_bed_says_it_was_used", array_length(_gs.ui.lines_raw) >= 1 && _gs.ui.lines_raw[0] == Loc_T("bed.used", "You have rested here already. The bed is still warm."), "lines=" + json_stringify(_gs.ui.lines_raw));
+            }
+            if (variable_struct_exists(_rc, "b1") && !variable_struct_exists(_rc, "b2") && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && _idle) {
+                _rc.b2 = true;
+                Scenario_RestBed(_rc, 5, 5);
+                _rc.key2 = _rc.key;
+                _rc.set_t = _s.t;
+            }
+            if (_rc.set_t > 0 && _s.t >= _rc.set_t + 20) { Scenario_Tap("interact"); _rc.set_t = -1; }
+            if (variable_struct_exists(_rc, "b2") && BedUi_IsOpen() && !variable_struct_exists(_rc, "b3")) {
+                _rc.b3 = true;
+                Scenario_Check("rest_second_bed_has_no_pop_up_again", !Tutorial_IsOpen());
+                Scenario_Check("rest_second_bed_is_free", Bed_CanUse(_gs.flags, _rc.key2) && !Bed_CanUse(_gs.flags, _rc.key1));
+                Ui_MenuFixCursor(Ui_StackTop(global.bed_ui.stk), 1);   // Upgrade a skill (moves of the cursor are checked by the UI suites; a simulated key can be seen twice)
+                _rc.q = ["confirm"];
+            }
+            if (variable_struct_exists(_rc, "b3") && BedUi_IsOpen() && Ui_StackDepth(global.bed_ui.stk) == 2 && !variable_struct_exists(_rc, "b4")) {
+                _rc.b4 = true;
+                var _sub = Ui_StackTop(global.bed_ui.stk);
+                Scenario_Check("rest_upgrade_opens_the_skill_list", _sub.id == "bed_upgrade" && array_length(_sub.items) == 3 && _sub.items[0].skill_id == SKILL_FIREBALL && _sub.items[1].skill_id == SKILL_ICE_SPEAR && _sub.items[2].skill_id == -1);
+                Scenario_Check("rest_each_skill_row_shows_what_changes", string_length(_sub.items[0].help) > 5 && array_length(_sub.items[0].lines) >= 1);
+                _rc.q = ["confirm"];   // Fireball
+            }
+            if (variable_struct_exists(_rc, "b3") && !variable_struct_exists(_rc, "b4") && !BedUi_IsOpen() && _idle) _rc.b4 = true;   // the confirm was seen twice and picked Fireball at once (a simulated key can be seen on two frames)
+            if (variable_struct_exists(_rc, "b4") && !BedUi_IsOpen() && !variable_struct_exists(_rc, "b5")) {
+                _rc.b5 = true;
+                Scenario_Check("rest_upgrade_adds_the_upgrade", array_contains(_gs.player_ch.upgrades, SKILL_FIREBALL) && !array_contains(_gs.player_ch.upgrades, SKILL_ICE_SPEAR), "upgrades=" + json_stringify(_gs.player_ch.upgrades));
+                Scenario_Check("rest_upgrade_uses_the_bed_up", Bed_Used(_gs.flags, _rc.key2) && Bed_Used(_gs.flags, _rc.key1));
+                Scenario_Check("rest_upgraded_skill_is_the_plus_version", SkillDB_Get(SKILL_FIREBALL).name == SkillDB_GetBase(SKILL_FIREBALL).name + "+");
+                var _flags_saved = RunSave_Build().statData.flags;
+                Scenario_Check("rest_used_beds_are_saved_with_the_run", variable_struct_exists(_flags_saved, _rc.key1) && variable_struct_exists(_flags_saved, _rc.key2));
+            }
+            if (variable_struct_exists(_rc, "b5") && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && _idle && _s.t > 60) Scenario_Next(_s, 164);
+            if (_s.t > 900) { Scenario_Check("rest_second_bed_flow", false, "b1=" + string(variable_struct_exists(_rc, "b1")) + " b3=" + string(variable_struct_exists(_rc, "b3")) + " b4=" + string(variable_struct_exists(_rc, "b4")) + " open=" + string(BedUi_IsOpen()) + " room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode) + " lines=" + string(array_length(_gs.ui.lines)) + " enemies=" + string(instance_number(obj_enemy)) + " tr=" + string(Transition_IsActive()) + " upg=" + json_stringify(Bed_UpgradableSkills(_gs.player_ch)) + " hp=" + string(_gs.player_ch.hp)); Scenario_Finish(); }
+            break;
+        case 164:   // a third bed with nothing left to upgrade: the row is greyed, the cursor skips it, Leave keeps the bed free
+            Scenario_CardsTalk(_s);
+            if (_s.t == 1) {
+                _gs.player_ch.upgrades = [SKILL_FIREBALL, SKILL_ICE_SPEAR];
+                Scenario_RestBed(_rc, 5, 3);
+                _rc.set_t = _s.t;
+            }
+            if (_rc.set_t > 0 && _s.t >= _rc.set_t + 20) { Scenario_Tap("interact"); _rc.set_t = -1; }
+            if (BedUi_IsOpen() && !variable_struct_exists(_rc, "c1")) {
+                _rc.c1 = true;
+                var _t3 = Ui_StackTop(global.bed_ui.stk);
+                Scenario_Check("rest_nothing_to_upgrade_greys_the_row", !_t3.items[1].enabled);
+                Scenario_Check("rest_the_cursor_skips_the_greyed_row", Ui_CursorMove(0, 1, Ui_ItemsEnabled(_t3.items)) == 2);
+                Ui_MenuFixCursor(_t3, 2);
+                _rc.q = ["confirm"];   // Leave
+                _rc.c2 = true;
+            }
+            if (variable_struct_exists(_rc, "c2") && !BedUi_IsOpen() && !variable_struct_exists(_rc, "c3")) {
+                _rc.c3 = true;
+                Scenario_Check("rest_leave_keeps_the_bed_free", Bed_CanUse(_gs.flags, _rc.key) && _gs.ui.mode == UI_NONE);
+                Scenario_Check("rest_leave_changes_nothing", array_length(_gs.player_ch.upgrades) == 2);
+                Scenario_Next(_s, 165);
+            }
+            if (_s.t > 600) { Scenario_Check("rest_third_bed_flow", false, "open=" + string(BedUi_IsOpen()) + " c1=" + string(variable_struct_exists(_rc, "c1"))); Scenario_Finish(); }
+            break;
+        case 165:   // pause menu > Help: all eleven, Back returns to the pause menu
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                if (instance_exists(_rc.bed)) with (_rc.bed) instance_destroy();
+                PauseMenu_Open();
+                _gs.ui.pause_menu.index = 2;   // Help
+                _rc.q = ["confirm"];
+            }
+            if (HelpUi_IsOpen() && !variable_struct_exists(_rc, "h1")) {
+                _rc.h1 = true;
+                var _hm = Ui_StackTop(global.help_ui.stk);
+                Scenario_Check("help_opens_from_the_pause_menu", _gs.ui.mode == UI_PAUSE && _gs.ui.pause_menu.index == 2 && _hm.id == "help");
+                Scenario_Check("help_lists_all_eleven_mechanics", array_length(_hm.items) == 11 && _hm.items[0].id == "timeline" && _hm.items[10].id == "status");
+                Scenario_Check("help_rows_carry_their_text", string_length(_hm.items[1].help) > 20 && string_pos("{confirm}", _hm.items[1].help) > 0);
+                Ui_MenuFixCursor(_hm, 1);
+                Scenario_Check("help_cursor_row_is_the_sliding_bar", _hm.items[_hm.cursor].id == "bar");
+                _rc.q = ["cancel"];
+                _rc.h2 = true;
+            }
+            if (variable_struct_exists(_rc, "h2") && !HelpUi_IsOpen() && !variable_struct_exists(_rc, "h3")) {
+                _rc.h3 = true;
+                Scenario_Check("help_back_returns_to_the_pause_menu", _gs.ui.mode == UI_PAUSE && _gs.ui.pause_menu.open && _gs.ui.pause_menu.index == 2);
+                PauseMenu_Close(true);
+                Scenario_Next(_s, 166);
+            }
+            if (_s.t > 600) { Scenario_Check("help_page_flow", false, "help=" + string(HelpUi_IsOpen()) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+            break;
+        case 166:   // pause > Settings > Controls: rebind Interact to T, back, Apply; reset to defaults, Apply
+            SettingsPopup_Ensure();
+            var _sp = _gs.ui.settings_popup;
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                PauseMenu_Open();
+                _gs.ui.pause_menu.index = 1;   // Settings
+                _rc.q = ["confirm"];
+            }
+            if (SettingsPopup_IsOpen("pause") && !variable_struct_exists(_rc, "k1") && _idle) {
+                _rc.k1 = true;
+                var _ci = -1;
+                for (var _i = 0; _i < array_length(_sp.menu.items); _i++) if (_sp.menu.items[_i].id == "controls") _ci = _i;
+                Scenario_Check("controls_row_is_in_the_settings", _ci >= 0 && _ci == array_length(_sp.menu.items) - 2);
+                Ui_MenuFixCursor(_sp.menu, max(0, _ci));
+                _rc.q = ["confirm"];
+            }
+            if (variable_struct_exists(_rc, "k1") && is_struct(_sp.controls) && !variable_struct_exists(_rc, "k2") && _idle) {
+                _rc.k2 = true;
+                if (_sp.controls.capture != "") ControlsPage_OnKey(_sp, vk_escape);   // a simulated key can be seen on two frames: the second confirm may have started a capture on the first row
+                Scenario_Check("controls_page_lists_ten_actions_and_reset", array_length(_sp.controls.menu.items) == 11 && _sp.controls.menu.items[10].id == "reset" && _sp.controls.menu.items[9].id == "interact");
+                Scenario_Check("controls_page_shows_the_default_keys", _sp.controls.menu.items[9].value == "Space" && _sp.controls.menu.items[0].value == "Space / Z / Enter", "interact=" + _sp.controls.menu.items[9].value + " confirm=" + _sp.controls.menu.items[0].value);
+                Ui_MenuFixCursor(_sp.controls.menu, 9);
+                _rc.q = ["confirm"];
+            }
+            if (variable_struct_exists(_rc, "k2") && is_struct(_sp.controls) && _sp.controls.capture == "interact" && !variable_struct_exists(_rc, "k3") && _idle) {
+                _rc.k3 = true;
+                Scenario_Check("controls_confirm_waits_for_a_key", _sp.controls.menu.items[9].value == Loc_T("controls.press_key", "Press a key..."));
+                ControlsPage_OnKey(_sp, ord("T"));   // the key press itself cannot reach a window that is not in front; the handler is the same
+                Scenario_Check("controls_the_pending_keys_change", _sp.pending.keys.interact[0] == ord("T") && _sp.dirty && _sp.controls.capture == "");
+                Scenario_Check("controls_nothing_is_applied_before_Apply", GameSettings_Ensure().keys.interact[0] == vk_space && global.input.bindings.interact[0] == vk_space);
+                Scenario_Check("controls_the_row_shows_the_new_key", _sp.controls.menu.items[9].value == "T");
+                _rc.q = ["cancel"];
+            }
+            if (variable_struct_exists(_rc, "k3") && !is_struct(_sp.controls) && SettingsPopup_IsOpen("pause") && !variable_struct_exists(_rc, "k4") && _idle) {
+                _rc.k4 = true;
+                Scenario_Check("controls_back_goes_up_one_level_to_the_list", SettingsPopup_IsOpen("pause") && _sp.dirty);
+                Ui_MenuFixCursor(_sp.menu, array_length(_sp.menu.items) - 1);   // Apply
+                _rc.q = ["confirm"];
+            }
+            if (variable_struct_exists(_rc, "k4") && !_sp.dirty && !variable_struct_exists(_rc, "k5") && _idle) {
+                _rc.k5 = true;
+                var _disk = Save_ReadSettingsConfig();
+                Scenario_Check("controls_apply_sets_the_live_settings", GameSettings_Ensure().keys.interact[0] == ord("T"));
+                Scenario_Check("controls_apply_rebinds_the_input", global.input.bindings.interact[0] == ord("T") && Prompt_Info("interact", "keyboard").label == "T");
+                Scenario_Check("controls_apply_writes_the_settings_file", is_struct(_disk) && _disk.keys.interact[0] == ord("T"));
+                Scenario_Check("controls_other_keys_are_untouched", global.input.bindings.confirm[0] == vk_space && global.input.bindings.cancel[0] == vk_escape);
+                var _ci2 = -1;
+                for (var _j = 0; _j < array_length(_sp.menu.items); _j++) if (_sp.menu.items[_j].id == "controls") _ci2 = _j;
+                Ui_MenuFixCursor(_sp.menu, _ci2);
+                _rc.q = ["confirm"];
+            }
+            if (variable_struct_exists(_rc, "k5") && is_struct(_sp.controls) && !variable_struct_exists(_rc, "k6") && _idle) {
+                _rc.k6 = true;
+                Ui_MenuFixCursor(_sp.controls.menu, 10);   // Reset to defaults
+                _rc.q = ["confirm"];
+            }
+            if (variable_struct_exists(_rc, "k6") && !variable_struct_exists(_rc, "k7") && _idle && _sp.pending.keys.interact[0] == vk_space) {
+                _rc.k7 = true;
+                Scenario_Check("controls_reset_puts_the_defaults_in_the_pending_copy", _sp.dirty && _sp.pending.keys.interact[0] == vk_space && GameSettings_Ensure().keys.interact[0] == ord("T"));
+                _rc.q = ["cancel"];
+            }
+            if (variable_struct_exists(_rc, "k7") && !is_struct(_sp.controls) && !variable_struct_exists(_rc, "k8") && _idle) {
+                _rc.k8 = true;
+                Ui_MenuFixCursor(_sp.menu, array_length(_sp.menu.items) - 1);
+                _rc.q = ["confirm"];
+            }
+            if (variable_struct_exists(_rc, "k8") && !_sp.dirty && !variable_struct_exists(_rc, "k9") && _idle) {
+                _rc.k9 = true;
+                var _disk2 = Save_ReadSettingsConfig();
+                Scenario_Check("controls_reset_then_Apply_restores_the_keys", global.input.bindings.interact[0] == vk_space && Prompt_Info("interact", "keyboard").label == "Space" && is_struct(_disk2) && _disk2.keys.interact[0] == vk_space);
+                _rc.q = ["cancel"];   // leave the settings
+            }
+            if (variable_struct_exists(_rc, "k9") && !SettingsPopup_IsOpen("pause") && !variable_struct_exists(_rc, "k10")) {
+                _rc.k10 = true;
+                PauseMenu_Close(true);
+                Scenario_Next(_s, 167);
+            }
+            if (_s.t > 1200) { Scenario_Check("controls_page_flow", false, "k1=" + string(variable_struct_exists(_rc, "k1")) + " k3=" + string(variable_struct_exists(_rc, "k3")) + " k5=" + string(variable_struct_exists(_rc, "k5")) + " k7=" + string(variable_struct_exists(_rc, "k7")) + " k9=" + string(variable_struct_exists(_rc, "k9")) + " open=" + string(SettingsPopup_IsOpen("pause"))); Scenario_Finish(); }
+            break;
+        case 167:   // two pop-ups at once: the first shows, the second waits behind it; confirm dismisses; nothing comes back
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Scenario_TutorialForget();
+                global.tutorial_off = false;
+                Scenario_Check("popup_first_trigger_opens", Tutorial_Trigger("cards"));
+                Scenario_Check("popup_second_trigger_queues", Tutorial_Trigger("shop") && Tutorial_CurrentId() == "cards" && Tutorial_QueueLength() == 1);
+                Scenario_Check("popup_blocks_the_world", UI_IsBlocking());
+                Scenario_Tap("confirm");   // too early: the press that caused a pop-up must not close it
+            }
+            if (_s.t == 6) Scenario_Check("popup_ignores_a_press_inside_the_input_delay", Tutorial_CurrentId() == "cards");
+            if (_s.t > 6 && Tutorial_CurrentId() == "cards") Scenario_TutorialTap(_s);
+            if (_s.t > 6 && Tutorial_CurrentId() == "shop" && !variable_struct_exists(_rc, "p1")) {
+                _rc.p1 = true;
+                Scenario_Check("popup_confirm_shows_the_queued_one", Tutorial_QueueLength() == 0);
+            }
+            if (variable_struct_exists(_rc, "p1") && Tutorial_IsOpen()) Scenario_TutorialTap(_s);
+            if (variable_struct_exists(_rc, "p1") && !Tutorial_IsOpen() && !variable_struct_exists(_rc, "p2t")) _rc.p2t = _s.t;
+            if (variable_struct_exists(_rc, "p2t") && _s.t >= _rc.p2t + 5 && !variable_struct_exists(_rc, "p2")) {   // the frame it closes in (and the next) still block: the closing press must not reach the world
+                _rc.p2 = true;
+                var _pf = Profile_Load(Profile_Path()).profile;
+                Scenario_Check("popup_closes_and_the_world_runs_again", !UI_IsBlocking());
+                Scenario_Check("popup_both_are_in_the_profile_file", Profile_StorySeen(_pf, "tutorial:cards") && Profile_StorySeen(_pf, "tutorial:shop"));
+                Scenario_Check("popup_never_again_on_this_profile", !Tutorial_Trigger("cards") && !Tutorial_Trigger("shop") && !Tutorial_IsOpen());
+                Scenario_Next(_s, 168);
+            }
+            if (_s.t > 600) { Scenario_Check("popup_queue_flow", false, "id=" + Tutorial_CurrentId() + " p1=" + string(variable_struct_exists(_rc, "p1"))); Scenario_Finish(); }
+            break;
+        case 168:   // clean up: pop-ups off again, the run ended quietly, back to the title for the next steps
+            if (_s.t == 1) {
+                global.tutorial_off = true;
+                Scenario_ClearUi();
+                RunSave_Delete();
+                _gs.run.active = false;
+                _gs.in_main_menu = true;
+                room_goto(rm_start);
+            }
+            if (_s.t > 20 && room == rm_start && _sc != noone && _sc.state == "main" && !Transition_IsActive()) Scenario_Next(_s, 113);   // C5: notes, boss banner, a killer-specific death line
+            if (_s.t > 600) { Scenario_Check("rest_returns_to_the_title", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
     }
 }
@@ -4846,6 +5504,175 @@ function Scenario_StepSmokeCards(_s) {
                 Scenario_Next(_s, 142);   // C3: the economy (142-146), then on to the first win: the Nobody class unlocks
             }
             if (_s.t > 900) { Scenario_Check("cards_replace_ends", false, "kind=" + CardsUi_Kind()); Scenario_Finish(); }
+            break;
+    }
+}
+
+// C4 pictures (shots steps 161-169, after the C5 story pictures): the bed menu and its skill list, the tutorial pop-up with a keyboard prompt, a
+// pad prompt (one D-Pad for the four arrows), in Korean with a second one waiting, at text scale 5, over a battle; the Help page; the Controls
+// page with a row waiting for a key and a swapped pair. Each screen is opened directly; the flows themselves are checked in the smoke run.
+// The first-time pop-ups are switched on only while a picture of one is taken.
+function Scenario_StepShotsRest(_s) {
+    var _gs = GameState_Get();
+    switch (_s.step) {
+        case 161:   // the bed menu
+            if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+            if (_s.t == 4) {
+                Scenario_SetWindowScale(3);
+                Scenario_NewKnight(CLASS_MAGE);
+                room_goto(rm_floor1);
+            }
+            if (_s.t == 100) {
+                Scenario_ClearUi();
+                var _c = _gs.player_ch;
+                _c.hp = 4;
+                _c.mp = 2;
+                _c.skills = [SKILL_FIREBALL, SKILL_ICE_SPEAR, SKILL_FORESIGHT];
+                _c.upgrades = [SKILL_FORESIGHT];
+                _gs.flags = {};
+                var _bed = Scenario_Block(obj_bed, 5, 7);
+                BedUi_Open(_bed);
+            }
+            if (_s.t == 150) {
+                Scenario_Check("shots_rest_bed_open", BedUi_IsOpen() && _gs.ui.mode == UI_BED && Ui_StackTop(global.bed_ui.stk).id == "bed_main");
+                Scenario_ShotUi(_s, "rest_bed");
+                Scenario_Next(_s, 162);
+            }
+            break;
+        case 162:   // the skill list of the Upgrade row
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                BedUi_MainConfirm(Ui_StackTop(global.bed_ui.stk), 1);
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_rest_upgrade_open", Ui_StackDepth(global.bed_ui.stk) == 2 && Ui_StackTop(global.bed_ui.stk).id == "bed_upgrade");
+                Scenario_ShotUi(_s, "rest_upgrade");
+                Scenario_Next(_s, 163);
+            }
+            break;
+        case 163:   // the sliding bar's pop-up, keyboard prompt
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                BedUi_Close();
+                global.input.last_device = "keyboard";
+                Scenario_TutorialForget();
+                global.tutorial_off = false;
+                Tutorial_Trigger("bar");
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_tutorial_bar_open", Tutorial_IsOpen() && Tutorial_CurrentId() == "bar");
+                Scenario_ShotUi(_s, "tutorial_bar");
+                Scenario_Next(_s, 164);
+            }
+            break;
+        case 164:   // the arrow pop-up with a pad in hand: one D-Pad for the four arrows, round A for the rest
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Tutorial_Dismiss();
+                global.input.last_device = "gamepad";
+                Tutorial_Trigger("arrows");
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_tutorial_arrows_open", Tutorial_IsOpen() && Tutorial_CurrentId() == "arrows");
+                Scenario_ShotUi(_s, "tutorial_arrows_pad");
+                Scenario_Next(_s, 165);
+            }
+            break;
+        case 165:   // Korean, with a second pop-up waiting behind the first
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Tutorial_Dismiss();
+                global.input.last_device = "keyboard";
+                Loc_SetLanguage("ko");
+                Tutorial_Trigger("stagger");
+                Tutorial_Trigger("status");
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_tutorial_ko_open_with_one_waiting", Tutorial_CurrentId() == "stagger" && Tutorial_QueueLength() == 1);
+                Scenario_ShotUi(_s, "tutorial_stagger_ko");
+                Scenario_Next(_s, 166);
+            }
+            break;
+        case 166:   // the longest text at the biggest text scale
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Tutorial_Dismiss();
+                Tutorial_Dismiss();
+                Loc_SetLanguage("en");
+                Scenario_TutorialForget();
+                Scenario_SetWindowScale(5);
+                Tutorial_Trigger("defence");
+            }
+            if (_s.t == 60) {
+                Scenario_Check("shots_tutorial_defence_open", Tutorial_IsOpen() && Tutorial_CurrentId() == "defence");
+                Scenario_ShotUi(_s, "tutorial_defence_5");
+                Scenario_Next(_s, 167);
+            }
+            break;
+        case 167:   // the Help page from the pause menu
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Tutorial_Dismiss();
+                global.tutorial_off = true;
+                Scenario_SetWindowScale(3);
+                PauseMenu_Open();
+                HelpUi_Open();
+                Ui_StackTop(global.help_ui.stk).cursor = 2;   // Arrow skills: the longest text, with the arrow keys
+            }
+            if (_s.t == 60) {
+                Scenario_Check("shots_help_open", HelpUi_IsOpen() && _gs.ui.mode == UI_PAUSE);
+                Scenario_ShotUi(_s, "help");
+                Scenario_Next(_s, 168);
+            }
+            break;
+        case 168:   // the Controls page: Confirm and Back swapped, the Interact row waiting for a key
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                HelpUi_Close();
+                PauseMenu_Close(true);
+                room_goto(rm_start);
+            }
+            if (_s.t == 50) {
+                if (!instance_exists(obj_start_controller)) { Scenario_Check("shots_controls_in_rm_start", false, "no start controller"); Scenario_Finish(); break; }
+                with (obj_start_controller) { state = "settings"; }
+                SettingsPopup_Open("title");
+                var _sp = GameState_Get().ui.settings_popup;
+                _sp.pending.keys = Binds_Assign(Binds_Defaults(), "confirm", ord("X")).keys;
+                ControlsPage_Open(_sp);
+                _sp.controls.capture = "interact";
+                _sp.controls.msg_row = "interact";
+                _sp.controls.msg = Loc_T("controls.waiting", "Press the new key for {action}. Esc cancels.", { action: Binds_RowLabel("interact") });
+                ControlsPage_Refresh(_sp);
+                Ui_MenuFixCursor(_sp.controls.menu, 9);
+            }
+            if (_s.t == 100) {
+                Scenario_Check("shots_controls_open", is_struct(GameState_Get().ui.settings_popup.controls));
+                Scenario_ShotUi(_s, "controls");
+                Scenario_Next(_s, 169);
+            }
+            break;
+        case 169:   // the pop-up over a real battle (draw order: it must sit above the battle's own screen)
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                SettingsPopup_Close(true);
+                Scenario_TutorialForget();
+                global.tutorial_off = false;
+                Scenario_EnterBattle("shots_tutorial");
+            }
+            if (_s.t > 20 && !variable_struct_exists(_s, "tb") && Tutorial_IsOpen() && room == rm_battle) {
+                _s.tb = _s.t;
+            }
+            if (variable_struct_exists(_s, "tb") && _s.t == _s.tb + 45) {
+                Scenario_Check("shots_tutorial_over_the_battle", Tutorial_CurrentId() == "timeline" && room == rm_battle);
+                Scenario_ShotUi(_s, "tutorial_battle");
+            }
+            if (variable_struct_exists(_s, "tb") && _s.t == _s.tb + 49) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Tutorial_Dismiss();
+                global.tutorial_off = true;
+                Scenario_Finish();
+            }
+            if (_s.t > 600) { Scenario_Check("shots_tutorial_battle_popup_opens", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
     }
 }
