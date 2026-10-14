@@ -120,6 +120,7 @@ Locked by the owner. Changing any of these needs a new grill-me.
 | D113 | Merchant (supersedes D110 tint) | Use candidate A (art/merchant). NO gold tint anymore; instead a gold glow OUTLINE (pulsing) so the player notices "something worth looking at" — a gold colour is an owner-approved exception for this highlight only. |
 | D114 | Icons | Use icon set v2. Agents may redo the weakest v2 icons (bloodthirsty, hilt_bash, muscle_up, poison_pot, solidify, …) at their discretion. Critical passive = starburst; Steadfast = anchor (agent's choice stands). |
 | D115 | Readable text | Item names (and other list/name text in menus) are drawn in WHITE, not light green — readability over strict palette. Frames/accents keep the 4-colour palette. |
+| D116 | Monster sound variation | Owner idea + approval (2026-10-15): every monster sound gets small random pitch/volume variation, and the agent may download CC0 creature packs (OpenGameArt: rubberduck 80 CC0 creature SFX 1+2, Ogrebane monster pack, Darsycho snarls) so monsters get 2-3 takes. Licence page checked per pack; creators go in the credits; owner imports the new sounds in the IDE at the end. |
 
 ## Notes
 - Three of the friend's bugs (skill books twice, mini boss moving, maybe poison) look already fixed in code since commit f39236b (2026-03-05) — the friend probably played an older build. From now on every build shows a build id, and every note records it.

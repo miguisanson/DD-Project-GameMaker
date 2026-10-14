@@ -47,7 +47,7 @@ stranger and final boss rotate takes (`SFX_RegisterVariantNoRepeat`). SFX_Play a
 Step A (code only, no new assets, no owner action): every enemy_* sound gets a small random pitch (about ±6 %) and
 volume (about ±10 %) per play, and no-repeat rotation where 2+ takes exist. Check first: a Test_Suite_Audio case that
 N plays of one enemy key give pitches inside the band and not all equal (inject the RNG stream). Owner L5: listen.
-Step B (only if the owner says yes, see BOARD "Waiting on you"): 1-2 extra takes per monster from CC0 packs —
+Step B (APPROVED by owner 2026-10-15, D116; download into E:\Temp, never into the repo until trimmed): 1-2 extra takes per monster from CC0 packs —
 rubberduck "80 CC0 creature SFX" 1 and 2 (opengameart.org/content/80-cc0-creature-sfx, .../80-cc0-creture-sfx-2,
 8 slime sounds), Ogrebane "Monster Sound Effects Pack" (opengameart.org/content/monster-sound-effects-pack),
 Darsycho "Monster snarls" (opengameart.org/content/monster-snarls). No CC0 spider pack found: use hiss/bug takes.
