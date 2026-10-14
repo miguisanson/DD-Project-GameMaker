@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Session 4 (2026-10-15): grill on randomness/loot -> D117-D125 locked; owner's old saves moved to E:\Games\DD-Project Playtest\old-saves-2026-10-15. READ .planning/RESUME.md: 1) full gate on next, 2) R1 randomness+loot packet, 3) F1, 4) E2 playtest build, 5) owner IDE import, 6) sound credits. |
+| WIP | Session 4 (2026-10-15): D117-D125 locked. Full gate on next running (worktree E:/Github_Projects/DD-Project-GameMaker-wt/next, log E:/Temp/dd-gate-next-full.log). R1 checks written on branch r1-rng (worktree DD-Project-GameMaker-wt/r1, uncommitted): Test_Suite_FairRng + runsave drop_dry + flee vectors; contract in that worktree at .planning/R1-CONTRACT.md. Next: confirm R1 checks fail, dispatch R1a (game logic) + R1-sim (python) Sonnet packets, then R1b (focus pause + odds text), F1, E2. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
