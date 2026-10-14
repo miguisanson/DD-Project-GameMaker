@@ -14,8 +14,8 @@ game exports JSON with `-exportdata` for the Python simulator (no Included File 
 | B3 | Turn timeline (next 5), stun push-back + Steadfast, stagger meter + BREAK, damage numbers | D74, D75, D92 | MERGED to next |
 | B4 | Battle AI rule lists, telegraphed big attacks, boss phases | D68, D7 | in flight (wt b4) |
 | C1 | Run loop: run/profile save split, seeded RNG streams, death → entrance, echo gift, abandon run, auto-save + continue, story seen once, run history, unlocks | D25-D27, D30-D33, D36, D46, D87, D88, D92 | MERGED to next |
-| C2 | Chests (class first, then cards), class pick (Nobody locked), cards 1-of-3 at chests + level-ups, upgrades, passives (shared + class), max 3 skills equipped | D73, D81, D82, D34, D83 | in flight (wt c2) |
-| C3 | Gold, merchant after floors 2/5/8, throwables (all classes, Nobody stronger), accessory slot, elites, per-run shuffles | D23, D33, D84, D85, D86, D92 | todo |
+| C2 | Chests (class first, then cards), class pick (Nobody locked), cards 1-of-3 at chests + level-ups, upgrades, passives (shared + class), max 3 skills equipped | D73, D81, D82, D34, D83 | MERGED to next |
+| C3 | Gold, merchant after floors 2/5/8, throwables (all classes, Nobody stronger), accessory slot, elites, per-run shuffles | D23, D33, D84, D85, D86, D92 | in flight (wt c3) |
 | C4 | Beds (heal or upgrade), tutorial prompts + Help page, settings (QTE assist, key rebinding, text speed, shake), device button prompts | D45, D47, D49, D92 | todo |
 | D0 | Shared UI framework: one menu component (wrap-around, hold-to-scroll, same confirm/back, back = one level, remembered cursor, mouse hover/click/wheel), frames, fonts, motion, details panel with data-generated text; migrate the title menu first as the pilot | D95-D98, D100 | MERGED to next (title + settings on the framework) |
 | D1 | Every screen on the framework: settings, credits, battle HUD (D99) + battle menus, Tab menu (Status/Skills/Items/Gear/Codex/Settings) + pause, class pick, card pick, shop, bed, level-up, run end, echo pick, dialogue box (D101), prompts; remove the old per-screen menu code | D89, D90, D96, D99, D101, I-061, I-062 | todo |
