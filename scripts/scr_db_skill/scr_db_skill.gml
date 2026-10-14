@@ -936,15 +936,15 @@ function Skill_StealRecord(_user, _item_id, _qty = 1) {
     return _user;
 }
 
-// Turns a status gets when a skill applies it. The skill's own `status_turns` is already the real number (BUG-16: the tooltip shows it); a status with a
-// fixed `duration` in StatusDB (Burning 2, Bleeding 3, Foresight 3) always gets that. Equipment can add turns to what the player puts on an enemy.
+// Turns a status gets when a skill applies it. The skill's own `status_turns` is already the real number (BUG-16: the tooltip shows it, an upgrade adds to it);
+// a status with a fixed `duration` in StatusDB (Burning 2, Bleeding 3, Foresight 3) is a floor, so an upgrade's extra turns still count (Foresight+ = 5). Equipment can add turns to what the player puts on an enemy.
 // A Poison has no turns (it has stacks, Skill_StatusStacks).
 function Skill_AdjustStatusTurns(_user, _target, _status_id, _base_turns) {
     var turns = max(1, round(real(_base_turns)));
     if (_status_id == STATUS_STUN) return turns;
 
     var fixed = Status_Cfg(_status_id, "duration", 0);
-    if (fixed > 0) turns = fixed;
+    if (fixed > 0) turns = max(turns, fixed);
 
     var user_is_player = (is_struct(_user) && variable_struct_exists(_user, "is_player") && _user.is_player);
     var target_is_player = (is_struct(_target) && variable_struct_exists(_target, "is_player") && _target.is_player);

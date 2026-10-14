@@ -147,7 +147,7 @@ unless something (a stun, a BREAK, an SPD change) happens in between.
 ticks_needed(f) = ceil((100 - gauge) / SPD)        advance every gauge by SPD x min over fighters of max(1, ticks_needed)
 first actor (both gauges 0): the higher SPD; a tie -> the player
 ```
-Examples: Archer 13 vs Slime 9: P E P P E P P E P ...; 20 vs 10: P P E P P E; 10 vs 10: P E P E.
+Examples: Archer 13 vs Slime 9: P E P E P P E P E P P E ...; 20 vs 10: P P E P P E; 10 vs 10: P E P E.
 
 **Stun (D75).** A stun that lands on a fighter (a skill's `status_chance` roll, the Stun status, Hilt Bash, Ice Spear, Vine Trap) is not a lost turn any more:
 `gauge -= 100` (a boss as the TARGET: `gauge -= 50`, "half as far"), and the fighter becomes **Steadfast** for 2 of its own turns: a stun that lands while `steadfast > 0` does
