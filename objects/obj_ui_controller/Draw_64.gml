@@ -233,6 +233,8 @@ if (gs.ui.mode == UI_BED) {
 
 Banner_Draw();   // C5 (D106): boss name banner
 
+if (room != rm_battle) Tutorial_Draw();   // C4 (D45): the first-time pop-up, over everything but the fade (in a battle the battle controller draws it, later)
+
 Transition_DrawGUI();
 
 Skip_DrawHint();   // D48: the "hold to skip" fill after a press (nothing when no skippable scene is running)

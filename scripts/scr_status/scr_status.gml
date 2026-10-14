@@ -627,6 +627,7 @@ function Status_Add(_ch, _status_id, _turns, _power, _stacks = 1) {
     }
     if (fresh) entry.fresh = true;
     array_push(_ch.status, entry);
+    if (room == rm_battle) Tutorial_Trigger("status");   // D45: the first status of the profile
     return _ch;
 }
 

@@ -1683,6 +1683,7 @@ function CardsUi_Open(_kind) {
     global.cards_ui = u;
     gs.ui.mode = UI_CARDS;
     SFX_PlayUI("ui_openclose");
+    if (_kind == "cards") Tutorial_Trigger("cards");   // D45
     return true;
 }
 
@@ -2022,7 +2023,7 @@ function CardsUi_DrawPick(_u, _a) {
     var skip_label = Loc_T("cards.pick.skip", "Skip: +{gold} gold", { gold: string(Card_SkipGold()) });
     var skip_w = UI_TextWidth(skip_label) + 24 * p;
     var skip_h = mt.row_h + 4 * p;
-    var hint = Loc_T("cards.pick.hint", "Left / Right to choose, confirm to take it");
+    var hint = Loc_T("cards.pick.hint", "{left}{right} Choose   {confirm} Take");
     var total = mt.line_h + 3 * p + ch_max + 3 * p + skip_h + 2 * p + mt.line_h;
     var y0 = max(margin, round((mt.gh - total) / 2));
     var slide = p * round((1 - _a) * 3);
@@ -2045,7 +2046,7 @@ function CardsUi_DrawPick(_u, _a) {
     Ui_Text(sx + skip_w / 2, sy + (skip_h - mt.line_h) div 2, skip_label, skip_sel ? UI_C_LIGHTEST : UI_C_LIGHT, fa_center);
     array_push(rects, { x: sx, y: sy, w: skip_w, h: skip_h });
     pk.rects = rects;
-    Ui_Text(mt.gw / 2, sy + skip_h + 2 * p, hint, UI_C_LIGHT, fa_center);
+    Prompt_RichDraw(round(mt.gw * 0.1), sy + skip_h + 2 * p, hint, round(mt.gw * 0.8), UI_C_LIGHT, fa_center, _a);
 }
 
 function CardsUi_Draw() {
@@ -2059,6 +2060,352 @@ function CardsUi_Draw() {
     else Ui_StackDraw(u.stk, 0.5);
     draw_set_alpha(1);
     draw_set_color(c_white);
+}
+
+// ==========================================================================================================================
+// C4: the bed menu (D47), the tutorial pop-up and the Help page (D45), the Controls page of the settings (D49). All on the UI framework
+// (Ui_Menu*, Ui_DrawFrame, Prompt_Rich*). The rules live in pure functions elsewhere: Bed_* (scr_levelup), Tutorial_* (scr_dialogue),
+// Binds_* / Prompt_* (scr_input).
+// ==========================================================================================================================
+
+// ---- the bed: Rest / Upgrade a skill / Leave, once per run per bed -----------------------------------------------------------------
+// global.bed_ui = { stk, opened_frame, opened_ms, key } while it is open, with gs.ui.mode = UI_BED. Back leaves without using the bed.
+function BedUi_IsOpen() {
+    return variable_global_exists("bed_ui") && is_struct(global.bed_ui);
+}
+
+function BedUi_Close() {
+    var gs = GameState_Get();
+    global.bed_ui = undefined;
+    if (variable_struct_exists(gs, "ui") && gs.ui.mode == UI_BED) gs.ui.mode = UI_NONE;
+}
+
+// A room change closes it (the bed stays free).
+function BedUi_Interrupt() {
+    if (BedUi_IsOpen()) BedUi_Close();
+}
+
+// The player used the bed (interact). A bed already used this run says so; a free one opens the menu. Returns true when the menu opened.
+function BedUi_Open(_inst) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
+    var key = Bed_Key(room_get_name(room), _inst.x, _inst.y);
+    if (!Bed_CanUse(gs.flags, key)) {
+        Dialogue_StartLines([Loc_T("bed.used", "You have rested here already. The bed is still warm.")]);
+        return false;
+    }
+    var u = { stk: Ui_StackNew(), opened_frame: Input_Frame(), opened_ms: current_time, key: key };
+    Ui_StackPush(u.stk, BedUi_MainMenu());
+    global.bed_ui = u;
+    gs.ui.mode = UI_BED;
+    SFX_PlayUI("ui_openclose");
+    Tutorial_Trigger("bed");
+    return true;
+}
+
+function BedUi_MainMenu() {
+    var m = Ui_MenuNew("bed_main", Bed_MenuItems(GameState_Get().player_ch), {
+        on_confirm: BedUi_MainConfirm, on_back: BedUi_OnBack,
+        layout: { title: Loc_T("bed.title", "Bed"), anchor: "center", details: true }
+    });
+    Ui_MenuFixCursor(m, 0);
+    return m;
+}
+
+function BedUi_UpgradeMenu() {
+    var m = Ui_MenuNew("bed_upgrade", Bed_UpgradeItems(GameState_Get().player_ch), {
+        on_confirm: BedUi_UpgradeConfirm, on_back: BedUi_OnBack,
+        layout: { title: Loc_T("bed.upgrade_title", "Upgrade which skill?"), anchor: "center", details: true, hides_below: true }
+    });
+    Ui_MenuFixCursor(m, 0);
+    return m;
+}
+
+// Back on the first menu leaves; Ui_StackBack already took the second menu off.
+function BedUi_OnBack(_m, _res) {
+    if (_res == "root") BedUi_Close();
+}
+
+function BedUi_MainConfirm(_m, _i) {
+    var rid = _m.items[_i].id;
+    if (rid == "heal") BedUi_Choose("heal", -1);
+    else if (rid == "upgrade") Ui_StackPush(global.bed_ui.stk, BedUi_UpgradeMenu());
+    else BedUi_Close();
+}
+
+function BedUi_UpgradeConfirm(_m, _i) {
+    var sid = _m.items[_i].skill_id;
+    if (sid < 0) {
+        Ui_StackBack(global.bed_ui.stk);
+        return;
+    }
+    BedUi_Choose("upgrade", sid);
+}
+
+function BedUi_Choose(_choice, _skill_id) {
+    var gs = GameState_Get();
+    var r = Bed_Choose(gs.player_ch, gs.flags, global.bed_ui.key, _choice, _skill_id);
+    BedUi_Close();
+    if (!r.ok) return;
+    CardsUi_Commit(r.ch);
+    if (_choice == "heal") Dialogue_StartLines([Loc_T("bed.msg.heal", "You sleep a while. HP and MP are full again.")]);
+    else Dialogue_StartLines([Loc_T("bed.msg.upgrade", "{skill} is better now.", { skill: SkillDB_Get(_skill_id).name })]);
+}
+
+// Called by obj_ui_controller Step while gs.ui.mode == UI_BED.
+function BedUi_Handle() {
+    var gs = GameState_Get();
+    if (!BedUi_IsOpen()) {
+        if (gs.ui.mode == UI_BED) gs.ui.mode = UI_NONE;
+        return;
+    }
+    var u = global.bed_ui;
+    if (Input_Frame() - u.opened_frame < CARDS_UI_INPUT_DELAY_FRAMES) return;
+    var top = Ui_StackTop(u.stk);
+    if (is_struct(top)) Ui_MenuUpdate(top, u.stk);
+}
+
+function BedUi_Draw() {
+    if (!BedUi_IsOpen()) return;
+    var u = global.bed_ui;
+    var a = Ui_AnimT(u.opened_ms, current_time);
+    UI_SetFont();
+    draw_set_alpha(1);
+    Ui_DimBackdrop(0.6 * a);
+    Ui_StackDraw(u.stk, 0.5);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
+// ---- the tutorial pop-up --------------------------------------------------------------------------------------------------------------
+// global.tutorial_ui = { id, queue, opened_frame, opened_ms } (Tutorial_Trigger, scr_dialogue). It is drawn over everything the ui controller
+// draws and, while it is up, nothing else gets input: the controller's Step calls Tutorial_Step first and the battle controller waits.
+function Tutorial_Step() {
+    if (!Tutorial_IsOpen()) return false;
+    var t = global.tutorial_ui;
+    if (Input_Frame() - t.opened_frame >= TUTORIAL_INPUT_DELAY_FRAMES) {
+        if (Input_UIConfirm() || Input_UIBack() || mouse_check_button_pressed(mb_left)) {
+            SFX_PlayUI("ui_confirm");
+            Tutorial_Dismiss();
+        }
+    }
+    return true;
+}
+
+// The box of a tutorial entry: { x, y, w, h, iw, body_h } centred on the GUI grid.
+function Tutorial_Box(_e, _slide) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var w = min(mt.gw - 2 * mt.margin, round(mt.gw * 0.8));
+    var iw = w - 8 * p;
+    var body_h = Ui_TextBlockH(_e.body, iw);
+    var h = 8 * p + (mt.line_h + 3 * p) + body_h + 3 * p + mt.line_h;
+    return { x: round((mt.gw - w) / 2), y: max(mt.margin, round((mt.gh - h) / 2)) - _slide, w: w, h: h, iw: iw, body_h: body_h };
+}
+
+function Tutorial_Draw() {
+    if (!Tutorial_IsOpen()) return;
+    var t = global.tutorial_ui;
+    var e = Tutorial_Get(t.id);
+    if (!is_struct(e)) return;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var a = Ui_AnimT(t.opened_ms, current_time);
+    UI_SetFont();
+    draw_set_alpha(1);
+    Ui_DimBackdrop(0.55 * a);
+    var slide = p * round((1 - a) * 3);
+    var b = Tutorial_Box(e, slide);
+    Ui_DrawFrame(b.x, b.y, b.w, b.h, a, p);
+    draw_set_alpha(a);
+    var x0 = b.x + 4 * p;
+    var ty = b.y + 4 * p;
+    Ui_Text(x0, ty, e.title, UI_C_LIGHTEST);
+    Ui_Box(b.x + 3 * p, ty + mt.line_h + p, b.x + b.w - 3 * p, ty + mt.line_h + 2 * p, UI_C_DARK);
+    ty += mt.line_h + 3 * p;
+    Ui_TextBlock(x0, ty, e.body, b.iw, UI_C_LIGHT);
+    ty += b.body_h + 3 * p;
+    var more = array_length(t.queue);
+    Prompt_RichDraw(x0, ty, Tutorial_Footer(), b.iw, UI_C_LIGHTEST, fa_left, a);
+    if (more > 0) Ui_Text(x0 + b.iw, ty, Loc_T("tutorial.more", "+{n} more", { n: string(more) }), UI_C_LIGHT, fa_right);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
+// ---- the Help page (pause menu): every tutorial, seen or not, in the framework's list with the details panel ----------------------------
+// global.help_ui = { stk, opened_frame, opened_ms }.
+function HelpUi_IsOpen() {
+    return variable_global_exists("help_ui") && is_struct(global.help_ui);
+}
+
+function HelpUi_Open() {
+    var u = { stk: Ui_StackNew(), opened_frame: Input_Frame(), opened_ms: current_time };
+    var m = Ui_MenuNew("help", Tutorial_HelpItems(), {
+        on_back: HelpUi_OnBack,
+        layout: { title: Loc_T("help.title", "Help"), anchor: "center", details: true }
+    });
+    Ui_StackPush(u.stk, m);
+    global.help_ui = u;
+    SFX_PlayUI("ui_openclose");
+}
+
+function HelpUi_Close() {
+    global.help_ui = undefined;
+}
+
+function HelpUi_OnBack(_m, _res) {
+    HelpUi_Close();
+}
+
+function HelpUi_Handle() {
+    if (!HelpUi_IsOpen()) return;
+    var u = global.help_ui;
+    if (Input_Frame() - u.opened_frame < 4) return;   // the press that opened it
+    var top = Ui_StackTop(u.stk);
+    if (is_struct(top)) Ui_MenuUpdate(top, u.stk);
+}
+
+function HelpUi_Draw() {
+    if (!HelpUi_IsOpen()) return;
+    var u = global.help_ui;
+    var a = Ui_AnimT(u.opened_ms, current_time);
+    UI_SetFont();
+    draw_set_alpha(1);
+    Ui_DimBackdrop(0.6 * a);
+    Ui_StackDraw(u.stk, 0.5);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
+// ---- the Controls page of the settings (D49) ---------------------------------------------------------------------------------------------
+// The rows are the rebindable actions; confirming one waits for a key (Esc or right click cancels). The page edits the settings' pending copy
+// (sp.pending.keys); Apply on the settings list saves and applies, Back throws the change away, like every other row.
+function Controls_RowHelp(_id) {
+    if (_id == "reset") return Loc_T("controls.help.reset", "Puts every keyboard key back to how it was. The controller is never changed.");
+    return Loc_T("controls.help.row", "Confirm, then press the new key. If another action already uses it, the two swap. Esc cancels.");
+}
+
+// The page's menu items for a key table. _capture_row is the row waiting for a key ("" = none); _msg_row / _msg replace that row's help.
+function Controls_Items(_keys, _capture_row, _msg_row = "", _msg = "") {
+    var items = [];
+    var ids = Binds_RowIds();
+    for (var i = 0; i < array_length(ids); i++) {
+        var rid = ids[i];
+        var waiting = (rid == _capture_row);
+        array_push(items, {
+            id: rid, label: Binds_RowLabel(rid), kind: "button", enabled: true, lines: [],
+            value: waiting ? Loc_T("controls.press_key", "Press a key...") : Binds_KeysText(variable_struct_get(_keys, rid)),
+            help: (rid == _msg_row && _msg != "") ? _msg : Controls_RowHelp(rid)
+        });
+    }
+    array_push(items, {
+        id: "reset", label: Loc_T("controls.reset", "Reset to defaults"), kind: "button", enabled: true, lines: [], value: "", help: Controls_RowHelp("reset")
+    });
+    return items;
+}
+
+// A key was pressed for a row: { ok, keys, message }. Pure: the caller stores the keys.
+function Controls_Capture(_keys, _row, _key) {
+    var r = Binds_Assign(_keys, _row, _key);
+    var msg = "";
+    if (!r.ok) {
+        msg = (r.reason == "reserved") ? Loc_T("controls.reserved", "That key is reserved.") : Loc_T("controls.unusable", "That key cannot be used.");
+    } else if (r.swapped != "") {
+        msg = Loc_T("controls.swapped", "{other} had that key, so the two swapped.", { other: Binds_RowLabel(r.swapped) });
+    } else {
+        msg = Loc_T("controls.set", "Key changed. Apply saves it.");
+    }
+    return { ok: r.ok, keys: r.keys, message: msg };
+}
+
+// A keyboard press this frame as a bindable code, or -1. Left / right shift and control count as the plain ones.
+function Controls_PollKey() {
+    if (!keyboard_check_pressed(vk_anykey)) return -1;
+    var k = keyboard_lastkey;
+    if (k == vk_lshift || k == vk_rshift) k = vk_shift;
+    if (k == vk_lcontrol || k == vk_rcontrol) k = vk_control;
+    return k;
+}
+
+function ControlsPage_Open(_sp) {
+    _sp.controls = { menu: undefined, capture: "", msg_row: "", msg: "", opened_frame: Input_Frame() };
+    var c = _sp.controls;
+    c.menu = Ui_MenuNew("controls", Controls_Items(_sp.pending.keys, ""), {
+        on_confirm: ControlsPage_OnConfirm, on_back: ControlsPage_OnBack,
+        layout: { title: Loc_T("controls.title", "Controls"), anchor: "center", details: true }
+    });
+}
+
+function ControlsPage_Refresh(_sp) {
+    var c = _sp.controls;
+    if (!is_struct(c)) return;
+    c.menu.items = Controls_Items(_sp.pending.keys, c.capture, c.msg_row, c.msg);
+}
+
+function ControlsPage_OnConfirm(_m, _i) {
+    var sp = GameState_Get().ui.settings_popup;
+    var c = sp.controls;
+    var rid = _m.items[_i].id;
+    if (rid == "reset") {
+        sp.pending.keys = Binds_Defaults();
+        sp.dirty = true;
+        c.msg_row = "reset";
+        c.msg = Loc_T("controls.reset_done", "Keys are back to the defaults. Apply saves them.");
+        SettingsPopup_Refresh();
+        ControlsPage_Refresh(sp);
+        return;
+    }
+    c.capture = rid;
+    c.opened_frame = Input_Frame();
+    c.msg_row = rid;
+    c.msg = Loc_T("controls.waiting", "Press the new key for {action}. Esc cancels.", { action: Binds_RowLabel(rid) });
+    ControlsPage_Refresh(sp);
+}
+
+// Back leaves the Controls page for the settings list (the change stays pending).
+function ControlsPage_OnBack(_m, _res) {
+    var sp = GameState_Get().ui.settings_popup;
+    sp.controls = undefined;
+}
+
+// A key for the row being captured (also the entry point the smoke run uses in place of a real key press).
+function ControlsPage_OnKey(_sp, _key) {
+    var c = _sp.controls;
+    if (!is_struct(c) || c.capture == "") return false;
+    if (_key == vk_escape) {
+        c.capture = "";
+        c.msg = "";
+        c.msg_row = "";
+        ControlsPage_Refresh(_sp);
+        SFX_PlayUI("ui_back");
+        return true;
+    }
+    var r = Controls_Capture(_sp.pending.keys, c.capture, _key);
+    c.msg_row = c.capture;
+    c.msg = r.message;
+    if (r.ok) {
+        _sp.pending.keys = r.keys;
+        _sp.dirty = true;
+        c.capture = "";
+        SFX_PlayUI("ui_confirm");
+        SettingsPopup_Refresh();
+    } else {
+        SFX_PlayUI("ui_back");
+    }
+    ControlsPage_Refresh(_sp);
+    return true;
+}
+
+function ControlsPage_Handle(_sp) {
+    var c = _sp.controls;
+    if (c.capture != "") {
+        if (Input_Frame() - c.opened_frame < 2) return;
+        if (mouse_check_button_pressed(mb_right)) { ControlsPage_OnKey(_sp, vk_escape); return; }
+        var k = Controls_PollKey();
+        if (k >= 0) ControlsPage_OnKey(_sp, k);
+        return;
+    }
+    Ui_MenuUpdate(c.menu);
 }
 
 // --------------------
@@ -2167,7 +2514,7 @@ function SettingsMenu_Items(_p, _scale_max, _dirty = false) {
 
     var r_qa = Settings_Row("qte_assist", Loc_T("settings.row.qte_assist", "QTE assist"), "choice",
         (_p.qte_assist != 0) ? Loc_T("settings.value.on", "On") : Loc_T("settings.value.off", "Off"),
-        Loc_T("settings.help.qte_assist", "Planned: more forgiving timing on button prompts."));
+        Loc_T("settings.help.qte_assist", "Wider bar zones and more time on arrow skills."));
     r_qa.measure = [Loc_T("settings.value.on", "On"), Loc_T("settings.value.off", "Off")];
     array_push(items, r_qa);
 
@@ -2191,6 +2538,10 @@ function SettingsMenu_Items(_p, _scale_max, _dirty = false) {
     r_lg.measure = [Loc_LanguageDisplayName("en"), Loc_LanguageDisplayName("ko")];
     array_push(items, r_lg);
 
+    var r_ct = Settings_Row("controls", Loc_T("settings.row.controls", "Controls"), "button", "",
+        Loc_T("settings.help.controls", "Change the keyboard keys. The controller stays as it is."));
+    array_push(items, r_ct);
+
     var r_ap = Settings_Row("apply", Loc_T("settings.row.apply", "Apply"), "button",
         _dirty ? Loc_T("settings.value.pending", "Pending") : Loc_T("settings.value.saved", "Saved"),
         Loc_T("settings.help.apply", "Saves your changes and applies them now. Back leaves without saving."));
@@ -2205,7 +2556,7 @@ function SettingsPopup_Ensure() {
     if (!variable_struct_exists(gs.ui, "settings_popup")) {
         gs.ui.settings_popup = {
             open: false, owner: "", menu: undefined, pending: GameSettings_Copy(GameSettings_Ensure()),
-            dirty: false, closing: false, closed_ms: -1, scale_max: DISPLAY_SCALE_MAX
+            dirty: false, closing: false, closed_ms: -1, scale_max: DISPLAY_SCALE_MAX, controls: undefined
         };
     }
 }
@@ -2237,6 +2588,7 @@ function SettingsPopup_Open(_owner = "") {
     var sp = GameState_Get().ui.settings_popup;
     sp.open = true;
     sp.owner = string(_owner);
+    sp.controls = undefined;
     sp.dirty = false;
     sp.closing = false;
     sp.closed_ms = -1;
@@ -2273,6 +2625,7 @@ function SettingsPopup_CloseFinalize() {
     sp.closed_ms = -1;
     sp.dirty = false;
     sp.menu = undefined;
+    sp.controls = undefined;
     sp.pending = GameSettings_Copy(GameSettings_Ensure());
 }
 
@@ -2297,6 +2650,10 @@ function SettingsMenu_OnAdjust(_m, _i, _dir) {
 function SettingsMenu_OnConfirm(_m, _i) {
     var rid = _m.items[_i].id;
     var sp = GameState_Get().ui.settings_popup;
+    if (rid == "controls") {
+        ControlsPage_Open(sp);
+        return;
+    }
     if (rid == "apply") {
         var committed = GameSettings_Commit(sp.pending, true);
         sp.pending = GameSettings_Copy(committed);
@@ -2312,6 +2669,7 @@ function SettingsMenu_OnBack(_m, _res) {
     var sp = GameState_Get().ui.settings_popup;
     sp.pending = GameSettings_Copy(GameSettings_Ensure());
     sp.dirty = false;
+    sp.controls = undefined;
     Loc_SetLanguage(GameSettings_Ensure().language);
     SettingsPopup_Close(false);
 }
@@ -2324,6 +2682,10 @@ function SettingsPopup_HandleInput() {
         if (current_time - sp.closed_ms >= UI_PANEL_MS) SettingsPopup_CloseFinalize();
         return;
     }
+    if (is_struct(sp.controls)) {   // D49: the Controls page sits on top of the list
+        ControlsPage_Handle(sp);
+        return;
+    }
     Ui_MenuUpdate(sp.menu);
 }
 
@@ -2333,7 +2695,8 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     if (!sp.open || !is_struct(sp.menu)) return;
     var a = Ui_MenuAlpha(sp.menu, current_time);
     if (_draw_backdrop) Ui_DimBackdrop(0.6 * a);
-    Ui_MenuDraw(sp.menu, a);
+    if (is_struct(sp.controls)) Ui_MenuDraw(sp.controls.menu, a);
+    else Ui_MenuDraw(sp.menu, a);
     draw_set_alpha(1);
     draw_set_color(c_white);
 }
@@ -2489,6 +2852,8 @@ function Title_ModalAlpha(_c) {
 // --------------------
 // PAUSE MENU (inventory-style popup)
 // --------------------
+#macro PAUSE_ABANDON_INDEX 4   // Resume, Settings, Help, Exit to Main Menu, Abandon Run
+
 function PauseMenu_Ensure() {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
@@ -2504,6 +2869,7 @@ function PauseMenu_Ensure() {
             options: [
                 Loc_T("pause.option.resume", "Resume"),
                 Loc_T("pause.option.settings", "Settings"),
+                Loc_T("pause.option.help", "Help"),
                 Loc_T("pause.option.exit_main", "Exit to Main Menu"),
                 Loc_T("pause.option.abandon", "Abandon Run")
             ],
@@ -2533,7 +2899,7 @@ function PauseMenu_Open() {
     pm.pending_exit_main_menu = false;
     pm.pending_abandon = false;
     pm.abandon_armed = false;
-    pm.options[3] = Loc_T("pause.option.abandon", "Abandon Run");
+    pm.options[PAUSE_ABANDON_INDEX] = Loc_T("pause.option.abandon", "Abandon Run");
     pm.index = 0;
     pm.opened_frame = Input_Frame();
     gs.ui.pause_menu = pm;
@@ -2632,6 +2998,10 @@ function PauseMenu_HandleInput() {
         SettingsPopup_HandleInput();
         return;
     }
+    if (HelpUi_IsOpen()) {   // D45: the Help page
+        HelpUi_Handle();
+        return;
+    }
 
     if (pm.closing) {
         if (frame - pm.close_frame >= UI_POPUP_FADE_FRAMES) {
@@ -2660,7 +3030,7 @@ function PauseMenu_HandleInput() {
     if (pm.index != prev_idx) {
         SFX_PlayUI("ui_move");
         pm.abandon_armed = false;
-        pm.options[3] = Loc_T("pause.option.abandon", "Abandon Run");
+        pm.options[PAUSE_ABANDON_INDEX] = Loc_T("pause.option.abandon", "Abandon Run");
     }
 
     if (k_ok) {
@@ -2673,13 +3043,17 @@ function PauseMenu_HandleInput() {
             gs.ui.pause_menu = pm;
             return;
         } else if (pm.index == 2) {
-            PauseMenu_ExitToMainMenu();
+            HelpUi_Open();
+            gs.ui.pause_menu = pm;
             return;
         } else if (pm.index == 3) {
+            PauseMenu_ExitToMainMenu();
+            return;
+        } else if (pm.index == PAUSE_ABANDON_INDEX) {
             // two presses: the first asks, the second abandons the run
             if (!pm.abandon_armed) {
                 pm.abandon_armed = true;
-                pm.options[3] = Loc_T("pause.option.abandon_confirm", "Sure? Confirm again");
+                pm.options[PAUSE_ABANDON_INDEX] = Loc_T("pause.option.abandon_confirm", "Sure? Confirm again");
             } else {
                 pm.pending_abandon = true;
                 gs.ui.pause_menu = pm;
@@ -2703,6 +3077,10 @@ function PauseMenu_Draw() {
         draw_set_alpha(1);
         return;
     }
+    if (HelpUi_IsOpen()) {
+        HelpUi_Draw();
+        return;
+    }
 
     UI_SetFont();
 
@@ -2717,6 +3095,7 @@ function PauseMenu_Draw() {
     var option_labels = [
         Loc_T("pause.option.resume", "Resume"),
         Loc_T("pause.option.settings", "Settings"),
+        Loc_T("pause.option.help", "Help"),
         Loc_T("pause.option.exit_main", "Exit to Main Menu")
     ];
     var max_w = 0;
@@ -3175,16 +3554,13 @@ function Ui_DrawNameTab(_x, _y, _name, _alpha = 1) {
 function Ui_DrawTabs(_x, _y, _w, _labels, _active, _alpha = 1) {
     var mt = Ui_Metrics();
     var p = mt.p;
-    var hint_l = (Input_GamepadDevice() != -1) ? "LB" : "Q";
-    var hint_r = (Input_GamepadDevice() != -1) ? "RB" : "E";
+    var info_l = Prompt_Info("tab_prev");   // D92: Q / E, or LB / RB with a pad in hand
+    var info_r = Prompt_Info("tab_next");
     var th = mt.line_h + 2 * p;
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
-    var hw = UI_TextWidth(hint_l) + 2 * p;
     var tx = _x;
-    Ui_Box(tx, _y, tx + hw, _y + th, UI_C_DARK);
-    Ui_Text(tx + p, _y + p, hint_l, UI_C_LIGHTEST);
-    tx += hw + 2 * p;
+    tx += Prompt_DrawGlyph(tx, _y + (th - Prompt_GlyphH()) div 2, info_l, _alpha) + 2 * p;
     for (var i = 0; i < array_length(_labels); i++) {
         var lw = UI_TextWidth(_labels[i]) + 4 * p;
         var on = (i == _active);
@@ -3192,21 +3568,22 @@ function Ui_DrawTabs(_x, _y, _w, _labels, _active, _alpha = 1) {
         Ui_Text(tx + 2 * p, _y + p, _labels[i], on ? UI_C_DARKEST : UI_C_LIGHT);
         tx += lw + p;
     }
-    var rw = UI_TextWidth(hint_r) + 2 * p;
+    var rw = Prompt_GlyphW(info_r);
     tx = max(tx + p, _x + _w - rw);
-    Ui_Box(tx, _y, tx + rw, _y + th, UI_C_DARK);
-    Ui_Text(tx + p, _y + p, hint_r, UI_C_LIGHTEST);
+    Prompt_DrawGlyph(tx, _y + (th - Prompt_GlyphH()) div 2, info_r, _alpha);
     draw_set_alpha(a0);
     return th;
 }
 
 // Height of wrapped text _w GUI units wide.
 function Ui_TextBlockH(_txt, _w) {
+    if (Prompt_HasTokens(_txt)) return Prompt_RichLayout(string(_txt), _w).h;   // a sentence with {confirm}-style prompts (D92)
     var s = max(0.0001, UI_GetFontScale());
     return round(string_height_ext(string(_txt), -1, max(1, round(_w / s))) * s);
 }
 
 function Ui_TextBlock(_x, _y, _txt, _w, _col) {
+    if (Prompt_HasTokens(_txt)) { Prompt_RichDraw(_x, _y, string(_txt), _w, _col); return; }
     var s = max(0.0001, UI_GetFontScale());
     draw_set_halign(fa_left);
     draw_set_valign(fa_top);

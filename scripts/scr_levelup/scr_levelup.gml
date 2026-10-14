@@ -308,3 +308,118 @@ function Cards_PickMove(_cur, _n, _dx, _dy, _last) {
     if (_dx != 0) return (_cur + ((_dx < 0) ? -1 : 1) + _n) mod _n;
     return _cur;
 }
+
+// ==========================================================================================================================
+// C4 (D47): beds are rest sites. Once per run per bed the player chooses: heal (full HP and MP) OR upgrade one owned skill (its upgrade
+// card, scr_db_skill). A used bed is remembered in the run's flags (gs.flags, saved with the run, wiped by a new run) under
+// Bed_Key = "bed:<room>:<x>,<y>". Everything here is pure; the menu is BedUi_* (scr_menu).
+// ==========================================================================================================================
+function Bed_Key(_room_name, _x, _y) {
+    return "bed:" + string(_room_name) + ":" + string(round(_x)) + "," + string(round(_y));
+}
+
+function Bed_Used(_flags, _key) {
+    return is_struct(_flags) && variable_struct_exists(_flags, _key) && (variable_struct_get(_flags, _key) == true);
+}
+
+function Bed_CanUse(_flags, _key) {
+    return !Bed_Used(_flags, _key);
+}
+
+function Bed_MarkUsed(_flags, _key) {
+    variable_struct_set(_flags, _key, true);
+}
+
+// The skills the character owns whose upgrade he does not have yet, in slot order.
+function Bed_UpgradableSkills(_ch) {
+    var out = [];
+    if (!is_struct(_ch)) return out;
+    var skills = (variable_struct_exists(_ch, "skills") && is_array(_ch.skills)) ? _ch.skills : [];
+    var ups = (variable_struct_exists(_ch, "upgrades") && is_array(_ch.upgrades)) ? _ch.upgrades : [];
+    for (var i = 0; i < array_length(skills); i++) {
+        if (array_contains(ups, skills[i])) continue;
+        if (!is_struct(CardDB_Get(Card_UpgradeId(skills[i])))) continue;
+        array_push(out, skills[i]);
+    }
+    return out;
+}
+
+// A changed copy with full HP and MP.
+function Bed_Heal(_ch) {
+    var ch = variable_clone(_ch);
+    ch.hp = ch.max_hp;
+    ch.mp = ch.max_mp;
+    return ch;
+}
+
+// { ok, ch }: a changed copy holding the skill's upgrade; not ok (and ch unchanged) when he does not own the skill or has the upgrade already.
+function Bed_Upgrade(_ch, _skill_id) {
+    var out = { ok: false, ch: _ch };
+    if (!array_contains(Bed_UpgradableSkills(_ch), _skill_id)) return out;
+    var r = Card_Take(_ch, Card_UpgradeId(_skill_id));
+    out.ok = true;
+    out.ch = r.ch;
+    return out;
+}
+
+// The whole choice. _choice is "heal" or "upgrade" (with the skill id). Marks the bed used only when something happened.
+// Returns { ok, ch }; _flags is changed in place.
+function Bed_Choose(_ch, _flags, _key, _choice, _skill_id) {
+    var out = { ok: false, ch: _ch };
+    if (Bed_Used(_flags, _key)) return out;
+    if (_choice == "heal") {
+        out.ch = Bed_Heal(_ch);
+        out.ok = true;
+    } else if (_choice == "upgrade") {
+        var u = Bed_Upgrade(_ch, _skill_id);
+        if (!u.ok) return out;
+        out.ch = u.ch;
+        out.ok = true;
+    } else {
+        return out;
+    }
+    Bed_MarkUsed(_flags, _key);
+    return out;
+}
+
+// The bed's first menu (Ui framework items): Rest, Upgrade a skill, Leave. Upgrade is greyed when nothing can be upgraded.
+function Bed_MenuItems(_ch) {
+    var n = array_length(Bed_UpgradableSkills(_ch));
+    var heal = {
+        id: "heal", label: Loc_T("bed.option.heal", "Rest"), value: "", kind: "button", enabled: true,
+        help: Loc_T("bed.help.heal", "Sleep a while and wake with all your HP and MP."),
+        lines: [
+            { label: Loc_T("bed.lbl.hp", "HP"), value: string(_ch.hp) + " > " + string(_ch.max_hp) },
+            { label: Loc_T("bed.lbl.mp", "MP"), value: string(_ch.mp) + " > " + string(_ch.max_mp) }
+        ]
+    };
+    var up = {
+        id: "upgrade", label: Loc_T("bed.option.upgrade", "Upgrade a skill"), value: (n > 0) ? "" : "-", kind: "button", enabled: (n > 0),
+        help: (n > 0) ? Loc_T("bed.help.upgrade", "Think over one of your skills and make it better for good.")
+                      : Loc_T("bed.help.upgrade_none", "None of your skills can be upgraded any more."),
+        lines: []
+    };
+    var leave = {
+        id: "leave", label: Loc_T("bed.option.leave", "Leave"), value: "", kind: "button", enabled: true,
+        help: Loc_T("bed.help.leave", "Walk away. The bed stays free for later."), lines: []
+    };
+    return [heal, up, leave];
+}
+
+// The second menu: one row per skill that can be upgraded (the details panel shows what changes), then Back.
+function Bed_UpgradeItems(_ch) {
+    var items = [];
+    var list = Bed_UpgradableSkills(_ch);
+    for (var i = 0; i < array_length(list); i++) {
+        var card = CardDB_Get(Card_UpgradeId(list[i]));
+        array_push(items, {
+            id: "skill", label: SkillDB_GetBase(list[i]).name, value: "+", kind: "button", enabled: true,
+            help: Card_Sentence(card), lines: Card_Lines(card), skill_id: list[i]
+        });
+    }
+    array_push(items, {
+        id: "back", label: Loc_T("bed.option.back", "Back"), value: "", kind: "button", enabled: true,
+        help: Loc_T("bed.help.back", "Go back without choosing."), lines: [], skill_id: -1
+    });
+    return items;
+}
