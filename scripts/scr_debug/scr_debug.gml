@@ -3644,6 +3644,9 @@ function Scenario_StepSmokeRun(_s) {
             }
             if (variable_struct_exists(_rl, "sum_t") && _s.t > _rl.sum_t + 60 && Scenario_FloorReady(rm_floor1)) {
                 Scenario_Check("abandon_next_run_starts_at_level_1", _gs.player_ch.level == 1 && Run_IsActive() && Profile_Get().runs_started == 3, "runs_started=" + string(Profile_Get().runs_started));
+                _gs.pending_wake_line = false;   // C5: the wake line (checked in step 121) is dropped here so the card steps start clean
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
                 Scenario_Next(_s, 133);   // C2: the card screens in this run (step 111, the win, follows them)
             }
             if (_s.t > 600) { Scenario_Check("abandon_next_run_reaches_rm_floor1", false, "room=" + room_get_name(room) + " phase=" + string(global.run_flow.phase)); Scenario_Finish(); }
