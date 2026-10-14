@@ -118,8 +118,7 @@ function Save_ReadSettingsConfig(_path = undefined) {
     if (variable_struct_exists(raw, "vol_sfx")) out.audio_sfx = raw.vol_sfx;
     if (variable_struct_exists(raw, "vol_bgm")) out.audio_bgm = raw.vol_bgm;
     if (variable_struct_exists(raw, "display_scale")) out.display_scale = raw.display_scale;
-    if (variable_struct_exists(raw, "fit_screen")) out.fit_screen = raw.fit_screen;
-    else if (settings_version > 0) out.fit_screen = false;
+    var legacy_fit_screen = variable_struct_exists(raw, "fit_screen") && (Save_ToReal(raw.fit_screen, 0) != 0);
     if (variable_struct_exists(raw, "language")) out.language = raw.language;
 
     // Migrate older configs that defaulted to tiny 1x startup scale.
@@ -130,7 +129,13 @@ function Save_ReadSettingsConfig(_path = undefined) {
     }
 
     // Migration: disable legacy monitor-fit startup to prevent fullscreen-like launch on fresh/old configs.
-    if (settings_version < 6) out.fit_screen = false;
+    if (settings_version < 6) legacy_fit_screen = false;
+
+    // Migration 7 -> 8 (D91, DISP-14): fit_screen (a fullscreen switch) became window_mode. Old files keep what they had: fit_screen on
+    // is the exclusive fullscreen it always was, off is windowed at their scale. A version 8 file carries window_mode itself, and one that
+    // lacks it gets the default (borderless, same as a fresh install).
+    if (settings_version < 8) out.window_mode = Display_ModeFromLegacy(legacy_fit_screen);
+    else if (variable_struct_exists(raw, "window_mode")) out.window_mode = raw.window_mode;
 
     return GameSettings_Normalize(out);
 }
@@ -138,12 +143,12 @@ function Save_ReadSettingsConfig(_path = undefined) {
 function Save_WriteSettingsConfig(_settings, _path = undefined) {
     var s = GameSettings_Normalize(_settings);
     var raw = {
-        settings_version: 7,
+        settings_version: 8,
         vol_ui: s.audio_ui,
         vol_sfx: s.audio_sfx,
         vol_bgm: s.audio_bgm,
         display_scale: s.display_scale,
-        fit_screen: s.fit_screen,
+        window_mode: s.window_mode,
         language: s.language
     };
 

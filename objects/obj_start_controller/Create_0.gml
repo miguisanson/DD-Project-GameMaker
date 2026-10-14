@@ -26,6 +26,7 @@ cutscene_sequence = [];
 cutscene_segment_index = -1;
 cutscene_segment_hold_timer = 0;
 cutscene_wait_transition = false;
+cutscene_skip = false;   // D48: hold confirm ~1 s skips the cutscene
 cutscene_transition_next_index = -1;
 cutscene_transition_switched = false;
 boot_logo_phase = 0;

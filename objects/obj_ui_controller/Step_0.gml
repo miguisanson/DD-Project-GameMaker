@@ -1,5 +1,6 @@
 Input_PreStep();
 Display_Update();   // the display owner's per-frame check (applies only on a real window change); moves to obj_display's Begin Step
+Skip_Tick();       // D48: hold-to-skip count (steps only while a cutscene or camera pan claims it)
 var gs = GameState_Get();
 Transition_Update();
 UI_UpdateModalDimState();

@@ -72,9 +72,12 @@ function Test_RunAll() {
     Test_RunSuite("Player", Test_Suite_Player);
     Test_RunSuite("Loc", Test_Suite_Loc);
     Test_RunSuite("Display", Test_Suite_Display);
+    Test_RunSuite("WindowModes", Test_Suite_WindowModes);
+    Test_RunSuite("Skip", Test_Suite_Skip);
     Test_RunSuite("Nav", Test_Suite_Nav);
     Test_RunSuite("Snap", Test_Suite_Snap);
     Test_RunSuite("SaveAtomic", Test_Suite_SaveAtomic);
+    Test_RunSuite("SettingsMigration", Test_Suite_SettingsMigration);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     Test_RunSuite("Mem", Test_Suite_Mem);
     Test_RunSuite("Input", Test_Suite_Input);
@@ -1264,6 +1267,265 @@ function Test_Suite_Display() {
         _fs = !_fs;
     }
     Test_Eq("DISP-05 five toggles end fullscreen", _fs, true);
+}
+
+
+// D91 / I-054 / DISP-11 / DISP-14: window modes. Expected rectangles are worked out by hand from the spec: windowed = the Settings scale
+// (clamped to what the monitor holds, leaving DISPLAY_WINDOW_MARGIN_H = 80 px of height for title bar and taskbar), centred, with a border;
+// borderless = the whole monitor at 0,0 with no border and NOT exclusive; exclusive = the fullscreen flag.
+function Test_Suite_WindowModes() {
+    // Windowed scale choices that fit a monitor: scale s needs 160 s <= width and 144 s + 80 <= height.
+    Test_Eq("D91 max windowed scale 1920x1080 (144*6+80=944 fits, 7 does not)", Display_WindowedMaxScale(1920, 1080), 6);
+    Test_Eq("D91 max windowed scale 2560x1440", Display_WindowedMaxScale(2560, 1440), 9);
+    Test_Eq("D91 max windowed scale 3840x2160", Display_WindowedMaxScale(3840, 2160), 14);
+    Test_Eq("D91 max windowed scale 1366x768", Display_WindowedMaxScale(1366, 768), 4);
+    Test_Eq("D91 max windowed scale 640x480", Display_WindowedMaxScale(640, 480), 2);
+    Test_Eq("D91 max windowed scale 100x100 never below 1", Display_WindowedMaxScale(100, 100), 1);
+    var _ch = Display_WindowedScales(1920, 1080);
+    Test_Eq("D91 choices at 1080p: count", array_length(_ch), 4);
+    Test_Eq("D91 choices at 1080p: first", _ch[0], 3);
+    Test_Eq("D91 choices at 1080p: last", _ch[array_length(_ch) - 1], 6);
+    _ch = Display_WindowedScales(640, 480);
+    Test_Eq("D91 choices on a tiny monitor: the one that fits", array_length(_ch), 1);
+    Test_Eq("D91 choices on a tiny monitor: value", _ch[0], 2);
+
+    // The target rectangle (mode, monitor, scale).
+    var _r = Display_TargetRect(WINDOW_MODE_WINDOWED, 1920, 1080, 4);
+    Test_Eq("D91 windowed 4x: w", _r.w, 640);
+    Test_Eq("D91 windowed 4x: h", _r.h, 576);
+    Test_Eq("D91 windowed 4x: x centred", _r.x, 640);
+    Test_Eq("D91 windowed 4x: y centred", _r.y, 252);
+    Test_Eq("D91 windowed has a border", _r.border, true);
+    Test_Eq("D91 windowed is not fullscreen", _r.fullscreen, false);
+    Test_Eq("D91 windowed asks to be centred", _r.center, true);
+    _r = Display_TargetRect(WINDOW_MODE_WINDOWED, 1920, 1080, 9);
+    Test_Eq("D91 windowed 9x on 1080p is clamped to 6x: w", _r.w, 960);
+    Test_Eq("D91 windowed 9x on 1080p is clamped to 6x: h", _r.h, 864);
+    _r = Display_TargetRect(WINDOW_MODE_BORDERLESS, 1920, 1080, 4);
+    Test_Eq("D91 borderless: x", _r.x, 0);
+    Test_Eq("D91 borderless: y", _r.y, 0);
+    Test_Eq("D91 borderless: w is the display width", _r.w, 1920);
+    Test_Eq("D91 borderless: h is the display height", _r.h, 1080);
+    Test_Eq("D91 borderless: no border", _r.border, false);
+    Test_Eq("D91 borderless is NOT the exclusive fullscreen flag", _r.fullscreen, false);
+    Test_Eq("D91 borderless is placed at 0,0 (not centred)", _r.center, false);
+    _r = Display_TargetRect(WINDOW_MODE_BORDERLESS, 2560, 1440, 3);
+    Test_Eq("D91 borderless 1440p: w", _r.w, 2560);
+    Test_Eq("D91 borderless 1440p: h", _r.h, 1440);
+    _r = Display_TargetRect(WINDOW_MODE_EXCLUSIVE, 2560, 1440, 3);
+    Test_Eq("D91 exclusive: fullscreen flag", _r.fullscreen, true);
+    Test_Eq("D91 exclusive: w", _r.w, 2560);
+    Test_Eq("D91 exclusive: h", _r.h, 1440);
+    // The picture a mode gives on the same monitor (existing layout rule).
+    var _l = Display_CalcLayout(_r.w, _r.h);
+    Test_Eq("D91 exclusive 1440p picture scale", _l.scale, 10);
+    _l = Display_CalcLayout(1920, 1080);
+    Test_Eq("D91 borderless 1080p picture scale", _l.scale, 7);
+    Test_Eq("D91 borderless 1080p picture x", _l.game_x, 400);
+
+    // Modes are normalised: unknown values become the default (borderless), reals are rounded and clamped.
+    Test_Eq("D91 normalize 0", Display_NormalizeMode(0), WINDOW_MODE_WINDOWED);
+    Test_Eq("D91 normalize 2", Display_NormalizeMode(2), WINDOW_MODE_EXCLUSIVE);
+    Test_Eq("D91 normalize 7 clamps", Display_NormalizeMode(7), WINDOW_MODE_EXCLUSIVE);
+    Test_Eq("D91 normalize -3 clamps", Display_NormalizeMode(-3), WINDOW_MODE_WINDOWED);
+    Test_Eq("D91 normalize a string falls back to the default", Display_NormalizeMode("x"), WINDOW_MODE_BORDERLESS);
+    Test_Eq("D91 normalize undefined falls back to the default", Display_NormalizeMode(undefined), WINDOW_MODE_BORDERLESS);
+    Test_Eq("D91 legacy fit_screen true -> exclusive", Display_ModeFromLegacy(true), WINDOW_MODE_EXCLUSIVE);
+    Test_Eq("D91 legacy fit_screen false -> windowed", Display_ModeFromLegacy(false), WINDOW_MODE_WINDOWED);
+
+    // Tests never touch the owner's screen: whatever mode is asked for, a test run is windowed.
+    Test_Eq("D91 test run forces windowed (borderless asked)", Display_EffectiveMode(WINDOW_MODE_BORDERLESS, true), WINDOW_MODE_WINDOWED);
+    Test_Eq("D91 test run forces windowed (exclusive asked)", Display_EffectiveMode(WINDOW_MODE_EXCLUSIVE, true), WINDOW_MODE_WINDOWED);
+    Test_Eq("D91 a normal run keeps the mode", Display_EffectiveMode(WINDOW_MODE_BORDERLESS, false), WINDOW_MODE_BORDERLESS);
+
+    // The request state machine with borderless: border off, the display-sized window at 0,0, no fullscreen flag, no centring.
+    var _q = Display_RequestNew(false, 1920, 1080, false, false, 0, 0);
+    var _obs = { fullscreen: false, win_w: 640, win_h: 576, border: true };
+    var _st = Display_RequestStep(_q, _obs);
+    Test_Eq("D91 windowed -> borderless: size command", _st.cmd.kind, "size");
+    Test_Eq("D91 windowed -> borderless: border off", _st.cmd.border, false);
+    Test_Eq("D91 windowed -> borderless: w", _st.cmd.w, 1920);
+    Test_Eq("D91 windowed -> borderless: not centred", _st.cmd.center, false);
+    Test_Eq("D91 windowed -> borderless: x", _st.cmd.x, 0);
+    Test_Eq("D91 windowed -> borderless: y", _st.cmd.y, 0);
+    _obs = { fullscreen: false, win_w: 1920, win_h: 1080, border: true };   // the right size but the border is still on: not satisfied
+    _st = Display_RequestStep(Display_RequestNew(false, 1920, 1080, false, false, 0, 0), _obs);
+    Test_Eq("D91 right size but border still on: still a command", _st.cmd.kind, "size");
+    _obs = { fullscreen: false, win_w: 1920, win_h: 1080, border: false };
+    _st = Display_RequestStep(Display_RequestNew(false, 1920, 1080, false, false, 0, 0), _obs);
+    Test_Eq("D91 borderless already in place: no command", _st.cmd.kind, "none");
+    Test_Eq("D91 borderless already in place: done", _st.req.phase, "done");
+    // borderless -> windowed: the border comes back even when the size already matches.
+    _obs = { fullscreen: false, win_w: 640, win_h: 576, border: false };
+    _st = Display_RequestStep(Display_RequestNew(false, 640, 576, true, true, 640, 252), _obs);
+    Test_Eq("D91 borderless -> windowed: size command", _st.cmd.kind, "size");
+    Test_Eq("D91 borderless -> windowed: border on", _st.cmd.border, true);
+    Test_Eq("D91 borderless -> windowed: centred", _st.cmd.center, true);
+    // exclusive -> borderless: the flag goes off first, then the borderless rectangle.
+    _q = Display_RequestNew(false, 1920, 1080, false, false, 0, 0);
+    _obs = { fullscreen: true, win_w: 1920, win_h: 1080, border: true };
+    _st = Display_RequestStep(_q, _obs);
+    Test_Eq("D91 exclusive -> borderless: leaves fullscreen first", _st.cmd.kind, "fullscreen");
+    Test_Eq("D91 exclusive -> borderless: flag off", _st.cmd.fullscreen, false);
+    _q = _st.req;
+    _obs = { fullscreen: false, win_w: 1920, win_h: 1080, border: true };
+    var _got_border = false;
+    for (var _k = 0; _k < DISPLAY_FS_WAIT + 3; _k++) {
+        _st = Display_RequestStep(_q, _obs);
+        _q = _st.req;
+        if (_st.cmd.kind == "size") { _got_border = (_st.cmd.border == false && _st.cmd.x == 0 && _st.cmd.y == 0); break; }
+    }
+    Test_Eq("D91 exclusive -> borderless: then the borderless rectangle", _got_border, true);
+    // borderless -> exclusive: only the flag.
+    _obs = { fullscreen: false, win_w: 1920, win_h: 1080, border: false };
+    _st = Display_RequestStep(Display_RequestNew(true, 1920, 1080, true, false, 0, 0), _obs);
+    Test_Eq("D91 borderless -> exclusive: fullscreen command", _st.cmd.kind, "fullscreen");
+    Test_Eq("D91 borderless -> exclusive: flag on", _st.cmd.fullscreen, true);
+
+    // DISP-10: a room narrower than the 160 px view (rm_floor6_5 is 144 wide, the camera sits at x=-16 against the room's right edge):
+    // only the part of the picture inside the room is shown, centred; the rest stays black. Wide rooms are left alone.
+    var _c = Display_RoomCrop(144, 144, -16, 0, 160, 144);
+    Test_Eq("DISP-10 144 wide room, camera -16: source x", _c.sx, 16);
+    Test_Eq("DISP-10 144 wide room, camera -16: source width", _c.sw, 144);
+    Test_Eq("DISP-10 144 wide room, camera -16: drawn centred (8 px each side)", _c.dx, 8);
+    Test_Eq("DISP-10 144 wide room: full height, source y", _c.sy, 0);
+    Test_Eq("DISP-10 144 wide room: full height", _c.sh, 144);
+    Test_Eq("DISP-10 144 wide room: no vertical move", _c.dy, 0);
+    Test_Eq("DISP-10 crop is active for a narrow room", _c.active, true);
+    _c = Display_RoomCrop(144, 144, -8, 0, 160, 144);
+    Test_Eq("DISP-10 camera already centred: source x", _c.sx, 8);
+    Test_Eq("DISP-10 camera already centred: drawn at 8", _c.dx, 8);
+    _c = Display_RoomCrop(144, 144, 0, 0, 160, 144);   // camera at the left edge: the room fills 0..144
+    Test_Eq("DISP-10 camera at the left edge: source x", _c.sx, 0);
+    Test_Eq("DISP-10 camera at the left edge: still centred", _c.dx, 8);
+    _c = Display_RoomCrop(321, 175, 50, 23, 160, 144);
+    Test_Eq("DISP-10 wide room: no crop", _c.active, false);
+    Test_Eq("DISP-10 wide room: full width", _c.sw, 160);
+    Test_Eq("DISP-10 wide room: full height", _c.sh, 144);
+    Test_Eq("DISP-10 wide room: drawn at 0", _c.dx, 0);
+    _c = Display_RoomCrop(160, 144, 0, 0, 160, 144);
+    Test_Eq("DISP-10 room equal to the view: no crop", _c.active, false);
+    _c = Display_RoomCrop(150, 100, -5, -22, 160, 144);   // narrow and short
+    Test_Eq("DISP-10 short room: source y", _c.sy, 22);
+    Test_Eq("DISP-10 short room: height", _c.sh, 100);
+    Test_Eq("DISP-10 short room: drawn centred", _c.dy, 22);
+    // The shift (drawn x minus source x) moves world-to-GUI points of a narrow room so HUD that follows a sprite stays on it.
+    var _lay = Display_CalcLayout(480, 432);
+    _lay.shift_x = -8;   // 144 wide room, camera -16: source 16, drawn 8
+    var _wp = Display_WorldToGui(_lay, 20, 0, 0, 0);   // 3 GUI units per world pixel: (20 - 8) * 3
+    Test_Eq("DISP-10 world -> gui includes the narrow-room shift", _wp.x, 36);
+}
+
+// D48 / I-055: hold-to-skip. Skip_Step is the pure core: a fresh press arms it, holding confirm for SKIP_HOLD_FRAMES fires it, a tap never does.
+function Test_Suite_Skip() {
+    var _st = Skip_StateNew();
+    var _r = Skip_Step(_st, true, true, true);   // first frame: pressed and held
+    Test_Eq("D48 first press: not fired", _r.fired, false);
+    Test_Eq("D48 first press: shows the hint", _r.hint > 0, true);
+    Test_Eq("D48 first press: progress started", _r.held_frames, 1);
+    _st = _r;
+    for (var _i = 2; _i < SKIP_HOLD_FRAMES; _i++) {
+        _st = Skip_Step(_st, true, false, true);
+        if (_st.fired) break;
+    }
+    Test_Eq("D48 held for one frame less than the hold time: not fired", _st.fired, false);
+    _st = Skip_Step(_st, true, false, true);
+    Test_Eq("D48 held for the whole hold time: fires", _st.fired, true);
+    Test_Eq("D48 firing resets the hold", _st.held_frames, 0);
+
+    // A tap (a few frames, then released) never skips and the count restarts on the next press.
+    _st = Skip_StateNew();
+    _st = Skip_Step(_st, true, true, true);
+    _st = Skip_Step(_st, true, false, true);
+    _st = Skip_Step(_st, true, false, true);
+    _st = Skip_Step(_st, true, false, false);   // released
+    Test_Eq("D48 tap: not fired", _st.fired, false);
+    Test_Eq("D48 tap: hold count back to 0", _st.held_frames, 0);
+    Test_Eq("D48 tap: hint stays on screen for a while", _st.hint > 0, true);
+    var _fired = false;
+    for (var _i = 0; _i < SKIP_HOLD_FRAMES * 3; _i++) {   // many taps, one every 10 frames
+        _st = Skip_Step(_st, true, (_i mod 10) == 0, (_i mod 10) < 3);
+        if (_st.fired) _fired = true;
+    }
+    Test_Eq("D48 repeated taps never skip", _fired, false);
+
+    // A key already held when the scene starts (no new press) never skips.
+    _st = Skip_StateNew();
+    _fired = false;
+    for (var _i = 0; _i < SKIP_HOLD_FRAMES * 2; _i++) {
+        _st = Skip_Step(_st, true, false, true);
+        if (_st.fired) _fired = true;
+    }
+    Test_Eq("D48 a key held from before the scene does not skip", _fired, false);
+
+    // Not allowed (no skippable scene): everything resets.
+    _st = Skip_Step(Skip_StateNew(), true, true, true);
+    _st = Skip_Step(_st, false, false, true);
+    Test_Eq("D48 leaving the scene resets the count", _st.held_frames, 0);
+    Test_Eq("D48 leaving the scene hides the hint", _st.hint, 0);
+
+    // The hint fades after SKIP_HINT_FRAMES without a press.
+    _st = Skip_Step(Skip_StateNew(), true, true, true);
+    _st = Skip_Step(_st, true, false, false);
+    for (var _i = 0; _i < SKIP_HINT_FRAMES + 2; _i++) _st = Skip_Step(_st, true, false, false);
+    Test_Eq("D48 the hint goes away", _st.hint, 0);
+    Test_Eq("D48 progress fraction", Skip_Fraction(SKIP_HOLD_FRAMES div 2), 0.5);
+}
+
+// DISP-14 / SAVE-06 / D91: settings_version 8. Old fit_screen + scale fields become a window mode; a fresh install is borderless.
+function Test_SettingsMigrationCase(_name, _json, _want_mode, _want_scale) {
+    var _f = "test_settings_mig.json";
+    Save_DeleteFileSet(_f);
+    Test_RawWrite(_f, _json);
+    var _cfg = Save_ReadSettingsConfig(_f);
+    Test_True("DISP-14 " + _name + ": file is read", is_struct(_cfg));
+    if (is_struct(_cfg)) {
+        Test_Eq("DISP-14 " + _name + ": window_mode", _cfg.window_mode, _want_mode);
+        Test_Eq("DISP-14 " + _name + ": scale kept", _cfg.display_scale, _want_scale);
+        Test_False("DISP-14 " + _name + ": no fit_screen field any more", variable_struct_exists(_cfg, "fit_screen"));
+    }
+    Save_DeleteFileSet(_f);
+}
+
+function Test_Suite_SettingsMigration() {
+    // A fresh install (no file, defaults) is borderless fullscreen (D91).
+    Test_Eq("D91 defaults: borderless", GameSettings_Defaults().window_mode, WINDOW_MODE_BORDERLESS);
+    Test_Eq("D91 normalizing nothing gives borderless", GameSettings_Normalize(undefined).window_mode, WINDOW_MODE_BORDERLESS);
+    Test_Eq("D91 normalizing a partial struct keeps the default mode", GameSettings_Normalize({ audio_bgm: 0.5 }).window_mode, WINDOW_MODE_BORDERLESS);
+    // Version 7 files (old fit_screen + display_scale).
+    Test_SettingsMigrationCase("v7 fit_screen true", "{\"settings_version\":7,\"vol_ui\":1,\"vol_sfx\":1,\"vol_bgm\":1,\"display_scale\":4,\"fit_screen\":true,\"language\":\"en\"}", WINDOW_MODE_EXCLUSIVE, 4);
+    Test_SettingsMigrationCase("v7 fit_screen false", "{\"settings_version\":7,\"vol_ui\":1,\"vol_sfx\":1,\"vol_bgm\":1,\"display_scale\":5,\"fit_screen\":false,\"language\":\"en\"}", WINDOW_MODE_WINDOWED, 5);
+    Test_SettingsMigrationCase("v6 fit_screen true", "{\"settings_version\":6,\"display_scale\":3,\"fit_screen\":true}", WINDOW_MODE_EXCLUSIVE, 3);
+    // Versions below 6 forced the old fit_screen off (the legacy monitor-fit startup was disabled): they stay windowed.
+    Test_SettingsMigrationCase("v5 fit_screen true is dropped", "{\"settings_version\":5,\"display_scale\":4,\"fit_screen\":true}", WINDOW_MODE_WINDOWED, 4);
+    Test_SettingsMigrationCase("v1 tiny scale -> default scale", "{\"settings_version\":1,\"display_scale\":1}", WINDOW_MODE_WINDOWED, DISPLAY_SCALE_DEFAULT);
+    Test_SettingsMigrationCase("no version, no fields", "{\"vol_bgm\":0.5}", WINDOW_MODE_WINDOWED, DISPLAY_SCALE_DEFAULT);
+    // Version 8 files carry the mode itself; a stray fit_screen is ignored.
+    Test_SettingsMigrationCase("v8 borderless", "{\"settings_version\":8,\"display_scale\":6,\"window_mode\":1}", WINDOW_MODE_BORDERLESS, 6);
+    Test_SettingsMigrationCase("v8 exclusive, stray fit_screen ignored", "{\"settings_version\":8,\"display_scale\":3,\"window_mode\":2,\"fit_screen\":false}", WINDOW_MODE_EXCLUSIVE, 3);
+    Test_SettingsMigrationCase("v8 windowed", "{\"settings_version\":8,\"display_scale\":4,\"window_mode\":0}", WINDOW_MODE_WINDOWED, 4);
+    Test_SettingsMigrationCase("v8 without the field -> default borderless", "{\"settings_version\":8,\"display_scale\":3}", WINDOW_MODE_BORDERLESS, 3);
+    Test_SettingsMigrationCase("v8 bad mode value is clamped", "{\"settings_version\":8,\"display_scale\":3,\"window_mode\":9}", WINDOW_MODE_EXCLUSIVE, 3);
+    // Scales above the old 5 are kept (windowed size choices follow the monitor now), up to the hard ceiling.
+    Test_SettingsMigrationCase("v8 scale 9 kept", "{\"settings_version\":8,\"display_scale\":9,\"window_mode\":0}", WINDOW_MODE_WINDOWED, 9);
+
+    // Write and read back: the file is version 8, carries window_mode and no fit_screen.
+    var _f = "test_settings_mig.json";
+    Save_DeleteFileSet(_f);
+    Save_WriteSettingsConfig({ window_mode: WINDOW_MODE_BORDERLESS, display_scale: 6, audio_bgm: 0.4 }, _f);
+    var _raw = json_parse(Test_RawRead(_f));
+    Test_Eq("DISP-14 written settings_version", _raw.settings_version, 8);
+    Test_Eq("DISP-14 written window_mode", _raw.window_mode, WINDOW_MODE_BORDERLESS);
+    Test_False("DISP-14 written file has no fit_screen", variable_struct_exists(_raw, "fit_screen"));
+    var _back = Save_ReadSettingsConfig(_f);
+    Test_Eq("DISP-14 round trip: mode", is_struct(_back) ? _back.window_mode : -1, WINDOW_MODE_BORDERLESS);
+    Test_Eq("DISP-14 round trip: scale", is_struct(_back) ? _back.display_scale : -1, 6);
+    Test_Eq("DISP-14 round trip: volume", is_struct(_back) ? _back.audio_bgm : -1, 0.4);
+    // An old in-memory struct that still says fit_screen (not window_mode) is mapped too.
+    Test_Eq("DISP-14 Normalize maps a legacy fit_screen true", GameSettings_Normalize({ fit_screen: true }).window_mode, WINDOW_MODE_EXCLUSIVE);
+    Test_Eq("DISP-14 Normalize maps a legacy fit_screen false", GameSettings_Normalize({ fit_screen: false }).window_mode, WINDOW_MODE_WINDOWED);
+    Test_Eq("DISP-14 window_mode wins over a legacy fit_screen", GameSettings_Normalize({ fit_screen: true, window_mode: WINDOW_MODE_BORDERLESS }).window_mode, WINDOW_MODE_BORDERLESS);
+    Save_DeleteFileSet(_f);
 }
 
 

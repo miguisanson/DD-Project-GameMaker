@@ -197,6 +197,14 @@ if (state == "difficulty") {
 }
 
 if (state == "cutscene") {
+    // D48 / I-055: holding confirm for about a second skips the whole cutscene (it still counts as seen: the end block below runs as usual).
+    // A tap only advances text. Not counted while the cutscene is not running, nor once it is already ending.
+    if (!variable_instance_exists(id, "cutscene_skip")) cutscene_skip = false;
+    if (cutscene_started && !cutscene_skip) {
+        Skip_Claim();
+        if (Skip_Consume()) cutscene_skip = true;
+    }
+
     // Allow first cutscene segment to initialize under the entry fade so the
     // first image reveals with fade-in (instead of popping after fade ends).
     // Still block processing while transitioning out of rm_cutscene.
@@ -358,6 +366,15 @@ if (state == "cutscene") {
     var seg_cur_lines = variable_struct_exists(seg_cur, "lines") ? seg_cur.lines : [];
     var segment_done = false;
 
+    if (cutscene_skip) {
+        // Skipped: close the line that is on screen and go straight to the end below (the same end block as watching to the last line).
+        Dialogue_CloseNow();
+        gs.ui.lines = [];
+        gs.ui.lines_raw = [];
+        seg_cur_lines = [];
+        cutscene_segment_hold_timer = 0;
+    }
+
     if (is_array(seg_cur_lines) && array_length(seg_cur_lines) > 0) {
         segment_done = (gs.ui.mode != UI_DIALOGUE && array_length(gs.ui.lines) <= 0);
     } else {
@@ -386,6 +403,7 @@ if (state == "cutscene") {
     if (!segment_done) return;
 
     var next_index = cutscene_segment_index + 1;
+    if (cutscene_skip) next_index = array_length(cutscene_sequence);
     if (next_index < array_length(cutscene_sequence)) {
         var seg_next = cutscene_sequence[next_index];
         var use_slow_segment_fade = false;
@@ -443,6 +461,8 @@ if (state == "cutscene") {
     cutscene_wait_transition = false;
     cutscene_transition_next_index = -1;
     cutscene_transition_switched = false;
+    cutscene_skip = false;
+    Skip_Reset();
 
     switch (cutscene_id) {
         case "intro":

@@ -234,3 +234,5 @@ if (gs.ui.mode == UI_BED) {
 }
 
 Transition_DrawGUI();
+
+Skip_DrawHint();   // D48: the "hold to skip" fill after a press (nothing when no skippable scene is running)

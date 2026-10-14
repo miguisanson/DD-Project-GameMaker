@@ -328,7 +328,7 @@ function Scenario_Step() {
     _s.f++;
     _s.t++;
     var _gs = GameState_Get();
-    if (is_struct(_gs) && variable_struct_exists(_gs, "settings") && is_struct(_gs.settings)) _gs.settings.fit_screen = false;
+    if (is_struct(_gs) && variable_struct_exists(_gs, "settings") && is_struct(_gs.settings)) _gs.settings.window_mode = WINDOW_MODE_WINDOWED;
     if (_s.f > _s.cap) {
         Scenario_Check(_s.mode + "_within_" + string(_s.cap) + "_frames", false, "step=" + string(_s.step));
         Scenario_Finish();
@@ -419,6 +419,98 @@ function Scenario_StepSmoke(_s) {
         case 6: case 7: case 8: case 9:
             Scenario_StepSmokeSnap(_s);
             break;
+        case 10: case 11: case 12: case 13: case 14: case 15: case 16: case 17:
+            Scenario_StepSmokeSkip(_s);
+            break;
+    }
+}
+
+// D48 / I-055 hold-to-skip, through the real input path (Scenario_Tap / Scenario_Hold write the game's own input state).
+// New Game -> intro cutscene: taps only advance text (the cutscene goes on); holding confirm ends the intro about a second later and the
+// game arrives in rm_floor1 in the same state as after watching the whole intro (compared with a second, watched run).
+function Scenario_IntroFingerprint() {
+    var _gs = GameState_Get();
+    var _hp = is_struct(_gs.player_ch) ? (string(_gs.player_ch.hp) + "/" + string(_gs.player_ch.max_hp)) : "none";
+    return room_get_name(room) + " class=" + string(_gs.selected_class) + " menu=" + string(_gs.in_main_menu) + " defeated=" + string(ds_list_size(_gs.defeated_enemies))
+        + " uid=" + string(_gs.uid_counter) + " reset=" + string(_gs.enemy_reset_version) + " mini=" + string(_gs.boss_defeated.mini_boss) + " final=" + string(_gs.boss_defeated.final_boss)
+        + " room_states=" + string(variable_struct_names_count(_gs.room_states)) + " player=" + _hp + " player_obj=" + string(instance_exists(obj_player))
+        + " intro_dialogue=" + string(_gs.ui.mode == UI_DIALOGUE) + " cutscene_active=" + string(variable_struct_exists(_gs.ui, "cutscene_active") && _gs.ui.cutscene_active);
+}
+
+function Scenario_StepSmokeSkip(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    switch (_s.step) {
+        case 10:   // a new game's intro cutscene, first run (skipped)
+            if (_s.t == 1) {
+                if (Transition_IsActive()) { _s.t = 0; break; }
+                if (instance_exists(obj_dialogue_trigger)) with (obj_dialogue_trigger) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_NewKnight();
+                Transition_RequestCutsceneById("intro");
+            }
+            if (_s.t > 1 && _s.t < 600 && room == rm_cutscene && _sc != noone && _sc.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE && _s.t > 40) {
+                Scenario_Check("skip_intro_cutscene_running", true);
+                _s.skp_taps = 0;
+                Scenario_Next(_s, 11);
+            }
+            if (_s.t >= 600) { Scenario_Check("skip_intro_cutscene_running", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 11:   // taps (three presses, 20 frames apart) only advance text: the cutscene is still running 60 frames after the last
+            if (_s.t == 10 || _s.t == 30 || _s.t == 50) Scenario_Tap("confirm");
+            if (_s.t == 110) {
+                Scenario_Check("skip_tap_does_not_skip_room", room == rm_cutscene, "room=" + room_get_name(room));
+                Scenario_Check("skip_tap_does_not_skip_flag", _sc != noone && !_sc.cutscene_skip && _sc.cutscene_started);
+                Scenario_Check("skip_tap_does_not_skip_no_exit_fade", !Transition_IsActive(), "a transition started");
+                Scenario_Next(_s, 12);
+            }
+            break;
+        case 12:   // hold confirm: the intro must end within about 1.2 s of the press (60 frames held + the flash/fade is the exit)
+            if (_s.t == 1) {
+                Scenario_Hold("confirm", 120);
+                _s.skp_f0 = _s.f;
+            }
+            if (_s.t > 1 && Transition_IsActive() && _gs.transition_fx.type == TRANSITION_TYPE_CUTSCENE && _gs.transition_fx.target_room == rm_floor1) {
+                var _d = _s.f - _s.skp_f0;
+                Scenario_Check("skip_hold_ends_intro_within_1_2_s", _d <= 72, "frames=" + string(_d));
+                Scenario_Check("skip_hold_not_before_1_s", _d >= SKIP_HOLD_FRAMES - 2, "frames=" + string(_d));
+                Scenario_Release();
+                Scenario_Next(_s, 13);
+            }
+            if (_s.t > 300) { Scenario_Check("skip_hold_ends_intro_within_1_2_s", false, "no exit fade after 300 frames"); Scenario_Finish(); }
+            break;
+        case 13:   // arrive in rm_floor1: its intro dialogue opens (the pending flag is the same one watching sets)
+            if (room == rm_floor1 && !Transition_IsActive() && instance_exists(obj_player) && _gs.ui.mode == UI_DIALOGUE) {
+                _s.skp_fp_skip = Scenario_IntroFingerprint();
+                Scenario_Check("skip_hold_reaches_floor1_with_its_intro_dialogue", true);
+                Scenario_Check("skip_hold_class_is_the_new_game_class", _gs.selected_class == CLASS_NOBODY, "class=" + string(_gs.selected_class));
+                Scenario_Next(_s, 14);
+            }
+            if (_s.t > 600) { Scenario_Check("skip_hold_reaches_floor1_with_its_intro_dialogue", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+            break;
+        case 14:   // second run: watch the whole intro (confirm every line)
+            if (_s.t == 1) {
+                Dialogue_CloseNow();
+                if (instance_exists(obj_dialogue_trigger)) with (obj_dialogue_trigger) instance_destroy();
+                Scenario_NewKnight();
+                Transition_RequestCutsceneById("intro");
+            }
+            if (_s.t > 2 && room == rm_cutscene && _sc != noone && _sc.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE) {
+                if ((_s.f - _s.last_tap) >= 8) Scenario_Tap("confirm");
+            }
+            if (_s.t > 2 && Transition_IsActive() && _gs.transition_fx.type == TRANSITION_TYPE_CUTSCENE && _gs.transition_fx.target_room == rm_floor1) {
+                Scenario_Next(_s, 15);
+            }
+            if (_s.t > 3000) { Scenario_Check("skip_watched_intro_ends", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 15:
+            if (room == rm_floor1 && !Transition_IsActive() && instance_exists(obj_player) && _gs.ui.mode == UI_DIALOGUE) {
+                var _fp = Scenario_IntroFingerprint();
+                Scenario_Check("skip_state_equals_watched_state", _fp == _s.skp_fp_skip, "watched=[" + _fp + "] skipped=[" + _s.skp_fp_skip + "]");
+                Scenario_Finish();
+            }
+            if (_s.t > 600) { Scenario_Check("skip_watched_reaches_floor1", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+            break;
     }
 }
 
@@ -491,7 +583,7 @@ function Scenario_StepSmokeSnap(_s) {
             if (_s.t == 50) {
                 var _sl4 = instance_exists(obj_slime) ? instance_find(obj_slime, 0) : noone;
                 Scenario_Check("snap_enemy_restored_on_grid", _sl4 != noone && room == rm_floor1 && Scenario_Aligned(_sl4), (_sl4 != noone) ? ("x=" + string(_sl4.x) + " y=" + string(_sl4.y)) : "no slime");
-                Scenario_Finish();
+                Scenario_Next(_s, 10);   // on to the hold-to-skip checks (D48)
             }
             break;
     }
@@ -973,7 +1065,7 @@ function Scenario_BotEvaluate(_s, _bc, _name) {
 
 // ---- -shots: screen_save of rm_start / rm_floor1 / rm_battle at display scales 3, 4, 5, then the screen after a cutscene end,
 // a dialogue end and a room transition at several window sizes (I-051, DISP-04/06/07/08), then one picture per skill animation ----
-// fit_screen is not captured: it needs a real fullscreen switch, which is not safe in an unattended run.
+// Borderless and exclusive fullscreen are not captured: they need a real fullscreen switch, which is not safe in an unattended run (D91: tests are always windowed).
 
 // The window sizes of the display flow. [w, h]
 function Scenario_DispSize(_i) {
@@ -987,8 +1079,8 @@ function Scenario_DispSizeCount() {
 
 // Put the window at a size and let the display owner lay it out (windowed, any size: DISP-11).
 function Scenario_SetWindow(_w, _h) {
-    GameSettings_Ensure().fit_screen = false;
-    Display_Request({ fullscreen: false, window_w: _w, window_h: _h });
+    GameSettings_Ensure().window_mode = WINDOW_MODE_WINDOWED;
+    Display_Request({ mode: WINDOW_MODE_WINDOWED, window_w: _w, window_h: _h });
 }
 
 function Scenario_SetWindowScale(_scale) {
@@ -1001,9 +1093,15 @@ function Scenario_SetWindowScale(_scale) {
 //   or only that rectangle when the Windows Scaling option is "keep aspect"), applies = display re-layout count (DISP-08),
 //   edge=1 the four edges of the rectangle must carry picture (not for fades or cutscene art), fade=1 a fade was on screen,
 //   art=1 the picture must not be all black (H2: the last cutscene image fades out, it does not vanish first).
-function Scenario_ShotLayout(_file, _flags = "") {
+function Scenario_ShotLayout(_file, _flags = "", _crop = undefined) {
     var _w = window_get_width(), _h = window_get_height();
     var _l = Display_CalcLayout(_w, _h);
+    if (is_struct(_crop)) {   // a room smaller than the view (DISP-10): the predicted picture is only the part inside the room, so anything outside it is garbage
+        _l.game_x += _crop.dx * _l.scale;
+        _l.game_y += _crop.dy * _l.scale;
+        _l.game_w = _crop.sw * _l.scale;
+        _l.game_h = _crop.sh * _l.scale;
+    }
     var _ap = application_get_position();
     var _fade = Transition_IsActive() && GameState_Get().transition_fx.alpha > 0.001;
     screen_save(_file);
@@ -1056,6 +1154,9 @@ function Scenario_StepShots(_s) {
         case 11:
         case 12:
             Scenario_StepShotsFx(_s);
+            break;
+        case 50: case 51: case 52: case 53: case 54: case 55: case 56: case 57: case 58:
+            Scenario_StepShotsWindow(_s);
             break;
         default:
             Scenario_StepShotsDisp(_s);
@@ -1371,6 +1472,96 @@ function Scenario_StepShotsQte(_s) {
         case 42:
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _s.si = 0;
+                Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
+            }
+            break;
+    }
+}
+
+// DISP-10: rm_floor6_5 (144 wide, the view is 160) at two windowed sizes: the room is centred and nothing outside it shows (the wrapper counts
+// non-black pixels outside the predicted room rectangle). D91: the Settings popup with the Window row. D48: the hold-to-skip hint mid-hold.
+function Scenario_StepShotsWindow(_s) {
+    var _gs = GameState_Get();
+    var _scales = [3, 5];
+    switch (_s.step) {
+        case 50:   // rm_floor6_5 at scale _scales[_s.si]
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(_scales[_s.si]);
+                room_goto(rm_floor6_5);
+            }
+            if (_s.t >= 45) {
+                Scenario_Check("shots_in_rm_floor6_5", room == rm_floor6_5, "room=" + room_get_name(room));
+                var _cam = view_camera[0];
+                var _crop = Display_RoomCrop(room_width, room_height, camera_get_view_x(_cam), camera_get_view_y(_cam), DISPLAY_BASE_W, DISPLAY_BASE_H);
+                Scenario_Check("shots_floor6_5_narrow_room_is_cropped_and_centred", _crop.active && _crop.sw == 144 && _crop.dx == 8, "sw=" + string(_crop.sw) + " dx=" + string(_crop.dx) + " cam_x=" + string(camera_get_view_x(_cam)));
+                _s.shot = "shot_rm_floor6_5_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot, "edge=1", _crop);
+                Scenario_Next(_s, 51);
+            }
+            break;
+        case 51:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _s.si++;
+                if (_s.si >= array_length(_scales)) { _s.si = 0; Scenario_Next(_s, 52); } else Scenario_Next(_s, 50);
+            }
+            break;
+        case 52:   // the Settings popup from the title menu, Window row selected, Borderless shown
+            if (_s.t == 1) {
+                Scenario_SetWindowScale(3);
+                room_goto(rm_start);
+            }
+            if (_s.t == 45) {
+                if (!instance_exists(obj_start_controller)) { Scenario_Check("shots_settings_in_rm_start", false, "no start controller"); Scenario_Finish(); break; }
+                with (obj_start_controller) { state = "settings"; }
+                SettingsPopup_Open("title");
+                var _sp = GameState_Get().ui.settings_popup;
+                _sp.pending.window_mode = WINDOW_MODE_BORDERLESS;
+                _sp.index = 3;
+            }
+            if (_s.t == 90) {
+                _s.shot = "shot_settings_window_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot, "edge=1");
+                Scenario_Next(_s, 53);
+            }
+            break;
+        case 53:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                SettingsPopup_Close(true);
+                Scenario_Next(_s, 54);
+            }
+            break;
+        case 54:   // the intro cutscene, confirm held for about half the skip time
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Transition_RequestCutsceneById("intro");
+            }
+            if (_s.t > 40 && room == rm_cutscene && instance_exists(obj_start_controller) && obj_start_controller.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE) {
+                Scenario_Hold("confirm", 200);
+                _s.skp_f0 = _s.f;
+                Scenario_Next(_s, 55);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_skip_hint_cutscene_running", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 55:
+            if (_s.f - _s.skp_f0 == SKIP_HOLD_FRAMES div 2) {
+                Scenario_Check("shots_skip_hint_is_filling", global.skip.st.hint > 0 && global.skip.st.held_frames >= 20 && global.skip.st.held_frames < SKIP_HOLD_FRAMES, "held=" + string(global.skip.st.held_frames));
+                _s.shot = "shot_skip_hint_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Release();
+                Scenario_Next(_s, 56);
+            }
+            break;
+        case 56:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Skip_Reset();
+                Dialogue_CloseNow();
+                Cutscene_ClearUiState();
+                room_goto(rm_floor1);
                 Scenario_Next(_s, 10);
             }
             break;
