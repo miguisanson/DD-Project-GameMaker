@@ -773,5 +773,169 @@
    "spd_enemy": 9,
    "player_first": true
   }
+ ],
+ "statuses": [
+  {
+   "id": "burn_tick_1",
+   "kind": "burn_tick",
+   "arg": 1,
+   "want": 2
+  },
+  {
+   "id": "burn_tick_3",
+   "kind": "burn_tick",
+   "arg": 3,
+   "want": 2
+  },
+  {
+   "id": "burn_tick_5",
+   "kind": "burn_tick",
+   "arg": 5,
+   "want": 2
+  },
+  {
+   "id": "burn_tick_12",
+   "kind": "burn_tick",
+   "arg": 12,
+   "want": 4
+  },
+  {
+   "id": "burn_tick_13",
+   "kind": "burn_tick",
+   "arg": 13,
+   "want": 4
+  },
+  {
+   "id": "burn_tick_15",
+   "kind": "burn_tick",
+   "arg": 15,
+   "want": 5
+  },
+  {
+   "id": "burn_tick_19",
+   "kind": "burn_tick",
+   "arg": 19,
+   "want": 6
+  },
+  {
+   "id": "burn_tick_39",
+   "kind": "burn_tick",
+   "arg": 39,
+   "want": 12
+  },
+  {
+   "id": "burn_def_1",
+   "kind": "burn_def",
+   "arg": 1,
+   "want": 1
+  },
+  {
+   "id": "burn_def_2",
+   "kind": "burn_def",
+   "arg": 2,
+   "want": 2
+  },
+  {
+   "id": "burn_def_7",
+   "kind": "burn_def",
+   "arg": 7,
+   "want": 5
+  },
+  {
+   "id": "burn_def_12",
+   "kind": "burn_def",
+   "arg": 12,
+   "want": 9
+  },
+  {
+   "id": "burn_def_18",
+   "kind": "burn_def",
+   "arg": 18,
+   "want": 14
+  },
+  {
+   "id": "poison_total_1",
+   "kind": "poison_total",
+   "arg": 1,
+   "want": 1
+  },
+  {
+   "id": "poison_total_3",
+   "kind": "poison_total",
+   "arg": 3,
+   "want": 6
+  },
+  {
+   "id": "poison_total_5",
+   "kind": "poison_total",
+   "arg": 5,
+   "want": 15
+  },
+  {
+   "id": "poison_total_10",
+   "kind": "poison_total",
+   "arg": 10,
+   "want": 55
+  },
+  {
+   "id": "poison_add_0_3",
+   "kind": "poison_add",
+   "arg": 0,
+   "arg2": 3,
+   "want": 3
+  },
+  {
+   "id": "poison_add_3_3",
+   "kind": "poison_add",
+   "arg": 3,
+   "arg2": 3,
+   "want": 6
+  },
+  {
+   "id": "poison_add_8_4",
+   "kind": "poison_add",
+   "arg": 8,
+   "arg2": 4,
+   "want": 10
+  },
+  {
+   "id": "bleed_tick_1",
+   "kind": "bleed_tick",
+   "arg": 1,
+   "want": 2
+  },
+  {
+   "id": "bleed_tick_2",
+   "kind": "bleed_tick",
+   "arg": 2,
+   "want": 4
+  },
+  {
+   "id": "bleed_tick_3",
+   "kind": "bleed_tick",
+   "arg": 3,
+   "want": 6
+  },
+  {
+   "id": "widen_55_1_5",
+   "kind": "widen",
+   "arg": 55,
+   "arg2": 1.5,
+   "want": 82.5
+  },
+  {
+   "id": "widen_60_1_5",
+   "kind": "widen",
+   "arg": 60,
+   "arg2": 1.5,
+   "want": 90.0
+  },
+  {
+   "id": "widen_50_1_0",
+   "kind": "widen",
+   "arg": 50,
+   "arg2": 1.0,
+   "want": 50.0
+  }
  ]
 }

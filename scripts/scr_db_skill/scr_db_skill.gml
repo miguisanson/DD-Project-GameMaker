@@ -14,7 +14,7 @@ function SkillDB_Init() {
         target: TGT_ENEMY,
         effect: "damage",
         status: STATUS_BLEED,
-        status_turns: 2,
+        status_turns: 3,
         status_chance: 0.75,
         icon_sprite: noone,
         fx_sprite: bleed_effect,
@@ -57,7 +57,7 @@ function SkillDB_Init() {
         target: TGT_SELF,
         effect: "status",
         status: STATUS_GUARD,
-        status_turns: 2,
+        status_turns: 6,
         status_chance: 1,
         icon_sprite: noone,
         fx_sprite: muscle_up_effect,
@@ -78,7 +78,7 @@ function SkillDB_Init() {
         target: TGT_SELF,
         effect: "status",
         status: STATUS_DMG_UP,
-        status_turns: 2,
+        status_turns: 6,
         status_chance: 1,
         icon_sprite: noone,
         fx_sprite: rev_up_effect,
@@ -121,7 +121,8 @@ function SkillDB_Init() {
         target: TGT_ENEMY,
         effect: "damage",
         status: STATUS_POISON,
-        status_turns: 2,
+        status_turns: 3,
+        status_stacks: 3,
         status_chance: 0.75,
         icon_sprite: noone,
         fx_sprite: poison_shot_effect,
@@ -142,7 +143,7 @@ function SkillDB_Init() {
         target: TGT_SELF,
         effect: "status",
         status: STATUS_EVASION,
-        status_turns: 2,
+        status_turns: 6,
         status_chance: 1,
         icon_sprite: noone,
         fx_sprite: evasion_up_effect,
@@ -184,7 +185,7 @@ function SkillDB_Init() {
         target: TGT_SELF,
         effect: "status",
         status: STATUS_CRIT_UP,
-        status_turns: 3,
+        status_turns: 9,
         status_chance: 1,
         icon_sprite: noone,
         fx_sprite: take_aim_effect,
@@ -227,7 +228,8 @@ function SkillDB_Init() {
         target: TGT_ENEMY,
         effect: "damage",
         status: STATUS_POISON,
-        status_turns: 2,
+        status_turns: 4,
+        status_stacks: 4,
         status_chance: 0.75,
         icon_sprite: noone,
         fx_sprite: poison_mist_effect,
@@ -270,7 +272,7 @@ function SkillDB_Init() {
         target: TGT_SELF,
         effect: "status",
         status: STATUS_MEDITATION,
-        status_turns: 3,
+        status_turns: 9,
         status_chance: 1,
         icon_sprite: noone,
         fx_sprite: meditation,
@@ -282,7 +284,7 @@ function SkillDB_Init() {
 
     global.skill_db[? SKILL_FORESIGHT] = {
         id: SKILL_FORESIGHT,
-        name: "Foresight",   // TODO(D24, STAT rework): its Foresight status ("cannot miss") does nothing for the player now (D6/D20)
+        name: "Foresight",
         mp_cost: 3,
         power: 0,
         power_mult: 1,
@@ -317,6 +319,7 @@ function SkillDB_Init() {
         effect: "damage",
         status: STATUS_POISON,
         status_turns: 2,
+        status_stacks: 2,
         status_chance: 0.70,
         icon_sprite: noone,
         fx_sprite: noone,
@@ -342,7 +345,7 @@ function SkillDB_Init() {
         target: TGT_SELF,
         effect: "status",
         status: STATUS_SOLIDIFY,
-        status_turns: 1,
+        status_turns: 2,
         status_chance: 1,
         icon_sprite: noone,
         fx_sprite: noone,
@@ -368,7 +371,7 @@ function SkillDB_Init() {
         target: TGT_OPPONENT,
         effect: "damage",
         status: STATUS_BLEED,
-        status_turns: 2,
+        status_turns: 3,
         status_chance: 0.75,
         icon_sprite: noone,
         fx_sprite: noone,
@@ -394,7 +397,7 @@ function SkillDB_Init() {
         target: TGT_SELF,
         effect: "status",
         status: STATUS_BLOODTHIRSTY,
-        status_turns: 2,
+        status_turns: 4,
         status_chance: 1,
         icon_sprite: noone,
         fx_sprite: noone,
@@ -473,7 +476,7 @@ function SkillDB_Init() {
         target: TGT_OPPONENT,
         effect: "damage",
         status: STATUS_BLEED,
-        status_turns: 2,
+        status_turns: 3,
         status_chance: 0.80,
         icon_sprite: noone,
         fx_sprite: noone,
@@ -528,7 +531,7 @@ function SkillDB_Init() {
         status_turns: 0,
         status_chance: 0.60,
         status_list: [STATUS_BLEED],
-        status_turns_list: [2],
+        status_turns_list: [3],
         icon_sprite: noone,
         fx_sprite: noone,
         sfx_key: "enemy_skill_ramming",
@@ -584,10 +587,11 @@ function SkillDB_Init() {
         target: TGT_OPPONENT,
         effect: "multi_status",
         status: -1,
-        status_turns: 1,
+        status_turns: 2,
         status_chance: 0.50,
         status_list: [STATUS_BURN, STATUS_POISON, STATUS_BLEED],
-        status_turns_list: [1, 1, 1],
+        status_turns_list: [2, 2, 3],
+        status_stacks_list: [1, 2, 1],
         icon_sprite: noone,
         fx_sprite: noone,
         sfx_key: "enemy_skill_curse",
@@ -613,7 +617,7 @@ function SkillDB_Init() {
         target: TGT_SELF,
         effect: "status",
         status: STATUS_BLESSING,
-        status_turns: 2,
+        status_turns: 4,
         status_chance: 1,
         icon_sprite: noone,
         fx_sprite: noone,
@@ -851,40 +855,54 @@ function Skill_StealRecord(_user, _item_id, _qty = 1) {
     return _user;
 }
 
+// Turns a status gets when a skill applies it. The skill's own `status_turns` is already the real number (BUG-16: the tooltip shows it); a status with a
+// fixed `duration` in StatusDB (Burning 2, Bleeding 3, Foresight 3) always gets that. Equipment can add turns to what the player puts on an enemy.
+// A Poison has no turns (it has stacks, Skill_StatusStacks).
 function Skill_AdjustStatusTurns(_user, _target, _status_id, _base_turns) {
     var turns = max(1, round(real(_base_turns)));
     if (_status_id == STATUS_STUN) return turns;
 
+    var fixed = Status_Cfg(_status_id, "duration", 0);
+    if (fixed > 0) turns = fixed;
+
     var user_is_player = (is_struct(_user) && variable_struct_exists(_user, "is_player") && _user.is_player);
     var target_is_player = (is_struct(_target) && variable_struct_exists(_target, "is_player") && _target.is_player);
-
-    var is_dot = (_status_id == STATUS_POISON || _status_id == STATUS_BLEED || _status_id == STATUS_BURN);
-
-    // DOT tuning pass: poison/bleed/burn should feel impactful and consistent.
-    // Player-applied DOTs lean toward 3+ turns, enemy-applied DOTs toward 2+ turns.
-    if (is_dot) {
-        var dot_mult = user_is_player ? 3.0 : 2.0;
-        turns = round(turns * dot_mult);
-        var dot_min = user_is_player ? 3 : 2;
-        turns = max(dot_min, turns);
-    } else {
-        // FUN-FIRST: other non-stun statuses keep the previous longer-duration behavior.
-        var mult = 2.0;
-        if (user_is_player) mult = 3.0;
-        if (!user_is_player && target_is_player) mult = 2.0;
-        turns = max(2, round(turns * mult));
-    }
-
-    if (user_is_player && !target_is_player) {
+    if (user_is_player && !target_is_player && _status_id != STATUS_POISON) {
         turns += max(0, Equip_PlayerStatusTurnBonus(_user, _status_id));
     }
 
-    if (is_dot) {
-        var clamp_min = user_is_player ? 3 : 2;
-        return clamp(turns, clamp_min, 5);
-    }
-
     return max(1, turns);
+}
+
+// Stacks a Poison or Bleeding hit adds (skill field status_stacks, default 1). Equipment "+1 status turn" adds 1 Poison stack when the player applies it.
+function Skill_StatusStacks(_user, _target, _status_id, _base_stacks) {
+    var stacks = max(1, round(real(_base_stacks)));
+    var user_is_player = (is_struct(_user) && variable_struct_exists(_user, "is_player") && _user.is_player);
+    var target_is_player = (is_struct(_target) && variable_struct_exists(_target, "is_player") && _target.is_player);
+    if (_status_id == STATUS_POISON && user_is_player && !target_is_player) {
+        stacks += max(0, Equip_PlayerStatusTurnBonus(_user, _status_id));
+    }
+    return stacks;
+}
+
+// Everything Status_Add needs for one status of a skill: { turns, stacks, power }. power = Burning's HP per tick, from the caster's effective MAG.
+function Skill_StatusApplyArgs(_user, _target, _status_id, _base_turns, _base_stacks = 1) {
+    var tick_power = 1;
+    if (_status_id == STATUS_BURN) tick_power = Status_BurnTick(Combat_EffectiveStat(_user, STAT_MAG));
+    return {
+        turns: Skill_AdjustStatusTurns(_user, _target, _status_id, _base_turns),
+        stacks: Skill_StatusStacks(_user, _target, _status_id, _base_stacks),
+        power: tick_power
+    };
+}
+
+// The stacks the skill gives for its status at index _i of status_list (or its single status when _i < 0).
+function Skill_BaseStacks(_s, _i = -1) {
+    if (_i >= 0 && variable_struct_exists(_s, "status_stacks_list") && is_array(_s.status_stacks_list) && _i < array_length(_s.status_stacks_list)) {
+        return max(1, round(real(_s.status_stacks_list[_i])));
+    }
+    if (_i < 0 && variable_struct_exists(_s, "status_stacks")) return max(1, round(real(_s.status_stacks)));
+    return 1;
 }
 
 function Skill_BuildAppliedStatusMessage(_applied_status_names) {
@@ -996,10 +1014,10 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
     // status-only skills
     if (s.effect == "status") {
         if (s.status != -1) {
-            var st_turns = Skill_AdjustStatusTurns(_user, _target, s.status, status_turns_default);
-            var adj1 = Equip_PassiveAdjustIncomingStatus(_user, _target, s.status, st_turns);
+            var st_args = Skill_StatusApplyArgs(_user, _target, s.status, status_turns_default, Skill_BaseStacks(s));
+            var adj1 = Equip_PassiveAdjustIncomingStatus(_user, _target, s.status, st_args.turns);
             if (adj1.apply) {
-                _target = Status_Add(_target, s.status, adj1.turns, 1);
+                _target = Status_Add(_target, s.status, adj1.turns, st_args.power, st_args.stacks);
                 var cfg = StatusDB_Get(s.status);
                 if (is_struct(cfg) && variable_struct_exists(cfg, "name")) {
                     array_push(applied_status_names, cfg.name);
@@ -1007,7 +1025,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
                 }
             }
             if (adj1.reflect) {
-                _user = Status_Add(_user, s.status, adj1.turns, 1);
+                _user = Status_Add(_user, s.status, adj1.turns, st_args.power, st_args.stacks);
             }
             if (adj1.msg != "") {
                 result.msg = adj1.msg;
@@ -1026,35 +1044,37 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
     }
 
     if (s.effect == "multi_status") {
+        // Curse (BUG-17): status_chance is rolled once PER status; the three DoTs coexist (D78); the message names only the ones that landed.
+        var multi_chance = variable_struct_exists(s, "status_chance") ? real(s.status_chance) : 1;
         if (variable_struct_exists(s, "status_list") && is_array(s.status_list)) {
             var turns_list = variable_struct_exists(s, "status_turns_list") && is_array(s.status_turns_list) ? s.status_turns_list : [];
             for (var m = 0; m < array_length(s.status_list); m++) {
                 var sid_m = s.status_list[m];
                 if (sid_m == -1) continue;
+                if (multi_chance < 1 && random(1) > multi_chance) continue;
                 var turns_m = status_turns_default;
                 if (m < array_length(turns_list)) turns_m = max(1, round(real(turns_list[m])));
-                turns_m = Skill_AdjustStatusTurns(_user, _target, sid_m, turns_m);
-                var adjm = Equip_PassiveAdjustIncomingStatus(_user, _target, sid_m, turns_m);
+                var args_m = Skill_StatusApplyArgs(_user, _target, sid_m, turns_m, Skill_BaseStacks(s, m));
+                var adjm = Equip_PassiveAdjustIncomingStatus(_user, _target, sid_m, args_m.turns);
                 if (adjm.apply) {
-                    _target = Status_Add(_target, sid_m, adjm.turns, 1);
+                    _target = Status_Add(_target, sid_m, adjm.turns, args_m.power, args_m.stacks);
                     var cfg_m = StatusDB_Get(sid_m);
                     if (is_struct(cfg_m) && variable_struct_exists(cfg_m, "name")) {
                         array_push(applied_status_names, cfg_m.name);
                         applied_any_status = true;
                     }
                 }
-                if (adjm.reflect) _user = Status_Add(_user, sid_m, adjm.turns, 1);
+                if (adjm.reflect) _user = Status_Add(_user, sid_m, adjm.turns, args_m.power, args_m.stacks);
                 if (adjm.msg != "" && result.msg == "") result.msg = adjm.msg;
             }
         }
-        
+
         if (applied_any_status) {
             var msg_status2 = Skill_BuildAppliedStatusMessage(applied_status_names);
             if (result.msg != "" && msg_status2 != "") result.msg += " ";
             result.msg += msg_status2;
         } else if (result.msg == "") {
-            if (variable_struct_exists(s, "use_msg")) result.msg = string(s.use_msg);
-            else result.msg = Loc_T("combat.msg.skill_used", "Skill used.");
+            result.msg = Loc_T("combat.msg.multi_status_none", "Nothing took hold.");
         }
         return result;
     }
@@ -1180,17 +1200,17 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
 
         if (s.status != -1 && any_hit) {
             if (status_chance >= 1 || random(1) <= status_chance) {
-                var turns_hit = Skill_AdjustStatusTurns(_user, _target, s.status, status_turns_default);
-                var adjh = Equip_PassiveAdjustIncomingStatus(_user, _target, s.status, turns_hit);
+                var args_h = Skill_StatusApplyArgs(_user, _target, s.status, status_turns_default, Skill_BaseStacks(s));
+                var adjh = Equip_PassiveAdjustIncomingStatus(_user, _target, s.status, args_h.turns);
                 if (adjh.apply) {
-                    _target = Status_Add(_target, s.status, adjh.turns, 1);
+                    _target = Status_Add(_target, s.status, adjh.turns, args_h.power, args_h.stacks);
                     var cfg2 = StatusDB_Get(s.status);
                     if (is_struct(cfg2) && variable_struct_exists(cfg2, "name")) {
                         array_push(applied_status_names, cfg2.name);
                         applied_any_status = true;
                     }
                 }
-                if (adjh.reflect) _user = Status_Add(_user, s.status, adjh.turns, 1);
+                if (adjh.reflect) _user = Status_Add(_user, s.status, adjh.turns, args_h.power, args_h.stacks);
                 if (adjh.msg != "" && result.msg == "") result.msg = adjh.msg;
             }
         }
@@ -1203,17 +1223,17 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
                     if (sid_d == -1) continue;
                     var turns_d = status_turns_default;
                     if (sd < array_length(turns_list_d)) turns_d = max(1, round(real(turns_list_d[sd])));
-                    turns_d = Skill_AdjustStatusTurns(_user, _target, sid_d, turns_d);
-                    var adjd = Equip_PassiveAdjustIncomingStatus(_user, _target, sid_d, turns_d);
+                    var args_d = Skill_StatusApplyArgs(_user, _target, sid_d, turns_d, Skill_BaseStacks(s, sd));
+                    var adjd = Equip_PassiveAdjustIncomingStatus(_user, _target, sid_d, args_d.turns);
                     if (adjd.apply) {
-                        _target = Status_Add(_target, sid_d, adjd.turns, 1);
+                        _target = Status_Add(_target, sid_d, adjd.turns, args_d.power, args_d.stacks);
                         var cfg_d = StatusDB_Get(sid_d);
                         if (is_struct(cfg_d) && variable_struct_exists(cfg_d, "name")) {
                             array_push(applied_status_names, cfg_d.name);
                             applied_any_status = true;
                         }
                     }
-                    if (adjd.reflect) _user = Status_Add(_user, sid_d, adjd.turns, 1);
+                    if (adjd.reflect) _user = Status_Add(_user, sid_d, adjd.turns, args_d.power, args_d.stacks);
                     if (adjd.msg != "" && result.msg == "") result.msg = adjd.msg;
                 }
             }

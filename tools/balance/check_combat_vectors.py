@@ -110,6 +110,32 @@ def player_first(spd_player, spd_enemy):
     return spd_player >= spd_enemy
 
 
+# ---- Statuses (spec section 10, packet B2) ----
+def burn_tick(mag):
+    return max(2, rhu(0.3 * mag))
+
+
+def burning_def(d):
+    return max(1, rhu(d * 0.75))
+
+
+def poison_total(n):
+    n = max(1, min(10, n))
+    return n * (n + 1) // 2
+
+
+def poison_add(existing, added):
+    return min(10, existing + added)
+
+
+def bleed_tick(stacks):
+    return 2 * max(1, min(3, stacks))
+
+
+def widen_perfect(half_width, widen):
+    return half_width * widen
+
+
 def build():
     v = {"version": 1, "spec": ".planning/research/combat-spec.md", "round_half_up_epsilon": EPS}
     dmg = [
@@ -149,6 +175,20 @@ def build():
     v["crit_chance"] = [dict(id="crit_%d" % b, bonus=b, want=crit_chance(b)) for b in (0, 25, 80)]
     v["heal"] = [dict(id="heal_5_12", power=5, A=12, want=heal(5, 12))]
     v["first_actor"] = [dict(id="first_%d_%d" % (a, b), spd_player=a, spd_enemy=b, player_first=player_first(a, b)) for a, b in [(8, 9), (9, 9), (13, 9)]]
+    st = []
+    for mag in (1, 3, 5, 12, 13, 15, 19, 39):
+        st.append(dict(id="burn_tick_%d" % mag, kind="burn_tick", arg=mag, want=burn_tick(mag)))
+    for d in (1, 2, 7, 12, 18):
+        st.append(dict(id="burn_def_%d" % d, kind="burn_def", arg=d, want=burning_def(d)))
+    for n in (1, 3, 5, 10):
+        st.append(dict(id="poison_total_%d" % n, kind="poison_total", arg=n, want=poison_total(n)))
+    for ex, ad in ((0, 3), (3, 3), (8, 4)):
+        st.append(dict(id="poison_add_%d_%d" % (ex, ad), kind="poison_add", arg=ex, arg2=ad, want=poison_add(ex, ad)))
+    for sk in (1, 2, 3):
+        st.append(dict(id="bleed_tick_%d" % sk, kind="bleed_tick", arg=sk, want=bleed_tick(sk)))
+    for hw, w in ((55, 1.5), (60, 1.5), (50, 1.0)):
+        st.append(dict(id="widen_%d_%s" % (hw, str(w).replace(".", "_")), kind="widen", arg=hw, arg2=w, want=widen_perfect(hw, w)))
+    v["statuses"] = st
     return v
 
 
@@ -195,6 +235,15 @@ def gml_lines(v):
         L.append('Test_Eq("vec %s", Combat_HealAmount(%d, %d), %d);' % (c["id"], c["power"], c["A"], c["want"]))
     for c in v["first_actor"]:
         L.append('Test_Eq("vec %s", Combat_PlayerActsFirst(%d, %d), %s);' % (c["id"], c["spd_player"], c["spd_enemy"], num(c["player_first"])))
+    calls = {"burn_tick": "Status_BurnTick(%s)", "burn_def": "Status_BurnDef(%s)", "poison_total": "Status_PoisonTotal(%s)", "bleed_tick": "Status_BleedTick(%s)"}
+    for c in v["statuses"]:
+        if c["kind"] == "poison_add":
+            call = "Status_PoisonAdd(%d, %d)" % (c["arg"], c["arg2"])
+        elif c["kind"] == "widen":
+            call = "Qte_WidenedHalfWidth(%d, %s)" % (c["arg"], num(c["arg2"]))
+        else:
+            call = calls[c["kind"]] % c["arg"]
+        L.append('Test_Eq("vec %s", %s, %s);' % (c["id"], call, num(c["want"])))
     return L
 
 
