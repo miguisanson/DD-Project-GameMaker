@@ -2703,7 +2703,7 @@ function Battle_ItemConfirm(_m, _i) {
 function Battle_ListBack(_m, _res) {
     var bc = _m.owner;
     bc.battle_state = BSTATE_MENU;
-    if (is_struct(bc.ui_cmd)) bc.ui_cmd.opened_ms = current_time;
+    if (is_struct(bc.ui_cmd)) { bc.ui_cmd.opened_ms = current_time; bc.ui_cmd.lock_ms = current_time; }
 }
 
 // Builds (or rebuilds) the three menus. The lists keep their cursor through Ui_MemGlobal (D95).
@@ -2748,6 +2748,7 @@ function Battle_OpenList(_bc, _state) {
     var m = (_state == BSTATE_SKILL_MENU) ? _bc.ui_skill : _bc.ui_item;
     m.items = (_state == BSTATE_SKILL_MENU) ? Battle_SkillRows(_bc.p) : Battle_ItemRows(_bc.p);
     m.opened_ms = current_time;
+    m.lock_ms = current_time;   // C4: the press that opened the list must not answer it
     m.closed_ms = -1;
     Ui_MenuFixCursor(m, Ui_MemGet(Ui_MemGlobal(), m.id, array_length(m.items)));
     m.rep_v = Ui_RepeatNew();
@@ -2760,7 +2761,11 @@ function Battle_MenusStep(_bc) {
     if (sig.mp != _bc.ui_sig.mp || sig.items != _bc.ui_sig.items || sig.rev != _bc.ui_sig.rev) {
         var c1 = _bc.ui_cmd.cursor, c2 = _bc.ui_skill.cursor, c3 = _bc.ui_item.cursor;
         var t1 = _bc.ui_cmd.opened_ms, t2 = _bc.ui_skill.opened_ms, t3 = _bc.ui_item.opened_ms;
+        var l1 = _bc.ui_cmd.lock_ms, l2 = _bc.ui_skill.lock_ms, l3 = _bc.ui_item.lock_ms;   // C4's confirm / back guard must not restart: a press just after a rebuild would be lost
         Battle_MenusBuild(_bc);
+        _bc.ui_cmd.lock_ms = l1;
+        _bc.ui_skill.lock_ms = l2;
+        _bc.ui_item.lock_ms = l3;
         Ui_MenuFixCursor(_bc.ui_cmd, c1);
         Ui_MenuFixCursor(_bc.ui_skill, c2);
         Ui_MenuFixCursor(_bc.ui_item, c3);

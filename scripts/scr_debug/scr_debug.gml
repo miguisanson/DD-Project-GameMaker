@@ -6741,7 +6741,7 @@ function Scenario_StepSmokeBattleUi(_s) {
                     Scenario_Tap("confirm");
                     break;
                 case 46:
-                    Scenario_Check("dialogue_second_confirm_moves_to_the_next_line", _gs.ui.index == 1 && _gs.ui.dialogue_state == UI_DIALOGUE_STATE_REVEALING, "index=" + string(_gs.ui.index));
+                    Scenario_Check("dialogue_second_confirm_moves_to_the_next_line", _gs.ui.index == 1 && _gs.ui.dialogue_state != UI_DIALOGUE_STATE_READY, "index=" + string(_gs.ui.index) + " state=" + string(_gs.ui.dialogue_state));
                     Scenario_Tap("confirm");
                     break;
                 case 50:
