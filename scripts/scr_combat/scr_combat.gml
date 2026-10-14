@@ -136,12 +136,29 @@ function Combat_ApplyDamage(_attacker, _defender, _weapon, _crit_mult, _skill_mu
     return { dmg: dmg, defender: _defender };
 }
 
-// I-052: how big an effect animation is drawn, and how long it plays. Pure helpers (Test_Suite_Fx checks them for every player skill).
-// Scale that draws the sprite's canvas at FX_TARGET_FIT x the target's longest side, never more than FX_MAX_DRAW_PX world px.
+// I-052 / I-060: how big an effect animation is drawn, and how long it plays. Pure helpers (Test_Suite_Fx checks them for every player skill).
+// Size is the VISIBLE part of the effect (the sprite's bounding box, tight round the pixels of every frame), not its canvas: the canvases are
+// 48 px with 1-20 px of empty margin, so sizing the canvas drew an Ice Spear smaller than the slime it hit (I-060).
+function FX_ContentSide(_sprite) {
+    var w = sprite_get_bbox_right(_sprite) - sprite_get_bbox_left(_sprite) + 1;
+    var h = sprite_get_bbox_bottom(_sprite) - sprite_get_bbox_top(_sprite) + 1;
+    var side = max(w, h);
+    if (side <= 0) side = max(sprite_get_width(_sprite), sprite_get_height(_sprite));
+    return side;
+}
+
+// The wanted size of the visible effect for a target: FX_TARGET_FIT x the target's longest side, never smaller than the target itself
+// (an effect is at least as big as what it hits), never more than FX_MAX_DRAW_PX world px (the screen is 160 x 144; the cap wins over a bigger target).
+function FX_DrawnSide(_target_px) {
+    var t = max(1, _target_px);
+    return max(min(t, FX_MAX_DRAW_PX), min(t * FX_TARGET_FIT, FX_MAX_DRAW_PX));
+}
+
+// Scale that draws the effect's visible part at FX_DrawnSide(target).
 function FX_ScaleFor(_sprite, _target_px) {
-    var side = max(sprite_get_width(_sprite), sprite_get_height(_sprite));
+    var side = FX_ContentSide(_sprite);
     if (side <= 0) return 1;
-    return min(FX_MAX_DRAW_PX, max(1, _target_px) * FX_TARGET_FIT) / side;
+    return FX_DrawnSide(_target_px) / side;
 }
 
 // World px of the longest side of an object's sprite (an enemy in battle), 0 when it has none.

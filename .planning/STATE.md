@@ -38,6 +38,8 @@ See: `.planning/PROJECT.md` (updated 2026-10-14)
 
 ## Current Position
 
+**Packet A1 (worktree `E:\Github_Projects\DD-Project-GameMaker-wt1`, branch `a1-draw`, implemented by the main session, not committed-merged):** world marks fixed (I-056, I-058, I-059, I-060, I-063; R-061 to R-065). Cause of the top-left marks: a layer script is called once per engine draw PASS (8 passes incl. the 3 Draw GUI ones), so `Nav_DrawWorldFx` / `Player_DrawWorldFx` also painted in GUI units; fixed with `Fx_IsWorldPass()`. Also: one `World_DrawFx` layer script registered once per room start (`World_RegisterFx`, `Room_StampBump` in `obj_game_controller` Create); effects sized by `FX_ContentSide` (sprite bbox). `-shots` now has 67 [SHOT] lines (`shot_world_*` pairs checked by Test-Shots A-versus-B diff). Next: review, merge to `next`, re-run the gate.
+
 **Phase:** 0 (audit, research, direction) is complete. Planning was **revised 2026-10-14 for the roguelike direction** (D25-D36 added, plan review applied). Phases 1-3 have not started.
 **Status:** The planning set is rewritten: 157 requirements (159 before D52), 8 phases, `BOARD.md` added. No game code has been changed.
 **Last activity:** 2026-10-14 (later): D52 applied (Windows only, no web/HTML5 build; D15 and D50 superseded, D39 amended): WEB became REL, 157 requirements. Earlier the same day: PROJECT, REQUIREMENTS, ROADMAP, BOARD (new), ISSUES, REGRESSION, IMPROVE, STATE and research/SUMMARY updated.
