@@ -17,10 +17,11 @@ game exports JSON with `-exportdata` for the Python simulator (no Included File 
 | C2 | Chests (class first, then cards), class pick (Nobody locked), cards 1-of-3 at chests + level-ups, upgrades, passives (shared + class), max 3 skills equipped | D73, D81, D82, D34, D83 | todo |
 | C3 | Gold, merchant after floors 2/5/8, throwables (all classes, Nobody stronger), accessory slot, elites, per-run shuffles | D23, D33, D84, D85, D86, D92 | todo |
 | C4 | Beds (heal or upgrade), tutorial prompts + Help page, settings (QTE assist, key rebinding, text speed, shake), device button prompts | D45, D47, D49, D92 | todo |
-| D1 | UI kit (modern retro, 4 colours), Tab menu (Status/Skills/Items/Gear/Codex/Settings), battle HUD, card pick, shop, run start/end, codex, settings screen | D89, D90, I-061, I-062 | todo |
+| D0 | Shared UI framework: one menu component (wrap-around, hold-to-scroll, same confirm/back, back = one level, remembered cursor, mouse hover/click/wheel), frames, fonts, motion, details panel with data-generated text; migrate the title menu first as the pilot | D95-D98, D100 | todo |
+| D1 | Every screen on the framework: settings, credits, battle HUD (D99) + battle menus, Tab menu (Status/Skills/Items/Gear/Codex/Settings) + pause, class pick, card pick, shop, bed, level-up, run end, echo pick, dialogue box (D101), prompts; remove the old per-screen menu code | D89, D90, D96, D99, D101, I-061, I-062 | todo |
 | D2 | Art: ComfyUI icons (status, skills, items, throwables, passives) + card frame, PNG strips + owner import checklist; code fallbacks until imported | D10, D43, D44, D94 | todo |
 | D3 | Text: cards, passives, death lines, merchant, tutorial, codex (EN + KO draft); credits screen (sound creators from owner) | D93, D40 | todo |
 | E1 | Simulator on `-exportdata` JSON, target bands, balance proposals for the owner | D13, D14 | todo |
 | E2 | Full gate, regression list run, playtest build + one big PLAYTEST-QUEUE | D71 | todo |
 
-Order: A1+A2 → B1 → (B2 ∥ C1) → B3 → (B4 ∥ C2) → C3 → C4 → D1 (∥ D2 art) → D3 → E1 → E2.
+Order: A1+A2 → (B1 ∥ D0) → (B2 ∥ C1) → B3 → (B4 ∥ C2) → C3 → C4 → D1 (∥ D2 art) → D3 → E1 → E2.
