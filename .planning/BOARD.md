@@ -1,6 +1,6 @@
 # DD-Project board
 Updated after every step that lands. The full build list is `.planning/BUILD-PLAN.md`; the design spec is `.planning/research/DECISIONS.md` (D1-D94).
-Build: none in progress | Mode: BIG BUILD, then one big playtest (D71) | Release then stop (D28)
+Build: PAUSED (owner playing) — 3 packets parked, see .planning/RESUME.md | Mode: BIG BUILD, then one big playtest (D71) | Release then stop (D28)
 
 ## Now
 - Building everything in BUILD-PLAN.md (A1 → E2). No playtest stops until it is all done.
@@ -12,6 +12,7 @@ Build: none in progress | Mode: BIG BUILD, then one big playtest (D71) | Release
 - All design decisions made (D1-D94).
 
 ## Decisions made 2026-10-15
+- Monster sounds: pitch/volume variation + free CC0 creature packs approved (D116).
 - Balance proposals approved (D111); runs ~25-30 min accepted (D112); merchant = A with a gold glow outline, no tint (D113); icons v2 + redo weakest (D114); white text for names (D115).
 
 ## Waiting on you (whenever convenient; close GameMaker afterwards)

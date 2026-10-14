@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | RESUMED 2026-10-15 (session 2). Baseline fast gate on next e9685dc: PASS. d1a: next merged in, full gate running (WorkRoot E:\Temp\dd-gate-d1a, log E:\Temp\dd-gate-d1a-full.log). bal-apply: Sonnet agent applying D111/D112 in wt ../DD-Project-GameMaker-wt/bal. art-final: waits (scr_test overlap rule). Briefs in .planning/RESUME.md. |
+| WIP | PAUSED by owner again 2026-10-15 (session 2, owner playing a game: run NO builds/tests until the owner says OK). READ .planning/RESUME.md FIRST. d1a: gate green except one flaky smoke check, root-cause evidence in RESUME (input double press). bal-apply: WIP d47014e, agent stopped before gates, unreviewed. art-final: not started. New item 4: monster sound variation (D116, CC0 downloads approved). |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
