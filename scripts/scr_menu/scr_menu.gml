@@ -487,7 +487,7 @@ function Tooltip_BuildStatLines(_stat_key, _stat_label, _cur) {
             array_push(lines, Loc_T("menu.tooltip.stat.atk.desc", "Increases physical damage (basic attacks and ATK skills)."));
         break;
         case "def":
-            array_push(lines, Loc_T("menu.tooltip.stat.def_all.desc", "Reduces all damage you take."));
+            array_push(lines, Loc_T("menu.tooltip.stat.def.desc", "Reduces all damage you take."));
         break;
         case "spd":
             array_push(lines, Loc_T("menu.tooltip.stat.spd.desc", "Decides who acts first."));

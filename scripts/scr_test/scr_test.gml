@@ -516,25 +516,31 @@ function Test_Suite_Combat() {
     Test_False("D80 enemy damage skills never miss a player without Evasion", _enemy_missed);
 }
 
-// D55 / I-052: every player skill animation plays in at most 0.75 s (45 game frames at 60 fps; with the 0.3 s hold that is under the 66-frame
-// action limit) and is drawn no bigger than 1.5 x its target's longest side and 64 world px (the screen is 160 x 144), whatever enemy it hits.
-// Limits are the owner's numbers written out here, not read from the macros.
+// D55 / I-052 / I-060: every player skill animation plays in at most 0.75 s (45 game frames at 60 fps; with the 0.3 s hold that is under the 66-frame
+// action limit); its VISIBLE part (sprite bounding box x scale) is at least as big as its target's longest side, at most 1.5 x that, and never over 64 world px
+// (the screen is 160 x 144), whatever enemy it hits. Limits are the owner's numbers written out here, not read from the macros.
 function Test_Suite_Fx() {
     var _ids = Skill_PlayerFxIds();
     Test_Eq("Fx: 14 player skills have an animation", array_length(_ids), 14);
-    var _targets = [32, 48, 64];   // slime-sized enemies, the mini boss, the final boss; 32 is also the player's reference size
+    var _targets = [16, 32, 48, 64, 80];   // a small enemy, slime-sized (also the player's reference size), the mini boss, the final boss, one bigger than the cap
     for (var _i = 0; _i < array_length(_ids); _i++) {
         var _s = SkillDB_Get(_ids[_i]);
         var _frames = FX_PlaybackFrames(_s.fx_sprite, Skill_FxSpeed(_s, true));
         Test_True("D55 " + _s.name + " animation <= 45 frames (got " + string(_frames) + ")", _frames <= 45);
-        var _side = max(sprite_get_width(_s.fx_sprite), sprite_get_height(_s.fx_sprite));
+        var _side = FX_ContentSide(_s.fx_sprite);
+        Test_True("I-060 " + _s.name + " has a visible box (" + string(_side) + " px)", _side > 0 && _side <= 48);
         for (var _t = 0; _t < array_length(_targets); _t++) {
-            var _drawn = _side * FX_ScaleFor(_s.fx_sprite, _targets[_t]);
-            Test_True("I-052 " + _s.name + " vs " + string(_targets[_t]) + " px target: drawn " + string(_drawn) + " px <= 1.5 x target and <= 64",
-                _drawn <= _targets[_t] * 1.5 + 0.01 && _drawn <= 64.01);
-            Test_True("I-052 " + _s.name + " vs " + string(_targets[_t]) + " px target: drawn " + string(_drawn) + " px >= 32 (still readable)", _drawn >= 32);
+            var _tp = _targets[_t];
+            var _drawn = _side * FX_ScaleFor(_s.fx_sprite, _tp);
+            var _lo = min(_tp, 64);
+            var _hi = min(_tp * 1.5, 64);
+            Test_True("I-060 " + _s.name + " vs " + string(_tp) + " px target: visible effect " + string(_drawn) + " px >= the target (min " + string(_lo) + ")", _drawn >= _lo - 0.01);
+            Test_True("I-060 " + _s.name + " vs " + string(_tp) + " px target: visible effect " + string(_drawn) + " px <= 1.5 x target and <= 64 (max " + string(_hi) + ")", _drawn <= _hi + 0.01);
         }
     }
+    Test_True("I-060 Ice Spear on a 32 px slime is drawn 48 px (1.5 x) of visible effect", abs(FX_ContentSide(ice_spear_effect) * FX_ScaleFor(ice_spear_effect, 32) - 48) < 0.01);
+    Test_True("I-060 an effect on a 64 px target is drawn 64 px", abs(FX_ContentSide(ice_spear_effect) * FX_ScaleFor(ice_spear_effect, 64) - 64) < 0.01);
+    Test_True("I-060 an effect on an 80 px target is capped at 64 px", abs(FX_ContentSide(ice_spear_effect) * FX_ScaleFor(ice_spear_effect, 80) - 64) < 0.01);
     Test_Eq("D55 hold after an action is 18 frames", Combat_SecToFrames(COMBAT_ACTION_HOLD_SEC), 18);
     // The pure helpers themselves: a 48 px sprite at 8 fps, 12 frames... uses the real sprites: ice_spear_effect has 12 frames at 8 fps.
     Test_Eq("Fx: ice spear at image_speed 1 plays 12 frames in 90 game frames", FX_PlaybackFrames(ice_spear_effect, 1), 90);

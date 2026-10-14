@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T08:38:07Z",
-    "row_count": 683
+    "generated_at_utc": "2026-10-14T09:19:34Z",
+    "row_count": 663
   },
   "default_lang": "en",
   "languages": [
@@ -1980,37 +1980,25 @@
       "en": "| Target: {target}",
       "ko": "| 대상: {target}"
     },
-    "menu.tooltip.stat.agi.desc": {
-      "en": "Improves turn order and evasion potential.",
-      "ko": "턴 순서와 회피 가능성이 향상됩니다."
+    "menu.tooltip.stat.atk.desc": {
+      "en": "Increases physical damage (basic attacks and ATK skills).",
+      "ko": "물리 피해(기본 공격과 ATK 스킬)가 증가합니다."
     },
     "menu.tooltip.stat.def.desc": {
-      "en": "Reduces incoming damage through mitigation.",
-      "ko": "완화를 통해 들어오는 피해를 줄입니다."
+      "en": "Reduces all damage you take.",
+      "ko": "받는 모든 피해를 줄입니다."
     },
     "menu.tooltip.stat.default.desc": {
       "en": "Affects combat performance.",
       "ko": "전투 성능에 영향을 미칩니다."
     },
-    "menu.tooltip.stat.intt.desc": {
-      "en": "Increases skill damage and magical output.",
-      "ko": "스킬 데미지와 마법 출력이 증가합니다."
+    "menu.tooltip.stat.mag.desc": {
+      "en": "Increases spell damage and max MP.",
+      "ko": "마법 피해와 최대 MP가 증가합니다."
     },
-    "menu.tooltip.stat.luck.desc": {
-      "en": "Improves critical chance and random checks.",
-      "ko": "치명타 확률과 무작위 검사가 향상됩니다."
-    },
-    "menu.tooltip.stat.pending_plus": {
-      "en": "Pending bonus: +{delta}",
-      "ko": "보류 중인 보너스: +{delta}"
-    },
-    "menu.tooltip.stat.pending_zero": {
-      "en": "Pending bonus: +0",
-      "ko": "보류 중인 보너스: +0"
-    },
-    "menu.tooltip.stat.str.desc": {
-      "en": "Increases physical damage for weapon attacks.",
-      "ko": "무기 공격의 물리 피해가 증가합니다."
+    "menu.tooltip.stat.spd.desc": {
+      "en": "Decides who acts first.",
+      "ko": "누가 먼저 행동하는지 결정합니다."
     },
     "menu.tooltip.status.default": {
       "en": "Status",
@@ -2131,70 +2119,6 @@
     "menu.tooltip_builditemlines.656.1": {
       "en": "Effect: {effect}",
       "ko": "효과: {effect}"
-    },
-    "menu.tooltip_buildstatlines.450.0": {
-      "en": "menu.tooltip.stat.pending_plus",
-      "ko": "menu.tooltip.stat.pending_plus"
-    },
-    "menu.tooltip_buildstatlines.450.1": {
-      "en": "Pending bonus: +{delta}",
-      "ko": "보류 중인 보너스: +{delta}"
-    },
-    "menu.tooltip_buildstatlines.454.0": {
-      "en": "menu.tooltip.stat.pending_zero",
-      "ko": "menu.tooltip.stat.pending_zero"
-    },
-    "menu.tooltip_buildstatlines.454.1": {
-      "en": "Pending bonus: +0",
-      "ko": "보류 중인 보너스: +0"
-    },
-    "menu.tooltip_buildstatlines.459.0": {
-      "en": "menu.tooltip.stat.str.desc",
-      "ko": "menu.tooltip.stat.str.desc"
-    },
-    "menu.tooltip_buildstatlines.459.1": {
-      "en": "Increases physical damage for weapon attacks.",
-      "ko": "무기 공격의 물리 피해가 증가합니다."
-    },
-    "menu.tooltip_buildstatlines.462.0": {
-      "en": "menu.tooltip.stat.agi.desc",
-      "ko": "menu.tooltip.stat.agi.desc"
-    },
-    "menu.tooltip_buildstatlines.462.1": {
-      "en": "Improves turn order and evasion potential.",
-      "ko": "턴 순서와 회피 가능성이 향상됩니다."
-    },
-    "menu.tooltip_buildstatlines.465.0": {
-      "en": "menu.tooltip.stat.def.desc",
-      "ko": "menu.tooltip.stat.def.desc"
-    },
-    "menu.tooltip_buildstatlines.465.1": {
-      "en": "Reduces incoming damage through mitigation.",
-      "ko": "완화를 통해 들어오는 피해를 줄입니다."
-    },
-    "menu.tooltip_buildstatlines.468.0": {
-      "en": "menu.tooltip.stat.intt.desc",
-      "ko": "menu.tooltip.stat.intt.desc"
-    },
-    "menu.tooltip_buildstatlines.468.1": {
-      "en": "Increases skill damage and magical output.",
-      "ko": "스킬 데미지와 마법 출력이 증가합니다."
-    },
-    "menu.tooltip_buildstatlines.471.0": {
-      "en": "menu.tooltip.stat.luck.desc",
-      "ko": "menu.tooltip.stat.luck.desc"
-    },
-    "menu.tooltip_buildstatlines.471.1": {
-      "en": "Improves critical chance and random checks.",
-      "ko": "치명타 확률과 무작위 검사가 향상됩니다."
-    },
-    "menu.tooltip_buildstatlines.474.0": {
-      "en": "menu.tooltip.stat.default.desc",
-      "ko": "menu.tooltip.stat.default.desc"
-    },
-    "menu.tooltip_buildstatlines.474.1": {
-      "en": "Affects combat performance.",
-      "ko": "전투 성능에 영향을 미칩니다."
     },
     "menu.tooltip_skilleffectlines.416.0": {
       "en": "menu.tooltip.effect.buff",
@@ -2652,25 +2576,21 @@
       "en": "Status",
       "ko": "상태"
     },
-    "status.name.stat.agi": {
-      "en": "AGI",
-      "ko": "AGI"
+    "status.name.stat.atk": {
+      "en": "ATK",
+      "ko": "공격"
     },
     "status.name.stat.def": {
       "en": "DEF",
       "ko": "데프"
     },
-    "status.name.stat.int": {
-      "en": "INT",
-      "ko": "정수"
+    "status.name.stat.mag": {
+      "en": "MAG",
+      "ko": "마력"
     },
-    "status.name.stat.luck": {
-      "en": "LUCK",
-      "ko": "운"
-    },
-    "status.name.stat.str": {
-      "en": "STR",
-      "ko": "STR"
+    "status.name.stat.spd": {
+      "en": "SPD",
+      "ko": "속도"
     },
     "status.name.status_bleed": {
       "en": "Bleeding",

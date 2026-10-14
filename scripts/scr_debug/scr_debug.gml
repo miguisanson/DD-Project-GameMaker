@@ -242,7 +242,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : ((_mode == "gridshots") ? 8000 : 6000)), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [] };
+                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 16000 : ((_mode == "gridshots") ? 8000 : 6000)), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined };
 }
 
 function Scenario_Finish() {
@@ -931,16 +931,18 @@ function Scenario_StepBotSkill(_s) {
                     _s.sk_fx_on_enemy = false;
                     _s.sk_fx_px = 0;
                     _s.sk_fx_limit = 0;
+                    _s.sk_fx_min = 0;
                     if (_s.sk_fx) {   // BUG-21: where did the animation spawn, relative to the player and enemy anchor points?
                         var _fxi = _bc.wait_fx;
                         var _pp = FX_CenterAtPoint(_fxi.sprite_index, _bc.player_fx_x, _bc.player_fx_y, _fxi.image_xscale);
                         var _pe = FX_CenterOn(_fxi.sprite_index, _bc.enemy_inst, _fxi.image_xscale);
                         _s.sk_fx_on_player = point_distance(_fxi.x, _fxi.y, _pp.x, _pp.y) < 1;
                         _s.sk_fx_on_enemy = point_distance(_fxi.x, _fxi.y, _pe.x, _pe.y) < 1;
-                        // I-052: longest drawn side against the target's (the enemy's sprite, or the player's 32 px reference)
+                        // I-052 / I-060: the drawn VISIBLE side (sprite bounding box x scale) against the target's (the enemy's sprite, or the player's 32 px reference)
                         var _target = Battle_SkillFxOnPlayer(_sid) ? FX_PLAYER_TARGET_PX : FX_TargetSize(_bc.enemy_inst);
-                        _s.sk_fx_px = max(sprite_get_width(_fxi.sprite_index), sprite_get_height(_fxi.sprite_index)) * abs(_fxi.image_xscale);
+                        _s.sk_fx_px = FX_ContentSide(_fxi.sprite_index) * abs(_fxi.image_xscale);
                         _s.sk_fx_limit = min(64, 1.5 * _target);
+                        _s.sk_fx_min = min(64, _target);
                     }
                     _s.sk_flash = instance_exists(obj_ui_controller) && obj_ui_controller.hud_hurt_flash_timer > 0;   // the tick ran in this same frame
                     _s.sk = 2;
@@ -953,7 +955,7 @@ function Scenario_StepBotSkill(_s) {
                     Scenario_Check(_name + "_fx_played", _s.sk_fx);
                     Scenario_Check(_name + "_fx_on_" + (Battle_SkillFxOnPlayer(_sid) ? "player" : "enemy"),
                         Battle_SkillFxOnPlayer(_sid) ? (_s.sk_fx_on_player && !_s.sk_fx_on_enemy) : (_s.sk_fx_on_enemy && !_s.sk_fx_on_player));
-                    Scenario_Check(_name + "_fx_size_fits_target", _s.sk_fx && _s.sk_fx_px <= _s.sk_fx_limit + 0.01, "drawn=" + string(_s.sk_fx_px) + " limit=" + string(_s.sk_fx_limit));
+                    Scenario_Check(_name + "_fx_size_fits_target", _s.sk_fx && _s.sk_fx_px <= _s.sk_fx_limit + 0.01 && _s.sk_fx_px >= _s.sk_fx_min - 0.01, "drawn=" + string(_s.sk_fx_px) + " min=" + string(_s.sk_fx_min) + " max=" + string(_s.sk_fx_limit));
                     if (_sid == SKILL_HILT_BASH) {
                         var _logged = false;
                         for (var _li = 0; _li < array_length(_bc.combat_log); _li++) {
@@ -1160,6 +1162,9 @@ function Scenario_StepShots(_s) {
             break;
         case 50: case 51: case 52: case 53: case 54: case 55: case 56: case 57: case 58:
             Scenario_StepShotsWindow(_s);
+            break;
+        case 60: case 61: case 62: case 63: case 64: case 65: case 66: case 67: case 68:
+            Scenario_StepShotsWorld(_s);
             break;
         default:
             Scenario_StepShotsDisp(_s);
@@ -1576,7 +1581,7 @@ function Scenario_StepShotsWindow(_s) {
 function Scenario_StepShotsFx(_s) {
     var _ids = Skill_PlayerFxIds();
     if (_s.fxi >= array_length(_ids)) {
-        Scenario_Finish();
+        Scenario_Next(_s, 60);   // A1: the world-space marks (sight ring, "!", interact arrow)
         return;
     }
     var _sid = _ids[_s.fxi];
@@ -1599,7 +1604,7 @@ function Scenario_StepShotsFx(_s) {
                 _bc.skill_banner_name = _skill.name;
                 var _fx = Battle_SkillFxSpawn(_bc, _sid, _skill.fx_sprite, _skill.fx_frames, Skill_FxSpeed(_skill, true));
                 _bc.wait_fx = noone;
-                _fx.image_index = sprite_get_number(_skill.fx_sprite) div 2;
+                _fx.image_index = (sprite_get_number(_skill.fx_sprite) * 3) div 4;   // late in the animation, where most effects are at their biggest (Ice Spear: 43 px wide at frame 9 of 12, 22 px at frame 6)
                 _fx.image_speed = 0;
                 _fx.fx_prev_frame = floor(_fx.image_index);
                 Scenario_Next(_s, 11);
@@ -1999,6 +2004,10 @@ function Scenario_StepMovePlayerFeel(_s) {
             }
             break;
         case 7:   // H5: the run key covers the ground faster
+            // I-063: and plays the same walk animation faster: per step it must get as far through the frames as a walking step does
+            if (_mv.n == 2) { _mv.wmax = 0; _mv.wspd = 0; _mv.rmax = 0; _mv.rspd = 0; }
+            if (_mv.n >= 3 && _mv.n <= 38 && _pl.moving) { _mv.wmax = max(_mv.wmax, _pl.image_index); _mv.wspd = max(_mv.wspd, _pl.image_speed); }
+            if (_mv.n >= 46 && _mv.n <= 88 && _pl.moving) { _mv.rmax = max(_mv.rmax, _pl.image_index); _mv.rspd = max(_mv.rspd, _pl.image_speed); }
             if (_mv.n == 2) { Scenario_PlacePlayer(9, 9); _pl.face = RIGHT; _mv.x1 = _pl.x; Scenario_Hold("move_right", 23); }
             if (_mv.n == 40) {
                 _mv.walk = _pl.x - _mv.x1;
@@ -2012,6 +2021,8 @@ function Scenario_StepMovePlayerFeel(_s) {
                 Scenario_Check("feel_H5_walk_is_one_pixel_a_frame", _mv.walk == 32, "walked=" + string(_mv.walk));
                 Scenario_Check("feel_H5_run_covers_more_ground_in_the_same_frames", _mv.runx >= 48, "ran=" + string(_mv.runx) + " walked=" + string(_mv.walk));
                 Scenario_Check("feel_H5_run_rests_on_the_grid", Grid_IsAligned(_pl.x) && !_pl.moving, "x=" + string(_pl.x));
+                Scenario_Check("feel_I063_run_animation_speed_is_double_the_walk", abs(_mv.rspd - 2 * _mv.wspd) < 0.01 && _mv.wspd > 0, "walk=" + string(_mv.wspd) + " run=" + string(_mv.rspd));
+                Scenario_Check("feel_I063_run_step_gets_as_far_through_the_frames_as_a_walk_step", _mv.wmax > 1.5 && _mv.rmax >= 0.9 * _mv.wmax, "walk_max_frame=" + string(_mv.wmax) + " run_max_frame=" + string(_mv.rmax));
                 _mv.phase = 8;
                 _mv.n = 0;
             }
@@ -2048,6 +2059,7 @@ function Scenario_GridRooms() {
 }
 
 function Scenario_GridOverlay() {
+    if (!Fx_IsWorldPass()) return;
     var _cam = view_camera[0];
     var _vx = camera_get_view_x(_cam), _vy = camera_get_view_y(_cam), _vw = camera_get_view_width(_cam), _vh = camera_get_view_height(_cam);
     var _c0 = draw_get_colour(), _a0 = draw_get_alpha();
@@ -2245,4 +2257,177 @@ function Scenario_StepExportData(_s) {
         Scenario_Check("exportdata_class_table_matches_the_game", parsed.classes[0].by_level[LEVEL_CAP_TECHNICAL - 1].hp > 0);
     }
     Scenario_Finish();
+}
+
+// ============================================================================
+// A1 (I-056, I-058, I-059): the world-space marks (the sight ring, the "!" and the interact arrow) must land on the picture where
+// the thing they belong to is, never at its top-left corner, and must come back after a battle. Two passes in rm_floor1 with a
+// slime and a chest near the player:  pass 0 = first visit at display scale 3,  pass 1 = back from a battle at scale 4.
+// Each pass saves picture A (marks on) and picture B (slime hidden and "defeated", player turned away from the chest: no marks).
+// Test-Shots (run_tests.ps1) diffs A and B: every differing pixel must lie on a place the game says the marks belong (the slime,
+// the ring annulus, the "!", the arrow, the player), the 24x24 corner of the picture must not differ at all, the ring probes (dots
+// computed from Display_WorldToGui) must differ, and the arrow outline probes must be the outline colour #071821.
+// ============================================================================
+function Scenario_WorldWin(_wx, _wy) {   // a world point as a window pixel (what screen_save writes), via Display_WorldToGui
+    var _l = Display_CalcLayout(window_get_width(), window_get_height());
+    var _cam = view_camera[0];
+    var _g = Display_WorldToGui(_l, _wx, _wy, camera_get_view_x(_cam), camera_get_view_y(_cam));
+    return { x: _l.game_x + _g.x * _l.ui_scale, y: _l.game_y + _g.y * _l.ui_scale, s: _l.scale };
+}
+
+function Scenario_WorldInView(_wx, _wy, _m = 2) {
+    var _cam = view_camera[0];
+    var _vx = camera_get_view_x(_cam), _vy = camera_get_view_y(_cam);
+    return (_wx >= _vx + _m && _wx < _vx + DISPLAY_BASE_W - _m && _wy >= _vy + _m && _wy < _vy + DISPLAY_BASE_H - _m);
+}
+
+// The extra [SHOT] keys for picture A. Window pixels throughout. A probe is the middle of one world pixel.
+function Scenario_WorldFlags(_w, _fileB) {
+    var _sl = _w.sl, _ch = _w.chest, _pl = instance_find(obj_player, 0);
+    var _t = GRID_TILE_SIZE;
+    var _cx = _sl.x + _t / 2, _cy = _sl.y + _t / 2;
+    var _r = _sl.prof.sight * _t;
+    var _n = max(12, round(2 * pi * _r / 6));
+    var _cn = Scenario_WorldWin(_cx, _cy);
+    var _sc = _cn.s;
+    var _rp = "";
+    for (var _k = 0; _k < _n; _k += max(1, _n div 24)) {   // about 24 dots round the ring, those on the picture
+        var _ang = (_k / _n) * 2 * pi;
+        var _dx = floor(_cx + cos(_ang) * _r), _dy = floor(_cy + sin(_ang) * _r);
+        if (!Scenario_WorldInView(_dx, _dy, 3)) continue;
+        var _p = Scenario_WorldWin(_dx + 0.5, _dy + 0.5);
+        _rp += ((_rp == "") ? "" : ";") + string(round(_p.x)) + "," + string(round(_p.y));
+    }
+    // "!" (alert_pop is held on): same numbers as Nav_DrawWorldFx
+    var _bx = floor(_cx), _by = floor(_sl.y) - 11;
+    var _b0 = Scenario_WorldWin(_bx - 3, _by - 1);
+    var _bp1 = Scenario_WorldWin(_bx - 2 + 0.5, _by + 3.5), _bp2 = Scenario_WorldWin(_bx + 2 + 0.5, _by + 3.5);   // the dark outline either side of the bar
+    var _boxes = string(round(_b0.x)) + "," + string(round(_b0.y)) + "," + string(7 * _sc) + "," + string(13 * _sc);
+    // the slime itself
+    var _s0 = Scenario_WorldWin(_sl.bbox_left - 3, _sl.bbox_top - 3);
+    _boxes += ";" + string(round(_s0.x)) + "," + string(round(_s0.y)) + "," + string((_sl.bbox_right - _sl.bbox_left + 7) * _sc) + "," + string((_sl.bbox_bottom - _sl.bbox_top + 7) * _sc);
+    // the player (B turns it round)
+    var _p0 = Scenario_WorldWin(_pl.bbox_left - 3, _pl.bbox_top - 3);
+    _boxes += ";" + string(round(_p0.x)) + "," + string(round(_p0.y)) + "," + string((_pl.bbox_right - _pl.bbox_left + 7) * _sc) + "," + string((_pl.bbox_bottom - _pl.bbox_top + 7) * _sc);
+    // the arrow over the chest: both bob heights
+    var _ax = floor((_ch.bbox_left + _ch.bbox_right) / 2), _at = floor(_ch.bbox_top);
+    var _a0 = Scenario_WorldWin(_ax - 4, _at - 13);
+    _boxes += ";" + string(round(_a0.x)) + "," + string(round(_a0.y)) + "," + string(9 * _sc) + "," + string(10 * _sc);
+    // arrow outline probes, one group of 7 per bob height (the arrow bobs with the wall clock; the picture shows one of the two): see Player_DrawWorldFx
+    var _ap = "";
+    var _offs = [[-2, -1], [2, -1], [-3, 0], [3, 0], [-2, 1], [2, 1], [0, 3]];
+    for (var _bb = 0; _bb < 2; _bb++) {
+        var _y0 = _at - 7 - _bb;
+        for (var _o = 0; _o < array_length(_offs); _o++) {
+            var _q = Scenario_WorldWin(_ax + _offs[_o][0] + 0.5, _y0 + _offs[_o][1] + 0.5);
+            _ap += ((_ap == "") ? "" : ";") + string(round(_q.x)) + "," + string(round(_q.y));
+        }
+    }
+    var _cc = Scenario_WorldWin(camera_get_view_x(view_camera[0]), camera_get_view_y(view_camera[0]));
+    return "pair=" + _fileB + " corner=24 cornerxy=" + string(round(_cc.x)) + "," + string(round(_cc.y))
+        + " ringc=" + string(round(_cn.x)) + "," + string(round(_cn.y)) + "," + string(_r * _sc) + "," + string(2.5 * _sc)
+        + " rp=" + _rp + " bp=" + string(round(_bp1.x)) + "," + string(round(_bp1.y)) + ";" + string(round(_bp2.x)) + "," + string(round(_bp2.y))
+        + " ap=" + _ap
+        + " boxes=" + _boxes;
+}
+
+function Scenario_WorldStage(_w) {
+    with (obj_enemy) instance_destroy();
+    _w.sl = instance_create_layer(1 * GRID_TILE_SIZE, 7 * GRID_TILE_SIZE, "Instances", obj_slime);   // in the open lit part of the room, over light and dark floor (frozen, so its sight does not matter)
+    Scenario_PlaceEnemy(_w.sl, 1, 7);
+    EnemyAI_Init(_w.sl);   // freeze it before its first update (that update may be late after a battle, and would pick a wander step): no wandering, no spotting, "!" held on
+    _w.sl.idle_timer = 1000000;
+    _w.sl.spot_cooldown = 1000000;
+    _w.sl.alert_pop = 1000000;
+    _w.chest = Scenario_Block(obj_chest_lv1, 5, 7);   // right of the player and clear of the room's light shaft (it dims what is under it)
+    var _pl = Scenario_PlacePlayer(4, 7);
+    _pl.face = RIGHT;
+    _w.calls0 = variable_global_exists("nav_fx_calls") ? global.nav_fx_calls : 0;
+}
+
+function Scenario_StepShotsWorld(_s) {
+    var _gs = GameState_Get();
+    if (!is_struct(_s.wd)) _s.wd = { pass: 0, sl: noone, chest: noone, calls0: 0, shot: "" };
+    var _w = _s.wd;
+    var _tapnow = ((_s.f - _s.last_tap) >= 8);
+    switch (_s.step) {
+        case 60:   // pass 0: a fresh knight into rm_floor1
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(3);
+                room_goto(rm_floor1);
+            }
+            var _talk = (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0);
+            if (_talk && _tapnow) Scenario_Tap("confirm");
+            if (_s.t >= 45 && !_talk && !Transition_IsActive()) Scenario_Next(_s, 61);
+            else if (_s.t > 900) { Scenario_Check("shots_world_floor1_ready", false, "dialogue or fade still up"); Scenario_Finish(); }
+            break;
+        case 61:   // build the stage (the slime frozen, "!" held on)
+            if (_s.t == 1) {
+                Scenario_Check("shots_world_in_floor1_" + string(_w.pass), room == rm_floor1 && instance_exists(obj_player), "room=" + room_get_name(room));
+                Scenario_WorldStage(_w);
+                if (_w.pass == 1) Scenario_SetWindowScale(4);
+            }
+            if (_s.t == 6) {
+                with (all) image_speed = 0;   // nothing animates between picture A and B (torches, the slime), so any difference is a mark
+            }
+            if (_s.t >= 50) {
+                // the marks are drawn: this room's layer scripts have been running since the stage was built
+                var _calls = variable_global_exists("nav_fx_calls") ? global.nav_fx_calls - _w.calls0 : 0;
+                Scenario_Check("shots_world_ring_script_runs_pass_" + string(_w.pass), _calls >= 5, "calls=" + string(_calls));
+                Scenario_Next(_s, 62);
+            }
+            break;
+        case 62:   // picture A
+            _w.shot = "shot_world_" + string(_w.pass) + "_a.png";
+            var _pl = instance_find(obj_player, 0);
+            Scenario_Check("shots_world_prompt_target_pass_" + string(_w.pass), instance_exists(_pl.prompt_target) && _pl.prompt_target.id == _w.chest.id);
+            Scenario_Check("shots_world_alert_still_on_pass_" + string(_w.pass), _w.sl.alert_pop > 0 && _w.sl.x == 1 * GRID_TILE_SIZE && _w.sl.y == 7 * GRID_TILE_SIZE, "pop=" + string(_w.sl.alert_pop) + " at " + string(_w.sl.x) + "," + string(_w.sl.y) + " mode=" + string(_w.sl.ai_mode));
+            Scenario_ShotLayout(_w.shot, Scenario_WorldFlags(_w, "shot_world_" + string(_w.pass) + "_b.png"));
+            Scenario_Next(_s, 63);
+            break;
+        case 63:   // turn the marks off: slime hidden and defeated, the player faces away from the chest
+            if (_s.t >= 4) {
+                Scenario_Check("shots_world_saved_" + _w.shot, file_exists(_w.shot));
+                _w.sl.defeated = true;
+                _w.sl.visible = false;
+                instance_find(obj_player, 0).face = LEFT;
+                Scenario_Next(_s, 64);
+            }
+            break;
+        case 64:   // picture B
+            if (_s.t >= 8) {
+                _w.shot = "shot_world_" + string(_w.pass) + "_b.png";
+                Scenario_ShotLayout(_w.shot);
+                Scenario_Next(_s, 65);
+            }
+            break;
+        case 65:
+            if (_s.t >= 4) {
+                Scenario_Check("shots_world_saved_" + _w.shot, file_exists(_w.shot));
+                if (_w.pass >= 1) { Scenario_Finish(); break; }
+                Scenario_Next(_s, 66);
+            }
+            break;
+        case 66:   // into a battle ...
+            if (_s.t == 1) Scenario_GotoBattle("shots_world");
+            if (_s.t >= 30) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_world_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); break; }
+                instance_find(obj_battle_controller, 0).battle_state = BSTATE_END_RUN;   // the end of a won battle and of a successful run: Battle_EndRun
+                Scenario_Next(_s, 67);
+            }
+            break;
+        case 67:   // ... and back (the real return path: room fade to the battle's return room)
+            if (room == rm_floor1 && _s.t >= 20 && !Transition_IsActive()) {
+                _w.pass = 1;
+                Scenario_ClearUi();
+                Scenario_Next(_s, 68);
+            } else if (_s.t > 900) { Scenario_Check("shots_world_back_from_battle", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 68:
+            if (_s.t >= 10) Scenario_Next(_s, 61);
+            break;
+    }
 }
