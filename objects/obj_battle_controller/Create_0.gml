@@ -93,6 +93,11 @@ ui_skill = undefined;
 ui_item = undefined;
 ui_sig = {};
 hud = { clock: current_time, hp_shown: p.hp, mp_shown: p.mp, rects: {} };   // the player panel's glided bars, and the rectangles the last draw used
+// each fight starts on Attack with the lists at their top (the cursors are remembered inside a fight, D95)
+Ui_MemSet(Ui_MemGlobal(), "battle_cmd", 0);
+Ui_MemSet(Ui_MemGlobal(), "battle_skill", 0);
+Ui_MemSet(Ui_MemGlobal(), "battle_item", 0);
+Battle_MenusBuild(self);
 
 // The basic attack's sliding bar (D56). qte_ms is the bar's own clock in ms: negative in the lead-in, 0 when the cursor starts.
 qte_active = false;
