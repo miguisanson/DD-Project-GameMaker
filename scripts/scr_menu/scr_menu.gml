@@ -2319,12 +2319,6 @@ function Hud_DrawGold() {
     var txt = string(Gold_Get());
     var gx = mt.margin;
     var gy = mt.margin;
-    if (room == rm_battle) {   // under the HP and MP bars and the status icons (obj_ui_controller Draw GUI)
-        var ui_visual = UI_GetVisualScale();
-        var scale = UI_BAR_SCALE * UI_GetSpriteScale();
-        var bar_h = sprite_get_height(hp_bar) * scale;
-        gy = max(6, round(8 * ui_visual)) + (bar_h * 2) + max(2, round(4 * ui_visual)) + max(6, round(10 * ui_visual)) + max(14, round(14 * ui_visual)) + mt.margin;
-    }
     var w = 6 * p + 2 * p + UI_TextWidth(txt) + 6 * p;
     var h = mt.line_h + 4 * p;
     var a0 = draw_get_alpha();

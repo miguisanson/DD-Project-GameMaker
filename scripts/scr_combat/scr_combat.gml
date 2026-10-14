@@ -2943,7 +2943,7 @@ function Battle_EnemyHeaderRect(_bc) {
     out.y1 = round(max(floor_y, want_y));
     out.chips_y = out.y1 + p;
     var chip_w = Battle_ChipMetrics(array_length(Battle_FighterChips(_bc, TL_ENEMY)), 16 * Battle_IconK(), p, mt.gw).w;
-    if (want_y < floor_y) {   // a big enemy: no room over its head, so the plate stands beside it (left, else right) and its chips go under the plate
+    if (floor_y - want_y > 10 * p) {   // a big enemy (more than a few pixels short): no room over its head, so the plate stands beside it (left, else right) and its chips go under the plate
         var spr_w = sprite_get_width(spr) * abs(inst.image_xscale) * sx;
         var left_x = round(out.cx - spr_w * 0.5 - out.bw - 2 * p);
         out.x1 = (left_x >= mt.margin) ? left_x : round(out.cx + spr_w * 0.5 + 2 * p);
