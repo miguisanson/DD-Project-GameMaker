@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | BIG BUILD (D71) per .planning/BUILD-PLAN.md on branch `next`. Owner asleep from 2026-10-14 night and wants it FINISHED when back: no usage cap at all (owner removed the +20% improvement cap). Up to 3 implementers when file sets don't overlap. A1 (worktree ../DD-Project-GameMaker-wt/a1) + A2 (../DD-Project-GameMaker-wt/a2) in flight. |
+| WIP | PAUSED by owner (gaming) 2026-10-15. Paused agents committing WIP on: d1a-battle-ui (wt d1a, merging next/C4), bal-apply (wt bal, D111/D112), art-final (wt artf, D113/D114). Resume when owner says so: re-send each its task, then D1b (Tab menu + pause + inventory/gear + codex + white text D115), D3 text pass, F1 optimisation, E2 full gate + playtest build. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
