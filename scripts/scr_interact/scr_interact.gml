@@ -102,7 +102,7 @@ function GraveLoot_StageChance(_stage) {
         case 1: return 0.25; // Lv2 item
         case 2: return 0.10; // Lv3 item
         case 3: return 0.05; // Lv3 item
-        default: return 0.01; // Skillbook
+        default: return 0.01; // Lv3 item (skill books are gone, D18)
     }
 }
 
@@ -175,12 +175,7 @@ function GraveLoot_RollRewardForStage(_stage, _class_id) {
     if (st <= 1) return GraveLoot_RollTierItem(2, class_id, player);
     if (st <= 3) return GraveLoot_RollTierItem(3, class_id, player);
 
-    if (class_id != CLASS_NOBODY) {
-        var sb = Loot_RollSkillbook(class_id, player, []);
-        if (is_struct(sb) && variable_struct_exists(sb, "item_id")) return [sb];
-    }
-
-    // Nobody class (or no valid skillbook): fallback to another Lv3 item.
+    // The last stage gives another Lv3 item.
     return GraveLoot_RollTierItem(3, class_id, player);
 }
 
@@ -274,26 +269,19 @@ function Interact_Handle(_inst) {
         return;
     }
 
-    // Special chest that opens class-select popup (used in rm_floor1).
-    if (variable_instance_exists(_inst, "class_select_chest") && _inst.class_select_chest) {
-        if (variable_instance_exists(_inst, "swap_on_interact") && _inst.swap_on_interact && !_inst.swapped) {
+    // Class chest and skill chest (D73, fixes I-057): the first one opened in a run gives the class choice, every later one a 1-of-3 card
+    // pick. The choice or pick is owed by the character and opens as a screen (CardsUi_Step) once the chest's line is read.
+    if ((variable_instance_exists(_inst, "class_select_chest") && _inst.class_select_chest) || (variable_instance_exists(_inst, "card_chest") && _inst.card_chest)) {
+        if (!_inst.swapped) {
             if (variable_instance_exists(_inst, "swap_sprite") && _inst.swap_sprite != noone) {
                 _inst.sprite_index = _inst.swap_sprite;
             }
             _inst.swapped = true;
             RoomState_SaveInstance(_inst, ["swapped","sprite_index"], false);
             SFX_Play("chest_open");
-        }
-
-        var current_class = CLASS_NOBODY;
-        if (is_struct(gs.player_ch) && variable_struct_exists(gs.player_ch, "class_id")) {
-            current_class = gs.player_ch.class_id;
-        }
-
-        if (current_class == CLASS_NOBODY) {
-            Dialogue_StartWithSpeaker(name, DialogueDB_Get("sys_class_chest_prompt"));
-            gs.pending_class_select_open = true;
-            gs.pending_class_select_block_frame = Input_Frame() + 1;
+            if (is_struct(gs.player_ch)) GameState_SetPlayer(Cards_ChestOpened(gs.player_ch));
+            if (instance_exists(obj_player)) obj_player.character = global.player_ch;
+            Dialogue_StartWithSpeaker(name, DialogueDB_Get("chest_open"));
         } else {
             Dialogue_StartWithSpeaker(name, DialogueDB_Get("chest_empty"));
         }

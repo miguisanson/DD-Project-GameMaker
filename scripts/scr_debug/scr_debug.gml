@@ -242,7 +242,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 10000 : 6000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined };
+                   cap: (_mode == "bot") ? 16000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 12000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined };
 }
 
 function Scenario_Finish() {
@@ -427,6 +427,9 @@ function Scenario_StepSmoke(_s) {
             break;
         case 113: case 114: case 115: case 116: case 117: case 118: case 119: case 120: case 121: case 122:
             Scenario_StepSmokeStory(_s);   // C5: death scene, wake line, notes, boss banner, credits
+            break;
+        case 133: case 134: case 135: case 136: case 137: case 138: case 139: case 140: case 141:
+            Scenario_StepSmokeCards(_s);   // C2: class screen, card pick, stat point, replace a skill
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -802,6 +805,10 @@ function Scenario_StepBot(_s) {
         Scenario_StepBotStatus(_s);
         return;
     }
+    if (_s.v == 7) {
+        Scenario_StepBotTurns(_s);
+        return;
+    }
     if (_s.v == 2) {
         Scenario_StepBotSkill(_s);
         return;
@@ -1171,7 +1178,7 @@ function Scenario_StepBotSkill(_s) {
         case 2:   // measured: start the next skill (the battle is simply abandoned) or the fail variant
             if (_s.t == 5) {
                 _s.ski++;
-                if (_s.ski >= array_length(_ids)) _s.v = 6;   // skills -> statuses (v=6, B2) -> movement and AI (v=5) -> fail (v=1)
+                if (_s.ski >= array_length(_ids)) _s.v = 6;   // skills -> statuses (v=6, B2) -> turn timeline (v=7, B3) -> movement and AI (v=5) -> fail (v=1)
                 Scenario_Next(_s, 0);
             }
             break;
@@ -1182,6 +1189,15 @@ function Scenario_StepBotSkill(_s) {
 // Battle A: a Mage against a Slime that stays stunned, 99 HP: Poison stacks tick down (3, 2, 1), Burning lowers DEF and ends after its 2 turns,
 // Bleeding does not hurt on a stunned turn but does on each action. Battle B: the Mage casts Foresight against a Spider that only uses its big
 // attack (Poison Fangs): the preview names it, the enemy really does it, the log says so, the Perfect zones are x1.5 for 3 turns and back to normal after.
+// The Foresight preview on the turn strip (D79): the first slot that carries it, or undefined. Returns { idx, slot }.
+function Scenario_BotForesightSlot(_bc) {
+    var _slots = Battle_TimelineSlots(_bc);
+    for (var _i = 0; _i < array_length(_slots); _i++) {
+        if (is_struct(_slots[_i].foresight)) return { idx: _i, slot: _slots[_i], count: array_length(_slots) };
+    }
+    return undefined;
+}
+
 function Scenario_BotLogCount(_bc, _needle) {
     var _n = 0;
     for (var _i = 0; _i < array_length(_bc.combat_log); _i++) {
@@ -1274,7 +1290,7 @@ function Scenario_StepBotStatus(_s) {
                     _bc.e.hp = 999;
                     _bc.p.max_hp = 99;   // the battle starts with the class's real HP, so raise it here
                     _bc.p.hp = 99;
-                    _bc.e = Status_Add(_bc.e, STATUS_STUN, 99, 1);
+                    Turn_Push(_bc.tl, TL_ENEMY, 100000);   // B3: the enemy is a very long way down the timeline, so it never acts (the player acts every turn)
                     _bc.p = Status_Add(_bc.p, STATUS_POISON, 0, 0, 3);
                     Scenario_Check(_name + "_poison_3_stacks_applied", Status_Stacks(_bc.p, STATUS_POISON) == 3);
                     _t.k = 1;
@@ -1305,26 +1321,17 @@ function Scenario_StepBotStatus(_s) {
                     if (_t.k == 5) {
                         Scenario_Check(_name + "_burn_ends_after_2_turns", !Status_Has(_bc.p, STATUS_BURN));
                         Scenario_Check(_name + "_def_restored_after_burn", Combat_EffectiveStat(_bc.p, STAT_DEF) == _t.def0);
-                        // Bleeding (2 stacks, 3 turns) and a stun on the player at once: the stunned turn is skipped and costs no HP
+                        // Bleeding (2 stacks, 3 turns): 4 HP per action, ends after the 3rd turn (a stunned turn no longer exists, D75: stun is a push-back)
                         _bc.p = Status_Add(_bc.p, STATUS_BLEED, 3, 0, 2);
-                        _bc.p = Status_Add(_bc.p, STATUS_STUN, 1, 1);
                         _t.hp_before = _bc.p.hp;
-                        _t.waited = false;
                     }
                     _t.k++;
                 }
-            } else if (_t.k == 6) {   // the stunned turn goes by on its own (the controller skips it)
-                if (_bc.battle_state != BSTATE_MENU) _t.waited = true;
-                if (_t.waited && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) {
-                    Scenario_Check(_name + "_bleed_does_not_hurt_on_a_stunned_turn", _bc.p.hp == _t.hp_before, "hp " + string(_t.hp_before) + " -> " + string(_bc.p.hp));
-                    Scenario_Check(_name + "_stun_was_used_up", !Status_Has(_bc.p, STATUS_STUN));
-                    Scenario_Check(_name + "_bleed_turn_counted_while_stunned", Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED) == 2, "turns=" + string(Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED)));
-                    _t.k = 7;
-                }
-            } else if (_t.k == 7 || _t.k == 8) {   // two actions: Bleeding costs 2 x 2 stacks each, and ends after its 3rd turn
+            } else if (_t.k >= 6 && _t.k <= 8) {   // three actions: Bleeding costs 2 x 2 stacks each, and ends after its 3rd turn
                 if (Scenario_BotOneAttack(_s, _bc)) {
                     var _dloss = _t.hp_before - _bc.p.hp;
-                    Scenario_Check(_name + "_bleed_action_" + string(_t.k - 6) + "_costs_4", _dloss == 4, "lost " + string(_dloss));
+                    Scenario_Check(_name + "_bleed_action_" + string(_t.k - 5) + "_costs_4", _dloss == 4, "lost " + string(_dloss));
+                    if (_t.k == 6) Scenario_Check(_name + "_bleed_2_turns_left", Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED) == 2, "turns=" + string(Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED)));
                     if (_t.k == 7) Scenario_Check(_name + "_bleed_1_turn_left", Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED) == 1);
                     if (_t.k == 8) Scenario_Check(_name + "_bleed_ends_after_3_turns", !Status_Has(_bc.p, STATUS_BLEED));
                     _t.k++;
@@ -1347,7 +1354,7 @@ function Scenario_StepBotStatus(_s) {
                 Scenario_Check(_name + "_b_finished", false, "k=" + string(_tb.k) + " state=" + string(_bcb.battle_state) + " sk=" + string(_tb.sk));
                 global.debug.enabled = false;
                 global.debug.enemy_damage_skill_only = false;
-                _s.v = 5;
+                _s.v = 7;
                 Scenario_Next(_s, 0);
                 break;
             }
@@ -1375,7 +1382,10 @@ function Scenario_StepBotStatus(_s) {
                         var _pv = Battle_EnemyNextActionPreview(_bcb);
                         Scenario_Check(_name + "_foresight_cast_with_3_turns", Battle_StatusCurrentTurns(_bcb.p, STATUS_HIT_UP) == 3, "turns=" + string(Battle_StatusCurrentTurns(_bcb.p, STATUS_HIT_UP)));
                         Scenario_Check(_name + "_preview_visible_and_names_the_big_attack", _pv.visible && _pv.kind == "skill" && _pv.skill_id == SKILL_POISON_FANGS && _pv.big, "kind=" + _pv.kind + " id=" + string(_pv.skill_id));
-                        Scenario_Check(_name + "_foresee_line_in_the_log", Scenario_BotLogCount(_bcb, _pv.text) == 1 && string_pos("You foresee: " + SkillDB_Get(SKILL_POISON_FANGS).name, _pv.text) > 0, _pv.text);
+                        var _fs = Scenario_BotForesightSlot(_bcb);   // the enemy acts next, so its own (current) slot holds the action
+                        Scenario_Check(_name + "_foresight_shown_on_the_enemy_slot_of_the_strip", is_struct(_fs) && _fs.idx == 0 && _fs.slot.who == TL_ENEMY && _fs.slot.foresight.skill_id == SKILL_POISON_FANGS && _fs.slot.foresight.big, is_struct(_fs) ? string(_fs.idx) : "none");
+                        Scenario_Check(_name + "_foresee_text_names_the_attack", string_pos("You foresee: " + SkillDB_Get(SKILL_POISON_FANGS).name, _pv.text) > 0, _pv.text);
+                        Scenario_Check(_name + "_no_foresee_log_lines_any_more_the_strip_shows_it", Scenario_BotLogCount(_bcb, "You foresee:") == 0);
                         _tb.pv_id = _pv.skill_id;
                         _tb.k = 1;
                     }
@@ -1388,7 +1398,8 @@ function Scenario_StepBotStatus(_s) {
                 if (_bcb.battle_state == BSTATE_MENU && _bcb.turn == TURN_PLAYER) {
                     Scenario_Check(_name + "_enemy_did_what_foresight_showed", _bcb.enemy_last_skill_id == _tb.pv_id, "did=" + string(_bcb.enemy_last_skill_id) + " showed=" + string(_tb.pv_id));
                     Scenario_Check(_name + "_defence_bar_perfect_zone_x1.5", _tb.def_widen == 1.5 && abs(_tb.def_pw - Qte_DefenceParams(SKILL_POISON_FANGS).perfect_half_width * 1.5) < 0.001, "widen=" + string(_tb.def_widen) + " pw=" + string(_tb.def_pw));
-                    Scenario_Check(_name + "_foresee_line_for_the_next_action", Scenario_BotLogCount(_bcb, "You foresee:") == 2 && Battle_EnemyNextActionPreview(_bcb).visible, "lines=" + string(Scenario_BotLogCount(_bcb, "You foresee:")));
+                    var _fs2 = Scenario_BotForesightSlot(_bcb);   // the player's turn: the next enemy slot carries the enemy's next action
+                    Scenario_Check(_name + "_strip_shows_the_next_enemy_action", is_struct(_fs2) && _fs2.idx >= 1 && _fs2.slot.who == TL_ENEMY && Battle_EnemyNextActionPreview(_bcb).visible, is_struct(_fs2) ? string(_fs2.idx) : "none");
                     Scenario_Check(_name + "_foresight_still_3_turns_after_the_cast_turn", Battle_StatusCurrentTurns(_bcb.p, STATUS_HIT_UP) == 3);
                     _tb.k = 2;
                 }
@@ -1402,14 +1413,286 @@ function Scenario_StepBotStatus(_s) {
                     if (_tb.k == 4) {
                         Scenario_Check(_name + "_foresight_over_after_3_turns", !Status_Has(_bcb.p, STATUS_HIT_UP));
                         Scenario_Check(_name + "_preview_hidden_again", !Battle_EnemyNextActionPreview(_bcb).visible);
-                        _tb.lines = Scenario_BotLogCount(_bcb, "You foresee:");
                     }
-                    if (_tb.k == 5) Scenario_Check(_name + "_no_foresee_line_after_it_ended", Scenario_BotLogCount(_bcb, "You foresee:") == _tb.lines, "was " + string(_tb.lines) + " now " + string(Scenario_BotLogCount(_bcb, "You foresee:")));
+                    if (_tb.k == 5) Scenario_Check(_name + "_strip_shows_nothing_after_foresight_ended", !is_struct(Scenario_BotForesightSlot(_bcb)));
                     _tb.k++;
                 }
             } else {
                 global.debug.enabled = false;
                 global.debug.enemy_damage_skill_only = false;
+                _s.v = 7;   // on to the turn timeline (B3), then movement and AI
+                Scenario_Next(_s, 0);
+            }
+            break;
+    }
+}
+
+// ---- v=7: the turn timeline, stun push-back, Steadfast, stagger and BREAK (B3: D19 D74 D75 D92) ----
+// One player action through the real input path. _t.ac: 0 wait for the menu, 1 attack bar up, 2 skill menu, 3 wait for the arrows, 4 arrows.
+// Returns true on the frame the action has just resolved (the battle is in its message state, the timeline already points at the next actor).
+// _kind "attack" (the first menu row) or "skill" (the second row, its first skill, arrows typed right); _perfect presses the attack bar on its zone.
+function Scenario_BotAct(_s, _bc, _kind, _perfect) {
+    var _t = _s.stt;
+    var _ready = (_s.f - _s.last_tap) >= 4;
+    switch (_t.ac) {
+        case 0:
+            if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {
+                var _want = (_kind == "attack") ? 0 : 1;
+                if (_bc.menu_index != _want) {
+                    Scenario_Tap((_bc.menu_index < _want) ? "menu_down" : "menu_up");
+                } else {
+                    Scenario_Tap("confirm");
+                    _t.ac = (_kind == "attack") ? 1 : 2;
+                }
+            }
+            break;
+        case 1:
+            if (_bc.battle_state == BSTATE_ATTACK_TIMING) {
+                if (_perfect && _ready && _bc.qte_active && (Qte_ZoneCentreMs(_bc.qte_params) - _bc.qte_ms) <= Qte_StepMs(delta_time) * 1.5) Scenario_Tap("confirm");
+            } else if (_bc.battle_state == BSTATE_MESSAGE) {
+                _t.ac = 0;
+                return true;
+            }
+            break;
+        case 2:
+            if (_bc.battle_state == BSTATE_SKILL_MENU && _ready) {
+                Scenario_Tap("confirm");
+                _t.ac = 3;
+            }
+            break;
+        case 3:
+            Scenario_BotArrows(_s, _bc, "right");
+            if (_bc.battle_state == BSTATE_SKILL_QTE) _t.ac = 4;
+            break;
+        case 4:
+            Scenario_BotArrows(_s, _bc, "right");
+            if (_bc.battle_state != BSTATE_SKILL_QTE) {
+                _t.ac = 0;
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+
+function Scenario_BotTurnString(_log, _n) {
+    var _out = "";
+    for (var _i = 0; _i < _n && _i < array_length(_log); _i++) _out += (_log[_i] == TL_PLAYER) ? "P" : "E";
+    return _out;
+}
+
+function Scenario_BotPreviewString(_tl, _n) {
+    var _pv = Turn_Preview(_tl, _n);
+    return Scenario_BotTurnString(_pv, _n);
+}
+
+// The same battle as the game plays it, advanced by the model: SPD read again, then the next actor.
+function Scenario_BotModelAdvance(_tl, _bc) {
+    Turn_SetSpd(_tl, TL_PLAYER, Combat_EffectiveStat(_bc.p, STAT_SPD));
+    Turn_SetSpd(_tl, TL_ENEMY, Combat_EffectiveStat(_bc.e, STAT_SPD));
+    return Turn_Next(_tl);
+}
+
+function Scenario_StepBotTurns(_s) {
+    var _name = "bot_turns";
+    switch (_s.step) {
+        case 0:   // battle A: an Archer (SPD 13) against a Slime made very slow
+        case 3:   // battle B: a Knight with Hilt Bash (stun, then BREAK)
+            if (_s.t == 10) {
+                var _b_battle = (_s.step == 3);
+                var _gs = Scenario_NewKnight(_b_battle ? CLASS_KNIGHT : CLASS_ARCHER);
+                var _ch = _gs.player_ch;
+                _ch.max_hp = 99;
+                _ch.hp = 99;
+                _ch.max_mp = 99;
+                _ch.mp = 99;
+                if (_b_battle) _ch.skills = [SKILL_HILT_BASH];
+                GameState_SetPlayer(_ch);
+                if (_b_battle) SkillDB_Get(SKILL_HILT_BASH).status_chance = 1;   // the stun always lands, so there is something to check
+                _s.stt = { ac: 0, k: 0, n: 0, base: undefined, pv: "", len0: 0, snap: false, st0: 0, grade: "", brk: false, enemy_seen: false };
+                _s.vstart = _s.f;
+                _s.xwrong = 0;
+                Scenario_GotoBattle(_name + (_b_battle ? "_b" : "_a"), ENEMY_SLIME);
+                Scenario_Next(_s, _b_battle ? 4 : 1);
+            }
+            break;
+        case 1:   // battle A
+            if (room != rm_battle || !instance_exists(obj_battle_controller)) {
+                if (_s.t > 20) { Scenario_Check(_name + "_a_in_battle", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+                break;
+            }
+            var _bc = instance_find(obj_battle_controller, 0);
+            var _t = _s.stt;
+            if (_s.f - _s.vstart > 3500) {
+                Scenario_Check(_name + "_a_finished", false, "k=" + string(_t.k) + " state=" + string(_bc.battle_state));
+                Scenario_Next(_s, 2);
+                break;
+            }
+            if (_t.k == 0) {
+                if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) {   // the Archer (13) is first against the Slime (9)
+                    _t.base = Turn_New([Turn_Fighter(TL_PLAYER, Combat_EffectiveStat(_bc.p, STAT_SPD)), Turn_Fighter(TL_ENEMY, Combat_EffectiveStat(_bc.e, STAT_SPD))]);   // how the battle began ...
+                    Turn_Next(_t.base);
+                    _bc.e.max_hp = 999;
+                    _bc.e.hp = 999;
+                    _bc.e.stats.spd = 4;
+                    _bc.e.skills = [];   // basic attacks only: no skill can change its SPD or its guard
+                    _bc.e.stagger_max = 999;   // and no BREAK push-back: this battle is about SPD alone
+                    Scenario_Check(_name + "_a_archer_acts_first_against_the_slime", _bc.turn_log[0] == TL_PLAYER);
+                    _t.k = 1;
+                }
+            } else if (_t.k <= 10) {   // ten attacks without pressing (Weak is enough)
+                if (Scenario_BotAct(_s, _bc, "attack", false)) _t.k++;
+            } else {
+                var _n = array_length(_bc.turn_log);
+                var _want = "P";
+                for (var _i = 1; _i < _n; _i++) {
+                    Turn_SetSpd(_t.base, TL_PLAYER, Combat_EffectiveStat(_bc.p, STAT_SPD));
+                    Turn_SetSpd(_t.base, TL_ENEMY, 4);   // ... and the Slime slowed to 4 from its first turn on
+                    _want += (Turn_Next(_t.base) == TL_PLAYER) ? "P" : "E";
+                }
+                var _got = Scenario_BotTurnString(_bc.turn_log, _n);
+                var _ne = string_count("E", _got);
+                Scenario_Check(_name + "_a_real_turns_follow_the_timeline_model", _got == _want, "got " + _got + " want " + _want + " spd p=" + string(Combat_EffectiveStat(_bc.p, STAT_SPD)) + " e=" + string(Combat_EffectiveStat(_bc.e, STAT_SPD)) + " e.status=" + json_stringify(_bc.e.status) + " p.status=" + json_stringify(_bc.p.status));
+                Scenario_Check(_name + "_a_fast_player_acts_twice_before_a_slow_enemy", string_pos("PP", _got) > 0, _got);
+                Scenario_Check(_name + "_a_player_acts_at_least_twice_as_often_as_the_slow_enemy", (_n - _ne) >= 2 * _ne && _ne >= 1, _got);
+                Scenario_Check(_name + "_a_strip_preview_is_the_next_five_turns", Scenario_BotPreviewString(_bc.tl, 5) == Scenario_BotPreviewString(Turn_Copy(_bc.tl), 5) && array_length(Battle_TimelineSlots(_bc)) == 5);
+                Scenario_Check(_name + "_a_no_extra_action_counter_left", !variable_instance_exists(_bc, "player_bonus_actions_remaining"));
+                Scenario_Next(_s, 2);
+            }
+            break;
+        case 2:   // measured: battle B next (the battle is simply abandoned)
+            if (_s.t == 5) Scenario_Next(_s, 3);
+            break;
+        case 4:   // battle B
+            if (room != rm_battle || !instance_exists(obj_battle_controller)) {
+                if (_s.t > 20) { Scenario_Check(_name + "_b_in_battle", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+                break;
+            }
+            var _bcb = instance_find(obj_battle_controller, 0);
+            var _tb = _s.stt;
+            if (_s.f - _s.vstart > 7000) {
+                Scenario_Check(_name + "_b_finished", false, "k=" + string(_tb.k) + " state=" + string(_bcb.battle_state));
+                SkillDB_Get(SKILL_HILT_BASH).status_chance = 0.6;
+                _s.v = 5;
+                Scenario_Next(_s, 0);
+                break;
+            }
+            if (_tb.k == 0) {   // set up: a sturdy Slime whose BREAK meter is out of the way for now
+                if (_bcb.battle_state == BSTATE_MENU && _bcb.turn == TURN_PLAYER) {
+                    _bcb.e.max_hp = 999;
+                    _bcb.e.hp = 999;
+                    _bcb.e.stagger_max = 999;
+                    _tb.base = Turn_Copy(_bcb.tl);
+                    _tb.k = 1;
+                }
+            } else if (_tb.k == 1) {   // Hilt Bash (stun, chance 1)
+                if (Scenario_BotAct(_s, _bcb, "skill", true)) {
+                    Turn_SetSpd(_tb.base, TL_PLAYER, Combat_EffectiveStat(_bcb.p, STAT_SPD));   // what the timeline would be without the stun: SPD read again, the player's turn used up
+                    Turn_SetSpd(_tb.base, TL_ENEMY, Combat_EffectiveStat(_bcb.e, STAT_SPD));
+                    var _plain_next = Turn_Next(_tb.base);
+                    var _en = Turn_Find(_bcb.tl, TL_ENEMY);
+                    Scenario_Check(_name + "_b_stun_makes_the_enemy_steadfast_for_2_turns", _en.steadfast == TURN_STEADFAST_TURNS, "steadfast=" + string(_en.steadfast));
+                    Scenario_Check(_name + "_b_stun_marker_consumed", !Status_Has(_bcb.e, STATUS_STUN));
+                    Scenario_Check(_name + "_b_pushed_back_message_logged", Scenario_BotLogCount(_bcb, "pushed back") >= 1);
+                    var _seq_plain = ((_plain_next == TL_PLAYER) ? "P" : "E") + Scenario_BotPreviewString(_tb.base, 5);   // the turns from here on, without the stun ...
+                    var _seq_stun = ((_bcb.tl_who == TL_PLAYER) ? "P" : "E") + Scenario_BotPreviewString(_bcb.tl, 5);   // ... and with it
+                    Scenario_Check(_name + "_b_the_enemy_turn_is_pushed_later_on_the_strip", string_pos("E", _seq_stun) > string_pos("E", _seq_plain) && _seq_plain != _seq_stun, "plain " + _seq_plain + " stunned " + _seq_stun);
+                    var _lead = 0;
+                    var _pv1 = Turn_Preview(_bcb.tl, 6);
+                    while (_lead < array_length(_pv1) && _pv1[_lead] == TL_PLAYER) _lead++;
+                    Scenario_Check(_name + "_b_no_extra_player_actions_after_a_stun", _lead <= 2, "player turns in a row after the stun: " + string(_lead));
+                    Scenario_Check(_name + "_b_no_extra_action_counter_left", !variable_instance_exists(_bcb, "player_bonus_actions_remaining"));
+                    _tb.k = 2;
+                    _tb.snap = false;
+                }
+            } else if (_tb.k == 2) {   // a second Hilt Bash while the Slime is Steadfast: resisted, nothing moves
+                if (_tb.ac == 0 && !_tb.snap && _bcb.battle_state == BSTATE_MENU && _bcb.turn == TURN_PLAYER) {
+                    _tb.base = Turn_Copy(_bcb.tl);
+                    Turn_SetSpd(_tb.base, TL_PLAYER, Combat_EffectiveStat(_bcb.p, STAT_SPD));
+                    Turn_SetSpd(_tb.base, TL_ENEMY, Combat_EffectiveStat(_bcb.e, STAT_SPD));
+                    _tb.st0 = Turn_Find(_bcb.tl, TL_ENEMY).steadfast;
+                    _tb.snap = true;
+                }
+                if (Scenario_BotAct(_s, _bcb, "skill", true)) {
+                    Turn_Next(_tb.base);
+                    Scenario_Check(_name + "_b_second_stun_is_resisted_by_steadfast", Scenario_BotLogCount(_bcb, "Steadfast") >= 1 && _tb.st0 >= 1);
+                    Scenario_Check(_name + "_b_resisted_stun_moves_nothing", Scenario_BotPreviewString(_bcb.tl, 6) == Scenario_BotPreviewString(_tb.base, 6), Scenario_BotPreviewString(_bcb.tl, 6) + " vs " + Scenario_BotPreviewString(_tb.base, 6));
+                    _tb.pv = Scenario_BotPreviewString(_bcb.tl, 6);
+                    _tb.len0 = array_length(_bcb.turn_log);
+                    _tb.k = 3;
+                }
+            } else if (_tb.k == 3) {   // play on with plain attacks: the real turns must be exactly what the strip promised
+                if (Scenario_BotAct(_s, _bcb, "attack", false)) {
+                    if (array_length(_bcb.turn_log) >= _tb.len0 + 6) {
+                        var _real = "";
+                        for (var _ri = 0; _ri < 6; _ri++) _real += (_bcb.turn_log[_tb.len0 + _ri] == TL_PLAYER) ? "P" : "E";
+                        Scenario_Check(_name + "_b_real_turns_are_the_strip_preview", _real == _tb.pv, "real " + _real + " strip " + _tb.pv);
+                        _tb.k = 4;
+                        _tb.snap = false;
+                        _tb.n = 0;
+                    }
+                }
+            } else if (_tb.k == 4) {   // BREAK: Perfect attacks until the meter fills (8 for a Slime)
+                if (_tb.ac == 0 && !_tb.snap && _bcb.battle_state == BSTATE_MENU && _bcb.turn == TURN_PLAYER) {
+                    if (_tb.n == 0) {   // the Slime is made slow so that the player acts again before it does
+                        _bcb.e.stats.spd = 3;
+                        _bcb.e.stagger_max = 8;
+                        _bcb.e.stagger = 0;
+                    }
+                    _tb.base = Turn_Copy(_bcb.tl);
+                    Turn_SetSpd(_tb.base, TL_PLAYER, Combat_EffectiveStat(_bcb.p, STAT_SPD));
+                    Turn_SetSpd(_tb.base, TL_ENEMY, Combat_EffectiveStat(_bcb.e, STAT_SPD));
+                    _tb.st0 = _bcb.e.stagger;
+                    _tb.snap = true;
+                }
+                if (Scenario_BotAct(_s, _bcb, "attack", true)) {
+                    _tb.n++;
+                    _tb.snap = false;
+                    var _gk = _bcb.qte_result_key;
+                    var _gain = Stagger_Gain(Combat_BasicSource(_bcb.player_weapon).power, false, _gk == QTE_PERFECT);
+                    if (!_bcb.e.broken) {
+                        Scenario_Check(_name + "_b_stagger_meter_fills_by_the_formula_" + string(_tb.n), _bcb.e.stagger == _tb.st0 + _gain, "grade " + _gk + " gain " + string(_gain) + " " + string(_tb.st0) + " -> " + string(_bcb.e.stagger));
+                    } else {
+                        Scenario_Check(_name + "_b_full_meter_is_a_break", _tb.st0 + _gain >= 8 && _bcb.e.stagger == 0, "grade " + _gk + " " + string(_tb.st0) + " + " + string(_gain));
+                        Scenario_Check(_name + "_b_break_message_logged", Scenario_BotLogCount(_bcb, "BREAK") >= 1);
+                        Turn_Next(_tb.base);
+                        Turn_Push(_tb.base, TL_ENEMY);
+                        Scenario_Check(_name + "_b_break_pushes_the_enemy_back_one_turn", Scenario_BotPreviewString(_bcb.tl, 6) == Scenario_BotPreviewString(_tb.base, 6), Scenario_BotPreviewString(_bcb.tl, 6) + " vs " + Scenario_BotPreviewString(_tb.base, 6));
+                        Scenario_Check(_name + "_b_break_pop_started", (current_time - _bcb.break_start) < 1000);
+                        _tb.k = 5;
+                    }
+                    if (_tb.n > 8 && _tb.k == 4) { Scenario_Check(_name + "_b_break_reached", false, "meter " + string(_bcb.e.stagger)); _tb.k = 7; }
+                }
+            } else if (_tb.k == 5) {   // while BROKEN the next hit does +50%; a plain Weak hit, from a fresh Slime copy for the expected number
+                if (_tb.ac == 0 && _bcb.battle_state == BSTATE_MENU && _bcb.turn == TURN_PLAYER) {
+                    if (_bcb.e.broken) {
+                        _bcb.e.status = [];   // no Solidify guard in the way
+                        _tb.pv = "armed";
+                    } else {
+                        Scenario_Check(_name + "_b_player_acted_again_before_the_enemy", false, "the break was already over: the enemy acted first");
+                        _tb.k = 7;
+                    }
+                }
+                if (_tb.pv == "armed" && Scenario_BotAct(_s, _bcb, "attack", false)) {
+                    var _src = Combat_BasicSource(_bcb.player_weapon);
+                    var _plain = EnemyCreate(ENEMY_SLIME);
+                    var _broken = EnemyCreate(ENEMY_SLIME);
+                    _broken.broken = true;
+                    var _w_plain = Combat_ApplyDamage(_bcb.p, _plain, _src, 1, 1, { is_skill: false, grade_mult: 0.75 }).dmg;
+                    var _w_broken = Combat_ApplyDamage(_bcb.p, _broken, _src, 1, 1, { is_skill: false, grade_mult: 0.75 }).dmg;
+                    Scenario_Check(_name + "_b_break_hit_does_more_than_a_plain_one", _w_broken > _w_plain, "plain " + string(_w_plain) + " broken " + string(_w_broken));
+                    Scenario_Check(_name + "_b_broken_enemy_takes_the_plus_50_percent", _bcb.last_dmg == _w_broken, "dealt " + string(_bcb.last_dmg) + " want " + string(_w_broken));
+                    _tb.k = 6;
+                }
+            } else if (_tb.k == 6) {   // BROKEN ends when the enemy's next turn starts
+                if (_bcb.tl_who == TL_ENEMY) {
+                    Scenario_Check(_name + "_b_break_ends_when_the_enemy_turn_starts", !_bcb.e.broken);
+                    _tb.k = 7;
+                } else {
+                    Scenario_BotAct(_s, _bcb, "attack", false);
+                }
+            } else {
+                SkillDB_Get(SKILL_HILT_BASH).status_chance = 0.6;
                 _s.v = 5;   // on to movement and AI
                 Scenario_Next(_s, 0);
             }
@@ -1607,7 +1890,13 @@ function Scenario_StepShots(_s) {
         case 80: case 81: case 82: case 83: case 84: case 85: case 86: case 87: case 88: case 89:
             Scenario_StepShotsUi(_s);
             break;
-        case 90: case 91: case 92: case 93: case 94: case 95: case 96: case 97: case 98: case 99: case 100:
+        case 90: case 91: case 92: case 93: case 94: case 95: case 96: case 97:
+            Scenario_StepShotsTurns(_s);
+            break;
+        case 120: case 121: case 122: case 123: case 124: case 125: case 126: case 127: case 128:
+            Scenario_StepShotsCards(_s);
+            break;
+        case 150: case 151: case 152: case 153: case 154: case 155: case 156: case 157: case 158: case 159: case 160:
             Scenario_StepShotsStory(_s);   // C5: death line, summary, echo, wake line, notes, banner, credits
             break;
         default:
@@ -1925,7 +2214,102 @@ function Scenario_StepShotsQte(_s) {
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 _s.si = 0;
-                Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
+                Scenario_Next(_s, 90);   // B3 pictures (turn strip, stagger, BREAK, Foresight), then on to the D91 / DISP-10 / D48 ones
+            }
+            break;
+    }
+}
+
+// B3 pictures at display scale 3 (open them: the strip, the meter, the numbers, BREAK!, Foresight on the strip).
+function Scenario_StepShotsTurns(_s) {
+    switch (_s.step) {
+        case 90:   // a Knight against a Spider: strip across the top, stagger half full, Perfect / Good numbers over the enemy and a hurt number on the player
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(3);
+                Scenario_GotoBattle("shots_turns_strip", ENEMY_SPIDER);
+            }
+            if (_s.t >= 25) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_turns_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.wait_timer = 9999;   // stay on the intro message while the picture is taken
+                _bc.e.hp = 7;
+                _bc.enemy_hp_shown = 7;
+                _bc.e.stagger = 5;
+                _bc.pops = [];
+                Battle_HitPop(_bc, 12, QTE_PERFECT, false);
+                Battle_HitPop(_bc, 5, QTE_GOOD, false);
+                Battle_PlayerHitPop(_bc, 3, false);
+                Scenario_Check("shots_turns_strip_has_5_slots", array_length(Battle_TimelineSlots(_bc)) == TURN_PREVIEW_COUNT);
+                Scenario_Next(_s, 91);
+            }
+            break;
+        case 91:
+            if (_s.t >= 10) {
+                _s.shot = "shot_turns_strip.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 92);
+            }
+            break;
+        case 92:   // the BREAK moment: the pop, the pulsing full meter and the strip faded after the push-back
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.pops = [];
+                var _note = Battle_StaggerHit(_bc, 20, false, true);
+                Scenario_Check("shots_turns_break_triggered", _bc.e.broken && string_pos("BREAK", _note) > 0, _note);
+                Battle_HitPop(_bc, 18, QTE_PERFECT, true);
+                Scenario_Next(_s, 93);
+            }
+            break;
+        case 93:
+            if (_s.t >= 9) {
+                _s.shot = "shot_turns_break.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 94);
+            }
+            break;
+        case 94:   // a Mage with Foresight against a Spider that only uses Poison Fangs: the eye and the action name on the enemy's slot
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_NewKnight(CLASS_MAGE);
+                Debug_Init();
+                global.debug.enabled = true;
+                global.debug.enemy_damage_skill_only = true;
+                Scenario_GotoBattle("shots_turns_foresight", ENEMY_SPIDER);
+                Scenario_Next(_s, 95);
+            }
+            break;
+        case 95:
+            if (_s.t >= 25) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_turns_foresight_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.wait_timer = 9999;
+                _bc.p = Status_Add(_bc.p, STATUS_HIT_UP, 3, 0);
+                var _slots = Battle_TimelineSlots(_bc);
+                var _fs = Scenario_BotForesightSlot(_bc);
+                Scenario_Check("shots_turns_foresight_on_the_enemy_slot", is_struct(_fs) && _fs.slot.who == TL_ENEMY && _fs.slot.foresight.skill_id == SKILL_POISON_FANGS, is_struct(_fs) ? string(_fs.idx) : "none");
+                global.debug.enabled = false;
+                global.debug.enemy_damage_skill_only = false;
+                Scenario_Next(_s, 96);
+            }
+            break;
+        case 96:
+            if (_s.t >= 8) {
+                _s.shot = "shot_turns_foresight.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 97);
+            }
+            break;
+        case 97:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _s.si = 0;
+                Scenario_Next(_s, 120);   // C2: the card screens (120-128), then the D91 / DISP-10 / D48 pictures (step 50), then the skill animations
             }
             break;
     }
@@ -2776,6 +3160,14 @@ function Export_Build() {
         var seq = Qte_SkillSequence(data.skills[si].id);
         data.skills[si].sequence_length = is_array(seq) ? array_length(seq) : 0;
     }
+    // C2: the cards (D82), with the numbers the game reads and the text it shows, for the simulator's build rules
+    data.cards = [];
+    var card_all = CardDB_All();
+    for (var cdi = 0; cdi < array_length(card_all); cdi++) {
+        var cd = card_all[cdi];
+        array_push(data.cards, Export_Clean({ id: cd.id, kind: cd.kind, skill_id: cd.skill_id, classes: cd.classes, params: cd.params, up: cd.up, name: Card_Name(cd), sentence: Card_Sentence(cd) }));
+    }
+    data.constants.cards = { pity_offers: CARD_PITY_OFFERS, max_skills: CARD_MAX_SKILLS, offer_size: CARD_OFFER_SIZE, skip_gold: CARD_SKIP_GOLD };
     data.items = Export_MapRecords(global.item_db, ItemDB_Get);
     data.statuses = Export_MapRecords(global.status_db, StatusDB_Get);
     data.loot = { tables: {}, configs: {}, tier_weights: Export_Clean(global.loot_tier_weights) };
@@ -2821,7 +3213,8 @@ function Scenario_StepExportData(_s) {
         Scenario_Check("exportdata_classes_4_unique", array_length(parsed.classes) == 4 && Export_IdsUnique(parsed.classes));
         Scenario_Check("exportdata_enemies_10_unique", array_length(parsed.enemies) == 10 && Export_IdsUnique(parsed.enemies));
         Scenario_Check("exportdata_skills_27_unique", array_length(parsed.skills) == 27 && Export_IdsUnique(parsed.skills));
-        Scenario_Check("exportdata_items_37_unique", array_length(parsed.items) == 37 && Export_IdsUnique(parsed.items));
+        Scenario_Check("exportdata_items_23_unique", array_length(parsed.items) == 23 && Export_IdsUnique(parsed.items));
+        Scenario_Check("exportdata_cards_51", array_length(parsed.cards) == 51);
         Scenario_Check("exportdata_statuses_14_unique", array_length(parsed.statuses) == 14 && Export_IdsUnique(parsed.statuses));
         Scenario_Check("exportdata_level_table_10_rows", array_length(parsed.levels) == LEVEL_CAP_TECHNICAL && parsed.levels[0].exp_next == 12);
         Scenario_Check("exportdata_class_table_matches_the_game", parsed.classes[0].by_level[LEVEL_CAP_TECHNICAL - 1].hp > 0);
@@ -2975,7 +3368,7 @@ function Scenario_StepShotsWorld(_s) {
         case 65:
             if (_s.t >= 4) {
                 Scenario_Check("shots_world_saved_" + _w.shot, file_exists(_w.shot));
-                if (_w.pass >= 1) { Scenario_Next(_s, 90); break; }   // C5: the story pictures
+                if (_w.pass >= 1) { Scenario_Next(_s, 150); break; }   // C5: the story pictures
                 Scenario_Next(_s, 66);
             }
             break;
@@ -3251,7 +3644,7 @@ function Scenario_StepSmokeRun(_s) {
             }
             if (variable_struct_exists(_rl, "sum_t") && _s.t > _rl.sum_t + 60 && Scenario_FloorReady(rm_floor1)) {
                 Scenario_Check("abandon_next_run_starts_at_level_1", _gs.player_ch.level == 1 && Run_IsActive() && Profile_Get().runs_started == 3, "runs_started=" + string(Profile_Get().runs_started));
-                Scenario_Next(_s, 111);
+                Scenario_Next(_s, 133);   // C2: the card screens in this run (step 111, the win, follows them)
             }
             if (_s.t > 600) { Scenario_Check("abandon_next_run_reaches_rm_floor1", false, "room=" + room_get_name(room) + " phase=" + string(global.run_flow.phase)); Scenario_Finish(); }
             break;
@@ -3280,6 +3673,7 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Check("win_ending_cutscene_played_once", _rl.held && Story_Seen(Story_CutsceneKey("ending")));
                 Scenario_Check("win_counts_one_win", _pf4.wins == 1 && _pf4.deaths == 2, "wins=" + string(_pf4.wins) + " deaths=" + string(_pf4.deaths));
                 Scenario_Check("win_first_win_unlocks_the_nobody_class", Profile_IsUnlocked(_pf4, "nobody_class"));
+                Scenario_Check("win_nobody_is_open_on_the_class_screen_after", !CardsUi_ClassMenu().items[3].locked && !Card_ClassChoices()[3].locked);
                 Scenario_Check("win_history_says_won", _pf4.history[array_length(_pf4.history) - 1].result == "won");
                 Scenario_Check("win_ends_the_run_and_deletes_its_save", !Run_IsActive() && !RunSave_HasSave());
                 _rl.saw_cutscene = false;
@@ -3592,7 +3986,7 @@ function Scenario_StepShotsStory(_s) {
     var _flow = (variable_global_exists("run_flow") && is_struct(global.run_flow)) ? global.run_flow : undefined;
     var _scn = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
     switch (_s.step) {
-        case 90:   // a run on a clean profile, then a death by a slime
+        case 150:   // a run on a clean profile, then a death by a slime
             if (_s.t == 1) {
                 if (!Scenario_CanSaveSlot()) {
                     show_debug_message("[TEST] SKIP story shots (LOCALAPPDATA is not the gate scratch folder)");
@@ -3615,19 +4009,19 @@ function Scenario_StepShotsStory(_s) {
                 GameState_SetPlayer(_chd);
                 _gs.run.kills = 3;
                 Player_OnDeath(_gs.player_ch);
-                Scenario_Next(_s, 91);
+                Scenario_Next(_s, 151);
             }
             if (_s.t > 600) { Scenario_Check("shots_story_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
-        case 91:   // the death line, faded in
+        case 151:   // the death line, faded in
             if (is_struct(_flow) && _scn != noone && _scn.state == "run_flow" && _flow.phase == "death" && _flow.t >= 70) {
                 Scenario_Check("shots_story_death_line_text", _flow.ctx.text == "A slime. You were beaten by a slime.", "text=" + _flow.ctx.text);
                 Scenario_ShotStory(_s, "death_line", "fade=1");   // a line of text on a dark screen: the "mostly one colour" check does not apply
-                Scenario_Next(_s, 92);
+                Scenario_Next(_s, 152);
             }
             if (_s.t > 900) { Scenario_Check("shots_story_reaches_the_death_line", false, "state=" + (_scn != noone ? string(_scn.state) : "none")); Scenario_Finish(); }
             break;
-        case 92:   // jump to the summary (the skip itself is a smoke check)
+        case 152:   // jump to the summary (the skip itself is a smoke check)
             if (_s.t == 4) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 _flow.phase = "summary";
@@ -3635,33 +4029,33 @@ function Scenario_StepShotsStory(_s) {
             }
             if (_s.t == 30) {
                 Scenario_ShotStory(_s, "summary");
-                Scenario_Next(_s, 93);
+                Scenario_Next(_s, 153);
             }
             break;
-        case 93:   // confirm -> the echo pick
+        case 153:   // confirm -> the echo pick
             if (_s.t == 4) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
             if (_s.t == 10) Scenario_Tap("confirm");
             if (_s.t == 50) {
                 Scenario_Check("shots_story_echo_pick_is_up", _flow.phase == "echo" && is_struct(_flow.menu), "phase=" + string(_flow.phase));
                 Scenario_ShotStory(_s, "echo");
-                Scenario_Next(_s, 94);
+                Scenario_Next(_s, 154);
             }
             break;
-        case 94:   // take the first option -> run 2 at the tunnel entrance with the wake line
+        case 154:   // take the first option -> run 2 at the tunnel entrance with the wake line
             if (_s.t == 4) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Tap("confirm"); }
             if (_s.t > 20 && Scenario_FloorReady(rm_floor1) && _gs.ui.mode == UI_DIALOGUE) {
-                Scenario_Next(_s, 95);
+                Scenario_Next(_s, 155);
             }
             if (_s.t > 900) { Scenario_Check("shots_story_wake_line_comes_up", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
             break;
-        case 95:   // the wake line, typed out
+        case 155:   // the wake line, typed out
             if (_s.t == 90) {
                 Scenario_Check("shots_story_wake_line_text", array_length(_gs.ui.lines_raw) == 1 && _gs.ui.lines_raw[0] == Loc_T("wake.t1", "x"), "lines=" + json_stringify(_gs.ui.lines_raw));
                 Scenario_ShotStory(_s, "wake");
-                Scenario_Next(_s, 96);
+                Scenario_Next(_s, 156);
             }
             break;
-        case 96:   // a note in the world, then read
+        case 156:   // a note in the world, then read
             if (_s.t == 4) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Dialogue_CloseNow();
@@ -3677,18 +4071,18 @@ function Scenario_StepShotsStory(_s) {
             if (_s.t == 50) {
                 Scenario_Check("shots_story_note_is_the_prompt_target", instance_exists(instance_find(obj_player, 0).prompt_target) && variable_instance_exists(instance_find(obj_player, 0).prompt_target, "note_id"));
                 Scenario_ShotStory(_s, "note_world");
-                Scenario_Next(_s, 97);
+                Scenario_Next(_s, 157);
             }
             break;
-        case 97:
+        case 157:
             if (_s.t == 4) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Tap("interact"); }
             if (_s.t == 140) {
                 Scenario_Check("shots_story_note_is_open", _gs.ui.mode == UI_DIALOGUE && _gs.ui.speaker == Note_Find("map_page").title, "speaker=" + string(_gs.ui.speaker));
                 Scenario_ShotStory(_s, "note_read");
-                Scenario_Next(_s, 98);
+                Scenario_Next(_s, 158);
             }
             break;
-        case 98:   // rm_floor5: the boss trigger was played on an earlier run -> the banner (leave and come back through rm_floor4)
+        case 158:   // rm_floor5: the boss trigger was played on an earlier run -> the banner (leave and come back through rm_floor4)
             if (room == rm_floor5 || room == rm_floor4) with (obj_enemy) instance_destroy();   // the room's hunters would start a battle
             if (_s.t == 4) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
@@ -3724,11 +4118,11 @@ function Scenario_StepShotsStory(_s) {
                 Scenario_Check("shots_story_banner_names_the_boss", global.banner.text == EnemyDB_Get(ENEMY_MINI_BOSS).name, "text=" + global.banner.text);
                 Scenario_ShotStory(_s, "banner");
                 _s.held = false;
-                Scenario_Next(_s, 99);
+                Scenario_Next(_s, 159);
             }
             if (_s.t > 900) { Scenario_Check("shots_story_banner_comes_up", false, "bn=" + string(variable_struct_exists(_s, "bn") ? _s.bn : -1)); Scenario_Finish(); }
             break;
-        case 99:   // the ending, its closing text skipped, the credits roll
+        case 159:   // the ending, its closing text skipped, the credits roll
             if (_s.t == 4) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Scenario_ClearUi();
@@ -3745,14 +4139,323 @@ function Scenario_StepShotsStory(_s) {
             }
             if (variable_struct_exists(_s, "cr0") && _scn.state == "credits") {
                 if (_scn.credits_t == 260) Scenario_ShotStory(_s, "credits_title", "fade=1");
-                if (_scn.credits_t == 760) { Scenario_ShotStory(_s, "credits_roll", "fade=1"); Scenario_Next(_s, 100); }
+                if (_scn.credits_t == 760) { Scenario_ShotStory(_s, "credits_roll", "fade=1"); Scenario_Next(_s, 160); }
             }
             if (_s.t > 3000) { Scenario_Check("shots_story_credits_roll", false, "state=" + (_scn != noone ? string(_scn.state) : "none")); Scenario_Finish(); }
             break;
-        case 100:
+        case 160:
             if (_s.t == 4) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Scenario_Finish();
+            }
+            break;
+    }
+}
+
+// ============================================================================
+// C2: the card screens through the real flows (smoke steps 133-141, between the third run's start and the first win):
+// a class chest opened by the interact key -> the class screen (Nobody locked, wrap-around, "are you sure") -> Mage; a skill chest -> a 1-of-3
+// pick -> a skill taken; a level-up -> the stat point prompt -> the card pick -> Skip pays gold; a 4th skill -> replace prompt, Keep returns to
+// the same cards, then replace Ice Spear (its upgrade goes with it). Every key goes through Scenario_Tap, the game's own input path.
+// ============================================================================
+function Scenario_CardsTapQueue(_s, _cd) {
+    var _settled = !CardsUi_IsOpen() || (Input_Frame() - global.cards_ui.opened_frame) >= CARDS_UI_INPUT_DELAY_FRAMES + 4;   // a key inside the screen's input delay is ignored by design
+    if (array_length(_cd.q) > 0 && (_s.f - _s.last_tap) >= 14 && _settled) {
+        Scenario_Tap(_cd.q[0]);
+        array_delete(_cd.q, 0, 1);
+    }
+}
+
+function Scenario_CardsTalk(_s) {
+    var _gs = GameState_Get();
+    var _talk = (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0);
+    if (_talk && (_s.f - _s.last_tap) >= 12) Scenario_Tap("confirm");
+    return _talk;
+}
+
+function Scenario_CardsChest(_cd, _obj, _pid) {
+    with (obj_enemy) instance_destroy();
+    if (instance_exists(_cd.chest)) with (_cd.chest) instance_destroy();
+    _cd.chest = Scenario_Block(_obj, 5, 7);
+    _cd.chest.persist_id = _pid;
+    var _pl = Scenario_PlacePlayer(4, 7);
+    _pl.face = RIGHT;
+}
+
+function Scenario_StepSmokeCards(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "cd")) _s.cd = { q: [], chest: noone, gold0: 0, spd0: 0, take: -1 };
+    var _cd = _s.cd;
+    var _ch = _gs.player_ch;
+    Scenario_CardsTapQueue(_s, _cd);
+    switch (_s.step) {
+        case 133:   // the first class chest of the run: it owes the class choice (D73)
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Scenario_Check("cards_new_run_has_not_chosen_a_class", !_ch.class_chosen && _ch.class_id == CLASS_NOBODY && Cards_NextOwed(_ch) == "");
+                Scenario_CardsChest(_cd, obj_chest_class_select, "c2_chest_class");
+            }
+            if (_s.t == 20) Scenario_Tap("interact");
+            Scenario_CardsTalk(_s);
+            if (_s.t > 30 && CardsUi_Kind() == "class") {
+                var _m = Ui_StackTop(global.cards_ui.stk);
+                Scenario_Check("cards_class_chest_opened", _cd.chest.swapped);
+                Scenario_Check("cards_first_chest_gives_the_class_screen", _gs.ui.mode == UI_CARDS && _m.id == "cards_class");
+                Scenario_Check("cards_class_screen_lists_four_classes", array_length(_m.items) == 4 && _m.items[0].class_id == CLASS_KNIGHT && _m.items[3].class_id == CLASS_NOBODY);
+                Scenario_Check("cards_nobody_is_locked_before_a_win", _m.items[3].locked && !Profile_IsUnlocked(Profile_Get(), "nobody_class") && string_length(_m.items[3].help) > 5);
+                Scenario_Check("cards_class_cursor_starts_on_the_first_row", _m.cursor == 0);
+                _cd.q = ["menu_up", "confirm", "menu_up", "confirm", "menu_up", "confirm"];   // wrap to Nobody (locked: nothing), up to Mage, confirm, up to Yes, confirm
+                Scenario_Next(_s, 134);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_class_chest_opens_the_class_screen", false, "kind=" + CardsUi_Kind() + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+            break;
+        case 134:   // locked Nobody does nothing; Mage asks "are you sure"; Yes applies it
+            if (array_length(_cd.q) == 5 && !variable_struct_exists(_cd, "c1") && (_s.f - _s.last_tap) >= 6) {
+                _cd.c1 = true;
+                var _m1 = Ui_StackTop(global.cards_ui.stk);
+                Scenario_Check("cards_class_up_from_the_top_wraps_to_nobody", _m1.cursor == 3, "cursor=" + string(_m1.cursor));
+            }
+            if (array_length(_cd.q) == 4 && !variable_struct_exists(_cd, "c2") && (_s.f - _s.last_tap) >= 6) {
+                _cd.c2 = true;
+                Scenario_Check("cards_confirm_on_locked_nobody_does_nothing", Ui_StackDepth(global.cards_ui.stk) == 1 && _ch.class_pick && _ch.class_id == CLASS_NOBODY);
+            }
+            if (array_length(_cd.q) == 2 && !variable_struct_exists(_cd, "c3") && (_s.f - _s.last_tap) >= 6) {
+                _cd.c3 = true;
+                var _m3 = Ui_StackTop(global.cards_ui.stk);
+                Scenario_Check("cards_class_asks_are_you_sure", Ui_StackDepth(global.cards_ui.stk) == 2 && _m3.id == "cards_class_sure", "depth=" + string(Ui_StackDepth(global.cards_ui.stk)));
+                Scenario_Check("cards_are_you_sure_starts_on_no", _m3.cursor == 1, "cursor=" + string(_m3.cursor));
+            }
+            if (array_length(_cd.q) == 0 && _s.t > 150) Scenario_Next(_s, 135);
+            if (_s.t > 900) { Scenario_Check("cards_class_screen_answers", false, "kind=" + CardsUi_Kind()); Scenario_Finish(); }
+            break;
+        case 135:   // the class is applied behind the flash; its chest line is read; then the skill chest
+            var _talk = Scenario_CardsTalk(_s);
+            if (_ch.class_id == CLASS_MAGE && !_talk && !Transition_IsActive() && !CardsUi_IsOpen() && _s.t > 30) {
+                Scenario_Check("cards_class_choice_makes_a_mage", _ch.class_id == CLASS_MAGE && _gs.selected_class == CLASS_MAGE && _ch.class_chosen && !_ch.class_pick);
+                Scenario_Check("cards_mage_has_the_starter_weapon", Equip_SlotGet(_ch, "weapon") != 0);
+                Scenario_Check("cards_nothing_is_owed_after_the_class", Cards_NextOwed(_ch) == "" && _ch.card_picks == 0);
+                Scenario_CardsChest(_cd, obj_chest_skillbook, "c2_chest_skill");
+                Scenario_Next(_s, 136);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_class_gets_applied", false, "class=" + string(_ch.class_id)); Scenario_Finish(); }
+            break;
+        case 136:   // the second chest: a 1-of-3 pick (I-057: no more "nothing is there")
+            if (_s.t == 20) Scenario_Tap("interact");
+            Scenario_CardsTalk(_s);
+            if (_s.t > 30 && CardsUi_Kind() == "cards") {
+                var _pk = global.cards_ui.pick;
+                Scenario_Check("cards_second_chest_gives_three_cards", array_length(_pk.ids) == 3 && _cd.chest.swapped);
+                Scenario_Check("cards_the_offer_is_kept_on_the_character", array_length(_ch.offer) == 3 && _ch.offer[0] == _pk.ids[0]);
+                var _k = -1;
+                for (var _i = 0; _i < 3; _i++) { if (CardDB_Get(_pk.ids[_i]).kind == "skill" && _k < 0) _k = _i; }
+                Scenario_Check("cards_a_new_mage_is_offered_a_skill", _k >= 0);
+                _cd.take = (_k >= 0) ? CardDB_Get(_pk.ids[_k]).skill_id : -1;
+                _cd.q = [];
+                repeat (max(0, _k)) array_push(_cd.q, "menu_right");
+                array_push(_cd.q, "confirm");
+                Scenario_Next(_s, 137);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_skill_chest_opens_the_pick", false, "kind=" + CardsUi_Kind()); Scenario_Finish(); }
+            break;
+        case 137:   // the skill is learned, the pick answered
+            if (array_length(_cd.q) == 0 && _s.t > 120 && !CardsUi_IsOpen()) {
+                Scenario_Check("cards_taking_a_skill_learns_it", array_length(_ch.skills) == 1 && _ch.skills[0] == _cd.take, "skills=" + json_stringify(_ch.skills));
+                Scenario_Check("cards_the_pick_is_answered", _ch.card_picks == 0 && array_length(_ch.offer) == 0 && Cards_NextOwed(_ch) == "");
+                Scenario_Check("cards_the_run_pity_state_moved_on", _gs.run.cards.offers == 1);
+                // level-up through the game's own path: 12 EXP is level 2
+                _cd.spd0 = _ch.stats.spd;
+                _cd.gold0 = _gs.run.gold;
+                _gs.player_ch = Player_AddExp(_gs.player_ch, 12);
+                GameState_SetPlayer(_gs.player_ch);
+                Scenario_Next(_s, 138);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_pick_closes", false, "q=" + string(array_length(_cd.q)) + " open=" + string(CardsUi_IsOpen())); Scenario_Finish(); }
+            break;
+        case 138:   // level-up: first the free stat point
+            if (_s.t > 5 && CardsUi_Kind() == "stat") {
+                var _ms = Ui_StackTop(global.cards_ui.stk);
+                Scenario_Check("cards_level_up_owes_a_stat_point_and_a_pick", _ch.level == 2 && _ch.stat_points == 1 && _ch.card_picks == 1);
+                Scenario_Check("cards_level_up_opens_the_stat_prompt_first", _ms.id == "cards_stat" && array_length(_ms.items) == 4);
+                Scenario_Check("cards_stat_prompt_starts_on_the_class_stat", _ms.cursor == STAT_MAG, "cursor=" + string(_ms.cursor));
+                _cd.q = ["menu_up", "confirm"];   // MAG -> SPD, place the point
+                Scenario_Next(_s, 139);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_level_up_opens_the_stat_prompt", false, "kind=" + CardsUi_Kind()); Scenario_Finish(); }
+            break;
+        case 139:   // the point is placed; the card pick comes next; Skip pays gold
+            if (_s.t > 30 && array_length(_cd.q) == 0 && CardsUi_Kind() == "cards" && !variable_struct_exists(_cd, "p1")) {
+                _cd.p1 = true;
+                Scenario_Check("cards_stat_point_goes_to_spd", _ch.stats.spd == _cd.spd0 + 1 + LevelUp_ClassGrowthGain(CLASS_MAGE, 2).spd && _ch.stat_points == 0, "spd=" + string(_ch.stats.spd) + " was " + string(_cd.spd0));
+                Scenario_Check("cards_the_pick_follows_the_stat_point", _ch.card_picks == 1 && array_length(global.cards_ui.pick.ids) == 3);
+                _cd.q = ["menu_down", "confirm"];   // Skip
+            }
+            if (variable_struct_exists(_cd, "p1") && array_length(_cd.q) == 0 && _s.t > 150 && !CardsUi_IsOpen()) {
+                Scenario_Check("cards_skip_pays_5_gold", _gs.run.gold == _cd.gold0 + 5, "gold=" + string(_gs.run.gold));
+                Scenario_Check("cards_skip_answers_the_pick", _ch.card_picks == 0 && array_length(_ch.offer) == 0 && Cards_NextOwed(_ch) == "");
+                // the 4th skill: three held (Ice Spear upgraded), a pick offering Meditation
+                _ch.skills = [SKILL_FIREBALL, SKILL_ICE_SPEAR, SKILL_FORESIGHT];
+                _ch.upgrades = [SKILL_ICE_SPEAR];
+                _ch.card_picks = 1;
+                _ch.offer = [Card_SkillId(SKILL_MEDITATION), "pas:quick_feet", "fb:gold"];
+                Scenario_Next(_s, 140);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_stat_and_pick_flow", false, "kind=" + CardsUi_Kind() + " q=" + string(array_length(_cd.q))); Scenario_Finish(); }
+            break;
+        case 140:   // take the 4th skill -> which one goes? Keep returns to the same cards
+            if (_s.t > 20 && CardsUi_Kind() == "cards" && !variable_struct_exists(_cd, "r1")) {
+                _cd.r1 = true;
+                Scenario_Check("cards_the_given_offer_is_shown_as_it_was", global.cards_ui.pick.ids[0] == Card_SkillId(SKILL_MEDITATION) && array_length(global.cards_ui.pick.ids) == 3);
+                _cd.q = ["confirm"];
+            }
+            if (variable_struct_exists(_cd, "r1") && array_length(_cd.q) == 0 && _s.t > 60 && CardsUi_Kind() == "replace" && !variable_struct_exists(_cd, "r2")) {
+                _cd.r2 = true;
+                var _mr = Ui_StackTop(global.cards_ui.stk);
+                Scenario_Check("cards_4th_skill_asks_which_to_replace", _mr.id == "cards_replace" && array_length(_mr.items) == 4 && _ch.skill_pending == SKILL_MEDITATION);
+                Scenario_Check("cards_the_pick_is_not_spent_before_the_answer", _ch.card_picks == 1 && array_length(_ch.skills) == 3);
+                _cd.q = ["menu_up", "confirm"];   // wrap to "Keep my skills"
+            }
+            if (variable_struct_exists(_cd, "r2") && array_length(_cd.q) == 0 && _s.t > 120 && CardsUi_Kind() == "cards" && !variable_struct_exists(_cd, "r3")) {
+                _cd.r3 = true;
+                Scenario_Check("cards_keep_returns_to_the_same_cards", global.cards_ui.pick.ids[0] == Card_SkillId(SKILL_MEDITATION) && _ch.skill_pending == -1 && _ch.card_picks == 1 && array_length(_ch.skills) == 3);
+                _cd.q = ["confirm"];   // take Meditation again
+                Scenario_Next(_s, 141);
+            }
+            if (_s.t > 900) { Scenario_Check("cards_replace_prompt_flow", false, "kind=" + CardsUi_Kind() + " r1=" + string(variable_struct_exists(_cd, "r1")) + " r2=" + string(variable_struct_exists(_cd, "r2"))); Scenario_Finish(); }
+            break;
+        case 141:   // replace Ice Spear (second row); its upgrade goes with it
+            if (_s.t > 60 && array_length(_cd.q) == 0 && CardsUi_Kind() == "replace" && !variable_struct_exists(_cd, "r4")) {
+                _cd.r4 = true;
+                _cd.q = ["menu_down", "confirm"];
+            }
+            if (variable_struct_exists(_cd, "r4") && array_length(_cd.q) == 0 && _s.t > 120 && !CardsUi_IsOpen()) {
+                Scenario_Check("cards_replace_swaps_ice_spear_for_meditation", array_length(_ch.skills) == 3 && _ch.skills[0] == SKILL_FIREBALL && _ch.skills[1] == SKILL_MEDITATION && _ch.skills[2] == SKILL_FORESIGHT, "skills=" + json_stringify(_ch.skills));
+                Scenario_Check("cards_replaced_skills_upgrade_is_gone", array_length(_ch.upgrades) == 0);
+                Scenario_Check("cards_replace_answers_the_pick", _ch.card_picks == 0 && _ch.skill_pending == -1 && array_length(_ch.offer) == 0 && Cards_NextOwed(_ch) == "");
+                Scenario_Check("cards_nobody_still_locked_before_the_first_win", Card_ClassChoices()[3].locked);
+                Scenario_Next(_s, 111);   // on to the first win: the Nobody class unlocks
+            }
+            if (_s.t > 900) { Scenario_Check("cards_replace_ends", false, "kind=" + CardsUi_Kind()); Scenario_Finish(); }
+            break;
+    }
+}
+
+// C2: one picture of each card screen (class choice, "are you sure", 1-of-3 pick at 3 sizes of text and in Korean, stat point, replace a skill).
+// Each screen is opened directly (CardsUi_Open) on a mage in rm_floor1; the flows themselves are checked in the smoke run.
+function Scenario_StepShotsCards(_s) {
+    var _gs = GameState_Get();
+    switch (_s.step) {
+        case 120:   // the class screen
+            if (_s.t == 1) { Scenario_NewKnight(CLASS_MAGE); Scenario_SetWindowScale(3); room_goto(rm_floor1); }
+            if (_s.t == 90) { Scenario_ClearUi(); CardsUi_Open("class"); }
+            if (_s.t == 135) {
+                Scenario_Check("shots_cards_class_open", CardsUi_Kind() == "class" && _gs.ui.mode == UI_CARDS, "kind=" + CardsUi_Kind());
+                Scenario_ShotUi(_s, "cards_class");
+                Scenario_Next(_s, 121);
+            }
+            break;
+        case 121:   // "Become a Mage?"
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                var _top = Ui_StackTop(global.cards_ui.stk);
+                CardsUi_ClassConfirm(_top, 2);
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_cards_class_sure_open", Ui_StackDepth(global.cards_ui.stk) == 2);
+                Scenario_ShotUi(_s, "cards_class_sure");
+                Scenario_Next(_s, 122);
+            }
+            break;
+        case 122:   // the card pick: a skill, an upgrade, a passive; two picks left
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                CardsUi_Close();
+                var _ch = _gs.player_ch;
+                _ch.skills = [SKILL_FIREBALL];
+                _ch.card_picks = 2;
+                _ch.offer = [Card_SkillId(SKILL_ICE_SPEAR), Card_UpgradeId(SKILL_FIREBALL), "pas:field_medic"];
+                CardsUi_Open("cards");
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_cards_pick_open", CardsUi_Kind() == "cards" && array_length(global.cards_ui.pick.ids) == 3);
+                Scenario_ShotUi(_s, "cards_pick");
+                Scenario_Next(_s, 123);
+            }
+            break;
+        case 123:   // the cursor on the middle card
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.cards_ui.pick.cursor = 1;
+                global.cards_ui.pick.last = 1;
+            }
+            if (_s.t == 12) {
+                Scenario_ShotUi(_s, "cards_pick_mid");
+                Scenario_Next(_s, 124);
+            }
+            break;
+        case 124:   // Skip selected, at scale 5
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.cards_ui.pick.cursor = 3;
+                Scenario_SetWindowScale(5);
+            }
+            if (_s.t == 50) {
+                Scenario_ShotUi(_s, "cards_pick_skip");
+                Scenario_Next(_s, 125);
+            }
+            break;
+        case 125:   // the same pick in Korean at scale 3
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.cards_ui.pick.cursor = 0;
+                Scenario_SetWindowScale(3);
+                Loc_SetLanguage("ko");
+            }
+            if (_s.t == 50) {
+                Scenario_ShotUi(_s, "cards_pick_ko");
+                Scenario_Next(_s, 126);
+            }
+            break;
+        case 126:   // the free stat point
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Loc_SetLanguage("en");
+                CardsUi_Close();
+                _gs.player_ch.stat_points = 1;
+                CardsUi_Open("stat");
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_cards_stat_open", CardsUi_Kind() == "stat");
+                Scenario_ShotUi(_s, "cards_stat");
+                Scenario_Next(_s, 127);
+            }
+            break;
+        case 127:   // replace a skill
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                CardsUi_Close();
+                var _ch2 = _gs.player_ch;
+                _ch2.stat_points = 0;
+                _ch2.skills = [SKILL_FIREBALL, SKILL_ICE_SPEAR, SKILL_FORESIGHT];
+                _ch2.upgrades = [SKILL_ICE_SPEAR];
+                _ch2.skill_pending = SKILL_MEDITATION;
+                CardsUi_Open("replace");
+            }
+            if (_s.t == 50) {
+                Scenario_Check("shots_cards_replace_open", CardsUi_Kind() == "replace");
+                Scenario_ShotUi(_s, "cards_replace");
+                Scenario_Next(_s, 128);
+            }
+            break;
+        case 128:
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                // nothing may stay owed: a run left active by an earlier shot would open the screen again
+                _gs.player_ch.skill_pending = -1;
+                _gs.player_ch.card_picks = 0;
+                _gs.player_ch.stat_points = 0;
+                _gs.player_ch.offer = [];
+                CardsUi_Close();
+                Scenario_Next(_s, 50);   // on to the D91 / DISP-10 / D48 pictures, then the skill animations
             }
             break;
     }

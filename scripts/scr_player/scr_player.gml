@@ -26,6 +26,7 @@ function CharacterCreate_Player(_class_id) {
     ch.stat_points = 0;
     ch.status = [];
     ch.inventory = Inv_Add(ch.inventory, 10, 2);
+    ch = Card_EnsureFields(ch);   // C2: upgrades, passives, owed picks
     ch = Player_NormalizeProgression(ch, true);
 
     return ch;
@@ -1069,16 +1070,7 @@ function UI_InterruptCloseAll(_fade_dim = true) {
         gs.ui.bed_menu = bm;
     }
 
-    if (variable_struct_exists(gs.ui, "class_select") && is_struct(gs.ui.class_select)) {
-        var cs = gs.ui.class_select;
-        cs.open = false;
-        cs.closing = false;
-        cs.close_frame = UI_OPENED_FRAME_NONE;
-        cs.pending_apply_class = -1;
-        cs.open_block_frame = UI_OPENED_FRAME_NONE;
-        cs.opened_frame = UI_OPENED_FRAME_NONE;
-        gs.ui.class_select = cs;
-    }
+    CardsUi_Interrupt();   // C2: what is owed opens again afterwards
 
     if (variable_struct_exists(gs.ui, "settings_popup") && is_struct(gs.ui.settings_popup)) {
         var sp = gs.ui.settings_popup;

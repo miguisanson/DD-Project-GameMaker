@@ -76,13 +76,8 @@ function Loot_Init() {
     ds_map_add(global.loot_configs, "enemy_mid",    { table:"enemy",  chance:[0.3, 0.45, 0.6], max_items:1 });
     ds_map_add(global.loot_configs, "enemy_elite",  { table:"enemy",  chance:[0.55, 0.75, 0.95], max_items:1 });
     ds_map_add(global.loot_configs, "enemy_boss",   { table:"enemy",  chance:[1, 1, 1], max_items:2 });
-    ds_map_add(global.loot_configs, "skillbook",  { table:"skillbook", chance:[1, 1, 1], max_items:1, mode:"skillbook" });
-
-    Loot_BuildSkillbookLists();
 
     if (variable_global_exists("state") && is_struct(global.state)) {
-        global.state.skillbook_by_class = global.skillbook_by_class;
-
         global.state.loot_tables = global.loot_tables;
         global.state.loot_configs = global.loot_configs;
         global.state.loot_tier_weights = global.loot_tier_weights;
@@ -179,21 +174,6 @@ function Loot_ItemEligibleForPlayer(_item_id, _player = undefined, _class_id = -
 
     if (Loot_ArrayHasItemId(_exclude_ids, _item_id)) return false;
 
-    if (Item_IsSkillbook(item)) {
-        if (Loot_PlayerOwnsItem(p, _item_id)) return false;
-
-        var sid = variable_struct_exists(item, "use") && is_struct(item.use) && variable_struct_exists(item.use, "skill_id") ? item.use.skill_id : -1;
-        var skill = SkillDB_Get(sid);
-        if (class_id != CLASS_NOBODY && !Skill_ClassAllowed(skill, class_id)) return false;
-
-        if (is_struct(p) && variable_struct_exists(p, "skills") && is_array(p.skills)) {
-            for (var si = 0; si < array_length(p.skills); si++) {
-                if (p.skills[si] == sid) return false;
-            }
-        }
-        return true;
-    }
-
     var is_equip = (variable_struct_exists(item, "type") && (item.type == ITEM_WEAPON || item.type == ITEM_ARMOR));
     if (is_equip) {
         if (!Loot_ItemClassAllowed(item, class_id)) return false;
@@ -201,83 +181,6 @@ function Loot_ItemEligibleForPlayer(_item_id, _player = undefined, _class_id = -
     }
 
     return true;
-}
-
-function Loot_BuildSkillbookLists() {
-    if (!variable_global_exists("item_db") || !ds_exists(global.item_db, ds_type_map)) ItemDB_Init();
-    if (!variable_global_exists("skill_db") || !ds_exists(global.skill_db, ds_type_map)) SkillDB_Init();
-
-    if (variable_global_exists("skillbook_by_class") && ds_exists(global.skillbook_by_class, ds_type_map)) {
-        ds_map_destroy(global.skillbook_by_class);
-    }
-    global.skillbook_by_class = ds_map_create();
-
-    var classes = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE];
-    for (var c = 0; c < array_length(classes); c++) {
-        global.skillbook_by_class[? classes[c]] = [];
-    }
-
-    var key = ds_map_find_first(global.item_db);
-    while (key != undefined) {
-        var item = global.item_db[? key];
-        if (is_struct(item) && variable_struct_exists(item, "use") && variable_struct_exists(item.use, "effect") && item.use.effect == "learn_skill") {
-            var skill = SkillDB_Get(item.use.skill_id);
-            if (!is_struct(skill) || !variable_struct_exists(skill, "class_list")) {
-                for (var c2 = 0; c2 < array_length(classes); c2++) {
-                    var arr = global.skillbook_by_class[? classes[c2]];
-                    array_push(arr, item.id);
-                    global.skillbook_by_class[? classes[c2]] = arr;
-                }
-            } else {
-                var cl = skill.class_list;
-                if (!is_array(cl) || array_length(cl) == 0) {
-                    for (var c3 = 0; c3 < array_length(classes); c3++) {
-                        var arr2 = global.skillbook_by_class[? classes[c3]];
-                        array_push(arr2, item.id);
-                        global.skillbook_by_class[? classes[c3]] = arr2;
-                    }
-                } else {
-                    for (var j = 0; j < array_length(cl); j++) {
-                        var cls = cl[j];
-                        if (ds_map_exists(global.skillbook_by_class, cls)) {
-                            var arr3 = global.skillbook_by_class[? cls];
-                            array_push(arr3, item.id);
-                            global.skillbook_by_class[? cls] = arr3;
-                        }
-                    }
-                }
-            }
-        }
-        key = ds_map_find_next(global.item_db, key);
-    }
-}
-
-function Loot_SkillbookList(_class_id) {
-    if (!variable_global_exists("skillbook_by_class") || !ds_exists(global.skillbook_by_class, ds_type_map)) Loot_BuildSkillbookLists();
-    if (ds_map_exists(global.skillbook_by_class, _class_id)) return global.skillbook_by_class[? _class_id];
-    return [];
-}
-
-function Loot_RollSkillbook(_class_id, _player = undefined, _exclude_ids = undefined) {
-    var list = Loot_SkillbookList(_class_id);
-    if (!is_array(list) || array_length(list) <= 0) return undefined;
-
-    var player = Loot_PlayerStruct(_player);
-    var class_id = round(real(_class_id));
-    if (class_id < 0) class_id = Loot_PlayerClassId(player);
-
-    var eligible = [];
-    for (var i = 0; i < array_length(list); i++) {
-        var iid = round(real(list[i]));
-        if (iid <= 0) continue;
-        if (Loot_ItemEligibleForPlayer(iid, player, class_id, _exclude_ids)) {
-            array_push(eligible, iid);
-        }
-    }
-
-    if (array_length(eligible) <= 0) return undefined;
-    var idx = RunRng_Int("loot", array_length(eligible));
-    return { item_id: eligible[idx], qty: 1 };
 }
 
 function Loot_TierMult(_level, _tier) {
@@ -344,12 +247,6 @@ function Loot_RollContainer(_level, _key) {
     var player = Loot_PlayerStruct(gs.player_ch);
     var class_id = Loot_PlayerClassId(player);
 
-    if (variable_struct_exists(cfg, "mode") && cfg.mode == "skillbook") {
-        var it_sb = Loot_RollSkillbook(class_id, player, []);
-        if (is_struct(it_sb)) return [it_sb];
-        return [];
-    }
-
     if (RunRng_Float("loot") > chance) return [];
 
     var items = [];
@@ -361,7 +258,7 @@ function Loot_RollContainer(_level, _key) {
             array_push(items, it);
 
             var item_cfg = ItemDB_Get(it.item_id);
-            var unique_drop = is_struct(item_cfg) && (Item_IsSkillbook(item_cfg) || item_cfg.type == ITEM_WEAPON || item_cfg.type == ITEM_ARMOR);
+            var unique_drop = is_struct(item_cfg) && (item_cfg.type == ITEM_WEAPON || item_cfg.type == ITEM_ARMOR);
             if (unique_drop && !Loot_ArrayHasItemId(exclude_ids, it.item_id)) {
                 array_push(exclude_ids, it.item_id);
             }

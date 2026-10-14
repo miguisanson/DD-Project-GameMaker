@@ -114,7 +114,7 @@ var log_bottom = margin + (log_visible_lines * log_line_h);
 if (log_count > 0) {
     var max_w = w * 0.45;
     var log_base_x = w - margin;
-    var log_base_y = margin;
+    var log_base_y = max(margin, Battle_TimelineBottom() + max(2, round(4 * ui_visual)));   // under the turn strip (D99)
     var log_rows = [];
 
     for (var li2 = 0; li2 < log_count; li2++) {
@@ -205,6 +205,7 @@ if (instance_exists(enemy_inst)) {
     draw_sprite_ext(enemy_inst.sprite_index, enemy_inst.image_index, exs, eys, scx, scy, enemy_inst.image_angle, c_white, enemy_fade_alpha);
     if (off.flash) gpu_set_blendmode(bm_normal);
 }
+Battle_DrawEnemyHeader(self, enemy_fade_alpha);   // name, HP and stagger meter above the enemy (D99, D75)
 
 // The basic attack's sliding bar (D56), sized in world pixels (sx GUI units each) so it is crisp at every window scale: below the enemy and its
 // status icons (no menu box is up during the bar). Fades in during the lead-in.
@@ -232,6 +233,8 @@ with (obj_fx) {
         draw_sprite_ext(sprite_index, image_index, fx_x, fx_y, fx_sx, fx_sy, image_angle, image_blend, image_alpha * enemy_fade_alpha);
     }
 }
+
+Battle_DrawPops(self);   // floating damage numbers and the BREAK word (D92)
 
 // Skill banner (drawn after enemy/FX so it stays in front, above enemy sprite).
 if (skill_banner_active && skill_banner_name != "") {
@@ -268,6 +271,8 @@ if (skill_banner_active && skill_banner_name != "") {
     var ty = banner_y + (banner_h - UI_TextHeight("A")) * 0.5;
     UI_DrawText(tx, ty, skill_banner_name);
 }
+
+Battle_DrawTimeline(self);   // the turn strip across the top (D74, D99)
 
 // A player skill's arrow sequence (D57) and its time bar, in the same place as the attack bar.
 if (battle_state == BSTATE_SKILL_QTE && sq_active) {

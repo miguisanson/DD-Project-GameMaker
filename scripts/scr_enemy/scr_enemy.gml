@@ -149,6 +149,7 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
         loot = kept;
     }
     p.inventory = Loot_Grant(p.inventory, loot);
+    p = Card_OnVictory(p);   // C2: Field Medic, Second Wind, Scrounger
     GameState_SetPlayer(p);
 
     var result = {
@@ -316,6 +317,10 @@ function EnemyCreate(_enemy_id) {
     ch.skills = base.skills;
     ch.status = [];
     ch.is_boss = base.is_boss;
+    ch.threat_rank = variable_struct_exists(base, "threat_rank") ? base.threat_rank : 1;
+    ch.stagger_max = Stagger_Max(ch.threat_rank, ch.is_boss);   // spec section 11: the BREAK meter
+    ch.stagger = 0;
+    ch.broken = false;
 
     return ch;
 }

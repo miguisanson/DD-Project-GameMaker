@@ -166,8 +166,7 @@ function StatusDB_Init() {
         icon_subimg: 0,
         stat_mods: { atk:0, def:0, spd:-2, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
-        stackable: false,
-        skip_turn: true
+        stackable: false
     };
 
     global.status_db[? STATUS_GUARD] = {
@@ -455,7 +454,7 @@ function Status_Describe(_status_id, _data = undefined) {
             }
             break;
         case STATUS_STUN:
-            line = Loc_T("status.desc.status_stun", "Cannot act.");
+            line = Loc_T("status.desc.status_stun", "Pushed back on the turn bar. Then Steadfast: cannot be stunned for 2 turns.");
             break;
         case STATUS_GUARD:
             line = Loc_T("status.desc.status_guard", "Blocks the next incoming hit.");
@@ -588,15 +587,7 @@ function Status_Add(_ch, _status_id, _turns, _power, _stacks = 1) {
     if (!is_array(_ch.status)) _ch.status = [];
     var cfg = StatusDB_Get(_status_id);
 
-    // Anti-stun-lock safety net: the player can never be chain-stunned.
-    // While a brief immunity window is active the stun is ignored outright,
-    // and any stun that does land is capped to a single turn.
-    if (_status_id == STATUS_STUN && is_struct(_ch)
-    && variable_struct_exists(_ch, "is_player") && _ch.is_player) {
-        var stun_immune = variable_struct_exists(_ch, "stun_immune_turns") ? max(0, _ch.stun_immune_turns) : 0;
-        if (stun_immune > 0) return _ch;
-        _turns = min(_turns, 1);
-    }
+    // Stun is only a marker (D75): the battle turns it into a push-back on the turn timeline at once (Battle_ConsumeStun); Steadfast lives there too.
 
     var dot = variable_struct_exists(cfg, "dot_kind") ? cfg.dot_kind : "";
     var max_stacks = variable_struct_exists(cfg, "max_stacks") ? cfg.max_stacks : 1;
@@ -796,12 +787,6 @@ function Status_ActionTick(_ch) {
 // turn with `no_tick_on_apply` (Foresight) skips its first decay.
 function Status_Tick(_ch, _acted = true) {
     if (!is_array(_ch.status)) return _ch;
-
-    // Decay the player's post-stun immunity window once per turn cycle.
-    if (is_struct(_ch) && variable_struct_exists(_ch, "is_player") && _ch.is_player
-    && variable_struct_exists(_ch, "stun_immune_turns") && _ch.stun_immune_turns > 0) {
-        _ch.stun_immune_turns -= 1;
-    }
 
     for (var i = array_length(_ch.status) - 1; i >= 0; i--) {
         var s = _ch.status[i];

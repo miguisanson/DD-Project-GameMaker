@@ -136,6 +136,78 @@ def widen_perfect(half_width, widen):
     return half_width * widen
 
 
+# ---- Turn timeline, stagger, BREAK (spec section 11, packet B3). Deliberately written tick by tick: the game solves the same thing in closed form. ----
+TURN_MAX = 100
+STEADFAST_TURNS = 2
+
+
+def stagger_gain(power, stun, perfect):
+    return max(1, rhu(power * 0.5 * (2 if stun else 1) * (1.5 if perfect else 1)))
+
+
+def stagger_max(rank, boss):
+    return (4 + 4 * rank) * (2 if boss else 1)
+
+
+class Timeline:
+    """Two fighters, 'P' (index 0, wins ties) and 'E'. Gauges are integers."""
+
+    def __init__(self, spd_p, spd_e, boss=False):
+        self.f = [dict(c="P", spd=spd_p, g=0, sf=0, boss=False), dict(c="E", spd=spd_e, g=0, sf=0, boss=boss)]
+
+    def copy(self):
+        t = Timeline(0, 0)
+        t.f = [dict(x) for x in self.f]
+        return t
+
+    def next(self):
+        while not any(x["g"] >= TURN_MAX for x in self.f):
+            for x in self.f:
+                x["g"] += max(1, x["spd"])
+        best = None
+        for x in self.f:
+            if x["g"] >= TURN_MAX and (best is None or x["g"] > best["g"]):
+                best = x
+        best["g"] -= TURN_MAX
+        best["sf"] = max(0, best["sf"] - 1)
+        return best["c"]
+
+    def who(self, c):
+        return self.f[0] if c == "P" else self.f[1]
+
+    def stun(self, c):
+        x = self.who(c)
+        if x["sf"] > 0:
+            return "~"
+        x["g"] -= TURN_MAX // 2 if x["boss"] else TURN_MAX
+        x["sf"] = STEADFAST_TURNS
+        return "!"
+
+    def push(self, c):   # a BREAK: one full turn back, bosses too
+        self.who(c)["g"] -= TURN_MAX
+        return "B"
+
+    def preview(self, n):
+        t = self.copy()
+        return "(" + "".join(t.next() for _ in range(n)) + ")"
+
+
+def turn_script(spd_p, spd_e, boss, script):
+    """Tokens: n = next actor, sP/sE = stun that fighter, bP/bE = BREAK push-back, pN = preview of the next N (changes nothing)."""
+    t = Timeline(spd_p, spd_e, boss)
+    out = ""
+    for tok in script.split():
+        if tok == "n":
+            out += t.next()
+        elif tok[0] == "s":
+            out += t.stun(tok[1])
+        elif tok[0] == "b":
+            out += t.push(tok[1])
+        elif tok[0] == "p":
+            out += t.preview(int(tok[1:]))
+    return out
+
+
 def build():
     v = {"version": 1, "spec": ".planning/research/combat-spec.md", "round_half_up_epsilon": EPS}
     dmg = [
@@ -189,6 +261,26 @@ def build():
     for hw, w in ((55, 1.5), (60, 1.5), (50, 1.0)):
         st.append(dict(id="widen_%d_%s" % (hw, str(w).replace(".", "_")), kind="widen", arg=hw, arg2=w, want=widen_perfect(hw, w)))
     v["statuses"] = st
+    v["stagger"] = (
+        [dict(id="stagger_gain_%d_%s%s" % (pw, "s" if sn else "n", "p" if pf else "o"), kind="gain", power=pw, stun=sn, perfect=pf, want=stagger_gain(pw, sn, pf))
+         for pw, sn, pf in [(6, False, False), (6, False, True), (11, True, False), (11, True, True), (1, False, False), (2, False, True)]]
+        + [dict(id="stagger_max_%d_%s" % (rk, "boss" if b else "norm"), kind="max", rank=rk, boss=b, want=stagger_max(rk, b))
+           for rk, b in [(1, False), (2, False), (3, True), (4, True), (4, False)]]
+    )
+    scripts = [
+        ("turn_13_9", 13, 9, False, "n n n n n n n n n"),
+        ("turn_2x", 20, 10, False, "n n n n n n n n n n n n"),
+        ("turn_tie", 10, 10, False, "n n n n"),
+        ("turn_slow_player", 9, 13, False, "n n n n n n"),
+        ("turn_preview", 13, 9, False, "p5 n n p5 n n n"),
+        ("turn_stun", 10, 10, False, "n sE p5 n n n n n n"),
+        ("turn_stun_steadfast", 10, 10, False, "n sE n sE n sE n n sE n"),
+        ("turn_stun_boss", 10, 10, True, "n sE n n n n"),
+        ("turn_stun_player", 10, 10, False, "n n sP n n n n"),
+        ("turn_break", 10, 10, False, "n bE n n n n"),
+        ("turn_fast_double", 20, 8, False, "n n n n n n n"),
+    ]
+    v["timeline"] = [dict(id=i, spd_player=a, spd_enemy=b, boss=bs, script=sc, want=turn_script(a, b, bs, sc)) for i, a, b, bs, sc in scripts]
     return v
 
 
@@ -196,6 +288,8 @@ def num(x):
     """The literal as GML source."""
     if isinstance(x, bool):
         return "true" if x else "false"
+    if isinstance(x, str):
+        return json.dumps(x)
     return repr(x)
 
 
@@ -235,6 +329,13 @@ def gml_lines(v):
         L.append('Test_Eq("vec %s", Combat_HealAmount(%d, %d), %d);' % (c["id"], c["power"], c["A"], c["want"]))
     for c in v["first_actor"]:
         L.append('Test_Eq("vec %s", Combat_PlayerActsFirst(%d, %d), %s);' % (c["id"], c["spd_player"], c["spd_enemy"], num(c["player_first"])))
+    for c in v["stagger"]:
+        if c["kind"] == "gain":
+            L.append('Test_Eq("vec %s", Stagger_Gain(%d, %s, %s), %d);' % (c["id"], c["power"], num(c["stun"]), num(c["perfect"]), c["want"]))
+        else:
+            L.append('Test_Eq("vec %s", Stagger_Max(%d, %s), %d);' % (c["id"], c["rank"], num(c["boss"]), c["want"]))
+    for c in v["timeline"]:
+        L.append('Test_Eq("vec %s", Test_TurnScript(%d, %d, %s, %s), %s);' % (c["id"], c["spd_player"], c["spd_enemy"], num(c["boss"]), num(c["script"]), num(c["want"])))
     calls = {"burn_tick": "Status_BurnTick(%s)", "burn_def": "Status_BurnDef(%s)", "poison_total": "Status_PoisonTotal(%s)", "bleed_tick": "Status_BleedTick(%s)"}
     for c in v["statuses"]:
         if c["kind"] == "poison_add":
