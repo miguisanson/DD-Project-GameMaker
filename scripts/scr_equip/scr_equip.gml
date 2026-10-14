@@ -12,7 +12,7 @@ function Equip_CanEquip(_ch, _item_or_id) {
 
     if (!is_struct(_ch)) return out;
     if (!is_struct(item) || item.id == 0) return out;
-    if (item.type != ITEM_WEAPON && item.type != ITEM_ARMOR) return out;
+    if (item.type != ITEM_WEAPON && item.type != ITEM_ARMOR && item.type != ITEM_ACCESSORY) return out;   // C3: the accessory slot (D92)
     if (!variable_struct_exists(item, "equip_slot") || item.equip_slot == "") return out;
     if (!variable_struct_exists(_ch, "class_id")) return out;
 
@@ -89,7 +89,7 @@ function Equip_GetStatBonus(_ch, _stat_id) {
     var total = 0;
     if (!is_struct(_ch) || !variable_struct_exists(_ch, "equip") || !is_struct(_ch.equip)) return 0;
 
-    var keys = ["weapon", "head", "body", "ring1", "ring2"];
+    var keys = ["weapon", "head", "body", "ring1", "ring2", "accessory"];
     for (var i = 0; i < array_length(keys); i++) {
         var item_id = Equip_SlotGet(_ch, keys[i]);
         if (item_id == 0) continue;
@@ -112,7 +112,7 @@ function Equip_GetStatBonus(_ch, _stat_id) {
 function Equip_GetEquippedItems(_ch) {
     var out = [];
     if (!is_struct(_ch)) return out;
-    var slots = ["weapon", "body", "head", "ring1", "ring2"];
+    var slots = ["weapon", "body", "head", "ring1", "ring2", "accessory"];
     for (var i = 0; i < array_length(slots); i++) {
         var iid = Equip_SlotGet(_ch, slots[i]);
         if (iid == 0) continue;

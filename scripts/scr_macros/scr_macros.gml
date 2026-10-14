@@ -67,6 +67,7 @@
 #macro ITEM_ARMOR      1
 #macro ITEM_CONSUMABLE 2
 #macro ITEM_KEY        3
+#macro ITEM_ACCESSORY  4   // C3 (D92): the third gear slot, "accessory" (ring / charm)
 
 #macro TGT_ENEMY       0
 #macro TGT_SELF        1
@@ -148,6 +149,7 @@
 #macro UI_CLASS_SELECT 5
 #macro UI_BED 6
 #macro UI_CARDS 7   // C2: class choice, stat point, card pick, replace-a-skill screens (CardsUi_*)
+#macro UI_SHOP 8    // C3 (D85): the merchant's shop (ShopUi_*)
 #macro UI_BAR_SCALE 3
 #macro UI_FONT retro_gaming
 #macro GRID_TILE_SIZE 16

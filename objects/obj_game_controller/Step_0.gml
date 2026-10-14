@@ -16,6 +16,7 @@ if (gs.last_room != room) {
         RoomState_Apply(room);
     }
     RoomTransition_Apply();
+    Merchant_EnsureInRoom();   // C3 (D85): the merchant of floors 2, 5 and 8 stands in an existing room
 
     if (variable_struct_exists(gs, "skip_room_save")) gs.skip_room_save = false;
     global.skipRoomSave = false;
