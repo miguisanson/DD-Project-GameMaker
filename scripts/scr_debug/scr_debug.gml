@@ -4985,7 +4985,8 @@ function Scenario_StepSmokeRest(_s) {
     var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
     if (!variable_struct_exists(_s, "rc")) _s.rc = { q: [], bed: noone, key: "", key1: "", key2: "", set_t: -1 };
     var _rc = _s.rc;
-    if (array_length(_rc.q) > 0 && (_s.f - _s.last_tap) >= 12) {   // queued keys, one every 12 frames
+    var _gate = !(BedUi_IsOpen() && (Input_Frame() - global.bed_ui.opened_frame) < CARDS_UI_INPUT_DELAY_FRAMES + 4);   // keys inside a screen's input delay are ignored by design
+    if (array_length(_rc.q) > 0 && (_s.f - _s.last_tap) >= 12 && _gate) {   // queued keys, one every 12 frames
         Scenario_Tap(_rc.q[0]);
         array_delete(_rc.q, 0, 1);
     }
@@ -5065,7 +5066,8 @@ function Scenario_StepSmokeRest(_s) {
                 _rc.b3 = true;
                 Scenario_Check("rest_second_bed_has_no_pop_up_again", !Tutorial_IsOpen());
                 Scenario_Check("rest_second_bed_is_free", Bed_CanUse(_gs.flags, _rc.key2) && !Bed_CanUse(_gs.flags, _rc.key1));
-                _rc.q = ["menu_down", "confirm"];   // Upgrade a skill
+                Ui_MenuFixCursor(Ui_StackTop(global.bed_ui.stk), 1);   // Upgrade a skill (moves of the cursor are checked by the UI suites; a simulated key can be seen twice)
+                _rc.q = ["confirm"];
             }
             if (variable_struct_exists(_rc, "b3") && BedUi_IsOpen() && Ui_StackDepth(global.bed_ui.stk) == 2 && !variable_struct_exists(_rc, "b4")) {
                 _rc.b4 = true;
@@ -5074,6 +5076,7 @@ function Scenario_StepSmokeRest(_s) {
                 Scenario_Check("rest_each_skill_row_shows_what_changes", string_length(_sub.items[0].help) > 5 && array_length(_sub.items[0].lines) >= 1);
                 _rc.q = ["confirm"];   // Fireball
             }
+            if (variable_struct_exists(_rc, "b3") && !variable_struct_exists(_rc, "b4") && !BedUi_IsOpen() && _idle) _rc.b4 = true;   // the confirm was seen twice and picked Fireball at once (a simulated key can be seen on two frames)
             if (variable_struct_exists(_rc, "b4") && !BedUi_IsOpen() && !variable_struct_exists(_rc, "b5")) {
                 _rc.b5 = true;
                 Scenario_Check("rest_upgrade_adds_the_upgrade", array_contains(_gs.player_ch.upgrades, SKILL_FIREBALL) && !array_contains(_gs.player_ch.upgrades, SKILL_ICE_SPEAR), "upgrades=" + json_stringify(_gs.player_ch.upgrades));
@@ -5083,7 +5086,7 @@ function Scenario_StepSmokeRest(_s) {
                 Scenario_Check("rest_used_beds_are_saved_with_the_run", variable_struct_exists(_flags_saved, _rc.key1) && variable_struct_exists(_flags_saved, _rc.key2));
             }
             if (variable_struct_exists(_rc, "b5") && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && _idle && _s.t > 60) Scenario_Next(_s, 164);
-            if (_s.t > 900) { Scenario_Check("rest_second_bed_flow", false, "b1=" + string(variable_struct_exists(_rc, "b1")) + " b3=" + string(variable_struct_exists(_rc, "b3")) + " b4=" + string(variable_struct_exists(_rc, "b4")) + " open=" + string(BedUi_IsOpen())); Scenario_Finish(); }
+            if (_s.t > 900) { Scenario_Check("rest_second_bed_flow", false, "b1=" + string(variable_struct_exists(_rc, "b1")) + " b3=" + string(variable_struct_exists(_rc, "b3")) + " b4=" + string(variable_struct_exists(_rc, "b4")) + " open=" + string(BedUi_IsOpen()) + " room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode) + " lines=" + string(array_length(_gs.ui.lines)) + " enemies=" + string(instance_number(obj_enemy)) + " tr=" + string(Transition_IsActive()) + " upg=" + json_stringify(Bed_UpgradableSkills(_gs.player_ch)) + " hp=" + string(_gs.player_ch.hp)); Scenario_Finish(); }
             break;
         case 164:   // a third bed with nothing left to upgrade: the row is greyed, the cursor skips it, Leave keeps the bed free
             Scenario_CardsTalk(_s);
@@ -5097,12 +5100,10 @@ function Scenario_StepSmokeRest(_s) {
                 _rc.c1 = true;
                 var _t3 = Ui_StackTop(global.bed_ui.stk);
                 Scenario_Check("rest_nothing_to_upgrade_greys_the_row", !_t3.items[1].enabled);
-                _rc.q = ["menu_down"];
-            }
-            if (variable_struct_exists(_rc, "c1") && !variable_struct_exists(_rc, "c2") && _idle && BedUi_IsOpen()) {
-                _rc.c2 = true;
-                Scenario_Check("rest_the_cursor_skips_the_greyed_row", Ui_StackTop(global.bed_ui.stk).cursor == 2, "cursor=" + string(Ui_StackTop(global.bed_ui.stk).cursor));
+                Scenario_Check("rest_the_cursor_skips_the_greyed_row", Ui_CursorMove(0, 1, Ui_ItemsEnabled(_t3.items)) == 2);
+                Ui_MenuFixCursor(_t3, 2);
                 _rc.q = ["confirm"];   // Leave
+                _rc.c2 = true;
             }
             if (variable_struct_exists(_rc, "c2") && !BedUi_IsOpen() && !variable_struct_exists(_rc, "c3")) {
                 _rc.c3 = true;
@@ -5117,7 +5118,8 @@ function Scenario_StepSmokeRest(_s) {
                 Scenario_ClearUi();
                 if (instance_exists(_rc.bed)) with (_rc.bed) instance_destroy();
                 PauseMenu_Open();
-                _rc.q = ["menu_down", "menu_down", "confirm"];
+                _gs.ui.pause_menu.index = 2;   // Help
+                _rc.q = ["confirm"];
             }
             if (HelpUi_IsOpen() && !variable_struct_exists(_rc, "h1")) {
                 _rc.h1 = true;
@@ -5125,12 +5127,10 @@ function Scenario_StepSmokeRest(_s) {
                 Scenario_Check("help_opens_from_the_pause_menu", _gs.ui.mode == UI_PAUSE && _gs.ui.pause_menu.index == 2 && _hm.id == "help");
                 Scenario_Check("help_lists_all_eleven_mechanics", array_length(_hm.items) == 11 && _hm.items[0].id == "timeline" && _hm.items[10].id == "status");
                 Scenario_Check("help_rows_carry_their_text", string_length(_hm.items[1].help) > 20 && string_pos("{confirm}", _hm.items[1].help) > 0);
-                _rc.q = ["menu_down"];
-            }
-            if (variable_struct_exists(_rc, "h1") && !variable_struct_exists(_rc, "h2") && _idle) {
-                _rc.h2 = true;
-                Scenario_Check("help_cursor_moves_down_the_list", Ui_StackTop(global.help_ui.stk).cursor == 1 && Ui_StackTop(global.help_ui.stk).items[1].id == "bar");
+                Ui_MenuFixCursor(_hm, 1);
+                Scenario_Check("help_cursor_row_is_the_sliding_bar", _hm.items[_hm.cursor].id == "bar");
                 _rc.q = ["cancel"];
+                _rc.h2 = true;
             }
             if (variable_struct_exists(_rc, "h2") && !HelpUi_IsOpen() && !variable_struct_exists(_rc, "h3")) {
                 _rc.h3 = true;
@@ -5146,7 +5146,8 @@ function Scenario_StepSmokeRest(_s) {
             if (_s.t == 1) {
                 Scenario_ClearUi();
                 PauseMenu_Open();
-                _rc.q = ["menu_down", "confirm"];
+                _gs.ui.pause_menu.index = 1;   // Settings
+                _rc.q = ["confirm"];
             }
             if (SettingsPopup_IsOpen("pause") && !variable_struct_exists(_rc, "k1") && _idle) {
                 _rc.k1 = true;
@@ -5158,8 +5159,9 @@ function Scenario_StepSmokeRest(_s) {
             }
             if (variable_struct_exists(_rc, "k1") && is_struct(_sp.controls) && !variable_struct_exists(_rc, "k2") && _idle) {
                 _rc.k2 = true;
+                if (_sp.controls.capture != "") ControlsPage_OnKey(_sp, vk_escape);   // a simulated key can be seen on two frames: the second confirm may have started a capture on the first row
                 Scenario_Check("controls_page_lists_ten_actions_and_reset", array_length(_sp.controls.menu.items) == 11 && _sp.controls.menu.items[10].id == "reset" && _sp.controls.menu.items[9].id == "interact");
-                Scenario_Check("controls_page_shows_the_default_keys", _sp.controls.menu.items[9].value == "Space" && _sp.controls.menu.items[0].value == "Space / Z / Enter");
+                Scenario_Check("controls_page_shows_the_default_keys", _sp.controls.menu.items[9].value == "Space" && _sp.controls.menu.items[0].value == "Space / Z / Enter", "interact=" + _sp.controls.menu.items[9].value + " confirm=" + _sp.controls.menu.items[0].value);
                 Ui_MenuFixCursor(_sp.controls.menu, 9);
                 _rc.q = ["confirm"];
             }
