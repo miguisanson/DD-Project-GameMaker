@@ -449,7 +449,7 @@ function Nav_Get() {
     var _nt = instance_number(obj_room_transition);
     var _fresh = !variable_global_exists("nav") || global.nav.room != room || global.nav.wall0 != _wall0;
     if (_fresh) {
-        global.nav = { room: room, wall0: _wall0, nw: -1, ni: -1, nt: -1, ne: -1, grid: undefined, res: Nav_ResCreate(), fx_set: false, builds: 0 };
+        global.nav = { room: room, wall0: _wall0, nw: -1, ni: -1, nt: -1, ne: -1, grid: undefined, res: Nav_ResCreate(), builds: 0 };
     }
     var _n = global.nav;
     var _ne = instance_number(obj_enemy);
@@ -627,10 +627,7 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
     }
 
     var _nav = Nav_Get();
-    if (!_nav.fx_set) {   // the "!" and the sight circle are drawn by a layer script: objects have no Draw event (no .yy edits)
-        _nav.fx_set = true;
-        if (layer_exists(_inst.layer)) layer_script_end(_inst.layer, Nav_DrawWorldFx);
-    }
+    World_RegisterFx(_inst);   // the "!" and the sight circle are drawn by the world layer script (objects have no Draw event, no .yy edits)
 
     var _t = GRID_TILE_SIZE;
     if (_inst.alert_pop > 0) _inst.alert_pop--;
@@ -803,9 +800,43 @@ function EnemyAI_Idle(_inst, _nav, _ecx, _ecy) {
     _inst.idle_timer = 20;   // nowhere to go right now
 }
 
-// Drawn by a layer script (registered once per room by the first enemy that updates): the "!" over an enemy that just spotted the
+// A layer script is called once per draw PASS of the engine, not once per frame (measured, I-056/I-058): pre draw, draw begin, draw, draw end,
+// post draw AND the three Draw GUI passes (view_current 7, the back buffer, GUI units). Only the normal Draw pass paints the world picture
+// (the application surface, world pixels); the others would land the same marks at the top-left of the window, in GUI units.
+function Fx_IsWorldPass() {
+    return (event_type == ev_draw && event_number == ev_draw_normal);
+}
+
+// Counts room starts (obj_game_controller Create runs in every room). A layer script belongs to the room it was registered in.
+function Room_StampBump() {
+    global.room_stamp = (variable_global_exists("room_stamp") ? global.room_stamp : 0) + 1;
+}
+
+function Room_Stamp() {
+    return variable_global_exists("room_stamp") ? global.room_stamp : 0;
+}
+
+// ONE layer script draws every world mark (the sight rings and "!" of enemies, the interact arrow of the player): a layer has only one end script,
+// and the player and the enemies share the "Instances" layer, so two registrations would replace each other (measured: the arrow vanished).
+// Registered once per room START by whoever gets here first (the player's Step, an enemy's update): a re-entered room (after a battle, a run,
+// a save load) has new layers, and the old once-ever flag left it without any mark (I-056).
+function World_RegisterFx(_inst) {
+    var _st = Room_Stamp();
+    if (variable_global_exists("world_fx_stamp") && global.world_fx_stamp == _st) return;
+    if (!layer_exists(_inst.layer)) return;
+    global.world_fx_stamp = _st;
+    layer_script_end(_inst.layer, World_DrawFx);
+}
+
+function World_DrawFx() {
+    Nav_DrawWorldFx();
+    Player_DrawWorldFx();
+}
+
+// Called by World_DrawFx (a layer script, see World_RegisterFx): the "!" over an enemy that just spotted the
 // player and a faint dotted ring of its sight range while the player is near. 4-colour palette, no new assets.
 function Nav_DrawWorldFx() {
+    if (!Fx_IsWorldPass()) return;
     if (!variable_global_exists("nav_fx_calls")) global.nav_fx_calls = 0;
     global.nav_fx_calls++;
     if (!instance_exists(obj_enemy)) return;
@@ -1105,8 +1136,8 @@ function Enemy_SnapToGrid(_inst) {
 }
 
 // ============================================================================
-// PLAYER WORLD FX (D70): the interact prompt. A small bobbing arrow over the interactable the player faces, drawn by a layer
-// script registered from obj_player Step (objects have no Draw event, and .yy files are not edited).
+// PLAYER WORLD FX (D70): the interact prompt. A small bobbing arrow over the interactable the player faces, drawn by World_DrawFx
+// (a layer script registered from obj_player Step: objects have no Draw event, and .yy files are not edited).
 // ============================================================================
 function Player_PromptWorthy(_t) {
     if (!instance_exists(_t)) return false;
@@ -1115,6 +1146,7 @@ function Player_PromptWorthy(_t) {
 }
 
 function Player_DrawWorldFx() {
+    if (!Fx_IsWorldPass()) return;
     if (!variable_global_exists("player_fx_calls")) global.player_fx_calls = 0;
     global.player_fx_calls++;
     if (!instance_exists(obj_player)) return;
@@ -1129,10 +1161,14 @@ function Player_DrawWorldFx() {
     var _bob = (current_time div 260) mod 2;
     var _cx = floor((_t.bbox_left + _t.bbox_right) / 2);
     var _y = floor(_t.bbox_top) - 7 - _bob;
-    draw_set_color(_c0);   // outline: a down-pointing triangle one pixel bigger than the light one
-    for (var _r = 0; _r < 4; _r++) draw_rectangle(_cx - (3 - _r), _y - 1 + _r, _cx + (3 - _r), _y - 1 + _r, false);
+    // I-059: a one pixel #071821 outline all the way round the light arrow, so it reads on a light floor too.
+    // Rows are [offset from the light top row, half width]: the light arrow is 5, 3, 1 wide; the outline is the pixels touching it above, below and beside.
+    var _outline = [[-1, 2], [0, 3], [1, 2], [2, 1], [3, 0]];
+    var _light = [[0, 2], [1, 1], [2, 0]];
+    draw_set_color(_c0);
+    for (var _r = 0; _r < array_length(_outline); _r++) draw_rectangle(_cx - _outline[_r][1], _y + _outline[_r][0], _cx + _outline[_r][1], _y + _outline[_r][0], false);
     draw_set_color(_c3);
-    for (var _r2 = 0; _r2 < 3; _r2++) draw_rectangle(_cx - (2 - _r2), _y + _r2, _cx + (2 - _r2), _y + _r2, false);
+    for (var _r2 = 0; _r2 < array_length(_light); _r2++) draw_rectangle(_cx - _light[_r2][1], _y + _light[_r2][0], _cx + _light[_r2][1], _y + _light[_r2][0], false);
     draw_set_color(_oc);
     draw_set_alpha(_oa);
 }
