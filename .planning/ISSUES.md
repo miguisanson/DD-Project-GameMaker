@@ -110,7 +110,8 @@ Found by audits and reviews (no person's words):
 | I-065 | B4 report: "the Knight is rebuilt at 10 HP when a battle starts" (setting max_hp before battle has no effect) | BUG? | P1 | next | verify: does the player carry HP/max HP/level gains into every battle in real play? | battle uses the run character as-is | open (improvement mode) |
 | I-066 | B4 report: six small enemy moves (Poison Fangs, Bite, ...) still get the defence bar; D7 says only big/telegraphed attacks | BUG (spec) | P2 | next | fight a spider/snake | small moves just hit; only telegraphed heavy moves use the defence bar | open |
 | I-067 | B4 report: wrapped combat-log rows overlap the enemy name header | UI | P2 | next | long log lines in battle | log never overlaps the HUD (D1) | open (D1) |
+| I-068 | review 2026-10-14: merchant placeholder is the Nobody sprite tinted yellow — breaks the 4-colour palette (D10) | BUG/ART | P2 | next | shot_merchant_world.png | merchant uses only palette colours; real merchant sprite pending owner choice (AI draft vs PaleRook drawing) | open |
 
 ---
 
-*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-068.*
+*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-069.*
