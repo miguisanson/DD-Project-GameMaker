@@ -3612,6 +3612,8 @@ function Export_Build() {
     for (var si = 0; si < array_length(data.skills); si++) {
         var seq = Qte_SkillSequence(data.skills[si].id);
         data.skills[si].sequence_length = is_array(seq) ? array_length(seq) : 0;
+        // E1: the defence bar of an enemy move that gets one (fixed per move, D60)
+        if (variable_struct_exists(data.skills[si], "uses_defensive_qte") && data.skills[si].uses_defensive_qte) data.skills[si].defence = Export_Clean(Qte_DefenceParams(data.skills[si].id));
     }
     // C2: the cards (D82), with the numbers the game reads and the text it shows, for the simulator's build rules
     data.cards = [];
@@ -3629,6 +3631,16 @@ function Export_Build() {
         elite_chance: ELITE_CHANCE, elite_def: ELITE_DEF_BONUS, elite_spd: ELITE_SPD_BONUS, elite_atk: ELITE_ATK_BONUS, elite_venom_stacks: ELITE_VENOM_STACKS, elite_regen_frac: ELITE_REGEN_FRAC,
         merchant_floors: [2, 5, 8]
     };
+    // E1: the timeline / stagger rules, the QTE bar numbers (attack bars per weapon kind, the defence grades) and which enemies each floor draws from (D33)
+    data.constants.timeline = { gauge_max: TURN_GAUGE_MAX, steadfast_turns: TURN_STEADFAST_TURNS, boss_push: TURN_BOSS_PUSH, break_mult: BREAK_DAMAGE_MULT, stagger_perfect_mult: STAGGER_PERFECT_MULT, stagger_stun_mult: STAGGER_STUN_MULT };
+    data.qte = {
+        zone_centre_pct: QTE_ZONE_CENTRE_PCT,
+        bar_params: { bow: Qte_BarParams("bow"), dagger: Qte_BarParams("dagger"), staff: Qte_BarParams("staff"), heavy: Qte_BarParams("heavy"), sword: Qte_BarParams("sword"), "default": Qte_BarParams("default") },
+        defence_mult: { perfect: Qte_DefenceMult(QTE_PERFECT), good: Qte_DefenceMult(QTE_GOOD), ok: Qte_DefenceMult(QTE_OK), weak: Qte_DefenceMult(QTE_WEAK) },
+        defence_status_turns: { perfect: Qte_DefenceStatusTurns(QTE_PERFECT, 4), good: Qte_DefenceStatusTurns(QTE_GOOD, 4), ok: Qte_DefenceStatusTurns(QTE_OK, 4), weak: Qte_DefenceStatusTurns(QTE_WEAK, 4) }
+    };
+    data.floors = [];
+    for (var fl = 1; fl <= 9; fl++) array_push(data.floors, { floor: fl, pool: Shuffle_EnemyPool(fl) });
     data.items = Export_MapRecords(global.item_db, ItemDB_Get);
     data.statuses = Export_MapRecords(global.status_db, StatusDB_Get);
     data.loot = { tables: {}, configs: {}, tier_weights: Export_Clean(global.loot_tier_weights) };
@@ -3673,8 +3685,8 @@ function Scenario_StepExportData(_s) {
     if (is_struct(parsed)) {
         Scenario_Check("exportdata_classes_4_unique", array_length(parsed.classes) == 4 && Export_IdsUnique(parsed.classes));
         Scenario_Check("exportdata_enemies_10_unique", array_length(parsed.enemies) == 10 && Export_IdsUnique(parsed.enemies));
-        Scenario_Check("exportdata_skills_27_unique", array_length(parsed.skills) == 27 && Export_IdsUnique(parsed.skills));
-        Scenario_Check("exportdata_items_23_unique", array_length(parsed.items) == 23 && Export_IdsUnique(parsed.items));
+        Scenario_Check("exportdata_skills_31_unique", array_length(parsed.skills) == 31 && Export_IdsUnique(parsed.skills));
+        Scenario_Check("exportdata_items_34_unique", array_length(parsed.items) == 34 && Export_IdsUnique(parsed.items));
         Scenario_Check("exportdata_cards_51", array_length(parsed.cards) == 51);
         Scenario_Check("exportdata_statuses_14_unique", array_length(parsed.statuses) == 14 && Export_IdsUnique(parsed.statuses));
         Scenario_Check("exportdata_level_table_10_rows", array_length(parsed.levels) == LEVEL_CAP_TECHNICAL && parsed.levels[0].exp_next == 12);
