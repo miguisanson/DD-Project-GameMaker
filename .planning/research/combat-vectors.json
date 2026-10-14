@@ -702,25 +702,25 @@
    "id": "run_8_9",
    "spd_player": 8,
    "spd_enemy": 9,
-   "want": 0.45
+   "want": 0.470588
   },
   {
    "id": "run_13_9",
    "spd_player": 13,
    "spd_enemy": 9,
-   "want": 0.7
+   "want": 0.590909
   },
   {
    "id": "run_30_5",
    "spd_player": 30,
    "spd_enemy": 5,
-   "want": 0.95
+   "want": 0.857143
   },
   {
    "id": "run_1_40",
    "spd_player": 1,
    "spd_enemy": 40,
-   "want": 0.1
+   "want": 0.02439
   },
   {
    "id": "run_10_10",
