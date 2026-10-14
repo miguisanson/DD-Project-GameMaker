@@ -69,6 +69,10 @@
   ],
   "ForcedPrefabProjectReferences":[],
   "IncludedFiles":[
+    {"$GMIncludedFile":"","%Name":"game_data.json","CopyToMask":-1,"filePath":"datafiles/data","name":"game_data.json","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
+    {"$GMIncludedFile":"","%Name":"Galmuri11.ttf","CopyToMask":-1,"filePath":"datafiles/fonts/galmuri","name":"Galmuri11.ttf","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
+    {"$GMIncludedFile":"","%Name":"Galmuri9.ttf","CopyToMask":-1,"filePath":"datafiles/fonts/galmuri","name":"Galmuri9.ttf","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
+    {"$GMIncludedFile":"","%Name":"OFL-Galmuri.txt","CopyToMask":-1,"filePath":"datafiles/fonts/galmuri","name":"OFL-Galmuri.txt","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
     {"$GMIncludedFile":"","%Name":"NotoSansCJKkr-Regular.otf","CopyToMask":-1,"filePath":"datafiles/fonts","name":"NotoSansCJKkr-Regular.otf","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
     {"$GMIncludedFile":"","%Name":"equivalence_report.json","CopyToMask":-1,"filePath":"datafiles/localization","name":"equivalence_report.json","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
     {"$GMIncludedFile":"","%Name":"game_text.legacy.xlsx","CopyToMask":-1,"filePath":"datafiles/localization","name":"game_text.legacy.xlsx","resourceType":"GMIncludedFile","resourceVersion":"2.0",},
