@@ -799,6 +799,10 @@ function Scenario_StepBot(_s) {
         Scenario_StepBotStatus(_s);
         return;
     }
+    if (_s.v == 7) {
+        Scenario_StepBotTurns(_s);
+        return;
+    }
     if (_s.v == 2) {
         Scenario_StepBotSkill(_s);
         return;
@@ -1168,7 +1172,7 @@ function Scenario_StepBotSkill(_s) {
         case 2:   // measured: start the next skill (the battle is simply abandoned) or the fail variant
             if (_s.t == 5) {
                 _s.ski++;
-                if (_s.ski >= array_length(_ids)) _s.v = 6;   // skills -> statuses (v=6, B2) -> movement and AI (v=5) -> fail (v=1)
+                if (_s.ski >= array_length(_ids)) _s.v = 6;   // skills -> statuses (v=6, B2) -> turn timeline (v=7, B3) -> movement and AI (v=5) -> fail (v=1)
                 Scenario_Next(_s, 0);
             }
             break;
@@ -1179,6 +1183,15 @@ function Scenario_StepBotSkill(_s) {
 // Battle A: a Mage against a Slime that stays stunned, 99 HP: Poison stacks tick down (3, 2, 1), Burning lowers DEF and ends after its 2 turns,
 // Bleeding does not hurt on a stunned turn but does on each action. Battle B: the Mage casts Foresight against a Spider that only uses its big
 // attack (Poison Fangs): the preview names it, the enemy really does it, the log says so, the Perfect zones are x1.5 for 3 turns and back to normal after.
+// The Foresight preview on the turn strip (D79): the first slot that carries it, or undefined. Returns { idx, slot }.
+function Scenario_BotForesightSlot(_bc) {
+    var _slots = Battle_TimelineSlots(_bc);
+    for (var _i = 0; _i < array_length(_slots); _i++) {
+        if (is_struct(_slots[_i].foresight)) return { idx: _i, slot: _slots[_i], count: array_length(_slots) };
+    }
+    return undefined;
+}
+
 function Scenario_BotLogCount(_bc, _needle) {
     var _n = 0;
     for (var _i = 0; _i < array_length(_bc.combat_log); _i++) {
@@ -1271,7 +1284,7 @@ function Scenario_StepBotStatus(_s) {
                     _bc.e.hp = 999;
                     _bc.p.max_hp = 99;   // the battle starts with the class's real HP, so raise it here
                     _bc.p.hp = 99;
-                    _bc.e = Status_Add(_bc.e, STATUS_STUN, 99, 1);
+                    Turn_Push(_bc.tl, TL_ENEMY, 100000);   // B3: the enemy is a very long way down the timeline, so it never acts (the player acts every turn)
                     _bc.p = Status_Add(_bc.p, STATUS_POISON, 0, 0, 3);
                     Scenario_Check(_name + "_poison_3_stacks_applied", Status_Stacks(_bc.p, STATUS_POISON) == 3);
                     _t.k = 1;
@@ -1302,26 +1315,17 @@ function Scenario_StepBotStatus(_s) {
                     if (_t.k == 5) {
                         Scenario_Check(_name + "_burn_ends_after_2_turns", !Status_Has(_bc.p, STATUS_BURN));
                         Scenario_Check(_name + "_def_restored_after_burn", Combat_EffectiveStat(_bc.p, STAT_DEF) == _t.def0);
-                        // Bleeding (2 stacks, 3 turns) and a stun on the player at once: the stunned turn is skipped and costs no HP
+                        // Bleeding (2 stacks, 3 turns): 4 HP per action, ends after the 3rd turn (a stunned turn no longer exists, D75: stun is a push-back)
                         _bc.p = Status_Add(_bc.p, STATUS_BLEED, 3, 0, 2);
-                        _bc.p = Status_Add(_bc.p, STATUS_STUN, 1, 1);
                         _t.hp_before = _bc.p.hp;
-                        _t.waited = false;
                     }
                     _t.k++;
                 }
-            } else if (_t.k == 6) {   // the stunned turn goes by on its own (the controller skips it)
-                if (_bc.battle_state != BSTATE_MENU) _t.waited = true;
-                if (_t.waited && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) {
-                    Scenario_Check(_name + "_bleed_does_not_hurt_on_a_stunned_turn", _bc.p.hp == _t.hp_before, "hp " + string(_t.hp_before) + " -> " + string(_bc.p.hp));
-                    Scenario_Check(_name + "_stun_was_used_up", !Status_Has(_bc.p, STATUS_STUN));
-                    Scenario_Check(_name + "_bleed_turn_counted_while_stunned", Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED) == 2, "turns=" + string(Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED)));
-                    _t.k = 7;
-                }
-            } else if (_t.k == 7 || _t.k == 8) {   // two actions: Bleeding costs 2 x 2 stacks each, and ends after its 3rd turn
+            } else if (_t.k >= 6 && _t.k <= 8) {   // three actions: Bleeding costs 2 x 2 stacks each, and ends after its 3rd turn
                 if (Scenario_BotOneAttack(_s, _bc)) {
                     var _dloss = _t.hp_before - _bc.p.hp;
-                    Scenario_Check(_name + "_bleed_action_" + string(_t.k - 6) + "_costs_4", _dloss == 4, "lost " + string(_dloss));
+                    Scenario_Check(_name + "_bleed_action_" + string(_t.k - 5) + "_costs_4", _dloss == 4, "lost " + string(_dloss));
+                    if (_t.k == 6) Scenario_Check(_name + "_bleed_2_turns_left", Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED) == 2, "turns=" + string(Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED)));
                     if (_t.k == 7) Scenario_Check(_name + "_bleed_1_turn_left", Battle_StatusCurrentTurns(_bc.p, STATUS_BLEED) == 1);
                     if (_t.k == 8) Scenario_Check(_name + "_bleed_ends_after_3_turns", !Status_Has(_bc.p, STATUS_BLEED));
                     _t.k++;
@@ -1344,7 +1348,7 @@ function Scenario_StepBotStatus(_s) {
                 Scenario_Check(_name + "_b_finished", false, "k=" + string(_tb.k) + " state=" + string(_bcb.battle_state) + " sk=" + string(_tb.sk));
                 global.debug.enabled = false;
                 global.debug.enemy_damage_skill_only = false;
-                _s.v = 5;
+                _s.v = 7;
                 Scenario_Next(_s, 0);
                 break;
             }
@@ -1372,7 +1376,10 @@ function Scenario_StepBotStatus(_s) {
                         var _pv = Battle_EnemyNextActionPreview(_bcb);
                         Scenario_Check(_name + "_foresight_cast_with_3_turns", Battle_StatusCurrentTurns(_bcb.p, STATUS_HIT_UP) == 3, "turns=" + string(Battle_StatusCurrentTurns(_bcb.p, STATUS_HIT_UP)));
                         Scenario_Check(_name + "_preview_visible_and_names_the_big_attack", _pv.visible && _pv.kind == "skill" && _pv.skill_id == SKILL_POISON_FANGS && _pv.big, "kind=" + _pv.kind + " id=" + string(_pv.skill_id));
-                        Scenario_Check(_name + "_foresee_line_in_the_log", Scenario_BotLogCount(_bcb, _pv.text) == 1 && string_pos("You foresee: " + SkillDB_Get(SKILL_POISON_FANGS).name, _pv.text) > 0, _pv.text);
+                        var _fs = Scenario_BotForesightSlot(_bcb);   // the enemy acts next, so its own (current) slot holds the action
+                        Scenario_Check(_name + "_foresight_shown_on_the_enemy_slot_of_the_strip", is_struct(_fs) && _fs.idx == 0 && _fs.slot.who == TL_ENEMY && _fs.slot.foresight.skill_id == SKILL_POISON_FANGS && _fs.slot.foresight.big, is_struct(_fs) ? string(_fs.idx) : "none");
+                        Scenario_Check(_name + "_foresee_text_names_the_attack", string_pos("You foresee: " + SkillDB_Get(SKILL_POISON_FANGS).name, _pv.text) > 0, _pv.text);
+                        Scenario_Check(_name + "_no_foresee_log_lines_any_more_the_strip_shows_it", Scenario_BotLogCount(_bcb, "You foresee:") == 0);
                         _tb.pv_id = _pv.skill_id;
                         _tb.k = 1;
                     }
@@ -1385,7 +1392,8 @@ function Scenario_StepBotStatus(_s) {
                 if (_bcb.battle_state == BSTATE_MENU && _bcb.turn == TURN_PLAYER) {
                     Scenario_Check(_name + "_enemy_did_what_foresight_showed", _bcb.enemy_last_skill_id == _tb.pv_id, "did=" + string(_bcb.enemy_last_skill_id) + " showed=" + string(_tb.pv_id));
                     Scenario_Check(_name + "_defence_bar_perfect_zone_x1.5", _tb.def_widen == 1.5 && abs(_tb.def_pw - Qte_DefenceParams(SKILL_POISON_FANGS).perfect_half_width * 1.5) < 0.001, "widen=" + string(_tb.def_widen) + " pw=" + string(_tb.def_pw));
-                    Scenario_Check(_name + "_foresee_line_for_the_next_action", Scenario_BotLogCount(_bcb, "You foresee:") == 2 && Battle_EnemyNextActionPreview(_bcb).visible, "lines=" + string(Scenario_BotLogCount(_bcb, "You foresee:")));
+                    var _fs2 = Scenario_BotForesightSlot(_bcb);   // the player's turn: the next enemy slot carries the enemy's next action
+                    Scenario_Check(_name + "_strip_shows_the_next_enemy_action", is_struct(_fs2) && _fs2.idx >= 1 && _fs2.slot.who == TL_ENEMY && Battle_EnemyNextActionPreview(_bcb).visible, is_struct(_fs2) ? string(_fs2.idx) : "none");
                     Scenario_Check(_name + "_foresight_still_3_turns_after_the_cast_turn", Battle_StatusCurrentTurns(_bcb.p, STATUS_HIT_UP) == 3);
                     _tb.k = 2;
                 }
@@ -1399,14 +1407,286 @@ function Scenario_StepBotStatus(_s) {
                     if (_tb.k == 4) {
                         Scenario_Check(_name + "_foresight_over_after_3_turns", !Status_Has(_bcb.p, STATUS_HIT_UP));
                         Scenario_Check(_name + "_preview_hidden_again", !Battle_EnemyNextActionPreview(_bcb).visible);
-                        _tb.lines = Scenario_BotLogCount(_bcb, "You foresee:");
                     }
-                    if (_tb.k == 5) Scenario_Check(_name + "_no_foresee_line_after_it_ended", Scenario_BotLogCount(_bcb, "You foresee:") == _tb.lines, "was " + string(_tb.lines) + " now " + string(Scenario_BotLogCount(_bcb, "You foresee:")));
+                    if (_tb.k == 5) Scenario_Check(_name + "_strip_shows_nothing_after_foresight_ended", !is_struct(Scenario_BotForesightSlot(_bcb)));
                     _tb.k++;
                 }
             } else {
                 global.debug.enabled = false;
                 global.debug.enemy_damage_skill_only = false;
+                _s.v = 7;   // on to the turn timeline (B3), then movement and AI
+                Scenario_Next(_s, 0);
+            }
+            break;
+    }
+}
+
+// ---- v=7: the turn timeline, stun push-back, Steadfast, stagger and BREAK (B3: D19 D74 D75 D92) ----
+// One player action through the real input path. _t.ac: 0 wait for the menu, 1 attack bar up, 2 skill menu, 3 wait for the arrows, 4 arrows.
+// Returns true on the frame the action has just resolved (the battle is in its message state, the timeline already points at the next actor).
+// _kind "attack" (the first menu row) or "skill" (the second row, its first skill, arrows typed right); _perfect presses the attack bar on its zone.
+function Scenario_BotAct(_s, _bc, _kind, _perfect) {
+    var _t = _s.stt;
+    var _ready = (_s.f - _s.last_tap) >= 4;
+    switch (_t.ac) {
+        case 0:
+            if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {
+                var _want = (_kind == "attack") ? 0 : 1;
+                if (_bc.menu_index != _want) {
+                    Scenario_Tap((_bc.menu_index < _want) ? "menu_down" : "menu_up");
+                } else {
+                    Scenario_Tap("confirm");
+                    _t.ac = (_kind == "attack") ? 1 : 2;
+                }
+            }
+            break;
+        case 1:
+            if (_bc.battle_state == BSTATE_ATTACK_TIMING) {
+                if (_perfect && _ready && _bc.qte_active && (Qte_ZoneCentreMs(_bc.qte_params) - _bc.qte_ms) <= Qte_StepMs(delta_time) * 1.5) Scenario_Tap("confirm");
+            } else if (_bc.battle_state == BSTATE_MESSAGE) {
+                _t.ac = 0;
+                return true;
+            }
+            break;
+        case 2:
+            if (_bc.battle_state == BSTATE_SKILL_MENU && _ready) {
+                Scenario_Tap("confirm");
+                _t.ac = 3;
+            }
+            break;
+        case 3:
+            Scenario_BotArrows(_s, _bc, "right");
+            if (_bc.battle_state == BSTATE_SKILL_QTE) _t.ac = 4;
+            break;
+        case 4:
+            Scenario_BotArrows(_s, _bc, "right");
+            if (_bc.battle_state != BSTATE_SKILL_QTE) {
+                _t.ac = 0;
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+
+function Scenario_BotTurnString(_log, _n) {
+    var _out = "";
+    for (var _i = 0; _i < _n && _i < array_length(_log); _i++) _out += (_log[_i] == TL_PLAYER) ? "P" : "E";
+    return _out;
+}
+
+function Scenario_BotPreviewString(_tl, _n) {
+    var _pv = Turn_Preview(_tl, _n);
+    return Scenario_BotTurnString(_pv, _n);
+}
+
+// The same battle as the game plays it, advanced by the model: SPD read again, then the next actor.
+function Scenario_BotModelAdvance(_tl, _bc) {
+    Turn_SetSpd(_tl, TL_PLAYER, Combat_EffectiveStat(_bc.p, STAT_SPD));
+    Turn_SetSpd(_tl, TL_ENEMY, Combat_EffectiveStat(_bc.e, STAT_SPD));
+    return Turn_Next(_tl);
+}
+
+function Scenario_StepBotTurns(_s) {
+    var _name = "bot_turns";
+    switch (_s.step) {
+        case 0:   // battle A: an Archer (SPD 13) against a Slime made very slow
+        case 3:   // battle B: a Knight with Hilt Bash (stun, then BREAK)
+            if (_s.t == 10) {
+                var _b_battle = (_s.step == 3);
+                var _gs = Scenario_NewKnight(_b_battle ? CLASS_KNIGHT : CLASS_ARCHER);
+                var _ch = _gs.player_ch;
+                _ch.max_hp = 99;
+                _ch.hp = 99;
+                _ch.max_mp = 99;
+                _ch.mp = 99;
+                if (_b_battle) _ch.skills = [SKILL_HILT_BASH];
+                GameState_SetPlayer(_ch);
+                if (_b_battle) SkillDB_Get(SKILL_HILT_BASH).status_chance = 1;   // the stun always lands, so there is something to check
+                _s.stt = { ac: 0, k: 0, n: 0, base: undefined, pv: "", len0: 0, snap: false, st0: 0, grade: "", brk: false, enemy_seen: false };
+                _s.vstart = _s.f;
+                _s.xwrong = 0;
+                Scenario_GotoBattle(_name + (_b_battle ? "_b" : "_a"), ENEMY_SLIME);
+                Scenario_Next(_s, _b_battle ? 4 : 1);
+            }
+            break;
+        case 1:   // battle A
+            if (room != rm_battle || !instance_exists(obj_battle_controller)) {
+                if (_s.t > 20) { Scenario_Check(_name + "_a_in_battle", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+                break;
+            }
+            var _bc = instance_find(obj_battle_controller, 0);
+            var _t = _s.stt;
+            if (_s.f - _s.vstart > 3500) {
+                Scenario_Check(_name + "_a_finished", false, "k=" + string(_t.k) + " state=" + string(_bc.battle_state));
+                Scenario_Next(_s, 2);
+                break;
+            }
+            if (_t.k == 0) {
+                if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) {   // the Archer (13) is first against the Slime (9)
+                    _t.base = Turn_New([Turn_Fighter(TL_PLAYER, Combat_EffectiveStat(_bc.p, STAT_SPD)), Turn_Fighter(TL_ENEMY, Combat_EffectiveStat(_bc.e, STAT_SPD))]);   // how the battle began ...
+                    Turn_Next(_t.base);
+                    _bc.e.max_hp = 999;
+                    _bc.e.hp = 999;
+                    _bc.e.stats.spd = 4;
+                    _bc.e.skills = [];   // basic attacks only: no skill can change its SPD or its guard
+                    _bc.e.stagger_max = 999;   // and no BREAK push-back: this battle is about SPD alone
+                    Scenario_Check(_name + "_a_archer_acts_first_against_the_slime", _bc.turn_log[0] == TL_PLAYER);
+                    _t.k = 1;
+                }
+            } else if (_t.k <= 10) {   // ten attacks without pressing (Weak is enough)
+                if (Scenario_BotAct(_s, _bc, "attack", false)) _t.k++;
+            } else {
+                var _n = array_length(_bc.turn_log);
+                var _want = "P";
+                for (var _i = 1; _i < _n; _i++) {
+                    Turn_SetSpd(_t.base, TL_PLAYER, Combat_EffectiveStat(_bc.p, STAT_SPD));
+                    Turn_SetSpd(_t.base, TL_ENEMY, 4);   // ... and the Slime slowed to 4 from its first turn on
+                    _want += (Turn_Next(_t.base) == TL_PLAYER) ? "P" : "E";
+                }
+                var _got = Scenario_BotTurnString(_bc.turn_log, _n);
+                var _ne = string_count("E", _got);
+                Scenario_Check(_name + "_a_real_turns_follow_the_timeline_model", _got == _want, "got " + _got + " want " + _want + " spd p=" + string(Combat_EffectiveStat(_bc.p, STAT_SPD)) + " e=" + string(Combat_EffectiveStat(_bc.e, STAT_SPD)) + " e.status=" + json_stringify(_bc.e.status) + " p.status=" + json_stringify(_bc.p.status));
+                Scenario_Check(_name + "_a_fast_player_acts_twice_before_a_slow_enemy", string_pos("PP", _got) > 0, _got);
+                Scenario_Check(_name + "_a_player_acts_at_least_twice_as_often_as_the_slow_enemy", (_n - _ne) >= 2 * _ne && _ne >= 1, _got);
+                Scenario_Check(_name + "_a_strip_preview_is_the_next_five_turns", Scenario_BotPreviewString(_bc.tl, 5) == Scenario_BotPreviewString(Turn_Copy(_bc.tl), 5) && array_length(Battle_TimelineSlots(_bc)) == 5);
+                Scenario_Check(_name + "_a_no_extra_action_counter_left", !variable_instance_exists(_bc, "player_bonus_actions_remaining"));
+                Scenario_Next(_s, 2);
+            }
+            break;
+        case 2:   // measured: battle B next (the battle is simply abandoned)
+            if (_s.t == 5) Scenario_Next(_s, 3);
+            break;
+        case 4:   // battle B
+            if (room != rm_battle || !instance_exists(obj_battle_controller)) {
+                if (_s.t > 20) { Scenario_Check(_name + "_b_in_battle", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+                break;
+            }
+            var _bcb = instance_find(obj_battle_controller, 0);
+            var _tb = _s.stt;
+            if (_s.f - _s.vstart > 7000) {
+                Scenario_Check(_name + "_b_finished", false, "k=" + string(_tb.k) + " state=" + string(_bcb.battle_state));
+                SkillDB_Get(SKILL_HILT_BASH).status_chance = 0.6;
+                _s.v = 5;
+                Scenario_Next(_s, 0);
+                break;
+            }
+            if (_tb.k == 0) {   // set up: a sturdy Slime whose BREAK meter is out of the way for now
+                if (_bcb.battle_state == BSTATE_MENU && _bcb.turn == TURN_PLAYER) {
+                    _bcb.e.max_hp = 999;
+                    _bcb.e.hp = 999;
+                    _bcb.e.stagger_max = 999;
+                    _tb.base = Turn_Copy(_bcb.tl);
+                    _tb.k = 1;
+                }
+            } else if (_tb.k == 1) {   // Hilt Bash (stun, chance 1)
+                if (Scenario_BotAct(_s, _bcb, "skill", true)) {
+                    Turn_SetSpd(_tb.base, TL_PLAYER, Combat_EffectiveStat(_bcb.p, STAT_SPD));   // what the timeline would be without the stun: SPD read again, the player's turn used up
+                    Turn_SetSpd(_tb.base, TL_ENEMY, Combat_EffectiveStat(_bcb.e, STAT_SPD));
+                    var _plain_next = Turn_Next(_tb.base);
+                    var _en = Turn_Find(_bcb.tl, TL_ENEMY);
+                    Scenario_Check(_name + "_b_stun_makes_the_enemy_steadfast_for_2_turns", _en.steadfast == TURN_STEADFAST_TURNS, "steadfast=" + string(_en.steadfast));
+                    Scenario_Check(_name + "_b_stun_marker_consumed", !Status_Has(_bcb.e, STATUS_STUN));
+                    Scenario_Check(_name + "_b_pushed_back_message_logged", Scenario_BotLogCount(_bcb, "pushed back") >= 1);
+                    var _seq_plain = ((_plain_next == TL_PLAYER) ? "P" : "E") + Scenario_BotPreviewString(_tb.base, 5);   // the turns from here on, without the stun ...
+                    var _seq_stun = ((_bcb.tl_who == TL_PLAYER) ? "P" : "E") + Scenario_BotPreviewString(_bcb.tl, 5);   // ... and with it
+                    Scenario_Check(_name + "_b_the_enemy_turn_is_pushed_later_on_the_strip", string_pos("E", _seq_stun) > string_pos("E", _seq_plain) && _seq_plain != _seq_stun, "plain " + _seq_plain + " stunned " + _seq_stun);
+                    var _lead = 0;
+                    var _pv1 = Turn_Preview(_bcb.tl, 6);
+                    while (_lead < array_length(_pv1) && _pv1[_lead] == TL_PLAYER) _lead++;
+                    Scenario_Check(_name + "_b_no_extra_player_actions_after_a_stun", _lead <= 2, "player turns in a row after the stun: " + string(_lead));
+                    Scenario_Check(_name + "_b_no_extra_action_counter_left", !variable_instance_exists(_bcb, "player_bonus_actions_remaining"));
+                    _tb.k = 2;
+                    _tb.snap = false;
+                }
+            } else if (_tb.k == 2) {   // a second Hilt Bash while the Slime is Steadfast: resisted, nothing moves
+                if (_tb.ac == 0 && !_tb.snap && _bcb.battle_state == BSTATE_MENU && _bcb.turn == TURN_PLAYER) {
+                    _tb.base = Turn_Copy(_bcb.tl);
+                    Turn_SetSpd(_tb.base, TL_PLAYER, Combat_EffectiveStat(_bcb.p, STAT_SPD));
+                    Turn_SetSpd(_tb.base, TL_ENEMY, Combat_EffectiveStat(_bcb.e, STAT_SPD));
+                    _tb.st0 = Turn_Find(_bcb.tl, TL_ENEMY).steadfast;
+                    _tb.snap = true;
+                }
+                if (Scenario_BotAct(_s, _bcb, "skill", true)) {
+                    Turn_Next(_tb.base);
+                    Scenario_Check(_name + "_b_second_stun_is_resisted_by_steadfast", Scenario_BotLogCount(_bcb, "Steadfast") >= 1 && _tb.st0 >= 1);
+                    Scenario_Check(_name + "_b_resisted_stun_moves_nothing", Scenario_BotPreviewString(_bcb.tl, 6) == Scenario_BotPreviewString(_tb.base, 6), Scenario_BotPreviewString(_bcb.tl, 6) + " vs " + Scenario_BotPreviewString(_tb.base, 6));
+                    _tb.pv = Scenario_BotPreviewString(_bcb.tl, 6);
+                    _tb.len0 = array_length(_bcb.turn_log);
+                    _tb.k = 3;
+                }
+            } else if (_tb.k == 3) {   // play on with plain attacks: the real turns must be exactly what the strip promised
+                if (Scenario_BotAct(_s, _bcb, "attack", false)) {
+                    if (array_length(_bcb.turn_log) >= _tb.len0 + 6) {
+                        var _real = "";
+                        for (var _ri = 0; _ri < 6; _ri++) _real += (_bcb.turn_log[_tb.len0 + _ri] == TL_PLAYER) ? "P" : "E";
+                        Scenario_Check(_name + "_b_real_turns_are_the_strip_preview", _real == _tb.pv, "real " + _real + " strip " + _tb.pv);
+                        _tb.k = 4;
+                        _tb.snap = false;
+                        _tb.n = 0;
+                    }
+                }
+            } else if (_tb.k == 4) {   // BREAK: Perfect attacks until the meter fills (8 for a Slime)
+                if (_tb.ac == 0 && !_tb.snap && _bcb.battle_state == BSTATE_MENU && _bcb.turn == TURN_PLAYER) {
+                    if (_tb.n == 0) {   // the Slime is made slow so that the player acts again before it does
+                        _bcb.e.stats.spd = 3;
+                        _bcb.e.stagger_max = 8;
+                        _bcb.e.stagger = 0;
+                    }
+                    _tb.base = Turn_Copy(_bcb.tl);
+                    Turn_SetSpd(_tb.base, TL_PLAYER, Combat_EffectiveStat(_bcb.p, STAT_SPD));
+                    Turn_SetSpd(_tb.base, TL_ENEMY, Combat_EffectiveStat(_bcb.e, STAT_SPD));
+                    _tb.st0 = _bcb.e.stagger;
+                    _tb.snap = true;
+                }
+                if (Scenario_BotAct(_s, _bcb, "attack", true)) {
+                    _tb.n++;
+                    _tb.snap = false;
+                    var _gk = _bcb.qte_result_key;
+                    var _gain = Stagger_Gain(Combat_BasicSource(_bcb.player_weapon).power, false, _gk == QTE_PERFECT);
+                    if (!_bcb.e.broken) {
+                        Scenario_Check(_name + "_b_stagger_meter_fills_by_the_formula_" + string(_tb.n), _bcb.e.stagger == _tb.st0 + _gain, "grade " + _gk + " gain " + string(_gain) + " " + string(_tb.st0) + " -> " + string(_bcb.e.stagger));
+                    } else {
+                        Scenario_Check(_name + "_b_full_meter_is_a_break", _tb.st0 + _gain >= 8 && _bcb.e.stagger == 0, "grade " + _gk + " " + string(_tb.st0) + " + " + string(_gain));
+                        Scenario_Check(_name + "_b_break_message_logged", Scenario_BotLogCount(_bcb, "BREAK") >= 1);
+                        Turn_Next(_tb.base);
+                        Turn_Push(_tb.base, TL_ENEMY);
+                        Scenario_Check(_name + "_b_break_pushes_the_enemy_back_one_turn", Scenario_BotPreviewString(_bcb.tl, 6) == Scenario_BotPreviewString(_tb.base, 6), Scenario_BotPreviewString(_bcb.tl, 6) + " vs " + Scenario_BotPreviewString(_tb.base, 6));
+                        Scenario_Check(_name + "_b_break_pop_started", (current_time - _bcb.break_start) < 1000);
+                        _tb.k = 5;
+                    }
+                    if (_tb.n > 8 && _tb.k == 4) { Scenario_Check(_name + "_b_break_reached", false, "meter " + string(_bcb.e.stagger)); _tb.k = 7; }
+                }
+            } else if (_tb.k == 5) {   // while BROKEN the next hit does +50%; a plain Weak hit, from a fresh Slime copy for the expected number
+                if (_tb.ac == 0 && _bcb.battle_state == BSTATE_MENU && _bcb.turn == TURN_PLAYER) {
+                    if (_bcb.e.broken) {
+                        _bcb.e.status = [];   // no Solidify guard in the way
+                        _tb.pv = "armed";
+                    } else {
+                        Scenario_Check(_name + "_b_player_acted_again_before_the_enemy", false, "the break was already over: the enemy acted first");
+                        _tb.k = 7;
+                    }
+                }
+                if (_tb.pv == "armed" && Scenario_BotAct(_s, _bcb, "attack", false)) {
+                    var _src = Combat_BasicSource(_bcb.player_weapon);
+                    var _plain = EnemyCreate(ENEMY_SLIME);
+                    var _broken = EnemyCreate(ENEMY_SLIME);
+                    _broken.broken = true;
+                    var _w_plain = Combat_ApplyDamage(_bcb.p, _plain, _src, 1, 1, { is_skill: false, grade_mult: 0.75 }).dmg;
+                    var _w_broken = Combat_ApplyDamage(_bcb.p, _broken, _src, 1, 1, { is_skill: false, grade_mult: 0.75 }).dmg;
+                    Scenario_Check(_name + "_b_break_hit_does_more_than_a_plain_one", _w_broken > _w_plain, "plain " + string(_w_plain) + " broken " + string(_w_broken));
+                    Scenario_Check(_name + "_b_broken_enemy_takes_the_plus_50_percent", _bcb.last_dmg == _w_broken, "dealt " + string(_bcb.last_dmg) + " want " + string(_w_broken));
+                    _tb.k = 6;
+                }
+            } else if (_tb.k == 6) {   // BROKEN ends when the enemy's next turn starts
+                if (_bcb.tl_who == TL_ENEMY) {
+                    Scenario_Check(_name + "_b_break_ends_when_the_enemy_turn_starts", !_bcb.e.broken);
+                    _tb.k = 7;
+                } else {
+                    Scenario_BotAct(_s, _bcb, "attack", false);
+                }
+            } else {
+                SkillDB_Get(SKILL_HILT_BASH).status_chance = 0.6;
                 _s.v = 5;   // on to movement and AI
                 Scenario_Next(_s, 0);
             }
@@ -1603,6 +1883,9 @@ function Scenario_StepShots(_s) {
             break;
         case 80: case 81: case 82: case 83: case 84: case 85: case 86: case 87: case 88: case 89:
             Scenario_StepShotsUi(_s);
+            break;
+        case 90: case 91: case 92: case 93: case 94: case 95: case 96: case 97:
+            Scenario_StepShotsTurns(_s);
             break;
         default:
             Scenario_StepShotsDisp(_s);
@@ -1916,6 +2199,101 @@ function Scenario_StepShotsQte(_s) {
             }
             break;
         case 42:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _s.si = 0;
+                Scenario_Next(_s, 90);   // B3 pictures (turn strip, stagger, BREAK, Foresight), then on to the D91 / DISP-10 / D48 ones
+            }
+            break;
+    }
+}
+
+// B3 pictures at display scale 3 (open them: the strip, the meter, the numbers, BREAK!, Foresight on the strip).
+function Scenario_StepShotsTurns(_s) {
+    switch (_s.step) {
+        case 90:   // a Knight against a Spider: strip across the top, stagger half full, Perfect / Good numbers over the enemy and a hurt number on the player
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(3);
+                Scenario_GotoBattle("shots_turns_strip", ENEMY_SPIDER);
+            }
+            if (_s.t >= 25) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_turns_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.wait_timer = 9999;   // stay on the intro message while the picture is taken
+                _bc.e.hp = 7;
+                _bc.enemy_hp_shown = 7;
+                _bc.e.stagger = 5;
+                _bc.pops = [];
+                Battle_HitPop(_bc, 12, QTE_PERFECT, false);
+                Battle_HitPop(_bc, 5, QTE_GOOD, false);
+                Battle_PlayerHitPop(_bc, 3, false);
+                Scenario_Check("shots_turns_strip_has_5_slots", array_length(Battle_TimelineSlots(_bc)) == TURN_PREVIEW_COUNT);
+                Scenario_Next(_s, 91);
+            }
+            break;
+        case 91:
+            if (_s.t >= 10) {
+                _s.shot = "shot_turns_strip.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 92);
+            }
+            break;
+        case 92:   // the BREAK moment: the pop, the pulsing full meter and the strip faded after the push-back
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.pops = [];
+                var _note = Battle_StaggerHit(_bc, 20, false, true);
+                Scenario_Check("shots_turns_break_triggered", _bc.e.broken && string_pos("BREAK", _note) > 0, _note);
+                Battle_HitPop(_bc, 18, QTE_PERFECT, true);
+                Scenario_Next(_s, 93);
+            }
+            break;
+        case 93:
+            if (_s.t >= 9) {
+                _s.shot = "shot_turns_break.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 94);
+            }
+            break;
+        case 94:   // a Mage with Foresight against a Spider that only uses Poison Fangs: the eye and the action name on the enemy's slot
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_NewKnight(CLASS_MAGE);
+                Debug_Init();
+                global.debug.enabled = true;
+                global.debug.enemy_damage_skill_only = true;
+                Scenario_GotoBattle("shots_turns_foresight", ENEMY_SPIDER);
+                Scenario_Next(_s, 95);
+            }
+            break;
+        case 95:
+            if (_s.t >= 25) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_turns_foresight_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.wait_timer = 9999;
+                _bc.p = Status_Add(_bc.p, STATUS_HIT_UP, 3, 0);
+                var _slots = Battle_TimelineSlots(_bc);
+                var _fs = Scenario_BotForesightSlot(_bc);
+                Scenario_Check("shots_turns_foresight_on_the_enemy_slot", is_struct(_fs) && _fs.slot.who == TL_ENEMY && _fs.slot.foresight.skill_id == SKILL_POISON_FANGS, is_struct(_fs) ? string(_fs.idx) : "none");
+                global.debug.enabled = false;
+                global.debug.enemy_damage_skill_only = false;
+                Scenario_Next(_s, 96);
+            }
+            break;
+        case 96:
+            if (_s.t >= 8) {
+                _s.shot = "shot_turns_foresight.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 97);
+            }
+            break;
+        case 97:
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 _s.si = 0;
