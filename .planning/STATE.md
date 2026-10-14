@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | RESUMED 2026-10-15 session 3 (owner OK to run). d1a: agent fixing input double-press flake (wt d1a). bal-apply: reviewed vs D111 = exact match; gates running (E:/Temp/dd-gate-bal). Then art-final, monster sound variation (RESUME item 4), D1b, D3, F1, E2. |
+| WIP | Session 3: D1a MERGED to next (full gate 712 s PASS, battle HUD + dialogue PNGs checked). In flight: bal-apply bot-scenario fix (wt bal; D111 numbers reviewed = exact), art-final (wt artf; merchant A + gold outline + icon redo). Then monster sounds (RESUME item 4), D1b, D3, F1, E2. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
