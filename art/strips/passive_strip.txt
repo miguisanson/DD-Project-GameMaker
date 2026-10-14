@@ -1,0 +1,9 @@
+# sprite: spr_icons_passive   frames: 8   16x16 each, left to right = subimage 0..7
+0	attack
+1	defense
+2	vitality
+3	magic
+4	speed
+5	critical
+6	greed
+7	recovery

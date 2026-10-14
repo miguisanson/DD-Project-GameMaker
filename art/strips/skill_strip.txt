@@ -1,0 +1,16 @@
+# sprite: spr_icons_skill   frames: 15   16x16 each, left to right = subimage 0..14
+0	wound
+1	hilt_bash
+2	muscle_up
+3	rev_up
+4	horizontal_slash
+5	power_strike
+6	poison_arrow
+7	evasion
+8	double_shot
+9	take_aim
+10	fireball
+11	poison_mist
+12	ice_spear
+13	meditation
+14	foresight
