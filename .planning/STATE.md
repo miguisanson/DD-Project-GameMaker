@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PAUSED by owner 2026-10-15. READ .planning/RESUME.md FIRST: 3 paused packets (d1a-battle-ui, bal-apply, art-final) with full briefs, then D1b, D3, F1, E2. |
+| WIP | RESUMED 2026-10-15 (session 2). Baseline fast gate on next e9685dc: PASS. d1a: next merged in, full gate running (WorkRoot E:\Temp\dd-gate-d1a, log E:\Temp\dd-gate-d1a-full.log). bal-apply: Sonnet agent applying D111/D112 in wt ../DD-Project-GameMaker-wt/bal. art-final: waits (scr_test overlap rule). Briefs in .planning/RESUME.md. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
