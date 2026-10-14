@@ -4,7 +4,9 @@ Start with `/continue_DD-Project-GameMaker`, then read this file, `BOARD.md`, `B
 Spec = `research/DECISIONS.md` (D1-D115). Work lands on branch `next`; docs live on `v1.9`.
 Never run tests/Igor/ComfyUI while the owner is using the PC — ask "is it OK to run now?" first.
 
-## Paused packets (worktrees exist; re-brief a Sonnet agent with the text below)
+## Status 2026-10-15 session 3: packets 1-3 below are DONE and merged to next. In flight: sfx-variety (item 4), d1b-menus.
+
+## (historical) Paused packets
 
 ### 1. D1a — battle HUD + battle menus + dialogue (wt `../DD-Project-GameMaker-wt/d1a`, branch `d1a-battle-ui` @ 573511e = WIP + next merged in, clean)
 Code done (see earlier notes: HUD/menus/dialogue on the framework, Guard, I-065/066/067, C4 merged). Session 2 full gate
