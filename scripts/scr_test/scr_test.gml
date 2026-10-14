@@ -4678,6 +4678,9 @@ function Test_Suite_Economy() {
     for (var _k2 = 0; _k2 < 2000; _k2++) { if (Shuffle_IsElite(77, "k" + string(_k2))) _el++; }
     Test_True("C3 shuffle: about 15% of map enemies are elites (255..345 of 2000)", _el >= 255 && _el <= 345);
     Test_Eq("C3 shuffle: the elite roll of one enemy never changes", Shuffle_IsElite(77, "k5"), Shuffle_IsElite(77, "k5"));
+    var _el_other = 0;
+    for (var _k3 = 0; _k3 < 400; _k3++) { if (Shuffle_IsElite(77, "k" + string(_k3)) != Shuffle_IsElite(78, "k" + string(_k3))) _el_other++; }
+    Test_True("C3 shuffle: which enemies are elites depends on the seed (about 2 x 15% x 85% = 25% of 400 differ)", _el_other >= 60 && _el_other <= 140);
     var _any_elite = false;
     for (var _sd2 = 1; _sd2 <= 60 && !_any_elite; _sd2++) {
         var _pp = Shuffle_RoomPlan(_sd2, "rm_floor4", _slots);
