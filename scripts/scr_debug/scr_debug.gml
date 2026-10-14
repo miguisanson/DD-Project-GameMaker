@@ -353,9 +353,7 @@ function Scenario_StepSmoke(_s) {
             if (_s.t == 60) _s.ap0 = Display_ApplyCount();   // after the boot layout (frame 30): nothing below may re-lay-out the display (DISP-08)
             if (_s.t == 90) {
                 Scenario_Check("smoke_title_menu", obj_start_controller.state == "main");
-                Scenario_NewKnight();
-                room_goto(rm_floor1);
-                Scenario_Next(_s, 1);
+                Scenario_Next(_s, 30);   // D0: drive the title menu and the settings through the real input, then on to rm_floor1
             }
             break;
         case 1:
@@ -421,6 +419,200 @@ function Scenario_StepSmoke(_s) {
             break;
         case 10: case 11: case 12: case 13: case 14: case 15: case 16: case 17:
             Scenario_StepSmokeSkip(_s);
+            break;
+        case 30:
+            Scenario_StepSmokeUi(_s);
+            break;
+        case 31:
+            Scenario_StepSmokeUiStart(_s);
+            break;
+        case 32:
+            Scenario_StepSmokePause(_s);
+            break;
+        case 33:
+            Scenario_StepSmokeUiToFloor(_s);
+            break;
+    }
+}
+
+// D0 / D95: the title menu and the settings screen driven by Scenario_Tap / Scenario_Hold (the game's own input state), so the
+// shared menu component is checked end to end: wrap-around, disabled items skipped, confirm opens a level, back goes up ONE level,
+// the cursor is remembered, left/right changes a pending value and Back throws it away, holding scrolls after a delay.
+// A fresh save area has no save, so Load Game is greyed: the title cursor visits New Game, Settings, Exit Game only.
+function Scenario_StepSmokeUi(_s) {
+    var _c = obj_start_controller;
+    var _top = is_struct(_c.title_stk) ? Ui_StackTop(_c.title_stk) : undefined;
+    var _sp = GameState_Get().ui.settings_popup;
+    switch (_s.t) {
+        case 1:
+            Scenario_Check("ui_title_menu_is_on_the_framework", is_struct(_top) && _top.id == "title" && Ui_StackDepth(_c.title_stk) == 1);
+            Scenario_Check("ui_title_starts_on_the_first_item", is_struct(_top) && _top.cursor == 0);
+            Scenario_Tap("menu_up");
+            break;
+        case 4:
+            Scenario_Check("ui_up_from_the_first_item_lands_on_the_last", _top.cursor == 3, "cursor=" + string(_top.cursor));
+            Scenario_Tap("menu_down");
+            break;
+        case 10:
+            Scenario_Check("ui_down_from_the_last_item_wraps_to_the_first", _top.cursor == 0, "cursor=" + string(_top.cursor));
+            Scenario_Tap("menu_down");
+            break;
+        case 16:
+            Scenario_Check("ui_cursor_skips_the_greyed_load_game", _top.cursor == 2, "cursor=" + string(_top.cursor));
+            Scenario_Tap("confirm");
+            break;
+        case 22:
+            Scenario_Check("ui_confirm_on_settings_opens_it", _c.state == "settings" && SettingsPopup_IsOpen("title"), "state=" + string(_c.state));
+            Scenario_Check("ui_settings_starts_on_the_first_row", _sp.menu.cursor == 0);
+            Scenario_Tap("menu_up");
+            break;
+        case 28:
+            Scenario_Check("ui_settings_up_from_the_first_row_lands_on_the_last", _sp.menu.cursor == array_length(_sp.menu.items) - 1 && _sp.menu.items[_sp.menu.cursor].id == "apply", "cursor=" + string(_sp.menu.cursor));
+            Scenario_Tap("menu_down");
+            break;
+        case 34:
+            Scenario_Check("ui_settings_down_from_the_last_row_wraps_to_the_first", _sp.menu.cursor == 0, "cursor=" + string(_sp.menu.cursor));
+            Scenario_Tap("menu_left");
+            break;
+        case 40:
+            Scenario_Check("ui_settings_left_lowers_the_pending_volume", abs(_sp.pending.audio_ui - 0.95) < 0.001, "ui=" + string(_sp.pending.audio_ui));
+            Scenario_Check("ui_settings_change_is_pending_not_applied", abs(GameSettings_Ensure().audio_ui - 1) < 0.001);
+            Scenario_Tap("cancel");
+            break;
+        case 60:
+            Scenario_Check("ui_back_leaves_settings_one_level", _c.state == "main" && !SettingsPopup_IsOpen("title"), "state=" + string(_c.state));
+            Scenario_Check("ui_back_throws_the_pending_change_away", abs(GameSettings_Ensure().audio_ui - 1) < 0.001);
+            Scenario_Check("ui_title_cursor_is_remembered", is_struct(_top) && _top.cursor == 2, "cursor=" + string(_top.cursor));
+            Scenario_Tap("menu_down");
+            break;
+        case 66:
+            Scenario_Tap("menu_down");
+            break;
+        case 72:
+            Scenario_Check("ui_title_cursor_back_on_new_game", _top.cursor == 0, "cursor=" + string(_top.cursor));
+            Scenario_Tap("confirm");
+            break;
+        case 80:
+            Scenario_Check("ui_new_game_opens_the_difficulty_level", _c.state == "difficulty" && Ui_StackDepth(_c.title_stk) == 2, "state=" + string(_c.state));
+            Scenario_Check("ui_difficulty_starts_on_normal", Ui_StackTop(_c.title_stk).cursor == 1);
+            Scenario_Tap("cancel");
+            break;
+        case 100:
+            Scenario_Check("ui_back_leaves_difficulty_one_level", _c.state == "main" && Ui_StackDepth(_c.title_stk) == 1, "state=" + string(_c.state) + " depth=" + string(Ui_StackDepth(_c.title_stk)));
+            Scenario_Tap("cancel");
+            break;
+        case 106:
+            Scenario_Check("ui_back_at_the_root_stays_on_the_title", _c.state == "main" && Ui_StackDepth(_c.title_stk) == 1);
+            _s.ui_t0 = current_time;
+            _s.ui_prev = _top.cursor;
+            _s.ui_moves = 0;
+            _s.ui_early = -1;
+            Scenario_Hold("menu_down", 90);
+            break;
+        default:
+            if (_s.t > 106 && _s.t < 230 && is_struct(_top) && _s.ui_t0 > 0) {
+                if (_top.cursor != _s.ui_prev) { _s.ui_moves++; _s.ui_prev = _top.cursor; }
+                var _el = current_time - _s.ui_t0;
+                if (_s.ui_early < 0 && _el >= 250) _s.ui_early = _s.ui_moves;
+                if (_s.ui_early >= 0 && _el >= 1000) {
+                    Scenario_Check("ui_hold_waits_before_it_repeats", _s.ui_early <= 1, "moves in the first 250 ms: " + string(_s.ui_early));
+                    Scenario_Check("ui_hold_then_scrolls_repeatedly", _s.ui_moves >= 4 && _s.ui_moves <= 40, "moves in 1 s: " + string(_s.ui_moves));
+                    _s.ui_t0 = 0;
+                    Scenario_Release();
+                    Scenario_Next(_s, 31);
+                }
+            }
+            if (_s.t >= 230 && _s.ui_t0 > 0) {
+                Scenario_Check("ui_hold_scroll_measured", false, "no measurement");
+                Scenario_Finish();
+            }
+            break;
+    }
+}
+
+// New Game from the title: confirm, pick Easy in the difficulty panel, and the intro cutscene starts with that difficulty.
+function Scenario_StepSmokeUiStart(_s) {
+    var _c = obj_start_controller;
+    switch (_s.t) {
+        case 1:
+            Ui_MenuFixCursor(Ui_StackTop(_c.title_stk), 0);   // the hold left the cursor anywhere
+            Scenario_Tap("confirm");
+            break;
+        case 20:
+            Scenario_Check("ui_new_game_shows_the_difficulty_panel", _c.state == "difficulty", "state=" + string(_c.state));
+            Scenario_Tap("menu_up");
+            break;
+        case 26:
+            Scenario_Tap("confirm");
+            break;
+        default:
+            if (_s.t > 26 && room == rm_cutscene && obj_start_controller.cutscene_started && !Transition_IsActive() && GameState_Get().ui.mode == UI_DIALOGUE) {
+                Scenario_Check("ui_difficulty_choice_starts_the_intro_with_it", Difficulty_GetCurrent() == DIFFICULTY_EASY, "difficulty=" + string(Difficulty_GetCurrent()));
+                Scenario_Hold("confirm", 120);   // D48: hold to skip the intro, then through the rm_floor1 intro dialogue (next step)
+                Scenario_Next(_s, 33);
+            }
+            if (_s.t > 600) {
+                Scenario_Check("ui_difficulty_choice_starts_the_intro_with_it", false, "room=" + room_get_name(room));
+                Scenario_Finish();
+            }
+            break;
+    }
+}
+
+function Scenario_StepSmokeUiToFloor(_s) {
+    var _gs = GameState_Get();
+    if (_s.t > 900) {
+        Scenario_Check("ui_new_game_reaches_rm_floor1", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode));
+        Scenario_Finish();
+        return;
+    }
+    if (room == rm_floor1 && !Transition_IsActive()) {
+        if (_gs.ui.mode == UI_DIALOGUE) {
+            if ((_s.f - _s.last_tap) >= 8) Scenario_Tap("confirm");
+        } else if (_s.t > 60 && array_length(_gs.ui.lines) <= 0 && variable_struct_exists(_gs, "pending_floor1_intro_dialogue") && !_gs.pending_floor1_intro_dialogue) {
+            Scenario_Check("ui_new_game_reaches_rm_floor1", true);
+            Scenario_Next(_s, 32);
+        }
+    }
+}
+
+// The other user of the settings screen: pause -> Settings -> Back (one level, back to the pause menu) -> Back (the game).
+function Scenario_StepSmokePause(_s) {
+    var _gs = GameState_Get();
+    switch (_s.t) {
+        case 1:
+            room_goto(rm_start);   // leave rm_floor1 first: a room_goto to the room we are in would not spawn the player again
+            break;
+        case 30:
+            Scenario_NewKnight();
+            room_goto(rm_floor1);
+            break;
+        case 120:
+            Scenario_Tap("pause");
+            break;
+        case 126:
+            Scenario_Check("ui_pause_menu_opens", _gs.ui.mode == UI_PAUSE, "mode=" + string(_gs.ui.mode) + " room=" + room_get_name(room));
+            Scenario_Tap("menu_down");
+            break;
+        case 132:
+            Scenario_Tap("confirm");
+            break;
+        case 140:
+            Scenario_Check("ui_pause_settings_opens", SettingsPopup_IsOpen("pause"));
+            Scenario_Tap("cancel");
+            break;
+        case 165:
+            Scenario_Check("ui_pause_settings_back_returns_to_the_pause_menu", !SettingsPopup_IsOpen("pause") && _gs.ui.mode == UI_PAUSE, "open=" + string(SettingsPopup_IsOpen("pause")) + " mode=" + string(_gs.ui.mode));
+            Scenario_Tap("cancel");
+            break;
+        case 190:
+            Scenario_Check("ui_pause_back_returns_to_the_game", _gs.ui.mode == UI_NONE, "mode=" + string(_gs.ui.mode));
+            room_goto(rm_start);
+            break;
+        case 220:
+            Scenario_NewKnight();   // the rest of the smoke run starts the way it always did: a new knight entering rm_floor1 from the title
+            room_goto(rm_floor1);
+            Scenario_Next(_s, 1);
             break;
     }
 }
@@ -1158,6 +1350,9 @@ function Scenario_StepShots(_s) {
         case 50: case 51: case 52: case 53: case 54: case 55: case 56: case 57: case 58:
             Scenario_StepShotsWindow(_s);
             break;
+        case 60: case 61: case 62: case 63: case 64: case 65: case 66: case 67:
+            Scenario_StepShotsUi(_s);
+            break;
         default:
             Scenario_StepShotsDisp(_s);
             break;
@@ -1519,7 +1714,8 @@ function Scenario_StepShotsWindow(_s) {
                 SettingsPopup_Open("title");
                 var _sp = GameState_Get().ui.settings_popup;
                 _sp.pending.window_mode = WINDOW_MODE_BORDERLESS;
-                _sp.index = 3;
+                SettingsPopup_Refresh();
+                Ui_MenuFixCursor(_sp.menu, 6);   // the Window row
             }
             if (_s.t == 90) {
                 _s.shot = "shot_settings_window_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
@@ -1531,7 +1727,7 @@ function Scenario_StepShotsWindow(_s) {
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 SettingsPopup_Close(true);
-                Scenario_Next(_s, 54);
+                Scenario_Next(_s, 60);
             }
             break;
         case 54:   // the intro cutscene, confirm held for about half the skip time
@@ -1566,6 +1762,112 @@ function Scenario_StepShotsWindow(_s) {
             }
             break;
     }
+}
+
+// D0: the shared UI framework on screen at window scale 3 (480 x 432, the GUI grid is the same size): the title menu, the difficulty
+// panel, the settings screen with its details panel (volume row, then the text speed row with its number line), Korean, and the
+// component kit (tabs header, speaker tab, details panel). Everything is reached through real input. Files shot_ui_<name>_<w>x<h>.png.
+function Scenario_ShotUi(_s, _name) {
+    _s.shot = "shot_ui_" + _name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+    Scenario_ShotLayout(_s.shot);
+}
+
+function Scenario_StepShotsUi(_s) {
+    var _c = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _sp = GameState_Get().ui.settings_popup;
+    switch (_s.step) {
+        case 60:   // the title menu
+            if (_s.t == 1) { Scenario_SetWindowScale(3); room_goto(rm_start); }
+            if (_s.t == 90) {
+                Scenario_Check("shots_ui_title_state", _c != noone && _c.state == "main", "state=" + ((_c != noone) ? string(_c.state) : "no controller"));
+                Scenario_ShotUi(_s, "title");
+                Scenario_Next(_s, 61);
+            }
+            break;
+        case 61:   // New Game -> the difficulty panel
+            if (_s.t == 3) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Tap("confirm"); }
+            if (_s.t == 40) {
+                Scenario_Check("shots_ui_difficulty_state", _c.state == "difficulty", "state=" + string(_c.state));
+                Scenario_ShotUi(_s, "difficulty");
+                Scenario_Next(_s, 62);
+            }
+            break;
+        case 62:   // Back -> down to Settings -> confirm
+            if (_s.t == 3) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Tap("cancel"); }
+            if (_s.t == 30) Scenario_Tap("menu_down");
+            if (_s.t == 36) Scenario_Tap("confirm");
+            if (_s.t == 60) Ui_MenuFixCursor(_sp.menu, 0);   // an earlier shot left the remembered cursor on the Window row
+            if (_s.t == 80) {
+                Scenario_Check("shots_ui_settings_state", _c.state == "settings" && SettingsPopup_IsOpen("title"), "state=" + string(_c.state));
+                Scenario_ShotUi(_s, "settings");
+                Scenario_Next(_s, 63);
+            }
+            break;
+        case 63:   // text speed row: the details panel with its number line
+            if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+            if (_s.t == 4 || _s.t == 10 || _s.t == 16) Scenario_Tap("menu_down");
+            if (_s.t == 60) {
+                Scenario_Check("shots_ui_settings_on_text_speed", _sp.menu.items[_sp.menu.cursor].id == "text_speed", "row=" + string(_sp.menu.items[_sp.menu.cursor].id));
+                Scenario_ShotUi(_s, "settings_details");
+                Scenario_Next(_s, 64);
+            }
+            break;
+        case 64:   // language row, right: Korean
+            if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+            if (_s.t == 4 || _s.t == 10 || _s.t == 16 || _s.t == 22 || _s.t == 28) Scenario_Tap("menu_down");
+            if (_s.t == 34) Scenario_Tap("menu_right");
+            if (_s.t == 90) {
+                Scenario_Check("shots_ui_settings_is_korean", Loc_GetLanguage() == "ko" && _sp.menu.items[_sp.menu.cursor].id == "language", "lang=" + Loc_GetLanguage());
+                Scenario_ShotUi(_s, "settings_ko");
+                Scenario_Next(_s, 65);
+            }
+            break;
+        case 65:   // Back restores English and leaves the settings
+            if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+            if (_s.t == 4) Scenario_Tap("cancel");
+            if (_s.t == 50) {
+                Scenario_Check("shots_ui_back_restores_english", Loc_GetLanguage() == "en" && _c.state == "main", "lang=" + Loc_GetLanguage() + " state=" + string(_c.state));
+                global.scn.uikit = true;
+                Scenario_Next(_s, 66);
+            }
+            break;
+        case 66:   // the component kit
+            if (_s.t == 15) {
+                Scenario_ShotUi(_s, "kit");
+                Scenario_Next(_s, 67);
+            }
+            break;
+        case 67:
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.scn.uikit = false;
+                Scenario_Next(_s, 54);   // on to the intro cutscene / skip hint shots
+            }
+            break;
+    }
+}
+
+// The kit gallery for the kit shot (drawn over the title by obj_start_controller's Draw GUI while global.scn.uikit is set).
+function Scenario_DrawUiKit() {
+    if (!variable_global_exists("scn") || !is_struct(global.scn) || !variable_struct_exists(global.scn, "uikit") || !global.scn.uikit) return;
+    var _mt = Ui_Metrics();
+    var _p = _mt.p;
+    Ui_Box(0, 0, _mt.gw, _mt.gh, UI_C_DARKEST);
+    var _x = _mt.margin;
+    var _w = _mt.gw - 2 * _mt.margin;
+    var _y = _mt.margin;
+    _y += Ui_DrawTabs(_x, _y, _w, ["Items", "Skills", "Status"], 1) + 2 * _p;
+    var _sent = "Hits one enemy for fire damage and may burn it.";
+    var _lines = [{ label: "Damage", value: "12" }, { label: "MP cost", value: "4" }];
+    var _dh = Ui_DetailsHeight(_w, _sent, _lines);
+    Ui_DrawDetails(_x, _y, _w, _dh, _sent, _lines);
+    _y += _dh + 10 * _p;
+    var _bh = 3 * _mt.row_h + 8 * _p;
+    Ui_DrawFrame(_x, _y, _w, _bh, 1, _p);
+    Ui_DrawNameTab(_x, _y, "Mira");
+    Ui_Text(_x + 4 * _p, _y + 4 * _p, "The tab and the box share one border.", UI_C_LIGHTEST);
+    Ui_Text(_x + 4 * _p, _y + 4 * _p + _mt.row_h, "Light, lighter, dark, darkest: four colours.", UI_C_LIGHT);
+    Ui_Arrow(_x + _w - 8 * _p, _y + _bh - 8 * _p, 1, _p, UI_C_LIGHTEST);
 }
 
 // I-052: one screenshot per player skill animation, in rm_battle at display scale 3 (480 x 432), file shot_fx_<skill>.png.

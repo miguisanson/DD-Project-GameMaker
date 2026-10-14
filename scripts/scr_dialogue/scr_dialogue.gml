@@ -863,7 +863,7 @@ function Dialogue_TypewriterPrepareCurrentLine() {
             if (cutscene_cps > 0) chars_per_sec = cutscene_cps;
         }
     }
-    gs.ui.dialogue_chars_per_sec = max(1, chars_per_sec);
+    gs.ui.dialogue_chars_per_sec = max(1, chars_per_sec * Settings_TextSpeedMul(GameSettings_Ensure().text_speed));   // D0: the Text speed setting
     gs.ui.dialogue_hold_duration = max(1, round(UI_DIALOGUE_ADVANCE_HOLD_SEC * game_fps));
 
     var line_text = Dialogue_LineText(gs.ui.lines[gs.ui.index]);

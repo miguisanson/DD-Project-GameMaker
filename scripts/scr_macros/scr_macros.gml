@@ -202,8 +202,6 @@
 #macro UI_NAV_REPEAT_RATE 2
 #macro MENU_REPEAT_DELAY 4
 #macro MENU_REPEAT_INTERVAL 2
-#macro SETTINGS_HOLD_REPEAT_DELAY 10
-#macro SETTINGS_HOLD_REPEAT_INTERVAL 5
 #macro COMBAT_ACTION_DELAY 60   // long hold: battle intro, kill and run-away messages
 #macro COMBAT_ACTION_HOLD_SEC 0.3   // D55: hold after a player or enemy action, in seconds (use Combat_SecToFrames)
 #macro COMBAT_LOG_MAX 30
@@ -293,7 +291,6 @@
 #macro SKIP_HOLD_FRAMES 60
 #macro SKIP_HINT_FRAMES 150
 #macro SETTINGS_VOLUME_STEP 0.05
-#macro SETTINGS_MENU_ROW_COUNT 8
 #macro AUDIO_DEBUG_TOOLS 0
 
 #macro TRANSITION_TYPE_NONE 0

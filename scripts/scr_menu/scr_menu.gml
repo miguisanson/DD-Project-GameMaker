@@ -2087,455 +2087,412 @@ function ClassSelect_Draw() {
     draw_set_alpha(1);
 }
 
+// --------------------
+// SETTINGS SCREEN (D0 pilot on the UI framework; opened from the title and from the pause menu)
+// --------------------
+// Rows work on a pending copy of the settings; Apply commits and saves, Back leaves without saving. The window rows keep D91's logic
+// (Display_WindowedMaxScaleNow decides the largest windowed scale; scale only matters while windowed).
+function Settings_TextSpeedMul(_idx) {
+    switch (clamp(round(_idx), 0, SETTINGS_TEXT_SPEED_MAX)) {
+        case 0: return 0.6;
+        case 2: return 1.6;
+    }
+    return 1;
+}
+
+function Settings_ShakeOn() {
+    return GameSettings_Ensure().screen_shake != 0;
+}
+
+// One change to the pending settings struct by row id. Returns true when something changed. The language row only flips the code;
+// the caller applies the preview (Loc_SetLanguage).
+function Settings_Adjust(_p, _id, _dir, _scale_max) {
+    var d = (_dir < 0) ? -1 : 1;
+    switch (_id) {
+        case "vol_ui":
+        case "vol_sfx":
+        case "vol_bgm":
+            var field = (_id == "vol_ui") ? "audio_ui" : ((_id == "vol_sfx") ? "audio_sfx" : "audio_bgm");
+            var old = variable_struct_get(_p, field);
+            var nv = clamp(round((old + d * SETTINGS_VOLUME_STEP) * 100) / 100, 0, 1);
+            variable_struct_set(_p, field, nv);
+            return nv != old;
+        case "text_speed":
+            var ts = clamp(_p.text_speed + d, 0, SETTINGS_TEXT_SPEED_MAX);
+            var ts_changed = (ts != _p.text_speed);
+            _p.text_speed = ts;
+            return ts_changed;
+        case "shake":
+            _p.screen_shake = (_p.screen_shake != 0) ? 0 : 1;
+            return true;
+        case "qte_assist":
+            _p.qte_assist = (_p.qte_assist != 0) ? 0 : 1;
+            return true;
+        case "window":
+            _p.window_mode = (_p.window_mode + ((d > 0) ? 1 : WINDOW_MODE_COUNT - 1)) mod WINDOW_MODE_COUNT;
+            return true;
+        case "scale":
+            if (_p.window_mode != WINDOW_MODE_WINDOWED) return false;
+            var sc = clamp(_p.display_scale + d, min(DISPLAY_SCALE_MIN, _scale_max), _scale_max);
+            var sc_changed = (sc != _p.display_scale);
+            _p.display_scale = sc;
+            return sc_changed;
+        case "language":
+            _p.language = (_p.language == "ko") ? "en" : "ko";
+            return true;
+    }
+    return false;
+}
+
+function Settings_WindowModeText(_mode) {
+    if (_mode == WINDOW_MODE_WINDOWED) return Loc_T("settings.value.window_windowed", "Windowed");
+    if (_mode == WINDOW_MODE_BORDERLESS) return Loc_T("settings.value.window_borderless", "Borderless");
+    return Loc_T("settings.value.window_exclusive", "Exclusive");
+}
+
+function Settings_TextSpeedText(_idx) {
+    if (_idx <= 0) return Loc_T("settings.value.speed_slow", "Slow");
+    if (_idx >= SETTINGS_TEXT_SPEED_MAX) return Loc_T("settings.value.speed_fast", "Fast");
+    return Loc_T("settings.value.speed_normal", "Normal");
+}
+
+function Settings_Row(_id, _label, _kind, _value, _help) {
+    return { id: _id, label: _label, kind: _kind, enabled: true, value: _value, amount: 0, help: _help, lines: [] };
+}
+
+function Settings_VolumeRow(_id, _label, _v, _help) {
+    var r = Settings_Row(_id, _label, "slider", string(clamp(round(_v * 100), 0, 100)) + "%", _help);
+    r.amount = _v;
+    return r;
+}
+
+// The menu items for a pending settings struct: labels, values, slider fills, help sentences and number lines (D100: the numbers
+// come from the real data, never typed in twice).
+function SettingsMenu_Items(_p, _scale_max, _dirty = false) {
+    var ts = clamp(_p.text_speed, 0, SETTINGS_TEXT_SPEED_MAX);
+    var windowed = (_p.window_mode == WINDOW_MODE_WINDOWED);
+    var items = [];
+    array_push(items, Settings_VolumeRow("vol_ui", Loc_T("settings.row.ui", "UI"), _p.audio_ui,
+        Loc_T("settings.help.vol_ui", "How loud menu clicks and other interface sounds are.")));
+    array_push(items, Settings_VolumeRow("vol_sfx", Loc_T("settings.row.sfx", "SFX"), _p.audio_sfx,
+        Loc_T("settings.help.vol_sfx", "How loud hits, footsteps and other game sounds are.")));
+    array_push(items, Settings_VolumeRow("vol_bgm", Loc_T("settings.row.bgm", "BGM"), _p.audio_bgm,
+        Loc_T("settings.help.vol_bgm", "How loud the music is.")));
+
+    var r_ts = Settings_Row("text_speed", Loc_T("settings.row.text_speed", "Text speed"), "choice",
+        Settings_TextSpeedText(ts), Loc_T("settings.help.text_speed", "How fast dialogue text appears."));
+    r_ts.measure = [Settings_TextSpeedText(0), Settings_TextSpeedText(1), Settings_TextSpeedText(2)];
+    array_push(r_ts.lines, { label: Loc_T("settings.line.cps", "Characters per second"), value: string(round(UI_DIALOGUE_CHARS_PER_SEC * Settings_TextSpeedMul(ts))) });
+    array_push(items, r_ts);
+
+    var r_sh = Settings_Row("shake", Loc_T("settings.row.shake", "Screen shake"), "choice",
+        (_p.screen_shake != 0) ? Loc_T("settings.value.on", "On") : Loc_T("settings.value.off", "Off"),
+        Loc_T("settings.help.shake", "Turns the screen shake on hits on or off."));
+    r_sh.measure = [Loc_T("settings.value.on", "On"), Loc_T("settings.value.off", "Off")];
+    array_push(items, r_sh);
+
+    var r_qa = Settings_Row("qte_assist", Loc_T("settings.row.qte_assist", "QTE assist"), "choice",
+        (_p.qte_assist != 0) ? Loc_T("settings.value.on", "On") : Loc_T("settings.value.off", "Off"),
+        Loc_T("settings.help.qte_assist", "Planned: more forgiving timing on button prompts."));
+    r_qa.measure = [Loc_T("settings.value.on", "On"), Loc_T("settings.value.off", "Off")];
+    array_push(items, r_qa);
+
+    var r_wm = Settings_Row("window", Loc_T("settings.row.window_mode", "Window"), "choice", Settings_WindowModeText(_p.window_mode),
+        Loc_T("settings.help.window", "Windowed, borderless fullscreen, or exclusive fullscreen."));
+    r_wm.measure = [Settings_WindowModeText(WINDOW_MODE_WINDOWED), Settings_WindowModeText(WINDOW_MODE_BORDERLESS), Settings_WindowModeText(WINDOW_MODE_EXCLUSIVE)];
+    array_push(r_wm.lines, { label: Loc_T("settings.line.monitor", "Monitor"), value: string(Display_MonitorW()) + " x " + string(Display_MonitorH()) });
+    array_push(items, r_wm);
+
+    var r_sc = Settings_Row("scale", Loc_T("settings.row.scale", "Scale"), "choice",
+        windowed ? (string(_p.display_scale) + "x") : Loc_T("settings.value.auto", "Auto"),
+        Loc_T("settings.help.scale", "How many times the picture is enlarged in a window. Only used when windowed."));
+    r_sc.enabled = windowed;
+    r_sc.measure = [string(DISPLAY_SCALE_MAX) + "x", Loc_T("settings.value.auto", "Auto")];
+    var wsz = Display_WindowSizeForScale(_p.display_scale);
+    array_push(r_sc.lines, { label: Loc_T("settings.line.window_size", "Window size"), value: string(wsz.w) + " x " + string(wsz.h) });
+    array_push(items, r_sc);
+
+    var r_lg = Settings_Row("language", Loc_T("settings.row.language", "Language"), "choice", Loc_LanguageDisplayName(_p.language),
+        Loc_T("settings.help.language", "Language of all text in the game."));
+    r_lg.measure = [Loc_LanguageDisplayName("en"), Loc_LanguageDisplayName("ko")];
+    array_push(items, r_lg);
+
+    var r_ap = Settings_Row("apply", Loc_T("settings.row.apply", "Apply"), "button",
+        _dirty ? Loc_T("settings.value.pending", "Pending") : Loc_T("settings.value.saved", "Saved"),
+        Loc_T("settings.help.apply", "Saves your changes and applies them now. Back leaves without saving."));
+    r_ap.measure = [Loc_T("settings.value.pending", "Pending"), Loc_T("settings.value.saved", "Saved")];
+    array_push(items, r_ap);
+    return items;
+}
+
 function SettingsPopup_Ensure() {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
     if (!variable_struct_exists(gs.ui, "settings_popup")) {
         gs.ui.settings_popup = {
-            open: false,
-            owner: "",
-            index: 0,
-            volume_step: SETTINGS_VOLUME_STEP,
-            dirty: false,
-            pending: GameSettings_Copy(GameSettings_Ensure()),
-            opened_frame: UI_OPENED_FRAME_NONE,
-            closing: false,
-            close_frame: UI_OPENED_FRAME_NONE,
-            lr_hold_dir: 0,
-            lr_hold_frames: 0
+            open: false, owner: "", menu: undefined, pending: GameSettings_Copy(GameSettings_Ensure()),
+            dirty: false, closing: false, closed_ms: -1, scale_max: DISPLAY_SCALE_MAX
         };
-    } else {
-        var sp0 = gs.ui.settings_popup;
-        if (!variable_struct_exists(sp0, "owner")) sp0.owner = "";
-        if (!variable_struct_exists(sp0, "index")) sp0.index = 0;
-        if (!variable_struct_exists(sp0, "volume_step")) sp0.volume_step = SETTINGS_VOLUME_STEP;
-        if (!variable_struct_exists(sp0, "dirty")) sp0.dirty = false;
-        if (!variable_struct_exists(sp0, "pending") || !is_struct(sp0.pending)) sp0.pending = GameSettings_Copy(GameSettings_Ensure());
-        if (!variable_struct_exists(sp0, "opened_frame")) sp0.opened_frame = UI_OPENED_FRAME_NONE;
-        if (!variable_struct_exists(sp0, "closing")) sp0.closing = false;
-        if (!variable_struct_exists(sp0, "close_frame")) sp0.close_frame = UI_OPENED_FRAME_NONE;
-        if (!variable_struct_exists(sp0, "lr_hold_dir")) sp0.lr_hold_dir = 0;
-        if (!variable_struct_exists(sp0, "lr_hold_frames")) sp0.lr_hold_frames = 0;
     }
 }
 
 function SettingsPopup_IsOpen(_owner = "") {
     SettingsPopup_Ensure();
-    var gs = GameState_Get();
-    var sp = gs.ui.settings_popup;
+    var sp = GameState_Get().ui.settings_popup;
     if (!sp.open) return false;
     if (_owner != "" && string(sp.owner) != string(_owner)) return false;
     return true;
 }
 
+// Rebuilds the rows from the pending settings (after any change; the cursor stays where it is).
+function SettingsPopup_Refresh() {
+    SettingsPopup_Ensure();
+    var sp = GameState_Get().ui.settings_popup;
+    if (!sp.open || !is_struct(sp.menu)) return;
+    sp.menu.items = SettingsMenu_Items(sp.pending, sp.scale_max, sp.dirty);
+}
+
+// 0..1 for the dim logic while the popup slides in or out (D97).
+function SettingsPopup_Alpha() {
+    var sp = GameState_Get().ui.settings_popup;
+    return is_struct(sp.menu) ? Ui_MenuAlpha(sp.menu, current_time) : 0;
+}
+
 function SettingsPopup_Open(_owner = "") {
     SettingsPopup_Ensure();
-    var gs = GameState_Get();
-    var sp = gs.ui.settings_popup;
+    var sp = GameState_Get().ui.settings_popup;
     sp.open = true;
     sp.owner = string(_owner);
-    sp.index = 0;
-    sp.volume_step = SETTINGS_VOLUME_STEP;
     sp.dirty = false;
-    sp.pending = GameSettings_Copy(GameSettings_Ensure());
-    sp.opened_frame = Input_Frame();
     sp.closing = false;
-    sp.close_frame = UI_OPENED_FRAME_NONE;
-    sp.lr_hold_dir = 0;
-    sp.lr_hold_frames = 0;
-    gs.ui.settings_popup = sp;
+    sp.closed_ms = -1;
+    sp.pending = GameSettings_Copy(GameSettings_Ensure());
+    sp.scale_max = clamp(Display_WindowedMaxScaleNow(), 1, DISPLAY_SCALE_MAX);
+    sp.menu = Ui_MenuNew("settings", SettingsMenu_Items(sp.pending, sp.scale_max), {
+        on_confirm: SettingsMenu_OnConfirm, on_adjust: SettingsMenu_OnAdjust, on_back: SettingsMenu_OnBack,
+        layout: { title: Loc_T("settings.title", "Settings"), anchor: "center", details: true, hides_below: true }
+    });
     SFX_PlayUI("ui_openclose");
 }
 
 function SettingsPopup_Close(_immediate = false) {
     SettingsPopup_Ensure();
-    var gs = GameState_Get();
-    var sp = gs.ui.settings_popup;
+    var sp = GameState_Get().ui.settings_popup;
     if (!sp.open) return;
     if (_immediate) {
-        sp.open = false;
-        sp.owner = "";
-        sp.closing = false;
-        sp.close_frame = UI_OPENED_FRAME_NONE;
-        sp.opened_frame = UI_OPENED_FRAME_NONE;
-        sp.dirty = false;
-        sp.pending = GameSettings_Copy(GameSettings_Ensure());
-        sp.lr_hold_dir = 0;
-        sp.lr_hold_frames = 0;
-        gs.ui.settings_popup = sp;
-        SFX_PlayUI("ui_openclose");
+        SettingsPopup_CloseFinalize();
         return;
     }
     if (sp.closing) return;
     sp.closing = true;
-    sp.close_frame = Input_Frame();
-    gs.ui.settings_popup = sp;
-    SFX_PlayUI("ui_openclose");
+    sp.closed_ms = current_time;
+    if (is_struct(sp.menu)) Ui_MenuClose(sp.menu);
 }
 
 function SettingsPopup_CloseFinalize() {
     SettingsPopup_Ensure();
-    var gs = GameState_Get();
-    var sp = gs.ui.settings_popup;
+    var sp = GameState_Get().ui.settings_popup;
+    if (is_struct(sp.menu)) Ui_MemSet(Ui_MemGlobal(), sp.menu.id, sp.menu.cursor);
     sp.open = false;
     sp.owner = "";
     sp.closing = false;
-    sp.close_frame = UI_OPENED_FRAME_NONE;
-    sp.opened_frame = UI_OPENED_FRAME_NONE;
+    sp.closed_ms = -1;
     sp.dirty = false;
+    sp.menu = undefined;
     sp.pending = GameSettings_Copy(GameSettings_Ensure());
-    sp.lr_hold_dir = 0;
-    sp.lr_hold_frames = 0;
-    gs.ui.settings_popup = sp;
+}
+
+// Applies one change to the pending copy and refreshes the rows; the language row previews at once.
+function SettingsPopup_Change(_id, _dir) {
+    var sp = GameState_Get().ui.settings_popup;
+    var changed = Settings_Adjust(sp.pending, _id, _dir, sp.scale_max);
+    if (changed) {
+        sp.dirty = true;
+        if (_id == "language") Loc_SetLanguage(sp.pending.language);
+        SettingsPopup_Refresh();
+        if (_id == "language") sp.menu.layout.title = Loc_T("settings.title", "Settings");
+    }
+    return changed;
+}
+
+function SettingsMenu_OnAdjust(_m, _i, _dir) {
+    return SettingsPopup_Change(_m.items[_i].id, _dir);
+}
+
+// Confirm: Apply commits and saves; a choice row steps forward (so a toggle flips with the confirm key too).
+function SettingsMenu_OnConfirm(_m, _i) {
+    var rid = _m.items[_i].id;
+    var sp = GameState_Get().ui.settings_popup;
+    if (rid == "apply") {
+        var committed = GameSettings_Commit(sp.pending, true);
+        sp.pending = GameSettings_Copy(committed);
+        sp.dirty = false;
+        SettingsPopup_Refresh();
+        return;
+    }
+    if (_m.items[_i].kind == "choice") SettingsPopup_Change(rid, 1);
+}
+
+// Back: leave without saving, restoring the saved language.
+function SettingsMenu_OnBack(_m, _res) {
+    var sp = GameState_Get().ui.settings_popup;
+    sp.pending = GameSettings_Copy(GameSettings_Ensure());
+    sp.dirty = false;
+    Loc_SetLanguage(GameSettings_Ensure().language);
+    SettingsPopup_Close(false);
 }
 
 function SettingsPopup_HandleInput() {
     SettingsPopup_Ensure();
-    var gs = GameState_Get();
-    var sp = gs.ui.settings_popup;
+    var sp = GameState_Get().ui.settings_popup;
     if (!sp.open) return;
-
     if (sp.closing) {
-        if (Input_Frame() - sp.close_frame >= UI_POPUP_FADE_FRAMES) {
-            SettingsPopup_CloseFinalize();
-        } else {
-            gs.ui.settings_popup = sp;
-        }
+        if (current_time - sp.closed_ms >= UI_PANEL_MS) SettingsPopup_CloseFinalize();
         return;
     }
-
-    var k_up = Input_UIPressed("menu_up");
-    var k_down = Input_UIPressed("menu_down");
-    var k_left = Input_UIPressed("menu_left");
-    var k_right = Input_UIPressed("menu_right");
-    var h_left = Input_Held("menu_left");
-    var h_right = Input_Held("menu_right");
-    var k_ok = Input_UIConfirm();
-    var k_back = Input_UIBack();
-
-    var settings_rows = SETTINGS_MENU_ROW_COUNT;
-    if (k_up) {
-        sp.index = (sp.index + settings_rows - 1) mod settings_rows;
-        SFX_PlayUI("ui_move");
-    }
-    if (k_down) {
-        sp.index = (sp.index + 1) mod settings_rows;
-        SFX_PlayUI("ui_move");
-    }
-
-    if (sp.index == 7 && k_left) {
-        sp.index = 6;
-        SFX_PlayUI("ui_move");
-    }
-
-    if (k_back) {
-        sp.pending = GameSettings_Copy(GameSettings_Ensure());
-        sp.dirty = false;
-        Loc_SetLanguage(GameSettings_Ensure().language);
-        gs.ui.settings_popup = sp;
-        SettingsPopup_Close(false);
-        return;
-    }
-
-    var pending = GameSettings_Copy(sp.pending);
-    var changed = false;
-    var step = sp.volume_step;
-    var can_hold_adjust = (sp.index >= 0 && sp.index <= 5);
-
-    // Local hold-repeat for slider/scale rows only.
-    var hold_dir = 0;
-    if (h_right && !h_left) hold_dir = 1;
-    if (h_left && !h_right) hold_dir = -1;
-    if (!can_hold_adjust) hold_dir = 0;
-
-    if (hold_dir != sp.lr_hold_dir) {
-        sp.lr_hold_dir = hold_dir;
-        sp.lr_hold_frames = 0;
-    } else if (hold_dir != 0) {
-        sp.lr_hold_frames += 1;
-    } else {
-        sp.lr_hold_frames = 0;
-    }
-
-    var k_left_step = k_left;
-    var k_right_step = k_right;
-    if (can_hold_adjust && hold_dir != 0) {
-        var repeat_fire = (sp.lr_hold_frames >= SETTINGS_HOLD_REPEAT_DELAY)
-            && (((sp.lr_hold_frames - SETTINGS_HOLD_REPEAT_DELAY) mod max(1, SETTINGS_HOLD_REPEAT_INTERVAL)) == 0);
-        if (hold_dir < 0) k_left_step = (k_left_step || repeat_fire);
-        if (hold_dir > 0) k_right_step = (k_right_step || repeat_fire);
-    }
-
-    switch (sp.index) {
-        case 0:
-            if (k_left_step) {
-                pending.audio_ui = clamp(pending.audio_ui - step, 0, 1);
-                changed = true;
-            }
-            if (k_right_step) {
-                pending.audio_ui = clamp(pending.audio_ui + step, 0, 1);
-                changed = true;
-            }
-            break;
-        case 1:
-            if (k_left_step) {
-                pending.audio_sfx = clamp(pending.audio_sfx - step, 0, 1);
-                changed = true;
-            }
-            if (k_right_step) {
-                pending.audio_sfx = clamp(pending.audio_sfx + step, 0, 1);
-                changed = true;
-            }
-            break;
-        case 2:
-            if (k_left_step) {
-                pending.audio_bgm = clamp(pending.audio_bgm - step, 0, 1);
-                changed = true;
-            }
-            if (k_right_step) {
-                pending.audio_bgm = clamp(pending.audio_bgm + step, 0, 1);
-                changed = true;
-            }
-            break;
-        case 3:   // window mode (D91): windowed / borderless / exclusive, wrapping
-            if (k_left_step || k_right_step) {
-                pending.window_mode = (pending.window_mode + (k_right_step ? 1 : WINDOW_MODE_COUNT - 1)) mod WINDOW_MODE_COUNT;
-                changed = true;
-            }
-            break;
-        case 4:   // scale: the size choices that fit the monitor; only windowed uses it
-            if (pending.window_mode == WINDOW_MODE_WINDOWED) {
-                var scale_max = clamp(Display_WindowedMaxScaleNow(), 1, DISPLAY_SCALE_MAX);
-                if (k_left_step) {
-                    pending.display_scale = clamp(pending.display_scale - 1, min(DISPLAY_SCALE_MIN, scale_max), scale_max);
-                    changed = true;
-                }
-                if (k_right_step) {
-                    pending.display_scale = clamp(pending.display_scale + 1, min(DISPLAY_SCALE_MIN, scale_max), scale_max);
-                    changed = true;
-                }
-            }
-            break;
-        case 5:
-            if (k_left_step || k_right_step) {
-                pending.language = (pending.language == "ko") ? "en" : "ko";
-                Loc_SetLanguage(pending.language);
-                changed = true;
-            }
-            break;
-        case 6:
-            if (k_ok) {
-                var committed = GameSettings_Commit(pending, true);
-                sp.pending = GameSettings_Copy(committed);
-                sp.dirty = false;
-                gs.ui.settings_popup = sp;
-                SFX_PlayUI("ui_confirm");
-                return;
-            }
-            break;
-        case 7:
-            if (k_ok) {
-                sp.pending = GameSettings_Copy(GameSettings_Ensure());
-                sp.dirty = false;
-                Loc_SetLanguage(GameSettings_Ensure().language);
-                gs.ui.settings_popup = sp;
-                SFX_PlayUI("ui_confirm");
-                SettingsPopup_Close(false);
-                return;
-            }
-            break;
-    }
-
-    if (changed) {
-        sp.pending = GameSettings_Copy(pending);
-        sp.dirty = true;
-        gs.ui.settings_popup = sp;
-        SFX_PlayUI("ui_move");
-        return;
-    }
-
-    gs.ui.settings_popup = sp;
+    Ui_MenuUpdate(sp.menu);
 }
 
 function SettingsPopup_Draw(_draw_backdrop = true) {
     SettingsPopup_Ensure();
-    var gs = GameState_Get();
-    var sp = gs.ui.settings_popup;
-    if (!sp.open) return;
-
-    var w = Display_GuiW();
-    var h = Display_GuiH();
-    UI_SetFont();
-    var line_h = UI_TextHeight("A");
-    var popup_alpha = UI_PopupAlpha(sp.opened_frame, sp.closing, sp.close_frame, 1);
-    var title_pad_x = max(12, round(line_h * 0.30));
-    var title_pad_y = max(12, round(line_h * 0.30));
-    var section_gap = max(6, round(line_h * 0.25));
-    var side_pad = max(16, title_pad_x + 4);
-    var row_gap_s = max(18, line_h + max(6, round(line_h * 0.15)));
-    var settings = GameSettings_Copy(sp.pending);
-
-    var title_txt = Loc_T("settings.title", "Settings");
-    var audio_txt = Loc_T("settings.section.audio", "Audio");
-    var display_txt = Loc_T("settings.section.display", "Display");
-    var labels_probe = [
-        Loc_T("settings.row.ui", "UI"),
-        Loc_T("settings.row.sfx", "SFX"),
-        Loc_T("settings.row.bgm", "BGM"),
-        Loc_T("settings.row.window_mode", "Window"),
-        Loc_T("settings.row.scale", "Scale"),
-        Loc_T("settings.row.language", "Language"),
-        Loc_T("settings.row.apply", "Apply"),
-        Loc_T("settings.row.back", "Back")
-    ];
-    var values_probe = [
-        "100%",
-        "100%",
-        "100%",
-        string(DISPLAY_SCALE_MAX) + "x",
-        max(UI_TextWidth(Loc_T("settings.value.window_windowed", "Windowed")), UI_TextWidth(Loc_T("settings.value.window_borderless", "Borderless")), UI_TextWidth(Loc_T("settings.value.window_exclusive", "Exclusive"))),
-        max(UI_TextWidth(Loc_LanguageDisplayName("en")), UI_TextWidth(Loc_LanguageDisplayName("ko"))),
-        max(UI_TextWidth(Loc_T("settings.value.pending", "Pending")), UI_TextWidth(Loc_T("settings.value.saved", "Saved")))
-    ];
-
-    var max_label_w = 0;
-    for (var lpi = 0; lpi < array_length(labels_probe); lpi++) {
-        max_label_w = max(max_label_w, UI_TextWidth(labels_probe[lpi]));
-    }
-
-    var max_value_w = 0;
-    max_value_w = max(max_value_w, UI_TextWidth(values_probe[0]));
-    max_value_w = max(max_value_w, UI_TextWidth(values_probe[1]));
-    max_value_w = max(max_value_w, UI_TextWidth(values_probe[2]));
-    max_value_w = max(max_value_w, UI_TextWidth(values_probe[3]));
-    max_value_w = max(max_value_w, values_probe[4]);
-    max_value_w = max(max_value_w, values_probe[5]);
-    max_value_w = max(max_value_w, values_probe[6]);
-
-    var row_split_gap = max(18, round(line_h * 0.8));
-    var need_w = max(UI_TextWidth(title_txt) + title_pad_x * 2, UI_TextWidth(audio_txt) + title_pad_x * 2, UI_TextWidth(display_txt) + title_pad_x * 2);
-    need_w = max(need_w, side_pad + max_label_w + row_split_gap + max_value_w + side_pad);
-
-    var title_y_local = title_pad_y;
-    var audio_header_y_local = title_y_local + line_h + section_gap;
-    var rows_y0_local = audio_header_y_local + line_h + section_gap;
-    var display_header_y_local = rows_y0_local + row_gap_s * 3 + section_gap;
-    var display_rows_y0_local = display_header_y_local + line_h + section_gap;
-    var last_row_y_local = display_rows_y0_local + row_gap_s * 4;
-    var need_h = last_row_y_local + line_h + title_pad_y;
-
-    var sw = min(w - 24, max(w * 0.72, need_w));
-    var sh = min(h - 24, max(h * 0.72, need_h));
-    var sx = (w - sw) * 0.5;
-    var sy = (h - sh) * 0.5;
-
-    if (_draw_backdrop) {
-        draw_set_alpha(popup_alpha * 0.6);
-        draw_set_color(c_black);
-        draw_rectangle(0, 0, w, h, false);
-    }
-
-    draw_set_alpha(popup_alpha * 0.9);
-    draw_set_color(c_black);
-    draw_rectangle(sx, sy, sx + sw, sy + sh, false);
-    draw_set_alpha(popup_alpha);
-    draw_set_color(c_white);
-    draw_rectangle(sx, sy, sx + sw, sy + sh, true);
-    draw_set_alpha(popup_alpha);
-    var title_y = sy + title_y_local;
-    UI_DrawText(sx + title_pad_x, title_y, title_txt);
-
-    var audio_header_y = sy + audio_header_y_local;
-    var rows_y0 = sy + rows_y0_local;
-    var display_header_y = sy + display_header_y_local;
-    var display_rows_y0 = sy + display_rows_y0_local;
-
-    var row_y = [];
-    row_y[0] = rows_y0;
-    row_y[1] = rows_y0 + row_gap_s;
-    row_y[2] = rows_y0 + row_gap_s * 2;
-    row_y[3] = display_rows_y0;
-    row_y[4] = display_rows_y0 + row_gap_s;
-    row_y[5] = display_rows_y0 + row_gap_s * 2;
-    row_y[6] = display_rows_y0 + row_gap_s * 3;
-    row_y[7] = display_rows_y0 + row_gap_s * 4;
-
-    draw_set_color(c_white);
-    UI_DrawText(sx + title_pad_x, audio_header_y, audio_txt);
-    UI_DrawText(sx + title_pad_x, display_header_y, display_txt);
-
-    for (var r = 0; r < SETTINGS_MENU_ROW_COUNT; r++) {
-        var yy = row_y[r];
-        var selected_row = (sp.index == r);
-        var label = "";
-        var value = "";
-
-        switch (r) {
-            case 0:
-                label = Loc_T("settings.row.ui", "UI");
-                value = string(clamp(round(settings.audio_ui * 100), 0, 100)) + "%";
-                break;
-            case 1:
-                label = Loc_T("settings.row.sfx", "SFX");
-                value = string(clamp(round(settings.audio_sfx * 100), 0, 100)) + "%";
-                break;
-            case 2:
-                label = Loc_T("settings.row.bgm", "BGM");
-                value = string(clamp(round(settings.audio_bgm * 100), 0, 100)) + "%";
-                break;
-            case 3:
-                label = Loc_T("settings.row.window_mode", "Window");
-                if (settings.window_mode == WINDOW_MODE_WINDOWED) value = Loc_T("settings.value.window_windowed", "Windowed");
-                else if (settings.window_mode == WINDOW_MODE_BORDERLESS) value = Loc_T("settings.value.window_borderless", "Borderless");
-                else value = Loc_T("settings.value.window_exclusive", "Exclusive");
-                break;
-            case 4:
-                label = Loc_T("settings.row.scale", "Scale");
-                value = (settings.window_mode == WINDOW_MODE_WINDOWED) ? (string(settings.display_scale) + "x") : Loc_T("settings.value.auto", "Auto");
-                break;
-            case 5:
-                label = Loc_T("settings.row.language", "Language");
-                value = Loc_LanguageDisplayName(settings.language);
-                break;
-            case 6:
-                label = Loc_T("settings.row.apply", "Apply");
-                value = sp.dirty ? Loc_T("settings.value.pending", "Pending") : Loc_T("settings.value.saved", "Saved");
-                break;
-            case 7:
-                label = Loc_T("settings.row.back", "Back");
-                break;
-        }
-
-        if (selected_row) {
-            if (r == 6 || r == 7) {
-                var row_x = sx + side_pad;
-                var row_w = UI_TextWidth(label) + 8;
-                draw_set_color(c_white);
-                draw_rectangle(row_x - 4, yy - 3, row_x + row_w, yy + line_h + 5, false);
-                draw_set_color(c_black);
-                draw_rectangle(row_x - 4, yy - 3, row_x + row_w, yy + line_h + 5, true);
-            } else {
-                var row_pad = max(8, round(line_h * 0.25));
-                draw_set_color(c_white);
-                draw_rectangle(sx + row_pad, yy - 3, sx + sw - row_pad, yy + line_h + 5, false);
-                draw_set_color(c_black);
-                draw_rectangle(sx + row_pad, yy - 3, sx + sw - row_pad, yy + line_h + 5, true);
-            }
-        }
-
-        draw_set_color(selected_row ? c_black : c_white);
-        UI_DrawText(sx + side_pad, yy, label);
-        if (value != "") {
-            if (r == 6) draw_set_color(c_white);
-            else draw_set_color(selected_row ? c_black : c_white);
-            draw_set_halign(fa_right);
-            UI_DrawText(sx + sw - side_pad, yy, value);
-            draw_set_halign(fa_left);
-        }
-    }
-
+    var sp = GameState_Get().ui.settings_popup;
+    if (!sp.open || !is_struct(sp.menu)) return;
+    var a = Ui_MenuAlpha(sp.menu, current_time);
+    if (_draw_backdrop) Ui_DimBackdrop(0.6 * a);
+    Ui_MenuDraw(sp.menu, a);
     draw_set_alpha(1);
     draw_set_color(c_white);
+}
+
+// --------------------
+// TITLE MENU (D0 pilot on the UI framework)
+// --------------------
+// obj_start_controller keeps `state` ("main" | "difficulty" | "settings" | "boot_logo" | "cutscene") and holds the menu stack in
+// title_stk: [title] or [title, difficulty]. Settings is the popup above.
+function Title_MainItems(_can_load) {
+    return [
+        { id: "new", label: Loc_T("menu.main.option.0", "New Game"), kind: "button", enabled: true },
+        { id: "load", label: Loc_T("menu.main.option.1", "Load Game"), kind: "button", enabled: _can_load },
+        { id: "settings", label: Loc_T("menu.main.option.2", "Settings"), kind: "button", enabled: true },
+        { id: "exit", label: Loc_T("menu.main.option.3", "Exit Game"), kind: "button", enabled: true }
+    ];
+}
+
+function Title_DifficultyItems() {
+    return [
+        { id: "easy", label: Loc_T("settings.difficulty.option.0", "Easy"), kind: "button", enabled: true },
+        { id: "normal", label: Loc_T("settings.difficulty.option.1", "Normal"), kind: "button", enabled: true },
+        { id: "hard", label: Loc_T("settings.difficulty.option.2", "Hard"), kind: "button", enabled: true },
+        { id: "back", label: Loc_T("menu.common.back", "Back"), kind: "button", enabled: true }
+    ];
+}
+
+function Title_DifficultyValue(_i) {
+    var vals = [DIFFICULTY_EASY, DIFFICULTY_NORMAL, DIFFICULTY_HARD];
+    return vals[clamp(_i, 0, 2)];
+}
+
+function Title_Build(_c) {
+    _c.title_stk = Ui_StackNew();
+    Ui_StackPush(_c.title_stk, Ui_MenuNew("title", Title_MainItems(Save_HasAnySlot()), {
+        owner: _c, on_confirm: Title_OnConfirm,
+        layout: { anchor: "bottom", y_frac: 0.62, center: true }
+    }));
+    _c.title_refresh = false;
+}
+
+// Language or save files may have changed since the labels were made.
+function Title_Refresh(_c) {
+    var m = _c.title_stk.menus[0];
+    m.items = Title_MainItems(Save_HasAnySlot());
+    Ui_MenuFixCursor(m, m.cursor);
+    _c.title_refresh = false;
+}
+
+function Title_OpenDifficulty(_c) {
+    var gs = GameState_Get();
+    UI_ModalRootBegin("title_difficulty");
+    var m = Ui_MenuNew("difficulty", Title_DifficultyItems(), {
+        owner: _c, on_confirm: Title_OnConfirm, on_back: Title_OnBack,
+        layout: { title: Loc_T("menu.difficulty.title", "Select Difficulty"), anchor: "center" }
+    });
+    var cur = DIFFICULTY_NORMAL;
+    if (variable_struct_exists(gs, "difficulty")) cur = Difficulty_Normalize(gs.difficulty);
+    for (var i = 0; i < 3; i++) if (Title_DifficultyValue(i) == cur) Ui_MenuFixCursor(m, i);
+    Ui_StackPush(_c.title_stk, m);
+    _c.state = "difficulty";
+}
+
+// The difficulty menu was left by Back (the stack already popped it).
+function Title_OnBack(_m, _res) {
+    if (_m.id != "difficulty") return;
+    UI_ModalRootEnd(false);
+    _m.owner.state = "main";
+}
+
+function Title_OnConfirm(_m, _i) {
+    var c = _m.owner;
+    var rid = _m.items[_i].id;
+    if (_m.id == "difficulty") {
+        if (rid == "back") {
+            if (Ui_StackBack(c.title_stk) == "pop") Title_OnBack(_m, "pop");
+            return;
+        }
+        // start: the panel fades out, then the intro cutscene is requested (the dim holds until the room changes)
+        UI_ModalRootHold("title_room_change");
+        c.title_exit = { value: Title_DifficultyValue(_i), at: current_time + UI_PANEL_MS };
+        Ui_MenuClose(_m);
+        return;
+    }
+    switch (rid) {
+        case "new": Title_OpenDifficulty(c); break;
+        case "load": SaveMenu_Open("load", "main"); break;
+        case "settings":
+            SettingsPopup_Open("title");
+            c.state = "settings";
+            break;
+        case "exit": game_end(); break;
+    }
+}
+
+// One Step for the title in states main / difficulty / settings.
+function Title_Step(_c) {
+    var gs = GameState_Get();
+    if (!is_struct(_c.title_stk)) Title_Build(_c);
+    if (is_struct(_c.title_exit)) {
+        if (current_time >= _c.title_exit.at) {
+            var v = _c.title_exit.value;
+            _c.title_exit = undefined;
+            Difficulty_SetCurrent(v);
+            gs.in_main_menu = false;
+            Transition_RequestCutsceneById("intro");
+        }
+        return;
+    }
+    if (_c.state == "settings") {
+        SettingsPopup_HandleInput();
+        if (!SettingsPopup_IsOpen("title")) {
+            _c.state = "main";
+            _c.title_refresh = true;
+        }
+        return;
+    }
+    if (_c.title_refresh) Title_Refresh(_c);
+    Ui_MenuUpdate(Ui_StackTop(_c.title_stk), _c.title_stk);
+}
+
+function Title_Draw(_c) {
+    if (!is_struct(_c.title_stk) || _c.state == "settings") return;
+    Ui_StackDraw(_c.title_stk);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
+// For the shared modal dim (UI_GetModalVisualAlpha) while the difficulty panel is up.
+function Title_ModalAlpha(_c) {
+    if (!is_struct(_c.title_stk)) return 1;
+    var top = Ui_StackTop(_c.title_stk);
+    return is_struct(top) ? Ui_MenuAlpha(top, current_time) : 1;
 }
 
 // --------------------
@@ -2785,4 +2742,657 @@ function PauseMenu_Draw() {
         UI_DrawText(text_x, yy, label);
     }
     draw_set_alpha(1);
+}
+
+// ==========================================================================================================================
+// UI FRAMEWORK (D0: D95 menu controls, D96 one shared component, D97 motion, D98 fonts, D100 details panel, D101 name tab)
+// One menu = a struct { id, items[], cursor, on_confirm, on_back, on_adjust, layout }. The pure model (cursor, hold-to-scroll,
+// stack, remembered cursor, hover, scroll window, motion curves) has no draw or input calls and is tested by Test_Suite_UI.
+// The drawing kit sits on the GUI grid (Display_GuiW/H) and uses only the four palette colours (D10). Time is milliseconds
+// (current_time), never frames. A screen builds a menu, pushes it on a stack, calls Ui_MenuUpdate in Step and Ui_StackDraw in
+// Draw GUI. Screens that exist today: Title_* and SettingsPopup_* below. The rest of D96 moves over one screen at a time.
+// ==========================================================================================================================
+#macro UI_C_DARKEST $211807      // #071821 (GameMaker colours are BGR)
+#macro UI_C_DARK $506830         // #306850
+#macro UI_C_LIGHT $6CC086        // #86C06C
+#macro UI_C_LIGHTEST $CFF8E0     // #E0F8CF
+#macro UI_REPEAT_DELAY_MS 300    // D95: hold this long before the list starts to scroll
+#macro UI_REPEAT_START_MS 140    // the first repeat gap; each next one is 20 percent shorter ...
+#macro UI_REPEAT_MIN_MS 45       // ... down to this
+#macro UI_PANEL_MS 120           // D97: panels slide and fade in this long
+#macro SETTINGS_TEXT_SPEED_MAX 2
+
+// ---- pure model ------------------------------------------------------------------------------------------------------------
+// Next enabled index from _cur in direction _dir (+1/-1). _enabled is one bool per item. Wraps (D95) unless _wrap is false.
+// Nothing enabled (or no move possible without wrapping): the cursor stays.
+function Ui_CursorMove(_cur, _dir, _enabled, _wrap = true) {
+    var n = array_length(_enabled);
+    if (n <= 0) return 0;
+    var cur = clamp(_cur, 0, n - 1);
+    if (_dir == 0) return cur;
+    var dir = (_dir < 0) ? -1 : 1;
+    var idx = cur;
+    repeat (n) {
+        idx += dir;
+        if (idx < 0 || idx >= n) {
+            if (!_wrap) return cur;
+            idx = (idx + n) mod n;
+        }
+        if (_enabled[idx]) return idx;
+    }
+    return cur;
+}
+
+function Ui_ItemEnabled(_it) {
+    return !variable_struct_exists(_it, "enabled") || _it.enabled;
+}
+
+function Ui_ItemsEnabled(_items) {
+    var out = array_create(array_length(_items), true);
+    for (var i = 0; i < array_length(_items); i++) out[i] = Ui_ItemEnabled(_items[i]);
+    return out;
+}
+
+// Hold-to-scroll (D95): one step on the press, none for UI_REPEAT_DELAY_MS, then repeats that get shorter. Returns 1 when it fires.
+// _dir is -1/0/+1 (what is held), _pressed is a fresh press this frame. Call once per frame per axis.
+function Ui_RepeatNew() {
+    return { dir: 0, next: 0, interval: UI_REPEAT_START_MS };
+}
+
+function Ui_RepeatStep(_st, _dir, _pressed, _now) {
+    if (_dir == 0) {
+        _st.dir = 0;
+        return 0;
+    }
+    if (_dir != _st.dir || _pressed) {
+        _st.dir = _dir;
+        _st.next = _now + UI_REPEAT_DELAY_MS;
+        _st.interval = UI_REPEAT_START_MS;
+        return 1;
+    }
+    if (_now >= _st.next) {
+        _st.interval = max(UI_REPEAT_MIN_MS, _st.interval * 0.8);
+        _st.next = _now + _st.interval;
+        return 1;
+    }
+    return 0;
+}
+
+// Remembered cursor per menu id (D95).
+function Ui_MemNew() {
+    return {};
+}
+
+function Ui_MemSet(_mem, _id, _idx) {
+    variable_struct_set(_mem, string(_id), _idx);
+}
+
+function Ui_MemGet(_mem, _id, _count) {
+    if (_count <= 0 || !variable_struct_exists(_mem, string(_id))) return 0;
+    return clamp(variable_struct_get(_mem, string(_id)), 0, _count - 1);
+}
+
+function Ui_MemGlobal() {
+    if (!variable_global_exists("ui_mem") || !is_struct(global.ui_mem)) global.ui_mem = Ui_MemNew();
+    return global.ui_mem;
+}
+
+// Which rectangle {x, y, w, h} holds the point: the top and left edges are inside, the bottom and right edges are not, so stacked
+// rows have no gaps and no overlaps. A disabled row (per _enabled) is not hovered. -1 = none.
+function Ui_HoverIndex(_rects, _mx, _my, _enabled = undefined) {
+    for (var i = 0; i < array_length(_rects); i++) {
+        var r = _rects[i];
+        if (_mx >= r.x && _mx < r.x + r.w && _my >= r.y && _my < r.y + r.h) {
+            if (is_array(_enabled) && i < array_length(_enabled) && !_enabled[i]) return -1;
+            return i;
+        }
+    }
+    return -1;
+}
+
+// First visible row of a list longer than its panel: keep the cursor inside the window, moving it as little as possible.
+function Ui_ScrollTop(_cur, _top, _visible, _count) {
+    if (_count <= _visible) return 0;
+    var top = clamp(_top, 0, _count - _visible);
+    if (_cur < top) top = _cur;
+    if (_cur >= top + _visible) top = _cur - _visible + 1;
+    return clamp(top, 0, _count - _visible);
+}
+
+function Ui_TabStep(_active, _count, _dir) {
+    if (_count <= 0) return 0;
+    if (_dir == 0) return clamp(_active, 0, _count - 1);
+    return (_active + ((_dir < 0) ? -1 : 1) + _count) mod _count;
+}
+
+// Motion (D97). Time based. Ui_AnimT: 0..1 over _dur ms, easing out. Ui_Glide: a value that eases toward its target (frame-rate
+// independent) and snaps on arrival. Ui_Bob: 0 or _amp whole UI pixels, a gentle two-state bob about every 0.4 s.
+function Ui_AnimT(_start, _now, _dur = UI_PANEL_MS) {
+    var t = clamp((_now - _start) / max(1, _dur), 0, 1);
+    return 1 - (1 - t) * (1 - t);
+}
+
+function Ui_Glide(_cur, _target, _dt, _tau = 55) {
+    var d = _target - _cur;
+    if (abs(d) < 0.5) return _target;
+    var v = _cur + d * (1 - exp(-max(0, _dt) / _tau));
+    if (abs(_target - v) < 0.5) return _target;
+    return v;
+}
+
+function Ui_Bob(_now, _amp = 1) {
+    return floor(((sin(_now * pi * 2 / 800) + 1) * 0.5) * _amp + 0.5);
+}
+
+// The Korean pixel font (D98). Galmuri9 / Galmuri11 are drawn crisp only at whole multiples of their native 9 / 11 px.
+// Returns { face (9 or 11), k (multiple), px (face * k) }: the multiple closest to _target_px (window pixels of line height).
+function Ui_KoFontChoice(_target_px) {
+    var best = undefined;
+    var faces = [9, 11];
+    for (var i = 0; i < 2; i++) {
+        var k = max(1, round(_target_px / faces[i]));
+        var px = faces[i] * k;
+        var err = abs(px - _target_px);
+        if (is_undefined(best) || err < best.err - 0.0001) best = { face: faces[i], k: k, px: px, err: err };
+    }
+    return best;
+}
+
+// ---- input snapshot: everything a menu reads in one frame ---------------------------------------------------------------------
+function Ui_SnapNew() {
+    return {
+        up: false, down: false, left: false, right: false,
+        up_p: false, down_p: false, left_p: false, right_p: false,
+        confirm: false, back: false, tab: 0,
+        wheel: 0, mx: -1, my: -1, mouse_moved: false, click: false, rclick: false
+    };
+}
+
+// From the game's own input actions, so the keyboard, the pad and the bot all drive menus the same way. Confirm / back are
+// Input_UIConfirm / Input_UIBack (today Space / Esc and pad A / B: see the report on D95's Z, Enter, X).
+function Ui_ReadInput() {
+    var s = Ui_SnapNew();
+    s.up_p = Input_Pressed("menu_up");
+    s.down_p = Input_Pressed("menu_down");
+    s.left_p = Input_Pressed("menu_left");
+    s.right_p = Input_Pressed("menu_right");
+    s.up = s.up_p || Input_Held("menu_up");
+    s.down = s.down_p || Input_Held("menu_down");
+    s.left = s.left_p || Input_Held("menu_left");
+    s.right = s.right_p || Input_Held("menu_right");
+    s.confirm = Input_UIConfirm();
+    s.back = Input_UIBack();
+    s.tab = (Input_Pressed("tab_next") ? 1 : 0) - (Input_Pressed("tab_prev") ? 1 : 0);   // bound by the screens that have tabs
+    var lay = Display_Layout();   // the mouse in GUI units from our own layout (window pixels minus the picture's corner, over the integer UI scale)
+    s.mx = (window_mouse_get_x() - lay.gui_x) / lay.ui_scale;
+    s.my = (window_mouse_get_y() - lay.gui_y) / lay.ui_scale;
+    if (!variable_global_exists("ui_mouse") || !is_struct(global.ui_mouse)) global.ui_mouse = { x: s.mx, y: s.my };
+    s.mouse_moved = (s.mx != global.ui_mouse.x || s.my != global.ui_mouse.y);
+    global.ui_mouse.x = s.mx;
+    global.ui_mouse.y = s.my;
+    s.click = mouse_check_button_pressed(mb_left);
+    s.rclick = mouse_check_button_pressed(mb_right);
+    s.wheel = mouse_wheel_up() ? 1 : (mouse_wheel_down() ? -1 : 0);
+    return s;
+}
+
+// ---- menus and the stack ----------------------------------------------------------------------------------------------------
+// _opts may set on_confirm(menu, index), on_adjust(menu, index, dir) -> changed, on_back(menu, "pop"|"root"), owner, data and layout
+// fields: title, anchor ("center" | "bottom"), y_frac, center (centre the labels), details (D100 panel under the list), hides_below.
+function Ui_MenuNew(_id, _items, _opts) {
+    var m = {
+        id: _id, items: _items, cursor: 0, top: 0, rects: [],
+        rep_v: Ui_RepeatNew(), rep_h: Ui_RepeatNew(),
+        on_confirm: undefined, on_back: undefined, on_adjust: undefined,
+        owner: noone, data: {},
+        layout: { title: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false },
+        opened_ms: current_time, closed_ms: -1, cur_y: -1, last_draw_ms: current_time
+    };
+    if (is_struct(_opts)) {
+        var names = variable_struct_get_names(_opts);
+        for (var i = 0; i < array_length(names); i++) {
+            if (names[i] == "layout") {
+                var lnames = variable_struct_get_names(_opts.layout);
+                for (var j = 0; j < array_length(lnames); j++) variable_struct_set(m.layout, lnames[j], variable_struct_get(_opts.layout, lnames[j]));
+            } else {
+                variable_struct_set(m, names[i], variable_struct_get(_opts, names[i]));
+            }
+        }
+    }
+    Ui_MenuFixCursor(m, Ui_MemGet(Ui_MemGlobal(), _id, array_length(_items)));
+    return m;
+}
+
+// Puts the cursor on _want, or the next enabled item when that one is disabled.
+function Ui_MenuFixCursor(_m, _want) {
+    var en = Ui_ItemsEnabled(_m.items);
+    var n = array_length(en);
+    if (n <= 0) { _m.cursor = 0; return; }
+    _want = clamp(_want, 0, n - 1);
+    _m.cursor = en[_want] ? _want : Ui_CursorMove(_want, 1, en);
+}
+
+function Ui_MenuClose(_m) {
+    if (_m.closed_ms < 0) _m.closed_ms = current_time;
+}
+
+// 0..1 for the panel's slide and fade: in while opening, out once closed.
+function Ui_MenuAlpha(_m, _now) {
+    if (_m.closed_ms >= 0) return 1 - Ui_AnimT(_m.closed_ms, _now);
+    return Ui_AnimT(_m.opened_ms, _now);
+}
+
+// One frame of one menu from a snapshot. Moves the cursor and reports what happened; the caller plays sounds and calls back.
+// { moved, confirm (an enabled item), back, adjust (-1/0/+1 for left/right), index (cursor after the step) }
+function Ui_MenuStep(_m, _snap, _now) {
+    var ev = { moved: false, confirm: false, back: false, adjust: 0, index: _m.cursor };
+    var en = Ui_ItemsEnabled(_m.items);
+    var n = array_length(en);
+    if (n > 0) {
+        _m.cursor = clamp(_m.cursor, 0, n - 1);
+        var dv = (_snap.down ? 1 : 0) - (_snap.up ? 1 : 0);
+        if (Ui_RepeatStep(_m.rep_v, dv, _snap.up_p || _snap.down_p, _now) > 0) {
+            var c = Ui_CursorMove(_m.cursor, dv, en);
+            if (c != _m.cursor) { _m.cursor = c; ev.moved = true; }
+        }
+        if (_snap.wheel != 0) {
+            var cw = Ui_CursorMove(_m.cursor, (_snap.wheel > 0) ? -1 : 1, en, false);   // wheel up = the item above; the ends do not wrap
+            if (cw != _m.cursor) { _m.cursor = cw; ev.moved = true; }
+        }
+        var hover = Ui_HoverIndex(_m.rects, _snap.mx, _snap.my, en);
+        if (_snap.mouse_moved && hover >= 0 && hover != _m.cursor) { _m.cursor = hover; ev.moved = true; }
+        if (_snap.click && hover >= 0) {
+            if (hover != _m.cursor) { _m.cursor = hover; ev.moved = true; }
+            ev.confirm = true;
+        }
+        if (_snap.confirm && en[_m.cursor]) ev.confirm = true;
+        var dh = (_snap.right ? 1 : 0) - (_snap.left ? 1 : 0);
+        if (Ui_RepeatStep(_m.rep_h, dh, _snap.left_p || _snap.right_p, _now) > 0) ev.adjust = dh;
+    }
+    if (_snap.back || _snap.rclick) ev.back = true;
+    ev.index = _m.cursor;
+    return ev;
+}
+
+function Ui_StackNew() {
+    return { menus: [], leaving: undefined };
+}
+
+function Ui_StackPush(_stk, _menu) {
+    _menu.opened_ms = current_time;
+    array_push(_stk.menus, _menu);
+    return _menu;
+}
+
+function Ui_StackDepth(_stk) {
+    return array_length(_stk.menus);
+}
+
+function Ui_StackTop(_stk) {
+    return (array_length(_stk.menus) > 0) ? _stk.menus[array_length(_stk.menus) - 1] : undefined;
+}
+
+// Back always goes up ONE level (D95): "pop" when a child was removed, "root" when the root is all that is left.
+function Ui_StackBack(_stk) {
+    if (array_length(_stk.menus) <= 1) return "root";
+    var m = array_pop(_stk.menus);
+    Ui_MemSet(Ui_MemGlobal(), m.id, m.cursor);
+    m.closed_ms = current_time;
+    _stk.leaving = m;
+    return "pop";
+}
+
+// Step + sounds + callbacks for the top menu of a stack (or a lone menu when _stk is undefined). Returns the event.
+function Ui_MenuUpdate(_m, _stk = undefined) {
+    var ev = Ui_MenuStep(_m, Ui_ReadInput(), current_time);
+    if (ev.moved) {
+        SFX_PlayUI("ui_move");
+        Ui_MemSet(Ui_MemGlobal(), _m.id, _m.cursor);
+    }
+    var it = (array_length(_m.items) > 0) ? _m.items[clamp(_m.cursor, 0, array_length(_m.items) - 1)] : undefined;
+    if (ev.adjust != 0 && is_struct(it) && Ui_ItemEnabled(it) && is_callable(_m.on_adjust)) {
+        if (_m.on_adjust(_m, _m.cursor, ev.adjust)) SFX_PlayUI("ui_move");
+    }
+    if (ev.confirm && is_struct(it) && variable_struct_exists(it, "kind") && it.kind == "slider") ev.confirm = false;   // a slider moves with left/right only
+    if (ev.confirm) {
+        SFX_PlayUI("ui_confirm");
+        if (is_callable(_m.on_confirm)) _m.on_confirm(_m, ev.index);
+    } else if (ev.back) {
+        if (is_struct(_stk)) {
+            var res = Ui_StackBack(_stk);
+            if (res == "pop" || is_callable(_m.on_back)) SFX_PlayUI("ui_back");
+            if (is_callable(_m.on_back)) _m.on_back(_m, res);
+        } else {
+            SFX_PlayUI("ui_back");
+            if (is_callable(_m.on_back)) _m.on_back(_m, "root");
+        }
+    }
+    return ev;
+}
+
+// ---- drawing kit (GUI grid, 4 colours) --------------------------------------------------------------------------------------
+// One font pixel in GUI units (2 at window scale 3, 3 at scale 4, 4 at scale 5 ...): borders, gaps and arrows are whole multiples of it,
+// so every edge lands on whole window pixels at every size.
+function Ui_Px() {
+    return max(1, round(UI_GetTextScale() * DISPLAY_FONT_PX));
+}
+
+function Ui_Metrics() {
+    UI_SetFont();
+    var p = Ui_Px();
+    var lh = UI_TextHeight("A");
+    return { p: p, line_h: lh, row_h: lh + 2 * p, pad: 2 * p, margin: 3 * p, gw: Display_GuiW(), gh: Display_GuiH() };
+}
+
+// Filled box, _x2/_y2 exclusive.
+function Ui_Box(_x1, _y1, _x2, _y2, _col) {
+    if (_x2 <= _x1 || _y2 <= _y1) return;
+    draw_set_color(_col);
+    draw_rectangle(_x1, _y1, _x2 - 1, _y2 - 1, false);
+}
+
+function Ui_Text(_x, _y, _txt, _col, _halign = fa_left) {
+    draw_set_halign(_halign);
+    draw_set_valign(fa_top);
+    draw_set_color(_col);
+    UI_DrawText(round(_x), round(_y), _txt);
+    draw_set_halign(fa_left);
+}
+
+// 3p wide, 5p tall pointing right (+1) or left (-1); (_x, _y) is the top-left.
+function Ui_Arrow(_x, _y, _dir, _p, _col) {
+    for (var i = 0; i < 3; i++) {
+        var cx = (_dir > 0) ? (_x + i * _p) : (_x + (2 - i) * _p);
+        Ui_Box(cx, _y + i * _p, cx + _p, _y + (5 - i) * _p, _col);
+    }
+}
+
+// The frame (D89, D96): a 1p light outline with notched corners, a 1p dark band, a dark-green fill. Border + band = 2p on every side.
+function Ui_DrawFrame(_x, _y, _w, _h, _alpha = 1, _p = -1) {
+    if (_p < 0) _p = Ui_Px();
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    var p = _p;
+    Ui_Box(_x + p, _y, _x + _w - p, _y + p, UI_C_LIGHTEST);
+    Ui_Box(_x + p, _y + _h - p, _x + _w - p, _y + _h, UI_C_LIGHTEST);
+    Ui_Box(_x, _y + p, _x + p, _y + _h - p, UI_C_LIGHTEST);
+    Ui_Box(_x + _w - p, _y + p, _x + _w, _y + _h - p, UI_C_LIGHTEST);
+    Ui_Box(_x + p, _y + p, _x + _w - p, _y + 2 * p, UI_C_DARK);
+    Ui_Box(_x + p, _y + _h - 2 * p, _x + _w - p, _y + _h - p, UI_C_DARK);
+    Ui_Box(_x + p, _y + 2 * p, _x + 2 * p, _y + _h - 2 * p, UI_C_DARK);
+    Ui_Box(_x + _w - 2 * p, _y + 2 * p, _x + _w - p, _y + _h - 2 * p, UI_C_DARK);
+    Ui_Box(_x + 2 * p, _y + 2 * p, _x + _w - 2 * p, _y + _h - 2 * p, UI_C_DARKEST);
+    draw_set_alpha(a0);
+}
+
+// D101 speaker tab: a small box that sits on the top-left of a dialogue frame and opens into it (no bottom edge). (_x, _y) = the
+// frame's top-left; the tab stands above it. Returns its { x, y, w, h }.
+function Ui_DrawNameTab(_x, _y, _name, _alpha = 1) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var w = UI_TextWidth(_name) + 2 * (2 * p + p);
+    var h = mt.line_h + 2 * p + 2 * p;
+    var tx = _x + 2 * p;
+    var ty = _y - h + 2 * p;   // the lower 2p overlap the frame's own border and band
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    Ui_Box(tx + p, ty, tx + w - p, ty + p, UI_C_LIGHTEST);
+    Ui_Box(tx, ty + p, tx + p, ty + h, UI_C_LIGHTEST);
+    Ui_Box(tx + w - p, ty + p, tx + w, ty + h, UI_C_LIGHTEST);
+    Ui_Box(tx + p, ty + p, tx + w - p, ty + 2 * p, UI_C_DARK);
+    Ui_Box(tx + p, ty + 2 * p, tx + 2 * p, ty + h, UI_C_DARK);
+    Ui_Box(tx + w - 2 * p, ty + 2 * p, tx + w - p, ty + h, UI_C_DARK);
+    Ui_Box(tx + 2 * p, ty + 2 * p, tx + w - 2 * p, ty + h, UI_C_DARKEST);
+    draw_set_alpha(_alpha);
+    Ui_Text(tx + 3 * p, ty + 2 * p + p, _name, UI_C_LIGHTEST);
+    draw_set_alpha(a0);
+    return { x: tx, y: ty, w: w, h: h };
+}
+
+// Tabs header (Q / E, or the shoulder buttons with a pad): labels left to right, the active one filled. Returns its height.
+function Ui_DrawTabs(_x, _y, _w, _labels, _active, _alpha = 1) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var hint_l = (Input_GamepadDevice() != -1) ? "LB" : "Q";
+    var hint_r = (Input_GamepadDevice() != -1) ? "RB" : "E";
+    var th = mt.line_h + 2 * p;
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    var hw = UI_TextWidth(hint_l) + 2 * p;
+    var tx = _x;
+    Ui_Box(tx, _y, tx + hw, _y + th, UI_C_DARK);
+    Ui_Text(tx + p, _y + p, hint_l, UI_C_LIGHTEST);
+    tx += hw + 2 * p;
+    for (var i = 0; i < array_length(_labels); i++) {
+        var lw = UI_TextWidth(_labels[i]) + 4 * p;
+        var on = (i == _active);
+        Ui_Box(tx, _y, tx + lw, _y + th, on ? UI_C_LIGHTEST : UI_C_DARK);
+        Ui_Text(tx + 2 * p, _y + p, _labels[i], on ? UI_C_DARKEST : UI_C_LIGHT);
+        tx += lw + p;
+    }
+    var rw = UI_TextWidth(hint_r) + 2 * p;
+    tx = max(tx + p, _x + _w - rw);
+    Ui_Box(tx, _y, tx + rw, _y + th, UI_C_DARK);
+    Ui_Text(tx + p, _y + p, hint_r, UI_C_LIGHTEST);
+    draw_set_alpha(a0);
+    return th;
+}
+
+// Height of wrapped text _w GUI units wide.
+function Ui_TextBlockH(_txt, _w) {
+    var s = max(0.0001, UI_GetFontScale());
+    return round(string_height_ext(string(_txt), -1, max(1, round(_w / s))) * s);
+}
+
+function Ui_TextBlock(_x, _y, _txt, _w, _col) {
+    var s = max(0.0001, UI_GetFontScale());
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+    draw_set_color(_col);
+    draw_text_ext_transformed(round(_x), round(_y), string(_txt), -1, max(1, round(_w / s)), s, s, 0);
+}
+
+// D100 details panel: one plain sentence, then number lines [{ label, value }] (generated from the real game data by the caller).
+function Ui_DetailsHeight(_w, _sentence, _lines) {
+    var mt = Ui_Metrics();
+    var inner = _w - 2 * (4 * mt.p);
+    var h = 2 * (2 * mt.p + mt.pad) + Ui_TextBlockH(_sentence, inner);
+    if (array_length(_lines) > 0) h += mt.p * 2 + array_length(_lines) * (mt.line_h + mt.p);
+    return h;
+}
+
+function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    Ui_DrawFrame(_x, _y, _w, _h, _alpha, p);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    var x0 = _x + 4 * p;
+    var x1 = _x + _w - 4 * p;
+    var ty0 = _y + 4 * p;
+    Ui_TextBlock(x0, ty0, _sentence, x1 - x0, UI_C_LIGHTEST);
+    ty0 += Ui_TextBlockH(_sentence, x1 - x0);
+    if (array_length(_lines) > 0) {
+        ty0 += p;
+        Ui_Box(x0, ty0, x1, ty0 + p, UI_C_DARK);
+        ty0 += p;
+        for (var i = 0; i < array_length(_lines); i++) {
+            Ui_Text(x0, ty0, _lines[i].label, UI_C_LIGHT);
+            Ui_Text(x1, ty0, _lines[i].value, UI_C_LIGHTEST, fa_right);
+            ty0 += mt.line_h + p;
+        }
+    }
+    draw_set_alpha(a0);
+}
+
+// Draws one menu: frame, optional title, rows (label left, value / slider right), the gliding highlight with a bobbing marker, and
+// the details panel of the highlighted item when layout.details is set. _alpha 0..1 fades and slides the panel (D97).
+// Stores each row's rectangle in m.rects for the mouse. Needs UI_SetFont-compatible state; sets and restores the draw state.
+function Ui_MenuDraw(_m, _alpha = 1) {
+    if (_alpha <= 0) return;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var L = _m.layout;
+    var n = array_length(_m.items);
+    var now = current_time;
+    var a0 = draw_get_alpha();
+    var c0 = draw_get_color();
+    var bar_w = 14 * p;
+
+    // widths
+    var label_w = 0;
+    var val_w = 0;
+    for (var i = 0; i < n; i++) {
+        var it = _m.items[i];
+        label_w = max(label_w, UI_TextWidth(it.label));
+        var kind = variable_struct_exists(it, "kind") ? it.kind : "button";
+        var vw = 0;
+        if (kind == "slider") {
+            vw = bar_w + 2 * p + UI_TextWidth("100%");
+        } else if (variable_struct_exists(it, "value") && it.value != "") {
+            var texts = variable_struct_exists(it, "measure") ? it.measure : [it.value];
+            for (var t = 0; t < array_length(texts); t++) vw = max(vw, UI_TextWidth(texts[t]));
+            if (kind == "choice") vw += 10 * p;
+        }
+        val_w = max(val_w, vw);
+    }
+    var title_w = (L.title != "") ? UI_TextWidth(L.title) : 0;
+    var inner_w = max(5 * p + label_w + ((val_w > 0) ? 4 * p + val_w : 0), title_w);
+    var chrome_x = 2 * (4 * p);
+    var panel_w = min(inner_w + chrome_x, mt.gw - 2 * mt.margin);
+    if (L.details) panel_w = min(max(panel_w, round(mt.gw * 0.78)), mt.gw - 2 * mt.margin);
+    var header_h = (L.title != "") ? (mt.line_h + 3 * p) : 0;
+    var chrome_y = 2 * (4 * p) + header_h;
+
+    // the details panel's height is the tallest sentence, so the list does not jump between items
+    var det_h = 0;
+    if (L.details) {
+        for (var d = 0; d < n; d++) {
+            var di = _m.items[d];
+            if (variable_struct_exists(di, "help")) det_h = max(det_h, Ui_DetailsHeight(panel_w, di.help, variable_struct_exists(di, "lines") ? di.lines : []));
+        }
+    }
+    var avail_h = mt.gh - 2 * mt.margin - ((det_h > 0) ? det_h + mt.margin : 0);
+    var rows_vis = clamp(floor((avail_h - chrome_y) / mt.row_h), 1, max(1, n));
+    var panel_h = chrome_y + rows_vis * mt.row_h;
+    var total_h = panel_h + ((det_h > 0) ? mt.margin + det_h : 0);
+    var px = round((mt.gw - panel_w) / 2);
+    var py;
+    if (L.anchor == "bottom") py = clamp(round(mt.gh * L.y_frac), mt.margin, max(mt.margin, mt.gh - mt.margin - total_h));
+    else py = max(mt.margin, round((mt.gh - total_h) / 2));
+    var slide = p * round((1 - _alpha) * 3);   // slides down into place in three pixel steps
+    py += -slide;
+
+    _m.top = Ui_ScrollTop(_m.cursor, _m.top, rows_vis, n);
+    Ui_DrawFrame(px, py, panel_w, panel_h, _alpha, p);
+    draw_set_alpha(_alpha);
+
+    var x0 = px + 4 * p;
+    var x1 = px + panel_w - 4 * p;
+    var ty0 = py + 4 * p;
+    if (L.title != "") {
+        Ui_Text(x0, ty0, L.title, UI_C_LIGHT);
+        Ui_Box(px + 3 * p, ty0 + mt.line_h + p, px + panel_w - 3 * p, ty0 + mt.line_h + 2 * p, UI_C_DARK);
+        ty0 += header_h;
+    }
+    var rows_y0 = ty0;
+
+    // rectangles for the mouse (rows outside the window can't be hit)
+    var rects = array_create(n);
+    for (var r = 0; r < n; r++) {
+        var vis = (r >= _m.top && r < _m.top + rows_vis);
+        rects[r] = { x: px + 2 * p, y: rows_y0 + (r - _m.top) * mt.row_h, w: vis ? (panel_w - 4 * p) : 0, h: vis ? mt.row_h : 0 };
+    }
+    _m.rects = rects;
+
+    // gliding highlight band
+    var target_y = rows_y0 + (_m.cursor - _m.top) * mt.row_h;
+    if (_m.cur_y < 0) _m.cur_y = target_y;
+    _m.cur_y = Ui_Glide(_m.cur_y, target_y, now - _m.last_draw_ms);
+    _m.last_draw_ms = now;
+    var band_y = round(_m.cur_y);
+    if (n > 0) Ui_Box(px + 2 * p + p, band_y, px + panel_w - 2 * p - p, band_y + mt.row_h, UI_C_DARK);
+
+    for (var k = _m.top; k < min(n, _m.top + rows_vis); k++) {
+        var row = _m.items[k];
+        var ry = rows_y0 + (k - _m.top) * mt.row_h;
+        var ty = ry + (mt.row_h - mt.line_h) div 2;
+        var sel = (k == _m.cursor);
+        var en = Ui_ItemEnabled(row);
+        var kd = variable_struct_exists(row, "kind") ? row.kind : "button";
+        var col = !en ? UI_C_DARK : (sel ? UI_C_LIGHTEST : UI_C_LIGHT);
+        var label_x = x0 + 5 * p;
+        if (L.center) Ui_Text((x0 + x1) / 2, ty, row.label, col, fa_center);
+        else Ui_Text(label_x, ty, row.label, col);
+        var vx = x1;
+        if (kd == "choice" && variable_struct_exists(row, "value")) {
+            if (sel && en) {
+                Ui_Arrow(x1 - 3 * p, ry + (mt.row_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
+            }
+            vx = x1 - 5 * p;
+            Ui_Text(vx, ty, row.value, col, fa_right);
+            if (sel && en) {
+                Ui_Arrow(vx - UI_TextWidth(row.value) - 5 * p, ry + (mt.row_h - 5 * p) div 2, -1, p, UI_C_LIGHTEST);
+            }
+        } else if (kd == "slider") {
+            Ui_Text(x1, ty, row.value, col, fa_right);
+            var bx = x1 - UI_TextWidth("100%") - 2 * p - bar_w;
+            var by = ry + (mt.row_h - 2 * p) div 2;
+            Ui_Box(bx, by, bx + bar_w, by + 2 * p, sel ? UI_C_DARKEST : UI_C_DARK);
+            var fill = floor(clamp(row.amount, 0, 1) * (bar_w / p) + 0.5) * p;
+            Ui_Box(bx, by, bx + fill, by + 2 * p, sel ? UI_C_LIGHTEST : UI_C_LIGHT);
+        } else if (variable_struct_exists(row, "value") && row.value != "") {
+            Ui_Text(x1, ty, row.value, col, fa_right);
+        }
+    }
+    // marker: follows the glide, bobs one pixel
+    if (n > 0) {
+        Ui_Arrow(x0 + Ui_Bob(now) * p, band_y + (mt.row_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
+    }
+    // a scroll hint when the list is longer than its window
+    if (n > rows_vis) {
+        if (_m.top > 0) Ui_Box(px + panel_w - 4 * p, rows_y0 - p, px + panel_w - 3 * p, rows_y0, UI_C_LIGHT);
+        if (_m.top + rows_vis < n) Ui_Box(px + panel_w - 4 * p, rows_y0 + rows_vis * mt.row_h, px + panel_w - 3 * p, rows_y0 + rows_vis * mt.row_h + p, UI_C_LIGHT);
+    }
+
+    if (det_h > 0 && n > 0) {
+        var cur = _m.items[_m.cursor];
+        if (variable_struct_exists(cur, "help")) {
+            Ui_DrawDetails(px, py + panel_h + mt.margin, panel_w, det_h, cur.help, variable_struct_exists(cur, "lines") ? cur.lines : [], _alpha);
+        }
+    }
+    draw_set_alpha(a0);
+    draw_set_color(c0);
+}
+
+// Draws a stack bottom to top from the last menu that hides what is below it, plus a menu that is on its way out. Each menu above
+// the first dims what is under it. Menus alpha-fade with Ui_MenuAlpha.
+function Ui_StackDraw(_stk, _dim_alpha = 0.6) {
+    var n = array_length(_stk.menus);
+    var from = 0;
+    for (var i = 0; i < n; i++) if (_stk.menus[i].layout.hides_below) from = i;
+    var now = current_time;
+    if (is_struct(_stk.leaving) && Ui_MenuAlpha(_stk.leaving, now) <= 0) _stk.leaving = undefined;
+    var gw = Display_GuiW();
+    var gh = Display_GuiH();
+    for (var j = from; j < n; j++) {
+        var m = _stk.menus[j];
+        var a = Ui_MenuAlpha(m, now);
+        if (j > from) Ui_DimBackdrop(_dim_alpha * a);
+        Ui_MenuDraw(m, a);
+    }
+    if (is_struct(_stk.leaving)) {
+        var lv = _stk.leaving;
+        var la = Ui_MenuAlpha(lv, now);
+        if (n > 0) Ui_DimBackdrop(_dim_alpha * la);
+        Ui_MenuDraw(lv, la);
+    }
+}
+
+function Ui_DimBackdrop(_a) {
+    if (_a <= 0) return;
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_a);
+    Ui_Box(0, 0, Display_GuiW(), Display_GuiH(), UI_C_DARKEST);
+    draw_set_alpha(a0);
 }
