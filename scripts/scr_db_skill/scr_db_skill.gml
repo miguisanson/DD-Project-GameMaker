@@ -995,7 +995,6 @@ function Skill_BuildAppliedStatusMessage(_applied_status_names) {
     if (!is_array(_applied_status_names) || array_length(_applied_status_names) <= 0) return "";
 
     var prefix = Loc_T("combat.msg.applied_prefix", "Applied ");
-    if (prefix == "") prefix = "Applied ";
     var last = string_char_at(prefix, string_length(prefix));
     if (last != " " && last != "\t" && last != "\n") prefix += " ";
 
