@@ -6312,7 +6312,7 @@ function Scenario_StepShotsEconomy(_s) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Scenario_SetWindowScale(5);
                 Ui_StackTop(global.shop_ui.stk).cursor = 5;
-                ShopUi_Say(ShopUi_ReasonText("gold"));
+                ShopUi_Say("gold");
             }
             if (_s.t == 50) {
                 global.shop_ui.msg_ms = current_time;
@@ -7084,7 +7084,7 @@ function Scenario_StepSmokeTabMenu(_s) {
                 case 8:
                     Scenario_Check("tabmenu_a_potion_heals", _gs.player_ch.hp > 1, "hp=" + string(_gs.player_ch.hp));
                     Scenario_Check("tabmenu_a_potion_is_spent", Scenario_ItemCount(_gs.player_ch, 10) == _s.n0 - 1, "have " + string(Scenario_ItemCount(_gs.player_ch, 10)) + " was " + string(_s.n0));
-                    Scenario_Check("tabmenu_it_says_what_happened", string_pos("Healed", _u.toast) == 1, _u.toast);
+                    Scenario_Check("tabmenu_it_says_what_happened", string_pos(string(_gs.player_ch.hp - 1), _u.toast) > 0, _u.toast + " hp=" + string(_gs.player_ch.hp));
                     Scenario_Tap("menu_up");
                     break;
                 case 15:
@@ -7397,6 +7397,7 @@ function Scenario_StepBotD1b(_s) {
                 Profile_ResetForTest();
                 global.ui_mem = Ui_MemNew();
                 var _g = Scenario_NewKnight();
+                variable_struct_remove(_g, "run");   // no run going: no card or stat screen opens over the menu after the level-ups
                 GameState_SetPlayer(Player_AddExp(_g.player_ch, 200));
                 Scenario_Check("bot_d1b_the_codex_starts_empty", Codex_BestiaryCount(Profile_Get()) == 0);
                 _s.vstart = _s.f;
@@ -7414,31 +7415,36 @@ function Scenario_StepBotD1b(_s) {
             if (_s.f - _s.vstart > 4000) { Scenario_Check("bot_d1b_fight_ends", false, "state=" + string(_bc.battle_state)); Scenario_Next(_s, 2); break; }
             Scenario_BotPlainAttack(_s, _bc);
             break;
-        case 2:   // back in the floor, open the menu with the real key
-            if (_s.t == 200) {
-                Scenario_Check("bot_d1b_back_in_the_floor", room == rm_floor1, "room=" + room_get_name(room));
-                Scenario_ClearUi();
-                Scenario_Tap("menu");
+        case 2:   // back in the floor (a reaction dialogue may be up: close it), open the menu with the real key
+            if (_s.t == 200) Scenario_Check("bot_d1b_back_in_the_floor", room == rm_floor1, "room=" + room_get_name(room));
+            if (_s.t >= 200 && !variable_struct_exists(_s, "d1b_t0")) {
+                if (_gs.ui.mode == UI_DIALOGUE) Dialogue_CloseNow();
+                else if (_gs.ui.mode == UI_NONE && Scenario_FloorReady(rm_floor1) && Player_IsSettled(_gs.player_inst)) {
+                    Scenario_Tap("menu");
+                    _s.d1b_t0 = _s.t;
+                }
             }
-            if (_s.t == 212) {
+            if (!variable_struct_exists(_s, "d1b_t0")) break;
+            var _k0 = _s.d1b_t0;
+            if (_s.t == _k0 + 12) {
                 Scenario_Check("bot_d1b_the_menu_opens_on_status", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && TabMenu_Get().tab == 0, "mode=" + string(_gs.ui.mode));
                 Scenario_Check("bot_d1b_status_shows_the_stats_after_the_fight", is_struct(_m) && _m.items[0].value == string(Stat_Get(_gs.player_ch, STAT_ATK)));
                 Scenario_Tap("tab_next");
             }
-            if (_s.t == 219) Scenario_Tap("tab_next");
-            if (_s.t == 226) Scenario_Tap("tab_next");
-            if (_s.t == 233) Scenario_Tap("tab_next");
-            if (_s.t == 240) {
+            if (_s.t == _k0 + 19) Scenario_Tap("tab_next");
+            if (_s.t == _k0 + 26) Scenario_Tap("tab_next");
+            if (_s.t == _k0 + 33) Scenario_Tap("tab_next");
+            if (_s.t == _k0 + 40) {
                 Scenario_Check("bot_d1b_four_E_reach_the_codex", is_struct(TabMenu_Get()) && TabMenu_Get().tab == 4);
                 Scenario_Check("bot_d1b_the_codex_counts_the_slime", is_struct(_m) && _m.items[0].value == "1/10", is_struct(_m) ? _m.items[0].value : "no menu");
                 Scenario_Tap("confirm");
             }
-            if (_s.t == 250) {
+            if (_s.t == _k0 + 50) {
                 Scenario_Check("bot_d1b_the_bestiary_names_the_slime", is_struct(_m) && _m.id == "codex_bestiary" && _m.items[0].label == EnemyDB_Get(ENEMY_SLIME).name, is_struct(_m) ? _m.id : "none");
                 Scenario_Check("bot_d1b_one_meeting_counted", is_struct(_m) && Test_RowValue(_m.items[0].lines, Loc_T("tab.lbl.met", "Met")) == "1");
                 Scenario_Tap("menu");
             }
-            if (_s.t == 275) {
+            if (_s.t == _k0 + 75) {
                 Scenario_Check("bot_d1b_the_menu_key_closes_it_from_any_depth", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
                 _s.v = 5;   // on to movement and AI
                 Scenario_Next(_s, 0);

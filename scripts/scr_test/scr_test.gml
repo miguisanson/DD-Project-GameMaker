@@ -4887,7 +4887,7 @@ function Test_Suite_TabMenu() {
     // ---- the pause menu (D92, D95): Resume, Help, Settings, Abandon run (two presses), Quit to title ----
     var _pm = PauseMenu_Items(false);
     Test_Eq("D92 pause rows", _pm[0].id + "/" + _pm[1].id + "/" + _pm[2].id + "/" + _pm[3].id + "/" + _pm[4].id, "resume/help/settings/abandon/quit");
-    Test_Eq("D92 pause labels", _pm[0].label + "," + _pm[1].label + "," + _pm[2].label + "," + _pm[3].label + "," + _pm[4].label, "Resume,Help,Settings,Abandon Run,Quit to Title");
+    Test_Eq("D92 pause labels", _pm[0].label + "," + _pm[1].label + "," + _pm[2].label + "," + _pm[3].label + "," + _pm[4].label, "Resume,Help,Settings,Abandon run,Quit to title");
     Test_Eq("D92 Abandon is where the constant says", PAUSE_ABANDON_INDEX, 3);
     Test_Eq("D92 the armed Abandon row asks again", PauseMenu_Items(true)[3].label, Loc_T("pause.option.abandon_confirm", "Sure? Confirm again"));
     Test_True("D100 every pause row explains itself", string_length(_pm[0].help) > 0 && string_length(_pm[3].help) > 0 && string_length(_pm[4].help) > 0);

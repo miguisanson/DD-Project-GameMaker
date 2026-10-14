@@ -351,7 +351,7 @@ function Codex_BestiaryRows(_prof) {
         ];
         if (ent.elite) array_push(lines, { label: Loc_T("tab.lbl.elite", "Elite"), value: Loc_T("tab.val.seen", "Seen") });
         array_push(rows, {
-            id: "enemy_" + string(eid), label: cfg.name, value: Loc_T("tab.bestiary.lv", "Lv {n}", { n: lvl }), kind: "button", enabled: true, enemy_id: eid,
+            id: "enemy_" + string(eid), label: cfg.name, value: lvl, kind: "button", enabled: true, enemy_id: eid,
             help: sentence, lines: lines, hint: "", pic: { spr: cfg.sprite, sub: 0 }
         });
     }
@@ -397,7 +397,7 @@ function Codex_HistoryRows(_prof) {
             sentence = Loc_T("tab.hist.abandoned", "You gave this run up on floor {n}.", { n: string(fl) });
             value = Loc_T("tab.val.abandoned", "Gave up");
         } else {
-            sentence = (cause != "") ? Loc_T("tab.hist.died_to", "Felled by {name} on floor {n}.", { name: cause, n: string(fl) }) : Loc_T("tab.hist.died", "You fell on floor {n}.", { n: string(fl) });
+            sentence = (cause != "") ? Loc_T("tab.hist.died_to", "Floor {n}: felled by {name}.", { name: cause, n: string(fl) }) : Loc_T("tab.hist.died", "You fell on floor {n}.", { n: string(fl) });
             value = Loc_T("tab.val.floor", "Floor {n}", { n: string(fl) });
         }
         array_push(rows, {
@@ -418,7 +418,7 @@ function Codex_UnlockRows(_prof) {
     var rows = [];
     var on = Profile_IsUnlocked(_prof, "nobody_class");
     array_push(rows, {
-        id: "unlock_nobody", label: Loc_T("tab.unlock.nobody", "The Nobody"), value: on ? Loc_T("tab.val.unlocked", "Unlocked") : Loc_T("tab.val.locked", "Locked"), kind: "button", enabled: true, dim: !on, hint: "",
+        id: "unlock_nobody", label: Loc_T("tab.unlock.nobody", "Nobody"), value: on ? Loc_T("tab.val.unlocked", "Unlocked") : Loc_T("tab.val.locked", "Locked"), kind: "button", enabled: true, dim: !on, hint: "",
         help: on ? Loc_T("tab.unlock.nobody_on", "A fighter with no class. Throws {m}x as hard and carries {cap} of each throwable.", { m: string_format(THROW_NOBODY_MULT, 1, 1), cap: string(THROW_CAP_NOBODY) })
                  : Loc_T("tab.unlock.nobody_off", "Win a run to unlock a fighter with no class."),
         lines: []
@@ -451,16 +451,11 @@ function TabMenu_Get() {
     return (variable_global_exists("tab_ui") && is_struct(global.tab_ui)) ? global.tab_ui : undefined;
 }
 
-function Menu_IsOpen() {
-    var gs = GameState_Get();
-    return variable_struct_exists(gs, "ui") && gs.ui.mode == UI_MENU;
-}
-
 // Where everything stands on the GUI grid: tabs header on top, the body (list left, details right), a footer line for prompts and gold.
 function TabMenu_ListShare(_tid) {
     switch (_tid) {
         case "codex_bestiary": case "codex_notes": return 0.4;   // the page on the right has the long text and the numbers
-        case "codex_history": return 0.46;
+        case "codex_history": return 0.58;
         case "gear": case "items": case "skills": return 0.55;   // long names with icons
         case "settings": return 0.6;                              // a name and a value on every row
         case "status": return 0.48;
@@ -1260,7 +1255,7 @@ function CardsUi_DrawCard(_x, _y, _w, _h, _c, _sel, _a) {
         Ui_Box(_x + 3 * p, ty - p, _x + _w - 3 * p, ty + nh + p, UI_C_DARK);
         Ui_Arrow(x0 + Ui_Bob(current_time) * p, ty + (mt.line_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
     }
-    Ui_TextBlock(x0 + 5 * p, ty, name, iw - 5 * p, _sel ? UI_C_LIGHTEST : UI_C_LIGHT);
+    Ui_TextBlock(x0 + 5 * p, ty, name, iw - 5 * p, UI_C_TEXT);
     ty += nh + 2 * p;
     Ui_Text(x0 + 5 * p, ty, Card_TypeTag(_c), UI_C_LIGHT);
     ty += mt.line_h + p;
@@ -1503,7 +1498,7 @@ function Tutorial_Draw() {
     Ui_Text(x0, ty, e.title, UI_C_LIGHTEST);
     Ui_Box(b.x + 3 * p, ty + mt.line_h + p, b.x + b.w - 3 * p, ty + mt.line_h + 2 * p, UI_C_DARK);
     ty += mt.line_h + 3 * p;
-    Ui_TextBlock(x0, ty, e.body, b.iw, UI_C_LIGHT);
+    Ui_TextBlock(x0, ty, e.body, b.iw, UI_C_TEXT);
     ty += b.body_h + 3 * p;
     var more = array_length(t.queue);
     Prompt_RichDraw(x0, ty, Tutorial_Footer(), b.iw, UI_C_LIGHTEST, fa_left, a);
@@ -1711,10 +1706,78 @@ function ShopUi_Interrupt() {
     if (ShopUi_IsOpen()) ShopUi_Close();
 }
 
-function ShopUi_Say(_text) {
+// The merchant's own lines (merchant.<kind>.<n>, casual and flat): greet on arrival, buy, sell, leave. Each kind rotates through its lines in order.
+function Merchant_Count(_kind) {
+    return (_kind == "greet") ? 4 : 3;
+}
+
+// The next line of this kind (0, 1, 2 ... and round again), so the same one never comes twice in a row.
+function Merchant_NextIndex(_kind) {
+    if (!variable_global_exists("merchant_rot") || !is_struct(global.merchant_rot)) global.merchant_rot = {};
+    var cur = variable_struct_exists(global.merchant_rot, _kind) ? variable_struct_get(global.merchant_rot, _kind) : -1;
+    cur = (cur + 1) mod Merchant_Count(_kind);
+    variable_struct_set(global.merchant_rot, _kind, cur);
+    return cur;
+}
+
+// Read at draw time, so the line follows the language.
+function Merchant_Line(_kind, _idx) {
+    var i = clamp(_idx, 0, Merchant_Count(_kind) - 1);
+    switch (_kind) {
+        case "greet":
+            switch (i) {
+                case 0: return Loc_T("merchant.greet.0", "You came a long way down. Brave. Or lost.");
+                case 1: return Loc_T("merchant.greet.1", "Coins keep the dark away. Mostly.");
+                case 2: return Loc_T("merchant.greet.2", "Don't ask where I sleep.");
+                default: return Loc_T("merchant.greet.3", "Buy something. Please.");
+            }
+        case "buy":
+            switch (i) {
+                case 0: return Loc_T("merchant.buy.0", "Good choice. You will need it.");
+                case 1: return Loc_T("merchant.buy.1", "It belonged to someone once.");
+                default: return Loc_T("merchant.buy.2", "Spend it while you can.");
+            }
+        case "sell":
+            switch (i) {
+                case 0: return Loc_T("merchant.sell.0", "I'll take it. No questions.");
+                case 1: return Loc_T("merchant.sell.1", "It will find its way to someone else.");
+                default: return Loc_T("merchant.sell.2", "Used. Like everything down here.");
+            }
+    }
+    switch (i) {
+        case 0: return Loc_T("merchant.leave.0", "Come back. They always do.");
+        case 1: return Loc_T("merchant.leave.1", "Mind the dark. It minds you.");
+        default: return Loc_T("merchant.leave.2", "I'll be here. I'm always here.");
+    }
+}
+
+// What the shop says: a message kept as its kind ("bought", "sold" or a refusal reason) and its numbers, so it is read again in the language of the
+// moment, and with _quote_kind the merchant's next line of that kind under it.
+function ShopUi_MsgText(_ref) {
+    switch (_ref.kind) {
+        case "bought": return Loc_T("shop.msg.bought", "Bought {name} for {price}.", _ref.params);
+        case "sold": return Loc_T("shop.msg.sold", "Sold {name} for {price}.", _ref.params);
+    }
+    return ShopUi_ReasonText(_ref.kind);
+}
+
+function ShopUi_Say(_kind, _params = {}, _quote_kind = "") {
     var u = global.shop_ui;
-    u.msg = _text;
+    u.msg_ref = { kind: _kind, params: _params };
+    u.msg = ShopUi_MsgText(u.msg_ref);
     u.msg_ms = current_time;
+    u.quote_kind = _quote_kind;
+    u.quote_idx = (_quote_kind != "") ? Merchant_NextIndex(_quote_kind) : -1;
+}
+
+// The merchant alone, without an information line (arrival).
+function ShopUi_Quote(_kind) {
+    var u = global.shop_ui;
+    u.msg_ref = undefined;
+    u.msg = "";
+    u.msg_ms = current_time;
+    u.quote_kind = _kind;
+    u.quote_idx = Merchant_NextIndex(_kind);
 }
 
 // One Buy row from a stock row: name, price (or sold out), the sentence and the number lines. can_buy says whether Confirm would work now.
@@ -1803,7 +1866,7 @@ function ShopUi_RootMenu() {
 function ShopUi_RootConfirm(_m, _i) {
     var u = global.shop_ui;
     if (_i == 2) {
-        ShopUi_Close();
+        ShopUi_Leave();
         return;
     }
     var sell = (_i == 1);
@@ -1816,6 +1879,12 @@ function ShopUi_RootConfirm(_m, _i) {
 }
 
 function ShopUi_RootBack(_m, _res) {
+    ShopUi_Leave();
+}
+
+// Leaving: the shop closes and the merchant's parting line stays on screen a moment (it is not a dialogue: nothing waits for it).
+function ShopUi_Leave() {
+    global.shop_farewell = { idx: Merchant_NextIndex("leave"), ms: current_time };
     ShopUi_Close();
 }
 
@@ -1840,11 +1909,11 @@ function ShopUi_BuyConfirm(_m, _i) {
     var r = Shop_Buy(gs.player_ch, Run_Get(), it.row);
     if (!r.ok) {
         SFX_PlayUI("ui_back");
-        ShopUi_Say(ShopUi_ReasonText(r.reason));
+        ShopUi_Say(r.reason);
         return;
     }
     CardsUi_Commit(r.ch);
-    ShopUi_Say(Loc_T("shop.msg.bought", "Bought {name} for {price}.", { name: it.label, price: string(r.price) }));
+    ShopUi_Say("bought", { name: it.label, price: string(r.price) }, "buy");
     ShopUi_Refresh(_m, "buy");
 }
 
@@ -1855,11 +1924,11 @@ function ShopUi_SellConfirm(_m, _i) {
     var r = Shop_Sell(gs.player_ch, Run_Get(), it.item_id);
     if (!r.ok) {
         SFX_PlayUI("ui_back");
-        ShopUi_Say(ShopUi_ReasonText(r.reason));
+        ShopUi_Say(r.reason);
         return;
     }
     CardsUi_Commit(r.ch);
-    ShopUi_Say(Loc_T("shop.msg.sold", "Sold {name} for {price}.", { name: ItemDB_Get(it.item_id).name, price: string(r.gold) }));
+    ShopUi_Say("sold", { name: ItemDB_Get(it.item_id).name, price: string(r.gold) }, "sell");
     ShopUi_Refresh(_m, "sell");
 }
 
@@ -1867,10 +1936,11 @@ function ShopUi_Open(_shop_index) {
     var gs = GameState_Get();
     if (!is_struct(Run_Get()) || !is_struct(gs.player_ch)) return false;
     Shop_RunStock(Run_Get(), _shop_index, gs.player_ch);   // made now, from the seed, if this is the first visit
-    var u = { stk: Ui_StackNew(), shop_index: _shop_index, msg: "", msg_ms: -100000, opened_frame: Input_Frame(), opened_ms: current_time };
+    var u = { stk: Ui_StackNew(), shop_index: _shop_index, msg: "", msg_ref: undefined, quote_kind: "", quote_idx: -1, msg_ms: -100000, opened_frame: Input_Frame(), opened_ms: current_time };
     global.shop_ui = u;
     Ui_StackPush(u.stk, ShopUi_RootMenu());
     gs.ui.mode = UI_SHOP;
+    ShopUi_Quote("greet");
     SFX_PlayUI("ui_openclose");
     Tutorial_Trigger("shop");   // C4 (D45)
     return true;
@@ -1896,24 +1966,52 @@ function ShopUi_Step() {
     return ShopUi_IsOpen();
 }
 
+// A framed plate at the bottom: one or two lines.
+function ShopUi_DrawPlate(_line1, _line2, _alpha = 1) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var lines = [];
+    if (_line1 != "") array_push(lines, _line1);
+    if (_line2 != "") array_push(lines, _line2);
+    if (array_length(lines) == 0) return;
+    var tw = 0;
+    for (var i = 0; i < array_length(lines); i++) tw = max(tw, UI_TextWidth(lines[i]));
+    tw = min(tw + 8 * p, mt.gw - 2 * mt.margin);
+    var th = array_length(lines) * mt.line_h + (array_length(lines) - 1) * p + 6 * p;
+    var mx0 = round((mt.gw - tw) / 2);
+    var my0 = mt.gh - mt.margin - th;
+    Ui_DrawFrame(mx0, my0, tw, th, _alpha, p);
+    for (var j = 0; j < array_length(lines); j++) {
+        var col = (j == 0 || array_length(lines) == 1) ? UI_C_LIGHTEST : UI_C_LIGHT;   // the information first, the merchant's line under it in the accent colour
+        Ui_Text(mx0 + 4 * p, my0 + 3 * p + j * (mt.line_h + p), Ui_FitText(lines[j], tw - 8 * p), col);
+    }
+}
+
 function ShopUi_Draw() {
-    if (!ShopUi_IsOpen()) return;
+    if (!ShopUi_IsOpen()) {   // the merchant's parting line, after the shop has closed
+        if (variable_global_exists("shop_farewell") && is_struct(global.shop_farewell)) {
+            if (current_time - global.shop_farewell.ms < SHOP_MSG_MS) {
+                UI_SetFont();
+                ShopUi_DrawPlate(Merchant_Line("leave", global.shop_farewell.idx), "");
+                draw_set_alpha(1);
+                draw_set_color(c_white);
+            } else {
+                global.shop_farewell = undefined;
+            }
+        }
+        return;
+    }
     var u = global.shop_ui;
     var a = Ui_AnimT(u.opened_ms, current_time);
-    var mt = Ui_Metrics();
     UI_SetFont();
     draw_set_alpha(1);
     Ui_DimBackdrop(0.8 * a);
     Ui_StackDraw(u.stk, 0.5);
-    // the last thing the shop said, at the bottom, for a moment
-    if (u.msg != "" && current_time - u.msg_ms < SHOP_MSG_MS) {
-        var p = mt.p;
-        var tw = UI_TextWidth(u.msg) + 8 * p;
-        var th = mt.line_h + 6 * p;
-        var mx0 = round((mt.gw - tw) / 2);
-        var my0 = mt.gh - mt.margin - th;
-        Ui_DrawFrame(mx0, my0, tw, th, 1, p);
-        Ui_Text(mx0 + 4 * p, my0 + 3 * p, u.msg, UI_C_LIGHTEST);
+    // the last thing the shop said, and the merchant's line, at the bottom, for a moment
+    if (current_time - u.msg_ms < SHOP_MSG_MS) {
+        var info = is_struct(u.msg_ref) ? ShopUi_MsgText(u.msg_ref) : "";   // read now: the language may have changed since it was said
+        var quote = (u.quote_kind != "") ? Merchant_Line(u.quote_kind, u.quote_idx) : "";
+        ShopUi_DrawPlate(info, quote);
     }
     draw_set_alpha(1);
     draw_set_color(c_white);
@@ -2098,7 +2196,7 @@ function SettingsMenu_Items(_p, _scale_max, _dirty = false) {
     var r_ts = Settings_Row("text_speed", Loc_T("settings.row.text_speed", "Text speed"), "choice",
         Settings_TextSpeedText(ts), Loc_T("settings.help.text_speed", "How fast dialogue text appears."));
     r_ts.measure = [Settings_TextSpeedText(0), Settings_TextSpeedText(1), Settings_TextSpeedText(2)];
-    array_push(r_ts.lines, { label: Loc_T("settings.line.cps", "Characters per second"), value: string(round(UI_DIALOGUE_CHARS_PER_SEC * Settings_TextSpeedMul(ts))) });
+    array_push(r_ts.lines, { label: Loc_T("settings.line.cps", "Chars per sec"), value: string(round(UI_DIALOGUE_CHARS_PER_SEC * Settings_TextSpeedMul(ts))) });
     array_push(items, r_ts);
 
     var r_sh = Settings_Row("shake", Loc_T("settings.row.shake", "Screen shake"), "choice",
@@ -2170,12 +2268,6 @@ function SettingsPopup_Refresh() {
     var sp = GameState_Get().ui.settings_popup;
     if (!sp.open || !is_struct(sp.menu)) return;
     sp.menu.items = SettingsMenu_Items(sp.pending, sp.scale_max, sp.dirty);
-}
-
-// 0..1 for the dim logic while the popup slides in or out (D97).
-function SettingsPopup_Alpha() {
-    var sp = GameState_Get().ui.settings_popup;
-    return is_struct(sp.menu) ? Ui_MenuAlpha(sp.menu, current_time) : 0;
 }
 
 function SettingsPopup_Open(_owner = "", _quiet = false) {
@@ -2458,10 +2550,10 @@ function PauseMenu_Items(_armed) {
         { id: "help", label: Loc_T("pause.option.help", "Help"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.help", "Every hint the game has: the ones you have seen and the ones still to come.") },
         { id: "settings", label: Loc_T("pause.option.settings", "Settings"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.settings", "Sound, text, window, language and keys.") },
         { id: "abandon", value: "", kind: "button", enabled: true, lines: [],
-          label: _armed ? Loc_T("pause.option.abandon_confirm", "Sure? Confirm again") : Loc_T("pause.option.abandon", "Abandon Run"),
+          label: _armed ? Loc_T("pause.option.abandon_confirm", "Sure? Confirm again") : Loc_T("pause.option.abandon", "Abandon run"),
           help: _armed ? Loc_T("pause.help.abandon_armed", "Confirm once more to end this run now. Back or another row cancels.")
                        : Loc_T("pause.help.abandon", "Ends this run now. It counts as a death, but you keep the echo.") },
-        { id: "quit", label: Loc_T("pause.option.quit", "Quit to Title"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.quit", "Saves the run and goes to the title. Continue picks it up again.") }
+        { id: "quit", label: Loc_T("pause.option.quit", "Quit to title"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.quit", "Saves the run and goes to the title. Continue picks it up again.") }
     ];
 }
 

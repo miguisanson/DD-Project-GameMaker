@@ -1807,7 +1807,7 @@ function Credits_Draw(_t) {
                 var s = max(0.0001, UI_GetFontScale());
                 draw_set_halign(fa_center);
                 draw_set_valign(fa_top);
-                draw_set_color(UI_C_LIGHT);
+                draw_set_color(UI_C_TEXT);
                 draw_text_ext_transformed(cx, round(ry), r.text, -1, max(1, round(l.col_w / s)), s, s, 0);
                 draw_set_halign(fa_left);
             } break;
