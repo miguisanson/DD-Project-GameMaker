@@ -30,7 +30,7 @@ something only the owner can do.
    (it maps the codebase with parallel agents, reads existing docs and asks
    the owner about goals), then continue below. Do not invent goals.
 2. Run `/gsd-progress` (or `/gsd-resume-work` if a pause handoff exists).
-3. Read `.planning/BOARD.md`. Run `git status`, `git worktree list`, and the
+3. If `.planning/RESUME.md` exists, read it first (paused packets with full briefs). Read `.planning/BOARD.md`. Run `git status`, `git worktree list`, and the
    fast gate (`powershell -NoProfile -ExecutionPolicy Bypass -File
    tools/automation/run_tests.ps1 -Mode fast`); it must say GATE PASS before
    new work starts. If worktrees are left over, land them or say why you can't.

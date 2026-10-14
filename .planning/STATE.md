@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PAUSED by owner (gaming) 2026-10-15. Paused agents committing WIP on: d1a-battle-ui (wt d1a, merging next/C4), bal-apply (wt bal, D111/D112), art-final (wt artf, D113/D114). Resume when owner says so: re-send each its task, then D1b (Tab menu + pause + inventory/gear + codex + white text D115), D3 text pass, F1 optimisation, E2 full gate + playtest build. |
+| WIP | PAUSED by owner 2026-10-15. READ .planning/RESUME.md FIRST: 3 paused packets (d1a-battle-ui, bal-apply, art-final) with full briefs, then D1b, D3, F1, E2. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
