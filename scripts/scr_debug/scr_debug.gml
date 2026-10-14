@@ -1263,8 +1263,9 @@ function Scenario_StepBotExtras(_s) {
                     GameState_SetPlayer(_ch);
                     _s.sk_mp0 = _ch.mp;
                 } else {
-                    _ch.max_hp = 99;   // a big hit must not end the battle
-                    _ch.hp = 99;
+                    _ch.level = LEVEL_CAP;   // a big hit must not end the battle: max HP comes from the level (D111: the enemies hit harder, and the failing variant takes the hit and the Bleeding in full)
+                    _ch = RecomputeResources(_ch);
+                    _ch.hp = _ch.max_hp;
                     GameState_SetPlayer(_ch);
                     Debug_Init();
                     global.debug.enabled = true;   // an enemy that only uses damaging skills: the mini boss's Ramming, every turn
@@ -1989,9 +1990,21 @@ function Scenario_StepBotTurns(_s) {
                     } else {
                         Scenario_Check(_name + "_b_full_meter_is_a_break", _tb.st0 + _gain >= 8 && _bcb.e.stagger == 0, "grade " + _gk + " " + string(_tb.st0) + " + " + string(_gain));
                         Scenario_Check(_name + "_b_break_message_logged", Scenario_BotLogCount(_bcb, "BREAK") >= 1);
-                        Turn_Next(_tb.base);
+                        // The same start state twice, from the model (the SPD values are the fighters' real ones, set on the snapshot above): the battle pushes the enemy back
+                        // first and then the timeline picks the next actor (Battle_StaggerHit, then Battle_TurnAdvance). With = push one full turn; without = nothing pushed.
+                        var _tb_without = Turn_Copy(_tb.base);
+                        var _who_without = Turn_Next(_tb_without);
                         Turn_Push(_tb.base, TL_ENEMY);
-                        Scenario_Check(_name + "_b_break_pushes_the_enemy_back_one_turn", Scenario_BotPreviewString(_bcb.tl, 6) == Scenario_BotPreviewString(_tb.base, 6), Scenario_BotPreviewString(_bcb.tl, 6) + " vs " + Scenario_BotPreviewString(_tb.base, 6));
+                        var _who_with = Turn_Next(_tb.base);
+                        var _pv_with = Scenario_BotPreviewString(_tb.base, 6);
+                        var _pv_without = Scenario_BotPreviewString(_tb_without, 6);
+                        var _pv_real = Scenario_BotPreviewString(_bcb.tl, 6);
+                        var _seq_with = ((_who_with == TL_PLAYER) ? "P" : "E") + _pv_with;   // the next actor, then the strip
+                        var _seq_without = ((_who_without == TL_PLAYER) ? "P" : "E") + _pv_without;
+                        var _e_with = string_pos("E", _seq_with);
+                        var _e_without = string_pos("E", _seq_without);
+                        Scenario_Check(_name + "_b_break_pushes_the_enemy_back_one_turn", _pv_real == _pv_with && _bcb.tl_who == _who_with, _pv_real + " vs " + _pv_with + " (spd p=" + string(Turn_Find(_bcb.tl, TL_PLAYER).spd) + " e=" + string(Turn_Find(_bcb.tl, TL_ENEMY).spd) + ")");
+                        Scenario_Check(_name + "_b_break_push_moves_the_enemy_later_than_no_break", _e_without > 0 && (_e_with == 0 || _e_with > _e_without), "with " + _seq_with + " without " + _seq_without);
                         Scenario_Check(_name + "_b_break_pop_started", (current_time - _bcb.break_start) < 1000);
                         _tb.k = 5;
                     }
