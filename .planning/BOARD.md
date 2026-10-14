@@ -15,4 +15,5 @@ Build: none in progress | Mode: BIG BUILD, then one big playtest (D71) | Release
 - In GameMaker: Game Options > Windows: tick "Allow window resize"; set scaling to "full scale"; widen `rm_floor6_5` to at least 160 px; delete unused sprites `spr_attack_timing_target`, `spr_attack_timing_falling`.
 - Send the creator names for the sounds/music (credits).
 - Ask the friend which build they played (I-039).
+- In GameMaker: add `datafiles/fonts/galmuri/Galmuri9.ttf` and `Galmuri11.ttf` as Included Files (right-click Included Files > Add Existing) — the game loads them for Korean.
 - Later: import the generated icon strips (a checklist will be on this board).

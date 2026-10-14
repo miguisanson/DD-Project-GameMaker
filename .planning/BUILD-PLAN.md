@@ -22,7 +22,8 @@ game exports JSON with `-exportdata` for the Python simulator (no Included File 
 | D2 | Art: ComfyUI icons (status, skills, items, throwables, passives) + card frame, PNG strips + owner import checklist; code fallbacks until imported | D10, D43, D44, D94 | todo |
 | C5 | Story in runs: death scene (D103) + rotating death lines, wake at tunnel entrance, seen-once story with boss name banners (D106), lore notes in existing rooms incl. death-count notes (D107), credits text update (D105) | D102-D107, D26 | todo |
 | D3 | Text: cards, passives, death lines, lore notes, merchant, tutorial, codex (EN + KO draft); credits list (sound creators from owner) | D93, D40, D105, D107 | todo |
+| F1 | Full optimisation + consistency pass: frame-time probe in the bot (before/after), per-frame work and allocations, draw calls, room loads; dead/duplicated code, frame-counted timers → ms, global sprawl; consistent controls, wording, colours, sounds, naming | D108, ROB-01..03 | todo |
 | E1 | Simulator on `-exportdata` JSON, target bands, balance proposals for the owner | D13, D14 | todo |
 | E2 | Full gate, regression list run, playtest build + one big PLAYTEST-QUEUE | D71 | todo |
 
-Order: A1+A2 → (B1 ∥ D0) → (B2 ∥ C1) → B3 → (B4 ∥ C2) → C3 → C4 → C5 → D1 (∥ D2 art) → D3 → E1 → E2.
+Order: A1+A2 → (B1 ∥ D0) → (B2 ∥ C1) → B3 → (B4 ∥ C2) → C3 → C4 → C5 → D1 (∥ D2 art) → D3 → F1 → E1 → E2.

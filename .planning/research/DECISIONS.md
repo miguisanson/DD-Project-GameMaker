@@ -112,6 +112,7 @@ Locked by the owner. Changing any of these needs a new grill-me.
 | D105 | Closing credits | Update the closing text: keep "Thank you for playing..." and "by PaleRook", drop "prototype"/"2 months" wording, add the full credits list (sound/music creators from the owner, fonts, tools/licences). Agent drafts; owner reviews at playtest. |
 | D106 | Seen story on later runs | Already-seen story moments do not replay (D26); bosses get a ~1 s name banner instead of the full camera pan. |
 | D107 | Lore pickups | New lore lives in readable items/notes placed in existing rooms that the player picks up or reads by interacting; some appear only after N deaths (e.g. 3/6/10 — your own earlier marks, hints about the tunnel). Collected notes are listed in the Codex. Agent drafts the text; owner reviews. |
+| D108 | Final optimisation pass | After everything is built: a full optimisation + consistency pass — performance (per-frame work, allocations, draw calls, room load times, measured with a frame-time probe in the bot), logic (duplicated code, dead code, frame-counted timers → ms, globals), and consistency (same controls, wording, colours, sounds, naming across all screens and systems). Every change keeps its checks green. |
 
 ## Notes
 - Three of the friend's bugs (skill books twice, mini boss moving, maybe poison) look already fixed in code since commit f39236b (2026-03-05) — the friend probably played an older build. From now on every build shows a build id, and every note records it.
