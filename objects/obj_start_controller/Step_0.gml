@@ -1,31 +1,11 @@
 Input_PreStep();
 var gs = GameState_Get();
 
-if (!variable_instance_exists(id, "difficulty_options") || !is_array(difficulty_options) || array_length(difficulty_options) <= 0) {
-    difficulty_options = [
-        Loc_T("settings.difficulty.option.0", "Easy"),
-        Loc_T("settings.difficulty.option.1", "Normal"),
-        Loc_T("settings.difficulty.option.2", "Hard")
-    ];
+if (gs.ui.mode == UI_SAVE) {
+    title_refresh = true;   // a save may have been made or deleted in there
+    exit;
 }
-if (!variable_instance_exists(id, "difficulty_values") || !is_array(difficulty_values) || array_length(difficulty_values) != array_length(difficulty_options)) {
-    difficulty_values = [DIFFICULTY_EASY, DIFFICULTY_NORMAL, DIFFICULTY_HARD];
-}
-if (!variable_instance_exists(id, "difficulty_index")) {
-    difficulty_index = 1;
-}
-var difficulty_row_count = array_length(difficulty_options) + 1; // + Back row
-difficulty_index = clamp(difficulty_index, 0, max(0, difficulty_row_count - 1));
-
-if (gs.ui.mode == UI_SAVE) exit;
 if (Transition_IsInputLocked() && state != "cutscene") return;
-
-var k_up = Input_UIPressed("menu_up");
-var k_down = Input_UIPressed("menu_down");
-var k_left = Input_UIPressed("menu_left");
-var k_right = Input_UIPressed("menu_right");
-var k_ok = Input_UIConfirm();
-var k_back = Input_UIBack();
 
 if (state == "boot_logo") {
     if (Transition_IsActive()) return;
@@ -82,138 +62,8 @@ if (state == "run_flow") {   // C1: run summary, echo pick, new run (scr_room_st
     return;
 }
 
-if (state == "main") {
-    var title_idx_new = 0;
-    var title_idx_load = 1;
-    var title_idx_settings = 2;
-    var title_idx_exit = 3;
-
-    if (!legacy_notice_checked) {   // C1 (D16): say once why old saves are not loaded; also tell about a profile file that was not usable
-        legacy_notice_checked = true;
-        var notice_text = Profile_NoticeText();
-        var notice_prof = Profile_Get();
-        if (notice_text == "" && Save_LegacyFilesExist() && !notice_prof.legacy_notice_seen) {
-            notice_prof.legacy_notice_seen = true;
-            Profile_Flush();
-            notice_text = Save_LegacyNotice();
-        }
-        if (notice_text != "") {
-            SaveMenu_OpenMessage(notice_text, true);
-            return;
-        }
-    }
-
-    load_available = RunSave_HasSave();
-    if (!load_available && main_index == title_idx_load) {
-        main_index = (main_index + 1) mod array_length(main_options);
-    }
-
-    if (k_up) {
-        var max_loop_up = array_length(main_options);
-        repeat (max_loop_up) {
-            main_index = (main_index + array_length(main_options) - 1) mod array_length(main_options);
-            if (load_available || main_index != title_idx_load) break;
-        }
-        SFX_PlayUI("ui_move");
-    }
-    if (k_down) {
-        var max_loop_down = array_length(main_options);
-        repeat (max_loop_down) {
-            main_index = (main_index + 1) mod array_length(main_options);
-            if (load_available || main_index != title_idx_load) break;
-        }
-        SFX_PlayUI("ui_move");
-    }
-
-    if (k_ok) {
-        var opt = main_index;
-        if (opt == title_idx_load && !load_available) {
-            main_index = (main_index + 1) mod array_length(main_options);
-            SFX_PlayUI("ui_move");
-            return;
-        }
-
-        SFX_PlayUI("ui_confirm");
-        if (opt == title_idx_new) {
-            UI_ModalRootBegin("title_difficulty");
-            var current_difficulty = DIFFICULTY_NORMAL;
-            if (variable_struct_exists(gs, "difficulty")) current_difficulty = Difficulty_Normalize(gs.difficulty);
-            difficulty_index = 1;
-            for (var di = 0; di < array_length(difficulty_values); di++) {
-                if (difficulty_values[di] == current_difficulty) {
-                    difficulty_index = di;
-                    break;
-                }
-            }
-            difficulty_opened_frame = Input_Frame();
-            difficulty_closing = false;
-            difficulty_close_frame = UI_OPENED_FRAME_NONE;
-            difficulty_pending_action = "";
-            state = "difficulty";
-        } else if (opt == title_idx_load) {
-            var cont = Run_Continue();   // C1 (D46): Continue run
-            if (!cont.ok) SaveMenu_OpenMessage(Run_ContinueFailText(cont.status), true);
-        } else if (opt == title_idx_settings) {
-            SettingsPopup_Open("title");
-            state = "settings";
-        } else if (opt == title_idx_exit) {
-            game_end();
-        }
-    }
-    return;
-}
-
-if (state == "difficulty") {
-    if (difficulty_closing) {
-        if (Input_Frame() - difficulty_close_frame >= UI_POPUP_FADE_FRAMES) {
-            var da = string(difficulty_pending_action);
-            difficulty_closing = false;
-            difficulty_close_frame = UI_OPENED_FRAME_NONE;
-            if (da == "start_intro") {
-                Difficulty_SetCurrent(difficulty_pending_value);
-                gs.in_main_menu = false;
-                Run_BeginNewGame();   // C1: the intro cutscene plays once per profile, later runs start at once
-            } else {
-                state = "main";
-            }
-        }
-        return;
-    }
-
-    var diff_rows = array_length(difficulty_options) + 1; // options + Back
-    if (k_up) {
-        difficulty_index = (difficulty_index + diff_rows - 1) mod diff_rows;
-        SFX_PlayUI("ui_move");
-    }
-    if (k_down) {
-        difficulty_index = (difficulty_index + 1) mod diff_rows;
-        SFX_PlayUI("ui_move");
-    }
-
-    if (k_back) {
-        SFX_PlayUI("ui_back");
-        UI_ModalRootEnd(false);
-        difficulty_closing = true;
-        difficulty_close_frame = Input_Frame();
-        difficulty_pending_action = "to_main";
-        return;
-    }
-
-    if (k_ok) {
-        SFX_PlayUI("ui_confirm");
-        if (difficulty_index >= 0 && difficulty_index < array_length(difficulty_values)) {
-            UI_ModalRootHold("title_room_change");
-            difficulty_pending_value = difficulty_values[difficulty_index];
-            difficulty_closing = true;
-            difficulty_close_frame = Input_Frame();
-            difficulty_pending_action = "start_intro";
-        } else {
-            UI_ModalRootEnd(false);
-            difficulty_closing = true;
-            difficulty_close_frame = Input_Frame();
-            difficulty_pending_action = "to_main";
-        }
-    }
+if (state == "main" || state == "difficulty" || state == "settings") {
+    Title_Step(id);   // scr_menu.gml: the title menu stack, the difficulty panel, the settings popup
     return;
 }
 
@@ -506,11 +356,5 @@ if (state == "cutscene") {
             Transition_RequestRoomFade(rm_start);
             break;
     }
-    return;
-}
-
-if (state == "settings") {
-    SettingsPopup_HandleInput();
-    if (!SettingsPopup_IsOpen("title")) state = "main";
     return;
 }
