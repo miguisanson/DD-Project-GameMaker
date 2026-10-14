@@ -15,4 +15,4 @@ Build: none in progress | Mode: BIG BUILD, then one big playtest (D71) | Release
 - Final cleanup (optional, at the end): delete unused sprites `spr_attack_timing_target`, `spr_attack_timing_falling` in GameMaker.
 - Send the creator names for the sounds/music (credits).
 - Ask the friend which build they played (I-039).
-- Later: import the generated icon strips (a checklist will be on this board).
+- Icons: look at `art/contact_sheet.png` (on branch next) and mark keep/redo; then import the strips in GameMaker following `art/IMPORT-CHECKLIST.md` (~10 min). Optional: OK to download the Pixel Art XL LoRA (~170 MB, huggingface nerijs/pixel-art-xl) + 2 ComfyUI nodes for better AI icons? Today's icons are script-drawn.
