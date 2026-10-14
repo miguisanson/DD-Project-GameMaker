@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | BIG BUILD (D71) per .planning/BUILD-PLAN.md, packets A1..E2, on branch `next`. Playtest 1 done (QTE approved). |
+| WIP | BIG BUILD (D71) per .planning/BUILD-PLAN.md on branch `next`. Owner asleep from 2026-10-14 night and wants it FINISHED when back: no usage cap at all (owner removed the +20% improvement cap). Up to 3 implementers when file sets don't overlap. A1 (worktree ../DD-Project-GameMaker-wt/a1) + A2 (../DD-Project-GameMaker-wt/a2) in flight. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
