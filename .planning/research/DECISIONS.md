@@ -75,6 +75,8 @@ Locked by the owner. Changing any of these needs a new grill-me.
 | D68 | Battle AI | Simple rules per enemy: a short priority list (e.g. low HP → heal/flee, player buffed → debuff, every Nth turn → big telegraphed attack), some randomness kept; bosses get phases. Readable and learnable. |
 | D69 | Player movement | Keep 16 px tile steps, polished: instant turn on tap, buffered next direction for responsive corners, always snapped to tiles, never stuck mid-tile. |
 | D70 | Movement extras | Run button (hold to move faster); bump feedback (soft sound + tiny nudge when walking into a wall); interact prompt (small hint over chests/NPCs/beds/doors when facing them). |
+| D71 | Big batches (2026-10-14, supersedes D12/D53/D54 caps) | No unplayed-feature cap. Build EVERYTHING decided, then the owner does one big playtest; repeat in big bulks. Get all design decisions from the owner while online so building never waits. Every drawing change must pass `-Only shots` and the main session opens the PNGs before merging. |
+| D72 | Owner verdicts on build d312bfb | The new QTEs (sliding bar for basic attack, arrow sequences for skills) are GOOD. |
 
 ## Notes
 - Three of the friend's bugs (skill books twice, mini boss moving, maybe poison) look already fixed in code since commit f39236b (2026-03-05) — the friend probably played an older build. From now on every build shows a build id, and every note records it.
