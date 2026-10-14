@@ -107,7 +107,10 @@ Found by audits and reviews (no person's words):
 | I-062 | owner playtest 2026-10-14 (build d312bfb): "the settings menu also needs to be improved its terrible, all the UIs need to be improved" | UI | P1 | d312bfb-20261014 | owner screenshots 1-3 | UI phase | open |
 | I-063 | owner playtest 2026-10-14 (build d312bfb): "when i hold shift and then run, the animation stops playing it should just speed up the normal walk animation" | BUG | P2 | d312bfb-20261014 | owner screenshots 1-3 | run plays the walk animation faster | open |
 | I-064 | owner playtest 2026-10-14 (build d312bfb): "i thought we are changing how beds work? is that still how we are saving" | EXPECTATION | P2 | d312bfb-20261014 | owner screenshots 1-3 | beds become rest sites (D46/D47) in the run-loop build | open |
+| I-065 | B4 report: "the Knight is rebuilt at 10 HP when a battle starts" (setting max_hp before battle has no effect) | BUG? | P1 | next | verify: does the player carry HP/max HP/level gains into every battle in real play? | battle uses the run character as-is | open (improvement mode) |
+| I-066 | B4 report: six small enemy moves (Poison Fangs, Bite, ...) still get the defence bar; D7 says only big/telegraphed attacks | BUG (spec) | P2 | next | fight a spider/snake | small moves just hit; only telegraphed heavy moves use the defence bar | open |
+| I-067 | B4 report: wrapped combat-log rows overlap the enemy name header | UI | P2 | next | long log lines in battle | log never overlaps the HUD (D1) | open (D1) |
 
 ---
 
-*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-065.*
+*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-068.*
