@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PAUSED end of session 3 (owner moving to a new session). ALL feature packets merged to next (e1a322d). READ .planning/RESUME.md: 1) full gate on next (not yet run after the d1b merge), 2) F1 optimisation, 3) E2 playtest build + big PLAYTEST-QUEUE, 4) owner IDE import, 5) sound credits. |
+| WIP | Session 4 (2026-10-15): grill on randomness/loot -> D117-D125 locked; owner's old saves moved to E:\Games\DD-Project Playtest\old-saves-2026-10-15. READ .planning/RESUME.md: 1) full gate on next, 2) R1 randomness+loot packet, 3) F1, 4) E2 playtest build, 5) owner IDE import, 6) sound credits. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |

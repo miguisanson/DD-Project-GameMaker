@@ -12,6 +12,7 @@ Build: PAUSED (owner playing) — 3 packets parked, see .planning/RESUME.md | Mo
 - All design decisions made (D1-D94).
 
 ## Decisions made 2026-10-15
+- Fairer randomness (D117-D125): loot picks the rarity tier first; chests never empty; crits use a marble bag; enemy drops get bad-luck protection; flee uses SPD ratio + retry boost; alt-tab opens pause; elites spread evenly per floor; tooltips state the odds. Old saves moved to E:\Games\DD-Project Playtest\old-saves-2026-10-15 (fresh start).
 - Monster sounds: pitch/volume variation + free CC0 creature packs approved (D116).
 - Balance proposals approved (D111); runs ~25-30 min accepted (D112); merchant = A with a gold glow outline, no tint (D113); icons v2 + redo weakest (D114); white text for names (D115).
 

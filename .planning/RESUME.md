@@ -15,20 +15,27 @@ Ask the owner "is it OK to run builds/tests now?" before running anything if the
 
 ## Left to do (in order)
 1. **Full gate on next** (above). Fix anything red.
-2. **F1 optimisation + consistency pass (D108)** — one Sonnet packet in a worktree from `next`: frame-time probe in the
+2. **R1 randomness + loot packet (D117-D125, grilled 2026-10-15)** — one Sonnet packet in a worktree from `next`, BEFORE F1:
+   tier-first loot roll (D117); chests never empty (D118); crit marble bag refilled on buff, enemies too (D119); enemy-drop
+   bad-luck protection +10 pts/dry fight (D120); flee = SPD/(SPD+eSPD) +25 pts per failed try (D121); pause menu on focus
+   loss, all ms timers frozen (D122); elites dealt per floor by shuffle, >=1 on floors 2+ (D123); tooltips state the odds +
+   flee % in the command menu (D124, workbook rows + rebuild); run save version bump, old run dropped (D125). Checks first:
+   GML suites for each rule (bag never gives >6 misses at 25%, chest table has no empty result, drop counter persists through
+   Continue, flee formula values, elite count per floor across 50 seeds) + simulator re-run for balance drift.
+3. **F1 optimisation + consistency pass (D108)** — one Sonnet packet in a worktree from `next`: frame-time probe in the
    bot (before/after), per-frame work/allocations, draw calls, room load time; dead/duplicated code (incl. the dead
    `SaveMenu_*` slot code in scr_save_menu.gml — convert its remaining notice popup to the framework), remaining
    frame-counted timers → ms, global sprawl; consistent controls/wording/colours/sounds/naming. Every check stays green;
    no balance numbers change (D13).
-3. **E2 playtest build**: full gate + REGRESSION.md run; copy `E:\Temp\dd-gate-next\out\` (exe, data.win, options.ini,
-   fonts, localization, ttf) to `E:\Games\DD-Project Playtest\<build id>\`; back up the owner's saves
-   (`%LOCALAPPDATA%\DD_Project`) beside it; write ONE big `.planning/PLAYTEST-QUEUE.md` covering everything built since
+4. **E2 playtest build**: full gate + REGRESSION.md run; copy `E:\Temp\dd-gate-next\out\` (exe, data.win, options.ini,
+   fonts, localization, ttf) to `E:\Games\DD-Project Playtest\<build id>\`; (owner's old saves already moved to
+   `E:\Games\DD-Project Playtest\old-saves-2026-10-15`, D125); write ONE big `.planning/PLAYTEST-QUEUE.md` covering everything built since
    playtest 1 (runs/death/echo, chests/cards/level-up, turn timeline/stagger/BREAK, statuses, enemy AI/boss phases,
    merchant/shop/gold/throwables/elites, beds/tutorial/settings/controls/prompts, Tab menu/codex/pause, death scene/lore/
    credits, window modes, balance feel, monster sounds) + BOARD "PLAYTEST NOW".
-4. **Owner IDE import (one session, ~15 min)** — combined list: `art/IMPORT-CHECKLIST.md` (icon strips v2 + merchant A +
+5. **Owner IDE import (one session, ~15 min)** — combined list: `art/IMPORT-CHECKLIST.md` (icon strips v2 + merchant A +
    card frame) and `art/sfx_new/IMPORT.md` (30 CC0 monster takes). Code already falls back until imported (D94).
-5. Sound/music creator names from the owner for the credits (very last, D40/D105).
+6. Sound/music creator names from the owner for the credits (very last, D40/D105).
 
 ## Notes / known follow-ups
 - Merge lessons: one scenario step range per packet (BUILD-PLAN.md); agents `git merge next` before reporting;
