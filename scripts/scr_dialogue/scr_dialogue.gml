@@ -1645,8 +1645,8 @@ function Credits_Draw(_t) {
 // throwables, beds, elites, statuses. Text is {action} tokens (Prompt_*, scr_input) so the glyphs follow the last-used device and the player's keys.
 // The game calls Tutorial_Trigger with the mechanic id at the moment the mechanic appears; the pop-up (Tutorial_* UI in scr_menu) blocks the world and
 // the battle until it is dismissed. global.tutorial_off silences it (the scripted test runs).
-// Hooks already in: timeline (battle menu), bar, arrows, defence (the QTE begin functions), stagger (Battle_StaggerHit), status
-// (Status_Add in battle), cards (CardsUi_Open), bed (BedUi_Open). shop, throwables and elite are called by the packet that adds them (C3).
+// Hooks in: timeline and elite (battle menu), bar, arrows, defence (the QTE begin functions), throwables (Battle_ThrowBegin), shop (ShopUi_Open), stagger (Battle_StaggerHit), status
+// (Status_Add in battle), cards (CardsUi_Open), bed (BedUi_Open).
 // ==========================================================================================================================
 #macro TUTORIAL_INPUT_DELAY_FRAMES 12   // keys are ignored this long after a pop-up opens (the press that caused it must not close it)
 

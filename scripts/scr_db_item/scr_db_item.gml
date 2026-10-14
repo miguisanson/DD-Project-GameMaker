@@ -451,6 +451,68 @@ function ItemDB_Init() {
     };
     ds_map_add(global.item_db, a5.id, a5);
 
+
+    // ---- C3 (D84): throwables. Any class throws them from the Items menu; a throw costs the turn and uses the sliding bar's grade (Throw_Resolve).
+    // use: power (formula power / 2, damage), burn_turns, stacks (poison), stun (push-back, not on Weak), evade_turns (Evasion on the thrower), escape (Perfect, not a boss).
+    // Numbers are starting values for the simulator; the text on screen is built from them (Item_Sentence, Item_NumberLines).
+    var t0 = {
+        id: 30, name: "Firebomb", type: ITEM_CONSUMABLE, stackable: true, usable_battle: true, throwable: true, max_stack: 8, equip_slot: "",
+        power: 0, stat_type: STAT_ATK, acc: 0, preferred_class: -1, sprite: noone, icon_kind: "throwable", icon_sub: 0,
+        bonus: { atk:0, def:0, spd:0, mag:0 },
+        use: { effect: "throw", power: 3, burn_turns: 2, stacks: 0, stun: false, evade_turns: 0, escape: false, status: -1, target: TGT_ENEMY, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
+        value: 18
+    };
+    ds_map_add(global.item_db, t0.id, t0);
+
+    var t1 = {
+        id: 31, name: "Poison Pot", type: ITEM_CONSUMABLE, stackable: true, usable_battle: true, throwable: true, max_stack: 8, equip_slot: "",
+        power: 0, stat_type: STAT_ATK, acc: 0, preferred_class: -1, sprite: noone, icon_kind: "throwable", icon_sub: 1,
+        bonus: { atk:0, def:0, spd:0, mag:0 },
+        use: { effect: "throw", power: 0, burn_turns: 0, stacks: 4, stun: false, evade_turns: 0, escape: false, status: STATUS_POISON, target: TGT_ENEMY, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
+        value: 18
+    };
+    ds_map_add(global.item_db, t1.id, t1);
+
+    var t2 = {
+        id: 32, name: "Ice Flask", type: ITEM_CONSUMABLE, stackable: true, usable_battle: true, throwable: true, max_stack: 8, equip_slot: "",
+        power: 0, stat_type: STAT_ATK, acc: 0, preferred_class: -1, sprite: noone, icon_kind: "throwable", icon_sub: 2,
+        bonus: { atk:0, def:0, spd:0, mag:0 },
+        use: { effect: "throw", power: 3, burn_turns: 0, stacks: 0, stun: true, evade_turns: 0, escape: false, status: STATUS_STUN, target: TGT_ENEMY, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
+        value: 20
+    };
+    ds_map_add(global.item_db, t2.id, t2);
+
+    var t3 = {
+        id: 33, name: "Smoke Bomb", type: ITEM_CONSUMABLE, stackable: true, usable_battle: true, throwable: true, max_stack: 8, equip_slot: "",
+        power: 0, stat_type: STAT_ATK, acc: 0, preferred_class: -1, sprite: noone, icon_kind: "throwable", icon_sub: 3,
+        bonus: { atk:0, def:0, spd:0, mag:0 },
+        use: { effect: "throw", power: 0, burn_turns: 0, stacks: 0, stun: false, evade_turns: 2, escape: true, status: STATUS_EVASION, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
+        value: 14
+    };
+    ds_map_add(global.item_db, t3.id, t3);
+
+    // ---- C3 (D92): accessories, the third gear slot ("accessory"): rings and charms with a small stat or a small passive. One copy each.
+    var ac_rows = [
+        [40, "Copper Ring",  0, { atk:1, def:0, spd:0, mag:0 }, 28],
+        [41, "Guard Ring",   0, { atk:0, def:1, spd:0, mag:0 }, 28],
+        [42, "Swift Charm",  1, { atk:0, def:0, spd:1, mag:0 }, 28],
+        [43, "Sage Charm",   1, { atk:0, def:0, spd:0, mag:1 }, 28],
+        [44, "Stone Charm",  1, { atk:0, def:0, spd:0, mag:0 }, 36],
+        [45, "Spring Ring",  0, { atk:0, def:0, spd:0, mag:0 }, 36],
+        [46, "Lucky Charm",  1, { atk:0, def:0, spd:0, mag:0 }, 30]
+    ];
+    for (var ai = 0; ai < array_length(ac_rows); ai++) {
+        var acr = ac_rows[ai];
+        var acc_item = {
+            id: acr[0], name: acr[1], type: ITEM_ACCESSORY, stackable: false, max_stack: 1, equip_slot: "accessory",
+            power: 0, stat_type: -1, acc: 0, preferred_class: -1, sprite: noone, icon_kind: "accessory", icon_sub: acr[2],
+            bonus: acr[3],
+            use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
+            value: acr[4]
+        };
+        ds_map_add(global.item_db, acc_item.id, acc_item);
+    }
+
     ItemDB_AssignEquipPassives(global.item_db);
 
     if (variable_global_exists("state") && is_struct(global.state)) {
@@ -518,13 +580,18 @@ function ItemDB_GetPassiveTemplate(_item_id) {
         case 23: return { id: "thin_veil", params: { mp_gain: 1, every_n_turns: 2, physical_vuln_flat: 1 }, desc: ["Thin Veil", "+1 MP/2 turns, take +1 phys damage"] };
         case 24: return { id: "silk_flow", params: { skill_mult: 1.10, status_turn_bonus: 1 }, desc: ["Silk Flow", "+10% skill damage, +1 status turn"] };
         case 25: return { id: "mirror_stitch", params: { reflect_first_status_once_per_battle: true, mp_cost_on_trigger: 1 }, desc: ["Mirror Stitch", "Reflect 1st status (cost 1 MP)"] };
+
+        // Accessories (C3, D92): small passives; the stat rings and charms 40-43 carry a plain +1 stat bonus instead.
+        case 44: return { id: "hardened", params: { damage_reduction: 0.10 }, desc: ["Hardened", "Take 10% less damage"] };
+        case 45: return { id: "ring_mana", params: { mp_gain: 1, every_n_turns: 3 }, desc: ["Spring", "+1 MP every 3 turns"] };
+        case 46: return { id: "lucky", params: { gold_mult: 0.15 }, desc: ["Lucky", "Find 15% more gold"] };
     }
     return { id: "", params: {}, desc: [] };
 }
 
 function ItemDB_AssignEquipPassives(_db) {
     if (!ds_exists(_db, ds_type_map)) return;
-    var ids = [1,2,3,4,5,6,7,8,9,20,21,22,23,24,25];
+    var ids = [1,2,3,4,5,6,7,8,9,20,21,22,23,24,25,44,45,46];
     for (var i = 0; i < array_length(ids); i++) {
         var iid = ids[i];
         if (!ds_map_exists(_db, iid)) continue;
@@ -575,6 +642,12 @@ function Item_Use(_item_id, _user, _target) {
         return result;
     }
 
+    if (Item_IsThrowable(item)) {   // C3 (D84): thrown in battle only
+        result.ok = false;
+        result.msg = Loc_T("item.msg.throw_in_battle", "Throw it at an enemy in battle.");
+        return result;
+    }
+
     var eff = item.use.effect;
     if (eff == "heal") {
         var before_hp = _target.hp;
@@ -618,4 +691,176 @@ function Item_Use(_item_id, _user, _target) {
     }
 
     return result;
+}
+
+// ============================================================================================================
+// C3 (D84): throwables. Used from the battle's Items menu by any class; the throw costs the turn and the sliding bar's grade (D61) sets how
+// strong it is. Nobody throws 1.5x as hard and carries 8 of each instead of 5. The thrower's "stat" is 12 + its level, the same for every class.
+// ============================================================================================================
+function Item_IsThrowable(_item) {
+    return is_struct(_item) && variable_struct_exists(_item, "throwable") && _item.throwable;
+}
+
+function Throw_Cap(_ch) {
+    return (is_struct(_ch) && variable_struct_exists(_ch, "class_id") && _ch.class_id == CLASS_NOBODY) ? THROW_CAP_NOBODY : THROW_CAP;
+}
+
+function Throw_Mult(_ch) {
+    return (is_struct(_ch) && variable_struct_exists(_ch, "class_id") && _ch.class_id == CLASS_NOBODY) ? THROW_NOBODY_MULT : 1;
+}
+
+function Throw_Stat(_ch) {
+    return THROW_STAT_BASE + ((is_struct(_ch) && variable_struct_exists(_ch, "level")) ? _ch.level : 1);
+}
+
+// Poison stacks by grade: Perfect one more than the base, Good and OK the base, Weak one fewer (never below 1).
+function Throw_Stacks(_base, _key) {
+    switch (_key) {
+        case QTE_PERFECT: return _base + 1;
+        case QTE_GOOD: return _base;
+        case QTE_OK: return _base;
+    }
+    return max(1, _base - 1);
+}
+
+// Burn per turn of a firebomb thrown by _ch at OK (before the grade).
+function Throw_BurnBase(_ch) {
+    return RoundHalfUp(Status_BurnTick(Throw_Stat(_ch)) * Throw_Mult(_ch));
+}
+
+// Throws item _item_id at _target for _user at grade _key. Changes both (damage, statuses). The caller removes the item from the inventory.
+// Returns { ok, msg, dmg, burn, stacks, stun, evade, escape }.
+function Throw_Resolve(_item_id, _user, _target, _key) {
+    var item = ItemDB_Get(_item_id);
+    var res = { ok: false, msg: "", dmg: 0, burn: 0, stacks: 0, stun: false, evade: 0, escape: false };
+    if (!Item_IsThrowable(item)) {
+        res.msg = Loc_T("item.msg.cant_use", "Can't use that.");
+        return res;
+    }
+    res.ok = true;
+    var u = item.use;
+    var gm = Qte_GradeMult(_key);
+    var nm = Throw_Mult(_user);
+    var parts = [];
+
+    if (u.power > 0) {
+        var mult = nm * Combat_BreakMult(_target);
+        var guard = Status_GetMul(_target, "guard_mult");
+        if (guard != 1) {
+            mult *= guard;
+            _target = Status_ConsumeByField(_target, "consume_on_hit");
+        }
+        res.dmg = Combat_RatioDamage(COMBAT_POWER_SCALE * u.power, Throw_Stat(_user), Combat_EffectiveStat(_target, STAT_DEF), gm, mult);
+        _target.hp = max(0, _target.hp - res.dmg);
+        array_push(parts, Loc_T("throw.msg.damage", "{dmg} damage.", { dmg: string(res.dmg) }));
+    }
+    if (u.burn_turns > 0 && _target.hp > 0) {
+        res.burn = Qte_ScaleAmount(Throw_BurnBase(_user), gm, 1);
+        Status_Add(_target, STATUS_BURN, u.burn_turns, res.burn);
+        array_push(parts, Loc_T("throw.msg.burn", "It burns for {n} a turn.", { n: string(res.burn) }));
+    }
+    if (u.stacks > 0) {
+        res.stacks = Throw_Stacks(RoundHalfUp(u.stacks * nm), _key);
+        Status_Add(_target, STATUS_POISON, res.stacks, 1, res.stacks);
+        array_push(parts, Loc_T("throw.msg.poison", "{n} stacks of poison.", { n: string(res.stacks) }));
+    }
+    if (u.stun && _key != QTE_WEAK && _target.hp > 0) {
+        Status_Add(_target, STATUS_STUN, 1, 1);
+        res.stun = true;
+    }
+    if (u.evade_turns > 0) {
+        res.evade = Qte_ScaleAmount(RoundHalfUp(u.evade_turns * nm), gm, 1);
+        Status_Add(_user, STATUS_EVASION, res.evade, 1);
+        array_push(parts, Loc_T("throw.msg.evade", "You will dodge the next attack."));
+    }
+    if (u.escape && _key == QTE_PERFECT && !(variable_struct_exists(_target, "is_boss") && _target.is_boss)) {
+        res.escape = true;
+        array_push(parts, Loc_T("throw.msg.escape", "You slip away in the smoke!"));
+    }
+    var msg = Loc_T("throw.msg.thrown", "You throw the {item}!", { item: item.name });
+    for (var i = 0; i < array_length(parts); i++) msg += " " + parts[i];
+    res.msg = msg;
+    return res;
+}
+
+// ---- text generated from the item data (D100): a plain sentence and number lines, so the screen can never disagree with the game ----
+function Item_Sentence(_item) {
+    if (!is_struct(_item) || !variable_struct_exists(_item, "id") || _item.id == 0) return "";
+    if (Item_IsThrowable(_item)) {
+        var u = _item.use;
+        switch (_item.id) {
+            case 30: return Loc_T("item.sent.30", "Throw it for {power} power of damage; it burns for {turns} turns. Costs your turn.", { power: string(u.power), turns: string(u.burn_turns) });
+            case 31: return Loc_T("item.sent.31", "Throw it to poison the enemy with {n} stacks. Costs your turn.", { n: string(u.stacks) });
+            case 32: return Loc_T("item.sent.32", "Throw it for {power} power of damage and a stun that pushes the enemy back. Costs your turn.", { power: string(u.power) });
+            case 33: return Loc_T("item.sent.33", "Throw it to dodge the next attack ({turns} turns); a Perfect throw lets you slip away. Costs your turn.", { turns: string(u.evade_turns) });
+        }
+        return Loc_T("item.sent.throw", "Throw it at the enemy. Costs your turn.");
+    }
+    if (_item.type == ITEM_ACCESSORY) {
+        var bonus = Tooltip_ItemBonusText(_item);
+        if (bonus != "") return Loc_T("item.sent.accessory_stat", "Wear it for {bonus}.", { bonus: bonus });
+        if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 1) return Loc_T("item.sent.accessory_passive", "Wear it: {line}.", { line: string(_item.passive_desc[1]) });
+        return Loc_T("item.sent.accessory", "A ring or charm worn in the accessory slot.");
+    }
+    if (_item.type == ITEM_CONSUMABLE && variable_struct_exists(_item, "use")) {
+        var us = _item.use;
+        switch (us.effect) {
+            case "heal": return Loc_T("item.sent.heal", "Restores {min} to {max} HP.", { min: string(us.min), max: string(us.max) });
+            case "mp": return Loc_T("item.sent.mp", "Restores {min} to {max} MP.", { min: string(us.min), max: string(us.max) });
+            case "cure": return Loc_T("item.sent.cure", "Cures {status}.", { status: StatusDB_Get(us.status).name });
+        }
+    }
+    if (_item.type == ITEM_WEAPON) return Loc_T("item.sent.weapon", "A weapon with {power} power.", { power: string(_item.power) });
+    if (_item.type == ITEM_ARMOR) {
+        var ab = Tooltip_ItemBonusText(_item);
+        return Loc_T("item.sent.armor", "Armor: {bonus}.", { bonus: ab });
+    }
+    return string(_item.name);
+}
+
+// [{ label, value }] for the details panel. _ch is the viewer (a Nobody sees its own, stronger numbers).
+function Item_NumberLines(_item, _ch) {
+    var lines = [];
+    if (!is_struct(_item) || !variable_struct_exists(_item, "id") || _item.id == 0) return lines;
+    var nm = Throw_Mult(_ch);
+    if (Item_IsThrowable(_item)) {
+        var u = _item.use;
+        if (u.power > 0) array_push(lines, { label: Loc_T("shop.lbl.power", "Power"), value: string(u.power) });
+        if (u.burn_turns > 0) array_push(lines, { label: Loc_T("shop.lbl.burn", "Burn"), value: string(Throw_BurnBase(_ch)) + " x " + string(u.burn_turns) });
+        if (u.stacks > 0) array_push(lines, { label: Loc_T("shop.lbl.poison", "Poison"), value: string(RoundHalfUp(u.stacks * nm)) });
+        if (u.stun) array_push(lines, { label: Loc_T("shop.lbl.stun", "Stun"), value: Loc_T("shop.val.pushback", "Push back") });
+        if (u.evade_turns > 0) array_push(lines, { label: Loc_T("shop.lbl.evade", "Dodge"), value: Loc_T("shop.val.turns", "{n} turns", { n: string(RoundHalfUp(u.evade_turns * nm)) }) });
+        if (u.escape) array_push(lines, { label: Loc_T("shop.lbl.perfect", "Perfect"), value: Loc_T("shop.val.escape", "Escape") });
+        if (nm != 1) array_push(lines, { label: Loc_T("shop.lbl.nobody", "Nobody"), value: "x" + string_format(nm, 1, 1) });
+        array_push(lines, { label: Loc_T("shop.lbl.carry", "Carry up to"), value: string(Throw_Cap(_ch)) });
+        return lines;
+    }
+    if (_item.type == ITEM_ACCESSORY) {
+        var b = _item.bonus;
+        if (b.atk != 0) array_push(lines, { label: Stat_ShortName(STAT_ATK), value: ((b.atk > 0) ? "+" : "") + string(b.atk) });
+        if (b.def != 0) array_push(lines, { label: Stat_ShortName(STAT_DEF), value: ((b.def > 0) ? "+" : "") + string(b.def) });
+        if (b.spd != 0) array_push(lines, { label: Stat_ShortName(STAT_SPD), value: ((b.spd > 0) ? "+" : "") + string(b.spd) });
+        if (b.mag != 0) array_push(lines, { label: Stat_ShortName(STAT_MAG), value: ((b.mag > 0) ? "+" : "") + string(b.mag) });
+        if (variable_struct_exists(_item, "passive_params")) {
+            var pp = _item.passive_params;
+            if (variable_struct_exists(pp, "damage_reduction")) array_push(lines, { label: Loc_T("shop.lbl.damage_taken", "Damage taken"), value: "-" + string(round(pp.damage_reduction * 100)) + "%" });
+            if (variable_struct_exists(pp, "mp_gain")) array_push(lines, { label: Loc_T("shop.lbl.mp", "MP"), value: Loc_T("shop.val.mp_every", "+{n} every {k} turns", { n: string(pp.mp_gain), k: string(pp.every_n_turns) }) });
+            if (variable_struct_exists(pp, "gold_mult")) array_push(lines, { label: Loc_T("shop.lbl.gold", "Gold"), value: "+" + string(round(pp.gold_mult * 100)) + "%" });
+        }
+        return lines;
+    }
+    if (_item.type == ITEM_CONSUMABLE && variable_struct_exists(_item, "use")) {
+        var us = _item.use;
+        if (us.effect == "heal") array_push(lines, { label: Loc_T("shop.lbl.hp", "HP"), value: string(us.min) + "-" + string(us.max) });
+        else if (us.effect == "mp") array_push(lines, { label: Loc_T("shop.lbl.mp", "MP"), value: string(us.min) + "-" + string(us.max) });
+        else if (us.effect == "cure") array_push(lines, { label: Loc_T("shop.lbl.cures", "Cures"), value: StatusDB_Get(us.status).name });
+        return lines;
+    }
+    if (_item.type == ITEM_WEAPON) {
+        array_push(lines, { label: Loc_T("shop.lbl.power", "Power"), value: string(_item.power) });
+        array_push(lines, { label: Loc_T("shop.lbl.stat", "Uses"), value: Stat_ShortName(_item.stat_type) });
+    }
+    var ib = Tooltip_ItemBonusText(_item);
+    if (_item.type == ITEM_ARMOR && ib != "") array_push(lines, { label: Loc_T("shop.lbl.bonus", "Bonus"), value: ib });
+    return lines;
 }

@@ -18,7 +18,7 @@ function Inv_Add(_inv, _item_id, _qty) {
             _qty -= add_stack;
         }
     } else {
-        var unique_once = item.type == ITEM_WEAPON || item.type == ITEM_ARMOR;
+        var unique_once = item.type == ITEM_WEAPON || item.type == ITEM_ARMOR || item.type == ITEM_ACCESSORY;   // C3: accessories are one copy each too
         if (unique_once) {
             if (Inv_Has(_inv, _item_id, 1)) return _inv;
 
@@ -56,4 +56,24 @@ function Inv_Has(_inv, _item_id, _qty) {
 
 function Inv_GetItems(_inv) {
     return _inv;
+}
+
+// How many of an item the inventory holds (all stacks).
+function Inv_Count(_inv, _item_id) {
+    var total = 0;
+    for (var i = 0; i < array_length(_inv); i++) {
+        if (_inv[i].id == _item_id) total += _inv[i].qty;
+    }
+    return total;
+}
+
+// C3 (D84): adds up to _qty of an item to a character, never past the throwable stack cap (5, Nobody 8) and never a second copy of gear.
+// Changes _ch's inventory and returns { ch, added }.
+function Inv_AddCapped(_ch, _item_id, _qty) {
+    var item = ItemDB_Get(_item_id);
+    var want = max(0, _qty);
+    if (Item_IsThrowable(item)) want = min(want, max(0, Throw_Cap(_ch) - Inv_Count(_ch.inventory, _item_id)));
+    else if (item.type == ITEM_WEAPON || item.type == ITEM_ARMOR || item.type == ITEM_ACCESSORY) want = Inv_Has(_ch.inventory, _item_id, 1) ? 0 : min(1, want);
+    if (want > 0) _ch.inventory = Inv_Add(_ch.inventory, _item_id, want);
+    return { ch: _ch, added: want };
 }

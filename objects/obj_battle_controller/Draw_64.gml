@@ -424,6 +424,9 @@ if (battle_state == BSTATE_ITEM_MENU) {
             if (item.sprite != noone) {
                 draw_sprite_ext(item.sprite, 0, mx3, yy2 + icon_y_off3, icon_scale3, icon_scale3, 0, c_white, 1);
                 tx2 += max(icon_min_w3, round(sprite_get_width(item.sprite) * icon_scale3));
+            } else if (variable_struct_exists(item, "icon_kind")) {   // C3 (D94): throwables use the strip sprite or a code glyph
+                Item_DrawIcon(item, mx3, yy2 + icon_y_off3, max(8, round(16 * icon_scale3)));
+                tx2 += max(icon_min_w3, round(16 * icon_scale3));
             }
             UI_DrawText(tx2, yy2, Loc_T("battle.menu.item_row", "{name} x{qty}", { name: item.name, qty: string(items[it].qty) }));
         }

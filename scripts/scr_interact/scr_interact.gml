@@ -262,6 +262,13 @@ function Interact_Handle(_inst) {
         }
     }
 
+    // C3 (D85): the merchant (an obj_npc placed by Merchant_EnsureInRoom) opens the shop instead of a dialogue
+    if (variable_instance_exists(_inst, "merchant") && _inst.merchant) {
+        ShopUi_Open(_inst.shop_index);
+        GameState_SyncLegacy();
+        return;
+    }
+
     // C5 (D107): a lore note made by Notes_SpawnForRoom: read it, record it in the profile.
     if (variable_instance_exists(_inst, "note_id") && _inst.note_id != "") {
         Note_Read(_inst);
@@ -418,7 +425,10 @@ function Interact_Handle(_inst) {
                 }
 
                 var loot = [];
-                if (key != "") loot = Loot_RollContainer(lvl, key);
+                if (key != "") {
+                    if (Run_IsActive() && RoomState_EnsurePersistId(_inst)) loot = Shuffle_ChestLoot(Run_Get().seed, room_get_name(room), _inst.persist_id, lvl, key, gs.player_ch);   // C3 (D33): contents come from the seed and this chest
+                    else loot = Loot_RollContainer(lvl, key);
+                }
                 if (is_array(loot) && array_length(loot) > 0) {
                     gs.player_ch.inventory = Loot_Grant(gs.player_ch.inventory, loot);
 

@@ -71,6 +71,7 @@ function Test_RunAll() {
     Test_RunSuite("Status", Test_Suite_Status);
     Test_RunSuite("StatusRules", Test_Suite_StatusRules);
     Test_RunSuite("Turns", Test_Suite_Turns);
+    Test_RunSuite("EnemyAI", Test_Suite_EnemyAI);
     Test_RunSuite("Inventory", Test_Suite_Inventory);
     Test_RunSuite("Data", Test_Suite_Data);
     Test_RunSuite("Export", Test_Suite_Export);
@@ -94,6 +95,7 @@ function Test_RunAll() {
     Test_RunSuite("Prompt", Test_Suite_Prompt);
     Test_RunSuite("Tutorial", Test_Suite_Tutorial);
     Test_RunSuite("Bed", Test_Suite_Bed);
+    Test_RunSuite("Economy", Test_Suite_Economy);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     Test_RunSuite("Mem", Test_Suite_Mem);
     Test_RunSuite("Input", Test_Suite_Input);
@@ -1490,6 +1492,404 @@ function Test_Suite_Turns() {
 }
 
 // Inventory rules (balance-data.md section 6; combat-bugs.md section 4; R-003 skill books appear twice).
+// Packet B4 (combat-spec.md section 12; D7 D59 D68 D75 D79). Expected values come from the spec text (rule table, phases, formulas), not from the code.
+function Test_AICtx(_turn = 1, _phase = 0) {
+    return { turn: _turn, phase: _phase, uses: {}, windup: -1, used_turn: [], actions_left: 1, force_damage_only: false };
+}
+
+// _n choices from one stream (nothing changes between them): the skill ids, -1 for the basic attack.
+function Test_AIDraws(_e, _p, _ctx, _seed, _n) {
+    var _rng = Rng_New(_seed, "combat");
+    var _out = [];
+    for (var _i = 0; _i < _n; _i++) array_push(_out, EnemyAI_Choose(_e, _p, _ctx, _rng).skill_id);
+    return _out;
+}
+
+function Test_AICount(_arr, _v) {
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_arr); _i++) { if (_arr[_i] == _v) _n++; }
+    return _n;
+}
+
+function Test_AICond(_c, _v = 0, _status = -1) {
+    return { c: _c, v: _v, status: _status };
+}
+
+// Does a one-rule brain (cond -> Bite, no weights) fire for this enemy / player / context?
+function Test_AIRuleFires(_cond, _e, _p, _ctx) {
+    _e.skills = [SKILL_BITE];
+    _e.brain = { rules: [ { label: "t", when: [_cond], act: "skill", skill: SKILL_BITE, chance: 1, max_uses: -1 } ], weights: [], phases: [] };
+    return EnemyAI_Choose(_e, _p, _ctx, Rng_New(1, "combat")).skill_id == SKILL_BITE;
+}
+
+function Test_Suite_EnemyAI() {
+    GameState_Get();
+    EnemyDB_Init(); SkillDB_Init(); StatusDB_Init();
+    var _p = CharacterCreate_Player(CLASS_KNIGHT);
+
+    // ---- the brain is data on every enemy, and it only names what exists ----
+    var _ids = [ENEMY_SLIME, ENEMY_SPIDER, ENEMY_SNAKE, ENEMY_DIREWOLF, ENEMY_MADWHISP, ENEMY_KILLER_PLANT, ENEMY_GHOSTSWORD, ENEMY_STRANGER, ENEMY_MINI_BOSS, ENEMY_FINAL_BOSS];
+    var _data_bad = "";
+    for (var _i = 0; _i < array_length(_ids); _i++) {
+        var _en = EnemyCreate(_ids[_i]);
+        if (!variable_struct_exists(_en, "brain")) { _data_bad += " " + _en.name + ":no-brain"; continue; }
+        var _b = _en.brain;
+        var _prev_at = 2;
+        Test_Eq("AI data: " + _en.name + " has " + (_en.is_boss ? "2 phases" : "no phases"), array_length(_b.phases), _en.is_boss ? 2 : 0);
+        for (var _k = 0; _k <= array_length(_b.phases); _k++) {
+            var _lists = EnemyAI_Lists(_b, _k);
+            var _labels = {};   // a label is unique within one list (a phase may keep a rule of the base list)
+            var _wsum = 0;
+            for (var _r = 0; _r < array_length(_lists.rules); _r++) {
+                var _rule = _lists.rules[_r];
+                if (variable_struct_exists(_labels, _rule.label)) _data_bad += " " + _en.name + ":dup-label-" + _rule.label;
+                variable_struct_set(_labels, _rule.label, true);
+                for (var _c = 0; _c < array_length(_rule.when); _c++) {
+                    if (!EnemyAI_KnownCond(_rule.when[_c].c)) _data_bad += " " + _en.name + ":cond-" + string(_rule.when[_c].c);
+                    if (_rule.when[_c].c == "every_nth" && _rule.when[_c].v < 2) _data_bad += " " + _en.name + ":nth<2";
+                }
+                if (_rule.act == "skill" && !array_contains(_en.skills, _rule.skill)) _data_bad += " " + _en.name + ":rule-skill-" + string(_rule.skill);
+                if (_rule.act != "skill" && _rule.act != "attack") _data_bad += " " + _en.name + ":do-" + string(_rule.act);
+            }
+            for (var _w = 0; _w < array_length(_lists.weights); _w++) {
+                var _wt = _lists.weights[_w];
+                _wsum += _wt.w;
+                if (_wt.act == "skill" && !array_contains(_en.skills, _wt.skill)) _data_bad += " " + _en.name + ":weight-skill-" + string(_wt.skill);
+            }
+            if (_wsum <= 0) _data_bad += " " + _en.name + ":no-weights-in-list-" + string(_k);
+            if (_k >= 1) {
+                if (_b.phases[_k - 1].at >= _prev_at) _data_bad += " " + _en.name + ":phases-not-falling";
+                _prev_at = _b.phases[_k - 1].at;
+            }
+        }
+    }
+    Test_Eq("AI data: every brain is complete (bad:" + _data_bad + ")", _data_bad, "");
+
+    // ---- each condition type fires when true and not when false ----
+    var _low = EnemyCreate(ENEMY_SLIME);
+    _low.hp = 3;   // 3 / 9
+    var _pl = CharacterCreate_Player(CLASS_KNIGHT);
+    _pl.hp = floor(_pl.max_hp * 0.4);
+    var _pbuff = CharacterCreate_Player(CLASS_KNIGHT);
+    _pbuff = Status_Add(_pbuff, STATUS_CRIT_UP, 3, 0);
+    var _ppoi = CharacterCreate_Player(CLASS_KNIGHT);
+    _ppoi = Status_Add(_ppoi, STATUS_POISON, 2, 0, 2);
+    var _sbleed = EnemyCreate(ENEMY_SLIME);
+    _sbleed = Status_Add(_sbleed, STATUS_BLEED, 3, 0);
+    Test_True("AI cond always: fires", Test_AIRuleFires(Test_AICond("always"), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_True("AI cond hp_below 0.5: fires at 3/9", Test_AIRuleFires(Test_AICond("hp_below", 0.5), _low, _p, Test_AICtx()));
+    Test_False("AI cond hp_below 0.5: not at full HP", Test_AIRuleFires(Test_AICond("hp_below", 0.5), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_True("AI cond hp_above 0.5: fires at full HP", Test_AIRuleFires(Test_AICond("hp_above", 0.5), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_False("AI cond hp_above 0.5: not at 3/9", Test_AIRuleFires(Test_AICond("hp_above", 0.5), _low, _p, Test_AICtx()));
+    Test_True("AI cond player_hp_below 0.5: fires at 40%", Test_AIRuleFires(Test_AICond("player_hp_below", 0.5), EnemyCreate(ENEMY_SLIME), _pl, Test_AICtx()));
+    Test_False("AI cond player_hp_below 0.5: not at full HP", Test_AIRuleFires(Test_AICond("player_hp_below", 0.5), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_True("AI cond player_buffed: fires with Take Aim", Test_AIRuleFires(Test_AICond("player_buffed"), EnemyCreate(ENEMY_SLIME), _pbuff, Test_AICtx()));
+    Test_False("AI cond player_buffed: not with nothing", Test_AIRuleFires(Test_AICond("player_buffed"), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_False("AI cond player_buffed: a debuff (Poison) is not a buff", Test_AIRuleFires(Test_AICond("player_buffed"), EnemyCreate(ENEMY_SLIME), _ppoi, Test_AICtx()));
+    Test_True("AI cond player_has_status Poison: fires when poisoned", Test_AIRuleFires(Test_AICond("player_has_status", 0, STATUS_POISON), EnemyCreate(ENEMY_SLIME), _ppoi, Test_AICtx()));
+    Test_False("AI cond player_has_status Poison: not when clean", Test_AIRuleFires(Test_AICond("player_has_status", 0, STATUS_POISON), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_True("AI cond player_missing_status Poison: fires when clean", Test_AIRuleFires(Test_AICond("player_missing_status", 0, STATUS_POISON), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_False("AI cond player_missing_status Poison: not when poisoned", Test_AIRuleFires(Test_AICond("player_missing_status", 0, STATUS_POISON), EnemyCreate(ENEMY_SLIME), _ppoi, Test_AICtx()));
+    Test_True("AI cond player_status_at_least Poison 2: fires with 2 stacks", Test_AIRuleFires(Test_AICond("player_status_at_least", 2, STATUS_POISON), EnemyCreate(ENEMY_SLIME), _ppoi, Test_AICtx()));
+    Test_False("AI cond player_status_at_least Poison 3: not with 2 stacks", Test_AIRuleFires(Test_AICond("player_status_at_least", 3, STATUS_POISON), EnemyCreate(ENEMY_SLIME), _ppoi, Test_AICtx()));
+    Test_True("AI cond self_has_status Bleeding: fires when bleeding", Test_AIRuleFires(Test_AICond("self_has_status", 0, STATUS_BLEED), _sbleed, _p, Test_AICtx()));
+    Test_False("AI cond self_has_status Bleeding: not when clean", Test_AIRuleFires(Test_AICond("self_has_status", 0, STATUS_BLEED), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_True("AI cond self_missing_status Bleeding: fires when clean", Test_AIRuleFires(Test_AICond("self_missing_status", 0, STATUS_BLEED), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_False("AI cond self_missing_status Bleeding: not when bleeding", Test_AIRuleFires(Test_AICond("self_missing_status", 0, STATUS_BLEED), _sbleed, _p, Test_AICtx()));
+    Test_True("AI cond every_nth 2: fires on turn 2", Test_AIRuleFires(Test_AICond("every_nth", 2), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx(2)));
+    Test_False("AI cond every_nth 2: not on turn 3", Test_AIRuleFires(Test_AICond("every_nth", 2), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx(3)));
+    Test_True("AI cond every_nth 2: fires on turn 4", Test_AIRuleFires(Test_AICond("every_nth", 2), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx(4)));
+    Test_False("AI an unknown condition never fires", Test_AIRuleFires(Test_AICond("no_such_cond"), EnemyCreate(ENEMY_SLIME), _p, Test_AICtx()));
+    Test_False("AI EnemyAI_KnownCond says no to a made-up name", EnemyAI_KnownCond("no_such_cond"));
+
+    // ---- Slime: defend when hurt (spec table) ----
+    var _sl = EnemyCreate(ENEMY_SLIME);
+    _sl.hp = 4;   // 4 / 9 = 44% <= 50%
+    var _ch = EnemyAI_Choose(_sl, _p, Test_AICtx(), Rng_New(5, "combat"));
+    Test_True("AI Slime at 44% HP uses Solidify by rule solidify_when_hurt", _ch.kind == "skill" && _ch.skill_id == SKILL_SOLIDIFY && _ch.rule == "solidify_when_hurt");
+    var _sl_ok = EnemyCreate(ENEMY_SLIME);
+    var _d = Test_AIDraws(_sl_ok, _p, Test_AICtx(), 5, 300);
+    Test_True("AI Slime at full HP: Solidify only from the weights (about 1 in 5), attack otherwise", Test_AICount(_d, SKILL_SOLIDIFY) >= 30 && Test_AICount(_d, SKILL_SOLIDIFY) <= 90 && Test_AICount(_d, -1) >= 210);
+    var _sl_solid = EnemyCreate(ENEMY_SLIME);
+    _sl_solid.hp = 4;
+    _sl_solid = Status_Add(_sl_solid, STATUS_SOLIDIFY, 2, 0);
+    Test_Eq("AI Slime that is already Solid never casts Solidify again", Test_AICount(Test_AIDraws(_sl_solid, _p, Test_AICtx(), 5, 100), SKILL_SOLIDIFY), 0);
+
+    // ---- Spider: a poison stack cap and an opener (spec table) ----
+    var _sp = EnemyCreate(ENEMY_SPIDER);
+    var _p4 = CharacterCreate_Player(CLASS_KNIGHT);
+    _p4 = Status_Add(_p4, STATUS_POISON, 4, 0, 4);
+    var _c4 = EnemyAI_Choose(_sp, _p4, Test_AICtx(), Rng_New(2, "combat"));
+    Test_True("AI Spider vs 4 Poison stacks: plain attack by rule no_stacking_past_4", _c4.skill_id == -1 && _c4.rule == "no_stacking_past_4");
+    Test_Eq("AI Spider vs 4 Poison stacks never uses Poison Fangs", Test_AICount(Test_AIDraws(_sp, _p4, Test_AICtx(), 2, 100), SKILL_POISON_FANGS), 0);
+    var _p3 = CharacterCreate_Player(CLASS_KNIGHT);
+    _p3 = Status_Add(_p3, STATUS_POISON, 3, 0, 3);
+    var _d3 = Test_AIDraws(_sp, _p3, Test_AICtx(), 2, 200);
+    Test_True("AI Spider vs 3 stacks: Poison Fangs from the weights only (about 1 in 4)", Test_AICount(_d3, SKILL_POISON_FANGS) >= 25 && Test_AICount(_d3, SKILL_POISON_FANGS) <= 80);
+    var _d0 = Test_AIDraws(_sp, _p, Test_AICtx(), 2, 300);
+    Test_True("AI Spider vs a clean player: Poison Fangs about 70% (60% rule, then the weights)", Test_AICount(_d0, SKILL_POISON_FANGS) >= 150 && Test_AICount(_d0, SKILL_POISON_FANGS) <= 250);
+    Test_True("AI Spider keeps some randomness: the plain attack still happens", Test_AICount(_d0, -1) >= 30);
+
+    // ---- Snake ----
+    var _sn = EnemyCreate(ENEMY_SNAKE);
+    var _pb3 = CharacterCreate_Player(CLASS_KNIGHT);
+    _pb3 = Status_Add(_pb3, STATUS_BLEED, 3, 0, 3);
+    Test_Eq("AI Snake vs 3 Bleeding stacks never bites", Test_AICount(Test_AIDraws(_sn, _pb3, Test_AICtx(), 4, 100), SKILL_BITE), 0);
+    var _dsn = Test_AIDraws(_sn, _p, Test_AICtx(), 4, 300);
+    Test_True("AI Snake vs a clean player: Bite about 67% (50% rule, then 1 in 3)", Test_AICount(_dsn, SKILL_BITE) >= 150 && Test_AICount(_dsn, SKILL_BITE) <= 250);
+
+    // ---- Dire Wolf: howl first, then fight ----
+    var _wo = EnemyCreate(ENEMY_DIREWOLF);
+    var _dwo = Test_AIDraws(_wo, _p, Test_AICtx(), 9, 300);
+    Test_True("AI Dire Wolf without Bloodthirsty: howls about half the time", Test_AICount(_dwo, SKILL_BLOODTHIRSTY) >= 110 && Test_AICount(_dwo, SKILL_BLOODTHIRSTY) <= 190);
+    var _wo2 = EnemyCreate(ENEMY_DIREWOLF);
+    _wo2 = Status_Add(_wo2, STATUS_BLOODTHIRSTY, 4, 0);
+    Test_Eq("AI Dire Wolf with Bloodthirsty never howls again", Test_AICount(Test_AIDraws(_wo2, _p, Test_AICtx(), 9, 100), SKILL_BLOODTHIRSTY), 0);
+
+    // ---- Mad Whisp: a buffed player gets Snuffed ----
+    var _wi = EnemyCreate(ENEMY_MADWHISP);
+    var _cb = EnemyAI_Choose(_wi, _pbuff, Test_AICtx(), Rng_New(3, "combat"));
+    Test_True("AI Mad Whisp vs a buffed player: Snuff by rule snuff_buffs", _cb.kind == "skill" && _cb.skill_id == SKILL_SNUFF && _cb.rule == "snuff_buffs");
+    Test_Eq("AI Mad Whisp vs a buffed player: every one of 30 choices is Snuff", Test_AICount(Test_AIDraws(_wi, _pbuff, Test_AICtx(), 3, 30), SKILL_SNUFF), 30);
+    var _pguard = CharacterCreate_Player(CLASS_KNIGHT);
+    _pguard = Status_Add(_pguard, STATUS_GUARD, 2, 0);
+    Test_Eq("AI Mad Whisp also answers Guard", EnemyAI_Choose(_wi, _pguard, Test_AICtx(), Rng_New(3, "combat")).skill_id, SKILL_SNUFF);
+    Test_Eq("AI Mad Whisp vs a poisoned (not buffed) player never Snuffs", Test_AICount(Test_AIDraws(_wi, _ppoi, Test_AICtx(), 3, 100), SKILL_SNUFF), 0);
+    var _dwi = Test_AIDraws(_wi, _p, Test_AICtx(), 3, 300);
+    Test_True("AI Mad Whisp default: Scorching Touch about 40%, attack about 60%", Test_AICount(_dwi, SKILL_SCORCHING_TOUCH) >= 90 && Test_AICount(_dwi, SKILL_SCORCHING_TOUCH) <= 150 && Test_AICount(_dwi, -1) >= 150);
+
+    // ---- Killer Plant: heal when low (once), a telegraphed Vine Trap every 3rd turn ----
+    var _kp = EnemyCreate(ENEMY_KILLER_PLANT);
+    var _kp_low = EnemyCreate(ENEMY_KILLER_PLANT);
+    _kp_low.hp = floor(_kp_low.max_hp * 0.3);
+    var _ck = EnemyAI_Choose(_kp_low, _p, Test_AICtx(), Rng_New(1, "combat"));
+    Test_True("AI Killer Plant at 30% HP: Regrow by rule low_hp_heal", _ck.kind == "skill" && _ck.skill_id == SKILL_REGROW && _ck.rule == "low_hp_heal");
+    var _ctx_used = Test_AICtx();
+    variable_struct_set(_ctx_used.uses, "low_hp_heal", 1);
+    Test_True("AI Killer Plant already healed once: the heal rule is spent (max_uses 1)", EnemyAI_Choose(_kp_low, _p, _ctx_used, Rng_New(1, "combat")).rule != "low_hp_heal");
+    Test_Eq("AI Killer Plant at full HP never heals", Test_AICount(Test_AIDraws(_kp, _p, Test_AICtx(), 1, 60), SKILL_REGROW), 0);
+    var _kp_expect = ["attack", "attack", "windup", "attack", "attack", "windup", "attack", "attack", "windup"];
+    var _kp_got = true;
+    var _kp_txt = "";
+    for (var _t = 1; _t <= 9; _t++) {
+        var _ct = EnemyAI_Choose(_kp, _p, Test_AICtx(_t), Rng_New(1, "combat"));
+        _kp_txt += " " + _ct.kind;
+        if (_ct.kind != _kp_expect[_t - 1]) _kp_got = false;
+        if (_ct.kind == "windup" && (_ct.skill_id != SKILL_VINE_TRAP || _ct.rule != "vine_every_3rd")) _kp_got = false;
+    }
+    Test_True("AI Killer Plant turns 1..9: attack attack WINDUP (Vine Trap) every 3rd (got:" + _kp_txt + ")", _kp_got);
+    Test_True("AI Killer Plant: a hurt plant on turn 3 heals first (the rules are a priority list)", EnemyAI_Choose(_kp_low, _p, Test_AICtx(3), Rng_New(1, "combat")).skill_id == SKILL_REGROW);
+
+    // ---- Ghost Sword ----
+    var _gs = EnemyCreate(ENEMY_GHOSTSWORD);
+    var _gs_ok = true;
+    for (var _tg = 1; _tg <= 7; _tg++) {
+        var _cg = EnemyAI_Choose(_gs, _p, Test_AICtx(_tg), Rng_New(1, "combat"));
+        var _want_w = (_tg mod 3 == 0);
+        if ((_cg.kind == "windup") != _want_w) _gs_ok = false;
+        if (_want_w && _cg.skill_id != SKILL_GHOST_CUT) _gs_ok = false;
+    }
+    Test_True("AI Ghost Sword: a telegraphed Cut on turns 3 and 6 only", _gs_ok);
+
+    // ---- Stranger: grabs when hurt, once; Steal needs something to steal ----
+    var _st = EnemyCreate(ENEMY_STRANGER);
+    _st.hp = floor(_st.max_hp * 0.4);
+    var _pinv = CharacterCreate_Player(CLASS_KNIGHT);
+    _pinv.inventory = Inv_Add([], 10, 2);
+    var _cs = EnemyAI_Choose(_st, _pinv, Test_AICtx(), Rng_New(1, "combat"));
+    Test_True("AI Stranger at 40% HP vs a player with items: Steal by rule grab_when_hurt", _cs.skill_id == SKILL_STEAL && _cs.rule == "grab_when_hurt");
+    var _pnone = CharacterCreate_Player(CLASS_KNIGHT);
+    _pnone.inventory = [];
+    Test_Eq("AI Stranger vs a player with nothing to steal never uses Steal", Test_AICount(Test_AIDraws(_st, _pnone, Test_AICtx(), 1, 100), SKILL_STEAL), 0);
+    var _ctx_grab = Test_AICtx();
+    variable_struct_set(_ctx_grab.uses, "grab_when_hurt", 1);
+    Test_True("AI Stranger: the grab rule is once per battle", EnemyAI_Choose(_st, _pinv, _ctx_grab, Rng_New(1, "combat")).rule != "grab_when_hurt");
+
+    // ---- rule mechanics: skip what the enemy does not have, chance, telegraph, wind-up resolution, force ----
+    var _x = EnemyCreate(ENEMY_SLIME);
+    _x.skills = [];
+    _x.brain = { rules: [ { label: "r", when: [Test_AICond("always")], act: "skill", skill: SKILL_BITE, chance: 1, max_uses: -1 } ], weights: [ { act: "skill", skill: SKILL_BITE, w: 5 } ], phases: [] };
+    Test_Eq("AI a rule and a weight naming a skill the enemy lacks fall back to the basic attack", EnemyAI_Choose(_x, _p, Test_AICtx(), Rng_New(1, "combat")).skill_id, -1);
+    _x.skills = [SKILL_BITE];
+    _x.brain.rules[0].chance = 0.3;
+    _x.brain.weights = [];
+    var _dch = Test_AIDraws(_x, _p, Test_AICtx(), 11, 400);
+    Test_True("AI a rule with chance 0.3 fires about 30% of the time", Test_AICount(_dch, SKILL_BITE) >= 90 && Test_AICount(_dch, SKILL_BITE) <= 150);
+    var _y = EnemyCreate(ENEMY_SLIME);
+    _y.skills = [SKILL_VINE_TRAP];
+    _y.brain = { rules: [], weights: [ { act: "skill", skill: SKILL_VINE_TRAP, w: 1 } ], phases: [] };
+    var _cy = EnemyAI_Choose(_y, _p, Test_AICtx(), Rng_New(1, "combat"));
+    Test_True("AI a telegraphed skill chosen from the weights starts as a wind-up", _cy.kind == "windup" && _cy.skill_id == SKILL_VINE_TRAP);
+    var _ctx_w = Test_AICtx();
+    _ctx_w.windup = SKILL_VINE_TRAP;
+    var _rw = Rng_New(1, "combat");
+    var _cw = EnemyAI_Choose(_y, _p, _ctx_w, _rw);
+    Test_True("AI after a wind-up the big attack comes (rule windup_attack)", _cw.kind == "skill" && _cw.skill_id == SKILL_VINE_TRAP && _cw.rule == "windup_attack");
+    Test_Eq("AI resolving a wind-up draws no random number", _rw.calls, 0);
+    var _ctx_f = Test_AICtx();
+    _ctx_f.force_damage_only = true;
+    var _cf = EnemyAI_Choose(_y, _p, _ctx_f, Rng_New(1, "combat"));
+    Test_True("AI the debug damage-only switch skips the wind-up", _cf.kind == "skill" && _cf.skill_id == SKILL_VINE_TRAP);
+    var _pal = EnemyCreate(ENEMY_MINI_BOSS);
+    var _ctx_pf0 = Test_AICtx(1, 0);
+    _ctx_pf0.force_damage_only = true;
+    var _ctx_pf1 = Test_AICtx(1, 1);
+    _ctx_pf1.force_damage_only = true;
+    var _pf0 = Test_AIDraws(_pal, _p, _ctx_pf0, 3, 60);
+    var _pf1 = Test_AIDraws(_pal, _p, _ctx_pf1, 3, 60);
+    Test_Eq("AI the damage-only switch uses only the skills of the lists in force: Palehorn phase 0 is always Ramming", Test_AICount(_pf0, SKILL_RAMMING), 60);
+    Test_True("AI the damage-only switch in phase 1 also uses Gore", Test_AICount(_pf1, SKILL_GORE) > 0 && Test_AICount(_pf1, SKILL_RAMMING) > 0);
+    var _ctx_once = Test_AICtx();
+    _ctx_once.used_turn = [SKILL_BLESSING];
+    var _bl = EnemyCreate(ENEMY_FINAL_BOSS);
+    _bl.hp = floor(_bl.max_hp * 0.5);
+    _bl.brain = { rules: [ { label: "b", when: [Test_AICond("always")], act: "skill", skill: SKILL_BLESSING, chance: 1, max_uses: -1 } ], weights: [], phases: [] };
+    Test_Eq("AI a once-per-turn skill already used this turn is not chosen again", EnemyAI_Choose(_bl, _p, _ctx_once, Rng_New(1, "combat")).skill_id, -1);
+    Test_Eq("AI the same skill is fine when it was not used yet this turn", EnemyAI_Choose(_bl, _p, Test_AICtx(), Rng_New(1, "combat")).skill_id, SKILL_BLESSING);
+
+    // ---- determinism (the "combat" stream) ----
+    var _s1 = Test_AIDraws(_sp, _p, Test_AICtx(), 7, 100);
+    var _s2 = Test_AIDraws(_sp, _p, Test_AICtx(), 7, 100);
+    var _s3 = Test_AIDraws(_sp, _p, Test_AICtx(), 8, 100);
+    Test_True("AI the same seed gives the same 100 choices", Test_SameArray(_s1, _s2));
+    Test_False("AI another seed gives another sequence", Test_SameArray(_s1, _s3));
+    var _rs = Rng_New(7, "combat");
+    EnemyAI_Choose(_sp, _p, Test_AICtx(), _rs);
+    Test_True("AI the choice draws from the stream it is given", _rs.calls >= 1);
+
+    // ---- pure state: turn counter, wind-up, BREAK ----
+    var _stt = EnemyAI_StateNew();
+    Test_True("AI state starts at turn 1, phase 0, no wind-up", EnemyAI_Ctx(_stt).turn == 1 && EnemyAI_Ctx(_stt).phase == 0 && EnemyAI_Ctx(_stt).windup == -1);
+    Test_Eq("AI BREAK with no wind-up cancels nothing", EnemyAI_Break(_stt), -1);
+    EnemyAI_Take(_stt, { kind: "windup", skill_id: SKILL_RAMMING, rule: "ram_every_3rd" });
+    Test_Eq("AI a wind-up is remembered", EnemyAI_Ctx(_stt).windup, SKILL_RAMMING);
+    Test_Eq("AI a wind-up counts as a use of its rule", variable_struct_get(_stt.uses, "ram_every_3rd"), 1);
+    Test_Eq("AI BREAK during the wind-up cancels the big attack and says which", EnemyAI_Break(_stt), SKILL_RAMMING);
+    Test_Eq("AI after the cancel there is no wind-up", EnemyAI_Ctx(_stt).windup, -1);
+    Test_Eq("AI a second BREAK cancels nothing", EnemyAI_Break(_stt), -1);
+    EnemyAI_Take(_stt, { kind: "windup", skill_id: SKILL_RAMMING, rule: "ram_every_3rd" });
+    EnemyAI_Take(_stt, { kind: "skill", skill_id: SKILL_RAMMING, rule: "windup_attack" });
+    Test_Eq("AI the big attack ends the wind-up", EnemyAI_Ctx(_stt).windup, -1);
+    Test_Eq("AI the big attack is not counted as another use of the rule (2 wind-ups so far)", variable_struct_get(_stt.uses, "ram_every_3rd"), 2);
+    EnemyAI_EndTurn(_stt);
+    Test_Eq("AI a finished enemy turn moves the counter on", EnemyAI_Ctx(_stt).turn, 2);
+
+    // ---- skills: the heavy moves, the new moves ----
+    var _heavy = [SKILL_VINE_TRAP, SKILL_GHOST_CUT, SKILL_RAMMING, SKILL_PALE_HYMN];
+    var _light = [SKILL_POISON_FANGS, SKILL_BITE, SKILL_SCORCHING_TOUCH, SKILL_GORE, SKILL_REGROW, SKILL_SNUFF, SKILL_SOLIDIFY, SKILL_BLOODTHIRSTY, SKILL_STEAL, SKILL_CURSE, SKILL_BLESSING];
+    for (var _hi = 0; _hi < array_length(_heavy); _hi++) {
+        var _hs = SkillDB_Get(_heavy[_hi]);
+        Test_True("AI " + _hs.name + " is a telegraphed heavy move with a defence bar", variable_struct_exists(_hs, "telegraphed") && _hs.telegraphed && _hs.uses_defensive_qte);
+        Test_True("AI " + _hs.name + " hits harder than a plain move (power_mult 1.5)", _hs.power_mult == 1.5);
+        Test_True("AI " + _hs.name + " has its own bar", Qte_DefenceParams(_heavy[_hi]).sweep_ms != Qte_BarParams("default").sweep_ms);
+        Test_True("AI " + _hs.name + " has a wind-up line that names the enemy", string_pos("Slimey", Skill_WindupText(_hs, "Slimey")) > 0);
+    }
+    for (var _li = 0; _li < array_length(_light); _li++) {
+        var _ls = SkillDB_Get(_light[_li]);
+        Test_False("AI " + _ls.name + " is not telegraphed", variable_struct_exists(_ls, "telegraphed") && _ls.telegraphed);
+    }
+    Test_Eq("AI Regrow heals the user: effect heal on self", SkillDB_Get(SKILL_REGROW).effect + string(SkillDB_Get(SKILL_REGROW).target), "heal" + string(TGT_SELF));
+    var _rg = EnemyCreate(ENEMY_KILLER_PLANT);
+    _rg.hp = 5;
+    var _rgr = Skill_Use(_rg, _rg, SKILL_REGROW);
+    Test_True("AI Regrow gives power 5 + floor(MAG/4) HP back (MAG 10 -> 7)", _rgr.ok && _rg.hp == 12);
+    var _rg2 = EnemyCreate(ENEMY_KILLER_PLANT);
+    _rg2.hp = _rg2.max_hp - 1;
+    Skill_Use(_rg2, _rg2, SKILL_REGROW);
+    Test_Eq("AI Regrow never heals past max HP", _rg2.hp, _rg2.max_hp);
+    var _sn_p = CharacterCreate_Player(CLASS_KNIGHT);
+    _sn_p = Status_Add(_sn_p, STATUS_CRIT_UP, 3, 0);
+    _sn_p = Status_Add(_sn_p, STATUS_GUARD, 2, 0);
+    _sn_p = Status_Add(_sn_p, STATUS_POISON, 2, 0, 2);
+    var _snr = Skill_Use(EnemyCreate(ENEMY_MADWHISP), _sn_p, SKILL_SNUFF);
+    Test_True("AI Snuff removes every buff of the player", _snr.ok && !Status_Has(_sn_p, STATUS_CRIT_UP) && !Status_Has(_sn_p, STATUS_GUARD));
+    Test_True("AI Snuff leaves the player's debuffs alone", Status_Has(_sn_p, STATUS_POISON));
+    Test_True("AI Snuff does no damage and says something", _snr.dmg == 0 && _snr.msg != "");
+    Test_True("AI Gore is a plain move with Bleeding and no bar", SkillDB_Get(SKILL_GORE).effect == "damage" && SkillDB_Get(SKILL_GORE).status == STATUS_BLEED && !Battle_EnemySkillCanBeDefended(SkillDB_Get(SKILL_GORE), { ok: true, hit: true, dmg: 5 }, _p));
+    Test_True("AI Pale Hymn is a MAG attack", SkillDB_Get(SKILL_PALE_HYMN).stat_type == STAT_MAG && SkillDB_Get(SKILL_PALE_HYMN).effect == "damage");
+
+    // ---- bosses: phases ----
+    var _bosses = [ENEMY_MINI_BOSS, ENEMY_FINAL_BOSS];
+    for (var _bi = 0; _bi < 2; _bi++) {
+        var _bb = EnemyCreate(_bosses[_bi]).brain;
+        var _bn = EnemyCreate(_bosses[_bi]).name;
+        Test_Eq("AI " + _bn + " at 100% is phase 0", EnemyAI_PhaseFor(_bb, 1.0), 0);
+        Test_Eq("AI " + _bn + " at 61% is still phase 0", EnemyAI_PhaseFor(_bb, 0.61), 0);
+        Test_Eq("AI " + _bn + " at 60% is phase 1", EnemyAI_PhaseFor(_bb, 0.60), 1);
+        Test_Eq("AI " + _bn + " at 31% is phase 1", EnemyAI_PhaseFor(_bb, 0.31), 1);
+        Test_Eq("AI " + _bn + " at 30% is phase 2", EnemyAI_PhaseFor(_bb, 0.30), 2);
+        Test_Eq("AI " + _bn + " at 1% is phase 2", EnemyAI_PhaseFor(_bb, 0.01), 2);
+    }
+    // Palehorn: the lists change with the phase
+    var _ph = EnemyCreate(ENEMY_MINI_BOSS);
+    Test_Eq("AI Palehorn phase 0 never uses Gore", Test_AICount(Test_AIDraws(_ph, _p, Test_AICtx(1, 0), 3, 300), SKILL_GORE), 0);
+    var _g1 = Test_AICount(Test_AIDraws(_ph, _p, Test_AICtx(1, 1), 3, 300), SKILL_GORE);
+    var _g2 = Test_AICount(Test_AIDraws(_ph, _p, Test_AICtx(1, 2), 3, 300), SKILL_GORE);
+    Test_True("AI Palehorn phase 1: Gore about 1 in 3", _g1 >= 60 && _g1 <= 140);
+    Test_True("AI Palehorn phase 2: Gore about 2 in 3", _g2 >= 160 && _g2 <= 240);
+    Test_True("AI Palehorn phase 0: Ramming is telegraphed on turn 3, not on turn 2", EnemyAI_Choose(_ph, _p, Test_AICtx(3, 0), Rng_New(1, "combat")).kind == "windup" && EnemyAI_Choose(_ph, _p, Test_AICtx(2, 0), Rng_New(1, "combat")).kind != "windup");
+    var _c2 = EnemyAI_Choose(_ph, _p, Test_AICtx(2, 2), Rng_New(1, "combat"));
+    Test_True("AI Palehorn phase 2: Ramming is telegraphed every 2nd turn", _c2.kind == "windup" && _c2.skill_id == SKILL_RAMMING && _c2.rule == "ram_every_2nd");
+    var _hy = EnemyCreate(ENEMY_FINAL_BOSS);
+    Test_True("AI Choirbeast phase 0: Pale Hymn telegraphed on turn 4 only", EnemyAI_Choose(_hy, _p, Test_AICtx(4, 0), Rng_New(1, "combat")).skill_id == SKILL_PALE_HYMN && EnemyAI_Choose(_hy, _p, Test_AICtx(3, 0), Rng_New(1, "combat")).kind != "windup");
+    Test_True("AI Choirbeast phase 1: Pale Hymn on turn 3", EnemyAI_Choose(_hy, _p, Test_AICtx(3, 1), Rng_New(1, "combat")).rule == "hymn_every_3rd");
+    Test_True("AI Choirbeast phase 2: Pale Hymn on turn 2", EnemyAI_Choose(_hy, _p, Test_AICtx(2, 2), Rng_New(1, "combat")).rule == "hymn_every_2nd");
+    var _hy_bless = EnemyCreate(ENEMY_FINAL_BOSS);
+    _hy_bless.hp = floor(_hy_bless.max_hp * 0.55);
+    var _bl_n = Test_AICount(Test_AIDraws(_hy_bless, _p, Test_AICtx(1, 1), 3, 300), SKILL_BLESSING);
+    Test_True("AI Choirbeast phase 1 without Blessing: casts it about half the time", _bl_n >= 110 && _bl_n <= 190);
+
+    // PhaseSync: forward only, SPD / ATK added, banner on the change, a skipped phase still counts
+    var _pst = EnemyAI_StateNew();
+    var _pb = EnemyCreate(ENEMY_MINI_BOSS);
+    var _spd0 = _pb.stats.spd;
+    var _atk0 = _pb.stats.atk;
+    Test_False("AI Palehorn at full HP: no phase change", EnemyAI_PhaseSync(_pst, _pb).changed);
+    _pb.hp = floor(_pb.max_hp * 0.55);
+    var _r1 = EnemyAI_PhaseSync(_pst, _pb);
+    Test_True("AI Palehorn at 55%: phase 1 with a banner", _r1.changed && _r1.phase == 1 && _r1.banner != "" && _pst.phase == 1);
+    Test_Eq("AI Palehorn phase 1: SPD +2", _pb.stats.spd, _spd0 + 2);
+    Test_Eq("AI Palehorn phase 1: ATK unchanged", _pb.stats.atk, _atk0);
+    Test_False("AI the same phase twice is not a change (no second SPD bonus)", EnemyAI_PhaseSync(_pst, _pb).changed || _pb.stats.spd != _spd0 + 2);
+    _pb.hp = _pb.max_hp;
+    Test_False("AI healing does not send a boss back a phase", EnemyAI_PhaseSync(_pst, _pb).changed || _pst.phase != 1);
+    _pb.hp = floor(_pb.max_hp * 0.2);
+    var _r2 = EnemyAI_PhaseSync(_pst, _pb);
+    Test_True("AI Palehorn at 20%: phase 2", _r2.changed && _r2.phase == 2 && _pst.phase == 2);
+    Test_Eq("AI Palehorn phase 2: SPD +4 in all", _pb.stats.spd, _spd0 + 4);
+    Test_Eq("AI Palehorn phase 2: ATK +3 (enrage)", _pb.stats.atk, _atk0 + 3);
+    var _fst = EnemyAI_StateNew();
+    var _fb = EnemyCreate(ENEMY_FINAL_BOSS);
+    var _fspd = _fb.stats.spd;
+    _fb.hp = floor(_fb.max_hp * 0.2);
+    var _rf = EnemyAI_PhaseSync(_fst, _fb);
+    Test_True("AI Choirbeast jumping from 100% to 20% reaches phase 2 at once", _rf.changed && _rf.phase == 2);
+    Test_Eq("AI Choirbeast skipping phase 1 still gets both SPD bonuses (+2 +3)", _fb.stats.spd, _fspd + 5);
+    Test_Eq("AI Choirbeast Fury is replaced by SPD: it has one action per turn even at 20% HP", Battle_EnemyActionBudget(_fb), 1);
+    Test_False("AI no enemy has Rampage any more", array_contains(EnemyCreate(ENEMY_MINI_BOSS).skills, SKILL_RAMPAGE));
+    Test_False("AI no enemy has Fury any more", array_contains(EnemyCreate(ENEMY_FINAL_BOSS).skills, SKILL_FINAL_FURY));
+    Test_True("AI Curse stays with the Choirbeast (B2)", array_contains(EnemyCreate(ENEMY_FINAL_BOSS).skills, SKILL_CURSE));
+    // the extra SPD is really more turns on the timeline
+    var _tl_a = Turn_New([Turn_Fighter(TL_PLAYER, 10), Turn_Fighter(TL_ENEMY, _spd0)]);
+    var _tl_b = Turn_New([Turn_Fighter(TL_PLAYER, 10), Turn_Fighter(TL_ENEMY, _spd0 + 4)]);
+    var _ea = 0; var _eb = 0;
+    for (var _tn = 0; _tn < 40; _tn++) {
+        if (Turn_Next(_tl_a) == TL_ENEMY) _ea++;
+        if (Turn_Next(_tl_b) == TL_ENEMY) _eb++;
+    }
+    Test_True("AI Palehorn in phase 2 gets more turns than in phase 0 (" + string(_ea) + " -> " + string(_eb) + " of 40)", _eb > _ea);
+
+    // ---- Foresight (D79): the wind-up is shown, and so is the big attack ----
+    var _pw = Battle_ActionPreviewOf({ skill_id: SKILL_RAMMING, kind: "windup" }, true);
+    Test_True("AI Foresight: a wind-up shows as kind windup, big, with the skill's name", _pw.visible && _pw.kind == "windup" && _pw.big && string_pos(SkillDB_Get(SKILL_RAMMING).name, _pw.name) > 0);
+    var _pa = Battle_ActionPreviewOf({ skill_id: SKILL_RAMMING, kind: "skill" }, true);
+    Test_True("AI Foresight: the big attack after it shows as a skill, big", _pa.visible && _pa.kind == "skill" && _pa.big && _pa.skill_id == SKILL_RAMMING);
+    Test_False("AI Foresight shows nothing without the status", Battle_ActionPreviewOf({ skill_id: SKILL_RAMMING, kind: "windup" }, false).visible);
+
+    // ---- the old per-skill use chances are gone (the weights replace them, D68) ----
+    Test_False("AI the old per-skill use chance is gone from the skill data", variable_struct_exists(SkillDB_Get(SKILL_BITE), "enemy_use_chance_min"));
+}
+
 function Test_Suite_Inventory() {
     Test_Hero(CLASS_KNIGHT, DIFFICULTY_NORMAL); // no skills learned yet
     var _max = ItemDB_Get(10).max_stack;
@@ -1518,12 +1918,12 @@ function Test_Suite_Inventory() {
 }
 
 // Data integrity over the GML databases (VER-11; R-003, R-004). ds_map_add silently drops a repeated key, so a
-// duplicate id shows up as a wrong record count; counts come from balance-data.md (23 items after the skill books went with D18, 27 skills, 14 statuses, 10 enemies).
+// duplicate id shows up as a wrong record count; counts come from balance-data.md (23 items after the skill books went with D18, 27 skills + 4 of packet B4, 14 statuses, 10 enemies).
 function Test_Suite_Data() {
     GameState_Get();
     ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init();
-    Test_Eq("item count == 23 (no lost duplicate ids; 14 skill books removed, D18)", ds_map_size(global.item_db), 23);
-    Test_Eq("skill count == 27", ds_map_size(global.skill_db), 27);
+    Test_Eq("item count == 34 (23 + 4 throwables + 7 accessories, C3; no lost duplicate ids)", ds_map_size(global.item_db), 34);
+    Test_Eq("skill count == 31 (27 + Regrow, Snuff, Gore, Pale Hymn of packet B4)", ds_map_size(global.skill_db), 31);
     Test_Eq("status count == 14", ds_map_size(global.status_db), 14);
     Test_Eq("enemy count == 10", ds_map_size(global.enemy_db), 10);
     var _bad = 0; var _names = {}; var _dupnames = 0;
@@ -1593,8 +1993,8 @@ function Test_Suite_Export() {
     Test_True("Export: the data survives a JSON round trip", is_struct(_back) && _back.version == 1);
     Test_Eq("Export: 4 classes", array_length(_back.classes), 4);
     Test_Eq("Export: 10 enemies", array_length(_back.enemies), 10);
-    Test_Eq("Export: 27 skills", array_length(_back.skills), 27);
-    Test_Eq("Export: 23 items", array_length(_back.items), 23);
+    Test_Eq("Export: 31 skills (27 + the 4 of packet B4)", array_length(_back.skills), 31);
+    Test_Eq("Export: 34 items (C3 adds 4 throwables and 7 accessories)", array_length(_back.items), 34);
     Test_Eq("Export: 51 cards (14 skills, 14 upgrades, 20 passives, 3 fallbacks)", array_length(_back.cards), 51);
     Test_Eq("Export: 14 statuses", array_length(_back.statuses), 14);
     Test_Eq("Export: 10 level rows", array_length(_back.levels), 10);
@@ -4264,4 +4664,563 @@ function Test_Suite_Bed() {
     Test_Eq("D47 upgrade menu: one row per upgradable skill, then Back", array_length(_sub), 2);
     Test_Eq("D47 upgrade menu: the row is the skill", _sub[0].skill_id, SKILL_FIREBALL);
     Test_True("D47 upgrade menu: the details panel shows what changes", string_length(_sub[0].help) > 5 && array_length(_sub[0].lines) >= 1);
+}
+
+// ============================================================================================================
+// C3 economy (D23 D33 D84 D85 D86 D92): gold, the merchant's stock and prices, throwables, the accessory slot, elites, per-run shuffles.
+// Expected values are worked out by hand from the formulas written in the packet (D61 grade numbers, combat-spec section 4 and 10), not read
+// from the code. Gold: 10 + 2 per enemy level, x1.2 for rank 2, x3 for a boss, x2 for an elite, +-25% roll. Price = value x 1.5 rounded up,
+// sell = half the price. Throwables: thrower stat 12 + level (Knight L1 = 13), slime DEF 7, firebomb power 3 -> formula power 6.
+// ============================================================================================================
+function Test_EcoSig(_rows) {
+    var _s = "";
+    for (var _i = 0; _i < array_length(_rows); _i++) _s += string(_rows[_i].kind) + ":" + string(_rows[_i].id) + "x" + string(_rows[_i].qty) + "@" + string(_rows[_i].price) + ",";
+    return _s;
+}
+
+function Test_EcoFind(_rows, _kind, _id) {
+    for (var _i = 0; _i < array_length(_rows); _i++) if (_rows[_i].kind == _kind && _rows[_i].id == _id) return _i;
+    return -1;
+}
+
+function Test_EcoCountType(_rows, _type) {
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_rows); _i++) {
+        if (_rows[_i].kind != "item") continue;
+        var _it = ItemDB_Get(_rows[_i].id);
+        if (_type == "throw" && variable_struct_exists(_it, "throwable") && _it.throwable) _n++;
+        else if (_type == "gear" && (_it.type == ITEM_WEAPON || _it.type == ITEM_ARMOR)) _n++;
+        else if (_type == "accessory" && _it.type == ITEM_ACCESSORY) _n++;
+    }
+    return _n;
+}
+
+function Test_Suite_Economy() {
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init(); CardDB_Init();
+
+    // ---- gold (D23): 10 + 2 per level; rank 2 x1.2; boss x3; elite x2 ----
+    Test_Eq("C3 gold: level 1 normal enemy = 12", Gold_Base(1, 1, false, false), 12);
+    Test_Eq("C3 gold: level 2 = 14", Gold_Base(2, 1, false, false), 14);
+    Test_Eq("C3 gold: level 5 = 20", Gold_Base(5, 1, false, false), 20);
+    Test_Eq("C3 gold: an elite pays double (level 5: 40)", Gold_Base(5, 1, false, true), 40);
+    Test_Eq("C3 gold: rank 2 pays x1.2 (level 5: 24)", Gold_Base(5, 2, false, false), 24);
+    Test_Eq("C3 gold: level 8 rank 2 = 31 (31.2 rounded)", Gold_Base(8, 2, false, false), 31);
+    Test_Eq("C3 gold: the mini boss (level 8, boss) = 78", Gold_Base(8, 3, true, false), 78);
+    Test_Eq("C3 gold: a rank 2 elite at level 8 = 62", Gold_Base(8, 2, false, true), 62);
+    var _r12 = Gold_Range(12);
+    Test_True("C3 gold: the range of 12 is 9..15 (+-25%)", _r12.lo == 9 && _r12.hi == 15);
+    var _r40 = Gold_Range(40);
+    Test_True("C3 gold: the range of 40 is 30..50", _r40.lo == 30 && _r40.hi == 50);
+    var _r78 = Gold_Range(78);
+    Test_True("C3 gold: the range of 78 is 58..98", _r78.lo == 58 && _r78.hi == 98);
+    var _grng = Rng_New(7, "gold");
+    var _gmin = 999; var _gmax = 0; var _gok = true;
+    repeat (300) {
+        var _g = Gold_Roll(_grng, 12);
+        _gmin = min(_gmin, _g); _gmax = max(_gmax, _g);
+        if (_g < 9 || _g > 15) _gok = false;
+    }
+    Test_True("C3 gold: 300 rolls of base 12 stay inside 9..15", _gok);
+    Test_True("C3 gold: the rolls reach both ends of the range", _gmin == 9 && _gmax == 15);
+    var _ga = Rng_New(55, "gold"); var _gb = Rng_New(55, "gold");
+    Test_Eq("C3 gold: the same stream gives the same roll", Gold_Roll(_ga, 20), Gold_Roll(_gb, 20));
+    var _kn = Test_Hero(CLASS_KNIGHT);
+    Test_Eq("C3 gold: no bonus = the plain amount", Gold_Scale(12, _kn), 12);
+    var _cs = Card_Take(_kn, "pas:coin_sense").ch;
+    Test_Eq("C3 gold: Coin Sense is +10% (12 -> 13)", Gold_Scale(12, _cs), 13);
+    Test_Eq("C3 gold: Coin Sense on 20 -> 22", Gold_Scale(20, _cs), 22);
+    var _lk = variable_clone(_kn);
+    _lk.inventory = Inv_Add(_lk.inventory, 46, 1);
+    Test_True("C3 accessory: the Lucky Charm equips", Equip_Item(_lk, 46));
+    Test_Eq("C3 gold: the Lucky Charm is +15% (12 -> 14)", Gold_Scale(12, _lk), 14);
+    var _lk2 = Card_Take(_lk, "pas:coin_sense").ch;
+    Test_Eq("C3 gold: Coin Sense and the Lucky Charm add up (12 -> 15)", Gold_Scale(12, _lk2), 15);
+
+    // the run's gold: added, spent, never negative, empty at the start of a run (so a dead run's gold is gone), kept in the history entry
+    var _run = Run_Create(31);
+    Test_Eq("C3 gold: a new run starts with 0 gold (what a dead run had is lost)", _run.gold, 0);
+    Test_True("C3 gold: a new run has an empty shop record", is_struct(_run.shop) && array_length(variable_struct_get_names(_run.shop)) == 0);
+    Gold_Add(_run, 40);
+    Test_Eq("C3 gold: Gold_Add", _run.gold, 40);
+    Test_False("C3 gold: cannot spend more than held", Gold_Spend(_run, 41));
+    Test_Eq("C3 gold: a failed spend changes nothing", _run.gold, 40);
+    Test_True("C3 gold: spend 15", Gold_Spend(_run, 15));
+    Test_Eq("C3 gold: 25 left", _run.gold, 25);
+    Gold_Add(_run, -100);
+    Test_Eq("C3 gold: a negative add is ignored", _run.gold, 25);
+    var _hist = Run_MakeHistoryEntry(_run, _kn, "rm_floor4", "died", "x");
+    Test_Eq("C3 gold: the run history keeps the gold the run had", _hist.gold, 25);
+
+    // income against prices (the target: a floor of gold buys one or two things)
+    Test_True("C3 balance: two fights of floor 2 (28 gold) buy a Smoke Bomb (21)", Gold_Base(2, 1, false, false) * 2 >= Shop_Price(33));
+    Test_True("C3 balance: but not a Smoke Bomb and a Firebomb together (48)", Gold_Base(2, 1, false, false) * 2 < Shop_Price(33) + Shop_Price(30));
+
+    // ---- prices: ceil(value x 1.5); sell = half ----
+    Test_Eq("C3 price: HP Potion Lv1 (value 8) = 12", Shop_Price(10), 12);
+    Test_Eq("C3 price: HP Potion Lv2 (14) = 21", Shop_Price(14), 21);
+    Test_Eq("C3 price: HP Potion Lv3 (25) = 38", Shop_Price(15), 38);
+    Test_Eq("C3 price: Antidote (6) = 9", Shop_Price(12), 9);
+    Test_Eq("C3 price: Iron Sword (18) = 27", Shop_Price(2), 27);
+    Test_Eq("C3 price: Platinum Sword (35) = 53", Shop_Price(3), 53);
+    Test_Eq("C3 price: Platinum Armor (70) = 105", Shop_Price(22), 105);
+    Test_Eq("C3 price: Firebomb (18) = 27", Shop_Price(30), 27);
+    Test_Eq("C3 price: Ice Flask (20) = 30", Shop_Price(32), 30);
+    Test_Eq("C3 price: Smoke Bomb (14) = 21", Shop_Price(33), 21);
+    Test_Eq("C3 price: Copper Ring (28) = 42", Shop_Price(40), 42);
+    Test_Eq("C3 price: Stone Charm (36) = 54", Shop_Price(44), 54);
+    Test_Eq("C3 price: Lucky Charm (30) = 45", Shop_Price(46), 45);
+    Test_Eq("C3 sell: half of 12 = 6", Shop_SellPrice(10), 6);
+    Test_Eq("C3 sell: half of 27 = 13", Shop_SellPrice(2), 13);
+    Test_Eq("C3 sell: half of 105 = 52", Shop_SellPrice(22), 52);
+    Test_Eq("C3 price: a skill card 80", Shop_CardPrice("skill:" + string(SKILL_FIREBALL)), 80);
+    Test_Eq("C3 price: an upgrade card 60", Shop_CardPrice("up:" + string(SKILL_FIREBALL)), 60);
+    Test_Eq("C3 price: a passive card 55", Shop_CardPrice("pas:quick_feet"), 55);
+
+    // ---- throwables (D84): the four items and the stack cap ----
+    var _tids = [30, 31, 32, 33];
+    var _tok = true;
+    for (var _t = 0; _t < 4; _t++) {
+        var _ti = ItemDB_Get(_tids[_t]);
+        if (!Item_IsThrowable(_ti) || !_ti.usable_battle || _ti.type != ITEM_CONSUMABLE) _tok = false;
+    }
+    Test_True("C3 throwables: ids 30..33 are throwable battle consumables", _tok);
+    Test_False("C3 throwables: a potion is not throwable", Item_IsThrowable(ItemDB_Get(10)));
+    var _nb = CharacterCreate_Player(CLASS_NOBODY);
+    Test_Eq("C3 throwables: a class carries 5 of each", Throw_Cap(_kn), 5);
+    Test_Eq("C3 throwables: Nobody carries 8 of each (D84)", Throw_Cap(_nb), 8);
+    Test_Eq("C3 throwables: thrower stat is 12 + level (13 at level 1)", Throw_Stat(_kn), 13);
+    var _full = variable_clone(_kn);
+    _full.inventory = Inv_Add(_full.inventory, 30, 4);
+    var _cap1 = Inv_AddCapped(_full, 30, 3);
+    Test_Eq("C3 throwables: only 1 of 3 fits under the cap of 5", _cap1.added, 1);
+    Test_Eq("C3 throwables: the stack is 5", Inv_Count(_cap1.ch.inventory, 30), 5);
+    var _cap2 = Inv_AddCapped(_nb, 30, 10);
+    Test_Eq("C3 throwables: Nobody fits 8 of 10", _cap2.added, 8);
+    var _cap3 = Inv_AddCapped(_kn, 10, 3);
+    Test_Eq("C3 throwables: potions have no cap but 99", _cap3.added, 3);
+
+    // grades: Perfect 1.30, Good 1.10, OK 1.00, Weak 0.75 (D61). Firebomb on a Slime (DEF 7), Knight (13): raw 3.9 -> OK 4, Good 5, Perfect 5, Weak 3
+    var _expect = [[QTE_OK, 4], [QTE_GOOD, 5], [QTE_PERFECT, 5], [QTE_WEAK, 3]];
+    for (var _g2 = 0; _g2 < 4; _g2++) {
+        var _slime = EnemyCreate(ENEMY_SLIME);
+        var _th = Test_Hero(CLASS_KNIGHT);
+        var _res = Throw_Resolve(30, _th, _slime, _expect[_g2][0]);
+        Test_True("C3 firebomb " + _expect[_g2][0] + ": ok", _res.ok);
+        Test_Eq("C3 firebomb " + _expect[_g2][0] + ": damage on a Slime", _res.dmg, _expect[_g2][1]);
+        Test_Eq("C3 firebomb " + _expect[_g2][0] + ": the Slime lost that much", _slime.hp, 9 - _expect[_g2][1]);
+        Test_True("C3 firebomb " + _expect[_g2][0] + ": the Slime burns", Status_Has(_slime, STATUS_BURN));
+    }
+    var _s1 = EnemyCreate(ENEMY_SLIME);
+    Throw_Resolve(30, Test_Hero(CLASS_KNIGHT), _s1, QTE_OK);
+    var _bn = Status_Find(_s1, STATUS_BURN);
+    Test_True("C3 firebomb OK: burn 4 for 2 turns", _bn.power == 4 && _bn.turns == 2);
+    var _s2 = EnemyCreate(ENEMY_SLIME);
+    Throw_Resolve(30, Test_Hero(CLASS_KNIGHT), _s2, QTE_PERFECT);
+    Test_Eq("C3 firebomb Perfect: burn 5 per turn", Status_Find(_s2, STATUS_BURN).power, 5);
+    var _s3 = EnemyCreate(ENEMY_SLIME);
+    Throw_Resolve(30, Test_Hero(CLASS_KNIGHT), _s3, QTE_WEAK);
+    Test_Eq("C3 firebomb Weak: burn 3 per turn", Status_Find(_s3, STATUS_BURN).power, 3);
+    // Nobody throws 50% stronger: damage 6 (raw 5.85), burn 6
+    var _s4 = EnemyCreate(ENEMY_SLIME);
+    var _nr = Throw_Resolve(30, CharacterCreate_Player(CLASS_NOBODY), _s4, QTE_OK);
+    Test_Eq("C3 firebomb, Nobody: damage 6 instead of 4", _nr.dmg, 6);
+    Test_Eq("C3 firebomb, Nobody: burn 6 per turn", Status_Find(_s4, STATUS_BURN).power, 6);
+
+    // poison pot: Perfect 5, Good 4, OK 4, Weak 3 stacks; Nobody 6 at OK, 7 at Perfect
+    var _pexp = [[QTE_PERFECT, 5], [QTE_GOOD, 4], [QTE_OK, 4], [QTE_WEAK, 3]];
+    for (var _p2 = 0; _p2 < 4; _p2++) {
+        var _sp = EnemyCreate(ENEMY_SLIME);
+        Throw_Resolve(31, Test_Hero(CLASS_KNIGHT), _sp, _pexp[_p2][0]);
+        Test_Eq("C3 poison pot " + _pexp[_p2][0] + ": stacks", Status_Stacks(_sp, STATUS_POISON), _pexp[_p2][1]);
+        Test_Eq("C3 poison pot " + _pexp[_p2][0] + ": no direct damage", _sp.hp, 9);
+    }
+    var _spn = EnemyCreate(ENEMY_SLIME);
+    Throw_Resolve(31, CharacterCreate_Player(CLASS_NOBODY), _spn, QTE_OK);
+    Test_Eq("C3 poison pot, Nobody: 6 stacks (4 x 1.5)", Status_Stacks(_spn, STATUS_POISON), 6);
+    var _spn2 = EnemyCreate(ENEMY_SLIME);
+    Throw_Resolve(31, CharacterCreate_Player(CLASS_NOBODY), _spn2, QTE_PERFECT);
+    Test_Eq("C3 poison pot, Nobody, Perfect: 7 stacks", Status_Stacks(_spn2, STATUS_POISON), 7);
+
+    // ice flask: damage like the firebomb; the stun (a push-back on the timeline) lands on OK or better, never on Weak
+    var _si = EnemyCreate(ENEMY_SLIME);
+    var _ir = Throw_Resolve(32, Test_Hero(CLASS_KNIGHT), _si, QTE_OK);
+    Test_True("C3 ice flask OK: 4 damage and a stun", _ir.dmg == 4 && _ir.stun && Status_Has(_si, STATUS_STUN));
+    var _sw = EnemyCreate(ENEMY_SLIME);
+    var _iw = Throw_Resolve(32, Test_Hero(CLASS_KNIGHT), _sw, QTE_WEAK);
+    Test_True("C3 ice flask Weak: 3 damage, no stun", _iw.dmg == 3 && !_iw.stun && !Status_Has(_sw, STATUS_STUN));
+    var _sn = EnemyCreate(ENEMY_SLIME);
+    var _inb = Throw_Resolve(32, CharacterCreate_Player(CLASS_NOBODY), _sn, QTE_OK);
+    Test_Eq("C3 ice flask, Nobody: 6 damage", _inb.dmg, 6);
+
+    // smoke bomb: Evasion on the thrower for 3 / 3 / 2 / 1 turns; Perfect against a normal enemy is an escape
+    var _sexp = [[QTE_PERFECT, 3], [QTE_GOOD, 3], [QTE_OK, 2], [QTE_WEAK, 1]];
+    for (var _m2 = 0; _m2 < 4; _m2++) {
+        var _me = Test_Hero(CLASS_KNIGHT);
+        var _mt = EnemyCreate(ENEMY_SLIME);
+        var _mr = Throw_Resolve(33, _me, _mt, _sexp[_m2][0]);
+        Test_True("C3 smoke bomb " + _sexp[_m2][0] + ": Evasion on the thrower", Status_Has(_me, STATUS_EVASION));
+        Test_Eq("C3 smoke bomb " + _sexp[_m2][0] + ": Evasion turns", Status_Find(_me, STATUS_EVASION).turns, _sexp[_m2][1]);
+        Test_Eq("C3 smoke bomb " + _sexp[_m2][0] + ": escape only on Perfect", _mr.escape, _sexp[_m2][0] == QTE_PERFECT);
+        Test_Eq("C3 smoke bomb " + _sexp[_m2][0] + ": the enemy is not hurt", _mt.hp, 9);
+    }
+    var _mb = Throw_Resolve(33, Test_Hero(CLASS_KNIGHT), EnemyCreate(ENEMY_MINI_BOSS), QTE_PERFECT);
+    Test_False("C3 smoke bomb: no escape from a boss", _mb.escape);
+    var _en = Test_Hero(CLASS_KNIGHT);
+    Throw_Resolve(33, _en, EnemyCreate(ENEMY_SLIME), QTE_OK);
+    Test_True("C3 smoke bomb: Evasion dodges the next hit (the D80 rule)", Combat_TryDodge(EnemyCreate(ENEMY_SLIME), _en).dodged);
+    Test_False("C3 throwing a potion is not a throw", Throw_Resolve(10, Test_Hero(CLASS_KNIGHT), EnemyCreate(ENEMY_SLIME), QTE_OK).ok);
+
+    // ---- accessories (D92): the third slot ----
+    var _ac = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_Eq("C3 accessory: a new character has an empty accessory slot", _ac.equip.accessory, 0);
+    var _acc_ok = true;
+    for (var _a = 40; _a <= 46; _a++) {
+        var _ai = ItemDB_Get(_a);
+        if (_ai.type != ITEM_ACCESSORY || _ai.equip_slot != "accessory" || _ai.max_stack != 1 || _ai.preferred_class != -1) _acc_ok = false;
+    }
+    Test_True("C3 accessory: ids 40..46 are accessories for every class", _acc_ok);
+    var _atk0 = Combat_EffectiveStat(_ac, STAT_ATK);
+    Test_False("C3 accessory: cannot equip what is not in the inventory", Equip_CanEquip(_ac, 40).ok);
+    _ac.inventory = Inv_Add(_ac.inventory, 40, 1);
+    Test_True("C3 accessory: Copper Ring can be equipped", Equip_CanEquip(_ac, 40).ok);
+    Test_True("C3 accessory: equip", Equip_Item(_ac, 40));
+    Test_Eq("C3 accessory: slot holds the ring", Equip_SlotGet(_ac, "accessory"), 40);
+    Test_Eq("C3 accessory: Copper Ring is +1 ATK", Combat_EffectiveStat(_ac, STAT_ATK), _atk0 + 1);
+    Test_True("C3 accessory: the menu marks it equipped", Menu_IsEquipped(_ac, 40));
+    _ac.inventory = Inv_Add(_ac.inventory, 41, 1);
+    Equip_Item(_ac, 41);
+    Test_Eq("C3 accessory: one slot, the new ring replaces the old", Equip_SlotGet(_ac, "accessory"), 41);
+    Test_Eq("C3 accessory: the old ATK bonus is gone", Combat_EffectiveStat(_ac, STAT_ATK), _atk0);
+    Test_Eq("C3 accessory: one copy each", array_length(Inv_Add(Inv_Add([], 41, 1), 41, 1)), 1);
+    Test_True("C3 accessory: the body slot is untouched", Equip_SlotGet(_ac, "body") == 0);
+    // passives: Stone Charm takes 10% off a hit (10 -> 9), Spring Ring gives +1 MP on every 3rd turn
+    var _st = CharacterCreate_Player(CLASS_KNIGHT);
+    _st.inventory = Inv_Add(_st.inventory, 44, 1);
+    Equip_Item(_st, 44);
+    Test_True("C3 accessory: Stone Charm has the Hardened passive", Equip_HasPassive(_st, "hardened"));
+    Test_Eq("C3 accessory: Hardened takes 1 off a hit of 10", Equip_PlayerIncomingDamageReduction(_st, 10), 1);
+    var _sr = CharacterCreate_Player(CLASS_MAGE);
+    _sr.inventory = Inv_Add(_sr.inventory, 45, 1);
+    Equip_Item(_sr, 45);
+    _sr.mp = 2;
+    Equip_PassiveBattleReset(_sr);
+    Equip_PassiveOnTurnStart(_sr); Equip_PassiveOnTurnStart(_sr);
+    Test_Eq("C3 accessory: Spring Ring gives nothing on turns 1 and 2", _sr.mp, 2);
+    Equip_PassiveOnTurnStart(_sr);
+    Test_Eq("C3 accessory: Spring Ring gives +1 MP on turn 3", _sr.mp, 3);
+
+    // ---- elites (D86) ----
+    var _mods = Elite_Mods();
+    Test_True("C3 elite: five modifiers in a fixed order", array_length(_mods) == 5 && _mods[0] == "armored" && _mods[1] == "venomous" && _mods[2] == "swift" && _mods[3] == "brutal" && _mods[4] == "regenerating");
+    var _ea = Elite_Apply(EnemyCreate(ENEMY_SLIME), "armored");
+    Test_True("C3 elite: Armored is +4 DEF (7 -> 11), tagged", _ea.stats.def == 11 && _ea.elite == "armored" && _ea.is_elite);
+    var _es = Elite_Apply(EnemyCreate(ENEMY_SLIME), "swift");
+    Test_Eq("C3 elite: Swift is +3 SPD (9 -> 12)", _es.stats.spd, 12);
+    var _eb = Elite_Apply(EnemyCreate(ENEMY_SLIME), "brutal");
+    Test_Eq("C3 elite: Brutal is +4 ATK (8 -> 12)", _eb.stats.atk, 12);
+    var _ev = Elite_Apply(EnemyCreate(ENEMY_SLIME), "venomous");
+    Test_True("C3 elite: Venomous leaves the stats alone", _ev.stats.atk == 8 && _ev.stats.def == 7 && _ev.stats.spd == 9);
+    var _en0 = Elite_Apply(EnemyCreate(ENEMY_SLIME), "");
+    Test_True("C3 elite: no modifier = a normal enemy", !_en0.is_elite && _en0.elite == "");
+    Test_True("C3 elite: a name for every modifier", Elite_Name("armored") != "" && Elite_Name("regenerating") != "");
+    // venom: 2 poison stacks on a hit that does damage; none on a normal enemy; none when the hit does 0
+    var _vk = CharacterCreate_Player(CLASS_KNIGHT);
+    Combat_ApplyDamage(_ev, _vk, { power: 6, stat_type: STAT_ATK }, 1, 1, { is_skill: false });
+    Test_Eq("C3 elite: a Venomous hit poisons for 2 stacks", Status_Stacks(_vk, STATUS_POISON), 2);
+    var _vk2 = CharacterCreate_Player(CLASS_KNIGHT);
+    Combat_ApplyDamage(EnemyCreate(ENEMY_SLIME), _vk2, { power: 6, stat_type: STAT_ATK }, 1, 1, { is_skill: false });
+    Test_Eq("C3 elite: a normal enemy does not poison", Status_Stacks(_vk2, STATUS_POISON), 0);
+    var _vk3 = CharacterCreate_Player(CLASS_KNIGHT);
+    Combat_ApplyDamage(_ev, _vk3, { power: 0, stat_type: STAT_ATK }, 1, 1, { is_skill: false });
+    Test_Eq("C3 elite: no damage, no poison", Status_Stacks(_vk3, STATUS_POISON), 0);
+    // regeneration: 10% of max HP, at least 2, up to the maximum
+    Test_Eq("C3 elite: regeneration of a 9 HP enemy = 2", Elite_RegenAmount(9), 2);
+    Test_Eq("C3 elite: regeneration of a 40 HP enemy = 4", Elite_RegenAmount(40), 4);
+    var _er = Elite_Apply(EnemyCreate(ENEMY_SLIME), "regenerating");
+    _er.hp = 3;
+    Test_Eq("C3 elite: Regenerating heals 2 at its turn", Elite_Regen(_er), 2);
+    Test_Eq("C3 elite: its HP is 5 now", _er.hp, 5);
+    _er.hp = _er.max_hp;
+    Test_Eq("C3 elite: nothing to heal at full HP", Elite_Regen(_er), 0);
+    var _ea2 = Elite_Apply(EnemyCreate(ENEMY_SLIME), "armored");
+    _ea2.hp = 3;
+    Test_Eq("C3 elite: only Regenerating heals", Elite_Regen(_ea2), 0);
+
+    // rewards: gold from every win, double from an elite plus a guaranteed card pick (the offer itself is C2's)
+    _gs.run = Run_Create(808);
+    var _rk = Test_Hero(CLASS_KNIGHT);
+    var _picks0 = _rk.card_picks;
+    var _rw = Battle_GrantRewards(_rk, EnemyCreate(ENEMY_SLIME));
+    Test_True("C3 reward: a Slime (level 1) pays 9..15 gold", _rw.gold >= 9 && _rw.gold <= 15);
+    Test_Eq("C3 reward: the gold went into the run", _gs.run.gold, _rw.gold);
+    Test_False("C3 reward: a normal enemy gives no card pick", _rw.card_pick);
+    Test_Eq("C3 reward: no pick owed", _rw.player.card_picks, _picks0);
+    _gs.run.gold = 0;
+    var _rk2 = Test_Hero(CLASS_KNIGHT);
+    var _rw2 = Battle_GrantRewards(_rk2, Elite_Apply(EnemyCreate(ENEMY_SLIME), "brutal"));
+    Test_True("C3 reward: an elite Slime pays 18..30 gold (double)", _rw2.gold >= 18 && _rw2.gold <= 30);
+    Test_True("C3 reward: an elite gives a card pick", _rw2.card_pick);
+    Test_Eq("C3 reward: the pick is owed by the character", _rw2.player.card_picks, _picks0 + 1);
+    _gs.run.gold = 0;
+    var _rk3 = Test_Hero(CLASS_KNIGHT);
+    _rk3 = Card_Take(_rk3, "pas:coin_sense").ch;
+    var _rw3 = Battle_GrantRewards(_rk3, EnemyCreate(ENEMY_MINI_BOSS));
+    Test_True("C3 reward: the mini boss pays about 78 (58..98), +10% with Coin Sense", _rw3.gold >= 58 && _rw3.gold <= 116);
+
+    // ---- per-run shuffles (D33): enemy pools, placement, elites, chests ----
+    var _bad_pool = false;
+    for (var _f = 1; _f <= 9; _f++) {
+        var _pool = Shuffle_EnemyPool(_f);
+        if (array_length(_pool) < 1) _bad_pool = true;
+        for (var _pi = 0; _pi < array_length(_pool); _pi++) {
+            if (_pool[_pi] == ENEMY_MINI_BOSS || _pool[_pi] == ENEMY_FINAL_BOSS || _pool[_pi] == ENEMY_STRANGER) _bad_pool = true;
+        }
+    }
+    Test_False("C3 shuffle: every floor has a pool; no boss or Stranger is ever in one", _bad_pool);
+    Test_Eq("C3 shuffle: floor 1 has only Slimes", array_length(Shuffle_EnemyPool(1)), 1);
+    Test_True("C3 shuffle: floor 6 can have Ghost Swords and Mad Whisps", Card_ArrayHas(Shuffle_EnemyPool(6), ENEMY_GHOSTSWORD) && Card_ArrayHas(Shuffle_EnemyPool(6), ENEMY_MADWHISP));
+    Test_False("C3 shuffle: floor 7 has no Slimes", Card_ArrayHas(Shuffle_EnemyPool(7), ENEMY_SLIME));
+    Test_Eq("C3 shuffle: the cellar rooms between floors have no pool", array_length(Shuffle_EnemyPool(6.5)), 0);
+    var _slots = [
+        { pid: "e1", enemy_id: ENEMY_DIREWOLF, x: 48, y: 64, fixed: false },
+        { pid: "e2", enemy_id: ENEMY_KILLER_PLANT, x: 96, y: 32, fixed: false },
+        { pid: "e3", enemy_id: ENEMY_KILLER_PLANT, x: 144, y: 80, fixed: false },
+        { pid: "b1", enemy_id: ENEMY_MINI_BOSS, x: 224, y: 32, fixed: true }
+    ];
+    var _plan_a = Shuffle_RoomPlan(111, "rm_floor4", _slots);
+    var _plan_a2 = Shuffle_RoomPlan(111, "rm_floor4", _slots);
+    var _plan_b = Shuffle_RoomPlan(222, "rm_floor4", _slots);
+    Test_Eq("C3 shuffle: a plan has one entry per slot", array_length(_plan_a), 4);
+    Test_Eq("C3 shuffle: the same seed gives the same layout", json_stringify(_plan_a), json_stringify(_plan_a2));
+    Test_True("C3 shuffle: another seed gives another layout", json_stringify(_plan_a) != json_stringify(_plan_b));
+    var _pl_ok = true; var _xs = 0; var _ys = 0;
+    for (var _s5 = 0; _s5 < 3; _s5++) {
+        var _pe = _plan_a[_s5];
+        var _cfg = EnemyDB_Get(_pe.enemy_id);
+        if (!Card_ArrayHas(Shuffle_EnemyPool(4), _pe.enemy_id)) _pl_ok = false;
+        if (_pe.level < _cfg.species_min_level || _pe.level > _cfg.species_max_level) _pl_ok = false;
+        _xs += _pe.x; _ys += _pe.y;
+    }
+    Test_True("C3 shuffle: every enemy comes from the floor pool, at a level its species allows", _pl_ok);
+    Test_True("C3 shuffle: the same three spots are used, only the order changes", _xs == 48 + 96 + 144 && _ys == 64 + 32 + 80);
+    Test_True("C3 shuffle: a fixed slot (the mini boss) keeps its enemy, its place and no modifier", _plan_a[3].enemy_id == ENEMY_MINI_BOSS && _plan_a[3].x == 224 && _plan_a[3].y == 32 && _plan_a[3].elite == "");
+    var _same_plan = 0;
+    for (var _sd = 1; _sd <= 12; _sd++) { if (json_stringify(Shuffle_RoomPlan(_sd, "rm_floor4", _slots)) == json_stringify(_plan_a)) _same_plan++; }
+    Test_True("C3 shuffle: twelve seeds give mostly different layouts", _same_plan <= 2);
+    var _el = 0;
+    for (var _k2 = 0; _k2 < 2000; _k2++) { if (Shuffle_IsElite(77, "k" + string(_k2))) _el++; }
+    Test_True("C3 shuffle: about 15% of map enemies are elites (255..345 of 2000)", _el >= 255 && _el <= 345);
+    Test_Eq("C3 shuffle: the elite roll of one enemy never changes", Shuffle_IsElite(77, "k5"), Shuffle_IsElite(77, "k5"));
+    var _el_other = 0;
+    for (var _k3 = 0; _k3 < 400; _k3++) { if (Shuffle_IsElite(77, "k" + string(_k3)) != Shuffle_IsElite(78, "k" + string(_k3))) _el_other++; }
+    Test_True("C3 shuffle: which enemies are elites depends on the seed (about 2 x 15% x 85% = 25% of 400 differ)", _el_other >= 60 && _el_other <= 140);
+    var _any_elite = false;
+    for (var _sd2 = 1; _sd2 <= 60 && !_any_elite; _sd2++) {
+        var _pp = Shuffle_RoomPlan(_sd2, "rm_floor4", _slots);
+        for (var _q = 0; _q < 3; _q++) { if (_pp[_q].elite != "" && Card_ArrayHas(Elite_Mods(), _pp[_q].elite)) _any_elite = true; }
+    }
+    Test_True("C3 shuffle: elites do show up in plans, with a real modifier", _any_elite);
+    Test_Eq("C3 shuffle: the cellar between floors 6 and 7 is not shuffled", array_length(Shuffle_RoomPlan(5, "rm_floor6_5", _slots)), 0);
+
+    // chest contents come from the seed and the chest, not from how many other things were rolled before
+    var _own = Test_Hero(CLASS_KNIGHT);
+    var _pid1 = "auto:rm_floor3:obj_chest_lv2:240:112#1";
+    var _c1 = Shuffle_ChestLoot(900, "rm_floor3", _pid1, 2, "chest_basic", _own);
+    RunRng_Float("loot"); RunRng_Float("loot"); RunRng_Float("loot");
+    var _c2 = Shuffle_ChestLoot(900, "rm_floor3", _pid1, 2, "chest_basic", _own);
+    Test_Eq("C3 chest: same seed + same chest = same contents, whatever else was rolled", json_stringify(_c1), json_stringify(_c2));
+    var _diff = 0;
+    for (var _sd3 = 901; _sd3 <= 912; _sd3++) { if (json_stringify(Shuffle_ChestLoot(_sd3, "rm_floor3", _pid1, 2, "chest_basic", _own)) != json_stringify(_c1)) _diff++; }
+    Test_True("C3 chest: other seeds give other contents (at least 6 of 12)", _diff >= 6);
+    var _more = 0;
+    for (var _ch2 = 0; _ch2 < 12; _ch2++) { if (json_stringify(Shuffle_ChestLoot(900, "rm_floor3", "x" + string(_ch2), 2, "chest_basic", _own)) != json_stringify(_c1)) _more++; }
+    Test_True("C3 chest: another chest in the same run has its own contents", _more >= 6);
+    Test_Eq("C3 loot: floors 1-3 are band 1", Loot_FloorBand(3), 1);
+    Test_Eq("C3 loot: floors 4-6 are band 2", Loot_FloorBand(4) * 10 + Loot_FloorBand(6), 22);
+    Test_Eq("C3 loot: floors 7-9 are band 3", Loot_FloorBand(7) * 10 + Loot_FloorBand(9), 33);
+    var _fx1 = Loot_FloorExtras(500, 2);
+    var _fx2 = Loot_FloorExtras(500, 3);
+    Test_Eq("C3 loot: a floor band adds one throwable and one accessory to the chests", array_length(_fx1), 2);
+    Test_Eq("C3 loot: floors of one band share their extras", json_stringify(_fx1), json_stringify(_fx2));
+    var _fx_ok = true;
+    for (var _xi = 0; _xi < 2; _xi++) {
+        var _xit = ItemDB_Get(_fx1[_xi].item_id);
+        if (_xi == 0 && !Item_IsThrowable(_xit)) _fx_ok = false;
+        if (_xi == 1 && _xit.type != ITEM_ACCESSORY) _fx_ok = false;
+    }
+    Test_True("C3 loot: the extras are a throwable then an accessory", _fx_ok);
+    var _fxd = 0;
+    for (var _sd4 = 501; _sd4 <= 520; _sd4++) { if (json_stringify(Loot_FloorExtras(_sd4, 2)) != json_stringify(_fx1)) _fxd++; }
+    Test_True("C3 loot: the extras change with the seed", _fxd >= 8);
+
+    // ---- the merchant's places and stock ----
+    var _sp2 = Merchant_SpotFor(rm_floor2);
+    var _sp5 = Merchant_SpotFor(rm_floor5);
+    var _sp8 = Merchant_SpotFor(rm_floor8);
+    Test_True("C3 merchant: after floors 2, 5 and 8, shop 0, 1, 2", is_struct(_sp2) && is_struct(_sp5) && is_struct(_sp8) && _sp2.shop == 0 && _sp5.shop == 1 && _sp8.shop == 2);
+    Test_True("C3 merchant: other rooms have none", is_undefined(Merchant_SpotFor(rm_floor3)) && is_undefined(Merchant_SpotFor(rm_floor1)) && is_undefined(Merchant_SpotFor(rm_floor6_5)));
+    Test_True("C3 merchant: spots sit on the 16 px grid", _sp2.x mod 16 == 0 && _sp2.y mod 16 == 0 && _sp5.x mod 16 == 0 && _sp8.y mod 16 == 0);
+
+    var _kz = Test_Hero(CLASS_KNIGHT);
+    var _ssa = Shop_StockGenerate(4321, 0, _kz);
+    var _ssb = Shop_StockGenerate(4321, 0, _kz);
+    Test_Eq("C3 shop: the same seed and shop = the same stock", Test_EcoSig(_ssa), Test_EcoSig(_ssb));
+    var _ss_diff = 0;
+    for (var _sd5 = 4400; _sd5 < 4410; _sd5++) { if (Test_EcoSig(Shop_StockGenerate(_sd5, 0, _kz)) != Test_EcoSig(_ssa)) _ss_diff++; }
+    Test_True("C3 shop: other seeds stock other things (9 of 10 differ)", _ss_diff >= 9);
+    Test_True("C3 shop: the three shops of one run differ", Test_EcoSig(Shop_StockGenerate(4321, 1, _kz)) != Test_EcoSig(_ssa) && Test_EcoSig(Shop_StockGenerate(4321, 2, _kz)) != Test_EcoSig(Shop_StockGenerate(4321, 1, _kz)));
+    Test_True("C3 shop: 8 to 10 rows", array_length(_ssa) >= 8 && array_length(_ssa) <= 10);
+    var _hp_row = -1;
+    for (var _hi = 0; _hi < array_length(_ssa); _hi++) { if (_ssa[_hi].kind == "item" && _ssa[_hi].id == 10) _hp_row = _hi; }
+    Test_True("C3 shop: shop 0 always sells HP Potion Lv1, three of them", _hp_row >= 0 && _ssa[_hp_row].qty == 3);
+    Test_True("C3 shop: shop 1 sells HP Potion Lv2 and shop 2 Lv3", Test_EcoFind(Shop_StockGenerate(4321, 1, _kz), "item", 14) >= 0 && Test_EcoFind(Shop_StockGenerate(4321, 2, _kz), "item", 15) >= 0);
+    Test_Eq("C3 shop: two throwables", Test_EcoCountType(_ssa, "throw"), 2);
+    Test_Eq("C3 shop: two pieces of gear", Test_EcoCountType(_ssa, "gear"), 2);
+    Test_Eq("C3 shop: one accessory", Test_EcoCountType(_ssa, "accessory"), 1);
+    var _ncards = 0;
+    for (var _ci = 0; _ci < array_length(_ssa); _ci++) { if (_ssa[_ci].kind == "card") _ncards++; }
+    Test_True("C3 shop: one or two cards", _ncards >= 1 && _ncards <= 2);
+    var _price_ok = true; var _qty_ok = true; var _gear_ok = true; var _card_ok = true;
+    for (var _ri = 0; _ri < array_length(_ssa); _ri++) {
+        var _row = _ssa[_ri];
+        if (_row.qty < 1) _qty_ok = false;
+        if (_row.kind == "item") {
+            if (_row.price != Shop_Price(_row.id)) _price_ok = false;
+            var _gi = ItemDB_Get(_row.id);
+            if (_gi.type == ITEM_WEAPON || _gi.type == ITEM_ARMOR) {
+                if (!Loot_ItemClassAllowed(_gi, CLASS_KNIGHT) || _gi.value > 20 || Inv_Has(_kz.inventory, _gi.id, 1)) _gear_ok = false;
+            }
+        } else {
+            var _cd = CardDB_Get(_row.id);
+            if (!is_struct(_cd) || _row.price != Shop_CardPrice(_row.id) || !Card_Eligible(_kz, _cd) || _cd.kind == "fallback") _card_ok = false;
+        }
+    }
+    Test_True("C3 shop: every price is the table price", _price_ok);
+    Test_True("C3 shop: nothing is sold out at the start", _qty_ok);
+    Test_True("C3 shop: shop 0 gear fits the class, is worth 20 or less and is not owned already", _gear_ok);
+    Test_True("C3 shop: cards are real cards this character could take (no fallbacks)", _card_ok);
+    var _mg = CharacterCreate_Player(CLASS_MAGE);
+    var _mg_ok = true;
+    var _mst = Shop_StockGenerate(4321, 1, _mg);
+    for (var _mi = 0; _mi < array_length(_mst); _mi++) {
+        if (_mst[_mi].kind != "item") continue;
+        var _mgi = ItemDB_Get(_mst[_mi].id);
+        if ((_mgi.type == ITEM_WEAPON || _mgi.type == ITEM_ARMOR) && !Loot_ItemClassAllowed(_mgi, CLASS_MAGE)) _mg_ok = false;
+    }
+    Test_True("C3 shop: a Mage is sold Mage gear only", _mg_ok);
+    var _nst = Shop_StockGenerate(4321, 1, _nb);
+    Test_Eq("C3 shop: Nobody is sold no gear (it cannot use any)", Test_EcoCountType(_nst, "gear"), 0);
+    Test_True("C3 shop: Nobody gets more throwables instead", Test_EcoCountType(_nst, "throw") >= 4);
+    var _skills_full = CharacterCreate_Player(CLASS_KNIGHT);
+    _skills_full.skills = [SKILL_WOUND, SKILL_HILT_BASH, SKILL_MUSCLE_UP];
+    var _no_skill_card = true;
+    for (var _sd6 = 5000; _sd6 < 5030; _sd6++) {
+        var _fst = Shop_StockGenerate(_sd6, 1, _skills_full);
+        for (var _fi = 0; _fi < array_length(_fst); _fi++) { if (_fst[_fi].kind == "card" && CardDB_Get(_fst[_fi].id).kind == "skill") _no_skill_card = false; }
+    }
+    Test_True("C3 shop: with 3 skills held no skill card is sold (there is no swap screen in the shop)", _no_skill_card);
+
+    // buying and selling
+    var _brun = Run_Create(4321);
+    _brun.gold = 100;
+    var _bch = Test_Hero(CLASS_KNIGHT);
+    var _stock = Shop_StockGenerate(4321, 0, _bch);
+    var _hpr = Test_EcoFind(_stock, "item", 10);
+    var _hp0 = Inv_Count(_bch.inventory, 10);
+    var _b1 = Shop_Buy(_bch, _brun, _stock[_hpr]);
+    Test_True("C3 buy: a potion for 12 gold", _b1.ok);
+    Test_Eq("C3 buy: gold 100 -> 88", _brun.gold, 88);
+    Test_Eq("C3 buy: the potion is in the inventory", Inv_Count(_b1.ch.inventory, 10), _hp0 + 1);
+    Test_Eq("C3 buy: stock 3 -> 2", _stock[_hpr].qty, 2);
+    _brun.gold = 5;
+    var _b2 = Shop_Buy(_bch, _brun, _stock[_hpr]);
+    Test_False("C3 buy: not enough gold", _b2.ok);
+    Test_Eq("C3 buy: the reason is gold", _b2.reason, "gold");
+    Test_Eq("C3 buy: nothing changed (gold)", _brun.gold, 5);
+    Test_Eq("C3 buy: nothing changed (stock)", _stock[_hpr].qty, 2);
+    _brun.gold = 100;
+    _stock[_hpr].qty = 0;
+    Test_Eq("C3 buy: sold out", Shop_Buy(_bch, _brun, _stock[_hpr]).reason, "sold_out");
+    var _tr = -1;
+    for (var _ti2 = 0; _ti2 < array_length(_stock); _ti2++) { if (_stock[_ti2].kind == "item" && Item_IsThrowable(ItemDB_Get(_stock[_ti2].id))) _tr = _ti2; }
+    var _tch = variable_clone(_bch);
+    _tch.inventory = Inv_Add(_tch.inventory, _stock[_tr].id, 5);
+    Test_Eq("C3 buy: a throwable at the cap of 5 is refused", Shop_Buy(_tch, _brun, _stock[_tr]).reason, "full");
+    Test_Eq("C3 buy: and costs nothing", _brun.gold, 100);
+    var _gr = -1;
+    for (var _gi2 = 0; _gi2 < array_length(_stock); _gi2++) { if (_stock[_gi2].kind == "item" && (ItemDB_Get(_stock[_gi2].id).type == ITEM_WEAPON || ItemDB_Get(_stock[_gi2].id).type == ITEM_ARMOR)) _gr = _gi2; }
+    var _gch = variable_clone(_bch);
+    _gch.inventory = Inv_Add(_gch.inventory, _stock[_gr].id, 1);
+    Test_Eq("C3 buy: gear that is already owned is refused", Shop_Buy(_gch, _brun, _stock[_gr]).reason, "owned");
+    var _cr = -1;
+    for (var _cj = 0; _cj < array_length(_stock); _cj++) { if (_stock[_cj].kind == "card") _cr = _cj; }
+    _brun.gold = 100;
+    var _cch = variable_clone(_bch);
+    var _cb = Shop_Buy(_cch, _brun, _stock[_cr]);
+    Test_True("C3 buy: a card can be bought", _cb.ok);
+    Test_Eq("C3 buy: it costs the card price", _brun.gold, 100 - Shop_CardPrice(_stock[_cr].id));
+    var _card_after = CardDB_Get(_stock[_cr].id);
+    var _taken = (_card_after.kind == "passive") ? Card_HasPassive(_cb.ch, _card_after.id) : ((_card_after.kind == "upgrade") ? Card_ArrayHas(_cb.ch.upgrades, _card_after.skill_id) : Card_ArrayHas(_cb.ch.skills, _card_after.skill_id));
+    Test_True("C3 buy: the card is on the character", _taken);
+    Test_Eq("C3 buy: and gone from the stock", _stock[_cr].qty, 0);
+    var _fullskills = variable_clone(_skills_full);
+    var _skill_row = { kind: "card", id: Card_SkillId(SKILL_REV_UP), qty: 1, price: 80 };
+    _brun.gold = 200;
+    Test_Eq("C3 buy: a skill card is refused when the 3 slots are full", Shop_Buy(_fullskills, _brun, _skill_row).reason, "slots");
+    // sell: half the price; not equipped; not something you do not have
+    var _sch = Test_Hero(CLASS_KNIGHT);
+    _sch.inventory = Inv_Add(_sch.inventory, 2, 1);
+    _brun.gold = 10;
+    var _s6 = Shop_Sell(_sch, _brun, 2);
+    Test_True("C3 sell: an Iron Sword is sold", _s6.ok);
+    Test_Eq("C3 sell: for 13 gold", _brun.gold, 23);
+    Test_False("C3 sell: it left the inventory", Inv_Has(_s6.ch.inventory, 2, 1));
+    _sch.inventory = Inv_Add(_sch.inventory, 2, 1);
+    Equip_Item(_sch, 2);
+    Test_Eq("C3 sell: an equipped weapon cannot be sold", Shop_Sell(_sch, _brun, 2).reason, "equipped");
+    Test_Eq("C3 sell: something you do not have cannot be sold", Shop_Sell(_sch, _brun, 3).reason, "none");
+    var _p5 = variable_clone(_sch);
+    var _pn = Inv_Count(_p5.inventory, 10);
+    var _s7 = Shop_Sell(_p5, _brun, 10);
+    Test_True("C3 sell: one potion for 6", _s7.ok && _brun.gold == 29 && Inv_Count(_s7.ch.inventory, 10) == _pn - 1);
+
+    // the run keeps what was bought: the stock is made once and saved with the run
+    _gs.run = Run_Create(6060);
+    _gs.player_ch = Test_Hero(CLASS_KNIGHT);
+    var _rs1 = Shop_RunStock(_gs.run, 0, _gs.player_ch);
+    _rs1[0].qty = 1;
+    var _rs2 = Shop_RunStock(_gs.run, 0, CharacterCreate_Player(CLASS_MAGE));
+    Test_Eq("C3 run shop: the stock is made once, later visits see the same rows", Test_EcoSig(_rs1), Test_EcoSig(_rs2));
+    Test_Eq("C3 run shop: what was bought stays bought", _rs2[0].qty, 1);
+    var _back = json_parse(json_stringify(_gs.run.shop));
+    Test_Eq("C3 run shop: survives a JSON round trip (the run save)", Test_EcoSig(variable_struct_get(_back, "s0")), Test_EcoSig(_rs1));
+    var _raw = RunSave_Build();
+    Test_True("C3 run shop: the run save carries it", variable_struct_exists(_raw, "shop") && variable_struct_exists(_raw.shop, "s0"));
+    var _old_cp = _gs.checkpoint; var _old_persist = _gs.persist; var _old_flags = _gs.flags; var _old_sel = _gs.selected_class;
+    _gs.run = Run_Create(1);
+    RunSave_ApplyState(json_parse(json_stringify(_raw)));
+    Test_Eq("C3 run shop: a loaded run has its shop back", Test_EcoSig(variable_struct_get(_gs.run.shop, "s0")), Test_EcoSig(_rs1));
+    _gs.checkpoint = _old_cp; _gs.persist = _old_persist; _gs.flags = _old_flags; _gs.selected_class = _old_sel;
+
+    // ---- text from the data (D100) ----
+    var _fb = ItemDB_Get(30);
+    var _fl = Item_NumberLines(_fb, _kn);
+    Test_True("C3 text: the Firebomb shows its power 3 and its burn 4 x 2", array_length(_fl) >= 2 && _fl[0].value == "3" && _fl[1].value == "4 x 2");
+    Test_Eq("C3 text: the Poison Pot shows its 4 stacks", Item_NumberLines(ItemDB_Get(31), _kn)[0].value, "4");
+    Test_Eq("C3 text: Nobody sees 6 stacks (x1.5)", Item_NumberLines(ItemDB_Get(31), _nb)[0].value, "6");
+    Test_True("C3 text: the sentence of every throwable has its numbers", string_pos("3", Item_Sentence(_fb)) > 0 && string_pos("4", Item_Sentence(ItemDB_Get(31))) > 0 && string_pos("2", Item_Sentence(ItemDB_Get(33))) > 0);
+    Test_True("C3 text: an accessory has a sentence and a line", string_length(Item_Sentence(ItemDB_Get(44))) > 8 && array_length(Item_NumberLines(ItemDB_Get(44), _kn)) >= 1);
+    Test_True("C3 text: a stat ring says +1", string_pos("1", Item_Sentence(ItemDB_Get(40))) > 0 && Item_NumberLines(ItemDB_Get(40), _kn)[0].value == "+1");
+    Test_True("C3 text: a potion lists its numbers", Item_NumberLines(ItemDB_Get(10), _kn)[0].value == "5-10");
+    var _row_it = ShopUi_ItemFor({ kind: "item", id: 30, qty: 2, price: 27 }, _kn, 100);
+    Test_True("C3 text: a shop row shows the price and can be bought when it can be paid", _row_it.value == "27" && _row_it.can_buy && _row_it.enabled && string_length(_row_it.help) > 8 && array_length(_row_it.lines) >= 2);
+    var _row_no = ShopUi_ItemFor({ kind: "item", id: 30, qty: 2, price: 27 }, _kn, 10);
+    Test_True("C3 text: a row you cannot pay for can still be looked at but not bought", !_row_no.can_buy && _row_no.enabled && _row_no.dim);
+    var _row_card = ShopUi_ItemFor({ kind: "card", id: "pas:coin_sense", qty: 1, price: 55 }, _kn, 100);
+    Test_True("C3 text: a card row names the card and carries its numbers", _row_card.label == Card_Name(CardDB_Get("pas:coin_sense")) && array_length(_row_card.lines) >= 1);
+
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }

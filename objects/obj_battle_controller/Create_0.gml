@@ -9,6 +9,8 @@ var gs = GameState_Init();
 p = gs.player_ch;
 p = Equip_PassiveBattleReset(p);
 e = EnemyCreate(gs.battle.enemy_id);
+e = Elite_Apply(e, Elite_BattleMod());   // C3 (D86): the map enemy's modifier (stats, name, tag)
+throw_item = -1;                          // C3 (D84): the throwable whose bar is running, -1 = a plain attack
 Card_OnBattleStart(p, e);   // C2: Opening Blow
 
 // --------------------
@@ -74,10 +76,12 @@ skill_banner_active = false;
 skill_banner_name = "";
 enemy_actions_remaining = 0;
 enemy_turn_used_skills = [];
-enemy_last_action_used_skill = false;
 player_turn_start_applied = false;
 enemy_plan = undefined;          // Foresight (D79): { skill_id, announced }, the enemy's next action once decided
 enemy_last_skill_id = -1;
+ai = EnemyAI_StateNew();           // B4: the enemy's own turn counter, rule uses, the pending wind-up and the boss phase (combat-spec.md section 12)
+phase_banner = "";               // B4: a boss phase change waiting to be announced at the enemy's next action
+enemy_last_windup = -1;          // the skill the enemy last wound up (bot and tests read it)
 qte_perfect_widen = 1;
 def_perfect_widen = 1;
 
@@ -129,6 +133,7 @@ def_ctx = {};
 // --------------------
 message_text = Loc_T("combat.msg.enemy_appeared", "{enemy} appeared!", { enemy: e.name });
 Combat_Log(message_text);
+if (e.is_elite) Combat_Log(Elite_Sentence(e.elite));   // C3 (D86): what the modifier does, in plain words
 
 // camera shake base
 cam_base_x = camera_get_view_x(view_camera[0]);

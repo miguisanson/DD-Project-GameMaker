@@ -895,6 +895,7 @@ function RunSave_Build() {
         seed: run.seed,
         rng: rng,
         gold: run.gold,
+        shop: run.shop,        // C3 (D85)
         cards: run.cards,
         kills: run.kills,
         started_at: run.started_at,
@@ -924,6 +925,7 @@ function RunSave_ApplyState(_raw) {
         }
     }
     if (variable_struct_exists(_raw, "gold")) run.gold = Save_ToReal(_raw.gold, 0);
+    if (variable_struct_exists(_raw, "shop") && is_struct(_raw.shop)) run.shop = _raw.shop;   // C3 (D85)
     if (variable_struct_exists(_raw, "cards")) run.cards = Card_StateNormalize(_raw.cards);
     if (variable_struct_exists(_raw, "kills")) run.kills = Save_ToReal(_raw.kills, 0);
     if (variable_struct_exists(_raw, "started_at")) run.started_at = Save_ToReal(_raw.started_at, run.started_at);

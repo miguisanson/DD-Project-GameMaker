@@ -21,7 +21,7 @@ function CharacterCreate_Player(_class_id) {
 
     // inventory/equip (later sections)
     ch.inventory = [];
-    ch.equip = { weapon: 0, head: 0, body: 0, ring1: 0, ring2: 0 };
+    ch.equip = { weapon: 0, head: 0, body: 0, ring1: 0, ring2: 0, accessory: 0 };   // C3 (D92): accessory = ring or charm
     ch.skills = Player_DefaultSkills(_class_id);
     ch.stat_points = 0;
     ch.status = [];
@@ -1073,6 +1073,7 @@ function UI_InterruptCloseAll(_fade_dim = true) {
 
     CardsUi_Interrupt();   // C2: what is owed opens again afterwards
     BedUi_Interrupt();     // C4: the bed stays free
+    ShopUi_Interrupt();    // C3
 
     if (variable_struct_exists(gs.ui, "settings_popup") && is_struct(gs.ui.settings_popup)) {
         var sp = gs.ui.settings_popup;
@@ -1728,6 +1729,7 @@ function GameState_SetBattleEnemy(_persist_id, _enemy_id, _enemy_level = 0) {
     gs.battle.enemy_id = _enemy_id;
     gs.battle.enemy_level = max(0, round(_enemy_level));
     gs.battle.enemy_room = room;
+    gs.battle.enemy_elite = "";   // C3 (D86): EnemyPersist_BeginEncounter sets the map enemy's modifier after this
 
     global.battle_enemy_persist_id = _persist_id;
     global.battle_enemy_id = _enemy_id;

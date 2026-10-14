@@ -73,6 +73,7 @@ if (battle_state == BSTATE_MENU) {
         exit;
     }
     Tutorial_Trigger("timeline");   // D45: the first time the strip and the menu are both up
+    if (variable_struct_exists(e, "is_elite") && e.is_elite) Tutorial_Trigger("elite");   // D45: the first elite fight
 
     if (k_down) menu_index = (menu_index + 1) mod menu_count;
     if (k_up)   menu_index = (menu_index + menu_count - 1) mod menu_count;
