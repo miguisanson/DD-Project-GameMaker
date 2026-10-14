@@ -46,6 +46,7 @@ function SpriteShake_Offset(_inst) {
 }
 
 function CameraShake_Start(_mag, _frames, _dir) {
+    if (!Settings_ShakeOn()) return;   // D0: the Screen shake setting
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "cam_shake")) gs.cam_shake = { mag: 0, timer: 0, dir: SHAKE_DIR_H, phase: 0 };
     gs.cam_shake.mag = _mag;

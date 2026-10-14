@@ -18,8 +18,10 @@ function Input_Init() {
         inp.bindings.move_right = [ord("D"), vk_right];
 
         inp.bindings.interact = [vk_space];
-        inp.bindings.confirm = [vk_space];
-        inp.bindings.cancel = [vk_escape];
+        inp.bindings.confirm = [vk_space, ord("Z"), vk_enter];
+        inp.bindings.cancel = [vk_escape, ord("X")];
+        inp.bindings.tab_prev = [ord("Q")];
+        inp.bindings.tab_next = [ord("E")];
         inp.bindings.pause = [vk_escape];
         inp.bindings.menu = [ord("I"), vk_tab];
 
@@ -41,8 +43,12 @@ function Input_Init() {
     }
 
     inp.bindings.debug_toggle = [ord("P")];
-    // UI confirm is intentionally space-only.
-    inp.bindings.confirm = [vk_space];
+    // D95: the same keys in every menu. Confirm = Space, Z, Enter (+ pad A); back = Esc, X (+ pad B); tabs = Q / E (+ pad shoulders).
+    // Rewritten on every init so an older table in memory gets them too. Interact stays on Space.
+    inp.bindings.confirm = [vk_space, ord("Z"), vk_enter];
+    inp.bindings.cancel = [vk_escape, ord("X")];
+    inp.bindings.tab_prev = [ord("Q")];
+    inp.bindings.tab_next = [ord("E")];
     if (!variable_struct_exists(inp.bindings, "pause")) inp.bindings.pause = [vk_escape];
     if (!variable_struct_exists(inp.bindings, "run")) inp.bindings.run = [vk_shift];
     if (!variable_struct_exists(inp.bindings, "debug_levelup")) inp.bindings.debug_levelup = [ord("L")];
@@ -178,6 +184,22 @@ function Input_GamepadDevice() {
     return -1;
 }
 
+// Pad buttons per button action (the sticks and the d-pad are handled below). The shoulder buttons are the tabs (D95); run moved to the
+// triggers so holding it does not flip tabs.
+function Input_GamepadButtons(_action) {
+    switch (_action) {
+        case "interact":
+        case "confirm": return [gp_face1];
+        case "cancel": return [gp_face2];
+        case "menu": return [gp_face3];
+        case "pause": return [gp_face4];
+        case "tab_prev": return [gp_shoulderl];
+        case "tab_next": return [gp_shoulderr];
+        case "run": return [gp_shoulderlb, gp_shoulderrb];
+    }
+    return [];
+}
+
 function Input_GamepadAxisHeld(_device, _axis, _dir, _deadzone) {
     var v = gamepad_axis_value(_device, _axis);
     if (_dir > 0) return v >= _deadzone;
@@ -198,17 +220,10 @@ function Input_GamepadActionHeld(_device, _action, _deadzone) {
         case "move_right":
         case "menu_right":
             return gamepad_button_check(_device, gp_padr) || Input_GamepadAxisHeld(_device, gp_axislh, 1, _deadzone);
-        case "interact":
-        case "confirm":
-            return gamepad_button_check(_device, gp_face1);
-        case "cancel":
-            return gamepad_button_check(_device, gp_face2);
-        case "run":
-            return gamepad_button_check(_device, gp_shoulderl) || gamepad_button_check(_device, gp_shoulderr);
-        case "menu":
-            return gamepad_button_check(_device, gp_face3);
-        case "pause":
-            return gamepad_button_check(_device, gp_face4);
+    }
+    var btns = Input_GamepadButtons(_action);
+    for (var i = 0; i < array_length(btns); i++) {
+        if (gamepad_button_check(_device, btns[i])) return true;
     }
     return false;
 }
@@ -227,15 +242,10 @@ function Input_GamepadActionPressed(_device, _action, _prev_held, _deadzone) {
         case "move_right":
         case "menu_right":
             return gamepad_button_check_pressed(_device, gp_padr) || (Input_GamepadAxisHeld(_device, gp_axislh, 1, _deadzone) && !_prev_held);
-        case "interact":
-        case "confirm":
-            return gamepad_button_check_pressed(_device, gp_face1);
-        case "cancel":
-            return gamepad_button_check_pressed(_device, gp_face2);
-        case "menu":
-            return gamepad_button_check_pressed(_device, gp_face3);
-        case "pause":
-            return gamepad_button_check_pressed(_device, gp_face4);
+    }
+    var btns = Input_GamepadButtons(_action);
+    for (var i = 0; i < array_length(btns); i++) {
+        if (gamepad_button_check_pressed(_device, btns[i])) return true;
     }
     return false;
 }

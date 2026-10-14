@@ -790,28 +790,35 @@ function UI_GetSpriteScale(_base = 1) {
     return max(1, round(mul * step));
 }
 
+// The scale text is DRAWN at. English: the integer rule above. Korean (D98): Galmuri is added at its final window-pixel size
+// (a whole multiple of its native 9 or 11 px, UI_KoFont), so it is drawn at 1 texel = 1 window pixel = 1 / ui_scale GUI units.
+function UI_GetFontScale() {
+    if (Loc_GetLanguage() == "ko" && UI_KoFont() != -1) return 1 / Display_Layout().ui_scale;
+    return UI_GetTextScale();
+}
+
 function UI_TextWidth(_txt) {
-    var s = UI_GetTextScale();
+    var s = UI_GetFontScale();
     return max(0, round(string_width(string(_txt)) * s));
 }
 
 function UI_TextHeight(_txt = "A") {
-    var s = UI_GetTextScale();
+    var s = UI_GetFontScale();
     return max(1, round(string_height(string(_txt)) * s));
 }
 
 function UI_DrawText(_x, _y, _txt) {
-    var s = UI_GetTextScale();
+    var s = UI_GetFontScale();
     draw_text_transformed(real(_x), real(_y), string(_txt), s, s, 0);
 }
 
 function UI_DrawTextTransformed(_x, _y, _txt, _xscale, _yscale, _angle) {
-    var s = UI_GetTextScale();
+    var s = UI_GetFontScale();
     draw_text_transformed(real(_x), real(_y), string(_txt), real(_xscale) * s, real(_yscale) * s, real(_angle));
 }
 
 function UI_DrawTextExt(_x, _y, _txt, _sep, _w) {
-    var s = max(0.0001, UI_GetTextScale());
+    var s = max(0.0001, UI_GetFontScale());
     var sep = real(_sep);
     var wrap_w = real(_w);
     if (sep > 0) sep = max(1, round(sep / s));
@@ -819,42 +826,46 @@ function UI_DrawTextExt(_x, _y, _txt, _sep, _w) {
     draw_text_ext_transformed(real(_x), real(_y), string(_txt), sep, wrap_w, s, s, 0);
 }
 
+// The Korean UI font (D98): Galmuri9 or Galmuri11 (SIL OFL, Included Files at fonts/galmuri) added at the whole multiple of its
+// native size that matches the English line height in window pixels. One font per size is cached. -1 when the file is missing.
+function UI_KoFont() {
+    var l = Display_Layout();
+    var sig = l.scale * 100 + l.ui_scale;
+    if (variable_global_exists("ui_ko_sig") && global.ui_ko_sig == sig) return global.ui_ko_cur;   // same layout as the last call
+    if (!variable_global_exists("ui_ko_fonts") || !is_struct(global.ui_ko_fonts)) global.ui_ko_fonts = {};
+    if (!variable_global_exists("ui_en_line_px")) {
+        var f0 = draw_get_font();
+        draw_set_font(UI_FONT);
+        global.ui_en_line_px = string_height("A");   // the English font's line height at text scale 1.0, in window pixels
+        draw_set_font(f0);
+    }
+    var target = global.ui_en_line_px * UI_GetTextScale() * l.ui_scale;
+    var ch = Ui_KoFontChoice(target);
+    var key = "g" + string(ch.face) + "x" + string(ch.k);
+    var f = -1;
+    if (variable_struct_exists(global.ui_ko_fonts, key)) {
+        f = variable_struct_get(global.ui_ko_fonts, key);
+    } else {
+        var path = "fonts/galmuri/Galmuri" + string(ch.face) + ".ttf";
+        if (file_exists(path)) {
+            var t0 = current_time;
+            f = font_add(path, ch.px * 0.75, false, false, 32, 55203);   // points = pixels * 0.75
+            show_debug_message("[UI] Galmuri" + string(ch.face) + " x" + string(ch.k) + " (" + string(ch.px) + " px) font " + string(f) + " added in " + string(current_time - t0) + " ms");
+        } else {
+            show_debug_message("[UI] Korean font file missing: " + path);
+        }
+        variable_struct_set(global.ui_ko_fonts, key, f);   // a miss is cached too: no retry every frame
+    }
+    global.ui_ko_sig = sig;
+    global.ui_ko_cur = f;
+    return f;
+}
+
 function UI_SetFont() {
     var font_to_use = UI_FONT;
     if (Loc_GetLanguage() == "ko") {
-        if (!variable_global_exists("ui_font_ko")) global.ui_font_ko = -1;
-        if (!variable_global_exists("ui_font_ko_warned")) global.ui_font_ko_warned = false;
-
-        // Retry until success so one failed early load doesn't permanently break Korean text.
-        if (global.ui_font_ko == -1) {
-            // Match English UI scale more closely.
-            var ko_size = 11;
-            // Use only sandbox-safe relative paths (absolute paths are blocked by the runner).
-            var ko_paths = [
-                "NanumGothic-Regular.ttf",
-                "datafiles/NanumGothic-Regular.ttf",
-                "datafiles/fonts/NanumGothic-Regular.ttf",
-                "NotoSansCJKkr-Regular.otf",
-                "datafiles/NotoSansCJKkr-Regular.otf",
-                "datafiles/fonts/NotoSansCJKkr-Regular.otf"
-            ];
-
-            for (var i = 0; i < array_length(ko_paths); i++) {
-                var p = ko_paths[i];
-                if (!file_exists(p)) continue;
-                global.ui_font_ko = font_add(p, ko_size, false, false, 32, 55203);
-                if (global.ui_font_ko != -1) break;
-            }
-
-            if (global.ui_font_ko == -1 && !global.ui_font_ko_warned) {
-                global.ui_font_ko_warned = true;
-                show_debug_message("UI_SetFont: failed to load Korean runtime font from all known paths.");
-            } else if (global.ui_font_ko != -1) {
-                global.ui_font_ko_warned = false;
-            }
-        }
-
-        if (global.ui_font_ko != -1) font_to_use = global.ui_font_ko;
+        var fk = UI_KoFont();
+        if (fk != -1) font_to_use = fk;
     }
     draw_set_font(font_to_use);
 }
@@ -1074,11 +1085,9 @@ function UI_InterruptCloseAll(_fade_dim = true) {
         sp.open = false;
         sp.owner = "";
         sp.closing = false;
-        sp.close_frame = UI_OPENED_FRAME_NONE;
-        sp.opened_frame = UI_OPENED_FRAME_NONE;
+        sp.closed_ms = -1;
         sp.dirty = false;
-        sp.lr_hold_dir = 0;
-        sp.lr_hold_frames = 0;
+        sp.menu = undefined;
         gs.ui.settings_popup = sp;
     }
 
@@ -1100,16 +1109,13 @@ function UI_GetModalVisualAlpha() {
         if (instance_exists(sc)
         && variable_instance_exists(sc, "state")
         && string(sc.state) == "difficulty"
-        && variable_instance_exists(sc, "difficulty_opened_frame")
-        && variable_instance_exists(sc, "difficulty_closing")
-        && variable_instance_exists(sc, "difficulty_close_frame")) {
-            return UI_PopupAlpha(sc.difficulty_opened_frame, sc.difficulty_closing, sc.difficulty_close_frame, 1);
+        && variable_instance_exists(sc, "title_stk")) {
+            return Title_ModalAlpha(sc);
         }
     }
 
     if (SettingsPopup_IsOpen("pause") && variable_struct_exists(gs.ui, "settings_popup")) {
-        var sp = gs.ui.settings_popup;
-        var sp_alpha = UI_PopupAlpha(sp.opened_frame, sp.closing, sp.close_frame, 1);
+        var sp_alpha = SettingsPopup_Alpha();
 
         // Linked modal chain: while pause owns the stack and opens Settings,
         // keep dim sourced from the stronger of parent/child alpha so dim
@@ -1297,7 +1303,10 @@ function GameSettings_Defaults() {
         audio_bgm: VOL_MUSIC_DEFAULT,
         display_scale: DISPLAY_SCALE_DEFAULT,
         window_mode: WINDOW_MODE_BORDERLESS,   // D91: first launch is borderless fullscreen (settings_version 8 replaced fit_screen)
-        language: "en"
+        language: "en",
+        text_speed: 1,    // settings_version 9 (D0): 0 slow, 1 normal, 2 fast (Settings_TextSpeedMul)
+        screen_shake: 1,  // 1 on, 0 off
+        qte_assist: 0     // 1 on; the option exists, the more forgiving timing comes with the QTE work
     };
 }
 
@@ -1311,6 +1320,9 @@ function GameSettings_Normalize(_settings) {
         if (variable_struct_exists(_settings, "window_mode")) out.window_mode = _settings.window_mode;
         else if (variable_struct_exists(_settings, "fit_screen")) out.window_mode = Display_ModeFromLegacy(GameSettings_ToReal(_settings.fit_screen, 0) != 0);   // an old struct
         if (variable_struct_exists(_settings, "language")) out.language = _settings.language;
+        if (variable_struct_exists(_settings, "text_speed")) out.text_speed = _settings.text_speed;
+        if (variable_struct_exists(_settings, "screen_shake")) out.screen_shake = _settings.screen_shake;
+        if (variable_struct_exists(_settings, "qte_assist")) out.qte_assist = _settings.qte_assist;
     }
 
     out.audio_ui = clamp(GameSettings_ToReal(out.audio_ui, VOL_UI_DEFAULT), 0, 1);
@@ -1319,6 +1331,9 @@ function GameSettings_Normalize(_settings) {
     out.display_scale = clamp(round(GameSettings_ToReal(out.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
     out.window_mode = Display_NormalizeMode(out.window_mode);
     out.language = GameSettings_NormalizeLanguage(out.language);
+    out.text_speed = clamp(round(GameSettings_ToReal(out.text_speed, 1)), 0, SETTINGS_TEXT_SPEED_MAX);
+    out.screen_shake = (GameSettings_ToReal(out.screen_shake, 1) != 0) ? 1 : 0;
+    out.qte_assist = (GameSettings_ToReal(out.qte_assist, 0) != 0) ? 1 : 0;
     return out;
 }
 
