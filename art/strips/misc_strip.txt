@@ -1,0 +1,2 @@
+# sprite: spr_icons_misc   frames: 1   16x16 each, left to right = subimage 0..0
+0	gold_coin
