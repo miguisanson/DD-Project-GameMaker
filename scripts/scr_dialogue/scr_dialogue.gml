@@ -1225,7 +1225,7 @@ function Dialogue_Draw() {
         var a0 = draw_get_alpha();
         draw_set_alpha(open_t);
         if (icon_draw_w > 0) draw_sprite_ext(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1, icon_scale, icon_scale, 0, c_white, open_t);
-        draw_set_color(UI_C_LIGHTEST);
+        draw_set_color(UI_C_TEXT);
         UI_DrawText(text_x, text_y, visible_text);
         draw_set_alpha(a0);
     }
@@ -1807,7 +1807,7 @@ function Credits_Draw(_t) {
                 var s = max(0.0001, UI_GetFontScale());
                 draw_set_halign(fa_center);
                 draw_set_valign(fa_top);
-                draw_set_color(UI_C_LIGHT);
+                draw_set_color(UI_C_TEXT);
                 draw_text_ext_transformed(cx, round(ry), r.text, -1, max(1, round(l.col_w / s)), s, s, 0);
                 draw_set_halign(fa_left);
             } break;

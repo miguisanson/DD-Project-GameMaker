@@ -464,6 +464,9 @@ function Scenario_StepSmoke(_s) {
         case 171: case 172: case 173: case 174: case 175: case 176: case 177: case 178: case 179: case 180:
             Scenario_StepSmokeBattleUi(_s);   // D1a: the battle menus (wrap, lists, details, back, Guard) and the dialogue box (typewriter, choices)
             break;
+        case 181: case 182: case 183: case 184: case 185: case 186: case 187: case 188: case 189: case 190: case 191: case 192: case 193: case 194: case 195:
+            Scenario_StepSmokeTabMenu(_s);   // D1b: the Tab menu (tabs wrap, remembered cursors, a potion, equip, Codex, settings) and the pause menu
+            break;
         case 30:
             Scenario_StepSmokeUi(_s);
             break;
@@ -636,9 +639,12 @@ function Scenario_StepSmokePause(_s) {
             break;
         case 126:
             Scenario_Check("ui_pause_menu_opens", _gs.ui.mode == UI_PAUSE, "mode=" + string(_gs.ui.mode) + " room=" + room_get_name(room));
+            Scenario_Tap("menu_down");   // Resume, Help, Settings
+            break;
+        case 130:
             Scenario_Tap("menu_down");
             break;
-        case 132:
+        case 134:
             Scenario_Tap("confirm");
             break;
         case 140:
@@ -840,6 +846,10 @@ function Scenario_StepBot(_s) {
     }
     if (_s.v == 6) {
         Scenario_StepBotStatus(_s);
+        return;
+    }
+    if (_s.v == 11) {
+        Scenario_StepBotD1b(_s);   // D1b: the Codex learns an enemy from a real fight; the Tab menu shows it
         return;
     }
     if (_s.v == 10) {
@@ -2598,6 +2608,9 @@ function Scenario_StepShots(_s) {
         case 170: case 171: case 172: case 173: case 174: case 175: case 176: case 177: case 178: case 179:
             Scenario_StepShotsEconomy(_s);   // C3: shop, throwables, elite, merchant, gold
             break;
+        case 210: case 211: case 212: case 213: case 214: case 215: case 216: case 217: case 218: case 219: case 220: case 221: case 222: case 223: case 224: case 225: case 226: case 227: case 228: case 229:
+            Scenario_StepShotsTabMenu(_s);   // D1b: every tab, the gear comparison, the Codex pages, settings, pause; two sizes, Korean once
+            break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
             break;
@@ -3309,8 +3322,7 @@ function Scenario_StepShotsUi(_s) {
         case 88:   // the Tab menu's Stats tab in rm_floor1 (B1 saw the ATK label overlap the HP numbers)
             if (_s.t == 1) { Scenario_NewKnight(); room_goto(rm_floor1); }
             if (_s.t == 90) {
-                Menu_Open();
-                GameState_Get().ui.menu.tab = 2;
+                Menu_Open(0);   // D1b: the Status tab (the Tab menu is on the framework now)
             }
             if (_s.t == 130) {
                 Scenario_ShotUi(_s, "stats_tab");
@@ -4448,13 +4460,13 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_ClearUi();
                 PauseMenu_Open();
             }
-            if (_s.t == 12 || _s.t == 24 || _s.t == 36 || _s.t == 48) Scenario_Tap("menu_down");   // Resume, Settings, Help, Exit, Abandon (C4 added Help)
+            if (_s.t == 12 || _s.t == 24 || _s.t == 36) Scenario_Tap("menu_down");   // Resume, Help, Settings, Abandon Run (D1b)
             if (_s.t == 60) {
-                Scenario_Check("abandon_cursor_is_on_the_abandon_row", _gs.ui.pause_menu.index == PAUSE_ABANDON_INDEX, "index=" + string(_gs.ui.pause_menu.index));
+                Scenario_Check("abandon_cursor_is_on_the_abandon_row", PauseMenu_Cursor() == PAUSE_ABANDON_INDEX, "index=" + string(PauseMenu_Cursor()));
                 Scenario_Tap("confirm");
             }
             if (_s.t == 72) {
-                Scenario_Check("abandon_asks_before_it_acts", _gs.ui.pause_menu.abandon_armed && Run_IsActive());
+                Scenario_Check("abandon_asks_before_it_acts", PauseMenu_Get().armed && Run_IsActive());
                 Scenario_Tap("confirm");
             }
             if (_s.t > 74) Scenario_TapCutscene(_s);
@@ -5193,13 +5205,13 @@ function Scenario_StepSmokeRest(_s) {
                 Scenario_ClearUi();
                 if (instance_exists(_rc.bed)) with (_rc.bed) instance_destroy();
                 PauseMenu_Open();
-                _gs.ui.pause_menu.index = 2;   // Help
+                Ui_MenuFixCursor(Ui_StackTop(PauseMenu_Get().stk), 1);   // Help
                 _rc.q = ["confirm"];
             }
             if (HelpUi_IsOpen() && !variable_struct_exists(_rc, "h1")) {
                 _rc.h1 = true;
                 var _hm = Ui_StackTop(global.help_ui.stk);
-                Scenario_Check("help_opens_from_the_pause_menu", _gs.ui.mode == UI_PAUSE && _gs.ui.pause_menu.index == 2 && _hm.id == "help");
+                Scenario_Check("help_opens_from_the_pause_menu", _gs.ui.mode == UI_PAUSE && PauseMenu_Cursor() == 1 && _hm.id == "help");
                 Scenario_Check("help_lists_all_eleven_mechanics", array_length(_hm.items) == 11 && _hm.items[0].id == "timeline" && _hm.items[10].id == "status");
                 Scenario_Check("help_rows_carry_their_text", string_length(_hm.items[1].help) > 20 && string_pos("{confirm}", _hm.items[1].help) > 0);
                 Ui_MenuFixCursor(_hm, 1);
@@ -5209,7 +5221,7 @@ function Scenario_StepSmokeRest(_s) {
             }
             if (variable_struct_exists(_rc, "h2") && !HelpUi_IsOpen() && !variable_struct_exists(_rc, "h3")) {
                 _rc.h3 = true;
-                Scenario_Check("help_back_returns_to_the_pause_menu", _gs.ui.mode == UI_PAUSE && _gs.ui.pause_menu.open && _gs.ui.pause_menu.index == 2);
+                Scenario_Check("help_back_returns_to_the_pause_menu", _gs.ui.mode == UI_PAUSE && is_struct(PauseMenu_Get()) && PauseMenu_Cursor() == 1);
                 PauseMenu_Close(true);
                 Scenario_Next(_s, 166);
             }
@@ -5221,7 +5233,7 @@ function Scenario_StepSmokeRest(_s) {
             if (_s.t == 1) {
                 Scenario_ClearUi();
                 PauseMenu_Open();
-                _gs.ui.pause_menu.index = 1;   // Settings
+                Ui_MenuFixCursor(Ui_StackTop(PauseMenu_Get().stk), 2);   // Settings
                 _rc.q = ["confirm"];
             }
             if (SettingsPopup_IsOpen("pause") && !variable_struct_exists(_rc, "k1") && _idle) {
@@ -6300,7 +6312,7 @@ function Scenario_StepShotsEconomy(_s) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Scenario_SetWindowScale(5);
                 Ui_StackTop(global.shop_ui.stk).cursor = 5;
-                ShopUi_Say(ShopUi_ReasonText("gold"));
+                ShopUi_Say("gold");
             }
             if (_s.t == 50) {
                 global.shop_ui.msg_ms = current_time;
@@ -6450,15 +6462,12 @@ function Scenario_StepShotsEconomy(_s) {
                 _k4.inventory = Inv_Add(_k4.inventory, 46, 1);
                 Equip_Item(_k4, 46);
                 GameState_SetPlayer(_k4);
-                Menu_Open();
+                Menu_Open(3);   // D1b: the Gear tab, with the worn charm and the gold in the footer
             }
             if (_s.t == 30) {
                 Scenario_Check("shots_eco_menu_open", _gs.ui.mode == UI_MENU);
-                var _mm = _gs.ui.menu;
-                var _its = Menu_InventoryDisplayItems(_gs.player_ch.inventory);
-                for (var _i = 0; _i < array_length(_its); _i++) { if (_its[_i].id == 46) _mm.inv_index = _i; }
-                _mm = Menu_ClampInventoryCursor(_mm, _gs.player_ch.inventory);
-                _mm.header_focus = false;
+                var _mm = TabMenu_TopMenu();
+                for (var _i = 0; _i < array_length(_mm.items); _i++) { if (_mm.items[_i].id == "gear_46") Ui_MenuFixCursor(_mm, _i); }
             }
             if (_s.t == 50) {
                 Scenario_ShotUi(_s, "menu_gold");
@@ -6624,7 +6633,7 @@ function Scenario_StepShotsBattleUi(_s) {
                     if (Loc_GetLanguage() != "en") Loc_SetLanguage("en");
                     _s.si = 0;
                     _s.di = 0;
-                    Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
+                    Scenario_Next(_s, 210);   // D1b pictures (210..213), then the D91 / DISP-10 / D48 pictures and the skill animations
                 } else {
                     Scenario_Next(_s, 185);
                 }
@@ -6813,7 +6822,7 @@ function Scenario_StepSmokeBattleUi(_s) {
                     break;
                 case 112:
                     Scenario_Check("dialogue_back_picks_the_last_answer_when_allowed", _gs.ui.mode == UI_NONE && global.smoke_pick == 1, "pick=" + string(global.smoke_pick));
-                    Scenario_Finish();
+                    Scenario_Next(_s, 181);   // D1b: the Tab menu, the Codex, the pause menu (181..189)
                     break;
             }
             break;
@@ -6909,7 +6918,7 @@ function Scenario_StepBotD1a(_s) {
                     Scenario_Check("bot_i066_the_move_was_poison_fangs", _bc.enemy_last_skill_id == SKILL_POISON_FANGS, "skill=" + string(_bc.enemy_last_skill_id));
                     global.debug.enabled = false;
                     global.debug.enemy_damage_skill_only = false;
-                    _s.v = 5;   // on to movement and AI
+                    _s.v = 11;   // on to D1b (the Codex through a real fight), then movement and AI
                     Scenario_Next(_s, 0);
                 }
             }
@@ -6917,7 +6926,527 @@ function Scenario_StepBotD1a(_s) {
                 Scenario_Check("bot_i066_the_spider_used_poison_fangs", false, "phase=" + string(_u.phase) + " state=" + string(_bc.battle_state));
                 global.debug.enabled = false;
                 global.debug.enemy_damage_skill_only = false;
-                _s.v = 5;
+                _s.v = 11;
+                Scenario_Next(_s, 0);
+            }
+            break;
+    }
+}
+
+// ==========================================================================================================================
+// D1b: the Tab menu (D90), the pause menu (D92, D95), the Codex (D88, D107) and white text (D115) through the real input.
+// Smoke steps 181..189, pictures 210..213, bot v=11.
+// ==========================================================================================================================
+// A Knight with something to show: level 3, three skills (one upgraded) and a passive, potions and throwables, worn weapon and armor, a bag with
+// better gear, a charm and a robe the Knight cannot wear, 87 gold. Levelled up BEFORE the run exists, so the free points are placed at once and no
+// card screen opens over the menu.
+function Scenario_TabFixture() {
+    var _gs = Scenario_NewKnight(CLASS_KNIGHT);
+    var _k = Player_AddExp(_gs.player_ch, 60);
+    _k.card_picks = 0;   // the level-ups owe card picks; none may open over the menu
+    _k.skills = [SKILL_WOUND, SKILL_MUSCLE_UP, SKILL_HILT_BASH];
+    _k.upgrades = [SKILL_WOUND];
+    var _all = CardDB_All();
+    for (var _i = 0; _i < array_length(_all); _i++) {
+        if (_all[_i].kind == "passive" && (array_length(_all[_i].classes) == 0)) { _k.passives = [_all[_i].id]; break; }
+    }
+    _k.inventory = Inv_Add(_k.inventory, 10, 1);
+    _k.inventory = Inv_Add(_k.inventory, 11, 1);
+    _k.inventory = Inv_Add(_k.inventory, 12, 1);
+    _k.inventory = Inv_Add(_k.inventory, 30, 2);
+    _k.inventory = Inv_Add(_k.inventory, 31, 1);
+    var _gear = [1, 20, 2, 22, 40, 41, 23];
+    for (var _g = 0; _g < array_length(_gear); _g++) _k.inventory = Inv_Add(_k.inventory, _gear[_g], 1);
+    Equip_Item(_k, 1);
+    Equip_Item(_k, 20);
+    _k.hp = max(1, _k.max_hp - 5);
+    _k.mp = max(0, _k.max_mp - 2);
+    GameState_SetPlayer(_k);
+    _gs.run = Run_Create(13579);
+    _gs.run.gold = 87;
+    return _gs;
+}
+
+// A profile to show in the Codex: a few enemies met (the Slime also as an elite), two notes read, three finished runs. Returns the real profile to put back.
+function Scenario_TabProfile() {
+    var _real = Profile_Get();
+    var _p = Profile_Normalize(json_parse(json_stringify(_real)));
+    Codex_Met(_p, ENEMY_SLIME, false);
+    Codex_Met(_p, ENEMY_SLIME, true);
+    Codex_Met(_p, ENEMY_SPIDER, false);
+    Codex_Met(_p, ENEMY_SNAKE, false);
+    Codex_Met(_p, ENEMY_MINI_BOSS, false);
+    Note_MarkCollected(_p, "map_page");
+    Note_MarkCollected(_p, "wall_breath");
+    Profile_RecordRun(_p, { seed: 40111, class_id: CLASS_KNIGHT, level: 4, floor: 3, room: "rm_floor3", result: "died", cause: "Spider", kills: 7, gold: 52, at: 0 });
+    Profile_RecordRun(_p, { seed: 40222, class_id: CLASS_MAGE, level: 6, floor: 5, room: "rm_floor5", result: "abandoned", cause: "abandoned", kills: 12, gold: 140, at: 0 });
+    Profile_RecordRun(_p, { seed: 40333, class_id: CLASS_ARCHER, level: 9, floor: 9, room: "rm_floor9_5", result: "won", cause: "", kills: 31, gold: 410, at: 0 });
+    global.profile = _p;
+    return _real;
+}
+
+function Scenario_TabRow(_m, _id) {
+    for (var _i = 0; _i < array_length(_m.items); _i++) if (variable_struct_exists(_m.items[_i], "id") && _m.items[_i].id == _id) return _i;
+    return -1;
+}
+
+// Checks that the last draw left everything on screen and that the details panel's text fits in its box (nothing runs off the bottom).
+function Scenario_TabLayoutChecks(_tag) {
+    var _m = TabMenu_TopMenu();
+    var _gw = Display_GuiW();
+    var _gh = Display_GuiH();
+    if (!is_struct(_m)) { Scenario_Check("tab_layout_has_a_menu_" + _tag, false); return; }
+    var _r = _m.rect;
+    var _d = _m.det_rect;
+    Scenario_Check("tab_list_on_screen_" + _tag, _r.x >= 0 && _r.y >= 0 && _r.x + _r.w <= _gw && _r.y + _r.h <= _gh, json_stringify(_r));
+    Scenario_Check("tab_details_on_screen_" + _tag, _d.w > 0 && _d.x >= 0 && _d.y >= 0 && _d.x + _d.w <= _gw && _d.y + _d.h <= _gh, json_stringify(_d));
+    Scenario_Check("tab_list_and_details_do_not_overlap_" + _tag, !Test_RectsOverlap(_r, _d));
+    if (array_length(_m.items) > 0) {
+        var _it = _m.items[clamp(_m.cursor, 0, array_length(_m.items) - 1)];
+        if (variable_struct_exists(_it, "help")) {
+            var _need = Ui_DetailsHeight(_d.w, _it.help, variable_struct_exists(_it, "lines") ? _it.lines : [], _m.layout.details_cols, variable_struct_exists(_it, "seq") ? array_length(_it.seq) : 0, _m.layout.det_art ? _it : undefined);
+            Scenario_Check("tab_details_text_fits_" + _tag, _need <= _d.h, "needs " + string(_need) + " has " + string(_d.h));
+        }
+    }
+}
+
+// ---- smoke 181..189: open, tabs wrap, cursor remembered, a potion, equip, codex, settings, pause ----
+function Scenario_StepSmokeTabMenu(_s) {
+    var _gs = GameState_Get();
+    var _u = TabMenu_Get();
+    var _m = TabMenu_TopMenu();
+    switch (_s.step) {
+        case 181:   // set up, open with the real key
+            if (_s.t == 1) {
+                Scenario_TabFixture();
+                Profile_ResetForTest();
+                global.ui_mem = Ui_MemNew();
+                room_goto(rm_floor2);
+            }
+            if (_s.t == 60) {
+                with (obj_enemy) instance_destroy();
+                Scenario_ClearUi();
+                Scenario_Tap("menu");
+            }
+            if (_s.t == 68) {
+                Scenario_Check("tabmenu_the_menu_key_opens_it", _gs.ui.mode == UI_MENU && is_struct(_u), "mode=" + string(_gs.ui.mode) + " room=" + room_get_name(room));
+                if (!is_struct(_u)) { Scenario_Finish(); break; }
+                Scenario_Check("tabmenu_starts_on_status", _u.tab == 0 && _m.id == "tab_status");
+                Scenario_Check("tabmenu_status_lists_the_four_stats", array_length(_m.items) == 4 && _m.cursor == 0);
+                Scenario_Check("tabmenu_status_has_a_description_for_each", string_length(_m.items[0].help) > 10 && _m.items[0].help != _m.items[1].help);
+                Scenario_Next(_s, 182);
+            }
+            if (_s.t > 600) { Scenario_Check("tabmenu_opens", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+            break;
+        case 182:   // Q / E wrap, the cursor is remembered per tab
+            switch (_s.t) {
+                case 1: Scenario_Tap("menu_down"); break;
+                case 8: Scenario_Tap("menu_down"); break;
+                case 15:
+                    Scenario_Check("tabmenu_down_moves_the_status_cursor", _m.cursor == 2, "cursor=" + string(_m.cursor));
+                    Scenario_Tap("tab_prev");
+                    break;
+                case 22:
+                    Scenario_Check("tabmenu_Q_on_the_first_tab_wraps_to_settings", _u.tab == 5 && SettingsPopup_IsOpen("tab") && _m.id == "settings", "tab=" + string(_u.tab));
+                    Scenario_Tap("tab_next");
+                    break;
+                case 29:
+                    Scenario_Check("tabmenu_E_on_the_last_tab_wraps_to_status", _u.tab == 0 && _m.id == "tab_status", "tab=" + string(_u.tab));
+                    Scenario_Check("tabmenu_status_cursor_is_remembered", _m.cursor == 2, "cursor=" + string(_m.cursor));
+                    Scenario_Tap("tab_next");
+                    break;
+                case 36:
+                    Scenario_Check("tabmenu_E_goes_to_skills", _u.tab == 1 && _m.id == "tab_skills");
+                    Scenario_Check("tabmenu_skills_lists_the_three_skills_then_the_passive_under_a_heading", array_length(_m.items) == 5 && _m.items[3].kind == "head", "n=" + string(array_length(_m.items)));
+                    Scenario_Check("tabmenu_skill_details_come_from_the_data", _m.items[0].help == Card_SkillSentence(SkillDB_Get(SKILL_WOUND)), _m.items[0].help);
+                    Scenario_Check("tabmenu_skill_shows_its_arrows", array_length(_m.items[2].seq) == array_length(Qte_SkillSequence(SKILL_HILT_BASH)));
+                    Scenario_Tap("menu_up");
+                    break;
+                case 43:
+                    Scenario_Check("tabmenu_up_from_the_first_row_wraps_to_the_last", _m.cursor == 4, "cursor=" + string(_m.cursor));
+                    Scenario_Tap("tab_next");
+                    break;
+                case 50:
+                    Scenario_Check("tabmenu_E_goes_to_items", _u.tab == 2 && _m.id == "tab_items");
+                    Scenario_Next(_s, 183);
+                    break;
+            }
+            break;
+        case 183:   // a potion from the Items tab, then a throwable that cannot be used here
+            switch (_s.t) {
+                case 1:
+                    _gs.player_ch.hp = 1;
+                    _s.n0 = Scenario_ItemCount(_gs.player_ch, 10);
+                    _s.th0 = Scenario_ItemCount(_gs.player_ch, 31);
+                    Scenario_Check("tabmenu_items_lists_potions_then_throwables", array_length(_m.items) == 5 && _m.items[0].item_id == 10 && _m.items[4].item_id == 31, "n=" + string(array_length(_m.items)));
+                    Scenario_Tap("confirm");
+                    break;
+                case 8:
+                    Scenario_Check("tabmenu_a_potion_heals", _gs.player_ch.hp > 1, "hp=" + string(_gs.player_ch.hp));
+                    Scenario_Check("tabmenu_a_potion_is_spent", Scenario_ItemCount(_gs.player_ch, 10) == _s.n0 - 1, "have " + string(Scenario_ItemCount(_gs.player_ch, 10)) + " was " + string(_s.n0));
+                    Scenario_Check("tabmenu_it_says_what_happened", string_pos(string(_gs.player_ch.hp - 1), _u.toast) > 0, _u.toast + " hp=" + string(_gs.player_ch.hp));
+                    Scenario_Tap("menu_up");
+                    break;
+                case 15:
+                    Scenario_Check("tabmenu_up_wraps_to_the_last_item", _m.items[_m.cursor].item_id == 31, "row=" + string(_m.items[_m.cursor].id));
+                    Scenario_Tap("confirm");
+                    break;
+                case 22:
+                    Scenario_Check("tabmenu_a_throwable_stays_in_the_bag", Scenario_ItemCount(_gs.player_ch, 31) == _s.th0);
+                    Scenario_Check("tabmenu_a_throwable_says_to_throw_it_in_battle", _u.toast == Loc_T("item.msg.throw_in_battle", "Throw it at an enemy in battle."), _u.toast);
+                    Scenario_Next(_s, 184);
+                    break;
+            }
+            break;
+        case 184:   // Gear: walk to the Platinum Armor, see the comparison, wear it
+            if (_s.t == 1) {
+                Scenario_Tap("tab_next");
+            }
+            if (_s.t == 8) {
+                Scenario_Check("tabmenu_E_goes_to_gear", _u.tab == 3 && _m.id == "tab_gear");
+                var _slots_first = (_m.items[0].kind == "head" && _m.items[1].slot == "weapon" && _m.items[2].slot == "body" && _m.items[3].slot == "accessory");
+                Scenario_Check("tabmenu_gear_shows_the_three_slots_first", _slots_first);
+                Scenario_Check("tabmenu_gear_starts_on_the_first_slot_not_the_heading", _m.cursor == 1, "cursor=" + string(_m.cursor));
+                _s.def0 = Stat_Get(_gs.player_ch, STAT_DEF);
+                _s.to = Scenario_TabRow(_m, "gear_22");
+                Scenario_Check("tabmenu_gear_bag_has_the_platinum_armor", _s.to > 0);
+            }
+            if (_s.t >= 10 && _m.cursor != _s.to && (_s.f - _s.last_tap) >= 7 && _s.to > 0) Scenario_Tap("menu_down");   // the heading between the slots and the bag is skipped, so count by looking
+            if (_s.t > 10 && _s.to > 0 && _m.cursor == _s.to && !variable_struct_exists(_s, "cmp")) {
+                _s.cmp = true;
+                var _row = _m.items[_m.cursor];
+                var _want = ItemDB_Get(22).bonus.def - ItemDB_Get(20).bonus.def;
+                Scenario_Check("tabmenu_comparison_shows_the_defence_change", Test_RowValue(_row.lines, "DEF") == string(_s.def0) + " > " + string(_s.def0 + _want), Test_RowValue(_row.lines, "DEF"));
+                Scenario_Check("tabmenu_comparison_marks_it_as_better", Test_LineDelta(_row.lines, "DEF") == 1);
+                _s.t0 = _s.t;
+            }
+            if (variable_struct_exists(_s, "cmp") && _s.t == _s.t0 + 8) Scenario_Tap("confirm");
+            if (variable_struct_exists(_s, "cmp") && _s.t == _s.t0 + 16) {
+                var _want2 = ItemDB_Get(22).bonus.def - ItemDB_Get(20).bonus.def;
+                Scenario_Check("tabmenu_equipping_changes_the_stats", Stat_Get(_gs.player_ch, STAT_DEF) == _s.def0 + _want2, "def=" + string(Stat_Get(_gs.player_ch, STAT_DEF)) + " was " + string(_s.def0) + " toast=" + _u.toast + " cursor=" + string(_m.cursor) + " row=" + _m.items[_m.cursor].id);
+                Scenario_Check("tabmenu_the_armor_is_worn_in_its_slot", Equip_SlotGet(_gs.player_ch, "body") == 22);
+                Scenario_Check("tabmenu_the_old_armor_went_to_the_bag", Scenario_TabRow(_m, "gear_20") > Scenario_TabRow(_m, "head_bag"));
+                Scenario_Next(_s, 185);
+            }
+            if (_s.t > 400) { Scenario_Check("tabmenu_gear_flow", false, "cursor=" + string(_m.cursor) + " to=" + string(_s.to)); Scenario_Finish(); }
+            break;
+        case 185:   // back on Status the new defence shows; three Q presses
+            switch (_s.t) {
+                case 1: Scenario_Tap("tab_prev"); break;
+                case 8: Scenario_Tap("tab_prev"); break;
+                case 15: Scenario_Tap("tab_prev"); break;
+                case 22:
+                    Scenario_Check("tabmenu_three_Q_go_back_to_status", _u.tab == 0, "tab=" + string(_u.tab));
+                    Scenario_Check("tabmenu_status_shows_the_new_defence", _m.items[1].value == string(Stat_Get(_gs.player_ch, STAT_DEF)), _m.items[1].value);
+                    Scenario_Tap("tab_prev");   // wraps to settings; E four times is shorter from there
+                    break;
+                case 29:
+                    Scenario_Check("tabmenu_settings_is_the_last_tab", _u.tab == 5);
+                    Scenario_Tap("tab_prev");
+                    break;
+                case 36:
+                    Scenario_Check("tabmenu_Q_from_settings_is_the_codex", _u.tab == 4 && _m.id == "tab_codex");
+                    Scenario_Check("tabmenu_codex_starts_empty", _m.items[0].value == "0/10" && _m.items[1].value == "0/8", _m.items[0].value + " " + _m.items[1].value);
+                    Scenario_Tap("confirm");
+                    break;
+                case 44:
+                    Scenario_Check("tabmenu_confirm_opens_the_bestiary_one_level_down", TabMenu_Depth() == 2 && _m.id == "codex_bestiary", "depth=" + string(TabMenu_Depth()));
+                    Scenario_Check("tabmenu_nothing_met_is_all_question_marks", _m.items[0].label == "???" && _m.items[9].label == "???");
+                    Scenario_Tap("menu_down");
+                    break;
+                case 51:
+                    Scenario_Tap("cancel");
+                    break;
+                case 59:
+                    Scenario_Check("tabmenu_back_goes_up_one_level_only", TabMenu_Depth() == 1 && _m.id == "tab_codex" && _u.closed_ms < 0, "depth=" + string(TabMenu_Depth()));
+                    Scenario_Check("tabmenu_codex_cursor_is_remembered", _m.cursor == 0);
+                    Scenario_Next(_s, 186);
+                    break;
+            }
+            break;
+        case 186:   // close, meet an enemy in a real fight, read a note
+            switch (_s.t) {
+                case 1:
+                    Scenario_Tap("menu");
+                    break;
+                case 20:
+                    Scenario_Check("tabmenu_the_menu_key_closes_it", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                    Scenario_Check("tabmenu_the_bestiary_is_still_empty", Codex_BestiaryCount(Profile_Get()) == 0);
+                    Scenario_GotoBattle("smoke_d1b", ENEMY_SLIME);
+                    break;
+            }
+            if (_s.t > 40 && room == rm_battle && instance_exists(obj_battle_controller)) {
+                Scenario_Check("tabmenu_a_fight_adds_the_enemy_to_the_bestiary", Codex_BestiaryCount(Profile_Get()) == 1 && is_struct(Codex_Entry(Profile_Get(), ENEMY_SLIME)));
+                Scenario_Check("tabmenu_the_meeting_is_written_to_the_profile_file", Profile_Load(Profile_Path()).profile.bestiary.e0.met == 1);
+                room_goto(rm_floor1);
+                Scenario_Next(_s, 187);
+            }
+            if (_s.t > 600) { Scenario_Check("tabmenu_reaches_the_battle", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 187:   // read the first note, open the Codex again
+            if (_s.t > 40 && !variable_struct_exists(_s, "note") && Scenario_FloorReady(rm_floor1)) {
+                with (obj_enemy) instance_destroy();
+                Scenario_ClearUi();
+                var _nt = Scenario_FindNote("map_page");
+                Scenario_Check("tabmenu_the_first_note_stands_in_floor_1", _nt != noone);
+                if (_nt == noone) { Scenario_Finish(); break; }
+                Note_Read(_nt);
+                _s.note = true;
+                _s.t0 = _s.t;
+            }
+            if (variable_struct_exists(_s, "note") && _s.t == _s.t0 + 5) {
+                Scenario_Check("tabmenu_reading_a_note_records_it", Note_IsCollected(Profile_Get(), "map_page"));
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_Tap("menu");
+            }
+            if (variable_struct_exists(_s, "note") && _s.t == _s.t0 + 14) {
+                Scenario_Check("tabmenu_it_opens_on_the_tab_used_last", _gs.ui.mode == UI_MENU && TabMenu_Get().tab == 4, "tab=" + string(is_struct(TabMenu_Get()) ? TabMenu_Get().tab : -1));
+                Scenario_Check("tabmenu_codex_counts_the_enemy_and_the_note", _m.items[0].value == "1/10" && _m.items[1].value == "1/8", _m.items[0].value + " " + _m.items[1].value);
+                Scenario_Tap("confirm");
+            }
+            if (variable_struct_exists(_s, "note") && _s.t == _s.t0 + 22) {
+                Scenario_Check("tabmenu_the_met_enemy_is_named", _m.id == "codex_bestiary" && _m.items[0].label == EnemyDB_Get(ENEMY_SLIME).name && _m.items[1].label == "???");
+                Scenario_Check("tabmenu_the_enemy_shows_its_stats_from_the_data", Test_RowValue(_m.items[0].lines, "ATK") == string(EnemyDB_Get(ENEMY_SLIME).stats.atk));
+                Scenario_Tap("cancel");
+            }
+            if (variable_struct_exists(_s, "note") && _s.t == _s.t0 + 30) {
+                Scenario_Tap("menu_down");
+            }
+            if (variable_struct_exists(_s, "note") && _s.t == _s.t0 + 37) {
+                Scenario_Tap("confirm");
+            }
+            if (variable_struct_exists(_s, "note") && _s.t == _s.t0 + 45) {
+                Scenario_Check("tabmenu_the_note_read_is_listed_with_its_title", _m.id == "codex_notes" && _m.items[0].label == Note_Find("map_page").title && _m.items[1].label == "???", _m.id);
+                Scenario_Tap("cancel");
+            }
+            if (variable_struct_exists(_s, "note") && _s.t == _s.t0 + 53) {
+                Scenario_Check("tabmenu_back_to_the_codex_list_with_the_cursor_on_notes", TabMenu_Depth() == 1 && _m.cursor == 1, "cursor=" + string(_m.cursor));
+                Scenario_Tap("cancel");
+            }
+            if (variable_struct_exists(_s, "note") && _s.t == _s.t0 + 75) {
+                Scenario_Check("tabmenu_back_on_the_list_closes_the_menu", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                Scenario_Next(_s, 188);
+            }
+            if (_s.t > 600) { Scenario_Check("tabmenu_note_flow", false, "note=" + string(variable_struct_exists(_s, "note"))); Scenario_Finish(); }
+            break;
+        case 188:   // the settings as a tab: a change is thrown away by Back
+            switch (_s.t) {
+                case 1:
+                    _s.ts0 = GameSettings_Ensure().text_speed;
+                    Scenario_Tap("menu");
+                    break;
+                case 12:
+                    Scenario_Tap("tab_next");
+                    break;
+                case 20:
+                    Scenario_Check("tabmenu_E_from_the_codex_is_settings", is_struct(_u) && _u.tab == 5 && SettingsPopup_IsOpen("tab"));
+                    Scenario_Check("tabmenu_settings_has_the_details_panel", is_struct(_m) && _m.layout.details && _m.layout.details_pos == "right");
+                    Scenario_Tap("menu_down");
+                    break;
+                case 27: Scenario_Tap("menu_down"); break;
+                case 34: Scenario_Tap("menu_down"); break;
+                case 41:
+                    Scenario_Check("tabmenu_settings_cursor_is_on_text_speed", _m.items[_m.cursor].id == "text_speed", "row=" + _m.items[_m.cursor].id);
+                    Scenario_Tap("menu_right");
+                    break;
+                case 48:
+                    Scenario_Check("tabmenu_a_setting_changes_in_the_pending_copy", GameState_Get().ui.settings_popup.dirty && GameState_Get().ui.settings_popup.pending.text_speed != _s.ts0);
+                    Scenario_Check("tabmenu_it_is_not_applied_yet", GameSettings_Ensure().text_speed == _s.ts0);
+                    Scenario_Tap("cancel");
+                    break;
+                case 70:
+                    Scenario_Check("tabmenu_back_closes_the_menu_and_drops_the_change", _gs.ui.mode == UI_NONE && !SettingsPopup_IsOpen("tab") && GameSettings_Ensure().text_speed == _s.ts0, "mode=" + string(_gs.ui.mode) + " popup=" + string(SettingsPopup_IsOpen("tab")) + " speed=" + string(GameSettings_Ensure().text_speed) + " was " + string(_s.ts0));
+                    Scenario_Next(_s, 189);
+                    break;
+            }
+            break;
+        case 189:   // the pause menu: Resume, Help, Settings, Abandon Run, Quit to Title; it wraps; Back resumes
+            switch (_s.t) {
+                case 1:
+                    Scenario_Tap("pause");
+                    break;
+                case 12:
+                    Scenario_Check("pausemenu_the_pause_key_opens_it", _gs.ui.mode == UI_PAUSE && PauseMenu_IsOpen());
+                    Scenario_Check("pausemenu_starts_on_resume", PauseMenu_Cursor() == 0);
+                    Scenario_Check("pausemenu_has_the_five_rows", array_length(Ui_StackTop(PauseMenu_Get().stk).items) == 5);
+                    Scenario_Tap("menu_up");
+                    break;
+                case 19:
+                    Scenario_Check("pausemenu_up_from_resume_wraps_to_quit", PauseMenu_Cursor() == 4, "cursor=" + string(PauseMenu_Cursor()));
+                    Scenario_Tap("menu_down");
+                    break;
+                case 26:
+                    Scenario_Check("pausemenu_down_from_quit_wraps_to_resume", PauseMenu_Cursor() == 0);
+                    Scenario_Tap("cancel");
+                    break;
+                case 50:
+                    Scenario_Check("pausemenu_back_resumes", _gs.ui.mode == UI_NONE && !is_struct(PauseMenu_Get()), "mode=" + string(_gs.ui.mode));
+                    Scenario_Finish();
+                    break;
+            }
+            break;
+    }
+}
+
+// ---- pictures 210..213: every tab, the gear comparison, the Codex pages, the settings tab and the pause menu at windowed scale 3 (480 x 432)
+// and 5 (800 x 720); the Korean gear tab once. Each is the real draw of the real menu on a real room; the layout is asserted on the rectangles. ----
+function Scenario_TabScenes() {
+    return ["status", "skills", "items", "gear", "gear_compare", "codex", "bestiary", "notes", "history", "unlocks", "settings", "pause", "korean"];
+}
+
+function Scenario_TabScales(_di) {
+    return (_di == 12) ? [3] : [3, 5];
+}
+
+function Scenario_TabCursorOn(_id) {
+    var _m = TabMenu_TopMenu();
+    var _i = Scenario_TabRow(_m, _id);
+    if (_i >= 0) Ui_MenuFixCursor(_m, _i);
+    return _i;
+}
+
+function Scenario_StepShotsTabMenu(_s) {
+    var _scenes = Scenario_TabScenes();
+    var _gs = GameState_Get();
+    switch (_s.step) {
+        case 210:   // enter a room at this scale (the two floors take turns: entering the room we are in would not spawn the player again)
+            if (_s.t == 1) {
+                if (!variable_struct_exists(_s, "d1b_n")) { _s.d1b_n = 0; _s.d1b_prof = Scenario_TabProfile(); }
+                Scenario_TabFixture();
+                Loc_SetLanguage("en");
+                Scenario_SetWindowScale(Scenario_TabScales(_s.di)[_s.si]);
+                _s.d1b_n++;
+                room_goto((_s.d1b_n mod 2 == 0) ? rm_floor2 : rm_floor3);
+            }
+            if (_s.t >= 30 && Scenario_FloorReady((_s.d1b_n mod 2 == 0) ? rm_floor2 : rm_floor3)) Scenario_Next(_s, 211);
+            if (_s.t > 600) { Scenario_Check("shots_tabmenu_enters_the_room", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 211:   // set the scene up
+            with (obj_enemy) instance_destroy();
+            Scenario_ClearUi();
+            switch (_scenes[_s.di]) {
+                case "status": Menu_Open(0); Ui_MenuFixCursor(TabMenu_TopMenu(), 1); break;
+                case "skills": Menu_Open(1); Ui_MenuFixCursor(TabMenu_TopMenu(), 2); break;
+                case "items": Menu_Open(2); Scenario_TabCursorOn("item_11"); break;
+                case "gear": Menu_Open(3); Ui_MenuFixCursor(TabMenu_TopMenu(), 1); break;
+                case "gear_compare": Menu_Open(3); Scenario_TabCursorOn("gear_22"); break;
+                case "codex": Menu_Open(4); break;
+                case "bestiary": Menu_Open(4); TabCodex_Open("bestiary"); break;
+                case "notes": Menu_Open(4); TabCodex_Open("notes"); break;
+                case "history": Menu_Open(4); TabCodex_Open("history"); break;
+                case "unlocks": Menu_Open(4); TabCodex_Open("unlocks"); break;
+                case "settings": Menu_Open(5); Ui_MenuFixCursor(TabMenu_TopMenu(), 3); break;
+                case "pause":
+                    PauseMenu_Open();
+                    PauseMenu_Get().armed = true;
+                    Ui_StackTop(PauseMenu_Get().stk).items = PauseMenu_Items(true);
+                    Ui_MenuFixCursor(Ui_StackTop(PauseMenu_Get().stk), PAUSE_ABANDON_INDEX);
+                    break;
+                case "korean":
+                    Loc_SetLanguage("ko");
+                    Menu_Open(3);
+                    Scenario_TabCursorOn("gear_22");
+                    break;
+            }
+            Scenario_Next(_s, 212);
+            break;
+        case 212:   // let the panels slide in, check the layout, take the picture
+            if (_s.t >= 24) {
+                var _tag = _scenes[_s.di] + "_" + string(Scenario_TabScales(_s.di)[_s.si]);
+                var _is_pause = (_scenes[_s.di] == "pause");
+                Scenario_Check("shots_tabmenu_open_" + _tag, _is_pause ? PauseMenu_IsOpen() : (_gs.ui.mode == UI_MENU && is_struct(TabMenu_Get())), "mode=" + string(_gs.ui.mode));
+                if (!_is_pause) Scenario_TabLayoutChecks(_tag);
+                _s.shot = "shot_tabmenu_" + _scenes[_s.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 213);
+            }
+            break;
+        case 213:
+            if (_s.t >= 3) {
+                var _scales = Scenario_TabScales(_s.di);
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                if (is_struct(TabMenu_Get())) Menu_Close(true);
+                if (is_struct(PauseMenu_Get())) PauseMenu_Close(true);
+                Scenario_ClearUi();
+                _s.si++;
+                if (_s.si >= array_length(_scales)) { _s.si = 0; _s.di++; }
+                if (_s.di >= array_length(_scenes)) {
+                    Loc_SetLanguage("en");
+                    global.profile = _s.d1b_prof;
+                    variable_struct_remove(_gs, "run");   // the pictures after these are of a game with no run going
+                    _s.si = 0;
+                    _s.di = 0;
+                    Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
+                } else {
+                    Scenario_Next(_s, 210);
+                }
+            }
+            break;
+    }
+}
+
+// ---- bot v=11: a real fight puts the enemy in the Codex; the Tab menu on the way back shows it (D88) ----
+function Scenario_StepBotD1b(_s) {
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+    var _gs = GameState_Get();
+    var _m = TabMenu_TopMenu();
+    switch (_s.step) {
+        case 0:   // a levelled Knight and an empty Codex, then a Slime
+            if (_s.t == 10) {
+                Profile_ResetForTest();
+                global.ui_mem = Ui_MemNew();
+                var _g = Scenario_NewKnight();
+                variable_struct_remove(_g, "run");   // no run going: no card or stat screen opens over the menu after the level-ups
+                GameState_SetPlayer(Player_AddExp(_g.player_ch, 200));
+                Scenario_Check("bot_d1b_the_codex_starts_empty", Codex_BestiaryCount(Profile_Get()) == 0);
+                _s.vstart = _s.f;
+                Scenario_GotoBattle("bot_d1b", ENEMY_SLIME);
+                Scenario_Next(_s, 1);
+            }
+            break;
+        case 1:
+            if (_bc == noone) {
+                if (_s.t > 60) { Scenario_Check("bot_d1b_in_battle", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+                break;
+            }
+            if (_s.t == 5) Scenario_Check("bot_d1b_the_fight_started_the_entry", Codex_BestiaryCount(Profile_Get()) == 1);
+            if (_bc.battle_over) { Scenario_Next(_s, 2); break; }
+            if (_s.f - _s.vstart > 4000) { Scenario_Check("bot_d1b_fight_ends", false, "state=" + string(_bc.battle_state)); Scenario_Next(_s, 2); break; }
+            Scenario_BotPlainAttack(_s, _bc);
+            break;
+        case 2:   // back in the floor (a reaction dialogue may be up: close it), open the menu with the real key
+            if (_s.t == 200) Scenario_Check("bot_d1b_back_in_the_floor", room == rm_floor1, "room=" + room_get_name(room));
+            if (_s.t >= 200 && !variable_struct_exists(_s, "d1b_t0")) {
+                if (_gs.ui.mode == UI_DIALOGUE) Dialogue_CloseNow();
+                else if (_gs.ui.mode == UI_NONE && Scenario_FloorReady(rm_floor1) && Player_IsSettled(_gs.player_inst)) {
+                    Scenario_Tap("menu");
+                    _s.d1b_t0 = _s.t;
+                }
+            }
+            if (!variable_struct_exists(_s, "d1b_t0")) break;
+            var _k0 = _s.d1b_t0;
+            if (_s.t == _k0 + 12) {
+                Scenario_Check("bot_d1b_the_menu_opens_on_status", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && TabMenu_Get().tab == 0, "mode=" + string(_gs.ui.mode));
+                Scenario_Check("bot_d1b_status_shows_the_stats_after_the_fight", is_struct(_m) && _m.items[0].value == string(Stat_Get(_gs.player_ch, STAT_ATK)));
+                Scenario_Tap("tab_next");
+            }
+            if (_s.t == _k0 + 19) Scenario_Tap("tab_next");
+            if (_s.t == _k0 + 26) Scenario_Tap("tab_next");
+            if (_s.t == _k0 + 33) Scenario_Tap("tab_next");
+            if (_s.t == _k0 + 40) {
+                Scenario_Check("bot_d1b_four_E_reach_the_codex", is_struct(TabMenu_Get()) && TabMenu_Get().tab == 4);
+                Scenario_Check("bot_d1b_the_codex_counts_the_slime", is_struct(_m) && _m.items[0].value == "1/10", is_struct(_m) ? _m.items[0].value : "no menu");
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == _k0 + 50) {
+                Scenario_Check("bot_d1b_the_bestiary_names_the_slime", is_struct(_m) && _m.id == "codex_bestiary" && _m.items[0].label == EnemyDB_Get(ENEMY_SLIME).name, is_struct(_m) ? _m.id : "none");
+                Scenario_Check("bot_d1b_one_meeting_counted", is_struct(_m) && Test_RowValue(_m.items[0].lines, Loc_T("tab.lbl.met", "Met")) == "1");
+                Scenario_Tap("menu");
+            }
+            if (_s.t == _k0 + 75) {
+                Scenario_Check("bot_d1b_the_menu_key_closes_it_from_any_depth", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                _s.v = 5;   // on to movement and AI
                 Scenario_Next(_s, 0);
             }
             break;

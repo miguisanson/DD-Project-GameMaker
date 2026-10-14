@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T21:52:28Z",
-    "row_count": 926
+    "generated_at_utc": "2026-10-14T22:35:43Z",
+    "row_count": 1017
   },
   "default_lang": "en",
   "languages": [
@@ -2792,6 +2792,30 @@
       "en": "A wall of marks",
       "ko": "흔적으로 가득한 벽"
     },
+    "pause.help.abandon": {
+      "en": "Ends this run now. It counts as a death, but you keep the echo.",
+      "ko": "지금 도전을 끝냅니다. 죽음으로 기록되지만 메아리는 그대로 가져갑니다."
+    },
+    "pause.help.abandon_armed": {
+      "en": "Confirm once more to end this run now. Back or another row cancels.",
+      "ko": "한 번 더 확인하면 지금 도전이 끝납니다. 뒤로 가기나 다른 항목을 고르면 취소됩니다."
+    },
+    "pause.help.help": {
+      "en": "Every hint the game has: the ones you have seen and the ones still to come.",
+      "ko": "게임이 알려 주는 모든 도움말입니다. 본 것도, 앞으로 볼 것도 있습니다."
+    },
+    "pause.help.quit": {
+      "en": "Saves the run and goes to the title. Continue picks it up again.",
+      "ko": "도전을 저장하고 타이틀로 갑니다. 이어하기로 다시 시작할 수 있습니다."
+    },
+    "pause.help.resume": {
+      "en": "Back to the game.",
+      "ko": "게임으로 돌아갑니다."
+    },
+    "pause.help.settings": {
+      "en": "Sound, text, window, language and keys.",
+      "ko": "소리, 글자, 창, 언어, 키를 바꿉니다."
+    },
     "pause.option.abandon": {
       "en": "Abandon run",
       "ko": "도전 포기"
@@ -2808,6 +2832,10 @@
       "en": "Help",
       "ko": "도움말"
     },
+    "pause.option.quit": {
+      "en": "Quit to title",
+      "ko": "타이틀로 나가기"
+    },
     "pause.option.resume": {
       "en": "Resume",
       "ko": "계속하기"
@@ -2815,6 +2843,10 @@
     "pause.option.settings": {
       "en": "Settings",
       "ko": "설정"
+    },
+    "pause.title": {
+      "en": "Paused",
+      "ko": "일시 정지"
     },
     "profile.notice.corrupt": {
       "en": "Your profile file was damaged, so a fresh one was started. The damaged file was kept next to it.",
@@ -3021,8 +3053,8 @@
       "ko": "한국어"
     },
     "settings.line.cps": {
-      "en": "Characters per second",
-      "ko": "초당 글자 수"
+      "en": "Chars per sec",
+      "ko": "초당 글자"
     },
     "settings.line.monitor": {
       "en": "Monitor",
@@ -3575,6 +3607,338 @@
     "status.name.unknown": {
       "en": "Unknown",
       "ko": "알 수 없음"
+    },
+    "tab.bestiary.attack": {
+      "en": "Attack",
+      "ko": "공격"
+    },
+    "tab.bestiary.boss": {
+      "en": "A boss.",
+      "ko": "보스입니다."
+    },
+    "tab.bestiary.moves": {
+      "en": "Moves: {list}.",
+      "ko": "행동: {list}."
+    },
+    "tab.bestiary.unknown": {
+      "en": "You have not met this one yet.",
+      "ko": "아직 만난 적 없는 적입니다."
+    },
+    "tab.codex": {
+      "en": "Codex",
+      "ko": "도감"
+    },
+    "tab.codex.bestiary": {
+      "en": "Bestiary",
+      "ko": "적 도감"
+    },
+    "tab.codex.bestiary_help": {
+      "en": "The enemies you have met: their numbers and their moves.",
+      "ko": "만난 적들의 능력치와 행동입니다."
+    },
+    "tab.codex.bestiary_title": {
+      "en": "Bestiary {n}/{max}",
+      "ko": "적 도감 {n}/{max}"
+    },
+    "tab.codex.history": {
+      "en": "Run history",
+      "ko": "도전 기록"
+    },
+    "tab.codex.history_help": {
+      "en": "Every run you have finished, newest first.",
+      "ko": "끝낸 도전이 최근 순서로 나옵니다."
+    },
+    "tab.codex.notes": {
+      "en": "Notes",
+      "ko": "쪽지"
+    },
+    "tab.codex.notes_help": {
+      "en": "The notes you have read in the tunnel.",
+      "ko": "터널에서 읽은 쪽지입니다."
+    },
+    "tab.codex.notes_title": {
+      "en": "Notes {n}/{max}",
+      "ko": "쪽지 {n}/{max}"
+    },
+    "tab.codex.unlocks": {
+      "en": "Unlocks",
+      "ko": "해금"
+    },
+    "tab.codex.unlocks_help": {
+      "en": "What winning has opened up for later runs.",
+      "ko": "승리로 이후 도전에 열린 것들입니다."
+    },
+    "tab.gear": {
+      "en": "Gear",
+      "ko": "장비"
+    },
+    "tab.gear.bag": {
+      "en": "Bag",
+      "ko": "가방"
+    },
+    "tab.gear.empty": {
+      "en": "Nothing worn",
+      "ko": "착용 없음"
+    },
+    "tab.gear.empty_help": {
+      "en": "Nothing is worn in this slot.",
+      "ko": "이 칸에는 아무것도 착용하지 않았습니다."
+    },
+    "tab.gear.no_accessory": {
+      "en": "No accessory",
+      "ko": "장신구 없음"
+    },
+    "tab.gear.no_armor": {
+      "en": "No armor",
+      "ko": "방어구 없음"
+    },
+    "tab.gear.no_weapon": {
+      "en": "No weapon",
+      "ko": "무기 없음"
+    },
+    "tab.gear.replaces": {
+      "en": "Replaces {item}.",
+      "ko": "{item}을(를) 대체합니다."
+    },
+    "tab.gear.worn": {
+      "en": "Worn",
+      "ko": "착용 중"
+    },
+    "tab.hint.back": {
+      "en": "{back} Back",
+      "ko": "{back} 뒤로"
+    },
+    "tab.hint.change": {
+      "en": "{left}{right} Change",
+      "ko": "{left}{right} 변경"
+    },
+    "tab.hint.close": {
+      "en": "{back} Close",
+      "ko": "{back} 닫기"
+    },
+    "tab.hint.equip": {
+      "en": "{confirm} Equip",
+      "ko": "{confirm} 착용"
+    },
+    "tab.hint.open": {
+      "en": "{confirm} Open",
+      "ko": "{confirm} 열기"
+    },
+    "tab.hint.select": {
+      "en": "{confirm} Select",
+      "ko": "{confirm} 선택"
+    },
+    "tab.hint.takeoff": {
+      "en": "{confirm} Take off",
+      "ko": "{confirm} 해제"
+    },
+    "tab.hint.use": {
+      "en": "{confirm} Use",
+      "ko": "{confirm} 사용"
+    },
+    "tab.hist.abandoned": {
+      "en": "You gave this run up on floor {n}.",
+      "ko": "{n}층에서 도전을 포기했습니다."
+    },
+    "tab.hist.died": {
+      "en": "You fell on floor {n}.",
+      "ko": "{n}층에서 쓰러졌습니다."
+    },
+    "tab.hist.died_to": {
+      "en": "Floor {n}: felled by {name}.",
+      "ko": "{n}층: {name}에게 쓰러졌습니다."
+    },
+    "tab.hist.row": {
+      "en": "{cls} Lv {n}",
+      "ko": "{cls} Lv {n}"
+    },
+    "tab.hist.won": {
+      "en": "You climbed out of the tunnel.",
+      "ko": "터널을 빠져나왔습니다."
+    },
+    "tab.items": {
+      "en": "Items",
+      "ko": "아이템"
+    },
+    "tab.items.key": {
+      "en": "An item you keep for the way ahead.",
+      "ko": "앞으로의 길을 위해 간직하는 아이템입니다."
+    },
+    "tab.items.none": {
+      "en": "Nothing in your bag",
+      "ko": "소지품이 없습니다"
+    },
+    "tab.items.none_help": {
+      "en": "Potions, throwables and keys you find show up here.",
+      "ko": "찾은 물약, 투척 아이템, 열쇠가 여기에 나옵니다."
+    },
+    "tab.lbl.base": {
+      "en": "Base",
+      "ko": "기본"
+    },
+    "tab.lbl.best_floor": {
+      "en": "Best floor",
+      "ko": "최고 층"
+    },
+    "tab.lbl.effects": {
+      "en": "Effects",
+      "ko": "효과"
+    },
+    "tab.lbl.elite": {
+      "en": "Elite",
+      "ko": "정예"
+    },
+    "tab.lbl.falls": {
+      "en": "Falls",
+      "ko": "추락"
+    },
+    "tab.lbl.floor": {
+      "en": "Floor",
+      "ko": "층"
+    },
+    "tab.lbl.gear": {
+      "en": "Gear",
+      "ko": "장비"
+    },
+    "tab.lbl.gold": {
+      "en": "Gold",
+      "ko": "골드"
+    },
+    "tab.lbl.hp": {
+      "en": "HP",
+      "ko": "HP"
+    },
+    "tab.lbl.kills": {
+      "en": "Foes beaten",
+      "ko": "처치한 적"
+    },
+    "tab.lbl.level": {
+      "en": "Level",
+      "ko": "레벨"
+    },
+    "tab.lbl.met": {
+      "en": "Met",
+      "ko": "만난 횟수"
+    },
+    "tab.lbl.seed": {
+      "en": "Seed",
+      "ko": "시드"
+    },
+    "tab.lbl.seed_small": {
+      "en": "Seed {n}",
+      "ko": "시드 {n}"
+    },
+    "tab.lbl.total": {
+      "en": "Total",
+      "ko": "합계"
+    },
+    "tab.lbl.upgrade": {
+      "en": "Upgrade",
+      "ko": "강화"
+    },
+    "tab.lbl.wins": {
+      "en": "Wins",
+      "ko": "승리"
+    },
+    "tab.lbl.xp": {
+      "en": "XP",
+      "ko": "경험치"
+    },
+    "tab.notes.unknown": {
+      "en": "A note you have not found yet. Look at the walls.",
+      "ko": "아직 찾지 못한 쪽지입니다. 벽을 살펴보세요."
+    },
+    "tab.settings": {
+      "en": "Settings",
+      "ko": "설정"
+    },
+    "tab.skills": {
+      "en": "Skills",
+      "ko": "스킬"
+    },
+    "tab.skills.none": {
+      "en": "No skills yet",
+      "ko": "스킬 없음"
+    },
+    "tab.skills.none_help": {
+      "en": "Cards and chests teach skills. They appear here with the arrows to press.",
+      "ko": "카드와 상자에서 스킬을 얻습니다. 누를 화살표와 함께 여기에 나옵니다."
+    },
+    "tab.skills.passives": {
+      "en": "Passives",
+      "ko": "패시브"
+    },
+    "tab.status": {
+      "en": "Status",
+      "ko": "상태"
+    },
+    "tab.title.codex": {
+      "en": "Codex",
+      "ko": "도감"
+    },
+    "tab.title.gear": {
+      "en": "Gear",
+      "ko": "장비"
+    },
+    "tab.title.items": {
+      "en": "Items",
+      "ko": "아이템"
+    },
+    "tab.title.skills": {
+      "en": "Skills {n}/{max}",
+      "ko": "스킬 {n}/{max}"
+    },
+    "tab.title.status": {
+      "en": "Stats",
+      "ko": "능력치"
+    },
+    "tab.unlock.nobody": {
+      "en": "Nobody",
+      "ko": "무명"
+    },
+    "tab.unlock.nobody_off": {
+      "en": "Win a run to unlock a fighter with no class.",
+      "ko": "승리하면 직업이 없는 전사가 해금됩니다."
+    },
+    "tab.unlock.nobody_on": {
+      "en": "A fighter with no class. Throws {m}x as hard and carries {cap} of each throwable.",
+      "ko": "직업이 없는 전사입니다. 투척 아이템을 {m}배 강하게 던지고 종류마다 {cap}개를 가질 수 있습니다."
+    },
+    "tab.val.abandoned": {
+      "en": "Gave up",
+      "ko": "포기"
+    },
+    "tab.val.applied": {
+      "en": "Applied",
+      "ko": "적용됨"
+    },
+    "tab.val.floor": {
+      "en": "Floor {n}",
+      "ko": "{n}층"
+    },
+    "tab.val.locked": {
+      "en": "Locked",
+      "ko": "잠김"
+    },
+    "tab.val.max": {
+      "en": "MAX",
+      "ko": "최대"
+    },
+    "tab.val.none": {
+      "en": "None",
+      "ko": "없음"
+    },
+    "tab.val.seen": {
+      "en": "Seen",
+      "ko": "목격"
+    },
+    "tab.val.unlocked": {
+      "en": "Unlocked",
+      "ko": "해금됨"
+    },
+    "tab.val.won": {
+      "en": "Won",
+      "ko": "승리"
     },
     "throw.msg.burn": {
       "en": "It burns for {n} each turn.",

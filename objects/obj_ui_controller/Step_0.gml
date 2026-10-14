@@ -92,7 +92,7 @@ if (gs.ui.mode == UI_PAUSE) {
     exit;
 }
 
-if (k_menu) {
+if (k_menu && !Menu_CaptureActive()) {
     if (gs.ui.mode == UI_MENU) {
         Menu_Close();
     } else if (gs.ui.mode == UI_NONE) {

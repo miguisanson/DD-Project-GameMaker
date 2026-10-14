@@ -684,18 +684,21 @@ function RunFlow_Active() {
     return variable_global_exists("run_flow") && is_struct(global.run_flow) && global.run_flow.phase != "off";
 }
 
-// One line about an echo option: type and effect, from the same lines the tooltips show.
-function RunFlow_EchoHelp(_o) {
-    var lines = (_o.kind == "skill") ? Tooltip_BuildSkillLines(SkillDB_Get(_o.id)) : Tooltip_BuildItemLines(ItemDB_Get(_o.id));
-    var out = "";
-    for (var i = 1; i < array_length(lines); i++) out += ((out == "") ? "" : " / ") + string(lines[i]);
-    return out;
+// What an echo option does, in the details panel's terms (D100): one plain sentence and the numbers from the data.
+function RunFlow_EchoDetails(_o) {
+    if (_o.kind == "skill") return Battle_SkillDetails(SkillDB_Get(_o.id));
+    var it = ItemDB_Get(_o.id);
+    return { sentence: Item_Sentence(it), lines: Item_NumberLines(it, GameState_Get().player_ch) };
 }
 
 function RunFlow_BuildEchoMenu(_f) {
     var items = [];
     for (var i = 0; i < array_length(_f.options); i++) {
-        array_push(items, { id: "echo" + string(i), label: Run_EchoLabel(_f.options[i]), kind: "button", enabled: true, help: RunFlow_EchoHelp(_f.options[i]), lines: [] });
+        var o = _f.options[i];
+        var det = RunFlow_EchoDetails(o);
+        var row = { id: "echo" + string(i), label: Run_EchoLabel(o), kind: "button", enabled: true, help: det.sentence, lines: det.lines };
+        if (o.kind == "skill") row.seq = Qte_SkillSequence(o.id);
+        array_push(items, row);
     }
     var m = Ui_MenuNew("run_echo", items, {
         data: { chosen: -1 },
@@ -772,7 +775,7 @@ function RunFlow_Draw() {
         draw_set_alpha(a);
         draw_set_halign(fa_center);
         draw_set_valign(fa_top);
-        draw_set_color(UI_C_LIGHTEST);
+        draw_set_color(UI_C_TEXT);
         draw_text_ext_transformed(round(w / 2), round((h - th) / 2), f.ctx.text, -1, max(1, round(col_w / s)), s, s, 0);
         draw_set_halign(fa_left);
         draw_set_alpha(1);

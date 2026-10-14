@@ -120,6 +120,7 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
     if (!is_struct(gs.player_ch)) return { message: "", loot_entries: [] };
     var p = gs.player_ch;
     var cfg = EnemyDB_Get(_enemy_id);
+    Codex_RecordMeeting(_enemy_id, false);   // D88: the bestiary
 
     var exp_mult = variable_struct_exists(cfg, "auto_resolve_exp_mult") ? max(0, real(cfg.auto_resolve_exp_mult)) : ENEMY_AUTO_RESOLVE_EXP_MULT_DEFAULT;
     var loot_mult = variable_struct_exists(cfg, "auto_resolve_loot_mult") ? clamp(real(cfg.auto_resolve_loot_mult), 0, 1) : ENEMY_AUTO_RESOLVE_LOOT_MULT_DEFAULT;

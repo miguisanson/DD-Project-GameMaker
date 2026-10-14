@@ -2971,7 +2971,7 @@ function Battle_EnemyHeaderRect(_bc) {
     var spr = inst.sprite_index;
     out.cx = ((inst.x - sprite_get_xoffset(spr) - _bc.cam_base_x) + sprite_get_width(spr) * abs(inst.image_xscale) * 0.5) * sx;
     var top = (inst.y - sprite_get_yoffset(spr) + sprite_get_bbox_top(spr) * abs(inst.image_yscale) - _bc.cam_base_y) * sx;
-    var name_w = UI_TextWidth(_bc.e.name) + 10 * p;
+    var name_w = UI_TextWidth(Battle_EnemyName(_bc.e)) + 10 * p;
     out.bw = clamp(max(name_w, round(sprite_get_width(spr) * abs(inst.image_xscale) * sx * 0.9), 30 * p), 30 * p, mt.gw - 4 * mt.margin);
     out.h = 8 * p + mt.line_h + p + 4 * p + p + 3 * p;
     if (variable_struct_exists(_bc, "e") && is_struct(_bc.e) && variable_struct_exists(_bc.e, "is_elite") && _bc.e.is_elite) out.h += mt.line_h + p;   // C3 (D86): room for the ELITE tag
@@ -3017,6 +3017,13 @@ function Battle_DrawBar(_x, _y, _w, _h, _p, _ratio, _shown, _col, _trail, _strip
     }
 }
 
+// The enemy's name in the language of this moment (the battle struct keeps the name it was made with), the elite modifier in front.
+function Battle_EnemyName(_e) {
+    var base = EnemyDB_Get(_e.id).name;
+    if (variable_struct_exists(_e, "is_elite") && _e.is_elite) return Elite_Name(_e.elite) + " " + base;
+    return base;
+}
+
 // Name, HP and stagger meter above the enemy. The stagger bar flashes when a hit lands and pulses while the enemy is BROKEN; chips above the plate.
 function Battle_DrawEnemyHeader(_bc, _alpha) {
     if (!instance_exists(_bc.enemy_inst) || _bc.enemy_inst.sprite_index == noone) return;
@@ -3035,7 +3042,7 @@ function Battle_DrawEnemyHeader(_bc, _alpha) {
         Ui_Text(hdr.x1 + hdr.bw * 0.5, yy, Loc_T("elite.tag", "ELITE"), pulse_col, fa_center);
         yy += mt.line_h + p;
     }
-    Ui_Text(hdr.x1 + hdr.bw * 0.5, yy, e.name, UI_C_LIGHTEST, fa_center);
+    Ui_Text(hdr.x1 + hdr.bw * 0.5, yy, Battle_EnemyName(e), UI_C_LIGHTEST, fa_center);
     yy += mt.line_h + p;
     _bc.enemy_hp_shown = Ui_Glide(_bc.enemy_hp_shown, e.hp, current_time - _bc.enemy_hp_clock, 120);
     _bc.enemy_hp_clock = current_time;

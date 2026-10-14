@@ -10,6 +10,7 @@ p = gs.player_ch;
 p = Equip_PassiveBattleReset(p);
 e = EnemyCreate(gs.battle.enemy_id);
 e = Elite_Apply(e, Elite_BattleMod());   // C3 (D86): the map enemy's modifier (stats, name, tag)
+Codex_RecordMeeting(e.id, e.is_elite);   // D88: the bestiary lists the enemies met
 throw_item = -1;                          // C3 (D84): the throwable whose bar is running, -1 = a plain attack
 Card_OnBattleStart(p, e);   // C2: Opening Blow
 

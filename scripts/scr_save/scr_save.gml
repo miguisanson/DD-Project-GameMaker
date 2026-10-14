@@ -590,6 +590,7 @@ function Profile_Default() {
         echo: { kind: "", id: -1 },            // the gift the next run starts with (D87): kind "item" or "skill"
         echo_offer: [],                        // the 3 options of a death whose pick has not been made yet
         history: [],                           // one entry per finished run, newest last
+        bestiary: {},                          // "e<enemy id>" -> { met, elite }: the enemies met in a fight, for the Codex (D88; Codex_Met)
         deaths: 0,
         wins: 0,
         runs_started: 0,
@@ -627,6 +628,15 @@ function Profile_Normalize(_raw) {
             if (is_struct(_raw.history[h])) array_push(p.history, _raw.history[h]);
         }
         while (array_length(p.history) > PROFILE_HISTORY_MAX) array_delete(p.history, 0, 1);
+    }
+    if (variable_struct_exists(_raw, "bestiary") && is_struct(_raw.bestiary)) {
+        var bkeys = variable_struct_get_names(_raw.bestiary);
+        for (var bi = 0; bi < array_length(bkeys); bi++) {
+            var be = variable_struct_get(_raw.bestiary, bkeys[bi]);
+            if (is_struct(be) && variable_struct_exists(be, "met")) {
+                variable_struct_set(p.bestiary, bkeys[bi], { met: max(1, Save_ToReal(be.met, 1)), elite: variable_struct_exists(be, "elite") && (Save_ToReal(be.elite, 0) != 0) });
+            }
+        }
     }
     var counters = ["deaths", "wins", "runs_started", "best_floor"];
     for (var c = 0; c < array_length(counters); c++) {

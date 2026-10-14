@@ -819,15 +819,6 @@ function UI_DrawTextTransformed(_x, _y, _txt, _xscale, _yscale, _angle) {
     draw_text_transformed(real(_x), real(_y), string(_txt), real(_xscale) * s, real(_yscale) * s, real(_angle));
 }
 
-function UI_DrawTextExt(_x, _y, _txt, _sep, _w) {
-    var s = max(0.0001, UI_GetFontScale());
-    var sep = real(_sep);
-    var wrap_w = real(_w);
-    if (sep > 0) sep = max(1, round(sep / s));
-    if (wrap_w > 0) wrap_w = max(1, round(wrap_w / s));
-    draw_text_ext_transformed(real(_x), real(_y), string(_txt), sep, wrap_w, s, s, 0);
-}
-
 // The Korean UI font (D98): Galmuri9 or Galmuri11 (SIL OFL, Included Files at fonts/galmuri) added at the whole multiple of its
 // native size that matches the English line height in window pixels. One font per size is cached. -1 when the file is missing.
 function UI_KoFont() {
@@ -889,45 +880,6 @@ function UI_PopupAlpha(_opened_frame, _closing = false, _close_frame = UI_OPENED
         a *= (1 - t);
     }
     return clamp(a, 0, 1);
-}
-
-// --- Shared popup styling (keeps every dialog/confirm box consistent + scaled) ---
-function UI_PopupMetrics() {
-    var v = UI_GetVisualScale();
-    var line_h = UI_TextHeight("A");
-    return {
-        scale: v,
-        line_h: line_h,
-        pad_x: max(8, round(12 * v)),
-        pad_y: max(6, round(8 * v)),
-        gap_y: max(6, round(8 * v)),
-        btn_pad_x: max(6, round(8 * v)),
-        btn_gap_x: max(10, round(14 * v)),
-        btn_h: line_h + max(4, round(6 * v)),
-        min_w: max(160, round(180 * v))
-    };
-}
-
-function UI_ButtonWidth(_label, _btn_pad_x) {
-    return UI_TextWidth(_label) + _btn_pad_x * 2;
-}
-
-function UI_DrawButton(_x, _y, _w, _h, _label, _selected, _alpha) {
-    if (_selected) {
-        draw_set_alpha(_alpha);
-        draw_set_color(c_white);
-        draw_rectangle(_x, _y, _x + _w, _y + _h, false);
-        draw_set_color(c_black);
-        draw_rectangle(_x, _y, _x + _w, _y + _h, true);
-        draw_set_color(c_black);
-    } else {
-        draw_set_alpha(_alpha);
-        draw_set_color(c_white);
-    }
-    var tx = _x + (_w - UI_TextWidth(_label)) * 0.5;
-    var ty = _y + (_h - UI_TextHeight("A")) * 0.5;
-    UI_DrawText(tx, ty, _label);
-    draw_set_alpha(1);
 }
 
 function UI_ModalRootEnsure() {
@@ -1028,26 +980,11 @@ function UI_InterruptCloseAll(_fade_dim = true) {
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
 
     // Immediately hide all modal/popups to avoid stale mode locks during transitions.
-    if (variable_struct_exists(gs.ui, "menu") && is_struct(gs.ui.menu)) {
-        var m = gs.ui.menu;
-        m.open = false;
-        m.closing = false;
-        m.close_frame = UI_OPENED_FRAME_NONE;
-        m.inv_popup_open = false;
-        m.inv_popup_closing = false;
-        m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
-        m.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
-        gs.ui.menu = m;
+    if (is_struct(TabMenu_Get())) {   // D1b: the Tab menu and the pause menu are framework screens held in globals
+        TabSettings_Discard();
+        global.tab_ui = undefined;
     }
-
-    if (variable_struct_exists(gs.ui, "pause_menu") && is_struct(gs.ui.pause_menu)) {
-        var pm = gs.ui.pause_menu;
-        pm.open = false;
-        pm.closing = false;
-        pm.close_frame = UI_OPENED_FRAME_NONE;
-        pm.opened_frame = UI_OPENED_FRAME_NONE;
-        gs.ui.pause_menu = pm;
-    }
+    if (is_struct(PauseMenu_Get())) global.pause_ui = undefined;
 
     if (variable_struct_exists(gs.ui, "save_menu") && is_struct(gs.ui.save_menu)) {
         var sm = gs.ui.save_menu;
@@ -1109,34 +1046,7 @@ function UI_GetModalVisualAlpha() {
         }
     }
 
-    if (SettingsPopup_IsOpen("pause") && variable_struct_exists(gs.ui, "settings_popup")) {
-        var sp_alpha = SettingsPopup_Alpha();
-
-        // Linked modal chain: while pause owns the stack and opens Settings,
-        // keep dim sourced from the stronger of parent/child alpha so dim
-        // never drops during handoff frames.
-        if (gs.ui.mode == UI_PAUSE && variable_struct_exists(gs.ui, "pause_menu")) {
-            var pm = gs.ui.pause_menu;
-            var pm_alpha = UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
-            return max(sp_alpha, pm_alpha);
-        }
-
-        return sp_alpha;
-    }
-
     switch (gs.ui.mode) {
-        case UI_MENU:
-            if (variable_struct_exists(gs.ui, "menu")) {
-                var m = gs.ui.menu;
-                return UI_PopupAlpha(m.opened_frame, m.closing, m.close_frame, 1);
-            }
-            break;
-        case UI_PAUSE:
-            if (variable_struct_exists(gs.ui, "pause_menu")) {
-                var pm = gs.ui.pause_menu;
-                return UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
-            }
-            break;
         case UI_SAVE:
             if (variable_struct_exists(gs.ui, "save_menu")) {
                 var sm = gs.ui.save_menu;
