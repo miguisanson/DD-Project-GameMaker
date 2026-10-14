@@ -4276,6 +4276,48 @@ function Test_Suite_Cards() {
     var _pot = Item_Use(10, _an, _tgt);
     Test_True("C2 Tonic Blend: a potion also gives 2 MP", _pot.ok && _tgt.mp == 2, "mp=" + string(_tgt.mp));
 
+    // ---- no inert upgrade (balance report: Foresight+ gave +0 turns because the status's fixed duration won over the skill's turns) ----
+    // Foresight+ is +2 turns (card table above: 3 > 5), so a real cast on the player leaves 5 turns, base Foresight 3.
+    var _fs_base = Test_CardPlayer(CLASS_MAGE, [SKILL_FORESIGHT]);
+    var _fs_up = Test_CardPlayer(CLASS_MAGE, [SKILL_FORESIGHT], [SKILL_FORESIGHT]);
+    _gs.player_ch = _fs_base;
+    Skill_Use(_fs_base, _fs_base, SKILL_FORESIGHT);
+    Test_Eq("Foresight: a cast gives 3 turns", Status_Find(_fs_base, STATUS_HIT_UP).turns, 3);
+    _gs.player_ch = _fs_up;
+    Skill_Use(_fs_up, _fs_up, SKILL_FORESIGHT);
+    Test_Eq("Foresight+: a cast gives 5 turns (card says 3 > 5)", Status_Find(_fs_up, STATUS_HIT_UP).turns, 5);
+    // data test: EVERY upgrade card changes at least one number the game really uses when the skill is cast, and EVERY number it declares
+    // (power, mp_cost, arrows, turns, stacks, chance) really changes: no upgrade, and no half of one, can be inert again.
+    var _inert = "";
+    var _ups = [SKILL_WOUND, SKILL_HILT_BASH, SKILL_MUSCLE_UP, SKILL_REV_UP, SKILL_HORIZ_SLASH, SKILL_POISON_ARROW, SKILL_EVASION, SKILL_DOUBLE_SHOT, SKILL_TAKE_AIM, SKILL_FIREBALL, SKILL_POISON_MIST, SKILL_ICE_SPEAR, SKILL_MEDITATION, SKILL_FORESIGHT];
+    for (var _ui = 0; _ui < array_length(_ups); _ui++) {
+        var _usid = _ups[_ui];
+        var _ubase = SkillDB_GetBase(_usid);
+        var _ucard = CardDB_Get(Card_UpgradeId(_usid));
+        var _uup = Skill_WithUpgrade(_ubase, _ucard);
+        var _uuser = Test_CardPlayer(CLASS_KNIGHT);
+        var _utgt = (_ubase.target == TGT_SELF) ? _uuser : EnemyCreate(ENEMY_SLIME);
+        var _eff_a = { power: _ubase.power, mp_cost: _ubase.mp_cost, seq_trim: Card_UpgradedSequenceLength(_usid, []), status_turns: 0, status_stacks: 0, status_chance: 0 };
+        var _eff_b = { power: _uup.power, mp_cost: _uup.mp_cost, seq_trim: Card_UpgradedSequenceLength(_usid, [_usid]), status_turns: 0, status_stacks: 0, status_chance: 0 };
+        if (_ubase.status != -1) {
+            var _ua = Skill_StatusApplyArgs(_uuser, _utgt, _ubase.status, max(1, round(_ubase.status_turns)), Skill_BaseStacks(_ubase));
+            var _ub = Skill_StatusApplyArgs(_uuser, _utgt, _uup.status, max(1, round(_uup.status_turns)), Skill_BaseStacks(_uup));
+            _eff_a.status_turns = _ua.turns; _eff_a.status_stacks = _ua.stacks;
+            _eff_b.status_turns = _ub.turns; _eff_b.status_stacks = _ub.stacks;
+            _eff_a.status_chance = variable_struct_exists(_ubase, "status_chance") ? _ubase.status_chance : 1;
+            _eff_b.status_chance = variable_struct_exists(_uup, "status_chance") ? _uup.status_chance : 1;
+        }
+        var _any_changed = false;
+        var _dkeys = variable_struct_get_names(_ucard.up);
+        for (var _di = 0; _di < array_length(_dkeys); _di++) {
+            var _dk = _dkeys[_di];
+            if (variable_struct_get(_eff_a, _dk) == variable_struct_get(_eff_b, _dk)) _inert += " " + string(_ubase.name) + "/" + _dk;
+            else _any_changed = true;
+        }
+        if (!_any_changed) _inert += " " + string(_ubase.name) + "/nothing";
+    }
+    Test_True("every upgrade changes every number it declares, as the game applies it (inert:" + _inert + ")", _inert == "");
+
     // ---- the owed screens: class choice (D73), free stat point (D76), card pick (D81) ----
     _gs.player_ch = _old_player;
     _gs.run = Run_Create(5);
