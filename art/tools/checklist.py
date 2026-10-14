@@ -36,7 +36,7 @@ def write_checklist(order, art):
     T.append("If a frame looks wrong in the IDE, the Import Strip numbers are off: delete the frames and import again with the table values.\n")
     T.append("## Provenance
 ")
-    T.append("The final icons in `art/icons/` and the strips are script-drawn pixel art (`art/tools/draw.py`), not AI output. The SDXL images in `art/candidates/` are post-processed candidates only, not used in the strips. All files use exactly #071821 #306850 #86C06C #E0F8CF plus transparency (checked by `build.py`).
+    T.append("The final icons in `art/icons/` and the strips are script-drawn pixel art (`art/tools/draw.py`), not AI output. The SDXL images in `art/candidates/` are post-processed candidates only and are not in the strips. All files use exactly #071821 #306850 #86C06C #E0F8CF plus transparency (checked by `build.py`).
 ")
     with open(f"{art}/IMPORT-CHECKLIST.md", "w", newline="\n") as f:
         f.write("\n".join(T) + "\n")
