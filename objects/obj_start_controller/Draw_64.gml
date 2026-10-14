@@ -24,6 +24,12 @@ if (state == "boot_logo") {
     exit;
 }
 if (state == "cutscene") exit;
+if (state == "run_flow") {   // C1: run summary and echo pick after the death scene (placeholder screens)
+    RunFlow_Draw();
+    draw_set_alpha(1);
+    Build_DrawId();
+    exit;
+}
 var loading_into_game = Transition_IsActive()
 && variable_struct_exists(gs, "in_main_menu")
 && !gs.in_main_menu;

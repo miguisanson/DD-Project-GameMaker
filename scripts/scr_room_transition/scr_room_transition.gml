@@ -344,6 +344,11 @@ function Transition_RequestBlackFlash(_fade_out_frames = TRANSITION_FLASH_FADE_O
 
 function Transition_RequestCutsceneById(_cutscene_id) {
     var gs = GameState_Get();
+    if (string(_cutscene_id) == "ending" && Story_Seen(Story_CutsceneKey("ending"))) {
+        Run_OnWin();   // C1: wins + 1, the run ends; the ending and the credits are not shown again
+        gs.in_main_menu = true;
+        return Transition_RequestCutsceneFade(rm_start);
+    }
     gs.pending_cutscene_id = string(_cutscene_id);
     return Transition_RequestCutsceneFade(rm_cutscene);
 }

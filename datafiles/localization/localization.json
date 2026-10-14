@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T10:05:30Z",
-    "row_count": 708
+    "generated_at_utc": "2026-10-14T10:16:55Z",
+    "row_count": 730
   },
   "default_lang": "en",
   "languages": [
@@ -183,6 +183,10 @@
     "bed.option.rest": {
       "en": "Rest",
       "ko": "나머지"
+    },
+    "bed.rest_moment": {
+      "en": "You rest for a moment.",
+      "ko": "잠시 쉬었다."
     },
     "class.classselect_draw.2029.0": {
       "en": "class.select.title",
@@ -1612,6 +1616,10 @@
       "en": "Exit Game",
       "ko": "게임 종료"
     },
+    "menu.main.option.continue": {
+      "en": "Continue",
+      "ko": "이어하기"
+    },
     "menu.menu_draw.1353.0": {
       "en": "menu.tab.inventory",
       "ko": "메뉴.탭.인벤토리"
@@ -2180,6 +2188,14 @@
       "en": "Effect: {effect}",
       "ko": "효과: {effect}"
     },
+    "pause.option.abandon": {
+      "en": "Abandon Run",
+      "ko": "도전 포기"
+    },
+    "pause.option.abandon_confirm": {
+      "en": "Sure? Confirm again",
+      "ko": "정말? 한 번 더 확인"
+    },
     "pause.option.exit_main": {
       "en": "Exit to Main Menu",
       "ko": "메인 메뉴로 나가기"
@@ -2191,6 +2207,74 @@
     "pause.option.settings": {
       "en": "Settings",
       "ko": "설정"
+    },
+    "profile.notice.corrupt": {
+      "en": "Your profile file was damaged, so a fresh one was started. The damaged file was kept next to it.",
+      "ko": "프로필 파일이 손상되어 새로 시작했습니다. 손상된 파일은 옆에 보관했습니다."
+    },
+    "profile.notice.locked": {
+      "en": "Your profile was saved by a different version of the game. It has been left untouched, and progress will not be saved this time.",
+      "ko": "다른 버전의 게임에서 저장된 프로필입니다. 그대로 두며, 이번에는 진행 상황이 저장되지 않습니다."
+    },
+    "run.continue.corrupt": {
+      "en": "The run save is damaged and cannot be loaded.",
+      "ko": "도전 저장 파일이 손상되어 불러올 수 없습니다."
+    },
+    "run.continue.missing": {
+      "en": "There is no run to continue.",
+      "ko": "이어할 도전이 없습니다."
+    },
+    "run.continue.newer": {
+      "en": "This run was saved by a newer version of the game and cannot be loaded.",
+      "ko": "더 새로운 버전의 게임에서 저장된 도전이라 불러올 수 없습니다."
+    },
+    "runflow.cause.abandoned": {
+      "en": "You gave up the run.",
+      "ko": "도전을 포기했다."
+    },
+    "runflow.cause.enemy": {
+      "en": "Felled by: {name}",
+      "ko": "쓰러뜨린 상대: {name}"
+    },
+    "runflow.cause.unknown": {
+      "en": "Something in the dark took you.",
+      "ko": "어둠 속의 무언가가 당신을 데려갔다."
+    },
+    "runflow.class_level": {
+      "en": "{cls}, level {lvl}",
+      "ko": "{cls}, 레벨 {lvl}"
+    },
+    "runflow.continue": {
+      "en": "Press confirm to go on",
+      "ko": "확인을 눌러 계속"
+    },
+    "runflow.echo.hint": {
+      "en": "Up / Down to choose, confirm to take it",
+      "ko": "위/아래로 선택, 확인으로 가져가기"
+    },
+    "runflow.echo.item": {
+      "en": "Item: {name}",
+      "ko": "아이템: {name}"
+    },
+    "runflow.echo.skill": {
+      "en": "Skill: {name}",
+      "ko": "스킬: {name}"
+    },
+    "runflow.echo.title": {
+      "en": "Carry one echo into the next fall",
+      "ko": "다음 추락에 메아리 하나를 가져갑니다"
+    },
+    "runflow.falls": {
+      "en": "Falls so far: {n}",
+      "ko": "지금까지 추락: {n}"
+    },
+    "runflow.floor": {
+      "en": "Floor reached: {n}",
+      "ko": "도달한 층: {n}"
+    },
+    "runflow.title": {
+      "en": "The tunnel keeps you.",
+      "ko": "터널이 당신을 놓아주지 않는다."
     },
     "save.back": {
       "en": "Back",
@@ -2215,6 +2299,10 @@
     "save.delete": {
       "en": "Delete",
       "ko": "삭제"
+    },
+    "save.legacy.notice": {
+      "en": "Saves from the earlier version cannot be loaded in this one. They have been left untouched. Start a new run.",
+      "ko": "이전 버전의 저장 파일은 이 버전에서 불러올 수 없습니다. 파일은 그대로 두었습니다. 새 도전을 시작하세요."
     },
     "save.level.short": {
       "en": "Lv",

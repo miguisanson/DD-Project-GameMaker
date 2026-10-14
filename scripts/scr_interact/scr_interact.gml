@@ -135,7 +135,7 @@ function GraveLoot_RollTierItem(_tier, _class_id = CLASS_NOBODY, _player = undef
     if (array_length(candidates) <= 0 || total_weight <= 0) return [];
 
     var pick = candidates[0];
-    var roll = random(total_weight);
+    var roll = RunRng_Float("loot") * total_weight;
     var acc = 0;
     for (var j = 0; j < array_length(candidates); j++) {
         var c = candidates[j];
@@ -162,7 +162,7 @@ function GraveLoot_RollTierItem(_tier, _class_id = CLASS_NOBODY, _player = undef
 
     minv = max(1, round(real(minv)));
     maxv = max(minv, round(real(maxv)));
-    var qty = (minv == maxv) ? minv : irandom_range(minv, maxv);
+    var qty = (minv == maxv) ? minv : RunRng_Range("loot", minv, maxv);
     qty = max(1, qty);
 
     return [{ item_id: pid, qty: qty }];
@@ -187,7 +187,7 @@ function GraveLoot_RollRewardForStage(_stage, _class_id) {
 function GraveLoot_TryRollReward(_class_id) {
     var stage_before = GraveLoot_GetStage();
     var chance = GraveLoot_StageChance(stage_before);
-    if (random(1) > chance) {
+    if (RunRng_Float("loot") > chance) {
         return {
             awarded: false,
             loot: [],
@@ -472,7 +472,8 @@ function Interact_Handle(_inst) {
         case INTERACT_CHECKPOINT: {
             GameState_SetCheckpoint(room, _inst.x, _inst.y);
             if (variable_instance_exists(_inst, "is_bed") && _inst.is_bed) {
-                BedMenu_Open();
+                // D46: beds are not save points any more. What a bed does instead is packet C4 (rest site); until then, one line.
+                Dialogue_StartLines([Loc_T("bed.rest_moment", "You rest for a moment.")]);
             }
         } break;
     }

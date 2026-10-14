@@ -28,7 +28,7 @@ function Enemy_ResolveLevel(_cfg, _room) {
 
     var zone_level = Enemy_ZoneLevelForRoom(_room);
     var offset = variable_struct_exists(_cfg, "species_level_offset") ? round(_cfg.species_level_offset) : 0;
-    var roll = irandom_range(-1, 1);
+    var roll = RunRng_Range("enemy", -1, 1);
     var lvl = zone_level + roll + offset;
     return clamp(lvl, min_lvl, max_lvl);
 }
@@ -144,7 +144,7 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
     if (loot_mult < 1 && is_array(loot)) {
         var kept = [];
         for (var i = 0; i < array_length(loot); i++) {
-            if (random(1) <= loot_mult) array_push(kept, loot[i]);
+            if (RunRng_Float("loot") <= loot_mult) array_push(kept, loot[i]);
         }
         loot = kept;
     }

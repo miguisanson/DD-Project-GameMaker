@@ -867,7 +867,7 @@ function Item_ComputeAmount(_user, _use) {
     if (variable_struct_exists(_use, "max")) maxv = _use.max; else maxv = _use.power;
     if (maxv < minv) maxv = minv;
 
-    var amt = (minv == maxv) ? minv : irandom_range(minv, maxv);
+    var amt = (minv == maxv) ? minv : RunRng_Range("combat", minv, maxv);
 
     if (is_struct(_user) && variable_struct_exists(_user, "level") && variable_struct_exists(_use, "scale")) {
         var lvl = max(0, _user.level - 1);

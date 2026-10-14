@@ -2364,7 +2364,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
 function Title_MainItems(_can_load) {
     return [
         { id: "new", label: Loc_T("menu.main.option.0", "New Game"), kind: "button", enabled: true },
-        { id: "load", label: Loc_T("menu.main.option.1", "Load Game"), kind: "button", enabled: _can_load },
+        { id: "load", label: Loc_T("menu.main.option.continue", "Continue"), kind: "button", enabled: _can_load },   // C1 (D46): Continue run
         { id: "settings", label: Loc_T("menu.main.option.2", "Settings"), kind: "button", enabled: true },
         { id: "exit", label: Loc_T("menu.main.option.3", "Exit Game"), kind: "button", enabled: true }
     ];
@@ -2386,7 +2386,7 @@ function Title_DifficultyValue(_i) {
 
 function Title_Build(_c) {
     _c.title_stk = Ui_StackNew();
-    Ui_StackPush(_c.title_stk, Ui_MenuNew("title", Title_MainItems(Save_HasAnySlot()), {
+    Ui_StackPush(_c.title_stk, Ui_MenuNew("title", Title_MainItems(RunSave_HasSave()), {
         owner: _c, on_confirm: Title_OnConfirm,
         layout: { anchor: "bottom", y_frac: 0.62, center: true }
     }));
@@ -2396,7 +2396,7 @@ function Title_Build(_c) {
 // Language or save files may have changed since the labels were made.
 function Title_Refresh(_c) {
     var m = _c.title_stk.menus[0];
-    m.items = Title_MainItems(Save_HasAnySlot());
+    m.items = Title_MainItems(RunSave_HasSave());
     Ui_MenuFixCursor(m, m.cursor);
     _c.title_refresh = false;
 }
@@ -2438,7 +2438,10 @@ function Title_OnConfirm(_m, _i) {
     }
     switch (rid) {
         case "new": Title_OpenDifficulty(c); break;
-        case "load": SaveMenu_Open("load", "main"); break;
+        case "load":   // C1 (D46): Continue run
+            var cont = Run_Continue();
+            if (!cont.ok) SaveMenu_OpenMessage(Run_ContinueFailText(cont.status), true);
+            break;
         case "settings":
             SettingsPopup_Open("title");
             c.state = "settings";
@@ -2451,13 +2454,27 @@ function Title_OnConfirm(_m, _i) {
 function Title_Step(_c) {
     var gs = GameState_Get();
     if (!is_struct(_c.title_stk)) Title_Build(_c);
+    if (!variable_instance_exists(_c, "legacy_notice_checked")) {   // C1 (D16): once per launch, say why old saves are not loaded / that the profile file was not usable
+        _c.legacy_notice_checked = true;
+        var notice_text = Profile_NoticeText();
+        var notice_prof = Profile_Get();
+        if (notice_text == "" && Save_LegacyFilesExist() && !notice_prof.legacy_notice_seen) {
+            notice_prof.legacy_notice_seen = true;
+            Profile_Flush();
+            notice_text = Save_LegacyNotice();
+        }
+        if (notice_text != "") {
+            SaveMenu_OpenMessage(notice_text, true);
+            return;
+        }
+    }
     if (is_struct(_c.title_exit)) {
         if (current_time >= _c.title_exit.at) {
             var v = _c.title_exit.value;
             _c.title_exit = undefined;
             Difficulty_SetCurrent(v);
             gs.in_main_menu = false;
-            Transition_RequestCutsceneById("intro");
+            Run_BeginNewGame();   // C1: the intro plays once per profile, later runs start at once
         }
         return;
     }
@@ -2499,11 +2516,14 @@ function PauseMenu_Ensure() {
             closing: false,
             close_frame: UI_OPENED_FRAME_NONE,
             pending_exit_main_menu: false,
+            pending_abandon: false,
+            abandon_armed: false,
             index: 0,
             options: [
                 Loc_T("pause.option.resume", "Resume"),
                 Loc_T("pause.option.settings", "Settings"),
-                Loc_T("pause.option.exit_main", "Exit to Main Menu")
+                Loc_T("pause.option.exit_main", "Exit to Main Menu"),
+                Loc_T("pause.option.abandon", "Abandon Run")
             ],
             opened_frame: UI_OPENED_FRAME_NONE
         };
@@ -2513,6 +2533,8 @@ function PauseMenu_Ensure() {
         if (!variable_struct_exists(pm0, "closing")) pm0.closing = false;
         if (!variable_struct_exists(pm0, "close_frame")) pm0.close_frame = UI_OPENED_FRAME_NONE;
         if (!variable_struct_exists(pm0, "pending_exit_main_menu")) pm0.pending_exit_main_menu = false;
+        if (!variable_struct_exists(pm0, "pending_abandon")) pm0.pending_abandon = false;
+        if (!variable_struct_exists(pm0, "abandon_armed")) pm0.abandon_armed = false;
     }
 }
 
@@ -2527,6 +2549,9 @@ function PauseMenu_Open() {
     pm.closing = false;
     pm.close_frame = UI_OPENED_FRAME_NONE;
     pm.pending_exit_main_menu = false;
+    pm.pending_abandon = false;
+    pm.abandon_armed = false;
+    pm.options[3] = Loc_T("pause.option.abandon", "Abandon Run");
     pm.index = 0;
     pm.opened_frame = Input_Frame();
     gs.ui.pause_menu = pm;
@@ -2570,16 +2595,24 @@ function PauseMenu_CloseFinalize() {
     var gs = GameState_Get();
     var pm = gs.ui.pause_menu;
     var do_exit = pm.pending_exit_main_menu;
+    var do_abandon = pm.pending_abandon;
 
     pm.open = false;
     pm.closing = false;
     pm.close_frame = UI_OPENED_FRAME_NONE;
     pm.pending_exit_main_menu = false;
+    pm.pending_abandon = false;
     pm.opened_frame = UI_OPENED_FRAME_NONE;
     gs.ui.pause_menu = pm;
     if (gs.ui.mode == UI_PAUSE) gs.ui.mode = UI_NONE;
 
+    if (do_abandon) {
+        Run_Abandon();   // C1 (D92): counts as a death, keeps the echo; the death scene and the echo pick follow
+        return;
+    }
+
     if (do_exit) {
+        Run_AutoSave();   // C1 (D46): leaving to the title keeps the run; Continue picks it up
         gs.in_main_menu = true;
         gs.player_inst = noone;
         global.player_inst = noone;
@@ -2642,7 +2675,11 @@ function PauseMenu_HandleInput() {
     var prev_idx = pm.index;
     if (nav_up && pm.index > 0) pm.index -= 1;
     if (nav_down && pm.index < count - 1) pm.index += 1;
-    if (pm.index != prev_idx) SFX_PlayUI("ui_move");
+    if (pm.index != prev_idx) {
+        SFX_PlayUI("ui_move");
+        pm.abandon_armed = false;
+        pm.options[3] = Loc_T("pause.option.abandon", "Abandon Run");
+    }
 
     if (k_ok) {
         SFX_PlayUI("ui_confirm");
@@ -2656,6 +2693,17 @@ function PauseMenu_HandleInput() {
         } else if (pm.index == 2) {
             PauseMenu_ExitToMainMenu();
             return;
+        } else if (pm.index == 3) {
+            // two presses: the first asks, the second abandons the run
+            if (!pm.abandon_armed) {
+                pm.abandon_armed = true;
+                pm.options[3] = Loc_T("pause.option.abandon_confirm", "Sure? Confirm again");
+            } else {
+                pm.pending_abandon = true;
+                gs.ui.pause_menu = pm;
+                PauseMenu_Close();
+                return;
+            }
         }
     }
 

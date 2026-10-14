@@ -87,7 +87,7 @@ function Combat_CritChance(_crit_bonus) {
 function Combat_CritCheck(_attacker, _crit_bonus) {
     var chance = Combat_CritChance(_crit_bonus);
     if (chance <= 0) return false;
-    return (random(1) < chance);
+    return RunRng_Chance("combat", chance);   // C1: run randomness comes from the run's combat stream
 }
 
 // D80: no dice. The only way an enemy action fails to land is Evasion on the PLAYER: the next damaging enemy action is fully dodged and Evasion is used up.
@@ -445,7 +445,7 @@ function Player_OnDeath(_p) {
     if (variable_struct_exists(gs, "pending_post_battle_dialogue_lines")) gs.pending_post_battle_dialogue_lines = [];
     gs.in_main_menu = false;
     GameState_SetJustReturned(false);
-    Transition_RequestCutsceneById("game_over");
+    Run_OnPlayerDeath();   // C1: ends the run in the profile, deletes the run save, then plays the death scene
 }
 
 // --------------------
@@ -1303,7 +1303,7 @@ function Battle_RunAttempt(_bc) {
         return;
     }
 
-    if (random(1) < Battle_RunChance(Combat_EffectiveStat(p, STAT_SPD), Combat_EffectiveStat(e, STAT_SPD))) {
+    if (RunRng_Float("combat") < Battle_RunChance(Combat_EffectiveStat(p, STAT_SPD), Combat_EffectiveStat(e, STAT_SPD))) {
         EnemyPersist_ResolveBattle(false);
         if (enemy_id == ENEMY_STRANGER) {
             Dialogue_NarrativeOnStrangerEncounterResolved();
@@ -1386,11 +1386,11 @@ function Battle_EnemyChooseSkill(_e, _p, _actions_remaining = -1, _used_skills =
 
         var chance = Skill_EnemyUseChance(sk);
         if (chance <= 0) continue;
-        if (random(1) <= chance) array_push(candidates, sid);
+        if (RunRng_Float("combat") <= chance) array_push(candidates, sid);
     }
 
     if (array_length(candidates) <= 0) return -1;
-    return candidates[irandom(array_length(candidates) - 1)];
+    return candidates[RunRng_Int("combat", array_length(candidates))];
 }
 
 // ---- Foresight (D79): the enemy's next action is decided ahead of time and kept in the battle (enemy_plan), so what it shows is what happens ----
