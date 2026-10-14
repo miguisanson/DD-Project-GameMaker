@@ -24,8 +24,8 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | WAITING FOR OWNER PLAYTEST (build d312bfb-20261014 = next). Improvement packets done (I-053 hidden-desktop runs, D65 grid overlays, sfx/input perf). Next after playtest: owner verdicts on Q-001..Q-009 → merge good ones to v1.9; grill turn-order bar (D19) + stats (D22); owner IDE tasks on BOARD (obj_display events, Included File game_data.json, options). Phase 4 (data to JSON, run/profile save split, RNG streams) needs the Included File first. |
-| Unplayed features | 9 / 15 (Q-001..Q-009) |
+| WIP | BIG BUILD (D71) per .planning/BUILD-PLAN.md, packets A1..E2, on branch `next`. Playtest 1 done (QTE approved). |
+| Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
 
