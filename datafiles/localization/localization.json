@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T13:26:14Z",
-    "row_count": 960
+    "generated_at_utc": "2026-10-14T13:52:40Z",
+    "row_count": 1051
   },
   "default_lang": "en",
   "languages": [
@@ -992,6 +992,10 @@
       "en": "You foresee: {action}",
       "ko": "예견: {action}"
     },
+    "combat.msg.gold_gain": {
+      "en": "(+{gold} gold)",
+      "ko": "(+{gold} 골드)"
+    },
     "combat.msg.guard": {
       "en": "You brace yourself.",
       "ko": "당신은 몸을 웅크립니다."
@@ -1752,6 +1756,50 @@
       "en": "A cut tree stump.",
       "ko": "잘린 나무 그루터기."
     },
+    "elite.line.armored": {
+      "en": "Armored: +{n} DEF.",
+      "ko": "철갑: 방어 +{n}."
+    },
+    "elite.line.brutal": {
+      "en": "Brutal: +{n} ATK.",
+      "ko": "흉포: 공격 +{n}."
+    },
+    "elite.line.regenerating": {
+      "en": "Regenerating: heals {pct}% of its HP each turn.",
+      "ko": "재생: 매 턴 HP의 {pct}%를 회복합니다."
+    },
+    "elite.line.swift": {
+      "en": "Swift: +{n} SPD.",
+      "ko": "신속: 속도 +{n}."
+    },
+    "elite.line.venomous": {
+      "en": "Venomous: its hits poison you for {n} stacks.",
+      "ko": "맹독: 공격이 {n}중첩의 독을 겁니다."
+    },
+    "elite.name.armored": {
+      "en": "Armored",
+      "ko": "철갑"
+    },
+    "elite.name.brutal": {
+      "en": "Brutal",
+      "ko": "흉포"
+    },
+    "elite.name.regenerating": {
+      "en": "Regenerating",
+      "ko": "재생"
+    },
+    "elite.name.swift": {
+      "en": "Swift",
+      "ko": "신속"
+    },
+    "elite.name.venomous": {
+      "en": "Venomous",
+      "ko": "맹독"
+    },
+    "elite.tag": {
+      "en": "ELITE",
+      "ko": "정예"
+    },
     "enemy.name.enemy_direwolf": {
       "en": "Dire Wolf",
       "ko": "다이어 울프"
@@ -2016,6 +2064,10 @@
       "en": "that skill",
       "ko": "그 기술"
     },
+    "item.msg.throw_in_battle": {
+      "en": "Throw it at an enemy in battle.",
+      "ko": "전투 중 적에게 던지세요."
+    },
     "item.name.0": {
       "en": "None",
       "ko": "없음"
@@ -2144,9 +2196,53 @@
       "en": "Platinum Sword",
       "ko": "백금검"
     },
+    "item.name.30": {
+      "en": "Firebomb",
+      "ko": "화염병"
+    },
+    "item.name.31": {
+      "en": "Poison Pot",
+      "ko": "독 항아리"
+    },
+    "item.name.32": {
+      "en": "Ice Flask",
+      "ko": "얼음 병"
+    },
+    "item.name.33": {
+      "en": "Smoke Bomb",
+      "ko": "연막탄"
+    },
     "item.name.4": {
       "en": "Wooden Bow",
       "ko": "나무활"
+    },
+    "item.name.40": {
+      "en": "Copper Ring",
+      "ko": "구리 반지"
+    },
+    "item.name.41": {
+      "en": "Guard Ring",
+      "ko": "수호 반지"
+    },
+    "item.name.42": {
+      "en": "Swift Charm",
+      "ko": "신속의 부적"
+    },
+    "item.name.43": {
+      "en": "Sage Charm",
+      "ko": "현자의 부적"
+    },
+    "item.name.44": {
+      "en": "Stone Charm",
+      "ko": "돌 부적"
+    },
+    "item.name.45": {
+      "en": "Spring Ring",
+      "ko": "샘물 반지"
+    },
+    "item.name.46": {
+      "en": "Lucky Charm",
+      "ko": "행운의 부적"
     },
     "item.name.5": {
       "en": "Iron Bow",
@@ -2208,6 +2304,18 @@
       "en": "GOOD->PERFECT (1/turn)",
       "ko": "좋음->완벽함 (1/턴)"
     },
+    "item.passive.desc.44": {
+      "en": "Take 10% less damage",
+      "ko": "받는 피해 10% 감소"
+    },
+    "item.passive.desc.45": {
+      "en": "+1 MP every 3 turns",
+      "ko": "3턴마다 MP +1"
+    },
+    "item.passive.desc.46": {
+      "en": "Find 15% more gold",
+      "ko": "골드를 15% 더 얻음"
+    },
     "item.passive.desc.5": {
       "en": "GOOD+: may Stun (cd 3 turns)",
       "ko": "GOOD+: 기절 가능(CD 3턴)"
@@ -2268,6 +2376,18 @@
       "en": "Aim Assist",
       "ko": "조준 지원"
     },
+    "item.passive.name.44": {
+      "en": "Hardened",
+      "ko": "단단함"
+    },
+    "item.passive.name.45": {
+      "en": "Spring",
+      "ko": "샘물"
+    },
+    "item.passive.name.46": {
+      "en": "Lucky",
+      "ko": "행운"
+    },
     "item.passive.name.5": {
       "en": "Pinning Shot",
       "ko": "피닝샷"
@@ -2287,6 +2407,58 @@
     "item.passive.name.9": {
       "en": "Arcane Surge",
       "ko": "비전 쇄도"
+    },
+    "item.sent.30": {
+      "en": "Throw it for {power} power of damage; it burns for {turns} turns. Costs your turn.",
+      "ko": "위력 {power}의 피해를 주고 {turns}턴 동안 불탑니다. 턴을 소모합니다."
+    },
+    "item.sent.31": {
+      "en": "Throw it to poison the enemy with {n} stacks. Costs your turn.",
+      "ko": "적을 독 {n}중첩으로 중독시킵니다. 턴을 소모합니다."
+    },
+    "item.sent.32": {
+      "en": "Throw it for {power} power of damage and a stun that pushes the enemy back. Costs your turn.",
+      "ko": "위력 {power}의 피해를 주고 기절시켜 적을 뒤로 밉니다. 턴을 소모합니다."
+    },
+    "item.sent.33": {
+      "en": "Throw it to dodge the next attack ({turns} turns); a Perfect throw lets you slip away. Costs your turn.",
+      "ko": "다음 공격을 피합니다({turns}턴). 완벽하게 던지면 도망칩니다. 턴을 소모합니다."
+    },
+    "item.sent.accessory": {
+      "en": "A ring or charm worn in the accessory slot.",
+      "ko": "장신구 칸에 착용하는 반지나 부적입니다."
+    },
+    "item.sent.accessory_passive": {
+      "en": "Wear it: {line}.",
+      "ko": "착용: {line}."
+    },
+    "item.sent.accessory_stat": {
+      "en": "Wear it for {bonus}.",
+      "ko": "착용하면 {bonus}."
+    },
+    "item.sent.armor": {
+      "en": "Armor: {bonus}.",
+      "ko": "방어구: {bonus}."
+    },
+    "item.sent.cure": {
+      "en": "Cures {status}.",
+      "ko": "{status}을(를) 치료합니다."
+    },
+    "item.sent.heal": {
+      "en": "Restores {min} to {max} HP.",
+      "ko": "HP를 {min}에서 {max}만큼 회복합니다."
+    },
+    "item.sent.mp": {
+      "en": "Restores {min} to {max} MP.",
+      "ko": "MP를 {min}에서 {max}만큼 회복합니다."
+    },
+    "item.sent.throw": {
+      "en": "Throw it at the enemy. Costs your turn.",
+      "ko": "적에게 던집니다. 턴을 소모합니다."
+    },
+    "item.sent.weapon": {
+      "en": "A weapon with {power} power.",
+      "ko": "위력 {power}의 무기입니다."
     },
     "menu.common.back": {
       "en": "Back",
@@ -2327,6 +2499,10 @@
     "menu.draw_64.91.1": {
       "en": "Select Difficulty",
       "ko": "난이도 선택"
+    },
+    "menu.gold": {
+      "en": "Gold: {n}",
+      "ko": "골드: {n}"
     },
     "menu.label.equipped_short": {
       "en": "E",
@@ -2680,6 +2856,10 @@
       "en": "Teaches: Unknown skill",
       "ko": "가르치는 것: 알 수 없는 기술"
     },
+    "menu.tooltip.item.type.accessory": {
+      "en": "Accessory",
+      "ko": "장신구"
+    },
     "menu.tooltip.item.type.armor": {
       "en": "Armor",
       "ko": "갑옷"
@@ -2923,6 +3103,10 @@
     "menu.tooltip_skilleffectlines.437.1": {
       "en": "Effect: {effect}",
       "ko": "효과: {effect}"
+    },
+    "merchant.name": {
+      "en": "Merchant",
+      "ko": "상인"
     },
     "note.carved_arrow.0": {
       "en": "An arrow is carved here, pointing up.",
@@ -3540,6 +3724,162 @@
       "en": "Windowed",
       "ko": "창"
     },
+    "shop.buy": {
+      "en": "Buy",
+      "ko": "구매"
+    },
+    "shop.gold": {
+      "en": "Gold {n}",
+      "ko": "골드 {n}"
+    },
+    "shop.lbl.bonus": {
+      "en": "Bonus",
+      "ko": "보너스"
+    },
+    "shop.lbl.burn": {
+      "en": "Burn",
+      "ko": "화상"
+    },
+    "shop.lbl.carry": {
+      "en": "Carry up to",
+      "ko": "최대 소지"
+    },
+    "shop.lbl.cures": {
+      "en": "Cures",
+      "ko": "치료"
+    },
+    "shop.lbl.damage_taken": {
+      "en": "Damage taken",
+      "ko": "받는 피해"
+    },
+    "shop.lbl.evade": {
+      "en": "Dodge",
+      "ko": "회피"
+    },
+    "shop.lbl.gold": {
+      "en": "Gold",
+      "ko": "골드"
+    },
+    "shop.lbl.have": {
+      "en": "You have",
+      "ko": "보유"
+    },
+    "shop.lbl.hp": {
+      "en": "HP",
+      "ko": "HP"
+    },
+    "shop.lbl.in_stock": {
+      "en": "In stock",
+      "ko": "재고"
+    },
+    "shop.lbl.mp": {
+      "en": "MP",
+      "ko": "MP"
+    },
+    "shop.lbl.nobody": {
+      "en": "Nobody",
+      "ko": "무명"
+    },
+    "shop.lbl.perfect": {
+      "en": "Perfect",
+      "ko": "완벽"
+    },
+    "shop.lbl.poison": {
+      "en": "Poison",
+      "ko": "독"
+    },
+    "shop.lbl.power": {
+      "en": "Power",
+      "ko": "위력"
+    },
+    "shop.lbl.sells_for": {
+      "en": "Sells for",
+      "ko": "판매가"
+    },
+    "shop.lbl.stat": {
+      "en": "Uses",
+      "ko": "능력치"
+    },
+    "shop.lbl.stun": {
+      "en": "Stun",
+      "ko": "기절"
+    },
+    "shop.leave": {
+      "en": "Leave",
+      "ko": "나가기"
+    },
+    "shop.msg.bought": {
+      "en": "Bought {name} for {price}.",
+      "ko": "{name}을(를) {price}에 샀습니다."
+    },
+    "shop.msg.cant": {
+      "en": "Cannot do that.",
+      "ko": "할 수 없습니다."
+    },
+    "shop.msg.equipped": {
+      "en": "Take it off first.",
+      "ko": "먼저 벗으세요."
+    },
+    "shop.msg.full": {
+      "en": "You cannot carry more of those.",
+      "ko": "더 이상 가질 수 없습니다."
+    },
+    "shop.msg.gold": {
+      "en": "Not enough gold.",
+      "ko": "골드가 부족합니다."
+    },
+    "shop.msg.owned": {
+      "en": "You already have that.",
+      "ko": "이미 가지고 있습니다."
+    },
+    "shop.msg.slots": {
+      "en": "All your skill slots are full.",
+      "ko": "스킬 칸이 가득 찼습니다."
+    },
+    "shop.msg.sold": {
+      "en": "Sold {name} for {price}.",
+      "ko": "{name}을(를) {price}에 팔았습니다."
+    },
+    "shop.msg.sold_out": {
+      "en": "Sold out.",
+      "ko": "품절입니다."
+    },
+    "shop.nothing_to_sell": {
+      "en": "Nothing to sell",
+      "ko": "팔 것이 없습니다"
+    },
+    "shop.sell": {
+      "en": "Sell",
+      "ko": "판매"
+    },
+    "shop.sold_out": {
+      "en": "Sold out",
+      "ko": "품절"
+    },
+    "shop.title": {
+      "en": "Merchant",
+      "ko": "상인"
+    },
+    "shop.val.escape": {
+      "en": "Escape",
+      "ko": "도망"
+    },
+    "shop.val.mp_every": {
+      "en": "+{n} every {k} turns",
+      "ko": "+{n} ({k}턴마다)"
+    },
+    "shop.val.pushback": {
+      "en": "Push back",
+      "ko": "뒤로 밀기"
+    },
+    "shop.val.turns": {
+      "en": "{n} turns",
+      "ko": "{n}턴"
+    },
+    "shop.worn": {
+      "en": "Worn",
+      "ko": "착용 중"
+    },
     "skill.name.skill_bite": {
       "en": "Bite",
       "ko": "깨물다"
@@ -3831,6 +4171,30 @@
     "system.msg.create_0.3.1": {
       "en": "Grave",
       "ko": "무덤"
+    },
+    "throw.msg.burn": {
+      "en": "It burns for {n} a turn.",
+      "ko": "매 턴 {n}의 화상을 입습니다."
+    },
+    "throw.msg.damage": {
+      "en": "{dmg} damage.",
+      "ko": "{dmg}의 피해."
+    },
+    "throw.msg.escape": {
+      "en": "You slip away in the smoke!",
+      "ko": "연기 속으로 빠져나갔습니다!"
+    },
+    "throw.msg.evade": {
+      "en": "You will dodge the next attack.",
+      "ko": "다음 공격을 피합니다."
+    },
+    "throw.msg.poison": {
+      "en": "{n} stacks of poison.",
+      "ko": "독 {n}중첩."
+    },
+    "throw.msg.thrown": {
+      "en": "You throw the {item}!",
+      "ko": "{item}을(를) 던졌다!"
     },
     "ui.skip_hold": {
       "en": "Hold to skip",

@@ -188,6 +188,7 @@ function Menu_IsEquipped(_ch, _item_id) {
     var eq = _ch.equip;
     if (variable_struct_exists(eq, "weapon") && eq.weapon == _item_id) return true;
     if (variable_struct_exists(eq, "body") && eq.body == _item_id) return true;
+    if (variable_struct_exists(eq, "accessory") && eq.accessory == _item_id) return true;   // C3 (D92)
     return false;
 }
 
@@ -532,6 +533,7 @@ function Tooltip_ItemTypeLine(_item) {
         return type_name;
     }
     if (_item.type == ITEM_CONSUMABLE) return Loc_T("menu.tooltip.item.type.consumable", "Consumable");
+    if (_item.type == ITEM_ACCESSORY) return Loc_T("menu.tooltip.item.type.accessory", "Accessory");   // C3 (D92)
     if (_item.type == ITEM_KEY) return Loc_T("menu.tooltip.item.type.key", "Key Item");
     return Loc_T("menu.tooltip.item.type.unknown", "Unknown");
 }
@@ -607,6 +609,13 @@ function Tooltip_BuildItemLines(_item) {
         if (class_txt != Loc_T("menu.tooltip.class.all", "All Classes")) {
             array_push(lines, Loc_T("menu.tooltip.class.only", "{classes} only", { classes: class_txt }));
         }
+        return lines;
+    }
+
+    if (_item.type == ITEM_ACCESSORY || Item_IsThrowable(_item)) {   // C3: the sentence and the numbers come from the item data (D100)
+        array_push(lines, Item_Sentence(_item));
+        var tn = Item_NumberLines(_item, GameState_Get().player_ch);
+        for (var tni = 0; tni < array_length(tn); tni++) array_push(lines, tn[tni].label + ": " + tn[tni].value);
         return lines;
     }
 
@@ -856,7 +865,7 @@ function Menu_UseInventoryItem(_m, _ch, _item_id) {
         return out;
     }
 
-    if (item.type == ITEM_WEAPON || item.type == ITEM_ARMOR) {
+    if (item.type == ITEM_WEAPON || item.type == ITEM_ARMOR || item.type == ITEM_ACCESSORY) {   // C3: accessories equip like gear (D92)
         var slot_name = variable_struct_exists(item, "equip_slot") ? string(item.equip_slot) : "";
         if (slot_name != "" && Equip_SlotGet(_ch, slot_name) == item.id) {
             Equip_SlotSet(_ch, slot_name, 0);
@@ -1287,6 +1296,12 @@ function Menu_Draw() {
         UI_DrawText(tx + tab_pad, by + tab_pad, tab_label);
     }
 
+    if (Run_IsActive()) {   // C3 (D23): the run's gold, bottom right of the menu box
+        var gold_txt = Loc_T("menu.gold", "Gold: {n}", { n: string(Gold_Get()) });
+        draw_set_color(c_white);
+        UI_DrawText(bx + bw - max(4, round(6 * ui_visual)) - UI_TextWidth(gold_txt), by + main_h - UI_TextHeight("A") - max(4, round(6 * ui_visual)), gold_txt);
+    }
+
     var draw_arrow_sprite = dialogue_arrow_down;
     var draw_arrow_w = max(1, sprite_get_width(draw_arrow_sprite));
     var draw_arrow_h = max(1, sprite_get_height(draw_arrow_sprite));
@@ -1328,6 +1343,9 @@ function Menu_Draw() {
                     var icon_scale = ui_sprite;
                     draw_sprite_ext(item.sprite, 0, tx, yy + max(1, round(2 * ui_visual)), icon_scale, icon_scale, 0, c_white, 1);
                     tx += max(round(16 * icon_scale), round(sprite_get_width(item.sprite) * icon_scale));
+                } else if (variable_struct_exists(item, "icon_kind")) {   // C3 (D94): the strip sprite or a code glyph
+                    Item_DrawIcon(item, tx, yy + max(1, round(2 * ui_visual)), round(16 * ui_sprite), menu_alpha);
+                    tx += round(16 * ui_sprite) + max(2, round(3 * ui_visual));
                 }
                 var label = item.name;
                 if (item.stackable) {
@@ -2050,6 +2068,325 @@ function CardsUi_Draw() {
     else Ui_StackDraw(u.stk, 0.5);
     draw_set_alpha(1);
     draw_set_color(c_white);
+}
+
+// ==========================================================================================================================
+// C3 (D85, D23, D100): the merchant's shop, on the UI framework. global.shop_ui = { stk, shop_index, msg, msg_ms, opened_frame } while it is open,
+// with gs.ui.mode = UI_SHOP. Root: Buy / Sell / Leave. Buy and Sell are Ui menus with the details panel: one plain sentence and the numbers,
+// generated from the item and card data. A row you cannot pay for stays selectable (dimmed) so you can still read it; Confirm then says why not.
+// ==========================================================================================================================
+#macro SHOP_UI_INPUT_DELAY_FRAMES 10
+#macro SHOP_MSG_MS 1800
+
+function ShopUi_IsOpen() {
+    return variable_global_exists("shop_ui") && is_struct(global.shop_ui);
+}
+
+function ShopUi_Close() {
+    var gs = GameState_Get();
+    global.shop_ui = undefined;
+    if (variable_struct_exists(gs, "ui") && gs.ui.mode == UI_SHOP) gs.ui.mode = UI_NONE;
+}
+
+function ShopUi_Interrupt() {
+    if (ShopUi_IsOpen()) ShopUi_Close();
+}
+
+function ShopUi_Say(_text) {
+    var u = global.shop_ui;
+    u.msg = _text;
+    u.msg_ms = current_time;
+}
+
+// One Buy row from a stock row: name, price (or sold out), the sentence and the number lines. can_buy says whether Confirm would work now.
+function ShopUi_ItemFor(_row, _ch, _gold) {
+    var sold = (_row.qty <= 0);
+    var out = { enabled: true, row: _row, can_buy: (!sold && _gold >= _row.price), label: "", value: "", help: "", lines: [] };
+    out.dim = !out.can_buy;
+    out.value = sold ? Loc_T("shop.sold_out", "Sold out") : string(_row.price);
+    if (_row.kind == "card") {
+        var c = CardDB_Get(_row.id);
+        out.label = Card_Name(c);
+        out.help = Card_Sentence(c);
+        out.lines = Card_Lines(c);
+    } else {
+        var it = ItemDB_Get(_row.id);
+        out.label = it.name;
+        out.help = Item_Sentence(it);
+        out.lines = Item_NumberLines(it, _ch);
+        out.icon_item = it;
+        if (it.type != ITEM_WEAPON && it.type != ITEM_ARMOR && it.type != ITEM_ACCESSORY) array_push(out.lines, { label: Loc_T("shop.lbl.have", "You have"), value: string(Inv_Count(_ch.inventory, it.id)) });
+    }
+    array_push(out.lines, { label: Loc_T("shop.lbl.in_stock", "In stock"), value: string(max(0, _row.qty)) });
+    return out;
+}
+
+function ShopUi_BuyItems() {
+    var u = global.shop_ui;
+    var gs = GameState_Get();
+    var run = Run_Get();
+    var rows = Shop_RunStock(run, u.shop_index, gs.player_ch);
+    var items = [];
+    for (var i = 0; i < array_length(rows); i++) array_push(items, ShopUi_ItemFor(rows[i], gs.player_ch, run.gold));
+    return items;
+}
+
+// What the player can sell: one row per distinct item (not key items). Worn gear is listed but dimmed: sell it after taking it off.
+function ShopUi_SellItems() {
+    var gs = GameState_Get();
+    var ch = gs.player_ch;
+    var items = [];
+    var seen = {};
+    for (var i = 0; i < array_length(ch.inventory); i++) {
+        var iid = ch.inventory[i].id;
+        if (variable_struct_exists(seen, string(iid))) continue;
+        variable_struct_set(seen, string(iid), true);
+        var it = ItemDB_Get(iid);
+        if (it.id == 0 || it.type == ITEM_KEY) continue;
+        var worn = Menu_IsEquipped(ch, iid);
+        var n = Inv_Count(ch.inventory, iid);
+        var lines = Item_NumberLines(it, ch);
+        array_push(lines, { label: Loc_T("shop.lbl.sells_for", "Sells for"), value: string(Shop_SellPrice(iid)) });
+        array_push(lines, { label: Loc_T("shop.lbl.have", "You have"), value: string(n) });
+        array_push(items, {
+            enabled: true, dim: worn, label: it.name + ((n > 1) ? " x" + string(n) : ""), value: worn ? Loc_T("shop.worn", "Worn") : string(Shop_SellPrice(iid)),
+            help: Item_Sentence(it), lines: lines, icon_item: it, item_id: iid
+        });
+    }
+    if (array_length(items) <= 0) array_push(items, { enabled: false, label: Loc_T("shop.nothing_to_sell", "Nothing to sell"), value: "", help: "", lines: [], item_id: -1 });
+    return items;
+}
+
+function ShopUi_Refresh(_m, _which) {
+    var keep = _m.cursor;
+    _m.items = (_which == "buy") ? ShopUi_BuyItems() : ShopUi_SellItems();
+    Ui_MenuFixCursor(_m, min(keep, array_length(_m.items) - 1));
+}
+
+function ShopUi_Title(_name) {
+    return _name + "  " + Loc_T("shop.gold", "Gold {n}", { n: string(Gold_Get()) });
+}
+
+function ShopUi_RootMenu() {
+    var items = [
+        { label: Loc_T("shop.buy", "Buy"), value: "" },
+        { label: Loc_T("shop.sell", "Sell"), value: "" },
+        { label: Loc_T("shop.leave", "Leave"), value: "" }
+    ];
+    var m = Ui_MenuNew("shop_root", items, {
+        on_confirm: ShopUi_RootConfirm, on_back: ShopUi_RootBack,
+        layout: { title: ShopUi_Title(Loc_T("shop.title", "Merchant")), anchor: "center", center: true }
+    });
+    Ui_MenuFixCursor(m, 0);
+    return m;
+}
+
+function ShopUi_RootConfirm(_m, _i) {
+    var u = global.shop_ui;
+    if (_i == 2) {
+        ShopUi_Close();
+        return;
+    }
+    var sell = (_i == 1);
+    var m = Ui_MenuNew(sell ? "shop_sell" : "shop_buy", sell ? ShopUi_SellItems() : ShopUi_BuyItems(), {
+        on_confirm: sell ? ShopUi_SellConfirm : ShopUi_BuyConfirm, on_back: ShopUi_ListBack,
+        layout: { title: ShopUi_Title(sell ? Loc_T("shop.sell", "Sell") : Loc_T("shop.buy", "Buy")), anchor: "center", details: true }
+    });
+    Ui_MenuFixCursor(m, 0);
+    Ui_StackPush(u.stk, m);
+}
+
+function ShopUi_RootBack(_m, _res) {
+    ShopUi_Close();
+}
+
+function ShopUi_ListBack(_m, _res) {
+}
+
+function ShopUi_ReasonText(_reason) {
+    switch (_reason) {
+        case "gold": return Loc_T("shop.msg.gold", "Not enough gold.");
+        case "sold_out": return Loc_T("shop.msg.sold_out", "Sold out.");
+        case "full": return Loc_T("shop.msg.full", "You cannot carry more of those.");
+        case "owned": return Loc_T("shop.msg.owned", "You already have that.");
+        case "slots": return Loc_T("shop.msg.slots", "All your skill slots are full.");
+        case "equipped": return Loc_T("shop.msg.equipped", "Take it off first.");
+    }
+    return Loc_T("shop.msg.cant", "Cannot do that.");
+}
+
+function ShopUi_BuyConfirm(_m, _i) {
+    var gs = GameState_Get();
+    var it = _m.items[_i];
+    var r = Shop_Buy(gs.player_ch, Run_Get(), it.row);
+    if (!r.ok) {
+        SFX_PlayUI("ui_back");
+        ShopUi_Say(ShopUi_ReasonText(r.reason));
+        return;
+    }
+    CardsUi_Commit(r.ch);
+    ShopUi_Say(Loc_T("shop.msg.bought", "Bought {name} for {price}.", { name: it.label, price: string(r.price) }));
+    ShopUi_Refresh(_m, "buy");
+}
+
+function ShopUi_SellConfirm(_m, _i) {
+    var gs = GameState_Get();
+    var it = _m.items[_i];
+    if (it.item_id < 0) return;
+    var r = Shop_Sell(gs.player_ch, Run_Get(), it.item_id);
+    if (!r.ok) {
+        SFX_PlayUI("ui_back");
+        ShopUi_Say(ShopUi_ReasonText(r.reason));
+        return;
+    }
+    CardsUi_Commit(r.ch);
+    ShopUi_Say(Loc_T("shop.msg.sold", "Sold {name} for {price}.", { name: ItemDB_Get(it.item_id).name, price: string(r.gold) }));
+    ShopUi_Refresh(_m, "sell");
+}
+
+function ShopUi_Open(_shop_index) {
+    var gs = GameState_Get();
+    if (!is_struct(Run_Get()) || !is_struct(gs.player_ch)) return false;
+    Shop_RunStock(Run_Get(), _shop_index, gs.player_ch);   // made now, from the seed, if this is the first visit
+    var u = { stk: Ui_StackNew(), shop_index: _shop_index, msg: "", msg_ms: -100000, opened_frame: Input_Frame(), opened_ms: current_time };
+    global.shop_ui = u;
+    Ui_StackPush(u.stk, ShopUi_RootMenu());
+    gs.ui.mode = UI_SHOP;
+    SFX_PlayUI("ui_openclose");
+    return true;
+}
+
+// Called every frame by obj_ui_controller. Returns true while the shop is open (the caller stops there).
+function ShopUi_Step() {
+    if (!ShopUi_IsOpen()) return false;
+    var u = global.shop_ui;
+    if (Input_Frame() - u.opened_frame >= SHOP_UI_INPUT_DELAY_FRAMES) {
+        var top = Ui_StackTop(u.stk);
+        if (is_struct(top)) {
+            Ui_MenuUpdate(top, u.stk);
+            if (ShopUi_IsOpen()) {
+                for (var i = 0; i < array_length(u.stk.menus); i++) {
+                    var mm = u.stk.menus[i];
+                    var nm0 = (mm.id == "shop_buy") ? Loc_T("shop.buy", "Buy") : ((mm.id == "shop_sell") ? Loc_T("shop.sell", "Sell") : Loc_T("shop.title", "Merchant"));
+                    mm.layout.title = ShopUi_Title(nm0);
+                }
+            }
+        }
+    }
+    return ShopUi_IsOpen();
+}
+
+function ShopUi_Draw() {
+    if (!ShopUi_IsOpen()) return;
+    var u = global.shop_ui;
+    var a = Ui_AnimT(u.opened_ms, current_time);
+    var mt = Ui_Metrics();
+    UI_SetFont();
+    draw_set_alpha(1);
+    Ui_DimBackdrop(0.8 * a);
+    Ui_StackDraw(u.stk, 0.5);
+    // the last thing the shop said, at the bottom, for a moment
+    if (u.msg != "" && current_time - u.msg_ms < SHOP_MSG_MS) {
+        var p = mt.p;
+        var tw = UI_TextWidth(u.msg) + 8 * p;
+        var th = mt.line_h + 6 * p;
+        var mx0 = round((mt.gw - tw) / 2);
+        var my0 = mt.gh - mt.margin - th;
+        Ui_DrawFrame(mx0, my0, tw, th, 1, p);
+        Ui_Text(mx0 + 4 * p, my0 + 3 * p, u.msg, UI_C_LIGHTEST);
+    }
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
+// ---- the gold counter (D23): a coin and the number, top left in the world and in battle (under the status icons) ----
+function Hud_DrawCoin(_x, _y, _p) {
+    Ui_Box(_x + _p, _y, _x + 5 * _p, _y + 6 * _p, UI_C_DARKEST);
+    Ui_Box(_x, _y + _p, _x + 6 * _p, _y + 5 * _p, UI_C_DARKEST);
+    Ui_Box(_x + _p, _y + _p, _x + 5 * _p, _y + 5 * _p, UI_C_LIGHT);
+    Ui_Box(_x + 2 * _p, _y + 2 * _p, _x + 3 * _p, _y + 4 * _p, UI_C_LIGHTEST);
+}
+
+function Hud_DrawGold() {
+    if (!Run_IsActive()) return;
+    var gs = GameState_Get();
+    if (room == rm_start || room == rm_cutscene) return;
+    if (gs.ui.mode != UI_NONE && gs.ui.mode != UI_DIALOGUE) return;
+    if (variable_struct_exists(gs.ui, "cutscene_active") && gs.ui.cutscene_active) return;
+    if (room != rm_battle && (room_width < DISPLAY_BASE_W || room_height < DISPLAY_BASE_H)) return;   // a room smaller than the view is centred with black round it (DISP-10): nothing may be drawn there
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var txt = string(Gold_Get());
+    var gx = mt.margin;
+    var gy = mt.margin;
+    if (room == rm_battle) {   // under the HP and MP bars and the status icons (obj_ui_controller Draw GUI)
+        var ui_visual = UI_GetVisualScale();
+        var scale = UI_BAR_SCALE * UI_GetSpriteScale();
+        var bar_h = sprite_get_height(hp_bar) * scale;
+        gy = max(6, round(8 * ui_visual)) + (bar_h * 2) + max(2, round(4 * ui_visual)) + max(6, round(10 * ui_visual)) + max(14, round(14 * ui_visual)) + mt.margin;
+    }
+    var w = 6 * p + 2 * p + UI_TextWidth(txt) + 6 * p;
+    var h = mt.line_h + 4 * p;
+    var a0 = draw_get_alpha();
+    draw_set_alpha(1);
+    Ui_DrawFrame(gx, gy, w, h, 1, p);
+    Hud_DrawCoin(gx + 3 * p, gy + (h - 6 * p) div 2, p);
+    Ui_Text(gx + 3 * p + 8 * p, gy + 2 * p, txt, UI_C_LIGHTEST);
+    draw_set_alpha(a0);
+}
+
+// ---- item icons (D94): the strip sprite when the owner has imported it (looked up by name), else a small pixel glyph drawn in code ----
+function Item_IconSprite(_item) {
+    if (!is_struct(_item)) return { spr: noone, sub: 0 };
+    if (variable_struct_exists(_item, "sprite") && _item.sprite != noone && _item.sprite != -1) return { spr: _item.sprite, sub: 0 };
+    var sub = variable_struct_exists(_item, "icon_sub") ? _item.icon_sub : 0;
+    var spr = -1;
+    if (variable_struct_exists(_item, "icon_kind")) spr = asset_get_index("spr_icons_" + string(_item.icon_kind));
+    if (spr == -1 || !sprite_exists(spr)) return { spr: noone, sub: sub };
+    return { spr: spr, sub: clamp(sub, 0, max(0, sprite_get_number(spr) - 1)) };
+}
+
+// 8 x 8 glyphs: '1' dark, '2' light, '3' lightest.
+function Item_GlyphRows(_item) {
+    var kind = variable_struct_exists(_item, "icon_kind") ? _item.icon_kind : "";
+    var sub = variable_struct_exists(_item, "icon_sub") ? _item.icon_sub : 0;
+    if (kind == "throwable") {
+        switch (sub) {
+            case 0: return [".....33.", "....3.2.", "...1221.", "..122221", ".1222221", ".1233221", ".1222221", "..11111."];   // firebomb: a round bomb with a lit fuse
+            case 1: return ["..1111..", ".111111.", "12222221", "12322321", "12222221", "12233221", ".122221.", "..1111.."];   // poison pot
+            case 2: return ["...11...", "...33...", "..3223..", "..3223..", ".322223.", ".322223.", "32222223", ".333333."];   // ice flask
+            default: return ["..333...", ".3333333", "33333333", "33333333", ".333333.", "..3333..", "........", "........"];   // smoke bomb: a puff
+        }
+    }
+    if (kind == "accessory") {
+        if (sub == 0) return ["...33...", "..3223..", ".3....3.", ".3....3.", ".3....3.", ".3....3.", "..3333..", "........"];   // ring
+        return [".3....3.", "..3..3..", "...33...", "..3223..", ".322223.", ".322223.", "..3223..", "...33..."];   // charm
+    }
+    return [];
+}
+
+// Draws the icon of an item in a square of _size pixels (GUI units) at (_x, _y).
+function Item_DrawIcon(_item, _x, _y, _size, _alpha = 1) {
+    var ic = Item_IconSprite(_item);
+    if (ic.spr != noone) {
+        var sc = _size / max(1, max(sprite_get_width(ic.spr), sprite_get_height(ic.spr)));
+        draw_sprite_ext(ic.spr, ic.sub, _x, _y, sc, sc, 0, c_white, _alpha);
+        return;
+    }
+    var rows = Item_GlyphRows(_item);
+    if (array_length(rows) <= 0) return;
+    var u = max(1, floor(_size / 8));
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    for (var r = 0; r < array_length(rows); r++) {
+        for (var c = 1; c <= 8; c++) {
+            var ch = string_char_at(rows[r], c);
+            if (ch == "." || ch == "") continue;
+            var col = (ch == "1") ? UI_C_DARK : ((ch == "2") ? UI_C_LIGHT : UI_C_LIGHTEST);
+            Ui_Box(_x + (c - 1) * u, _y + r * u, _x + c * u, _y + (r + 1) * u, col);
+        }
+    }
+    draw_set_alpha(a0);
 }
 
 // --------------------
@@ -3280,7 +3617,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var icon_px = 0;     // the icon column (battle lists): one icon pixel is k GUI units, k = whole units that fit a row
     for (var i = 0; i < n; i++) {
         var it = _m.items[i];
-        label_w = max(label_w, UI_TextWidth(it.label));
+        label_w = max(label_w, UI_TextWidth(it.label) + (variable_struct_exists(it, "icon_item") ? 10 * p : 0));   // C3: a row can carry an item icon
         if (variable_struct_exists(it, "icon") && is_struct(it.icon)) icon_px = 16 * max(1, floor(mt.row_h / 16));
         var kind = variable_struct_exists(it, "kind") ? it.kind : "button";
         var vw = 0;
@@ -3371,18 +3708,19 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         var sel = (k == _m.cursor);
         var en = Ui_ItemEnabled(row);
         var kd = variable_struct_exists(row, "kind") ? row.kind : "button";
-        var dim = variable_struct_exists(row, "dim") && row.dim;
-        var col = (!en || dim) ? (sel ? UI_C_LIGHT : UI_C_DARK) : (sel ? UI_C_LIGHTEST : UI_C_LIGHT);
+        var dim = variable_struct_exists(row, "dim") && row.dim;   // looks unavailable but can be selected (a shop row you cannot pay for, a skill you lack the MP for)
+        var col = !en ? UI_C_DARK : (dim ? (sel ? UI_C_LIGHT : UI_C_DARK) : (sel ? UI_C_LIGHTEST : UI_C_LIGHT));
         var label_x = x0 + 5 * p;
-        if (icon_px > 0) {
+        if (icon_px > 0) {   // { cat, frame }: an Icon_Get picture (skills, statuses)
             if (variable_struct_exists(row, "icon") && is_struct(row.icon)) {
-                var ic = variable_struct_exists(row.icon, "spr") ? row.icon : Icon_Get(row.icon.cat, row.icon.frame);   // { cat, frame } an Icon_Get picture, or { spr, sub } a sprite
-                if (is_struct(ic)) {
-                    var isc = icon_px / max(16, max(sprite_get_width(ic.spr), sprite_get_height(ic.spr)));
-                    draw_sprite_ext(ic.spr, ic.sub, label_x + sprite_get_xoffset(ic.spr) * isc, ry + (mt.row_h - icon_px) div 2 + sprite_get_yoffset(ic.spr) * isc, isc, isc, 0, c_white, (dim && !sel) ? _alpha * 0.55 : _alpha);
-                }
+                var ic = Icon_Get(row.icon.cat, row.icon.frame);
+                if (is_struct(ic)) draw_sprite_ext(ic.spr, ic.sub, label_x, ry + (mt.row_h - icon_px) div 2, icon_px / 16, icon_px / 16, 0, c_white, (dim && !sel) ? _alpha * 0.55 : _alpha);
             }
             label_x += icon_px + 2 * p;
+        }
+        if (variable_struct_exists(row, "icon_item")) {   // C3: an item's picture
+            Item_DrawIcon(row.icon_item, label_x, ry + (mt.row_h - 8 * p) div 2, 8 * p, dim ? 0.6 : 1);
+            label_x += 10 * p;
         }
         var shown_label = row.label;
         if (!L.center) {   // a fixed-width panel (battle): a long name gives way to ".." before it reaches the value
