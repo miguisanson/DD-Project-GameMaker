@@ -1,0 +1,5 @@
+# sprite: spr_icons_throwable   frames: 4   16x16 each, left to right = subimage 0..3
+0	firebomb
+1	poison_pot
+2	ice_flask
+3	smoke_bomb
