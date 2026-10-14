@@ -2875,6 +2875,27 @@ function Test_Suite_Input() {
     Test_Eq("ROB-03 override then update: held reset", variable_struct_get(_inp.state, "move_up").held, false);
     Test_Eq("ROB-03 override then update: pressed reset", variable_struct_get(_inp.state, "move_up").pressed, false);
     _inp.last_step_time = -1;
+
+    // The input is read once per FRAME, not once per millisecond: two frames that share one current_time value (an unthrottled run, a 1 ms
+    // timer) must not let a press of the first one survive into the second (a menu moved twice for one tap). Input_FrameEnd is called by the draw
+    // of every frame, after all the Step events, so the next frame's first Input_Update always recomputes.
+    var _dn = { held: false, pressed: true };   // the press of frame N, still in the state
+    variable_struct_set(_inp.state, "menu_down", _dn);
+    _inp.last_step_time = current_time;          // frame N + 1 starts in the same millisecond as frame N
+    var _f1 = _inp.frame;
+    Input_FrameEnd();
+    Input_Update();
+    Test_Eq("Input a new frame in the same millisecond still recomputes (frame counter)", _inp.frame, _f1 + 1);
+    Test_False("Input a press does not survive into the next frame, even in the same millisecond", variable_struct_get(_inp.state, "menu_down").pressed);
+    // without a frame boundary and in the same millisecond nothing is recomputed (many objects call Input_PreStep in one frame)
+    variable_struct_set(_inp.state, "menu_down", { held: false, pressed: true });
+    _inp.last_step_time = current_time - 5;   // a clock that has moved on inside the frame
+    var _f2 = _inp.frame;
+    Input_Update();
+    Test_Eq("Input inside one frame (no draw in between) does not recompute, whatever the clock says", _inp.frame, _f2);
+    Test_True("Input the state of the frame is kept for every later controller of that frame", variable_struct_get(_inp.state, "menu_down").pressed);
+    _inp.last_step_time = -1;
+    Input_Update();
 }
 
 // ---- ROB-03 obj_sfx_manager: audio globals are created once, not every Step -----------------------

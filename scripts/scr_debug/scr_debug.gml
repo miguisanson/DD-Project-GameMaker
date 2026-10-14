@@ -262,8 +262,9 @@ function Scenario_Next(_s, _step) {
 // -bot input. The runner ignores keyboard_key_press while its window is not in front (measured), and tests never take focus,
 // so the bot presses by writing the game's own input state: Input_Update ends with Scenario_InputOverride(), after which
 // Input_Pressed / Input_UIConfirm (what every menu, QTE and the battle controller read) see the press.
-// The press is visible from this step until the next Scenario_Step (global.scn.f changes), i.e. for exactly one game frame
-// of the controllers that run before this one and for the rest of this frame for those that run after it.
+// The press is visible from this step until the next Scenario_Step (global.scn.f changes), i.e. for one game frame of the controllers that run before this
+// one (their next read) and for the rest of this frame for those that run after it. Scenario_Step re-reads the input as soon as the new frame's f is set
+// (Scenario_Step head), so a press cannot leak into the next frame's read of a controller that runs after it (a 2-item menu wrapped 0 -> 1 -> 0).
 function Scenario_Tap(_action) {
     global.scn.tap_action = _action;
     global.scn.last_tap = global.scn.f;
@@ -346,6 +347,10 @@ function Scenario_Step() {
     if (_s.done) return;
     _s.f++;
     _s.t++;
+    if (variable_global_exists("input")) {   // the old tap's override ends with the old f: re-read now, for every controller that runs after this one
+        global.input.last_step_time = -1;
+        Input_Update();
+    }
     var _gs = GameState_Get();
     if (is_struct(_gs) && variable_struct_exists(_gs, "settings") && is_struct(_gs.settings)) _gs.settings.window_mode = WINDOW_MODE_WINDOWED;
     if (_s.f > _s.cap) {
