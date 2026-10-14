@@ -110,9 +110,7 @@ if (cutscene_active) {
     }
 }
 
-if (gs.ui.mode == UI_CLASS_SELECT) {
-    ClassSelect_Draw();
-}
+CardsUi_Draw();   // C2: class choice, stat point, card pick, replace a skill
 
 // Dialogue box
 if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
@@ -232,6 +230,8 @@ if (gs.ui.mode == UI_SAVE) {
 if (gs.ui.mode == UI_BED) {
     BedMenu_Draw();
 }
+
+Banner_Draw();   // C5 (D106): boss name banner
 
 Transition_DrawGUI();
 

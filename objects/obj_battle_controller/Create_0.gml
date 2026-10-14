@@ -9,6 +9,7 @@ var gs = GameState_Init();
 p = gs.player_ch;
 p = Equip_PassiveBattleReset(p);
 e = EnemyCreate(gs.battle.enemy_id);
+Card_OnBattleStart(p, e);   // C2: Opening Blow
 
 // --------------------
 // CREATE ENEMY VISUAL (CENTERED)

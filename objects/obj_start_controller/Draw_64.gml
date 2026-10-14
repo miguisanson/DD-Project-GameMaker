@@ -23,6 +23,11 @@ if (state == "boot_logo") {
     draw_set_color(c_white);
     exit;
 }
+if (state == "credits") {   // C5 (D105)
+    Credits_Draw(credits_t);
+    draw_set_alpha(1);
+    exit;
+}
 if (state == "cutscene") exit;
 if (state == "run_flow") {   // C1: run summary and echo pick after the death scene (placeholder screens)
     RunFlow_Draw();

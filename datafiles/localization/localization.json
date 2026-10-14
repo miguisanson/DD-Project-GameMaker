@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T11:49:28Z",
-    "row_count": 752
+    "generated_at_utc": "2026-10-14T12:20:36Z",
+    "row_count": 942
   },
   "default_lang": "en",
   "languages": [
@@ -192,6 +192,398 @@
       "en": "You rest for a moment.",
       "ko": "잠시 쉬었다."
     },
+    "card.fb.focus.line": {
+      "en": "Your main stat grows by {n} for good.",
+      "ko": "주력 능력치가 영구히 {n} 오른다."
+    },
+    "card.fb.focus.name": {
+      "en": "Whetstone",
+      "ko": "숫돌"
+    },
+    "card.fb.gold.line": {
+      "en": "Take {n} gold.",
+      "ko": "골드 {n}을 얻는다."
+    },
+    "card.fb.gold.name": {
+      "en": "Coin Purse",
+      "ko": "동전 주머니"
+    },
+    "card.fb.rest.line": {
+      "en": "Restore {n}% of your HP and MP now.",
+      "ko": "지금 HP와 MP를 {n}% 회복한다."
+    },
+    "card.fb.rest.name": {
+      "en": "Second Breath",
+      "ko": "숨 고르기"
+    },
+    "card.lbl.after_fight": {
+      "en": "After fight",
+      "ko": "전투 후"
+    },
+    "card.lbl.arrows": {
+      "en": "Arrows",
+      "ko": "화살표"
+    },
+    "card.lbl.atk": {
+      "en": "ATK",
+      "ko": "ATK"
+    },
+    "card.lbl.chance": {
+      "en": "Chance",
+      "ko": "확률"
+    },
+    "card.lbl.def": {
+      "en": "DEF",
+      "ko": "DEF"
+    },
+    "card.lbl.each_turn": {
+      "en": "Each turn",
+      "ko": "매 턴"
+    },
+    "card.lbl.gold": {
+      "en": "Gold",
+      "ko": "골드"
+    },
+    "card.lbl.guard": {
+      "en": "Guard",
+      "ko": "방어"
+    },
+    "card.lbl.mag": {
+      "en": "MAG",
+      "ko": "MAG"
+    },
+    "card.lbl.main_stat": {
+      "en": "Main stat",
+      "ko": "주력 능력치"
+    },
+    "card.lbl.mp": {
+      "en": "MP",
+      "ko": "MP"
+    },
+    "card.lbl.perfect": {
+      "en": "Perfect zone",
+      "ko": "퍼펙트 구간"
+    },
+    "card.lbl.poison_stacks": {
+      "en": "Poison stacks",
+      "ko": "독 중첩"
+    },
+    "card.lbl.potion_find": {
+      "en": "Potion find",
+      "ko": "물약 발견"
+    },
+    "card.lbl.potion_mp": {
+      "en": "Potion MP",
+      "ko": "물약 MP"
+    },
+    "card.lbl.potions": {
+      "en": "Potions",
+      "ko": "물약"
+    },
+    "card.lbl.power": {
+      "en": "Power",
+      "ko": "위력"
+    },
+    "card.lbl.restores": {
+      "en": "Restores",
+      "ko": "회복량"
+    },
+    "card.lbl.skill_mp": {
+      "en": "Skill MP",
+      "ko": "스킬 MP"
+    },
+    "card.lbl.skill_power": {
+      "en": "Skill power",
+      "ko": "스킬 위력"
+    },
+    "card.lbl.skills": {
+      "en": "Skills",
+      "ko": "스킬"
+    },
+    "card.lbl.spd": {
+      "en": "SPD",
+      "ko": "SPD"
+    },
+    "card.lbl.stacks": {
+      "en": "Stacks",
+      "ko": "중첩"
+    },
+    "card.lbl.stagger": {
+      "en": "Stagger",
+      "ko": "경직"
+    },
+    "card.lbl.status_turns": {
+      "en": "Status turns",
+      "ko": "상태 턴"
+    },
+    "card.lbl.turns": {
+      "en": "Turns",
+      "ko": "턴"
+    },
+    "card.mp_short": {
+      "en": "{mp} MP",
+      "ko": "{mp} MP"
+    },
+    "card.pas.a_barbed.line": {
+      "en": "Your damage skills hit for {n} more power.",
+      "ko": "내 공격 스킬의 위력이 {n} 높아진다."
+    },
+    "card.pas.a_barbed.name": {
+      "en": "Barbed Arrows",
+      "ko": "가시 화살"
+    },
+    "card.pas.a_fleet_foot.line": {
+      "en": "Quicker than the wind: +{n} SPD for good.",
+      "ko": "바람보다 빠르게: 영구히 SPD +{n}."
+    },
+    "card.pas.a_fleet_foot.name": {
+      "en": "Fleet Foot",
+      "ko": "날랜 발"
+    },
+    "card.pas.a_second_wind.line": {
+      "en": "Regain {n} MP after each fight you win.",
+      "ko": "전투에서 이길 때마다 MP를 {n} 회복한다."
+    },
+    "card.pas.a_second_wind.name": {
+      "en": "Second Wind",
+      "ko": "두 번째 숨"
+    },
+    "card.pas.coin_sense.line": {
+      "en": "Find {n}% more gold.",
+      "ko": "골드를 {n}% 더 얻는다."
+    },
+    "card.pas.coin_sense.name": {
+      "en": "Coin Sense",
+      "ko": "돈 냄새"
+    },
+    "card.pas.field_medic.line": {
+      "en": "Heal {n} HP after each fight you win.",
+      "ko": "전투에서 이길 때마다 HP를 {n} 회복한다."
+    },
+    "card.pas.field_medic.name": {
+      "en": "Field Medic",
+      "ko": "야전 의무병"
+    },
+    "card.pas.k_bulwark.line": {
+      "en": "Guard on yourself lasts {n} turns longer.",
+      "ko": "나에게 건 방어 효과가 {n}턴 더 오래간다."
+    },
+    "card.pas.k_bulwark.name": {
+      "en": "Bulwark",
+      "ko": "방벽"
+    },
+    "card.pas.k_heavy_hands.line": {
+      "en": "A harder swing: +{n} ATK for good.",
+      "ko": "더 묵직한 일격: 영구히 ATK +{n}."
+    },
+    "card.pas.k_heavy_hands.name": {
+      "en": "Heavy Hands",
+      "ko": "묵직한 손"
+    },
+    "card.pas.k_iron_hide.line": {
+      "en": "Thick armour sense: +{n} DEF for good.",
+      "ko": "단단한 감각: 영구히 DEF +{n}."
+    },
+    "card.pas.k_iron_hide.name": {
+      "en": "Iron Hide",
+      "ko": "강철 가죽"
+    },
+    "card.pas.m_arcane_well.line": {
+      "en": "A deeper well: +{n} MAG for good.",
+      "ko": "더 깊은 샘: 영구히 MAG +{n}."
+    },
+    "card.pas.m_arcane_well.name": {
+      "en": "Arcane Well",
+      "ko": "비전의 샘"
+    },
+    "card.pas.m_cold_focus.line": {
+      "en": "Statuses you inflict last {n} turn longer.",
+      "ko": "내가 거는 상태 이상이 {n}턴 더 오래간다."
+    },
+    "card.pas.m_cold_focus.name": {
+      "en": "Cold Focus",
+      "ko": "차가운 집중"
+    },
+    "card.pas.m_spellweave.line": {
+      "en": "Your skills cost {n} MP less (never below 1).",
+      "ko": "스킬의 MP 소모가 {n} 줄어든다 (최소 1)."
+    },
+    "card.pas.m_spellweave.name": {
+      "en": "Spellweave",
+      "ko": "주문 엮기"
+    },
+    "card.pas.mana_spring.line": {
+      "en": "Regain {n} MP at the start of each of your turns.",
+      "ko": "내 턴이 시작될 때마다 MP를 {n} 회복한다."
+    },
+    "card.pas.mana_spring.name": {
+      "en": "Mana Spring",
+      "ko": "마나의 샘"
+    },
+    "card.pas.n_apothecary.line": {
+      "en": "Potions work {n}% better.",
+      "ko": "물약의 효과가 {n}% 커진다."
+    },
+    "card.pas.n_apothecary.name": {
+      "en": "Apothecary",
+      "ko": "약제사"
+    },
+    "card.pas.n_scrounger.line": {
+      "en": "{n}% chance to find a potion after each fight you win.",
+      "ko": "전투에서 이길 때마다 {n}% 확률로 물약을 줍는다."
+    },
+    "card.pas.n_scrounger.name": {
+      "en": "Scrounger",
+      "ko": "주워 모으는 자"
+    },
+    "card.pas.n_tonic.line": {
+      "en": "Healing potions also restore {n} MP.",
+      "ko": "회복 물약이 MP도 {n} 회복시킨다."
+    },
+    "card.pas.n_tonic.name": {
+      "en": "Tonic Blend",
+      "ko": "강장제 배합"
+    },
+    "card.pas.opening_blow.line": {
+      "en": "Enemies start each fight with {n} stagger.",
+      "ko": "전투가 시작될 때 적의 경직이 {n} 쌓여 있다."
+    },
+    "card.pas.opening_blow.name": {
+      "en": "Opening Blow",
+      "ko": "선제 일격"
+    },
+    "card.pas.potion_lore.line": {
+      "en": "Potions work {n}% better.",
+      "ko": "물약의 효과가 {n}% 커진다."
+    },
+    "card.pas.potion_lore.name": {
+      "en": "Potion Lore",
+      "ko": "물약 지식"
+    },
+    "card.pas.quick_feet.line": {
+      "en": "Light on your feet: +{n} SPD for good.",
+      "ko": "가벼운 발걸음: 영구히 SPD +{n}."
+    },
+    "card.pas.quick_feet.name": {
+      "en": "Quick Feet",
+      "ko": "빠른 발"
+    },
+    "card.pas.steady_hands.line": {
+      "en": "Perfect zones are {n}% wider.",
+      "ko": "퍼펙트 구간이 {n}% 넓어진다."
+    },
+    "card.pas.steady_hands.name": {
+      "en": "Steady Hands",
+      "ko": "흔들림 없는 손"
+    },
+    "card.pas.venom_coat.line": {
+      "en": "Poison you apply lands {n} extra stack.",
+      "ko": "내가 거는 독이 {n}중첩 더 쌓인다."
+    },
+    "card.pas.venom_coat.name": {
+      "en": "Venom Coat",
+      "ko": "독 바르기"
+    },
+    "card.skill.buff": {
+      "en": "Gain {status} for {turns} turns.",
+      "ko": "{status} 효과를 {turns}턴 동안 얻는다."
+    },
+    "card.skill.hit": {
+      "en": "Strike for {power} power.",
+      "ko": "위력 {power}로 공격한다."
+    },
+    "card.skill.hit_status": {
+      "en": "{chance}% to inflict {status}.",
+      "ko": "{chance}% 확률로 {status} 부여."
+    },
+    "card.skill.hits": {
+      "en": "Strike {hits} times for {power} power each.",
+      "ko": "{hits}번 공격한다. 한 번에 위력 {power}."
+    },
+    "card.skill.other": {
+      "en": "A special technique.",
+      "ko": "특수한 기술."
+    },
+    "card.tag.boon": {
+      "en": "Boon",
+      "ko": "은총"
+    },
+    "card.tag.class_passive": {
+      "en": "Class passive",
+      "ko": "직업 패시브"
+    },
+    "card.tag.passive": {
+      "en": "Passive",
+      "ko": "패시브"
+    },
+    "card.tag.skill": {
+      "en": "Skill",
+      "ko": "스킬"
+    },
+    "card.tag.upgrade": {
+      "en": "Upgrade",
+      "ko": "강화"
+    },
+    "card.val.hp": {
+      "en": "+{n} HP",
+      "ko": "HP +{n}"
+    },
+    "card.val.mp": {
+      "en": "+{n} MP",
+      "ko": "MP +{n}"
+    },
+    "card.val.restores": {
+      "en": "{pct} HP, MP",
+      "ko": "HP, MP {pct}"
+    },
+    "card.val.turns": {
+      "en": "+{n} turns",
+      "ko": "+{n}턴"
+    },
+    "cards.pick.hint": {
+      "en": "Left / Right to choose, confirm to take it",
+      "ko": "좌/우로 고르고, 확인으로 받는다"
+    },
+    "cards.pick.left": {
+      "en": "({n} picks left)",
+      "ko": "(남은 선택 {n}번)"
+    },
+    "cards.pick.skip": {
+      "en": "Skip: +{gold} gold",
+      "ko": "건너뛰기: +{gold} 골드"
+    },
+    "cards.pick.title": {
+      "en": "Choose a card",
+      "ko": "카드를 고르세요"
+    },
+    "cards.replace.keep": {
+      "en": "Keep my skills",
+      "ko": "스킬 유지"
+    },
+    "cards.replace.keep_help": {
+      "en": "Go back to the cards and choose again.",
+      "ko": "카드 화면으로 돌아가 다시 고릅니다."
+    },
+    "cards.replace.lose": {
+      "en": "Gives up: {line}",
+      "ko": "잃는 것: {line}"
+    },
+    "cards.replace.title": {
+      "en": "Learn {skill}: replace which?",
+      "ko": "{skill} 배우기: 무엇을 바꿀까요?"
+    },
+    "cards.stat.after": {
+      "en": "After",
+      "ko": "이후"
+    },
+    "cards.stat.now": {
+      "en": "Now",
+      "ko": "현재"
+    },
+    "cards.stat.title": {
+      "en": "Level {lvl}: place 1 point",
+      "ko": "레벨 {lvl}: 포인트 1개 배분"
+    },
     "class.classselect_draw.2029.0": {
       "en": "class.select.title",
       "ko": "클래스.선택.제목"
@@ -207,6 +599,30 @@
     "class.classselect_draw.2066.1": {
       "en": "Back",
       "ko": "뒤쪽에"
+    },
+    "class.lbl.five": {
+      "en": "5 to find",
+      "ko": "5개 발견 가능"
+    },
+    "class.lbl.none": {
+      "en": "None",
+      "ko": "없음"
+    },
+    "class.line.archer": {
+      "en": "Fast and sharp. High speed, poison and double shots to find.",
+      "ko": "빠르고 날카롭다. 높은 속도, 독과 연속 사격을 찾아보자."
+    },
+    "class.line.knight": {
+      "en": "A sturdy fighter. Strong attack and defence, five skills to find.",
+      "ko": "듬직한 전사. 강한 공격과 방어, 찾아야 할 스킬 5개."
+    },
+    "class.line.mage": {
+      "en": "A spell caster. Great magic and mana, five spells to find.",
+      "ko": "주문 시전자. 뛰어난 마법과 마나, 찾아야 할 주문 5개."
+    },
+    "class.line.nobody": {
+      "en": "No skills at all. Fight with your blade, your passives and your items.",
+      "ko": "스킬이 전혀 없다. 칼, 패시브, 아이템으로 싸운다."
     },
     "class.name.archer": {
       "en": "Archer",
@@ -239,6 +655,18 @@
     "class.name.warrior": {
       "en": "Warrior",
       "ko": "전사"
+    },
+    "class.nobody.locked": {
+      "en": "Locked",
+      "ko": "잠김"
+    },
+    "class.nobody.locked_hint": {
+      "en": "Win a run to unlock this path.",
+      "ko": "한 번 승리하면 이 길이 열립니다."
+    },
+    "class.select.become": {
+      "en": "Become {cls}?",
+      "ko": "{cls}(이)가 될까요?"
     },
     "class.select.title": {
       "en": "Select Class",
@@ -680,6 +1108,50 @@
       "en": "OK",
       "ko": "좋아요"
     },
+    "credits.by": {
+      "en": "by PaleRook",
+      "ko": "PaleRook 제작"
+    },
+    "credits.creator": {
+      "en": "creator: {name}",
+      "ko": "제작자: {name}"
+    },
+    "credits.font_galmuri": {
+      "en": "Galmuri by Lee Minseo (OFL-1.1)",
+      "ko": "Galmuri - Lee Minseo (OFL-1.1)"
+    },
+    "credits.font_pixel": {
+      "en": "Retro Gaming pixel font",
+      "ko": "Retro Gaming 픽셀 글꼴"
+    },
+    "credits.fonts": {
+      "en": "Fonts",
+      "ko": "글꼴"
+    },
+    "credits.game_by": {
+      "en": "Game and art by PaleRook",
+      "ko": "게임과 그림: PaleRook"
+    },
+    "credits.sounds": {
+      "en": "Sound and music",
+      "ko": "효과음과 음악"
+    },
+    "credits.thanks": {
+      "en": "Thank you for playing.",
+      "ko": "플레이해 주셔서 감사합니다."
+    },
+    "credits.title": {
+      "en": "NO HOPE",
+      "ko": "NO HOPE"
+    },
+    "credits.tool_gamemaker": {
+      "en": "Made with GameMaker",
+      "ko": "GameMaker로 제작"
+    },
+    "credits.tools": {
+      "en": "Tools",
+      "ko": "도구"
+    },
     "cutscene.ending.0.0": {
       "en": "Thank the Almighty...",
       "ko": "전능자께 감사하라..."
@@ -737,8 +1209,8 @@
       "ko": "플레이해 주셔서 감사합니다..."
     },
     "cutscene.ending.4.1": {
-      "en": "This was around 2 months of development, and I'm glad you were able to get through our prototype story.",
-      "ko": "이 게임은 약 2개월 동안 개발되었고, 여러분이 우리의 프로토타입 스토리를 끝까지 플레이해 주셔서 정말 기쁩니다."
+      "en": "We're glad you made it all the way to the end.",
+      "ko": "끝까지 함께해 주셔서 정말 기쁩니다."
     },
     "cutscene.ending.4.2": {
       "en": "We're looking to use what we learned from this game for our next title.",
@@ -871,6 +1343,126 @@
     "cutscene.intro.2.1": {
       "en": "You fell.",
       "ko": "당신은 떨어졌습니다."
+    },
+    "death.killer.abandoned": {
+      "en": "You let go. The tunnel did not mind.",
+      "ko": "당신은 손을 놓았다. 터널은 개의치 않았다."
+    },
+    "death.killer.enemy_direwolf": {
+      "en": "The wolf was faster than your fear.",
+      "ko": "늑대는 당신의 두려움보다 빨랐다."
+    },
+    "death.killer.enemy_final_boss": {
+      "en": "The choir sings. You were its last note.",
+      "ko": "성가대가 노래한다. 당신은 그 마지막 음이었다."
+    },
+    "death.killer.enemy_ghostsword": {
+      "en": "A blade with no hand to hold it.",
+      "ko": "손도 없이 휘둘러지는 검."
+    },
+    "death.killer.enemy_killer_plant": {
+      "en": "Even the plants here want you gone.",
+      "ko": "여기선 식물조차 당신을 죽이려 든다."
+    },
+    "death.killer.enemy_madwhisp": {
+      "en": "The glow led you here. It always does.",
+      "ko": "그 빛이 여기까지 이끌었다. 언제나 그렇다."
+    },
+    "death.killer.enemy_mini_boss": {
+      "en": "{killer} did not even slow down.",
+      "ko": "{killer}은(는) 속도조차 늦추지 않았다."
+    },
+    "death.killer.enemy_slime": {
+      "en": "A slime. You were beaten by a slime.",
+      "ko": "고작 더러운 것에게 당했다."
+    },
+    "death.killer.enemy_snake": {
+      "en": "A hiss. Then nothing.",
+      "ko": "쉬익. 그리고 아무것도 없다."
+    },
+    "death.killer.enemy_spider": {
+      "en": "Eight eyes. The last thing you saw.",
+      "ko": "여덟 개의 눈. 마지막으로 본 것."
+    },
+    "death.killer.enemy_stranger": {
+      "en": "The stranger smiled the whole time.",
+      "ko": "낯선 이는 내내 웃고 있었다."
+    },
+    "death.killer.status_bleed": {
+      "en": "You bled out, counting the drops.",
+      "ko": "방울을 세며 피를 흘렸다."
+    },
+    "death.killer.status_burn": {
+      "en": "The fire was warm, at least.",
+      "ko": "적어도 불은 따뜻했다."
+    },
+    "death.killer.status_poison": {
+      "en": "The poison finished what the fight began.",
+      "ko": "독이 싸움이 남긴 일을 끝냈다."
+    },
+    "death.killer.unknown_name": {
+      "en": "Something",
+      "ko": "무언가"
+    },
+    "death.t1.0": {
+      "en": "The dark takes you. Quietly.",
+      "ko": "어둠이 당신을 조용히 데려간다."
+    },
+    "death.t1.1": {
+      "en": "So this is how it ends.",
+      "ko": "결국 이렇게 끝나는구나."
+    },
+    "death.t1.2": {
+      "en": "The floor gives way beneath you.",
+      "ko": "발밑의 바닥이 꺼진다."
+    },
+    "death.t2.0": {
+      "en": "You were sure that was the end.",
+      "ko": "분명 이게 끝이라고 생각했다."
+    },
+    "death.t2.1": {
+      "en": "The tunnel is not finished with you.",
+      "ko": "터널은 아직 당신을 놓아주지 않는다."
+    },
+    "death.t2.2": {
+      "en": "Cold stone. A fall. Again.",
+      "ko": "차가운 돌. 추락. 또다시."
+    },
+    "death.t3.0": {
+      "en": "You know this fall by heart now.",
+      "ko": "이 추락은 이제 눈 감고도 안다."
+    },
+    "death.t3.1": {
+      "en": "How many times has it been?",
+      "ko": "벌써 몇 번째일까?"
+    },
+    "death.t3.2": {
+      "en": "Dying is starting to feel like routine.",
+      "ko": "죽는 일이 일상처럼 느껴지기 시작한다."
+    },
+    "death.t4.0": {
+      "en": "You stopped counting. The walls didn't.",
+      "ko": "세는 건 그만뒀다. 벽은 아니었다."
+    },
+    "death.t4.1": {
+      "en": "{killer}. You don't even flinch anymore.",
+      "ko": "{killer}. 이제 놀라지도 않는다."
+    },
+    "death.t4.2": {
+      "en": "Nobody is coming. Nobody ever did.",
+      "ko": "아무도 오지 않는다. 한 번도 온 적 없다."
+    },
+    "death.t5.0": {
+      "en": "Even wanting to leave has gone quiet.",
+      "ko": "떠나고 싶다는 마음마저 조용해졌다."
+    },
+    "death.t5.1": {
+      "en": "{killer}. Of course it was.",
+      "ko": "{killer}. 역시 그랬다."
+    },
+    "death.t5.2": {
+      "en": "Down here, at least, you know what to expect.",
+      "ko": "적어도 여기서는 무엇이 올지 안다."
     },
     "dialogue.after_class_chest_archer.0": {
       "en": "Light. Balanced.",
@@ -1644,6 +2236,14 @@
       "en": "Confirm",
       "ko": "확인하다"
     },
+    "menu.common.no": {
+      "en": "No",
+      "ko": "아니오"
+    },
+    "menu.common.yes": {
+      "en": "Yes",
+      "ko": "예"
+    },
     "menu.difficulty.title": {
       "en": "Select Difficulty",
       "ko": "난이도 선택"
@@ -2260,6 +2860,130 @@
       "en": "Effect: {effect}",
       "ko": "효과: {effect}"
     },
+    "note.carved_arrow.0": {
+      "en": "An arrow is carved here, pointing up.",
+      "ko": "위쪽을 가리키는 화살표가 새겨져 있다."
+    },
+    "note.carved_arrow.1": {
+      "en": "Someone crossed it out. Beneath it, one word:",
+      "ko": "누군가 그 위에 줄을 긋고, 아래에 한 단어를 남겼다."
+    },
+    "note.carved_arrow.2": {
+      "en": "\"Don't.\"",
+      "ko": "\"가지 마.\""
+    },
+    "note.carved_arrow.title": {
+      "en": "Carved arrow",
+      "ko": "새겨진 화살표"
+    },
+    "note.lost_others.0": {
+      "en": "A letter that stops in the middle of a sentence.",
+      "ko": "문장 중간에서 끊긴 편지."
+    },
+    "note.lost_others.1": {
+      "en": "\"The others went ahead. Or I did. I can't tell anymore.\"",
+      "ko": "\"다른 이들이 먼저 갔다. 아니면 내가. 이제 모르겠다.\""
+    },
+    "note.lost_others.2": {
+      "en": "\"I keep calling for them. Only the walls answer.\"",
+      "ko": "\"계속 불러보지만 벽만 대답한다.\""
+    },
+    "note.lost_others.title": {
+      "en": "Unfinished letter",
+      "ko": "쓰다 만 편지"
+    },
+    "note.map_page.0": {
+      "en": "A page torn from a survey book. Your handwriting.",
+      "ko": "측량 수첩에서 뜯긴 한 장. 당신의 필체다."
+    },
+    "note.map_page.1": {
+      "en": "\"No tunnel here. Not on any map I ever drew.\"",
+      "ko": "\"이곳에 터널은 없다. 내가 그린 어떤 지도에도.\""
+    },
+    "note.map_page.2": {
+      "en": "The ink still looks wet. You don't remember writing it.",
+      "ko": "잉크가 아직 젖어 있다. 쓴 기억은 없다."
+    },
+    "note.map_page.title": {
+      "en": "Torn survey page",
+      "ko": "찢어진 측량 기록"
+    },
+    "note.mapmaker_scrap.0": {
+      "en": "A scrap of paper in your own hand:",
+      "ko": "당신의 필체로 쓰인 쪽지."
+    },
+    "note.mapmaker_scrap.1": {
+      "en": "\"The fall was no accident. It wanted a mapmaker.\"",
+      "ko": "\"추락은 사고가 아니었다. 터널은 지도 제작자를 원했다.\""
+    },
+    "note.mapmaker_scrap.2": {
+      "en": "\"Someone who would map it, and come back to map it again.\"",
+      "ko": "\"그리고 돌아와서 다시 지도를 그릴 사람을.\""
+    },
+    "note.mapmaker_scrap.title": {
+      "en": "Mapmaker's scrap",
+      "ko": "지도 제작자의 쪽지"
+    },
+    "note.six_marks.0": {
+      "en": "Six scratches in a row, tidy as a ledger.",
+      "ko": "장부처럼 가지런한 긁힘 여섯 개."
+    },
+    "note.six_marks.1": {
+      "en": "Beside them, in a shakier hand: \"Stop counting.\"",
+      "ko": "그 옆에 떨리는 필체로: \"세지 마.\""
+    },
+    "note.six_marks.2": {
+      "en": "\"It only counts you back.\"",
+      "ko": "\"세면, 터널도 너를 센다.\""
+    },
+    "note.six_marks.title": {
+      "en": "Six marks",
+      "ko": "여섯 줄의 흔적"
+    },
+    "note.three_marks.0": {
+      "en": "Three short scratches in the stone.",
+      "ko": "돌에 짧은 긁힘이 세 개 있다."
+    },
+    "note.three_marks.1": {
+      "en": "You made these. You don't remember making them.",
+      "ko": "당신이 새긴 것이다. 새긴 기억은 없다."
+    },
+    "note.three_marks.title": {
+      "en": "Three marks",
+      "ko": "세 줄의 흔적"
+    },
+    "note.wall_breath.0": {
+      "en": "Scratched deep into the stone, slowly and carefully:",
+      "ko": "돌에 깊고 신중하게 새겨져 있다."
+    },
+    "note.wall_breath.1": {
+      "en": "\"It breathes. Hold still and you can feel it.\"",
+      "ko": "\"숨을 쉰다. 가만히 있으면 느껴진다.\""
+    },
+    "note.wall_breath.2": {
+      "en": "\"Every step goes deeper. None of them go back.\"",
+      "ko": "\"한 걸음마다 더 깊어진다. 돌아가는 길은 없다.\""
+    },
+    "note.wall_breath.title": {
+      "en": "Wall scratches",
+      "ko": "벽의 긁힌 자국"
+    },
+    "note.wall_of_marks.0": {
+      "en": "Ten scratches. Then more, far older than yours.",
+      "ko": "긁힘 열 개. 그 너머로 훨씬 오래된 자국들."
+    },
+    "note.wall_of_marks.1": {
+      "en": "Some are in other hands.",
+      "ko": "일부는 다른 사람의 손길이다."
+    },
+    "note.wall_of_marks.2": {
+      "en": "You are not the first to wake down here.",
+      "ko": "여기서 눈을 뜬 사람은 당신이 처음이 아니다."
+    },
+    "note.wall_of_marks.title": {
+      "en": "A wall of marks",
+      "ko": "흔적으로 가득한 벽"
+    },
     "pause.option.abandon": {
       "en": "Abandon Run",
       "ko": "도전 포기"
@@ -2343,6 +3067,26 @@
     "runflow.floor": {
       "en": "Floor reached: {n}",
       "ko": "도달한 층: {n}"
+    },
+    "runflow.sum.class": {
+      "en": "Class",
+      "ko": "직업"
+    },
+    "runflow.sum.falls": {
+      "en": "Falls so far",
+      "ko": "지금까지 추락"
+    },
+    "runflow.sum.floor": {
+      "en": "Floor reached",
+      "ko": "도달한 층"
+    },
+    "runflow.sum.kills": {
+      "en": "Foes beaten",
+      "ko": "쓰러뜨린 적"
+    },
+    "runflow.sum.level": {
+      "en": "Level",
+      "ko": "레벨"
     },
     "runflow.title": {
       "en": "The tunnel keeps you.",
@@ -3019,6 +3763,22 @@
     "ui.skip_hold": {
       "en": "Hold to skip",
       "ko": "길게 눌러 건너뛰기"
+    },
+    "wake.t1": {
+      "en": "You wake where you first fell. Alive.",
+      "ko": "처음 떨어진 곳에서 눈을 뜬다. 살아 있다."
+    },
+    "wake.t2": {
+      "en": "The same stone. The same cold. You wake again.",
+      "ko": "같은 돌바닥. 같은 냉기. 다시 눈을 뜬다."
+    },
+    "wake.t3": {
+      "en": "You wake at the entrance. It almost feels like home.",
+      "ko": "입구에서 눈을 뜬다. 어쩐지 집처럼 느껴진다."
+    },
+    "wake.t4": {
+      "en": "You wake. You no longer ask why.",
+      "ko": "눈을 뜬다. 더는 이유를 묻지 않는다."
     }
   }
 }

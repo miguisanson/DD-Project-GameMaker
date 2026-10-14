@@ -749,7 +749,13 @@ function SkillDB_Init() {
     }
 }
 
+// What the skill is for the player who holds it (C2: his upgrade, Barbed Arrows, Spellweave); anything else is the database entry.
 function SkillDB_Get(_skill_id) {
+    return Card_ApplyToSkill(SkillDB_GetBase(_skill_id), _skill_id);
+}
+
+// The database entry itself, localized (no card effects).
+function SkillDB_GetBase(_skill_id) {
     if (!variable_global_exists("skill_db") || !ds_exists(global.skill_db, ds_type_map)) {
         SkillDB_Init();
     }
@@ -944,6 +950,10 @@ function Skill_AdjustStatusTurns(_user, _target, _status_id, _base_turns) {
     var target_is_player = (is_struct(_target) && variable_struct_exists(_target, "is_player") && _target.is_player);
     if (user_is_player && !target_is_player && _status_id != STATUS_POISON) {
         turns += max(0, Equip_PlayerStatusTurnBonus(_user, _status_id));
+        turns += Card_StatusTurnBonus(_user, _status_id);   // Cold Focus
+    }
+    if (user_is_player && target_is_player && _status_id == STATUS_GUARD) {
+        turns += max(0, round(Card_PassiveSum(_user, "guard_turns")));   // Bulwark
     }
 
     return max(1, turns);
@@ -956,6 +966,7 @@ function Skill_StatusStacks(_user, _target, _status_id, _base_stacks) {
     var target_is_player = (is_struct(_target) && variable_struct_exists(_target, "is_player") && _target.is_player);
     if (_status_id == STATUS_POISON && user_is_player && !target_is_player) {
         stacks += max(0, Equip_PlayerStatusTurnBonus(_user, _status_id));
+        stacks += max(0, round(Card_PassiveSum(_user, "poison_stacks")));   // Venom Coat
     }
     return stacks;
 }
@@ -1350,4 +1361,743 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
     }
 
     return result;
+}
+
+
+// ==========================================================================================================================
+// C2: cards (D18, D34, D73, D76, D81-D83, D88, D100).
+// A card is a struct { id, kind, stem, name_en, line_en, classes, params, skill_id, up }.
+//   kind skill     id skill:<skill id>   learn a class skill (max CARD_MAX_SKILLS equipped, D82)
+//   kind upgrade   id up:<skill id>      the skill's one upgrade; only offered for a skill you have; `up` holds the deltas
+//   kind passive   id pas:<name>         shared (classes = []) or class-exclusive; `params` are the numbers the game reads
+//   kind fallback  id fb:<name>          fills an offer when the pool ran dry; never part of a class pool
+// Text is generated from this data (D100): the sentence has its numbers filled in, the number lines are label/value pairs.
+// The player (a character struct) keeps: skills [ids], upgrades [skill ids], passives [card ids], card_picks (owed 1-of-3 picks),
+// class_pick (owed class choice), class_chosen, skill_pending (a taken skill waiting for a slot, -1 = none), offer (the 3 ids on screen).
+// ==========================================================================================================================
+#macro CARD_PITY_OFFERS 2     // offers without an upgrade (while one was possible) before the next one must hold one
+#macro CARD_MAX_SKILLS 3      // D82
+#macro CARD_OFFER_SIZE 3      // D81
+#macro CARD_SKIP_GOLD 5       // D81: a small payout for refusing an offer (about one early fight's gold)
+
+function Card_SkillId(_skill_id) { return "skill:" + string(_skill_id); }
+function Card_UpgradeId(_skill_id) { return "up:" + string(_skill_id); }
+function Card_SkipGold() { return CARD_SKIP_GOLD; }
+
+function Card_ArrayHas(_arr, _v) {
+    if (!is_array(_arr)) return false;
+    for (var i = 0; i < array_length(_arr); i++) if (_arr[i] == _v) return true;
+    return false;
+}
+
+function Card_ArrayWithout(_arr, _v) {
+    var out = [];
+    for (var i = 0; i < array_length(_arr); i++) if (_arr[i] != _v) array_push(out, _arr[i]);
+    return out;
+}
+
+function CardDB_Add(_c) {
+    array_push(global.card_list, _c);
+    variable_struct_set(global.card_index, _c.id, array_length(global.card_list) - 1);
+}
+
+function CardDB_Make(_id, _kind, _stem, _name, _line, _classes, _params, _skill_id = -1, _up = {}) {
+    return { id: _id, kind: _kind, stem: _stem, name_en: _name, line_en: _line, classes: _classes, params: _params, skill_id: _skill_id, up: _up };
+}
+
+// Builds the card list once: the 14 player skills (from the skill database), their 14 upgrades, the passives and the fallbacks.
+function CardDB_Init() {
+    if (variable_global_exists("card_list") && is_array(global.card_list) && array_length(global.card_list) > 0) return;
+    SkillDB_Init();
+    global.card_list = [];
+    global.card_index = {};
+
+    // skills, in id order; one upgrade each. Upgrade deltas: power, mp_cost, status_turns, status_stacks, status_chance (all added), seq_trim (arrows removed from the end).
+    var ups = [
+        [SKILL_WOUND,       { power: 2, status_chance: 0.25 }],                  // Wound+: power 4 > 6, bleed 75% > 100%
+        [SKILL_HILT_BASH,   { power: 1, status_chance: 0.25 }],                  // Hilt Bash+: power 4 > 5, stun 60% > 85%
+        [SKILL_MUSCLE_UP,   { mp_cost: -1, status_turns: 2 }],                   // Muscle Up+: 3 > 2 MP, guard 6 > 8 turns
+        [SKILL_REV_UP,      { seq_trim: 1, status_turns: 2 }],                   // Rev Up+: 3 > 2 arrows, 6 > 8 turns
+        [SKILL_HORIZ_SLASH, { power: 2, seq_trim: 1 }],                          // Horizontal Slash+: power 5 > 7, 5 > 4 arrows
+        [SKILL_POISON_ARROW,{ status_stacks: 1, status_chance: 0.25 }],          // Poison Arrow+: 3 > 4 stacks, 75% > 100%
+        [SKILL_EVASION,     { mp_cost: -1, status_turns: 3 }],                   // Evasion+: 3 > 2 MP, 6 > 9 turns
+        [SKILL_DOUBLE_SHOT, { power: 1, seq_trim: 1 }],                          // Double Shot+: power 4 > 5 per shot, 5 > 4 arrows
+        [SKILL_TAKE_AIM,    { mp_cost: -1, status_turns: 3 }],                   // Take Aim+: 3 > 2 MP, 9 > 12 turns
+        [SKILL_FIREBALL,    { power: 2, status_chance: 0.25 }],                  // Fireball+: power 6 > 8, burn 60% > 85%
+        [SKILL_POISON_MIST, { status_stacks: 1, seq_trim: 1 }],                  // Poison Mist+: 4 > 5 stacks, 4 > 3 arrows
+        [SKILL_ICE_SPEAR,   { power: 2, seq_trim: 1 }],                          // Ice Spear+: power 5 > 7, 5 > 4 arrows
+        [SKILL_MEDITATION,  { mp_cost: -1, status_turns: 3 }],                   // Meditation+: 3 > 2 MP, 9 > 12 turns
+        [SKILL_FORESIGHT,   { status_turns: 2, seq_trim: 1 }]                    // Foresight+: 3 > 5 turns, 3 > 2 arrows
+    ];
+    for (var i = 0; i < array_length(ups); i++) {
+        var sid = ups[i][0];
+        var sk = global.skill_db[? sid];
+        CardDB_Add(CardDB_Make(Card_SkillId(sid), "skill", "", "", "", sk.class_list, {}, sid));
+    }
+    for (var j = 0; j < array_length(ups); j++) {
+        var sid2 = ups[j][0];
+        var sk2 = global.skill_db[? sid2];
+        CardDB_Add(CardDB_Make(Card_UpgradeId(sid2), "upgrade", "", "", "", sk2.class_list, {}, sid2, ups[j][1]));
+    }
+
+    // passives: [id, name, sentence ({n} = the main number), classes, main param, params]
+    var K = [CLASS_KNIGHT]; var A = [CLASS_ARCHER]; var M = [CLASS_MAGE]; var N = [CLASS_NOBODY];
+    var pas = [
+        ["quick_feet",    "Quick Feet",    "Light on your feet: +{n} SPD for good.",                    [], "stat_spd",         { stat_spd: 1 }],
+        ["venom_coat",    "Venom Coat",    "Poison you apply lands {n} extra stack.",                   [], "poison_stacks",    { poison_stacks: 1 }],
+        ["field_medic",   "Field Medic",   "Heal {n} HP after each fight you win.",                     [], "heal_after_fight", { heal_after_fight: 3 }],
+        ["steady_hands",  "Steady Hands",  "Perfect zones are {n}% wider.",                             [], "perfect_widen",    { perfect_widen: 0.10 }],
+        ["coin_sense",    "Coin Sense",    "Find {n}% more gold.",                                      [], "gold_mult",        { gold_mult: 0.10 }],
+        ["mana_spring",   "Mana Spring",   "Regain {n} MP at the start of each of your turns.",         [], "mp_gain",          { mp_gain: 1, every_n_turns: 1 }],
+        ["potion_lore",   "Potion Lore",   "Potions work {n}% better.",                                 [], "item_power",       { item_power: 0.15 }],
+        ["opening_blow",  "Opening Blow",  "Enemies start each fight with {n} stagger.",                [], "start_stagger",    { start_stagger: 1 }],
+        ["k_iron_hide",   "Iron Hide",     "Thick armour sense: +{n} DEF for good.",                    K,  "stat_def",         { stat_def: 2 }],
+        ["k_bulwark",     "Bulwark",       "Guard on yourself lasts {n} turns longer.",                 K,  "guard_turns",      { guard_turns: 3 }],
+        ["k_heavy_hands", "Heavy Hands",   "A harder swing: +{n} ATK for good.",                        K,  "stat_atk",         { stat_atk: 2 }],
+        ["a_fleet_foot",  "Fleet Foot",    "Quicker than the wind: +{n} SPD for good.",                 A,  "stat_spd",         { stat_spd: 2 }],
+        ["a_barbed",      "Barbed Arrows", "Your damage skills hit for {n} more power.",                A,  "skill_power",      { skill_power: 1 }],
+        ["a_second_wind", "Second Wind",   "Regain {n} MP after each fight you win.",                   A,  "mp_after_fight",   { mp_after_fight: 2 }],
+        ["m_arcane_well", "Arcane Well",   "A deeper well: +{n} MAG for good.",                         M,  "stat_mag",         { stat_mag: 2 }],
+        ["m_spellweave",  "Spellweave",    "Your skills cost {n} MP less (never below 1).",             M,  "mp_cost_less",     { mp_cost_less: 1 }],
+        ["m_cold_focus",  "Cold Focus",    "Statuses you inflict last {n} turn longer.",                M,  "status_turn_bonus",{ status_turn_bonus: 1 }],
+        ["n_tonic",       "Tonic Blend",   "Healing potions also restore {n} MP.",                      N,  "potion_mp",        { potion_mp: 2 }],
+        ["n_apothecary",  "Apothecary",    "Potions work {n}% better.",                                 N,  "item_power",       { item_power: 0.30 }],
+        ["n_scrounger",   "Scrounger",     "{n}% chance to find a potion after each fight you win.",    N,  "find_potion_pct",  { find_potion_pct: 0.30 }]
+    ];
+    for (var p = 0; p < array_length(pas); p++) {
+        var row = pas[p];
+        var c = CardDB_Make("pas:" + row[0], "passive", "card.pas." + row[0], row[1], row[2], row[3], row[5]);
+        c.main = row[4];
+        CardDB_Add(c);
+    }
+
+    // fallbacks: when an offer cannot be filled from the pool
+    var fbs = [
+        ["rest",  "Second Breath", "Restore {n}% of your HP and MP now.",       "heal_pct",  { heal_pct: 0.5 }],
+        ["gold",  "Coin Purse",    "Take {n} gold.",                            "gold",      { gold: 15 }],
+        ["focus", "Whetstone",     "Your main stat grows by {n} for good.",     "stat_main", { stat_main: 1 }]
+    ];
+    for (var f = 0; f < array_length(fbs); f++) {
+        var frow = fbs[f];
+        var fc = CardDB_Make("fb:" + frow[0], "fallback", "card.fb." + frow[0], frow[1], frow[2], [], frow[4]);
+        fc.main = frow[3];
+        CardDB_Add(fc);
+    }
+}
+
+function CardDB_All() {
+    CardDB_Init();
+    return global.card_list;
+}
+
+function CardDB_Get(_id) {
+    CardDB_Init();
+    if (variable_struct_exists(global.card_index, _id)) return global.card_list[variable_struct_get(global.card_index, _id)];
+    return undefined;
+}
+
+function Card_AllIds() {
+    var out = [];
+    var clist = CardDB_All();
+    for (var i = 0; i < array_length(clist); i++) array_push(out, clist[i].id);
+    return out;
+}
+
+function Card_FallbackIds() {
+    var out = [];
+    var clist = CardDB_All();
+    for (var i = 0; i < array_length(clist); i++) if (clist[i].kind == "fallback") array_push(out, clist[i].id);
+    return out;
+}
+
+function Card_ForClass(_c, _class_id) {
+    return array_length(_c.classes) == 0 || Card_ArrayHas(_c.classes, _class_id);
+}
+
+// The cards a class can ever be offered (no fallbacks).
+function Card_Pool(_class_id) {
+    var out = [];
+    var clist = CardDB_All();
+    for (var i = 0; i < array_length(clist); i++) {
+        if (clist[i].kind == "fallback") continue;
+        if (Card_ForClass(clist[i], _class_id)) array_push(out, clist[i]);
+    }
+    return out;
+}
+
+function Card_PoolIds(_class_id) {
+    var pool = Card_Pool(_class_id);
+    var out = [];
+    for (var i = 0; i < array_length(pool); i++) array_push(out, pool[i].id);
+    return out;
+}
+
+function Card_PoolPassiveIds(_class_id) {
+    var pool = Card_Pool(_class_id);
+    var out = [];
+    for (var i = 0; i < array_length(pool); i++) if (pool[i].kind == "passive") array_push(out, pool[i].id);
+    return out;
+}
+
+// ---- character fields ----------------------------------------------------------------------------------------------------
+function Card_EnsureFields(_ch) {
+    if (!is_struct(_ch)) return _ch;
+    if (!variable_struct_exists(_ch, "skills") || !is_array(_ch.skills)) _ch.skills = [];
+    if (!variable_struct_exists(_ch, "upgrades") || !is_array(_ch.upgrades)) _ch.upgrades = [];
+    if (!variable_struct_exists(_ch, "passives") || !is_array(_ch.passives)) _ch.passives = [];
+    if (!variable_struct_exists(_ch, "card_picks") || !is_real(_ch.card_picks)) _ch.card_picks = 0;
+    if (!variable_struct_exists(_ch, "class_pick")) _ch.class_pick = false;
+    if (!variable_struct_exists(_ch, "class_chosen")) _ch.class_chosen = (variable_struct_exists(_ch, "class_id") && _ch.class_id != CLASS_NOBODY);   // a ready-made class counts as chosen; a run starts as Nobody (D73)
+    if (!variable_struct_exists(_ch, "skill_pending") || !is_real(_ch.skill_pending)) _ch.skill_pending = -1;
+    if (!variable_struct_exists(_ch, "offer") || !is_array(_ch.offer)) _ch.offer = [];
+    return _ch;
+}
+
+// What the active card effects read from a character: the sum of one numeric param over its passives (0 for an enemy or no passive).
+function Card_PassiveSum(_ch, _key) {
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "passives") || !is_array(_ch.passives) || array_length(_ch.passives) <= 0) return 0;
+    var total = 0;
+    for (var i = 0; i < array_length(_ch.passives); i++) {
+        var c = CardDB_Get(_ch.passives[i]);
+        if (is_struct(c) && variable_struct_exists(c.params, _key)) total += real(variable_struct_get(c.params, _key));
+    }
+    return total;
+}
+
+function Card_HasPassive(_ch, _card_id) {
+    return is_struct(_ch) && variable_struct_exists(_ch, "passives") && Card_ArrayHas(_ch.passives, _card_id);
+}
+
+function Card_GoldMult(_ch) { return 1 + Card_PassiveSum(_ch, "gold_mult"); }
+
+// The passives as equipment-style passives ({ id, params, item_id, item_name }), so Equip_PassiveOnTurnStart & co. read them (Mana Spring).
+function Card_EquipPassives(_ch) {
+    var out = [];
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "passives") || !is_array(_ch.passives)) return out;
+    for (var i = 0; i < array_length(_ch.passives); i++) {
+        var c = CardDB_Get(_ch.passives[i]);
+        if (is_struct(c)) array_push(out, { id: c.id, params: c.params, item_id: 0, item_name: Card_Name(c) });
+    }
+    return out;
+}
+
+// After a fight is won (Battle_GrantRewards, Enemy_AutoResolveFinalize): Field Medic, Second Wind, Scrounger.
+function Card_OnVictory(_ch) {
+    if (!is_struct(_ch)) return _ch;
+    var heal = round(Card_PassiveSum(_ch, "heal_after_fight"));
+    if (heal > 0 && variable_struct_exists(_ch, "max_hp")) _ch.hp = clamp(_ch.hp + heal, 0, _ch.max_hp);
+    var mp = round(Card_PassiveSum(_ch, "mp_after_fight"));
+    if (mp > 0 && variable_struct_exists(_ch, "max_mp")) _ch.mp = clamp(_ch.mp + mp, 0, _ch.max_mp);
+    var find = Card_PassiveSum(_ch, "find_potion_pct");
+    if (find > 0 && variable_struct_exists(_ch, "inventory") && RunRng_Chance("loot", find)) _ch.inventory = Inv_Add(_ch.inventory, 10, 1);
+    return _ch;
+}
+
+// At the start of a fight (obj_battle_controller Create): Opening Blow gives the enemy's stagger meter a head start.
+function Card_OnBattleStart(_p, _e) {
+    var n = round(Card_PassiveSum(_p, "start_stagger"));
+    if (n > 0 && is_struct(_e)) Stagger_Add(_e, n);
+    return _e;
+}
+
+function Card_StatusTurnBonus(_user, _status_id) {
+    if (_status_id == STATUS_STUN) return 0;
+    return max(0, round(Card_PassiveSum(_user, "status_turn_bonus")));
+}
+
+// ---- upgrades on skills ---------------------------------------------------------------------------------------------------
+// A copy of the skill with the upgrade's deltas applied (the database entry is never touched). The name gets a "+".
+function Skill_WithUpgrade(_skill, _card) {
+    var s = variable_clone(_skill);
+    if (!is_struct(_card) || !variable_struct_exists(_card, "up")) return s;
+    var u = _card.up;
+    if (variable_struct_exists(u, "power")) s.power = s.power + u.power;
+    if (variable_struct_exists(u, "mp_cost")) s.mp_cost = max(0, s.mp_cost + u.mp_cost);
+    if (variable_struct_exists(u, "status_turns")) s.status_turns = s.status_turns + u.status_turns;
+    if (variable_struct_exists(u, "status_stacks")) s.status_stacks = (variable_struct_exists(s, "status_stacks") ? s.status_stacks : 1) + u.status_stacks;
+    if (variable_struct_exists(u, "status_chance")) s.status_chance = min(1, s.status_chance + u.status_chance);
+    s.name = string(s.name) + "+";
+    return s;
+}
+
+function Card_SeqTrimOf(_skill_id) {
+    var c = CardDB_Get(Card_UpgradeId(_skill_id));
+    if (is_struct(c) && variable_struct_exists(c.up, "seq_trim")) return c.up.seq_trim;
+    return 0;
+}
+
+// Arrows of a skill's sequence when the player holds the listed upgrades.
+function Card_UpgradedSequenceLength(_skill_id, _upgrades) {
+    var n = array_length(Qte_SkillSequenceBase(_skill_id));
+    if (Card_ArrayHas(_upgrades, _skill_id)) n = max(1, n - Card_SeqTrimOf(_skill_id));
+    return n;
+}
+
+// The player the card effects on skills read: the current character (battle copies hold the same skills and upgrades).
+function Card_PlayerRef() {
+    if (!variable_global_exists("state") || !is_struct(global.state)) return undefined;
+    if (!variable_struct_exists(global.state, "player_ch") || !is_struct(global.state.player_ch)) return undefined;
+    return global.state.player_ch;
+}
+
+// Called by Qte_SkillSequence: a held upgrade removes arrows from the end (the start stays learned).
+function Card_TrimSequence(_skill_id, _seq) {
+    var ch = Card_PlayerRef();
+    if (!is_struct(ch) || !variable_struct_exists(ch, "upgrades") || !Card_ArrayHas(ch.skills, _skill_id) || !Card_ArrayHas(ch.upgrades, _skill_id)) return _seq;
+    var keep = max(1, array_length(_seq) - Card_SeqTrimOf(_skill_id));
+    var out = [];
+    for (var i = 0; i < keep; i++) array_push(out, _seq[i]);
+    return out;
+}
+
+// Called by SkillDB_Get: what the equipped skill really is for this player (its upgrade, Barbed Arrows). Anything else comes back untouched.
+function Card_ApplyToSkill(_s, _skill_id) {
+    var ch = Card_PlayerRef();
+    if (!is_struct(ch) || !variable_struct_exists(ch, "skills") || !Card_ArrayHas(ch.skills, _skill_id)) return _s;
+    var out = _s;
+    if (variable_struct_exists(ch, "upgrades") && Card_ArrayHas(ch.upgrades, _skill_id)) out = Skill_WithUpgrade(out, CardDB_Get(Card_UpgradeId(_skill_id)));
+    var bonus = round(Card_PassiveSum(ch, "skill_power"));
+    if (bonus > 0 && variable_struct_exists(out, "effect") && out.effect == "damage") {
+        if (out == _s) out = variable_clone(_s);
+        out.power = out.power + bonus;
+    }
+    var less = round(Card_PassiveSum(ch, "mp_cost_less"));
+    if (less > 0 && out.mp_cost > 0) {
+        if (out == _s) out = variable_clone(_s);
+        out.mp_cost = max(1, out.mp_cost - less);
+    }
+    return out;
+}
+
+// ---- text from the data (D100) --------------------------------------------------------------------------------------------
+function Card_Name(_c) {
+    if (!is_struct(_c)) return "";
+    if (_c.kind == "skill") return SkillDB_GetBase(_c.skill_id).name;
+    if (_c.kind == "upgrade") return SkillDB_GetBase(_c.skill_id).name + "+";
+    return Loc_T(_c.stem + ".name", _c.name_en);
+}
+
+function Card_TypeTag(_c) {
+    switch (_c.kind) {
+        case "skill": return Loc_T("card.tag.skill", "Skill");
+        case "upgrade": return Loc_T("card.tag.upgrade", "Upgrade");
+        case "passive": return array_length(_c.classes) > 0 ? Loc_T("card.tag.class_passive", "Class passive") : Loc_T("card.tag.passive", "Passive");
+    }
+    return Loc_T("card.tag.boon", "Boon");
+}
+
+// 0.10 -> "10", 3 -> "3": fractions below 1 are shown as percent.
+function Card_FormatN(_v) {
+    if (_v < 1 && _v > 0) return string(round(_v * 100));
+    return string(round(_v));
+}
+
+function Card_StatusNameSafe(_status_id) {
+    if (_status_id == -1) return "";
+    var cfg = StatusDB_Get(_status_id);
+    return (is_struct(cfg) && variable_struct_exists(cfg, "name")) ? string(cfg.name) : "";   // the plain name, without the +/- sign of the tooltips
+}
+
+function Card_SkillSentence(_s) {
+    var pw = string(round(_s.power));
+    var status = Card_StatusNameSafe(_s.status);
+    if (_s.effect == "damage") {
+        var hits = variable_struct_exists(_s, "hits") ? round(_s.hits) : 1;
+        var txt = (hits > 1) ? Loc_T("card.skill.hits", "Strike {hits} times for {power} power each.", { hits: string(hits), power: pw })
+                             : Loc_T("card.skill.hit", "Strike for {power} power.", { power: pw });
+        if (status != "" && _s.status_chance > 0) txt += " " + Loc_T("card.skill.hit_status", "{chance}% to inflict {status}.", { chance: string(round(_s.status_chance * 100)), status: status });
+        return txt;
+    }
+    if (_s.effect == "status" && status != "") return Loc_T("card.skill.buff", "Gain {status} for {turns} turns.", { status: status, turns: string(round(_s.status_turns)) });
+    return Loc_T("card.skill.other", "A special technique.");
+}
+
+function Card_Sentence(_c) {
+    if (!is_struct(_c)) return "";
+    if (_c.kind == "skill") return Card_SkillSentence(SkillDB_GetBase(_c.skill_id));
+    if (_c.kind == "upgrade") return Card_SkillSentence(Skill_WithUpgrade(SkillDB_GetBase(_c.skill_id), _c));
+    return Loc_T(_c.stem + ".line", _c.line_en, { n: Card_FormatN(real(variable_struct_get(_c.params, _c.main))) });
+}
+
+// The arrows a skill or upgrade card shows ([] for the others): the base sequence, or the upgraded one.
+function Card_Sequence(_c) {
+    if (!is_struct(_c) || (_c.kind != "skill" && _c.kind != "upgrade")) return [];
+    var base = Qte_SkillSequenceBase(_c.skill_id);
+    if (_c.kind == "skill") return base;
+    var keep = max(1, array_length(base) - Card_SeqTrimOf(_c.skill_id));
+    var out = [];
+    for (var i = 0; i < keep; i++) array_push(out, base[i]);
+    return out;
+}
+
+function Card_NumLine(_label, _a, _b = undefined) {
+    var v = string(_a);
+    if (!is_undefined(_b)) v += " > " + string(_b);
+    return { label: _label, value: v };
+}
+
+function Card_Pct(_v) { return string(round(_v * 100)) + "%"; }
+
+// Number lines: a skill card lists what the skill is; an upgrade card lists only what changes (a > b); a passive lists its params.
+function Card_Lines(_c) {
+    var lines = [];
+    if (!is_struct(_c)) return lines;
+    if (_c.kind == "skill" || _c.kind == "upgrade") {
+        var a = SkillDB_GetBase(_c.skill_id);
+        var b = (_c.kind == "upgrade") ? Skill_WithUpgrade(a, _c) : undefined;
+        var up = !is_undefined(b);
+        var seq_a = array_length(Qte_SkillSequenceBase(_c.skill_id));
+        var seq_b = array_length(Card_Sequence(_c));
+        if (a.effect == "damage" && (!up || b.power != a.power)) array_push(lines, Card_NumLine(Loc_T("card.lbl.power", "Power"), round(a.power), up ? round(b.power) : undefined));
+        if (!up || b.mp_cost != a.mp_cost) array_push(lines, Card_NumLine(Loc_T("card.lbl.mp", "MP"), round(a.mp_cost), up ? round(b.mp_cost) : undefined));
+        if (up && seq_a != seq_b) array_push(lines, Card_NumLine(Loc_T("card.lbl.arrows", "Arrows"), seq_a, seq_b));   // a plain skill card draws its arrows instead
+        if (a.status != -1) {
+            if (up && a.effect == "damage" && b.status_chance != a.status_chance) array_push(lines, Card_NumLine(Loc_T("card.lbl.chance", "Chance"), Card_Pct(a.status_chance), Card_Pct(b.status_chance)));
+            if (up && b.status_turns != a.status_turns) array_push(lines, Card_NumLine(Loc_T("card.lbl.turns", "Turns"), round(a.status_turns), round(b.status_turns)));
+            var sta = variable_struct_exists(a, "status_stacks") ? round(a.status_stacks) : 0;
+            if (up && sta > 0 && b.status_stacks != a.status_stacks) array_push(lines, Card_NumLine(Loc_T("card.lbl.stacks", "Stacks"), sta, round(b.status_stacks)));
+            if (!up && a.effect != "damage") array_push(lines, Card_NumLine(Loc_T("card.lbl.turns", "Turns"), round(a.status_turns)));
+        }
+        return lines;
+    }
+    var keys = variable_struct_get_names(_c.params);
+    array_sort(keys, true);
+    for (var k = 0; k < array_length(keys); k++) {
+        var val = real(variable_struct_get(_c.params, keys[k]));
+        switch (keys[k]) {
+            case "stat_atk": array_push(lines, Card_NumLine(Loc_T("card.lbl.atk", "ATK"), "+" + string(round(val)))); break;
+            case "stat_def": array_push(lines, Card_NumLine(Loc_T("card.lbl.def", "DEF"), "+" + string(round(val)))); break;
+            case "stat_spd": array_push(lines, Card_NumLine(Loc_T("card.lbl.spd", "SPD"), "+" + string(round(val)))); break;
+            case "stat_mag": array_push(lines, Card_NumLine(Loc_T("card.lbl.mag", "MAG"), "+" + string(round(val)))); break;
+            case "stat_main": array_push(lines, Card_NumLine(Loc_T("card.lbl.main_stat", "Main stat"), "+" + string(round(val)))); break;
+            case "poison_stacks": array_push(lines, Card_NumLine(Loc_T("card.lbl.poison_stacks", "Poison stacks"), "+" + string(round(val)))); break;
+            case "heal_after_fight": array_push(lines, Card_NumLine(Loc_T("card.lbl.after_fight", "After fight"), Loc_T("card.val.hp", "+{n} HP", { n: string(round(val)) }))); break;
+            case "mp_after_fight": array_push(lines, Card_NumLine(Loc_T("card.lbl.after_fight", "After fight"), Loc_T("card.val.mp", "+{n} MP", { n: string(round(val)) }))); break;
+            case "find_potion_pct": array_push(lines, Card_NumLine(Loc_T("card.lbl.potion_find", "Potion find"), Card_Pct(val))); break;
+            case "perfect_widen": array_push(lines, Card_NumLine(Loc_T("card.lbl.perfect", "Perfect zone"), "+" + Card_Pct(val))); break;
+            case "gold_mult": array_push(lines, Card_NumLine(Loc_T("card.lbl.gold", "Gold"), "+" + Card_Pct(val))); break;
+            case "mp_gain": array_push(lines, Card_NumLine(Loc_T("card.lbl.each_turn", "Each turn"), Loc_T("card.val.mp", "+{n} MP", { n: string(round(val)) }))); break;
+            case "item_power": array_push(lines, Card_NumLine(Loc_T("card.lbl.potions", "Potions"), "+" + Card_Pct(val))); break;
+            case "guard_turns": array_push(lines, Card_NumLine(Loc_T("card.lbl.guard", "Guard"), Loc_T("card.val.turns", "+{n} turns", { n: string(round(val)) }))); break;
+            case "skill_power": array_push(lines, Card_NumLine(Loc_T("card.lbl.skill_power", "Skill power"), "+" + string(round(val)))); break;
+            case "mp_cost_less": array_push(lines, Card_NumLine(Loc_T("card.lbl.skill_mp", "Skill MP"), "-" + string(round(val)))); break;
+            case "status_turn_bonus": array_push(lines, Card_NumLine(Loc_T("card.lbl.status_turns", "Status turns"), "+" + string(round(val)))); break;
+            case "start_stagger": array_push(lines, Card_NumLine(Loc_T("card.lbl.stagger", "Stagger"), "+" + string(round(val)))); break;
+            case "potion_mp": array_push(lines, Card_NumLine(Loc_T("card.lbl.potion_mp", "Potion MP"), "+" + string(round(val)))); break;
+            case "heal_pct": array_push(lines, Card_NumLine(Loc_T("card.lbl.restores", "Restores"), Loc_T("card.val.restores", "{pct} HP, MP", { pct: Card_Pct(val) }))); break;
+            case "gold": array_push(lines, Card_NumLine(Loc_T("card.lbl.gold", "Gold"), "+" + string(round(val)))); break;
+        }
+    }
+    return lines;
+}
+
+// ---- the offer (roguelike-cases.md 2.2) -----------------------------------------------------------------------------------
+function Card_StateNew() {
+    return { pity: 0, last: [], offers: 0 };
+}
+
+function Card_StateNormalize(_st) {
+    var out = Card_StateNew();
+    if (!is_struct(_st)) return out;
+    if (variable_struct_exists(_st, "pity") && is_real(_st.pity)) out.pity = max(0, _st.pity);
+    if (variable_struct_exists(_st, "offers") && is_real(_st.offers)) out.offers = max(0, _st.offers);
+    if (variable_struct_exists(_st, "last") && is_array(_st.last)) for (var i = 0; i < array_length(_st.last); i++) array_push(out.last, _st.last[i]);
+    return out;
+}
+
+// Can this card be offered to this character right now? (Fallbacks always can; they are only used to fill.)
+function Card_Eligible(_ch, _c) {
+    if (!is_struct(_c) || !is_struct(_ch)) return false;
+    if (_c.kind == "fallback") return true;
+    if (!Card_ForClass(_c, _ch.class_id)) return false;
+    switch (_c.kind) {
+        case "skill": return !Card_ArrayHas(_ch.skills, _c.skill_id);
+        case "upgrade": return Card_ArrayHas(_ch.skills, _c.skill_id) && !Card_ArrayHas(_ch.upgrades, _c.skill_id);
+        case "passive": return !Card_ArrayHas(_ch.passives, _c.id);
+    }
+    return false;
+}
+
+function Card_EligibleLists(_ch) {
+    var out = { skill: [], upgrade: [], passive: [] };
+    var clist = CardDB_All();
+    for (var i = 0; i < array_length(clist); i++) {
+        if (clist[i].kind == "fallback" || !Card_Eligible(_ch, clist[i])) continue;
+        array_push(variable_struct_get(out, clist[i].kind), clist[i].id);
+    }
+    return out;
+}
+
+function Card_ListsWithout(_lists, _ids) {
+    var out = { skill: [], upgrade: [], passive: [] };
+    var kinds = ["skill", "upgrade", "passive"];
+    for (var k = 0; k < 3; k++) {
+        var src = variable_struct_get(_lists, kinds[k]);
+        var dst = variable_struct_get(out, kinds[k]);
+        for (var i = 0; i < array_length(src); i++) if (!Card_ArrayHas(_ids, src[i])) array_push(dst, src[i]);
+    }
+    return out;
+}
+
+function Card_ListsCount(_lists) {
+    return array_length(_lists.skill) + array_length(_lists.upgrade) + array_length(_lists.passive);
+}
+
+// Weight of a kind in the draw: new skills while the slots are not full, upgrades once they are (roguelike-cases.md 2.2 step 4).
+function Card_KindWeight(_kind, _owned) {
+    var full = (_owned >= CARD_MAX_SKILLS);
+    switch (_kind) {
+        case "skill": return full ? 1 : 3;
+        case "upgrade": return full ? 3 : 1;
+        case "passive": return 2;
+    }
+    return 0;
+}
+
+function Card_PickedHasKind(_picked, _kind) {
+    for (var i = 0; i < array_length(_picked); i++) if (CardDB_Get(_picked[i]).kind == _kind) return true;
+    return false;
+}
+
+// Fills _picked up to CARD_OFFER_SIZE from _lists: draw a kind by weight, then a card of it (uniform). With every slot full, at most one new
+// skill (each would need a swap).
+function Card_FillPicks(_rng, _picked, _lists, _owned) {
+    var kinds = ["skill", "upgrade", "passive"];
+    while (array_length(_picked) < CARD_OFFER_SIZE) {
+        var skill_blocked = (_owned >= CARD_MAX_SKILLS) && Card_PickedHasKind(_picked, "skill");
+        var total = 0;
+        for (var k = 0; k < 3; k++) {
+            if (kinds[k] == "skill" && skill_blocked) continue;
+            if (array_length(variable_struct_get(_lists, kinds[k])) > 0) total += Card_KindWeight(kinds[k], _owned);
+        }
+        if (total <= 0) break;
+        var r = Rng_Float(_rng) * total;
+        var acc = 0;
+        var kind = "";
+        for (var k2 = 0; k2 < 3; k2++) {
+            if (kinds[k2] == "skill" && skill_blocked) continue;
+            if (array_length(variable_struct_get(_lists, kinds[k2])) <= 0) continue;
+            acc += Card_KindWeight(kinds[k2], _owned);
+            kind = kinds[k2];
+            if (r < acc) break;
+        }
+        var src = variable_struct_get(_lists, kind);
+        var pid = src[Rng_Int(_rng, array_length(src))];
+        array_push(_picked, pid);
+        variable_struct_set(_lists, kind, Card_ArrayWithout(src, pid));
+    }
+    return _picked;
+}
+
+// 3 distinct cards for _ch from the class pool. _rng is the run's "cards" stream, _state the run's { pity, last, offers }.
+// Rules: weighted by kind (new skill / upgrade / passive); a new skill is guaranteed while fewer than 2 are held (so a fresh class gets skills);
+// with all slots full at most one new-skill card; the pity counter forces an upgrade after CARD_PITY_OFFERS offers without one (when one was
+// possible); the previous offer's cards are not shown again while other cards exist; a dry pool is filled with fallbacks. Returns
+// { cards, state, forced }. Pure apart from drawing from _rng.
+function Card_OfferGenerate(_rng, _ch, _state) {
+    var st = Card_StateNormalize(_state);
+    var owned = array_length(_ch.skills);
+    var elig = Card_EligibleLists(_ch);
+    var could_upgrade = array_length(elig.upgrade) > 0;
+    var lists = Card_ListsWithout(elig, st.last);
+    if (Card_ListsCount(lists) < CARD_OFFER_SIZE) lists = Card_ListsWithout(elig, []);
+    var picked = [];
+    var forced = false;
+
+    if (st.pity >= CARD_PITY_OFFERS && could_upgrade) {
+        var pu = (array_length(lists.upgrade) > 0) ? lists.upgrade : elig.upgrade;
+        var pid = pu[Rng_Int(_rng, array_length(pu))];
+        array_push(picked, pid);
+        forced = true;
+        lists = Card_ListsWithout(lists, [pid]);
+        elig = Card_ListsWithout(elig, [pid]);
+    }
+    if (owned < 2 && !Card_PickedHasKind(picked, "skill")) {
+        var ps = (array_length(lists.skill) > 0) ? lists.skill : elig.skill;
+        if (array_length(ps) > 0) {
+            var sid = ps[Rng_Int(_rng, array_length(ps))];
+            array_push(picked, sid);
+            lists = Card_ListsWithout(lists, [sid]);
+            elig = Card_ListsWithout(elig, [sid]);
+        }
+    }
+    picked = Card_FillPicks(_rng, picked, lists, owned);
+    if (array_length(picked) < CARD_OFFER_SIZE) picked = Card_FillPicks(_rng, picked, Card_ListsWithout(elig, picked), owned);
+    if (array_length(picked) < CARD_OFFER_SIZE) {
+        var fb = Rng_Shuffle(_rng, Card_FallbackIds());
+        for (var f = 0; f < array_length(fb) && array_length(picked) < CARD_OFFER_SIZE; f++) if (!Card_ArrayHas(picked, fb[f])) array_push(picked, fb[f]);
+    }
+    picked = Rng_Shuffle(_rng, picked);
+
+    var has_upgrade = Card_PickedHasKind(picked, "upgrade");
+    var out_state = { pity: has_upgrade ? 0 : (could_upgrade ? st.pity + 1 : st.pity), last: picked, offers: st.offers + 1 };
+    return { cards: picked, state: out_state, forced: forced };
+}
+
+// The offer for _ch drawn from the active run's "cards" stream (the free stream when no run is going); updates the run's pity/last state.
+function Card_OfferFromRun(_ch) {
+    var run = Run_Get();
+    var st = (is_struct(run) && variable_struct_exists(run, "cards")) ? run.cards : Card_StateNew();
+    var off = Card_OfferGenerate(Run_Stream("cards"), _ch, st);
+    if (is_struct(run)) run.cards = off.state;
+    return off;
+}
+
+// Refusing an offer pays CARD_SKIP_GOLD into the run (D81).
+function Card_SkipOffer() {
+    var run = Run_Get();
+    if (is_struct(run)) run.gold += Card_SkipGold();
+    return Card_SkipGold();
+}
+
+// ---- taking a card -------------------------------------------------------------------------------------------------------
+function Card_RecomputeKeep(_ch) {
+    var mhp = _ch.max_hp;
+    var mmp = _ch.max_mp;
+    var hp = _ch.hp;
+    var mp = _ch.mp;
+    _ch = RecomputeResources(_ch);
+    _ch.hp = clamp(hp + max(0, _ch.max_hp - mhp), 0, _ch.max_hp);
+    _ch.mp = clamp(mp + max(0, _ch.max_mp - mmp), 0, _ch.max_mp);
+    return _ch;
+}
+
+function Card_AddStat(_ch, _stat_id, _n) {
+    var key = Stat_Key(_stat_id);
+    if (key == "") return _ch;
+    variable_struct_set(_ch.stats, key, StatClamp(variable_struct_get(_ch.stats, key) + _n));
+    return _ch;
+}
+
+// The stat bonuses of the passives a character holds (also used to rebuild them when the class changes).
+function Card_ApplyStatPassives(_ch) {
+    _ch = Card_AddStat(_ch, STAT_ATK, round(Card_PassiveSum(_ch, "stat_atk")));
+    _ch = Card_AddStat(_ch, STAT_DEF, round(Card_PassiveSum(_ch, "stat_def")));
+    _ch = Card_AddStat(_ch, STAT_SPD, round(Card_PassiveSum(_ch, "stat_spd")));
+    _ch = Card_AddStat(_ch, STAT_MAG, round(Card_PassiveSum(_ch, "stat_mag")));
+    return _ch;
+}
+
+// Takes a card. Returns { ch (a changed copy), needs_replace, card, gold }. A skill with every slot full changes nothing yet: the caller
+// asks which skill to replace and calls Card_ReplaceSkill. Gold (Coin Purse) is for the caller to add to the run.
+function Card_Take(_ch, _card_id) {
+    var ch = Card_EnsureFields(variable_clone(_ch));
+    var c = CardDB_Get(_card_id);
+    var out = { ch: ch, needs_replace: false, card: c, gold: 0 };
+    if (!is_struct(c)) return out;
+    switch (c.kind) {
+        case "skill":
+            if (array_length(ch.skills) >= CARD_MAX_SKILLS) out.needs_replace = true;
+            else if (!Card_ArrayHas(ch.skills, c.skill_id)) array_push(ch.skills, c.skill_id);
+        break;
+        case "upgrade":
+            if (!Card_ArrayHas(ch.upgrades, c.skill_id)) array_push(ch.upgrades, c.skill_id);
+        break;
+        case "passive":
+            if (!Card_ArrayHas(ch.passives, c.id)) {
+                array_push(ch.passives, c.id);
+                ch = Card_AddStat(ch, STAT_ATK, round(variable_struct_exists(c.params, "stat_atk") ? c.params.stat_atk : 0));
+                ch = Card_AddStat(ch, STAT_DEF, round(variable_struct_exists(c.params, "stat_def") ? c.params.stat_def : 0));
+                ch = Card_AddStat(ch, STAT_SPD, round(variable_struct_exists(c.params, "stat_spd") ? c.params.stat_spd : 0));
+                ch = Card_AddStat(ch, STAT_MAG, round(variable_struct_exists(c.params, "stat_mag") ? c.params.stat_mag : 0));
+                ch = Card_RecomputeKeep(ch);
+            }
+        break;
+        case "fallback":
+            if (variable_struct_exists(c.params, "heal_pct")) {
+                ch.hp = clamp(ch.hp + floor(ch.max_hp * c.params.heal_pct), 0, ch.max_hp);
+                ch.mp = clamp(ch.mp + floor(ch.max_mp * c.params.heal_pct), 0, ch.max_mp);
+            }
+            if (variable_struct_exists(c.params, "gold")) out.gold = round(c.params.gold);
+            if (variable_struct_exists(c.params, "stat_main")) {
+                ch = Card_AddStat(ch, DB_PlayerClass(ch.class_id).free_default, round(c.params.stat_main));
+                ch = Card_RecomputeKeep(ch);
+            }
+        break;
+    }
+    out.ch = ch;
+    return out;
+}
+
+// Puts _new_skill in the slot of _old_skill (D82). The old skill's upgrade goes with it. Returns the changed copy.
+function Card_ReplaceSkill(_ch, _old_skill, _new_skill) {
+    var ch = Card_EnsureFields(variable_clone(_ch));
+    for (var i = 0; i < array_length(ch.skills); i++) {
+        if (ch.skills[i] == _old_skill) { ch.skills[i] = _new_skill; break; }
+    }
+    ch.upgrades = Card_ArrayWithout(ch.upgrades, _old_skill);
+    ch.skill_pending = -1;
+    return ch;
+}
+
+// ---- classes (D34, D73, D83) ----------------------------------------------------------------------------------------------
+// The class screen's rows. Nobody is locked until the profile has a win (D83, D88).
+function Card_ClassChoices(_prof = undefined) {
+    var prof = is_undefined(_prof) ? Profile_Get() : _prof;
+    var ids = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE, CLASS_NOBODY];
+    var out = [];
+    for (var i = 0; i < array_length(ids); i++) {
+        var locked = (ids[i] == CLASS_NOBODY) && !Profile_IsUnlocked(prof, "nobody_class");
+        array_push(out, { class_id: ids[i], locked: locked, hint: locked ? Loc_T("class.nobody.locked_hint", "Win a run to unlock this path.") : "" });
+    }
+    return out;
+}
+
+function Card_ClassSentence(_class_id) {
+    switch (_class_id) {
+        case CLASS_KNIGHT: return Loc_T("class.line.knight", "A sturdy fighter. Strong attack and defence, five skills to find.");
+        case CLASS_ARCHER: return Loc_T("class.line.archer", "Fast and sharp. High speed, poison and double shots to find.");
+        case CLASS_MAGE: return Loc_T("class.line.mage", "A spell caster. Great magic and mana, five spells to find.");
+        case CLASS_NOBODY: return Loc_T("class.line.nobody", "No skills at all. Fight with your blade, your passives and your items.");
+    }
+    return "";
+}
+
+// A copy of _old as the new class: level, items and cards carried over, stats rebuilt from the class (its fixed growth per level, the spent free
+// points back in the bank to place again), skills the new class cannot use dropped. Marks the class chosen and clears the owed choice.
+function Card_ClassCharacter(_old, _class_id) {
+    var ch = CharacterCreate_Player(_class_id);
+    if (is_struct(_old)) {
+        var lvl = variable_struct_exists(_old, "level") ? max(1, round(_old.level)) : 1;
+        ch.level = lvl;
+        if (variable_struct_exists(_old, "exp")) ch.exp = _old.exp;
+        if (variable_struct_exists(_old, "inventory")) ch.inventory = variable_clone(_old.inventory);
+        if (variable_struct_exists(_old, "equip")) ch.equip = variable_clone(_old.equip);
+        if (variable_struct_exists(_old, "status")) ch.status = variable_clone(_old.status);
+        var banked = variable_struct_exists(_old, "stat_points") ? _old.stat_points : 0;
+        var spent = max(0, (lvl - 1) * LEVEL_FREE_POINTS_PER_LEVEL - banked);
+        ch.stat_points = banked + spent;
+        for (var l = 2; l <= lvl; l++) {
+            var g = LevelUp_ClassGrowthGain(_class_id, l);
+            ch.stats.atk = StatClamp(ch.stats.atk + g.atk);
+            ch.stats.def = StatClamp(ch.stats.def + g.def);
+            ch.stats.spd = StatClamp(ch.stats.spd + g.spd);
+            ch.stats.mag = StatClamp(ch.stats.mag + g.mag);
+        }
+        Card_EnsureFields(_old);
+        var kept = [];
+        var kept_up = [];
+        for (var i = 0; i < array_length(_old.skills); i++) {
+            var sk = SkillDB_GetBase(_old.skills[i]);
+            if (array_length(kept) < CARD_MAX_SKILLS && Skill_ClassAllowed(sk, _class_id) && array_length(sk.class_list) > 0) {
+                array_push(kept, _old.skills[i]);
+                if (Card_ArrayHas(_old.upgrades, _old.skills[i])) array_push(kept_up, _old.skills[i]);
+            }
+        }
+        ch.skills = kept;
+        ch.upgrades = kept_up;
+        ch.passives = variable_clone(_old.passives);
+        ch.card_picks = _old.card_picks;
+        ch.offer = variable_clone(_old.offer);
+        ch = Card_ApplyStatPassives(ch);
+        ch = RecomputeResources(ch);
+        var hp0 = variable_struct_exists(_old, "hp") ? _old.hp : ch.max_hp;
+        var mp0 = variable_struct_exists(_old, "mp") ? _old.mp : ch.max_mp;
+        ch.hp = clamp(hp0, 1, ch.max_hp);
+        ch.mp = clamp(mp0, 0, ch.max_mp);
+        ch.exp_next = Exp_NextLevel(ch.level);
+    }
+    ch.class_chosen = true;
+    ch.class_pick = false;
+    return ch;
 }
