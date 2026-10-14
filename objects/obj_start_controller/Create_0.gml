@@ -9,6 +9,7 @@ cutscene_segment_index = -1;
 cutscene_segment_hold_timer = 0;
 cutscene_wait_transition = false;
 cutscene_skip = false;   // D48: hold confirm ~1 s skips the cutscene
+credits_t = 0;           // C5 (D105): frames of the credits roll (state "credits")
 cutscene_transition_next_index = -1;
 cutscene_transition_switched = false;
 boot_logo_phase = 0;
@@ -125,30 +126,21 @@ cutscene_definitions.ending = [
     },
     {
         sprite: black_screen,
-        lines: [
-            "Thank you for playing...",
-            "This was around 2 months of development, and I'm glad you were able to get through our prototype story.",
-            "We're looking to use what we learned from this game for our next title.",
-            "Please support our next development :)",
-            "by PaleRook",
-            "..."
-        ],
+        lines: Story_ClosingLines(),   // C5 (D105): the closing text lives in scr_dialogue.gml (the credits roll follows it)
         hold_frames: 0,
         transition_speed: "normal",
         text_only: false
     }
 ];
 
+// C5 (D103): no more "GAME OVER.". The fade to black is all this holds; the death line, summary and echo pick follow in RunFlow (scr_room_state).
 cutscene_definitions.game_over = [
     {
-        sprite_name: "GAME_OVER",
-        lines: [
-            "GAME OVER."
-        ],
-        hold_frames: 0,
+        sprite: black_screen,
+        lines: [],
+        hold_frames: 2,
         transition_speed: "normal",
-        text_only: true,
-        chars_per_sec: UI_CUTSCENE_GAME_OVER_CHARS_PER_SEC
+        text_only: true
     }
 ];
 

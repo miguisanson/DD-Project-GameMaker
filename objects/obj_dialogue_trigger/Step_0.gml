@@ -5,7 +5,10 @@ if (!variable_instance_exists(id, "story_key")) {
     story_key = "";
     if (trigger_once && persist_id != "") {
         story_key = "trigger:" + RoomState_Key(room, persist_id);
-        if (Story_Seen(story_key)) triggered = true;
+        if (Story_Seen(story_key)) {
+            triggered = true;
+            story_prev_seen = true;   // C5 (D106): played on an earlier run; a boss pan becomes a name banner
+        }
     }
 }
 

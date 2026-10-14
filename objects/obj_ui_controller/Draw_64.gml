@@ -231,6 +231,8 @@ if (gs.ui.mode == UI_BED) {
     BedMenu_Draw();
 }
 
+Banner_Draw();   // C5 (D106): boss name banner
+
 Transition_DrawGUI();
 
 Skip_DrawHint();   // D48: the "hold to skip" fill after a press (nothing when no skippable scene is running)

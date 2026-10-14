@@ -262,6 +262,13 @@ function Interact_Handle(_inst) {
         }
     }
 
+    // C5 (D107): a lore note made by Notes_SpawnForRoom: read it, record it in the profile.
+    if (variable_instance_exists(_inst, "note_id") && _inst.note_id != "") {
+        Note_Read(_inst);
+        GameState_SyncLegacy();
+        return;
+    }
+
     // Class chest and skill chest (D73, fixes I-057): the first one opened in a run gives the class choice, every later one a 1-of-3 card
     // pick. The choice or pick is owed by the character and opens as a screen (CardsUi_Step) once the chest's line is read.
     if ((variable_instance_exists(_inst, "class_select_chest") && _inst.class_select_chest) || (variable_instance_exists(_inst, "card_chest") && _inst.card_chest)) {

@@ -86,6 +86,7 @@ function Test_RunAll() {
     Test_RunSuite("Profile", Test_Suite_Profile);
     Test_RunSuite("RunSave", Test_Suite_RunSave);
     Test_RunSuite("RunLoop", Test_Suite_RunLoop);
+    Test_RunSuite("Story", Test_Suite_Story);
     Test_RunSuite("Cards", Test_Suite_Cards);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     Test_RunSuite("Mem", Test_Suite_Mem);
@@ -2932,6 +2933,214 @@ function Test_Suite_RunLoop() {
     Test_False("story: unseen events are not set", variable_struct_exists(_nf, "skillbook_first_read_done") && variable_struct_get(_nf, "skillbook_first_read_done") == true);
 
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+// ---- C5 story: death lines (D102-D104), wake line, boss banner (D106), lore notes (D107), closing text and credits (D105, D40) ----------
+// Expected values come from the decisions: tiers 1st / 2-3 / 4-6 / 7-10 / 11+, a killer line while the tone is still light, never a spoiler
+// of the ending (the raid party, the world outside), 2-4 s on screen, a ~1 s banner, 4 notes always plus 2 / 1 / 1 after 3 / 6 / 10 deaths.
+function Test_StoryJoin(_arr) {
+    var _s = "";
+    for (var _i = 0; _i < array_length(_arr); _i++) _s += string(_arr[_i]) + "\n";
+    return _s;
+}
+
+function Test_StoryVisibleNotes(_deaths) {
+    var _c = 0;
+    var _rooms = ["rm_floor1", "rm_floor2", "rm_floor3", "rm_floor4", "rm_floor5", "rm_floor6", "rm_floor6_5", "rm_floor7", "rm_floor8", "rm_floor9", "rm_floor9_5"];
+    for (var _r = 0; _r < array_length(_rooms); _r++) _c += array_length(Note_ForRoom(_rooms[_r], _deaths));
+    return _c;
+}
+
+function Test_Suite_Story() {
+    // --- death tiers (pure)
+    Test_Eq("D103 tier of the 1st death", DeathLine_Tier(1), 1);
+    Test_Eq("D103 tier of the 2nd death", DeathLine_Tier(2), 2);
+    Test_Eq("D103 tier of the 3rd death", DeathLine_Tier(3), 2);
+    Test_Eq("D103 tier of the 4th death", DeathLine_Tier(4), 3);
+    Test_Eq("D103 tier of the 6th death", DeathLine_Tier(6), 3);
+    Test_Eq("D103 tier of the 7th death", DeathLine_Tier(7), 4);
+    Test_Eq("D103 tier of the 10th death", DeathLine_Tier(10), 4);
+    Test_Eq("D103 tier of the 11th death", DeathLine_Tier(11), 5);
+    Test_Eq("D103 tier of the 80th death", DeathLine_Tier(80), 5);
+    Test_Eq("D103 tier of a count of 0 is the first", DeathLine_Tier(0), 1);
+
+    // --- the pick: tier first, killer second
+    var _p1 = DeathLine_Pick(1, "enemy_slime", 0);
+    Test_Eq("D103 1st death, slime: the slime line", _p1.key, "death.killer.enemy_slime");
+    Test_Eq("D103 1st death picks tier 1", _p1.tier, 1);
+    var _p1g = DeathLine_Pick(1, "enemy_slime", 1);
+    Test_True("D103 1st death, another salt: a tier 1 line", string_pos("death.t1.", _p1g.key) == 1);
+    var _p2 = DeathLine_Pick(2, "status_poison", 0);
+    Test_Eq("D103 2nd death, poison: the poison line", _p2.key, "death.killer.status_poison");
+    var _p3 = DeathLine_Pick(5, "enemy_spider", 0);
+    Test_Eq("D103 5th death, spider: the spider line", _p3.key, "death.killer.enemy_spider");
+    var _pa = DeathLine_Pick(2, "abandoned", 0);
+    Test_Eq("D103 abandoning has its own line", _pa.key, "death.killer.abandoned");
+    var _pu = DeathLine_Pick(1, "", 0);
+    Test_True("D103 no known killer: a plain tier 1 line", string_pos("death.t1.", _pu.key) == 1);
+    var _late = DeathLine_Pick(12, "enemy_spider", 0);
+    Test_True("D103 12th death never gets a light killer line", string_pos("death.killer.", _late.key) != 1);
+    Test_Eq("D103 12th death picks tier 5", _late.tier, 5);
+    var _tiers_ok = true;
+    for (var _d = 1; _d <= 14; _d++) {
+        for (var _salt = 0; _salt < 6; _salt++) {
+            var _pk = DeathLine_Pick(_d, (_salt mod 2 == 0) ? "enemy_snake" : "", _salt);
+            if (_pk.tier != DeathLine_Tier(_d) || _pk.text == "") _tiers_ok = false;
+            if (_pk.tier >= 4 && string_pos("death.killer.", _pk.key) == 1) _tiers_ok = false;
+        }
+    }
+    Test_True("D103 every count and salt gives a line of its tier, none light at 7+", _tiers_ok);
+    var _no_slot = true;
+    for (var _s1 = 0; _s1 < 6; _s1++) { if (string_pos("{killer}", DeathLine_Pick(11, "", _s1).text) > 0) _no_slot = false; }
+    for (var _s1b = 0; _s1b < 6; _s1b++) { if (string_pos("{killer}", DeathLine_Pick(11, "abandoned", _s1b).text) > 0) _no_slot = false; }
+    Test_True("D103 a {killer} line is not offered without a killer", _no_slot);
+    var _killer_line_late = false;
+    for (var _s2 = 0; _s2 < 6; _s2++) { if (string_pos("{killer}", DeathLine_Pick(8, "enemy_snake", _s2).text) > 0) _killer_line_late = true; }
+    Test_True("D103 late deaths still name what killed you", _killer_line_late);
+
+    // --- the lines themselves
+    var _all = DeathLine_All();
+    Test_True("D103 about 25 death lines are written", array_length(_all) >= 20 && array_length(_all) <= 36);
+    var _keys = {};
+    var _dup = false;
+    var _spoil = "";
+    var _long = "";
+    var _words = ["raid", "party", "outside", "apocal", "escape", "exit", "hope", "ending", "surface"];
+    for (var _i = 0; _i < array_length(_all); _i++) {
+        var _l = _all[_i];
+        if (variable_struct_exists(_keys, _l.key)) _dup = true;
+        variable_struct_set(_keys, _l.key, true);
+        var _low = string_lower(_l.text);
+        for (var _w = 0; _w < array_length(_words); _w++) { if (string_pos(_words[_w], _low) > 0) _spoil = _l.key; }
+        if (string_length(_l.text) > 48) _long = _l.key;
+    }
+    Test_False("D103 no death line key twice", _dup);
+    Test_Eq("D104 no death line gives the ending away", _spoil, "");
+    Test_Eq("D103 every death line is terse (48 characters)", _long, "");
+    var _early_in_late = false;
+    var _pool1 = DeathLine_Pool(1, "");
+    var _pool5 = DeathLine_Pool(11, "");
+    for (var _i2 = 0; _i2 < array_length(_pool1); _i2++) {
+        for (var _j2 = 0; _j2 < array_length(_pool5); _j2++) {
+            if (_pool1[_i2].key == _pool5[_j2].key) _early_in_late = true;
+        }
+    }
+    Test_False("D102 the lines darken: tier 1 and tier 5 share no line", _early_in_late);
+    Test_True("D102 every tier has at least two lines", array_length(DeathLine_Pool(1, "")) >= 2 && array_length(DeathLine_Pool(3, "")) >= 2 && array_length(DeathLine_Pool(5, "")) >= 2);
+    Test_Eq("D103 the {killer} slot is filled with the name", DeathLine_Format({ key: "x", text: "{killer} came." }, "Slime"), "Slime came.");
+
+    // --- on screen 2-4 s (60 fps assumed by the caller)
+    Test_Eq("D103 a short line holds the 2 s minimum", DeathScene_Frames("Short.", 60), 120);
+    Test_Eq("D103 a long line holds the 4 s maximum", DeathScene_Frames(string_repeat("long ", 60), 60), 240);
+    var _mid = DeathScene_Frames("The tunnel is not finished with you.", 60);
+    Test_True("D103 a normal line is between 2 and 4 s", _mid >= 120 && _mid <= 240);
+
+    // --- what killed you: a poison tick that takes the last HP is noted (scr_status), read once by Death_KillerKey
+    Death_KillerKey("died");             // clears any note an earlier suite left (a status test can take a player to 0 HP)
+    var _k0 = Death_KillerKey("died");   // what the battle context alone says
+    var _pz = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_POISON, 0, 1, 4);
+    _pz.hp = 50;
+    _pz = Status_Tick(_pz);
+    _pz = Status_Tick(_pz);
+    Test_Eq("D103 a tick that leaves you alive is no killer", Death_KillerKey("died"), _k0);
+    var _py = Status_Add(CharacterCreate_Player(CLASS_KNIGHT), STATUS_POISON, 0, 1, 4);
+    _py.hp = 1;
+    _py = Status_Tick(_py);
+    _py = Status_Tick(_py);
+    Test_Eq("D103 the poison tick that finishes you is the killer", Death_KillerKey("died"), "status_poison");
+    Test_Eq("D103 the killer note is used up once read", Death_KillerKey("died"), _k0);
+    Test_Eq("D103 giving up the run is its own killer", Death_KillerKey("abandoned"), "abandoned");
+
+    // --- the wake line
+    Test_True("D102 a wake line for every count", WakeLine_Pick(1).text != "" && WakeLine_Pick(3).text != "" && WakeLine_Pick(8).text != "" && WakeLine_Pick(40).text != "");
+    Test_True("D102 the wake lines darken too", WakeLine_Pick(1).key != WakeLine_Pick(8).key);
+
+    // --- banner (D106)
+    var _bf = Banner_Frames(60);
+    Test_True("D106 the boss banner lasts about 1 s", _bf >= 54 && _bf <= 72);
+    Test_Eq("D106 banner is clear before it starts", Banner_Alpha(0, _bf), 0);
+    Test_Eq("D106 banner is full in the middle", Banner_Alpha(round(_bf / 2), _bf), 1);
+    Test_Eq("D106 banner is clear when it ends", Banner_Alpha(_bf, _bf), 0);
+    Test_True("D106 banner fades in", Banner_Alpha(4, _bf) > 0 && Banner_Alpha(4, _bf) < 1);
+
+    // --- notes (D107)
+    var _defs = Note_Defs();
+    Test_Eq("D107 eight notes", array_length(_defs), 8);
+    var _n0 = 0; var _n3 = 0; var _n6 = 0; var _n10 = 0; var _ids = {}; var _iddup = false; var _bad_pos = ""; var _bad_room = "";
+    for (var _n = 0; _n < array_length(_defs); _n++) {
+        var _d2 = _defs[_n];
+        if (_d2.min_deaths == 0) _n0++;
+        if (_d2.min_deaths == 3) _n3++;
+        if (_d2.min_deaths == 6) _n6++;
+        if (_d2.min_deaths == 10) _n10++;
+        if (variable_struct_exists(_ids, _d2.id)) _iddup = true;
+        variable_struct_set(_ids, _d2.id, true);
+        if (_d2.tx < 0 || _d2.ty < 0) _bad_pos = _d2.id;
+        if (asset_get_index(_d2.room) == -1) _bad_room = _d2.id;
+        if (array_length(_d2.lines) < 2) _bad_pos = _d2.id;
+    }
+    Test_Eq("D107 four notes are always there", _n0, 4);
+    Test_Eq("D107 two notes after 3 deaths", _n3, 2);
+    Test_Eq("D107 one note after 6 deaths", _n6, 1);
+    Test_Eq("D107 one note after 10 deaths", _n10, 1);
+    Test_False("D107 note ids are unique", _iddup);
+    Test_Eq("D107 every note has a place and a text", _bad_pos, "");
+    Test_Eq("D107 every note is in a room that exists", _bad_room, "");
+    Test_Eq("D107 no deaths: 4 notes in the world", Test_StoryVisibleNotes(0), 4);
+    Test_Eq("D107 2 deaths: still 4", Test_StoryVisibleNotes(2), 4);
+    Test_Eq("D107 3 deaths: 6", Test_StoryVisibleNotes(3), 6);
+    Test_Eq("D107 5 deaths: 6", Test_StoryVisibleNotes(5), 6);
+    Test_Eq("D107 6 deaths: 7", Test_StoryVisibleNotes(6), 7);
+    Test_Eq("D107 9 deaths: 7", Test_StoryVisibleNotes(9), 7);
+    Test_Eq("D107 10 deaths: 8", Test_StoryVisibleNotes(10), 8);
+    Test_Eq("D107 rm_floor1 has a note from the start", array_length(Note_ForRoom("rm_floor1", 0)), 1);
+    Test_Eq("D107 a room without notes gives none", array_length(Note_ForRoom("rm_battle", 99)), 0);
+    var _prof = Profile_Default();
+    Test_Eq("D107 nothing collected in a new profile", array_length(Note_Collected(_prof)), 0);
+    Note_MarkCollected(_prof, _defs[2].id);
+    Note_MarkCollected(_prof, _defs[0].id);
+    Note_MarkCollected(_prof, _defs[0].id);
+    var _col = Note_Collected(_prof);
+    Test_True("D107 collected notes are recorded once, in note order", array_length(_col) == 2 && _col[0].id == _defs[0].id && _col[1].id == _defs[2].id);
+    Test_True("D107 the Codex data has a title and lines", _col[0].title != "" && array_length(_col[0].lines) >= 2);
+    var _note_text = "";
+    for (var _n2 = 0; _n2 < array_length(_defs); _n2++) { _note_text += string_lower(Test_StoryJoin(_defs[_n2].lines)); }
+    Test_True("D104 no note gives the ending away", string_pos("apocal", _note_text) == 0 && string_pos("raid party", _note_text) == 0 && string_pos("end of the world", _note_text) == 0);
+
+    // --- closing text and credits (D105, D40)
+    var _close = Story_ClosingLines();
+    var _cj = Test_StoryJoin(_close);
+    Test_True("D105 the closing text keeps 'Thank you for playing...'", _close[0] == "Thank you for playing...");
+    Test_True("D105 the closing text keeps 'by PaleRook'", string_pos("by PaleRook", _cj) > 0);
+    Test_True("D105 no prototype wording", string_pos("prototype", string_lower(_cj)) == 0);
+    Test_True("D105 no 2 months wording", string_pos("months", string_lower(_cj)) == 0);
+    var _loc_ok = true;
+    for (var _ci = 0; _ci < array_length(_close); _ci++) {
+        var _en = Loc_GetRaw("cutscene.ending.4." + string(_ci), "en");
+        var _ko = Loc_GetRaw("cutscene.ending.4." + string(_ci), "ko");
+        if (_en != _close[_ci] || _ko == "" || string_digits(_ko) != "") _loc_ok = false;   // the old Korean line named "2 months" (a digit)
+    }
+    Test_True("D105 the localization workbook has the same closing text in English and Korean", _loc_ok);
+    var _cr = Test_StoryJoin(Credits_PlainLines());
+    Test_True("D105 credits: game by PaleRook", string_pos("PaleRook", _cr) > 0);
+    Test_True("D105 credits: Galmuri by Lee Minseo", string_pos("Galmuri", _cr) > 0 && string_pos("Lee Minseo", _cr) > 0);
+    Test_True("D105 credits: the OFL-1.1 licence", string_pos("OFL-1.1", _cr) > 0);
+    Test_True("D105 credits: GameMaker", string_pos("GameMaker", _cr) > 0);
+    Test_True("D105 credits: the existing pixel font", string_pos("Retro Gaming", _cr) > 0);
+    var _snd = Credits_SoundAssets();
+    var _snd_missing = "";
+    var _snd_dup = false;
+    for (var _si = 0; _si < array_length(_snd); _si++) {
+        if (string_pos(_snd[_si].asset, _cr) == 0) _snd_missing = _snd[_si].asset;
+        for (var _sj = _si + 1; _sj < array_length(_snd); _sj++) { if (_snd[_sj].asset == _snd[_si].asset) _snd_dup = true; }
+    }
+    // (asset_get_index cannot vouch for every name: a build leaves out sounds no code uses. The list was generated from the sounds/ folder; a Python comparison of the two ran when it was written.)
+    Test_True("D40 sounds the game plays are in the list", asset_get_index("Body_falling_wood") != -1 && _snd[array_length(_snd) - 1].asset != "" && string_pos("Body_falling_wood", _cr) > 0 && string_pos("Metal_resonance", _cr) > 0);
+    Test_False("D40 no sound listed twice", _snd_dup);
+    Test_Eq("D40 every credited sound appears in the credits text", _snd_missing, "");
+    Test_Eq("D40 all 126 sounds and music tracks are listed", array_length(_snd), 126);
+    Test_Eq("D40 until the owner sends names the creator is the marked placeholder", _snd[0].creator, CREDITS_CREATOR_TBD);
+    Test_True("D105 credits come with headings and spacing", array_length(Credits_Lines()) > array_length(Credits_PlainLines()));
 }
 
 // ---- D0 shared UI framework (D95-D98): the pure menu model in scr_menu.gml ("UI FRAMEWORK") ----------------------------------------

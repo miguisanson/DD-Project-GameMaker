@@ -32,6 +32,7 @@ if (gs.last_room != room) {
         }
     }
 
+    Notes_SpawnForRoom();   // C5 (D107): the lore notes of this room (by death count)
     Run_AutoSave();   // C1 (D46): the run is saved on every room change; coming back from a fight is one too
 }
 
@@ -45,6 +46,15 @@ if (room == rm_floor1 && variable_struct_exists(gs, "pending_floor1_intro_dialog
         gs.pending_floor1_intro_dialogue = false;
         SFX_Play("body_falling_wood");
         Dialogue_Start("sys_floor1_intro");
+    }
+}
+
+// C5 (D102): after a death the next run starts at the tunnel entrance with one short wake line.
+if (room == rm_floor1 && variable_struct_exists(gs, "pending_wake_line") && gs.pending_wake_line) {
+    if (instance_exists(obj_player) && !Transition_IsActive() && gs.ui.mode == UI_NONE && array_length(gs.ui.lines) <= 0) {
+        gs.pending_wake_line = false;
+        var wake = WakeLine_Pick(Profile_Get().deaths);
+        Dialogue_StartLines([Loc_T(wake.key, wake.text)]);
     }
 }
 
