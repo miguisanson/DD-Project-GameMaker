@@ -16,11 +16,11 @@ function ItemDB_Init() {
         equip_slot: "weapon",
         weapon_kind: "sword",   // row of Qte_BarParams (D60)
         power: 3,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: CLASS_KNIGHT,
         sprite: wooden_sword,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 8
     };
@@ -35,11 +35,11 @@ function ItemDB_Init() {
         equip_slot: "weapon",
         weapon_kind: "sword",   // row of Qte_BarParams (D60)
         power: 6,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: CLASS_KNIGHT,
         sprite: iron_sword,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 18
     };
@@ -54,11 +54,11 @@ function ItemDB_Init() {
         equip_slot: "weapon",
         weapon_kind: "sword",   // row of Qte_BarParams (D60)
         power: 9,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 1,
         preferred_class: CLASS_KNIGHT,
         sprite: platinum_sword,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 35
     };
@@ -74,11 +74,11 @@ function ItemDB_Init() {
         equip_slot: "weapon",
         weapon_kind: "bow",   // row of Qte_BarParams (D60)
         power: 3,
-        stat_type: STAT_AGI,
+        stat_type: STAT_ATK,
         acc: 1,
         preferred_class: CLASS_ARCHER,
         sprite: wooden_bow,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 8
     };
@@ -93,11 +93,11 @@ function ItemDB_Init() {
         equip_slot: "weapon",
         weapon_kind: "bow",   // row of Qte_BarParams (D60)
         power: 6,
-        stat_type: STAT_AGI,
+        stat_type: STAT_ATK,
         acc: 1,
         preferred_class: CLASS_ARCHER,
         sprite: iron_bow,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 18
     };
@@ -112,11 +112,11 @@ function ItemDB_Init() {
         equip_slot: "weapon",
         weapon_kind: "bow",   // row of Qte_BarParams (D60)
         power: 9,
-        stat_type: STAT_AGI,
+        stat_type: STAT_ATK,
         acc: 2,
         preferred_class: CLASS_ARCHER,
         sprite: platinum_bow,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 35
     };
@@ -132,11 +132,11 @@ function ItemDB_Init() {
         equip_slot: "weapon",
         weapon_kind: "staff",   // row of Qte_BarParams (D60)
         power: 3,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 0,
         preferred_class: CLASS_MAGE,
         sprite: wooden_staff,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 8
     };
@@ -151,11 +151,11 @@ function ItemDB_Init() {
         equip_slot: "weapon",
         weapon_kind: "staff",   // row of Qte_BarParams (D60)
         power: 6,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 0,
         preferred_class: CLASS_MAGE,
         sprite: ruby_staff,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 20
     };
@@ -170,11 +170,11 @@ function ItemDB_Init() {
         equip_slot: "weapon",
         weapon_kind: "staff",   // row of Qte_BarParams (D60)
         power: 9,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 1,
         preferred_class: CLASS_MAGE,
         sprite: diamond_staff,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 40
     };
@@ -190,11 +190,11 @@ function ItemDB_Init() {
         max_stack: 99,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: hp_potion,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "heal", min: 5, max: 10, scale: 1.0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 8
     };
@@ -209,11 +209,11 @@ function ItemDB_Init() {
         max_stack: 99,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: hp_potion,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "heal", min: 10, max: 20, scale: 0.8, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 14
     };
@@ -228,11 +228,11 @@ function ItemDB_Init() {
         max_stack: 99,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: hp_potion,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "heal", min: 20, max: 35, scale: 1.2, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 25
     };
@@ -248,11 +248,11 @@ function ItemDB_Init() {
         max_stack: 99,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: mp_potion,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "mp", min: 4, max: 8, scale: 0.4, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 10
     };
@@ -267,11 +267,11 @@ function ItemDB_Init() {
         max_stack: 99,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: mp_potion,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "mp", min: 8, max: 14, scale: 0.7, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 16
     };
@@ -286,11 +286,11 @@ function ItemDB_Init() {
         max_stack: 99,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: mp_potion,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "mp", min: 12, max: 20, scale: 1.0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 28
     };
@@ -306,11 +306,11 @@ function ItemDB_Init() {
         max_stack: 99,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: antidote,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "cure", power: 0, status: STATUS_POISON, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 6
     };
@@ -325,11 +325,11 @@ function ItemDB_Init() {
         max_stack: 99,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: bandage,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "cure", power: 0, status: STATUS_BLEED, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 6
     };
@@ -344,11 +344,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_WOUND },
         value: 25
     };
@@ -362,11 +362,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_HILT_BASH },
         value: 30
     };
@@ -380,11 +380,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_MUSCLE_UP },
         value: 30
     };
@@ -398,11 +398,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_REV_UP },
         value: 30
     };
@@ -416,11 +416,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_HORIZ_SLASH },
         value: 35
     };
@@ -434,11 +434,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_POISON_ARROW },
         value: 30
     };
@@ -452,11 +452,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_EVASION },
         value: 28
     };
@@ -470,11 +470,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_DOUBLE_SHOT },
         value: 35
     };
@@ -488,11 +488,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_TAKE_AIM },
         value: 30
     };
@@ -506,11 +506,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_FIREBALL },
         value: 35
     };
@@ -524,11 +524,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_POISON_MIST },
         value: 35
     };
@@ -542,11 +542,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_ICE_SPEAR },
         value: 40
     };
@@ -560,11 +560,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_MEDITATION },
         value: 35
     };
@@ -578,11 +578,11 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "",
         power: 0,
-        stat_type: STAT_STR,
+        stat_type: STAT_ATK,
         acc: 0,
         preferred_class: -1,
         sprite: skill_book,
-        bonus: { str:0, agi:0, def:0, intt:0, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:0 },
         use: { effect: "learn_skill", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: SKILL_FORESIGHT },
         value: 35
     };
@@ -602,7 +602,7 @@ function ItemDB_Init() {
         preferred_class: -1,
         allowed_classes: [CLASS_KNIGHT, CLASS_ARCHER],
         sprite: leather_armor,
-        bonus: { str:0, agi:0, def:1, intt:0, luck:0 },
+        bonus: { atk:0, def:1, spd:0, mag:0 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 20
     };
@@ -621,7 +621,7 @@ function ItemDB_Init() {
         preferred_class: -1,
         allowed_classes: [CLASS_KNIGHT, CLASS_ARCHER],
         sprite: iron_armor,
-        bonus: { str:0, agi:0, def:2, intt:0, luck:0 },
+        bonus: { atk:0, def:2, spd:0, mag:0 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 40
     };
@@ -640,7 +640,7 @@ function ItemDB_Init() {
         preferred_class: -1,
         allowed_classes: [CLASS_KNIGHT, CLASS_ARCHER],
         sprite: platinum_armor,
-        bonus: { str:0, agi:0, def:3, intt:0, luck:0 },
+        bonus: { atk:0, def:3, spd:0, mag:0 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 70
     };
@@ -655,12 +655,12 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "body",
         power: 0,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 0,
         preferred_class: CLASS_MAGE,
         allowed_classes: [CLASS_MAGE],
         sprite: cloth_robe,
-        bonus: { str:0, agi:0, def:0, intt:1, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:1 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 16
     };
@@ -674,12 +674,12 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "body",
         power: 0,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 0,
         preferred_class: CLASS_MAGE,
         allowed_classes: [CLASS_MAGE],
         sprite: silk_robe,
-        bonus: { str:0, agi:0, def:0, intt:2, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:2 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 34
     };
@@ -693,12 +693,12 @@ function ItemDB_Init() {
         max_stack: 1,
         equip_slot: "body",
         power: 0,
-        stat_type: STAT_INT,
+        stat_type: STAT_MAG,
         acc: 0,
         preferred_class: CLASS_MAGE,
         allowed_classes: [CLASS_MAGE],
         sprite: mithril_robe,
-        bonus: { str:0, agi:0, def:0, intt:3, luck:0 },
+        bonus: { atk:0, def:0, spd:0, mag:3 },
         use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 },
         value: 60
     };
@@ -722,7 +722,7 @@ function ItemDB_Get(_id) {
 
     ItemDB_AssignEquipPassives(db);
     if (ds_map_exists(db, _id)) return Item_LocalizeRuntime(db[? _id]);
-    return { id: 0, name: Loc_T("item.name.0", "None"), type: ITEM_KEY, stackable: false, max_stack: 0, equip_slot: "", power: 0, stat_type: -1, acc: 0, preferred_class: -1, sprite: noone, bonus: { str:0, agi:0, def:0, intt:0, luck:0 }, use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 }, value: 0 };
+    return { id: 0, name: Loc_T("item.name.0", "None"), type: ITEM_KEY, stackable: false, max_stack: 0, equip_slot: "", power: 0, stat_type: -1, acc: 0, preferred_class: -1, sprite: noone, bonus: { atk:0, def:0, spd:0, mag:0 }, use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 }, value: 0 };
 }
 
 function Item_LocalizeRuntime(_item) {
@@ -867,7 +867,7 @@ function Item_ComputeAmount(_user, _use) {
     if (variable_struct_exists(_use, "max")) maxv = _use.max; else maxv = _use.power;
     if (maxv < minv) maxv = minv;
 
-    var amt = (minv == maxv) ? minv : irandom_range(minv, maxv);
+    var amt = (minv == maxv) ? minv : RunRng_Range("combat", minv, maxv);
 
     if (is_struct(_user) && variable_struct_exists(_user, "level") && variable_struct_exists(_use, "scale")) {
         var lvl = max(0, _user.level - 1);

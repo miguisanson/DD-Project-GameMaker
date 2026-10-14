@@ -221,6 +221,7 @@ function Scenario_Boot() {
     else if (Scenario_HasFlag("-bot")) _mode = "bot";
     else if (Scenario_HasFlag("-shots")) _mode = "shots";
     else if (Scenario_HasFlag("-gridshots")) _mode = "gridshots";
+    else if (Scenario_HasFlag("-exportdata")) _mode = "exportdata";
     if (_mode != "" || Scenario_HasFlag("-runtests")) {
         show_debug_message("[TEST-BUILD] " + BUILD_ID);
         // tests are always windowed whatever the saved setting says (Display_Init checks Display_TestRun); no focus / foreground calls anywhere
@@ -339,6 +340,7 @@ function Scenario_Step() {
         case "bot": Scenario_StepBot(_s); break;
         case "shots": Scenario_StepShots(_s); break;
         case "gridshots": Scenario_StepGridShots(_s); break;
+        case "exportdata": Scenario_StepExportData(_s); break;
     }
 }
 
@@ -780,9 +782,10 @@ function Scenario_StepBotExtras(_s) {
                         var _want_mult = _fail ? 0.75 : 1.30;
                         var _dealt = 99 - _bc.e.hp;
                         // what the skill deals at grade OK, with and without a crit, from a fresh copy of the same enemy
-                        var _w = { power: _skill.power, stat_type: _skill.stat_type, acc: _skill.acc };
-                        var _b1 = Combat_ApplyDamage(_bc.p, EnemyCreate(ENEMY_SLIME), _w, 1, _skill.power_mult, { is_skill: true, grade_mult: 1 }).dmg;
-                        var _min = Qte_ScaleAmount(_b1, _want_mult, 1);
+                        // B1: the grade is part of the single damage rounding now (spec section 4), so the expectation is the formula at that grade.
+                        var _w = { power: Combat_PowerSkill(_skill.power, _skill.power_mult, Combat_WeaponPower(_bc.p)), stat_type: _skill.stat_type, acc: _skill.acc };
+                        var _b1 = Combat_ApplyDamage(_bc.p, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: true, grade_mult: 1 }).dmg;
+                        var _min = Combat_ApplyDamage(_bc.p, EnemyCreate(ENEMY_SLIME), _w, 1, 1, { is_skill: true, grade_mult: _want_mult }).dmg;
                         show_debug_message("[BOT] " + _name + " grade=" + _st.key + " mult=" + string(_bc.qte_result_mult) + " arrows=" + string(_st.len) + " mistakes=" + string(_st.mistakes)
                             + " timed_out=" + string(_st.timed_out) + " finish_ms=" + string(_st.finish_ms) + "/" + string(_st.limit_ms) + " dealt=" + string(_dealt) + " base=" + string(_b1) + " expected_min=" + string(_min));
                         Scenario_Check(_name + "_grade_" + _want_key, _st.key == _want_key && _bc.qte_result_key == _want_key, "got " + _st.key);
@@ -1002,7 +1005,7 @@ function Scenario_BotDrive(_s, _bc) {
                 _s.attacking = true;
                 _s.qhitstop = false;
             }
-            if (_bc.qte_active) _s.qbase = Combat_Damage(_bc.p, _bc.e, _bc.player_weapon);
+            if (_bc.qte_active) _s.qbase = Combat_Damage(_bc.p, _bc.e, Combat_BasicSource(_bc.player_weapon));
             // The press is read by the controller in this frame or the next, so it is judged one or two frames of the clock later:
             // press when the zone centre is within 1.5 frames, which lands it within a frame and a half of the centre.
             if (_perfect && _ready && _bc.qte_active && (Qte_ZoneCentreMs(_bc.qte_params) - _bc.qte_ms) <= Qte_StepMs(delta_time) * 1.5) {
@@ -2133,6 +2136,131 @@ function Scenario_StepGridShots(_s) {
     }
 }
 
+// ---- -exportdata (B1): the game's own data as JSON for the balance simulator (BAL-01, BAL-02). Pure data, no instances. ----
+// A copy of a struct/array with every asset reference (any key containing "sprite") and method left out; keys sorted so the file diffs cleanly.
+function Export_Clean(_v, _depth = 0) {
+    if (_depth > 8) return undefined;
+    if (is_struct(_v)) {
+        var out = {};
+        var keys = variable_struct_get_names(_v);
+        array_sort(keys, true);
+        for (var i = 0; i < array_length(keys); i++) {
+            var k = keys[i];
+            if (string_pos("sprite", k) > 0) continue;
+            var val = variable_struct_get(_v, k);
+            if (is_undefined(val) || is_method(val)) continue;
+            variable_struct_set(out, k, Export_Clean(val, _depth + 1));
+        }
+        return out;
+    }
+    if (is_array(_v)) {
+        var arr = [];
+        for (var j = 0; j < array_length(_v); j++) array_push(arr, Export_Clean(_v[j], _depth + 1));
+        return arr;
+    }
+    return _v;
+}
+
+// Records of an id-keyed ds_map as an array sorted by id; _get turns an id into the record (the game's own getter, so names are the runtime ones).
+function Export_MapRecords(_map, _get) {
+    var ids = ds_map_keys_to_array(_map);
+    array_sort(ids, true);
+    var out = [];
+    for (var i = 0; i < array_length(ids); i++) array_push(out, Export_Clean(_get(ids[i])));
+    return out;
+}
+
+function Export_Build() {
+    GameState_Get();
+    ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init();
+    var data = { version: 1, build: BUILD_ID, spec: ".planning/research/combat-spec.md" };
+    data.constants = {
+        stat_ids: { atk: STAT_ATK, def: STAT_DEF, spd: STAT_SPD, mag: STAT_MAG },
+        stat_min: STAT_MIN, stat_max: STAT_MAX, level_cap: LEVEL_CAP_TECHNICAL,
+        power_scale: COMBAT_POWER_SCALE, weapon_skill_share: COMBAT_WEAPON_SKILL_SHARE, unarmed_power: COMBAT_UNARMED_POWER,
+        crit_mult: COMBAT_CRIT_MULT, crit_chance_max: COMBAT_CRIT_CHANCE_MAX, free_points_per_level: LEVEL_FREE_POINTS_PER_LEVEL,
+        player_base_hp: PLAYER_BASE_HP, player_base_mp: PLAYER_BASE_MP,
+        grades: { perfect: Qte_GradeMult(QTE_PERFECT), good: Qte_GradeMult(QTE_GOOD), ok: Qte_GradeMult(QTE_OK), weak: Qte_GradeMult(QTE_WEAK) },
+        assist_damage_taken_mult: Difficulty_Profile().assist_damage_taken_mult
+    };
+    // Level table: EXP to leave each level, and every class's stats/HP/MP by level as the game itself builds them (fixed growth + the auto-placed free point).
+    data.levels = [];
+    for (var lv = 1; lv <= LEVEL_CAP_TECHNICAL; lv++) array_push(data.levels, { level: lv, exp_next: Exp_NextLevel(lv) });
+    data.classes = [];
+    var class_ids = [CLASS_ARCHER, CLASS_KNIGHT, CLASS_MAGE, CLASS_NOBODY];   // ascending id
+    for (var ci = 0; ci < array_length(class_ids); ci++) {
+        var cfg = Export_Clean(DB_PlayerClass(class_ids[ci]));
+        cfg.id = class_ids[ci];
+        cfg.growth_per_level = [];
+        cfg.by_level = [];
+        var ch = CharacterCreate_Player(class_ids[ci]);
+        for (var lv2 = 1; lv2 <= LEVEL_CAP_TECHNICAL; lv2++) {
+            if (lv2 > 1) {
+                array_push(cfg.growth_per_level, { level: lv2, gain: LevelUp_ClassGrowthGain(class_ids[ci], lv2) });
+                ch = LevelUp_ApplyLevel(ch);
+            }
+            array_push(cfg.by_level, { level: lv2, atk: ch.stats.atk, def: ch.stats.def, spd: ch.stats.spd, mag: ch.stats.mag, hp: ch.max_hp, mp: ch.max_mp });
+        }
+        array_push(data.classes, cfg);
+    }
+    data.enemies = Export_MapRecords(global.enemy_db, EnemyDB_Get);
+    data.skills = Export_MapRecords(global.skill_db, SkillDB_Get);
+    for (var si = 0; si < array_length(data.skills); si++) {
+        var seq = Qte_SkillSequence(data.skills[si].id);
+        data.skills[si].sequence_length = is_array(seq) ? array_length(seq) : 0;
+    }
+    data.items = Export_MapRecords(global.item_db, ItemDB_Get);
+    data.statuses = Export_MapRecords(global.status_db, StatusDB_Get);
+    data.loot = { tables: {}, configs: {}, tier_weights: Export_Clean(global.loot_tier_weights) };
+    var tk = ds_map_keys_to_array(global.loot_tables);
+    for (var ti = 0; ti < array_length(tk); ti++) variable_struct_set(data.loot.tables, string(tk[ti]), Export_Clean(global.loot_tables[? tk[ti]]));
+    var ck = ds_map_keys_to_array(global.loot_configs);
+    for (var cj = 0; cj < array_length(ck); cj++) variable_struct_set(data.loot.configs, string(ck[cj]), Export_Clean(global.loot_configs[? ck[cj]]));
+    return data;
+}
+
+// Writes export_data.json to the save area (the working directory, like test_results.txt). Returns the JSON text.
+function Export_WriteFile(_data) {
+    var text = json_stringify(_data, true);
+    var f = file_text_open_write("export_data.json");
+    if (f != -1) {
+        file_text_write_string(f, text);
+        file_text_close(f);
+    }
+    return text;
+}
+
+// True when every record in the array has a distinct numeric id.
+function Export_IdsUnique(_records) {
+    var seen = {};
+    for (var i = 0; i < array_length(_records); i++) {
+        var key = string(_records[i].id);
+        if (variable_struct_exists(seen, key)) return false;
+        variable_struct_set(seen, key, true);
+    }
+    return array_length(_records) > 0;
+}
+
+function Scenario_StepExportData(_s) {
+    if (_s.t < 5) return;
+    var text = Export_WriteFile(Export_Build());
+    Scenario_Check("exportdata_file_exists", file_exists("export_data.json"));
+    var back = Test_RawRead("export_data.json");
+    Scenario_Check("exportdata_file_matches_the_text_written", (string_length(string_replace_all(back, "\r", "")) == string_length(text)) && (string_length(text) > 1000), "file=" + string(string_length(back)) + " text=" + string(string_length(text)) + " bytes=" + string(string_byte_length(text)));
+    var parsed = undefined;
+    try { parsed = json_parse(back); } catch (_e) { parsed = undefined; }
+    Scenario_Check("exportdata_parses", is_struct(parsed));
+    if (is_struct(parsed)) {
+        Scenario_Check("exportdata_classes_4_unique", array_length(parsed.classes) == 4 && Export_IdsUnique(parsed.classes));
+        Scenario_Check("exportdata_enemies_10_unique", array_length(parsed.enemies) == 10 && Export_IdsUnique(parsed.enemies));
+        Scenario_Check("exportdata_skills_27_unique", array_length(parsed.skills) == 27 && Export_IdsUnique(parsed.skills));
+        Scenario_Check("exportdata_items_37_unique", array_length(parsed.items) == 37 && Export_IdsUnique(parsed.items));
+        Scenario_Check("exportdata_statuses_14_unique", array_length(parsed.statuses) == 14 && Export_IdsUnique(parsed.statuses));
+        Scenario_Check("exportdata_level_table_10_rows", array_length(parsed.levels) == LEVEL_CAP_TECHNICAL && parsed.levels[0].exp_next == 12);
+        Scenario_Check("exportdata_class_table_matches_the_game", parsed.classes[0].by_level[LEVEL_CAP_TECHNICAL - 1].hp > 0);
+    }
+    Scenario_Finish();
+}
 
 // ============================================================================
 // A1 (I-056, I-058, I-059): the world-space marks (the sight ring, the "!" and the interact arrow) must land on the picture where

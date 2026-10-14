@@ -120,7 +120,7 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
 
     var exp_mult = variable_struct_exists(cfg, "auto_resolve_exp_mult") ? max(0, real(cfg.auto_resolve_exp_mult)) : ENEMY_AUTO_RESOLVE_EXP_MULT_DEFAULT;
     var loot_mult = variable_struct_exists(cfg, "auto_resolve_loot_mult") ? clamp(real(cfg.auto_resolve_loot_mult), 0, 1) : ENEMY_AUTO_RESOLVE_LOOT_MULT_DEFAULT;
-    var diff = Difficulty_Profile();
+    var diff = Difficulty_Profile();   // D35: only player_exp_mult (1) is left
     var at_cap_before = Level_IsAtCap(p.level);
 
     var level_exp_mult = 1;
@@ -269,7 +269,6 @@ function Enemy_AutoResolveEncounter(_enemy_inst, _player_inst) {
 
 function EnemyCreate(_enemy_id) {
     var base = EnemyDB_Get(_enemy_id);
-    var diff = Difficulty_Profile();
     var gs = GameState_Get();
 
     // build battle character struct
@@ -288,30 +287,22 @@ function EnemyCreate(_enemy_id) {
 
     // copy stats (keep same keys you use everywhere)
     ch.stats = {
-        str:  max(1, round(base.stats.str)),
-        agi:  max(1, round(base.stats.agi)),
-        def:  max(1, round(base.stats.def)),
-        intt: max(1, round(base.stats.intt)),
-        luck: max(1, round(base.stats.luck))
+        atk: max(1, round(base.stats.atk)),
+        def: max(1, round(base.stats.def)),
+        spd: max(1, round(base.stats.spd)),
+        mag: max(1, round(base.stats.mag))
     };
+    ch.basic_power = base.basic_power;
 
     ch.base_hp = base.base_hp;
     ch.base_mp = base.base_mp;
     ch.hd = base.hd;
     ch.mp_gain = base.mp_gain;
 
-    // compute resources using your formula style
-    var def_mod = StatMod(ch.stats.def);
-    var int_mod = StatMod(ch.stats.intt);
-
-    var hp_gain = ceil(ch.hd / 2) + 1; // BG3 average
-    // DEF adds a one-time flat bonus instead of compounding every level, so
-    // high-DEF enemies stay meaty without ballooning into HP sponges.
-    ch.max_hp = max(1, ch.base_hp + (ch.level - 1) * hp_gain + max(0, def_mod));
-
-    ch.max_mp = max(0, ch.base_mp + (ch.level - 1) * (ch.mp_gain + int_mod));
-    ch.max_hp = max(1, round(ch.max_hp * diff.enemy_hp_mult));
-    ch.max_mp = max(0, round(ch.max_mp * diff.enemy_mp_mult));
+    // Spec section 6: no stat adds HP (the old DEF bonus is folded into base_hp); one difficulty, no multipliers (D35).
+    var hp_gain = ceil(ch.hd / 2) + 1;
+    ch.max_hp = max(1, ch.base_hp + (ch.level - 1) * hp_gain);
+    ch.max_mp = max(0, ch.base_mp + (ch.level - 1) * ch.mp_gain);
 
     // current resources start full
     ch.hp = ch.max_hp;
