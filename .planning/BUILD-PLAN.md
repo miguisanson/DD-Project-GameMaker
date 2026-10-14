@@ -16,11 +16,11 @@ game exports JSON with `-exportdata` for the Python simulator (no Included File 
 | C1 | Run loop: run/profile save split, seeded RNG streams, death → entrance, echo gift, abandon run, auto-save + continue, story seen once, run history, unlocks | D25-D27, D30-D33, D36, D46, D87, D88, D92 | MERGED to next |
 | C2 | Chests (class first, then cards), class pick (Nobody locked), cards 1-of-3 at chests + level-ups, upgrades, passives (shared + class), max 3 skills equipped | D73, D81, D82, D34, D83 | MERGED to next |
 | C3 | Gold, merchant after floors 2/5/8, throwables (all classes, Nobody stronger), accessory slot, elites, per-run shuffles | D23, D33, D84, D85, D86, D92 | in flight (wt c3) |
-| C4 | Beds (heal or upgrade), tutorial prompts + Help page, settings (QTE assist, key rebinding, text speed, shake), device button prompts | D45, D47, D49, D92 | todo |
+| C4 | Beds (heal or upgrade), tutorial prompts + Help page, settings (QTE assist, key rebinding, text speed, shake), device button prompts | D45, D47, D49, D92 | in flight (wt c4) |
 | D0 | Shared UI framework: one menu component (wrap-around, hold-to-scroll, same confirm/back, back = one level, remembered cursor, mouse hover/click/wheel), frames, fonts, motion, details panel with data-generated text; migrate the title menu first as the pilot | D95-D98, D100 | MERGED to next (title + settings on the framework) |
 | D1 | Every screen on the framework: settings, credits, battle HUD (D99) + battle menus, Tab menu (Status/Skills/Items/Gear/Codex/Settings) + pause, class pick, card pick, shop, bed, level-up, run end, echo pick, dialogue box (D101), prompts; remove the old per-screen menu code | D89, D90, D96, D99, D101, I-061, I-062 | todo |
 | D2 | Art: ComfyUI icons (status, skills, items, throwables, passives) + card frame, PNG strips + owner import checklist; code fallbacks until imported | D10, D43, D44, D94 | MERGED to next (script-drawn icons; SDXL base unusable at 16 px; owner import pending) |
-| C5 | Story in runs: death scene (D103) + rotating death lines, wake at tunnel entrance, seen-once story with boss name banners (D106), lore notes in existing rooms incl. death-count notes (D107), credits text update (D105) | D102-D107, D26 | todo |
+| C5 | Story in runs: death scene (D103) + rotating death lines, wake at tunnel entrance, seen-once story with boss name banners (D106), lore notes in existing rooms incl. death-count notes (D107), credits text update (D105) | D102-D107, D26 | MERGED to next |
 | D3 | Text: cards, passives, death lines, lore notes, merchant, tutorial, codex (EN + KO draft); credits list (sound creators from owner) | D93, D40, D105, D107 | todo |
 | F1 | Full optimisation + consistency pass: frame-time probe in the bot (before/after), per-frame work and allocations, draw calls, room loads; dead/duplicated code, frame-counted timers → ms, global sprawl; consistent controls, wording, colours, sounds, naming | D108, ROB-01..03 | todo |
 | E1 | Simulator on `-exportdata` JSON, target bands, balance proposals for the owner | D13, D14 | todo |
@@ -28,4 +28,4 @@ game exports JSON with `-exportdata` for the Python simulator (no Included File 
 
 Order: A1+A2 → (B1 ∥ D0) → (B2 ∥ C1) → B3 → (B4 ∥ C2) → C3 → C4 → C5 → D1 (∥ D2 art) → D3 → F1 → E1 → E2.
 
-Step-number ranges (avoid scenario clashes): smoke C1 100-112, C5 113-121, C2 133-141; shots UI 80-89, B3 90-97, C2 120-128, B4 140-149, C3 150-159, C4 160-169, D1 170-199.
+Step-number ranges (C4: smoke 161-170, shots 160-169, bot v=9) (avoid scenario clashes): smoke C1 100-112, C5 113-121, C2 133-141; shots UI 80-89, B3 90-97, C2 120-128, B4 140-149, C3 150-159, C4 160-169, D1 170-199.
