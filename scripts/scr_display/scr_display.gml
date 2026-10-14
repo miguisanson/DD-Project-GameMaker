@@ -417,6 +417,7 @@ function Display_ClearZoom() {
 // picture's corner, so the blit is at 0,0). Called from the top of every Draw GUI event; only the first call of a frame draws, so it
 // does not matter which object draws first. Fades and dims draw Display_WindowRectInGui to cover the bars too.
 function Display_DrawFrame() {
+    Input_FrameEnd();   // every Step of this frame is done: the next frame reads the input afresh (even in the same millisecond)
     if (!variable_global_exists("display") || !is_struct(global.display)) return;
     var _d = global.display;
     if (_d.drawn_frame == _d.frame) return;

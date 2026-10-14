@@ -25,7 +25,7 @@ if (e.sprite != noone) {
 
 // fixed battle resolution (GB-style)
 var cx = DISPLAY_BASE_W div 2;
-var cy = DISPLAY_BASE_H div 2;
+var cy = (DISPLAY_BASE_H div 2) - 14;   // D99: a little above the middle, so the bottom panels, the lists and the log have room under it
 
 enemy_inst = instance_create_layer(
     cx - sw div 2,
@@ -85,16 +85,19 @@ enemy_last_windup = -1;          // the skill the enemy last wound up (bot and t
 qte_perfect_widen = 1;
 def_perfect_widen = 1;
 
-menu_index = 0;
-battle_actions = [
-    { label: Loc_T("battle.action.attack", "ATTACK"), state: BSTATE_ATTACK_TIMING },
-    { label: Loc_T("battle.action.skill", "SKILL"), state: BSTATE_SKILL_MENU },
-    { label: Loc_T("battle.action.item",  "ITEM"),  state: BSTATE_ITEM_MENU },
-    { label: Loc_T("battle.action.run",   "RUN"),   state: BSTATE_PLAYER_RUN }
-];
-menu_count = array_length(battle_actions);
-skill_index = 0;
+menu_index = 0;          // the command cursor: the menu owns it (ui_cmd.cursor), this mirrors it for the bot and the tests
+skill_index = 0;         // the same for the skill and item lists
 item_index = 0;
+ui_cmd = undefined;      // D95 / D99: the command, skill and item menus are Ui_Menu objects (Battle_MenusBuild, Battle_MenusStep, Battle_DrawMenus)
+ui_skill = undefined;
+ui_item = undefined;
+ui_sig = {};
+hud = { clock: current_time, hp_shown: p.hp, mp_shown: p.mp, rects: {} };   // the player panel's glided bars, and the rectangles the last draw used
+// each fight starts on Attack with the lists at their top (the cursors are remembered inside a fight, D95)
+Ui_MemSet(Ui_MemGlobal(), "battle_cmd", 0);
+Ui_MemSet(Ui_MemGlobal(), "battle_skill", 0);
+Ui_MemSet(Ui_MemGlobal(), "battle_item", 0);
+Battle_MenusBuild(self);
 
 // The basic attack's sliding bar (D56). qte_ms is the bar's own clock in ms: negative in the lead-in, 0 when the cursor starts.
 qte_active = false;

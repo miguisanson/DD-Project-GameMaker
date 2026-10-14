@@ -281,6 +281,19 @@ function StatusDB_Init() {
         stackable: false
     };
 
+    global.status_db[? STATUS_BRACE] = {
+        id: STATUS_BRACE,
+        name: "Braced",
+        // D99: the Guard command. The next hit deals half; it fades after the enemy's turn (duration 2: one tick on the Guard turn itself).
+        icon_sprite: noone,
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
+        stackable: false,
+        guard_mult: 0.5,
+        duration: 2,
+        consume_on_hit: true
+    };
+
     Status_AssignCoreIcons();
     Status_AssignPlayerBuffIconsFromFX();
     Status_AssignMissingIconsFromSkillFX();
@@ -315,6 +328,7 @@ function Status_LocalizationKey(_status_id) {
         case STATUS_BLOODTHIRSTY: return "status_bloodthirsty";
         case STATUS_BLESSING: return "status_blessing";
         case STATUS_SUNDER: return "status_sunder";
+        case STATUS_BRACE: return "status_brace";
     }
     return "unknown";
 }
@@ -495,6 +509,10 @@ function Status_Describe(_status_id, _data = undefined) {
             break;
         case STATUS_SUNDER:
             line = Loc_T("status.desc.status_sunder", "Lose defence.{mods}", vars);
+            break;
+        case STATUS_BRACE:
+            vars.pct = round((1 - Status_Cfg(_status_id, "guard_mult", 1)) * 100);
+            line = Loc_T("status.desc.status_brace", "Braced for the next hit: it deals {pct}% less damage.", vars);
             break;
     }
 
@@ -831,17 +849,6 @@ function Status_CanAct(_ch) {
     return true;
 }
 
-function Status_UsesCoreIconSprite(_status_id, _icon_sprite) {
-    if (_icon_sprite == noone || _icon_sprite == -1) return false;
-    switch (_status_id) {
-        case STATUS_POISON: return (_icon_sprite == poison_status);
-        case STATUS_BLEED:  return (_icon_sprite == bleed_status);
-        case STATUS_BURN:   return (_icon_sprite == burn_status);
-        case STATUS_STUN:   return (_icon_sprite == stun_status);
-    }
-    return false;
-}
-
 function Status_IsNegative(_status_id) {
     switch (_status_id) {
         case STATUS_POISON:
@@ -861,71 +868,4 @@ function Status_LabelWithSign(_cfg, _status_id) {
     }
     var suffix = Status_IsNegative(_status_id) ? "-" : "+";
     return name_txt + suffix;
-}
-
-function Status_DrawFallbackLabel(_cfg, _status_id, _x, _y) {
-    var txt = Status_LabelWithSign(_cfg, _status_id);
-    var text_scale = UI_STATUS_FALLBACK_TEXT_SCALE;
-
-    draw_set_color(c_black);
-    UI_DrawTextTransformed(_x + 1, _y + 1, txt, text_scale, text_scale, 0);
-    draw_set_color(c_white);
-    UI_DrawTextTransformed(_x, _y, txt, text_scale, text_scale, 0);
-
-    return max(1, round(UI_TextWidth(txt) * text_scale));
-}
-
-function Status_DrawIcons(_ch, _x, _y, _spacing = 10, _rtl = false, _noncore_text_fallback = false) {
-    if (!is_array(_ch.status)) return;
-
-    var spacing = 10;
-    if (argument_count >= 4) spacing = _spacing;
-    var rtl = false;
-    if (argument_count >= 5) rtl = _rtl;
-    var noncore_text_fallback = false;
-    if (argument_count >= 6) noncore_text_fallback = _noncore_text_fallback;
-    var icon_scale = UI_GetSpriteScale();
-    var spacing_px = max(1, round(real(spacing) * icon_scale));
-    var icon_gap = max(2, round(4 * icon_scale));
-
-    var off = 0;
-    if (rtl) {
-        for (var i = array_length(_ch.status) - 1; i >= 0; i--) {
-            var cfg = StatusDB_Get(_ch.status[i].id);
-            var sid = _ch.status[i].id;
-            var has_sprite = (variable_struct_exists(cfg, "icon_sprite") && cfg.icon_sprite != noone);
-            var use_text_fallback = (!has_sprite) || (noncore_text_fallback && !Status_UsesCoreIconSprite(sid, cfg.icon_sprite));
-            if (use_text_fallback) {
-                var tag_w = Status_DrawFallbackLabel(cfg, sid, _x + off, _y);
-                off += max(spacing_px, tag_w + icon_gap);
-            } else if (has_sprite) {
-                var icon_sub = 0;
-                if (variable_struct_exists(cfg, "icon_subimg")) icon_sub = round(cfg.icon_subimg);
-                var icon_max = max(0, sprite_get_number(cfg.icon_sprite) - 1);
-                icon_sub = clamp(icon_sub, 0, icon_max);
-                draw_sprite_ext(cfg.icon_sprite, icon_sub, _x + off, _y, icon_scale, icon_scale, 0, c_white, 1);
-                var icon_w = round(sprite_get_width(cfg.icon_sprite) * icon_scale);
-                off += max(spacing_px, icon_w + icon_gap);
-            }
-        }
-    } else {
-        for (var i = 0; i < array_length(_ch.status); i++) {
-            var cfg2 = StatusDB_Get(_ch.status[i].id);
-            var sid2 = _ch.status[i].id;
-            var has_sprite2 = (variable_struct_exists(cfg2, "icon_sprite") && cfg2.icon_sprite != noone);
-            var use_text_fallback2 = (!has_sprite2) || (noncore_text_fallback && !Status_UsesCoreIconSprite(sid2, cfg2.icon_sprite));
-            if (use_text_fallback2) {
-                var tag_w2 = Status_DrawFallbackLabel(cfg2, sid2, _x + off, _y);
-                off += max(spacing_px, tag_w2 + icon_gap);
-            } else if (has_sprite2) {
-                var icon_sub2 = 0;
-                if (variable_struct_exists(cfg2, "icon_subimg")) icon_sub2 = round(cfg2.icon_subimg);
-                var icon_max2 = max(0, sprite_get_number(cfg2.icon_sprite) - 1);
-                icon_sub2 = clamp(icon_sub2, 0, icon_max2);
-                draw_sprite_ext(cfg2.icon_sprite, icon_sub2, _x + off, _y, icon_scale, icon_scale, 0, c_white, 1);
-                var icon_w2 = round(sprite_get_width(cfg2.icon_sprite) * icon_scale);
-                off += max(spacing_px, icon_w2 + icon_gap);
-            }
-        }
-    }
 }

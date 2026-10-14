@@ -96,6 +96,7 @@ function Test_RunAll() {
     Test_RunSuite("Tutorial", Test_Suite_Tutorial);
     Test_RunSuite("Bed", Test_Suite_Bed);
     Test_RunSuite("Economy", Test_Suite_Economy);
+    Test_RunSuite("BattleUi", Test_Suite_BattleUi);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     Test_RunSuite("Mem", Test_Suite_Mem);
     Test_RunSuite("Input", Test_Suite_Input);
@@ -841,7 +842,7 @@ function Test_Suite_QteArrows() {
 // QTE part 2b: the defence sliding bar (D59, D60, D21). Grades come from the same Qte_Grade as the attack bar; these checks cover what is new:
 // per-attack bar numbers, how much each grade blocks, and that a status can only get shorter.
 function Test_Suite_QteDefence() {
-    var _big = [SKILL_POISON_FANGS, SKILL_BITE, SKILL_VINE_TRAP, SKILL_SCORCHING_TOUCH, SKILL_GHOST_CUT, SKILL_RAMMING];
+    var _big = [SKILL_VINE_TRAP, SKILL_GHOST_CUT, SKILL_RAMMING, SKILL_PALE_HYMN];   // the telegraphed heavy moves: the only ones with a defence bar (D7, I-066)
     var _def = Qte_BarParams("default");
     for (var _i = 0; _i < array_length(_big); _i++) {
         var _sk = SkillDB_Get(_big[_i]);
@@ -855,7 +856,7 @@ function Test_Suite_QteDefence() {
     // heavy hitters are slower and narrower, quick ones faster (D60)
     var _ram = Qte_DefenceParams(SKILL_RAMMING);
     var _cut = Qte_DefenceParams(SKILL_GHOST_CUT);
-    var _bit = Qte_DefenceParams(SKILL_BITE);
+    var _bit = Qte_DefenceParams(SKILL_PALE_HYMN);
     Test_True("QteDefence Ramming (mini boss) sweeps slower than every other big attack", _ram.sweep_ms > Qte_DefenceParams(SKILL_VINE_TRAP).sweep_ms && _ram.sweep_ms > _cut.sweep_ms && _ram.sweep_ms > _bit.sweep_ms);
     Test_True("QteDefence Ramming's perfect zone is the narrowest on the bar", _ram.perfect_half_width / _ram.sweep_ms < _cut.perfect_half_width / _cut.sweep_ms && _ram.perfect_half_width / _ram.sweep_ms < _bit.perfect_half_width / _bit.sweep_ms);
     Test_True("QteDefence Ghost Cut sweeps faster than the attack default", _cut.sweep_ms < _def.sweep_ms);
@@ -863,9 +864,9 @@ function Test_Suite_QteDefence() {
     // only damaging enemy hits on the player that are flagged big get the bar
     var _spider = EnemyCreate(ENEMY_SPIDER);
     var _player = CharacterCreate_Player(CLASS_KNIGHT);
-    var _fangs = SkillDB_Get(SKILL_POISON_FANGS);
-    Test_True("QteDefence a landed Poison Fangs is defended", Battle_EnemySkillCanBeDefended(_fangs, { ok: true, hit: true, dmg: 3 }, _player));
-    Test_False("QteDefence a Poison Fangs that missed is not", Battle_EnemySkillCanBeDefended(_fangs, { ok: true, hit: false, dmg: 0 }, _player));
+    var _fangs = SkillDB_Get(SKILL_VINE_TRAP);
+    Test_True("QteDefence a landed Vine Trap is defended", Battle_EnemySkillCanBeDefended(_fangs, { ok: true, hit: true, dmg: 3 }, _player));
+    Test_False("QteDefence a Vine Trap that missed is not", Battle_EnemySkillCanBeDefended(_fangs, { ok: true, hit: false, dmg: 0 }, _player));
     Test_False("QteDefence a hit for 0 is not", Battle_EnemySkillCanBeDefended(_fangs, { ok: true, hit: true, dmg: 0 }, _player));
     Test_False("QteDefence Solidify (no damage) is not", Battle_EnemySkillCanBeDefended(SkillDB_Get(SKILL_SOLIDIFY), { ok: true, hit: true, dmg: 3 }, _player));
     Test_False("QteDefence Bloodthirsty (not a big attack) is not", Battle_EnemySkillCanBeDefended(SkillDB_Get(SKILL_BLOODTHIRSTY), { ok: true, hit: true, dmg: 3 }, _player));
@@ -1284,9 +1285,11 @@ function Test_Suite_StatusRules() {
     Test_Eq("Foresight arrows: the time bar itself is not longer", Qte_SeqNew(_seq, 1, 1.5).limit_ms, Qte_SeqNew(_seq).limit_ms);
     Test_Eq("Foresight arrows: the Perfect window is x1.5", Qte_SeqNew(_seq, 1, 1.5).fast_ms, Qte_SeqNew(_seq).fast_ms * 1.5);
     // the preview (pure part): a visible plan shows the action, an invisible one gives nothing away
-    var _pv = Battle_ActionPreviewOf({ skill_id: SKILL_POISON_FANGS, announced: false }, true);
-    Test_True("Preview: a skill shows its name and that it is a big attack", _pv.visible && _pv.kind == "skill" && _pv.name == SkillDB_Get(SKILL_POISON_FANGS).name && _pv.big);
-    Test_Eq("Preview: the log line", _pv.text, "You foresee: " + SkillDB_Get(SKILL_POISON_FANGS).name);
+    var _pv = Battle_ActionPreviewOf({ skill_id: SKILL_RAMMING, announced: false }, true);
+    Test_True("Preview: a heavy skill shows its name and that it is a big attack", _pv.visible && _pv.kind == "skill" && _pv.name == SkillDB_Get(SKILL_RAMMING).name && _pv.big);
+    Test_Eq("Preview: the log line", _pv.text, "You foresee: " + SkillDB_Get(SKILL_RAMMING).name);
+    var _pf = Battle_ActionPreviewOf({ skill_id: SKILL_POISON_FANGS, announced: false }, true);
+    Test_True("Preview: a plain skill shows its name but is not a big attack (I-066)", _pf.visible && _pf.name == SkillDB_Get(SKILL_POISON_FANGS).name && !_pf.big);
     var _pa = Battle_ActionPreviewOf({ skill_id: -1, announced: false }, true);
     Test_True("Preview: a plain attack", _pa.visible && _pa.kind == "attack" && !_pa.big);
     var _ps = Battle_ActionPreviewOf({ skill_id: -1, announced: false }, true, true);
@@ -1918,13 +1921,13 @@ function Test_Suite_Inventory() {
 }
 
 // Data integrity over the GML databases (VER-11; R-003, R-004). ds_map_add silently drops a repeated key, so a
-// duplicate id shows up as a wrong record count; counts come from balance-data.md (23 items after the skill books went with D18, 27 skills + 4 of packet B4, 14 statuses, 10 enemies).
+// duplicate id shows up as a wrong record count; counts come from balance-data.md (23 items after the skill books went with D18, 27 skills + 4 of packet B4, 15 statuses (14 + Braced), 10 enemies).
 function Test_Suite_Data() {
     GameState_Get();
     ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init();
     Test_Eq("item count == 34 (23 + 4 throwables + 7 accessories, C3; no lost duplicate ids)", ds_map_size(global.item_db), 34);
     Test_Eq("skill count == 31 (27 + Regrow, Snuff, Gore, Pale Hymn of packet B4)", ds_map_size(global.skill_db), 31);
-    Test_Eq("status count == 14", ds_map_size(global.status_db), 14);
+    Test_Eq("status count == 15 (14 + Braced of the Guard command, D1a)", ds_map_size(global.status_db), 15);
     Test_Eq("enemy count == 10", ds_map_size(global.enemy_db), 10);
     var _bad = 0; var _names = {}; var _dupnames = 0;
     var _key = ds_map_find_first(global.item_db);
@@ -1996,7 +1999,7 @@ function Test_Suite_Export() {
     Test_Eq("Export: 31 skills (27 + the 4 of packet B4)", array_length(_back.skills), 31);
     Test_Eq("Export: 34 items (C3 adds 4 throwables and 7 accessories)", array_length(_back.items), 34);
     Test_Eq("Export: 51 cards (14 skills, 14 upgrades, 20 passives, 3 fallbacks)", array_length(_back.cards), 51);
-    Test_Eq("Export: 14 statuses", array_length(_back.statuses), 14);
+    Test_Eq("Export: 15 statuses (14 + Braced of the Guard command)", array_length(_back.statuses), 15);
     Test_Eq("Export: 10 level rows", array_length(_back.levels), 10);
     Test_True("Export: class ids are unique", Export_IdsUnique(_back.classes));
     Test_True("Export: enemy ids are unique", Export_IdsUnique(_back.enemies));
@@ -2872,6 +2875,27 @@ function Test_Suite_Input() {
     Test_Eq("ROB-03 override then update: held reset", variable_struct_get(_inp.state, "move_up").held, false);
     Test_Eq("ROB-03 override then update: pressed reset", variable_struct_get(_inp.state, "move_up").pressed, false);
     _inp.last_step_time = -1;
+
+    // The input is read once per FRAME, not once per millisecond: two frames that share one current_time value (an unthrottled run, a 1 ms
+    // timer) must not let a press of the first one survive into the second (a menu moved twice for one tap). Input_FrameEnd is called by the draw
+    // of every frame, after all the Step events, so the next frame's first Input_Update always recomputes.
+    var _dn = { held: false, pressed: true };   // the press of frame N, still in the state
+    variable_struct_set(_inp.state, "menu_down", _dn);
+    _inp.last_step_time = current_time;          // frame N + 1 starts in the same millisecond as frame N
+    var _f1 = _inp.frame;
+    Input_FrameEnd();
+    Input_Update();
+    Test_Eq("Input a new frame in the same millisecond still recomputes (frame counter)", _inp.frame, _f1 + 1);
+    Test_False("Input a press does not survive into the next frame, even in the same millisecond", variable_struct_get(_inp.state, "menu_down").pressed);
+    // without a frame boundary and in the same millisecond nothing is recomputed (many objects call Input_PreStep in one frame)
+    variable_struct_set(_inp.state, "menu_down", { held: false, pressed: true });
+    _inp.last_step_time = current_time - 5;   // a clock that has moved on inside the frame
+    var _f2 = _inp.frame;
+    Input_Update();
+    Test_Eq("Input inside one frame (no draw in between) does not recompute, whatever the clock says", _inp.frame, _f2);
+    Test_True("Input the state of the frame is kept for every later controller of that frame", variable_struct_get(_inp.state, "menu_down").pressed);
+    _inp.last_step_time = -1;
+    Input_Update();
 }
 
 // ---- ROB-03 obj_sfx_manager: audio globals are created once, not every Step -----------------------
@@ -4389,6 +4413,157 @@ function Test_Suite_Cards() {
 
     _gs.player_ch = _old_player;
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+
+// ---- D1a: battle HUD (D99), details (D100), icons (D94), the Guard command, small enemy moves (I-066, D7), I-065 ----
+function Test_RowValue(_lines, _label) {
+    for (var _i = 0; _i < array_length(_lines); _i++) if (_lines[_i].label == _label) return _lines[_i].value;
+    return "";
+}
+
+function Test_RectsOverlap(_a, _b) {
+    return _a.x < _b.x + _b.w && _b.x < _a.x + _a.w && _a.y < _b.y + _b.h && _b.y < _a.y + _a.h;
+}
+
+function Test_Suite_BattleUi() {
+    // ---- I-066 / D7: only the telegraphed heavy moves get the defence bar ----
+    var _player = CharacterCreate_Player(CLASS_KNIGHT);
+    var _landed = { ok: true, hit: true, dmg: 3 };
+    var _plain = [SKILL_POISON_FANGS, SKILL_BITE, SKILL_SCORCHING_TOUCH, SKILL_GORE];
+    for (var _i = 0; _i < array_length(_plain); _i++) {
+        Test_False("BattleUi " + SkillDB_Get(_plain[_i]).name + " is a plain move: no defence bar", Battle_EnemySkillCanBeDefended(SkillDB_Get(_plain[_i]), _landed, _player));
+    }
+    var _heavy = [SKILL_VINE_TRAP, SKILL_GHOST_CUT, SKILL_RAMMING, SKILL_PALE_HYMN];
+    for (var _h = 0; _h < array_length(_heavy); _h++) {
+        Test_True("BattleUi " + SkillDB_Get(_heavy[_h]).name + " is a heavy move: defence bar", Battle_EnemySkillCanBeDefended(SkillDB_Get(_heavy[_h]), _landed, _player));
+    }
+    var _every_defended_is_telegraphed = true;
+    for (var _sid = 0; _sid <= 31; _sid++) {
+        var _sk = SkillDB_Get(_sid);
+        if (is_struct(_sk) && Battle_EnemySkillCanBeDefended(_sk, _landed, _player)) {
+            if (!(variable_struct_exists(_sk, "telegraphed") && _sk.telegraphed)) _every_defended_is_telegraphed = false;
+        }
+    }
+    Test_True("BattleUi every skill that gets the defence bar is telegraphed (D7)", _every_defended_is_telegraphed);
+    Test_False("BattleUi a plain enemy move does not show the big-attack mark on the strip", Battle_ActionPreviewOf({ kind: "skill", skill_id: SKILL_POISON_FANGS }, true).big);
+
+    // ---- layout: nothing overlaps (I-067), everything is on screen ----
+    var _sizes = [[480, 432, 2, 16, 2], [640, 576, 3, 24, 2], [800, 720, 4, 32, 3], [960, 864, 6, 48, 4]];   // gui w, gui h, p, line height, icon pixel size k
+    for (var _z = 0; _z < array_length(_sizes); _z++) {
+        var _g = _sizes[_z];
+        var _tlb = 3 * _g[2] + (16 * _g[4] + 6 * _g[2]) + 2 * _g[2] + (_g[3] + _g[2]);   // the turn strip's bottom edge (margin + slot + chrome + caption)
+        var _zn = BattleHud_Zones(_g[0], _g[1], _g[2], _g[3], _tlb, 16 * _g[4]);
+        var _tag = "BattleUi zones " + string(_g[0]) + "x" + string(_g[1]);
+        Test_True(_tag + ": player panel on screen", _zn.player.x >= _zn.m && _zn.player.y >= 0 && _zn.player.x + _zn.player.w <= _g[0] - _zn.m && _zn.player.y + _zn.player.h <= _g[1] - _zn.m);
+        Test_True(_tag + ": the right column starts after the player panel", _zn.right.x >= _zn.player.x + _zn.player.w + _zn.m);
+        Test_True(_tag + ": the right column ends inside the screen", _zn.right.x + _zn.right.w <= _g[0] - _zn.m + 0.5);
+        Test_True(_tag + ": the log sits above both bottom panels", _zn.msg.y + _zn.msg.h <= _zn.player.y && _zn.msg.y + _zn.msg.h <= _zn.band_top);
+        Test_False(_tag + ": the log does not overlap the player panel", Test_RectsOverlap(_zn.msg, _zn.player));
+        Test_True(_tag + ": the log is below the turn strip", _zn.msg.y >= _tlb);
+        Test_True(_tag + ": the log is on screen", _zn.msg.x >= 0 && _zn.msg.x + _zn.msg.w <= _g[0] && _zn.msg.y + _zn.msg.h <= _g[1]);
+        Test_True(_tag + ": the command menu (5 rows) fits the band", _zn.cmd_h <= _zn.band_h && _zn.band_top > _tlb);
+    }
+
+    // ---- icons (D94): frames are the positions in art/strips_v2/*.txt ----
+    var _st = [[STATUS_POISON, 0], [STATUS_BURN, 1], [STATUS_BLEED, 2], [STATUS_STUN, 3], [STATUS_GUARD, 6], [STATUS_DMG_UP, 7], [STATUS_EVASION, 8], [STATUS_CRIT_UP, 9], [STATUS_HIT_UP, 10],
+               [STATUS_MEDITATION, 11], [STATUS_SOLIDIFY, 12], [STATUS_BLOODTHIRSTY, 13], [STATUS_BLESSING, 14], [STATUS_SUNDER, 15], [STATUS_BRACE, 6]];
+    for (var _s2 = 0; _s2 < array_length(_st); _s2++) Test_Eq("BattleUi status " + string(_st[_s2][0]) + " icon frame", Icon_StatusFrame(_st[_s2][0]), _st[_s2][1]);
+    var _sk2 = [[SKILL_WOUND, 0], [SKILL_HILT_BASH, 1], [SKILL_MUSCLE_UP, 2], [SKILL_REV_UP, 3], [SKILL_HORIZ_SLASH, 4], [SKILL_POWER_STRIKE, 5], [SKILL_POISON_ARROW, 6], [SKILL_EVASION, 7],
+                [SKILL_DOUBLE_SHOT, 8], [SKILL_TAKE_AIM, 9], [SKILL_FIREBALL, 10], [SKILL_POISON_MIST, 11], [SKILL_ICE_SPEAR, 12], [SKILL_MEDITATION, 13], [SKILL_FORESIGHT, 14]];
+    for (var _k2 = 0; _k2 < array_length(_sk2); _k2++) Test_Eq("BattleUi skill " + string(_sk2[_k2][0]) + " icon frame", Icon_SkillFrame(_sk2[_k2][0]), _sk2[_k2][1]);
+    var _rows_ok = true;
+    for (var _f = 0; _f < 17; _f++) {
+        var _r = Icon_Rows("status", _f);
+        if (array_length(_r) != 16 || string_length(_r[0]) != 16 || string_length(_r[15]) != 16) _rows_ok = false;
+    }
+    Test_True("BattleUi the 17 status icons have 16 x 16 pixel rows", _rows_ok);
+    Test_Eq("BattleUi a frame past the strip has no rows", array_length(Icon_Rows("status", 17)), 0);
+
+    // ---- status chips (D99): icon frame and the number the player needs (turns, or the stacks of a poison) ----
+    var _ch = CharacterCreate_Player(CLASS_MAGE);
+    _ch = Status_Add(_ch, STATUS_POISON, 0, 0, 3);
+    _ch = Status_Add(_ch, STATUS_BURN, 2, 3);
+    _ch = Status_Add(_ch, STATUS_BRACE, 2, 0);
+    var _chips = Battle_StatusChips(_ch);
+    Test_Eq("BattleUi three statuses make three chips", array_length(_chips), 3);
+    Test_Eq("BattleUi poison chip shows its 3 stacks", _chips[0].text, "3");
+    Test_True("BattleUi poison is a debuff chip", _chips[0].negative);
+    Test_Eq("BattleUi burn chip shows its 2 turns", _chips[1].text, "2");
+    Test_Eq("BattleUi braced chip uses the guard icon", _chips[2].frame, 6);
+    Test_False("BattleUi braced is a buff chip", _chips[2].negative);
+    Test_Eq("BattleUi a chip carries the description from the data", _chips[1].line, Status_Describe(STATUS_BURN, Status_Find(_ch, STATUS_BURN)).line);
+
+    // ---- details panel (D100): generated from the data, never typed ----
+    var _fb = SkillDB_Get(SKILL_FIREBALL);
+    var _det = Battle_SkillDetails(_fb);
+    Test_Eq("BattleUi Fireball sentence comes from the data", _det.sentence, Card_SkillSentence(SkillDB_GetBase(SKILL_FIREBALL)));
+    Test_Eq("BattleUi Fireball power line is the data's power", Test_RowValue(_det.lines, Loc_T("card.lbl.power", "Power")), string(round(_fb.power)));
+    Test_Eq("BattleUi Fireball MP line is the data's cost", Test_RowValue(_det.lines, Loc_T("card.lbl.mp", "MP")), string(round(_fb.mp_cost)));
+    var _pa = SkillDB_Get(SKILL_POISON_ARROW);
+    var _pdet = Battle_SkillDetails(_pa);
+    Test_Eq("BattleUi Poison Arrow shows its poison stacks from the data", Test_RowValue(_pdet.lines, Loc_T("card.lbl.stacks", "Stacks")), string(round(_pa.status_stacks)));
+    Test_Eq("BattleUi Fireball shows the burn turns from the data", Test_RowValue(_det.lines, Loc_T("card.lbl.turns", "Turns")), string(round(_fb.status_turns)));
+    Test_Eq("BattleUi Fireball shows the burn chance from the data", Test_RowValue(_det.lines, Loc_T("card.lbl.chance", "Chance")), string(round(_fb.status_chance * 100)) + "%");
+    var _mu = SkillDB_Get(SKILL_MUSCLE_UP);
+    Test_Eq("BattleUi a buff shows no Power line", Test_RowValue(Battle_SkillDetails(_mu).lines, Loc_T("card.lbl.power", "Power")), "");
+    var _hp = ItemDB_Get(10);
+    var _idet = Battle_ItemDetails(_hp, _player);
+    var _rng = Item_AmountRange(_player, _hp.use);
+    Test_Eq("BattleUi HP Potion Lv1 range at level 1 is the data's 5-10", string(_rng.lo) + "-" + string(_rng.hi), "5-10");
+    Test_Eq("BattleUi HP Potion row shows that range", Test_RowValue(_idet.lines, Loc_T("battle.det.hp", "HP")), "5-10");
+    var _lvl5 = CharacterCreate_Player(CLASS_KNIGHT);
+    _lvl5.level = 5;
+    var _rng5 = Item_AmountRange(_lvl5, _hp.use);
+    Test_Eq("BattleUi HP Potion Lv1 range at level 5 adds the level scaling (4 levels x 1.0)", string(_rng5.lo) + "-" + string(_rng5.hi), "9-14");
+    var _inside = true;
+    for (var _t = 0; _t < 40; _t++) {
+        var _a = Item_ComputeAmount(_lvl5, _hp.use);
+        if (_a < _rng5.lo || _a > _rng5.hi) _inside = false;
+    }
+    Test_True("BattleUi the real roll always falls inside the shown range", _inside);
+
+    // ---- rows of the skill list: MP, arrows, greyed when the MP is short ----
+    var _kn = CharacterCreate_Player(CLASS_KNIGHT);
+    _kn.skills = [SKILL_WOUND, SKILL_MUSCLE_UP, SKILL_HILT_BASH];   // a fresh Knight has none: they come from cards (D82)
+    var _srows = Battle_SkillRows(_kn);
+    Test_Eq("BattleUi one row per skill the player knows", array_length(_srows), array_length(_kn.skills));
+    Test_Eq("BattleUi the first row is the first skill", _srows[0].skill_id, _kn.skills[0]);
+    Test_Eq("BattleUi the arrows are the real sequence", string(_srows[0].seq), string(Qte_SkillSequence(_kn.skills[0])));
+    Test_Eq("BattleUi the MP cost is the real cost", _srows[0].cost, Equip_PlayerSkillMPCost(_kn, SkillDB_Get(_kn.skills[0]), SkillDB_Get(_kn.skills[0]).mp_cost));
+    Test_False("BattleUi an affordable skill is not greyed", _srows[0].dim);
+    _kn.mp = 0;
+    Test_True("BattleUi a skill the player cannot pay for is greyed (still selectable, with its details)", Battle_SkillRows(_kn)[0].dim);
+    var _irows = Battle_ItemRows(_player);
+    Test_True("BattleUi the HP potion is in the item list with its quantity", array_length(_irows) >= 1 && _irows[0].item_id == 10 && _irows[0].qty == 2);
+
+    // ---- the Guard command (D99): the next hit deals half, then it is gone ----
+    var _slime = EnemyCreate(ENEMY_SLIME);
+    var _src = { power: 6, stat_type: STAT_ATK };
+    var _g0 = CharacterCreate_Player(CLASS_KNIGHT);
+    var _plain_hit = Combat_ApplyDamage(_slime, _g0, _src, 1, 1, { is_skill: false }).dmg;
+    var _g1 = Battle_GuardApply(CharacterCreate_Player(CLASS_KNIGHT));
+    Test_True("BattleUi Guard leaves the player Braced", Status_Has(_g1, STATUS_BRACE));
+    var _braced_hit = Combat_ApplyDamage(_slime, _g1, _src, 1, 1, { is_skill: false });
+    Test_True("BattleUi a Braced hit deals about half (" + string(_plain_hit) + " -> " + string(_braced_hit.dmg) + ")", _plain_hit >= 2 && _braced_hit.dmg < _plain_hit && abs(_braced_hit.dmg - _plain_hit * 0.5) <= 1);
+    Test_False("BattleUi the hit used the Brace up", Status_Has(_braced_hit.defender, STATUS_BRACE));
+    var _g2 = Battle_GuardApply(CharacterCreate_Player(CLASS_KNIGHT));
+    _g2 = Status_Tick(_g2);
+    Test_True("BattleUi Brace survives the Guard turn's own tick", Status_Has(_g2, STATUS_BRACE));
+    _g2 = Status_Tick(_g2);
+    Test_False("BattleUi Brace fades after one more turn when nothing hit", Status_Has(_g2, STATUS_BRACE));
+
+    // ---- I-065: level gains survive the battle's own normalisation (GameState_Init runs it at every battle start) ----
+    var _lv = CharacterCreate_Player(CLASS_KNIGHT);
+    _lv = Player_AddExp(_lv, 200);
+    var _lv_before = { level: _lv.level, max_hp: _lv.max_hp, hp: _lv.hp, atk: _lv.stats.atk, def: _lv.stats.def, spd: _lv.stats.spd, mag: _lv.stats.mag };
+    Test_True("BattleUi (I-065) 200 EXP levels the Knight up", _lv_before.level >= 3);
+    Test_Eq("BattleUi (I-065) max HP follows the level: base 10 + 7 per level", _lv_before.max_hp, 10 + (_lv_before.level - 1) * 7);
+    var _lv2 = Player_NormalizeProgression(_lv, true);
+    Test_Eq("BattleUi (I-065) normalising keeps the level", _lv2.level, _lv_before.level);
+    Test_Eq("BattleUi (I-065) normalising keeps max HP", _lv2.max_hp, _lv_before.max_hp);
+    Test_Eq("BattleUi (I-065) normalising keeps HP", _lv2.hp, _lv_before.hp);
+    Test_Eq("BattleUi (I-065) normalising keeps the stats", string(_lv2.stats.atk) + "/" + string(_lv2.stats.def) + "/" + string(_lv2.stats.spd) + "/" + string(_lv2.stats.mag), string(_lv_before.atk) + "/" + string(_lv_before.def) + "/" + string(_lv_before.spd) + "/" + string(_lv_before.mag));
 }
 
 // ---- C4: QTE assist (D35), key rebinding (D49), button prompts (D92), tutorial prompts (D45), beds (D47) ----------------------------------

@@ -4,10 +4,7 @@ if (gs.ui.mode == UI_MENU || gs.ui.mode == UI_PAUSE || Tutorial_IsOpen() || Tuto
 if (battle_over && battle_state != BSTATE_MESSAGE) exit;
 
 // helper input keys
-var k_up = Input_UIPressed("menu_up");
-var k_down = Input_UIPressed("menu_down");
 var k_ok = Input_UIConfirm();
-var k_back = Input_UIBack();
 
 // The grade word runs on real time, also through a hit-stop.
 if (qte_result_ms > 0) qte_result_ms = max(0, qte_result_ms - Qte_StepMs(delta_time));
@@ -21,16 +18,11 @@ if (hitstop_ms > 0) {
     exit;
 }
 
-if (!variable_instance_exists(id, "loc_revision")) loc_revision = -1;
-var loc_rev = Loc_GetRevision();
-if (loc_revision != loc_rev) {
-    if (is_array(battle_actions) && array_length(battle_actions) >= 4) {
-        battle_actions[0].label = Loc_T("battle.action.attack", "ATTACK");
-        battle_actions[1].label = Loc_T("battle.action.skill", "SKILL");
-        battle_actions[2].label = Loc_T("battle.action.item", "ITEM");
-        battle_actions[3].label = Loc_T("battle.action.run", "RUN");
-    }
-    loc_revision = loc_rev;
+// D97: the command panel slides in each time the player's turn comes round (not when coming back from a list: Battle_ListBack does that)
+if (!variable_instance_exists(id, "hud_prev_state")) hud_prev_state = battle_state;
+if (battle_state != hud_prev_state) {
+    if (battle_state == BSTATE_MENU && hud_prev_state != BSTATE_SKILL_MENU && hud_prev_state != BSTATE_ITEM_MENU && is_struct(ui_cmd)) ui_cmd.opened_ms = current_time;
+    hud_prev_state = battle_state;
 }
 
 if (turn == TURN_PLAYER) {
@@ -65,106 +57,21 @@ if (battle_state == BSTATE_MESSAGE) {
 }
 
 // --------------------
-// PLAYER MENU
+// PLAYER MENUS (D95, D99): the command menu, then the skill or item list. Battle_MenusStep reads the shared input and calls back.
 // --------------------
 if (battle_state == BSTATE_MENU) {
     if (turn != TURN_PLAYER) {
         battle_state = BSTATE_ENEMY_ACT;
         exit;
     }
-    Tutorial_Trigger("timeline");   // D45: the first time the strip and the menu are both up
-    if (variable_struct_exists(e, "is_elite") && e.is_elite) Tutorial_Trigger("elite");   // D45: the first elite fight
-
-    if (k_down) menu_index = (menu_index + 1) mod menu_count;
-    if (k_up)   menu_index = (menu_index + menu_count - 1) mod menu_count;
-
-    if (k_ok) {
-        var action = battle_actions[menu_index];
-        if (action.state == BSTATE_ATTACK_TIMING) {
-            Battle_AttackTimingBegin(self);
-        } else if (action.state == BSTATE_SKILL_MENU) {
-            if (array_length(Battle_GetSkillList(self)) <= 0) {
-                Battle_Message(self, Loc_T("battle.menu.no_skills", "No skills available."), BSTATE_MENU);
-            } else {
-                battle_state = action.state;
-            }
-        } else if (action.state == BSTATE_ITEM_MENU) {
-            if (array_length(Battle_GetItemList(self)) <= 0) {
-                Battle_Message(self, Loc_T("battle.menu.no_items", "No items available."), BSTATE_MENU);
-            } else {
-                battle_state = action.state;
-            }
-        } else {
-            battle_state = action.state;
-        }
-    }
-
+    Tutorial_Trigger("timeline");   // C4 (D45): the first time the strip and the menu are both up
+    if (variable_struct_exists(e, "is_elite") && e.is_elite) Tutorial_Trigger("elite");   // C4 (D45): the first elite fight
+    Battle_MenusStep(self);
     exit;
 }
 
-// --------------------
-// SKILL MENU
-// --------------------
-if (battle_state == BSTATE_SKILL_MENU) {
-    var skills = Battle_GetSkillList(self);
-    if (array_length(skills) <= 0) {
-        Battle_Message(self, Loc_T("battle.menu.no_skills", "No skills available."), BSTATE_MENU);
-        exit;
-    }
-
-    var skill_count = array_length(skills);
-    var skill_menu_count = skill_count + 1; // +1 for Back
-    if (skill_index >= skill_menu_count) skill_index = 0;
-
-    if (k_down) skill_index = (skill_index + 1) mod skill_menu_count;
-    if (k_up)   skill_index = (skill_index + skill_menu_count - 1) mod skill_menu_count;
-
-    if (k_back) {
-        battle_state = BSTATE_MENU;
-        exit;
-    }
-
-    if (k_ok) {
-        if (skill_index == skill_count) {
-            battle_state = BSTATE_MENU;
-        } else {
-            Battle_SkillQteBegin(self, skills[skill_index]);
-        }
-    }
-
-    exit;
-}
-
-// --------------------
-// ITEM MENU
-// --------------------
-if (battle_state == BSTATE_ITEM_MENU) {
-    var items = Battle_GetItemList(self);
-    if (array_length(items) <= 0) {
-        Battle_Message(self, Loc_T("battle.menu.no_items", "No items available."), BSTATE_MENU);
-        exit;
-    }
-
-    var item_count = array_length(items);
-    var item_menu_count = item_count + 1; // +1 for Back
-    if (item_index >= item_menu_count) item_index = 0;
-
-    if (k_down) item_index = (item_index + 1) mod item_menu_count;
-    if (k_up)   item_index = (item_index + item_menu_count - 1) mod item_menu_count;
-
-    if (k_back) {
-        battle_state = BSTATE_MENU;
-        exit;
-    }
-
-    if (k_ok) {
-        if (item_index == item_count) {
-            battle_state = BSTATE_MENU;
-        } else {
-            Battle_PlayerItem(self, items[item_index].id);
-        }
-    }
-
+if (battle_state == BSTATE_SKILL_MENU || battle_state == BSTATE_ITEM_MENU) {
+    Battle_MenusStep(self);
     exit;
 }
 

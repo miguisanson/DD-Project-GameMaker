@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T13:13:43Z",
-    "row_count": 1097
+    "generated_at_utc": "2026-10-14T14:45:39Z",
+    "row_count": 1116
   },
   "default_lang": "en",
   "languages": [
@@ -24,17 +24,21 @@
       "en": "{enemy} appeared!",
       "ko": "{enemy} 등장!"
     },
+    "battle.action.guard": {
+      "en": "GUARD",
+      "ko": "방어"
+    },
     "battle.action.item": {
       "en": "ITEM",
-      "ko": "목"
+      "ko": "아이템"
     },
     "battle.action.run": {
       "en": "RUN",
-      "ko": "달리다"
+      "ko": "도망"
     },
     "battle.action.skill": {
       "en": "SKILL",
-      "ko": "기능"
+      "ko": "기술"
     },
     "battle.action.timing.good": {
       "en": "GOOD",
@@ -52,9 +56,65 @@
       "en": "WEAK",
       "ko": "약한"
     },
+    "battle.chip.break.line": {
+      "en": "Takes +50% damage until its next turn.",
+      "ko": "다음 차례까지 받는 피해가 50% 늘어납니다."
+    },
+    "battle.chip.steadfast": {
+      "en": "Steadfast",
+      "ko": "버티기"
+    },
+    "battle.chip.steadfast.line": {
+      "en": "Cannot be stunned.",
+      "ko": "기절하지 않습니다."
+    },
+    "battle.det.hits": {
+      "en": "Hits",
+      "ko": "타수"
+    },
+    "battle.det.hp": {
+      "en": "HP",
+      "ko": "HP"
+    },
+    "battle.det.mp": {
+      "en": "MP",
+      "ko": "MP"
+    },
+    "battle.hint.list": {
+      "en": "{confirm} Choose   {back} Back",
+      "ko": "{confirm} 선택   {back} 뒤로"
+    },
     "battle.hud.break": {
       "en": "BREAK!",
       "ko": "브레이크!"
+    },
+    "battle.hud.hp": {
+      "en": "HP",
+      "ko": "HP"
+    },
+    "battle.hud.level": {
+      "en": "Lv {n}",
+      "ko": "Lv {n}"
+    },
+    "battle.hud.mp": {
+      "en": "MP",
+      "ko": "MP"
+    },
+    "battle.item.cure": {
+      "en": "Cures {status}.",
+      "ko": "{status} 상태를 치료합니다."
+    },
+    "battle.item.heal": {
+      "en": "Restores your HP.",
+      "ko": "HP를 회복합니다."
+    },
+    "battle.item.mp": {
+      "en": "Restores your MP.",
+      "ko": "MP를 회복합니다."
+    },
+    "battle.item.other": {
+      "en": "A useful item.",
+      "ko": "쓸모 있는 물건입니다."
     },
     "battle.menu.back": {
       "en": "Back",
@@ -95,6 +155,10 @@
     "battle.menu.item_row": {
       "en": "{name} x{qty}",
       "ko": "{name} x{qty}"
+    },
+    "battle.menu.mp": {
+      "en": "{mp} MP",
+      "ko": "{mp} MP"
     },
     "battle.menu.no_items": {
       "en": "No items available.",
@@ -995,6 +1059,10 @@
     "combat.msg.gold_gain": {
       "en": "(+{gold} gold)",
       "ko": "(+{gold} 골드)"
+    },
+    "combat.msg.guard": {
+      "en": "You brace yourself.",
+      "ko": "당신은 몸을 웅크립니다."
     },
     "combat.msg.level_up": {
       "en": "Level up x{levels}!",
@@ -4136,6 +4204,10 @@
       "en": "Until hit: take {take}% less, deal {deal}% more damage.",
       "ko": "맞을 때까지: 받는 피해 {take}% 감소, 주는 피해 {deal}% 증가."
     },
+    "status.desc.status_brace": {
+      "en": "Braced for the next hit: it deals {pct}% less damage.",
+      "ko": "다음 공격에 대비합니다. 피해가 {pct}% 줄어듭니다."
+    },
     "status.desc.status_crit_up": {
       "en": "Critical chance +{pct}%.",
       "ko": "치명타 확률 +{pct}%."
@@ -4203,6 +4275,10 @@
     "status.name.status_bloodthirsty": {
       "en": "Bloodthirsty",
       "ko": "피에 굶주린"
+    },
+    "status.name.status_brace": {
+      "en": "Braced",
+      "ko": "방어 태세"
     },
     "status.name.status_burn": {
       "en": "Burning",

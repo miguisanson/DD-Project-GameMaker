@@ -72,6 +72,9 @@ function Input_Init() {
     if (!variable_struct_exists(inp, "last_step_time")) {
         inp.last_step_time = -1;
     }
+    if (!variable_struct_exists(inp, "new_frame")) {
+        inp.new_frame = true;
+    }
     if (!variable_struct_exists(inp, "frame")) {
         inp.frame = 0;
     }
@@ -257,10 +260,19 @@ function Input_GamepadActionPressed(_device, _action, _prev_held, _deadzone) {
 }
 
 
+// Called by the draw of every frame (Display_DrawFrame), after all the Step events: the next frame's first Input_Update recomputes.
+function Input_FrameEnd() {
+    Input_Init();
+    global.input.new_frame = true;
+}
+
 function Input_Update() {
     Input_Init();
     if (variable_struct_exists(global.input, "frozen") && global.input.frozen) return;   // tests inject state (no clock race)
-    if (global.input.last_step_time == current_time) return;
+    // Once per FRAME: the first call after a frame's draw (Input_FrameEnd) recomputes, whatever current_time says (two frames can share one value, and one
+    // frame can span two); the other calls of the same frame (every controller's Step) find the state ready. last_step_time = -1 forces a recompute (tests, taps).
+    if (!global.input.new_frame && global.input.last_step_time != -1) return;
+    global.input.new_frame = false;
     global.input.last_step_time = current_time;
 
     var inp = global.input;
