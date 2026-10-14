@@ -1,6 +1,6 @@
 Input_PreStep();
 var gs = GameState_Get();
-if (gs.ui.mode == UI_MENU || gs.ui.mode == UI_PAUSE) exit;
+if (gs.ui.mode == UI_MENU || gs.ui.mode == UI_PAUSE || Tutorial_IsOpen() || Tutorial_JustClosed()) exit;
 if (battle_over && battle_state != BSTATE_MESSAGE) exit;
 
 // helper input keys
@@ -72,6 +72,8 @@ if (battle_state == BSTATE_MENU) {
         battle_state = BSTATE_ENEMY_ACT;
         exit;
     }
+    Tutorial_Trigger("timeline");   // D45: the first time the strip and the menu are both up
+    if (variable_struct_exists(e, "is_elite") && e.is_elite) Tutorial_Trigger("elite");   // D45: the first elite fight
 
     if (k_down) menu_index = (menu_index + 1) mod menu_count;
     if (k_up)   menu_index = (menu_index + menu_count - 1) mod menu_count;

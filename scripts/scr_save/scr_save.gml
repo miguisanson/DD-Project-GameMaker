@@ -124,6 +124,8 @@ function Save_ReadSettingsConfig(_path = undefined) {
     if (variable_struct_exists(raw, "text_speed")) out.text_speed = raw.text_speed;
     if (variable_struct_exists(raw, "screen_shake")) out.screen_shake = raw.screen_shake;
     if (variable_struct_exists(raw, "qte_assist")) out.qte_assist = raw.qte_assist;
+    // Version 10 (D49): keys, the keyboard keys per rebindable action. An older file has none and gets the default keys.
+    if (settings_version >= 10 && variable_struct_exists(raw, "keys")) out.keys = raw.keys;
 
     // Migrate older configs that defaulted to tiny 1x startup scale.
     if (settings_version < 2) {
@@ -147,7 +149,7 @@ function Save_ReadSettingsConfig(_path = undefined) {
 function Save_WriteSettingsConfig(_settings, _path = undefined) {
     var s = GameSettings_Normalize(_settings);
     var raw = {
-        settings_version: 9,
+        settings_version: 10,
         vol_ui: s.audio_ui,
         vol_sfx: s.audio_sfx,
         vol_bgm: s.audio_bgm,
@@ -156,7 +158,8 @@ function Save_WriteSettingsConfig(_settings, _path = undefined) {
         language: s.language,
         text_speed: s.text_speed,
         screen_shake: s.screen_shake,
-        qte_assist: s.qte_assist
+        qte_assist: s.qte_assist,
+        keys: s.keys
     };
 
     var path = is_undefined(_path) ? Save_SettingsPath() : _path;

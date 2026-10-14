@@ -236,6 +236,9 @@
 #macro QTE_OK "OK"
 #macro QTE_WEAK "WEAK"
 #macro QTE_NO_PRESS -1             // a press time below 0 means "no press" (Weak)
+#macro TUTORIAL_KEY_PREFIX "tutorial:"   // C4 (D45): the profile key of a seen pop-up is this + its id (profile.story_seen)
+#macro QTE_ASSIST_ZONE_MULT 1.5    // D35 QTE assist: the bar and defence zones are this much wider
+#macro QTE_ASSIST_TIME_MULT 1.3    // D35 QTE assist: the arrow sequences get this much more time
 #macro QTE_ZONE_CENTRE_PCT 70      // the bright zone's centre, in percent of the sweep
 #macro QTE_LEAD_IN_MS 250          // the bar is up and the cursor is parked at 0 before the sweep starts
 #macro QTE_EARLY_BUFFER_MS 80      // a press this close before the sweep starts is kept (judged at 0); earlier ones are dropped

@@ -762,6 +762,7 @@ function DialogueTrigger_UpdateCinematic(_tr) {
 
 function UI_IsBlocking() {
     if (Transition_IsInputLocked()) return true;
+    if (Tutorial_IsOpen() || Tutorial_JustClosed()) return true;   // D45: a tutorial pop-up stops the world until it is dismissed
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) return false;
     if (variable_struct_exists(gs.ui, "mode") && gs.ui.mode != UI_NONE) return true;
@@ -1071,6 +1072,7 @@ function UI_InterruptCloseAll(_fade_dim = true) {
     }
 
     CardsUi_Interrupt();   // C2: what is owed opens again afterwards
+    BedUi_Interrupt();     // C4: the bed stays free
     ShopUi_Interrupt();    // C3
 
     if (variable_struct_exists(gs.ui, "settings_popup") && is_struct(gs.ui.settings_popup)) {
@@ -1299,7 +1301,8 @@ function GameSettings_Defaults() {
         language: "en",
         text_speed: 1,    // settings_version 9 (D0): 0 slow, 1 normal, 2 fast (Settings_TextSpeedMul)
         screen_shake: 1,  // 1 on, 0 off
-        qte_assist: 0     // 1 on; the option exists, the more forgiving timing comes with the QTE work
+        qte_assist: 0,    // 1 on: zones x1.5 and arrow time x1.3 (D35, Qte_AssistMult / Qte_AssistTimeMultNow)
+        keys: Binds_Defaults()   // settings_version 10 (D49): the keyboard keys per rebindable action (scr_input, Binds_*)
     };
 }
 
@@ -1316,6 +1319,7 @@ function GameSettings_Normalize(_settings) {
         if (variable_struct_exists(_settings, "text_speed")) out.text_speed = _settings.text_speed;
         if (variable_struct_exists(_settings, "screen_shake")) out.screen_shake = _settings.screen_shake;
         if (variable_struct_exists(_settings, "qte_assist")) out.qte_assist = _settings.qte_assist;
+        if (variable_struct_exists(_settings, "keys")) out.keys = _settings.keys;
     }
 
     out.audio_ui = clamp(GameSettings_ToReal(out.audio_ui, VOL_UI_DEFAULT), 0, 1);
@@ -1327,6 +1331,7 @@ function GameSettings_Normalize(_settings) {
     out.text_speed = clamp(round(GameSettings_ToReal(out.text_speed, 1)), 0, SETTINGS_TEXT_SPEED_MAX);
     out.screen_shake = (GameSettings_ToReal(out.screen_shake, 1) != 0) ? 1 : 0;
     out.qte_assist = (GameSettings_ToReal(out.qte_assist, 0) != 0) ? 1 : 0;
+    out.keys = Binds_Normalize(out.keys);
     return out;
 }
 
@@ -1354,6 +1359,7 @@ function GameSettings_ApplyAll() {
     var settings = GameSettings_Ensure();
     Loc_SetLanguage(settings.language);
     GameSettings_ApplyAudio();
+    Binds_Apply(settings.keys);   // D49: the player's keys
 }
 
 // Settings > Apply: the only caller that asks the display for something (boot does the same from Display_Init).

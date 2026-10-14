@@ -5,6 +5,7 @@ Banner_Step();     // C5 (D106): the boss name banner (about 1 s)
 var gs = GameState_Get();
 Transition_Update();
 UI_UpdateModalDimState();
+if (Tutorial_Step()) exit;   // C4 (D45): a tutorial pop-up takes every key until it is dismissed
 
 if (!variable_instance_exists(id, "hud_hurt_flash_timer")) hud_hurt_flash_timer = 0;
 if (!variable_instance_exists(id, "hud_prev_hp")) hud_prev_hp = -1;
@@ -64,7 +65,7 @@ if (gs.ui.mode == UI_BED) {
     exit;
 }
 
-if (SettingsPopup_IsOpen("pause")) {
+if (SettingsPopup_IsOpen("pause") || HelpUi_IsOpen()) {
     PauseMenu_HandleInput();
     exit;
 }

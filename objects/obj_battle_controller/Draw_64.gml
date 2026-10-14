@@ -479,3 +479,5 @@ if (battle_state == BSTATE_SKILL_MENU || battle_state == BSTATE_ITEM_MENU) {
         }
     }
 }
+
+Tutorial_Draw();   // C4 (D45): the first-time pop-up goes over the whole battle screen (the ui controller draws it in the other rooms)

@@ -44,11 +44,15 @@ function Input_Init() {
 
     inp.bindings.debug_toggle = [ord("P")];
     // D95: the same keys in every menu. Confirm = Space, Z, Enter (+ pad A); back = Esc, X (+ pad B); tabs = Q / E (+ pad shoulders).
-    // Rewritten on every init so an older table in memory gets them too. Interact stays on Space.
-    inp.bindings.confirm = [vk_space, ord("Z"), vk_enter];
-    inp.bindings.cancel = [vk_escape, ord("X")];
-    inp.bindings.tab_prev = [ord("Q")];
-    inp.bindings.tab_next = [ord("E")];
+    // Rewritten on every init so an older table in memory gets them too. Interact stays on Space. Once the settings have applied the
+    // player's own keys (Binds_Apply, D49) the table is theirs and is left alone.
+    if (!variable_struct_exists(inp, "binds_applied") || !inp.binds_applied) {
+        inp.bindings.confirm = [vk_space, ord("Z"), vk_enter];
+        inp.bindings.cancel = [vk_escape, ord("X")];
+        inp.bindings.tab_prev = [ord("Q")];
+        inp.bindings.tab_next = [ord("E")];
+    }
+    if (!variable_struct_exists(inp, "last_device")) inp.last_device = "keyboard";   // D92: what the prompts show
     if (!variable_struct_exists(inp.bindings, "pause")) inp.bindings.pause = [vk_escape];
     if (!variable_struct_exists(inp.bindings, "run")) inp.bindings.run = [vk_shift];
     if (!variable_struct_exists(inp.bindings, "debug_levelup")) inp.bindings.debug_levelup = [ord("L")];
@@ -127,6 +131,8 @@ function Input_KeyLabel(_key) {
         case vk_tab: return "Tab";
         case vk_backspace: return "Backspace";
         case vk_delete: return "Delete";
+        case vk_shift: return "Shift";
+        case vk_control: return "Ctrl";
         case vk_up: return "Up";
         case vk_down: return "Down";
         case vk_left: return "Left";
@@ -328,6 +334,7 @@ function Input_Update() {
             inp.move_order = order;
         }
     }
+    inp.last_device = Prompt_DeviceStep(inp.last_device, Prompt_KeyboardActivity(), Prompt_PadActivity(gp_device, pad_deadzone));   // D92
     Scenario_InputOverride();   // scr_debug: no-op unless run with -bot
 }
 
@@ -561,4 +568,473 @@ function Skip_DrawHint() {
     draw_set_alpha(_a);
     draw_set_halign(_h);
     draw_set_valign(_v);
+}
+
+// ============================================================================================================================
+// C4 (D49): key rebinding model. The pure part (rows, defaults, assigning with swaps, normalising, the action table) has no input or
+// draw calls and is tested by Test_Suite_Binds. A row is one thing the player rebinds; it feeds one or more input actions.
+//   keys = { confirm: [..], back: [..], up: [..], down: [..], left: [..], right: [..], run: [..], tab_prev: [..], tab_next: [..], interact: [..] }
+// The first key of a row is its main key (the one prompts show). The settings keep the table (settings_version 10); the gamepad is not
+// rebindable and stays as Input_GamepadButtons says. ctx says where an action is used: "menu", "world", or "both" (directions);
+// two rows conflict only when their places overlap, so Interact (world) and Confirm (menu) may share Space.
+// ============================================================================================================================
+#macro BINDS_MAX_KEYS 3
+
+function Binds_RowDefs() {
+    if (!variable_global_exists("binds_rows") || !is_array(global.binds_rows)) {
+        global.binds_rows = [
+            { id: "confirm",  actions: ["confirm"],             ctx: "menu",  label: "Confirm" },
+            { id: "back",     actions: ["cancel"],              ctx: "menu",  label: "Back" },
+            { id: "up",       actions: ["move_up", "menu_up"],       ctx: "both", label: "Up" },
+            { id: "down",     actions: ["move_down", "menu_down"],   ctx: "both", label: "Down" },
+            { id: "left",     actions: ["move_left", "menu_left"],   ctx: "both", label: "Left" },
+            { id: "right",    actions: ["move_right", "menu_right"], ctx: "both", label: "Right" },
+            { id: "run",      actions: ["run"],                 ctx: "world", label: "Run" },
+            { id: "tab_prev", actions: ["tab_prev"],            ctx: "menu",  label: "Previous tab" },
+            { id: "tab_next", actions: ["tab_next"],            ctx: "menu",  label: "Next tab" },
+            { id: "interact", actions: ["interact"],            ctx: "world", label: "Interact" }
+        ];
+    }
+    return global.binds_rows;
+}
+
+function Binds_RowIds() {
+    var rows = Binds_RowDefs();
+    var out = [];
+    for (var i = 0; i < array_length(rows); i++) array_push(out, rows[i].id);
+    return out;
+}
+
+function Binds_Row(_id) {
+    var rows = Binds_RowDefs();
+    for (var i = 0; i < array_length(rows); i++) if (rows[i].id == _id) return rows[i];
+    return undefined;
+}
+
+function Binds_RowLabel(_id) {
+    var r = Binds_Row(_id);
+    if (!is_struct(r)) return string(_id);
+    return Loc_T("controls.row." + _id, r.label);
+}
+
+function Binds_Defaults() {
+    return {
+        confirm: [vk_space, ord("Z"), vk_enter],
+        back: [vk_escape, ord("X")],
+        up: [ord("W"), vk_up],
+        down: [ord("S"), vk_down],
+        left: [ord("A"), vk_left],
+        right: [ord("D"), vk_right],
+        run: [vk_shift],
+        tab_prev: [ord("Q")],
+        tab_next: [ord("E")],
+        interact: [vk_space]
+    };
+}
+
+function Binds_Copy(_keys) {
+    var out = {};
+    var ids = Binds_RowIds();
+    for (var i = 0; i < array_length(ids); i++) {
+        var src = (is_struct(_keys) && variable_struct_exists(_keys, ids[i])) ? variable_struct_get(_keys, ids[i]) : [];
+        var dst = [];
+        if (is_array(src)) for (var k = 0; k < array_length(src); k++) array_push(dst, src[k]);
+        variable_struct_set(out, ids[i], dst);
+    }
+    return out;
+}
+
+function Binds_KeyValid(_k) {
+    return is_real(_k) && _k == floor(_k) && _k >= 8 && _k <= 255;
+}
+
+// Keys the player cannot give to an action: the ones other parts of the game own (Esc = pause and cancel-the-capture, Tab / I = the
+// menu, P = the debug overlay, F1-F12 = the debug keys).
+function Binds_Reserved(_k) {
+    return _k == vk_escape || _k == vk_tab || _k == ord("I") || _k == ord("P") || (_k >= vk_f1 && _k <= vk_f12);
+}
+
+function Binds_Allowed(_k) {
+    if (_k >= ord("A") && _k <= ord("Z")) return true;
+    if (_k >= ord("0") && _k <= ord("9")) return true;
+    return _k == vk_space || _k == vk_enter || _k == vk_up || _k == vk_down || _k == vk_left || _k == vk_right
+        || _k == vk_shift || _k == vk_control || _k == vk_backspace || _k == vk_delete;
+}
+
+function Binds_CanCapture(_k) {
+    return Binds_KeyValid(_k) && Binds_Allowed(_k) && !Binds_Reserved(_k);
+}
+
+function Binds_NormalizeRow(_raw, _default) {
+    if (!is_array(_raw)) return _default;
+    var out = [];
+    for (var i = 0; i < array_length(_raw); i++) {
+        if (array_length(out) >= BINDS_MAX_KEYS) break;
+        var k = _raw[i];
+        if (!Binds_KeyValid(k)) continue;
+        if (array_contains(out, k)) continue;
+        array_push(out, k);
+    }
+    if (array_length(out) == 0) return _default;
+    return out;
+}
+
+// Anything (a file, an old struct, nothing) -> a complete, valid table. A row that is missing, the wrong type or empty gets its default.
+function Binds_Normalize(_raw) {
+    var out = Binds_Defaults();
+    if (!is_struct(_raw)) return out;
+    var ids = Binds_RowIds();
+    for (var i = 0; i < array_length(ids); i++) {
+        if (variable_struct_exists(_raw, ids[i])) {
+            variable_struct_set(out, ids[i], Binds_NormalizeRow(variable_struct_get(_raw, ids[i]), variable_struct_get(out, ids[i])));
+        }
+    }
+    return out;
+}
+
+function Binds_CtxOverlap(_a, _b) {
+    return _a == "both" || _b == "both" || _a == _b;
+}
+
+// Every other row that is used in the same place and already holds _key.
+function Binds_Conflicts(_keys, _row, _key) {
+    var out = [];
+    var me = Binds_Row(_row);
+    var rows = Binds_RowDefs();
+    for (var i = 0; i < array_length(rows); i++) {
+        if (rows[i].id == _row) continue;
+        if (is_struct(me) && !Binds_CtxOverlap(me.ctx, rows[i].ctx)) continue;
+        if (variable_struct_exists(_keys, rows[i].id) && array_contains(variable_struct_get(_keys, rows[i].id), _key)) array_push(out, rows[i].id);
+    }
+    return out;
+}
+
+// The first of them, or "".
+function Binds_Conflict(_keys, _row, _key) {
+    var c = Binds_Conflicts(_keys, _row, _key);
+    return (array_length(c) > 0) ? c[0] : "";
+}
+
+function Binds_IndexOf(_arr, _v) {
+    for (var i = 0; i < array_length(_arr); i++) if (_arr[i] == _v) return i;
+    return -1;
+}
+
+// Gives _key to a row as its main key. A key the row already has swaps places with its main key. A new key replaces the main key; if
+// another row used in the same place already has it, that row takes the old main key in its place (a swap, nothing is left unbound).
+// Returns { ok, reason ("", "unknown", "unusable", "reserved"), keys (a changed copy), swapped (the id of the first row that was swapped, or "") }.
+function Binds_Assign(_keys, _row, _key) {
+    var out = { ok: false, reason: "", keys: Binds_Copy(_keys), swapped: "" };
+    if (!is_struct(Binds_Row(_row))) { out.reason = "unknown"; return out; }
+    if (!Binds_KeyValid(_key) || !Binds_Allowed(_key)) { out.reason = "unusable"; return out; }
+    if (Binds_Reserved(_key)) { out.reason = "reserved"; return out; }
+    var cur = variable_struct_get(out.keys, _row);
+    if (array_length(cur) == 0) cur = variable_struct_get(Binds_Defaults(), _row);
+    var a0 = cur[0];
+    var idx = Binds_IndexOf(cur, _key);
+    if (idx == 0) { out.ok = true; variable_struct_set(out.keys, _row, cur); return out; }
+    if (idx > 0) {
+        cur[idx] = a0;
+        cur[0] = _key;
+        variable_struct_set(out.keys, _row, cur);
+        out.ok = true;
+        return out;
+    }
+    var others = Binds_Conflicts(out.keys, _row, _key);
+    for (var o = 0; o < array_length(others); o++) {
+        var oc = variable_struct_get(out.keys, others[o]);
+        var oi = Binds_IndexOf(oc, _key);
+        if (array_contains(oc, a0)) array_delete(oc, oi, 1); else oc[oi] = a0;
+        if (out.swapped == "") out.swapped = others[o];
+    }
+    cur[0] = _key;
+    variable_struct_set(out.keys, _row, cur);
+    out.ok = true;
+    return out;
+}
+
+// The input system's table: action name -> keys.
+function Binds_ToActions(_keys) {
+    var out = {};
+    var rows = Binds_RowDefs();
+    var keys = Binds_Normalize(_keys);
+    for (var i = 0; i < array_length(rows); i++) {
+        var src = variable_struct_get(keys, rows[i].id);
+        for (var a = 0; a < array_length(rows[i].actions); a++) {
+            var dst = [];
+            for (var k = 0; k < array_length(src); k++) array_push(dst, src[k]);
+            variable_struct_set(out, rows[i].actions[a], dst);
+        }
+    }
+    return out;
+}
+
+// Puts a key table into the live input system (boot, Apply, load). From here Input_Init leaves the table alone.
+function Binds_Apply(_keys) {
+    Input_Init();
+    var acts = Binds_ToActions(_keys);
+    var names = variable_struct_get_names(acts);
+    for (var i = 0; i < array_length(names); i++) variable_struct_set(global.input.bindings, names[i], variable_struct_get(acts, names[i]));
+    global.input.binds_applied = true;
+}
+
+function Binds_KeysText(_arr) {
+    if (!is_array(_arr) || array_length(_arr) == 0) return "";
+    var out = "";
+    for (var i = 0; i < array_length(_arr); i++) out += ((i > 0) ? " / " : "") + Input_KeyLabel(_arr[i]);
+    return out;
+}
+
+// ============================================================================================================================
+// C4 (D92): button prompts. The device the player touched last decides the glyph; the labels come from the live key table, so a
+// rebound key shows as the new key. Prompt_Info / Prompt_Text are pure reads; the drawing (code-drawn keycap and round buttons in the
+// four palette colours) is below, next to the text layout that lets a sentence hold prompts: "Press {confirm} to go on".
+// ============================================================================================================================
+
+// Which device was used last, from this frame's activity (pure). Both in the same frame keeps what it was.
+function Prompt_DeviceStep(_cur, _kb, _pad) {
+    if (_kb && !_pad) return "keyboard";
+    if (_pad && !_kb) return "gamepad";
+    return _cur;
+}
+
+function Prompt_KeyboardActivity() {
+    return keyboard_check_pressed(vk_anykey) || mouse_check_button_pressed(mb_any);
+}
+
+function Prompt_PadActivity(_device, _deadzone) {
+    if (_device < 0) return false;
+    var btns = [gp_face1, gp_face2, gp_face3, gp_face4, gp_shoulderl, gp_shoulderr, gp_shoulderlb, gp_shoulderrb, gp_start, gp_select, gp_padu, gp_padd, gp_padl, gp_padr];
+    for (var i = 0; i < array_length(btns); i++) if (gamepad_button_check_pressed(_device, btns[i])) return true;
+    var axes = [gp_axislh, gp_axislv, gp_axisrh, gp_axisrv];
+    for (var a = 0; a < array_length(axes); a++) if (abs(gamepad_axis_value(_device, axes[a])) >= max(0.6, _deadzone)) return true;
+    return false;
+}
+
+function Prompt_Device() {
+    Input_Init();
+    return global.input.last_device;
+}
+
+// Row names (the rebinding page) and action names (the input system) both work.
+function Prompt_ActionOfRow(_name) {
+    switch (_name) {
+        case "back": return "cancel";
+        case "up": return "move_up";
+        case "down": return "move_down";
+        case "left": return "move_left";
+        case "right": return "move_right";
+    }
+    return _name;
+}
+
+function Prompt_PadLabel(_action) {
+    switch (_action) {
+        case "confirm":
+        case "interact": return "A";
+        case "cancel":
+        case "back": return "B";
+        case "menu": return "X";
+        case "pause": return "Y";
+        case "tab_prev": return "LB";
+        case "tab_next": return "RB";
+        case "run": return "LT";
+        case "up": case "down": case "left": case "right":
+        case "move_up": case "move_down": case "move_left": case "move_right":
+        case "menu_up": case "menu_down": case "menu_left": case "menu_right": return "D-Pad";
+    }
+    return string(_action);
+}
+
+// { kind: "key" | "pad", label, action }: what to draw for an action on a device (the live one when _device is undefined).
+function Prompt_Info(_action, _device = undefined) {
+    var dev = is_undefined(_device) ? Prompt_Device() : _device;
+    if (dev == "gamepad") return { kind: "pad", label: Prompt_PadLabel(_action), action: _action };
+    Input_Init();
+    var act = Prompt_ActionOfRow(_action);
+    var label = string(_action);
+    if (variable_struct_exists(global.input.bindings, act)) {
+        var keys = variable_struct_get(global.input.bindings, act);
+        if (is_struct(keys) && variable_struct_exists(keys, "keys")) keys = keys.keys;
+        if (is_array(keys) && array_length(keys) > 0) {
+            var code = keys[0];
+            if (is_string(code)) code = Input_KeyCodeFromName(code);
+            label = Input_KeyLabel(code);
+        }
+    }
+    return { kind: "key", label: label, action: _action };
+}
+
+function Prompt_Text(_action, _device = undefined) {
+    return Prompt_Info(_action, _device).label;
+}
+
+// The action names a sentence may hold between braces. Anything else in braces stays plain text.
+function Prompt_IsAction(_name) {
+    switch (_name) {
+        case "confirm": case "back": case "cancel": case "up": case "down": case "left": case "right":
+        case "interact": case "run": case "tab_prev": case "tab_next": case "menu": case "pause": return true;
+    }
+    return false;
+}
+
+function Prompt_HasTokens(_text) {
+    return string_pos("{", string(_text)) > 0 && Prompt_TokensHaveAction(Prompt_Tokens(_text));
+}
+
+function Prompt_TokensHaveAction(_toks) {
+    for (var i = 0; i < array_length(_toks); i++) if (_toks[i].kind == "action") return true;
+    return false;
+}
+
+// "Press {confirm} to go" -> [{ kind: "text", s: "Press " }, { kind: "action", s: "confirm" }, { kind: "text", s: " to go" }]
+function Prompt_Tokens(_text) {
+    var out = [];
+    var s = string(_text);
+    var buf = "";
+    while (string_length(s) > 0) {
+        var o = string_pos("{", s);
+        if (o == 0) { buf += s; break; }
+        var rest = string_delete(s, 1, o);
+        var c = string_pos("}", rest);
+        var inner = (c > 1) ? string_copy(rest, 1, c - 1) : "";
+        if (c > 1 && Prompt_IsAction(inner)) {
+            buf += string_copy(s, 1, o - 1);
+            if (buf != "") array_push(out, { kind: "text", s: buf });
+            buf = "";
+            array_push(out, { kind: "action", s: inner });
+            s = string_delete(rest, 1, c);
+        } else {
+            buf += string_copy(s, 1, o);
+            s = rest;
+        }
+    }
+    if (buf != "") array_push(out, { kind: "text", s: buf });
+    return out;
+}
+
+// The sentence with each prompt replaced by its label ("Press A."): for logs and places that cannot draw glyphs.
+function Prompt_Plain(_text, _device = undefined) {
+    var toks = Prompt_Tokens(_text);
+    var out = "";
+    for (var i = 0; i < array_length(toks); i++) out += (toks[i].kind == "text") ? toks[i].s : Prompt_Text(toks[i].s, _device);
+    return out;
+}
+
+// ---- drawing: the glyphs and sentences with prompts (GUI grid, palette colours, whole multiples of one font pixel) ----
+function Prompt_GlyphH() {
+    var mt = Ui_Metrics();
+    return max(5, round(mt.line_h / mt.p)) * mt.p;
+}
+
+function Prompt_GlyphW(_info) {
+    var mt = Ui_Metrics();
+    var tw = UI_TextWidth(_info.label);
+    var h = Prompt_GlyphH();
+    var w = (_info.kind == "pad") ? max(h, tw + 3 * mt.p) : max(h, tw + 4 * mt.p);
+    return ceil(w / mt.p) * mt.p;
+}
+
+// Draws one glyph with its top-left at (_x, _y), one text line tall. Keyboard: a keycap (light outline, dark face, a lower edge).
+// Pad: a light round button (a pill for LB / RB / D-Pad) with the label cut out in dark. Returns its width.
+function Prompt_DrawGlyph(_x, _y, _info, _alpha = 1) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var w = Prompt_GlyphW(_info);
+    var h = Prompt_GlyphH();
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    if (_info.kind == "pad") {
+        var hc = h / p;
+        var wc = w / p;
+        var rad = hc / 2;
+        for (var r = 0; r < hc; r++) {
+            var yc = r + 0.5 - rad;
+            var inset = round(rad - sqrt(max(0, rad * rad - yc * yc)));
+            Ui_Box(_x + inset * p, _y + r * p, _x + (wc - inset) * p, _y + (r + 1) * p, UI_C_LIGHTEST);
+        }
+        Ui_Text(_x + w / 2, _y + (h - mt.line_h) div 2, _info.label, UI_C_DARKEST, fa_center);
+    } else {
+        Ui_Box(_x + p, _y, _x + w - p, _y + h, UI_C_LIGHTEST);
+        Ui_Box(_x, _y + p, _x + w, _y + h - p, UI_C_LIGHTEST);
+        Ui_Box(_x + p, _y + p, _x + w - p, _y + h - 2 * p, UI_C_DARK);
+        Ui_Box(_x + p, _y + h - 2 * p, _x + w - p, _y + h - p, UI_C_LIGHT);   // the key's lower edge
+        Ui_Text(_x + w / 2, _y + (h - 2 * p - mt.line_h) div 2 + p, _info.label, UI_C_LIGHTEST, fa_center);
+    }
+    draw_set_alpha(a0);
+    return w;
+}
+
+// Lays a sentence with prompts out in a column _w wide. Returns { items, h, lines, line_w }: each item is a word or a glyph with its
+// own x, y (line pitch = one text line + one font pixel) and line number. On a pad, a run of direction prompts shows one D-Pad.
+function Prompt_RichLayout(_text, _w, _device = undefined) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var pitch = mt.line_h + p;
+    var space_w = max(p, UI_TextWidth("a a") - UI_TextWidth("aa"));
+    var toks = Prompt_Tokens(_text);
+    var items = [];
+    var line_w = [0];
+    var cx = 0;
+    var line = 0;
+    var pending = false;
+    var dev = is_undefined(_device) ? Prompt_Device() : _device;
+    var last_dir = false;
+    for (var t = 0; t < array_length(toks); t++) {
+        var tk = toks[t];
+        if (tk.kind == "action") {
+            var is_dir = (tk.s == "up" || tk.s == "down" || tk.s == "left" || tk.s == "right");
+            if (dev == "gamepad" && is_dir && last_dir) continue;   // one D-Pad stands for the whole run
+            var info = Prompt_Info(tk.s, dev);
+            var gw = Prompt_GlyphW(info);
+            if (cx > 0 && pending) cx += space_w;
+            if (cx > 0 && cx + gw > _w) { line_w[line] = cx; line++; array_push(line_w, 0); cx = 0; }
+            array_push(items, { kind: "glyph", info: info, x: cx, y: line * pitch, line: line, w: gw });
+            cx += gw;
+            pending = false;
+            last_dir = is_dir;
+            continue;
+        }
+        var s = tk.s;
+        var word = "";
+        var n = string_length(s);
+        if (n > 0 && (string_char_at(s, 1) == " " || string_char_at(s, 1) == "\n")) pending = (cx > 0) || pending;
+        for (var i = 1; i <= n + 1; i++) {
+            var ch = (i <= n) ? string_char_at(s, i) : " ";
+            if (ch == " " || ch == "\n") {
+                if (word != "") {
+                    var ww = UI_TextWidth(word);
+                    if (cx > 0 && pending) cx += space_w;
+                    if (cx > 0 && cx + ww > _w) { line_w[line] = cx; line++; array_push(line_w, 0); cx = 0; }
+                    array_push(items, { kind: "word", s: word, x: cx, y: line * pitch, line: line, w: ww });
+                    cx += ww;
+                    pending = false;
+                    last_dir = false;
+                    word = "";
+                }
+                if (ch == "\n" && i <= n) { line_w[line] = cx; line++; array_push(line_w, 0); cx = 0; pending = false; }
+                else if (i <= n) pending = true;
+            } else {
+                word += ch;
+            }
+        }
+        if (n > 0 && string_char_at(s, n) != " " && string_char_at(s, n) != "\n") pending = false;
+    }
+    line_w[line] = cx;
+    return { items: items, h: (line + 1) * pitch - p, lines: line + 1, line_w: line_w };
+}
+
+// Draws a sentence with prompts, top-left (_x, _y) or centred on _x + _w / 2 with _halign = fa_center.
+function Prompt_RichDraw(_x, _y, _text, _w, _col, _halign = fa_left, _alpha = 1) {
+    var lay = Prompt_RichLayout(_text, _w);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    for (var i = 0; i < array_length(lay.items); i++) {
+        var it = lay.items[i];
+        var off = (_halign == fa_center) ? round((_w - lay.line_w[it.line]) / 2) : 0;
+        if (it.kind == "glyph") Prompt_DrawGlyph(_x + off + it.x, _y + it.y, it.info, _alpha);
+        else Ui_Text(_x + off + it.x, _y + it.y, it.s, _col);
+    }
+    draw_set_alpha(a0);
+    return lay.h;
 }

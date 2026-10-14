@@ -649,6 +649,7 @@ function Battle_StaggerHit(_bc, _power, _stun_skill, _perfect, _hits = 1) {
     if (!is_struct(e) || e.hp <= 0) return "";
     var gain = Stagger_Gain(_power, _stun_skill, _perfect) * max(1, _hits);
     _bc.stagger_flash_start = current_time;
+    Tutorial_Trigger("stagger");   // D45: the first time the meter fills
     if (!Stagger_Add(e, gain)) return "";
     Turn_Push(_bc.tl, TL_ENEMY);   // pushed back one turn
     _bc.tl_slide_start = current_time;
@@ -803,13 +804,33 @@ function Qte_WeaponKind(_weapon) {
     return "default";
 }
 
-// D35: the one accessibility setting, a multiplier that widens every zone. 1 until the settings screen stores one (GAP-09).
+// D35: the one accessibility setting (Settings > QTE assist). On, every zone of the sliding bar and the defence bar is x1.5 wider, and the
+// arrow sequences get x1.3 the time (the time bar and the Perfect window; a wrong press still costs the same). Pure by the flag; the live
+// readers below take the flag from the settings. qte_window_mult is the older hook (1 to 3) and still multiplies the zones when set.
+function Qte_AssistZoneMult(_on) {
+    return _on ? QTE_ASSIST_ZONE_MULT : 1;
+}
+
+function Qte_AssistTimeMult(_on) {
+    return _on ? QTE_ASSIST_TIME_MULT : 1;
+}
+
+function Qte_AssistOn() {
+    var gs = GameState_Get();
+    return is_struct(gs) && variable_struct_exists(gs, "settings") && is_struct(gs.settings) && variable_struct_exists(gs.settings, "qte_assist") && (gs.settings.qte_assist != 0);
+}
+
 function Qte_AssistMult() {
     var gs = GameState_Get();
+    var m = Qte_AssistZoneMult(Qte_AssistOn());
     if (is_struct(gs) && variable_struct_exists(gs, "settings") && is_struct(gs.settings) && variable_struct_exists(gs.settings, "qte_window_mult")) {
-        return clamp(real(gs.settings.qte_window_mult), 1, 3);
+        m *= clamp(real(gs.settings.qte_window_mult), 1, 3);
     }
-    return 1;
+    return m;
+}
+
+function Qte_AssistTimeMultNow() {
+    return Qte_AssistTimeMult(Qte_AssistOn());
 }
 
 // Milliseconds one frame adds to the QTE clock, from delta_time (microseconds). Capped so a hitch cannot skip the bar (QTE-01, QTE-14).
@@ -1190,6 +1211,7 @@ function Battle_AttackTimingBegin(_bc) {
     _bc.qte_press_ms = QTE_NO_PRESS;
     _bc.qte_active = true;
     _bc.battle_state = BSTATE_ATTACK_TIMING;
+    Tutorial_Trigger("bar");   // D45: the clock waits behind the pop-up (the battle controller does not step)
 }
 
 // The enemy shake and the small camera shakes of a landed hit. After a Perfect's hit-stop Step_0 calls this again, so the freeze comes first.
@@ -1359,7 +1381,7 @@ function Battle_SkillQteBegin(_bc, _skill_id) {
     }
 
     _bc.sq_skill = _skill_id;
-    _bc.sq_st = Qte_SeqNew(Qte_SkillSequence(_skill_id), Qte_AssistMult(), Qte_PerfectWiden(p));
+    _bc.sq_st = Qte_SeqNew(Qte_SkillSequence(_skill_id), Qte_AssistTimeMultNow(), Qte_PerfectWiden(p));   // D35: assist = more time
     _bc.sq_ms = -QTE_SEQ_LEAD_IN_MS;   // the arrows are up and the clock waits; the press that chose the skill cannot count
     _bc.sq_wrong_ms = 0;
     _bc.sq_pop_ms = 0;
@@ -1368,6 +1390,7 @@ function Battle_SkillQteBegin(_bc, _skill_id) {
     _bc.skill_banner_active = true;
     _bc.skill_banner_name = skill.name;
     _bc.battle_state = BSTATE_SKILL_QTE;
+    Tutorial_Trigger("arrows");   // D45
 }
 
 // One Step of the sequence. Presses are read like the attack bar's: stamped with the clock at the top of the Step that sees them.
@@ -1533,6 +1556,7 @@ function Battle_ThrowBegin(_bc, _item_id) {
     _bc.qte_press_ms = QTE_NO_PRESS;
     _bc.qte_active = true;
     _bc.battle_state = BSTATE_ATTACK_TIMING;
+    Tutorial_Trigger("throwables");   // C4 (D45)
 }
 
 function Battle_ThrowResolve(_bc, _timing) {
@@ -1907,6 +1931,7 @@ function Battle_DefenceStart(_bc, _skill, _res, _follow_state, _player_hp_before
         SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, QTE_TELEGRAPH_MS * 60 div 1000, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
     }
     _bc.battle_state = BSTATE_ENEMY_DEFENCE;
+    Tutorial_Trigger("defence");   // D45
 }
 
 // One Step: the same bar rules as the basic attack. A press before the sweep (the telegraph, mashing) is dropped; no press at all is Weak.
