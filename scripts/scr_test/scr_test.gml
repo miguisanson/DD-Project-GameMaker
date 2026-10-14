@@ -96,6 +96,7 @@ function Test_RunAll() {
     Test_RunSuite("Tutorial", Test_Suite_Tutorial);
     Test_RunSuite("Bed", Test_Suite_Bed);
     Test_RunSuite("Economy", Test_Suite_Economy);
+    Test_RunSuite("BalanceD111", Test_Suite_BalanceD111);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     Test_RunSuite("Mem", Test_Suite_Mem);
     Test_RunSuite("Input", Test_Suite_Input);
@@ -226,11 +227,11 @@ function Test_Suite_Stats() {
     Test_Eq("vec mp_2_10_39", Resource_MaxMp(2, 10, 39), 47);
     Test_Eq("vec mp_2_1_12", Resource_MaxMp(2, 1, 12), 16);
     Test_Eq("vec mp_1_5_4", Resource_MaxMp(1, 5, 4), 16);
-    Test_ClassAt("vec cls_knight_1", CLASS_KNIGHT, 1, 11, 12, 8, 3, 10, 11);
-    Test_ClassAt("vec cls_knight_2", CLASS_KNIGHT, 2, 12, 14, 8, 3, 17, 12);
-    Test_ClassAt("vec cls_knight_3", CLASS_KNIGHT, 3, 13, 16, 8, 3, 24, 13);
-    Test_ClassAt("vec cls_knight_5", CLASS_KNIGHT, 5, 15, 20, 8, 3, 38, 15);
-    Test_ClassAt("vec cls_knight_10", CLASS_KNIGHT, 10, 20, 30, 8, 3, 73, 20);
+    Test_ClassAt("vec cls_knight_1", CLASS_KNIGHT, 1, 11, 12, 10, 3, 10, 11);
+    Test_ClassAt("vec cls_knight_2", CLASS_KNIGHT, 2, 12, 14, 10, 3, 17, 12);
+    Test_ClassAt("vec cls_knight_3", CLASS_KNIGHT, 3, 13, 16, 10, 3, 24, 13);
+    Test_ClassAt("vec cls_knight_5", CLASS_KNIGHT, 5, 15, 20, 10, 3, 38, 15);
+    Test_ClassAt("vec cls_knight_10", CLASS_KNIGHT, 10, 20, 30, 10, 3, 73, 20);
     Test_ClassAt("vec cls_archer_1", CLASS_ARCHER, 1, 9, 8, 13, 4, 10, 12);
     Test_ClassAt("vec cls_archer_2", CLASS_ARCHER, 2, 11, 8, 14, 4, 16, 14);
     Test_ClassAt("vec cls_archer_3", CLASS_ARCHER, 3, 13, 8, 15, 4, 22, 16);
@@ -242,10 +243,10 @@ function Test_Suite_Stats() {
     Test_ClassAt("vec cls_mage_5", CLASS_MAGE, 5, 5, 7, 10, 24, 30, 30);
     Test_ClassAt("vec cls_mage_10", CLASS_MAGE, 10, 5, 7, 10, 39, 55, 47);
     Test_ClassAt("vec cls_nobody_1", CLASS_NOBODY, 1, 8, 8, 9, 3, 10, 11);
-    Test_ClassAt("vec cls_nobody_2", CLASS_NOBODY, 2, 10, 8, 9, 3, 16, 12);
-    Test_ClassAt("vec cls_nobody_3", CLASS_NOBODY, 3, 11, 9, 9, 3, 22, 13);
-    Test_ClassAt("vec cls_nobody_5", CLASS_NOBODY, 5, 13, 9, 10, 4, 34, 16);
-    Test_ClassAt("vec cls_nobody_10", CLASS_NOBODY, 10, 20, 10, 11, 5, 64, 21);
+    Test_ClassAt("vec cls_nobody_2", CLASS_NOBODY, 2, 10, 8, 10, 3, 16, 12);
+    Test_ClassAt("vec cls_nobody_3", CLASS_NOBODY, 3, 11, 9, 10, 4, 22, 14);
+    Test_ClassAt("vec cls_nobody_5", CLASS_NOBODY, 5, 14, 10, 11, 5, 34, 16);
+    Test_ClassAt("vec cls_nobody_10", CLASS_NOBODY, 10, 22, 12, 14, 7, 64, 22);
     Test_Eq("vec exp_1", Exp_NextLevel(1), 12);
     Test_Eq("vec exp_2", Exp_NextLevel(2), 24);
     Test_Eq("vec exp_3", Exp_NextLevel(3), 40);
@@ -264,8 +265,8 @@ function Test_Suite_Stats() {
     Test_EnemyAt("vec en_dire_wolf_4", ENEMY_DIREWOLF, 4, 11, 9, 11, 6, 27);
     Test_EnemyAt("vec en_ghost_sword_6", ENEMY_GHOSTSWORD, 6, 14, 12, 12, 10, 40);
     Test_EnemyAt("vec en_stranger_8", ENEMY_STRANGER, 8, 16, 14, 13, 15, 53);
-    Test_EnemyAt("vec en_palehorn_8", ENEMY_MINI_BOSS, 8, 18, 16, 12, 14, 67);
-    Test_EnemyAt("vec en_choirbeast_10", ENEMY_FINAL_BOSS, 10, 21, 18, 14, 19, 88);
+    Test_EnemyAt("vec en_palehorn_8", ENEMY_MINI_BOSS, 8, 18, 18, 12, 14, 97);
+    Test_EnemyAt("vec en_choirbeast_10", ENEMY_FINAL_BOSS, 10, 21, 24, 14, 19, 194);
     Test_Eq("vec run_8_9", Battle_RunChance(8, 9), 0.45);
     Test_Eq("vec run_13_9", Battle_RunChance(13, 9), 0.7);
     Test_Eq("vec run_30_5", Battle_RunChance(30, 5), 0.95);
@@ -292,7 +293,7 @@ function Test_Suite_Stats() {
     Test_True("STAT-01 more MAG gives more max MP", _wiz.max_mp > _lo.max_mp);
     Test_True("STAT-01 more MAG gives more spell damage", Combat_Damage(_wiz, EnemyCreate(ENEMY_SLIME), Test_Wpn(10, STAT_MAG, 0)) > Combat_Damage(_lo, EnemyCreate(ENEMY_SLIME), Test_Wpn(10, STAT_MAG, 0)));
     Test_True("STAT-01 SPD decides who acts first (Archer 13 vs Slime 9)", Combat_PlayerActsFirst(Combat_EffectiveStat(CharacterCreate_Player(CLASS_ARCHER), STAT_SPD), Combat_EffectiveStat(EnemyCreate(ENEMY_SLIME), STAT_SPD)));
-    Test_False("STAT-01 SPD decides who acts first (Knight 8 vs Slime 9)", Combat_PlayerActsFirst(Combat_EffectiveStat(_lo, STAT_SPD), Combat_EffectiveStat(EnemyCreate(ENEMY_SLIME), STAT_SPD)));
+    Test_True("STAT-01 SPD decides who acts first (Knight 10 vs Slime 9, D111)", Combat_PlayerActsFirst(Combat_EffectiveStat(_lo, STAT_SPD), Combat_EffectiveStat(EnemyCreate(ENEMY_SLIME), STAT_SPD)));
     // Equipment: a bonus struct with atk/def/spd/mag keys counts as stats; a weapon's power adds to skill power too (D22).
     var _gear = CharacterCreate_Player(CLASS_KNIGHT);
     _gear.inventory = Inv_Add(_gear.inventory, 22, 1);
@@ -321,10 +322,10 @@ function Test_Suite_Stats() {
     Test_True("D76 free points auto-place until the level-up UI exists", Level_AutoPlaceEnabled());
     _c.stat_points = 1;
     var _c2 = Level_ApplyFreePoint(_c, STAT_SPD);
-    Test_Eq("Level_ApplyFreePoint adds +1 to the chosen stat", _c2.stats.spd, 9);
+    Test_Eq("Level_ApplyFreePoint adds +1 to the chosen stat", _c2.stats.spd, 11);   // Knight SPD 10 (D111) + 1
     Test_Eq("Level_ApplyFreePoint spends the point", _c2.stat_points, 0);
     var _c3 = Level_ApplyFreePoint(_c2, STAT_SPD);
-    Test_Eq("Level_ApplyFreePoint with no points left changes nothing", _c3.stats.spd, 9);
+    Test_Eq("Level_ApplyFreePoint with no points left changes nothing", _c3.stats.spd, 11);
     var _c4 = CharacterCreate_Player(CLASS_KNIGHT); _c4.stat_points = 1;
     _c4 = Level_ApplyFreePoint(_c4, 17);
     Test_Eq("Level_ApplyFreePoint rejects an unknown stat and keeps the point", _c4.stat_points, 1);
@@ -352,14 +353,14 @@ function Test_Suite_Stats() {
     Test_Eq("Tooltip_ItemBonusText(Mithril Robe) == MAG +3", Tooltip_ItemBonusText(ItemDB_Get(25)), "MAG +3");
     Test_Eq("Tooltip_BuildStatLines gives a title and a description", array_length(Tooltip_BuildStatLines("spd", "SPD", 8)), 2);
     var _cp = Menu_StatsCopy(_k.stats);
-    Test_Eq("Menu_StatsCopy copies the four stats", _cp.atk + _cp.def + _cp.spd + _cp.mag, 11 + 12 + 8 + 3);
+    Test_Eq("Menu_StatsCopy copies the four stats", _cp.atk + _cp.def + _cp.spd + _cp.mag, 11 + 12 + 10 + 3);
     // Enemies carry the same four stats and a basic power by rank (spec section 6).
     var _sl = EnemyCreate(ENEMY_SLIME);
     Test_False("STAT-01 enemies have no luck/intt", variable_struct_exists(_sl.stats, "luck") || variable_struct_exists(_sl.stats, "intt"));
-    Test_Eq("Enemy basic power: Slime (rank 1) = 3", _sl.basic_power, 3);
-    Test_Eq("Enemy basic power: Mad Whisp (rank 2) = 5", EnemyCreate(ENEMY_MADWHISP).basic_power, 5);
+    Test_Eq("Enemy basic power: Slime (rank 1) = 5 (D111)", _sl.basic_power, 5);
+    Test_Eq("Enemy basic power: Mad Whisp (rank 2) = 7 (D111)", EnemyCreate(ENEMY_MADWHISP).basic_power, 7);
     Test_Eq("Enemy basic power: Palehorn (rank 3) = 7", EnemyCreate(ENEMY_MINI_BOSS).basic_power, 7);
-    Test_Eq("Enemy basic power: Pale Choirbeast (rank 4) = 9", EnemyCreate(ENEMY_FINAL_BOSS).basic_power, 9);
+    Test_Eq("Enemy basic power: Pale Choirbeast (rank 4) = 14 (D111)", EnemyCreate(ENEMY_FINAL_BOSS).basic_power, 14);
 }
 
 // ---- Fixtures: shared game state is borrowed and put back by Test_RunSuite (Test_FixRestore). ----
@@ -403,8 +404,8 @@ function Test_False(_name, _cond) {
     Test_Eq(_name, bool(_cond), false);
 }
 
-// Combat formulas (combat-spec.md sections 1, 4, 5). Start values: Knight ATK11 DEF12 HP10; Slime ATK8 DEF7 HP9 basic power 3 (rank 1);
-// Pale Choirbeast (final boss, L10) ATK21 DEF18 HP88; Mage MAG12 ATK5. A Test_Wpn power is the FINAL formula power (spec section 4).
+// Combat formulas (combat-spec.md sections 1, 4, 5). Start values: Knight ATK11 DEF12 HP10; Slime ATK8 DEF7 HP9 basic power 5 (rank 1, D111);
+// Pale Choirbeast (final boss, L10) ATK21 DEF24 HP194 (D111); Mage MAG12 ATK5. A Test_Wpn power is the FINAL formula power (spec section 4).
 // No dice anywhere (D80): the only avoidance is Evasion on the player. Expected values are worked out from the spec, not read from the code.
 function Test_Suite_Combat() {
     var _k = Test_Hero(CLASS_KNIGHT);
@@ -414,7 +415,7 @@ function Test_Suite_Combat() {
     // Combat_Damage = the grade-OK ratio damage of one hit, no statuses: round_half_up(power x A / (A + D)), at least 1.
     Test_Eq("Combat_Damage knight(ATK11) power6 vs slime(DEF7) == 4", Combat_Damage(_k, _slime, Test_Wpn(6, STAT_ATK, 0)), 4);
     Test_Eq("Combat_Damage slime basic(power3,ATK8) vs knight(DEF12) == 1", Combat_Damage(_slime, _k, Test_Wpn(3, STAT_ATK, 0)), 1);
-    Test_Eq("Combat_Damage never below 1 (power1 slime vs boss DEF18)", Combat_Damage(_slime, _boss, Test_Wpn(1, STAT_ATK, 0)), 1);
+    Test_Eq("Combat_Damage never below 1 (power1 slime vs boss DEF24)", Combat_Damage(_slime, _boss, Test_Wpn(1, STAT_ATK, 0)), 1);
     Test_Eq("Combat_Damage uses the weapon stat: mage MAG12 power6 vs slime == 4", Combat_Damage(_m, _slime, Test_Wpn(6, STAT_MAG, 0)), 4);
     Test_Eq("Combat_Damage uses the weapon stat: mage ATK5 power6 vs slime == 3", Combat_Damage(_m, _slime, Test_Wpn(6, STAT_ATK, 0)), 3);
     Test_Eq("Combat_Damage a stronger ATK hits harder: boss ATK21 power9 vs knight DEF12 == 6", Combat_Damage(_boss, _k, Test_Wpn(9, STAT_ATK, 0)), 6);
@@ -468,9 +469,9 @@ function Test_Suite_Combat() {
     Test_Eq("Combat_ApplyDamage Solidify takes 75% less: power20 12 -> 3", Test_Hit(_k, _solid, Test_Wpn(20, STAT_ATK, 0)).dmg, 3);
     Test_False("Combat_ApplyDamage Solidify is consumed by the next hit", Status_Has(_solid, STATUS_SOLIDIFY));
     Test_Eq("Combat_ApplyDamage after Solidify the next hit is full: 12", Test_Hit(_k, _solid, Test_Wpn(20, STAT_ATK, 0)).dmg, 12);
-    Test_Eq("boss max_hp (L10) == 88", _boss.max_hp, 88);
-    Test_Eq("Combat_ApplyDamage crit x2: power12 vs boss(DEF18) == 9", Combat_ApplyDamage(_k, _boss, Test_Wpn(12, STAT_ATK, 0), 2).dmg, 9);
-    Test_Eq("Combat_ApplyDamage boss hp 88 -> 79", _boss.hp, 79);
+    Test_Eq("boss max_hp (L10) == 194 (D111: 140 + 9 x 6)", _boss.max_hp, 194);
+    Test_Eq("Combat_ApplyDamage crit x2: power12 vs boss(DEF24) == 8", Combat_ApplyDamage(_k, _boss, Test_Wpn(12, STAT_ATK, 0), 2).dmg, 8);   // 12 x 11 / (11 + 24) x 2 = 7.54
+    Test_Eq("Combat_ApplyDamage boss hp 194 -> 186", _boss.hp, 186);
     var _tiny = EnemyCreate(ENEMY_SLIME);
     Test_Hit(_k, _tiny, Test_Wpn(100, STAT_ATK, 0));
     Test_Eq("Combat_ApplyDamage HP clamps at 0, never negative", _tiny.hp, 0);
@@ -1780,7 +1781,7 @@ function Test_Suite_EnemyAI() {
     for (var _hi = 0; _hi < array_length(_heavy); _hi++) {
         var _hs = SkillDB_Get(_heavy[_hi]);
         Test_True("AI " + _hs.name + " is a telegraphed heavy move with a defence bar", variable_struct_exists(_hs, "telegraphed") && _hs.telegraphed && _hs.uses_defensive_qte);
-        Test_True("AI " + _hs.name + " hits harder than a plain move (power_mult 1.5)", _hs.power_mult == 1.5);
+        Test_True("AI " + _hs.name + " hits harder than a plain move (power_mult 2, D111)", _hs.power_mult == 2);
         Test_True("AI " + _hs.name + " has its own bar", Qte_DefenceParams(_heavy[_hi]).sweep_ms != Qte_BarParams("default").sweep_ms);
         Test_True("AI " + _hs.name + " has a wind-up line that names the enemy", string_pos("Slimey", Skill_WindupText(_hs, "Slimey")) > 0);
     }
@@ -2007,7 +2008,7 @@ function Test_Suite_Export() {
     Test_Eq("Export: level table row 1 needs 12 EXP", _back.levels[0].exp_next, 12);
     Test_Eq("Export: Knight level 10 HP matches the vector (73)", _back.classes[1].by_level[9].hp, 73);
     Test_Eq("Export: constants carry the power scale", _back.constants.power_scale, 2);
-    Test_Eq("Export: the final boss exports its basic power (9)", _back.enemies[9].basic_power, 9);
+    Test_Eq("Export: the final boss exports its basic power (14, D111)", _back.enemies[9].basic_power, 14);
     Test_False("Export: no asset references leak into the data", string_pos("sprite", json_stringify(_back.enemies)) > 0);
     // E1 (balance simulator): the timeline / stagger constants, the QTE bar numbers, each heavy enemy move's defence bar and the floor pools
     Test_Eq("Export E1: timeline gauge max 100", _back.constants.timeline.gauge_max, 100);
@@ -4892,13 +4893,13 @@ function Test_Suite_Economy() {
     var _s3 = EnemyCreate(ENEMY_SLIME);
     Throw_Resolve(30, Test_Hero(CLASS_KNIGHT), _s3, QTE_WEAK);
     Test_Eq("C3 firebomb Weak: burn 3 per turn", Status_Find(_s3, STATUS_BURN).power, 3);
-    // Nobody throws 50% stronger: damage 6 (raw 5.85), burn 6
+    // Nobody throws twice as strong (D111, THROW_NOBODY_MULT 2): damage 8 (6 x 13 / 20 x 2 = 7.8), burn 8
     var _s4 = EnemyCreate(ENEMY_SLIME);
     var _nr = Throw_Resolve(30, CharacterCreate_Player(CLASS_NOBODY), _s4, QTE_OK);
-    Test_Eq("C3 firebomb, Nobody: damage 6 instead of 4", _nr.dmg, 6);
-    Test_Eq("C3 firebomb, Nobody: burn 6 per turn", Status_Find(_s4, STATUS_BURN).power, 6);
+    Test_Eq("C3 firebomb, Nobody: damage 8 instead of 4", _nr.dmg, 8);
+    Test_Eq("C3 firebomb, Nobody: burn 8 per turn", Status_Find(_s4, STATUS_BURN).power, 8);
 
-    // poison pot: Perfect 5, Good 4, OK 4, Weak 3 stacks; Nobody 6 at OK, 7 at Perfect
+    // poison pot: Perfect 5, Good 4, OK 4, Weak 3 stacks; Nobody 8 at OK, 9 at Perfect (4 x 2, +1)
     var _pexp = [[QTE_PERFECT, 5], [QTE_GOOD, 4], [QTE_OK, 4], [QTE_WEAK, 3]];
     for (var _p2 = 0; _p2 < 4; _p2++) {
         var _sp = EnemyCreate(ENEMY_SLIME);
@@ -4908,10 +4909,10 @@ function Test_Suite_Economy() {
     }
     var _spn = EnemyCreate(ENEMY_SLIME);
     Throw_Resolve(31, CharacterCreate_Player(CLASS_NOBODY), _spn, QTE_OK);
-    Test_Eq("C3 poison pot, Nobody: 6 stacks (4 x 1.5)", Status_Stacks(_spn, STATUS_POISON), 6);
+    Test_Eq("C3 poison pot, Nobody: 8 stacks (4 x 2)", Status_Stacks(_spn, STATUS_POISON), 8);
     var _spn2 = EnemyCreate(ENEMY_SLIME);
     Throw_Resolve(31, CharacterCreate_Player(CLASS_NOBODY), _spn2, QTE_PERFECT);
-    Test_Eq("C3 poison pot, Nobody, Perfect: 7 stacks", Status_Stacks(_spn2, STATUS_POISON), 7);
+    Test_Eq("C3 poison pot, Nobody, Perfect: 9 stacks", Status_Stacks(_spn2, STATUS_POISON), 9);
 
     // ice flask: damage like the firebomb; the stun (a push-back on the timeline) lands on OK or better, never on Weak
     var _si = EnemyCreate(ENEMY_SLIME);
@@ -4922,7 +4923,7 @@ function Test_Suite_Economy() {
     Test_True("C3 ice flask Weak: 3 damage, no stun", _iw.dmg == 3 && !_iw.stun && !Status_Has(_sw, STATUS_STUN));
     var _sn = EnemyCreate(ENEMY_SLIME);
     var _inb = Throw_Resolve(32, CharacterCreate_Player(CLASS_NOBODY), _sn, QTE_OK);
-    Test_Eq("C3 ice flask, Nobody: 6 damage", _inb.dmg, 6);
+    Test_Eq("C3 ice flask, Nobody: 8 damage", _inb.dmg, 8);
 
     // smoke bomb: Evasion on the thrower for 3 / 3 / 2 / 1 turns; Perfect against a normal enemy is an escape
     var _sexp = [[QTE_PERFECT, 3], [QTE_GOOD, 3], [QTE_OK, 2], [QTE_WEAK, 1]];
@@ -5279,7 +5280,7 @@ function Test_Suite_Economy() {
     var _fl = Item_NumberLines(_fb, _kn);
     Test_True("C3 text: the Firebomb shows its power 3 and its burn 4 x 2", array_length(_fl) >= 2 && _fl[0].value == "3" && _fl[1].value == "4 x 2");
     Test_Eq("C3 text: the Poison Pot shows its 4 stacks", Item_NumberLines(ItemDB_Get(31), _kn)[0].value, "4");
-    Test_Eq("C3 text: Nobody sees 6 stacks (x1.5)", Item_NumberLines(ItemDB_Get(31), _nb)[0].value, "6");
+    Test_Eq("C3 text: Nobody sees 8 stacks (x2)", Item_NumberLines(ItemDB_Get(31), _nb)[0].value, "8");
     Test_True("C3 text: the sentence of every throwable has its numbers", string_pos("3", Item_Sentence(_fb)) > 0 && string_pos("4", Item_Sentence(ItemDB_Get(31))) > 0 && string_pos("2", Item_Sentence(ItemDB_Get(33))) > 0);
     Test_True("C3 text: an accessory has a sentence and a line", string_length(Item_Sentence(ItemDB_Get(44))) > 8 && array_length(Item_NumberLines(ItemDB_Get(44), _kn)) >= 1);
     Test_True("C3 text: a stat ring says +1", string_pos("1", Item_Sentence(ItemDB_Get(40))) > 0 && Item_NumberLines(ItemDB_Get(40), _kn)[0].value == "+1");
@@ -5292,4 +5293,91 @@ function Test_Suite_Economy() {
     Test_True("C3 text: a card row names the card and carries its numbers", _row_card.label == Card_Name(CardDB_Get("pas:coin_sense")) && array_length(_row_card.lines) >= 1);
 
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+// D111 (owner-approved balance, balance-report.md E1-1 .. E1-6). Expected values are the numbers of DECISIONS.md D111, not read back from the code.
+function Test_D111_EnemyHpAt(_name, _enemy_id, _level, _mod, _want_plain, _want_elite) {
+    var _gs = GameState_Get();
+    var _lv0 = _gs.battle.enemy_level;
+    _gs.battle.enemy_level = _level;
+    var _plain = EnemyCreate(_enemy_id);
+    var _elite = Elite_Apply(EnemyCreate(_enemy_id), _mod);
+    _gs.battle.enemy_level = _lv0;
+    Test_Eq(_name + " plain max HP", _plain.max_hp, _want_plain);
+    Test_Eq(_name + " elite max HP", _elite.max_hp, _want_elite);
+    Test_Eq(_name + " elite starts at full HP", _elite.hp, _want_elite);
+}
+
+function Test_D111_Gain(_name, _level, _atk, _def, _spd, _mag) {
+    var _g = LevelUp_ClassGrowthGain(CLASS_NOBODY, _level);
+    Test_Eq(_name + " ATK", _g.atk, _atk);
+    Test_Eq(_name + " DEF", _g.def, _def);
+    Test_Eq(_name + " SPD", _g.spd, _spd);
+    Test_Eq(_name + " MAG", _g.mag, _mag);
+}
+
+function Test_Suite_BalanceD111() {
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    EnemyDB_Init(); SkillDB_Init(); Loot_Init();
+
+    // E1-1: the bosses' HP and DEF
+    var _ph = EnemyDB_Get(ENEMY_MINI_BOSS);
+    Test_Eq("D111 Palehorn base HP 25 -> 55", _ph.base_hp, 55);
+    Test_Eq("D111 Palehorn DEF 16 -> 18", _ph.stats.def, 18);
+    var _cb = EnemyDB_Get(ENEMY_FINAL_BOSS);
+    Test_Eq("D111 Choirbeast base HP 34 -> 140", _cb.base_hp, 140);
+    Test_Eq("D111 Choirbeast DEF 18 -> 24", _cb.stats.def, 24);
+    Test_EnemyAt("D111 palehorn_8 (HP 55 + 7 x 6)", ENEMY_MINI_BOSS, 8, 18, 18, 12, 14, 97);
+    Test_EnemyAt("D111 choirbeast_10 (HP 140 + 9 x 6)", ENEMY_FINAL_BOSS, 10, 21, 24, 14, 19, 194);
+
+    // E1-2: an elite has ELITE_HP_MULT x the HP, rounded half up (Slime L1 9 -> 16, Killer Plant L5 34 -> 61, Palehorn L8 97 -> 175)
+    Test_Eq("D111 ELITE_HP_MULT is 1.8", ELITE_HP_MULT, 1.8);
+    Test_D111_EnemyHpAt("D111 elite Slime L1 (9 x 1.8 = 16.2)", ENEMY_SLIME, 1, "armored", 9, 16);
+    Test_D111_EnemyHpAt("D111 elite Killer Plant L5 (34 x 1.8 = 61.2)", ENEMY_KILLER_PLANT, 5, "venomous", 34, 61);
+    Test_D111_EnemyHpAt("D111 elite Dire Wolf L4 (27 x 1.8 = 48.6)", ENEMY_DIREWOLF, 4, "regenerating", 27, 49);
+    var _en = Elite_Apply(EnemyCreate(ENEMY_SLIME), "");
+    Test_Eq("D111 no modifier leaves the HP alone", _en.max_hp, 9);
+    var _exp = Export_Build();
+    Test_True("D111 the export carries elite_hp_mult 1.8", variable_struct_exists(_exp.constants.economy, "elite_hp_mult") && _exp.constants.economy.elite_hp_mult == 1.8);
+
+    // E1-3: enemy basic power 3 -> 5, 5 -> 7, Choirbeast 9 -> 14 (Palehorn stays 7)
+    Test_Eq("D111 basic power Slime 5", EnemyDB_Get(ENEMY_SLIME).basic_power, 5);
+    Test_Eq("D111 basic power Spider 5", EnemyDB_Get(ENEMY_SPIDER).basic_power, 5);
+    Test_Eq("D111 basic power Snake 5", EnemyDB_Get(ENEMY_SNAKE).basic_power, 5);
+    Test_Eq("D111 basic power Dire Wolf 5", EnemyDB_Get(ENEMY_DIREWOLF).basic_power, 5);
+    Test_Eq("D111 basic power Mad Whisp 7", EnemyDB_Get(ENEMY_MADWHISP).basic_power, 7);
+    Test_Eq("D111 basic power Killer Plant 7", EnemyDB_Get(ENEMY_KILLER_PLANT).basic_power, 7);
+    Test_Eq("D111 basic power Ghost Sword 7", EnemyDB_Get(ENEMY_GHOSTSWORD).basic_power, 7);
+    Test_Eq("D111 basic power Stranger 7", EnemyDB_Get(ENEMY_STRANGER).basic_power, 7);
+    Test_Eq("D111 basic power Palehorn stays 7", EnemyDB_Get(ENEMY_MINI_BOSS).basic_power, 7);
+    Test_Eq("D111 basic power Choirbeast 14", EnemyDB_Get(ENEMY_FINAL_BOSS).basic_power, 14);
+
+    // E1-4: the four telegraphed (wind-up) moves hit x2.0; Horizontal Slash (a player move) stays x1.5
+    Test_Eq("D111 Vine Trap power_mult 2", SkillDB_Get(SKILL_VINE_TRAP).power_mult, 2);
+    Test_Eq("D111 Cut power_mult 2", SkillDB_Get(SKILL_GHOST_CUT).power_mult, 2);
+    Test_Eq("D111 Ramming power_mult 2", SkillDB_Get(SKILL_RAMMING).power_mult, 2);
+    Test_Eq("D111 Pale Hymn power_mult 2", SkillDB_Get(SKILL_PALE_HYMN).power_mult, 2);
+    Test_Eq("D111 Horizontal Slash (player) stays 1.5", SkillDB_Get(SKILL_HORIZ_SLASH).power_mult, 1.5);
+
+    // E1-5: Knight base SPD 8 -> 10
+    var _kn = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_Eq("D111 Knight SPD 10", _kn.stats.spd, 10);
+    Test_Eq("D111 Knight SPD still 10 at level 2 (fixed growth has none)", LevelUp_ApplyLevel(_kn).stats.spd, 10);
+
+    // E1-6: Nobody gets two fixed points a level (the old one plus the one two steps further on the ATK-DEF-SPD-MAG cycle), throwables x2
+    Test_D111_Gain("D111 Nobody L2 gain", 2, 1, 0, 1, 0);
+    Test_D111_Gain("D111 Nobody L3 gain", 3, 0, 1, 0, 1);
+    Test_D111_Gain("D111 Nobody L4 gain", 4, 1, 0, 1, 0);
+    Test_D111_Gain("D111 Nobody L5 gain", 5, 0, 1, 0, 1);
+    Test_D111_Gain("D111 Nobody L6 gain", 6, 1, 0, 1, 0);
+    Test_D111_Gain("D111 Nobody L7 gain", 7, 0, 1, 0, 1);
+    Test_D111_Gain("D111 Nobody L8 gain", 8, 1, 0, 1, 0);
+    Test_D111_Gain("D111 Nobody L9 gain", 9, 0, 1, 0, 1);
+    Test_D111_Gain("D111 Nobody L10 gain", 10, 1, 0, 1, 0);
+    var _nb = CharacterCreate_Player(CLASS_NOBODY);
+    for (var _l = 2; _l <= 10; _l++) _nb = LevelUp_ApplyLevel(_nb);
+    Test_True("D111 Nobody L10 stats ATK 22 DEF 12 SPD 14 MAG 7 (8+5+9, 8+4, 9+5, 3+4)", _nb.stats.atk == 22 && _nb.stats.def == 12 && _nb.stats.spd == 14 && _nb.stats.mag == 7);
+    Test_Eq("D111 THROW_NOBODY_MULT is 2", THROW_NOBODY_MULT, 2);
+    Test_Eq("D111 Nobody's throws are x2", Throw_Mult(CharacterCreate_Player(CLASS_NOBODY)), 2);
+    Test_Eq("D111 the Knight's throws are x1", Throw_Mult(CharacterCreate_Player(CLASS_KNIGHT)), 1);
 }

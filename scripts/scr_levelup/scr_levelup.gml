@@ -57,14 +57,17 @@ function LevelUp_ClassGrowthGain(_class_id, _new_level) {
         case CLASS_ARCHER: return { atk:1, def:0, spd:1, mag:0 };
         case CLASS_MAGE:   return { atk:0, def:0, spd:0, mag:2 };
         case CLASS_NOBODY:
-            // Balanced-low (D83): a single point per level, cycling ATK, DEF, SPD, MAG.
+            // Balanced-low (D83), two points a level since D111 (E1-6): the point that cycles ATK, DEF, SPD, MAG, plus the one two steps further on the cycle.
             var rot = [
                 { atk:1, def:0, spd:0, mag:0 },
                 { atk:0, def:1, spd:0, mag:0 },
                 { atk:0, def:0, spd:1, mag:0 },
                 { atk:0, def:0, spd:0, mag:1 }
             ];
-            return rot[(lvl - 2) mod array_length(rot)];
+            var ri = (lvl - 2) mod array_length(rot);
+            var r1 = rot[ri];
+            var r2 = rot[(ri + 2) mod array_length(rot)];
+            return { atk:r1.atk + r2.atk, def:r1.def + r2.def, spd:r1.spd + r2.spd, mag:r1.mag + r2.mag };
     }
     return { atk:0, def:0, spd:0, mag:0 };
 }

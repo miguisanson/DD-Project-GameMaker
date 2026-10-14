@@ -57,13 +57,20 @@ def mp_max(mp_gain, level, mag):
     return 10 + (level - 1) * mp_gain + mag // 2
 
 
+def nobody_fixed(lv):
+    """D111 (E1-6): two fixed points a level - the one that cycles ATK, DEF, SPD, MAG and the one two steps further on the cycle."""
+    rot = [(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)]
+    a, b = rot[(lv - 2) % 4], rot[(lv - 2 + 2) % 4]
+    return tuple(x + y for x, y in zip(a, b))
+
+
 CLASSES = {
     # name: base atk,def,spd,mag, hd, mp_gain, fixed growth fn(level) -> (atk,def,spd,mag), free-point default stat index (0 atk 1 def 2 spd 3 mag)
-    "knight": dict(base=(11, 12, 8, 3), hd=10, mp_gain=1, fixed=lambda lv: (1, 1, 0, 0), free=1),
+    "knight": dict(base=(11, 12, 10, 3), hd=10, mp_gain=1, fixed=lambda lv: (1, 1, 0, 0), free=1),
     "archer": dict(base=(9, 8, 13, 4), hd=8, mp_gain=2, fixed=lambda lv: (1, 0, 1, 0), free=0),
     "mage": dict(base=(5, 7, 10, 12), hd=6, mp_gain=2, fixed=lambda lv: (0, 0, 0, 2), free=3),
     "nobody": dict(base=(8, 8, 9, 3), hd=8, mp_gain=1,
-                   fixed=lambda lv: [(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)][(lv - 2) % 4], free=0),
+                   fixed=lambda lv: nobody_fixed(lv), free=0),
 }
 
 
@@ -85,7 +92,7 @@ ENEMIES = {
     "slime": (8, 7, 9, 5, 9, 7), "spider": (8, 7, 10, 5, 10, 7), "snake": (9, 7, 10, 5, 10, 7),
     "mad_whisp": (10, 9, 12, 13, 12, 6), "killer_plant": (12, 11, 9, 10, 14, 8), "dire_wolf": (11, 9, 11, 6, 12, 7),
     "ghost_sword": (14, 12, 12, 10, 15, 8), "stranger": (16, 14, 13, 15, 18, 8),
-    "palehorn": (18, 16, 12, 14, 25, 10), "choirbeast": (21, 18, 14, 19, 34, 10),
+    "palehorn": (18, 18, 12, 14, 55, 10), "choirbeast": (21, 24, 14, 19, 140, 10),
 }
 
 

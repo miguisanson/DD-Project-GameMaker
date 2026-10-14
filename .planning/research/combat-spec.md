@@ -14,12 +14,12 @@ Effective stat = max(1, base + equipment bonus + status mod). Equipment/status s
 ## 2. Classes (level 1) and fixed growth per level (D76)
 | class | ATK | DEF | SPD | MAG | hd | mp_gain | fixed growth each level 2..10 | free point default (auto) |
 |---|---|---|---|---|---|---|---|---|
-| Knight | 11 | 12 | 8 | 3 | 10 | 1 | ATK+1, DEF+1 | DEF |
+| Knight | 11 | 12 | 10 | 3 | 10 | 1 | ATK+1, DEF+1 | DEF |
 | Archer | 9 | 8 | 13 | 4 | 8 | 2 | SPD+1, ATK+1 | ATK |
 | Mage | 5 | 7 | 10 | 12 | 6 | 2 | MAG+2 | MAG |
-| Nobody | 8 | 8 | 9 | 3 | 8 | 1 | one stat per level, cycle ATK, DEF, SPD, MAG by (level-2) mod 4 | ATK |
+| Nobody | 8 | 8 | 9 | 3 | 8 | 1 | two stats per level (D111): the one of the cycle ATK, DEF, SPD, MAG by (level-2) mod 4, and the one two steps further on it | ATK |
 
-Nobody is balanced-low (28 stat points against 34, half the growth); D83 gives it items and passives instead of skills.
+Nobody is balanced-low (28 stat points against 34; since D111 its growth is two points a level, like the other classes' two); D83 gives it items and passives instead of skills.
 Each level also gives ONE free point: `ch.stat_points += 1`; `Level_ApplyFreePoint(ch, stat)` spends one (needs stat_points > 0, stat in
 ATK/DEF/SPD/MAG, +1 clamped to 60) and returns ch. Until the level-up UI exists the level-up places it on the
 class default at once (`Level_AutoPlaceEnabled()`, `global.levelup_auto_place`, default true); the UI packet sets it false and calls
@@ -64,7 +64,7 @@ Basic attacks and skills use the same rule (no more +1 on basic attacks). Crit d
 Mapping: ATK = old STR, DEF = old DEF, SPD = old AGI, MAG = old INT, LUCK dropped. The new stat scale equals the old one (player level 1 is 5..13 as before),
 so every enemy keeps its place relative to the player. HP no longer has a DEF term, so `base_hp += max(0, floor((DEF-10)/2))` (old DEF bonus folded in):
 Ghost Sword 14 -> 15, Stranger 16 -> 18, Palehorn 22 -> 25, Pale Choirbeast 30 -> 34 (all other `base_hp` unchanged).
-`enemy max_hp = base_hp + (L-1) * (ceil(hd/2) + 1)`; `max_mp = base_mp + (L-1) * mp_gain` (no enemy uses MP). `basic_power` by threat rank 1/2/3/4 = 3/5/7/9.
+`enemy max_hp = base_hp + (L-1) * (ceil(hd/2) + 1)`; `max_mp = base_mp + (L-1) * mp_gain` (no enemy uses MP). `basic_power` by threat rank 1/2/3/4 = 3/5/7/9; D111 (E1-3) raised it to 5/7/7/14 (rank 1 enemies 5, rank 2 enemies 7, Palehorn 7, Choirbeast 14).
 | enemy | ATK | DEF | SPD | MAG | base_hp | rank |
 |---|---|---|---|---|---|---|
 | Slime | 8 | 7 | 9 | 5 | 9 | 1 |
@@ -75,15 +75,15 @@ Ghost Sword 14 -> 15, Stranger 16 -> 18, Palehorn 22 -> 25, Pale Choirbeast 30 -
 | Dire Wolf | 11 | 9 | 11 | 6 | 12 | 1 |
 | Ghost Sword | 14 | 12 | 12 | 10 | 15 | 2 |
 | Stranger | 16 | 14 | 13 | 15 | 18 | 2 |
-| Palehorn (mini boss) | 18 | 16 | 12 | 14 | 25 | 3 |
-| The Pale Choirbeast (final boss) | 21 | 18 | 14 | 19 | 34 | 4 |
+| Palehorn (mini boss) | 18 | 18 | 12 | 14 | 55 | 3 |
+| The Pale Choirbeast (final boss) | 21 | 24 | 14 | 19 | 140 | 4 |
 Enemy skill `stat_type` follows the same rename (STR -> ATK, INT -> MAG, AGI -> SPD). Skill/weapon `acc` fields stay in the data, unused.
 
 ## 7. Levels and XP (D27, D30)
 Level resets to 1 every run; cap 10. EXP needed to leave level L (L = 1..9): 12, 24, 40, 58, 80, 105, 135, 170, 210 (cumulative to L9 624, to L10 834).
 EXP per kill is unchanged (`enemy.exp` x level factor). One clean pass of the ten floors supplies about 750 EXP (balance-data.md section 3), so:
 **Target: level 9 when the final boss starts (8 at the very least, 10 only after optional/elite fights); level 4-5 at the mini boss (floor 5); level 7 on entering floor 7.**
-This is the number to check in the run simulator; a full winning run is 45-60 minutes.
+This is the number to check in the run simulator; a full winning run is 25-30 minutes (D112, which supersedes 45-60).
 
 ## 8. Run and initiative
 Run (flee) succeeds with `clamp(0.5 + 0.05 * (SPD_player - SPD_enemy), 0.10, 0.95)` (one `random(1)`; bosses still cannot be fled). The first actor is whoever the timeline (section 11) picks first, which is the higher SPD; a tie goes to the player (`Combat_PlayerActsFirst` states the same rule).
@@ -198,7 +198,7 @@ force_damage_only }`; `rng` is a stream from `Rng_New` (the game passes the "com
 `force_damage_only` picks, with `Rng_Int`, one usable damaging skill (basic attack if none).
 
 **Telegraph (D7, D59).** A skill with `telegraphed: true` is a heavy move: it is announced for one turn, then it is used with the defence bar. It also has
-`uses_defensive_qte` and a row in `Qte_DefenceParams`. Starting value: heavy moves have `power_mult 1.5` (so they are really heavier than a basic hit; E1 tunes it).
+`uses_defensive_qte` and a row in `Qte_DefenceParams`. Starting value: heavy moves have `power_mult 2.0` (D111, E1-4; it was 1.5).
 - The wind-up turn: the enemy does no damage and no status. `ai.windup = skill`, the log/banner says `windup_msg` ("Palehorn lowers its horns!"), the enemy's slots on the turn strip
   wear a "!" mark while the wind-up is pending. The enemy's turn counter still advances.
 - The next enemy turn is the big attack (step 1), through the defence bar; `ai.windup` becomes -1.
@@ -215,7 +215,7 @@ is shown as a battle message at the start of the enemy's next action. SPD is rea
 No boss has a double action any more: Rampage and Fury stay in the skill table (ids are stable) but no enemy has them; Curse and Blessing stay as in B2.
 
 **New skills** (starting numbers): Regrow 28 (heal self, power 5, MAG: +5 + floor(MAG/4)); Snuff 29 (removes every non-negative status of the player); Gore 30 (ATK power 4, Bleeding 70%,
-3 turns, no bar); Pale Hymn 31 (MAG power 5 x1.5, telegraphed, defence bar). Telegraphed: Vine Trap, Cut, Ramming, Pale Hymn (all at `power_mult 1.5`).
+3 turns, no bar); Pale Hymn 31 (MAG power 5 x2.0, telegraphed, defence bar). Telegraphed: Vine Trap, Cut, Ramming, Pale Hymn (all at `power_mult 2.0` since D111; Pale Hymn is MAG power 5 x2.0).
 
 **Rule lists** (turn T = the enemy's own turn; "windup X" = X is telegraphed):
 | enemy | rules (in order) | default weights |

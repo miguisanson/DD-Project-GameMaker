@@ -3957,7 +3957,7 @@ function Export_Build() {
         gold_base: GOLD_BASE, gold_per_level: GOLD_PER_LEVEL, gold_rank2_mult: GOLD_RANK2_MULT, gold_boss_mult: GOLD_BOSS_MULT, gold_elite_mult: GOLD_ELITE_MULT,
         gold_spread: GOLD_SPREAD, price_mult: SHOP_PRICE_MULT, sell_frac: SHOP_SELL_FRAC, card_price: { skill: 80, upgrade: 60, passive: 55 },
         throw_cap: THROW_CAP, throw_cap_nobody: THROW_CAP_NOBODY, throw_nobody_mult: THROW_NOBODY_MULT, throw_stat_base: THROW_STAT_BASE,
-        elite_chance: ELITE_CHANCE, elite_def: ELITE_DEF_BONUS, elite_spd: ELITE_SPD_BONUS, elite_atk: ELITE_ATK_BONUS, elite_venom_stacks: ELITE_VENOM_STACKS, elite_regen_frac: ELITE_REGEN_FRAC,
+        elite_chance: ELITE_CHANCE, elite_def: ELITE_DEF_BONUS, elite_spd: ELITE_SPD_BONUS, elite_atk: ELITE_ATK_BONUS, elite_venom_stacks: ELITE_VENOM_STACKS, elite_regen_frac: ELITE_REGEN_FRAC, elite_hp_mult: ELITE_HP_MULT,
         merchant_floors: [2, 5, 8]
     };
     // E1: the timeline / stagger rules, the QTE bar numbers (attack bars per weapon kind, the defence grades) and which enemies each floor draws from (D33)
