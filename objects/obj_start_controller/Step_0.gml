@@ -57,6 +57,18 @@ if (state == "boot_logo") {
     return;
 }
 
+if (state == "credits") {   // C5 (D105): the credits roll after the ending's closing text; hold confirm to skip it (D48)
+    Skip_Claim();
+    credits_t += 1;
+    if (credits_t >= Credits_TotalFrames() || Skip_Consume()) {
+        Skip_Reset();
+        state = "credits_end";
+        Transition_RequestCutsceneFade(rm_start);
+    }
+    return;
+}
+if (state == "credits_end") return;
+
 if (state == "run_flow") {   // C1: run summary, echo pick, new run (scr_room_state RunFlow_*)
     RunFlow_Step();
     return;
@@ -344,7 +356,10 @@ if (state == "cutscene") {
         case "ending":
             Run_OnWin();   // C1: wins + 1; the first win unlocks the Nobody class
             gs.in_main_menu = true;
-            Transition_RequestCutsceneFade(rm_start);
+            Cutscene_ClearUiState();
+            Skip_Reset();
+            credits_t = 0;
+            state = "credits";   // C5 (D105): the credits roll, then the title
             break;
         case "game_over":
             // C1 (D46, D103): no reload after a death. The run is already over in the profile; show the summary, the echo pick, then a new run.

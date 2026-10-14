@@ -1091,3 +1091,549 @@ function Dialogue_CloseNow() {
         gs.ui.cutscene_text_only = false;
     }
 }
+
+
+// ============================================================================
+// C5 STORY (D102-D107, D40, D105): death lines, the wake line, the boss banner, lore notes, the closing text and the credits.
+// Every player-facing string goes through Loc_T (keys in game_text.xlsx); the English text written here is the fallback and what
+// Test_Suite_Story reads. Everything below is plain code in this script: no new objects, rooms or sprites.
+// ============================================================================
+
+// ---- death lines (D102-D104) ----
+// The tunnel keeps pulling you back, and the lines get darker the more often it does. Tiers by death count: 1 = the first, 2 = the 2nd
+// and 3rd, 3 = 4th-6th, 4 = 7th-10th, 5 = 11th on. Early on a killer-specific line can come up; from the 7th death on the tone is set.
+// None of them may hint at what is outside (D104).
+function DeathLine_Tier(_deaths) {
+    if (_deaths <= 1) return 1;
+    if (_deaths <= 3) return 2;
+    if (_deaths <= 6) return 3;
+    if (_deaths <= 10) return 4;
+    return 5;
+}
+
+function DeathLine_Defs() {
+    if (variable_global_exists("death_line_defs") && is_struct(global.death_line_defs)) return global.death_line_defs;
+    global.death_line_defs = {
+        tiers: [
+            [   // 1st death: shock, still sure it is the end
+                { key: "death.t1.0", text: "The dark takes you. Quietly." },
+                { key: "death.t1.1", text: "So this is how it ends." },
+                { key: "death.t1.2", text: "The floor gives way beneath you." }
+            ],
+            [   // 2nd-3rd: disbelief
+                { key: "death.t2.0", text: "You were sure that was the end." },
+                { key: "death.t2.1", text: "The tunnel is not finished with you." },
+                { key: "death.t2.2", text: "Cold stone. A fall. Again." }
+            ],
+            [   // 4th-6th: it becomes a habit
+                { key: "death.t3.0", text: "You know this fall by heart now." },
+                { key: "death.t3.1", text: "How many times has it been?" },
+                { key: "death.t3.2", text: "Dying is starting to feel like routine." }
+            ],
+            [   // 7th-10th: numb
+                { key: "death.t4.0", text: "You stopped counting. The walls didn't." },
+                { key: "death.t4.1", text: "{killer}. You don't even flinch anymore." },
+                { key: "death.t4.2", text: "Nobody is coming. Nobody ever did." }
+            ],
+            [   // 11th on: the tunnel has become the safe place
+                { key: "death.t5.0", text: "Even wanting to leave has gone quiet." },
+                { key: "death.t5.1", text: "{killer}. Of course it was." },
+                { key: "death.t5.2", text: "Down here, at least, you know what to expect." }
+            ]
+        ],
+        killers: [
+            { killer: "enemy_slime", key: "death.killer.enemy_slime", text: "A slime. You were beaten by a slime." },
+            { killer: "enemy_direwolf", key: "death.killer.enemy_direwolf", text: "The wolf was faster than your fear." },
+            { killer: "enemy_ghostsword", key: "death.killer.enemy_ghostsword", text: "A blade with no hand to hold it." },
+            { killer: "enemy_spider", key: "death.killer.enemy_spider", text: "Eight eyes. The last thing you saw." },
+            { killer: "enemy_madwhisp", key: "death.killer.enemy_madwhisp", text: "The glow led you here. It always does." },
+            { killer: "enemy_snake", key: "death.killer.enemy_snake", text: "A hiss. Then nothing." },
+            { killer: "enemy_killer_plant", key: "death.killer.enemy_killer_plant", text: "Even the plants here want you gone." },
+            { killer: "enemy_stranger", key: "death.killer.enemy_stranger", text: "The stranger smiled the whole time." },
+            { killer: "enemy_mini_boss", key: "death.killer.enemy_mini_boss", text: "{killer} did not even slow down." },
+            { killer: "enemy_final_boss", key: "death.killer.enemy_final_boss", text: "The choir sings. You were its last note." },
+            { killer: "status_poison", key: "death.killer.status_poison", text: "The poison finished what the fight began." },
+            { killer: "status_burn", key: "death.killer.status_burn", text: "The fire was warm, at least." },
+            { killer: "status_bleed", key: "death.killer.status_bleed", text: "You bled out, counting the drops." },
+            { killer: "abandoned", key: "death.killer.abandoned", text: "You let go. The tunnel did not mind." }
+        ]
+    };
+    return global.death_line_defs;
+}
+
+function DeathLine_All() {
+    var defs = DeathLine_Defs();
+    var out = [];
+    for (var t = 0; t < array_length(defs.tiers); t++) {
+        for (var i = 0; i < array_length(defs.tiers[t]); i++) array_push(out, defs.tiers[t][i]);
+    }
+    for (var k = 0; k < array_length(defs.killers); k++) array_push(out, defs.killers[k]);
+    return out;
+}
+
+function DeathLine_KillerLine(_killer) {
+    var defs = DeathLine_Defs();
+    for (var k = 0; k < array_length(defs.killers); k++) {
+        if (defs.killers[k].killer == _killer) return defs.killers[k];
+    }
+    return undefined;
+}
+
+// The lines that can play for this death count and killer. Tiers 1-3 start with the killer's own line when there is one;
+// a "{killer}" line needs a killer to name (not for an abandoned run).
+function DeathLine_Pool(_deaths, _killer) {
+    var defs = DeathLine_Defs();
+    var tier = DeathLine_Tier(_deaths);
+    var out = [];
+    if (tier <= 3) {
+        var own = DeathLine_KillerLine(_killer);
+        if (is_struct(own)) array_push(out, own);
+    }
+    var named = (_killer != "" && _killer != "abandoned");
+    var gen = defs.tiers[tier - 1];
+    for (var i = 0; i < array_length(gen); i++) {
+        if (!named && string_pos("{killer}", gen[i].text) > 0) continue;
+        array_push(out, gen[i]);
+    }
+    return out;
+}
+
+// One line for this death: { key, text (English), tier }. _salt rotates through the pool (the caller passes the run seed plus the death count).
+function DeathLine_Pick(_deaths, _killer, _salt) {
+    var pool = DeathLine_Pool(_deaths, _killer);
+    var n = array_length(pool);
+    var line = pool[(n > 0) ? (abs(floor(_salt)) mod n) : 0];
+    return { key: line.key, text: line.text, tier: DeathLine_Tier(_deaths) };
+}
+
+// The line as the player reads it: the translation when there is one, {killer} filled with the name of what killed you.
+function DeathLine_Format(_pick, _killer_name) {
+    var nm = (_killer_name != "") ? _killer_name : Loc_T("death.killer.unknown_name", "Something");
+    return Loc_T(_pick.key, _pick.text, { killer: nm });
+}
+
+// How long the line stays up: 2 s at least, 4 s at most, longer for longer lines (D103).
+function DeathScene_Frames(_text, _fps) {
+    return clamp(round(_fps * (1.4 + string_length(_text) * 0.05)), _fps * 2, _fps * 4);
+}
+
+// The wake line when the next run starts at the tunnel entrance (D102): one per tone, the last two tiers share one.
+function WakeLine_Pick(_deaths) {
+    var tier = min(DeathLine_Tier(_deaths), 4);
+    switch (tier) {
+        case 1: return { key: "wake.t1", text: "You wake where you first fell. Alive." };
+        case 2: return { key: "wake.t2", text: "The same stone. The same cold. You wake again." };
+        case 3: return { key: "wake.t3", text: "You wake at the entrance. It almost feels like home." };
+    }
+    return { key: "wake.t4", text: "You wake. You no longer ask why." };
+}
+
+// ---- who killed you (read when the death hook fires, D103) ----
+// A poison / burn / bleed tick that takes the player's last HP calls this (scr_status); Death_KillerKey reads and clears it.
+function Death_NoteDotKill(_status_id) {
+    global.death_dot_kill = _status_id;
+}
+
+// "enemy_slime" ... for the enemy of the last battle, "status_poison" / "status_burn" / "status_bleed" for a tick that finished you,
+// "abandoned" for giving up the run, "" when unknown. Reads and clears the status note.
+function Death_KillerKey(_result = "died") {
+    var dot = variable_global_exists("death_dot_kill") ? global.death_dot_kill : -1;
+    global.death_dot_kill = -1;
+    if (_result == "abandoned") return "abandoned";
+    if (dot == STATUS_POISON) return "status_poison";
+    if (dot == STATUS_BURN) return "status_burn";
+    if (dot == STATUS_BLEED) return "status_bleed";
+    var gs = GameState_Get();
+    if (variable_struct_exists(gs, "battle") && is_struct(gs.battle) && variable_struct_exists(gs.battle, "enemy_id") && gs.battle.enemy_id >= 0) {
+        var k = Enemy_LocalizationKey(gs.battle.enemy_id);
+        if (k != "unknown") return k;
+    }
+    return "";
+}
+
+// Everything the death scene needs, decided once when the run ends (the profile's death count already includes this death).
+function Death_BuildContext(_result, _cause_name) {
+    var deaths = max(1, Profile_Get().deaths);
+    var run = Run_Get();
+    var salt = (is_struct(run) ? run.seed : 0) + deaths;
+    var killer = Death_KillerKey(_result);
+    var pick = DeathLine_Pick(deaths, killer, salt);
+    var text = DeathLine_Format(pick, _cause_name);
+    return { deaths: deaths, killer: killer, pick: pick, text: text, frames: DeathScene_Frames(text, max(1, game_get_speed(gamespeed_fps))) };
+}
+
+// ---- the boss name banner (D106) ----
+// A boss whose camera pan was already seen on an earlier run gets a ~1 s name banner instead of the pan.
+function Banner_Frames(_fps) {
+    return round(_fps * 1.0);
+}
+
+// 0 -> 1 -> 0 over _dur frames: a fifth of the time to fade in, a fifth to fade out, full in between.
+function Banner_Alpha(_t, _dur) {
+    if (_dur <= 0) return 0;
+    var fade = max(1, round(_dur * 0.2));
+    return clamp(min(_t / fade, (_dur - _t) / fade), 0, 1);
+}
+
+function Banner_Show(_text) {
+    global.banner = { text: string(_text), t: 0, dur: Banner_Frames(max(1, game_get_speed(gamespeed_fps))) };
+}
+
+function Banner_Active() {
+    return variable_global_exists("banner") && is_struct(global.banner) && global.banner.t < global.banner.dur;
+}
+
+function Banner_Step() {
+    if (Banner_Active()) global.banner.t += 1;
+}
+
+// Drawn last-but-one by obj_ui_controller (Draw GUI): a framed name in the upper third, on the shared UI kit.
+function Banner_Draw() {
+    if (!Banner_Active()) return;
+    var b = global.banner;
+    var a = Banner_Alpha(b.t, b.dur);
+    if (a <= 0) return;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var tw = UI_TextWidth(b.text);
+    var w = tw + 16 * p;
+    var h = mt.line_h + 8 * p;
+    var bx = round((mt.gw - w) / 2);
+    var by = round(mt.gh * 0.22);
+    var a0 = draw_get_alpha();
+    var c0 = draw_get_color();
+    Ui_DrawFrame(bx, by, w, h, a, p);
+    draw_set_alpha(a);
+    Ui_Text(bx + 8 * p, by + 4 * p, b.text, UI_C_LIGHTEST);
+    draw_set_alpha(a0);
+    draw_set_color(c0);
+}
+
+// The boss a story trigger's camera pan points at ("" when it is not a boss pan): the display name for the banner.
+function DialogueTrigger_BannerName(_tr) {
+    if (!instance_exists(_tr)) return "";
+    if (!variable_instance_exists(_tr, "camera_focus_enabled") || !_tr.camera_focus_enabled) return "";
+    if (!variable_instance_exists(_tr, "camera_focus_object")) return "";
+    var eid = -1;
+    if (_tr.camera_focus_object == obj_mini_boss) eid = ENEMY_MINI_BOSS;
+    else if (_tr.camera_focus_object == obj_final_boss) eid = ENEMY_FINAL_BOSS;
+    if (eid < 0) return "";
+    return string(EnemyDB_Get(eid).name);
+}
+
+// obj_dialogue_trigger Collision: the trigger was played on an earlier run (story_prev_seen), so show the banner once per visit to the room.
+function DialogueTrigger_TryBanner(_tr) {
+    if (!variable_instance_exists(_tr, "story_prev_seen") || !_tr.story_prev_seen) return false;
+    if (variable_instance_exists(_tr, "banner_done") && _tr.banner_done) return false;
+    var nm = DialogueTrigger_BannerName(_tr);
+    if (nm == "") return false;
+    var gs = GameState_Get();
+    if (variable_struct_exists(gs, "boss_defeated") && is_struct(gs.boss_defeated)) {   // beaten in this run: nothing to announce
+        if (_tr.camera_focus_object == obj_mini_boss && gs.boss_defeated.mini_boss) return false;
+        if (_tr.camera_focus_object == obj_final_boss && gs.boss_defeated.final_boss) return false;
+    }
+    if (UI_IsBlocking()) return false;
+    _tr.banner_done = true;
+    Banner_Show(nm);
+    if (is_string(_tr.trigger_sfx_on_fire_key) && _tr.trigger_sfx_on_fire_key != "") SFX_Play(_tr.trigger_sfx_on_fire_key);
+    return true;
+}
+
+// ---- lore notes (D107) ----
+// Readable notes at fixed tiles in the existing floor rooms. Each is a plain obj_interactable made at room start (Notes_SpawnForRoom) and read
+// through the interact path (Interact_Handle); no new object. 4 are always there, the rest show your own earlier marks after 3 / 6 / 10 deaths.
+// A note you read is recorded in the profile (unlocks "note_<id>"): Note_Collected is the data function the Codex will list.
+function Note_Defs() {
+    var defs = [
+        { id: "map_page", room: "rm_floor1", tx: 1, ty: 6, min_deaths: 0, title: "Torn survey page", lines: [
+            "A page torn from a survey book. Your handwriting.",
+            "\"No tunnel here. Not on any map I ever drew.\"",
+            "The ink still looks wet. You don't remember writing it." ] },
+        { id: "wall_breath", room: "rm_floor3", tx: 6, ty: 6, min_deaths: 0, title: "Wall scratches", lines: [
+            "Scratched deep into the stone, slowly and carefully:",
+            "\"It breathes. Hold still and you can feel it.\"",
+            "\"Every step goes deeper. None of them go back.\"" ] },
+        { id: "lost_others", room: "rm_floor6", tx: 3, ty: 15, min_deaths: 0, title: "Unfinished letter", lines: [
+            "A letter that stops in the middle of a sentence.",
+            "\"The others went ahead. Or I did. I can't tell anymore.\"",
+            "\"I keep calling for them. Only the walls answer.\"" ] },
+        { id: "carved_arrow", room: "rm_floor8", tx: 2, ty: 3, min_deaths: 0, title: "Carved arrow", lines: [
+            "An arrow is carved here, pointing up.",
+            "Someone crossed it out. Beneath it, one word:",
+            "\"Don't.\"" ] },
+        { id: "three_marks", room: "rm_floor2", tx: 8, ty: 6, min_deaths: 3, title: "Three marks", lines: [
+            "Three short scratches in the stone.",
+            "You made these. You don't remember making them." ] },
+        { id: "mapmaker_scrap", room: "rm_floor4", tx: 2, ty: 8, min_deaths: 3, title: "Mapmaker's scrap", lines: [
+            "A scrap of paper in your own hand:",
+            "\"The fall was no accident. It wanted a mapmaker.\"",
+            "\"Someone who would map it, and come back to map it again.\"" ] },
+        { id: "six_marks", room: "rm_floor7", tx: 12, ty: 12, min_deaths: 6, title: "Six marks", lines: [
+            "Six scratches in a row, tidy as a ledger.",
+            "Beside them, in a shakier hand: \"Stop counting.\"",
+            "\"It only counts you back.\"" ] },
+        { id: "wall_of_marks", room: "rm_floor9", tx: 7, ty: 4, min_deaths: 10, title: "A wall of marks", lines: [
+            "Ten scratches. Then more, far older than yours.",
+            "Some are in other hands.",
+            "You are not the first to wake down here." ] }
+    ];
+    for (var i = 0; i < array_length(defs); i++) {
+        var d = defs[i];
+        d.title = Loc_T("note." + d.id + ".title", d.title);
+        for (var j = 0; j < array_length(d.lines); j++) d.lines[j] = Loc_T("note." + d.id + "." + string(j), d.lines[j]);
+        defs[i] = d;
+    }
+    return defs;
+}
+
+function Note_Visible(_def, _deaths) {
+    return _deaths >= _def.min_deaths;
+}
+
+// The notes that stand in _room_name for a player with _deaths deaths.
+function Note_ForRoom(_room_name, _deaths) {
+    var out = [];
+    var defs = Note_Defs();
+    for (var i = 0; i < array_length(defs); i++) {
+        if (defs[i].room == _room_name && Note_Visible(defs[i], _deaths)) array_push(out, defs[i]);
+    }
+    return out;
+}
+
+function Note_UnlockKey(_id) {
+    return "note_" + string(_id);
+}
+
+function Note_MarkCollected(_prof, _id) {
+    Profile_Unlock(_prof, Note_UnlockKey(_id));
+}
+
+function Note_IsCollected(_prof, _id) {
+    return Profile_IsUnlocked(_prof, Note_UnlockKey(_id));
+}
+
+// Codex data: every note read so far, in note order, each { id, title, lines, room, min_deaths }.
+function Note_Collected(_prof) {
+    var out = [];
+    var defs = Note_Defs();
+    for (var i = 0; i < array_length(defs); i++) {
+        if (Note_IsCollected(_prof, defs[i].id)) array_push(out, defs[i]);
+    }
+    return out;
+}
+
+// Room start (obj_game_controller): stands up the notes this player can see here.
+function Notes_SpawnForRoom() {
+    if (room == rm_start || room == rm_battle || room == rm_cutscene) return 0;
+    var list = Note_ForRoom(room_get_name(room), Profile_Get().deaths);
+    var made = 0;
+    for (var i = 0; i < array_length(list); i++) {
+        var d = list[i];
+        var inst = instance_create_layer(d.tx * GRID_TILE_SIZE, d.ty * GRID_TILE_SIZE, "Instances", obj_interactable);
+        with (inst) {
+            note_id = d.id;
+            interact_kind = INTERACT_DIALOGUE;
+            interact_name = d.title;
+            sprite_index = spr_red;   // only its 16 x 16 mask is used (the note is drawn by Note_DrawWorldFx); like the graves it is not visible itself
+            visible = false;
+        }
+        made++;
+    }
+    return made;
+}
+
+function Note_Find(_id) {
+    var defs = Note_Defs();
+    for (var i = 0; i < array_length(defs); i++) { if (defs[i].id == _id) return defs[i]; }
+    return undefined;
+}
+
+// Interact_Handle: the player read a note. The text opens as a dialogue under the note's title; the note is recorded in the profile.
+function Note_Read(_inst) {
+    var d = Note_Find(_inst.note_id);
+    if (!is_struct(d)) return false;
+    var prof = Profile_Get();
+    if (!Note_IsCollected(prof, d.id)) {
+        Note_MarkCollected(prof, d.id);
+        Profile_Flush();
+    }
+    Dialogue_StartWithSpeaker(d.title, d.lines);
+    return true;
+}
+
+// World layer script (World_DrawFx): a small page on the note's tile. Pale while unread, dimmer once read. Four palette colours.
+function Note_DrawWorldFx() {
+    if (!Fx_IsWorldPass()) return;
+    if (!instance_exists(obj_interactable)) return;
+    var c0 = make_color_rgb(7, 24, 33);
+    var c1 = make_color_rgb(48, 104, 80);
+    var c2 = make_color_rgb(134, 192, 108);
+    var c3 = make_color_rgb(224, 248, 207);
+    var oc = draw_get_color();
+    var oa = draw_get_alpha();
+    draw_set_alpha(1);
+    var prof = Profile_Get();
+    with (obj_interactable) {
+        if (!variable_instance_exists(id, "note_id")) continue;
+        var read = Note_IsCollected(prof, note_id);
+        var nx = floor(x);
+        var ny = floor(y);
+        draw_set_color(c0);
+        draw_rectangle(nx + 3, ny + 2, nx + 12, ny + 13, false);
+        draw_set_color(read ? c2 : c3);
+        draw_rectangle(nx + 4, ny + 3, nx + 11, ny + 12, false);
+        draw_set_color(c1);
+        draw_rectangle(nx + 5, ny + 5, nx + 10, ny + 5, false);
+        draw_rectangle(nx + 5, ny + 7, nx + 10, ny + 7, false);
+        draw_rectangle(nx + 5, ny + 9, nx + 8, ny + 9, false);
+    }
+    draw_set_color(oc);
+    draw_set_alpha(oa);
+}
+
+// ---- closing text and credits (D105, D40) ----
+// The last cutscene segment of the ending (after "There is no hope."). D105: "Thank you for playing..." and "by PaleRook" stay, the
+// prototype / 2 months wording is gone. The credits roll follows it.
+function Story_ClosingLines() {
+    return [
+        "Thank you for playing...",
+        "We're glad you made it all the way to the end.",
+        "We're looking to use what we learned from this game for our next title.",
+        "Please support our next development :)",
+        "by PaleRook",
+        "..."
+    ];
+}
+
+// TODO-OWNER: the owner has not sent the sound / music creator names yet (D40). Until then every sound carries this placeholder; when the names
+// arrive, set the creator of each asset in Credits_SoundAssets below (the roll groups sounds by creator by itself).
+#macro CREDITS_CREATOR_TBD "(owner to supply)"
+
+// All 126 sound and music assets, by asset name. TODO-OWNER: creator per asset.
+function Credits_SoundAssets() {
+    var names = [
+        "Abstract1", "Abstract2", "African1", "African2", "African3", "African4", "Ambience_haunting",
+        "Ambience_haunting_2", "Arrival", "barrel_break", "Bite_2", "bleed", "Blocked", "Body_falling_wood",
+        "Bow_Attack_", "Bow_Impact_Hit_", "chest_open", "Coffee1", "Coffee2", "Crying_moaning_ambience",
+        "Crying_moaning_ambience_2", "Crying_moaning_ambience_3", "dire_wolf_attack", "dire_wolf_spawn",
+        "double_shot", "Dropping_keys", "evasion_up", "final_boss_spawn", "fireball", "Fireball_2", "foresight",
+        "forest_bgm__for_everymap_with_trees", "Ghost_scream_3", "ghost_sword_attack", "ghost_sword_spawn",
+        "GooeySlime___Sound_Effect", "Hiss", "horinzotal_slash", "horizontal_slash", "ice_spear", "kill_torch",
+        "killer_plant_attack", "killer_plant_spawn", "Knife_stab", "Laugh_evil_deep_3", "Laugh_spooky_3",
+        "Laugh_spooky_4", "Liquid_slosh", "mad_whisp_attack", "mad_whisp_spawn", "mage_attack", "meditation35",
+        "Metal_resonance", "mini_boss_attack", "mini_boss_spawn", "Minimalist1", "Minimalist10", "Minimalist11",
+        "Minimalist12", "Minimalist13", "Minimalist2", "Minimalist3", "Minimalist4", "Minimalist5", "Minimalist6",
+        "Minimalist7", "Minimalist8", "Minimalist9", "miss_effect", "miss_effect2", "Modern1", "Modern10",
+        "Modern11", "Modern12", "Modern13", "Modern14", "Modern15", "Modern16", "Modern2", "Modern3", "Modern4",
+        "Modern5", "Modern6", "Modern7", "Modern8", "Modern9", "Monster_chatter", "Monster_chatter_2",
+        "Monster_chatter_3", "Monster_chatter_4", "Monster_Roar_5", "Monster_Roar_9", "muscle_up", "overall_bgm",
+        "Punch_1", "Punch_2", "Punch_3", "Punch_crunchy", "Punch_crunchy_2", "Retro1", "Retro10", "Retro11",
+        "Retro12", "Retro2", "Retro3", "Retro4", "Retro5", "Retro6", "Retro7", "Retro8", "Retro9", "rev_up",
+        "Slice_Whoosh_Sound_Effect", "Slime_Attack__Nr__1__Minecraft_Sound____Sound_Effect_for_editing",
+        "snake_spaawn_and_attack", "spider_both_attack_and_spawn", "stun", "sword_attack", "sword_impact",
+        "take_aim", "The_Twilight_of_Camelot", "waterspray", "Whip_2", "Wood_Block1", "Wood_Block2", "Wood_Block3"
+    ];
+    var out = [];
+    for (var i = 0; i < array_length(names); i++) array_push(out, { asset: names[i], creator: CREDITS_CREATOR_TBD });   // TODO-OWNER
+    return out;
+}
+
+// The credits roll as { kind, text }: "title", "head", "line", "names" (a paragraph) and "gap".
+function Credits_Lines() {
+    var out = [];
+    array_push(out, { kind: "title", text: Loc_T("credits.title", "NO HOPE") });
+    array_push(out, { kind: "line", text: Loc_T("credits.game_by", "Game and art by PaleRook") });
+    array_push(out, { kind: "gap", text: "" });
+    array_push(out, { kind: "head", text: Loc_T("credits.fonts", "Fonts") });
+    array_push(out, { kind: "line", text: Loc_T("credits.font_galmuri", "Galmuri by Lee Minseo (OFL-1.1)") });
+    array_push(out, { kind: "line", text: Loc_T("credits.font_pixel", "Retro Gaming pixel font") });
+    array_push(out, { kind: "gap", text: "" });
+    array_push(out, { kind: "head", text: Loc_T("credits.tools", "Tools") });
+    array_push(out, { kind: "line", text: Loc_T("credits.tool_gamemaker", "Made with GameMaker") });
+    array_push(out, { kind: "gap", text: "" });
+    array_push(out, { kind: "head", text: Loc_T("credits.sounds", "Sound and music") });
+    var snd = Credits_SoundAssets();
+    var creators = [];
+    for (var i = 0; i < array_length(snd); i++) {
+        var seen = false;
+        for (var c = 0; c < array_length(creators); c++) { if (creators[c] == snd[i].creator) seen = true; }
+        if (!seen) array_push(creators, snd[i].creator);
+    }
+    for (var g = 0; g < array_length(creators); g++) {
+        var list = "";
+        for (var s = 0; s < array_length(snd); s++) {
+            if (snd[s].creator != creators[g]) continue;
+            list += ((list == "") ? "" : ", ") + snd[s].asset;
+        }
+        array_push(out, { kind: "line", text: Loc_T("credits.creator", "creator: {name}", { name: creators[g] }) });
+        array_push(out, { kind: "names", text: list });
+        array_push(out, { kind: "gap", text: "" });
+    }
+    array_push(out, { kind: "gap", text: "" });
+    array_push(out, { kind: "line", text: Loc_T("credits.thanks", "Thank you for playing.") });
+    array_push(out, { kind: "line", text: Loc_T("credits.by", "by PaleRook") });
+    return out;
+}
+
+// The roll without its spacing, as plain strings (what the tests search).
+function Credits_PlainLines() {
+    var out = [];
+    var entries = Credits_Lines();
+    for (var i = 0; i < array_length(entries); i++) { if (entries[i].kind != "gap") array_push(out, entries[i].text); }
+    return out;
+}
+
+// Lays the roll out for the current GUI size: y of every entry (from the top of the roll), its height, and the whole height.
+function Credits_Layout() {
+    var mt = Ui_Metrics();
+    var entries = Credits_Lines();
+    var col_w = min(mt.gw - 2 * mt.margin, round(mt.gw * 0.7));
+    var ypos = 0;
+    var rows = [];
+    for (var i = 0; i < array_length(entries); i++) {
+        var e = entries[i];
+        var h = mt.line_h;
+        var pre = 0;
+        if (e.kind == "gap") h = mt.line_h;
+        else if (e.kind == "names") h = Ui_TextBlockH(e.text, col_w);
+        else if (e.kind == "title") h = mt.line_h * 2;
+        else if (e.kind == "head") pre = mt.line_h div 2;
+        ypos += pre;
+        array_push(rows, { kind: e.kind, text: e.text, y: ypos, h: h });
+        ypos += h + mt.p * 2;
+    }
+    return { rows: rows, total: ypos, col_w: col_w };
+}
+
+// Frames the roll takes at one GUI pixel per frame (a screen of lead-in, the roll, a screen of lead-out).
+function Credits_TotalFrames(_layout = undefined) {
+    var l = is_struct(_layout) ? _layout : Credits_Layout();
+    return Display_GuiH() + l.total + round(Display_GuiH() * 0.5);
+}
+
+function Credits_Draw(_t) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    Ui_Box(0, 0, mt.gw, mt.gh, UI_C_DARKEST);
+    var l = Credits_Layout();
+    var top = mt.gh - _t;   // one GUI pixel per frame
+    var cx = round(mt.gw / 2);
+    for (var i = 0; i < array_length(l.rows); i++) {
+        var r = l.rows[i];
+        var ry = top + r.y;
+        if (ry > mt.gh || ry + r.h < 0) continue;
+        switch (r.kind) {
+            case "title": Ui_Text(cx, ry, r.text, UI_C_LIGHTEST, fa_center); break;
+            case "head": Ui_Text(cx, ry, r.text, UI_C_LIGHTEST, fa_center); break;
+            case "line": Ui_Text(cx, ry, r.text, UI_C_LIGHT, fa_center); break;
+            case "names": {
+                var s = max(0.0001, UI_GetFontScale());
+                draw_set_halign(fa_center);
+                draw_set_valign(fa_top);
+                draw_set_color(UI_C_LIGHT);
+                draw_text_ext_transformed(cx, round(ry), r.text, -1, max(1, round(l.col_w / s)), s, s, 0);
+                draw_set_halign(fa_left);
+            } break;
+        }
+    }
+}

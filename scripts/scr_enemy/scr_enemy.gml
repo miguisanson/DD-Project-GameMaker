@@ -820,6 +820,7 @@ function World_RegisterFx(_inst) {
 }
 
 function World_DrawFx() {
+    Note_DrawWorldFx();   // C5 (D107): the lore notes lie under everything else
     Nav_DrawWorldFx();
     Player_DrawWorldFx();
 }

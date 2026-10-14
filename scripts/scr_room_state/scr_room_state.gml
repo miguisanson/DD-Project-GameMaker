@@ -640,7 +640,10 @@ function Run_AutosaveTick() {
 // then RunFlow shows the summary and the echo pick and starts the next run.
 function Run_OnPlayerDeath(_cause = undefined, _result = "died") {
     var cause = is_undefined(_cause) ? Run_CauseText() : _cause;
+    var killer = (_result == "abandoned") ? "" : cause;   // the enemy's name for the "{killer}" slot of a death line
     Run_Finish(_result, cause);
+    global.death_ctx = Death_BuildContext(_result, killer);   // C5 (D103): the line, chosen by death count and killer, before the screen goes dark
+    SFX_Play("body_falling_wood");                            // the fall, as the screen fades to black
     return Transition_RequestCutsceneById("game_over");
 }
 
@@ -657,18 +660,44 @@ function Run_OnWin() {
     Run_Finish("won", "");
 }
 
-// ---- after the death scene: run summary, echo pick, new run (placeholder screens; the scene art and text are packet C5) ----
+// ---- after the fall to black: the death line (D103), the run summary, the echo pick, then a new run at the tunnel entrance ----
+// Phases: "death" (one line, 2-4 s, hold confirm to skip, D48) -> "summary" -> "echo" (only when the run left something to carry) -> "start".
 function RunFlow_Begin() {
     var prof = Profile_Get();
     var entry = (variable_global_exists("run_last") && is_struct(global.run_last)) ? global.run_last : Run_MakeHistoryEntry(Run_Create(0), undefined, "rm_floor1", "died", "");
     var opts = [];
     for (var i = 0; i < array_length(prof.echo_offer); i++) array_push(opts, prof.echo_offer[i]);
-    global.run_flow = { phase: "summary", index: 0, options: opts, entry: entry, t: 0 };
+    var ctx = (variable_global_exists("death_ctx") && is_struct(global.death_ctx)) ? global.death_ctx : Death_BuildContext(entry.result, entry.cause);
+    global.death_ctx = undefined;
+    global.run_flow = { phase: "death", index: 0, options: opts, entry: entry, t: 0, ctx: ctx, menu: undefined };
+    Skip_Reset();
     Cutscene_ClearUiState();
 }
 
 function RunFlow_Active() {
     return variable_global_exists("run_flow") && is_struct(global.run_flow) && global.run_flow.phase != "off";
+}
+
+// One line about an echo option: type and effect, from the same lines the tooltips show.
+function RunFlow_EchoHelp(_o) {
+    var lines = (_o.kind == "skill") ? Tooltip_BuildSkillLines(SkillDB_Get(_o.id)) : Tooltip_BuildItemLines(ItemDB_Get(_o.id));
+    var out = "";
+    for (var i = 1; i < array_length(lines); i++) out += ((out == "") ? "" : " / ") + string(lines[i]);
+    return out;
+}
+
+function RunFlow_BuildEchoMenu(_f) {
+    var items = [];
+    for (var i = 0; i < array_length(_f.options); i++) {
+        array_push(items, { id: "echo" + string(i), label: Run_EchoLabel(_f.options[i]), kind: "button", enabled: true, help: RunFlow_EchoHelp(_f.options[i]), lines: [] });
+    }
+    var m = Ui_MenuNew("run_echo", items, {
+        data: { chosen: -1 },
+        on_confirm: function(_m, _i) { _m.data.chosen = _i; },
+        layout: { title: Loc_T("runflow.echo.title", "Carry one echo into the next fall"), anchor: "center", details: true }
+    });
+    Ui_MenuFixCursor(m, 0);   // the remembered cursor of an earlier death does not count
+    return m;
 }
 
 function RunFlow_Step() {
@@ -677,26 +706,37 @@ function RunFlow_Step() {
     f.t += 1;
     if (Transition_IsActive()) return;
     var ok = Input_UIConfirm();
-    if (f.phase == "summary") {
+    if (f.phase == "death") {
+        Skip_Claim();
+        if (f.t == 1) SFX_Play("metal_resonance");   // the crack
+        if (f.t >= f.ctx.frames || Skip_Consume()) {
+            Skip_Reset();
+            f.phase = "summary";
+            f.t = 0;
+        }
+    } else if (f.phase == "summary") {
         if (ok && f.t > 15) {
             SFX_PlayUI("ui_confirm");
             f.phase = (array_length(f.options) > 0) ? "echo" : "start";
             f.t = 0;
         }
     } else if (f.phase == "echo") {
-        var n = array_length(f.options);
-        if (Input_UIPressed("menu_up")) { f.index = (f.index + n - 1) mod n; SFX_PlayUI("ui_move"); }
-        if (Input_UIPressed("menu_down")) { f.index = (f.index + 1) mod n; SFX_PlayUI("ui_move"); }
-        if (ok && f.t > 10) {
-            SFX_PlayUI("ui_confirm");
-            var prof = Profile_Get();
-            prof.echo = f.options[f.index];
-            prof.echo_offer = [];
-            Profile_Flush();
-            f.phase = "start";
+        if (!is_struct(f.menu)) {
+            f.menu = RunFlow_BuildEchoMenu(f);
+        } else if (f.t > 8) {   // a few frames of grace so the confirm that opened the pick does not also take the first option
+            Ui_MenuUpdate(f.menu);
+            f.index = f.menu.cursor;
+            if (f.menu.data.chosen >= 0) {
+                var prof = Profile_Get();
+                prof.echo = f.options[f.menu.data.chosen];
+                prof.echo_offer = [];
+                Profile_Flush();
+                f.phase = "start";
+            }
         }
     } else if (f.phase == "start") {
         f.phase = "starting";
+        GameState_Get().pending_wake_line = true;   // the short wake line when the entrance room is up (obj_game_controller)
         Run_StartNew(false);
     }
 }
@@ -710,53 +750,48 @@ function RunFlow_CauseLine(_entry) {
 function RunFlow_Draw() {
     if (!RunFlow_Active()) return;
     var f = global.run_flow;
-    var w = Display_GuiW();
-    var h = Display_GuiH();
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var w = mt.gw;
+    var h = mt.gh;
     draw_set_alpha(1);
-    draw_set_color(c_black);
-    draw_rectangle(0, 0, w, h, false);
-    UI_SetFont();
-    draw_set_halign(fa_left);
-    draw_set_valign(fa_top);
-    var lh = UI_TextHeight("A");
-    var gap = max(6, round(lh * 0.5));
-    var lines = [];
-    var title = "";
-    var footer = "";
-    if (f.phase == "summary") {
-        title = Loc_T("runflow.title", "The tunnel keeps you.");
-        array_push(lines, Loc_T("runflow.floor", "Floor reached: {n}", { n: f.entry.floor }));
-        array_push(lines, Loc_T("runflow.class_level", "{cls}, level {lvl}", { cls: DB_PlayerClass(f.entry.class_id).name, lvl: f.entry.level }));
-        array_push(lines, RunFlow_CauseLine(f.entry));
-        array_push(lines, Loc_T("runflow.falls", "Falls so far: {n}", { n: Profile_Get().deaths }));
-        footer = Loc_T("runflow.continue", "Press confirm to go on");
-    } else if (f.phase == "echo") {
-        title = Loc_T("runflow.echo.title", "Carry one echo into the next fall");
-        for (var i = 0; i < array_length(f.options); i++) array_push(lines, Run_EchoLabel(f.options[i]));
-        footer = Loc_T("runflow.echo.hint", "Up / Down to choose, confirm to take it");
-    } else {
-        return;
+    Ui_Box(0, 0, w, h, UI_C_DARKEST);
+    if (f.phase == "death") {
+        // the line fades in, holds, fades out; centred on the screen
+        var fade = 30;
+        var a = clamp(min(f.t / fade, (f.ctx.frames - f.t) / fade), 0, 1);
+        var col_w = min(w - 2 * mt.margin, round(w * 0.6));
+        var th = Ui_TextBlockH(f.ctx.text, col_w);
+        var s = max(0.0001, UI_GetFontScale());
+        draw_set_alpha(a);
+        draw_set_halign(fa_center);
+        draw_set_valign(fa_top);
+        draw_set_color(UI_C_LIGHTEST);
+        draw_text_ext_transformed(round(w / 2), round((h - th) / 2), f.ctx.text, -1, max(1, round(col_w / s)), s, s, 0);
+        draw_set_halign(fa_left);
+        draw_set_alpha(1);
+    } else if (f.phase == "summary") {
+        var title = Loc_T("runflow.title", "The tunnel keeps you.");
+        var cls = DB_PlayerClass(f.entry.class_id).name;
+        var rows = [
+            { label: Loc_T("runflow.sum.floor", "Floor reached"), value: string(f.entry.floor) },
+            { label: Loc_T("runflow.sum.class", "Class"), value: string(cls) },
+            { label: Loc_T("runflow.sum.level", "Level"), value: string(f.entry.level) },
+            { label: Loc_T("runflow.sum.kills", "Foes beaten"), value: string(f.entry.kills) },
+            { label: Loc_T("runflow.sum.falls", "Falls so far"), value: string(Profile_Get().deaths) }
+        ];
+        var sentence = RunFlow_CauseLine(f.entry);
+        var footer = Loc_T("runflow.continue", "Press confirm to go on");
+        var pw = min(w - 2 * mt.margin, round(w * 0.62));
+        var dh = Ui_DetailsHeight(pw, sentence, rows);
+        var total = mt.line_h + 3 * p + dh + 3 * p + mt.line_h;
+        var y0 = max(mt.margin, round((h - total) / 2));
+        var px = round((w - pw) / 2);
+        Ui_Text(w / 2, y0, title, UI_C_LIGHTEST, fa_center);
+        Ui_DrawDetails(px, y0 + mt.line_h + 3 * p, pw, dh, sentence, rows);
+        Ui_Text(w / 2, y0 + mt.line_h + 3 * p + dh + 3 * p, footer, UI_C_LIGHT, fa_center);
+    } else if (f.phase == "echo" && is_struct(f.menu)) {
+        Ui_MenuDraw(f.menu, Ui_MenuAlpha(f.menu, current_time));
     }
-    var total_h = lh + gap * 2 + array_length(lines) * (lh + gap) + gap + lh;
-    var y0 = max(8, round((h - total_h) * 0.5));
-    draw_set_color(c_white);
-    UI_DrawText(round((w - UI_TextWidth(title)) * 0.5), y0, title);
-    var y1 = y0 + lh + gap * 2;
-    for (var k = 0; k < array_length(lines); k++) {
-        var sel = (f.phase == "echo" && k == f.index);
-        var tw = UI_TextWidth(lines[k]);
-        var tx = round((w - tw) * 0.5);
-        if (sel) {
-            draw_set_color(c_white);
-            draw_rectangle(tx - 6, y1 - 2, tx + tw + 6, y1 + lh + 2, false);
-            draw_set_color(c_black);
-        } else {
-            draw_set_color(c_white);
-        }
-        UI_DrawText(tx, y1, lines[k]);
-        y1 += lh + gap;
-    }
-    draw_set_color(c_gray);
-    UI_DrawText(round((w - UI_TextWidth(footer)) * 0.5), y1 + gap, footer);
-    draw_set_color(c_white);
+    draw_set_alpha(1);
 }

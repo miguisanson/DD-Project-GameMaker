@@ -267,6 +267,13 @@ function Interact_Handle(_inst) {
         }
     }
 
+    // C5 (D107): a lore note made by Notes_SpawnForRoom: read it, record it in the profile.
+    if (variable_instance_exists(_inst, "note_id") && _inst.note_id != "") {
+        Note_Read(_inst);
+        GameState_SyncLegacy();
+        return;
+    }
+
     // Special chest that opens class-select popup (used in rm_floor1).
     if (variable_instance_exists(_inst, "class_select_chest") && _inst.class_select_chest) {
         if (variable_instance_exists(_inst, "swap_on_interact") && _inst.swap_on_interact && !_inst.swapped) {

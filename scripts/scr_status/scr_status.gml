@@ -770,7 +770,10 @@ function Status_ApplyHpTick(_ch, _entry, _cfg, _acted) {
     var hp_before = _ch.hp;
     _ch.hp = clamp(_ch.hp + delta_hp, 0, _ch.max_hp);
     if (_ch.hp < hp_before) {
-        if (variable_struct_exists(_ch, "is_player") && _ch.is_player) Status_TickFeedback(_entry.id, hp_before - _ch.hp);
+        if (variable_struct_exists(_ch, "is_player") && _ch.is_player) {
+            Status_TickFeedback(_entry.id, hp_before - _ch.hp);
+            if (_ch.hp <= 0) Death_NoteDotKill(_entry.id);   // C5 (D103): the death line can say what finished you
+        }
         else Status_TickFeedbackEnemy(_entry.id, hp_before - _ch.hp, variable_struct_exists(_ch, "name") ? string(_ch.name) : "");
     }
     return _ch;
