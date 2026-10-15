@@ -4022,7 +4022,7 @@ function Export_Build() {
     for (var fl = 1; fl <= 9; fl++) array_push(data.floors, { floor: fl, pool: Shuffle_EnemyPool(fl) });
     data.items = Export_MapRecords(global.item_db, ItemDB_Get);
     data.statuses = Export_MapRecords(global.status_db, StatusDB_Get);
-    data.loot = { tables: {}, configs: {}, tier_weights: Export_Clean(global.loot_tier_weights) };
+    data.loot = { tables: {}, configs: {}, tier_weights: Export_Clean(global.loot_tier_weights), tier_odds: Export_Clean(global.loot_tier_odds) };
     var tk = ds_map_keys_to_array(global.loot_tables);
     for (var ti = 0; ti < array_length(tk); ti++) variable_struct_set(data.loot.tables, string(tk[ti]), Export_Clean(global.loot_tables[? tk[ti]]));
     var ck = ds_map_keys_to_array(global.loot_configs);

@@ -101,8 +101,10 @@ def enemy_hp(name, level):
     return e[4] + (level - 1) * (math.ceil(e[5] / 2) + 1)
 
 
-def run_chance(spd_player, spd_enemy):
-    return min(0.95, max(0.10, 0.5 + 0.05 * (spd_player - spd_enemy)))
+def run_chance(spd_player, spd_enemy, fails=0):
+    # D121: X / (X + K) with the enemy's SPD as K, +0.25 per failed try in the same fight, at most 1
+    p, e = max(1, spd_player), max(1, spd_enemy)
+    return min(1.0, p / (p + e) + 0.25 * fails)
 
 
 def crit_chance(bonus):
@@ -250,7 +252,7 @@ def build():
                      ("stranger", 8), ("palehorn", 8), ("choirbeast", 10)]:
         e = ENEMIES[name]
         v["enemies"].append(dict(id="en_%s_%d" % (name, lv), enemy=name, level=lv, atk=e[0], df=e[1], spd=e[2], mag=e[3], hp=enemy_hp(name, lv)))
-    v["run_chance"] = [dict(id="run_%d_%d" % (a, b), spd_player=a, spd_enemy=b, want=round(run_chance(a, b), 4)) for a, b in [(8, 9), (13, 9), (30, 5), (1, 40), (10, 10)]]
+    v["run_chance"] = [dict(id="run_%d_%d" % (a, b), spd_player=a, spd_enemy=b, want=round(run_chance(a, b), 6)) for a, b in [(8, 9), (13, 9), (30, 5), (1, 40), (10, 10)]]
     v["crit_chance"] = [dict(id="crit_%d" % b, bonus=b, want=crit_chance(b)) for b in (0, 25, 80)]
     v["heal"] = [dict(id="heal_5_12", power=5, A=12, want=heal(5, 12))]
     v["first_actor"] = [dict(id="first_%d_%d" % (a, b), spd_player=a, spd_enemy=b, player_first=player_first(a, b)) for a, b in [(8, 9), (9, 9), (13, 9)]]

@@ -99,6 +99,7 @@ function Test_RunAll() {
     Test_RunSuite("BattleUi", Test_Suite_BattleUi);
     Test_RunSuite("TabMenu", Test_Suite_TabMenu);
     Test_RunSuite("BalanceD111", Test_Suite_BalanceD111);
+    Test_RunSuite("FairRng", Test_Suite_FairRng);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     Test_RunSuite("Mem", Test_Suite_Mem);
     Test_RunSuite("Input", Test_Suite_Input);
@@ -270,10 +271,10 @@ function Test_Suite_Stats() {
     Test_EnemyAt("vec en_stranger_8", ENEMY_STRANGER, 8, 16, 14, 13, 15, 53);
     Test_EnemyAt("vec en_palehorn_8", ENEMY_MINI_BOSS, 8, 18, 18, 12, 14, 97);
     Test_EnemyAt("vec en_choirbeast_10", ENEMY_FINAL_BOSS, 10, 21, 24, 14, 19, 194);
-    Test_Eq("vec run_8_9", Battle_RunChance(8, 9), 0.45);
-    Test_Eq("vec run_13_9", Battle_RunChance(13, 9), 0.7);
-    Test_Eq("vec run_30_5", Battle_RunChance(30, 5), 0.95);
-    Test_Eq("vec run_1_40", Battle_RunChance(1, 40), 0.1);
+    Test_Eq("vec run_8_9", Battle_RunChance(8, 9), 0.470588);
+    Test_Eq("vec run_13_9", Battle_RunChance(13, 9), 0.590909);
+    Test_Eq("vec run_30_5", Battle_RunChance(30, 5), 0.857143);
+    Test_Eq("vec run_1_40", Battle_RunChance(1, 40), 0.02439);
     Test_Eq("vec run_10_10", Battle_RunChance(10, 10), 0.5);
     Test_Eq("vec crit_0", Combat_CritChance(0), 0.0);
     Test_Eq("vec crit_25", Combat_CritChance(25), 0.25);
@@ -3269,6 +3270,7 @@ function Test_Suite_RunSave() {
     repeat (5) RunRng_Float("loot");
     _gs.run.gold = 7;
     _gs.run.kills = 3;
+    _gs.run.drop_dry = 4;   // R1 (D120)
     var _p = CharacterCreate_Player(CLASS_MAGE);
     _p.level = 3; _p.exp = 5;
     _p = Player_NormalizeProgression(_p, true);
@@ -3290,6 +3292,7 @@ function Test_Suite_RunSave() {
     Test_Eq("runsave: untouched stream counter", _raw.rng.map.calls, 0);
     Test_Eq("runsave: gold", _raw.gold, 7);
     Test_Eq("runsave: kills", _raw.kills, 3);
+    Test_Eq("runsave: dry-fight counter (R1 D120)", _raw.drop_dry, 4);
     Test_Eq("runsave: room name", _raw.statData.save_room_name, "rm_floor3");
     Test_Eq("runsave: floor number", _raw.floor, 3);
     Test_Eq("runsave: class", _raw.statData.selected_class, CLASS_MAGE);
@@ -3316,6 +3319,7 @@ function Test_Suite_RunSave() {
     Test_True("runsave: restored run is active", _gs.run.active);
     Test_Eq("runsave: restored gold", _gs.run.gold, 7);
     Test_Eq("runsave: restored kills", _gs.run.kills, 3);
+    Test_Eq("runsave: restored dry-fight counter (R1 D120)", _gs.run.drop_dry, 4);
     Test_Eq("runsave: restored loot counter", _gs.run.rng.loot.calls, 5);
     Test_Eq("runsave: the restored loot stream continues where it stopped", Rng_Next(_gs.run.rng.loot), _predicted);
     Test_Eq("runsave: restored class", _r.class_id, CLASS_MAGE);
@@ -5581,13 +5585,6 @@ function Test_Suite_Economy() {
     var _same_plan = 0;
     for (var _sd = 1; _sd <= 12; _sd++) { if (json_stringify(Shuffle_RoomPlan(_sd, "rm_floor4", _slots)) == json_stringify(_plan_a)) _same_plan++; }
     Test_True("C3 shuffle: twelve seeds give mostly different layouts", _same_plan <= 2);
-    var _el = 0;
-    for (var _k2 = 0; _k2 < 2000; _k2++) { if (Shuffle_IsElite(77, "k" + string(_k2))) _el++; }
-    Test_True("C3 shuffle: about 15% of map enemies are elites (255..345 of 2000)", _el >= 255 && _el <= 345);
-    Test_Eq("C3 shuffle: the elite roll of one enemy never changes", Shuffle_IsElite(77, "k5"), Shuffle_IsElite(77, "k5"));
-    var _el_other = 0;
-    for (var _k3 = 0; _k3 < 400; _k3++) { if (Shuffle_IsElite(77, "k" + string(_k3)) != Shuffle_IsElite(78, "k" + string(_k3))) _el_other++; }
-    Test_True("C3 shuffle: which enemies are elites depends on the seed (about 2 x 15% x 85% = 25% of 400 differ)", _el_other >= 60 && _el_other <= 140);
     var _any_elite = false;
     for (var _sd2 = 1; _sd2 <= 60 && !_any_elite; _sd2++) {
         var _pp = Shuffle_RoomPlan(_sd2, "rm_floor4", _slots);
@@ -5891,4 +5888,208 @@ function Test_Suite_BalanceD111() {
     Test_Eq("D111 THROW_NOBODY_MULT is 2", THROW_NOBODY_MULT, 2);
     Test_Eq("D111 Nobody's throws are x2", Throw_Mult(CharacterCreate_Player(CLASS_NOBODY)), 2);
     Test_Eq("D111 the Knight's throws are x1", Throw_Mult(CharacterCreate_Player(CLASS_KNIGHT)), 1);
+}
+
+// R1 (D117-D125, owner grill 2026-10-15): fairer randomness. Expected values come from the decisions, not from the code:
+// tier first then item (odds kept at today's effective values), chests never empty, crit marble bag, enemy-drop bad-luck
+// protection, flee = SPD / (SPD + enemy SPD) + 0.25 per failed try, elites dealt per floor, run save version 2.
+function Test_Suite_FairRng() {
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+
+    // ---- D117: the tier is rolled first (rarest first), then the item from that tier ----
+    var _odds = Loot_TierOdds("chest", 1);
+    Test_Eq("R1 D117: chest level-1 tier odds keep today's effective values (low 0.87)", _odds[0], 0.87);
+    Test_Eq("R1 D117: chest level-1 mid 0.115", _odds[1], 0.115);
+    Test_Eq("R1 D117: chest level-1 high 0.015", _odds[2], 0.015);
+    var _sums_ok = true;
+    var _tabs = ["chest", "barrel", "enemy"];
+    for (var _t = 0; _t < 3; _t++) {
+        for (var _lv = 1; _lv <= 3; _lv++) {
+            var _o = Loot_TierOdds(_tabs[_t], _lv);
+            if (abs(_o[0] + _o[1] + _o[2] - 1) > 0.0001) _sums_ok = false;
+        }
+    }
+    Test_True("R1 D117: every table's tier odds add up to 1 at every level", _sums_ok);
+    var _rng = Rng_New(31337, "r1tier");
+    var _tc = [0, 0, 0, 0];
+    for (var _i = 0; _i < 4000; _i++) _tc[Loot_RollTier(_rng, [0.5, 0.3, 0.2])]++;
+    Test_True("R1 D117: odds 0.5/0.3/0.2 -> about 800 rare of 4000 (700..900)", _tc[3] >= 700 && _tc[3] <= 900);
+    Test_True("R1 D117: odds 0.5/0.3/0.2 -> about 1200 mid of 4000 (1050..1350)", _tc[2] >= 1050 && _tc[2] <= 1350);
+    var _always_hi = true;
+    var _always_lo = true;
+    for (var _i2 = 0; _i2 < 200; _i2++) {
+        if (Loot_RollTier(_rng, [0, 0, 1]) != 3) _always_hi = false;
+        if (Loot_RollTier(_rng, [1, 0, 0]) != 1) _always_lo = false;
+    }
+    Test_True("R1 D117: odds 0/0/1 always give the rare tier", _always_hi);
+    Test_True("R1 D117: odds 1/0/0 always give the common tier", _always_lo);
+    // many extra rare rows must not make the rare tier more likely (the old single table gives about 60% rare here)
+    var _hero = Test_Hero(CLASS_KNIGHT);
+    var _heavy = [];
+    repeat (5) array_push(_heavy, { item_id: 15, weight: 1000, tier: 3, qty_min: 1, qty_max: 1 });
+    var _rare_ids = [15, 18, 3, 6, 9, 22, 25];
+    var _rare = 0;
+    var _rng2 = Rng_New(4711, "r1heavy");
+    for (var _i3 = 0; _i3 < 2000; _i3++) {
+        var _it = Loot_RollFromTable("chest", 1, _hero, -1, [], _rng2, _heavy);
+        if (is_struct(_it) && Card_ArrayHas(_rare_ids, _it.item_id)) _rare++;
+    }
+    Test_True("R1 D117: extra rare rows do not change the rare-tier odds (level 1: about 30 of 2000, at most 60)", _rare <= 60);
+
+    // ---- D118: chests are never empty; gear rows always give 1 ----
+    var _chest_rows = Loot_TableGet("chest");
+    var _rows_ok = true;
+    for (var _r = 0; _r < array_length(_chest_rows); _r++) {
+        if (_chest_rows[_r].item_id <= 0 || _chest_rows[_r].qty_min < 1) _rows_ok = false;
+    }
+    Test_True("R1 D118: the chest table has no 'nothing' row and no 0-quantity row", _rows_ok);
+    var _gear_ok = true;
+    for (var _t2 = 0; _t2 < 3; _t2++) {
+        var _rows = Loot_TableGet(_tabs[_t2]);
+        for (var _r2 = 0; _r2 < array_length(_rows); _r2++) {
+            if (_rows[_r2].item_id <= 0) continue;
+            var _cfg = ItemDB_Get(_rows[_r2].item_id);
+            if (is_struct(_cfg) && (_cfg.type == ITEM_WEAPON || _cfg.type == ITEM_ARMOR || _cfg.type == ITEM_ACCESSORY) && _rows[_r2].qty_min < 1) _gear_ok = false;
+        }
+    }
+    Test_True("R1 D118: a gear row in any table always gives 1 (no hidden 0-quantity roll)", _gear_ok);
+    var _empty = 0;
+    var _classes = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE];
+    for (var _c = 0; _c < 3; _c++) {
+        var _h = Test_Hero(_classes[_c]);
+        for (var _sd = 1; _sd <= 60; _sd++) {
+            for (var _lv2 = 1; _lv2 <= 3; _lv2++) {
+                var _loot = Shuffle_ChestLoot(_sd, "rm_floor" + string(1 + (_sd mod 9)), "p" + string(_sd), _lv2, "chest_basic", _h);
+                if (array_length(_loot) < 1 || _loot[0].qty < 1) _empty++;
+            }
+        }
+    }
+    Test_Eq("R1 D118: 540 chests (3 classes x 60 seeds x 3 levels) are never empty", _empty, 0);
+
+    // ---- D119: crits come from a shuffled marble bag, refilled when a crit buff is applied ----
+    var _bs = Crit_BagSize(0.25);
+    Test_True("R1 D119: 25% = a bag of 4 with 1 crit", _bs.n == 4 && _bs.reds == 1);
+    _bs = Crit_BagSize(0.5);
+    Test_True("R1 D119: 50% = a bag of 2 with 1 crit", _bs.n == 2 && _bs.reds == 1);
+    _bs = Crit_BagSize(0.3);
+    Test_True("R1 D119: 30% = a bag of 10 with 3 crits", _bs.n == 10 && _bs.reds == 3);
+    _bs = Crit_BagSize(0.35);
+    Test_True("R1 D119: 35% = a bag of 20 with 7 crits", _bs.n == 20 && _bs.reds == 7);
+    _bs = Crit_BagSize(1);
+    Test_True("R1 D119: 100% = a bag of 1 crit", _bs.n == 1 && _bs.reds == 1);
+    var _plain = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_False("R1 D119: no bonus, no crit", Combat_CritCheck(_plain, 0));
+    Test_Eq("R1 D119: no bonus, no bag", Crit_BagLeft(_plain), 0);
+    var _aim = Status_Add(CharacterCreate_Player(CLASS_ARCHER), STATUS_CRIT_UP, 9, 0);
+    var _bonus = Status_GetSum(_aim, "crit_bonus");
+    Test_Eq("R1 D119: a fresh buff starts with no bag drawn yet", Crit_BagLeft(_aim), 0);
+    var _n4 = 0;
+    for (var _k = 0; _k < 4; _k++) if (Combat_CritCheck(_aim, _bonus)) _n4++;
+    Test_Eq("R1 D119: Take Aim crits exactly once in its first 4 hits", _n4, 1);
+    var _n8 = 0;
+    for (var _k2 = 0; _k2 < 4; _k2++) if (Combat_CritCheck(_aim, _bonus)) _n8++;
+    Test_Eq("R1 D119: and exactly once in the next 4", _n8, 1);
+    var _total = 0;
+    var _dry = 0;
+    var _worst = 0;
+    for (var _k3 = 0; _k3 < 400; _k3++) {
+        if (Combat_CritCheck(_aim, _bonus)) { _total++; _dry = 0; } else { _dry++; _worst = max(_worst, _dry); }
+    }
+    Test_Eq("R1 D119: 400 hits at 25% give exactly 100 crits", _total, 100);
+    Test_True("R1 D119: never more than 6 hits in a row without a crit at 25%", _worst <= 6);
+    var _aim2 = Status_Add(CharacterCreate_Player(CLASS_ARCHER), STATUS_CRIT_UP, 9, 0);
+    Combat_CritCheck(_aim2, 25);
+    Test_Eq("R1 D119: one hit drawn -> 3 marbles left", Crit_BagLeft(_aim2), 3);
+    _aim2 = Status_Add(_aim2, STATUS_CRIT_UP, 9, 0);
+    Test_Eq("R1 D119: applying the crit buff again empties the bag (a fresh one is filled on the next hit)", Crit_BagLeft(_aim2), 0);
+    Combat_CritCheck(_aim2, 25);
+    Combat_CritCheck(_aim2, 50);
+    Test_Eq("R1 D119: a different chance fills a matching bag (50% -> 2, one drawn)", Crit_BagLeft(_aim2), 1);
+    var _foe = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_CRIT_UP, 9, 0);
+    var _fc = 0;
+    for (var _k4 = 0; _k4 < 8; _k4++) if (Combat_CritCheck(_foe, 25)) _fc++;
+    Test_Eq("R1 D119: enemies use the same bag (2 crits in 8 hits at 25%)", _fc, 2);
+
+    // ---- D120: enemy drops: +10 points per won fight without an item, reset by a drop ----
+    Test_Eq("R1 D120: the step is 0.10", LOOT_DRY_STEP, 0.1);
+    Test_Eq("R1 D120: no dry fights -> the base chance", Loot_EnemyDropChance(0.2, 0), 0.2);
+    Test_Eq("R1 D120: 3 dry fights -> 0.2 + 0.3", Loot_EnemyDropChance(0.2, 3), 0.5);
+    Test_Eq("R1 D120: 8 dry fights -> certain", Loot_EnemyDropChance(0.2, 8), 1);
+    Test_Eq("R1 D120: never above 1", Loot_EnemyDropChance(0.95, 1), 1);
+    _gs.run = Run_Create(4242);
+    Test_Eq("R1 D120: a new run starts with no dry fights", _gs.run.drop_dry, 0);
+    var _streak = 0;
+    var _worst2 = 0;
+    var _counter_ok = true;
+    var _drops = 0;
+    for (var _f = 0; _f < 300; _f++) {
+        var _d = Loot_RollEnemy({ id: ENEMY_SLIME, level: 1, loot_key: "enemy_basic" });
+        if (array_length(_d) > 0) {
+            _drops++;
+            _streak = 0;
+            if (_gs.run.drop_dry != 0) _counter_ok = false;
+            if (_d[0].qty < 1) _counter_ok = false;
+        } else {
+            _streak++;
+            _worst2 = max(_worst2, _streak);
+            if (_gs.run.drop_dry != _streak) _counter_ok = false;
+        }
+    }
+    Test_True("R1 D120: the dry counter counts fights without an item and resets on a drop", _counter_ok);
+    Test_True("R1 D120: at a 20% base never more than 8 fights in a row without an item", _worst2 <= 8);
+    Test_True("R1 D120: drops still happen often (at least 60 of 300)", _drops >= 60);
+
+    // ---- D121: flee = SPD / (SPD + enemy SPD), +0.25 per failed try this fight ----
+    Test_Eq("R1 D121: the retry step is 0.25", FLEE_FAIL_STEP, 0.25);
+    Test_Eq("R1 D121: double speed -> 2/3", Battle_RunChance(20, 10), 0.666667);
+    Test_Eq("R1 D121: equal speed, one failed try -> 0.75", Battle_RunChance(10, 10, 1), 0.75);
+    Test_Eq("R1 D121: equal speed, two failed tries -> certain", Battle_RunChance(10, 10, 2), 1);
+    Test_Eq("R1 D121: never above 1", Battle_RunChance(1, 40, 4), 1);
+
+    // ---- D123: elites are dealt per floor: about 15% of the free slots, at least 1 from floor 2 on ----
+    Test_Eq("R1 D123: floor 4, 3 enemies -> 1 elite", Shuffle_EliteCount(4, 3), 1);
+    Test_Eq("R1 D123: floor 1, 3 enemies -> 0 elites", Shuffle_EliteCount(1, 3), 0);
+    Test_Eq("R1 D123: floor 1, 7 enemies -> 1 elite", Shuffle_EliteCount(1, 7), 1);
+    Test_Eq("R1 D123: floor 4, 10 enemies -> 2 elites (1.5 rounds up)", Shuffle_EliteCount(4, 10), 2);
+    Test_Eq("R1 D123: floor 6, 20 enemies -> 3 elites", Shuffle_EliteCount(6, 20), 3);
+    Test_Eq("R1 D123: floor 2, 1 enemy -> 1 elite", Shuffle_EliteCount(2, 1), 1);
+    Test_Eq("R1 D123: no free enemies -> 0 elites", Shuffle_EliteCount(9, 0), 0);
+    var _slots = [
+        { pid: "e1", enemy_id: ENEMY_DIREWOLF, x: 48, y: 64, fixed: false },
+        { pid: "e2", enemy_id: ENEMY_KILLER_PLANT, x: 96, y: 32, fixed: false },
+        { pid: "e3", enemy_id: ENEMY_KILLER_PLANT, x: 144, y: 80, fixed: false },
+        { pid: "b1", enemy_id: ENEMY_MINI_BOSS, x: 224, y: 32, fixed: true }
+    ];
+    var _each_one = true;
+    var _which = [];
+    for (var _sd2 = 1; _sd2 <= 50; _sd2++) {
+        var _pl = Shuffle_RoomPlan(_sd2, "rm_floor4", _slots);
+        var _ne = 0;
+        for (var _q = 0; _q < 3; _q++) {
+            if (_pl[_q].elite != "") {
+                _ne++;
+                if (!Card_ArrayHas(_which, _q)) array_push(_which, _q);
+            }
+        }
+        if (_ne != 1 || _pl[3].elite != "") _each_one = false;
+    }
+    Test_True("R1 D123: 50 seeds of floor 4 (3 free slots): exactly 1 elite each, never the boss", _each_one);
+    Test_True("R1 D123: which slot is the elite changes with the seed", array_length(_which) >= 2);
+    var _ten = [];
+    for (var _s = 0; _s < 10; _s++) array_push(_ten, { pid: "t" + string(_s), enemy_id: ENEMY_GHOSTSWORD, x: 16 * _s, y: 16, fixed: false });
+    var _two_ok = true;
+    for (var _sd3 = 1; _sd3 <= 20; _sd3++) {
+        var _pl2 = Shuffle_RoomPlan(_sd3, "rm_floor6", _ten);
+        var _ne2 = 0;
+        for (var _q2 = 0; _q2 < 10; _q2++) if (_pl2[_q2].elite != "") _ne2++;
+        if (_ne2 != 2) _two_ok = false;
+    }
+    Test_True("R1 D123: floor 6 with 10 free slots always has exactly 2 elites", _two_ok);
+
+    // ---- D125: run save version 2 ----
+    Test_Eq("R1 D125: the run save version is 2", RUN_SAVE_VERSION, 2);
+
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }
