@@ -1484,10 +1484,11 @@ function DialogueTrigger_TryBanner(_tr) {
     return true;
 }
 
-// ---- lore notes (D107) ----
-// Readable notes at fixed tiles in the existing floor rooms. Each is a plain obj_interactable made at room start (Notes_SpawnForRoom) and read
-// through the interact path (Interact_Handle); no new object. 4 are always there, the rest show your own earlier marks after 3 / 6 / 10 deaths.
-// A note you read is recorded in the profile (unlocks "note_<id>"): Note_Collected is the data function the Codex will list.
+// ---- lore notes (D107, D147) ----
+// Notes at fixed tiles in the existing floor rooms. 4 are always there, the rest show your own earlier marks after 3 / 6 / 10 deaths.
+// D147: a note is picked up by stepping onto its tile (Notes_StepPlayer, from the player's Step): it is read once, recorded in the profile (unlocks
+// "note_<id>") and gone from the map at once. A note found in ANY run never stands on the map again; it is read again in the Codex Notes page
+// (Note_Collected / Codex_NoteRows). A note is not an instance: it is an entry in global.notes_live, so it blocks neither the player nor the enemies' grid.
 function Note_Defs() {
     var defs = [
         { id: "map_page", room: "rm_floor1", tx: 1, ty: 6, min_deaths: 0, title: "Torn survey page", lines: [
@@ -1567,24 +1568,71 @@ function Note_Collected(_prof) {
     return out;
 }
 
-// Room start (obj_game_controller): stands up the notes this player can see here.
-function Notes_SpawnForRoom() {
-    if (room == rm_start || room == rm_battle || room == rm_cutscene) return 0;
-    var list = Note_ForRoom(room_get_name(room), Profile_Get().deaths);
-    var made = 0;
+// The notes that stand in _room_name for a player with _deaths deaths and this profile: the ones whose deaths are reached and that no run has found yet.
+function Notes_ToSpawn(_prof, _room_name, _deaths) {
+    var out = [];
+    var list = Note_ForRoom(_room_name, _deaths);
     for (var i = 0; i < array_length(list); i++) {
-        var d = list[i];
-        var inst = instance_create_layer(d.tx * GRID_TILE_SIZE, d.ty * GRID_TILE_SIZE, "Instances", obj_interactable);
-        with (inst) {
-            note_id = d.id;
-            interact_kind = INTERACT_DIALOGUE;
-            interact_name = d.title;
-            sprite_index = spr_red;   // only its 16 x 16 mask is used (the note is drawn by Note_DrawWorldFx); like the graves it is not visible itself
-            visible = false;
-        }
-        made++;
+        if (!Note_IsCollected(_prof, list[i].id)) array_push(out, list[i]);
     }
-    return made;
+    return out;
+}
+
+// The notes lying on the map of one room: { room, list: [{ id, tx, ty }] }. Rebuilt at every room start; a pickup takes the entry out.
+function Notes_Live() {
+    if (!variable_global_exists("notes_live") || !is_struct(global.notes_live)) global.notes_live = { room: "", list: [] };
+    return global.notes_live;
+}
+
+function Notes_LiveSet(_room_name, _list) {
+    var live = [];
+    for (var i = 0; i < array_length(_list); i++) array_push(live, { id: _list[i].id, tx: _list[i].tx, ty: _list[i].ty });
+    global.notes_live = { room: _room_name, list: live };
+}
+
+function Notes_LiveCount(_room_name) {
+    var l = Notes_Live();
+    return (l.room == _room_name) ? array_length(l.list) : 0;
+}
+
+// The id of the note lying on tile (_tx, _ty) of _room_name, or "".
+function Notes_LiveAtTile(_room_name, _tx, _ty) {
+    var l = Notes_Live();
+    if (l.room != _room_name) return "";
+    for (var i = 0; i < array_length(l.list); i++) {
+        if (l.list[i].tx == _tx && l.list[i].ty == _ty) return l.list[i].id;
+    }
+    return "";
+}
+
+// Picks the note on tile (_tx, _ty) up: it leaves the map, and the profile records it. Returns the note's definition, or undefined when none lies there.
+function Notes_PickupAt(_prof, _room_name, _tx, _ty) {
+    var nid = Notes_LiveAtTile(_room_name, _tx, _ty);
+    if (nid == "") return undefined;
+    var l = Notes_Live();
+    for (var i = array_length(l.list) - 1; i >= 0; i--) {
+        if (l.list[i].id == nid) array_delete(l.list, i, 1);
+    }
+    Note_MarkCollected(_prof, nid);
+    return Note_Find(nid);
+}
+
+// The notice shown when a note is picked up.
+function Note_FoundText(_def) {
+    return Loc_T("note.found", "Note found: {title}", { title: _def.title });
+}
+
+// Room start (obj_game_controller): lays out the notes this player has not found yet and can see here.
+function Notes_SpawnForRoom() {
+    if (room == rm_start || room == rm_battle || room == rm_cutscene) {
+        Notes_LiveSet("", []);
+        return 0;
+    }
+    var prof = Profile_Get();
+    var rname = room_get_name(room);
+    var list = Notes_ToSpawn(prof, rname, prof.deaths);
+    Notes_LiveSet(rname, list);
+    return array_length(list);
 }
 
 function Note_Find(_id) {
@@ -1593,47 +1641,46 @@ function Note_Find(_id) {
     return undefined;
 }
 
-// Interact_Handle: the player read a note. The text opens as a dialogue under the note's title; the note is recorded in the profile.
-function Note_Read(_inst) {
-    var d = Note_Find(_inst.note_id);
+// The player's Step, once he stands still on a tile: a note on that tile is picked up. A notice names it, a small page rises off the tile (a chime
+// with it), the profile file is written. No dialogue and no key: the text is read later in the Codex.
+function Notes_StepPlayer(_pl) {
+    var l = Notes_Live();
+    if (array_length(l.list) <= 0 || l.room != room_get_name(room)) return false;
+    var tx = round(_pl.x / GRID_TILE_SIZE);
+    var ty = round(_pl.y / GRID_TILE_SIZE);
+    var d = Notes_PickupAt(Profile_Get(), l.room, tx, ty);
     if (!is_struct(d)) return false;
-    var prof = Profile_Get();
-    if (!Note_IsCollected(prof, d.id)) {
-        Note_MarkCollected(prof, d.id);
-        Profile_Flush();
-    }
-    Dialogue_StartWithSpeaker(d.title, d.lines);
+    Profile_Flush();
+    Banner_Show(Note_FoundText(d));
+    MapFx_NoteFound(tx * GRID_TILE_SIZE + GRID_TILE_SIZE / 2, ty * GRID_TILE_SIZE + GRID_TILE_SIZE / 2);
     return true;
 }
 
-// World layer script (World_DrawFx): a small page on the note's tile. Pale while unread, dimmer once read. Four palette colours.
-function Note_DrawWorldFx() {
-    if (!Fx_IsWorldPass()) return;
-    if (!instance_exists(obj_interactable)) return;
-    var c0 = UI_C_DARKEST;
-    var c1 = UI_C_DARK;
-    var c2 = UI_C_LIGHT;
-    var c3 = UI_C_LIGHTEST;
+// A small page, 16 x 16, top-left at (_x, _y): the note on the map and the one that rises off it. Four palette colours.
+function Note_DrawGlyph(_x, _y, _alpha = 1) {
     var oc = draw_get_color();
     var oa = draw_get_alpha();
-    draw_set_alpha(1);
-    var prof = Profile_Get();
-    with (obj_interactable) {
-        if (!variable_instance_exists(id, "note_id")) continue;
-        var read = Note_IsCollected(prof, note_id);
-        var nx = floor(x);
-        var ny = floor(y);
-        draw_set_color(c0);
-        draw_rectangle(nx + 3, ny + 2, nx + 12, ny + 13, false);
-        draw_set_color(read ? c2 : c3);
-        draw_rectangle(nx + 4, ny + 3, nx + 11, ny + 12, false);
-        draw_set_color(c1);
-        draw_rectangle(nx + 5, ny + 5, nx + 10, ny + 5, false);
-        draw_rectangle(nx + 5, ny + 7, nx + 10, ny + 7, false);
-        draw_rectangle(nx + 5, ny + 9, nx + 8, ny + 9, false);
-    }
+    draw_set_alpha(_alpha);
+    draw_set_color(UI_C_DARKEST);
+    draw_rectangle(_x + 3, _y + 2, _x + 12, _y + 13, false);
+    draw_set_color(UI_C_LIGHTEST);
+    draw_rectangle(_x + 4, _y + 3, _x + 11, _y + 12, false);
+    draw_set_color(UI_C_DARK);
+    draw_rectangle(_x + 5, _y + 5, _x + 10, _y + 5, false);
+    draw_rectangle(_x + 5, _y + 7, _x + 10, _y + 7, false);
+    draw_rectangle(_x + 5, _y + 9, _x + 8, _y + 9, false);
     draw_set_color(oc);
     draw_set_alpha(oa);
+}
+
+// World layer script (World_DrawFx): a small page on every tile where a note lies.
+function Note_DrawWorldFx() {
+    if (!Fx_IsWorldPass()) return;
+    var l = Notes_Live();
+    if (array_length(l.list) <= 0 || l.room != room_get_name(room)) return;
+    for (var i = 0; i < array_length(l.list); i++) {
+        Note_DrawGlyph(l.list[i].tx * GRID_TILE_SIZE, l.list[i].ty * GRID_TILE_SIZE);
+    }
 }
 
 // ---- closing text and credits (D105, D40) ----

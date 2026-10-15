@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T12:12:52Z",
-    "row_count": 1041
+    "generated_at_utc": "2026-10-15T14:18:17Z",
+    "row_count": 1044
   },
   "default_lang": "en",
   "languages": [
@@ -2724,6 +2724,10 @@
       "en": "Carved arrow",
       "ko": "새겨진 화살표"
     },
+    "note.found": {
+      "en": "Note found: {title}",
+      "ko": "쪽지를 찾았다: {title}"
+    },
     "note.lost_others.0": {
       "en": "A letter that stops in the middle of a sentence.",
       "ko": "문장 중간에서 끊긴 편지."
@@ -3721,12 +3725,12 @@
       "ko": "쪽지"
     },
     "tab.codex.notes_help": {
-      "en": "The notes you have read in the tunnel.",
-      "ko": "터널에서 읽은 쪽지입니다."
+      "en": "The notes you have found in the tunnel.",
+      "ko": "터널에서 찾은 쪽지입니다."
     },
     "tab.codex.notes_title": {
-      "en": "Notes {n}/{max}",
-      "ko": "쪽지 {n}/{max}"
+      "en": "Notes found {n}/{max}",
+      "ko": "찾은 쪽지 {n}/{max}"
     },
     "tab.codex.unlocks": {
       "en": "Unlocks",
@@ -3791,6 +3795,14 @@
     "tab.hint.open": {
       "en": "{confirm} Open",
       "ko": "{confirm} 열기"
+    },
+    "tab.hint.read": {
+      "en": "{confirm} Read",
+      "ko": "{confirm} 읽기"
+    },
+    "tab.hint.scroll": {
+      "en": "{up}{down} Scroll",
+      "ko": "{up}{down} 넘기기"
     },
     "tab.hint.select": {
       "en": "{confirm} Select",
