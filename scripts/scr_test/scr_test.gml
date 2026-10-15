@@ -9804,6 +9804,7 @@ function Test_EliteMask(_spr, _img, _mode) {
     surface_set_target(_surf);
     draw_clear_alpha(c_black, 0);
     if (_mode == "sprite") draw_sprite_ext(_spr, _img, 4, 4, 1, 1, 0, c_white, 1);
+    else if (_mode == "rim") Elite_DrawRim(_spr, _img, 4, 4, 1, 1, 0, c_white, 1);
     else Elite_DrawOutline(_spr, _img, 4, 4, 1, 1, 0, c_white, 1);
     surface_reset_target();
     var _m = array_create(24 * 24, false);
@@ -9837,6 +9838,29 @@ function Test_EliteOutlineDiff(_spr, _img) {
     return _diff;
 }
 
+// How many pixels differ between "light outline + dark rim" and "every pixel within 2 px (8 ways, 2 steps) of an opaque pixel of the sprite": 0 = the rim is a 1 px dark edge outside the outline.
+function Test_EliteRimDiff(_spr, _img) {
+    var _sp = Test_EliteMask(_spr, _img, "sprite");
+    var _ol = Test_EliteMask(_spr, _img, "outline");
+    var _rm = Test_EliteMask(_spr, _img, "rim");
+    var _diff = 0;
+    for (var _y = 0; _y < 24; _y++) {
+        for (var _x = 0; _x < 24; _x++) {
+            var _want = false;
+            for (var _dy = -2; _dy <= 2; _dy++) {
+                for (var _dx = -2; _dx <= 2; _dx++) {
+                    if (_dx == 0 && _dy == 0) continue;
+                    var _sx = _x - _dx;
+                    var _sy = _y - _dy;
+                    if (_sx >= 0 && _sy >= 0 && _sx < 24 && _sy < 24 && _sp[_sy * 24 + _sx]) _want = true;
+                }
+            }
+            if (_want != (_ol[_y * 24 + _x] || _rm[_y * 24 + _x])) _diff++;
+        }
+    }
+    return _diff;
+}
+
 function Test_Suite_EliteDeath() {
     // --- 1. the outline: 8 one-pixel steps, the same pulse
     var _off = Elite_OutlineOffsets();
@@ -9852,6 +9876,10 @@ function Test_Suite_EliteDeath() {
     Test_Eq("H13 no outline offset is farther than 1 px", _far, 0);
     Test_Eq("H13 no outline offset is the sprite's own place", _zero, 0);
     Test_Eq("H13 the 8 outline offsets are all different", array_length(variable_struct_get_names(_seen)), 8);
+    var _rim = Elite_RimOffsets();
+    var _rim_ok = (array_length(_rim) == 16);
+    for (var _i = 0; _i < array_length(_rim); _i++) { if (max(abs(_rim[_i][0]), abs(_rim[_i][1])) != 2) _rim_ok = false; }
+    Test_True("H13 the dark rim is drawn at 16 offsets, all exactly 2 px out", _rim_ok);
     Test_Eq("H13 the pulse starts on the lightest colour", Elite_OutlineColor(0), UI_C_LIGHTEST);
     Test_Eq("H13 the first beat lasts 250 ms", Elite_OutlineColor(249), UI_C_LIGHTEST);
     Test_Eq("H13 the second beat is the light colour", Elite_OutlineColor(250), UI_C_LIGHT);
@@ -9867,6 +9895,13 @@ function Test_Suite_EliteDeath() {
         if (_spr == -1) continue;
         for (var _f = 0; _f < sprite_get_number(_spr); _f++) {
             Test_Eq("H13 outline of " + _names[_n] + " frame " + string(_f) + " is the silhouette 1 px out (pixels off)", Test_EliteOutlineDiff(_spr, _f), 0);
+            Test_Eq("H13 the dark rim of " + _names[_n] + " frame " + string(_f) + " edges the outline 1 px further out (pixels off)", Test_EliteRimDiff(_spr, _f), 0);
+            var _cs = 0;
+            var _co = 0;
+            var _ms = Test_EliteMask(_spr, _f, "sprite");
+            var _mo = Test_EliteMask(_spr, _f, "outline");
+            for (var _q = 0; _q < 24 * 24; _q++) { if (_ms[_q]) _cs++; if (_mo[_q]) _co++; }
+            Test_True("H13 the masks are read from real drawn pixels: " + _names[_n] + " frame " + string(_f) + " has a sprite and a larger outline", _cs > 20 && _co > _cs / 4 && _co < 4 * _cs);
         }
     }
 

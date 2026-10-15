@@ -10820,7 +10820,9 @@ function Scenario_StepShotsEliteDeath(_s) {
                 }
                 Scenario_SetWindowScale(_scales[_s.eg_i]);
                 Loc_SetLanguage("en");
+                Dialogue_CloseNow();
                 Scenario_ClearUi();
+                _gs.pending_wake_line = false;   // run 2 of the first pass owes its wake line: it would open over the map
                 var _g = Scenario_NewKnight(CLASS_KNIGHT);
                 _g.run = Run_Create(2468);
                 room_goto(rm_floor4);
