@@ -24,8 +24,8 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Playtest build fc886c7-20261015 is ready, but I2 found a real bug in it (R-022: a failed/blocked flee skips the status tick). Fix in flight (Sonnet, wt/runtick, fix-runtick); F4b dedupe in flight (wt/f4b). Plan: merge both, FULL gate, make a NEW playtest build from next and repoint BOARD/PLAYTEST-QUEUE to it. next 78b51ab = + F2a, F4a, F1d-2, I1, I2, I3. |
-| Unplayed features | 57 playtest entries (PLAYTEST-QUEUE, build fc886c7-20261015) |
+| WIP | PLAYTEST NOW: build 8762d9b-20261015 (next 8762d9b, FULL gate PASS 3529/0 + smoke + bot + 172 shots), in E:/Games/DD-Project Playtest/8762d9b-20261015, launch-checked. Supersedes fc886c7 (R-022 flee bug). Queue: 59 entries. Improvement mode continues on next (F2b feel clocks, F4c audio globals, I4 gate nits; F4d needs owner). |
+| Unplayed features | 59 playtest entries (PLAYTEST-QUEUE, build 8762d9b-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
 
