@@ -58,4 +58,4 @@ if (room != rm_battle) Tutorial_Draw();   // C4 (D45): the first-time pop-up, ov
 
 Transition_DrawGUI();
 
-Skip_DrawHint();   // D48: the "hold to skip" fill after a press (nothing when no skippable scene is running)
+Skip_DrawHint();   // D48 / D146: the "Hold to skip" prompt after 1 s of holding (nothing on a tap or when no skippable scene is running)

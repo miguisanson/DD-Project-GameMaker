@@ -295,10 +295,12 @@
 #macro WINDOW_MODE_COUNT 3
 // Room left on the monitor's height for a windowed window's title bar, border and the taskbar (Display_WindowedMaxScale).
 #macro DISPLAY_WINDOW_MARGIN_H 80
-// D48 hold-to-skip, in ms (D108 F2b-2, was 60 / 150 frames): holding confirm for 1.0 s skips; the "hold to skip" hint stays 2.5 s after a press, fading over its last 20 frames.
-#macro SKIP_HOLD_MS 1000
-#macro SKIP_HINT_MS 2500
-#macro SKIP_HINT_FADE_MS (20000 / 60)
+// D48 / D146 hold-to-skip, in ms: tapping confirm only advances text; holding the same key shows the "Hold to skip" prompt after SKIP_HINT_MS, fading in over SKIP_HINT_FADE_MS
+// (and out again when the key is let go), and skips at SKIP_HOLD_MS. The bar fills from SKIP_HINT_MS to SKIP_HOLD_MS. One rule for every Skip_* user.
+#macro SKIP_HOLD_MS 2000
+#macro SKIP_HINT_MS 1000
+#macro SKIP_HINT_FADE_MS 200
+#macro SKIP_EDGE_SLACK_MS 0.1   // a hold within this of an edge counts as there: 60 steps of 33.333 ms make 1999.98
 #macro BANNER_DURATION_MS 1000   // D106 boss name banner (D108 F2b-2: ms, was Banner_Frames(fps) = 1 s)
 #macro SETTINGS_VOLUME_STEP 0.05
 

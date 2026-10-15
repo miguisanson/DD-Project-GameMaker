@@ -44,8 +44,7 @@ cutscene_definitions.intro = [
             "You signed up."
         ],
         hold_ms: 0,
-        transition_speed: "normal",
-        text_only: true
+        transition_speed: "normal"
     },
     {
         sprite: very_first_cut_scene,
@@ -66,8 +65,7 @@ cutscene_definitions.intro = [
             "Small tremors..."
         ],
         hold_ms: 0,
-        transition_speed: "normal",
-        text_only: true
+        transition_speed: "normal"
     },
     {
         sprite: intro_scene,
@@ -76,8 +74,7 @@ cutscene_definitions.intro = [
             "You fell."
         ],
         hold_ms: 0,
-        transition_speed: "normal",
-        text_only: true
+        transition_speed: "normal"
     }
 ];
 
@@ -90,8 +87,7 @@ cutscene_definitions.ending = [
             "I need to find out where I am."
         ],
         hold_ms: 0,
-        transition_speed: "normal",
-        text_only: true
+        transition_speed: "normal"
     },
     {
         sprite: third_to_last_scene,
@@ -103,8 +99,7 @@ cutscene_definitions.ending = [
             "... What on earth..."
         ],
         hold_ms: 0,
-        transition_speed: "normal",
-        text_only: true
+        transition_speed: "normal"
     },
     {
         sprite: second_to_last_scene,
@@ -115,8 +110,7 @@ cutscene_definitions.ending = [
             "I wasn't so lucky after all."
         ],
         hold_ms: 0,
-        transition_speed: "normal",
-        text_only: true
+        transition_speed: "normal"
     },
     {
         sprite: last_cut_scene,
@@ -124,16 +118,13 @@ cutscene_definitions.ending = [
             "There is no hope."
         ],
         hold_ms: 0,
-        transition_speed: "slow",
-        text_only: true,
-        chars_per_sec: 12
+        transition_speed: "slow"
     },
     {
         sprite: black_screen,
         lines: Story_ClosingLines(),   // C5 (D105): the closing text lives in scr_dialogue.gml (the credits roll follows it)
         hold_ms: 0,
-        transition_speed: "normal",
-        text_only: false
+        transition_speed: "normal"
     }
 ];
 
@@ -143,8 +134,7 @@ cutscene_definitions.game_over = [
         sprite: black_screen,
         lines: [],
         hold_ms: Transition_FramesToMs(2),
-        transition_speed: "normal",
-        text_only: true
+        transition_speed: "normal"
     }
 ];
 

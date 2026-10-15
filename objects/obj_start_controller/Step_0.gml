@@ -87,7 +87,7 @@ if (state == "main" || state == "settings") {
 }
 
 if (state == "cutscene") {
-    // D48 / I-055: holding confirm for about a second skips the whole cutscene (it still counts as seen: the end block below runs as usual).
+    // D48 / I-055 / D146: holding confirm for 2 s skips the whole cutscene (the prompt shows from 1 s) (it still counts as seen: the end block below runs as usual).
     // A tap only advances text. Not counted while the cutscene is not running, nor once it is already ending.
     if (!variable_instance_exists(id, "cutscene_skip")) cutscene_skip = false;
     if (cutscene_started && !cutscene_skip) {

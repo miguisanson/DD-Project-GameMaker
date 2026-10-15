@@ -131,6 +131,7 @@ function Test_RunAll() {
     Test_RunSuite("SeedInput", Test_Suite_SeedInput);
     Test_RunSuite("MapAI", Test_Suite_MapAI);
     Test_RunSuite("Confirm", Test_Suite_Confirm);
+    Test_RunSuite("CutSkip", Test_Suite_CutSkip);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -818,9 +819,10 @@ function Test_SkipFireSteps(_step_ms) {
     return 100000;
 }
 
-// Steps from the press (the confirm is released at once) until the "hold to skip" hint is gone.
+// D146: steps from the release (after the prompt is fully shown) until the "Hold to skip" prompt is gone.
 function Test_SkipHintSteps(_step_ms) {
-    var _st = Skip_Step(Skip_StateNew(), true, true, false, _step_ms);
+    var _st = Skip_Step(Skip_StateNew(), true, true, true, _step_ms);
+    for (var _i = 1; _i <= 100000 && Skip_HintAlpha(_st) < 1; _i++) _st = Skip_Step(_st, true, false, true, _step_ms);
     for (var _i = 1; _i <= 100000; _i++) {
         _st = Skip_Step(_st, true, false, false, _step_ms);
         if (_st.hint <= 0) return _i;
@@ -947,23 +949,23 @@ function Test_Suite_UiClock() {
     }
     Test_Eq("F2b-2 the banner alpha at 60 fps equals the old per-frame fade for all 61 frames", _bad, 0);
 
-    // --- hold-to-skip (D48): confirm held for 1 s, at 60 and at 30 fps; the hint fills for 2.5 s after the press
-    Test_Eq("F2b-2 the skip hold is 1000 ms", SKIP_HOLD_MS, 1000);
-    Test_Eq("F2b-2 the skip hint stays 2500 ms (150 frames)", SKIP_HINT_MS, 2500);
+    // --- hold-to-skip (D48, D146): confirm held for 2 s, at 60 and at 30 fps; the prompt shows from 1 s of holding and fades out in 200 ms
+    Test_Eq("F2b-2 the skip hold is 2000 ms (D146)", SKIP_HOLD_MS, 2000);
+    Test_Eq("F2b-2 the skip prompt appears at 1000 ms of holding (D146)", SKIP_HINT_MS, 1000);
     _n = Test_SkipFireSteps(_f60);
-    Test_True("F2b-2 hold-to-skip fires after 60 +-1 steps at 60 fps (got " + string(_n) + ")", abs(_n - 60) <= 1);
-    Test_True("F2b-2 hold-to-skip needs about 1 s at 60 fps (got " + string(_n * _f60) + " ms)", _n * _f60 >= 983 && _n * _f60 <= 1020);
+    Test_True("F2b-2 hold-to-skip fires after 120 +-1 steps at 60 fps (got " + string(_n) + ")", abs(_n - 120) <= 1);
+    Test_True("F2b-2 hold-to-skip needs about 2 s at 60 fps (got " + string(_n * _f60) + " ms)", _n * _f60 >= 1966 && _n * _f60 <= 2040);
     _n = Test_SkipFireSteps(_f30);
-    Test_True("F2b-2 hold-to-skip fires after 30 +-1 steps at 30 fps (got " + string(_n) + ")", abs(_n - 30) <= 1);
-    Test_True("F2b-2 hold-to-skip needs about 1 s at 30 fps (got " + string(_n * _f30) + " ms)", _n * _f30 >= 966 && _n * _f30 <= 1034);
+    Test_True("F2b-2 hold-to-skip fires after 60 +-1 steps at 30 fps (got " + string(_n) + ")", abs(_n - 60) <= 1);
+    Test_True("F2b-2 hold-to-skip needs about 2 s at 30 fps (got " + string(_n * _f30) + " ms)", _n * _f30 >= 1932 && _n * _f30 <= 2068);
     var _sk = Skip_Step(Skip_StateNew(), true, true, true, _hit);
     Test_Eq("F2b-2 a 200 ms hitch adds 50 ms to the skip hold", _sk.held_ms, 50);
     Test_Eq("F2b-2 a 200 ms hitch cannot fire the skip on its own", _sk.fired, false);
     _n = Test_SkipHintSteps(_f60);
-    Test_True("F2b-2 the skip hint fades after 150 +-1 steps at 60 fps (got " + string(_n) + ")", abs(_n - 150) <= 1);
+    Test_True("F2b-2 the skip prompt fades out after 12 +-1 steps at 60 fps (got " + string(_n) + ")", abs(_n - 12) <= 1);
     _n = Test_SkipHintSteps(_f30);
-    Test_True("F2b-2 the skip hint fades after 75 +-1 steps at 30 fps (got " + string(_n) + ")", abs(_n - 75) <= 1);
-    Test_True("F2b-2 the skip hint fade-out is 20 frames (333 ms)", abs(SKIP_HINT_FADE_MS - 20000 / 60) < 0.01);
+    Test_True("F2b-2 the skip prompt fades out after 6 +-1 steps at 30 fps (got " + string(_n) + ")", abs(_n - 6) <= 1);
+    Test_Eq("F2b-2 the skip prompt fade is 200 ms (D146)", SKIP_HINT_FADE_MS, 200);
 }
 
 // QTE part 1 (D5, D6, D20, D35, D56, D60, D61; QTE-01, 03, 07, 14). Expected values are the owner's decisions written out, not read from the macros:
@@ -2994,15 +2996,15 @@ function Test_Suite_WindowModes() {
     Test_Eq("DISP-10 world -> gui includes the narrow-room shift", _wp.x, 36);
 }
 
-// D48 / I-055: hold-to-skip. Skip_Step is the pure core: a fresh press arms it, holding confirm for SKIP_HOLD_MS (one step = 1/60 s here, D108 F2b-2) fires it, a tap never does.
+// D48 / I-055 / D146: hold-to-skip. Skip_Step is the pure core: a fresh press arms it, holding confirm for SKIP_HOLD_MS (2 s; one step = 1/60 s here, D108 F2b-2) fires it, a tap never does.
 function Test_Suite_Skip() {
     var _f60 = Presentation_StepMs(16667);   // D108 F2b-2: the steps are ms now; one 60 fps frame
-    var _hold_frames = round(SKIP_HOLD_MS / _f60);   // 60
-    var _hint_frames = round(SKIP_HINT_MS / _f60);   // 150
+    var _hold_frames = round(SKIP_HOLD_MS / _f60);   // 120
+    var _hint_frames = round(SKIP_HINT_MS / _f60);   // 60
     var _st = Skip_StateNew();
     var _r = Skip_Step(_st, true, true, true, _f60);   // first frame: pressed and held
     Test_Eq("D48 first press: not fired", _r.fired, false);
-    Test_Eq("D48 first press: shows the hint", _r.hint > 0, true);
+    Test_Eq("D48 first press: no prompt yet (D146: only after 1 s of holding)", _r.hint, 0);
     Test_Eq("D48 first press: progress started", _r.held_ms, _f60);
     _st = _r;
     for (var _i = 2; _i < _hold_frames; _i++) {
@@ -3022,7 +3024,7 @@ function Test_Suite_Skip() {
     _st = Skip_Step(_st, true, false, false, _f60);   // released
     Test_Eq("D48 tap: not fired", _st.fired, false);
     Test_Eq("D48 tap: hold count back to 0", _st.held_ms, 0);
-    Test_Eq("D48 tap: hint stays on screen for a while", _st.hint > 0, true);
+    Test_Eq("D48 tap: no prompt (D146)", _st.hint, 0);
     var _fired = false;
     for (var _i = 0; _i < _hold_frames * 3; _i++) {   // many taps, one every 10 frames
         _st = Skip_Step(_st, true, (_i mod 10) == 0, (_i mod 10) < 3, _f60);
@@ -3045,12 +3047,12 @@ function Test_Suite_Skip() {
     Test_Eq("D48 leaving the scene resets the count", _st.held_ms, 0);
     Test_Eq("D48 leaving the scene hides the hint", _st.hint, 0);
 
-    // The hint fades after _hint_frames without a press.
+    // The prompt is gone again after _hint_frames steps with the key up.
     _st = Skip_Step(Skip_StateNew(), true, true, true, _f60);
     _st = Skip_Step(_st, true, false, false, _f60);
     for (var _i = 0; _i < _hint_frames + 2; _i++) _st = Skip_Step(_st, true, false, false, _f60);
     Test_Eq("D48 the hint goes away", _st.hint, 0);
-    Test_Eq("D48 progress fraction", Skip_Fraction(SKIP_HOLD_MS / 2), 0.5);
+    Test_Eq("D48 progress fraction (D146: from 1 s to 2 s)", Skip_Fraction(1500), 0.5);
 }
 
 // DISP-14 / SAVE-06 / D91: settings_version 8. Old fit_screen + scale fields become a window mode; a fresh install is borderless.
@@ -11102,4 +11104,154 @@ function Test_Suite_Confirm() {
     Test_ConfirmPart("skill swap", Test_ConfirmReplace);
     Test_ConfirmPart("selling gear", Test_ConfirmSell);
     Test_ConfirmPart("no press-twice path left", Test_ConfirmNoArmed);
+}
+
+// ---- H6 (D146, D156): hold-to-skip and cutscene text in the shared dialogue box -------------------------------------------------------
+// Expected values are the decisions written out, not read from the macros: tapping confirm only advances text; holding the same key shows the "Hold to skip" prompt
+// after 1000 ms (never on a tap), fading in over 200 ms with a bar that fills from 1000 to 2000 ms, and the skip fires at 2000 ms exactly once. The clock is injected:
+// Skip_Step takes the step length in ms, so 1 ms steps make every edge exact.
+// Simulates steps of _step_ms up to _ms: the key is down while the time is <= _held_until (the first step is the press unless _press_first is false), then up.
+// Returns the state, the number of fires, the step time of the first fire and the highest prompt alpha.
+function Test_CutSkipRun(_st, _ms, _step_ms, _held_until, _press_first = true) {
+    var _fired = 0, _amax = 0, _fire_at = -1;
+    for (var _t = _step_ms; _t <= _ms + 0.001; _t += _step_ms) {
+        _st = Skip_Step(_st, true, (_press_first && abs(_t - _step_ms) < 0.001), (_t <= _held_until + 0.001), _step_ms);
+        if (_st.fired) {
+            _fired++;
+            if (_fire_at < 0) _fire_at = _t;
+        }
+        _amax = max(_amax, Skip_HintAlpha(_st));
+    }
+    return { st: _st, fired: _fired, amax: _amax, fire_at: _fire_at };
+}
+
+function Test_Suite_CutSkip() {
+    // --- the numbers
+    Test_Eq("D146 the skip completes at 2000 ms", SKIP_HOLD_MS, 2000);
+    Test_Eq("D146 the prompt appears at 1000 ms of holding", SKIP_HINT_MS, 1000);
+    Test_Eq("D146 the prompt fades in over 200 ms", SKIP_HINT_FADE_MS, 200);
+
+    // --- 1. holding: 999 ms shows nothing and skips nothing
+    var _r = Test_CutSkipRun(Skip_StateNew(), 999, 1, 999);
+    Test_Eq("D146 held 999 ms: the prompt alpha is 0", Skip_HintAlpha(_r.st), 0);
+    Test_Eq("D146 held 999 ms: the prompt never showed", _r.amax, 0);
+    Test_Eq("D146 held 999 ms: no skip", _r.fired, 0);
+    // from 1000 ms it fades in over 200 ms: half after 100 ms of fading, full after 200
+    _r = Test_CutSkipRun(Skip_StateNew(), 1000, 1, 1000);
+    Test_True("D146 held 1000 ms: the prompt starts to fade in (alpha " + string(Skip_HintAlpha(_r.st)) + ")", Skip_HintAlpha(_r.st) > 0 && Skip_HintAlpha(_r.st) < 0.02);
+    _r = Test_CutSkipRun(Skip_StateNew(), 1100, 1, 1100);
+    Test_True("D146 held 1100 ms: the prompt is half faded in (alpha " + string(Skip_HintAlpha(_r.st)) + ")", abs(Skip_HintAlpha(_r.st) - 0.5) < 0.01);
+    _r = Test_CutSkipRun(Skip_StateNew(), 1200, 1, 1200);
+    Test_Eq("D146 held 1200 ms: the prompt is fully shown", Skip_HintAlpha(_r.st), 1);
+    _r = Test_CutSkipRun(Skip_StateNew(), 1999, 1, 1999);
+    Test_Eq("D146 held 1999 ms: the prompt is fully shown", Skip_HintAlpha(_r.st), 1);
+    Test_Eq("D146 held 1999 ms: no skip yet", _r.fired, 0);
+
+    // released at 1500 ms: no skip, the prompt fades out, nothing is advanced (no fire, the hold count is back to 0)
+    _r = Test_CutSkipRun(Skip_StateNew(), 1500, 1, 1500);
+    Test_Eq("D146 held to 1500 ms: the prompt is fully shown", Skip_HintAlpha(_r.st), 1);
+    _r = Test_CutSkipRun(_r.st, 100, 1, 0, false);   // 100 more ms with the key up
+    Test_True("D146 100 ms after the release: the prompt is half faded out (alpha " + string(Skip_HintAlpha(_r.st)) + ")", abs(Skip_HintAlpha(_r.st) - 0.5) < 0.01);
+    Test_Eq("D146 a release at 1500 ms: no skip", _r.fired, 0);
+    Test_Eq("D146 a release at 1500 ms: the hold count is back to 0", _r.st.held_ms, 0);
+    _r = Test_CutSkipRun(_r.st, 100, 1, 0, false);
+    Test_Eq("D146 200 ms after the release: the prompt is gone", Skip_HintAlpha(_r.st), 0);
+    Test_Eq("D146 200 ms after the release: still no skip", _r.fired, 0);
+    // pressing again starts the count from 0
+    _r = Test_CutSkipRun(_r.st, 500, 1, 500);
+    Test_Eq("D146 a second press counts from 0: no prompt after 500 ms", _r.amax, 0);
+
+    // held to 2000 ms: fires exactly once, at 2000, and holding longer does not fire again
+    _r = Test_CutSkipRun(Skip_StateNew(), 3500, 1, 3500);
+    Test_Eq("D146 held 3500 ms: exactly one skip", _r.fired, 1);
+    Test_Eq("D146 the skip fires at the 2000 ms step", _r.fire_at, 2000);
+    _r = Test_CutSkipRun(Skip_StateNew(), 2000, 1, 2000);
+    Test_Eq("D146 held 2000 ms: the skip has fired once", _r.fired, 1);
+
+    // the same at 60 fps and 30 fps steps (120 and 60 steps; one fewer does not fire)
+    var _f60 = Presentation_StepMs(16667);
+    var _f30 = Presentation_StepMs(33333);
+    _r = Test_CutSkipRun(Skip_StateNew(), 119 * _f60, _f60, 1000000);
+    Test_Eq("D146 119 steps at 60 fps: no skip", _r.fired, 0);
+    _r = Test_CutSkipRun(Skip_StateNew(), 120 * _f60, _f60, 1000000);
+    Test_Eq("D146 120 steps at 60 fps: skip", _r.fired, 1);
+    _r = Test_CutSkipRun(Skip_StateNew(), 59 * _f30, _f30, 1000000);
+    Test_Eq("D146 59 steps at 30 fps: no skip", _r.fired, 0);
+    _r = Test_CutSkipRun(Skip_StateNew(), 60 * _f30, _f30, 1000000);
+    Test_Eq("D146 60 steps at 30 fps: skip", _r.fired, 1);
+    _r = Test_CutSkipRun(Skip_StateNew(), 59 * _f60, _f60, 1000000);
+    Test_Eq("D146 59 steps at 60 fps (983 ms): no prompt", _r.amax, 0);
+
+    // --- 2. a tap never shows the prompt and never skips; a key held from before the scene does neither
+    _r = Test_CutSkipRun(Skip_StateNew(), 400, 1, 120);   // pressed, held 120 ms, released
+    Test_Eq("D146 a tap: the prompt never shows", _r.amax, 0);
+    Test_Eq("D146 a tap: no skip", _r.fired, 0);
+    _r = Test_CutSkipRun(Skip_StateNew(), 3000, 1, 999);   // held 999 ms (the longest tap), then up for 2 s
+    Test_Eq("D146 a 999 ms press: the prompt never shows", _r.amax, 0);
+    Test_Eq("D146 a 999 ms press: no skip", _r.fired, 0);
+    var _fired = 0, _amax = 0, _st = Skip_StateNew();
+    for (var _i = 0; _i < 300; _i++) {   // many taps, one every 100 ms, each held 30 ms
+        _st = Skip_Step(_st, true, (_i mod 100) == 0, (_i mod 100) < 30, 1);
+        if (_st.fired) _fired++;
+        _amax = max(_amax, Skip_HintAlpha(_st));
+    }
+    Test_Eq("D146 repeated taps: no prompt", _amax, 0);
+    Test_Eq("D146 repeated taps: no skip", _fired, 0);
+    _r = Test_CutSkipRun(Skip_StateNew(), 3000, 1, 3000, false);   // never pressed in the scene
+    Test_Eq("D146 a key held from before the scene: no prompt", _r.amax, 0);
+    Test_Eq("D146 a key held from before the scene: no skip", _r.fired, 0);
+    // leaving the scene (nothing claims the skip) clears the prompt at once
+    _r = Test_CutSkipRun(Skip_StateNew(), 1500, 1, 1500);
+    _st = Skip_Step(_r.st, false, false, true, 1);
+    Test_Eq("D146 leaving the scene hides the prompt", Skip_HintAlpha(_st), 0);
+    Test_Eq("D146 leaving the scene clears the hold", _st.held_ms, 0);
+
+    // --- 3. the bar: (held - 1000) / 1000, clamped 0..1
+    Test_Eq("D146 bar at 0 ms", Skip_Fraction(0), 0);
+    Test_Eq("D146 bar at 500 ms", Skip_Fraction(500), 0);
+    Test_Eq("D146 bar at 1000 ms", Skip_Fraction(1000), 0);
+    Test_Eq("D146 bar at 1250 ms", Skip_Fraction(1250), 0.25);
+    Test_Eq("D146 bar at 1500 ms", Skip_Fraction(1500), 0.5);
+    Test_Eq("D146 bar at 2000 ms", Skip_Fraction(2000), 1);
+    Test_Eq("D146 bar past 2000 ms stays full", Skip_Fraction(2600), 1);
+    _r = Test_CutSkipRun(Skip_StateNew(), 1500, 1, 1500);
+    Test_Eq("D146 the live bar after a 1500 ms hold is half full", Skip_Fraction(_r.st.held_ms), 0.5);
+
+    // --- 4. cutscene text goes through the shared dialogue box (D156)
+    var _gs = GameState_Get();
+    var _had_ui = variable_struct_exists(_gs, "ui");
+    var _ui0 = _had_ui ? _gs.ui : undefined;
+    var _had_ctl = instance_exists(obj_ui_controller);
+    var _ui = {};
+    if (is_struct(_ui0)) {
+        var _names = variable_struct_get_names(_ui0);
+        for (var _n = 0; _n < array_length(_names); _n++) variable_struct_set(_ui, _names[_n], variable_struct_get(_ui0, _names[_n]));
+    }
+    _ui.mode = UI_NONE;
+    _ui.cutscene_active = true;
+    _ui.cutscene_text_only = false;
+    _ui.dialogue_box_half = false;
+    _gs.ui = _ui;
+    // a segment written the old way (text_only, a slow chars_per_sec) must still open in the normal box
+    Cutscene_SegmentApply({ sprite: black_screen, lines: ["The plan was to ambush the enemy.", "You fell."], text_only: true, chars_per_sec: 12 });
+    Test_Eq("D156 a cutscene line opens the dialogue", _gs.ui.mode, UI_DIALOGUE);
+    Test_False("D156 the cutscene does not use the separate text-only style", Dialogue_IsCutsceneTextOnly());
+    Test_False("D156 the cutscene does not use the tall half-screen box", _gs.ui.dialogue_box_half);
+    var _mt = Ui_Metrics();
+    var _box = Dialogue_BoxRect();
+    var _lay = Dialogue_TextLayout("");
+    Test_False("D156 the cutscene text layout is the normal one", _lay.cutscene_text_only);
+    Test_Eq("D156 the box is the shared one: 8p + 3 lines high", _box.h, 8 * _mt.p + 3 * _mt.line_h);
+    Test_Eq("D156 the box is the shared one: along the bottom edge", _box.y, _mt.gh - _box.h - _mt.margin);
+    Test_Eq("D156 the text starts 4p inside the frame (x)", _lay.text_x, _box.x + 4 * _mt.p);
+    Test_Eq("D156 the text starts 4p inside the frame (y)", _lay.text_y, _box.y + 4 * _mt.p);
+    Test_Eq("D156 the text leaves 10p on the right for the arrow", _lay.text_w, _box.w - 14 * _mt.p);
+    Dialogue_TypewriterPrepareCurrentLine();
+    Test_Eq("D156 the typewriter speed is the normal dialogue one", _gs.ui.dialogue_chars_per_sec, max(1, 60 * Settings_TextSpeedMul(GameSettings_Ensure().text_speed)));
+    Test_Eq("D156 the line is ready for the next confirm as soon as in a normal box", _gs.ui.dialogue_hold_duration_ms, 150);
+    Test_Eq("D156 a cutscene line has no longer advance block than a normal one", _gs.ui.dialogue_open_lock.ms, 0);
+    Dialogue_CloseNow();
+    _gs.ui.cutscene_active = false;
+    if (_had_ui) _gs.ui = _ui0; else variable_struct_remove(_gs, "ui");
+    if (!_had_ctl && instance_exists(obj_ui_controller)) instance_destroy(obj_ui_controller);
 }
