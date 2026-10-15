@@ -520,7 +520,22 @@ function Dialogue_CopyLineEntryWithText(_line_entry, _text) {
     return _text;
 }
 
+// D108 F1d-2: the box rect and the text layout are built once per change. The Ui_Metrics struct is a new one whenever the Display layout or the language
+// changes (see Ui_Metrics), and everything below reads only that plus the two UI flags in the key, so the same struct comes back until one of them changes.
+// The returned structs are shared: callers read them, never write.
 function Dialogue_BoxRect() {
+    var gs = GameState_Get();
+    var mt = Ui_Metrics();
+    var half = (variable_struct_exists(gs.ui, "dialogue_box_half") && gs.ui.dialogue_box_half);
+    var c = variable_global_exists("dialogue_box_cache") ? global.dialogue_box_cache : undefined;
+    if (is_struct(c) && c.mt == mt && c.half == half) return c.box;
+    var box = Dialogue_BoxRectBuild();
+    global.dialogue_box_cache = { mt: mt, half: half, box: box };
+    return box;
+}
+
+// The uncached computation of Dialogue_BoxRect.
+function Dialogue_BoxRectBuild() {
     var gs = GameState_Get();
     var mt = Ui_Metrics();
     var w = mt.gw;
@@ -549,7 +564,28 @@ function Dialogue_BoxRect() {
     };
 }
 
+// D108 F1d-2: how often the text layout is built (Dialogue_TextLayoutBuilds), so a check can see it run once per change.
+function Dialogue_TextLayoutBuilds() {
+    return variable_global_exists("dialogue_layout_builds") ? global.dialogue_layout_builds : 0;
+}
+
 function Dialogue_TextLayout(_speaker) {
+    var mt = Ui_Metrics();   // also sets the UI font, as the build does
+    var has_speaker = (string(_speaker) != "");
+    var cutscene_text_only = Dialogue_IsCutsceneTextOnly();
+    var gs = GameState_Get();
+    var half = (variable_struct_exists(gs.ui, "dialogue_box_half") && gs.ui.dialogue_box_half);
+    var c = variable_global_exists("dialogue_layout_cache") ? global.dialogue_layout_cache : undefined;
+    if (is_struct(c) && c.mt == mt && c.has_speaker == has_speaker && c.cutscene_text_only == cutscene_text_only && c.half == half) return c.layout;
+    var layout = Dialogue_TextLayoutBuild(_speaker);
+    global.dialogue_layout_cache = { mt: mt, has_speaker: has_speaker, cutscene_text_only: cutscene_text_only, half: half, layout: layout };
+    return layout;
+}
+
+// The uncached computation of Dialogue_TextLayout. Counted (Dialogue_TextLayoutBuilds).
+function Dialogue_TextLayoutBuild(_speaker) {
+    if (!variable_global_exists("dialogue_layout_builds")) global.dialogue_layout_builds = 0;
+    global.dialogue_layout_builds++;
     UI_SetFont();
     var mt = Ui_Metrics();
     var line_h = max(8, UI_TextHeight("Ag"));
@@ -558,7 +594,7 @@ function Dialogue_TextLayout(_speaker) {
     var ui_visual = UI_GetVisualScale();
 
     // The speaker's name sits on a tab above the frame (Ui_DrawNameTab), so the text starts at the same place with or without one.
-    var box = Dialogue_BoxRect();
+    var box = Dialogue_BoxRectBuild();
     var text_x = box.x + 4 * mt.p;
     var text_y = box.y + 4 * mt.p;
     var text_w = max(1, box.w - 14 * mt.p);   // 4p of frame and air on the left, 10p on the right: the blinking arrow lives there
@@ -1658,6 +1694,8 @@ function Credits_NewSfxAssets() {
 
 // The credits roll as { kind, text }: "title", "head", "line", "names" (a paragraph) and "gap".
 function Credits_Lines() {
+    if (!variable_global_exists("credits_lines_builds")) global.credits_lines_builds = 0;
+    global.credits_lines_builds++;
     var out = [];
     array_push(out, { kind: "title", text: Loc_T("credits.title", "NO HOPE") });
     array_push(out, { kind: "line", text: Loc_T("credits.game_by", "Game and art by PaleRook") });
@@ -1701,8 +1739,32 @@ function Credits_PlainLines() {
     return out;
 }
 
+// D108 F1d-2: how often the roll's lines and its layout are built (a check reads them to see the roll is built once per change).
+function Credits_LinesBuilds() {
+    return variable_global_exists("credits_lines_builds") ? global.credits_lines_builds : 0;
+}
+
+function Credits_LayoutBuilds() {
+    return variable_global_exists("credits_layout_builds") ? global.credits_layout_builds : 0;
+}
+
 // Lays the roll out for the current GUI size: y of every entry (from the top of the roll), its height, and the whole height.
+// D108 F1d-2: built once per change. The Ui_Metrics struct is a new one whenever the Display layout or the language changes (see Ui_Metrics); the roll's
+// text also follows the language, so the key is that struct plus the language string. The returned struct is shared: callers read it, never write.
 function Credits_Layout() {
+    var mt = Ui_Metrics();
+    var lang = Loc_GetLanguage();
+    var c = variable_global_exists("credits_layout_cache") ? global.credits_layout_cache : undefined;
+    if (is_struct(c) && c.mt == mt && c.lang == lang) return c.layout;
+    var layout = Credits_LayoutBuild();
+    global.credits_layout_cache = { mt: mt, lang: lang, layout: layout };
+    return layout;
+}
+
+// The uncached computation of Credits_Layout. Counted (Credits_LayoutBuilds).
+function Credits_LayoutBuild() {
+    if (!variable_global_exists("credits_layout_builds")) global.credits_layout_builds = 0;
+    global.credits_layout_builds++;
     var mt = Ui_Metrics();
     var entries = Credits_Lines();
     var col_w = min(mt.gw - 2 * mt.margin, round(mt.gw * 0.7));

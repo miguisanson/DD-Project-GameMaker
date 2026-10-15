@@ -107,6 +107,7 @@ function Test_RunAll() {
     Test_RunSuite("Input", Test_Suite_Input);
     Test_RunSuite("UI", Test_Suite_UI);
     Test_RunSuite("MetricsCache", Test_Suite_MetricsCache);
+    Test_RunSuite("LayoutCache", Test_Suite_LayoutCache);
     Test_RunSuite("MenuMeasure", Test_Suite_MenuMeasure);
     Test_RunSuite("SfxInit", Test_Suite_SfxInit);
     Test_RunSuite("Audio", Test_Suite_Audio);
@@ -7022,4 +7023,160 @@ function Test_Suite_Transition() {
     var _lay = { total: 1000 };
     var _frames_old = Display_GuiH() + 1000 + round(Display_GuiH() * 0.5);
     Test_True("F2a credits total ms == the old frame count at 60 fps", abs(Credits_TotalMs(_lay) - _frames_old * _f60) < 0.01);
+}
+
+// D108 F1d-2: the credits roll and the dialogue text layout are built once per change, not once per call.
+// The credits layout is keyed on the Ui_Metrics struct (a new one per Display layout and language) plus the language; the dialogue layout on that struct plus the
+// states it reads (speaker or not, cutscene text only, half-height box). Expected counts: 0 more builds while nothing changes, exactly 1 after a change.
+function Test_Suite_LayoutCache() {
+    var _lang0 = Loc_GetLanguage();
+    var _disp0 = variable_global_exists("display") ? global.display : undefined;
+    var _own = !(is_struct(_disp0) && is_struct(_disp0.layout));
+    var _layout0 = _own ? Display_CalcLayout(480, 432) : _disp0.layout;
+    if (_own) global.display = { layout: _layout0, apply_count: 0 };
+    var _d = global.display;
+    var _f0 = draw_get_font();
+
+    // a private copy of the UI state, so the dialogue fields the check sets never leak
+    var _gs = GameState_Get();
+    var _had_ui = variable_struct_exists(_gs, "ui");
+    var _ui0 = _had_ui ? _gs.ui : undefined;
+    var _ui = {};
+    if (is_struct(_ui0)) {
+        var _names = variable_struct_get_names(_ui0);
+        for (var _n = 0; _n < array_length(_names); _n++) variable_struct_set(_ui, _names[_n], variable_struct_get(_ui0, _names[_n]));
+    }
+    _ui.mode = UI_DIALOGUE;
+    _ui.speaker = "Hero";
+    _ui.lines_raw = ["Hello there, traveller. The tunnel is long and the dark is patient, so rest while you can."];
+    _ui.lines = [];
+    _ui.index = 0;
+    _ui.cutscene_text_only = false;
+    _ui.dialogue_box_half = false;
+    _gs.ui = _ui;
+
+    // ---- credits: 300 Credits_Layout and 300 Credits_TotalMs calls with nothing changing build nothing more ----
+    Loc_SetLanguage("en");
+    Ui_Metrics();
+    var _cl_en = Credits_Layout();
+    var _cb0 = Credits_LayoutBuilds();
+    var _lb0 = Credits_LinesBuilds();
+    var _same = true;
+    for (var _i = 0; _i < 300; _i++) {
+        if (Credits_Layout() != _cl_en) _same = false;
+        Credits_TotalMs();
+    }
+    Test_Eq("F1d2 300 Credits_Layout + 300 Credits_TotalMs calls build the layout 0 more times", Credits_LayoutBuilds() - _cb0, 0);
+    Test_Eq("F1d2 300 Credits_Layout + 300 Credits_TotalMs calls build the lines 0 more times", Credits_LinesBuilds() - _lb0, 0);
+    Test_True("F1d2 Credits_Layout returns the same struct while nothing changes", _same);
+    var _ref = Credits_LayoutBuild();
+    Test_Eq("F1d2 the cached en credits layout equals the uncached one", json_stringify(_cl_en), json_stringify(_ref));
+    Test_Eq("F1d2 the credits layout has a row per roll entry", array_length(_cl_en.rows), array_length(Credits_Lines()));
+
+    // en -> ko: one rebuild, then cached again
+    _cb0 = Credits_LayoutBuilds();
+    _lb0 = Credits_LinesBuilds();
+    Loc_SetLanguage("ko");
+    var _cl_ko = Credits_Layout();
+    for (var _i2 = 0; _i2 < 300; _i2++) { Credits_Layout(); Credits_TotalMs(); }
+    Test_Eq("F1d2 credits en to ko rebuild the layout exactly once", Credits_LayoutBuilds() - _cb0, 1);
+    Test_Eq("F1d2 credits en to ko rebuild the lines exactly once", Credits_LinesBuilds() - _lb0, 1);
+    Test_True("F1d2 the ko credits layout is a new struct", _cl_ko != _cl_en);
+    Test_Eq("F1d2 the cached ko credits layout equals the uncached one", json_stringify(_cl_ko), json_stringify(Credits_LayoutBuild()));
+
+    // ko -> en
+    _cb0 = Credits_LayoutBuilds();
+    Loc_SetLanguage("en");
+    var _cl_en2 = Credits_Layout();
+    for (var _i3 = 0; _i3 < 300; _i3++) { Credits_Layout(); Credits_TotalMs(); }
+    Test_Eq("F1d2 credits ko to en rebuild the layout exactly once", Credits_LayoutBuilds() - _cb0, 1);
+    Test_Eq("F1d2 back in en the credits layout equals the first en one", json_stringify(_cl_en2), json_stringify(_cl_en));
+
+    // a Display relayout (a new layout struct, as Display_Relayout makes)
+    _cb0 = Credits_LayoutBuilds();
+    _d.layout = Display_CalcLayout(1280, 720);
+    var _cl_big = Credits_Layout();
+    for (var _i4 = 0; _i4 < 300; _i4++) { Credits_Layout(); Credits_TotalMs(); }
+    Test_Eq("F1d2 a relayout rebuilds the credits layout exactly once", Credits_LayoutBuilds() - _cb0, 1);
+    Test_Eq("F1d2 the relayout credits layout equals the uncached one", json_stringify(_cl_big), json_stringify(Credits_LayoutBuild()));
+    Test_True("F1d2 the relayout credits layout has another column width", _cl_big.col_w != _cl_en.col_w);
+    _d.layout = _layout0;
+    Credits_Layout();
+
+    // ---- dialogue: the layout of an open line ----
+    Loc_SetLanguage("en");
+    Ui_Metrics();
+    var _tl = Dialogue_TextLayout("Hero");
+    Dialogue_RebuildPagedLines();
+    Dialogue_TypewriterPrepareCurrentLine();
+    var _page = Dialogue_LineText(_ui.lines[_ui.index]);
+    _ui.dialogue_visible_count = 5;
+    var _db0 = Dialogue_TextLayoutBuilds();
+    var _dsame = true;
+    for (var _j = 0; _j < 300; _j++) {
+        if (Dialogue_TextLayout("Hero") != _tl) _dsame = false;
+        Dialogue_TypewriterPrepareCurrentLine();   // the Step and the Draw both do this every frame
+        Dialogue_EnsurePagedLinesCurrent();
+    }
+    Test_Eq("F1d2 300 frames of dialogue prepare + layout build the text layout 0 more times", Dialogue_TextLayoutBuilds() - _db0, 0);
+    Test_True("F1d2 Dialogue_TextLayout returns the same struct while nothing changes", _dsame);
+    Test_Eq("F1d2 the typewriter is not reset by the layout checks", _ui.dialogue_visible_count, 5);
+    Test_Eq("F1d2 the page text is unchanged by the layout checks", Dialogue_LineText(_ui.lines[_ui.index]), _page);
+    Test_Eq("F1d2 the cached dialogue layout equals the uncached one", json_stringify(_tl), json_stringify(Dialogue_TextLayoutBuild("Hero")));
+    Test_Eq("F1d2 the cached dialogue layout without a speaker equals the uncached one", json_stringify(Dialogue_TextLayout("")), json_stringify(Dialogue_TextLayoutBuild("")));
+    Test_Eq("F1d2 the cached box rect equals the uncached layout's box", json_stringify(Dialogue_BoxRect()), json_stringify(Dialogue_BoxRectBuild()));
+
+    // cutscene text only and the half-height box each give their own (equal-to-uncached) layout
+    _ui.cutscene_text_only = true;
+    Test_Eq("F1d2 the cutscene text-only layout equals the uncached one", json_stringify(Dialogue_TextLayout("Hero")), json_stringify(Dialogue_TextLayoutBuild("Hero")));
+    Test_Eq("F1d2 the cutscene text-only layout without a speaker equals the uncached one", json_stringify(Dialogue_TextLayout("")), json_stringify(Dialogue_TextLayoutBuild("")));
+    Test_True("F1d2 the cutscene text-only layout differs from the boxed one", json_stringify(Dialogue_TextLayout("Hero")) != json_stringify(_tl));
+    _ui.cutscene_text_only = false;
+    _ui.dialogue_box_half = true;
+    Test_Eq("F1d2 the half-height box layout equals the uncached one", json_stringify(Dialogue_TextLayout("Hero")), json_stringify(Dialogue_TextLayoutBuild("Hero")));
+    Test_Eq("F1d2 the half-height box rect equals the uncached one", json_stringify(Dialogue_BoxRect()), json_stringify(Dialogue_BoxRectBuild()));
+    Test_True("F1d2 the half-height box is taller than the boxed one", Dialogue_BoxRect().h > _tl.box.h);
+    _ui.dialogue_box_half = false;
+    Test_Eq("F1d2 back to the boxed layout the cached one equals the first", json_stringify(Dialogue_TextLayout("Hero")), json_stringify(_tl));
+
+    // en -> ko -> en
+    Dialogue_TextLayout("Hero");
+    _db0 = Dialogue_TextLayoutBuilds();
+    Loc_SetLanguage("ko");
+    var _tl_ko = Dialogue_TextLayout("Hero");
+    for (var _j2 = 0; _j2 < 300; _j2++) { Dialogue_TextLayout("Hero"); Dialogue_BoxRect(); }
+    Test_Eq("F1d2 dialogue en to ko rebuild the text layout exactly once", Dialogue_TextLayoutBuilds() - _db0, 1);
+    Test_Eq("F1d2 the cached ko dialogue layout equals the uncached one", json_stringify(_tl_ko), json_stringify(Dialogue_TextLayoutBuild("Hero")));
+    _db0 = Dialogue_TextLayoutBuilds();
+    Loc_SetLanguage("en");
+    var _tl_en2 = Dialogue_TextLayout("Hero");
+    for (var _j3 = 0; _j3 < 300; _j3++) { Dialogue_TextLayout("Hero"); Dialogue_BoxRect(); }
+    Test_Eq("F1d2 dialogue ko to en rebuild the text layout exactly once", Dialogue_TextLayoutBuilds() - _db0, 1);
+    Test_Eq("F1d2 back in en the dialogue layout equals the first en one", json_stringify(_tl_en2), json_stringify(_tl));
+
+    // a Display relayout
+    _db0 = Dialogue_TextLayoutBuilds();
+    _d.layout = Display_CalcLayout(1280, 720);
+    var _tl_big = Dialogue_TextLayout("Hero");
+    for (var _j4 = 0; _j4 < 300; _j4++) { Dialogue_TextLayout("Hero"); Dialogue_BoxRect(); }
+    Test_Eq("F1d2 a relayout rebuilds the dialogue text layout exactly once", Dialogue_TextLayoutBuilds() - _db0, 1);
+    Test_Eq("F1d2 the relayout dialogue layout equals the uncached one", json_stringify(_tl_big), json_stringify(Dialogue_TextLayoutBuild("Hero")));
+    Test_True("F1d2 the relayout dialogue layout has another text width", _tl_big.text_w != _tl.text_w);
+    Test_Eq("F1d2 the relayout box rect equals the uncached one", json_stringify(Dialogue_BoxRect()), json_stringify(Dialogue_BoxRectBuild()));
+    _d.layout = _layout0;
+
+    // [PERF] 1000 x Credits_Layout and 1000 x Dialogue_TextLayout (no assertion: the time depends on the PC)
+    Ui_Metrics();
+    var _t0 = get_timer();
+    for (var _p0 = 0; _p0 < 1000; _p0++) Credits_Layout();
+    var _t1 = get_timer();
+    for (var _p1 = 0; _p1 < 1000; _p1++) Dialogue_TextLayout("Hero");
+    var _t2 = get_timer();
+    Test_Log("[PERF] 1000 x Credits_Layout: " + string(_t1 - _t0) + " us, 1000 x Dialogue_TextLayout: " + string(_t2 - _t1) + " us");
+
+    if (_had_ui) _gs.ui = _ui0;
+    else variable_struct_remove(_gs, "ui");
+    draw_set_font(_f0);
+    if (_own) global.display = _disp0;
+    Loc_SetLanguage(_lang0);
 }
