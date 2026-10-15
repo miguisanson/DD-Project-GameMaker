@@ -2840,7 +2840,8 @@ function Test_SightRingCache() {
     var _t1 = get_timer();
     for (var _e2 = 0; _e2 < 300; _e2++) {
         var _rg = Nav_SightRing(5 * GRID_TILE_SIZE);
-        for (var _k2 = 0; _k2 < _rg.n; _k2++) _sink += floor(100 + _rg.ox[_k2]) + floor(100 + _rg.oy[_k2]);
+        var _rox = _rg.ox, _roy = _rg.oy, _rn = _rg.n;   // as Nav_DrawWorldFx reads them
+        for (var _k2 = 0; _k2 < _rn; _k2++) _sink += floor(100 + _rox[_k2]) + floor(100 + _roy[_k2]);
     }
     Test_Log("[PERF] 300 x sight ring points (sight 5): cached offsets " + string(get_timer() - _t1) + " us (" + string(_sink > 0) + ")");
 
@@ -2878,6 +2879,7 @@ function Test_InteractTargetTie() {
     Test_True("F1d3 interact: three interactables cover the faced tile", Interact_PlayerFacing(_pl, _a) && Interact_PlayerFacing(_pl, _b) && Interact_PlayerFacing(_pl, _c));
     Test_True("F1d3 interact: the old loop found one of them", _old != noone && instance_exists(_old));
     Test_True("F1d3 interact: Interact_GetTarget picks the same instance as the old loop with three overlapping", instance_exists(_new) && instance_exists(_old) && _new.id == _old.id);
+    Test_True("F1d3 interact: the value is the same kind of reference as the old loop's self (Interact_Handle compares target != self)", _new == _old);
 
     // one interactable only on the tile
     instance_destroy(_b);
@@ -2889,6 +2891,9 @@ function Test_InteractTargetTie() {
     _gs.interact_cache_frame = -1;
     _new = Interact_GetTarget(_pl);
     Test_True("F1d3 interact: a single interactable on the tile is found", instance_exists(_new) && _new.id == _a.id);
+    var _self_a = noone;
+    with (_a) _self_a = self;
+    Test_True("F1d3 interact: a single hit is returned as that instance's self (Interact_Handle compares target != self)", _new == _self_a);
 
     // facing the empty side, or away, finds nothing
     _pl.face = UP;

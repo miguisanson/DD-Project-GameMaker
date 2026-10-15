@@ -46,14 +46,53 @@ function Interact_GetTarget(_pl) {
         if (cached == noone || instance_exists(cached)) return cached;
     }
 
+    // D108 F1d-3: ask the faced tile once instead of testing every interactable in the room. The tile point is the one Interact_FacingDistance uses.
+    // One hit (the usual case) is the answer; no hit means no target. Only when several interactables overlap the tile do we run the old loop, which
+    // picks the first one in instance order, so the tie-break is exactly what it was.
     var INF = 1000000000;
     var best = noone;
     var best_dist = INF;
-    with (obj_interactable) {
-        var d = Interact_FacingDistance(_pl, self);
-        if (d < best_dist) {
-            best_dist = d;
-            best = self;
+    var tile = GRID_TILE_SIZE;
+    if (variable_instance_exists(_pl, "tile_size")) tile = _pl.tile_size;
+    var tx = round(_pl.x / tile) * tile;
+    var ty = round(_pl.y / tile) * tile;
+    var resolved = true;
+    switch (_pl.face) {
+        case UP:    ty -= tile; break;
+        case DOWN:  ty += tile; break;
+        case LEFT:  tx -= tile; break;
+        case RIGHT: tx += tile; break;
+        default:    resolved = false; break;   // a face we cannot read: no target, like the old loop (every distance INF)
+    }
+    if (resolved) {
+        var cx = tx + (tile * 0.5);
+        var cy = ty + (tile * 0.5);
+        var first = noone;
+        with (_pl) {
+            first = instance_position(cx, cy, obj_interactable);
+        }
+        if (first != noone) {
+            static overlap = ds_list_create();
+            ds_list_clear(overlap);
+            var n_hit = 0;
+            with (_pl) {
+                n_hit = instance_position_list(cx, cy, obj_interactable, overlap, false);
+            }
+            if (n_hit <= 1) {
+                with (first) {
+                    best = self;   // the same kind of reference the old loop returned: Interact_Handle compares it with its own "self"
+                }
+                best_dist = tile;
+            } else {
+                with (obj_interactable) {
+                    var d = Interact_FacingDistance(_pl, self);
+                    if (d < best_dist) {
+                        best_dist = d;
+                        best = self;
+                    }
+                }
+            }
+            ds_list_clear(overlap);
         }
     }
     gs.interact_cache_frame = frame;

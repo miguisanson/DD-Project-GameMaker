@@ -860,6 +860,34 @@ function World_DrawFx() {
     Merchant_DrawWorldFx();   // D113: the pulsing gold glow round the merchant
 }
 
+// D108 F1d-3: the dot offsets of a sight ring depend only on its radius in pixels, so they are built once per radius (cos/sin of each dot, NOT yet
+// floored: the draw floors cx + offset, the same float sum as the per-frame formula it replaced, so every dot lands on the same pixel).
+// Returns { n, ox[], oy[] }. global.nav_ring_builds counts the builds (Test_SightRingCache).
+function Nav_SightRing(_r) {
+    if (!variable_global_exists("nav_ring_cache") || !is_struct(global.nav_ring_cache)) global.nav_ring_cache = {};
+    if (!variable_global_exists("nav_ring_builds")) global.nav_ring_builds = 0;
+    var _key = string(_r);
+    if (variable_struct_exists(global.nav_ring_cache, _key)) return variable_struct_get(global.nav_ring_cache, _key);
+    var _n = max(12, round(2 * pi * _r / 6));
+    var _ring = { n: _n, ox: array_create(_n, 0), oy: array_create(_n, 0) };
+    for (var _k = 0; _k < _n; _k++) {
+        var _a = (_k / _n) * 2 * pi;
+        _ring.ox[_k] = cos(_a) * _r;
+        _ring.oy[_k] = sin(_a) * _r;
+    }
+    variable_struct_set(global.nav_ring_cache, _key, _ring);
+    global.nav_ring_builds++;
+    return _ring;
+}
+
+// The 4-colour palette of the world marks, built once (make_color_rgb every frame was the old cost).
+function Nav_FxColors() {
+    if (!variable_global_exists("nav_fx_colors") || !is_struct(global.nav_fx_colors)) {
+        global.nav_fx_colors = { c0: make_color_rgb(7, 24, 33), c1: make_color_rgb(48, 104, 80), c2: make_color_rgb(134, 192, 108), c3: make_color_rgb(224, 248, 207) };
+    }
+    return global.nav_fx_colors;
+}
+
 // Called by World_DrawFx (a layer script, see World_RegisterFx): the "!" over an enemy that just spotted the
 // player and a faint dotted ring of its sight range while the player is near. 4-colour palette, no new assets.
 function Nav_DrawWorldFx() {
@@ -868,10 +896,11 @@ function Nav_DrawWorldFx() {
     global.nav_fx_calls++;
     if (!instance_exists(obj_enemy)) return;
     var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
-    var _c0 = make_color_rgb(7, 24, 33);
-    var _c1 = make_color_rgb(48, 104, 80);
-    var _c2 = make_color_rgb(134, 192, 108);
-    var _c3 = make_color_rgb(224, 248, 207);
+    var _pal = Nav_FxColors();
+    var _c0 = _pal.c0;
+    var _c1 = _pal.c1;
+    var _c2 = _pal.c2;
+    var _c3 = _pal.c3;
     var _oc = draw_get_color();
     var _oa = draw_get_alpha();
     draw_set_alpha(1);
@@ -880,12 +909,15 @@ function Nav_DrawWorldFx() {
             var _cx = x + GRID_TILE_SIZE / 2;
             var _cy = y + GRID_TILE_SIZE / 2;
             if (instance_exists(_pl) && prof.sight > 0 && !prof.fixed && point_distance(_cx, _cy, _pl.x + 8, _pl.y + 8) <= (prof.sight + 2) * GRID_TILE_SIZE) {
-                var _r = prof.sight * GRID_TILE_SIZE;
-                var _n = max(12, round(2 * pi * _r / 6));
+                var _ring = Nav_SightRing(prof.sight * GRID_TILE_SIZE);
+                var _ox = _ring.ox;
+                var _oy = _ring.oy;
+                var _n = _ring.n;
                 for (var _k = 0; _k < _n; _k++) {
                     draw_set_color((_k mod 2 == 0) ? _c1 : _c2);   // two greens: faint on both a light and a dark floor
-                    var _a = (_k / _n) * 2 * pi;
-                    draw_rectangle(floor(_cx + cos(_a) * _r), floor(_cy + sin(_a) * _r), floor(_cx + cos(_a) * _r), floor(_cy + sin(_a) * _r), false);
+                    var _px = floor(_cx + _ox[_k]);
+                    var _py = floor(_cy + _oy[_k]);
+                    draw_rectangle(_px, _py, _px, _py, false);
                 }
             }
             if (alert_pop > 0) {

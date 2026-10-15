@@ -73,7 +73,7 @@ if (hide_cursor != global.mouse_cursor_hidden) {
 if (group_loaded) {
     var need_bgm_bootstrap = true;
     if (variable_global_exists("bgm_mix_handles") && is_struct(global.bgm_mix_handles)) {
-        need_bgm_bootstrap = (array_length(variable_struct_get_names(global.bgm_mix_handles)) <= 0);
+        need_bgm_bootstrap = (variable_struct_names_count(global.bgm_mix_handles) <= 0);   // D108 F1d-3: a count, not a names array built every frame
     }
     if (need_bgm_bootstrap) {
         BGM_ApplyForRoom(room);
@@ -81,12 +81,16 @@ if (group_loaded) {
 }
 
 // One-time skillbook ambience: loop only while the special dialogue is active.
-if (!variable_global_exists("skillbook_mana_ambience_handle")) global.skillbook_mana_ambience_handle = -1;
-if (!variable_global_exists("skillbook_mana_ambience_gain")) global.skillbook_mana_ambience_gain = 0;
-if (!variable_global_exists("skillbook_mana_ambience_playing")) global.skillbook_mana_ambience_playing = false;
-if (!variable_global_exists("skillbook_mana_ambience_tail_frames")) global.skillbook_mana_ambience_tail_frames = 0;
-if (!variable_global_exists("skillbook_mana_ambience_last_key")) global.skillbook_mana_ambience_last_key = "";
-if (!variable_global_exists("skillbook_mana_ambience_current_key")) global.skillbook_mana_ambience_current_key = "";
+// D108 F1d-3: Create sets these globals; the existence checks run once per object instead of six times per frame.
+if (!variable_instance_exists(id, "ambience_globals_checked")) {
+    ambience_globals_checked = true;
+    if (!variable_global_exists("skillbook_mana_ambience_handle")) global.skillbook_mana_ambience_handle = -1;
+    if (!variable_global_exists("skillbook_mana_ambience_gain")) global.skillbook_mana_ambience_gain = 0;
+    if (!variable_global_exists("skillbook_mana_ambience_playing")) global.skillbook_mana_ambience_playing = false;
+    if (!variable_global_exists("skillbook_mana_ambience_tail_frames")) global.skillbook_mana_ambience_tail_frames = 0;
+    if (!variable_global_exists("skillbook_mana_ambience_last_key")) global.skillbook_mana_ambience_last_key = "";
+    if (!variable_global_exists("skillbook_mana_ambience_current_key")) global.skillbook_mana_ambience_current_key = "";
+}
 
 var skillbook_should_play = false;
 var gs_audio = GameState_Get();
@@ -128,10 +132,12 @@ if (dialogue_active && ambience_key != "") {
 }
 
 var skillbook_asset = noone;
-if (variable_global_exists("sfx_db") && ds_exists(global.sfx_db, ds_type_map) && ds_map_exists(global.sfx_db, ambience_key)) {
-    skillbook_asset = global.sfx_db[? ambience_key];
+if (ambience_key != "") {   // idle (no ambience key): nothing to look up
+    if (variable_global_exists("sfx_db") && ds_exists(global.sfx_db, ds_type_map) && ds_map_exists(global.sfx_db, ambience_key)) {
+        skillbook_asset = global.sfx_db[? ambience_key];
+    }
+    if (!SFX_IsValidSoundAsset(skillbook_asset)) skillbook_asset = noone;
 }
-if (!SFX_IsValidSoundAsset(skillbook_asset)) skillbook_asset = noone;
 
 if (skillbook_should_play && ambience_key != "" && ambience_key != global.skillbook_mana_ambience_current_key) {
     if (global.skillbook_mana_ambience_handle != -1 && audio_is_playing(global.skillbook_mana_ambience_handle)) {
@@ -156,9 +162,13 @@ if (global.skillbook_mana_ambience_handle != -1 && !audio_is_playing(global.skil
     global.skillbook_mana_ambience_current_key = "";
 }
 
-SFX_ClampVolumes();
-var skillbook_trim = SFX_GetGain(ambience_key);
-var skillbook_target = clamp(SKILLBOOK_MANA_AMBIENCE_BASE_GAIN, 0, 1) * skillbook_trim * global.vol_master * global.vol_sfx;
+// The target gain is read only while the ambience plays or still fades out; idle frames skip the volume clamp and the gain lookup.
+var skillbook_target = 0;
+if (skillbook_should_play || global.skillbook_mana_ambience_gain > 0) {
+    SFX_ClampVolumes();
+    var skillbook_trim = SFX_GetGain(ambience_key);
+    skillbook_target = clamp(SKILLBOOK_MANA_AMBIENCE_BASE_GAIN, 0, 1) * skillbook_trim * global.vol_master * global.vol_sfx;
+}
 
 if (skillbook_should_play) {
     if (global.skillbook_mana_ambience_gain < skillbook_target) {
