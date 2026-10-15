@@ -3907,6 +3907,98 @@ function Test_Suite_Story() {
     Test_True("D116 the credited takes run from slime_spawn_2 to final_boss_attack_3", _new_n == 30 && string_pos("slime_spawn_2", _cr) > 0 && string_pos("final_boss_attack_3", _cr) > 0);
     Test_Eq("D40 until the owner sends names the creator is the marked placeholder", _snd[0].creator, CREDITS_CREATOR_TBD);
     Test_True("D105 credits come with headings and spacing", array_length(Credits_Lines()) > array_length(Credits_PlainLines()));
+    Test_DialogueStartChecks();
+}
+
+// D108 F4b: what each Dialogue_Start* leaves in the UI state (characterization: the three openers share one body). Runs on a private copy of
+// the UI state; the UI controller is removed again if the openers had to create it.
+function Test_DialogueStartCheck(_tag, _gs, _speaker_want, _raw_want) {
+    var _u = _gs.ui;
+    Test_Eq(_tag + " speaker", _u.speaker, _speaker_want);
+    Test_Eq(_tag + " raw lines are the ones given", json_stringify(_u.lines_raw), json_stringify(_raw_want));
+    Test_True(_tag + " the lines are paged (at least one)", is_array(_u.lines) && array_length(_u.lines) >= 1);
+    Test_Eq(_tag + " index 0", _u.index, 0);
+    Test_Eq(_tag + " mode is dialogue", _u.mode, UI_DIALOGUE);
+    Test_Eq(_tag + " no ambience key", Dialogue_GetActiveAmbienceSfxKey(), "");
+    Test_Eq(_tag + " no choice", is_undefined(_u.choice), true);
+    Test_Eq(_tag + " opened this frame", _u.opened_frame, Input_Frame());
+    Test_Eq(_tag + " confirm action", _u.confirm_action, "confirm");
+    Test_Eq(_tag + " typewriter restarts", _u.dialogue_state, UI_DIALOGUE_STATE_REVEALING);
+    Test_Eq(_tag + " typewriter shows nothing yet", _u.dialogue_visible_count, 0);
+    Test_Eq(_tag + " typewriter line index reset", _u.dialogue_tw_line_index, -1);
+    Test_Eq(_tag + " the layout was recorded", _u.dialogue_layout_has_speaker, (_speaker_want != ""));
+}
+
+function Test_DialogueStartChecks() {
+    var _gs = GameState_Get();
+    var _had_ui = variable_struct_exists(_gs, "ui");
+    var _ui0 = _had_ui ? _gs.ui : undefined;
+    var _had_ctl = instance_exists(obj_ui_controller);
+    var _ui = {};
+    if (is_struct(_ui0)) {
+        var _names = variable_struct_get_names(_ui0);
+        for (var _n = 0; _n < array_length(_names); _n++) variable_struct_set(_ui, _names[_n], variable_struct_get(_ui0, _names[_n]));
+    }
+    _ui.mode = UI_NONE;
+    _ui.cutscene_active = false;
+    _ui.cutscene_text_only = true;
+    _ui.dialogue_box_half = false;
+    _gs.ui = _ui;
+
+    // Dialogue_StartLines: no speaker, the given lines; a stale text-only flag is cleared when no cutscene is on
+    var _lines = ["First line.", "Second line."];
+    _ui.choice = { stale: true };
+    _ui.dialogue_open_block_frame = 12345;
+    Dialogue_StartLines(_lines);
+    Test_DialogueStartCheck("F4b StartLines", _gs, "", _lines);
+    Test_False("F4b StartLines clears the text-only flag outside a cutscene", _gs.ui.cutscene_text_only);
+    Test_Eq("F4b StartLines open block frame is the open frame (no cutscene text)", _gs.ui.dialogue_open_block_frame, _gs.ui.opened_frame);
+    Test_True("F4b StartLines stamps the slide-in time", _gs.ui.dialogue_open_ms <= current_time && _gs.ui.dialogue_open_ms >= 0);
+    Dialogue_StartLines("nope");
+    Test_Eq("F4b StartLines with a non-array gives no raw lines", array_length(_gs.ui.lines_raw), 0);
+
+    // Dialogue_StartWithSpeaker: the speaker and the given lines
+    Dialogue_SetActiveAmbienceSfxKey("stale_key");
+    _gs.ui.cutscene_text_only = true;
+    Dialogue_StartWithSpeaker("Hero", _lines);
+    Test_DialogueStartCheck("F4b StartWithSpeaker", _gs, "Hero", _lines);
+    Test_False("F4b StartWithSpeaker clears the text-only flag outside a cutscene", _gs.ui.cutscene_text_only);
+    Dialogue_StartWithSpeaker("Hero", 5);
+    Test_Eq("F4b StartWithSpeaker with a non-array gives no raw lines", array_length(_gs.ui.lines_raw), 0);
+
+    // Dialogue_Start: no speaker, the lines of the dialogue id from the database ("default" for an unknown id)
+    Dialogue_StartWithSpeaker("Hero", _lines);
+    Dialogue_Start("no_such_dialogue_id_f4b");
+    Test_DialogueStartCheck("F4b Start", _gs, "", DialogueDB_Get("default"));
+    Dialogue_SetActiveAmbienceSfxKey("stale_key");
+    Dialogue_Start("first_encounter_slime");
+    Test_DialogueStartCheck("F4b Start (slime)", _gs, "", DialogueDB_Get("first_encounter_slime"));
+
+    // a cutscene keeps its text-only flag and blocks the advance for the shared number of frames
+    _gs.ui.cutscene_active = true;
+    _gs.ui.cutscene_text_only = true;
+    Dialogue_StartLines(_lines);
+    Test_True("F4b StartLines keeps the text-only flag during a cutscene", _gs.ui.cutscene_text_only);
+    Test_Eq("F4b StartLines in a text-only cutscene blocks the advance for the shared frames", _gs.ui.dialogue_open_block_frame, _gs.ui.opened_frame + max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES));
+    Dialogue_StartWithSpeaker("Hero", _lines);
+    Test_Eq("F4b StartWithSpeaker in a text-only cutscene blocks the advance for the shared frames", _gs.ui.dialogue_open_block_frame, _gs.ui.opened_frame + max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES));
+    Dialogue_Start("first_encounter_slime");
+    Test_Eq("F4b Start in a text-only cutscene blocks the advance for the shared frames", _gs.ui.dialogue_open_block_frame, _gs.ui.opened_frame + max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES));
+    _gs.ui.cutscene_active = false;
+
+    // opening closes the pause menu first
+    _gs.ui.mode = UI_PAUSE;
+    Dialogue_StartLines(_lines);
+    Test_Eq("F4b opening over the pause menu leaves the dialogue open", _gs.ui.mode, UI_DIALOGUE);
+
+    // Dialogue_StartChoice picks the opener by the speaker and then sets the choice
+    Dialogue_StartChoice("", _lines, ["Yes", "No"], undefined);
+    Test_True("F4b StartChoice without a speaker: no speaker and a choice", _gs.ui.speaker == "" && is_struct(_gs.ui.choice) && array_length(_gs.ui.choice.labels) == 2);
+    Dialogue_StartChoice("Hero", _lines, ["Yes", "No"], undefined, true);
+    Test_True("F4b StartChoice with a speaker: the speaker, the choice and allow_back", _gs.ui.speaker == "Hero" && is_struct(_gs.ui.choice) && _gs.ui.choice.allow_back);
+
+    if (_had_ui) _gs.ui = _ui0; else variable_struct_remove(_gs, "ui");
+    if (!_had_ctl && instance_exists(obj_ui_controller)) instance_destroy(obj_ui_controller);
 }
 
 // ---- D0 shared UI framework (D95-D98): the pure menu model in scr_menu.gml ("UI FRAMEWORK") ----------------------------------------
@@ -6574,6 +6666,49 @@ function Test_Suite_Economy() {
     Test_True("C3 text: a card row names the card and carries its numbers", _row_card.label == Card_Name(CardDB_Get("pas:coin_sense")) && array_length(_row_card.lines) >= 1);
 
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+    Test_PassiveRuntimeChecks();
+}
+
+// D108 F4b: the passive runtime struct after Equip_PassiveRuntimeEnsure and after Equip_PassiveBattleReset (characterization: one constructor).
+function Test_PassiveRuntimeFields(_tag, _rt) {
+    Test_True(_tag + " is a struct", is_struct(_rt));
+    Test_Eq(_tag + " has nine fields", array_length(variable_struct_get_names(_rt)), 9);
+    Test_Eq(_tag + " battle_turn", _rt.battle_turn, 0);
+    Test_Eq(_tag + " first_hit_done", _rt.first_hit_done, false);
+    Test_Eq(_tag + " steady_strike_turn", _rt.steady_strike_turn, -1);
+    Test_Eq(_tag + " aim_assist_turn", _rt.aim_assist_turn, -1);
+    Test_Eq(_tag + " pinning_cooldown", _rt.pinning_cooldown, 0);
+    Test_Eq(_tag + " first_impact_used", _rt.first_impact_used, false);
+    Test_Eq(_tag + " brace_guard_ready", _rt.brace_guard_ready, false);
+    Test_Eq(_tag + " brace_cooldown", _rt.brace_cooldown, 0);
+    Test_Eq(_tag + " mirror_used", _rt.mirror_used, false);
+}
+
+function Test_PassiveRuntimeChecks() {
+    var _c = { name: "dummy" };
+    Test_PassiveRuntimeFields("F4b Ensure on a fresh character", Equip_PassiveRuntimeEnsure(_c));
+    Test_True("F4b Ensure stores the struct on the character", variable_struct_exists(_c, "passive_runtime"));
+    _c.passive_runtime.battle_turn = 4;
+    _c.passive_runtime.mirror_used = true;
+    Test_Eq("F4b Ensure keeps the existing struct", Equip_PassiveRuntimeEnsure(_c).battle_turn, 4);
+    _c.passive_runtime = 7;
+    Test_PassiveRuntimeFields("F4b Ensure replaces a non-struct", Equip_PassiveRuntimeEnsure(_c));
+    Test_Eq("F4b Ensure on a non-struct gives an empty struct", array_length(variable_struct_get_names(Equip_PassiveRuntimeEnsure(undefined))), 0);
+
+    _c.passive_runtime.battle_turn = 9;
+    _c.passive_runtime.pinning_cooldown = 2;
+    var _r = Equip_PassiveBattleReset(_c);
+    Test_True("F4b BattleReset returns the same character", _r == _c);
+    Test_PassiveRuntimeFields("F4b BattleReset", _c.passive_runtime);
+    var _first = _c.passive_runtime;
+    Equip_PassiveBattleReset(_c);
+    Test_True("F4b BattleReset builds a new struct each time", _c.passive_runtime != _first);
+    var _d = { name: "other" };
+    Equip_PassiveRuntimeEnsure(_d);
+    Equip_PassiveBattleReset(_c);
+    _d.passive_runtime.battle_turn = 3;
+    Test_Eq("F4b two characters never share a runtime struct", _c.passive_runtime.battle_turn, 0);
+    Test_Eq("F4b BattleReset on a non-struct returns it", Equip_PassiveBattleReset(undefined), undefined);
 }
 
 // D111 (owner-approved balance, balance-report.md E1-1 .. E1-6). Expected values are the numbers of DECISIONS.md D111, not read back from the code.
