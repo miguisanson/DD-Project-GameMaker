@@ -58,3 +58,20 @@ Leave frame-counted: player grid step, enemy AI pacing, fx ages, cine pan (gamep
 | I3 (merged) | R-021 negative-control plants for a syntax error and an unknown function | regression run | todo |
 | F2a / F4a | ms clocks for transitions/credits; palette literals | F1 audit | MERGED to next (after the playtest build) |
 | I4 | Opus review 2 (fc886c7..8762d9b): no real bugs. Nits: run_tests.ps1 `$Plant` Position=0 steals positional `-Mode`; text-lint label reads the cumulative fail flag; unknownfn plant anchor -1 check. Possible: after a slow room load the black hold lasts 1 step instead of 2 (fade-in 1 frame earlier) — fix only if the owner sees a one-frame pop (Q-010) | Opus review 2 | nits: todo |
+
+## Round 2 (owner grill 2026-10-16: D126-D138) — Sonnet packets, max 2 at once, Opus reviews + gates
+
+| # | Packet | Decisions | Main files | Status |
+|---|---|---|---|---|
+| G1 | Marble bag everywhere: status chances, enemy move deck, fixed heal/tick amounts, gold bag, Scrounger | D126 | scr_db_skill, scr_db_enemy, scr_db_item, scr_status, scr_loot, scr_save | todo |
+| G2 | Main menu refresh: splash, living background, clean menu, Continue card | D128 | scr_menu (Title_*), obj_start_controller, workbook | todo |
+| G3 | Battle game feel: death pop, hit sparks + per-hit freeze, heavier player hurt + HP lag bar | D138 | scr_combat, scr_fx, obj_battle_controller | todo |
+| G4 | Class chest guard | D127 | obj_room_transition / scr_interact, workbook | todo |
+| G5 | Echo after class pick, filtered | D130 | scr_room_state, scr_menu (cards/echo) | todo |
+| G6 | Map juice: chest burst, item rise, level-up sparkle, gold tick, step squash | D138 | scr_interact, obj_player, scr_fx, HUD | todo |
+| G7 | Battle speed-up hold + damage preview | D134, D135 | scr_combat | todo |
+| G8 | Controller rumble + setting; save-on-close code + IDE step | D136, D132 | scr_input, settings, obj_game_controller | todo |
+| G9 | Run stats at run end + history | D137 | scr_room_state, run-end screen | todo |
+| G10 | Other screens: lighter modern touch | D129 | Ui_* framework (scr_menu) | todo (after G2) |
+| G11 | Consistency pass: Title Case, one word per meaning, one sound per action, one dim | D133 | workbook, scr_menu, scr_combat | todo (last) |
+| — | D131: no milestone unlocks (docs only) | D131 | — | done (decision) |
