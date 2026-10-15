@@ -3898,8 +3898,9 @@ function Scenario_StepMovePlayer(_s) {
     }
 }
 
-// G: rm_floor2 left exit -> rm_floor1 arrival ON the exit tile (D64).
-// Exit fires once per entry (I-049); arriving on the exit tile does not fire it until the player steps off and comes back.
+// G: rm_floor2 left exit -> rm_floor1 arrival ON the exit tile (D64, amended by D142).
+// Exit fires once per entry (I-049); arriving on the exit tile does not fire it until the player steps off and comes back, except that a press TOWARD the
+// arrival exit leaves at once (D142: checked last, on the arrival in rm_floor2).
 function Scenario_StepMoveExit(_s) {
     var _mv = _s.mv;
     var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
@@ -3927,7 +3928,7 @@ function Scenario_StepMoveExit(_s) {
                 Scenario_Check("exit_G1_fires_once_per_entry", _mv.c1 - _mv.c0 == 1, "exit snapshots=" + string(_mv.c1 - _mv.c0));
                 Scenario_Check("exit_G2_arrives_on_the_exit_tile", _pl.x == 18 * GRID_TILE_SIZE && _pl.y == 3 * GRID_TILE_SIZE, "at " + string(_pl.x) + "," + string(_pl.y));
                 with (obj_enemy) instance_destroy();
-                Scenario_Hold("move_right", 45);   // pressing toward the exit while standing on it
+                Scenario_Hold("move_left", 15);   // step off the exit (not toward it): the player reads last frame's input, so 15 held frames = exactly one 16 px tile
                 _mv.phase = 3;
                 _mv.f0 = _s.f;
             } else if (_s.f - _mv.f0 > 400) {
@@ -3935,25 +3936,40 @@ function Scenario_StepMoveExit(_s) {
                 Scenario_MoveNext6(_s);
             }
             break;
-        case 3:   // still in rm_floor1: the exit ignores the player standing on it
-            if (_s.f - _mv.f0 >= 50) {
-                Scenario_Check("exit_G3_standing_on_the_exit_does_not_fire", room == rm_floor1 && Scenario_ExitCount() == _mv.c1 && !Transition_IsActive(), "room=" + room_get_name(room) + " fires=" + string(Scenario_ExitCount() - _mv.c1));
-                Scenario_Hold("move_left", 15);   // step off: the player reads last frame's input, so 15 held frames = exactly one 16 px tile
+        case 3:
+            if (_s.f - _mv.f0 >= 24) {
+                Scenario_Check("exit_G3_walking_off_the_exit_does_not_fire_it", room == rm_floor1 && Scenario_ExitCount() == _mv.c1 && !Transition_IsActive(), "room=" + room_get_name(room) + " fires=" + string(Scenario_ExitCount() - _mv.c1));
+                Scenario_Check("exit_G4_stepped_off_the_exit_tile", _pl != noone && _pl.x == 17 * GRID_TILE_SIZE && _pl.y == 3 * GRID_TILE_SIZE, "at " + ((_pl != noone) ? (string(_pl.x) + "," + string(_pl.y)) : "no player"));
+                Scenario_Hold("move_right", 30);   // and back on
                 _mv.phase = 4;
                 _mv.f0 = _s.f;
             }
             break;
         case 4:
-            if (_s.f - _mv.f0 >= 24) {
-                Scenario_Check("exit_G4_stepped_off_the_exit_tile", _pl != noone && _pl.x == 17 * GRID_TILE_SIZE && _pl.y == 3 * GRID_TILE_SIZE, "at " + ((_pl != noone) ? (string(_pl.x) + "," + string(_pl.y)) : "no player"));
-                Scenario_Hold("move_right", 30);   // and back on
-                _mv.phase = 5;
-                _mv.f0 = _s.f;
-            }
-            break;
-        case 5:
             if (room == rm_floor2 || _s.f - _mv.f0 > 300) {
                 Scenario_Check("exit_G5_fires_again_after_stepping_off", room == rm_floor2 && Scenario_ExitCount() - _mv.c1 == 1, "room=" + room_get_name(room) + " fires=" + string(Scenario_ExitCount() - _mv.c1));
+                _mv.phase = 5;
+                _mv.f0 = _s.f;
+                if (room != rm_floor2) Scenario_MoveNext6(_s);
+            }
+            break;
+        case 5:   // the arrival in rm_floor2 (on its exit tile again): D142, a press TOWARD that exit leaves at once
+            if (room == rm_floor2 && _pl != noone && !Transition_IsActive() && _s.f - _mv.f0 > 20) {
+                _mv.c2 = Scenario_ExitCount();
+                with (obj_enemy) instance_destroy();
+                with (obj_dialogue_trigger) instance_destroy();
+                Scenario_ClearUi();
+                Scenario_Hold("move_left", 45);   // toward the exit
+                _mv.phase = 6;
+                _mv.f0 = _s.f;
+            } else if (_s.f - _mv.f0 > 400) {
+                Scenario_Check("exit_G6_arrival_in_rm_floor2", false, "room=" + room_get_name(room));
+                Scenario_MoveNext6(_s);
+            }
+            break;
+        case 6:
+            if (room == rm_floor1 || _s.f - _mv.f0 > 300) {
+                Scenario_Check("exit_G6_a_press_toward_the_arrival_exit_leaves_at_once", room == rm_floor1 && Scenario_ExitCount() - _mv.c2 == 1, "room=" + room_get_name(room) + " fires=" + string(Scenario_ExitCount() - _mv.c2));
                 Scenario_MoveNext6(_s);
             }
             break;
@@ -10341,7 +10357,9 @@ function Scenario_StepSmokeH3(_s) {
             if (_s.t >= 40 && Player_IsSettled(_pl)) {
                 Scenario_Release();
                 Scenario_Check("h3_a_side_press_does_not_leave_the_room", room == rm_floor3 && !Transition_IsActive(), "room=" + room_get_name(room));
-                Scenario_Check("h3_the_player_walked_one_tile_sideways", _pl.x == _h.x0 + _h.dx && _pl.y == _h.y0 + _h.dy, "at " + string(_pl.x) + "," + string(_pl.y) + " from " + string(_h.x0) + "," + string(_h.y0));
+                var _along = (_pl.x - _h.x0) * sign(_h.dx) + (_pl.y - _h.y0) * sign(_h.dy);   // how far it went the way it was pressed (the key is held a little longer than one step)
+                var _across = abs((_pl.x - _h.x0) * sign(_h.dy)) + abs((_pl.y - _h.y0) * sign(_h.dx));
+                Scenario_Check("h3_the_player_walked_sideways_at_least_a_tile", _along >= _T && _across == 0, "at " + string(_pl.x) + "," + string(_pl.y) + " from " + string(_h.x0) + "," + string(_h.y0));
                 Scenario_Check("h3_off_the_exit_it_is_armed_again", _pl.exit_ignore == noone);
                 Scenario_NoticeEnd();
             }

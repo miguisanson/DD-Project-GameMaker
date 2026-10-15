@@ -51,6 +51,7 @@ if (exit_ignore != noone) {
         exit_ignore = noone;
     }
 }
+if (exit_ignore == noone) exit_leave = false;
 
 // I-048: never rest between tiles (quick-load mid-step, aborted step, odd spawn).
 if (!moving) Player_SnapIfOffGrid(id);
@@ -114,6 +115,12 @@ if (!moving) {
     if (want != -1) {
         buf_dir = -1;
         move_dir = want;
+        // D142 (amends D64): on a room arrival the exit under the player opens to a press toward it (the way you walk out through it): the exit sees the move
+        // direction in its collision event this very step and leaves at once. Any other direction walks normally and the exit re-arms after the step off it.
+        if (exit_leave && exit_ignore != noone && instance_exists(exit_ignore) && exit_ignore.require_dir == want) {
+            exit_ignore = noone;
+            exit_leave = false;
+        }
         if (face != want) {
             // D69: the turn is instant; walking starts only if the key is still held after turn_frames (a tap just turns)
             face = want;

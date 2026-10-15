@@ -811,12 +811,10 @@ function Shuffle_EnemyPool(_floor) {
     return [];
 }
 
-// R1 (D123): elites per floor: ~15% of the free enemies (rounded half up), at least 1 from floor 2 on, never more than there are.
+// R1 (D123, D145): elites per floor: none on floors 1 and 2; from floor 3, ~15% of the free enemies (rounded half up), at least 1, never more than there are.
 function Shuffle_EliteCount(_floor, _free) {
-    if (_free <= 0) return 0;
-    var c = RoundHalfUp(ELITE_CHANCE * _free);
-    if (floor(_floor) >= 2) c = max(c, 1);
-    return min(c, _free);
+    if (_free <= 0 || floor(_floor) < 3) return 0;
+    return min(max(RoundHalfUp(ELITE_CHANCE * _free), 1), _free);
 }
 
 // The layout of one room's map enemies for a seed. _slots: [{ pid, enemy_id, x, y, fixed }] (the room's authored enemies; fixed = a boss or a

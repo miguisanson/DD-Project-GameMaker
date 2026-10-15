@@ -724,6 +724,7 @@ function Battle_StaggerHit(_bc, _power, _stun_skill, _perfect, _hits = 1) {
     _bc.stagger_flash_start = current_time;
     Tutorial_Trigger("stagger");   // D45: the first time the meter fills
     if (!Stagger_Add(e, gain)) return "";
+    _bc.rumble_break = true;       // H3: the controller rumble must not miss a BREAK that ends again before it looks (a fast enemy acts right after the push-back)
     Turn_Push(_bc.tl, TL_ENEMY);   // pushed back one turn
     _bc.tl_slide_start = current_time;
     _bc.tl_slide_kind = 1;
@@ -3452,6 +3453,8 @@ function Battle_FeelInit(_bc) {
     _bc.feel_punch_on = false;
     _bc.feel_break = false;             // a BREAK landed with this hit (its freeze and zoom)
     _bc.feel_contact = false;           // the freeze is long enough to show the contact flash
+    _bc.rumble_perfect = false;         // H3: a Perfect hit landed (one-shot: the controller rumble takes it, Rumble_SnapshotOf)
+    _bc.rumble_break = false;           // H3: a BREAK landed (one-shot, the same: it is raised and cleared inside one step when the enemy acts right after)
     _bc.feel_edge_start = -100000;      // the dark screen-edge flash of a big hit taken
     _bc.feel_pjolt_start = -100000;     // the HP panel's jolt
     _bc.feel_pjolt_big = false;
@@ -3475,6 +3478,7 @@ function Battle_HitFreeze(_bc, _key, _crit) {
     var ms = Feel_FreezeMs(_key, _crit, _bc.feel_break);
     _bc.hitstop_ms = max(_bc.hitstop_ms, ms);
     _bc.feel_contact = (ms >= FEEL_FREEZE_PERFECT_MS);
+    _bc.rumble_perfect = (_key == QTE_PERFECT);   // H3: the grade says Perfect, not the length of the freeze (a crit and a BREAK freeze 120 ms too)
 }
 
 // The sparks, the jolt, the recoil and (crit / BREAK) the zoom punch of a damaging hit, started on the feel clock.
@@ -3707,9 +3711,39 @@ function Battle_HitPreview(_p, _e, _src, _is_skill, _grade_mult) {
     return base + min(bonus, left);
 }
 
-// { ok, perfect, hits }: the hit at the grade OK and at Perfect (the D61 multipliers), and how many hits it has.
+// The damage of each hit of a skill with several hits, in order, as Skill_Use deals them: one after the other on copies of the fighters, so what a hit
+// changes (a guard status is used up, the enemy's HP falls, a gear passive's state) is there for the next one. A crit is luck and is not shown.
+function Battle_HitsPreview(_p, _e, _src, _is_skill, _grade_mult, _hits) {
+    var out = [];
+    var p = variable_clone(_p);
+    var e = variable_clone(_e);
+    for (var h = 0; h < _hits; h++) {
+        var pack = Combat_ApplyDamage(p, e, _src, 1, 1, { is_skill: _is_skill, grade_mult: _grade_mult });
+        e = pack.defender;
+        var dmg = pack.dmg;
+        if (dmg > 0) {
+            var bonus = Equip_PlayerBonusDamage(p, e, dmg, _is_skill, "");
+            var spend = min(bonus, e.hp);
+            e.hp = max(0, e.hp - spend);
+            dmg += spend;
+        }
+        array_push(out, dmg);
+    }
+    return out;
+}
+
+// { ok, perfect, hits, ok_hits, perfect_hits }: the first hit at the grade OK and at Perfect (the D61 multipliers), how many hits it has and the damage of every hit.
 function Battle_PreviewOf(_p, _e, _src, _is_skill, _hits) {
-    return { ok: Battle_HitPreview(_p, _e, _src, _is_skill, Qte_GradeMult(QTE_OK)), perfect: Battle_HitPreview(_p, _e, _src, _is_skill, Qte_GradeMult(QTE_PERFECT)), hits: _hits };
+    var ok = Qte_GradeMult(QTE_OK);
+    var pf = Qte_GradeMult(QTE_PERFECT);
+    if (_hits <= 1) {
+        var a = Battle_HitPreview(_p, _e, _src, _is_skill, ok);
+        var b = Battle_HitPreview(_p, _e, _src, _is_skill, pf);
+        return { ok: a, perfect: b, hits: 1, ok_hits: [a], perfect_hits: [b] };
+    }
+    var oh = Battle_HitsPreview(_p, _e, _src, _is_skill, ok, _hits);
+    var ph = Battle_HitsPreview(_p, _e, _src, _is_skill, pf, _hits);
+    return { ok: oh[0], perfect: ph[0], hits: _hits, ok_hits: oh, perfect_hits: ph };
 }
 
 // The basic attack with this weapon (an ItemDB weapon entry or the bare-hands struct, as Battle_PlayerWeapon gives).
@@ -3731,20 +3765,30 @@ function Battle_PreviewValue(_n, _hits) {
     return (_hits > 1) ? Loc_T("battle.preview.hits", "{n} x{hits}", { n: string(_n), hits: string(_hits) }) : string(_n);
 }
 
+// The hits of a preview as text: "7 x2" when every hit is the same, else each hit on its own: "1+4" (a guard that the first hit uses up).
+function Battle_PreviewHitsText(_list) {
+    var same = true;
+    for (var i = 1; i < array_length(_list); i++) { if (_list[i] != _list[0]) same = false; }
+    if (same) return Battle_PreviewValue(_list[0], array_length(_list));
+    var t = "";
+    for (var j = 0; j < array_length(_list); j++) t += ((j > 0) ? "+" : "") + string(_list[j]);
+    return t;
+}
+
 // The two number lines a skill details panel gets (D100: the same numbers the hit deals). [] without a preview.
 function Battle_PreviewLines(_pv) {
     if (!is_struct(_pv)) return [];
     return [
-        { label: Loc_T("battle.det.damage", "Damage"), value: Battle_PreviewValue(_pv.ok, _pv.hits) },
-        { label: Loc_T("battle.det.perfect", "Perfect"), value: Battle_PreviewValue(_pv.perfect, _pv.hits) }
+        { label: Loc_T("battle.det.damage", "Damage"), value: Battle_PreviewHitsText(_pv.ok_hits) },
+        { label: Loc_T("battle.det.perfect", "Perfect"), value: Battle_PreviewHitsText(_pv.perfect_hits) }
     ];
 }
 
 // The line pair of the small plate beside the command menu while the cursor is on ATTACK: "Damage 4" over "Perfect 5".
 function Battle_PreviewPlateLines(_pv) {
     return [
-        Loc_T("battle.preview.damage", "Damage {n}", { n: Battle_PreviewValue(_pv.ok, _pv.hits) }),
-        Loc_T("battle.preview.perfect", "Perfect {n}", { n: Battle_PreviewValue(_pv.perfect, _pv.hits) })
+        Loc_T("battle.preview.damage", "Damage {n}", { n: Battle_PreviewHitsText(_pv.ok_hits) }),
+        Loc_T("battle.preview.perfect", "Perfect {n}", { n: Battle_PreviewHitsText(_pv.perfect_hits) })
     ];
 }
 
@@ -3754,7 +3798,7 @@ function Battle_SkillPreviewSig(_p, _e) {
     var ids = is_array(_p.skills) ? _p.skills : [];
     for (var i = 0; i < array_length(ids); i++) {
         var pv = Battle_SkillPreview(_p, _e, ids[i]);
-        sig += is_struct(pv) ? (string(pv.ok) + "/" + string(pv.perfect) + "/" + string(pv.hits)) : "-";
+        sig += is_struct(pv) ? (Battle_PreviewHitsText(pv.ok_hits) + "/" + Battle_PreviewHitsText(pv.perfect_hits)) : "-";
         sig += ",";
     }
     return sig;
