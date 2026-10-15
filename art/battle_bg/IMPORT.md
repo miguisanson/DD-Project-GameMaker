@@ -1,8 +1,8 @@
 # Import the battle backgrounds in the IDE (D151)
 
 **Update 2026-10-16: you only need to import `spr_battle_bg_boss` now.** `spr_battle_bg_forest` (A1), `spr_battle_bg_caves` (B2) and
-`spr_battle_bg_ruins` (C3) are already done. The boss picture comes from the new row D (`candidates/D4.png` ... `D13.png`, see `PICK.md`;
-the old D1-D3 are gone). The steps below are the same; just do them once, for the boss sprite.
+`spr_battle_bg_ruins` (C3) are already done. **You picked D13 (D165): import `art/battle_bg/candidates/D13.png` as `spr_battle_bg_boss`.** (The other new candidates D4-D12 are in
+`candidates/`, see `PICK.md`; the old D1-D3 are gone.) The steps below are the same; just do them once, for the boss sprite.
 
 Why: the IDE owns the `.yyp`/`.yy` files, so agents cannot create sprites. The code looks each sprite up by its exact name with
 `asset_get_index(...)` (`Battle_BgSprite` in `scripts/scr_fx/scr_fx.gml`) and keeps today's background (`battle_screen`) until the sprite
