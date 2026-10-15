@@ -470,6 +470,9 @@ function Scenario_StepSmoke(_s) {
         case 200: case 201: case 202: case 203: case 204: case 205: case 206: case 207: case 208: case 209:
             Scenario_StepSmokeFairUi(_s);   // R1b: the window loses focus -> the pause menu (the battle clock stops), the RUN chance
             break;
+        case 210: case 211: case 212: case 213: case 214: case 215: case 216: case 217: case 218: case 219:
+            Scenario_StepSmokeNotice(_s);   // F3a (D96): the notice pop-up through the real title (old slot file, a Continue that fails) and the keys around it
+            break;
         case 30:
             Scenario_StepSmokeUi(_s);
             break;
@@ -2605,6 +2608,9 @@ function Scenario_StepShots(_s) {
             break;
         case 200: case 201: case 202: case 203: case 204: case 205: case 206: case 207: case 208: case 209:
             Scenario_StepShotsFairUi(_s);   // R1b: the battle command menu with the RUN chance, the pause menu opened in a battle
+            break;
+        case 230: case 231: case 232: case 233: case 234: case 235: case 236: case 237: case 238: case 239:
+            Scenario_StepShotsNotice(_s);   // F3a: the notice pop-up over the title (old-save text at two sizes, the damaged-run text, Korean)
             break;
         case 210: case 211: case 212: case 213: case 214: case 215: case 216: case 217: case 218: case 219: case 220: case 221: case 222: case 223: case 224: case 225: case 226: case 227: case 228: case 229:
             Scenario_StepShotsTabMenu(_s);   // D1b: every tab, the gear comparison, the Codex pages, settings, pause; two sizes, Korean once
@@ -7372,9 +7378,169 @@ function Scenario_StepSmokeFairUi(_s) {
                 Scenario_Check("fairui_abandon_and_quit_stay_on_outside_a_battle", _it2[3].enabled && _it2[4].enabled && !PauseMenu_Get().in_battle);
                 Focus_Step(true);
                 PauseMenu_Close(true);
-                Scenario_Finish();
+                Scenario_Next(_s, 210);   // F3a: the notice pop-up on the title
             }
             if (_s.t > 600) { Scenario_Check("fairui_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+    }
+}
+
+// ---- F3a (D96, D108): the notice pop-up through the real title. A run is saved (so Continue is on) and an old slot file is on disk (the legacy notice).
+// Back at the title the notice must show, take no key but Confirm / Back, ignore a press that is too early (the unit check does that to the millisecond),
+// and leave Continue and New Game working. Writes the real profile.sav / run.sav / savedata0.sav: only inside the gate (Scenario_CanSaveSlot). ----
+function Scenario_NoticeLegacyFile(_on) {
+    var _p = Save_Path(1);
+    if (_on) Test_RawWrite(_p, json_stringify({ save_version: 1, statData: { selected_class: 1 } }));   // an old-format slot file
+    else if (file_exists(_p)) file_delete(_p);
+}
+
+// Quits the run in memory and goes back to the title, as the pause menu's Quit does (the profile is read from disk again).
+function Scenario_NoticeToTitle() {
+    var _gs = GameState_Get();
+    variable_struct_remove(_gs, "run");
+    _gs.player_ch = CharacterCreate_Player(CLASS_KNIGHT);
+    _gs.flags = {};
+    _gs.persist = {};
+    global.profile = undefined;
+    _gs.in_main_menu = true;
+    room_goto(rm_start);
+}
+
+// The files the scenario made are always removed: a leftover old slot file would show the notice in every later run.
+function Scenario_NoticeEnd() {
+    Scenario_NoticeLegacyFile(false);
+    RunSave_Delete();
+    Profile_ResetForTest();
+    Scenario_Finish();
+}
+
+function Scenario_StepSmokeNotice(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _top = (_sc != noone && is_struct(_sc.title_stk)) ? Ui_StackTop(_sc.title_stk) : undefined;
+    if (!variable_struct_exists(_s, "nt")) _s.nt = {};
+    var _n = _s.nt;
+    if (room == rm_start && _sc != noone && _sc.state == "boot_logo") _sc.state = "main";   // the logo is not what is checked here
+    var _title_ready = (room == rm_start && _sc != noone && _sc.state == "main" && is_struct(_top) && !Transition_IsActive());
+    switch (_s.step) {
+        case 210:   // a run in progress and an old slot file; then back to the title
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP notice (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_Finish();
+                    break;
+                }
+                if (Transition_IsActive()) { _s.t = 0; break; }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_NoticeLegacyFile(false);
+                Profile_ResetForTest();
+                RunSave_Delete();
+                Run_StartNew(false, 2222);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                Run_AutoSave();
+                Scenario_Check("notice_a_run_is_saved_so_continue_is_on", RunSave_HasSave());
+                Scenario_Check("notice_no_notice_is_up_in_the_game", !Notice_IsOpen());
+                Scenario_NoticeLegacyFile(true);
+                Scenario_Check("notice_the_old_slot_file_is_on_disk", Save_LegacyFilesExist());
+                Scenario_NoticeToTitle();
+                Scenario_Next(_s, 211);
+            }
+            if (_s.t > 600) { Scenario_Check("notice_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 211:   // the title opens with the old-save notice on top
+            if (_s.t > 20 && _title_ready && Notice_IsOpen()) {
+                _n.opened = global.notice_ui.opened_ms;
+                Scenario_Check("notice_the_title_shows_the_old_save_notice", Notice_Text() == Save_LegacyNotice(), "text=" + Notice_Text());
+                Scenario_Check("notice_it_marks_the_profile_so_it_shows_once", Profile_Get().legacy_notice_seen);
+                Scenario_Check("notice_the_ui_mode_is_the_notice", _gs.ui.mode == UI_NOTICE, "mode=" + string(_gs.ui.mode));
+                Scenario_Check("notice_it_blocks_the_world", UI_IsBlocking());
+                _n.cursor0 = _top.cursor;
+                Scenario_Tap("menu_down");
+                Scenario_Next(_s, 212);
+            }
+            if (_s.t > 600) { Scenario_Check("notice_shows_on_the_title", false, "room=" + room_get_name(room) + " open=" + string(Notice_IsOpen())); Scenario_NoticeEnd(); }
+            break;
+        case 212:   // a menu key does nothing; Confirm after the lock (in ms) dismisses it, and that press does not also pick New Game
+            if (_s.t == 8) {
+                Scenario_Check("notice_a_menu_key_does_not_move_the_title_cursor", _top.cursor == _n.cursor0, "cursor=" + string(_top.cursor));
+                Scenario_Check("notice_a_menu_key_does_not_close_it", Notice_IsOpen() && !Notice_Closing());
+            }
+            if (_s.t > 8 && !variable_struct_exists(_n, "pressed") && current_time - _n.opened >= UI_INPUT_LOCK_MS + 80) {
+                _n.pressed = true;
+                Scenario_Tap("confirm");
+            }
+            if (variable_struct_exists(_n, "pressed") && _s.t > 8 && !Notice_IsOpen()) {
+                Scenario_Check("notice_confirm_dismisses_it", true);
+                Scenario_Check("notice_the_ui_mode_is_free_again", _gs.ui.mode == UI_NONE, "mode=" + string(_gs.ui.mode));
+                Scenario_Check("notice_the_dismissing_press_did_not_pick_new_game", room == rm_start && !is_struct(_sc.title_exit), "room=" + room_get_name(room));
+                Scenario_Check("notice_continue_is_on", _top.items[1].enabled);
+                Scenario_Next(_s, 213);
+            }
+            if (_s.t > 300) { Scenario_Check("notice_confirm_dismisses_it", false, "open=" + string(Notice_IsOpen()) + " pressed=" + string(variable_struct_exists(_n, "pressed"))); Scenario_NoticeEnd(); }
+            break;
+        case 213:   // Continue still works after the notice
+            if (_s.t == 20) {
+                Ui_MenuFixCursor(_top, 1);
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 60 && Scenario_FloorReady(rm_floor1)) {
+                Scenario_Check("notice_continue_after_the_notice_enters_the_saved_room", room == rm_floor1);
+                Scenario_Check("notice_continue_restores_the_run", Run_IsActive() && _gs.run.seed == 2222, "seed=" + (Run_IsActive() ? string(_gs.run.seed) : "no run"));
+                Scenario_NoticeToTitle();
+                Scenario_Next(_s, 214);
+            }
+            if (_s.t > 600) { Scenario_Check("notice_continue_after_the_notice", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 214:   // the second visit to the title: the old-save notice is once per profile; a damaged run save makes Continue show its notice
+            if (_s.t > 40 && _title_ready) {
+                Scenario_Check("notice_the_old_save_notice_shows_once", !Notice_IsOpen() && Save_LegacyFilesExist() && _gs.ui.mode == UI_NONE);
+                RunSave_Delete();
+                Test_RawWrite(RunSave_Path(), "{{ not json");
+                _sc.title_refresh = true;
+                Scenario_Next(_s, 215);
+            }
+            if (_s.t > 600) { Scenario_Check("notice_second_title_visit", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 215:   // Continue on the damaged file: the failure text, in the same notice
+            if (_s.t == 10) {
+                Scenario_Check("notice_continue_is_on_for_a_file_that_exists", _top.items[1].enabled);
+                Ui_MenuFixCursor(_top, 1);
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 10 && Notice_IsOpen()) {
+                _n.opened = global.notice_ui.opened_ms;
+                _n.pressed2 = false;
+                Scenario_Check("notice_a_failed_continue_shows_the_failure_text", Notice_Text() == Run_ContinueFailText("corrupt"), "text=" + Notice_Text());
+                Scenario_Check("notice_it_is_the_same_blocking_notice", _gs.ui.mode == UI_NOTICE && UI_IsBlocking());
+                Scenario_Next(_s, 216);
+            }
+            if (_s.t > 120) { Scenario_Check("notice_a_failed_continue_shows_a_notice", false, "state=" + string(_sc.state)); Scenario_NoticeEnd(); }
+            break;
+        case 216:   // Back dismisses it too (after the lock); then the damaged file goes
+            if (!_n.pressed2 && current_time - _n.opened >= UI_INPUT_LOCK_MS + 80) {
+                _n.pressed2 = true;
+                Scenario_Tap("cancel");
+            }
+            if (_n.pressed2 && !Notice_IsOpen()) {
+                Scenario_Check("notice_back_dismisses_it", _gs.ui.mode == UI_NONE && room == rm_start && !is_struct(_sc.title_exit));
+                RunSave_Delete();
+                _sc.title_refresh = true;
+                Scenario_Next(_s, 217);
+            }
+            if (_s.t > 300) { Scenario_Check("notice_back_dismisses_it", false, "open=" + string(Notice_IsOpen())); Scenario_NoticeEnd(); }
+            break;
+        case 217:   // New Game after the notice
+            if (_s.t == 15) {
+                Ui_MenuFixCursor(_top, 0);
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 20 && room != rm_start) {
+                Scenario_Check("notice_new_game_after_the_notice_starts_the_run", room == rm_cutscene || room == rm_floor1, "room=" + room_get_name(room));
+                Scenario_NoticeEnd();
+            }
+            if (_s.t > 600) { Scenario_Check("notice_new_game_after_the_notice", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
     }
 }
@@ -7446,9 +7612,79 @@ function Scenario_StepShotsFairUi(_s) {
                 if (_s.di >= array_length(_scenes)) {
                     _s.si = 0;
                     _s.di = 0;
-                    Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
+                    Scenario_Next(_s, 230);   // F3a pictures (230..232), then the D91 / DISP-10 / D48 pictures and the skill animations
                 } else {
                     Scenario_Next(_s, 200);
+                }
+            }
+            break;
+    }
+}
+
+// ---- F3a pictures 230..232: the notice pop-up over the title: the old-save text at windowed scale 3 (480 x 432) and 5 (800 x 720), the short
+// damaged-run text at scale 3, and the old-save text in Korean at scale 3. The real draw of the real pop-up on the real title. ----
+function Scenario_NoticeScenes() {
+    return ["legacy", "corrupt", "korean"];
+}
+
+function Scenario_NoticeScales(_di) {
+    return (_di == 0) ? [3, 5] : [3];
+}
+
+function Scenario_NoticeText(_di) {
+    return (_di == 1) ? Run_ContinueFailText("corrupt") : Save_LegacyNotice();
+}
+
+function Scenario_StepShotsNotice(_s) {
+    var _scenes = Scenario_NoticeScenes();
+    var _scales = Scenario_NoticeScales(_s.di);
+    var _c = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _tag = _scenes[_s.di] + "_" + string(_scales[_s.si]);
+    switch (_s.step) {
+        case 230:   // the title at this scale
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Notice_Interrupt();
+                Loc_SetLanguage((_s.di == 2) ? "ko" : "en");
+                Scenario_SetWindowScale(_scales[_s.si]);
+                GameState_Get().in_main_menu = true;
+                if (room != rm_start) room_goto(rm_start);
+            }
+            if (room == rm_start && _s.t >= 40) {
+                with (obj_start_controller) { if (state == "boot_logo") state = "main"; }
+                if (_c != noone && _c.state == "main" && !Transition_IsActive()) Scenario_Next(_s, 231);
+            }
+            if (_s.t > 400) { Scenario_Check("shots_notice_reaches_the_title_" + _tag, false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 231:   // open it; let it fade in; check the box; take the picture
+            if (_s.t == 1) {
+                Notice_Interrupt();
+                Notice_Open(Scenario_NoticeText(_s.di));
+            }
+            if (_s.t >= 30) {
+                var _mt = Ui_Metrics();
+                var _b = Notice_Box(Notice_Text());
+                Scenario_Check("shots_notice_is_open_" + _tag, Notice_IsOpen() && !Notice_Closing() && Notice_Text() == Scenario_NoticeText(_s.di));
+                Scenario_Check("shots_notice_is_fully_faded_in_" + _tag, Notice_Alpha(current_time) == 1);
+                Scenario_Check("shots_notice_box_is_inside_the_gui_" + _tag, _b.x >= 0 && _b.y >= 0 && _b.x + _b.w <= _mt.gw && _b.y + _b.h <= _mt.gh);
+                _s.shot = "shot_notice_" + _scenes[_s.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 232);
+            }
+            break;
+        case 232:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Notice_Interrupt();
+                _s.si++;
+                if (_s.si >= array_length(_scales)) { _s.si = 0; _s.di++; }
+                if (_s.di >= array_length(_scenes)) {
+                    Loc_SetLanguage("en");
+                    _s.si = 0;
+                    _s.di = 0;
+                    Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
+                } else {
+                    Scenario_Next(_s, 230);
                 }
             }
             break;
