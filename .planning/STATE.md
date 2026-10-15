@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PLAYTEST NOW: build dbc678a-20261015 (= next dbc678a; FULL gate PASS 3690/0 + smoke + bot + 172 shots; Opus reviews 1-3; bug hunt: 3 bugs fixed, 3 owner questions I-069..I-071), E:/Games/DD-Project Playtest/dbc678a-20261015, launch-checked. Supersedes fc886c7, 8762d9b, 9015871. Queue 61 entries + 3 questions. Next: owner playtest + answers, then merge good ones next -> v1.9. |
+| WIP | Build dbc678a-20261015 is ready (full gate PASS 3690/0) but bug hunt 2 found 4 non-critical map/room bugs (I-073..I-076, incl. enemies chasing under the pause menu). Fix in flight (Sonnet, wt/hunt2, fix-hunt2). Then: FULL gate, rebuild the playtest build, repoint BOARD/QUEUE (add an entry for the fixes). |
 | Unplayed features | 61 playtest entries (PLAYTEST-QUEUE, build dbc678a-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |

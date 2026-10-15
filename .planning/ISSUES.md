@@ -115,6 +115,10 @@ Found by audits and reviews (no person's words):
 | I-070 | bug hunt 2026-10-16: D88 milestone unlocks (extra cards/passives/throwables) not implemented | DESIGN | P3 | next | profile with no milestones still gets every card | owner decides (question 2) | waiting on owner |
 | I-071 | bug hunt 2026-10-16: closing the window does not save the run (D46 "on quit") | BUG/IDE | P3 | next | Alt-F4 mid-floor loses up to ~10 s | Game End event saves the run (owner IDE task) | waiting on owner |
 | I-072 | bug hunt 2026-10-16: stolen items never returned, battle win never lists loot; weak Smoke Bomb gives no dodge; throwable cap not applied on class pick | BUG | P2 | next | see fix-hunt1 | checks in fix-hunt1 | fixed on next (dbc678a); owner confirms at playtest Q-061 |
+| I-073 | bug hunt 2: enemies keep chasing under the pause/Tab/bed/card/tutorial screens and can start a fight behind the pause (D122) | BUG | P2 | next | alt-tab while a wolf chases | enemies freeze under any screen | fix in progress (fix-hunt2) |
+| I-074 | bug hunt 2: enemy home resets to the authored spot after re-entering a room or a battle; enemies walk across the room (D33/D63/D66) | BUG | P2 | next | leave and re-enter rm_floor4 | home saved with the room state | fix in progress (fix-hunt2) |
+| I-075 | bug hunt 2: after a battle or Continue on an exit tile the first key press fires the exit (D64) | BUG | P2 | next | arrive on floor 1 from floor 2, fight the slime at once | exit ignores the player until they step off | fix in progress (fix-hunt2) |
+| I-076 | bug hunt 2: auto-resolve + autosave + Continue re-deals the room (types/places/elites change, D33) | BUG | P3 | next | auto-resolve 1 of 3 enemies, wait 10 s, quit, Continue | same layout after Continue | fix in progress (fix-hunt2) |
 
 ---
 
