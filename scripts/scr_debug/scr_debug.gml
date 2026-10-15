@@ -580,29 +580,28 @@ function Scenario_StepSmokeUi(_s) {
     }
 }
 
-// New Game from the title: confirm, pick Easy in the difficulty panel, and the intro cutscene starts with that difficulty.
+// New Game from the title (D35: one difficulty only): confirm on New Game starts the run at once. No difficulty menu may appear on
+// any frame, and the run starts on Normal even when the game was left on another value.
 function Scenario_StepSmokeUiStart(_s) {
     var _c = obj_start_controller;
+    if (_s.t > 1 && string(_c.state) == "difficulty") _s.diff_menu_seen = true;
     switch (_s.t) {
         case 1:
+            _s.diff_menu_seen = false;
             Ui_MenuFixCursor(Ui_StackTop(_c.title_stk), 0);   // the hold left the cursor anywhere
-            Scenario_Tap("confirm");
-            break;
-        case 20:
-            Scenario_Check("ui_new_game_shows_the_difficulty_panel", _c.state == "difficulty", "state=" + string(_c.state));
-            Scenario_Tap("menu_up");
-            break;
-        case 26:
+            Difficulty_SetCurrent(DIFFICULTY_HARD);   // a stale value: New Game must start on Normal, not keep it
             Scenario_Tap("confirm");
             break;
         default:
-            if (_s.t > 26 && room == rm_cutscene && obj_start_controller.cutscene_started && !Transition_IsActive() && GameState_Get().ui.mode == UI_DIALOGUE) {
-                Scenario_Check("ui_difficulty_choice_starts_the_intro_with_it", Difficulty_GetCurrent() == DIFFICULTY_EASY, "difficulty=" + string(Difficulty_GetCurrent()));
+            if (_s.t > 1 && room == rm_cutscene && obj_start_controller.cutscene_started && !Transition_IsActive() && GameState_Get().ui.mode == UI_DIALOGUE) {
+                Scenario_Check("ui_new_game_opens_no_difficulty_menu", !_s.diff_menu_seen, "a difficulty state appeared");
+                Scenario_Check("ui_new_game_starts_the_intro_on_normal", Difficulty_GetCurrent() == DIFFICULTY_NORMAL, "difficulty=" + string(Difficulty_GetCurrent()));
                 Scenario_Hold("confirm", 120);   // D48: hold to skip the intro, then through the rm_floor1 intro dialogue (next step)
                 Scenario_Next(_s, 33);
             }
             if (_s.t > 600) {
-                Scenario_Check("ui_difficulty_choice_starts_the_intro_with_it", false, "room=" + room_get_name(room));
+                Scenario_Check("ui_new_game_opens_no_difficulty_menu", !_s.diff_menu_seen, "a difficulty state appeared");
+                Scenario_Check("ui_new_game_starts_the_intro_on_normal", false, "room=" + room_get_name(room) + " state=" + string(_c.state));
                 Scenario_Finish();
             }
             break;
