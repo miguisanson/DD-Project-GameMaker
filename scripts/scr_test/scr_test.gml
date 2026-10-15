@@ -125,6 +125,7 @@ function Test_RunAll() {
     Test_RunSuite("MapJuice", Test_Suite_MapJuice);
     Test_RunSuite("BattleBg", Test_Suite_BattleBg);
     Test_RunSuite("RunStats", Test_Suite_RunStats);
+    Test_RunSuite("CutSkip", Test_Suite_CutSkip);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -9636,4 +9637,154 @@ function Test_Suite_RunStats() {
     _gs.in_main_menu = _old_menu;
     global.focus_prev = _old_focus;
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+// ---- H6 (D146, D156): hold-to-skip and cutscene text in the shared dialogue box -------------------------------------------------------
+// Expected values are the decisions written out, not read from the macros: tapping confirm only advances text; holding the same key shows the "Hold to skip" prompt
+// after 1000 ms (never on a tap), fading in over 200 ms with a bar that fills from 1000 to 2000 ms, and the skip fires at 2000 ms exactly once. The clock is injected:
+// Skip_Step takes the step length in ms, so 1 ms steps make every edge exact.
+// Simulates steps of _step_ms up to _ms: the key is down while the time is <= _held_until (the first step is the press unless _press_first is false), then up.
+// Returns the state, the number of fires, the step time of the first fire and the highest prompt alpha.
+function Test_CutSkipRun(_st, _ms, _step_ms, _held_until, _press_first = true) {
+    var _fired = 0, _amax = 0, _fire_at = -1;
+    for (var _t = _step_ms; _t <= _ms + 0.001; _t += _step_ms) {
+        _st = Skip_Step(_st, true, (_press_first && abs(_t - _step_ms) < 0.001), (_t <= _held_until + 0.001), _step_ms);
+        if (_st.fired) {
+            _fired++;
+            if (_fire_at < 0) _fire_at = _t;
+        }
+        _amax = max(_amax, Skip_HintAlpha(_st));
+    }
+    return { st: _st, fired: _fired, amax: _amax, fire_at: _fire_at };
+}
+
+function Test_Suite_CutSkip() {
+    // --- the numbers
+    Test_Eq("D146 the skip completes at 2000 ms", SKIP_HOLD_MS, 2000);
+    Test_Eq("D146 the prompt appears at 1000 ms of holding", SKIP_HINT_MS, 1000);
+    Test_Eq("D146 the prompt fades in over 200 ms", SKIP_HINT_FADE_MS, 200);
+
+    // --- 1. holding: 999 ms shows nothing and skips nothing
+    var _r = Test_CutSkipRun(Skip_StateNew(), 999, 1, 999);
+    Test_Eq("D146 held 999 ms: the prompt alpha is 0", Skip_HintAlpha(_r.st), 0);
+    Test_Eq("D146 held 999 ms: the prompt never showed", _r.amax, 0);
+    Test_Eq("D146 held 999 ms: no skip", _r.fired, 0);
+    // from 1000 ms it fades in over 200 ms: half after 100 ms of fading, full after 200
+    _r = Test_CutSkipRun(Skip_StateNew(), 1000, 1, 1000);
+    Test_True("D146 held 1000 ms: the prompt starts to fade in (alpha " + string(Skip_HintAlpha(_r.st)) + ")", Skip_HintAlpha(_r.st) > 0 && Skip_HintAlpha(_r.st) < 0.02);
+    _r = Test_CutSkipRun(Skip_StateNew(), 1100, 1, 1100);
+    Test_True("D146 held 1100 ms: the prompt is half faded in (alpha " + string(Skip_HintAlpha(_r.st)) + ")", abs(Skip_HintAlpha(_r.st) - 0.5) < 0.01);
+    _r = Test_CutSkipRun(Skip_StateNew(), 1200, 1, 1200);
+    Test_Eq("D146 held 1200 ms: the prompt is fully shown", Skip_HintAlpha(_r.st), 1);
+    _r = Test_CutSkipRun(Skip_StateNew(), 1999, 1, 1999);
+    Test_Eq("D146 held 1999 ms: the prompt is fully shown", Skip_HintAlpha(_r.st), 1);
+    Test_Eq("D146 held 1999 ms: no skip yet", _r.fired, 0);
+
+    // released at 1500 ms: no skip, the prompt fades out, nothing is advanced (no fire, the hold count is back to 0)
+    _r = Test_CutSkipRun(Skip_StateNew(), 1500, 1, 1500);
+    Test_Eq("D146 held to 1500 ms: the prompt is fully shown", Skip_HintAlpha(_r.st), 1);
+    _r = Test_CutSkipRun(_r.st, 100, 1, 0, false);   // 100 more ms with the key up
+    Test_True("D146 100 ms after the release: the prompt is half faded out (alpha " + string(Skip_HintAlpha(_r.st)) + ")", abs(Skip_HintAlpha(_r.st) - 0.5) < 0.01);
+    Test_Eq("D146 a release at 1500 ms: no skip", _r.fired, 0);
+    Test_Eq("D146 a release at 1500 ms: the hold count is back to 0", _r.st.held_ms, 0);
+    _r = Test_CutSkipRun(_r.st, 100, 1, 0, false);
+    Test_Eq("D146 200 ms after the release: the prompt is gone", Skip_HintAlpha(_r.st), 0);
+    Test_Eq("D146 200 ms after the release: still no skip", _r.fired, 0);
+    // pressing again starts the count from 0
+    _r = Test_CutSkipRun(_r.st, 500, 1, 500);
+    Test_Eq("D146 a second press counts from 0: no prompt after 500 ms", _r.amax, 0);
+
+    // held to 2000 ms: fires exactly once, at 2000, and holding longer does not fire again
+    _r = Test_CutSkipRun(Skip_StateNew(), 3500, 1, 3500);
+    Test_Eq("D146 held 3500 ms: exactly one skip", _r.fired, 1);
+    Test_Eq("D146 the skip fires at the 2000 ms step", _r.fire_at, 2000);
+    _r = Test_CutSkipRun(Skip_StateNew(), 2000, 1, 2000);
+    Test_Eq("D146 held 2000 ms: the skip has fired once", _r.fired, 1);
+
+    // the same at 60 fps and 30 fps steps (120 and 60 steps; one fewer does not fire)
+    var _f60 = Presentation_StepMs(16667);
+    var _f30 = Presentation_StepMs(33333);
+    _r = Test_CutSkipRun(Skip_StateNew(), 119 * _f60, _f60, 1000000);
+    Test_Eq("D146 119 steps at 60 fps: no skip", _r.fired, 0);
+    _r = Test_CutSkipRun(Skip_StateNew(), 120 * _f60, _f60, 1000000);
+    Test_Eq("D146 120 steps at 60 fps: skip", _r.fired, 1);
+    _r = Test_CutSkipRun(Skip_StateNew(), 59 * _f30, _f30, 1000000);
+    Test_Eq("D146 59 steps at 30 fps: no skip", _r.fired, 0);
+    _r = Test_CutSkipRun(Skip_StateNew(), 60 * _f30, _f30, 1000000);
+    Test_Eq("D146 60 steps at 30 fps: skip", _r.fired, 1);
+    _r = Test_CutSkipRun(Skip_StateNew(), 59 * _f60, _f60, 1000000);
+    Test_Eq("D146 59 steps at 60 fps (983 ms): no prompt", _r.amax, 0);
+
+    // --- 2. a tap never shows the prompt and never skips; a key held from before the scene does neither
+    _r = Test_CutSkipRun(Skip_StateNew(), 400, 1, 120);   // pressed, held 120 ms, released
+    Test_Eq("D146 a tap: the prompt never shows", _r.amax, 0);
+    Test_Eq("D146 a tap: no skip", _r.fired, 0);
+    _r = Test_CutSkipRun(Skip_StateNew(), 3000, 1, 999);   // held 999 ms (the longest tap), then up for 2 s
+    Test_Eq("D146 a 999 ms press: the prompt never shows", _r.amax, 0);
+    Test_Eq("D146 a 999 ms press: no skip", _r.fired, 0);
+    var _fired = 0, _amax = 0, _st = Skip_StateNew();
+    for (var _i = 0; _i < 300; _i++) {   // many taps, one every 100 ms, each held 30 ms
+        _st = Skip_Step(_st, true, (_i mod 100) == 0, (_i mod 100) < 30, 1);
+        if (_st.fired) _fired++;
+        _amax = max(_amax, Skip_HintAlpha(_st));
+    }
+    Test_Eq("D146 repeated taps: no prompt", _amax, 0);
+    Test_Eq("D146 repeated taps: no skip", _fired, 0);
+    _r = Test_CutSkipRun(Skip_StateNew(), 3000, 1, 3000, false);   // never pressed in the scene
+    Test_Eq("D146 a key held from before the scene: no prompt", _r.amax, 0);
+    Test_Eq("D146 a key held from before the scene: no skip", _r.fired, 0);
+    // leaving the scene (nothing claims the skip) clears the prompt at once
+    _r = Test_CutSkipRun(Skip_StateNew(), 1500, 1, 1500);
+    _st = Skip_Step(_r.st, false, false, true, 1);
+    Test_Eq("D146 leaving the scene hides the prompt", Skip_HintAlpha(_st), 0);
+    Test_Eq("D146 leaving the scene clears the hold", _st.held_ms, 0);
+
+    // --- 3. the bar: (held - 1000) / 1000, clamped 0..1
+    Test_Eq("D146 bar at 0 ms", Skip_Fraction(0), 0);
+    Test_Eq("D146 bar at 500 ms", Skip_Fraction(500), 0);
+    Test_Eq("D146 bar at 1000 ms", Skip_Fraction(1000), 0);
+    Test_Eq("D146 bar at 1250 ms", Skip_Fraction(1250), 0.25);
+    Test_Eq("D146 bar at 1500 ms", Skip_Fraction(1500), 0.5);
+    Test_Eq("D146 bar at 2000 ms", Skip_Fraction(2000), 1);
+    Test_Eq("D146 bar past 2000 ms stays full", Skip_Fraction(2600), 1);
+    _r = Test_CutSkipRun(Skip_StateNew(), 1500, 1, 1500);
+    Test_Eq("D146 the live bar after a 1500 ms hold is half full", Skip_Fraction(_r.st.held_ms), 0.5);
+
+    // --- 4. cutscene text goes through the shared dialogue box (D156)
+    var _gs = GameState_Get();
+    var _had_ui = variable_struct_exists(_gs, "ui");
+    var _ui0 = _had_ui ? _gs.ui : undefined;
+    var _had_ctl = instance_exists(obj_ui_controller);
+    var _ui = {};
+    if (is_struct(_ui0)) {
+        var _names = variable_struct_get_names(_ui0);
+        for (var _n = 0; _n < array_length(_names); _n++) variable_struct_set(_ui, _names[_n], variable_struct_get(_ui0, _names[_n]));
+    }
+    _ui.mode = UI_NONE;
+    _ui.cutscene_active = true;
+    _ui.cutscene_text_only = false;
+    _ui.dialogue_box_half = false;
+    _gs.ui = _ui;
+    // a segment written the old way (text_only, a slow chars_per_sec) must still open in the normal box
+    Cutscene_SegmentApply({ sprite: black_screen, lines: ["The plan was to ambush the enemy.", "You fell."], text_only: true, chars_per_sec: 12 });
+    Test_Eq("D156 a cutscene line opens the dialogue", _gs.ui.mode, UI_DIALOGUE);
+    Test_False("D156 the cutscene does not use the separate text-only style", Dialogue_IsCutsceneTextOnly());
+    Test_False("D156 the cutscene does not use the tall half-screen box", _gs.ui.dialogue_box_half);
+    var _mt = Ui_Metrics();
+    var _box = Dialogue_BoxRect();
+    var _lay = Dialogue_TextLayout("");
+    Test_False("D156 the cutscene text layout is the normal one", _lay.cutscene_text_only);
+    Test_Eq("D156 the box is the shared one: 8p + 3 lines high", _box.h, 8 * _mt.p + 3 * _mt.line_h);
+    Test_Eq("D156 the box is the shared one: along the bottom edge", _box.y, _mt.gh - _box.h - _mt.margin);
+    Test_Eq("D156 the text starts 4p inside the frame (x)", _lay.text_x, _box.x + 4 * _mt.p);
+    Test_Eq("D156 the text starts 4p inside the frame (y)", _lay.text_y, _box.y + 4 * _mt.p);
+    Test_Eq("D156 the text leaves 10p on the right for the arrow", _lay.text_w, _box.w - 14 * _mt.p);
+    Dialogue_TypewriterPrepareCurrentLine();
+    Test_Eq("D156 the typewriter speed is the normal dialogue one", _gs.ui.dialogue_chars_per_sec, max(1, 60 * Settings_TextSpeedMul(GameSettings_Ensure().text_speed)));
+    Test_Eq("D156 the line is ready for the next confirm as soon as in a normal box", _gs.ui.dialogue_hold_duration_ms, 150);
+    Test_Eq("D156 a cutscene line has no longer advance block than a normal one", _gs.ui.dialogue_open_lock.ms, 0);
+    Dialogue_CloseNow();
+    _gs.ui.cutscene_active = false;
+    if (_had_ui) _gs.ui = _ui0; else variable_struct_remove(_gs, "ui");
+    if (!_had_ctl && instance_exists(obj_ui_controller)) instance_destroy(obj_ui_controller);
 }

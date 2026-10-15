@@ -448,6 +448,11 @@ function Skip_Step(_st, _allowed, _pressed, _held, _step_ms) {
     return _r;
 }
 
+// D146: how visible the "Hold to skip" prompt is, 0..1: it fades in over SKIP_HINT_FADE_MS once the hold passes SKIP_HINT_MS and out when the key is let go.
+function Skip_HintAlpha(_st) {
+    return clamp(_st.hint / SKIP_HINT_FADE_MS, 0, 1);
+}
+
 function Skip_Fraction(_held_ms) {
     return clamp(_held_ms / SKIP_HOLD_MS, 0, 1);
 }
