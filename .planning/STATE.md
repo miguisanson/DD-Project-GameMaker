@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Session 4 overnight: on next = R1a+R1-sim (aebc9db) + F1a (a436c69, fast gate PASS 3130/0). In flight (Sonnet): R1b (wt/r1b, r1b-ui), F3b-1 dead input/audio code (wt/f3b1, f3b1-dead). Queue: FIX-diff (D35 difficulty select), F1b, F3a, F1c, then E2 build; F2/F4/F1d after E2 (BUILD-PLAN F1 table). Process note: F packets have the Sonnet agent commit its check first (red), Opus reviews + gates + merges. |
+| WIP | Session 4 overnight: next = R1 + R1b + F1a + F3b-1 + F3b-2 merged (b28a2eb); FULL gate running (log E:/Temp/dd-gate-next-full.log). In flight (Sonnet): fix-diff (wt/fixdiff, D35 difficulty menu removal), F1d-1 battle HUD per-frame (wt/f1d1). Queue: F1b, F3a, F1c, then E2 build; F2/F4/F1d-2/3 after. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |

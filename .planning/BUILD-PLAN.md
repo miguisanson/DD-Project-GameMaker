@@ -35,13 +35,13 @@ Step-number ranges (C4: smoke 161-170, shots 160-169, bot v=9) (avoid scenario c
 | # | Packet | Files | Risk | Status |
 |---|---|---|---|---|
 | R1 | Fairer randomness D117-D121, D123, D125 (+ sim) | scr_loot, scr_combat, scr_status, scr_save, sim.py | - | MERGED to next |
-| R1b | Focus-loss pause D122 + odds text D124 | scr_menu, scr_combat, scr_status, obj_ui_controller, workbook | low | in flight |
-| FIX-diff | Title still offers Easy/Normal/Hard after New Game (D35 leftover) | scr_menu (title) | low | todo |
-| F1a | Input_Init + ItemDB passives re-run on every call -> run once | scr_input, scr_db_item | low | in flight |
+| R1b | Focus-loss pause D122 + odds text D124 | scr_menu, scr_combat, scr_status, obj_ui_controller, workbook | low | MERGED to next |
+| FIX-diff | Title still offers Easy/Normal/Hard after New Game (D35 leftover) | scr_menu (title) | low | in flight |
+| F1a | Input_Init + ItemDB passives re-run on every call -> run once | scr_input, scr_db_item | low | MERGED to next |
 | F1b | Text scale / Ui_Metrics recomputed per call -> cache per layout+language | scr_player, scr_menu, scr_localization | med-low | todo |
 | F3a | Notice popup -> Ui framework, then delete dead slot save menu (~600 lines) | scr_save_menu, scr_menu, obj_ui/obj_start/obj_game controllers, scr_save | med | todo |
 | F1c | Menu draw re-measures rows / rebuilds tab icons every frame -> cache | scr_menu | low-med | todo |
-| F3b | Unreachable-code sweep: 62 dead functions, ~20 unused macros, P audio-debug key in obj_sfx_manager | many (split audio/input vs rest) | low | todo |
+| F3b | Unreachable-code sweep: 62 dead functions, ~20 unused macros, P audio-debug key in obj_sfx_manager | many (split audio/input vs rest) | low | MERGED to next (F3b-1, F3b-2; -445 lines) |
 | F1d | Battle HUD per-frame duplicates, credits layout x2/frame, icon lookups, sight-ring math | scr_combat, scr_dialogue, scr_fx, scr_enemy | low-med | todo |
 | F2a | Presentation clocks frames -> ms (transitions, boot logo, cutscene holds, credits) | scr_room_transition, obj_start_controller | med | after E2 |
 | F2b | Battle message/shake + dialogue/typewriter/input-lock clocks -> ms | scr_combat, scr_fx, scr_dialogue, scr_menu, scr_input | med-high (feel) | after E2 |
