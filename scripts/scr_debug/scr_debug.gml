@@ -1603,7 +1603,7 @@ function Scenario_StepBotExtras(_s) {
                         Scenario_Check(_name + "_mp_spent_once", _s.sk_mp0 - _bc.p.mp == _skill.mp_cost, "mp0=" + string(_s.sk_mp0) + " mp=" + string(_bc.p.mp));
                         Scenario_Check(_name + "_grade_word_shown", _bc.qte_result_text == Qte_GradeLabel(_want_key) && _bc.qte_result_ms > 0);
                         Scenario_Check(_name + "_grade_sound_fired", global.sfx_last_key == Qte_GradeSfxKey(_want_key), "last=" + string(global.sfx_last_key));
-                        Scenario_Check(_name + "_hitstop_on_perfect_only", (_bc.hitstop_ms > 0) == (_want_key == QTE_PERFECT), "hitstop=" + string(_bc.hitstop_ms));
+                        Scenario_Check(_name + "_hitstop_on_every_damaging_hit", _bc.hitstop_ms > 0 && _bc.hitstop_ms <= FEEL_FREEZE_HEAVY_MS, "hitstop=" + string(_bc.hitstop_ms));   // D138: 40 / 80 / 120 ms by grade, crit and BREAK
                         Scenario_Next(_s, 2);
                     }
                 }
@@ -2692,7 +2692,7 @@ function Scenario_BotEvaluate(_s, _bc, _name) {
         if (_q.dmg < _exp || _q.dmg < 1) _all_dmg = false;   // base x grade multiplier at least (gear bonuses only add)
         if (_q.sfx != Qte_GradeSfxKey(_q.key)) _all_snd = false;
         if (_q.word != Qte_GradeLabel(_q.key)) _all_word = false;
-        if (_q.hitstop != (_q.key == "PERFECT")) _all_hs = false;   // hit-stop on Perfect only
+        if (!_q.hitstop) _all_hs = false;   // D138: a freeze on every damaging hit (40 ms OK / Good / Weak, 80 ms Perfect, 120 ms crit)
         if (_s.v == 0 && abs(_q.press_ms - _centre) > _q.params.perfect_half_width) _all_press = false;
         if (_s.v == 1 && _q.press_ms != QTE_NO_PRESS) _all_press = false;   // the fail variant never presses
     }
@@ -2703,7 +2703,7 @@ function Scenario_BotEvaluate(_s, _bc, _name) {
     Scenario_Check(_name + "_qte_damage_at_least_base_x_multiplier_and_never_0", _all_dmg);
     Scenario_Check(_name + "_qte_grade_sound_fired", _all_snd);
     Scenario_Check(_name + "_qte_grade_word_shown", _all_word);
-    Scenario_Check(_name + "_qte_hitstop_on_perfect_only", _all_hs);
+    Scenario_Check(_name + "_qte_hitstop_on_every_hit", _all_hs);
     Scenario_Check(_name + (_s.v == 0 ? "_qte_press_inside_perfect_zone" : "_qte_never_pressed"), _all_press);
     if (_s.v == 0) {
         Scenario_Check("bot_perfect_player_won", _pl.hp > 0, "hp=" + string(_pl.hp));
@@ -2846,6 +2846,10 @@ function Scenario_StepShots(_s) {
             break;
         case 210: case 211: case 212: case 213: case 214: case 215: case 216: case 217: case 218: case 219: case 220: case 221: case 222: case 223: case 224: case 225: case 226: case 227: case 228: case 229:
             Scenario_StepShotsTabMenu(_s);   // D1b: every tab, the gear comparison, the Codex pages, settings, pause; two sizes, Korean once
+            break;
+        case 300: case 301: case 302: case 303: case 304: case 305: case 306: case 307: case 308: case 309:
+        case 310: case 311: case 312: case 313: case 314: case 315: case 316: case 317: case 318: case 319:
+            Scenario_StepShotsFeel(_s);   // g3 (D138, D139): the death burst, Perfect sparks, the BREAK zoom punch, the low-HP edge pulse, the HP lag bar
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -5928,7 +5932,7 @@ function Scenario_StepShotsRest(_s) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Tutorial_Dismiss();
                 global.tutorial_off = true;
-                Scenario_Finish();
+                Scenario_Next(_s, 300);   // g3 (D138, D139): the battle feel pictures (300-314) finish the run
             }
             if (_s.t > 600) { Scenario_Check("shots_tutorial_battle_popup_opens", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
@@ -9184,6 +9188,123 @@ function Scenario_StepBotD1b(_s) {
                 Scenario_Check("bot_d1b_the_menu_key_closes_it_from_any_depth", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
                 _s.v = 5;   // on to movement and AI
                 Scenario_Next(_s, 0);
+            }
+            break;
+    }
+}
+
+// ============================================================================
+// g3 (D138, D139): battle feel pictures, 480 x 432 (display scale 3). Steps 300-302: six scenes, run in turn (arm, wait for the moment, shoot).
+// The moments are parked by a very long hit freeze (hitstop_ms), which stops the feel clock, so the picture is the same every run:
+//   0 death_burst     the dire wolf 300 ms into its death pop (180 ms into the burst)
+//   1 sparks_perfect  a Perfect hit, 70 ms after the freeze: sparks at the impact, the view pushed in 3 px, the enemy squashed
+//   2 zoom_break      a BREAK, at the peak of the ~5% zoom punch (4 px a side)
+//   3 lowhp_edge      20% HP, the edge pulse at its faint peak
+//   4 hp_lag          the HP bar just dropped from full to 45%: the real bar short, the lighter trail still draining (after the HUD's own hurt flash)
+//   5 hurt_edge       a big hit (55% of max HP): the dark edge flash and the HP panel jolted up
+// ============================================================================
+function Scenario_StepShotsFeel(_s) {
+    if (!variable_struct_exists(_s, "fe")) _s.fe = 0;
+    var _names = ["death_burst", "sparks_perfect", "zoom_break", "lowhp_edge", "hp_lag", "hurt_edge"];
+    if (_s.fe >= array_length(_names)) {
+        Scenario_Finish();
+        return;
+    }
+    var _tag = _names[_s.fe];
+    var _bc = instance_exists(obj_battle_controller) ? instance_find(obj_battle_controller, 0) : noone;
+    switch (_s.step) {
+        case 300:   // enter the battle and arm the scene
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(3);
+                Scenario_GotoBattle("shots_feel_" + _tag, (_s.fe == 0) ? ENEMY_DIREWOLF : ENEMY_SLIME);
+            }
+            if (_s.t >= 30) {
+                var _inb = (room == rm_battle && _bc != noone);
+                Scenario_Check("shots_feel_in_battle_" + _tag, _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;   // park the intro message: the fight does not move on by itself
+                _bc.e.max_hp = 300;
+                _bc.e.hp = 300;
+                _bc.enemy_hp_shown = 300;
+                switch (_s.fe) {
+                    case 0:
+                        _bc.e.hp = 0;
+                        Scenario_Check("shots_feel_death_pop_starts", Battle_DeathPopBegin(_bc, _bc.e, "The enemy has been slain.") && _bc.death_pop.active);
+                        break;
+                    case 1:
+                        Battle_PlayerAttackResolveTimed(_bc, Qte_Result(QTE_PERFECT));
+                        _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
+                        Scenario_Check("shots_feel_perfect_hit_freezes_80_ms", _bc.hitstop_ms > 0 && _bc.hitstop_ms <= Feel_FreezeMs(QTE_PERFECT, true, false), "hitstop=" + string(_bc.hitstop_ms));
+                        break;
+                    case 2:
+                        _bc.e.stagger = max(0, _bc.e.stagger_max - 1);   // one more point of stagger is a BREAK
+                        Battle_PlayerAttackResolveTimed(_bc, Qte_Result(QTE_GOOD));
+                        _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
+                        Scenario_Check("shots_feel_break_freezes_120_ms_and_zooms", _bc.e.broken && _bc.feel_break && _bc.hitstop_ms > 0, "broken=" + string(_bc.e.broken) + " hitstop=" + string(_bc.hitstop_ms));
+                        break;
+                    case 3:
+                        _bc.p.hp = max(1, floor(_bc.p.max_hp * 0.2));
+                        _bc.hud.hp_shown = _bc.p.hp;
+                        _bc.hud.lag_hp = _bc.p.hp;
+                        _bc.hud.lag_from = _bc.p.hp;
+                        break;
+                    case 4:
+                        _bc.hud.hp_shown = _bc.p.max_hp;
+                        _bc.hud.lag_hp = _bc.p.max_hp;
+                        _bc.hud.lag_from = _bc.p.max_hp;
+                        _bc.p.hp = max(1, floor(_bc.p.max_hp * 0.45));
+                        _s.fe_t0 = -1;
+                        break;
+                    case 5:
+                        _bc.hud.hp_shown = _bc.p.max_hp;
+                        _bc.hud.lag_hp = _bc.p.max_hp;
+                        _bc.hud.lag_from = _bc.p.max_hp;
+                        _bc.p.hp = max(1, floor(_bc.p.max_hp * 0.45));
+                        Battle_PlayerHurtFeel(_bc, _bc.p.max_hp - _bc.p.hp, _bc.p.max_hp, false);   // 55% of max HP in one hit: a big hit
+                        Scenario_Check("shots_feel_big_hit_flashes_the_edge", _bc.feel_edge_start == _bc.feel_ms && _bc.feel_pjolt_big);
+                        break;
+                }
+                Scenario_Next(_s, 301);
+            }
+            break;
+        case 301:   // wait for the moment, park it
+            if (_bc == noone) { Scenario_Check("shots_feel_battle_still_there_" + _tag, false); Scenario_Finish(); return; }
+            var _ready = false;
+            switch (_s.fe) {
+                case 0: _ready = is_struct(_bc.death_pop) && _bc.death_pop.t_ms >= 300 && _bc.death_pop.t_ms < 500; break;
+                case 1: _ready = is_struct(_bc.sparks) && (_bc.feel_ms - _bc.sparks.start) >= 70; break;
+                case 2: _ready = (_bc.feel_inset >= 4); break;
+                case 3: _ready = (_bc.lowhp_ms >= 1190); break;
+                case 4:
+                    if (_s.fe_t0 < 0 && _bc.hud.lag_hp == _bc.p.hp && _bc.hud.hp_shown > _bc.p.hp) _s.fe_t0 = current_time;
+                    _ready = (_s.fe_t0 >= 0 && (current_time - _s.fe_t0) >= 160);   // after the HUD's own hurt flash (133 ms), which lights the whole bar
+                    break;
+                case 5: _ready = (_bc.feel_ms - _bc.feel_edge_start) >= 40; break;
+            }
+            if (_ready) {
+                if (_s.fe == 1 || _s.fe == 2 || _s.fe == 3 || _s.fe == 5) {   // freeze the feel clock so the picture is steady
+                    _bc.hitstop_ms = 999999;
+                    _bc.feel_contact = false;
+                }
+                show_debug_message("[BOT] shots_feel " + _tag + " t=" + string(_s.t) + " feel_ms=" + string(_bc.feel_ms) + " inset=" + string(_bc.feel_inset) + " lowhp_ms=" + string(_bc.lowhp_ms)
+                    + " death_t=" + string(is_struct(_bc.death_pop) ? _bc.death_pop.t_ms : -1) + " crit=" + string(_bc.last_crit) + " hp_shown=" + string(_bc.hud.hp_shown) + " hp=" + string(_bc.p.hp));
+                Scenario_Next(_s, 302);
+            } else if (_s.t > 600) {
+                Scenario_Check("shots_feel_moment_reached_" + _tag, false, "feel_ms=" + string(_bc.feel_ms) + " inset=" + string(_bc.feel_inset) + " lowhp_ms=" + string(_bc.lowhp_ms));
+                Scenario_Finish();
+            }
+            break;
+        case 302:   // two frames to draw it, then the picture
+            if (_s.t == 2) {
+                _s.shot = "shot_feel_" + _tag + ".png";
+                Scenario_ShotLayout(_s.shot);
+            }
+            if (_s.t >= 5) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Display_ClearZoom();   // the parked push-in must not carry into the next scene
+                _s.fe++;
+                Scenario_Next(_s, 300);
             }
             break;
     }

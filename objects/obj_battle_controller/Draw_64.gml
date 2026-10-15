@@ -33,18 +33,40 @@ Battle_HudFrameBegin(self);   // D108 F1d-1: the strip's metrics, the enemy head
 var zones = Battle_Zones();   // D99: where the panels, the log and the menus sit
 hud.rects.log = undefined;
 
-// enemy sprite draw with shake/flash
-if (instance_exists(enemy_inst)) {
+// enemy sprite draw with shake/flash. D138 / D139: through the picture's push-in (zr), squashed by the recoil, light-flashed in the hit freeze and the death
+// freeze, and not drawn once it has burst.
+var zr = feel_zr;
+var dp = death_pop;
+var dying = is_struct(dp);
+if (instance_exists(enemy_inst) && (!dying || Feel_SpriteVisible(dp.t_ms))) {
     var off = SpriteShake_Offset(enemy_inst);
-    var exs = port_x + ((enemy_inst.x + off.x - vx) * sx);
-    var eys = port_y + ((enemy_inst.y + off.y - vy) * sy);
-    var scx = enemy_inst.image_xscale * sx;
-    var scy = enemy_inst.image_yscale * sy;
-    if (off.flash) gpu_set_blendmode(bm_add);
+    var espr = enemy_inst.sprite_index;
+    var rec = Feel_RecoilScale(feel_ms - feel_hit_start, Settings_ShakeOn());
+    var base_sx = enemy_inst.image_xscale * sx * zr.kx;
+    var base_sy = enemy_inst.image_yscale * sx * zr.ky;
+    var exs = port_x + (((enemy_inst.x + off.x - vx) - zr.sx) * zr.kx * sx);
+    var eys = port_y + (((enemy_inst.y + off.y - vy) - zr.sy) * zr.ky * sx);
+    var scx = base_sx * rec.x;
+    var scy = base_sy * rec.y;
+    if (espr != noone && (rec.x != 1 || rec.y != 1)) {   // squash about the bottom centre: the feet stay put
+        var sw_g = sprite_get_width(espr) * abs(base_sx);
+        var sh_g = sprite_get_height(espr) * abs(base_sy);
+        var left = exs - sprite_get_xoffset(espr) * base_sx;
+        var top = eys - sprite_get_yoffset(espr) * base_sy;
+        left += (sw_g - sw_g * rec.x) * 0.5;
+        top += (sh_g - sh_g * rec.y);
+        exs = left + sprite_get_xoffset(espr) * scx;
+        eys = top + sprite_get_yoffset(espr) * scy;
+    }
+    var white = (dying && dp.t_ms < FEEL_DEATH_FREEZE_MS) || (hitstop_ms > 0 && feel_contact && last_dmg > 0);
+    if (white) gpu_set_fog(true, UI_C_LIGHTEST, 0, 1);   // every opaque pixel in the lightest palette colour
+    else if (off.flash) gpu_set_blendmode(bm_add);
     draw_sprite_ext(enemy_inst.sprite_index, enemy_inst.image_index, exs, eys, scx, scy, enemy_inst.image_angle, c_white, enemy_fade_alpha);
-    if (off.flash) gpu_set_blendmode(bm_normal);
+    if (white) gpu_set_fog(false, c_white, 0, 0);
+    else if (off.flash) gpu_set_blendmode(bm_normal);
 }
-Battle_DrawEnemyHeader(self, enemy_fade_alpha);   // name, HP, stagger meter and status chips above the enemy (D99, D75)
+var header_a = dying ? clamp(1 - (dp.t_ms - FEEL_DEATH_FREEZE_MS) / 100, 0, 1) : 1;   // the name and bars fade as the enemy bursts
+Battle_DrawEnemyHeader(self, enemy_fade_alpha * header_a);   // name, HP, stagger meter and status chips above the enemy (D99, D75)
 
 // The basic attack's sliding bar (D56), sized in world pixels (sx GUI units each) so it is crisp at every window scale: below the enemy
 // (no menu is up during the bar). Fades in during the lead-in.
@@ -65,15 +87,17 @@ if (qte_result_ms > 0 && qte_result_text != "") {
 // FX draw (battle-only), over enemy sprite
 with (obj_fx) {
     if (sprite_index != noone) {
-        var fx_x = port_x + ((x - vx) * sx);
-        var fx_y = port_y + ((y - vy) * sy);
-        var fx_sx = image_xscale * sx;
-        var fx_sy = image_yscale * sy;
+        var fx_x = port_x + (((x - vx) - zr.sx) * zr.kx * sx);
+        var fx_y = port_y + (((y - vy) - zr.sy) * zr.ky * sy);
+        var fx_sx = image_xscale * sx * zr.kx;
+        var fx_sy = image_yscale * sy * zr.ky;
         draw_sprite_ext(sprite_index, image_index, fx_x, fx_y, fx_sx, fx_sy, image_angle, image_blend, image_alpha * enemy_fade_alpha);
     }
 }
 
+Battle_DrawFeelFx(self, vx, vy, sx);   // D138: hit sparks and the death burst
 Battle_DrawPops(self);   // floating damage numbers and the BREAK word (D92)
+Battle_DrawFeelEdges(self, sx);   // D138 / D139: the dark edge flash of a big hit taken and the faint low-HP pulse, under the HUD
 
 Battle_DrawTimeline(self);   // the turn strip across the top (D74, D99)
 Battle_DrawBanner(self, 1);  // the move's name (or the wind-up / phase line) while it is up

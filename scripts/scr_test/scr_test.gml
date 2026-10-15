@@ -118,6 +118,7 @@ function Test_RunAll() {
     Test_RunSuite("Hunt2", Test_Suite_Hunt2);
     Test_RunSuite("Title", Test_Suite_Title);
     Test_RunSuite("ClassGuard", Test_Suite_ClassGuard);
+    Test_RunSuite("BattleFeel", Test_Suite_BattleFeel);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -7995,7 +7996,9 @@ function Test_Suite_ClassGuard() {
     Test_Eq("g4 line 2", array_length(_lines) > 1 ? _lines[1] : "", "...there might be something I can use to protect myself.");
 }
 
-// ============================================================================================================
+// =====================================================================================================
+}
+
 // D126: the marble bag everywhere. Status chances, enemy moves, gold per fight and the Scrounger find come from shuffled bags that
 // are drawn without putting back; heals and ticks give their exact average. Expected values come from the decision text and the
 // bag arithmetic (75% = 3 of 4, 60% = 3 of 5, weights 3:1 = 3 of 4), not from the code.
@@ -8358,4 +8361,334 @@ function Test_BagsFind() {
     Test_Eq("D126 find: a loaded run has the 6 marbles back", variable_struct_exists(_gs.run, "find_bag") && is_struct(_gs.run.find_bag) ? array_length(_gs.run.find_bag.left) : -1, 6);
     for (var _m = 0; _m < 6; _m++) _s2 = Card_OnVictory(_s2);
     Test_Eq("D126 find: the loaded run finishes the bag: 3 potions in the 10 fights, none lost or doubled", Inv_Count(_s2.inventory, 10) - _q0, 3);
+=======
+// ---- g3 (D138, D139): battle feel. Expected values are the owner's: freeze 40 ms OK / Good, 80 ms Perfect, 120 ms crit and BREAK; death: freeze 120 ms, burst 500 ms (boss longer),
+// then the slain message; jolt 2-3 px for ~80 ms; recoil ~150 ms; crit / BREAK zoom ~5% in ~150 ms; HP lag bar ~400 ms; edge flash ~150 ms; heartbeat only at or under 25% HP,
+// quiet (volume <= 0.25), ~1 beat per 1.2 s; the Screen shake setting off zeroes shakes, jolts and the zoom. ----
+
+// A battle controller stand-in (a struct with the controller's feel fields), the real enemy visual and a player at _hp / _max_hp.
+function Test_FeelFakeBattle(_hp = 100, _max_hp = 100, _enemy_id = ENEMY_SLIME) {
+    var _pl = CharacterCreate_Player(CLASS_KNIGHT);
+    _pl.max_hp = _max_hp;
+    _pl.hp = _hp;
+    var _en = EnemyCreate(_enemy_id);
+    var _inst = instance_create_depth(0, 0, 0, obj_enemy_battle);
+    _inst.sprite_index = _en.sprite;
+    _inst.x = 64;
+    _inst.y = 48;
+    var _bc = { p: _pl, e: _en, enemy_inst: _inst, enemy_fx_x: 80, enemy_fx_y: 58, cam_base_x: 0, cam_base_y: 0,
+        hitstop_ms: 0, qte_active: false, sq_active: false, def_active: false, last_dmg: 5, last_crit: false, qte_result_key: QTE_OK,
+        battle_over: false, battle_state: BSTATE_MENU, message_text: "", message_next_state: BSTATE_MENU, wait_fx: noone, wait_timer: 0 };
+    Battle_FeelInit(_bc);
+    return _bc;
+}
+
+function Test_Suite_BattleFeel() {
+    var _shake_keep = GameSettings_Ensure().screen_shake;
+    GameSettings_Ensure().screen_shake = 1;
+
+    // ---- the freeze on every hit (D138) ----
+    Test_Eq("feel: OK freezes 40 ms", Feel_FreezeMs(QTE_OK, false, false), 40);
+    Test_Eq("feel: Good freezes 40 ms", Feel_FreezeMs(QTE_GOOD, false, false), 40);
+    Test_Eq("feel: Weak freezes 40 ms (every hit freezes)", Feel_FreezeMs(QTE_WEAK, false, false), 40);
+    Test_Eq("feel: Perfect freezes 80 ms", Feel_FreezeMs(QTE_PERFECT, false, false), 80);
+    Test_Eq("feel: a crit freezes 120 ms", Feel_FreezeMs(QTE_OK, true, false), 120);
+    Test_Eq("feel: a Perfect crit freezes 120 ms", Feel_FreezeMs(QTE_PERFECT, true, false), 120);
+    Test_Eq("feel: a BREAK freezes 120 ms", Feel_FreezeMs(QTE_GOOD, false, true), 120);
+    var _f = Test_FeelFakeBattle();
+    Battle_HitFreeze(_f, QTE_OK, false);
+    Test_Eq("feel: a damaging OK hit sets a 40 ms freeze", _f.hitstop_ms, 40);
+    _f.hitstop_ms = 0;
+    Battle_HitFreeze(_f, QTE_PERFECT, false);
+    Test_Eq("feel: a damaging Perfect hit sets an 80 ms freeze", _f.hitstop_ms, 80);
+    _f.hitstop_ms = 0;
+    Battle_HitFreeze(_f, QTE_OK, true);
+    Test_Eq("feel: a damaging crit sets a 120 ms freeze", _f.hitstop_ms, 120);
+    var _flags = ["qte_active", "sq_active", "def_active"];
+    for (var _i = 0; _i < 3; _i++) {
+        var _g = Test_FeelFakeBattle();
+        variable_struct_set(_g, _flags[_i], true);
+        Battle_HitFreeze(_g, QTE_PERFECT, true);
+        Test_Eq("feel: no freeze while " + _flags[_i] + " (a bar's timing window)", _g.hitstop_ms, 0);
+        instance_destroy(_g.enemy_inst);
+    }
+    var _g0 = Test_FeelFakeBattle();
+    _g0.last_dmg = 0;
+    Battle_HitFreeze(_g0, QTE_PERFECT, false);
+    Test_Eq("feel: a hit that deals nothing does not freeze", _g0.hitstop_ms, 0);
+    instance_destroy(_g0.enemy_inst);
+
+    // ---- sparks on every damaging hit, more and bigger on Perfect / crit / BREAK (D138) ----
+    Test_True("feel: Perfect throws more sparks than OK", Feel_SparkCount(QTE_PERFECT, false, false) > Feel_SparkCount(QTE_OK, false, false));
+    Test_True("feel: a crit throws more sparks than Perfect", Feel_SparkCount(QTE_PERFECT, true, false) > Feel_SparkCount(QTE_PERFECT, false, false));
+    Test_True("feel: a BREAK throws at least as many sparks as a crit", Feel_SparkCount(QTE_OK, false, true) >= Feel_SparkCount(QTE_OK, true, false));
+    Test_True("feel: Good throws at least as many sparks as OK", Feel_SparkCount(QTE_GOOD, false, false) >= Feel_SparkCount(QTE_OK, false, false));
+    Test_True("feel: Perfect sparks are bigger than OK sparks", Feel_SparkSize(QTE_PERFECT, false, false) > Feel_SparkSize(QTE_OK, false, false));
+    Test_True("feel: BREAK sparks are bigger than Perfect sparks", Feel_SparkSize(QTE_OK, false, true) > Feel_SparkSize(QTE_PERFECT, false, false));
+    var _sp = Feel_Sparks(80, 58, QTE_PERFECT, false, false);
+    Test_Eq("feel: Feel_Sparks builds the counted number of sparks", array_length(_sp), Feel_SparkCount(QTE_PERFECT, false, false));
+    var _sp_in = true, _sp_gone = true;
+    for (var _i = 0; _i < array_length(_sp); _i++) {
+        for (var _t = 0; _t < FEEL_SPARK_MS; _t += 20) {
+            var _pos = Feel_SparkPos(_sp[_i], 80, 58, _t);
+            if (abs(_pos.x - 80) > 32 || abs(_pos.y - 58) > 32) _sp_in = false;
+        }
+        if (Feel_SparkPos(_sp[_i], 80, 58, FEEL_SPARK_MS).alive) _sp_gone = false;
+    }
+    Test_True("feel: sparks stay within 32 px of the impact", _sp_in);
+    Test_True("feel: every spark is gone when its time is up", _sp_gone);
+    var _h1 = Test_FeelFakeBattle();
+    Battle_QteImpactFeedback(_h1);
+    Test_True("feel: a damaging hit leaves sparks at the impact", is_struct(_h1.sparks) && array_length(_h1.sparks.items) == Feel_SparkCount(QTE_OK, false, false));
+    Test_Eq("feel: the hit starts the jolt on the feel clock", _h1.feel_hit_start, _h1.feel_ms);
+    Test_False("feel: a plain hit does not zoom", _h1.feel_punch_on);
+    var _h2 = Test_FeelFakeBattle();
+    _h2.last_dmg = 0;
+    Battle_QteImpactFeedback(_h2);
+    Test_True("feel: a hit that deals nothing leaves no sparks", !is_struct(_h2.sparks));
+    var _h3 = Test_FeelFakeBattle();
+    _h3.last_crit = true;
+    Battle_QteImpactFeedback(_h3);
+    Test_True("feel: a crit zooms", _h3.feel_punch_on && _h3.feel_punch_start == _h3.feel_ms);
+    var _h4 = Test_FeelFakeBattle();
+    _h4.feel_break = true;
+    Battle_QteImpactFeedback(_h4);
+    Test_True("feel: a BREAK zooms and uses the flag up", _h4.feel_punch_on && !_h4.feel_break);
+    Test_True("feel: the jolt is 3 px on a crit and a Perfect and 2 px on a plain hit", Feel_JoltPx(QTE_OK, true) == 3 && Feel_JoltPx(QTE_OK, false) == 2 && Feel_JoltPx(QTE_PERFECT, false) == 3);
+    instance_destroy(_h1.enemy_inst);
+    instance_destroy(_h2.enemy_inst);
+    instance_destroy(_h3.enemy_inst);
+    instance_destroy(_h4.enemy_inst);
+    instance_destroy(_f.enemy_inst);
+
+    // ---- the view jolt (D139): 2-3 px for ~80 ms, 0 at the start and at the end; the zoom punch ~5%, ~150 ms ----
+    var _max2 = 0, _max3 = 0, _in = true, _off_ok = true;
+    for (var _t = 0; _t <= 100; _t += 4) {
+        var _i2 = Feel_InsetPx(_t, 2, -100000, false, true);
+        var _i3 = Feel_InsetPx(_t, 3, -100000, false, true);
+        _max2 = max(_max2, _i2);
+        _max3 = max(_max3, _i3);
+        if (_i2 < 0 || _i2 > 2 || _i3 < 0 || _i3 > 3) _in = false;
+        if (Feel_InsetPx(_t, 3, _t, true, false) != 0) _off_ok = false;
+    }
+    Test_Eq("feel: the jolt reaches 2 px at most for a plain hit", _max2, 2);
+    Test_Eq("feel: the jolt reaches 3 px at most for a crit", _max3, 3);
+    Test_True("feel: the jolt stays inside 0..3 px", _in);
+    Test_Eq("feel: the jolt is 0 at the start", Feel_InsetPx(0, 3, -100000, false, true), 0);
+    Test_Eq("feel: the jolt is 0 at the end (80 ms)", Feel_InsetPx(80, 3, -100000, false, true), 0);
+    Test_Eq("feel: no hit yet means no jolt", Feel_InsetPx(-100000, 3, -100000, false, true), 0);
+    Test_True("feel: the Screen shake setting off zeroes the jolt and the zoom at every time", _off_ok);
+    Test_Eq("feel: the zoom punch is 0 at the start", Feel_InsetPx(-100000, 0, 0, true, true), 0);
+    Test_Eq("feel: the zoom punch is 4 px a side (5%) at its peak", Feel_InsetPx(-100000, 0, 45, true, true), 4);
+    Test_Eq("feel: the zoom punch is 0 at the end (150 ms)", Feel_InsetPx(-100000, 0, 150, true, true), 0);
+    var _zmax = 0, _zok = true;
+    for (var _t = 0; _t <= 160; _t += 5) {
+        var _z = Feel_InsetPx(-100000, 0, _t, true, true);
+        _zmax = max(_zmax, _z);
+        if (_z < 0 || _z > 4) _zok = false;
+    }
+    Test_True("feel: the zoom punch stays inside 0..4 px a side", _zok && _zmax == 4);
+    var _zr = Feel_ZoomRegion(4, 80, 58);
+    Test_True("feel: 4 px a side shows 152 of 160 columns (about 5% in)", _zr.sw == 152 && abs(_zr.kx - 160 / 152) < 0.0001);
+    Test_True("feel: the zoom region is whole pixels, centred sideways on the enemy and held to the top edge of the picture (the enemy is high)", _zr.sx == 4 && _zr.sy == 0 && frac(_zr.sx) == 0 && frac(_zr.sy) == 0);
+    var _zrc = Feel_ZoomRegion(4, 80, 72);
+    Test_True("feel: an enemy in the middle of the picture is centred in the region", _zrc.sx == 4 && _zrc.sy >= 3 && _zrc.sy <= 4 && _zrc.sy + _zrc.sh > 72 && _zrc.sy < 72);
+    var _zr2 = Feel_ZoomRegion(4, 2, 2);
+    Test_True("feel: the zoom region never leaves the picture", _zr2.sx == 0 && _zr2.sy == 0);
+    var _zr0 = Feel_ZoomRegion(0, 80, 58);
+    Test_True("feel: no inset is no zoom", _zr0.sw == 160 && _zr0.sh == 144 && _zr0.kx == 1 && _zr0.ky == 1);
+    var _fz = Test_FeelFakeBattle();
+    _fz.feel_hit_start = _fz.feel_ms - 24;
+    _fz.feel_hit_px = 3;
+    Test_Eq("feel: the controller's jolt reads 3 px in the push-in", Battle_FeelInset(_fz), 3);
+    GameSettings_Ensure().screen_shake = 0;
+    Test_Eq("feel: the controller's jolt is 0 with the Screen shake setting off", Battle_FeelInset(_fz), 0);
+    GameSettings_Ensure().screen_shake = 1;
+    instance_destroy(_fz.enemy_inst);
+
+    // ---- the enemy recoil (D139): squash (wider, shorter), spring back eased, ~150 ms ----
+    var _r0 = Feel_RecoilScale(0, true), _r1 = Feel_RecoilScale(FEEL_RECOIL_MS, true), _rk = Feel_RecoilScale(45, true);
+    Test_True("feel: the recoil is 1 x 1 at the start", _r0.x == 1 && _r0.y == 1);
+    Test_True("feel: the recoil is 1 x 1 at the end (150 ms)", _r1.x == 1 && _r1.y == 1);
+    Test_True("feel: the recoil squashes: wider and shorter", _rk.x > 1 && _rk.y < 1);
+    var _rok = true, _spring = false;
+    for (var _t = 0; _t <= 160; _t += 5) {
+        var _rs = Feel_RecoilScale(_t, true);
+        if (_rs.x < 0.8 || _rs.x > 1.2 || _rs.y < 0.8 || _rs.y > 1.2) _rok = false;
+        if (_t > 60 && _t < 150 && _rs.x < 1 && _rs.y > 1) _spring = true;
+        var _roff = Feel_RecoilScale(_t, false);
+        if (_roff.x != 1 || _roff.y != 1) _rok = false;
+    }
+    Test_True("feel: the recoil stays inside 0.8..1.2 and is 1 with the Screen shake setting off", _rok);
+    Test_True("feel: the recoil springs back past 1 (tall and narrow) before it settles", _spring);
+
+    // ---- the HP lag bar (D138): the real HP drops at once, the trailing bar drains over ~400 ms ----
+    Test_Eq("feel: the lag bar starts at the old HP", Feel_LagShown(100, 60, 0), 100);
+    Test_Eq("feel: the lag bar reaches the real HP at 400 ms", Feel_LagShown(100, 60, FEEL_LAG_MS), 60);
+    Test_Eq("feel: the lag bar stays on the real HP afterwards", Feel_LagShown(100, 60, 900), 60);
+    Test_True("feel: the lag bar is between the two at 200 ms", Feel_LagShown(100, 60, 200) > 60 && Feel_LagShown(100, 60, 200) < 100);
+    var _mono = true, _prev = 101;
+    for (var _t = 0; _t <= 450; _t += 10) {
+        var _ls = Feel_LagShown(100, 60, _t);
+        if (_ls > _prev + 0.0001 || _ls < 60) _mono = false;
+        _prev = _ls;
+    }
+    Test_True("feel: the lag bar only drains and never undershoots the real HP", _mono);
+    var _hud = { hp_shown: 100, lag_hp: 100, lag_from: 100, lag_start: 0 };
+    Feel_LagStep(_hud, 60, 1000, 16);
+    Test_True("feel: right after a hit the trailing bar is still at the old HP (the real bar already dropped)", _hud.hp_shown >= 99);
+    Feel_LagStep(_hud, 60, 1200, 16);
+    Test_True("feel: halfway through it is draining", _hud.hp_shown > 60 && _hud.hp_shown < 99);
+    Feel_LagStep(_hud, 60, 1400, 16);
+    Test_Eq("feel: 400 ms after the hit the trailing bar sits on the real HP", _hud.hp_shown, 60);
+    Feel_LagStep(_hud, 20, 2000, 16);
+    Feel_LagStep(_hud, 20, 2400, 16);
+    Test_Eq("feel: a second hit drains from where the bar was", _hud.hp_shown, 20);
+    for (var _i = 0; _i < 60; _i++) Feel_LagStep(_hud, 90, 3000 + _i * 16, 16);
+    Test_True("feel: a heal makes the bar rise to the new HP", _hud.hp_shown > 20 && _hud.hp_shown <= 90);
+
+    // ---- the heavier hurt (D138): the edge flash, the stronger shake, the HP panel jolt (D139) ----
+    Test_False("feel: 24 of 100 HP is not a big hit", Feel_IsBigHit(24, 100, false));
+    Test_True("feel: 25 of 100 HP is a big hit", Feel_IsBigHit(25, 100, false));
+    Test_True("feel: a telegraphed move is a big hit at any damage", Feel_IsBigHit(1, 100, true));
+    Test_False("feel: no damage is no hit", Feel_IsBigHit(0, 100, true));
+    Test_True("feel: the edge flash starts strong and is gone at 150 ms", Feel_EdgeAlpha(0) > 0.5 && Feel_EdgeAlpha(0) <= 1 && Feel_EdgeAlpha(FEEL_EDGE_MS) == 0 && Feel_EdgeAlpha(300) == 0);
+    Test_True("feel: the edge flash fades", Feel_EdgeAlpha(100) < Feel_EdgeAlpha(40));
+    Test_Eq("feel: the panel jolt is 0 at the start", Feel_PanelJoltPx(0, false, true), 0);
+    Test_Eq("feel: the panel jolt is 0 at the end", Feel_PanelJoltPx(FEEL_JOLT_MS, true, true), 0);
+    Test_True("feel: the panel jolt is 2 px on a hit and 3 px on a big one", Feel_PanelJoltPx(24, false, true) == 2 && Feel_PanelJoltPx(24, true, true) == 3);
+    Test_Eq("feel: the panel jolt is 0 with the Screen shake setting off", Feel_PanelJoltPx(24, true, false), 0);
+    var _gs = GameState_Get();
+    var _hb = Test_FeelFakeBattle();
+    if (variable_struct_exists(_gs, "cam_shake")) variable_struct_remove(_gs, "cam_shake");
+    Battle_PlayerHurtFeel(_hb, 30, 100, false);
+    Test_True("feel: a big hit starts the dark edge flash", _hb.feel_edge_start == _hb.feel_ms);
+    Test_True("feel: a big hit shakes harder than a Perfect (> 0.8 px)", variable_struct_exists(_gs, "cam_shake") && _gs.cam_shake.mag > 0.8);
+    Test_True("feel: a hit jolts the player's HP panel", _hb.feel_pjolt_start == _hb.feel_ms && _hb.feel_pjolt_big);
+    var _hs = Test_FeelFakeBattle();
+    if (variable_struct_exists(_gs, "cam_shake")) variable_struct_remove(_gs, "cam_shake");
+    Battle_PlayerHurtFeel(_hs, 10, 100, false);
+    Test_True("feel: a small hit has no edge flash and no extra shake", _hs.feel_edge_start < -1000 && !variable_struct_exists(_gs, "cam_shake"));
+    Test_True("feel: a small hit still jolts the HP panel (not big)", _hs.feel_pjolt_start == _hs.feel_ms && !_hs.feel_pjolt_big);
+    var _hh = Test_FeelFakeBattle();
+    Battle_PlayerHurtFeel(_hh, 2, 100, true);
+    Test_True("feel: a telegraphed move flashes the edge at any damage", _hh.feel_edge_start == _hh.feel_ms);
+    GameSettings_Ensure().screen_shake = 0;
+    var _ho = Test_FeelFakeBattle();
+    if (variable_struct_exists(_gs, "cam_shake")) variable_struct_remove(_gs, "cam_shake");
+    Battle_PlayerHurtFeel(_ho, 40, 100, true);
+    Test_False("feel: the Screen shake setting off: a big hit shakes nothing", variable_struct_exists(_gs, "cam_shake"));
+    Test_True("feel: the Screen shake setting off: the edge flash stays", _ho.feel_edge_start == _ho.feel_ms);
+    GameSettings_Ensure().screen_shake = 1;
+    if (variable_struct_exists(_gs, "cam_shake")) variable_struct_remove(_gs, "cam_shake");
+    instance_destroy(_hb.enemy_inst);
+    instance_destroy(_hs.enemy_inst);
+    instance_destroy(_hh.enemy_inst);
+    instance_destroy(_ho.enemy_inst);
+
+    // ---- the low-HP warning (D139): only at or under 25%, quiet, slow ----
+    Test_True("feel: 24 of 100 HP is low", Feel_LowHpActive(24, 100));
+    Test_True("feel: 25 of 100 HP is low (the HUD's own low mark)", Feel_LowHpActive(25, 100));
+    Test_False("feel: 26 of 100 HP is not low", Feel_LowHpActive(26, 100));
+    Test_False("feel: full HP is not low", Feel_LowHpActive(100, 100));
+    Test_False("feel: 0 HP is not a warning (the fight is over)", Feel_LowHpActive(0, 100));
+    Test_False("feel: a max HP of 0 is never low", Feel_LowHpActive(5, 0));
+    Test_Eq("feel: the first thump is at once", Feel_BeatCount(0), 1);
+    Test_Eq("feel: no second thump before 220 ms", Feel_BeatCount(219), 1);
+    Test_Eq("feel: the second thump comes at 220 ms", Feel_BeatCount(220), 2);
+    Test_Eq("feel: a beat cycle is 1.2 s", Feel_BeatCount(1200), 3);
+    Test_Eq("feel: two cycles are 2.4 s", Feel_BeatCount(2400), 5);
+    Test_True("feel: the thump is quiet (volume 0.25 or less) and audible", Feel_BeatVol(false) > 0 && Feel_BeatVol(false) <= 0.25 && Feel_BeatVol(true) <= Feel_BeatVol(false));
+    var _pa_ok = true, _pa_max = 0;
+    for (var _t = 0; _t <= 4800; _t += 50) {
+        var _pa = Feel_PulseAlpha(_t, true);
+        _pa_max = max(_pa_max, _pa);
+        if (_pa < 0 || _pa > 0.5 || Feel_PulseAlpha(_t, false) != 0) _pa_ok = false;
+    }
+    Test_True("feel: the edge pulse is faint (alpha 0.5 at most: the bands are almost the backdrop colour) and 0 when not low", _pa_ok);
+    Test_True("feel: the edge pulse is visible at its peak", _pa_max > 0.2);
+    Test_True("feel: the edge pulse is slow (starts at 0, one swell takes 2.4 s)", Feel_PulseAlpha(0, true) == 0 && Feel_PulseAlpha(1200, true) > Feel_PulseAlpha(300, true) && abs(Feel_PulseAlpha(2400, true)) < 0.0001);
+    var _hk = Test_FeelFakeBattle(20, 100);
+    var _last_key = "keep_me";
+    global.sfx_last_key = _last_key;
+    Battle_FeelStep(_hk, 16);
+    Test_True("feel: under 25% HP the warning is on and the first thump has played", _hk.lowhp_on && _hk.beat_n == 1);
+    Test_Eq("feel: the heartbeat does not steal the last sound key the tests and the bot read", global.sfx_last_key, _last_key);
+    repeat (75) Battle_FeelStep(_hk, 16);
+    Test_True("feel: 1.2 s later it has beaten again", _hk.beat_n >= 3 && _hk.beat_n <= 5);
+    var _clock = _hk.feel_ms;
+    _hk.hitstop_ms = 40;
+    Battle_FeelStep(_hk, 16);
+    Test_Eq("feel: the feel clock stands still in a hit freeze", _hk.feel_ms, _clock);
+    _hk.hitstop_ms = 0;
+    _hk.p.hp = 60;
+    Battle_FeelStep(_hk, 16);
+    Test_True("feel: above 25% HP it stops and resets", !_hk.lowhp_on && _hk.beat_n == 0 && _hk.lowhp_ms == 0);
+    _hk.p.hp = 20;
+    _hk.battle_over = true;
+    Battle_FeelStep(_hk, 16);
+    Test_False("feel: at the battle's end it stays off", _hk.lowhp_on);
+    instance_destroy(_hk.enemy_inst);
+    var _hm = Test_FeelFakeBattle(100, 100);
+    _hm.feel_hit_start = _hm.feel_ms - 10;
+    _hm.feel_hit_px = 3;
+    Battle_FeelStep(_hm, 16);
+    Test_True("feel: the controller applies the jolt as a push-in of the picture", _hm.feel_zoom_on && _hm.feel_zr.sw < 160);
+    _hm.feel_hit_start = -100000;
+    repeat (3) Battle_FeelStep(_hm, 16);
+    Test_True("feel: the push-in ends and the picture is back to 160 x 144", !_hm.feel_zoom_on && _hm.feel_zr.sw == 160);
+    Display_ClearZoom();
+    instance_destroy(_hm.enemy_inst);
+
+    // ---- the enemy death pop (D138): freeze + white flash, burst of pixels, THEN the slain message ----
+    Test_Eq("feel: the death freeze is 120 ms", FEEL_DEATH_FREEZE_MS, 120);
+    Test_Eq("feel: a normal pop is 120 ms of freeze plus a 500 ms burst", Feel_DeathTotalMs(false), 620);
+    Test_True("feel: a boss bursts longer", Feel_DeathTotalMs(true) > Feel_DeathTotalMs(false) + 200);
+    Test_True("feel: the phases run freeze, burst, done", Feel_DeathPhase(60, false) == 0 && Feel_DeathPhase(130, false) == 1 && Feel_DeathPhase(619, false) == 1 && Feel_DeathPhase(620, false) == 2);
+    Test_True("feel: the boss phases run freeze, burst, done", Feel_DeathPhase(130, true) == 1 && Feel_DeathPhase(619, true) == 1 && Feel_DeathPhase(1020, true) == 2);
+    Test_Eq("feel: a particle starts opaque", Feel_ParticleAlpha(0, 500), 1);
+    Test_Eq("feel: a particle is gone at the end of the burst", Feel_ParticleAlpha(500, 500), 0);
+    var _pal_ok = true, _pal_prev = 2;
+    for (var _t = 0; _t <= 520; _t += 10) {
+        var _pl2 = Feel_ParticleAlpha(_t, 500);
+        if (_pl2 > _pal_prev + 0.0001 || _pl2 < 0 || _pl2 > 1) _pal_ok = false;
+        _pal_prev = _pl2;
+    }
+    Test_True("feel: particles only fade (1 down to 0)", _pal_ok);
+    var _d = Test_FeelFakeBattle(100, 100);
+    _d.e.hp = 0;
+    var _began = Battle_DeathPopBegin(_d, _d.e, "Slime has been slain.");
+    Test_True("feel: a killing blow starts the death pop", _began && is_struct(_d.death_pop) && _d.death_pop.active);
+    Test_Eq("feel: the slain message is not posted when the pop starts", _d.message_text, "");
+    Test_True("feel: the battle waits on a message state meanwhile", _d.battle_state == BSTATE_MESSAGE && _d.message_next_state == BSTATE_END_RUN);
+    var _np = is_struct(_d.death_pop) ? array_length(_d.death_pop.parts) : 0;
+    Test_True("feel: the enemy bursts into a bounded number of pixel squares", _np >= 16 && _np <= 200);
+    var _pbound = (_np > 0);
+    for (var _i = 0; _i < _np; _i++) {
+        var _pp = _d.death_pop.parts[_i];
+        for (var _t = 0; _t <= 500; _t += 25) {
+            var _q = Feel_ParticlePos(_pp, _t);
+            if (abs(_q.x - _pp.x) > 80 || abs(_q.y - _pp.y) > 100) _pbound = false;
+        }
+        if (Feel_ParticlePos(_pp, 0).x != _pp.x || Feel_ParticlePos(_pp, 0).y != _pp.y) _pbound = false;
+    }
+    Test_True("feel: particle positions start at their cell and stay bounded", _pbound);
+    Battle_DeathPopAdvance(_d, 60);
+    Test_True("feel: during the freeze the pop is still playing and nothing is said", Battle_DeathPopStep(_d) && _d.message_text == "");
+    Battle_DeathPopAdvance(_d, 200);
+    Test_True("feel: during the burst the pop is still playing and nothing is said", Battle_DeathPopStep(_d) && _d.message_text == "" && is_struct(_d.death_pop) && _d.death_pop.active);
+    Battle_DeathPopAdvance(_d, 400);
+    var _still = Battle_DeathPopStep(_d);
+    Test_True("feel: when the burst is over the slain message comes", _still && _d.message_text == "Slime has been slain." && is_struct(_d.death_pop) && !_d.death_pop.active);
+    Test_True("feel: then the battle ends on that message with the long hold", _d.message_next_state == BSTATE_END_RUN && _d.wait_timer == COMBAT_ACTION_DELAY_MS);
+    Test_False("feel: the sprite is not drawn after the burst", Feel_SpriteVisible(is_struct(_d.death_pop) ? _d.death_pop.t_ms : 0));
+    Test_False("feel: Battle_DeathPopStep is idle once the pop is done", Battle_DeathPopStep(_d));
+    instance_destroy(_d.enemy_inst);
+    var _db = Test_FeelFakeBattle(100, 100, ENEMY_MINI_BOSS);
+    _db.e.hp = 0;
+    Battle_DeathPopBegin(_db, _db.e, "x");
+    Test_True("feel: a boss death pop is longer", is_struct(_db.death_pop) && _db.death_pop.total_ms == Feel_DeathTotalMs(true) && _db.death_pop.total_ms > 620);
+    instance_destroy(_db.enemy_inst);
+
+    GameSettings_Ensure().screen_shake = _shake_keep;
 }
