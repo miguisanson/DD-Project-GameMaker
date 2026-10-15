@@ -713,6 +713,9 @@ function Item_Use(_item_id, _user, _target) {
             result.ok = false;
             result.msg = Loc_T("item.msg.no_status_cure", "No status to cure.");
         }
+    } else {   // D156: an effect this function does not know would be used up for nothing
+        result.ok = false;
+        result.msg = Loc_T("item.msg.nothing_happens", "Nothing happens.");
     }
 
     return result;

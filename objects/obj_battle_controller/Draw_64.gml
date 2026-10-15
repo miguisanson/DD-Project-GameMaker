@@ -152,9 +152,11 @@ if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.e
 // The command menu, or the skill / item list with its details panel (D95, D99, D100): last, so it is on top of everything.
 Battle_DrawMenus(self);
 Battle_DrawSpeedMark(self);   // D134: "x2" in the top right corner while run is held and no QTE is up
+Battle_DrawChipTip(self);   // D150: the full sentence of the status chip under the mouse
 
 // what the last draw used, for the tests (nothing may overlap, I-067) and the shots
 hud.rects.zones = zones;
+hud.rects.chips = Battle_HudFrame().chip_rects;   // D150: every chip with its label, as drawn
 var tl_m = Battle_TimelineMetrics(self);
 hud.rects.timeline = { x: tl_m.x0, y: tl_m.y0, w: tl_m.w, h: tl_m.plate_h };
 var hdr_r = Battle_EnemyHeaderRect(self);

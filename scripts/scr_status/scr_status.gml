@@ -558,6 +558,9 @@ function Status_DisplayList(_ch) {
             tick: d.tick,
             label: label,
             line: d.line,
+            full: Status_FullLine(s.id, s),
+            short: Status_ShortName(s.id),
+            count: Status_LabelCount(s.id, s),
             negative: Status_IsNegative(s.id),
             icon_sprite: variable_struct_exists(cfg, "icon_sprite") ? cfg.icon_sprite : noone,
             icon_subimg: variable_struct_exists(cfg, "icon_subimg") ? cfg.icon_subimg : 0
@@ -877,4 +880,47 @@ function Status_LabelWithSign(_cfg, _status_id) {
     }
     var suffix = Status_IsNegative(_status_id) ? "-" : "+";
     return name_txt + suffix;
+}
+
+// ---- D150: the short label under a status chip ("PSN 3", "BLD 2", "Thirst 4") and the full sentence shown when the status is highlighted ----
+// Every status id in order (the labels, the Help page and the tests walk this list).
+function Status_AllIds() {
+    return [STATUS_POISON, STATUS_BLEED, STATUS_BURN, STATUS_STUN, STATUS_GUARD, STATUS_DMG_UP, STATUS_EVASION, STATUS_CRIT_UP, STATUS_HIT_UP,
+            STATUS_MEDITATION, STATUS_SOLIDIFY, STATUS_BLOODTHIRSTY, STATUS_BLESSING, STATUS_SUNDER, STATUS_BRACE];
+}
+
+// The short word under the chip: a text key per status, at most 6 characters in English (and 3 in Korean) so it fits under the chip.
+function Status_ShortName(_status_id) {
+    var cfg = StatusDB_Get(_status_id);
+    var fb = (is_struct(cfg) && variable_struct_exists(cfg, "name")) ? string_copy(string(cfg.name), 1, 6) : "?";
+    return Loc_T("status.short." + Status_LocalizationKey(_status_id), fb);
+}
+
+// The number next to the name: a poison's or a bleed's stacks, otherwise the turns left. "" when there is none to show.
+function Status_LabelCount(_status_id, _data = undefined) {
+    if (!is_struct(_data)) return "";
+    var cfg = StatusDB_Get(_status_id);
+    var dot = (is_struct(cfg) && variable_struct_exists(cfg, "dot_kind")) ? cfg.dot_kind : "";
+    var n = 0;
+    if (dot == "poison" || dot == "bleed") n = variable_struct_exists(_data, "stacks") ? _data.stacks : 1;
+    else n = variable_struct_exists(_data, "turns") ? _data.turns : 0;
+    return (n > 0) ? string(n) : "";
+}
+
+// "PSN 3", "BLD 2", "Thirst 4"; the name alone when there is no number.
+function Status_ShortLabel(_status_id, _data = undefined) {
+    var n = Status_LabelCount(_status_id, _data);
+    return Status_ShortName(_status_id) + ((n != "") ? " " + n : "");
+}
+
+// The sentence for a highlighted status (Status tab, the chip's tip): what it does, then the turns left. A poison, a bleed and a burn already say
+// their stacks and turns, Foresight says its turns, and a Stun is used up at once, so they add nothing.
+function Status_FullLine(_status_id, _data = undefined) {
+    var line = Status_Describe(_status_id, _data).line;
+    if (!is_struct(_data) || !variable_struct_exists(_data, "turns") || _data.turns <= 0) return line;
+    var cfg = StatusDB_Get(_status_id);
+    if (is_struct(cfg) && variable_struct_exists(cfg, "dot_kind")) return line;
+    if (_status_id == STATUS_HIT_UP || _status_id == STATUS_STUN) return line;
+    var tail = (_data.turns == 1) ? Loc_T("status.turn_left", "1 turn left.") : Loc_T("status.turns_left", "{turns} turns left.", { turns: string(_data.turns) });
+    return line + " " + tail;
 }

@@ -243,7 +243,7 @@ function Scenario_Boot() {
     random_set_seed(12345);
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 27000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 32000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -554,7 +554,11 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeNotes(_s);   // H7 (D147): lore notes are picked up by walking onto them, never block, stay gone; the Codex Notes page and its reader; its last step goes on with D164 (820)
             break;
         case 820: case 821: case 822: case 823: case 824: case 825: case 826: case 827: case 828: case 829:
-            Scenario_StepSmokeD164(_s);   // D164 (amends D159): the daylight room, the extra torches placed once per room start; its last step goes on with H5 (750)
+            Scenario_StepSmokeD164(_s);   // D164 (amends D159): the daylight room, the extra torches placed once per room start; its last step goes on with H8a (850)
+            break;
+        case 850: case 851: case 852: case 853: case 854: case 855: case 856: case 857: case 858: case 859:
+        case 860: case 861: case 862: case 863: case 864: case 865: case 866: case 867: case 868: case 869:
+            Scenario_StepSmokeLabels(_s);   // H8a (D150, D156): potions and a bed refused when they would do nothing, the highlighted status sentence, the Help stats page; goes on with H5 (750)
             break;
         case 750: case 751: case 752: case 753: case 754: case 755: case 756: case 757: case 758: case 759:
         case 760: case 761: case 762: case 763: case 764: case 765: case 766: case 767: case 768: case 769:
@@ -2966,7 +2970,11 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsNotes(_s);   // H7 (D147): the Codex Notes page, a note in the reader, a long text in the reader; two sizes; goes on with H5 (770)
             break;
         case 770: case 771: case 772: case 773: case 774: case 775: case 776: case 777: case 778: case 779:
-            Scenario_StepShotsClassMem(_s);   // H5 (D144, D148): the class screen (some skills ???, the sprite preview, the locked Nobody) and the echo screen, two sizes; finishes the run
+            Scenario_StepShotsClassMem(_s);   // H5 (D144, D148): the class screen (some skills ???, the sprite preview, the locked Nobody) and the echo screen, two sizes; goes on with H8a (870)
+            break;
+        case 870: case 871: case 872: case 873: case 874: case 875: case 876: case 877: case 878: case 879:
+        case 880: case 881: case 882: case 883: case 884: case 885: case 886: case 887: case 888: case 889:
+            Scenario_StepShotsLabels(_s);   // H8a (D150, D156): status labels in battle (highlighted, Korean), the Status tab with the XP bar, the Gear header, the Help stats page; goes on with H13a (800)
             break;
         case 800: case 801: case 802: case 803: case 804: case 805: case 806: case 807: case 808: case 809:
             Scenario_StepShotsEliteDeath(_s);   // H13a (D156): an elite slime and an elite plant on the map, the death scene with its picture, 480 x 432 and 800 x 720; the end of the pictures
@@ -5611,7 +5619,7 @@ function Scenario_StepSmokeRest(_s) {
                 _rc.h1 = true;
                 var _hm = TabMenu_TopMenu();
                 Scenario_Check("help_opens_from_the_system_tab", _gs.ui.mode == UI_MENU && TabMenu_Get().tab == 6 && _hm.id == "help");
-                Scenario_Check("help_lists_all_eleven_mechanics", array_length(_hm.items) == 11 && _hm.items[0].id == "timeline" && _hm.items[10].id == "status");
+                Scenario_Check("help_lists_all_eleven_mechanics", array_length(_hm.items) == 12 && _hm.items[0].id == "timeline" && _hm.items[10].id == "status" && _hm.items[11].id == "stats_terms");
                 Scenario_Check("help_rows_carry_their_text", string_length(_hm.items[1].help) > 20 && string_pos("{confirm}", _hm.items[1].help) > 0);
                 Ui_MenuFixCursor(_hm, 1);
                 Scenario_Check("help_cursor_row_is_the_sliding_bar", _hm.items[_hm.cursor].id == "bar");
@@ -12904,7 +12912,7 @@ function Scenario_StepSmokeD164(_s) {
             if (_s.t > 600) { Scenario_Check("d164_rm_floor3_is_ready_again", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
         case 824:
-            Scenario_Next(_s, 750);   // goes on with H5 (750..769), then H13a (790..), the end of the chain
+            Scenario_Next(_s, 850);   // goes on with H5 (750..769), then H13a (790..), the end of the chain
             break;
     }
 }
@@ -13183,8 +13191,7 @@ function Scenario_StepShotsClassMem(_s) {
                 if (_o.di >= array_length(_scenes)) {
                     global.profile = undefined;   // the next Profile_Get reads the real (scratch) file again
                     RunSave_Delete();
-                    _s.eg_i = 0;
-                    Scenario_Next(_s, 800);   // goes on with H13a (800..809), the end of the pictures
+                    Scenario_Next(_s, 870);   // goes on with H8a (870..889), then H13a (800..), the end of the pictures
                 } else {
                     Scenario_Next(_s, 770);
                 }
@@ -13357,6 +13364,382 @@ function Scenario_StepShotsEliteDeath(_s) {
             if (_s.t == 20) Scenario_Tap("confirm");
             if (_s.t > 40 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) Scenario_Next(_s, 800);
             if (_s.t > 900) { Scenario_Check("shots_elitedeath_back_to_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ---- H8a (D150, D156) steps 850..853, through the real keys: the Items tab refuses a potion at full HP / MP and an antidote with no poison (the item is
+// not used up, HP / MP do not change) and the same item works once it is needed; a bed at full HP and MP is refused (still free), a hurt player rests;
+// the Status tab shows the full sentence of the highlighted status; System > Help > Stats & terms opens its page. Its last step calls Scenario_NoticeEnd. ----
+function Scenario_StepSmokeLabels(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "lb")) _s.lb = { rc: { bed: noone, key: "", set_t: -1 } };
+    var _o = _s.lb;
+    var _u = TabMenu_Get();
+    switch (_s.step) {
+        case 850:   // the Items tab: HP potion x2, MP potion, antidote; all needed nothing yet
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                with (obj_enemy) instance_destroy();
+                var _ch = _gs.player_ch;
+                _ch.inventory = [];
+                _ch.inventory = Inv_Add(_ch.inventory, 10, 2);
+                _ch.inventory = Inv_Add(_ch.inventory, 11, 1);
+                _ch.inventory = Inv_Add(_ch.inventory, 12, 1);
+                _ch.status = [];
+                _ch.hp = _ch.max_hp;
+                _ch.mp = _ch.max_mp;
+                GameState_SetPlayer(_ch);
+                if (instance_exists(obj_player) && variable_instance_exists(obj_player, "character")) obj_player.character = _gs.player_ch;
+                _o.gold0 = Run_Get().gold;
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 2);   // the menu opens on Items
+                Ui_MemSet(Ui_MemGlobal(), "tab_items", 0);
+            }
+            if (_s.t == 8) Scenario_Tap("menu");
+            if (_s.t == 30) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_the_menu_opens_on_items", is_struct(_u) && _u.tab == 2, "tab=" + string(is_struct(_u) ? _u.tab : -1));
+                var _tm = TabMenu_TopMenu();
+                Scenario_Check("labels_the_cursor_is_on_the_hp_potion", is_struct(_tm) && _tm.items[_tm.cursor].id == "item_10", "id=" + (is_struct(_tm) ? string(_tm.items[_tm.cursor].id) : "?"));
+                Scenario_Tap("confirm");   // an HP potion at full HP
+            }
+            if (_s.t == 44) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_hp_potion_at_full_hp_says_so", is_struct(_u) && _u.toast == "HP is already full.", "toast=" + (is_struct(_u) ? _u.toast : "?"));
+                Scenario_Check("labels_hp_potion_at_full_hp_is_not_used_up", Inv_Count(_gs.player_ch.inventory, 10) == 2, "count=" + string(Inv_Count(_gs.player_ch.inventory, 10)));
+                Scenario_Check("labels_hp_is_unchanged_by_the_refused_potion", _gs.player_ch.hp == _gs.player_ch.max_hp);
+                _gs.player_ch.hp = max(1, _gs.player_ch.max_hp - 6);
+                _o.hp1 = _gs.player_ch.hp;
+                Scenario_Tap("confirm");   // the same potion, now needed
+            }
+            if (_s.t == 58) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_the_same_potion_works_when_hurt", Inv_Count(_gs.player_ch.inventory, 10) == 1 && _gs.player_ch.hp > _o.hp1 && _gs.player_ch.hp <= _gs.player_ch.max_hp, "count=" + string(Inv_Count(_gs.player_ch.inventory, 10)) + " hp=" + string(_gs.player_ch.hp));
+                Scenario_Check("labels_and_says_how_much_it_restored", is_struct(_u) && string_pos("Restored", _u.toast) == 1, "toast=" + (is_struct(_u) ? _u.toast : "?"));
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 70) Scenario_Tap("confirm");   // the MP potion at full MP
+            if (_s.t == 84) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_mp_potion_at_full_mp_says_so", is_struct(_u) && _u.toast == "MP is already full.", "toast=" + (is_struct(_u) ? _u.toast : "?"));
+                Scenario_Check("labels_mp_potion_at_full_mp_is_not_used_up", Inv_Count(_gs.player_ch.inventory, 11) == 1);
+                Scenario_Check("labels_mp_is_unchanged_by_the_refused_potion", _gs.player_ch.mp == _gs.player_ch.max_mp);
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 96) Scenario_Tap("confirm");   // the antidote with no poison
+            if (_s.t == 110) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_an_antidote_with_no_poison_says_so", is_struct(_u) && _u.toast == "No status to cure.", "toast=" + (is_struct(_u) ? _u.toast : "?"));
+                Scenario_Check("labels_the_antidote_is_not_used_up", Inv_Count(_gs.player_ch.inventory, 12) == 1);
+                Status_Add(_gs.player_ch, STATUS_POISON, 0, 0, 2);
+                Scenario_Tap("confirm");   // the antidote, now needed
+            }
+            if (_s.t == 124) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_the_antidote_cures_a_poison", Inv_Count(_gs.player_ch.inventory, 12) == 0 && !Status_Has(_gs.player_ch, STATUS_POISON), "count=" + string(Inv_Count(_gs.player_ch.inventory, 12)));
+                Scenario_Check("labels_and_says_it_is_cured", is_struct(_u) && string_pos("cured", _u.toast) > 0, "toast=" + (is_struct(_u) ? _u.toast : "?"));
+                Scenario_Check("labels_the_gold_is_untouched", Run_Get().gold == _o.gold0);
+                Scenario_Tap("esc");
+            }
+            if (_s.t == 140) {
+                Scenario_Check("labels_the_menu_closes", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()));
+                Scenario_Next(_s, 851);
+            }
+            break;
+        case 851:   // a bed with full HP and MP: refused, the bed stays free, nothing changes
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                var _c3 = _gs.player_ch;
+                _c3.hp = _c3.max_hp;
+                _c3.mp = _c3.max_mp;
+                _c3.status = [];
+                _o.rc = { bed: noone, key: "", set_t: -1 };
+                Scenario_RestBed(_o.rc, 5, 7);
+                _o.rc.set_t = _s.t;
+            }
+            if (_o.rc.set_t > 0 && _s.t >= _o.rc.set_t + 20) { Scenario_Tap("interact"); _o.rc.set_t = -1; }
+            if (BedUi_IsOpen() && !variable_struct_exists(_o, "b_open")) {
+                _o.b_open = _s.t;
+                Scenario_Check("labels_the_bed_menu_opens", _gs.ui.mode == UI_BED && Ui_StackTop(global.bed_ui.stk).id == "bed_main");
+                Scenario_Check("labels_rest_looks_unavailable_when_rested", Test_FieldOr(Ui_StackTop(global.bed_ui.stk).items[0], "dim", false));
+            }
+            if (variable_struct_exists(_o, "b_open") && !variable_struct_exists(_o, "b_tap") && BedUi_IsOpen() && InputLock_Settled(global.bed_ui.lock, 4 * TRANSITION_FRAME_MS)) {
+                _o.b_tap = _s.t;
+                Scenario_Tap("confirm");   // Rest
+            }
+            if (variable_struct_exists(_o, "b_tap") && _s.t == _o.b_tap + 14) {
+                Scenario_Check("labels_rest_at_full_is_refused_with_the_line", array_length(_gs.ui.lines_raw) >= 1 && _gs.ui.lines_raw[0] == "You are already rested.", "lines=" + json_stringify(_gs.ui.lines_raw));
+                Scenario_Check("labels_the_refused_bed_is_still_free", Bed_CanUse(_gs.flags, _o.rc.key) && !BedUi_IsOpen());
+                Scenario_Check("labels_the_refused_rest_changes_nothing", _gs.player_ch.hp == _gs.player_ch.max_hp && _gs.player_ch.mp == _gs.player_ch.max_mp);
+            }
+            if (variable_struct_exists(_o, "b_tap") && _s.t > _o.b_tap + 14) {
+                Scenario_CardsTalk(_s);
+                if (_s.t > _o.b_tap + 40 && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0) Scenario_Next(_s, 852);
+            }
+            if (_s.t > 600) { Scenario_Check("labels_the_refused_bed_flow", false, "open=" + string(BedUi_IsOpen()) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 852:   // hurt: the same bed works, and is used up
+            if (_s.t == 1) {
+                _gs.player_ch.hp = max(1, _gs.player_ch.max_hp - 4);
+                _gs.player_ch.mp = max(0, _gs.player_ch.max_mp - 1);
+                _o.rc.set_t = _s.t;
+                variable_struct_remove(_o, "b_open");
+                variable_struct_remove(_o, "b_tap");
+            }
+            if (_o.rc.set_t > 0 && _s.t >= _o.rc.set_t + 10) { Scenario_Tap("interact"); _o.rc.set_t = -1; }
+            if (BedUi_IsOpen() && !variable_struct_exists(_o, "b_open")) _o.b_open = _s.t;
+            if (variable_struct_exists(_o, "b_open") && !variable_struct_exists(_o, "b_tap") && BedUi_IsOpen() && InputLock_Settled(global.bed_ui.lock, 4 * TRANSITION_FRAME_MS)) {
+                _o.b_tap = _s.t;
+                Scenario_Check("labels_rest_does_not_look_unavailable_when_hurt", !Test_FieldOr(Ui_StackTop(global.bed_ui.stk).items[0], "dim", false));
+                Scenario_Tap("confirm");
+            }
+            if (variable_struct_exists(_o, "b_tap") && _s.t == _o.b_tap + 14) {
+                Scenario_Check("labels_rest_when_hurt_heals_hp_and_mp", _gs.player_ch.hp == _gs.player_ch.max_hp && _gs.player_ch.mp == _gs.player_ch.max_mp, "hp=" + string(_gs.player_ch.hp) + "/" + string(_gs.player_ch.max_hp));
+                Scenario_Check("labels_and_uses_the_bed_up", Bed_Used(_gs.flags, _o.rc.key));
+            }
+            if (variable_struct_exists(_o, "b_tap") && _s.t > _o.b_tap + 14) {
+                Scenario_CardsTalk(_s);
+                if (_s.t > _o.b_tap + 40 && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0) Scenario_Next(_s, 853);
+            }
+            if (_s.t > 600) { Scenario_Check("labels_the_hurt_bed_flow", false, "open=" + string(BedUi_IsOpen()) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 853:   // the Status tab highlights a status; System > Help > Stats & terms
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                if (instance_exists(_o.rc.bed)) with (_o.rc.bed) instance_destroy();
+                var _g2 = _gs.player_ch;
+                _g2.status = [];
+                Status_Add(_g2, STATUS_GUARD, 4, 0);
+                Status_Add(_g2, STATUS_POISON, 0, 0, 3);
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);
+                Ui_MemSet(Ui_MemGlobal(), "tab_status", 0);
+                Ui_MemSet(Ui_MemGlobal(), "tab_system", 0);
+            }
+            if (_s.t == 8) Scenario_Tap("menu");
+            if (_s.t == 30) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_the_menu_opens_on_status", is_struct(_u) && _u.tab == 0);
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 42 || _s.t == 54 || _s.t == 66) Scenario_Tap("menu_down");
+            if (_s.t == 78) {
+                var _sm = TabMenu_TopMenu();
+                var _row = _sm.items[_sm.cursor];
+                Scenario_Check("labels_the_cursor_is_on_the_guard_status", _row.id == "status_" + string(STATUS_GUARD), "id=" + string(_row.id));
+                Scenario_Check("labels_the_highlighted_status_says_what_it_does_and_its_turns", string_pos("4 turns left", _row.help) > 0 && string_pos("next incoming hit", string_lower(_row.help)) > 0, "help=" + _row.help);
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 90) {
+                var _sm2 = TabMenu_TopMenu();
+                var _row2 = _sm2.items[_sm2.cursor];
+                Scenario_Check("labels_the_poison_row_says_its_stacks", _row2.id == "status_" + string(STATUS_POISON) && string_pos("3 stacks", _row2.help) > 0, "help=" + _row2.help);
+                Scenario_Tap("tab_prev");   // Q from Status wraps to System
+            }
+            if (_s.t == 106) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_q_from_status_reaches_system", is_struct(_u) && _u.tab == 6);
+                Scenario_Tap("confirm");   // Help
+            }
+            if (_s.t == 120) {
+                var _hm = TabMenu_TopMenu();
+                Scenario_Check("labels_help_opens_with_the_stats_page_added", TabMenu_Depth() == 2 && _hm.id == "help" && array_length(_hm.items) == 12, "depth=" + string(TabMenu_Depth()) + " items=" + string(array_length(_hm.items)));
+                Scenario_Tap("menu_up");   // wraps to the last row
+            }
+            if (_s.t == 134) {
+                var _hm2 = TabMenu_TopMenu();
+                Scenario_Check("labels_the_last_help_row_is_stats_and_terms", _hm2.items[_hm2.cursor].id == "stats_terms", "id=" + string(_hm2.items[_hm2.cursor].id));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 148) {
+                var _st = TabMenu_TopMenu();
+                Scenario_Check("labels_the_stats_page_opens", TabMenu_Depth() == 3 && _st.id == "help_stats", "depth=" + string(TabMenu_Depth()) + " id=" + string(_st.id));
+                Scenario_Check("labels_the_stats_page_lists_every_term", array_length(_st.items) == array_length(Help_StatsItems()) && array_length(_st.items) >= 28);
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 162) {
+                var _st2 = TabMenu_TopMenu();
+                Scenario_Check("labels_the_stats_page_scrolls_by_cursor", _st2.cursor == 1);
+                Scenario_Tap("cancel");
+            }
+            if (_s.t == 176) {
+                Scenario_Check("labels_back_returns_to_the_help_list", TabMenu_Depth() == 2 && TabMenu_TopMenu().id == "help");
+                Menu_Close(true);
+                Scenario_Next(_s, 750);   // goes on with H5 (750..769), then H13a (790..), the end of the chain
+            }
+            break;
+    }
+}
+
+// ---- H8a (D150, D156) pictures 870..873: the battle HUD with three statuses on each side and a label under every chip, the same with an enemy chip highlighted
+// (its full sentence in a plate), in Korean, the Status tab with a highlighted status and the XP bar, the Gear tab header, the Help stats page; windowed
+// scale 3 (480 x 432) and 5 (800 x 720), Korean at 3 only. shot_labels_<scene>_<w>x<h>.png. The last picture of the run: it ends the run. ----
+function Scenario_LabelsScenes() {
+    return ["battle", "battle_tip", "status", "gear", "help_stats", "battle_ko"];
+}
+
+function Scenario_LabelsScales(_di) {
+    return (_di == 5) ? [3] : [3, 5];
+}
+
+function Scenario_LabelsIsBattle(_di) {
+    return (_di == 0 || _di == 1 || _di == 5);
+}
+
+// Every chip rectangle of one side lies inside _zone (or the screen), none overlaps another, and each is wide enough for its label.
+function Scenario_LabelsChipChecks(_bc, _tag) {
+    var _rs = _bc.hud.rects.chips;
+    var _gw = Display_GuiW();
+    var _gh = Display_GuiH();
+    var _np = 0;
+    var _ne = 0;
+    var _bad_screen = "";
+    var _bad_zone = "";
+    var _bad_overlap = "";
+    var _bad_wide = "";
+    var _pz = _bc.hud.rects.zones.player;
+    for (var _i = 0; _i < array_length(_rs); _i++) {
+        var _r = _rs[_i];
+        if (_r.who == TL_PLAYER) _np++; else _ne++;
+        if (_r.x < 0 || _r.y < 0 || _r.x + _r.w > _gw || _r.y + _r.h > _gh) _bad_screen += string(_i) + " ";
+        if (_r.who == TL_PLAYER && !(_r.x >= _pz.x && _r.y >= _pz.y && _r.x + _r.w <= _pz.x + _pz.w && _r.y + _r.h <= _pz.y + _pz.h)) _bad_zone += string(_i) + " ";
+        if (_r.w < _r.chip.lw) _bad_wide += string(_i) + " ";
+        for (var _j = _i + 1; _j < array_length(_rs); _j++) if (Test_RectsOverlap(_r, _rs[_j])) _bad_overlap += string(_i) + "/" + string(_j) + " ";
+    }
+    Scenario_Check("shots_labels_player_has_three_chips_" + _tag, _np == 3, "n=" + string(_np));
+    Scenario_Check("shots_labels_enemy_has_three_chips_" + _tag, _ne == 3, "n=" + string(_ne));
+    Scenario_Check("shots_labels_chips_are_on_screen_" + _tag, _bad_screen == "", _bad_screen);
+    Scenario_Check("shots_labels_player_chips_sit_in_the_panel_" + _tag, _bad_zone == "", _bad_zone + json_stringify(_pz));
+    Scenario_Check("shots_labels_no_chip_overlaps_another_" + _tag, _bad_overlap == "", _bad_overlap);
+    Scenario_Check("shots_labels_every_cell_holds_its_label_" + _tag, _bad_wide == "", _bad_wide);
+    var _tl = _bc.hud.rects.timeline;
+    var _hit_tl = "";
+    for (var _k = 0; _k < array_length(_rs); _k++) if (Test_RectsOverlap(_rs[_k], _tl)) _hit_tl += string(_k) + " ";
+    Scenario_Check("shots_labels_no_chip_touches_the_turn_strip_" + _tag, _hit_tl == "", _hit_tl);
+}
+
+function Scenario_StepShotsLabels(_s) {
+    var _scenes = Scenario_LabelsScenes();
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "lb2")) _s.lb2 = { n: 0, di: 0, si: 0 };
+    var _o = _s.lb2;
+    var _scales = Scenario_LabelsScales(_o.di);
+    var _tag = _scenes[_o.di] + "_" + string(_scales[_o.si]);
+    switch (_s.step) {
+        case 870:   // enter the room (a fight, or one of the two floors in turn) at this scale
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                if (Scenario_LabelsIsBattle(_o.di)) {
+                    Scenario_NewKnight();
+                    Scenario_SetWindowScale(_scales[_o.si]);
+                    Scenario_GotoBattle("shots_labels_" + _tag, ENEMY_SPIDER);
+                } else {
+                    Scenario_TabFixture();
+                    Scenario_SetWindowScale(_scales[_o.si]);
+                    _o.n++;
+                    room_goto((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3);
+                }
+            }
+            if (_s.t >= 25) {
+                if (Scenario_LabelsIsBattle(_o.di) ? (room == rm_battle && instance_exists(obj_battle_controller)) : Scenario_FloorReady((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3)) Scenario_Next(_s, 871);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_labels_enters_the_room_" + _tag, false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 871:   // set the scene up
+            if (_o.di == 5) Loc_SetLanguage("ko");   // after the room has loaded: a room's controller reloads the language from the settings
+            else if (Loc_GetLanguage() != "en") Loc_SetLanguage("en");
+            if (Scenario_LabelsIsBattle(_o.di)) {
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
+                _bc.p.skills = [SKILL_HILT_BASH, SKILL_MUSCLE_UP, SKILL_WOUND];
+                _bc.p.hp = max(1, _bc.p.max_hp - 5);
+                _bc.p.mp = max(0, _bc.p.max_mp - 2);
+                _bc.hud.hp_shown = _bc.p.hp;
+                _bc.hud.mp_shown = _bc.p.mp;
+                _bc.pops = [];
+                _bc.combat_log = [];
+                _bc.p = Status_Add(_bc.p, STATUS_POISON, 0, 0, 3);
+                _bc.p = Status_Add(_bc.p, STATUS_BLEED, 3, 0, 2);
+                _bc.p = Status_Add(_bc.p, STATUS_BRACE, 2, 0);
+                _bc.e = Status_Add(_bc.e, STATUS_BURN, 2, 3);
+                _bc.e = Status_Add(_bc.e, STATUS_BLOODTHIRSTY, 4, 0);
+                _bc.e = Status_Add(_bc.e, STATUS_SOLIDIFY, 3, 0);
+                _bc.e.hp = floor(_bc.e.max_hp * 0.8);
+                _bc.enemy_hp_shown = _bc.e.hp;
+                _bc.tl_who = TL_PLAYER;
+                _bc.turn = TURN_PLAYER;
+                _bc.enemy_action_pending = false;
+                _bc.battle_state = BSTATE_MENU;
+                variable_struct_remove(_bc.hud, "chip_focus");
+                if (_o.di == 1) _bc.hud.chip_focus = { who: TL_ENEMY, idx: 1 };   // Bloodthirsty, in the middle of the enemy's row
+            } else {
+                with (obj_enemy) instance_destroy();
+                switch (_scenes[_o.di]) {
+                    case "status":
+                        Status_Add(_gs.player_ch, STATUS_GUARD, 4, 0);
+                        Status_Add(_gs.player_ch, STATUS_POISON, 0, 0, 3);
+                        Status_Add(_gs.player_ch, STATUS_BURN, 2, 3);
+                        Ui_MemSet(Ui_MemGlobal(), "tab_status", 0);
+                        Menu_Open(0);
+                        Ui_MenuFixCursor(TabMenu_TopMenu(), 4);   // Guard, with its sentence and its turns left
+                        break;
+                    case "gear":
+                        Menu_Open(3);
+                        break;
+                    case "help_stats":
+                        Menu_Open(6);
+                        TabHelp_Open();
+                        TabHelpStats_Open();
+                        Ui_MenuFixCursor(TabMenu_TopMenu(), 8);   // Perfect, with the number from the data
+                        break;
+                }
+            }
+            Scenario_Next(_s, 872);
+            break;
+        case 872:   // let the panels settle, check the layout, take the picture
+            if (_s.t >= 24) {
+                _s.shot = "shot_labels_" + _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                if (Scenario_LabelsIsBattle(_o.di)) {
+                    var _bc2 = instance_find(obj_battle_controller, 0);
+                    Scenario_Check("shots_labels_in_battle_" + _tag, room == rm_battle && instance_exists(_bc2));
+                    Scenario_LabelsChipChecks(_bc2, _tag);
+                    Scenario_BattleUiOverlaps(_bc2, "labels_" + _tag);
+                    var _pl = Battle_StatusChips(_bc2.p);
+                    Scenario_Check("shots_labels_the_player_row_reads_psn_bld_brace_" + _tag, array_length(_pl) == 3 && _pl[0].label == Status_ShortName(STATUS_POISON) + " 3" && _pl[1].label == Status_ShortName(STATUS_BLEED) + " 2" && _pl[2].label == Status_ShortName(STATUS_BRACE) + " 2");
+                    if (_o.di == 1) {
+                        var _tp = _bc2.hud.rects.chip_tip;
+                        Scenario_Check("shots_labels_the_highlighted_chip_has_its_plate_" + _tag, is_struct(_tp) && _tp.w > 0 && _tp.x >= 0 && _tp.y >= 0 && _tp.x + _tp.w <= Display_GuiW() && _tp.y + _tp.h <= Display_GuiH(), json_stringify(_tp));
+                    } else {
+                        Scenario_Check("shots_labels_no_plate_without_a_highlight_" + _tag, !is_struct(_bc2.hud.rects.chip_tip));
+                    }
+                    if (_o.di == 5) Scenario_Check("shots_labels_the_korean_name_is_not_the_english_one", Status_ShortName(STATUS_POISON) != "PSN");
+                } else {
+                    Scenario_Check("shots_labels_menu_is_open_" + _tag, _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                    Scenario_TabLayoutChecks(_tag);
+                    var _tm = TabMenu_TopMenu();
+                    if (_scenes[_o.di] == "status") Scenario_Check("shots_labels_the_status_row_shows_its_turns_left_" + _tag, string_pos("4 turns left", _tm.items[_tm.cursor].help) > 0, _tm.items[_tm.cursor].help);
+                    if (_scenes[_o.di] == "gear") Scenario_Check("shots_labels_the_gear_header_says_equipped_" + _tag, _tm.items[0].label == "Equipped" && _tm.items[0].kind == "head");
+                    if (_scenes[_o.di] == "help_stats") Scenario_Check("shots_labels_the_stats_page_is_up_" + _tag, TabMenu_Depth() == 3 && _tm.id == "help_stats" && _tm.items[_tm.cursor].id == "perfect");
+                }
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 873);
+            }
+            break;
+        case 873:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                if (is_struct(TabMenu_Get())) Menu_Close(true);
+                Scenario_ClearUi();
+                if (Loc_GetLanguage() != "en") Loc_SetLanguage("en");
+                _o.si++;
+                if (_o.si >= array_length(Scenario_LabelsScales(_o.di))) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    _s.eg_i = 0;
+                    Scenario_Next(_s, 800);   // goes on with H13a (800..809), the end of the pictures
+                } else {
+                    Scenario_Next(_s, 870);
+                }
+            }
             break;
     }
 }

@@ -2536,11 +2536,12 @@ function Battle_IconK() {
 // The screen in zones (pure; Test_Suite_BattleUi checks that nothing overlaps at every size). _tl_bottom = the turn strip's bottom edge,
 // _icon = a status chip's icon edge. player = the HP / MP / status panel (bottom left); right = the column of the command menu and lists
 // (bottom right, bottom edge list_bottom); msg = where the log toast and the skill banner's plate may sit (above both bottom panels).
-function BattleHud_Zones(_gw, _gh, _p, _lh, _tl_bottom, _icon) {
+// _lab_h (D150): the height of the label row under the chips (0 = none); the panel grows by it and one gap.
+function BattleHud_Zones(_gw, _gh, _p, _lh, _tl_bottom, _icon, _lab_h = 0) {
     var m = 3 * _p;
     var row = _lh + 2 * _p;
     var pl_w = round(_gw * 0.40);
-    var pl_h = 8 * _p + 3 * _lh + 6 * _p + _icon;
+    var pl_h = 8 * _p + 3 * _lh + 6 * _p + _icon + ((_lab_h > 0) ? _lab_h + _p : 0);
     var cmd_h = 8 * _p + 5 * row;
     var band_h = max(pl_h, cmd_h);
     var band_top = _gh - m - band_h;
@@ -2557,12 +2558,12 @@ function BattleHud_Zones(_gw, _gh, _p, _lh, _tl_bottom, _icon) {
 
 function Battle_Zones() {
     var mt = Ui_Metrics();
-    return BattleHud_Zones(mt.gw, mt.gh, mt.p, mt.line_h, Battle_TimelineBottom(), 16 * Battle_IconK());
+    return BattleHud_Zones(mt.gw, mt.gh, mt.p, mt.line_h, Battle_TimelineBottom(), 16 * Battle_IconK(), Battle_ChipLabelH());
 }
 
 // ---- 3 x 5 digits and a plus sign for the chips (retro-ui.md section 3). Every cell is _p x _p. ----
 function Battle_GlyphRows(_ch) {
-    switch (_ch) {
+    switch (string_upper(_ch)) {
         case "0": return [7, 5, 5, 5, 7];
         case "1": return [2, 6, 2, 2, 7];
         case "2": return [7, 1, 7, 4, 7];
@@ -2574,6 +2575,33 @@ function Battle_GlyphRows(_ch) {
         case "8": return [7, 5, 7, 5, 7];
         case "9": return [7, 5, 7, 1, 7];
         case "+": return [0, 2, 7, 2, 0];
+        // D150: the letters of the short status names, in the same 3 x 5 cells
+        case "A": return [2, 5, 7, 5, 5];
+        case "B": return [6, 5, 6, 5, 6];
+        case "C": return [3, 4, 4, 4, 3];
+        case "D": return [6, 5, 5, 5, 6];
+        case "E": return [7, 4, 6, 4, 7];
+        case "F": return [7, 4, 6, 4, 4];
+        case "G": return [3, 4, 5, 5, 3];
+        case "H": return [5, 5, 7, 5, 5];
+        case "I": return [7, 2, 2, 2, 7];
+        case "J": return [1, 1, 1, 5, 2];
+        case "K": return [5, 5, 6, 5, 5];
+        case "L": return [4, 4, 4, 4, 7];
+        case "M": return [5, 7, 7, 5, 5];
+        case "N": return [6, 5, 5, 5, 5];
+        case "O": return [2, 5, 5, 5, 2];
+        case "P": return [6, 5, 6, 4, 4];
+        case "Q": return [2, 5, 5, 3, 1];
+        case "R": return [6, 5, 6, 5, 5];
+        case "S": return [3, 4, 2, 1, 6];
+        case "T": return [7, 2, 2, 2, 2];
+        case "U": return [5, 5, 5, 5, 7];
+        case "V": return [5, 5, 5, 5, 2];
+        case "W": return [5, 5, 7, 7, 5];
+        case "X": return [5, 5, 2, 5, 5];
+        case "Y": return [5, 5, 2, 2, 2];
+        case "Z": return [7, 1, 2, 4, 7];
     }
     return [0, 0, 0, 0, 0];
 }
@@ -2596,7 +2624,8 @@ function Battle_DrawDigits(_x, _y, _text, _p, _col) {
 }
 
 // ---- status chips (D99): what a fighter is under, with the number the player needs ----
-// { id, frame (the strip frame of art/strips_v2/status), text (turns left, or a poison's stacks), corner (the stacks of a bleed), negative, name, line, last (1 turn left) }
+// { id, frame (the strip frame of art/strips_v2/status), text (turns left, or a poison's stacks), corner (the stacks of a bleed), negative, name, line, last (1 turn left),
+//   label ("PSN 3"), lab_name / lab_count (its two parts, D150), full (the highlighted sentence with the turns left) }
 function Battle_StatusChips(_ch) {
     var out = [];
     var list = Status_DisplayList(_ch);
@@ -2608,7 +2637,8 @@ function Battle_StatusChips(_ch) {
             id: d.id, frame: Icon_StatusFrame(d.id),
             text: (d.turns > 0) ? string(d.turns) : "",
             corner: (dot == "bleed" && d.stacks > 1) ? string(d.stacks) : "",
-            negative: d.negative, name: d.name, line: d.line, last: (d.turns == 1 && dot != "poison")
+            negative: d.negative, name: d.name, line: d.line, last: (d.turns == 1 && dot != "poison"),
+            label: d.short + ((d.count != "") ? " " + d.count : ""), lab_name: d.short, lab_count: d.count, full: d.full
         });
     }
     return out;
@@ -2630,30 +2660,111 @@ function Battle_FighterChipsBuild(_bc, _who) {
     var chips = Battle_StatusChips(ch);
     var f = Turn_Find(_bc.tl, _who);
     if (is_struct(f) && f.steadfast > 0) {
+        var sf_name = Loc_T("battle.chip.steadfast.short", "Steady");
         array_push(chips, { id: -2, frame: Icon_Frame("status", "steadfast"), text: string(f.steadfast), corner: "", negative: false, last: (f.steadfast == 1),
-                            name: Loc_T("battle.chip.steadfast", "Steadfast"), line: Loc_T("battle.chip.steadfast.line", "Cannot be stunned.") });
+                            name: Loc_T("battle.chip.steadfast", "Steadfast"), line: Loc_T("battle.chip.steadfast.line", "Cannot be stunned."),
+                            label: sf_name + " " + string(f.steadfast), lab_name: sf_name, lab_count: string(f.steadfast),
+                            full: Loc_T("battle.chip.steadfast.line", "Cannot be stunned.") });
     }
     if (_who == TL_ENEMY && variable_struct_exists(ch, "broken") && ch.broken) {
+        var bk_name = Loc_T("battle.chip.break.short", "BREAK");
         array_push(chips, { id: -3, frame: Icon_Frame("status", "break"), text: "", corner: "", negative: true, last: false,
-                            name: Loc_T("battle.hud.break", "BREAK!"), line: Loc_T("battle.chip.break.line", "Takes +50% damage until its next turn.") });
+                            name: Loc_T("battle.hud.break", "BREAK!"), line: Loc_T("battle.chip.break.line", "Takes +50% damage until its next turn."),
+                            label: bk_name, lab_name: bk_name, lab_count: "", full: Loc_T("battle.chip.break.line", "Takes +50% damage until its next turn.") });
     }
+    var k = Battle_IconK();
+    for (var ci = 0; ci < array_length(chips); ci++) chips[ci].lw = Battle_ChipLabelW(chips[ci].lab_name, chips[ci].lab_count, k);   // D150: how wide each label is, for the row
     return chips;
 }
 
-// Width of a row of chips, and how many fit in _max_w (the rest become one plus-count chip).
-function Battle_ChipMetrics(_n, _ic, _p, _max_w) {
-    var c = _ic + 2 * _p;
-    var fit = max(1, floor((_max_w + _p) / (c + _p)));
-    var shown = (_n <= fit) ? _n : max(1, fit - 1);
-    var cells = shown + ((_n > shown) ? 1 : 0);
-    return { c: c, shown: shown, more: _n - shown, w: (cells <= 0) ? 0 : cells * c + (cells - 1) * _p };
+// D150: the label under a chip is the short name and its count in 3 x 5 glyphs of _q window pixels (4 cells a character, the space included).
+// A name that is not plain letters (Korean) is drawn in the UI font, then a gap, then the count in glyphs.
+function Battle_LabelIsMini(_name) {
+    for (var i = 1; i <= string_length(_name); i++) {
+        var o = ord(string_upper(string_char_at(_name, i)));
+        if (!((o >= 65 && o <= 90) || (o >= 48 && o <= 57) || o == 32)) return false;
+    }
+    return true;
 }
 
-// Draws the row; returns its width. _align: fa_left (x = left edge), fa_center, fa_right (x = right edge).
-function Battle_DrawChips(_chips, _x, _y, _ic, _p, _max_w, _alpha, _align = fa_left) {
+function Battle_ChipLabelW(_name, _count, _q) {
+    if (Battle_LabelIsMini(_name)) return Battle_DigitsWidth(_name + ((_count != "") ? " " + _count : ""), _q);
+    return UI_TextWidth(_name) + ((_count != "") ? 4 * _q + Battle_DigitsWidth(_count, _q) : 0);
+}
+
+// The height of the label row: 5 glyph rows in English, a text line in Korean.
+function Battle_ChipLabelH() {
+    return (Loc_GetLanguage() == "ko") ? Ui_Metrics().line_h : 5 * Battle_IconK();
+}
+
+// The width each chip's cell must hold: its label and two glyph cells of air, so neighbouring labels never run together.
+function Battle_ChipLws(_chips) {
+    var out = [];
+    var pad = 2 * Battle_IconK();
+    for (var i = 0; i < array_length(_chips); i++) array_push(out, variable_struct_exists(_chips[i], "lw") ? _chips[i].lw + pad : 0);
+    return out;
+}
+
+// Width of a row of chips, and how many fit in _max_w (the rest become one plus-count chip). _lws (D150): the width of each label; a chip's cell is
+// the wider of the chip and its label. cells: the width of each cell.
+function Battle_ChipMetrics(_n, _ic, _p, _max_w, _lws = undefined) {
+    var c = _ic + 2 * _p;
+    var cells = array_create(max(0, _n), c);
+    if (is_array(_lws)) {
+        for (var i = 0; i < _n && i < array_length(_lws); i++) cells[i] = max(c, _lws[i]);
+    }
+    var total = 0;
+    for (var t = 0; t < _n; t++) total += cells[t] + ((t > 0) ? _p : 0);
+    var shown = max(0, _n);
+    if (total > _max_w && _n > 1) {   // leave room for the plus chip
+        shown = 0;
+        var run = 0;
+        for (var j = 0; j < _n; j++) {
+            var nw = run + ((j > 0) ? _p : 0) + cells[j];
+            if (nw + _p + c > _max_w) break;
+            run = nw;
+            shown++;
+        }
+        shown = max(1, shown);
+    }
+    var w = 0;
+    for (var s = 0; s < shown; s++) w += cells[s] + ((s > 0) ? _p : 0);
+    var more = max(0, _n) - shown;
+    if (more > 0) w += _p + c;
+    return { c: c, shown: shown, more: more, w: w, cells: cells };
+}
+
+// D150: where each chip and its label were drawn this frame (for the tip and the tests): { who, idx, x, y, w, h, chip }.
+function Battle_ChipRectAdd(_who, _idx, _x, _y, _w, _h, _chip) {
+    var fr = Battle_HudFrame();
+    if (!is_struct(fr)) return;
+    array_push(fr.chip_rects, { who: _who, idx: _idx, x: _x, y: _y, w: _w, h: _h, chip: _chip });
+}
+
+// The label, centred on _cx: the glyph name and count (white-green for a debuff, mid green for a buff); blinks light while 1 turn is left.
+function Battle_DrawChipLabel(_cx, _y, _ch, _q, _lab_h) {
+    var w = _ch.lw;
+    var lx = round(_cx - w * 0.5);
+    var gy = _y + (_lab_h - 5 * _q) div 2;
+    var col = _ch.negative ? UI_C_LIGHTEST : UI_C_LIGHT;
+    if (_ch.last && (floor(current_time / 250) mod 2 == 0)) {
+        Ui_Box(lx - _q, _y, lx + w + _q, _y + _lab_h, UI_C_LIGHTEST);
+        col = UI_C_DARKEST;
+    }
+    if (Battle_LabelIsMini(_ch.lab_name)) {
+        Battle_DrawDigits(lx, gy, string_upper(_ch.lab_name) + ((_ch.lab_count != "") ? " " + _ch.lab_count : ""), _q, col);
+    } else {
+        Ui_Text(lx, _y + (_lab_h - Ui_Metrics().line_h) div 2, _ch.lab_name, col);
+        if (_ch.lab_count != "") Battle_DrawDigits(lx + UI_TextWidth(_ch.lab_name) + 4 * _q, gy, _ch.lab_count, _q, col);
+    }
+}
+
+// Draws the row; returns its width. _align: fa_left (x = left edge), fa_center, fa_right (x = right edge). D150: each chip has its label under it
+// (short name and count, which replace the number badge); _who (TL_PLAYER / TL_ENEMY) tags the rectangles kept for the tip.
+function Battle_DrawChips(_chips, _x, _y, _ic, _p, _max_w, _alpha, _align = fa_left, _who = -1) {
     var n = array_length(_chips);
     if (n <= 0) return 0;
-    var cm = Battle_ChipMetrics(n, _ic, _p, _max_w);
+    var cm = Battle_ChipMetrics(n, _ic, _p, _max_w, Battle_ChipLws(_chips));
     var x0 = _x;
     if (_align == fa_center) x0 = _x - cm.w * 0.5;
     else if (_align == fa_right) x0 = _x - cm.w;
@@ -2661,39 +2772,78 @@ function Battle_DrawChips(_chips, _x, _y, _ic, _p, _max_w, _alpha, _align = fa_l
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
     var k = _ic div 16;
+    var lab_h = Battle_ChipLabelH();
+    var cell_x = x0;
     for (var i = 0; i < cm.shown; i++) {
         var ch = _chips[i];
-        var cx = x0 + i * (cm.c + _p);
+        var cell = cm.cells[i];
+        var cx = cell_x + (cell - cm.c) div 2;
         Ui_Box(cx, _y, cx + cm.c, _y + cm.c, ch.negative ? UI_C_LIGHT : UI_C_DARK);
         Ui_Box(cx + _p, _y + _p, cx + cm.c - _p, _y + cm.c - _p, UI_C_DARKEST);
         if (ch.frame >= 0) Icon_Draw("status", ch.frame, cx + _p, _y + _p, k, _alpha);
         else Ui_Text(cx + cm.c * 0.5, _y + (cm.c - UI_TextHeight("A")) * 0.5, string_upper(string_copy(ch.name, 1, 1)), UI_C_LIGHTEST, fa_center);
-        if (ch.text != "") {
-            var dw = Battle_DigitsWidth(ch.text, _p);
-            var pw = dw + 2 * _p;
-            var ph = 7 * _p;
-            var px = cx + cm.c - pw;
-            var py = _y + cm.c - ph;
-            var inv = ch.last && (floor(current_time / 250) mod 2 == 0);   // blinks while 1 turn is left
-            Ui_Box(px, py, px + pw, py + ph, inv ? UI_C_LIGHTEST : UI_C_DARKEST);
-            Ui_Box(px, py, px + pw, py + _p, UI_C_DARK);
-            Battle_DrawDigits(px + _p, py + _p, ch.text, _p, inv ? UI_C_DARKEST : UI_C_LIGHTEST);
-        }
-        if (ch.corner != "") {
-            var cw = Battle_DigitsWidth(ch.corner, _p) + 2 * _p;
-            Ui_Box(cx, _y, cx + cw, _y + 7 * _p, UI_C_DARKEST);
-            Battle_DrawDigits(cx + _p, _y + _p, ch.corner, _p, UI_C_LIGHTEST);
-        }
+        if (variable_struct_exists(ch, "lab_name") && ch.lab_name != "") Battle_DrawChipLabel(cell_x + cell * 0.5, _y + cm.c + _p, ch, k, lab_h);
+        Battle_ChipRectAdd(_who, i, cell_x, _y, cell, cm.c + _p + lab_h, ch);
+        cell_x += cell + _p;
     }
     if (cm.more > 0) {
-        var mx = x0 + cm.shown * (cm.c + _p);
-        Ui_Box(mx, _y, mx + cm.c, _y + cm.c, UI_C_DARK);
-        Ui_Box(mx + _p, _y + _p, mx + cm.c - _p, _y + cm.c - _p, UI_C_DARKEST);
+        Ui_Box(cell_x, _y, cell_x + cm.c, _y + cm.c, UI_C_DARK);
+        Ui_Box(cell_x + _p, _y + _p, cell_x + cm.c - _p, _y + cm.c - _p, UI_C_DARKEST);
         var mt2 = "+" + string(cm.more);
-        Battle_DrawDigits(mx + (cm.c - Battle_DigitsWidth(mt2, _p)) div 2, _y + (cm.c - 5 * _p) div 2, mt2, _p, UI_C_LIGHTEST);
+        Battle_DrawDigits(cell_x + (cm.c - Battle_DigitsWidth(mt2, _p)) div 2, _y + (cm.c - 5 * _p) div 2, mt2, _p, UI_C_LIGHTEST);
     }
     draw_set_alpha(a0);
     return cm.w;
+}
+
+// D150: the chip under the mouse (or the one a scenario asks for with hud.chip_focus = { who, idx }) gets its full sentence in a small plate.
+function Battle_ChipFocus(_bc) {
+    var fr = Battle_HudFrame();
+    if (!is_struct(fr)) return undefined;
+    var rs = fr.chip_rects;
+    if (variable_struct_exists(_bc.hud, "chip_focus") && is_struct(_bc.hud.chip_focus)) {
+        var f = _bc.hud.chip_focus;
+        for (var i = 0; i < array_length(rs); i++) if (rs[i].who == f.who && rs[i].idx == f.idx) return rs[i];
+        return undefined;
+    }
+    var mp = Ui_MousePos();
+    for (var j = 0; j < array_length(rs); j++) {
+        if (mp.x >= rs[j].x && mp.x < rs[j].x + rs[j].w && mp.y >= rs[j].y && mp.y < rs[j].y + rs[j].h) return rs[j];
+    }
+    return undefined;
+}
+
+function Battle_DrawChipTip(_bc) {
+    _bc.hud.rects.chip_tip = undefined;
+    if (_bc.battle_state == BSTATE_ATTACK_TIMING || _bc.battle_state == BSTATE_SKILL_QTE || _bc.battle_state == BSTATE_ENEMY_DEFENCE) return;
+    if (GameState_Get().ui.mode == UI_MENU) return;
+    var fr = Battle_ChipFocus(_bc);
+    if (!is_struct(fr)) return;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var chip = fr.chip;
+    var inner = min(mt.gw - 2 * mt.margin, round(mt.gw * 0.7)) - 8 * p;
+    var body = Battle_LogWrap(string(chip.full), inner);
+    var w = UI_TextWidth(chip.name);
+    for (var i = 0; i < array_length(body); i++) w = max(w, UI_TextWidth(body[i]));
+    w += 8 * p;
+    var h = 8 * p + mt.line_h * (1 + array_length(body)) + p * array_length(body);
+    var tx = clamp(round(fr.x + fr.w * 0.5 - w * 0.5), mt.margin, mt.gw - mt.margin - w);
+    var ty = fr.y + fr.h + 2 * p;
+    if (ty + h > mt.gh - mt.margin) ty = fr.y - h - 2 * p;
+    ty = max(mt.margin, ty);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(1);
+    var o = p;   // the highlighted chip: a bright outline around its cell
+    Ui_Box(fr.x - o, fr.y - o, fr.x + fr.w + o, fr.y, UI_C_LIGHTEST);
+    Ui_Box(fr.x - o, fr.y + fr.h, fr.x + fr.w + o, fr.y + fr.h + o, UI_C_LIGHTEST);
+    Ui_Box(fr.x - o, fr.y, fr.x, fr.y + fr.h, UI_C_LIGHTEST);
+    Ui_Box(fr.x + fr.w, fr.y, fr.x + fr.w + o, fr.y + fr.h, UI_C_LIGHTEST);
+    Ui_DrawFrame(tx, ty, w, h, 1, p);
+    Ui_Text(tx + 4 * p, ty + 4 * p, chip.name, UI_C_LIGHTEST);
+    for (var j = 0; j < array_length(body); j++) Ui_Text(tx + 4 * p, ty + 4 * p + (j + 1) * (mt.line_h + p), body[j], UI_C_LIGHT);
+    draw_set_alpha(a0);
+    _bc.hud.rects.chip_tip = { x: tx, y: ty, w: w, h: h };
 }
 
 // ---- details (D100): one plain sentence and the exact numbers, generated from the real data ----
@@ -2972,7 +3122,7 @@ function Battle_HudBuildsReset() {
 // frame: nothing they read (HP, statuses, layout, the enemy's place) changes while one Draw GUI event runs. Outside a bracket (Step code, the
 // scenarios, the tests) every call builds from the live data, as before.
 function Battle_HudFrameBegin(_bc) {
-    global.battle_hud_frame = { bc: _bc, tm: undefined, hdr: undefined, chips: [undefined, undefined] };   // chips[TL_PLAYER], chips[TL_ENEMY]
+    global.battle_hud_frame = { bc: _bc, tm: undefined, hdr: undefined, chips: [undefined, undefined], chip_rects: [] };   // chips[TL_PLAYER], chips[TL_ENEMY]; chip_rects: D150
 }
 
 function Battle_HudFrameEnd() {
@@ -3156,7 +3306,7 @@ function Battle_EnemyHeaderRectBuild(_bc) {
     var mt = Ui_Metrics();
     var p = mt.p;
     var sx = Display_WorldScale();
-    var out = { cx: Display_GuiW() * 0.5, x1: 0, y1: round(Display_GuiH() * 0.3), bw: round(36 * sx), h: 0, chips_x: 0, chips_y: 0, chips_align: fa_left };
+    var out = { cx: Display_GuiW() * 0.5, x1: 0, y1: round(Display_GuiH() * 0.3), bw: round(36 * sx), h: 0, chips_x: 0, chips_y: 0, chips_align: fa_left, chips_max: mt.gw - 4 * mt.margin };
     if (!instance_exists(_bc.enemy_inst) || _bc.enemy_inst.sprite_index == noone) return out;
     var inst = _bc.enemy_inst;
     var spr = inst.sprite_index;
@@ -3172,7 +3322,8 @@ function Battle_EnemyHeaderRectBuild(_bc) {
     var want_y = top - out.h - 2 * p;
     out.y1 = round(max(floor_y, want_y));
     out.chips_y = out.y1 + p;
-    var chip_w = Battle_ChipMetrics(array_length(Battle_FighterChips(_bc, TL_ENEMY)), 16 * Battle_IconK(), p, mt.gw).w;
+    var ech = Battle_FighterChips(_bc, TL_ENEMY);
+    var chip_w = Battle_ChipMetrics(array_length(ech), 16 * Battle_IconK(), p, mt.gw, Battle_ChipLws(ech)).w;
     if (floor_y - want_y > 10 * p) {   // a big enemy (more than a few pixels short): no room over its head, so the plate stands beside it (left, else right) and its chips go under the plate
         var spr_w = sprite_get_width(spr) * abs(inst.image_xscale) * sx;
         var left_x = round(out.cx - spr_w * 0.5 - out.bw - 2 * p);
@@ -3181,19 +3332,22 @@ function Battle_EnemyHeaderRectBuild(_bc) {
         out.chips_x = out.x1;
         out.chips_y = out.y1 + out.h + p;
         out.chips_align = fa_left;
+        out.chips_max = mt.gw - mt.margin - out.chips_x;
     } else if (out.x1 + out.bw + p + chip_w <= mt.gw - mt.margin) {
         out.chips_x = out.x1 + out.bw + p;
         out.chips_align = fa_left;
-    } else {
+        out.chips_max = mt.gw - mt.margin - out.chips_x;
+    } else {   // left of the plate; a row wider than the room is cut short with a plus chip, never off the screen (D150: the labels make the row wider)
         out.chips_x = out.x1 - p;
         out.chips_align = fa_right;
+        out.chips_max = max(0, out.chips_x - mt.margin);
     }
     return out;
 }
 
 // A bar: a 1p border, a dark inside, the fill in _col up to _ratio. _shown (the glided value) leaves a bright trail behind a falling bar (or a
 // bright lead on a rising one). _stripe draws every other column dark (the MP bar), so the two bars differ without a colour of their own.
-function Battle_DrawBar(_x, _y, _w, _h, _p, _ratio, _shown, _col, _trail, _stripe = false) {
+function Battle_DrawBar(_x, _y, _w, _h, _p, _ratio, _shown, _col, _trail, _stripe = false, _segments = false) {
     Ui_Box(_x, _y, _x + _w, _y + _h, UI_C_DARK);
     Ui_Box(_x + _p, _y + _p, _x + _w - _p, _y + _h - _p, UI_C_DARKEST);
     var iw = _w - 2 * _p;
@@ -3205,6 +3359,9 @@ function Battle_DrawBar(_x, _y, _w, _h, _p, _ratio, _shown, _col, _trail, _strip
     if (lo > 0) Ui_Box(_x + _p, _y + _p, _x + _p + lo, _y + _h - _p, _col);
     if (_stripe && lo > 0) {
         for (var cx = 2 * _p; cx < lo; cx += 3 * _p) Ui_Box(_x + _p + cx, _y + _p, _x + _p + min(lo, cx + _p), _y + _h - _p, UI_C_DARK);
+    }
+    if (_segments && lo > 0) {   // D156 (the XP bar): 3p of fill, a 1p dark gap, over and over
+        for (var sx = 3 * _p; sx < lo; sx += 4 * _p) Ui_Box(_x + _p + sx, _y + _p, _x + _p + min(lo, sx + _p), _y + _h - _p, UI_C_DARKEST);
     }
 }
 
@@ -3259,7 +3416,7 @@ function Battle_DrawEnemyHeader(_bc, _alpha) {
     }
     var chips = Battle_FighterChips(_bc, TL_ENEMY);
     if (array_length(chips) > 0) {
-        Battle_DrawChips(chips, hdr.chips_x, hdr.chips_y, 16 * Battle_IconK(), p, mt.gw - 4 * mt.margin, _alpha, hdr.chips_align);
+        Battle_DrawChips(chips, hdr.chips_x, hdr.chips_y, 16 * Battle_IconK(), p, hdr.chips_max, _alpha, hdr.chips_align, TL_ENEMY);
     }
     draw_set_alpha(a0);
 }
@@ -3282,7 +3439,8 @@ function Battle_DrawPlayerPanel(_bc, _z, _alpha) {
     var r = _z.player;
     var rx = r.x + shake;
     var ry = r.y - Feel_PanelJoltPx(_bc.feel_ms - _bc.feel_pjolt_start, _bc.feel_pjolt_big, Settings_ShakeOn()) * Display_WorldScale();   // D139: an enemy hit jolts this panel up
-    var ex = (r.h - (8 * p + 3 * lh + 6 * p + 16 * Battle_IconK())) div 3;   // the panel is as tall as the command menu: the spare height goes between the rows
+    var lab_h = Battle_ChipLabelH();
+    var ex = (r.h - (8 * p + 3 * lh + 6 * p + 16 * Battle_IconK() + lab_h + p)) div 3;   // the panel is as tall as the command menu: the spare height goes between the rows
     ex = max(0, ex);
     Ui_DrawFrame(rx, ry, r.w, r.h, _alpha, p);
     var x0 = rx + 4 * p;
@@ -3319,12 +3477,14 @@ function Battle_DrawPlayerPanel(_bc, _z, _alpha) {
     var chips = Battle_FighterChips(_bc, TL_PLAYER);
     var ic = 16 * Battle_IconK();
     var slot_n = clamp(floor((x1 - x0 + p) / (ic + 3 * p)), 1, 4);   // a tray of status slots: the empty ones are drawn as dark outlines
+    var used_w = (array_length(chips) > 0) ? Battle_ChipMetrics(array_length(chips), ic, p, x1 - x0, Battle_ChipLws(chips)).w + p : 0;
     for (var sl = array_length(chips); sl < slot_n; sl++) {
-        var sx0 = x0 + sl * (ic + 3 * p);
+        var sx0 = x0 + used_w + (sl - array_length(chips)) * (ic + 3 * p);
+        if (sx0 + ic + 2 * p > x1) break;
         Ui_Box(sx0, yy, sx0 + ic + 2 * p, yy + ic + 2 * p, UI_C_DARK);
         Ui_Box(sx0 + p, yy + p, sx0 + ic + p, yy + ic + p, UI_C_DARKEST);
     }
-    Battle_DrawChips(chips, x0, yy, ic, p, x1 - x0, _alpha, fa_left);
+    Battle_DrawChips(chips, x0, yy, ic, p, x1 - x0, _alpha, fa_left, TL_PLAYER);
     draw_set_alpha(a0);
 }
 

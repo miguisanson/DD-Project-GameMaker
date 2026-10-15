@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T16:50:32Z",
-    "row_count": 1070
+    "generated_at_utc": "2026-10-15T22:22:21Z",
+    "row_count": 1110
   },
   "default_lang": "en",
   "languages": [
@@ -56,6 +56,10 @@
       "en": "Takes +50% damage until its next turn.",
       "ko": "다음 차례까지 받는 피해가 50% 늘어납니다."
     },
+    "battle.chip.break.short": {
+      "en": "BREAK",
+      "ko": "브레이크"
+    },
     "battle.chip.steadfast": {
       "en": "Steadfast",
       "ko": "버티기"
@@ -63,6 +67,10 @@
     "battle.chip.steadfast.line": {
       "en": "Cannot be stunned.",
       "ko": "기절하지 않습니다."
+    },
+    "battle.chip.steadfast.short": {
+      "en": "Steady",
+      "ko": "버티기"
     },
     "battle.det.damage": {
       "en": "Damage",
@@ -168,6 +176,10 @@
       "en": "Sleep a while and wake with all your HP and MP.",
       "ko": "잠시 자고 나면 HP와 MP가 가득 찹니다."
     },
+    "bed.help.heal_rested": {
+      "en": "You are already rested. Come back when HP or MP is missing.",
+      "ko": "이미 충분히 쉬었습니다. HP나 MP가 줄었을 때 다시 오세요."
+    },
     "bed.help.leave": {
       "en": "Walk away. The bed stays free for later.",
       "ko": "그냥 떠납니다. 침대는 나중을 위해 비어 있습니다."
@@ -191,6 +203,14 @@
     "bed.msg.heal": {
       "en": "You sleep a while. HP and MP are full again.",
       "ko": "잠시 잠들었습니다. HP와 MP가 다시 가득 찼습니다."
+    },
+    "bed.msg.nothing_to_upgrade": {
+      "en": "Nothing to upgrade there.",
+      "ko": "강화할 수 있는 것이 없습니다."
+    },
+    "bed.msg.rested": {
+      "en": "You are already rested.",
+      "ko": "이미 충분히 쉬었습니다."
     },
     "bed.msg.upgrade": {
       "en": "{skill} is better now.",
@@ -1780,6 +1800,74 @@
       "en": "Enemy",
       "ko": "적"
     },
+    "help.line.break": {
+      "en": "Good hits fill the stagger meter. When it is full the enemy loses a turn and takes +{pct}% damage.",
+      "ko": "좋은 공격은 경직 게이지를 채웁니다. 가득 차면 적이 한 턴을 잃고 피해를 {pct}% 더 받습니다."
+    },
+    "help.line.crit": {
+      "en": "A critical hit deals {mult} times the damage. Take Aim and some gear raise the odds.",
+      "ko": "치명타는 피해를 {mult}배로 줍니다. 조준과 일부 장비가 확률을 높입니다."
+    },
+    "help.line.elite": {
+      "en": "A marked, tougher enemy with a special trait. Its rewards are better.",
+      "ko": "표시가 붙은 더 강한 적으로, 특별한 특성이 있습니다. 보상이 더 좋습니다."
+    },
+    "help.line.good": {
+      "en": "Press near the middle for +{pct}% damage.",
+      "ko": "가운데 근처에서 누르면 피해가 {pct}% 늘어납니다."
+    },
+    "help.line.hp": {
+      "en": "Health. At 0 HP you fall.",
+      "ko": "체력입니다. HP가 0이 되면 쓰러집니다."
+    },
+    "help.line.mp": {
+      "en": "Magic points. Skills spend them; potions and rest restore them.",
+      "ko": "스킬을 쓰면 줄어드는 마력입니다. 물약과 휴식으로 회복합니다."
+    },
+    "help.line.ok": {
+      "en": "Press on the bar but off the middle for normal damage.",
+      "ko": "막대 위에서 가운데를 벗어나 누르면 보통 피해를 줍니다."
+    },
+    "help.line.perfect": {
+      "en": "Press in the bright zone of the bar for +{pct}% damage.",
+      "ko": "막대의 밝은 구간에서 누르면 피해가 {pct}% 늘어납니다."
+    },
+    "help.line.power": {
+      "en": "How hard a weapon or skill hits. More Power means more damage.",
+      "ko": "무기나 스킬의 타격 세기입니다. 위력이 높을수록 피해가 커집니다."
+    },
+    "help.line.weak": {
+      "en": "Miss the zone and the hit deals {pct}% less damage.",
+      "ko": "구간을 놓치면 피해가 {pct}% 줄어듭니다."
+    },
+    "help.stats.help": {
+      "en": "What Power, ATK, DEF, MAG, SPD, Crit, the grades, BREAK and every status mean.",
+      "ko": "위력, ATK, DEF, MAG, SPD, 치명타, 등급, 브레이크와 모든 상태 이상의 뜻입니다."
+    },
+    "help.stats.title": {
+      "en": "Stats & terms",
+      "ko": "능력치와 용어"
+    },
+    "help.term.break": {
+      "en": "BREAK",
+      "ko": "브레이크"
+    },
+    "help.term.crit": {
+      "en": "Crit",
+      "ko": "치명타"
+    },
+    "help.term.good": {
+      "en": "Good",
+      "ko": "좋음"
+    },
+    "help.term.ok": {
+      "en": "OK",
+      "ko": "무난"
+    },
+    "help.term.weak": {
+      "en": "Weak",
+      "ko": "약함"
+    },
     "help.title": {
       "en": "Help",
       "ko": "도움말"
@@ -1951,6 +2039,10 @@
     "item.msg.not_ready_skill": {
       "en": "You are not ready to learn this yet.",
       "ko": "아직 이 스킬을 배울 수 없습니다."
+    },
+    "item.msg.nothing_happens": {
+      "en": "Nothing happens.",
+      "ko": "아무 일도 일어나지 않았습니다."
     },
     "item.msg.recovered_mp": {
       "en": "Restored {amt} MP.",
@@ -3469,7 +3561,7 @@
       "ko": "{n}턴"
     },
     "shop.worn": {
-      "en": "Worn",
+      "en": "Equipped",
       "ko": "착용 중"
     },
     "skill.name.skill_bite": {
@@ -3784,6 +3876,74 @@
       "en": "Unknown",
       "ko": "알 수 없음"
     },
+    "status.short.status_bleed": {
+      "en": "BLD",
+      "ko": "출혈"
+    },
+    "status.short.status_blessing": {
+      "en": "Bless",
+      "ko": "축복"
+    },
+    "status.short.status_bloodthirsty": {
+      "en": "Thirst",
+      "ko": "갈증"
+    },
+    "status.short.status_brace": {
+      "en": "Brace",
+      "ko": "태세"
+    },
+    "status.short.status_burn": {
+      "en": "BRN",
+      "ko": "화상"
+    },
+    "status.short.status_crit_up": {
+      "en": "AIM",
+      "ko": "조준"
+    },
+    "status.short.status_dmg_up": {
+      "en": "REV",
+      "ko": "기세"
+    },
+    "status.short.status_evasion": {
+      "en": "EVA",
+      "ko": "회피"
+    },
+    "status.short.status_guard": {
+      "en": "GRD",
+      "ko": "방어"
+    },
+    "status.short.status_hit_up": {
+      "en": "FORE",
+      "ko": "선견"
+    },
+    "status.short.status_meditation": {
+      "en": "MED",
+      "ko": "명상"
+    },
+    "status.short.status_poison": {
+      "en": "PSN",
+      "ko": "독"
+    },
+    "status.short.status_solidify": {
+      "en": "Solid",
+      "ko": "굳힘"
+    },
+    "status.short.status_stun": {
+      "en": "STN",
+      "ko": "기절"
+    },
+    "status.short.status_sunder": {
+      "en": "Sunder",
+      "ko": "분쇄"
+    },
+    "status.turn_left": {
+      "en": "1 turn left.",
+      "ko": "1턴 남았습니다."
+    },
+    "status.turns_left": {
+      "en": "{turns} turns left.",
+      "ko": "{turns}턴 남았습니다."
+    },
     "tab.bestiary.attack": {
       "en": "Attack",
       "ko": "공격"
@@ -3853,11 +4013,11 @@
       "ko": "가방"
     },
     "tab.gear.empty": {
-      "en": "Nothing worn",
+      "en": "Nothing equipped",
       "ko": "착용 없음"
     },
     "tab.gear.empty_help": {
-      "en": "Nothing is worn in this slot.",
+      "en": "Nothing is equipped in this slot.",
       "ko": "이 칸에는 아무것도 착용하지 않았습니다."
     },
     "tab.gear.no_accessory": {
@@ -3877,7 +4037,7 @@
       "ko": "{item}을(를) 대체합니다."
     },
     "tab.gear.worn": {
-      "en": "Worn",
+      "en": "Equipped",
       "ko": "착용 중"
     },
     "tab.hint.back": {

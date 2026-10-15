@@ -109,7 +109,7 @@ function TabStatus_Items(_ch) {
     for (var s = 0; s < array_length(sl); s++) {
         var d = sl[s];
         var fr = Icon_StatusFrame(d.id);
-        array_push(items, { id: "status_" + string(d.id), label: d.name, value: d.label, kind: "button", enabled: true, help: d.line, lines: [], hint: "", icon: (fr >= 0) ? { cat: "status", frame: fr } : undefined });
+        array_push(items, { id: "status_" + string(d.id), label: d.name, value: d.label, kind: "button", enabled: true, help: d.full, lines: [], hint: "", icon: (fr >= 0) ? { cat: "status", frame: fr } : undefined });   // D150: what it does and the turns left
     }
     return items;
 }
@@ -615,13 +615,77 @@ function TabSystem_Yes(_d) {
     Menu_Close();
 }
 
+// D156: the three bars differ without a colour of their own: HP solid, MP striped, XP thin and in segments in the brightest green.
+function Ui_BarStyle(_kind) {
+    switch (_kind) {
+        case "mp": return { kind: _kind, fill: UI_C_LIGHT, pattern: "stripe", thin: false };
+        case "xp": return { kind: _kind, fill: UI_C_LIGHTEST, pattern: "segments", thin: true };
+    }
+    return { kind: "hp", fill: UI_C_LIGHT, pattern: "solid", thin: false };
+}
+
+// The bar's height for a text line of _line_h with pixel _p: HP and MP are a whole number of 2p steps tall, XP half as tall (never under 2p).
+function Ui_BarHeight(_kind, _line_h, _p) {
+    var full = max(3 * _p, (_line_h div (2 * _p)) * 2 * _p);
+    if (!Ui_BarStyle(_kind).thin) return full;
+    return max(2 * _p, (full div (2 * _p)) * _p);
+}
+
+// D156: one row of the "Stats & terms" page: the term as the label, one short line in the details panel.
+function Help_Term(_id, _label, _help) {
+    return { id: _id, label: _label, value: "", kind: "button", enabled: true, help: _help, lines: [], hint: "" };
+}
+
+// D156: the rows of the Help "Stats & terms" page. The numbers in the lines come from the game's own constants; each status is explained by the
+// same sentence the Status tab and the chips use.
+function Help_StatsItems() {
+    var out = [];
+    array_push(out, Help_Term("power", Loc_T("card.lbl.power", "Power"), Loc_T("help.line.power", "How hard a weapon or skill hits. More Power means more damage.")));
+    var stat_ids = [STAT_ATK, STAT_DEF, STAT_MAG, STAT_SPD];
+    var stat_keys = ["atk", "def", "mag", "spd"];
+    for (var i = 0; i < 4; i++) array_push(out, Help_Term(stat_keys[i], Stat_ShortName(stat_ids[i]), Stat_Sentence(stat_ids[i])));
+    array_push(out, Help_Term("hp", Loc_T("battle.hud.hp", "HP"), Loc_T("help.line.hp", "Health. At 0 HP you fall.")));
+    array_push(out, Help_Term("mp", Loc_T("battle.hud.mp", "MP"), Loc_T("help.line.mp", "Magic points. Skills spend them; potions and rest restore them.")));
+    array_push(out, Help_Term("crit", Loc_T("help.term.crit", "Crit"), Loc_T("help.line.crit", "A critical hit deals {mult} times the damage. Take Aim and some gear raise the odds.", { mult: string(COMBAT_CRIT_MULT) })));
+    array_push(out, Help_Term("perfect", Loc_T("battle.det.perfect", "Perfect"), Loc_T("help.line.perfect", "Press in the bright zone of the bar for +{pct}% damage.", { pct: string(round((Qte_GradeMult(QTE_PERFECT) - 1) * 100)) })));
+    array_push(out, Help_Term("good", Loc_T("help.term.good", "Good"), Loc_T("help.line.good", "Press near the middle for +{pct}% damage.", { pct: string(round((Qte_GradeMult(QTE_GOOD) - 1) * 100)) })));
+    array_push(out, Help_Term("ok", Loc_T("help.term.ok", "OK"), Loc_T("help.line.ok", "Press on the bar but off the middle for normal damage.")));
+    array_push(out, Help_Term("weak", Loc_T("help.term.weak", "Weak"), Loc_T("help.line.weak", "Miss the zone and the hit deals {pct}% less damage.", { pct: string(round((1 - Qte_GradeMult(QTE_WEAK)) * 100)) })));
+    array_push(out, Help_Term("break", Loc_T("help.term.break", "BREAK"), Loc_T("help.line.break", "Good hits fill the stagger meter. When it is full the enemy loses a turn and takes +{pct}% damage.", { pct: string(round((BREAK_DAMAGE_MULT - 1) * 100)) })));
+    array_push(out, Help_Term("steadfast", Loc_T("battle.chip.steadfast", "Steadfast"), Loc_T("battle.chip.steadfast.line", "Cannot be stunned.")));
+    array_push(out, Help_Term("elite", Loc_T("tab.lbl.elite", "Elite"), Loc_T("help.line.elite", "A marked, tougher enemy with a special trait. Its rewards are better.")));
+    var sids = Status_AllIds();
+    for (var s = 0; s < array_length(sids); s++) array_push(out, Help_Term("status_" + string(sids[s]), StatusDB_Get(sids[s]).name, Status_Description(sids[s])));
+    return out;
+}
+
+// The Help list: every tutorial, then the stats page.
+function TabHelp_Items() {
+    var out = Tutorial_HelpItems();
+    array_push(out, { id: "stats_terms", label: Loc_T("help.stats.title", "Stats & terms"), value: "", kind: "button", enabled: true, lines: [], hint: "",
+                      help: Loc_T("help.stats.help", "What Power, ATK, DEF, MAG, SPD, Crit, the grades, BREAK and every status mean.") });
+    return out;
+}
+
 // The Help page: every tutorial, seen or not, as a page on top of the System list.
 function TabHelp_Open() {
     var u = TabMenu_Get();
     var pg = u.pages[u.tab];
-    var m = Ui_MenuNew("help", Tutorial_HelpItems(), {
-        data: { tab: "help_page" },
+    var m = Ui_MenuNew("help", TabHelp_Items(), {
+        data: { tab: "help_page" }, on_confirm: TabMenu_OnConfirm,
         layout: { title: Loc_T("help.title", "Help"), anchor: "center", details: true, details_pos: "right", hides_below: true }
+    });
+    Ui_MenuFixCursor(m, m.cursor);
+    Ui_StackPush(pg.stk, m);
+}
+
+// D156: the Stats & terms page on top of the Help list (scrolls with the cursor; Back returns to the list).
+function TabHelpStats_Open() {
+    var u = TabMenu_Get();
+    var pg = u.pages[u.tab];
+    var m = Ui_MenuNew("help_stats", Help_StatsItems(), {
+        data: { tab: "help_stats" },
+        layout: { title: Loc_T("help.stats.title", "Stats & terms"), anchor: "center", details: true, details_pos: "right", hides_below: true }
     });
     Ui_MenuFixCursor(m, m.cursor);
     Ui_StackPush(pg.stk, m);
@@ -984,6 +1048,9 @@ function TabMenu_OnConfirm(_m, _i) {
         case "codex":
             TabCodex_Open(it.id);
             break;
+        case "help_page":
+            if (it.id == "stats_terms") TabHelpStats_Open();
+            break;
         case "system":
             switch (it.id) {
                 case "help":
@@ -1079,12 +1146,14 @@ function TabMenu_CardData(_mt) {
 }
 
 // One bar row of the card: label, bar, "cur/max".
-function TabMenu_DrawCardBar(_x0, _x1, _yy, _bx, _bw, _bar_h, _lab, _ratio, _txt, _stripe) {
+function TabMenu_DrawCardBar(_x0, _x1, _yy, _bx, _bw, _lab, _ratio, _txt, _kind) {
     var mt = Ui_Metrics();
     var p = mt.p;
     var lh = mt.line_h;
+    var st = Ui_BarStyle(_kind);   // D156: HP solid, MP striped, XP thin and in segments
+    var bh = Ui_BarHeight(_kind, lh, p);
     Ui_Text(_x0, _yy, _lab, UI_C_LIGHT);
-    Battle_DrawBar(_bx, _yy + (lh - _bar_h) div 2, _bw, _bar_h, p, _ratio, _ratio, UI_C_LIGHT, UI_C_LIGHTEST, _stripe);
+    Battle_DrawBar(_bx, _yy + (lh - bh) div 2, _bw, bh, p, _ratio, _ratio, st.fill, UI_C_LIGHTEST, st.pattern == "stripe", st.pattern == "segments");
     Ui_Text(_x1, _yy, _txt, UI_C_LIGHT, fa_right);
 }
 
@@ -1114,12 +1183,11 @@ function TabMenu_DrawStatusCard(_x, _y, _w, _h, _ch, _alpha) {
     }
     var bx = x0 + cd.lab_w + 2 * p;
     var bw = x1 - cd.val_w - 2 * p - bx;
-    var bar_h = max(3 * p, (lh div (2 * p)) * 2 * p);
-    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, bar_h, cd.hp, (_ch.max_hp > 0) ? clamp(_ch.hp / _ch.max_hp, 0, 1) : 1, string(_ch.hp) + "/" + string(_ch.max_hp), false);
+    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, cd.hp, (_ch.max_hp > 0) ? clamp(_ch.hp / _ch.max_hp, 0, 1) : 1, string(_ch.hp) + "/" + string(_ch.max_hp), "hp");
     yy += lh + p;
-    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, bar_h, cd.mp, (_ch.max_mp > 0) ? clamp(_ch.mp / _ch.max_mp, 0, 1) : 1, string(_ch.mp) + "/" + string(_ch.max_mp), true);
+    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, cd.mp, (_ch.max_mp > 0) ? clamp(_ch.mp / _ch.max_mp, 0, 1) : 1, string(_ch.mp) + "/" + string(_ch.max_mp), "mp");
     yy += lh + p;
-    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, bar_h, cd.xp, (_ch.exp_next > 0) ? clamp(_ch.exp / _ch.exp_next, 0, 1) : 1, (_ch.exp_next > 0) ? (string(_ch.exp) + "/" + string(_ch.exp_next)) : cd.xp_max, false);
+    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, cd.xp, (_ch.exp_next > 0) ? clamp(_ch.exp / _ch.exp_next, 0, 1) : 1, (_ch.exp_next > 0) ? (string(_ch.exp) + "/" + string(_ch.exp_next)) : cd.xp_max, "xp");
     yy += lh + p;
     Hud_DrawCoin(x0, yy + (lh - 6 * p) div 2, p);
     Ui_Text(x0 + 8 * p, yy, string(Gold_Get()), UI_C_LIGHTEST);
@@ -1805,7 +1873,10 @@ function BedUi_Choose(_choice, _skill_id) {
     var gs = GameState_Get();
     var r = Bed_Choose(gs.player_ch, gs.flags, global.bed_ui.key, _choice, _skill_id);
     BedUi_Close();
-    if (!r.ok) return;
+    if (!r.ok) {   // D156: a refused choice (already rested, nothing to upgrade) says so; the bed stays free
+        if (r.msg != "") Dialogue_StartLines([r.msg]);
+        return;
+    }
     CardsUi_Commit(r.ch);
     if (_choice == "heal") Dialogue_StartLines([Loc_T("bed.msg.heal", "You sleep a while. HP and MP are full again.")]);
     else Dialogue_StartLines([Loc_T("bed.msg.upgrade", "{skill} is better now.", { skill: SkillDB_Get(_skill_id).name })]);
