@@ -342,6 +342,7 @@ function Run_Create(_seed) {
         shop: {},                // C3 (D85): the stock of each shop visited, { s0: [rows], ... }, so what was bought stays bought
         cards: Card_StateNew(),  // C2: the offer generator's pity counter and the last offer (scr_db_skill)
         kills: 0,
+        drop_dry: 0,             // R1 (D120): won fights in a row where the enemy left no item
         started_at: date_current_datetime(),
         echo_used: { kind: "", id: -1 }
     };

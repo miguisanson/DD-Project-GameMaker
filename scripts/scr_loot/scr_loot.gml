@@ -8,35 +8,41 @@ function Loot_Init() {
         { low:0.7, mid:0.6,  high:0.2  },
         { low:0.4, mid:0.7,  high:0.5  }
     ];
+    // R1 (D117): [low, mid, high] odds of the tier, per table and container level 1..3 (today's effective odds). The tier is rolled first, then an item of it.
+    // global.loot_tier_weights is only kept for the old simulator data; nothing in the game rolls with it.
+    global.loot_tier_odds = {
+        chest:  [[0.87, 0.115, 0.015], [0.65, 0.285, 0.065], [0.43, 0.38, 0.19]],
+        barrel: [[0.95, 0.05, 0], [0.85, 0.15, 0], [0.74, 0.26, 0]],
+        enemy:  [[0.914, 0.084, 0.002], [0.754, 0.236, 0.010], [0.588, 0.376, 0.036]]
+    };
 
     // --- item tables (NO skillbooks) ---
     var chest = [
-        { item_id:0,  weight:6,  tier:1, qty_min:0, qty_max:0 }, // Nothing found
         { item_id:10, weight:32, tier:1, qty_min:1, qty_max:3 }, // HP Potion Lv1
         { item_id:11, weight:28, tier:1, qty_min:1, qty_max:3 }, // MP Potion Lv1
         { item_id:12, weight:20, tier:1, qty_min:1, qty_max:2 }, // Antidote
         { item_id:13, weight:20, tier:1, qty_min:1, qty_max:2 }, // Bandage
-        { item_id:1,  weight:8,  tier:1, qty_min:0, qty_max:1 }, // Wooden Sword
-        { item_id:4,  weight:8,  tier:1, qty_min:0, qty_max:1 }, // Wooden Bow
-        { item_id:7,  weight:8,  tier:1, qty_min:0, qty_max:1 }, // Wooden Staff
-        { item_id:20, weight:6,  tier:1, qty_min:0, qty_max:1 }, // Leather Armor
-        { item_id:23, weight:6,  tier:1, qty_min:0, qty_max:1 }, // Cloth Robe
+        { item_id:1,  weight:8,  tier:1, qty_min:1, qty_max:1 }, // Wooden Sword
+        { item_id:4,  weight:8,  tier:1, qty_min:1, qty_max:1 }, // Wooden Bow
+        { item_id:7,  weight:8,  tier:1, qty_min:1, qty_max:1 }, // Wooden Staff
+        { item_id:20, weight:6,  tier:1, qty_min:1, qty_max:1 }, // Leather Armor
+        { item_id:23, weight:6,  tier:1, qty_min:1, qty_max:1 }, // Cloth Robe
 
         { item_id:14, weight:20, tier:2, qty_min:1, qty_max:4 }, // HP Potion Lv2
         { item_id:17, weight:18, tier:2, qty_min:1, qty_max:4 }, // MP Potion Lv2
-        { item_id:2,  weight:7,  tier:2, qty_min:0, qty_max:1 }, // Iron Sword
-        { item_id:5,  weight:7,  tier:2, qty_min:0, qty_max:1 }, // Iron Bow
-        { item_id:8,  weight:6,  tier:2, qty_min:0, qty_max:1 }, // Ruby Staff
-        { item_id:21, weight:6,  tier:2, qty_min:0, qty_max:1 }, // Iron Armor
-        { item_id:24, weight:6,  tier:2, qty_min:0, qty_max:1 }, // Silk Robe
+        { item_id:2,  weight:7,  tier:2, qty_min:1, qty_max:1 }, // Iron Sword
+        { item_id:5,  weight:7,  tier:2, qty_min:1, qty_max:1 }, // Iron Bow
+        { item_id:8,  weight:6,  tier:2, qty_min:1, qty_max:1 }, // Ruby Staff
+        { item_id:21, weight:6,  tier:2, qty_min:1, qty_max:1 }, // Iron Armor
+        { item_id:24, weight:6,  tier:2, qty_min:1, qty_max:1 }, // Silk Robe
 
         { item_id:15, weight:14, tier:3, qty_min:1, qty_max:5 }, // HP Potion Lv3
         { item_id:18, weight:12, tier:3, qty_min:1, qty_max:5 }, // MP Potion Lv3
-        { item_id:3,  weight:5,  tier:3, qty_min:0, qty_max:1 }, // Platinum Sword
-        { item_id:6,  weight:5,  tier:3, qty_min:0, qty_max:1 }, // Platinum Bow
-        { item_id:9,  weight:4,  tier:3, qty_min:0, qty_max:1 }, // Diamond Staff
-        { item_id:22, weight:4,  tier:3, qty_min:0, qty_max:1 }, // Platinum Armor
-        { item_id:25, weight:4,  tier:3, qty_min:0, qty_max:1 }  // Mithril Robe
+        { item_id:3,  weight:5,  tier:3, qty_min:1, qty_max:1 }, // Platinum Sword
+        { item_id:6,  weight:5,  tier:3, qty_min:1, qty_max:1 }, // Platinum Bow
+        { item_id:9,  weight:4,  tier:3, qty_min:1, qty_max:1 }, // Diamond Staff
+        { item_id:22, weight:4,  tier:3, qty_min:1, qty_max:1 }, // Platinum Armor
+        { item_id:25, weight:4,  tier:3, qty_min:1, qty_max:1 }  // Mithril Robe
     ];
 
     var barrel = [
@@ -47,8 +53,8 @@ function Loot_Init() {
         { item_id:13, weight:20, tier:1, qty_min:1, qty_max:2 }, // Bandage
         { item_id:14, weight:12, tier:2, qty_min:1, qty_max:3 }, // HP Potion Lv2
         { item_id:17, weight:10, tier:2, qty_min:1, qty_max:3 }, // MP Potion Lv2
-        { item_id:1,  weight:6,  tier:1, qty_min:0, qty_max:1 }, // Wooden Sword
-        { item_id:4,  weight:6,  tier:1, qty_min:0, qty_max:1 }  // Wooden Bow
+        { item_id:1,  weight:6,  tier:1, qty_min:1, qty_max:1 }, // Wooden Sword
+        { item_id:4,  weight:6,  tier:1, qty_min:1, qty_max:1 }  // Wooden Bow
     ];
 
     var enemy = [
@@ -58,10 +64,10 @@ function Loot_Init() {
         { item_id:13, weight:12, tier:1, qty_min:1, qty_max:1 }, // Bandage
         { item_id:14, weight:10, tier:2, qty_min:1, qty_max:2 }, // HP Potion Lv2
         { item_id:17, weight:8,  tier:2, qty_min:1, qty_max:2 }, // MP Potion Lv2
-        { item_id:2,  weight:4,  tier:2, qty_min:0, qty_max:1 }, // Iron Sword
-        { item_id:5,  weight:4,  tier:2, qty_min:0, qty_max:1 }, // Iron Bow
-        { item_id:3,  weight:2,  tier:3, qty_min:0, qty_max:1 }, // Platinum Sword
-        { item_id:6,  weight:2,  tier:3, qty_min:0, qty_max:1 }, // Platinum Bow
+        { item_id:2,  weight:4,  tier:2, qty_min:1, qty_max:1 }, // Iron Sword
+        { item_id:5,  weight:4,  tier:2, qty_min:1, qty_max:1 }, // Iron Bow
+        { item_id:3,  weight:2,  tier:3, qty_min:1, qty_max:1 }, // Platinum Sword
+        { item_id:6,  weight:2,  tier:3, qty_min:1, qty_max:1 }, // Platinum Bow
         { item_id:33, weight:6,  tier:1, qty_min:1, qty_max:1 }, // C3: Smoke Bomb
         { item_id:30, weight:4,  tier:2, qty_min:1, qty_max:1 }  // C3: Firebomb
     ];
@@ -185,18 +191,25 @@ function Loot_ItemEligibleForPlayer(_item_id, _player = undefined, _class_id = -
     return true;
 }
 
-function Loot_TierMult(_level, _tier) {
-    var lvl = clamp(_level, 1, 3);
-    var tw = global.loot_tier_weights[lvl - 1];
-    switch (_tier) {
-        case 1: return tw.low;
-        case 2: return tw.mid;
-        case 3: return tw.high;
-    }
+// R1 (D117): [low, mid, high] tier odds of a table at a container level (clamped 1..3). An unknown table is all low.
+function Loot_TierOdds(_table_key, _level) {
+    if (!variable_global_exists("loot_tier_odds")) Loot_Init();
+    var lvl = clamp(round(_level), 1, 3);
+    if (variable_struct_exists(global.loot_tier_odds, _table_key)) return variable_struct_get(global.loot_tier_odds, _table_key)[lvl - 1];
+    return [1, 0, 0];
+}
+
+// R1 (D117): the tier, rarest first: high? else mid (of what is left)? else low. Returns 1, 2 or 3.
+function Loot_RollTier(_rng, _odds) {
+    var hi = _odds[2];
+    var mid = _odds[1];
+    if (Rng_Float(_rng) < hi) return 3;
+    if (hi < 1 && Rng_Float(_rng) < mid / (1 - hi)) return 2;
     return 1;
 }
 
 // _rng / _extra (C3, D33): a chest rolls from its own stream and from the table plus this floor band's extra rows; without them the run's loot stream.
+// R1 (D117): the tier is rolled first, then an item of that tier by weight alone; a tier with nothing eligible steps down, then up.
 function Loot_RollFromTable(_table_key, _level, _player = undefined, _class_id = -1, _exclude_ids = undefined, _rng = undefined, _extra = undefined) {
     var entries = Loot_TableGet(_table_key);
     if (is_array(_extra) && array_length(_extra) > 0) {
@@ -209,36 +222,42 @@ function Loot_RollFromTable(_table_key, _level, _player = undefined, _class_id =
     var class_id = round(real(_class_id));
     if (class_id < 0) class_id = Loot_PlayerClassId(player);
 
-    var weighted = [];
-    var total = 0;
+    var rng = is_undefined(_rng) ? Run_Stream("loot") : _rng;
+    var by_tier = [[], [], []];
+    var total = [0, 0, 0];
     for (var i = 0; i < array_length(entries); i++) {
         var e = entries[i];
-        var w = e.weight * Loot_TierMult(_level, e.tier);
-        if (w <= 0) continue;
+        if (e.weight <= 0) continue;
 
         if (variable_struct_exists(e, "item_id")) {
             var iid = round(real(e.item_id));
             if (iid > 0 && !Loot_ItemEligibleForPlayer(iid, player, class_id, _exclude_ids)) continue;
         }
 
-        array_push(weighted, { entry: e, weight: w });
-        total += w;
+        var ti = clamp(round(e.tier), 1, 3) - 1;
+        array_push(by_tier[ti], e);
+        total[ti] += e.weight;
     }
-    if (total <= 0) return undefined;
 
-    var r = (is_undefined(_rng) ? RunRng_Float("loot") : Rng_Float(_rng)) * total;
+    var tier = Loot_RollTier(rng, Loot_TierOdds(_table_key, _level));
+    var use = -1;
+    for (var d = tier; d >= 1 && use < 0; d--) if (total[d - 1] > 0) use = d - 1;
+    for (var u = tier + 1; u <= 3 && use < 0; u++) if (total[u - 1] > 0) use = u - 1;
+    if (use < 0) return undefined;
+
+    var r = Rng_Float(rng) * total[use];
     var acc = 0;
-    for (var j = 0; j < array_length(weighted); j++) {
-        var row = weighted[j];
-        var e2 = row.entry;
-        acc += row.weight;
+    var rows = by_tier[use];
+    for (var j = 0; j < array_length(rows); j++) {
+        var e2 = rows[j];
+        acc += e2.weight;
         if (r <= acc) {
             var minv = 1;
             var maxv = 1;
             if (variable_struct_exists(e2, "qty_min")) minv = e2.qty_min; else if (variable_struct_exists(e2, "min_qty")) minv = e2.min_qty; else if (variable_struct_exists(e2, "min")) minv = e2.min;
             if (variable_struct_exists(e2, "qty_max")) maxv = e2.qty_max; else if (variable_struct_exists(e2, "max_qty")) maxv = e2.max_qty; else if (variable_struct_exists(e2, "max")) maxv = e2.max;
             if (maxv < minv) maxv = minv;
-            var qty = (minv == maxv) ? minv : (is_undefined(_rng) ? RunRng_Range("loot", minv, maxv) : Rng_Range(_rng, minv, maxv));
+            var qty = (minv == maxv) ? minv : Rng_Range(rng, minv, maxv);
             if (qty <= 0) return undefined;
             if (variable_struct_exists(e2, "item_id") && e2.item_id <= 0) return undefined;
             return { item_id: e2.item_id, qty: qty };
@@ -277,6 +296,11 @@ function Loot_RollContainer(_level, _key, _rng = undefined, _extra = undefined, 
     return items;
 }
 
+// R1 (D120): +10 points of drop chance for every won fight in a row without an item.
+function Loot_EnemyDropChance(_base, _dry) {
+    return min(1, _base + LOOT_DRY_STEP * _dry);
+}
+
 function Loot_RollEnemy(_enemy_or_id) {
     var lvl = 1;
     var key = "enemy_basic";
@@ -298,11 +322,17 @@ function Loot_RollEnemy(_enemy_or_id) {
 
     var cfg = Loot_ConfigGet(key);
     var chance = cfg.chance[clamp(round(lvl), 1, 3) - 1];
-    if (RunRng_Float("loot") > chance) return [];
+    var run = Run_Get();
+    var counting = is_struct(run) && run.active;
+    if (counting) chance = Loot_EnemyDropChance(chance, run.drop_dry);   // R1 (D120)
 
-    var player = Loot_PlayerStruct();
-    var class_id = Loot_PlayerClassId(player);
-    var it = Loot_RollFromTable(cfg.table, lvl, player, class_id, []);
+    var it = undefined;
+    if (RunRng_Float("loot") <= chance) {
+        var player = Loot_PlayerStruct();
+        var class_id = Loot_PlayerClassId(player);
+        it = Loot_RollFromTable(cfg.table, lvl, player, class_id, []);
+    }
+    if (counting) run.drop_dry = is_struct(it) ? 0 : run.drop_dry + 1;
     if (is_struct(it)) return [it];
     return [];
 }
@@ -368,6 +398,7 @@ function Loot_BuildMessageEntries(_loot, _prefix = "Loot: ") {
 #macro SHOP_PRICE_MULT 1.5
 #macro SHOP_SELL_FRAC 0.5
 #macro ELITE_CHANCE 0.15
+#macro LOOT_DRY_STEP 0.1
 #macro ELITE_DEF_BONUS 4
 #macro ELITE_SPD_BONUS 3
 #macro ELITE_ATK_BONUS 4
@@ -770,14 +801,17 @@ function Shuffle_EnemyPool(_floor) {
     return [];
 }
 
-// An enemy of this map slot is an elite: 15%, from the seed and the slot's key (room + placement), so it never changes during a run.
-function Shuffle_IsElite(_seed, _key) {
-    return Rng_Chance(Rng_New(_seed, "map:" + string(_key)), ELITE_CHANCE);
+// R1 (D123): elites per floor: ~15% of the free enemies (rounded half up), at least 1 from floor 2 on, never more than there are.
+function Shuffle_EliteCount(_floor, _free) {
+    if (_free <= 0) return 0;
+    var c = RoundHalfUp(ELITE_CHANCE * _free);
+    if (floor(_floor) >= 2) c = max(c, 1);
+    return min(c, _free);
 }
 
 // The layout of one room's map enemies for a seed. _slots: [{ pid, enemy_id, x, y, fixed }] (the room's authored enemies; fixed = a boss or a
 // story enemy, left alone). Returns an array of the same length: [{ pid, enemy_id, x, y, level, elite }]. Enemy types come from the floor's pool,
-// the authored places are dealt out again among the free slots, ~15% get one modifier.
+// the authored places are dealt out again among the free slots, Shuffle_EliteCount of them get one modifier.
 function Shuffle_RoomPlan(_seed, _room_name, _slots) {
     var out = [];
     var fl = Run_FloorOfRoomName(_room_name);
@@ -795,6 +829,8 @@ function Shuffle_RoomPlan(_seed, _room_name, _slots) {
         }
     }
     spots = Rng_Shuffle(rng, spots);
+    var elite_order = Rng_Shuffle(Rng_New(_seed, "elite:" + string(_room_name)), free_idx);   // R1 (D123): the first n of these are the room's elites
+    var n_elite = Shuffle_EliteCount(fl, array_length(free_idx));
     for (var k = 0; k < array_length(free_idx); k++) {
         var e = out[free_idx[k]];
         e.x = spots[k].x;
@@ -805,7 +841,9 @@ function Shuffle_RoomPlan(_seed, _room_name, _slots) {
         var hi = max(lo, round(cfg.species_max_level));
         e.level = clamp(fl + Rng_Range(rng, -1, 1) + round(cfg.species_level_offset), lo, min(hi, LEVEL_CAP_TECHNICAL));
         var key = string(_room_name) + ":" + string(e.pid);
-        if (Shuffle_IsElite(_seed, key)) e.elite = Rng_Pick(Rng_New(_seed, "mod:" + key), Elite_Mods());
+        for (var q = 0; q < n_elite; q++) {
+            if (elite_order[q] == free_idx[k]) e.elite = Rng_Pick(Rng_New(_seed, "mod:" + key), Elite_Mods());
+        }
     }
     return out;
 }
@@ -848,7 +886,7 @@ function Elite_GrantPick(_p) {
     return _p;
 }
 
-// Gives the map enemies of the room their layout for this run (D33): types from the floor's pool, the authored spots dealt out again, ~15% elites.
+// Gives the map enemies of the room their layout for this run (D33): types from the floor's pool, the authored spots dealt out again, Shuffle_EliteCount elites.
 // Only enemies the room has no saved state for yet are touched (a room you have been in restores what it saved), so this is the same every time
 // for the same seed. Bosses, the Stranger and any enemy a story trigger points at (cine_id) stay as authored. Called from RoomState_Apply.
 function Shuffle_ApplyRoom() {

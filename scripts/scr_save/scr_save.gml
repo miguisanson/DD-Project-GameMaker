@@ -545,7 +545,7 @@ function Save_SlotInfo(_slot) {
 // current, never written and never deleted: they are only recognised, so the title screen can say why they cannot be loaded.
 // ============================================================================================================
 #macro PROFILE_VERSION 1
-#macro RUN_SAVE_VERSION 1
+#macro RUN_SAVE_VERSION 2
 #macro PROFILE_HISTORY_MAX 50
 
 function Profile_Path() {
@@ -908,6 +908,7 @@ function RunSave_Build() {
         shop: run.shop,        // C3 (D85)
         cards: run.cards,
         kills: run.kills,
+        drop_dry: run.drop_dry,   // R1 (D120), run save v2
         started_at: run.started_at,
         floor: Run_FloorOfRoomName(where.room_name),
         statData: stat,
@@ -938,6 +939,7 @@ function RunSave_ApplyState(_raw) {
     if (variable_struct_exists(_raw, "shop") && is_struct(_raw.shop)) run.shop = _raw.shop;   // C3 (D85)
     if (variable_struct_exists(_raw, "cards")) run.cards = Card_StateNormalize(_raw.cards);
     if (variable_struct_exists(_raw, "kills")) run.kills = Save_ToReal(_raw.kills, 0);
+    if (variable_struct_exists(_raw, "drop_dry")) run.drop_dry = Save_ToReal(_raw.drop_dry, 0);
     if (variable_struct_exists(_raw, "started_at")) run.started_at = Save_ToReal(_raw.started_at, run.started_at);
     gs.run = run;
     return info;

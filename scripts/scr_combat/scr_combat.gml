@@ -84,10 +84,33 @@ function Combat_CritChance(_crit_bonus) {
     return clamp(_crit_bonus / 100, 0, COMBAT_CRIT_CHANCE_MAX);
 }
 
+// R1 (D119): a crit chance is a bag of marbles: n marbles, n * chance of them red, drawn without putting back until the bag is empty.
+// The smallest bag (up to 20) that holds the chance exactly; otherwise 20 marbles with round(20 * chance) red.
+// (<= on purpose: GML compares reals with an epsilon, so "< 0.000001" is false for a difference of 0.)
+function Crit_BagSize(_p) {
+    for (var n = 1; n <= 20; n++) {
+        var reds = n * _p;
+        if (abs(reds - round(reds)) <= 0.000001) return { n: n, reds: round(reds) };
+    }
+    return { n: 20, reds: round(20 * _p) };
+}
+
+// Marbles left in the fighter's crit bag (0 when it has none).
+function Crit_BagLeft(_f) {
+    if (is_struct(_f) && variable_struct_exists(_f, "crit_bag") && is_struct(_f.crit_bag)) return array_length(_f.crit_bag.left);
+    return 0;
+}
+
 function Combat_CritCheck(_attacker, _crit_bonus) {
     var chance = Combat_CritChance(_crit_bonus);
     if (chance <= 0) return false;
-    return RunRng_Chance("combat", chance);   // C1: run randomness comes from the run's combat stream
+    if (Crit_BagLeft(_attacker) <= 0 || abs(_attacker.crit_bag.p - chance) > 0.000001) {
+        var size = Crit_BagSize(chance);
+        var marbles = [];
+        for (var i = 0; i < size.n; i++) array_push(marbles, i < size.reds);
+        _attacker.crit_bag = { p: chance, left: Rng_Shuffle(Run_Stream("combat"), marbles) };   // C1: run randomness comes from the run's combat stream
+    }
+    return array_pop(_attacker.crit_bag.left);
 }
 
 // D80: no dice. The only way an enemy action fails to land is Evasion on the PLAYER: the next damaging enemy action is fully dodged and Evasion is used up.
@@ -1608,8 +1631,12 @@ function Battle_GetItemList(_bc) {
 }
 
 // Spec section 8: the one random roll left in a flee. Bosses are checked before this.
-function Battle_RunChance(_spd_player, _spd_enemy) {
-    return clamp(0.5 + 0.05 * (_spd_player - _spd_enemy), 0.10, 0.95);
+#macro FLEE_FAIL_STEP 0.25
+// R1 (D121): SPD / (SPD + enemy SPD), +0.25 for every failed try this battle (certain after enough tries).
+function Battle_RunChance(_spd_player, _spd_enemy, _fails = 0) {
+    var sp = max(1, _spd_player);
+    var se = max(1, _spd_enemy);
+    return min(1, sp / (sp + se) + FLEE_FAIL_STEP * _fails);
 }
 
 function Battle_RunAttempt(_bc) {
@@ -1624,13 +1651,14 @@ function Battle_RunAttempt(_bc) {
         return;
     }
 
-    if (RunRng_Float("combat") < Battle_RunChance(Combat_EffectiveStat(p, STAT_SPD), Combat_EffectiveStat(e, STAT_SPD))) {
+    if (RunRng_Float("combat") < Battle_RunChance(Combat_EffectiveStat(p, STAT_SPD), Combat_EffectiveStat(e, STAT_SPD), _bc.run_fails)) {
         EnemyPersist_ResolveBattle(false);
         if (enemy_id == ENEMY_STRANGER) {
             Dialogue_NarrativeOnStrangerEncounterResolved();
         }
         Battle_Message(_bc, Loc_T("combat.msg.player_ran", "You ran away!"), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY);
     } else {
+        _bc.run_fails += 1;
         Battle_TurnAdvance(_bc);
         Battle_Message(_bc, Loc_T("combat.msg.player_couldnt_escape", "Couldn't escape!"), BSTATE_ENEMY_ACT);
     }

@@ -76,6 +76,7 @@ combat_log = [];
 skill_banner_active = false;
 skill_banner_name = "";
 enemy_actions_remaining = 0;
+run_fails = 0;                   // R1 (D121): failed flee tries this battle
 enemy_turn_used_skills = [];
 player_turn_start_applied = false;
 enemy_plan = undefined;          // Foresight (D79): { skill_id, announced }, the enemy's next action once decided

@@ -604,6 +604,7 @@ function Status_ClearAll(_ch) {
 function Status_Add(_ch, _status_id, _turns, _power, _stacks = 1) {
     if (!is_array(_ch.status)) _ch.status = [];
     var cfg = StatusDB_Get(_status_id);
+    if (Status_Cfg(_status_id, "crit_bonus", 0) > 0 && variable_struct_exists(_ch, "crit_bag")) variable_struct_remove(_ch, "crit_bag");   // R1 (D119): a fresh bag for a re-applied crit buff
 
     // Stun is only a marker (D75): the battle turns it into a push-back on the turn timeline at once (Battle_ConsumeStun); Steadfast lives there too.
 
