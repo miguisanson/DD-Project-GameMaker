@@ -124,6 +124,7 @@ function Test_RunAll() {
     Test_RunSuite("SpeedPreview", Test_Suite_SpeedPreview);
     Test_RunSuite("MapJuice", Test_Suite_MapJuice);
     Test_RunSuite("BattleBg", Test_Suite_BattleBg);
+    Test_RunSuite("RunStats", Test_Suite_RunStats);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -9423,4 +9424,216 @@ function Test_Suite_BattleBg() {
     Test_Eq("battlebg: an empty name falls back too", Battle_BgSprite(""), battle_screen);
     Test_Eq("battlebg: a name that exists resolves through asset_get_index", Battle_BgSprite("battle_screen"), battle_screen);
     Test_Eq("battlebg: the fallback is not an asset index error", Battle_BgSprite("spr_battle_bg_not_imported_yet") != -1, true);
+}
+
+// ---- G9 (D137): run stats on the summary and in run history ----------------------------------------------------------------------------
+// Expected values come from D137: Perfect % = Perfect grades / all graded QTEs (attack bars, arrow skills, defence bars, throws) as a whole percent
+// (no QTE at all shows "-", never a division by zero); crits landed, damage dealt, damage taken, fights won; run time = real play time of the run,
+// counted only while the run is active and the game is neither paused nor unfocused, shown as m:ss (h:mm:ss from an hour); kept on the run struct as
+// run.stats = { qte_total, qte_perfect, crits, dmg_dealt, dmg_taken, fights_won, play_ms }, saved with the run (older saves read 0, no version bump) and
+// copied into the history entry (an entry without stats shows "-").
+function Test_Suite_RunStats() {
+    var _gs = GameState_Get();
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_pl = _gs.player_ch;
+    var _old_mode = _gs.ui.mode;
+    var _old_menu = _gs.in_main_menu;
+    var _old_focus = variable_global_exists("focus_prev") ? global.focus_prev : true;
+
+    // a new run starts with zeros
+    var _st0 = Run_Create(9137).stats;
+    Test_True("D137 a new run has stats", is_struct(_st0));
+    Test_True("D137 a new run's stats are all zero", _st0.qte_total == 0 && _st0.qte_perfect == 0 && _st0.crits == 0 && _st0.dmg_dealt == 0 && _st0.dmg_taken == 0 && _st0.fights_won == 0 && _st0.play_ms == 0);
+
+    // Perfect %: Perfect / all graded QTEs
+    var _run = Run_Create(9138);
+    RunStats_Qte(QTE_PERFECT, _run);
+    RunStats_Qte(QTE_OK, _run);
+    Test_Eq("D137 a Perfect and an OK are 2 graded QTEs", _run.stats.qte_total, 2);
+    Test_Eq("D137 a Perfect and an OK are 1 Perfect", _run.stats.qte_perfect, 1);
+    Test_Eq("D137 a Perfect and an OK are 50%", RunStats_PerfectText(_run.stats), "50%");
+    RunStats_Qte(QTE_GOOD, _run);
+    Test_Eq("D137 1 Perfect of 3 is 33% (rounded to the nearest)", RunStats_PerfectText(_run.stats), "33%");
+    RunStats_Qte(QTE_WEAK, _run);
+    Test_Eq("D137 a Weak counts as a graded QTE", _run.stats.qte_total, 4);
+    RunStats_Qte(QTE_PERFECT, _run);
+    RunStats_Qte(QTE_PERFECT, _run);
+    Test_Eq("D137 3 Perfect of 6 is 50%", RunStats_PerfectText(_run.stats), "50%");
+    var _two = RunStats_New();
+    _two.qte_total = 3; _two.qte_perfect = 2;
+    Test_Eq("D137 2 Perfect of 3 is 67%", RunStats_PerfectText(_two), "67%");
+    var _all = RunStats_New();
+    _all.qte_total = 5; _all.qte_perfect = 5;
+    Test_Eq("D137 all Perfect is 100%", RunStats_PerfectText(_all), "100%");
+    Test_Eq("D137 no QTE at all shows - (no division by zero)", RunStats_PerfectText(RunStats_New()), "-");
+    Test_Eq("D137 no QTE: the percent is -1, not a number", RunStats_PerfectPct(RunStats_New()), -1);
+
+    // crits, damage, fights
+    var _r2 = Run_Create(9139);
+    RunStats_Dealt(12, false, _r2);
+    RunStats_Dealt(8, true, _r2);
+    RunStats_Dealt(0, false, _r2);
+    RunStats_Dealt(-4, true, _r2);
+    Test_Eq("D137 damage dealt adds up (a 0 or negative amount adds nothing)", _r2.stats.dmg_dealt, 20);
+    Test_Eq("D137 one crit landed (a crit with no damage is not counted)", _r2.stats.crits, 1);
+    RunStats_Taken(5, _r2);
+    RunStats_Taken(0, _r2);
+    RunStats_Taken(-3, _r2);
+    RunStats_Taken(7, _r2);
+    Test_Eq("D137 damage taken adds up", _r2.stats.dmg_taken, 12);
+    RunStats_FightWon(_r2);
+    RunStats_FightWon(_r2);
+    Test_Eq("D137 fights won count", _r2.stats.fights_won, 2);
+    var _dead = Run_Create(9140);
+    _dead.active = false;
+    RunStats_Dealt(30, true, _dead);
+    RunStats_Taken(30, _dead);
+    RunStats_Qte(QTE_PERFECT, _dead);
+    RunStats_FightWon(_dead);
+    Test_True("D137 nothing counts once the run is over", _dead.stats.dmg_dealt == 0 && _dead.stats.dmg_taken == 0 && _dead.stats.qte_total == 0 && _dead.stats.fights_won == 0 && _dead.stats.crits == 0);
+    var _none_ok = true;
+    try { RunStats_Dealt(5, false, undefined); RunStats_Qte(QTE_OK, undefined); RunStats_Taken(5, undefined); RunStats_FightWon(undefined); } catch (_e) { _none_ok = false; }
+    Test_True("D137 counting with no run at all (title screen, scenarios) does nothing and does not throw", _none_ok);
+
+    // the hooks count into the live run
+    _gs.run = Run_Create(9141);
+    RunStats_Qte(QTE_PERFECT);
+    RunStats_Dealt(9, true);
+    RunStats_Taken(4);
+    RunStats_FightWon();
+    Test_True("D137 the hooks count into the active run", _gs.run.stats.qte_perfect == 1 && _gs.run.stats.dmg_dealt == 9 && _gs.run.stats.crits == 1 && _gs.run.stats.dmg_taken == 4 && _gs.run.stats.fights_won == 1);
+
+    // play time: only while the run is active and the game is neither paused nor unfocused (nor on the title)
+    var _rt = Run_Create(9142);
+    RunStats_AdvanceMs(_rt, 16, true);
+    RunStats_AdvanceMs(_rt, 17, true);
+    Test_Eq("D137 play time advances while counting", _rt.stats.play_ms, 33);
+    RunStats_AdvanceMs(_rt, 500, false);
+    Test_Eq("D137 play time does not advance when not counting", _rt.stats.play_ms, 33);
+    RunStats_AdvanceMs(_rt, -50, true);
+    Test_Eq("D137 play time never goes back", _rt.stats.play_ms, 33);
+    _rt.active = false;
+    RunStats_AdvanceMs(_rt, 1000, true);
+    Test_Eq("D137 play time stops when the run is over", _rt.stats.play_ms, 33);
+    Test_True("D137 counting: in front, nothing open", RunStats_Counting(true, UI_NONE, false));
+    Test_True("D137 counting: in a dialogue still counts", RunStats_Counting(true, UI_DIALOGUE, false));
+    Test_False("D137 counting: paused does not", RunStats_Counting(true, UI_PAUSE, false));
+    Test_False("D137 counting: an unfocused window does not", RunStats_Counting(false, UI_NONE, false));
+    Test_False("D137 counting: the title screen does not", RunStats_Counting(true, UI_NONE, true));
+    _gs.run = Run_Create(9143);
+    _gs.in_main_menu = false;
+    _gs.ui.mode = UI_NONE;
+    global.focus_prev = true;
+    RunStats_Tick(20);
+    Test_Eq("D137 the frame tick counts in front", _gs.run.stats.play_ms, 20);
+    _gs.ui.mode = UI_PAUSE;
+    RunStats_Tick(20);
+    Test_Eq("D137 the frame tick stops under the pause menu", _gs.run.stats.play_ms, 20);
+    _gs.ui.mode = UI_NONE;
+    global.focus_prev = false;
+    RunStats_Tick(20);
+    Test_Eq("D137 the frame tick stops when the window loses focus", _gs.run.stats.play_ms, 20);
+    global.focus_prev = true;
+    _gs.in_main_menu = true;
+    RunStats_Tick(20);
+    Test_Eq("D137 the frame tick stops on the title", _gs.run.stats.play_ms, 20);
+    _gs.in_main_menu = false;
+    RunStats_Tick(20);
+    Test_Eq("D137 and goes on when back in the game", _gs.run.stats.play_ms, 40);
+    _gs.run.active = false;
+    RunStats_Tick(20);
+    Test_Eq("D137 the frame tick does nothing after the run", _gs.run.stats.play_ms, 40);
+
+    // time text: m:ss, h:mm:ss from an hour
+    Test_Eq("D137 time 0", RunStats_TimeText(0), "0:00");
+    Test_Eq("D137 time 59.999 s", RunStats_TimeText(59999), "0:59");
+    Test_Eq("D137 time 65 s", RunStats_TimeText(65000), "1:05");
+    Test_Eq("D137 time 10 min", RunStats_TimeText(600000), "10:00");
+    Test_Eq("D137 time 59:59", RunStats_TimeText(3599999), "59:59");
+    Test_Eq("D137 time 1 h", RunStats_TimeText(3600000), "1:00:00");
+    Test_Eq("D137 time 1:02:05", RunStats_TimeText(3725000), "1:02:05");
+    Test_Eq("D137 time 12:34:56", RunStats_TimeText(45296000), "12:34:56");
+    Test_Eq("D137 a negative time reads 0:00", RunStats_TimeText(-5), "0:00");
+
+    // the run save: the stats survive Build -> json -> Apply; an older save reads zeros; no version bump
+    var _ch = CharacterCreate_Player(CLASS_KNIGHT);
+    _gs.player_ch = _ch;
+    _gs.run = Run_Create(9144);
+    _gs.run.stats = { qte_total: 9, qte_perfect: 4, crits: 3, dmg_dealt: 250, dmg_taken: 120, fights_won: 5, play_ms: 754321 };
+    var _raw = json_parse(json_stringify(RunSave_Build()));
+    Test_True("D137 the run save carries the stats", variable_struct_exists(_raw, "stats") && _raw.stats.play_ms == 754321);
+    Test_Eq("D137 the run save is still the same version (no bump)", _raw.run_version, RUN_SAVE_VERSION);
+    Test_Eq("D137 the run save with stats still reads ok", RunSave_Check(_raw), "ok");
+    _gs.run = Run_Create(1);
+    RunSave_ApplyState(_raw);
+    var _back = _gs.run.stats;
+    Test_True("D137 Continue restores every stat", _back.qte_total == 9 && _back.qte_perfect == 4 && _back.crits == 3 && _back.dmg_dealt == 250 && _back.dmg_taken == 120 && _back.fights_won == 5);
+    Test_Eq("D137 Continue restores the play time", _back.play_ms, 754321);
+    var _old_raw = json_parse(json_stringify(RunSave_Build()));
+    variable_struct_remove(_old_raw, "stats");
+    Test_Eq("D137 a save without stats still reads ok", RunSave_Check(_old_raw), "ok");
+    _gs.run = Run_Create(2);
+    _gs.run.stats.crits = 99;
+    RunSave_ApplyState(_old_raw);
+    var _z = _gs.run.stats;
+    Test_True("D137 a save from before the stats reads zeros", _z.qte_total == 0 && _z.qte_perfect == 0 && _z.crits == 0 && _z.dmg_dealt == 0 && _z.dmg_taken == 0 && _z.fights_won == 0 && _z.play_ms == 0);
+    var _part = RunStats_Normalize({ crits: 2, play_ms: 1000 });
+    Test_True("D137 a partial stats struct fills the rest with 0", _part.crits == 2 && _part.play_ms == 1000 && _part.qte_total == 0 && _part.fights_won == 0 && _part.dmg_dealt == 0);
+    var _junk = RunStats_Normalize({ crits: "x", play_ms: -5, fights_won: 2.7 });
+    Test_True("D137 junk in a save reads as 0 and counts stay whole", _junk.crits == 0 && _junk.play_ms == 0 && _junk.fights_won == 2);
+
+    // the history entry carries the stats (a copy), also the one made from a saved run that is walked away from
+    var _hr_run = Run_Create(9145);
+    _hr_run.stats = { qte_total: 8, qte_perfect: 2, crits: 1, dmg_dealt: 77, dmg_taken: 33, fights_won: 3, play_ms: 185000 };
+    var _he = Run_MakeHistoryEntry(_hr_run, _ch, "rm_floor3", "died", "Spider");
+    Test_True("D137 the history entry carries the stats", variable_struct_exists(_he, "stats") && _he.stats.fights_won == 3 && _he.stats.dmg_dealt == 77 && _he.stats.dmg_taken == 33 && _he.stats.crits == 1 && _he.stats.qte_total == 8 && _he.stats.qte_perfect == 2 && _he.stats.play_ms == 185000);
+    _hr_run.stats.fights_won = 50;
+    Test_Eq("D137 the entry holds a copy, not the run's own struct", _he.stats.fights_won, 3);
+    var _pf = Profile_Default();
+    Profile_RecordRun(_pf, _he);
+    var _pf2 = Profile_Normalize(json_parse(json_stringify(_pf)));
+    Test_True("D137 the stats survive the profile file", array_length(_pf2.history) == 1 && variable_struct_exists(_pf2.history[0], "stats") && _pf2.history[0].stats.play_ms == 185000 && _pf2.history[0].stats.dmg_dealt == 77);
+    _gs.run = Run_Create(9147);
+    _gs.run.stats.play_ms = 4000;
+    var _sv_pl = json_parse(json_stringify(RunSave_Build()));
+    var _ae = Run_HistoryEntryFromSave(_sv_pl);
+    Test_True("D137 an abandoned saved run keeps its stats in the history", variable_struct_exists(_ae, "stats") && _ae.result == "abandoned" && _ae.stats.play_ms == 4000);
+    variable_struct_remove(_sv_pl, "stats");
+    Test_False("D137 an abandoned old save has no stats in the history", variable_struct_exists(Run_HistoryEntryFromSave(_sv_pl), "stats"));
+
+    // the rows: summary and Codex "Runs" page; an entry without stats shows "-"
+    var _rows = RunFlow_SummaryRows(_he);
+    Test_Eq("D137 summary: Perfect rate", Test_RowValue(_rows, Loc_T("stat.perfect", "Perfect rate")), "25%");
+    Test_Eq("D137 summary: crits", Test_RowValue(_rows, Loc_T("stat.crits", "Crits landed")), "1");
+    Test_Eq("D137 summary: damage dealt", Test_RowValue(_rows, Loc_T("stat.dmg_dealt", "Damage dealt")), "77");
+    Test_Eq("D137 summary: damage taken", Test_RowValue(_rows, Loc_T("stat.dmg_taken", "Damage taken")), "33");
+    Test_Eq("D137 summary: fights won", Test_RowValue(_rows, Loc_T("stat.fights_won", "Fights won")), "3");
+    Test_Eq("D137 summary: run time", Test_RowValue(_rows, Loc_T("stat.time", "Run time")), "3:05");
+    Test_Eq("D137 summary: the old rows are still there", Test_RowValue(_rows, Loc_T("runflow.sum.kills", "Foes beaten")), string(_he.kills));
+    var _bare = Run_MakeHistoryEntry(Run_Create(9146), _ch, "rm_floor1", "died", "");
+    variable_struct_remove(_bare, "stats");
+    var _brows = RunFlow_SummaryRows(_bare);
+    Test_True("D137 summary: an entry with no stats shows - on every stat row", Test_RowValue(_brows, Loc_T("stat.perfect", "Perfect rate")) == "-" && Test_RowValue(_brows, Loc_T("stat.crits", "Crits landed")) == "-" && Test_RowValue(_brows, Loc_T("stat.dmg_dealt", "Damage dealt")) == "-" && Test_RowValue(_brows, Loc_T("stat.dmg_taken", "Damage taken")) == "-" && Test_RowValue(_brows, Loc_T("stat.fights_won", "Fights won")) == "-" && Test_RowValue(_brows, Loc_T("stat.time", "Run time")) == "-");
+    var _cp = Profile_Default();
+    Profile_RecordRun(_cp, { seed: 1, class_id: CLASS_KNIGHT, level: 2, floor: 1, room: "rm_floor1", result: "died", cause: "Slime", kills: 1, gold: 5, at: 0 });
+    Profile_RecordRun(_cp, _he);
+    var _hrows = Codex_HistoryRows(_cp);
+    Test_Eq("D137 Codex runs: two rows", array_length(_hrows), 2);
+    var _hl = _hrows[0].lines;   // the newest first: the run with stats
+    Test_Eq("D137 Codex runs: Perfect rate", Test_RowValue(_hl, Loc_T("stat.perfect", "Perfect rate")), "25%");
+    Test_Eq("D137 Codex runs: crits", Test_RowValue(_hl, Loc_T("stat.crits", "Crits landed")), "1");
+    Test_Eq("D137 Codex runs: damage dealt", Test_RowValue(_hl, Loc_T("stat.dmg_dealt", "Damage dealt")), "77");
+    Test_Eq("D137 Codex runs: damage taken", Test_RowValue(_hl, Loc_T("stat.dmg_taken", "Damage taken")), "33");
+    Test_Eq("D137 Codex runs: fights won", Test_RowValue(_hl, Loc_T("stat.fights_won", "Fights won")), "3");
+    Test_Eq("D137 Codex runs: run time", Test_RowValue(_hl, Loc_T("stat.time", "Run time")), "3:05");
+    var _ol = _hrows[1].lines;   // the older entry has no stats
+    Test_True("D137 Codex runs: an old entry shows - for every stat", Test_RowValue(_ol, Loc_T("stat.perfect", "Perfect rate")) == "-" && Test_RowValue(_ol, Loc_T("stat.crits", "Crits landed")) == "-" && Test_RowValue(_ol, Loc_T("stat.dmg_dealt", "Damage dealt")) == "-" && Test_RowValue(_ol, Loc_T("stat.dmg_taken", "Damage taken")) == "-" && Test_RowValue(_ol, Loc_T("stat.fights_won", "Fights won")) == "-" && Test_RowValue(_ol, Loc_T("stat.time", "Run time")) == "-");
+    Test_Eq("D137 Codex runs: the old lines are still there", Test_RowValue(_ol, Loc_T("tab.lbl.kills", "Foes beaten")), "1");
+
+    _gs.player_ch = _old_pl;
+    _gs.ui.mode = _old_mode;
+    _gs.in_main_menu = _old_menu;
+    global.focus_prev = _old_focus;
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }

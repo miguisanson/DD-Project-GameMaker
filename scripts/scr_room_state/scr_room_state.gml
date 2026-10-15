@@ -339,6 +339,7 @@ function Run_Create(_seed) {
         shop: {},                // C3 (D85): the stock of each shop visited, { s0: [rows], ... }, so what was bought stays bought
         cards: Card_StateNew(),  // C2: the offer generator's pity counter and the last offer (scr_db_skill)
         kills: 0,
+        stats: RunStats_New(),   // G9 (D137): Perfect %, crits, damage, fights won, play time; saved with the run and copied into the history entry
         drop_dry: 0,             // R1 (D120): won fights in a row where the enemy left no item
         gold_bag: [],            // D126: the gold offsets of the fights not paid yet (a shuffled bag of 5, refilled when empty); saved with the run
         find_bag: { p: 0, left: [] },   // D126: the Scrounger's marble bag; saved with the run
@@ -563,6 +564,7 @@ function Run_MakeHistoryEntry(_run, _ch, _room_name, _result, _cause) {
         cause: _cause,
         kills: _run.kills,
         gold: _run.gold,
+        stats: variable_clone(RunStats_Of(_run)),   // G9 (D137): a copy, the run struct goes on to be reused or dropped
         at: date_current_datetime()
     };
 }
@@ -645,25 +647,31 @@ function Run_StartNew(_intro_dialogue = false, _seed = undefined) {
     Transition_RequestCutsceneFade(rm_floor1, "start", -1, true);
 }
 
+// The history entry of a saved run the player walks away from (abandoned, no echo). A save from before D137 has no stats: its entry has none either ("-").
+function Run_HistoryEntryFromSave(_raw) {
+    var pl = _raw.statData.player;
+    var entry = {
+        seed: _raw.seed,
+        class_id: (is_struct(pl) && variable_struct_exists(pl, "class_id")) ? pl.class_id : CLASS_NOBODY,
+        level: (is_struct(pl) && variable_struct_exists(pl, "level")) ? pl.level : 1,
+        floor: variable_struct_exists(_raw, "floor") ? _raw.floor : 0,
+        room: variable_struct_exists(_raw.statData, "save_room_name") ? _raw.statData.save_room_name : "",
+        result: "abandoned",
+        cause: "abandoned",
+        kills: variable_struct_exists(_raw, "kills") ? _raw.kills : 0,
+        gold: variable_struct_exists(_raw, "gold") ? _raw.gold : 0,
+        at: date_current_datetime()
+    };
+    if (variable_struct_exists(_raw, "stats") && is_struct(_raw.stats)) entry.stats = RunStats_Normalize(_raw.stats);
+    return entry;
+}
+
 // A run saved on disk that the player walks away from by starting a new game: it counts as abandoned (no echo).
 function Run_AbandonSaved(_path = undefined) {
     var l = RunSave_LoadFrom(_path);
     if (l.status == "ok") {
         var prof = Profile_Get();
-        var raw = l.run;
-        var pl = raw.statData.player;
-        var entry = {
-            seed: raw.seed,
-            class_id: (is_struct(pl) && variable_struct_exists(pl, "class_id")) ? pl.class_id : CLASS_NOBODY,
-            level: (is_struct(pl) && variable_struct_exists(pl, "level")) ? pl.level : 1,
-            floor: variable_struct_exists(raw, "floor") ? raw.floor : 0,
-            room: variable_struct_exists(raw.statData, "save_room_name") ? raw.statData.save_room_name : "",
-            result: "abandoned",
-            cause: "abandoned",
-            kills: variable_struct_exists(raw, "kills") ? raw.kills : 0,
-            gold: variable_struct_exists(raw, "gold") ? raw.gold : 0,
-            at: date_current_datetime()
-        };
+        var entry = Run_HistoryEntryFromSave(l.run);
         Profile_RecordRun(prof, entry);
         Profile_Flush();
     }
@@ -822,6 +830,20 @@ function RunFlow_CauseLine(_entry) {
     return Loc_T("runflow.cause.unknown", "Something in the dark took you.");
 }
 
+// The rows of the run summary: the five of old and, since D137, the six run stats ("-" for an entry without them).
+function RunFlow_SummaryRows(_entry) {
+    var rows = [
+        { label: Loc_T("runflow.sum.floor", "Floor reached"), value: string(_entry.floor) },
+        { label: Loc_T("runflow.sum.class", "Class"), value: string(DB_PlayerClass(_entry.class_id).name) },
+        { label: Loc_T("runflow.sum.level", "Level"), value: string(_entry.level) },
+        { label: Loc_T("runflow.sum.kills", "Foes beaten"), value: string(_entry.kills) },
+        { label: Loc_T("runflow.sum.falls", "Falls so far"), value: string(Profile_Get().deaths) }
+    ];
+    var st = RunStats_Lines(_entry);
+    for (var i = 0; i < array_length(st); i++) array_push(rows, st[i]);
+    return rows;
+}
+
 function RunFlow_Draw() {
     if (!RunFlow_Active()) return;
     var f = global.run_flow;
@@ -847,24 +869,158 @@ function RunFlow_Draw() {
         draw_set_alpha(1);
     } else if (f.phase == "summary") {
         var title = Loc_T("runflow.title", "The tunnel keeps you.");
-        var cls = DB_PlayerClass(f.entry.class_id).name;
-        var rows = [
-            { label: Loc_T("runflow.sum.floor", "Floor reached"), value: string(f.entry.floor) },
-            { label: Loc_T("runflow.sum.class", "Class"), value: string(cls) },
-            { label: Loc_T("runflow.sum.level", "Level"), value: string(f.entry.level) },
-            { label: Loc_T("runflow.sum.kills", "Foes beaten"), value: string(f.entry.kills) },
-            { label: Loc_T("runflow.sum.falls", "Falls so far"), value: string(Profile_Get().deaths) }
-        ];
+        var rows = RunFlow_SummaryRows(f.entry);
         var sentence = RunFlow_CauseLine(f.entry);
         var footer = Loc_T("runflow.continue", "Press confirm to go on");
         var pw = min(w - 2 * mt.margin, round(w * 0.62));
+        var cols = 1;
         var dh = Ui_DetailsHeight(pw, sentence, rows);
         var total = mt.line_h + 3 * p + dh + 3 * p + mt.line_h;
+        if (total > h - 2 * mt.margin) {   // G9 (D137): the eleven rows do not fit one under the other on a small window: two columns, a wider panel
+            cols = 2;
+            pw = min(w - 2 * mt.margin, round(w * 0.9));
+            dh = Ui_DetailsHeight(pw, sentence, rows, cols);
+            total = mt.line_h + 3 * p + dh + 3 * p + mt.line_h;
+        }
         var y0 = max(mt.margin, round((h - total) / 2));
         var px = round((w - pw) / 2);
         Ui_Text(w / 2, y0, title, UI_C_LIGHTEST, fa_center);
-        Ui_DrawDetails(px, y0 + mt.line_h + 3 * p, pw, dh, sentence, rows);
+        Ui_DrawDetails(px, y0 + mt.line_h + 3 * p, pw, dh, sentence, rows, 1, cols);
         Ui_Text(w / 2, y0 + mt.line_h + 3 * p + dh + 3 * p, footer, UI_C_LIGHT, fa_center);
     }
     draw_set_alpha(1);
+}
+
+
+// ============================================================================================================
+// G9 (D137): run stats. run.stats = { qte_total, qte_perfect, crits, dmg_dealt, dmg_taken, fights_won, play_ms }.
+// Counted by one-line hooks in scr_combat (RunStats_Qte where a QTE is graded, RunStats_Dealt / RunStats_Taken where a hit lands, RunStats_FightWon in
+// Battle_CheckEnd) and by RunStats_Tick (obj_game_controller, every step). Saved with the run (RunSave_Build / RunSave_ApplyState, no version bump: a
+// save without them reads zeros), copied into the history entry (Run_MakeHistoryEntry) and shown on the run summary and the Codex run history.
+// An entry with no stats (a run from before D137) shows "-". Nothing here counts without an active run.
+// ============================================================================================================
+function RunStats_New() {
+    return { qte_total: 0, qte_perfect: 0, crits: 0, dmg_dealt: 0, dmg_taken: 0, fights_won: 0, play_ms: 0 };
+}
+
+function RunStats_Names() {
+    return ["qte_total", "qte_perfect", "crits", "dmg_dealt", "dmg_taken", "fights_won", "play_ms"];
+}
+
+// A stats struct from anything a save or a history file may hold: every field a whole number >= 0, a missing or broken one 0.
+function RunStats_Normalize(_raw) {
+    var out = RunStats_New();
+    if (!is_struct(_raw)) return out;
+    var names = RunStats_Names();
+    for (var i = 0; i < array_length(names); i++) {
+        if (!variable_struct_exists(_raw, names[i])) continue;
+        variable_struct_set(out, names[i], max(0, floor(Save_ToReal(variable_struct_get(_raw, names[i]), 0))));
+    }
+    return out;
+}
+
+// The stats a run holds (made on the spot for a run struct that has none), undefined without a run.
+function RunStats_Of(_run) {
+    if (!is_struct(_run)) return undefined;
+    if (!variable_struct_exists(_run, "stats") || !is_struct(_run.stats)) _run.stats = RunStats_New();
+    return _run.stats;
+}
+
+// The run a hook counts into: the one given, else the active run of the game; undefined when there is none or it is over.
+function RunStats_Target(_run = undefined) {
+    var run = is_struct(_run) ? _run : Run_Get();
+    if (!is_struct(run) || !run.active) return undefined;
+    return RunStats_Of(run);
+}
+
+// A QTE was graded (attack bar, arrow skill, defence bar, throw): a Weak counts too.
+function RunStats_Qte(_key, _run = undefined) {
+    var st = RunStats_Target(_run);
+    if (!is_struct(st)) return;
+    st.qte_total += 1;
+    if (_key == QTE_PERFECT) st.qte_perfect += 1;
+}
+
+// The player's hit landed for _dmg (a crit adds one to the crits landed).
+function RunStats_Dealt(_dmg, _crit = false, _run = undefined) {
+    var st = RunStats_Target(_run);
+    if (!is_struct(st) || _dmg <= 0) return;
+    st.dmg_dealt += _dmg;
+    if (_crit) st.crits += 1;
+}
+
+// A hit took _dmg off the player.
+function RunStats_Taken(_dmg, _run = undefined) {
+    var st = RunStats_Target(_run);
+    if (!is_struct(st) || _dmg <= 0) return;
+    st.dmg_taken += _dmg;
+}
+
+function RunStats_FightWon(_run = undefined) {
+    var st = RunStats_Target(_run);
+    if (!is_struct(st)) return;
+    st.fights_won += 1;
+}
+
+// Run time counts while the window is in front, nothing is paused and the title screen is not up.
+function RunStats_Counting(_has_focus, _ui_mode, _in_main_menu) {
+    return _has_focus && !_in_main_menu && _ui_mode != UI_PAUSE;
+}
+
+function RunStats_AdvanceMs(_run, _ms, _counting) {
+    var st = RunStats_Target(_run);
+    if (!is_struct(st) || !_counting || _ms <= 0) return;
+    st.play_ms += _ms;
+}
+
+// Every step (obj_game_controller). The window's focus is the one Focus_Step keeps (global.focus_prev; scripted runs never lose it).
+function RunStats_Tick(_step_ms) {
+    var run = Run_Get();
+    if (!is_struct(run) || !run.active) return;
+    var gs = GameState_Get();
+    var focused = !variable_global_exists("focus_prev") || global.focus_prev;
+    var in_menu = variable_struct_exists(gs, "in_main_menu") && gs.in_main_menu;
+    RunStats_AdvanceMs(run, _step_ms, RunStats_Counting(focused, gs.ui.mode, in_menu));
+}
+
+// Perfect grades as a whole percent of all graded QTEs (the nearest); -1 when there was no QTE.
+function RunStats_PerfectPct(_st) {
+    if (!is_struct(_st) || _st.qte_total <= 0) return -1;
+    return floor((200 * _st.qte_perfect + _st.qte_total) / (2 * _st.qte_total));
+}
+
+function RunStats_PerfectText(_st) {
+    var pct = RunStats_PerfectPct(_st);
+    return (pct < 0) ? "-" : (string(pct) + "%");
+}
+
+// m:ss, h:mm:ss from an hour.
+function RunStats_TimeText(_ms) {
+    var secs = floor(max(0, _ms) / 1000);
+    var h = secs div 3600;
+    var m = (secs mod 3600) div 60;
+    var s = secs mod 60;
+    var ss = ((s < 10) ? "0" : "") + string(s);
+    if (h > 0) return string(h) + ":" + ((m < 10) ? "0" : "") + string(m) + ":" + ss;
+    return string(m) + ":" + ss;
+}
+
+// A history entry's stats struct, undefined for an entry from before D137.
+function RunStats_FromEntry(_entry) {
+    if (!is_struct(_entry) || !variable_struct_exists(_entry, "stats") || !is_struct(_entry.stats)) return undefined;
+    return RunStats_Normalize(_entry.stats);
+}
+
+// The six lines for the run summary and the Codex run history: { label, value }; "-" for an entry without stats.
+function RunStats_Lines(_entry) {
+    var st = RunStats_FromEntry(_entry);
+    var has = is_struct(st);
+    return [
+        { label: Loc_T("stat.perfect", "Perfect rate"), value: has ? RunStats_PerfectText(st) : "-" },
+        { label: Loc_T("stat.crits", "Crits landed"), value: has ? string(st.crits) : "-" },
+        { label: Loc_T("stat.dmg_dealt", "Damage dealt"), value: has ? string(st.dmg_dealt) : "-" },
+        { label: Loc_T("stat.dmg_taken", "Damage taken"), value: has ? string(st.dmg_taken) : "-" },
+        { label: Loc_T("stat.fights_won", "Fights won"), value: has ? string(st.fights_won) : "-" },
+        { label: Loc_T("stat.time", "Run time"), value: has ? RunStats_TimeText(st.play_ms) : "-" }
+    ];
 }

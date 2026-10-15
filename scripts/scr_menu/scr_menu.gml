@@ -428,15 +428,18 @@ function Codex_HistoryRows(_prof) {
             sentence = (cause != "") ? Loc_T("tab.hist.died_to", "Floor {n}: felled by {name}.", { name: cause, n: string(fl) }) : Loc_T("tab.hist.died", "You fell on floor {n}.", { n: string(fl) });
             value = Loc_T("tab.val.floor", "Floor {n}", { n: string(fl) });
         }
+        // G9 (D137): the six run stats made eleven lines, which do not fit the details panel at 800 x 720. The level is in the row's title, the gold is gone with the run
+        // (D23), so those two lines gave way; the floor, the foes beaten and the seed stay.
+        var lines = [
+            { label: Loc_T("tab.lbl.floor", "Floor"), value: string(fl) },
+            { label: Loc_T("tab.lbl.kills", "Foes beaten"), value: string(variable_struct_exists(h, "kills") ? h.kills : 0) }
+        ];
+        var stat_lines = RunStats_Lines(h);   // Perfect rate, crits, damage dealt / taken, fights won, run time ("-" for a run from before D137)
+        for (var sl = 0; sl < array_length(stat_lines); sl++) array_push(lines, stat_lines[sl]);
+        array_push(lines, { label: Loc_T("tab.lbl.seed", "Seed"), value: string(variable_struct_exists(h, "seed") ? h.seed : 0) });
         array_push(rows, {
             id: "run_" + string(i), label: Loc_T("tab.hist.row", "{cls} Lv {n}", { cls: string(cname), n: string(h.level) }), value: value, kind: "button", enabled: true, help: sentence, hint: "",
-            lines: [
-                { label: Loc_T("tab.lbl.floor", "Floor"), value: string(fl) },
-                { label: Loc_T("tab.lbl.level", "Level"), value: string(h.level) },
-                { label: Loc_T("tab.lbl.kills", "Foes beaten"), value: string(variable_struct_exists(h, "kills") ? h.kills : 0) },
-                { label: Loc_T("tab.lbl.gold", "Gold"), value: string(variable_struct_exists(h, "gold") ? h.gold : 0) },
-                { label: Loc_T("tab.lbl.seed", "Seed"), value: string(variable_struct_exists(h, "seed") ? h.seed : 0) }
-            ]
+            lines: lines
         });
     }
     return rows;
