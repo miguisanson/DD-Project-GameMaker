@@ -94,6 +94,7 @@ function Test_RunAll() {
     Test_RunSuite("Binds", Test_Suite_Binds);
     Test_RunSuite("Prompt", Test_Suite_Prompt);
     Test_RunSuite("Tutorial", Test_Suite_Tutorial);
+    Test_RunSuite("Notice", Test_Suite_Notice);
     Test_RunSuite("Bed", Test_Suite_Bed);
     Test_RunSuite("Economy", Test_Suite_Economy);
     Test_RunSuite("BattleUi", Test_Suite_BattleUi);
@@ -3555,10 +3556,6 @@ function Test_Suite_RunSave() {
     Test_True("legacy: the friendly message is not empty", string_length(Save_LegacyNotice()) > 20);
     Test_False("legacy: an old file is not a current snapshot", is_struct(Save_LoadSnapshotFile(_lg)));
     Test_True("legacy: loading the old file does not delete it", file_exists(_lg));
-    var _slot1 = file_exists(Save_Path(1));
-    Test_False("legacy: the retired slot writer reports nothing written", Save_Write(1));
-    Test_Eq("legacy: the retired slot writer creates no slot file", file_exists(Save_Path(1)), _slot1);
-    Test_False("legacy: the retired slot loader loads nothing", Save_Read(1));
     Test_Eq("legacy: the old file is unchanged", Test_RawRead(_lg), _old);
     file_delete(_lg);
 
@@ -5591,6 +5588,89 @@ function Test_Suite_Tutorial() {
     global.tutorial_ui = undefined;
     Profile_ResetForTest();
     global.tutorial_off = _was_off;
+}
+
+// D96 / D108 F3a: the notice pop-up (one message, Confirm to dismiss) on the shared UI framework. Time is milliseconds only: every call below
+// passes its own clock, the game frame never advances, so a frame count anywhere in the module would make these fail.
+function Test_Suite_Notice() {
+    var _gs = GameState_Get();
+    var _mode0 = _gs.ui.mode;
+    var _f0 = Input_Frame();
+    global.notice_ui = undefined;
+    _gs.ui.mode = UI_NONE;
+    var _t0 = 100000;   // a made-up clock, far from current_time
+    Test_False("F3a nothing is open at first", Notice_IsOpen());
+    Test_Eq("F3a no text while nothing is open", Notice_Text(), "");
+    Test_False("F3a a closed notice does not block", UI_IsBlocking());
+
+    var _msg = "Saves from the earlier version cannot be loaded in this one.";
+    Notice_Open(_msg, _t0);
+    Test_True("F3a open: it is visible", Notice_IsOpen());
+    Test_Eq("F3a open: it shows the text it was given", Notice_Text(), _msg);
+    Test_Eq("F3a open: the UI mode says a notice is up", _gs.ui.mode, UI_NOTICE);
+    Test_True("F3a open: it blocks the world", UI_IsBlocking());
+    Test_False("F3a open: it is not closing", Notice_Closing());
+    Test_True("F3a the input lock is the menus' one (a few frames, in ms)", UI_INPUT_LOCK_MS > 0 && UI_INPUT_LOCK_MS < 200);
+
+    // the press that opened it must not close it: nothing answers inside the input lock
+    Test_True("F3a inside the lock: update reports it is still open", Notice_Update(_t0, true));
+    Test_False("F3a confirm at once does nothing", Notice_Closing());
+    Notice_Update(_t0 + UI_INPUT_LOCK_MS - 1, true);
+    Test_False("F3a confirm 1 ms before the lock ends does nothing", Notice_Closing());
+    Test_True("F3a still open and blocking", Notice_IsOpen() && UI_IsBlocking());
+    Notice_Update(_t0 + UI_INPUT_LOCK_MS + 500, false);
+    Test_False("F3a no press after the lock does nothing", Notice_Closing());
+
+    // confirm after the lock dismisses it: it fades out first (still open, still blocking, so the closing press cannot answer what is behind)
+    var _tc = _t0 + UI_INPUT_LOCK_MS;
+    Notice_Update(_tc, true);
+    Test_True("F3a confirm exactly when the lock ends dismisses it", Notice_Closing());
+    Test_True("F3a closing: it still blocks the world", Notice_IsOpen() && UI_IsBlocking() && _gs.ui.mode == UI_NOTICE);
+    Notice_Update(_tc + 10, true);
+    Test_Eq("F3a a second press while closing changes nothing", global.notice_ui.closed_ms, _tc);
+    Notice_Update(_tc + UI_PANEL_MS - 1, false);
+    Test_True("F3a closing: still up 1 ms before the fade ends", Notice_IsOpen());
+    Test_False("F3a closing: no longer takes an answer", Notice_CanAnswer(_tc + UI_PANEL_MS - 1));
+    Test_False("F3a the fade ends: update reports it is gone", Notice_Update(_tc + UI_PANEL_MS, false));
+    Test_False("F3a gone: not open", Notice_IsOpen());
+    Test_Eq("F3a gone: the UI mode is free again", _gs.ui.mode, UI_NONE);
+    Test_False("F3a gone: it does not block", UI_IsBlocking());
+
+    // the fade is a pure function of the clock
+    Notice_Open(_msg, _t0);
+    Test_Eq("F3a alpha is 0 when it opens", Notice_Alpha(_t0), 0);
+    Test_Eq("F3a alpha is 1 after the panel time", Notice_Alpha(_t0 + UI_PANEL_MS), 1);
+    var _mid = Notice_Alpha(_t0 + UI_PANEL_MS div 2);
+    Test_True("F3a alpha is between 0 and 1 half way", _mid > 0 && _mid < 1);
+    var _a_before = Notice_Alpha(_tc);   // dismissed half way through the fade-in: the fade-out starts from where the fade-in was
+    Notice_Update(_tc, true);
+    Test_Eq("F3a the fade-out starts from the alpha it had", Notice_Alpha(_tc), _a_before);
+    Test_Eq("F3a alpha is 0 when the fade-out ends", Notice_Alpha(_tc + UI_PANEL_MS), 0);
+    Test_True("F3a alpha falls during the fade-out", Notice_Alpha(_tc + UI_PANEL_MS div 2) < _a_before && Notice_Alpha(_tc + UI_PANEL_MS div 2) > 0);
+
+    // a new notice replaces the one that is up and starts its own lock; an interruption (a room change, a battle) removes it at once
+    Notice_Open("first", _t0);
+    Notice_Open("second", _t0 + 5000);
+    Test_Eq("F3a a second notice replaces the first", Notice_Text(), "second");
+    Test_False("F3a the replacement starts its own lock", Notice_CanAnswer(_t0 + 5000 + UI_INPUT_LOCK_MS - 1));
+    Test_True("F3a ... and answers after it", Notice_CanAnswer(_t0 + 5000 + UI_INPUT_LOCK_MS));
+    Notice_Interrupt();
+    Test_False("F3a an interruption removes it", Notice_IsOpen());
+    Test_Eq("F3a an interruption frees the UI mode", _gs.ui.mode, UI_NONE);
+
+    // the box sits inside the GUI for the three real texts
+    var _texts = [Save_LegacyNotice(), Run_ContinueFailText("corrupt"), Run_ContinueFailText("newer")];
+    var _mt = Ui_Metrics();
+    for (var _i = 0; _i < array_length(_texts); _i++) {
+        var _b = Notice_Box(_texts[_i]);
+        Test_True("F3a the box " + string(_i) + " is inside the GUI", _b.x >= 0 && _b.y >= 0 && _b.x + _b.w <= _mt.gw && _b.y + _b.h <= _mt.gh);
+        Test_True("F3a the box " + string(_i) + " is wide enough for its text", _b.iw > 0 && _b.w > _b.iw);
+    }
+    Test_True("F3a the footer carries the Confirm prompt", Prompt_HasTokens(Notice_Footer()));
+
+    Test_Eq("F3a the game frame never moved (nothing above used it)", Input_Frame(), _f0);
+    global.notice_ui = undefined;
+    _gs.ui.mode = _mode0;
 }
 
 function Test_Suite_Bed() {

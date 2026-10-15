@@ -135,7 +135,8 @@
 #macro UI_NONE     0
 #macro UI_DIALOGUE 1
 #macro UI_MENU 2
-#macro UI_SAVE 3
+#macro UI_NOTICE 3   // F3a (D96): the notice pop-up (Notice_*) is up; it blocks the title and the world until it is gone
+#macro UI_SAVE UI_NOTICE   // the old slot menu's name: obj_sfx_manager's debug overlay still reads it (that file is another packet's)
 #macro UI_PAUSE 4
 #macro UI_CLASS_SELECT 5
 #macro UI_BED 6
@@ -150,7 +151,6 @@
 #macro ENEMY_WANDER_CHANCE_DEFAULT 4
 #macro ENEMY_MOVE_SPEED_DEFAULT 1
 #macro UI_OPENED_FRAME_NONE -1
-#macro UI_POPUP_FADE_FRAMES 8
 #macro UI_DIALOGUE_REOPEN_LOCK 1
 #macro UI_DIALOGUE_CHARS_PER_SEC 60
 #macro UI_DIALOGUE_ADVANCE_HOLD_SEC 0.75   // cutscene text only

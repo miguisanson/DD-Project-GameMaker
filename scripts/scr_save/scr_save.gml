@@ -175,37 +175,15 @@ function Save_IsCurrentSnapshot(_snap) {
     return is_struct(_snap.statData);
 }
 
-// Loads a snapshot from F, or from F.bak when F is corrupt or not a current snapshot. Never throws.
-// With _delete_legacy, a file set where nothing is usable is removed (old behaviour for unreadable/old-format saves).
-function Save_LoadSnapshotFile(_path, _delete_legacy = false) {
-    var snap = Save_ReadJsonFile(_path, Save_IsCurrentSnapshot);
-    if (is_undefined(snap)) {
-        if (_delete_legacy) Save_DeleteFileSet(_path);
-        return undefined;
-    }
-    return snap;
-}
-
-function Save_TryLoadSnapshot(_slot, _delete_legacy = false) {
-    return Save_LoadSnapshotFile(Save_Path(_slot), _delete_legacy);
+// Loads a snapshot from F, or from F.bak when F is corrupt or not a current snapshot. Never throws. Nothing is ever deleted (D16).
+function Save_LoadSnapshotFile(_path) {
+    return Save_ReadJsonFile(_path, Save_IsCurrentSnapshot);
 }
 
 function Save_LoadLatestSettings() {
     var cfg = Save_ReadSettingsConfig();
     if (is_struct(cfg)) return cfg;
     return undefined;
-}
-
-function Save_HasSlot(_slot) {
-    var info = Save_SlotInfo(_slot);
-    return is_struct(info) && variable_struct_exists(info, "exists") && info.exists;
-}
-
-function Save_HasAnySlot() {
-    for (var i = 1; i <= 3; i++) {
-        if (Save_HasSlot(i)) return true;
-    }
-    return false;
 }
 
 function Save_PersistEntryEnemyId(_entry, _key = "") {
@@ -451,57 +429,6 @@ function Save_Path(_slot) {
     var idx = _slot;
     if (idx <= 0) idx = 0; else idx = _slot - 1;
     return "savedata" + string(idx) + ".sav";
-}
-
-// Retired by C1 (D16, D46): the three save slots are gone. Old slot files are recognised (Save_LegacyFilesExist) but never written,
-// loaded or deleted. The old slot menu in scr_save_menu is dead code that the UI packet (D1) removes; these stubs keep it harmless.
-function Save_Write(_slot) {
-    return false;
-}
-
-function Save_HealPlayerToFull() {
-    var gs = GameState_Get();
-    if (!is_struct(gs.player_ch)) return;
-
-    var ch = Player_NormalizeProgression(gs.player_ch, true, false);
-    ch.hp = ch.max_hp;
-    ch.mp = ch.max_mp;
-
-    gs.player_ch = ch;
-    GameState_SyncLegacy();
-
-    var pl = gs.player_inst;
-    if (!instance_exists(pl) && instance_exists(obj_player)) pl = instance_find(obj_player, 0);
-    if (instance_exists(pl) && variable_instance_exists(pl, "character")) {
-        pl.character = ch;
-    }
-}
-
-function Save_Read(_slot) {
-    return false;   // retired, see Save_Write
-}
-
-function Save_Delete(_slot) {
-    // retired, see Save_Write: an old slot file is never deleted
-}
-
-function Save_SlotInfo(_slot) {
-    var snap = Save_TryLoadSnapshot(_slot, false);
-    if (!is_struct(snap)) return { exists: false, class_name: "", level: 0, room: "" };
-    var stat = {};
-    if (variable_struct_exists(snap, "statData")) stat = snap.statData; else stat = snap;
-
-    var class_name = "";
-    var lvl = 1;
-    if (variable_struct_exists(stat, "player") && variable_struct_exists(stat.player, "level")) lvl = stat.player.level;
-    if (variable_struct_exists(stat, "selected_class")) {
-        var cfg = DB_PlayerClass(stat.selected_class);
-        if (is_struct(cfg) && variable_struct_exists(cfg, "name")) class_name = cfg.name;
-    }
-    var room_name = "";
-    if (variable_struct_exists(stat, "save_room_name")) room_name = stat.save_room_name;
-
-    return { exists: true, class_name: class_name, level: lvl, room: room_name };
 }
 
 // ============================================================================================================

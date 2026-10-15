@@ -12,8 +12,6 @@ draw_set_alpha(1);
 
 // The battle's HUD (HP, MP, statuses, strip, log, menus) is drawn by obj_battle_controller (D99).
 
-UI_DrawModalDim();
-
 if (gs.ui.mode == UI_PAUSE) {
     if (room != rm_battle) PauseMenu_Draw();   // R1b (D122): in a battle the battle controller draws it, after its own HUD
     exit;
@@ -51,9 +49,7 @@ Hud_DrawGold();   // C3 (D23): the run's gold, in the world and in battle
 
 Dialogue_Draw();   // D101: the framed box with the speaker tab, the typewriter text, the arrow and any choices
 
-if (gs.ui.mode == UI_SAVE) {
-    SaveMenu_Draw();
-}
+Notice_Draw();   // F3a: the notice pop-up (D96), over the screens above and under the banner, the tutorial and the fade
 
 if (gs.ui.mode == UI_BED) {
     BedMenu_Draw();
