@@ -548,7 +548,10 @@ function Scenario_StepSmoke(_s) {
             break;
         case 680: case 681: case 682: case 683: case 684: case 685: case 686: case 687: case 688: case 689:
         case 690: case 691: case 692: case 693: case 694: case 695: case 696: case 697: case 698: case 699:
-            Scenario_StepSmokeNotes(_s);   // H7 (D147): lore notes are picked up by walking onto them, never block, stay gone; the Codex Notes page and its reader; its last step calls Scenario_NoticeEnd
+            Scenario_StepSmokeNotes(_s);   // H7 (D147): lore notes are picked up by walking onto them, never block, stay gone; the Codex Notes page and its reader; its last step goes on with hunt 5a (800)
+            break;
+        case 800: case 801: case 802: case 803: case 804: case 805: case 806: case 807: case 808: case 809:
+            Scenario_StepSmokeHunt5a(_s);   // hunt 5a: the quit-before-fight snapshot is gone when a fight is won or lost; its last step calls Scenario_NoticeEnd
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -12648,7 +12651,7 @@ function Scenario_StepSmokeNotes(_s) {
                 case 70: Scenario_Tap("cancel"); break;
                 case 90:
                     Scenario_Check("notes_back_back_back_closes_the_menu", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
-                    Scenario_NoticeEnd();
+                    Scenario_Next(_s, 800);   // hunt 5a (800..803) goes on from here; its last step calls Scenario_NoticeEnd
                     break;
             }
             break;
@@ -12751,6 +12754,86 @@ function Scenario_StepShotsNotes(_s) {
                     Scenario_Next(_s, 700);
                 }
             }
+            break;
+    }
+}
+
+// ---- Bug hunt 5a (D141), steps 800..803. They go on from the Notes steps (a run in a map room); the last one calls Scenario_NoticeEnd.
+// 800/801: the snapshot taken before a fight (as EnemyPersist_BeginEncounter takes it) is held in the fight and gone once the fight is WON and the map is back.
+// 802/803: the same, but the fight is LOST (1 HP, poisoned): the snapshot is gone when the run ends. ----
+function Scenario_StepSmokeHunt5a(_s) {
+    var _gs = GameState_Get();
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+    if (!variable_struct_exists(_s, "h5")) _s.h5 = {};
+    var _h = _s.h5;
+    var _ready_tap = ((_s.f - _s.last_tap) >= 4);
+    switch (_s.step) {
+        case 800:   // a snapshot, then a battle that starts without BeginEncounter (the snapshot is all that says "a map fight began")
+            if (_s.t == 1) {
+                Scenario_Release();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                if (room != rm_floor1 && !Transition_IsActive()) room_goto(rm_floor1);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                Scenario_Check("hunt5a_a_snapshot_is_taken_before_the_fight", EnemyPersist_SnapshotRun() && EnemyPersist_HasSnapshot());
+                _s.boost = { hp: 9999, mp: 99 };   // the battle copy of the player is sturdy: the fight is only the way to the win
+                Scenario_GotoBattle("h5a_win", ENEMY_SLIME);
+                Scenario_Next(_s, 801);
+            }
+            if (_s.t > 600) { Scenario_Check("hunt5a_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 801:   // 1 HP left on the enemy when the menu is up, ATTACK through the menu; back on the map
+            if (_bc != noone) {
+                if (!variable_struct_exists(_h, "in_fight")) {
+                    _h.in_fight = true;
+                    Scenario_Check("hunt5a_the_snapshot_is_held_during_the_fight", EnemyPersist_HasSnapshot());
+                }
+                if (_s.t > 10 && !_bc.battle_over && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready_tap) {
+                    if (!variable_struct_exists(_h, "e1")) { _h.e1 = true; _bc.e.hp = 1; }
+                    Scenario_Tap((_bc.menu_index != 0) ? "menu_up" : "confirm");
+                }
+            }
+            if (variable_struct_exists(_h, "in_fight") && room == rm_floor1 && Scenario_FloorReady(rm_floor1)) {
+                Scenario_Check("hunt5a_a_won_fight_leaves_no_snapshot", !EnemyPersist_HasSnapshot());
+                Scenario_Next(_s, 802);
+            }
+            if (_s.t > 3000) { Scenario_Check("hunt5a_the_fight_is_won", false, "room=" + room_get_name(room) + " state=" + string(_bc != noone ? _bc.battle_state : -1)); Scenario_NoticeEnd(); }
+            break;
+        case 802:   // a snapshot again, then a battle the player will lose
+            if (_s.t == 1) {
+                Scenario_Release();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                Scenario_Check("hunt5a_a_second_snapshot_is_taken", EnemyPersist_SnapshotRun() && EnemyPersist_HasSnapshot());
+                Scenario_GotoBattle("h5a_lose", ENEMY_SLIME);
+                Scenario_Next(_s, 803);
+            }
+            if (_s.t > 600) { Scenario_Check("hunt5a_back_in_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 803:   // 1 HP and 3 Poison stacks, an enemy that never acts; ATTACK through the menu: the tick after it takes the last HP
+            if (!variable_struct_exists(_h, "p_set")) {
+                if (_bc != noone && _s.t > 10 && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) {
+                    _h.p_set = true;
+                    _h.d0 = Profile_Get().deaths;
+                    _bc.e.max_hp = 999;
+                    _bc.e.hp = 999;
+                    Turn_Push(_bc.tl, TL_ENEMY, 100000);
+                    _bc.p.hp = 1;
+                    _bc.p = Status_Add(_bc.p, STATUS_POISON, 0, 0, 3);
+                    Scenario_Check("hunt5a_the_snapshot_is_held_in_the_lost_fight", EnemyPersist_HasSnapshot());
+                }
+            } else if (_bc != noone && !_bc.battle_over && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready_tap) {
+                Scenario_Tap((_bc.menu_index != 0) ? "menu_up" : "confirm");
+            }
+            if (variable_struct_exists(_h, "p_set") && Profile_Get().deaths > _h.d0) {
+                Scenario_Check("hunt5a_the_player_died", _gs.player_ch.hp <= 0, "hp=" + string(_gs.player_ch.hp));
+                Scenario_Check("hunt5a_a_lost_fight_leaves_no_snapshot", !EnemyPersist_HasSnapshot());
+                Scenario_NoticeEnd();
+            }
+            if (_s.t > 1500) { Scenario_Check("hunt5a_the_fight_is_lost", false, "state=" + string(_bc != noone ? _bc.battle_state : -1) + " set=" + string(variable_struct_exists(_h, "p_set")) + " room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
     }
 }

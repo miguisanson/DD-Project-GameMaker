@@ -134,6 +134,7 @@ function Test_RunAll() {
     Test_RunSuite("CutSkip", Test_Suite_CutSkip);
     Test_RunSuite("Lighting", Test_Suite_Lighting);
     Test_RunSuite("Notes", Test_Suite_Notes);
+    Test_RunSuite("Hunt5a", Test_Suite_Hunt5a);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -11630,4 +11631,75 @@ function Test_Suite_Notes() {
     Test_True("D147 found notes survive the profile file", Note_IsCollected(_lr.profile, "wall_breath") && Note_IsCollected(_lr.profile, "carved_arrow") && !Note_IsCollected(_lr.profile, "map_page"));
     Test_Eq("D147 the count survives the profile file", Codex_NoteCount(_lr.profile), 2);
     Save_DeleteFileSet(_f);
+}
+
+// Bug hunt 5a (D141): the quit-before-fight snapshot belongs to ONE fight. It is taken by EnemyPersist_BeginEncounter and must be gone when that fight ends
+// (won, fled, lost) or once Quit has used it, or a later quit in a fight that did not start from the map would write a stale run over the autosave.
+// The "lost" path (Run_OnPlayerDeath) is checked by the smoke steps 800..802.
+function Test_Suite_Hunt5a() {
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    var _old_persist = _gs.persist;
+    var _old_pid = _gs.battle.enemy_persist_id;
+    var _old_eid = _gs.battle.enemy_id;
+    var _old_room = _gs.battle.enemy_room;
+    _gs.persist = {};
+
+    // the clear itself
+    global.encounter_snapshot = "{}";
+    Test_True("hunt5a: a snapshot is held (setup)", EnemyPersist_HasSnapshot());
+    EnemyPersist_ClearSnapshot();
+    Test_False("hunt5a: clearing the snapshot leaves none", EnemyPersist_HasSnapshot());
+    EnemyPersist_ClearSnapshot();
+    Test_False("hunt5a: clearing with none is harmless", EnemyPersist_HasSnapshot());
+
+    // a won fight from the map
+    _gs.battle.enemy_persist_id = "h5a_e1";
+    _gs.battle.enemy_id = 0;
+    _gs.battle.enemy_room = rm_floor2;
+    global.encounter_snapshot = "{}";
+    EnemyPersist_ResolveBattle(true);
+    Test_False("hunt5a: a won fight clears the snapshot", EnemyPersist_HasSnapshot());
+
+    // a fled fight from the map
+    global.encounter_snapshot = "{}";
+    EnemyPersist_ResolveBattle(false);
+    Test_False("hunt5a: a fled fight clears the snapshot", EnemyPersist_HasSnapshot());
+
+    // a fight that did not start from the map (no enemy to resolve) still ends
+    _gs.battle.enemy_persist_id = "";
+    global.encounter_snapshot = "{}";
+    EnemyPersist_ResolveBattle(true);
+    Test_False("hunt5a: a won fight with no map enemy clears the snapshot", EnemyPersist_HasSnapshot());
+    global.encounter_snapshot = "{}";
+    EnemyPersist_ResolveBattle(false);
+    Test_False("hunt5a: a fled fight with no map enemy clears the snapshot", EnemyPersist_HasSnapshot());
+
+    // Quit used it: a second quit must not write it again
+    var _gs2 = _gs;
+    var _had_run = variable_struct_exists(_gs2, "run");
+    var _old_run = _had_run ? _gs2.run : undefined;
+    var _old_cp = _gs2.checkpoint;
+    var _old_ch = _gs2.player_ch;
+    var _old_flags = _gs2.flags;
+    _gs2.run = Run_Create(5151);
+    _gs2.checkpoint = { room: rm_floor2, x: 48, y: 64 };
+    _gs2.player_ch = CharacterCreate_Player(CLASS_MAGE);
+    _gs2.flags = {};
+    var _f = "test_hunt5a_run.sav";
+    Save_DeleteFileSet(_f);
+    Test_True("hunt5a: a snapshot is taken (setup)", EnemyPersist_SnapshotRun());
+    Test_True("hunt5a: Quit writes it", EnemyPersist_WriteSnapshot(_f));
+    Test_False("hunt5a: once written the snapshot is spent", EnemyPersist_HasSnapshot());
+    Test_False("hunt5a: a second write has nothing to write", EnemyPersist_WriteSnapshot(_f));
+    global.encounter_snapshot = undefined;
+    Save_DeleteFileSet(_f);
+    if (_had_run) _gs2.run = _old_run; else variable_struct_remove(_gs2, "run");
+    _gs2.checkpoint = _old_cp;
+    _gs2.player_ch = _old_ch;
+    _gs2.flags = _old_flags;
+
+    _gs.persist = _old_persist;
+    _gs.battle.enemy_persist_id = _old_pid;
+    _gs.battle.enemy_id = _old_eid;
+    _gs.battle.enemy_room = _old_room;
 }

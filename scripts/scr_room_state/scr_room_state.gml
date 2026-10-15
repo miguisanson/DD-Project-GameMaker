@@ -1129,6 +1129,11 @@ function EnemyPersist_SnapshotRun() {
     return is_string(global.encounter_snapshot);
 }
 
+// The snapshot belongs to one fight: forgotten when that fight ends (hunt 5a), so a later fight that did not begin on the map cannot write it.
+function EnemyPersist_ClearSnapshot() {
+    global.encounter_snapshot = undefined;
+}
+
 function EnemyPersist_HasSnapshot() {
     return variable_global_exists("encounter_snapshot") && is_string(global.encounter_snapshot);
 }
