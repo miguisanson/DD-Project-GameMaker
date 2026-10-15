@@ -8,3 +8,7 @@
 - H5: one fast gate run exited with a native crash code AFTER printing fail=0 errors=0 (rerun clean) — check the game's exit path (surfaces/sprites created at runtime, Game End save).
 - H13: G7 smoke check g7_the_enemy_turn_with_run_held_takes_about_half_the_time flaked once (368 vs 333 ms) under parallel gates — timing check may need a wider margin or frame-based measure.
 - H5: dead D130 item-echo functions (Run_EchoFilter, Run_EchoOptionsFor, Run_EchoPoolAfter, Run_EchoGrantTo) + their checks; remove together.
+- H8a: enemy plate status sentence shows only on mouse hover — no keyboard/pad way to highlight it (D150 wants it on highlight).
+- H8a: Tonic Blend (HP+MP) refused at full HP even with MP missing — should be allowed when any part helps.
+- H8a: Korean status short names 갈증/굳힘 deviate from glossary 굶주림/굳히기 (H12b).
+- H8a: attack preview plate truncates 'Damag..' at 800x720 (H13b text sweep).
