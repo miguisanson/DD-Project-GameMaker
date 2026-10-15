@@ -1,6 +1,6 @@
 // Title menu (D0 UI framework, scr_menu.gml Title_*): the stack is built on the first Step in state "main".
 title_stk = undefined;
-title_exit = undefined;      // { value, at }: the difficulty was chosen, the intro starts when the panel has faded
+title_exit = undefined;      // { at }: New Game was chosen, the run starts when the title menu has faded
 title_refresh = true;        // relabel the title items (language or save files may have changed)
 cutscene_id = "";
 cutscene_started = false;

@@ -540,16 +540,9 @@ function Scenario_StepSmokeUi(_s) {
             break;
         case 72:
             Scenario_Check("ui_title_cursor_back_on_new_game", _top.cursor == 0, "cursor=" + string(_top.cursor));
-            Scenario_Tap("confirm");
             break;
         case 80:
-            Scenario_Check("ui_new_game_opens_the_difficulty_level", _c.state == "difficulty" && Ui_StackDepth(_c.title_stk) == 2, "state=" + string(_c.state));
-            Scenario_Check("ui_difficulty_starts_on_normal", Ui_StackTop(_c.title_stk).cursor == 1);
-            Scenario_Tap("cancel");
-            break;
-        case 100:
-            Scenario_Check("ui_back_leaves_difficulty_one_level", _c.state == "main" && Ui_StackDepth(_c.title_stk) == 1, "state=" + string(_c.state) + " depth=" + string(Ui_StackDepth(_c.title_stk)));
-            Scenario_Tap("cancel");
+            Scenario_Tap("cancel");   // D35: no difficulty level; Back on the title root is the next thing to check
             break;
         case 106:
             Scenario_Check("ui_back_at_the_root_stays_on_the_title", _c.state == "main" && Ui_StackDepth(_c.title_stk) == 1);
@@ -580,29 +573,28 @@ function Scenario_StepSmokeUi(_s) {
     }
 }
 
-// New Game from the title: confirm, pick Easy in the difficulty panel, and the intro cutscene starts with that difficulty.
+// New Game from the title (D35: one difficulty only): confirm on New Game starts the run at once. No difficulty menu may appear on
+// any frame, and the run starts on Normal even when the game was left on another value.
 function Scenario_StepSmokeUiStart(_s) {
     var _c = obj_start_controller;
+    if (_s.t > 1 && string(_c.state) == "difficulty") _s.diff_menu_seen = true;
     switch (_s.t) {
         case 1:
+            _s.diff_menu_seen = false;
             Ui_MenuFixCursor(Ui_StackTop(_c.title_stk), 0);   // the hold left the cursor anywhere
-            Scenario_Tap("confirm");
-            break;
-        case 20:
-            Scenario_Check("ui_new_game_shows_the_difficulty_panel", _c.state == "difficulty", "state=" + string(_c.state));
-            Scenario_Tap("menu_up");
-            break;
-        case 26:
+            Difficulty_SetCurrent(DIFFICULTY_HARD);   // a stale value: New Game must start on Normal, not keep it
             Scenario_Tap("confirm");
             break;
         default:
-            if (_s.t > 26 && room == rm_cutscene && obj_start_controller.cutscene_started && !Transition_IsActive() && GameState_Get().ui.mode == UI_DIALOGUE) {
-                Scenario_Check("ui_difficulty_choice_starts_the_intro_with_it", Difficulty_GetCurrent() == DIFFICULTY_EASY, "difficulty=" + string(Difficulty_GetCurrent()));
+            if (_s.t > 1 && room == rm_cutscene && obj_start_controller.cutscene_started && !Transition_IsActive() && GameState_Get().ui.mode == UI_DIALOGUE) {
+                Scenario_Check("ui_new_game_opens_no_difficulty_menu", !_s.diff_menu_seen, "a difficulty state appeared");
+                Scenario_Check("ui_new_game_starts_the_intro_on_normal", Difficulty_GetCurrent() == DIFFICULTY_NORMAL, "difficulty=" + string(Difficulty_GetCurrent()));
                 Scenario_Hold("confirm", 120);   // D48: hold to skip the intro, then through the rm_floor1 intro dialogue (next step)
                 Scenario_Next(_s, 33);
             }
             if (_s.t > 600) {
-                Scenario_Check("ui_difficulty_choice_starts_the_intro_with_it", false, "room=" + room_get_name(room));
+                Scenario_Check("ui_new_game_opens_no_difficulty_menu", !_s.diff_menu_seen, "a difficulty state appeared");
+                Scenario_Check("ui_new_game_starts_the_intro_on_normal", false, "room=" + room_get_name(room) + " state=" + string(_c.state));
                 Scenario_Finish();
             }
             break;
@@ -2590,7 +2582,7 @@ function Scenario_StepShots(_s) {
         case 60: case 61: case 62: case 63: case 64: case 65: case 66: case 67: case 68:
             Scenario_StepShotsWorld(_s);
             break;
-        case 80: case 81: case 82: case 83: case 84: case 85: case 86: case 87: case 88: case 89:
+        case 80: case 82: case 83: case 84: case 85: case 86: case 87: case 88: case 89:
             Scenario_StepShotsUi(_s);
             break;
         case 90: case 91: case 92: case 93: case 94: case 95: case 96: case 97:
@@ -3244,8 +3236,8 @@ function Scenario_StepShotsWindow(_s) {
     }
 }
 
-// D0: the shared UI framework on screen at window scale 3 (480 x 432, the GUI grid is the same size): the title menu, the difficulty
-// panel, the settings screen with its details panel (volume row, then the text speed row with its number line), Korean, and the
+// D0: the shared UI framework on screen at window scale 3 (480 x 432, the GUI grid is the same size): the title menu,
+// the settings screen with its details panel (volume row, then the text speed row with its number line), Korean, and the
 // component kit (tabs header, speaker tab, details panel). Everything is reached through real input. Files shot_ui_<name>_<w>x<h>.png.
 function Scenario_ShotUi(_s, _name) {
     _s.shot = "shot_ui_" + _name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
@@ -3261,19 +3253,11 @@ function Scenario_StepShotsUi(_s) {
             if (_s.t == 90) {
                 Scenario_Check("shots_ui_title_state", _c != noone && _c.state == "main", "state=" + ((_c != noone) ? string(_c.state) : "no controller"));
                 Scenario_ShotUi(_s, "title");
-                Scenario_Next(_s, 81);
-            }
-            break;
-        case 81:   // New Game -> the difficulty panel
-            if (_s.t == 3) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Tap("confirm"); }
-            if (_s.t == 40) {
-                Scenario_Check("shots_ui_difficulty_state", _c.state == "difficulty", "state=" + string(_c.state));
-                Scenario_ShotUi(_s, "difficulty");
                 Scenario_Next(_s, 82);
             }
             break;
-        case 82:   // Back -> down to Settings -> confirm
-            if (_s.t == 3) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Tap("cancel"); }
+        case 82:   // down to Settings -> confirm (D35: no difficulty panel between the title and here)
+            if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
             if (_s.t == 10) { RunSave_Delete(); _c.title_refresh = true; }   // C1: an earlier shot started a run; with no run save Continue is greyed and Down lands on Settings
             if (_s.t == 30) Scenario_Tap("menu_down");
             if (_s.t == 36) Scenario_Tap("confirm");
