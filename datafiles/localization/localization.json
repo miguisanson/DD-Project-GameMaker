@@ -3,7 +3,7 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T14:21:24Z",
+    "generated_at_utc": "2026-10-15T15:16:31Z",
     "row_count": 1046
   },
   "default_lang": "en",
@@ -624,29 +624,25 @@
       "en": "Level {lvl}: place 1 point",
       "ko": "레벨 {lvl}: 포인트 1개 배분"
     },
-    "class.lbl.five": {
-      "en": "5 to find",
-      "ko": "찾을 스킬 5개"
-    },
     "class.lbl.none": {
       "en": "None",
       "ko": "없음"
     },
     "class.line.archer": {
-      "en": "Fast and sharp. High speed, poison and double shots to find.",
-      "ko": "빠르고 날카롭다. 높은 속도, 독과 연속 사격을 찾아보자."
+      "en": "A scout of the dark tunnels. Quick and sharp: poison and double shots.",
+      "ko": "어두운 터널의 척후병. 빠르고 날카롭습니다. 독과 연속 사격."
     },
     "class.line.knight": {
-      "en": "A sturdy fighter. Strong attack and defense, five skills to find.",
-      "ko": "듬직한 전사. 강한 공격과 방어, 찾아야 할 스킬 5개."
+      "en": "Guard of the fallen keep. Hits hard, takes hits harder. Stands firm.",
+      "ko": "무너진 보루의 수호병. 강하게 치고 더 단단히 버팁니다."
     },
     "class.line.mage": {
-      "en": "A spell caster. Great magic and MP, five skills to find.",
-      "ko": "주문 시전자. 뛰어난 마법과 MP, 찾아야 할 스킬 5개."
+      "en": "A scholar who heard the dark. Frail, but great magic and mana.",
+      "ko": "어둠의 소리를 들은 학자. 약하지만 마법과 마나가 대단합니다."
     },
     "class.line.nobody": {
-      "en": "No skills at all. Fight with your blade, your passives and your items.",
-      "ko": "스킬이 전혀 없다. 칼, 패시브, 아이템으로 싸운다."
+      "en": "No name, no past, no skills. Only blade, passives and items.",
+      "ko": "이름도 과거도 스킬도 없습니다. 칼과 패시브와 아이템뿐."
     },
     "class.name.archer": {
       "en": "Archer",
@@ -695,6 +691,10 @@
     "class.select.title": {
       "en": "Select class",
       "ko": "직업 선택"
+    },
+    "class.skill.unknown": {
+      "en": "???",
+      "ko": "???"
     },
     "combat.foresee.attack": {
       "en": "a plain attack",
@@ -1673,8 +1673,8 @@
       "ko": "베어 낸 나무 그루터기."
     },
     "echo.pick.title": {
-      "en": "Keep one echo of the last fall",
-      "ko": "지난 추락의 메아리 하나를 간직합니다"
+      "en": "Keep one skill you remember",
+      "ko": "기억하는 스킬 하나를 간직합니다"
     },
     "elite.line.armored": {
       "en": "Armored: +{n} DEF.",

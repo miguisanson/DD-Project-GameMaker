@@ -9969,6 +9969,7 @@ function Test_ClassMemMigration() {
     var _bad = Profile_Normalize({ profile_version: 2, skills_known: [1, 2] });
     Test_Eq("H5 normalize: a wrong-typed memory falls back to empty", array_length(variable_struct_get_names(_bad.skills_known)), 0);
     // a newer file is still refused
+    Save_DeleteFileSet(_f);
     Test_RawWrite(_f, json_stringify({ profile_version: 3, deaths: 1 }));
     Test_Eq("H5 migration: version 3 is still newer", Profile_Load(_f).status, "newer");
     Save_DeleteFileSet(_f);
@@ -10023,12 +10024,12 @@ function Test_ClassMemRecording() {
 
 function Test_ClassMemClassLists() {
     Test_True("H5 class skills: Knight has Wound, Hilt Bash, Muscle Up, Rev Up, Horizontal Slash", Test_ClassMemSameSet(Skill_IdsOfClass(CLASS_KNIGHT), [SKILL_WOUND, SKILL_HILT_BASH, SKILL_MUSCLE_UP, SKILL_REV_UP, SKILL_HORIZ_SLASH]));
-    Test_True("H5 class skills: Archer has Rev Up, Poison Arrow, Evasion, Double Shot, Take Aim", Test_ClassMemSameSet(Skill_IdsOfClass(CLASS_ARCHER), [SKILL_REV_UP, SKILL_POISON_ARROW, SKILL_EVASION, SKILL_DOUBLE_SHOT, SKILL_TAKE_AIM]));
+    Test_True("H5 class skills: Archer has Wound, Poison Arrow, Evasion, Double Shot, Take Aim", Test_ClassMemSameSet(Skill_IdsOfClass(CLASS_ARCHER), [SKILL_WOUND, SKILL_POISON_ARROW, SKILL_EVASION, SKILL_DOUBLE_SHOT, SKILL_TAKE_AIM]));
     Test_True("H5 class skills: Mage has Fireball, Poison Mist, Ice Spear, Meditation, Foresight", Test_ClassMemSameSet(Skill_IdsOfClass(CLASS_MAGE), [SKILL_FIREBALL, SKILL_POISON_MIST, SKILL_ICE_SPEAR, SKILL_MEDITATION, SKILL_FORESIGHT]));
     Test_Eq("H5 class skills: Nobody has none", array_length(Skill_IdsOfClass(CLASS_NOBODY)), 0);
     var _p = Test_ClassMemSet([SKILL_WOUND, SKILL_REV_UP, SKILL_FIREBALL]);
     Test_True("H5 known of class: a Knight knows Wound and Rev Up only", Test_ClassMemSameSet(Skill_KnownOfClass(_p, CLASS_KNIGHT), [SKILL_WOUND, SKILL_REV_UP]));
-    Test_True("H5 known of class: an Archer knows Rev Up only (the skill is shared)", Test_ClassMemSameSet(Skill_KnownOfClass(_p, CLASS_ARCHER), [SKILL_REV_UP]));
+    Test_True("H5 known of class: an Archer knows Wound only (the skill is shared with the Knight)", Test_ClassMemSameSet(Skill_KnownOfClass(_p, CLASS_ARCHER), [SKILL_WOUND]));
     Test_True("H5 known of class: a Mage knows Fireball only", Test_ClassMemSameSet(Skill_KnownOfClass(_p, CLASS_MAGE), [SKILL_FIREBALL]));
     Test_Eq("H5 known of class: Nobody knows none", array_length(Skill_KnownOfClass(_p, CLASS_NOBODY)), 0);
 }
@@ -10063,11 +10064,11 @@ function Test_ClassMemEcho() {
     var _seen = {};
     for (var _sd = 1; _sd <= 30; _sd++) variable_struct_set(_seen, json_stringify(Test_ClassMemOfferIds(Run_EchoSkillOptions(_five, CLASS_KNIGHT, _sd))), true);
     Test_True("H5 echo: other seeds can give other offers", array_length(variable_struct_get_names(_seen)) > 1);
-    // a shared skill is offered to both its classes, never to the Mage
-    var _rev = Test_ClassMemSet([SKILL_REV_UP]);
-    Test_Eq("H5 echo: Rev Up is offered to a Knight", array_length(Run_EchoSkillOptions(_rev, CLASS_KNIGHT, 1)), 1);
-    Test_Eq("H5 echo: and to an Archer", array_length(Run_EchoSkillOptions(_rev, CLASS_ARCHER, 1)), 1);
-    Test_Eq("H5 echo: but not to a Mage", array_length(Run_EchoSkillOptions(_rev, CLASS_MAGE, 1)), 0);
+    // a shared skill (Wound belongs to the Knight and the Archer) is offered to both its classes, never to the Mage
+    var _wnd = Test_ClassMemSet([SKILL_WOUND]);
+    Test_Eq("H5 echo: Wound is offered to a Knight", array_length(Run_EchoSkillOptions(_wnd, CLASS_KNIGHT, 1)), 1);
+    Test_Eq("H5 echo: and to an Archer", array_length(Run_EchoSkillOptions(_wnd, CLASS_ARCHER, 1)), 1);
+    Test_Eq("H5 echo: but not to a Mage", array_length(Run_EchoSkillOptions(_wnd, CLASS_MAGE, 1)), 0);
     // a skill the character already holds is not offered again
     var _own = Run_EchoSkillOptions(_two, CLASS_KNIGHT, 5, [SKILL_WOUND]);
     Test_True("H5 echo: a skill already held is left out", Test_ClassMemSameSet(Test_ClassMemOfferIds(_own), [SKILL_HILT_BASH]));
@@ -10086,11 +10087,12 @@ function Test_ClassMemEcho() {
     var _g2 = Run_EchoGrant(Card_ClassCharacter(CharacterCreate_Player(CLASS_NOBODY), CLASS_MAGE));
     Test_True("H5 grant: a Mage is offered only the discovered Mage skill", Test_ClassMemSameSet(Test_ClassMemOfferIds(_g2.echo_offer), [SKILL_FIREBALL]));
     var _g3 = Run_EchoGrant(Card_ClassCharacter(CharacterCreate_Player(CLASS_NOBODY), CLASS_ARCHER));
-    Test_Eq("H5 grant: an Archer with none of its own gets no echo", array_length(_g3.echo_offer), 0);
+    Test_True("H5 grant: an Archer is offered the shared Wound only", Test_ClassMemSameSet(Test_ClassMemOfferIds(_g3.echo_offer), [SKILL_WOUND]));
     // taking it puts it in the deck
     var _taken = Run_EchoTake(_g1, 0);
     Test_True("H5 grant: taking the echo puts the skill in the deck", array_contains(_taken.skills, SKILL_WOUND) && array_length(_taken.echo_offer) == 0);
     // an old item pool in the profile is read, ignored, and cleared by the class pick
+    Profile_ResetForTest();
     var _pf = Profile_Get();
     _pf.echo_pool = [{ kind: "item", id: 11 }];
     var _g4 = Run_EchoGrant(Card_ClassCharacter(CharacterCreate_Player(CLASS_NOBODY), CLASS_ARCHER));
@@ -10116,7 +10118,7 @@ function Test_ClassMemMenu() {
         Test_Eq("H5 menu: and the details panel lines show them too (class " + string(_c) + ")", _lq, 5);
     }
     // discovered ones show by name
-    var _known = Test_ClassMemSet([SKILL_WOUND, SKILL_HILT_BASH, SKILL_REV_UP]);
+    var _known = Test_ClassMemSet([SKILL_WOUND, SKILL_HILT_BASH, SKILL_REV_UP]);   // Wound is shared by the Knight and the Archer
     var _m2 = CardsUi_ClassMenu(_known);
     var _kn = _m2.items[0];
     var _names = [];
@@ -10129,7 +10131,7 @@ function Test_ClassMemMenu() {
     var _ar = _m2.items[1];
     var _arn = 0;
     for (var _k3 = 0; _k3 < array_length(_ar.skills); _k3++) { if (_ar.skills[_k3].known) _arn++; }
-    Test_Eq("H5 menu: the Archer shows the shared Rev Up only", _arn, 1);
+    Test_Eq("H5 menu: the Archer shows the shared Wound only", _arn, 1);
     var _ma = _m2.items[2];
     var _man = 0;
     for (var _k4 = 0; _k4 < array_length(_ma.skills); _k4++) { if (_ma.skills[_k4].known) _man++; }

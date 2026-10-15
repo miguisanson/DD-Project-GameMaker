@@ -2000,7 +2000,10 @@ function Card_Take(_ch, _card_id) {
     switch (c.kind) {
         case "skill":
             if (array_length(ch.skills) >= CARD_MAX_SKILLS) out.needs_replace = true;
-            else if (!Card_ArrayHas(ch.skills, c.skill_id)) array_push(ch.skills, c.skill_id);
+            else if (!Card_ArrayHas(ch.skills, c.skill_id)) {
+                array_push(ch.skills, c.skill_id);
+                Skill_Discover(c.skill_id);   // D148: the profile remembers every skill that was ever learned
+            }
         break;
         case "upgrade":
             if (!Card_ArrayHas(ch.upgrades, c.skill_id)) array_push(ch.upgrades, c.skill_id);
@@ -2039,6 +2042,7 @@ function Card_ReplaceSkill(_ch, _old_skill, _new_skill) {
     }
     ch.upgrades = Card_ArrayWithout(ch.upgrades, _old_skill);
     ch.skill_pending = -1;
+    Skill_Discover(_new_skill);   // D148
     return ch;
 }
 
@@ -2057,12 +2061,46 @@ function Card_ClassChoices(_prof = undefined) {
 
 function Card_ClassSentence(_class_id) {
     switch (_class_id) {
-        case CLASS_KNIGHT: return Loc_T("class.line.knight", "A sturdy fighter. Strong attack and defence, five skills to find.");
-        case CLASS_ARCHER: return Loc_T("class.line.archer", "Fast and sharp. High speed, poison and double shots to find.");
-        case CLASS_MAGE: return Loc_T("class.line.mage", "A spell caster. Great magic and mana, five spells to find.");
-        case CLASS_NOBODY: return Loc_T("class.line.nobody", "No skills at all. Fight with your blade, your passives and your items.");
+        case CLASS_KNIGHT: return Loc_T("class.line.knight", "Guard of the fallen keep. Hits hard, takes hits harder. Stands firm.");
+        case CLASS_ARCHER: return Loc_T("class.line.archer", "A scout of the dark tunnels. Quick and sharp: poison and double shots.");
+        case CLASS_MAGE: return Loc_T("class.line.mage", "A scholar who heard the dark. Frail, but great magic and mana.");
+        case CLASS_NOBODY: return Loc_T("class.line.nobody", "No name, no past, no skills. Only blade, passives and items.");
     }
     return "";
+}
+
+// ---- skill memory on the class screen (D148) ----
+// The player skills of a class, in id order (the skill cards' class lists; Rev Up belongs to both the Knight and the Archer). Nobody has none.
+function Skill_IdsOfClass(_class_id) {
+    var out = [];
+    var clist = CardDB_All();
+    for (var i = 0; i < array_length(clist); i++) {
+        var c = clist[i];
+        if (c.kind != "skill" || array_length(c.classes) <= 0 || !Card_ArrayHas(c.classes, _class_id)) continue;
+        if (!Card_ArrayHas(out, c.skill_id)) array_push(out, c.skill_id);
+    }
+    return out;
+}
+
+// The skills of the class that _prof has had in some run.
+function Skill_KnownOfClass(_prof, _class_id) {
+    var ids = Skill_IdsOfClass(_class_id);
+    var out = [];
+    for (var i = 0; i < array_length(ids); i++) {
+        if (Profile_SkillKnown(_prof, ids[i])) array_push(out, ids[i]);
+    }
+    return out;
+}
+
+// One row per skill of the class for the class screen: the name once discovered, "???" before.
+function Class_SkillRows(_prof, _class_id) {
+    var ids = Skill_IdsOfClass(_class_id);
+    var out = [];
+    for (var i = 0; i < array_length(ids); i++) {
+        var known = Profile_SkillKnown(_prof, ids[i]);
+        array_push(out, { id: ids[i], known: known, label: known ? SkillDB_GetBase(ids[i]).name : Loc_T("class.skill.unknown", "???") });
+    }
+    return out;
 }
 
 // A copy of _old as the new class: level, items and cards carried over, stats rebuilt from the class (its fixed growth per level, the spent free

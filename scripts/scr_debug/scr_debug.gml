@@ -243,7 +243,7 @@ function Scenario_Boot() {
     random_set_seed(12345);
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 24000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 27000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -516,7 +516,11 @@ function Scenario_StepSmoke(_s) {
             break;
         case 650: case 651: case 652: case 653: case 654: case 655: case 656: case 657: case 658: case 659:
         case 660: case 661: case 662: case 663: case 664: case 665: case 666: case 667: case 668: case 669:
-            Scenario_StepSmokeConfirm(_s);   // H2 (D156): the one Yes / No pop-up through real keys (abandon, quit, New Game over a saved run); its last step calls Scenario_NoticeEnd
+            Scenario_StepSmokeConfirm(_s);   // H2 (D156): the one Yes / No pop-up through real keys (abandon, quit, New Game over a saved run); goes on to step 750 (H5)
+            break;
+        case 750: case 751: case 752: case 753: case 754: case 755: case 756: case 757: case 758: case 759:
+        case 760: case 761: case 762: case 763: case 764: case 765: case 766: case 767: case 768: case 769:
+            Scenario_StepSmokeClassMem(_s);   // H5 (D144, D148): the class screen and the echo of discovered skills through real keys; its last step calls Scenario_NoticeEnd
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -2886,7 +2890,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsOneMenu(_s);   // H1 (D140): the System tab, the Settings tab and the "Keep this?" prompt, two sizes; goes on to step 670 (H2)
             break;
         case 670: case 671: case 672: case 673: case 674: case 675: case 676: case 677: case 678: case 679:
-            Scenario_StepShotsConfirm(_s);   // H2 (D156): the shared Yes / No pop-up over the System tab and the title, two sizes, Korean once; finishes the run
+            Scenario_StepShotsConfirm(_s);   // H2 (D156): the shared Yes / No pop-up over the System tab and the title, two sizes, Korean once; goes on to step 770 (H5)
+            break;
+        case 770: case 771: case 772: case 773: case 774: case 775: case 776: case 777: case 778: case 779:
+            Scenario_StepShotsClassMem(_s);   // H5 (D144, D148): the class screen (some skills ???, the sprite preview, the locked Nobody) and the echo screen, two sizes; finishes the run
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -4629,11 +4636,7 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Check("death_run_save_is_deleted_no_reload", !RunSave_HasSave());
                 Scenario_Check("death_run_is_over", !Run_IsActive());
                 Scenario_Check("death_flow_starts_with_the_death_scene", global.run_flow.phase == "death", "phase=" + string(global.run_flow.phase));
-                var _okopts = array_length(_pf.echo_pool) == 2;   // the run had two things: potion (10) and MP potion (11)
-                for (var _i = 0; _i < array_length(_pf.echo_pool); _i++) {
-                    if (_pf.echo_pool[_i].kind != "item" || (_pf.echo_pool[_i].id != 10 && _pf.echo_pool[_i].id != 11)) _okopts = false;
-                }
-                Scenario_Check("death_echo_pool_is_what_the_run_had", _okopts, "pool=" + json_stringify(_pf.echo_pool));
+                Scenario_Check("death_no_longer_fills_the_item_echo_pool", array_length(_pf.echo_pool) == 0, "pool=" + json_stringify(_pf.echo_pool));   // D144: the echo is skills from the skill memory, never the run's items
                 Scenario_Next(_s, 120);   // C5: the death line first, then the summary (step 103)
             }
             if (_s.t > 1200) { Scenario_Check("death_reaches_the_run_summary", false, "room=" + room_get_name(room) + " state=" + (_sc != noone ? string(_sc.state) : "none")); Scenario_Finish(); }
@@ -4656,7 +4659,7 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Check("newrun_starts_at_level_1_again", _ch2.level == 1 && _ch2.class_id == CLASS_NOBODY && _ch2.hp == _ch2.max_hp, "level=" + string(_ch2.level));
                 Scenario_Check("newrun_death_count_stays_1", _pf2.deaths == 1, "deaths=" + string(_pf2.deaths));
                 Scenario_Check("newrun_counts_2_started_runs", _pf2.runs_started == 2, "runs_started=" + string(_pf2.runs_started));
-                Scenario_Check("newrun_echo_waits_in_the_profile_for_the_class_pick", array_length(_pf2.echo_pool) == 2, "pool=" + json_stringify(_pf2.echo_pool));
+                Scenario_Check("newrun_leaves_the_item_echo_pool_empty", array_length(_pf2.echo_pool) == 0, "pool=" + json_stringify(_pf2.echo_pool));   // D144
                 Scenario_Check("newrun_has_no_echo_yet", Scenario_ItemCount(_ch2, 11) == Scenario_ItemCount(CharacterCreate_Player(CLASS_NOBODY), 11) && _gs.run.echo_used.kind == "" && Cards_NextOwed(_ch2) == "", "echo_used=" + json_stringify(_gs.run.echo_used));
                 Scenario_Check("newrun_does_not_replay_the_fall_dialogue", !_gs.pending_floor1_intro_dialogue);
                 Scenario_Check("newrun_carries_no_gold_or_kills", _gs.run.gold == 0 && _gs.run.kills == 0);
@@ -4751,7 +4754,7 @@ function Scenario_StepSmokeRun(_s) {
                 var _pf3 = Profile_Get();
                 Scenario_Check("abandon_counts_as_a_death", _pf3.deaths == 2, "deaths=" + string(_pf3.deaths));
                 Scenario_Check("abandon_history_says_abandoned", array_length(_pf3.history) == 2 && _pf3.history[1].result == "abandoned" && _pf3.history[1].floor == 2, "history=" + json_stringify(_pf3.history));
-                Scenario_Check("abandon_keeps_the_echo_pool", array_length(_pf3.echo_pool) >= 1);
+                Scenario_Check("abandon_leaves_the_item_echo_pool_empty", array_length(_pf3.echo_pool) == 0);   // D144
                 Scenario_Check("abandon_deletes_the_run_save", !RunSave_HasSave() && !Run_IsActive());
                 Scenario_Next(_s, 110);
             }
@@ -5214,7 +5217,8 @@ function Scenario_StepShotsStory(_s) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Dialogue_CloseNow();
                 Scenario_ClearUi();
-                ClassSelect_ApplyClass(CLASS_KNIGHT);   // the real call the class screen makes: the death's potions are owed as the echo pick
+                Skill_Discover(SKILL_HILT_BASH);   // D144: the echo offers the Knight skills an earlier run discovered
+                ClassSelect_ApplyClass(CLASS_KNIGHT);   // the real call the class screen makes: the discovered Knight skill is owed as the echo pick
             }
             if (_s.t > 94 && (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0) && (_s.f - _s.last_tap) >= 12) Scenario_Tap("confirm");   // the class chest's own line
             if (_s.t > 94 && _s.ec == 0 && CardsUi_Kind() == "echo" && InputLock_Settled(global.cards_ui.lock, 4 * TRANSITION_FRAME_MS)) {
@@ -8073,7 +8077,7 @@ function Scenario_StepSmokeReg(_s) {
                 var _pf235 = Profile_Get();
                 Scenario_Check("regr_r036_the_death_scene_state_is_reached", global.run_flow.phase == "death", "phase=" + string(global.run_flow.phase));
                 Scenario_Check("regr_r036_history_says_died_on_floor_1", array_length(_pf235.history) == 1 && _pf235.history[0].result == "died" && _pf235.history[0].floor == 1, "history=" + json_stringify(_pf235.history));
-                Scenario_Check("regr_r036_the_echo_pool_is_kept_for_the_class_pick", array_length(_pf235.echo_pool) >= 1, "pool=" + json_stringify(_pf235.echo_pool));
+                Scenario_Check("regr_r036_the_death_leaves_the_item_echo_pool_empty", array_length(_pf235.echo_pool) == 0, "pool=" + json_stringify(_pf235.echo_pool));   // D144
             }
             if (_rg.flow) {
                 var _ph235 = global.run_flow.phase;
@@ -8940,10 +8944,10 @@ function Scenario_StepSmokeClassGuard(_s) {
 }
 
 // ============================================================================
-// G5 (D130): the echo is offered right after the class pick (smoke steps 340-359, the end of the chain). A Knight with a Knight skill and an item dies;
-// the death flow (line, summary) shows no echo pick and the next run wakes as the Nobody; the pool waits in the profile (it survives a reload of the profile
-// from disk); the class chest is opened and Mage picked; the echo pick then shows only what a Mage can use (the item, not the Knight skill); taking it
-// puts the item in the inventory and empties the pool. A pool with nothing a class can use opens no pick at all. The last step ends the run.
+// G5 (D130, reworked for D144): the echo is offered right after the class pick (smoke steps 340-359). A Knight with a Knight skill and an item dies;
+// the death flow (line, summary) shows no echo pick and the next run wakes as the Nobody; the skill is remembered in the profile (skill memory, D148; it survives a
+// reload of the profile from disk) and no item pool is kept; the class chest is opened and Knight picked; the echo pick then shows only that discovered Knight skill
+// (never an item); taking it puts the skill in the deck. A class with no discovered skill (an old item pool in the profile is ignored) opens no pick at all.
 // Writes the real profile.sav / run.sav: only inside the gate (Scenario_CanSaveSlot).
 // ============================================================================
 function Scenario_StepSmokeEcho(_s) {
@@ -8995,8 +8999,8 @@ function Scenario_StepSmokeEcho(_s) {
             if (_s.t > 3) Scenario_TapCutscene(_s);
             if (_s.t > 3 && _sc != noone && _sc.state == "run_flow") {
                 var _pf1 = Profile_Get();
-                Scenario_Check("g5_death_keeps_the_knight_skill_for_later", Run_EchoHas(_pf1.echo_pool, "skill", SKILL_HILT_BASH), "pool=" + json_stringify(_pf1.echo_pool));
-                Scenario_Check("g5_death_keeps_the_item_for_later", Run_EchoHas(_pf1.echo_pool, "item", 11), "pool=" + json_stringify(_pf1.echo_pool));
+                Scenario_Check("g5_death_keeps_the_knight_skill_for_later", Profile_SkillKnown(_pf1, SKILL_HILT_BASH), "known=" + json_stringify(_pf1.skills_known));   // D144: in the skill memory (was: in echo_pool)
+                Scenario_Check("g5_death_keeps_no_item_for_later", array_length(_pf1.echo_pool) == 0, "pool=" + json_stringify(_pf1.echo_pool));   // D144 (was g5_death_keeps_the_item_for_later: item 11 in echo_pool)
                 Scenario_Check("g5_the_death_flow_starts_with_the_death_line", global.run_flow.phase == "death", "phase=" + string(global.run_flow.phase));
                 Scenario_Next(_s, 342);
             }
@@ -9010,19 +9014,19 @@ function Scenario_StepSmokeEcho(_s) {
                 Scenario_Check("g5_the_summary_goes_straight_to_the_next_run_no_echo_pick", !_eo.ever_echo && !CardsUi_IsOpen());
                 Scenario_Check("g5_the_next_run_wakes_as_the_nobody", _gs.player_ch.class_id == CLASS_NOBODY && !_gs.player_ch.class_chosen && Run_IsActive());
                 Scenario_Check("g5_the_next_run_has_no_echo_yet", array_length(_gs.player_ch.skills) == 0 && Scenario_ItemCount(_gs.player_ch, 11) == Scenario_ItemCount(CharacterCreate_Player(CLASS_NOBODY), 11) && _gs.run.echo_used.kind == "", "echo_used=" + json_stringify(_gs.run.echo_used));
-                Scenario_Check("g5_the_pool_waits_in_the_profile", Run_EchoHas(_pf2.echo_pool, "skill", SKILL_HILT_BASH) && Run_EchoHas(_pf2.echo_pool, "item", 11));
+                Scenario_Check("g5_the_skill_memory_waits_in_the_profile", Profile_SkillKnown(_pf2, SKILL_HILT_BASH) && array_length(_pf2.echo_pool) == 0);   // D144 (was g5_the_pool_waits_in_the_profile)
                 Scenario_Check("g5_nothing_is_owed_before_the_class_chest", Cards_NextOwed(_gs.player_ch) == "");
                 _gs.pending_wake_line = false;
                 Dialogue_CloseNow();
                 Scenario_ClearUi();
                 global.profile = undefined;   // a quit between the death and the class pick: the profile is read from disk again
                 var _pf2b = Profile_Get();
-                Scenario_Check("g5_the_pool_survives_a_quit_before_the_class_pick", array_length(_pf2b.echo_pool) == 2 && Run_EchoHas(_pf2b.echo_pool, "skill", SKILL_HILT_BASH) && Run_EchoHas(_pf2b.echo_pool, "item", 11), "pool=" + json_stringify(_pf2b.echo_pool));
+                Scenario_Check("g5_the_skill_memory_survives_a_quit_before_the_class_pick", Profile_SkillKnown(_pf2b, SKILL_HILT_BASH) && array_length(_pf2b.echo_pool) == 0, "known=" + json_stringify(_pf2b.skills_known));   // D144 (was g5_the_pool_survives_a_quit_before_the_class_pick)
                 Scenario_Next(_s, 343);
             }
             if (_s.t > 1500) { Scenario_Check("g5_the_death_flow_reaches_the_next_run", false, "room=" + room_get_name(room) + " phase=" + (variable_global_exists("run_flow") ? string(global.run_flow.phase) : "none")); Scenario_NoticeEnd(); }
             break;
-        case 343:   // the class chest: Mage ("are you sure": Yes)
+        case 343:   // the class chest: Knight ("are you sure": Yes)
             if (_s.t == 1) {
                 Scenario_ClearUi();
                 Scenario_CardsChest(_eo, obj_chest_class_select, "g5_chest_class");
@@ -9031,7 +9035,7 @@ function Scenario_StepSmokeEcho(_s) {
             Scenario_CardsTalk(_s);
             if (_s.t > 30 && CardsUi_Kind() == "class" && !_eo.qset) {
                 _eo.qset = true;
-                _eo.q = ["menu_down", "menu_down", "confirm", "menu_up", "confirm"];   // Knight, Archer, Mage; confirm; No -> Yes; confirm
+                _eo.q = ["confirm", "menu_up", "confirm"];   // the Knight is first; confirm; No -> Yes; confirm (D144: a Knight, because the skill the run found is a Knight skill)
                 Scenario_Next(_s, 344);
             }
             if (_s.t > 900) { Scenario_Check("g5_the_class_chest_opens_the_class_screen", false, "kind=" + CardsUi_Kind() + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
@@ -9040,39 +9044,39 @@ function Scenario_StepSmokeEcho(_s) {
             Scenario_CardsTalk(_s);
             if (CardsUi_Kind() == "echo" && InputLock_Settled(global.cards_ui.lock, 4 * TRANSITION_FRAME_MS)) {
                 var _m = Ui_StackTop(global.cards_ui.stk);
-                Scenario_Check("g5_the_class_is_a_mage", _ch.class_id == CLASS_MAGE && _ch.class_chosen, "class=" + string(_ch.class_id));
+                Scenario_Check("g5_the_class_is_a_knight", _ch.class_id == CLASS_KNIGHT && _ch.class_chosen, "class=" + string(_ch.class_id));   // D144 (was g5_the_class_is_a_mage)
                 Scenario_Check("g5_the_echo_pick_opens_after_the_class_pick", _gs.ui.mode == UI_CARDS && _m.id == "run_echo", "id=" + string(_m.id));
-                Scenario_Check("g5_the_echo_pick_shows_only_the_item", array_length(_m.items) == 1 && array_length(_ch.echo_offer) == 1 && _ch.echo_offer[0].kind == "item" && _ch.echo_offer[0].id == 11, "offer=" + json_stringify(_ch.echo_offer));
-                Scenario_Check("g5_the_pool_still_waits_until_the_answer", array_length(Profile_Get().echo_pool) == 2);
+                Scenario_Check("g5_the_echo_pick_shows_only_the_known_skill", array_length(_m.items) == 1 && array_length(_ch.echo_offer) == 1 && _ch.echo_offer[0].kind == "skill" && _ch.echo_offer[0].id == SKILL_HILT_BASH, "offer=" + json_stringify(_ch.echo_offer));   // D144 (was g5_the_echo_pick_shows_only_the_item)
+                Scenario_Check("g5_the_skill_is_not_in_the_deck_before_the_answer", array_length(_ch.skills) == 0);   // D144 (was g5_the_pool_still_waits_until_the_answer)
                 _eo.items_before = Scenario_ItemCount(_ch, 11);
                 _eo.q = ["confirm", "menu_up", "confirm"];   // the pick, the pop-up opens on No: up to Yes, confirm
                 Scenario_Next(_s, 345);
             }
             if (_s.t > 1500) { Scenario_Check("g5_the_echo_pick_opens_after_the_class", false, "kind=" + CardsUi_Kind() + " class=" + string(_ch.class_id) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
             break;
-        case 345:   // taken: the item is in the inventory, the pool is empty, nothing is owed any more
+        case 345:   // taken: the skill is in the deck, nothing is owed any more
             if (array_length(_eo.q) == 2 && !variable_struct_exists(_eo, "asked") && (_s.f - _s.last_tap) >= 6) {
                 _eo.asked = true;
                 Scenario_Check("confirm_the_echo_asks_before_it_is_taken", Confirm_IsOpen() && Confirm_Menu().cursor == 1 && CardsUi_Kind() == "echo", "open=" + string(Confirm_IsOpen()));
-                Scenario_Check("confirm_the_echo_is_not_taken_before_yes", Scenario_ItemCount(_ch, 11) == _eo.items_before && array_length(Profile_Get().echo_pool) == 2, "items=" + string(Scenario_ItemCount(_ch, 11)));
+                Scenario_Check("confirm_the_echo_is_not_taken_before_yes", array_length(_ch.skills) == 0 && array_length(_ch.echo_offer) == 1 && Scenario_ItemCount(_ch, 11) == _eo.items_before, "skills=" + json_stringify(_ch.skills));   // D144 (was: item count unchanged and the pool still 2)
             }
             if (array_length(_eo.q) == 0 && !CardsUi_IsOpen() && _s.t > 20) {
                 var _pf3 = Profile_Get();
-                Scenario_Check("g5_the_echo_item_is_in_the_inventory", Scenario_ItemCount(_ch, 11) == _eo.items_before + 1, "before=" + string(_eo.items_before) + " now=" + string(Scenario_ItemCount(_ch, 11)));
-                Scenario_Check("g5_the_knight_skill_was_not_given", array_length(_ch.skills) == 0);
+                Scenario_Check("g5_the_echo_skill_is_in_the_deck", array_length(_ch.skills) == 1 && _ch.skills[0] == SKILL_HILT_BASH, "skills=" + json_stringify(_ch.skills));   // D144 (was g5_the_echo_item_is_in_the_inventory)
+                Scenario_Check("g5_no_item_came_with_it", Scenario_ItemCount(_ch, 11) == _eo.items_before, "before=" + string(_eo.items_before) + " now=" + string(Scenario_ItemCount(_ch, 11)));   // D144 (was g5_the_knight_skill_was_not_given: the deck had no skill)
                 Scenario_Check("g5_the_pool_is_empty_after_the_pick", array_length(_pf3.echo_pool) == 0);
-                Scenario_Check("g5_the_pick_is_remembered_on_the_run", _gs.run.echo_used.kind == "item" && _gs.run.echo_used.id == 11, json_stringify(_gs.run.echo_used));
+                Scenario_Check("g5_the_pick_is_remembered_on_the_run", _gs.run.echo_used.kind == "skill" && _gs.run.echo_used.id == SKILL_HILT_BASH, json_stringify(_gs.run.echo_used));   // D144 (was: item 11)
                 Scenario_Check("g5_nothing_is_owed_after_the_pick", Cards_NextOwed(_ch) == "" && array_length(_ch.echo_offer) == 0);
                 Scenario_Next(_s, 346);
             }
             if (_s.t > 600) { Scenario_Check("g5_the_echo_pick_answers", false, "open=" + string(CardsUi_IsOpen()) + " q=" + string(array_length(_eo.q))); Scenario_NoticeEnd(); }
             break;
-        case 346:   // a pool with nothing the class can use: the class is picked, no pick opens and nothing is said
+        case 346:   // a class with no discovered skill (and an old item pool in the profile, which is ignored): the class is picked, no pick opens and nothing is said
             if (_s.t == 1) {
                 Dialogue_CloseNow();
                 Scenario_ClearUi();
                 var _pf4 = Profile_Get();
-                _pf4.echo_pool = [{ kind: "skill", id: SKILL_HILT_BASH }];
+                _pf4.echo_pool = [{ kind: "item", id: 11 }];   // D144: an older profile's item pool; it must never be offered (the only skill known is a Knight skill, the class is Mage)
                 Profile_Flush();
                 ClassSelect_ApplyClass(CLASS_MAGE);
                 _eo.ever_echo = false;
@@ -10630,9 +10634,155 @@ function Scenario_StepSmokeConfirm(_s) {
                 Scenario_Check("confirm_history_says_abandoned", array_length(_pf.history) >= 1 && _pf.history[array_length(_pf.history) - 1].result == "abandoned");
                 Scenario_Check("confirm_abandon_deletes_the_run_save", !RunSave_HasSave() && !Run_IsActive());
                 Scenario_Check("confirm_the_popup_is_gone_after_yes", !Confirm_IsOpen());
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 750);   // H5 (D144, D148, 750..757) goes on; its last step ends the chain (Scenario_NoticeEnd removes the files and the profile)
             }
             if (_s.t > 1500) { Scenario_Check("confirm_abandon_reaches_the_run_summary", false, "room=" + room_get_name(room) + " state=" + ((_sc != noone) ? string(_sc.state) : "none") + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ============================================================================
+// H5 (D144, D148): the class screen and the echo of discovered skills, through real keys (smoke steps 750-769, the end of the chain). Writes the real
+// profile.sav / run.sav: only inside the gate (Scenario_CanSaveSlot).
+//   750-752  a fresh profile: the class screen reads ??? for every skill, Knight is picked, the echo screen never opens and the run goes on
+//   753-757  a profile that knows two Knight skills and one Mage skill: the class screen names them; Knight picked; the echo offers exactly the two Knight
+//            skills (no Mage skill, no item); the first is taken and is in the deck. The last step ends the run.
+// ============================================================================
+function Scenario_ClassMemNames(_row) {
+    var _out = [];
+    for (var _i = 0; _i < array_length(_row.skills); _i++) array_push(_out, _row.skills[_i].label);
+    return _out;
+}
+
+function Scenario_ClassMemCount(_names, _what) {
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_names); _i++) { if (_names[_i] == _what) _n++; }
+    return _n;
+}
+
+function Scenario_StepSmokeClassMem(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "cm")) _s.cm = { q: [], chest: noone, ever_echo: false, take: -1 };
+    var _cm = _s.cm;
+    var _ch = _gs.player_ch;
+    var _second = (_s.step >= 753);
+    var _tag = _second ? "known" : "fresh";
+    Scenario_CardsTapQueue(_s, _cm);
+    if (CardsUi_Kind() == "echo") _cm.ever_echo = true;
+    switch (_s.step) {
+        case 750:   // a clean profile and a new run
+        case 753:   // a profile that knows two Knight skills and one Mage skill, and a new run
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP skill memory class screen (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_NoticeEnd();
+                    break;
+                }
+                if (Transition_IsActive()) { _s.t = 0; break; }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Profile_ResetForTest();
+                if (_second) {
+                    Skill_Discover(SKILL_WOUND);
+                    Skill_Discover(SKILL_HILT_BASH);
+                    Skill_Discover(SKILL_FIREBALL);
+                }
+                RunSave_Delete();
+                _gs.in_main_menu = false;
+                Run_StartNew(false, _second ? 7502 : 7501);
+                _cm.ever_echo = false;
+                _cm.q = [];
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                _gs.pending_wake_line = false;
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_Check("classmem_a_new_run_is_owed_nothing_" + _tag, Cards_NextOwed(_gs.player_ch) == "" && array_length(_gs.player_ch.echo_offer) == 0);
+                if (_second) Scenario_Check("classmem_the_profile_remembers_three_skills", array_length(variable_struct_get_names(Profile_Get().skills_known)) == 3 && Profile_SkillKnown(Profile_Get(), SKILL_HILT_BASH));
+                else Scenario_Check("classmem_a_fresh_profile_remembers_no_skill", array_length(variable_struct_get_names(Profile_Get().skills_known)) == 0);
+                Scenario_Next(_s, _s.step + 1);
+            }
+            if (_s.t > 900) { Scenario_Check("classmem_a_new_run_reaches_rm_floor1_" + _tag, false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 751:   // the class chest: the class screen opens (fresh: every skill reads ???; known: the discovered ones show by name)
+        case 754:
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Scenario_CardsChest(_cm, obj_chest_class_select, "h5_chest_class_" + _tag);
+            }
+            if (_s.t == 20) Scenario_Tap("interact");
+            Scenario_CardsTalk(_s);
+            if (_s.t > 30 && CardsUi_Kind() == "class" && InputLock_Settled(global.cards_ui.lock, 4 * TRANSITION_FRAME_MS)) {
+                var _m = Ui_StackTop(global.cards_ui.stk);
+                var _kn = Scenario_ClassMemNames(_m.items[0]);
+                var _ar = Scenario_ClassMemNames(_m.items[1]);
+                var _mg = Scenario_ClassMemNames(_m.items[2]);
+                Scenario_Check("classmem_the_class_screen_is_up_" + _tag, _gs.ui.mode == UI_CARDS && _m.id == "cards_class" && _m.cursor == 0);
+                Scenario_Check("classmem_every_class_row_has_a_sprite_" + _tag, sprite_exists(_m.items[0].pic.spr) && sprite_exists(_m.items[1].pic.spr) && sprite_exists(_m.items[2].pic.spr) && sprite_exists(_m.items[3].pic.spr));
+                Scenario_Check("classmem_nobody_is_greyed_" + _tag, _m.items[3].locked && _m.items[3].dim);
+                if (!_second) {
+                    Scenario_Check("classmem_a_fresh_profile_shows_only_question_marks", Scenario_ClassMemCount(_kn, "???") == 5 && Scenario_ClassMemCount(_ar, "???") == 5 && Scenario_ClassMemCount(_mg, "???") == 5, "knight=" + json_stringify(_kn));
+                } else {
+                    Scenario_Check("classmem_the_known_knight_skills_show_by_name", array_contains(_kn, SkillDB_GetBase(SKILL_WOUND).name) && array_contains(_kn, SkillDB_GetBase(SKILL_HILT_BASH).name) && !array_contains(_kn, SkillDB_GetBase(SKILL_FIREBALL).name), "knight=" + json_stringify(_kn));
+                    Scenario_Check("classmem_the_other_knight_skills_stay_question_marks", array_length(_kn) == 5 && Scenario_ClassMemCount(_kn, "???") == 3);
+                    Scenario_Check("classmem_the_mage_shows_its_known_skill", array_contains(_mg, SkillDB_GetBase(SKILL_FIREBALL).name) && Scenario_ClassMemCount(_mg, "???") == 4, "mage=" + json_stringify(_mg));
+                    Scenario_Check("classmem_the_archer_shows_only_the_shared_wound", array_contains(_ar, SkillDB_GetBase(SKILL_WOUND).name) && Scenario_ClassMemCount(_ar, "???") == 4, "archer=" + json_stringify(_ar));
+                }
+                _cm.q = ["confirm", "menu_up", "confirm"];   // the Knight is first; confirm; the pop-up opens on No: up to Yes; confirm
+                Scenario_Next(_s, _s.step + 1);
+            }
+            if (_s.t > 900) { Scenario_Check("classmem_the_class_chest_opens_the_class_screen_" + _tag, false, "kind=" + CardsUi_Kind() + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 752:   // fresh: Knight asked about, Yes: the class is applied behind the flash, its chest line read; the echo never opens
+        case 755:   // known: the same, and the echo screen opens by itself
+            if (array_length(_cm.q) == 2 && !variable_struct_exists(_cm, "asked_" + _tag) && (_s.f - _s.last_tap) >= 6) {
+                variable_struct_set(_cm, "asked_" + _tag, true);
+                Scenario_Check("classmem_the_knight_is_asked_about_" + _tag, Confirm_IsOpen() && Confirm_Menu().cursor == 1 && CardsUi_Kind() == "class");
+            }
+            var _talk = Scenario_CardsTalk(_s);
+            if (!_second) {
+                if (_ch.class_id == CLASS_KNIGHT && _ch.class_chosen && !_talk && !Transition_IsActive() && !CardsUi_IsOpen() && _gs.ui.mode == UI_NONE && _s.t > 90) {
+                    Scenario_Check("classmem_the_class_is_a_knight", _ch.class_id == CLASS_KNIGHT && _gs.selected_class == CLASS_KNIGHT);
+                    Scenario_Check("classmem_a_class_without_discovered_skills_opens_no_echo", !_cm.ever_echo && Cards_NextOwed(_ch) == "" && array_length(_ch.echo_offer) == 0);
+                    Scenario_Check("classmem_the_run_goes_on", Run_IsActive() && room == rm_floor1 && array_length(_ch.skills) == 0);
+                    Scenario_Next(_s, 753);
+                }
+            } else if (CardsUi_Kind() == "echo" && InputLock_Settled(global.cards_ui.lock, 4 * TRANSITION_FRAME_MS)) {
+                var _em = Ui_StackTop(global.cards_ui.stk);
+                var _ids = [];
+                for (var _i = 0; _i < array_length(_ch.echo_offer); _i++) array_push(_ids, (_ch.echo_offer[_i].kind == "skill") ? _ch.echo_offer[_i].id : -99);
+                Scenario_Check("classmem_the_class_is_a_knight_again", _ch.class_id == CLASS_KNIGHT && _ch.class_chosen);
+                Scenario_Check("classmem_the_echo_screen_opens_after_the_class_pick", _gs.ui.mode == UI_CARDS && _em.id == "run_echo");
+                Scenario_Check("classmem_the_echo_offers_exactly_the_two_known_knight_skills", array_length(_em.items) == 2 && array_length(_ids) == 2 && array_contains(_ids, SKILL_WOUND) && array_contains(_ids, SKILL_HILT_BASH), "offer=" + json_stringify(_ch.echo_offer));
+                Scenario_Check("classmem_the_echo_offers_no_mage_skill_and_no_item", !array_contains(_ids, SKILL_FIREBALL) && !array_contains(_ids, -99));
+                _cm.take = _ch.echo_offer[0].id;
+                _cm.q = ["confirm", "menu_up", "confirm"];   // the first row; the pop-up opens on No: up to Yes; confirm
+                Scenario_Next(_s, 756);
+            }
+            if (_s.t > 1500) { Scenario_Check("classmem_the_class_pick_goes_on_" + _tag, false, "class=" + string(_ch.class_id) + " kind=" + CardsUi_Kind() + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 756:   // the pick asks; Yes: the skill is in the deck and nothing is owed any more
+            if (array_length(_cm.q) == 2 && !variable_struct_exists(_cm, "asked2") && (_s.f - _s.last_tap) >= 6) {
+                _cm.asked2 = true;
+                Scenario_Check("classmem_the_echo_pick_asks_first", Confirm_IsOpen() && Confirm_Menu().cursor == 1 && CardsUi_Kind() == "echo");
+                Scenario_Check("classmem_the_skill_is_not_in_the_deck_before_yes", array_length(_ch.skills) == 0);
+            }
+            if (array_length(_cm.q) == 0 && !CardsUi_IsOpen() && _s.t > 20) {
+                Scenario_Check("classmem_the_echo_skill_is_in_the_deck", array_length(_ch.skills) == 1 && _ch.skills[0] == _cm.take, "skills=" + json_stringify(_ch.skills) + " take=" + string(_cm.take));
+                Scenario_Check("classmem_the_other_offer_is_gone_and_nothing_is_owed", array_length(_ch.echo_offer) == 0 && Cards_NextOwed(_ch) == "");
+                Scenario_Check("classmem_the_run_remembers_the_echo", _gs.run.echo_used.kind == "skill" && _gs.run.echo_used.id == _cm.take);
+                Scenario_Check("classmem_taking_it_leaves_the_memory_as_it_was", array_length(variable_struct_get_names(Profile_Get().skills_known)) == 3);
+                Scenario_Check("classmem_no_item_pool_was_made", array_length(Profile_Get().echo_pool) == 0);
+                Scenario_Next(_s, 757);
+            }
+            if (_s.t > 600) { Scenario_Check("classmem_the_echo_pick_answers", false, "open=" + string(CardsUi_IsOpen()) + " q=" + string(array_length(_cm.q))); Scenario_NoticeEnd(); }
+            break;
+        case 757:   // the end of the run: the profile on disk holds the memory
+            if (_s.t == 2) {
+                var _disk = Profile_Load(Profile_Path());
+                Scenario_Check("classmem_the_profile_file_holds_the_memory", _disk.status == "ok" && _disk.profile.profile_version == 2 && Profile_SkillKnown(_disk.profile, SKILL_WOUND) && Profile_SkillKnown(_disk.profile, SKILL_HILT_BASH) && Profile_SkillKnown(_disk.profile, SKILL_FIREBALL));
+                Scenario_NoticeEnd();
+            }
             break;
     }
 }
@@ -10720,10 +10870,122 @@ function Scenario_StepShotsOneMenu(_s) {
     }
 }
 
+// ---- H5 (D144, D148) pictures 770..773: the class screen with some skills still ??? and the idle sprite preview, the same with the locked Nobody under the
+// cursor, and the echo screen (the two discovered Knight skills), at windowed scale 3 (480 x 432) and 5 (800 x 720). Each is the real draw of the real screen
+// on a real room; the panels are asserted on their rectangles (on screen, side by side, the text of every row fits its panel). Files shot_classmem_<scene>_<w>x<h>.png.
+// The profile is a throwaway one in memory (nothing is written). The last picture of the run: it ends the run. ----
+function Scenario_ClassMemShotScenes() {
+    return ["class", "locked", "echo"];
+}
+
+function Scenario_StepShotsClassMem(_s) {
+    var _scenes = Scenario_ClassMemShotScenes();
+    var _scales = [3, 5];
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "cmz")) _s.cmz = { di: 0, si: 0, room: rm_floor2 };
+    var _o = _s.cmz;
+    var _sc = _scenes[_o.di];
+    var _tag = _sc + "_" + string(_scales[_o.si]);
+    switch (_s.step) {
+        case 770:   // the room and the window scale of this picture (two floors take turns), a Knight, a profile that knows two Knight skills and one Mage skill
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                CardsUi_Close();
+                Loc_SetLanguage("en");
+                Scenario_SetWindowScale(_scales[_o.si]);
+                Scenario_TabFixture();
+                global.profile = Profile_Default();
+                global.profile_status = "missing";
+                Profile_SkillLearn(global.profile, SKILL_WOUND);
+                Profile_SkillLearn(global.profile, SKILL_HILT_BASH);
+                Profile_SkillLearn(global.profile, SKILL_FIREBALL);
+                _o.room = (room == rm_floor3) ? rm_floor2 : rm_floor3;   // entering the room we are in would not spawn the player again
+                room_goto(_o.room);
+            }
+            if (_s.t >= 30 && Scenario_FloorReady(_o.room)) Scenario_Next(_s, 771);
+            if (_s.t > 900) { Scenario_Check("shots_classmem_reaches_the_room_" + _tag, false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 771:   // open the screen the way the game does
+            with (obj_enemy) instance_destroy();
+            Scenario_ClearUi();
+            if (_sc == "echo") {
+                var _k = Card_ClassCharacter(_gs.player_ch, CLASS_KNIGHT);
+                _k.skills = [];
+                _k.card_picks = 0;
+                _k.echo_offer = Run_EchoSkillOptions(Profile_Get(), CLASS_KNIGHT, 4242);
+                GameState_SetPlayer(_k);
+                CardsUi_Open("echo");
+            } else {
+                var _c = Card_ClassCharacter(_gs.player_ch, CLASS_NOBODY);
+                _c.class_chosen = false;
+                _c.class_pick = true;
+                _c.card_picks = 0;
+                GameState_SetPlayer(_c);
+                CardsUi_Open("class");
+                if (_sc == "locked") Ui_MenuFixCursor(Ui_StackTop(global.cards_ui.stk), 3);
+            }
+            Scenario_Next(_s, 772);
+            break;
+        case 772:   // let it slide in, check the layout, take the picture
+            if (_s.t >= 24) {
+                var _gw = Display_GuiW();
+                var _gh = Display_GuiH();
+                var _m = CardsUi_IsOpen() ? Ui_StackTop(global.cards_ui.stk) : undefined;
+                Scenario_Check("shots_classmem_is_open_" + _tag, is_struct(_m) && _gs.ui.mode == UI_CARDS && _m.id == ((_sc == "echo") ? "run_echo" : "cards_class"));
+                if (is_struct(_m)) {
+                    var _r = _m.rect;
+                    var _d = _m.det_rect;
+                    Scenario_Check("shots_classmem_list_on_screen_" + _tag, _r.w > 0 && _r.x >= 0 && _r.y >= 0 && _r.x + _r.w <= _gw && _r.y + _r.h <= _gh, json_stringify(_r));
+                    if (_sc == "echo") {
+                        Scenario_Check("shots_classmem_echo_offers_two_" + _tag, array_length(_m.items) == 2);
+                        Scenario_Check("shots_classmem_echo_details_on_screen_" + _tag, _d.w > 0 && _d.x >= 0 && _d.y >= 0 && _d.x + _d.w <= _gw && _d.y + _d.h <= _gh, json_stringify(_d));
+                    } else {
+                        Scenario_Check("shots_classmem_details_on_screen_" + _tag, _d.w > 0 && _d.x >= 0 && _d.y >= 0 && _d.x + _d.w <= _gw && _d.y + _d.h <= _gh, json_stringify(_d));
+                        Scenario_Check("shots_classmem_list_and_details_do_not_overlap_" + _tag, !Test_RectsOverlap(_r, _d));
+                        Scenario_Check("shots_classmem_cursor_is_on_the_asked_row_" + _tag, _m.cursor == ((_sc == "locked") ? 3 : 0), "cursor=" + string(_m.cursor));
+                        var _fit = true;
+                        var _need_max = 0;
+                        for (var _i = 0; _i < array_length(_m.items); _i++) {
+                            var _it = _m.items[_i];
+                            var _need = Ui_DetailsHeight(_d.w, _it.help, _it.lines, _m.layout.details_cols, 0, _m.layout.det_art ? _it : undefined);
+                            _need_max = max(_need_max, _need);
+                            if (_need > _d.h) _fit = false;
+                        }
+                        Scenario_Check("shots_classmem_every_row_fits_its_panel_" + _tag, _fit, "needs " + string(_need_max) + " has " + string(_d.h));
+                        var _mt = Ui_Metrics();
+                        var _name_need = UI_TextWidth(_m.items[3].label) + 4 * _mt.p + UI_TextWidth(_m.items[3].value) + 13 * _mt.p;   // Nobody and its Locked mark, in full, inside the list's frame
+                        Scenario_Check("shots_classmem_the_list_shows_the_names_in_full_" + _tag, _r.w >= _name_need, "needs " + string(_name_need) + " has " + string(_r.w));
+                        Scenario_Check("shots_classmem_the_sprite_preview_is_drawn_" + _tag, Ui_ArtKind(_m.items[_m.cursor]) == "pic");
+                    }
+                }
+                _s.shot = "shot_classmem_" + _sc + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 773);
+            }
+            break;
+        case 773:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                CardsUi_Close();
+                Scenario_ClearUi();
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    global.profile = undefined;   // the next Profile_Get reads the real (scratch) file again
+                    RunSave_Delete();
+                    Scenario_Finish();   // the end of the pictures
+                } else {
+                    Scenario_Next(_s, 770);
+                }
+            }
+            break;
+    }
+}
+
 // ---- H2 (D156) pictures 670..673: the shared Yes / No pop-up over the System tab (Abandon run), over the title (New Game with a run saved) and in Korean
 // over the System tab, at windowed scale 3 (480 x 432) and 5 (800 x 720). Each is the real draw of the real screen; the pop-up is asserted on its rectangles
 // (on screen, centred, the two rows inside it, the cursor on No). Files shot_confirm_<scene>_<w>x<h>.png. The title scene writes the real run.sav
-// (the gate's scratch folder only). The last picture of the run: it ends the run. ----
+// (the gate's scratch folder only). The last picture of the chain goes on with H5's 770..773. ----
 function Scenario_ConfirmShotScenes() {
     return ["system", "title", "korean"];
 }
@@ -10815,7 +11077,7 @@ function Scenario_StepShotsConfirm(_s) {
                 if (_o.di >= array_length(_scenes)) {
                     Loc_SetLanguage("en");
                     RunSave_Delete();
-                    Scenario_Finish();   // the end of the pictures
+                    Scenario_Next(_s, 770);   // H5 (D144, D148) pictures (770..773) finish the run
                 } else {
                     Scenario_Next(_s, 670);
                 }

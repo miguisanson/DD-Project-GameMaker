@@ -437,7 +437,7 @@ function Save_Path(_slot) {
 // Both go through the SAVE-04 atomic helpers (.tmp -> verify -> .bak). The old slot files (savedata0..3.sav) are never read as
 // current, never written and never deleted: they are only recognised, so the title screen can say why they cannot be loaded.
 // ============================================================================================================
-#macro PROFILE_VERSION 1
+#macro PROFILE_VERSION 2   // 2 (D148): skills_known, the skill memory. A version 1 file is read and migrated (no skill memory yet).
 #macro RUN_SAVE_VERSION 2
 #macro PROFILE_HISTORY_MAX 50
 
@@ -480,7 +480,8 @@ function Profile_Default() {
         profile_version: PROFILE_VERSION,
         story_seen: {},                        // key -> true: cutscenes, camera pans, story dialogue (D26)
         unlocks: {},                           // key -> true: "nobody_class", "item_<id>" ... (D88)
-        echo_pool: [],                         // D130 (amends D87): everything the lost run had ({ kind: "item" | "skill", id }); the echo pick after the next run's class pick draws from it
+        echo_pool: [],                         // OLD (D130): the item pool of the lost run. D144 stopped filling it; it is still read so an old file loads, and the class pick empties it
+        skills_known: {},                      // D148: "<skill id>" -> true for every player skill the profile has ever had in a run (skill memory); the class screen and the echo (D144) read it
         history: [],                           // one entry per finished run, newest last
         bestiary: {},                          // "e<enemy id>" -> { met, elite }: the enemies met in a fight, for the Codex (D88; Codex_Met)
         deaths: 0,
@@ -495,7 +496,8 @@ function Profile_Default() {
 function Profile_IsCurrentRaw(_raw) {
     if (!is_struct(_raw)) return false;
     if (!variable_struct_exists(_raw, "profile_version")) return false;
-    return Save_ToReal(_raw.profile_version, -1) == PROFILE_VERSION;
+    var ver = Save_ToReal(_raw.profile_version, -1);
+    return ver >= 1 && ver <= PROFILE_VERSION;   // an older file is migrated by Profile_Normalize
 }
 
 // A valid profile file with some keys missing is filled up from the defaults; wrong-typed keys fall back too.
@@ -516,6 +518,13 @@ function Profile_Normalize(_raw) {
         var okind = string(o.kind);
         var oid = Save_ToReal(o.id, -1);
         if ((okind == "item" || okind == "skill") && !Run_EchoHas(p.echo_pool, okind, oid)) array_push(p.echo_pool, { kind: okind, id: oid });
+    }
+    // D148: version 2 added the skill memory; a version 1 file has none, so it starts empty (whatever the file holds under that name is not trusted)
+    if (Save_ToReal(variable_struct_exists(_raw, "profile_version") ? _raw.profile_version : 0, 0) >= 2 && variable_struct_exists(_raw, "skills_known") && is_struct(_raw.skills_known)) {
+        var sknames = variable_struct_get_names(_raw.skills_known);
+        for (var sk = 0; sk < array_length(sknames); sk++) {
+            if (sknames[sk] != "" && string_digits(sknames[sk]) == sknames[sk] && variable_struct_get(_raw.skills_known, sknames[sk]) == true) variable_struct_set(p.skills_known, string(real(sknames[sk])), true);
+        }
     }
     if (variable_struct_exists(_raw, "history") && is_array(_raw.history)) {
         for (var h = 0; h < array_length(_raw.history); h++) {
@@ -594,6 +603,46 @@ function Profile_IsUnlocked(_p, _key) {
 
 function Profile_Unlock(_p, _key) {
     variable_struct_set(_p.unlocks, _key, true);
+}
+
+// ---- skill memory (D148): the player skills this profile has ever had in a run ----
+function Profile_SkillKnown(_p, _skill_id) {
+    if (!is_struct(_p) || !variable_struct_exists(_p, "skills_known") || !is_struct(_p.skills_known)) return false;
+    var key = string(floor(Save_ToReal(_skill_id, -1)));
+    return variable_struct_exists(_p.skills_known, key) && (variable_struct_get(_p.skills_known, key) == true);
+}
+
+// Remembers a skill id. Returns true when it was new, false when it was known already (or is no id).
+function Profile_SkillLearn(_p, _skill_id) {
+    var sid = floor(Save_ToReal(_skill_id, -1));
+    if (!is_struct(_p) || sid < 0 || Profile_SkillKnown(_p, sid)) return false;
+    if (!variable_struct_exists(_p, "skills_known") || !is_struct(_p.skills_known)) _p.skills_known = {};
+    variable_struct_set(_p.skills_known, string(sid), true);
+    return true;
+}
+
+// THE helper every way of getting a skill goes through (card pick, swap, echo, direct learn, the class pick and the end of a run): remembers a player
+// skill in the profile and writes the profile when it is new. Enemy skills and ids that are no skill are ignored. Returns true when it was new.
+// With _prof given (tests) that profile is changed in memory only.
+function Skill_Discover(_skill_id, _prof = undefined) {
+    var sid = floor(Save_ToReal(_skill_id, -1));
+    if (sid < 0) return false;
+    var sk = SkillDB_GetBase(sid);
+    if (sk.id < 0 || !is_array(sk.class_list) || array_length(sk.class_list) <= 0) return false;
+    var own = is_undefined(_prof);
+    var prof = own ? Profile_Get() : _prof;
+    if (!Profile_SkillLearn(prof, sid)) return false;
+    if (own) Profile_Flush();
+    return true;
+}
+
+function Skills_DiscoverAll(_ids, _prof = undefined) {
+    if (!is_array(_ids)) return false;
+    var any = false;
+    for (var i = 0; i < array_length(_ids); i++) {
+        if (Skill_Discover(_ids[i], _prof)) any = true;
+    }
+    return any;
 }
 
 // A finished run: history (newest last, capped), the death or win counter, the best floor, and the first win's unlock (D88).

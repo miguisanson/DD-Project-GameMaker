@@ -1163,30 +1163,65 @@ function CardsUi_NoBack(_m, _res) {
 }
 
 // ---- class choice -------------------------------------------------------------------------------------------------------------
-function CardsUi_ClassMenu() {
-    var choices = Card_ClassChoices();
+// D148: the class screen. Beside the list stands a panel with the class's idle sprite, its lore and playstyle, the starting numbers and the five skills of the
+// class: "???" until the profile has had that skill in some run (skill memory), then the name and its MP. A locked Nobody is greyed (the sprite too), says what unlocks it
+// and cannot be picked. _prof is the profile to read (tests); the game reads its own.
+function CardsUi_ClassMenu(_prof = undefined) {
+    var prof = is_undefined(_prof) ? Profile_Get() : _prof;
+    var choices = Card_ClassChoices(prof);
     var items = [];
     for (var i = 0; i < array_length(choices); i++) {
         var cid = choices[i].class_id;
         var cfg = DB_PlayerClass(cid);
-        var lines = [
-            { label: Stat_ShortName(STAT_ATK), value: string(cfg.stats.atk) },
-            { label: Stat_ShortName(STAT_DEF), value: string(cfg.stats.def) },
-            { label: Stat_ShortName(STAT_SPD), value: string(cfg.stats.spd) },
-            { label: Stat_ShortName(STAT_MAG), value: string(cfg.stats.mag) },
-            { label: Loc_T("card.lbl.skills", "Skills"), value: (cid == CLASS_NOBODY) ? Loc_T("class.lbl.none", "None") : Loc_T("class.lbl.five", "5 to find") }
-        ];
+        var locked = choices[i].locked;
+        var skills = Class_SkillRows(prof, cid);
+        var lines = [];
+        if (!locked) {
+            lines = [   // the four numbers as two lines, so the five skills below still fit the panel at the biggest text size
+                { label: Stat_ShortName(STAT_ATK) + " / " + Stat_ShortName(STAT_DEF), value: string(cfg.stats.atk) + " / " + string(cfg.stats.def) },
+                { label: Stat_ShortName(STAT_SPD) + " / " + Stat_ShortName(STAT_MAG), value: string(cfg.stats.spd) + " / " + string(cfg.stats.mag) }
+            ];
+            if (array_length(skills) == 0) {
+                array_push(lines, { label: Loc_T("card.lbl.skills", "Skills"), value: Loc_T("class.lbl.none", "None") });
+            } else {
+                for (var s = 0; s < array_length(skills); s++) {
+                    array_push(lines, { label: skills[s].label, value: skills[s].known ? Loc_T("card.mp_short", "{mp} MP", { mp: string(round(SkillDB_GetBase(skills[s].id).mp_cost)) }) : "" });
+                }
+            }
+        }
+        var spr = cfg.sprites.down;
         array_push(items, {
-            label: cfg.name, value: choices[i].locked ? Loc_T("class.nobody.locked", "Locked") : "",
-            help: choices[i].locked ? choices[i].hint : Card_ClassSentence(cid), lines: lines, class_id: cid, locked: choices[i].locked
+            label: cfg.name, value: locked ? Loc_T("class.nobody.locked", "Locked") : "",
+            help: locked ? choices[i].hint : Card_ClassSentence(cid), lines: lines, class_id: cid, locked: locked, dim: locked, skills: skills,
+            pic: { spr: spr, sub: 0, anim_ms: 450, tint: locked ? c_gray : c_white }   // the idle sprite: its two frames take turns
         });
     }
     var m = Ui_MenuNew("cards_class", items, {
         on_confirm: CardsUi_ClassConfirm, on_back: CardsUi_NoBack,
         layout: { title: Loc_T("class.select.title", "Select Class"), anchor: "center", details: true }
     });
+    CardsUi_ClassFit(m);
     Ui_MenuFixCursor(m, 0);
     return m;
+}
+
+// The list stands on the left, the details panel (picture, text, numbers) beside it, both as tall as the screen allows.
+function CardsUi_ClassFit(_m) {
+    var mt = Ui_Metrics();
+    var L = _m.layout;
+    var avail_h = mt.gh - 2 * mt.margin;
+    L.x_anchor = "left";
+    var need = UI_TextWidth(L.title);
+    for (var i = 0; i < array_length(_m.items); i++) need = max(need, UI_TextWidth(_m.items[i].label) + 4 * mt.p + UI_TextWidth(_m.items[i].value));   // a row's name and its Locked mark in full
+    L.panel_w = max(floor((mt.gw - 3 * mt.margin) * 0.4 / mt.p) * mt.p, need + 21 * mt.p);
+    L.y_top = mt.margin;
+    L.max_h = avail_h;
+    L.details = true;
+    L.details_pos = "right";
+    L.det_w = mt.gw - 3 * mt.margin - L.panel_w;
+    L.det_top = mt.margin;
+    L.det_h = avail_h;
+    L.det_art = true;
 }
 
 function CardsUi_ClassConfirm(_m, _i) {
@@ -1210,6 +1245,7 @@ function CardsUi_ClassYes(_d) {
 function ClassSelect_ApplyClass(_class_id) {
     var gs = GameState_Get();
     var ch = Card_ClassCharacter(gs.player_ch, _class_id);
+    Skills_DiscoverAll(ch.skills);   // D148: skills carried over or given by the class itself are remembered too
 
     // FUN-FIRST: grant and auto-equip class starter weapon (no duplicates).
     ch = Equip_GrantStarterWeapon(ch, _class_id, true);
@@ -1218,7 +1254,7 @@ function ClassSelect_ApplyClass(_class_id) {
     ch = Player_NormalizeProgression(ch, true);
     ch.hp = clamp(hp0, 1, ch.max_hp);
     ch.mp = clamp(mp0, 0, ch.max_mp);
-    ch = Run_EchoGrant(ch);   // D130: the lost run's echo, filtered to this class, is owed now (CardsUi_Step opens the pick)
+    ch = Run_EchoGrant(ch);   // D144: the discovered skills of this class are owed as the echo pick (CardsUi_Step opens it); none discovered, no pick
 
     GameState_SetSelectedClass(_class_id);
     GameState_SetPlayer(ch);
@@ -1237,7 +1273,7 @@ function ClassSelect_ApplyClass(_class_id) {
     Dialogue_TryStartClassChestReaction(_class_id);
 }
 
-// ---- the echo of the last fall (D130, amends D87): up to 3 things from the lost run that the new class can use; one is kept ----------------------------------------
+// ---- the echo (D144, amends D130 / D87): up to 3 skills of the picked class that an earlier run discovered (skill memory, D148); one is kept ----------------------------------------
 // What an echo option does, in the details panel's terms (D100): one plain sentence and the numbers from the data.
 function CardsUi_EchoDetails(_o) {
     if (_o.kind == "skill") return Battle_SkillDetails(SkillDB_Get(_o.id));
@@ -1257,7 +1293,7 @@ function CardsUi_EchoMenu() {
     }
     var m = Ui_MenuNew("run_echo", items, {
         on_confirm: CardsUi_EchoConfirm, on_back: CardsUi_NoBack,   // it must be answered
-        layout: { title: Loc_T("echo.pick.title", "Keep one echo of the last fall"), anchor: "center", details: true }
+        layout: { title: Loc_T("echo.pick.title", "Keep one skill you remember"), anchor: "center", details: true }
     });
     Ui_MenuFixCursor(m, 0);   // the remembered cursor of an earlier screen does not count
     return m;
@@ -3821,11 +3857,14 @@ function Ui_DrawArt(_cx, _y, _it, _alpha = 1) {
     Ui_Box(bx + p, _y + p, bx + side - p, _y + side - p, UI_C_DARKEST);
     if (kind == "pic") {
         var spr = _it.pic.spr;
+        var sub = _it.pic.sub;
+        if (variable_struct_exists(_it.pic, "anim_ms") && _it.pic.anim_ms > 0) sub = (current_time div _it.pic.anim_ms) mod max(1, sprite_get_number(spr));   // an idle animation: the frames take turns
+        var tint = variable_struct_exists(_it.pic, "tint") ? _it.pic.tint : c_white;
         var dim = max(1, max(sprite_get_width(spr), sprite_get_height(spr)));
         var sc = max(1, floor((side - 4 * p) / dim));   // whole multiples only: the pixels stay square
         var dw = sprite_get_width(spr) * sc;
         var dh = sprite_get_height(spr) * sc;
-        draw_sprite_ext(spr, _it.pic.sub, bx + round((side - dw) / 2) + sprite_get_xoffset(spr) * sc, _y + round((side - dh) / 2) + sprite_get_yoffset(spr) * sc, sc, sc, 0, c_white, _alpha);   // the origin is where the picture is placed
+        draw_sprite_ext(spr, sub, bx + round((side - dw) / 2) + sprite_get_xoffset(spr) * sc, _y + round((side - dh) / 2) + sprite_get_yoffset(spr) * sc, sc, sc, 0, tint, _alpha);   // the origin is where the picture is placed
     } else {
         var isz = side - 8 * p;
         Item_DrawIcon(_it.icon_item, bx + round((side - isz) / 2), _y + round((side - isz) / 2), isz, _alpha);
