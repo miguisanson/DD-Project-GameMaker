@@ -163,7 +163,7 @@ function TabItems_Items(_ch) {
             array_push(lines, { label: Loc_T("shop.lbl.have", "You have"), value: string(inv.qty) });
             array_push(items, {
                 id: "item_" + string(it.id), label: it.name, value: "x" + string(inv.qty), kind: "button", enabled: true, item_id: it.id, throwable: Item_IsThrowable(it),
-                help: sentence, lines: lines, icon_item: it, hint: (grp == 0) ? Loc_T("tab.hint.use", "{confirm} Use") : ""
+                help: sentence, lines: lines, icon_item: it, hint: (grp == 0) ? Loc_T("tab.hint.use", "[k:confirm] Use") : ""
             });
         }
     }
@@ -245,7 +245,7 @@ function TabGear_Row(_ch, _item, _slot, _worn) {
     return {
         id: "gear_" + string(_item.id), label: _item.name, value: "", kind: "button", enabled: true, item_id: _item.id, slot: _slot, worn: _worn,
         dim: (!_worn && !can.ok), help: sentence, lines: _worn ? Item_NumberLines(_item, _ch) : Gear_CompareLines(_ch, _item), icon_item: _item,
-        hint: _worn ? Loc_T("tab.hint.takeoff", "{confirm} Take off") : (can.ok ? Loc_T("tab.hint.equip", "{confirm} Equip") : "")
+        hint: _worn ? Loc_T("tab.hint.takeoff", "[k:confirm] Take off") : (can.ok ? Loc_T("tab.hint.equip", "[k:confirm] Equip") : "")
     };
 }
 
@@ -413,7 +413,7 @@ function Codex_NoteRows(_prof) {
         if (Note_IsCollected(_prof, d.id)) {
             var txt = "";
             for (var j = 0; j < array_length(d.lines); j++) txt += ((j > 0) ? "\n" : "") + d.lines[j];
-            array_push(rows, { id: "note_" + d.id, note_id: d.id, label: d.title, value: "", kind: "button", enabled: true, help: txt, hint: Loc_T("tab.hint.read", "{confirm} Read"),
+            array_push(rows, { id: "note_" + d.id, note_id: d.id, label: d.title, value: "", kind: "button", enabled: true, help: txt, hint: Loc_T("tab.hint.read", "[k:confirm] Read"),
                                lines: [{ label: Loc_T("tab.lbl.floor", "Floor"), value: string(Run_FloorOfRoomName(d.room)) }] });
         } else {
             array_push(rows, { id: "note_" + d.id, label: "???", value: "", kind: "button", enabled: true, help: Loc_T("tab.notes.unknown", "A note you have not found yet. Look at the walls."), lines: [], hint: "" });
@@ -478,15 +478,15 @@ function TabCodex_Items(_prof) {
     var runs = array_length(_prof.history);
     return [
         { id: "bestiary", label: Loc_T("tab.codex.bestiary", "Bestiary"), value: string(Codex_BestiaryCount(_prof)) + "/" + string(array_length(ids)), kind: "button", enabled: true,
-          help: Loc_T("tab.codex.bestiary_help", "The enemies you have met: their numbers and their moves."), lines: [], hint: Loc_T("tab.hint.open", "{confirm} Open") },
+          help: Loc_T("tab.codex.bestiary_help", "The enemies you have met: their numbers and their moves."), lines: [], hint: Loc_T("tab.hint.open", "[k:confirm] Open") },
         { id: "notes", label: Loc_T("tab.codex.notes", "Notes"), value: string(Codex_NoteCount(_prof)) + "/" + string(array_length(Note_Defs())), kind: "button", enabled: true,
-          help: Loc_T("tab.codex.notes_help", "The notes you have read in the tunnel."), lines: [], hint: Loc_T("tab.hint.open", "{confirm} Open") },
+          help: Loc_T("tab.codex.notes_help", "The notes you have read in the tunnel."), lines: [], hint: Loc_T("tab.hint.open", "[k:confirm] Open") },
         { id: "history", label: Loc_T("tab.codex.history", "Run history"), value: string(runs), kind: "button", enabled: (runs > 0), dim: (runs <= 0),
           help: Loc_T("tab.codex.history_help", "Every run you have finished, newest first."),
           lines: [{ label: Loc_T("tab.lbl.wins", "Wins"), value: string(_prof.wins) }, { label: Loc_T("tab.lbl.falls", "Falls"), value: string(_prof.deaths) }, { label: Loc_T("tab.lbl.best_floor", "Best floor"), value: string(_prof.best_floor) }],
-          hint: Loc_T("tab.hint.open", "{confirm} Open") },
+          hint: Loc_T("tab.hint.open", "[k:confirm] Open") },
         { id: "unlocks", label: Loc_T("tab.codex.unlocks", "Unlocks"), value: string(Profile_IsUnlocked(_prof, "nobody_class") ? 1 : 0) + "/1", kind: "button", enabled: true,
-          help: Loc_T("tab.codex.unlocks_help", "What winning has opened up for later runs."), lines: [], hint: Loc_T("tab.hint.open", "{confirm} Open") }
+          help: Loc_T("tab.codex.unlocks_help", "What winning has opened up for later runs."), lines: [], hint: Loc_T("tab.hint.open", "[k:confirm] Open") }
     ];
 }
 
@@ -1111,9 +1111,9 @@ function TabMenu_Hint() {
         var it = m.items[clamp(m.cursor, 0, array_length(m.items) - 1)];
         if (variable_struct_exists(it, "hint")) txt = it.hint;
         else if (variable_struct_exists(it, "kind") && (it.kind == "choice" || it.kind == "slider")) txt = Loc_T("tab.hint.change", "{left}{right} Change");
-        else if (TabMenu_Ids()[TabMenu_Get().tab] == "settings") txt = Loc_T("tab.hint.select", "{confirm} Select");
+        else if (TabMenu_Ids()[TabMenu_Get().tab] == "settings") txt = Loc_T("tab.hint.select", "[k:confirm] Select");
     }
-    if (TabNote_IsReader(m) && NoteReader_MaxScroll(array_length(m.data.wrapped), m.data.visible) > 0) txt = Loc_T("tab.hint.scroll", "{up}{down} Scroll");
+    if (TabNote_IsReader(m) && NoteReader_MaxScroll(array_length(m.data.wrapped), m.data.visible) > 0) txt = Loc_T("tab.hint.scroll", "[k:up][k:down] Scroll");
     if (txt != "") txt += "    ";
     return txt + ((TabMenu_Depth() > 1) ? Loc_T("tab.hint.back", "{back} Back") : Loc_T("tab.hint.close", "{back} Close"));
 }
@@ -1751,7 +1751,7 @@ function CardsUi_DrawPick(_u, _a) {
     var skip_label = Loc_T("cards.pick.skip", "Skip: +{gold} gold", { gold: string(Card_SkipGold()) });
     var skip_w = UI_TextWidth(skip_label) + 24 * p;
     var skip_h = mt.row_h + 4 * p;
-    var hint = Loc_T("cards.pick.hint", "{left}{right} Choose   {confirm} Take");
+    var hint = Loc_T("cards.pick.hint", "[k:left][k:right] Choose   [k:confirm] Take");
     var total = mt.line_h + 3 * p + ch_max + 3 * p + skip_h + 2 * p + mt.line_h;
     var y0 = max(margin, round((mt.gh - total) / 2));
     var slide = p * round((1 - _a) * 3);
@@ -1982,7 +1982,7 @@ function Notice_Text() {
 }
 
 function Notice_Footer() {
-    return "{confirm} " + Loc_T("common.ok", "OK");
+    return "[k:confirm] " + Loc_T("common.ok", "OK");
 }
 
 // Opens the pop-up with _text (a notice that is up is replaced and starts its own lock). _now is the clock, current_time in the game.
@@ -2781,7 +2781,7 @@ function KeepThis_Draw(_a = 1) {
     var iw = min(mt.gw - 2 * mt.margin - 8 * p, 130 * p);
     var t1 = Loc_T("settings.keep.title", "Keep this setting?");
     var t2 = Loc_T("settings.keep.body", "It goes back by itself in {n} s.", { n: string(ceil(KeepThis_Remaining() / 1000)) });
-    var t3 = Loc_T("settings.keep.hint", "{confirm} Keep   {back} Revert");
+    var t3 = Loc_T("settings.keep.hint", "[k:confirm] Keep   [k:back] Revert");
     var l1 = Prompt_RichLayout(t1, iw);
     var l2 = Prompt_RichLayout(t2, iw);
     var l3 = Prompt_RichLayout(t3, iw);
@@ -3220,7 +3220,7 @@ function Title_SeedEntryDraw(_c) {
     var ch = lh + 4 * p;
     var inner_w = pw - 8 * p;
     var info = _c.title_seed_msg ? Loc_T("seed.entry.need", "Enter a seed above zero.") : Loc_T("seed.entry.info", "Up to 9 digits. Same seed, same run.");
-    var hints = [Loc_T("seed.entry.hint", "{up}{down} Digit   {left}{right} Move"), Loc_T("seed.entry.hint2", "{confirm} Start"), Loc_T("seed.entry.hint3", "{back} Back   {tab_prev} Delete")];   // one group per row: a key never wraps away from its word
+    var hints = [Loc_T("seed.entry.hint", "[k:up][k:down] Digit   [k:left][k:right] Move"), Loc_T("seed.entry.hint2", "[k:confirm] Start"), Loc_T("seed.entry.hint3", "[k:back] Back   [k:tab_prev] Delete")];   // one group per row: a key never wraps away from its word
     var info_h = Ui_TextBlockH(info, inner_w);
     var hint_h = 0;
     for (var h = 0; h < array_length(hints); h++) hint_h += Ui_TextBlockH(hints[h], inner_w) + ((h > 0) ? p : 0);
@@ -3591,6 +3591,8 @@ function Focus_Step(_has_focus) {
 #macro UI_C_DARK $506830         // #306850
 #macro UI_C_LIGHT $6CC086        // #86C06C
 #macro UI_C_LIGHTEST $CFF8E0     // #E0F8CF
+#macro UI_C_TERM $6CC086        // #86C06C (D149): a game term in a sentence ([t]..[/t]): the palette's bright green, drawn as asked on the white main text
+#macro UI_C_ACCENT $47C5E8      // #E8C547 (D149): the one accent ([a]..[/a]): BREAK, Perfect and a newly received item only (the merchant gold of D113)
 #macro UI_C_TEXT $FFFFFF         // #FFFFFF (D115): item names and list / name text are white; frames, bars and accents keep the four palette colours
 #macro UI_REPEAT_DELAY_MS 300    // D95: hold this long before the list starts to scroll
 #macro UI_REPEAT_START_MS 140    // the first repeat gap; each next one is 20 percent shorter ...
@@ -4037,6 +4039,7 @@ function Ui_Text(_x, _y, _txt, _col, _halign = fa_left) {
     draw_set_halign(_halign);
     draw_set_valign(fa_top);
     draw_set_color(Ui_TextColor(_col));
+    if (is_string(_txt) && string_pos("[", _txt) > 0) _txt = Markup_Strip(_txt);   // D149: markup never reaches a plain draw as brackets
     UI_DrawText(round(_x), round(_y), _txt);
     draw_set_halign(fa_left);
 }
@@ -4176,6 +4179,7 @@ function Ui_TextBlock(_x, _y, _txt, _w, _col) {
 // The text of _txt, cut with ".." so it is no wider than _max_w GUI units.
 function Ui_FitText(_txt, _max_w) {
     var t = string(_txt);
+    if (string_pos("[", t) > 0) t = Markup_Strip(t);   // D149: the width of what is drawn, not of the tags
     if (UI_TextWidth(t) <= _max_w) return t;
     while (string_length(t) > 1 && UI_TextWidth(t + "..") > _max_w) t = string_copy(t, 1, string_length(t) - 1);
     return t + "..";

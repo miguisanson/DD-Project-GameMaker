@@ -3081,11 +3081,21 @@ function Battle_MenusStep(_bc) {
     }
 }
 
-// The keys of a list (C4's glyphs: the keyboard key or the pad button of the device in use), right-aligned just above the details panel.
-function Battle_DrawListHint(_m) {
+// D156: the hint labels a battle state draws, each { action, text } (the text has its [k:action] button). One prompt line, for the action that is
+// current: the skill and item lists say what the confirm button does (Back is Esc / B everywhere, so it is not repeated); the command menu and the
+// bars draw none (a bar is taught by its first-time pop-up). Before D156 the lists drew two labels (Choose, Back).
+function Battle_HintLabels(_state) {
+    if (_state == BSTATE_SKILL_MENU || _state == BSTATE_ITEM_MENU) return [{ action: "confirm", text: Loc_T("battle.hint.list", "[k:confirm] Choose") }];
+    return [];
+}
+
+// The prompt line of a list (C4's glyphs: the keyboard key or the pad button of the device in use), right-aligned just above the details panel.
+function Battle_DrawListHint(_m, _state) {
     if (_m.det_rect.w <= 0) return;
+    var hints = Battle_HintLabels(_state);
+    if (array_length(hints) == 0) return;
     var mt = Ui_Metrics();
-    var txt = Loc_T("battle.hint.list", "{confirm} Choose   {back} Back");
+    var txt = hints[0].text;
     var lay = Prompt_RichLayout(txt, _m.det_rect.w);
     Prompt_RichDraw(_m.det_rect.x + _m.det_rect.w - lay.line_w[0] - mt.p, _m.det_rect.y - lay.h - mt.p, txt, _m.det_rect.w, UI_C_LIGHT, fa_left, Ui_MenuAlpha(_m, current_time));
 }
@@ -3101,8 +3111,8 @@ function Battle_DrawMenus(_bc) {
                 if (cmd_a > 0) Battle_DrawAttackPreview(_bc, cmd_a);   // D135: the damage against this enemy, while the cursor is on ATTACK
             }
             break;
-        case BSTATE_SKILL_MENU: Ui_MenuDraw(_bc.ui_skill, Ui_MenuAlpha(_bc.ui_skill, now)); Battle_DrawListHint(_bc.ui_skill); break;
-        case BSTATE_ITEM_MENU: Ui_MenuDraw(_bc.ui_item, Ui_MenuAlpha(_bc.ui_item, now)); Battle_DrawListHint(_bc.ui_item); break;
+        case BSTATE_SKILL_MENU: Ui_MenuDraw(_bc.ui_skill, Ui_MenuAlpha(_bc.ui_skill, now)); Battle_DrawListHint(_bc.ui_skill, BSTATE_SKILL_MENU); break;
+        case BSTATE_ITEM_MENU: Ui_MenuDraw(_bc.ui_item, Ui_MenuAlpha(_bc.ui_item, now)); Battle_DrawListHint(_bc.ui_item, BSTATE_ITEM_MENU); break;
     }
 }
 

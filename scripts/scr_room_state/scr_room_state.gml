@@ -1081,17 +1081,21 @@ function RunFlow_Draw() {
             global.run_flow_pic_draws = RunFlow_DeathPicDraws() + 1;
         }
         draw_set_alpha(a);
-        draw_set_halign(fa_center);
-        draw_set_valign(fa_top);
-        draw_set_color(UI_C_TEXT);
-        draw_text_ext_transformed(round(w / 2), lay.text_y, f.ctx.text, -1, max(1, round(lay.text_w / s)), s, s, 0);
-        draw_set_halign(fa_left);
+        if (Prompt_HasTokens(f.ctx.text)) {   // D149: terms and buttons in the line (laid out in the text column under the death picture, H13a)
+            Prompt_RichDraw(round((w - lay.text_w) / 2), lay.text_y, f.ctx.text, lay.text_w, UI_C_TEXT, fa_center, a);
+        } else {
+            draw_set_halign(fa_center);
+            draw_set_valign(fa_top);
+            draw_set_color(UI_C_TEXT);
+            draw_text_ext_transformed(round(w / 2), lay.text_y, f.ctx.text, -1, max(1, round(lay.text_w / s)), s, s, 0);
+            draw_set_halign(fa_left);
+        }
         draw_set_alpha(1);
     } else if (f.phase == "summary") {
         var title = Loc_T("runflow.title", "The tunnel keeps you.");
         var rows = RunFlow_SummaryRows(f.entry);
         var sentence = RunFlow_CauseLine(f.entry);
-        var footer = Loc_T("runflow.continue", "Press confirm to go on");
+        var footer = Loc_T("runflow.continue", "Press [k:confirm] to go on");
         var pw = min(w - 2 * mt.margin, round(w * 0.62));
         var cols = 1;
         var dh = Ui_DetailsHeight(pw, sentence, rows);
@@ -1106,7 +1110,7 @@ function RunFlow_Draw() {
         var px = round((w - pw) / 2);
         Ui_Text(w / 2, y0, title, UI_C_LIGHTEST, fa_center);
         Ui_DrawDetails(px, y0 + mt.line_h + 3 * p, pw, dh, sentence, rows, 1, cols);
-        Ui_Text(w / 2, y0 + mt.line_h + 3 * p + dh + 3 * p, footer, UI_C_LIGHT, fa_center);
+        Prompt_RichDraw(round(w * 0.1), y0 + mt.line_h + 3 * p + dh + 3 * p, footer, round(w * 0.8), UI_C_LIGHT, fa_center);   // D156: the button of the device in use
     }
     draw_set_alpha(1);
 }

@@ -22,9 +22,9 @@ if ($PSBoundParameters.ContainsKey('Plant')) { $NegativeControl = [switch]$true 
 # Strict = also require exit code 0 and the result file (only -runtests; crash exit codes are unreliable).
 $GameModes = @(
     @{ Name = 'runtests'; Flag = '-runtests'; Timeout = 30;  Impl = $true;  Strict = $true  }
-    @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 680;  Impl = $true;  Strict = $false }
+    @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 740;  Impl = $true;  Strict = $false }
     @{ Name = 'bot';      Flag = '-bot';      Timeout = 480; Impl = $true;  Strict = $false }
-    @{ Name = 'shots';    Flag = '-shots';    Timeout = 480; Impl = $true;  Strict = $false; Shots = 270 }   # Shots = number of [SHOT] lines required. (H1: pause-menu pictures -2, one-menu +6. H2 +6. H6 +4. H14 +10. H7 +6. H5 +6. H13a +6. D164 +6. H8a +11.)
+    @{ Name = 'shots';    Flag = '-shots';    Timeout = 480; Impl = $true;  Strict = $false; Shots = 280 }   # Shots = number of [SHOT] lines required. (H1: pause-menu pictures -2, one-menu +6. H2 +6. H6 +4. H14 +10. H7 +6. H5 +6. H13a +6. D164 +6. H8a +11. H8b +10.)
     @{ Name = 'exportdata'; Flag = '-exportdata'; Timeout = 60; Impl = $true;  Strict = $false; Export = $true; Explicit = $true }   # B1: the game's classes/enemies/skills/items/statuses/level table as JSON -> <WorkRoot>\export\export_data.json. Run with -Only exportdata.
     @{ Name = 'gridshots'; Flag = '-gridshots'; Timeout = 120; Impl = $true;  Strict = $false; Shots = 11; ShotDir = 'gridshots'; Explicit = $true }   # D65: 16 px grid over every floor room -> <WorkRoot>\gridshots. Not part of -Mode full: run with -Only gridshots.
 )

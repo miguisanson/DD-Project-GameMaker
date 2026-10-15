@@ -3,7 +3,7 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T22:22:21Z",
+    "generated_at_utc": "2026-10-15T22:45:34Z",
     "row_count": 1110
   },
   "default_lang": "en",
@@ -66,7 +66,7 @@
     },
     "battle.chip.steadfast.line": {
       "en": "Cannot be stunned.",
-      "ko": "기절하지 않습니다."
+      "ko": "[t]기절[/t]하지 않습니다."
     },
     "battle.chip.steadfast.short": {
       "en": "Steady",
@@ -93,8 +93,8 @@
       "ko": "완벽"
     },
     "battle.hint.list": {
-      "en": "{confirm} Choose   {back} Back",
-      "ko": "{confirm} 선택   {back} 뒤로"
+      "en": "[k:confirm] Choose",
+      "ko": "[k:confirm] 선택"
     },
     "battle.hud.break": {
       "en": "BREAK!",
@@ -113,16 +113,16 @@
       "ko": "MP"
     },
     "battle.item.cure": {
-      "en": "Cures {status}.",
-      "ko": "{status} 상태를 치료합니다."
+      "en": "Cures [t]{status}[/t].",
+      "ko": "[t]{status}[/t] 상태를 치료합니다."
     },
     "battle.item.heal": {
-      "en": "Restores your HP.",
-      "ko": "HP를 회복합니다."
+      "en": "Restores your [t]HP[/t].",
+      "ko": "[t]HP[/t]를 회복합니다."
     },
     "battle.item.mp": {
-      "en": "Restores your MP.",
-      "ko": "MP를 회복합니다."
+      "en": "Restores your [t]MP[/t].",
+      "ko": "[t]MP[/t]를 회복합니다."
     },
     "battle.item.other": {
       "en": "A useful item.",
@@ -269,8 +269,8 @@
       "ko": "동전 주머니"
     },
     "card.fb.rest.line": {
-      "en": "Restore {n}% of your HP and MP now.",
-      "ko": "지금 HP와 MP를 {n}% 회복한다."
+      "en": "Restore {n}% of your [t]HP[/t] and [t]MP[/t] now.",
+      "ko": "지금 [t]HP[/t]와 [t]MP[/t]를 {n}% 회복한다."
     },
     "card.fb.rest.name": {
       "en": "Second Breath",
@@ -393,16 +393,16 @@
       "ko": "가시 화살"
     },
     "card.pas.a_fleet_foot.line": {
-      "en": "Quicker than the wind: +{n} SPD for good.",
-      "ko": "바람보다 빠르게: 영구히 SPD +{n}."
+      "en": "Quicker than the wind: +{n} [t]SPD[/t] for good.",
+      "ko": "바람보다 빠르게: 영구히 [t]SPD[/t] +{n}."
     },
     "card.pas.a_fleet_foot.name": {
       "en": "Fleet Foot",
       "ko": "날랜 발"
     },
     "card.pas.a_second_wind.line": {
-      "en": "Regain {n} MP after each fight you win.",
-      "ko": "전투에서 이길 때마다 MP를 {n} 회복한다."
+      "en": "Regain {n} [t]MP[/t] after each fight you win.",
+      "ko": "전투에서 이길 때마다 [t]MP[/t]를 {n} 회복한다."
     },
     "card.pas.a_second_wind.name": {
       "en": "Second Wind",
@@ -417,15 +417,15 @@
       "ko": "돈 냄새"
     },
     "card.pas.field_medic.line": {
-      "en": "Restore {n} HP after each fight you win.",
-      "ko": "전투에서 이길 때마다 HP를 {n} 회복한다."
+      "en": "Restore {n} [t]HP[/t] after each fight you win.",
+      "ko": "전투에서 이길 때마다 [t]HP[/t]를 {n} 회복한다."
     },
     "card.pas.field_medic.name": {
       "en": "Field Medic",
       "ko": "야전 의무병"
     },
     "card.pas.k_bulwark.line": {
-      "en": "Guard on yourself lasts {n} turns longer.",
+      "en": "[t]Guard[/t] on yourself lasts {n} turns longer.",
       "ko": "나에게 건 방어 효과가 {n}턴 더 오래간다."
     },
     "card.pas.k_bulwark.name": {
@@ -433,24 +433,24 @@
       "ko": "방벽"
     },
     "card.pas.k_heavy_hands.line": {
-      "en": "A harder swing: +{n} ATK for good.",
-      "ko": "더 묵직한 일격: 영구히 ATK +{n}."
+      "en": "A harder swing: +{n} [t]ATK[/t] for good.",
+      "ko": "더 묵직한 일격: 영구히 [t]ATK[/t] +{n}."
     },
     "card.pas.k_heavy_hands.name": {
       "en": "Heavy Hands",
       "ko": "묵직한 손"
     },
     "card.pas.k_iron_hide.line": {
-      "en": "Thicker hide: +{n} DEF for good.",
-      "ko": "두꺼운 가죽: 영구히 DEF +{n}."
+      "en": "Thicker hide: +{n} [t]DEF[/t] for good.",
+      "ko": "두꺼운 가죽: 영구히 [t]DEF[/t] +{n}."
     },
     "card.pas.k_iron_hide.name": {
       "en": "Iron Hide",
       "ko": "강철 가죽"
     },
     "card.pas.m_arcane_well.line": {
-      "en": "A deeper well: +{n} MAG for good.",
-      "ko": "더 깊은 샘: 영구히 MAG +{n}."
+      "en": "A deeper well: +{n} [t]MAG[/t] for good.",
+      "ko": "더 깊은 샘: 영구히 [t]MAG[/t] +{n}."
     },
     "card.pas.m_arcane_well.name": {
       "en": "Arcane Well",
@@ -465,16 +465,16 @@
       "ko": "차가운 집중"
     },
     "card.pas.m_spellweave.line": {
-      "en": "Your skills cost {n} MP less (never below 1).",
-      "ko": "스킬의 MP 소모가 {n} 줄어든다 (최소 1)."
+      "en": "Your skills cost {n} [t]MP[/t] less (never below 1).",
+      "ko": "스킬의 [t]MP[/t] 소모가 {n} 줄어든다 (최소 1)."
     },
     "card.pas.m_spellweave.name": {
       "en": "Spellweave",
       "ko": "주문 엮기"
     },
     "card.pas.mana_spring.line": {
-      "en": "Regain {n} MP at the start of each of your turns.",
-      "ko": "내 턴이 시작될 때마다 MP를 {n} 회복한다."
+      "en": "Regain {n} [t]MP[/t] at the start of each of your turns.",
+      "ko": "내 턴이 시작될 때마다 [t]MP[/t]를 {n} 회복한다."
     },
     "card.pas.mana_spring.name": {
       "en": "Mana Spring",
@@ -497,16 +497,16 @@
       "ko": "주워 모으는 자"
     },
     "card.pas.n_tonic.line": {
-      "en": "Healing potions also restore {n} MP.",
-      "ko": "회복 물약이 MP도 {n} 회복시킨다."
+      "en": "Healing potions also restore {n} [t]MP[/t].",
+      "ko": "회복 물약이 [t]MP[/t]도 {n} 회복시킨다."
     },
     "card.pas.n_tonic.name": {
       "en": "Tonic Blend",
       "ko": "강장제 배합"
     },
     "card.pas.opening_blow.line": {
-      "en": "Enemies start each fight with {n} stagger.",
-      "ko": "전투가 시작될 때 적의 경직이 {n} 쌓여 있다."
+      "en": "Enemies start each fight with {n} [t]stagger[/t].",
+      "ko": "전투가 시작될 때 적의 [t]경직[/t]이 {n} 쌓여 있다."
     },
     "card.pas.opening_blow.name": {
       "en": "Opening Blow",
@@ -521,40 +521,40 @@
       "ko": "물약 지식"
     },
     "card.pas.quick_feet.line": {
-      "en": "Light on your feet: +{n} SPD for good.",
-      "ko": "가벼운 발걸음: 영구히 SPD +{n}."
+      "en": "Light on your feet: +{n} [t]SPD[/t] for good.",
+      "ko": "가벼운 발걸음: 영구히 [t]SPD[/t] +{n}."
     },
     "card.pas.quick_feet.name": {
       "en": "Quick Feet",
       "ko": "빠른 발"
     },
     "card.pas.steady_hands.line": {
-      "en": "Perfect zones are {n}% wider.",
-      "ko": "완벽 구간이 {n}% 넓어진다."
+      "en": "[a]Perfect[/a] zones are {n}% wider.",
+      "ko": "[a]완벽[/a] 구간이 {n}% 넓어진다."
     },
     "card.pas.steady_hands.name": {
       "en": "Steady Hands",
       "ko": "흔들림 없는 손"
     },
     "card.pas.venom_coat.line": {
-      "en": "Poison you apply adds {n} extra stack.",
-      "ko": "내가 거는 독이 {n}중첩 더 쌓인다."
+      "en": "[t]Poison[/t] you apply adds {n} extra stack.",
+      "ko": "내가 거는 [t]독[/t]이 {n}중첩 더 쌓인다."
     },
     "card.pas.venom_coat.name": {
       "en": "Venom Coat",
       "ko": "독 바르기"
     },
     "card.skill.buff": {
-      "en": "Gain {status} for {turns} turns.",
-      "ko": "{status} 효과를 {turns}턴 동안 얻는다."
+      "en": "Gain [t]{status}[/t] for {turns} turns.",
+      "ko": "[t]{status}[/t] 효과를 {turns}턴 동안 얻는다."
     },
     "card.skill.hit": {
       "en": "Strike for {power} power.",
       "ko": "위력 {power}로 공격한다."
     },
     "card.skill.hit_status": {
-      "en": "{chance}% to inflict {status}.",
-      "ko": "{chance}% 확률로 {status} 부여."
+      "en": "{chance}% to inflict [t]{status}[/t].",
+      "ko": "{chance}% 확률로 [t]{status}[/t] 부여."
     },
     "card.skill.hits": {
       "en": "Strike {hits} times for {power} power each.",
@@ -601,8 +601,8 @@
       "ko": "+{n}턴"
     },
     "cards.pick.hint": {
-      "en": "{left}{right} Choose   {confirm} Take",
-      "ko": "{left}{right} 고르기   {confirm} 받기"
+      "en": "[k:left][k:right] Choose   [k:confirm] Take",
+      "ko": "[k:left][k:right] 고르기   [k:confirm] 받기"
     },
     "cards.pick.left": {
       "en": "({n} picks left)",
@@ -641,16 +641,16 @@
       "ko": "최대 HP +{n}"
     },
     "cards.stat.maxhp.desc": {
-      "en": "Raises your max HP by {n} and heals {n} HP.",
-      "ko": "최대 HP가 {n} 오르고 HP를 {n} 회복합니다."
+      "en": "Raises your max [t]HP[/t] by {n} and heals {n} [t]HP[/t].",
+      "ko": "최대 [t]HP[/t]가 {n} 오르고 [t]HP[/t]를 {n} 회복합니다."
     },
     "cards.stat.maxmp": {
       "en": "Max MP +{n}",
       "ko": "최대 MP +{n}"
     },
     "cards.stat.maxmp.desc": {
-      "en": "Raises your max MP by {n} and restores {n} MP.",
-      "ko": "최대 MP가 {n} 오르고 MP를 {n} 회복합니다."
+      "en": "Raises your max [t]MP[/t] by {n} and restores {n} [t]MP[/t].",
+      "ko": "최대 [t]MP[/t]가 {n} 오르고 [t]MP[/t]를 {n} 회복합니다."
     },
     "cards.stat.now": {
       "en": "Now",
@@ -1625,8 +1625,8 @@
       "ko": "아무것도 찾지 못했다."
     },
     "dialogue.loot_received.0": {
-      "en": "Received {item} x{qty}.",
-      "ko": "{item} x{qty}을(를) 받았습니다."
+      "en": "Received [a]{item}[/a] x{qty}.",
+      "ko": "[a]{item}[/a] x{qty}을(를) 받았습니다."
     },
     "dialogue.rock.0": {
       "en": "Just a rock.",
@@ -2257,12 +2257,12 @@
       "ko": "다이아몬드 지팡이"
     },
     "item.passive.desc.1": {
-      "en": "A Weak press counts as OK (once per turn)",
-      "ko": "약함 판정이 무난으로 처리됩니다 (턴당 1회)"
+      "en": "A [t]Weak[/t] press counts as [t]OK[/t] (once per turn)",
+      "ko": "[t]약함[/t] 판정이 [t]무난[/t]으로 처리됩니다 (턴당 1회)"
     },
     "item.passive.desc.2": {
-      "en": "First hit: -1 DEF for 2 turns",
-      "ko": "첫 타격: 2턴 동안 DEF -1"
+      "en": "First hit: -1 [t]DEF[/t] for 2 turns",
+      "ko": "첫 타격: 2턴 동안 [t]DEF[/t] -1"
     },
     "item.passive.desc.20": {
       "en": "First hit -3 damage (once per battle)",
@@ -2277,56 +2277,56 @@
       "ko": "큰 피해 30% 감소"
     },
     "item.passive.desc.23": {
-      "en": "+1 MP every 2 turns, +1 physical damage taken",
-      "ko": "2턴마다 MP +1, 받는 물리 피해 +1"
+      "en": "+1 [t]MP[/t] every 2 turns, +1 physical damage taken",
+      "ko": "2턴마다 [t]MP[/t] +1, 받는 물리 피해 +1"
     },
     "item.passive.desc.24": {
       "en": "+10% skill damage, +1 status turn",
       "ko": "스킬 피해 +10%, 상태 지속 +1턴"
     },
     "item.passive.desc.25": {
-      "en": "Reflects the first status (costs 1 MP)",
-      "ko": "첫 상태 이상을 반사 (MP 1 소모)"
+      "en": "Reflects the first status (costs 1 [t]MP[/t])",
+      "ko": "첫 상태 이상을 반사 ([t]MP[/t] 1 소모)"
     },
     "item.passive.desc.3": {
-      "en": "+35% damage to foes below 35% HP",
-      "ko": "HP 35% 미만 적에게 피해 +35%"
+      "en": "+35% damage to foes below 35% [t]HP[/t]",
+      "ko": "[t]HP[/t] 35% 미만 적에게 피해 +35%"
     },
     "item.passive.desc.4": {
-      "en": "A Good press counts as Perfect (once per turn)",
-      "ko": "좋음 판정이 완벽으로 처리됩니다 (턴당 1회)"
+      "en": "A [t]Good[/t] press counts as [a]Perfect[/a] (once per turn)",
+      "ko": "[t]좋음[/t] 판정이 [a]완벽[/a]으로 처리됩니다 (턴당 1회)"
     },
     "item.passive.desc.44": {
       "en": "Take 10% less damage",
       "ko": "받는 피해 10% 감소"
     },
     "item.passive.desc.45": {
-      "en": "+1 MP every 3 turns",
-      "ko": "3턴마다 MP +1"
+      "en": "+1 [t]MP[/t] every 3 turns",
+      "ko": "3턴마다 [t]MP[/t] +1"
     },
     "item.passive.desc.46": {
       "en": "Find 15% more gold",
       "ko": "골드를 15% 더 얻음"
     },
     "item.passive.desc.5": {
-      "en": "Good or Perfect: may Stun (3-turn cooldown)",
-      "ko": "좋음 이상: 기절시킬 수 있음 (재사용 3턴)"
+      "en": "[t]Good[/t] or [a]Perfect[/a]: may [t]Stun[/t] (3-turn cooldown)",
+      "ko": "[t]좋음[/t] 또는 [a]완벽[/a]: [t]기절[/t]시킬 수 있음 (재사용 3턴)"
     },
     "item.passive.desc.6": {
       "en": "+30% damage to foes with a status",
       "ko": "상태 이상에 걸린 적에게 피해 +30%"
     },
     "item.passive.desc.7": {
-      "en": "+1 MP every 2 turns",
-      "ko": "2턴마다 MP +1"
+      "en": "+1 [t]MP[/t] every 2 turns",
+      "ko": "2턴마다 [t]MP[/t] +1"
     },
     "item.passive.desc.8": {
       "en": "+15% skill damage, +1 status turn",
       "ko": "스킬 피해 +15%, 상태 지속 +1턴"
     },
     "item.passive.desc.9": {
-      "en": "+25% skill damage, Perfect +1 MP",
-      "ko": "스킬 피해 +25%, 완벽 판정 시 MP +1"
+      "en": "+25% skill damage, [a]Perfect[/a] +1 [t]MP[/t]",
+      "ko": "스킬 피해 +25%, [a]완벽[/a] 판정 시 [t]MP[/t] +1"
     },
     "item.passive.name.1": {
       "en": "Steady Strike",
@@ -2406,15 +2406,15 @@
     },
     "item.sent.31": {
       "en": "Throw it to poison the enemy with {n} stacks. Costs your turn.",
-      "ko": "적에게 독 {n}중첩을 겁니다. 턴을 소모합니다."
+      "ko": "적에게 [t]독[/t] {n}중첩을 겁니다. 턴을 소모합니다."
     },
     "item.sent.32": {
       "en": "Throw it for {power} power of damage and a stun that pushes the enemy back. Costs your turn.",
-      "ko": "위력 {power}의 피해를 주고 기절시켜 적을 뒤로 밉니다. 턴을 소모합니다."
+      "ko": "위력 {power}의 피해를 주고 [t]기절[/t]시켜 적을 뒤로 밉니다. 턴을 소모합니다."
     },
     "item.sent.33": {
-      "en": "Throw it to dodge the next attack ({turns} turns); a Perfect throw lets you slip away. Costs your turn.",
-      "ko": "다음 공격을 피합니다({turns}턴). 완벽하게 던지면 도망칩니다. 턴을 소모합니다."
+      "en": "Throw it to dodge the next attack ({turns} turns); a [a]Perfect[/a] throw lets you slip away. Costs your turn.",
+      "ko": "다음 공격을 피합니다({turns}턴). [a]완벽[/a]하게 던지면 도망칩니다. 턴을 소모합니다."
     },
     "item.sent.accessory": {
       "en": "A ring or charm worn in the accessory slot.",
@@ -2437,12 +2437,12 @@
       "ko": "{status} 상태를 치료합니다."
     },
     "item.sent.heal": {
-      "en": "Restores {n} HP.",
-      "ko": "HP를 {n}만큼 회복합니다."
+      "en": "Restores {n} [t]HP[/t].",
+      "ko": "[t]HP[/t]를 {n}만큼 회복합니다."
     },
     "item.sent.mp": {
-      "en": "Restores {n} MP.",
-      "ko": "MP를 {n}만큼 회복합니다."
+      "en": "Restores {n} [t]MP[/t].",
+      "ko": "[t]MP[/t]를 {n}만큼 회복합니다."
     },
     "item.sent.throw": {
       "en": "Throw it at the enemy. Costs your turn.",
@@ -2729,8 +2729,8 @@
       "ko": "| 대상: {target}"
     },
     "menu.tooltip.stat.atk.desc": {
-      "en": "Increases physical damage (basic attacks and ATK skills).",
-      "ko": "물리 피해(기본 공격과 ATK 스킬)를 늘립니다."
+      "en": "Increases physical damage (basic attacks and [t]ATK[/t] skills).",
+      "ko": "물리 피해(기본 공격과 [t]ATK[/t] 스킬)를 늘립니다."
     },
     "menu.tooltip.stat.def.desc": {
       "en": "Reduces all damage you take.",
@@ -2741,8 +2741,8 @@
       "ko": "전투 능력에 영향을 줍니다."
     },
     "menu.tooltip.stat.mag.desc": {
-      "en": "Increases spell damage and max MP.",
-      "ko": "마법 피해와 최대 MP를 늘립니다."
+      "en": "Increases spell damage and max [t]MP[/t].",
+      "ko": "마법 피해와 최대 [t]MP[/t]를 늘립니다."
     },
     "menu.tooltip.stat.spd.desc": {
       "en": "Decides who acts first.",
@@ -3069,12 +3069,12 @@
       "ko": "{cls}, 레벨 {lvl}"
     },
     "runflow.continue": {
-      "en": "Press confirm to go on",
-      "ko": "확인을 눌러 계속"
+      "en": "Press [k:confirm] to go on",
+      "ko": "[k:confirm]을(를) 눌러 계속"
     },
     "runflow.echo.hint": {
-      "en": "Up / Down to choose, confirm to take it",
-      "ko": "위/아래로 선택, 확인으로 가져가기"
+      "en": "[k:up][k:down] Choose   [k:confirm] Take it",
+      "ko": "[k:up][k:down] 고르기   [k:confirm] 가져가기"
     },
     "runflow.echo.item": {
       "en": "Item: {name}",
@@ -3185,16 +3185,16 @@
       "ko": "시드 선택"
     },
     "seed.entry.hint": {
-      "en": "{up}{down} Digit   {left}{right} Move",
-      "ko": "{up}{down} 숫자   {left}{right} 이동"
+      "en": "[k:up][k:down] Digit   [k:left][k:right] Move",
+      "ko": "[k:up][k:down] 숫자   [k:left][k:right] 이동"
     },
     "seed.entry.hint2": {
-      "en": "{confirm} Start",
-      "ko": "{confirm} 시작"
+      "en": "[k:confirm] Start",
+      "ko": "[k:confirm] 시작"
     },
     "seed.entry.hint3": {
-      "en": "{back} Back   {tab_prev} Delete",
-      "ko": "{back} 뒤로   {tab_prev} 지우기"
+      "en": "[k:back] Back   [k:tab_prev] Delete",
+      "ko": "[k:back] 뒤로   [k:tab_prev] 지우기"
     },
     "seed.entry.info": {
       "en": "Up to 9 digits. Same seed, same run.",
@@ -3273,8 +3273,8 @@
       "ko": "{n}초 뒤에 자동으로 원래대로 돌아갑니다."
     },
     "settings.keep.hint": {
-      "en": "{confirm} Keep   {back} Revert",
-      "ko": "{confirm} 유지   {back} 되돌리기"
+      "en": "[k:confirm] Keep   [k:back] Revert",
+      "ko": "[k:confirm] 유지   [k:back] 되돌리기"
     },
     "settings.keep.title": {
       "en": "Keep this setting?",
@@ -3717,28 +3717,28 @@
       "ko": "플레이 시간"
     },
     "status.desc.bleed": {
-      "en": "Lose {tick} HP per stack each time you act. Stacks up to {max}, lasts {dur} turns.{mods}",
-      "ko": "행동할 때마다 중첩당 {tick} HP를 잃습니다. 최대 {max}중첩, {dur}턴 지속.{mods}"
+      "en": "Lose {tick} [t]HP[/t] per stack each time you act. Stacks up to {max}, lasts {dur} turns.{mods}",
+      "ko": "행동할 때마다 중첩당 {tick} [t]HP[/t]를 잃습니다. 최대 {max}중첩, {dur}턴 지속.{mods}"
     },
     "status.desc.bleed.data": {
-      "en": "Lose {tick} HP each time you act ({stacks} stacks, max {max}), for {turns} more turns.{mods}",
-      "ko": "행동할 때마다 {tick} HP를 잃습니다 ({stacks}중첩, 최대 {max}). {turns}턴 더 지속.{mods}"
+      "en": "Lose {tick} [t]HP[/t] each time you act ({stacks} stacks, max {max}), for {turns} more turns.{mods}",
+      "ko": "행동할 때마다 {tick} [t]HP[/t]를 잃습니다 ({stacks}중첩, 최대 {max}). {turns}턴 더 지속.{mods}"
     },
     "status.desc.burn": {
-      "en": "Lose a fixed amount of HP (it grows with the caster's MAG) each turn for {dur} turns. Does not stack.{mods}",
-      "ko": "매 턴 정해진 HP(시전자의 MAG에 비례)를 {dur}턴 동안 잃습니다. 중첩되지 않습니다.{mods}"
+      "en": "Lose a fixed amount of [t]HP[/t] (it grows with the caster's [t]MAG[/t]) each turn for {dur} turns. Does not stack.{mods}",
+      "ko": "매 턴 정해진 [t]HP[/t](시전자의 [t]MAG[/t]에 비례)를 {dur}턴 동안 잃습니다. 중첩되지 않습니다.{mods}"
     },
     "status.desc.burn.data": {
-      "en": "Lose {tick} HP each turn for {turns} more turns.{mods}",
-      "ko": "매 턴 {tick} HP를 잃습니다. {turns}턴 더 지속.{mods}"
+      "en": "Lose {tick} [t]HP[/t] each turn for {turns} more turns.{mods}",
+      "ko": "매 턴 {tick} [t]HP[/t]를 잃습니다. {turns}턴 더 지속.{mods}"
     },
     "status.desc.poison": {
-      "en": "Lose HP equal to its stacks each turn, then 1 stack fades. Stacks up to {max}.{mods}",
-      "ko": "매 턴 중첩 수만큼 HP를 잃고, 중첩이 1 줄어듭니다. 최대 {max}중첩.{mods}"
+      "en": "Lose [t]HP[/t] equal to its stacks each turn, then 1 stack fades. Stacks up to {max}.{mods}",
+      "ko": "매 턴 중첩 수만큼 [t]HP[/t]를 잃고, 중첩이 1 줄어듭니다. 최대 {max}중첩.{mods}"
     },
     "status.desc.poison.data": {
-      "en": "Lose {tick} HP each turn, then 1 stack fades ({stacks} stacks, max {max}).{mods}",
-      "ko": "매 턴 {tick} HP를 잃고, 중첩이 1 줄어듭니다 ({stacks}중첩, 최대 {max}).{mods}"
+      "en": "Lose {tick} [t]HP[/t] each turn, then 1 stack fades ({stacks} stacks, max {max}).{mods}",
+      "ko": "매 턴 {tick} [t]HP[/t]를 잃고, 중첩이 1 줄어듭니다 ({stacks}중첩, 최대 {max}).{mods}"
     },
     "status.desc.status_blessing": {
       "en": "Next incoming hit deals {pct}% less damage.",
@@ -3773,20 +3773,20 @@
       "ko": "다음에 받는 공격을 막습니다."
     },
     "status.desc.status_hit_up": {
-      "en": "For {turns} turns: you see the enemy's next move and every Perfect zone is {pct}% wider.",
-      "ko": "{turns}턴 동안 적의 다음 행동이 보이고 모든 완벽 구간이 {pct}% 넓어집니다."
+      "en": "For {turns} turns: you see the enemy's next move and every [a]Perfect[/a] zone is {pct}% wider.",
+      "ko": "{turns}턴 동안 적의 다음 행동이 보이고 모든 [a]완벽[/a] 구간이 {pct}% 넓어집니다."
     },
     "status.desc.status_meditation": {
-      "en": "Recover {n} MP each turn.",
-      "ko": "매 턴 MP를 {n} 회복합니다."
+      "en": "Recover {n} [t]MP[/t] each turn.",
+      "ko": "매 턴 [t]MP[/t]를 {n} 회복합니다."
     },
     "status.desc.status_solidify": {
       "en": "Takes {pct}% less damage from the next hit.",
       "ko": "다음 공격에서 받는 피해가 {pct}% 줄어듭니다."
     },
     "status.desc.status_stun": {
-      "en": "Pushed back on the turn bar. Then Steadfast: cannot be stunned for 2 turns.",
-      "ko": "차례가 뒤로 밀립니다. 이후 2턴간 버티기 상태가 되어 기절하지 않습니다."
+      "en": "Pushed back on the turn bar. Then [t]Steadfast[/t]: cannot be stunned for 2 turns.",
+      "ko": "차례가 뒤로 밀립니다. 이후 2턴간 [t]버티기[/t] 상태가 되어 [t]기절[/t]하지 않습니다."
     },
     "status.desc.status_sunder": {
       "en": "Lose defense.{mods}",
@@ -4041,44 +4041,44 @@
       "ko": "착용 중"
     },
     "tab.hint.back": {
-      "en": "{back} Back",
-      "ko": "{back} 뒤로"
+      "en": "[k:back] Back",
+      "ko": "[k:back] 뒤로"
     },
     "tab.hint.change": {
-      "en": "{left}{right} Change",
-      "ko": "{left}{right} 변경"
+      "en": "[k:left][k:right] Change",
+      "ko": "[k:left][k:right] 변경"
     },
     "tab.hint.close": {
-      "en": "{back} Close",
-      "ko": "{back} 닫기"
+      "en": "[k:back] Close",
+      "ko": "[k:back] 닫기"
     },
     "tab.hint.equip": {
-      "en": "{confirm} Equip",
-      "ko": "{confirm} 착용"
+      "en": "[k:confirm] Equip",
+      "ko": "[k:confirm] 착용"
     },
     "tab.hint.open": {
-      "en": "{confirm} Open",
-      "ko": "{confirm} 열기"
+      "en": "[k:confirm] Open",
+      "ko": "[k:confirm] 열기"
     },
     "tab.hint.read": {
-      "en": "{confirm} Read",
-      "ko": "{confirm} 읽기"
+      "en": "[k:confirm] Read",
+      "ko": "[k:confirm] 읽기"
     },
     "tab.hint.scroll": {
-      "en": "{up}{down} Scroll",
-      "ko": "{up}{down} 넘기기"
+      "en": "[k:up][k:down] Scroll",
+      "ko": "[k:up][k:down] 넘기기"
     },
     "tab.hint.select": {
-      "en": "{confirm} Select",
-      "ko": "{confirm} 선택"
+      "en": "[k:confirm] Select",
+      "ko": "[k:confirm] 선택"
     },
     "tab.hint.takeoff": {
-      "en": "{confirm} Take off",
-      "ko": "{confirm} 해제"
+      "en": "[k:confirm] Take off",
+      "ko": "[k:confirm] 해제"
     },
     "tab.hint.use": {
-      "en": "{confirm} Use",
-      "ko": "{confirm} 사용"
+      "en": "[k:confirm] Use",
+      "ko": "[k:confirm] 사용"
     },
     "tab.hist.abandoned": {
       "en": "You gave this run up on floor {n}.",
@@ -4337,24 +4337,24 @@
       "ko": "아무 키나 누르세요"
     },
     "tutorial.arrows.body": {
-      "en": "Skills show a row of arrows. Press {up}{down}{left}{right} in that order before the time bar runs out. A wrong press costs time.",
-      "ko": "스킬을 쓰면 화살표 줄이 나옵니다. 시간 막대가 다 줄기 전에 {up}{down}{left}{right}으로 순서대로 누르세요. 틀리면 시간이 깎입니다."
+      "en": "Skills show a row of arrows. Press [k:up][k:down][k:left][k:right] in that order before the time bar runs out. A wrong press costs time.",
+      "ko": "스킬을 쓰면 화살표 줄이 나옵니다. 시간 막대가 다 줄기 전에 [k:up][k:down][k:left][k:right]으로 순서대로 누르세요. 틀리면 시간이 깎입니다."
     },
     "tutorial.arrows.title": {
       "en": "Arrow skills",
       "ko": "화살표 스킬"
     },
     "tutorial.bar.body": {
-      "en": "A cursor slides along the bar. Press {confirm} when it is over the bright zone. The closer to the middle, the harder you hit.",
-      "ko": "커서가 막대를 따라 움직입니다. 밝은 구간 위에 왔을 때 {confirm}을(를) 누르세요. 가운데에 가까울수록 더 세게 때립니다."
+      "en": "A cursor slides along the bar. Press [k:confirm] when it is over the bright zone. The closer to the middle, the harder you hit.",
+      "ko": "커서가 막대를 따라 움직입니다. 밝은 구간 위에 왔을 때 [k:confirm]을(를) 누르세요. 가운데에 가까울수록 더 세게 때립니다."
     },
     "tutorial.bar.title": {
       "en": "The sliding bar",
       "ko": "움직이는 막대"
     },
     "tutorial.bed.body": {
-      "en": "Each bed can be used once per run. Rest to restore all your HP and MP, or use it to upgrade one of your skills.",
-      "ko": "침대는 도전마다 한 번씩만 쓸 수 있습니다. 쉬어서 HP와 MP를 모두 채우거나, 스킬 하나를 강화하세요."
+      "en": "Each bed can be used once per run. Rest to restore all your [t]HP[/t] and [t]MP[/t], or use it to upgrade one of your skills.",
+      "ko": "침대는 도전마다 한 번씩만 쓸 수 있습니다. 쉬어서 [t]HP[/t]와 [t]MP[/t]를 모두 채우거나, 스킬 하나를 강화하세요."
     },
     "tutorial.bed.title": {
       "en": "Beds",
@@ -4369,24 +4369,24 @@
       "ko": "카드"
     },
     "tutorial.defence.body": {
-      "en": "When an enemy winds up a big attack, a bar appears. Press {confirm} on the bright zone to take less damage and shake off its effects.",
-      "ko": "적이 큰 공격을 준비하면 막대가 나타납니다. 밝은 구간에서 {confirm}을(를) 누르면 피해가 줄고 부가 효과도 털어냅니다."
+      "en": "When an enemy winds up a big attack, a bar appears. Press [k:confirm] on the bright zone to take less damage and shake off its effects.",
+      "ko": "적이 큰 공격을 준비하면 막대가 나타납니다. 밝은 구간에서 [k:confirm]을(를) 누르면 피해가 줄고 부가 효과도 털어냅니다."
     },
     "tutorial.defence.title": {
       "en": "Defending",
       "ko": "막기"
     },
     "tutorial.elite.body": {
-      "en": "Marked enemies are Elites. They are tougher than normal ones, but their rewards are better.",
-      "ko": "표시가 붙은 적은 정예입니다. 일반 적보다 강하지만 보상이 더 좋습니다."
+      "en": "Marked enemies are [t]Elites[/t]. They are tougher than normal ones, but their rewards are better.",
+      "ko": "표시가 붙은 적은 [t]정예[/t]입니다. 일반 적보다 강하지만 보상이 더 좋습니다."
     },
     "tutorial.elite.title": {
       "en": "Elites",
       "ko": "정예"
     },
     "tutorial.footer": {
-      "en": "{confirm} Continue",
-      "ko": "{confirm} 계속"
+      "en": "[k:confirm] Continue",
+      "ko": "[k:confirm] 계속"
     },
     "tutorial.more": {
       "en": "+{n} more",
@@ -4401,16 +4401,16 @@
       "ko": "상점"
     },
     "tutorial.stagger.body": {
-      "en": "Good hits fill the enemy's stagger meter. When it is full the enemy goes into BREAK: it loses a turn and takes +50% damage.",
-      "ko": "좋은 공격은 적의 경직 게이지를 채웁니다. 가득 차면 적이 브레이크 상태가 되어 한 턴을 잃고 피해를 50% 더 받습니다."
+      "en": "[t]Good[/t] hits fill the enemy's [t]stagger[/t] meter. When it is full the enemy goes into [a]BREAK[/a]: it loses a turn and takes +50% damage.",
+      "ko": "좋은 공격은 적의 [t]경직[/t] 게이지를 채웁니다. 가득 차면 적이 [a]브레이크[/a] 상태가 되어 한 턴을 잃고 피해를 50% 더 받습니다."
     },
     "tutorial.stagger.title": {
       "en": "Stagger and BREAK",
       "ko": "경직과 브레이크"
     },
     "tutorial.status.body": {
-      "en": "Poison, Burn, Bleed and Stun last a few turns. The icons under a name show which ones a fighter has.",
-      "ko": "독, 화상, 출혈, 기절은 몇 턴 동안 이어집니다. 이름 아래 아이콘이 걸려 있는 상태를 보여 줍니다."
+      "en": "[t]Poison[/t], [t]Burn[/t], [t]Bleed[/t] and [t]Stun[/t] last a few turns. The icons under a name show which ones a fighter has.",
+      "ko": "[t]독[/t], [t]화상[/t], [t]출혈[/t], [t]기절[/t]은 몇 턴 동안 이어집니다. 이름 아래 아이콘이 걸려 있는 상태를 보여 줍니다."
     },
     "tutorial.status.title": {
       "en": "Statuses",
