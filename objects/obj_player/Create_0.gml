@@ -70,6 +70,7 @@ bump_applied = false;
 squash_start = -100000;  // D138 (G6): when the current tile step began (MapFx_Now ms); the step squash is on for FEEL_SQUASH_MS after it
 squash_on = false;       // the squashed sprite is drawn by the world layer script (MapFx_DrawPlayerSquash) while this is true, the plain one is off (visible = false)
 prompt_target = noone; // interactable the player faces right now (drives the prompt)
+still_frames = 0;     // D153: frames spent standing still; on a hiding cell long enough (HIDE_SETTLE_FRAMES) the player is hidden
 auto_resolve_recover_timer = 0;
 auto_resolve_recover_total = 0;
 auto_resolve_recover_progress = 0;

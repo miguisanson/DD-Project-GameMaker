@@ -86,6 +86,7 @@ function RoomTransition_Apply() {
     Player_StartAutoResolveRecover(pl, PLAYER_POST_TRANSITION_RECOVER_FRAMES, false);
     if (variable_instance_exists(pl, "exit_leave") && variable_instance_exists(pl, "exit_ignore")) pl.exit_leave = (pl.exit_ignore != noone);   // D142: a room arrival, not a battle return or a load
 
+    if (target != noone) Enemy_ArrivalFix(pl);   // D158: nobody waits at the exits or stands near the arrival tile
     RoomTransition_Clear();
 }
 

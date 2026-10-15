@@ -129,6 +129,7 @@ function Test_RunAll() {
     Test_RunSuite("LevelUpGrowth", Test_Suite_LevelUpGrowth);
     Test_RunSuite("OneMenu", Test_Suite_OneMenu);
     Test_RunSuite("SeedInput", Test_Suite_SeedInput);
+    Test_RunSuite("MapAI", Test_Suite_MapAI);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -10409,4 +10410,365 @@ function Test_Suite_SeedInput() {
     Profile_RecordRun(_prof, _won);
     Test_Eq("seed history: a seeded win counts", _prof.wins, 1);
     Test_True("seed history: and unlocks as any win does", Profile_IsUnlocked(_prof, "nobody_class"));
+}
+
+// ============================================================================
+// H11 (D153, D158): smarter map AI, hiding spots, no spawn camping. Expected values come from the brief:
+//   hear radius 4 tiles (running only), flee search up to 4 tiles past the last seen cell, one "?" per search, a hidden player is seen from 1 tile only,
+//   idle / patrol targets >= 3 tiles from every exit, no enemy within 3 tiles of the arrival tile, a relocated enemy >= 4 tiles from the exit.
+// ============================================================================
+function Test_H11Open(_w, _h) {
+    var _rows = [];
+    var _row = "";
+    for (var _i = 0; _i < _w; _i++) _row += ".";
+    for (var _j = 0; _j < _h; _j++) array_push(_rows, _row);
+    return Nav_GridFromRows(_rows);
+}
+
+// An enemy that lost the player: walks to the last seen cell (A*, one cell per tick), then follows its Search_Step goals until the search is done.
+// Returns { trail: [[cx,cy], ...], pops, pop_cell, done, ticks }.
+function Test_H11RunSearch(_g, _sx, _sy, _lcx, _lcy, _dir) {
+    var _out = { trail: [[_sx, _sy]], pops: 0, pop_cell: [-1, -1], done: false, ticks: 0 };
+    var _cx = _sx;
+    var _cy = _sy;
+    while (_cx != _lcx || _cy != _lcy) {   // the chase part: walk to the last seen cell
+        var _p = Nav_FindPath(_g, _cx, _cy, _lcx, _lcy);
+        if (array_length(_p) == 0) break;
+        _cx = _p[0][0];
+        _cy = _p[0][1];
+        array_push(_out.trail, [_cx, _cy]);
+    }
+    var _se = Search_Create(_lcx, _lcy, _dir, AI_LOOK_FRAMES);
+    while (_out.ticks < 3000 && !_out.done) {
+        _out.ticks++;
+        var _r = Search_Step(_se, _g, _cx, _cy);
+        if (_r.pop) { _out.pops++; _out.pop_cell = [_cx, _cy]; }
+        if (_r.done) { _out.done = true; break; }
+        if (_r.goal_cx >= 0 && (_cx != _r.goal_cx || _cy != _r.goal_cy)) {
+            var _q = Nav_FindPath(_g, _cx, _cy, _r.goal_cx, _r.goal_cy);
+            if (array_length(_q) > 0) {
+                _cx = _q[0][0];
+                _cy = _q[0][1];
+                array_push(_out.trail, [_cx, _cy]);
+            }
+        }
+    }
+    // a finished search stays finished and never pops again
+    var _after = Search_Step(_se, _g, _cx, _cy);
+    _out.pops += _after.pop ? 1 : 0;
+    return _out;
+}
+
+function Test_H11Visited(_trail, _cx, _cy) {
+    for (var _i = 0; _i < array_length(_trail); _i++) {
+        if (_trail[_i][0] == _cx && _trail[_i][1] == _cy) return true;
+    }
+    return false;
+}
+
+function Test_H11MaxX(_trail) {
+    var _m = -1;
+    for (var _i = 0; _i < array_length(_trail); _i++) _m = max(_m, _trail[_i][0]);
+    return _m;
+}
+
+function Test_H11Search() {
+    var _g = Test_H11Open(16, 5);
+    // the enemy starts at (2,2), loses the player at (8,2) who was running RIGHT: it must reach (8,2), then go on to (12,2) (4 tiles past), then give up
+    var _r = Test_H11RunSearch(_g, 2, 2, 8, 2, RIGHT);
+    Test_True("H11 search: the enemy walks to the last seen cell", Test_H11Visited(_r.trail, 8, 2));
+    Test_True("H11 search: then searches 4 tiles toward the flee direction", Test_H11Visited(_r.trail, 12, 2));
+    Test_Eq("H11 search: and no further than 4 tiles", Test_H11MaxX(_r.trail), 12);
+    Test_Eq("H11 search: the ? goes up exactly once", _r.pops, 1);
+    Test_True("H11 search: the ? goes up at the end of the flee leg", _r.pop_cell[0] == 12 && _r.pop_cell[1] == 2);
+    Test_True("H11 search: then the search is over (the enemy goes home)", _r.done);
+
+    // a wall right ahead: the leg has nowhere to go; a wall two cells ahead: it stops one cell short of it
+    var _gw = Nav_GridFromRows(["................", "................", ".........#......", "................", "................"]);
+    var _rw = Test_H11RunSearch(_gw, 2, 2, 8, 2, RIGHT);
+    Test_Eq("H11 search: a wall right ahead, the leg goes nowhere", Test_H11MaxX(_rw.trail), 8);
+    Test_Eq("H11 search: still one ? when the leg is blocked", _rw.pops, 1);
+    var _gw2 = Nav_GridFromRows(["................", "................", "..........#.....", "................", "................"]);
+    Test_Eq("H11 search: a wall two cells ahead stops the leg one cell ahead", Test_H11MaxX(Test_H11RunSearch(_gw2, 2, 2, 8, 2, RIGHT).trail), 9);
+
+    // the room edge stops it too; UP from row 2 of 5 can only go to row 0
+    var _ru = Test_H11RunSearch(_g, 8, 4, 8, 2, UP);
+    Test_True("H11 search: UP is followed to the room edge", Test_H11Visited(_ru.trail, 8, 0));
+    Test_Eq("H11 search: and the ? goes up once there", _ru.pops, 1);
+
+    // no known direction: it looks at the last seen cell and gives up there
+    var _rn = Test_H11RunSearch(_g, 2, 2, 8, 2, -1);
+    Test_True("H11 search: no flee direction, the ? goes up at the last seen cell", _rn.pops == 1 && _rn.pop_cell[0] == 8 && _rn.pop_cell[1] == 2 && _rn.done);
+
+    // the flee cell itself
+    var _fc = Search_FleeCell(_g, 8, 2, LEFT, 4);
+    Test_True("H11 flee cell: LEFT 4 tiles from (8,2) is (4,2)", _fc.cx == 4 && _fc.cy == 2);
+    _fc = Search_FleeCell(_g, 8, 2, DOWN, 4);
+    Test_True("H11 flee cell: DOWN stops at the room edge (8,4)", _fc.cx == 8 && _fc.cy == 4);
+    _fc = Search_FleeCell(_g, 8, 2, -1, 4);
+    Test_True("H11 flee cell: no direction stays on the last seen cell", _fc.cx == 8 && _fc.cy == 2);
+}
+
+function Test_H11Hear() {
+    // an enemy at (10,5): the player behind it
+    Test_True("H11 hear: running 4 tiles behind is heard", Hear_RunHeard(10, 5, 6, 5, true));
+    Test_False("H11 hear: walking at the same spot is not heard", Hear_RunHeard(10, 5, 6, 5, false));
+    Test_False("H11 hear: running 5 tiles away is not heard", Hear_RunHeard(10, 5, 5, 5, true));
+    Test_True("H11 hear: any direction (4 tiles in front)", Hear_RunHeard(10, 5, 14, 5, true));
+    Test_True("H11 hear: straight line, not steps: (2,3) is 3.6 tiles", Hear_RunHeard(10, 5, 12, 8, true));
+    Test_False("H11 hear: (3,3) is 4.2 tiles, too far", Hear_RunHeard(10, 5, 13, 8, true));
+    Test_True("H11 hear: running next to it is heard", Hear_RunHeard(10, 5, 11, 5, true));
+
+    // through the senses: a wall between the two blocks sight but not sound
+    var _g = Nav_GridFromRows(["..........", "..........", "....#.....", "..........", ".........."]);
+    var _prof = EnemyAI_Profile(ENEMY_SLIME);
+    var _T = GRID_TILE_SIZE;
+    var _ex = 6 * _T;
+    var _ey = 2 * _T;
+    var _pr = EnemyAI_Perceive(_g, _prof, _ex, _ey, 2 * _T, 2 * _T, true, false);
+    Test_False("H11 senses: the wall hides the player", _pr.sees);
+    Test_True("H11 senses: running 4 tiles away behind the wall is heard", _pr.heard);
+    _pr = EnemyAI_Perceive(_g, _prof, _ex, _ey, 2 * _T, 2 * _T, false, false);
+    Test_False("H11 senses: walking at the same place is not heard", _pr.heard);
+    _pr = EnemyAI_Perceive(_g, _prof, _ex, _ey, 1 * _T, 2 * _T, true, false);
+    Test_False("H11 senses: running 5 tiles away is not heard", _pr.heard);
+    _pr = EnemyAI_Perceive(_g, _prof, _ex, _ey, 5 * _T, 2 * _T, true, false);
+    Test_True("H11 senses: a player in plain sight is seen", _pr.sees);
+    Test_False("H11 senses: seen is not heard", _pr.heard);
+}
+
+function Test_H11Hide() {
+    var _cells = [[5, 2]];
+    var _g = Test_H11Open(12, 5);
+    var _T = GRID_TILE_SIZE;
+    var _settle = HIDE_SETTLE_FRAMES;
+    Test_True("H11 hide: still on a hiding cell is hidden", Sight_PlayerHidden(_cells, 5, 2, false, _settle));
+    Test_False("H11 hide: not before the settle time", Sight_PlayerHidden(_cells, 5, 2, false, _settle - 1));
+    Test_False("H11 hide: moving across the cell is not hiding", Sight_PlayerHidden(_cells, 5, 2, true, _settle + 50));
+    Test_False("H11 hide: still on an ordinary cell is not hiding", Sight_PlayerHidden(_cells, 6, 2, false, _settle + 50));
+    Test_False("H11 hide: a room without hiding cells never hides", Sight_PlayerHidden([], 5, 2, false, _settle + 50));
+
+    var _hid = Sight_PlayerHidden(_cells, 5, 2, false, _settle);
+    // an enemy 2 tiles away with a clear line (sight 5): it does not see a hidden player, it does see one who is not hidden
+    Test_False("H11 hide: hidden at distance 2 in clear sight is NOT seen", Sight_CanSee(_g, 7 * _T, 2 * _T, 5 * _T, 2 * _T, 5, false, _hid));
+    Test_True("H11 hide: hidden at distance 1 IS seen", Sight_CanSee(_g, 6 * _T, 2 * _T, 5 * _T, 2 * _T, 5, false, _hid));
+    Test_True("H11 hide: hidden, diagonal neighbour IS seen", Sight_CanSee(_g, 6 * _T, 3 * _T, 5 * _T, 2 * _T, 5, false, _hid));
+    Test_False("H11 hide: hidden, two cells away diagonally is NOT seen", Sight_CanSee(_g, 7 * _T, 4 * _T, 5 * _T, 2 * _T, 5, false, _hid));
+    var _moved = Sight_PlayerHidden(_cells, 5, 2, true, 0);
+    Test_True("H11 hide: crossing the cell is seen at distance 2 as usual", Sight_CanSee(_g, 7 * _T, 2 * _T, 5 * _T, 2 * _T, 5, false, _moved));
+    Test_False("H11 hide: a ghost (sees through walls) also misses the hidden player at distance 2", Sight_CanSee(_g, 7 * _T, 2 * _T, 5 * _T, 2 * _T, 5, true, _hid));
+    var _prof = EnemyAI_Profile(ENEMY_DIREWOLF);
+    var _pr = EnemyAI_Perceive(_g, _prof, 7 * _T, 2 * _T, 5 * _T, 2 * _T, false, _hid);
+    Test_False("H11 hide: through the senses, hidden at distance 2 is not seen", _pr.sees);
+    _pr = EnemyAI_Perceive(_g, _prof, 6 * _T, 2 * _T, 5 * _T, 2 * _T, false, _hid);
+    Test_True("H11 hide: through the senses, hidden at distance 1 is seen", _pr.sees);
+
+    // the table: some rooms have 1..3 hiding cells, not every room; every cell is a free floor cell inside its room
+    var _rooms = Scenario_GridRooms();
+    var _with = 0;
+    var _bad = "";
+    for (var _i = 0; _i < array_length(_rooms); _i++) {
+        var _name = room_get_name(_rooms[_i]);
+        var _hc = Hide_Cells(_name);
+        if (array_length(_hc) > 0) _with++;
+        if (array_length(_hc) > 3) _bad += " " + _name + ":more-than-3";
+        var _m = Test_H11Model(_rooms[_i]);
+        for (var _k = 0; _k < array_length(_hc); _k++) {
+            var _cx = _hc[_k][0];
+            var _cy = _hc[_k][1];
+            if (!Nav_GridInside(_m.grid, _cx, _cy)) { _bad += " " + _name + ":outside(" + string(_cx) + "," + string(_cy) + ")"; continue; }
+            if (Nav_CellBlocked(_m.grid, _cx, _cy)) _bad += " " + _name + ":blocked(" + string(_cx) + "," + string(_cy) + ")";
+            if (!Hide_IsCell(_name, _cx, _cy)) _bad += " " + _name + ":IsCell(" + string(_cx) + "," + string(_cy) + ")";
+        }
+        Test_False("H11 hide: " + _name + " does not know a cell outside the room", Hide_IsCell(_name, -5, -5));
+    }
+    Test_True("H11 hide: at least 3 rooms have hiding cells (" + string(_with) + ")", _with >= 3);
+    Test_True("H11 hide: not every room has them (" + string(_with) + " of " + string(array_length(_rooms)) + ")", _with < array_length(_rooms));
+    Test_Eq("H11 hide: every hiding cell is free floor inside its room, at most 3 per room (bad:" + _bad + ")", _bad, "");
+}
+
+// A tile-sized box of an object placed in a room: { l, t, r, b } in pixels from its sprite's bbox, or undefined without a sprite.
+function Test_H11Bbox(_obj, _x, _y, _sx, _sy) {
+    var _spr = object_get_sprite(_obj);
+    if (_spr < 0) return undefined;
+    var _l = _x + (sprite_get_bbox_left(_spr) - sprite_get_xoffset(_spr)) * _sx;
+    var _r = _x + (sprite_get_bbox_right(_spr) + 1 - sprite_get_xoffset(_spr)) * _sx;
+    var _t = _y + (sprite_get_bbox_top(_spr) - sprite_get_yoffset(_spr)) * _sy;
+    var _b = _y + (sprite_get_bbox_bottom(_spr) + 1 - sprite_get_yoffset(_spr)) * _sy;
+    return { l: min(_l, _r), r: max(_l, _r) - 0.01, t: min(_t, _b), b: max(_t, _b) - 0.01 };
+}
+
+// One floor room from its asset: { grid, exits: [[cx,cy]], spawns: [[cx,cy]], slots: [{ pid, enemy_id, x, y, fixed }] }.
+// Walls and objects block movement, walls block sight, exits are blocked cells (as Nav_BuildGrid does for the live room).
+function Test_H11Model(_rm) {
+    var _info = room_get_info(_rm, false, true, false, false, false);
+    var _T = GRID_TILE_SIZE;
+    var _g = Nav_GridCreate(ceil(_info.width / _T), ceil(_info.height / _T));
+    var _m = { grid: _g, exits: [], spawns: [], slots: [] };
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_info.instances); _i++) {
+        var _in = _info.instances[_i];
+        var _o = _in.object_index;
+        if (is_string(_o)) _o = asset_get_index(_o);   // the room info may give the object's name
+        var _sx = variable_struct_exists(_in, "scale_x") ? _in.scale_x : 1;
+        var _sy = variable_struct_exists(_in, "scale_y") ? _in.scale_y : 1;
+        if (_o == obj_room_spawn) {
+            array_push(_m.spawns, [Nav_CellOf(_in.x + _T / 2), Nav_CellOf(_in.y + _T / 2)]);
+        } else if (_o == obj_enemy || object_is_ancestor(_o, obj_enemy)) {
+            var _cc = variable_struct_exists(_in, "creation_code") ? _in.creation_code : "";
+            var _story = (is_string(_cc) && string_pos("cine_id", _cc) > 0) || (_rm == rm_floor1 && _o == obj_slime);   // the intro slime of floor 1 carries a cine_id (its creation code)
+            var _fixed = (_o == obj_stranger || _o == obj_mini_boss || _o == obj_final_boss || _story);
+            array_push(_m.slots, { pid: "p" + string(_n++), enemy_id: _fixed ? ENEMY_STRANGER : ENEMY_SLIME, x: _in.x, y: _in.y, fixed: _fixed });
+        } else {
+            var _isw = (_o == obj_wall);
+            var _isx = (_o == obj_room_transition);
+            var _isi = (_o == obj_interactable || object_is_ancestor(_o, obj_interactable));
+            if (!_isw && !_isx && !_isi) continue;
+            var _bb = Test_H11Bbox(_o, _in.x, _in.y, _sx, _sy);
+            if (!is_struct(_bb)) continue;
+            for (var _cx = floor(_bb.l / _T); _cx <= floor(_bb.r / _T); _cx++) {
+                for (var _cy = floor(_bb.t / _T); _cy <= floor(_bb.b / _T); _cy++) {
+                    Nav_GridSet(_g, _cx, _cy, true, _isw);
+                    if (_isx) { array_push(_m.exits, [_cx, _cy]); Nav_GridAddExit(_g, _cx, _cy); }
+                }
+            }
+        }
+    }
+    return _m;
+}
+
+// The distance (tiles) to the nearest exit, worked out here and not with the code under test.
+function Test_H11ExitDist(_m, _cx, _cy) {
+    var _d = 9999;
+    for (var _i = 0; _i < array_length(_m.exits); _i++) _d = min(_d, point_distance(_cx, _cy, _m.exits[_i][0], _m.exits[_i][1]));
+    return _d;
+}
+
+// Which cells a walker from (_sx,_sy) can reach over free cells (an exit cell next to a reached cell counts as reached too). A flat array of bools, indexed cy * w + cx.
+function Test_H11Flood(_g, _sx, _sy) {
+    var _seen = array_create(_g.w * _g.h, false);
+    var _q = [[_sx, _sy]];
+    _seen[_sy * _g.w + _sx] = true;
+    var _dx = [1, 0, -1, 0];
+    var _dy = [0, 1, 0, -1];
+    var _i = 0;
+    while (_i < array_length(_q)) {
+        var _c = _q[_i++];
+        for (var _d = 0; _d < 4; _d++) {
+            var _nx = _c[0] + _dx[_d];
+            var _ny = _c[1] + _dy[_d];
+            if (!Nav_GridInside(_g, _nx, _ny) || _seen[_ny * _g.w + _nx]) continue;
+            _seen[_ny * _g.w + _nx] = true;
+            if (!Nav_CellBlocked(_g, _nx, _ny)) array_push(_q, [_nx, _ny]);
+        }
+    }
+    return _seen;
+}
+
+function Test_H11Spots() {
+    // the helpers on a hand-made map: an exit on the left edge
+    var _g = Test_H11Open(12, 5);
+    Nav_GridSet(_g, 0, 2, true, false);
+    Nav_GridAddExit(_g, 0, 2);
+    Test_Eq("H11 exits: distance from (3,2) to the exit at (0,2)", Nav_ExitDist(_g, 3, 2), 3);
+    Test_Eq("H11 exits: a grid without exits is 9999 away", Nav_ExitDist(Test_H11Open(4, 4), 1, 1), 9999);
+    var _sc = Nav_SafeCell(_g, 1, 2, 4, -1, -1, 3);
+    Test_True("H11 safe cell: nearest cell 4 tiles from the exit is (4,2)", _sc.ok && _sc.cx == 4 && _sc.cy == 2);
+    _sc = Nav_SafeCell(_g, 1, 2, 4, 1, 2, 3);
+    Test_True("H11 safe cell: also 3 tiles from an arrival at (1,2) is still (4,2)", _sc.ok && _sc.cx == 4 && _sc.cy == 2);
+
+    // a chased enemy at (2,2) next to the exit, home at (8,2): back home when the player returns at (1,2)
+    var _a = Enemy_ArrivalCell(_g, 2, 2, 8, 2, 1, 2);
+    Test_True("H11 arrival: the enemy that chased to the exit goes back home", _a.moved && _a.cx == 8 && _a.cy == 2 && _a.home_cx == 8 && _a.home_cy == 2);
+    // its home is by the exit too: 4 tiles from the exit instead, and that is its new home
+    _a = Enemy_ArrivalCell(_g, 2, 2, 2, 2, 1, 2);
+    Test_True("H11 arrival: no good home, a spot 4 tiles from the exit (and its new home)", _a.moved && _a.cx == 4 && _a.cy == 2 && _a.home_cx == 4 && _a.home_cy == 2);
+    _a = Enemy_ArrivalCell(_g, 8, 2, 8, 2, 1, 2);
+    Test_True("H11 arrival: an enemy far from everything is left alone", !_a.moved && _a.cx == 8 && _a.cy == 2);
+
+    // wandering: no step into the 3-tile zone round the exit, steps away are always fine
+    Test_False("H11 wander: (3,2) -> (2,2) is into the zone", Idle_StepAllowed(_g, 3, 2, 2, 2));
+    Test_True("H11 wander: (3,2) -> (4,2) is away", Idle_StepAllowed(_g, 3, 2, 4, 2));
+    Test_True("H11 wander: from inside the zone, a step away is allowed", Idle_StepAllowed(_g, 2, 2, 3, 2));
+    Test_False("H11 wander: from inside the zone, a step closer is not", Idle_StepAllowed(_g, 2, 2, 1, 2));
+    Test_True("H11 wander: far from the exit anything goes", Idle_StepAllowed(_g, 7, 2, 6, 2));
+
+    // every floor room, many seeds
+    var _rooms = Scenario_GridRooms();
+    var _patrol_bad = "";
+    var _arr_bad = "";
+    var _exit_bad = "";
+    var _free_bad = "";
+    var _seen_enemies = 0;
+    var _saved_seed = random_get_seed();
+    for (var _ri = 0; _ri < array_length(_rooms); _ri++) {
+        var _name = room_get_name(_rooms[_ri]);
+        var _m = Test_H11Model(_rooms[_ri]);
+        for (var _seed = 1; _seed <= 40; _seed++) {
+            var _plan = Shuffle_RoomPlan(_seed * 7919, _name, _m.slots);
+            if (array_length(_plan) == 0) _plan = _m.slots;
+            for (var _e = 0; _e < array_length(_plan); _e++) {
+                if (_m.slots[_e].fixed) continue;
+                _seen_enemies++;
+                var _hx = Nav_CellOf(_plan[_e].x + 8);
+                var _hy = Nav_CellOf(_plan[_e].y + 8);
+                var _reach = Test_H11Flood(_m.grid, _hx, _hy);
+                // idle and patrol targets
+                random_set_seed(_seed * 31 + _e);
+                for (var _d = 0; _d < 25; _d++) {
+                    var _t = Idle_PatrolTarget(_m.grid, _hx, _hy, 5, _hx, _hy);
+                    if (is_undefined(_t)) continue;
+                    if (Test_H11ExitDist(_m, _t[0], _t[1]) < 3) { _patrol_bad += " " + _name + "/" + string(_seed) + ":(" + string(_t[0]) + "," + string(_t[1]) + ")"; break; }
+                    if (Nav_CellBlocked(_m.grid, _t[0], _t[1])) { _patrol_bad += " " + _name + "/" + string(_seed) + ":blocked"; break; }
+                }
+                // a player arrives at each spawn: nobody within 3 tiles of it
+                for (var _s = 0; _s < array_length(_m.spawns); _s++) {
+                    var _sp = _m.spawns[_s];
+                    var _r = Enemy_ArrivalCell(_m.grid, _hx, _hy, _hx, _hy, _sp[0], _sp[1]);
+                    if (point_distance(_r.cx, _r.cy, _sp[0], _sp[1]) < 3) _arr_bad += " " + _name + "/" + string(_seed) + ":(" + string(_r.cx) + "," + string(_r.cy) + ")near(" + string(_sp[0]) + "," + string(_sp[1]) + ")";
+                    if (Nav_CellBlocked(_m.grid, _r.cx, _r.cy)) _free_bad += " " + _name + "/" + string(_seed) + ":in-a-wall";
+                    // ... also when it stood on any free cell within 2 tiles of the arrival (an enemy that wandered or chased there)
+                    for (var _ox = -2; _ox <= 2; _ox++) {
+                        for (var _oy = -2; _oy <= 2; _oy++) {
+                            var _wx = _sp[0] + _ox;
+                            var _wy = _sp[1] + _oy;
+                            if (!Nav_GridInside(_m.grid, _wx, _wy) || Nav_CellBlocked(_m.grid, _wx, _wy)) continue;
+                            if (!_reach[_wy * _m.grid.w + _wx]) continue;   // not part of the floor the enemy lives on
+                            var _r3 = Enemy_ArrivalCell(_m.grid, _wx, _wy, _hx, _hy, _sp[0], _sp[1]);
+                            if (point_distance(_r3.cx, _r3.cy, _sp[0], _sp[1]) < 3) _arr_bad += " " + _name + "/" + string(_seed) + ":from(" + string(_wx) + "," + string(_wy) + ")to(" + string(_r3.cx) + "," + string(_r3.cy) + ")";
+                            if (Nav_CellBlocked(_m.grid, _r3.cx, _r3.cy)) _free_bad += " " + _name + "/" + string(_seed) + ":in-a-wall";
+                        }
+                    }
+                }
+                // an enemy that chased the player onto an exit (on it, or next to it) is 4 tiles from it when the player comes back
+                for (var _x = 0; _x < array_length(_m.exits); _x++) {
+                    var _ex = _m.exits[_x];
+                    var _near = [[_ex[0], _ex[1]], [_ex[0] + 1, _ex[1]], [_ex[0] - 1, _ex[1]], [_ex[0], _ex[1] + 1], [_ex[0], _ex[1] - 1]];
+                    for (var _c = 0; _c < array_length(_near); _c++) {
+                        var _nc = _near[_c];
+                        if (!Nav_GridInside(_m.grid, _nc[0], _nc[1])) continue;
+                        if (Nav_CellBlocked(_m.grid, _nc[0], _nc[1]) && !(_nc[0] == _ex[0] && _nc[1] == _ex[1])) continue;
+                        if (!_reach[_nc[1] * _m.grid.w + _nc[0]]) continue;   // another floor (an exit beyond a wall)
+                        var _r2 = Enemy_ArrivalCell(_m.grid, _nc[0], _nc[1], _hx, _hy, _ex[0], _ex[1]);
+                        if (Test_H11ExitDist(_m, _r2.cx, _r2.cy) < 4) _exit_bad += " " + _name + "/" + string(_seed) + ":from(" + string(_nc[0]) + "," + string(_nc[1]) + ")to(" + string(_r2.cx) + "," + string(_r2.cy) + ")";
+                    }
+                }
+            }
+        }
+    }
+    random_set_seed(_saved_seed);
+    Test_True("H11 spawn: the rooms hold enemies to check (" + string(_seen_enemies) + ")", _seen_enemies > 100);
+    Test_Eq("H11 spawn: no idle / patrol target within 3 tiles of an exit (bad:" + _patrol_bad + ")", _patrol_bad, "");
+    Test_Eq("H11 spawn: nobody within 3 tiles of the arrival tile (bad:" + _arr_bad + ")", _arr_bad, "");
+    Test_Eq("H11 spawn: a relocated enemy is 4 tiles from the exit it chased to (bad:" + _exit_bad + ")", _exit_bad, "");
+    Test_Eq("H11 spawn: nobody is put into a wall (bad:" + _free_bad + ")", _free_bad, "");
+}
+
+function Test_Suite_MapAI() {
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    EnemyDB_Init(); SkillDB_Init(); StatusDB_Init();
+    Test_H11Search();
+    Test_H11Hear();
+    Test_H11Hide();
+    Test_H11Spots();
 }

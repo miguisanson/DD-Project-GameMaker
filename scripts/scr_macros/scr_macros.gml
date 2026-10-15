@@ -130,6 +130,18 @@
 
 #macro ENEMY_SCAN_RADIUS_DEFAULT 32
 
+// H11 (D153, D158): smarter map AI, hiding spots, no spawn camping. Agent-chosen first numbers, for the owner to tune at the playtest.
+#macro AI_HEAR_RUN_TILES 4         // an enemy hears the player RUN inside this straight-line distance (tiles, any direction, walls do not block sound); walking is silent
+#macro AI_FLEE_SEARCH_TILES 4      // after the last seen cell an enemy searches this many tiles further the way the player was heading
+#macro AI_EXIT_CLEAR_TILES 3       // idle and patrol targets keep at least this far from every exit cell
+#macro AI_ARRIVAL_CLEAR_TILES 3    // on a room arrival no enemy stands closer than this to the arrival tile
+#macro AI_EXIT_RELOCATE_TILES 4    // an enemy found nearer than this to an exit on arrival is put back at its home, or at a spot at least this far from every exit
+#macro AI_LOOK_FRAMES 30           // the pause at the last seen cell, and again before it gives up (the profile's own search time / 3 when it has one)
+#macro AI_QUESTION_FRAMES 70       // how long the "?" of a given-up search stays over the enemy's head
+#macro HIDE_SEEN_TILES 1           // a hidden player is only seen from this close (Chebyshev, tiles)
+#macro HIDE_SETTLE_FRAMES 20       // the player must stand still this long on a hiding cell before it counts as hidden (walking across one does not)
+#macro HIDE_PLAYER_ALPHA 0.5       // how see-through the hidden player is drawn
+
 #macro INTERACT_NONE       0
 #macro INTERACT_DOOR       2
 #macro INTERACT_SWITCH     3
