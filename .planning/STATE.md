@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Session 4 overnight (2026-10-15): full gate on next = GATE PASS (e1a322d, 795 s). R1 checks committed on r1-rng (627abc0), confirmed failing for the right reason. In flight (Sonnet): R1a game logic in worktree DD-Project-GameMaker-wt/r1 (r1-rng); R1-sim in DD-Project-GameMaker-wt/r1sim (r1-sim); PLAYTEST-QUEUE draft in the main checkout (uncommitted). Contract: r1-rng:.planning/R1-CONTRACT.md. Next: review+merge R1a, R1-sim; R1b (D122 focus pause, D124 odds text); F1; E2 build. Owner asleep: wants playtest-ready on return, Sonnet helpers, improvement mode after. |
+| WIP | Session 4 overnight: R1a + R1-sim MERGED to next (aebc9db, fast gate PASS 3118/0; mutation test red). In flight (Sonnet): R1b (D122/D124) in worktree DD-Project-GameMaker-wt/r1b (branch r1b-ui, checks cbb4133); F1 audit (read-only). PLAYTEST-QUEUE drafted (57 entries, 508dab3). Queued: fix leftover difficulty select after New Game (D35, found by the queue agent); F1 packets from the audit; E2 build. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
