@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Session 5 (2026-10-15): fast gate PASS on next f59c2b1. Sonnet agents re-dispatched in worktrees g9 (finish), h1, h3, h9 (briefs = RESUME.md notes + BUILD-PLAN round 3). Merge one at a time into next, re-gate after each. Then H2, H4-H8, H10-H14, G10/G11 (RESUME "Left to do"). |
+| WIP | Session 5 (2026-10-15): next @ 74a11c5 = H9 backgrounds + G9 run stats merged (fast 4348/0, smoke, 200 shots PASS). In flight (Sonnet, worktrees E:/Github_Projects/DD-Project-GameMaker-wt/<x>): h1 (one menu), h3 (review-4 fixes, elites floor 3, exit press), h4 (level-up growth + HP/MP point + sim; balance proposal only), h10 (seed input). Merge one at a time (scratchpad recipe = RESUME "Merge lessons"), re-gate after each. Then H2 (after H1), H5-H8, H11-H14, G10/G11. Owner IDE task queued: import 4 battle backgrounds (art/battle_bg/IMPORT.md, picks in PICK.md). Gate tip: in Git Bash pass -WorkRoot with forward slashes (E:/Temp/dd-gate-x); backslashes made a relative folder with no cache and the build timed out. |
 | Unplayed features | 61 playtest entries (PLAYTEST-QUEUE, build dbc678a-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
