@@ -236,10 +236,6 @@ function Dialogue_ClassChestId(_class_id) {
     return Dialogue_ClassEventId("class_chest_ids", _class_id);
 }
 
-function Dialogue_SkillbookFirstReadId(_class_id) {
-    return Dialogue_ClassEventId("skillbook_first_ids", _class_id);
-}
-
 function Dialogue_SkillbookFirstReadDoneFlagKey() {
     var cfg = Dialogue_EventConfigEnsure();
     return variable_struct_exists(cfg, "skillbook_done_flag") ? string(cfg.skillbook_done_flag) : "skillbook_first_read_done";
@@ -253,19 +249,6 @@ function Dialogue_SkillbookFirstReadPendingFlagKey() {
 function Dialogue_SkillbookFirstReadUIActiveKey() {
     var cfg = Dialogue_EventConfigEnsure();
     return variable_struct_exists(cfg, "skillbook_ui_active_key") ? string(cfg.skillbook_ui_active_key) : "skillbook_mana_dialogue_active";
-}
-
-function Dialogue_SkillbookAmbienceSfxKey() {
-    var cfg = Dialogue_EventConfigEnsure();
-    return variable_struct_exists(cfg, "skillbook_ambience_sfx_key") ? string(cfg.skillbook_ambience_sfx_key) : SKILLBOOK_MANA_AMBIENCE_KEY;
-}
-
-function Dialogue_SkillbookAmbienceSfxKeys() {
-    var cfg = Dialogue_EventConfigEnsure();
-    if (variable_struct_exists(cfg, "skillbook_ambience_sfx_keys") && is_array(cfg.skillbook_ambience_sfx_keys) && array_length(cfg.skillbook_ambience_sfx_keys) > 0) {
-        return cfg.skillbook_ambience_sfx_keys;
-    }
-    return [Dialogue_SkillbookAmbienceSfxKey()];
 }
 
 function Dialogue_PickSkillbookAmbienceSfxKey() {
@@ -317,29 +300,6 @@ function Dialogue_TryStartClassChestReaction(_class_id) {
     return true;
 }
 
-function Dialogue_SkillbookFirstReadDone() {
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) return false;
-    var key = Dialogue_SkillbookFirstReadDoneFlagKey();
-    if (!variable_struct_exists(gs.flags, key)) return false;
-    return variable_struct_get(gs.flags, key);
-}
-
-function Dialogue_SkillbookFirstReadPending() {
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) return false;
-    var key = Dialogue_SkillbookFirstReadPendingFlagKey();
-    if (!variable_struct_exists(gs.flags, key)) return false;
-    return variable_struct_get(gs.flags, key);
-}
-
-function Dialogue_SkillbookFirstReadShouldTrigger(_class_id) {
-    if (Dialogue_SkillbookFirstReadId(_class_id) == "") return false;
-    if (Dialogue_SkillbookFirstReadDone()) return false;
-    if (Dialogue_SkillbookFirstReadPending()) return false;
-    return true;
-}
-
 function Dialogue_SkillbookFirstReadMarkDone() {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
@@ -347,21 +307,6 @@ function Dialogue_SkillbookFirstReadMarkDone() {
     variable_struct_set(gs.flags, Dialogue_SkillbookFirstReadPendingFlagKey(), false);
     Dialogue_SetSkillbookFirstReadUIActive(false);
     Dialogue_SetActiveAmbienceSfxKey("");
-}
-
-function Dialogue_TryStartSkillbookFirstRead(_class_id) {
-    if (!Dialogue_SkillbookFirstReadShouldTrigger(_class_id)) return false;
-    var did = Dialogue_SkillbookFirstReadId(_class_id);
-    if (did == "") return false;
-
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
-    variable_struct_set(gs.flags, Dialogue_SkillbookFirstReadPendingFlagKey(), true);
-    Dialogue_SetSkillbookFirstReadUIActive(true);
-
-    Dialogue_Start(did);
-    Dialogue_SetActiveAmbienceSfxKey(Dialogue_PickSkillbookAmbienceSfxKey());
-    return true;
 }
 
 function Dialogue_NarrativeDoneFlagKey(_event_id) {
@@ -1026,10 +971,6 @@ function Dialogue_StartWithSpeaker(_speaker, _lines) {
     Dialogue_RebuildPagedLines();
     Dialogue_ResetTypewriter();
     SFX_Play("dialogue_open");
-}
-
-function Dialogue_StartLinesWithSpeaker(_speaker, _lines) {
-    Dialogue_StartWithSpeaker(_speaker, _lines);
 }
 
 function Dialogue_Advance() {

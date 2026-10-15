@@ -190,13 +190,6 @@ function Save_TryLoadSnapshot(_slot, _delete_legacy = false) {
     return Save_LoadSnapshotFile(Save_Path(_slot), _delete_legacy);
 }
 
-function Save_LoadSlotStat(_slot) {
-    var snap = Save_TryLoadSnapshot(_slot, false);
-    if (!is_struct(snap)) return undefined;
-    if (variable_struct_exists(snap, "statData")) return snap.statData;
-    return snap;
-}
-
 function Save_LoadLatestSettings() {
     var cfg = Save_ReadSettingsConfig();
     if (is_struct(cfg)) return cfg;
@@ -213,32 +206,6 @@ function Save_HasAnySlot() {
         if (Save_HasSlot(i)) return true;
     }
     return false;
-}
-
-function Save_FindLatestSlot() {
-    var best_slot = 0;
-    var best_stamp = -1;
-
-    for (var slot = 1; slot <= 3; slot++) {
-        var stat = Save_LoadSlotStat(slot);
-        if (!is_struct(stat)) continue;
-
-        var stamp = slot;
-        if (variable_struct_exists(stat, "saved_at")) {
-            stamp = Save_ToReal(stat.saved_at, slot);
-        }
-
-        if (best_slot == 0 || stamp >= best_stamp) {
-            best_slot = slot;
-            best_stamp = stamp;
-        }
-    }
-
-    return best_slot;
-}
-
-function Save_IsBossEnemyId(_enemy_id) {
-    return (_enemy_id == ENEMY_MINI_BOSS || _enemy_id == ENEMY_FINAL_BOSS);
 }
 
 function Save_PersistEntryEnemyId(_entry, _key = "") {
@@ -740,18 +707,7 @@ function Profile_NoticeText() {
 }
 
 // ---- unlocks (D88): the Nobody class (first win) and extra pool items/cards/passives; no permanent power ----
-// Keys: "nobody_class", "item_<id>", "skill_<id>" ... Anything that offers a pool entry asks Unlock_Has first.
-function Unlock_Has(_key) {
-    return Profile_IsUnlocked(Profile_Get(), _key);
-}
-
-function Unlock_Grant(_key) {
-    var p = Profile_Get();
-    if (Profile_IsUnlocked(p, _key)) return false;
-    Profile_Unlock(p, _key);
-    Profile_Flush();
-    return true;
-}
+// Keys: "nobody_class", "item_<id>", "skill_<id>" ... Anything that offers a pool entry asks Profile_IsUnlocked first.
 
 // A fresh in-memory profile and no profile file (scenarios and tests only).
 function Profile_ResetForTest() {

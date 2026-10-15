@@ -48,17 +48,6 @@ function Difficulty_GetCurrent() {
     return DIFFICULTY_NORMAL;
 }
 
-function Difficulty_Label(_difficulty = -1) {
-    var d = _difficulty;
-    if (argument_count <= 0 || d == -1) d = Difficulty_GetCurrent();
-    d = Difficulty_Normalize(d);
-    switch (d) {
-        case DIFFICULTY_EASY: return Loc_T("settings.difficulty.option.0", "Easy");
-        case DIFFICULTY_HARD: return Loc_T("settings.difficulty.option.2", "Hard");
-        default: return Loc_T("settings.difficulty.option.1", "Normal");
-    }
-}
-
 // D35: ONE difficulty. Whatever difficulty id is saved (the id only survives for the title screen and the save format until the UI
 // packets drop it), the profile is the same. The single knob is the QTE assist multiplier on damage the PLAYER takes (1 = off);
 // the assist setting writes global.assist_damage_taken_mult (combat-spec.md section 5).
@@ -1166,11 +1155,6 @@ function Action_CanAct(_pl) {
     return Player_CanAcceptMove(_pl);
 }
 
-function Action_KeyPressed(_pl, _action) {
-    if (!Action_CanAct(_pl)) return false;
-    return Input_Pressed(_action);
-}
-
 function Action_Request(_pl, _action) {
     var gs = GameState_Get();
 
@@ -1288,30 +1272,6 @@ function GameSettings_Commit(_settings, _save_config = false) {
         Save_WriteSettingsConfig(gs.settings);
     }
     return gs.settings;
-}
-
-function GameSettings_SetUIVolume(_v) {
-    var settings = GameSettings_Ensure();
-    settings.audio_ui = clamp(GameSettings_ToReal(_v, settings.audio_ui), 0, 1);
-    GameSettings_ApplyAudio();
-}
-
-function GameSettings_SetSFXVolume(_v) {
-    var settings = GameSettings_Ensure();
-    settings.audio_sfx = clamp(GameSettings_ToReal(_v, settings.audio_sfx), 0, 1);
-    GameSettings_ApplyAudio();
-}
-
-function GameSettings_SetBGMVolume(_v) {
-    var settings = GameSettings_Ensure();
-    settings.audio_bgm = clamp(GameSettings_ToReal(_v, settings.audio_bgm), 0, 1);
-    GameSettings_ApplyAudio();
-}
-
-function GameSettings_SetScale(_scale) {
-    var settings = GameSettings_Ensure();
-    settings.display_scale = clamp(round(GameSettings_ToReal(_scale, settings.display_scale)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-    GameSettings_ApplyDisplayRequest();
 }
 
 // --------------------

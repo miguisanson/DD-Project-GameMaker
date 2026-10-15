@@ -535,7 +535,7 @@ function ItemDB_Get(_id) {
 }
 
 // D108 F1a: a serial number for "the language and string table as they are now". It changes when the language, its revision (Loc_SetLanguage)
-// or the string table (Loc_Reload / a payload load) changes, so each item localizes once per change instead of on every ItemDB_Get.
+// or the string table (a payload load) changes, so each item localizes once per change instead of on every ItemDB_Get.
 function Item_LocSerial() {
     Loc_Init();
     var loc = Loc_GetData();

@@ -100,11 +100,6 @@ function EndingExitSequence_Ensure() {
     return gs.ending_exit_sequence;
 }
 
-function EndingExitSequence_IsActive() {
-    var seq = EndingExitSequence_Ensure();
-    return variable_struct_exists(seq, "active") && seq.active;
-}
-
 function EndingExitSequence_Begin(_cutscene_id = "ending") {
     var seq = EndingExitSequence_Ensure();
     if (seq.active) return true;
@@ -351,19 +346,6 @@ function Transition_RequestCutsceneById(_cutscene_id) {
     }
     gs.pending_cutscene_id = string(_cutscene_id);
     return Transition_RequestCutsceneFade(rm_cutscene);
-}
-
-function Transition_RequestCutsceneIn() {
-    var ok = Transition_Begin(TRANSITION_TYPE_CUTSCENE, noone, "", -1, false);
-    if (!ok) return false;
-
-    var gs = GameState_Get();
-    var tr = gs.transition_fx;
-    tr.black_hold_frames = 0;
-    tr.phase = 2; // intro fade-in only
-    tr.timer = 0;
-    tr.alpha = 1;
-    return true;
 }
 
 function Transition_Finish() {

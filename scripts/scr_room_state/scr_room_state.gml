@@ -306,11 +306,6 @@ function RoomState_Apply(_room) {
     if (object_exists(obj_item_pickup)) with (obj_item_pickup) RoomState_ApplyInstance(self);
 }
 
-function Enemy_ResetAll() {
-    var gs = GameState_Get();
-    gs.enemy_reset_version += 1;
-}
-
 
 // ============================================================================================================
 // C1: the run (D25-D27, D31, D33, D46, D87, D88, D92, D102, D103).
@@ -377,10 +372,8 @@ function Run_Stream(_name) {
 }
 
 function RunRng_Float(_name) { return Rng_Float(Run_Stream(_name)); }
-function RunRng_Int(_name, _n) { return Rng_Int(Run_Stream(_name), _n); }
 function RunRng_Range(_name, _lo, _hi) { return Rng_Range(Run_Stream(_name), _lo, _hi); }
 function RunRng_Chance(_name, _p) { return Rng_Chance(Run_Stream(_name), _p); }
-function RunRng_Pick(_name, _arr) { return Rng_Pick(Run_Stream(_name), _arr); }
 
 // "rm_floor3" -> 3, "rm_floor6_5" -> 6.5, anything else (title, battle, cutscene) -> 0
 function Run_FloorOfRoomName(_name) {

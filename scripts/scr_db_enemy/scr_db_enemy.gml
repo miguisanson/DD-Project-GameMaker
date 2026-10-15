@@ -615,7 +615,3 @@ function Enemy_LocalizeRuntime(_enemy, _enemy_id = -1) {
     _enemy.name = Loc_T("enemy.name." + key_suffix, string(_enemy.name_en));
     return _enemy;
 }
-
-function DB_Enemy(_enemy_id) {
-    return EnemyDB_Get(_enemy_id);
-}
