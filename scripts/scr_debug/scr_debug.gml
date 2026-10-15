@@ -793,6 +793,7 @@ function Scenario_StepSmokeTitle(_s) {
                 _gs.selected_class = CLASS_ARCHER;
                 if (Run_IsActive()) _gs.run.gold = 137;
                 Scenario_Check("title_run_save_written_for_the_card", Run_IsActive() && RunSave_WriteTo() && RunSave_HasSave());
+                _ti.want_floor = string(Run_FloorOfRoomName(room_get_name(room)));   // the floor the saved run is on (depends on the scenario before this one)
                 _gs.startup_logo_seen = false;   // what a fresh launch has: the logo plays, then the splash
                 _ti.boot = false;
                 Scenario_NoticeToTitle();
@@ -830,7 +831,7 @@ function Scenario_StepSmokeTitle(_s) {
                 var _ct = Title_CardText(_sc.title_card);
                 Scenario_Check("title_card_shows_the_saved_run", _sc.title_card.kind == "run");
                 Scenario_Check("title_card_class_is_the_saved_class", _ct.title == Loc_T("class.name.class_archer", "Archer"), "title=" + string(_ct.title));
-                Scenario_Check("title_card_has_floor_and_gold", array_length(_ct.rows) >= 2 && _ct.rows[0].value == "4" && _ct.rows[1].value == "137", json_stringify(_ct.rows));
+                Scenario_Check("title_card_has_floor_and_gold", array_length(_ct.rows) >= 2 && _ct.rows[0].value == _ti.want_floor && _ct.rows[1].value == "137", json_stringify(_ct.rows));
                 Scenario_Check("title_card_did_not_apply_the_run", !Run_IsActive());
                 Scenario_Next(_s, 274);
             }
