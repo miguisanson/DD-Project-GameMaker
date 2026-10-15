@@ -69,7 +69,7 @@ Leave frame-counted: player grid step, enemy AI pacing, fx ages, cine pan (gamep
 | G4 | Class chest guard | D127 | obj_room_transition / scr_interact, workbook | MERGED to next |
 | G5 | Echo after class pick, filtered | D130 | scr_room_state, scr_menu (cards/echo) | MERGED to next |
 | G6 | Map juice: chest burst, item rise, level-up sparkle, gold tick, step squash | D138 | scr_interact, obj_player, scr_fx, HUD | in flight |
-| G7 | Battle speed-up hold + damage preview | D134, D135 | scr_combat | in flight |
+| G7 | Battle speed-up hold + damage preview | D134, D135 | scr_combat | MERGED to next |
 | G8 | Controller rumble + setting; save-on-close code + IDE step | D136, D132 | scr_input, settings, obj_game_controller | MERGED to next (Perfect detection fixed at merge for the D138 per-hit freeze) |
 | G9 | Run stats at run end + history | D137 | scr_room_state, run-end screen | in flight |
 | G10 | One UI style audit: every screen uses the shared frame/highlight/cursor/fonts/colours/spacing/motion/sounds; fix any screen that differs (incl. G2/G3/G6 additions) | D129 | Ui_* framework + every screen | todo (after G2) |
