@@ -84,6 +84,7 @@ function RoomTransition_Apply() {
     if (variable_instance_exists(pl, "move_timer")) pl.move_timer = 0;
     if (variable_instance_exists(pl, "move_dir")) pl.move_dir = -1;
     Player_StartAutoResolveRecover(pl, PLAYER_POST_TRANSITION_RECOVER_FRAMES, false);
+    if (variable_instance_exists(pl, "exit_leave") && variable_instance_exists(pl, "exit_ignore")) pl.exit_leave = (pl.exit_ignore != noone);   // D142: a room arrival, not a battle return or a load
 
     RoomTransition_Clear();
 }

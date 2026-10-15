@@ -474,31 +474,38 @@ function EnemyAI_Choose(_e, _p, _ctx, _rng) {
         return EnemyAI_Result((rule.act == "skill") ? rule.skill : -1, rule.label);
     }
 
-    // 4. the weighted default (D126): a shuffled deck built from the whole-number weights of the moves that can be used right now.
-    // Drawn without putting back, so a 3:1 enemy uses its rare move exactly once in every 4 picks. The deck lives on the enemy and is
-    // rebuilt when it is empty or when the set of usable moves (or the phase's list) changes.
-    var elig = [];
+    // 4. the weighted default (D126, H3): a shuffled deck built from the whole-number weights of every move in the list in force. Drawn without putting back,
+    // so a 3:1 enemy uses its rare move exactly once in every 4 picks. The deck lives on the enemy and is rebuilt only when it is empty or when the phase or
+    // the weights change. A move that cannot be used right now keeps its card: the draw takes the last card (as array_pop would) that can be used and leaves
+    // the others where they are; when no card in the deck can be used, the enemy uses its basic attack and the deck stays as it is.
+    var cards = [];
     var raw_w = [];
     for (var w = 0; w < array_length(lists.weights); w++) {
         var wt = lists.weights[w];
-        if (wt.w > 0 && EnemyAI_Usable(_e, _p, _ctx, wt.act, wt.skill)) { array_push(elig, w); array_push(raw_w, wt.w); }
+        if (wt.w > 0) { array_push(cards, w); array_push(raw_w, wt.w); }
     }
-    if (array_length(elig) <= 0) return { kind: "attack", skill_id: -1, rule: "default" };
+    if (array_length(cards) <= 0) return { kind: "attack", skill_id: -1, rule: "default" };
     var ints = EnemyAI_IntWeights(raw_w);
-    var sig = "";
-    for (var g = 0; g < array_length(elig); g++) {
-        var wg = lists.weights[elig[g]];
+    var sig = "p" + string(_ctx.phase) + ";";
+    for (var g = 0; g < array_length(cards); g++) {
+        var wg = lists.weights[cards[g]];
         sig += string(wg.act) + ":" + string(wg.skill) + "x" + string(ints[g]) + ";";
     }
     var deck = (variable_struct_exists(_e, "move_deck") && is_struct(_e.move_deck)) ? _e.move_deck : undefined;
     if (!is_struct(deck) || deck.sig != sig || array_length(deck.left) <= 0) {
-        var cards = [];
-        for (var d = 0; d < array_length(elig); d++) { repeat (ints[d]) array_push(cards, elig[d]); }
-        deck = { sig: sig, left: Rng_Shuffle(_rng, cards) };
+        var fresh = [];
+        for (var d = 0; d < array_length(cards); d++) { repeat (ints[d]) array_push(fresh, cards[d]); }
+        deck = { sig: sig, left: Rng_Shuffle(_rng, fresh) };
         _e.move_deck = deck;
     }
-    var wp = lists.weights[array_pop(deck.left)];
-    return EnemyAI_Result((wp.act == "skill") ? wp.skill : -1, "default");
+    for (var k = array_length(deck.left) - 1; k >= 0; k--) {
+        var wp = lists.weights[deck.left[k]];
+        if (EnemyAI_Usable(_e, _p, _ctx, wp.act, wp.skill)) {
+            array_delete(deck.left, k, 1);
+            return EnemyAI_Result((wp.act == "skill") ? wp.skill : -1, "default");
+        }
+    }
+    return { kind: "attack", skill_id: -1, rule: "default" };
 }
 
 // D126: the weights as the smallest whole numbers with the same ratios (3:1 stays 3:1, 2:2 becomes 1:1, 0.5:1.5 becomes 1:3);

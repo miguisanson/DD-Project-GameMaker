@@ -125,6 +125,7 @@ function Test_RunAll() {
     Test_RunSuite("MapJuice", Test_Suite_MapJuice);
     Test_RunSuite("BattleBg", Test_Suite_BattleBg);
     Test_RunSuite("RunStats", Test_Suite_RunStats);
+    Test_RunSuite("H3", Test_Suite_H3);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -7466,13 +7467,13 @@ function Test_Suite_FairRng() {
     Test_Eq("R1 D121: equal speed, two failed tries -> certain", Battle_RunChance(10, 10, 2), 1);
     Test_Eq("R1 D121: never above 1", Battle_RunChance(1, 40, 4), 1);
 
-    // ---- D123: elites are dealt per floor: about 15% of the free slots, at least 1 from floor 2 on ----
+    // ---- D123 / D145: elites are dealt per floor: about 15% of the free slots, none on floors 1-2, at least 1 from floor 3 on ----
     Test_Eq("R1 D123: floor 4, 3 enemies -> 1 elite", Shuffle_EliteCount(4, 3), 1);
     Test_Eq("R1 D123: floor 1, 3 enemies -> 0 elites", Shuffle_EliteCount(1, 3), 0);
-    Test_Eq("R1 D123: floor 1, 7 enemies -> 1 elite", Shuffle_EliteCount(1, 7), 1);
+    Test_Eq("R1 D123: floor 1, 7 enemies -> 0 elites (D145: none on floors 1-2)", Shuffle_EliteCount(1, 7), 0);
     Test_Eq("R1 D123: floor 4, 10 enemies -> 2 elites (1.5 rounds up)", Shuffle_EliteCount(4, 10), 2);
     Test_Eq("R1 D123: floor 6, 20 enemies -> 3 elites", Shuffle_EliteCount(6, 20), 3);
-    Test_Eq("R1 D123: floor 2, 1 enemy -> 1 elite", Shuffle_EliteCount(2, 1), 1);
+    Test_Eq("R1 D123: floor 2, 1 enemy -> 0 elites (D145: none on floors 1-2)", Shuffle_EliteCount(2, 1), 0);
     Test_Eq("R1 D123: no free enemies -> 0 elites", Shuffle_EliteCount(9, 0), 0);
     var _slots = [
         { pid: "e1", enemy_id: ENEMY_DIREWOLF, x: 48, y: 64, fixed: false },
@@ -8203,7 +8204,7 @@ function Test_BagsMoves() {
     Test_Eq("D126 moves: with the rare move unusable every pick is the common one", Test_AICount(_alone, -1), 5);
     _e3.skills = [SKILL_BITE];
     var _back = Test_BagsPicks(_e3, _p, _rng3, 4);
-    Test_Eq("D126 moves: once it is usable again a fresh deck has exactly one of it in 4", Test_AICount(_back, SKILL_BITE), 1);
+    Test_True("D126 moves: once it is usable again the deck has at least one of it in 4 (H3: the unused card is kept, not dropped)", Test_AICount(_back, SKILL_BITE) >= 1);
 
     // 2:1:1 weights make a deck of 4
     var _e4 = Test_BagsFoe([], [ AI_Weight("attack", -1, 2), AI_Weight("skill", SKILL_BITE, 1), AI_Weight("skill", SKILL_POISON_FANGS, 1) ]);
@@ -9635,5 +9636,306 @@ function Test_Suite_RunStats() {
     _gs.ui.mode = _old_mode;
     _gs.in_main_menu = _old_menu;
     global.focus_prev = _old_focus;
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+// ============================================================================
+// H3: review-4 fixes (the enemy's move deck keeps cards, the multi-hit damage preview, the Perfect and BREAK rumble flags) and the playtest decisions
+// D145 (elites from floor 3, amends D123) and D142 (press toward the arrival exit leaves, amends D64; its smoke is steps 500..519).
+// ============================================================================
+
+// ---- 1. the move deck keeps the cards it cannot use ----
+function Test_H3Deck() {
+    var _p = CharacterCreate_Player(CLASS_KNIGHT);
+    var _w31 = [ AI_Weight("attack", -1, 3), AI_Weight("skill", SKILL_BITE, 1) ];
+
+    // (a) Bite is blocked for 5 picks: its card stays in the deck and is the first pick once it can be used again
+    for (var _sd = 1; _sd <= 8; _sd++) {
+        var _e = Test_BagsFoe([], _w31);
+        var _rng = Rng_New(900 + _sd, "combat");
+        _e.skills = [];
+        var _blocked = Test_BagsPicks(_e, _p, _rng, 5);
+        Test_Eq("H3 deck seed " + string(_sd) + ": while Bite is blocked every pick is the basic attack", Test_AICount(_blocked, -1), 5);
+        Test_True("H3 deck seed " + string(_sd) + ": Bite's card is still in the deck after 5 blocked picks", is_struct(_e.move_deck) && array_length(_e.move_deck.left) == 1);
+        _e.skills = [SKILL_BITE];
+        var _after = Test_BagsPicks(_e, _p, _rng, 1);
+        Test_Eq("H3 deck seed " + string(_sd) + ": the first pick after unblocking is Bite", _after[0], SKILL_BITE);
+    }
+
+    // (b) a 3:1 attack / Solidify brain with a 2-turn Solidify block (as the Solidify status makes it unusable): 10 uses in 40 turns, never twice in one deck
+    for (var _sd2 = 1; _sd2 <= 4; _sd2++) {
+        var _s = EnemyCreate(ENEMY_SLIME);
+        _s.skills = [SKILL_SOLIDIFY];
+        _s.brain = { rules: [], weights: [ AI_Weight("attack", -1, 3), AI_Weight("skill", SKILL_SOLIDIFY, 1) ], phases: [] };
+        var _rng2 = Rng_New(950 + _sd2, "combat");
+        var _uses = 0; var _deck_uses = 0; var _worst = 0; var _block = 0;
+        for (var _t = 0; _t < 40; _t++) {
+            var _left = (variable_struct_exists(_s, "move_deck") && is_struct(_s.move_deck)) ? array_length(_s.move_deck.left) : 0;
+            if (_left <= 0) _deck_uses = 0;   // an empty deck is rebuilt on this pick: a new deck cycle
+            _s.skills = (_block > 0) ? [] : [SKILL_SOLIDIFY];
+            if (_block > 0) _block--;
+            var _pick = EnemyAI_Choose(_s, _p, Test_AICtx(), _rng2).skill_id;
+            if (_pick == SKILL_SOLIDIFY) { _uses++; _deck_uses++; _worst = max(_worst, _deck_uses); _block = 2; }
+        }
+        Test_Eq("H3 deck seed " + string(_sd2) + ": 3:1 with a 2-turn block uses Solidify exactly 10 times in 40 turns", _uses, 10);
+        Test_True("H3 deck seed " + string(_sd2) + ": never twice in one deck cycle", _worst <= 1);
+    }
+
+    // a deck that only holds unusable cards falls back to the basic attack and keeps them
+    var _e3 = Test_BagsFoe([], [ AI_Weight("skill", SKILL_BITE, 1) ]);
+    _e3.skills = [];
+    var _only = Test_BagsPicks(_e3, _p, Rng_New(990, "combat"), 3);
+    Test_Eq("H3 deck: only an unusable move in the list -> the basic attack", Test_AICount(_only, -1), 3);
+    _e3.skills = [SKILL_BITE];
+    Test_Eq("H3 deck: and it is used as soon as it can be", Test_BagsPicks(_e3, _p, Rng_New(991, "combat"), 1)[0], SKILL_BITE);
+}
+
+// ---- 2. the damage preview of a skill with several hits ----
+// The real hits, one after the other on the same target (a guard is used up by the first one): the damage of each.
+function Test_H3RealHits(_p, _e, _skill_id, _grade_mult) {
+    var _sk = SkillDB_Get(_skill_id);
+    var _src = Skill_DamageSource(_p, _sk);
+    var _out = [];
+    for (var _h = 0; _h < round(_sk.hits); _h++) {
+        var _pack = Combat_ApplyDamage(_p, _e, _src, 1, 1, { is_skill: true, grade_mult: _grade_mult });
+        _e = _pack.defender;
+        array_push(_out, _pack.dmg);
+    }
+    return _out;
+}
+
+// What the preview reads for a list of hit damages: "7 x2" when they are all equal, else each hit: "1+4".
+function Test_H3HitsText(_hits) {
+    var _same = true;
+    for (var _i = 1; _i < array_length(_hits); _i++) { if (_hits[_i] != _hits[0]) _same = false; }
+    if (_same) return string(_hits[0]) + " x" + string(array_length(_hits));
+    var _t = "";
+    for (var _j = 0; _j < array_length(_hits); _j++) _t += ((_j > 0) ? "+" : "") + string(_hits[_j]);
+    return _t;
+}
+
+function Test_H3Foe(_guarded) {
+    var _foe = EnemyCreate(ENEMY_SLIME);
+    _foe.max_hp = 500;
+    _foe.hp = 500;
+    if (_guarded) _foe = Status_Add(_foe, STATUS_SOLIDIFY, 3, 0);
+    return _foe;
+}
+
+function Test_H3Preview() {
+    var _sk = SkillDB_Get(SKILL_DOUBLE_SHOT);
+    var _n = round(_sk.hits);
+    Test_Eq("H3 preview: Double Shot's data says 2 hits", _n, 2);
+    var _names = ["OK", "Perfect"];
+    var _mults = [Qte_GradeMult(QTE_OK), Qte_GradeMult(QTE_PERFECT)];
+    var _lbl = [ Loc_T("battle.det.damage", "Damage"), Loc_T("battle.det.perfect", "Perfect") ];
+    for (var _g = 0; _g < 2; _g++) {
+        // a plain target: both hits are the same, so the line is "per hit x hits"
+        var _ar = Test_SpFresh(CLASS_ARCHER);
+        var _plain = Test_H3RealHits(_ar, Test_H3Foe(false), SKILL_DOUBLE_SHOT, _mults[_g]);
+        var _lines = Battle_PreviewLines(Battle_SkillPreview(_ar, Test_H3Foe(false), SKILL_DOUBLE_SHOT));
+        Test_Eq("H3 preview: a plain target at " + _names[_g] + " reads per hit x hits", Test_RowValue(_lines, _lbl[_g]), Test_H3HitsText(_plain));
+        var _real = Skill_Use(Test_SpFresh(CLASS_ARCHER), Test_H3Foe(false), SKILL_DOUBLE_SHOT, _mults[_g]);
+        Test_True("H3 preview: the real total at " + _names[_g] + " is the sum of the hits", !_real.crit && _real.dmg == _plain[0] + _plain[1]);
+
+        // a guarded target (Solidify x0.25 is used up by the first hit): the second hit is the full one, and the preview says so
+        var _gh = Test_H3RealHits(_ar, Test_H3Foe(true), SKILL_DOUBLE_SHOT, _mults[_g]);
+        Test_True("H3 preview: (setup) the guard makes the second hit stronger than the first at " + _names[_g], _gh[1] > _gh[0]);
+        var _glines = Battle_PreviewLines(Battle_SkillPreview(_ar, Test_H3Foe(true), SKILL_DOUBLE_SHOT));
+        Test_Eq("H3 preview: a guarded target at " + _names[_g] + " lists each hit", Test_RowValue(_glines, _lbl[_g]), Test_H3HitsText(_gh));
+        var _greal = Skill_Use(Test_SpFresh(CLASS_ARCHER), Test_H3Foe(true), SKILL_DOUBLE_SHOT, _mults[_g]);
+        Test_True("H3 preview: the real total on the guarded target at " + _names[_g] + " is the listed hits added up", !_greal.crit && _greal.dmg == _gh[0] + _gh[1]);
+    }
+    var _pa = Test_SpFresh(CLASS_ARCHER);
+    var _asked = Test_H3Foe(true);
+    Battle_SkillPreview(_pa, _asked, SKILL_DOUBLE_SHOT);
+    Test_True("H3 preview: asking leaves the guard on the target", Status_Has(_asked, STATUS_SOLIDIFY) && _asked.hp == 500);
+    // a one-hit skill is unchanged
+    var _kn = Test_SpFresh();
+    Test_Eq("H3 preview: a one-hit skill still reads a single number", Test_RowValue(Battle_PreviewLines(Battle_SkillPreview(_kn, EnemyCreate(ENEMY_SLIME), SKILL_HILT_BASH)), Loc_T("battle.det.damage", "Damage")), "7");
+}
+
+// ---- 3. rumble: the Perfect and BREAK events ----
+// One step of what the game does for the rumble: the snapshot, the detector (against the last snapshot) and the freeze counting down as the battle controller does.
+function Test_H3RumbleStep(_st, _bc) {
+    var _cur = Rumble_SnapshotOf(_bc.p, _bc);
+    var _ev = Rumble_Detect(_st.snap, _cur);
+    _st.snap = _cur;
+    if (_bc.hitstop_ms > 0) {   // obj_battle_controller's Step: the freeze counts down, and its end starts the hit's feel (which uses the BREAK flag up)
+        _bc.hitstop_ms = max(0, _bc.hitstop_ms - 16.7);
+        if (_bc.hitstop_ms <= 0) Battle_QteImpactFeedback(_bc);
+    }
+    return _ev;
+}
+
+// Steps until the freeze is over (and a few more); the events found, in order.
+function Test_H3RumbleRun(_st, _bc, _steps = 12) {
+    var _evs = [];
+    for (var _i = 0; _i < _steps; _i++) {
+        var _ev = Test_H3RumbleStep(_st, _bc);
+        if (_ev != "") array_push(_evs, _ev);
+    }
+    return _evs;
+}
+
+function Test_H3Count(_arr, _v) {
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_arr); _i++) { if (_arr[_i] == _v) _n++; }
+    return _n;
+}
+
+function Test_H3Bc(_enemy_spd = 30) {
+    var _bc = Test_FeelFakeBattle();
+    _bc.p.stats.spd = 8;
+    _bc.e.stats.spd = _enemy_spd;
+    _bc.tl = Turn_New([ Turn_Fighter(TL_PLAYER, Combat_EffectiveStat(_bc.p, STAT_SPD)), Turn_Fighter(TL_ENEMY, Combat_EffectiveStat(_bc.e, STAT_SPD)) ]);
+    _bc.ai = EnemyAI_StateNew();
+    _bc.turn_log = [];
+    _bc.tl_who = TL_PLAYER;
+    _bc.tl_prev_who = TL_PLAYER;
+    _bc.tl_slide_start = 0;
+    _bc.tl_slide_kind = 1;
+    _bc.stagger_flash_start = 0;
+    _bc.break_start = 0;
+    _bc.player_turn_start_applied = true;
+    _bc.enemy_action_pending = false;
+    _bc.turn = TURN_PLAYER;
+    _bc.enemy_plan = undefined;
+    _bc.phase_banner = "";
+    _bc.e.stagger = 0;
+    _bc.e.stagger_max = 8;
+    _bc.e.broken = false;
+    return _bc;
+}
+
+// The timeline goes on until it is the player's turn (the enemy acts first when it is faster).
+function Test_H3ToPlayerTurn(_bc) {
+    var _guard = 0;
+    while (Turn_Next(_bc.tl) != TL_PLAYER && _guard < 20) _guard++;
+}
+
+// Who the timeline would pick next (on a copy).
+function Test_H3Next(_bc) {
+    return Turn_Preview(_bc.tl, 1)[0];
+}
+
+function Test_H3Rumble() {
+    if (!variable_global_exists("sfx_last_key")) global.sfx_last_key = "";
+    var _bc = Test_H3Bc();
+    var _st = { snap: Rumble_SnapshotOf(_bc.p, _bc) };
+
+    // Perfect: exactly one rumble, then nothing on a later hit that is not Perfect
+    Battle_HitFreeze(_bc, QTE_PERFECT, false);
+    Test_Eq("H3 rumble: a Perfect hit raises the rumble exactly once", Test_H3Count(Test_H3RumbleRun(_st, _bc), "perfect"), 1);
+    Battle_HitFreeze(_bc, QTE_OK, false);
+    Test_Eq("H3 rumble: an OK hit right after raises no Perfect rumble", Test_H3Count(Test_H3RumbleRun(_st, _bc), "perfect"), 0);
+    Battle_HitFreeze(_bc, QTE_GOOD, false);
+    Test_Eq("H3 rumble: a Good hit raises no Perfect rumble", Test_H3Count(Test_H3RumbleRun(_st, _bc), "perfect"), 0);
+    Battle_HitFreeze(_bc, QTE_OK, true);
+    Test_Eq("H3 rumble: a crit that is not a Perfect raises no Perfect rumble (its 120 ms freeze is not a Perfect)", Test_H3Count(Test_H3RumbleRun(_st, _bc), "perfect"), 0);
+    Battle_HitFreeze(_bc, QTE_PERFECT, true);
+    Test_Eq("H3 rumble: a Perfect crit raises the rumble once", Test_H3Count(Test_H3RumbleRun(_st, _bc), "perfect"), 1);
+    Battle_HitFreeze(_bc, QTE_PERFECT, false);
+    Test_Eq("H3 rumble: the next Perfect raises it once again", Test_H3Count(Test_H3RumbleRun(_st, _bc), "perfect"), 1);
+    Battle_HitFreeze(_bc, QTE_OK, false);
+    Test_Eq("H3 rumble: and an OK hit after that is quiet again", Test_H3Count(Test_H3RumbleRun(_st, _bc), "perfect"), 0);
+    instance_destroy(_bc.enemy_inst);
+
+    // BREAK, the player acts next (the usual case): one rumble when the meter fills, none while the enemy stays broken, none for the next hit
+    var _b1 = Test_H3Bc(5);
+    Test_H3ToPlayerTurn(_b1);
+    var _s1 = { snap: Rumble_SnapshotOf(_b1.p, _b1) };
+    _b1.e.stagger = _b1.e.stagger_max - 1;
+    Battle_HitFreeze(_b1, QTE_OK, false);
+    Battle_StaggerHit(_b1, 10, false, false, 1);
+    Test_True("H3 rumble: (setup) the hit broke the enemy", _b1.e.broken);
+    Battle_TurnAdvance(_b1);
+    Test_Eq("H3 rumble: (setup) the player is next after the push-back", _b1.tl_who, TL_PLAYER);
+    var _e1 = Test_H3RumbleRun(_s1, _b1);
+    Test_Eq("H3 rumble: a BREAK raises the rumble exactly once", Test_H3Count(_e1, "break"), 1);
+    Test_Eq("H3 rumble: the BREAK hit was not read as a Perfect", Test_H3Count(_e1, "perfect"), 0);
+    Battle_HitFreeze(_b1, QTE_OK, false);
+    Test_Eq("H3 rumble: a plain hit while the enemy is still broken raises nothing", array_length(Test_H3RumbleRun(_s1, _b1)), 0);
+    instance_destroy(_b1.enemy_inst);
+
+    // BREAK against a much faster enemy: it acts right after the push-back, so the broken flag is raised and cleared inside one step. The BREAK still rumbles.
+    var _b2 = Test_H3Bc(40);
+    Test_H3ToPlayerTurn(_b2);
+    var _s2 = { snap: Rumble_SnapshotOf(_b2.p, _b2) };
+    _b2.e.stagger = _b2.e.stagger_max - 1;
+    Battle_HitFreeze(_b2, QTE_OK, false);
+    Battle_StaggerHit(_b2, 10, false, false, 1);
+    Test_True("H3 rumble: (setup) the fast enemy was broken", _b2.e.broken);
+    Test_Eq("H3 rumble: (setup) the fast enemy acts right after the push-back", Test_H3Next(_b2), TL_ENEMY);
+    Battle_TurnAdvance(_b2);
+    Test_False("H3 rumble: (setup) its BROKEN state ended with its turn start, in the same step", _b2.e.broken);
+    Test_Eq("H3 rumble: a BREAK that ends in the same step still raises the rumble once", Test_H3Count(Test_H3RumbleRun(_s2, _b2), "break"), 1);
+    instance_destroy(_b2.enemy_inst);
+}
+
+// ---- 4. D145: elites from floor 3 ----
+function Test_H3Slots(_n) {
+    var _ids = [ENEMY_SLIME, ENEMY_SPIDER, ENEMY_DIREWOLF, ENEMY_SNAKE];
+    var _slots = [];
+    for (var _i = 0; _i < _n; _i++) array_push(_slots, { pid: "h" + string(_i), enemy_id: _ids[_i mod 4], x: 16 * (2 + _i), y: 48, fixed: false });
+    array_push(_slots, { pid: "boss", enemy_id: ENEMY_MINI_BOSS, x: 224, y: 32, fixed: true });
+    return _slots;
+}
+
+function Test_H3Elites(_plan) {
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_plan); _i++) { if (_plan[_i].elite != "") _n++; }
+    return _n;
+}
+
+function Test_H3EliteRules() {
+    Test_Eq("H3 D145: floor 1, 3 enemies -> 0 elites", Shuffle_EliteCount(1, 3), 0);
+    Test_Eq("H3 D145: floor 1, 20 enemies -> 0 elites", Shuffle_EliteCount(1, 20), 0);
+    Test_Eq("H3 D145: floor 2, 1 enemy -> 0 elites", Shuffle_EliteCount(2, 1), 0);
+    Test_Eq("H3 D145: floor 2, 12 enemies -> 0 elites", Shuffle_EliteCount(2, 12), 0);
+    Test_Eq("H3 D145: floor 3, 2 enemies -> 1 elite (at least 1)", Shuffle_EliteCount(3, 2), 1);
+    Test_Eq("H3 D145: floor 3, 10 enemies -> 2 elites (15%, 1.5 rounds up)", Shuffle_EliteCount(3, 10), 2);
+    Test_Eq("H3 D145: floor 9, 20 enemies -> 3 elites", Shuffle_EliteCount(9, 20), 3);
+    Test_Eq("H3 D145: no free enemies -> 0 elites on any floor", Shuffle_EliteCount(5, 0), 0);
+
+    var _early_ok = true; var _each_ok = true; var _boss_ok = true;
+    var _free_counts = [1, 2, 3, 5, 12];
+    for (var _sd = 1; _sd <= 40; _sd++) {
+        for (var _f = 1; _f <= 9; _f++) {
+            var _free = _free_counts[_sd mod 5];
+            var _plan = Shuffle_RoomPlan(3000 + _sd, "rm_floor" + string(_f), Test_H3Slots(_free));
+            var _el = Test_H3Elites(_plan);
+            if (_f <= 2 && _el != 0) _early_ok = false;
+            if (_f >= 3 && _el < 1) _each_ok = false;
+            if (_plan[_free].elite != "") _boss_ok = false;   // the last slot is the fixed boss
+        }
+    }
+    Test_True("H3 D145: floors 1 and 2 never have an elite (40 seeds, 1 to 12 enemies)", _early_ok);
+    Test_True("H3 D145: floors 3 to 9 always have at least 1 elite (40 seeds, 1 to 12 enemies)", _each_ok);
+    Test_True("H3 D145: the fixed boss is never an elite", _boss_ok);
+
+    // about 15% of the enemies over 200 seeded floors of 12 enemies, floors 3 to 9
+    var _elites = 0; var _total = 0;
+    for (var _s2 = 1; _s2 <= 200; _s2++) {
+        var _fl = 3 + (_s2 mod 7);
+        _elites += Test_H3Elites(Shuffle_RoomPlan(5000 + _s2, "rm_floor" + string(_fl), Test_H3Slots(12)));
+        _total += 12;
+    }
+    var _share = _elites / _total;
+    Test_True("H3 D145: the share of elites over 200 seeded floors is within 10-20% (got " + string(_share) + ")", _share >= 0.10 && _share <= 0.20);
+}
+
+function Test_Suite_H3() {
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    EnemyDB_Init(); SkillDB_Init(); StatusDB_Init();
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    _gs.run = Run_Create(9301);
+
+    Test_H3Deck();
+    Test_H3Preview();
+    Test_H3Rumble();
+    Test_H3EliteRules();
+
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }
