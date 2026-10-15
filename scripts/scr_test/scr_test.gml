@@ -100,6 +100,7 @@ function Test_RunAll() {
     Test_RunSuite("TabMenu", Test_Suite_TabMenu);
     Test_RunSuite("BalanceD111", Test_Suite_BalanceD111);
     Test_RunSuite("FairRng", Test_Suite_FairRng);
+    Test_RunSuite("FairUi", Test_Suite_FairUi);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     Test_RunSuite("Mem", Test_Suite_Mem);
     Test_RunSuite("Input", Test_Suite_Input);
@@ -6092,4 +6093,40 @@ function Test_Suite_FairRng() {
     Test_Eq("R1 D125: the run save version is 2", RUN_SAVE_VERSION, 2);
 
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+// R1b (D122, D124, owner grill 2026-10-15): the game pauses when the window loses focus; the smoothed odds are stated plainly.
+function Test_Suite_FairUi() {
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+
+    // ---- D122: losing focus opens the pause menu (only when nothing else owns the screen) ----
+    Test_True("R1b D122: unfocused, walking around -> pause", Focus_ShouldPause(false, UI_NONE, false, false, false));
+    Test_True("R1b D122: unfocused, in a battle -> pause", Focus_ShouldPause(false, UI_NONE, false, true, false));
+    Test_False("R1b D122: focused -> no pause", Focus_ShouldPause(true, UI_NONE, false, false, false));
+    Test_False("R1b D122: already paused -> nothing new", Focus_ShouldPause(false, UI_PAUSE, false, false, false));
+    Test_False("R1b D122: on the title screen -> nothing", Focus_ShouldPause(false, UI_NONE, true, false, false));
+    Test_False("R1b D122: during a room transition -> nothing", Focus_ShouldPause(false, UI_NONE, false, false, true));
+    Test_False("R1b D122: in the shop -> nothing (it waits for input anyway)", Focus_ShouldPause(false, UI_SHOP, false, false, false));
+    var _pm = PauseMenu_Items(false, true);
+    Test_True("R1b D122: the pause menu in a battle keeps Resume, Help and Settings", _pm[0].enabled && _pm[1].enabled && _pm[2].enabled);
+    Test_False("R1b D122: the pause menu in a battle disables Abandon run", _pm[3].enabled);
+    Test_False("R1b D122: the pause menu in a battle disables Quit to title", _pm[4].enabled);
+    var _pm2 = PauseMenu_Items(false);
+    Test_True("R1b D122: outside a battle Abandon and Quit stay enabled", _pm2[3].enabled && _pm2[4].enabled);
+
+    // ---- D124: the flee chance is shown on the RUN command ----
+    var _k = CharacterCreate_Player(CLASS_KNIGHT);
+    var _sl = EnemyCreate(ENEMY_SLIME);
+    Test_Eq("R1b D124: Knight (SPD 10) vs Slime (SPD 9): 10/19 -> 53%", Battle_RunPct(_k, _sl, 0), 53);
+    Test_Eq("R1b D124: after one failed try: 78%", Battle_RunPct(_k, _sl, 1), 78);
+    Test_Eq("R1b D124: a boss cannot be fled (-1)", Battle_RunPct(_k, EnemyCreate(ENEMY_MINI_BOSS), 0), -1);
+    var _cmd = Battle_CmdItems({ p: _k, e: _sl, run_fails: 0 });
+    Test_Eq("R1b D124: the RUN row shows the chance", _cmd[4].value, "53%");
+    var _cmd_b = Battle_CmdItems({ p: _k, e: EnemyCreate(ENEMY_FINAL_BOSS), run_fails: 0 });
+    Test_Eq("R1b D124: against a boss the RUN row says no", _cmd_b[4].value, Loc_T("battle.action.run_no", "no"));
+    Test_Eq("R1b D124: without a battle the RUN row has no number", Battle_CmdItems()[4].value, "");
+
+    // ---- D124: Take Aim says how often it crits, from the bag size ----
+    var _line = Status_Describe(STATUS_CRIT_UP).line;
+    Test_True("R1b D124: Take Aim's status line reads '1 in every 4 hits is a critical.'", string_pos("1 in every 4 hits is a critical", _line) > 0);
 }
