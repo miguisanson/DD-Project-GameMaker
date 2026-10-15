@@ -241,14 +241,15 @@ function Player_AddExp(_ch, _amount) {
 }
 
 // ==========================================================================================================================
-// C2: what a character owes the player (D73, D76, D81, D82): a class choice, a place for a taken skill, a free stat point, a 1-of-3
-// card pick. The debts live on the character (class_pick, skill_pending, stat_points, card_picks), so a save or a reload cannot lose them;
+// C2: what a character owes the player (D73, D76, D81, D82, D130): a class choice, the echo of the last fall, a place for a taken skill, a free stat point,
+// a 1-of-3 card pick. The debts live on the character (class_pick, echo_offer, skill_pending, stat_points, card_picks), so a save or a reload cannot lose them;
 // the screens (scr_menu: CardsUi_*) open them one by one, in the order below.
 // ==========================================================================================================================
 function Cards_NextOwed(_ch) {
     if (!is_struct(_ch)) return "";
     Card_EnsureFields(_ch);
     if (_ch.class_pick) return "class";
+    if (array_length(_ch.echo_offer) > 0) return "echo";   // D130: the lost run's gift, right after the class pick
     if (_ch.skill_pending >= 0) return "replace";
     if (!Level_AutoPlaceEnabled() && _ch.stat_points > 0) return "stat";
     if (_ch.card_picks > 0 && _ch.class_chosen) return "cards";   // picks wait for the class (so they come from its pool)

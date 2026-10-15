@@ -477,9 +477,7 @@ function Profile_Default() {
         profile_version: PROFILE_VERSION,
         story_seen: {},                        // key -> true: cutscenes, camera pans, story dialogue (D26)
         unlocks: {},                           // key -> true: "nobody_class", "item_<id>" ... (D88)
-        echo: { kind: "", id: -1 },            // the gift the next run starts with (D87): kind "item" or "skill"
-        echo_offer: [],                        // the 3 options of a death whose pick has not been made yet
-        echo_pool: [],                         // D130: what the lost run had; the echo pick after the class pick draws from it
+        echo_pool: [],                         // D130 (amends D87): everything the lost run had ({ kind: "item" | "skill", id }); the echo pick after the next run's class pick draws from it
         history: [],                           // one entry per finished run, newest last
         bestiary: {},                          // "e<enemy id>" -> { met, elite }: the enemies met in a fight, for the Codex (D88; Codex_Met)
         deaths: 0,
@@ -503,16 +501,18 @@ function Profile_Normalize(_raw) {
     if (!is_struct(_raw)) return p;
     if (variable_struct_exists(_raw, "story_seen") && is_struct(_raw.story_seen)) p.story_seen = _raw.story_seen;
     if (variable_struct_exists(_raw, "unlocks") && is_struct(_raw.unlocks)) p.unlocks = _raw.unlocks;
-    if (variable_struct_exists(_raw, "echo") && is_struct(_raw.echo)) {
-        var kind = variable_struct_exists(_raw.echo, "kind") ? string(_raw.echo.kind) : "";
-        var eid = variable_struct_exists(_raw.echo, "id") ? Save_ToReal(_raw.echo.id, -1) : -1;
-        if (kind == "item" || kind == "skill") p.echo = { kind: kind, id: eid };
-    }
-    if (variable_struct_exists(_raw, "echo_offer") && is_array(_raw.echo_offer)) {
-        for (var i = 0; i < array_length(_raw.echo_offer); i++) {
-            var o = _raw.echo_offer[i];
-            if (is_struct(o) && variable_struct_exists(o, "kind") && variable_struct_exists(o, "id")) array_push(p.echo_offer, { kind: string(o.kind), id: Save_ToReal(o.id, -1) });
-        }
+    // D130: echo_pool is what a death left for the next class pick. A file without it has no echo pending. A file from the build before D130 may hold a death
+    // whose pick was not made (echo_offer) or made but not used yet (echo): either becomes the pool, so that death still gives its gift.
+    var pool_src = [];
+    if (variable_struct_exists(_raw, "echo_pool") && is_array(_raw.echo_pool)) pool_src = _raw.echo_pool;
+    else if (variable_struct_exists(_raw, "echo") && is_struct(_raw.echo) && variable_struct_exists(_raw.echo, "kind") && (string(_raw.echo.kind) == "item" || string(_raw.echo.kind) == "skill")) pool_src = [_raw.echo];
+    else if (variable_struct_exists(_raw, "echo_offer") && is_array(_raw.echo_offer)) pool_src = _raw.echo_offer;
+    for (var i = 0; i < array_length(pool_src); i++) {
+        var o = pool_src[i];
+        if (!is_struct(o) || !variable_struct_exists(o, "kind") || !variable_struct_exists(o, "id")) continue;
+        var okind = string(o.kind);
+        var oid = Save_ToReal(o.id, -1);
+        if ((okind == "item" || okind == "skill") && !Run_EchoHas(p.echo_pool, okind, oid)) array_push(p.echo_pool, { kind: okind, id: oid });
     }
     if (variable_struct_exists(_raw, "history") && is_array(_raw.history)) {
         for (var h = 0; h < array_length(_raw.history); h++) {

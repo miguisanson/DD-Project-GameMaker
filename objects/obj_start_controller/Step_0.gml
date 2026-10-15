@@ -71,7 +71,7 @@ if (state == "credits") {   // C5 (D105): the credits roll after the ending's cl
 }
 if (state == "credits_end") return;
 
-if (state == "run_flow") {   // C1: run summary, echo pick, new run (scr_room_state RunFlow_*)
+if (state == "run_flow") {   // C1: run summary, new run (scr_room_state RunFlow_*)
     RunFlow_Step();
     return;
 }
@@ -279,7 +279,7 @@ if (state == "cutscene") {
             state = "credits";   // C5 (D105): the credits roll, then the title
             break;
         case "game_over":
-            // C1 (D46, D103): no reload after a death. The run is already over in the profile; show the summary, the echo pick, then a new run.
+            // C1 (D46, D103): no reload after a death. The run is already over in the profile; show the summary, then a new run (the echo comes after its class pick, D130).
             gs.in_main_menu = false;
             RunFlow_Begin();
             state = "run_flow";

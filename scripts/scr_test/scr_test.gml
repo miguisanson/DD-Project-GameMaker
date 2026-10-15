@@ -3715,7 +3715,7 @@ function Test_Suite_Profile() {
     Test_Eq("profile: default has no deaths", _p.deaths, 0);
     Test_Eq("profile: default has no wins", _p.wins, 0);
     Test_Eq("profile: default history is empty", array_length(_p.history), 0);
-    Test_Eq("profile: default has no echo", _p.echo.kind, "");
+    Test_Eq("profile: default has no echo pending (D130)", array_length(_p.echo_pool), 0);
     Test_False("profile: story not seen at first", Profile_StorySeen(_p, "cutscene:intro"));
     Profile_StoryMark(_p, "cutscene:intro");
     Profile_StoryMark(_p, "cutscene:intro");
@@ -3758,7 +3758,7 @@ function Test_Suite_Profile() {
     var _w = Profile_Default();
     Profile_StoryMark(_w, "cutscene:intro");
     Profile_Unlock(_w, "nobody_class");
-    _w.echo = { kind: "item", id: 11 };
+    _w.echo_pool = [{ kind: "item", id: 11 }];
     _w.runs_started = 4;
     Profile_RecordRun(_w, { seed: 9, class_id: CLASS_ARCHER, level: 5, floor: 4, room: "rm_floor4", result: "died", cause: "enemy 5", kills: 8, gold: 0 });
     Test_True("profile file: write reports success", Profile_SaveTo(_f, _w));
@@ -3766,7 +3766,7 @@ function Test_Suite_Profile() {
     Test_Eq("profile file: reads back ok", _r1.status, "ok");
     Test_True("profile file: story survives", Profile_StorySeen(_r1.profile, "cutscene:intro"));
     Test_True("profile file: unlock survives", Profile_IsUnlocked(_r1.profile, "nobody_class"));
-    Test_True("profile file: echo survives", _r1.profile.echo.kind == "item" && _r1.profile.echo.id == 11);
+    Test_True("profile file: the pending echo pool survives (D130)", array_length(_r1.profile.echo_pool) == 1 && _r1.profile.echo_pool[0].kind == "item" && _r1.profile.echo_pool[0].id == 11);
     Test_Eq("profile file: deaths survive", _r1.profile.deaths, 1);
     Test_Eq("profile file: runs started survives", _r1.profile.runs_started, 4);
     Test_Eq("profile file: history survives", _r1.profile.history[0].room, "rm_floor4");
@@ -8369,7 +8369,7 @@ function Test_EchoPool() {
     var _kw = Equip_FindStarterWeaponId(CLASS_KNIGHT);
     var _mw = Equip_FindStarterWeaponId(CLASS_MAGE);
     return [
-        { kind: "skill", id: SKILL_POWER_STRIKE },   // Knight
+        { kind: "skill", id: SKILL_HILT_BASH },   // Knight
         { kind: "skill", id: SKILL_FIREBALL },       // Mage
         { kind: "item", id: 10 },                    // potions: any class
         { kind: "item", id: 11 },
@@ -8386,21 +8386,21 @@ function Test_Suite_EchoAfterClass() {
 
     // the candidate filter per class
     var _fk = Run_EchoFilter(_pool, CLASS_KNIGHT);
-    Test_True("D130 filter: a Knight is offered a Knight skill", Run_EchoHas(_fk, "skill", SKILL_POWER_STRIKE));
+    Test_True("D130 filter: a Knight is offered a Knight skill", Run_EchoHas(_fk, "skill", SKILL_HILT_BASH));
     Test_False("D130 filter: a Knight is not offered a Mage skill", Run_EchoHas(_fk, "skill", SKILL_FIREBALL));
     Test_True("D130 filter: a Knight keeps both potions", Run_EchoHas(_fk, "item", 10) && Run_EchoHas(_fk, "item", 11));
     Test_True("D130 filter: a Knight keeps the Knight weapon", Run_EchoHas(_fk, "item", _kw));
     Test_False("D130 filter: a Knight is not offered the Mage weapon", Run_EchoHas(_fk, "item", _mw));
     var _fm = Run_EchoFilter(_pool, CLASS_MAGE);
     Test_True("D130 filter: a Mage is offered a Mage skill", Run_EchoHas(_fm, "skill", SKILL_FIREBALL));
-    Test_False("D130 filter: a Mage is not offered a Knight skill", Run_EchoHas(_fm, "skill", SKILL_POWER_STRIKE));
+    Test_False("D130 filter: a Mage is not offered a Knight skill", Run_EchoHas(_fm, "skill", SKILL_HILT_BASH));
     Test_True("D130 filter: a Mage keeps both potions (items any class can use are always offered)", Run_EchoHas(_fm, "item", 10) && Run_EchoHas(_fm, "item", 11));
     Test_True("D130 filter: a Mage keeps the Mage weapon and loses the Knight one", Run_EchoHas(_fm, "item", _mw) && !Run_EchoHas(_fm, "item", _kw));
     var _fa = Run_EchoFilter(_pool, CLASS_ARCHER);
-    Test_False("D130 filter: an Archer gets neither the Knight nor the Mage skill", Run_EchoHas(_fa, "skill", SKILL_POWER_STRIKE) || Run_EchoHas(_fa, "skill", SKILL_FIREBALL));
+    Test_False("D130 filter: an Archer gets neither the Knight nor the Mage skill", Run_EchoHas(_fa, "skill", SKILL_HILT_BASH) || Run_EchoHas(_fa, "skill", SKILL_FIREBALL));
     Test_True("D130 filter: an Archer still gets the potions", Run_EchoHas(_fa, "item", 10) && Run_EchoHas(_fa, "item", 11));
     var _fn = Run_EchoFilter(_pool, CLASS_NOBODY);
-    Test_False("D130 filter: Nobody has no skills at all", Run_EchoHas(_fn, "skill", SKILL_POWER_STRIKE) || Run_EchoHas(_fn, "skill", SKILL_FIREBALL));
+    Test_False("D130 filter: Nobody has no skills at all", Run_EchoHas(_fn, "skill", SKILL_HILT_BASH) || Run_EchoHas(_fn, "skill", SKILL_FIREBALL));
     Test_True("D130 filter: Nobody gets the potions", Run_EchoHas(_fn, "item", 10) && Run_EchoHas(_fn, "item", 11));
     Test_Eq("D130 filter: the pool itself is not changed", array_length(_pool), 6);
 
@@ -8416,17 +8416,17 @@ function Test_Suite_EchoAfterClass() {
     Test_False("D130 options: no option twice", _dup);
     var _o2 = Run_EchoOptionsFor(_pool, CLASS_MAGE, 777);
     Test_True("D130 options: the same seed gives the same options", array_length(_o2) == 3 && _o2[0].id == _o[0].id && _o2[1].id == _o[1].id && _o2[2].id == _o[2].id);
-    var _only_k = [{ kind: "skill", id: SKILL_POWER_STRIKE }];
+    var _only_k = [{ kind: "skill", id: SKILL_HILT_BASH }];
     Test_Eq("D130 options: nothing that fits means no pick at all", array_length(Run_EchoOptionsFor(_only_k, CLASS_MAGE, 5)), 0);
     Test_Eq("D130 options: the Knight skill alone is offered to a Knight", array_length(Run_EchoOptionsFor(_only_k, CLASS_KNIGHT, 5)), 1);
     Test_Eq("D130 options: the first run has no echo (an empty pool offers nothing)", array_length(Run_EchoOptionsFor([], CLASS_KNIGHT, 5)), 0);
 
     // the pool a death leaves: what the run had; a run with nothing leaves the potion; a pool not yet used by a class pick is kept
     var _ch = CharacterCreate_Player(CLASS_KNIGHT);
-    _ch.skills = [SKILL_POWER_STRIKE];
+    _ch.skills = [SKILL_HILT_BASH];
     _ch.inventory = Inv_Add(_ch.inventory, 11, 1);
     var _after = Run_EchoPoolAfter([], _ch);
-    Test_True("D130 pool: the lost run's skill and items are all in it", Run_EchoHas(_after, "skill", SKILL_POWER_STRIKE) && Run_EchoHas(_after, "item", 10) && Run_EchoHas(_after, "item", 11));
+    Test_True("D130 pool: the lost run's skill and items are all in it", Run_EchoHas(_after, "skill", SKILL_HILT_BASH) && Run_EchoHas(_after, "item", 10) && Run_EchoHas(_after, "item", 11));
     var _bare = CharacterCreate_Player(CLASS_KNIGHT);
     _bare.inventory = [];
     _bare.skills = [];
@@ -8452,7 +8452,7 @@ function Test_Suite_EchoAfterClass() {
     Test_Eq("D130 profile: the file with a pool reads back ok", _r.status, "ok");
     var _rp = variable_struct_exists(_r.profile, "echo_pool") ? _r.profile.echo_pool : [];
     Test_Eq("D130 profile: the whole pool survives the file", array_length(_rp), 6);
-    Test_True("D130 profile: kinds and ids survive", Run_EchoHas(_rp, "skill", SKILL_POWER_STRIKE) && Run_EchoHas(_rp, "item", _kw) && Run_EchoHas(_rp, "item", 11));
+    Test_True("D130 profile: kinds and ids survive", Run_EchoHas(_rp, "skill", SKILL_HILT_BASH) && Run_EchoHas(_rp, "item", _kw) && Run_EchoHas(_rp, "item", 11));
     Save_DeleteFileSet(_f);
     var _legacy = Profile_Normalize({ profile_version: PROFILE_VERSION, echo_offer: [{ kind: "item", id: 11 }, { kind: "skill", id: SKILL_FIREBALL }] });
     Test_True("D130 profile: a death from the older build, pick not made, becomes the pool", variable_struct_exists(_legacy, "echo_pool") && array_length(_legacy.echo_pool) == 2 && Run_EchoHas(_legacy.echo_pool, "skill", SKILL_FIREBALL));
@@ -8490,13 +8490,13 @@ function Test_Suite_EchoAfterClass() {
 
     // taking one
     var _t_pool = Card_ClassCharacter(CharacterCreate_Player(CLASS_NOBODY), CLASS_KNIGHT);
-    _t_pool.echo_offer = [{ kind: "item", id: 11 }, { kind: "skill", id: SKILL_POWER_STRIKE }];
+    _t_pool.echo_offer = [{ kind: "item", id: 11 }, { kind: "skill", id: SKILL_HILT_BASH }];
     var _before11 = Inv_Count(_t_pool.inventory, 11);
     var _t1 = Run_EchoTake(variable_clone(_t_pool), 0);
     Test_Eq("D130 take: an item echo is in the inventory", Inv_Count(_t1.inventory, 11) - _before11, 1);
     Test_Eq("D130 take: and nothing is owed any more", Cards_NextOwed(_t1), "");
     var _t2 = Run_EchoTake(variable_clone(_t_pool), 1);
-    Test_True("D130 take: a skill echo is learned", array_length(_t2.skills) == 1 && _t2.skills[0] == SKILL_POWER_STRIKE);
+    Test_True("D130 take: a skill echo is learned", array_length(_t2.skills) == 1 && _t2.skills[0] == SKILL_HILT_BASH);
     Test_Eq("D130 take: and the offer is empty", variable_struct_exists(_t2, "echo_offer") ? array_length(_t2.echo_offer) : -1, 0);
 
     // the run save carries the offer (the quit between the class pick and the answer loses nothing)

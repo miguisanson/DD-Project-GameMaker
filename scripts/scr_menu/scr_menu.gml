@@ -1010,6 +1010,7 @@ function CardsUi_Open(_kind) {
     var u = { kind: _kind, stk: Ui_StackNew(), pick: undefined, lock: InputLock_New(CARDS_UI_INPUT_DELAY_MS), opened_ms: current_time };
     switch (_kind) {
         case "class": Ui_StackPush(u.stk, CardsUi_ClassMenu()); break;
+        case "echo": Ui_StackPush(u.stk, CardsUi_EchoMenu()); break;
         case "stat": Ui_StackPush(u.stk, CardsUi_StatMenu()); break;
         case "replace": Ui_StackPush(u.stk, CardsUi_ReplaceMenu()); break;
         case "cards": u.pick = CardsUi_PickNew(); break;
@@ -1105,6 +1106,7 @@ function ClassSelect_ApplyClass(_class_id) {
     ch = Player_NormalizeProgression(ch, true);
     ch.hp = clamp(hp0, 1, ch.max_hp);
     ch.mp = clamp(mp0, 0, ch.max_mp);
+    ch = Run_EchoGrant(ch);   // D130: the lost run's echo, filtered to this class, is owed now (CardsUi_Step opens the pick)
 
     GameState_SetSelectedClass(_class_id);
     GameState_SetPlayer(ch);
@@ -1121,6 +1123,39 @@ function ClassSelect_ApplyClass(_class_id) {
 
     GameState_SyncLegacy();
     Dialogue_TryStartClassChestReaction(_class_id);
+}
+
+// ---- the echo of the last fall (D130, amends D87): up to 3 things from the lost run that the new class can use; one is kept ----------------------------------------
+// What an echo option does, in the details panel's terms (D100): one plain sentence and the numbers from the data.
+function CardsUi_EchoDetails(_o) {
+    if (_o.kind == "skill") return Battle_SkillDetails(SkillDB_Get(_o.id));
+    var it = ItemDB_Get(_o.id);
+    return { sentence: Item_Sentence(it), lines: Item_NumberLines(it, GameState_Get().player_ch) };
+}
+
+function CardsUi_EchoMenu() {
+    var offer = GameState_Get().player_ch.echo_offer;
+    var items = [];
+    for (var i = 0; i < array_length(offer); i++) {
+        var o = offer[i];
+        var det = CardsUi_EchoDetails(o);
+        var row = { label: Run_EchoLabel(o), help: det.sentence, lines: det.lines, echo_index: i };
+        if (o.kind == "skill") row.seq = Qte_SkillSequence(o.id);
+        array_push(items, row);
+    }
+    var m = Ui_MenuNew("run_echo", items, {
+        on_confirm: CardsUi_EchoConfirm, on_back: CardsUi_NoBack,   // it must be answered
+        layout: { title: Loc_T("echo.pick.title", "Keep one echo of the last fall"), anchor: "center", details: true }
+    });
+    Ui_MenuFixCursor(m, 0);   // the remembered cursor of an earlier screen does not count
+    return m;
+}
+
+function CardsUi_EchoConfirm(_m, _i) {
+    var gs = GameState_Get();
+    CardsUi_Commit(Run_EchoTake(gs.player_ch, _m.items[_i].echo_index));
+    Run_EchoDone();
+    CardsUi_Close();
 }
 
 // ---- free stat point (D76) ------------------------------------------------------------------------------------------------------

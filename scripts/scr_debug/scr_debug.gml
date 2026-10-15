@@ -4481,9 +4481,10 @@ function Scenario_StepShotsWorld(_s) {
 }
 
 // ---- C1 run loop through the real flows (D25, D26, D36, D46, D87, D88, D92). Writes profile.sav / run.sav: only inside the gate's scratch folder. ----
-// New run (known seed) -> story trigger fires and is remembered -> death -> death scene -> run summary -> echo pick -> new run at level 1 with
-// another seed, death count +1, echo applied, the same trigger not replayed -> room change autosaves -> "relaunch" (state wiped, profile reloaded
-// from disk) -> title Continue restores room, HP, position, seed and the loot stream -> pause menu Abandon run -> echo pick -> new run ->
+// New run (known seed) -> story trigger fires and is remembered -> death -> death scene -> run summary -> new run at level 1 with
+// another seed, death count +1, the echo waiting in the profile (D130: it is picked after the class pick, steps 340+), the same trigger not replayed
+// -> room change autosaves -> "relaunch" (state wiped, profile reloaded
+// from disk) -> title Continue restores room, HP, position, seed and the loot stream -> pause menu Abandon run -> new run ->
 // the win: the ending plays once, wins + 1, the first win unlocks the Nobody class; a second win skips the ending.
 function Scenario_ItemCount(_ch, _id) {
     var _n = 0;
@@ -4501,12 +4502,6 @@ function Scenario_FloorReady(_room) {
 function Scenario_TapCutscene(_s) {
     var _gs = GameState_Get();
     if (room == rm_cutscene && _gs.ui.mode == UI_DIALOGUE && !Transition_IsActive() && (_s.f - _s.last_tap) >= 8) Scenario_Tap("confirm");
-}
-
-function Scenario_EchoMatches(_ch, _o, _items_before) {
-    if (_o.kind == "item") return Scenario_ItemCount(_ch, _o.id) == _items_before + 1;
-    for (var _i = 0; _i < array_length(_ch.skills); _i++) { if (_ch.skills[_i] == _o.id) return true; }
-    return false;
 }
 
 function Scenario_StepSmokeRun(_s) {
@@ -4583,29 +4578,23 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Check("death_run_save_is_deleted_no_reload", !RunSave_HasSave());
                 Scenario_Check("death_run_is_over", !Run_IsActive());
                 Scenario_Check("death_flow_starts_with_the_death_scene", global.run_flow.phase == "death", "phase=" + string(global.run_flow.phase));
-                var _okopts = array_length(_pf.echo_offer) == 2;   // the run had two things: potion (10) and MP potion (11)
-                for (var _i = 0; _i < array_length(_pf.echo_offer); _i++) {
-                    if (_pf.echo_offer[_i].kind != "item" || (_pf.echo_offer[_i].id != 10 && _pf.echo_offer[_i].id != 11)) _okopts = false;
+                var _okopts = array_length(_pf.echo_pool) == 2;   // the run had two things: potion (10) and MP potion (11)
+                for (var _i = 0; _i < array_length(_pf.echo_pool); _i++) {
+                    if (_pf.echo_pool[_i].kind != "item" || (_pf.echo_pool[_i].id != 10 && _pf.echo_pool[_i].id != 11)) _okopts = false;
                 }
-                Scenario_Check("death_echo_offer_is_1_of_what_the_run_had", _okopts, "offer=" + json_stringify(_pf.echo_offer));
+                Scenario_Check("death_echo_pool_is_what_the_run_had", _okopts, "pool=" + json_stringify(_pf.echo_pool));
                 Scenario_Next(_s, 120);   // C5: the death line first, then the summary (step 103)
             }
             if (_s.t > 1200) { Scenario_Check("death_reaches_the_run_summary", false, "room=" + room_get_name(room) + " state=" + (_sc != noone ? string(_sc.state) : "none")); Scenario_Finish(); }
             break;
-        case 103:   // summary -> echo pick: down once, confirm
+        case 103:   // summary -> confirm -> the next run (D130: the echo pick is not part of the death flow any more)
             if (_s.t == 20) Scenario_Tap("confirm");
             if (_s.t == 40) {
-                Scenario_Check("death_confirm_moves_on_to_the_echo_pick", global.run_flow.phase == "echo", "phase=" + string(global.run_flow.phase));
-                Scenario_Tap("menu_down");
+                Scenario_Check("death_confirm_goes_straight_to_the_next_run", global.run_flow.phase == "starting", "phase=" + string(global.run_flow.phase));
+                Scenario_Check("death_flow_opens_no_echo_pick", !CardsUi_IsOpen() && _gs.ui.mode != UI_CARDS);
             }
-            if (_s.t == 60) {
-                Scenario_Check("death_echo_cursor_moved_down", global.run_flow.index == 1, "index=" + string(global.run_flow.index));
-                _rl.pick = global.run_flow.options[global.run_flow.index];
-                _rl.items_before = Scenario_ItemCount(CharacterCreate_Player(CLASS_NOBODY), _rl.pick.kind == "item" ? _rl.pick.id : -1);
-                Scenario_Tap("confirm");
-            }
-            if (_s.t > 62 && Transition_IsActive()) Scenario_Next(_s, 104);
-            if (_s.t > 300) { Scenario_Check("death_echo_pick_starts_the_next_run", false, "phase=" + string(global.run_flow.phase)); Scenario_Finish(); }
+            if (_s.t > 42 && Transition_IsActive()) Scenario_Next(_s, 104);
+            if (_s.t > 300) { Scenario_Check("death_summary_confirm_starts_the_next_run", false, "phase=" + string(global.run_flow.phase)); Scenario_Finish(); }
             break;
         case 104:   // run 2: level 1, another seed, the echo, the trigger not replayed
             if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
@@ -4616,8 +4605,8 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Check("newrun_starts_at_level_1_again", _ch2.level == 1 && _ch2.class_id == CLASS_NOBODY && _ch2.hp == _ch2.max_hp, "level=" + string(_ch2.level));
                 Scenario_Check("newrun_death_count_stays_1", _pf2.deaths == 1, "deaths=" + string(_pf2.deaths));
                 Scenario_Check("newrun_counts_2_started_runs", _pf2.runs_started == 2, "runs_started=" + string(_pf2.runs_started));
-                Scenario_Check("newrun_echo_is_consumed", _pf2.echo.kind == "" && array_length(_pf2.echo_offer) == 0);
-                Scenario_Check("newrun_echo_is_applied", Scenario_EchoMatches(_ch2, _rl.pick, _rl.items_before) && _gs.run.echo_used.kind == _rl.pick.kind && _gs.run.echo_used.id == _rl.pick.id, "pick=" + json_stringify(_rl.pick));
+                Scenario_Check("newrun_echo_waits_in_the_profile_for_the_class_pick", array_length(_pf2.echo_pool) == 2, "pool=" + json_stringify(_pf2.echo_pool));
+                Scenario_Check("newrun_has_no_echo_yet", Scenario_ItemCount(_ch2, 11) == Scenario_ItemCount(CharacterCreate_Player(CLASS_NOBODY), 11) && _gs.run.echo_used.kind == "" && Cards_NextOwed(_ch2) == "", "echo_used=" + json_stringify(_gs.run.echo_used));
                 Scenario_Check("newrun_does_not_replay_the_fall_dialogue", !_gs.pending_floor1_intro_dialogue);
                 Scenario_Check("newrun_carries_no_gold_or_kills", _gs.run.gold == 0 && _gs.run.kills == 0);
                 Scenario_Check("newrun_autosaved_with_the_new_seed", RunSave_HasSave() && RunSave_LoadFrom().run.seed == _rl.seed2);
@@ -4707,7 +4696,7 @@ function Scenario_StepSmokeRun(_s) {
                 var _pf3 = Profile_Get();
                 Scenario_Check("abandon_counts_as_a_death", _pf3.deaths == 2, "deaths=" + string(_pf3.deaths));
                 Scenario_Check("abandon_history_says_abandoned", array_length(_pf3.history) == 2 && _pf3.history[1].result == "abandoned" && _pf3.history[1].floor == 2, "history=" + json_stringify(_pf3.history));
-                Scenario_Check("abandon_keeps_the_echo_offer", array_length(_pf3.echo_offer) >= 1);
+                Scenario_Check("abandon_keeps_the_echo_pool", array_length(_pf3.echo_pool) >= 1);
                 Scenario_Check("abandon_deletes_the_run_save", !RunSave_HasSave() && !Run_IsActive());
                 Scenario_Next(_s, 110);
             }
@@ -4725,12 +4714,12 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Check("abandon_holding_confirm_skips_the_death_line", _s.t < 150, "t=" + string(_s.t));
             }
             if (variable_struct_exists(_rl, "sum_t")) {
-                if (_s.t == _rl.sum_t + 20) Scenario_Tap("confirm");
-                if (_s.t == _rl.sum_t + 40) Scenario_Tap("confirm");
+                if (_s.t == _rl.sum_t + 20) Scenario_Tap("confirm");   // (D130: one confirm; the echo pick that took the second one is gone from the death flow)
             }
             if (variable_struct_exists(_rl, "sum_t") && _s.t > _rl.sum_t + 60 && Scenario_FloorReady(rm_floor1)) {
                 Scenario_Check("abandon_next_run_starts_at_level_1", _gs.player_ch.level == 1 && Run_IsActive() && Profile_Get().runs_started == 3, "runs_started=" + string(Profile_Get().runs_started));
                 _gs.pending_wake_line = false;   // C5: the wake line (checked in step 121) is dropped here so the card steps start clean
+                Profile_Get().echo_pool = [];    // D130: the card steps check the class screen on its own; the echo that follows a class pick is checked in 340+
                 Dialogue_CloseNow();
                 Scenario_ClearUi();
                 Scenario_Next(_s, 133);   // C2: the card screens in this run (step 111, the win, follows them)
@@ -5146,28 +5135,48 @@ function Scenario_StepShotsStory(_s) {
                 Scenario_Next(_s, 153);
             }
             break;
-        case 153:   // confirm -> the echo pick
+        case 153:   // confirm -> run 2 at the tunnel entrance (D130: no echo pick in the death flow; it comes after the class pick, below)
             if (_s.t == 4) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
             if (_s.t == 10) Scenario_Tap("confirm");
-            if (_s.t == 50) {
-                Scenario_Check("shots_story_echo_pick_is_up", _flow.phase == "echo" && is_struct(_flow.menu), "phase=" + string(_flow.phase));
-                Scenario_ShotStory(_s, "echo");
+            if (_s.t == 14) {
+                Scenario_Check("shots_story_no_echo_pick_after_the_summary", _flow.phase != "echo" && !CardsUi_IsOpen(), "phase=" + string(_flow.phase));
+                _s.ec = 0;
                 Scenario_Next(_s, 154);
             }
             break;
-        case 154:   // take the first option -> run 2 at the tunnel entrance with the wake line
-            if (_s.t == 4) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Tap("confirm"); }
+        case 154:   // run 2 at the tunnel entrance with the wake line
             if (_s.t > 20 && Scenario_FloorReady(rm_floor1) && _gs.ui.mode == UI_DIALOGUE) {
                 Scenario_Next(_s, 155);
             }
             if (_s.t > 900) { Scenario_Check("shots_story_wake_line_comes_up", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
             break;
-        case 155:   // the wake line, typed out
+        case 155:   // the wake line, typed out; then a class is picked and the echo pick (D130) comes up
             if (_s.t == 90) {
                 Scenario_Check("shots_story_wake_line_text", array_length(_gs.ui.lines_raw) == 1 && _gs.ui.lines_raw[0] == Loc_T("wake.t1", "x"), "lines=" + json_stringify(_gs.ui.lines_raw));
                 Scenario_ShotStory(_s, "wake");
+            }
+            if (_s.t == 94) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                ClassSelect_ApplyClass(CLASS_KNIGHT);   // the real call the class screen makes: the death's potions are owed as the echo pick
+            }
+            if (_s.t > 94 && (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0) && (_s.f - _s.last_tap) >= 12) Scenario_Tap("confirm");   // the class chest's own line
+            if (_s.t > 94 && _s.ec == 0 && CardsUi_Kind() == "echo" && InputLock_Settled(global.cards_ui.lock, 4 * TRANSITION_FRAME_MS)) {
+                Scenario_Check("shots_story_echo_pick_is_up", _gs.ui.mode == UI_CARDS && Ui_StackTop(global.cards_ui.stk).id == "run_echo" && array_length(Ui_StackTop(global.cards_ui.stk).items) >= 1);
+                Scenario_ShotStory(_s, "echo");
+                _s.ec = 1;
+                _s.ec_t = _s.t;
+            }
+            if (_s.ec == 1 && _s.t == _s.ec_t + 4) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_Tap("confirm");   // take the first option
+            }
+            if (_s.ec == 1 && _s.t > _s.ec_t + 10 && !CardsUi_IsOpen()) {
+                Scenario_Check("shots_story_echo_pick_is_answered", Cards_NextOwed(_gs.player_ch) == "" && array_length(Profile_Get().echo_pool) == 0);
                 Scenario_Next(_s, 156);
             }
+            if (_s.t > 900) { Scenario_Check("shots_story_echo_pick_comes_up", false, "kind=" + CardsUi_Kind() + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
             break;
         case 156:   // a note in the world, then read
             if (_s.t == 4) {
@@ -8027,20 +8036,14 @@ function Scenario_StepSmokeReg(_s) {
                 var _pf235 = Profile_Get();
                 Scenario_Check("regr_r036_the_death_scene_state_is_reached", global.run_flow.phase == "death", "phase=" + string(global.run_flow.phase));
                 Scenario_Check("regr_r036_history_says_died_on_floor_1", array_length(_pf235.history) == 1 && _pf235.history[0].result == "died" && _pf235.history[0].floor == 1, "history=" + json_stringify(_pf235.history));
-                Scenario_Check("regr_r036_the_echo_pick_is_offered", array_length(_pf235.echo_offer) >= 1, "offer=" + json_stringify(_pf235.echo_offer));
+                Scenario_Check("regr_r036_the_echo_pool_is_kept_for_the_class_pick", array_length(_pf235.echo_pool) >= 1, "pool=" + json_stringify(_pf235.echo_pool));
             }
             if (_rg.flow) {
                 var _ph235 = global.run_flow.phase;
                 if (_ph235 == "summary" && !variable_struct_exists(_rg, "sum_t")) _rg.sum_t = _s.t;
-                if (variable_struct_exists(_rg, "sum_t") && !variable_struct_exists(_rg, "echo_t")) {
-                    if (_s.t == _rg.sum_t + 20) Scenario_Tap("confirm");
-                    if (_ph235 == "echo") {
-                        _rg.echo_t = _s.t;
-                        Scenario_Check("regr_r036_the_echo_pick_screen_opens", array_length(global.run_flow.options) >= 1);
-                    }
-                }
-                if (variable_struct_exists(_rg, "echo_t") && _s.t == _rg.echo_t + 20) Scenario_Tap("confirm");
-                if (variable_struct_exists(_rg, "echo_t") && _s.t > _rg.echo_t + 22 && Scenario_FloorReady(rm_floor1)) {
+                if (variable_struct_exists(_rg, "sum_t") && _s.t == _rg.sum_t + 20) Scenario_Tap("confirm");   // D130: the summary goes straight to the next run
+                if (variable_struct_exists(_rg, "sum_t") && _s.t == _rg.sum_t + 22) Scenario_Check("regr_r036_the_death_flow_has_no_echo_pick", _ph235 != "echo" && !CardsUi_IsOpen());
+                if (variable_struct_exists(_rg, "sum_t") && _s.t > _rg.sum_t + 22 && Scenario_FloorReady(rm_floor1)) {
                     var _ch235 = _gs.player_ch;
                     var _pf235b = Profile_Get();
                     Scenario_Check("regr_r036_the_next_run_starts_at_level_1_with_full_hp", _ch235.level == 1 && _ch235.hp == _ch235.max_hp, "level=" + string(_ch235.level) + " hp=" + string(_ch235.hp) + "/" + string(_ch235.max_hp));
@@ -8692,6 +8695,7 @@ function Scenario_StepSmokeClassGuard(_s) {
                 Dialogue_CloseNow();
                 Scenario_ClearUi();
                 global.tutorial_off = true;
+                Profile_Get().echo_pool = [];   // D130: an earlier death's echo would open its pick after the class is chosen here; that is checked in 340+
                 with (obj_enemy) instance_destroy();
                 with (obj_dialogue_trigger) instance_destroy();
                 Scenario_Check("g4_a_new_run_has_not_chosen_a_class", !_gs.player_ch.class_chosen && _gs.player_ch.class_id == CLASS_NOBODY);
@@ -8826,10 +8830,10 @@ function Scenario_StepSmokeEcho(_s) {
             }
             if (_s.t > 900) { Scenario_Check("g5_a_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
-        case 341:   // a Knight with the Knight skill Power Strike and one MP potion (nothing else) dies
+        case 341:   // a Knight with the Knight skill Hilt Bash and one MP potion (nothing else) dies
             if (_s.t == 1) {
                 var _k = Card_ClassCharacter(_gs.player_ch, CLASS_KNIGHT);
-                _k.skills = [SKILL_POWER_STRIKE];
+                _k.skills = [SKILL_HILT_BASH];
                 _k.inventory = Inv_Add([], 11, 1);
                 _k.equip = {};
                 GameState_SetSelectedClass(CLASS_KNIGHT);
@@ -8839,7 +8843,7 @@ function Scenario_StepSmokeEcho(_s) {
             if (_s.t > 3) Scenario_TapCutscene(_s);
             if (_s.t > 3 && _sc != noone && _sc.state == "run_flow") {
                 var _pf1 = Profile_Get();
-                Scenario_Check("g5_death_keeps_the_knight_skill_for_later", Run_EchoHas(_pf1.echo_pool, "skill", SKILL_POWER_STRIKE), "pool=" + json_stringify(_pf1.echo_pool));
+                Scenario_Check("g5_death_keeps_the_knight_skill_for_later", Run_EchoHas(_pf1.echo_pool, "skill", SKILL_HILT_BASH), "pool=" + json_stringify(_pf1.echo_pool));
                 Scenario_Check("g5_death_keeps_the_item_for_later", Run_EchoHas(_pf1.echo_pool, "item", 11), "pool=" + json_stringify(_pf1.echo_pool));
                 Scenario_Check("g5_the_death_flow_starts_with_the_death_line", global.run_flow.phase == "death", "phase=" + string(global.run_flow.phase));
                 Scenario_Next(_s, 342);
@@ -8854,14 +8858,14 @@ function Scenario_StepSmokeEcho(_s) {
                 Scenario_Check("g5_the_summary_goes_straight_to_the_next_run_no_echo_pick", !_eo.ever_echo && !CardsUi_IsOpen());
                 Scenario_Check("g5_the_next_run_wakes_as_the_nobody", _gs.player_ch.class_id == CLASS_NOBODY && !_gs.player_ch.class_chosen && Run_IsActive());
                 Scenario_Check("g5_the_next_run_has_no_echo_yet", array_length(_gs.player_ch.skills) == 0 && Scenario_ItemCount(_gs.player_ch, 11) == Scenario_ItemCount(CharacterCreate_Player(CLASS_NOBODY), 11) && _gs.run.echo_used.kind == "", "echo_used=" + json_stringify(_gs.run.echo_used));
-                Scenario_Check("g5_the_pool_waits_in_the_profile", Run_EchoHas(_pf2.echo_pool, "skill", SKILL_POWER_STRIKE) && Run_EchoHas(_pf2.echo_pool, "item", 11));
+                Scenario_Check("g5_the_pool_waits_in_the_profile", Run_EchoHas(_pf2.echo_pool, "skill", SKILL_HILT_BASH) && Run_EchoHas(_pf2.echo_pool, "item", 11));
                 Scenario_Check("g5_nothing_is_owed_before_the_class_chest", Cards_NextOwed(_gs.player_ch) == "");
                 _gs.pending_wake_line = false;
                 Dialogue_CloseNow();
                 Scenario_ClearUi();
                 global.profile = undefined;   // a quit between the death and the class pick: the profile is read from disk again
                 var _pf2b = Profile_Get();
-                Scenario_Check("g5_the_pool_survives_a_quit_before_the_class_pick", array_length(_pf2b.echo_pool) == 2 && Run_EchoHas(_pf2b.echo_pool, "skill", SKILL_POWER_STRIKE) && Run_EchoHas(_pf2b.echo_pool, "item", 11), "pool=" + json_stringify(_pf2b.echo_pool));
+                Scenario_Check("g5_the_pool_survives_a_quit_before_the_class_pick", array_length(_pf2b.echo_pool) == 2 && Run_EchoHas(_pf2b.echo_pool, "skill", SKILL_HILT_BASH) && Run_EchoHas(_pf2b.echo_pool, "item", 11), "pool=" + json_stringify(_pf2b.echo_pool));
                 Scenario_Next(_s, 343);
             }
             if (_s.t > 1500) { Scenario_Check("g5_the_death_flow_reaches_the_next_run", false, "room=" + room_get_name(room) + " phase=" + (variable_global_exists("run_flow") ? string(global.run_flow.phase) : "none")); Scenario_NoticeEnd(); }
@@ -8911,7 +8915,7 @@ function Scenario_StepSmokeEcho(_s) {
                 Dialogue_CloseNow();
                 Scenario_ClearUi();
                 var _pf4 = Profile_Get();
-                _pf4.echo_pool = [{ kind: "skill", id: SKILL_POWER_STRIKE }];
+                _pf4.echo_pool = [{ kind: "skill", id: SKILL_HILT_BASH }];
                 Profile_Flush();
                 ClassSelect_ApplyClass(CLASS_MAGE);
                 _eo.ever_echo = false;
