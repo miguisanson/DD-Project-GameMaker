@@ -48,3 +48,12 @@ Step-number ranges (C4: smoke 161-170, shots 160-169, bot v=9) (avoid scenario c
 | F4 | Palette literals -> UI_C_*, shared helpers, global sprawl, wording/sound consistency (F4d needs owner) | many | varies | after E2 |
 
 Leave frame-counted: player grid step, enemy AI pacing, fx ages, cine pan (gameplay feel).
+
+## Improvement-mode queue (after E2, evidence-based)
+
+| # | Item | Source | Status |
+|---|---|---|---|
+| I1 | `lint_hardcoded_text.py` exits 1 on the `"{n}"` templates at scr_menu.gml ~858/882 (F1c): add `{n}` to its allow list or route through Loc_T | regression run | todo |
+| I2 | Automate regression gaps: R-007 (mini boss 60 s, fight within 4 tiles, stays removed), R-017 (dialogue end on floor 5 / 9.5), R-022 (status tick on a failed Run turn), R-028 (no cutscene background after Continue), R-036 (death from a status tick / in a transition) | regression run | todo |
+| I3 | R-021 negative-control plants for a syntax error and an unknown function | regression run | todo |
+| F2a / F4a | ms clocks for transitions/credits; palette literals | F1 audit | in flight |
