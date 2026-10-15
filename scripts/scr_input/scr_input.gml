@@ -1116,22 +1116,31 @@ function Rumble_FocusStep(_has_focus) {
     if (!_has_focus) Rumble_StopNow();
 }
 
-// What the detector looks at, from the battle controller when in a fight, else the player on the map. undefined when there is no fighter.
-function Rumble_Snapshot() {
-    var gs = GameState_Get();
-    var ch = gs.player_ch;
+// A field of a battle controller instance or of a struct shaped like one.
+function Rumble_Has(_o, _key) {
+    return is_struct(_o) ? variable_struct_exists(_o, _key) : variable_instance_exists(_o, _key);
+}
+
+// What the detector looks at, from a fighter and (in a fight) its battle controller (or a struct shaped like one). undefined when there is no fighter.
+function Rumble_SnapshotOf(_ch, _bc) {
     var hit = false;
     var broken = false;
     var def = false;
-    if (room == rm_battle && instance_exists(obj_battle_controller)) {
-        var bc = instance_find(obj_battle_controller, 0);
-        if (variable_instance_exists(bc, "p") && is_struct(bc.p)) ch = bc.p;
-        if (variable_instance_exists(bc, "hitstop_ms")) hit = (bc.hitstop_ms > FEEL_FREEZE_NORMAL_MS);   // D138: every hit freezes 40 ms; only a Perfect (80) or a crit / BREAK (120) freezes longer
-        if (variable_instance_exists(bc, "def_active")) def = bc.def_active;
-        if (variable_instance_exists(bc, "e") && is_struct(bc.e) && variable_struct_exists(bc.e, "broken")) broken = bc.e.broken;
+    if (is_struct(_bc) || instance_exists(_bc)) {
+        if (Rumble_Has(_bc, "p") && is_struct(_bc.p)) _ch = _bc.p;
+        if (Rumble_Has(_bc, "hitstop_ms")) hit = (_bc.hitstop_ms > FEEL_FREEZE_NORMAL_MS);   // D138: every hit freezes 40 ms; only a Perfect (80) or a crit / BREAK (120) freezes longer
+        if (Rumble_Has(_bc, "def_active")) def = _bc.def_active;
+        if (Rumble_Has(_bc, "e") && is_struct(_bc.e) && variable_struct_exists(_bc.e, "broken")) broken = _bc.e.broken;
     }
-    if (!is_struct(ch) || !variable_struct_exists(ch, "hp") || !variable_struct_exists(ch, "max_hp")) return undefined;
-    return { hitstop: hit, broken: broken, hp: ch.hp, max_hp: ch.max_hp, def: def };
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "hp") || !variable_struct_exists(_ch, "max_hp")) return undefined;
+    return { hitstop: hit, broken: broken, hp: _ch.hp, max_hp: _ch.max_hp, def: def };
+}
+
+// What the detector looks at now: the battle controller when in a fight, else the player on the map.
+function Rumble_Snapshot() {
+    var bc = noone;
+    if (room == rm_battle && instance_exists(obj_battle_controller)) bc = instance_find(obj_battle_controller, 0);
+    return Rumble_SnapshotOf(GameState_Get().player_ch, bc);
 }
 
 // One step of the live rumble (obj_ui_controller's Step, before any early exit). Events found while a stop reason holds are dropped.

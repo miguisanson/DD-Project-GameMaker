@@ -505,6 +505,10 @@ function Scenario_StepSmoke(_s) {
         case 390: case 391: case 392: case 393: case 394: case 395: case 396: case 397: case 398: case 399:
             Scenario_StepSmokeMapJuice(_s);   // G6 (D138, map part): chest burst + rising item, gold ticks up, step squash, level-up sparkle; its last step calls Scenario_NoticeEnd
             break;
+        case 500: case 501: case 502: case 503: case 504: case 505: case 506: case 507: case 508: case 509:
+        case 510: case 511: case 512: case 513: case 514: case 515: case 516: case 517: case 518: case 519:
+            Scenario_StepSmokeH3(_s);   // H3 (D142): room arrival, pressing toward the arrival exit leaves at once, a side direction walks; its last step calls Scenario_NoticeEnd
+            break;
         case 30:
             Scenario_StepSmokeUi(_s);
             break;
@@ -10091,7 +10095,7 @@ function Scenario_StepSmokeMapJuice(_s) {
                 _gs.player_ch.card_picks = 0;
                 _gs.player_ch.stat_points = 0;
                 CardsUi_Close();
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 500);   // H3 (D142, 500..519) goes on; its last step calls Scenario_NoticeEnd
             }
             if (_s.t > 300) { Scenario_Check("mapjuice_a_level_up_starts_the_sparkle", false, "n=" + string(MapFx_Count("sparkle"))); Scenario_NoticeEnd(); }
             break;
@@ -10237,6 +10241,111 @@ function Scenario_StepShotsMapJuice(_s) {
                 Scenario_Finish();
             }
             if (_s.t > 200) { Scenario_Release(); Scenario_Check("shots_mapjuice_the_step_squashes", false); Scenario_Finish(); }
+            break;
+    }
+}
+
+// ============================================================================
+// H3 (D142, amends D64), smoke steps 500..519. On room arrival the player still stands on the exit tile; pressing TOWARD that exit (the way you walk out
+// through it) leaves at once, any other direction walks normally. Real exits of rm_floor3 / rm_floor4, the game's own input state.
+//   500: rm_floor3, the player on its exit to floor 4: UP walks out of it.   501: rm_floor4, arrived on the exit back: the first input is toward it (DOWN).
+//   502: the room changes at once.   503: rm_floor3 again, on the exit: the first input is a side direction.   504: the player walks, the room stays; the last step ends the run.
+// ============================================================================
+// A direction the player can walk one tile in, other than the exit's own: { act, dx, dy }, or undefined.
+function Scenario_H3SideDir(_pl, _exit_dir) {
+    var _opts = [
+        { dir: LEFT, act: "move_left", dx: -1, dy: 0 }, { dir: RIGHT, act: "move_right", dx: 1, dy: 0 },
+        { dir: UP, act: "move_up", dx: 0, dy: -1 }, { dir: DOWN, act: "move_down", dx: 0, dy: 1 }
+    ];
+    for (var _i = 0; _i < 4; _i++) {
+        if (_opts[_i].dir == _exit_dir) continue;
+        if (!Player_TileBlocked(_pl, _pl.x + _opts[_i].dx * GRID_TILE_SIZE, _pl.y + _opts[_i].dy * GRID_TILE_SIZE)) return _opts[_i];
+    }
+    return undefined;
+}
+
+function Scenario_StepSmokeH3(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "h3")) _s.h3 = { };
+    var _h = _s.h3;
+    var _T = GRID_TILE_SIZE;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    switch (_s.step) {
+        case 500:   // rm_floor3, the player placed on its exit to floor 4 (no enemies), UP walks out of it
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor3) && Player_IsSettled(_pl)) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                var _ex = noone;
+                with (obj_room_transition) { if (transition_id == "floor3_to_floor4") _ex = id; }
+                Scenario_Check("h3_rm_floor3_has_its_exit_to_floor_4", _ex != noone);
+                if (_ex == noone) { Scenario_NoticeEnd(); break; }
+                Scenario_PlacePlayer(round(_ex.bbox_left / _T), round(_ex.bbox_top / _T));
+                Scenario_Hold(Scenario_Hunt2DirAction(_ex.require_dir), 4);   // a press that ends before the next room is up
+                Scenario_Next(_s, 501);
+            }
+            if (_s.t > 300) { Scenario_Check("h3_rm_floor3_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 501:   // arrived in rm_floor4 on the exit back to floor 3: it ignores the player until a step, but the first input is toward it
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor4) && Player_IsSettled(_pl)) {
+                Scenario_Release();
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                var _ex2 = instance_position(_pl.x + _T / 2, _pl.y + _T / 2, obj_room_transition);
+                Scenario_Check("h3_the_arrival_puts_the_player_on_an_exit_tile", _ex2 != noone, "x=" + string(_pl.x) + " y=" + string(_pl.y));
+                if (_ex2 == noone) { Scenario_NoticeEnd(); break; }
+                Scenario_Check("h3_it_is_the_exit_back_to_floor_3", _ex2.transition_id == "floor4_to_floor3", "id=" + string(_ex2.transition_id));
+                Scenario_Check("h3_the_arrival_exit_ignores_the_player_until_a_press_or_a_step", _pl.exit_ignore == _ex2);
+                _h.f0 = _s.f;
+                Scenario_Hold(Scenario_Hunt2DirAction(_ex2.require_dir), 6);   // the first input: toward the exit
+                Scenario_Next(_s, 502);
+            }
+            if (_s.t > 600) { Scenario_Check("h3_the_player_arrives_in_rm_floor4", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 502:   // the room changes at once (the fade starts within a few frames of the press), and rm_floor3 is the room that comes
+            if (!variable_struct_exists(_h, "left_f") && (Transition_IsActive() || room != rm_floor4)) {
+                _h.left_f = _s.f - _h.f0;
+                Scenario_Release();
+                Scenario_Check("h3_a_press_toward_the_arrival_exit_leaves_at_once", _h.left_f <= 12, "frames=" + string(_h.left_f));
+            }
+            if (variable_struct_exists(_h, "left_f") && _s.t > 5 && Scenario_FloorReady(rm_floor3) && Player_IsSettled(_pl)) {
+                Scenario_Release();
+                Scenario_Check("h3_it_leads_back_to_rm_floor_3", room == rm_floor3);
+                Scenario_Next(_s, 503);
+            }
+            if (_s.t > 600) { Scenario_Release(); Scenario_Check("h3_the_press_toward_the_exit_changes_the_room", false, "room=" + room_get_name(room) + " left=" + string(variable_struct_exists(_h, "left_f"))); Scenario_NoticeEnd(); }
+            break;
+        case 503:   // arrived in rm_floor3 on the exit to floor 4 again: the first input is a side direction
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor3) && Player_IsSettled(_pl)) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                var _ex3 = instance_position(_pl.x + _T / 2, _pl.y + _T / 2, obj_room_transition);
+                Scenario_Check("h3_the_second_arrival_is_on_an_exit_tile_too", _ex3 != noone, "x=" + string(_pl.x) + " y=" + string(_pl.y));
+                if (_ex3 == noone) { Scenario_NoticeEnd(); break; }
+                Scenario_Check("h3_the_exit_ignores_the_player_on_the_second_arrival", _pl.exit_ignore == _ex3);
+                var _side = Scenario_H3SideDir(_pl, _ex3.require_dir);
+                Scenario_Check("h3_a_side_direction_is_free_to_walk", is_struct(_side));
+                if (!is_struct(_side)) { Scenario_NoticeEnd(); break; }
+                _h.x0 = _pl.x;
+                _h.y0 = _pl.y;
+                _h.dx = _side.dx * _T;
+                _h.dy = _side.dy * _T;
+                Scenario_Hold(_side.act, 30);
+                Scenario_Next(_s, 504);
+            }
+            if (_s.t > 600) { Scenario_Check("h3_the_player_arrives_in_rm_floor3_again", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 504:   // the side press walks one tile; the room does not change; the exit is armed again once the player is off it
+            if (_s.t >= 40 && Player_IsSettled(_pl)) {
+                Scenario_Release();
+                Scenario_Check("h3_a_side_press_does_not_leave_the_room", room == rm_floor3 && !Transition_IsActive(), "room=" + room_get_name(room));
+                Scenario_Check("h3_the_player_walked_one_tile_sideways", _pl.x == _h.x0 + _h.dx && _pl.y == _h.y0 + _h.dy, "at " + string(_pl.x) + "," + string(_pl.y) + " from " + string(_h.x0) + "," + string(_h.y0));
+                Scenario_Check("h3_off_the_exit_it_is_armed_again", _pl.exit_ignore == noone);
+                Scenario_NoticeEnd();
+            }
+            if (_s.t > 300) { Scenario_Release(); Scenario_Check("h3_the_side_step_ends", false); Scenario_NoticeEnd(); }
             break;
     }
 }
