@@ -1418,6 +1418,7 @@ function Player_LearnSkill(_ch, _skill_id) {
     }
     if (!exists) {
         array_push(_ch.skills, _skill_id);
+        Skill_Discover(_skill_id);   // D148
     }
     return _ch;
 }

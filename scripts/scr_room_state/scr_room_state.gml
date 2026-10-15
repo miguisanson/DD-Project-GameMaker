@@ -543,6 +543,8 @@ function Run_EchoOptions(_ch, _rng) {
 }
 
 // ---- D130 (amends D87): the echo is offered right AFTER the class pick, filtered to what the new class can use ----
+// SUPERSEDED by D144 (see Run_EchoSkillOptions below): the game no longer calls Run_EchoFilter, Run_EchoOptionsFor, Run_EchoPoolAfter or Run_EchoGrantTo. They stay,
+// with their D130 checks, until a cleanup removes the item-pool echo for good.
 // A death leaves everything the lost run had in the profile (echo_pool). The class pick (ClassSelect_ApplyClass -> Run_EchoGrant) draws up to 3 of it that the
 // class can use onto the character (echo_offer, saved with the run, so a quit before the answer loses nothing); Cards_NextOwed owes the pick ("echo"),
 // CardsUi opens it, Run_EchoTake applies the answer and Run_EchoDone empties the pool. The first run has no echo (the pool is empty).
@@ -603,18 +605,30 @@ function Run_EchoGrantTo(_ch, _pool, _seed) {
     return ch;
 }
 
-// The class pick (ClassSelect_ApplyClass): the character gets its echo offer from the profile's pool. When nothing in the pool fits the class there is no pick
-// and the pool is dropped at once, without a word. When something does, the pool stays until the answer (Run_EchoDone).
+// ---- D144 (amends D130/D87): the echo is up to 3 SKILLS OF THE PICKED CLASS that the profile has discovered in any earlier run (skill memory, D148) ----
+// No items. Nothing discovered for the class: no echo screen at all and the run goes on. The three are drawn with a stream made from the run's seed, so the
+// same run offers the same three. A skill the character already holds is not offered again. [{ kind: "skill", id }]
+function Run_EchoSkillOptions(_prof, _class_id, _seed, _owned = []) {
+    var known = Skill_KnownOfClass(_prof, _class_id);
+    var pool = [];
+    for (var i = 0; i < array_length(known); i++) {
+        if (!array_contains(_owned, known[i])) array_push(pool, { kind: "skill", id: known[i] });
+    }
+    if (array_length(pool) <= 0) return [];
+    return Run_EchoDraw3(pool, Rng_New(_seed, "echo"));
+}
+
+// The class pick (ClassSelect_ApplyClass): the character gets its echo offer from the skill memory of the profile. When the class has no discovered skill there
+// is no pick. The item pool of older builds (echo_pool) is no longer used: it is read, never offered, and emptied here so it does not linger.
 function Run_EchoGrant(_ch) {
-    var prof = Profile_Get();
-    if (!is_struct(prof) || !variable_struct_exists(prof, "echo_pool") || array_length(prof.echo_pool) <= 0) return Card_EnsureFields(_ch);
+    var ch = Card_EnsureFields(variable_clone(_ch));
     var seed = Run_IsActive() ? Run_Get().seed : 0;
-    var ch = Run_EchoGrantTo(_ch, prof.echo_pool, seed);
+    ch.echo_offer = Run_EchoSkillOptions(Profile_Get(), ch.class_id, seed, ch.skills);
     if (array_length(ch.echo_offer) <= 0) Run_EchoDone();
     return ch;
 }
 
-// The echo was answered (or nothing could be offered): nothing is pending any more.
+// The echo was answered (or nothing could be offered): the old item pool, if an older profile still holds one, is emptied.
 function Run_EchoDone() {
     var prof = Profile_Get();
     if (is_struct(prof) && variable_struct_exists(prof, "echo_pool") && array_length(prof.echo_pool) > 0) {
@@ -683,7 +697,7 @@ function Run_EndRoomName(_result = "died") {
     return room_get_name(room);
 }
 
-// Ends the run in the profile: history entry, death or win counter, story flags, the echo pool (not for a win), run save deleted.
+// Ends the run in the profile: history entry, death or win counter, story flags, the skills the run ended with (skill memory, D148), run save deleted.
 // Returns the history entry. Works without an active run (scenarios): the entry then carries seed 0.
 function Run_Finish(_result, _cause) {
     var gs = GameState_Get();
@@ -695,7 +709,7 @@ function Run_Finish(_result, _cause) {
     Story_CopyFlagsToProfile(prof, gs.flags);
     var entry = Run_MakeHistoryEntry(run, ch, Run_EndRoomName(_result), _result, _cause);
     Profile_RecordRun(prof, entry);
-    prof.echo_pool = (_result == "won") ? [] : Run_EchoPoolAfter(prof.echo_pool, ch);   // D130: the pick comes after the next run's class pick
+    if (is_struct(ch)) Skills_DiscoverAll(variable_struct_exists(ch, "skills") ? ch.skills : [], prof);   // D148: whatever the run ended with is remembered (a run saved before skill memory existed)
     Profile_Flush();
 
     RunSave_Delete();
