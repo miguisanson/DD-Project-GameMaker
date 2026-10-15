@@ -94,3 +94,5 @@ Keep this short. Add a line when an automated entry cannot be built.
 
 ---
 *Created: 2026-10-13. Updated 2026-10-14 (roguelike entries R-036 to R-048; phase numbers follow the 8-phase roadmap). Last run recorded 2026-10-15 on `fc886c7-20261015` (see Run log).*
+| R-049 | A crit or BREAK that is not a Perfect never fires the Perfect rumble; a Perfect fires it exactly once (one-shot flag set in Battle_HitFreeze) | battle, input | L2 `Test_Suite_H3` rumble assertions (h3-fixes 4e7e8ce) | ACTIVE | 2026-10-15 | 119396f-20261015 PASS (fast gate on next after the H3 merge) |
+| R-050 | A BREAK always rumbles, even when a much faster enemy acts right after the push-back (one-shot flag set in Battle_StaggerHit) | battle, input | L2 `Test_Suite_H3` BREAK rumble assertions (h3-fixes 4e7e8ce) | ACTIVE | 2026-10-15 | 119396f-20261015 PASS (fast gate on next after the H3 merge) |
