@@ -3,6 +3,12 @@ if (sprite_index == noone) {
     exit;
 }
 
+// D134: a battle effect animation plays at 2x while run is held (never while a QTE is up). The spawn's speed is kept as the base.
+if (room == rm_battle) {
+    if (!variable_instance_exists(id, "fx_base_speed")) fx_base_speed = image_speed;
+    image_speed = fx_base_speed * Battle_TimeScale();
+}
+
 fx_age += 1;
 if (image_number <= 1) {
     if (fx_age > 1) instance_destroy();

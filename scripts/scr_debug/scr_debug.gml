@@ -498,6 +498,9 @@ function Scenario_StepSmoke(_s) {
         case 350: case 351: case 352: case 353: case 354: case 355: case 356: case 357: case 358: case 359:
             Scenario_StepSmokeEcho(_s);   // G5 (D130): the echo is offered after the class pick; the end of the chain (its last step calls Scenario_NoticeEnd)
             break;
+        case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
+            Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step calls Scenario_NoticeEnd
+            break;
         case 30:
             Scenario_StepSmokeUi(_s);
             break;
@@ -2858,6 +2861,9 @@ function Scenario_StepShots(_s) {
         case 300: case 301: case 302: case 303: case 304: case 305: case 306: case 307: case 308: case 309:
         case 310: case 311: case 312: case 313: case 314: case 315: case 316: case 317: case 318: case 319:
             Scenario_StepShotsFeel(_s);   // g3 (D138, D139): the death burst, Perfect sparks, the BREAK zoom punch, the low-HP edge pulse, the HP lag bar
+            break;
+        case 430: case 431: case 432: case 433: case 434: case 435: case 436: case 437: case 438: case 439:
+            Scenario_StepShotsSpeed(_s);   // g7 (D134, D135): the command menu with the damage plate, the skill list with its lines, the x2 marker; finishes the run
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -9065,7 +9071,7 @@ function Scenario_StepSmokeEcho(_s) {
             if (_s.t > 90 && !CardsUi_IsOpen() && _gs.ui.mode == UI_NONE) {
                 Scenario_Check("g5_a_pool_nothing_fits_opens_no_pick", !_eo.ever_echo && Cards_NextOwed(_gs.player_ch) == "" && array_length(_gs.player_ch.echo_offer) == 0);
                 Scenario_Check("g5_and_the_pool_is_cleared_quietly", array_length(Profile_Get().echo_pool) == 0);
-                Scenario_NoticeEnd();   // the end of the chain: removes the files and the profile the steps made
+                Scenario_Next(_s, 410);   // g7 (D134, D135, 410..415) goes on; its last step ends the chain (Scenario_NoticeEnd removes the files and the profile)
             }
             if (_s.t > 600) { Scenario_Check("g5_the_class_pick_without_a_fitting_echo_ends", false, "kind=" + CardsUi_Kind() + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
             break;
@@ -9496,7 +9502,7 @@ function Scenario_StepShotsFeel(_s) {
     if (!variable_struct_exists(_s, "fe")) _s.fe = 0;
     var _names = ["death_burst", "sparks_perfect", "zoom_break", "lowhp_edge", "hp_lag", "hurt_edge"];
     if (_s.fe >= array_length(_names)) {
-        Scenario_Finish();
+        Scenario_Next(_s, 430);   // g7 (D134, D135): the speed-up and damage preview pictures (430..433) finish the run
         return;
     }
     var _tag = _names[_s.fe];
@@ -9594,6 +9600,259 @@ function Scenario_StepShotsFeel(_s) {
                 Display_ClearZoom();   // the parked push-in must not carry into the next scene
                 _s.fe++;
                 Scenario_Next(_s, 300);
+            }
+            break;
+    }
+}
+
+// ============================================================================
+// g7 (D134 battle speed-up, D135 damage preview). Smoke steps 410-419, shots 430-433.
+// Smoke (a Knight with the Wooden Sword against a Slime that uses its plain attack):
+//   410  a fresh battle (mode 0: no key; mode 1: the second battle, run held through real input)
+//   411  the cursor on ATTACK shows the plate (Damage 4 / Perfect 5), on SKILL it is gone, the skill list's Hilt Bash shows 7 / 9, Muscle Up no number
+//   413  the enemy's turn timed from its first frame to the player's menu: mode 0 is the baseline, mode 1 (run held) must take about half
+//   414  the sliding bar with run held: its clock keeps real time (qte_ms moves as fast as current_time) and the time scale is 1
+//   415  the preview equals the damage the real resolve paths deal (attack and Hilt Bash, OK and Perfect); then the run ends
+// ============================================================================
+function Scenario_StepSmokeSpeed(_s) {
+    var _bc = instance_exists(obj_battle_controller) ? instance_find(obj_battle_controller, 0) : noone;
+    if (!variable_struct_exists(_s, "g7")) _s.g7 = { mode: 0, base_f: -1, base_ms: -1, phase: 0, f0: 0, ct0: 0, scale_max: 1, qphase: 0, q0: 0, c0: 0 };
+    var _g = _s.g7;
+    var _ready = (_s.f - _s.last_tap) >= 8;
+    switch (_s.step) {
+        case 410:   // a fresh battle against a Slime; wait for the player's menu
+            if (_s.t == 1) {
+                Scenario_Release();
+                Transition_Finish();
+                Scenario_ClearUi();
+                Scenario_NewKnight();
+                Scenario_GotoBattle("smoke_g7_" + string(_g.mode), ENEMY_SLIME);
+            }
+            if (_s.t > 20 && room == rm_battle && _bc != noone && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && is_struct(_bc.ui_cmd)) {
+                _bc.e.skills = [];   // the plain attack: no defence bar in the timed turn
+                _bc.p.skills = [SKILL_HILT_BASH, SKILL_MUSCLE_UP];
+                _bc.p.equip.weapon = 1;
+                _bc.player_weapon = ItemDB_Get(1);
+                _bc.p.hp = _bc.p.max_hp;
+                _bc.p.mp = _bc.p.max_mp;
+                _g.phase = 0;
+                _g.qphase = 0;
+                Scenario_Next(_s, (_g.mode == 0) ? 411 : 413);
+            }
+            if (_s.t > 900) { Scenario_Check("g7_the_battle_reaches_the_player_menu", false, "room=" + room_get_name(room) + " state=" + string((_bc != noone) ? _bc.battle_state : -1)); Scenario_NoticeEnd(); }
+            break;
+        case 411:   // the preview plate beside the command menu and the skill list's lines, through real keys
+            switch (_s.t) {
+                case 14:
+                    var _pv = Battle_AttackPreview(_bc.p, _bc.e, Battle_PlayerWeapon(_bc));
+                    Scenario_Check("g7_the_cursor_starts_on_attack", _bc.menu_index == 0, "i=" + string(_bc.menu_index));
+                    Scenario_Check("g7_the_preview_plate_is_drawn_on_attack", is_struct(_bc.hud.rects.preview) && _bc.hud.rects.preview.w > 0);
+                    Scenario_Check("g7_the_plate_numbers_are_4_and_5_for_the_wooden_sword_vs_a_slime", _pv.ok == 4 && _pv.perfect == 5, "ok=" + string(_pv.ok) + " perfect=" + string(_pv.perfect));
+                    var _want = Battle_PreviewPlateLines(_pv);
+                    Scenario_Check("g7_the_plate_says_damage_and_perfect_from_the_preview", array_length(_bc.hud.preview_text) == 2 && _bc.hud.preview_text[0] == _want[0] && _bc.hud.preview_text[1] == _want[1], json_stringify(_bc.hud.preview_text));
+                    if (is_struct(_bc.hud.rects.preview)) {
+                        var _pr = _bc.hud.rects.preview;
+                        var _hr = _bc.hud.rects;
+                        Scenario_Check("g7_the_plate_clears_the_command_menu", !Test_RectsOverlap(_pr, _hr.cmd));
+                        Scenario_Check("g7_the_plate_clears_the_player_panel", !Test_RectsOverlap(_pr, _hr.zones.player));
+                        Scenario_Check("g7_the_plate_clears_the_turn_strip", !Test_RectsOverlap(_pr, _hr.timeline));
+                        Scenario_Check("g7_the_plate_is_on_screen", _pr.x >= 0 && _pr.y >= 0 && _pr.x + _pr.w <= Display_GuiW() && _pr.y + _pr.h <= Display_GuiH());
+                    }
+                    Scenario_Check("g7_no_x2_marker_while_run_is_not_held", !is_struct(_bc.hud.rects.speed));
+                    Scenario_Tap("menu_down");
+                    break;
+                case 24:
+                    Scenario_Check("g7_the_plate_is_gone_with_the_cursor_on_skill", _bc.menu_index == 1 && !is_struct(_bc.hud.rects.preview), "i=" + string(_bc.menu_index));
+                    Scenario_Tap("confirm");
+                    break;
+                case 34:
+                    Scenario_Check("g7_the_skill_list_is_open", _bc.battle_state == BSTATE_SKILL_MENU && array_length(_bc.ui_skill.items) == 2, "state=" + string(_bc.battle_state));
+                    Scenario_Check("g7_hilt_bash_shows_damage_7", Test_RowValue(_bc.ui_skill.items[0].lines, Loc_T("battle.det.damage", "Damage")) == "7", Test_RowValue(_bc.ui_skill.items[0].lines, Loc_T("battle.det.damage", "Damage")));
+                    Scenario_Check("g7_hilt_bash_shows_perfect_9", Test_RowValue(_bc.ui_skill.items[0].lines, Loc_T("battle.det.perfect", "Perfect")) == "9");
+                    Scenario_Check("g7_muscle_up_shows_no_damage_number", Test_RowValue(_bc.ui_skill.items[1].lines, Loc_T("battle.det.damage", "Damage")) == "");
+                    Scenario_Tap("cancel");
+                    break;
+                case 44:
+                    Scenario_Check("g7_back_to_the_command_menu", _bc.battle_state == BSTATE_MENU && _bc.menu_index == 1);
+                    Scenario_Tap("menu_up");
+                    break;
+                case 54:
+                    Scenario_Check("g7_the_plate_is_back_on_attack", _bc.menu_index == 0 && is_struct(_bc.hud.rects.preview));
+                    Scenario_Next(_s, 413);
+                    break;
+            }
+            break;
+        case 413:   // the enemy's turn timed, from its first frame to the player's menu (mode 0: no key; mode 1: run held)
+            if (_s.t == 1 && _g.mode == 1) Scenario_Hold("run", 900);
+            if (_bc == noone) break;
+            switch (_g.phase) {
+                case 0:   // cast Guard (the fourth row) until it is the enemy's turn
+                    if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {
+                        if (_bc.menu_index != 3) Scenario_Tap((_bc.menu_index < 3) ? "menu_down" : "menu_up");
+                        else { Scenario_Tap("confirm"); _g.phase = 1; }
+                    }
+                    break;
+                case 1:
+                    if (_bc.turn == TURN_ENEMY && _bc.battle_state == BSTATE_ENEMY_ACT) {
+                        _g.f0 = _s.f;
+                        _g.ct0 = current_time;
+                        _g.scale_max = 1;
+                        _g.phase = 2;
+                    } else if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {
+                        _g.phase = 0;   // the player acts again before the enemy: Guard once more
+                    }
+                    break;
+                case 2:
+                    _g.scale_max = max(_g.scale_max, Battle_TimeScale(_bc));
+                    if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) {
+                        var _fr = _s.f - _g.f0;
+                        var _ms = current_time - _g.ct0;
+                        var _tag = (_g.mode == 0) ? "baseline" : "held";
+                        show_debug_message("[BOT] g7 enemy turn " + _tag + " frames=" + string(_fr) + " ms=" + string(_ms) + " scale_max=" + string(_g.scale_max) + " enemy_skill=" + string(_bc.enemy_last_skill_id));
+                        if (_g.mode == 0) {
+                            _g.base_f = _fr;
+                            _g.base_ms = _ms;
+                            Scenario_Check("g7_the_baseline_enemy_turn_is_a_normal_one", _fr >= 12 && _bc.enemy_last_skill_id == -1 && _g.scale_max == 1, "frames=" + string(_fr) + " scale=" + string(_g.scale_max));
+                            _g.mode = 1;
+                            Scenario_Next(_s, 410);
+                        } else {
+                            Scenario_Check("g7_run_held_through_real_input_gives_a_time_scale_of_2", _g.scale_max == 2, "scale=" + string(_g.scale_max));
+                            Scenario_Check("g7_the_enemy_turn_with_run_held_takes_about_half_the_frames", _g.base_f > 0 && _fr <= _g.base_f * 0.7 && _fr >= _g.base_f * 0.3, "held=" + string(_fr) + " baseline=" + string(_g.base_f));
+                            Scenario_Check("g7_the_enemy_turn_with_run_held_takes_about_half_the_time", _g.base_ms > 0 && _ms <= _g.base_ms * 0.7 && _ms >= _g.base_ms * 0.3, "held=" + string(_ms) + " baseline=" + string(_g.base_ms));
+                            Scenario_Next(_s, 414);
+                        }
+                    }
+                    if (_s.t > 900) { Scenario_Check("g7_the_enemy_turn_ends", false, "phase=" + string(_g.phase) + " state=" + string(_bc.battle_state) + " turn=" + string(_bc.turn)); Scenario_NoticeEnd(); }
+                    break;
+            }
+            break;
+        case 414:   // the sliding bar with run held: real time
+            if (_bc == noone) break;
+            if (_g.qphase == 0) {
+                if (_s.t == 1) Scenario_Hold("run", 400);
+                if (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready) {
+                    if (_bc.menu_index != 0) Scenario_Tap("menu_up");
+                    else { Scenario_Tap("confirm"); _g.qphase = 1; }
+                }
+            } else if (_g.qphase == 1) {
+                if (_bc.battle_state == BSTATE_ATTACK_TIMING && _bc.qte_active && _bc.qte_ms >= -150) {
+                    Scenario_Hold("run", 200);
+                    _g.q0 = _bc.qte_ms;
+                    _g.c0 = current_time;
+                    _g.f0 = _s.f;
+                    _g.qphase = 2;
+                }
+            } else if (_s.f - _g.f0 >= 30) {
+                var _dq = _bc.qte_ms - _g.q0;
+                var _dc = current_time - _g.c0;
+                show_debug_message("[BOT] g7 bar with run held: dq=" + string(_dq) + " dc=" + string(_dc) + " scale=" + string(Battle_TimeScale(_bc)));
+                Scenario_Check("g7_run_is_held_during_the_bar", Input_Held("run"));
+                Scenario_Check("g7_the_time_scale_is_1_during_the_bar", Battle_TimeScale(_bc) == 1 && _bc.battle_state == BSTATE_ATTACK_TIMING);
+                Scenario_Check("g7_the_bar_clock_runs_at_real_speed_with_run_held", _dc > 200 && _dq >= _dc * 0.8 && _dq <= _dc * 1.25, "bar=" + string(_dq) + " real=" + string(_dc));
+                Scenario_Release();
+                Scenario_Next(_s, 415);
+            }
+            if (_s.t > 900) { Scenario_Check("g7_the_bar_starts", false, "state=" + string(_bc.battle_state)); Scenario_NoticeEnd(); }
+            break;
+        case 415:   // the preview equals the damage the real resolve paths deal; every call in this one frame, so nothing else moves in between
+            if (_bc == noone) { Scenario_Check("g7_the_battle_is_still_there", false); Scenario_NoticeEnd(); break; }
+            var _p = _bc.p;
+            var _pvA = Battle_AttackPreview(_p, _bc.e, Battle_PlayerWeapon(_bc));
+            var _pvS = Battle_SkillPreview(_p, _bc.e, SKILL_HILT_BASH);
+            var _grades = [QTE_OK, QTE_PERFECT];
+            for (var _gi = 0; _gi < 2; _gi++) {
+                var _want_a = (_gi == 0) ? _pvA.ok : _pvA.perfect;
+                var _want_s = (_gi == 0) ? _pvS.ok : _pvS.perfect;
+                _bc.e.hp = _bc.e.max_hp;
+                _bc.e.stagger = 0;
+                _bc.e.broken = false;
+                _bc.hitstop_ms = 0;
+                Battle_PlayerAttackResolveTimed(_bc, Qte_Result(_grades[_gi]));
+                Scenario_Check("g7_the_attack_at_" + _grades[_gi] + "_deals_the_preview", !_bc.last_crit && _bc.last_dmg == _want_a, "dealt=" + string(_bc.last_dmg) + " preview=" + string(_want_a));
+                _bc.e.hp = _bc.e.max_hp;
+                _bc.e.stagger = 0;
+                _bc.e.broken = false;
+                _bc.hitstop_ms = 0;
+                _p.mp = _p.max_mp;
+                Battle_PlayerSkill(_bc, SKILL_HILT_BASH, Qte_Result(_grades[_gi]));
+                Scenario_Check("g7_hilt_bash_at_" + _grades[_gi] + "_deals_the_preview", !_bc.last_crit && _bc.last_dmg == _want_s, "dealt=" + string(_bc.last_dmg) + " preview=" + string(_want_s));
+            }
+            Scenario_NoticeEnd();   // the last step of the smoke chain
+            break;
+    }
+}
+
+// Shots 430-433 (480 x 432): 0 the command menu with the plate (Damage 4 / Perfect 5), 1 the skill list with Hilt Bash's Damage / Perfect lines, 2 the x2 marker (run held).
+function Scenario_SpeedShotScenes() {
+    return ["attack", "skill", "x2"];
+}
+
+function Scenario_StepShotsSpeed(_s) {
+    var _names = Scenario_SpeedShotScenes();
+    if (!variable_struct_exists(_s, "g7i")) _s.g7i = 0;
+    if (_s.g7i >= array_length(_names)) {
+        Scenario_Finish();
+        return;
+    }
+    var _tag = _names[_s.g7i];
+    var _bc = instance_exists(obj_battle_controller) ? instance_find(obj_battle_controller, 0) : noone;
+    switch (_s.step) {
+        case 430:   // enter the battle at scale 3
+            if (_s.t == 1) {
+                Scenario_Release();
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(3);
+                Scenario_GotoBattle("shots_g7_" + _tag, ENEMY_SLIME);
+            }
+            if (_s.t >= 30) Scenario_Next(_s, 431);
+            break;
+        case 431:   // the player's menu, parked
+            var _inb = (room == rm_battle && _bc != noone);
+            Scenario_Check("shots_g7_in_battle_" + _tag, _inb, "room=" + room_get_name(room));
+            if (!_inb) { Scenario_Finish(); return; }
+            _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
+            _bc.e.skills = [];
+            _bc.p.skills = [SKILL_HILT_BASH, SKILL_MUSCLE_UP, SKILL_WOUND];
+            _bc.p.equip.weapon = 1;
+            _bc.player_weapon = ItemDB_Get(1);
+            _bc.pops = [];
+            _bc.combat_log = [];
+            _bc.tl_who = TL_PLAYER;
+            _bc.turn = TURN_PLAYER;
+            _bc.enemy_action_pending = false;
+            _bc.battle_state = BSTATE_MENU;
+            Scenario_Next(_s, 432);
+            break;
+        case 432:
+            if (_s.t == 6) {
+                if (_s.g7i == 1) Battle_OpenList(_bc, BSTATE_SKILL_MENU);
+                if (_s.g7i == 2) Scenario_Hold("run", 60);
+            }
+            if (_s.t == 30) {
+                switch (_s.g7i) {
+                    case 0:
+                        Scenario_Check("shots_g7_the_plate_is_drawn_on_attack", is_struct(_bc.hud.rects.preview) && array_length(_bc.hud.preview_text) == 2, json_stringify(_bc.hud.preview_text));
+                        break;
+                    case 1:
+                        Scenario_Check("shots_g7_the_skill_list_has_the_damage_lines", _bc.battle_state == BSTATE_SKILL_MENU && Test_RowValue(_bc.ui_skill.items[0].lines, Loc_T("battle.det.damage", "Damage")) != "");
+                        Scenario_BattleUiOverlaps(_bc, "g7_skill_list");
+                        break;
+                    case 2:
+                        Scenario_Check("shots_g7_the_x2_marker_is_drawn", is_struct(_bc.hud.rects.speed) && Battle_TimeScale(_bc) == 2);
+                        if (is_struct(_bc.hud.rects.speed)) Scenario_Check("shots_g7_the_x2_marker_clears_the_turn_strip", !Test_RectsOverlap(_bc.hud.rects.speed, _bc.hud.rects.timeline));
+                        break;
+                }
+                _s.shot = "shot_g7_" + _tag + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 433);
+            }
+            break;
+        case 433:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_Release();
+                _s.g7i++;
+                Scenario_Next(_s, 430);
             }
             break;
     }

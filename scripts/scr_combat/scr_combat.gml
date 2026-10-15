@@ -156,21 +156,28 @@ function Combat_TryDodge(_attacker, _defender) {
     return res;
 }
 
+// Every multiplier of one hit except the QTE grade (spec section 4): the attacker's damage statuses, the crit and skill multipliers, the defender's guard
+// statuses, the assist setting and the BREAK bonus. Pure: it only reads (a guard status is consumed by Combat_ApplyDamage, not here).
+function Combat_HitMult(_attacker, _defender, _crit_mult = 1, _skill_mult = 1) {
+    var mult = Status_GetMul(_attacker, "dmg_mult") * _crit_mult * _skill_mult;
+    mult *= Status_GetMul(_defender, "guard_mult");
+    mult *= Combat_AssistMult(_defender);
+    mult *= Combat_BreakMult(_defender);   // spec section 11: a BROKEN enemy takes +50% until its next turn
+    return mult;
+}
+
+// The damage one hit does, with nothing changed (D135: the damage preview reads this; Combat_ApplyDamage deals exactly this number).
+function Combat_HitDamage(_attacker, _defender, _src, _crit_mult = 1, _skill_mult = 1, _grade = 1) {
+    return Combat_RatioDamage(_src.power, Combat_AttackStat(_attacker, _src), Combat_EffectiveStat(_defender, STAT_DEF), _grade, Combat_HitMult(_attacker, _defender, _crit_mult, _skill_mult));
+}
+
 // _src = { power (final formula power), stat_type }. _ctx: { grade_mult, is_skill }. Statuses: dmg_mult (attacker), guard_mult (defender, consumed on hit).
 function Combat_ApplyDamage(_attacker, _defender, _src, _crit_mult = 1, _skill_mult = 1, _ctx = undefined) {
     var dmg_ctx = is_struct(_ctx) ? _ctx : {};
     var grade = variable_struct_exists(dmg_ctx, "grade_mult") ? dmg_ctx.grade_mult : 1;
 
-    var mult = Status_GetMul(_attacker, "dmg_mult") * _crit_mult * _skill_mult;
-    var guard_mult = Status_GetMul(_defender, "guard_mult");
-    if (guard_mult != 1) {
-        mult *= guard_mult;
-        _defender = Status_ConsumeByField(_defender, "consume_on_hit");
-    }
-    mult *= Combat_AssistMult(_defender);
-    mult *= Combat_BreakMult(_defender);   // spec section 11: a BROKEN enemy takes +50% until its next turn
-
-    var dmg = Combat_RatioDamage(_src.power, Combat_AttackStat(_attacker, _src), Combat_EffectiveStat(_defender, STAT_DEF), grade, mult);
+    var dmg = Combat_HitDamage(_attacker, _defender, _src, _crit_mult, _skill_mult, grade);
+    if (Status_GetMul(_defender, "guard_mult") != 1) _defender = Status_ConsumeByField(_defender, "consume_on_hit");
 
     if (!variable_struct_exists(dmg_ctx, "is_skill")) dmg_ctx.is_skill = false;
 
@@ -1296,6 +1303,34 @@ function Battle_QteImpactFeedback(_bc) {
     Battle_HitFeel(_bc);   // D138 / D139: sparks, jolt, recoil, zoom punch
 }
 
+// The weapon the basic attack swings: the one the battle started with, or what the player has equipped now (nothing = bare hands).
+function Battle_PlayerWeapon(_bc) {
+    var w = _bc.player_weapon;
+    if (!is_struct(w) || !variable_struct_exists(w, "power")) {
+        w = ItemDB_Get(_bc.p.equip.weapon);
+        if (w.id == 0) w = { power:COMBAT_UNARMED_POWER, stat_type:STAT_ATK, acc:0, preferred_class:-1 };
+        _bc.player_weapon = w;
+    }
+    return w;
+}
+
+// One hit of the player's basic attack (D20): the damage at the grade's multiplier, then the gear passives' bonus pressure. Changes the defender and
+// returns { dealt, defender }. The one place the number is made: the attack resolves through it, the preview (Battle_AttackPreview) mirrors it.
+function Battle_PlayerAttackHit(_p, _e, _w, _crit, _grade_mult, _timing_key) {
+    var dmg_pack = Combat_ApplyDamage(_p, _e, Combat_BasicSource(_w), (_crit ? COMBAT_CRIT_MULT : 1), 1, { is_skill: false, grade_mult: _grade_mult });
+    var e = dmg_pack.defender;
+    var dealt = max(0, dmg_pack.dmg);
+
+    // FUN-FIRST gear passives add bonus pressure after the grade.
+    var bonus_dmg = Equip_PlayerBonusDamage(_p, e, dealt, false, _timing_key);
+    if (bonus_dmg > 0) {
+        var spend = min(bonus_dmg, e.hp);
+        e.hp = max(0, e.hp - spend);
+        dealt += spend;
+    }
+    return { dealt: dealt, defender: e };
+}
+
 // The player's basic attack always lands (D20): damage = base x the grade's multiplier, never 0.
 function Battle_PlayerAttackResolveTimed(_bc, _timing) {
     if (_bc.throw_item > 0) {   // C3 (D84): this bar was started by a throw, not an attack
@@ -1323,28 +1358,14 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
     SFX_PlayClassAttack(player_class_id);
     SFX_Play(Qte_GradeSfxKey(timing_key));
 
-    var w = _bc.player_weapon;
-    if (!is_struct(w) || !variable_struct_exists(w, "power")) {
-        var wid = p.equip.weapon;
-        w = ItemDB_Get(wid);
-        if (w.id == 0) w = { power:COMBAT_UNARMED_POWER, stat_type:STAT_ATK, acc:0, preferred_class:-1 };
-        _bc.player_weapon = w;
-    }
+    var w = Battle_PlayerWeapon(_bc);
 
     _bc.last_hit = true;
     var crit_bonus = Status_GetSum(p, "crit_bonus");
     _bc.last_crit = Combat_CritCheck(p, crit_bonus);
-    var dmg_pack = Combat_ApplyDamage(p, e, Combat_BasicSource(w), (_bc.last_crit ? COMBAT_CRIT_MULT : 1), 1, { is_skill: false, grade_mult: timing.mult });
-    e = dmg_pack.defender;
-    var dealt = max(0, dmg_pack.dmg);
-
-    // FUN-FIRST gear passives add bonus pressure after the grade.
-    var bonus_dmg = Equip_PlayerBonusDamage(p, e, dealt, false, timing_key);
-    if (bonus_dmg > 0) {
-        var spend = min(bonus_dmg, e.hp);
-        e.hp = max(0, e.hp - spend);
-        dealt += spend;
-    }
+    var hit = Battle_PlayerAttackHit(p, e, w, _bc.last_crit, timing.mult, timing_key);
+    e = hit.defender;
+    var dealt = hit.dealt;
 
     _bc.last_dmg = dealt;
     Battle_HitPop(_bc, dealt, timing_key, _bc.last_crit);
@@ -2667,10 +2688,13 @@ function Battle_DrawChips(_chips, _x, _y, _ic, _p, _max_w, _alpha, _align = fa_l
 }
 
 // ---- details (D100): one plain sentence and the exact numbers, generated from the real data ----
-function Battle_SkillDetails(_skill, _cost = -1) {
+// _pv (D135): the skill damage preview against the current enemy (Battle_SkillPreview), or undefined (no enemy, or a skill that deals no damage).
+function Battle_SkillDetails(_skill, _cost = -1, _pv = undefined) {
     var lines = [];
     var sentence = Card_SkillSentence(_skill);
     if (_skill.effect == "damage") {
+        var pv_lines = Battle_PreviewLines(_pv);   // D135: what the hit does now, first (the two numbers share a row of the two-column panel)
+        for (var pli = 0; pli < array_length(pv_lines); pli++) array_push(lines, pv_lines[pli]);
         array_push(lines, { label: Loc_T("card.lbl.power", "Power"), value: string(round(_skill.power)) });
         if (variable_struct_exists(_skill, "hits") && _skill.hits > 1) array_push(lines, { label: Loc_T("battle.det.hits", "Hits"), value: string(round(_skill.hits)) });
     }
@@ -2708,13 +2732,14 @@ function Battle_ItemDetails(_item, _user) {
 }
 
 // ---- the lists (D99): one row per skill / item, as Ui_Menu items ----
-function Battle_SkillRows(_p) {
+// _e (D135): the current enemy; with it a damaging skill's details show the expected damage against it at OK and at Perfect.
+function Battle_SkillRows(_p, _e = undefined) {
     var out = [];
     var ids = is_array(_p.skills) ? _p.skills : [];
     for (var i = 0; i < array_length(ids); i++) {
         var sk = SkillDB_Get(ids[i]);
         var cost = Equip_PlayerSkillMPCost(_p, sk, sk.mp_cost);
-        var det = Battle_SkillDetails(sk, cost);
+        var det = Battle_SkillDetails(sk, cost, is_struct(_e) ? Battle_SkillPreview(_p, _e, ids[i]) : undefined);
         var fr = Icon_SkillFrame(ids[i]);
         array_push(out, {
             label: sk.name, value: Loc_T("battle.menu.mp", "{mp} MP", { mp: string(cost) }), skill_id: ids[i], cost: cost, seq: Qte_SkillSequence(ids[i]),
@@ -2817,7 +2842,7 @@ function Battle_MenusBuild(_bc) {
         owner: _bc, on_confirm: Battle_CmdConfirm,
         layout: { x_anchor: "right", panel_w: round(z.right.w * 0.5), y_bottom: z.list_bottom }
     });
-    _bc.ui_skill = Ui_MenuNew("battle_skill", Battle_SkillRows(_bc.p), {
+    _bc.ui_skill = Ui_MenuNew("battle_skill", Battle_SkillRows(_bc.p, _bc.e), {
         owner: _bc, on_confirm: Battle_SkillConfirm, on_back: Battle_ListBack,
         layout: { x_anchor: "right", panel_w: z.right.w, y_bottom: z.list_bottom, details: true, details_pos: "above", details_cols: 2, rows_max: 3 }
     });
@@ -2825,7 +2850,7 @@ function Battle_MenusBuild(_bc) {
         owner: _bc, on_confirm: Battle_ItemConfirm, on_back: Battle_ListBack,
         layout: { x_anchor: "right", panel_w: z.right.w, y_bottom: z.list_bottom, details: true, details_pos: "above", details_cols: 2, rows_max: 3 }
     });
-    _bc.ui_sig = { mp: _bc.p.mp, items: Battle_ItemSig(_bc.p), rev: Loc_GetRevision(), run: Battle_RunPct(_bc.p, _bc.e, _bc.run_fails) };
+    _bc.ui_sig = { mp: _bc.p.mp, items: Battle_ItemSig(_bc.p), rev: Loc_GetRevision(), run: Battle_RunPct(_bc.p, _bc.e, _bc.run_fails), pv: Battle_SkillPreviewSig(_bc.p, _bc.e) };
 }
 
 // The menus' place follows the window (the zones change with the size): set every frame before a menu is stepped or drawn.
@@ -2850,7 +2875,7 @@ function Battle_ItemSig(_p) {
 function Battle_OpenList(_bc, _state) {
     _bc.battle_state = _state;
     var m = (_state == BSTATE_SKILL_MENU) ? _bc.ui_skill : _bc.ui_item;
-    m.items = (_state == BSTATE_SKILL_MENU) ? Battle_SkillRows(_bc.p) : Battle_ItemRows(_bc.p);
+    m.items = (_state == BSTATE_SKILL_MENU) ? Battle_SkillRows(_bc.p, _bc.e) : Battle_ItemRows(_bc.p);
     m.opened_ms = current_time;
     m.lock_ms = current_time;   // C4: the press that opened the list must not answer it
     m.closed_ms = -1;
@@ -2861,8 +2886,8 @@ function Battle_OpenList(_bc, _state) {
 // One frame of whichever menu is up. Keeps the rows in step with the fight (MP spent, items used, language changed).
 function Battle_MenusStep(_bc) {
     if (!is_struct(_bc.ui_cmd)) Battle_MenusBuild(_bc);
-    var sig = { mp: _bc.p.mp, items: Battle_ItemSig(_bc.p), rev: Loc_GetRevision(), run: Battle_RunPct(_bc.p, _bc.e, _bc.run_fails) };   // the RUN chance moves with SPD and failed tries
-    if (sig.mp != _bc.ui_sig.mp || sig.items != _bc.ui_sig.items || sig.rev != _bc.ui_sig.rev || sig.run != _bc.ui_sig.run) {
+    var sig = { mp: _bc.p.mp, items: Battle_ItemSig(_bc.p), rev: Loc_GetRevision(), run: Battle_RunPct(_bc.p, _bc.e, _bc.run_fails), pv: Battle_SkillPreviewSig(_bc.p, _bc.e) };   // the RUN chance moves with SPD and failed tries; the damage preview with the enemy
+    if (sig.mp != _bc.ui_sig.mp || sig.items != _bc.ui_sig.items || sig.rev != _bc.ui_sig.rev || sig.run != _bc.ui_sig.run || sig.pv != _bc.ui_sig.pv) {
         var c1 = _bc.ui_cmd.cursor, c2 = _bc.ui_skill.cursor, c3 = _bc.ui_item.cursor;
         var t1 = _bc.ui_cmd.opened_ms, t2 = _bc.ui_skill.opened_ms, t3 = _bc.ui_item.opened_ms;
         var l1 = _bc.ui_cmd.lock_ms, l2 = _bc.ui_skill.lock_ms, l3 = _bc.ui_item.lock_ms;   // C4's confirm / back guard must not restart: a press just after a rebuild would be lost
@@ -2910,7 +2935,13 @@ function Battle_DrawMenus(_bc) {
     if (!is_struct(_bc.ui_cmd)) return;
     var now = current_time;
     switch (_bc.battle_state) {
-        case BSTATE_MENU: if (_bc.turn == TURN_PLAYER) Ui_MenuDraw(_bc.ui_cmd, Ui_MenuAlpha(_bc.ui_cmd, now)); break;
+        case BSTATE_MENU:
+            if (_bc.turn == TURN_PLAYER) {
+                var cmd_a = Ui_MenuAlpha(_bc.ui_cmd, now);
+                Ui_MenuDraw(_bc.ui_cmd, cmd_a);
+                if (cmd_a > 0) Battle_DrawAttackPreview(_bc, cmd_a);   // D135: the damage against this enemy, while the cursor is on ATTACK
+            }
+            break;
         case BSTATE_SKILL_MENU: Ui_MenuDraw(_bc.ui_skill, Ui_MenuAlpha(_bc.ui_skill, now)); Battle_DrawListHint(_bc.ui_skill); break;
         case BSTATE_ITEM_MENU: Ui_MenuDraw(_bc.ui_item, Ui_MenuAlpha(_bc.ui_item, now)); Battle_DrawListHint(_bc.ui_item); break;
     }
@@ -3468,14 +3499,16 @@ function Battle_FeelInset(_bc) {
 }
 
 // Once per Step: the feel clock, the death pop's clock, the low-HP heartbeat, and the push-in handed to the display.
-function Battle_FeelStep(_bc, _step_ms) {
+// _step_ms is battle time (2x while run is held, D134); _real_ms (default: the same) is the unscaled step, which the low-HP warning keeps.
+function Battle_FeelStep(_bc, _step_ms, _real_ms = undefined) {
+    if (is_undefined(_real_ms)) _real_ms = _step_ms;
     var frozen = (_bc.hitstop_ms > 0);
     if (!frozen) _bc.feel_ms += _step_ms;
-    Battle_DeathPopAdvance(_bc, _step_ms);   // real time: the pop's own freeze is part of it
+    Battle_DeathPopAdvance(_bc, _step_ms);   // the pop's own freeze is part of it (not stopped by a hit freeze)
 
     var low = !_bc.battle_over && Feel_LowHpActive(_bc.p.hp, _bc.p.max_hp);
     if (low) {
-        if (!frozen) _bc.lowhp_ms += _step_ms;
+        if (!frozen) _bc.lowhp_ms += _real_ms;
         var due = Feel_BeatCount(_bc.lowhp_ms);
         while (_bc.beat_n < due) {
             _bc.beat_n++;
@@ -3629,4 +3662,152 @@ function Battle_DrawFeelEdges(_bc, _unit) {
     var pulse = Feel_PulseAlpha(_bc.lowhp_ms, _bc.lowhp_on);
     if (flash > 0.001) Feel_DrawEdge(Display_GuiW(), Display_GuiH(), _unit, flash);
     if (pulse > 0.001) Feel_DrawEdge(Display_GuiW(), Display_GuiH(), _unit, pulse);
+}
+
+// ============================================================================
+// D134 (battle speed-up) and D135 (damage preview).
+// ============================================================================
+#macro BATTLE_SPEEDUP_MULT 2   // D134: holding run plays the battle's own clocks (never a QTE) at this speed
+
+// True while a QTE is up: the sliding bar (also a throw's), the arrow sequence, the defence bar and the telegraph before it. Reads a battle controller or a struct shaped like one.
+function Battle_QteBusy(_bc) {
+    if (_bc.qte_active || _bc.sq_active || _bc.def_active) return true;
+    var st = _bc.battle_state;
+    return (st == BSTATE_ATTACK_TIMING || st == BSTATE_SKILL_QTE || st == BSTATE_ENEMY_DEFENCE);
+}
+
+// D134: the battle time scale from its two inputs. 2 only while run is held and no QTE is up, 1 otherwise.
+function Battle_TimeScaleOf(_run_held, _qte_busy) {
+    return (_run_held && !_qte_busy) ? BATTLE_SPEEDUP_MULT : 1;
+}
+
+// The one time-scale factor of a battle (the controller Step, the effect animations). Every NON-QTE ms clock of the battle runs on Battle_StepMs / this;
+// the QTE clocks read Qte_StepMs and never see it. _bc defaults to the battle controller (1 when there is none).
+function Battle_TimeScale(_bc = undefined) {
+    if (is_undefined(_bc)) {
+        if (!instance_exists(obj_battle_controller)) return 1;
+        _bc = instance_find(obj_battle_controller, 0);
+    }
+    return Battle_TimeScaleOf(Input_Held("run"), Battle_QteBusy(_bc));
+}
+
+// Milliseconds one frame adds to a battle (non-QTE) clock: the presentation step times the time scale.
+function Battle_StepMs(_delta_us, _bc = undefined) {
+    return Presentation_StepMs(_delta_us) * Battle_TimeScale(_bc);
+}
+
+// D135: the damage of ONE player hit at a grade multiplier, from the same pieces the hit is dealt with (Combat_HitDamage, then the gear passives' bonus
+// pressure, which reads the enemy HP after the hit), changing nothing. A crit is luck and is not shown. _src is { power, stat_type } of the attack or skill.
+function Battle_HitPreview(_p, _e, _src, _is_skill, _grade_mult) {
+    var base = Combat_HitDamage(_p, _e, _src, 1, 1, _grade_mult);
+    if (base <= 0) return 0;
+    var left = max(0, _e.hp - base);
+    var after = { hp: left, max_hp: _e.max_hp, status: _e.status };   // what the bonus passives look at: the enemy once the hit has landed
+    var bonus = Equip_PlayerBonusDamage(_p, after, base, _is_skill, "", true);
+    return base + min(bonus, left);
+}
+
+// { ok, perfect, hits }: the hit at the grade OK and at Perfect (the D61 multipliers), and how many hits it has.
+function Battle_PreviewOf(_p, _e, _src, _is_skill, _hits) {
+    return { ok: Battle_HitPreview(_p, _e, _src, _is_skill, Qte_GradeMult(QTE_OK)), perfect: Battle_HitPreview(_p, _e, _src, _is_skill, Qte_GradeMult(QTE_PERFECT)), hits: _hits };
+}
+
+// The basic attack with this weapon (an ItemDB weapon entry or the bare-hands struct, as Battle_PlayerWeapon gives).
+function Battle_AttackPreview(_p, _e, _weapon) {
+    return Battle_PreviewOf(_p, _e, Combat_BasicSource(_weapon), false, 1);
+}
+
+// A damaging skill; undefined for a skill that deals no damage (a buff, a status-only skill, a steal) and for one aimed at yourself.
+function Battle_SkillPreview(_p, _e, _skill_id) {
+    var s = SkillDB_Get(_skill_id);
+    if (!is_struct(s) || s.id == -1 || s.effect != "damage") return undefined;
+    if (variable_struct_exists(s, "target") && s.target == TGT_SELF) return undefined;
+    var hits = variable_struct_exists(s, "hits") ? max(1, round(real(s.hits))) : 1;
+    return Battle_PreviewOf(_p, _e, Skill_DamageSource(_p, s), true, hits);
+}
+
+// "7" for one hit, "7 x2" for a skill that hits twice (per-hit damage x hits).
+function Battle_PreviewValue(_n, _hits) {
+    return (_hits > 1) ? Loc_T("battle.preview.hits", "{n} x{hits}", { n: string(_n), hits: string(_hits) }) : string(_n);
+}
+
+// The two number lines a skill details panel gets (D100: the same numbers the hit deals). [] without a preview.
+function Battle_PreviewLines(_pv) {
+    if (!is_struct(_pv)) return [];
+    return [
+        { label: Loc_T("battle.det.damage", "Damage"), value: Battle_PreviewValue(_pv.ok, _pv.hits) },
+        { label: Loc_T("battle.det.perfect", "Perfect"), value: Battle_PreviewValue(_pv.perfect, _pv.hits) }
+    ];
+}
+
+// The line pair of the small plate beside the command menu while the cursor is on ATTACK: "Damage 4" over "Perfect 5".
+function Battle_PreviewPlateLines(_pv) {
+    return [
+        Loc_T("battle.preview.damage", "Damage {n}", { n: Battle_PreviewValue(_pv.ok, _pv.hits) }),
+        Loc_T("battle.preview.perfect", "Perfect {n}", { n: Battle_PreviewValue(_pv.perfect, _pv.hits) })
+    ];
+}
+
+// A signature of every skill preview: the skill rows are rebuilt when it changes (the enemy broke, was hurt, took a status...).
+function Battle_SkillPreviewSig(_p, _e) {
+    var sig = "";
+    var ids = is_array(_p.skills) ? _p.skills : [];
+    for (var i = 0; i < array_length(ids); i++) {
+        var pv = Battle_SkillPreview(_p, _e, ids[i]);
+        sig += is_struct(pv) ? (string(pv.ok) + "/" + string(pv.perfect) + "/" + string(pv.hits)) : "-";
+        sig += ",";
+    }
+    return sig;
+}
+
+// Where the plate sits: left of the command menu (_cmd = its rect), top aligned with it, clear of the player panel (_player = its zone rect). Pure.
+function BattleHud_PreviewRect(_cmd, _player, _m, _p, _lh, _text_w) {
+    var avail = _cmd.x - _m - (_player.x + _player.w + _m);
+    var w = min(_text_w + 12 * _p, max(avail, 12 * _p));
+    var h = 2 * _lh + 9 * _p;
+    return { x: _cmd.x - _m - w, y: _cmd.y, w: w, h: h };
+}
+
+// The "x2" marker of D134: a small plate in the top right corner, clear of the turn strip in the middle. Pure.
+function BattleHud_SpeedRect(_gw, _gh, _p, _lh, _text_w) {
+    var m = 3 * _p;
+    var w = _text_w + 12 * _p;
+    return { x: _gw - m - w, y: m, w: w, h: _lh + 8 * _p };
+}
+
+// D135: with the cursor on ATTACK in the command menu, a plate beside it shows the damage against the current enemy at OK and at Perfect.
+// Remembers what it drew for the tests and the shots (hud.rects.preview, hud.preview_text); both stay empty on any other row.
+function Battle_DrawAttackPreview(_bc, _alpha) {
+    _bc.hud.rects.preview = undefined;
+    _bc.hud.preview_text = [];
+    var m = _bc.ui_cmd;
+    if (array_length(m.items) <= 0 || m.items[m.cursor].id != "attack" || m.rect.w <= 0) return;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var z = Battle_Zones();
+    var lines = Battle_PreviewPlateLines(Battle_AttackPreview(_bc.p, _bc.e, Battle_PlayerWeapon(_bc)));
+    var tw = max(UI_TextWidth(lines[0]), UI_TextWidth(lines[1]));
+    var r = BattleHud_PreviewRect(m.rect, z.player, z.m, p, mt.line_h, tw);
+    var fit_w = r.w - 12 * p;
+    lines = [Ui_FitText(lines[0], fit_w), Ui_FitText(lines[1], fit_w)];
+    Ui_DrawFrame(r.x, r.y, r.w, r.h, _alpha, p);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    Ui_Text(r.x + 6 * p, r.y + 4 * p, lines[0], UI_C_LIGHTEST);
+    Ui_Text(r.x + 6 * p, r.y + 5 * p + mt.line_h, lines[1], UI_C_LIGHT);
+    draw_set_alpha(a0);
+    _bc.hud.rects.preview = r;
+    _bc.hud.preview_text = lines;
+}
+
+// D134: "x2" in the top right corner while the battle runs at double speed.
+function Battle_DrawSpeedMark(_bc) {
+    _bc.hud.rects.speed = undefined;
+    if (Battle_TimeScale(_bc) <= 1) return;
+    var mt = Ui_Metrics();
+    var txt = Loc_T("battle.speed.mark", "x2");
+    var r = BattleHud_SpeedRect(mt.gw, mt.gh, mt.p, mt.line_h, UI_TextWidth(txt));
+    Ui_DrawFrame(r.x, r.y, r.w, r.h, 1, mt.p);
+    Ui_Text(r.x + r.w * 0.5, r.y + 4 * mt.p, txt, UI_C_LIGHTEST, fa_center);
+    _bc.hud.rects.speed = r;
 }

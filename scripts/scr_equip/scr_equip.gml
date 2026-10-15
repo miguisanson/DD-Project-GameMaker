@@ -287,11 +287,11 @@ function Equip_ModifyTimedAttackResult(_ch, _timing) {
     return Qte_Result(key);
 }
 
-function Equip_PlayerBonusDamage(_attacker, _defender, _base_damage, _is_skill = false, _timing_key = "") {
+// _preview (D135): the damage preview asks the same question without changing anything (no first-hit mark, no Sunder status on the defender).
+function Equip_PlayerBonusDamage(_attacker, _defender, _base_damage, _is_skill = false, _timing_key = "", _preview = false) {
     var base = max(0, round(real(_base_damage)));
     if (base <= 0) return 0;
 
-    var rt = Equip_PassiveRuntimeEnsure(_attacker);
     var def_ratio = 1;
     if (is_struct(_defender) && variable_struct_exists(_defender, "max_hp") && _defender.max_hp > 0 && variable_struct_exists(_defender, "hp")) {
         def_ratio = clamp(_defender.hp / _defender.max_hp, 0, 1);
@@ -299,7 +299,8 @@ function Equip_PlayerBonusDamage(_attacker, _defender, _base_damage, _is_skill =
 
     var mult = 1;
 
-    if (Equip_HasPassive(_attacker, "sunder_edge")) {
+    if (!_preview && Equip_HasPassive(_attacker, "sunder_edge")) {
+        var rt = Equip_PassiveRuntimeEnsure(_attacker);
         if (!rt.first_hit_done) {
             var def_down = max(0, round(Equip_GetPassiveParam(_attacker, "sunder_edge", "first_hit_def_down", 1)));
             var turns = max(1, round(Equip_GetPassiveParam(_attacker, "sunder_edge", "turns", 2)));
