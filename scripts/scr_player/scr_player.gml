@@ -784,8 +784,19 @@ function UI_GetSpriteScale(_base = 1) {
 // The scale text is DRAWN at. English: the integer rule above. Korean (D98): Galmuri is added at its final window-pixel size
 // (a whole multiple of its native 9 or 11 px, UI_KoFont), so it is drawn at 1 texel = 1 window pixel = 1 / ui_scale GUI units.
 function UI_GetFontScale() {
+    return UI_FontScaleBuild();
+}
+
+// The uncached computation of UI_GetFontScale. Counted (UI_FontScaleBuilds) so a check can see how often it runs.
+function UI_FontScaleBuild() {
+    if (!variable_global_exists("ui_fs_builds")) global.ui_fs_builds = 0;
+    global.ui_fs_builds++;
     if (Loc_GetLanguage() == "ko" && UI_KoFont() != -1) return 1 / Display_Layout().ui_scale;
     return UI_GetTextScale();
+}
+
+function UI_FontScaleBuilds() {
+    return variable_global_exists("ui_fs_builds") ? global.ui_fs_builds : 0;
 }
 
 function UI_TextWidth(_txt) {

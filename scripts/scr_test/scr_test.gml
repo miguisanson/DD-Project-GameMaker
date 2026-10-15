@@ -105,6 +105,7 @@ function Test_RunAll() {
     Test_RunSuite("Mem", Test_Suite_Mem);
     Test_RunSuite("Input", Test_Suite_Input);
     Test_RunSuite("UI", Test_Suite_UI);
+    Test_RunSuite("MetricsCache", Test_Suite_MetricsCache);
     Test_RunSuite("SfxInit", Test_Suite_SfxInit);
     Test_RunSuite("Audio", Test_Suite_Audio);
     if (Test_HasFlag("-testcontrol")) {
@@ -3779,6 +3780,111 @@ function Test_UiFireTimes(_dir, _ms_total) {
         if (Ui_RepeatStep(_r, _dir, false, _t0 + _ms) > 0) array_push(_times, _ms);
     }
     return _times;
+}
+
+// D108 F1b: the font scale and Ui_Metrics are built once per (layout, language) and the same struct comes back until one of them changes.
+function Test_MetricsSame(_name, _a, _b) {
+    var _ok = true;
+    var _keys = ["p", "line_h", "row_h", "pad", "margin", "gw", "gh"];
+    for (var _i = 0; _i < array_length(_keys); _i++) {
+        if (variable_struct_get(_a, _keys[_i]) != variable_struct_get(_b, _keys[_i])) _ok = false;
+    }
+    Test_True(_name, _ok);
+}
+
+function Test_Suite_MetricsCache() {
+    var _lang0 = Loc_GetLanguage();
+    var _disp0 = variable_global_exists("display") ? global.display : undefined;
+    var _own = !(is_struct(_disp0) && is_struct(_disp0.layout));
+    var _layout0 = _own ? Display_CalcLayout(480, 432) : _disp0.layout;
+    if (_own) global.display = { layout: _layout0, apply_count: 0 };
+    var _d = global.display;
+    var _f0 = draw_get_font();
+
+    // en, nothing changing: 300 calls build nothing more and return the very same struct; the font is still set each time.
+    Loc_SetLanguage("en");
+    var _mt_en = Ui_Metrics();
+    UI_GetFontScale();
+    var _b0 = Ui_MetricsBuilds();
+    var _s0 = UI_FontScaleBuilds();
+    var _same = true;
+    var _font_ok = true;
+    for (var _i = 0; _i < 300; _i++) {
+        draw_set_font(-1);
+        var _m = Ui_Metrics();
+        if (_m != _mt_en) _same = false;
+        if (draw_get_font() != UI_FONT) _font_ok = false;
+        UI_GetFontScale();
+    }
+    Test_Eq("F1b 300 Ui_Metrics calls build nothing more", Ui_MetricsBuilds() - _b0, 0);
+    Test_Eq("F1b 300 UI_GetFontScale calls build nothing more", UI_FontScaleBuilds() - _s0, 0);
+    Test_True("F1b Ui_Metrics returns the same struct while nothing changes", _same);
+    Test_True("F1b Ui_Metrics still sets the UI font on a cached call", _font_ok);
+    var _fs_en = UI_GetFontScale();
+    var _ref = Ui_MetricsBuild();
+    Test_Eq("F1b en font scale equals the uncached one", _fs_en, UI_FontScaleBuild());
+    Test_MetricsSame("F1b en metrics equal the uncached ones", _mt_en, _ref);
+
+    // en -> ko: one rebuild of each, then cached again.
+    _b0 = Ui_MetricsBuilds();
+    _s0 = UI_FontScaleBuilds();
+    Loc_SetLanguage("ko");
+    var _mt_ko = Ui_Metrics();
+    for (var _i2 = 0; _i2 < 300; _i2++) { Ui_Metrics(); UI_GetFontScale(); }
+    Test_Eq("F1b en to ko rebuilds the metrics exactly once", Ui_MetricsBuilds() - _b0, 1);
+    Test_Eq("F1b en to ko rebuilds the font scale exactly once", UI_FontScaleBuilds() - _s0, 1);
+    Test_True("F1b the ko metrics are a new struct", _mt_ko != _mt_en);
+    Test_True("F1b ko returns the same struct on repeat", Ui_Metrics() == _mt_ko);
+    var _fs_ko = UI_GetFontScale();
+    _ref = Ui_MetricsBuild();
+    Test_Eq("F1b ko font scale equals the uncached one", _fs_ko, UI_FontScaleBuild());
+    Test_MetricsSame("F1b ko metrics equal the uncached ones", _mt_ko, _ref);
+    draw_set_font(-1);
+    Ui_Metrics();
+    Test_Eq("F1b ko cached call sets the font the uncached call sets", draw_get_font(), (UI_KoFont() != -1) ? UI_KoFont() : UI_FONT);
+
+    // ko -> en: back to the English values.
+    _b0 = Ui_MetricsBuilds();
+    _s0 = UI_FontScaleBuilds();
+    Loc_SetLanguage("en");
+    var _mt_en2 = Ui_Metrics();
+    for (var _i3 = 0; _i3 < 300; _i3++) { Ui_Metrics(); UI_GetFontScale(); }
+    Test_Eq("F1b ko to en rebuilds the metrics exactly once", Ui_MetricsBuilds() - _b0, 1);
+    Test_Eq("F1b ko to en rebuilds the font scale exactly once", UI_FontScaleBuilds() - _s0, 1);
+    Test_MetricsSame("F1b back in en the metrics equal the first en ones", _mt_en2, _mt_en);
+    Test_Eq("F1b back in en the font scale equals the first en one", UI_GetFontScale(), _fs_en);
+
+    // A relayout (a new layout struct, as Display_Relayout makes) rebuilds once; restoring the old layout rebuilds once more.
+    _b0 = Ui_MetricsBuilds();
+    _s0 = UI_FontScaleBuilds();
+    _d.layout = Display_CalcLayout(1280, 720);
+    var _mt_big = Ui_Metrics();
+    for (var _i4 = 0; _i4 < 300; _i4++) { Ui_Metrics(); UI_GetFontScale(); }
+    Test_Eq("F1b a relayout rebuilds the metrics exactly once", Ui_MetricsBuilds() - _b0, 1);
+    Test_Eq("F1b a relayout rebuilds the font scale exactly once", UI_FontScaleBuilds() - _s0, 1);
+    Test_True("F1b the new layout's metrics are a new struct", _mt_big != _mt_en2);
+    Test_Eq("F1b the new layout's gui width is in the metrics", _mt_big.gw, Display_GuiW());
+    _ref = Ui_MetricsBuild();
+    Test_MetricsSame("F1b relayout metrics equal the uncached ones", _mt_big, _ref);
+    Test_Eq("F1b relayout font scale equals the uncached one", UI_GetFontScale(), UI_FontScaleBuild());
+    _b0 = Ui_MetricsBuilds();
+    _d.layout = _layout0;
+    var _mt_back = Ui_Metrics();
+    Ui_Metrics();
+    Test_Eq("F1b restoring the layout rebuilds the metrics exactly once", Ui_MetricsBuilds() - _b0, 1);
+    Test_MetricsSame("F1b the restored layout's metrics equal the first ones", _mt_back, _mt_en);
+
+    // [PERF] 1000 x Ui_Metrics + 1000 x UI_TextWidth (no assertion: the time depends on the PC)
+    var _t0 = get_timer();
+    for (var _i5 = 0; _i5 < 1000; _i5++) Ui_Metrics();
+    var _t1 = get_timer();
+    for (var _i6 = 0; _i6 < 1000; _i6++) UI_TextWidth("Wooden Sword");
+    var _t2 = get_timer();
+    Test_Log("[PERF] 1000 x Ui_Metrics: " + string(_t1 - _t0) + " us, 1000 x UI_TextWidth: " + string(_t2 - _t1) + " us");
+
+    draw_set_font(_f0);
+    if (_own) global.display = _disp0;
+    Loc_SetLanguage(_lang0);
 }
 
 function Test_Suite_UI() {

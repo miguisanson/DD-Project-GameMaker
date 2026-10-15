@@ -3054,10 +3054,21 @@ function Ui_Px() {
 }
 
 function Ui_Metrics() {
+    return Ui_MetricsBuild();
+}
+
+// The uncached computation of Ui_Metrics (sets the UI font). Counted (Ui_MetricsBuilds) so a check can see how often it runs.
+function Ui_MetricsBuild() {
+    if (!variable_global_exists("ui_mt_builds")) global.ui_mt_builds = 0;
+    global.ui_mt_builds++;
     UI_SetFont();
     var p = Ui_Px();
     var lh = UI_TextHeight("A");
     return { p: p, line_h: lh, row_h: lh + 2 * p, pad: 2 * p, margin: 3 * p, gw: Display_GuiW(), gh: Display_GuiH() };
+}
+
+function Ui_MetricsBuilds() {
+    return variable_global_exists("ui_mt_builds") ? global.ui_mt_builds : 0;
 }
 
 // Filled box, _x2/_y2 exclusive.
