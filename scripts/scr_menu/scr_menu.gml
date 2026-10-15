@@ -399,6 +399,12 @@ function Codex_NoteCount(_prof) {
     return array_length(Note_Collected(_prof));
 }
 
+// The Notes page title: how many of the notes are found.
+function Codex_NotesTitle(_prof) {
+    return Loc_T("tab.codex.notes_title", "Notes found {n}/{max}", { n: string(Codex_NoteCount(_prof)), max: string(array_length(Note_Defs())) });
+}
+
+// D147: a found note is a row with its title; Confirm opens the reader (note_id). One not found is ??? and opens nothing.
 function Codex_NoteRows(_prof) {
     var rows = [];
     var defs = Note_Defs();
@@ -407,7 +413,7 @@ function Codex_NoteRows(_prof) {
         if (Note_IsCollected(_prof, d.id)) {
             var txt = "";
             for (var j = 0; j < array_length(d.lines); j++) txt += ((j > 0) ? "\n" : "") + d.lines[j];
-            array_push(rows, { id: "note_" + d.id, label: d.title, value: "", kind: "button", enabled: true, help: txt, hint: "",
+            array_push(rows, { id: "note_" + d.id, note_id: d.id, label: d.title, value: "", kind: "button", enabled: true, help: txt, hint: Loc_T("tab.hint.read", "{confirm} Read"),
                                lines: [{ label: Loc_T("tab.lbl.floor", "Floor"), value: string(Run_FloorOfRoomName(d.room)) }] });
         } else {
             array_push(rows, { id: "note_" + d.id, label: "???", value: "", kind: "button", enabled: true, help: Loc_T("tab.notes.unknown", "A note you have not found yet. Look at the walls."), lines: [], hint: "" });
@@ -494,7 +500,8 @@ function TabMenu_Get() {
 // Where everything stands on the GUI grid: tabs header on top, the body (list left, details right), a footer line for prompts and gold.
 function TabMenu_ListShare(_tid) {
     switch (_tid) {
-        case "codex_bestiary": case "codex_notes": return 0.4;   // the page on the right has the long text and the numbers
+        case "codex_bestiary": return 0.4;   // the page on the right has the long text and the numbers
+        case "codex_notes": return 0.5;      // D147: room for the note titles and "Notes found 2/8" (the details text of a note must still fit at 800 x 720 too)
         case "codex_history": return 0.58;
         case "gear": case "items": case "skills": return 0.55;   // long names with icons
         case "settings": return 0.6;                              // a name and a value on every row
@@ -820,7 +827,7 @@ function TabCodex_Open(_kind) {
             break;
         case "notes":
             rows = Codex_NoteRows(prof);
-            title = Loc_T("tab.codex.notes_title", "Notes {n}/{max}", { n: string(Codex_NoteCount(prof)), max: string(array_length(rows)) });
+            title = Codex_NotesTitle(prof);
             break;
         case "history":
             rows = Codex_HistoryRows(prof);
@@ -836,8 +843,119 @@ function TabCodex_Open(_kind) {
         data: { tab: "codex_page" },
         layout: { title: title, anchor: "center", details: true, details_pos: "right", details_cols: cols, det_art: true, hides_below: true }
     });
+    if (_kind == "notes") m.on_confirm = TabNote_OnConfirm;
     Ui_MenuFixCursor(m, m.cursor);
     Ui_StackPush(pg.stk, m);
+}
+
+// ---- the note reader (D147) ----
+// A found note opened from the Notes page: its whole text on one panel over the page, title on top. A long text scrolls with Up / Down (or the wheel);
+// Back goes up one level. The text is wrapped at draw time to the panel's width and only the lines that fit are drawn, so nothing needs clipping.
+function NoteReader_Text(_def) {
+    var txt = "";
+    for (var j = 0; j < array_length(_def.lines); j++) txt += ((j > 0) ? "\n\n" : "") + _def.lines[j];   // a gap between the note's lines
+    return txt;
+}
+
+function NoteReader_Lines(_text, _w) {
+    return Dialogue_WrapToLines(_text, _w);
+}
+
+// How far a text of _n lines scrolls in a window of _vis lines.
+function NoteReader_MaxScroll(_n, _vis) {
+    return max(0, _n - _vis);
+}
+
+// The first shown line after moving _dir (+1 down, -1 up) from _cur; it stays between the first line and the last full window.
+function NoteReader_Scroll(_cur, _dir, _n, _vis) {
+    return clamp(_cur + _dir, 0, NoteReader_MaxScroll(_n, _vis));
+}
+
+function NoteReader_New(_def) {
+    return Ui_MenuNew("codex_note_read", [], {
+        data: { tab: "codex_page", reader: true, note_id: _def.id, text: NoteReader_Text(_def), scroll: 0, wrapped: [], wrap_w: -1, visible: 8 },
+        layout: { title: _def.title, anchor: "center", hides_below: true }
+    });
+}
+
+function TabNote_OpenReader(_def) {
+    var u = TabMenu_Get();
+    if (!is_struct(u) || !is_struct(_def)) return;
+    Ui_StackPush(u.pages[u.tab].stk, NoteReader_New(_def));
+}
+
+function TabNote_OnConfirm(_m, _i) {
+    var it = _m.items[_i];
+    if (!variable_struct_exists(it, "note_id")) return;   // a ??? row
+    var d = Note_Find(it.note_id);
+    if (is_struct(d) && Note_IsCollected(Profile_Get(), d.id)) TabNote_OpenReader(d);
+}
+
+function TabNote_IsReader(_m) {
+    return is_struct(_m) && is_struct(_m.data) && variable_struct_exists(_m.data, "reader") && _m.data.reader;
+}
+
+// Up / Down (held keys repeat) and the wheel move the text; called after the menu's own step.
+function TabNote_ReaderInput(_m) {
+    if (!TabNote_IsReader(_m) || !variable_global_exists("ui_snap")) return;
+    var sn = global.ui_snap;
+    var dv = (sn.down ? 1 : 0) - (sn.up ? 1 : 0);
+    var step = 0;
+    if (Ui_RepeatStep(_m.rep_v, dv, sn.up_p || sn.down_p, current_time) > 0) step = dv;
+    if (sn.wheel != 0) step = -sn.wheel;   // wheel up = towards the top
+    if (step == 0) return;
+    var to = NoteReader_Scroll(_m.data.scroll, step, array_length(_m.data.wrapped), _m.data.visible);
+    if (to != _m.data.scroll) {
+        _m.data.scroll = to;
+        SFX_PlayUI("ui_move");
+    }
+}
+
+// The reader panel: fills the Tab menu's body (the list's top edge and height from TabMenu_FitMenu), title, a rule, the text, a scroll bar when it is long.
+function TabNote_ReaderDraw(_m, _alpha) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var L = _m.layout;
+    var rx = mt.margin;
+    var rw = mt.gw - 2 * mt.margin;
+    var slide = p * round((1 - _alpha) * 3);
+    var ry = ((L.y_top >= 0) ? L.y_top : mt.margin) - slide;
+    var rh = (L.max_h > 0) ? L.max_h : (mt.gh - 2 * mt.margin);
+    _m.rect = { x: rx, y: ry, w: rw, h: rh };
+    _m.det_rect = { x: 0, y: 0, w: 0, h: 0 };
+    Ui_DrawFrame(rx, ry, rw, rh, _alpha, p);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    var x0 = rx + 4 * p;
+    var x1 = rx + rw - 4 * p - 3 * p;   // the right 3p keep the scroll bar
+    var ty = ry + 4 * p;
+    Ui_Text(x0, ty, Ui_FitText(L.title, x1 - x0), UI_C_LIGHTEST);
+    Ui_Box(rx + 3 * p, ty + mt.line_h + p, rx + rw - 3 * p, ty + mt.line_h + 2 * p, UI_C_DARK);
+    ty += mt.line_h + 3 * p;
+    var pitch = mt.line_h + p;
+    var bottom = ry + rh - 4 * p;
+    var vis = max(1, floor((bottom - ty) / pitch));
+    var d = _m.data;
+    if (d.wrap_w != x1 - x0 || d.visible != vis) {
+        d.wrap_w = x1 - x0;
+        d.wrapped = NoteReader_Lines(d.text, d.wrap_w);
+        d.visible = vis;
+    }
+    var n = array_length(d.wrapped);
+    d.scroll = clamp(d.scroll, 0, NoteReader_MaxScroll(n, vis));
+    for (var i = d.scroll; i < min(n, d.scroll + vis); i++) {
+        Ui_Text(x0, ty + (i - d.scroll) * pitch, d.wrapped[i], UI_C_LIGHTEST);
+    }
+    if (n > vis) {   // the bar: a dark track the height of the text window and a light thumb as long as the share that is shown
+        var bx = rx + rw - 4 * p - p;
+        var track_h = vis * pitch - p;
+        Ui_Box(bx, ty, bx + p, ty + track_h, UI_C_DARK);
+        var thumb_h = max(2 * p, round(track_h * vis / n / p) * p);
+        var max_s = NoteReader_MaxScroll(n, vis);
+        var thumb_y = ty + round((track_h - thumb_h) * d.scroll / max_s / p) * p;
+        Ui_Box(bx, thumb_y, bx + p, thumb_y + thumb_h, UI_C_LIGHT);
+    }
+    draw_set_alpha(a0);
 }
 
 function TabMenu_OnConfirm(_m, _i) {
@@ -912,7 +1030,9 @@ function Menu_HandleInput() {
         return;
     }
     var pg = u.pages[u.tab];
-    Ui_MenuUpdate(Ui_StackTop(pg.stk), pg.stk);
+    var top = Ui_StackTop(pg.stk);
+    var ev = Ui_MenuUpdate(top, pg.stk);
+    if (TabNote_IsReader(top) && !ev.back) TabNote_ReaderInput(top);
 }
 
 // The prompts for the footer: what Confirm does on the row under the cursor, then what Back does.
@@ -926,6 +1046,7 @@ function TabMenu_Hint() {
         else if (variable_struct_exists(it, "kind") && (it.kind == "choice" || it.kind == "slider")) txt = Loc_T("tab.hint.change", "{left}{right} Change");
         else if (TabMenu_Ids()[TabMenu_Get().tab] == "settings") txt = Loc_T("tab.hint.select", "{confirm} Select");
     }
+    if (TabNote_IsReader(m) && NoteReader_MaxScroll(array_length(m.data.wrapped), m.data.visible) > 0) txt = Loc_T("tab.hint.scroll", "{up}{down} Scroll");
     if (txt != "") txt += "    ";
     return txt + ((TabMenu_Depth() > 1) ? Loc_T("tab.hint.back", "{back} Back") : Loc_T("tab.hint.close", "{back} Close"));
 }
@@ -4193,6 +4314,7 @@ function Ui_MenuMeasure(_m, _mt) {
 // Stores each row's rectangle in m.rects for the mouse. Needs UI_SetFont-compatible state; sets and restores the draw state.
 function Ui_MenuDraw(_m, _alpha = 1) {
     if (_alpha <= 0) return;
+    if (TabNote_IsReader(_m)) { TabNote_ReaderDraw(_m, _alpha); return; }   // D147: the note reader is a text panel, not a list
     var mt = Ui_Metrics();
     var p = mt.p;
     var L = _m.layout;

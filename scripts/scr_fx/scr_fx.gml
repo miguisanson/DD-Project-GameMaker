@@ -743,7 +743,7 @@ function Feel_RiseAlpha(_t_ms) {
 
 // What a loot entry (or "card") rises as: "item" (an { item_id }), "gold" (a { gold }), "card" (the string "card"), "" for anything else.
 function MapFx_RiseKind(_what) {
-    if (is_string(_what)) return (_what == "card") ? "card" : "";
+    if (is_string(_what)) return (_what == "card" || _what == "note") ? _what : "";
     if (!is_struct(_what)) return "";
     if (variable_struct_exists(_what, "gold")) return "gold";
     if (variable_struct_exists(_what, "item_id")) return "item";
@@ -892,6 +892,11 @@ function MapFx_Opened(_cx, _top, _loot, _card, _now = MapFx_Now()) {
     }
 }
 
+// A lore note was picked up (D147): a small page rises off its tile, centred on (_cx, _cy), with the same chime as a rising item.
+function MapFx_NoteFound(_cx, _cy, _now = MapFx_Now()) {
+    array_push(MapFx_List(), { kind: "rise", start: _now, room: room, x: _cx, y: _cy, what: "note", chime: false });
+}
+
 // A level-up: a ring of sparkles round the player (the player's place is read when it is drawn, so the ring follows him).
 function MapFx_Sparkle(_now = MapFx_Now()) {
     array_push(MapFx_List(), { kind: "sparkle", start: _now, room: room, ring: Feel_SparkleRing(), chime: false });
@@ -968,6 +973,9 @@ function MapFx_DrawWhat(_what, _x, _y, _alpha) {
             break;
         case "card":
             Feel_DrawCardGlyph(_x, _y, _alpha);
+            break;
+        case "note":
+            Note_DrawGlyph(_x, _y, _alpha);
             break;
     }
 }

@@ -194,6 +194,7 @@ if (moving) {
 if (!moving) {
     sprite_index = sprite[face];
     image_index = 0;
+    Notes_StepPlayer(id);   // D147: standing on a lore note picks it up (it never blocks)
 
     // D70: what the player faces, for the prompt (only when standing still and free)
     var facing_target = Interact_GetTarget(id);

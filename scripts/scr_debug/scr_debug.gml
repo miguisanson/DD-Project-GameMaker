@@ -544,7 +544,11 @@ function Scenario_StepSmoke(_s) {
             break;
         case 710: case 711: case 712: case 713: case 714: case 715: case 716: case 717: case 718: case 719:
         case 720: case 721: case 722: case 723: case 724: case 725: case 726: case 727: case 728: case 729:
-            Scenario_StepSmokeH14(_s);   // H14 (D157, D159): behind a pillar inside the radius is not seen, one step into the cone is; the lights; the pass under 1 ms; no dotted outline; its last step calls Scenario_NoticeEnd
+            Scenario_StepSmokeH14(_s);   // H14 (D157, D159): behind a pillar inside the radius is not seen, one step into the cone is; the lights; the pass under 1 ms; no dotted outline; goes on with H7 (680)
+            break;
+        case 680: case 681: case 682: case 683: case 684: case 685: case 686: case 687: case 688: case 689:
+        case 690: case 691: case 692: case 693: case 694: case 695: case 696: case 697: case 698: case 699:
+            Scenario_StepSmokeNotes(_s);   // H7 (D147): lore notes are picked up by walking onto them, never block, stay gone; the Codex Notes page and its reader; its last step calls Scenario_NoticeEnd
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -2943,7 +2947,10 @@ function Scenario_StepShots(_s) {
             break;
         case 730: case 731: case 732: case 733: case 734: case 735: case 736: case 737: case 738: case 739:
         case 740: case 741: case 742: case 743: case 744: case 745: case 746: case 747: case 748: case 749:
-            Scenario_StepShotsH14(_s);   // H14 (D157, D159): five scenes at two sizes (forest, cave, torches, shadow behind cover, hidden pocket); finishes the run
+            Scenario_StepShotsH14(_s);   // H14 (D157, D159): five scenes at two sizes (forest, cave, torches, shadow behind cover, hidden pocket); goes on with H7 (700)
+            break;
+        case 700: case 701: case 702: case 703: case 704: case 705: case 706: case 707: case 708: case 709:
+            Scenario_StepShotsNotes(_s);   // H7 (D147): the Codex Notes page, a note in the reader, a long text in the reader; two sizes; finishes the run
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -4927,22 +4934,10 @@ function Scenario_StepSmokeRun(_s) {
 // ---- C5 story through the real flows (D102-D107). Runs after the C1 run loop, inside the same profile (the gate's scratch folder). ----
 // Death scene (one line, 2-4 s, hold to skip) -> summary; the wake line on run 2; the 8 notes (4 always, 2 / 1 / 1 after 3 / 6 / 10 deaths): each
 // stands on a free tile you can walk up to, reading one records it; the boss name banner replaces the camera pan on a later run; a killer-specific line.
-function Scenario_FindNote(_id) {
-    var _n = instance_number(obj_interactable);
-    for (var _i = 0; _i < _n; _i++) {
-        var _o = instance_find(obj_interactable, _i);
-        if (variable_instance_exists(_o, "note_id") && _o.note_id == _id) return _o;
-    }
-    return noone;
-}
-
-function Scenario_NoteCount() {
-    var _c = 0;
-    var _n = instance_number(obj_interactable);
-    for (var _i = 0; _i < _n; _i++) {
-        if (variable_instance_exists(instance_find(obj_interactable, _i), "note_id")) _c++;
-    }
-    return _c;
+// H7 (D147): notes are entries of Notes_Live (not instances any more): this forgets every find, as in a profile that never found one.
+function Scenario_ForgetNotes() {
+    var _defs = Note_Defs();
+    for (var _i = 0; _i < array_length(_defs); _i++) variable_struct_remove(Profile_Get().unlocks, Note_UnlockKey(_defs[_i].id));
 }
 
 // The tiles reachable on foot from the player's tile (the game's own wall / interactable rule, four-way steps): { reach (a bool per tile), gw }.
@@ -4992,9 +4987,9 @@ function Scenario_ReachNear(_g, _x, _y, _self_too = false) {
     return false;
 }
 
-// True when a tile next to the note can be reached on foot from the player's tile.
+// True when the note's own tile can be reached on foot from the player's tile (a note is walked onto, D147).
 function Scenario_NoteReachable(_pl, _nt) {
-    return Scenario_ReachNear(Scenario_ReachGrid(_pl), _nt.x, _nt.y);
+    return Scenario_ReachNear(Scenario_ReachGrid(_pl), _nt.tx * GRID_TILE_SIZE, _nt.ty * GRID_TILE_SIZE, true);
 }
 
 // True when every door of the room (obj_room_transition) can still be reached on foot from the player's tile: a note must never close a corridor.
@@ -5053,12 +5048,12 @@ function Scenario_StepSmokeStory(_s) {
             if (_s.t == 1) {
                 _gs.in_main_menu = false;
                 Profile_Get().deaths = 2;
+                Scenario_ForgetNotes();   // H7: a note found in an earlier step of this chain would not stand on the map
                 Run_StartNew(false, 3333);
             }
             if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && _s.t > 30) {
-                Scenario_Check("note_floor1_has_one_note_from_the_start", Scenario_NoteCount() == 1, "notes=" + string(Scenario_NoteCount()));
-                var _nt = Scenario_FindNote("map_page");
-                Scenario_Check("note_map_page_stands_at_its_tile", instance_exists(_nt) && _nt.x == 16 && _nt.y == 96);
+                Scenario_Check("note_floor1_has_one_note_from_the_start", Notes_LiveCount("rm_floor1") == 1, "notes=" + string(Notes_LiveCount("rm_floor1")));
+                Scenario_Check("note_map_page_stands_at_its_tile", Notes_LiveAtTile("rm_floor1", 1, 6) == "map_page");
                 Scenario_Check("note_is_not_collected_yet", !Note_IsCollected(Profile_Get(), "map_page"));
                 Scenario_ClearUi();
                 var _plr = Scenario_PlacePlayer(2, 6);   // right of the note
@@ -5067,11 +5062,11 @@ function Scenario_StepSmokeStory(_s) {
             }
             if (_s.t > 600) { Scenario_Check("note_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
-        case 114:   // read it through the real interact key
-            if (_s.t == 10) Scenario_Tap("interact");
-            if (_s.t == 30) {
-                var _nd = Note_Find("map_page");
-                Scenario_Check("note_interact_opens_the_note", _gs.ui.mode == UI_DIALOGUE && _gs.ui.speaker == _nd.title && array_length(_gs.ui.lines_raw) == array_length(_nd.lines) && _gs.ui.lines_raw[0] == _nd.lines[0], "mode=" + string(_gs.ui.mode) + " speaker=" + string(_gs.ui.speaker));
+        case 114:   // H7 (D147): pick it up by walking onto it with the real key (it used to open as a dialogue on the interact key)
+            if (_s.t == 10) Scenario_Hold("move_left", 10);
+            if (_s.t == 40) {
+                Scenario_Release();
+                Scenario_Check("note_walking_onto_it_picks_it_up_without_a_dialogue", _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && Notes_LiveCount("rm_floor1") == 0, "mode=" + string(_gs.ui.mode) + " live=" + string(Notes_LiveCount("rm_floor1")));
                 Scenario_Check("note_read_is_recorded_in_the_profile", Note_IsCollected(Profile_Get(), "map_page"));
                 var _cod = Note_Collected(Profile_Get());
                 Scenario_Check("note_codex_data_lists_the_read_note", array_length(_cod) == 1 && _cod[0].id == "map_page");
@@ -5083,7 +5078,7 @@ function Scenario_StepSmokeStory(_s) {
         case 115:   // 2 deaths: rm_floor2 has no note yet (they come after 3 deaths)
             if (_s.t == 1) room_goto(rm_floor2);
             if (_s.t > 5 && Scenario_FloorReady(rm_floor2) && _s.t > 30) {
-                Scenario_Check("note_floor2_has_none_with_2_deaths", Scenario_NoteCount() == 0, "notes=" + string(Scenario_NoteCount()));
+                Scenario_Check("note_floor2_has_none_with_2_deaths", Notes_LiveCount("rm_floor2") == 0, "notes=" + string(Notes_LiveCount("rm_floor2")));
                 Profile_Get().deaths = 3;
                 Scenario_Next(_s, 116);
             }
@@ -5092,14 +5087,15 @@ function Scenario_StepSmokeStory(_s) {
         case 116:   // 3 deaths: the other room with a 3-death note has it
             if (_s.t == 1) room_goto(rm_floor4);
             if (_s.t > 5 && Scenario_FloorReady(rm_floor4) && _s.t > 30) {
-                Scenario_Check("note_floor4_has_its_note_after_3_deaths", Scenario_NoteCount() == 1 && instance_exists(Scenario_FindNote("mapmaker_scrap")), "notes=" + string(Scenario_NoteCount()));
+                Scenario_Check("note_floor4_has_its_note_after_3_deaths", Notes_LiveCount("rm_floor4") == 1 && Notes_LiveAtTile("rm_floor4", Note_Find("mapmaker_scrap").tx, Note_Find("mapmaker_scrap").ty) == "mapmaker_scrap", "notes=" + string(Notes_LiveCount("rm_floor4")));
                 _st.ni = 0;
+                Scenario_ForgetNotes();   // H7: 117 looks at every note in its room, found or not
                 Profile_Get().deaths = 99;
                 Scenario_Next(_s, 117);
             }
             if (_s.t > 600) { Scenario_Check("note_reaches_rm_floor4", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
-        case 117: {   // every note, in its own room: it exists, its tile is clear of walls and other objects, and it can be walked up to
+        case 117: {   // every note, in its own room: it lies there, its tile is clear of walls and other objects, it can be walked onto and blocks nothing
             var _defs = Note_Defs();
             if (_st.ni >= array_length(_defs)) {
                 Profile_Get().deaths = 2;
@@ -5110,21 +5106,18 @@ function Scenario_StepSmokeStory(_s) {
             var _rmn = asset_get_index(_d.room);
             if (_s.t == 1) room_goto(_rmn);
             if (_s.t > 5 && Scenario_FloorReady(_rmn) && _s.t > 30) {
-                var _n1 = Scenario_FindNote(_d.id);
-                var _ok1 = instance_exists(_n1);
-                Scenario_Check("note_" + _d.id + "_stands_in_" + _d.room, _ok1);
+                var _ok1 = (Notes_LiveAtTile(_d.room, _d.tx, _d.ty) == _d.id);
+                Scenario_Check("note_" + _d.id + "_lies_in_" + _d.room, _ok1);
                 if (_ok1) {
-                    var _wall = false;
-                    var _other = noone;
-                    with (_n1) {
-                        _wall = place_meeting(x, y, obj_wall);
-                        _other = instance_place(x, y, obj_interactable);
-                    }
-                    Scenario_Check("note_" + _d.id + "_tile_has_no_wall_or_object", !_wall && _other == noone, "wall=" + string(_wall));
+                    var _T1 = GRID_TILE_SIZE;
+                    var _wall = (collision_rectangle(_d.tx * _T1, _d.ty * _T1, _d.tx * _T1 + _T1 - 1, _d.ty * _T1 + _T1 - 1, obj_wall, false, true) != noone);
+                    var _other = (collision_rectangle(_d.tx * _T1, _d.ty * _T1, _d.tx * _T1 + _T1 - 1, _d.ty * _T1 + _T1 - 1, obj_interactable, false, true) != noone);
+                    Scenario_Check("note_" + _d.id + "_tile_has_no_wall_or_object", !_wall && !_other, "wall=" + string(_wall) + " object=" + string(_other));
                     var _plb = instance_find(obj_player, 0);
-                    Scenario_Check("note_" + _d.id + "_can_be_walked_up_to", Scenario_NoteReachable(_plb, _n1));
+                    Scenario_Check("note_" + _d.id + "_can_be_walked_onto", Scenario_NoteReachable(_plb, _d));
                     Scenario_Check("note_" + _d.id + "_leaves_every_door_of_" + _d.room + "_reachable", Scenario_ExitsReachable(_plb));   // C5 flagged rm_floor8's note in the only corridor
-                    Scenario_Check("note_" + _d.id + "_prompt_counts_it_as_interactable", Player_PromptWorthy(_n1));
+                    var _fr = Scenario_NoteTileFree(_plb, _d);
+                    Scenario_Check("note_" + _d.id + "_blocks_neither_the_player_nor_the_enemies", _fr.player && _fr.nav);
                 }
                 _st.ni++;
                 _s.t = 0;
@@ -5339,16 +5332,17 @@ function Scenario_StepShotsStory(_s) {
                 _pl2.face = LEFT;
             }
             if (_s.t == 50) {
-                Scenario_Check("shots_story_note_is_the_prompt_target", instance_exists(instance_find(obj_player, 0).prompt_target) && variable_instance_exists(instance_find(obj_player, 0).prompt_target, "note_id"));
+                Scenario_Check("shots_story_note_lies_on_the_map", Notes_LiveAtTile("rm_floor1", 1, 6) == "map_page");   // H7 (D147): no prompt, it is picked up by walking onto it
                 Scenario_ShotStory(_s, "note_world");
                 Scenario_Next(_s, 157);
             }
             break;
-        case 157:
-            if (_s.t == 4) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Tap("interact"); }
-            if (_s.t == 140) {
-                Scenario_Check("shots_story_note_is_open", _gs.ui.mode == UI_DIALOGUE && _gs.ui.speaker == Note_Find("map_page").title, "speaker=" + string(_gs.ui.speaker));
-                Scenario_ShotStory(_s, "note_read");
+        case 157:   // H7 (D147): one step onto it: the notice (the picture is taken while it is on screen) and the page rising off the tile
+            if (_s.t == 4) { Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot)); Scenario_Hold("move_left", 10); }
+            if (_s.t == 26) {
+                Scenario_Release();
+                Scenario_Check("shots_story_note_is_picked_up_with_a_notice", Note_IsCollected(Profile_Get(), "map_page") && Banner_Active() && _gs.ui.mode == UI_NONE, "mode=" + string(_gs.ui.mode));
+                Scenario_ShotStory(_s, "note_found");
                 Scenario_Next(_s, 158);
             }
             break;
@@ -7567,10 +7561,11 @@ function Scenario_StepSmokeTabMenu(_s) {
             if (_s.t > 40 && !variable_struct_exists(_s, "note") && Scenario_FloorReady(rm_floor1)) {
                 with (obj_enemy) instance_destroy();
                 Scenario_ClearUi();
-                var _nt = Scenario_FindNote("map_page");
-                Scenario_Check("tabmenu_the_first_note_stands_in_floor_1", _nt != noone);
-                if (_nt == noone) { Scenario_Finish(); break; }
-                Note_Read(_nt);
+                var _nt = Note_Find("map_page");
+                var _there = (Notes_LiveAtTile("rm_floor1", _nt.tx, _nt.ty) == "map_page");
+                Scenario_Check("tabmenu_the_first_note_stands_in_floor_1", _there);
+                if (!_there) { Scenario_Finish(); break; }
+                Scenario_PlacePlayer(_nt.tx, _nt.ty);   // standing on it picks it up (D147)
                 _s.note = true;
                 _s.t0 = _s.t;
             }
@@ -12342,7 +12337,7 @@ function Scenario_StepSmokeH14(_s) {
         case 717:
             Scenario_Check("h14_the_dotted_sight_outline_is_not_drawn_any_more", !variable_global_exists("nav_ring_builds") || global.nav_ring_builds == 0, "ring builds=" + string(variable_global_exists("nav_ring_builds") ? global.nav_ring_builds : 0));
             with (obj_enemy) instance_destroy();
-            Scenario_NoticeEnd();   // H14 ends the smoke chain
+            Scenario_Next(_s, 680);   // goes on with H7 (680..699), the end of the chain
             break;
     }
 }
@@ -12421,7 +12416,7 @@ function Scenario_StepShotsH14(_s) {
                 _h.i++;
                 if (Scenario_H14Scene(_h.i) == undefined) {
                     with (obj_enemy) instance_destroy();
-                    Scenario_Finish();
+                    Scenario_Next(_s, 700);   // goes on with H7 (700..709), the end of the pictures
                 } else {
                     Scenario_Next(_s, 730);
                 }
@@ -12449,5 +12444,313 @@ function Scenario_H14Judge(_h, _sc, _pl) {
         var _cone = Vis_Cone(_g, _ec.cx, _ec.cy, _h.e[0].prof.sight, _h.e[0].prof.see_through);
         if (_sc.name == "shadow") Scenario_Check("shots_h14_shadow_the_player_stands_in_the_dark_inside_the_radius", !Vis_Has(_cone, _pcx, _pcy) && point_distance(_ec.cx, _ec.cy, _pcx, _pcy) <= _h.e[0].prof.sight);
         else Scenario_Check("shots_h14_hidden_the_player_is_hidden_and_the_cell_is_a_dark_pocket", Player_IsHidden(_pl) && Light_PocketCell(_ec.cx, _ec.cy, _pcx, _pcy));
+    }
+}
+
+// ============================================================================
+// H7 (D147): lore notes you pick up. Smoke steps 680-699 (the end of the chain: the last step calls Scenario_NoticeEnd).
+//   680  rm_floor1's note is forgotten (as in a profile that never found it), the room is left and entered again
+//   681  the note stands on its tile and blocks nothing (the player's rule and the enemies' grid)
+//   682  the player walks onto it with a real key: a notice, a rise on the map, the note gone, found in the profile and in the profile file, no dialogue
+//   683  leaving and entering the room does not bring it back; a note not found yet (rm_floor3) is there
+//   684  a new run does not bring it back either
+//   685  the menu with the real keys: Codex -> Notes -> the found note opens a reader with its text -> Back; a ??? row opens nothing
+//   686  a long text scrolls with the real keys and Back closes it; the menu closes
+// ============================================================================
+function Scenario_NoteTileFree(_pl, _d) {
+    var _t = GRID_TILE_SIZE;
+    var _blocked_player = Player_TileBlocked(_pl, _d.tx * _t, _d.ty * _t);
+    var _g = Nav_Get().grid;
+    var _blocked_nav = Nav_CellBlocked(_g, _d.tx, _d.ty);
+    return { player: !_blocked_player, nav: !_blocked_nav };
+}
+
+function Scenario_StepSmokeNotes(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "nn")) _s.nn = { };
+    var _n = _s.nn;
+    var _T = GRID_TILE_SIZE;
+    var _d1 = Note_Find("map_page");
+    var _u = TabMenu_Get();
+    var _m = TabMenu_TopMenu();
+    switch (_s.step) {
+        case 680:   // forget the note, leave the room and come back through the real room change
+            if (_s.t == 1 && room != rm_floor1) {   // one-time setup (the chain arrives from H14 in rm_floor6): back to rm_floor1 by a real room change
+                Scenario_Release();
+                Scenario_ClearUi();
+                room_goto(rm_floor1);
+            }
+            if (_s.t == 40) {
+                if (!Scenario_FloorReady(rm_floor1)) { Scenario_Check("notes_the_chain_starts_in_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); break; }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                variable_struct_remove(Profile_Get().unlocks, Note_UnlockKey("map_page"));
+                variable_struct_remove(Profile_Get().unlocks, Note_UnlockKey("wall_breath"));
+                room_goto(rm_floor2);
+            }
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor2)) {
+                room_goto(rm_floor1);
+                Scenario_Next(_s, 681);
+            }
+            if (_s.t > 600) { Scenario_Check("notes_reaches_rm_floor2", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 681:   // the note stands there and blocks nothing
+            if (_s.t > 30 && Scenario_FloorReady(rm_floor1)) {
+                with (obj_enemy) instance_destroy();
+                Scenario_ClearUi();
+                Scenario_Check("notes_floor1_shows_its_note", Notes_LiveCount("rm_floor1") == 1 && Notes_LiveAtTile("rm_floor1", _d1.tx, _d1.ty) == "map_page", "live=" + string(Notes_LiveCount("rm_floor1")));
+                Scenario_Check("notes_it_is_not_found_yet", !Note_IsCollected(Profile_Get(), "map_page"));
+                var _pl = Scenario_PlacePlayer(_d1.tx + 1, _d1.ty);
+                _pl.face = LEFT;
+                var _free = Scenario_NoteTileFree(_pl, _d1);
+                Scenario_Check("notes_the_player_may_walk_onto_the_tile", _free.player);
+                Scenario_Check("notes_enemies_see_the_tile_as_free", _free.nav);
+                _n.mp = MapFx_Count("rise");
+                Scenario_Next(_s, 682);
+            }
+            if (_s.t > 600) { Scenario_Check("notes_floor1_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 682:   // one real step onto it
+            if (_s.t == 10) Scenario_Hold("move_left", 10);
+            if (_s.t > 12 && Notes_LiveCount("rm_floor1") == 0 && !variable_struct_exists(_n, "got")) {
+                _n.got = _s.t;
+                Scenario_Release();
+            }
+            if (variable_struct_exists(_n, "got") && _s.t == _n.got + 4) {
+                var _pl2 = instance_find(obj_player, 0);
+                Scenario_Check("notes_the_player_stands_on_the_tile", _pl2.x == _d1.tx * _T && _pl2.y == _d1.ty * _T, "at " + string(_pl2.x) + "," + string(_pl2.y));
+                Scenario_Check("notes_it_is_gone_from_the_map", Notes_LiveCount("rm_floor1") == 0);
+                Scenario_Check("notes_it_is_found_in_the_profile", Note_IsCollected(Profile_Get(), "map_page"));
+                Scenario_Check("notes_a_notice_names_it", Banner_Active() && global.banner.text == "Note found: " + _d1.title, "banner=" + (variable_global_exists("banner") ? string(global.banner.text) : "none"));
+                Scenario_Check("notes_a_note_rises_off_the_tile", MapFx_Count("rise") > _n.mp);
+                Scenario_Check("notes_no_dialogue_opens", _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0, "mode=" + string(_gs.ui.mode));
+                Scenario_Check("notes_the_profile_file_has_it", Note_IsCollected(Profile_Load(Profile_Path()).profile, "map_page"));
+                Scenario_Next(_s, 683);
+            }
+            if (_s.t > 120 && !variable_struct_exists(_n, "got")) { Scenario_Release(); Scenario_Check("notes_walking_onto_it_picks_it_up", false, "live=" + string(Notes_LiveCount("rm_floor1"))); Scenario_NoticeEnd(); }
+            break;
+        case 683:   // it stays gone in this run; one not found yet is there
+            if (_s.t == 1) room_goto(rm_floor2);
+            if (_s.t > 20 && room == rm_floor2 && Scenario_FloorReady(rm_floor2) && !variable_struct_exists(_n, "back")) {
+                _n.back = true;
+                room_goto(rm_floor1);
+            }
+            if (variable_struct_exists(_n, "back") && !variable_struct_exists(_n, "again") && _s.t > 50 && Scenario_FloorReady(rm_floor1)) {
+                _n.again = true;
+                Scenario_Check("notes_entering_the_room_again_does_not_bring_it_back", Notes_LiveCount("rm_floor1") == 0 && Notes_LiveAtTile("rm_floor1", _d1.tx, _d1.ty) == "");
+                room_goto(rm_floor3);
+            }
+            if (variable_struct_exists(_n, "again") && _s.t > 60 && Scenario_FloorReady(rm_floor3)) {
+                var _w = Note_Find("wall_breath");
+                Scenario_Check("notes_a_note_not_found_yet_is_there", Notes_LiveCount("rm_floor3") == 1 && Notes_LiveAtTile("rm_floor3", _w.tx, _w.ty) == "wall_breath", "live=" + string(Notes_LiveCount("rm_floor3")));
+                Scenario_Next(_s, 684);
+            }
+            if (_s.t > 900) { Scenario_Check("notes_room_changes_work", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 684:   // a new run: the profile still remembers
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 6847);
+            }
+            if (_s.t > 30 && Scenario_FloorReady(rm_floor1)) {
+                Scenario_Check("notes_a_new_run_does_not_bring_it_back", Notes_LiveCount("rm_floor1") == 0, "live=" + string(Notes_LiveCount("rm_floor1")));
+                Scenario_Check("notes_the_profile_still_has_it", Note_IsCollected(Profile_Get(), "map_page"));
+                with (obj_enemy) instance_destroy();
+                Scenario_ClearUi();
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);
+                Ui_MemSet(Ui_MemGlobal(), "tab_codex", 0);     // the menus remember their cursors: start both Codex lists on their first row
+                Ui_MemSet(Ui_MemGlobal(), "codex_notes", 0);
+                Scenario_Next(_s, 685);
+            }
+            if (_s.t > 900) { Scenario_Check("notes_a_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 685:   // Tab, E x4 (Codex), Notes, the found note
+            switch (_s.t) {
+                case 5: Scenario_Tap("menu"); break;
+                case 20:
+                    _u = TabMenu_Get();
+                    Scenario_Check("notes_the_menu_opens_on_status", _gs.ui.mode == UI_MENU && is_struct(_u) && _u.tab == 0, "mode=" + string(_gs.ui.mode));
+                    Scenario_Tap("tab_next");
+                    break;
+                case 28: Scenario_Tap("tab_next"); break;
+                case 36: Scenario_Tap("tab_next"); break;
+                case 44: Scenario_Tap("tab_next"); break;
+                case 54:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_four_E_reach_the_codex", is_struct(TabMenu_Get()) && TabMenu_Get().tab == 4 && _m.id == "tab_codex", "tab=" + string(is_struct(TabMenu_Get()) ? TabMenu_Get().tab : -1));
+                    Scenario_Check("notes_the_codex_row_counts_the_notes", _m.items[1].id == "notes" && _m.items[1].value == "1/8", _m.items[1].value);
+                    Scenario_Check("notes_the_codex_starts_on_its_first_row", _m.cursor == 0, "cursor=" + string(_m.cursor));
+                    Scenario_Tap("menu_down");
+                    break;
+                case 62: Scenario_Tap("confirm"); break;
+                case 72:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_confirm_opens_the_notes_page", _m.id == "codex_notes" && TabMenu_Depth() == 2, "id=" + _m.id);
+                    Scenario_Check("notes_the_page_says_found_1_of_8", _m.layout.title == "Notes found 1/8", _m.layout.title);
+                    Scenario_Check("notes_the_found_note_is_listed_by_title", _m.items[0].label == _d1.title);
+                    Scenario_Check("notes_the_others_are_question_marks", _m.items[1].label == "???" && _m.items[7].label == "???");
+                    Scenario_Tap("menu_down");
+                    break;
+                case 80: Scenario_Tap("confirm"); break;   // a ??? row opens nothing
+                case 90:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_a_question_mark_row_opens_nothing", _m.id == "codex_notes" && TabMenu_Depth() == 2, "id=" + _m.id);
+                    Scenario_Tap("menu_up");
+                    break;
+                case 98: Scenario_Tap("confirm"); break;
+                case 110:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_the_found_note_opens_a_reader", _m.id == "codex_note_read" && TabMenu_Depth() == 3 && _m.data.reader, "id=" + _m.id);
+                    Scenario_Check("notes_the_reader_has_the_title", _m.layout.title == _d1.title);
+                    Scenario_Check("notes_the_reader_has_the_full_text", string_pos(_d1.lines[0], _m.data.text) > 0 && string_pos(_d1.lines[1], _m.data.text) > 0 && string_pos(_d1.lines[2], _m.data.text) > 0);
+                    Scenario_Check("notes_the_footer_offers_back", string_pos("{back}", TabMenu_Hint()) > 0, TabMenu_Hint());
+                    Scenario_Tap("cancel");
+                    break;
+                case 124:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_back_closes_the_reader", _m.id == "codex_notes" && TabMenu_Depth() == 2 && _m.cursor == 0, "id=" + _m.id);
+                    Scenario_Next(_s, 686);
+                    break;
+            }
+            break;
+        case 686:   // a long text scrolls; Back closes it; the menu closes
+            switch (_s.t) {
+                case 1:
+                    var _fake = { id: "smoke_long", title: "A long letter", room: "rm_floor1", tx: 0, ty: 0, min_deaths: 0, lines: [] };
+                    for (var _k = 0; _k < 40; _k++) array_push(_fake.lines, "Line " + string(_k) + " of a very long letter.");
+                    TabNote_OpenReader(_fake);
+                    break;
+                case 20:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_the_long_text_reader_is_open", _m.id == "codex_note_read" && TabMenu_Depth() == 3, "id=" + _m.id);
+                    Scenario_Check("notes_it_starts_at_the_top", _m.data.scroll == 0);
+                    Scenario_Tap("menu_down");
+                    break;
+                case 28: Scenario_Tap("menu_down"); break;
+                case 36:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_down_scrolls_the_long_text", _m.data.scroll == 2, "scroll=" + string(_m.data.scroll));
+                    Scenario_Check("notes_a_long_text_has_more_to_scroll", _m.data.scroll < NoteReader_MaxScroll(array_length(_m.data.wrapped), _m.data.visible), "n=" + string(array_length(_m.data.wrapped)) + " vis=" + string(_m.data.visible));
+                    Scenario_Tap("menu_up");
+                    break;
+                case 44:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_up_scrolls_back", _m.data.scroll == 1, "scroll=" + string(_m.data.scroll));
+                    Scenario_Tap("cancel");
+                    break;
+                case 58:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_back_closes_the_long_reader", _m.id == "codex_notes" && TabMenu_Depth() == 2, "id=" + _m.id);
+                    Scenario_Tap("cancel");
+                    break;
+                case 70: Scenario_Tap("cancel"); break;
+                case 90:
+                    Scenario_Check("notes_back_back_back_closes_the_menu", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                    Scenario_NoticeEnd();
+                    break;
+            }
+            break;
+    }
+}
+
+// ---- H7 (D147) pictures 700..704: the Codex Notes page, a found note in the reader and a long text in the reader (scrolled, with its bar) at windowed
+// scale 3 (480 x 432) and 5 (800 x 720). The last pictures of the run: they end it. ----
+function Scenario_NotesShotScenes() {
+    return ["list", "reader", "long"];
+}
+
+function Scenario_StepShotsNotes(_s) {
+    var _scenes = Scenario_NotesShotScenes();
+    var _scales = [3, 5];
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "nt7")) _s.nt7 = { n: 0, di: 0, si: 0, prof: undefined };
+    var _o = _s.nt7;
+    switch (_s.step) {
+        case 700:   // enter a room at this scale (the two floors take turns: entering the room we are in would not spawn the player again)
+            if (_s.t == 1) {
+                if (!is_struct(_o.prof)) _o.prof = Scenario_TabProfile();   // two notes found (map_page, wall_breath); the real profile is put back at the end
+                Scenario_TabFixture();
+                Loc_SetLanguage("en");
+                Scenario_SetWindowScale(_scales[_o.si]);
+                _o.n++;
+                room_goto((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3);
+            }
+            if (_s.t >= 30 && Scenario_FloorReady((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3)) Scenario_Next(_s, 701);
+            if (_s.t > 600) { Scenario_Check("shots_notes_enters_the_room", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 701:   // set the scene up
+            with (obj_enemy) instance_destroy();
+            Scenario_ClearUi();
+            Menu_Open(4);
+            TabCodex_Open("notes");
+            switch (_scenes[_o.di]) {
+                case "list":
+                    Ui_MenuFixCursor(TabMenu_TopMenu(), 1);   // the Wall scratches
+                    break;
+                case "reader":
+                    TabNote_OpenReader(Note_Find("wall_breath"));
+                    break;
+                case "long":
+                    var _fake = { id: "shot_long", title: "A long letter", room: "rm_floor1", tx: 0, ty: 0, min_deaths: 0, lines: [] };
+                    for (var _k = 0; _k < 14; _k++) array_push(_fake.lines, "Day " + string(_k + 1) + ". The tunnel is quiet and the walls keep their secrets, and I keep walking all the same.");
+                    TabNote_OpenReader(_fake);
+                    break;
+            }
+            Scenario_Next(_s, 702);
+            break;
+        case 702:   // let the panels slide in, check the layout, take the picture
+            if (_s.t >= 30) {
+                var _tag = _scenes[_o.di] + "_" + string(_scales[_o.si]);
+                var _m = TabMenu_TopMenu();
+                Scenario_Check("shots_notes_open_" + _tag, _gs.ui.mode == UI_MENU && is_struct(_m), "mode=" + string(_gs.ui.mode));
+                if (_scenes[_o.di] == "list") {
+                    Scenario_Check("shots_notes_list_is_the_notes_page_" + _tag, is_struct(_m) && _m.id == "codex_notes" && _m.layout.title == "Notes found 2/8", is_struct(_m) ? _m.layout.title : "");
+                    Scenario_TabLayoutChecks(_tag);
+                } else {
+                    var _r = is_struct(_m) ? _m.rect : { x: -1, y: -1, w: 0, h: 0 };
+                    Scenario_Check("shots_notes_reader_is_up_" + _tag, TabNote_IsReader(_m));
+                    Scenario_Check("shots_notes_reader_is_on_screen_" + _tag, _r.w > 0 && _r.x >= 0 && _r.y >= 0 && _r.x + _r.w <= Display_GuiW() && _r.y + _r.h <= Display_GuiH(), json_stringify(_r));
+                    var _n = array_length(_m.data.wrapped);
+                    if (_scenes[_o.di] == "reader") {
+                        Scenario_Check("shots_notes_the_whole_note_fits_" + _tag, _n > 0 && _n <= _m.data.visible, "lines=" + string(_n) + " visible=" + string(_m.data.visible));
+                    } else {
+                        Scenario_Check("shots_notes_the_long_text_needs_scrolling_" + _tag, _n > _m.data.visible, "lines=" + string(_n) + " visible=" + string(_m.data.visible));
+                        Scenario_Check("shots_notes_the_footer_offers_scrolling_" + _tag, string_pos("{up}{down}", TabMenu_Hint()) > 0, TabMenu_Hint());
+                        _m.data.scroll = 3;   // a picture of the text part-way down
+                    }
+                }
+                if (_scenes[_o.di] != "long") {
+                    _s.shot = "shot_notes_" + _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                    Scenario_ShotLayout(_s.shot);
+                    Scenario_Next(_s, 703);
+                } else {
+                    Scenario_Next(_s, 704);   // two frames later so the scrolled text is what is drawn
+                }
+            }
+            break;
+        case 704:
+            if (_s.t >= 2) {
+                _s.shot = "shot_notes_long_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 703);
+            }
+            break;
+        case 703:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                if (is_struct(TabMenu_Get())) Menu_Close(true);
+                Scenario_ClearUi();
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    global.profile = _o.prof;
+                    Scenario_Finish();   // the end of the pictures
+                } else {
+                    Scenario_Next(_s, 700);
+                }
+            }
+            break;
     }
 }
