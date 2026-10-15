@@ -123,6 +123,7 @@ function Test_RunAll() {
     Test_RunSuite("EchoAfterClass", Test_Suite_EchoAfterClass);
     Test_RunSuite("SpeedPreview", Test_Suite_SpeedPreview);
     Test_RunSuite("MapJuice", Test_Suite_MapJuice);
+    Test_RunSuite("BattleBg", Test_Suite_BattleBg);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -9403,4 +9404,23 @@ function Test_Suite_MapJuice() {
     Test_True("mapjuice: a lower level (a new character) does not sparkle and is remembered", !_lv3.fire && _lv3.seen == 1);
     var _lv4 = MapFx_LevelGate("a", 3, "a", 3);
     Test_True("mapjuice: the same level does not sparkle", !_lv4.fire && _lv4.seen == 3);
+}
+
+// H9 (D151): battle backgrounds. Floors 1-3 forest tunnel, 4-6 caves, 7-9 ruins, any boss fight the boss arena (names fixed by the brief; the owner imports the
+// sprites in the IDE, so a name with no sprite yet falls back to today's picture, battle_screen).
+function Test_Suite_BattleBg() {
+    Test_Eq("battlebg: floor 1 is the forest", Battle_BgSpriteName(1, false), "spr_battle_bg_forest");
+    Test_Eq("battlebg: floor 3 is the forest", Battle_BgSpriteName(3, false), "spr_battle_bg_forest");
+    Test_Eq("battlebg: floor 4 is the caves", Battle_BgSpriteName(4, false), "spr_battle_bg_caves");
+    Test_Eq("battlebg: floor 6 is the caves", Battle_BgSpriteName(6, false), "spr_battle_bg_caves");
+    Test_Eq("battlebg: floor 7 is the ruins", Battle_BgSpriteName(7, false), "spr_battle_bg_ruins");
+    Test_Eq("battlebg: floor 9 is the ruins", Battle_BgSpriteName(9, false), "spr_battle_bg_ruins");
+    Test_Eq("battlebg: a boss fight is the arena on floor 3", Battle_BgSpriteName(3, true), "spr_battle_bg_boss");
+    Test_Eq("battlebg: a boss fight is the arena on floor 9", Battle_BgSpriteName(9, true), "spr_battle_bg_boss");
+    Test_Eq("battlebg: the half floor 6.5 is still the caves", Battle_BgSpriteName(6.5, false), "spr_battle_bg_caves");
+    Test_Eq("battlebg: no known floor (0) names nothing", Battle_BgSpriteName(0, false), "");
+    Test_Eq("battlebg: a sprite that is not imported falls back to today's background", Battle_BgSprite("spr_battle_bg_not_imported_yet"), battle_screen);
+    Test_Eq("battlebg: an empty name falls back too", Battle_BgSprite(""), battle_screen);
+    Test_Eq("battlebg: a name that exists resolves through asset_get_index", Battle_BgSprite("battle_screen"), battle_screen);
+    Test_Eq("battlebg: the fallback is not an asset index error", Battle_BgSprite("spr_battle_bg_not_imported_yet") != -1, true);
 }

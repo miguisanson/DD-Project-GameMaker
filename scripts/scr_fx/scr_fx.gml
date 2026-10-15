@@ -1043,3 +1043,7 @@ function MapFx_OpenedAt(_inst, _loot, _card) {
     if (!instance_exists(_inst)) return;
     MapFx_Opened(floor((_inst.bbox_left + _inst.bbox_right) / 2), _inst.bbox_top + 2, _loot, _card);
 }
+
+// H9 (D151) stub, replaced by the implementation in the next commit.
+function Battle_BgSpriteName(_floor, _boss) { return "?"; }
+function Battle_BgSprite(_name) { return -1; }
