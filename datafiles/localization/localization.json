@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T22:22:21Z",
-    "row_count": 1110
+    "generated_at_utc": "2026-10-15T22:42:44Z",
+    "row_count": 1150
   },
   "default_lang": "en",
   "languages": [
@@ -659,6 +659,166 @@
     "cards.stat.title": {
       "en": "Level {lvl}: place 1 point",
       "ko": "레벨 {lvl}: 포인트 1개 배분"
+    },
+    "choice.map_page.again1.0": {
+      "en": "The ink is dry now. You've stopped doubting the hand.",
+      "ko": "잉크가 말랐다. 이 글씨를 더는 의심하지 않는다."
+    },
+    "choice.map_page.again2.0": {
+      "en": "The ink is dry now. You still say it isn't yours.",
+      "ko": "잉크가 말랐다. 그래도 내 글씨가 아니라고 말한다."
+    },
+    "choice.map_page.ask.0": {
+      "en": "You read it twice.",
+      "ko": "두 번 읽는다."
+    },
+    "choice.map_page.ask.1": {
+      "en": "Whose hand is this?",
+      "ko": "누구의 글씨일까?"
+    },
+    "choice.map_page.label.0": {
+      "en": "Mine.",
+      "ko": "내 것."
+    },
+    "choice.map_page.label.1": {
+      "en": "Someone else's.",
+      "ko": "남의 것."
+    },
+    "choice.map_page.reply1.0": {
+      "en": "Yours. You say it out loud.",
+      "ko": "내 글씨다. 소리 내어 말해 본다."
+    },
+    "choice.map_page.reply1.1": {
+      "en": "The ink seems to settle.",
+      "ko": "잉크가 가라앉는 듯하다."
+    },
+    "choice.map_page.reply2.0": {
+      "en": "Not yours. You say it out loud.",
+      "ko": "내 글씨가 아니다. 소리 내어 말해 본다."
+    },
+    "choice.map_page.reply2.1": {
+      "en": "The ink shivers.",
+      "ko": "잉크가 떨리는 듯하다."
+    },
+    "choice.merchant.again1.0": {
+      "en": "Found your way out yet? No? Then buy something.",
+      "ko": "나갈 길은 찾았어? 아직이면 뭐라도 사."
+    },
+    "choice.merchant.again2.0": {
+      "en": "Back to spend, I hope. That I understand.",
+      "ko": "돈 쓰러 왔길 바란다. 그거라면 내가 잘 알지."
+    },
+    "choice.merchant.ask.0": {
+      "en": "Tell me, friend.",
+      "ko": "말해 봐, 친구."
+    },
+    "choice.merchant.ask.1": {
+      "en": "Looking for a way out, or something to buy?",
+      "ko": "나갈 길을 찾는 거야, 아니면 살 게 있는 거야?"
+    },
+    "choice.merchant.label.0": {
+      "en": "A way out.",
+      "ko": "나갈 길."
+    },
+    "choice.merchant.label.1": {
+      "en": "Something to buy.",
+      "ko": "살 물건."
+    },
+    "choice.merchant.reply1.0": {
+      "en": "Ha. They all say that.",
+      "ko": "하하, 다들 그렇게 말하지."
+    },
+    "choice.merchant.reply1.1": {
+      "en": "Shop first. Hope walks better with a full pack.",
+      "ko": "일단 사. 짐이 든든해야 희망도 잘 걷거든."
+    },
+    "choice.merchant.reply2.0": {
+      "en": "Good. Buying I understand.",
+      "ko": "좋아. 장사라면 내가 잘 알지."
+    },
+    "choice.merchant.reply2.1": {
+      "en": "Asking after exits gets people killed.",
+      "ko": "출구를 캐묻다 죽은 사람이 한둘이 아니야."
+    },
+    "choice.stranger.again1.0": {
+      "en": "Still asking if you should?",
+      "ko": "아직도 기억해야 하는지 묻는군?"
+    },
+    "choice.stranger.again1.1": {
+      "en": "You'll know me when you stop asking.",
+      "ko": "묻기를 그만두면 알게 될 거야."
+    },
+    "choice.stranger.again2.0": {
+      "en": "Still telling me to back off?",
+      "ko": "아직도 저리 가라고 하는군?"
+    },
+    "choice.stranger.again2.1": {
+      "en": "I'm patient. I've had practice.",
+      "ko": "난 참을성이 있어. 연습을 많이 했거든."
+    },
+    "choice.stranger.ask.0": {
+      "en": "There you are.",
+      "ko": "거기 있었군."
+    },
+    "choice.stranger.ask.1": {
+      "en": "Do you remember me?",
+      "ko": "나를 기억해?"
+    },
+    "choice.stranger.label.0": {
+      "en": "Should I?",
+      "ko": "기억해야 해?"
+    },
+    "choice.stranger.label.1": {
+      "en": "Back off.",
+      "ko": "저리 가."
+    },
+    "choice.stranger.reply1.0": {
+      "en": "Not yet.",
+      "ko": "아직은 아니야."
+    },
+    "choice.stranger.reply1.1": {
+      "en": "Ask again when the tunnel has had you a few more times.",
+      "ko": "터널이 널 몇 번 더 삼키면 다시 물어봐."
+    },
+    "choice.stranger.reply2.0": {
+      "en": "Ha. Fair.",
+      "ko": "하하, 그렇겠지."
+    },
+    "choice.stranger.reply2.1": {
+      "en": "Nobody does, at first.",
+      "ko": "처음엔 다들 그래."
+    },
+    "choice.wake.again1.0": {
+      "en": "Your body already knows how to get up.",
+      "ko": "몸은 이미 일어나는 법을 안다."
+    },
+    "choice.wake.again2.0": {
+      "en": "You lie still a while first. You always do now.",
+      "ko": "먼저 한참 누워 있는다. 이제는 늘 그렇다."
+    },
+    "choice.wake.ask.0": {
+      "en": "Your head swims.",
+      "ko": "머리가 어지럽다."
+    },
+    "choice.wake.ask.1": {
+      "en": "Your body waits for you to decide.",
+      "ko": "몸이 당신의 결정을 기다린다."
+    },
+    "choice.wake.label.0": {
+      "en": "Sit up.",
+      "ko": "일어난다."
+    },
+    "choice.wake.label.1": {
+      "en": "Lie still.",
+      "ko": "가만히 있는다."
+    },
+    "choice.wake.reply1.0": {
+      "en": "You push up. The stone lets go of your back slowly.",
+      "ko": "몸을 일으킨다. 돌바닥이 등을 천천히 놓아 준다."
+    },
+    "choice.wake.reply2.0": {
+      "en": "You lie still. The ceiling says nothing. Neither do you.",
+      "ko": "가만히 누워 있다. 천장은 말이 없다. 당신도 그렇다."
     },
     "class.lbl.none": {
       "en": "None",

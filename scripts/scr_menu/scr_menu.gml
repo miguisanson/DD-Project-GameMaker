@@ -2242,7 +2242,10 @@ function Merchant_Line(_kind, _idx) {
     switch (_kind) {
         case "greet":
             switch (i) {
-                case 0: return Loc_T("merchant.greet.0", "You came a long way down. Brave. Or lost.");
+                case 0:
+                    var later = Choice_AgainLines("merchant");   // D154: once he has been answered, his first greeting remembers it
+                    if (array_length(later) > 0) return later[0];
+                    return Loc_T("merchant.greet.0", "You came a long way down. Brave. Or lost.");
                 case 1: return Loc_T("merchant.greet.1", "Coins keep the dark away. Mostly.");
                 case 2: return Loc_T("merchant.greet.2", "Don't ask where I sleep.");
                 default: return Loc_T("merchant.greet.3", "Buy something. Please.");

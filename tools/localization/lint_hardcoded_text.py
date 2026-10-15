@@ -115,8 +115,8 @@ SKIP_LINE_TOKENS = (
 )
 
 SKIP_FUNCTIONS_BY_FILE = {
-    # D3: the dialogue tables are keyed data (key + English fallback; Loc_T reads them by key): death lines, wake lines, lore notes, closing text
-    "scripts/scr_dialogue/scr_dialogue.gml": {"DialogueDB_Init", "DeathLine_Defs", "WakeLine_Pick", "Note_Defs", "Story_ClosingLines", "Credits_SoundAssets", "Credits_NewSfxAssets"},
+    # D3: the dialogue tables are keyed data (key + English fallback; Loc_T reads them by key): death lines, wake lines, lore notes, closing text, the D154 choices
+    "scripts/scr_dialogue/scr_dialogue.gml": {"DialogueDB_Init", "DeathLine_Defs", "WakeLine_Pick", "Note_Defs", "Story_ClosingLines", "Credits_SoundAssets", "Credits_NewSfxAssets", "Choice_Raw", "Choice_Lines"},
     "scripts/scr_db_item/scr_db_item.gml": {"ItemDB_Init", "ItemDB_GetPassiveTemplate"},
     "scripts/scr_db_skill/scr_db_skill.gml": {"SkillDB_Init", "CardDB_Init"},   # C2: the card table is data; Card_Name and Card_Sentence look the text up with Loc_T
     "scripts/scr_db_enemy/scr_db_enemy.gml": {"EnemyDB_Init"},

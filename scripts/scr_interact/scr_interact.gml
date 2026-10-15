@@ -241,6 +241,12 @@ function GraveLoot_TryRollReward(_class_id) {
 
 
 
+// Bound to the shop's index by Interact_Handle (method).
+function Interact_MerchantOpen() {
+    ShopUi_Open(shop);
+    GameState_SyncLegacy();
+}
+
 function Interact_Handle(_inst) {
     var gs = GameState_Get();
     var pl = gs.player_inst;
@@ -286,8 +292,9 @@ function Interact_Handle(_inst) {
     }
 
     // C3 (D85): the merchant (an obj_npc placed by Merchant_EnsureInRoom) opens the shop instead of a dialogue
+    // D154: the first time, he asks his question first (a box, 2 replies); the shop opens when his answer is read
     if (variable_instance_exists(_inst, "merchant") && _inst.merchant) {
-        ShopUi_Open(_inst.shop_index);
+        Choice_Run("merchant", method({ shop: _inst.shop_index }, Interact_MerchantOpen));
         GameState_SyncLegacy();
         return;
     }
