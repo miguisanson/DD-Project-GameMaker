@@ -3562,6 +3562,21 @@ function Test_Suite_RunSave() {
     Test_Eq("legacy: the old file is unchanged", Test_RawRead(_lg), _old);
     file_delete(_lg);
 
+    // Review 1: starting a new game clears an old-format run file (Continue would keep showing the old-slot notice), never a newer one
+    var _ab = "test_abandon_run.sav";
+    Save_DeleteFileSet(_ab);
+    Test_RawWrite(_ab, _old);
+    Test_Eq("review1: the old-format run file reads as old", RunSave_LoadFrom(_ab).status, "old");
+    Run_AbandonSaved(_ab);
+    Test_False("review1: Run_AbandonSaved deletes an old-format run file", RunSave_ExistsAt(_ab));
+    Test_RawWrite(_ab, _newer);
+    Run_AbandonSaved(_ab);
+    Test_True("review1: Run_AbandonSaved keeps a newer-version run file", RunSave_ExistsAt(_ab));
+    Test_Eq("review1: the newer run file is unchanged", Test_RawRead(_ab), _newer);
+    Save_DeleteFileSet(_ab);
+    Run_AbandonSaved(_ab);
+    Test_False("review1: Run_AbandonSaved with no file does nothing", RunSave_ExistsAt(_ab));
+
     // restore the borrowed state
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
     _gs.checkpoint = _old_cp;
@@ -6524,11 +6539,25 @@ function Test_Suite_FairUi() {
     // ---- D124: the flee chance is shown on the RUN command ----
     var _k = CharacterCreate_Player(CLASS_KNIGHT);
     var _sl = EnemyCreate(ENEMY_SLIME);
-    Test_Eq("R1b D124: Knight (SPD 10) vs Slime (SPD 9): 10/19 -> 53%", Battle_RunPct(_k, _sl, 0), 53);
-    Test_Eq("R1b D124: after one failed try: 78%", Battle_RunPct(_k, _sl, 1), 78);
+    // Review 1: the shown percent never rounds up to a sure thing (floor, 99 at most) and says 100 only when the chance is exactly 1.
+    // D124 says "a whole percent"; round() showed 100% for 0.9955 while the escape could still fail, so the two figures below are floored (spec refinement).
+    Test_Eq("R1b D124: Knight (SPD 10) vs Slime (SPD 9): 10/19 = 52.6 -> 52%", Battle_RunPct(_k, _sl, 0), 52);
+    Test_Eq("R1b D124: after one failed try: 77.6 -> 77%", Battle_RunPct(_k, _sl, 1), 77);
+    var _fast = CharacterCreate_Player(CLASS_KNIGHT);
+    var _slow = EnemyCreate(ENEMY_SLIME);
+    _fast.stats.spd = 41;
+    _slow.stats.spd = 14;
+    Test_Eq("Review1: SPD 41 vs 14 after one failed try is 0.9955 -> 99%, not 100%", Battle_RunPct(_fast, _slow, 1), 99);
+    _fast.stats.spd = 200;
+    _slow.stats.spd = 1;
+    Test_Eq("Review1: SPD 200 vs 1 is 0.995 -> 99%, not 100%", Battle_RunPct(_fast, _slow, 0), 99);
+    _fast.stats.spd = 10;
+    _slow.stats.spd = 10;
+    Test_Eq("Review1: equal SPD after two failed tries is exactly 1 -> 100%", Battle_RunPct(_fast, _slow, 2), 100);
+    Test_Eq("Review1: equal SPD, no failed try -> 50%", Battle_RunPct(_fast, _slow, 0), 50);
     Test_Eq("R1b D124: a boss cannot be fled (-1)", Battle_RunPct(_k, EnemyCreate(ENEMY_MINI_BOSS), 0), -1);
     var _cmd = Battle_CmdItems({ p: _k, e: _sl, run_fails: 0 });
-    Test_Eq("R1b D124: the RUN row shows the chance", _cmd[4].value, "53%");
+    Test_Eq("R1b D124: the RUN row shows the chance", _cmd[4].value, "52%");
     var _cmd_b = Battle_CmdItems({ p: _k, e: EnemyCreate(ENEMY_FINAL_BOSS), run_fails: 0 });
     Test_Eq("R1b D124: against a boss the RUN row says no", _cmd_b[4].value, Loc_T("battle.action.run_no", "no"));
     Test_Eq("R1b D124: without a battle the RUN row has no number", Battle_CmdItems()[4].value, "");
