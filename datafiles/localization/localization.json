@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T08:54:00Z",
-    "row_count": 1024
+    "generated_at_utc": "2026-10-15T09:32:57Z",
+    "row_count": 1026
   },
   "default_lang": "en",
   "languages": [
@@ -1547,6 +1547,14 @@
     "dialogue.skull.0": {
       "en": "A cracked skull.",
       "ko": "금이 간 두개골."
+    },
+    "dialogue.sys_class_chest_guard.0": {
+      "en": "Wait, there was a chest back there. I think I should open it...",
+      "ko": "잠깐, 저 뒤에 상자가 있었어. 열어 봐야겠어..."
+    },
+    "dialogue.sys_class_chest_guard.1": {
+      "en": "...there might be something I can use to protect myself.",
+      "ko": "...나를 지킬 만한 뭔가가 들어 있을지도 몰라."
     },
     "dialogue.sys_class_chest_prompt.0": {
       "en": "How convenient...",

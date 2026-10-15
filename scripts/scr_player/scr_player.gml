@@ -193,6 +193,66 @@ function Player_ArmExitIgnore(_pl, _gx = undefined, _gy = undefined) {
     return _exit_here;
 }
 
+// ---- D127: the first class chest of a run cannot be skipped ----
+// rm_floor1 holds the run's first class chest and skill chest (D73: the first one opened gives the class choice) and nothing there is
+// reachable only after the exit, so floor 1's exit refuses a player who has not chosen a class yet. A character struct that predates
+// class_chosen counts as chosen when it has a class (the same rule as Card_EnsureFields).
+function ClassGuard_Applies(_ch, _room) {
+    if (!is_struct(_ch)) return false;
+    if (_room != rm_floor1) return false;
+    if (variable_struct_exists(_ch, "class_chosen")) return !_ch.class_chosen;
+    return !(variable_struct_exists(_ch, "class_id") && _ch.class_id != CLASS_NOBODY);
+}
+
+// The way back from a direction (the one the player was walking into the exit); -1 for none.
+function ClassGuard_BackDir(_dir) {
+    switch (_dir) {
+        case RIGHT: return LEFT;
+        case LEFT: return RIGHT;
+        case UP: return DOWN;
+        case DOWN: return UP;
+    }
+    return -1;
+}
+
+// Where the player steps after the lines: straight back from the exit, else sideways; never into a wall or a chest. -1 when boxed in.
+function ClassGuard_PickDir(_pl, _dir_to_exit) {
+    if (!instance_exists(_pl) || _dir_to_exit == -1) return -1;
+    var tile = GRID_TILE_SIZE;
+    if (variable_instance_exists(_pl, "tile_size")) tile = max(1, round(real(_pl.tile_size)));
+    var back = ClassGuard_BackDir(_dir_to_exit);
+    var side_a = (back == LEFT || back == RIGHT) ? UP : LEFT;
+    var tries = [back, side_a, ClassGuard_BackDir(side_a)];
+    for (var i = 0; i < 3; i++) {
+        var d = tries[i];
+        var tx = _pl.x + ((d == RIGHT) - (d == LEFT)) * tile;
+        var ty = _pl.y + ((d == DOWN) - (d == UP)) * tile;
+        if (!Player_TileBlocked(_pl, tx, ty)) return d;
+    }
+    return -1;
+}
+
+// Called by an exit (obj_room_transition) the player walked into. True = the exit does not fire: the step into it is undone, the two lines
+// play, and the player's Step walks him one tile back once they are read (the same movement code as any step, so he stays on the grid, D69).
+function ClassGuard_OnExit(_pl) {
+    if (!instance_exists(_pl)) return false;
+    var gs = GameState_Get();
+    if (!ClassGuard_Applies(gs.player_ch, room)) return false;
+    if (UI_IsBlocking()) return true;   // a screen is already up: the exit waits (the lines come when the player walks into it again)
+    var dir_to_exit = variable_instance_exists(_pl, "move_dir") ? _pl.move_dir : -1;
+    if (dir_to_exit == -1 && variable_instance_exists(_pl, "face")) dir_to_exit = _pl.face;
+    if (variable_instance_exists(_pl, "moving") && _pl.moving && variable_instance_exists(_pl, "step_from_x")) {
+        _pl.x = _pl.step_from_x;   // the step into the exit is undone, as an aborted step is (I-048)
+        _pl.y = _pl.step_from_y;
+    }
+    _pl.moving = false;
+    _pl.move_timer = 0;
+    _pl.move_dir = -1;
+    _pl.class_guard_to = dir_to_exit;
+    Dialogue_StartLines(DialogueDB_Get("sys_class_chest_guard"));
+    return true;
+}
+
 function Player_EnsureDialogueSettle(_pl, _recover_frames = PLAYER_DIALOGUE_SETTLE_FRAMES) {
     if (!instance_exists(_pl)) return;
     if (variable_instance_exists(_pl, "auto_resolve_recover_timer") && _pl.auto_resolve_recover_timer > 0) return;
