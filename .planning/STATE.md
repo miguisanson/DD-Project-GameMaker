@@ -70,6 +70,8 @@ Do not start Phase 4 until the G3 save contract is written. Do not start any com
 
 ## Learned, not obvious from code
 
+- **D123 as chosen doubles elites** (R1-sim, 2026-10-15): per-floor elites with "at least 1 from floor 2" = ~6.3 elites/run vs ~2.8 with the old 15% roll; sim win rate average profile Knight 94->88, Archer 96->92, Mage 87->84, Nobody 26->25; gold/run +7-10%. Kept as the owner chose; flagged in PLAYTEST-QUEUE balance entry. Fallback if too hard: drop the minimum of 1.
+
 - **Test runs still take focus**: the game window becomes foreground ~273 ms after a minimized launch (display spike). Never run window modes while the owner uses the PC until fixed (I-053).
 - **Owner IDE tasks for the next stop**: add Create/Begin Step/Draw GUI events to obj_display (then move display logic from obj_ui_controller); options: window colour black, Windows scaling -1, allow window resize (DISP-11).
 
