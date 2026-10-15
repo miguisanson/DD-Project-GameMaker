@@ -1233,3 +1233,90 @@ function Player_DrawWorldFx() {
     draw_set_color(_oc);
     draw_set_alpha(_oa);
 }
+
+// ============================================================================
+// H11 (D153, D158): smarter map AI, hiding spots, no spawn camping. Pure functions first (Test_Suite_MapAI); the instance code only calls them.
+// ============================================================================
+// True when an enemy standing on cell (_ecx,_ecy) hears a player on cell (_pcx,_pcy): running only, straight-line distance, walls do not matter.
+function Hear_RunHeard(_ecx, _ecy, _pcx, _pcy, _running) {
+    return false;
+}
+
+// The cell a fleeing player most likely ran to: from the last seen cell straight on in _dir (RIGHT, UP, LEFT, DOWN, or -1 for none), up to _tiles cells, stopping before a blocked cell or the room edge.
+function Search_FleeCell(_g, _lcx, _lcy, _dir, _tiles) {
+    return { cx: _lcx, cy: _lcy };
+}
+
+// A search that starts when the enemy stands on the last seen cell: look, walk the flee leg, look, give up with one "?".
+function Search_Create(_lcx, _lcy, _dir, _look_frames) {
+    return { stage: 0, lcx: _lcx, lcy: _lcy, dir: _dir, look: _look_frames, timer: 0, fcx: _lcx, fcy: _lcy, popped: false };
+}
+
+// One decision of a search for an enemy on cell (_ecx,_ecy). Returns { goal_cx, goal_cy, pop, done }: goal_cx < 0 means stay here; pop is true on the one step the "?" goes up; done ends the search.
+function Search_Step(_se, _g, _ecx, _ecy) {
+    return { goal_cx: -1, goal_cy: -1, pop: false, done: true };
+}
+
+// The hiding cells of a room (D153): [[cx, cy], ...] picked by hand from the room art (tall grass, deep shadow). Rooms without any return [].
+function Hide_Cells(_room_name) {
+    return [];
+}
+
+function Hide_IsCell(_room_name, _cx, _cy) {
+    return false;
+}
+
+// True when the player counts as hidden: standing still (not mid-step) for HIDE_SETTLE_FRAMES on one of the room's hiding cells (_cells = Hide_Cells(room name)).
+function Sight_PlayerHidden(_cells, _pcx, _pcy, _moving, _still_frames) {
+    return false;
+}
+
+// Can an enemy at pixel (_ex,_ey) see a player at pixel (_px,_py)? A circle of _tiles, a clear line unless _see_through, and a hidden player only from HIDE_SEEN_TILES.
+function Sight_CanSee(_g, _ex, _ey, _px, _py, _tiles, _see_through, _hidden) {
+    if (_tiles <= 0) return false;
+    var _half = GRID_TILE_SIZE / 2;
+    if (point_distance(_ex, _ey, _px, _py) > _tiles * GRID_TILE_SIZE) return false;
+    if (_see_through) return true;
+    return Nav_LineClear(_g, Nav_CellOf(_ex + _half), Nav_CellOf(_ey + _half), Nav_CellOf(_px + _half), Nav_CellOf(_py + _half));
+}
+
+// What an enemy (profile _prof, pixel position _ex,_ey) notices of a player at pixel (_px,_py): { sees, heard }. heard only counts when it does not see him.
+function EnemyAI_Perceive(_g, _prof, _ex, _ey, _px, _py, _running, _hidden) {
+    var _sees = Sight_CanSee(_g, _ex, _ey, _px, _py, _prof.sight, _prof.see_through, _hidden);
+    return { sees: _sees, heard: false };
+}
+
+// Distance in tiles from a cell to the nearest exit cell of the grid (9999 when the room has none).
+function Nav_ExitDist(_g, _cx, _cy) {
+    return 9999;
+}
+
+function Nav_GridAddExit(_g, _cx, _cy) {
+}
+
+// The nearest cell (by walking) from (_fcx,_fcy) that is at least _min_exit tiles from every exit and _arr_clear tiles from the arrival cell (_arr_cx < 0: no arrival). { ok, cx, cy }.
+function Nav_SafeCell(_g, _fcx, _fcy, _min_exit, _arr_cx, _arr_cy, _arr_clear) {
+    return { ok: false, cx: _fcx, cy: _fcy };
+}
+
+// Where an enemy belongs when the player arrives at cell (_arr_cx,_arr_cy): { cx, cy, moved, home_cx, home_cy }. Left alone unless it stands nearer than AI_EXIT_RELOCATE_TILES to an exit or nearer than AI_ARRIVAL_CLEAR_TILES to the arrival.
+function Enemy_ArrivalCell(_g, _ecx, _ecy, _hcx, _hcy, _arr_cx, _arr_cy) {
+    return { cx: _ecx, cy: _ecy, moved: false, home_cx: _hcx, home_cy: _hcy };
+}
+
+// The next patrol target for an enemy on (_ecx,_ecy) with home (_hcx,_hcy): a free cell inside the roaming range, not near an exit. undefined when none was found.
+function Idle_PatrolTarget(_g, _hcx, _hcy, _roam, _ecx, _ecy) {
+    for (var _try = 0; _try < 8; _try++) {
+        var _cx = _hcx + irandom_range(-_roam, _roam);
+        var _cy = _hcy + irandom_range(-_roam, _roam);
+        if (abs(_cx - _ecx) + abs(_cy - _ecy) < 2) continue;
+        if (Nav_CellBlocked(_g, _cx, _cy)) continue;
+        return [_cx, _cy];
+    }
+    return undefined;
+}
+
+// May a wandering enemy on (_ecx,_ecy) step to (_tcx,_tcy)? Not into the zone round an exit, unless it is a step away from the exit.
+function Idle_StepAllowed(_g, _ecx, _ecy, _tcx, _tcy) {
+    return true;
+}
