@@ -635,30 +635,6 @@ function SFX_Play(_key, _vol = 1, _pitch = 1) {
     return snd_handle;
 }
 
-function SFX_Stop(_key = "") {
-    if (_key == "") {
-        if (variable_global_exists("sfx_last_handle") && global.sfx_last_handle != -1 && audio_is_playing(global.sfx_last_handle)) {
-            audio_stop_sound(global.sfx_last_handle);
-        }
-        return;
-    }
-    if (variable_global_exists("sfx_variant_db") && ds_exists(global.sfx_variant_db, ds_type_map) && ds_map_exists(global.sfx_variant_db, _key)) {
-        var list = global.sfx_variant_db[? _key];
-        if (is_array(list)) {
-            for (var i = 0; i < array_length(list); i++) {
-                var sndv = list[i];
-                if (SFX_IsValidSoundAsset(sndv)) audio_stop_sound(sndv);
-            }
-            return;
-        }
-    }
-
-    if (!variable_global_exists("sfx_db") || !ds_exists(global.sfx_db, ds_type_map)) return;
-    if (!ds_map_exists(global.sfx_db, _key)) return;
-    var snd = global.sfx_db[? _key];
-    if (SFX_IsValidSoundAsset(snd)) audio_stop_sound(snd);
-}
-
 function SFX_PlayUI(_key, _vol = 1, _pitch = 1) {
     return SFX_Play(_key, _vol, _pitch);
 }
@@ -980,85 +956,6 @@ function BGM_ApplyGain(_fade_ms = 0) {
     }
 }
 
-function BGM_Play(_key, _loop = true, _force_restart = false) {
-    SFX_EnsureManager();
-    SFX_ClampVolumes();
-    var snd = BGM_GetSound(_key);
-    if (!SFX_IsValidSoundAsset(snd)) return -1;
-
-    if (!variable_global_exists("bgm_current_key")) global.bgm_current_key = "";
-    if (!variable_global_exists("bgm_current_sound")) global.bgm_current_sound = noone;
-    if (!variable_global_exists("bgm_current_handle")) global.bgm_current_handle = -1;
-    if (!variable_global_exists("bgm_pending_stop_handle")) global.bgm_pending_stop_handle = -1;
-    if (!variable_global_exists("bgm_pending_stop_frames")) global.bgm_pending_stop_frames = 0;
-
-    var cur_h = global.bgm_current_handle;
-    var playing = (cur_h != -1) && audio_is_playing(cur_h);
-    var same_track = (global.bgm_current_sound == snd);
-    if (same_track && playing && !_force_restart) {
-        BGM_ApplyGain(100);
-        return cur_h;
-    }
-
-    if (playing) {
-        audio_sound_gain(cur_h, 0, 250);
-        global.bgm_pending_stop_handle = cur_h;
-        var game_fps = max(1, game_get_speed(gamespeed_fps));
-        global.bgm_pending_stop_frames = max(1, ceil((250 / 1000) * game_fps));
-    }
-
-    var h = audio_play_sound(snd, 10, _loop);
-    if (h != -1) {
-        global.bgm_current_key = is_string(_key) ? _key : "";
-        global.bgm_current_sound = snd;
-        global.bgm_current_handle = h;
-        var trim = BGM_GetGainByKey(global.bgm_current_key);
-        audio_sound_gain(h, global.vol_master * global.vol_music * trim, 0);
-    } else {
-        global.bgm_current_key = "";
-        global.bgm_current_sound = noone;
-        global.bgm_current_handle = -1;
-    }
-    return h;
-}
-
-function BGM_Stop(_fade_ms = 250) {
-    if (!variable_global_exists("bgm_current_handle")) return;
-    var h = global.bgm_current_handle;
-    if (h == -1) return;
-
-    if (audio_is_playing(h)) {
-        var fade = max(0, _fade_ms);
-        audio_sound_gain(h, 0, fade);
-        if (fade <= 0) {
-            audio_stop_sound(h);
-        } else {
-            global.bgm_pending_stop_handle = h;
-            var game_fps = max(1, game_get_speed(gamespeed_fps));
-            global.bgm_pending_stop_frames = max(1, ceil((fade / 1000) * game_fps));
-        }
-    }
-
-    global.bgm_current_key = "";
-    global.bgm_current_handle = -1;
-    global.bgm_current_sound = noone;
-}
-
-function BGM_IsPlaying(_key = "") {
-    if (!variable_global_exists("bgm_current_handle")) return false;
-    var h = global.bgm_current_handle;
-    if (h == -1 || !audio_is_playing(h)) return false;
-    if (_key == "") return true;
-    if (!variable_global_exists("bgm_current_key")) return false;
-    return global.bgm_current_key == _key;
-}
-
-function Audio_SetMasterVolume(_v) {
-    global.vol_master = clamp(_v, 0, 1);
-    SFX_ApplyActiveGains(100);
-    BGM_ApplyGain(100);
-}
-
 function Audio_SetUIVolume(_v) {
     global.vol_ui = clamp(_v, 0, 1);
     SFX_ApplyActiveGains(100);
@@ -1073,12 +970,6 @@ function Audio_SetMusicVolume(_v) {
     global.vol_music = clamp(_v, 0, 1);
     BGM_ApplyGain(100);
 }
-
-// Backward-compatible aliases
-function Master_SetVolume(_v) { Audio_SetMasterVolume(_v); }
-function UI_SetVolume(_v) { Audio_SetUIVolume(_v); }
-function SFX_SetVolume(_v) { Audio_SetSFXVolume(_v); }
-function BGM_SetVolume(_v) { Audio_SetMusicVolume(_v); }
 
 function SFX_EnemyKeySuffix(_enemy_id) {
     switch (_enemy_id) {
@@ -1150,16 +1041,6 @@ function SFX_PlaySkill(_skill_id) {
 function SFX_PlayMissOrBlocked(_attacker_is_monster, _defender_class_id) {
     if (_attacker_is_monster && _defender_class_id == CLASS_KNIGHT) return SFX_Play("blocked");
     return SFX_Play("miss_effect");
-}
-
-function BGM_GetTrackForRoom(_room_id) {
-    var tracks = BGM_GetMixTracksForRoom(_room_id);
-    if (is_array(tracks) && array_length(tracks) > 0) return string(tracks[0]);
-    return "";
-}
-
-function BGM_GetTrackNameForRoom(_room_id) {
-    return BGM_GetTrackForRoom(_room_id);
 }
 
 function BGM_ApplyForRoom(_room_id) {

@@ -3,8 +3,8 @@ function Input_PreStep() {
 }
 
 // D108 F1a: runs its body once (init_done, set at the end); about 14 input calls per Ui_ReadInput made it re-allocate the tables every frame.
-// Input_Bind clears init_done, so the D95 repair below still applies after a bind made before Binds_Apply. Binds_Apply needs no reset:
-// binds_applied only ever goes false -> true, and the repair is skipped from then on.
+// The D95 repair below needs no re-run: binds_applied only ever goes false -> true, and the repair is skipped from then on.
+// A test can set init_done = false to force a re-run.
 function Input_Init() {
     if (variable_global_exists("input") && is_struct(global.input) && variable_struct_exists(global.input, "init_done") && global.input.init_done) return;
     if (!variable_global_exists("input") || !is_struct(global.input)) {
@@ -81,15 +81,6 @@ function Input_Init() {
     }
     if (!variable_struct_exists(inp, "frame")) {
         inp.frame = 0;
-    }
-    if (!variable_struct_exists(inp, "buffer")) {
-        inp.buffer = {};
-    }
-    if (!variable_struct_exists(inp, "cooldown")) {
-        inp.cooldown = {};
-    }
-    if (!variable_struct_exists(inp, "repeat_state")) {
-        inp.repeat_state = {};
     }
     if (!variable_struct_exists(inp, "move_order")) {
         inp.move_order = [];
@@ -406,46 +397,7 @@ function Input_Frame() {
     return global.input.frame;
 }
 
-function Input_ActionBuffer(_action) {
-    // Input buffering disabled globally.
-}
-
-function Input_ActionBuffered(_action, _max_age) {
-    // Input buffering disabled globally.
-    return false;
-}
-
-function Input_ActionConsume(_action) {
-    // Input buffering disabled globally.
-}
-
-// Buffering disabled: always returns no action.
-function Input_BufferedLatest(_actions, _max_age) {
-    // Input buffering disabled globally.
-    return "";
-}
-
-function Input_ActionCooldownReady(_action) {
-    // Input cooldown disabled globally.
-    return true;
-}
-
-function Input_ActionSetCooldown(_action, _frames) {
-    // Input cooldown disabled globally.
-}
-
-// Repeat behavior disabled: this is now discrete press only.
-function Input_ActionRepeat(_action, _initial_delay, _repeat_delay) {
-    // Hold-repeat disabled globally.
-    return Input_Pressed(_action);
-}
-
 function Input_UIPressed(_action) {
-    return Input_Pressed(_action);
-}
-
-function Input_UIRepeat(_action, _initial_delay = UI_NAV_REPEAT_DELAY, _repeat_delay = UI_NAV_REPEAT_RATE) {
-    // UI repeat disabled: discrete presses only.
     return Input_Pressed(_action);
 }
 
@@ -455,21 +407,6 @@ function Input_UIConfirm() {
 
 function Input_UIBack() {
     return Input_UIPressed("cancel");
-}
-
-function Input_MoveX() {
-    return (Input_Held("move_right") ? 1 : 0) - (Input_Held("move_left") ? 1 : 0);
-}
-
-function Input_MoveY() {
-    return (Input_Held("move_down") ? 1 : 0) - (Input_Held("move_up") ? 1 : 0);
-}
-
-function Input_Bind(_action, _keys) {
-    Input_Init();
-    if (!is_array(_keys)) _keys = [_keys];
-    variable_struct_set(global.input.bindings, _action, _keys);
-    global.input.init_done = false;   // the next Input_Init repairs the table again, as it did before D108
 }
 
 // ---- hold-to-skip (D48, I-055) ----------------------------------------------------------------------------------------------------
