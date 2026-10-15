@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Session 4 overnight: R1a + R1-sim MERGED to next (aebc9db, fast gate PASS 3118/0; mutation test red). In flight (Sonnet): R1b (D122/D124) in worktree DD-Project-GameMaker-wt/r1b (branch r1b-ui, checks cbb4133); F1 audit (read-only). PLAYTEST-QUEUE drafted (57 entries, 508dab3). Queued: fix leftover difficulty select after New Game (D35, found by the queue agent); F1 packets from the audit; E2 build. |
+| WIP | Session 4 overnight: on next = R1a+R1-sim (aebc9db) + F1a (a436c69, fast gate PASS 3130/0). In flight (Sonnet): R1b (wt/r1b, r1b-ui), F3b-1 dead input/audio code (wt/f3b1, f3b1-dead). Queue: FIX-diff (D35 difficulty select), F1b, F3a, F1c, then E2 build; F2/F4/F1d after E2 (BUILD-PLAN F1 table). Process note: F packets have the Sonnet agent commit its check first (red), Opus reviews + gates + merges. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
