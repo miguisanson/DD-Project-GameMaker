@@ -113,12 +113,14 @@ Run only what the change touches (D62): `-Mode fast` plus the one relevant `-Onl
 | **Sonnet subagent** (`Agent`, `model: "sonnet"`) | Makes a written failing check pass; implements against a stated contract; works in its own git worktree | Change a check to match its code; widen scope; create/rename resources outside the IDE |
 | **Local model** (Ollama, `mcp__ollama__ask_local`) | Mechanical work: string drafts, commit messages, summarizing long files | Design, multi-file reasoning, anything unverified |
 
-- **At most 2 implementer subagents at once**, each in its own worktree under
-  `E:\Github_Projects\DD-Project-GameMaker-wt\<short>`, and only if their files do
-  not overlap and neither touches shared globals, `scr_test`/`scr_debug` or
-  `scr_save`. Read-only research agents are not capped. **One integrator** merges
-  one packet at a time and **re-runs the gate after every merge**. WIP cap 3. Drop
-  to 1 implementer after a manual merge conflict, a regression or a red compile.
+- **At most 4 implementer subagents at once** (owner, 2026-10-16), each in its own worktree under
+  `E:\Github_Projects\DD-Project-GameMaker-wt\<short>`, and only if their game-code files do
+  not overlap. `scr_test`/`scr_debug` may be shared: each packet appends its own suite and uses its
+  own scenario step range; the text workbook may be shared: on a merge conflict take `next`'s
+  `game_text.xlsx`, re-add the packet's rows with openpyxl and rebuild `localization.json`.
+  Read-only research agents are not capped. **One integrator** merges one packet at a time and
+  **re-runs the gate after every merge**. WIP cap 5. Drop to 2 implementers after a regression or a
+  red compile on `next`, or if the owner reports the PC slowing down.
 - **Reviewer rules** (never the builder; assume the report is wrong): run the
   checks yourself; mutate the code and see the new check go red; take expected
   values from the spec; list removed or changed assertion names; open every
