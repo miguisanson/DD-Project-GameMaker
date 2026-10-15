@@ -280,6 +280,7 @@ function EnemyPersist_BeginEncounter(_enemy_inst, _player_inst) {
 }
 
 function EnemyPersist_ResolveBattle(_defeated) {
+    EnemyPersist_ClearSnapshot();   // hunt 5a: the fight is over (won or fled), whatever started it; the snapshot was for this fight only
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "battle")) return;
     if (gs.battle.enemy_persist_id == "") return;
@@ -856,6 +857,7 @@ function Run_SaveOnClose(_ignore_harness = false) {
 // The death hook (Player_OnDeath, Debug_KillPlayer): ends the run in the profile, then the death scene plays (C5 replaces the placeholder),
 // then RunFlow shows the summary and starts the next run (the echo pick comes later, after that run's class pick: D130).
 function Run_OnPlayerDeath(_cause = undefined, _result = "died") {
+    EnemyPersist_ClearSnapshot();   // hunt 5a: the fight is lost (or the run abandoned): no snapshot of it may be written later
     var cause = is_undefined(_cause) ? Run_CauseText() : _cause;
     var killer = (_result == "abandoned") ? "" : cause;   // the enemy's name for the "{killer}" slot of a death line
     Run_Finish(_result, cause);
@@ -1142,5 +1144,7 @@ function EnemyPersist_HasSnapshot() {
 function EnemyPersist_WriteSnapshot(_path = undefined) {
     if (!EnemyPersist_HasSnapshot()) return false;
     var path = is_undefined(_path) ? RunSave_Path() : _path;
-    return Save_WriteFileAtomic(path, global.encounter_snapshot, RunSave_IsCurrentRaw);
+    var ok = Save_WriteFileAtomic(path, global.encounter_snapshot, RunSave_IsCurrentRaw);
+    if (ok) EnemyPersist_ClearSnapshot();   // hunt 5a: spent; a second quit must not write it again
+    return ok;
 }
