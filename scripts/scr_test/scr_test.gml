@@ -1990,6 +1990,26 @@ function Test_Suite_Data() {
         Test_Eq("R-004 loot table '" + string(_tk) + "' rows resolve (item exists, weight > 0, qty_min <= qty_max)", _tbad, 0);
         _tk = ds_map_find_next(global.loot_tables, _tk);
     }
+    // D108 F1a: equip passives are assigned once, and localized names still follow the language (ItemDB_Get runs every frame in a battle menu)
+    var _p1 = ItemDB_Get(1).passive_params;
+    variable_struct_set(_p1, "f1a_probe", 7);
+    for (var _g = 0; _g < 300; _g++) ItemDB_Get(1);
+    Test_True("F1a ItemDB_Get(1).passive_params is the same struct on every call", ItemDB_Get(1).passive_params == _p1 && variable_struct_exists(ItemDB_Get(1).passive_params, "f1a_probe"));
+    variable_struct_remove(_p1, "f1a_probe");
+    var _lang1 = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    Test_Eq("F1a item 1 name (en)", ItemDB_Get(1).name, "Wooden Sword");
+    Test_Eq("F1a item 1 passive name (en)", ItemDB_Get(1).passive_desc[0], "Steady Strike");
+    Loc_SetLanguage("ko");
+    Test_Eq("F1a item 1 name follows Loc_SetLanguage(ko)", ItemDB_Get(1).name, Loc_GetRaw("item.name.1", "ko"));
+    Test_Eq("F1a item 1 passive name follows Loc_SetLanguage(ko)", ItemDB_Get(1).passive_desc[0], Loc_GetRaw("item.passive.name.1", "ko"));
+    Test_True("F1a the ko item name is not the English one", ItemDB_Get(1).name != "Wooden Sword");
+    Loc_SetLanguage("en");
+    Test_Eq("F1a item 1 name back to en", ItemDB_Get(1).name, "Wooden Sword");
+    Loc_SetLanguage(_lang1);
+    var _t0 = get_timer();
+    for (var _g = 0; _g < 1000; _g++) ItemDB_Get(1);
+    Test_Log("[PERF] 1000 x ItemDB_Get(1): " + string(get_timer() - _t0) + " us");
 }
 
 // -exportdata (B1, spec section 9): the data the simulator reads. Built in memory here (the real file is written and re-read by `-Only exportdata`).
@@ -2899,6 +2919,31 @@ function Test_Suite_Input() {
     Test_True("Input the state of the frame is kept for every later controller of that frame", variable_struct_get(_inp.state, "menu_down").pressed);
     _inp.last_step_time = -1;
     Input_Update();
+    // D108 F1a: Input_Init does its work once, not on every Input_Held / Input_Pressed / Prompt_Device call (dozens per frame)
+    var _ba = variable_struct_exists(_inp, "binds_applied") && _inp.binds_applied;
+    _inp.binds_applied = false;
+    _inp.bindings.confirm = [ord("Q")];   // an older table in memory: the first init still repairs it (D95)
+    _inp.init_done = false;
+    global.input_init_runs = 0;
+    Input_Init();
+    Test_True("F1a the first init repairs an older confirm table", array_contains(_inp.bindings.confirm, vk_space) && array_contains(_inp.bindings.confirm, ord("Z")));
+    var _conf = _inp.bindings.confirm;
+    _conf[@ 0] = 12345;   // a probe in the live array: a re-init would write a fresh table over it
+    for (var _c = 0; _c < 300; _c++) { Input_Held("confirm"); Input_Pressed("confirm"); Prompt_Device(); }
+    Test_Eq("F1a Input_Init body ran once over 300 Input_Held/Input_Pressed/Prompt_Device calls", global.input_init_runs, 1);
+    Test_True("F1a bindings.confirm is the same array after 300 calls", _inp.bindings.confirm == _conf && _inp.bindings.confirm[0] == 12345);
+    _conf[@ 0] = vk_space;
+    var _kp = Binds_Defaults();
+    _kp.interact = [ord("T")];
+    Binds_Apply(_kp);
+    for (var _c = 0; _c < 300; _c++) Input_Held("interact");
+    Test_True("F1a after Binds_Apply the new binding takes effect and stays", _inp.bindings.interact[0] == ord("T") && Input_Label("interact") == "T");
+    Binds_Apply(Binds_Defaults());
+    Test_True("F1a Binds_Apply of the defaults puts Space back", _inp.bindings.interact[0] == vk_space);
+    _inp.binds_applied = _ba;
+    var _t1 = get_timer();
+    for (var _c = 0; _c < 1000; _c++) Input_Held("confirm");
+    Test_Log("[PERF] 1000 x Input_Held: " + string(get_timer() - _t1) + " us");
 }
 
 // ---- ROB-03 obj_sfx_manager: audio globals are created once, not every Step -----------------------
