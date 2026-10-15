@@ -9806,8 +9806,10 @@ function Scenario_StepSmokeSpeed(_s) {
                             Scenario_Next(_s, 410);
                         } else {
                             Scenario_Check("g7_run_held_through_real_input_gives_a_time_scale_of_2", _g.scale_max == 2, "scale=" + string(_g.scale_max));
-                            Scenario_Check("g7_the_enemy_turn_with_run_held_takes_about_half_the_frames", _g.base_f > 0 && _fr <= _g.base_f * 0.7 && _fr >= _g.base_f * 0.3, "held=" + string(_fr) + " baseline=" + string(_g.base_f));
-                            Scenario_Check("g7_the_enemy_turn_with_run_held_takes_about_half_the_time", _g.base_ms > 0 && _ms <= _g.base_ms * 0.7 && _ms >= _g.base_ms * 0.3, "held=" + string(_ms) + " baseline=" + string(_g.base_ms));
+                            // Hunt 5a: the ratio is measured in game FRAMES, not wall-clock ms. A frame the PC stalls on still adds one frame and at most
+                            // PRESENTATION_MAX_STEP_US of game time, but its whole length to the ms count (368 ms held against a 333 ms baseline when gates ran at once).
+                            // The ms are only logged above.
+                            Scenario_Check("g7_the_enemy_turn_with_run_held_takes_about_half_the_frames", _g.base_f > 0 && _fr <= _g.base_f * 0.7 && _fr >= _g.base_f * 0.3, "held=" + string(_fr) + " baseline=" + string(_g.base_f) + " (ms held=" + string(_ms) + " baseline=" + string(_g.base_ms) + ")");
                             Scenario_Next(_s, 414);
                         }
                     }
