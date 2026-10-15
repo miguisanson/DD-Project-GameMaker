@@ -2773,7 +2773,7 @@ function Scenario_StepShotsDisp(_s) {
                 Scenario_Finish();
                 break;
             }
-            if (!_s.fade_shot && Transition_IsActive() && _gs.transition_fx.phase == 0 && _gs.transition_fx.timer >= 8 && room == rm_cutscene) {
+            if (!_s.fade_shot && Transition_IsActive() && _gs.transition_fx.phase == 0 && _gs.transition_fx.timer >= Transition_FramesToMs(8) && room == rm_cutscene) {
                 Scenario_ShotLayout("shot_disp_cut_fade_" + _tag + ".png", "art=1");
                 _s.fade_shot = true;
             }
@@ -2848,7 +2848,7 @@ function Scenario_StepShotsDisp(_s) {
                 Scenario_Finish();
                 break;
             }
-            if (!_s.fade_shot && Transition_IsActive() && _gs.transition_fx.type == TRANSITION_TYPE_ENCOUNTER && _gs.transition_fx.phase == 1 && _gs.transition_fx.timer >= 3) {
+            if (!_s.fade_shot && Transition_IsActive() && _gs.transition_fx.type == TRANSITION_TYPE_ENCOUNTER && _gs.transition_fx.phase == 1 && _gs.transition_fx.timer >= Transition_FramesToMs(3)) {
                 Scenario_Check("shots_disp_encounter_zoom_active", global.display.zoom > 1.2, "zoom=" + string(global.display.zoom));
                 Scenario_ShotLayout("shot_disp_encounter_zoom.png", "edge=1");
                 _s.fade_shot = true;
@@ -4605,7 +4605,7 @@ function Scenario_StepSmokeRun(_s) {
             if (_s.t > 2 && room == rm_cutscene && _sc != noone && _sc.state == "credits" && !_rl.credits) {   // C5 (D105): the credits roll after the closing text; hold confirm skips it
                 _rl.credits = true;
                 Scenario_Release();
-                Scenario_Check("win_credits_roll_follows_the_closing_text", Credits_TotalFrames() > 600 && _sc.credits_t < 30, "frames=" + string(Credits_TotalFrames()));
+                Scenario_Check("win_credits_roll_follows_the_closing_text", Credits_TotalMs() > Transition_FramesToMs(600) && _sc.credits_t < Transition_FramesToMs(30), "ms=" + string(Credits_TotalMs()));
                 Scenario_Hold("confirm", 120);
             }
             if (_s.t > 2 && room == rm_start && !Transition_IsActive()) {
@@ -5105,8 +5105,8 @@ function Scenario_StepShotsStory(_s) {
                 _s.cr0 = _s.t;
             }
             if (variable_struct_exists(_s, "cr0") && _scn.state == "credits") {
-                if (_scn.credits_t == 260) Scenario_ShotStory(_s, "credits_title", "fade=1");
-                if (_scn.credits_t == 760) { Scenario_ShotStory(_s, "credits_roll", "fade=1"); Scenario_Next(_s, 160); }
+                if (!variable_struct_exists(_s, "cr_title") && _scn.credits_t >= Transition_FramesToMs(260)) { _s.cr_title = true; Scenario_ShotStory(_s, "credits_title", "fade=1"); }   // credits_t is ms (F2a); 260 and 760 are the old frame marks
+                if (!variable_struct_exists(_s, "cr_roll") && _scn.credits_t >= Transition_FramesToMs(760)) { _s.cr_roll = true; Scenario_ShotStory(_s, "credits_roll", "fade=1"); Scenario_Next(_s, 160); }
             }
             if (_s.t > 3000) { Scenario_Check("shots_story_credits_roll", false, "state=" + (_scn != noone ? string(_scn.state) : "none")); Scenario_Finish(); }
             break;

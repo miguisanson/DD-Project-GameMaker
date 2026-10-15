@@ -9,16 +9,16 @@ cutscene_segment_index = -1;
 cutscene_segment_hold_timer = 0;
 cutscene_wait_transition = false;
 cutscene_skip = false;   // D48: hold confirm ~1 s skips the cutscene
-credits_t = 0;           // C5 (D105): frames of the credits roll (state "credits")
+credits_t = 0;           // C5 (D105): milliseconds of the credits roll (state "credits"), D108 F2a
 cutscene_transition_next_index = -1;
 cutscene_transition_switched = false;
 boot_logo_phase = 0;
 boot_logo_timer = 0;
 boot_logo_alpha = 0;
-boot_logo_fade_in_frames = 48;
-boot_logo_hold_frames = 120;
-boot_logo_fade_out_frames = 48;
-boot_logo_black_hold_frames = 8;
+boot_logo_fade_in_ms = BOOT_LOGO_FADE_IN_MS;
+boot_logo_hold_ms = BOOT_LOGO_HOLD_MS;
+boot_logo_fade_out_ms = BOOT_LOGO_FADE_OUT_MS;
+boot_logo_black_hold_ms = BOOT_LOGO_BLACK_HOLD_MS;
 boot_logo_sprite = pale_rook_1;
 
 cutscene_definitions = {};
@@ -39,7 +39,7 @@ cutscene_definitions.intro = [
             "It was worth it...",
             "You signed up."
         ],
-        hold_frames: 0,
+        hold_ms: 0,
         transition_speed: "normal",
         text_only: true
     },
@@ -61,7 +61,7 @@ cutscene_definitions.intro = [
             "You hear cracking...",
             "Small tremors..."
         ],
-        hold_frames: 0,
+        hold_ms: 0,
         transition_speed: "normal",
         text_only: true
     },
@@ -71,7 +71,7 @@ cutscene_definitions.intro = [
             "But it was already too late.",
             "You fell."
         ],
-        hold_frames: 0,
+        hold_ms: 0,
         transition_speed: "normal",
         text_only: true
     }
@@ -85,7 +85,7 @@ cutscene_definitions.ending = [
             "An exit...",
             "I need to find out where I am."
         ],
-        hold_frames: 0,
+        hold_ms: 0,
         transition_speed: "normal",
         text_only: true
     },
@@ -98,7 +98,7 @@ cutscene_definitions.ending = [
             "They're all dead.",
             "... What on earth..."
         ],
-        hold_frames: 0,
+        hold_ms: 0,
         transition_speed: "normal",
         text_only: true
     },
@@ -110,7 +110,7 @@ cutscene_definitions.ending = [
             "...",
             "I wasn't so lucky after all."
         ],
-        hold_frames: 0,
+        hold_ms: 0,
         transition_speed: "normal",
         text_only: true
     },
@@ -119,7 +119,7 @@ cutscene_definitions.ending = [
         lines: [
             "There is no hope."
         ],
-        hold_frames: 0,
+        hold_ms: 0,
         transition_speed: "slow",
         text_only: true,
         chars_per_sec: 12
@@ -127,7 +127,7 @@ cutscene_definitions.ending = [
     {
         sprite: black_screen,
         lines: Story_ClosingLines(),   // C5 (D105): the closing text lives in scr_dialogue.gml (the credits roll follows it)
-        hold_frames: 0,
+        hold_ms: 0,
         transition_speed: "normal",
         text_only: false
     }
@@ -138,7 +138,7 @@ cutscene_definitions.game_over = [
     {
         sprite: black_screen,
         lines: [],
-        hold_frames: 2,
+        hold_ms: Transition_FramesToMs(2),
         transition_speed: "normal",
         text_only: true
     }

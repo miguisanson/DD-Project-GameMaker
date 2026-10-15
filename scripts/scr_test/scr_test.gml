@@ -110,6 +110,7 @@ function Test_RunAll() {
     Test_RunSuite("MenuMeasure", Test_Suite_MenuMeasure);
     Test_RunSuite("SfxInit", Test_Suite_SfxInit);
     Test_RunSuite("Audio", Test_Suite_Audio);
+    Test_RunSuite("Transition", Test_Suite_Transition);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -6913,4 +6914,112 @@ function Test_Suite_FairUi() {
     // ---- D124: Take Aim says how often it crits, from the bag size ----
     var _line = Status_Describe(STATUS_CRIT_UP).line;
     Test_True("R1b D124: Take Aim's status line reads '1 in every 4 hits is a critical.'", string_pos("1 in every 4 hits is a critical", _line) > 0);
+}
+
+// ---- D108 F2a: transitions, boot logo, cutscene holds and the credits roll run on a ms clock ----
+// Plays one transition through the pure phase machine at a fixed step. Returns { steps: [steps spent in each phase], events: [{ ev, phase, timer, i }], total }.
+function Test_TransitionRun(_type, _step_ms, _black_hold_ms = undefined) {
+    var _tr = { type: _type, phase: 0, timer: 0, alpha: 0, progress: 0 };
+    Transition_ApplyTimes(_tr, _type);
+    if (!is_undefined(_black_hold_ms)) _tr.black_hold_ms = _black_hold_ms;
+    var _out = { steps: [0, 0, 0, 0, 0], events: [], total: 0 };
+    for (var _i = 0; _i < 2000; _i++) {
+        var _ph = _tr.phase;
+        var _ev = Transition_PhaseStep(_tr, _step_ms);
+        _out.steps[_ph]++;
+        _out.total++;
+        if (_ev != TRANSITION_EVT_NONE) array_push(_out.events, { ev: _ev, phase: _tr.phase, timer: _tr.timer, i: _i });
+        if (_ev == TRANSITION_EVT_DONE) break;
+    }
+    return _out;
+}
+
+function Test_TransitionSame(_name, _got, _want, _tol) {
+    var _ok = true;
+    for (var _i = 0; _i < array_length(_want); _i++) { if (abs(_got[_i] - _want[_i]) > _tol) _ok = false; }
+    Test_True(_name + " (got " + string(_got) + " want " + string(_want) + ")", _ok);
+}
+
+function Test_Suite_Transition() {
+    var _f60 = 1000 / 60;      // 16.667 ms, the old frame
+    var _s60 = Presentation_StepMs(16667);
+    var _s30 = Presentation_StepMs(33333);
+
+    // the clock: microseconds from delta_time, a long frame cannot skip a whole fade
+    Test_Eq("F2a a step of 16667 us == 16.667 ms", _s60, 16.667);
+    Test_Eq("F2a a step of a 200 ms hitch is capped at 50 ms", Presentation_StepMs(200000), 50);
+    Test_Eq("F2a a negative delta_time adds nothing", Presentation_StepMs(-5), 0);
+    Test_Eq("F2a Transition_FramesToMs(12) == 200 ms", Transition_FramesToMs(12), 200);
+
+    // 60 fps: the old frame counts (steps per phase), +-1
+    var _r = Test_TransitionRun(TRANSITION_TYPE_ROOM, _s60);
+    Test_TransitionSame("F2a ROOM at 60 fps: out 12, hold 2, in 14 frames", _r.steps, [12, 2, 14, 0, 0], 1);
+    _r = Test_TransitionRun(TRANSITION_TYPE_ENCOUNTER, _s60);
+    Test_TransitionSame("F2a ENCOUNTER at 60 fps: zoom 36, zoom hold 6, out 22, hold 10, in 24 frames", _r.steps, [36, 6, 22, 10, 24], 1);
+    _r = Test_TransitionRun(TRANSITION_TYPE_FLASH, _s60);
+    Test_TransitionSame("F2a FLASH at 60 fps: out 12, in 14 frames", _r.steps, [12, 14, 0, 0, 0], 1);
+    _r = Test_TransitionRun(TRANSITION_TYPE_CUTSCENE, _s60);
+    Test_TransitionSame("F2a CUTSCENE at 60 fps: out 20, hold 2, in 22 frames", _r.steps, [20, 2, 22, 0, 0], 1);
+
+    // 30 fps: the same durations in ms, so half the steps
+    _r = Test_TransitionRun(TRANSITION_TYPE_ROOM, _s30);
+    Test_TransitionSame("F2a ROOM at 30 fps: 200 ms out, 33 ms hold, 233 ms in -> 6, 1, 7 steps", _r.steps, [6, 1, 7, 0, 0], 0);
+    _r = Test_TransitionRun(TRANSITION_TYPE_ENCOUNTER, _s30);
+    Test_TransitionSame("F2a ENCOUNTER at 30 fps -> 18, 3, 11, 5, 12 steps", _r.steps, [18, 3, 11, 5, 12], 0);
+    _r = Test_TransitionRun(TRANSITION_TYPE_FLASH, _s30);
+    Test_TransitionSame("F2a FLASH at 30 fps -> 6, 7 steps", _r.steps, [6, 7, 0, 0, 0], 0);
+    _r = Test_TransitionRun(TRANSITION_TYPE_CUTSCENE, _s30);
+    Test_TransitionSame("F2a CUTSCENE at 30 fps -> 10, 1, 11 steps", _r.steps, [10, 1, 11, 0, 0], 0);
+
+    // events: the room change fires once, at the end of the fade-out, and the black hold starts after it
+    _r = Test_TransitionRun(TRANSITION_TYPE_ROOM, _s60);
+    Test_Eq("F2a ROOM fires ROOM_CHANGE then DONE", array_length(_r.events), 2);
+    Test_Eq("F2a ROOM first event is ROOM_CHANGE", _r.events[0].ev, TRANSITION_EVT_ROOM_CHANGE);
+    Test_Eq("F2a ROOM ROOM_CHANGE leaves the machine in the hold with timer 0", _r.events[0].phase == 1 && _r.events[0].timer == 0, true);
+    Test_Eq("F2a ROOM last event is DONE", _r.events[1].ev, TRANSITION_EVT_DONE);
+    _r = Test_TransitionRun(TRANSITION_TYPE_FLASH, _s60);
+    Test_Eq("F2a FLASH fires FLASH_BLACK at the end of the fade-out", _r.events[0].ev, TRANSITION_EVT_FLASH_BLACK);
+    _r = Test_TransitionRun(TRANSITION_TYPE_ENCOUNTER, _s60);
+    Test_Eq("F2a ENCOUNTER changes the room at the end of its 3rd phase (fade-out)", _r.events[0].ev == TRANSITION_EVT_ROOM_CHANGE && _r.events[0].phase == 3, true);
+
+    // the black hold needs at least one real step after the room change, even with a 0 ms hold and a long step
+    _r = Test_TransitionRun(TRANSITION_TYPE_ROOM, _s60, 0);
+    Test_True("F2a ROOM with a 0 ms hold still spends >= 1 step in the black hold", _r.steps[1] >= 1);
+    _r = Test_TransitionRun(TRANSITION_TYPE_CUTSCENE, 50, 0);
+    Test_True("F2a CUTSCENE with a 0 ms hold and 50 ms steps still spends >= 1 step in the black hold", _r.steps[1] >= 1);
+    _r = Test_TransitionRun(TRANSITION_TYPE_ENCOUNTER, 50, 0);
+    Test_True("F2a ENCOUNTER with a 0 ms hold and 50 ms steps still spends >= 1 step in the black hold", _r.steps[3] >= 1);
+
+    // a hitch cannot skip a fade: one 200 ms frame advances the fade by at most 50 ms
+    var _tr = { type: TRANSITION_TYPE_ROOM, phase: 0, timer: 0, alpha: 0, progress: 0 };
+    Transition_ApplyTimes(_tr, TRANSITION_TYPE_ROOM);
+    var _ev = Transition_PhaseStep(_tr, Presentation_StepMs(200000));
+    Test_Eq("F2a a 200 ms hitch advances the fade-out by 50 ms", _tr.timer, 50);
+    Test_Eq("F2a a 200 ms hitch does not finish the 200 ms fade-out", _ev == TRANSITION_EVT_NONE && _tr.phase == 0, true);
+    Test_Eq("F2a the fade-out alpha after 50 of 200 ms is 0.25", _tr.alpha, 0.25);
+
+    // alpha: black through the hold, fades back to 0 by the end
+    _tr = { type: TRANSITION_TYPE_ROOM, phase: 1, timer: 0, alpha: 0, progress: 0 };
+    Transition_ApplyTimes(_tr, TRANSITION_TYPE_ROOM);
+    Transition_PhaseStep(_tr, _f60);
+    Test_Eq("F2a ROOM black hold keeps alpha 1", _tr.alpha, 1);
+
+    // boot logo, in ms (48 / 120 / 48 / 8 frames at 60 fps)
+    Test_Eq("F2a boot logo fade-in 800 ms", BOOT_LOGO_FADE_IN_MS, 800);
+    Test_Eq("F2a boot logo hold 2000 ms", BOOT_LOGO_HOLD_MS, 2000);
+    Test_Eq("F2a boot logo fade-out 800 ms", BOOT_LOGO_FADE_OUT_MS, 800);
+    Test_True("F2a boot logo black hold 8 frames == 133.33 ms", abs(BOOT_LOGO_BLACK_HOLD_MS - 8 * _f60) < 0.01);
+    Test_Eq("F2a cutscene logo fade 300 ms (18 frames at 60 fps)", CUTSCENE_LOGO_FADE_MS, 300);
+
+    // credits: one GUI pixel per 60 fps frame == 60 px per second
+    var _px = 0;
+    for (var _i = 0; _i < 600; _i++) _px = Credits_ScrollPx((_i + 1) * _s60);
+    Test_True("F2a credits scroll 60 * 10 px after 10 s of 60 fps steps", abs(_px - 600) < 1);
+    var _ms = 0;
+    for (var _j = 0; _j < 150; _j++) _ms += _s30;
+    Test_True("F2a credits scroll 60 * 5 px after 5 s of 30 fps steps", abs(Credits_ScrollPx(_ms) - 300) < 1);
+    Test_Eq("F2a credits scroll at 0 ms is 0 px", Credits_ScrollPx(0), 0);
+    var _lay = { total: 1000 };
+    var _frames_old = Display_GuiH() + 1000 + round(Display_GuiH() * 0.5);
+    Test_True("F2a credits total ms == the old frame count at 60 fps", abs(Credits_TotalMs(_lay) - _frames_old * _f60) < 0.01);
 }

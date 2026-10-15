@@ -1723,18 +1723,27 @@ function Credits_Layout() {
     return { rows: rows, total: ypos, col_w: col_w };
 }
 
-// Frames the roll takes at one GUI pixel per frame (a screen of lead-in, the roll, a screen of lead-out).
-function Credits_TotalFrames(_layout = undefined) {
-    var l = is_struct(_layout) ? _layout : Credits_Layout();
-    return Display_GuiH() + l.total + round(Display_GuiH() * 0.5);
+// D108 F2a: the roll scrolls 60 GUI pixels per second (it was one pixel per 60 fps frame), whatever the frame rate.
+#macro CREDITS_PX_PER_SEC 60
+
+// GUI pixels the roll has scrolled after _ms milliseconds.
+function Credits_ScrollPx(_ms) {
+    return _ms * CREDITS_PX_PER_SEC / 1000;
 }
 
-function Credits_Draw(_t) {
+// Milliseconds the roll takes (a screen of lead-in, the roll, a screen of lead-out).
+function Credits_TotalMs(_layout = undefined) {
+    var l = is_struct(_layout) ? _layout : Credits_Layout();
+    var px = Display_GuiH() + l.total + round(Display_GuiH() * 0.5);
+    return px * 1000 / CREDITS_PX_PER_SEC;
+}
+
+function Credits_Draw(_ms) {
     var mt = Ui_Metrics();
     var p = mt.p;
     Ui_Box(0, 0, mt.gw, mt.gh, UI_C_DARKEST);
     var l = Credits_Layout();
-    var top = mt.gh - _t;   // one GUI pixel per frame
+    var top = mt.gh - round(Credits_ScrollPx(_ms));   // 60 GUI pixels per second
     var cx = round(mt.gw / 2);
     for (var i = 0; i < array_length(l.rows); i++) {
         var r = l.rows[i];
