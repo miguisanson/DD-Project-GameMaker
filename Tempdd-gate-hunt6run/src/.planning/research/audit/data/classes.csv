@@ -1,0 +1,5 @@
+id,name,hd,mp_gain_per_level,base_hp,base_mp,start_bonus_str,start_bonus_agi,start_bonus_def,start_bonus_int,start_bonus_luck,hp_gain_per_level,stat_growth_per_level,skillbook_pool
+1,Knight,10,1,10,10,1,0,2,0,0,7,"odd lvl: str+1 | even lvl: str+1,def_+1",Wound|Hilt Bash|Muscle Up|Rev Up|Horizontal Slash
+0,Archer,8,2,10,10,0,2,0,0,1,6,"odd lvl: agi+1 | even lvl: agi+1,luck+1",Wound|Poison Arrow|Evasion|Double Shot|Take Aim
+2,Mage,6,2,10,10,0,0,0,2,1,5,"odd lvl: intt+1 | even lvl: intt+1,luck+1",Fireball|Poison Mist|Ice Spear|Meditation|Foresight
+3,Nobody,8,1,10,10,0,0,0,0,0,6,rotating 5-level table (see formulas),"no skills, no class books"

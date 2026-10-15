@@ -1,0 +1,664 @@
+legacy_row,legacy_key,new_ref,runtime_key,group,context,source_file,source_line,source_ref
+2,battle.action.attack,battle.action.attack,battle.action.attack,battle,Loc_T fallback in Create_0,objects/obj_battle_controller/Create_0.gml,77,Create_0:77
+3,battle.action.create_0.103.0,battle.action.create_0.103.0,battle.action.create_0.103.0,battle.action,Create_0 UI/message text,objects/obj_battle_controller/Create_0.gml,103,Create_0:103
+4,battle.action.create_0.103.1,battle.action.create_0.103.1,battle.action.create_0.103.1,battle.action,Create_0 UI/message text,objects/obj_battle_controller/Create_0.gml,103,Create_0:103
+5,battle.action.item,battle.action.item,battle.action.item,battle,Loc_T fallback in Create_0,objects/obj_battle_controller/Create_0.gml,79,Create_0:79
+6,battle.action.run,battle.action.run,battle.action.run,battle,Loc_T fallback in Create_0,objects/obj_battle_controller/Create_0.gml,80,Create_0:80
+7,battle.action.skill,battle.action.skill,battle.action.skill,battle,Loc_T fallback in Create_0,objects/obj_battle_controller/Create_0.gml,78,Create_0:78
+8,battle.action.timing.bad,battle.action.timing.bad,battle.action.timing.bad,battle,Loc_T fallback in Battle_AttackTimingJudge,scripts/scr_combat/scr_combat.gml,382,Battle_AttackTimingJudge:382
+9,battle.action.timing.good,battle.action.timing.good,battle.action.timing.good,battle,Loc_T fallback in Battle_AttackTimingJudge,scripts/scr_combat/scr_combat.gml,380,Battle_AttackTimingJudge:380
+10,battle.action.timing.miss,battle.action.timing.miss,battle.action.timing.miss,battle,Loc_T fallback in Battle_AttackTimingJudge,scripts/scr_combat/scr_combat.gml,383,Battle_AttackTimingJudge:383
+11,battle.action.timing.okay,battle.action.timing.okay,battle.action.timing.okay,battle,Loc_T fallback in Battle_AttackTimingJudge,scripts/scr_combat/scr_combat.gml,381,Battle_AttackTimingJudge:381
+12,battle.action.timing.perfect,battle.action.timing.perfect,battle.action.timing.perfect,battle,Loc_T fallback in Battle_AttackTimingJudge,scripts/scr_combat/scr_combat.gml,379,Battle_AttackTimingJudge:379
+13,battle.menu.back,battle.menu.back,battle.menu.back,battle,Loc_T fallback in Draw_64,objects/obj_battle_controller/Draw_64.gml,362,Draw_64:362
+14,battle.menu.draw_64.362.0,battle.menu.draw_64.362.0,battle.menu.draw_64.362.0,battle.menu,Draw_64 UI/message text,objects/obj_battle_controller/Draw_64.gml,362,Draw_64:362
+15,battle.menu.draw_64.362.1,battle.menu.draw_64.362.1,battle.menu.draw_64.362.1,battle.menu,Draw_64 UI/message text,objects/obj_battle_controller/Draw_64.gml,362,Draw_64:362
+16,battle.menu.draw_64.371.0,battle.menu.draw_64.371.0,battle.menu.draw_64.371.0,battle.menu,Draw_64 UI/message text,objects/obj_battle_controller/Draw_64.gml,371,Draw_64:371
+17,battle.menu.draw_64.371.1,battle.menu.draw_64.371.1,battle.menu.draw_64.371.1,battle.menu,Draw_64 UI/message text,objects/obj_battle_controller/Draw_64.gml,371,Draw_64:371
+18,battle.menu.draw_64.393.0,battle.menu.draw_64.393.0,battle.menu.draw_64.393.0,battle.menu,Draw_64 UI/message text,objects/obj_battle_controller/Draw_64.gml,393,Draw_64:393
+19,battle.menu.draw_64.393.1,battle.menu.draw_64.393.1,battle.menu.draw_64.393.1,battle.menu,Draw_64 UI/message text,objects/obj_battle_controller/Draw_64.gml,393,Draw_64:393
+20,battle.menu.draw_64.402.0,battle.menu.draw_64.402.0,battle.menu.draw_64.402.0,battle.menu,Draw_64 UI/message text,objects/obj_battle_controller/Draw_64.gml,402,Draw_64:402
+21,battle.menu.draw_64.402.1,battle.menu.draw_64.402.1,battle.menu.draw_64.402.1,battle.menu,Draw_64 UI/message text,objects/obj_battle_controller/Draw_64.gml,402,Draw_64:402
+22,battle.menu.item_row,battle.menu.item_row,battle.menu.item_row,battle,Loc_T fallback in Draw_64,objects/obj_battle_controller/Draw_64.gml,402,Draw_64:402
+23,battle.menu.no_items,battle.menu.no_items,battle.menu.no_items,battle,Loc_T fallback in Step_0,objects/obj_battle_controller/Step_0.gml,87,Step_0:87
+24,battle.menu.no_skills,battle.menu.no_skills,battle.menu.no_skills,battle,Loc_T fallback in Step_0,objects/obj_battle_controller/Step_0.gml,81,Step_0:81
+25,battle.menu.skill_row,battle.menu.skill_row,battle.menu.skill_row,battle,Loc_T fallback in Draw_64,objects/obj_battle_controller/Draw_64.gml,371,Draw_64:371
+26,battle.menu.step_0.105.0,battle.menu.step_0.105.0,battle.menu.step_0.105.0,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,105,Step_0:105
+27,battle.menu.step_0.105.1,battle.menu.step_0.105.1,battle.menu.step_0.105.1,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,105,Step_0:105
+28,battle.menu.step_0.138.0,battle.menu.step_0.138.0,battle.menu.step_0.138.0,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,138,Step_0:138
+29,battle.menu.step_0.138.1,battle.menu.step_0.138.1,battle.menu.step_0.138.1,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,138,Step_0:138
+30,battle.menu.step_0.18.0,battle.menu.step_0.18.0,battle.menu.step_0.18.0,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,18,Step_0:18
+31,battle.menu.step_0.18.1,battle.menu.step_0.18.1,battle.menu.step_0.18.1,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,18,Step_0:18
+32,battle.menu.step_0.19.0,battle.menu.step_0.19.0,battle.menu.step_0.19.0,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,19,Step_0:19
+33,battle.menu.step_0.19.1,battle.menu.step_0.19.1,battle.menu.step_0.19.1,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,19,Step_0:19
+34,battle.menu.step_0.20.0,battle.menu.step_0.20.0,battle.menu.step_0.20.0,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,20,Step_0:20
+35,battle.menu.step_0.20.1,battle.menu.step_0.20.1,battle.menu.step_0.20.1,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,20,Step_0:20
+36,battle.menu.step_0.21.0,battle.menu.step_0.21.0,battle.menu.step_0.21.0,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,21,Step_0:21
+37,battle.menu.step_0.21.1,battle.menu.step_0.21.1,battle.menu.step_0.21.1,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,21,Step_0:21
+38,battle.menu.step_0.81.0,battle.menu.step_0.81.0,battle.menu.step_0.81.0,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,81,Step_0:81
+39,battle.menu.step_0.81.1,battle.menu.step_0.81.1,battle.menu.step_0.81.1,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,81,Step_0:81
+40,battle.menu.step_0.87.0,battle.menu.step_0.87.0,battle.menu.step_0.87.0,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,87,Step_0:87
+41,battle.menu.step_0.87.1,battle.menu.step_0.87.1,battle.menu.step_0.87.1,battle.menu,Step_0 UI/message text,objects/obj_battle_controller/Step_0.gml,87,Step_0:87
+42,bed.bedmenu_draw.182.0,bed.bedmenu_draw.182.0,bed.bedmenu_draw.182.0,bed,BedMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,182,BedMenu_Draw:182
+43,bed.bedmenu_draw.183.0,bed.bedmenu_draw.183.0,bed.bedmenu_draw.183.0,bed,BedMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,183,BedMenu_Draw:183
+44,bed.option.back,bed.option.back,bed.option.back,bed,Loc_T fallback in BedMenu_Open,scripts/scr_save_menu/scr_save_menu.gml,27,BedMenu_Open:27
+45,bed.option.rest,bed.option.rest,bed.option.rest,bed,Loc_T fallback in BedMenu_Open,scripts/scr_save_menu/scr_save_menu.gml,26,BedMenu_Open:26
+46,class.classselect_draw.2029.0,class.classselect_draw.2029.0,class.classselect_draw.2029.0,class,ClassSelect_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2029,ClassSelect_Draw:2029
+47,class.classselect_draw.2029.1,class.classselect_draw.2029.1,class.classselect_draw.2029.1,class,ClassSelect_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2029,ClassSelect_Draw:2029
+48,class.classselect_draw.2066.0,class.classselect_draw.2066.0,class.classselect_draw.2066.0,class,ClassSelect_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2066,ClassSelect_Draw:2066
+49,class.classselect_draw.2066.1,class.classselect_draw.2066.1,class.classselect_draw.2066.1,class,ClassSelect_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2066,ClassSelect_Draw:2066
+50,class.name.archer,class.name.archer,class.name.archer,class,Loc_T fallback in ClassSelect_Ensure,scripts/scr_menu/scr_menu.gml,1788,ClassSelect_Ensure:1788
+51,class.name.class_archer,class.name.class_archer,class.name.class_archer,class,Loc_T fallback in DB_PlayerClass,scripts/scr_db_player_class/scr_db_player_class.gml,9,DB_PlayerClass:9
+52,class.name.class_knight,class.name.class_knight,class.name.class_knight,class,Loc_T fallback in DB_PlayerClass,scripts/scr_db_player_class/scr_db_player_class.gml,4,DB_PlayerClass:4
+53,class.name.class_mage,class.name.class_mage,class.name.class_mage,class,Loc_T fallback in DB_PlayerClass,scripts/scr_db_player_class/scr_db_player_class.gml,14,DB_PlayerClass:14
+54,class.name.class_nobody,class.name.class_nobody,class.name.class_nobody,class,Loc_T fallback in DB_PlayerClass,scripts/scr_db_player_class/scr_db_player_class.gml,19,DB_PlayerClass:19
+55,class.name.mage,class.name.mage,class.name.mage,class,Loc_T fallback in ClassSelect_Ensure,scripts/scr_menu/scr_menu.gml,1789,ClassSelect_Ensure:1789
+56,class.name.unknown,class.name.unknown,class.name.unknown,class,Loc_T fallback in DB_PlayerClass,scripts/scr_db_player_class/scr_db_player_class.gml,24,DB_PlayerClass:24
+57,class.name.warrior,class.name.warrior,class.name.warrior,class,Loc_T fallback in ClassSelect_Ensure,scripts/scr_menu/scr_menu.gml,1787,ClassSelect_Ensure:1787
+58,class.select.title,class.select.title,class.select.title,class,Loc_T fallback in ClassSelect_Draw,scripts/scr_menu/scr_menu.gml,2029,ClassSelect_Draw:2029
+59,combat.msg.applied_prefix,combat.msg.applied_prefix,combat.msg.applied_prefix,combat,Loc_T fallback in Skill_Use,scripts/scr_db_skill/scr_db_skill.gml,891,Skill_Use:891
+60,combat.msg.battle_buildvictorydialoguelines.279.0,combat.msg.battle_buildvictorydialoguelines.279.0,combat.msg.battle_buildvictorydialoguelines.279.0,combat.msg,Battle_BuildVictoryDialogueLines UI/message text,scripts/scr_combat/scr_combat.gml,279,Battle_BuildVictoryDialogueLines:279
+61,combat.msg.battle_buildvictorydialoguelines.279.1,combat.msg.battle_buildvictorydialoguelines.279.1,combat.msg.battle_buildvictorydialoguelines.279.1,combat.msg,Battle_BuildVictoryDialogueLines UI/message text,scripts/scr_combat/scr_combat.gml,279,Battle_BuildVictoryDialogueLines:279
+62,combat.msg.battle_buildvictorydialoguelines.281.0,combat.msg.battle_buildvictorydialoguelines.281.0,combat.msg.battle_buildvictorydialoguelines.281.0,combat.msg,Battle_BuildVictoryDialogueLines UI/message text,scripts/scr_combat/scr_combat.gml,281,Battle_BuildVictoryDialogueLines:281
+63,combat.msg.battle_buildvictorydialoguelines.281.1,combat.msg.battle_buildvictorydialoguelines.281.1,combat.msg.battle_buildvictorydialoguelines.281.1,combat.msg,Battle_BuildVictoryDialogueLines UI/message text,scripts/scr_combat/scr_combat.gml,281,Battle_BuildVictoryDialogueLines:281
+64,combat.msg.battle_buildvictorydialoguelines.302.0,combat.msg.battle_buildvictorydialoguelines.302.0,combat.msg.battle_buildvictorydialoguelines.302.0,combat.msg,Battle_BuildVictoryDialogueLines UI/message text,scripts/scr_combat/scr_combat.gml,302,Battle_BuildVictoryDialogueLines:302
+65,combat.msg.battle_buildvictorydialoguelines.302.1,combat.msg.battle_buildvictorydialoguelines.302.1,combat.msg.battle_buildvictorydialoguelines.302.1,combat.msg,Battle_BuildVictoryDialogueLines UI/message text,scripts/scr_combat/scr_combat.gml,302,Battle_BuildVictoryDialogueLines:302
+66,combat.msg.battle_buildvictorydialoguelines.303.0,combat.msg.battle_buildvictorydialoguelines.303.0,combat.msg.battle_buildvictorydialoguelines.303.0,combat.msg,Battle_BuildVictoryDialogueLines UI/message text,scripts/scr_combat/scr_combat.gml,303,Battle_BuildVictoryDialogueLines:303
+67,combat.msg.battle_buildvictorydialoguelines.303.1,combat.msg.battle_buildvictorydialoguelines.303.1,combat.msg.battle_buildvictorydialoguelines.303.1,combat.msg,Battle_BuildVictoryDialogueLines UI/message text,scripts/scr_combat/scr_combat.gml,303,Battle_BuildVictoryDialogueLines:303
+68,combat.msg.battle_checkend.335.0,combat.msg.battle_checkend.335.0,combat.msg.battle_checkend.335.0,combat.msg,Battle_CheckEnd UI/message text,scripts/scr_combat/scr_combat.gml,335,Battle_CheckEnd:335
+69,combat.msg.battle_checkend.335.1,combat.msg.battle_checkend.335.1,combat.msg.battle_checkend.335.1,combat.msg,Battle_CheckEnd UI/message text,scripts/scr_combat/scr_combat.gml,335,Battle_CheckEnd:335
+70,combat.msg.battle_enemyact.785.0,combat.msg.battle_enemyact.785.0,combat.msg.battle_enemyact.785.0,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,785,Battle_EnemyAct:785
+71,combat.msg.battle_enemyact.785.1,combat.msg.battle_enemyact.785.1,combat.msg.battle_enemyact.785.1,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,785,Battle_EnemyAct:785
+72,combat.msg.battle_enemyact.844.0,combat.msg.battle_enemyact.844.0,combat.msg.battle_enemyact.844.0,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,844,Battle_EnemyAct:844
+73,combat.msg.battle_enemyact.844.1,combat.msg.battle_enemyact.844.1,combat.msg.battle_enemyact.844.1,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,844,Battle_EnemyAct:844
+74,combat.msg.battle_enemyact.849.0,combat.msg.battle_enemyact.849.0,combat.msg.battle_enemyact.849.0,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,849,Battle_EnemyAct:849
+75,combat.msg.battle_enemyact.849.1,combat.msg.battle_enemyact.849.1,combat.msg.battle_enemyact.849.1,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,849,Battle_EnemyAct:849
+76,combat.msg.battle_enemyact.852.0,combat.msg.battle_enemyact.852.0,combat.msg.battle_enemyact.852.0,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,852,Battle_EnemyAct:852
+77,combat.msg.battle_enemyact.852.1,combat.msg.battle_enemyact.852.1,combat.msg.battle_enemyact.852.1,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,852,Battle_EnemyAct:852
+78,combat.msg.battle_enemyact.855.0,combat.msg.battle_enemyact.855.0,combat.msg.battle_enemyact.855.0,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,855,Battle_EnemyAct:855
+79,combat.msg.battle_enemyact.855.1,combat.msg.battle_enemyact.855.1,combat.msg.battle_enemyact.855.1,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,855,Battle_EnemyAct:855
+80,combat.msg.battle_enemyact.892.0,combat.msg.battle_enemyact.892.0,combat.msg.battle_enemyact.892.0,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,892,Battle_EnemyAct:892
+81,combat.msg.battle_enemyact.892.1,combat.msg.battle_enemyact.892.1,combat.msg.battle_enemyact.892.1,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,892,Battle_EnemyAct:892
+82,combat.msg.battle_enemyact.895.0,combat.msg.battle_enemyact.895.0,combat.msg.battle_enemyact.895.0,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,895,Battle_EnemyAct:895
+83,combat.msg.battle_enemyact.895.1,combat.msg.battle_enemyact.895.1,combat.msg.battle_enemyact.895.1,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,895,Battle_EnemyAct:895
+84,combat.msg.battle_enemyact.898.0,combat.msg.battle_enemyact.898.0,combat.msg.battle_enemyact.898.0,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,898,Battle_EnemyAct:898
+85,combat.msg.battle_enemyact.898.1,combat.msg.battle_enemyact.898.1,combat.msg.battle_enemyact.898.1,combat.msg,Battle_EnemyAct UI/message text,scripts/scr_combat/scr_combat.gml,898,Battle_EnemyAct:898
+86,combat.msg.battle_playerattackresolvetimed.452.1,combat.msg.battle_playerattackresolvetimed.452.1,combat.msg.battle_playerattackresolvetimed.452.1,combat.msg,Battle_PlayerAttackResolveTimed UI/message text,scripts/scr_combat/scr_combat.gml,452,Battle_PlayerAttackResolveTimed:452
+87,combat.msg.battle_playerattackresolvetimed.452.2,combat.msg.battle_playerattackresolvetimed.452.2,combat.msg.battle_playerattackresolvetimed.452.2,combat.msg,Battle_PlayerAttackResolveTimed UI/message text,scripts/scr_combat/scr_combat.gml,452,Battle_PlayerAttackResolveTimed:452
+88,combat.msg.battle_playerattackresolvetimed.525.0,combat.msg.battle_playerattackresolvetimed.525.0,combat.msg.battle_playerattackresolvetimed.525.0,combat.msg,Battle_PlayerAttackResolveTimed UI/message text,scripts/scr_combat/scr_combat.gml,525,Battle_PlayerAttackResolveTimed:525
+89,combat.msg.battle_playerattackresolvetimed.525.1,combat.msg.battle_playerattackresolvetimed.525.1,combat.msg.battle_playerattackresolvetimed.525.1,combat.msg,Battle_PlayerAttackResolveTimed UI/message text,scripts/scr_combat/scr_combat.gml,525,Battle_PlayerAttackResolveTimed:525
+90,combat.msg.battle_playerattackresolvetimed.532.0,combat.msg.battle_playerattackresolvetimed.532.0,combat.msg.battle_playerattackresolvetimed.532.0,combat.msg,Battle_PlayerAttackResolveTimed UI/message text,scripts/scr_combat/scr_combat.gml,532,Battle_PlayerAttackResolveTimed:532
+91,combat.msg.battle_playerattackresolvetimed.532.1,combat.msg.battle_playerattackresolvetimed.532.1,combat.msg.battle_playerattackresolvetimed.532.1,combat.msg,Battle_PlayerAttackResolveTimed UI/message text,scripts/scr_combat/scr_combat.gml,532,Battle_PlayerAttackResolveTimed:532
+92,combat.msg.battle_playerattackresolvetimed.539.0,combat.msg.battle_playerattackresolvetimed.539.0,combat.msg.battle_playerattackresolvetimed.539.0,combat.msg,Battle_PlayerAttackResolveTimed UI/message text,scripts/scr_combat/scr_combat.gml,539,Battle_PlayerAttackResolveTimed:539
+93,combat.msg.battle_playerattackresolvetimed.539.1,combat.msg.battle_playerattackresolvetimed.539.1,combat.msg.battle_playerattackresolvetimed.539.1,combat.msg,Battle_PlayerAttackResolveTimed UI/message text,scripts/scr_combat/scr_combat.gml,539,Battle_PlayerAttackResolveTimed:539
+94,combat.msg.battle_playerskill.631.0,combat.msg.battle_playerskill.631.0,combat.msg.battle_playerskill.631.0,combat.msg,Battle_PlayerSkill UI/message text,scripts/scr_combat/scr_combat.gml,631,Battle_PlayerSkill:631
+95,combat.msg.battle_playerskill.631.1,combat.msg.battle_playerskill.631.1,combat.msg.battle_playerskill.631.1,combat.msg,Battle_PlayerSkill UI/message text,scripts/scr_combat/scr_combat.gml,631,Battle_PlayerSkill:631
+96,combat.msg.battle_playerskill.633.0,combat.msg.battle_playerskill.633.0,combat.msg.battle_playerskill.633.0,combat.msg,Battle_PlayerSkill UI/message text,scripts/scr_combat/scr_combat.gml,633,Battle_PlayerSkill:633
+97,combat.msg.battle_playerskill.633.1,combat.msg.battle_playerskill.633.1,combat.msg.battle_playerskill.633.1,combat.msg,Battle_PlayerSkill UI/message text,scripts/scr_combat/scr_combat.gml,633,Battle_PlayerSkill:633
+98,combat.msg.battle_playerskill.638.0,combat.msg.battle_playerskill.638.0,combat.msg.battle_playerskill.638.0,combat.msg,Battle_PlayerSkill UI/message text,scripts/scr_combat/scr_combat.gml,638,Battle_PlayerSkill:638
+99,combat.msg.battle_playerskill.638.1,combat.msg.battle_playerskill.638.1,combat.msg.battle_playerskill.638.1,combat.msg,Battle_PlayerSkill UI/message text,scripts/scr_combat/scr_combat.gml,638,Battle_PlayerSkill:638
+100,combat.msg.battle_playerskill.640.0,combat.msg.battle_playerskill.640.0,combat.msg.battle_playerskill.640.0,combat.msg,Battle_PlayerSkill UI/message text,scripts/scr_combat/scr_combat.gml,640,Battle_PlayerSkill:640
+101,combat.msg.battle_playerskill.640.1,combat.msg.battle_playerskill.640.1,combat.msg.battle_playerskill.640.1,combat.msg,Battle_PlayerSkill UI/message text,scripts/scr_combat/scr_combat.gml,640,Battle_PlayerSkill:640
+102,combat.msg.battle_playerstunskip.395.0,combat.msg.battle_playerstunskip.395.0,combat.msg.battle_playerstunskip.395.0,combat.msg,Battle_PlayerStunSkip UI/message text,scripts/scr_combat/scr_combat.gml,395,Battle_PlayerStunSkip:395
+103,combat.msg.battle_playerstunskip.395.1,combat.msg.battle_playerstunskip.395.1,combat.msg.battle_playerstunskip.395.1,combat.msg,Battle_PlayerStunSkip UI/message text,scripts/scr_combat/scr_combat.gml,395,Battle_PlayerStunSkip:395
+104,combat.msg.battle_runattempt.709.0,combat.msg.battle_runattempt.709.0,combat.msg.battle_runattempt.709.0,combat.msg,Battle_RunAttempt UI/message text,scripts/scr_combat/scr_combat.gml,709,Battle_RunAttempt:709
+105,combat.msg.battle_runattempt.709.1,combat.msg.battle_runattempt.709.1,combat.msg.battle_runattempt.709.1,combat.msg,Battle_RunAttempt UI/message text,scripts/scr_combat/scr_combat.gml,709,Battle_RunAttempt:709
+106,combat.msg.battle_runattempt.712.0,combat.msg.battle_runattempt.712.0,combat.msg.battle_runattempt.712.0,combat.msg,Battle_RunAttempt UI/message text,scripts/scr_combat/scr_combat.gml,712,Battle_RunAttempt:712
+107,combat.msg.battle_runattempt.712.1,combat.msg.battle_runattempt.712.1,combat.msg.battle_runattempt.712.1,combat.msg,Battle_RunAttempt UI/message text,scripts/scr_combat/scr_combat.gml,712,Battle_RunAttempt:712
+108,combat.msg.enemy_appeared,combat.msg.enemy_appeared,combat.msg.enemy_appeared,combat,Loc_T fallback in Create_0,objects/obj_battle_controller/Create_0.gml,103,Create_0:103
+109,combat.msg.enemy_crit,combat.msg.enemy_crit,combat.msg.enemy_crit,combat,Loc_T fallback in Battle_EnemyAct,scripts/scr_combat/scr_combat.gml,852,Battle_EnemyAct:852
+110,combat.msg.enemy_hit,combat.msg.enemy_hit,combat.msg.enemy_hit,combat,Loc_T fallback in Battle_EnemyAct,scripts/scr_combat/scr_combat.gml,855,Battle_EnemyAct:855
+111,combat.msg.enemy_miss,combat.msg.enemy_miss,combat.msg.enemy_miss,combat,Loc_T fallback in Battle_EnemyAct,scripts/scr_combat/scr_combat.gml,849,Battle_EnemyAct:849
+112,combat.msg.enemy_skill_message,combat.msg.enemy_skill_message,combat.msg.enemy_skill_message,combat,Loc_T fallback in Battle_EnemyAct,scripts/scr_combat/scr_combat.gml,844,Battle_EnemyAct:844
+113,combat.msg.enemy_slain,combat.msg.enemy_slain,combat.msg.enemy_slain,combat,Loc_T fallback in Battle_CheckEnd,scripts/scr_combat/scr_combat.gml,335,Battle_CheckEnd:335
+114,combat.msg.enemy_stunned,combat.msg.enemy_stunned,combat.msg.enemy_stunned,combat,Loc_T fallback in Battle_EnemyAct,scripts/scr_combat/scr_combat.gml,785,Battle_EnemyAct:785
+115,combat.msg.floor1_reaction.0,combat.msg.floor1_reaction.0,combat.msg.floor1_reaction.0,combat,Loc_T fallback in Battle_BuildVictoryDialogueLines,scripts/scr_combat/scr_combat.gml,302,Battle_BuildVictoryDialogueLines:302
+116,combat.msg.floor1_reaction.1,combat.msg.floor1_reaction.1,combat.msg.floor1_reaction.1,combat,Loc_T fallback in Battle_BuildVictoryDialogueLines,scripts/scr_combat/scr_combat.gml,303,Battle_BuildVictoryDialogueLines:303
+117,combat.msg.list_separator,combat.msg.list_separator,combat.msg.list_separator,combat,Loc_T fallback in Skill_Use,scripts/scr_db_skill/scr_db_skill.gml,893,Skill_Use:893
+118,combat.msg.loot_prefix,combat.msg.loot_prefix,combat.msg.loot_prefix,combat,Loc_T fallback in Battle_BuildVictoryDialogueLines,scripts/scr_combat/scr_combat.gml,281,Battle_BuildVictoryDialogueLines:281
+119,combat.msg.not_enough_mp,combat.msg.not_enough_mp,combat.msg.not_enough_mp,combat,Loc_T fallback in Skill_Use,scripts/scr_db_skill/scr_db_skill.gml,847,Skill_Use:847
+120,combat.msg.nothing_to_steal,combat.msg.nothing_to_steal,combat.msg.nothing_to_steal,combat,Loc_T fallback in Skill_Use,scripts/scr_db_skill/scr_db_skill.gml,942,Skill_Use:942
+121,combat.msg.player_couldnt_escape,combat.msg.player_couldnt_escape,combat.msg.player_couldnt_escape,combat,Loc_T fallback in Battle_RunAttempt,scripts/scr_combat/scr_combat.gml,712,Battle_RunAttempt:712
+122,combat.msg.player_crit,combat.msg.player_crit,combat.msg.player_crit,combat,Loc_T fallback in Battle_PlayerAttackResolveTimed,scripts/scr_combat/scr_combat.gml,532,Battle_PlayerAttackResolveTimed:532
+123,combat.msg.player_hit,combat.msg.player_hit,combat.msg.player_hit,combat,Loc_T fallback in Battle_PlayerAttackResolveTimed,scripts/scr_combat/scr_combat.gml,539,Battle_PlayerAttackResolveTimed:539
+124,combat.msg.player_miss,combat.msg.player_miss,combat.msg.player_miss,combat,Loc_T fallback in Battle_PlayerAttackResolveTimed,scripts/scr_combat/scr_combat.gml,525,Battle_PlayerAttackResolveTimed:525
+125,combat.msg.player_ran,combat.msg.player_ran,combat.msg.player_ran,combat,Loc_T fallback in Battle_RunAttempt,scripts/scr_combat/scr_combat.gml,709,Battle_RunAttempt:709
+126,combat.msg.player_stunned,combat.msg.player_stunned,combat.msg.player_stunned,combat,Loc_T fallback in Battle_PlayerStunSkip,scripts/scr_combat/scr_combat.gml,395,Battle_PlayerStunSkip:395
+127,combat.msg.sentence_dot,combat.msg.sentence_dot,combat.msg.sentence_dot,combat,Loc_T fallback in Skill_Use,scripts/scr_db_skill/scr_db_skill.gml,897,Skill_Use:897
+128,combat.msg.skill.use.skill_rampage,combat.msg.skill.use.skill_rampage,combat.msg.skill.use.skill_rampage,combat.msg,Skill use message (SKILL_RAMPAGE),scripts/scr_db_skill/scr_db_skill.gml,558,SkillDB_Init skill SKILL_RAMPAGE use_msg
+129,combat.msg.skill_crit,combat.msg.skill_crit,combat.msg.skill_crit,combat,Loc_T fallback in Battle_PlayerSkill,scripts/scr_combat/scr_combat.gml,633,Battle_PlayerSkill:633
+130,combat.msg.skill_hit,combat.msg.skill_hit,combat.msg.skill_hit,combat,Loc_T fallback in Battle_PlayerSkill,scripts/scr_combat/scr_combat.gml,638,Battle_PlayerSkill:638
+131,combat.msg.skill_miss,combat.msg.skill_miss,combat.msg.skill_miss,combat,Loc_T fallback in Battle_PlayerSkill,scripts/scr_combat/scr_combat.gml,631,Battle_PlayerSkill:631
+132,combat.msg.skill_used,combat.msg.skill_used,combat.msg.skill_used,combat,Loc_T fallback in Battle_PlayerSkill,scripts/scr_combat/scr_combat.gml,640,Battle_PlayerSkill:640
+133,combat.msg.stole_an_item,combat.msg.stole_an_item,combat.msg.stole_an_item,combat,Loc_T fallback in Skill_Use,scripts/scr_db_skill/scr_db_skill.gml,957,Skill_Use:957
+134,combat.msg.stole_item,combat.msg.stole_item,combat.msg.stole_item,combat,Loc_T fallback in Skill_Use,scripts/scr_db_skill/scr_db_skill.gml,955,Skill_Use:955
+135,combat.msg.victory_prefix,combat.msg.victory_prefix,combat.msg.victory_prefix,combat,Loc_T fallback in Battle_BuildVictoryDialogueLines,scripts/scr_combat/scr_combat.gml,279,Battle_BuildVictoryDialogueLines:279
+136,common.cancel,common.cancel,common.cancel,common,Loc_T fallback in SaveMenu_Draw,scripts/scr_save_menu/scr_save_menu.gml,729,SaveMenu_Draw:729
+137,common.ok,common.ok,common.ok,common,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1741,Menu_Draw:1741
+138,cutscene.ending.0.0,cutscene.ending.0.0,cutscene.ending.0.0,cutscene,Cutscene ending segment 0 line 0,objects/obj_start_controller/Create_0.gml,92,cutscene_definitions.ending[0].lines
+139,cutscene.ending.0.1,cutscene.ending.0.1,cutscene.ending.0.1,cutscene,Cutscene ending segment 0 line 1,objects/obj_start_controller/Create_0.gml,93,cutscene_definitions.ending[0].lines
+140,cutscene.ending.0.2,cutscene.ending.0.2,cutscene.ending.0.2,cutscene,Cutscene ending segment 0 line 2,objects/obj_start_controller/Create_0.gml,94,cutscene_definitions.ending[0].lines
+141,cutscene.ending.1.0,cutscene.ending.1.0,cutscene.ending.1.0,cutscene,Cutscene ending segment 1 line 0,objects/obj_start_controller/Create_0.gml,103,cutscene_definitions.ending[1].lines
+142,cutscene.ending.1.1,cutscene.ending.1.1,cutscene.ending.1.1,cutscene,Cutscene ending segment 1 line 1,objects/obj_start_controller/Create_0.gml,104,cutscene_definitions.ending[1].lines
+143,cutscene.ending.1.2,cutscene.ending.1.2,cutscene.ending.1.2,cutscene,Cutscene ending segment 1 line 2,objects/obj_start_controller/Create_0.gml,105,cutscene_definitions.ending[1].lines
+144,cutscene.ending.1.3,cutscene.ending.1.3,cutscene.ending.1.3,cutscene,Cutscene ending segment 1 line 3,objects/obj_start_controller/Create_0.gml,106,cutscene_definitions.ending[1].lines
+145,cutscene.ending.1.4,cutscene.ending.1.4,cutscene.ending.1.4,cutscene,Cutscene ending segment 1 line 4,objects/obj_start_controller/Create_0.gml,107,cutscene_definitions.ending[1].lines
+146,cutscene.ending.2.0,cutscene.ending.2.0,cutscene.ending.2.0,cutscene,Cutscene ending segment 2 line 0,objects/obj_start_controller/Create_0.gml,116,cutscene_definitions.ending[2].lines
+147,cutscene.ending.2.1,cutscene.ending.2.1,cutscene.ending.2.1,cutscene,Cutscene ending segment 2 line 1,objects/obj_start_controller/Create_0.gml,117,cutscene_definitions.ending[2].lines
+148,cutscene.ending.2.2,cutscene.ending.2.2,cutscene.ending.2.2,cutscene,Cutscene ending segment 2 line 2,objects/obj_start_controller/Create_0.gml,118,cutscene_definitions.ending[2].lines
+149,cutscene.ending.2.3,cutscene.ending.2.3,cutscene.ending.2.3,cutscene,Cutscene ending segment 2 line 3,objects/obj_start_controller/Create_0.gml,119,cutscene_definitions.ending[2].lines
+150,cutscene.ending.3.0,cutscene.ending.3.0,cutscene.ending.3.0,cutscene,Cutscene ending segment 3 line 0,objects/obj_start_controller/Create_0.gml,128,cutscene_definitions.ending[3].lines
+151,cutscene.ending.4.0,cutscene.ending.4.0,cutscene.ending.4.0,cutscene,Cutscene ending segment 4 line 0,objects/obj_start_controller/Create_0.gml,138,cutscene_definitions.ending[4].lines
+152,cutscene.ending.4.1,cutscene.ending.4.1,cutscene.ending.4.1,cutscene,Cutscene ending segment 4 line 1,objects/obj_start_controller/Create_0.gml,139,cutscene_definitions.ending[4].lines
+153,cutscene.game_over.0.0,cutscene.game_over.0.0,cutscene.game_over.0.0,cutscene,Cutscene game_over segment 0 line 0,objects/obj_start_controller/Create_0.gml,151,cutscene_definitions.game_over[0].lines
+154,cutscene.intro.0.0,cutscene.intro.0.0,cutscene.intro.0.0,cutscene,Cutscene intro segment 0 line 0,objects/obj_start_controller/Create_0.gml,37,cutscene_definitions.intro[0].lines
+155,cutscene.intro.0.1,cutscene.intro.0.1,cutscene.intro.0.1,cutscene,Cutscene intro segment 0 line 1,objects/obj_start_controller/Create_0.gml,38,cutscene_definitions.intro[0].lines
+156,cutscene.intro.0.10,cutscene.intro.0.10,cutscene.intro.0.10,cutscene,Cutscene intro segment 0 line 10,objects/obj_start_controller/Create_0.gml,47,cutscene_definitions.intro[0].lines
+157,cutscene.intro.0.11,cutscene.intro.0.11,cutscene.intro.0.11,cutscene,Cutscene intro segment 0 line 11,objects/obj_start_controller/Create_0.gml,48,cutscene_definitions.intro[0].lines
+158,cutscene.intro.0.2,cutscene.intro.0.2,cutscene.intro.0.2,cutscene,Cutscene intro segment 0 line 2,objects/obj_start_controller/Create_0.gml,39,cutscene_definitions.intro[0].lines
+159,cutscene.intro.0.3,cutscene.intro.0.3,cutscene.intro.0.3,cutscene,Cutscene intro segment 0 line 3,objects/obj_start_controller/Create_0.gml,40,cutscene_definitions.intro[0].lines
+160,cutscene.intro.0.4,cutscene.intro.0.4,cutscene.intro.0.4,cutscene,Cutscene intro segment 0 line 4,objects/obj_start_controller/Create_0.gml,41,cutscene_definitions.intro[0].lines
+161,cutscene.intro.0.5,cutscene.intro.0.5,cutscene.intro.0.5,cutscene,Cutscene intro segment 0 line 5,objects/obj_start_controller/Create_0.gml,42,cutscene_definitions.intro[0].lines
+162,cutscene.intro.0.6,cutscene.intro.0.6,cutscene.intro.0.6,cutscene,Cutscene intro segment 0 line 6,objects/obj_start_controller/Create_0.gml,43,cutscene_definitions.intro[0].lines
+163,cutscene.intro.0.7,cutscene.intro.0.7,cutscene.intro.0.7,cutscene,Cutscene intro segment 0 line 7,objects/obj_start_controller/Create_0.gml,44,cutscene_definitions.intro[0].lines
+164,cutscene.intro.0.8,cutscene.intro.0.8,cutscene.intro.0.8,cutscene,Cutscene intro segment 0 line 8,objects/obj_start_controller/Create_0.gml,45,cutscene_definitions.intro[0].lines
+165,cutscene.intro.0.9,cutscene.intro.0.9,cutscene.intro.0.9,cutscene,Cutscene intro segment 0 line 9,objects/obj_start_controller/Create_0.gml,46,cutscene_definitions.intro[0].lines
+166,cutscene.intro.1.0,cutscene.intro.1.0,cutscene.intro.1.0,cutscene,Cutscene intro segment 1 line 0,objects/obj_start_controller/Create_0.gml,57,cutscene_definitions.intro[1].lines
+167,cutscene.intro.1.1,cutscene.intro.1.1,cutscene.intro.1.1,cutscene,Cutscene intro segment 1 line 1,objects/obj_start_controller/Create_0.gml,58,cutscene_definitions.intro[1].lines
+168,cutscene.intro.1.10,cutscene.intro.1.10,cutscene.intro.1.10,cutscene,Cutscene intro segment 1 line 10,objects/obj_start_controller/Create_0.gml,67,cutscene_definitions.intro[1].lines
+169,cutscene.intro.1.11,cutscene.intro.1.11,cutscene.intro.1.11,cutscene,Cutscene intro segment 1 line 11,objects/obj_start_controller/Create_0.gml,68,cutscene_definitions.intro[1].lines
+170,cutscene.intro.1.12,cutscene.intro.1.12,cutscene.intro.1.12,cutscene,Cutscene intro segment 1 line 12,objects/obj_start_controller/Create_0.gml,69,cutscene_definitions.intro[1].lines
+171,cutscene.intro.1.13,cutscene.intro.1.13,cutscene.intro.1.13,cutscene,Cutscene intro segment 1 line 13,objects/obj_start_controller/Create_0.gml,70,cutscene_definitions.intro[1].lines
+172,cutscene.intro.1.2,cutscene.intro.1.2,cutscene.intro.1.2,cutscene,Cutscene intro segment 1 line 2,objects/obj_start_controller/Create_0.gml,59,cutscene_definitions.intro[1].lines
+173,cutscene.intro.1.3,cutscene.intro.1.3,cutscene.intro.1.3,cutscene,Cutscene intro segment 1 line 3,objects/obj_start_controller/Create_0.gml,60,cutscene_definitions.intro[1].lines
+174,cutscene.intro.1.4,cutscene.intro.1.4,cutscene.intro.1.4,cutscene,Cutscene intro segment 1 line 4,objects/obj_start_controller/Create_0.gml,61,cutscene_definitions.intro[1].lines
+175,cutscene.intro.1.5,cutscene.intro.1.5,cutscene.intro.1.5,cutscene,Cutscene intro segment 1 line 5,objects/obj_start_controller/Create_0.gml,62,cutscene_definitions.intro[1].lines
+176,cutscene.intro.1.6,cutscene.intro.1.6,cutscene.intro.1.6,cutscene,Cutscene intro segment 1 line 6,objects/obj_start_controller/Create_0.gml,63,cutscene_definitions.intro[1].lines
+177,cutscene.intro.1.7,cutscene.intro.1.7,cutscene.intro.1.7,cutscene,Cutscene intro segment 1 line 7,objects/obj_start_controller/Create_0.gml,64,cutscene_definitions.intro[1].lines
+178,cutscene.intro.1.8,cutscene.intro.1.8,cutscene.intro.1.8,cutscene,Cutscene intro segment 1 line 8,objects/obj_start_controller/Create_0.gml,65,cutscene_definitions.intro[1].lines
+179,cutscene.intro.1.9,cutscene.intro.1.9,cutscene.intro.1.9,cutscene,Cutscene intro segment 1 line 9,objects/obj_start_controller/Create_0.gml,66,cutscene_definitions.intro[1].lines
+180,cutscene.intro.2.0,cutscene.intro.2.0,cutscene.intro.2.0,cutscene,Cutscene intro segment 2 line 0,objects/obj_start_controller/Create_0.gml,79,cutscene_definitions.intro[2].lines
+181,cutscene.intro.2.1,cutscene.intro.2.1,cutscene.intro.2.1,cutscene,Cutscene intro segment 2 line 1,objects/obj_start_controller/Create_0.gml,80,cutscene_definitions.intro[2].lines
+182,dialogue.after_class_chest_archer.0,dialogue.after_class_chest_archer.0,dialogue.after_class_chest_archer.0,dialogue,Dialogue line 0 for after_class_chest_archer,scripts/scr_dialogue/scr_dialogue.gml,36,"global.dialogue_db[? ""after_class_chest_archer""]"
+183,dialogue.after_class_chest_archer.1,dialogue.after_class_chest_archer.1,dialogue.after_class_chest_archer.1,dialogue,Dialogue line 1 for after_class_chest_archer,scripts/scr_dialogue/scr_dialogue.gml,37,"global.dialogue_db[? ""after_class_chest_archer""]"
+184,dialogue.after_class_chest_archer.2,dialogue.after_class_chest_archer.2,dialogue.after_class_chest_archer.2,dialogue,Dialogue line 2 for after_class_chest_archer,scripts/scr_dialogue/scr_dialogue.gml,38,"global.dialogue_db[? ""after_class_chest_archer""]"
+185,dialogue.after_class_chest_knight.0,dialogue.after_class_chest_knight.0,dialogue.after_class_chest_knight.0,dialogue,Dialogue line 0 for after_class_chest_knight,scripts/scr_dialogue/scr_dialogue.gml,31,"global.dialogue_db[? ""after_class_chest_knight""]"
+186,dialogue.after_class_chest_knight.1,dialogue.after_class_chest_knight.1,dialogue.after_class_chest_knight.1,dialogue,Dialogue line 1 for after_class_chest_knight,scripts/scr_dialogue/scr_dialogue.gml,32,"global.dialogue_db[? ""after_class_chest_knight""]"
+187,dialogue.after_class_chest_knight.2,dialogue.after_class_chest_knight.2,dialogue.after_class_chest_knight.2,dialogue,Dialogue line 2 for after_class_chest_knight,scripts/scr_dialogue/scr_dialogue.gml,33,"global.dialogue_db[? ""after_class_chest_knight""]"
+188,dialogue.after_class_chest_mage.0,dialogue.after_class_chest_mage.0,dialogue.after_class_chest_mage.0,dialogue,Dialogue line 0 for after_class_chest_mage,scripts/scr_dialogue/scr_dialogue.gml,41,"global.dialogue_db[? ""after_class_chest_mage""]"
+189,dialogue.after_class_chest_mage.1,dialogue.after_class_chest_mage.1,dialogue.after_class_chest_mage.1,dialogue,Dialogue line 1 for after_class_chest_mage,scripts/scr_dialogue/scr_dialogue.gml,42,"global.dialogue_db[? ""after_class_chest_mage""]"
+190,dialogue.after_class_chest_mage.2,dialogue.after_class_chest_mage.2,dialogue.after_class_chest_mage.2,dialogue,Dialogue line 2 for after_class_chest_mage,scripts/scr_dialogue/scr_dialogue.gml,43,"global.dialogue_db[? ""after_class_chest_mage""]"
+191,dialogue.after_class_chest_mage.3,dialogue.after_class_chest_mage.3,dialogue.after_class_chest_mage.3,dialogue,Dialogue line 3 for after_class_chest_mage,scripts/scr_dialogue/scr_dialogue.gml,44,"global.dialogue_db[? ""after_class_chest_mage""]"
+192,dialogue.after_skillbook_chest_archer.0,dialogue.after_skillbook_chest_archer.0,dialogue.after_skillbook_chest_archer.0,dialogue,Dialogue line 0 for after_skillbook_chest_archer,scripts/scr_dialogue/scr_dialogue.gml,52,"global.dialogue_db[? ""after_skillbook_chest_archer""]"
+193,dialogue.after_skillbook_chest_archer.1,dialogue.after_skillbook_chest_archer.1,dialogue.after_skillbook_chest_archer.1,dialogue,Dialogue line 1 for after_skillbook_chest_archer,scripts/scr_dialogue/scr_dialogue.gml,53,"global.dialogue_db[? ""after_skillbook_chest_archer""]"
+194,dialogue.after_skillbook_chest_archer.2,dialogue.after_skillbook_chest_archer.2,dialogue.after_skillbook_chest_archer.2,dialogue,Dialogue line 2 for after_skillbook_chest_archer,scripts/scr_dialogue/scr_dialogue.gml,54,"global.dialogue_db[? ""after_skillbook_chest_archer""]"
+195,dialogue.after_skillbook_chest_knight.0,dialogue.after_skillbook_chest_knight.0,dialogue.after_skillbook_chest_knight.0,dialogue,Dialogue line 0 for after_skillbook_chest_knight,scripts/scr_dialogue/scr_dialogue.gml,47,"global.dialogue_db[? ""after_skillbook_chest_knight""]"
+196,dialogue.after_skillbook_chest_knight.1,dialogue.after_skillbook_chest_knight.1,dialogue.after_skillbook_chest_knight.1,dialogue,Dialogue line 1 for after_skillbook_chest_knight,scripts/scr_dialogue/scr_dialogue.gml,48,"global.dialogue_db[? ""after_skillbook_chest_knight""]"
+197,dialogue.after_skillbook_chest_knight.2,dialogue.after_skillbook_chest_knight.2,dialogue.after_skillbook_chest_knight.2,dialogue,Dialogue line 2 for after_skillbook_chest_knight,scripts/scr_dialogue/scr_dialogue.gml,49,"global.dialogue_db[? ""after_skillbook_chest_knight""]"
+198,dialogue.after_skillbook_chest_mage.0,dialogue.after_skillbook_chest_mage.0,dialogue.after_skillbook_chest_mage.0,dialogue,Dialogue line 0 for after_skillbook_chest_mage,scripts/scr_dialogue/scr_dialogue.gml,57,"global.dialogue_db[? ""after_skillbook_chest_mage""]"
+199,dialogue.after_skillbook_chest_mage.1,dialogue.after_skillbook_chest_mage.1,dialogue.after_skillbook_chest_mage.1,dialogue,Dialogue line 1 for after_skillbook_chest_mage,scripts/scr_dialogue/scr_dialogue.gml,58,"global.dialogue_db[? ""after_skillbook_chest_mage""]"
+200,dialogue.after_skillbook_chest_mage.2,dialogue.after_skillbook_chest_mage.2,dialogue.after_skillbook_chest_mage.2,dialogue,Dialogue line 2 for after_skillbook_chest_mage,scripts/scr_dialogue/scr_dialogue.gml,59,"global.dialogue_db[? ""after_skillbook_chest_mage""]"
+201,dialogue.after_skillbook_chest_mage.3,dialogue.after_skillbook_chest_mage.3,dialogue.after_skillbook_chest_mage.3,dialogue,Dialogue line 3 for after_skillbook_chest_mage,scripts/scr_dialogue/scr_dialogue.gml,60,"global.dialogue_db[? ""after_skillbook_chest_mage""]"
+202,dialogue.barrel_break.0,dialogue.barrel_break.0,dialogue.barrel_break.0,dialogue,Dialogue line 0 for barrel_break,scripts/scr_dialogue/scr_dialogue.gml,73,"global.dialogue_db[? ""barrel_break""]"
+203,dialogue.barrel_broken.0,dialogue.barrel_broken.0,dialogue.barrel_broken.0,dialogue,Dialogue line 0 for barrel_broken,scripts/scr_dialogue/scr_dialogue.gml,74,"global.dialogue_db[? ""barrel_broken""]"
+204,dialogue.bone.0,dialogue.bone.0,dialogue.bone.0,dialogue,Dialogue line 0 for bone,scripts/scr_dialogue/scr_dialogue.gml,70,"global.dialogue_db[? ""bone""]"
+205,dialogue.chest_empty.0,dialogue.chest_empty.0,dialogue.chest_empty.0,dialogue,Dialogue line 0 for chest_empty,scripts/scr_dialogue/scr_dialogue.gml,77,"global.dialogue_db[? ""chest_empty""]"
+206,dialogue.chest_open.0,dialogue.chest_open.0,dialogue.chest_open.0,dialogue,Dialogue line 0 for chest_open,scripts/scr_dialogue/scr_dialogue.gml,76,"global.dialogue_db[? ""chest_open""]"
+207,dialogue.default.0,dialogue.default.0,dialogue.default.0,dialogue,Dialogue line 0 for default,scripts/scr_dialogue/scr_dialogue.gml,6,"global.dialogue_db[? ""default""]"
+208,dialogue.dung_pile.0,dialogue.dung_pile.0,dialogue.dung_pile.0,dialogue,Dialogue line 0 for dung_pile,scripts/scr_dialogue/scr_dialogue.gml,71,"global.dialogue_db[? ""dung_pile""]"
+209,dialogue.entering_second_floor.0,dialogue.entering_second_floor.0,dialogue.entering_second_floor.0,dialogue,Dialogue line 0 for entering_second_floor,scripts/scr_dialogue/scr_dialogue.gml,11,"global.dialogue_db[? ""entering_second_floor""]"
+210,dialogue.entering_second_floor.1,dialogue.entering_second_floor.1,dialogue.entering_second_floor.1,dialogue,Dialogue line 1 for entering_second_floor,scripts/scr_dialogue/scr_dialogue.gml,12,"global.dialogue_db[? ""entering_second_floor""]"
+211,dialogue.entering_second_floor.2,dialogue.entering_second_floor.2,dialogue.entering_second_floor.2,dialogue,Dialogue line 2 for entering_second_floor,scripts/scr_dialogue/scr_dialogue.gml,13,"global.dialogue_db[? ""entering_second_floor""]"
+212,dialogue.entering_second_floor.3,dialogue.entering_second_floor.3,dialogue.entering_second_floor.3,dialogue,Dialogue line 3 for entering_second_floor,scripts/scr_dialogue/scr_dialogue.gml,14,"global.dialogue_db[? ""entering_second_floor""]"
+213,dialogue.fire_stand_extinguish.0,dialogue.fire_stand_extinguish.0,dialogue.fire_stand_extinguish.0,dialogue,Dialogue line 0 for fire_stand_extinguish,scripts/scr_dialogue/scr_dialogue.gml,82,"global.dialogue_db[? ""fire_stand_extinguish""]"
+214,dialogue.fire_stand_off.0,dialogue.fire_stand_off.0,dialogue.fire_stand_off.0,dialogue,Dialogue line 0 for fire_stand_off,scripts/scr_dialogue/scr_dialogue.gml,83,"global.dialogue_db[? ""fire_stand_off""]"
+215,dialogue.first_encounter_slime.0,dialogue.first_encounter_slime.0,dialogue.first_encounter_slime.0,dialogue,Dialogue line 0 for first_encounter_slime,scripts/scr_dialogue/scr_dialogue.gml,9,"global.dialogue_db[? ""first_encounter_slime""]"
+216,dialogue.first_encounter_slime.1,dialogue.first_encounter_slime.1,dialogue.first_encounter_slime.1,dialogue,Dialogue line 1 for first_encounter_slime,scripts/scr_dialogue/scr_dialogue.gml,9,"global.dialogue_db[? ""first_encounter_slime""]"
+217,dialogue.horned_skull.0,dialogue.horned_skull.0,dialogue.horned_skull.0,dialogue,Dialogue line 0 for horned_skull,scripts/scr_dialogue/scr_dialogue.gml,69,"global.dialogue_db[? ""horned_skull""]"
+218,dialogue.loot_empty.0,dialogue.loot_empty.0,dialogue.loot_empty.0,dialogue,Dialogue line 0 for loot_empty,scripts/scr_dialogue/scr_dialogue.gml,80,"global.dialogue_db[? ""loot_empty""]"
+219,dialogue.loot_received.0,dialogue.loot_received.0,dialogue.loot_received.0,dialogue,Dialogue line 0 for loot_received,scripts/scr_dialogue/scr_dialogue.gml,78,"global.dialogue_db[? ""loot_received""]"
+220,dialogue.rock.0,dialogue.rock.0,dialogue.rock.0,dialogue,Dialogue line 0 for rock,scripts/scr_dialogue/scr_dialogue.gml,67,"global.dialogue_db[? ""rock""]"
+221,dialogue.skull.0,dialogue.skull.0,dialogue.skull.0,dialogue,Dialogue line 0 for skull,scripts/scr_dialogue/scr_dialogue.gml,68,"global.dialogue_db[? ""skull""]"
+222,dialogue.sys_class_chest_prompt.0,dialogue.sys_class_chest_prompt.0,dialogue.sys_class_chest_prompt.0,dialogue,Dialogue line 0 for sys_class_chest_prompt,scripts/scr_dialogue/scr_dialogue.gml,21,"global.dialogue_db[? ""sys_class_chest_prompt""]"
+223,dialogue.sys_class_chest_prompt.1,dialogue.sys_class_chest_prompt.1,dialogue.sys_class_chest_prompt.1,dialogue,Dialogue line 1 for sys_class_chest_prompt,scripts/scr_dialogue/scr_dialogue.gml,22,"global.dialogue_db[? ""sys_class_chest_prompt""]"
+224,dialogue.sys_floor1_intro.0,dialogue.sys_floor1_intro.0,dialogue.sys_floor1_intro.0,dialogue,Dialogue line 0 for sys_floor1_intro,scripts/scr_dialogue/scr_dialogue.gml,24,"global.dialogue_db[? ""sys_floor1_intro""]"
+225,dialogue.sys_floor1_intro.1,dialogue.sys_floor1_intro.1,dialogue.sys_floor1_intro.1,dialogue,Dialogue line 1 for sys_floor1_intro,scripts/scr_dialogue/scr_dialogue.gml,25,"global.dialogue_db[? ""sys_floor1_intro""]"
+226,dialogue.sys_floor1_intro.2,dialogue.sys_floor1_intro.2,dialogue.sys_floor1_intro.2,dialogue,Dialogue line 2 for sys_floor1_intro,scripts/scr_dialogue/scr_dialogue.gml,26,"global.dialogue_db[? ""sys_floor1_intro""]"
+227,dialogue.sys_floor1_intro.3,dialogue.sys_floor1_intro.3,dialogue.sys_floor1_intro.3,dialogue,Dialogue line 3 for sys_floor1_intro,scripts/scr_dialogue/scr_dialogue.gml,27,"global.dialogue_db[? ""sys_floor1_intro""]"
+228,dialogue.sys_floor1_intro.4,dialogue.sys_floor1_intro.4,dialogue.sys_floor1_intro.4,dialogue,Dialogue line 4 for sys_floor1_intro,scripts/scr_dialogue/scr_dialogue.gml,28,"global.dialogue_db[? ""sys_floor1_intro""]"
+229,dialogue.sys_floor1_intro.5,dialogue.sys_floor1_intro.5,dialogue.sys_floor1_intro.5,dialogue,Dialogue line 5 for sys_floor1_intro,scripts/scr_dialogue/scr_dialogue.gml,29,"global.dialogue_db[? ""sys_floor1_intro""]"
+230,dialogue.sys_load_missing.0,dialogue.sys_load_missing.0,dialogue.sys_load_missing.0,dialogue,Dialogue line 0 for sys_load_missing,scripts/scr_dialogue/scr_dialogue.gml,19,"global.dialogue_db[? ""sys_load_missing""]"
+231,dialogue.sys_load_ok.0,dialogue.sys_load_ok.0,dialogue.sys_load_ok.0,dialogue,Dialogue line 0 for sys_load_ok,scripts/scr_dialogue/scr_dialogue.gml,18,"global.dialogue_db[? ""sys_load_ok""]"
+232,dialogue.sys_save_ok.0,dialogue.sys_save_ok.0,dialogue.sys_save_ok.0,dialogue,Dialogue line 0 for sys_save_ok,scripts/scr_dialogue/scr_dialogue.gml,17,"global.dialogue_db[? ""sys_save_ok""]"
+233,dialogue.tall_grass.0,dialogue.tall_grass.0,dialogue.tall_grass.0,dialogue,Dialogue line 0 for tall_grass,scripts/scr_dialogue/scr_dialogue.gml,66,"global.dialogue_db[? ""tall_grass""]"
+234,dialogue.torch_extinguish.0,dialogue.torch_extinguish.0,dialogue.torch_extinguish.0,dialogue,Dialogue line 0 for torch_extinguish,scripts/scr_dialogue/scr_dialogue.gml,85,"global.dialogue_db[? ""torch_extinguish""]"
+235,dialogue.torch_off.0,dialogue.torch_off.0,dialogue.torch_off.0,dialogue,Dialogue line 0 for torch_off,scripts/scr_dialogue/scr_dialogue.gml,86,"global.dialogue_db[? ""torch_off""]"
+236,dialogue.tree.0,dialogue.tree.0,dialogue.tree.0,dialogue,Dialogue line 0 for tree,scripts/scr_dialogue/scr_dialogue.gml,64,"global.dialogue_db[? ""tree""]"
+237,dialogue.tree_stump.0,dialogue.tree_stump.0,dialogue.tree_stump.0,dialogue,Dialogue line 0 for tree_stump,scripts/scr_dialogue/scr_dialogue.gml,65,"global.dialogue_db[? ""tree_stump""]"
+238,enemy.name.enemy_direwolf,enemy.name.enemy_direwolf,enemy.name.enemy_direwolf,enemy,Enemy display name (ENEMY_DIREWOLF),scripts/scr_db_enemy/scr_db_enemy.gml,145,EnemyDB_Init enemy ENEMY_DIREWOLF
+239,enemy.name.enemy_final_boss,enemy.name.enemy_final_boss,enemy.name.enemy_final_boss,enemy,Enemy display name (ENEMY_FINAL_BOSS),scripts/scr_db_enemy/scr_db_enemy.gml,253,EnemyDB_Init enemy ENEMY_FINAL_BOSS
+240,enemy.name.enemy_ghostsword,enemy.name.enemy_ghostsword,enemy.name.enemy_ghostsword,enemy,Enemy display name (ENEMY_GHOSTSWORD),scripts/scr_db_enemy/scr_db_enemy.gml,172,EnemyDB_Init enemy ENEMY_GHOSTSWORD
+241,enemy.name.enemy_killer_plant,enemy.name.enemy_killer_plant,enemy.name.enemy_killer_plant,enemy,Enemy display name (ENEMY_KILLER_PLANT),scripts/scr_db_enemy/scr_db_enemy.gml,118,EnemyDB_Init enemy ENEMY_KILLER_PLANT
+242,enemy.name.enemy_madwhisp,enemy.name.enemy_madwhisp,enemy.name.enemy_madwhisp,enemy,Enemy display name (ENEMY_MADWHISP),scripts/scr_db_enemy/scr_db_enemy.gml,91,EnemyDB_Init enemy ENEMY_MADWHISP
+243,enemy.name.enemy_mini_boss,enemy.name.enemy_mini_boss,enemy.name.enemy_mini_boss,enemy,Enemy display name (ENEMY_MINI_BOSS),scripts/scr_db_enemy/scr_db_enemy.gml,226,EnemyDB_Init enemy ENEMY_MINI_BOSS
+244,enemy.name.enemy_slime,enemy.name.enemy_slime,enemy.name.enemy_slime,enemy,Enemy display name (ENEMY_SLIME),scripts/scr_db_enemy/scr_db_enemy.gml,10,EnemyDB_Init enemy ENEMY_SLIME
+245,enemy.name.enemy_snake,enemy.name.enemy_snake,enemy.name.enemy_snake,enemy,Enemy display name (ENEMY_SNAKE),scripts/scr_db_enemy/scr_db_enemy.gml,64,EnemyDB_Init enemy ENEMY_SNAKE
+246,enemy.name.enemy_spider,enemy.name.enemy_spider,enemy.name.enemy_spider,enemy,Enemy display name (ENEMY_SPIDER),scripts/scr_db_enemy/scr_db_enemy.gml,37,EnemyDB_Init enemy ENEMY_SPIDER
+247,enemy.name.enemy_stranger,enemy.name.enemy_stranger,enemy.name.enemy_stranger,enemy,Enemy display name (ENEMY_STRANGER),scripts/scr_db_enemy/scr_db_enemy.gml,199,EnemyDB_Init enemy ENEMY_STRANGER
+248,enemy.name.unknown,enemy.name.unknown,enemy.name.unknown,enemy,Loc_T fallback in Battle_BuildVictoryDialogueLines,scripts/scr_combat/scr_combat.gml,266,Battle_BuildVictoryDialogueLines:266
+249,interact.grave.default,interact.grave.default,interact.grave.default,interact,Loc_T fallback in Interact_Handle,scripts/scr_interact/scr_interact.gml,156,Interact_Handle:156
+250,interact.grave.line.obj_grave.0,interact.grave.line.obj_grave.0,interact.grave.line.obj_grave.0,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,11,obj_grave.grave_lines[0]
+251,interact.grave.line.obj_grave.1,interact.grave.line.obj_grave.1,interact.grave.line.obj_grave.1,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,11,obj_grave.grave_lines[1]
+252,interact.grave.line.obj_grave.10,interact.grave.line.obj_grave.10,interact.grave.line.obj_grave.10,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,16,obj_grave.grave_lines[10]
+253,interact.grave.line.obj_grave.11,interact.grave.line.obj_grave.11,interact.grave.line.obj_grave.11,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,16,obj_grave.grave_lines[11]
+254,interact.grave.line.obj_grave.12,interact.grave.line.obj_grave.12,interact.grave.line.obj_grave.12,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,17,obj_grave.grave_lines[12]
+255,interact.grave.line.obj_grave.13,interact.grave.line.obj_grave.13,interact.grave.line.obj_grave.13,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,17,obj_grave.grave_lines[13]
+256,interact.grave.line.obj_grave.14,interact.grave.line.obj_grave.14,interact.grave.line.obj_grave.14,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,18,obj_grave.grave_lines[14]
+257,interact.grave.line.obj_grave.15,interact.grave.line.obj_grave.15,interact.grave.line.obj_grave.15,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,18,obj_grave.grave_lines[15]
+258,interact.grave.line.obj_grave.16,interact.grave.line.obj_grave.16,interact.grave.line.obj_grave.16,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,19,obj_grave.grave_lines[16]
+259,interact.grave.line.obj_grave.17,interact.grave.line.obj_grave.17,interact.grave.line.obj_grave.17,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,19,obj_grave.grave_lines[17]
+260,interact.grave.line.obj_grave.18,interact.grave.line.obj_grave.18,interact.grave.line.obj_grave.18,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,20,obj_grave.grave_lines[18]
+261,interact.grave.line.obj_grave.19,interact.grave.line.obj_grave.19,interact.grave.line.obj_grave.19,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,20,obj_grave.grave_lines[19]
+262,interact.grave.line.obj_grave.2,interact.grave.line.obj_grave.2,interact.grave.line.obj_grave.2,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,12,obj_grave.grave_lines[2]
+263,interact.grave.line.obj_grave.3,interact.grave.line.obj_grave.3,interact.grave.line.obj_grave.3,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,12,obj_grave.grave_lines[3]
+264,interact.grave.line.obj_grave.4,interact.grave.line.obj_grave.4,interact.grave.line.obj_grave.4,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,13,obj_grave.grave_lines[4]
+265,interact.grave.line.obj_grave.5,interact.grave.line.obj_grave.5,interact.grave.line.obj_grave.5,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,13,obj_grave.grave_lines[5]
+266,interact.grave.line.obj_grave.6,interact.grave.line.obj_grave.6,interact.grave.line.obj_grave.6,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,14,obj_grave.grave_lines[6]
+267,interact.grave.line.obj_grave.7,interact.grave.line.obj_grave.7,interact.grave.line.obj_grave.7,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,14,obj_grave.grave_lines[7]
+268,interact.grave.line.obj_grave.8,interact.grave.line.obj_grave.8,interact.grave.line.obj_grave.8,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,15,obj_grave.grave_lines[8]
+269,interact.grave.line.obj_grave.9,interact.grave.line.obj_grave.9,interact.grave.line.obj_grave.9,interact,Grave flavor line (obj_grave),objects/obj_grave/Create_0.gml,15,obj_grave.grave_lines[9]
+270,interact.name.obj_barrel,interact.name.obj_barrel,interact.name.obj_barrel,interact,Interactable display name (obj_barrel),objects/obj_barrel/Create_0.gml,3,obj_barrel.interact_name
+271,interact.name.obj_barrel_broken,interact.name.obj_barrel_broken,interact.name.obj_barrel_broken,interact,Interactable display name (obj_barrel_broken),objects/obj_barrel_broken/Create_0.gml,3,obj_barrel_broken.interact_name
+272,interact.name.obj_bed,interact.name.obj_bed,interact.name.obj_bed,interact,Interactable display name (obj_bed),objects/obj_bed/Create_0.gml,4,obj_bed.interact_name
+273,interact.name.obj_bone,interact.name.obj_bone,interact.name.obj_bone,interact,Interactable display name (obj_bone),objects/obj_bone/Create_0.gml,3,obj_bone.interact_name
+274,interact.name.obj_chest,interact.name.obj_chest,interact.name.obj_chest,interact,Interactable display name (obj_chest),objects/obj_chest/Create_0.gml,3,obj_chest.interact_name
+275,interact.name.obj_chest_opened,interact.name.obj_chest_opened,interact.name.obj_chest_opened,interact,Interactable display name (obj_chest_opened),objects/obj_chest_opened/Create_0.gml,3,obj_chest_opened.interact_name
+276,interact.name.obj_dung_pile,interact.name.obj_dung_pile,interact.name.obj_dung_pile,interact,Interactable display name (obj_dung_pile),objects/obj_dung_pile/Create_0.gml,3,obj_dung_pile.interact_name
+277,interact.name.obj_fire_stand,interact.name.obj_fire_stand,interact.name.obj_fire_stand,interact,Interactable display name (obj_fire_stand),objects/obj_fire_stand/Create_0.gml,3,obj_fire_stand.interact_name
+278,interact.name.obj_fire_stand_off,interact.name.obj_fire_stand_off,interact.name.obj_fire_stand_off,interact,Interactable display name (obj_fire_stand_off),objects/obj_fire_stand_off/Create_0.gml,3,obj_fire_stand_off.interact_name
+279,interact.name.obj_grave,interact.name.obj_grave,interact.name.obj_grave,interact,Loc_T fallback in Create_0,objects/obj_grave/Create_0.gml,3,Create_0:3
+280,interact.name.obj_horned_skull,interact.name.obj_horned_skull,interact.name.obj_horned_skull,interact,Interactable display name (obj_horned_skull),objects/obj_horned_skull/Create_0.gml,3,obj_horned_skull.interact_name
+281,interact.name.obj_rock1,interact.name.obj_rock1,interact.name.obj_rock1,interact,Interactable display name (obj_rock1),objects/obj_rock1/Create_0.gml,3,obj_rock1.interact_name
+282,interact.name.obj_rock2,interact.name.obj_rock2,interact.name.obj_rock2,interact,Interactable display name (obj_rock2),objects/obj_rock2/Create_0.gml,3,obj_rock2.interact_name
+283,interact.name.obj_skull_1,interact.name.obj_skull_1,interact.name.obj_skull_1,interact,Interactable display name (obj_skull_1),objects/obj_skull_1/Create_0.gml,3,obj_skull_1.interact_name
+284,interact.name.obj_skull_2,interact.name.obj_skull_2,interact.name.obj_skull_2,interact,Interactable display name (obj_skull_2),objects/obj_skull_2/Create_0.gml,3,obj_skull_2.interact_name
+285,interact.name.obj_tall_grass,interact.name.obj_tall_grass,interact.name.obj_tall_grass,interact,Interactable display name (obj_tall_grass),objects/obj_tall_grass/Create_0.gml,3,obj_tall_grass.interact_name
+286,interact.name.obj_torch,interact.name.obj_torch,interact.name.obj_torch,interact,Interactable display name (obj_torch),objects/obj_torch/Create_0.gml,3,obj_torch.interact_name
+287,interact.name.obj_torch_off,interact.name.obj_torch_off,interact.name.obj_torch_off,interact,Interactable display name (obj_torch_off),objects/obj_torch_off/Create_0.gml,3,obj_torch_off.interact_name
+288,interact.name.obj_tree_1,interact.name.obj_tree_1,interact.name.obj_tree_1,interact,Interactable display name (obj_tree_1),objects/obj_tree_1/Create_0.gml,3,obj_tree_1.interact_name
+289,interact.name.obj_tree_2,interact.name.obj_tree_2,interact.name.obj_tree_2,interact,Interactable display name (obj_tree_2),objects/obj_tree_2/Create_0.gml,3,obj_tree_2.interact_name
+290,interact.name.obj_tree_stump1,interact.name.obj_tree_stump1,interact.name.obj_tree_stump1,interact,Interactable display name (obj_tree_stump1),objects/obj_tree_stump1/Create_0.gml,3,obj_tree_stump1.interact_name
+291,interact.name.obj_tree_stump2,interact.name.obj_tree_stump2,interact.name.obj_tree_stump2,interact,Interactable display name (obj_tree_stump2),objects/obj_tree_stump2/Create_0.gml,3,obj_tree_stump2.interact_name
+292,item.msg.already_know,item.msg.already_know,item.msg.already_know,item,Loc_T fallback in Item_SkillbookValidate,scripts/scr_db_item/scr_db_item.gml,844,Item_SkillbookValidate:844
+293,item.msg.cant_use,item.msg.cant_use,item.msg.cant_use,item,Loc_T fallback in Menu_UseInventoryItem,scripts/scr_menu/scr_menu.gml,854,Menu_UseInventoryItem:854
+294,item.msg.class_cannot_learn,item.msg.class_cannot_learn,item.msg.class_cannot_learn,item,Loc_T fallback in Item_SkillbookValidate,scripts/scr_db_item/scr_db_item.gml,830,Item_SkillbookValidate:830
+295,item.msg.full_health,item.msg.full_health,item.msg.full_health,item,Loc_T fallback in Item_Use,scripts/scr_db_item/scr_db_item.gml,888,Item_Use:888
+296,item.msg.full_mana,item.msg.full_mana,item.msg.full_mana,item,Loc_T fallback in Item_Use,scripts/scr_db_item/scr_db_item.gml,898,Item_Use:898
+297,item.msg.healed_hp,item.msg.healed_hp,item.msg.healed_hp,item,Loc_T fallback in Item_Use,scripts/scr_db_item/scr_db_item.gml,890,Item_Use:890
+298,item.msg.learned,item.msg.learned,item.msg.learned,item,Loc_T fallback in Item_SkillbookValidate,scripts/scr_db_item/scr_db_item.gml,849,Item_SkillbookValidate:849
+299,item.msg.no_status_cure,item.msg.no_status_cure,item.msg.no_status_cure,item,Loc_T fallback in Item_Use,scripts/scr_db_item/scr_db_item.gml,917,Item_Use:917
+300,item.msg.not_ready_skill,item.msg.not_ready_skill,item.msg.not_ready_skill,item,Loc_T fallback in Item_SkillbookValidate,scripts/scr_db_item/scr_db_item.gml,825,Item_SkillbookValidate:825
+301,item.msg.recovered_mp,item.msg.recovered_mp,item.msg.recovered_mp,item,Loc_T fallback in Item_Use,scripts/scr_db_item/scr_db_item.gml,900,Item_Use:900
+302,item.msg.status_cured,item.msg.status_cured,item.msg.status_cured,item,Loc_T fallback in Item_Use,scripts/scr_db_item/scr_db_item.gml,914,Item_Use:914
+303,item.msg.that_skill,item.msg.that_skill,item.msg.that_skill,item,Loc_T fallback in Item_SkillbookValidate,scripts/scr_db_item/scr_db_item.gml,810,Item_SkillbookValidate:810
+304,item.name.0,item.name.0,item.name.0,item,Loc_T fallback in ItemDB_Get,scripts/scr_db_item/scr_db_item.gml,716,ItemDB_Get:716
+305,item.name.1,item.name.1,item.name.1,item,Item display name (1),scripts/scr_db_item/scr_db_item.gml,12,ItemDB_Init item 1
+306,item.name.10,item.name.10,item.name.10,item,Item display name (10),scripts/scr_db_item/scr_db_item.gml,177,ItemDB_Init item 10
+307,item.name.101,item.name.101,item.name.101,item,Item display name (101),scripts/scr_db_item/scr_db_item.gml,332,ItemDB_Init item 101
+308,item.name.102,item.name.102,item.name.102,item,Item display name (102),scripts/scr_db_item/scr_db_item.gml,350,ItemDB_Init item 102
+309,item.name.103,item.name.103,item.name.103,item,Item display name (103),scripts/scr_db_item/scr_db_item.gml,368,ItemDB_Init item 103
+310,item.name.104,item.name.104,item.name.104,item,Item display name (104),scripts/scr_db_item/scr_db_item.gml,386,ItemDB_Init item 104
+311,item.name.105,item.name.105,item.name.105,item,Item display name (105),scripts/scr_db_item/scr_db_item.gml,404,ItemDB_Init item 105
+312,item.name.106,item.name.106,item.name.106,item,Item display name (106),scripts/scr_db_item/scr_db_item.gml,422,ItemDB_Init item 106
+313,item.name.107,item.name.107,item.name.107,item,Item display name (107),scripts/scr_db_item/scr_db_item.gml,440,ItemDB_Init item 107
+314,item.name.108,item.name.108,item.name.108,item,Item display name (108),scripts/scr_db_item/scr_db_item.gml,458,ItemDB_Init item 108
+315,item.name.109,item.name.109,item.name.109,item,Item display name (109),scripts/scr_db_item/scr_db_item.gml,476,ItemDB_Init item 109
+316,item.name.11,item.name.11,item.name.11,item,Item display name (11),scripts/scr_db_item/scr_db_item.gml,235,ItemDB_Init item 11
+317,item.name.110,item.name.110,item.name.110,item,Item display name (110),scripts/scr_db_item/scr_db_item.gml,494,ItemDB_Init item 110
+318,item.name.111,item.name.111,item.name.111,item,Item display name (111),scripts/scr_db_item/scr_db_item.gml,512,ItemDB_Init item 111
+319,item.name.112,item.name.112,item.name.112,item,Item display name (112),scripts/scr_db_item/scr_db_item.gml,530,ItemDB_Init item 112
+320,item.name.113,item.name.113,item.name.113,item,Item display name (113),scripts/scr_db_item/scr_db_item.gml,548,ItemDB_Init item 113
+321,item.name.114,item.name.114,item.name.114,item,Item display name (114),scripts/scr_db_item/scr_db_item.gml,566,ItemDB_Init item 114
+322,item.name.12,item.name.12,item.name.12,item,Item display name (12),scripts/scr_db_item/scr_db_item.gml,293,ItemDB_Init item 12
+323,item.name.13,item.name.13,item.name.13,item,Item display name (13),scripts/scr_db_item/scr_db_item.gml,312,ItemDB_Init item 13
+324,item.name.14,item.name.14,item.name.14,item,Item display name (14),scripts/scr_db_item/scr_db_item.gml,196,ItemDB_Init item 14
+325,item.name.15,item.name.15,item.name.15,item,Item display name (15),scripts/scr_db_item/scr_db_item.gml,215,ItemDB_Init item 15
+326,item.name.17,item.name.17,item.name.17,item,Item display name (17),scripts/scr_db_item/scr_db_item.gml,254,ItemDB_Init item 17
+327,item.name.18,item.name.18,item.name.18,item,Item display name (18),scripts/scr_db_item/scr_db_item.gml,273,ItemDB_Init item 18
+328,item.name.2,item.name.2,item.name.2,item,Item display name (2),scripts/scr_db_item/scr_db_item.gml,30,ItemDB_Init item 2
+329,item.name.20,item.name.20,item.name.20,item,Item display name (20),scripts/scr_db_item/scr_db_item.gml,585,ItemDB_Init item 20
+330,item.name.21,item.name.21,item.name.21,item,Item display name (21),scripts/scr_db_item/scr_db_item.gml,604,ItemDB_Init item 21
+331,item.name.22,item.name.22,item.name.22,item,Item display name (22),scripts/scr_db_item/scr_db_item.gml,623,ItemDB_Init item 22
+332,item.name.23,item.name.23,item.name.23,item,Item display name (23),scripts/scr_db_item/scr_db_item.gml,643,ItemDB_Init item 23
+333,item.name.24,item.name.24,item.name.24,item,Item display name (24),scripts/scr_db_item/scr_db_item.gml,662,ItemDB_Init item 24
+334,item.name.25,item.name.25,item.name.25,item,Item display name (25),scripts/scr_db_item/scr_db_item.gml,681,ItemDB_Init item 25
+335,item.name.3,item.name.3,item.name.3,item,Item display name (3),scripts/scr_db_item/scr_db_item.gml,48,ItemDB_Init item 3
+336,item.name.4,item.name.4,item.name.4,item,Item display name (4),scripts/scr_db_item/scr_db_item.gml,67,ItemDB_Init item 4
+337,item.name.5,item.name.5,item.name.5,item,Item display name (5),scripts/scr_db_item/scr_db_item.gml,85,ItemDB_Init item 5
+338,item.name.6,item.name.6,item.name.6,item,Item display name (6),scripts/scr_db_item/scr_db_item.gml,103,ItemDB_Init item 6
+339,item.name.7,item.name.7,item.name.7,item,Item display name (7),scripts/scr_db_item/scr_db_item.gml,122,ItemDB_Init item 7
+340,item.name.8,item.name.8,item.name.8,item,Item display name (8),scripts/scr_db_item/scr_db_item.gml,140,ItemDB_Init item 8
+341,item.name.9,item.name.9,item.name.9,item,Item display name (9),scripts/scr_db_item/scr_db_item.gml,158,ItemDB_Init item 9
+342,item.passive.desc.1,item.passive.desc.1,item.passive.desc.1,item,Equip passive description for item 1,scripts/scr_db_item/scr_db_item.gml,748,ItemDB_GetPassiveTemplate case 1
+343,item.passive.desc.2,item.passive.desc.2,item.passive.desc.2,item,Equip passive description for item 2,scripts/scr_db_item/scr_db_item.gml,749,ItemDB_GetPassiveTemplate case 2
+344,item.passive.desc.20,item.passive.desc.20,item.passive.desc.20,item,Equip passive description for item 20,scripts/scr_db_item/scr_db_item.gml,759,ItemDB_GetPassiveTemplate case 20
+345,item.passive.desc.21,item.passive.desc.21,item.passive.desc.21,item,Equip passive description for item 21,scripts/scr_db_item/scr_db_item.gml,760,ItemDB_GetPassiveTemplate case 21
+346,item.passive.desc.22,item.passive.desc.22,item.passive.desc.22,item,Equip passive description for item 22,scripts/scr_db_item/scr_db_item.gml,761,ItemDB_GetPassiveTemplate case 22
+347,item.passive.desc.23,item.passive.desc.23,item.passive.desc.23,item,Equip passive description for item 23,scripts/scr_db_item/scr_db_item.gml,762,ItemDB_GetPassiveTemplate case 23
+348,item.passive.desc.24,item.passive.desc.24,item.passive.desc.24,item,Equip passive description for item 24,scripts/scr_db_item/scr_db_item.gml,763,ItemDB_GetPassiveTemplate case 24
+349,item.passive.desc.25,item.passive.desc.25,item.passive.desc.25,item,Equip passive description for item 25,scripts/scr_db_item/scr_db_item.gml,764,ItemDB_GetPassiveTemplate case 25
+350,item.passive.desc.3,item.passive.desc.3,item.passive.desc.3,item,Equip passive description for item 3,scripts/scr_db_item/scr_db_item.gml,750,ItemDB_GetPassiveTemplate case 3
+351,item.passive.desc.4,item.passive.desc.4,item.passive.desc.4,item,Equip passive description for item 4,scripts/scr_db_item/scr_db_item.gml,751,ItemDB_GetPassiveTemplate case 4
+352,item.passive.desc.5,item.passive.desc.5,item.passive.desc.5,item,Equip passive description for item 5,scripts/scr_db_item/scr_db_item.gml,752,ItemDB_GetPassiveTemplate case 5
+353,item.passive.desc.6,item.passive.desc.6,item.passive.desc.6,item,Equip passive description for item 6,scripts/scr_db_item/scr_db_item.gml,753,ItemDB_GetPassiveTemplate case 6
+354,item.passive.desc.7,item.passive.desc.7,item.passive.desc.7,item,Equip passive description for item 7,scripts/scr_db_item/scr_db_item.gml,754,ItemDB_GetPassiveTemplate case 7
+355,item.passive.desc.8,item.passive.desc.8,item.passive.desc.8,item,Equip passive description for item 8,scripts/scr_db_item/scr_db_item.gml,755,ItemDB_GetPassiveTemplate case 8
+356,item.passive.desc.9,item.passive.desc.9,item.passive.desc.9,item,Equip passive description for item 9,scripts/scr_db_item/scr_db_item.gml,756,ItemDB_GetPassiveTemplate case 9
+357,item.passive.name.1,item.passive.name.1,item.passive.name.1,item,Equip passive name for item 1,scripts/scr_db_item/scr_db_item.gml,748,ItemDB_GetPassiveTemplate case 1
+358,item.passive.name.2,item.passive.name.2,item.passive.name.2,item,Equip passive name for item 2,scripts/scr_db_item/scr_db_item.gml,749,ItemDB_GetPassiveTemplate case 2
+359,item.passive.name.20,item.passive.name.20,item.passive.name.20,item,Equip passive name for item 20,scripts/scr_db_item/scr_db_item.gml,759,ItemDB_GetPassiveTemplate case 20
+360,item.passive.name.21,item.passive.name.21,item.passive.name.21,item,Equip passive name for item 21,scripts/scr_db_item/scr_db_item.gml,760,ItemDB_GetPassiveTemplate case 21
+361,item.passive.name.22,item.passive.name.22,item.passive.name.22,item,Equip passive name for item 22,scripts/scr_db_item/scr_db_item.gml,761,ItemDB_GetPassiveTemplate case 22
+362,item.passive.name.23,item.passive.name.23,item.passive.name.23,item,Equip passive name for item 23,scripts/scr_db_item/scr_db_item.gml,762,ItemDB_GetPassiveTemplate case 23
+363,item.passive.name.24,item.passive.name.24,item.passive.name.24,item,Equip passive name for item 24,scripts/scr_db_item/scr_db_item.gml,763,ItemDB_GetPassiveTemplate case 24
+364,item.passive.name.25,item.passive.name.25,item.passive.name.25,item,Equip passive name for item 25,scripts/scr_db_item/scr_db_item.gml,764,ItemDB_GetPassiveTemplate case 25
+365,item.passive.name.3,item.passive.name.3,item.passive.name.3,item,Equip passive name for item 3,scripts/scr_db_item/scr_db_item.gml,750,ItemDB_GetPassiveTemplate case 3
+366,item.passive.name.4,item.passive.name.4,item.passive.name.4,item,Equip passive name for item 4,scripts/scr_db_item/scr_db_item.gml,751,ItemDB_GetPassiveTemplate case 4
+367,item.passive.name.5,item.passive.name.5,item.passive.name.5,item,Equip passive name for item 5,scripts/scr_db_item/scr_db_item.gml,752,ItemDB_GetPassiveTemplate case 5
+368,item.passive.name.6,item.passive.name.6,item.passive.name.6,item,Equip passive name for item 6,scripts/scr_db_item/scr_db_item.gml,753,ItemDB_GetPassiveTemplate case 6
+369,item.passive.name.7,item.passive.name.7,item.passive.name.7,item,Equip passive name for item 7,scripts/scr_db_item/scr_db_item.gml,754,ItemDB_GetPassiveTemplate case 7
+370,item.passive.name.8,item.passive.name.8,item.passive.name.8,item,Equip passive name for item 8,scripts/scr_db_item/scr_db_item.gml,755,ItemDB_GetPassiveTemplate case 8
+371,item.passive.name.9,item.passive.name.9,item.passive.name.9,item,Equip passive name for item 9,scripts/scr_db_item/scr_db_item.gml,756,ItemDB_GetPassiveTemplate case 9
+372,menu.common.back,menu.common.back,menu.common.back,menu,Loc_T fallback in ClassSelect_Draw,scripts/scr_menu/scr_menu.gml,2066,ClassSelect_Draw:2066
+373,menu.common.cancel,menu.common.cancel,menu.common.cancel,menu,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1622,Menu_Draw:1622
+374,menu.common.confirm,menu.common.confirm,menu.common.confirm,menu,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1621,Menu_Draw:1621
+375,menu.difficulty.title,menu.difficulty.title,menu.difficulty.title,menu,Loc_T fallback in Draw_64,objects/obj_start_controller/Draw_64.gml,91,Draw_64:91
+376,menu.draw_64.127.0,menu.draw_64.127.0,menu.draw_64.127.0,menu,Draw_64 UI/message text,objects/obj_start_controller/Draw_64.gml,127,Draw_64:127
+377,menu.draw_64.127.1,menu.draw_64.127.1,menu.draw_64.127.1,menu,Draw_64 UI/message text,objects/obj_start_controller/Draw_64.gml,127,Draw_64:127
+378,menu.draw_64.91.0,menu.draw_64.91.0,menu.draw_64.91.0,menu,Draw_64 UI/message text,objects/obj_start_controller/Draw_64.gml,91,Draw_64:91
+379,menu.draw_64.91.1,menu.draw_64.91.1,menu.draw_64.91.1,menu,Draw_64 UI/message text,objects/obj_start_controller/Draw_64.gml,91,Draw_64:91
+380,menu.label.equipped_short,menu.label.equipped_short,menu.label.equipped_short,menu,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1417,Menu_Draw:1417
+381,menu.label.stack_suffix,menu.label.stack_suffix,menu.label.stack_suffix,menu,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1410,Menu_Draw:1410
+382,menu.main.option.0,menu.main.option.0,menu.main.option.0,menu,Loc_T fallback in Create_0,objects/obj_start_controller/Create_0.gml,3,Create_0:3
+383,menu.main.option.1,menu.main.option.1,menu.main.option.1,menu,Loc_T fallback in Create_0,objects/obj_start_controller/Create_0.gml,4,Create_0:4
+384,menu.main.option.2,menu.main.option.2,menu.main.option.2,menu,Loc_T fallback in Create_0,objects/obj_start_controller/Create_0.gml,5,Create_0:5
+385,menu.main.option.3,menu.main.option.3,menu.main.option.3,menu,Loc_T fallback in Create_0,objects/obj_start_controller/Create_0.gml,6,Create_0:6
+386,menu.menu_draw.1353.0,menu.menu_draw.1353.0,menu.menu_draw.1353.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1353,Menu_Draw:1353
+387,menu.menu_draw.1354.0,menu.menu_draw.1354.0,menu.menu_draw.1354.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1354,Menu_Draw:1354
+388,menu.menu_draw.1355.0,menu.menu_draw.1355.0,menu.menu_draw.1355.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1355,Menu_Draw:1355
+389,menu.menu_draw.1387.0,menu.menu_draw.1387.0,menu.menu_draw.1387.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1387,Menu_Draw:1387
+390,menu.menu_draw.1387.1,menu.menu_draw.1387.1,menu.menu_draw.1387.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1387,Menu_Draw:1387
+391,menu.menu_draw.1417.0,menu.menu_draw.1417.0,menu.menu_draw.1417.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1417,Menu_Draw:1417
+392,menu.menu_draw.1417.1,menu.menu_draw.1417.1,menu.menu_draw.1417.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1417,Menu_Draw:1417
+393,menu.menu_draw.1417.2,menu.menu_draw.1417.2,menu.menu_draw.1417.2,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1417,Menu_Draw:1417
+394,menu.menu_draw.1417.3,menu.menu_draw.1417.3,menu.menu_draw.1417.3,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1417,Menu_Draw:1417
+395,menu.menu_draw.1448.0,menu.menu_draw.1448.0,menu.menu_draw.1448.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1448,Menu_Draw:1448
+396,menu.menu_draw.1448.1,menu.menu_draw.1448.1,menu.menu_draw.1448.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1448,Menu_Draw:1448
+397,menu.menu_draw.1529.0,menu.menu_draw.1529.0,menu.menu_draw.1529.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1529,Menu_Draw:1529
+398,menu.menu_draw.1529.1,menu.menu_draw.1529.1,menu.menu_draw.1529.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1529,Menu_Draw:1529
+399,menu.menu_draw.1529.2,menu.menu_draw.1529.2,menu.menu_draw.1529.2,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1529,Menu_Draw:1529
+400,menu.menu_draw.1529.3,menu.menu_draw.1529.3,menu.menu_draw.1529.3,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1529,Menu_Draw:1529
+401,menu.menu_draw.1530.0,menu.menu_draw.1530.0,menu.menu_draw.1530.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1530,Menu_Draw:1530
+402,menu.menu_draw.1530.1,menu.menu_draw.1530.1,menu.menu_draw.1530.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1530,Menu_Draw:1530
+403,menu.menu_draw.1556.0,menu.menu_draw.1556.0,menu.menu_draw.1556.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1556,Menu_Draw:1556
+404,menu.menu_draw.1556.1,menu.menu_draw.1556.1,menu.menu_draw.1556.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1556,Menu_Draw:1556
+405,menu.menu_draw.1562.0,menu.menu_draw.1562.0,menu.menu_draw.1562.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1562,Menu_Draw:1562
+406,menu.menu_draw.1562.1,menu.menu_draw.1562.1,menu.menu_draw.1562.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1562,Menu_Draw:1562
+407,menu.menu_draw.1621.0,menu.menu_draw.1621.0,menu.menu_draw.1621.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1621,Menu_Draw:1621
+408,menu.menu_draw.1621.1,menu.menu_draw.1621.1,menu.menu_draw.1621.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1621,Menu_Draw:1621
+409,menu.menu_draw.1622.0,menu.menu_draw.1622.0,menu.menu_draw.1622.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1622,Menu_Draw:1622
+410,menu.menu_draw.1622.1,menu.menu_draw.1622.1,menu.menu_draw.1622.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1622,Menu_Draw:1622
+411,menu.menu_draw.1670.0,menu.menu_draw.1670.0,menu.menu_draw.1670.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1670,Menu_Draw:1670
+412,menu.menu_draw.1670.1,menu.menu_draw.1670.1,menu.menu_draw.1670.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1670,Menu_Draw:1670
+413,menu.menu_draw.1688.0,menu.menu_draw.1688.0,menu.menu_draw.1688.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1688,Menu_Draw:1688
+414,menu.menu_draw.1688.1,menu.menu_draw.1688.1,menu.menu_draw.1688.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1688,Menu_Draw:1688
+415,menu.menu_draw.1689.0,menu.menu_draw.1689.0,menu.menu_draw.1689.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1689,Menu_Draw:1689
+416,menu.menu_draw.1689.1,menu.menu_draw.1689.1,menu.menu_draw.1689.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1689,Menu_Draw:1689
+417,menu.menu_draw.1741.0,menu.menu_draw.1741.0,menu.menu_draw.1741.0,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1741,Menu_Draw:1741
+418,menu.menu_draw.1741.1,menu.menu_draw.1741.1,menu.menu_draw.1741.1,menu,Menu_Draw UI/message text,scripts/scr_menu/scr_menu.gml,1741,Menu_Draw:1741
+419,menu.menu_handleinput.1170.0,menu.menu_handleinput.1170.0,menu.menu_handleinput.1170.0,menu,Menu_HandleInput UI/message text,scripts/scr_menu/scr_menu.gml,1170,Menu_HandleInput:1170
+420,menu.menu_handleinput.1170.1,menu.menu_handleinput.1170.1,menu.menu_handleinput.1170.1,menu,Menu_HandleInput UI/message text,scripts/scr_menu/scr_menu.gml,1170,Menu_HandleInput:1170
+421,menu.menu_useinventoryitem.854.0,menu.menu_useinventoryitem.854.0,menu.menu_useinventoryitem.854.0,menu,Menu_UseInventoryItem UI/message text,scripts/scr_menu/scr_menu.gml,854,Menu_UseInventoryItem:854
+422,menu.menu_useinventoryitem.854.1,menu.menu_useinventoryitem.854.1,menu.menu_useinventoryitem.854.1,menu,Menu_UseInventoryItem UI/message text,scripts/scr_menu/scr_menu.gml,854,Menu_UseInventoryItem:854
+423,menu.menu_useinventoryitem.869.0,menu.menu_useinventoryitem.869.0,menu.menu_useinventoryitem.869.0,menu,Menu_UseInventoryItem UI/message text,scripts/scr_menu/scr_menu.gml,869,Menu_UseInventoryItem:869
+424,menu.menu_useinventoryitem.869.1,menu.menu_useinventoryitem.869.1,menu.menu_useinventoryitem.869.1,menu,Menu_UseInventoryItem UI/message text,scripts/scr_menu/scr_menu.gml,869,Menu_UseInventoryItem:869
+425,menu.menu_useinventoryitem.884.0,menu.menu_useinventoryitem.884.0,menu.menu_useinventoryitem.884.0,menu,Menu_UseInventoryItem UI/message text,scripts/scr_menu/scr_menu.gml,884,Menu_UseInventoryItem:884
+426,menu.menu_useinventoryitem.884.1,menu.menu_useinventoryitem.884.1,menu.menu_useinventoryitem.884.1,menu,Menu_UseInventoryItem UI/message text,scripts/scr_menu/scr_menu.gml,884,Menu_UseInventoryItem:884
+427,menu.menu_useinventoryitem.890.0,menu.menu_useinventoryitem.890.0,menu.menu_useinventoryitem.890.0,menu,Menu_UseInventoryItem UI/message text,scripts/scr_menu/scr_menu.gml,890,Menu_UseInventoryItem:890
+428,menu.menu_useinventoryitem.890.1,menu.menu_useinventoryitem.890.1,menu.menu_useinventoryitem.890.1,menu,Menu_UseInventoryItem UI/message text,scripts/scr_menu/scr_menu.gml,890,Menu_UseInventoryItem:890
+429,menu.menu_useinventoryitem.912.0,menu.menu_useinventoryitem.912.0,menu.menu_useinventoryitem.912.0,menu,Menu_UseInventoryItem UI/message text,scripts/scr_menu/scr_menu.gml,912,Menu_UseInventoryItem:912
+430,menu.menu_useinventoryitem.912.1,menu.menu_useinventoryitem.912.1,menu.menu_useinventoryitem.912.1,menu,Menu_UseInventoryItem UI/message text,scripts/scr_menu/scr_menu.gml,912,Menu_UseInventoryItem:912
+431,menu.msg.cant_equip,menu.msg.cant_equip,menu.msg.cant_equip,menu,Loc_T fallback in Menu_UseInventoryItem,scripts/scr_menu/scr_menu.gml,890,Menu_UseInventoryItem:890
+432,menu.msg.equipped,menu.msg.equipped,menu.msg.equipped,menu,Loc_T fallback in Menu_UseInventoryItem,scripts/scr_menu/scr_menu.gml,884,Menu_UseInventoryItem:884
+433,menu.msg.no_items,menu.msg.no_items,menu.msg.no_items,menu,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1387,Menu_Draw:1387
+434,menu.msg.no_skills,menu.msg.no_skills,menu.msg.no_skills,menu,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1448,Menu_Draw:1448
+435,menu.msg.unequipped,menu.msg.unequipped,menu.msg.unequipped,menu,Loc_T fallback in Menu_UseInventoryItem,scripts/scr_menu/scr_menu.gml,869,Menu_UseInventoryItem:869
+436,menu.popup.learn_skill,menu.popup.learn_skill,menu.popup.learn_skill,menu,Loc_T fallback in Menu_InvPopupOpenConfirm,scripts/scr_menu/scr_menu.gml,922,Menu_InvPopupOpenConfirm:922
+437,menu.stats.available_points,menu.stats.available_points,menu.stats.available_points,menu,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1538,Menu_Draw:1538
+438,menu.stats.level,menu.stats.level,menu.stats.level,menu,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1535,Menu_Draw:1535
+439,menu.stats.level_cap,menu.stats.level_cap,menu.stats.level_cap,menu,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1529,Menu_Draw:1529
+440,menu.stats.max,menu.stats.max,menu.stats.max,menu,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1530,Menu_Draw:1530
+441,menu.stats.required_exp,menu.stats.required_exp,menu.stats.required_exp,menu,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1529,Menu_Draw:1529
+442,menu.tab.inventory,menu.tab.inventory,menu.tab.inventory,menu,Loc_T fallback in Menu_Ensure,scripts/scr_menu/scr_menu.gml,15,Menu_Ensure:15
+443,menu.tab.skills,menu.tab.skills,menu.tab.skills,menu,Loc_T fallback in Menu_Ensure,scripts/scr_menu/scr_menu.gml,16,Menu_Ensure:16
+444,menu.tab.stats,menu.tab.stats,menu.tab.stats,menu,Loc_T fallback in Menu_Ensure,scripts/scr_menu/scr_menu.gml,17,Menu_Ensure:17
+445,menu.tooltip.class.all,menu.tooltip.class.all,menu.tooltip.class.all,menu,Loc_T fallback in Tooltip_ClassListText,scripts/scr_menu/scr_menu.gml,217,Tooltip_ClassListText:217
+446,menu.tooltip.class.only,menu.tooltip.class.only,menu.tooltip.class.only,menu,Loc_T fallback in Tooltip_ClassOnlyText,scripts/scr_menu/scr_menu.gml,229,Tooltip_ClassOnlyText:229
+447,menu.tooltip.damage,menu.tooltip.damage,menu.tooltip.damage,menu,Loc_T fallback in Tooltip_SkillDamageLine,scripts/scr_menu/scr_menu.gml,299,Tooltip_SkillDamageLine:299
+448,menu.tooltip.damage.acc,menu.tooltip.damage.acc,menu.tooltip.damage.acc,menu,Loc_T fallback in Tooltip_SkillDamageLine,scripts/scr_menu/scr_menu.gml,317,Tooltip_SkillDamageLine:317
+449,menu.tooltip.damage.hits,menu.tooltip.damage.hits,menu.tooltip.damage.hits,menu,Loc_T fallback in Tooltip_SkillDamageLine,scripts/scr_menu/scr_menu.gml,311,Tooltip_SkillDamageLine:311
+450,menu.tooltip.damage.power,menu.tooltip.damage.power,menu.tooltip.damage.power,menu,Loc_T fallback in Tooltip_SkillDamageLine,scripts/scr_menu/scr_menu.gml,301,Tooltip_SkillDamageLine:301
+451,menu.tooltip.damage.stat,menu.tooltip.damage.stat,menu.tooltip.damage.stat,menu,Loc_T fallback in Tooltip_SkillDamageLine,scripts/scr_menu/scr_menu.gml,320,Tooltip_SkillDamageLine:320
+452,menu.tooltip.effect.buff,menu.tooltip.effect.buff,menu.tooltip.effect.buff,menu,Loc_T fallback in Tooltip_SkillEffectLines,scripts/scr_menu/scr_menu.gml,416,Tooltip_SkillEffectLines:416
+453,menu.tooltip.effect.multi_status,menu.tooltip.effect.multi_status,menu.tooltip.effect.multi_status,menu,Loc_T fallback in Tooltip_SkillEffectLines,scripts/scr_menu/scr_menu.gml,424,Tooltip_SkillEffectLines:424
+454,menu.tooltip.effect.named,menu.tooltip.effect.named,menu.tooltip.effect.named,menu,Loc_T fallback in Tooltip_SkillEffectLines,scripts/scr_menu/scr_menu.gml,437,Tooltip_SkillEffectLines:437
+455,menu.tooltip.effect.restore_hp,menu.tooltip.effect.restore_hp,menu.tooltip.effect.restore_hp,menu,Loc_T fallback in Tooltip_SkillEffectLines,scripts/scr_menu/scr_menu.gml,428,Tooltip_SkillEffectLines:428
+456,menu.tooltip.effect.steal_item,menu.tooltip.effect.steal_item,menu.tooltip.effect.steal_item,menu,Loc_T fallback in Tooltip_SkillEffectLines,scripts/scr_menu/scr_menu.gml,432,Tooltip_SkillEffectLines:432
+457,menu.tooltip.item.bonus,menu.tooltip.item.bonus,menu.tooltip.item.bonus,menu,Loc_T fallback in Tooltip_BuildItemLines,scripts/scr_menu/scr_menu.gml,572,Tooltip_BuildItemLines:572
+458,menu.tooltip.item.cure,menu.tooltip.item.cure,menu.tooltip.item.cure,menu,Loc_T fallback in Tooltip_BuildItemLines,scripts/scr_menu/scr_menu.gml,623,Tooltip_BuildItemLines:623
+459,menu.tooltip.item.heal_hp,menu.tooltip.item.heal_hp,menu.tooltip.item.heal_hp,menu,Loc_T fallback in Tooltip_BuildItemLines,scripts/scr_menu/scr_menu.gml,597,Tooltip_BuildItemLines:597
+460,menu.tooltip.item.restore_mp,menu.tooltip.item.restore_mp,menu.tooltip.item.restore_mp,menu,Loc_T fallback in Tooltip_BuildItemLines,scripts/scr_menu/scr_menu.gml,611,Tooltip_BuildItemLines:611
+461,menu.tooltip.item.scale_with_level,menu.tooltip.item.scale_with_level,menu.tooltip.item.scale_with_level,menu,Loc_T fallback in Tooltip_BuildItemLines,scripts/scr_menu/scr_menu.gml,603,Tooltip_BuildItemLines:603
+462,menu.tooltip.item.teaches,menu.tooltip.item.teaches,menu.tooltip.item.teaches,menu,Loc_T fallback in Tooltip_BuildItemLines,scripts/scr_menu/scr_menu.gml,633,Tooltip_BuildItemLines:633
+463,menu.tooltip.item.teaches_unknown,menu.tooltip.item.teaches_unknown,menu.tooltip.item.teaches_unknown,menu,Loc_T fallback in Tooltip_BuildItemLines,scripts/scr_menu/scr_menu.gml,652,Tooltip_BuildItemLines:652
+464,menu.tooltip.item.type.armor,menu.tooltip.item.type.armor,menu.tooltip.item.type.armor,menu,Loc_T fallback in Tooltip_ItemTypeLine,scripts/scr_menu/scr_menu.gml,502,Tooltip_ItemTypeLine:502
+465,menu.tooltip.item.type.consumable,menu.tooltip.item.type.consumable,menu.tooltip.item.type.consumable,menu,Loc_T fallback in Tooltip_ItemTypeLine,scripts/scr_menu/scr_menu.gml,511,Tooltip_ItemTypeLine:511
+466,menu.tooltip.item.type.key,menu.tooltip.item.type.key,menu.tooltip.item.type.key,menu,Loc_T fallback in Tooltip_ItemTypeLine,scripts/scr_menu/scr_menu.gml,512,Tooltip_ItemTypeLine:512
+467,menu.tooltip.item.type.skillbook,menu.tooltip.item.type.skillbook,menu.tooltip.item.type.skillbook,menu,Loc_T fallback in Tooltip_ItemTypeLine,scripts/scr_menu/scr_menu.gml,497,Tooltip_ItemTypeLine:497
+468,menu.tooltip.item.type.unknown,menu.tooltip.item.type.unknown,menu.tooltip.item.type.unknown,menu,Loc_T fallback in Tooltip_ItemTypeLine,scripts/scr_menu/scr_menu.gml,496,Tooltip_ItemTypeLine:496
+469,menu.tooltip.item.type.weapon,menu.tooltip.item.type.weapon,menu.tooltip.item.type.weapon,menu,Loc_T fallback in Tooltip_ItemTypeLine,scripts/scr_menu/scr_menu.gml,501,Tooltip_ItemTypeLine:501
+470,menu.tooltip.item.type.with_slot,menu.tooltip.item.type.with_slot,menu.tooltip.item.type.with_slot,menu,Loc_T fallback in Tooltip_ItemTypeLine,scripts/scr_menu/scr_menu.gml,504,Tooltip_ItemTypeLine:504
+471,menu.tooltip.passive.cooldown,menu.tooltip.passive.cooldown,menu.tooltip.passive.cooldown,menu,Loc_T fallback in Tooltip_PassiveLineHuman,scripts/scr_menu/scr_menu.gml,257,Tooltip_PassiveLineHuman:257
+472,menu.tooltip.passive.cooldown_prefix,menu.tooltip.passive.cooldown_prefix,menu.tooltip.passive.cooldown_prefix,menu,Loc_T fallback in Tooltip_PassiveLineHuman,scripts/scr_menu/scr_menu.gml,256,Tooltip_PassiveLineHuman:256
+473,menu.tooltip.passive.good_plus,menu.tooltip.passive.good_plus,menu.tooltip.passive.good_plus,menu,Loc_T fallback in Tooltip_PassiveLineHuman,scripts/scr_menu/scr_menu.gml,259,Tooltip_PassiveLineHuman:259
+474,menu.tooltip.passive.good_plus_colon,menu.tooltip.passive.good_plus_colon,menu.tooltip.passive.good_plus_colon,menu,Loc_T fallback in Tooltip_PassiveLineHuman,scripts/scr_menu/scr_menu.gml,258,Tooltip_PassiveLineHuman:258
+475,menu.tooltip.passive.once_per_turn,menu.tooltip.passive.once_per_turn,menu.tooltip.passive.once_per_turn,menu,Loc_T fallback in Tooltip_PassiveLineHuman,scripts/scr_menu/scr_menu.gml,255,Tooltip_PassiveLineHuman:255
+476,menu.tooltip.passive.to,menu.tooltip.passive.to,menu.tooltip.passive.to,menu,Loc_T fallback in Tooltip_PassiveLineHuman,scripts/scr_menu/scr_menu.gml,254,Tooltip_PassiveLineHuman:254
+477,menu.tooltip.skill.mp,menu.tooltip.skill.mp,menu.tooltip.skill.mp,menu,Loc_T fallback in Tooltip_BuildSkillLines,scripts/scr_menu/scr_menu.gml,669,Tooltip_BuildSkillLines:669
+478,menu.tooltip.skill.mp_target,menu.tooltip.skill.mp_target,menu.tooltip.skill.mp_target,menu,Loc_T fallback in Tooltip_BuildItemLines,scripts/scr_menu/scr_menu.gml,641,Tooltip_BuildItemLines:641
+479,menu.tooltip.skill.target_suffix,menu.tooltip.skill.target_suffix,menu.tooltip.skill.target_suffix,menu,Loc_T fallback in Tooltip_BuildSkillLines,scripts/scr_menu/scr_menu.gml,673,Tooltip_BuildSkillLines:673
+480,menu.tooltip.stat.agi.desc,menu.tooltip.stat.agi.desc,menu.tooltip.stat.agi.desc,menu,Loc_T fallback in Tooltip_BuildStatLines,scripts/scr_menu/scr_menu.gml,462,Tooltip_BuildStatLines:462
+481,menu.tooltip.stat.def.desc,menu.tooltip.stat.def.desc,menu.tooltip.stat.def.desc,menu,Loc_T fallback in Tooltip_BuildStatLines,scripts/scr_menu/scr_menu.gml,465,Tooltip_BuildStatLines:465
+482,menu.tooltip.stat.default.desc,menu.tooltip.stat.default.desc,menu.tooltip.stat.default.desc,menu,Loc_T fallback in Tooltip_BuildStatLines,scripts/scr_menu/scr_menu.gml,474,Tooltip_BuildStatLines:474
+483,menu.tooltip.stat.intt.desc,menu.tooltip.stat.intt.desc,menu.tooltip.stat.intt.desc,menu,Loc_T fallback in Tooltip_BuildStatLines,scripts/scr_menu/scr_menu.gml,468,Tooltip_BuildStatLines:468
+484,menu.tooltip.stat.luck.desc,menu.tooltip.stat.luck.desc,menu.tooltip.stat.luck.desc,menu,Loc_T fallback in Tooltip_BuildStatLines,scripts/scr_menu/scr_menu.gml,471,Tooltip_BuildStatLines:471
+485,menu.tooltip.stat.pending_plus,menu.tooltip.stat.pending_plus,menu.tooltip.stat.pending_plus,menu,Loc_T fallback in Tooltip_BuildStatLines,scripts/scr_menu/scr_menu.gml,450,Tooltip_BuildStatLines:450
+486,menu.tooltip.stat.pending_zero,menu.tooltip.stat.pending_zero,menu.tooltip.stat.pending_zero,menu,Loc_T fallback in Tooltip_BuildStatLines,scripts/scr_menu/scr_menu.gml,454,Tooltip_BuildStatLines:454
+487,menu.tooltip.stat.str.desc,menu.tooltip.stat.str.desc,menu.tooltip.stat.str.desc,menu,Loc_T fallback in Tooltip_BuildStatLines,scripts/scr_menu/scr_menu.gml,459,Tooltip_BuildStatLines:459
+488,menu.tooltip.status.default,menu.tooltip.status.default,menu.tooltip.status.default,menu,Loc_T fallback in Tooltip_StatusName,scripts/scr_menu/scr_menu.gml,236,Tooltip_StatusName:236
+489,menu.tooltip.status.line,menu.tooltip.status.line,menu.tooltip.status.line,menu,Loc_T fallback in Tooltip_SkillSingleStatusLine,scripts/scr_menu/scr_menu.gml,333,Tooltip_SkillSingleStatusLine:333
+490,menu.tooltip.status.turns_short,menu.tooltip.status.turns_short,menu.tooltip.status.turns_short,menu,Loc_T fallback in Tooltip_SkillMultiStatusLine,scripts/scr_menu/scr_menu.gml,369,Tooltip_SkillMultiStatusLine:369
+491,menu.tooltip.status.turns_suffix,menu.tooltip.status.turns_suffix,menu.tooltip.status.turns_suffix,menu,Loc_T fallback in Tooltip_SkillSingleStatusLine,scripts/scr_menu/scr_menu.gml,339,Tooltip_SkillSingleStatusLine:339
+492,menu.tooltip.statuses.more,menu.tooltip.statuses.more,menu.tooltip.statuses.more,menu,Loc_T fallback in Tooltip_SkillMultiStatusLine,scripts/scr_menu/scr_menu.gml,383,Tooltip_SkillMultiStatusLine:383
+493,menu.tooltip.statuses.prefix,menu.tooltip.statuses.prefix,menu.tooltip.statuses.prefix,menu,Loc_T fallback in Tooltip_SkillMultiStatusLine,scripts/scr_menu/scr_menu.gml,377,Tooltip_SkillMultiStatusLine:377
+494,menu.tooltip.target.all,menu.tooltip.target.all,menu.tooltip.target.all,menu,Loc_T fallback in Tooltip_TargetName,scripts/scr_menu/scr_menu.gml,211,Tooltip_TargetName:211
+495,menu.tooltip.target.all_allies,menu.tooltip.target.all_allies,menu.tooltip.target.all_allies,menu,Loc_T fallback in Tooltip_TargetName,scripts/scr_menu/scr_menu.gml,210,Tooltip_TargetName:210
+496,menu.tooltip.target.all_enemies,menu.tooltip.target.all_enemies,menu.tooltip.target.all_enemies,menu,Loc_T fallback in Tooltip_TargetName,scripts/scr_menu/scr_menu.gml,209,Tooltip_TargetName:209
+497,menu.tooltip.target.enemy,menu.tooltip.target.enemy,menu.tooltip.target.enemy,menu,Loc_T fallback in Tooltip_TargetName,scripts/scr_menu/scr_menu.gml,208,Tooltip_TargetName:208
+498,menu.tooltip.target.self,menu.tooltip.target.self,menu.tooltip.target.self,menu,Loc_T fallback in Tooltip_TargetName,scripts/scr_menu/scr_menu.gml,207,Tooltip_TargetName:207
+499,menu.tooltip.target.unknown,menu.tooltip.target.unknown,menu.tooltip.target.unknown,menu,Loc_T fallback in Tooltip_TargetName,scripts/scr_menu/scr_menu.gml,213,Tooltip_TargetName:213
+500,menu.tooltip_builditemlines.572.0,menu.tooltip_builditemlines.572.0,menu.tooltip_builditemlines.572.0,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,572,Tooltip_BuildItemLines:572
+501,menu.tooltip_builditemlines.572.1,menu.tooltip_builditemlines.572.1,menu.tooltip_builditemlines.572.1,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,572,Tooltip_BuildItemLines:572
+502,menu.tooltip_builditemlines.585.0,menu.tooltip_builditemlines.585.0,menu.tooltip_builditemlines.585.0,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,585,Tooltip_BuildItemLines:585
+503,menu.tooltip_builditemlines.585.1,menu.tooltip_builditemlines.585.1,menu.tooltip_builditemlines.585.1,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,585,Tooltip_BuildItemLines:585
+504,menu.tooltip_builditemlines.603.0,menu.tooltip_builditemlines.603.0,menu.tooltip_builditemlines.603.0,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,603,Tooltip_BuildItemLines:603
+505,menu.tooltip_builditemlines.603.1,menu.tooltip_builditemlines.603.1,menu.tooltip_builditemlines.603.1,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,603,Tooltip_BuildItemLines:603
+506,menu.tooltip_builditemlines.617.0,menu.tooltip_builditemlines.617.0,menu.tooltip_builditemlines.617.0,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,617,Tooltip_BuildItemLines:617
+507,menu.tooltip_builditemlines.617.1,menu.tooltip_builditemlines.617.1,menu.tooltip_builditemlines.617.1,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,617,Tooltip_BuildItemLines:617
+508,menu.tooltip_builditemlines.623.0,menu.tooltip_builditemlines.623.0,menu.tooltip_builditemlines.623.0,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,623,Tooltip_BuildItemLines:623
+509,menu.tooltip_builditemlines.623.1,menu.tooltip_builditemlines.623.1,menu.tooltip_builditemlines.623.1,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,623,Tooltip_BuildItemLines:623
+510,menu.tooltip_builditemlines.633.0,menu.tooltip_builditemlines.633.0,menu.tooltip_builditemlines.633.0,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,633,Tooltip_BuildItemLines:633
+511,menu.tooltip_builditemlines.633.1,menu.tooltip_builditemlines.633.1,menu.tooltip_builditemlines.633.1,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,633,Tooltip_BuildItemLines:633
+512,menu.tooltip_builditemlines.641.0,menu.tooltip_builditemlines.641.0,menu.tooltip_builditemlines.641.0,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,641,Tooltip_BuildItemLines:641
+513,menu.tooltip_builditemlines.641.1,menu.tooltip_builditemlines.641.1,menu.tooltip_builditemlines.641.1,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,641,Tooltip_BuildItemLines:641
+514,menu.tooltip_builditemlines.652.0,menu.tooltip_builditemlines.652.0,menu.tooltip_builditemlines.652.0,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,652,Tooltip_BuildItemLines:652
+515,menu.tooltip_builditemlines.652.1,menu.tooltip_builditemlines.652.1,menu.tooltip_builditemlines.652.1,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,652,Tooltip_BuildItemLines:652
+516,menu.tooltip_builditemlines.656.0,menu.tooltip_builditemlines.656.0,menu.tooltip_builditemlines.656.0,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,656,Tooltip_BuildItemLines:656
+517,menu.tooltip_builditemlines.656.1,menu.tooltip_builditemlines.656.1,menu.tooltip_builditemlines.656.1,menu,Tooltip_BuildItemLines UI/message text,scripts/scr_menu/scr_menu.gml,656,Tooltip_BuildItemLines:656
+518,menu.tooltip_buildstatlines.450.0,menu.tooltip_buildstatlines.450.0,menu.tooltip_buildstatlines.450.0,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,450,Tooltip_BuildStatLines:450
+519,menu.tooltip_buildstatlines.450.1,menu.tooltip_buildstatlines.450.1,menu.tooltip_buildstatlines.450.1,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,450,Tooltip_BuildStatLines:450
+520,menu.tooltip_buildstatlines.454.0,menu.tooltip_buildstatlines.454.0,menu.tooltip_buildstatlines.454.0,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,454,Tooltip_BuildStatLines:454
+521,menu.tooltip_buildstatlines.454.1,menu.tooltip_buildstatlines.454.1,menu.tooltip_buildstatlines.454.1,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,454,Tooltip_BuildStatLines:454
+522,menu.tooltip_buildstatlines.459.0,menu.tooltip_buildstatlines.459.0,menu.tooltip_buildstatlines.459.0,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,459,Tooltip_BuildStatLines:459
+523,menu.tooltip_buildstatlines.459.1,menu.tooltip_buildstatlines.459.1,menu.tooltip_buildstatlines.459.1,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,459,Tooltip_BuildStatLines:459
+524,menu.tooltip_buildstatlines.462.0,menu.tooltip_buildstatlines.462.0,menu.tooltip_buildstatlines.462.0,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,462,Tooltip_BuildStatLines:462
+525,menu.tooltip_buildstatlines.462.1,menu.tooltip_buildstatlines.462.1,menu.tooltip_buildstatlines.462.1,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,462,Tooltip_BuildStatLines:462
+526,menu.tooltip_buildstatlines.465.0,menu.tooltip_buildstatlines.465.0,menu.tooltip_buildstatlines.465.0,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,465,Tooltip_BuildStatLines:465
+527,menu.tooltip_buildstatlines.465.1,menu.tooltip_buildstatlines.465.1,menu.tooltip_buildstatlines.465.1,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,465,Tooltip_BuildStatLines:465
+528,menu.tooltip_buildstatlines.468.0,menu.tooltip_buildstatlines.468.0,menu.tooltip_buildstatlines.468.0,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,468,Tooltip_BuildStatLines:468
+529,menu.tooltip_buildstatlines.468.1,menu.tooltip_buildstatlines.468.1,menu.tooltip_buildstatlines.468.1,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,468,Tooltip_BuildStatLines:468
+530,menu.tooltip_buildstatlines.471.0,menu.tooltip_buildstatlines.471.0,menu.tooltip_buildstatlines.471.0,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,471,Tooltip_BuildStatLines:471
+531,menu.tooltip_buildstatlines.471.1,menu.tooltip_buildstatlines.471.1,menu.tooltip_buildstatlines.471.1,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,471,Tooltip_BuildStatLines:471
+532,menu.tooltip_buildstatlines.474.0,menu.tooltip_buildstatlines.474.0,menu.tooltip_buildstatlines.474.0,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,474,Tooltip_BuildStatLines:474
+533,menu.tooltip_buildstatlines.474.1,menu.tooltip_buildstatlines.474.1,menu.tooltip_buildstatlines.474.1,menu,Tooltip_BuildStatLines UI/message text,scripts/scr_menu/scr_menu.gml,474,Tooltip_BuildStatLines:474
+534,menu.tooltip_skilleffectlines.416.0,menu.tooltip_skilleffectlines.416.0,menu.tooltip_skilleffectlines.416.0,menu,Tooltip_SkillEffectLines UI/message text,scripts/scr_menu/scr_menu.gml,416,Tooltip_SkillEffectLines:416
+535,menu.tooltip_skilleffectlines.416.1,menu.tooltip_skilleffectlines.416.1,menu.tooltip_skilleffectlines.416.1,menu,Tooltip_SkillEffectLines UI/message text,scripts/scr_menu/scr_menu.gml,416,Tooltip_SkillEffectLines:416
+536,menu.tooltip_skilleffectlines.424.0,menu.tooltip_skilleffectlines.424.0,menu.tooltip_skilleffectlines.424.0,menu,Tooltip_SkillEffectLines UI/message text,scripts/scr_menu/scr_menu.gml,424,Tooltip_SkillEffectLines:424
+537,menu.tooltip_skilleffectlines.424.1,menu.tooltip_skilleffectlines.424.1,menu.tooltip_skilleffectlines.424.1,menu,Tooltip_SkillEffectLines UI/message text,scripts/scr_menu/scr_menu.gml,424,Tooltip_SkillEffectLines:424
+538,menu.tooltip_skilleffectlines.428.0,menu.tooltip_skilleffectlines.428.0,menu.tooltip_skilleffectlines.428.0,menu,Tooltip_SkillEffectLines UI/message text,scripts/scr_menu/scr_menu.gml,428,Tooltip_SkillEffectLines:428
+539,menu.tooltip_skilleffectlines.428.1,menu.tooltip_skilleffectlines.428.1,menu.tooltip_skilleffectlines.428.1,menu,Tooltip_SkillEffectLines UI/message text,scripts/scr_menu/scr_menu.gml,428,Tooltip_SkillEffectLines:428
+540,menu.tooltip_skilleffectlines.432.0,menu.tooltip_skilleffectlines.432.0,menu.tooltip_skilleffectlines.432.0,menu,Tooltip_SkillEffectLines UI/message text,scripts/scr_menu/scr_menu.gml,432,Tooltip_SkillEffectLines:432
+541,menu.tooltip_skilleffectlines.432.1,menu.tooltip_skilleffectlines.432.1,menu.tooltip_skilleffectlines.432.1,menu,Tooltip_SkillEffectLines UI/message text,scripts/scr_menu/scr_menu.gml,432,Tooltip_SkillEffectLines:432
+542,menu.tooltip_skilleffectlines.437.0,menu.tooltip_skilleffectlines.437.0,menu.tooltip_skilleffectlines.437.0,menu,Tooltip_SkillEffectLines UI/message text,scripts/scr_menu/scr_menu.gml,437,Tooltip_SkillEffectLines:437
+543,menu.tooltip_skilleffectlines.437.1,menu.tooltip_skilleffectlines.437.1,menu.tooltip_skilleffectlines.437.1,menu,Tooltip_SkillEffectLines UI/message text,scripts/scr_menu/scr_menu.gml,437,Tooltip_SkillEffectLines:437
+544,pause.option.exit_main,pause.option.exit_main,pause.option.exit_main,pause,Loc_T fallback in PauseMenu_Ensure,scripts/scr_menu/scr_menu.gml,2466,PauseMenu_Ensure:2466
+545,pause.option.resume,pause.option.resume,pause.option.resume,pause,Loc_T fallback in PauseMenu_Ensure,scripts/scr_menu/scr_menu.gml,2464,PauseMenu_Ensure:2464
+546,pause.option.settings,pause.option.settings,pause.option.settings,pause,Loc_T fallback in PauseMenu_Ensure,scripts/scr_menu/scr_menu.gml,2465,PauseMenu_Ensure:2465
+547,save.back,save.back,save.back,save,Loc_T fallback in SaveMenu_Draw,scripts/scr_save_menu/scr_save_menu.gml,685,SaveMenu_Draw:685
+548,save.confirm.delete,save.confirm.delete,save.confirm.delete,save,Loc_T fallback in SaveMenu_Draw,scripts/scr_save_menu/scr_save_menu.gml,714,SaveMenu_Draw:714
+549,save.confirm.load,save.confirm.load,save.confirm.load,save,Loc_T fallback in SaveMenu_Draw,scripts/scr_save_menu/scr_save_menu.gml,715,SaveMenu_Draw:715
+550,save.confirm.overwrite,save.confirm.overwrite,save.confirm.overwrite,save,Loc_T fallback in SaveMenu_Draw,scripts/scr_save_menu/scr_save_menu.gml,716,SaveMenu_Draw:716
+551,save.confirm.save,save.confirm.save,save.confirm.save,save,Loc_T fallback in SaveMenu_Draw,scripts/scr_save_menu/scr_save_menu.gml,717,SaveMenu_Draw:717
+552,save.delete,save.delete,save.delete,save,Loc_T fallback in SaveMenu_Draw,scripts/scr_save_menu/scr_save_menu.gml,606,SaveMenu_Draw:606
+553,save.level.short,save.level.short,save.level.short,save,Loc_T fallback in SaveMenu_Draw,scripts/scr_save_menu/scr_save_menu.gml,600,SaveMenu_Draw:600
+554,save.msg.no_game_saves,save.msg.no_game_saves,save.msg.no_game_saves,save,Loc_T fallback in SaveMenu_Handle,scripts/scr_save_menu/scr_save_menu.gml,523,SaveMenu_Handle:523
+555,save.msg.no_saved_games_found,save.msg.no_saved_games_found,save.msg.no_saved_games_found,save,Loc_T fallback in SaveMenu_Handle,scripts/scr_save_menu/scr_save_menu.gml,357,SaveMenu_Handle:357
+556,save.savemenu_draw.606.0,save.savemenu_draw.606.0,save.savemenu_draw.606.0,save,SaveMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,606,SaveMenu_Draw:606
+557,save.savemenu_draw.606.1,save.savemenu_draw.606.1,save.savemenu_draw.606.1,save,SaveMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,606,SaveMenu_Draw:606
+558,save.savemenu_draw.685.0,save.savemenu_draw.685.0,save.savemenu_draw.685.0,save,SaveMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,685,SaveMenu_Draw:685
+559,save.savemenu_draw.685.1,save.savemenu_draw.685.1,save.savemenu_draw.685.1,save,SaveMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,685,SaveMenu_Draw:685
+560,save.savemenu_draw.695.0,save.savemenu_draw.695.0,save.savemenu_draw.695.0,save,SaveMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,695,SaveMenu_Draw:695
+561,save.savemenu_draw.695.1,save.savemenu_draw.695.1,save.savemenu_draw.695.1,save,SaveMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,695,SaveMenu_Draw:695
+562,save.savemenu_draw.756.0,save.savemenu_draw.756.0,save.savemenu_draw.756.0,save,SaveMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,756,SaveMenu_Draw:756
+563,save.savemenu_draw.756.1,save.savemenu_draw.756.1,save.savemenu_draw.756.1,save,SaveMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,756,SaveMenu_Draw:756
+564,save.savemenu_draw.757.0,save.savemenu_draw.757.0,save.savemenu_draw.757.0,save,SaveMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,757,SaveMenu_Draw:757
+565,save.savemenu_draw.757.1,save.savemenu_draw.757.1,save.savemenu_draw.757.1,save,SaveMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,757,SaveMenu_Draw:757
+566,save.savemenu_draw.786.0,save.savemenu_draw.786.0,save.savemenu_draw.786.0,save,SaveMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,786,SaveMenu_Draw:786
+567,save.savemenu_draw.786.1,save.savemenu_draw.786.1,save.savemenu_draw.786.1,save,SaveMenu_Draw UI/message text,scripts/scr_save_menu/scr_save_menu.gml,786,SaveMenu_Draw:786
+568,save.savemenu_handle.357.0,save.savemenu_handle.357.0,save.savemenu_handle.357.0,save,SaveMenu_Handle UI/message text,scripts/scr_save_menu/scr_save_menu.gml,357,SaveMenu_Handle:357
+569,save.savemenu_handle.357.1,save.savemenu_handle.357.1,save.savemenu_handle.357.1,save,SaveMenu_Handle UI/message text,scripts/scr_save_menu/scr_save_menu.gml,357,SaveMenu_Handle:357
+570,save.savemenu_handle.523.0,save.savemenu_handle.523.0,save.savemenu_handle.523.0,save,SaveMenu_Handle UI/message text,scripts/scr_save_menu/scr_save_menu.gml,523,SaveMenu_Handle:523
+571,save.savemenu_handle.523.1,save.savemenu_handle.523.1,save.savemenu_handle.523.1,save,SaveMenu_Handle UI/message text,scripts/scr_save_menu/scr_save_menu.gml,523,SaveMenu_Handle:523
+572,save.slot.prefix,save.slot.prefix,save.slot.prefix,save,Loc_T fallback in SaveMenu_Draw,scripts/scr_save_menu/scr_save_menu.gml,598,SaveMenu_Draw:598
+573,save.title.load,save.title.load,save.title.load,save,Loc_T fallback in SaveMenu_Draw,scripts/scr_save_menu/scr_save_menu.gml,586,SaveMenu_Draw:586
+574,save.title.save,save.title.save,save.title.save,save,Loc_T fallback in SaveMenu_Draw,scripts/scr_save_menu/scr_save_menu.gml,587,SaveMenu_Draw:587
+575,settings.difficulty.option.0,settings.difficulty.option.0,settings.difficulty.option.0,settings,Difficulty option,objects/obj_start_controller/Create_0.gml,3,difficulty_options[0]
+576,settings.difficulty.option.1,settings.difficulty.option.1,settings.difficulty.option.1,settings,Difficulty option,objects/obj_start_controller/Create_0.gml,3,difficulty_options[1]
+577,settings.difficulty.option.2,settings.difficulty.option.2,settings.difficulty.option.2,settings,Loc_T fallback in Difficulty_Label,scripts/scr_player/scr_player.gml,59,Difficulty_Label:59
+578,settings.row.apply,settings.row.apply,settings.row.apply,settings,Loc_T fallback in SettingsPopup_Draw,scripts/scr_menu/scr_menu.gml,2411,SettingsPopup_Draw:2411
+579,settings.row.back,settings.row.back,settings.row.back,settings,Loc_T fallback in SettingsPopup_Draw,scripts/scr_menu/scr_menu.gml,2415,SettingsPopup_Draw:2415
+580,settings.row.bgm,settings.row.bgm,settings.row.bgm,settings,Loc_T fallback in SettingsPopup_Draw,scripts/scr_menu/scr_menu.gml,2399,SettingsPopup_Draw:2399
+581,settings.row.language,settings.row.language,settings.row.language,settings,Loc_T fallback in SettingsPopup_Draw,scripts/scr_menu/scr_menu.gml,2407,SettingsPopup_Draw:2407
+582,settings.row.scale,settings.row.scale,settings.row.scale,settings,Loc_T fallback in SettingsPopup_Draw,scripts/scr_menu/scr_menu.gml,2403,SettingsPopup_Draw:2403
+583,settings.row.sfx,settings.row.sfx,settings.row.sfx,settings,Loc_T fallback in SettingsPopup_Draw,scripts/scr_menu/scr_menu.gml,2395,SettingsPopup_Draw:2395
+584,settings.row.ui,settings.row.ui,settings.row.ui,settings,Loc_T fallback in SettingsPopup_Draw,scripts/scr_menu/scr_menu.gml,2391,SettingsPopup_Draw:2391
+585,settings.section.audio,settings.section.audio,settings.section.audio,settings,Loc_T fallback in SettingsPopup_Draw,scripts/scr_menu/scr_menu.gml,2380,SettingsPopup_Draw:2380
+586,settings.section.display,settings.section.display,settings.section.display,settings,Loc_T fallback in SettingsPopup_Draw,scripts/scr_menu/scr_menu.gml,2381,SettingsPopup_Draw:2381
+587,settings.settingspopup_draw.2362.0,settings.settingspopup_draw.2362.0,settings.settingspopup_draw.2362.0,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2362,SettingsPopup_Draw:2362
+588,settings.settingspopup_draw.2362.1,settings.settingspopup_draw.2362.1,settings.settingspopup_draw.2362.1,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2362,SettingsPopup_Draw:2362
+589,settings.settingspopup_draw.2380.0,settings.settingspopup_draw.2380.0,settings.settingspopup_draw.2380.0,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2380,SettingsPopup_Draw:2380
+590,settings.settingspopup_draw.2380.1,settings.settingspopup_draw.2380.1,settings.settingspopup_draw.2380.1,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2380,SettingsPopup_Draw:2380
+591,settings.settingspopup_draw.2381.0,settings.settingspopup_draw.2381.0,settings.settingspopup_draw.2381.0,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2381,SettingsPopup_Draw:2381
+592,settings.settingspopup_draw.2381.1,settings.settingspopup_draw.2381.1,settings.settingspopup_draw.2381.1,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2381,SettingsPopup_Draw:2381
+593,settings.settingspopup_draw.2391.0,settings.settingspopup_draw.2391.0,settings.settingspopup_draw.2391.0,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2391,SettingsPopup_Draw:2391
+594,settings.settingspopup_draw.2391.1,settings.settingspopup_draw.2391.1,settings.settingspopup_draw.2391.1,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2391,SettingsPopup_Draw:2391
+595,settings.settingspopup_draw.2395.0,settings.settingspopup_draw.2395.0,settings.settingspopup_draw.2395.0,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2395,SettingsPopup_Draw:2395
+596,settings.settingspopup_draw.2395.1,settings.settingspopup_draw.2395.1,settings.settingspopup_draw.2395.1,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2395,SettingsPopup_Draw:2395
+597,settings.settingspopup_draw.2399.0,settings.settingspopup_draw.2399.0,settings.settingspopup_draw.2399.0,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2399,SettingsPopup_Draw:2399
+598,settings.settingspopup_draw.2399.1,settings.settingspopup_draw.2399.1,settings.settingspopup_draw.2399.1,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2399,SettingsPopup_Draw:2399
+599,settings.settingspopup_draw.2403.0,settings.settingspopup_draw.2403.0,settings.settingspopup_draw.2403.0,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2403,SettingsPopup_Draw:2403
+600,settings.settingspopup_draw.2403.1,settings.settingspopup_draw.2403.1,settings.settingspopup_draw.2403.1,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2403,SettingsPopup_Draw:2403
+601,settings.settingspopup_draw.2407.0,settings.settingspopup_draw.2407.0,settings.settingspopup_draw.2407.0,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2407,SettingsPopup_Draw:2407
+602,settings.settingspopup_draw.2407.1,settings.settingspopup_draw.2407.1,settings.settingspopup_draw.2407.1,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2407,SettingsPopup_Draw:2407
+603,settings.settingspopup_draw.2411.0,settings.settingspopup_draw.2411.0,settings.settingspopup_draw.2411.0,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2411,SettingsPopup_Draw:2411
+604,settings.settingspopup_draw.2411.1,settings.settingspopup_draw.2411.1,settings.settingspopup_draw.2411.1,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2411,SettingsPopup_Draw:2411
+605,settings.settingspopup_draw.2412.0,settings.settingspopup_draw.2412.0,settings.settingspopup_draw.2412.0,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2412,SettingsPopup_Draw:2412
+606,settings.settingspopup_draw.2412.1,settings.settingspopup_draw.2412.1,settings.settingspopup_draw.2412.1,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2412,SettingsPopup_Draw:2412
+607,settings.settingspopup_draw.2412.2,settings.settingspopup_draw.2412.2,settings.settingspopup_draw.2412.2,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2412,SettingsPopup_Draw:2412
+608,settings.settingspopup_draw.2412.3,settings.settingspopup_draw.2412.3,settings.settingspopup_draw.2412.3,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2412,SettingsPopup_Draw:2412
+609,settings.settingspopup_draw.2415.0,settings.settingspopup_draw.2415.0,settings.settingspopup_draw.2415.0,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2415,SettingsPopup_Draw:2415
+610,settings.settingspopup_draw.2415.1,settings.settingspopup_draw.2415.1,settings.settingspopup_draw.2415.1,settings,SettingsPopup_Draw UI/message text,scripts/scr_menu/scr_menu.gml,2415,SettingsPopup_Draw:2415
+611,settings.title,settings.title,settings.title,settings,Loc_T fallback in SettingsPopup_Draw,scripts/scr_menu/scr_menu.gml,2362,SettingsPopup_Draw:2362
+612,settings.value.pending,settings.value.pending,settings.value.pending,settings,Loc_T fallback in SettingsPopup_Draw,scripts/scr_menu/scr_menu.gml,2412,SettingsPopup_Draw:2412
+613,settings.value.saved,settings.value.saved,settings.value.saved,settings,Loc_T fallback in SettingsPopup_Draw,scripts/scr_menu/scr_menu.gml,2412,SettingsPopup_Draw:2412
+614,skill.name.skill_bite,skill.name.skill_bite,skill.name.skill_bite,skill,Skill display name (SKILL_BITE),scripts/scr_db_skill/scr_db_skill.gml,359,SkillDB_Init skill SKILL_BITE
+615,skill.name.skill_blessing,skill.name.skill_blessing,skill.name.skill_blessing,skill,Skill display name (SKILL_BLESSING),scripts/scr_db_skill/scr_db_skill.gml,599,SkillDB_Init skill SKILL_BLESSING
+616,skill.name.skill_bloodthirsty,skill.name.skill_bloodthirsty,skill.name.skill_bloodthirsty,skill,Skill display name (SKILL_BLOODTHIRSTY),scripts/scr_db_skill/scr_db_skill.gml,384,SkillDB_Init skill SKILL_BLOODTHIRSTY
+617,skill.name.skill_curse,skill.name.skill_curse,skill.name.skill_curse,skill,Skill display name (SKILL_CURSE),scripts/scr_db_skill/scr_db_skill.gml,570,SkillDB_Init skill SKILL_CURSE
+618,skill.name.skill_double_shot,skill.name.skill_double_shot,skill.name.skill_double_shot,skill,Skill display name (SKILL_DOUBLE_SHOT),scripts/scr_db_skill/scr_db_skill.gml,156,SkillDB_Init skill SKILL_DOUBLE_SHOT
+619,skill.name.skill_evasion,skill.name.skill_evasion,skill.name.skill_evasion,skill,Skill display name (SKILL_EVASION),scripts/scr_db_skill/scr_db_skill.gml,135,SkillDB_Init skill SKILL_EVASION
+620,skill.name.skill_final_fury,skill.name.skill_final_fury,skill.name.skill_final_fury,skill,Skill display name (SKILL_FINAL_FURY),scripts/scr_db_skill/scr_db_skill.gml,628,SkillDB_Init skill SKILL_FINAL_FURY
+621,skill.name.skill_fireball,skill.name.skill_fireball,skill.name.skill_fireball,skill,Skill display name (SKILL_FIREBALL),scripts/scr_db_skill/scr_db_skill.gml,199,SkillDB_Init skill SKILL_FIREBALL
+622,skill.name.skill_foresight,skill.name.skill_foresight,skill.name.skill_foresight,skill,Skill display name (SKILL_FORESIGHT),scripts/scr_db_skill/scr_db_skill.gml,283,SkillDB_Init skill SKILL_FORESIGHT
+623,skill.name.skill_ghost_cut,skill.name.skill_ghost_cut,skill.name.skill_ghost_cut,skill,Skill display name (SKILL_GHOST_CUT),scripts/scr_db_skill/scr_db_skill.gml,461,SkillDB_Init skill SKILL_GHOST_CUT
+624,skill.name.skill_hilt_bash,skill.name.skill_hilt_bash,skill.name.skill_hilt_bash,skill,Skill display name (SKILL_HILT_BASH),scripts/scr_db_skill/scr_db_skill.gml,29,SkillDB_Init skill SKILL_HILT_BASH
+625,skill.name.skill_horiz_slash,skill.name.skill_horiz_slash,skill.name.skill_horiz_slash,skill,Skill display name (SKILL_HORIZ_SLASH),scripts/scr_db_skill/scr_db_skill.gml,92,SkillDB_Init skill SKILL_HORIZ_SLASH
+626,skill.name.skill_ice_spear,skill.name.skill_ice_spear,skill.name.skill_ice_spear,skill,Skill display name (SKILL_ICE_SPEAR),scripts/scr_db_skill/scr_db_skill.gml,241,SkillDB_Init skill SKILL_ICE_SPEAR
+627,skill.name.skill_meditation,skill.name.skill_meditation,skill.name.skill_meditation,skill,Skill display name (SKILL_MEDITATION),scripts/scr_db_skill/scr_db_skill.gml,262,SkillDB_Init skill SKILL_MEDITATION
+628,skill.name.skill_muscle_up,skill.name.skill_muscle_up,skill.name.skill_muscle_up,skill,Skill display name (SKILL_MUSCLE_UP),scripts/scr_db_skill/scr_db_skill.gml,50,SkillDB_Init skill SKILL_MUSCLE_UP
+629,skill.name.skill_poison_arrow,skill.name.skill_poison_arrow,skill.name.skill_poison_arrow,skill,Skill display name (SKILL_POISON_ARROW),scripts/scr_db_skill/scr_db_skill.gml,114,SkillDB_Init skill SKILL_POISON_ARROW
+630,skill.name.skill_poison_fangs,skill.name.skill_poison_fangs,skill.name.skill_poison_fangs,skill,Skill display name (SKILL_POISON_FANGS),scripts/scr_db_skill/scr_db_skill.gml,308,SkillDB_Init skill SKILL_POISON_FANGS
+631,skill.name.skill_poison_mist,skill.name.skill_poison_mist,skill.name.skill_poison_mist,skill,Skill display name (SKILL_POISON_MIST),scripts/scr_db_skill/scr_db_skill.gml,220,SkillDB_Init skill SKILL_POISON_MIST
+632,skill.name.skill_ramming,skill.name.skill_ramming,skill.name.skill_ramming,skill,Skill display name (SKILL_RAMMING),scripts/scr_db_skill/scr_db_skill.gml,512,SkillDB_Init skill SKILL_RAMMING
+633,skill.name.skill_rampage,skill.name.skill_rampage,skill.name.skill_rampage,skill,Skill display name (SKILL_RAMPAGE),scripts/scr_db_skill/scr_db_skill.gml,539,SkillDB_Init skill SKILL_RAMPAGE
+634,skill.name.skill_rev_up,skill.name.skill_rev_up,skill.name.skill_rev_up,skill,Skill display name (SKILL_REV_UP),scripts/scr_db_skill/scr_db_skill.gml,71,SkillDB_Init skill SKILL_REV_UP
+635,skill.name.skill_scorching_touch,skill.name.skill_scorching_touch,skill.name.skill_scorching_touch,skill,Skill display name (SKILL_SCORCHING_TOUCH),scripts/scr_db_skill/scr_db_skill.gml,436,SkillDB_Init skill SKILL_SCORCHING_TOUCH
+636,skill.name.skill_solidify,skill.name.skill_solidify,skill.name.skill_solidify,skill,Skill display name (SKILL_SOLIDIFY),scripts/scr_db_skill/scr_db_skill.gml,333,SkillDB_Init skill SKILL_SOLIDIFY
+637,skill.name.skill_steal,skill.name.skill_steal,skill.name.skill_steal,skill,Skill display name (SKILL_STEAL),scripts/scr_db_skill/scr_db_skill.gml,486,SkillDB_Init skill SKILL_STEAL
+638,skill.name.skill_take_aim,skill.name.skill_take_aim,skill.name.skill_take_aim,skill,Skill display name (SKILL_TAKE_AIM),scripts/scr_db_skill/scr_db_skill.gml,177,SkillDB_Init skill SKILL_TAKE_AIM
+639,skill.name.skill_vine_trap,skill.name.skill_vine_trap,skill.name.skill_vine_trap,skill,Skill display name (SKILL_VINE_TRAP),scripts/scr_db_skill/scr_db_skill.gml,411,SkillDB_Init skill SKILL_VINE_TRAP
+640,skill.name.skill_wound,skill.name.skill_wound,skill.name.skill_wound,skill,Skill display name (SKILL_WOUND),scripts/scr_db_skill/scr_db_skill.gml,8,SkillDB_Init skill SKILL_WOUND
+641,skill.name.unknown,skill.name.unknown,skill.name.unknown,skill,Loc_T fallback in SkillDB_Get,scripts/scr_db_skill/scr_db_skill.gml,667,SkillDB_Get:667
+642,status.name.default,status.name.default,status.name.default,status,Loc_T fallback in Status_LabelWithSign,scripts/scr_status/scr_status.gml,502,Status_LabelWithSign:502
+643,status.name.stat.agi,status.name.stat.agi,status.name.stat.agi,status,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1495,Menu_Draw:1495
+644,status.name.stat.def,status.name.stat.def,status.name.stat.def,status,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1496,Menu_Draw:1496
+645,status.name.stat.int,status.name.stat.int,status.name.stat.int,status,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1497,Menu_Draw:1497
+646,status.name.stat.luck,status.name.stat.luck,status.name.stat.luck,status,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1498,Menu_Draw:1498
+647,status.name.stat.str,status.name.stat.str,status.name.stat.str,status,Loc_T fallback in Menu_Draw,scripts/scr_menu/scr_menu.gml,1494,Menu_Draw:1494
+648,status.name.status_bleed,status.name.status_bleed,status.name.status_bleed,status,Status display name (STATUS_BLEED),scripts/scr_status/scr_status.gml,131,StatusDB_Init status STATUS_BLEED
+649,status.name.status_blessing,status.name.status_blessing,status.name.status_blessing,status,Status display name (STATUS_BLESSING),scripts/scr_status/scr_status.gml,250,StatusDB_Init status STATUS_BLESSING
+650,status.name.status_bloodthirsty,status.name.status_bloodthirsty,status.name.status_bloodthirsty,status,Status display name (STATUS_BLOODTHIRSTY),scripts/scr_status/scr_status.gml,238,StatusDB_Init status STATUS_BLOODTHIRSTY
+651,status.name.status_burn,status.name.status_burn,status.name.status_burn,status,Status display name (STATUS_BURN),scripts/scr_status/scr_status.gml,142,StatusDB_Init status STATUS_BURN
+652,status.name.status_crit_up,status.name.status_crit_up,status.name.status_crit_up,status,Status display name (STATUS_CRIT_UP),scripts/scr_status/scr_status.gml,197,StatusDB_Init status STATUS_CRIT_UP
+653,status.name.status_dmg_up,status.name.status_dmg_up,status.name.status_dmg_up,status,Status display name (STATUS_DMG_UP),scripts/scr_status/scr_status.gml,175,StatusDB_Init status STATUS_DMG_UP
+654,status.name.status_evasion,status.name.status_evasion,status.name.status_evasion,status,Status display name (STATUS_EVASION),scripts/scr_status/scr_status.gml,186,StatusDB_Init status STATUS_EVASION
+655,status.name.status_guard,status.name.status_guard,status.name.status_guard,status,Status display name (STATUS_GUARD),scripts/scr_status/scr_status.gml,164,StatusDB_Init status STATUS_GUARD
+656,status.name.status_hit_up,status.name.status_hit_up,status.name.status_hit_up,status,Status display name (STATUS_HIT_UP),scripts/scr_status/scr_status.gml,207,StatusDB_Init status STATUS_HIT_UP
+657,status.name.status_meditation,status.name.status_meditation,status.name.status_meditation,status,Status display name (STATUS_MEDITATION),scripts/scr_status/scr_status.gml,218,StatusDB_Init status STATUS_MEDITATION
+658,status.name.status_poison,status.name.status_poison,status.name.status_poison,status,Status display name (STATUS_POISON),scripts/scr_status/scr_status.gml,120,StatusDB_Init status STATUS_POISON
+659,status.name.status_solidify,status.name.status_solidify,status.name.status_solidify,status,Status display name (STATUS_SOLIDIFY),scripts/scr_status/scr_status.gml,227,StatusDB_Init status STATUS_SOLIDIFY
+660,status.name.status_stun,status.name.status_stun,status.name.status_stun,status,Status display name (STATUS_STUN),scripts/scr_status/scr_status.gml,153,StatusDB_Init status STATUS_STUN
+661,status.name.status_sunder,status.name.status_sunder,status.name.status_sunder,status,Status display name (STATUS_SUNDER),scripts/scr_status/scr_status.gml,261,StatusDB_Init status STATUS_SUNDER
+662,status.name.unknown,status.name.unknown,status.name.unknown,status,Loc_T fallback in StatusDB_Get,scripts/scr_status/scr_status.gml,283,StatusDB_Get:283
+663,system.msg.create_0.3.0,system.msg.create_0.3.0,system.msg.create_0.3.0,system.msg,Create_0 UI/message text,objects/obj_grave/Create_0.gml,3,Create_0:3
+664,system.msg.create_0.3.1,system.msg.create_0.3.1,system.msg.create_0.3.1,system.msg,Create_0 UI/message text,objects/obj_grave/Create_0.gml,3,Create_0:3

@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Knife_stab",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":0.5273469,
+  "exportDir":"",
+  "name":"Knife_stab",
+  "parent":{
+    "name":"Ghost Sword",
+    "path":"folders/Sounds/Entities/Monsters/Ghost Sword.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Knife_stab.ogg",
+  "volume":1.0,
+}

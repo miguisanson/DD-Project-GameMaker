@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"dire_wolf_attack",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":1.2675964,
+  "exportDir":"",
+  "name":"dire_wolf_attack",
+  "parent":{
+    "name":"Dire Wolf",
+    "path":"folders/Sounds/Entities/Monsters/Dire Wolf.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"dire_wolf_attack.wav",
+  "volume":1.0,
+}

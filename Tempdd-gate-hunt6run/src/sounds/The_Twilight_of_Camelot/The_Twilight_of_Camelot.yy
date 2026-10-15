@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"The_Twilight_of_Camelot",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":121.0,
+  "exportDir":"",
+  "name":"The_Twilight_of_Camelot",
+  "parent":{
+    "name":"BGM",
+    "path":"folders/Sounds/BGM.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"The_Twilight_of_Camelot.mp3",
+  "volume":1.0,
+}

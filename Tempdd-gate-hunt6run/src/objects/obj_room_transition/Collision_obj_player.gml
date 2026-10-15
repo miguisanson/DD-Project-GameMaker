@@ -1,0 +1,49 @@
+if (transition_id == "") exit;
+
+// I-049: one exit per entry. Once a fade or another exit is under way, further overlap frames do nothing.
+if (Transition_IsActive()) exit;
+
+// D64: the player arrived standing on this tile; it ignores them until they step off it (no bounce-back).
+if (variable_instance_exists(other, "exit_ignore") && other.exit_ignore == id) exit;
+
+// Require intentional movement into the transition direction
+if (require_move) {
+    var requested_dir = -1;
+    if (variable_instance_exists(other, "move_dir")) requested_dir = other.move_dir;
+
+    // Accept directional intent even if the movement step is blocked this frame.
+    // This allows re-triggering while still overlapping the transition tile.
+    var has_intent = (requested_dir != -1);
+    if (!has_intent && variable_instance_exists(other, "moving")) has_intent = other.moving;
+    if (!has_intent) exit;
+
+    if (require_dir != -1 && requested_dir != require_dir) exit;
+}
+
+// D127: the first class chest of a run cannot be skipped: floor 1's exit refuses a player with no class yet (two lines, then a step back).
+if (ClassGuard_OnExit(other)) exit;
+
+var entry = RoomDB_Get(transition_id);
+if (!is_struct(entry)) exit;
+
+if (transition_id == "floor9_5_to_ending" && variable_struct_exists(entry, "cutscene_id")) {
+    var ending_cutscene_id = string(entry.cutscene_id);
+    if (ending_cutscene_id == "") ending_cutscene_id = "ending";
+    if (EndingExitSequence_Begin(ending_cutscene_id)) exit;
+}
+
+RoomState_OnRoomExit();
+
+if (variable_struct_exists(entry, "cutscene_id")) {
+    var cutscene_id = string(entry.cutscene_id);
+    if (cutscene_id != "") {
+        Transition_RequestCutsceneById(cutscene_id);
+        exit;
+    }
+}
+
+var face_dir = -1;
+if (variable_struct_exists(entry, "face")) face_dir = entry.face;
+if (face_dir == -1 && variable_instance_exists(other, "face")) face_dir = other.face;
+
+Transition_RequestRoomFade(entry.target_room, entry.target_spawn_id, face_dir, true);

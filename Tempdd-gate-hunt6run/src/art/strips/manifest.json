@@ -1,0 +1,106 @@
+{
+ "spr_icons_status": {
+  "strip": "strips/status_strip.png",
+  "frames": 17,
+  "ids": [
+   "poison",
+   "burn",
+   "bleed",
+   "stun",
+   "steadfast",
+   "break",
+   "guard",
+   "rev_up",
+   "evasion",
+   "take_aim",
+   "foresight",
+   "meditation",
+   "solidify",
+   "bloodthirsty",
+   "blessing",
+   "sundered",
+   "curse"
+  ]
+ },
+ "spr_icons_skill": {
+  "strip": "strips/skill_strip.png",
+  "frames": 15,
+  "ids": [
+   "wound",
+   "hilt_bash",
+   "muscle_up",
+   "rev_up",
+   "horizontal_slash",
+   "power_strike",
+   "poison_arrow",
+   "evasion",
+   "double_shot",
+   "take_aim",
+   "fireball",
+   "poison_mist",
+   "ice_spear",
+   "meditation",
+   "foresight"
+  ]
+ },
+ "spr_icons_throwable": {
+  "strip": "strips/throwable_strip.png",
+  "frames": 4,
+  "ids": [
+   "firebomb",
+   "poison_pot",
+   "ice_flask",
+   "smoke_bomb"
+  ]
+ },
+ "spr_icons_passive": {
+  "strip": "strips/passive_strip.png",
+  "frames": 8,
+  "ids": [
+   "attack",
+   "defense",
+   "vitality",
+   "magic",
+   "speed",
+   "critical",
+   "greed",
+   "recovery"
+  ]
+ },
+ "spr_icons_accessory": {
+  "strip": "strips/accessory_strip.png",
+  "frames": 2,
+  "ids": [
+   "ring",
+   "charm"
+  ]
+ },
+ "spr_icons_misc": {
+  "strip": "strips/misc_strip.png",
+  "frames": 1,
+  "ids": [
+   "gold_coin"
+  ]
+ },
+ "spr_icons_skill_up": {
+  "strip": "strips/skill_up_strip.png",
+  "frames": 15,
+  "ids": [
+   "wound",
+   "hilt_bash",
+   "muscle_up",
+   "rev_up",
+   "horizontal_slash",
+   "power_strike",
+   "poison_arrow",
+   "evasion",
+   "double_shot",
+   "take_aim",
+   "fireball",
+   "poison_mist",
+   "ice_spear",
+   "meditation",
+   "foresight"
+  ]
+ }
+}

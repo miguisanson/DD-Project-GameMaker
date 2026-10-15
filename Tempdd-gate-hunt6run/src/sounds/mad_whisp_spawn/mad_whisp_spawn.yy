@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"mad_whisp_spawn",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":1.9729705,
+  "exportDir":"",
+  "name":"mad_whisp_spawn",
+  "parent":{
+    "name":"Mad Whisp",
+    "path":"folders/Sounds/Entities/Monsters/Mad Whisp.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"mad_whisp_spawn.ogg",
+  "volume":1.0,
+}

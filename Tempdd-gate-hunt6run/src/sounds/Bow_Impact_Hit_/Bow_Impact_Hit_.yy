@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Bow_Impact_Hit_",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":1.03483,
+  "exportDir":"",
+  "name":"Bow_Impact_Hit_",
+  "parent":{
+    "name":"FIght",
+    "path":"folders/Sounds/FIght.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Bow_Impact_Hit_.ogg",
+  "volume":1.0,
+}

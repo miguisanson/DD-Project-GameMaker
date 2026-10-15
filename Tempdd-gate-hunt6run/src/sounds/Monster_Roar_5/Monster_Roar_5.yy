@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Monster_Roar_5",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":1.2845805,
+  "exportDir":"",
+  "name":"Monster_Roar_5",
+  "parent":{
+    "name":"Dire Wolf",
+    "path":"folders/Sounds/Entities/Monsters/Dire Wolf.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Monster_Roar_5.ogg",
+  "volume":1.0,
+}

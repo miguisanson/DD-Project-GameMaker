@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Crying_moaning_ambience",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":19.797346,
+  "exportDir":"",
+  "name":"Crying_moaning_ambience",
+  "parent":{
+    "name":"Cutscenes_Dialogue",
+    "path":"folders/Sounds/Cutscenes_Dialogue.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Crying_moaning_ambience.ogg",
+  "volume":1.0,
+}

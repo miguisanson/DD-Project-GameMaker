@@ -1,0 +1,13 @@
+if (!trigger_enabled) exit;
+if (trigger_once && triggered) {
+    DialogueTrigger_TryBanner(id);   // C5 (D106): a boss pan seen on an earlier run becomes a ~1 s name banner
+    exit;
+}
+if (trigger_cooldown > 0) exit;
+if (pending_trigger) exit;
+if (UI_IsBlocking()) exit;
+pending_trigger = true;
+pending_player_id = other.id;
+pending_wait_for_settle = false;
+if (variable_instance_exists(other, "moving") && other.moving) pending_wait_for_settle = true;
+if (variable_instance_exists(other, "move_timer") && other.move_timer > 0) pending_wait_for_settle = true;

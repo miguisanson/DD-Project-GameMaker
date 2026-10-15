@@ -508,7 +508,10 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeRunStats(_s);   // G9 (D137): the run stats from a real fight on the summary and in the Codex run history; its last step goes on to H3 (500), the end of the chain
             break;
         case 790: case 791: case 792: case 793: case 794: case 795: case 796: case 797: case 798: case 799:
-            Scenario_StepSmokeEliteDeath(_s);   // H13a (D156): an elite on the map draws its sprite outline, a death shows its picture and reaches the summary; the end of the chain (its last step calls Scenario_NoticeEnd)
+            Scenario_StepSmokeEliteDeath(_s);   // H13a (D156): an elite on the map draws its sprite outline, a death shows its picture and reaches the summary; goes on to the kept run file (840)
+            break;
+        case 840: case 841: case 842: case 843: case 844: case 845: case 846: case 847: case 848: case 849:
+            Scenario_StepSmokeHunt6Run(_s);   // hunt6run: starting a new run keeps a newer-version run.sav; the end of the chain (its last step calls Scenario_NoticeEnd)
             break;
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step goes on to G6 (380)
@@ -13083,9 +13086,33 @@ function Scenario_StepSmokeEliteDeath(_s) {
                 var _d = RunFlow_DeathPicDraws() - _ed.pics0;
                 Scenario_Check("elitedeath_the_picture_is_drawn_through_the_death_line", _d >= 100, "frames=" + string(_d));
                 Scenario_Check("elitedeath_the_death_reaches_the_summary", true);
-                Scenario_NoticeEnd();   // the end of the chain: removes the files and the profile the steps made
+                // hunt6run: a run file of a newer build is on disk when the player confirms the summary (New Game's Run_StartNew); it must stay
+                Save_WriteFileAtomic(RunSave_Path(), Hunt6Run_NewerRunText());
+                Scenario_Next(_s, 840);   // goes on with the kept run file (840), the end of the chain
             }
             if (_s.t > 900) { Scenario_Check("elitedeath_the_death_reaches_the_summary", false, "phase=" + (is_struct(_flow) ? string(_flow.phase) : "none") + " seen=" + string(_ed.seen)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ---- hunt6run (smoke steps 840-849, the end of the chain) ----
+function Hunt6Run_NewerRunText() {
+    return json_stringify({ run_version: RUN_SAVE_VERSION + 50, seed: 1, marker: "keep me" });
+}
+
+// The summary after a death is up and a run.sav of a newer build sits in the save folder. Confirm: the next run starts (Run_StartNew, as New Game does) and the file stays as it was.
+// Checked on the first frame the new run is active, before anything can autosave over it.
+function Scenario_StepSmokeHunt6Run(_s) {
+    var _flow = (variable_global_exists("run_flow") && is_struct(global.run_flow)) ? global.run_flow : undefined;
+    switch (_s.step) {
+        case 840:
+            if (_s.t == 1) Scenario_Check("hunt6run_the_newer_run_file_is_there_before_the_new_run", RunSave_ExistsAt(RunSave_Path()) && RunSave_LoadFrom().status == "newer");
+            if (_s.t == 30) Scenario_Tap("confirm");
+            if (_s.t > 30 && Run_IsActive()) {
+                Scenario_Check("hunt6run_a_new_run_keeps_a_newer_version_run_file", RunSave_ExistsAt(RunSave_Path()) && Save_ReadTextFile(RunSave_Path()) == Hunt6Run_NewerRunText(), "exists=" + string(RunSave_ExistsAt(RunSave_Path())));
+                Scenario_NoticeEnd();   // the end of the chain: removes the files and the profile the steps made
+            }
+            if (_s.t > 600) { Scenario_Check("hunt6run_the_new_run_started", false, "phase=" + (is_struct(_flow) ? string(_flow.phase) : "none")); Scenario_NoticeEnd(); }
             break;
     }
 }

@@ -1,0 +1,534 @@
+function RoomTransition_Init() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "transition")) {
+        gs.transition = { pending: false, room: noone, spawn_id: "", face: -1 };
+    }
+    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    if (!variable_struct_exists(gs.ui, "debug_warns")) gs.ui.debug_warns = [];
+}
+
+function RoomTransition_Warn(_msg) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    if (!variable_struct_exists(gs.ui, "debug_warns")) gs.ui.debug_warns = [];
+    array_push(gs.ui.debug_warns, _msg);
+    show_debug_message(_msg);
+}
+
+function RoomTransition_FindSpawn(_spawn_id) {
+    if (!object_exists(obj_room_spawn)) return noone;
+    if (!instance_exists(obj_room_spawn)) return noone;
+    var n = instance_number(obj_room_spawn);
+    var first = noone;
+    for (var i = 0; i < n; i++) {
+        var inst = instance_find(obj_room_spawn, i);
+        if (first == noone) first = inst;
+        if (_spawn_id != "" && inst.spawn_id == _spawn_id) return inst;
+    }
+    return (_spawn_id == "") ? first : noone;
+}
+
+function RoomTransition_Set(_room, _spawn_id, _face) {
+    RoomTransition_Init();
+    var gs = GameState_Get();
+    gs.transition.pending = true;
+    gs.transition.room = _room;
+    gs.transition.spawn_id = _spawn_id;
+    gs.transition.face = _face;
+}
+
+function RoomTransition_Clear() {
+    RoomTransition_Init();
+    var gs = GameState_Get();
+    gs.transition.pending = false;
+    gs.transition.room = noone;
+    gs.transition.spawn_id = "";
+    gs.transition.face = -1;
+}
+
+function RoomTransition_Apply() {
+    RoomTransition_Init();
+    var gs = GameState_Get();
+    if (!gs.transition.pending) return;
+    if (room == rm_battle) return;
+
+    var pl = noone;
+    if (instance_exists(obj_player)) pl = instance_find(obj_player, 0);
+
+    var sid = gs.transition.spawn_id;
+    var target = RoomTransition_FindSpawn(sid);
+
+    if (pl == noone) {
+        if (target != noone) {
+            pl = instance_create_layer(target.x, target.y, "Instances", obj_player);
+        } else {
+            RoomTransition_Warn("[RoomTransition] Missing spawn '" + string(sid) + "' in " + room_get_name(room));
+            pl = instance_create_layer(0, 0, "Instances", obj_player);
+        }
+    }
+
+    if (target != noone) {
+        pl.x = target.x;
+        pl.y = target.y;
+    } else {
+        RoomTransition_Warn("[RoomTransition] Missing spawn '" + string(sid) + "' in " + room_get_name(room));
+    }
+
+    if (gs.transition.face != -1) {
+        pl.face = gs.transition.face;
+    } else if (target != noone && variable_instance_exists(target, "spawn_facing") && target.spawn_facing != -1) {
+        pl.face = target.spawn_facing;
+    }
+
+    if (variable_instance_exists(pl, "moving")) pl.moving = false;
+    if (variable_instance_exists(pl, "move_timer")) pl.move_timer = 0;
+    if (variable_instance_exists(pl, "move_dir")) pl.move_dir = -1;
+    Player_StartAutoResolveRecover(pl, PLAYER_POST_TRANSITION_RECOVER_FRAMES, false);
+    if (variable_instance_exists(pl, "exit_leave") && variable_instance_exists(pl, "exit_ignore")) pl.exit_leave = (pl.exit_ignore != noone);   // D142: a room arrival, not a battle return or a load
+
+    if (target != noone) Enemy_ArrivalFix(pl);   // D158: nobody waits at the exits or stands near the arrival tile
+    RoomTransition_Clear();
+}
+
+function EndingExitSequence_Ensure() {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ending_exit_sequence") || !is_struct(gs.ending_exit_sequence)) {
+        gs.ending_exit_sequence = {
+            active: false,
+            stage: 0,
+            cutscene_id: "ending"
+        };
+    }
+    return gs.ending_exit_sequence;
+}
+
+function EndingExitSequence_Begin(_cutscene_id = "ending") {
+    var seq = EndingExitSequence_Ensure();
+    if (seq.active) return true;
+    seq.active = true;
+    seq.stage = 0;
+    seq.cutscene_id = string(_cutscene_id);
+    return true;
+}
+
+function EndingExitSequence_Clear() {
+    var seq = EndingExitSequence_Ensure();
+    seq.active = false;
+    seq.stage = 0;
+    seq.cutscene_id = "ending";
+}
+
+function EndingExitSequence_Update() {
+    var seq = EndingExitSequence_Ensure();
+    if (!seq.active) return false;
+    if (Transition_IsActive()) return true;
+
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) gs.ui = {};
+
+    var ui_busy = false;
+    if (variable_struct_exists(gs.ui, "mode") && gs.ui.mode != UI_NONE) ui_busy = true;
+    if (variable_struct_exists(gs.ui, "lines") && is_array(gs.ui.lines) && array_length(gs.ui.lines) > 0) ui_busy = true;
+
+    switch (seq.stage) {
+        case 0: {
+            if (ui_busy) return true;
+
+            var pl = noone;
+            if (instance_exists(obj_player)) pl = instance_find(obj_player, 0);
+            if (instance_exists(pl) && !Player_IsSettled(pl)) return true;
+
+            SFX_Play(SKILLBOOK_MANA_AMBIENCE_KEY_1);
+            SFX_Play(SKILLBOOK_MANA_AMBIENCE_KEY_2);
+            SFX_Play(SKILLBOOK_MANA_AMBIENCE_KEY_3);
+            Dialogue_Start("sys_floor9_5_exit_reaction");
+            seq.stage = 1;
+            return true;
+        }
+
+        case 1: {
+            if (ui_busy) return true;
+
+            RoomState_OnRoomExit();
+            var cid = string(seq.cutscene_id);
+            if (cid == "") cid = "ending";
+            if (Transition_RequestCutsceneById(cid)) {
+                EndingExitSequence_Clear();
+            }
+            return true;
+        }
+    }
+
+    return true;
+}
+
+// ==========================================================================================================================
+// D108 (F2a): transitions run on a ms clock. Presentation_StepMs turns delta_time into the step; Transition_PhaseStep is the one pure phase
+// machine (fade-out -> black hold -> fade-in, plus the encounter zoom), so every fade shares the same code and a test can drive it at any step.
+// ==========================================================================================================================
+
+// Milliseconds one frame adds to a presentation clock, from delta_time (microseconds). Capped, so a hitch cannot skip a whole fade.
+function Presentation_StepMs(_delta_us) {
+    return clamp(_delta_us, 0, PRESENTATION_MAX_STEP_US) / 1000;
+}
+
+// A length given in 60 fps frames, in milliseconds (12 frames = 200 ms).
+function Transition_FramesToMs(_frames) {
+    return _frames * 1000 / 60;
+}
+
+// Fills a transition struct's lengths (ms) for its type. Phase lengths are fixed here; Transition_Request* may override them afterwards.
+function Transition_ApplyTimes(_tr, _type) {
+    _tr.zoom_ms = 0;
+    _tr.zoom_hold_ms = 0;
+    if (_type == TRANSITION_TYPE_CUTSCENE) {
+        _tr.fade_out_ms = max(1, Transition_FramesToMs(TRANSITION_CUTSCENE_FADE_OUT_FRAMES));
+        _tr.black_hold_ms = max(0, Transition_FramesToMs(TRANSITION_CUTSCENE_BLACK_HOLD_FRAMES));
+        _tr.fade_in_ms = max(1, Transition_FramesToMs(TRANSITION_CUTSCENE_FADE_IN_FRAMES));
+    } else if (_type == TRANSITION_TYPE_ENCOUNTER) {
+        _tr.fade_out_ms = max(1, Transition_FramesToMs(TRANSITION_ENCOUNTER_FADE_OUT_FRAMES));
+        _tr.black_hold_ms = max(0, Transition_FramesToMs(TRANSITION_ENCOUNTER_BLACK_HOLD_FRAMES));
+        _tr.fade_in_ms = max(1, Transition_FramesToMs(TRANSITION_ENCOUNTER_FADE_IN_FRAMES));
+        _tr.zoom_ms = max(1, Transition_FramesToMs(TRANSITION_ENCOUNTER_ZOOM_FRAMES));
+        _tr.zoom_hold_ms = max(0, Transition_FramesToMs(TRANSITION_ENCOUNTER_ZOOM_HOLD_FRAMES));
+    } else if (_type == TRANSITION_TYPE_FLASH) {
+        _tr.fade_out_ms = max(1, Transition_FramesToMs(TRANSITION_FLASH_FADE_OUT_FRAMES));
+        _tr.black_hold_ms = 0;
+        _tr.fade_in_ms = max(1, Transition_FramesToMs(TRANSITION_FLASH_FADE_IN_FRAMES));
+    } else {
+        _tr.fade_out_ms = max(1, Transition_FramesToMs(TRANSITION_ROOM_FADE_OUT_FRAMES));
+        _tr.black_hold_ms = max(0, Transition_FramesToMs(TRANSITION_ROOM_BLACK_HOLD_FRAMES));
+        _tr.fade_in_ms = max(1, Transition_FramesToMs(TRANSITION_ROOM_FADE_IN_FRAMES));
+    }
+}
+
+// What a phase number means for each type: ROOM and CUTSCENE are out, hold, in; ENCOUNTER is zoom, zoom hold, out, hold, in; FLASH is out, in.
+function Transition_PhaseKind(_type, _phase) {
+    if (_type == TRANSITION_TYPE_ENCOUNTER) return clamp(_phase, TRANSITION_KIND_ZOOM, TRANSITION_KIND_IN);
+    if (_type == TRANSITION_TYPE_FLASH) return (_phase <= 0) ? TRANSITION_KIND_OUT : TRANSITION_KIND_IN;
+    if (_phase <= 0) return TRANSITION_KIND_OUT;
+    return (_phase == 1) ? TRANSITION_KIND_HOLD : TRANSITION_KIND_IN;
+}
+
+// One step of the phase machine. Adds _step_ms to the phase timer, sets alpha and progress (0..1 through the phase), and when the phase is over
+// moves to the next one with the timer back at 0 (no carry-over). Returns a TRANSITION_EVT_*; the caller does the side effects.
+// The black hold always costs at least one step: a phase is only ever judged after its step is added, and the step that ends the fade-out returns
+// ROOM_CHANGE without touching the hold, so room_goto has run before the hold's first step (the new room's Create and Step go first).
+function Transition_PhaseStep(_tr, _step_ms) {
+    var kind = Transition_PhaseKind(_tr.type, _tr.phase);
+    var dur = 0;
+    switch (kind) {
+        case TRANSITION_KIND_ZOOM: dur = max(1, _tr.zoom_ms); break;
+        case TRANSITION_KIND_ZOOM_HOLD: dur = max(0, _tr.zoom_hold_ms); break;
+        case TRANSITION_KIND_OUT: dur = max(1, _tr.fade_out_ms); break;
+        case TRANSITION_KIND_HOLD: dur = max(0, _tr.black_hold_ms); break;
+        default: dur = max(1, _tr.fade_in_ms); break;
+    }
+    _tr.timer += max(0, _step_ms);
+    var p = clamp(_tr.timer / max(1, dur), 0, 1);
+    _tr.progress = p;
+    switch (kind) {
+        case TRANSITION_KIND_OUT: _tr.alpha = p; break;
+        case TRANSITION_KIND_HOLD: _tr.alpha = 1; break;
+        case TRANSITION_KIND_IN: _tr.alpha = 1 - p; break;
+        default: _tr.alpha = 0; break;
+    }
+    if (_tr.timer + TRANSITION_DONE_SLACK_MS < dur) return TRANSITION_EVT_NONE;
+
+    _tr.progress = 1;
+    _tr.timer = 0;
+    _tr.phase += 1;
+    if (kind == TRANSITION_KIND_OUT) {
+        _tr.alpha = 1;
+        return (_tr.type == TRANSITION_TYPE_FLASH) ? TRANSITION_EVT_FLASH_BLACK : TRANSITION_EVT_ROOM_CHANGE;
+    }
+    if (kind == TRANSITION_KIND_IN) {
+        _tr.alpha = 0;
+        return TRANSITION_EVT_DONE;
+    }
+    return TRANSITION_EVT_NONE;
+}
+
+function Transition_Init() {
+    RoomTransition_Init();
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "transition_fx") || !is_struct(gs.transition_fx)) {
+        gs.transition_fx = {
+            active: false,
+            type: TRANSITION_TYPE_NONE,
+            phase: 0,
+            timer: 0,
+            alpha: 0,
+            target_room: noone,
+            target_spawn_id: "",
+            target_face: -1,
+            use_spawn: false,
+            progress: 0,
+            fade_out_ms: Transition_FramesToMs(TRANSITION_ROOM_FADE_OUT_FRAMES),
+            black_hold_ms: Transition_FramesToMs(TRANSITION_ROOM_BLACK_HOLD_FRAMES),
+            fade_in_ms: Transition_FramesToMs(TRANSITION_ROOM_FADE_IN_FRAMES),
+            zoom_ms: 0,
+            zoom_hold_ms: 0,
+            encounter_zoom: 0,
+            encounter_shake_x: 0,
+            encounter_shake_y: 0,
+            encounter_focus_x: 0,
+            encounter_focus_y: 0,
+            encounter_has_focus: false,
+            flash_apply_class_id: -1,
+            flash_apply_class_pending: false,
+            flash_action: "",
+            flash_owner_inst: noone
+        };
+    }
+}
+
+function Transition_IsActive() {
+    Transition_Init();
+    var gs = GameState_Get();
+    return gs.transition_fx.active;
+}
+
+function Transition_IsInputLocked() {
+    return Transition_IsActive();
+}
+
+// The encounter zoom is drawn, not set up in the view: the camera, view port and surface stay 160x144 (Display_DrawFrame magnifies the
+// picture). The zoom centre is the view centre pulled 35 percent toward the focus point, in view-local world pixels, plus the shake.
+function Transition_ApplyEncounterZoom(_tr) {
+    var cam = view_camera[0];
+    var cam_x = 0;
+    var cam_y = 0;
+    if (!is_undefined(cam) && cam != -1) {
+        cam_x = camera_get_view_x(cam);
+        cam_y = camera_get_view_y(cam);
+    }
+    var cx = DISPLAY_BASE_W * 0.5;
+    var cy = DISPLAY_BASE_H * 0.5;
+    if (_tr.encounter_has_focus) {
+        cx = lerp(cx, _tr.encounter_focus_x - cam_x, 0.35);
+        cy = lerp(cy, _tr.encounter_focus_y - cam_y, 0.35);
+    }
+    Display_SetZoom(1 + max(0, _tr.encounter_zoom), cx + _tr.encounter_shake_x, cy + _tr.encounter_shake_y);
+}
+
+// H2 / H6: the cutscene's picture, text mode and logo stay up until the exit fade is fully black, so the last image fades out with the
+// screen. This clears them at the room change (every transition's room_goto passes Transition_PreRoomChange).
+function Cutscene_ClearUiState() {
+    var gs = GameState_Get();
+    if (!is_struct(gs) || !variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) return;
+    gs.ui.cutscene_active = false;
+    gs.ui.cutscene_bg_sprite = noone;
+    gs.ui.dialogue_box_half = false;
+    gs.ui.cutscene_text_only = false;
+    gs.ui.cutscene_logo_sprite = noone;
+    gs.ui.cutscene_logo_alpha = 0;
+}
+
+function Transition_PreRoomChange() {
+    Cutscene_ClearUiState();
+    var gs = GameState_Get();
+    if (is_struct(gs)) {
+        gs.last_room = noone;
+        gs.player_inst = noone;
+        if (variable_struct_exists(gs, "ui") && is_struct(gs.ui) && variable_struct_exists(gs.ui, "cinematic_input_lock_count")) {
+            gs.ui.cinematic_input_lock_count = 0;
+        }
+    }
+}
+
+function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus_x = undefined, _enc_focus_y = undefined) {
+    Transition_Init();
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+    if (tr.active) return false;
+
+    tr.active = true;
+    tr.type = _type;
+    tr.phase = 0;
+    tr.timer = 0;
+    tr.alpha = 0;
+    tr.target_room = _room;
+    tr.target_spawn_id = _spawn_id;
+    tr.target_face = _face;
+    tr.use_spawn = _use_spawn;
+    tr.encounter_focus_x = 0;
+    tr.encounter_focus_y = 0;
+    tr.encounter_has_focus = false;
+    tr.flash_apply_class_id = -1;
+    tr.flash_apply_class_pending = false;
+    tr.flash_action = "";
+    tr.flash_owner_inst = noone;
+
+    Transition_ApplyTimes(tr, _type);
+    tr.progress = 0;
+    tr.encounter_zoom = 0;
+    tr.encounter_shake_x = 0;
+    tr.encounter_shake_y = 0;
+    if (_type == TRANSITION_TYPE_ENCOUNTER) {
+        tr.encounter_has_focus = is_real(_enc_focus_x) && is_real(_enc_focus_y);
+        if (tr.encounter_has_focus) {
+            tr.encounter_focus_x = _enc_focus_x;
+            tr.encounter_focus_y = _enc_focus_y;
+        }
+    }
+
+    if (_use_spawn && _room != noone) {
+        RoomTransition_Set(_room, _spawn_id, _face);
+    }
+
+    return true;
+}
+
+function Transition_RequestRoomFade(_room, _spawn_id = "", _face = -1, _use_spawn = false) {
+    return Transition_Begin(TRANSITION_TYPE_ROOM, _room, _spawn_id, _face, _use_spawn);
+}
+
+function Transition_RequestLoadingRoomFade(_room, _spawn_id = "", _face = -1, _use_spawn = false) {
+    var ok = Transition_Begin(TRANSITION_TYPE_ROOM, _room, _spawn_id, _face, _use_spawn);
+    if (!ok) return false;
+
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+    tr.fade_out_ms = max(1, Transition_FramesToMs(TRANSITION_LOADING_FADE_OUT_FRAMES));
+    tr.black_hold_ms = max(0, Transition_FramesToMs(TRANSITION_LOADING_BLACK_HOLD_FRAMES));
+    tr.fade_in_ms = max(1, Transition_FramesToMs(TRANSITION_LOADING_FADE_IN_FRAMES));
+    return true;
+}
+
+function Transition_RequestEncounterBattle(_room = rm_battle, _focus_x = undefined, _focus_y = undefined) {
+    return Transition_Begin(TRANSITION_TYPE_ENCOUNTER, _room, "", -1, false, _focus_x, _focus_y);
+}
+
+function Transition_RequestCutsceneFade(_room, _spawn_id = "", _face = -1, _use_spawn = false) {
+    return Transition_Begin(TRANSITION_TYPE_CUTSCENE, _room, _spawn_id, _face, _use_spawn);
+}
+
+// The two lengths are 60 fps frame counts (the TRANSITION_*_FRAMES design numbers); they are turned into ms here.
+function Transition_RequestBlackFlash(_fade_out_frames = TRANSITION_FLASH_FADE_OUT_FRAMES, _fade_in_frames = TRANSITION_FLASH_FADE_IN_FRAMES, _flash_apply_class_id = -1, _flash_action = "", _flash_owner_inst = noone) {
+    var ok = Transition_Begin(TRANSITION_TYPE_FLASH, noone, "", -1, false);
+    if (!ok) return false;
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+    tr.fade_out_ms = max(1, Transition_FramesToMs(_fade_out_frames));
+    tr.black_hold_ms = 0;
+    tr.fade_in_ms = max(1, Transition_FramesToMs(_fade_in_frames));
+    tr.flash_apply_class_pending = is_real(_flash_apply_class_id) && (_flash_apply_class_id >= 0);
+    tr.flash_apply_class_id = tr.flash_apply_class_pending ? _flash_apply_class_id : -1;
+    tr.flash_action = string(_flash_action);
+    tr.flash_owner_inst = _flash_owner_inst;
+    return true;
+}
+
+function Transition_RequestCutsceneById(_cutscene_id) {
+    var gs = GameState_Get();
+    if (string(_cutscene_id) == "ending" && Story_Seen(Story_CutsceneKey("ending"))) {
+        Run_OnWin();   // C1: wins + 1, the run ends; the ending and the credits are not shown again
+        gs.in_main_menu = true;
+        return Transition_RequestCutsceneFade(rm_start);
+    }
+    gs.pending_cutscene_id = string(_cutscene_id);
+    return Transition_RequestCutsceneFade(rm_cutscene);
+}
+
+function Transition_Finish() {
+    Transition_Init();
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+    if (tr.type == TRANSITION_TYPE_ENCOUNTER) {
+        Display_ClearZoom();
+    }
+    tr.active = false;
+    tr.type = TRANSITION_TYPE_NONE;
+    tr.phase = 0;
+    tr.timer = 0;
+    tr.alpha = 0;
+    tr.target_room = noone;
+    tr.target_spawn_id = "";
+    tr.target_face = -1;
+    tr.use_spawn = false;
+    tr.encounter_zoom = 0;
+    tr.black_hold_ms = 0;
+    tr.progress = 0;
+    tr.encounter_shake_x = 0;
+    tr.encounter_shake_y = 0;
+    tr.encounter_focus_x = 0;
+    tr.encounter_focus_y = 0;
+    tr.encounter_has_focus = false;
+    tr.flash_apply_class_id = -1;
+    tr.flash_apply_class_pending = false;
+    tr.flash_action = "";
+    tr.flash_owner_inst = noone;
+    // The display is NOT re-applied here (I-051, DISP-08): a transition changes the room, not the window.
+}
+
+function Transition_Update() {
+    Transition_Init();
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+
+    if (!tr.active) return;
+
+    var kind = Transition_PhaseKind(tr.type, tr.phase);
+    var ev = Transition_PhaseStep(tr, Presentation_StepMs(delta_time));
+
+    if (tr.type == TRANSITION_TYPE_ENCOUNTER) {
+        if (kind == TRANSITION_KIND_ZOOM) {
+            // Ease-out for smoother, heavier encounter zoom.
+            var pe = 1 - power(1 - tr.progress, 2);
+            tr.encounter_zoom = lerp(0, TRANSITION_ENCOUNTER_ZOOM_MAX, pe);
+            var shake_mag = max(0, round(TRANSITION_ENCOUNTER_SHAKE_PX * (1 - (pe * 0.85))));
+            tr.encounter_shake_x = irandom_range(-shake_mag, shake_mag);
+            tr.encounter_shake_y = irandom_range(-shake_mag, shake_mag);
+            Transition_ApplyEncounterZoom(tr);
+        } else if (kind == TRANSITION_KIND_ZOOM_HOLD || kind == TRANSITION_KIND_OUT) {
+            tr.encounter_zoom = TRANSITION_ENCOUNTER_ZOOM_MAX;
+            tr.encounter_shake_x = 0;
+            tr.encounter_shake_y = 0;
+            Transition_ApplyEncounterZoom(tr);
+        }
+    }
+
+    switch (ev) {
+        case TRANSITION_EVT_ROOM_CHANGE: {
+            if (tr.type == TRANSITION_TYPE_ENCOUNTER) Display_ClearZoom();
+            Transition_PreRoomChange();
+            room_goto(tr.target_room);
+        } break;
+
+        case TRANSITION_EVT_FLASH_BLACK: {
+            if (tr.flash_apply_class_pending && is_real(tr.flash_apply_class_id) && tr.flash_apply_class_id >= 0) {
+                ClassSelect_ApplyClass(tr.flash_apply_class_id);
+            }
+            if (tr.flash_action == "auto_resolve") {
+                Enemy_AutoResolveFinalizePending();
+            } else if (tr.flash_action == "dialogue_trigger_handoff") {
+                DialogueTrigger_ApplyBlackHandoff(tr.flash_owner_inst);
+            }
+            tr.flash_apply_class_pending = false;
+            tr.flash_apply_class_id = -1;
+            tr.flash_action = "";
+            tr.flash_owner_inst = noone;
+        } break;
+
+        case TRANSITION_EVT_DONE: {
+            Transition_Finish();
+        } break;
+    }
+}
+
+function Transition_DrawGUI() {
+    Transition_Init();
+    var gs = GameState_Get();
+    var tr = gs.transition_fx;
+
+    if (tr.alpha > 0) {
+        var wr = Display_WindowRectInGui(Display_Layout());   // the whole window, bars included
+        draw_set_alpha(clamp(tr.alpha, 0, 1));
+        draw_set_color(c_black);
+        draw_rectangle(wr.x, wr.y, wr.x + wr.w, wr.y + wr.h, false);
+    }
+
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}

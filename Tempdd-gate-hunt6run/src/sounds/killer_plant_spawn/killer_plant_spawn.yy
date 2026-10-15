@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"killer_plant_spawn",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":1.7566214,
+  "exportDir":"",
+  "name":"killer_plant_spawn",
+  "parent":{
+    "name":"Killer Plant",
+    "path":"folders/Sounds/Entities/Monsters/Killer Plant.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"killer_plant_spawn.ogg",
+  "volume":1.0,
+}

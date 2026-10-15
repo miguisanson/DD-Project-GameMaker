@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"spider_spawn_2",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":0.18022676,
+  "exportDir":"",
+  "name":"spider_spawn_2",
+  "parent":{
+    "name":"Spider",
+    "path":"folders/Sounds/Entities/Monsters/Spider.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"spider_spawn_2.wav",
+  "volume":1.0,
+}

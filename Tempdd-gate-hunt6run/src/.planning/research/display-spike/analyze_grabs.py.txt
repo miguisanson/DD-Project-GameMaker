@@ -1,0 +1,50 @@
+import sys, glob, os, re, math
+import numpy as np
+from PIL import Image
+G = r'E:\Temp\dd-disp-spike\grabs'; S = r'E:\Temp\dd-disp-spike\save\DD_Project'
+def calc(w, h, bw=160, bh=144):
+    s = max(1, int(min(w / bw, h / bh)))
+    gw, gh = bw * s, bh * s
+    gx, gy = (w - gw) // 2, (h - gh) // 2
+    v = gw / 640; u = 1
+    while v * v >= u * (u + 1): u += 1
+    guw, guh = gw // u, gh // u
+    return dict(s=s, gx=gx, gy=gy, gw=gw, gh=gh, u=u, guw=guw, guh=guh, guix=gx + (gw - guw * u) // 2, guiy=gy + (gh - guh * u) // 2)
+def bbox(m):
+    ys, xs = np.nonzero(m)
+    return None if len(xs) == 0 else (int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max()))
+tag = sys.argv[1]
+for f in sorted(glob.glob(os.path.join(G, tag + '_a_*.png'))):
+    base = os.path.basename(f)[len(tag) + 1:-4]          # a_1920x1080_G1
+    m = re.match(r'a_(\d+)x(\d+)_(G\d)', base); W, H, mode = int(m[1]), int(m[2]), m[3]
+    L = calc(W, H)
+    a = np.array(Image.open(f).convert('RGB')); h, w = a.shape[:2]
+    isc = lambda r, g, b: (a[:, :, 0] == r) & (a[:, :, 1] == g) & (a[:, :, 2] == b)
+    mag, red, grn, cy = isc(255, 0, 255), isc(255, 0, 0), isc(0, 255, 0), isc(0, 255, 255)
+    res = [f'{base}: grab={w}x{h}']
+    res.append('winOK' if (w, h) == (W, H) else f'WINDOW-MISMATCH({w}x{h})')
+    # magenta outline: fraction of each edge that is magenta or cyan-marker
+    ed = [float((mag | cy)[0, :].mean()), float((mag | cy)[h - 1, :].mean()), float((mag | cy)[:, 0].mean()), float((mag | cy)[:, w - 1].mean())]
+    res.append('outline=' + ','.join(f'{x:.2f}' for x in ed))
+    rb = bbox(red); want = (L['gx'], L['gy'], L['gx'] + L['gw'] - 1, L['gy'] + L['gh'] - 1)
+    res.append(f'rect={rb} want={want} ' + ('RECT-OK' if rb == want else 'RECT-BAD'))
+    # bars: non-black outside rect, excluding magenta and cyan
+    outside = np.ones((h, w), bool); outside[L['gy']:L['gy'] + L['gh'], L['gx']:L['gx'] + L['gw']] = False
+    bad = outside & (a.sum(axis=2) > 0) & ~mag & ~cy
+    res.append(f'bars-nonblack={int(bad.sum())}')
+    # 1x reference
+    r1 = os.path.join(S, base + '_1x.png')
+    if os.path.exists(r1):
+        ref = np.array(Image.open(r1).convert('RGBA'))
+        ref_rgb = np.where(ref[:, :, 3:4] > 0, ref[:, :, :3], 0)
+        crop = a[L['gy']:L['gy'] + L['gh'], L['gx']:L['gx'] + L['gw']]
+        s = L['s']
+        blocks = crop.reshape(144, s, 160, s, 3)
+        centre = blocks[:, s // 2, :, s // 2, :]
+        cycrop = cy[L['gy']:L['gy'] + L['gh'], L['gx']:L['gx'] + L['gw']].reshape(144, s, 160, s).any(axis=(1, 3))
+        diff = (centre != ref_rgb).any(axis=2) & ~cycrop
+        uni = (blocks == blocks[:, :1, :, :1, :]).all(axis=(1, 3, 4)) | cycrop
+        res.append(f'1x-diff={int(diff.sum())} uniform-blocks={float(uni.mean()):.4f}')
+    cb = bbox(cy)
+    res.append(f'cyan={cb}')
+    print(' | '.join(res))

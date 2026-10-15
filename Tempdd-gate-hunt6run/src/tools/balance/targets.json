@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "about": "D112: a winning run takes 25-30 minutes (it was 45-60, D30). Target bands for the run simulator (tools/balance/sim.py --check, tools/balance/report.py). Numbers come from DECISIONS.md (D14 D30 D61), balance-methods.md section 6.2, combat-spec.md section 7 and the E1 packet brief. Proposals, not owner-locked values: the owner adjusts them (D13).",
+  "check_runs": 300,
+  "check_seed": 20261014,
+  "check_classes": [
+    "knight",
+    "archer",
+    "mage",
+    "nobody"
+  ],
+  "fight_turns": {
+    "_note": "mean player turns of the fights the player wins, average QTE profile, greedy policy",
+    "normal": [
+      3,
+      5
+    ],
+    "elite": [
+      5,
+      8
+    ],
+    "mini_boss": [
+      8,
+      12
+    ],
+    "final_boss": [
+      12,
+      18
+    ]
+  },
+  "normal_fight_win_rate_min": 0.97,
+  "run_win_rate": {
+    "_note": "first-try runs; whole-run win rate per QTE skill profile, greedy decisions. The 95% interval of the estimate must overlap the band.",
+    "average": [
+      0.35,
+      0.55
+    ],
+    "expert": [
+      0.7,
+      1.0
+    ],
+    "novice": [
+      0.15,
+      0.3
+    ]
+  },
+  "run_minutes": [
+    25,
+    30
+  ],
+  "level_final_boss": [
+    8,
+    10
+  ],
+  "level_mini_boss": [
+    4,
+    5.5
+  ],
+  "level_floor7": [
+    6.5,
+    7.5
+  ],
+  "class_spread_max": 0.1,
+  "class_spread_classes": [
+    "knight",
+    "archer",
+    "mage"
+  ],
+  "dominance_max_share": 0.6,
+  "advisory": {
+    "_note": "balance-methods.md section 6.2: reported in balance-report.md, not part of --check",
+    "normal_fight_hp_lost": [
+      0.1,
+      0.25
+    ],
+    "normal_fight_mp_spent_share": [
+      0.15,
+      0.3
+    ],
+    "floor_drain": [
+      0.6,
+      0.8
+    ]
+  },
+  "fight_turn_classes": [
+    "knight",
+    "archer",
+    "mage"
+  ],
+  "nobody_win_rate": {
+    "_note": "Nobody is the pure challenge class (D83, unlocked after the first win): its own band instead of the +-10 pts spread and the fight-length bands. Move 'nobody' into class_spread_classes / fight_turn_classes for the literal reading of the brief.",
+    "average": [
+      0.15,
+      0.3
+    ],
+    "expert": [
+      0.3,
+      0.5
+    ],
+    "novice": [
+      0.05,
+      0.15
+    ]
+  }
+}

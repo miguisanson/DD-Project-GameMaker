@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"Laugh_evil_deep_3",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":3.7587302,
+  "exportDir":"",
+  "name":"Laugh_evil_deep_3",
+  "parent":{
+    "name":"Final Boss",
+    "path":"folders/Sounds/Entities/Monsters/Final Boss.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"Laugh_evil_deep_3.ogg",
+  "volume":1.0,
+}
