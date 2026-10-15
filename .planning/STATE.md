@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Owner back (2026-10-16). next 63deaae = all overnight work + hunt-2 fixes (I-073..I-076), fast gate PASS 3695/0. Playtest build on disk: dbc678a-20261015 (without the hunt-2 fixes). Next: FULL gate + rebuild when the owner OKs running tests on the PC; then repoint BOARD/QUEUE (add an entry for I-073..I-076) and add REGRESSION entries for I-072..I-076. |
+| WIP | PLAYTEST NOW: build 63deaae-20261015 (= next 63deaae, FULL gate PASS 3695/0 + smoke + bot + shots). Owner back 2026-10-16, playing it; grill in progress for new work (marble bag everywhere, chest-skip guard, main menu refresh, open questions). Do NOT run tests on the PC while the owner plays unless they say so. |
 | Unplayed features | 61 playtest entries (PLAYTEST-QUEUE, build dbc678a-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |

@@ -13,7 +13,7 @@ What the owner needs to play, test or decide after the agents worked while the o
 - The agents never write a verdict for you. A line saying `played` or `good` is written by you (or by the agent only because you said it in chat, with the date).
 - The entries are in **play order**: they follow one natural run, from the first launch to the ending. You do not need to stop the game to write notes; mark them afterwards.
 
-**Build to play:** `E:\Games\DD-Project Playtest\dbc678a-20261015\DD-Project.exe` (the build id is shown bottom-right of the title screen) | **Branch:** `next` | **Unplayed:** 61
+**Build to play:** `E:\Games\DD-Project Playtest\63deaae-20261015\DD-Project.exe` (the build id is shown bottom-right of the title screen) | **Branch:** `next` | **Unplayed:** 62
 
 **Before you play:**
 - Your old saves were moved to `E:\Games\DD-Project Playtest\old-saves-2026-10-15`, so the game starts fresh: no run, no story seen, no hints seen yet. Your old *settings* were kept (Windowed, scale 5, volumes UI 50 / SFX 50 / BGM 80), so the first start will probably be a window, not full screen. That is expected (Q-001).
@@ -31,7 +31,7 @@ What the owner needs to play, test or decide after the agents worked while the o
 ## Entry template (copy for each new entry)
 
 ```
-### Q-001 | feature or fix name | commit abc1234 | build dbc678a-20261015
+### Q-001 | feature or fix name | commit abc1234 | build 63deaae-20261015
 - Status: unplayed   (you change it to: good / bad / change)
 - Requirement / issue: (REQ id, D-number or I-id)
 - Automated proof already run: (checks, R-ids, build id, screenshot names)
@@ -49,7 +49,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 1: First launch (about 8 minutes)
 
-### Q-001 | Window mode and build id at first launch | commit 26a9523 | build dbc678a-20261015
+### Q-001 | Window mode and build id at first launch | commit 26a9523 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D91, I-054
 - Automated proof already run: Test_Suite_Display, smoke window-mode steps (tests force Windowed, so the real default was never seen on screen).
@@ -62,7 +62,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: the window changing size or flickering while it starts; build id too faint to read.
 - Your note:
 
-### Q-002 | Settings: volume, window mode, window size, language | commit 26a9523 | build dbc678a-20261015
+### Q-002 | Settings: volume, window mode, window size, language | commit 26a9523 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D91, D49, D95, I-062
 - Automated proof already run: Test_Suite_UI (204 checks), smoke drives Settings through the real keys, window-size screenshots.
@@ -75,7 +75,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: text hard to read at some size; flicker when switching modes; is Apply easy to find; do volume changes feel right?
 - Your note:
 
-### Q-003 | QTE assist, text speed, screen shake | commit c819526 | build dbc678a-20261015
+### Q-003 | QTE assist, text speed, screen shake | commit c819526 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D49, D35
 - Automated proof already run: Test_Suite_Assist, smoke assist steps (bar zones x1.5, arrow time x1.3).
@@ -87,7 +87,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: is the difference between text speeds clear? Does Assist On feel like help or like cheating? Does it still feel too hard with Assist On?
 - Your note:
 
-### Q-004 | Key rebinding | commit c819526 | build dbc678a-20261015
+### Q-004 | Key rebinding | commit c819526 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D49, D95
 - Automated proof already run: Test_Suite_Binds, smoke Controls-page flow.
@@ -99,7 +99,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: any key you cannot undo; words that confuse; the new key not working in the world or in menus.
 - Your note:
 
-### Q-005 | Button prompts follow the keyboard or the controller | commit c819526 | build dbc678a-20261015
+### Q-005 | Button prompts follow the keyboard or the controller | commit c819526 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D92. Needs a controller; skip it (mark "not reached") if you have none.
 - Automated proof already run: Test_Suite_Prompt (labels per device), shots of the prompts.
@@ -111,7 +111,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: a wrong or missing button picture; a delay before the prompt changes.
 - Your note:
 
-### Q-006 | Menu controls feel (same in every menu) | commit 642e7bd | build dbc678a-20261015
+### Q-006 | Menu controls feel (same in every menu) | commit 642e7bd | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D95, D96, D97, I-061, I-062
 - Automated proof already run: Test_Suite_UI, shots of every menu.
@@ -126,7 +126,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 2: Start of a run and moving around (about 8 minutes)
 
-### Q-007 | New Game, intro cutscene and skipping | commit 4d312bf | build dbc678a-20261015
+### Q-007 | New Game, intro cutscene and skipping | commit 4d312bf | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D48, D35, I-051, I-055
 - Automated proof already run: smoke display steps (0 re-layouts over room changes, cutscene end, dialogue end), shots at 480x432 / 1000x700 / 1920x1080.
@@ -138,7 +138,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: is it clear you must hold to skip? Any screen glitch at the end of the cutscene? Is the "confirm again" on New Game clear enough when you have a run saved?
 - Your note:
 
-### Q-008 | Walking, turning, running, bumping | commit bcedf32 | build dbc678a-20261015
+### Q-008 | Walking, turning, running, bumping | commit bcedf32 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D69, D70, I-048, I-063
 - Automated proof already run: movement bot (grid snapping), Test_Suite_Nav, shots.
@@ -150,7 +150,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: getting stuck mid-tile or on corners; run speed too fast or slow; any room where the map looks off the grid (tell me which room).
 - Your note:
 
-### Q-009 | Interact hints and the marks over enemies | commit cb984f0 | build dbc678a-20261015
+### Q-009 | Interact hints and the marks over enemies | commit cb984f0 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D70, I-056, I-058, I-059
 - Automated proof already run: shot pairs (marks on and off) diffed for stray pixels, corner probe.
@@ -162,7 +162,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: the arrow blending into the floor; odd marks in a corner; the ring missing after a battle.
 - Your note:
 
-### Q-010 | Doors and room arrival | commit 946a689 | build dbc678a-20261015
+### Q-010 | Doors and room arrival | commit 946a689 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D64, I-049
 - Automated proof already run: smoke door steps (every door reachable, one exit per entry).
@@ -173,7 +173,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: bouncing, a door that triggers twice, a pause or jump during the fade.
 - Your note:
 
-### Q-011 | Enemies: sight, "!", chase, searching, personalities | commit bcedf32 | build dbc678a-20261015
+### Q-011 | Enemies: sight, "!", chase, searching, personalities | commit bcedf32 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D63, D66, D67, I-047, I-050
 - Automated proof already run: Test_Suite_Nav, bot parts A-F (path around walls, no overlap, sight blocked by walls, search then go home).
@@ -189,7 +189,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 3: Chests (about 5 minutes)
 
-### Q-012 | The first class or skill chest gives the class choice | commit ebfcaed | build dbc678a-20261015
+### Q-012 | The first class or skill chest gives the class choice | commit ebfcaed | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D73, D34, D83, I-057
 - Automated proof already run: Test_Suite_Cards (140 checks), smoke steps 133-141, card shots.
@@ -201,7 +201,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: confusing words; the details panel missing numbers; the screen feeling slow or abrupt.
 - Your note:
 
-### Q-013 | Later skill chests: pick 1 of 3 cards | commit ebfcaed | build dbc678a-20261015
+### Q-013 | Later skill chests: pick 1 of 3 cards | commit ebfcaed | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D81, D82, D18
 - Automated proof already run: Test_Suite_Cards (offers, upgrades, passives, max 3 skills), card shots.
@@ -213,7 +213,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: are the choices readable and different from each other? Offers repeating too much? Wording?
 - Your note:
 
-### Q-014 | Item chests and barrels: chests are never empty (new tonight) | commit 89dba56 | build dbc678a-20261015
+### Q-014 | Item chests and barrels: chests are never empty (new tonight) | commit 89dba56 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D118, D117
 - Automated proof already run: Test_Suite_FairRng (no empty chest result, tier odds), merged with the logic in 89dba56; the full gate after this merge is still to run (main session fills in).
@@ -226,7 +226,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 4: Battle (about 20 minutes, spread over the run)
 
-### Q-015 | Battle screen and command menu | commit 505bd3b | build dbc678a-20261015
+### Q-015 | Battle screen and command menu | commit 505bd3b | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D99, D89, D96, I-066, I-067
 - Automated proof already run: battle HUD shots, bot fight with a levelled Knight, smoke battle steps.
@@ -239,7 +239,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: text too small; something hidden behind a panel; a menu that feels slow.
 - Your note:
 
-### Q-016 | Sliding bar for the basic attack | commit 90b59e4 | build dbc678a-20261015
+### Q-016 | Sliding bar for the basic attack | commit 90b59e4 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D56, D60, D61, D20. Approved in playtest 1 (D72); only check that nothing got worse.
 - Automated proof already run: Test_Suite_Qte, bot Perfect and fail variants, shot_qte_bar.png.
@@ -249,7 +249,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: sweep speed and zone size still right? Does the pop-up for the bar show once?
 - Your note:
 
-### Q-017 | Arrow sequences for skills | commit 5129de8 | build dbc678a-20261015
+### Q-017 | Arrow sequences for skills | commit 5129de8 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D57, D58, D61. Approved in playtest 1 (D72); quick check only.
 - Automated proof already run: Test_Suite_Qte arrow grader, bot casts per class, shot_qte_arrows.png.
@@ -259,7 +259,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: time limits (3.4 / 4.2 / 5.0 seconds for 3 / 4 / 5 arrows); are the sequences easy to remember?
 - Your note:
 
-### Q-018 | Defence bar on big enemy attacks | commit 3eefcc9 | build dbc678a-20261015
+### Q-018 | Defence bar on big enemy attacks | commit 3eefcc9 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D59, D7, D68, I-066
 - Automated proof already run: bot defended Ramming, shot_qte_telegraph.png, shot_qte_defence.png, Test_Suite_EnemyAI.
@@ -271,7 +271,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: is the warning clear and long enough (0.4 s)? Is blocking satisfying?
 - Your note:
 
-### Q-019 | Turn timeline (speed decides who acts) | commit 9dfeac7 | build dbc678a-20261015
+### Q-019 | Turn timeline (speed decides who acts) | commit 9dfeac7 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D74, D19
 - Automated proof already run: Test_Suite_Turns, bot turn scenarios, timeline shots.
@@ -283,7 +283,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: can you tell who acts next at a glance? Does the strip flicker or jump?
 - Your note:
 
-### Q-020 | Stagger meter, BREAK and Steadfast | commit 9dfeac7 | build dbc678a-20261015
+### Q-020 | Stagger meter, BREAK and Steadfast | commit 9dfeac7 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D75
 - Automated proof already run: Test_Suite_Turns (stagger, BREAK, Steadfast), B3 shots.
@@ -295,7 +295,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: is BREAK obvious and rewarding? Is Steadfast understandable?
 - Your note:
 
-### Q-021 | Statuses: poison, burn, bleed (with turn counters) | commit 17a7aa9 | build dbc678a-20261015
+### Q-021 | Statuses: poison, burn, bleed (with turn counters) | commit 17a7aa9 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D78, D21, BUG-08
 - Automated proof already run: Test_Suite_StatusRules, bot battles A and B, status shots.
@@ -306,7 +306,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: can you feel poison working? Icons readable (they are code-drawn shapes until imported)?
 - Your note:
 
-### Q-022 | Foresight, Evasion and Solidify | commit e9685dc | build dbc678a-20261015
+### Q-022 | Foresight, Evasion and Solidify | commit e9685dc | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D79, D80, D24, I-002, I-052
 - Automated proof already run: Test_Suite_StatusRules, fix-foresight tests (Foresight+ gets its extra turns), shot_fx_* per skill.
@@ -318,7 +318,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: is Foresight easy to understand now? Eye size OK? Does the icon look like an eye (the drawn stand-in)?
 - Your note:
 
-### Q-023 | Damage numbers, skill speed and effect sizes | commit d0ddcbf | build dbc678a-20261015
+### Q-023 | Damage numbers, skill speed and effect sizes | commit d0ddcbf | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D55, D92, I-052, I-060, BUG-05, BUG-06, BUG-21
 - Automated proof already run: bot measures every skill at most 66 frames, shot_fx_* per skill, Test_Suite_Fx.
@@ -329,7 +329,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: anything too rushed; numbers hard to read; an effect too big or too small.
 - Your note:
 
-### Q-024 | Enemy battle behaviour (rule lists, wind-ups) | commit 3eefcc9 | build dbc678a-20261015
+### Q-024 | Enemy battle behaviour (rule lists, wind-ups) | commit 3eefcc9 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D68, D7
 - Automated proof already run: Test_Suite_EnemyAI, bot_ai_* fights, B4 shots.
@@ -342,7 +342,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 5: Fairer randomness (about 6 minutes, new tonight)
 
-### Q-025 | Critical hits with Take Aim (new tonight) | commit 89dba56, 1f5b7fd | build dbc678a-20261015
+### Q-025 | Critical hits with Take Aim (new tonight) | commit 89dba56, 1f5b7fd | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D119, D124. Needs the Archer; mark "not reached" otherwise.
 - Automated proof already run: Test_Suite_FairRng (bag sizing, never more than 6 misses in a row at 25%), merged in 89dba56. The status line comes from the same bag size (Test_Suite_FairUi).
@@ -354,7 +354,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: is a critical clearly visible and audible? Is the tooltip clear?
 - Your note:
 
-### Q-026 | Fleeing: chance shown and rising (new tonight) | commit 89dba56, 1f5b7fd, d716e76 | build dbc678a-20261015
+### Q-026 | Fleeing: chance shown and rising (new tonight) | commit 89dba56, 1f5b7fd, d716e76 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D121, D124
 - Automated proof already run: Test_Suite_FairRng (flee formula values, +25 points per failed try), merged in 89dba56. The RUN percentage is checked in Test_Suite_FairUi and shot_fairui_run_* (e.g. Knight vs Slime: RUN 52%).
@@ -366,7 +366,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: does the shown number match what happens? Does a failed try cost too much? Is the number easy to read?
 - Your note:
 
-### Q-027 | Enemy item drops never dry for long (new tonight) | commit 89dba56 | build dbc678a-20261015
+### Q-027 | Enemy item drops never dry for long (new tonight) | commit 89dba56 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D120
 - Automated proof already run: Test_Suite_FairRng and Test_Suite_RunSave (the dry-fight counter is saved and restored), merged in 89dba56.
@@ -378,7 +378,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 6: Level-up (about 3 minutes)
 
-### Q-028 | Level-up: fixed growth, 1 free point, then a card | commit 20f6333 | build dbc678a-20261015
+### Q-028 | Level-up: fixed growth, 1 free point, then a card | commit 20f6333 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D76, D81, D22, D27
 - Automated proof already run: Test_Suite_Stats, Test_Suite_Cards, smoke level-up steps.
@@ -392,7 +392,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 7: Gold, merchant, throwables, gear, elites (about 10 minutes)
 
-### Q-029 | Gold counter and gold drops | commit 2b16016 | build dbc678a-20261015
+### Q-029 | Gold counter and gold drops | commit 2b16016 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D23
 - Automated proof already run: Test_Suite_Economy (about 240 checks), economy shots.
@@ -403,7 +403,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: amounts too small or too big; counter hard to see.
 - Your note:
 
-### Q-030 | Merchant and shop (floors 2, 5 and 8) | commit 9b89e54 | build dbc678a-20261015
+### Q-030 | Merchant and shop (floors 2, 5 and 8) | commit 9b89e54 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D85, D113, D115, D23
 - Automated proof already run: Test_Suite_Economy (shop buy and sell), merchant shots, smoke steps 142-146.
@@ -415,7 +415,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: does the glow make you notice it without looking silly? (The sprite is the Nobody stand-in until you import it.) Prices fair? Shop easy to use?
 - Your note:
 
-### Q-031 | Throwables | commit 2b16016 | build dbc678a-20261015
+### Q-031 | Throwables | commit 2b16016 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D84
 - Automated proof already run: Test_Suite_Economy (throw damage, Nobody x2), bot throw scenarios.
@@ -426,7 +426,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: are throwables worth their price? Is the animation clear?
 - Your note:
 
-### Q-032 | Accessory slot and gear comparison | commit 2b16016 | build dbc678a-20261015
+### Q-032 | Accessory slot and gear comparison | commit 2b16016 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D92, D90
 - Automated proof already run: Test_Suite_Economy, Tab menu shots (shot_tabmenu_gear*).
@@ -438,7 +438,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: confusing before / after numbers; names hard to read.
 - Your note:
 
-### Q-033 | Elites: outline, one modifier, better rewards (D123 new tonight) | commit 2b16016, 89dba56 | build dbc678a-20261015
+### Q-033 | Elites: outline, one modifier, better rewards (D123 new tonight) | commit 2b16016, 89dba56 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D86, D123
 - Automated proof already run: Test_Suite_Economy (elite stats and modifiers); the per-floor count rule is checked in Test_Suite_FairRng (89dba56).
@@ -453,7 +453,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 8: Beds and hints (about 4 minutes)
 
-### Q-034 | Beds: heal or upgrade a skill | commit c819526 | build dbc678a-20261015
+### Q-034 | Beds: heal or upgrade a skill | commit c819526 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D47, D46, I-064
 - Automated proof already run: Test_Suite_Bed, smoke steps 161-168.
@@ -464,7 +464,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: is the choice clear? Should a bed also do something else?
 - Your note:
 
-### Q-035 | Tutorial pop-ups and the Help page | commit c819526 | build dbc678a-20261015
+### Q-035 | Tutorial pop-ups and the Help page | commit c819526 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D45
 - Automated proof already run: Test_Suite_Tutorial, smoke pop-up steps, shots.
@@ -477,7 +477,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 9: Tab menu, Codex and pause (about 8 minutes)
 
-### Q-036 | Tab menu: tabs and details panel | commit e1a322d | build dbc678a-20261015
+### Q-036 | Tab menu: tabs and details panel | commit e1a322d | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D90, D100, D95, D115, I-061
 - Automated proof already run: Test_Suite_UI, shot_tabmenu_* for every tab.
@@ -489,7 +489,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: numbers overlapping on the Status tab; too much text; a tab that feels empty.
 - Your note:
 
-### Q-037 | Items and Skills tabs | commit e1a322d | build dbc678a-20261015
+### Q-037 | Items and Skills tabs | commit e1a322d | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D90, D100
 - Automated proof already run: Test_Suite_UI (rows come from the real data), tab shots.
@@ -500,7 +500,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: a tooltip number that disagrees with the game (that is a bug, tell me which); hard-to-use lists.
 - Your note:
 
-### Q-038 | Codex: bestiary, notes, runs, unlocks | commit e1a322d | build dbc678a-20261015
+### Q-038 | Codex: bestiary, notes, runs, unlocks | commit e1a322d | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D88, D107
 - Automated proof already run: Test_Suite_UI (Codex rows), Codex shots.
@@ -511,7 +511,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: pages that are empty or confusing; text cut off.
 - Your note:
 
-### Q-039 | Pause menu | commit e1a322d | build dbc678a-20261015
+### Q-039 | Pause menu | commit e1a322d | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D96, D92
 - Automated proof already run: smoke pause steps, Test_Suite_UI.
@@ -523,7 +523,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: Esc pausing when you wanted Back; the menu being slow to open.
 - Your note:
 
-### Q-040 | Alt-tab opens the pause menu (new tonight) | commit 1f5b7fd, d716e76 | build dbc678a-20261015
+### Q-040 | Alt-tab opens the pause menu (new tonight) | commit 1f5b7fd, d716e76 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D122
 - Automated proof already run: Test_Suite_FairUi + smoke fairui_* (bar frozen while paused, Abandon/Quit greyed in a fight, resuming while still unfocused does not re-open the pause); shot_fairui_pause_*.
@@ -537,7 +537,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 10: Death, the summary and the echo (about 6 minutes)
 
-### Q-041 | Death scene and the rotating lore line | commit 39c0f9b | build dbc678a-20261015
+### Q-041 | Death scene and the rotating lore line | commit 39c0f9b | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D103, D102, D104
 - Automated proof already run: Test_Suite_Story (line choice per death count and killer), death-scene shots.
@@ -549,7 +549,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: tone right? Too long or too short? Skipping works?
 - Your note:
 
-### Q-042 | Run summary and the echo pick | commit 4d312bf | build dbc678a-20261015
+### Q-042 | Run summary and the echo pick | commit 4d312bf | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D87, D103
 - Automated proof already run: Test_Suite_RunLoop, smoke run-loop steps.
@@ -560,7 +560,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: what if you had almost nothing to pick; wording of "echo".
 - Your note:
 
-### Q-043 | Waking at the tunnel entrance, a fresh run | commit 4d312bf | build dbc678a-20261015
+### Q-043 | Waking at the tunnel entrance, a fresh run | commit 4d312bf | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D102, D26, D27, D33
 - Automated proof already run: Test_Suite_RunLoop, Test_Suite_Rng (same seed gives the same shuffles).
@@ -571,7 +571,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: dying and restarting feeling slow; the new run feeling too much like the last one.
 - Your note:
 
-### Q-044 | Abandon run | commit 4d312bf | build dbc678a-20261015
+### Q-044 | Abandon run | commit 4d312bf | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D92
 - Automated proof already run: smoke abandon steps (two-step confirm).
@@ -584,7 +584,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 11: Quit and Continue (about 3 minutes)
 
-### Q-045 | Quit to title, Continue, auto-save | commit 4d312bf | build dbc678a-20261015
+### Q-045 | Quit to title, Continue, auto-save | commit 4d312bf | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D46, D36, D125
 - Automated proof already run: Test_Suite_RunSave, Test_Suite_Profile, smoke continue steps.
@@ -598,7 +598,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 12: Story and lore (about 4 minutes)
 
-### Q-046 | Story is told only once | commit 4d312bf | build dbc678a-20261015
+### Q-046 | Story is told only once | commit 4d312bf | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D26, D106
 - Automated proof already run: smoke story-once steps, Test_Suite_Profile.
@@ -608,7 +608,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: a story scene that repeats; one you missed the first time and now cannot see.
 - Your note:
 
-### Q-047 | Boss name banner on later runs | commit 39c0f9b | build dbc678a-20261015
+### Q-047 | Boss name banner on later runs | commit 39c0f9b | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D106
 - Automated proof already run: Test_Suite_Story (banner timing), banner shot.
@@ -618,7 +618,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: banner too short or too long; hard to read.
 - Your note:
 
-### Q-048 | Lore notes | commit 39c0f9b | build dbc678a-20261015
+### Q-048 | Lore notes | commit 39c0f9b | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D107
 - Automated proof already run: Test_Suite_Story (note placement and death-count gates), note shots.
@@ -631,7 +631,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 13: Winning (about 6 minutes, only if you get there)
 
-### Q-049 | Final boss and the ending | commit 39c0f9b | build dbc678a-20261015
+### Q-049 | Final boss and the ending | commit 39c0f9b | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D104, D31
 - Automated proof already run: Test_Suite_Story (ending text), ending smoke steps.
@@ -642,7 +642,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: does it make sense? Is it paced well? Any typo?
 - Your note:
 
-### Q-050 | Closing credits | commit 39c0f9b | build dbc678a-20261015
+### Q-050 | Closing credits | commit 39c0f9b | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D105, D109, D40
 - Automated proof already run: Test_Suite_Story (credits lines), credits shot.
@@ -652,7 +652,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: roll speed; text cut off at the edges; can you skip it? Does it return to the title?
 - Your note:
 
-### Q-051 | The Nobody class after the first win | commit ebfcaed | build dbc678a-20261015
+### Q-051 | The Nobody class after the first win | commit ebfcaed | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D83, D88
 - Automated proof already run: Test_Suite_Cards (Nobody locked until a win, passives), Test_Suite_Economy.
@@ -665,7 +665,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 14: How the whole game feels (about 5 minutes of thinking, no extra play)
 
-### Q-052 | Run length and difficulty | commit 1c8dd66 | build dbc678a-20261015
+### Q-052 | Run length and difficulty | commit 1c8dd66 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D111, D112, D14
 - Automated proof already run: simulator report "After D111" (targets inside their bands).
@@ -675,7 +675,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: floors that feel like walls; floors that are too easy; times when you had to grind; potions and MP mattering.
 - Your note:
 
-### Q-053 | Floor-5 mini boss (Palehorn) | commit 1c8dd66 | build dbc678a-20261015
+### Q-053 | Floor-5 mini boss (Palehorn) | commit 1c8dd66 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D111, D68, D75
 - Automated proof already run: bot boss fights, Test_Suite_EnemyAI (two phases).
@@ -685,7 +685,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: too long, too short, too hard; boring in the first phase?
 - Your note:
 
-### Q-054 | Final boss (Pale Choirbeast) | commit 1c8dd66 | build dbc678a-20261015
+### Q-054 | Final boss (Pale Choirbeast) | commit 1c8dd66 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D111, D68
 - Automated proof already run: bot boss fights, Test_Suite_EnemyAI (phases).
@@ -695,7 +695,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: a wall; a fight you win without trying; a phase that is unreadable.
 - Your note:
 
-### Q-055 | Do the classes feel different? | commit 1c8dd66 | build dbc678a-20261015
+### Q-055 | Do the classes feel different? | commit 1c8dd66 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D22, D76, D111
 - Automated proof already run: simulator report (win rate per class).
@@ -707,7 +707,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 15: Monster sounds (about 3 minutes, during any fights)
 
-### Q-056 | Monster sound variety | commit 0762b1a | build dbc678a-20261015
+### Q-056 | Monster sound variety | commit 0762b1a | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D116
 - Automated proof already run: Test_Suite_Audio (pitch within 6%, volume within 10%, no repeat of the same take twice in a row).
@@ -720,7 +720,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 ## Stage 16: Korean (about 3 minutes)
 
-### Q-057 | Korean language quick look | commit 578c1c3 | build dbc678a-20261015
+### Q-057 | Korean language quick look | commit 578c1c3 | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D9, D98, D93
 - Automated proof already run: missing-Korean check in the gate, Korean shots of every screen.
@@ -731,10 +731,10 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: words that sound unnatural; text too long for its box; mixed English and Korean.
 - Your note:
 
-### Q-058 | Odds and ends from the regression list | commit next | build dbc678a-20261015
+### Q-058 | Odds and ends from the regression list | commit next | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: R-011, R-017, R-028, R-032 (no automated check covers these parts)
-- Automated proof already run: REGRESSION.md run on dbc678a-20261015 (34 PASS, 0 FAIL); these are the parts only a person can judge.
+- Automated proof already run: REGRESSION.md run on 63deaae-20261015 (34 PASS, 0 FAIL); these are the parts only a person can judge.
 - Steps (as they come up, no extra play):
   1. Look at the status icons in a fight (poison, burn, bleed, buffs): any that look like a placeholder?
   2. Is the Foresight icon clearly an eye?
@@ -744,7 +744,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: anything odd for a frame or two.
 - Your note:
 
-### Q-059 | Fixed tonight: a failed Run now counts as a turn | commit 946741a | build dbc678a-20261015
+### Q-059 | Fixed tonight: a failed Run now counts as a turn | commit 946741a | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: R-022 (found by a new automated check after the first build)
 - Automated proof already run: smoke regr_r022_* (failed Run and a boss "can't run" both tick poison: HP -3, stacks 3 -> 2, logged).
@@ -753,7 +753,7 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: nothing else should change about running away.
 - Your note:
 
-### Q-060 | Timing should feel exactly as before (timers now run on real time) | commit f2a/f2b merges on next | build dbc678a-20261015
+### Q-060 | Timing should feel exactly as before (timers now run on real time) | commit f2a/f2b merges on next | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: D108 (optimisation: frame-counted timers -> milliseconds)
 - Automated proof already run: Test_Suite_Transition, Test_Suite_BattleClock, Test_Suite_UiClock (same durations at 60 fps, same in ms at 30 fps, hitches capped); smoke, bot and screenshots.
@@ -762,13 +762,22 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 - Look out for: any fade or shake that looks cut short; a key press that "leaks" through a pop-up.
 - Your note:
 
-### Q-061 | Fixed tonight: stolen items come back, loot is listed, a weak Smoke Bomb still dodges | commit dbc678a | build dbc678a-20261015
+### Q-061 | Fixed tonight: stolen items come back, loot is listed, a weak Smoke Bomb still dodges | commit dbc678a | build 63deaae-20261015
 - Status: unplayed
 - Requirement / issue: I-072 (bug hunt), D80, D84, D5
 - Automated proof already run: 12 new checks (red before the fix): Stranger's stolen item returned on his death; victory text lists drops ("Loot: ..."); Smoke Bomb at every grade, and the Archer's Evasion, still dodge the next attack; throwables trimmed to 5 when the Nobody picks a class.
 - Steps (as they come up): win a fight that drops an item and read the victory text; if the Stranger steals something, beat him; throw a Smoke Bomb badly (miss the bar) and let the enemy attack.
 - Expected: "Loot: ..." shows after a win with a drop; the stolen item comes back; the attack after any Smoke Bomb is dodged. Note: the Archer's Evasion now lasts the full 6 turns its card says (it was 5 in practice).
 - Look out for: anything missing from the victory text.
+- Your note:
+
+### Q-062 | Fixed: enemies wait while menus are open; they remember their spot; exits after a fight | commit 63deaae | build 63deaae-20261015
+- Status: unplayed
+- Requirement / issue: I-073..I-076 (bug hunt 2), D122, D33, D64
+- Automated proof already run: smoke steps 250-268 (red before the fix).
+- Steps (as they come up): with an enemy chasing you, open the Tab menu or Alt-Tab for a few seconds; leave a room and come back; win a fight that started right where you entered a room, then press a direction.
+- Expected: enemies stand still while any menu or pop-up is open; after coming back they stay where they were and do not walk across the room; you are not bounced back through the door you came in.
+- Look out for: an enemy that "slides" after closing a menu.
 - Your note:
 
 ## Questions for the owner
