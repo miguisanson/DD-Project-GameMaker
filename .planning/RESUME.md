@@ -1,45 +1,27 @@
-# Resume here (written 2026-10-15, end of session 3 — owner moved to a new session)
+# Resume here (written 2026-10-16, end of overnight session 4)
 
-Start with `/continue_DD-Project-GameMaker`, then read this file, `BOARD.md`, `BUILD-PLAN.md`.
-Spec = `research/DECISIONS.md` (D1-D116). Work lands on branch `next`; docs live on `v1.9`.
-Ask the owner "is it OK to run builds/tests now?" before running anything if they may be gaming.
+Start with `/continue_DD-Project-GameMaker`, then read this file and `BOARD.md`.
+Spec = `research/DECISIONS.md` (D1-D125). Code lands on branch `next` (worktree `E:\Github_Projects\DD-Project-GameMaker-wt\next`); docs on `v1.9`.
 
 ## Where things stand
-- **All feature packets are merged into `next`** (head e1a322d): A1, A2, B1-B4, C1-C5, D0, D1a, D1b, D2 (+v2 icons,
-  art-final), D3 text pass, E1 simulator, bal-apply (D111/D112), sfx-variety (D116), fix-foresight.
-- No worktrees left. Main checkout on `v1.9`. Nothing running.
-- **The last merge (d1b-menus → next, e1a322d) has NOT had a full gate run yet** (stopped when the owner paused).
-  d1b's own branch passed full gate + negative control before merging and already contained the D3 text pass.
-  FIRST STEP: run `powershell -NoProfile -ExecutionPolicy Bypass -File tools/automation/run_tests.ps1 -Mode full
-  -WorkRoot E:\Temp\dd-gate-next` on `next` (≈12-15 min) and open a few `shot_tabmenu_*` PNGs.
+- **PLAYTEST NOW.** Build `fc886c7-20261015` (= `next` @ fc886c7) passed the FULL gate and is in
+  `E:\Games\DD-Project Playtest\fc886c7-20261015\`. Owner's old saves: `E:\Games\DD-Project Playtest\old-saves-2026-10-15`.
+- Owner checklist: `.planning/PLAYTEST-QUEUE.md` (57 entries). After the owner plays: merge the good ones from `next` to `v1.9`,
+  revert/fix the bad ones.
+- Merged overnight (all on next): R1 + R1-sim (D117-D121, D123, D125), R1b (D122, D124), fix-diff (D35 difficulty list gone),
+  fix-review1 (Opus review: New Game guard, honest RUN %, edge-triggered focus pause, old run files), F1a, F1b, F1c, F1d-1, F1d-3,
+  F3a, F3b-1, F3b-2 (see BUILD-PLAN "F1 packets").
 
-## Left to do (in order)
-1. **Full gate on next** (above). Fix anything red.
-2. **R1 randomness + loot packet (D117-D125, grilled 2026-10-15)** — one Sonnet packet in a worktree from `next`, BEFORE F1:
-   tier-first loot roll (D117); chests never empty (D118); crit marble bag refilled on buff, enemies too (D119); enemy-drop
-   bad-luck protection +10 pts/dry fight (D120); flee = SPD/(SPD+eSPD) +25 pts per failed try (D121); pause menu on focus
-   loss, all ms timers frozen (D122); elites dealt per floor by shuffle, >=1 on floors 2+ (D123); tooltips state the odds +
-   flee % in the command menu (D124, workbook rows + rebuild); run save version bump, old run dropped (D125). Checks first:
-   GML suites for each rule (bag never gives >6 misses at 25%, chest table has no empty result, drop counter persists through
-   Continue, flee formula values, elite count per floor across 50 seeds) + simulator re-run for balance drift.
-3. **F1 optimisation + consistency pass (D108)** — one Sonnet packet in a worktree from `next`: frame-time probe in the
-   bot (before/after), per-frame work/allocations, draw calls, room load time; dead/duplicated code (incl. the dead
-   `SaveMenu_*` slot code in scr_save_menu.gml — convert its remaining notice popup to the framework), remaining
-   frame-counted timers → ms, global sprawl; consistent controls/wording/colours/sounds/naming. Every check stays green;
-   no balance numbers change (D13).
-4. **E2 playtest build**: full gate + REGRESSION.md run; copy `E:\Temp\dd-gate-next\out\` (exe, data.win, options.ini,
-   fonts, localization, ttf) to `E:\Games\DD-Project Playtest\<build id>\`; (owner's old saves already moved to
-   `E:\Games\DD-Project Playtest\old-saves-2026-10-15`, D125); write ONE big `.planning/PLAYTEST-QUEUE.md` covering everything built since
-   playtest 1 (runs/death/echo, chests/cards/level-up, turn timeline/stagger/BREAK, statuses, enemy AI/boss phases,
-   merchant/shop/gold/throwables/elites, beds/tutorial/settings/controls/prompts, Tab menu/codex/pause, death scene/lore/
-   credits, window modes, balance feel, monster sounds) + BOARD "PLAYTEST NOW".
-5. **Owner IDE import (one session, ~15 min)** — combined list: `art/IMPORT-CHECKLIST.md` (icon strips v2 + merchant A +
-   card frame) and `art/sfx_new/IMPORT.md` (30 CC0 monster takes). Code already falls back until imported (D94).
-6. Sound/music creator names from the owner for the credits (very last, D40/D105).
+## Left to do
+1. Owner playtest (above).
+2. Improvement mode on `next` (does not touch the playtest build): F2a presentation clocks frames -> ms, F2b battle/dialogue clocks
+   (feel: owner checks), F1d-2 credits/dialogue layout, F4a palette literals, F4b shared helpers, F4c audio global sprawl;
+   F4d wording/sound consistency needs owner decisions (list in BUILD-PLAN).
+3. Owner IDE import (~15 min): `art/IMPORT-CHECKLIST.md` + `art/sfx_new/IMPORT.md`.
+4. Sound/music creator names for the credits (very last).
 
-## Notes / known follow-ups
-- Merge lessons: one scenario step range per packet (BUILD-PLAN.md); agents `git merge next` before reporting;
-  workbook conflicts: take next's game_text.xlsx, re-add rows with openpyxl, rebuild localization.json; ko-check is in
-  the fast gate; open PNGs for drawing changes before merging.
-- `killer_plant_spawn` original sound is extremely quiet (-46 dB RMS) — owner may want to look at it.
-- New CC0 monster takes were chosen by pack/length/brightness, not by ear — owner auditions at playtest.
+## Notes
+- D123 as chosen gives ~6 elites/run (sim: win rate -3..6 points). In PLAYTEST-QUEUE Q-033; fallback = drop "at least one per floor".
+- Process tonight: Sonnet subagents wrote every implementation in worktrees, committing their failing check first; Opus reviewed,
+  ran the gates, merged, plus one Opus deep-review pass after ~7 packets (found the New Game bug).
+- `run_tests.ps1` needs an exact `Shots =` count (now 172): every packet that adds shots must update it.

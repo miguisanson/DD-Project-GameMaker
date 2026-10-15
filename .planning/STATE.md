@@ -24,8 +24,8 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Session 4 overnight: next d9ab5c2 (fast PASS 3207/0). Opus deep review done: 1 real bug (title New Game one press deletes the saved run since fix-diff removed the difficulty step) + 3 minor (RUN 100% rounding, controller focus-pause loop, old v1 run file left) -> Sonnet packet fix-review1 (wt/rev1) in flight. F3a (wt/f3a) in flight. Then F1c, FULL gate + E2 build. After E2: update PLAYTEST-QUEUE Q-007 (New Game asks twice when a run exists). |
-| Unplayed features | no cap (D71); one big playtest at E2 |
+| WIP | PLAYTEST NOW: build fc886c7-20261015 (next fc886c7, FULL gate PASS 3337/0 + smoke + bot + 172 shots) copied to E:/Games/DD-Project Playtest/fc886c7-20261015 and launch-checked. PLAYTEST-QUEUE filled (57 entries). Improvement mode continues on next after this (F2a/F2b ms clocks, F1d-2, F4) — never changes the playtest build. |
+| Unplayed features | 57 playtest entries (PLAYTEST-QUEUE, build fc886c7-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
 
