@@ -410,45 +410,46 @@ function Input_UIBack() {
 }
 
 // ---- hold-to-skip (D48, I-055) ----------------------------------------------------------------------------------------------------
-// Holding confirm for SKIP_HOLD_FRAMES (1.0 s) skips a cutscene or a camera pan and it still counts as seen; a tap only advances text.
+// Holding confirm for SKIP_HOLD_MS (1.0 s) skips a cutscene or a camera pan and it still counts as seen; a tap only advances text.
 // The count starts only on a fresh press (a key already held when the scene starts never skips), and a small "hold to skip" fill
-// shows for SKIP_HINT_FRAMES after the first press. Skip_Step is the pure core (tested by Test_Suite_Skip); Skip_Update steps the live one.
+// shows for SKIP_HINT_MS after the first press. D108 F2b-2: the count is ms (Presentation_StepMs per step), so it needs 1 s at any frame rate. Skip_Step is the pure core (tested by Test_Suite_Skip); Skip_Update steps the live one.
 function Skip_StateNew() {
-    return { armed: false, held_frames: 0, hint: 0, fired: false };
+    return { armed: false, held_ms: 0, hint: 0, fired: false };
 }
 
-function Skip_Step(_st, _allowed, _pressed, _held) {
-    var _r = { armed: _st.armed, held_frames: _st.held_frames, hint: _st.hint, fired: false };
+function Skip_Step(_st, _allowed, _pressed, _held, _step_ms) {
+    var _r = { armed: _st.armed, held_ms: _st.held_ms, hint: _st.hint, fired: false };
     if (!_allowed) {
         _r.armed = false;
-        _r.held_frames = 0;
+        _r.held_ms = 0;
         _r.hint = 0;
         return _r;
     }
     if (_pressed) {
         _r.armed = true;
-        _r.held_frames = 0;
-        _r.hint = SKIP_HINT_FRAMES;
+        _r.held_ms = 0;
+        _r.hint = SKIP_HINT_MS;
     } else if (_r.hint > 0) {
-        _r.hint--;
+        _r.hint -= _step_ms;
+        if (_r.hint <= TRANSITION_DONE_SLACK_MS) _r.hint = 0;   // within 1 ms of spent counts as spent (150 steps of 16.667 ms make 2.5 s)
     }
     if (_r.armed && _held) {
-        _r.held_frames++;
-        if (_r.held_frames >= SKIP_HOLD_FRAMES) {
+        _r.held_ms += _step_ms;
+        if (_r.held_ms >= SKIP_HOLD_MS - TRANSITION_DONE_SLACK_MS) {   // 60 steps of 16.667 ms, 30 of 33.333 ms
             _r.fired = true;
             _r.armed = false;
-            _r.held_frames = 0;
+            _r.held_ms = 0;
             _r.hint = 0;
         }
     } else {
         _r.armed = false;
-        _r.held_frames = 0;
+        _r.held_ms = 0;
     }
     return _r;
 }
 
-function Skip_Fraction(_held_frames) {
-    return clamp(_held_frames / SKIP_HOLD_FRAMES, 0, 1);
+function Skip_Fraction(_held_ms) {
+    return clamp(_held_ms / SKIP_HOLD_MS, 0, 1);
 }
 
 // A skippable scene (a cutscene, a camera pan) calls Skip_Claim every frame it runs and asks Skip_Consume whether the hold completed;
@@ -467,10 +468,10 @@ function Skip_Claim() {
     global.skip.claim = Skip_Frame();
 }
 
-function Skip_Tick() {
+function Skip_Tick(_step_ms) {
     Skip_Ensure();
     var _g = global.skip;
-    _g.st = Skip_Step(_g.st, (Skip_Frame() - _g.claim) <= 1, Input_Pressed("confirm"), Input_Held("confirm"));
+    _g.st = Skip_Step(_g.st, (Skip_Frame() - _g.claim) <= 1, Input_Pressed("confirm"), Input_Held("confirm"), _step_ms);
     if (_g.st.fired) _g.latched = true;
 }
 
@@ -508,7 +509,7 @@ function Skip_DrawHint() {
     var _hh = _th + _bar_h + _pad * 3;
     var _x = Display_GuiW() - _w - max(4, _pad);
     var _y = max(4, _pad);
-    var _fade = clamp(_g.st.hint / 20, 0, 1);
+    var _fade = clamp(_g.st.hint / SKIP_HINT_FADE_MS, 0, 1);
     draw_set_alpha(0.65 * _fade);
     draw_set_color(c_black);
     draw_rectangle(_x, _y, _x + _w, _y + _hh, false);
@@ -519,7 +520,7 @@ function Skip_DrawHint() {
     draw_set_alpha(0.35 * _fade);
     draw_rectangle(_x + _pad, _by, _x + _pad + _tw, _by + _bar_h, false);
     draw_set_alpha(_fade);
-    draw_rectangle(_x + _pad, _by, _x + _pad + round(_tw * Skip_Fraction(_g.st.held_frames)), _by + _bar_h, false);
+    draw_rectangle(_x + _pad, _by, _x + _pad + round(_tw * Skip_Fraction(_g.st.held_ms)), _by + _bar_h, false);
     draw_set_color(_c);
     draw_set_alpha(_a);
     draw_set_halign(_h);

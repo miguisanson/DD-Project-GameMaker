@@ -806,7 +806,7 @@ function Scenario_StepSmokeSkip(_s) {
             if (_s.t > 1 && Transition_IsActive() && _gs.transition_fx.type == TRANSITION_TYPE_CUTSCENE && _gs.transition_fx.target_room == rm_floor1) {
                 var _d = _s.f - _s.skp_f0;
                 Scenario_Check("skip_hold_ends_intro_within_1_2_s", _d <= 72, "frames=" + string(_d));
-                Scenario_Check("skip_hold_not_before_1_s", _d >= SKIP_HOLD_FRAMES - 2, "frames=" + string(_d));
+                Scenario_Check("skip_hold_not_before_1_s", _d >= round(SKIP_HOLD_MS / TRANSITION_FRAME_MS) - 2, "frames=" + string(_d));   // D108 F2b-2: the hold is ms; 60 frames at 60 fps
                 Scenario_Release();
                 Scenario_Next(_s, 13);
             }
@@ -3314,8 +3314,8 @@ function Scenario_StepShotsWindow(_s) {
             if (_s.t > 600) { Scenario_Check("shots_skip_hint_cutscene_running", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
         case 55:
-            if (_s.f - _s.skp_f0 == SKIP_HOLD_FRAMES div 2) {
-                Scenario_Check("shots_skip_hint_is_filling", global.skip.st.hint > 0 && global.skip.st.held_frames >= 20 && global.skip.st.held_frames < SKIP_HOLD_FRAMES, "held=" + string(global.skip.st.held_frames));
+            if (_s.f - _s.skp_f0 == round(SKIP_HOLD_MS / TRANSITION_FRAME_MS) div 2) {
+                Scenario_Check("shots_skip_hint_is_filling", global.skip.st.hint > 0 && global.skip.st.held_ms >= 20 * TRANSITION_FRAME_MS && global.skip.st.held_ms < SKIP_HOLD_MS, "held_ms=" + string(global.skip.st.held_ms));
                 _s.shot = "shot_skip_hint_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
                 Scenario_ShotLayout(_s.shot);
                 Scenario_Release();
@@ -5085,7 +5085,7 @@ function Scenario_StepShotsStory(_s) {
                 _pl3.move_timer = 0;
                 _s.bn = 3;
             }
-            if (variable_struct_exists(_s, "bn") && _s.bn == 3 && Banner_Active() && global.banner.t >= 28) {
+            if (variable_struct_exists(_s, "bn") && _s.bn == 3 && Banner_Active() && global.banner.t >= 28 * TRANSITION_FRAME_MS) {
                 Scenario_Check("shots_story_banner_names_the_boss", global.banner.text == EnemyDB_Get(ENEMY_MINI_BOSS).name, "text=" + global.banner.text);
                 Scenario_ShotStory(_s, "banner");
                 _s.held = false;
@@ -5138,7 +5138,7 @@ function Scenario_TutorialForget() {
 }
 
 function Scenario_TutorialTap(_s) {
-    if (Tutorial_IsOpen() && (Input_Frame() - global.tutorial_ui.opened_frame) >= TUTORIAL_INPUT_DELAY_FRAMES + 2 && (_s.f - _s.last_tap) >= 8) {
+    if (Tutorial_IsOpen() && InputLock_Settled(global.tutorial_ui.lock, 2 * TRANSITION_FRAME_MS) && (_s.f - _s.last_tap) >= 8) {
         Scenario_Tap("confirm");
         return true;
     }
@@ -5162,7 +5162,7 @@ function Scenario_StepSmokeRest(_s) {
     var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
     if (!variable_struct_exists(_s, "rc")) _s.rc = { q: [], bed: noone, key: "", key1: "", key2: "", set_t: -1 };
     var _rc = _s.rc;
-    var _gate = !(BedUi_IsOpen() && (Input_Frame() - global.bed_ui.opened_frame) < CARDS_UI_INPUT_DELAY_FRAMES + 4);   // keys inside a screen's input delay are ignored by design
+    var _gate = !(BedUi_IsOpen() && !InputLock_Settled(global.bed_ui.lock, 4 * TRANSITION_FRAME_MS));   // keys inside a screen's input delay are ignored by design
     if (array_length(_rc.q) > 0 && (_s.f - _s.last_tap) >= 12 && _gate) {   // queued keys, one every 12 frames
         Scenario_Tap(_rc.q[0]);
         array_delete(_rc.q, 0, 1);
@@ -5447,7 +5447,7 @@ function Scenario_StepSmokeRest(_s) {
 // the same cards, then replace Ice Spear (its upgrade goes with it). Every key goes through Scenario_Tap, the game's own input path.
 // ============================================================================
 function Scenario_CardsTapQueue(_s, _cd) {
-    var _settled = !CardsUi_IsOpen() || (Input_Frame() - global.cards_ui.opened_frame) >= CARDS_UI_INPUT_DELAY_FRAMES + 4;   // a key inside the screen's input delay is ignored by design
+    var _settled = !CardsUi_IsOpen() || InputLock_Settled(global.cards_ui.lock, 4 * TRANSITION_FRAME_MS);   // a key inside the screen's input delay is ignored by design
     if (array_length(_cd.q) > 0 && (_s.f - _s.last_tap) >= 14 && _settled) {
         Scenario_Tap(_cd.q[0]);
         array_delete(_cd.q, 0, 1);
@@ -5928,8 +5928,8 @@ function Scenario_StepShotsCards(_s) {
 //  -shots steps 150-159: the shop, the throwable bar, the elite tag and outline, the merchant, the gold counter, the Tab menu with an accessory.
 // ============================================================================
 function Scenario_EcoTapQueue(_s, _ec) {
-    var _shop_ok = !ShopUi_IsOpen() || (Input_Frame() - global.shop_ui.opened_frame) >= SHOP_UI_INPUT_DELAY_FRAMES + 4;
-    var _cards_ok = !CardsUi_IsOpen() || (Input_Frame() - global.cards_ui.opened_frame) >= CARDS_UI_INPUT_DELAY_FRAMES + 4;
+    var _shop_ok = !ShopUi_IsOpen() || InputLock_Settled(global.shop_ui.lock, 4 * TRANSITION_FRAME_MS);
+    var _cards_ok = !CardsUi_IsOpen() || InputLock_Settled(global.cards_ui.lock, 4 * TRANSITION_FRAME_MS);
     if (array_length(_ec.q) > 0 && (_s.f - _s.last_tap) >= 14 && _shop_ok && _cards_ok) {
         Scenario_Tap(_ec.q[0]);
         array_delete(_ec.q, 0, 1);

@@ -489,7 +489,7 @@ function Dialogue_ResetTypewriter() {
     gs.ui.dialogue_visible_count = 0;
     gs.ui.dialogue_reveal_accum = 0;
     gs.ui.dialogue_state = UI_DIALOGUE_STATE_REVEALING;
-    gs.ui.dialogue_hold_frames = 0;
+    gs.ui.dialogue_hold_ms = 0;
 }
 
 function Dialogue_LineText(_line_entry) {
@@ -827,7 +827,6 @@ function Dialogue_TypewriterPrepareCurrentLine() {
     if (!is_array(gs.ui.lines) || array_length(gs.ui.lines) <= 0) return;
     if (gs.ui.index < 0 || gs.ui.index >= array_length(gs.ui.lines)) return;
 
-    var game_fps = max(1, game_get_speed(gamespeed_fps));
     var chars_per_sec = UI_DIALOGUE_CHARS_PER_SEC;
     if (Dialogue_IsCutsceneTextOnly()) {
         chars_per_sec = UI_CUTSCENE_DIALOGUE_CHARS_PER_SEC;
@@ -837,7 +836,7 @@ function Dialogue_TypewriterPrepareCurrentLine() {
         }
     }
     gs.ui.dialogue_chars_per_sec = max(1, chars_per_sec * Settings_TextSpeedMul(GameSettings_Ensure().text_speed));   // D0: the Text speed setting
-    gs.ui.dialogue_hold_duration = max(1, round((Dialogue_IsCutsceneTextOnly() ? UI_DIALOGUE_ADVANCE_HOLD_SEC : UI_DIALOGUE_BOX_HOLD_SEC) * game_fps));   // D101: a boxed line is ready almost at once
+    gs.ui.dialogue_hold_duration_ms = max(1, (Dialogue_IsCutsceneTextOnly() ? UI_DIALOGUE_ADVANCE_HOLD_SEC : UI_DIALOGUE_BOX_HOLD_SEC) * 1000);   // D101: a boxed line is ready almost at once (D108 F2b-2: ms, was frames)
 
     var line_text = Dialogue_LineText(gs.ui.lines[gs.ui.index]);
     var line_changed = (!variable_struct_exists(gs.ui, "dialogue_tw_line_index") || gs.ui.dialogue_tw_line_index != gs.ui.index
@@ -847,7 +846,7 @@ function Dialogue_TypewriterPrepareCurrentLine() {
         gs.ui.dialogue_visible_count = 0;
         gs.ui.dialogue_reveal_accum = 0;
         gs.ui.dialogue_state = UI_DIALOGUE_STATE_REVEALING;
-        gs.ui.dialogue_hold_frames = gs.ui.dialogue_hold_duration;
+        gs.ui.dialogue_hold_ms = gs.ui.dialogue_hold_duration_ms;
         gs.ui.dialogue_tw_line_index = gs.ui.index;
     }
 
@@ -860,30 +859,48 @@ function Dialogue_TypewriterStep() {
     if (gs.ui.mode != UI_DIALOGUE) return;
 
     Dialogue_TypewriterPrepareCurrentLine();
+    Typewriter_Step(gs.ui, string_length(gs.ui.dialogue_full_text), Presentation_StepMs(delta_time));
+}
 
-    var full_text = gs.ui.dialogue_full_text;
-    var full_len = string_length(full_text);
-    var game_fps = max(1, game_get_speed(gamespeed_fps));
-
-    if (gs.ui.dialogue_state == UI_DIALOGUE_STATE_REVEALING) {
-        gs.ui.dialogue_reveal_accum += (gs.ui.dialogue_chars_per_sec / game_fps);
-        while (gs.ui.dialogue_reveal_accum >= 1 && gs.ui.dialogue_visible_count < full_len) {
-            gs.ui.dialogue_visible_count += 1;
-            gs.ui.dialogue_reveal_accum -= 1;
+// D108 F2b-2: one typewriter step of _step_ms (Presentation_StepMs). The reveal is chars-per-second times the time of the step, so the speed is exact at any
+// frame rate (it was a per-frame rate from game_get_speed); the hold after the last character counts down in ms. _ui is the dialogue UI state (a plain
+// struct with the same dialogue_* fields in the tests). A character that is this close to due is shown: 60 chars/s at 33.333 ms is 1.99998 characters.
+#macro TYPEWRITER_CHAR_EPS 0.001
+function Typewriter_Step(_ui, _full_len, _step_ms) {
+    if (_ui.dialogue_state == UI_DIALOGUE_STATE_REVEALING) {
+        _ui.dialogue_reveal_accum += _ui.dialogue_chars_per_sec * _step_ms / 1000;
+        while (_ui.dialogue_reveal_accum >= 1 - TYPEWRITER_CHAR_EPS && _ui.dialogue_visible_count < _full_len) {
+            _ui.dialogue_visible_count += 1;
+            _ui.dialogue_reveal_accum -= 1;
         }
-        if (gs.ui.dialogue_visible_count >= full_len) {
-            gs.ui.dialogue_visible_count = full_len;
-            gs.ui.dialogue_reveal_accum = 0;
-            gs.ui.dialogue_state = UI_DIALOGUE_STATE_HOLDING;
-            gs.ui.dialogue_hold_frames = gs.ui.dialogue_hold_duration;
+        if (_ui.dialogue_visible_count >= _full_len) {
+            _ui.dialogue_visible_count = _full_len;
+            _ui.dialogue_reveal_accum = 0;
+            _ui.dialogue_state = UI_DIALOGUE_STATE_HOLDING;
+            _ui.dialogue_hold_ms = _ui.dialogue_hold_duration_ms;
         }
-    } else if (gs.ui.dialogue_state == UI_DIALOGUE_STATE_HOLDING) {
-        gs.ui.dialogue_hold_frames -= 1;
-        if (gs.ui.dialogue_hold_frames <= 0) {
-            gs.ui.dialogue_hold_frames = 0;
-            gs.ui.dialogue_state = UI_DIALOGUE_STATE_READY;
+    } else if (_ui.dialogue_state == UI_DIALOGUE_STATE_HOLDING) {
+        _ui.dialogue_hold_ms -= _step_ms;
+        if (_ui.dialogue_hold_ms <= TRANSITION_DONE_SLACK_MS) {   // within 1 ms of spent counts as spent, like the transition phases (45 steps of 16.667 ms make 750 ms)
+            _ui.dialogue_hold_ms = 0;
+            _ui.dialogue_state = UI_DIALOGUE_STATE_READY;
         }
     }
+}
+
+// The one-step lock after a dialogue closes (gs.ui.dialogue_lock, read by the world): loses _step_ms per UI step, so it lasts one step at 60 fps and
+// never zero (it is set after the step that closed the box, and the next step is the first to take time off). Returns the lock left, 0 when spent.
+function Dialogue_LockStep(_lock_ms, _step_ms) {
+    if (_lock_ms <= 0) return 0;
+    _lock_ms -= _step_ms;
+    return (_lock_ms <= TRANSITION_DONE_SLACK_MS) ? 0 : _lock_ms;
+}
+
+// The blinking "continue" arrow: icon_frame runs 0 to 2 at UI_DIALOGUE_ARROW_FPS per second (the draw shows floor(icon_frame) mod 2).
+function Dialogue_IconStep(_icon, _step_ms) {
+    _icon += max(0, UI_DIALOGUE_ARROW_FPS) * _step_ms / 1000;
+    if (_icon >= 2) _icon -= 2;
+    return _icon;
 }
 
 function Dialogue_TypewriterRevealInstant() {
@@ -894,7 +911,7 @@ function Dialogue_TypewriterRevealInstant() {
     gs.ui.dialogue_visible_count = full_len;
     gs.ui.dialogue_reveal_accum = 0;
     gs.ui.dialogue_state = UI_DIALOGUE_STATE_HOLDING;
-    gs.ui.dialogue_hold_frames = gs.ui.dialogue_hold_duration;
+    gs.ui.dialogue_hold_ms = gs.ui.dialogue_hold_duration_ms;
 }
 
 // D108 F4b: the one place a dialogue box is opened. The three Dialogue_Start* openers below only choose the speaker and the raw lines.
@@ -914,8 +931,7 @@ function Dialogue_Open(_speaker, _lines_raw) {
     gs.ui.dialogue_open_ms = current_time;   // D97: the box slides in
     gs.ui.choice = undefined;
     gs.ui.opened_frame = Input_Frame();
-    var open_block_frames = Dialogue_IsCutsceneTextOnly() ? max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES) : 0;
-    gs.ui.dialogue_open_block_frame = gs.ui.opened_frame + open_block_frames;
+    gs.ui.dialogue_open_lock = InputLock_New(Dialogue_IsCutsceneTextOnly() ? UI_CUTSCENE_ADVANCE_BLOCK_MS : 0, 1, gs.ui.opened_frame);   // the open frame always; a text-only cutscene line a little longer
     gs.ui.confirm_action = "confirm";
     Dialogue_RebuildPagedLines();
     Dialogue_ResetTypewriter();
@@ -1007,8 +1023,7 @@ function Dialogue_Advance() {
     var gs = GameState_Get();
     if (gs.ui.mode != UI_DIALOGUE) return;
 
-    var frame = Input_Frame();
-    if (variable_struct_exists(gs.ui, "dialogue_open_block_frame") && frame <= gs.ui.dialogue_open_block_frame) return;
+    if (variable_struct_exists(gs.ui, "dialogue_open_lock") && InputLock_Active(gs.ui.dialogue_open_lock)) return;
 
     Dialogue_TypewriterPrepareCurrentLine();
     if (gs.ui.dialogue_state == UI_DIALOGUE_STATE_REVEALING) {
@@ -1024,7 +1039,7 @@ function Dialogue_Advance() {
     gs.ui.index += 1;
     Dialogue_ResetTypewriter();
     if (Dialogue_IsCutsceneTextOnly()) {
-        gs.ui.dialogue_open_block_frame = Input_Frame() + max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES);
+        gs.ui.dialogue_open_lock = InputLock_New(UI_CUTSCENE_ADVANCE_BLOCK_MS, 1);
     }
 
     if (gs.ui.index < array_length(gs.ui.lines)) {
@@ -1054,8 +1069,8 @@ function Dialogue_CloseNow() {
     gs.ui.index = 0;
     gs.ui.speaker = "";
     gs.ui.confirm_action = "";
-    gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
-    gs.ui.dialogue_lock = UI_DIALOGUE_REOPEN_LOCK;
+    gs.ui.dialogue_open_lock = undefined;
+    gs.ui.dialogue_lock = UI_DIALOGUE_REOPEN_LOCK_MS;
     gs.ui.dialogue_require_release = true;
     gs.ui.choice = undefined;
     Dialogue_SetActiveAmbienceSfxKey("");
@@ -1390,27 +1405,27 @@ function Death_BuildContext(_result, _cause_name) {
 
 // ---- the boss name banner (D106) ----
 // A boss whose camera pan was already seen on an earlier run gets a ~1 s name banner instead of the pan.
-function Banner_Frames(_fps) {
-    return round(_fps * 1.0);
+function Banner_DurMs() {   // D108 F2b-2: ms (was Banner_Frames(fps) = fps * 1.0 frames)
+    return BANNER_DURATION_MS;
 }
 
-// 0 -> 1 -> 0 over _dur frames: a fifth of the time to fade in, a fifth to fade out, full in between.
+// 0 -> 1 -> 0 over _dur ms: a fifth of the time to fade in, a fifth to fade out, full in between.
 function Banner_Alpha(_t, _dur) {
     if (_dur <= 0) return 0;
-    var fade = max(1, round(_dur * 0.2));
+    var fade = max(1, _dur * 0.2);
     return clamp(min(_t / fade, (_dur - _t) / fade), 0, 1);
 }
 
 function Banner_Show(_text) {
-    global.banner = { text: string(_text), t: 0, dur: Banner_Frames(max(1, game_get_speed(gamespeed_fps))) };
+    global.banner = { text: string(_text), t: 0, dur: Banner_DurMs() };   // t and dur are ms
 }
 
 function Banner_Active() {
-    return variable_global_exists("banner") && is_struct(global.banner) && global.banner.t < global.banner.dur;
+    return variable_global_exists("banner") && is_struct(global.banner) && global.banner.t < global.banner.dur - TRANSITION_DONE_SLACK_MS;
 }
 
-function Banner_Step() {
-    if (Banner_Active()) global.banner.t += 1;
+function Banner_Step(_step_ms) {
+    if (Banner_Active()) global.banner.t += _step_ms;
 }
 
 // Drawn last-but-one by obj_ui_controller (Draw GUI): a framed name in the upper third, on the shared UI kit.
@@ -1831,7 +1846,8 @@ function Credits_Draw(_ms) {
 // Hooks in: timeline and elite (battle menu), bar, arrows, defence (the QTE begin functions), throwables (Battle_ThrowBegin), shop (ShopUi_Open), stagger (Battle_StaggerHit), status
 // (Status_Add in battle), cards (CardsUi_Open), bed (BedUi_Open).
 // ==========================================================================================================================
-#macro TUTORIAL_INPUT_DELAY_FRAMES 12   // keys are ignored this long after a pop-up opens (the press that caused it must not close it)
+#macro TUTORIAL_INPUT_DELAY_MS 200   // keys are ignored this long after a pop-up opens (the press that caused it must not close it); D108 F2b-2: ms, was 12 frames
+#macro TUTORIAL_CLOSED_GUARD_MS (2000 / 60)   // the closing press is guarded this long (the frame it closed in and the next one: 2 frames); D108 F2b-2: ms, was frame <= closed + 1
 
 function Tutorial_Ids() {
     return ["timeline", "bar", "arrows", "defence", "stagger", "cards", "shop", "throwables", "bed", "elite", "status"];
@@ -1912,27 +1928,28 @@ function Tutorial_Trigger(_id) {
         array_push(global.tutorial_ui.queue, _id);
         return true;
     }
-    global.tutorial_ui = { id: _id, queue: [], opened_frame: Input_Frame(), opened_ms: current_time };
+    global.tutorial_ui = { id: _id, queue: [], lock: InputLock_New(TUTORIAL_INPUT_DELAY_MS), opened_ms: current_time };
     SFX_PlayUI("ui_openclose");
     return true;
 }
 
 // True during the frame a pop-up was dismissed in and the next one: the press that closed it must not also answer whatever is behind it (the
 // battle menu, an interact in the world). A controller that steps before the ui controller sees the press one frame late (the scripted runs
-// show it: a simulated key stays visible to it for the next frame too), so the guard covers two frames (about 33 ms).
+// show it: a simulated key stays visible to it for the next frame too), so the guard covers two frames (about 33 ms). D108 F2b-2: an input lock of
+// TUTORIAL_CLOSED_GUARD_MS that always refuses the frame it closed in and the next one, whatever the frame rate.
 function Tutorial_JustClosed() {
-    return variable_global_exists("tutorial_closed_frame") && (Input_Frame() - global.tutorial_closed_frame) <= 1;
+    return variable_global_exists("tutorial_closed") && InputLock_Active(global.tutorial_closed);
 }
 
 // Closes the pop-up that is up; the next queued one takes its place.
 function Tutorial_Dismiss() {
     if (!Tutorial_IsOpen()) return;
-    global.tutorial_closed_frame = Input_Frame();
+    global.tutorial_closed = InputLock_New(TUTORIAL_CLOSED_GUARD_MS);
     var t = global.tutorial_ui;
     if (array_length(t.queue) > 0) {
         t.id = t.queue[0];
         array_delete(t.queue, 0, 1);
-        t.opened_frame = Input_Frame();
+        t.lock = InputLock_New(TUTORIAL_INPUT_DELAY_MS);
         t.opened_ms = current_time;
         return;
     }

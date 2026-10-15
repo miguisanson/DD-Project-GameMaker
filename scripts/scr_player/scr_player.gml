@@ -1180,10 +1180,10 @@ function GameState_Init() {
             dialogue_reveal_accum: 0,
             dialogue_chars_per_sec: UI_DIALOGUE_CHARS_PER_SEC,
             dialogue_state: UI_DIALOGUE_STATE_REVEALING,
-            dialogue_hold_frames: 0,
-            dialogue_hold_duration: 0,
+            dialogue_hold_ms: 0,
+            dialogue_hold_duration_ms: 0,
             dialogue_tw_line_index: -1,
-            dialogue_open_block_frame: UI_OPENED_FRAME_NONE,
+            dialogue_open_lock: undefined,
             cinematic_input_lock_count: 0
         };
     }
@@ -1195,10 +1195,10 @@ function GameState_Init() {
     if (!variable_struct_exists(gs.ui, "dialogue_reveal_accum")) gs.ui.dialogue_reveal_accum = 0;
     if (!variable_struct_exists(gs.ui, "dialogue_chars_per_sec")) gs.ui.dialogue_chars_per_sec = UI_DIALOGUE_CHARS_PER_SEC;
     if (!variable_struct_exists(gs.ui, "dialogue_state")) gs.ui.dialogue_state = UI_DIALOGUE_STATE_REVEALING;
-    if (!variable_struct_exists(gs.ui, "dialogue_hold_frames")) gs.ui.dialogue_hold_frames = 0;
-    if (!variable_struct_exists(gs.ui, "dialogue_hold_duration")) gs.ui.dialogue_hold_duration = 0;
+    if (!variable_struct_exists(gs.ui, "dialogue_hold_ms")) gs.ui.dialogue_hold_ms = 0;
+    if (!variable_struct_exists(gs.ui, "dialogue_hold_duration_ms")) gs.ui.dialogue_hold_duration_ms = 0;
     if (!variable_struct_exists(gs.ui, "dialogue_tw_line_index")) gs.ui.dialogue_tw_line_index = -1;
-    if (!variable_struct_exists(gs.ui, "dialogue_open_block_frame")) gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
+    if (!variable_struct_exists(gs.ui, "dialogue_open_lock")) gs.ui.dialogue_open_lock = undefined;
     if (!variable_struct_exists(gs.ui, "cinematic_input_lock_count")) gs.ui.cinematic_input_lock_count = 0;
     gs.ui.cinematic_input_lock_count = max(0, round(real(gs.ui.cinematic_input_lock_count)));
     if (!variable_struct_exists(gs.ui, "lines_raw") || !is_array(gs.ui.lines_raw)) gs.ui.lines_raw = [];
