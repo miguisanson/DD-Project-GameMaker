@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PLAYTEST NOW: build 8762d9b-20261015 (next 8762d9b, FULL gate PASS 3529/0 + smoke + bot + 172 shots), in E:/Games/DD-Project Playtest/8762d9b-20261015, launch-checked. Supersedes fc886c7 (R-022 flee bug). Queue: 59 entries. Improvement mode continues on next (F2b feel clocks, F4c audio globals, I4 gate nits; F4d needs owner). |
+| WIP | PLAYTEST NOW: build 8762d9b-20261015 (FULL gate PASS 3529/0), E:/Games/DD-Project Playtest/8762d9b-20261015. Improvement mode on next (df66aea, after the build): I4 merged. In flight (Sonnet): F2b-1 battle clocks -> ms (wt/f2b1), F4c write-only globals (wt/f4c). Skipped on purpose: audio manager restructure (no by-ear check overnight). F4d needs owner. |
 | Unplayed features | 59 playtest entries (PLAYTEST-QUEUE, build 8762d9b-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
