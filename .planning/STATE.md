@@ -24,8 +24,8 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PLAYTEST NOW: build 8762d9b-20261015 (FULL gate PASS 3529/0). Improvement mode on next f4f966d (FULL gate PASS 3562/0; shots vs 8762d9b: layouts identical, only build stamp + animation-phase noise): I4, F4c, F2b-1 merged. In flight: F2b-2 dialogue/UI clocks (Sonnet, wt/f2b2). Then: Opus review 3, rebuild the playtest build from final next and repoint BOARD/QUEUE. |
-| Unplayed features | 59 playtest entries (PLAYTEST-QUEUE, build 8762d9b-20261015) |
+| WIP | PLAYTEST NOW: build 9015871-20261015 (= next 9015871; FULL gate PASS 3645/0 + smoke + bot + 172 shots; Opus reviews 1-3 done, last two found no real bugs), E:/Games/DD-Project Playtest/9015871-20261015, launch-checked. Supersedes fc886c7 and 8762d9b. Queue 60 entries. Next: owner playtest, then merge good ones next -> v1.9. |
+| Unplayed features | 60 playtest entries (PLAYTEST-QUEUE, build 9015871-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
 

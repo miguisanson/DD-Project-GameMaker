@@ -4,9 +4,9 @@ Start with `/continue_DD-Project-GameMaker`, then read this file and `BOARD.md`.
 Spec = `research/DECISIONS.md` (D1-D125). Code lands on branch `next` (worktree `E:\Github_Projects\DD-Project-GameMaker-wt\next`); docs on `v1.9`.
 
 ## Where things stand
-- **PLAYTEST NOW.** Build `8762d9b-20261015` (= `next` @ 8762d9b; supersedes fc886c7, which had the R-022 flee bug) passed the FULL gate and is in
-  `E:\Games\DD-Project Playtest\8762d9b-20261015\`. Owner's old saves: `E:\Games\DD-Project Playtest\old-saves-2026-10-15`.
-- Owner checklist: `.planning/PLAYTEST-QUEUE.md` (59 entries). After the owner plays: merge the good ones from `next` to `v1.9`,
+- **PLAYTEST NOW.** Build `9015871-20261015` (= `next` @ 9015871; supersedes fc886c7 and 8762d9b) passed the FULL gate and is in
+  `E:\Games\DD-Project Playtest\9015871-20261015\`. Owner's old saves: `E:\Games\DD-Project Playtest\old-saves-2026-10-15`.
+- Owner checklist: `.planning/PLAYTEST-QUEUE.md` (60 entries). After the owner plays: merge the good ones from `next` to `v1.9`,
   revert/fix the bad ones.
 - Merged overnight (all on next): R1 + R1-sim (D117-D121, D123, D125), R1b (D122, D124), fix-diff (D35 difficulty list gone),
   fix-review1 (Opus review: New Game guard, honest RUN %, edge-triggered focus pause, old run files), F1a, F1b, F1c, F1d-1, F1d-3,
@@ -15,8 +15,7 @@ Spec = `research/DECISIONS.md` (D1-D125). Code lands on branch `next` (worktree 
 
 ## Left to do
 1. Owner playtest (above).
-2. Improvement mode on `next` (does not touch the playtest build): F2b battle/dialogue clocks (feel: owner checks), F4c audio
-   global sprawl, I4 gate-script nits;
+2. Improvement mode on `next`: all F1 packets done except the audio-manager restructure (skipped: needs by-ear checks);
    F4d wording/sound consistency needs owner decisions (list in BUILD-PLAN).
 3. Owner IDE import (~15 min): `art/IMPORT-CHECKLIST.md` + `art/sfx_new/IMPORT.md`.
 4. Sound/music creator names for the credits (very last).

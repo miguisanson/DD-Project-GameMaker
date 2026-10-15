@@ -43,8 +43,8 @@ Step-number ranges (C4: smoke 161-170, shots 160-169, bot v=9) (avoid scenario c
 | F1c | Menu draw re-measures rows / rebuilds tab icons every frame -> cache | scr_menu | low-med | todo |
 | F3b | Unreachable-code sweep: 62 dead functions, ~20 unused macros, P audio-debug key in obj_sfx_manager | many (split audio/input vs rest) | low | MERGED to next (F3b-1, F3b-2; -445 lines) |
 | F1d | Battle HUD per-frame duplicates, credits layout x2/frame, icon lookups, sight-ring math | scr_combat, scr_dialogue, scr_fx, scr_enemy | low-med | todo |
-| F2a | Presentation clocks frames -> ms (transitions, boot logo, cutscene holds, credits) | scr_room_transition, obj_start_controller | med | after E2 |
-| F2b | Battle message/shake + dialogue/typewriter/input-lock clocks -> ms | scr_combat, scr_fx, scr_dialogue, scr_menu, scr_input | med-high (feel) | after E2 |
+| F2a | Presentation clocks frames -> ms (transitions, boot logo, cutscene holds, credits) | scr_room_transition, obj_start_controller | med | MERGED to next |
+| F2b | Battle message/shake + dialogue/typewriter/input-lock clocks -> ms | scr_combat, scr_fx, scr_dialogue, scr_menu, scr_input | med-high (feel) | MERGED to next |
 | F4 | Palette literals -> UI_C_*, shared helpers, global sprawl, wording/sound consistency (F4d needs owner) | many | varies | after E2 |
 
 Leave frame-counted: player grid step, enemy AI pacing, fx ages, cine pan (gameplay feel).
