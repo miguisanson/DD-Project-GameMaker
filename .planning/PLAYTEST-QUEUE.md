@@ -766,7 +766,9 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
 
 Design questions the agents could not answer from `DECISIONS.md` or the research. They stay parked until you answer. Do not answer in your head; say them in chat so they get written down.
 
-(none yet)
+1. **Echo gift and classes (D87).** Every run starts as the Nobody and you pick a class later, but the echo (1 item or skill from your lost run) is chosen before that. A skill your new class cannot use is silently lost. Options: (a) only offer items + skills of the class you had, and warn if you pick a different class; (b) let you choose the echo after the class pick; (c) echo offers items only. Recommendation: (b). (I-069)
+2. **Milestone unlocks (D88) are not built.** D88 says extra cards / passives / throwables join the pool at milestones (e.g. reaching floor 5, beating bosses). Today everything is in the pool from the first run; only the Nobody class and the death-count notes are locked. Build it (and which milestones unlock what), or keep everything open? Recommendation: keep everything open (simpler, and runs are short), and change D88 accordingly. (I-070)
+3. **Closing the window (Alt-F4 / X) does not save (D46).** Quit to title saves; autosave runs every ~10 s and on room changes, so at most ~10 s is lost. A real save-on-close needs a "Game End" event added to obj_game_controller in GameMaker (an IDE task, ~1 minute). Want it? (I-071)
 
 ## IDE tasks for the owner
 
