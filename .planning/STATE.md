@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PLAYTEST NOW: build fc886c7-20261015 (unchanged; owner plays it). Improvement mode on next (after the build): F4a + F2a merged (next 774d2f3, fast PASS 3388/0). In flight (Sonnet): i13-tools (lint {n} + negative controls, wt/i13), i2-reggaps (regression gap scenarios, wt/i2). Remaining: F2b (battle/dialogue clocks, feel), F1d-2, F4b/F4c; F4d needs owner. |
+| WIP | Playtest build fc886c7-20261015 is ready, but I2 found a real bug in it (R-022: a failed/blocked flee skips the status tick). Fix in flight (Sonnet, wt/runtick, fix-runtick); F4b dedupe in flight (wt/f4b). Plan: merge both, FULL gate, make a NEW playtest build from next and repoint BOARD/PLAYTEST-QUEUE to it. next 78b51ab = + F2a, F4a, F1d-2, I1, I2, I3. |
 | Unplayed features | 57 playtest entries (PLAYTEST-QUEUE, build fc886c7-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
