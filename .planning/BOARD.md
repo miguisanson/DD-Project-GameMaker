@@ -3,7 +3,7 @@ Updated after every step that lands. The full build list is `.planning/BUILD-PLA
 Build: **PLAYTEST NOW** — build fc886c7-20261015 | Mode: BIG BUILD, then one big playtest (D71) | Release then stop (D28)
 
 ## Now — PLAYTEST NOW
-- Play: `E:\Games\DD-Project Playtestc886c7-20261015\DD-Project.exe` (fresh start: your old saves are in `old-saves-2026-10-15`).
+- Play: `E:\Games\DD-Project Playtest\fc886c7-20261015\DD-Project.exe` (fresh start: your old saves are in `old-saves-2026-10-15`).
 - Checklist: `.planning/PLAYTEST-QUEUE.md` — 57 entries in play order (~60-90 min). Mark good / bad / change, then say "merge the good ones".
 - Everything decided is built; full gate PASS on this build (3337 unit checks, smoke, bot fight, 172 screenshots).
 - While you play, the agents keep going on safe clean-up (improvement mode) on branch `next`; nothing changes this build.
