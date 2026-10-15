@@ -2787,6 +2787,122 @@ function Test_Suite_Nav() {
     _b = Nav_StepToward(_g, _r, 2, 1, 1, 0, 2);
     Test_True("NAV-01 enemy 2 steps once the cell is free", _b.ok && _b.cx == 0 && _b.cy == 1);
     Test_Eq("NAV-01 release frees all cells of an owner", Nav_ResOwnerAt(_r, 0, 0), -1);
+
+    Test_SightRingCache();
+    Test_InteractTargetTie();
+}
+
+// D108 F1d-3: the sight ring of an enemy (Nav_DrawWorldFx) used to recompute ~2 sin/cos per dot per enemy per frame. Its dot offsets now come from a cache
+// keyed on the radius (Nav_SightRing). EXPECTED values below are the OLD formula, copied from Nav_DrawWorldFx as it was before this change:
+//   n = max(12, round(2*pi*r/6)); a = (k/n)*2*pi; dot = floor(cx + cos(a)*r), floor(cy + sin(a)*r); colour 1 (even k) / colour 2 (odd k).
+function Test_SightRingCache() {
+    var _t0 = get_timer();
+    var _sink = 0;
+    for (var _e = 0; _e < 300; _e++) {   // [PERF] the OLD per-frame work for 300 enemy rings of sight 5, no assertion (the time depends on the PC)
+        var _rr = 5 * GRID_TILE_SIZE;
+        var _nn = max(12, round(2 * pi * _rr / 6));
+        for (var _kk = 0; _kk < _nn; _kk++) {
+            var _aa = (_kk / _nn) * 2 * pi;
+            _sink += floor(100 + cos(_aa) * _rr) + floor(100 + sin(_aa) * _rr);
+        }
+    }
+    Test_Log("[PERF] 300 x sight ring points (sight 5): old formula " + string(get_timer() - _t0) + " us (" + string(_sink > 0) + ")");
+    if (asset_get_index("Nav_SightRing") == -1) {
+        Test_True("F1d3 Nav_SightRing exists (cached ring offsets)", false);
+        return;
+    }
+    global.nav_ring_cache = {};
+    global.nav_ring_builds = 0;
+    var _tiles = [3, 4, 5];
+    var _same = true;
+    var _px_same = true;
+    var _cxs = [208, 208.5, 123.37];   // whole and fractional enemy positions: the draw does floor(cx + offset), the same float sum as before
+    for (var _i = 0; _i < 3; _i++) {
+        var _r = _tiles[_i] * GRID_TILE_SIZE;
+        var _ring = undefined;
+        for (var _c = 0; _c < 100; _c++) _ring = Nav_SightRing(_r);   // 300 calls over the three radii
+        var _n = max(12, round(2 * pi * _r / 6));
+        if (_ring.n != _n || array_length(_ring.ox) != _n || array_length(_ring.oy) != _n) _same = false;
+        for (var _k = 0; _k < _n && _same; _k++) {
+            var _a = (_k / _n) * 2 * pi;
+            for (var _q = 0; _q < 3; _q++) {
+                var _cx = _cxs[_q];
+                if (floor(_cx + _ring.ox[_k]) != floor(_cx + cos(_a) * _r)) _px_same = false;
+                if (floor(_cx + _ring.oy[_k]) != floor(_cx + sin(_a) * _r)) _px_same = false;
+            }
+        }
+        Test_Eq("F1d3 ring r=" + string(_tiles[_i]) + " tiles has the old dot count", _ring.n, _n);
+    }
+    Test_True("F1d3 ring offsets equal the old formula for radii 3, 4, 5", _same);
+    Test_True("F1d3 ring dots land on the same pixels as the old formula (whole and fractional centres)", _px_same);
+    Test_Eq("F1d3 the ring offset builder runs once per radius over 300 calls", global.nav_ring_builds, 3);
+
+    var _t1 = get_timer();
+    for (var _e2 = 0; _e2 < 300; _e2++) {
+        var _rg = Nav_SightRing(5 * GRID_TILE_SIZE);
+        for (var _k2 = 0; _k2 < _rg.n; _k2++) _sink += floor(100 + _rg.ox[_k2]) + floor(100 + _rg.oy[_k2]);
+    }
+    Test_Log("[PERF] 300 x sight ring points (sight 5): cached offsets " + string(get_timer() - _t1) + " us (" + string(_sink > 0) + ")");
+
+}
+
+// D108 F1d-3: Interact_GetTarget now asks for the faced tile once instead of looping every interactable. When several interactables overlap the
+// tile, the OLD loop picked the first one in instance order (strict "<" on equal distances); the new code must hand back that same instance.
+function Test_InteractTargetTie() {
+    var _spr = asset_get_index("barrel_asset");
+    if (_spr == -1) return;
+    var _gs = GameState_Get();
+    var _pl = instance_create_depth(304, 320, 0, obj_interactable);   // stands in for the player: Interact_* only read x, y, face
+    _pl.face = RIGHT;                                                  // faces the tile at 320,320 (centre 328,328)
+    var _a = instance_create_depth(320, 320, 0, obj_interactable);
+    var _b = instance_create_depth(320, 320, 0, obj_interactable);
+    var _c = instance_create_depth(320, 320, 0, obj_interactable);
+    var _far = instance_create_depth(480, 480, 0, obj_interactable);
+    var _all = [_a, _b, _c, _far];
+    for (var _i = 0; _i < 4; _i++) {
+        _all[_i].sprite_index = _spr;
+        _all[_i].mask_index = _spr;
+    }
+    // reference = the old loop, verbatim
+    var _old = noone;
+    var _best = 1000000000;
+    with (obj_interactable) {
+        var _d = Interact_FacingDistance(_pl, self);
+        if (_d < _best) {
+            _best = _d;
+            _old = self;
+        }
+    }
+    _gs.interact_cache_frame = -1;
+    var _new = Interact_GetTarget(_pl);
+    Test_True("F1d3 interact: three interactables cover the faced tile", Interact_PlayerFacing(_pl, _a) && Interact_PlayerFacing(_pl, _b) && Interact_PlayerFacing(_pl, _c));
+    Test_True("F1d3 interact: the old loop found one of them", _old != noone && instance_exists(_old));
+    Test_True("F1d3 interact: Interact_GetTarget picks the same instance as the old loop with three overlapping", instance_exists(_new) && instance_exists(_old) && _new.id == _old.id);
+
+    // one interactable only on the tile
+    instance_destroy(_b);
+    instance_destroy(_c);
+    with (obj_interactable) {
+        var _d1 = Interact_FacingDistance(_pl, self);
+        if (_d1 < 1000000000) _old = self;
+    }
+    _gs.interact_cache_frame = -1;
+    _new = Interact_GetTarget(_pl);
+    Test_True("F1d3 interact: a single interactable on the tile is found", instance_exists(_new) && _new.id == _a.id);
+
+    // facing the empty side, or away, finds nothing
+    _pl.face = UP;
+    _gs.interact_cache_frame = -1;
+    Test_Eq("F1d3 interact: facing an empty tile gives noone", Interact_GetTarget(_pl), noone);
+    _pl.face = RIGHT;
+    instance_destroy(_a);
+    _gs.interact_cache_frame = -1;
+    Test_Eq("F1d3 interact: nothing on the faced tile gives noone", Interact_GetTarget(_pl), noone);
+
+    instance_destroy(_far);
+    instance_destroy(_pl);
+    _gs.interact_cache_frame = -1;
+    _gs.interact_cache_target = noone;
 }
 
 // SNAP-01 (I-048, D69): everything that walks lives on the 16 px grid; the snap is "nearest multiple of 16".
@@ -2958,6 +3074,11 @@ function Test_Suite_SfxInit() {
     SFX_EnsureAudioGlobals();
     Test_Eq("ROB-03 later calls do not overwrite live audio state", global.audio_debug_missing_count, 5);
     global.audio_debug_missing_count = 0;
+
+    // D108 F1d-3: obj_sfx_manager Step asks variable_struct_names_count (no array) whether any BGM handle is live; it must agree with the old name list
+    var _hs = { a: 1, b: 2 };
+    Test_Eq("F1d3 struct names count equals the old get_names length (2)", variable_struct_names_count(_hs), array_length(variable_struct_get_names(_hs)));
+    Test_Eq("F1d3 struct names count of an empty struct is 0", variable_struct_names_count({}), 0);
 }
 
 // ---- D116 monster sound variation: every enemy_* play gets a small random pitch and volume, and a key with 2+ takes never repeats the last take
