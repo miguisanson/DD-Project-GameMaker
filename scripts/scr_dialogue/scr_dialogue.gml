@@ -950,11 +950,8 @@ function Dialogue_Start(_dialogue_id) {
 // segment. Returns the hold time in ms for a segment with no lines (0 when it has lines). obj_start_controller sets the hold timer from it.
 function Cutscene_SegmentApply(_seg) {
     var gs = GameState_Get();
-    var seg_text_only = true;
-    if (variable_struct_exists(_seg, "text_only")) seg_text_only = _seg.text_only;
-    gs.ui.cutscene_text_only = seg_text_only;
-    if (variable_struct_exists(_seg, "chars_per_sec")) gs.ui.cutscene_chars_per_sec = real(_seg.chars_per_sec);
-    else gs.ui.cutscene_chars_per_sec = -1;
+    gs.ui.cutscene_text_only = false;   // D156: cutscene text is the normal dialogue box (frame, font, padding, typewriter, arrow); a segment's old text_only / chars_per_sec are ignored
+    gs.ui.cutscene_chars_per_sec = -1;
     var seg_sprite = noone;
     if (variable_struct_exists(_seg, "sprite")) seg_sprite = _seg.sprite;
     if ((is_undefined(seg_sprite) || seg_sprite == noone || seg_sprite == -1) && variable_struct_exists(_seg, "sprite_name")) {

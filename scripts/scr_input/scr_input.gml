@@ -409,10 +409,11 @@ function Input_UIBack() {
     return Input_UIPressed("cancel");
 }
 
-// ---- hold-to-skip (D48, I-055) ----------------------------------------------------------------------------------------------------
-// Holding confirm for SKIP_HOLD_MS (1.0 s) skips a cutscene or a camera pan and it still counts as seen; a tap only advances text.
-// The count starts only on a fresh press (a key already held when the scene starts never skips), and a small "hold to skip" fill
-// shows for SKIP_HINT_MS after the first press. D108 F2b-2: the count is ms (Presentation_StepMs per step), so it needs 1 s at any frame rate. Skip_Step is the pure core (tested by Test_Suite_Skip); Skip_Update steps the live one.
+// ---- hold-to-skip (D48, I-055, D146) ----------------------------------------------------------------------------------------------
+// A tap of confirm only advances text. Holding it: after SKIP_HINT_MS (1.0 s) the "Hold to skip" prompt fades in, and at SKIP_HOLD_MS (2.0 s) the cutscene or camera pan
+// is skipped (it still counts as seen). The count starts only on a fresh press (a key already held when the scene starts never skips). The count is ms
+// (Presentation_StepMs per step, D108 F2b-2), so it takes the same time at any frame rate. Skip_Step is the pure core (tested by Test_Suite_CutSkip);
+// st.hint is the prompt's fade in ms (0..SKIP_HINT_FADE_MS), Skip_HintAlpha turns it into 0..1.
 function Skip_StateNew() {
     return { armed: false, held_ms: 0, hint: 0, fired: false };
 }
@@ -428,23 +429,23 @@ function Skip_Step(_st, _allowed, _pressed, _held, _step_ms) {
     if (_pressed) {
         _r.armed = true;
         _r.held_ms = 0;
-        _r.hint = SKIP_HINT_MS;
-    } else if (_r.hint > 0) {
-        _r.hint -= _step_ms;
-        if (_r.hint <= TRANSITION_DONE_SLACK_MS) _r.hint = 0;   // within 1 ms of spent counts as spent (150 steps of 16.667 ms make 2.5 s)
     }
     if (_r.armed && _held) {
         _r.held_ms += _step_ms;
-        if (_r.held_ms >= SKIP_HOLD_MS - TRANSITION_DONE_SLACK_MS) {   // 60 steps of 16.667 ms, 30 of 33.333 ms
+        if (_r.held_ms >= SKIP_HOLD_MS - SKIP_EDGE_SLACK_MS) {
             _r.fired = true;
             _r.armed = false;
             _r.held_ms = 0;
             _r.hint = 0;
+            return _r;
         }
     } else {
         _r.armed = false;
         _r.held_ms = 0;
     }
+    if (_r.held_ms >= SKIP_HINT_MS - SKIP_EDGE_SLACK_MS) _r.hint = min(SKIP_HINT_FADE_MS, _r.hint + _step_ms);
+    else _r.hint = max(0, _r.hint - _step_ms);
+    if (_r.hint <= SKIP_EDGE_SLACK_MS) _r.hint = 0;
     return _r;
 }
 
@@ -453,8 +454,9 @@ function Skip_HintAlpha(_st) {
     return clamp(_st.hint / SKIP_HINT_FADE_MS, 0, 1);
 }
 
+// The prompt's bar: empty at SKIP_HINT_MS of holding, full at SKIP_HOLD_MS.
 function Skip_Fraction(_held_ms) {
-    return clamp(_held_ms / SKIP_HOLD_MS, 0, 1);
+    return clamp((_held_ms - SKIP_HINT_MS) / (SKIP_HOLD_MS - SKIP_HINT_MS), 0, 1);
 }
 
 // A skippable scene (a cutscene, a camera pan) calls Skip_Claim every frame it runs and asks Skip_Consume whether the hold completed;
@@ -496,36 +498,35 @@ function Skip_Reset() {
     global.skip.claim = -100;
 }
 
-// The "hold to skip" hint: top right, a line of text over a fill that grows while confirm is held. Drawn last by obj_ui_controller.
+// D146: where the "Hold to skip" prompt sits: a shared-style frame in the top right corner, the text on top and the bar under it. { x, y, w, h, bar_x, bar_y, bar_w, bar_h, text_x, text_y }.
+function Skip_HintRect() {
+    var _mt = Ui_Metrics();   // also sets the UI font
+    var _p = _mt.p;
+    var _txt = Loc_T("ui.skip_hold", "Hold to skip");
+    var _tw = UI_TextWidth(_txt);
+    var _w = _tw + 10 * _p;   // 2p frame + 2p air + 1p for the last glyph to breathe, each side
+    var _h = _mt.line_h + 12 * _p;
+    var _x = _mt.gw - _w - _mt.margin;
+    var _y = _mt.margin;
+    return { x: _x, y: _y, w: _w, h: _h, text_x: _x + 5 * _p, text_y: _y + 4 * _p, bar_x: _x + 5 * _p, bar_y: _y + 4 * _p + _mt.line_h + 2 * _p, bar_w: _tw, bar_h: 2 * _p, txt: _txt };
+}
+
+// The "Hold to skip" prompt, drawn last by obj_ui_controller: the shared frame and text style, the bar filling from 1 s to 2 s of holding (D146). Nothing while its alpha is 0.
 function Skip_DrawHint() {
     if (!variable_global_exists("skip")) return;
     var _g = global.skip;
-    if (_g.st.hint <= 0) return;
+    var _fade = Skip_HintAlpha(_g.st);
+    if (_fade <= 0) return;
     var _c = draw_get_color(), _a = draw_get_alpha(), _h = draw_get_halign(), _v = draw_get_valign();
-    UI_SetFont();
+    var _r = Skip_HintRect();
+    var _p = Ui_Metrics().p;
+    draw_set_alpha(_fade);
+    Ui_DrawFrame(_r.x, _r.y, _r.w, _r.h, _fade, _p);
     draw_set_halign(fa_left);
     draw_set_valign(fa_top);
-    var _txt = Loc_T("ui.skip_hold", "Hold to skip");
-    var _tw = UI_TextWidth(_txt);
-    var _th = UI_TextHeight(_txt);
-    var _pad = max(3, round(_th * 0.25));
-    var _bar_h = max(2, round(_th * 0.2));
-    var _w = _tw + _pad * 2;
-    var _hh = _th + _bar_h + _pad * 3;
-    var _x = Display_GuiW() - _w - max(4, _pad);
-    var _y = max(4, _pad);
-    var _fade = clamp(_g.st.hint / SKIP_HINT_FADE_MS, 0, 1);
-    draw_set_alpha(0.65 * _fade);
-    draw_set_color(c_black);
-    draw_rectangle(_x, _y, _x + _w, _y + _hh, false);
-    draw_set_alpha(_fade);
-    draw_set_color(c_white);
-    UI_DrawText(_x + _pad, _y + _pad, _txt);
-    var _by = _y + _pad * 2 + _th;
-    draw_set_alpha(0.35 * _fade);
-    draw_rectangle(_x + _pad, _by, _x + _pad + _tw, _by + _bar_h, false);
-    draw_set_alpha(_fade);
-    draw_rectangle(_x + _pad, _by, _x + _pad + round(_tw * Skip_Fraction(_g.st.held_ms)), _by + _bar_h, false);
+    Ui_Text(_r.text_x, _r.text_y, _r.txt, UI_C_TEXT);
+    Ui_Box(_r.bar_x, _r.bar_y, _r.bar_x + _r.bar_w, _r.bar_y + _r.bar_h, UI_C_DARK);
+    Ui_Box(_r.bar_x, _r.bar_y, _r.bar_x + round(_r.bar_w * Skip_Fraction(_g.st.held_ms)), _r.bar_y + _r.bar_h, UI_C_LIGHT);
     draw_set_color(_c);
     draw_set_alpha(_a);
     draw_set_halign(_h);

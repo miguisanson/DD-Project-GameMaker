@@ -813,9 +813,10 @@ function Test_SkipFireSteps(_step_ms) {
     return 100000;
 }
 
-// Steps from the press (the confirm is released at once) until the "hold to skip" hint is gone.
+// D146: steps from the release (after the prompt is fully shown) until the "Hold to skip" prompt is gone.
 function Test_SkipHintSteps(_step_ms) {
-    var _st = Skip_Step(Skip_StateNew(), true, true, false, _step_ms);
+    var _st = Skip_Step(Skip_StateNew(), true, true, true, _step_ms);
+    for (var _i = 1; _i <= 100000 && Skip_HintAlpha(_st) < 1; _i++) _st = Skip_Step(_st, true, false, true, _step_ms);
     for (var _i = 1; _i <= 100000; _i++) {
         _st = Skip_Step(_st, true, false, false, _step_ms);
         if (_st.hint <= 0) return _i;
@@ -942,23 +943,23 @@ function Test_Suite_UiClock() {
     }
     Test_Eq("F2b-2 the banner alpha at 60 fps equals the old per-frame fade for all 61 frames", _bad, 0);
 
-    // --- hold-to-skip (D48): confirm held for 1 s, at 60 and at 30 fps; the hint fills for 2.5 s after the press
-    Test_Eq("F2b-2 the skip hold is 1000 ms", SKIP_HOLD_MS, 1000);
-    Test_Eq("F2b-2 the skip hint stays 2500 ms (150 frames)", SKIP_HINT_MS, 2500);
+    // --- hold-to-skip (D48, D146): confirm held for 2 s, at 60 and at 30 fps; the prompt shows from 1 s of holding and fades out in 200 ms
+    Test_Eq("F2b-2 the skip hold is 2000 ms (D146)", SKIP_HOLD_MS, 2000);
+    Test_Eq("F2b-2 the skip prompt appears at 1000 ms of holding (D146)", SKIP_HINT_MS, 1000);
     _n = Test_SkipFireSteps(_f60);
-    Test_True("F2b-2 hold-to-skip fires after 60 +-1 steps at 60 fps (got " + string(_n) + ")", abs(_n - 60) <= 1);
-    Test_True("F2b-2 hold-to-skip needs about 1 s at 60 fps (got " + string(_n * _f60) + " ms)", _n * _f60 >= 983 && _n * _f60 <= 1020);
+    Test_True("F2b-2 hold-to-skip fires after 120 +-1 steps at 60 fps (got " + string(_n) + ")", abs(_n - 120) <= 1);
+    Test_True("F2b-2 hold-to-skip needs about 2 s at 60 fps (got " + string(_n * _f60) + " ms)", _n * _f60 >= 1966 && _n * _f60 <= 2040);
     _n = Test_SkipFireSteps(_f30);
-    Test_True("F2b-2 hold-to-skip fires after 30 +-1 steps at 30 fps (got " + string(_n) + ")", abs(_n - 30) <= 1);
-    Test_True("F2b-2 hold-to-skip needs about 1 s at 30 fps (got " + string(_n * _f30) + " ms)", _n * _f30 >= 966 && _n * _f30 <= 1034);
+    Test_True("F2b-2 hold-to-skip fires after 60 +-1 steps at 30 fps (got " + string(_n) + ")", abs(_n - 60) <= 1);
+    Test_True("F2b-2 hold-to-skip needs about 2 s at 30 fps (got " + string(_n * _f30) + " ms)", _n * _f30 >= 1932 && _n * _f30 <= 2068);
     var _sk = Skip_Step(Skip_StateNew(), true, true, true, _hit);
     Test_Eq("F2b-2 a 200 ms hitch adds 50 ms to the skip hold", _sk.held_ms, 50);
     Test_Eq("F2b-2 a 200 ms hitch cannot fire the skip on its own", _sk.fired, false);
     _n = Test_SkipHintSteps(_f60);
-    Test_True("F2b-2 the skip hint fades after 150 +-1 steps at 60 fps (got " + string(_n) + ")", abs(_n - 150) <= 1);
+    Test_True("F2b-2 the skip prompt fades out after 12 +-1 steps at 60 fps (got " + string(_n) + ")", abs(_n - 12) <= 1);
     _n = Test_SkipHintSteps(_f30);
-    Test_True("F2b-2 the skip hint fades after 75 +-1 steps at 30 fps (got " + string(_n) + ")", abs(_n - 75) <= 1);
-    Test_True("F2b-2 the skip hint fade-out is 20 frames (333 ms)", abs(SKIP_HINT_FADE_MS - 20000 / 60) < 0.01);
+    Test_True("F2b-2 the skip prompt fades out after 6 +-1 steps at 30 fps (got " + string(_n) + ")", abs(_n - 6) <= 1);
+    Test_Eq("F2b-2 the skip prompt fade is 200 ms (D146)", SKIP_HINT_FADE_MS, 200);
 }
 
 // QTE part 1 (D5, D6, D20, D35, D56, D60, D61; QTE-01, 03, 07, 14). Expected values are the owner's decisions written out, not read from the macros:
@@ -2989,15 +2990,15 @@ function Test_Suite_WindowModes() {
     Test_Eq("DISP-10 world -> gui includes the narrow-room shift", _wp.x, 36);
 }
 
-// D48 / I-055: hold-to-skip. Skip_Step is the pure core: a fresh press arms it, holding confirm for SKIP_HOLD_MS (one step = 1/60 s here, D108 F2b-2) fires it, a tap never does.
+// D48 / I-055 / D146: hold-to-skip. Skip_Step is the pure core: a fresh press arms it, holding confirm for SKIP_HOLD_MS (2 s; one step = 1/60 s here, D108 F2b-2) fires it, a tap never does.
 function Test_Suite_Skip() {
     var _f60 = Presentation_StepMs(16667);   // D108 F2b-2: the steps are ms now; one 60 fps frame
-    var _hold_frames = round(SKIP_HOLD_MS / _f60);   // 60
-    var _hint_frames = round(SKIP_HINT_MS / _f60);   // 150
+    var _hold_frames = round(SKIP_HOLD_MS / _f60);   // 120
+    var _hint_frames = round(SKIP_HINT_MS / _f60);   // 60
     var _st = Skip_StateNew();
     var _r = Skip_Step(_st, true, true, true, _f60);   // first frame: pressed and held
     Test_Eq("D48 first press: not fired", _r.fired, false);
-    Test_Eq("D48 first press: shows the hint", _r.hint > 0, true);
+    Test_Eq("D48 first press: no prompt yet (D146: only after 1 s of holding)", _r.hint, 0);
     Test_Eq("D48 first press: progress started", _r.held_ms, _f60);
     _st = _r;
     for (var _i = 2; _i < _hold_frames; _i++) {
@@ -3017,7 +3018,7 @@ function Test_Suite_Skip() {
     _st = Skip_Step(_st, true, false, false, _f60);   // released
     Test_Eq("D48 tap: not fired", _st.fired, false);
     Test_Eq("D48 tap: hold count back to 0", _st.held_ms, 0);
-    Test_Eq("D48 tap: hint stays on screen for a while", _st.hint > 0, true);
+    Test_Eq("D48 tap: no prompt (D146)", _st.hint, 0);
     var _fired = false;
     for (var _i = 0; _i < _hold_frames * 3; _i++) {   // many taps, one every 10 frames
         _st = Skip_Step(_st, true, (_i mod 10) == 0, (_i mod 10) < 3, _f60);
@@ -3040,12 +3041,12 @@ function Test_Suite_Skip() {
     Test_Eq("D48 leaving the scene resets the count", _st.held_ms, 0);
     Test_Eq("D48 leaving the scene hides the hint", _st.hint, 0);
 
-    // The hint fades after _hint_frames without a press.
+    // The prompt is gone again after _hint_frames steps with the key up.
     _st = Skip_Step(Skip_StateNew(), true, true, true, _f60);
     _st = Skip_Step(_st, true, false, false, _f60);
     for (var _i = 0; _i < _hint_frames + 2; _i++) _st = Skip_Step(_st, true, false, false, _f60);
     Test_Eq("D48 the hint goes away", _st.hint, 0);
-    Test_Eq("D48 progress fraction", Skip_Fraction(SKIP_HOLD_MS / 2), 0.5);
+    Test_Eq("D48 progress fraction (D146: from 1 s to 2 s)", Skip_Fraction(1500), 0.5);
 }
 
 // DISP-14 / SAVE-06 / D91: settings_version 8. Old fit_screen + scale fields become a window mode; a fresh install is borderless.

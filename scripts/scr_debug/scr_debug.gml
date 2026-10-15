@@ -500,7 +500,11 @@ function Scenario_StepSmoke(_s) {
             break;
         case 440: case 441: case 442: case 443: case 444: case 445: case 446: case 447: case 448: case 449:
         case 450: case 451: case 452: case 453: case 454: case 455: case 456: case 457: case 458: case 459:
-            Scenario_StepSmokeRunStats(_s);   // G9 (D137): the run stats from a real fight on the summary and in the Codex run history; the end of the chain (its last step calls Scenario_NoticeEnd)
+            Scenario_StepSmokeRunStats(_s);   // G9 (D137): the run stats from a real fight on the summary and in the Codex run history; goes on to the cutscene skip steps (620..)
+            break;
+        case 620: case 621: case 622: case 623: case 624: case 625: case 626: case 627: case 628: case 629:
+        case 630: case 631: case 632: case 633: case 634: case 635: case 636: case 637: case 638: case 639:
+            Scenario_StepSmokeCutSkip(_s);   // H6 (D146, D156): a tap advances one line, a 2 s hold ends the intro cutscene; the end of the chain (its last step calls Scenario_NoticeEnd)
             break;
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step goes on to G6 (380)
@@ -628,7 +632,7 @@ function Scenario_StepSmokeUiStart(_s) {
             if (_s.t > 1 && room == rm_cutscene && obj_start_controller.cutscene_started && !Transition_IsActive() && GameState_Get().ui.mode == UI_DIALOGUE) {
                 Scenario_Check("ui_new_game_opens_no_difficulty_menu", !_s.diff_menu_seen, "a difficulty state appeared");
                 Scenario_Check("ui_new_game_starts_the_intro_on_normal", Difficulty_GetCurrent() == DIFFICULTY_NORMAL, "difficulty=" + string(Difficulty_GetCurrent()));
-                Scenario_Hold("confirm", 120);   // D48: hold to skip the intro, then through the rm_floor1 intro dialogue (next step)
+                Scenario_Hold("confirm", 150);   // D48: hold to skip the intro, then through the rm_floor1 intro dialogue (next step)
                 Scenario_Next(_s, 33);
             }
             if (_s.t > 600) {
@@ -774,7 +778,7 @@ function Scenario_StepSmokeNewGameGuard(_s) {
             if (_s.t > 1500) { Scenario_Check("newgame_guard_reaches_rm_floor1", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); break; }
             if (room == rm_cutscene && !_s.ng_held && instance_exists(obj_start_controller) && obj_start_controller.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE && _s.t > 40) {
                 _s.ng_held = true;
-                Scenario_Hold("confirm", 120);
+                Scenario_Hold("confirm", 150);
             }
             if (room == rm_floor1 && !Transition_IsActive()) {
                 if (_gs.ui.mode == UI_DIALOGUE) {
@@ -953,19 +957,19 @@ function Scenario_StepSmokeSkip(_s) {
                 Scenario_Next(_s, 12);
             }
             break;
-        case 12:   // hold confirm: the intro must end within about 1.2 s of the press (60 frames held + the flash/fade is the exit)
+        case 12:   // hold confirm: the intro must end within about 2.2 s of the press (D146: 2 s held + the flash/fade is the exit)
             if (_s.t == 1) {
-                Scenario_Hold("confirm", 120);
+                Scenario_Hold("confirm", 240);
                 _s.skp_f0 = _s.f;
             }
             if (_s.t > 1 && Transition_IsActive() && _gs.transition_fx.type == TRANSITION_TYPE_CUTSCENE && _gs.transition_fx.target_room == rm_floor1) {
                 var _d = _s.f - _s.skp_f0;
-                Scenario_Check("skip_hold_ends_intro_within_1_2_s", _d <= 72, "frames=" + string(_d));
-                Scenario_Check("skip_hold_not_before_1_s", _d >= round(SKIP_HOLD_MS / TRANSITION_FRAME_MS) - 2, "frames=" + string(_d));   // D108 F2b-2: the hold is ms; 60 frames at 60 fps
+                Scenario_Check("skip_hold_ends_intro_within_2_2_s", _d <= 132, "frames=" + string(_d));
+                Scenario_Check("skip_hold_not_before_2_s", _d >= round(SKIP_HOLD_MS / TRANSITION_FRAME_MS) - 2, "frames=" + string(_d));   // D108 F2b-2: the hold is ms; 120 frames at 60 fps (D146)
                 Scenario_Release();
                 Scenario_Next(_s, 13);
             }
-            if (_s.t > 300) { Scenario_Check("skip_hold_ends_intro_within_1_2_s", false, "no exit fade after 300 frames"); Scenario_Finish(); }
+            if (_s.t > 400) { Scenario_Check("skip_hold_ends_intro_within_2_2_s", false, "no exit fade after 400 frames"); Scenario_Finish(); }
             break;
         case 13:   // arrive in rm_floor1: its intro dialogue opens (the pending flag is the same one watching sets)
             if (room == rm_floor1 && !Transition_IsActive() && instance_exists(obj_player) && _gs.ui.mode == UI_DIALOGUE) {
@@ -2877,7 +2881,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsMapJuice(_s);   // G6 (D138, map part): the chest burst, the rising item, the gold counter, the level-up sparkle, the step squash; goes on to G9 (460)
             break;
         case 460: case 461: case 462: case 463: case 464: case 465: case 466: case 467: case 468: case 469:
-            Scenario_StepShotsRunStats(_s);   // G9 (D137): the run summary with the stats (English, Korean), the Codex run history with and without stats; the end of the pictures
+            Scenario_StepShotsRunStats(_s);   // G9 (D137): the run summary with the stats (English, Korean), the Codex run history with and without stats; goes on to 640
+            break;
+        case 640: case 641: case 642: case 643: case 644: case 645: case 646: case 647: case 648: case 649:
+            Scenario_StepShotsCutSkip(_s);   // H6 (D146, D156): an intro cutscene line in the dialogue box and the "Hold to skip" prompt half filled, 480 x 432 and 800 x 720; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -3485,8 +3492,8 @@ function Scenario_StepShotsWindow(_s) {
             if (_s.t > 600) { Scenario_Check("shots_skip_hint_cutscene_running", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
         case 55:
-            if (_s.f - _s.skp_f0 == round(SKIP_HOLD_MS / TRANSITION_FRAME_MS) div 2) {
-                Scenario_Check("shots_skip_hint_is_filling", global.skip.st.hint > 0 && global.skip.st.held_ms >= 20 * TRANSITION_FRAME_MS && global.skip.st.held_ms < SKIP_HOLD_MS, "held_ms=" + string(global.skip.st.held_ms));
+            if (_s.f - _s.skp_f0 == round((SKIP_HINT_MS + SKIP_HOLD_MS) / 2 / TRANSITION_FRAME_MS)) {   // D146: half way between the prompt appearing (1 s) and the skip (2 s)
+                Scenario_Check("shots_skip_hint_is_filling", Skip_HintAlpha(global.skip.st) >= 1 && global.skip.st.held_ms >= SKIP_HINT_MS + 20 * TRANSITION_FRAME_MS && global.skip.st.held_ms < SKIP_HOLD_MS, "held_ms=" + string(global.skip.st.held_ms));
                 _s.shot = "shot_skip_hint_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
                 Scenario_ShotLayout(_s.shot);
                 Scenario_Release();
@@ -4743,12 +4750,12 @@ function Scenario_StepSmokeRun(_s) {
             if (_s.t == 10) { Scenario_Tap("confirm"); _rl.tap_t = _s.f; }   // a tap does not skip the death line
             if (_s.t == 40) {
                 Scenario_Check("abandon_a_tap_does_not_skip_the_death_line", global.run_flow.phase == "death", "phase=" + string(global.run_flow.phase));
-                Scenario_Hold("confirm", 100);
+                Scenario_Hold("confirm", 240);
             }
             if (!variable_struct_exists(_rl, "sum_t") && global.run_flow.phase == "summary") {
                 _rl.sum_t = _s.t;
                 Scenario_Release();
-                Scenario_Check("abandon_holding_confirm_skips_the_death_line", _s.t < 150, "t=" + string(_s.t));
+                Scenario_Check("abandon_holding_confirm_skips_the_death_line", _s.t < 240, "t=" + string(_s.t));
             }
             if (variable_struct_exists(_rl, "sum_t")) {
                 if (_s.t == _rl.sum_t + 20) Scenario_Tap("confirm");   // (D130: one confirm; the echo pick that took the second one is gone from the death flow)
@@ -4773,13 +4780,13 @@ function Scenario_StepSmokeRun(_s) {
             }
             if (_s.t > 2 && room == rm_cutscene && _sc != noone && _sc.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE && !_rl.held) {
                 _rl.held = true;
-                Scenario_Hold("confirm", 120);
+                Scenario_Hold("confirm", 150);
             }
             if (_s.t > 2 && room == rm_cutscene && _sc != noone && _sc.state == "credits" && !_rl.credits) {   // C5 (D105): the credits roll after the closing text; hold confirm skips it
                 _rl.credits = true;
                 Scenario_Release();
                 Scenario_Check("win_credits_roll_follows_the_closing_text", Credits_TotalMs() > Transition_FramesToMs(600) && _sc.credits_t < Transition_FramesToMs(30), "ms=" + string(Credits_TotalMs()));
-                Scenario_Hold("confirm", 120);
+                Scenario_Hold("confirm", 150);
             }
             if (_s.t > 2 && room == rm_start && !Transition_IsActive()) {
                 Scenario_Release();
@@ -5100,11 +5107,11 @@ function Scenario_StepSmokeStory(_s) {
                 if (_u == 20) Scenario_Tap("confirm");
                 if (_u == 40) {
                     Scenario_Check("death_scene_a_tap_does_not_skip", global.run_flow.phase == "death");
-                    Scenario_Hold("confirm", 100);
+                    Scenario_Hold("confirm", 240);
                 }
                 if (_u > 40 && global.run_flow.phase == "summary") {
                     Scenario_Release();
-                    Scenario_Check("death_scene_holding_confirm_skips_to_the_summary", _u < 130, "u=" + string(_u));
+                    Scenario_Check("death_scene_holding_confirm_skips_to_the_summary", _u < 230, "u=" + string(_u));
                     Scenario_Check("death_scene_summary_shows_the_run", global.run_flow.entry.result == "died" && global.run_flow.entry.cause == EnemyDB_Get(ENEMY_SPIDER).name, "cause=" + string(global.run_flow.entry.cause));
                     Scenario_Next(_s, 171);   // D1a: the battle menus and the dialogue box
                 }
@@ -5291,7 +5298,7 @@ function Scenario_StepShotsStory(_s) {
             }
             if (_s.t > 6 && room == rm_cutscene && _scn != noone && _scn.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE && !_s.held) {
                 _s.held = true;
-                Scenario_Hold("confirm", 90);
+                Scenario_Hold("confirm", 240);
             }
             if (_s.held && _scn != noone && _scn.state == "credits" && !variable_struct_exists(_s, "cr0")) {
                 Scenario_Release();
@@ -7978,7 +7985,7 @@ function Scenario_StepSmokeReg(_s) {
             if (!_rg.held && _s.t > 40 && room == rm_cutscene && _sc != noone && _sc.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE) {
                 _rg.held = true;
                 Scenario_Check("regr_r028_the_intro_cutscene_sets_its_state", variable_struct_exists(_gs.ui, "cutscene_active") && _gs.ui.cutscene_active);
-                Scenario_Hold("confirm", 120);
+                Scenario_Hold("confirm", 150);
             }
             if (room == rm_floor1 && !Transition_IsActive() && instance_exists(obj_player)) {
                 if (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0) {
@@ -8725,7 +8732,7 @@ function Scenario_StepSmokeRumble(_s) {
     switch (_s.step) {
         case 360:   // the title's New Game (the last Title step) is running: the intro cutscene, held through like D48's skip
             if (_s.t > 1 && room == rm_cutscene && instance_exists(obj_start_controller) && obj_start_controller.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE) {
-                Scenario_Hold("confirm", 120);
+                Scenario_Hold("confirm", 150);
                 Scenario_Next(_s, 361);
             }
             if (_s.t > 900) { Scenario_Check("g8_new_game_reaches_the_intro", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
@@ -10288,7 +10295,7 @@ function Scenario_StepSmokeRunStats(_s) {
             }
             if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && !(variable_struct_exists(_gs, "load_spawn_pending") && _gs.load_spawn_pending)) {
                 Scenario_Check("g9_continue_keeps_the_run_time_and_it_goes_on", _gs.run.stats.play_ms >= _rs.c0 && _gs.run.stats.play_ms < _rs.c0 + 8000, "saved " + string(_rs.c0) + " now " + string(_gs.run.stats.play_ms));
-                Scenario_NoticeEnd();   // the end of the chain: removes the files and the profile the steps made
+                Scenario_Next(_s, 620);   // on to the cutscene skip steps (H6, 620..); they end the chain
             }
             if (_s.t > 900) { Scenario_Check("g9_continue_reaches_the_floor", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
@@ -10549,8 +10556,168 @@ function Scenario_StepShotsRunStats(_s) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 if (is_struct(TabMenu_Get())) Menu_Close(true);
                 Scenario_ClearUi();
-                Scenario_NoticeEnd();   // the end of the pictures: removes the files and the profile the steps made
+                _s.cs_i = 0;
+                Scenario_Next(_s, 640);   // on to the cutscene skip pictures (H6, 640..), the end of the pictures
             }
+            break;
+    }
+}
+
+
+// ---- H6 (D146, D156): cutscene text in the shared dialogue box and hold-to-skip, through real input (smoke steps 620-639, the end of the chain; pictures 640-649) ----
+// A tap of confirm finishes the typewriter line, a second tap advances exactly one line, and neither shows the prompt. Holding confirm: no prompt before 1 s, the prompt fully shown with the bar
+// half full at 1.5 s, and the intro ends at 2 s (not before 1.9 s, within 2.2 s); the run then starts. Writes the profile and the run: only inside the gate (NoticeEnd removes them).
+function Scenario_StepSmokeCutSkip(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    if (!variable_struct_exists(_s, "cs")) _s.cs = { amax: 0, idx0: 0, idx1: 0, idx2: 0, f0: 0, early: false, mid: false };
+    var _cs = _s.cs;
+    var _running = (room == rm_cutscene && _sc != noone && _sc.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE);
+    if (variable_global_exists("skip")) _cs.amax = max(_cs.amax, Skip_HintAlpha(global.skip.st));
+    switch (_s.step) {
+        case 620:   // a new game's intro cutscene
+            if (_s.t == 1) {
+                if (Transition_IsActive()) { _s.t = 0; break; }
+                Scenario_ClearUi();
+                if (instance_exists(obj_dialogue_trigger)) with (obj_dialogue_trigger) instance_destroy();
+                Scenario_NewKnight();
+                Transition_RequestCutsceneById("intro");
+            }
+            if (_s.t > 40 && _running) {
+                var _lay = Dialogue_TextLayout("");
+                Scenario_Check("cutskip_the_cutscene_text_is_in_the_normal_dialogue_box", !Dialogue_IsCutsceneTextOnly() && !_gs.ui.dialogue_box_half && !_lay.cutscene_text_only, "text_only=" + string(Dialogue_IsCutsceneTextOnly()) + " half=" + string(_gs.ui.dialogue_box_half));
+                Scenario_Next(_s, 621);
+            }
+            if (_s.t > 600) { Scenario_Check("cutskip_intro_cutscene_running", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 621:   // a tap while the line is being typed finishes the line and does not advance
+            if (_s.t == 1) {
+                if (_gs.ui.dialogue_state != UI_DIALOGUE_STATE_REVEALING) { Scenario_Next(_s, 622); break; }   // the line was already complete
+                _cs.idx0 = _gs.ui.index;
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 4) {
+                Scenario_Check("cutskip_a_tap_finishes_the_typewriter_and_stays_on_the_line", _gs.ui.index == _cs.idx0 && _gs.ui.dialogue_state != UI_DIALOGUE_STATE_REVEALING, "index=" + string(_gs.ui.index) + " was " + string(_cs.idx0));
+                Scenario_Next(_s, 622);
+            }
+            break;
+        case 622:   // the line is complete: one tap
+            if (_gs.ui.dialogue_state == UI_DIALOGUE_STATE_READY && _running) {
+                _cs.idx1 = _gs.ui.index;
+                Scenario_Tap("confirm");
+                Scenario_Next(_s, 623);
+            }
+            if (_s.t > 300) { Scenario_Check("cutskip_the_line_becomes_ready", false, "state=" + string(_gs.ui.dialogue_state)); Scenario_NoticeEnd(); }
+            break;
+        case 623:   // exactly one line on, no prompt, no skip
+            if (_s.t == 4) {
+                Scenario_Check("cutskip_a_tap_advances_exactly_one_line", _gs.ui.index == _cs.idx1 + 1, "index=" + string(_gs.ui.index) + " from " + string(_cs.idx1));
+                Scenario_Check("cutskip_a_tap_never_shows_the_prompt", _cs.amax == 0, "alpha=" + string(_cs.amax));
+                Scenario_Check("cutskip_a_tap_does_not_skip", room == rm_cutscene && _sc != noone && !_sc.cutscene_skip && !Transition_IsActive(), "room=" + room_get_name(room));
+                Scenario_Next(_s, 624);
+            }
+            break;
+        case 624:   // hold confirm
+            if (_s.t == 1) {
+                Scenario_Hold("confirm", 300);
+                _cs.f0 = _s.f;
+                _cs.amax = 0;
+                _cs.idx2 = _gs.ui.index;
+            }
+            if (_s.t > 1 && variable_global_exists("skip")) {
+                var _hm = global.skip.st.held_ms;
+                if (_hm > 0 && _hm < SKIP_HINT_MS - 20 && Skip_HintAlpha(global.skip.st) > 0) _cs.early = true;
+                if (!_cs.mid && _hm >= 1500) {
+                    _cs.mid = true;
+                    var _fr = Skip_Fraction(_hm);
+                    Scenario_Check("cutskip_before_1_s_there_is_no_prompt", !_cs.early);
+                    Scenario_Check("cutskip_at_1_5_s_the_prompt_is_shown_and_the_bar_half_full", Skip_HintAlpha(global.skip.st) >= 1 && abs(_fr - 0.5) < 0.06, "alpha=" + string(Skip_HintAlpha(global.skip.st)) + " fraction=" + string(_fr));
+                    Scenario_Check("cutskip_holding_does_not_advance_lines", _gs.ui.index == _cs.idx2, "index=" + string(_gs.ui.index) + " was " + string(_cs.idx2));
+                }
+            }
+            if (_s.t > 1 && Transition_IsActive() && _gs.transition_fx.type == TRANSITION_TYPE_CUTSCENE && _gs.transition_fx.target_room == rm_floor1) {
+                var _d = _s.f - _cs.f0;
+                Scenario_Check("cutskip_a_2_s_hold_ends_the_intro_not_before_1_9_s", _d >= round(1900 / TRANSITION_FRAME_MS), "frames=" + string(_d));
+                Scenario_Check("cutskip_a_2_s_hold_ends_the_intro_within_2_2_s", _d <= round(2200 / TRANSITION_FRAME_MS), "frames=" + string(_d));
+                Scenario_Release();
+                Scenario_Next(_s, 625);
+            }
+            if (_s.t > 500) { Scenario_Check("cutskip_a_2_s_hold_ends_the_intro", false, "room=" + room_get_name(room)); Scenario_Release(); Scenario_NoticeEnd(); }
+            break;
+        case 625:   // the run starts
+            if (room == rm_floor1 && !Transition_IsActive() && instance_exists(obj_player) && Run_IsActive()) {
+                Scenario_Check("cutskip_the_run_starts_after_the_skip", true);
+                Scenario_Check("cutskip_the_prompt_is_gone_after_the_skip", Skip_HintAlpha(global.skip.st) == 0, "alpha=" + string(Skip_HintAlpha(global.skip.st)));
+                Scenario_NoticeEnd();   // the end of the chain: removes the files and the profile the steps made
+            }
+            if (_s.t > 900) { Scenario_Check("cutskip_the_run_starts_after_the_skip", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// Pictures 640-649 (480 x 432 = scale 3, then 800 x 720 = scale 5): an intro cutscene line in the shared dialogue box, and the "Hold to skip" prompt with the bar half full (confirm held 1.5 s).
+function Scenario_ShotCutSkip(_s, _name) {
+    _s.shot = "shot_cutskip_" + _name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+    Scenario_ShotLayout(_s.shot);
+}
+
+function Scenario_StepShotsCutSkip(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _scales = [3, 5];
+    switch (_s.step) {
+        case 640:   // the intro cutscene at this size; the first line typed out
+            if (_s.t == 1) {
+                Scenario_SetWindowScale(_scales[_s.cs_i]);
+                Loc_SetLanguage("en");
+                Scenario_ClearUi();
+                Skip_Reset();
+                Scenario_NewKnight();
+                Transition_RequestCutsceneById("intro");
+            }
+            if (_s.t > 60 && room == rm_cutscene && _sc != noone && _sc.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE && _gs.ui.dialogue_state == UI_DIALOGUE_STATE_READY) {
+                Scenario_Check("shots_cutskip_the_line_is_in_the_normal_dialogue_box", !Dialogue_IsCutsceneTextOnly() && !_gs.ui.dialogue_box_half);
+                Scenario_Check("shots_cutskip_no_prompt_on_the_line", Skip_HintAlpha(global.skip.st) == 0);
+                Scenario_ShotCutSkip(_s, "line");
+                Scenario_Next(_s, 641);
+            }
+            if (_s.t > 700) { Scenario_Check("shots_cutskip_intro_line_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 641:   // hold confirm
+            if (_s.t >= 4) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_Hold("confirm", 300);
+                Scenario_Next(_s, 642);
+            }
+            break;
+        case 642:   // 1.5 s into the hold: the prompt is fully shown and the bar is half full
+            if (global.skip.st.held_ms >= 1500) {
+                Scenario_Check("shots_cutskip_the_prompt_is_half_filled", Skip_HintAlpha(global.skip.st) >= 1 && abs(Skip_Fraction(global.skip.st.held_ms) - 0.5) < 0.06, "held_ms=" + string(global.skip.st.held_ms));
+                Scenario_ShotCutSkip(_s, "prompt");
+                Scenario_Release();
+                Scenario_Next(_s, 643);
+            }
+            if (_s.t > 400) { Scenario_Check("shots_cutskip_the_hold_reaches_1_5_s", false, "held_ms=" + string(global.skip.st.held_ms)); Scenario_Release(); Scenario_NoticeEnd(); }
+            break;
+        case 643:
+            if (_s.t >= 4) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Skip_Reset();
+                Dialogue_CloseNow();
+                Cutscene_ClearUiState();
+                _s.cs_i++;
+                if (_s.cs_i >= array_length(_scales)) {
+                    Scenario_SetWindowScale(3);
+                    Scenario_NoticeEnd();   // the end of the pictures: removes the files and the profile the steps made
+                } else {
+                    room_goto(rm_floor1);
+                    Scenario_Next(_s, 644);
+                }
+            }
+            break;
+        case 644:   // out of the cutscene; back to the start of the pictures at the next size
+            if (room == rm_floor1 && !Transition_IsActive() && _s.t > 30) Scenario_Next(_s, 640);
+            if (_s.t > 600) { Scenario_Check("shots_cutskip_back_to_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
     }
 }
