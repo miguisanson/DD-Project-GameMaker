@@ -2901,7 +2901,11 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsLevelUp(_s);   // H4 (D143): the free-point screen with the class growth line, two sizes and Korean; goes on with H1 (490..499)
             break;
         case 490: case 491: case 492: case 493: case 494: case 495: case 496: case 497: case 498: case 499:
-            Scenario_StepShotsOneMenu(_s);   // H1 (D140): the System tab, the Settings tab and the "Keep this?" prompt, two sizes; finishes the run
+            Scenario_StepShotsOneMenu(_s);   // H1 (D140): the System tab, the Settings tab and the "Keep this?" prompt, two sizes; goes on with H8a (830..)
+            break;
+        case 830: case 831: case 832: case 833: case 834: case 835: case 836: case 837: case 838: case 839:
+        case 840: case 841: case 842: case 843: case 844: case 845: case 846: case 847: case 848: case 849:
+            Scenario_StepShotsLabels(_s);   // H8a (D150, D156): the battle HUD with a label under every chip (a chip highlighted, Korean), the Status tab with the XP bar, the Gear header, the Help stats page; finishes the run
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -5536,7 +5540,7 @@ function Scenario_StepSmokeRest(_s) {
                 _rc.h1 = true;
                 var _hm = TabMenu_TopMenu();
                 Scenario_Check("help_opens_from_the_system_tab", _gs.ui.mode == UI_MENU && TabMenu_Get().tab == 6 && _hm.id == "help");
-                Scenario_Check("help_lists_all_eleven_mechanics", array_length(_hm.items) == 11 && _hm.items[0].id == "timeline" && _hm.items[10].id == "status");
+                Scenario_Check("help_lists_all_eleven_mechanics", array_length(_hm.items) == 12 && _hm.items[0].id == "timeline" && _hm.items[10].id == "status" && _hm.items[11].id == "stats_terms");   // H8a (D156): the Stats & terms page is the 12th row, after the eleven mechanics
                 Scenario_Check("help_rows_carry_their_text", string_length(_hm.items[1].help) > 20 && string_pos("{confirm}", _hm.items[1].help) > 0);
                 Ui_MenuFixCursor(_hm, 1);
                 Scenario_Check("help_cursor_row_is_the_sliding_bar", _hm.items[_hm.cursor].id == "bar");
@@ -11051,7 +11055,7 @@ function Scenario_StepShotsLevelUp(_s) {
 }
 
 // ---- H1 (D140) pictures 490..493: the System tab, the Settings tab and the "Keep this?" prompt at windowed scale 3 (480 x 432) and 5 (800 x 720).
-// Each is the real draw of the real menu on a real room; the layout is asserted on the rectangles. The last picture of the run: it ends the run. ----
+// Each is the real draw of the real menu on a real room; the layout is asserted on the rectangles. The last picture goes on with H8a (830). ----
 function Scenario_OneMenuShotScenes() {
     return ["system", "settings", "keep"];
 }
@@ -11124,7 +11128,7 @@ function Scenario_StepShotsOneMenu(_s) {
                 _o.si++;
                 if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
                 if (_o.di >= array_length(_scenes)) {
-                    Scenario_Finish();   // the end of the pictures
+                    Scenario_Next(_s, 830);   // H8a goes on (its last picture ends the run)
                 } else {
                     Scenario_Next(_s, 490);
                 }
@@ -11331,6 +11335,178 @@ function Scenario_StepSmokeLabels(_s) {
                 Scenario_Check("labels_back_returns_to_the_help_list", TabMenu_Depth() == 2 && TabMenu_TopMenu().id == "help");
                 Menu_Close(true);
                 Scenario_NoticeEnd();   // the end of the chain
+            }
+            break;
+    }
+}
+
+// ---- H8a (D150, D156) pictures 830..833: the battle HUD with three statuses on each side and a label under every chip, the same with an enemy chip highlighted
+// (its full sentence in a plate), in Korean, the Status tab with a highlighted status and the XP bar, the Gear tab header, the Help stats page; windowed
+// scale 3 (480 x 432) and 5 (800 x 720), Korean at 3 only. shot_labels_<scene>_<w>x<h>.png. The last picture of the run: it ends the run. ----
+function Scenario_LabelsScenes() {
+    return ["battle", "battle_tip", "status", "gear", "help_stats", "battle_ko"];
+}
+
+function Scenario_LabelsScales(_di) {
+    return (_di == 5) ? [3] : [3, 5];
+}
+
+function Scenario_LabelsIsBattle(_di) {
+    return (_di == 0 || _di == 1 || _di == 5);
+}
+
+// Every chip rectangle of one side lies inside _zone (or the screen), none overlaps another, and each is wide enough for its label.
+function Scenario_LabelsChipChecks(_bc, _tag) {
+    var _rs = _bc.hud.rects.chips;
+    var _gw = Display_GuiW();
+    var _gh = Display_GuiH();
+    var _np = 0;
+    var _ne = 0;
+    var _bad_screen = "";
+    var _bad_zone = "";
+    var _bad_overlap = "";
+    var _bad_wide = "";
+    var _pz = _bc.hud.rects.zones.player;
+    for (var _i = 0; _i < array_length(_rs); _i++) {
+        var _r = _rs[_i];
+        if (_r.who == TL_PLAYER) _np++; else _ne++;
+        if (_r.x < 0 || _r.y < 0 || _r.x + _r.w > _gw || _r.y + _r.h > _gh) _bad_screen += string(_i) + " ";
+        if (_r.who == TL_PLAYER && !(_r.x >= _pz.x && _r.y >= _pz.y && _r.x + _r.w <= _pz.x + _pz.w && _r.y + _r.h <= _pz.y + _pz.h)) _bad_zone += string(_i) + " ";
+        if (_r.w < _r.chip.lw) _bad_wide += string(_i) + " ";
+        for (var _j = _i + 1; _j < array_length(_rs); _j++) if (Test_RectsOverlap(_r, _rs[_j])) _bad_overlap += string(_i) + "/" + string(_j) + " ";
+    }
+    Scenario_Check("shots_labels_player_has_three_chips_" + _tag, _np == 3, "n=" + string(_np));
+    Scenario_Check("shots_labels_enemy_has_three_chips_" + _tag, _ne == 3, "n=" + string(_ne));
+    Scenario_Check("shots_labels_chips_are_on_screen_" + _tag, _bad_screen == "", _bad_screen);
+    Scenario_Check("shots_labels_player_chips_sit_in_the_panel_" + _tag, _bad_zone == "", _bad_zone + json_stringify(_pz));
+    Scenario_Check("shots_labels_no_chip_overlaps_another_" + _tag, _bad_overlap == "", _bad_overlap);
+    Scenario_Check("shots_labels_every_cell_holds_its_label_" + _tag, _bad_wide == "", _bad_wide);
+    var _tl = _bc.hud.rects.timeline;
+    var _hit_tl = "";
+    for (var _k = 0; _k < array_length(_rs); _k++) if (Test_RectsOverlap(_rs[_k], _tl)) _hit_tl += string(_k) + " ";
+    Scenario_Check("shots_labels_no_chip_touches_the_turn_strip_" + _tag, _hit_tl == "", _hit_tl);
+}
+
+function Scenario_StepShotsLabels(_s) {
+    var _scenes = Scenario_LabelsScenes();
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "lb2")) _s.lb2 = { n: 0, di: 0, si: 0 };
+    var _o = _s.lb2;
+    var _scales = Scenario_LabelsScales(_o.di);
+    var _tag = _scenes[_o.di] + "_" + string(_scales[_o.si]);
+    switch (_s.step) {
+        case 830:   // enter the room (a fight, or one of the two floors in turn) at this scale
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                if (Scenario_LabelsIsBattle(_o.di)) {
+                    Scenario_NewKnight();
+                    Scenario_SetWindowScale(_scales[_o.si]);
+                    Scenario_GotoBattle("shots_labels_" + _tag, ENEMY_SPIDER);
+                } else {
+                    Scenario_TabFixture();
+                    Scenario_SetWindowScale(_scales[_o.si]);
+                    _o.n++;
+                    room_goto((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3);
+                }
+            }
+            if (_s.t >= 25) {
+                if (Scenario_LabelsIsBattle(_o.di) ? (room == rm_battle && instance_exists(obj_battle_controller)) : Scenario_FloorReady((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3)) Scenario_Next(_s, 831);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_labels_enters_the_room_" + _tag, false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 831:   // set the scene up
+            if (_o.di == 5) Loc_SetLanguage("ko");   // after the room has loaded: a room's controller reloads the language from the settings
+            else if (Loc_GetLanguage() != "en") Loc_SetLanguage("en");
+            if (Scenario_LabelsIsBattle(_o.di)) {
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
+                _bc.p.skills = [SKILL_HILT_BASH, SKILL_MUSCLE_UP, SKILL_WOUND];
+                _bc.p.hp = max(1, _bc.p.max_hp - 5);
+                _bc.p.mp = max(0, _bc.p.max_mp - 2);
+                _bc.hud.hp_shown = _bc.p.hp;
+                _bc.hud.mp_shown = _bc.p.mp;
+                _bc.pops = [];
+                _bc.combat_log = [];
+                _bc.p = Status_Add(_bc.p, STATUS_POISON, 0, 0, 3);
+                _bc.p = Status_Add(_bc.p, STATUS_BLEED, 3, 0, 2);
+                _bc.p = Status_Add(_bc.p, STATUS_BRACE, 2, 0);
+                _bc.e = Status_Add(_bc.e, STATUS_BURN, 2, 3);
+                _bc.e = Status_Add(_bc.e, STATUS_BLOODTHIRSTY, 4, 0);
+                _bc.e = Status_Add(_bc.e, STATUS_SOLIDIFY, 3, 0);
+                _bc.e.hp = floor(_bc.e.max_hp * 0.8);
+                _bc.enemy_hp_shown = _bc.e.hp;
+                _bc.tl_who = TL_PLAYER;
+                _bc.turn = TURN_PLAYER;
+                _bc.enemy_action_pending = false;
+                _bc.battle_state = BSTATE_MENU;
+                variable_struct_remove(_bc.hud, "chip_focus");
+                if (_o.di == 1) _bc.hud.chip_focus = { who: TL_ENEMY, idx: 1 };   // Bloodthirsty, in the middle of the enemy's row
+            } else {
+                with (obj_enemy) instance_destroy();
+                switch (_scenes[_o.di]) {
+                    case "status":
+                        Status_Add(_gs.player_ch, STATUS_GUARD, 4, 0);
+                        Status_Add(_gs.player_ch, STATUS_POISON, 0, 0, 3);
+                        Status_Add(_gs.player_ch, STATUS_BURN, 2, 3);
+                        Ui_MemSet(Ui_MemGlobal(), "tab_status", 0);
+                        Menu_Open(0);
+                        Ui_MenuFixCursor(TabMenu_TopMenu(), 4);   // Guard, with its sentence and its turns left
+                        break;
+                    case "gear":
+                        Menu_Open(3);
+                        break;
+                    case "help_stats":
+                        Menu_Open(6);
+                        TabHelp_Open();
+                        TabHelpStats_Open();
+                        Ui_MenuFixCursor(TabMenu_TopMenu(), 8);   // Perfect, with the number from the data
+                        break;
+                }
+            }
+            Scenario_Next(_s, 832);
+            break;
+        case 832:   // let the panels settle, check the layout, take the picture
+            if (_s.t >= 24) {
+                _s.shot = "shot_labels_" + _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                if (Scenario_LabelsIsBattle(_o.di)) {
+                    var _bc2 = instance_find(obj_battle_controller, 0);
+                    Scenario_Check("shots_labels_in_battle_" + _tag, room == rm_battle && instance_exists(_bc2));
+                    Scenario_LabelsChipChecks(_bc2, _tag);
+                    Scenario_BattleUiOverlaps(_bc2, "labels_" + _tag);
+                    var _pl = Battle_StatusChips(_bc2.p);
+                    Scenario_Check("shots_labels_the_player_row_reads_psn_bld_brace_" + _tag, array_length(_pl) == 3 && _pl[0].label == Status_ShortName(STATUS_POISON) + " 3" && _pl[1].label == Status_ShortName(STATUS_BLEED) + " 2" && _pl[2].label == Status_ShortName(STATUS_BRACE) + " 2");
+                    if (_o.di == 1) {
+                        var _tp = _bc2.hud.rects.chip_tip;
+                        Scenario_Check("shots_labels_the_highlighted_chip_has_its_plate_" + _tag, is_struct(_tp) && _tp.w > 0 && _tp.x >= 0 && _tp.y >= 0 && _tp.x + _tp.w <= Display_GuiW() && _tp.y + _tp.h <= Display_GuiH(), json_stringify(_tp));
+                    } else {
+                        Scenario_Check("shots_labels_no_plate_without_a_highlight_" + _tag, !is_struct(_bc2.hud.rects.chip_tip));
+                    }
+                    if (_o.di == 5) Scenario_Check("shots_labels_the_korean_name_is_not_the_english_one", Status_ShortName(STATUS_POISON) != "PSN");
+                } else {
+                    Scenario_Check("shots_labels_menu_is_open_" + _tag, _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                    Scenario_TabLayoutChecks(_tag);
+                    var _tm = TabMenu_TopMenu();
+                    if (_scenes[_o.di] == "status") Scenario_Check("shots_labels_the_status_row_shows_its_turns_left_" + _tag, string_pos("4 turns left", _tm.items[_tm.cursor].help) > 0, _tm.items[_tm.cursor].help);
+                    if (_scenes[_o.di] == "gear") Scenario_Check("shots_labels_the_gear_header_says_equipped_" + _tag, _tm.items[0].label == "Equipped" && _tm.items[0].kind == "head");
+                    if (_scenes[_o.di] == "help_stats") Scenario_Check("shots_labels_the_stats_page_is_up_" + _tag, TabMenu_Depth() == 3 && _tm.id == "help_stats" && _tm.items[_tm.cursor].id == "perfect");
+                }
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 833);
+            }
+            break;
+        case 833:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                if (is_struct(TabMenu_Get())) Menu_Close(true);
+                Scenario_ClearUi();
+                if (Loc_GetLanguage() != "en") Loc_SetLanguage("en");
+                _o.si++;
+                if (_o.si >= array_length(Scenario_LabelsScales(_o.di))) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Scenario_Finish();   // the end of the pictures
+                } else {
+                    Scenario_Next(_s, 830);
+                }
             }
             break;
     }

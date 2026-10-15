@@ -392,7 +392,7 @@ function Bed_UpgradableSkills(_ch) {
 
 // D156: resting only helps while HP or MP is missing.
 function Bed_CanRest(_ch) {
-    return true;
+    return is_struct(_ch) && (_ch.hp < _ch.max_hp || _ch.mp < _ch.max_mp);
 }
 
 // A changed copy with full HP and MP.
@@ -414,16 +414,26 @@ function Bed_Upgrade(_ch, _skill_id) {
 }
 
 // The whole choice. _choice is "heal" or "upgrade" (with the skill id). Marks the bed used only when something happened.
-// Returns { ok, ch }; _flags is changed in place.
+// Returns { ok, ch, msg }; _flags is changed in place. A refused choice (D156: already rested, nothing to upgrade) changes nothing and has a line in msg.
 function Bed_Choose(_ch, _flags, _key, _choice, _skill_id) {
     var out = { ok: false, ch: _ch, msg: "" };
-    if (Bed_Used(_flags, _key)) return out;
+    if (Bed_Used(_flags, _key)) {
+        out.msg = Loc_T("bed.used", "You have rested here already. The bed is still warm.");
+        return out;
+    }
     if (_choice == "heal") {
+        if (!Bed_CanRest(_ch)) {
+            out.msg = Loc_T("bed.msg.rested", "You are already rested.");
+            return out;
+        }
         out.ch = Bed_Heal(_ch);
         out.ok = true;
     } else if (_choice == "upgrade") {
         var u = Bed_Upgrade(_ch, _skill_id);
-        if (!u.ok) return out;
+        if (!u.ok) {
+            out.msg = Loc_T("bed.msg.nothing_to_upgrade", "Nothing to upgrade there.");
+            return out;
+        }
         out.ch = u.ch;
         out.ok = true;
     } else {
@@ -436,9 +446,10 @@ function Bed_Choose(_ch, _flags, _key, _choice, _skill_id) {
 // The bed's first menu (Ui framework items): Rest, Upgrade a skill, Leave. Upgrade is greyed when nothing can be upgraded.
 function Bed_MenuItems(_ch) {
     var n = array_length(Bed_UpgradableSkills(_ch));
+    var rested = !Bed_CanRest(_ch);   // D156: nothing to restore: the row stays selectable (it says why) but looks unavailable
     var heal = {
-        id: "heal", label: Loc_T("bed.option.heal", "Rest"), value: "", kind: "button", enabled: true,
-        help: Loc_T("bed.help.heal", "Sleep a while and wake with all your HP and MP."),
+        id: "heal", label: Loc_T("bed.option.heal", "Rest"), value: "", kind: "button", enabled: true, dim: rested,
+        help: rested ? Loc_T("bed.help.heal_rested", "You are already rested. Come back when HP or MP is missing.") : Loc_T("bed.help.heal", "Sleep a while and wake with all your HP and MP."),
         lines: [
             { label: Loc_T("bed.lbl.hp", "HP"), value: string(_ch.hp) + " > " + string(_ch.max_hp) },
             { label: Loc_T("bed.lbl.mp", "MP"), value: string(_ch.mp) + " > " + string(_ch.max_mp) }
