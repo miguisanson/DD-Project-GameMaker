@@ -887,7 +887,7 @@ function Scenario_StepSmokeTitle(_s) {
             if (_s.t == 3) Scenario_Tap("confirm");
             if (_s.t == 9) {
                 Scenario_Check("title_new_game_without_a_run_starts_at_once", is_struct(_sc.title_exit) || room != rm_start || Transition_IsActive());
-                Scenario_Next(_s, 320);   // G4 (D127, 320..339) goes on from here; its last step calls Scenario_NoticeEnd
+                Scenario_NoticeEnd();
             }
             break;
     }
@@ -8654,7 +8654,7 @@ function Scenario_StepSmokeHunt2(_s) {
                 var _sigD = Scenario_EcoLayoutSig();
                 Scenario_Check("hunt2_the_auto_resolved_enemy_stays_gone_after_continue", instance_number(obj_enemy) == 2, "n=" + string(instance_number(obj_enemy)));
                 Scenario_Check("hunt2_continue_after_an_auto_resolve_keeps_the_layout_of_the_room", _sigD == _h.sigR, _h.sigR + " vs " + _sigD);
-                Scenario_Next(_s, 270);   // G2 (D128): the launch splash, the menu and the Continue card (270..277); the last one calls Scenario_NoticeEnd
+                Scenario_Next(_s, 320);   // G4 (D127, 320..339) first; it goes on to the title steps (270..275), which end the run
             }
             if (_s.t > 900) { Scenario_Check("hunt2_continue_reaches_rm_floor4_again", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
@@ -8772,7 +8772,7 @@ function Scenario_StepSmokeClassGuard(_s) {
             }
             if (room == rm_floor2 || _s.t > 400) {
                 Scenario_Check("g4_with_a_class_the_exit_leaves_rm_floor1", room == rm_floor2 && Scenario_ExitCount() - _cg.c0 == 1, "room=" + room_get_name(room) + " exits=" + string(Scenario_ExitCount() - _cg.c0));
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 270);   // G2 (D128): the launch splash, the menu and the Continue card (270..275); the last one ends the run
             }
             break;
     }
