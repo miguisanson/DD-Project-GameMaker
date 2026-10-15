@@ -2503,9 +2503,9 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
 // --------------------
 // obj_start_controller keeps `state` ("main" | "settings" | "boot_logo" | "cutscene") and holds the menu stack in title_stk: [title].
 // Settings is the popup above. New Game starts the run at once on Normal (D35: one difficulty only).
-function Title_MainItems(_can_load) {
+function Title_MainItems(_can_load, _new_armed = false) {
     return [
-        { id: "new", label: Loc_T("menu.main.option.0", "New Game"), kind: "button", enabled: true },
+        { id: "new", label: _new_armed ? Loc_T("pause.option.abandon_confirm", "Sure? Confirm again") : Loc_T("menu.main.option.0", "New Game"), kind: "button", enabled: true },
         { id: "load", label: Loc_T("menu.main.option.continue", "Continue"), kind: "button", enabled: _can_load },   // C1 (D46): Continue run
         { id: "settings", label: Loc_T("menu.main.option.2", "Settings"), kind: "button", enabled: true },
         { id: "exit", label: Loc_T("menu.main.option.3", "Exit Game"), kind: "button", enabled: true }
@@ -2514,26 +2514,54 @@ function Title_MainItems(_can_load) {
 
 function Title_Build(_c) {
     _c.title_stk = Ui_StackNew();
-    Ui_StackPush(_c.title_stk, Ui_MenuNew("title", Title_MainItems(RunSave_HasSave()), {
-        owner: _c, on_confirm: Title_OnConfirm,
+    var has_run = RunSave_HasSave();
+    var m = Ui_MenuNew("title", Title_MainItems(has_run), {
+        owner: _c, on_confirm: Title_OnConfirm, on_back: Title_OnBack,
         layout: { anchor: "bottom", y_frac: 0.62, center: true }
-    }));
+    });
+    if (has_run) Ui_MenuFixCursor(m, 1);   // review 1: with a run saved the cursor starts on Continue, not on New Game
+    Ui_StackPush(_c.title_stk, m);
+    _c.title_new_armed = false;
     _c.title_refresh = false;
 }
 
 // Language or save files may have changed since the labels were made.
 function Title_Refresh(_c) {
     var m = _c.title_stk.menus[0];
-    m.items = Title_MainItems(RunSave_HasSave());
+    var has_run = RunSave_HasSave();
+    if (!has_run) _c.title_new_armed = false;
+    m.items = Title_MainItems(has_run, Title_NewArmed(_c));
     Ui_MenuFixCursor(m, m.cursor);
     _c.title_refresh = false;
+}
+
+function Title_NewArmed(_c) {
+    return variable_instance_exists(_c, "title_new_armed") && _c.title_new_armed;
+}
+
+// New Game asks twice while a run is saved (it would be abandoned): moving the cursor or Back puts the label back.
+function Title_DisarmNew(_c) {
+    if (!Title_NewArmed(_c)) return;
+    _c.title_new_armed = false;
+    if (is_struct(_c.title_stk)) _c.title_stk.menus[0].items = Title_MainItems(RunSave_HasSave(), false);
+}
+
+function Title_OnBack(_m, _res) {
+    Title_DisarmNew(_m.owner);
 }
 
 function Title_OnConfirm(_m, _i) {
     var c = _m.owner;
     var rid = _m.items[_i].id;
+    if (rid != "new") Title_DisarmNew(c);
     switch (rid) {
         case "new":   // D35: no difficulty menu. The title fades out, then the run (or the intro cutscene) is requested.
+            if (RunSave_HasSave() && !Title_NewArmed(c)) {   // review 1: a saved run is abandoned by New Game, so the first press only asks
+                c.title_new_armed = true;
+                _m.items = Title_MainItems(true, true);
+                break;
+            }
+            c.title_new_armed = false;
             c.title_exit = { at: current_time + UI_PANEL_MS };
             Ui_MenuClose(_m);
             break;
@@ -2585,7 +2613,8 @@ function Title_Step(_c) {
         return;
     }
     if (_c.title_refresh) Title_Refresh(_c);
-    Ui_MenuUpdate(Ui_StackTop(_c.title_stk), _c.title_stk);
+    var ev = Ui_MenuUpdate(Ui_StackTop(_c.title_stk), _c.title_stk);
+    if (ev.moved) Title_DisarmNew(_c);
 }
 
 function Title_Draw(_c) {
@@ -2629,18 +2658,32 @@ function Focus_ShouldPause(_has_focus, _ui_mode, _in_main_menu, _in_battle, _in_
     return _ui_mode == UI_NONE;
 }
 
+// Review 1: the pause opens on the focused -> unfocused EDGE only (the first frame counts as focused). A Resume while the window is still
+// in the background must stay resumed, not reopen next frame. The loss is remembered (global.focus_pending) until the pause could open
+// (a dialogue or a room change may be in the way) or the window comes back.
+function Focus_Edge(_has_focus) {
+    var prev = variable_global_exists("focus_prev") ? global.focus_prev : true;
+    global.focus_prev = _has_focus;
+    return prev && !_has_focus;
+}
+
 // Called by the UI controller every Step with window_has_focus(). Coming back does not close the pause menu: the player resumes.
 function Focus_Step(_has_focus) {
-    BGM_SetDuck(_has_focus ? 1 : FOCUS_MUSIC_DUCK);
+    BGM_SetDuck(_has_focus ? 1 : FOCUS_MUSIC_DUCK);   // the music follows the current state, not the edge
+    if (Focus_Edge(_has_focus)) global.focus_pending = true;
+    if (_has_focus) global.focus_pending = false;
+    if (!variable_global_exists("focus_pending") || !global.focus_pending) return;
     var gs = GameState_Get();
     if (!is_struct(gs) || !variable_struct_exists(gs, "ui")) return;
+    if (gs.ui.mode == UI_PAUSE) { global.focus_pending = false; return; }   // already paused (by this loss or by hand)
     var in_battle = (room == rm_battle);
     if (!Focus_ShouldPause(_has_focus, gs.ui.mode, gs.in_main_menu, in_battle, Transition_IsActive())) return;
     if (Tutorial_IsOpen()) return;   // a pop-up owns the keys; the battle waits for it already
     if (in_battle) {
-        if (instance_exists(obj_battle_controller)) PauseMenu_Open(true);
+        if (instance_exists(obj_battle_controller)) { PauseMenu_Open(true); global.focus_pending = false; }
     } else if (instance_exists(gs.player_inst) && Player_IsSettled(gs.player_inst)) {
         PauseMenu_Open();
+        global.focus_pending = false;
     }
 }
 

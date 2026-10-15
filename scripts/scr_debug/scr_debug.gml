@@ -472,6 +472,8 @@ function Scenario_StepSmoke(_s) {
             break;
         case 210: case 211: case 212: case 213: case 214: case 215: case 216: case 217: case 218: case 219:
             Scenario_StepSmokeNotice(_s);   // F3a (D96): the notice pop-up through the real title (old slot file, a Continue that fails) and the keys around it
+        case 220: case 221: case 222:
+            Scenario_StepSmokeNewGameGuard(_s);   // review 1: New Game with a run saved needs a second confirm; the cursor starts on Continue
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -658,9 +660,96 @@ function Scenario_StepSmokePause(_s) {
             room_goto(rm_start);
             break;
         case 220:
-            Scenario_NewKnight();   // the rest of the smoke run starts the way it always did: a new knight entering rm_floor1 from the title
-            room_goto(rm_floor1);
-            Scenario_Next(_s, 1);
+            Scenario_Next(_s, 220);   // review 1: the title's New Game guard (220..222), which then goes on to step 1 in rm_floor1
+            break;
+    }
+}
+
+// Review 1 (HIGH): one confirm on New Game used to delete the saved run. With a run saved, the title starts on Continue and New Game
+// asks "Sure? Confirm again" (the pause menu's Abandon pattern): the run save survives the first press; moving or Back disarms; the
+// second press starts a new run. Real key input throughout. Then the smoke run goes on as before: a new run in rm_floor1.
+function Scenario_StepSmokeNewGameGuard(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _m = (_sc != noone && is_struct(_sc.title_stk)) ? _sc.title_stk.menus[0] : undefined;
+    var _armed = Loc_T("pause.option.abandon_confirm", "Sure? Confirm again");
+    var _plain = Loc_T("menu.main.option.0", "New Game");
+    switch (_s.step) {
+        case 220:   // wait for the title, save a run, build the title again as a launch does
+            if (_s.t > 600) { Scenario_Check("newgame_guard_reaches_the_title", false, "room=" + room_get_name(room)); Scenario_Finish(); break; }
+            if (_s.t > 40 && room == rm_start && _sc != noone && _sc.state == "main" && is_struct(_sc.title_stk) && !Transition_IsActive() && _gs.ui.mode == UI_NONE) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP newgame guard (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_NewKnight();
+                    room_goto(rm_floor1);
+                    Scenario_Next(_s, 1);
+                    break;
+                }
+                RunSave_Delete();
+                _gs.run = Run_Create(4242);
+                Scenario_Check("newgame_guard_run_save_written", RunSave_WriteTo() && RunSave_HasSave());
+                _sc.title_stk = undefined;   // Title_Step builds it again, as at launch
+                Scenario_Next(_s, 221);
+            }
+            break;
+        case 221:
+            switch (_s.t) {
+                case 3:
+                    Scenario_Check("newgame_guard_cursor_starts_on_continue_when_a_run_is_saved", is_struct(_m) && _m.cursor == 1 && _m.items[1].enabled, "cursor=" + (is_struct(_m) ? string(_m.cursor) : "no menu"));
+                    Scenario_Tap("menu_up");
+                    break;
+                case 9:
+                    Scenario_Check("newgame_guard_up_from_continue_is_new_game", _m.cursor == 0, "cursor=" + string(_m.cursor));
+                    break;
+                case 40:
+                    Scenario_Tap("confirm");   // the first press on New Game
+                    break;
+                case 46:
+                    Scenario_Check("newgame_guard_first_confirm_keeps_the_run_save", RunSave_HasSave());
+                    Scenario_Check("newgame_guard_first_confirm_asks_again", _m.items[0].label == _armed, "label=" + string(_m.items[0].label));
+                    Scenario_Check("newgame_guard_first_confirm_does_not_start_a_game", room == rm_start && _sc != noone && !is_struct(_sc.title_exit) && _sc.state == "main");
+                    Scenario_Tap("menu_down");
+                    break;
+                case 52:
+                    Scenario_Check("newgame_guard_moving_the_cursor_disarms", _m.cursor == 1 && _m.items[0].label == _plain, "cursor=" + string(_m.cursor) + " label=" + string(_m.items[0].label));
+                    Scenario_Tap("menu_up");
+                    break;
+                case 58:
+                    Scenario_Tap("confirm");   // arm again
+                    break;
+                case 64:
+                    Scenario_Check("newgame_guard_arms_again_after_a_move", _m.cursor == 0 && _m.items[0].label == _armed && RunSave_HasSave(), "label=" + string(_m.items[0].label));
+                    Scenario_Tap("cancel");
+                    break;
+                case 70:
+                    Scenario_Check("newgame_guard_back_disarms", _m.items[0].label == _plain && RunSave_HasSave() && room == rm_start && _sc.state == "main", "label=" + string(_m.items[0].label));
+                    Scenario_Tap("confirm");   // arm
+                    break;
+                case 76:
+                    Scenario_Check("newgame_guard_armed_once_more", _m.items[0].label == _armed && RunSave_HasSave());
+                    Scenario_Tap("confirm");   // the second press starts the new run
+                    break;
+                case 82:
+                    Scenario_Check("newgame_guard_second_confirm_starts_a_new_run", (_sc != noone && is_struct(_sc.title_exit)) || room != rm_start || Transition_IsActive(), "room=" + room_get_name(room));
+                    _s.ng_held = false;
+                    Scenario_Next(_s, 222);
+                    break;
+            }
+            break;
+        case 222:   // the new run reaches rm_floor1 (the intro, if it plays, is skipped by holding confirm; the first dialogue is confirmed)
+            if (_s.t > 1500) { Scenario_Check("newgame_guard_reaches_rm_floor1", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); break; }
+            if (room == rm_cutscene && !_s.ng_held && instance_exists(obj_start_controller) && obj_start_controller.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE && _s.t > 40) {
+                _s.ng_held = true;
+                Scenario_Hold("confirm", 120);
+            }
+            if (room == rm_floor1 && !Transition_IsActive()) {
+                if (_gs.ui.mode == UI_DIALOGUE) {
+                    if ((_s.f - _s.last_tap) >= 8) Scenario_Tap("confirm");
+                } else if (_s.t > 60 && array_length(_gs.ui.lines) <= 0 && variable_struct_exists(_gs, "pending_floor1_intro_dialogue") && !_gs.pending_floor1_intro_dialogue) {
+                    Scenario_Check("newgame_guard_new_run_is_not_the_saved_one", Run_IsActive() && _gs.run.seed != 4242, "seed=" + (Run_IsActive() ? string(_gs.run.seed) : "no run"));
+                    Scenario_Next(_s, 1);
+                }
+            }
             break;
     }
 }
@@ -3265,6 +3354,7 @@ function Scenario_StepShotsUi(_s) {
         case 82:   // down to Settings -> confirm (D35: no difficulty panel between the title and here)
             if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
             if (_s.t == 10) { RunSave_Delete(); _c.title_refresh = true; }   // C1: an earlier shot started a run; with no run save Continue is greyed and Down lands on Settings
+            if (_s.t == 20) Ui_MenuFixCursor(_c.title_stk.menus[0], 0);   // review 1: with a run saved the title started on Continue; back to New Game so Down lands on Settings
             if (_s.t == 30) Scenario_Tap("menu_down");
             if (_s.t == 36) Scenario_Tap("confirm");
             if (_s.t == 60) Ui_MenuFixCursor(_sp.menu, 0);   // an earlier shot left the remembered cursor on the Window row
@@ -7376,6 +7466,17 @@ function Scenario_StepSmokeFairUi(_s) {
                 Scenario_Check("fairui_losing_focus_on_the_map_opens_the_pause_menu", PauseMenu_IsOpen(), "mode=" + string(_gs.ui.mode));
                 var _it2 = Ui_StackTop(PauseMenu_Get().stk).items;
                 Scenario_Check("fairui_abandon_and_quit_stay_on_outside_a_battle", _it2[3].enabled && _it2[4].enabled && !PauseMenu_Get().in_battle);
+                // Review 1: Resume while the window is still unfocused must stay resumed (the pause opens on the loss EDGE only)
+                PauseMenu_Close(true);
+                Focus_Step(false);
+                Focus_Step(false);
+                Focus_Step(false);
+                Scenario_Check("fairui_resume_while_unfocused_does_not_reopen_the_pause", !PauseMenu_IsOpen() && !is_struct(PauseMenu_Get()), "mode=" + string(_gs.ui.mode));
+                Scenario_Check("fairui_the_music_stays_lowered_while_unfocused", BGM_Duck() < 1, "duck=" + string(BGM_Duck()));
+                Focus_Step(true);
+                Scenario_Check("fairui_focus_back_with_no_pause_open_changes_nothing", !PauseMenu_IsOpen() && BGM_Duck() == 1);
+                Focus_Step(false);
+                Scenario_Check("fairui_losing_focus_again_opens_the_pause_once", PauseMenu_IsOpen(), "mode=" + string(_gs.ui.mode));
                 Focus_Step(true);
                 PauseMenu_Close(true);
                 Scenario_Next(_s, 210);   // F3a: the notice pop-up on the title

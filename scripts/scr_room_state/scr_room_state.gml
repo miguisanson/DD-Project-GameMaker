@@ -544,8 +544,8 @@ function Run_StartNew(_intro_dialogue = false, _seed = undefined) {
 }
 
 // A run saved on disk that the player walks away from by starting a new game: it counts as abandoned (no echo).
-function Run_AbandonSaved() {
-    var l = RunSave_LoadFrom();
+function Run_AbandonSaved(_path = undefined) {
+    var l = RunSave_LoadFrom(_path);
     if (l.status == "ok") {
         var prof = Profile_Get();
         var raw = l.run;
@@ -565,7 +565,9 @@ function Run_AbandonSaved() {
         Profile_RecordRun(prof, entry);
         Profile_Flush();
     }
-    if (l.status == "ok" || l.status == "missing") RunSave_Delete();   // a newer / old / damaged file is left where it is
+    // An old-format file is cleared too (review 1): left behind, Continue kept showing the old-slot notice after a new game.
+    // A newer-version or damaged file is left where it is.
+    if (l.status == "ok" || l.status == "missing" || l.status == "old") RunSave_Delete(_path);
 }
 
 // Title screen, New Game after the difficulty pick: the intro cutscene plays once per profile (D26); later runs start at once.
