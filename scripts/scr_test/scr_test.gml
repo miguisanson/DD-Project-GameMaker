@@ -128,6 +128,7 @@ function Test_RunAll() {
     Test_RunSuite("H3", Test_Suite_H3);
     Test_RunSuite("LevelUpGrowth", Test_Suite_LevelUpGrowth);
     Test_RunSuite("OneMenu", Test_Suite_OneMenu);
+    Test_RunSuite("SeedInput", Test_Suite_SeedInput);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -10224,4 +10225,188 @@ function Test_Suite_OneMenu() {
     _gs2.persist = _old_persist;
     _gs2.player_ch = _old_ch;
     _gs2.flags = _old_flags;
+}
+
+// H10 (D152): seed input on New Game. The entry is a string of up to 9 digits with a cursor (no leading-zero padding): up / down cycle the digit under
+// the cursor (a blank slot counts as 0), left / right move the cursor (clamped to the digits typed plus the one blank slot), a typed digit goes in at the
+// cursor, Backspace removes the digit under the cursor (the one before it from the blank slot). "000123" is 123; empty and all zeros cannot be confirmed (a seed is 1 .. RNG_MOD - 2).
+function Test_Suite_SeedInput() {
+    // ---- parsing ----
+    Test_Eq("seed: 12345 parses to 12345", SeedParse("12345"), 12345);
+    Test_Eq("seed: 000123 parses to 123", SeedParse("000123"), 123);
+    Test_Eq("seed: empty parses to 0", SeedParse(""), 0);
+    Test_Eq("seed: nine zeros parse to 0", SeedParse("000000000"), 0);
+    Test_Eq("seed: nine nines parse to 999999999", SeedParse("999999999"), 999999999);
+    Test_Eq("seed: only the first nine digits count", SeedParse("1234567890"), 123456789);
+    Test_Eq("seed: anything that is not a digit is ignored", SeedParse("1a2-3"), 123);
+    Test_True("seed: 1 is a valid seed", Seed_IsValid(1));
+    Test_True("seed: 999999999 is a valid seed (positive 32 bit)", Seed_IsValid(999999999));
+    Test_True("seed: RNG_MOD - 2 is the last valid seed", Seed_IsValid(RNG_MOD - 2));
+    Test_False("seed: 0 is not a valid seed", Seed_IsValid(0));
+    Test_False("seed: a negative number is not a valid seed", Seed_IsValid(-5));
+    Test_False("seed: RNG_MOD - 1 is not a valid seed", Seed_IsValid(RNG_MOD - 1));
+
+    // ---- typing ----
+    var _e = SeedEntry_New();
+    Test_Eq("seed entry: a new entry is empty", SeedEntry_Text(_e), "");
+    Test_Eq("seed entry: a new entry has its cursor on the first slot", _e.cur, 0);
+    Test_False("seed entry: an empty entry cannot be confirmed", SeedEntry_CanConfirm(_e));
+    for (var _d = 1; _d <= 5; _d++) SeedEntry_Type(_e, _d);
+    Test_Eq("seed entry: typing 1 2 3 4 5 makes 12345", SeedEntry_Text(_e), "12345");
+    Test_Eq("seed entry: the cursor sits after the last digit", _e.cur, 5);
+    Test_Eq("seed entry: its value is 12345", SeedEntry_Value(_e), 12345);
+    Test_True("seed entry: 12345 can be confirmed", SeedEntry_CanConfirm(_e));
+
+    // ---- up / down cycle the digit, wrapping ----
+    var _c = SeedEntry_New();
+    SeedEntry_Type(_c, 9);
+    SeedEntry_Move(_c, -1);
+    Test_Eq("seed entry: left puts the cursor on the 9", _c.cur, 0);
+    SeedEntry_Cycle(_c, 1);
+    Test_Eq("seed entry: up on a 9 wraps to 0", SeedEntry_Text(_c), "0");
+    SeedEntry_Cycle(_c, -1);
+    Test_Eq("seed entry: down on a 0 wraps to 9", SeedEntry_Text(_c), "9");
+    SeedEntry_Cycle(_c, -1);
+    Test_Eq("seed entry: down on a 9 gives 8", SeedEntry_Text(_c), "8");
+    var _b = SeedEntry_New();
+    SeedEntry_Cycle(_b, 1);
+    Test_Eq("seed entry: up on the blank slot makes a 1", SeedEntry_Text(_b), "1");
+    var _b2 = SeedEntry_New();
+    SeedEntry_Cycle(_b2, -1);
+    Test_Eq("seed entry: down on the blank slot makes a 9 (0 wraps to 9)", SeedEntry_Text(_b2), "9");
+
+    // ---- left / right clamp ----
+    var _m = SeedEntry_New();
+    SeedEntry_Move(_m, -1);
+    Test_Eq("seed entry: left at the start stays", _m.cur, 0);
+    SeedEntry_Move(_m, 1);
+    Test_Eq("seed entry: right on an empty entry stays (the blank slot is the first)", _m.cur, 0);
+    SeedEntry_Type(_m, 4);
+    SeedEntry_Type(_m, 2);
+    Test_Eq("seed entry: two digits, cursor on the blank slot after them", _m.cur, 2);
+    SeedEntry_Move(_m, 1);
+    Test_Eq("seed entry: right past the blank slot stays", _m.cur, 2);
+    SeedEntry_Move(_m, -1);
+    SeedEntry_Move(_m, -1);
+    SeedEntry_Move(_m, -1);
+    Test_Eq("seed entry: left three times from 2 ends on 0", _m.cur, 0);
+    SeedEntry_Type(_m, 7);
+    Test_Eq("seed entry: a digit typed at the cursor replaces the digit there", SeedEntry_Text(_m), "72");
+    Test_Eq("seed entry: and the cursor moves on", _m.cur, 1);
+
+    // ---- at most 9 digits ----
+    var _f = SeedEntry_New();
+    for (var _k = 1; _k <= 9; _k++) SeedEntry_Type(_f, _k);
+    Test_Eq("seed entry: nine digits fit", SeedEntry_Text(_f), "123456789");
+    Test_Eq("seed entry: the cursor of a full entry stays on the last digit", _f.cur, 8);
+    SeedEntry_Type(_f, 0);
+    Test_Eq("seed entry: a tenth digit does not add a slot (it replaces the last)", SeedEntry_Text(_f), "123456780");
+    SeedEntry_Move(_f, 1);
+    Test_Eq("seed entry: right on a full entry stays on the last digit", _f.cur, 8);
+    SeedEntry_Cycle(_f, 1);
+    Test_Eq("seed entry: up on the last digit of a full entry changes it, not the length", SeedEntry_Text(_f), "123456781");
+
+    // ---- Backspace ----
+    var _g = SeedEntry_New();
+    for (var _k2 = 1; _k2 <= 3; _k2++) SeedEntry_Type(_g, _k2);
+    SeedEntry_Backspace(_g);
+    Test_Eq("seed entry: Backspace on the blank slot removes the last digit", SeedEntry_Text(_g), "12");
+    Test_Eq("seed entry: and the cursor follows", _g.cur, 2);
+    SeedEntry_Move(_g, -1);
+    SeedEntry_Backspace(_g);
+    Test_Eq("seed entry: Backspace removes the digit the cursor is on", SeedEntry_Text(_g), "1");
+    Test_Eq("seed entry: the cursor stays where it was (now the blank slot)", _g.cur, 1);
+    SeedEntry_Backspace(_g);
+    Test_Eq("seed entry: Backspace on the blank slot again removes the one before", SeedEntry_Text(_g), "");
+    Test_Eq("seed entry: and the cursor is on the first slot", _g.cur, 0);
+    SeedEntry_Backspace(_g);
+    Test_Eq("seed entry: Backspace on an empty entry does nothing", SeedEntry_Text(_g), "");
+    var _mid = SeedEntry_New();
+    for (var _k4 = 1; _k4 <= 3; _k4++) SeedEntry_Type(_mid, _k4);
+    SeedEntry_Move(_mid, -1);
+    SeedEntry_Move(_mid, -1);
+    SeedEntry_Backspace(_mid);
+    Test_Eq("seed entry: Backspace in the middle removes that digit", SeedEntry_Text(_mid), "13");
+    Test_Eq("seed entry: and the cursor stays on the digit that moved up", _mid.cur, 1);
+    var _h = SeedEntry_New();
+    for (var _k3 = 1; _k3 <= 9; _k3++) SeedEntry_Type(_h, _k3);
+    SeedEntry_Backspace(_h);
+    Test_Eq("seed entry: Backspace on a full entry removes the digit under the cursor", SeedEntry_Text(_h), "12345678");
+    Test_Eq("seed entry: and the cursor ends on the blank slot", _h.cur, 8);
+    var _ud = SeedEntry_New();
+    SeedEntry_Cycle(_ud, 1);
+    SeedEntry_Backspace(_ud);
+    Test_Eq("seed entry: Backspace takes back a digit made with up on the blank slot", SeedEntry_Text(_ud), "");
+
+    // ---- the keys: digits (top row and number pad) and Backspace are input actions, so a pad-less keyboard and the bot reach them the same way ----
+    Input_Init();
+    var _kb = global.input.bindings;
+    var _keys_ok = true;
+    for (var _kd = 0; _kd < 10; _kd++) {
+        var _ka = variable_struct_exists(_kb, "seed_d" + string(_kd)) ? variable_struct_get(_kb, "seed_d" + string(_kd)) : [];
+        if (!array_contains(_ka, ord("0") + _kd) || !array_contains(_ka, vk_numpad0 + _kd)) _keys_ok = false;
+    }
+    Test_True("seed keys: every digit has its top-row key and its number-pad key", _keys_ok);
+    Test_True("seed keys: Backspace deletes", array_contains(_kb.seed_back, vk_backspace));
+    Test_False("seed keys: no digit key is also a menu key", array_contains(_kb.confirm, ord("5")) || array_contains(_kb.cancel, ord("5")) || array_contains(_kb.menu_up, ord("5")));
+
+    // ---- what can be confirmed ----
+    var _z = SeedEntry_New();
+    SeedEntry_Type(_z, 0);
+    SeedEntry_Type(_z, 0);
+    Test_False("seed entry: 00 cannot be confirmed (a seed is above zero)", SeedEntry_CanConfirm(_z));
+    SeedEntry_Type(_z, 5);
+    Test_True("seed entry: 005 can be confirmed", SeedEntry_CanConfirm(_z));
+    Test_Eq("seed entry: and its seed is 5", SeedEntry_Value(_z), 5);
+
+    // ---- a run started with a seed keeps exactly that seed ----
+    Test_Eq("seed run: Run_Create keeps 12345", Run_Create(12345).seed, 12345);
+    Test_Eq("seed run: an explicit seed wins", Run_ResolveSeed(777), 777);
+    global.run_next_seed = 4242;
+    Test_Eq("seed run: the seed picked on the title is used", Run_ResolveSeed(), 4242);
+    Test_True("seed run: and is used once", is_undefined(global.run_next_seed));
+    var _rnd = Run_ResolveSeed();
+    Test_True("seed run: without a pick the seed is random and valid", Seed_IsValid(_rnd));
+    global.run_next_seed = 4242;
+    Test_Eq("seed run: a seed given by the caller leaves the pick alone", Run_ResolveSeed(55), 55);
+    global.run_next_seed = undefined;
+
+    // ---- same seed, same room plans; another seed, another plan somewhere ----
+    var _slots = [
+        { pid: "e1", enemy_id: ENEMY_DIREWOLF, x: 48, y: 64, fixed: false },
+        { pid: "e2", enemy_id: ENEMY_KILLER_PLANT, x: 96, y: 32, fixed: false },
+        { pid: "e3", enemy_id: ENEMY_KILLER_PLANT, x: 144, y: 80, fixed: false },
+        { pid: "b1", enemy_id: ENEMY_MINI_BOSS, x: 224, y: 32, fixed: true }
+    ];
+    var _rooms = ["rm_floor2", "rm_floor3", "rm_floor4", "rm_floor5", "rm_floor6"];
+    var _same = true;
+    var _diff = false;
+    for (var _r = 0; _r < array_length(_rooms); _r++) {
+        var _a1 = json_stringify(Shuffle_RoomPlan(Run_Create(12345).seed, _rooms[_r], _slots));
+        var _a2 = json_stringify(Shuffle_RoomPlan(Run_Create(12345).seed, _rooms[_r], _slots));
+        var _o = json_stringify(Shuffle_RoomPlan(Run_Create(54321).seed, _rooms[_r], _slots));
+        if (_a1 != _a2) _same = false;
+        if (_a1 != _o) _diff = true;
+    }
+    Test_True("seed run: two runs with seed 12345 deal the same plan in five rooms", _same);
+    Test_True("seed run: seed 54321 deals another plan in at least one of them", _diff);
+
+    // ---- the Status tab and the run summary show the seed ----
+    Loc_SetLanguage("en");
+    Test_Eq("seed label: Seed: 12345", Seed_Label(12345), "Seed: 12345");
+    Test_Eq("seed status: the Status card's seed line is Seed: 12345", string_replace_all(TabMenu_CardData(Ui_Metrics()).seed_tpl, "{n}", "12345"), "Seed: 12345");
+    var _entry = Run_MakeHistoryEntry(Run_Create(12345), undefined, "rm_floor2", "died", "x");
+    var _rows = RunFlow_SummaryRows(_entry);
+    Test_Eq("seed summary: the run summary has a Seed row with the seed", Test_RowValue(_rows, Loc_T("tab.lbl.seed", "Seed")), "12345");
+    Test_Eq("seed summary: it keeps the other five rows", array_length(_rows), 6);
+
+    // ---- a seeded run lands in the history and the counters like any run ----
+    var _prof = Profile_Default();
+    Profile_RecordRun(_prof, _entry);
+    Test_Eq("seed history: the seeded run is in the history with its seed", _prof.history[array_length(_prof.history) - 1].seed, 12345);
+    Test_Eq("seed history: a seeded death counts", _prof.deaths, 1);
+    var _won = Run_MakeHistoryEntry(Run_Create(777), undefined, "rm_floor9", "won", "");
+    Profile_RecordRun(_prof, _won);
+    Test_Eq("seed history: a seeded win counts", _prof.wins, 1);
+    Test_True("seed history: and unlocks as any win does", Profile_IsUnlocked(_prof, "nobody_class"));
 }

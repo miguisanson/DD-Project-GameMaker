@@ -524,7 +524,10 @@ function Scenario_StepSmoke(_s) {
             break;
         case 470: case 471: case 472: case 473: case 474: case 475: case 476: case 477: case 478: case 479:
         case 480: case 481: case 482: case 483: case 484: case 485: case 486: case 487: case 488: case 489:
-            Scenario_StepSmokeOneMenu(_s);   // H1 (D140, D141): Esc and Tab are one menu, in the fight too; Quit in a fight comes back to just before it; its last step calls Scenario_NoticeEnd
+            Scenario_StepSmokeOneMenu(_s);   // H1 (D140, D141): Esc and Tab are one menu, in the fight too; Quit in a fight comes back to just before it; its last step goes on with H10 (550..559)
+            break;
+        case 550: case 551: case 552: case 553: case 554: case 555: case 556: case 557: case 558: case 559:
+            Scenario_StepSmokeSeed(_s);   // H10 (D152): the seed pick and the number entry through the real title, a run on seed 12345 and one on a random seed; the end of the chain
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -644,6 +647,7 @@ function Scenario_StepSmokeUiStart(_s) {
             Scenario_Tap("confirm");
             break;
         default:
+            Scenario_SeedPickRandom(_s);   // D152: New Game asks for a seed first; Random seed is the first row
             if (_s.t > 1 && room == rm_cutscene && obj_start_controller.cutscene_started && !Transition_IsActive() && GameState_Get().ui.mode == UI_DIALOGUE) {
                 Scenario_Check("ui_new_game_opens_no_difficulty_menu", !_s.diff_menu_seen, "a difficulty state appeared");
                 Scenario_Check("ui_new_game_starts_the_intro_on_normal", Difficulty_GetCurrent() == DIFFICULTY_NORMAL, "difficulty=" + string(Difficulty_GetCurrent()));
@@ -778,6 +782,12 @@ function Scenario_StepSmokeNewGameGuard(_s) {
                     Scenario_Tap("confirm");   // the second press starts the new run
                     break;
                 case 82:
+                    Scenario_Check("newgame_guard_second_confirm_asks_for_a_seed", _sc != noone && is_struct(_sc.title_stk) && Ui_StackTop(_sc.title_stk).id == "seed_choice" && !is_struct(_sc.title_exit) && RunSave_HasSave(), "room=" + room_get_name(room));   // D152
+                    break;
+                case 96:
+                    Scenario_Tap("confirm");   // D152: Random seed, the first row
+                    break;
+                case 104:
                     Scenario_Check("newgame_guard_second_confirm_starts_a_new_run", (_sc != noone && is_struct(_sc.title_exit)) || room != rm_start || Transition_IsActive(), "room=" + room_get_name(room));
                     _s.ng_held = false;
                     Scenario_Next(_s, 222);
@@ -919,7 +929,9 @@ function Scenario_StepSmokeTitle(_s) {
             break;
         case 275:   // with no run the guard is out of the way: New Game starts at once (one press); then the scenario ends
             if (_s.t == 3) Scenario_Tap("confirm");
-            if (_s.t == 9) {
+            if (_s.t == 12) Scenario_Check("title_new_game_without_a_run_asks_for_a_seed", Ui_StackTop(_sc.title_stk).id == "seed_choice" && !is_struct(_sc.title_exit));   // D152
+            if (_s.t == 16) Scenario_Tap("confirm");   // D152: Random seed, the first row
+            if (_s.t == 24) {
                 Scenario_Check("title_new_game_without_a_run_starts_at_once", is_struct(_sc.title_exit) || room != rm_start || Transition_IsActive());
                 Scenario_Next(_s, 360);   // G8 (D136): the Rumble setting through the real pause menu and Settings (360..369); the last one ends the run
             }
@@ -2897,7 +2909,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsLevelUp(_s);   // H4 (D143): the free-point screen with the class growth line, two sizes and Korean; goes on with H1 (490..499)
             break;
         case 490: case 491: case 492: case 493: case 494: case 495: case 496: case 497: case 498: case 499:
-            Scenario_StepShotsOneMenu(_s);   // H1 (D140): the System tab, the Settings tab and the "Keep this?" prompt, two sizes; finishes the run
+            Scenario_StepShotsOneMenu(_s);   // H1 (D140): the System tab, the Settings tab and the "Keep this?" prompt, two sizes; goes on with H10 (570..579)
+            break;
+        case 570: case 571: case 572: case 573: case 574: case 575: case 576: case 577: case 578: case 579:
+            Scenario_StepShotsSeed(_s);   // H10 (D152): the seed pick and the entry screen, two sizes, Korean once; goes on with H10 (570..579)
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -7842,6 +7857,7 @@ function Scenario_StepSmokeNotice(_s) {
                 Ui_MenuFixCursor(_top, 0);
                 Scenario_Tap("confirm");
             }
+            if (_s.t == 30) Scenario_Tap("confirm");   // D152: Random seed, the first row of the pick New Game opened
             if (_s.t > 20 && room != rm_start) {
                 Scenario_Check("notice_new_game_after_the_notice_starts_the_run", room == rm_cutscene || room == rm_floor1, "room=" + room_get_name(room));
                 Scenario_Next(_s, 230);   // I2: the regression-gap steps (230..249) go on from this new game; the last one calls Scenario_NoticeEnd
@@ -8365,7 +8381,7 @@ function Scenario_StepSmokeReg(_s) {
             if (variable_struct_exists(_rg, "goto5") && _s.t > _rg.goto5 + 40 && Scenario_FloorReady(rm_floor5)) {
                 var _mb249 = instance_exists(obj_mini_boss) ? instance_find(obj_mini_boss, 0) : noone;
                 Scenario_Check("regr_r007_a_new_run_brings_the_mini_boss_back", _mb249 != noone && !_mb249.defeated && !_gs.boss_defeated.mini_boss);
-                Scenario_Next(_s, 250);   // bug hunt 2 (250..268) goes on from here; its last step calls Scenario_NoticeEnd
+                Scenario_Next(_s, 250);   // bug hunt 2 (250..268) goes on from here; its last step goes on with H10 (550..559)
             }
             if (_s.t > 900) { Scenario_Check("regr_r007_new_run_reaches_rm_floor5", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
@@ -10968,9 +10984,167 @@ function Scenario_StepSmokeOneMenu(_s) {
             }
             if (variable_struct_exists(_o, "arrived") && _s.t == _o.arrived + 30) {
                 Scenario_Check("onemenu_no_fight_starts_at_once_after_continue", room == rm_floor1 && !Transition_IsActive(), "room=" + room_get_name(room) + " fx=" + json_stringify(_gs.transition_fx) + " cooldown=" + string(instance_exists(obj_player) ? instance_find(obj_player, 0).battle_cooldown : -1));
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 550);   // H10 (D152, 550..559) goes on; its last step ends the smoke chain
             }
             if (_s.t > 1500) { Scenario_Check("onemenu_continue_reaches_rm_floor1", false, "room=" + room_get_name(room) + " cont=" + string(variable_struct_exists(_o, "cont"))); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// D152: New Game opens the seed pick. The scenarios that only want a run take its first row (Random seed) with a real confirm, once the pick is open and has
+// accepted keys (UI_INPUT_LOCK_MS). Returns true on the frame it taps.
+function Scenario_SeedPickRandom(_s) {
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    if (_sc == noone || room != rm_start || !is_struct(_sc.title_stk) || is_struct(_sc.title_exit)) return false;
+    var _top = Ui_StackTop(_sc.title_stk);
+    if (!is_struct(_top) || _top.id != "seed_choice" || is_struct(Title_SeedEntryOf(_sc))) return false;
+    if (current_time - _top.lock_ms < UI_INPUT_LOCK_MS + 40 || (_s.f - _s.last_tap) < 8) return false;
+    Scenario_Tap("confirm");
+    return true;
+}
+
+// ============================================================================
+// H10 (D152): seed input through the real title (smoke steps 550-559, the end of the chain). A clean profile that has seen the intro (New Game starts a run
+// at once), the title, New Game opens the seed pick (Random seed first and highlighted), Enter seed opens the entry, Confirm on an empty entry is refused
+// with a line saying why, 1 2 3 4 5 are typed with the digit keys, up adds a digit and Backspace takes it away, left / right move, Confirm starts the run:
+// its seed is 12345. The run is ended like any run (history, counters). A second New Game with the default Random seed starts a run with a seed of its own.
+// ============================================================================
+function Scenario_StepSmokeSeed(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _top = (_sc != noone && is_struct(_sc.title_stk)) ? Ui_StackTop(_sc.title_stk) : undefined;
+    if (!variable_struct_exists(_s, "sd")) _s.sd = {};
+    var _d = _s.sd;
+    if (room == rm_start && _sc != noone && _sc.state == "boot_logo") _sc.state = "main";   // the logo is not what is checked here
+    var _title_ready = (room == rm_start && _sc != noone && _sc.state == "main" && is_struct(_top) && !Transition_IsActive() && !Notice_IsOpen());
+    var _ent = (_sc != noone) ? Title_SeedEntryOf(_sc) : undefined;
+    switch (_s.step) {
+        case 550:   // a clean profile that has seen the intro, then the title
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP seed smoke (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_NoticeEnd();
+                    break;
+                }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                RunSave_Delete();
+                Profile_ResetForTest();
+                Story_Mark(Story_CutsceneKey("intro"));
+                _d.runs0 = Profile_Get().runs_started;
+                Scenario_NoticeToTitle();
+            }
+            if (_s.t > 20 && _title_ready) Scenario_Next(_s, 551);
+            if (_s.t > 900) { Scenario_Check("seed_smoke_reaches_the_title", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 551:   // New Game (no run is saved: one press) opens the seed pick
+            if (_s.t == 1) {
+                Scenario_Check("seed_smoke_the_cursor_starts_on_new_game", _top.cursor == 0 && _top.items[0].id == "new", "cursor=" + string(_top.cursor));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 8 && is_struct(_top) && _top.id == "seed_choice") {
+                Scenario_Check("seed_smoke_new_game_opens_the_seed_pick", Ui_StackDepth(_sc.title_stk) == 2 && !is_struct(_sc.title_exit));
+                Scenario_Check("seed_smoke_random_seed_is_the_first_row", _top.items[0].id == "random" && _top.items[0].label == Loc_T("seed.choice.random", "Random seed"), "label=" + string(_top.items[0].label));
+                Scenario_Check("seed_smoke_random_seed_is_highlighted", _top.cursor == 0, "cursor=" + string(_top.cursor));
+                Scenario_Check("seed_smoke_enter_seed_is_the_second_row", _top.items[1].id == "enter" && _top.items[1].label == Loc_T("seed.choice.enter", "Enter seed"));
+                Scenario_Tap("menu_down");
+                Scenario_Next(_s, 552);
+            }
+            if (_s.t > 300) { Scenario_Check("seed_smoke_new_game_opens_the_seed_pick", false, "room=" + room_get_name(room) + " exit=" + string(is_struct(_sc.title_exit))); Scenario_NoticeEnd(); }
+            break;
+        case 552:   // Down to Enter seed, Confirm: the entry screen opens, empty
+            if (_s.t == 10) {
+                Scenario_Check("seed_smoke_down_moves_to_enter_seed", _top.id == "seed_choice" && _top.cursor == 1, "cursor=" + string(_top.cursor));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 14 && is_struct(_ent)) {
+                Scenario_Check("seed_smoke_enter_seed_opens_the_entry", true);
+                Scenario_Check("seed_smoke_the_entry_starts_empty", SeedEntry_Text(_ent) == "" && !SeedEntry_CanConfirm(_ent));
+                Scenario_Next(_s, 553);
+            }
+            if (_s.t > 300) { Scenario_Check("seed_smoke_enter_seed_opens_the_entry", false, "cursor=" + string(is_struct(_top) ? _top.cursor : -1)); Scenario_NoticeEnd(); }
+            break;
+        case 553:   // Confirm on the empty entry is refused; then 1 2 3 4 5 with the digit keys, up / Backspace / left / right, Confirm
+            switch (_s.t) {
+                case 12: Scenario_Tap("confirm"); break;
+                case 18:
+                    Scenario_Check("seed_smoke_an_empty_entry_is_refused", is_struct(_ent) && !is_struct(_sc.title_exit) && _sc.title_seed_msg, "msg=" + string(_sc.title_seed_msg));
+                    break;
+                case 22: Scenario_Tap("seed_d1"); break;
+                case 26: Scenario_Tap("seed_d2"); break;
+                case 30: Scenario_Tap("seed_d3"); break;
+                case 34: Scenario_Tap("seed_d4"); break;
+                case 38: Scenario_Tap("seed_d5"); break;
+                case 44:
+                    Scenario_Check("seed_smoke_the_digit_keys_type_12345", is_struct(_ent) && SeedEntry_Text(_ent) == "12345" && _ent.cur == 5, "text=" + (is_struct(_ent) ? SeedEntry_Text(_ent) : "none"));
+                    Scenario_Check("seed_smoke_typing_clears_the_refusal_line", !_sc.title_seed_msg);
+                    Scenario_Tap("menu_up");
+                    break;
+                case 50:
+                    Scenario_Check("seed_smoke_up_adds_a_digit_on_the_blank_slot", is_struct(_ent) && SeedEntry_Text(_ent) == "123451", "text=" + (is_struct(_ent) ? SeedEntry_Text(_ent) : "none"));
+                    Scenario_Tap("seed_back");
+                    break;
+                case 56:
+                    Scenario_Check("seed_smoke_backspace_takes_it_away", is_struct(_ent) && SeedEntry_Text(_ent) == "12345" && _ent.cur == 5, "text=" + (is_struct(_ent) ? SeedEntry_Text(_ent) : "none"));
+                    Scenario_Tap("menu_left");
+                    break;
+                case 62:
+                    Scenario_Check("seed_smoke_left_moves_the_cursor", is_struct(_ent) && _ent.cur == 4, "cur=" + (is_struct(_ent) ? string(_ent.cur) : "none"));
+                    Scenario_Tap("menu_right");
+                    break;
+                case 68:
+                    Scenario_Check("seed_smoke_right_moves_it_back", is_struct(_ent) && _ent.cur == 5 && SeedEntry_CanConfirm(_ent), "cur=" + (is_struct(_ent) ? string(_ent.cur) : "none"));
+                    Scenario_Tap("confirm");
+                    break;
+                case 74:
+                    Scenario_Check("seed_smoke_confirm_starts_the_run_on_the_typed_seed", !is_struct(_ent) && (global.run_next_seed == 12345 || (Run_IsActive() && Run_Get().seed == 12345)));
+                    Scenario_Next(_s, 554);
+                    break;
+            }
+            break;
+        case 554:   // the run is up: its seed is 12345, counted as a started run; it ends like any run
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) {
+                Scenario_Check("seed_smoke_the_run_has_the_typed_seed", Run_Get().seed == 12345, "seed=" + string(Run_Get().seed));
+                Scenario_Check("seed_smoke_the_typed_seed_is_used_once", is_undefined(global.run_next_seed));
+                Scenario_Check("seed_smoke_the_run_counts_as_started", Profile_Get().runs_started == _d.runs0 + 1, "runs_started=" + string(Profile_Get().runs_started));
+                Scenario_Check("seed_smoke_the_status_line_says_the_seed", Seed_Label(Run_Get().seed) == "Seed: 12345");
+                var _deaths0 = Profile_Get().deaths;
+                Run_Finish("died", "seed smoke");
+                var _hist = Profile_Get().history;
+                Scenario_Check("seed_smoke_the_run_lands_in_the_history", array_length(_hist) >= 1 && _hist[array_length(_hist) - 1].seed == 12345);
+                Scenario_Check("seed_smoke_a_seeded_death_counts", Profile_Get().deaths == _deaths0 + 1);
+                Scenario_Check("seed_smoke_the_summary_shows_the_seed", Test_RowValue(RunFlow_SummaryRows(global.run_last), Loc_T("tab.lbl.seed", "Seed")) == "12345");
+                Scenario_NoticeToTitle();
+                Scenario_Next(_s, 555);
+            }
+            if (_s.t > 1500) { Scenario_Check("seed_smoke_the_seeded_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 555:   // the second path: New Game, and the pick's default row (Random seed) is taken
+            if (_s.t > 20 && _title_ready) {
+                Scenario_Tap("confirm");
+                Scenario_Next(_s, 556);
+            }
+            if (_s.t > 900) { Scenario_Check("seed_smoke_reaches_the_title_again", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 556:
+            if (_s.t > 8 && is_struct(_top) && _top.id == "seed_choice") {
+                Scenario_Check("seed_smoke_random_seed_is_highlighted_again_after_using_enter_seed", _top.cursor == 0, "cursor=" + string(_top.cursor));
+                if (current_time - _top.lock_ms >= UI_INPUT_LOCK_MS + 40) {
+                    Scenario_Tap("confirm");
+                    Scenario_Next(_s, 557);
+                }
+            }
+            if (_s.t > 300) { Scenario_Check("seed_smoke_the_pick_opens_again", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 557:   // Random seed starts a run with a seed of its own
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) {
+                Scenario_Check("seed_smoke_random_seed_starts_a_run", Seed_IsValid(Run_Get().seed), "seed=" + string(Run_Get().seed));
+                Scenario_Check("seed_smoke_random_seed_is_not_the_typed_one", Run_Get().seed != 12345);
+                Scenario_Check("seed_smoke_the_pick_is_used_up", is_undefined(global.run_next_seed));
+                Scenario_Check("seed_smoke_the_second_run_counts_too", Profile_Get().runs_started == _d.runs0 + 2, "runs_started=" + string(Profile_Get().runs_started));
+                Scenario_NoticeEnd();
+            }
+            if (_s.t > 1500) { Scenario_Check("seed_smoke_the_random_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
     }
 }
@@ -11120,9 +11294,101 @@ function Scenario_StepShotsOneMenu(_s) {
                 _o.si++;
                 if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
                 if (_o.di >= array_length(_scenes)) {
-                    Scenario_Finish();   // the end of the pictures
+                    _o.si = 0;
+                    _o.di = 0;
+                    _s.si = 0;
+                    _s.di = 0;
+                    Scenario_Next(_s, 570);   // H10 (D152): the seed pick and entry pictures (570..579) finish the run
                 } else {
                     Scenario_Next(_s, 490);
+                }
+            }
+            break;
+    }
+}
+
+// ---- H10 (D152) pictures 570..572: the seed pick and the entry screen at windowed scale 3 (480 x 432) and 5 (800 x 720), and the entry in Korean at scale 3.
+// Each is the real draw of the real title screen; the layout is asserted on the rectangles. Files shot_seed_<scene>_<w>x<h>.png. Ends the shots run. ----
+function Scenario_SeedScenes() {
+    return ["choice", "entry", "entry_ko"];
+}
+
+function Scenario_SeedScales(_di) {
+    return (_di == 2) ? [3] : [3, 5];
+}
+
+function Scenario_StepShotsSeed(_s) {
+    var _scenes = Scenario_SeedScenes();
+    var _scales = Scenario_SeedScales(_s.di);
+    var _sc = _scenes[_s.di];
+    var _tag = _sc + "_" + string(_scales[_s.si]);
+    var _c = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _gs = GameState_Get();
+    switch (_s.step) {
+        case 570:   // the title at this scale, then the pick (or the entry with 1 2 3 4 5 typed) opened over it
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Notice_Interrupt();
+                Loc_SetLanguage("en");
+                Scenario_SetWindowScale(_scales[_s.si]);
+                RunSave_Delete();
+                _gs.in_main_menu = true;
+                _gs.startup_logo_seen = true;
+                room_goto(rm_start);
+            }
+            if (_s.t >= 40 && room == rm_start && _c != noone && !Transition_IsActive() && _c.state == "main" && is_struct(_c.title_stk)) {
+                if (_sc == "entry_ko") Loc_SetLanguage("ko");
+                Title_SeedChoiceOpen(_c);
+                if (_sc != "choice") {
+                    Title_SeedChoiceConfirm(Ui_StackTop(_c.title_stk), 1);
+                    for (var _k = 1; _k <= 5; _k++) SeedEntry_Type(_c.title_seed, _k);
+                }
+                Scenario_Next(_s, 571);
+            }
+            if (_s.t > 900) { Scenario_Check("shots_seed_reaches_the_title_" + _tag, false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 571:   // wait until the panel is in, assert the layout, take the picture
+            var _mt = Ui_Metrics();
+            var _p = _mt.p;
+            var _ready = (_sc == "choice") ? (Ui_MenuAlpha(Ui_StackTop(_c.title_stk), current_time) >= 1) : (is_struct(Title_SeedEntryOf(_c)) && Ui_AnimT(_c.title_seed_t, current_time) >= 1 && variable_instance_exists(_c, "title_seed_rects"));
+            if (_ready) {
+                if (_sc == "choice") {
+                    var _top = Ui_StackTop(_c.title_stk);
+                    var _r = _top.rect;
+                    Scenario_Check("shots_seed_pick_is_inside_the_gui_" + _tag, _r.w > 0 && _r.x >= 0 && _r.y >= 0 && _r.x + _r.w <= _mt.gw && _r.y + _r.h <= _mt.gh, json_stringify(_r));
+                    Scenario_Check("shots_seed_pick_has_random_first_and_lit_" + _tag, _top.id == "seed_choice" && _top.cursor == 0 && _top.items[0].id == "random");
+                    Scenario_Check("shots_seed_pick_hides_the_continue_card_" + _tag, Ui_StackDepth(_c.title_stk) == 2);
+                } else {
+                    var _rc = _c.title_seed_rects;
+                    var _pn = _rc.panel;
+                    Scenario_Check("shots_seed_entry_is_inside_the_gui_" + _tag, _pn.x >= 0 && _pn.y >= 0 && _pn.x + _pn.w <= _mt.gw && _pn.y + _pn.h <= _mt.gh, json_stringify(_pn));
+                    var _cells_ok = (array_length(_rc.cells) == SEED_DIGITS_MAX);
+                    for (var _i = 0; _i < array_length(_rc.cells); _i++) {
+                        var _ce = _rc.cells[_i];
+                        if (_ce.x < _pn.x + 2 * _p || _ce.x + _ce.w > _pn.x + _pn.w - 2 * _p || _ce.y < _pn.y || _ce.y + _ce.h > _pn.y + _pn.h) _cells_ok = false;
+                        if (_i > 0 && _rc.cells[_i - 1].x + _rc.cells[_i - 1].w > _ce.x) _cells_ok = false;
+                    }
+                    Scenario_Check("shots_seed_entry_cells_fit_the_panel_in_one_row_" + _tag, _cells_ok, json_stringify(_rc.cells[0]));
+                    Scenario_Check("shots_seed_entry_hint_fits_the_panel_" + _tag, _rc.hint_y + _rc.hint_h <= _pn.y + _pn.h - 3 * _p, "hint " + string(_rc.hint_y) + "+" + string(_rc.hint_h) + " panel " + json_stringify(_pn));
+                    Scenario_Check("shots_seed_entry_shows_12345_" + _tag, SeedEntry_Text(_c.title_seed) == "12345" && _c.title_seed.cur == 5);
+                }
+                _s.shot = "shot_seed_" + _sc + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 572);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_seed_scene_is_ready_" + _tag, false, "state=" + ((_c != noone) ? string(_c.state) : "none")); Scenario_Finish(); }
+            break;
+        case 572:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _s.si++;
+                if (_s.si >= array_length(_scales)) { _s.si = 0; _s.di++; }
+                if (_s.di >= array_length(_scenes)) {
+                    Loc_SetLanguage("en");
+                    RunSave_Delete();
+                    Scenario_Finish();
+                } else {
+                    Scenario_Next(_s, 570);
                 }
             }
             break;

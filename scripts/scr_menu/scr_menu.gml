@@ -956,7 +956,7 @@ function TabMenu_CardData(_mt) {
     c = {
         lang: lang, mt: _mt,
         hp: Loc_T("battle.hud.hp", "HP"), mp: Loc_T("battle.hud.mp", "MP"), xp: Loc_T("tab.lbl.xp", "XP"), xp_max: Loc_T("tab.val.max", "MAX"),
-        level_tpl: Loc_T("battle.hud.level", "Lv {n}"), seed_tpl: Loc_T("tab.lbl.seed_small", "Seed {n}"),
+        level_tpl: Loc_T("battle.hud.level", "Lv {n}"), seed_tpl: Loc_T("tab.lbl.seed_small", "Seed: {n}"),
         lab_w: 0, k_hp: -999, k_mp: -999, k_xp: -999, val_w: 0
     };
     c.lab_w = max(UI_TextWidth(c.hp), max(UI_TextWidth(c.mp), UI_TextWidth(c.xp)));
@@ -2822,6 +2822,7 @@ function Title_Build(_c) {
     Ui_StackPush(_c.title_stk, m);
     _c.title_new_armed = false;
     _c.title_refresh = false;
+    _c.title_seed = undefined;   // D152: the seed entry screen (a SeedEntry struct while it is open)
     _c.title_card = has_run ? Title_CardLoad() : Title_CardNone();   // D128: read, never applied
 }
 
@@ -2863,8 +2864,7 @@ function Title_OnConfirm(_m, _i) {
                 break;
             }
             c.title_new_armed = false;
-            c.title_exit = { at: current_time + UI_PANEL_MS };
-            Ui_MenuClose(_m);
+            Title_SeedChoiceOpen(c);   // D152: Random seed (first) or Enter seed; the title fades out after that pick
             break;
         case "load":   // C1 (D46): Continue run
             var cont = Run_Continue();
@@ -2876,6 +2876,153 @@ function Title_OnConfirm(_m, _i) {
             break;
         case "exit": game_end(); break;
     }
+}
+
+// ---- D152: the seed pick after New Game ----
+// A small menu above the title: "Random seed" (first and highlighted every time) or "Enter seed" (the number entry below). Either way the title then
+// fades out and the run starts (Title_Step -> Run_BeginNewGame); a picked seed waits in global.run_next_seed for Run_StartNew (after the intro cutscene
+// of a first run). Back goes back to the title menu.
+function Title_SeedChoiceOpen(_c) {
+    var m = Ui_MenuNew("seed_choice", [
+        { id: "random", label: Loc_T("seed.choice.random", "Random seed"), kind: "button", enabled: true },
+        { id: "enter", label: Loc_T("seed.choice.enter", "Enter seed"), kind: "button", enabled: true }
+    ], {
+        owner: _c, on_confirm: Title_SeedChoiceConfirm,
+        layout: { title: Loc_T("seed.choice.title", "Choose a seed"), anchor: "center", center: true }
+    });
+    Ui_MenuFixCursor(m, 0);   // not the remembered row: Random is the default
+    Ui_StackPush(_c.title_stk, m);
+}
+
+function Title_SeedChoiceConfirm(_m, _i) {
+    var c = _m.owner;
+    if (_m.items[_i].id == "enter") {
+        c.title_seed = SeedEntry_New();
+        c.title_seed_t = current_time;
+        c.title_seed_msg = false;
+        c.title_seed_rep = { v: Ui_RepeatNew(), h: Ui_RepeatNew() };
+        return;
+    }
+    global.run_next_seed = undefined;
+    Title_NewGameGo(c);
+}
+
+// The title fades out; Title_Step starts the run when the fade is over.
+function Title_NewGameGo(_c) {
+    _c.title_exit = { at: current_time + UI_PANEL_MS };
+    for (var i = 0; i < array_length(_c.title_stk.menus); i++) Ui_MenuClose(_c.title_stk.menus[i]);
+}
+
+function Title_SeedEntryOf(_c) {
+    return (variable_instance_exists(_c, "title_seed") && is_struct(_c.title_seed)) ? _c.title_seed : undefined;
+}
+
+// The entry screen's keys: digits type at the cursor, Backspace (or Q / pad LB) deletes, up / down change the digit, left / right move; Confirm starts
+// (not while the entry is empty or all zeros: a line says why), Back returns to the pick. The press that opened the screen does not answer it.
+function Title_SeedEntryStep(_c) {
+    var e = _c.title_seed;
+    var snap = Ui_ReadInput();
+    var now = current_time;
+    var changed = false;
+    for (var d = 0; d < 10; d++) {
+        if (Input_Pressed("seed_d" + string(d))) { SeedEntry_Type(e, d); changed = true; }
+    }
+    if (Input_Pressed("seed_back") || snap.tab < 0) { SeedEntry_Backspace(e); changed = true; }
+    var dv = (snap.up ? 1 : 0) - (snap.down ? 1 : 0);
+    if (Ui_RepeatStep(_c.title_seed_rep.v, dv, snap.up_p || snap.down_p, now) > 0) { SeedEntry_Cycle(e, dv); changed = true; }
+    var dh = (snap.right ? 1 : 0) - (snap.left ? 1 : 0);
+    if (Ui_RepeatStep(_c.title_seed_rep.h, dh, snap.left_p || snap.right_p, now) > 0) {
+        var was = e.cur;
+        SeedEntry_Move(e, dh);
+        if (e.cur != was) changed = true;
+    }
+    if (changed) {
+        _c.title_seed_msg = false;
+        SFX_PlayUI("ui_move");
+    }
+    if (now - _c.title_seed_t < UI_INPUT_LOCK_MS) return;
+    if (snap.confirm) {
+        if (SeedEntry_CanConfirm(e)) {
+            SFX_PlayUI("ui_confirm");
+            global.run_next_seed = SeedEntry_Value(e);
+            _c.title_seed = undefined;
+            Title_NewGameGo(_c);
+        } else {
+            SFX_PlayUI("ui_back");
+            _c.title_seed_msg = true;
+        }
+    } else if (snap.back || snap.rclick) {
+        SFX_PlayUI("ui_back");
+        _c.title_seed = undefined;
+        Ui_StackTop(_c.title_stk).lock_ms = now;
+    }
+}
+
+// A small arrow: 5p wide, 3p tall, pointing up (_dir -1) or down (+1); (_x, _y) is its top-left.
+function Title_SeedArrow(_x, _y, _dir, _p, _col) {
+    for (var i = 0; i < 3; i++) {
+        var row = (_dir < 0) ? i : (2 - i);
+        Ui_Box(_x + (2 - i) * _p, _y + row * _p, _x + (3 + i) * _p, _y + (row + 1) * _p, _col);
+    }
+}
+
+// The entry screen: a framed panel with nine digit cells (the cursor's cell lit, an arrow above and below it), a line of help (or why Confirm said no) and
+// the keys. Everything is measured from Ui_Metrics, so it fits the 480 x 432 window and larger ones. The rectangles are kept in _c.title_seed_rects for -shots.
+function Title_SeedEntryDraw(_c) {
+    var e = _c.title_seed;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var lh = mt.line_h;
+    var a = Ui_AnimT(_c.title_seed_t, current_time);
+    var n = SEED_DIGITS_MAX;
+    var gap = p;
+    var cw = UI_TextWidth("0") + 4 * p;
+    var pw = min(mt.gw - 2 * mt.margin, n * cw + (n - 1) * gap + 12 * p);
+    cw = min(cw, floor((pw - 12 * p - (n - 1) * gap) / n));
+    var row_w = n * cw + (n - 1) * gap;
+    var ch = lh + 4 * p;
+    var inner_w = pw - 8 * p;
+    var info = _c.title_seed_msg ? Loc_T("seed.entry.need", "Enter a seed above zero.") : Loc_T("seed.entry.info", "Up to 9 digits. Same seed, same run.");
+    var hints = [Loc_T("seed.entry.hint", "{up}{down} Digit   {left}{right} Move"), Loc_T("seed.entry.hint2", "{confirm} Start"), Loc_T("seed.entry.hint3", "{back} Back   {tab_prev} Delete")];   // one group per row: a key never wraps away from its word
+    var info_h = Ui_TextBlockH(info, inner_w);
+    var hint_h = 0;
+    for (var h = 0; h < array_length(hints); h++) hint_h += Ui_TextBlockH(hints[h], inner_w) + ((h > 0) ? p : 0);
+    var ph = 4 * p + (lh + 3 * p) + 5 * p + ch + 5 * p + 3 * p + info_h + 3 * p + hint_h + 4 * p;
+    var px = round((mt.gw - pw) / 2);
+    var py = max(mt.margin, round((mt.gh - ph) / 2)) - p * round((1 - a) * 3);
+    Ui_DimBackdrop(0.6 * a);
+    Ui_DrawFrame(px, py, pw, ph, a, p);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(a);
+    var x0 = px + 4 * p;
+    var yy = py + 4 * p;
+    Ui_Text(x0, yy, Loc_T("seed.entry.title", "Enter seed"), UI_C_LIGHTEST);
+    Ui_Box(px + 3 * p, yy + lh + p, px + pw - 3 * p, yy + lh + 2 * p, UI_C_DARK);
+    yy += lh + 3 * p + 5 * p;
+    var rx = px + round((pw - row_w) / 2);
+    var cells = [];
+    for (var i = 0; i < n; i++) {
+        var cx = rx + i * (cw + gap);
+        var on = (i == e.cur);
+        Ui_Box(cx, yy, cx + cw, yy + ch, on ? UI_C_LIGHTEST : UI_C_DARK);
+        Ui_Box(cx + p, yy + p, cx + cw - p, yy + ch - p, on ? UI_C_DARK : UI_C_DARKEST);
+        if (i < array_length(e.digits)) Ui_Text(cx + cw / 2, yy + (ch - lh) div 2, string(e.digits[i]), UI_C_TEXT, fa_center);
+        if (on) {
+            Title_SeedArrow(cx + (cw - 5 * p) div 2, yy - 4 * p, -1, p, UI_C_LIGHTEST);
+            Title_SeedArrow(cx + (cw - 5 * p) div 2, yy + ch + p, 1, p, UI_C_LIGHTEST);
+        }
+        array_push(cells, { x: cx, y: yy, w: cw, h: ch });
+    }
+    yy += ch + 5 * p + 3 * p;
+    Ui_TextBlock(x0, yy, info, inner_w, _c.title_seed_msg ? UI_C_LIGHTEST : UI_C_LIGHT);
+    yy += info_h + 3 * p;
+    var hint_y = yy;
+    for (var r = 0; r < array_length(hints); r++) {
+        Prompt_RichDraw(x0, yy, hints[r], inner_w, UI_C_LIGHT, fa_left, a);
+        yy += Ui_TextBlockH(hints[r], inner_w) + p;
+    }
+    _c.title_seed_rects = { panel: { x: px, y: py, w: pw, h: ph }, cells: cells, hint_y: hint_y, hint_h: hint_h };
+    draw_set_alpha(a0);
 }
 
 // One Step for the title in states main / settings.
@@ -2913,6 +3060,10 @@ function Title_Step(_c) {
         }
         return;
     }
+    if (is_struct(Title_SeedEntryOf(_c))) {   // D152: the entry screen is above the seed pick
+        Title_SeedEntryStep(_c);
+        return;
+    }
     if (_c.title_refresh) Title_Refresh(_c);
     var ev = Ui_MenuUpdate(Ui_StackTop(_c.title_stk), _c.title_stk);
     if (ev.moved) Title_DisarmNew(_c);
@@ -2920,8 +3071,12 @@ function Title_Step(_c) {
 
 function Title_Draw(_c) {
     if (!is_struct(_c.title_stk) || _c.state == "settings") return;
-    Ui_StackDraw(_c.title_stk);
-    Title_DrawCard(_c);
+    if (is_struct(Title_SeedEntryOf(_c))) {   // D152: the entry screen stands alone over the dimmed picture
+        Title_SeedEntryDraw(_c);
+    } else {
+        Ui_StackDraw(_c.title_stk);
+        if (Ui_StackDepth(_c.title_stk) <= 1) Title_DrawCard(_c);   // the Continue card makes way for the seed pick
+    }
     draw_set_alpha(1);
     draw_set_color(c_white);
 }
