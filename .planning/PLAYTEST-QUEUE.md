@@ -13,7 +13,7 @@ What the owner needs to play, test or decide after the agents worked while the o
 - The agents never write a verdict for you. A line saying `played` or `good` is written by you (or by the agent only because you said it in chat, with the date).
 - The entries are in **play order**: they follow one natural run, from the first launch to the ending. You do not need to stop the game to write notes; mark them afterwards.
 
-**Build to play:** `E:\Games\DD-Project Playtest\fc886c7-20261015\DD-Project.exe` (the build id is shown bottom-right of the title screen) | **Branch:** `next` | **Unplayed:** 57
+**Build to play:** `E:\Games\DD-Project Playtest\fc886c7-20261015\DD-Project.exe` (the build id is shown bottom-right of the title screen) | **Branch:** `next` | **Unplayed:** 58
 
 **Before you play:**
 - Your old saves were moved to `E:\Games\DD-Project Playtest\old-saves-2026-10-15`, so the game starts fresh: no run, no story seen, no hints seen yet. Your old *settings* were kept (Windowed, scale 5, volumes UI 50 / SFX 50 / BGM 80), so the first start will probably be a window, not full screen. That is expected (Q-001).
@@ -729,6 +729,19 @@ Automated proof for everything below: the full gate passed on `next` at e1a322d 
   2. Look at the title, a fight, the Tab menu, a card pick and a shop. Then switch back to English.
 - Expected: the Korean pixel font is crisp, nothing is cut off or overflowing, and no English leftovers. The text is a first draft written by the agents, for you to review.
 - Look out for: words that sound unnatural; text too long for its box; mixed English and Korean.
+- Your note:
+
+### Q-058 | Odds and ends from the regression list | commit next | build fc886c7-20261015
+- Status: unplayed
+- Requirement / issue: R-011, R-017, R-028, R-032 (no automated check covers these parts)
+- Automated proof already run: REGRESSION.md run on fc886c7-20261015 (34 PASS, 0 FAIL); these are the parts only a person can judge.
+- Steps (as they come up, no extra play):
+  1. Look at the status icons in a fight (poison, burn, bleed, buffs): any that look like a placeholder?
+  2. Is the Foresight icon clearly an eye?
+  3. On floor 5 and in the room after floor 9, when a dialogue ends, does the picture stay steady?
+  4. After Quit to title and Continue: is any old cutscene picture left on screen?
+- Expected: real icons, an eye, no jump at dialogue end, no leftover picture.
+- Look out for: anything odd for a frame or two.
 - Your note:
 
 ## Questions for the owner
