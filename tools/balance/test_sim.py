@@ -208,6 +208,179 @@ class Economy(unittest.TestCase):
         self.assertEqual(D.enemies[8]["base_hp"], 55)   # the game's Palehorn since D111 (it was 25)
 
 
+class Script:
+    """A scripted rng: random() pops the next value, randint() gives the low end, shuffle() keeps the order."""
+
+    def __init__(self, vals):
+        self.v = list(vals)
+
+    def random(self):
+        return self.v.pop(0)
+
+    def randint(self, a, b):
+        return a
+
+    def shuffle(self, x):
+        pass
+
+
+class FairRng(unittest.TestCase):
+    """R1 (D117-D121, D123). Expected values come from .planning/R1-CONTRACT.md, not from the simulator."""
+
+    # ---- D117 tier first, then item ----
+    def test_tier_roll_is_a_cascade_from_the_rarest(self):          # draw < high -> 3; else draw < mid / (1 - high) -> 2; else 1
+        odds = [0.87, 0.115, 0.015]
+        self.assertEqual(sim.roll_tier(Script([0.01]), odds), 3)
+        self.assertEqual(sim.roll_tier(Script([0.5, 0.11]), odds), 2)        # 0.115 / 0.985 = 0.1168
+        self.assertEqual(sim.roll_tier(Script([0.5, 0.12]), odds), 1)
+        self.assertEqual(sim.roll_tier(Script([0.0, 0.0]), [1, 0, 0]), 1)    # high 0 and mid 0: always the low tier
+
+    def test_tier_roll_guards_a_certain_high_tier(self):
+        self.assertEqual(sim.roll_tier(Script([0.99]), [0, 0, 1]), 3)
+
+    def test_export_without_tier_odds_uses_the_game_values(self):
+        self.assertEqual(D.tier_odds["chest"], [[0.87, 0.115, 0.015], [0.65, 0.285, 0.065], [0.43, 0.38, 0.19]])
+        self.assertEqual(D.tier_odds["barrel"][2], [0.74, 0.26, 0])
+        self.assertEqual(D.tier_odds["enemy"][0], [0.914, 0.084, 0.002])
+
+    def test_export_tier_odds_win_when_present(self):
+        d2 = sim.Data(sim.DEFAULT_DATA, [("loot.tier_odds", {"chest": [[0.1, 0.2, 0.7]] * 3})])
+        self.assertEqual(d2.tier_odds["chest"][0], [0.1, 0.2, 0.7])
+
+    def run_with(self, script, cls="nobody", seed=3):
+        run = sim.RunSim(D, cls, "average", seed, rules=R)
+        run.rng = Script(script)
+        return run
+
+    def test_item_inside_the_tier_is_picked_by_its_row_weight_alone(self):
+        # chest level 1, tier 3 rolled: rows 15 (w14), 18 (w12), 3 (w5), 6 (w5), 9 (w4), 22 (w4), 25 (w4) = 48. x = 0.30 * 48 = 14.4 -> item 18.
+        run = self.run_with([0.0, 0.30])
+        self.assertEqual(run.roll_table("chest", 1), (18, 1))
+
+    def test_empty_tier_steps_down_then_up(self):
+        t3 = (15, 18, 3, 6, 9, 22, 25)
+        run = self.run_with([0.0, 0.0])                           # tier 3 rolled, none eligible -> tier 2, first row (item 14)
+        self.assertEqual(run.roll_table("chest", 1, exclude=t3), (14, 1))
+        t12 = tuple(r["item_id"] for r in D.loot["tables"]["chest"] if r["tier"] in (1, 2) and r["item_id"] > 0)
+        run = self.run_with([0.9, 0.9, 0.0])                      # tier 1 rolled, tiers 1 and 2 empty -> up to tier 3, first row (item 15)
+        self.assertEqual(run.roll_table("chest", 1, exclude=t12), (15, 1))
+
+    def test_a_tier_two_roll_with_no_tier_two_rows_goes_down_first(self):
+        t2 = tuple(r["item_id"] for r in D.loot["tables"]["chest"] if r["tier"] == 2 and r["item_id"] > 0)
+        run = self.run_with([0.9, 0.0, 0.0])                      # not high; 0.0 < mid / (1 - high) -> tier 2; empty -> tier 1 first real row (item 10)
+        self.assertEqual(run.roll_table("chest", 1, exclude=t2), (10, 1))
+
+    # ---- D118 chests never empty ----
+    def test_chest_ignores_the_nothing_row(self):
+        run = self.run_with([0.9, 0.9, 0.0])                      # tier 1, first row: the "Nothing found" row (item 0) is gone -> HP Potion (10)
+        self.assertEqual(run.roll_table("chest", 1), (10, 1))
+
+    def test_a_chest_roll_is_never_empty_and_gear_is_at_least_one(self):
+        run = sim.RunSim(D, "nobody", "average", 3, rules=R)
+        for lvl in (1, 2, 3):
+            for _ in range(1500):
+                got = run.roll_table("chest", lvl)
+                self.assertIsNotNone(got)
+                self.assertGreaterEqual(got[1], 1)
+
+    def test_gear_row_gives_one_even_when_the_export_row_says_zero(self):
+        run = self.run_with([0.9, 0.9, 0.75])                     # chest tier 1 (no nothing row): total 136, x = 102 -> Wooden Sword (item 1), row qty 0..1
+        self.assertEqual(run.roll_table("chest", 1), (1, 1))
+
+    def test_a_barrel_can_still_be_empty(self):
+        run = self.run_with([0.9, 0.9, 0.0])                      # barrel tier 1, first row is "Nothing found"
+        self.assertIsNone(run.roll_table("barrel", 1))
+
+    # ---- D119 crit marble bag ----
+    def test_bag_size_is_the_smallest_whole_count(self):
+        self.assertEqual(sim.crit_bag_size(0.25), (4, 1))
+        self.assertEqual(sim.crit_bag_size(0.5), (2, 1))
+        self.assertEqual(sim.crit_bag_size(0.1), (10, 1))
+        self.assertEqual(sim.crit_bag_size(0.15), (20, 3))
+        self.assertEqual(sim.crit_bag_size(0.05), (20, 1))
+        self.assertEqual(sim.crit_bag_size(0.3333), (20, 7))      # no n with n * p whole -> 20 marbles, round(6.666) reds
+        self.assertEqual(sim.crit_bag_size(1.0), (1, 1))
+
+    def aim(self, who):
+        R.status_add(who, sim.CRIT_UP, 3, 1)
+
+    def test_take_aim_crits_exactly_one_in_every_four(self):          # bonus 25 -> p 0.25 -> bag of 4 with 1 red
+        b = battle("archer", seed=4)
+        self.aim(b.p)
+        for _ in range(10):
+            self.assertEqual(sum(b.crit_roll(b.p) for _ in range(4)), 1)
+
+    def test_no_crit_chance_means_no_bag_is_touched(self):
+        b = battle("archer", seed=4)
+        self.assertFalse(b.crit_roll(b.p))
+        self.assertIsNone(b.p.crit_bag)
+
+    def test_applying_take_aim_again_starts_a_fresh_bag(self):
+        b = battle("archer", seed=4)
+        self.aim(b.p)
+        b.crit_roll(b.p)
+        self.assertEqual(len(b.p.crit_bag["left"]), 3)
+        self.aim(b.p)
+        self.assertIsNone(b.p.crit_bag)
+        b.crit_roll(b.p)
+        self.assertEqual(len(b.p.crit_bag["left"]), 3)
+
+    def test_a_changed_chance_refills_the_bag(self):
+        b = battle("archer", seed=4)
+        self.aim(b.p)
+        b.crit_roll(b.p)
+        old = b.R.status_sum
+        b.R.status_sum = lambda f, k: 50.0 if k == "crit_bonus" else old(f, k)
+        try:
+            b.crit_roll(b.p)
+        finally:
+            b.R.status_sum = old
+        self.assertEqual(b.p.crit_bag["p"], 0.5)
+        self.assertEqual(len(b.p.crit_bag["left"]), 1)            # bag of 2, one drawn
+
+    def test_an_enemy_uses_the_same_bag(self):
+        b = battle("archer", "slime", seed=4)
+        self.aim(b.e)
+        self.assertEqual(sum(b.crit_roll(b.e) for _ in range(4)), 1)
+
+    # ---- D120 enemy-drop dry counter ----
+    def test_drop_chance_rises_a_tenth_per_dry_fight_and_caps_at_one(self):
+        self.assertAlmostEqual(sim.drop_chance(0.2, 0), 0.2)
+        self.assertAlmostEqual(sim.drop_chance(0.2, 3), 0.5)
+        self.assertEqual(sim.drop_chance(0.2, 20), 1.0)
+
+    def test_dry_counter_goes_up_on_nothing_and_resets_on_an_item(self):
+        e = sim.make_enemy(R, sim.ENEMY_IDS["slime"], 1)             # enemy_basic, level 1: 20% base
+        run = self.run_with([0.45])
+        run.enemy_drop(e)
+        self.assertEqual(run.drop_dry, 1)                            # 0.45 is above 0.2 + 0
+        run = self.run_with([0.45, 0.9, 0.9, 0.0])
+        run.drop_dry = 3
+        run.enemy_drop(e)                                            # chance 0.5 -> a drop: tier 1, first enemy row (HP Potion)
+        self.assertEqual(run.drop_dry, 0)
+        self.assertEqual(run.p.inv[10], 3)
+
+    # ---- D123 elites per floor ----
+    def test_elite_count_rule(self):
+        self.assertEqual(sim.elite_count(1, 0), 0)
+        self.assertEqual(sim.elite_count(3, 0), 0)
+        self.assertEqual(sim.elite_count(1, 3), 0)                   # round(0.45) = 0, floor 1 has no minimum
+        self.assertEqual(sim.elite_count(1, 10), 2)                  # 1.5 rounds up
+        self.assertEqual(sim.elite_count(2, 3), 1)                   # floor 2 and up: at least one
+        self.assertEqual(sim.elite_count(5, 1), 1)
+        self.assertEqual(sim.elite_count(4, 20), 3)
+
+    def test_each_floor_has_exactly_the_planned_number_of_elites(self):
+        for seed in range(1, 25):
+            run = sim.RunSim(D, "knight", "average", seed, rules=R)
+            for f in (1, 2, 3, 4, 5, 6, 7, 8, 9, 9.5):
+                lay, enemies = run.make_floor(f)
+                free = len(lay["enemies_free"])
+                n = sum(1 for (_, _, el) in enemies if el)
+                self.assertEqual(n, sim.elite_count(int(f), free), "seed %d floor %s" % (seed, f))
+                self.assertEqual(len(enemies), free + len(lay["enemies_fixed"]))
+
+
 def ref_burn(mag):
     return sim.ref.burn_tick(mag)
 

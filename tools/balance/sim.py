@@ -58,6 +58,47 @@ def rhu(x):
     return ref.rhu(x)
 
 
+# R1 (D117-D123): the randomness rules of the game, written once so the run code and the tests share them.
+LOOT_DRY_STEP = 0.1   # D120: +10 points of enemy-drop chance per fight in a row without a drop
+# D117: [low, mid, high] tier odds per container level 1..3. The game exports them as loot.tier_odds; an export from before R1 has none, so these are the values it will export.
+DEFAULT_TIER_ODDS = {
+    "chest": [[0.87, 0.115, 0.015], [0.65, 0.285, 0.065], [0.43, 0.38, 0.19]],
+    "barrel": [[0.95, 0.05, 0], [0.85, 0.15, 0], [0.74, 0.26, 0]],
+    "enemy": [[0.914, 0.084, 0.002], [0.754, 0.236, 0.010], [0.588, 0.376, 0.036]],
+}
+
+
+def roll_tier(rng, odds):
+    """D117 Loot_RollTier: a cascade from the rarest. draw < high -> tier 3; else draw < mid / (1 - high) -> tier 2; else tier 1."""
+    low, mid, high = odds
+    if rng.random() < high:
+        return 3
+    return 2 if rng.random() < mid / (1 - high) else 1   # high >= 1 already returned above, so 1 - high > 0 here
+
+
+def crit_bag_size(p):
+    """D119 Crit_BagSize: the smallest bag n in 1..20 where n * p is a whole number of red marbles; else 20 marbles and round(20 * p) reds."""
+    for n in range(1, 21):
+        if abs(n * p - round(n * p)) < 1e-6:
+            return n, int(round(n * p))
+    return 20, int(round(20 * p))
+
+
+def drop_chance(base, dry):
+    """D120 Loot_EnemyDropChance."""
+    return min(1.0, base + LOOT_DRY_STEP * dry)
+
+
+def elite_count(floor, free, chance=0.15):
+    """D123 Shuffle_EliteCount: elites on one floor, out of its `free` (non-fixed) enemy slots (chance = ELITE_CHANCE, exported as economy.elite_chance)."""
+    if free <= 0:
+        return 0
+    c = rhu(chance * free)
+    if int(floor) >= 2:
+        c = max(c, 1)
+    return min(c, free)
+
+
 KEY = {"atk": "atk", "df": "def", "spd": "spd", "mag": "mag"}   # the fighter's stat key -> the key the game's data uses
 
 
@@ -150,7 +191,8 @@ class Data:
         self.skill_cards_by_class = {}
         for cid in CLASS_NAMES:
             self.skill_cards_by_class[cid] = [c for c in self.card_list if c["kind"] != "fallback" and (not c["classes"] or cid in c["classes"])]
-        self.tier_weights = self.loot["tier_weights"]
+        self.tier_weights = self.loot["tier_weights"]   # kept for old readers; since D117 nothing rolls with it
+        self.tier_odds = self.loot.get("tier_odds") or DEFAULT_TIER_ODDS
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------
@@ -180,6 +222,7 @@ class F:
         self.picks = 0
         self.card_state = dict(pity=0, last=[], offers=0)
         self.rt = {}              # battle-only runtime (equipment passives)
+        self.crit_bag = None      # D119: dict(p, left=[bool marbles]) while the fighter has a crit chance
         # enemy
         self.enemy_id = -1
         self.rank = 1
@@ -226,6 +269,8 @@ class Rules:
 
     def status_add(self, f, sid, turns, power, stacks=1):
         cfg = self.sdb[sid]
+        if cfg.get("crit_bonus", 0) > 0:
+            f.crit_bag = None   # D119: applying (or re-applying) a crit buff starts a fresh bag
         dot = cfg.get("dot_kind", "")
         max_stacks = cfg.get("max_stacks", 1)
         add = max(1, stacks)
@@ -707,7 +752,15 @@ class Battle:
 
     def crit_roll(self, f):
         c = ref.crit_chance(self.R.status_sum(f, "crit_bonus"))
-        return c > 0 and self.rng.random() < c
+        if c <= 0:
+            return False
+        bag = f.crit_bag   # D119: a bag of marbles, drawn without putting them back; refilled when empty or when the chance changed
+        if bag is None or not bag["left"] or bag["p"] != c:
+            n, reds = crit_bag_size(c)
+            left = [True] * reds + [False] * (n - reds)
+            self.rng.shuffle(left)
+            bag = f.crit_bag = dict(p=c, left=left)
+        return bag["left"].pop()
 
     def use_skill(self, user, target, sid, grade="OK"):
         """Skill_Use for either side. Returns dict(dmg, hit, free, defended_info)."""
@@ -1572,6 +1625,7 @@ class RunSim:
         self.policy_name = policy
         self.gold = 0
         self.gold_earned = 0
+        self.drop_dry = 0   # D120: enemy fights in a row without a drop
         self.rec = dict(fights=[], picks=[], potions_used=0, mp_potions_used=0, throws=0, shops=[], beds=[], elites=0, card_offers=[], levels={}, buys=[],
                         actions=0, defences=0, item_uses=0, pick_count=0, used_skills={}, card_gain=[])
         self.p = new_player(self.R, self.class_id)
@@ -1628,10 +1682,6 @@ class RunSim:
         return gained
 
     # ---- loot ----
-    def tier_mult(self, level, tier):
-        tw = self.d.tier_weights[max(1, min(3, level)) - 1]
-        return {1: tw["low"], 2: tw["mid"], 3: tw["high"]}.get(tier, 1.0)
-
     def class_allows(self, item):
         if self.p.class_id == 3:
             return True
@@ -1647,12 +1697,12 @@ class RunSim:
         return iid in self.p.inv or iid in self.p.equip.values()
 
     def roll_table(self, table, level, extra=None, exclude=()):
+        """D117: roll the rarity tier first (the table's odds for this container level), then the item inside it by its row weight alone.
+        A tier with no eligible rows steps down (3 -> 2 -> 1), then up from the rolled tier. D118: a chest has no "nothing" row and gear gives at least 1."""
         rows = list(self.d.loot["tables"][table]) + list(extra or [])
-        weighted = []
-        tot = 0.0
+        tiers = {1: [], 2: [], 3: []}
         for r in rows:
-            w = r["weight"] * self.tier_mult(level, r["tier"])
-            if w <= 0:
+            if r["weight"] <= 0:
                 continue
             iid = r["item_id"]
             if iid > 0:
@@ -1662,20 +1712,30 @@ class RunSim:
                         continue
                 if iid in exclude:
                     continue
-            weighted.append((r, w))
-            tot += w
-        if tot <= 0:
+            elif table == "chest":
+                continue
+            tiers[max(1, min(3, r["tier"]))].append(r)
+        odds = self.d.tier_odds.get(table, [[1, 0, 0]] * 3)[max(1, min(3, level)) - 1]
+        t = roll_tier(self.rng, odds)
+        for t2 in list(range(t, 0, -1)) + list(range(t + 1, 4)):
+            if tiers[t2]:
+                break
+        else:
             return None
-        x = self.rng.random() * tot
+        pool = tiers[t2]
+        x = self.rng.random() * sum(r["weight"] for r in pool)
         acc = 0.0
-        for r, w in weighted:
-            acc += w
+        for r in pool:
+            acc += r["weight"]
             if x <= acc:
-                qty = r["qty_min"] if r["qty_min"] == r["qty_max"] else self.rng.randint(r["qty_min"], max(r["qty_min"], r["qty_max"]))
-                if qty <= 0 or r["item_id"] <= 0:
-                    return None
-                return (r["item_id"], qty)
-        return None
+                break
+        lo = r["qty_min"]
+        if r["item_id"] > 0 and self.d.items[r["item_id"]]["type"] in (0, 1, 4):
+            lo = max(1, lo)   # D118: gear is never "0 of it"
+        qty = lo if lo >= r["qty_max"] else self.rng.randint(lo, r["qty_max"])
+        if qty <= 0 or r["item_id"] <= 0:
+            return None
+        return (r["item_id"], qty)
 
     def floor_extras(self, floor):
         band = 1 if floor <= 3 else (2 if floor <= 6 else 3)
@@ -1713,11 +1773,15 @@ class RunSim:
     def enemy_drop(self, e):
         cfg = self.d.loot["configs"][self.d.enemies[e.enemy_id]["loot_key"]]
         lvl = max(1, min(3, e.level))
-        if self.rng.random() > cfg["chance"][lvl - 1]:
+        if self.rng.random() > drop_chance(cfg["chance"][lvl - 1], self.drop_dry):   # D120
+            self.drop_dry += 1
             return
         r = self.roll_table(cfg["table"], e.level)
         if r:
             self.grant(*r)
+            self.drop_dry = 0
+        else:
+            self.drop_dry += 1
 
     # ---- gear ----
     def gear_score(self, p):
@@ -2240,10 +2304,13 @@ class RunSim:
             lo = max(1, cfg["species_min_level"])
             hi = max(lo, cfg["species_max_level"])
             lvl = max(lo, min(min(hi, 10), int(f) + rr.randint(-1, 1) + cfg["species_level_offset"]))
-            elite = ""
-            if rr.random() < self.d.eco["elite_chance"]:
-                elite = rr.choice(["armored", "venomous", "swift", "brutal", "regenerating"])
-            enemies.append((eid, lvl, elite))
+            enemies.append((eid, lvl, ""))
+        # D123: a fixed number of elites per floor, picked by shuffling the free slots
+        slots = list(range(len(enemies)))
+        rr.shuffle(slots)
+        for k in slots[:elite_count(f, len(slots), self.d.eco["elite_chance"])]:
+            eid, lvl, _ = enemies[k]
+            enemies[k] = (eid, lvl, rr.choice(["armored", "venomous", "swift", "brutal", "regenerating"]))
         for name in lay["enemies_fixed"]:
             eid = ENEMY_IDS[name]
             cfg = self.d.enemies[eid]
@@ -2665,7 +2732,7 @@ def check_vectors(path=DEFAULT_DATA):
         else:
             chk("vec " + c["id"], ref.stagger_max(c["rank"], c["boss"]), c["want"])
     for c in v["run_chance"]:
-        chk("vec " + c["id"], round(ref.run_chance(c["spd_player"], c["spd_enemy"]), 4), c["want"])
+        chk("vec " + c["id"], round(ref.run_chance(c["spd_player"], c["spd_enemy"]), 6), c["want"])
     for c in v["timeline"]:
         chk("vec " + c["id"], fast_timeline_script(c["spd_player"], c["spd_enemy"], c["boss"], c["script"]), c["want"])
     # the exported grade numbers are the ones the damage vectors use
