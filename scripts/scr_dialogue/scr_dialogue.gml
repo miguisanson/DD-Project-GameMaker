@@ -549,7 +549,19 @@ function Dialogue_BoxRect() {
     };
 }
 
+// D108 F1d-2: how often the text layout is built (Dialogue_TextLayoutBuilds), so a check can see it run once per change.
+function Dialogue_TextLayoutBuilds() {
+    return variable_global_exists("dialogue_layout_builds") ? global.dialogue_layout_builds : 0;
+}
+
 function Dialogue_TextLayout(_speaker) {
+    return Dialogue_TextLayoutBuild(_speaker);
+}
+
+// The uncached computation of Dialogue_TextLayout. Counted (Dialogue_TextLayoutBuilds).
+function Dialogue_TextLayoutBuild(_speaker) {
+    if (!variable_global_exists("dialogue_layout_builds")) global.dialogue_layout_builds = 0;
+    global.dialogue_layout_builds++;
     UI_SetFont();
     var mt = Ui_Metrics();
     var line_h = max(8, UI_TextHeight("Ag"));
@@ -1658,6 +1670,8 @@ function Credits_NewSfxAssets() {
 
 // The credits roll as { kind, text }: "title", "head", "line", "names" (a paragraph) and "gap".
 function Credits_Lines() {
+    if (!variable_global_exists("credits_lines_builds")) global.credits_lines_builds = 0;
+    global.credits_lines_builds++;
     var out = [];
     array_push(out, { kind: "title", text: Loc_T("credits.title", "NO HOPE") });
     array_push(out, { kind: "line", text: Loc_T("credits.game_by", "Game and art by PaleRook") });
@@ -1701,8 +1715,24 @@ function Credits_PlainLines() {
     return out;
 }
 
+// D108 F1d-2: how often the roll's lines and its layout are built (a check reads them to see the roll is built once per change).
+function Credits_LinesBuilds() {
+    return variable_global_exists("credits_lines_builds") ? global.credits_lines_builds : 0;
+}
+
+function Credits_LayoutBuilds() {
+    return variable_global_exists("credits_layout_builds") ? global.credits_layout_builds : 0;
+}
+
 // Lays the roll out for the current GUI size: y of every entry (from the top of the roll), its height, and the whole height.
 function Credits_Layout() {
+    return Credits_LayoutBuild();
+}
+
+// The uncached computation of Credits_Layout. Counted (Credits_LayoutBuilds).
+function Credits_LayoutBuild() {
+    if (!variable_global_exists("credits_layout_builds")) global.credits_layout_builds = 0;
+    global.credits_layout_builds++;
     var mt = Ui_Metrics();
     var entries = Credits_Lines();
     var col_w = min(mt.gw - 2 * mt.margin, round(mt.gw * 0.7));
