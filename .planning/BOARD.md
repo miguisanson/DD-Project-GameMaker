@@ -1,9 +1,9 @@
 # DD-Project board
 Updated after every step that lands. The full build list is `.planning/BUILD-PLAN.md`; the design spec is `.planning/research/DECISIONS.md` (D1-D125).
-Build: **PLAYTEST NOW** — build 63deaae-20261015 | Mode: BIG BUILD, then one big playtest (D71) | Release then stop (D28)
+Build: **PLAYTEST NOW** — build 943ce6d-20261015 | Mode: BIG BUILD, then one big playtest (D71) | Release then stop (D28)
 
 ## Now — PLAYTEST NOW
-- Play: `E:\Games\DD-Project Playtest\63deaae-20261015\DD-Project.exe` (fresh start: your old saves are in `old-saves-2026-10-15`).
+- Play: `E:\Games\DD-Project Playtest\943ce6d-20261015\DD-Project.exe` (fresh start: your old saves are in `old-saves-2026-10-15`).
 - Checklist: `.planning/PLAYTEST-QUEUE.md` — 62 entries + 3 quick questions at the end in play order (~60-90 min). Mark good / bad / change, then say "merge the good ones".
 - Everything decided is built; full gate PASS on this build (3695 unit checks, smoke, bot fight, 172 screenshots), three extra Opus review passes and two bug hunts (7 bugs fixed). Older folders fc886c7 / 8762d9b / 9015871 / dbc678a are superseded (you can delete them).
 - While you play, the agents keep going on safe clean-up (improvement mode) on branch `next`; nothing changes this build.

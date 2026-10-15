@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Round 2 (D126-D139): G1 bags, G2 title, G4 chest guard + owner art/sound import MERGED (next 2aa555d, fast PASS 3852/0, smoke 625/0). In flight (Sonnet): G3 battle feel (wt/g3), G5 echo after class (wt/g5), G8 rumble (wt/g8). Next when G3 lands: G6 map juice, G7 speed-up + preview, G9 run stats; then G10 one-style audit (incl. KO 800x720 build-id overlapping the title menu), G11 consistency; Opus review; full gate + new build. Owner will playtest later. |
+| WIP | Owner trying build 943ce6d-20261015 (next 943ce6d: G1 bags, G2 title, G3 battle feel, G4 chest guard + owner art/sound import; FULL gate PASS 3976/0, smoke, bot, 186 shots). In flight (Sonnet): G5 echo, G6 map juice, G7 speed-up + preview, G8 rumble. Then G9 run stats, G10 one-style audit, G11 consistency, Opus review, full gate + build. |
 | Unplayed features | 61 playtest entries (PLAYTEST-QUEUE, build dbc678a-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
