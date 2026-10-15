@@ -9,12 +9,14 @@
 [CmdletBinding()]
 param(
     [ValidateSet('fast', 'full', 'compile')][string]$Mode = 'fast',
-    [switch]$NegativeControl,
+    [switch]$NegativeControl,                  # must end in GATE FAIL; run it whenever this script changes
+    [Parameter(Position = 0)][ValidateSet('test', 'syntax', 'unknownfn')][string]$Plant = 'test',   # which plant: test (default, a failing test + a display-guard violation) | syntax (GML syntax error: the build must fail) | unknownfn (call to an unknown function: Igor passes, the test run must catch it). `-NegativeControl syntax` works; `-Plant syntax` alone implies -NegativeControl.
     [ValidateSet('', 'runtests', 'smoke', 'bot', 'shots', 'gridshots', 'exportdata')][string]$Only = '',   # run just this game mode (with fast/full)
     [string]$ProjectDir = '',                  # default: repo root of this script
     [string]$WorkRoot = 'E:\Temp\dd-gate'      # test hook: point at C:\ to see the drive guard refuse
 )
 $ErrorActionPreference = 'Stop'
+if ($PSBoundParameters.ContainsKey('Plant')) { $NegativeControl = [switch]$true }
 
 # ---- game modes: ONE ROW EACH. Flip Impl to $true when a packet implements the mode. ----------
 # Strict = also require exit code 0 and the result file (only -runtests; crash exit codes are unreliable).
@@ -400,11 +402,31 @@ if (Test-Path $lintPy) {
     $pyExe = Get-Command python -ErrorAction SilentlyContinue
     if (-not $pyExe) { Fail 'lint: python not found (the display source guard needs it)' }
     else {
-        $lintArgs = @($lintPy, '--root', $ProjectDir); if ($NegativeControl) { $lintArgs += '--plant' }
+        $lintArgs = @($lintPy, '--root', $ProjectDir); if ($NegativeControl -and $Plant -eq 'test') { $lintArgs += '--plant' }
         $lintOut = @(& $pyExe.Source @lintArgs)
         if ($LASTEXITCODE -ne 0) { $lintOut | Select-Object -First 12 | ForEach-Object { Write-Host "  $_" }; Fail 'lint: display source guard found violations' }
     }
     Step 'lint' $(if ($script:failed) { 'FAIL' } else { 'OK' }) $sw
+}
+
+# ---- hardcoded English (I1): no new player-facing literals in the scoped GML files; the lint's own self-check runs first.
+$txtPy = Join-Path $ProjectDir 'tools\localization\lint_hardcoded_text.py'
+if (Test-Path $txtPy) {
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $pyExe = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $pyExe) { Fail 'text lint: python not found' }
+    else {
+        $ErrorActionPreference = 'Continue'   # python writes its test report to stderr; 2>&1 would otherwise throw
+        $selfPy = Join-Path $ProjectDir 'tools\localization\test_lint_hardcoded_text.py'
+        if (Test-Path $selfPy) {
+            $selfOut = @(& $pyExe.Source $selfPy 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -notmatch '^System.Management.Automation.RemoteException' })
+            if ($LASTEXITCODE -ne 0) { $selfOut | Select-Object -Last 12 | ForEach-Object { Write-Host "  $_" }; Fail 'text lint: self-check failed' }
+        }
+        $txtOut = @(& $pyExe.Source $txtPy 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -notmatch '^System.Management.Automation.RemoteException' })
+        if ($LASTEXITCODE -ne 0) { $txtOut | Select-Object -First 12 | ForEach-Object { Write-Host "  $_" }; Fail 'text lint: hardcoded player-facing literals found' }
+        $ErrorActionPreference = 'Stop'
+    }
+    Step 'text-lint' $(if ($script:failed) { 'FAIL' } else { 'OK' }) $sw
 }
 
 # ---- missing Korean (D9): every workbook row needs a real ko (tools/localization/check_missing_ko.py, allowlist in ko_allowlist.txt).
@@ -461,6 +483,24 @@ if ($stamped -eq $macroText -and $macroText -notmatch ('#macro BUILD_ID "' + [re
 [IO.File]::WriteAllText($macroFile, $stamped, (New-Object Text.UTF8Encoding $false))
 Write-Host "build id  $BuildId"
 
+# ---- negative-control plants (R-021): into the SCRATCH copy only; the repo is never touched ------------
+if ($NegativeControl -and $Plant -ne 'test') {
+    $plantFile = Join-Path $D.src 'scripts\scr_test\scr_test.gml'
+    $plantText = [IO.File]::ReadAllText($plantFile)
+    if ($Plant -eq 'syntax') {
+        $plantText += "`n" + 'function __plant_syntax_error() { var __x = ( ; }' + "`n"   # unbalanced parenthesis: Igor must fail the build
+        Write-Host 'plant     syntax error appended to the scratch scr_test.gml (expect: build fails)'
+    } else {
+        $hook = 'Test_Reset();'
+        $at = $plantText.IndexOf($hook, $plantText.IndexOf('function Test_RunAll()'))
+        if ($at -lt 0) { Fail 'plant: Test_RunAll anchor not found in scr_test.gml'; Finish }
+        # Igor compiles an unknown function name without complaint; only running the call raises the error
+        $plantText = $plantText.Insert($at + $hook.Length, "`n" + '    Test_RunSuite("PlantUnknownFn", function() { __plant_no_such_function_xyz(); });')
+        Write-Host 'plant     call to an unknown function added to the scratch Test_RunAll (expect: build ok, test run fails)'
+    }
+    [IO.File]::WriteAllText($plantFile, $plantText, (New-Object Text.UTF8Encoding $false))
+}
+
 # ---- build (VER-01): the exact command proven in automation-igor.md 2.4 -------------------------
 $sw = [Diagnostics.Stopwatch]::StartNew()
 $fw = { param($p) $p.Replace('\', '/') }
@@ -493,7 +533,7 @@ foreach ($m in $runs) {
     $null = New-Item -ItemType Directory -Force -Path $D.save
     $log = Join-Path $D.logs "$($m.Name).log"
     $gameArgs = "-game data.win $($m.Flag)"
-    if ($NegativeControl) { $gameArgs += ' -testcontrol' }
+    if ($NegativeControl -and $Plant -eq 'test') { $gameArgs += ' -testcontrol' }
     $env:LOCALAPPDATA = $D.save                 # VER-06: the game must never see the real save area
     try { $r = Invoke-Proc $exe $gameArgs $D.out $log $m.Timeout 'Minimized' $true } finally { $env:LOCALAPPDATA = $RealLocal }
     $lines = Get-LogLines $log

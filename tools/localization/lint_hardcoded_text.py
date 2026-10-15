@@ -166,8 +166,15 @@ def iter_literals(line: str) -> Iterable[str]:
         yield decode(m.group(1))
 
 
+PLACEHOLDER_RE = re.compile(r"\{[A-Za-z_][A-Za-z0-9_]*\}")
+
+
 def looks_player_facing(text: str) -> bool:
     if text in ALLOW_EXACT:
+        return False
+    # a format token such as "{n}" is not text; with the tokens removed, a string with no letters left
+    # ("{n}", "{a}/{b}") is non-text, while "Lv {n}" keeps "Lv" and is still flagged.
+    if not re.search(r"[A-Za-z]", PLACEHOLDER_RE.sub("", text)):
         return False
     if text.startswith(ALLOW_PREFIX):
         return False
