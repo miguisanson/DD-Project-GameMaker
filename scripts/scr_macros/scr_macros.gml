@@ -309,6 +309,26 @@
 #macro TRANSITION_LOADING_FADE_OUT_FRAMES 28
 #macro TRANSITION_LOADING_BLACK_HOLD_FRAMES 18
 #macro TRANSITION_LOADING_FADE_IN_FRAMES 32
+// D108 (F2a): presentation timers run on a ms clock (Presentation_StepMs from delta_time). The *_FRAMES values above are 60 fps frame counts, kept as the
+// design numbers and as the unit of Transition_RequestBlackFlash's arguments; Transition_FramesToMs turns one into milliseconds (12 frames = 200 ms).
+#macro TRANSITION_FRAME_MS (1000 / 60)
+#macro PRESENTATION_MAX_STEP_US 50000   // one frame never adds more than 50 ms to a presentation clock, so a hitch cannot skip a whole fade
+#macro TRANSITION_DONE_SLACK_MS 1       // a phase ends when it is within this of its length, so 12 frames of 16.6 ms still make a 200 ms fade
+#macro TRANSITION_EVT_NONE 0
+#macro TRANSITION_EVT_ROOM_CHANGE 1     // the fade-out is black: leave the room now (the black hold starts with the next step, in the new room)
+#macro TRANSITION_EVT_FLASH_BLACK 2     // a black flash is fully black: do its swap now
+#macro TRANSITION_EVT_DONE 3            // the fade-in is over: the transition is finished
+#macro TRANSITION_KIND_ZOOM 0           // phase kinds (Transition_PhaseKind)
+#macro TRANSITION_KIND_ZOOM_HOLD 1
+#macro TRANSITION_KIND_OUT 2
+#macro TRANSITION_KIND_HOLD 3
+#macro TRANSITION_KIND_IN 4
+// Boot logo (obj_start_controller), 48 / 120 / 48 / 8 frames at 60 fps, and the cutscene logo fade (18 frames).
+#macro BOOT_LOGO_FADE_IN_MS (48000 / 60)
+#macro BOOT_LOGO_HOLD_MS (120000 / 60)
+#macro BOOT_LOGO_FADE_OUT_MS (48000 / 60)
+#macro BOOT_LOGO_BLACK_HOLD_MS (8000 / 60)
+#macro CUTSCENE_LOGO_FADE_MS 300
 
 #macro SAVE_SNAPSHOT_VERSION 2
 

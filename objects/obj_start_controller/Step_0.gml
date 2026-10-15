@@ -6,17 +6,18 @@ if (Notice_IsOpen()) {   // F3a: the notice pop-up owns the keys (the ui control
     exit;
 }
 if (Transition_IsInputLocked() && state != "cutscene") return;
+var step_ms = Presentation_StepMs(delta_time);   // D108 F2a: the boot logo, the cutscene holds and the credits roll run on a ms clock
 
 if (state == "boot_logo") {
     if (Transition_IsActive()) return;
 
     switch (boot_logo_phase) {
         case 0: // fade in
-            boot_logo_timer += 1;
-            var in_t = clamp(boot_logo_timer / max(1, boot_logo_fade_in_frames), 0, 1);
+            boot_logo_timer += step_ms;
+            var in_t = clamp(boot_logo_timer / max(1, boot_logo_fade_in_ms), 0, 1);
             // smoothstep easing keeps the intro logo fade seamless and bell-curved
             boot_logo_alpha = in_t * in_t * (3 - (2 * in_t));
-            if (boot_logo_timer >= max(1, boot_logo_fade_in_frames)) {
+            if (boot_logo_timer + TRANSITION_DONE_SLACK_MS >= max(1, boot_logo_fade_in_ms)) {
                 boot_logo_phase = 1;
                 boot_logo_timer = 0;
                 boot_logo_alpha = 1;
@@ -24,20 +25,20 @@ if (state == "boot_logo") {
             break;
 
         case 1: // hold
-            boot_logo_timer += 1;
+            boot_logo_timer += step_ms;
             boot_logo_alpha = 1;
-            if (boot_logo_timer >= max(0, boot_logo_hold_frames)) {
+            if (boot_logo_timer + TRANSITION_DONE_SLACK_MS >= max(0, boot_logo_hold_ms)) {
                 boot_logo_phase = 2;
                 boot_logo_timer = 0;
             }
             break;
 
         case 2: // fade out
-            boot_logo_timer += 1;
-            var out_t = clamp(boot_logo_timer / max(1, boot_logo_fade_out_frames), 0, 1);
+            boot_logo_timer += step_ms;
+            var out_t = clamp(boot_logo_timer / max(1, boot_logo_fade_out_ms), 0, 1);
             out_t = out_t * out_t * (3 - (2 * out_t));
             boot_logo_alpha = 1 - out_t;
-            if (boot_logo_timer >= max(1, boot_logo_fade_out_frames)) {
+            if (boot_logo_timer + TRANSITION_DONE_SLACK_MS >= max(1, boot_logo_fade_out_ms)) {
                 boot_logo_phase = 3;
                 boot_logo_timer = 0;
                 boot_logo_alpha = 0;
@@ -45,9 +46,9 @@ if (state == "boot_logo") {
             break;
 
         default: // black hold, then reveal title menu
-            boot_logo_timer += 1;
+            boot_logo_timer += step_ms;
             boot_logo_alpha = 0;
-            if (boot_logo_timer >= max(0, boot_logo_black_hold_frames)) {
+            if (boot_logo_timer + TRANSITION_DONE_SLACK_MS >= max(0, boot_logo_black_hold_ms)) {
                 state = "main";
                 Transition_RequestBlackFlash(1, TRANSITION_CUTSCENE_FADE_IN_FRAMES);
             }
@@ -59,8 +60,8 @@ if (state == "boot_logo") {
 
 if (state == "credits") {   // C5 (D105): the credits roll after the ending's closing text; hold confirm to skip it (D48)
     Skip_Claim();
-    credits_t += 1;
-    if (credits_t >= Credits_TotalFrames() || Skip_Consume()) {
+    credits_t += step_ms;
+    if (credits_t >= Credits_TotalMs() || Skip_Consume()) {
         Skip_Reset();
         state = "credits_end";
         Transition_RequestCutsceneFade(rm_start);
@@ -164,7 +165,7 @@ if (state == "cutscene") {
             gs.ui.lines_raw = [];
             gs.ui.index = 0;
             gs.ui.speaker = "";
-            cutscene_segment_hold_timer = max(0, variable_struct_exists(seg0, "hold_frames") ? seg0.hold_frames : 0);
+            cutscene_segment_hold_timer = max(0, variable_struct_exists(seg0, "hold_ms") ? seg0.hold_ms : 0);
         }
         return;
     }
@@ -201,7 +202,7 @@ if (state == "cutscene") {
                     gs.ui.lines_raw = [];
                     gs.ui.index = 0;
                     gs.ui.speaker = "";
-                    cutscene_segment_hold_timer = max(0, variable_struct_exists(seg_sw, "hold_frames") ? seg_sw.hold_frames : 0);
+                    cutscene_segment_hold_timer = max(0, variable_struct_exists(seg_sw, "hold_ms") ? seg_sw.hold_ms : 0);
                 }
 
                 cutscene_transition_switched = true;
@@ -235,7 +236,7 @@ if (state == "cutscene") {
                 gs.ui.lines_raw = [];
                 gs.ui.index = 0;
                 gs.ui.speaker = "";
-                cutscene_segment_hold_timer = max(0, variable_struct_exists(seg_fallback, "hold_frames") ? seg_fallback.hold_frames : 0);
+                cutscene_segment_hold_timer = max(0, variable_struct_exists(seg_fallback, "hold_ms") ? seg_fallback.hold_ms : 0);
             }
         }
 
@@ -261,8 +262,8 @@ if (state == "cutscene") {
     if (is_array(seg_cur_lines) && array_length(seg_cur_lines) > 0) {
         segment_done = (gs.ui.mode != UI_DIALOGUE && array_length(gs.ui.lines) <= 0);
     } else {
-        if (cutscene_segment_hold_timer > 0) cutscene_segment_hold_timer -= 1;
-        segment_done = (cutscene_segment_hold_timer <= 0);
+        if (cutscene_segment_hold_timer > 0) cutscene_segment_hold_timer -= step_ms;
+        segment_done = (cutscene_segment_hold_timer <= TRANSITION_DONE_SLACK_MS);
     }
 
     if (!variable_struct_exists(gs.ui, "cutscene_logo_sprite")) gs.ui.cutscene_logo_sprite = noone;
@@ -274,7 +275,7 @@ if (state == "cutscene") {
         var logo_line_idx = variable_struct_exists(gs.ui, "index") ? max(0, round(real(gs.ui.index))) : 0;
         if (logo_line_idx >= 3) logo_target = 1;
     }
-    var logo_step = 1 / max(1, round(max(1, game_get_speed(gamespeed_fps)) * 0.30));
+    var logo_step = step_ms / CUTSCENE_LOGO_FADE_MS;   // a full fade takes CUTSCENE_LOGO_FADE_MS (300 ms) at any frame rate
     if (gs.ui.cutscene_logo_alpha < logo_target) {
         gs.ui.cutscene_logo_alpha = min(logo_target, gs.ui.cutscene_logo_alpha + logo_step);
     } else {
@@ -327,7 +328,7 @@ if (state == "cutscene") {
             gs.ui.lines_raw = [];
             gs.ui.index = 0;
             gs.ui.speaker = "";
-            cutscene_segment_hold_timer = max(0, variable_struct_exists(seg_next, "hold_frames") ? seg_next.hold_frames : 0);
+            cutscene_segment_hold_timer = max(0, variable_struct_exists(seg_next, "hold_ms") ? seg_next.hold_ms : 0);
         }
         return;
     }
