@@ -20,6 +20,9 @@ if (require_move) {
     if (require_dir != -1 && requested_dir != require_dir) exit;
 }
 
+// D127: the first class chest of a run cannot be skipped: floor 1's exit refuses a player with no class yet (two lines, then a step back).
+if (ClassGuard_OnExit(other)) exit;
+
 var entry = RoomDB_Get(transition_id);
 if (!is_struct(entry)) exit;
 

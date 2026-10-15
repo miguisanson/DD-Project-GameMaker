@@ -49,6 +49,7 @@ move_timer = 0;
 tile_size = GRID_TILE_SIZE;
 step_from_x = x;
 step_from_y = y;
+class_guard_to = -1;   // D127: the direction of the exit that refused the player; set by ClassGuard_OnExit, the step back is taken in Step once the lines are read
 exit_ignore = noone;   // D64: the exit tile the player arrived on; it does not fire until the player has stepped off it (armed at the end of this event after a battle return)
 // D69 / D70: turn on a tap, buffered corner, run, bump, interact prompt
 walk_speed = (16 mod max(1, move_speed) == 0) ? move_speed : 1;   // pixels per frame; must divide the 16 px tile

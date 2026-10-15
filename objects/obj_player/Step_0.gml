@@ -99,6 +99,17 @@ if (!moving) {
         }
     }
 
+    // D127: the exit refused the player (no class yet) and the lines are read: one step away from the exit, through the code below
+    // (a turn, then the tile check: never into a wall; no key needed, no turn delay)
+    if (class_guard_to != -1) {
+        var guard_dir = ClassGuard_PickDir(id, class_guard_to);
+        class_guard_to = -1;
+        if (guard_dir != -1) {
+            want = guard_dir;
+            from_buffer = true;
+        }
+    }
+
     if (want != -1) {
         buf_dir = -1;
         move_dir = want;

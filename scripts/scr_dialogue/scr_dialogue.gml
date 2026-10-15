@@ -44,6 +44,10 @@ function DialogueDB_Init() {
 						"...", 
 						"I knew it. There's something wrong about this place.",
 						"I need to get back."];
+    global.dialogue_db[? "sys_class_chest_guard"] = [   // D127: floor 1's exit before the class chest was opened
+        "Wait, there was a chest back there. I think I should open it...",
+        "...there might be something I can use to protect myself."
+    ];
     global.dialogue_db[? "after_class_chest_knight"] = [
         "Heavy... but it fits.",
         "Like it's been mine for years.",
