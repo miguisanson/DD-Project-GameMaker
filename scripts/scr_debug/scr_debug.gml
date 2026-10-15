@@ -4520,7 +4520,7 @@ function Scenario_WorldFlags(_w, _fileB) {
     return "pair=" + _fileB + " corner=24 cornerxy=" + string(round(_cc.x)) + "," + string(round(_cc.y))
         + " rp=" + _rp + " bp=" + string(round(_bp1.x)) + "," + string(round(_bp1.y)) + ";" + string(round(_bp2.x)) + "," + string(round(_bp2.y))
         + " ap=" + _ap
-        + " boxes=" + _boxes + _lboxes;
+        + " boxes=" + _boxes;   // D160: no allowed boxes for the sight cells: the slime casts no light, so a difference there is a stray mark
 }
 
 function Scenario_WorldStage(_w) {
@@ -12214,6 +12214,7 @@ function Scenario_StepShotsCutSkip(_s) {
 //   714-716: rm_floor6 (two torches, two fire stands), the player in the middle of the lights and every enemy of the room plus extra slimes standing blind inside the view:
 //            the lighting pass is timed for 130 frames, average under 1 ms.
 //   717:     the dotted sight outline (D63) is gone: its ring cache was never built in the whole run.
+//   D160 (amends D157): enemy sight is invisible. The pass draws no light for an enemy (cones == 0) while the fires still light (lights >= 2).
 // ============================================================================
 function Scenario_H14Free(_cx, _cy) {
     return !Nav_CellBlocked(Nav_Get().grid, _cx, _cy);
@@ -12329,7 +12330,7 @@ function Scenario_StepSmokeH14(_s) {
                 show_debug_message("[LIGHT-PERF] room=rm_floor6 enemies=" + string(_h.n_enemies) + " cones_drawn=" + string(_st.cones) + " lights_drawn=" + string(_st.lights)
                     + " frames=" + string(Light_PerfFrames()) + " avg_ms=" + string_format(_avg, 1, 4) + " max_ms=" + string_format(Light_PerfMaxMs(), 1, 4));
                 Scenario_Check("h14_the_pass_ran_130_frames", Light_PerfFrames() >= 120, "frames=" + string(Light_PerfFrames()));
-                Scenario_Check("h14_the_view_holds_cones_and_lights", _st.cones >= 3 && _st.lights >= 2, "cones=" + string(_st.cones) + " lights=" + string(_st.lights));
+                Scenario_Check("d160_no_enemy_lights_its_sight_and_the_fires_still_light", _st.cones == 0 && _st.lights >= 2, "cones=" + string(_st.cones) + " lights=" + string(_st.lights));
                 Scenario_Check("h14_the_lighting_pass_costs_under_1_ms_per_frame", _avg < 1.0, "avg_ms=" + string(_avg));
                 Scenario_Next(_s, 717);
             }
