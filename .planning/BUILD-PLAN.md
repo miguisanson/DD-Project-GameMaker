@@ -65,7 +65,7 @@ Leave frame-counted: player grid step, enemy AI pacing, fx ages, cine pan (gamep
 |---|---|---|---|---|
 | G1 | Marble bag everywhere: status chances, enemy move deck, fixed heal/tick amounts, gold bag, Scrounger | D126 | scr_db_skill, scr_db_enemy, scr_db_item, scr_status, scr_loot, scr_save | todo |
 | G2 | Main menu refresh: splash, living background, Continue card; menu keeps the shared framed style | D128 | scr_menu (Title_*), obj_start_controller, workbook | todo |
-| G3 | Battle game feel: death pop, hit sparks + per-hit freeze, heavier player hurt + HP lag bar | D138 | scr_combat, scr_fx, obj_battle_controller | todo |
+| G3 | Battle game feel: death pop, hit sparks + per-hit freeze, heavier player hurt + HP lag bar, hit jolt + enemy recoil, crit/BREAK zoom punch, subtle low-HP heartbeat | D138, D139 | scr_combat, scr_fx, obj_battle_controller | todo |
 | G4 | Class chest guard | D127 | obj_room_transition / scr_interact, workbook | todo |
 | G5 | Echo after class pick, filtered | D130 | scr_room_state, scr_menu (cards/echo) | todo |
 | G6 | Map juice: chest burst, item rise, level-up sparkle, gold tick, step squash | D138 | scr_interact, obj_player, scr_fx, HUD | todo |
