@@ -54,10 +54,6 @@ function Inv_Has(_inv, _item_id, _qty) {
     return total >= _qty;
 }
 
-function Inv_GetItems(_inv) {
-    return _inv;
-}
-
 // How many of an item the inventory holds (all stacks).
 function Inv_Count(_inv, _item_id) {
     var total = 0;

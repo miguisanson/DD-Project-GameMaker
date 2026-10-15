@@ -139,10 +139,6 @@ function Equip_GetPassives(_ch) {
     return out;
 }
 
-function Equip_GetPassiveList(_ch) {
-    return Equip_GetPassives(_ch);
-}
-
 function Equip_HasPassive(_ch, _passive_id) {
     var pid = string(_passive_id);
     if (pid == "") return false;

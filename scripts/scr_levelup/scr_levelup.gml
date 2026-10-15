@@ -131,10 +131,6 @@ function LevelUp_ApplyLevel(_ch) {
     return _ch;
 }
 
-function LevelUp_StatName(_stat_id) {
-    return Stat_ShortName(_stat_id);
-}
-
 // The class's default free-point stat (-1 when it has none).
 function LevelUp_AutoStatForClass(_ch) {
     var cfg = undefined;
@@ -186,10 +182,6 @@ function Exp_NextLevel(_level) {
     }
 
     return 0;
-}
-
-function LevelUp_Auto(_ch) {
-    return LevelUp_ApplyLevel(_ch);
 }
 
 function LevelUp_FromExp(_ch) {

@@ -1,19 +1,3 @@
-function Flag_Get(_key) {
-    var gs = GameState_Get();
-    if (variable_struct_exists(gs.flags, _key)) return variable_struct_get(gs.flags, _key);
-    return false;
-}
-
-function Flag_Set(_key, _value) {
-    var gs = GameState_Get();
-    variable_struct_set(gs.flags, _key, _value);
-}
-
-function Flag_Toggle(_key) {
-    var v = Flag_Get(_key);
-    Flag_Set(_key, !v);
-}
-
 function Interact_PlayerFacing(_pl, _inst) {
     var INF = 1000000000;
     return (Interact_FacingDistance(_pl, _inst) < INF);

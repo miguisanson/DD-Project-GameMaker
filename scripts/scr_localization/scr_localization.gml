@@ -154,14 +154,6 @@ function Loc_GetRaw(_key, _lang_code) {
     return string(variable_struct_get(entry, _lang_code));
 }
 
-function Loc_Has(_key, _lang_code = "") {
-    Loc_Init();
-    var lang = string(_lang_code);
-    if (lang == "") lang = Loc_GetLanguage();
-    var text = Loc_GetRaw(_key, lang);
-    return (text != "");
-}
-
 function Loc_FormatTemplate(_text, _vars) {
     var out = string(_text);
     if (!is_struct(_vars)) return out;
@@ -199,12 +191,6 @@ function Loc_T(_key, _fallback = "", _vars = undefined) {
     }
 
     return Loc_FormatTemplate(text, _vars);
-}
-
-function Loc_Reload() {
-    global.loc = Loc_DefaultData();
-    Loc_Init();
-    return Loc_GetData();
 }
 
 function Loc_LanguageDisplayName(_lang_code = "") {
