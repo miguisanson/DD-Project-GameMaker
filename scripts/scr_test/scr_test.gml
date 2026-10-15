@@ -8359,7 +8359,8 @@ function Test_BagsFind() {
     Test_Eq("D126 find: a loaded run has the 6 marbles back", variable_struct_exists(_gs.run, "find_bag") && is_struct(_gs.run.find_bag) ? array_length(_gs.run.find_bag.left) : -1, 6);
     for (var _m = 0; _m < 6; _m++) _s2 = Card_OnVictory(_s2);
     Test_Eq("D126 find: the loaded run finishes the bag: 3 potions in the 10 fights, none lost or doubled", Inv_Count(_s2.inventory, 10) - _q0, 3);
-=======
+}
+
 // ---- g3 (D138, D139): battle feel. Expected values are the owner's: freeze 40 ms OK / Good, 80 ms Perfect, 120 ms crit and BREAK; death: freeze 120 ms, burst 500 ms (boss longer),
 // then the slain message; jolt 2-3 px for ~80 ms; recoil ~150 ms; crit / BREAK zoom ~5% in ~150 ms; HP lag bar ~400 ms; edge flash ~150 ms; heartbeat only at or under 25% HP,
 // quiet (volume <= 0.25), ~1 beat per 1.2 s; the Screen shake setting off zeroes shakes, jolts and the zoom. ----
