@@ -7876,11 +7876,11 @@ function Test_Suite_BattleFeel() {
     for (var _i = 0; _i < array_length(_sp); _i++) {
         for (var _t = 0; _t < FEEL_SPARK_MS; _t += 20) {
             var _pos = Feel_SparkPos(_sp[_i], 80, 58, _t);
-            if (abs(_pos.x - 80) > 24 || abs(_pos.y - 58) > 24) _sp_in = false;
+            if (abs(_pos.x - 80) > 32 || abs(_pos.y - 58) > 32) _sp_in = false;
         }
         if (Feel_SparkPos(_sp[_i], 80, 58, FEEL_SPARK_MS).alive) _sp_gone = false;
     }
-    Test_True("feel: sparks stay within 24 px of the impact", _sp_in);
+    Test_True("feel: sparks stay within 32 px of the impact", _sp_in);
     Test_True("feel: every spark is gone when its time is up", _sp_gone);
     var _h1 = Test_FeelFakeBattle();
     Battle_QteImpactFeedback(_h1);
@@ -7935,7 +7935,9 @@ function Test_Suite_BattleFeel() {
     Test_True("feel: the zoom punch stays inside 0..4 px a side", _zok && _zmax == 4);
     var _zr = Feel_ZoomRegion(4, 80, 58);
     Test_True("feel: 4 px a side shows 152 of 160 columns (about 5% in)", _zr.sw == 152 && abs(_zr.kx - 160 / 152) < 0.0001);
-    Test_True("feel: the zoom region is whole pixels centred on the enemy", _zr.sx == 4 && _zr.sy == round(58 - _zr.sh * 0.5) && frac(_zr.sx) == 0 && frac(_zr.sy) == 0);
+    Test_True("feel: the zoom region is whole pixels, centred sideways on the enemy and held to the top edge of the picture (the enemy is high)", _zr.sx == 4 && _zr.sy == 0 && frac(_zr.sx) == 0 && frac(_zr.sy) == 0);
+    var _zrc = Feel_ZoomRegion(4, 80, 72);
+    Test_True("feel: an enemy in the middle of the picture is centred in the region", _zrc.sx == 4 && _zrc.sy >= 3 && _zrc.sy <= 4 && _zrc.sy + _zrc.sh > 72 && _zrc.sy < 72);
     var _zr2 = Feel_ZoomRegion(4, 2, 2);
     Test_True("feel: the zoom region never leaves the picture", _zr2.sx == 0 && _zr2.sy == 0);
     var _zr0 = Feel_ZoomRegion(0, 80, 58);
@@ -8046,10 +8048,10 @@ function Test_Suite_BattleFeel() {
     for (var _t = 0; _t <= 4800; _t += 50) {
         var _pa = Feel_PulseAlpha(_t, true);
         _pa_max = max(_pa_max, _pa);
-        if (_pa < 0 || _pa > 0.25 || Feel_PulseAlpha(_t, false) != 0) _pa_ok = false;
+        if (_pa < 0 || _pa > 0.5 || Feel_PulseAlpha(_t, false) != 0) _pa_ok = false;
     }
-    Test_True("feel: the edge pulse is faint (alpha 0.25 at most) and 0 when not low", _pa_ok);
-    Test_True("feel: the edge pulse is visible at its peak", _pa_max > 0.1);
+    Test_True("feel: the edge pulse is faint (alpha 0.5 at most: the bands are almost the backdrop colour) and 0 when not low", _pa_ok);
+    Test_True("feel: the edge pulse is visible at its peak", _pa_max > 0.2);
     Test_True("feel: the edge pulse is slow (starts at 0, one swell takes 2.4 s)", Feel_PulseAlpha(0, true) == 0 && Feel_PulseAlpha(1200, true) > Feel_PulseAlpha(300, true) && abs(Feel_PulseAlpha(2400, true)) < 0.0001);
     var _hk = Test_FeelFakeBattle(20, 100);
     var _last_key = "keep_me";

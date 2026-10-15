@@ -693,6 +693,11 @@ function Battle_StaggerHit(_bc, _power, _stun_skill, _perfect, _hits = 1) {
     SFX_Play(Qte_GradeSfxKey(QTE_PERFECT));
     global.sfx_last_key = last_key;
     CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_MS, SHAKE_DIR_H);
+    if (_bc.hitstop_ms > 0) {   // D138 / D139: the hit's freeze is still to come: a BREAK freezes 120 ms and punches the zoom in (Battle_HitFeel)
+        _bc.hitstop_ms = max(_bc.hitstop_ms, FEEL_FREEZE_HEAVY_MS);
+        _bc.feel_contact = true;
+        _bc.feel_break = true;
+    }
     var note = " " + Loc_T("combat.msg.break", "BREAK! {name} takes +50% damage!", { name: e.name });
     var cancelled = EnemyAI_Break(_bc.ai);   // B4 (D75): a BREAK during a wind-up cancels the big attack
     if (cancelled >= 0) {
@@ -779,7 +784,10 @@ function Battle_CheckEnd(_bc, _p, _e) {
         var gs = GameState_Get();
         gs.pending_post_battle_dialogue_lines = Battle_BuildVictoryDialogueLines(_e, rewards, _p);
 
-        Battle_Message(_bc, Loc_T("combat.msg.enemy_slain", "{enemy} has been slain.", { enemy: _e.name }), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY_MS);
+        var slain_text = Loc_T("combat.msg.enemy_slain", "{enemy} has been slain.", { enemy: _e.name });
+        if (!Battle_DeathPopBegin(_bc, _e, slain_text)) {   // D138: the enemy bursts first, then the message (no picture to burst: the message at once)
+            Battle_Message(_bc, slain_text, BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY_MS);
+        }
         return true;
     }
 
@@ -1246,13 +1254,14 @@ function Battle_AttackTimingBegin(_bc) {
     Tutorial_Trigger("bar");   // D45: the clock waits behind the pop-up (the battle controller does not step)
 }
 
-// The enemy shake and the small camera shakes of a landed hit. After a Perfect's hit-stop Step_0 calls this again, so the freeze comes first.
+// The enemy shake, the small camera shakes, the sparks, the jolt and the recoil of a landed hit. After the hit's freeze (every damaging hit, Battle_HitFreeze) Step_0 calls this, so the freeze comes first.
 function Battle_QteImpactFeedback(_bc) {
-    if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
+    if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst) && !Battle_DeathPopActive(_bc)) {
         SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_MS, ENEMY_FLASH_MS, ENEMY_FLASH_RATE_MS);
     }
     if (_bc.qte_result_key == QTE_PERFECT) CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_MS, SHAKE_DIR_H);
     if (_bc.qte_result_key == QTE_GOOD) CameraShake_Start(QTE_SHAKE_GOOD_MAG, QTE_SHAKE_GOOD_MS, SHAKE_DIR_H);
+    Battle_HitFeel(_bc);   // D138 / D139: sparks, jolt, recoil, zoom punch
 }
 
 // The player's basic attack always lands (D20): damage = base x the grade's multiplier, never 0.
@@ -1316,12 +1325,8 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
 
     p = Status_ConsumeByField(p, "consume_on_attack");
 
-    // D61 feedback: a Perfect freezes the picture for QTE_HITSTOP_PERFECT_MS first (also on a killing blow); the shakes follow it.
-    if (timing_key == QTE_PERFECT) {
-        _bc.hitstop_ms = QTE_HITSTOP_PERFECT_MS;
-    } else {
-        Battle_QteImpactFeedback(_bc);
-    }
+    // D61 / D138 feedback: every damaging hit freezes the picture first (also on a killing blow); the shakes, sparks and jolt follow it.
+    Battle_HitFreeze(_bc, timing_key, _bc.last_crit);
 
     if (Battle_CheckEnd(_bc, p, e)) return;
 
@@ -1481,12 +1486,10 @@ function Battle_SkillGradeFeedback(_bc, _skill, _grade, _res) {
     SFX_Play(Qte_GradeSfxKey(_grade.key));
 
     _bc.last_dmg = max(0, _res.dmg);
+    _bc.last_crit = (_res.dmg > 0) && variable_struct_exists(_res, "crit") && _res.crit;
     if (_res.dmg > 0) Battle_HitPop(_bc, _res.dmg, _grade.key, _res.crit);
     if (_res.dmg < 0) Battle_HealPop(_bc, -_res.dmg);
-    if (_res.dmg > 0) {
-        if (_grade.key == QTE_PERFECT) _bc.hitstop_ms = QTE_HITSTOP_PERFECT_MS;
-        else Battle_QteImpactFeedback(_bc);
-    }
+    if (_res.dmg > 0) Battle_HitFreeze(_bc, _grade.key, _bc.last_crit);
 }
 
 // Casts the skill. _grade is the arrow sequence's result (Qte_Result); a damaging skill's hit is scaled by its multiplier and never misses (D6).
@@ -1612,7 +1615,7 @@ function Battle_ThrowResolve(_bc, _timing) {
     _bc.last_dmg = res.dmg;
     _bc.last_crit = false;
     Battle_HitPop(_bc, res.dmg, _timing.key);
-    if (_timing.key == QTE_PERFECT) _bc.hitstop_ms = QTE_HITSTOP_PERFECT_MS; else Battle_QteImpactFeedback(_bc);
+    Battle_HitFreeze(_bc, _timing.key, false);
 
     if (Battle_CheckEnd(_bc, p, e)) return;
 
@@ -1687,6 +1690,7 @@ function Battle_RunAttempt(_bc) {
 
 function Battle_EndRun(_bc) {
     _bc.battle_over = true;
+    Display_ClearZoom();   // D139: no push-in is left over into the next room
     _bc.p = Equip_PassiveBattleCleanup(_bc.p);
     _bc.p = Status_ClearAll(_bc.p);
     GameState_SetPlayer(_bc.p);
@@ -2038,7 +2042,10 @@ function Battle_DefenceResolve(_bc, _key) {
     if (final_dmg > 0 && _key != QTE_PERFECT) {
         CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_MS, PLAYER_SHAKE_DIR);
     }
-    if (final_dmg > 0) Battle_PlayerHitPop(_bc, final_dmg, crit);
+    if (final_dmg > 0) {
+        Battle_PlayerHitPop(_bc, final_dmg, crit);
+        Battle_PlayerHurtFeel(_bc, final_dmg, p.max_hp, _key != QTE_PERFECT);   // a telegraphed move that gets through is a big hit
+    }
 
     if (Battle_CheckEnd(_bc, p, e)) {
         _bc.p = p;
@@ -2387,6 +2394,7 @@ function Battle_EnemyAct(_bc) {
         if (res.hit && res.dmg > 0) {
             CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_MS, PLAYER_SHAKE_DIR);
             Battle_PlayerHitPop(_bc, res.dmg, res.crit);
+            Battle_PlayerHurtFeel(_bc, res.dmg, p.max_hp, false);
         }
 
         if (Battle_CheckEnd(_bc, p, e)) return;
@@ -2439,6 +2447,7 @@ function Battle_EnemyAct(_bc) {
         if (_bc.last_hit && _bc.last_dmg > 0) {
             CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_MS, PLAYER_SHAKE_DIR);
             Battle_PlayerHitPop(_bc, _bc.last_dmg, _bc.last_crit);
+            Battle_PlayerHurtFeel(_bc, _bc.last_dmg, p.max_hp, false);
         }
 
         var end_attack_pack = Battle_EnemyFinalizeTurnState(_bc, p, e);
@@ -3195,19 +3204,20 @@ function Battle_DrawPlayerPanel(_bc, _z, _alpha) {
     var now = current_time;
     var dt = now - hud.clock;
     hud.clock = now;
-    hud.hp_shown = Ui_Glide(hud.hp_shown, ch.hp, dt, 140);
+    Feel_LagStep(hud, ch.hp, now, dt);   // D138: the bar drops at once, the lighter trail drains over ~400 ms
     hud.mp_shown = Ui_Glide(hud.mp_shown, ch.mp, dt, 140);
     var hurt = instance_exists(obj_ui_controller) ? obj_ui_controller.hud_hurt_flash_ms : 0;   // set by a hit or a poison / burn tick (ms left)
     var shake = Hud_HurtFlashSign(hurt) * p;   // the panel nudges one way then the other every 2 frames at 60 fps (the old "mod 4")
 
     var r = _z.player;
     var rx = r.x + shake;
+    var ry = r.y - Feel_PanelJoltPx(_bc.feel_ms - _bc.feel_pjolt_start, _bc.feel_pjolt_big, Settings_ShakeOn()) * Display_WorldScale();   // D139: an enemy hit jolts this panel up
     var ex = (r.h - (8 * p + 3 * lh + 6 * p + 16 * Battle_IconK())) div 3;   // the panel is as tall as the command menu: the spare height goes between the rows
     ex = max(0, ex);
-    Ui_DrawFrame(rx, r.y, r.w, r.h, _alpha, p);
+    Ui_DrawFrame(rx, ry, r.w, r.h, _alpha, p);
     var x0 = rx + 4 * p;
     var x1 = rx + r.w - 4 * p;
-    var yy = r.y + 4 * p;
+    var yy = ry + 4 * p;
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
     var nm = (is_struct(ch.class_cfg) && variable_struct_exists(ch.class_cfg, "name")) ? ch.class_cfg.name : "";
@@ -3370,7 +3380,9 @@ function Battle_DrawPops(_bc) {
     draw_set_color(c_white);
 }
 
-// ---- Battle feel (D138, D139): the controller's feel fields, then STUBS so the checks fail on values ----
+// ---- Battle feel (D138, D139): hit freeze + sparks + jolt + recoil + zoom punch, the death pop, the heavier hurt, the low-HP warning ----
+// The curves are pure (scr_fx: Feel_*); this is the wiring to the battle controller. The controller keeps a "feel clock" (feel_ms, in ms, it stands still in a
+// hit freeze) and the start time of each effect on it. D49: the Screen shake setting off turns off the shakes, the jolt, the recoil and the zoom punch only.
 function Battle_FeelInit(_bc) {
     _bc.feel_ms = 0;                    // the feel clock (ms): stands still in a hit freeze
     _bc.feel_hit_start = -100000;       // when the last hit's jolt and recoil began (feel clock)
@@ -3382,19 +3394,209 @@ function Battle_FeelInit(_bc) {
     _bc.feel_edge_start = -100000;      // the dark screen-edge flash of a big hit taken
     _bc.feel_pjolt_start = -100000;     // the HP panel's jolt
     _bc.feel_pjolt_big = false;
-    _bc.feel_inset = 0;
+    _bc.feel_inset = 0;                 // the picture's push-in this frame, px a side
     _bc.feel_zr = Feel_ZoomRegion(0, 0, 0);
     _bc.feel_zoom_on = false;
-    _bc.sparks = undefined;
-    _bc.death_pop = undefined;
-    _bc.lowhp_ms = 0;
+    _bc.sparks = undefined;             // { start, cx, cy, items } of the last damaging hit
+    _bc.death_pop = undefined;          // the enemy's death pop (Battle_DeathPopBegin)
+    _bc.lowhp_ms = 0;                   // how long the low-HP warning has run
     _bc.lowhp_on = false;
-    _bc.beat_n = 0;
+    _bc.beat_n = 0;                     // thumps played so far in this warning
 }
-function Battle_HitFreeze(_bc, _key, _crit) { }
-function Battle_FeelInset(_bc) { return 0; }
-function Battle_FeelStep(_bc, _step_ms) { }
-function Battle_PlayerHurtFeel(_bc, _dmg, _max_hp, _heavy) { }
-function Battle_DeathPopBegin(_bc, _e, _text) { return false; }
-function Battle_DeathPopAdvance(_bc, _ms) { }
-function Battle_DeathPopStep(_bc) { return false; }
+
+// A damaging player hit freezes the picture (40 ms OK / Good, 80 Perfect, 120 crit / BREAK); the impact feedback (shakes, sparks, jolt, recoil) comes when the
+// freeze ends (Step_0 calls Battle_QteImpactFeedback). Never while a bar is in its timing window; a hit that deals nothing has its feedback at once.
+function Battle_HitFreeze(_bc, _key, _crit) {
+    if (_bc.last_dmg <= 0 || _bc.qte_active || _bc.sq_active || _bc.def_active) {
+        Battle_QteImpactFeedback(_bc);
+        return;
+    }
+    var ms = Feel_FreezeMs(_key, _crit, _bc.feel_break);
+    _bc.hitstop_ms = max(_bc.hitstop_ms, ms);
+    _bc.feel_contact = (ms >= FEEL_FREEZE_PERFECT_MS);
+}
+
+// The sparks, the jolt, the recoil and (crit / BREAK) the zoom punch of a damaging hit, started on the feel clock.
+function Battle_HitFeel(_bc) {
+    var brk = _bc.feel_break;
+    _bc.feel_break = false;
+    if (_bc.last_dmg <= 0) return;
+    var key = _bc.qte_result_key;
+    var crit = _bc.last_crit;
+    _bc.sparks = { start: _bc.feel_ms, cx: _bc.enemy_fx_x, cy: _bc.enemy_fx_y, items: Feel_Sparks(_bc.enemy_fx_x, _bc.enemy_fx_y, key, crit, brk) };
+    _bc.feel_hit_start = _bc.feel_ms;
+    _bc.feel_hit_px = Feel_JoltPx(key, crit);
+    if (crit || brk) {
+        _bc.feel_punch_start = _bc.feel_ms;
+        _bc.feel_punch_on = true;
+    }
+}
+
+// The picture's push-in now, px a side (the hit's jolt or the zoom punch; 0 with the Screen shake setting off).
+function Battle_FeelInset(_bc) {
+    return Feel_InsetPx(_bc.feel_ms - _bc.feel_hit_start, _bc.feel_hit_px, _bc.feel_ms - _bc.feel_punch_start, _bc.feel_punch_on, Settings_ShakeOn());
+}
+
+// Once per Step: the feel clock, the death pop's clock, the low-HP heartbeat, and the push-in handed to the display.
+function Battle_FeelStep(_bc, _step_ms) {
+    var frozen = (_bc.hitstop_ms > 0);
+    if (!frozen) _bc.feel_ms += _step_ms;
+    Battle_DeathPopAdvance(_bc, _step_ms);   // real time: the pop's own freeze is part of it
+
+    var low = !_bc.battle_over && Feel_LowHpActive(_bc.p.hp, _bc.p.max_hp);
+    if (low) {
+        if (!frozen) _bc.lowhp_ms += _step_ms;
+        var due = Feel_BeatCount(_bc.lowhp_ms);
+        while (_bc.beat_n < due) {
+            _bc.beat_n++;
+            var second = ((_bc.beat_n mod 2) == 0);
+            Feel_PlayKeep("qte_weak", Feel_BeatVol(second), second ? 0.62 : 0.5);   // the dull knock, low and quiet; SFX_Play applies the SFX volume
+        }
+    } else {
+        _bc.lowhp_ms = 0;
+        _bc.beat_n = 0;
+    }
+    _bc.lowhp_on = low;
+
+    var inset = Battle_FeelInset(_bc);
+    _bc.feel_inset = inset;
+    var cx = round(_bc.enemy_fx_x - _bc.cam_base_x);
+    var cy = round(_bc.enemy_fx_y - _bc.cam_base_y);
+    _bc.feel_zr = Feel_ZoomRegion(inset, cx, cy);
+    if (inset > 0) {
+        Display_SetZoom(_bc.feel_zr.zoom, cx, cy);
+        _bc.feel_zoom_on = true;
+    } else if (_bc.feel_zoom_on) {
+        Display_ClearZoom();
+        _bc.feel_zoom_on = false;
+    }
+}
+
+// The enemy hit the player (D138, D139): the HP panel jolts; a big hit (a telegraphed move, or a quarter of max HP) also shakes the picture harder than a Perfect
+// and flashes the screen edges dark. The HP lag bar needs nothing here: it follows every drop in Battle_DrawPlayerPanel.
+function Battle_PlayerHurtFeel(_bc, _dmg, _max_hp, _heavy) {
+    if (_dmg <= 0) return;
+    var big = Feel_IsBigHit(_dmg, _max_hp, _heavy);
+    _bc.feel_pjolt_start = _bc.feel_ms;
+    _bc.feel_pjolt_big = big;
+    if (big) {
+        _bc.feel_edge_start = _bc.feel_ms;
+        CameraShake_Start(FEEL_BIG_SHAKE_MAG, FEEL_BIG_SHAKE_MS, SHAKE_DIR_V);
+    }
+}
+
+// ---- the enemy death pop (D138) ----
+// The killing blow: the enemy freezes and flashes light (FEEL_DEATH_FREEZE_MS), bursts into pixel squares that scatter, fall and fade, and only THEN does the
+// "has been slain" message come (Battle_DeathPopStep posts it). Returns false when there is no enemy picture to burst (the caller posts the message at once).
+function Battle_DeathPopBegin(_bc, _e, _text) {
+    if (!instance_exists(_bc.enemy_inst) || _bc.enemy_inst.sprite_index == noone) return false;
+    var inst = _bc.enemy_inst;
+    var spr = inst.sprite_index;
+    var boss = variable_struct_exists(_e, "is_boss") && _e.is_boss;
+    var xs = abs(inst.image_xscale);
+    var ys = abs(inst.image_yscale);
+    _bc.death_pop = {
+        active: true, t_ms: 0, boss: boss, text: _text, total_ms: Feel_DeathTotalMs(boss), burst_done: false,
+        parts: Feel_DeathParticles(spr, inst.image_index, inst.x - sprite_get_xoffset(spr) * xs, inst.y - sprite_get_yoffset(spr) * ys, xs, ys, boss)
+    };
+    _bc.battle_state = BSTATE_MESSAGE;       // the controller waits here until the pop is over (Step_0 exits through Battle_DeathPopStep)
+    _bc.message_next_state = BSTATE_END_RUN;
+    _bc.wait_fx = noone;
+    _bc.wait_timer = 0;
+    return true;
+}
+
+function Battle_DeathPopActive(_bc) {
+    return is_struct(_bc.death_pop) && _bc.death_pop.active;
+}
+
+// The pop's clock (real ms). The sound and the shake of the burst start when the freeze is over.
+function Battle_DeathPopAdvance(_bc, _ms) {
+    var dp = _bc.death_pop;
+    if (!is_struct(dp) || !dp.active) return;
+    dp.t_ms += _ms;
+    if (!dp.burst_done && dp.t_ms >= FEEL_DEATH_FREEZE_MS) {
+        dp.burst_done = true;
+        Feel_PlayKeep("barrel_break", 1, dp.boss ? 0.6 : 0.85);
+        if (dp.boss) Feel_PlayKeep("qte_perfect", 1, 0.55);
+        CameraShake_Start(dp.boss ? FEEL_BIG_SHAKE_MAG : QTE_SHAKE_PERFECT_MAG, dp.boss ? 320 : QTE_SHAKE_PERFECT_MS, SHAKE_DIR_H);
+    }
+}
+
+// True while the pop is playing (the controller does nothing else); when it has run its time it posts the slain message and the battle ends on it as before.
+function Battle_DeathPopStep(_bc) {
+    var dp = _bc.death_pop;
+    if (!is_struct(dp) || !dp.active) return false;
+    if (dp.t_ms >= dp.total_ms) {
+        dp.active = false;
+        Battle_Message(_bc, dp.text, BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY_MS);
+    }
+    return true;
+}
+
+// ---- drawing the feel (Draw_64) ----
+// A view-local world point (x - the camera's x) to GUI units, through the push-in's region and magnification.
+function Battle_FeelGuiX(_zr, _wx_view, _unit) {
+    return (_wx_view - _zr.sx) * _zr.kx * _unit;
+}
+
+function Battle_FeelGuiY(_zr, _wy_view, _unit) {
+    return (_wy_view - _zr.sy) * _zr.ky * _unit;
+}
+
+// Whole-pixel squares in GUI units (_size_world world px each, magnified like the picture).
+function Battle_FeelSquare(_zr, _wx_view, _wy_view, _size_world, _unit, _col, _alpha, _outline = false) {
+    var sz = max(1, round(_size_world * _unit * _zr.kx));
+    var x0 = floor(Battle_FeelGuiX(_zr, _wx_view, _unit) - sz * 0.5);
+    var y0 = floor(Battle_FeelGuiY(_zr, _wy_view, _unit) - sz * 0.5);
+    draw_set_alpha(_alpha);
+    if (_outline) {   // a dark rim so the light square reads on the light enemy as well as on the dark backdrop
+        var ow = max(1, round(_unit * 0.5));
+        draw_set_colour(UI_C_DARKEST);
+        draw_rectangle(x0 - ow, y0 - ow, x0 + sz - 1 + ow, y0 + sz - 1 + ow, false);
+    }
+    draw_set_colour(_col);
+    draw_rectangle(x0, y0, x0 + sz - 1, y0 + sz - 1, false);
+}
+
+// The hit sparks and the death burst, over the enemy and the skill animations.
+function Battle_DrawFeelFx(_bc, _vx, _vy, _unit) {
+    var zr = _bc.feel_zr;
+    var a0 = draw_get_alpha();
+    var c0 = draw_get_colour();
+    var sp = _bc.sparks;
+    if (is_struct(sp)) {
+        var el = _bc.feel_ms - sp.start;
+        if (el >= 0 && el < FEEL_SPARK_MS) {
+            for (var i = 0; i < array_length(sp.items); i++) {
+                var it = sp.items[i];
+                var pos = Feel_SparkPos(it, sp.cx, sp.cy, el);
+                if (pos.alive) Battle_FeelSquare(zr, pos.x - _vx, pos.y - _vy, it.size, _unit, it.col, 1, true);
+            }
+        }
+    }
+    var dp = _bc.death_pop;
+    if (is_struct(dp) && dp.t_ms >= FEEL_DEATH_FREEZE_MS) {
+        var burst_ms = dp.total_ms - FEEL_DEATH_FREEZE_MS;
+        var bt = dp.t_ms - FEEL_DEATH_FREEZE_MS;
+        if (bt < burst_ms) {
+            var alpha = Feel_ParticleAlpha(bt, burst_ms);
+            var shrink = 1 - 0.5 * clamp(bt / burst_ms, 0, 1);
+            for (var j = 0; j < array_length(dp.parts); j++) {
+                var pt = dp.parts[j];
+                var pp = Feel_ParticlePos(pt, bt);
+                Battle_FeelSquare(zr, pp.x - _vx, pp.y - _vy, pt.size * shrink, _unit, pt.col, alpha);
+            }
+        }
+    }
+    draw_set_alpha(a0);
+    draw_set_colour(c0);
+}
+
+// The dark screen edges: the flash of a big hit taken, and the slow faint pulse of the low-HP warning. Under the HUD.
+function Battle_DrawFeelEdges(_bc, _unit) {
+    var flash = Feel_EdgeAlpha(_bc.feel_ms - _bc.feel_edge_start);
+    var pulse = Feel_PulseAlpha(_bc.lowhp_ms, _bc.lowhp_on);
+    if (flash > 0.001) Feel_DrawEdge(Display_GuiW(), Display_GuiH(), _unit, flash);
+    if (pulse > 0.001) Feel_DrawEdge(Display_GuiW(), Display_GuiH(), _unit, pulse);
+}

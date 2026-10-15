@@ -348,40 +348,332 @@ function Icon_FallbackData() {
 }
 // ---- ICON FALLBACK END ----
 
-// ---- Battle feel (D138, D139): STUBS so the checks in Test_Suite_BattleFeel fail on values; the real curves land with the implementation ----
-#macro FEEL_FREEZE_NORMAL_MS 40
-#macro FEEL_FREEZE_PERFECT_MS 80
-#macro FEEL_FREEZE_HEAVY_MS 120
-#macro FEEL_DEATH_FREEZE_MS 120
+// ---- Battle feel (D138, D139): pure curves for the hit freeze, sparks, jolt, recoil, zoom punch, death pop, HP lag bar, edge flash and the low-HP warning ----
+// Everything here is a function of elapsed ms (and the Screen shake setting passed in as _shake_on), so the tests drive it without a battle. The battle controller
+// keeps one "feel clock" (feel_ms, it stands still in a hit freeze) and the start time of each effect; scr_combat reads these through Battle_Feel*.
+#macro FEEL_FREEZE_NORMAL_MS 40         // D138: a hit freezes the picture 40 ms (OK / Good / Weak) ...
+#macro FEEL_FREEZE_PERFECT_MS 80        // ... 80 ms on a Perfect ...
+#macro FEEL_FREEZE_HEAVY_MS 120         // ... 120 ms on a crit or a BREAK
+#macro FEEL_DEATH_FREEZE_MS 120         // the killing blow: freeze + white flash, then the burst
 #macro FEEL_DEATH_BURST_MS 500
 #macro FEEL_DEATH_BURST_BOSS_MS 900
-#macro FEEL_JOLT_MS 80
-#macro FEEL_RECOIL_MS 150
-#macro FEEL_PUNCH_MS 150
-#macro FEEL_PUNCH_PX 4
-#macro FEEL_LAG_MS 400
-#macro FEEL_EDGE_MS 150
+#macro FEEL_GRAVITY 260                 // particle gravity, world px per second squared
+#macro FEEL_JOLT_MS 80                  // D139: the view pushes in 2-3 px and eases back
+#macro FEEL_RECOIL_MS 150               // the enemy squashes and springs back
+#macro FEEL_PUNCH_MS 150                // crit / BREAK zoom punch
+#macro FEEL_PUNCH_PX 4                  // px a side of the 160 px picture = 8/160 = 5% zoom
+#macro FEEL_LAG_MS 400                  // the HP lag bar drains this long
+#macro FEEL_EDGE_MS 150                 // the dark screen-edge flash of a big hit taken
+#macro FEEL_EDGE_ALPHA 0.9             // the battle backdrop is almost UI_C_DARKEST already, so the edge bands need a high alpha to read at all
 #macro FEEL_SPARK_MS 240
-function Feel_FreezeMs(_key, _crit, _break) { return 0; }
-function Feel_JoltPx(_key, _crit) { return 0; }
-function Feel_InsetPx(_hit_elapsed_ms, _jolt_px, _punch_elapsed_ms, _punch_on, _shake_on) { return 0; }
-function Feel_ZoomRegion(_inset, _cx, _cy) { return { sx: 0, sy: 0, sw: DISPLAY_BASE_W, sh: DISPLAY_BASE_H, kx: 1, ky: 1, zoom: 1 }; }
-function Feel_RecoilScale(_elapsed_ms, _shake_on) { return { x: 1, y: 1 }; }
-function Feel_LagShown(_from, _to, _elapsed_ms) { return _to; }
-function Feel_LagStep(_hud, _hp, _now, _dt) { return _hp; }
-function Feel_IsBigHit(_dmg, _max_hp, _heavy) { return false; }
-function Feel_EdgeAlpha(_elapsed_ms) { return 0; }
-function Feel_PanelJoltPx(_elapsed_ms, _big, _shake_on) { return 0; }
-function Feel_LowHpActive(_hp, _max_hp) { return false; }
-function Feel_BeatCount(_ms) { return 0; }
-function Feel_BeatVol(_second) { return 0; }
-function Feel_PulseAlpha(_ms, _active) { return 0; }
-function Feel_DeathTotalMs(_boss) { return 0; }
-function Feel_DeathPhase(_t_ms, _boss) { return 0; }
-function Feel_SpriteVisible(_t_ms) { return true; }
-function Feel_ParticleAlpha(_t_ms, _burst_ms) { return 1; }
-function Feel_ParticlePos(_p, _t_ms) { return { x: _p.x + 1000, y: _p.y + 1000 }; }
-function Feel_SparkCount(_key, _crit, _break) { return 0; }
-function Feel_SparkSize(_key, _crit, _break) { return 0; }
-function Feel_Sparks(_cx, _cy, _key, _crit, _break) { return []; }
-function Feel_SparkPos(_s, _cx, _cy, _elapsed_ms) { return { x: _cx + 1000, y: _cy + 1000, alive: true }; }
+#macro FEEL_BIG_SHAKE_MAG 1.4           // a big hit taken shakes the picture harder than a Perfect (QTE_SHAKE_PERFECT_MAG is 0.8)
+#macro FEEL_BIG_SHAKE_MS 260
+#macro FEEL_LOWHP_PCT 0.25              // D139: the warning is on at or under this share of max HP (the HUD's own "low" mark)
+#macro FEEL_BEAT_MS 1200                // one lub-dub per 1.2 s
+#macro FEEL_BEAT_GAP_MS 220             // the "dub" follows the "lub" after this
+#macro FEEL_BEAT_VOL 0.2                // of the SFX volume: well under the music, the owner does not want a loud heartbeat
+#macro FEEL_PULSE_MS 2400               // the edge pulse swells once per two beats
+#macro FEEL_PULSE_ALPHA 0.45            // still faint on screen: the bands are only a few levels darker than the backdrop
+
+function Feel_Ease(_u) {
+    return 1 - sqr(1 - clamp(_u, 0, 1));
+}
+
+function Feel_EaseInOut(_u) {
+    var u = clamp(_u, 0, 1);
+    return u * u * (3 - 2 * u);
+}
+
+// 0..1 shape over _ms: 0 at the start, up to 1 at 30% of the time (eased out), eased back to 0 at the end; 0 before the start and from the end on.
+function Feel_Pulse(_elapsed_ms, _ms) {
+    if (_elapsed_ms <= 0 || _elapsed_ms >= _ms) return 0;
+    var u = _elapsed_ms / _ms;
+    if (u < 0.3) return Feel_Ease(u / 0.3);
+    return 1 - Feel_EaseInOut((u - 0.3) / 0.7);
+}
+
+// How long a damaging player hit freezes the picture (D138).
+function Feel_FreezeMs(_key, _crit, _break) {
+    if (_crit || _break) return FEEL_FREEZE_HEAVY_MS;
+    if (_key == QTE_PERFECT) return FEEL_FREEZE_PERFECT_MS;
+    return FEEL_FREEZE_NORMAL_MS;
+}
+
+// px the view pushes in on each side for a hit (D139: 2-3 px).
+function Feel_JoltPx(_key, _crit) {
+    return (_crit || _key == QTE_PERFECT) ? 3 : 2;
+}
+
+// The picture's push-in, px a side: the hit's jolt (_jolt_px over FEEL_JOLT_MS) or the crit / BREAK punch (FEEL_PUNCH_PX over FEEL_PUNCH_MS), the larger one.
+// The elapsed times are ms since each began (a huge negative number when it never did). 0 with the Screen shake setting off.
+function Feel_InsetPx(_hit_elapsed_ms, _jolt_px, _punch_elapsed_ms, _punch_on, _shake_on) {
+    if (!_shake_on) return 0;
+    var j = round(_jolt_px * Feel_Pulse(_hit_elapsed_ms, FEEL_JOLT_MS));
+    var p = _punch_on ? round(FEEL_PUNCH_PX * Feel_Pulse(_punch_elapsed_ms, FEEL_PUNCH_MS)) : 0;
+    return max(j, p);
+}
+
+// The part of the 160 x 144 picture a push-in of _inset px a side shows, centred on (_cx, _cy) in view pixels: the same arithmetic as Display_DrawFrame's zoom
+// branch (whole pixels, never outside the picture). kx / ky = how much each axis is magnified; zoom = the value to give Display_SetZoom.
+function Feel_ZoomRegion(_inset, _cx, _cy) {
+    if (_inset <= 0) return { sx: 0, sy: 0, sw: DISPLAY_BASE_W, sh: DISPLAY_BASE_H, kx: 1, ky: 1, zoom: 1 };
+    var zoom = DISPLAY_BASE_W / max(1, DISPLAY_BASE_W - 2 * _inset);
+    var sw = max(1, round(DISPLAY_BASE_W / zoom));
+    var sh = max(1, round(DISPLAY_BASE_H / zoom));
+    var sx = clamp(round(_cx - sw * 0.5), 0, DISPLAY_BASE_W - sw);
+    var sy = clamp(round(_cy - sh * 0.5), 0, DISPLAY_BASE_H - sh);
+    return { sx: sx, sy: sy, sw: sw, sh: sh, kx: DISPLAY_BASE_W / sw, ky: DISPLAY_BASE_H / sh, zoom: zoom };
+}
+
+// The enemy's squash: x wider and y shorter right after a hit (up to 12%), then a spring back past 1 (a little tall and narrow) and rest. 1 x 1 at both ends.
+function Feel_RecoilScale(_elapsed_ms, _shake_on) {
+    if (!_shake_on || _elapsed_ms <= 0 || _elapsed_ms >= FEEL_RECOIL_MS) return { x: 1, y: 1 };
+    var u = _elapsed_ms / FEEL_RECOIL_MS;
+    var s;
+    if (u < 0.3) {
+        s = Feel_Ease(u / 0.3);
+    } else {
+        var v = (u - 0.3) / 0.7;
+        s = cos(v * pi * 1.5) * (1 - v);
+    }
+    return { x: 1 + 0.12 * s, y: 1 - 0.12 * s };
+}
+
+// The trailing HP bar: it stays near the old value for a moment and then drains to the real HP, reaching it at FEEL_LAG_MS. A rise is not lagged.
+function Feel_LagShown(_from, _to, _elapsed_ms) {
+    if (_from <= _to || _elapsed_ms >= FEEL_LAG_MS) return _to;
+    var u = clamp(_elapsed_ms / FEEL_LAG_MS, 0, 1);
+    return _to + (_from - _to) * (1 - u * u);
+}
+
+// One draw frame of the player's HP trail: a drop starts the lag from where the bar was, a rise glides up. _hud holds hp_shown, lag_hp, lag_from, lag_start.
+function Feel_LagStep(_hud, _hp, _now, _dt) {
+    if (!variable_struct_exists(_hud, "lag_hp")) {
+        _hud.lag_hp = _hp;
+        _hud.lag_from = _hp;
+        _hud.lag_start = _now;
+    }
+    if (_hp < _hud.lag_hp) {
+        _hud.lag_from = max(_hud.hp_shown, _hp);
+        _hud.lag_start = _now;
+    }
+    _hud.lag_hp = _hp;
+    if (_hp >= _hud.hp_shown) {
+        _hud.hp_shown = Ui_Glide(_hud.hp_shown, _hp, _dt, 140);
+    } else {
+        _hud.hp_shown = Feel_LagShown(_hud.lag_from, _hp, _now - _hud.lag_start);
+    }
+    return _hud.hp_shown;
+}
+
+// D138: a big hit taken is a telegraphed / heavy move, or damage of a quarter of max HP or more.
+function Feel_IsBigHit(_dmg, _max_hp, _heavy) {
+    return _dmg > 0 && (_heavy || (_max_hp > 0 && _dmg * 4 >= _max_hp));
+}
+
+// The dark screen-edge flash: strongest at once, gone at FEEL_EDGE_MS.
+function Feel_EdgeAlpha(_elapsed_ms) {
+    if (_elapsed_ms < 0 || _elapsed_ms >= FEEL_EDGE_MS) return 0;
+    return FEEL_EDGE_ALPHA * (1 - _elapsed_ms / FEEL_EDGE_MS);
+}
+
+// The player's HP panel jolts when the enemy hits (D139): px up, 2 (3 on a big hit) over FEEL_JOLT_MS; 0 with the Screen shake setting off.
+function Feel_PanelJoltPx(_elapsed_ms, _big, _shake_on) {
+    if (!_shake_on) return 0;
+    return round((_big ? 3 : 2) * Feel_Pulse(_elapsed_ms, FEEL_JOLT_MS));
+}
+
+// ---- the low-HP warning (D139) ----
+function Feel_LowHpActive(_hp, _max_hp) {
+    return _max_hp > 0 && _hp > 0 && (_hp / _max_hp) <= FEEL_LOWHP_PCT;
+}
+
+// Thumps heard by _ms into the warning: a "lub" at the start of each cycle and a "dub" FEEL_BEAT_GAP_MS later, one cycle per FEEL_BEAT_MS. The first is at once.
+function Feel_BeatCount(_ms) {
+    if (_ms < 0) return 0;
+    var cyc = floor(_ms / FEEL_BEAT_MS);
+    var ph = _ms - cyc * FEEL_BEAT_MS;
+    return 2 * cyc + 1 + ((ph >= FEEL_BEAT_GAP_MS) ? 1 : 0);
+}
+
+// The thump's volume (0..1 of the SFX volume, which SFX_Play applies on top): quiet, the "dub" softer.
+function Feel_BeatVol(_second) {
+    return FEEL_BEAT_VOL * (_second ? 0.7 : 1);
+}
+
+// The faint dark pulse at the screen edges: one slow swell per FEEL_PULSE_MS, 0 when the warning is off.
+function Feel_PulseAlpha(_ms, _active) {
+    if (!_active) return 0;
+    return FEEL_PULSE_ALPHA * (0.5 - 0.5 * cos(2 * pi * _ms / FEEL_PULSE_MS));
+}
+
+// Plays a sound without becoming "the last sound" the bot and the tests read (global.sfx_last_key / handle).
+function Feel_PlayKeep(_key, _vol, _pitch) {
+    var k = variable_global_exists("sfx_last_key") ? global.sfx_last_key : "";
+    var h = variable_global_exists("sfx_last_handle") ? global.sfx_last_handle : -1;
+    SFX_Play(_key, _vol, _pitch);
+    global.sfx_last_key = k;
+    global.sfx_last_handle = h;
+}
+
+// ---- the enemy death pop (D138) ----
+function Feel_DeathTotalMs(_boss) {
+    return FEEL_DEATH_FREEZE_MS + (_boss ? FEEL_DEATH_BURST_BOSS_MS : FEEL_DEATH_BURST_MS);
+}
+
+// 0 = freeze + white flash, 1 = burst, 2 = over.
+function Feel_DeathPhase(_t_ms, _boss) {
+    if (_t_ms < FEEL_DEATH_FREEZE_MS) return 0;
+    if (_t_ms < Feel_DeathTotalMs(_boss)) return 1;
+    return 2;
+}
+
+// The sprite is drawn only before the burst begins.
+function Feel_SpriteVisible(_t_ms) {
+    return _t_ms < FEEL_DEATH_FREEZE_MS;
+}
+
+// A particle's opacity _t_ms into the burst: solid for 40%, then fading to 0 at _burst_ms.
+function Feel_ParticleAlpha(_t_ms, _burst_ms) {
+    var u = _t_ms / max(1, _burst_ms);
+    if (u <= 0.4) return 1;
+    return clamp(1 - (u - 0.4) / 0.6, 0, 1);
+}
+
+// Where a particle is _t_ms into the burst (world px): its cell plus its velocity (px per second) and gravity.
+function Feel_ParticlePos(_p, _t_ms) {
+    var ts = _t_ms / 1000;
+    return { x: _p.x + _p.vx * ts, y: _p.y + _p.vy * ts + 0.5 * FEEL_GRAVITY * ts * ts };
+}
+
+// A deterministic 0..1 from an index and a salt (no random stream is touched: tests and shots see the same burst).
+function Feel_Hash01(_i, _salt) {
+    var v = sin(_i * 12.9898 + _salt * 78.233) * 43758.5453;
+    return v - floor(v);
+}
+
+// The palette colour (UI_C_*) nearest a sprite pixel by brightness.
+function Feel_PaletteOf(_col) {
+    var lum = 0.299 * colour_get_red(_col) + 0.587 * colour_get_green(_col) + 0.114 * colour_get_blue(_col);
+    if (lum < 56) return UI_C_DARKEST;
+    if (lum < 112) return UI_C_DARK;
+    if (lum < 190) return UI_C_LIGHT;
+    return UI_C_LIGHTEST;
+}
+
+// The pixel squares an enemy sprite bursts into: a grid over its bounds, one square per opaque cell, in the palette colour of the sprite's pixel there (or a
+// brightness pattern when the sprite cannot be read). _wx, _wy = the sprite's top-left in world px. Returns [{ x, y (cell centre), vx, vy, col, size }].
+function Feel_DeathParticles(_spr, _img, _wx, _wy, _xs, _ys, _boss) {
+    var out = [];
+    if (_spr == noone || !sprite_exists(_spr)) return out;
+    var sw = sprite_get_width(_spr);
+    var sh = sprite_get_height(_spr);
+    var cell = max(2, ceil(max(sw, sh) / (_boss ? 14 : 10)));
+    var surf = -1;
+    try {
+        surf = surface_create(sw, sh);
+        if (surface_exists(surf)) {
+            surface_set_target(surf);
+            draw_clear_alpha(c_black, 0);
+            draw_sprite(_spr, _img, sprite_get_xoffset(_spr), sprite_get_yoffset(_spr));
+            surface_reset_target();
+        }
+    } catch (_e) {
+        surf = -1;
+    }
+    var have = (surf != -1 && surface_exists(surf));
+    var cols = ceil(sw / cell);
+    var rows = ceil(sh / cell);
+    var n = 0;
+    for (var cy = 0; cy < rows; cy++) {
+        for (var cx = 0; cx < cols; cx++) {
+            var px = min(sw - 1, cx * cell + cell div 2);
+            var py = min(sh - 1, cy * cell + cell div 2);
+            var col = UI_C_LIGHT;
+            if (have) {
+                var raw = surface_getpixel_ext(surf, px, py);
+                if (((raw >> 24) & 255) < 128) continue;   // clear: not part of the silhouette
+                col = Feel_PaletteOf(raw & $FFFFFF);
+            } else {
+                col = (((cx + cy) mod 3) == 0) ? UI_C_LIGHTEST : ((((cx + cy) mod 3) == 1) ? UI_C_LIGHT : UI_C_DARK);
+            }
+            var dx = ((cx + 0.5) / cols) * 2 - 1;      // -1 (left) .. 1 (right)
+            var dy = ((cy + 0.5) / rows) * 2 - 1;      // -1 (top) .. 1 (bottom)
+            var h1 = Feel_Hash01(n, 1);
+            var h2 = Feel_Hash01(n, 2);
+            array_push(out, {
+                x: _wx + (cx * cell + cell * 0.5) * _xs,
+                y: _wy + (cy * cell + cell * 0.5) * _ys,
+                vx: dx * (_boss ? 56 : 46) + (h1 - 0.5) * 24,
+                vy: -(24 + h2 * (_boss ? 64 : 52)) + dy * 26,
+                col: col,
+                size: cell * 0.5 * (_xs + _ys)
+            });
+            n++;
+        }
+    }
+    if (have) surface_free(surf);
+    return out;
+}
+
+// ---- hit sparks (D138): pixel squares thrown out from the impact point ----
+function Feel_SparkCount(_key, _crit, _break) {
+    if (_break) return 18;
+    if (_crit) return 14;
+    if (_key == QTE_PERFECT) return 11;
+    if (_key == QTE_GOOD) return 7;
+    return 6;
+}
+
+// World px per spark square.
+function Feel_SparkSize(_key, _crit, _break) {
+    if (_break) return 3;
+    if (_crit || _key == QTE_PERFECT) return 2;
+    return 1;
+}
+
+// The sparks of a hit: each a direction, a reach (world px) and a colour.
+function Feel_Sparks(_cx, _cy, _key, _crit, _break) {
+    var n = Feel_SparkCount(_key, _crit, _break);
+    var size = Feel_SparkSize(_key, _crit, _break);
+    var big = (_crit || _break || _key == QTE_PERFECT);
+    var out = [];
+    for (var i = 0; i < n; i++) {
+        array_push(out, {
+            a: (i / n) * 2 * pi + Feel_Hash01(i, 3) * 0.6,
+            r: (big ? 16 : 11) + Feel_Hash01(i, 4) * (big ? 12 : 7),
+            size: size,
+            col: ((i mod 2) == 0) ? UI_C_LIGHTEST : UI_C_LIGHT
+        });
+    }
+    return out;
+}
+
+// A spark's place _elapsed_ms after the hit (world px): it flies out and slows (eased), and is gone at FEEL_SPARK_MS. It blinks off for its last quarter.
+function Feel_SparkPos(_s, _cx, _cy, _elapsed_ms) {
+    var u = clamp(_elapsed_ms / FEEL_SPARK_MS, 0, 1);
+    var e = 1 - power(1 - u, 3);   // flies out fast, then slows
+    var alive = (_elapsed_ms < FEEL_SPARK_MS) && (u < 0.75 || (floor(_elapsed_ms / 30) mod 2 == 0));
+    return { x: _cx + cos(_s.a) * _s.r * e, y: _cy + sin(_s.a) * _s.r * e, alive: alive };
+}
+
+// The dark screen edges (UI_C_DARKEST): three bands in from the edge, 3 / 4 / 6 world px wide, 100% / 60% / 30% of _alpha. A faint vignette, no distortion.
+function Feel_DrawEdge(_gw, _gh, _unit, _alpha) {
+    var a0 = draw_get_alpha();
+    var c0 = draw_get_colour();
+    draw_set_colour(UI_C_DARKEST);
+    var widths = [3, 4, 6];
+    var mults = [1, 0.6, 0.3];
+    var d0 = 0;
+    for (var i = 0; i < 3; i++) {
+        var d1 = d0 + round(widths[i] * _unit);
+        draw_set_alpha(_alpha * mults[i]);
+        draw_rectangle(d0, d0, _gw - 1 - d0, d1 - 1, false);                       // top
+        draw_rectangle(d0, _gh - d1, _gw - 1 - d0, _gh - 1 - d0, false);           // bottom
+        draw_rectangle(d0, d1, d1 - 1, _gh - 1 - d1, false);                       // left
+        draw_rectangle(_gw - d1, d1, _gw - 1 - d0, _gh - 1 - d1, false);           // right
+        d0 = d1;
+    }
+    draw_set_alpha(a0);
+    draw_set_colour(c0);
+}

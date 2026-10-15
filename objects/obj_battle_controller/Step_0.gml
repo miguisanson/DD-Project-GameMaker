@@ -5,6 +5,7 @@ var gs = GameState_Get();
 var step_ms = Presentation_StepMs(delta_time);
 Fx_BattleShakesStep(enemy_inst, step_ms);
 if (gs.ui.mode == UI_MENU || gs.ui.mode == UI_PAUSE || Tutorial_IsOpen() || Tutorial_JustClosed()) exit;
+Battle_FeelStep(self, step_ms);   // D138 / D139: the feel clock, the death pop's clock, the low-HP heartbeat and the push-in (before any exit below)
 if (battle_over && battle_state != BSTATE_MESSAGE) exit;
 
 // helper input keys
@@ -13,7 +14,9 @@ var k_ok = Input_UIConfirm();
 // The grade word runs on real time, also through a hit-stop.
 if (qte_result_ms > 0) qte_result_ms = max(0, qte_result_ms - Qte_StepMs(delta_time));
 
-// Hit-stop (D61, Perfect): the battle logic waits; input and drawing carry on. The shakes start when it ends.
+// Hit-stop (D61, D138: every damaging hit): the battle logic waits; input and drawing carry on. The shakes, sparks and jolt start when it ends.
+// A bar in its timing window never freezes (the freeze starts after a bar is resolved; this is the guard).
+if (hitstop_ms > 0 && (qte_active || sq_active || def_active)) hitstop_ms = 0;
 if (hitstop_ms > 0) {
     hitstop_ms -= Qte_StepMs(delta_time);
     if (hitstop_ms > 0) exit;
@@ -21,6 +24,9 @@ if (hitstop_ms > 0) {
     Battle_QteImpactFeedback(self);
     exit;
 }
+
+// D138: the enemy has been killed: its death pop plays (freeze, white flash, burst), then the "has been slain" message and the end of the fight.
+if (Battle_DeathPopStep(self)) exit;
 
 // D97: the command panel slides in each time the player's turn comes round (not when coming back from a list: Battle_ListBack does that)
 if (!variable_instance_exists(id, "hud_prev_state")) hud_prev_state = battle_state;
