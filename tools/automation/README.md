@@ -4,7 +4,7 @@
 Background and the proven commands: `.planning/research/automation-igor.md`.
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File tools\automation\run_tests.ps1 [-Mode fast|full|compile] [-Only runtests|smoke|bot|shots|gridshots] [-NegativeControl]
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\automation\run_tests.ps1 [-Mode fast|full|compile] [-Only runtests|smoke|bot|shots|gridshots] [-NegativeControl [test|syntax|unknownfn]]
 ```
 
 | Mode | What runs |
@@ -27,7 +27,12 @@ Full logs: `E:\Temp\dd-gate\logs\build.log` and `<mode>.log`.
 - Work dirs `src, cache, tmp, out, save, logs` all live under `-WorkRoot` (default `E:\Temp\dd-gate`). If any resolves to C: the script exits 2 before touching anything. `cache` and `tmp` are kept between runs; the rest are emptied.
 - Games run with `LOCALAPPDATA` pointed at `...\save`. A hash of `%LOCALAPPDATA%\DD_Project` is taken before and after; any change is a FAIL. (If the owner plays the real game during a run, that also trips it.)
 - `-runtests` passes only with: a `[TEST-SUMMARY] pass=N fail=0 errors=0` line (N > 0), no `UNHANDLED` / `CRASH` / `[TEST] ERROR` line, `test_results.txt` somewhere under the save dir, exit code 0, no timeout, and no `DD-Project` process left from this run (anything left is killed and counted as FAIL).
-- `-NegativeControl` adds `-testcontrol` to the game, which should add a deliberately failing test. The expected result is `GATE FAIL`; run it whenever this script changes (VER-04).
+- `-NegativeControl` adds `-testcontrol` to the game, which should add a deliberately failing test (and plants a violation for the display source guard). The expected result is `GATE FAIL`; run it whenever this script changes (VER-04).
+- Other plants (R-021), chosen with `-NegativeControl syntax` or `-NegativeControl unknownfn` (same as `-NegativeControl -Plant <kind>`; `-Plant <kind>` alone also implies `-NegativeControl`). Each one edits only the scratch copy under `<WorkRoot>\src` (`scripts\scr_test\scr_test.gml`), never the repo, and each must end in `GATE FAIL`:
+  - `syntax`: appends `function __plant_syntax_error() { var __x = ( ; }`. Igor must fail the build: expect `FAIL build exit code ...` and/or `FAIL build: Error : ...` lines, no game run.
+  - `unknownfn`: adds a suite that calls `__plant_no_such_function_xyz()` to `Test_RunAll`. Igor still compiles with exit 0 (it does not check function names); the `-runtests` run must catch it: expect `[TEST] ERROR PlantUnknownFn ...` and `FAIL runtests: summary reports fail=0 errors=1`.
+  - The `test` plant (the default) is the only one that also plants the display-guard violation.
+- Before the build the wrapper also runs the hardcoded-English lint (`tools/localization/lint_hardcoded_text.py`, step `text-lint`) after its own self-check (`test_lint_hardcoded_text.py`); a finding is a `GATE FAIL`. Pure placeholder strings such as `"{n}"` are not text; `"Lv {n}"` still is.
 
 ## Game modes (in `scripts/scr_debug/scr_debug.gml`, inert without a flag)
 - `-runtests`: assertion suites (`scr_test.gml`).
