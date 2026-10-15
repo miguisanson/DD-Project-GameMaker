@@ -333,7 +333,6 @@ function Transition_PreRoomChange() {
             gs.ui.cinematic_input_lock_count = 0;
         }
     }
-    global.player_inst = noone;
 }
 
 function Transition_Begin(_type, _room, _spawn_id, _face, _use_spawn, _enc_focus_x = undefined, _enc_focus_y = undefined) {
