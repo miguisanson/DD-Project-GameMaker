@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T10:40:49Z",
-    "row_count": 1028
+    "generated_at_utc": "2026-10-15T10:48:49Z",
+    "row_count": 1029
   },
   "default_lang": "en",
   "languages": [
@@ -1619,6 +1619,10 @@
     "dialogue.tree_stump.0": {
       "en": "A cut tree stump.",
       "ko": "베어 낸 나무 그루터기."
+    },
+    "echo.pick.title": {
+      "en": "Keep one echo of the last fall",
+      "ko": "지난 추락의 메아리 하나를 간직합니다"
     },
     "elite.line.armored": {
       "en": "Armored: +{n} DEF.",

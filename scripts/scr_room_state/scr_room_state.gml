@@ -429,14 +429,113 @@ function Run_EchoHas(_list, _kind, _id) {
     return false;
 }
 
-// Up to 3 distinct things the run had, drawn with _rng (the loot stream). A run with nothing offers the starting potion.
-function Run_EchoOptions(_ch, _rng) {
-    var cands = Run_EchoCandidates(_ch);
-    if (array_length(cands) <= 0) return [{ kind: "item", id: 10 }];
-    var order = Rng_Shuffle(_rng, cands);
+// Up to 3 of _list, drawn with _rng.
+function Run_EchoDraw3(_list, _rng) {
+    var order = Rng_Shuffle(_rng, _list);
     var out = [];
     for (var i = 0; i < min(3, array_length(order)); i++) array_push(out, order[i]);
     return out;
+}
+
+// Up to 3 distinct things the run had, drawn with _rng, no class filter (D87's draw at the death; since D130 the game draws after the class pick with
+// Run_EchoOptionsFor, and this stays for its tests). A run with nothing offers the starting potion.
+function Run_EchoOptions(_ch, _rng) {
+    var cands = Run_EchoCandidates(_ch);
+    if (array_length(cands) <= 0) return [{ kind: "item", id: 10 }];
+    return Run_EchoDraw3(cands, _rng);
+}
+
+// ---- D130 (amends D87): the echo is offered right AFTER the class pick, filtered to what the new class can use ----
+// A death leaves everything the lost run had in the profile (echo_pool). The class pick (ClassSelect_ApplyClass -> Run_EchoGrant) draws up to 3 of it that the
+// class can use onto the character (echo_offer, saved with the run, so a quit before the answer loses nothing); Cards_NextOwed owes the pick ("echo"),
+// CardsUi opens it, Run_EchoTake applies the answer and Run_EchoDone empties the pool. The first run has no echo (the pool is empty).
+// A gear item fits when its class rules (preferred_class, allowed_classes) allow the class; a potion fits every class; a skill fits when its class list does.
+function Run_EchoItemFits(_item_id, _class_id) {
+    var it = ItemDB_Get(_item_id);
+    if (!is_struct(it) || it.id == 0) return false;
+    if (variable_struct_exists(it, "preferred_class") && it.preferred_class != -1 && it.preferred_class != _class_id) return false;
+    if (variable_struct_exists(it, "allowed_classes") && is_array(it.allowed_classes) && array_length(it.allowed_classes) > 0 && !array_contains(it.allowed_classes, _class_id)) return false;
+    return true;
+}
+
+function Run_EchoFilter(_pool, _class_id) {
+    var out = [];
+    if (!is_array(_pool)) return out;
+    for (var i = 0; i < array_length(_pool); i++) {
+        var e = _pool[i];
+        var fits = false;
+        if (e.kind == "skill") {
+            var sk = SkillDB_GetBase(e.id);
+            fits = (sk.id >= 0) && is_array(sk.class_list) && array_length(sk.class_list) > 0 && Skill_ClassAllowed(sk, _class_id);   // the same rule as Card_ClassCharacter
+        } else if (e.kind == "item") {
+            fits = Run_EchoItemFits(e.id, _class_id);
+        }
+        if (fits) array_push(out, e);
+    }
+    return out;
+}
+
+// Up to 3 distinct things of the pool that the class can use, shuffled with a stream made from the run's seed (it does not move any saved stream). [] = no pick.
+function Run_EchoOptionsFor(_pool, _class_id, _seed) {
+    var fit = Run_EchoFilter(_pool, _class_id);
+    if (array_length(fit) <= 0) return [];
+    return Run_EchoDraw3(fit, Rng_New(_seed, "echo"));
+}
+
+// The pool a death leaves: what the lost run had. A pool that no class pick has used yet (the run died before its class chest) is kept and joined.
+// A run with nothing at all leaves the starting potion.
+function Run_EchoPoolAfter(_old_pool, _ch) {
+    var out = [];
+    if (is_array(_old_pool)) {
+        for (var i = 0; i < array_length(_old_pool); i++) {
+            if (!Run_EchoHas(out, _old_pool[i].kind, _old_pool[i].id)) array_push(out, _old_pool[i]);
+        }
+    }
+    var cands = Run_EchoCandidates(_ch);
+    for (var j = 0; j < array_length(cands); j++) {
+        if (!Run_EchoHas(out, cands[j].kind, cands[j].id)) array_push(out, cands[j]);
+    }
+    if (array_length(out) <= 0) out = [{ kind: "item", id: 10 }];
+    return out;
+}
+
+// A changed copy of _ch (already the chosen class) that owes the echo pick drawn from _pool. An empty result owes nothing.
+function Run_EchoGrantTo(_ch, _pool, _seed) {
+    var ch = Card_EnsureFields(variable_clone(_ch));
+    ch.echo_offer = Run_EchoOptionsFor(_pool, ch.class_id, _seed);
+    return ch;
+}
+
+// The class pick (ClassSelect_ApplyClass): the character gets its echo offer from the profile's pool. When nothing in the pool fits the class there is no pick
+// and the pool is dropped at once, without a word. When something does, the pool stays until the answer (Run_EchoDone).
+function Run_EchoGrant(_ch) {
+    var prof = Profile_Get();
+    if (!is_struct(prof) || !variable_struct_exists(prof, "echo_pool") || array_length(prof.echo_pool) <= 0) return Card_EnsureFields(_ch);
+    var seed = Run_IsActive() ? Run_Get().seed : 0;
+    var ch = Run_EchoGrantTo(_ch, prof.echo_pool, seed);
+    if (array_length(ch.echo_offer) <= 0) Run_EchoDone();
+    return ch;
+}
+
+// The echo was answered (or nothing could be offered): nothing is pending any more.
+function Run_EchoDone() {
+    var prof = Profile_Get();
+    if (is_struct(prof) && variable_struct_exists(prof, "echo_pool") && array_length(prof.echo_pool) > 0) {
+        prof.echo_pool = [];
+        Profile_Flush();
+    }
+}
+
+// Takes option _index of the character's echo offer: an item goes in the inventory, a skill is learned; the offer is emptied. Returns the changed character.
+function Run_EchoTake(_ch, _index) {
+    var ch = Card_EnsureFields(_ch);
+    if (_index >= 0 && _index < array_length(ch.echo_offer)) {
+        var o = ch.echo_offer[_index];
+        ch = Run_ApplyEcho(ch, o);
+        if (Run_IsActive()) Run_Get().echo_used = { kind: o.kind, id: o.id };
+    }
+    ch.echo_offer = [];
+    return ch;
 }
 
 function Run_ApplyEcho(_ch, _echo) {
@@ -486,7 +585,7 @@ function Run_EndRoomName(_result = "died") {
     return room_get_name(room);
 }
 
-// Ends the run in the profile: history entry, death or win counter, story flags, the echo offer (not for a win), run save deleted.
+// Ends the run in the profile: history entry, death or win counter, story flags, the echo pool (not for a win), run save deleted.
 // Returns the history entry. Works without an active run (scenarios): the entry then carries seed 0.
 function Run_Finish(_result, _cause) {
     var gs = GameState_Get();
@@ -498,8 +597,7 @@ function Run_Finish(_result, _cause) {
     Story_CopyFlagsToProfile(prof, gs.flags);
     var entry = Run_MakeHistoryEntry(run, ch, Run_EndRoomName(_result), _result, _cause);
     Profile_RecordRun(prof, entry);
-    prof.echo = { kind: "", id: -1 };
-    prof.echo_offer = (_result == "won") ? [] : Run_EchoOptions(ch, Run_Stream("loot"));
+    prof.echo_pool = (_result == "won") ? [] : Run_EchoPoolAfter(prof.echo_pool, ch);   // D130: the pick comes after the next run's class pick
     Profile_Flush();
 
     RunSave_Delete();
@@ -509,7 +607,7 @@ function Run_Finish(_result, _cause) {
 }
 
 // ---- starting ----
-// A new run: level 1, a new seed, nothing carried but the echo, in rm_floor1 where you fell in (D102).
+// A new run: level 1, a new seed, nothing carried (the echo waits in the profile for the class pick, D130), in rm_floor1 where you fell in (D102).
 // _intro_dialogue: the fall line of the first ever run (it belongs to the intro cutscene; later runs do not repeat it).
 function Run_StartNew(_intro_dialogue = false, _seed = undefined) {
     var gs = GameState_Get();
@@ -534,14 +632,6 @@ function Run_StartNew(_intro_dialogue = false, _seed = undefined) {
 
     GameState_SetSelectedClass(CLASS_NOBODY);
     var ch = CharacterCreate_Player(CLASS_NOBODY);
-    // an echo whose pick was never made (the game was closed on the pick screen) takes its first option
-    if (prof.echo.kind == "" && array_length(prof.echo_offer) > 0) prof.echo = prof.echo_offer[0];
-    if (prof.echo.kind != "") {
-        ch = Run_ApplyEcho(ch, prof.echo);
-        gs.run.echo_used = { kind: prof.echo.kind, id: prof.echo.id };
-    }
-    prof.echo = { kind: "", id: -1 };
-    prof.echo_offer = [];
     prof.runs_started += 1;
     Profile_Flush();
     RunSave_Delete();
@@ -660,7 +750,7 @@ function Run_SaveOnClose(_ignore_harness = false) {
 
 // ---- death, abandon, win ----
 // The death hook (Player_OnDeath, Debug_KillPlayer): ends the run in the profile, then the death scene plays (C5 replaces the placeholder),
-// then RunFlow shows the summary and the echo pick and starts the next run.
+// then RunFlow shows the summary and starts the next run (the echo pick comes later, after that run's class pick: D130).
 function Run_OnPlayerDeath(_cause = undefined, _result = "died") {
     var cause = is_undefined(_cause) ? Run_CauseText() : _cause;
     var killer = (_result == "abandoned") ? "" : cause;   // the enemy's name for the "{killer}" slot of a death line
@@ -683,47 +773,20 @@ function Run_OnWin() {
     Run_Finish("won", "");
 }
 
-// ---- after the fall to black: the death line (D103), the run summary, the echo pick, then a new run at the tunnel entrance ----
-// Phases: "death" (one line, 2-4 s, hold confirm to skip, D48) -> "summary" -> "echo" (only when the run left something to carry) -> "start".
+// ---- after the fall to black: the death line (D103), the run summary, then a new run at the tunnel entrance ----
+// Phases: "death" (one line, 2-4 s, hold confirm to skip, D48) -> "summary" -> "start". (D130: the echo is not offered here any more; it waits in the
+// profile until the next run's class pick.)
 function RunFlow_Begin() {
-    var prof = Profile_Get();
     var entry = (variable_global_exists("run_last") && is_struct(global.run_last)) ? global.run_last : Run_MakeHistoryEntry(Run_Create(0), undefined, "rm_floor1", "died", "");
-    var opts = [];
-    for (var i = 0; i < array_length(prof.echo_offer); i++) array_push(opts, prof.echo_offer[i]);
     var ctx = (variable_global_exists("death_ctx") && is_struct(global.death_ctx)) ? global.death_ctx : Death_BuildContext(entry.result, entry.cause);
     global.death_ctx = undefined;
-    global.run_flow = { phase: "death", index: 0, options: opts, entry: entry, t: 0, ctx: ctx, menu: undefined };
+    global.run_flow = { phase: "death", entry: entry, t: 0, ctx: ctx };
     Skip_Reset();
     Cutscene_ClearUiState();
 }
 
 function RunFlow_Active() {
     return variable_global_exists("run_flow") && is_struct(global.run_flow) && global.run_flow.phase != "off";
-}
-
-// What an echo option does, in the details panel's terms (D100): one plain sentence and the numbers from the data.
-function RunFlow_EchoDetails(_o) {
-    if (_o.kind == "skill") return Battle_SkillDetails(SkillDB_Get(_o.id));
-    var it = ItemDB_Get(_o.id);
-    return { sentence: Item_Sentence(it), lines: Item_NumberLines(it, GameState_Get().player_ch) };
-}
-
-function RunFlow_BuildEchoMenu(_f) {
-    var items = [];
-    for (var i = 0; i < array_length(_f.options); i++) {
-        var o = _f.options[i];
-        var det = RunFlow_EchoDetails(o);
-        var row = { id: "echo" + string(i), label: Run_EchoLabel(o), kind: "button", enabled: true, help: det.sentence, lines: det.lines };
-        if (o.kind == "skill") row.seq = Qte_SkillSequence(o.id);
-        array_push(items, row);
-    }
-    var m = Ui_MenuNew("run_echo", items, {
-        data: { chosen: -1 },
-        on_confirm: function(_m, _i) { _m.data.chosen = _i; },
-        layout: { title: Loc_T("runflow.echo.title", "Carry one echo into the next fall"), anchor: "center", details: true }
-    });
-    Ui_MenuFixCursor(m, 0);   // the remembered cursor of an earlier death does not count
-    return m;
 }
 
 function RunFlow_Step() {
@@ -743,22 +806,8 @@ function RunFlow_Step() {
     } else if (f.phase == "summary") {
         if (ok && f.t > 15) {
             SFX_PlayUI("ui_confirm");
-            f.phase = (array_length(f.options) > 0) ? "echo" : "start";
+            f.phase = "start";
             f.t = 0;
-        }
-    } else if (f.phase == "echo") {
-        if (!is_struct(f.menu)) {
-            f.menu = RunFlow_BuildEchoMenu(f);
-        } else if (f.t > 8) {   // a few frames of grace so the confirm that opened the pick does not also take the first option
-            Ui_MenuUpdate(f.menu);
-            f.index = f.menu.cursor;
-            if (f.menu.data.chosen >= 0) {
-                var prof = Profile_Get();
-                prof.echo = f.options[f.menu.data.chosen];
-                prof.echo_offer = [];
-                Profile_Flush();
-                f.phase = "start";
-            }
         }
     } else if (f.phase == "start") {
         f.phase = "starting";
@@ -816,8 +865,6 @@ function RunFlow_Draw() {
         Ui_Text(w / 2, y0, title, UI_C_LIGHTEST, fa_center);
         Ui_DrawDetails(px, y0 + mt.line_h + 3 * p, pw, dh, sentence, rows);
         Ui_Text(w / 2, y0 + mt.line_h + 3 * p + dh + 3 * p, footer, UI_C_LIGHT, fa_center);
-    } else if (f.phase == "echo" && is_struct(f.menu)) {
-        Ui_MenuDraw(f.menu, Ui_MenuAlpha(f.menu, current_time));
     }
     draw_set_alpha(1);
 }

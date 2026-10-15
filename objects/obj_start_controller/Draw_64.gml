@@ -29,7 +29,7 @@ if (state == "credits") {   // C5 (D105)
     exit;
 }
 if (state == "cutscene") exit;
-if (state == "run_flow") {   // C1: run summary and echo pick after the death scene (placeholder screens)
+if (state == "run_flow") {   // C1: run summary after the death scene (placeholder screens)
     RunFlow_Draw();
     draw_set_alpha(1);
     Build_DrawId();

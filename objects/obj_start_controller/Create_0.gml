@@ -137,7 +137,7 @@ cutscene_definitions.ending = [
     }
 ];
 
-// C5 (D103): no more "GAME OVER.". The fade to black is all this holds; the death line, summary and echo pick follow in RunFlow (scr_room_state).
+// C5 (D103): no more "GAME OVER.". The fade to black is all this holds; the death line and summary follow in RunFlow (scr_room_state).
 cutscene_definitions.game_over = [
     {
         sprite: black_screen,

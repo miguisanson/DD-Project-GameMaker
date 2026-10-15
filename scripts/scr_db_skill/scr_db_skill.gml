@@ -1555,6 +1555,7 @@ function Card_EnsureFields(_ch) {
     if (!variable_struct_exists(_ch, "class_chosen")) _ch.class_chosen = (variable_struct_exists(_ch, "class_id") && _ch.class_id != CLASS_NOBODY);   // a ready-made class counts as chosen; a run starts as Nobody (D73)
     if (!variable_struct_exists(_ch, "skill_pending") || !is_real(_ch.skill_pending)) _ch.skill_pending = -1;
     if (!variable_struct_exists(_ch, "offer") || !is_array(_ch.offer)) _ch.offer = [];
+    if (!variable_struct_exists(_ch, "echo_offer") || !is_array(_ch.echo_offer)) _ch.echo_offer = [];   // D130: the echo pick waiting after the class pick
     return _ch;
 }
 
