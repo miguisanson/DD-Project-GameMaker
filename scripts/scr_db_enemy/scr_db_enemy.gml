@@ -470,25 +470,63 @@ function EnemyAI_Choose(_e, _p, _ctx, _rng) {
             if (used >= rule.max_uses) continue;
         }
         if (!EnemyAI_Usable(_e, _p, _ctx, rule.act, rule.skill)) continue;
-        if (rule.chance < 1 && Rng_Float(_rng) >= rule.chance) continue;
+        if (rule.chance < 1 && !Bag_Draw(_e, "rule_" + string(rule.label), rule.chance, _rng)) continue;   // D126: a rule's chance is a marble bag too
         return EnemyAI_Result((rule.act == "skill") ? rule.skill : -1, rule.label);
     }
 
-    // 4. the weighted default
-    var total = 0;
+    // 4. the weighted default (D126): a shuffled deck built from the whole-number weights of the moves that can be used right now.
+    // Drawn without putting back, so a 3:1 enemy uses its rare move exactly once in every 4 picks. The deck lives on the enemy and is
+    // rebuilt when it is empty or when the set of usable moves (or the phase's list) changes.
+    var elig = [];
+    var raw_w = [];
     for (var w = 0; w < array_length(lists.weights); w++) {
         var wt = lists.weights[w];
-        if (wt.w > 0 && EnemyAI_Usable(_e, _p, _ctx, wt.act, wt.skill)) total += wt.w;
+        if (wt.w > 0 && EnemyAI_Usable(_e, _p, _ctx, wt.act, wt.skill)) { array_push(elig, w); array_push(raw_w, wt.w); }
     }
-    if (total <= 0) return { kind: "attack", skill_id: -1, rule: "default" };
-    var roll = Rng_Float(_rng) * total;
-    for (var w2 = 0; w2 < array_length(lists.weights); w2++) {
-        var wt2 = lists.weights[w2];
-        if (wt2.w <= 0 || !EnemyAI_Usable(_e, _p, _ctx, wt2.act, wt2.skill)) continue;
-        if (roll < wt2.w) return EnemyAI_Result((wt2.act == "skill") ? wt2.skill : -1, "default");
-        roll -= wt2.w;
+    if (array_length(elig) <= 0) return { kind: "attack", skill_id: -1, rule: "default" };
+    var ints = EnemyAI_IntWeights(raw_w);
+    var sig = "";
+    for (var g = 0; g < array_length(elig); g++) {
+        var wg = lists.weights[elig[g]];
+        sig += string(wg.act) + ":" + string(wg.skill) + "x" + string(ints[g]) + ";";
     }
-    return { kind: "attack", skill_id: -1, rule: "default" };
+    var deck = (variable_struct_exists(_e, "move_deck") && is_struct(_e.move_deck)) ? _e.move_deck : undefined;
+    if (!is_struct(deck) || deck.sig != sig || array_length(deck.left) <= 0) {
+        var cards = [];
+        for (var d = 0; d < array_length(elig); d++) { repeat (ints[d]) array_push(cards, elig[d]); }
+        deck = { sig: sig, left: Rng_Shuffle(_rng, cards) };
+        _e.move_deck = deck;
+    }
+    var wp = lists.weights[array_pop(deck.left)];
+    return EnemyAI_Result((wp.act == "skill") ? wp.skill : -1, "default");
+}
+
+// D126: the weights as the smallest whole numbers with the same ratios (3:1 stays 3:1, 2:2 becomes 1:1, 0.5:1.5 becomes 1:3);
+// a deck never holds more than about 40 cards.
+function EnemyAI_IntWeights(_ws) {
+    var scale = 1;
+    for (var t = 0; t < 3; t++) {
+        var whole = true;
+        for (var i = 0; i < array_length(_ws); i++) { if (abs(_ws[i] * scale - round(_ws[i] * scale)) > 0.000001) whole = false; }
+        if (whole) break;
+        scale *= 10;
+    }
+    var out = [];
+    var gcd = 0;
+    for (var j = 0; j < array_length(_ws); j++) {
+        var n = max(1, round(_ws[j] * scale));
+        array_push(out, n);
+        var a = gcd; var b = n;
+        while (b != 0) { var r = a mod b; a = b; b = r; }
+        gcd = a;
+    }
+    var total = 0;
+    for (var k = 0; k < array_length(out); k++) { out[k] = out[k] div max(1, gcd); total += out[k]; }
+    if (total > 40) {
+        var f = 40 / total;
+        for (var m = 0; m < array_length(out); m++) out[m] = max(1, round(out[m] * f));
+    }
+    return out;
 }
 
 // ---- the battle AI state (kept on the battle controller as `ai`): own turn counter, rule uses, the pending wind-up, the boss phase ----

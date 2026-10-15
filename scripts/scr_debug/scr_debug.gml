@@ -6799,7 +6799,7 @@ function Scenario_StepSmokeBattleUi(_s) {
                 case 52:
                     Scenario_Check("battleui_confirm_on_item_opens_the_item_list", _bc.battle_state == BSTATE_ITEM_MENU, "state=" + string(_bc.battle_state));
                     Scenario_Check("battleui_item_list_shows_the_potion_and_its_amount", array_length(_bc.ui_item.items) >= 1 && _bc.ui_item.items[0].item_id == 10 && _bc.ui_item.items[0].value == "x2");
-                    Scenario_Check("battleui_item_details_show_the_range", Test_RowValue(_bc.ui_item.items[0].lines, Loc_T("battle.det.hp", "HP")) == "5-10");
+                    Scenario_Check("battleui_item_details_show_the_average", Test_RowValue(_bc.ui_item.items[0].lines, Loc_T("battle.det.hp", "HP")) == "8");   // D126: one exact number, the average of 5-10
                     Scenario_BattleUiOverlaps(_bc, "item_list");
                     Scenario_Tap("confirm");   // full health: the potion is refused and the list comes back
                     break;

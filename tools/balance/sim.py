@@ -84,6 +84,52 @@ def crit_bag_size(p):
     return 20, int(round(20 * p))
 
 
+def bag_draw(store, key, p, rng):
+    """D126 Bag_Draw: one draw from the marble bag store[key] = dict(p, left=[bool]) for the chance p, shuffled with rng when it has to be filled.
+    A chance of 1 or 0 needs no bag and draws no random number; the bag refills when it is empty or when the chance changed."""
+    if p >= 0.999999:
+        store.pop(key, None)
+        return True
+    if p <= 0:
+        store.pop(key, None)
+        return False
+    bag = store.get(key)
+    if bag is None or not bag["left"] or abs(bag["p"] - p) > 1e-6:
+        n, reds = crit_bag_size(p)
+        left = [True] * reds + [False] * (n - reds)
+        rng.shuffle(left)
+        bag = store[key] = dict(p=p, left=left)
+    return bag["left"].pop()
+
+
+def int_weights(ws):
+    """D126 EnemyAI_IntWeights: the weights as the smallest whole numbers with the same ratios; a deck holds at most about 40 cards."""
+    scale = 1
+    for _ in range(3):
+        if all(abs(w * scale - round(w * scale)) <= 1e-6 for w in ws):
+            break
+        scale *= 10
+    out = [max(1, int(round(w * scale))) for w in ws]
+    g = 0
+    for n in out:
+        g = math.gcd(g, n)
+    out = [n // max(1, g) for n in out]
+    total = sum(out)
+    if total > 40:
+        out = [max(1, int(round(n * 40 / total))) for n in out]
+    return out
+
+
+def tick_amount(lo, hi):
+    """D126 Status_TickAmount: a tick written as lo..hi is worth its average, rounded half up, every time."""
+    return rhu((lo + hi) / 2)
+
+
+def gold_offsets(spread):
+    """D126 Gold_Roll: the five offsets of a gold bag (-spread, -spread/2, 0, +spread/2, +spread)."""
+    return [i * spread / 2 for i in range(-2, 3)]
+
+
 def drop_chance(base, dry):
     """D120 Loot_EnemyDropChance."""
     return min(1.0, base + LOOT_DRY_STEP * dry)
@@ -223,6 +269,7 @@ class F:
         self.card_state = dict(pity=0, last=[], offers=0)
         self.rt = {}              # battle-only runtime (equipment passives)
         self.crit_bag = None      # D119: dict(p, left=[bool marbles]) while the fighter has a crit chance
+        self.bags = {}            # D126: the other marble bags (status chances "status_<id>", rule chances "rule_<label>") and the move deck "deck"
         # enemy
         self.enemy_id = -1
         self.rank = 1
@@ -361,7 +408,7 @@ class Rules:
             t = cfg.get("tick", {})
             lo, hi = t.get("mp_min", 0), t.get("mp_max", 0)
             if lo or hi:
-                f.mp = min(f.mmp, max(0, f.mp + (lo if lo == hi else rng.randint(min(lo, hi), max(lo, hi)))))
+                f.mp = min(f.mmp, max(0, f.mp + tick_amount(min(lo, hi), max(lo, hi))))   # D126: the exact average
             if cfg.get("dot_kind") == "poison":
                 s["stacks"] -= 1
                 s["turns"] = s["stacks"]
@@ -762,6 +809,10 @@ class Battle:
             bag = f.crit_bag = dict(p=c, left=left)
         return bag["left"].pop()
 
+    def status_roll(self, user, sid, chance, slot=""):
+        """D126 Skill_StatusRoll: does the status of this skill land? One bag per skill per user (per status for Curse)."""
+        return bag_draw(user.bags, "status_%s%s" % (sid, slot), chance, self.rng)
+
     def use_skill(self, user, target, sid, grade="OK"):
         """Skill_Use for either side. Returns dict(dmg, hit, free, defended_info)."""
         R = self.R
@@ -780,7 +831,7 @@ class Battle:
             turns = s.get("status_turns_list", [])
             stacks = s.get("status_stacks_list", [])
             for i, sid_m in enumerate(s["status_list"]):
-                if ch < 1 and self.rng.random() > ch:
+                if not self.status_roll(user, sid, ch, "_%d" % i):
                     continue
                 self.apply_status(user, target, sid_m, turns[i] if i < len(turns) else s.get("status_turns", 1), stacks[i] if i < len(stacks) else 1)
             return res
@@ -820,11 +871,11 @@ class Battle:
         if any_hit:
             if s["status"] != -1:
                 res["before"] = None
-                if chance >= 1 or self.rng.random() <= chance:
+                if self.status_roll(user, sid, chance):
                     res["status_ids"].append(s["status"])
                     self.apply_status(user, target, s["status"], max(1, s.get("status_turns", 1)), s.get("status_stacks", 1))
             if "status_list" in s:
-                if chance >= 1 or self.rng.random() <= chance:
+                if self.status_roll(user, sid, chance, "_list"):
                     tl = s.get("status_turns_list", [])
                     for i, sid_d in enumerate(s["status_list"]):
                         res["status_ids"].append(sid_d)
@@ -1008,23 +1059,22 @@ class Battle:
                 continue
             if not self.usable(e, p, r["act"], r["skill"], used_turn):
                 continue
-            if r["chance"] < 1 and self.rng.random() >= r["chance"]:
+            if r["chance"] < 1 and not bag_draw(e.bags, "rule_%s" % r["label"], r["chance"], self.rng):   # D126: a rule's chance is a bag too
                 continue
             return self.result(r["act"], r["skill"], r["label"])
-        total = 0
-        for w in lists["weights"]:
-            if w["w"] > 0 and self.usable(e, p, w["act"], w["skill"], used_turn):
-                total += w["w"]
-        if total <= 0:
+        # D126: the weighted default is a shuffled deck of the whole-number weights of the usable moves, kept on the enemy
+        elig = [w for w in lists["weights"] if w["w"] > 0 and self.usable(e, p, w["act"], w["skill"], used_turn)]
+        if not elig:
             return ("attack", -1, "default")
-        roll = self.rng.random() * total
-        for w in lists["weights"]:
-            if w["w"] <= 0 or not self.usable(e, p, w["act"], w["skill"], used_turn):
-                continue
-            if roll < w["w"]:
-                return self.result(w["act"], w["skill"], "default")
-            roll -= w["w"]
-        return ("attack", -1, "default")
+        ints = int_weights([w["w"] for w in elig])
+        sig = tuple((w["act"], w["skill"], n) for w, n in zip(elig, ints))
+        deck = e.bags.get("deck")
+        if deck is None or deck["sig"] != sig or not deck["left"]:
+            cards = [w for w, n in zip(elig, ints) for _ in range(n)]
+            self.rng.shuffle(cards)
+            deck = e.bags["deck"] = dict(sig=sig, left=cards)
+        w = deck["left"].pop()
+        return self.result(w["act"], w["skill"], "default")
 
     def result(self, act, skill, label):
         if act == "skill" and self.R.skills[skill].get("telegraphed"):
@@ -1216,7 +1266,7 @@ def defence_turns(grade, turns):
 
 def item_amount(R, p, u, rng):
     lo, hi = u.get("min", u.get("power", 0)), u.get("max", u.get("power", 0))
-    amt = lo if lo == hi else rng.randint(lo, hi)
+    amt = tick_amount(lo, max(lo, hi))   # D126: a min..max heal gives its exact average
     if "scale" in u:
         amt += math.floor(max(0, p.level - 1) * u["scale"])
     pb = R.passive_sum(p, "item_power")
@@ -1625,6 +1675,8 @@ class RunSim:
         self.policy_name = policy
         self.gold = 0
         self.gold_earned = 0
+        self.gold_bag = []   # D126: offsets of the fights not paid yet
+        self.find_bag = {}   # D126: the Scrounger's marble bag
         self.drop_dry = 0   # D120: enemy fights in a row without a drop
         self.rec = dict(fights=[], picks=[], potions_used=0, mp_potions_used=0, throws=0, shops=[], beds=[], elites=0, card_offers=[], levels={}, buys=[],
                         actions=0, defences=0, item_uses=0, pick_count=0, used_skills={}, card_gain=[])
@@ -2270,9 +2322,12 @@ class RunSim:
         self.n_fights_done += 1
         g = self.d.eco
         base = rhu((g["gold_base"] + g["gold_per_level"] * max(1, level)) * (g["gold_boss_mult"] if e.is_boss else (g["gold_rank2_mult"] if e.rank >= 2 else 1)) * (g["gold_elite_mult"] if elite else 1))
-        lo, hi = math.floor(base * (1 - g["gold_spread"]) + 1e-7), math.ceil(base * (1 + g["gold_spread"]) - 1e-7)
+        if not self.gold_bag:   # D126: a shuffled bag of 5 offsets around the base, refilled when empty
+            self.gold_bag = gold_offsets(g["gold_spread"])
+            self.rng.shuffle(self.gold_bag)
+        rolled = rhu(base * (1 + self.gold_bag.pop()))
         gm = 1 + R.passive_sum(p, "gold_mult") + sum(self.d.items[i].get("passive_params", {}).get("gold_mult", 0) for i in p.equip.values() if i)
-        gold = max(1, rhu(self.rng.randint(lo, hi) * gm))
+        gold = max(1, rhu(rolled * gm))
         self.gold += gold
         self.gold_earned += gold
         self.add_exp(e.base_exp)
@@ -2288,7 +2343,7 @@ class RunSim:
         if mpg > 0:
             p.mp = min(p.mmp, p.mp + mpg)
         fp = R.passive_sum(p, "find_potion_pct")
-        if fp > 0 and self.rng.random() < fp:
+        if fp > 0 and bag_draw(self.find_bag, "find", fp, self.rng):   # D126
             p.inv[10] = p.inv.get(10, 0) + 1
         return True
 

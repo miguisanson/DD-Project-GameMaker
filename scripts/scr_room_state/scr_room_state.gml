@@ -340,6 +340,8 @@ function Run_Create(_seed) {
         cards: Card_StateNew(),  // C2: the offer generator's pity counter and the last offer (scr_db_skill)
         kills: 0,
         drop_dry: 0,             // R1 (D120): won fights in a row where the enemy left no item
+        gold_bag: [],            // D126: the gold offsets of the fights not paid yet (a shuffled bag of 5, refilled when empty); saved with the run
+        find_bag: { p: 0, left: [] },   // D126: the Scrounger's marble bag; saved with the run
         started_at: date_current_datetime(),
         echo_used: { kind: "", id: -1 }
     };
@@ -371,6 +373,14 @@ function Run_Stream(_name) {
     var run = Run_Get();
     if (is_struct(run) && run.active && variable_struct_exists(run.rng, _name)) return variable_struct_get(run.rng, _name);
     return Run_FreeStream(_name);
+}
+
+// D126: where the bags that outlive a battle live: the run, or (title screen, tests) a free holder that is not saved.
+function Run_BagHolder() {
+    var run = Run_Get();
+    if (is_struct(run)) return run;
+    if (!variable_global_exists("run_free_bags") || !is_struct(global.run_free_bags)) global.run_free_bags = {};
+    return global.run_free_bags;
 }
 
 function RunRng_Float(_name) { return Rng_Float(Run_Stream(_name)); }

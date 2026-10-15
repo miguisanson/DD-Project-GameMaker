@@ -423,9 +423,18 @@ function Gold_Range(_base) {
     return { lo: floor(_base * (1 - GOLD_SPREAD) + 0.0000001), hi: ceil(_base * (1 + GOLD_SPREAD) - 0.0000001) };
 }
 
+// D126: the gold of one fight is the base times an offset from a shuffled bag of 5 (-25%, -12.5%, 0, +12.5%, +25% = GOLD_SPREAD in steps),
+// drawn without putting back, so the totals stay near the average. The bag lives on the run (run.gold_bag) and is saved with it.
 function Gold_Roll(_rng, _base) {
-    var r = Gold_Range(_base);
-    return Rng_Range(_rng, r.lo, r.hi);
+    var holder = Run_BagHolder();
+    if (!variable_struct_exists(holder, "gold_bag") || !is_array(holder.gold_bag)) holder.gold_bag = [];
+    if (array_length(holder.gold_bag) <= 0) {
+        var offsets = [];
+        for (var i = -2; i <= 2; i++) array_push(offsets, i * GOLD_SPREAD / 2);
+        holder.gold_bag = Rng_Shuffle(_rng, offsets);
+    }
+    var off = array_pop(holder.gold_bag);
+    return RoundHalfUp(_base * (1 + off));
 }
 
 // Gold bonus of what is worn (the Lucky Charm); Coin Sense is a card passive (Card_GoldMult).

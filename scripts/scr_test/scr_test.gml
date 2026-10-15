@@ -1417,7 +1417,7 @@ function Test_Suite_Status() {
     Test_Eq("meditation tick clamps MP at max", _med.mp, _med.max_mp);
     _med.mp = 0;
     _med = Status_Tick(_med);
-    Test_True("meditation tick restores 2-4 MP", _med.mp >= 2 && _med.mp <= 4);
+    Test_Eq("meditation tick restores exactly 3 MP, the average of 2-4 (D126)", _med.mp, 3);
     // Non-stackable re-apply refreshes to the longer duration (Guard); the three DoTs no longer exclude each other (D78, StatusRules covers them).
     var _r = CharacterCreate_Player(CLASS_KNIGHT);
     _r = Status_Add(_r, STATUS_GUARD, 2, 0);
@@ -1887,6 +1887,9 @@ function Test_AICtx(_turn = 1, _phase = 0) {
 function Test_AIDraws(_e, _p, _ctx, _seed, _n) {
     var _rng = Rng_New(_seed, "combat");
     var _out = [];
+    if (variable_struct_exists(_e, "move_deck")) variable_struct_remove(_e, "move_deck");   // D126: each call starts with a fresh deck and fresh rule bags, so a seed means a sequence
+    var _bag_names = variable_struct_get_names(_e);
+    for (var _b = 0; _b < array_length(_bag_names); _b++) { if (string_pos("rule_", _bag_names[_b]) == 1) variable_struct_remove(_e, _bag_names[_b]); }
     for (var _i = 0; _i < _n; _i++) array_push(_out, EnemyAI_Choose(_e, _p, _ctx, _rng).skill_id);
     return _out;
 }
@@ -5675,19 +5678,16 @@ function Test_Suite_BattleUi() {
     Test_Eq("BattleUi a buff shows no Power line", Test_RowValue(Battle_SkillDetails(_mu).lines, Loc_T("card.lbl.power", "Power")), "");
     var _hp = ItemDB_Get(10);
     var _idet = Battle_ItemDetails(_hp, _player);
-    var _rng = Item_AmountRange(_player, _hp.use);
-    Test_Eq("BattleUi HP Potion Lv1 range at level 1 is the data's 5-10", string(_rng.lo) + "-" + string(_rng.hi), "5-10");
-    Test_Eq("BattleUi HP Potion row shows that range", Test_RowValue(_idet.lines, Loc_T("battle.det.hp", "HP")), "5-10");
+    Test_Eq("BattleUi HP Potion Lv1 at level 1 heals the average of the data's 5-10, rounded up: 8 (D126)", Item_ComputeAmount(_player, _hp.use), 8);
+    Test_Eq("BattleUi HP Potion row shows that one number (D126)", Test_RowValue(_idet.lines, Loc_T("battle.det.hp", "HP")), "8");
     var _lvl5 = CharacterCreate_Player(CLASS_KNIGHT);
     _lvl5.level = 5;
-    var _rng5 = Item_AmountRange(_lvl5, _hp.use);
-    Test_Eq("BattleUi HP Potion Lv1 range at level 5 adds the level scaling (4 levels x 1.0)", string(_rng5.lo) + "-" + string(_rng5.hi), "9-14");
-    var _inside = true;
+    Test_Eq("BattleUi HP Potion Lv1 at level 5 adds the level scaling to the average (8 + 4 levels x 1.0) (D126)", Item_ComputeAmount(_lvl5, _hp.use), 12);
+    var _same = true;
     for (var _t = 0; _t < 40; _t++) {
-        var _a = Item_ComputeAmount(_lvl5, _hp.use);
-        if (_a < _rng5.lo || _a > _rng5.hi) _inside = false;
+        if (string(Item_ComputeAmount(_lvl5, _hp.use)) != Test_RowValue(Battle_ItemDetails(_hp, _lvl5).lines, Loc_T("battle.det.hp", "HP"))) _same = false;
     }
-    Test_True("BattleUi the real roll always falls inside the shown range", _inside);
+    Test_True("BattleUi the real heal is always the number the details show (D126)", _same);
 
     // ---- rows of the skill list: MP, arrows, greyed when the MP is short ----
     var _kn = CharacterCreate_Player(CLASS_KNIGHT);
@@ -6544,7 +6544,10 @@ function Test_Suite_Economy() {
     Test_True("C3 gold: 300 rolls of base 12 stay inside 9..15", _gok);
     Test_True("C3 gold: the rolls reach both ends of the range", _gmin == 9 && _gmax == 15);
     var _ga = Rng_New(55, "gold"); var _gb = Rng_New(55, "gold");
-    Test_Eq("C3 gold: the same stream gives the same roll", Gold_Roll(_ga, 20), Gold_Roll(_gb, 20));
+    Run_BagHolder().gold_bag = [];   // D126: the bag is run state, so each roll starts from an empty one
+    var _gra = Gold_Roll(_ga, 20);
+    Run_BagHolder().gold_bag = [];
+    Test_Eq("C3 gold: the same stream gives the same roll (from an empty bag, D126)", _gra, Gold_Roll(_gb, 20));
     var _kn = Test_Hero(CLASS_KNIGHT);
     Test_Eq("C3 gold: no bonus = the plain amount", Gold_Scale(12, _kn), 12);
     var _cs = Card_Take(_kn, "pas:coin_sense").ch;
@@ -7035,7 +7038,7 @@ function Test_Suite_Economy() {
     Test_True("C3 text: the sentence of every throwable has its numbers", string_pos("3", Item_Sentence(_fb)) > 0 && string_pos("4", Item_Sentence(ItemDB_Get(31))) > 0 && string_pos("2", Item_Sentence(ItemDB_Get(33))) > 0);
     Test_True("C3 text: an accessory has a sentence and a line", string_length(Item_Sentence(ItemDB_Get(44))) > 8 && array_length(Item_NumberLines(ItemDB_Get(44), _kn)) >= 1);
     Test_True("C3 text: a stat ring says +1", string_pos("1", Item_Sentence(ItemDB_Get(40))) > 0 && Item_NumberLines(ItemDB_Get(40), _kn)[0].value == "+1");
-    Test_True("C3 text: a potion lists its numbers", Item_NumberLines(ItemDB_Get(10), _kn)[0].value == "5-10");
+    Test_True("C3 text: a potion lists its one number, the average of 5-10 rounded up (D126)", Item_NumberLines(ItemDB_Get(10), _kn)[0].value == "8");
     var _row_it = ShopUi_ItemFor({ kind: "item", id: 30, qty: 2, price: 27 }, _kn, 100);
     Test_True("C3 text: a shop row shows the price and can be bought when it can be paid", _row_it.value == "27" && _row_it.can_buy && _row_it.enabled && string_length(_row_it.help) > 8 && array_length(_row_it.lines) >= 2);
     var _row_no = ShopUi_ItemFor({ kind: "item", id: 30, qty: 2, price: 27 }, _kn, 10);
@@ -7937,10 +7940,10 @@ function Test_BagsStatus() {
     var _ku = Test_CardPlayer(CLASS_KNIGHT, [SKILL_HILT_BASH]);
     _gs.player_ch = _ku;
     Test_BagsStatusUses(_ku, SKILL_HILT_BASH, STATUS_STUN, 2);
-    Test_Eq("D126 status: 2 uses of a 60% skill leave 3 marbles in its bag", Bag_Left(_ku, "status:" + string(SKILL_HILT_BASH)), 3);
+    Test_Eq("D126 status: 2 uses of a 60% skill leave 3 marbles in its bag", Bag_Left(_ku, "status_" + string(SKILL_HILT_BASH)), 3);
     _ku.upgrades = [SKILL_HILT_BASH];
     var _first = Test_BagsStatusUses(_ku, SKILL_HILT_BASH, STATUS_STUN, 1);
-    Test_Eq("D126 status: after the upgrade (85%) the bag is a new one of 20, one drawn", Bag_Left(_ku, "status:" + string(SKILL_HILT_BASH)), 19);
+    Test_Eq("D126 status: after the upgrade (85%) the bag is a new one of 20, one drawn", Bag_Left(_ku, "status_" + string(SKILL_HILT_BASH)), 19);
     var _rest = Test_BagsStatusUses(_ku, SKILL_HILT_BASH, STATUS_STUN, 19);
     Test_Eq("D126 status: the 85% skill lands exactly 17 times in its bag of 20", Test_BagsCount(_first) + Test_BagsCount(_rest), 17);
 
@@ -7971,7 +7974,7 @@ function Test_BagsStatus() {
     _gs.player_ch = _kc;
     var _c10 = Test_BagsStatusUses(_kc, SKILL_WOUND, STATUS_BLEED, 10);
     Test_Eq("D126 status: a 100% status always lands", Test_BagsCount(_c10), 10);
-    Test_Eq("D126 status: and keeps no bag", Bag_Left(_kc, "status:" + string(SKILL_WOUND)), 0);
+    Test_Eq("D126 status: and keeps no bag", Bag_Left(_kc, "status_" + string(SKILL_WOUND)), 0);
 }
 
 function Test_BagsMoves() {
