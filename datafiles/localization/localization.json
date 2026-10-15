@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T12:26:14Z",
-    "row_count": 1041
+    "generated_at_utc": "2026-10-15T14:05:05Z",
+    "row_count": 1047
   },
   "default_lang": "en",
   "languages": [
@@ -615,6 +615,22 @@
     "cards.stat.after": {
       "en": "After",
       "ko": "이후"
+    },
+    "cards.stat.maxhp": {
+      "en": "Max HP +{n}",
+      "ko": "최대 HP +{n}"
+    },
+    "cards.stat.maxhp.desc": {
+      "en": "Raises your max HP by {n} and heals {n} HP.",
+      "ko": "최대 HP가 {n} 오르고 HP를 {n} 회복합니다."
+    },
+    "cards.stat.maxmp": {
+      "en": "Max MP +{n}",
+      "ko": "최대 MP +{n}"
+    },
+    "cards.stat.maxmp.desc": {
+      "en": "Raises your max MP by {n} and restores {n} MP.",
+      "ko": "최대 MP가 {n} 오르고 MP를 {n} 회복합니다."
     },
     "cards.stat.now": {
       "en": "Now",
@@ -2315,6 +2331,14 @@
     "item.sent.weapon": {
       "en": "A weapon with {power} power.",
       "ko": "위력 {power}의 무기입니다."
+    },
+    "levelup.gain": {
+      "en": "{stat} +{n}",
+      "ko": "{stat} +{n}"
+    },
+    "levelup.growth": {
+      "en": "{name} growth: {gains}",
+      "ko": "{name} 성장: {gains}"
     },
     "menu.common.back": {
       "en": "Back",

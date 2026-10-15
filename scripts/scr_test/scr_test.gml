@@ -126,6 +126,7 @@ function Test_RunAll() {
     Test_RunSuite("BattleBg", Test_Suite_BattleBg);
     Test_RunSuite("RunStats", Test_Suite_RunStats);
     Test_RunSuite("H3", Test_Suite_H3);
+    Test_RunSuite("LevelUpGrowth", Test_Suite_LevelUpGrowth);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -9938,4 +9939,126 @@ function Test_Suite_H3() {
     Test_H3EliteRules();
 
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+// H4 (D143, amends D76): the level-up screen shows the class's fixed growth, and the free point may also go to Max HP (+3) or Max MP (+2).
+// Expected wording and numbers come from the brief ("Knight growth: ATK +1, DEF +1"), not from the code.
+function Test_Suite_LevelUpGrowth() {
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    var _gs = GameState_Get();
+    var _old_player = _gs.player_ch;
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _disp0 = variable_global_exists("display") ? global.display : undefined;
+    var _own = !(is_struct(_disp0) && is_struct(_disp0.layout));
+    if (_own) global.display = { layout: Display_CalcLayout(480, 432), apply_count: 0 };
+    var _f0 = draw_get_font();
+
+    // ---- the growth line, class by class ----
+    Test_Eq("D143 Knight growth line", LevelUp_GrowthText(CLASS_KNIGHT, 2), "Knight growth: ATK +1, DEF +1");
+    Test_Eq("D143 Knight growth line is the same at level 7", LevelUp_GrowthText(CLASS_KNIGHT, 7), "Knight growth: ATK +1, DEF +1");
+    Test_Eq("D143 Archer growth line", LevelUp_GrowthText(CLASS_ARCHER, 2), "Archer growth: ATK +1, SPD +1");
+    Test_Eq("D143 Mage growth line", LevelUp_GrowthText(CLASS_MAGE, 2), "Mage growth: MAG +2");
+    // Nobody rotates (D83/D111): the point that cycles ATK, DEF, SPD, MAG from level 2, plus the one two steps further on
+    Test_Eq("D143 Nobody growth line at level 2", LevelUp_GrowthText(CLASS_NOBODY, 2), "Nobody growth: ATK +1, SPD +1");
+    Test_Eq("D143 Nobody growth line at level 3", LevelUp_GrowthText(CLASS_NOBODY, 3), "Nobody growth: DEF +1, MAG +1");
+    Test_Eq("D143 Nobody growth line at level 4", LevelUp_GrowthText(CLASS_NOBODY, 4), "Nobody growth: ATK +1, SPD +1");
+    Test_Eq("D143 Nobody growth line at level 5", LevelUp_GrowthText(CLASS_NOBODY, 5), "Nobody growth: DEF +1, MAG +1");
+    Test_Eq("D143 an unknown class has no growth line", LevelUp_GrowthText(99, 2), "");
+    Loc_SetLanguage("ko");
+    Test_True("D143 the growth line resolves in Korean, not the English fallback", Loc_GetRaw("levelup.growth", "ko") != "{class} growth: {gains}" && Loc_GetRaw("levelup.growth", "ko") != "");
+    Test_True("D143 the Korean growth line is not the English one", LevelUp_GrowthText(CLASS_KNIGHT, 2) != "Knight growth: ATK +1, DEF +1");
+    Loc_SetLanguage("en");
+
+    // ---- the free-point menu: the four stats, then Max HP +3 and Max MP +2 ----
+    var _kn = Test_CardPlayer(CLASS_KNIGHT);
+    var _opts = Cards_FreePointOptions(_kn);
+    Test_Eq("D143 the free-point menu has six rows", array_length(_opts), 6);
+    Test_True("D143 the first four rows are ATK, DEF, SPD, MAG", _opts[0].stat == STAT_ATK && _opts[1].stat == STAT_DEF && _opts[2].stat == STAT_SPD && _opts[3].stat == STAT_MAG);
+    Test_True("D143 the fifth row is Max HP +3, the sixth Max MP +2", _opts[4].stat == FREE_POINT_MAX_HP && _opts[5].stat == FREE_POINT_MAX_MP);
+    Test_Eq("D143 Max HP row label", _opts[4].label, "Max HP +3");
+    Test_Eq("D143 Max MP row label", _opts[5].label, "Max MP +2");
+    Test_True("D143 the Max HP row shows the max HP now and after (+3)", _opts[4].from == _kn.max_hp && _opts[4].to == _kn.max_hp + 3);
+    Test_True("D143 the Max MP row shows the max MP now and after (+2)", _opts[5].from == _kn.max_mp && _opts[5].to == _kn.max_mp + 2);
+
+    // ---- placing the point on Max HP / Max MP ----
+    var _hp = Test_CardPlayer(CLASS_KNIGHT);
+    _hp.stat_points = 1;
+    _hp.hp = _hp.max_hp - 5;
+    var _hp_max0 = _hp.max_hp;
+    var _hp_cur0 = _hp.hp;
+    var _hp_atk0 = _hp.stats.atk;
+    var _hp2 = Cards_PlaceStat(_hp, FREE_POINT_MAX_HP);
+    Test_Eq("D143 a point on Max HP raises max HP by 3", _hp2.max_hp, _hp_max0 + 3);
+    Test_Eq("D143 a point on Max HP raises current HP by 3", _hp2.hp, _hp_cur0 + 3);
+    Test_Eq("D143 the Max HP point is spent", _hp2.stat_points, 0);
+    Test_Eq("D143 the Max HP point leaves the stats alone", _hp2.stats.atk, _hp_atk0);
+    var _hp3 = Cards_PlaceStat(_hp2, FREE_POINT_MAX_HP);
+    Test_True("D143 with no point left a second Max HP placement does nothing", _hp3.max_hp == _hp_max0 + 3 && _hp3.hp == _hp_cur0 + 3 && _hp3.stat_points == 0);
+    var _hp_re = RecomputeResources(variable_clone(_hp2));
+    Test_Eq("D143 the Max HP bonus survives a resource recompute (a load, a level-up)", _hp_re.max_hp, _hp_max0 + 3);
+    var _hp_lvl0 = _hp2.level;   // LevelUp_ApplyLevel changes the struct it is given
+    var _hp_lv = LevelUp_ApplyLevel(_hp2);
+    Test_Eq("D143 the Max HP bonus is kept on the next level", _hp_lv.max_hp, Resource_MaxHp(_hp_lv.class_cfg.hd, _hp_lvl0 + 1) + 3);
+
+    var _mp = Test_CardPlayer(CLASS_KNIGHT);
+    _mp.stat_points = 1;
+    _mp.mp = _mp.max_mp - 4;
+    var _mp_max0 = _mp.max_mp;
+    var _mp_cur0 = _mp.mp;
+    var _mp_hp0 = _mp.max_hp;
+    var _mp2 = Cards_PlaceStat(_mp, FREE_POINT_MAX_MP);
+    Test_Eq("D143 a point on Max MP raises max MP by 2", _mp2.max_mp, _mp_max0 + 2);
+    Test_Eq("D143 a point on Max MP raises current MP by 2", _mp2.mp, _mp_cur0 + 2);
+    Test_Eq("D143 the Max MP point is spent", _mp2.stat_points, 0);
+    Test_Eq("D143 the Max MP point leaves max HP alone", _mp2.max_hp, _mp_hp0);
+    var _mp3 = Cards_PlaceStat(_mp2, FREE_POINT_MAX_MP);
+    Test_True("D143 with no point left a second Max MP placement does nothing", _mp3.max_mp == _mp_max0 + 2 && _mp3.mp == _mp_cur0 + 2);
+
+    // a plain stat point still works as before
+    var _st = Test_CardPlayer(CLASS_MAGE);
+    _st.stat_points = 1;
+    var _st_atk0 = _st.stats.atk;
+    _st = Cards_PlaceStat(_st, STAT_ATK);
+    Test_True("D143 a point on ATK is still ATK +1 and spends the point", _st.stats.atk == _st_atk0 + 1 && _st.stat_points == 0);
+
+    // ---- the screen shows the growth line and the six rows ----
+    _gs.run = Run_Create(5);
+    var _lv = LevelUp_ApplyLevel(Test_CardPlayer(CLASS_KNIGHT));
+    _gs.player_ch = _lv;
+    var _menu = CardsUi_StatMenu();
+    Test_Eq("D143 the free-point screen has six rows", array_length(_menu.items), 6);
+    Test_Eq("D143 the free-point screen shows the class growth line", _menu.layout.note, "Knight growth: ATK +1, DEF +1");
+    Test_Eq("D143 the free-point screen still opens first when a point is owed", Cards_NextOwed(_lv), "stat");
+    var _mt = Ui_Metrics();
+    var _mc = Ui_MenuMeasure(_menu, _mt);
+    Test_True("D143 the panel is as wide as the growth line (or the screen)", _mc.panel_w >= min(UI_TextWidth(_menu.layout.note) + 8 * _mt.p, _mt.gw - 2 * _mt.margin));
+
+    // ---- the victory text: it says the player levelled up, but no longer lists the automatic gains ----
+    var _vic = Test_CardPlayer(CLASS_KNIGHT);
+    _vic.exp = _vic.exp_next - 1;
+    var _slime = EnemyCreate(ENEMY_SLIME);
+    var _rw = Battle_GrantRewards(_vic, _slime);
+    var _auto = LevelUp_AutoGainSummary(_rw.player);
+    Test_True("D143 (setup) the victory levelled the Knight up and the summary is not empty", _rw.levels_gained >= 1 && _auto != "");
+    var _lines = Battle_BuildVictoryDialogueLines(_slime, _rw, _rw.player);
+    var _txt = "";
+    for (var _i = 0; _i < array_length(_lines); _i++) _txt += is_struct(_lines[_i]) ? _lines[_i].text : string(_lines[_i]);
+    Test_True("D143 the victory text still says the player levelled up", string_pos("Level up", _txt) > 0);
+    Test_Eq("D143 the victory text has no automatic stat summary", string_pos(_auto, _txt), 0);
+    Test_Eq("D143 the victory text has no auto wording", string_pos("auto ", _txt), 0);
+    Test_Eq("D143 the auto-resolve line has no summary either", string_pos("auto ", Enemy_AutoResolveBuildMessage({ name: "Slime" }, { exp_gain: 5, levels_gained: 1, auto_stat_summary: "ATK +1, DEF +1" })), 0);
+
+    // ---- outside a run (tests, tools) the point is placed at once, as before ----
+    variable_struct_remove(_gs, "run");
+    var _auto_ch = LevelUp_ApplyLevel(Test_CardPlayer(CLASS_KNIGHT));
+    Test_True("D143 outside a run the free point is still auto-placed on the class stat", Level_AutoPlaceEnabled() && _auto_ch.stat_points == 0 && _auto_ch.stats.def == Test_CardPlayer(CLASS_KNIGHT).stats.def + 2);
+    Test_Eq("D143 outside a run the auto-placed point does not touch max HP beyond the level", _auto_ch.max_hp, Resource_MaxHp(_auto_ch.class_cfg.hd, 2));
+
+    _gs.player_ch = _old_player;
+    if (_had_run) _gs.run = _old_run;
+    draw_set_font(_f0);
+    if (_own) global.display = _disp0;
+    Loc_SetLanguage(_lang0);
 }

@@ -50,6 +50,11 @@ POISON, BLEED, BURN, STUN, GUARD, DMG_UP, EVASION, CRIT_UP, HIT_UP, MEDITATION, 
 SK_REGROW, SK_SNUFF, SK_STEAL = 28, 29, 22
 STATS = ("atk", "def", "spd", "mag")
 BEDS_HEAL_FRAC = 1.0   # C4 (D47): a bed heals all HP and MP (scr_levelup Bed_Heal on branch c4-rest)
+# H4 (D143): the level's free point may go to Max HP (+FREE_POINT_HP_GAIN) or Max MP (+FREE_POINT_MP_GAIN) instead of the class stat (scr_macros). what-if knobs:
+# constants.free_point_choices=0 plays the old way (always the class stat), constants.free_point_hp_gain / free_point_mp_gain change the amounts.
+FREE_POINT_HP_GAIN = 3
+FREE_POINT_MP_GAIN = 2
+ST_KEY = {"atk": "atk", "def": "df", "spd": "spd", "mag": "mag"}   # the free_default stat name -> the key of a fighter's st
 # time proxy (seconds); documented in the report. Battle actions count both sides, a defence bar adds time, the rest is walking and menus.
 TIME = dict(action_s=2.5, defence_extra_s=1.5, floor_walk_s=25.0, fight_approach_s=6.0, card_pick_s=8.0, shop_s=45.0, story_s=150.0, item_use_s=3.0)
 
@@ -461,8 +466,8 @@ class Rules:
         return w["power"] if w else self.d.const["unarmed_power"]
 
     def resources(self, f):
-        f.mhp = ref.hp_max(f.hd, f.level)
-        f.mmp = ref.mp_max(f.mp_gain, f.level, f.st["mag"])
+        f.mhp = ref.hp_max(f.hd, f.level) + getattr(f, "hp_bonus", 0)   # D143: + the Max HP bought with free points
+        f.mmp = ref.mp_max(f.mp_gain, f.level, f.st["mag"]) + getattr(f, "mp_bonus", 0)
         f.hp = min(f.hp, f.mhp)
         f.mp = min(f.mp, f.mmp)
 
@@ -1703,6 +1708,12 @@ class RunSim:
         st["mag"] += int(round(R.passive_sum(p, "stat_mag")))
         for k, v in p.__dict__.get("extra", {}).items():
             st[k] += v
+        # D143: a free point placed on Max HP / Max MP is not on the class stat the class table (by_level) counts it on
+        hp_pts, mp_pts = p.__dict__.get("hp_pts", 0), p.__dict__.get("mp_pts", 0)
+        if hp_pts + mp_pts:
+            st[ST_KEY[self.free_stat_key()]] -= hp_pts + mp_pts
+        p.hp_bonus = self.d.const.get("free_point_hp_gain", FREE_POINT_HP_GAIN) * hp_pts
+        p.mp_bonus = self.d.const.get("free_point_mp_gain", FREE_POINT_MP_GAIN) * mp_pts
         for k in st:
             st[k] = min(60, st[k])
         mhp0, mmp0 = p.mhp, p.mmp
@@ -1713,6 +1724,42 @@ class RunSim:
 
     def free_stat_key(self):
         return ("atk", "def", "spd", "mag")[self.R.d.classes[self.p.class_id]["free_default"]]
+
+    def beds_ahead(self):
+        """Beds still to come on later floors (each one refills HP and MP to the new maximum)."""
+        return sum(v["beds"] for k, v in self.d.layout.items() if float(k) > self.floor)
+
+    def place_free_point(self):
+        """D143: the level's free point. The class table (by_level) already counts it on the class stat; Max HP (+3) or Max MP (+2) replaces that when it is
+        worth more to the average player, valued like a card pick: the stat and Max MP by the expected-fight value over the fights left, plus the
+        points of HP / MP they give now and at every bed to come (Max HP does not change the fight model, so it is only that refill value)."""
+        p, R = self.p, self.R
+        if not self.d.const.get("free_point_choices", 1):
+            return
+        n = self.n_rem()
+        refills = 1 + self.beds_ahead()
+        hp_gain = self.d.const.get("free_point_hp_gain", FREE_POINT_HP_GAIN)
+        mp_gain = self.d.const.get("free_point_mp_gain", FREE_POINT_MP_GAIN)
+        w = clone_player(p)   # the build without the point on the class stat
+        w.st = dict(p.st)
+        w.st[ST_KEY[self.free_stat_key()]] -= 1
+        R.resources(w)
+        base = self.value(w)
+        g_stat = (base - self.value(p)) * n
+        q = clone_player(w)
+        q.mp_bonus = getattr(w, "mp_bonus", 0) + mp_gain
+        R.resources(q)
+        g_mp = (base - self.value(q)) * n + MP_VALUE * mp_gain * refills
+        g_hp = hp_gain * refills
+        if max(g_hp, g_mp) <= g_stat:
+            return
+        if g_hp >= g_mp:
+            p.hp_pts = p.__dict__.get("hp_pts", 0) + 1
+            self.rec["free_hp"] = self.rec.get("free_hp", 0) + 1
+        else:
+            p.mp_pts = p.__dict__.get("mp_pts", 0) + 1
+            self.rec["free_mp"] = self.rec.get("free_mp", 0) + 1
+        self.sync_stats()
 
     def add_exp(self, amount):
         p, R = self.p, self.R
@@ -1727,6 +1774,7 @@ class RunSim:
             p.picks += 1
             mhp0, mmp0, hp0, mp0 = p.mhp, p.mmp, p.hp, p.mp
             self.sync_stats()
+            self.place_free_point()   # D143: the class stat (in by_level), Max HP or Max MP
             p.hp = min(p.mhp, hp0 + max(0, p.mhp - mhp0))
             p.mp = min(p.mmp, mp0 + max(0, p.mmp - mmp0))
         if p.level >= 10:

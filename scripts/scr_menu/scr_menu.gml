@@ -1168,13 +1168,15 @@ function CardsUi_StatHelp(_stat_id) {
         case STAT_DEF: return Loc_T("menu.tooltip.stat.def.desc", "Reduces all damage you take.");
         case STAT_SPD: return Loc_T("menu.tooltip.stat.spd.desc", "Decides who acts first.");
         case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage and max MP.");
+        case FREE_POINT_MAX_HP: return Loc_T("cards.stat.maxhp.desc", "Raises your max HP by {n} and heals {n} HP.", { n: FREE_POINT_HP_GAIN });   // D143
+        case FREE_POINT_MAX_MP: return Loc_T("cards.stat.maxmp.desc", "Raises your max MP by {n} and restores {n} MP.", { n: FREE_POINT_MP_GAIN });
     }
     return "";
 }
 
 function CardsUi_StatMenu() {
     var ch = GameState_Get().player_ch;
-    var opts = Cards_StatOptions(ch);
+    var opts = Cards_FreePointOptions(ch);   // D143: the four stats, Max HP, Max MP
     var items = [];
     for (var i = 0; i < array_length(opts); i++) {
         var o = opts[i];
@@ -1186,7 +1188,7 @@ function CardsUi_StatMenu() {
     }
     var m = Ui_MenuNew("cards_stat", items, {
         on_confirm: CardsUi_StatConfirm, on_back: CardsUi_NoBack,
-        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: place 1 point", { lvl: string(ch.level) }), anchor: "center", details: true }
+        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: place 1 point", { lvl: string(ch.level) }), note: LevelUp_GrowthText(ch.class_id, ch.level), anchor: "center", details: true }
     });
     Ui_MenuFixCursor(m, clamp(DB_PlayerClass(ch.class_id).free_default, 0, 3));   // the class's usual stat first
     return m;
@@ -3446,7 +3448,7 @@ function Ui_MenuNew(_id, _items, _opts) {
         rep_v: Ui_RepeatNew(), rep_h: Ui_RepeatNew(),
         on_confirm: undefined, on_back: undefined, on_adjust: undefined,
         owner: noone, data: {}, lock_ms: current_time,
-        layout: { title: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false,
+        layout: { title: "", note: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false,
                   x_anchor: "center", panel_w: 0, y_bottom: -1, max_h: 0, details_pos: "below", details_cols: 1, rows_max: 0,
                   y_top: -1, det_w: 0, det_art: false, det_top: -1, det_h: -1 },
         rect: { x: 0, y: 0, w: 0, h: 0 }, det_rect: { x: 0, y: 0, w: 0, h: 0 },
@@ -3955,9 +3957,10 @@ function Ui_MenuMeasureRows(_m, _mt, _lang) {
         val_w = max(val_w, vw);
     }
     var title = _m.layout.title;
+    var note = _m.layout.note;
     return {
-        items: _m.items, n: n, mt: _mt, lang: _lang, title: title, sig: Ui_MenuSigBuild(_m.items, n),
-        label_w: label_w, val_w: val_w, icon_px: icon_px, title_w: (title != "") ? UI_TextWidth(title) : 0,
+        items: _m.items, n: n, mt: _mt, lang: _lang, title: title, note: note, sig: Ui_MenuSigBuild(_m.items, n),
+        label_w: label_w, val_w: val_w, icon_px: icon_px, title_w: (title != "") ? UI_TextWidth(title) : 0, note_w: (note != "") ? UI_TextWidth(note) : 0,
         l2: false, l2_pw: 0, l2_details: false, l2_pos: "", l2_cols: 0, l2_cur: -1,
         panel_w: 0, det_h: 0
     };
@@ -3971,7 +3974,7 @@ function Ui_MenuMeasureSizes(_m, _mt, _mc, _cur) {
     var L = _m.layout;
     var n = _mc.n;
     var icon_col = (_mc.icon_px > 0) ? _mc.icon_px + 2 * p : 0;
-    var inner_w = max(5 * p + icon_col + _mc.label_w + ((_mc.val_w > 0) ? 4 * p + _mc.val_w : 0), _mc.title_w);
+    var inner_w = max(5 * p + icon_col + _mc.label_w + ((_mc.val_w > 0) ? 4 * p + _mc.val_w : 0), _mc.title_w, _mc.note_w);
     var chrome_x = 2 * (4 * p);
     var panel_w = min(inner_w + chrome_x, _mt.gw - 2 * _mt.margin);
     if (L.details && L.panel_w <= 0) panel_w = min(max(panel_w, round(_mt.gw * 0.78)), _mt.gw - 2 * _mt.margin);
@@ -3999,7 +4002,7 @@ function Ui_MenuMeasure(_m, _mt) {
     var n = array_length(_m.items);
     var lang = Loc_GetLanguage();
     var mc = variable_struct_get(_m, "mc");
-    var fresh = is_struct(mc) && mc.items == _m.items && mc.n == n && mc.mt == _mt && mc.lang == lang && mc.title == L.title && Ui_MenuSigSame(_m.items, mc.sig, n);
+    var fresh = is_struct(mc) && mc.items == _m.items && mc.n == n && mc.mt == _mt && mc.lang == lang && mc.title == L.title && mc.note == L.note && Ui_MenuSigSame(_m.items, mc.sig, n);
     if (!fresh) {
         mc = Ui_MenuMeasureRows(_m, _mt, lang);
         _m.mc = mc;
@@ -4037,7 +4040,8 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var icon_px = mm.icon_px;     // the icon column (battle lists): one icon pixel is k GUI units, k = whole units that fit a row
     var panel_w = mm.panel_w;
     var header_h = (L.title != "") ? (mt.line_h + 3 * p) : 0;
-    var chrome_y = 2 * (4 * p) + header_h;
+    var note_h = (L.note != "") ? (mt.line_h + 2 * p) : 0;   // D143: one line under the title (the level-up screen's class growth)
+    var chrome_y = 2 * (4 * p) + header_h + note_h;
     var det_h = mm.det_h;         // the tallest sentence (so the list does not jump between items); the highlighted item's own when the panel is above
     var det_right = (L.details && L.details_pos == "right");   // D90: beside the list, as tall as the list (the Tab menu)
     var avail_h = ((L.max_h > 0) ? L.max_h : (mt.gh - 2 * mt.margin)) - ((det_h > 0) ? det_h + mt.margin : 0);
@@ -4077,6 +4081,10 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         Ui_Text(x0, ty0, L.title, UI_C_LIGHTEST);
         Ui_Box(px + 3 * p, ty0 + mt.line_h + p, px + panel_w - 3 * p, ty0 + mt.line_h + 2 * p, UI_C_DARK);
         ty0 += header_h;
+    }
+    if (L.note != "") {
+        Ui_Text(x0, ty0, Ui_FitText(L.note, x1 - x0), UI_C_LIGHT);
+        ty0 += note_h;
     }
     var rows_y0 = ty0;
 

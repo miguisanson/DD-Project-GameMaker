@@ -82,21 +82,11 @@ function Enemy_AutoResolveBuildMessage(_cfg, _result, _verb_prefix = "You overpo
 
     var levels = (variable_struct_exists(_result, "levels_gained")) ? max(0, round(real(_result.levels_gained))) : 0;
     var stat_points = (variable_struct_exists(_result, "stat_points_gained")) ? max(0, round(real(_result.stat_points_gained))) : 0;
-    var auto_summary = (variable_struct_exists(_result, "auto_stat_summary")) ? string(_result.auto_stat_summary) : "";
     if (levels > 0) {
         var lvl_msg = Loc_T("combat.msg.level_up", "Level up x{levels}!", { levels: levels });
-        if (stat_points > 0 || auto_summary != "") {
-            lvl_msg += " (";
-            var sub = [];
-            if (stat_points == 1) array_push(sub, Loc_T("combat.msg.stat_point_one", "+{n} stat point", { n: stat_points }));
-            else if (stat_points > 1) array_push(sub, Loc_T("combat.msg.stat_points_many", "+{n} stat points", { n: stat_points }));
-            if (auto_summary != "") array_push(sub, Loc_T("combat.msg.auto_stats", "auto {summary}", { summary: auto_summary }));
-            for (var si = 0; si < array_length(sub); si++) {
-                if (si > 0) lvl_msg += ", ";
-                lvl_msg += sub[si];
-            }
-            lvl_msg += ")";
-        }
+        // D143: the class's automatic gains are shown on the level-up screen (LevelUp_GrowthText), no longer listed here
+        if (stat_points == 1) lvl_msg += " (" + Loc_T("combat.msg.stat_point_one", "+{n} stat point", { n: stat_points }) + ")";
+        else if (stat_points > 1) lvl_msg += " (" + Loc_T("combat.msg.stat_points_many", "+{n} stat points", { n: stat_points }) + ")";
         array_push(parts, lvl_msg);
     } else if (variable_struct_exists(_result, "at_level_cap") && _result.at_level_cap) {
         array_push(parts, Loc_T("combat.msg.max_level", "Max level reached."));

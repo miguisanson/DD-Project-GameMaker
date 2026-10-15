@@ -19,6 +19,12 @@ function Player_NormalizeProgression(_ch, _recompute_resources = true, _clamp_ex
     if (!variable_struct_exists(_ch.stats, "mag")) _ch.stats.mag = variable_struct_exists(_ch.stats, "intt") ? _ch.stats.intt : 10;
     _ch.stats = StatsClampAll({ atk: _ch.stats.atk, def: _ch.stats.def, spd: _ch.stats.spd, mag: _ch.stats.mag });
 
+    // D143: the Max HP / Max MP bought with free points; a character without the fields has none.
+    if (!variable_struct_exists(_ch, "hp_bonus")) _ch.hp_bonus = 0;
+    if (!variable_struct_exists(_ch, "mp_bonus")) _ch.mp_bonus = 0;
+    _ch.hp_bonus = max(0, round(_ch.hp_bonus));
+    _ch.mp_bonus = max(0, round(_ch.mp_bonus));
+
     // Banked free points (D76) survive; a character without the field has none.
     if (!variable_struct_exists(_ch, "stat_points")) _ch.stat_points = 0;
     _ch.stat_points = max(0, round(_ch.stat_points));
@@ -86,6 +92,24 @@ function Level_ApplyFreePoint(_ch, _stat_id) {
     variable_struct_set(_ch.stats, key, StatClamp(variable_struct_get(_ch.stats, key) + 1));
     _ch.stat_points -= 1;
     if (variable_struct_exists(_ch, "last_growth") && is_struct(_ch.last_growth)) variable_struct_set(_ch.last_growth, key, variable_struct_get(_ch.last_growth, key) + 1);
+    return _ch;
+}
+
+// D143: spends one banked free point on Max HP (+FREE_POINT_HP_GAIN) or Max MP (+FREE_POINT_MP_GAIN); the current HP / MP rise by the same amount.
+// The bonus lives on the character (hp_bonus, mp_bonus) and RecomputeResources adds it, so a level-up or a load keeps it. Does nothing without a point.
+function Level_ApplyResourcePoint(_ch, _id) {
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "stat_points") || _ch.stat_points <= 0) return _ch;
+    if (_id != FREE_POINT_MAX_HP && _id != FREE_POINT_MAX_MP) return _ch;
+    var hp0 = _ch.hp;
+    var mp0 = _ch.mp;
+    var max_hp0 = _ch.max_hp;
+    var max_mp0 = _ch.max_mp;
+    if (_id == FREE_POINT_MAX_HP) _ch.hp_bonus = (variable_struct_exists(_ch, "hp_bonus") ? _ch.hp_bonus : 0) + FREE_POINT_HP_GAIN;
+    else _ch.mp_bonus = (variable_struct_exists(_ch, "mp_bonus") ? _ch.mp_bonus : 0) + FREE_POINT_MP_GAIN;
+    _ch.stat_points -= 1;
+    _ch = RecomputeResources(_ch);
+    _ch.hp = clamp(hp0 + max(0, _ch.max_hp - max_hp0), 0, _ch.max_hp);
+    _ch.mp = clamp(mp0 + max(0, _ch.max_mp - max_mp0), 0, _ch.max_mp);
     return _ch;
 }
 
@@ -273,6 +297,31 @@ function Cards_ChestOpened(_ch) {
     return ch;
 }
 
+// D143: the line the level-up screen shows: what the class gains by itself at _level, e.g. "Knight growth: ATK +1, DEF +1" (Nobody's rotates, so the
+// level matters). "" for a class with no growth.
+function LevelUp_GrowthText(_class_id, _level) {
+    var g = LevelUp_ClassGrowthGain(_class_id, _level);
+    var keys = ["atk", "def", "spd", "mag"];
+    var ids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG];
+    var gains = "";
+    for (var i = 0; i < 4; i++) {
+        var n = variable_struct_get(g, keys[i]);
+        if (n <= 0) continue;
+        if (gains != "") gains += ", ";
+        gains += Loc_T("levelup.gain", "{stat} +{n}", { stat: Stat_ShortName(ids[i]), n: n });
+    }
+    if (gains == "") return "";
+    return Loc_T("levelup.growth", "{name} growth: {gains}", { name: DB_PlayerClass(_class_id).name, gains: gains });
+}
+
+// D143: the free-point prompt's rows: the four stats, then Max HP and Max MP (value now > after).
+function Cards_FreePointOptions(_ch) {
+    var out = Cards_StatOptions(_ch);
+    array_push(out, { stat: FREE_POINT_MAX_HP, label: Loc_T("cards.stat.maxhp", "Max HP +{n}", { n: FREE_POINT_HP_GAIN }), from: _ch.max_hp, to: _ch.max_hp + FREE_POINT_HP_GAIN });
+    array_push(out, { stat: FREE_POINT_MAX_MP, label: Loc_T("cards.stat.maxmp", "Max MP +{n}", { n: FREE_POINT_MP_GAIN }), from: _ch.max_mp, to: _ch.max_mp + FREE_POINT_MP_GAIN });
+    return out;
+}
+
 // The four rows of the free-point prompt: the stat, its value now and after the point.
 function Cards_StatOptions(_ch) {
     var ids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG];
@@ -284,8 +333,9 @@ function Cards_StatOptions(_ch) {
     return out;
 }
 
-// Spends one banked point on _stat_id (Level_ApplyFreePoint) and gives the extra MP a MAG point adds.
+// Spends one banked point on _stat_id (Level_ApplyFreePoint, or Level_ApplyResourcePoint for Max HP / Max MP) and gives the extra MP a MAG point adds.
 function Cards_PlaceStat(_ch, _stat_id) {
+    if (_stat_id == FREE_POINT_MAX_HP || _stat_id == FREE_POINT_MAX_MP) return Level_ApplyResourcePoint(_ch, _stat_id);   // D143
     var max_mp0 = _ch.max_mp;
     _ch = Level_ApplyFreePoint(_ch, _stat_id);
     _ch = RecomputeResources(_ch);
