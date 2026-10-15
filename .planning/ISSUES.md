@@ -114,7 +114,7 @@ Found by audits and reviews (no person's words):
 | I-069 | bug hunt 2026-10-16: echo skill from another class is silently lost (echo chosen before the class pick) | DESIGN | P3 | next | die as Knight, echo Horizontal Slash, pick Mage | owner decides (PLAYTEST-QUEUE question 1) | waiting on owner |
 | I-070 | bug hunt 2026-10-16: D88 milestone unlocks (extra cards/passives/throwables) not implemented | DESIGN | P3 | next | profile with no milestones still gets every card | owner decides (question 2) | waiting on owner |
 | I-071 | bug hunt 2026-10-16: closing the window does not save the run (D46 "on quit") | BUG/IDE | P3 | next | Alt-F4 mid-floor loses up to ~10 s | Game End event saves the run (owner IDE task) | waiting on owner |
-| I-072 | bug hunt 2026-10-16: stolen items never returned, battle win never lists loot; weak Smoke Bomb gives no dodge; throwable cap not applied on class pick | BUG | P2 | next | see fix-hunt1 | checks in fix-hunt1 | fix in progress |
+| I-072 | bug hunt 2026-10-16: stolen items never returned, battle win never lists loot; weak Smoke Bomb gives no dodge; throwable cap not applied on class pick | BUG | P2 | next | see fix-hunt1 | checks in fix-hunt1 | fixed on next (dbc678a); owner confirms at playtest Q-061 |
 
 ---
 
