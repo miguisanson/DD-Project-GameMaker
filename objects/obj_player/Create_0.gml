@@ -49,7 +49,7 @@ move_timer = 0;
 tile_size = GRID_TILE_SIZE;
 step_from_x = x;
 step_from_y = y;
-exit_ignore = noone;   // D64: the exit tile the player arrived on; it does not fire until the player has stepped off it
+exit_ignore = noone;   // D64: the exit tile the player arrived on; it does not fire until the player has stepped off it (armed at the end of this event after a battle return)
 // D69 / D70: turn on a tap, buffered corner, run, bump, interact prompt
 walk_speed = (16 mod max(1, move_speed) == 0) ? move_speed : 1;   // pixels per frame; must divide the 16 px tile
 run_speed = 2;
@@ -73,3 +73,6 @@ auto_resolve_recover_start_x = x;
 auto_resolve_recover_start_y = y;
 auto_resolve_recover_target_x = x;
 auto_resolve_recover_target_y = y;
+
+// D64: put back (battle return, Continue / load) on an exit tile: that exit ignores the player until they step off it. (A room change arms it in RoomTransition_Apply.)
+if (just_returned) Player_ArmExitIgnore(id);

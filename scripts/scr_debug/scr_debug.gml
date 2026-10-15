@@ -479,6 +479,10 @@ function Scenario_StepSmoke(_s) {
         case 240: case 241: case 242: case 243: case 244: case 245: case 246: case 247: case 248: case 249:
             Scenario_StepSmokeReg(_s);   // I2: R-028 (intro, Continue), R-036 (poison death), R-022 (failed Run), R-017 (boss dialogue end), R-007 (mini boss)
             break;
+        case 250: case 251: case 252: case 253: case 254: case 255: case 256: case 257: case 258: case 259:
+        case 260: case 261: case 262: case 263: case 264: case 265: case 266: case 267: case 268: case 269:
+            Scenario_StepSmokeHunt2(_s);   // bug hunt 2: enemies freeze under menus (D122), homes survive re-entry (D33), the exit tile after a battle / Continue (D64), auto-resolve + Continue
+            break;
         case 30:
             Scenario_StepSmokeUi(_s);
             break;
@@ -8170,9 +8174,355 @@ function Scenario_StepSmokeReg(_s) {
             if (variable_struct_exists(_rg, "goto5") && _s.t > _rg.goto5 + 40 && Scenario_FloorReady(rm_floor5)) {
                 var _mb249 = instance_exists(obj_mini_boss) ? instance_find(obj_mini_boss, 0) : noone;
                 Scenario_Check("regr_r007_a_new_run_brings_the_mini_boss_back", _mb249 != noone && !_mb249.defeated && !_gs.boss_defeated.mini_boss);
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 250);   // bug hunt 2 (250..268) goes on from here; its last step calls Scenario_NoticeEnd
             }
             if (_s.t > 900) { Scenario_Check("regr_r007_new_run_reaches_rm_floor5", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ---- Bug hunt 2 (D122, D33, D63, D64, D66), steps 250..269. They go on from the new game of the mini boss steps (249); the last one calls Scenario_NoticeEnd.
+// 250..252: a chasing dire wolf 3 tiles away stands still while the pause (focus loss), the Tab menu or a tutorial pop-up is open, and goes on when it closes.
+// 253..263: seed A in rm_floor4: each enemy's home survives leaving and coming back, a battle return and Continue; the exit tile the player stands on after
+//           a battle or Continue ignores them until they step off it.
+// 264..268: an auto-resolved enemy, an autosave and Continue: the two others keep their types, places and elites. ----
+function Scenario_Hunt2DirAction(_dir) {
+    switch (_dir) {
+        case UP: return "move_up";
+        case DOWN: return "move_down";
+        case LEFT: return "move_left";
+        case RIGHT: return "move_right";
+    }
+    return "move_up";
+}
+
+// An exit of the room with a gate direction (the player must walk INTO it); noone when there is none.
+function Scenario_Hunt2Exit() {
+    var _e = noone;
+    with (obj_room_transition) {
+        if (_e == noone && transition_id != "" && require_dir != -1) _e = id;
+    }
+    return _e;
+}
+
+// A new run of the seed from another room (restarting the room the player is in would not spawn him again). True once rm_floor1 is up with the player.
+function Scenario_Hunt2Begin(_s, _h, _seed) {
+    if (!variable_struct_exists(_h, "bph")) _h.bph = 0;
+    switch (_h.bph) {
+        case 0:
+            if (Transition_IsActive()) return false;
+            Dialogue_CloseNow();
+            Scenario_ClearUi();
+            room_goto(rm_floor2);
+            _h.bph = 1;
+            _h.bt = _s.t;
+            return false;
+        case 1:
+            if (_s.t > _h.bt + 30 && Scenario_FloorReady(rm_floor2)) {
+                Run_StartNew(false, _seed);
+                _h.bph = 2;
+                _h.bt = _s.t;
+            }
+            return false;
+        case 2:
+            if (_s.t > _h.bt + 5 && Scenario_FloorReady(rm_floor1)) {
+                _h.bph = 0;
+                return true;
+            }
+            return false;
+    }
+    return false;
+}
+
+function Scenario_StepSmokeHunt2(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "h2")) _s.h2 = { v: 0, ph: 0, need_run: true, tries: 0 };
+    var _h = _s.h2;
+    var _T = GRID_TILE_SIZE;
+    var _names = ["pause", "tab_menu", "tutorial_popup"];
+    var _nm = _names[min(_h.v, 2)];
+    switch (_s.step) {
+        case 250:   // stage: a dire wolf 3 tiles from the player in rm_floor1's open corridor (part v of 3)
+            if (_h.need_run) {
+                if (!Scenario_Hunt2Begin(_s, _h, 7101)) {
+                    if (_s.t > 1500) { Scenario_Check("hunt2_a_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                    break;
+                }
+                _h.need_run = false;
+                _s.t = 0;
+            }
+            if (!Scenario_FloorReady(rm_floor1)) {
+                if (_s.t > 600) { _h.need_run = true; _s.t = 0; }
+                break;
+            }
+            if (_s.t > 5) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                with (obj_enemy) instance_destroy();
+                _h.w = instance_create_layer(16 * _T, 9 * _T, "Instances", obj_dire_wolf);
+                Scenario_PlaceEnemy(_h.w, 16, 9);
+                Scenario_PlacePlayer(19, 9);
+                _h.ph = 0;
+                Scenario_Next(_s, 251);
+            }
+            break;
+        case 251:   // the wolf runs at the player; then the screen opens (pause by Focus_Step(false), Tab menu by the real key, a tutorial pop-up)
+            if (!instance_exists(_h.w) || room != rm_floor1) {
+                Scenario_Check("hunt2_" + _nm + "_the_wolf_is_in_the_room", false, "room=" + room_get_name(room));
+                _h.need_run = true;
+                _h.v++;
+                Scenario_Next(_s, (_h.v < 3) ? 250 : 253);
+                break;
+            }
+            var _w = _h.w;
+            if (_h.ph == 0) {
+                if (variable_instance_exists(_w, "ai_mode") && _w.ai_mode == "chase" && _w.moving && _gs.ui.mode == UI_NONE) {
+                    if (_h.v == 0) Focus_Step(false);
+                    else if (_h.v == 1) Scenario_Tap("menu");
+                    else {
+                        Scenario_TutorialForget();
+                        global.tutorial_off = false;
+                        Scenario_Check("hunt2_the_tutorial_popup_opens", Tutorial_Trigger("cards"));
+                    }
+                    _h.ph = 1;
+                    _h.t1 = _s.t;
+                } else if (_s.t > 150) {
+                    Scenario_Check("hunt2_" + _nm + "_the_wolf_chases_the_player", false, "ai_mode=" + (variable_instance_exists(_w, "ai_mode") ? string(_w.ai_mode) : "none") + " moving=" + string(_w.moving));
+                    with (obj_enemy) instance_destroy();
+                    _h.v++;
+                    Scenario_Next(_s, (_h.v < 3) ? 250 : 253);
+                }
+            } else {
+                var _open = (_h.v == 0) ? PauseMenu_IsOpen() : ((_h.v == 1) ? (_gs.ui.mode == UI_MENU) : Tutorial_IsOpen());
+                if (_open && _s.t >= _h.t1 + 3) {
+                    Scenario_Check("hunt2_" + _nm + "_is_open_while_the_wolf_chases", true);
+                    _h.x0 = _w.x;
+                    _h.y0 = _w.y;
+                    _h.d0 = point_distance(_w.x, _w.y, instance_find(obj_player, 0).x, instance_find(obj_player, 0).y);
+                    _h.drift = 0;
+                    _h.f0 = _s.f;
+                    _h.ph = 0;
+                    Scenario_Next(_s, 252);
+                } else if (_s.t > _h.t1 + 60) {
+                    Scenario_Check("hunt2_" + _nm + "_is_open_while_the_wolf_chases", false, "mode=" + string(_gs.ui.mode));
+                    with (obj_enemy) instance_destroy();
+                    _h.v++;
+                    Scenario_Next(_s, (_h.v < 3) ? 250 : 253);
+                }
+            }
+            break;
+        case 252:   // 120 frames behind the screen: the wolf does not move and no fight starts; closed: it goes on
+            var _w2 = _h.w;
+            if (_h.ph == 0) {
+                var _gone = !instance_exists(_w2) || room != rm_floor1;
+                if (!_gone) _h.drift = max(_h.drift, abs(_w2.x - _h.x0) + abs(_w2.y - _h.y0));
+                var _started = _gone || Transition_IsActive();
+                if (_h.drift > 0 || _started || (_s.f - _h.f0) >= 120) {
+                    Scenario_Check("hunt2_" + _nm + "_the_enemy_stands_still_behind_it_for_120_frames", _h.drift == 0 && !_started, "drift=" + string(_h.drift) + " frames=" + string(_s.f - _h.f0) + " from " + string(_h.d0) + " px away");
+                    Scenario_Check("hunt2_" + _nm + "_no_fight_starts_behind_it", !_started && room == rm_floor1, "room=" + room_get_name(room) + " transition=" + string(Transition_IsActive()));
+                    if (_h.drift > 0 || _started) {   // the red case: no need to wait for the fight
+                        with (obj_enemy) instance_destroy();
+                        if (room != rm_floor1 || Transition_IsActive()) _h.need_run = true;
+                        if (_h.v == 0) { Focus_Step(true); if (PauseMenu_IsOpen()) PauseMenu_Close(true); }
+                        if (_h.v == 2) { Tutorial_Dismiss(); global.tutorial_off = true; }
+                        if (_h.v == 1 && _gs.ui.mode == UI_MENU) Scenario_Tap("menu");
+                        _h.v++;
+                        _h.ph = 0;
+                        Scenario_Next(_s, (_h.v < 3) ? 250 : 253);
+                        break;
+                    }
+                    if (_h.v == 0) { Focus_Step(true); PauseMenu_Close(true); }
+                    else if (_h.v == 1) Scenario_Tap("menu");
+                    else { Tutorial_Dismiss(); global.tutorial_off = true; }
+                    _h.ph = 1;
+                    _h.t2 = _s.t;
+                }
+            } else {
+                var _moved = instance_exists(_w2) && (abs(_w2.x - _h.x0) + abs(_w2.y - _h.y0)) > 0;
+                var _fight = (room != rm_floor1) || Transition_IsActive();
+                if (_moved || _fight || _s.t > _h.t2 + 200) {
+                    Scenario_Check("hunt2_" + _nm + "_closed_the_enemy_goes_on_hunting", _moved || _fight, "frames=" + string(_s.t - _h.t2));
+                    with (obj_enemy) instance_destroy();
+                    if (room != rm_floor1 || Transition_IsActive()) _h.need_run = true;
+                    _h.v++;
+                    _h.ph = 0;
+                    Scenario_Next(_s, (_h.v < 3) ? 250 : 253);
+                }
+            }
+            break;
+        // ---------------------------------------------------------------- homes and the exit tile (rm_floor4, seed A)
+        case 253:
+            if (Scenario_Hunt2Begin(_s, _h, 7102 + _h.tries)) {
+                global.tutorial_off = true;
+                room_goto(rm_floor4);
+                Scenario_Next(_s, 254);
+            } else if (_s.t > 1500) { Scenario_Check("hunt2_seed_a_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 254:   // the first visit: the shuffle deals the enemies; their homes are the dealt spots; leave (the exit snapshot) and come back
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor4)) {
+                Scenario_Check("hunt2_floor4_has_its_three_enemies", instance_number(obj_enemy) == 3, "n=" + string(instance_number(obj_enemy)));
+                var _off = false;   // the check is only worth anything when the deal put an enemy somewhere else than its authored spot (the seeds are tried in order)
+                with (obj_enemy) { if (home_x != xstart || home_y != ystart) _off = true; }
+                if (!_off && _h.tries < 12) { _h.tries++; Scenario_Next(_s, 253); break; }
+                Scenario_Check("hunt2_the_deal_moved_an_enemy_off_its_authored_spot", _off, "tries=" + string(_h.tries));
+                _h.sigA = Scenario_EcoLayoutSig();
+                RoomState_OnRoomExit();
+                room_goto(rm_floor3);
+                Scenario_Next(_s, 255);
+            }
+            if (_s.t > 600) { Scenario_Check("hunt2_reaches_rm_floor4", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 255:
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor3)) {
+                room_goto(rm_floor4);
+                Scenario_Next(_s, 256);
+            }
+            if (_s.t > 600) { Scenario_Check("hunt2_reaches_rm_floor3", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 256:   // back: homes as before; then the player stands on an exit tile and meets an enemy: the battle is entered and fled from
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor4)) {
+                _h.sigA1 = Scenario_EcoLayoutSig();
+                Scenario_Check("hunt2_leaving_and_coming_back_keeps_each_enemys_home", _h.sigA1 == _h.sigA, _h.sigA + " vs " + _h.sigA1);
+                var _ex = Scenario_Hunt2Exit();
+                Scenario_Check("hunt2_floor4_has_an_exit_with_a_gate_direction", _ex != noone);
+                if (_ex == noone || instance_number(obj_enemy) < 1) { Scenario_NoticeEnd(); break; }
+                _h.ex_cx = round(_ex.bbox_left / _T);
+                _h.ex_cy = round(_ex.bbox_top / _T);
+                _h.ex_act = Scenario_Hunt2DirAction(_ex.require_dir);
+                var _plb = Scenario_PlacePlayer(_h.ex_cx, _h.ex_cy);
+                Scenario_Check("hunt2_the_encounter_is_saved_for_the_battle", EnemyPersist_BeginEncounter(instance_find(obj_enemy, 0), _plb));   // saves the room's enemies, as a touch does
+                room_goto(rm_battle);
+                _h.res = false;
+                Scenario_Next(_s, 257);
+            }
+            if (_s.t > 600) { Scenario_Check("hunt2_returns_to_rm_floor4", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 257:   // the battle is fled from (the same calls as Battle_EndRun)
+            if (room == rm_battle && _s.t > 20 && instance_exists(obj_battle_controller) && !Transition_IsActive()) {
+                if (!_h.res) {
+                    _h.res = true;
+                    EnemyPersist_ResolveBattle(false);
+                    GameState_SetJustReturned(true);
+                }
+                if (Transition_RequestRoomFade(_gs.battle.return_room)) Scenario_Next(_s, 258);
+            }
+            if (_s.t > 600) { Scenario_Check("hunt2_reaches_the_battle", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 258:   // back on the exit tile: the homes are as before; the exit ignores the player; a press INTO the exit does not leave the room
+            if (_s.t > 3 && Scenario_FloorReady(rm_floor4)) {   // the enemies do not hunt in the fade-in: look and clear them at the first frame
+                _h.sigB = Scenario_EcoLayoutSig();
+                Scenario_Check("hunt2_a_battle_return_keeps_each_enemys_home", _h.sigB == _h.sigA, _h.sigA + " vs " + _h.sigB);
+                var _plc = instance_find(obj_player, 0);
+                var _exb = instance_position(_plc.x + _T / 2, _plc.y + _T / 2, obj_room_transition);
+                Scenario_Check("hunt2_the_battle_return_puts_the_player_back_on_the_exit_tile", _exb != noone, "x=" + string(_plc.x) + " y=" + string(_plc.y));
+                Scenario_Check("hunt2_the_exit_under_the_returning_player_is_ignored_until_he_steps_off", _plc.exit_ignore != noone && _plc.exit_ignore == _exb);
+                with (obj_enemy) instance_destroy();
+                Scenario_Hold(_h.ex_act, 40);
+                Scenario_Next(_s, 259);
+            }
+            if (_s.t > 600) { Scenario_Check("hunt2_battle_return_reaches_rm_floor4", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 259:
+            if (room != rm_floor4) with (obj_enemy) instance_destroy();   // the exit of the red case leads into a room full of hunters
+            if (_s.t == 45) {
+                var _left = (room != rm_floor4 || Transition_IsActive());
+                Scenario_Check("hunt2_a_press_into_the_exit_after_a_battle_return_does_not_leave_the_room", !_left, "room=" + room_get_name(room) + " transition=" + string(Transition_IsActive()));
+                if (_left) {   // the red case: back to rm_floor4 for what follows
+                    Transition_Finish();
+                    with (obj_enemy) instance_destroy();
+                }
+                Scenario_Next(_s, 260);
+            }
+            break;
+        case 260:   // the player on the exit tile again, the run saved, and Continue (it also loads into the room the player is in)
+            if (Transition_IsActive()) break;
+            if (!Scenario_FloorReady(rm_floor4)) {
+                if (!variable_struct_exists(_h, "back")) { _h.back = true; room_goto(rm_floor4); }
+                if (_s.t > 900) { Scenario_Check("hunt2_back_in_rm_floor4_for_the_save", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                break;
+            }
+            Scenario_ClearUi();
+            with (obj_enemy) instance_destroy();
+            Scenario_PlacePlayer(_h.ex_cx, _h.ex_cy);
+            if (!Scenario_CanSaveSlot()) {
+                show_debug_message("[TEST] SKIP hunt2 continue (LOCALAPPDATA is not the gate scratch folder)");
+                Scenario_Next(_s, 264);
+                break;
+            }
+            Scenario_Check("hunt2_the_run_is_saved_with_the_player_on_the_exit_tile", RunSave_WriteTo());
+            Scenario_Check("hunt2_continue_starts", Run_Continue().ok);
+            Scenario_Next(_s, 262);
+            break;
+        case 262:   // Continue: the homes as before; the player on the exit tile, which ignores him; a press INTO the exit does not leave the room
+            if (_s.t > 3 && Scenario_FloorReady(rm_floor4) && !(variable_struct_exists(_gs, "load_spawn_pending") && _gs.load_spawn_pending)) {
+                _h.sigC = Scenario_EcoLayoutSig();
+                Scenario_Check("hunt2_continue_keeps_each_enemys_home", _h.sigC == _h.sigA, _h.sigA + " vs " + _h.sigC);
+                var _pld = instance_find(obj_player, 0);
+                var _exc = instance_position(_pld.x + _T / 2, _pld.y + _T / 2, obj_room_transition);
+                Scenario_Check("hunt2_continue_puts_the_player_back_on_the_exit_tile", _exc != noone, "x=" + string(_pld.x) + " y=" + string(_pld.y));
+                Scenario_Check("hunt2_the_exit_under_the_continued_player_is_ignored_until_he_steps_off", _pld.exit_ignore != noone && _pld.exit_ignore == _exc);
+                with (obj_enemy) instance_destroy();
+                Scenario_Hold(_h.ex_act, 40);
+                Scenario_Next(_s, 263);
+            }
+            if (_s.t > 900) { Scenario_Check("hunt2_continue_reaches_rm_floor4", false, "room=" + room_get_name(room) + " transition=" + string(Transition_IsActive()) + " load_spawn_pending=" + string(variable_struct_exists(_gs, "load_spawn_pending") ? _gs.load_spawn_pending : -1) + " enemy=" + string(variable_struct_exists(_gs, "battle") ? _gs.battle.enemy_id : -1)); Scenario_NoticeEnd(); }
+            break;
+        case 263:
+            if (_s.t == 45) {
+                Scenario_Check("hunt2_a_press_into_the_exit_after_continue_does_not_leave_the_room", room == rm_floor4 && !Transition_IsActive(), "room=" + room_get_name(room) + " transition=" + string(Transition_IsActive()));
+                Scenario_Next(_s, 264);
+            }
+            break;
+        // ---------------------------------------------------------------- an auto-resolved enemy and Continue (rm_floor4, seed B)
+        case 264:
+            if (Scenario_Hunt2Begin(_s, _h, 7103)) {
+                room_goto(rm_floor4);
+                Scenario_Next(_s, 265);
+            } else if (_s.t > 1500) { Scenario_Check("hunt2_seed_b_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 265:   // one of the three enemies is overpowered (the real auto-resolve path, with the player at the level cap)
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor4)) {
+                Scenario_Check("hunt2_floor4_has_its_three_enemies_for_seed_b", instance_number(obj_enemy) == 3, "n=" + string(instance_number(obj_enemy)));
+                var _pick = noone;
+                with (obj_enemy) { if (_pick == noone && elite_mod == "") _pick = id; }
+                if (_pick == noone) { Scenario_Check("hunt2_floor4_has_an_enemy_that_is_not_an_elite", false); Scenario_NoticeEnd(); break; }
+                if (!Enemy_CanAutoResolve(EnemyDB_Get(_pick.enemy_id), LEVEL_CAP, _pick.enemy_level)) {   // a type that is always fought: the one that goes is a slime
+                    _pick.enemy_id = ENEMY_SLIME;
+                    _pick.enemy_level = 1;
+                    Enemy_ReapplyConfig(_pick);
+                }
+                _gs.player_ch.level = LEVEL_CAP;
+                Scenario_Check("hunt2_the_auto_resolve_starts", Enemy_AutoResolveEncounter(_pick, instance_find(obj_player, 0)));
+                Scenario_Next(_s, 266);
+            }
+            if (_s.t > 600) { Scenario_Check("hunt2_seed_b_reaches_rm_floor4", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 266:   // the fight is over at the black flash; the layout of the two left, then an autosave and a room away
+            if (_s.t > 10 && !Transition_IsActive() && !is_struct(_gs.auto_resolve_pending) && room == rm_floor4) {
+                Scenario_Check("hunt2_the_auto_resolved_enemy_is_gone", instance_number(obj_enemy) == 2, "n=" + string(instance_number(obj_enemy)));
+                _h.sigR = Scenario_EcoLayoutSig();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP hunt2 auto-resolve continue (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_NoticeEnd();
+                    break;
+                }
+                Scenario_Check("hunt2_the_run_is_saved_after_the_auto_resolve", RunSave_WriteTo());
+                Scenario_Check("hunt2_continue_after_the_auto_resolve_starts", Run_Continue().ok);
+                Scenario_Next(_s, 268);
+            }
+            if (_s.t > 900) { Scenario_Check("hunt2_the_auto_resolve_ends", false, "room=" + room_get_name(room) + " pending=" + string(is_struct(_gs.auto_resolve_pending))); Scenario_NoticeEnd(); }
+            break;
+        case 268:   // Continue: the same two enemies (types, homes, elites); the third stays gone
+            if (_s.t > 3 && Scenario_FloorReady(rm_floor4) && !(variable_struct_exists(_gs, "load_spawn_pending") && _gs.load_spawn_pending)) {
+                var _sigD = Scenario_EcoLayoutSig();
+                Scenario_Check("hunt2_the_auto_resolved_enemy_stays_gone_after_continue", instance_number(obj_enemy) == 2, "n=" + string(instance_number(obj_enemy)));
+                Scenario_Check("hunt2_continue_after_an_auto_resolve_keeps_the_layout_of_the_room", _sigD == _h.sigR, _h.sigR + " vs " + _sigD);
+                Scenario_NoticeEnd();
+            }
+            if (_s.t > 900) { Scenario_Check("hunt2_continue_reaches_rm_floor4_again", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
     }
 }

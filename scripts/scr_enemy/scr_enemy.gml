@@ -204,6 +204,7 @@ function Enemy_AutoResolveFinalizePending() {
     if (is_struct(final) && variable_struct_exists(final, "message")) msg = string(final.message);
 
     if (persist_id != "") {
+        RoomState_Save(room);   // D33: the others keep their place, type and elite; unsaved they would be dealt again with one slot fewer after a Continue
         RoomState_SetRemoved(room, persist_id, obj_enemy, enemy_id);
     }
     if (instance_exists(enemy_inst)) {

@@ -177,12 +177,20 @@ function Player_StartAutoResolveRecover(_pl, _recover_frames = ENEMY_AUTO_RESOLV
         _pl.battle_cooldown = max(_pl.battle_cooldown, BATTLE_COOLDOWN_FRAMES);
     }
 
-    // D64: placed (arrival, battle return) standing on an exit tile: that exit ignores the player until they step off it.
-    if (variable_instance_exists(_pl, "exit_ignore")) {
-        // a point test on the cell centre: it uses the exit's mask only (a fresh player has no mask until its first Step)
-        var _exit_here = instance_position(gx + tile / 2, gy + tile / 2, obj_room_transition);
-        if (_exit_here != noone) _pl.exit_ignore = _exit_here;
-    }
+    Player_ArmExitIgnore(_pl, gx, gy);   // D64
+}
+
+// D64: a player placed (arrival, battle return, Continue) standing on an exit tile: that exit ignores them until they step off it. _gx/_gy: the cell
+// (default: the one the player is on). A point test on the cell centre uses the exit's mask only (a fresh player has no mask until its first Step).
+function Player_ArmExitIgnore(_pl, _gx = undefined, _gy = undefined) {
+    if (!instance_exists(_pl) || !variable_instance_exists(_pl, "exit_ignore")) return noone;
+    var tile = GRID_TILE_SIZE;
+    if (variable_instance_exists(_pl, "tile_size")) tile = max(1, round(real(_pl.tile_size)));
+    var gx = is_undefined(_gx) ? round(_pl.x / tile) * tile : _gx;
+    var gy = is_undefined(_gy) ? round(_pl.y / tile) * tile : _gy;
+    var _exit_here = instance_position(gx + tile / 2, gy + tile / 2, obj_room_transition);
+    if (_exit_here != noone) _pl.exit_ignore = _exit_here;
+    return _exit_here;
 }
 
 function Player_EnsureDialogueSettle(_pl, _recover_frames = PLAYER_DIALOGUE_SETTLE_FRAMES) {

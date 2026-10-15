@@ -114,6 +114,7 @@ function Test_RunAll() {
     Test_RunSuite("SfxInit", Test_Suite_SfxInit);
     Test_RunSuite("Audio", Test_Suite_Audio);
     Test_RunSuite("Transition", Test_Suite_Transition);
+    Test_RunSuite("Hunt2", Test_Suite_Hunt2);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -7792,4 +7793,15 @@ function Test_Suite_LayoutCache() {
     draw_set_font(_f0);
     if (_own) global.display = _disp0;
     Loc_SetLanguage(_lang0);
+}
+
+// Bug hunt 2 (D33, D63, D66): the home spot of a map enemy is saved with its place (the enemy comes back to the spot it was dealt, not to the authored one).
+function Test_Suite_Hunt2() {
+    var _v = RoomState_SanitizeEnemyVars({ x: 112, y: 96, enemy_id: ENEMY_DIREWOLF, home_x: 128, home_y: 80, junk: 5 }, ENEMY_DIREWOLF);
+    Test_True("hunt2 the saved enemy vars keep the home spot", variable_struct_exists(_v, "home_x") && variable_struct_exists(_v, "home_y"));
+    Test_Eq("hunt2 the saved home x is the dealt spot", variable_struct_exists(_v, "home_x") ? _v.home_x : -1, 128);
+    Test_Eq("hunt2 the saved home y is the dealt spot", variable_struct_exists(_v, "home_y") ? _v.home_y : -1, 80);
+    Test_True("hunt2 unknown vars are still dropped", !variable_struct_exists(_v, "junk"));
+    var _old = RoomState_SanitizeEnemyVars({ x: 112, y: 96, enemy_id: ENEMY_SLIME }, ENEMY_SLIME);
+    Test_True("hunt2 an old save without a home keeps none (the enemy keeps its authored home)", !variable_struct_exists(_old, "home_x") && !variable_struct_exists(_old, "home_y"));
 }
