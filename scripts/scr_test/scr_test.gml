@@ -124,6 +124,7 @@ function Test_RunAll() {
     Test_RunSuite("SpeedPreview", Test_Suite_SpeedPreview);
     Test_RunSuite("MapJuice", Test_Suite_MapJuice);
     Test_RunSuite("OneMenu", Test_Suite_OneMenu);
+    Test_RunSuite("Confirm", Test_Suite_Confirm);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -9414,7 +9415,7 @@ function Test_Suite_OneMenu() {
     Test_Eq("D140 Q on the first tab wraps to System", Ui_TabStep(0, TabMenu_Count(), -1), 6);
 
     // ---- the System tab: Help, Abandon run, Quit to title; all on in a battle too (D141) ----
-    var _sys = TabSystem_Items(false, false);
+    var _sys = TabSystem_Items();
     var _sys_ids = "";
     var _sys_lb = "";
     for (var _i = 0; _i < array_length(_sys); _i++) {
@@ -9431,13 +9432,13 @@ function Test_Suite_OneMenu() {
     }
     Test_True("D140 all three System rows are on on the map", _all_on);
     Test_True("D100 every System row explains itself", _all_help);
-    var _sysb = TabSystem_Items(false, true);
+    var _sysb = TabSystem_Items(true);
     var _all_on_b = (array_length(_sysb) == 3);
     for (var _i4 = 0; _i4 < array_length(_sysb); _i4++) _all_on_b = _all_on_b && _sysb[_i4].enabled;
     Test_True("D141 Abandon run and Quit to title are on in a battle", _all_on_b);
     Test_Eq("D141 in a battle Quit says it returns to just before the fight", (array_length(_sysb) == 3) ? _sysb[2].help : "", Loc_T("tab.system.quit_battle_help", "Goes back to the title. Continue puts you back just before this fight."));
-    var _sysa = TabSystem_Items(true, false);
-    Test_Eq("D92 the armed Abandon row asks again", (array_length(_sysa) == 3) ? _sysa[1].label : "", Loc_T("pause.option.abandon_confirm", "Sure? Confirm again"));
+    // D156 replaced the press-twice Abandon row by the shared Yes / No pop-up: the row always reads "Abandon run" (Test_Suite_Confirm checks the pop-up).
+    Test_Eq("D156 the Abandon row always reads Abandon run", (array_length(_sys) == 3) ? _sys[1].label : "", "Abandon run");
 
     // ---- Settings: no Apply row, no pending copy; a change is live at once ----
     var _items = SettingsMenu_Items(GameSettings_Defaults(), 16);
@@ -9566,4 +9567,320 @@ function Test_Suite_OneMenu() {
     _gs2.persist = _old_persist;
     _gs2.player_ch = _old_ch;
     _gs2.flags = _old_flags;
+}
+
+// =====================================================================================================
+// H2 (D156): ONE Yes / No pop-up for every important action (Confirm_*). Opening it puts the cursor on No; No and Back (Esc / pad B / right click)
+// close it and run nothing; Yes runs the action exactly once. Every place that used to ask by pressing twice (the Abandon row, New Game over a
+// saved run) or that acted at once (quit to title, class pick, echo pick, skill swap, selling gear) now goes through it. The questions are the
+// brief's wording; the "nothing happens before Yes" values are the state before the press.
+// =====================================================================================================
+function Test_ConfirmYes(_d) {
+    global.test_confirm.yes++;
+    global.test_confirm.last = _d;
+}
+
+function Test_ConfirmReset() {
+    global.test_confirm = { yes: 0, last: undefined };
+}
+
+function Test_ConfirmPart(_name, _fn) {
+    try { _fn(); } catch (_e) { Test_Eq("H2 confirm: " + _name + " runs without an error: " + string(_e.message), false, true); }
+    try { Confirm_Close(); } catch (_e2) { }
+}
+
+// A synthetic input snapshot with one thing pressed this frame.
+function Test_ConfirmSnap(_what) {
+    var _s = Ui_SnapNew();
+    switch (_what) {
+        case "up": _s.up = true; _s.up_p = true; break;
+        case "down": _s.down = true; _s.down_p = true; break;
+        case "confirm": _s.confirm = true; break;
+        case "back": _s.back = true; break;
+    }
+    return _s;
+}
+
+// The clock a pop-up answers to: past the lock that swallows the press that opened it.
+function Test_ConfirmOpenClock() {
+    return Confirm_Menu().lock_ms + UI_INPUT_LOCK_MS + 1;
+}
+
+// Yes on the open pop-up: the cursor to the first row, then the answer.
+function Test_ConfirmSayYes() {
+    Ui_MenuFixCursor(Confirm_Menu(), 0);
+    return Confirm_Choose();
+}
+
+function Test_ConfirmCore() {
+    Test_ConfirmReset();
+    Test_False("H2 no pop-up is open to begin with", Confirm_IsOpen());
+    Confirm_Open("Do the thing?", Test_ConfirmYes, { n: 7 });
+    Test_True("H2 Confirm_Open opens the pop-up", Confirm_IsOpen());
+    var _m = Confirm_Menu();
+    Test_Eq("H2 the pop-up shows the question it was given", Confirm_Question(), "Do the thing?");
+    Test_Eq("H2 the pop-up has two rows", array_length(_m.items), 2);
+    Test_Eq("H2 row 0 is Yes", _m.items[0].label, "Yes");
+    Test_Eq("H2 row 1 is No", _m.items[1].label, "No");
+    Test_Eq("H2 opening the pop-up puts the cursor on No", _m.cursor, 1);
+    Test_Eq("H2 opening the pop-up runs nothing", global.test_confirm.yes, 0);
+    // the press that opened it cannot answer it
+    Test_True("H2 the pop-up owns the input while it is open", Confirm_Step(Test_ConfirmSnap("confirm"), _m.lock_ms + 10));
+    Test_True("H2 a confirm inside the opening lock leaves it open", Confirm_IsOpen());
+    Test_Eq("H2 and runs nothing", global.test_confirm.yes, 0);
+    // confirming No
+    Confirm_Step(Test_ConfirmSnap("confirm"), Test_ConfirmOpenClock());
+    Test_False("H2 confirming No closes the pop-up", Confirm_IsOpen());
+    Test_Eq("H2 confirming No runs nothing", global.test_confirm.yes, 0);
+    // moving to Yes, then confirming
+    Confirm_Open("Do the thing?", Test_ConfirmYes, { n: 7 });
+    Confirm_Step(Test_ConfirmSnap("up"), Test_ConfirmOpenClock());
+    Test_Eq("H2 Up from No lands on Yes", Confirm_Menu().cursor, 0);
+    Test_True("H2 moving the cursor leaves the pop-up open", Confirm_IsOpen());
+    Test_Eq("H2 moving the cursor runs nothing", global.test_confirm.yes, 0);
+    Confirm_Step(Test_ConfirmSnap("confirm"), Test_ConfirmOpenClock());
+    Test_False("H2 confirming Yes closes the pop-up", Confirm_IsOpen());
+    Test_Eq("H2 confirming Yes runs the action exactly once", global.test_confirm.yes, 1);
+    Test_Eq("H2 the action gets the data it was opened with", is_struct(global.test_confirm.last) ? global.test_confirm.last.n : -1, 7);
+    Test_False("H2 an answer after it is closed runs nothing more", Confirm_Choose());
+    Test_Eq("H2 still exactly once", global.test_confirm.yes, 1);
+    // Back is No, even with the cursor on Yes
+    Test_ConfirmReset();
+    Confirm_Open("Do the thing?", Test_ConfirmYes, { n: 7 });
+    Confirm_Step(Test_ConfirmSnap("up"), Test_ConfirmOpenClock());
+    Test_Eq("H2 the cursor is on Yes before Back", Confirm_Menu().cursor, 0);
+    Confirm_Step(Test_ConfirmSnap("back"), Test_ConfirmOpenClock());
+    Test_False("H2 Back closes the pop-up", Confirm_IsOpen());
+    Test_Eq("H2 Back runs nothing, whatever the cursor was on", global.test_confirm.yes, 0);
+    // a pop-up opened again starts on No, not where the last one was left
+    Confirm_Open("Again?", Test_ConfirmYes, undefined);
+    Test_Eq("H2 a new pop-up starts on No again", Confirm_Menu().cursor, 1);
+    // a second Confirm_Open replaces the first: only the second Yes can run
+    Confirm_Open("Second?", Test_ConfirmYes, { n: 2 });
+    Test_Eq("H2 the newest question is the one shown", Confirm_Question(), "Second?");
+    Test_True("H2 the newest pop-up is answered with Yes", Test_ConfirmSayYes());
+    Test_Eq("H2 only one action ran", global.test_confirm.yes, 1);
+    Test_Eq("H2 and it was the newest", is_struct(global.test_confirm.last) ? global.test_confirm.last.n : -1, 2);
+    Test_False("H2 nothing is left open", Confirm_IsOpen());
+}
+
+function Test_ConfirmSystem() {
+    Test_ConfirmReset();
+    var _gs = Test_Hero(CLASS_KNIGHT);
+    var _mem = Ui_MemGet(Ui_MemGlobal(), "tab_menu_active", TabMenu_Count());
+    Menu_Open(6);
+    var _u = TabMenu_Get();
+    var _m = TabMenu_TopMenu();
+    Test_Eq("H2 the System list has Help, Abandon run and Quit to title", (array_length(_m.items) == 3) ? (_m.items[0].id + "/" + _m.items[1].id + "/" + _m.items[2].id) : "", "help/abandon/quit");
+    // Help opens its page at once, no question
+    TabMenu_OnConfirm(_m, 0);
+    Test_False("H2 Help asks nothing", Confirm_IsOpen());
+    Test_Eq("H2 Help opens its page", Ui_StackDepth(_u.pages[_u.tab].stk), 2);
+    Ui_StackBack(_u.pages[_u.tab].stk);
+    // Abandon run
+    TabMenu_OnConfirm(_m, 1);
+    Test_True("H2 Abandon run opens the pop-up", Confirm_IsOpen());
+    Test_Eq("H2 the Abandon question", Confirm_Question(), "Abandon this run? It counts as a death, but you keep the echo.");
+    Test_Eq("H2 the Abandon pop-up starts on No", Confirm_Menu().cursor, 1);
+    Test_Eq("H2 the first press has not abandoned the run", _u.pending, "");
+    Test_True("H2 the menu is still open behind the pop-up", _u.closed_ms < 0);
+    Confirm_Back();
+    Test_Eq("H2 No leaves the run alone", _u.pending, "");
+    Test_True("H2 and the menu open", _u.closed_ms < 0);
+    TabMenu_OnConfirm(_m, 1);
+    Test_True("H2 Abandon run Yes is answered", Test_ConfirmSayYes());
+    Test_Eq("H2 Yes abandons", _u.pending, "abandon");
+    Test_True("H2 and the menu starts to close", _u.closed_ms >= 0);
+    Menu_Close(true);
+    // Quit to title (on the map)
+    Menu_Open(6);
+    _u = TabMenu_Get();
+    _m = TabMenu_TopMenu();
+    TabMenu_OnConfirm(_m, 2);
+    Test_True("H2 Quit to title opens the pop-up", Confirm_IsOpen());
+    Test_Eq("H2 the Quit question on the map", Confirm_Question(), "Quit to title? The run is saved and Continue picks it up again.");
+    Test_Eq("H2 the Quit pop-up starts on No", Confirm_Menu().cursor, 1);
+    Test_Eq("H2 the first press has not quit", _u.pending, "");
+    Confirm_Back();
+    Test_Eq("H2 No does not quit", _u.pending, "");
+    TabMenu_OnConfirm(_m, 2);
+    Test_True("H2 Quit to title Yes is answered", Test_ConfirmSayYes());
+    Test_Eq("H2 Yes quits", _u.pending, "quit");
+    Menu_Close(true);
+    Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", _mem);
+    // the same row in a fight says what Continue will do
+    Test_Eq("H2 the Quit question in a fight", TabSystem_Question("quit", true), "Quit to title? Continue puts you back just before this fight.");
+    Test_Eq("H2 the Abandon question is the same in a fight", TabSystem_Question("abandon", true), "Abandon this run? It counts as a death, but you keep the echo.");
+}
+
+function Test_ConfirmNewGame() {
+    Test_ConfirmReset();
+    var _c = { title_exit: undefined };
+    var _m = Ui_MenuNew("test_h2_title", Title_MainItems(true), { owner: _c });
+    Title_NewPress(_c, _m, true);
+    Test_True("H2 New Game over a saved run opens the pop-up", Confirm_IsOpen());
+    Test_Eq("H2 the New Game question", Confirm_Question(), "Start a new game? The saved run will be abandoned.");
+    Test_Eq("H2 the New Game pop-up starts on No", Confirm_Menu().cursor, 1);
+    Test_False("H2 the first press starts no game", is_struct(_c.title_exit));
+    Test_Eq("H2 the row still reads New game", _m.items[0].label, "New game");
+    Test_False("H2 no armed flag is set by the press", variable_struct_exists(_c, "title_new_armed"));
+    Confirm_Back();
+    Test_False("H2 No starts no game", is_struct(_c.title_exit));
+    Title_NewPress(_c, _m, true);
+    Test_True("H2 New Game Yes is answered", Test_ConfirmSayYes());
+    Test_True("H2 Yes starts the new game", is_struct(_c.title_exit));
+    Test_True("H2 and the title menu starts to close", _m.closed_ms >= 0);
+    var _c2 = { title_exit: undefined };
+    var _m2 = Ui_MenuNew("test_h2_title2", Title_MainItems(false), { owner: _c2 });
+    Title_NewPress(_c2, _m2, false);
+    Test_False("H2 New Game with no saved run asks nothing", Confirm_IsOpen());
+    Test_True("H2 and starts at once", is_struct(_c2.title_exit));
+}
+
+function Test_ConfirmClassAndEcho() {
+    Test_ConfirmReset();
+    var _p = Test_Hero(CLASS_NOBODY);
+    var _gs = GameState_Get();
+    // class pick
+    var _cm = CardsUi_ClassMenu();
+    CardsUi_ClassConfirm(_cm, 2);
+    Test_True("H2 picking a class opens the pop-up", Confirm_IsOpen());
+    Test_Eq("H2 the class question names the class", Confirm_Question(), "Become " + _cm.items[2].label + "?");
+    Test_Eq("H2 the class pop-up starts on No", Confirm_Menu().cursor, 1);
+    Test_Eq("H2 the class is not picked before Yes", _gs.player_ch.class_id, CLASS_NOBODY);
+    Test_True("H2 Yes picks the class asked about", Confirm_YesAction() == CardsUi_ClassYes && is_struct(Confirm_Data()) && Confirm_Data().class_id == CLASS_MAGE);
+    Confirm_Back();
+    Test_False("H2 No closes the class pop-up", Confirm_IsOpen());
+    Test_Eq("H2 No leaves the class alone", _gs.player_ch.class_id, CLASS_NOBODY);
+    // echo pick
+    var _hero = Test_Hero(CLASS_MAGE);
+    _hero.echo_offer = [{ kind: "item", id: 11 }];
+    var _inv0 = Inv_Count(_hero.inventory, 11);
+    var _em = CardsUi_EchoMenu();
+    CardsUi_EchoConfirm(_em, 0);
+    Test_True("H2 picking an echo opens the pop-up", Confirm_IsOpen());
+    Test_Eq("H2 the echo question names the echo", Confirm_Question(), "Keep " + ItemDB_Get(11).name + " as your echo?");
+    Test_Eq("H2 the echo pop-up starts on No", Confirm_Menu().cursor, 1);
+    Test_Eq("H2 the echo is not taken before Yes", Inv_Count(GameState_Get().player_ch.inventory, 11), _inv0);
+    Test_Eq("H2 and the offer is still there", array_length(GameState_Get().player_ch.echo_offer), 1);
+    Test_True("H2 Yes takes the echo asked about", Confirm_YesAction() == CardsUi_EchoYes && is_struct(Confirm_Data()) && Confirm_Data().echo_index == 0);
+    Confirm_Back();
+    Test_Eq("H2 No leaves the offer", array_length(GameState_Get().player_ch.echo_offer), 1);
+    Test_Eq("H2 and the inventory", Inv_Count(GameState_Get().player_ch.inventory, 11), _inv0);
+}
+
+function Test_ConfirmReplace() {
+    Test_ConfirmReset();
+    var _p = Test_Hero(CLASS_MAGE);
+    _p.skills = [SKILL_FIREBALL, SKILL_ICE_SPEAR, SKILL_FORESIGHT];
+    _p.upgrades = [];
+    _p.skill_pending = SKILL_MEDITATION;
+    _p.card_picks = 1;
+    _p.offer = [Card_SkillId(SKILL_MEDITATION), "pas:quick_feet", "fb:gold"];
+    var _m = CardsUi_ReplaceMenu();
+    CardsUi_ReplaceConfirm(_m, 1);
+    Test_True("H2 replacing a skill opens the pop-up", Confirm_IsOpen());
+    Test_Eq("H2 the replace question names both skills", Confirm_Question(), "Forget " + SkillDB_Get(SKILL_ICE_SPEAR).name + " and learn " + SkillDB_GetBase(SKILL_MEDITATION).name + "?");
+    Test_Eq("H2 the replace pop-up starts on No", Confirm_Menu().cursor, 1);
+    var _g = GameState_Get().player_ch;
+    Test_True("H2 the skills are unchanged before Yes", array_length(_g.skills) == 3 && _g.skills[1] == SKILL_ICE_SPEAR && _g.skill_pending == SKILL_MEDITATION && _g.card_picks == 1);
+    Confirm_Back();
+    _g = GameState_Get().player_ch;
+    Test_True("H2 No leaves the skills and the pick as they were", array_length(_g.skills) == 3 && _g.skills[1] == SKILL_ICE_SPEAR && _g.skill_pending == SKILL_MEDITATION && _g.card_picks == 1);
+    CardsUi_ReplaceConfirm(_m, 1);
+    Test_True("H2 replace Yes is answered", Test_ConfirmSayYes());
+    _g = GameState_Get().player_ch;
+    Test_True("H2 Yes swaps the skill", array_length(_g.skills) == 3 && _g.skills[0] == SKILL_FIREBALL && _g.skills[1] == SKILL_MEDITATION && _g.skills[2] == SKILL_FORESIGHT, json_stringify(_g.skills));
+    Test_Eq("H2 and spends the pick", _g.card_picks, 0);
+    // "Keep my skills" is not a swap: it asks nothing
+    var _m2 = CardsUi_ReplaceMenu();
+    CardsUi_ReplaceConfirm(_m2, array_length(_m2.items) - 1);
+    Test_False("H2 Keep my skills asks nothing", Confirm_IsOpen());
+}
+
+function Test_ConfirmSell() {
+    Test_ConfirmReset();
+    var _gs = GameState_Get();
+    var _hero = Test_Hero(CLASS_KNIGHT);
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_shop = variable_global_exists("shop_ui") ? global.shop_ui : undefined;
+    _gs.run = Run_Create(5160);
+    _gs.run.gold = 10;
+    global.shop_ui = { stk: Ui_StackNew(), shop_index: 0, msg: "", msg_ref: undefined, quote_kind: "", quote_idx: -1, msg_ms: -100000, lock: InputLock_New(0), opened_ms: current_time };
+    var _gear = -1;
+    for (var _i = 1; _i < 120 && _gear < 0; _i++) {
+        var _it = ItemDB_Get(_i);
+        if (_it.id != 0 && (_it.type == ITEM_WEAPON || _it.type == ITEM_ARMOR || _it.type == ITEM_ACCESSORY) && !Menu_IsEquipped(_hero, _i)) _gear = _i;
+    }
+    Test_True("H2 the sell test found a piece of gear to sell", _gear > 0);
+    _hero.inventory = Inv_Add(_hero.inventory, _gear, 1);
+    _hero.inventory = Inv_Add(_hero.inventory, 11, 1);
+    var _m = Ui_MenuNew("test_h2_sell", ShopUi_SellItems(), { on_confirm: ShopUi_SellConfirm });
+    var _ig = -1;
+    var _ip = -1;
+    for (var _j = 0; _j < array_length(_m.items); _j++) {
+        if (_m.items[_j].item_id == _gear) _ig = _j;
+        if (_m.items[_j].item_id == 11) _ip = _j;
+    }
+    Test_True("H2 the sell list shows the gear and the potion", _ig >= 0 && _ip >= 0);
+    var _price = Shop_SellPrice(_gear);
+    ShopUi_SellConfirm(_m, _ig);
+    Test_True("H2 selling gear opens the pop-up", Confirm_IsOpen());
+    Test_Eq("H2 the sell question names the gear and the price", Confirm_Question(), "Sell " + ItemDB_Get(_gear).name + " for " + string(_price) + "?");
+    Test_Eq("H2 the sell pop-up starts on No", Confirm_Menu().cursor, 1);
+    Test_Eq("H2 the gear is still in the bag before Yes", Inv_Count(GameState_Get().player_ch.inventory, _gear), 1);
+    Test_Eq("H2 and the gold is the same", _gs.run.gold, 10);
+    Confirm_Back();
+    Test_Eq("H2 No keeps the gear", Inv_Count(GameState_Get().player_ch.inventory, _gear), 1);
+    Test_Eq("H2 and the gold", _gs.run.gold, 10);
+    ShopUi_SellConfirm(_m, _ig);
+    Test_True("H2 sell Yes is answered", Test_ConfirmSayYes());
+    Test_Eq("H2 Yes sells the gear", Inv_Count(GameState_Get().player_ch.inventory, _gear), 0);
+    Test_Eq("H2 and pays for it", _gs.run.gold, 10 + _price);
+    // a potion is not gear: one press sells it
+    var _m2 = Ui_MenuNew("test_h2_sell2", ShopUi_SellItems(), { on_confirm: ShopUi_SellConfirm });
+    var _ip2 = -1;
+    for (var _k = 0; _k < array_length(_m2.items); _k++) { if (_m2.items[_k].item_id == 11) _ip2 = _k; }
+    var _gold1 = _gs.run.gold;
+    ShopUi_SellConfirm(_m2, _ip2);
+    Test_False("H2 selling a potion asks nothing", Confirm_IsOpen());
+    Test_Eq("H2 and sells it at once", _gs.run.gold, _gold1 + Shop_SellPrice(11));
+    global.shop_ui = _old_shop;
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+// D156: no press-twice path is left: the System tab and the title keep no armed flag and no "Sure?" row.
+function Test_ConfirmNoArmed() {
+    Test_True("H2 the control: TabSystem_Items exists as a function", asset_get_index("TabSystem_Items") != -1);
+    Test_True("H2 TabSystem_Armed is gone", asset_get_index("TabSystem_Armed") == -1);
+    Test_True("H2 TabSystem_Disarm is gone", asset_get_index("TabSystem_Disarm") == -1);
+    Test_True("H2 Title_NewArmed is gone", asset_get_index("Title_NewArmed") == -1);
+    Test_True("H2 Title_DisarmNew is gone", asset_get_index("Title_DisarmNew") == -1);
+    Test_Eq("H2 the Abandon row never reads Sure", TabSystem_Items()[1].label, "Abandon run");
+    Test_Eq("H2 the title row never reads Sure", Title_MainItems(true)[0].label, "New game");
+    var _gs = Test_Hero(CLASS_KNIGHT);
+    var _mem = Ui_MemGet(Ui_MemGlobal(), "tab_menu_active", TabMenu_Count());
+    Menu_Open(6);
+    var _u = TabMenu_Get();
+    Test_False("H2 the open menu keeps no sys_armed flag", variable_struct_exists(_u, "sys_armed"));
+    TabMenu_OnConfirm(TabMenu_TopMenu(), 1);
+    Test_False("H2 pressing Abandon sets no armed flag", variable_struct_exists(_u, "sys_armed"));
+    Test_Eq("H2 and leaves the row as it was", TabMenu_TopMenu().items[1].label, "Abandon run");
+    Confirm_Close();
+    Menu_Close(true);
+    Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", _mem);
+    var _c = { title_stk: undefined };
+    Title_Build(_c);
+    Test_False("H2 Title_Build sets no armed flag", variable_struct_exists(_c, "title_new_armed"));
+}
+
+function Test_Suite_Confirm() {
+    Test_ConfirmPart("the shared pop-up", Test_ConfirmCore);
+    Test_ConfirmPart("abandon and quit in the System tab", Test_ConfirmSystem);
+    Test_ConfirmPart("New Game over a saved run", Test_ConfirmNewGame);
+    Test_ConfirmPart("class pick and echo pick", Test_ConfirmClassAndEcho);
+    Test_ConfirmPart("skill swap", Test_ConfirmReplace);
+    Test_ConfirmPart("selling gear", Test_ConfirmSell);
+    Test_ConfirmPart("no press-twice path left", Test_ConfirmNoArmed);
 }
