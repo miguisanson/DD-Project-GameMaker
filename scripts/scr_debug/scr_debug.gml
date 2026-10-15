@@ -467,6 +467,9 @@ function Scenario_StepSmoke(_s) {
         case 181: case 182: case 183: case 184: case 185: case 186: case 187: case 188: case 189: case 190: case 191: case 192: case 193: case 194: case 195:
             Scenario_StepSmokeTabMenu(_s);   // D1b: the Tab menu (tabs wrap, remembered cursors, a potion, equip, Codex, settings) and the pause menu
             break;
+        case 200: case 201: case 202: case 203: case 204: case 205: case 206: case 207: case 208: case 209:
+            Scenario_StepSmokeFairUi(_s);   // R1b: the window loses focus -> the pause menu (the battle clock stops), the RUN chance
+            break;
         case 30:
             Scenario_StepSmokeUi(_s);
             break;
@@ -2607,6 +2610,9 @@ function Scenario_StepShots(_s) {
             break;
         case 170: case 171: case 172: case 173: case 174: case 175: case 176: case 177: case 178: case 179:
             Scenario_StepShotsEconomy(_s);   // C3: shop, throwables, elite, merchant, gold
+            break;
+        case 200: case 201: case 202: case 203: case 204: case 205: case 206: case 207: case 208: case 209:
+            Scenario_StepShotsFairUi(_s);   // R1b: the battle command menu with the RUN chance, the pause menu opened in a battle
             break;
         case 210: case 211: case 212: case 213: case 214: case 215: case 216: case 217: case 218: case 219: case 220: case 221: case 222: case 223: case 224: case 225: case 226: case 227: case 228: case 229:
             Scenario_StepShotsTabMenu(_s);   // D1b: every tab, the gear comparison, the Codex pages, settings, pause; two sizes, Korean once
@@ -7282,8 +7288,184 @@ function Scenario_StepSmokeTabMenu(_s) {
                     break;
                 case 50:
                     Scenario_Check("pausemenu_back_resumes", _gs.ui.mode == UI_NONE && !is_struct(PauseMenu_Get()), "mode=" + string(_gs.ui.mode));
-                    Scenario_Finish();
+                    Scenario_Next(_s, 200);   // R1b: focus loss in a battle and on the map (200..205)
                     break;
+            }
+            break;
+    }
+}
+
+// ---- R1b (D122, D124): focus loss and the odds. A scenario cannot unfocus the window (the runner is never in front, so the UI controller skips its own
+// focus check in scripted runs); it calls Focus_Step(false) / Focus_Step(true), the same function the controller calls with window_has_focus(). ----
+function Scenario_StepSmokeFairUi(_s) {
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+    var _gs = GameState_Get();
+    switch (_s.step) {
+        case 200:   // a fresh battle against a Slime: wait for the player's menu, read the RUN row
+            if (_s.t == 1) { Scenario_ClearUi(); Scenario_NewKnight(); Scenario_GotoBattle("smoke_r1b", ENEMY_SLIME); }
+            if (_s.t > 20 && _bc != noone && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && is_struct(_bc.ui_cmd)) {
+                var _pct = Battle_RunPct(_bc.p, _bc.e, _bc.run_fails);
+                Scenario_Check("fairui_the_run_row_shows_the_flee_chance", _pct > 0 && _bc.ui_cmd.items[4].value == string(_pct) + "%", "value=" + string(_bc.ui_cmd.items[4].value) + " pct=" + string(_pct));
+                Scenario_Check("fairui_the_music_starts_at_full_volume", BGM_Duck() == 1);
+                Scenario_Next(_s, 201);
+            }
+            if (_s.t > 600) { Scenario_Check("fairui_reaches_the_player_menu", false, "state=" + string(_bc != noone ? _bc.battle_state : -1)); Scenario_Finish(); }
+            break;
+        case 201:   // ATTACK with the real key, let the sliding bar run, then the window "loses focus" in the middle of it
+            if (_s.t == 5) Scenario_Tap("confirm");
+            if (_s.t > 5 && _bc != noone && _bc.battle_state == BSTATE_ATTACK_TIMING && _bc.qte_ms >= 100) {
+                _s.fu_q0 = _bc.qte_ms;
+                Focus_Step(false);
+                Scenario_Next(_s, 202);
+            }
+            if (_s.t > 300) { Scenario_Check("fairui_the_bar_runs", false, "state=" + string(_bc != noone ? _bc.battle_state : -1) + " qte=" + string(_bc != noone ? _bc.qte_ms : 0)); Scenario_Finish(); }
+            break;
+        case 202:   // unfocused: the pause menu is open, the clock is frozen, Abandon and Quit are off, the music is down
+            switch (_s.t) {
+                case 1:
+                    Scenario_Check("fairui_losing_focus_in_a_battle_opens_the_pause_menu", _gs.ui.mode == UI_PAUSE && PauseMenu_IsOpen(), "mode=" + string(_gs.ui.mode));
+                    Scenario_Check("fairui_it_is_the_battle_variant", is_struct(PauseMenu_Get()) && PauseMenu_Get().in_battle);
+                    var _it = Ui_StackTop(PauseMenu_Get().stk).items;
+                    Scenario_Check("fairui_abandon_and_quit_are_off_in_a_battle", !_it[3].enabled && !_it[4].enabled && _it[0].enabled && _it[1].enabled && _it[2].enabled);
+                    Scenario_Check("fairui_the_music_is_lowered_while_unfocused", BGM_Duck() < 1, "duck=" + string(BGM_Duck()));
+                    break;
+                case 2:
+                    _s.fu_q1 = _bc.qte_ms;
+                    Scenario_Check("fairui_the_bar_was_mid_sweep_when_paused", _s.fu_q1 >= _s.fu_q0 && _s.fu_q1 - _s.fu_q0 < 60, "q0=" + string(_s.fu_q0) + " q1=" + string(_s.fu_q1));
+                    break;
+                case 14:
+                    Scenario_Check("fairui_the_bar_clock_does_not_advance_while_paused", _bc.qte_ms == _s.fu_q1 && _bc.battle_state == BSTATE_ATTACK_TIMING, "q1=" + string(_s.fu_q1) + " now=" + string(_bc.qte_ms));
+                    Scenario_Tap("menu_up");
+                    break;
+                case 21:
+                    Scenario_Check("fairui_the_cursor_skips_the_greyed_rows", PauseMenu_Cursor() == 2, "cursor=" + string(PauseMenu_Cursor()));
+                    Ui_StackTop(PauseMenu_Get().stk).cursor = 4;   // force it onto Quit to title, then press confirm
+                    Scenario_Tap("confirm");
+                    break;
+                case 28:
+                    Scenario_Check("fairui_a_greyed_row_does_nothing", PauseMenu_IsOpen() && PauseMenu_Get().pending == "" && PauseMenu_Get().closed_ms < 0, "mode=" + string(_gs.ui.mode));
+                    Ui_MenuFixCursor(Ui_StackTop(PauseMenu_Get().stk), 0);
+                    Scenario_Next(_s, 203);
+                    break;
+            }
+            break;
+        case 203:   // focus returns: the pause menu stays open and the music comes back; Back resumes and the bar goes on from where it stopped
+            switch (_s.t) {
+                case 1:
+                    Focus_Step(true);
+                    Scenario_Check("fairui_focus_back_does_not_close_the_pause_menu", PauseMenu_IsOpen() && _gs.ui.mode == UI_PAUSE);
+                    Scenario_Check("fairui_the_music_is_back_to_full_volume", BGM_Duck() == 1, "duck=" + string(BGM_Duck()));
+                    break;
+                case 10:
+                    Scenario_Check("fairui_the_bar_is_still_frozen_after_focus_returns", _bc.qte_ms == _s.fu_q1);
+                    Scenario_Tap("cancel");
+                    break;
+                default:
+                    if (_s.t > 12 && _gs.ui.mode == UI_NONE) {
+                        _s.fu_q2 = _bc.qte_ms;
+                        Scenario_Check("fairui_back_resumes_the_battle", !is_struct(PauseMenu_Get()));
+                        Scenario_Check("fairui_the_bar_resumes_where_it_stopped", _s.fu_q2 - _s.fu_q1 >= 0 && _s.fu_q2 - _s.fu_q1 < 60, "q1=" + string(_s.fu_q1) + " q2=" + string(_s.fu_q2));
+                        Scenario_Next(_s, 204);
+                    }
+                    if (_s.t > 120) { Scenario_Check("fairui_back_resumes_the_battle", false, "mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+                    break;
+            }
+            break;
+        case 204:   // the clock moves again (or the bar has run out and the fight went on); then the map
+            if (_s.t == 12) {
+                Scenario_Check("fairui_the_bar_moves_again", _bc.qte_ms > _s.fu_q2 || _bc.battle_state != BSTATE_ATTACK_TIMING, "q2=" + string(_s.fu_q2) + " now=" + string(_bc.qte_ms));
+                Scenario_ClearUi();
+                Scenario_NewKnight();
+                room_goto(rm_floor1);
+                Scenario_Next(_s, 205);
+            }
+            break;
+        case 205:   // walking around: the same call opens the ordinary pause menu, with Abandon and Quit on
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor1)) {
+                Focus_Step(false);
+                Scenario_Check("fairui_losing_focus_on_the_map_opens_the_pause_menu", PauseMenu_IsOpen(), "mode=" + string(_gs.ui.mode));
+                var _it2 = Ui_StackTop(PauseMenu_Get().stk).items;
+                Scenario_Check("fairui_abandon_and_quit_stay_on_outside_a_battle", _it2[3].enabled && _it2[4].enabled && !PauseMenu_Get().in_battle);
+                Focus_Step(true);
+                PauseMenu_Close(true);
+                Scenario_Finish();
+            }
+            if (_s.t > 600) { Scenario_Check("fairui_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+    }
+}
+
+// ---- R1b pictures 200..203: the battle command menu with the RUN chance (a Slime, after a failed try, a boss) and the pause menu opened in a battle,
+// at windowed scale 3 and 5. ----
+function Scenario_FairUiScenes() {
+    return ["run", "run_after_fail", "run_boss", "pause"];
+}
+
+function Scenario_StepShotsFairUi(_s) {
+    var _scenes = Scenario_FairUiScenes();
+    var _scales = [3, 5];
+    switch (_s.step) {
+        case 200:   // scene _s.di at scale index _s.si: enter the battle
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(_scales[_s.si]);
+                Scenario_GotoBattle("shots_fairui_" + string(_s.di) + "_" + string(_s.si), (_s.di == 2) ? ENEMY_MINI_BOSS : ENEMY_SLIME);
+            }
+            if (_s.t >= 25) Scenario_Next(_s, 201);
+            break;
+        case 201:   // the player's menu, with the cursor on RUN
+            var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+            Scenario_Check("shots_fairui_in_battle_" + _scenes[_s.di], _inb, "room=" + room_get_name(room));
+            if (!_inb) { Scenario_Finish(); return; }
+            var _bc = instance_find(obj_battle_controller, 0);
+            _bc.wait_timer = 9999;
+            _bc.pops = [];
+            _bc.combat_log = [];
+            if (_s.di == 1) _bc.run_fails = 1;
+            _bc.tl_who = TL_PLAYER;
+            _bc.turn = TURN_PLAYER;
+            _bc.enemy_action_pending = false;
+            _bc.battle_state = BSTATE_MENU;
+            Scenario_Next(_s, 202);
+            break;
+        case 202:
+            if (_s.t == 6) {
+                var _bc2 = instance_find(obj_battle_controller, 0);
+                if (_s.di == 3) {
+                    Focus_Step(false);   // the real call the UI controller makes when the window loses focus
+                    Scenario_Check("shots_fairui_the_pause_menu_opens_in_the_battle", PauseMenu_IsOpen() && PauseMenu_Get().in_battle);
+                } else {
+                    _bc2.ui_cmd.cursor = 4;
+                    _bc2.menu_index = 4;
+                    var _mt = Ui_Metrics();
+                    var _r = _bc2.ui_cmd.items[4];
+                    var _tag = _scenes[_s.di] + "_" + string(_scales[_s.si]);
+                    Scenario_Check("shots_fairui_run_value_" + _tag, _r.value == ((_s.di == 2) ? Loc_T("battle.action.run_no", "no") : string(Battle_RunPct(_bc2.p, _bc2.e, _bc2.run_fails)) + "%"), "value=" + _r.value);
+                    Scenario_Check("shots_fairui_label_and_value_fit_" + _tag, UI_TextWidth(_r.label) + UI_TextWidth(_r.value) + 16 * _mt.p <= _bc2.ui_cmd.rect.w || _bc2.ui_cmd.rect.w == 0, "w=" + string(_bc2.ui_cmd.rect.w));
+                }
+            }
+            if (_s.t >= 30) {
+                var _bc3 = instance_find(obj_battle_controller, 0);
+                if (_s.di != 3) Scenario_BattleUiOverlaps(_bc3, "fairui_" + _scenes[_s.di] + "_" + string(_scales[_s.si]));
+                _s.shot = "shot_fairui_" + _scenes[_s.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 203);
+            }
+            break;
+        case 203:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                if (is_struct(PauseMenu_Get())) { Focus_Step(true); PauseMenu_Close(true); }
+                Scenario_ClearUi();
+                _s.si++;
+                if (_s.si >= array_length(_scales)) { _s.si = 0; _s.di++; }
+                if (_s.di >= array_length(_scenes)) {
+                    _s.si = 0;
+                    _s.di = 0;
+                    Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
+                } else {
+                    Scenario_Next(_s, 200);
+                }
             }
             break;
     }
@@ -7377,7 +7559,7 @@ function Scenario_StepShotsTabMenu(_s) {
                     variable_struct_remove(_gs, "run");   // the pictures after these are of a game with no run going
                     _s.si = 0;
                     _s.di = 0;
-                    Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
+                    Scenario_Next(_s, 200);   // R1b pictures (200..203), then the D91 / DISP-10 / D48 pictures and the skill animations
                 } else {
                     Scenario_Next(_s, 210);
                 }

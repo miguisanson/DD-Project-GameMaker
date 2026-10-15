@@ -2540,21 +2540,50 @@ function Title_ModalAlpha(_c) {
 // --------------------
 // PAUSE MENU (D92, D95): Resume, Help, Settings, Abandon Run (two presses), Quit to Title, on the UI framework
 // --------------------
-// global.pause_ui = { stk, opened_ms, closed_ms, armed, pending } while it is open, with gs.ui.mode = UI_PAUSE. Settings and Help open above it
+// global.pause_ui = { stk, opened_ms, closed_ms, armed, pending, in_battle } while it is open, with gs.ui.mode = UI_PAUSE. Settings and Help open above it
 // (their own screens). A choice that leaves the game (Abandon, Quit) fades the menu out first, then acts (PauseMenu_CloseFinalize).
 #macro PAUSE_ABANDON_INDEX 3   // Resume, Help, Settings, Abandon Run, Quit to Title
 
-function PauseMenu_Items(_armed) {
+// R1b (D122): in a battle Abandon run and Quit to title are switched off (the fight cannot be saved or left from here).
+function PauseMenu_Items(_armed, _in_battle = false) {
     return [
         { id: "resume", label: Loc_T("pause.option.resume", "Resume"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.resume", "Back to the game.") },
         { id: "help", label: Loc_T("pause.option.help", "Help"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.help", "Every hint the game has: the ones you have seen and the ones still to come.") },
         { id: "settings", label: Loc_T("pause.option.settings", "Settings"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.settings", "Sound, text, window, language and keys.") },
-        { id: "abandon", value: "", kind: "button", enabled: true, lines: [],
+        { id: "abandon", value: "", kind: "button", enabled: !_in_battle, lines: [],
           label: _armed ? Loc_T("pause.option.abandon_confirm", "Sure? Confirm again") : Loc_T("pause.option.abandon", "Abandon run"),
-          help: _armed ? Loc_T("pause.help.abandon_armed", "Confirm once more to end this run now. Back or another row cancels.")
-                       : Loc_T("pause.help.abandon", "Ends this run now. It counts as a death, but you keep the echo.") },
-        { id: "quit", label: Loc_T("pause.option.quit", "Quit to title"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.quit", "Saves the run and goes to the title. Continue picks it up again.") }
+          help: _in_battle ? Loc_T("pause.help.in_battle", "Not available during a battle.")
+                : (_armed ? Loc_T("pause.help.abandon_armed", "Confirm once more to end this run now. Back or another row cancels.")
+                          : Loc_T("pause.help.abandon", "Ends this run now. It counts as a death, but you keep the echo.")) },
+        { id: "quit", label: Loc_T("pause.option.quit", "Quit to title"), value: "", kind: "button", enabled: !_in_battle, lines: [],
+          help: _in_battle ? Loc_T("pause.help.in_battle", "Not available during a battle.") : Loc_T("pause.help.quit", "Saves the run and goes to the title. Continue picks it up again.") }
     ];
+}
+
+// --------------------
+// FOCUS LOSS (R1b, D122): the window loses focus -> the pause menu opens (the battle variant in a fight) and the music is lowered
+// --------------------
+#macro FOCUS_MUSIC_DUCK 0.25   // the music's share of its normal volume while the window is not in front
+
+// True only when the window is unfocused, we are not on the title, not in a room change, and nothing else owns the screen (ui mode NONE).
+function Focus_ShouldPause(_has_focus, _ui_mode, _in_main_menu, _in_battle, _in_transition) {
+    if (_has_focus || _in_main_menu || _in_transition) return false;
+    return _ui_mode == UI_NONE;
+}
+
+// Called by the UI controller every Step with window_has_focus(). Coming back does not close the pause menu: the player resumes.
+function Focus_Step(_has_focus) {
+    BGM_SetDuck(_has_focus ? 1 : FOCUS_MUSIC_DUCK);
+    var gs = GameState_Get();
+    if (!is_struct(gs) || !variable_struct_exists(gs, "ui")) return;
+    var in_battle = (room == rm_battle);
+    if (!Focus_ShouldPause(_has_focus, gs.ui.mode, gs.in_main_menu, in_battle, Transition_IsActive())) return;
+    if (Tutorial_IsOpen()) return;   // a pop-up owns the keys; the battle waits for it already
+    if (in_battle) {
+        if (instance_exists(obj_battle_controller)) PauseMenu_Open(true);
+    } else if (instance_exists(gs.player_inst) && Player_IsSettled(gs.player_inst)) {
+        PauseMenu_Open();
+    }
 }
 
 function PauseMenu_Get() {
@@ -2572,10 +2601,10 @@ function PauseMenu_Cursor() {
     return is_struct(u) ? Ui_StackTop(u.stk).cursor : -1;
 }
 
-function PauseMenu_Open() {
+function PauseMenu_Open(_in_battle = false) {
     var gs = GameState_Get();
-    var u = { stk: Ui_StackNew(), opened_ms: current_time, closed_ms: -1, armed: false, pending: "" };
-    var m = Ui_MenuNew("pause", PauseMenu_Items(false), {
+    var u = { stk: Ui_StackNew(), opened_ms: current_time, closed_ms: -1, armed: false, pending: "", in_battle: _in_battle };
+    var m = Ui_MenuNew("pause", PauseMenu_Items(false, _in_battle), {
         on_confirm: PauseMenu_OnConfirm, on_back: PauseMenu_OnBack,
         layout: { title: Loc_T("pause.title", "Paused"), anchor: "center", details: true }
     });
@@ -2636,7 +2665,7 @@ function PauseMenu_Disarm() {
     var u = PauseMenu_Get();
     if (!is_struct(u) || !u.armed) return;
     u.armed = false;
-    Ui_StackTop(u.stk).items = PauseMenu_Items(false);
+    Ui_StackTop(u.stk).items = PauseMenu_Items(false, u.in_battle);
 }
 
 function PauseMenu_OnBack(_m, _res) {

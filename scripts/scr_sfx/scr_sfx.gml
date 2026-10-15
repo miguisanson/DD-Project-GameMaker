@@ -920,7 +920,7 @@ function BGM_MixApplyForRoom(_room_id, _fade_in_ms = -1, _fade_out_ms = -1) {
         variable_struct_set(global.bgm_mix_active, key, active);
 
         var trim = BGM_GetGainByKey(key);
-        var target_gain = active ? (global.vol_master * global.vol_music * trim) : 0;
+        var target_gain = active ? (global.vol_master * global.vol_music * trim * BGM_Duck()) : 0;
         audio_sound_gain(handle, target_gain, active ? in_ms : out_ms);
     }
 
@@ -938,6 +938,18 @@ function BGM_MixApplyForRoom(_room_id, _fade_in_ms = -1, _fade_out_ms = -1) {
     }
 }
 
+// R1b (D122): the music's share of its normal volume (1 = untouched). Lowered while the window is not in front (Focus_Step); never saved,
+// never written into the volume settings, so 1 gives back exactly the settings' volume.
+function BGM_Duck() {
+    return variable_global_exists("bgm_duck") ? global.bgm_duck : 1;
+}
+
+function BGM_SetDuck(_duck, _fade_ms = 250) {
+    if (BGM_Duck() == _duck) return;
+    global.bgm_duck = _duck;
+    BGM_ApplyGain(_fade_ms);
+}
+
 function BGM_ApplyGain(_fade_ms = 0) {
     SFX_ClampVolumes();
     BGM_MixEnsureRuntime();
@@ -951,7 +963,7 @@ function BGM_ApplyGain(_fade_ms = 0) {
         if (h == -1 || !audio_is_playing(h)) continue;
         var trim = BGM_GetGainByKey(key);
         var active = variable_struct_exists(global.bgm_mix_active, key) && variable_struct_get(global.bgm_mix_active, key);
-        var target = active ? (global.vol_master * global.vol_music * trim) : 0;
+        var target = active ? (global.vol_master * global.vol_music * trim * BGM_Duck()) : 0;
         audio_sound_gain(h, target, max(0, _fade_ms));
     }
 }

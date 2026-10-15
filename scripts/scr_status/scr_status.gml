@@ -481,8 +481,11 @@ function Status_Describe(_status_id, _data = undefined) {
             line = Loc_T("status.desc.status_evasion", "Dodges the next incoming attack.");
             break;
         case STATUS_CRIT_UP:
-            vars.pct = Status_Cfg(_status_id, "crit_bonus", 0);
-            line = Loc_T("status.desc.status_crit_up", "Critical chance +{pct}%.", vars);
+            var bag = Crit_BagSize(Combat_CritChance(Status_Cfg(_status_id, "crit_bonus", 0)));   // R1b (D124): the odds in plain words, from the marble bag (D119)
+            vars.n = bag.n;
+            vars.reds = bag.reds;
+            if (bag.reds == 1) line = Loc_T("status.desc.status_crit_up", "1 in every {n} hits is a critical.", vars);
+            else line = Loc_T("status.desc.status_crit_up_many", "{reds} in every {n} hits are criticals.", vars);
             break;
         case STATUS_HIT_UP:
             vars.pct = round((Status_Cfg(_status_id, "perfect_widen", 1) - 1) * 100);

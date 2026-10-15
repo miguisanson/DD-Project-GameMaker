@@ -138,4 +138,5 @@ hud.rects.details = (battle_state == BSTATE_SKILL_MENU) ? ui_skill.det_rect : ((
 draw_set_alpha(1);
 draw_set_color(c_white);
 
+if (gs.ui.mode == UI_PAUSE) PauseMenu_Draw();   // R1b (D122): the pause menu opened by a focus loss goes over the battle HUD, dimming it
 Tutorial_Draw();   // C4 (D45): the first-time pop-up goes over the whole battle screen (the ui controller draws it in the other rooms)
