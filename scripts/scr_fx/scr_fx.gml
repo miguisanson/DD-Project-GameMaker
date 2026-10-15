@@ -1071,3 +1071,226 @@ function Battle_BgApply(_floor, _boss) {
     if (bg == -1) return;
     layer_background_sprite(bg, Battle_BgSprite(Battle_BgSpriteName(_floor, _boss)));
 }
+
+// ============================================================================
+// ROOM LIGHTING (H14, D157, D159). Every floor room is a little dark and light is what is cut out of the dark:
+//   - the darkness is one layer, UI_C_DARKEST (#071821) at LIGHT_DARK_ALPHA over the whole view (not a blackout: the 4-colour picture stays readable);
+//   - every lit fire stand and torch cuts a soft pool out of it (three nested circles, so three steps of brightness like the rest of the art) that flickers;
+//   - every enemy cuts the cells it can see out of it (Vis_Cone, the very set EnemyAI_CanSee uses, so what is lit is what is watched): standing behind cover is
+//     visibly standing in the dark, and a hidden player (D153) sits in a dark pocket.
+// One pass per frame: one view-sized surface, filled with the darkness, the light shapes drawn into it with a blend that only lowers its alpha, then drawn over the world.
+// The pass runs at the start of World_DrawFx: the characters and the floor are darkened with the rest (a figure standing in the dark must look like it),
+// while everything World_DrawFx draws after it (the "!" and "?", the interact arrow, the elite outline, the merchant glow, chest bursts) stays at full brightness.
+// ============================================================================
+#macro LIGHT_DARK_ALPHA 0.4          // how dark a room is where no light reaches (D159: slightly darker, not a blackout)
+#macro LIGHT_DARK_COLOUR UI_C_DARKEST   // #071821
+#macro LIGHT_FLICKER_AMP 0.12         // a light's radius moves within +-12%
+#macro LIGHT_FLICKER_STEP_MS 90       // and changes about 11 times a second
+
+// One light source: cell, radius in tiles, palette colour, the object that must still be lit (a fire stand or torch put out in the game stops lighting).
+function Light_Src(_cx, _cy, _r, _col, _obj) {
+    return { cx: _cx, cy: _cy, r: _r, col: _col, obj: _obj };
+}
+
+function Light_Fire(_cx, _cy) {
+    return Light_Src(_cx, _cy, 3.5, UI_C_LIGHTEST, obj_fire_stand);
+}
+
+function Light_Torch(_cx, _cy) {
+    return Light_Src(_cx, _cy, 3, UI_C_LIGHT, obj_torch);
+}
+
+// The light sources of a room by its name: every fire stand and torch that the room asset places lit (the ones placed already put out, obj_fire_stand_off, give no light).
+// Read from the rooms with the gridshots; the test reads the room assets again and compares.
+function Light_Sources(_room_name) {
+    switch (_room_name) {
+        case "rm_floor1": return [Light_Fire(13, 4)];
+        case "rm_floor3": return [Light_Fire(8, 3)];
+        case "rm_floor4": return [Light_Fire(7, 12)];
+        case "rm_floor5": return [Light_Fire(2, 8), Light_Fire(12, 5)];
+        case "rm_floor6": return [Light_Torch(4, 2), Light_Torch(12, 2), Light_Fire(16, 5), Light_Fire(2, 16)];
+        case "rm_floor6_5": return [Light_Fire(1, 3)];
+        case "rm_floor7": return [Light_Fire(2, 5), Light_Torch(11, 1), Light_Torch(5, 1), Light_Torch(8, 10)];
+        case "rm_floor8": return [Light_Fire(1, 2), Light_Fire(4, 3), Light_Fire(7, 4), Light_Fire(10, 5), Light_Fire(13, 6), Light_Fire(16, 7)];
+        case "rm_floor9": return [Light_Fire(8, 3), Light_Fire(3, 8)];
+    }
+    return [];
+}
+
+// Is the fire stand or torch of this source still burning in the room it is in?
+function Light_IsLit(_src) {
+    var _t = GRID_TILE_SIZE;
+    var _i = instance_position(_src.cx * _t + _t / 2, _src.cy * _t + _t / 2, _src.obj);
+    if (_i == noone) return false;
+    return !(variable_instance_exists(_i, "swapped") && _i.swapped);
+}
+
+// The clock of the flicker: the game clock; a picture scenario freezes it (global.light_clock >= 0) so two pictures of one room are the same.
+function Light_Now() {
+    if (variable_global_exists("light_clock") && global.light_clock >= 0) return global.light_clock;
+    return MapFx_Now();
+}
+
+// The sources of the current room, kept until the room changes (the pass asks every frame).
+function Light_RoomSources() {
+    if (!variable_global_exists("light_room") || global.light_room != room) {
+        global.light_room = room;
+        global.light_srcs = Light_Sources(room_get_name(room));
+    }
+    return global.light_srcs;
+}
+
+// The flickering radius (pixels) of a light with base radius _r_px at game time _ms: always inside Light_FlickerRange, a pure function of (radius, seed, time),
+// changing once per LIGHT_FLICKER_STEP_MS (three sines of different speeds, so it never looks like a loop).
+function Light_FlickerRange(_r_px) {
+    return { lo: _r_px * (1 - LIGHT_FLICKER_AMP), hi: _r_px * (1 + LIGHT_FLICKER_AMP) };
+}
+
+function Light_FlickerRadius(_r_px, _seed, _ms) {
+    var _t = floor(_ms / LIGHT_FLICKER_STEP_MS);
+    var _s = 0.5 * sin(_t * 0.9 + _seed * 2.1) + 0.3 * sin(_t * 2.3 + _seed * 1.7) + 0.2 * sin(_t * 5.1 + _seed * 0.6);   // -1 .. 1
+    return _r_px * (1 + LIGHT_FLICKER_AMP * _s);
+}
+
+// D153: the cell a hidden player stands on is a pocket of shadow in an enemy's light unless the enemy is within HIDE_SEEN_TILES of it (then it sees him anyway).
+// (_hid_cx < 0: nobody is hidden.)
+function Light_PocketCell(_ecx, _ecy, _hid_cx, _hid_cy) {
+    if (_hid_cx < 0) return false;
+    return max(abs(_ecx - _hid_cx), abs(_ecy - _hid_cy)) > HIDE_SEEN_TILES;
+}
+
+// The view-sized surface of the pass: made on demand, made again when the engine lost it, resized when the view changes size.
+function Light_EnsureSurface(_w, _h) {
+    if (!variable_global_exists("light_surf")) global.light_surf = -1;
+    if (global.light_surf != -1 && surface_exists(global.light_surf) && (surface_get_width(global.light_surf) != _w || surface_get_height(global.light_surf) != _h)) {
+        surface_free(global.light_surf);
+        global.light_surf = -1;
+    }
+    if (global.light_surf == -1 || !surface_exists(global.light_surf)) global.light_surf = surface_create(_w, _h);
+    return global.light_surf;
+}
+
+function Light_FreeSurface() {
+    if (variable_global_exists("light_surf") && global.light_surf != -1 && surface_exists(global.light_surf)) surface_free(global.light_surf);
+    global.light_surf = -1;
+}
+
+// The cost of the pass, in microseconds of CPU time per frame (get_timer around the whole pass): { frames, us, us_max, cones, lights } (cones and lights: drawn in the last frame).
+function Light_Stats() {
+    if (!variable_global_exists("light_stats") || !is_struct(global.light_stats)) global.light_stats = { frames: 0, us: 0, us_max: 0, cones: 0, lights: 0 };
+    return global.light_stats;
+}
+
+function Light_PerfReset() {
+    var _o = Light_Stats();
+    global.light_stats = { frames: 0, us: 0, us_max: 0, cones: _o.cones, lights: _o.lights };
+}
+
+function Light_PerfFrames() {
+    return Light_Stats().frames;
+}
+
+function Light_PerfAvgMs() {
+    var _s = Light_Stats();
+    return (_s.frames > 0) ? _s.us / _s.frames / 1000 : 0;
+}
+
+function Light_PerfMaxMs() {
+    return Light_Stats().us_max / 1000;
+}
+
+// The pass (called first by World_DrawFx, a layer script, see World_RegisterFx). Everything is in view pixels: the world position minus the camera's corner.
+function Light_DrawPass() {
+    // how much of the darkness each step of light removes (a pool: outer, middle, inner ring; an enemy's light: far, middle, near cells)
+    static _pool_r = [1.0, 0.7, 0.4];
+    static _pool_cut = [0.30, 0.40, 0.50];
+    static _cone_cut = [0.42, 0.55, 0.68];
+    if (!Fx_IsWorldPass()) return;
+    var _t0 = get_timer();
+    var _cam = view_camera[0];
+    if (is_undefined(_cam) || _cam == -1) return;
+    var _vw = camera_get_view_width(_cam);
+    var _vh = camera_get_view_height(_cam);
+    var _vx = floor(camera_get_view_x(_cam));
+    var _vy = floor(camera_get_view_y(_cam));
+    var _surf = Light_EnsureSurface(_vw, _vh);
+    if (!surface_exists(_surf)) return;
+    var _T = GRID_TILE_SIZE;
+    var _st = Light_Stats();
+    var _ms = Light_Now();
+    var _oc = draw_get_colour();
+    var _oa = draw_get_alpha();
+    var _hcx = -1;
+    var _hcy = -1;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    if (_pl != noone && Player_IsHidden(_pl)) {
+        _hcx = Nav_CellOf(_pl.x + _T / 2);
+        _hcy = Nav_CellOf(_pl.y + _T / 2);
+    }
+    var _g = Nav_Get().grid;
+    var _lights = 0;
+    var _cones = 0;
+    surface_set_target(_surf);
+    draw_clear_alpha(LIGHT_DARK_COLOUR, LIGHT_DARK_ALPHA);
+    gpu_set_blendmode_ext_sepalpha(bm_zero, bm_one, bm_zero, bm_inv_src_alpha);   // colour untouched, alpha * (1 - source alpha): a light only takes darkness away
+    draw_set_colour(c_white);
+    var _src = Light_RoomSources();
+    for (var _i = 0; _i < array_length(_src); _i++) {
+        var _s = _src[_i];
+        var _px = _s.cx * _T + _T / 2 - _vx;
+        var _py = _s.cy * _T + 5 - _vy;   // the flame, a little above the middle of the tile
+        var _r = Light_FlickerRadius(_s.r * _T, _s.cx * 7 + _s.cy * 13, _ms);
+        if (_px + _r < 0 || _py + _r < 0 || _px - _r > _vw || _py - _r > _vh) continue;
+        if (!Light_IsLit(_s)) continue;
+        for (var _b = 0; _b < 3; _b++) {
+            draw_set_alpha(_pool_cut[_b]);
+            draw_circle(_px, _py, round(_r * _pool_r[_b]), false);
+        }
+        _lights++;
+    }
+    with (obj_enemy) {
+        if (defeated || !variable_instance_exists(id, "prof")) continue;
+        var _tiles = Vis_EnemyTiles(prof, ai_mode);
+        if (_tiles <= 0) continue;
+        var _ecx = Nav_CellOf(x + _T / 2);
+        var _ecy = Nav_CellOf(y + _T / 2);
+        if ((_ecx + _tiles + 1) * _T < _vx || (_ecx - _tiles) * _T > _vx + _vw || (_ecy + _tiles + 1) * _T < _vy || (_ecy - _tiles) * _T > _vy + _vh) continue;
+        var _cone = Vis_Cone(_g, _ecx, _ecy, _tiles, prof.see_through);
+        var _runs = _cone.runs;
+        var _skip = Light_PocketCell(_ecx, _ecy, _hcx, _hcy);
+        var _ox = _ecx * _T - _vx;
+        var _oy = _ecy * _T - _vy;
+        var _band = -1;
+        for (var _k = 0; _k < array_length(_runs); _k += 4) {
+            if (_runs[_k + 3] != _band) {
+                _band = _runs[_k + 3];
+                draw_set_alpha(_cone_cut[_band]);
+            }
+            var _len = _runs[_k + 2];
+            var _x0 = _ox + _runs[_k] * _T;
+            var _y0 = _oy + _runs[_k + 1] * _T;
+            if (_skip && _ecy + _runs[_k + 1] == _hcy && _hcx >= _ecx + _runs[_k] && _hcx < _ecx + _runs[_k] + _len) {
+                var _left = _hcx - (_ecx + _runs[_k]);   // the hidden player's cell is left dark: the run is drawn in two pieces round it
+                var _right = _len - _left - 1;
+                if (_left > 0) draw_rectangle(_x0, _y0, _x0 + _left * _T - 1, _y0 + _T - 1, false);
+                if (_right > 0) draw_rectangle(_x0 + (_left + 1) * _T, _y0, _x0 + _len * _T - 1, _y0 + _T - 1, false);
+            } else {
+                draw_rectangle(_x0, _y0, _x0 + _len * _T - 1, _y0 + _T - 1, false);
+            }
+        }
+        _cones++;
+    }
+    gpu_set_blendmode(bm_normal);
+    surface_reset_target();
+    draw_set_alpha(1);
+    draw_set_colour(c_white);
+    draw_surface(_surf, _vx, _vy);
+    draw_set_colour(_oc);
+    draw_set_alpha(_oa);
+    var _us = get_timer() - _t0;
+    _st.frames++;
+    _st.us += _us;
+    _st.us_max = max(_st.us_max, _us);
+    _st.cones = _cones;
+    _st.lights = _lights;
+}
