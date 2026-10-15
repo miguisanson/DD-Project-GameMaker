@@ -2560,7 +2560,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
 // --------------------
 // TITLE MENU (D0 pilot on the UI framework)
 // --------------------
-// obj_start_controller keeps `state` ("main" | "settings" | "boot_logo" | "cutscene") and holds the menu stack in title_stk: [title].
+// obj_start_controller keeps `state` ("main" | "settings" | "boot_logo" | "splash" | "cutscene") and holds the menu stack in title_stk: [title].
 // Settings is the popup above. New Game starts the run at once on Normal (D35: one difficulty only).
 function Title_MainItems(_can_load, _new_armed = false) {
     return [
@@ -2582,6 +2582,7 @@ function Title_Build(_c) {
     Ui_StackPush(_c.title_stk, m);
     _c.title_new_armed = false;
     _c.title_refresh = false;
+    _c.title_card = has_run ? Title_CardLoad() : Title_CardNone();   // D128: read, never applied
 }
 
 // Language or save files may have changed since the labels were made.
@@ -2592,6 +2593,7 @@ function Title_Refresh(_c) {
     m.items = Title_MainItems(has_run, Title_NewArmed(_c));
     Ui_MenuFixCursor(m, m.cursor);
     _c.title_refresh = false;
+    _c.title_card = has_run ? Title_CardLoad() : Title_CardNone();
 }
 
 function Title_NewArmed(_c) {
@@ -2679,8 +2681,227 @@ function Title_Step(_c) {
 function Title_Draw(_c) {
     if (!is_struct(_c.title_stk) || _c.state == "settings") return;
     Ui_StackDraw(_c.title_stk);
+    Title_DrawCard(_c);
     draw_set_alpha(1);
     draw_set_color(c_white);
+}
+
+// --------------------
+// TITLE SCREEN (D128): press-any-key splash, living background, Continue card
+// --------------------
+// The menu itself stays the shared framework's (frame, highlight, cursor, fonts): the owner wants every screen in one style. What is new is
+// around it: obj_start_controller.state "splash" (after the logo of a fresh launch: art + a blinking prompt, any key / button / click goes on and the
+// menu slides in), the art that breathes and a little dust, and a card with the saved run next to the menu. All code-drawn, four palette colours.
+// Everything time-based is a pure function of milliseconds, so it is deterministic and checked by Test_Suite_Title.
+#macro TITLE_ART_W 160          // the title picture (sprite main_menu) in art pixels
+#macro TITLE_ART_H 144
+#macro TITLE_SEAM_Y 116         // art rows above this breathe (the boss ends at row 112); the little hero below (rows 120..139) stands still
+#macro TITLE_BREATH_MS 3000     // one breath
+#macro TITLE_BREATH_PX 2        // the boss rises and falls by 0..2 art pixels
+#macro TITLE_DUST_N 32          // "a few dozen" dots of dust
+#macro TITLE_BLINK_MS 1000      // the prompt: on 600 ms, off 400 ms
+#macro TITLE_BLINK_ON_MS 600
+#macro TITLE_FADE_MS 1200       // the slow fade-in of a launch
+#macro TITLE_SPLASH_LOCK_MS 200 // a key this soon after the splash appears is ignored (a press at the end of the logo must not skip it)
+
+// 0..TITLE_BREATH_PX whole art pixels: a sine over 3 s, at rest (0) at t = 0. _calm (screen shake off) holds it still.
+function Title_BreathOffset(_now_ms, _calm) {
+    if (_calm) return 0;
+    var ph = (max(0, _now_ms) mod TITLE_BREATH_MS) / TITLE_BREATH_MS;
+    return floor((1 - cos(ph * 2 * pi)) * 0.5 * TITLE_BREATH_PX + 0.5);
+}
+
+function Title_DustCount() {
+    return TITLE_DUST_N;
+}
+
+// Whole art pixels per second the dot rises: 2..8 (slow).
+function Title_DustSpeed(_i) {
+    return 2 + ((_i * 5 + 3) mod 7);
+}
+
+// Dot _i at _now_ms: { x, y, size (1 or 2 art pixels), col (0 dark, 1 light, 2 lightest) } inside the picture, drifting up and wrapping from the
+// top to the bottom, with a one-pixel sway. _calm freezes it at t = 0. Integers only, no randomness: the same time gives the same dot.
+function Title_DustAt(_i, _now_ms, _calm) {
+    var t = _calm ? 0 : max(0, _now_ms);
+    var w = TITLE_ART_W - 1;   // one less than the picture, so a 2 px dot at the last position still ends inside it
+    var h = TITLE_ART_H - 1;
+    var x0 = (_i * 53 + _i * _i * 7 + 11) mod w;
+    var y0 = (_i * 29 + _i * _i * 13 + 5) mod h;
+    var sw = sin(t / 1400 + _i);
+    var sx = (sw > 0.5) ? 1 : ((sw < -0.5) ? -1 : 0);
+    var size = (_i mod 4 == 3) ? 2 : 1;
+    var dx = (((x0 + sx) mod w) + w) mod w;
+    var dy = (((y0 - floor(Title_DustSpeed(_i) * t / 1000)) mod h) + h) mod h;
+    return { x: dx, y: dy, size: size, col: _i mod 3 };
+}
+
+function Title_BlinkOn(_t_ms) {
+    return (max(0, _t_ms) mod TITLE_BLINK_MS) < TITLE_BLINK_ON_MS;
+}
+
+// 0..1, easing out: how much of the picture shows _t_ms after the launch.
+function Title_FadeIn(_t_ms) {
+    var t = clamp(_t_ms / TITLE_FADE_MS, 0, 1);
+    return 1 - (1 - t) * (1 - t);
+}
+
+function Title_SplashAccepts(_age_ms) {
+    return _age_ms >= TITLE_SPLASH_LOCK_MS;
+}
+
+// The prompt for the device used last (the glyph system has no "any" key, so it is two sentences).
+function Title_SplashPrompt(_device) {
+    if (_device == "gamepad") return Loc_T("title.splash.press_button", "Press any button");
+    return Loc_T("title.splash.press_key", "Press any key");
+}
+
+// Any key, mouse button, pad button or stick, or one of the game's own actions (the scripted runs press by writing those).
+function Title_AnyInput() {
+    if (Prompt_KeyboardActivity()) return true;
+    if (Prompt_PadActivity(Input_GamepadDevice(), 0.6)) return true;
+    return Input_UIConfirm() || Input_UIBack() || Input_Pressed("menu_up") || Input_Pressed("menu_down") || Input_Pressed("menu_left") || Input_Pressed("menu_right");
+}
+
+// The splash is over: the menu is built (or kept) and slides in from now; its own input lock keeps the ending press from answering it.
+function Title_SplashEnd(_c) {
+    _c.state = "main";
+    if (!is_struct(_c.title_stk)) Title_Build(_c);
+    var m = _c.title_stk.menus[0];
+    m.opened_ms = current_time;
+    m.lock_ms = current_time;
+    m.cur_y = -1;
+    SFX_PlayUI("ui_confirm");
+}
+
+function Title_SplashStep(_c) {
+    if (!Title_SplashAccepts(current_time - _c.title_t0)) return;
+    if (Title_AnyInput()) Title_SplashEnd(_c);
+}
+
+// ---- the Continue card -------------------------------------------------------------------------------------------------------
+function Title_CardNone() {
+    return { kind: "none", status: "missing", class_name: "", floor: 0, gold: 0, time_ms: -1 };
+}
+
+// _load = a RunSave_LoadFrom result { status, run }. "run" (a good save: class, floor, gold, and a play time when the save has one),
+// "cant" (an old / newer / damaged file), "none" (no file). Reads only: nothing is applied to the game.
+function Title_CardModel(_load) {
+    var st = (is_struct(_load) && variable_struct_exists(_load, "status")) ? string(_load.status) : "missing";
+    if (st == "missing") return Title_CardNone();
+    if (st != "ok" || !is_struct(_load.run)) return { kind: "cant", status: st, class_name: "", floor: 0, gold: 0, time_ms: -1 };
+    var r = _load.run;
+    var cls = (variable_struct_exists(r, "statData") && is_struct(r.statData) && variable_struct_exists(r.statData, "selected_class")) ? r.statData.selected_class : -1;
+    return {
+        kind: "run", status: "ok",
+        class_name: DB_PlayerClass(cls).name,
+        floor: variable_struct_exists(r, "floor") ? floor(Save_ToReal(r.floor, 0)) : 0,
+        gold: variable_struct_exists(r, "gold") ? round(Save_ToReal(r.gold, 0)) : 0,
+        time_ms: variable_struct_exists(r, "play_ms") ? Save_ToReal(r.play_ms, -1) : -1   // the run save has no play-time field yet (started_at is a wall-clock date): shown only when one exists
+    };
+}
+
+function Title_CardLoad(_path = undefined) {
+    return Title_CardModel(RunSave_LoadFrom(_path));
+}
+
+function Title_FormatTime(_ms) {
+    var s = max(0, floor(_ms / 1000));
+    var h = s div 3600;
+    var m = (s mod 3600) div 60;
+    var sec = s mod 60;
+    var mm = (h > 0 && m < 10) ? "0" + string(m) : string(m);
+    return ((h > 0) ? string(h) + ":" : "") + mm + ":" + ((sec < 10) ? "0" : "") + string(sec);
+}
+
+// { title, rows [{ label, value }] } as the details panel takes them (a sentence and number lines).
+function Title_CardText(_model) {
+    if (_model.kind == "cant") return { title: Loc_T("title.card.cant", "Can't continue"), rows: [] };
+    if (_model.kind != "run") return { title: "", rows: [] };
+    var rows = [];
+    if (_model.floor > 0) array_push(rows, { label: Loc_T("tab.lbl.floor", "Floor"), value: string(_model.floor) });
+    array_push(rows, { label: Loc_T("tab.lbl.gold", "Gold"), value: string(_model.gold) });
+    if (_model.time_ms >= 0) array_push(rows, { label: Loc_T("title.card.time", "Time"), value: Title_FormatTime(_model.time_ms) });
+    return { title: _model.class_name, rows: rows };
+}
+
+// Where the card goes: right of the menu when it fits beside it, else under it, else above it. { x, y }.
+function Title_CardPlace(_menu_rect, _gw, _gh, _margin, _cw, _ch) {
+    var side_x = _menu_rect.x + _menu_rect.w + _margin;
+    if (side_x + _cw <= _gw - _margin) return { x: side_x, y: _menu_rect.y };
+    var cx = clamp(_menu_rect.x + (_menu_rect.w - _cw) div 2, _margin, max(_margin, _gw - _margin - _cw));
+    var below = _menu_rect.y + _menu_rect.h + _margin;
+    if (below + _ch <= _gh - _margin) return { x: cx, y: below };
+    return { x: cx, y: max(_margin, _menu_rect.y - _margin - _ch) };
+}
+
+// Drawn after the menu, with the menu's own fade and slide. The card is the framework's details panel (same frame, same label / value rows).
+function Title_DrawCard(_c) {
+    _c.title_card_rect = { x: 0, y: 0, w: 0, h: 0 };
+    var cd = _c.title_card;
+    if (!is_struct(cd) || cd.kind == "none") return;
+    var m = _c.title_stk.menus[0];
+    var a = Ui_MenuAlpha(m, current_time);
+    if (a <= 0 || m.rect.w <= 0) return;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var tx = Title_CardText(cd);
+    var w = UI_TextWidth(tx.title);
+    for (var i = 0; i < array_length(tx.rows); i++) w = max(w, UI_TextWidth(tx.rows[i].label) + 4 * p + UI_TextWidth(tx.rows[i].value));
+    w = max(w + 8 * p, 36 * p);
+    var h = Ui_DetailsHeight(w, tx.title, tx.rows);
+    var pos = Title_CardPlace(m.rect, mt.gw, mt.gh, mt.margin, w, h);
+    var slide = p * round((1 - a) * 3);   // slides in with the menu
+    _c.title_card_rect = { x: pos.x, y: pos.y - slide, w: w, h: h };
+    Ui_DrawDetails(pos.x, pos.y - slide, w, h, tx.title, tx.rows, a);
+    draw_set_alpha(1);
+}
+
+// ---- the picture ---------------------------------------------------------------------------------------------------------------
+// The boss (everything above TITLE_SEAM_Y) rises and falls by whole art pixels, the hero below stands still, the dust drifts over both, and a launch
+// fades in from black. Breathing and dust stop with the screen shake setting (the one motion setting there is).
+function Title_DrawBackground(_c) {
+    var w = Display_GuiW();
+    var h = Display_GuiH();
+    var spr = _c.title_bg_sprite;
+    var now = current_time;
+    var calm = !Settings_ShakeOn();
+    var sx = w / TITLE_ART_W;
+    var sy = h / TITLE_ART_H;
+    var a0 = draw_get_alpha();
+    draw_set_alpha(1);
+    Ui_Box(0, 0, w, h, UI_C_DARKEST);
+    var yseam = round(TITLE_SEAM_Y * sy);
+    draw_sprite_part_ext(spr, 0, 0, TITLE_SEAM_Y, TITLE_ART_W, TITLE_ART_H - TITLE_SEAM_Y, 0, yseam, sx, sy, c_white, 1);
+    draw_sprite_part_ext(spr, 0, 0, 0, TITLE_ART_W, TITLE_SEAM_Y, 0, round(Title_BreathOffset(now, calm) * sy), sx, sy, c_white, 1);
+    var cols = [UI_C_DARK, UI_C_LIGHT, UI_C_LIGHTEST];
+    for (var i = 0; i < Title_DustCount(); i++) {
+        var d = Title_DustAt(i, now, calm);
+        var x1 = round(d.x * sx);
+        var y1 = round(d.y * sy);
+        Ui_Box(x1, y1, round((d.x + d.size) * sx), round((d.y + d.size) * sy), cols[d.col]);
+    }
+    var fade = Title_FadeIn(now - _c.title_t0);
+    if (fade < 1) {
+        draw_set_alpha(1 - fade);
+        Ui_Box(0, 0, w, h, UI_C_DARKEST);
+    }
+    draw_set_alpha(a0);
+}
+
+// The splash's prompt, under the NO HOPE plate where the picture is empty. Blinks; the rectangle is kept for the checks.
+function Title_DrawSplash(_c) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var txt = Title_SplashPrompt(Prompt_Device());
+    var tw = UI_TextWidth(txt);
+    var cx = mt.gw div 2;
+    var ty = round(102 * mt.gh / TITLE_ART_H) - mt.line_h div 2;
+    _c.title_prompt_rect = { x: cx - tw div 2, y: ty, w: tw, h: mt.line_h };
+    if (Title_FadeIn(current_time - _c.title_t0) < 1 || !Title_BlinkOn(current_time - _c.title_t0)) return;
+    Ui_Text(cx + p, ty + p, txt, UI_C_DARKEST, fa_center);   // a one-pixel shadow keeps it readable over the picture
+    Ui_Text(cx, ty, txt, UI_C_TEXT, fa_center);
+    draw_set_alpha(1);
 }
 
 // --------------------

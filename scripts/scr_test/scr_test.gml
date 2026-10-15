@@ -7842,12 +7842,12 @@ function Test_Suite_Title() {
         if (_v < 2 || _v > 8 || _v != floor(_v)) { _d_ok = false; _d_msg = "speed " + string(_i); }
         var _d0 = Title_DustAt(_i, 0, false);
         var _d1 = Title_DustAt(_i, 1000, false);
-        if (((_d0.y - _d1.y) + TITLE_ART_H) mod TITLE_ART_H != _v) { _d_ok = false; _d_msg = "drift " + string(_i); }   // one second: _v pixels up (wrapping)
+        if (((_d0.y - _d1.y) + (TITLE_ART_H - 1)) mod (TITLE_ART_H - 1) != _v) { _d_ok = false; _d_msg = "drift " + string(_i); }   // one second: _v pixels up (wrapping)
         for (var _t2 = 0; _t2 < 60000; _t2 += 1733) {
             var _d = Title_DustAt(_i, _t2, false);
-            if (_d.x < 0 || _d.x >= TITLE_ART_W || _d.y < 0 || _d.y >= TITLE_ART_H || _d.x != floor(_d.x) || _d.y != floor(_d.y)) { _d_ok = false; _d_msg = "bounds " + string(_i) + "@" + string(_t2); }
+            if (_d.x < 0 || _d.x + _d.size > TITLE_ART_W || _d.y < 0 || _d.y + _d.size > TITLE_ART_H || _d.x != floor(_d.x) || _d.y != floor(_d.y)) { _d_ok = false; _d_msg = "bounds " + string(_i) + "@" + string(_t2); }
             var _dx = abs(_d.x - _d0.x);
-            if (_dx > 2 && _dx < TITLE_ART_W - 2) { _d_ok = false; _d_msg = "sway " + string(_i); }
+            if (_dx > 2 && _dx < TITLE_ART_W - 3) { _d_ok = false; _d_msg = "sway " + string(_i); }
             var _again = Title_DustAt(_i, _t2, false);
             if (_again.x != _d.x || _again.y != _d.y || _again.size != _d.size || _again.col != _d.col) { _d_ok = false; _d_msg = "determinism " + string(_i); }
             var _still = Title_DustAt(_i, _t2, true);

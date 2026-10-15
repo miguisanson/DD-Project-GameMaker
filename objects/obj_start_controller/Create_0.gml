@@ -2,6 +2,10 @@
 title_stk = undefined;
 title_exit = undefined;      // { at }: New Game was chosen, the run starts when the title menu has faded
 title_refresh = true;        // relabel the title items (language or save files may have changed)
+title_t0 = -100000;          // D128: when the picture started to fade in (a fresh launch sets it when the splash appears; every other visit shows it at once)
+title_card = { kind: "none", status: "missing", class_name: "", floor: 0, gold: 0, time_ms: -1 };   // D128: the Continue card's model (Title_Build / Title_Refresh)
+title_card_rect = { x: 0, y: 0, w: 0, h: 0 };     // where the card and the splash prompt were drawn last (the -shots checks read them)
+title_prompt_rect = { x: 0, y: 0, w: 0, h: 0 };
 cutscene_id = "";
 cutscene_started = false;
 cutscene_sequence = [];

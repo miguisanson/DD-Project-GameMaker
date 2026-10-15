@@ -8833,7 +8833,7 @@ function Scenario_StepShotsTitle(_s) {
                 }
                 Scenario_ClearUi();
                 Notice_Interrupt();
-                Loc_SetLanguage((_sc == "korean") ? "ko" : "en");
+                Loc_SetLanguage("en");   // the room restart below reads the saved language again: Korean is set once the title is up (below)
                 Scenario_SetWindowScale(_scales[_s.si]);
                 RunSave_Delete();
                 if (_sc == "continue" || _sc == "korean") Scenario_TitleRunFile();
@@ -8841,14 +8841,23 @@ function Scenario_StepShotsTitle(_s) {
                 _gs.startup_logo_seen = (_sc != "splash");   // the splash is only after the logo of a fresh launch
                 room_goto(rm_start);
             }
-            if (_s.t >= 40 && room == rm_start && _c != noone && !Transition_IsActive()) Scenario_Next(_s, 291);
+            if (_s.t >= 40 && room == rm_start && _c != noone && !Transition_IsActive()) {
+                if (_sc == "korean") {
+                    Loc_SetLanguage("ko");
+                    _c.title_refresh = true;   // the labels and the card are made again in Korean
+                }
+                Scenario_Next(_s, 291);
+            }
             if (_s.t > 900) { Scenario_Check("shots_title_reaches_the_title_" + _tag, false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
         case 291:   // wait until the scene is settled, assert the layout, take the picture
             var _ready = false;
             var _mt = Ui_Metrics();
             if (_c != noone) {
-                if (_sc == "splash") _ready = (_c.state == "splash" && Title_FadeIn(current_time - _c.title_t0) >= 1 && Title_BlinkOn(current_time - _c.title_t0));
+                if (_sc == "splash") {   // faded in and well inside a blink-on window (the picture is the frame drawn just before this step)
+                    var _el = current_time - _c.title_t0;
+                    _ready = (_c.state == "splash" && _el >= 1300 && (_el mod TITLE_BLINK_MS) >= 100 && (_el mod TITLE_BLINK_MS) <= TITLE_BLINK_ON_MS - 100);
+                }
                 else _ready = (_c.state == "main" && is_struct(_c.title_stk) && Ui_MenuAlpha(_c.title_stk.menus[0], current_time) >= 1);
             }
             if (_ready) {
@@ -8858,6 +8867,7 @@ function Scenario_StepShotsTitle(_s) {
                 } else {
                     var _mr = _c.title_stk.menus[0].rect;
                     Scenario_Check("shots_title_menu_is_inside_the_gui_" + _tag, _mr.x >= 0 && _mr.y >= 0 && _mr.x + _mr.w <= _mt.gw && _mr.y + _mr.h <= _mt.gh, json_stringify(_mr));
+                    if (_sc == "korean") Scenario_Check("shots_title_labels_are_korean_" + _tag, Loc_GetLanguage() == "ko" && _c.title_stk.menus[0].items[0].label != "New Game" && _c.title_stk.menus[0].items[0].label != "New game", "label=" + string(_c.title_stk.menus[0].items[0].label));
                     if (_sc == "menu") {
                         Scenario_Check("shots_title_no_card_without_a_run_" + _tag, _c.title_card.kind == "none");
                     } else {

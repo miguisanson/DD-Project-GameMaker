@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T00:28:51Z",
-    "row_count": 1020
+    "generated_at_utc": "2026-10-15T08:54:00Z",
+    "row_count": 1024
   },
   "default_lang": "en",
   "languages": [
@@ -3975,6 +3975,22 @@
     "throw.msg.thrown": {
       "en": "You throw the {item}!",
       "ko": "{item}을(를) 던졌습니다!"
+    },
+    "title.card.cant": {
+      "en": "Can't continue",
+      "ko": "이어할 수 없음"
+    },
+    "title.card.time": {
+      "en": "Time",
+      "ko": "플레이 시간"
+    },
+    "title.splash.press_button": {
+      "en": "Press any button",
+      "ko": "아무 버튼이나 누르세요"
+    },
+    "title.splash.press_key": {
+      "en": "Press any key",
+      "ko": "아무 키나 누르세요"
     },
     "tutorial.arrows.body": {
       "en": "Skills show a row of arrows. Press {up}{down}{left}{right} in that order before the time bar runs out. A wrong press costs time.",
