@@ -3813,6 +3813,14 @@ function Test_Suite_Profile() {
 }
 
 function Test_Suite_RunSave() {
+    // D132: closing the window saves like an autosave, never under the harness, never without a run
+    Test_False("D132 save on close: never while the test harness runs", Run_SaveOnClose());
+    var _gs_sc = GameState_Get();
+    var _had_sc = variable_struct_exists(_gs_sc, "run");
+    var _old_sc = _had_sc ? _gs_sc.run : undefined;
+    if (_had_sc) variable_struct_remove(_gs_sc, "run");
+    Test_False("D132 save on close: nothing to save without a run", Run_SaveOnClose(true));
+    if (_had_sc) _gs_sc.run = _old_sc;
     var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
     var _had_run = variable_struct_exists(_gs, "run");
     var _old_run = _had_run ? _gs.run : undefined;

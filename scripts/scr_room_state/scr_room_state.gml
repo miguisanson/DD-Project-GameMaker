@@ -639,6 +639,15 @@ function Run_AutosaveTick() {
     Run_AutoSave();
 }
 
+// D132: the window is closing (obj_game_controller's Game End event calls this). Saves the run the way an autosave would (never in a
+// battle, a cutscene, a transition or on the title). The test harness and scripted runs end the game on purpose, so they never save here;
+// _ignore_harness lets the tests reach the rest of the rule.
+function Run_SaveOnClose(_ignore_harness = false) {
+    if (!_ignore_harness && (Test_HasFlag("-runtests") || (variable_global_exists("scn") && is_struct(global.scn)))) return false;
+    if (Transition_IsActive()) return false;
+    return Run_AutoSave();
+}
+
 // ---- death, abandon, win ----
 // The death hook (Player_OnDeath, Debug_KillPlayer): ends the run in the profile, then the death scene plays (C5 replaces the placeholder),
 // then RunFlow shows the summary and the echo pick and starts the next run.
