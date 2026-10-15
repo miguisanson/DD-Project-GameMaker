@@ -9925,7 +9925,7 @@ function Test_H11Model(_rm) {
             for (var _cx = floor(_bb.l / _T); _cx <= floor(_bb.r / _T); _cx++) {
                 for (var _cy = floor(_bb.t / _T); _cy <= floor(_bb.b / _T); _cy++) {
                     Nav_GridSet(_g, _cx, _cy, true, _isw);
-                    if (_isx) array_push(_m.exits, [_cx, _cy]);
+                    if (_isx) { array_push(_m.exits, [_cx, _cy]); Nav_GridAddExit(_g, _cx, _cy); }
                 }
             }
         }

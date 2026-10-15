@@ -412,7 +412,7 @@ function EnemyAI_CanStep(_inst, _mx, _my) {
 //   idle        "wander" (pause, one step, pause), "drift" (steps almost without pause), "patrol" (walks legs to far spots),
 //               "still" (ambusher: stays on its post)
 //   idle_speed  speed while idling;  pause_min..pause_max frames between idle steps;  roam tiles from home
-//   search      frames spent looking at the last seen spot;  react frames between spotting the player and moving
+//   search      the time it spends looking: a third of it at the last seen cell and a third again before it gives up (D153);  react frames between spotting the player and moving
 //   pass        true = ignores walls and objects (ghosts), only the room edge stops it
 //   fixed       true = never moves (bosses): the old square-trigger rules still apply to ai_stationary enemies
 // The numbers are first guesses for the owner to tune by playing (reported in the packet notes).
@@ -439,7 +439,7 @@ function EnemyAI_Profile(_enemy_id) {
 // Room integration of the pure Nav code: one grid and one reservation table per loaded room, built lazily from the instances.
 // Rebuilt when a blocker appears or disappears (barrel broken, chest opened and replaced). Nothing hooks into the game controller.
 // ----------------------------------------------------------------------------
-function Nav_MarkInstance(_g, _block, _sight) {
+function Nav_MarkInstance(_g, _block, _sight, _exit = false) {
     // runs in the scope of the instance being marked
     var _t = GRID_TILE_SIZE;
     var _x0 = floor(bbox_left / _t);
@@ -447,7 +447,10 @@ function Nav_MarkInstance(_g, _block, _sight) {
     var _y0 = floor(bbox_top / _t);
     var _y1 = floor((bbox_bottom - 0.01) / _t);
     for (var _cx = _x0; _cx <= _x1; _cx++) {
-        for (var _cy = _y0; _cy <= _y1; _cy++) Nav_GridSet(_g, _cx, _cy, _block, _sight);
+        for (var _cy = _y0; _cy <= _y1; _cy++) {
+            Nav_GridSet(_g, _cx, _cy, _block, _sight);
+            if (_exit && Nav_GridInside(_g, _cx, _cy)) Nav_GridAddExit(_g, _cx, _cy);
+        }
     }
 }
 
@@ -455,7 +458,7 @@ function Nav_BuildGrid() {
     var _g = Nav_GridCreate(ceil(room_width / GRID_TILE_SIZE), ceil(room_height / GRID_TILE_SIZE));
     with (obj_wall) Nav_MarkInstance(_g, true, true);
     with (obj_interactable) Nav_MarkInstance(_g, true, false);
-    with (obj_room_transition) Nav_MarkInstance(_g, true, false);   // enemies never park on an exit
+    with (obj_room_transition) Nav_MarkInstance(_g, true, false, true);   // enemies never park on an exit; the exit cells are kept for the clear zones (D158)
     return _g;
 }
 
@@ -498,8 +501,8 @@ function Nav_Stats() {
 }
 
 // ----------------------------------------------------------------------------
-// Overworld AI (D63, D66, D67). Modes: idle -> chase (sees the player) -> search (lost sight: wait at the last seen spot)
-// -> return (walk home) -> idle. Movement is always a 16 px step toward a path cell; the enemy rests on the grid between steps.
+// Overworld AI (D63, D66, D67, D153). Modes: idle -> chase (sees the player, or heard him run) -> search (lost him: look at the last seen cell, walk the way he fled,
+// look again, ONE "?") -> return (walk home) -> idle. Movement is always a 16 px step toward a path cell; the enemy rests on the grid between steps.
 // ----------------------------------------------------------------------------
 function EnemyAI_BuildContext(_inst, _cfg) {
     return { move_speed_mult: 1 };
@@ -512,7 +515,10 @@ function EnemyAI_Init(_inst) {
     _inst.ai_mode = "idle";
     _inst.last_seen_cx = 0;
     _inst.last_seen_cy = 0;
-    _inst.search_timer = 0;
+    _inst.last_seen_dir = -1;
+    _inst.srch = undefined;
+    _inst.question_pop = 0;
+    _inst.q_pops = 0;
     _inst.alert_pop = 0;
     _inst.react_timer = 0;
     _inst.spot_cooldown = 0;
@@ -531,13 +537,9 @@ function EnemyAI_Init(_inst) {
     _inst.home_cy = Nav_CellOf(Grid_Snap(_inst.home_y) + GRID_TILE_SIZE / 2);
 }
 
-// Notices the player: inside the sight circle and (unless see_through) no wall on the line between the two cells.
-function EnemyAI_CanSee(_inst, _pl, _nav, _tiles) {
-    if (_tiles <= 0) return false;
-    var _half = GRID_TILE_SIZE / 2;
-    if (point_distance(_inst.x, _inst.y, _pl.x, _pl.y) > _tiles * GRID_TILE_SIZE) return false;
-    if (_inst.prof.see_through) return true;
-    return Nav_LineClear(_nav.grid, Nav_CellOf(_inst.x + _half), Nav_CellOf(_inst.y + _half), Nav_CellOf(_pl.x + _half), Nav_CellOf(_pl.y + _half));
+// Notices the player: inside the sight circle and (unless see_through) no wall on the line between the two cells; a hidden player (D153) only from 1 tile (Sight_CanSee).
+function EnemyAI_CanSee(_inst, _pl, _nav, _tiles, _hidden = false) {
+    return Sight_CanSee(_nav.grid, _inst.x, _inst.y, _pl.x, _pl.y, _tiles, _inst.prof.see_through, _hidden);
 }
 
 function EnemyAI_BeginStep(_inst, _dir, _speed) {
@@ -656,30 +658,52 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
 
     var _t = GRID_TILE_SIZE;
     if (_inst.alert_pop > 0) _inst.alert_pop--;
+    if (_inst.question_pop > 0) _inst.question_pop--;
     if (_inst.spot_cooldown > 0) _inst.spot_cooldown--;
 
     // ---- senses ----
     var _pcx = Nav_CellOf(_pl.x + _t / 2);
     var _pcy = Nav_CellOf(_pl.y + _t / 2);
-    var _sees = (_inst.spot_cooldown <= 0) && EnemyAI_CanSee(_inst, _pl, _nav, _p.sight);
+    var _hidden = Player_IsHidden(_pl);   // D153: still on a hiding cell: only seen from 1 tile
+    var _per = EnemyAI_Perceive(_nav.grid, _p, _inst.x, _inst.y, _pl.x, _pl.y, Player_IsRunning(_pl), _hidden);   // sight, and the noise of a RUN (D153)
+    var _sees = (_inst.spot_cooldown <= 0) && _per.sees;
+    var _heard = (_inst.spot_cooldown <= 0) && _per.heard;
     if (_inst.ai_mode == "chase") {
         // a little extra range once chasing so the edge of the circle does not flicker
-        if (_sees || EnemyAI_CanSee(_inst, _pl, _nav, _p.sight + 1)) {
+        if (_sees || EnemyAI_CanSee(_inst, _pl, _nav, _p.sight + 1, _hidden)) {
             _inst.last_seen_cx = _pcx;
             _inst.last_seen_cy = _pcy;
-            _inst.search_timer = 0;
+            _inst.last_seen_dir = _pl.face;
             _sees = true;
+        } else if (_heard) {
+            _inst.last_seen_cx = _pcx;   // out of sight but running: it follows the noise
+            _inst.last_seen_cy = _pcy;
+            _inst.last_seen_dir = _pl.face;
         }
     } else if (_sees) {
         _inst.ai_mode = "chase";
         _inst.last_seen_cx = _pcx;
         _inst.last_seen_cy = _pcy;
+        _inst.last_seen_dir = _pl.face;
+        _inst.srch = undefined;
+        _inst.question_pop = 0;
         _inst.alert_pop = 50;
         _inst.react_timer = _p.react;
         _inst.patrol_cx = -1;
         _inst.stuck_frames = 0;
         Nav_Stats().spots++;
         SFX_Play("ui_confirm", 0.5, 1.5);   // existing sound, small and high: "!"
+    } else if (_heard) {
+        // D153: it heard the player run: turn and go to where the noise came from, no "!" (it has not seen anyone); once there it searches like after a lost sight
+        _inst.ai_mode = "chase";
+        _inst.last_seen_cx = _pcx;
+        _inst.last_seen_cy = _pcy;
+        _inst.last_seen_dir = _pl.face;
+        _inst.srch = undefined;
+        _inst.question_pop = 0;
+        _inst.react_timer = _p.react;
+        _inst.patrol_cx = -1;
+        _inst.stuck_frames = 0;
     }
     _inst.ai_state = (_inst.ai_mode == "chase" || _inst.ai_mode == "search") ? ENEMY_ALERT : ENEMY_IDLE;
     if (_inst.ai_state == ENEMY_ALERT) _inst.forget_time = _inst.forget_delay;
@@ -698,16 +722,25 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
                     var _gx = _inst.last_seen_cx;
                     var _gy = _inst.last_seen_cy;
                     if (!_sees && _ecx == _gx && _ecy == _gy) {
-                        _inst.ai_mode = "search";
-                        _inst.search_timer = _p.search;
+                        _inst.ai_mode = "search";   // D153: look, then the way the player fled, then one "?" and home
+                        _inst.srch = Search_Create(_gx, _gy, _inst.last_seen_dir, max(10, round(_p.search / 3)));
                     } else if (_ecx != _gx || _ecy != _gy) {
                         EnemyAI_Pursue(_inst, _nav, _gx, _gy, _p.chase);
                     }
                     break;
                 case "search":
-                    _inst.stuck_frames = 0;
-                    _inst.search_timer--;
-                    if (_inst.search_timer <= 0) _inst.ai_mode = "return";
+                    if (!is_struct(_inst.srch)) _inst.srch = Search_Create(_ecx, _ecy, -1, max(10, round(_p.search / 3)));
+                    var _sr = Search_Step(_inst.srch, _nav.grid, _ecx, _ecy);
+                    if (_sr.pop) EnemyAI_PopQuestion(_inst);
+                    if (_sr.done) {
+                        _inst.ai_mode = "return";
+                        _inst.srch = undefined;
+                        _inst.stuck_frames = 0;
+                    } else if (_sr.goal_cx >= 0) {
+                        EnemyAI_Pursue(_inst, _nav, _sr.goal_cx, _sr.goal_cy, _p.ret_speed);
+                    } else {
+                        _inst.stuck_frames = 0;
+                    }
                     break;
                 case "return":
                     if (_ecx == _inst.home_cx && _ecy == _inst.home_cy) {
@@ -733,8 +766,10 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
             _inst.retry_timer = 0;
             if (_inst.ai_mode == "chase") {
                 _inst.ai_mode = "search";
-                _inst.search_timer = _p.search;
+                _inst.srch = Search_Create(_ecx, _ecy, -1, max(10, round(_p.search / 3)));
                 _inst.spot_cooldown = 180;
+            } else if (_inst.ai_mode == "search") {
+                if (is_struct(_inst.srch)) Search_GiveUp(_inst.srch);   // cannot reach the end of the flee leg: give up here
             } else if (_inst.ai_mode == "return") {
                 _inst.home_cx = _ecx;   // cannot get home from here: make here the new home
                 _inst.home_cy = _ecy;
@@ -787,16 +822,10 @@ function EnemyAI_Idle(_inst, _nav, _ecx, _ecy) {
                 _inst.idle_timer = irandom_range(_p.pause_min, max(_p.pause_min, _p.pause_max));
                 return;
             }
-            for (var _try = 0; _try < 8; _try++) {
-                var _cx = _inst.home_cx + irandom_range(-_p.roam, _p.roam);
-                var _cy = _inst.home_cy + irandom_range(-_p.roam, _p.roam);
-                if (abs(_cx - _ecx) + abs(_cy - _ecy) < 2) continue;
-                if (Nav_CellBlocked(_nav.grid, _cx, _cy)) continue;
-                _inst.patrol_cx = _cx;
-                _inst.patrol_cy = _cy;
-                break;
-            }
-            if (_inst.patrol_cx < 0) { _inst.idle_timer = 30; return; }
+            var _pt = Idle_PatrolTarget(_nav.grid, _inst.home_cx, _inst.home_cy, _p.roam, _ecx, _ecy);   // D158: never a target near an exit
+            if (is_undefined(_pt)) { _inst.idle_timer = 30; return; }
+            _inst.patrol_cx = _pt[0];
+            _inst.patrol_cy = _pt[1];
         }
         EnemyAI_Pursue(_inst, _nav, _inst.patrol_cx, _inst.patrol_cy, _p.idle_speed);
         return;
@@ -813,6 +842,7 @@ function EnemyAI_Idle(_inst, _nav, _ecx, _ecy) {
         var _tcy = _ecy + (_d == DOWN) - (_d == UP);
         if (max(abs(_tcx - _inst.home_cx), abs(_tcy - _inst.home_cy)) > _p.roam) continue;
         if (!Nav_GridInside(_nav.grid, _tcx, _tcy)) continue;
+        if (!Idle_StepAllowed(_nav.grid, _ecx, _ecy, _tcx, _tcy)) continue;   // D158: not into the zone round an exit
         if (!_p.pass) {
             if (Nav_CellBlocked(_nav.grid, _tcx, _tcy)) continue;
             if (!EnemyAI_CanStep(_inst, (_d == RIGHT) - (_d == LEFT), (_d == DOWN) - (_d == UP))) continue;
@@ -931,6 +961,25 @@ function Nav_DrawWorldFx() {
                 draw_rectangle(_bx - 1, _by + 1, _bx + 1, _by + 6, false);
                 draw_rectangle(_bx - 1, _by + 8, _bx + 1, _by + 9, false);
             }
+            // D153: the "?" of a given-up search. Small tier of feedback: it pops up with a little overshoot (ease-back, 10 frames), rests, then flickers out. No shake, no stop.
+            var _qage = AI_QUESTION_FRAMES - question_pop;
+            if (question_pop > 0 && !(question_pop < 12 && ((question_pop div 3) mod 2) == 0)) {
+                var _qt = clamp(_qage / 10, 0, 1);
+                var _qs = 1.70158;
+                var _qe = 1 + (_qs + 1) * power(_qt - 1, 3) + _qs * power(_qt - 1, 2);   // ease-out-back: 0 -> overshoots 1 -> settles on 1
+                var _qx = floor(_cx);
+                var _qy = floor(y) - 11 + round(6 * (1 - _qe));   // starts 6 px low, rises past its place by a pixel, settles
+                draw_set_color(_c0);
+                draw_rectangle(_qx - 3, _qy, _qx + 3, _qy + 10, false);
+                draw_set_color(_c3);
+                // the glyph, row by row: x offsets of its light pixels
+                var _qpix = [[-1, 0, 1], [-2, 2], [2], [0, 1], [0], [], [0]];
+                for (var _qr = 0; _qr < array_length(_qpix); _qr++) {
+                    for (var _qc = 0; _qc < array_length(_qpix[_qr]); _qc++) {
+                        draw_rectangle(_qx + _qpix[_qr][_qc], _qy + 2 + _qr, _qx + _qpix[_qr][_qc], _qy + 2 + _qr, false);
+                    }
+                }
+            }
         }
     }
     draw_set_color(_oc);
@@ -940,8 +989,8 @@ function Nav_DrawWorldFx() {
 
 // ============================================================================
 // NAV (D63, I-047): pure grid pathfinding, line of sight and cell reservations.
-// A grid is a struct { w, h, block[], sight[] } of 16 px cells with the origin at world (0,0) (D65: room sizes are not changed).
-// block = movement blocked (wall, rock, chest, exit tile); sight = line of sight blocked (wall only).
+// A grid is a struct { w, h, block[], sight[], exits[] } of 16 px cells with the origin at world (0,0) (D65: room sizes are not changed).
+// block = movement blocked (wall, rock, chest, exit tile); sight = line of sight blocked (wall only); exits = [[cx, cy], ...] the exit cells (D158).
 // Nothing here touches instances, so Test_Suite_Nav can run it on hand-made maps. Room integration is Nav_Get() further down.
 // ============================================================================
 function Nav_CellOf(_v) {
@@ -955,7 +1004,7 @@ function Nav_WorldOf(_c) {
 function Nav_GridCreate(_w, _h) {
     _w = max(1, _w);
     _h = max(1, _h);
-    return { w: _w, h: _h, block: array_create(_w * _h, 0), sight: array_create(_w * _h, 0) };
+    return { w: _w, h: _h, block: array_create(_w * _h, 0), sight: array_create(_w * _h, 0), exits: [] };
 }
 
 // rows: array of strings. "." free, "#" wall (blocks movement and sight), "~" blocks movement only.
@@ -1239,35 +1288,107 @@ function Player_DrawWorldFx() {
 // ============================================================================
 // True when an enemy standing on cell (_ecx,_ecy) hears a player on cell (_pcx,_pcy): running only, straight-line distance, walls do not matter.
 function Hear_RunHeard(_ecx, _ecy, _pcx, _pcy, _running) {
-    return false;
+    if (!_running) return false;
+    return point_distance(_ecx, _ecy, _pcx, _pcy) <= AI_HEAR_RUN_TILES;
 }
 
 // The cell a fleeing player most likely ran to: from the last seen cell straight on in _dir (RIGHT, UP, LEFT, DOWN, or -1 for none), up to _tiles cells, stopping before a blocked cell or the room edge.
 function Search_FleeCell(_g, _lcx, _lcy, _dir, _tiles) {
-    return { cx: _lcx, cy: _lcy };
+    var _dx = (_dir == RIGHT) - (_dir == LEFT);
+    var _dy = (_dir == DOWN) - (_dir == UP);
+    var _cx = _lcx;
+    var _cy = _lcy;
+    if (_dx == 0 && _dy == 0) return { cx: _cx, cy: _cy };
+    for (var _i = 0; _i < _tiles; _i++) {
+        if (Nav_CellBlocked(_g, _cx + _dx, _cy + _dy)) break;
+        _cx += _dx;
+        _cy += _dy;
+    }
+    return { cx: _cx, cy: _cy };
 }
 
-// A search that starts when the enemy stands on the last seen cell: look, walk the flee leg, look, give up with one "?".
+// A search that starts when the enemy stands on the last seen cell: look (stage 0), walk the flee leg (1), look again and give up with ONE "?" (2), done (3).
 function Search_Create(_lcx, _lcy, _dir, _look_frames) {
-    return { stage: 0, lcx: _lcx, lcy: _lcy, dir: _dir, look: _look_frames, timer: 0, fcx: _lcx, fcy: _lcy, popped: false };
+    return { stage: 0, lcx: _lcx, lcy: _lcy, dir: _dir, look: max(1, _look_frames), timer: 0, fcx: _lcx, fcy: _lcy, popped: false };
 }
 
 // One decision of a search for an enemy on cell (_ecx,_ecy). Returns { goal_cx, goal_cy, pop, done }: goal_cx < 0 means stay here; pop is true on the one step the "?" goes up; done ends the search.
 function Search_Step(_se, _g, _ecx, _ecy) {
-    return { goal_cx: -1, goal_cy: -1, pop: false, done: true };
+    var _out = { goal_cx: -1, goal_cy: -1, pop: false, done: false };
+    switch (_se.stage) {
+        case 0:
+            _se.timer++;
+            if (_se.timer >= _se.look) {
+                var _fc = Search_FleeCell(_g, _se.lcx, _se.lcy, _se.dir, AI_FLEE_SEARCH_TILES);
+                _se.fcx = _fc.cx;
+                _se.fcy = _fc.cy;
+                _se.stage = (_fc.cx != _se.lcx || _fc.cy != _se.lcy) ? 1 : 2;
+                _se.timer = 0;
+            }
+            break;
+        case 1:
+            if (_ecx == _se.fcx && _ecy == _se.fcy) {
+                _se.stage = 2;
+                _se.timer = 0;
+            } else {
+                _out.goal_cx = _se.fcx;
+                _out.goal_cy = _se.fcy;
+            }
+            break;
+        case 2:
+            if (!_se.popped) {
+                _se.popped = true;
+                _out.pop = true;
+            }
+            _se.timer++;
+            if (_se.timer >= _se.look) {
+                _se.stage = 3;
+                _out.done = true;
+            }
+            break;
+        default:
+            _out.done = true;
+            break;
+    }
+    return _out;
 }
 
-// The hiding cells of a room (D153): [[cx, cy], ...] picked by hand from the room art (tall grass, deep shadow). Rooms without any return [].
+// A search that cannot go on (the enemy is stuck on its way): straight to giving up.
+function Search_GiveUp(_se) {
+    if (_se.stage < 2) {
+        _se.stage = 2;
+        _se.timer = 0;
+    }
+}
+
+// The hiding cells of a room (D153): [[cx, cy], ...], picked by hand from the room art (the dark grass patches and the foliage along the walls, see gridshots).
+// Free floor cells only; rooms without any return []. The owner reviews them at the playtest.
 function Hide_Cells(_room_name) {
+    switch (_room_name) {
+        case "rm_floor2": return [[3, 3], [12, 3]];
+        case "rm_floor3": return [[3, 4]];
+        case "rm_floor4": return [[4, 3]];
+        case "rm_floor5": return [[4, 2]];
+        case "rm_floor6": return [[4, 3]];
+        case "rm_floor7": return [[9, 2]];
+    }
     return [];
 }
 
 function Hide_IsCell(_room_name, _cx, _cy) {
+    var _cells = Hide_Cells(_room_name);
+    for (var _i = 0; _i < array_length(_cells); _i++) {
+        if (_cells[_i][0] == _cx && _cells[_i][1] == _cy) return true;
+    }
     return false;
 }
 
 // True when the player counts as hidden: standing still (not mid-step) for HIDE_SETTLE_FRAMES on one of the room's hiding cells (_cells = Hide_Cells(room name)).
 function Sight_PlayerHidden(_cells, _pcx, _pcy, _moving, _still_frames) {
+    if (_moving || _still_frames < HIDE_SETTLE_FRAMES) return false;
+    for (var _i = 0; _i < array_length(_cells); _i++) {
+        if (_cells[_i][0] == _pcx && _cells[_i][1] == _pcy) return true;
+    }
     return false;
 }
 
@@ -1276,41 +1397,94 @@ function Sight_CanSee(_g, _ex, _ey, _px, _py, _tiles, _see_through, _hidden) {
     if (_tiles <= 0) return false;
     var _half = GRID_TILE_SIZE / 2;
     if (point_distance(_ex, _ey, _px, _py) > _tiles * GRID_TILE_SIZE) return false;
+    var _ecx = Nav_CellOf(_ex + _half);
+    var _ecy = Nav_CellOf(_ey + _half);
+    var _pcx = Nav_CellOf(_px + _half);
+    var _pcy = Nav_CellOf(_py + _half);
+    if (_hidden && max(abs(_ecx - _pcx), abs(_ecy - _pcy)) > HIDE_SEEN_TILES) return false;
     if (_see_through) return true;
-    return Nav_LineClear(_g, Nav_CellOf(_ex + _half), Nav_CellOf(_ey + _half), Nav_CellOf(_px + _half), Nav_CellOf(_py + _half));
+    return Nav_LineClear(_g, _ecx, _ecy, _pcx, _pcy);
 }
 
 // What an enemy (profile _prof, pixel position _ex,_ey) notices of a player at pixel (_px,_py): { sees, heard }. heard only counts when it does not see him.
 function EnemyAI_Perceive(_g, _prof, _ex, _ey, _px, _py, _running, _hidden) {
+    var _half = GRID_TILE_SIZE / 2;
     var _sees = Sight_CanSee(_g, _ex, _ey, _px, _py, _prof.sight, _prof.see_through, _hidden);
-    return { sees: _sees, heard: false };
+    var _heard = !_sees && Hear_RunHeard(Nav_CellOf(_ex + _half), Nav_CellOf(_ey + _half), Nav_CellOf(_px + _half), Nav_CellOf(_py + _half), _running);
+    return { sees: _sees, heard: _heard };
 }
 
 // Distance in tiles from a cell to the nearest exit cell of the grid (9999 when the room has none).
 function Nav_ExitDist(_g, _cx, _cy) {
-    return 9999;
+    var _d = 9999;
+    for (var _i = 0; _i < array_length(_g.exits); _i++) _d = min(_d, point_distance(_cx, _cy, _g.exits[_i][0], _g.exits[_i][1]));
+    return _d;
 }
 
 function Nav_GridAddExit(_g, _cx, _cy) {
+    array_push(_g.exits, [_cx, _cy]);
 }
 
 // The nearest cell (by walking) from (_fcx,_fcy) that is at least _min_exit tiles from every exit and _arr_clear tiles from the arrival cell (_arr_cx < 0: no arrival). { ok, cx, cy }.
 function Nav_SafeCell(_g, _fcx, _fcy, _min_exit, _arr_cx, _arr_cy, _arr_clear) {
+    if (!Nav_GridInside(_g, _fcx, _fcy)) return { ok: false, cx: _fcx, cy: _fcy };
+    var _seen = array_create(_g.w * _g.h, false);
+    var _q = [[_fcx, _fcy]];
+    _seen[_fcy * _g.w + _fcx] = true;
+    var _dxs = [1, 0, -1, 0];
+    var _dys = [0, 1, 0, -1];
+    var _i = 0;
+    while (_i < array_length(_q)) {
+        var _c = _q[_i++];
+        if (!Nav_CellBlocked(_g, _c[0], _c[1]) && Nav_ExitDist(_g, _c[0], _c[1]) >= _min_exit
+            && (_arr_cx < 0 || point_distance(_c[0], _c[1], _arr_cx, _arr_cy) >= _arr_clear)) {
+            return { ok: true, cx: _c[0], cy: _c[1] };
+        }
+        for (var _d = 0; _d < 4; _d++) {
+            var _nx = _c[0] + _dxs[_d];
+            var _ny = _c[1] + _dys[_d];
+            if (!Nav_GridInside(_g, _nx, _ny) || _seen[_ny * _g.w + _nx]) continue;
+            _seen[_ny * _g.w + _nx] = true;
+            if (!Nav_CellBlocked(_g, _nx, _ny)) array_push(_q, [_nx, _ny]);
+        }
+    }
     return { ok: false, cx: _fcx, cy: _fcy };
 }
 
-// Where an enemy belongs when the player arrives at cell (_arr_cx,_arr_cy): { cx, cy, moved, home_cx, home_cy }. Left alone unless it stands nearer than AI_EXIT_RELOCATE_TILES to an exit or nearer than AI_ARRIVAL_CLEAR_TILES to the arrival.
+// Where an enemy belongs when the player arrives at cell (_arr_cx,_arr_cy): { cx, cy, moved, home_cx, home_cy }. Left alone unless it stands nearer than AI_EXIT_RELOCATE_TILES
+// to an exit or nearer than AI_ARRIVAL_CLEAR_TILES to the arrival. Then it goes home when home is clear of both, else to the nearest clear cell (which becomes its home).
 function Enemy_ArrivalCell(_g, _ecx, _ecy, _hcx, _hcy, _arr_cx, _arr_cy) {
-    return { cx: _ecx, cy: _ecy, moved: false, home_cx: _hcx, home_cy: _hcy };
+    var _out = { cx: _ecx, cy: _ecy, moved: false, home_cx: _hcx, home_cy: _hcy };
+    var _has_arr = (_arr_cx >= 0);
+    var _bad = (Nav_ExitDist(_g, _ecx, _ecy) < AI_EXIT_RELOCATE_TILES) || (_has_arr && point_distance(_ecx, _ecy, _arr_cx, _arr_cy) < AI_ARRIVAL_CLEAR_TILES);
+    if (!_bad) return _out;
+    var _home_ok = !Nav_CellBlocked(_g, _hcx, _hcy) && Nav_ExitDist(_g, _hcx, _hcy) >= AI_EXIT_RELOCATE_TILES
+        && (!_has_arr || point_distance(_hcx, _hcy, _arr_cx, _arr_cy) >= AI_ARRIVAL_CLEAR_TILES);
+    if (_home_ok) {
+        _out.cx = _hcx;
+        _out.cy = _hcy;
+        _out.moved = (_hcx != _ecx || _hcy != _ecy);
+        return _out;
+    }
+    var _s = Nav_SafeCell(_g, _ecx, _ecy, AI_EXIT_RELOCATE_TILES, _arr_cx, _arr_cy, AI_ARRIVAL_CLEAR_TILES);
+    if (_s.ok) {
+        _out.cx = _s.cx;
+        _out.cy = _s.cy;
+        _out.moved = (_s.cx != _ecx || _s.cy != _ecy);
+        _out.home_cx = _s.cx;
+        _out.home_cy = _s.cy;
+    }
+    return _out;
 }
 
-// The next patrol target for an enemy on (_ecx,_ecy) with home (_hcx,_hcy): a free cell inside the roaming range, not near an exit. undefined when none was found.
+// The next patrol target for an enemy on (_ecx,_ecy) with home (_hcx,_hcy): a free cell inside the roaming range, not near an exit (D158). undefined when none was found.
 function Idle_PatrolTarget(_g, _hcx, _hcy, _roam, _ecx, _ecy) {
     for (var _try = 0; _try < 8; _try++) {
         var _cx = _hcx + irandom_range(-_roam, _roam);
         var _cy = _hcy + irandom_range(-_roam, _roam);
         if (abs(_cx - _ecx) + abs(_cy - _ecy) < 2) continue;
         if (Nav_CellBlocked(_g, _cx, _cy)) continue;
+        if (Nav_ExitDist(_g, _cx, _cy) < AI_EXIT_CLEAR_TILES) continue;
         return [_cx, _cy];
     }
     return undefined;
@@ -1318,5 +1492,78 @@ function Idle_PatrolTarget(_g, _hcx, _hcy, _roam, _ecx, _ecy) {
 
 // May a wandering enemy on (_ecx,_ecy) step to (_tcx,_tcy)? Not into the zone round an exit, unless it is a step away from the exit.
 function Idle_StepAllowed(_g, _ecx, _ecy, _tcx, _tcy) {
-    return true;
+    var _dt = Nav_ExitDist(_g, _tcx, _tcy);
+    if (_dt >= AI_EXIT_CLEAR_TILES) return true;
+    return _dt > Nav_ExitDist(_g, _ecx, _ecy);
+}
+
+// ---- the player side: running, standing still, hidden ----
+// Running = a step that goes at the run speed (fixed for the whole step, obj_player Step).
+function Player_IsRunning(_pl) {
+    return _pl.moving && _pl.step_speed > _pl.walk_speed;
+}
+
+// Counts the frames the player has stood still (reset by any step). Called from obj_player Step.
+function Player_TrackStill(_pl) {
+    if (!variable_instance_exists(_pl, "still_frames")) _pl.still_frames = 0;
+    if (_pl.moving) _pl.still_frames = 0;
+    else _pl.still_frames = min(_pl.still_frames + 1, 100000);
+}
+
+function Player_IsHidden(_pl) {
+    if (!variable_instance_exists(_pl, "still_frames")) return false;
+    var _half = GRID_TILE_SIZE / 2;
+    return Sight_PlayerHidden(Hide_Cells(room_get_name(room)), Nav_CellOf(_pl.x + _half), Nav_CellOf(_pl.y + _half), _pl.moving, _pl.still_frames);
+}
+
+// A hidden player is drawn see-through (obj_player Step, end): readable at a glance, no new asset.
+function Player_ApplyHiddenLook(_pl) {
+    _pl.image_alpha = Player_IsHidden(_pl) ? HIDE_PLAYER_ALPHA : 1;
+}
+
+// ---- the enemy side ----
+// The "?" goes up over an enemy that gave up its search (once per search).
+function EnemyAI_PopQuestion(_inst) {
+    _inst.question_pop = AI_QUESTION_FRAMES;
+    _inst.q_pops++;
+    SFX_Play("ui_confirm", 0.35, 0.9);   // the "!" sound a little lower and softer: "hm?"
+}
+
+// D158: on a room arrival (the player is placed) every enemy that stands near an exit or near the arrival tile is put back (home, or a clear spot) and forgets its chase.
+// Bosses and story enemies (cine_id) stay where the room has them. Returns how many were moved.
+function Enemy_ArrivalFix(_pl) {
+    if (!instance_exists(_pl)) return 0;
+    var _t = GRID_TILE_SIZE;
+    var _g = Nav_Get().grid;
+    var _acx = Nav_CellOf(_pl.x + _t / 2);
+    var _acy = Nav_CellOf(_pl.y + _t / 2);
+    var _n = 0;
+    with (obj_enemy) {
+        if (defeated || enemy_id < 0) continue;
+        if (variable_instance_exists(id, "cine_id") && string(cine_id) != "") continue;
+        if (EnemyDB_Get(enemy_id).is_boss || enemy_id == ENEMY_STRANGER) continue;
+        var _r = Enemy_ArrivalCell(_g, Nav_CellOf(x + _t / 2), Nav_CellOf(y + _t / 2), Nav_CellOf(home_x + _t / 2), Nav_CellOf(home_y + _t / 2), _acx, _acy);
+        if (!_r.moved) continue;
+        x = _r.cx * _t;
+        y = _r.cy * _t;
+        home_x = _r.home_cx * _t;
+        home_y = _r.home_cy * _t;
+        moving = false;
+        move_timer = 0;
+        move_dir = -1;
+        if (variable_instance_exists(id, "ai_mode")) {
+            ai_mode = "idle";
+            srch = undefined;
+            question_pop = 0;
+            alert_pop = 0;
+            react_timer = 0;
+            patrol_cx = -1;
+            stuck_frames = 0;
+            retry_timer = 0;
+            home_cx = _r.home_cx;
+            home_cy = _r.home_cy;
+        }
+        _n++;
+    }
+    return _n;
 }

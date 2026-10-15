@@ -7,6 +7,7 @@ if (bump_applied) {
 prompt_target = noone;
 World_RegisterFx(id);   // the interact prompt is drawn by the world layer script: objects have no Draw event (no .yy edits)
 MapFx_Step();           // D138 (G6): finish old effects, sparkle on a level gained
+Player_TrackStill(id);   // D153: how long the player has stood still (hiding spots)
 
 var gs = GameState_Get();
 Player_EnsureSpriteSet();
@@ -205,6 +206,7 @@ mask_index = sprite[DOWN];
 // MapFx_DrawPlayerSquash in whole pixels while the plain sprite is off. Off with Screen shake off (D49).
 squash_on = Settings_ShakeOn() && ((MapFx_Now() - squash_start) < FEEL_SQUASH_MS);
 visible = !squash_on;
+Player_ApplyHiddenLook(id);   // D153: see-through while hidden
 
 // D70: apply the bump nudge last (taken back at the top of the next step)
 if (bump_timer > 0) {
