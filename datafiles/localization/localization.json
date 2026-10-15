@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-14T22:35:43Z",
-    "row_count": 1017
+    "generated_at_utc": "2026-10-15T00:28:51Z",
+    "row_count": 1020
   },
   "default_lang": "en",
   "languages": [
@@ -27,6 +27,10 @@
     "battle.action.run": {
       "en": "RUN",
       "ko": "도망"
+    },
+    "battle.action.run_no": {
+      "en": "no",
+      "ko": "불가"
     },
     "battle.action.skill": {
       "en": "SKILL",
@@ -2804,6 +2808,10 @@
       "en": "Every hint the game has: the ones you have seen and the ones still to come.",
       "ko": "게임이 알려 주는 모든 도움말입니다. 본 것도, 앞으로 볼 것도 있습니다."
     },
+    "pause.help.in_battle": {
+      "en": "Not available during a battle.",
+      "ko": "전투 중에는 사용할 수 없습니다."
+    },
     "pause.help.quit": {
       "en": "Saves the run and goes to the title. Continue picks it up again.",
       "ko": "도전을 저장하고 타이틀로 갑니다. 이어하기로 다시 시작할 수 있습니다."
@@ -3489,8 +3497,12 @@
       "ko": "다음 공격에 대비합니다. 피해가 {pct}% 줄어듭니다."
     },
     "status.desc.status_crit_up": {
-      "en": "Critical chance +{pct}%.",
-      "ko": "치명타 확률 +{pct}%."
+      "en": "1 in every {n} hits is a critical.",
+      "ko": "{n}번 공격마다 1번은 치명타입니다."
+    },
+    "status.desc.status_crit_up_many": {
+      "en": "In every {n} hits, {reds} are criticals.",
+      "ko": "{n}번 공격 중 {reds}번은 치명타입니다."
     },
     "status.desc.status_dmg_up": {
       "en": "Next attack deals {mult} times the damage.",

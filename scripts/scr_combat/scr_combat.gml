@@ -1639,6 +1639,12 @@ function Battle_RunChance(_spd_player, _spd_enemy, _fails = 0) {
     return min(1, sp / (sp + se) + FLEE_FAIL_STEP * _fails);
 }
 
+// R1b (D124): the flee chance as a whole percent for the RUN row; -1 against a boss (the same rule Battle_RunAttempt uses).
+function Battle_RunPct(_p, _e, _fails) {
+    if (is_struct(_e) && variable_struct_exists(_e, "id") && (_e.id == ENEMY_MINI_BOSS || _e.id == ENEMY_FINAL_BOSS)) return -1;
+    return round(Battle_RunChance(Combat_EffectiveStat(_p, STAT_SPD), Combat_EffectiveStat(_e, STAT_SPD), _fails) * 100);
+}
+
 function Battle_RunAttempt(_bc) {
     var p = _bc.p;
     var e = _bc.e;
@@ -2693,13 +2699,19 @@ function Battle_PlayerGuard(_bc) {
 }
 
 // ---- the menus: Ui_Menu objects the controller owns; the cursor and the open animation live there ----
-function Battle_CmdItems() {
+// R1b (D124): with the battle (_bc) the RUN row shows the flee chance now, e.g. "53%", or "no" against a boss.
+function Battle_CmdItems(_bc = undefined) {
+    var run_val = "";
+    if (!is_undefined(_bc) && variable_instance_exists(_bc, "p") && variable_instance_exists(_bc, "e")) {   // the battle controller (an instance) or a struct that looks like it
+        var pct = Battle_RunPct(_bc.p, _bc.e, variable_instance_exists(_bc, "run_fails") ? _bc.run_fails : 0);
+        run_val = (pct < 0) ? Loc_T("battle.action.run_no", "no") : string(pct) + "%";
+    }
     return [
         { id: "attack", label: Loc_T("battle.action.attack", "ATTACK"), enabled: true },
         { id: "skill", label: Loc_T("battle.action.skill", "SKILL"), enabled: true },
         { id: "item", label: Loc_T("battle.action.item", "ITEM"), enabled: true },
         { id: "guard", label: Loc_T("battle.action.guard", "GUARD"), enabled: true },
-        { id: "run", label: Loc_T("battle.action.run", "RUN"), enabled: true }
+        { id: "run", label: Loc_T("battle.action.run", "RUN"), value: run_val, enabled: true }
     ];
 }
 
@@ -2737,7 +2749,7 @@ function Battle_ListBack(_m, _res) {
 // Builds (or rebuilds) the three menus. The lists keep their cursor through Ui_MemGlobal (D95).
 function Battle_MenusBuild(_bc) {
     var z = Battle_Zones();
-    _bc.ui_cmd = Ui_MenuNew("battle_cmd", Battle_CmdItems(), {
+    _bc.ui_cmd = Ui_MenuNew("battle_cmd", Battle_CmdItems(_bc), {
         owner: _bc, on_confirm: Battle_CmdConfirm,
         layout: { x_anchor: "right", panel_w: round(z.right.w * 0.5), y_bottom: z.list_bottom }
     });
@@ -2749,7 +2761,7 @@ function Battle_MenusBuild(_bc) {
         owner: _bc, on_confirm: Battle_ItemConfirm, on_back: Battle_ListBack,
         layout: { x_anchor: "right", panel_w: z.right.w, y_bottom: z.list_bottom, details: true, details_pos: "above", details_cols: 2, rows_max: 3 }
     });
-    _bc.ui_sig = { mp: _bc.p.mp, items: Battle_ItemSig(_bc.p), rev: Loc_GetRevision() };
+    _bc.ui_sig = { mp: _bc.p.mp, items: Battle_ItemSig(_bc.p), rev: Loc_GetRevision(), run: Battle_RunPct(_bc.p, _bc.e, _bc.run_fails) };
 }
 
 // The menus' place follows the window (the zones change with the size): set every frame before a menu is stepped or drawn.
@@ -2785,8 +2797,8 @@ function Battle_OpenList(_bc, _state) {
 // One frame of whichever menu is up. Keeps the rows in step with the fight (MP spent, items used, language changed).
 function Battle_MenusStep(_bc) {
     if (!is_struct(_bc.ui_cmd)) Battle_MenusBuild(_bc);
-    var sig = { mp: _bc.p.mp, items: Battle_ItemSig(_bc.p), rev: Loc_GetRevision() };
-    if (sig.mp != _bc.ui_sig.mp || sig.items != _bc.ui_sig.items || sig.rev != _bc.ui_sig.rev) {
+    var sig = { mp: _bc.p.mp, items: Battle_ItemSig(_bc.p), rev: Loc_GetRevision(), run: Battle_RunPct(_bc.p, _bc.e, _bc.run_fails) };   // the RUN chance moves with SPD and failed tries
+    if (sig.mp != _bc.ui_sig.mp || sig.items != _bc.ui_sig.items || sig.rev != _bc.ui_sig.rev || sig.run != _bc.ui_sig.run) {
         var c1 = _bc.ui_cmd.cursor, c2 = _bc.ui_skill.cursor, c3 = _bc.ui_item.cursor;
         var t1 = _bc.ui_cmd.opened_ms, t2 = _bc.ui_skill.opened_ms, t3 = _bc.ui_item.opened_ms;
         var l1 = _bc.ui_cmd.lock_ms, l2 = _bc.ui_skill.lock_ms, l3 = _bc.ui_item.lock_ms;   // C4's confirm / back guard must not restart: a press just after a rebuild would be lost

@@ -24,7 +24,7 @@ if (room == rm_start && instance_exists(obj_start_controller)) {
 if (!skip_shared_modal_dim) UI_DrawModalDim();
 
 if (gs.ui.mode == UI_PAUSE) {
-    PauseMenu_Draw();
+    if (room != rm_battle) PauseMenu_Draw();   // R1b (D122): in a battle the battle controller draws it, after its own HUD
     exit;
 }
 

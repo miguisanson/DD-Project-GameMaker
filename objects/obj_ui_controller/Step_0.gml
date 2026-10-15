@@ -4,6 +4,7 @@ Skip_Tick();       // D48: hold-to-skip count (steps only while a cutscene or ca
 Banner_Step();     // C5 (D106): the boss name banner (about 1 s)
 var gs = GameState_Get();
 Transition_Update();
+if (!variable_global_exists("scn")) Focus_Step(window_has_focus());   // R1b (D122): the window lost focus -> pause, lower the music (scripted runs are never in front: they call Focus_Step themselves)
 UI_UpdateModalDimState();
 if (Tutorial_Step()) exit;   // C4 (D45): a tutorial pop-up takes every key until it is dismissed
 
