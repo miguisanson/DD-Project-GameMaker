@@ -65,13 +65,13 @@ Leave frame-counted: player grid step, enemy AI pacing, fx ages, cine pan (gamep
 |---|---|---|---|---|
 | G1 | Marble bag everywhere: status chances, enemy move deck, fixed heal/tick amounts, gold bag, Scrounger | D126 | scr_db_skill, scr_db_enemy, scr_db_item, scr_status, scr_loot, scr_save | MERGED to next |
 | G2 | Main menu refresh: splash, living background, Continue card; menu keeps the shared framed style | D128 | scr_menu (Title_*), obj_start_controller, workbook | MERGED to next |
-| G3 | Battle game feel: death pop, hit sparks + per-hit freeze, heavier player hurt + HP lag bar, hit jolt + enemy recoil, crit/BREAK zoom punch, subtle low-HP heartbeat | D138, D139 | scr_combat, scr_fx, obj_battle_controller | in flight |
+| G3 | Battle game feel: death pop, hit sparks + per-hit freeze, heavier player hurt + HP lag bar, hit jolt + enemy recoil, crit/BREAK zoom punch, subtle low-HP heartbeat | D138, D139 | scr_combat, scr_fx, obj_battle_controller | MERGED to next |
 | G4 | Class chest guard | D127 | obj_room_transition / scr_interact, workbook | MERGED to next |
-| G5 | Echo after class pick, filtered | D130 | scr_room_state, scr_menu (cards/echo) | in flight |
-| G6 | Map juice: chest burst, item rise, level-up sparkle, gold tick, step squash | D138 | scr_interact, obj_player, scr_fx, HUD | todo |
-| G7 | Battle speed-up hold + damage preview | D134, D135 | scr_combat | todo |
-| G8 | Controller rumble + setting; save-on-close code + IDE step | D136, D132 | scr_input, settings, obj_game_controller | in flight (save-on-close done: Run_SaveOnClose + owner Game End event) |
-| G9 | Run stats at run end + history | D137 | scr_room_state, run-end screen | todo |
+| G5 | Echo after class pick, filtered | D130 | scr_room_state, scr_menu (cards/echo) | MERGED to next |
+| G6 | Map juice: chest burst, item rise, level-up sparkle, gold tick, step squash | D138 | scr_interact, obj_player, scr_fx, HUD | in flight |
+| G7 | Battle speed-up hold + damage preview | D134, D135 | scr_combat | in flight |
+| G8 | Controller rumble + setting; save-on-close code + IDE step | D136, D132 | scr_input, settings, obj_game_controller | MERGED to next (Perfect detection fixed at merge for the D138 per-hit freeze) |
+| G9 | Run stats at run end + history | D137 | scr_room_state, run-end screen | in flight |
 | G10 | One UI style audit: every screen uses the shared frame/highlight/cursor/fonts/colours/spacing/motion/sounds; fix any screen that differs (incl. G2/G3/G6 additions) | D129 | Ui_* framework + every screen | todo (after G2) |
 | G11 | Consistency pass: Title Case, one word per meaning, one sound per action, one dim | D133 | workbook, scr_menu, scr_combat | todo (last) |
 | — | D131: no milestone unlocks (docs only) | D131 | — | done (decision) |
