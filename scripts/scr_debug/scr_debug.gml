@@ -243,7 +243,7 @@ function Scenario_Boot() {
     random_set_seed(12345);
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 24000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 26000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -524,7 +524,11 @@ function Scenario_StepSmoke(_s) {
             break;
         case 470: case 471: case 472: case 473: case 474: case 475: case 476: case 477: case 478: case 479:
         case 480: case 481: case 482: case 483: case 484: case 485: case 486: case 487: case 488: case 489:
-            Scenario_StepSmokeOneMenu(_s);   // H1 (D140, D141): Esc and Tab are one menu, in the fight too; Quit in a fight comes back to just before it; its last step calls Scenario_NoticeEnd
+            Scenario_StepSmokeOneMenu(_s);   // H1 (D140, D141): Esc and Tab are one menu, in the fight too; Quit in a fight comes back to just before it; its last step goes on with H8a (810)
+            break;
+        case 810: case 811: case 812: case 813: case 814: case 815: case 816: case 817: case 818: case 819:
+        case 820: case 821: case 822: case 823: case 824: case 825: case 826: case 827: case 828: case 829:
+            Scenario_StepSmokeLabels(_s);   // H8a (D150, D156): potions and a bed refused when they would do nothing, the highlighted status sentence, the Help stats page; its last step calls Scenario_NoticeEnd
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -10968,7 +10972,7 @@ function Scenario_StepSmokeOneMenu(_s) {
             }
             if (variable_struct_exists(_o, "arrived") && _s.t == _o.arrived + 30) {
                 Scenario_Check("onemenu_no_fight_starts_at_once_after_continue", room == rm_floor1 && !Transition_IsActive(), "room=" + room_get_name(room) + " fx=" + json_stringify(_gs.transition_fx) + " cooldown=" + string(instance_exists(obj_player) ? instance_find(obj_player, 0).battle_cooldown : -1));
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 810);   // H8a goes on from the map (its last step calls Scenario_NoticeEnd)
             }
             if (_s.t > 1500) { Scenario_Check("onemenu_continue_reaches_rm_floor1", false, "room=" + room_get_name(room) + " cont=" + string(variable_struct_exists(_o, "cont"))); Scenario_NoticeEnd(); }
             break;
@@ -11124,6 +11128,209 @@ function Scenario_StepShotsOneMenu(_s) {
                 } else {
                     Scenario_Next(_s, 490);
                 }
+            }
+            break;
+    }
+}
+
+// ---- H8a (D150, D156) steps 810..813, through the real keys: the Items tab refuses a potion at full HP / MP and an antidote with no poison (the item is
+// not used up, HP / MP do not change) and the same item works once it is needed; a bed at full HP and MP is refused (still free), a hurt player rests;
+// the Status tab shows the full sentence of the highlighted status; System > Help > Stats & terms opens its page. Its last step calls Scenario_NoticeEnd. ----
+function Scenario_StepSmokeLabels(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "lb")) _s.lb = { rc: { bed: noone, key: "", set_t: -1 } };
+    var _o = _s.lb;
+    var _u = TabMenu_Get();
+    switch (_s.step) {
+        case 810:   // the Items tab: HP potion x2, MP potion, antidote; all needed nothing yet
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                with (obj_enemy) instance_destroy();
+                var _ch = _gs.player_ch;
+                _ch.inventory = [];
+                _ch.inventory = Inv_Add(_ch.inventory, 10, 2);
+                _ch.inventory = Inv_Add(_ch.inventory, 11, 1);
+                _ch.inventory = Inv_Add(_ch.inventory, 12, 1);
+                _ch.status = [];
+                _ch.hp = _ch.max_hp;
+                _ch.mp = _ch.max_mp;
+                GameState_SetPlayer(_ch);
+                if (instance_exists(obj_player) && variable_instance_exists(obj_player, "character")) obj_player.character = _gs.player_ch;
+                _o.gold0 = Run_Get().gold;
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 2);   // the menu opens on Items
+                Ui_MemSet(Ui_MemGlobal(), "tab_items", 0);
+            }
+            if (_s.t == 8) Scenario_Tap("menu");
+            if (_s.t == 30) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_the_menu_opens_on_items", is_struct(_u) && _u.tab == 2, "tab=" + string(is_struct(_u) ? _u.tab : -1));
+                var _tm = TabMenu_TopMenu();
+                Scenario_Check("labels_the_cursor_is_on_the_hp_potion", is_struct(_tm) && _tm.items[_tm.cursor].id == "item_10", "id=" + (is_struct(_tm) ? string(_tm.items[_tm.cursor].id) : "?"));
+                Scenario_Tap("confirm");   // an HP potion at full HP
+            }
+            if (_s.t == 44) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_hp_potion_at_full_hp_says_so", is_struct(_u) && _u.toast == "HP is already full.", "toast=" + (is_struct(_u) ? _u.toast : "?"));
+                Scenario_Check("labels_hp_potion_at_full_hp_is_not_used_up", Inv_Count(_gs.player_ch.inventory, 10) == 2, "count=" + string(Inv_Count(_gs.player_ch.inventory, 10)));
+                Scenario_Check("labels_hp_is_unchanged_by_the_refused_potion", _gs.player_ch.hp == _gs.player_ch.max_hp);
+                _gs.player_ch.hp = max(1, _gs.player_ch.max_hp - 6);
+                _o.hp1 = _gs.player_ch.hp;
+                Scenario_Tap("confirm");   // the same potion, now needed
+            }
+            if (_s.t == 58) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_the_same_potion_works_when_hurt", Inv_Count(_gs.player_ch.inventory, 10) == 1 && _gs.player_ch.hp > _o.hp1 && _gs.player_ch.hp <= _gs.player_ch.max_hp, "count=" + string(Inv_Count(_gs.player_ch.inventory, 10)) + " hp=" + string(_gs.player_ch.hp));
+                Scenario_Check("labels_and_says_how_much_it_restored", is_struct(_u) && string_pos("Restored", _u.toast) == 1, "toast=" + (is_struct(_u) ? _u.toast : "?"));
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 70) Scenario_Tap("confirm");   // the MP potion at full MP
+            if (_s.t == 84) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_mp_potion_at_full_mp_says_so", is_struct(_u) && _u.toast == "MP is already full.", "toast=" + (is_struct(_u) ? _u.toast : "?"));
+                Scenario_Check("labels_mp_potion_at_full_mp_is_not_used_up", Inv_Count(_gs.player_ch.inventory, 11) == 1);
+                Scenario_Check("labels_mp_is_unchanged_by_the_refused_potion", _gs.player_ch.mp == _gs.player_ch.max_mp);
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 96) Scenario_Tap("confirm");   // the antidote with no poison
+            if (_s.t == 110) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_an_antidote_with_no_poison_says_so", is_struct(_u) && _u.toast == "No status to cure.", "toast=" + (is_struct(_u) ? _u.toast : "?"));
+                Scenario_Check("labels_the_antidote_is_not_used_up", Inv_Count(_gs.player_ch.inventory, 12) == 1);
+                Status_Add(_gs.player_ch, STATUS_POISON, 0, 0, 2);
+                Scenario_Tap("confirm");   // the antidote, now needed
+            }
+            if (_s.t == 124) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_the_antidote_cures_a_poison", Inv_Count(_gs.player_ch.inventory, 12) == 0 && !Status_Has(_gs.player_ch, STATUS_POISON), "count=" + string(Inv_Count(_gs.player_ch.inventory, 12)));
+                Scenario_Check("labels_and_says_it_is_cured", is_struct(_u) && string_pos("cured", _u.toast) > 0, "toast=" + (is_struct(_u) ? _u.toast : "?"));
+                Scenario_Check("labels_the_gold_is_untouched", Run_Get().gold == _o.gold0);
+                Scenario_Tap("esc");
+            }
+            if (_s.t == 140) {
+                Scenario_Check("labels_the_menu_closes", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()));
+                Scenario_Next(_s, 811);
+            }
+            break;
+        case 811:   // a bed with full HP and MP: refused, the bed stays free, nothing changes
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                var _c3 = _gs.player_ch;
+                _c3.hp = _c3.max_hp;
+                _c3.mp = _c3.max_mp;
+                _c3.status = [];
+                _o.rc = { bed: noone, key: "", set_t: -1 };
+                Scenario_RestBed(_o.rc, 5, 7);
+                _o.rc.set_t = _s.t;
+            }
+            if (_o.rc.set_t > 0 && _s.t >= _o.rc.set_t + 20) { Scenario_Tap("interact"); _o.rc.set_t = -1; }
+            if (BedUi_IsOpen() && !variable_struct_exists(_o, "b_open")) {
+                _o.b_open = _s.t;
+                Scenario_Check("labels_the_bed_menu_opens", _gs.ui.mode == UI_BED && Ui_StackTop(global.bed_ui.stk).id == "bed_main");
+                Scenario_Check("labels_rest_looks_unavailable_when_rested", Test_FieldOr(Ui_StackTop(global.bed_ui.stk).items[0], "dim", false));
+            }
+            if (variable_struct_exists(_o, "b_open") && !variable_struct_exists(_o, "b_tap") && BedUi_IsOpen() && InputLock_Settled(global.bed_ui.lock, 4 * TRANSITION_FRAME_MS)) {
+                _o.b_tap = _s.t;
+                Scenario_Tap("confirm");   // Rest
+            }
+            if (variable_struct_exists(_o, "b_tap") && _s.t == _o.b_tap + 14) {
+                Scenario_Check("labels_rest_at_full_is_refused_with_the_line", array_length(_gs.ui.lines_raw) >= 1 && _gs.ui.lines_raw[0] == "You are already rested.", "lines=" + json_stringify(_gs.ui.lines_raw));
+                Scenario_Check("labels_the_refused_bed_is_still_free", Bed_CanUse(_gs.flags, _o.rc.key) && !BedUi_IsOpen());
+                Scenario_Check("labels_the_refused_rest_changes_nothing", _gs.player_ch.hp == _gs.player_ch.max_hp && _gs.player_ch.mp == _gs.player_ch.max_mp);
+            }
+            if (variable_struct_exists(_o, "b_tap") && _s.t > _o.b_tap + 14) {
+                Scenario_CardsTalk(_s);
+                if (_s.t > _o.b_tap + 40 && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0) Scenario_Next(_s, 812);
+            }
+            if (_s.t > 600) { Scenario_Check("labels_the_refused_bed_flow", false, "open=" + string(BedUi_IsOpen()) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 812:   // hurt: the same bed works, and is used up
+            if (_s.t == 1) {
+                _gs.player_ch.hp = max(1, _gs.player_ch.max_hp - 4);
+                _gs.player_ch.mp = max(0, _gs.player_ch.max_mp - 1);
+                _o.rc.set_t = _s.t;
+                variable_struct_remove(_o, "b_open");
+                variable_struct_remove(_o, "b_tap");
+            }
+            if (_o.rc.set_t > 0 && _s.t >= _o.rc.set_t + 10) { Scenario_Tap("interact"); _o.rc.set_t = -1; }
+            if (BedUi_IsOpen() && !variable_struct_exists(_o, "b_open")) _o.b_open = _s.t;
+            if (variable_struct_exists(_o, "b_open") && !variable_struct_exists(_o, "b_tap") && BedUi_IsOpen() && InputLock_Settled(global.bed_ui.lock, 4 * TRANSITION_FRAME_MS)) {
+                _o.b_tap = _s.t;
+                Scenario_Check("labels_rest_does_not_look_unavailable_when_hurt", !Test_FieldOr(Ui_StackTop(global.bed_ui.stk).items[0], "dim", false));
+                Scenario_Tap("confirm");
+            }
+            if (variable_struct_exists(_o, "b_tap") && _s.t == _o.b_tap + 14) {
+                Scenario_Check("labels_rest_when_hurt_heals_hp_and_mp", _gs.player_ch.hp == _gs.player_ch.max_hp && _gs.player_ch.mp == _gs.player_ch.max_mp, "hp=" + string(_gs.player_ch.hp) + "/" + string(_gs.player_ch.max_hp));
+                Scenario_Check("labels_and_uses_the_bed_up", Bed_Used(_gs.flags, _o.rc.key));
+            }
+            if (variable_struct_exists(_o, "b_tap") && _s.t > _o.b_tap + 14) {
+                Scenario_CardsTalk(_s);
+                if (_s.t > _o.b_tap + 40 && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0) Scenario_Next(_s, 813);
+            }
+            if (_s.t > 600) { Scenario_Check("labels_the_hurt_bed_flow", false, "open=" + string(BedUi_IsOpen()) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 813:   // the Status tab highlights a status; System > Help > Stats & terms
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                if (instance_exists(_o.rc.bed)) with (_o.rc.bed) instance_destroy();
+                var _g2 = _gs.player_ch;
+                _g2.status = [];
+                Status_Add(_g2, STATUS_GUARD, 4, 0);
+                Status_Add(_g2, STATUS_POISON, 0, 0, 3);
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);
+                Ui_MemSet(Ui_MemGlobal(), "tab_status", 0);
+                Ui_MemSet(Ui_MemGlobal(), "tab_system", 0);
+            }
+            if (_s.t == 8) Scenario_Tap("menu");
+            if (_s.t == 30) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_the_menu_opens_on_status", is_struct(_u) && _u.tab == 0);
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 42 || _s.t == 54 || _s.t == 66) Scenario_Tap("menu_down");
+            if (_s.t == 78) {
+                var _sm = TabMenu_TopMenu();
+                var _row = _sm.items[_sm.cursor];
+                Scenario_Check("labels_the_cursor_is_on_the_guard_status", _row.id == "status_" + string(STATUS_GUARD), "id=" + string(_row.id));
+                Scenario_Check("labels_the_highlighted_status_says_what_it_does_and_its_turns", string_pos("4 turns left", _row.help) > 0 && string_pos("next incoming hit", string_lower(_row.help)) > 0, "help=" + _row.help);
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 90) {
+                var _sm2 = TabMenu_TopMenu();
+                var _row2 = _sm2.items[_sm2.cursor];
+                Scenario_Check("labels_the_poison_row_says_its_stacks", _row2.id == "status_" + string(STATUS_POISON) && string_pos("3 stacks", _row2.help) > 0, "help=" + _row2.help);
+                Scenario_Tap("tab_prev");   // Q from Status wraps to System
+            }
+            if (_s.t == 106) {
+                _u = TabMenu_Get();
+                Scenario_Check("labels_q_from_status_reaches_system", is_struct(_u) && _u.tab == 6);
+                Scenario_Tap("confirm");   // Help
+            }
+            if (_s.t == 120) {
+                var _hm = TabMenu_TopMenu();
+                Scenario_Check("labels_help_opens_with_the_stats_page_added", TabMenu_Depth() == 2 && _hm.id == "help" && array_length(_hm.items) == 12, "depth=" + string(TabMenu_Depth()) + " items=" + string(array_length(_hm.items)));
+                Scenario_Tap("menu_up");   // wraps to the last row
+            }
+            if (_s.t == 134) {
+                var _hm2 = TabMenu_TopMenu();
+                Scenario_Check("labels_the_last_help_row_is_stats_and_terms", _hm2.items[_hm2.cursor].id == "stats_terms", "id=" + string(_hm2.items[_hm2.cursor].id));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 148) {
+                var _st = TabMenu_TopMenu();
+                Scenario_Check("labels_the_stats_page_opens", TabMenu_Depth() == 3 && _st.id == "help_stats", "depth=" + string(TabMenu_Depth()) + " id=" + string(_st.id));
+                Scenario_Check("labels_the_stats_page_lists_every_term", array_length(_st.items) == array_length(Help_StatsItems()) && array_length(_st.items) >= 28);
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 162) {
+                var _st2 = TabMenu_TopMenu();
+                Scenario_Check("labels_the_stats_page_scrolls_by_cursor", _st2.cursor == 1);
+                Scenario_Tap("cancel");
+            }
+            if (_s.t == 176) {
+                Scenario_Check("labels_back_returns_to_the_help_list", TabMenu_Depth() == 2 && TabMenu_TopMenu().id == "help");
+                Menu_Close(true);
+                Scenario_NoticeEnd();   // the end of the chain
             }
             break;
     }

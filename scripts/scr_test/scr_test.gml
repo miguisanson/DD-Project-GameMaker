@@ -128,6 +128,7 @@ function Test_RunAll() {
     Test_RunSuite("H3", Test_Suite_H3);
     Test_RunSuite("LevelUpGrowth", Test_Suite_LevelUpGrowth);
     Test_RunSuite("OneMenu", Test_Suite_OneMenu);
+    Test_RunSuite("Labels", Test_Suite_Labels);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -10224,4 +10225,300 @@ function Test_Suite_OneMenu() {
     _gs2.persist = _old_persist;
     _gs2.player_ch = _old_ch;
     _gs2.flags = _old_flags;
+}
+
+// ---- H8a (D150, D156): status labels, the XP bar, the "Equipped" header, the Help stats page, the refusals ----
+// A field of a struct that the older builders may not have, or the default.
+function Test_FieldOr(_s, _k, _d) {
+    return (is_struct(_s) && variable_struct_exists(_s, _k)) ? variable_struct_get(_s, _k) : _d;
+}
+
+function Test_Suite_Labels() {
+    Loc_SetLanguage("en");
+
+    // ---- D150: the short name of every status (the brief's examples: PSN, BLD, Thirst); at most 6 characters in English ----
+    var _names = [[STATUS_POISON, "PSN"], [STATUS_BLEED, "BLD"], [STATUS_BURN, "BRN"], [STATUS_STUN, "STN"], [STATUS_GUARD, "GRD"], [STATUS_DMG_UP, "REV"],
+                  [STATUS_EVASION, "EVA"], [STATUS_CRIT_UP, "AIM"], [STATUS_HIT_UP, "FORE"], [STATUS_MEDITATION, "MED"], [STATUS_SOLIDIFY, "Solid"],
+                  [STATUS_BLOODTHIRSTY, "Thirst"], [STATUS_BLESSING, "Bless"], [STATUS_SUNDER, "Sunder"], [STATUS_BRACE, "Brace"]];
+    var _ids = Status_AllIds();
+    Test_Eq("D150 there are 15 statuses to label", array_length(_ids), 15);
+    var _seen = {};
+    var _all_short = true;
+    for (var _i = 0; _i < array_length(_names); _i++) {
+        var _sn = Status_ShortName(_names[_i][0]);
+        Test_Eq("D150 short name of status " + string(_names[_i][0]), _sn, _names[_i][1]);
+        if (string_length(_sn) < 1 || string_length(_sn) > 6) _all_short = false;
+        variable_struct_set(_seen, (_sn == "") ? ("none" + string(_i)) : string_lower(_sn), true);
+    }
+    Test_True("D150 every English short name is 1 to 6 characters", _all_short);
+    Test_Eq("D150 no two statuses share a short name", array_length(variable_struct_get_names(_seen)), 15);
+
+    // ---- the label = short name + the count the player needs: a poison's or a bleed's stacks, otherwise the turns left ----
+    var _ch = CharacterCreate_Player(CLASS_MAGE);
+    _ch = Status_Add(_ch, STATUS_POISON, 0, 0, 3);
+    _ch = Status_Add(_ch, STATUS_BLEED, 3, 0, 2);
+    _ch = Status_Add(_ch, STATUS_BURN, 2, 3);
+    _ch = Status_Add(_ch, STATUS_BRACE, 2, 0);
+    _ch = Status_Add(_ch, STATUS_BLOODTHIRSTY, 4, 0);
+    Test_Eq("D150 poison with 3 stacks reads PSN 3", Status_ShortLabel(STATUS_POISON, Status_Find(_ch, STATUS_POISON)), "PSN 3");
+    Test_Eq("D150 bleeding with 2 stacks reads BLD 2", Status_ShortLabel(STATUS_BLEED, Status_Find(_ch, STATUS_BLEED)), "BLD 2");
+    Test_Eq("D150 burning with 2 turns left reads BRN 2", Status_ShortLabel(STATUS_BURN, Status_Find(_ch, STATUS_BURN)), "BRN 2");
+    Test_Eq("D150 braced with 2 turns left reads Brace 2", Status_ShortLabel(STATUS_BRACE, Status_Find(_ch, STATUS_BRACE)), "Brace 2");
+    Test_Eq("D150 bloodthirsty reads Thirst 4", Status_ShortLabel(STATUS_BLOODTHIRSTY, Status_Find(_ch, STATUS_BLOODTHIRSTY)), "Thirst 4");
+    Test_Eq("D150 the count of a poison is its stacks", Status_LabelCount(STATUS_POISON, Status_Find(_ch, STATUS_POISON)), "3");
+    Test_Eq("D150 the count of a burn is its turns", Status_LabelCount(STATUS_BURN, Status_Find(_ch, STATUS_BURN)), "2");
+    Test_Eq("D150 a status with no data reads its name alone", Status_ShortLabel(STATUS_CRIT_UP), "AIM");
+    Test_Eq("D150 a status with 0 turns reads its name alone", Status_ShortLabel(STATUS_GUARD, { id: STATUS_GUARD, turns: 0, power: 0, stacks: 1 }), "GRD");
+    Test_Eq("D150 one poison stack reads PSN 1", Status_ShortLabel(STATUS_POISON, { id: STATUS_POISON, turns: 1, power: 0, stacks: 1 }), "PSN 1");
+
+    // ---- the chips carry the label and the full sentence ----
+    var _chips = Battle_StatusChips(_ch);
+    Test_Eq("D150 five statuses make five chips", array_length(_chips), 5);
+    Test_Eq("D150 the poison chip's label", Test_FieldOr(_chips[0], "label", "?"), "PSN 3");
+    Test_Eq("D150 the bleed chip's label", Test_FieldOr(_chips[1], "label", "?"), "BLD 2");
+    Test_Eq("D150 the burn chip's label", Test_FieldOr(_chips[2], "label", "?"), "BRN 2");
+    Test_Eq("D150 the chip's full sentence is the highlighted sentence", Test_FieldOr(_chips[3], "full", "?"), Status_FullLine(STATUS_BRACE, Status_Find(_ch, STATUS_BRACE)));
+    var _en = EnemyCreate(ENEMY_SLIME);
+    _en = Status_Add(_en, STATUS_BURN, 2, 3);
+    Test_Eq("D150 an enemy's chips are labelled the same way", Test_FieldOr(Battle_StatusChips(_en)[0], "label", "?"), "BRN 2");
+
+    // ---- the highlighted sentence: what it does, then the turns left (statuses whose own sentence already counts the turns add nothing) ----
+    for (var _j = 0; _j < array_length(_ids); _j++) {
+        var _fl = Status_FullLine(_ids[_j]);
+        Test_True("D150 status " + string(_ids[_j]) + " has a sentence", string_length(_fl) > 8 && string_pos("{", _fl) == 0 && string_pos("}", _fl) == 0);
+    }
+    var _gd = { id: STATUS_GUARD, turns: 4, power: 0, stacks: 1 };
+    Test_Eq("D150 a buff's sentence ends with its turns left", Status_FullLine(STATUS_GUARD, _gd), Status_Describe(STATUS_GUARD, _gd).line + " 4 turns left.");
+    var _gd1 = { id: STATUS_GUARD, turns: 1, power: 0, stacks: 1 };
+    Test_Eq("D150 one turn left is singular", Status_FullLine(STATUS_GUARD, _gd1), Status_Describe(STATUS_GUARD, _gd1).line + " 1 turn left.");
+    var _pe = Status_Find(_ch, STATUS_POISON);
+    Test_Eq("D150 a poison's sentence already says its stacks: nothing added", Status_FullLine(STATUS_POISON, _pe), Status_Describe(STATUS_POISON, _pe).line);
+    var _be = Status_Find(_ch, STATUS_BURN);
+    Test_Eq("D150 a burn's sentence already says its turns: nothing added", Status_FullLine(STATUS_BURN, _be), Status_Describe(STATUS_BURN, _be).line);
+    Test_Eq("D150 with no data the sentence is the general one", Status_FullLine(STATUS_GUARD), Status_Describe(STATUS_GUARD).line);
+
+    // ---- the Status tab shows the full sentence when a status row is highlighted ----
+    var _kn = CharacterCreate_Player(CLASS_KNIGHT);
+    _kn = Status_Add(_kn, STATUS_GUARD, 4, 0);
+    var _rows = TabStatus_Items(_kn);
+    var _row = undefined;
+    for (var _r = 0; _r < array_length(_rows); _r++) if (_rows[_r].id == "status_" + string(STATUS_GUARD)) _row = _rows[_r];
+    Test_True("D150 the Status tab has a row for the status", is_struct(_row));
+    Test_Eq("D150 the highlighted row says what it does and the turns left", Test_FieldOr(_row, "help", ""), Status_FullLine(STATUS_GUARD, Status_Find(_kn, STATUS_GUARD)));
+    Test_True("D150 and the turns left are in it", string_pos("4 turns left", Test_FieldOr(_row, "help", "")) > 0);
+
+    // ---- Korean: every short name exists, differs from the English, and is short enough to sit under the chip ----
+    Loc_SetLanguage("ko");
+    var _ko_ok = true;
+    var _ko_diff = true;
+    var _ko_names = "";
+    for (var _k = 0; _k < array_length(_ids); _k++) {
+        var _kn2 = Status_ShortName(_ids[_k]);
+        _ko_names += _kn2 + ",";
+        if (string_length(_kn2) < 1 || string_length(_kn2) > 3) _ko_ok = false;
+        if (_kn2 == _names[_k][1]) _ko_diff = false;
+    }
+    Test_True("D150 Korean short names are 1 to 3 characters: " + _ko_names, _ko_ok);
+    Test_True("D150 Korean short names are Korean words", _ko_diff);
+    Test_Eq("D150 a Korean poison label is the Korean word and the count", Status_ShortLabel(STATUS_POISON, Status_Find(_ch, STATUS_POISON)), Status_ShortName(STATUS_POISON) + " 3");
+    Loc_SetLanguage("en");
+
+    // ---- the label's size: 3 x 5 glyphs, 4 cells per character with the space; the chip row makes room ----
+    Test_Eq("D150 PSN 3 is 19 cells wide at 2 px", Battle_ChipLabelW("PSN", "3", 2), 38);
+    Test_Eq("D150 a name alone is its letters", Battle_ChipLabelW("PSN", "", 2), 22);
+    Test_Eq("D150 Thirst 4 at 3 px", Battle_ChipLabelW("Thirst", "4", 3), 93);
+    Test_Eq("D150 the label row is 5 glyph rows high in English", Battle_ChipLabelH(), 5 * Battle_IconK());
+    var _cm = Battle_ChipMetrics(3, 32, 2, 176, [38, 38, 38]);
+    Test_Eq("D150 three wide cells all show", _cm.shown, 3);
+    Test_Eq("D150 their row is 3 x 38 + 2 gaps", _cm.w, 118);
+    var _cm2 = Battle_ChipMetrics(6, 32, 2, 176, [38, 38, 38, 38, 38, 38]);
+    Test_Eq("D150 six wide cells: three show", _cm2.shown, 3);
+    Test_Eq("D150 and the rest become a plus chip", _cm2.more, 3);
+    Test_Eq("D150 the row with the plus chip", _cm2.w, 156);
+    var _cm3 = Battle_ChipMetrics(2, 32, 2, 176, [20, 20]);
+    Test_Eq("D150 narrow labels do not shrink the chip's cell", _cm3.w, 2 * 36 + 2);
+    var _cm4 = Battle_ChipMetrics(4, 32, 2, 100);
+    Test_True("D150 the old call (no label widths) still works", _cm4.shown >= 1 && _cm4.c == 36);
+
+    // ---- the player panel is taller by the label row at 480 x 432; the other sizes already had room (the band is the command menu) ----
+    var _sizes = [[480, 432, 2, 16, 2, 120], [640, 576, 3, 24, 2, 174], [800, 720, 4, 32, 3, 232], [960, 864, 6, 48, 4, 348]];   // gui w, h, p, line, k, expected band height with the labels
+    for (var _z = 0; _z < array_length(_sizes); _z++) {
+        var _g = _sizes[_z];
+        var _tlb = 3 * _g[2] + (16 * _g[4] + 6 * _g[2]) + 2 * _g[2] + (_g[3] + _g[2]);
+        var _zn = BattleHud_Zones(_g[0], _g[1], _g[2], _g[3], _tlb, 16 * _g[4], 5 * _g[4]);
+        var _tag = "D150 zones " + string(_g[0]) + "x" + string(_g[1]);
+        Test_Eq(_tag + ": the band holds the panel with its label row", _zn.band_h, _g[5]);
+        Test_True(_tag + ": the panel is on screen", _zn.player.y >= _tlb && _zn.player.y + _zn.player.h <= _g[1] - _zn.m);
+        Test_True(_tag + ": the log still sits above it", _zn.msg.y + _zn.msg.h <= _zn.player.y && _zn.msg.y >= _tlb);
+        var _need = 8 * _g[2] + 3 * _g[3] + 6 * _g[2] + 16 * _g[4] + 5 * _g[4] + _g[2];
+        Test_True(_tag + ": the panel is at least as tall as its rows, chips and labels", _zn.player.h >= _need);
+    }
+    var _z0 = BattleHud_Zones(480, 432, 2, 16, 60, 32);
+    Test_Eq("D150 without a label height the zones are as before", _z0.band_h, 116);
+
+    // ---- D156: the XP bar is not the HP bar nor the MP bar ----
+    var _hp = Ui_BarStyle("hp");
+    var _mp = Ui_BarStyle("mp");
+    var _xp = Ui_BarStyle("xp");
+    Test_Eq("D156 the HP bar is solid", _hp.pattern, "solid");
+    Test_Eq("D156 the MP bar is striped", _mp.pattern, "stripe");
+    Test_Eq("D156 the XP bar is in segments", _xp.pattern, "segments");
+    Test_Eq("D156 the XP bar uses the brightest palette green", _xp.fill, UI_C_LIGHTEST);
+    Test_Eq("D156 the HP bar uses the mid green", _hp.fill, UI_C_LIGHT);
+    Test_True("D156 the XP style differs from both others", _xp.pattern != _hp.pattern && _xp.pattern != _mp.pattern && _xp.fill != _hp.fill && _xp.fill != _mp.fill);
+    Test_True("D156 the XP bar is thinner than the HP and MP bars", Ui_BarHeight("xp", 16, 2) < Ui_BarHeight("hp", 16, 2) && Ui_BarHeight("xp", 16, 2) == Ui_BarHeight("mp", 16, 2) div 2);
+    Test_True("D156 the XP bar is still thick enough to read (2 pixels)", Ui_BarHeight("xp", 16, 2) >= 2 * 2);
+    Test_True("D156 the XP bar is a whole number of pixels at every size", Ui_BarHeight("xp", 48, 6) mod 6 == 0 && Ui_BarHeight("xp", 32, 4) mod 4 == 0);
+    Test_Eq("D156 the XP bar is labelled XP", Loc_T("tab.lbl.xp", "?"), "XP");
+
+    // ---- D156: the Gear header says Equipped, as a section header like Bag; no "Worn" is left in English ----
+    var _gear = TabGear_Items(CharacterCreate_Player(CLASS_KNIGHT));
+    Test_Eq("D156 the first Gear header is Equipped", _gear[0].label, "Equipped");
+    Test_Eq("D156 it is a section header", _gear[0].kind, "head");
+    Test_Eq("D156 its text key now holds Equipped", Loc_GetRaw("tab.gear.worn", "en"), "Equipped");
+    var _bag_kn = CharacterCreate_Player(CLASS_KNIGHT);
+    _bag_kn.inventory = Inv_Add(_bag_kn.inventory, 2, 1);
+    var _gear2 = TabGear_Items(_bag_kn);
+    var _bag_head = undefined;
+    for (var _gi = 0; _gi < array_length(_gear2); _gi++) if (_gear2[_gi].id == "head_bag") _bag_head = _gear2[_gi];
+    Test_True("D156 Bag and Equipped are the same kind of header", is_struct(_bag_head) && _bag_head.kind == _gear2[0].kind && _bag_head.enabled == _gear2[0].enabled && _bag_head.value == _gear2[0].value);
+    var _worn_keys = ["tab.gear.worn", "shop.worn", "tab.gear.empty", "tab.gear.empty_help"];
+    var _no_worn = true;
+    var _bad_key = "";
+    for (var _wk = 0; _wk < array_length(_worn_keys); _wk++) {
+        if (string_pos("worn", string_lower(Loc_GetRaw(_worn_keys[_wk], "en"))) > 0) { _no_worn = false; _bad_key += _worn_keys[_wk] + " "; }
+    }
+    Test_True("D156 no English Gear or shop text says worn: " + _bad_key, _no_worn);
+
+    // ---- D156: the Help page "Stats & terms" ----
+    var _hi = TabHelp_Items();
+    Test_Eq("D156 the Help list has the 11 hints and the stats page", array_length(_hi), 12);
+    Test_Eq("D156 the stats page is the last row", _hi[array_length(_hi) - 1].id, "stats_terms");
+    Test_Eq("D156 its title", _hi[array_length(_hi) - 1].label, "Stats & terms");
+    Test_Eq("D156 the hints keep their places", _hi[0].id, "timeline");
+    var _terms = Help_StatsItems();
+    var _tid = {};
+    for (var _t = 0; _t < array_length(_terms); _t++) variable_struct_set(_tid, _terms[_t].id, _terms[_t]);
+    var _must = ["power", "atk", "def", "mag", "spd", "hp", "mp", "crit", "perfect", "good", "ok", "break", "elite"];
+    for (var _m = 0; _m < array_length(_must); _m++) {
+        var _have = variable_struct_exists(_tid, _must[_m]);
+        Test_True("D156 the stats page lists " + _must[_m], _have);
+        if (_have) {
+            var _tr = variable_struct_get(_tid, _must[_m]);
+            Test_True("D156 " + _must[_m] + " has a short line", string_length(_tr.help) >= 12 && string_length(_tr.help) <= 120 && string_pos("{", _tr.help) == 0);
+        }
+    }
+    for (var _si = 0; _si < array_length(_ids); _si++) {
+        var _sk = "status_" + string(_ids[_si]);
+        var _sh = variable_struct_exists(_tid, _sk);
+        Test_True("D156 the stats page lists status " + string(_ids[_si]), _sh);
+        if (_sh) {
+            var _sr = variable_struct_get(_tid, _sk);
+            Test_Eq("D156 status " + string(_ids[_si]) + " is explained by the game's own sentence", _sr.help, Status_Describe(_ids[_si]).line);
+            Test_Eq("D156 and listed under its name", _sr.label, StatusDB_Get(_ids[_si]).name);
+        }
+    }
+    Test_Eq("D156 the stats page rows start with Power", array_length(_terms) > 0 ? _terms[0].label : "", "Power");
+    var _lbl = {};
+    for (var _l = 0; _l < array_length(_terms); _l++) variable_struct_set(_lbl, _terms[_l].label, true);
+    Test_Eq("D156 no term is listed twice", array_length(variable_struct_get_names(_lbl)), array_length(_terms));
+    var _grades = (variable_struct_exists(_tid, "perfect") ? _tid.perfect.help : "") + "|" + (variable_struct_exists(_tid, "good") ? _tid.good.help : "") + "|" + (variable_struct_exists(_tid, "ok") ? _tid.ok.help : "");
+    Test_True("D156 the grades give the damage numbers (+30%, +10%)", string_pos("30%", _grades) > 0 && string_pos("10%", _grades) > 0);
+    Test_True("D156 BREAK says +50% damage", variable_struct_exists(_tid, "break") && string_pos("50%", variable_struct_get(_tid, "break").help) > 0);
+    Test_True("D156 Crit says the damage is doubled", variable_struct_exists(_tid, "crit") && string_pos("2", _tid.crit.help) > 0);
+
+    // ---- D156: refusals. A potion at full HP / MP, a cure with nothing to cure, an item that would do nothing: refused, not used up ----
+    var _m1 = CharacterCreate_Player(CLASS_MAGE);
+    _m1.inventory = [];
+    _m1.inventory = Inv_Add(_m1.inventory, 10, 2);
+    _m1.inventory = Inv_Add(_m1.inventory, 11, 2);
+    _m1.inventory = Inv_Add(_m1.inventory, 12, 1);
+    _m1.inventory = Inv_Add(_m1.inventory, 13, 1);
+    _m1.hp = _m1.max_hp;
+    _m1.mp = _m1.max_mp;
+    var _r1 = TabItems_Use(_m1, 10);
+    Test_False("D156 an HP potion at full HP is refused", _r1.ok);
+    Test_Eq("D156 with the HP-is-full line", _r1.msg, "HP is already full.");
+    Test_Eq("D156 the HP potion is not used up", Inv_Count(_r1.ch.inventory, 10), 2);
+    Test_Eq("D156 HP is as it was", _r1.ch.hp, _r1.ch.max_hp);
+    var _r2 = TabItems_Use(_m1, 11);
+    Test_False("D156 an MP potion at full MP is refused", _r2.ok);
+    Test_Eq("D156 with the MP-is-full line", _r2.msg, "MP is already full.");
+    Test_Eq("D156 the MP potion is not used up", Inv_Count(_r2.ch.inventory, 11), 2);
+    var _r3 = TabItems_Use(_m1, 12);
+    Test_False("D156 an antidote with no poison is refused", _r3.ok);
+    Test_Eq("D156 with the nothing-to-cure line", _r3.msg, "No status to cure.");
+    Test_Eq("D156 the antidote is not used up", Inv_Count(_r3.ch.inventory, 12), 1);
+    _m1 = Status_Add(_m1, STATUS_BLEED, 3, 0, 1);
+    var _r4 = TabItems_Use(_m1, 12);
+    Test_False("D156 an antidote against a bleed only is refused (wrong status)", _r4.ok);
+    Test_Eq("D156 the antidote is still there", Inv_Count(_r4.ch.inventory, 12), 1);
+    Test_True("D156 and the bleed is still there", Status_Has(_r4.ch, STATUS_BLEED));
+    var _r5 = TabItems_Use(_m1, 13);
+    Test_True("D156 a bandage against the bleed works", _r5.ok);
+    Test_Eq("D156 the bandage is used up", Inv_Count(_r5.ch.inventory, 13), 0);
+    Test_False("D156 the bleed is gone", Status_Has(_r5.ch, STATUS_BLEED));
+    _m1.hp = _m1.max_hp - 5;
+    var _hp_before = _m1.hp;
+    var _r6 = TabItems_Use(_m1, 10);
+    Test_True("D156 the same HP potion at less than full HP works", _r6.ok);
+    Test_Eq("D156 and is used up", Inv_Count(_r6.ch.inventory, 10), 1);
+    Test_True("D156 and HP went up (never past the maximum)", _r6.ch.hp > _hp_before && _r6.ch.hp <= _r6.ch.max_hp);
+    _m1.mp = max(0, _m1.max_mp - 3);
+    var _r7 = TabItems_Use(_m1, 11);
+    Test_True("D156 the MP potion at less than full MP works", _r7.ok);
+    Test_Eq("D156 and is used up", Inv_Count(_r7.ch.inventory, 11), 1);
+    _m1 = Status_Add(_m1, STATUS_POISON, 0, 0, 2);
+    var _r8 = TabItems_Use(_m1, 12);
+    Test_True("D156 the antidote against a poison works", _r8.ok);
+    Test_Eq("D156 and is used up", Inv_Count(_r8.ch.inventory, 12), 0);
+
+    // an item whose whole effect would do nothing (a made-up consumable with no effect)
+    var _fake = variable_clone(ItemDB_Get(10));
+    _fake.id = 998;
+    _fake.use = { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite: noone, fx_frames: 12, fx_speed: 0.2, skill_id: -1 };
+    ds_map_add(global.item_db, 998, _fake);
+    var _m2 = CharacterCreate_Player(CLASS_MAGE);
+    _m2.inventory = [];
+    _m2.inventory = Inv_Add(_m2.inventory, 998, 1);
+    _m2.hp = max(1, _m2.max_hp - 4);
+    var _r9 = TabItems_Use(_m2, 998);
+    Test_False("D156 a consumable that would do nothing is refused", _r9.ok);
+    Test_Eq("D156 with the nothing-happens line", _r9.msg, "Nothing happens.");
+    Test_Eq("D156 and is not used up", Inv_Count(_r9.ch.inventory, 998), 1);
+    ds_map_delete(global.item_db, 998);
+
+    // ---- D156: the bed ----
+    var _bk = Bed_Key("rm_floor3", 48, 64);
+    var _b1 = CharacterCreate_Player(CLASS_MAGE);
+    _b1.hp = _b1.max_hp;
+    _b1.mp = _b1.max_mp;
+    Test_False("D156 a rested character cannot rest", Bed_CanRest(_b1));
+    var _bf = {};
+    var _bc1 = Bed_Choose(_b1, _bf, _bk, "heal", -1);
+    Test_False("D156 resting at full HP and MP is refused", _bc1.ok);
+    Test_Eq("D156 with the already-rested line", _bc1.msg, "You are already rested.");
+    Test_False("D156 the bed is not used up", Bed_Used(_bf, _bk));
+    Test_True("D156 the bed can be used later", Bed_CanUse(_bf, _bk));
+    Test_True("D156 HP and MP are as they were", _bc1.ch.hp == _b1.max_hp && _bc1.ch.mp == _b1.max_mp);
+    var _b2 = CharacterCreate_Player(CLASS_MAGE);
+    _b2.hp = _b2.max_hp - 3;
+    _b2.mp = _b2.max_mp;
+    Test_True("D156 missing HP: it can rest", Bed_CanRest(_b2));
+    var _bc2 = Bed_Choose(_b2, _bf, _bk, "heal", -1);
+    Test_True("D156 resting with missing HP works", _bc2.ok && _bc2.ch.hp == _bc2.ch.max_hp);
+    Test_True("D156 and uses the bed up", Bed_Used(_bf, _bk));
+    var _b3 = CharacterCreate_Player(CLASS_MAGE);
+    _b3.hp = _b3.max_hp;
+    _b3.mp = max(0, _b3.max_mp - 2);
+    var _bf3 = {};
+    Test_True("D156 full HP but missing MP: resting still helps", Bed_CanRest(_b3) && Bed_Choose(_b3, _bf3, _bk, "heal", -1).ok);
+    var _bf4 = {};
+    var _bc4 = Bed_Choose(_b1, _bf4, _bk, "upgrade", SKILL_WOUND);
+    Test_False("D156 upgrading a skill he does not have is refused", _bc4.ok);
+    Test_False("D156 and the bed stays free", Bed_Used(_bf4, _bk));
+    Test_True("D156 with a line that says so", string_length(_bc4.msg) > 5);
+    var _bmenu = Bed_MenuItems(_b1);
+    Test_True("D156 the Rest row looks unavailable when rested", Test_FieldOr(_bmenu[0], "dim", false));
+    Test_False("D156 the Rest row is not dim when HP is missing", Test_FieldOr(Bed_MenuItems(_b2)[0], "dim", false));
 }

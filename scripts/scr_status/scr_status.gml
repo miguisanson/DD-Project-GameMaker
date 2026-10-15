@@ -878,3 +878,26 @@ function Status_LabelWithSign(_cfg, _status_id) {
     var suffix = Status_IsNegative(_status_id) ? "-" : "+";
     return name_txt + suffix;
 }
+
+// ---- D150: the short label under a status chip ("PSN 3", "BLD 2", "Thirst 4") and the full sentence shown when the status is highlighted ----
+// Every status id in order (the labels, the Help page and the tests walk this list).
+function Status_AllIds() {
+    return [STATUS_POISON, STATUS_BLEED, STATUS_BURN, STATUS_STUN, STATUS_GUARD, STATUS_DMG_UP, STATUS_EVASION, STATUS_CRIT_UP, STATUS_HIT_UP,
+            STATUS_MEDITATION, STATUS_SOLIDIFY, STATUS_BLOODTHIRSTY, STATUS_BLESSING, STATUS_SUNDER, STATUS_BRACE];
+}
+
+function Status_ShortName(_status_id) {
+    return "";
+}
+
+function Status_LabelCount(_status_id, _data = undefined) {
+    return "";
+}
+
+function Status_ShortLabel(_status_id, _data = undefined) {
+    return "";
+}
+
+function Status_FullLine(_status_id, _data = undefined) {
+    return "";
+}

@@ -390,6 +390,11 @@ function Bed_UpgradableSkills(_ch) {
     return out;
 }
 
+// D156: resting only helps while HP or MP is missing.
+function Bed_CanRest(_ch) {
+    return true;
+}
+
 // A changed copy with full HP and MP.
 function Bed_Heal(_ch) {
     var ch = variable_clone(_ch);
@@ -411,7 +416,7 @@ function Bed_Upgrade(_ch, _skill_id) {
 // The whole choice. _choice is "heal" or "upgrade" (with the skill id). Marks the bed used only when something happened.
 // Returns { ok, ch }; _flags is changed in place.
 function Bed_Choose(_ch, _flags, _key, _choice, _skill_id) {
-    var out = { ok: false, ch: _ch };
+    var out = { ok: false, ch: _ch, msg: "" };
     if (Bed_Used(_flags, _key)) return out;
     if (_choice == "heal") {
         out.ch = Bed_Heal(_ch);

@@ -2640,6 +2640,16 @@ function Battle_FighterChipsBuild(_bc, _who) {
     return chips;
 }
 
+// D150: width of the label under a chip (name, then the count): 3 x 5 glyphs of _q window pixels.
+function Battle_ChipLabelW(_name, _count, _q) {
+    return 0;
+}
+
+// D150: height of the label row under the chips (zero language-dependent: the mini glyphs are 5 high, a Korean name is a text line).
+function Battle_ChipLabelH() {
+    return 0;
+}
+
 // Width of a row of chips, and how many fit in _max_w (the rest become one plus-count chip).
 function Battle_ChipMetrics(_n, _ic, _p, _max_w) {
     var c = _ic + 2 * _p;

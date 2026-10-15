@@ -603,6 +603,24 @@ function TabSystem_Disarm() {
     TabMenu_Refresh();
 }
 
+// D156: the three bars differ without a colour of their own: HP solid, MP striped, XP thin and in segments (the brightest green).
+function Ui_BarStyle(_kind) {
+    return { kind: _kind, fill: UI_C_LIGHT, pattern: "solid", thick: 1 };
+}
+
+function Ui_BarHeight(_kind, _line_h, _p) {
+    return max(3 * _p, (_line_h div (2 * _p)) * 2 * _p);
+}
+
+// D156: the rows of the Help "Stats & terms" page (id, label, help), then the Help list with that page as its last row.
+function Help_StatsItems() {
+    return [];
+}
+
+function TabHelp_Items() {
+    return Tutorial_HelpItems();
+}
+
 // The Help page: every tutorial, seen or not, as a page on top of the System list.
 function TabHelp_Open() {
     var u = TabMenu_Get();
