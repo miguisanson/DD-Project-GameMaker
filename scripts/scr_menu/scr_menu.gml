@@ -2202,16 +2202,19 @@ function Hud_DrawGold() {
     if (room != rm_battle && (room_width < DISPLAY_BASE_W || room_height < DISPLAY_BASE_H)) return;   // a room smaller than the view is centred with black round it (DISP-10): nothing may be drawn there
     var mt = Ui_Metrics();
     var p = mt.p;
-    var txt = string(Gold_Get());
+    var gold = Gold_Get();
+    var gst = Feel_GoldState();
+    var txt = string(Feel_GoldStep(gst, gold, MapFx_Now()));   // D138 (G6): the number counts up to the real gold over 400 ms; the real value is already `gold`
+    var lift = (gst.to > gst.from) ? Feel_GoldBounce(MapFx_Now() - gst.start, Settings_ShakeOn()) * p : 0;   // 1 px up at the start and as it lands (off with Screen shake off, D49)
     var gx = mt.margin;
     var gy = mt.margin;
-    var w = 6 * p + 2 * p + UI_TextWidth(txt) + 6 * p;
+    var w = 6 * p + 2 * p + UI_TextWidth(string(gold)) + 6 * p;   // the frame is as wide as the final number, so it does not grow while counting
     var h = mt.line_h + 4 * p;
     var a0 = draw_get_alpha();
     draw_set_alpha(1);
     Ui_DrawFrame(gx, gy, w, h, 1, p);
-    Hud_DrawCoin(gx + 3 * p, gy + (h - 6 * p) div 2, p);
-    Ui_Text(gx + 3 * p + 8 * p, gy + 2 * p, txt, UI_C_LIGHTEST);
+    Hud_DrawCoin(gx + 3 * p, gy + (h - 6 * p) div 2 - lift, p);
+    Ui_Text(gx + 3 * p + 8 * p, gy + 2 * p - lift, txt, UI_C_LIGHTEST);
     draw_set_alpha(a0);
 }
 

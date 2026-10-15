@@ -859,6 +859,7 @@ function World_DrawFx() {
     Player_DrawWorldFx();
     Elite_DrawWorldFx();   // C3 (D86): the pulsing outline round elites
     Merchant_DrawWorldFx();   // D113: the pulsing gold glow round the merchant
+    MapFx_DrawWorldFx();   // D138 (G6): chest burst, the rising item, the level-up sparkle, the player's step squash
 }
 
 // D108 F1d-3: the dot offsets of a sight ring depend only on its radius in pixels, so they are built once per radius (cos/sin of each dot, NOT yet

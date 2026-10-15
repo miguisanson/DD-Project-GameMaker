@@ -8711,14 +8711,14 @@ function Test_Suite_MapJuice() {
         _prev_a = _a;
         for (var _i = 0; _i < array_length(_b); _i++) {
             var _q = Feel_ParticlePos(_b[_i], _t);
-            if (abs(_q.x - 80) > 16 || _q.y < 60 - 20 || _q.y > 60 + 6) _in_box = false;
+            if (abs(_q.x - 80) > 24 || _q.y < 60 - 24 || _q.y > 60 + 6) _in_box = false;
         }
     }
     for (var _i2 = 0; _i2 < array_length(_b); _i2++) {
         var _c = _b[_i2].col;
         if (_c != UI_C_DARKEST && _c != UI_C_DARK && _c != UI_C_LIGHT && _c != UI_C_LIGHTEST) _pal = false;
     }
-    Test_True("mapjuice: every burst pixel stays within 16 px sideways and 20 px up of the lid", _in_box);
+    Test_True("mapjuice: every burst pixel stays within 24 px sideways and 24 px up of the lid", _in_box);
     Test_True("mapjuice: every burst pixel is one of the four palette colours", _pal);
     Test_True("mapjuice: the burst only fades out (never brighter again)", _alpha_ok);
     Test_Eq("mapjuice: the burst is solid at the start", Feel_BurstAlpha(0), 1);

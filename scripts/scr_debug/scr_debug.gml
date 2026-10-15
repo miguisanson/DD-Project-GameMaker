@@ -9406,7 +9406,8 @@ function Scenario_StepSmokeMapJuice(_s) {
         case 381:   // stand next to the chest, open it with the interact key: the burst and the rising item start, the reward comes once
             if (_s.t > 40 && Scenario_FloorReady(rm_floor3) && !variable_struct_exists(_mj, "staged")) {
                 _mj.staged = true;
-                Scenario_Check("mapjuice_a_chest_with_loot_is_staged", Scenario_MapJuiceStage(_mj), "chest=" + string(_mj.chest) + " placed=" + string(_mj.placed) + " loot=" + string(array_length(_mj.want)));
+                var _staged_ok = Scenario_MapJuiceStage(_mj);
+                Scenario_Check("mapjuice_a_chest_with_loot_is_staged", _staged_ok, "chest=" + string(_mj.chest) + " placed=" + string(_mj.placed) + " loot=" + string(array_length(_mj.want)));
                 MapFx_Clear();
                 _mj.t1 = _s.t;
             }
@@ -9418,7 +9419,14 @@ function Scenario_StepSmokeMapJuice(_s) {
                 _mj.open_ms = current_time;
                 Scenario_Check("mapjuice_opening_the_chest_starts_the_burst", MapFx_Count("burst") == 1, "burst=" + string(MapFx_Count("burst")));
                 Scenario_Check("mapjuice_opening_the_chest_makes_the_item_rise", MapFx_Count("rise") == 1, "rise=" + string(MapFx_Count("rise")));
-                Scenario_Check("mapjuice_the_chest_sound_is_still_the_last_sound", global.sfx_last_key == "chest_open", "last=" + string(global.sfx_last_key));
+            }
+            if (variable_struct_exists(_mj, "open_ms") && !variable_struct_exists(_mj, "chime_checked") && current_time - _mj.open_ms > 250) {
+                _mj.chime_checked = true;
+                var _chimed = false;
+                var _fxl = MapFx_List();
+                for (var _fi = 0; _fi < array_length(_fxl); _fi++) if (_fxl[_fi].kind == "rise" && _fxl[_fi].chime) _chimed = true;
+                Scenario_Check("mapjuice_the_rising_item_has_played_its_chime", _chimed);
+                Scenario_Check("mapjuice_the_chime_does_not_become_the_last_sound", global.sfx_last_key != "ui_confirm", "last=" + string(global.sfx_last_key));
             }
             if (variable_struct_exists(_mj, "open_ms")) Scenario_CardsTalk(_s);
             if (variable_struct_exists(_mj, "open_ms") && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && current_time - _mj.open_ms > 900) {
@@ -9562,18 +9570,24 @@ function Scenario_StepShotsMapJuice(_s) {
                 global.mapfx_clock = -1;
                 room_goto(rm_floor3);
             }
-            if (_s.t == 80) {
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor3) && !variable_struct_exists(_mj, "staged")) {   // the fade from the battle room is over
+                _mj.staged = true;
                 Scenario_ClearUi();
-                Scenario_Check("shots_mapjuice_the_chest_is_staged", Scenario_MapJuiceStage(_mj));
+                var _staged_ok = Scenario_MapJuiceStage(_mj);
+                Scenario_Check("shots_mapjuice_the_chest_is_staged", _staged_ok);
                 MapFx_Clear();
+                _mj.t1 = _s.t;
             }
-            if (_s.t == 110) Scenario_Tap("interact");
-            if (_s.t > 110 && MapFx_Count("burst") > 0) {
+            if (variable_struct_exists(_mj, "staged") && !variable_struct_exists(_mj, "tapped") && _s.t >= _mj.t1 + 25) {
+                _mj.tapped = true;
+                Scenario_Tap("interact");
+            }
+            if (variable_struct_exists(_mj, "tapped") && MapFx_Count("burst") > 0) {
                 _mj.t0 = MapFx_Start("burst");
-                global.mapfx_clock = _mj.t0 + 110;   // the burst 110 ms old, the item a few pixels up
+                global.mapfx_clock = _mj.t0 + 170;   // the burst 170 ms old (spread out, still opaque enough), the item a few pixels up
                 Scenario_Next(_s, 401);
             }
-            if (_s.t > 400) { Scenario_Check("shots_mapjuice_the_chest_opens", false); Scenario_Finish(); }
+            if (_s.t > 900) { Scenario_Check("shots_mapjuice_the_chest_opens", false); Scenario_Finish(); }
             break;
         case 401:
             if (_s.t == 3) {
@@ -9628,6 +9642,8 @@ function Scenario_StepShotsMapJuice(_s) {
             if (_s.t == 1) {
                 MapFx_Clear();
                 var _chl = Player_AddExp(_gs.player_ch, max(1, _gs.player_ch.exp_next));
+                _chl.card_picks = 0;   // the level's screens (stat point, card pick) would open over the picture
+                _chl.stat_points = 0;
                 GameState_SetPlayer(_chl);
                 if (instance_exists(obj_player)) obj_player.character = _gs.player_ch;
             }
