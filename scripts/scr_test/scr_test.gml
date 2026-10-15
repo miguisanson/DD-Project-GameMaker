@@ -118,6 +118,7 @@ function Test_RunAll() {
     Test_RunSuite("Hunt2", Test_Suite_Hunt2);
     Test_RunSuite("Title", Test_Suite_Title);
     Test_RunSuite("ClassGuard", Test_Suite_ClassGuard);
+    Test_RunSuite("EchoAfterClass", Test_Suite_EchoAfterClass);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -8358,4 +8359,162 @@ function Test_BagsFind() {
     Test_Eq("D126 find: a loaded run has the 6 marbles back", variable_struct_exists(_gs.run, "find_bag") && is_struct(_gs.run.find_bag) ? array_length(_gs.run.find_bag.left) : -1, 6);
     for (var _m = 0; _m < 6; _m++) _s2 = Card_OnVictory(_s2);
     Test_Eq("D126 find: the loaded run finishes the bag: 3 potions in the 10 fights, none lost or doubled", Inv_Count(_s2.inventory, 10) - _q0, 3);
+}
+
+// ============================================================================
+// G5 (D130, amends D87): the echo is offered right after the class pick, filtered to what the new class can use. The lost run's candidates wait in
+// the profile (echo_pool) until the class chest; the pick itself waits on the character (echo_offer), so a save or a quit loses neither.
+// ============================================================================
+function Test_EchoPool() {
+    var _kw = Equip_FindStarterWeaponId(CLASS_KNIGHT);
+    var _mw = Equip_FindStarterWeaponId(CLASS_MAGE);
+    return [
+        { kind: "skill", id: SKILL_POWER_STRIKE },   // Knight
+        { kind: "skill", id: SKILL_FIREBALL },       // Mage
+        { kind: "item", id: 10 },                    // potions: any class
+        { kind: "item", id: 11 },
+        { kind: "item", id: _kw },                   // Knight-only weapon
+        { kind: "item", id: _mw }                    // Mage-only weapon
+    ];
+}
+
+function Test_Suite_EchoAfterClass() {
+    var _kw = Equip_FindStarterWeaponId(CLASS_KNIGHT);
+    var _mw = Equip_FindStarterWeaponId(CLASS_MAGE);
+    Test_True("D130 setup: the class weapons exist and differ", _kw > 0 && _mw > 0 && _kw != _mw);
+    var _pool = Test_EchoPool();
+
+    // the candidate filter per class
+    var _fk = Run_EchoFilter(_pool, CLASS_KNIGHT);
+    Test_True("D130 filter: a Knight is offered a Knight skill", Run_EchoHas(_fk, "skill", SKILL_POWER_STRIKE));
+    Test_False("D130 filter: a Knight is not offered a Mage skill", Run_EchoHas(_fk, "skill", SKILL_FIREBALL));
+    Test_True("D130 filter: a Knight keeps both potions", Run_EchoHas(_fk, "item", 10) && Run_EchoHas(_fk, "item", 11));
+    Test_True("D130 filter: a Knight keeps the Knight weapon", Run_EchoHas(_fk, "item", _kw));
+    Test_False("D130 filter: a Knight is not offered the Mage weapon", Run_EchoHas(_fk, "item", _mw));
+    var _fm = Run_EchoFilter(_pool, CLASS_MAGE);
+    Test_True("D130 filter: a Mage is offered a Mage skill", Run_EchoHas(_fm, "skill", SKILL_FIREBALL));
+    Test_False("D130 filter: a Mage is not offered a Knight skill", Run_EchoHas(_fm, "skill", SKILL_POWER_STRIKE));
+    Test_True("D130 filter: a Mage keeps both potions (items any class can use are always offered)", Run_EchoHas(_fm, "item", 10) && Run_EchoHas(_fm, "item", 11));
+    Test_True("D130 filter: a Mage keeps the Mage weapon and loses the Knight one", Run_EchoHas(_fm, "item", _mw) && !Run_EchoHas(_fm, "item", _kw));
+    var _fa = Run_EchoFilter(_pool, CLASS_ARCHER);
+    Test_False("D130 filter: an Archer gets neither the Knight nor the Mage skill", Run_EchoHas(_fa, "skill", SKILL_POWER_STRIKE) || Run_EchoHas(_fa, "skill", SKILL_FIREBALL));
+    Test_True("D130 filter: an Archer still gets the potions", Run_EchoHas(_fa, "item", 10) && Run_EchoHas(_fa, "item", 11));
+    var _fn = Run_EchoFilter(_pool, CLASS_NOBODY);
+    Test_False("D130 filter: Nobody has no skills at all", Run_EchoHas(_fn, "skill", SKILL_POWER_STRIKE) || Run_EchoHas(_fn, "skill", SKILL_FIREBALL));
+    Test_True("D130 filter: Nobody gets the potions", Run_EchoHas(_fn, "item", 10) && Run_EchoHas(_fn, "item", 11));
+    Test_Eq("D130 filter: the pool itself is not changed", array_length(_pool), 6);
+
+    // the options: up to 3, all valid for the class, the same seed gives the same options
+    var _o = Run_EchoOptionsFor(_pool, CLASS_MAGE, 777);
+    Test_Eq("D130 options: a Mage gets 3 of the 4 things that fit", array_length(_o), 3);
+    var _okm = true; var _dup = false;
+    for (var _i = 0; _i < array_length(_o); _i++) {
+        if (!Run_EchoHas(_fm, _o[_i].kind, _o[_i].id)) _okm = false;
+        for (var _j = _i + 1; _j < array_length(_o); _j++) { if (_o[_j].kind == _o[_i].kind && _o[_j].id == _o[_i].id) _dup = true; }
+    }
+    Test_True("D130 options: every option fits the class", _okm);
+    Test_False("D130 options: no option twice", _dup);
+    var _o2 = Run_EchoOptionsFor(_pool, CLASS_MAGE, 777);
+    Test_True("D130 options: the same seed gives the same options", array_length(_o2) == 3 && _o2[0].id == _o[0].id && _o2[1].id == _o[1].id && _o2[2].id == _o[2].id);
+    var _only_k = [{ kind: "skill", id: SKILL_POWER_STRIKE }];
+    Test_Eq("D130 options: nothing that fits means no pick at all", array_length(Run_EchoOptionsFor(_only_k, CLASS_MAGE, 5)), 0);
+    Test_Eq("D130 options: the Knight skill alone is offered to a Knight", array_length(Run_EchoOptionsFor(_only_k, CLASS_KNIGHT, 5)), 1);
+    Test_Eq("D130 options: the first run has no echo (an empty pool offers nothing)", array_length(Run_EchoOptionsFor([], CLASS_KNIGHT, 5)), 0);
+
+    // the pool a death leaves: what the run had; a run with nothing leaves the potion; a pool not yet used by a class pick is kept
+    var _ch = CharacterCreate_Player(CLASS_KNIGHT);
+    _ch.skills = [SKILL_POWER_STRIKE];
+    _ch.inventory = Inv_Add(_ch.inventory, 11, 1);
+    var _after = Run_EchoPoolAfter([], _ch);
+    Test_True("D130 pool: the lost run's skill and items are all in it", Run_EchoHas(_after, "skill", SKILL_POWER_STRIKE) && Run_EchoHas(_after, "item", 10) && Run_EchoHas(_after, "item", 11));
+    var _bare = CharacterCreate_Player(CLASS_KNIGHT);
+    _bare.inventory = [];
+    _bare.skills = [];
+    _bare.equip = {};
+    var _fb = Run_EchoPoolAfter([], _bare);
+    Test_True("D130 pool: a run with nothing leaves the potion", array_length(_fb) == 1 && _fb[0].kind == "item" && _fb[0].id == 10);
+    var _kept = Run_EchoPoolAfter([{ kind: "skill", id: SKILL_FIREBALL }], _bare);
+    Test_True("D130 pool: a death before any class pick keeps what the earlier death left", Run_EchoHas(_kept, "skill", SKILL_FIREBALL));
+    var _merged = Run_EchoPoolAfter([{ kind: "item", id: 11 }], _ch);
+    var _n11 = 0;
+    for (var _k = 0; _k < array_length(_merged); _k++) { if (_merged[_k].kind == "item" && _merged[_k].id == 11) _n11++; }
+    Test_Eq("D130 pool: an earlier pool and the new run are merged without doubles", _n11, 1);
+
+    // the profile: the pool is saved with it; a profile without the field has no echo pending; the old fields are read as a pool
+    var _pd = Profile_Default();
+    Test_True("D130 profile: a default profile has an empty echo pool (the first run has no echo)", variable_struct_exists(_pd, "echo_pool") && is_array(_pd.echo_pool) && array_length(_pd.echo_pool) == 0);
+    var _f = "test_echo_profile.sav";
+    Save_DeleteFileSet(_f);
+    var _w = Profile_Default();
+    _w.echo_pool = Test_EchoPool();
+    Test_True("D130 profile: the file with a pool writes", Profile_SaveTo(_f, _w));
+    var _r = Profile_Load(_f);
+    Test_Eq("D130 profile: the file with a pool reads back ok", _r.status, "ok");
+    var _rp = variable_struct_exists(_r.profile, "echo_pool") ? _r.profile.echo_pool : [];
+    Test_Eq("D130 profile: the whole pool survives the file", array_length(_rp), 6);
+    Test_True("D130 profile: kinds and ids survive", Run_EchoHas(_rp, "skill", SKILL_POWER_STRIKE) && Run_EchoHas(_rp, "item", _kw) && Run_EchoHas(_rp, "item", 11));
+    Save_DeleteFileSet(_f);
+    var _legacy = Profile_Normalize({ profile_version: PROFILE_VERSION, echo_offer: [{ kind: "item", id: 11 }, { kind: "skill", id: SKILL_FIREBALL }] });
+    Test_True("D130 profile: a death from the older build, pick not made, becomes the pool", variable_struct_exists(_legacy, "echo_pool") && array_length(_legacy.echo_pool) == 2 && Run_EchoHas(_legacy.echo_pool, "skill", SKILL_FIREBALL));
+    var _legacy2 = Profile_Normalize({ profile_version: PROFILE_VERSION, echo: { kind: "item", id: 11 }, echo_offer: [] });
+    Test_True("D130 profile: an echo picked but not yet used by the older build becomes the pool", variable_struct_exists(_legacy2, "echo_pool") && array_length(_legacy2.echo_pool) == 1 && _legacy2.echo_pool[0].id == 11);
+    var _none = Profile_Normalize({ profile_version: PROFILE_VERSION });
+    Test_True("D130 profile: a file without the field has no echo pending", variable_struct_exists(_none, "echo_pool") && array_length(_none.echo_pool) == 0);
+
+    // the character: the pick is owed after the class, before everything else; the offer is saved with the run
+    var _nob = CharacterCreate_Player(CLASS_NOBODY);
+    var _g0 = Run_EchoGrantTo(_nob, [], 9);
+    Test_True("D130 grant: no pool, no echo owed (the first run)", Cards_NextOwed(_g0) == "" && variable_struct_exists(_g0, "echo_offer") && array_length(_g0.echo_offer) == 0);
+    var _mage = Card_ClassCharacter(_nob, CLASS_MAGE);
+    var _gm = Run_EchoGrantTo(_mage, _pool, 9);
+    Test_Eq("D130 grant: a Mage is owed the echo pick", Cards_NextOwed(_gm), "echo");
+    Test_Eq("D130 grant: the offer holds 3 options", variable_struct_exists(_gm, "echo_offer") ? array_length(_gm.echo_offer) : -1, 3);
+    var _oneof = variable_struct_exists(_gm, "echo_offer") && array_length(_gm.echo_offer) > 0;
+    for (var _a = 0; _oneof && _a < array_length(_gm.echo_offer); _a++) { if (!Run_EchoHas(_fm, _gm.echo_offer[_a].kind, _gm.echo_offer[_a].id)) _oneof = false; }
+    Test_True("D130 grant: and every one fits a Mage", _oneof);
+    var _gn = Run_EchoGrantTo(Card_ClassCharacter(_nob, CLASS_KNIGHT), _only_k, 9);
+    Test_Eq("D130 grant: a Knight with a Knight skill pending is owed it", Cards_NextOwed(_gn), "echo");
+    var _gx = Run_EchoGrantTo(Card_ClassCharacter(_nob, CLASS_MAGE), _only_k, 9);
+    Test_Eq("D130 grant: a Mage with only a Knight skill pending is owed nothing", Cards_NextOwed(_gx), "");
+    var _both = Run_EchoGrantTo(Cards_ChestOpened(CharacterCreate_Player(CLASS_NOBODY)), _pool, 9);
+    _both.echo_offer = [{ kind: "item", id: 10 }];   // (the grant itself comes after the class pick; this checks only the owed order)
+    Test_Eq("D130 order: the class choice still comes before the echo", Cards_NextOwed(_both), "class");
+    var _pend = Card_ClassCharacter(CharacterCreate_Player(CLASS_NOBODY), CLASS_MAGE);
+    _pend.echo_offer = [{ kind: "item", id: 11 }];
+    _pend.card_picks = 1;
+    Test_Eq("D130 order: the echo comes before a card pick", Cards_NextOwed(_pend), "echo");
+    var _old_char = CharacterCreate_Player(CLASS_KNIGHT);
+    if (variable_struct_exists(_old_char, "echo_offer")) variable_struct_remove(_old_char, "echo_offer");
+    Test_Eq("D130 save compatibility: a character without the field owes no echo", Cards_NextOwed(_old_char), "");
+    Test_True("D130 save compatibility: and gets an empty offer", variable_struct_exists(_old_char, "echo_offer") && array_length(_old_char.echo_offer) == 0);
+
+    // taking one
+    var _t_pool = Card_ClassCharacter(CharacterCreate_Player(CLASS_NOBODY), CLASS_KNIGHT);
+    _t_pool.echo_offer = [{ kind: "item", id: 11 }, { kind: "skill", id: SKILL_POWER_STRIKE }];
+    var _before11 = Inv_Count(_t_pool.inventory, 11);
+    var _t1 = Run_EchoTake(variable_clone(_t_pool), 0);
+    Test_Eq("D130 take: an item echo is in the inventory", Inv_Count(_t1.inventory, 11) - _before11, 1);
+    Test_Eq("D130 take: and nothing is owed any more", Cards_NextOwed(_t1), "");
+    var _t2 = Run_EchoTake(variable_clone(_t_pool), 1);
+    Test_True("D130 take: a skill echo is learned", array_length(_t2.skills) == 1 && _t2.skills[0] == SKILL_POWER_STRIKE);
+    Test_Eq("D130 take: and the offer is empty", variable_struct_exists(_t2, "echo_offer") ? array_length(_t2.echo_offer) : -1, 0);
+
+    // the run save carries the offer (the quit between the class pick and the answer loses nothing)
+    var _gs = GameState_Get();
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_pl = _gs.player_ch;
+    _gs.run = Run_Create(7130);
+    _gs.player_ch = variable_clone(_gm);
+    var _raw = json_parse(json_stringify(RunSave_Build()));
+    _gs.player_ch = CharacterCreate_Player(CLASS_NOBODY);
+    RunSave_ApplyState(_raw);
+    var _back = _gs.player_ch;
+    Test_True("D130 run save: the offer survives the round trip", variable_struct_exists(_back, "echo_offer") && array_length(_back.echo_offer) == 3);
+    var _gm_first = variable_struct_exists(_gm, "echo_offer") && array_length(_gm.echo_offer) > 0 ? _gm.echo_offer[0].id : -998;
+    Test_Eq("D130 run save: the same first option", (variable_struct_exists(_back, "echo_offer") && array_length(_back.echo_offer) > 0) ? _back.echo_offer[0].id : -999, _gm_first);
+    Test_Eq("D130 run save: the loaded character is still owed the pick", Cards_NextOwed(_back), "echo");
+    Test_Eq("D130 run save: the version is still 2", RUN_SAVE_VERSION, 2);
+    _gs.player_ch = _old_pl;
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }

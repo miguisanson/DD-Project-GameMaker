@@ -479,6 +479,7 @@ function Profile_Default() {
         unlocks: {},                           // key -> true: "nobody_class", "item_<id>" ... (D88)
         echo: { kind: "", id: -1 },            // the gift the next run starts with (D87): kind "item" or "skill"
         echo_offer: [],                        // the 3 options of a death whose pick has not been made yet
+        echo_pool: [],                         // D130: what the lost run had; the echo pick after the class pick draws from it
         history: [],                           // one entry per finished run, newest last
         bestiary: {},                          // "e<enemy id>" -> { met, elite }: the enemies met in a fight, for the Codex (D88; Codex_Met)
         deaths: 0,

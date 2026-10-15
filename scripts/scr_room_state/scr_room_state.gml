@@ -439,6 +439,14 @@ function Run_EchoOptions(_ch, _rng) {
     return out;
 }
 
+// ---- D130 (amends D87): the echo is offered after the class pick, filtered to the class (STUBS for the red run of the checks) ----
+function Run_EchoItemFits(_item_id, _class_id) { return true; }
+function Run_EchoFilter(_pool, _class_id) { return _pool; }
+function Run_EchoOptionsFor(_pool, _class_id, _seed) { return []; }
+function Run_EchoPoolAfter(_old_pool, _ch) { return _old_pool; }
+function Run_EchoGrantTo(_ch, _pool, _seed) { return _ch; }
+function Run_EchoTake(_ch, _index) { return _ch; }
+
 function Run_ApplyEcho(_ch, _echo) {
     if (!is_struct(_echo) || !variable_struct_exists(_echo, "kind")) return _ch;
     if (_echo.kind == "item" && _echo.id > 0) _ch.inventory = Inv_Add(_ch.inventory, _echo.id, 1);
