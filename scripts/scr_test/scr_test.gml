@@ -139,6 +139,7 @@ function Test_RunAll() {
     Test_RunSuite("EliteDeath", Test_Suite_EliteDeath);
     Test_RunSuite("Labels", Test_Suite_Labels);
     Test_RunSuite("RichText", Test_Suite_RichText);
+    Test_RunSuite("Hunt6Combat", Test_Suite_Hunt6Combat);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -12765,4 +12766,194 @@ function Test_Suite_RichText() {
 
     global.input.last_device = _dev0;
     Binds_Apply(Binds_Defaults());
+}
+
+// ---- Hunt 6 combat (bug hunt session 6, findings 1 to 6 in .planning/research/bughunt-session6-combat.md) ----
+// Expected values come from the decisions and the tooltips, not from the code: D99 (Guard: the next hit deals half), D100 / BUG-16 (the number a tooltip shows is
+// the number applied), D132 + D141 (closing the window saves the run; in a fight that is the moment just before the encounter), D74 (a fast fighter acts twice
+// in a row), I-072 (an item the Stranger stole is won back by beating him).
+function Test_Suite_Hunt6Combat() {
+    var _gs = GameState_Get();
+    ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init(); CardDB_Init();
+
+    // ---- 1. the Esc / Tab menu in a fight is read-only for potions and gear (the battle's own ITEM command is the turn) ----
+    var _k = Test_Hero(CLASS_KNIGHT);
+    _k.hp = 1;
+    var _used = TabItems_Use(_k, 10, true);
+    Test_False("hunt6 menu: a potion is not drunk from the menu in a fight", _used.ok);
+    Test_Eq("hunt6 menu: the refused potion did not heal", _k.hp, 1);
+    Test_Eq("hunt6 menu: the refused potion is not spent", Inv_Count(_k.inventory, 10), 2);
+    Test_Eq("hunt6 menu: the refusal says to use ITEM in the battle menu", _used.msg, Loc_T("menu.msg.items_in_fight", "In a fight, use ITEM in the battle menu."));
+    var _outside = TabItems_Use(_k, 10);
+    Test_True("hunt6 menu: outside a fight the same potion is drunk", _outside.ok);
+    var _kh = CharacterCreate_Player(CLASS_KNIGHT);
+    _kh.inventory = Inv_Add(_kh.inventory, 1, 1);
+    Test_True("hunt6 menu: outside a fight a potion row has a Use hint", TabItems_Items(_kh, false)[0].hint != "");
+    Test_True("hunt6 menu: in a fight a potion row has no Use hint", TabItems_Items(_kh, true)[0].hint == "");
+    var _g = CharacterCreate_Player(CLASS_KNIGHT);
+    _g.inventory = Inv_Add(_g.inventory, 1, 1);
+    _g.inventory = Inv_Add(_g.inventory, 22, 1);
+    Equip_Item(_g, 1);
+    var _put = Gear_Toggle(_g, 22, true);
+    Test_False("hunt6 menu: armor is not put on from the menu in a fight", _put.ok);
+    Test_Eq("hunt6 menu: the body slot stays empty", Equip_SlotGet(_g, "body"), 0);
+    Test_Eq("hunt6 menu: the refusal says gear cannot change in a fight", _put.msg, Loc_T("menu.msg.gear_in_fight", "You can't change gear in a fight."));
+    var _take = Gear_Toggle(_g, 1, true);
+    Test_False("hunt6 menu: the weapon is not taken off from the menu in a fight", _take.ok);
+    Test_Eq("hunt6 menu: the weapon stays worn", Equip_SlotGet(_g, "weapon"), 1);
+    Test_True("hunt6 menu: outside a fight armor goes on", Gear_Toggle(_g, 22).ok);
+
+    // ---- 3. Guard (the Brace status) lasts until the enemy's turns are over, not through the player's own turns ----
+    var _slime = EnemyCreate(ENEMY_SLIME);
+    var _src = { power: 6, stat_type: STAT_ATK };
+    var _plain = Combat_ApplyDamage(_slime, CharacterCreate_Player(CLASS_KNIGHT), _src, 1, 1, { is_skill: false }).dmg;
+    var _bp = CharacterCreate_Player(CLASS_KNIGHT);
+    var _bc = Test_Hunt1Bc(_bp, EnemyCreate(ENEMY_SLIME));
+    Battle_GuardApply(_bp);
+    Battle_PlayerFinalizeTurn(_bc, _bc.p, _bc.e);   // the Guard turn
+    Battle_PlayerFinalizeTurn(_bc, _bc.p, _bc.e);   // D74: a faster player acts again before the enemy (P P E)
+    Battle_PlayerFinalizeTurn(_bc, _bc.p, _bc.e);
+    Test_True("hunt6 guard: still braced after the player acted three times in a row", Status_Has(_bc.p, STATUS_BRACE));
+    var _hit = Combat_ApplyDamage(_slime, _bc.p, _src, 1, 1, { is_skill: false });
+    Test_True("hunt6 guard: the enemy's hit then deals about half (" + string(_plain) + " -> " + string(_hit.dmg) + ")", _plain >= 2 && abs(_hit.dmg - _plain * 0.5) <= 1);
+    Test_False("hunt6 guard: that hit used the Brace up", Status_Has(_hit.defender, STATUS_BRACE));
+    var _bp2 = CharacterCreate_Player(CLASS_KNIGHT);
+    var _bc2 = Test_Hunt1Bc(_bp2, EnemyCreate(ENEMY_SLIME));
+    Battle_GuardApply(_bp2);
+    Test_Eq("hunt6 guard: the chip reads 2 enemy turns", Battle_StatusCurrentTurns(_bc2.p, STATUS_BRACE), 2);
+    Battle_PlayerFinalizeTurn(_bc2, _bc2.p, _bc2.e);
+    _bc2.enemy_actions_remaining = 0;
+    Battle_EnemyFinalizeTurnState(_bc2, _bc2.p, _bc2.e);   // the enemy spends its turn on a wind-up: no hit
+    Test_True("hunt6 guard: braced after an enemy turn without a hit", Status_Has(_bc2.p, STATUS_BRACE));
+    Test_Eq("hunt6 guard: one enemy turn used", Battle_StatusCurrentTurns(_bc2.p, STATUS_BRACE), 1);
+    Battle_PlayerFinalizeTurn(_bc2, _bc2.p, _bc2.e);   // the player acts, the big attack comes next
+    Test_True("hunt6 guard: braced when the wind-up's attack arrives", Status_Has(_bc2.p, STATUS_BRACE));
+    _bc2.enemy_actions_remaining = 0;
+    Battle_EnemyFinalizeTurnState(_bc2, _bc2.p, _bc2.e);   // a second enemy turn with no hit
+    Test_False("hunt6 guard: gone after two enemy turns with no hit", Status_Has(_bc2.p, STATUS_BRACE));
+
+    // ---- 4. Take Aim and Muscle Up last as many player actions as the tooltip says (the cast turn's own tick does not count) ----
+    var _tk = [[CLASS_ARCHER, SKILL_TAKE_AIM, STATUS_CRIT_UP, 9, "Take Aim"], [CLASS_KNIGHT, SKILL_MUSCLE_UP, STATUS_GUARD, 6, "Muscle Up"]];
+    for (var _i = 0; _i < array_length(_tk); _i++) {
+        var _n = _tk[_i][4];
+        var _hero = Test_Hero(_tk[_i][0]);
+        _hero.mp = 99;
+        var _stated = SkillDB_Get(_tk[_i][1]).status_turns;
+        Test_Eq("hunt6 " + _n + ": the tooltip number", _stated, _tk[_i][3]);
+        Skill_Use(_hero, _hero, _tk[_i][1]);
+        Test_Eq("hunt6 " + _n + ": applied right after the cast = the tooltip number", Battle_StatusCurrentTurns(_hero, _tk[_i][2]), _stated);
+        _hero = Status_Tick(_hero);   // the cast turn's own end-of-turn tick
+        Test_Eq("hunt6 " + _n + ": the cast turn does not use one up", Battle_StatusCurrentTurns(_hero, _tk[_i][2]), _stated);
+        for (var _t = 1; _t < _stated; _t++) _hero = Status_Tick(_hero);
+        Test_True("hunt6 " + _n + ": still on for the last of its " + string(_stated) + " turns", Status_Has(_hero, _tk[_i][2]));
+        _hero = Status_Tick(_hero);
+        Test_False("hunt6 " + _n + ": gone after " + string(_stated) + " turns", Status_Has(_hero, _tk[_i][2]));
+    }
+
+    // ---- 2. closing the window in a fight writes the moment just before the encounter (D141), not the older autosave ----
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_cp = _gs.checkpoint;
+    var _old_persist = _gs.persist;
+    var _old_ch = _gs.player_ch;
+    var _old_flags = _gs.flags;
+    var _old_snap = variable_global_exists("encounter_snapshot") ? global.encounter_snapshot : undefined;
+    _gs.run = Run_Create(6100);
+    _gs.run.gold = 5;
+    _gs.run.kills = 1;
+    var _m = CharacterCreate_Player(CLASS_MAGE);
+    _m.hp = 7;
+    _m.mp = 4;
+    _gs.player_ch = _m;
+    _gs.selected_class = CLASS_MAGE;
+    _gs.flags = {};
+    _gs.checkpoint = { room: rm_floor2, x: 48, y: 64 };
+    _gs.persist = {};
+    RoomState_SetAlive(rm_floor2, "h6_e1");
+    global.encounter_snapshot = undefined;
+    EnemyPersist_SnapshotRun();
+    var _m2 = CharacterCreate_Player(CLASS_MAGE);
+    _m2.hp = 1;
+    _m2.mp = 0;
+    _gs.player_ch = _m2;
+    _gs.run.gold = 99;
+    var _cf = "test_hunt6_close.sav";
+    Save_DeleteFileSet(_cf);
+    Test_True("hunt6 close: closing the window in a fight writes a run save", Run_SaveOnClose(true, rm_battle, _cf));
+    var _cl = RunSave_LoadFrom(_cf);
+    Test_Eq("hunt6 close: it reads back ok", _cl.status, "ok");
+    _gs.run = Run_Create(1);
+    _gs.persist = {};
+    if (is_struct(_cl.run)) RunSave_ApplyState(_cl.run);
+    Test_Eq("hunt6 close: the saved HP is the pre-fight HP", _gs.player_ch.hp, 7);
+    Test_Eq("hunt6 close: the saved MP is the pre-fight MP", _gs.player_ch.mp, 4);
+    Test_Eq("hunt6 close: the saved gold is the pre-fight gold", _gs.run.gold, 5);
+    Save_DeleteFileSet(_cf);
+    _gs.run = Run_Create(6100);
+    var _m3 = CharacterCreate_Player(CLASS_MAGE);
+    _m3.hp = 0;
+    _gs.player_ch = _m3;
+    Test_False("hunt6 close: a dead player writes no snapshot", Run_SaveOnClose(true, rm_battle, _cf));
+    Test_False("hunt6 close: and no file appears", RunSave_ExistsAt(_cf));
+    global.encounter_snapshot = undefined;
+    _gs.player_ch = _m2;
+    Test_False("hunt6 close: a fight with no snapshot writes nothing", Run_SaveOnClose(true, rm_battle, _cf));
+    Test_False("hunt6 close: and no file appears either", RunSave_ExistsAt(_cf));
+    Save_DeleteFileSet(_cf);
+
+    // ---- 5. what the Stranger stole stays recoverable when the player runs or throws a Smoke Bomb (I-072) ----
+    var _bt = _gs.battle;
+    var _bt0 = { pid: _bt.enemy_persist_id, eid: _bt.enemy_id, room: _bt.enemy_room };
+    _gs.persist = {};
+    _gs.run = Run_Create(6101);
+    _gs.run.drop_dry = 10;
+    _bt.enemy_persist_id = "h6_str";
+    _bt.enemy_id = ENEMY_STRANGER;
+    _bt.enemy_room = rm_floor2;
+    RoomState_SetAlive(rm_floor2, "h6_str");
+    var _str = EnemyCreate(ENEMY_STRANGER);
+    _str = Skill_StealRecord(_str, 10, 1);
+    EnemyPersist_ResolveBattle(false, _str.stolen_items);   // the player got away
+    var _rec = RoomState_Get(rm_floor2, "h6_str");
+    Test_True("hunt6 steal: the Stranger is still on the map after the escape", is_struct(_rec) && !Test_FieldOr(_rec, "removed", false));
+    var _kept = Test_FieldOr(_rec, "stolen_items", []);
+    Test_Eq("hunt6 steal: he still holds what he took", array_length(_kept), 1);
+    Test_Eq("hunt6 steal: it is the potion", (array_length(_kept) > 0) ? _kept[0].id : -1, 10);
+    // the next fight with him: the item is on him again, a win gives it back
+    var _str2 = EnemyCreate(ENEMY_STRANGER);
+    EnemyPersist_RestoreStolen(_str2);
+    Test_Eq("hunt6 steal: the next fight starts with it on him", array_length(Test_FieldOr(_str2, "stolen_items", [])), 1);
+    EnemyPersist_ResolveBattle(false, Test_FieldOr(_str2, "stolen_items", []));   // a second escape
+    Test_Eq("hunt6 steal: a second escape does not copy it", array_length(Test_FieldOr(RoomState_Get(rm_floor2, "h6_str"), "stolen_items", [])), 1);
+    var _kn = Test_Hero(CLASS_KNIGHT);
+    var _have = Inv_Count(_kn.inventory, 10);
+    var _rw = Battle_GrantRewards(_kn, _str2);
+    Test_True("hunt6 steal: beating him gives the potion back", Inv_Count(_rw.player.inventory, 10) >= _have + 1);
+    EnemyPersist_ResolveBattle(true);
+    var _gone = RoomState_Get(rm_floor2, "h6_str");
+    Test_True("hunt6 steal: once he is beaten the record holds no loot", Test_FieldOr(_gone, "removed", false) && array_length(Test_FieldOr(_gone, "stolen_items", [])) == 0);
+    // leaving the room and coming back rebuilds the enemy's record from the instance: the loot is carried over
+    RoomState_SetAlive(rm_floor2, "h6_str");
+    EnemyPersist_ResolveBattle(false, [{ id: 31, qty: 2 }]);
+    var _carried = RoomState_CarryStolen(rm_floor2, "h6_str", { removed: false, vars: {} });
+    Test_Eq("hunt6 steal: a rebuilt record keeps the loot", array_length(Test_FieldOr(_carried, "stolen_items", [])), 1);
+    // either way out of the fight settles the same: the loot is kept and the Stranger's first-meeting line is queued
+    _gs.flags = {};
+    RoomState_SetAlive(rm_floor2, "h6_str");
+    Battle_EscapeResolve(_str);
+    Test_Eq("hunt6 steal: the escape helper keeps the loot", array_length(Test_FieldOr(RoomState_Get(rm_floor2, "h6_str"), "stolen_items", [])), 1);
+    Test_True("hunt6 steal: a Smoke Bomb escape queues the Stranger's reaction too", Dialogue_NarrativeIsPending("first_stranger_encounter_reaction"));
+    _gs.flags = {};
+    Battle_EscapeResolve(EnemyCreate(ENEMY_SLIME));
+    Test_False("hunt6 steal: running from a slime queues no Stranger line", Dialogue_NarrativeIsPending("first_stranger_encounter_reaction"));
+
+    _bt.enemy_persist_id = _bt0.pid;
+    _bt.enemy_id = _bt0.eid;
+    _bt.enemy_room = _bt0.room;
+    global.encounter_snapshot = _old_snap;
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+    _gs.checkpoint = _old_cp;
+    _gs.persist = _old_persist;
+    _gs.player_ch = _old_ch;
+    _gs.flags = _old_flags;
 }
