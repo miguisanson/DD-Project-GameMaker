@@ -1,0 +1,38 @@
+id,name,type,slot,power,stat,acc,note,preferred_class,allowed_classes,bonus_str,bonus_agi,bonus_def,bonus_int,bonus_luck,use_effect,use_min,use_max,use_scale_per_level,cures,teaches_skill,stackable,max_stack,value_unused,passive_id,passive_params,passive_desc,loot_chest(weight/tier/qty),loot_barrel,loot_enemy
+1,Wooden Sword,weapon,weapon,3,STR,0,,Knight,,0,0,0,0,0,none,,,,,,false,1,8,steady_strike,{ once_per_turn: true },"MISS->BAD, BAD->OKAY (1/turn)",w8/tier1/qty0-1,w6/tier1/qty0-1,
+2,Iron Sword,weapon,weapon,6,STR,0,,Knight,,0,0,0,0,0,none,,,,,,false,1,18,sunder_edge,"{ first_hit_def_down: 1, turns: 2 }",1st hit: -1 DEF for 2 turns,w7/tier2/qty0-1,,w4/tier2/qty0-1
+3,Platinum Sword,weapon,weapon,9,STR,1,dead for players: weapon acc never enters a hit roll,Knight,,0,0,0,0,0,none,,,,,,false,1,35,executioner,"{ hp_ratio: 0.35, mult: 1.35 }",+35% damage vs <35% HP,w5/tier3/qty0-1,,w2/tier3/qty0-1
+4,Wooden Bow,weapon,weapon,3,AGI,1,dead for players: weapon acc never enters a hit roll,Archer,,0,0,0,0,0,none,,,,,,false,1,8,aim_assist,{ upgrade_good_to_perfect_once_per_turn: true },GOOD->PERFECT (1/turn),w8/tier1/qty0-1,w6/tier1/qty0-1,
+5,Iron Bow,weapon,weapon,6,AGI,1,dead for players: weapon acc never enters a hit roll,Archer,,0,0,0,0,0,none,,,,,,false,1,18,pinning_shot,"{ stun_chance: 0.15, stun_turns: 1, cooldown_turns: 3, requires_good_or_perfect: true }",GOOD+: may Stun (cd 3 turns),w7/tier2/qty0-1,,w4/tier2/qty0-1
+6,Platinum Bow,weapon,weapon,9,AGI,2,dead for players: weapon acc never enters a hit roll,Archer,,0,0,0,0,0,none,,,,,,false,1,35,predator,"{ mult: 1.30, requires_target_statused: true }",+30% damage vs statused foes,w5/tier3/qty0-1,,w2/tier3/qty0-1
+7,Wooden Staff,weapon,weapon,3,INT,0,,Mage,,0,0,0,0,0,none,,,,,,false,1,8,mana_trickle,"{ mp_gain: 1, every_n_turns: 2 }",+1 MP every 2 turns,w8/tier1/qty0-1,,
+8,Ruby Staff,weapon,weapon,6,INT,0,,Mage,,0,0,0,0,0,none,,,,,,false,1,20,ember_lens,"{ skill_mult: 1.15, status_turn_bonus: 1 }","+15% skill damage, +1 status turn",w6/tier2/qty0-1,,
+9,Diamond Staff,weapon,weapon,9,INT,1,dead for players: weapon acc never enters a hit roll,Mage,,0,0,0,0,0,none,,,,,,false,1,40,arcane_surge,"{ skill_mult: 1.25, perfect_mp: 1 }","+25% skill damage, PERFECT +1 MP",w4/tier3/qty0-1,,
+10,HP Potion Lv1,consumable,,0,STR,0,,,,0,0,0,0,0,heal,5,10,1.0,,,true,99,8,,,,w32/tier1/qty1-3,w30/tier1/qty1-2,w30/tier1/qty1-2
+14,HP Potion Lv2,consumable,,0,STR,0,,,,0,0,0,0,0,heal,10,20,0.8,,,true,99,14,,,,w20/tier2/qty1-4,w12/tier2/qty1-3,w10/tier2/qty1-2
+15,HP Potion Lv3,consumable,,0,STR,0,,,,0,0,0,0,0,heal,20,35,1.2,,,true,99,25,,,,w14/tier3/qty1-5,,
+11,MP Potion Lv1,consumable,,0,STR,0,,,,0,0,0,0,0,mp,4,8,0.4,,,true,99,10,,,,w28/tier1/qty1-3,w26/tier1/qty1-2,w22/tier1/qty1-2
+17,MP Potion Lv2,consumable,,0,STR,0,,,,0,0,0,0,0,mp,8,14,0.7,,,true,99,16,,,,w18/tier2/qty1-4,w10/tier2/qty1-3,w8/tier2/qty1-2
+18,MP Potion Lv3,consumable,,0,STR,0,,,,0,0,0,0,0,mp,12,20,1.0,,,true,99,28,,,,w12/tier3/qty1-5,,
+12,Antidote,consumable,,0,STR,0,,,,0,0,0,0,0,cure,,,,Poison,,true,99,6,,,,w20/tier1/qty1-2,w20/tier1/qty1-2,w12/tier1/qty1-1
+13,Bandage,consumable,,0,STR,0,,,,0,0,0,0,0,cure,,,,Bleeding,,true,99,6,,,,w20/tier1/qty1-2,w20/tier1/qty1-2,w12/tier1/qty1-1
+101,Skillbook: Wound,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Wound,false,1,25,,,,,,
+102,Skillbook: Hilt Bash,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Hilt Bash,false,1,30,,,,,,
+103,Skillbook: Muscle Up,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Muscle Up,false,1,30,,,,,,
+104,Skillbook: Rev Up,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Rev Up,false,1,30,,,,,,
+105,Skillbook: Horizontal Slash,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Horizontal Slash,false,1,35,,,,,,
+106,Skillbook: Poison Arrow,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Poison Arrow,false,1,30,,,,,,
+107,Skillbook: Evasion,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Evasion,false,1,28,,,,,,
+108,Skillbook: Double Shot,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Double Shot,false,1,35,,,,,,
+109,Skillbook: Take Aim,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Take Aim,false,1,30,,,,,,
+110,Skillbook: Fireball,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Fireball,false,1,35,,,,,,
+111,Skillbook: Poison Mist,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Poison Mist,false,1,35,,,,,,
+112,Skillbook: Ice Spear,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Ice Spear,false,1,40,,,,,,
+113,Skillbook: Meditation,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Meditation,false,1,35,,,,,,
+114,Skillbook: Foresight,consumable,,0,STR,0,,,,0,0,0,0,0,learn_skill,,,,,Foresight,false,1,35,,,,,,
+20,Leather Armor,armor,body,0,DEF,0,,,Knight/Archer,0,0,1,0,0,none,,,,,,false,1,20,first_impact,"{ flat_reduction_first_hit: 3, once_per_battle: true }",1st hit -3 damage (each battle),w6/tier1/qty0-1,,
+21,Iron Armor,armor,body,0,DEF,0,,,Knight/Archer,0,0,2,0,0,none,,,,,,false,1,40,brace,"{ guard_mult_next_hit: 0.60, cooldown_turns: 2, triggers_on_take_damage: true }",After hit: next hit -40% (cd2),w6/tier2/qty0-1,,
+22,Platinum Armor,armor,body,0,DEF,0,,,Knight/Archer,0,0,3,0,0,none,,,,,,false,1,70,debt_plate,"{ big_hit_threshold: 6, big_hit_reduction: 0.30 }",Big hits reduced by 30%,w4/tier3/qty0-1,,
+23,Cloth Robe,armor,body,0,INT,0,,Mage,Mage,0,0,0,1,0,none,,,,,,false,1,16,thin_veil,"{ mp_gain: 1, every_n_turns: 2, physical_vuln_flat: 1 }","+1 MP/2 turns, take +1 phys damage",w6/tier1/qty0-1,,
+24,Silk Robe,armor,body,0,INT,0,,Mage,Mage,0,0,0,2,0,none,,,,,,false,1,34,silk_flow,"{ skill_mult: 1.10, status_turn_bonus: 1 }","+10% skill damage, +1 status turn",w6/tier2/qty0-1,,
+25,Mithril Robe,armor,body,0,INT,0,,Mage,Mage,0,0,0,3,0,none,,,,,,false,1,60,mirror_stitch,"{ reflect_first_status_once_per_battle: true, mp_cost_on_trigger: 1 }",Reflect 1st status (cost 1 MP),w4/tier3/qty0-1,,

@@ -357,4 +357,4 @@
 #macro SAVE_SNAPSHOT_VERSION 2
 
 // Build id (VER-10). tools/automation/run_tests.ps1 rewrites this line in its scratch copy only.
-#macro BUILD_ID "ab91434-20261016-dirty"
+#macro BUILD_ID "104611c-20261016-dirty"

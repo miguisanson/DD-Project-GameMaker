@@ -1,0 +1,4 @@
+difficulty,player_hp_mult,player_mp_mult,enemy_hp_mult,enemy_mp_mult,player_damage_mult,enemy_damage_mult,enemy_status_chance_mult,player_exp_mult,player_stat_mult_UNUSED,enemy_stat_mult_UNUSED
+easy,1.15,1.05,0.9,0.95,1.08,0.9,0.9,1.2,1.0,1.0
+normal,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+hard,0.92,0.95,1.12,1.0,0.94,1.12,1.08,0.85,1.0,1.0

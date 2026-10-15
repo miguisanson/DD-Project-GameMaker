@@ -21,7 +21,7 @@ Setting viewport to 480 by 432
 Resizing swap chain to 480 by 432...
 Setting viewport to 480 by 432
 
-Collision Event time(microsecs)=7
+Collision Event time(microsecs)=6
 Variable_Global_Init()
 PrepareGame()
 Audio_Init()
@@ -36,11 +36,11 @@ Finished PrepareGame()
 Run_Start
 Done g_EffectsManager.Init()
 Done RenderStateManager
-CreateColPairs took 0.000000s 5 usecs for 67 object types obj_col_numb=0 physobjcount=13 resizes 0 final size 52
+CreateColPairs took 0.000000s 4 usecs for 67 object types obj_col_numb=0 physobjcount=13 resizes 0 final size 52
 Done ObjectLists
 Done Extension_Initialize
 About to startroom
-[TEST-BUILD] ab91434-20261016-dirty
+[TEST-BUILD] 104611c-20261016-dirty
 [DISPLAY] relayout #1 window=480x432 fullscreen=0 scale=3 game=0,0,480x432 ui_scale=1 gui=480x432
 [SFX MAP] ui_move -> id=ref sound Modern2 name=ref sound Modern2 ok=1 reason=OK
 [SFX MAP] ui_confirm -> id=ref sound Modern5 name=ref sound Modern5 ok=1 reason=OK
@@ -55,9 +55,9 @@ About to startroom
 [SFX MAP] save_confirm -> id=ref sound Modern5 name=ref sound Modern5 ok=1 reason=OK
 [SFX MAP] load_confirm -> id=ref sound Modern5 name=ref sound Modern5 ok=1 reason=OK
 [SFX MAP] delete_confirm -> id=ref sound Modern5 name=ref sound Modern5 ok=1 reason=OK
-Total memory used = 107040185 (0x06614db9) bytes 102.08MB
-Free memory = 6211136 (0x005ec640) bytes 5.92MB
-Peak memory used = 107040185 (0x06614db9) bytes 102.08MB
+Total memory used = 107044714 (0x06615f6a) bytes 102.09MB
+Free memory = 6210032 (0x005ec1f0) bytes 5.92MB
+Peak memory used = 107044714 (0x06615f6a) bytes 102.09MB
 **********************************.
 Entering main loop.
 **********************************.
@@ -750,13 +750,13 @@ Setting viewport to 480 by 432
 [TEST] PASS g7_muscle_up_shows_no_damage_number
 [TEST] PASS g7_back_to_the_command_menu
 [TEST] PASS g7_the_plate_is_back_on_attack
-[BOT] g7 enemy turn baseline frames=20 ms=333 scale_max=1 enemy_skill=-1
+[BOT] g7 enemy turn baseline frames=20 ms=334 scale_max=1 enemy_skill=-1
 [TEST] PASS g7_the_baseline_enemy_turn_is_a_normal_one
-[BOT] g7 enemy turn held frames=11 ms=183 scale_max=2 enemy_skill=-1
+[BOT] g7 enemy turn held frames=11 ms=184 scale_max=2 enemy_skill=-1
 [TEST] PASS g7_run_held_through_real_input_gives_a_time_scale_of_2
 [TEST] PASS g7_the_enemy_turn_with_run_held_takes_about_half_the_frames
 [TEST] PASS g7_the_enemy_turn_with_run_held_takes_about_half_the_time
-[BOT] g7 bar with run held: dq=500.01 dc=500 scale=1
+[BOT] g7 bar with run held: dq=499.91 dc=500 scale=1
 [TEST] PASS g7_run_is_held_during_the_bar
 [TEST] PASS g7_the_time_scale_is_1_during_the_bar
 [TEST] PASS g7_the_bar_clock_runs_at_real_speed_with_run_held
@@ -790,7 +790,7 @@ Setting viewport to 480 by 432
 [TEST] PASS mapjuice_the_sparkle_ring_is_over
 [TEST] PASS g9_a_new_run_starts_with_no_counts
 [TEST] PASS g9_run_time_advances_while_playing
-[BOT] g9_stats_after_the_fight {"dmg_dealt":23.0,"dmg_taken":12.0,"fights_won":1.0,"play_ms":19166.674000000072,"qte_total":8.0,"qte_perfect":8.0,"crits":0.0}
+[BOT] g9_stats_after_the_fight {"dmg_dealt":23.0,"dmg_taken":12.0,"fights_won":1.0,"play_ms":19166.686000000031,"qte_total":8.0,"qte_perfect":8.0,"crits":0.0}
 [TEST] PASS g9_one_fight_won
 [TEST] PASS g9_damage_dealt_is_counted
 [TEST] PASS g9_damage_taken_is_counted
@@ -994,7 +994,7 @@ Setting viewport to 480 by 432
 [TEST] PASS h14_that_fire_stand_is_lit
 [TEST] PASS h14_the_lighting_pass_ran_every_frame_of_the_room
 [TEST] PASS h14_rm_floor6_has_lights_and_enemies_for_the_cost_run
-[LIGHT-PERF] room=rm_floor6 enemies=8 cones_drawn=5 lights_drawn=2 frames=130 avg_ms=0.1488 max_ms=1.5100
+[LIGHT-PERF] room=rm_floor6 enemies=8 cones_drawn=5 lights_drawn=2 frames=130 avg_ms=0.1518 max_ms=1.6090
 [TEST] PASS h14_the_cost_run_stayed_in_rm_floor6_without_a_fight
 [TEST] PASS h14_the_pass_ran_130_frames
 [TEST] PASS h14_the_view_holds_cones_and_lights
@@ -1075,10 +1075,10 @@ Setting viewport to 480 by 432
 [TEST] PASS elitedeath_the_picture_is_drawn_through_the_death_line
 [TEST] PASS elitedeath_the_death_reaches_the_summary
 [TEST] PASS hunt6run_the_newer_run_file_is_there_before_the_new_run
-[TEST] FAIL hunt6run_a_new_run_keeps_a_newer_version_run_file exists=0
-[TEST-FRAMES] smoke frames=26381 of 27000
-[TEST-SUMMARY] pass=1004 fail=1 errors=0
-###game_end###1
+[TEST] PASS hunt6run_a_new_run_keeps_a_newer_version_run_file
+[TEST-FRAMES] smoke frames=26345 of 27000
+[TEST-SUMMARY] pass=1005 fail=0 errors=0
+###game_end###0
 Attempting to set gamepadcount to 0
-Script_Free called with 4112 and global 30
+Script_Free called with 4113 and global 30
 Unsetting previous scheduler resolution of 1

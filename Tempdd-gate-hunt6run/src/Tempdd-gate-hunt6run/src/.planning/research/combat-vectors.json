@@ -1,0 +1,1116 @@
+{
+ "version": 1,
+ "spec": ".planning/research/combat-spec.md",
+ "round_half_up_epsilon": 1e-06,
+ "damage": [
+  {
+   "id": "dmg_01",
+   "power": 6,
+   "A": 11,
+   "D": 7,
+   "grade": 1.0,
+   "mult": 1.0,
+   "want": 4
+  },
+  {
+   "id": "dmg_02",
+   "power": 7,
+   "A": 5,
+   "D": 5,
+   "grade": 1.0,
+   "mult": 1.0,
+   "want": 4
+  },
+  {
+   "id": "dmg_03",
+   "power": 1,
+   "A": 1,
+   "D": 60,
+   "grade": 1.0,
+   "mult": 1.0,
+   "want": 1
+  },
+  {
+   "id": "dmg_04",
+   "power": 6,
+   "A": 11,
+   "D": 7,
+   "grade": 1.3,
+   "mult": 1.0,
+   "want": 5
+  },
+  {
+   "id": "dmg_05",
+   "power": 6,
+   "A": 11,
+   "D": 7,
+   "grade": 1.1,
+   "mult": 1.0,
+   "want": 5
+  },
+  {
+   "id": "dmg_06",
+   "power": 6,
+   "A": 11,
+   "D": 7,
+   "grade": 0.75,
+   "mult": 1.0,
+   "want": 3
+  },
+  {
+   "id": "dmg_07",
+   "power": 1,
+   "A": 1,
+   "D": 60,
+   "grade": 0.75,
+   "mult": 1.0,
+   "want": 1
+  },
+  {
+   "id": "dmg_08",
+   "power": 1,
+   "A": 1,
+   "D": 60,
+   "grade": 1.3,
+   "mult": 1.0,
+   "want": 2
+  },
+  {
+   "id": "dmg_09",
+   "power": 6,
+   "A": 11,
+   "D": 7,
+   "grade": 1.0,
+   "mult": 0.0,
+   "want": 0
+  },
+  {
+   "id": "dmg_10",
+   "power": 6,
+   "A": 11,
+   "D": 7,
+   "grade": 1.0,
+   "mult": 0.8,
+   "want": 3
+  },
+  {
+   "id": "dmg_11",
+   "power": 6,
+   "A": 8,
+   "D": 7,
+   "grade": 1.0,
+   "mult": 0.25,
+   "want": 1
+  },
+  {
+   "id": "dmg_12",
+   "power": 6,
+   "A": 11,
+   "D": 7,
+   "grade": 1.0,
+   "mult": 2.0,
+   "want": 7
+  },
+  {
+   "id": "dmg_13",
+   "power": 19.5,
+   "A": 11,
+   "D": 7,
+   "grade": 1.0,
+   "mult": 1.0,
+   "want": 12
+  },
+  {
+   "id": "dmg_14",
+   "power": 22,
+   "A": 29,
+   "D": 18,
+   "grade": 1.0,
+   "mult": 1.0,
+   "want": 14
+  },
+  {
+   "id": "dmg_15",
+   "power": 0,
+   "A": 11,
+   "D": 7,
+   "grade": 1.0,
+   "mult": 1.0,
+   "want": 0
+  },
+  {
+   "id": "dmg_16",
+   "power": 4,
+   "A": 8,
+   "D": 12,
+   "grade": 1.0,
+   "mult": 1.0,
+   "want": 2
+  },
+  {
+   "id": "dmg_17",
+   "power": 12,
+   "A": 12,
+   "D": 12,
+   "grade": 1.3,
+   "mult": 1.0,
+   "want": 8
+  },
+  {
+   "id": "dmg_18",
+   "power": 18,
+   "A": 6,
+   "D": 6,
+   "grade": 0.75,
+   "mult": 1.0,
+   "want": 7
+  },
+  {
+   "id": "dmg_19",
+   "power": 9,
+   "A": 21,
+   "D": 18,
+   "grade": 1.0,
+   "mult": 1.0,
+   "want": 5
+  },
+  {
+   "id": "dmg_20",
+   "power": 13,
+   "A": 5,
+   "D": 60,
+   "grade": 1.0,
+   "mult": 1.0,
+   "want": 1
+  },
+  {
+   "id": "dmg_21",
+   "power": 6,
+   "A": 11,
+   "D": 7,
+   "grade": 1.0,
+   "mult": 4.0,
+   "want": 15
+  },
+  {
+   "id": "dmg_22",
+   "power": 6,
+   "A": 11,
+   "D": 7,
+   "grade": 1.0,
+   "mult": 0.65,
+   "want": 2
+  }
+ ],
+ "power": [
+  {
+   "id": "pow_01",
+   "kind": "basic",
+   "weapon_power": 3,
+   "skill_power": 0,
+   "power_mult": 1.0,
+   "want": 6.0
+  },
+  {
+   "id": "pow_02",
+   "kind": "basic",
+   "weapon_power": 6,
+   "skill_power": 0,
+   "power_mult": 1.0,
+   "want": 12.0
+  },
+  {
+   "id": "pow_03",
+   "kind": "basic",
+   "weapon_power": 1,
+   "skill_power": 0,
+   "power_mult": 1.0,
+   "want": 2.0
+  },
+  {
+   "id": "pow_04",
+   "kind": "skill",
+   "weapon_power": 3,
+   "skill_power": 5,
+   "power_mult": 1.5,
+   "want": 19.5
+  },
+  {
+   "id": "pow_05",
+   "kind": "skill",
+   "weapon_power": 9,
+   "skill_power": 4,
+   "power_mult": 1.0,
+   "want": 17.0
+  },
+  {
+   "id": "pow_06",
+   "kind": "enemy_skill",
+   "weapon_power": 0,
+   "skill_power": 4,
+   "power_mult": 1.0,
+   "want": 8.0
+  }
+ ],
+ "resources": [
+  {
+   "id": "hp_10_1",
+   "kind": "hp",
+   "hd": 10,
+   "level": 1,
+   "want": 10
+  },
+  {
+   "id": "hp_10_10",
+   "kind": "hp",
+   "hd": 10,
+   "level": 10,
+   "want": 73
+  },
+  {
+   "id": "hp_8_5",
+   "kind": "hp",
+   "hd": 8,
+   "level": 5,
+   "want": 34
+  },
+  {
+   "id": "hp_6_10",
+   "kind": "hp",
+   "hd": 6,
+   "level": 10,
+   "want": 55
+  },
+  {
+   "id": "hp_8_3",
+   "kind": "hp",
+   "hd": 8,
+   "level": 3,
+   "want": 22
+  },
+  {
+   "id": "mp_1_1_3",
+   "kind": "mp",
+   "mp_gain": 1,
+   "level": 1,
+   "mag": 3,
+   "want": 11
+  },
+  {
+   "id": "mp_2_10_39",
+   "kind": "mp",
+   "mp_gain": 2,
+   "level": 10,
+   "mag": 39,
+   "want": 47
+  },
+  {
+   "id": "mp_2_1_12",
+   "kind": "mp",
+   "mp_gain": 2,
+   "level": 1,
+   "mag": 12,
+   "want": 16
+  },
+  {
+   "id": "mp_1_5_4",
+   "kind": "mp",
+   "mp_gain": 1,
+   "level": 5,
+   "mag": 4,
+   "want": 16
+  }
+ ],
+ "class_levels": [
+  {
+   "id": "cls_knight_1",
+   "cls": "knight",
+   "level": 1,
+   "atk": 11,
+   "df": 12,
+   "spd": 10,
+   "mag": 3,
+   "hp": 10,
+   "mp": 11
+  },
+  {
+   "id": "cls_knight_2",
+   "cls": "knight",
+   "level": 2,
+   "atk": 12,
+   "df": 14,
+   "spd": 10,
+   "mag": 3,
+   "hp": 17,
+   "mp": 12
+  },
+  {
+   "id": "cls_knight_3",
+   "cls": "knight",
+   "level": 3,
+   "atk": 13,
+   "df": 16,
+   "spd": 10,
+   "mag": 3,
+   "hp": 24,
+   "mp": 13
+  },
+  {
+   "id": "cls_knight_5",
+   "cls": "knight",
+   "level": 5,
+   "atk": 15,
+   "df": 20,
+   "spd": 10,
+   "mag": 3,
+   "hp": 38,
+   "mp": 15
+  },
+  {
+   "id": "cls_knight_10",
+   "cls": "knight",
+   "level": 10,
+   "atk": 20,
+   "df": 30,
+   "spd": 10,
+   "mag": 3,
+   "hp": 73,
+   "mp": 20
+  },
+  {
+   "id": "cls_archer_1",
+   "cls": "archer",
+   "level": 1,
+   "atk": 9,
+   "df": 8,
+   "spd": 13,
+   "mag": 4,
+   "hp": 10,
+   "mp": 12
+  },
+  {
+   "id": "cls_archer_2",
+   "cls": "archer",
+   "level": 2,
+   "atk": 11,
+   "df": 8,
+   "spd": 14,
+   "mag": 4,
+   "hp": 16,
+   "mp": 14
+  },
+  {
+   "id": "cls_archer_3",
+   "cls": "archer",
+   "level": 3,
+   "atk": 13,
+   "df": 8,
+   "spd": 15,
+   "mag": 4,
+   "hp": 22,
+   "mp": 16
+  },
+  {
+   "id": "cls_archer_5",
+   "cls": "archer",
+   "level": 5,
+   "atk": 17,
+   "df": 8,
+   "spd": 17,
+   "mag": 4,
+   "hp": 34,
+   "mp": 20
+  },
+  {
+   "id": "cls_archer_10",
+   "cls": "archer",
+   "level": 10,
+   "atk": 27,
+   "df": 8,
+   "spd": 22,
+   "mag": 4,
+   "hp": 64,
+   "mp": 30
+  },
+  {
+   "id": "cls_mage_1",
+   "cls": "mage",
+   "level": 1,
+   "atk": 5,
+   "df": 7,
+   "spd": 10,
+   "mag": 12,
+   "hp": 10,
+   "mp": 16
+  },
+  {
+   "id": "cls_mage_2",
+   "cls": "mage",
+   "level": 2,
+   "atk": 5,
+   "df": 7,
+   "spd": 10,
+   "mag": 15,
+   "hp": 15,
+   "mp": 19
+  },
+  {
+   "id": "cls_mage_3",
+   "cls": "mage",
+   "level": 3,
+   "atk": 5,
+   "df": 7,
+   "spd": 10,
+   "mag": 18,
+   "hp": 20,
+   "mp": 23
+  },
+  {
+   "id": "cls_mage_5",
+   "cls": "mage",
+   "level": 5,
+   "atk": 5,
+   "df": 7,
+   "spd": 10,
+   "mag": 24,
+   "hp": 30,
+   "mp": 30
+  },
+  {
+   "id": "cls_mage_10",
+   "cls": "mage",
+   "level": 10,
+   "atk": 5,
+   "df": 7,
+   "spd": 10,
+   "mag": 39,
+   "hp": 55,
+   "mp": 47
+  },
+  {
+   "id": "cls_nobody_1",
+   "cls": "nobody",
+   "level": 1,
+   "atk": 8,
+   "df": 8,
+   "spd": 9,
+   "mag": 3,
+   "hp": 10,
+   "mp": 11
+  },
+  {
+   "id": "cls_nobody_2",
+   "cls": "nobody",
+   "level": 2,
+   "atk": 10,
+   "df": 8,
+   "spd": 10,
+   "mag": 3,
+   "hp": 16,
+   "mp": 12
+  },
+  {
+   "id": "cls_nobody_3",
+   "cls": "nobody",
+   "level": 3,
+   "atk": 11,
+   "df": 9,
+   "spd": 10,
+   "mag": 4,
+   "hp": 22,
+   "mp": 14
+  },
+  {
+   "id": "cls_nobody_5",
+   "cls": "nobody",
+   "level": 5,
+   "atk": 14,
+   "df": 10,
+   "spd": 11,
+   "mag": 5,
+   "hp": 34,
+   "mp": 16
+  },
+  {
+   "id": "cls_nobody_10",
+   "cls": "nobody",
+   "level": 10,
+   "atk": 22,
+   "df": 12,
+   "spd": 14,
+   "mag": 7,
+   "hp": 64,
+   "mp": 22
+  }
+ ],
+ "exp_next": [
+  {
+   "id": "exp_1",
+   "level": 1,
+   "want": 12
+  },
+  {
+   "id": "exp_2",
+   "level": 2,
+   "want": 24
+  },
+  {
+   "id": "exp_3",
+   "level": 3,
+   "want": 40
+  },
+  {
+   "id": "exp_4",
+   "level": 4,
+   "want": 58
+  },
+  {
+   "id": "exp_5",
+   "level": 5,
+   "want": 80
+  },
+  {
+   "id": "exp_6",
+   "level": 6,
+   "want": 105
+  },
+  {
+   "id": "exp_7",
+   "level": 7,
+   "want": 135
+  },
+  {
+   "id": "exp_8",
+   "level": 8,
+   "want": 170
+  },
+  {
+   "id": "exp_9",
+   "level": 9,
+   "want": 210
+  },
+  {
+   "id": "exp_10",
+   "level": 10,
+   "want": 0
+  }
+ ],
+ "enemies": [
+  {
+   "id": "en_slime_1",
+   "enemy": "slime",
+   "level": 1,
+   "atk": 8,
+   "df": 7,
+   "spd": 9,
+   "mag": 5,
+   "hp": 9
+  },
+  {
+   "id": "en_spider_3",
+   "enemy": "spider",
+   "level": 3,
+   "atk": 8,
+   "df": 7,
+   "spd": 10,
+   "mag": 5,
+   "hp": 20
+  },
+  {
+   "id": "en_snake_4",
+   "enemy": "snake",
+   "level": 4,
+   "atk": 9,
+   "df": 7,
+   "spd": 10,
+   "mag": 5,
+   "hp": 25
+  },
+  {
+   "id": "en_mad_whisp_6",
+   "enemy": "mad_whisp",
+   "level": 6,
+   "atk": 10,
+   "df": 9,
+   "spd": 12,
+   "mag": 13,
+   "hp": 32
+  },
+  {
+   "id": "en_killer_plant_5",
+   "enemy": "killer_plant",
+   "level": 5,
+   "atk": 12,
+   "df": 11,
+   "spd": 9,
+   "mag": 10,
+   "hp": 34
+  },
+  {
+   "id": "en_dire_wolf_4",
+   "enemy": "dire_wolf",
+   "level": 4,
+   "atk": 11,
+   "df": 9,
+   "spd": 11,
+   "mag": 6,
+   "hp": 27
+  },
+  {
+   "id": "en_ghost_sword_6",
+   "enemy": "ghost_sword",
+   "level": 6,
+   "atk": 14,
+   "df": 12,
+   "spd": 12,
+   "mag": 10,
+   "hp": 40
+  },
+  {
+   "id": "en_stranger_8",
+   "enemy": "stranger",
+   "level": 8,
+   "atk": 16,
+   "df": 14,
+   "spd": 13,
+   "mag": 15,
+   "hp": 53
+  },
+  {
+   "id": "en_palehorn_8",
+   "enemy": "palehorn",
+   "level": 8,
+   "atk": 18,
+   "df": 18,
+   "spd": 12,
+   "mag": 14,
+   "hp": 97
+  },
+  {
+   "id": "en_choirbeast_10",
+   "enemy": "choirbeast",
+   "level": 10,
+   "atk": 21,
+   "df": 24,
+   "spd": 14,
+   "mag": 19,
+   "hp": 194
+  }
+ ],
+ "run_chance": [
+  {
+   "id": "run_8_9",
+   "spd_player": 8,
+   "spd_enemy": 9,
+   "want": 0.470588
+  },
+  {
+   "id": "run_13_9",
+   "spd_player": 13,
+   "spd_enemy": 9,
+   "want": 0.590909
+  },
+  {
+   "id": "run_30_5",
+   "spd_player": 30,
+   "spd_enemy": 5,
+   "want": 0.857143
+  },
+  {
+   "id": "run_1_40",
+   "spd_player": 1,
+   "spd_enemy": 40,
+   "want": 0.02439
+  },
+  {
+   "id": "run_10_10",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "want": 0.5
+  }
+ ],
+ "crit_chance": [
+  {
+   "id": "crit_0",
+   "bonus": 0,
+   "want": 0.0
+  },
+  {
+   "id": "crit_25",
+   "bonus": 25,
+   "want": 0.25
+  },
+  {
+   "id": "crit_80",
+   "bonus": 80,
+   "want": 0.5
+  }
+ ],
+ "heal": [
+  {
+   "id": "heal_5_12",
+   "power": 5,
+   "A": 12,
+   "want": 8
+  }
+ ],
+ "first_actor": [
+  {
+   "id": "first_8_9",
+   "spd_player": 8,
+   "spd_enemy": 9,
+   "player_first": false
+  },
+  {
+   "id": "first_9_9",
+   "spd_player": 9,
+   "spd_enemy": 9,
+   "player_first": true
+  },
+  {
+   "id": "first_13_9",
+   "spd_player": 13,
+   "spd_enemy": 9,
+   "player_first": true
+  }
+ ],
+ "statuses": [
+  {
+   "id": "burn_tick_1",
+   "kind": "burn_tick",
+   "arg": 1,
+   "want": 2
+  },
+  {
+   "id": "burn_tick_3",
+   "kind": "burn_tick",
+   "arg": 3,
+   "want": 2
+  },
+  {
+   "id": "burn_tick_5",
+   "kind": "burn_tick",
+   "arg": 5,
+   "want": 2
+  },
+  {
+   "id": "burn_tick_12",
+   "kind": "burn_tick",
+   "arg": 12,
+   "want": 4
+  },
+  {
+   "id": "burn_tick_13",
+   "kind": "burn_tick",
+   "arg": 13,
+   "want": 4
+  },
+  {
+   "id": "burn_tick_15",
+   "kind": "burn_tick",
+   "arg": 15,
+   "want": 5
+  },
+  {
+   "id": "burn_tick_19",
+   "kind": "burn_tick",
+   "arg": 19,
+   "want": 6
+  },
+  {
+   "id": "burn_tick_39",
+   "kind": "burn_tick",
+   "arg": 39,
+   "want": 12
+  },
+  {
+   "id": "burn_def_1",
+   "kind": "burn_def",
+   "arg": 1,
+   "want": 1
+  },
+  {
+   "id": "burn_def_2",
+   "kind": "burn_def",
+   "arg": 2,
+   "want": 2
+  },
+  {
+   "id": "burn_def_7",
+   "kind": "burn_def",
+   "arg": 7,
+   "want": 5
+  },
+  {
+   "id": "burn_def_12",
+   "kind": "burn_def",
+   "arg": 12,
+   "want": 9
+  },
+  {
+   "id": "burn_def_18",
+   "kind": "burn_def",
+   "arg": 18,
+   "want": 14
+  },
+  {
+   "id": "poison_total_1",
+   "kind": "poison_total",
+   "arg": 1,
+   "want": 1
+  },
+  {
+   "id": "poison_total_3",
+   "kind": "poison_total",
+   "arg": 3,
+   "want": 6
+  },
+  {
+   "id": "poison_total_5",
+   "kind": "poison_total",
+   "arg": 5,
+   "want": 15
+  },
+  {
+   "id": "poison_total_10",
+   "kind": "poison_total",
+   "arg": 10,
+   "want": 55
+  },
+  {
+   "id": "poison_add_0_3",
+   "kind": "poison_add",
+   "arg": 0,
+   "arg2": 3,
+   "want": 3
+  },
+  {
+   "id": "poison_add_3_3",
+   "kind": "poison_add",
+   "arg": 3,
+   "arg2": 3,
+   "want": 6
+  },
+  {
+   "id": "poison_add_8_4",
+   "kind": "poison_add",
+   "arg": 8,
+   "arg2": 4,
+   "want": 10
+  },
+  {
+   "id": "bleed_tick_1",
+   "kind": "bleed_tick",
+   "arg": 1,
+   "want": 2
+  },
+  {
+   "id": "bleed_tick_2",
+   "kind": "bleed_tick",
+   "arg": 2,
+   "want": 4
+  },
+  {
+   "id": "bleed_tick_3",
+   "kind": "bleed_tick",
+   "arg": 3,
+   "want": 6
+  },
+  {
+   "id": "widen_55_1_5",
+   "kind": "widen",
+   "arg": 55,
+   "arg2": 1.5,
+   "want": 82.5
+  },
+  {
+   "id": "widen_60_1_5",
+   "kind": "widen",
+   "arg": 60,
+   "arg2": 1.5,
+   "want": 90.0
+  },
+  {
+   "id": "widen_50_1_0",
+   "kind": "widen",
+   "arg": 50,
+   "arg2": 1.0,
+   "want": 50.0
+  }
+ ],
+ "stagger": [
+  {
+   "id": "stagger_gain_6_no",
+   "kind": "gain",
+   "power": 6,
+   "stun": false,
+   "perfect": false,
+   "want": 3
+  },
+  {
+   "id": "stagger_gain_6_np",
+   "kind": "gain",
+   "power": 6,
+   "stun": false,
+   "perfect": true,
+   "want": 5
+  },
+  {
+   "id": "stagger_gain_11_so",
+   "kind": "gain",
+   "power": 11,
+   "stun": true,
+   "perfect": false,
+   "want": 11
+  },
+  {
+   "id": "stagger_gain_11_sp",
+   "kind": "gain",
+   "power": 11,
+   "stun": true,
+   "perfect": true,
+   "want": 17
+  },
+  {
+   "id": "stagger_gain_1_no",
+   "kind": "gain",
+   "power": 1,
+   "stun": false,
+   "perfect": false,
+   "want": 1
+  },
+  {
+   "id": "stagger_gain_2_np",
+   "kind": "gain",
+   "power": 2,
+   "stun": false,
+   "perfect": true,
+   "want": 2
+  },
+  {
+   "id": "stagger_max_1_norm",
+   "kind": "max",
+   "rank": 1,
+   "boss": false,
+   "want": 8
+  },
+  {
+   "id": "stagger_max_2_norm",
+   "kind": "max",
+   "rank": 2,
+   "boss": false,
+   "want": 12
+  },
+  {
+   "id": "stagger_max_3_boss",
+   "kind": "max",
+   "rank": 3,
+   "boss": true,
+   "want": 32
+  },
+  {
+   "id": "stagger_max_4_boss",
+   "kind": "max",
+   "rank": 4,
+   "boss": true,
+   "want": 40
+  },
+  {
+   "id": "stagger_max_4_norm",
+   "kind": "max",
+   "rank": 4,
+   "boss": false,
+   "want": 20
+  }
+ ],
+ "timeline": [
+  {
+   "id": "turn_13_9",
+   "spd_player": 13,
+   "spd_enemy": 9,
+   "boss": false,
+   "script": "n n n n n n n n n",
+   "want": "PEPEPPEPE"
+  },
+  {
+   "id": "turn_2x",
+   "spd_player": 20,
+   "spd_enemy": 10,
+   "boss": false,
+   "script": "n n n n n n n n n n n n",
+   "want": "PPEPPEPPEPPE"
+  },
+  {
+   "id": "turn_tie",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "boss": false,
+   "script": "n n n n",
+   "want": "PEPE"
+  },
+  {
+   "id": "turn_slow_player",
+   "spd_player": 9,
+   "spd_enemy": 13,
+   "boss": false,
+   "script": "n n n n n n",
+   "want": "EPEPEE"
+  },
+  {
+   "id": "turn_preview",
+   "spd_player": 13,
+   "spd_enemy": 9,
+   "boss": false,
+   "script": "p5 n n p5 n n n",
+   "want": "(PEPEP)PE(PEPPE)PEP"
+  },
+  {
+   "id": "turn_stun",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "boss": false,
+   "script": "n sE p5 n n n n n n",
+   "want": "P!(PEPEP)PEPEPE"
+  },
+  {
+   "id": "turn_stun_steadfast",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "boss": false,
+   "script": "n sE n sE n sE n n sE n",
+   "want": "P!P~E~PE!P"
+  },
+  {
+   "id": "turn_stun_boss",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "boss": true,
+   "script": "n sE n n n n",
+   "want": "P!EPEP"
+  },
+  {
+   "id": "turn_stun_player",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "boss": false,
+   "script": "n n sP n n n n",
+   "want": "PE!EPEP"
+  },
+  {
+   "id": "turn_break",
+   "spd_player": 10,
+   "spd_enemy": 10,
+   "boss": false,
+   "script": "n bE n n n n",
+   "want": "PBPEPE"
+  },
+  {
+   "id": "turn_fast_double",
+   "spd_player": 20,
+   "spd_enemy": 8,
+   "boss": false,
+   "script": "n n n n n n n",
+   "want": "PPEPPPE"
+  }
+ ]
+}

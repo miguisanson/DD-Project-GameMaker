@@ -2,7 +2,7 @@ Options: C:/ProgramData/GameMakerStudio2/Cache/runtimes/runtime-2024.14.3.260\bi
 Options: C:/Users/Windows10/AppData/Roaming/GameMakerStudio2/qalp2122_3623108\local_settings.json
 Setting up the Asset compiler
 Found Project Format 2
-+++ GMSC serialisation:  SUCCESSFUL LOAD AND LINK TIME: 374.1971ms
++++ GMSC serialisation:  SUCCESSFUL LOAD AND LINK TIME: 357.2873ms
 Success
 finished adding assets from E:/Github_Projects/DD-Project-GameMaker-wt/hunt6run/Tempdd-gate-hunt6run/src/DD-Project.yyp.
 Release build
@@ -55,7 +55,7 @@ Texture Group - __YY__0fallbacktexture.png_YYG_AUTO_GEN_TEX_GROUP_NAME_
 Texture Group - Default
 Writing Chunk... TGIN size ... 0.01 MB
 Writing Chunk... CODE size ... 0.00 MB
-Writing Chunk... VARI size ... 2.32 MB
+Writing Chunk... VARI size ... 2.33 MB
 Writing Chunk... FUNC size ... 0.22 MB
 Writing Chunk... FEAT size ... 0.05 MB
 Writing Chunk... STRG size ... 0.00 MB
@@ -63,8 +63,8 @@ Writing Chunk... TXTR size ... 0.79 MB
 0 Compressing texture... writing texture __yy__0fallbacktexture.png_yyg_auto_gen_tex_group_name__0.yytex... 
 1 Compressing texture... writing texture default_0.yytex... 
 Writing Chunk... AUDO size ... 0.10 MB
-Stats : GMA : Elapsed=3895.2734
-Stats : GMA : sp=143,au=111,bk=0,pt=0,sc=4112,sh=0,fo=1,tl=0,ob=66,ro=14,da=13,ex=0,ma=6,fm=0x1040B29D6DFE66B4
+Stats : GMA : Elapsed=3915.0729
+Stats : GMA : sp=143,au=111,bk=0,pt=0,sc=4113,sh=0,fo=1,tl=0,ob=66,ro=14,da=13,ex=0,ma=6,fm=0x1040B29D6DFE66B4
 Igor complete.
 PlatformOptions
 DoVersion
