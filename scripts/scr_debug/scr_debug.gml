@@ -514,6 +514,10 @@ function Scenario_StepSmoke(_s) {
         case 480: case 481: case 482: case 483: case 484: case 485: case 486: case 487: case 488: case 489:
             Scenario_StepSmokeOneMenu(_s);   // H1 (D140, D141): Esc and Tab are one menu, in the fight too; Quit in a fight comes back to just before it; its last step calls Scenario_NoticeEnd
             break;
+        case 680: case 681: case 682: case 683: case 684: case 685: case 686: case 687: case 688: case 689:
+        case 690: case 691: case 692: case 693: case 694: case 695: case 696: case 697: case 698: case 699:
+            Scenario_StepSmokeNotes(_s);   // H7 (D147): lore notes are picked up by walking onto them, never block, stay gone; the Codex Notes page and its reader; its last step calls Scenario_NoticeEnd
+            break;
         case 30:
             Scenario_StepSmokeUi(_s);
             break;
@@ -10425,7 +10429,7 @@ function Scenario_StepSmokeOneMenu(_s) {
             }
             if (variable_struct_exists(_o, "arrived") && _s.t == _o.arrived + 30) {
                 Scenario_Check("onemenu_no_fight_starts_at_once_after_continue", room == rm_floor1 && !Transition_IsActive(), "room=" + room_get_name(room) + " fx=" + json_stringify(_gs.transition_fx) + " cooldown=" + string(instance_exists(obj_player) ? instance_find(obj_player, 0).battle_cooldown : -1));
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 680);   // H7 (D147, 680..686) goes on; its last step ends the chain (Scenario_NoticeEnd removes the files and the profile)
             }
             if (_s.t > 1500) { Scenario_Check("onemenu_continue_reaches_rm_floor1", false, "room=" + room_get_name(room) + " cont=" + string(variable_struct_exists(_o, "cont"))); Scenario_NoticeEnd(); }
             break;
@@ -10510,6 +10514,206 @@ function Scenario_StepShotsOneMenu(_s) {
                 } else {
                     Scenario_Next(_s, 490);
                 }
+            }
+            break;
+    }
+}
+
+// ============================================================================
+// H7 (D147): lore notes you pick up. Smoke steps 680-699 (the end of the chain: the last step calls Scenario_NoticeEnd).
+//   680  rm_floor1's note is forgotten (as in a profile that never found it), the room is left and entered again
+//   681  the note stands on its tile and blocks nothing (the player's rule and the enemies' grid)
+//   682  the player walks onto it with a real key: a notice, a rise on the map, the note gone, found in the profile and in the profile file, no dialogue
+//   683  leaving and entering the room does not bring it back; a note not found yet (rm_floor3) is there
+//   684  a new run does not bring it back either
+//   685  the menu with the real keys: Codex -> Notes -> the found note opens a reader with its text -> Back; a ??? row opens nothing
+//   686  a long text scrolls with the real keys and Back closes it; the menu closes
+// ============================================================================
+function Scenario_NoteTileFree(_pl, _d) {
+    var _t = GRID_TILE_SIZE;
+    var _blocked_player = Player_TileBlocked(_pl, _d.tx * _t, _d.ty * _t);
+    var _g = Nav_Get().grid;
+    var _blocked_nav = Nav_CellBlocked(_g, _d.tx, _d.ty);
+    return { player: !_blocked_player, nav: !_blocked_nav };
+}
+
+function Scenario_StepSmokeNotes(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "nn")) _s.nn = { };
+    var _n = _s.nn;
+    var _T = GRID_TILE_SIZE;
+    var _d1 = Note_Find("map_page");
+    var _u = TabMenu_Get();
+    var _m = TabMenu_TopMenu();
+    switch (_s.step) {
+        case 680:   // forget the note, leave the room and come back through the real room change
+            if (_s.t == 1) {
+                if (!Scenario_FloorReady(rm_floor1)) { Scenario_Check("notes_the_chain_starts_in_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); break; }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                variable_struct_remove(Profile_Get().unlocks, Note_UnlockKey("map_page"));
+                variable_struct_remove(Profile_Get().unlocks, Note_UnlockKey("wall_breath"));
+                room_goto(rm_floor2);
+            }
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor2)) {
+                room_goto(rm_floor1);
+                Scenario_Next(_s, 681);
+            }
+            if (_s.t > 600) { Scenario_Check("notes_reaches_rm_floor2", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 681:   // the note stands there and blocks nothing
+            if (_s.t > 30 && Scenario_FloorReady(rm_floor1)) {
+                with (obj_enemy) instance_destroy();
+                Scenario_ClearUi();
+                Scenario_Check("notes_floor1_shows_its_note", Notes_LiveCount("rm_floor1") == 1 && Notes_LiveAtTile("rm_floor1", _d1.tx, _d1.ty) == "map_page", "live=" + string(Notes_LiveCount("rm_floor1")));
+                Scenario_Check("notes_it_is_not_found_yet", !Note_IsCollected(Profile_Get(), "map_page"));
+                var _pl = Scenario_PlacePlayer(_d1.tx + 1, _d1.ty);
+                _pl.face = LEFT;
+                var _free = Scenario_NoteTileFree(_pl, _d1);
+                Scenario_Check("notes_the_player_may_walk_onto_the_tile", _free.player);
+                Scenario_Check("notes_enemies_see_the_tile_as_free", _free.nav);
+                _n.mp = MapFx_Count("rise");
+                Scenario_Next(_s, 682);
+            }
+            if (_s.t > 600) { Scenario_Check("notes_floor1_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 682:   // one real step onto it
+            if (_s.t == 10) Scenario_Hold("move_left", 10);
+            if (_s.t > 12 && Notes_LiveCount("rm_floor1") == 0 && !variable_struct_exists(_n, "got")) {
+                _n.got = _s.t;
+                Scenario_Release();
+            }
+            if (variable_struct_exists(_n, "got") && _s.t == _n.got + 4) {
+                var _pl2 = instance_find(obj_player, 0);
+                Scenario_Check("notes_the_player_stands_on_the_tile", _pl2.x == _d1.tx * _T && _pl2.y == _d1.ty * _T, "at " + string(_pl2.x) + "," + string(_pl2.y));
+                Scenario_Check("notes_it_is_gone_from_the_map", Notes_LiveCount("rm_floor1") == 0);
+                Scenario_Check("notes_it_is_found_in_the_profile", Note_IsCollected(Profile_Get(), "map_page"));
+                Scenario_Check("notes_a_notice_names_it", Banner_Active() && global.banner.text == "Note found: " + _d1.title, "banner=" + (variable_global_exists("banner") ? string(global.banner.text) : "none"));
+                Scenario_Check("notes_a_note_rises_off_the_tile", MapFx_Count("rise") > _n.mp);
+                Scenario_Check("notes_no_dialogue_opens", _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0, "mode=" + string(_gs.ui.mode));
+                Scenario_Check("notes_the_profile_file_has_it", Note_IsCollected(Profile_Load(Profile_Path()).profile, "map_page"));
+                Scenario_Next(_s, 683);
+            }
+            if (_s.t > 120 && !variable_struct_exists(_n, "got")) { Scenario_Release(); Scenario_Check("notes_walking_onto_it_picks_it_up", false, "live=" + string(Notes_LiveCount("rm_floor1"))); Scenario_NoticeEnd(); }
+            break;
+        case 683:   // it stays gone in this run; one not found yet is there
+            if (_s.t == 1) room_goto(rm_floor2);
+            if (_s.t > 20 && room == rm_floor2 && Scenario_FloorReady(rm_floor2) && !variable_struct_exists(_n, "back")) {
+                _n.back = true;
+                room_goto(rm_floor1);
+            }
+            if (variable_struct_exists(_n, "back") && !variable_struct_exists(_n, "again") && _s.t > 50 && Scenario_FloorReady(rm_floor1)) {
+                _n.again = true;
+                Scenario_Check("notes_entering_the_room_again_does_not_bring_it_back", Notes_LiveCount("rm_floor1") == 0 && Notes_LiveAtTile("rm_floor1", _d1.tx, _d1.ty) == "");
+                room_goto(rm_floor3);
+            }
+            if (variable_struct_exists(_n, "again") && _s.t > 60 && Scenario_FloorReady(rm_floor3)) {
+                var _w = Note_Find("wall_breath");
+                Scenario_Check("notes_a_note_not_found_yet_is_there", Notes_LiveCount("rm_floor3") == 1 && Notes_LiveAtTile("rm_floor3", _w.tx, _w.ty) == "wall_breath", "live=" + string(Notes_LiveCount("rm_floor3")));
+                Scenario_Next(_s, 684);
+            }
+            if (_s.t > 900) { Scenario_Check("notes_room_changes_work", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 684:   // a new run: the profile still remembers
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 6847);
+            }
+            if (_s.t > 30 && Scenario_FloorReady(rm_floor1)) {
+                Scenario_Check("notes_a_new_run_does_not_bring_it_back", Notes_LiveCount("rm_floor1") == 0, "live=" + string(Notes_LiveCount("rm_floor1")));
+                Scenario_Check("notes_the_profile_still_has_it", Note_IsCollected(Profile_Get(), "map_page"));
+                with (obj_enemy) instance_destroy();
+                Scenario_ClearUi();
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);
+                Scenario_Next(_s, 685);
+            }
+            if (_s.t > 900) { Scenario_Check("notes_a_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 685:   // Tab, E x4 (Codex), Notes, the found note
+            switch (_s.t) {
+                case 5: Scenario_Tap("menu"); break;
+                case 20:
+                    _u = TabMenu_Get();
+                    Scenario_Check("notes_the_menu_opens_on_status", _gs.ui.mode == UI_MENU && is_struct(_u) && _u.tab == 0, "mode=" + string(_gs.ui.mode));
+                    Scenario_Tap("tab_next");
+                    break;
+                case 28: Scenario_Tap("tab_next"); break;
+                case 36: Scenario_Tap("tab_next"); break;
+                case 44: Scenario_Tap("tab_next"); break;
+                case 54:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_four_E_reach_the_codex", is_struct(TabMenu_Get()) && TabMenu_Get().tab == 4 && _m.id == "tab_codex", "tab=" + string(is_struct(TabMenu_Get()) ? TabMenu_Get().tab : -1));
+                    Scenario_Check("notes_the_codex_row_counts_the_notes", _m.items[1].id == "notes" && _m.items[1].value == "1/8", _m.items[1].value);
+                    Scenario_Tap("menu_down");
+                    break;
+                case 62: Scenario_Tap("confirm"); break;
+                case 72:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_confirm_opens_the_notes_page", _m.id == "codex_notes" && TabMenu_Depth() == 2, "id=" + _m.id);
+                    Scenario_Check("notes_the_page_says_found_1_of_8", _m.layout.title == "Notes found 1/8", _m.layout.title);
+                    Scenario_Check("notes_the_found_note_is_listed_by_title", _m.items[0].label == _d1.title);
+                    Scenario_Check("notes_the_others_are_question_marks", _m.items[1].label == "???" && _m.items[7].label == "???");
+                    Scenario_Tap("menu_down");
+                    break;
+                case 80: Scenario_Tap("confirm"); break;   // a ??? row opens nothing
+                case 90:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_a_question_mark_row_opens_nothing", _m.id == "codex_notes" && TabMenu_Depth() == 2, "id=" + _m.id);
+                    Scenario_Tap("menu_up");
+                    break;
+                case 98: Scenario_Tap("confirm"); break;
+                case 110:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_the_found_note_opens_a_reader", _m.id == "codex_note_read" && TabMenu_Depth() == 3 && _m.data.reader, "id=" + _m.id);
+                    Scenario_Check("notes_the_reader_has_the_title", _m.layout.title == _d1.title);
+                    Scenario_Check("notes_the_reader_has_the_full_text", string_pos(_d1.lines[0], _m.data.text) > 0 && string_pos(_d1.lines[1], _m.data.text) > 0 && string_pos(_d1.lines[2], _m.data.text) > 0);
+                    Scenario_Check("notes_the_footer_offers_back", string_pos("{back}", TabMenu_Hint()) > 0, TabMenu_Hint());
+                    Scenario_Tap("cancel");
+                    break;
+                case 124:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_back_closes_the_reader", _m.id == "codex_notes" && TabMenu_Depth() == 2 && _m.cursor == 0, "id=" + _m.id);
+                    Scenario_Next(_s, 686);
+                    break;
+            }
+            break;
+        case 686:   // a long text scrolls; Back closes it; the menu closes
+            switch (_s.t) {
+                case 1:
+                    var _fake = { id: "smoke_long", title: "A long letter", room: "rm_floor1", tx: 0, ty: 0, min_deaths: 0, lines: [] };
+                    for (var _k = 0; _k < 40; _k++) array_push(_fake.lines, "Line " + string(_k) + " of a very long letter.");
+                    TabNote_OpenReader(_fake);
+                    break;
+                case 20:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_the_long_text_reader_is_open", _m.id == "codex_note_read" && TabMenu_Depth() == 3, "id=" + _m.id);
+                    Scenario_Check("notes_it_starts_at_the_top", _m.data.scroll == 0);
+                    Scenario_Tap("menu_down");
+                    break;
+                case 28: Scenario_Tap("menu_down"); break;
+                case 36:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_down_scrolls_the_long_text", _m.data.scroll == 2, "scroll=" + string(_m.data.scroll));
+                    Scenario_Check("notes_a_long_text_has_more_to_scroll", _m.data.scroll < NoteReader_MaxScroll(array_length(_m.data.wrapped), _m.data.visible), "n=" + string(array_length(_m.data.wrapped)) + " vis=" + string(_m.data.visible));
+                    Scenario_Tap("menu_up");
+                    break;
+                case 44:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_up_scrolls_back", _m.data.scroll == 1, "scroll=" + string(_m.data.scroll));
+                    Scenario_Tap("cancel");
+                    break;
+                case 58:
+                    _m = TabMenu_TopMenu();
+                    Scenario_Check("notes_back_closes_the_long_reader", _m.id == "codex_notes" && TabMenu_Depth() == 2, "id=" + _m.id);
+                    Scenario_Tap("cancel");
+                    break;
+                case 70: Scenario_Tap("cancel"); break;
+                case 90:
+                    Scenario_Check("notes_back_back_back_closes_the_menu", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                    Scenario_NoticeEnd();
+                    break;
             }
             break;
     }

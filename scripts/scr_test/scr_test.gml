@@ -124,6 +124,7 @@ function Test_RunAll() {
     Test_RunSuite("SpeedPreview", Test_Suite_SpeedPreview);
     Test_RunSuite("MapJuice", Test_Suite_MapJuice);
     Test_RunSuite("OneMenu", Test_Suite_OneMenu);
+    Test_RunSuite("Notes", Test_Suite_Notes);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -9566,4 +9567,92 @@ function Test_Suite_OneMenu() {
     _gs2.persist = _old_persist;
     _gs2.player_ch = _old_ch;
     _gs2.flags = _old_flags;
+}
+
+// ---- H7: lore notes (D147) ----
+// Expected values come from D147 and the packet brief: a note is picked up by walking onto it (no key), is read once, is gone from the map at once, never
+// spawns again in any later run (the profile remembers it) and never blocks a path; the found ones are read in the Codex Notes page, which says "found x/8".
+function Test_Suite_Notes() {
+    var _defs = Note_Defs();
+    Test_Eq("D147 still eight notes", array_length(_defs), 8);
+
+    // which notes stand on the map
+    var _p = Profile_Default();
+    Test_Eq("D147 a fresh profile: rm_floor1 has its note", array_length(Notes_ToSpawn(_p, "rm_floor1", 0)), 1);
+    Test_Eq("D147 a note that is not found yet and has its deaths still spawns", array_length(Notes_ToSpawn(_p, "rm_floor2", 3)), 1);
+    Test_Eq("D147 a note waits for its deaths", array_length(Notes_ToSpawn(_p, "rm_floor2", 2)), 0);
+    Test_Eq("D147 a room without notes has none", array_length(Notes_ToSpawn(_p, "rm_battle", 99)), 0);
+    Note_MarkCollected(_p, "map_page");
+    Test_Eq("D147 a found note never spawns again", array_length(Notes_ToSpawn(_p, "rm_floor1", 0)), 0);
+    Test_Eq("D147 another note still spawns", array_length(Notes_ToSpawn(_p, "rm_floor3", 0)), 1);
+    var _pn = Profile_Normalize(json_parse(json_stringify(_p)));
+    Test_Eq("D147 a note found in an earlier run is still gone in a later one (profile in, profile out)", array_length(Notes_ToSpawn(_pn, "rm_floor1", 0)), 0);
+
+    // walking onto a note picks it up
+    var _p2 = Profile_Default();
+    var _d = Note_Find("map_page");
+    Notes_LiveSet("rm_floor1", Notes_ToSpawn(_p2, "rm_floor1", 0));
+    Test_Eq("D147 the note is on the map", Notes_LiveCount("rm_floor1"), 1);
+    Test_Eq("D147 it is the survey page, on its tile", Notes_LiveAtTile("rm_floor1", _d.tx, _d.ty), "map_page");
+    Test_Eq("D147 another tile has none", Notes_LiveAtTile("rm_floor1", _d.tx + 1, _d.ty), "");
+    Test_Eq("D147 another room has none", Notes_LiveAtTile("rm_floor2", _d.tx, _d.ty), "");
+    Test_False("D147 standing next to it picks nothing up", is_struct(Notes_PickupAt(_p2, "rm_floor1", _d.tx + 1, _d.ty)));
+    Test_False("D147 so it is not found yet", Note_IsCollected(_p2, "map_page"));
+    var _got = Notes_PickupAt(_p2, "rm_floor1", _d.tx, _d.ty);
+    Test_True("D147 stepping on it picks the note up", is_struct(_got) && _got.id == "map_page");
+    Test_True("D147 it is marked found in the profile", Note_IsCollected(_p2, "map_page"));
+    Test_Eq("D147 it is gone from the map at once", Notes_LiveCount("rm_floor1"), 0);
+    Test_False("D147 stepping on the same tile again picks up nothing", is_struct(Notes_PickupAt(_p2, "rm_floor1", _d.tx, _d.ty)));
+    Test_Eq("D147 the notice names the note", Note_FoundText(_got), "Note found: Torn survey page");
+    Notes_LiveSet("", []);
+
+    // the Codex page: found by title, the rest ???, a count, a reader
+    var _r0 = Codex_NoteRows(Profile_Default());
+    Test_Eq("D147 the page has a row for all 8", array_length(_r0), 8);
+    Test_Eq("D147 nothing found: every row is ???", _r0[0].label + _r0[7].label, "??????");
+    Test_Eq("D147 the title counts what is found (none)", Codex_NotesTitle(Profile_Default()), "Notes found 0/8");
+    var _r1 = Codex_NoteRows(_p2);
+    Test_Eq("D147 a found note is listed by its title", _r1[0].label, "Torn survey page");
+    Test_Eq("D147 the others stay ???", _r1[1].label, "???");
+    Test_Eq("D147 the title counts what is found (one)", Codex_NotesTitle(_p2), "Notes found 1/8");
+    Test_Eq("D147 a found row knows which note it opens", _r1[0].note_id, "map_page");
+    Test_False("D147 a ??? row opens nothing", variable_struct_exists(_r1[1], "note_id"));
+    Test_True("D147 a found row's footer says Read", string_pos("Read", _r1[0].hint) > 0);
+
+    // the reader: full text, scrolls when long, Back closes (one level up)
+    var _text = NoteReader_Text(_d);
+    Test_True("D147 the reader has every line of the note", string_pos(_d.lines[0], _text) > 0 && string_pos(_d.lines[1], _text) > 0 && string_pos(_d.lines[2], _text) > 0);
+    var _rd = NoteReader_New(_d);
+    Test_Eq("D147 the reader shows the note's title", _rd.layout.title, "Torn survey page");
+    Test_True("D147 the reader is marked as a reader", _rd.data.reader);
+    Test_Eq("D147 a short text does not scroll", NoteReader_MaxScroll(3, 8), 0);
+    Test_Eq("D147 a long text scrolls by what does not fit", NoteReader_MaxScroll(20, 8), 12);
+    Test_Eq("D147 down moves one line", NoteReader_Scroll(3, 1, 20, 8), 4);
+    Test_Eq("D147 down stops at the last line", NoteReader_Scroll(12, 1, 20, 8), 12);
+    Test_Eq("D147 up stops at the top", NoteReader_Scroll(0, -1, 20, 8), 0);
+    Test_Eq("D147 up moves one line", NoteReader_Scroll(5, -1, 20, 8), 4);
+    Test_Eq("D147 a text that fits stays at the top", NoteReader_Scroll(0, 1, 3, 8), 0);
+    var _long = "";
+    for (var _i = 0; _i < 30; _i++) _long += "A long note goes on and on. ";
+    Test_True("D147 long text wraps to many lines", array_length(NoteReader_Lines(_long, 120)) > array_length(NoteReader_Lines("Hi", 120)) + 5);
+
+    // the notice and the rise on the map
+    Test_Eq("D147 a note rises out of the tile as a note", MapFx_RiseKind("note"), "note");
+    MapFx_Clear();
+    MapFx_NoteFound(24, 100);
+    Test_Eq("D147 picking a note up starts one rise effect", MapFx_Count("rise"), 1);
+    MapFx_Clear();
+
+    // the profile file keeps what was found
+    var _f = "test_notes_profile.sav";
+    Save_DeleteFileSet(_f);
+    var _w = Profile_Default();
+    Note_MarkCollected(_w, "wall_breath");
+    Note_MarkCollected(_w, "carved_arrow");
+    Test_True("D147 profile write reports success", Profile_SaveTo(_f, _w));
+    var _lr = Profile_Load(_f);
+    Test_Eq("D147 profile reads back ok", _lr.status, "ok");
+    Test_True("D147 found notes survive the profile file", Note_IsCollected(_lr.profile, "wall_breath") && Note_IsCollected(_lr.profile, "carved_arrow") && !Note_IsCollected(_lr.profile, "map_page"));
+    Test_Eq("D147 the count survives the profile file", Codex_NoteCount(_lr.profile), 2);
+    Save_DeleteFileSet(_f);
 }
