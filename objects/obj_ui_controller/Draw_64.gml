@@ -50,6 +50,8 @@ if (gs.ui.mode == UI_BED) {
     BedMenu_Draw();
 }
 
+if (room != rm_start) Confirm_Draw();   // D156: the shared Yes / No pop-up over the class, echo, skill and shop screens (the title draws its own; the menu draws its own)
+
 Banner_Draw();   // C5 (D106): boss name banner
 
 if (room != rm_battle) Tutorial_Draw();   // C4 (D45): the first-time pop-up, over everything but the fade (in a battle the battle controller draws it, later)

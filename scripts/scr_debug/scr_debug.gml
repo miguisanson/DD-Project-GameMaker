@@ -5225,9 +5225,14 @@ function Scenario_StepShotsStory(_s) {
             }
             if (_s.ec == 1 && _s.t == _s.ec_t + 4) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
-                Scenario_Tap("confirm");   // take the first option
+                Scenario_Tap("confirm");   // take the first option: the shared Yes / No pop-up asks (D156)
             }
-            if (_s.ec == 1 && _s.t > _s.ec_t + 10 && !CardsUi_IsOpen()) {
+            if (_s.ec == 1 && _s.t == _s.ec_t + 16) {
+                Scenario_Check("shots_story_echo_pick_asks_first", Confirm_IsOpen() && Confirm_Menu().cursor == 1 && CardsUi_IsOpen());
+                Scenario_Tap("menu_up");   // No -> Yes
+            }
+            if (_s.ec == 1 && _s.t == _s.ec_t + 28) Scenario_Tap("confirm");
+            if (_s.ec == 1 && _s.t > _s.ec_t + 34 && !CardsUi_IsOpen()) {
                 Scenario_Check("shots_story_echo_pick_is_answered", Cards_NextOwed(_gs.player_ch) == "" && array_length(Profile_Get().echo_pool) == 0);
                 Scenario_Next(_s, 156);
             }

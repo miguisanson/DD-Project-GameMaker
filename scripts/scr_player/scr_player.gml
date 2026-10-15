@@ -950,6 +950,7 @@ function UI_InterruptCloseAll(_fade_dim = true) {
     }
 
     Notice_Interrupt();
+    Confirm_Close();       // D156
 
     CardsUi_Interrupt();   // C2: what is owed opens again afterwards
     BedUi_Interrupt();     // C4: the bed stays free

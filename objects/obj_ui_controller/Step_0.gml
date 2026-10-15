@@ -26,6 +26,7 @@ if (is_struct(hud_ch)) {
 if (hud_hurt_flash_ms > 0) hud_hurt_flash_ms = Hud_HurtFlashStep(hud_hurt_flash_ms, step_ms);   // D108 F2b-1: ms, was frames
 
 if (Transition_IsInputLocked()) exit;
+if (Confirm_Step()) exit;   // D156: the Yes / No pop-up takes every key until it is answered (the title's own Step handles it in rm_start)
 
 // C2: the screens a character owes (class choice, free stat point, card pick, replace a skill) open and run here.
 if (CardsUi_Step()) exit;
