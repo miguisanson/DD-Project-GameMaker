@@ -151,7 +151,7 @@
 #macro ENEMY_WANDER_CHANCE_DEFAULT 4
 #macro ENEMY_MOVE_SPEED_DEFAULT 1
 #macro UI_OPENED_FRAME_NONE -1
-#macro UI_DIALOGUE_REOPEN_LOCK 1
+#macro UI_DIALOGUE_REOPEN_LOCK_MS (1000 / 60)   // D108 F2b-2: ms, was 1 frame. After a close the world ignores the closing press for one UI step (Dialogue_LockStep)
 #macro UI_DIALOGUE_CHARS_PER_SEC 60
 #macro UI_DIALOGUE_ADVANCE_HOLD_SEC 0.75   // cutscene text only
 #macro UI_DIALOGUE_BOX_HOLD_SEC 0.15       // D101: a boxed line is ready for the next confirm this soon after it is complete
@@ -172,7 +172,7 @@
 #macro UI_CUTSCENE_TEXT_SHADOW_X 1
 #macro UI_CUTSCENE_TEXT_SHADOW_Y 1
 #macro UI_CUTSCENE_DIALOGUE_CHARS_PER_SEC 24
-#macro UI_CUTSCENE_ADVANCE_BLOCK_FRAMES 2
+#macro UI_CUTSCENE_ADVANCE_BLOCK_MS (3000 / 60)   // D108 F2b-2: ms, was 2 frames (frame <= open + 2: the open frame and 2 after = 50 ms). A text-only cutscene line ignores Advance this long
 
 #macro SHAKE_DIR_H 0
 #macro SHAKE_DIR_V 1
@@ -280,9 +280,11 @@
 #macro WINDOW_MODE_COUNT 3
 // Room left on the monitor's height for a windowed window's title bar, border and the taskbar (Display_WindowedMaxScale).
 #macro DISPLAY_WINDOW_MARGIN_H 80
-// D48 hold-to-skip: frames of holding confirm (1.0 s at 60 fps) and how long the "hold to skip" hint stays after a press.
-#macro SKIP_HOLD_FRAMES 60
-#macro SKIP_HINT_FRAMES 150
+// D48 hold-to-skip, in ms (D108 F2b-2, was 60 / 150 frames): holding confirm for 1.0 s skips; the "hold to skip" hint stays 2.5 s after a press, fading over its last 20 frames.
+#macro SKIP_HOLD_MS 1000
+#macro SKIP_HINT_MS 2500
+#macro SKIP_HINT_FADE_MS (20000 / 60)
+#macro BANNER_DURATION_MS 1000   // D106 boss name banner (D108 F2b-2: ms, was Banner_Frames(fps) = 1 s)
 #macro SETTINGS_VOLUME_STEP 0.05
 
 #macro TRANSITION_TYPE_NONE 0

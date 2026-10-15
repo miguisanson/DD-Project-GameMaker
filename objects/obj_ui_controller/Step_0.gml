@@ -1,7 +1,8 @@
 Input_PreStep();
 Display_Update();   // the display owner's per-frame check (applies only on a real window change); moves to obj_display's Begin Step
-Skip_Tick();       // D48: hold-to-skip count (steps only while a cutscene or camera pan claims it)
-Banner_Step();     // C5 (D106): the boss name banner (about 1 s)
+var step_ms = Presentation_StepMs(delta_time);   // D108 F2b-2: the banner, the hold-to-skip, the arrow blink and the dialogue lock run on a ms clock
+Skip_Tick(step_ms);       // D48: hold-to-skip count (steps only while a cutscene or camera pan claims it)
+Banner_Step(step_ms);     // C5 (D106): the boss name banner (about 1 s)
 var gs = GameState_Get();
 Transition_Update();
 if (!variable_global_exists("scn")) Focus_Step(window_has_focus());   // R1b (D122): the window lost focus -> pause, lower the music (scripted runs are never in front: they call Focus_Step themselves)
@@ -21,7 +22,7 @@ if (is_struct(hud_ch)) {
 } else {
     hud_prev_hp = -1;
 }
-if (hud_hurt_flash_ms > 0) hud_hurt_flash_ms = Hud_HurtFlashStep(hud_hurt_flash_ms, Presentation_StepMs(delta_time));   // D108 F2b-1: ms, was frames
+if (hud_hurt_flash_ms > 0) hud_hurt_flash_ms = Hud_HurtFlashStep(hud_hurt_flash_ms, step_ms);   // D108 F2b-1: ms, was frames
 
 if (Transition_IsInputLocked()) exit;
 
@@ -29,12 +30,10 @@ if (Transition_IsInputLocked()) exit;
 if (CardsUi_Step()) exit;
 if (ShopUi_Step()) exit;   // C3 (D85): the merchant's shop
 
-var game_fps = max(1, game_get_speed(gamespeed_fps));
-gs.ui.icon_frame += max(0, UI_DIALOGUE_ARROW_FPS) / game_fps;
-if (gs.ui.icon_frame >= 2) gs.ui.icon_frame -= 2;
+gs.ui.icon_frame = Dialogue_IconStep(gs.ui.icon_frame, step_ms);
 
 if (variable_struct_exists(gs.ui, "dialogue_lock") && gs.ui.dialogue_lock > 0) {
-    gs.ui.dialogue_lock -= 1;
+    gs.ui.dialogue_lock = Dialogue_LockStep(gs.ui.dialogue_lock, step_ms);
 }
 if (variable_struct_exists(gs.ui, "dialogue_require_release") && gs.ui.dialogue_require_release && !Input_Held("interact")) {
     gs.ui.dialogue_require_release = false;

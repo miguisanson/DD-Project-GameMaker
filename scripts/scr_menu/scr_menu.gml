@@ -955,10 +955,10 @@ function Menu_Draw() {
 // C2: the card screens, on the shared UI framework (D0, D95-D100): class choice (D73, D83), free stat point (D76), 1-of-3 card pick (D81),
 // replace a skill (D82). What a character owes is kept on the character (Cards_NextOwed, scr_levelup), so a save, a reload or an interrupted
 // screen loses nothing; CardsUi_Step (obj_ui_controller Step) opens the next owed screen when nothing else is on screen.
-// global.cards_ui = { kind, stk, pick, opened_frame, opened_ms } while a screen is open, with gs.ui.mode = UI_CARDS. Class, stat and replace
+// global.cards_ui = { kind, stk, pick, lock, opened_ms } while a screen is open, with gs.ui.mode = UI_CARDS. Class, stat and replace
 // are Ui menus on a Ui stack (list + details panel); the pick is three cards side by side, drawn with the same frame and text kit.
 // ==========================================================================================================================
-#macro CARDS_UI_INPUT_DELAY_FRAMES 10   // keys are ignored this long after a screen opens (the press that opened it must not answer it)
+#macro CARDS_UI_INPUT_DELAY_MS (10000 / 60)   // keys are ignored this long after a screen opens (the press that opened it must not answer it); D108 F2b-2: ms, was 10 frames
 
 function CardsUi_IsOpen() {
     return variable_global_exists("cards_ui") && is_struct(global.cards_ui);
@@ -1007,7 +1007,7 @@ function CardsUi_Step() {
 
 function CardsUi_Open(_kind) {
     var gs = GameState_Get();
-    var u = { kind: _kind, stk: Ui_StackNew(), pick: undefined, opened_frame: Input_Frame(), opened_ms: current_time };
+    var u = { kind: _kind, stk: Ui_StackNew(), pick: undefined, lock: InputLock_New(CARDS_UI_INPUT_DELAY_MS), opened_ms: current_time };
     switch (_kind) {
         case "class": Ui_StackPush(u.stk, CardsUi_ClassMenu()); break;
         case "stat": Ui_StackPush(u.stk, CardsUi_StatMenu()); break;
@@ -1024,7 +1024,7 @@ function CardsUi_Open(_kind) {
 
 function CardsUi_HandleInput() {
     var u = global.cards_ui;
-    if (Input_Frame() - u.opened_frame < CARDS_UI_INPUT_DELAY_FRAMES) return;
+    if (InputLock_Active(u.lock)) return;
     if (u.kind == "cards") {
         CardsUi_PickUpdate(u);
     } else {
@@ -1403,7 +1403,7 @@ function CardsUi_Draw() {
 // Binds_* / Prompt_* (scr_input).
 // ===================================================================================================================
 // ---- the bed: Rest / Upgrade a skill / Leave, once per run per bed -----------------------------------------------------------------
-// global.bed_ui = { stk, opened_frame, opened_ms, key } while it is open, with gs.ui.mode = UI_BED. Back leaves without using the bed.
+// global.bed_ui = { stk, lock, opened_ms, key } while it is open, with gs.ui.mode = UI_BED. Back leaves without using the bed.
 function BedUi_IsOpen() {
     return variable_global_exists("bed_ui") && is_struct(global.bed_ui);
 }
@@ -1428,7 +1428,7 @@ function BedUi_Open(_inst) {
         Dialogue_StartLines([Loc_T("bed.used", "You have rested here already. The bed is still warm.")]);
         return false;
     }
-    var u = { stk: Ui_StackNew(), opened_frame: Input_Frame(), opened_ms: current_time, key: key };
+    var u = { stk: Ui_StackNew(), lock: InputLock_New(CARDS_UI_INPUT_DELAY_MS), opened_ms: current_time, key: key };
     Ui_StackPush(u.stk, BedUi_MainMenu());
     global.bed_ui = u;
     gs.ui.mode = UI_BED;
@@ -1494,7 +1494,7 @@ function BedUi_Handle() {
         return;
     }
     var u = global.bed_ui;
-    if (Input_Frame() - u.opened_frame < CARDS_UI_INPUT_DELAY_FRAMES) return;
+    if (InputLock_Active(u.lock)) return;
     var top = Ui_StackTop(u.stk);
     if (is_struct(top)) Ui_MenuUpdate(top, u.stk);
 }
@@ -1512,12 +1512,12 @@ function BedUi_Draw() {
 }
 
 // ---- the tutorial pop-up --------------------------------------------------------------------------------------------------------------
-// global.tutorial_ui = { id, queue, opened_frame, opened_ms } (Tutorial_Trigger, scr_dialogue). It is drawn over everything the ui controller
+// global.tutorial_ui = { id, queue, lock, opened_ms } (Tutorial_Trigger, scr_dialogue). It is drawn over everything the ui controller
 // draws and, while it is up, nothing else gets input: the controller's Step calls Tutorial_Step first and the battle controller waits.
 function Tutorial_Step() {
     if (!Tutorial_IsOpen()) return false;
     var t = global.tutorial_ui;
-    if (Input_Frame() - t.opened_frame >= TUTORIAL_INPUT_DELAY_FRAMES) {
+    if (!InputLock_Active(t.lock)) {
         if (Input_UIConfirm() || Input_UIBack() || mouse_check_button_pressed(mb_left)) {
             SFX_PlayUI("ui_confirm");
             Tutorial_Dismiss();
@@ -1676,13 +1676,13 @@ function Notice_Draw() {
 }
 
 // ---- the Help page (pause menu): every tutorial, seen or not, in the framework's list with the details panel ----------------------------
-// global.help_ui = { stk, opened_frame, opened_ms }.
+// global.help_ui = { stk, lock, opened_ms }.
 function HelpUi_IsOpen() {
     return variable_global_exists("help_ui") && is_struct(global.help_ui);
 }
 
 function HelpUi_Open() {
-    var u = { stk: Ui_StackNew(), opened_frame: Input_Frame(), opened_ms: current_time };
+    var u = { stk: Ui_StackNew(), lock: InputLock_New(HELP_UI_INPUT_DELAY_MS), opened_ms: current_time };
     var m = Ui_MenuNew("help", Tutorial_HelpItems(), {
         on_back: HelpUi_OnBack,
         layout: { title: Loc_T("help.title", "Help"), anchor: "center", details: true }
@@ -1703,7 +1703,7 @@ function HelpUi_OnBack(_m, _res) {
 function HelpUi_Handle() {
     if (!HelpUi_IsOpen()) return;
     var u = global.help_ui;
-    if (Input_Frame() - u.opened_frame < 4) return;   // the press that opened it
+    if (InputLock_Active(u.lock)) return;   // the press that opened it
     var top = Ui_StackTop(u.stk);
     if (is_struct(top)) Ui_MenuUpdate(top, u.stk);
 }
@@ -1771,7 +1771,7 @@ function Controls_PollKey() {
 }
 
 function ControlsPage_Open(_sp) {
-    _sp.controls = { menu: undefined, capture: "", msg_row: "", msg: "", opened_frame: Input_Frame() };
+    _sp.controls = { menu: undefined, capture: "", msg_row: "", msg: "", lock: undefined };
     var c = _sp.controls;
     c.menu = Ui_MenuNew("controls", Controls_Items(_sp.pending.keys, ""), {
         on_confirm: ControlsPage_OnConfirm, on_back: ControlsPage_OnBack,
@@ -1799,7 +1799,7 @@ function ControlsPage_OnConfirm(_m, _i) {
         return;
     }
     c.capture = rid;
-    c.opened_frame = Input_Frame();
+    c.lock = InputLock_New(CONTROLS_CAPTURE_DELAY_MS);   // the press that chose the row must not be taken as the new key
     c.msg_row = rid;
     c.msg = Loc_T("controls.waiting", "Press the new key for {action}. Esc cancels.", { action: Binds_RowLabel(rid) });
     ControlsPage_Refresh(sp);
@@ -1843,7 +1843,7 @@ function ControlsPage_OnKey(_sp, _key) {
 function ControlsPage_Handle(_sp) {
     var c = _sp.controls;
     if (c.capture != "") {
-        if (Input_Frame() - c.opened_frame < 2) return;
+        if (InputLock_Active(c.lock)) return;
         if (mouse_check_button_pressed(mb_right)) { ControlsPage_OnKey(_sp, vk_escape); return; }
         var k = Controls_PollKey();
         if (k >= 0) ControlsPage_OnKey(_sp, k);
@@ -1853,11 +1853,11 @@ function ControlsPage_Handle(_sp) {
 }
 
 // ==========================================================================================================================
-// C3 (D85, D23, D100): the merchant's shop, on the UI framework. global.shop_ui = { stk, shop_index, msg, msg_ms, opened_frame } while it is open,
+// C3 (D85, D23, D100): the merchant's shop, on the UI framework. global.shop_ui = { stk, shop_index, msg, msg_ms, lock } while it is open,
 // with gs.ui.mode = UI_SHOP. Root: Buy / Sell / Leave. Buy and Sell are Ui menus with the details panel: one plain sentence and the numbers,
 // generated from the item and card data. A row you cannot pay for stays selectable (dimmed) so you can still read it; Confirm then says why not.
 // ==========================================================================================================================
-#macro SHOP_UI_INPUT_DELAY_FRAMES 10
+#macro SHOP_UI_INPUT_DELAY_MS (10000 / 60)   // D108 F2b-2: ms, was 10 frames
 #macro SHOP_MSG_MS 1800
 
 function ShopUi_IsOpen() {
@@ -2104,7 +2104,7 @@ function ShopUi_Open(_shop_index) {
     var gs = GameState_Get();
     if (!is_struct(Run_Get()) || !is_struct(gs.player_ch)) return false;
     Shop_RunStock(Run_Get(), _shop_index, gs.player_ch);   // made now, from the seed, if this is the first visit
-    var u = { stk: Ui_StackNew(), shop_index: _shop_index, msg: "", msg_ref: undefined, quote_kind: "", quote_idx: -1, msg_ms: -100000, opened_frame: Input_Frame(), opened_ms: current_time };
+    var u = { stk: Ui_StackNew(), shop_index: _shop_index, msg: "", msg_ref: undefined, quote_kind: "", quote_idx: -1, msg_ms: -100000, lock: InputLock_New(SHOP_UI_INPUT_DELAY_MS), opened_ms: current_time };
     global.shop_ui = u;
     Ui_StackPush(u.stk, ShopUi_RootMenu());
     gs.ui.mode = UI_SHOP;
@@ -2118,7 +2118,7 @@ function ShopUi_Open(_shop_index) {
 function ShopUi_Step() {
     if (!ShopUi_IsOpen()) return false;
     var u = global.shop_ui;
-    if (Input_Frame() - u.opened_frame >= SHOP_UI_INPUT_DELAY_FRAMES) {
+    if (!InputLock_Active(u.lock)) {
         var top = Ui_StackTop(u.stk);
         if (is_struct(top)) {
             Ui_MenuUpdate(top, u.stk);
@@ -2924,6 +2924,49 @@ function PauseMenu_Draw() {
 #macro UI_PANEL_MS 120           // D97: panels slide and fade in this long
 #macro UI_INPUT_LOCK_MS 60       // C4: a menu ignores confirm and back this long after it opens or becomes the top one again (a key seen on two frames cannot answer two menus)
 #macro SETTINGS_TEXT_SPEED_MAX 2
+
+// ---- D108 F2b-2: "keys are ignored for a while after a screen opens", on a ms clock ---------------------------------------------------------------
+// The screens used to compare Input_Frame() with the frame they opened in (10 / 12 / 4 / 2 frames). An input lock counts ms instead: it loses one step
+// (Presentation_StepMs(delta_time), capped at 50 ms) per game frame that has passed since it was last asked, so a lock nobody asked about for a few frames
+// is still the right length, and asking twice in a frame costs nothing. Two guarantees are kept at any frame rate: the frame it was made in and the next
+// one (min_frames, 2) always refuse a key, because the press that opened the screen is seen by a controller that steps before the UI controller one frame
+// late, so a slow frame can never skip the "not the same press" guard.
+#macro INPUT_LOCK_MIN_FRAMES 2
+#macro INPUT_LOCK_FLOOR_MS 1000                    // a spent lock keeps counting down to here (the margin InputLock_Settled reads)
+#macro HELP_UI_INPUT_DELAY_MS (4000 / 60)          // the Help page ignores keys this long after it opens (4 frames)
+#macro CONTROLS_CAPTURE_DELAY_MS (2000 / 60)       // the Controls page ignores keys this long after "press the new key" starts (2 frames)
+
+// { ms (left, below 0 once spent), tick (the frame it last lost a step in), frame0, min_frames }. _frame is for tests; it defaults to the game frame.
+function InputLock_New(_ms, _min_frames = INPUT_LOCK_MIN_FRAMES, _frame = undefined) {
+    if (is_undefined(_frame)) _frame = Input_Frame();
+    return { ms: _ms, tick: _frame, frame0: _frame, min_frames: _min_frames };
+}
+
+// The pure step: true while the lock still refuses keys. _frame is the game frame now, _step_ms what one frame adds (Presentation_StepMs).
+function InputLock_Tick(_lk, _frame, _step_ms) {
+    if (!is_struct(_lk)) return false;
+    var _passed = _frame - _lk.tick;
+    if (_passed > 0) {
+        _lk.tick = _frame;
+        _lk.ms = max(-INPUT_LOCK_FLOOR_MS, _lk.ms - _passed * _step_ms);
+    }
+    return (_frame - _lk.frame0) < _lk.min_frames || _lk.ms > TRANSITION_DONE_SLACK_MS;
+}
+
+// The live one: true while the lock refuses keys this frame (a lock that is not there refuses nothing).
+function InputLock_Active(_lk) {
+    if (!is_struct(_lk)) return false;
+    return InputLock_Tick(_lk, Input_Frame(), Presentation_StepMs(delta_time));
+}
+
+// The scripted runs press keys only once a screen has settled: its lock is spent by _pad_ms (the old "+ 2 / + 4 frames" margin, in ms).
+function InputLock_Settled(_lk, _pad_ms, _frame = undefined, _step_ms = undefined) {
+    if (!is_struct(_lk)) return true;
+    if (is_undefined(_frame)) _frame = Input_Frame();
+    if (is_undefined(_step_ms)) _step_ms = Presentation_StepMs(delta_time);
+    if (InputLock_Tick(_lk, _frame, _step_ms)) return false;
+    return _lk.ms <= -_pad_ms;
+}
 
 // ---- pure model ------------------------------------------------------------------------------------------------------------
 // Next enabled index from _cur in direction _dir (+1/-1). _enabled is one bool per item. Wraps (D95) unless _wrap is false.

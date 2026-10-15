@@ -863,7 +863,7 @@ function Test_Suite_UiClock() {
     for (var _i = 0; _i < 120; _i++) _ic = Dialogue_IconStep(_ic, _f60);
     Test_True("F2b-2 the arrow blink wraps at 2 s (120 steps at 60 fps is back at the start, got " + string(_ic) + ")", _ic < 0.1);
     Test_True("F2b-2 the arrow blink never leaves 0 to 2", Dialogue_IconStep(1.99, _hit) >= 0 && Dialogue_IconStep(1.99, _hit) < 2);
-    Test_True("F2b-2 a 200 ms hitch moves the arrow on by 50 ms (0.1)", abs(Dialogue_IconStep(0, _hit) - 0.1) < 0.000001);
+    Test_True("F2b-2 a 200 ms hitch moves the arrow on by 50 ms (0.1)", abs(Dialogue_IconStep(0, _hit) - 0.1) < 0.001);   // GML compares within its epsilon (1e-5), so the tolerance is wider than that
 
     // --- the input locks: the old frame counts at 60 fps, the same ms at 30 fps, and the open frame and the next one never answer a key
     var _locks = [
@@ -906,8 +906,8 @@ function Test_Suite_UiClock() {
     _lk = InputLock_New(CARDS_UI_INPUT_DELAY_MS, 2, 300);
     Test_True("F2b-2 a lock first asked about 6 frames later still has 66.7 ms to go", InputLock_Tick(_lk, 306, _f60) && abs(_lk.ms - (CARDS_UI_INPUT_DELAY_MS - 6 * _f60)) < 0.01);
     Test_False("F2b-2 a lock first asked about 12 frames later is spent", InputLock_Tick(_lk, 312, _f60));
-    Test_True("F2b-2 a spent lock reads as settled with no margin", InputLock_Settled(_lk, 0));
-    Test_False("F2b-2 a lock that has only just run out is not settled 4 frames later", InputLock_Settled(InputLock_New(CARDS_UI_INPUT_DELAY_MS, 2, 400), 4000 / 60));
+    Test_True("F2b-2 a spent lock reads as settled with no margin", InputLock_Settled(_lk, 0, 312, _f60));
+    Test_False("F2b-2 a lock that has only just run out is not settled 4 frames later", InputLock_Settled(InputLock_New(CARDS_UI_INPUT_DELAY_MS, 2, 400), 4000 / 60, 410, _f60));
     Test_False("F2b-2 no lock (undefined) refuses nothing", InputLock_Active(undefined));
 
     // --- the boss name banner (D106): 1 s, 60 frames at 60 fps; the fade is a fifth at each end
