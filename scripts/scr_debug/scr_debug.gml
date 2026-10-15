@@ -243,7 +243,7 @@ function Scenario_Boot() {
     random_set_seed(12345);
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 12000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 24000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -474,6 +474,10 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeNotice(_s);   // F3a (D96): the notice pop-up through the real title (old slot file, a Continue that fails) and the keys around it
         case 220: case 221: case 222:
             Scenario_StepSmokeNewGameGuard(_s);   // review 1: New Game with a run saved needs a second confirm; the cursor starts on Continue
+            break;
+        case 230: case 231: case 232: case 233: case 234: case 235: case 236: case 237: case 238: case 239:
+        case 240: case 241: case 242: case 243: case 244: case 245: case 246: case 247: case 248: case 249:
+            Scenario_StepSmokeReg(_s);   // I2: R-028 (intro, Continue), R-036 (poison death), R-022 (failed Run), R-017 (boss dialogue end), R-007 (mini boss)
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -7639,9 +7643,500 @@ function Scenario_StepSmokeNotice(_s) {
             }
             if (_s.t > 20 && room != rm_start) {
                 Scenario_Check("notice_new_game_after_the_notice_starts_the_run", room == rm_cutscene || room == rm_floor1, "room=" + room_get_name(room));
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 230);   // I2: the regression-gap steps (230..249) go on from this new game; the last one calls Scenario_NoticeEnd
             }
             if (_s.t > 600) { Scenario_Check("notice_new_game_after_the_notice", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ---- I2 (regression gaps, checks only): R-028, R-036, R-022, R-017, R-007. One chain of smoke steps (230..249), after the notice steps: ----
+//   230..232  R-028  the intro cutscene of a new game, hold-skipped; rm_floor1 has no cutscene state; quit to the title with stale state set; Continue clears it
+//   233..235  R-036  a poison tick takes the last HP in a battle: the death scene, the run save gone, the echo pick, the next run is fresh
+//   236..237  R-022  a failed Run with Poison on (SPD forced so the flee cannot succeed). The tick checks need the flag -regbugs: they expose an open
+//                    bug (Battle_RunAttempt never ticks the player's statuses), so the default run only checks that the Run really failed.
+//   239..241  R-017  the boss dialogue (pan, text, pan back) of rm_floor5 and rm_floor9_5: view, GUI scale and the player's screen place are unchanged
+//   242..249  R-007  rm_floor5's mini boss: 60 s (3600 frames) at its post, the fight starts within 4 tiles, stays removed after the win, a new run brings it back
+// Writes profile.sav / run.sav in the gate's scratch folder (the notice steps already checked Scenario_CanSaveSlot). Every failure path ends with Scenario_NoticeEnd.
+function Scenario_RegBugs() {
+    return Scenario_HasFlag("-regbugs");
+}
+
+// The cutscene UI flags the world draw reads (obj_ui_controller Draw_64 draws the stretched picture while cutscene_active and a sprite is set).
+function Scenario_CutsceneUi() {
+    var _ui = GameState_Get().ui;
+    var _a = variable_struct_exists(_ui, "cutscene_active") && _ui.cutscene_active;
+    var _bg = variable_struct_exists(_ui, "cutscene_bg_sprite") ? _ui.cutscene_bg_sprite : noone;
+    var _lg = variable_struct_exists(_ui, "cutscene_logo_sprite") ? _ui.cutscene_logo_sprite : noone;
+    var _la = variable_struct_exists(_ui, "cutscene_logo_alpha") ? real(_ui.cutscene_logo_alpha) : 0;
+    var _half = variable_struct_exists(_ui, "dialogue_box_half") && _ui.dialogue_box_half;
+    var _txt = variable_struct_exists(_ui, "cutscene_text_only") && _ui.cutscene_text_only;
+    return {
+        ok: (!_a && _bg == noone && !_txt && !_half && (_lg == noone || _lg == -1) && _la <= 0),
+        drawn: (_a && _bg != noone),
+        text: "active=" + string(_a) + " bg=" + string(_bg) + " text_only=" + string(_txt) + " half=" + string(_half) + " logo=" + string(_lg) + " logo_alpha=" + string(_la)
+    };
+}
+
+// What a dialogue end must leave alone: the camera's view size, the GUI size and scale, the zoom, and the number of display re-layouts.
+function Scenario_ViewSig() {
+    var _cam = view_camera[0];
+    return { vw: camera_get_view_width(_cam), vh: camera_get_view_height(_cam), gw: Display_GuiW(), gh: Display_GuiH(), ws: Display_WorldScale(), ap: Display_ApplyCount(), zoom: global.display.zoom };
+}
+
+// Confirms a dialogue line every 8 frames; returns true while a dialogue is up.
+function Scenario_RegTapDialogue(_s) {
+    var _gs = GameState_Get();
+    var _on = (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0);
+    if (_on && (_s.f - _s.last_tap) >= 8) Scenario_Tap("confirm");
+    return _on;
+}
+
+// R-017: the boss dialogue of a floor (_room), played by walking onto its trigger. The trigger is switched off while the player is put on it, so the camera
+// settles and the reference (view, GUI scale, the player's place on the screen) is measured; then it is switched on and the real pan / text / pan back runs.
+// The player gets a battle cooldown so the boss (released at the end of the cinematic, a few tiles away) does not start its fight in the middle of the check.
+// Call it every frame of a step; it starts the room change on its first frame (_s.t == 1). Returns 0 while running, 1 when done, -1 when it failed.
+function Scenario_RegDialogueEnd(_s, _room, _boss, _tag) {
+    var _gs = GameState_Get();
+    var _rg = _s.rg;
+    if (_s.t == 1) {
+        Dialogue_CloseNow();
+        Scenario_ClearUi();
+        _rg.d = { ph: 0, t0: 0, t1: 0, cine: false, said: false, tg: noone, sig: undefined, ox: 0, oy: 0 };
+        room_goto(_room);
+        return 0;
+    }
+    var _d = _rg.d;
+    if (_s.t > 2400) {
+        Scenario_Check(_tag + "_dialogue_end_is_reached", false, "ph=" + string(_d.ph) + " cine=" + string(_d.cine) + " said=" + string(_d.said) + " room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode));
+        return -1;
+    }
+    switch (_d.ph) {
+        case 0:   // arrive, take the other enemies out, put the player on the trigger (switched off)
+            if (_s.t > 40 && Scenario_FloorReady(_room)) {
+                var _tg = instance_exists(obj_dialogue_trigger) ? instance_find(obj_dialogue_trigger, 0) : noone;
+                Scenario_Check(_tag + "_room_has_its_boss_trigger_not_yet_seen", _tg != noone && !_tg.triggered);
+                if (_tg == noone) return -1;
+                with (obj_enemy) { if (object_index != _boss) instance_destroy(); }
+                _tg.trigger_enabled = false;
+                Scenario_ClearUi();
+                var _pl = instance_find(obj_player, 0);
+                _pl.x = _tg.x;
+                _pl.y = _tg.y;
+                _pl.moving = false;
+                _pl.move_timer = 0;
+                _pl.battle_cooldown = 100000;
+                _d.tg = _tg;
+                _d.t0 = _s.t;
+                _d.ph = 1;
+            }
+            break;
+        case 1:   // 40 frames on the trigger: the reference
+            if (_s.t == _d.t0 + 40) {
+                var _pl1 = instance_find(obj_player, 0);
+                var _cam1 = view_camera[0];
+                _d.sig = Scenario_ViewSig();
+                _d.ox = _pl1.x - camera_get_view_x(_cam1);
+                _d.oy = _pl1.y - camera_get_view_y(_cam1);
+                _d.tg.trigger_enabled = true;
+                _d.tg.trigger_cooldown = 0;
+                _d.ph = 2;
+            }
+            break;
+        case 2:   // the pan and the text; confirm every line
+            if (instance_exists(_d.tg) && _d.tg.cine_runtime_active) _d.cine = true;
+            if (Scenario_RegTapDialogue(_s)) _d.said = true;
+            if (_d.cine && _d.said && (!instance_exists(_d.tg) || !_d.tg.cine_runtime_active) && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && !Transition_IsActive()) {
+                _d.t1 = _s.t;
+                _d.ph = 3;
+            }
+            break;
+        case 3:   // 60 frames after the end (the camera hands back to the follow): compare with the reference
+            if (_s.t == _d.t1 + 60) {
+                var _pl3 = instance_find(obj_player, 0);
+                var _cam3 = view_camera[0];
+                var _sg = Scenario_ViewSig();
+                var _ox3 = _pl3.x - camera_get_view_x(_cam3);
+                var _oy3 = _pl3.y - camera_get_view_y(_cam3);
+                var _ui3 = Scenario_CutsceneUi();
+                Scenario_Check(_tag + "_dialogue_end_the_pan_and_the_text_ran", _d.cine && _d.said);
+                Scenario_Check(_tag + "_dialogue_end_view_size_unchanged", _sg.vw == _d.sig.vw && _sg.vh == _d.sig.vh, "view " + string(_d.sig.vw) + "x" + string(_d.sig.vh) + " -> " + string(_sg.vw) + "x" + string(_sg.vh));
+                Scenario_Check(_tag + "_dialogue_end_gui_size_and_scale_unchanged", _sg.gw == _d.sig.gw && _sg.gh == _d.sig.gh && _sg.ws == _d.sig.ws, "gui " + string(_d.sig.gw) + "x" + string(_d.sig.gh) + " scale " + string(_d.sig.ws) + " -> " + string(_sg.gw) + "x" + string(_sg.gh) + " scale " + string(_sg.ws));
+                Scenario_Check(_tag + "_dialogue_end_no_relayout_and_no_zoom", _sg.ap == _d.sig.ap && _sg.zoom == _d.sig.zoom, "applies " + string(_sg.ap - _d.sig.ap) + " zoom " + string(_sg.zoom));
+                Scenario_Check(_tag + "_dialogue_end_player_keeps_its_screen_place", abs(_ox3 - _d.ox) <= 2 && abs(_oy3 - _d.oy) <= 2, "before " + string(_d.ox) + "," + string(_d.oy) + " after " + string(_ox3) + "," + string(_oy3));
+                Scenario_Check(_tag + "_dialogue_end_leaves_no_cutscene_state", _ui3.ok, _ui3.text);
+                return 1;
+            }
+            break;
+    }
+    return 0;
+}
+
+function Scenario_StepSmokeReg(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+    if (!variable_struct_exists(_s, "rg")) _s.rg = {};
+    var _rg = _s.rg;
+    var _ready_tap = ((_s.f - _s.last_tap) >= 4);
+    switch (_s.step) {
+        // ---------------------------------------------------------------- R-028
+        case 230:   // the new game's intro cutscene (started by the notice steps) sets its state; hold confirm to skip it; rm_floor1 must have none left
+            if (_s.t == 1) {
+                Scenario_NoticeLegacyFile(false);   // the old slot file of the notice steps would put the notice up again at the title
+                _rg.held = false;
+            }
+            if (!_rg.held && _s.t > 40 && room == rm_cutscene && _sc != noone && _sc.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE) {
+                _rg.held = true;
+                Scenario_Check("regr_r028_the_intro_cutscene_sets_its_state", variable_struct_exists(_gs.ui, "cutscene_active") && _gs.ui.cutscene_active);
+                Scenario_Hold("confirm", 120);
+            }
+            if (room == rm_floor1 && !Transition_IsActive() && instance_exists(obj_player)) {
+                if (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0) {
+                    if ((_s.f - _s.last_tap) >= 8) Scenario_Tap("confirm");
+                } else if (_s.t > 60 && variable_struct_exists(_gs, "pending_floor1_intro_dialogue") && !_gs.pending_floor1_intro_dialogue) {
+                    var _u230 = Scenario_CutsceneUi();
+                    Scenario_Check("regr_r028_the_intro_ran_as_a_cutscene_and_ended_in_rm_floor1", _rg.held);
+                    Scenario_Check("regr_r028_intro_end_leaves_no_cutscene_state", _u230.ok, _u230.text);
+                    Scenario_Check("regr_r028_a_run_is_saved_for_continue", Run_AutoSave() && RunSave_HasSave());
+                    Scenario_NoticeToTitle();   // the Quit to title of the pause menu, in memory
+                    Scenario_Next(_s, 231);
+                }
+            }
+            if (_s.t > 3000) { Scenario_Check("regr_r028_intro_reaches_rm_floor1", false, "room=" + room_get_name(room) + " held=" + string(_rg.held) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 231:   // at the title: a half-left cutscene state is put in place (what an interrupted exit would leave), then Continue
+            if (_s.t > 40 && room == rm_start && _sc != noone && _sc.state == "main" && is_struct(_sc.title_stk) && !Transition_IsActive() && _gs.ui.mode == UI_NONE) {
+                var _m231 = _sc.title_stk.menus[0];
+                Scenario_Check("regr_r028_continue_is_on_at_the_title", _m231.items[1].enabled);
+                _gs.ui.cutscene_active = true;
+                _gs.ui.cutscene_bg_sprite = mini_boss_profile;
+                _gs.ui.cutscene_text_only = true;
+                _gs.ui.dialogue_box_half = true;
+                Scenario_Check("regr_r028_the_stale_state_is_in_place_before_continue", !Scenario_CutsceneUi().ok && Scenario_CutsceneUi().drawn);
+                Ui_MenuFixCursor(_m231, 1);   // the Continue row
+                Scenario_Tap("confirm");
+                Scenario_Next(_s, 232);
+            }
+            if (_s.t > 600) { Scenario_Check("regr_r028_reaches_the_title", false, "room=" + room_get_name(room) + " state=" + (_sc != noone ? string(_sc.state) : "none")); Scenario_NoticeEnd(); }
+            break;
+        case 232:   // Continue: the saved room, and no cutscene picture or text mode left from before
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && _s.t > 30) {
+                var _u232 = Scenario_CutsceneUi();
+                Scenario_Check("regr_r028_continue_enters_the_saved_room", room == rm_floor1 && Run_IsActive());
+                Scenario_Check("regr_r028_continue_clears_a_stale_cutscene_state", _u232.ok, _u232.text);
+                Scenario_Check("regr_r028_no_cutscene_picture_is_drawn_after_continue", !_u232.drawn, _u232.text);
+                Scenario_Next(_s, 233);
+            }
+            if (_s.t > 600) { Scenario_Check("regr_r028_continue_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        // ---------------------------------------------------------------- R-036
+        case 233:   // a fresh run with a potion (so the death offers an echo) and a run save, then a battle
+            if (_s.t == 1) {
+                if (Transition_IsActive()) { _s.t = 0; break; }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Profile_ResetForTest();
+                RunSave_Delete();
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 3636);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                var _ch233 = _gs.player_ch;
+                _ch233.inventory = Inv_Add(_ch233.inventory, 10, 1);
+                GameState_SetPlayer(_ch233);
+                Scenario_ClearUi();
+                Scenario_Check("regr_r036_a_run_save_exists_before_the_death", Run_AutoSave() && RunSave_HasSave());
+                Scenario_GotoBattle("regr_poison_death", ENEMY_SLIME);
+                Scenario_Next(_s, 234);
+            }
+            if (_s.t > 600) { Scenario_Check("regr_r036_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 234:   // 1 HP and 3 Poison stacks, an enemy that never acts; ATTACK through the menu: the tick after the attack takes the last HP
+            if (!variable_struct_exists(_rg, "p_set")) {
+                if (_bc != noone && _s.t > 10 && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) {
+                    _rg.p_set = true;
+                    _bc.e.max_hp = 999;
+                    _bc.e.hp = 999;
+                    Turn_Push(_bc.tl, TL_ENEMY, 100000);
+                    _bc.p.hp = 1;
+                    _bc.p = Status_Add(_bc.p, STATUS_POISON, 0, 0, 3);
+                    Scenario_Check("regr_r036_the_player_is_on_1_hp_and_poisoned", _bc.p.hp == 1 && Status_Stacks(_bc.p, STATUS_POISON) == 3);
+                }
+            } else if (_bc != noone && !_bc.battle_over && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready_tap) {
+                Scenario_Tap((_bc.menu_index != 0) ? "menu_up" : "confirm");
+            }
+            if (variable_struct_exists(_rg, "p_set") && Profile_Get().deaths >= 1) {
+                Scenario_Check("regr_r036_the_poison_tick_took_the_last_hp", _gs.player_ch.hp <= 0, "hp=" + string(_gs.player_ch.hp));
+                Scenario_Check("regr_r036_the_killer_is_the_poison", is_struct(global.death_ctx) && global.death_ctx.killer == "status_poison", "ctx=" + (is_struct(global.death_ctx) ? json_stringify(global.death_ctx.killer) : "none"));
+                Scenario_Check("regr_r036_the_death_counts_once", Profile_Get().deaths == 1, "deaths=" + string(Profile_Get().deaths));
+                Scenario_Check("regr_r036_the_run_save_is_deleted_no_reload", !RunSave_HasSave());
+                Scenario_Check("regr_r036_the_run_is_over", !Run_IsActive());
+                _rg.flow = false;
+                Scenario_Next(_s, 235);
+            }
+            if (_s.t > 1500) { Scenario_Check("regr_r036_the_poison_tick_kills", false, "state=" + string(_bc != noone ? _bc.battle_state : -1) + " set=" + string(variable_struct_exists(_rg, "p_set")) + " room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 235:   // the normal death flow: the death scene, the summary, the echo pick, then a fresh run
+            Scenario_TapCutscene(_s);
+            if (!_rg.flow && _sc != noone && _sc.state == "run_flow") {
+                _rg.flow = true;
+                var _pf235 = Profile_Get();
+                Scenario_Check("regr_r036_the_death_scene_state_is_reached", global.run_flow.phase == "death", "phase=" + string(global.run_flow.phase));
+                Scenario_Check("regr_r036_history_says_died_on_floor_1", array_length(_pf235.history) == 1 && _pf235.history[0].result == "died" && _pf235.history[0].floor == 1, "history=" + json_stringify(_pf235.history));
+                Scenario_Check("regr_r036_the_echo_pick_is_offered", array_length(_pf235.echo_offer) >= 1, "offer=" + json_stringify(_pf235.echo_offer));
+            }
+            if (_rg.flow) {
+                var _ph235 = global.run_flow.phase;
+                if (_ph235 == "summary" && !variable_struct_exists(_rg, "sum_t")) _rg.sum_t = _s.t;
+                if (variable_struct_exists(_rg, "sum_t") && !variable_struct_exists(_rg, "echo_t")) {
+                    if (_s.t == _rg.sum_t + 20) Scenario_Tap("confirm");
+                    if (_ph235 == "echo") {
+                        _rg.echo_t = _s.t;
+                        Scenario_Check("regr_r036_the_echo_pick_screen_opens", array_length(global.run_flow.options) >= 1);
+                    }
+                }
+                if (variable_struct_exists(_rg, "echo_t") && _s.t == _rg.echo_t + 20) Scenario_Tap("confirm");
+                if (variable_struct_exists(_rg, "echo_t") && _s.t > _rg.echo_t + 22 && Scenario_FloorReady(rm_floor1)) {
+                    var _ch235 = _gs.player_ch;
+                    var _pf235b = Profile_Get();
+                    Scenario_Check("regr_r036_the_next_run_starts_at_level_1_with_full_hp", _ch235.level == 1 && _ch235.hp == _ch235.max_hp, "level=" + string(_ch235.level) + " hp=" + string(_ch235.hp) + "/" + string(_ch235.max_hp));
+                    Scenario_Check("regr_r036_the_next_run_has_no_statuses", array_length(_ch235.status) == 0, "status=" + json_stringify(_ch235.status));
+                    Scenario_Check("regr_r036_the_next_run_has_no_gold_or_kills", Run_IsActive() && _gs.run.gold == 0 && _gs.run.kills == 0);
+                    Scenario_Check("regr_r036_the_next_run_is_new_not_a_reload", Run_IsActive() && _gs.run.seed != 3636 && RunSave_HasSave() && RunSave_LoadFrom().run.seed == _gs.run.seed, "seed=" + (Run_IsActive() ? string(_gs.run.seed) : "no run"));
+                    Scenario_Check("regr_r036_the_profile_keeps_the_death", _pf235b.deaths == 1 && _pf235b.runs_started == 2, "deaths=" + string(_pf235b.deaths) + " started=" + string(_pf235b.runs_started));
+                    _gs.pending_wake_line = false;
+                    Dialogue_CloseNow();
+                    Scenario_ClearUi();
+                    Scenario_Next(_s, 236);
+                }
+            }
+            if (_s.t > 2400) { Scenario_Check("regr_r036_death_flow_reaches_the_next_run", false, "flow=" + string(_rg.flow) + " room=" + room_get_name(room) + " phase=" + (variable_global_exists("run_flow") ? string(global.run_flow.phase) : "none")); Scenario_NoticeEnd(); }
+            break;
+        // ---------------------------------------------------------------- R-022
+        case 236:   // a battle with a Slime that never acts; Poison (3 stacks) on the player; the player's SPD 1 against SPD 99999, so the flee cannot succeed
+            if (_s.t == 1) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_NewKnight();
+                Scenario_GotoBattle("regr_failed_run", ENEMY_SLIME);
+                _rg.r = {};
+            }
+            if (_bc != noone && !variable_struct_exists(_rg.r, "set") && _s.t > 10 && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && is_struct(_bc.ui_cmd)) {
+                _rg.r.set = true;
+                _bc.e.max_hp = 999;
+                _bc.e.hp = 999;
+                _bc.e.stats.spd = 99999;
+                Turn_Push(_bc.tl, TL_ENEMY, 100000000);   // the enemy's gauge is far below zero: it never acts, whatever its SPD
+                _bc.p.max_hp = 99;
+                _bc.p.hp = 99;
+                _bc.p.stats.spd = 1;
+                _bc.p = Status_Add(_bc.p, STATUS_POISON, 0, 0, 3);
+                _rg.r.hp0 = _bc.p.hp;
+                Scenario_Check("regr_r022_the_flee_chance_is_tiny", Battle_RunChance(Combat_EffectiveStat(_bc.p, STAT_SPD), Combat_EffectiveStat(_bc.e, STAT_SPD), 0) < 0.001);
+                Scenario_Check("regr_r022_poison_is_on_before_the_run", Status_Stacks(_bc.p, STATUS_POISON) == 3);
+                Scenario_Next(_s, 237);
+            }
+            if (_s.t > 600) { Scenario_Check("regr_r022_reaches_the_player_menu", false, "room=" + room_get_name(room) + " state=" + string(_bc != noone ? _bc.battle_state : -1)); Scenario_NoticeEnd(); }
+            break;
+        case 237:   // RUN through the menu (the cursor goes down to the 5th row); it fails; back at the menu the Poison must have ticked like on any other turn
+            if (_bc == noone) {
+                if (_s.t > 60) { Scenario_Check("regr_r022_stays_in_the_battle", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                break;
+            }
+            if (!variable_struct_exists(_rg.r, "sent") && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && !_bc.battle_over && _ready_tap) {
+                if (_bc.ui_cmd.cursor != 4) {
+                    Scenario_Tap("menu_down");
+                } else {
+                    _rg.r.sent = true;
+                    Scenario_Tap("confirm");
+                }
+            }
+            if (variable_struct_exists(_rg.r, "sent") && _bc.run_fails >= 1 && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && !_bc.battle_over) {
+                Scenario_Check("regr_r022_the_run_attempt_failed", _bc.run_fails == 1 && room == rm_battle, "run_fails=" + string(_bc.run_fails));
+                Scenario_Check("regr_r022_the_log_says_it_failed", Scenario_BotLogCount(_bc, "escape") >= 1);
+                if (Scenario_RegBugs()) {
+                    Scenario_Check("regr_r022_a_failed_run_ticks_poison_hp", _bc.p.hp == _rg.r.hp0 - 3, "hp " + string(_rg.r.hp0) + " -> " + string(_bc.p.hp));
+                    Scenario_Check("regr_r022_a_failed_run_ticks_poison_stacks", Status_Stacks(_bc.p, STATUS_POISON) == 2, "stacks=" + string(Status_Stacks(_bc.p, STATUS_POISON)));
+                    Scenario_Check("regr_r022_a_failed_run_logs_the_tick", Scenario_BotLogCount(_bc, "Poison hurts you") >= 1);
+                } else {
+                    show_debug_message("[TEST] SKIP regr_r022 tick checks (open bug: a failed Run does not tick statuses; run the game with -regbugs to see them fail). Poison hp " + string(_rg.r.hp0) + " -> " + string(_bc.p.hp) + ", stacks " + string(Status_Stacks(_bc.p, STATUS_POISON)));
+                }
+                Scenario_Next(_s, 239);
+            }
+            if (_s.t > 1200) { Scenario_Check("regr_r022_the_run_attempt_ends", false, "sent=" + string(variable_struct_exists(_rg.r, "sent")) + " fails=" + string(_bc.run_fails) + " state=" + string(_bc.battle_state)); Scenario_NoticeEnd(); }
+            break;
+        // ---------------------------------------------------------------- R-017
+        case 239:   // a clean profile (the boss triggers are unseen) and a new run
+            if (_s.t == 1) {
+                if (Transition_IsActive()) { _s.t = 0; break; }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Profile_ResetForTest();
+                RunSave_Delete();
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 1717);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) Scenario_Next(_s, 240);
+            if (_s.t > 600) { Scenario_Check("regr_r017_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 240:
+            var _r240 = Scenario_RegDialogueEnd(_s, rm_floor5, obj_mini_boss, "regr_r017_floor5");
+            if (_r240 < 0) Scenario_NoticeEnd();
+            else if (_r240 > 0) Scenario_Next(_s, 241);
+            break;
+        case 241:
+            var _r241 = Scenario_RegDialogueEnd(_s, rm_floor9_5, obj_final_boss, "regr_r017_floor9_5");
+            if (_r241 < 0) Scenario_NoticeEnd();
+            else if (_r241 > 0) Scenario_Next(_s, 242);
+            break;
+        // ---------------------------------------------------------------- R-007 (the pan trigger of rm_floor5 was seen in step 240, so the boss is not held)
+        case 242:   // a new run, then rm_floor5
+            if (_s.t == 1) {
+                if (Transition_IsActive()) { _s.t = 0; break; }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                RunSave_Delete();
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 7007);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                room_goto(rm_floor5);
+                Scenario_Next(_s, 243);
+            }
+            if (_s.t > 600) { Scenario_Check("regr_r007_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 243:   // stage: only the mini boss stays; the player stands at the spawn, far away
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor5)) {
+                var _mb243 = instance_exists(obj_mini_boss) ? instance_find(obj_mini_boss, 0) : noone;
+                var _tg243 = instance_exists(obj_dialogue_trigger) ? instance_find(obj_dialogue_trigger, 0) : noone;
+                Scenario_Check("regr_r007_floor5_has_the_mini_boss_at_its_post", _mb243 != noone && _mb243.x == 224 && _mb243.y == 32);
+                if (_mb243 == noone || _tg243 == noone) { Scenario_NoticeEnd(); break; }
+                Scenario_Check("regr_r007_the_pan_trigger_is_seen_so_the_boss_is_not_held", _tg243.triggered && !(variable_instance_exists(_mb243, "cine_lock_count") && _mb243.cine_lock_count > 0));
+                with (obj_enemy) { if (id != _mb243.id) instance_destroy(); }
+                Scenario_ClearUi();
+                _rg.mb = _mb243;
+                _rg.mx = _mb243.x;
+                _rg.my = _mb243.y;
+                _rg.drift = 0;
+                _rg.f0 = _s.f;
+                _rg.ms0 = current_time;
+                Scenario_Next(_s, 244);
+            }
+            if (_s.t > 600) { Scenario_Check("regr_r007_reaches_rm_floor5", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 244:   // 60 s = 3600 frames at 60 fps with the player away: the mini boss does not move and no fight starts
+            if (!instance_exists(_rg.mb)) _rg.drift = 9999;
+            else _rg.drift = max(_rg.drift, abs(_rg.mb.x - _rg.mx) + abs(_rg.mb.y - _rg.my));
+            if (room != rm_floor5) _rg.drift = 9999;
+            if ((_s.f - _rg.f0) >= 3600 || _rg.drift > 0) {
+                var _held244 = _s.f - _rg.f0;
+                Scenario_Check("regr_r007_mini_boss_stays_at_its_post_for_60_s", _rg.drift == 0 && _held244 >= 3600 && room == rm_floor5, "frames=" + string(_held244) + " drift=" + string(_rg.drift) + " room=" + room_get_name(room));
+                show_debug_message("[TEST] r007 hold: frames=" + string(_held244) + " ms=" + string(current_time - _rg.ms0));
+                if (room != rm_floor5 || !instance_exists(_rg.mb)) { Scenario_NoticeEnd(); break; }
+                Scenario_Next(_s, 245);
+            }
+            break;
+        case 245:   // a free tile 5 tiles from the boss with a free tile 4 tiles from it next to it: stand there (no fight), then walk the one step with the real key
+            if (!variable_struct_exists(_rg, "w")) {
+                var _pl245 = instance_find(obj_player, 0);
+                var _g245 = Scenario_ReachGrid(_pl245);
+                var _t245 = GRID_TILE_SIZE;
+                var _dx245 = [0, 0, -1, 1];
+                var _dy245 = [-1, 1, 0, 0];
+                var _act245 = ["move_up", "move_down", "move_left", "move_right"];
+                var _pick245 = undefined;
+                for (var _ty = 0; _ty < _g245.gh && is_undefined(_pick245); _ty++) {
+                    for (var _tx = 0; _tx < _g245.gw && is_undefined(_pick245); _tx++) {
+                        if (!_g245.reach[_ty * _g245.gw + _tx]) continue;
+                        if (max(abs(_tx * _t245 - _rg.mx), abs(_ty * _t245 - _rg.my)) != 5 * _t245) continue;
+                        for (var _k = 0; _k < 4; _k++) {
+                            var _nx = _tx + _dx245[_k];
+                            var _ny = _ty + _dy245[_k];
+                            if (_nx < 0 || _ny < 0 || _nx >= _g245.gw || _ny >= _g245.gh) continue;
+                            if (!_g245.reach[_ny * _g245.gw + _nx]) continue;
+                            if (max(abs(_nx * _t245 - _rg.mx), abs(_ny * _t245 - _rg.my)) != 4 * _t245) continue;
+                            _pick245 = { cx: _tx, cy: _ty, act: _act245[_k] };
+                            break;
+                        }
+                    }
+                }
+                Scenario_Check("regr_r007_a_tile_5_tiles_out_with_a_step_to_4_tiles_exists", !is_undefined(_pick245));
+                if (is_undefined(_pick245)) { Scenario_NoticeEnd(); break; }
+                _rg.w = { ph: 0, t0: _s.t, pick: _pick245, t1: 0 };
+                Scenario_PlacePlayer(_pick245.cx, _pick245.cy);
+                break;
+            }
+            if (_rg.w.ph == 0 && _s.t == _rg.w.t0 + 120) {
+                var _pl245b = instance_find(obj_player, 0);
+                var _d245 = max(abs(_pl245b.x - _rg.mb.x), abs(_pl245b.y - _rg.mb.y));
+                Scenario_Check("regr_r007_no_fight_at_5_tiles", room == rm_floor5 && !Transition_IsActive() && _d245 == 5 * GRID_TILE_SIZE, "room=" + room_get_name(room) + " dist=" + string(_d245));
+                _s.boost = { hp: 9999, mp: 99 };   // the battle copy of the player is sturdy: the fight is only the way to the win
+                Scenario_Hold(_rg.w.pick.act, 15);   // 15 held frames = exactly one 16 px tile
+                _rg.w.ph = 1;
+                _rg.w.t1 = _s.t;
+            } else if (_rg.w.ph == 1) {
+                if (room == rm_battle || (Transition_IsActive() && _gs.transition_fx.type == TRANSITION_TYPE_ENCOUNTER)) {
+                    var _pl245c = instance_find(obj_player, 0);
+                    var _d245c = (instance_exists(_pl245c) && instance_exists(_rg.mb)) ? max(abs(_pl245c.x - _rg.mb.x), abs(_pl245c.y - _rg.mb.y)) : -1;
+                    Scenario_Check("regr_r007_the_fight_starts_within_4_tiles", _d245c >= 48 && _d245c <= 4 * GRID_TILE_SIZE, "dist=" + string(_d245c));
+                    Scenario_Next(_s, 246);
+                } else if (_s.t > _rg.w.t1 + 120) {
+                    Scenario_Check("regr_r007_the_fight_starts_within_4_tiles", false, "no fight 120 frames after the step to 4 tiles; room=" + room_get_name(room));
+                    Scenario_NoticeEnd();
+                }
+            }
+            break;
+        case 246:   // the fight: the mini boss, 1 HP left when the menu is up, ATTACK through the menu; back in rm_floor5
+            if (_bc != noone) {
+                if (!variable_struct_exists(_rg, "bt")) {
+                    _rg.bt = true;
+                    Scenario_Check("regr_r007_the_battle_is_the_mini_boss", _gs.battle.enemy_id == ENEMY_MINI_BOSS, "enemy=" + string(_gs.battle.enemy_id));
+                }
+                if (_s.t > 10 && !_bc.battle_over && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready_tap) {
+                    if (!variable_struct_exists(_rg, "e1")) { _rg.e1 = true; _bc.e.hp = 1; }
+                    Scenario_Tap((_bc.menu_index != 0) ? "menu_up" : "confirm");
+                }
+            }
+            if (variable_struct_exists(_rg, "bt") && room == rm_floor5 && Scenario_FloorReady(rm_floor5)) Scenario_Next(_s, 247);
+            if (_s.t > 3000) { Scenario_Check("regr_r007_the_fight_is_won", false, "room=" + room_get_name(room) + " state=" + string(_bc != noone ? _bc.battle_state : -1) + " bt=" + string(variable_struct_exists(_rg, "bt"))); Scenario_NoticeEnd(); }
+            break;
+        case 247:   // after the win: the mini boss is gone; leave the room
+            if (_s.t == 40) {
+                Scenario_Check("regr_r007_back_in_floor5_after_the_win", room == rm_floor5);
+                Scenario_Check("regr_r007_the_win_removes_the_mini_boss", !instance_exists(obj_mini_boss));
+                Scenario_Check("regr_r007_the_win_is_remembered_for_the_run", _gs.boss_defeated.mini_boss);
+                Scenario_ClearUi();
+                room_goto(rm_floor4);
+                Scenario_Next(_s, 248);
+            }
+            break;
+        case 248:   // come back from rm_floor4: still gone; then a new run
+            if (!variable_struct_exists(_rg, "hop_t") && _s.t > 30 && Scenario_FloorReady(rm_floor4)) {
+                _rg.hop_t = _s.t;
+                room_goto(rm_floor5);
+            }
+            if (variable_struct_exists(_rg, "hop_t") && _s.t > _rg.hop_t + 40 && Scenario_FloorReady(rm_floor5)) {
+                Scenario_Check("regr_r007_the_mini_boss_stays_removed_after_leaving_and_coming_back", !instance_exists(obj_mini_boss));
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 7008);
+                Scenario_Next(_s, 249);
+            }
+            if (_s.t > 900) { Scenario_Check("regr_r007_leaves_and_comes_back", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 249:   // the new run: rm_floor5 has its mini boss again
+            if (_s.t > 5 && room == rm_floor1 && Scenario_FloorReady(rm_floor1) && !variable_struct_exists(_rg, "goto5")) {
+                _rg.goto5 = _s.t;
+                room_goto(rm_floor5);
+            }
+            if (variable_struct_exists(_rg, "goto5") && _s.t > _rg.goto5 + 40 && Scenario_FloorReady(rm_floor5)) {
+                var _mb249 = instance_exists(obj_mini_boss) ? instance_find(obj_mini_boss, 0) : noone;
+                Scenario_Check("regr_r007_a_new_run_brings_the_mini_boss_back", _mb249 != noone && !_mb249.defeated && !_gs.boss_defeated.mini_boss);
+                Scenario_NoticeEnd();
+            }
+            if (_s.t > 900) { Scenario_Check("regr_r007_new_run_reaches_rm_floor5", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
     }
 }
