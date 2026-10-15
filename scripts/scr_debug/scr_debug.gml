@@ -243,7 +243,7 @@ function Scenario_Boot() {
     random_set_seed(12345);
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 24000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 27000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -507,7 +507,12 @@ function Scenario_StepSmoke(_s) {
             break;
         case 500: case 501: case 502: case 503: case 504: case 505: case 506: case 507: case 508: case 509:
         case 510: case 511: case 512: case 513: case 514: case 515: case 516: case 517: case 518: case 519:
-            Scenario_StepSmokeH3(_s);   // H3 (D142): room arrival, pressing toward the arrival exit leaves at once, a side direction walks; its last step calls Scenario_NoticeEnd
+            Scenario_StepSmokeH3(_s);   // H3 (D142): room arrival, pressing toward the arrival exit leaves at once, a side direction walks; goes on with H11 (580)
+            break;
+        case 580: case 581: case 582: case 583: case 584: case 585: case 586: case 587: case 588: case 589:
+        case 590: case 591: case 592: case 593: case 594: case 595: case 596: case 597: case 598: case 599:
+        case 600: case 601: case 602: case 603: case 604: case 605: case 606: case 607: case 608: case 609:
+            Scenario_StepSmokeH11(_s);   // H11 (D153, D158): hearing a run, the flee-direction search and the one "?", hiding, no camping at the exit; its last step calls Scenario_NoticeEnd
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -2874,6 +2879,9 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsSpeed(_s);   // g7 (D134, D135): the command menu with the damage plate, the skill list with its lines, the x2 marker; finishes the run
         case 400: case 401: case 402: case 403: case 404: case 405: case 406: case 407: case 408: case 409:
             Scenario_StepShotsMapJuice(_s);   // G6 (D138, map part): the chest burst, the rising item, the gold counter, the level-up sparkle, the step squash
+            break;
+        case 610: case 611: case 612: case 613: case 614: case 615: case 616: case 617: case 618: case 619:
+            Scenario_StepShotsH11(_s);   // H11 (D153): the ? over an enemy that gave up, the hidden player, the same spot one step off; finishes the run
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -10254,7 +10262,7 @@ function Scenario_StepShotsMapJuice(_s) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 global.mapfx_clock = -1;
                 Scenario_Release();
-                Scenario_Finish();
+                Scenario_Next(_s, 610);   // H11 pictures (610..619) finish the run
             }
             if (_s.t > 200) { Scenario_Release(); Scenario_Check("shots_mapjuice_the_step_squashes", false); Scenario_Finish(); }
             break;
@@ -10361,9 +10369,298 @@ function Scenario_StepSmokeH3(_s) {
                 var _across = abs((_pl.x - _h.x0) * sign(_h.dy)) + abs((_pl.y - _h.y0) * sign(_h.dx));
                 Scenario_Check("h3_the_player_walked_sideways_at_least_a_tile", _along >= _T && _across == 0, "at " + string(_pl.x) + "," + string(_pl.y) + " from " + string(_h.x0) + "," + string(_h.y0));
                 Scenario_Check("h3_off_the_exit_it_is_armed_again", _pl.exit_ignore == noone);
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 580);   // H11 (580..609) goes on; its last step ends the smoke chain
             }
             if (_s.t > 300) { Scenario_Release(); Scenario_Check("h3_the_side_step_ends", false); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ============================================================================
+// H11 (D153, D158), smoke steps 580..609 (rm_floor3, the game's own input state; the enemies are stood still on purpose, the checks are about what they notice).
+//   580-583: a slime (sight cut to 1 tile, so only its ears count) at (12,6): RUNNING 5 tiles away does not move it, WALKING 4 tiles away does not, RUNNING within 4 does.
+//   584-585: the player is gone: it walks to the cell it heard him last, searches 4 tiles down the way he ran, raises ONE "?", walks home.
+//   586-588: a dire wolf 2 tiles from the hiding cell (3,4): the player stands still there, no "!" and no battle; one step off the cell and the wolf spots him.
+//   589-592: a spider put next to the exit chased to: the player leaves and comes back, the spider is 4 tiles from the exit, nobody within 3 tiles of the arrival tile.
+// ============================================================================
+function Scenario_H11Enemy(_obj, _cx, _cy, _sight) {
+    var _e = instance_create_layer(_cx * GRID_TILE_SIZE, _cy * GRID_TILE_SIZE, "Instances", _obj);
+    EnemyAI_Init(_e);
+    Scenario_PlaceEnemy(_e, _cx, _cy);
+    if (_sight >= 0) _e.prof.sight = _sight;
+    _e.idle_timer = 100000;   // it stays where it is until it has a reason to move
+    return _e;
+}
+
+function Scenario_H11Cell(_inst) {
+    return { cx: Nav_CellOf(_inst.x + GRID_TILE_SIZE / 2), cy: Nav_CellOf(_inst.y + GRID_TILE_SIZE / 2) };
+}
+
+function Scenario_StepSmokeH11(_s) {
+    if (!variable_struct_exists(_s, "h11")) _s.h11 = { };
+    var _h = _s.h11;
+    var _T = GRID_TILE_SIZE;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _e = (variable_struct_exists(_h, "e") && instance_exists(_h.e)) ? _h.e : noone;
+    switch (_s.step) {
+        case 580:   // the slime at (12,6); the player at (7,7), RUNNING up the column 5 tiles away (rm_floor3 has a note at (6,6))
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor3) && Player_IsSettled(_pl)) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                _h.e = Scenario_H11Enemy(obj_slime, 12, 6, 1);
+                Scenario_PlacePlayer(7, 7);
+                _h.y0 = _pl.y;
+                _h.ran = false;
+                Scenario_Hold("move_up", 40);
+                Scenario_Hold("run", 40);
+                Scenario_Next(_s, 581);
+            }
+            if (_s.t > 300) { Scenario_Check("h11_rm_floor3_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 581:   // judged after the run; then WALKING at 4 tiles
+            if (_pl.moving && _pl.step_speed > _pl.walk_speed) _h.ran = true;
+            if (_e != noone && _e.ai_mode != "idle" && !variable_struct_exists(_h, "a1_bad")) _h.a1_bad = _e.ai_mode;
+            if (_s.t >= 48) {
+                Scenario_Release();
+                Scenario_Check("h11_the_player_ran_at_least_two_tiles", _h.ran && _pl.y <= _h.y0 - 2 * _T, "y=" + string(_pl.y) + " from " + string(_h.y0));
+                Scenario_Check("h11_running_5_tiles_away_is_not_heard", !variable_struct_exists(_h, "a1_bad"), "mode=" + (variable_struct_exists(_h, "a1_bad") ? _h.a1_bad : ""));
+                Scenario_PlacePlayer(8, 6);   // 4 tiles from (12,6), in line
+                _h.y0 = _pl.y;
+                Scenario_Hold("move_down", 40);
+                Scenario_Next(_s, 582);
+            }
+            break;
+        case 582:   // WALKING 4 tiles away: silent
+            if (_e != noone && _e.ai_mode != "idle" && !variable_struct_exists(_h, "a2_bad")) _h.a2_bad = _e.ai_mode;
+            if (_s.t >= 48) {
+                Scenario_Release();
+                Scenario_Check("h11_the_player_walked_at_least_a_tile", _pl.y >= _h.y0 + _T, "y=" + string(_pl.y) + " from " + string(_h.y0));
+                Scenario_Check("h11_walking_4_tiles_away_is_not_heard", !variable_struct_exists(_h, "a2_bad"), "mode=" + (variable_struct_exists(_h, "a2_bad") ? _h.a2_bad : ""));
+                Scenario_PlacePlayer(8, 5);   // (8,6) is 4 tiles from (12,6): the first run step crosses into the hearing circle
+                Scenario_Hold("move_down", 60);
+                Scenario_Hold("run", 60);
+                _h.heard = false;
+                Scenario_Next(_s, 583);
+            }
+            break;
+        case 583:   // RUNNING within 4 tiles, out of its sight: it reacts, without a "!"
+            if (_e != noone && _e.ai_mode == "chase" && !_h.heard) {
+                _h.heard = true;
+                _h.pop_at_hear = _e.alert_pop;
+                _h.heard_t = _s.t;
+            }
+            if (_h.heard && _s.t >= _h.heard_t + 2) {
+                Scenario_Check("h11_running_within_4_tiles_out_of_sight_is_heard", true);
+                Scenario_Check("h11_a_heard_player_is_no_sighting_no_exclamation_mark", _h.pop_at_hear == 0, "alert_pop=" + string(_h.pop_at_hear));
+                // the player is gone: far away, out of sight and hearing
+                Scenario_Release();
+                var _c = Scenario_H11Cell(_e);
+                _h.ls_cx = _e.last_seen_cx;
+                _h.ls_cy = _e.last_seen_cy;
+                _h.max_cy = _c.cy;
+                _h.min_cy = _c.cy;
+                _h.saw_return = false;
+                _h.t_b = _s.f;
+                Scenario_PlacePlayer(3, 4);
+                Scenario_Next(_s, 584);
+            }
+            if (_s.t > 90) { Scenario_Check("h11_running_within_4_tiles_out_of_sight_is_heard", false, "mode=" + ((_e != noone) ? _e.ai_mode : "gone")); Scenario_Release(); Scenario_NoticeEnd(); }
+            break;
+        case 584:   // last heard cell -> searches down the column (the way he ran) -> ONE "?" -> home
+            if (_e == noone) { Scenario_Check("h11_the_searcher_is_alive", false); Scenario_NoticeEnd(); break; }
+            var _cb = Scenario_H11Cell(_e);
+            _h.max_cy = max(_h.max_cy, _cb.cy);
+            if (_e.ai_mode == "return") _h.saw_return = true;
+            if (_e.q_pops > 1) _h.many = true;
+            if (_h.saw_return && _e.ai_mode == "idle") {
+                var _want_cy = min(_h.ls_cy + AI_FLEE_SEARCH_TILES, 9);   // rm_floor3: column 8 is free down to row 9, row 10 is wall
+                Scenario_Check("h11_the_search_went_down_the_way_he_ran", _h.max_cy == _want_cy, "max_cy=" + string(_h.max_cy) + " want=" + string(_want_cy) + " last_heard=" + string(_h.ls_cx) + "," + string(_h.ls_cy));
+                Scenario_Check("h11_it_gave_up_with_exactly_one_question_mark", _e.q_pops == 1 && !variable_struct_exists(_h, "many"), "q_pops=" + string(_e.q_pops));
+                Scenario_Check("h11_then_it_walked_home", _cb.cx == 12 && _cb.cy == 6 && !_e.moving, "at " + string(_cb.cx) + "," + string(_cb.cy));
+                Scenario_Next(_s, 585);
+            }
+            if (_s.f - _h.t_b > 2400) { Scenario_Check("h11_the_search_ends_at_home_in_2400_frames", false, "mode=" + _e.ai_mode + " q=" + string(_e.q_pops) + " max_cy=" + string(_h.max_cy)); Scenario_NoticeEnd(); }
+            break;
+        case 585:   // the hiding cell (3,4): the player stands still on it, then a dire wolf appears 2 tiles away with a clear line
+            with (obj_enemy) instance_destroy();
+            Scenario_PlacePlayer(3, 4);
+            _pl.face = DOWN;
+            _h.e = noone;
+            Scenario_Next(_s, 586);
+            break;
+        case 586:
+            if (_s.t == HIDE_SETTLE_FRAMES + 10) {
+                Scenario_Check("h11_standing_still_on_the_hiding_cell_hides_the_player", Player_IsHidden(_pl));
+                Scenario_Check("h11_the_hidden_player_is_drawn_see_through", abs(_pl.image_alpha - HIDE_PLAYER_ALPHA) < 0.01, "alpha=" + string(_pl.image_alpha));
+                _h.e = Scenario_H11Enemy(obj_dire_wolf, 3, 6, -1);   // sight 5, as in the game; 2 tiles below, clear line over (3,5)
+                _h.t_c = _s.f;
+                _h.spotted = false;
+                Scenario_Next(_s, 587);
+            }
+            break;
+        case 587:   // 150 frames: the wolf must not notice, no battle starts
+            if (_e != noone && (_e.ai_mode != "idle" || _e.alert_pop > 0)) _h.spotted = true;
+            if (_s.f - _h.t_c >= 150) {
+                Scenario_Check("h11_a_wolf_2_tiles_away_does_not_see_the_hidden_player", !_h.spotted, "mode=" + ((_e != noone) ? _e.ai_mode : "gone"));
+                Scenario_Check("h11_no_battle_started", room == rm_floor3 && !Transition_IsActive());
+                Scenario_Check("h11_the_player_is_still_hidden_and_in_place", Player_IsHidden(_pl) && _pl.x == 3 * _T && _pl.y == 4 * _T);
+                Scenario_Hold("move_left", 30);   // one step off the cell (2,4): not hidden any more, 2.2 tiles from the wolf
+                _h.t_c = _s.f;
+                Scenario_Next(_s, 588);
+            }
+            break;
+        case 588:   // the control: the same wolf, the same distance, but the player is moving: it spots him
+            if (_e != noone && (_e.ai_mode == "chase") && !variable_struct_exists(_h, "spot_f")) _h.spot_f = _s.f - _h.t_c;
+            if (variable_struct_exists(_h, "spot_f") || _s.f - _h.t_c > 120) {
+                Scenario_Release();
+                Scenario_Check("h11_one_step_off_the_hiding_cell_the_same_wolf_spots_the_player", variable_struct_exists(_h, "spot_f"), "mode=" + ((_e != noone) ? _e.ai_mode : "gone"));
+                if (instance_exists(obj_enemy)) with (obj_enemy) instance_destroy();
+                Scenario_Next(_s, 589);
+            }
+            break;
+        case 589:   // a fresh rm_floor3 (its own enemies): via another room, the controller only restores a room on a room change
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                room_goto(rm_floor2);
+            }
+            if (_s.t > 20 && room == rm_floor2) {
+                room_goto(rm_floor3);
+                Scenario_Next(_s, 590);
+            }
+            break;
+        case 590:   // a spider next to the exit to floor 4; the player on that exit leaves
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor3) && Player_IsSettled(_pl)) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                var _sp = instance_exists(obj_spider) ? instance_find(obj_spider, 0) : noone;
+                Scenario_Check("h11_rm_floor3_has_its_spider", _sp != noone);
+                if (_sp == noone) { Scenario_NoticeEnd(); break; }
+                with (obj_enemy) { if (id != _sp) instance_destroy(); }
+                EnemyAI_Init(_sp);
+                _sp.prof.sight = 0;   // it only has to stand there: it chased the player to the exit
+                Scenario_PlaceEnemy(_sp, 13, 8);
+                _h.sp_pid = _sp.persist_id;
+                var _ex = noone;
+                with (obj_room_transition) { if (transition_id == "floor3_to_floor4") _ex = id; }
+                Scenario_Check("h11_the_exit_to_floor_4_is_there", _ex != noone);
+                if (_ex == noone) { Scenario_NoticeEnd(); break; }
+                _h.ex_cx = round(_ex.bbox_left / _T);
+                _h.ex_cy = round(_ex.bbox_top / _T);
+                Scenario_PlacePlayer(_h.ex_cx, _h.ex_cy);
+                Scenario_Hold(Scenario_Hunt2DirAction(_ex.require_dir), 4);
+                Scenario_Next(_s, 591);
+            }
+            if (_s.t > 600) { Scenario_Check("h11_a_fresh_rm_floor3_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 591:   // in rm_floor4, on the exit back: leave again
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor4) && Player_IsSettled(_pl)) {
+                Scenario_Release();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                var _ex2 = instance_position(_pl.x + _T / 2, _pl.y + _T / 2, obj_room_transition);
+                Scenario_Check("h11_arrived_in_rm_floor4_on_an_exit", _ex2 != noone);
+                if (_ex2 == noone) { Scenario_NoticeEnd(); break; }
+                Scenario_Hold(Scenario_Hunt2DirAction(_ex2.require_dir), 6);
+                Scenario_Next(_s, 592);
+            }
+            if (_s.t > 600) { Scenario_Check("h11_the_player_arrives_in_rm_floor4", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 592:   // back in rm_floor3: the spider was saved next to the exit, it is put back
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor3) && Player_IsSettled(_pl)) {
+                Scenario_Release();
+                var _sp2 = noone;
+                with (obj_enemy) { if (persist_id == _h.sp_pid) _sp2 = id; }
+                Scenario_Check("h11_the_spider_is_back_in_the_room", _sp2 != noone);
+                if (_sp2 == noone) { Scenario_NoticeEnd(); break; }
+                var _cs = Scenario_H11Cell(_sp2);
+                var _pc = Scenario_H11Cell(_pl);
+                Scenario_Check("h11_the_player_arrived_on_the_exit_it_left_by", _pc.cx == _h.ex_cx && _pc.cy == _h.ex_cy, "player at " + string(_pc.cx) + "," + string(_pc.cy));
+                Scenario_Check("h11_the_spider_that_waited_at_the_exit_is_4_tiles_from_it", point_distance(_cs.cx, _cs.cy, _h.ex_cx, _h.ex_cy) >= AI_EXIT_RELOCATE_TILES, "spider at " + string(_cs.cx) + "," + string(_cs.cy));
+                var _near = 0;
+                with (obj_enemy) { if (point_distance(Nav_CellOf(x + 8), Nav_CellOf(y + 8), _pc.cx, _pc.cy) < AI_ARRIVAL_CLEAR_TILES) _near++; }
+                Scenario_Check("h11_nobody_within_3_tiles_of_the_arrival_tile", _near == 0, "near=" + string(_near));
+                Scenario_NoticeEnd();   // H11 ends the smoke chain
+            }
+            if (_s.t > 600) { Scenario_Release(); Scenario_Check("h11_the_player_is_back_in_rm_floor3", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ============================================================================
+// H11 (D153) pictures 610-619 (rm_floor3 at scale 3, 480 x 432): 610/611 the "?" over an enemy that gave up its search (the real search, stood at its last
+// seen cell), 612 the player hidden on the cell (3,4) with a slime 2 tiles away that does not see him, 613 the same spot one step off the cell: seen, "!" up.
+// ============================================================================
+function Scenario_StepShotsH11(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "h11s")) _s.h11s = { };
+    var _h = _s.h11s;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _e = (variable_struct_exists(_h, "e") && instance_exists(_h.e)) ? _h.e : noone;
+    switch (_s.step) {
+        case 610:   // rm_floor3, the player at (6,6), a slime at (9,6) that has just lost him and searches
+            if (_s.t == 1) {
+                Scenario_Release();
+                Scenario_NewKnight(CLASS_KNIGHT);
+                Scenario_SetWindowScale(3);
+                room_goto(rm_floor2);   // via another room: the controller only spawns the player on a room change
+            }
+            if (_s.t == 30 && room == rm_floor2) room_goto(rm_floor3);
+            if (_s.t > 70 && Scenario_FloorReady(rm_floor3) && Player_IsSettled(_pl)) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_PlacePlayer(6, 6);
+                _h.e = Scenario_H11Enemy(obj_slime, 9, 6, 0);   // sight 0: it only stands there and searches
+                _h.e.ai_mode = "search";
+                _h.e.srch = Search_Create(9, 6, -1, 10);
+                Scenario_Next(_s, 611);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_h11_rm_floor3_is_ready", false, "room=" + room_get_name(room) + " player=" + string(_pl != noone)); Scenario_Finish(); }
+            break;
+        case 611:   // the "?" is up and has settled: the picture
+            if (_e != noone && _e.q_pops >= 1 && (AI_QUESTION_FRAMES - _e.question_pop) >= 16) {
+                Scenario_Check("shots_h11_the_question_mark_is_up_once", _e.q_pops == 1 && _e.question_pop > 12, "pops=" + string(_e.q_pops) + " left=" + string(_e.question_pop));
+                _s.shot = "shot_h11_question.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 612);
+            }
+            if (_s.t > 400) { Scenario_Check("shots_h11_the_search_gives_up", false, "mode=" + ((_e != noone) ? _e.ai_mode : "gone")); Scenario_Finish(); }
+            break;
+        case 612:   // the hiding cell (3,4), a slime 2 tiles below with a clear line
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                with (obj_enemy) instance_destroy();
+                Scenario_PlacePlayer(3, 4);
+                _h.e = Scenario_H11Enemy(obj_slime, 3, 6, -1);
+            }
+            if (_s.t == HIDE_SETTLE_FRAMES + 20) {
+                Scenario_Check("shots_h11_the_player_is_hidden_and_unseen", Player_IsHidden(_pl) && _h.e.ai_mode == "idle" && _h.e.alert_pop == 0);
+                _s.shot = "shot_h11_hidden.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 613);
+            }
+            break;
+        case 613:   // one cell to the side: no longer on the hiding cell, the slime spots him
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_PlacePlayer(2, 4);
+            }
+            if (_s.t > 3 && _e != noone && _e.alert_pop > 0 && !variable_struct_exists(_h, "seen_t")) _h.seen_t = _s.t;
+            if (variable_struct_exists(_h, "seen_t") && _s.t >= _h.seen_t + 3) {
+                Scenario_Check("shots_h11_off_the_cell_the_player_is_seen", !Player_IsHidden(_pl) && abs(_pl.image_alpha - 1) < 0.01);
+                _s.shot = "shot_h11_visible.png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 614);
+            }
+            if (_s.t > 120) { Scenario_Check("shots_h11_the_slime_spots_the_player_off_the_cell", false); Scenario_Finish(); }
+            break;
+        case 614:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                with (obj_enemy) instance_destroy();
+                Scenario_Finish();
+            }
             break;
     }
 }
