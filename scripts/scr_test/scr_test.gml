@@ -7997,8 +7997,6 @@ function Test_Suite_ClassGuard() {
 }
 
 // =====================================================================================================
-}
-
 // D126: the marble bag everywhere. Status chances, enemy moves, gold per fight and the Scrounger find come from shuffled bags that
 // are drawn without putting back; heals and ticks give their exact average. Expected values come from the decision text and the
 // bag arithmetic (75% = 3 of 4, 60% = 3 of 5, weights 3:1 = 3 of 4), not from the code.
