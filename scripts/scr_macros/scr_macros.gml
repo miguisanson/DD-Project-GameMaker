@@ -159,7 +159,7 @@
 #macro UI_DIALOGUE_STATE_HOLDING 1
 #macro UI_DIALOGUE_STATE_READY 2
 #macro UI_DIALOGUE_ARROW_FPS 2
-#macro UI_HUD_HURT_FLASH_FRAMES 8
+#macro UI_HUD_HURT_FLASH_MS (8000 / 60)   // the HUD panel shake when the player is hurt: 8 frames at 60 fps (D108 F2b-1: ms)
 #macro UI_TEXT_SCALE_BASE 2.00
 #macro UI_TEXT_SCALE_MIN 1.00
 #macro UI_TEXT_SCALE_MAX 4.00
@@ -176,21 +176,25 @@
 
 #macro SHAKE_DIR_H 0
 #macro SHAKE_DIR_V 1
+#macro FX_FRAME_MS (1000 / 60)       // the 60 fps frame the shake rhythm was designed in
+#macro FX_EDGE_SLACK_MS 1            // a ms boundary counts as reached when within this, so 12 steps of 16.667 ms still make 200 ms
 
 #macro ENEMY_SHAKE_MAG 0.3
-#macro ENEMY_SHAKE_FRAMES 12
-#macro ENEMY_FLASH_FRAMES 12
-#macro ENEMY_FLASH_RATE 3
+#macro ENEMY_SHAKE_MS 200         // D108 F2b-1: the shakes and flashes run on a ms clock; these were 12 / 12 frames and a 3 frame rate at 60 fps
+#macro ENEMY_FLASH_MS 200
+#macro ENEMY_FLASH_RATE_MS 50
 #macro ENEMY_SHAKE_DIR SHAKE_DIR_H
 
 #macro PLAYER_SHAKE_MAG 0.3
-#macro PLAYER_SHAKE_FRAMES 12
+#macro PLAYER_SHAKE_MS 200
 #macro PLAYER_SHAKE_DIR SHAKE_DIR_V
 
 #macro SPR_SPEED_FPS 0
 
-#macro COMBAT_ACTION_DELAY 60   // long hold: battle intro, kill and run-away messages
-#macro COMBAT_ACTION_HOLD_SEC 0.3   // D55: hold after a player or enemy action, in seconds (use Combat_SecToFrames)
+#macro COMBAT_ACTION_DELAY_MS 1000   // long hold: battle intro, kill and run-away messages (D108 F2b-1: ms, was 60 frames)
+#macro COMBAT_ACTION_HOLD_SEC 0.3   // D55: hold after a player or enemy action, in seconds (Combat_ActionHoldMs gives it in ms)
+#macro COMBAT_HOLD_FOREVER_MS (9999000 / 60)   // a scenario parks a battle on its message with wait_timer = this (it was 9999 frames)
+#macro COMBAT_HOLD_SLACK_MS 1    // a message hold is spent when it is within this of 0, so 60 steps of 16.667 ms still make 1000 ms
 #macro COMBAT_LOG_MAX 30
 #macro SKILL_FX_SPEED_MULT 2.50
 #macro PLAYER_SKILL_FX_SPEED_MULT 6.00
@@ -217,9 +221,9 @@
 #macro QTE_RESULT_MS 700           // how long the grade word stays up
 #macro QTE_HITSTOP_PERFECT_MS 60   // D61 feedback: freeze on a Perfect hit
 #macro QTE_SHAKE_PERFECT_MAG 0.8   // camera shake (world px), subtle: PLAYER_SHAKE_MAG is 0.3
-#macro QTE_SHAKE_PERFECT_FRAMES 10
+#macro QTE_SHAKE_PERFECT_MS (10000 / 60)
 #macro QTE_SHAKE_GOOD_MAG 0.4
-#macro QTE_SHAKE_GOOD_FRAMES 8
+#macro QTE_SHAKE_GOOD_MS (8000 / 60)
 #macro QTE_BAR_W 96                // bar size in base units (the picture is 160 x 144)
 #macro QTE_BAR_H 8
 #macro QTE_COL_DARKEST UI_C_DARKEST     // the four palette colours (D10, D108): the QTE bar uses the same UI_C_* macros as every other screen (defined in scr_menu)

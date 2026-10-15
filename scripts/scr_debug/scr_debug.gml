@@ -1614,7 +1614,7 @@ function Scenario_StepBotSkill(_s) {
                         _s.sk_fx_limit = min(64, 1.5 * _target);
                         _s.sk_fx_min = min(64, _target);
                     }
-                    _s.sk_flash = instance_exists(obj_ui_controller) && obj_ui_controller.hud_hurt_flash_timer > 0;   // the tick ran in this same frame
+                    _s.sk_flash = instance_exists(obj_ui_controller) && obj_ui_controller.hud_hurt_flash_ms > 0;   // the tick ran in this same frame
                     _s.sk = 2;
                 }
             } else if (_s.sk == 2) {
@@ -2991,7 +2991,7 @@ function Scenario_StepShotsQte(_s) {
                 _bc.skill_banner_active = true;
                 _bc.skill_banner_name = _sk.name;
                 Battle_DefenceStart(_bc, _sk, { ok: true, hit: true, dmg: 8, crit: false, msg: "" }, BSTATE_MENU, _bc.p.hp, Battle_StatusSnapshot(_bc.p));
-                _bc.wait_timer = 9999;
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
                 _bc.def_ms = -QTE_LEAD_IN_MS - 300;   // 100 ms into the telegraph
                 Scenario_Next(_s, 39);
             }
@@ -3046,7 +3046,7 @@ function Scenario_StepShotsTurns(_s) {
                 Scenario_Check("shots_turns_in_battle", _inb, "room=" + room_get_name(room));
                 if (!_inb) { Scenario_Finish(); return; }
                 var _bc = instance_find(obj_battle_controller, 0);
-                _bc.wait_timer = 9999;   // stay on the intro message while the picture is taken
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;   // stay on the intro message while the picture is taken
                 _bc.e.hp = 7;
                 _bc.enemy_hp_shown = 7;
                 _bc.e.stagger = 5;
@@ -3100,7 +3100,7 @@ function Scenario_StepShotsTurns(_s) {
                 Scenario_Check("shots_turns_foresight_in_battle", _inb, "room=" + room_get_name(room));
                 if (!_inb) { Scenario_Finish(); return; }
                 var _bc = instance_find(obj_battle_controller, 0);
-                _bc.wait_timer = 9999;
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
                 _bc.p = Status_Add(_bc.p, STATUS_HIT_UP, 3, 0);
                 var _slots = Battle_TimelineSlots(_bc);
                 var _fs = Scenario_BotForesightSlot(_bc);
@@ -3153,7 +3153,7 @@ function Scenario_StepShotsAI(_s) {
                 _bc.message_text = _text;
                 _bc.message_next_state = BSTATE_MENU;
                 _bc.battle_state = BSTATE_MESSAGE;
-                _bc.wait_timer = 9999;
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
                 _bc.skill_banner_active = true;
                 _bc.skill_banner_name = _text;
                 _bc.combat_log = [];   // the log (top right) is checked by the bot; two wrapped rows of it would sit on the enemy name in this picture
@@ -3183,7 +3183,7 @@ function Scenario_StepShotsAI(_s) {
                 Scenario_Check("shots_ai_foresight_in_battle", _inb2, "room=" + room_get_name(room));
                 if (!_inb2) { Scenario_Finish(); return; }
                 var _bc2 = instance_find(obj_battle_controller, 0);
-                _bc2.wait_timer = 9999;
+                _bc2.wait_timer = COMBAT_HOLD_FOREVER_MS;
                 _bc2.ai.turns = 2;   // its next turn is the 3rd
                 _bc2.p = Status_Add(_bc2.p, STATUS_HIT_UP, 3, 0);
                 var _fs = Scenario_BotForesightSlot(_bc2);
@@ -3223,7 +3223,7 @@ function Scenario_StepShotsAI(_s) {
                 _bc3.skill_banner_name = _banner;
                 Battle_Message(_bc3, _banner, BSTATE_ENEMY_ACT);
                 _bc3.combat_log = [];
-                _bc3.wait_timer = 9999;
+                _bc3.wait_timer = COMBAT_HOLD_FOREVER_MS;
                 Scenario_Next(_s, 147);
             }
             break;
@@ -3475,7 +3475,7 @@ function Scenario_StepShotsFx(_s) {
                 Scenario_Check("shots_fx_" + _slug + "_in_battle", _inb, "room=" + room_get_name(room));
                 if (!_inb) { Scenario_Finish(); return; }
                 var _bc = instance_find(obj_battle_controller, 0);
-                _bc.wait_timer = 9999;   // stay on the intro message while the picture is taken
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;   // stay on the intro message while the picture is taken
                 _bc.skill_banner_active = true;
                 _bc.skill_banner_name = _skill.name;
                 var _fx = Battle_SkillFxSpawn(_bc, _sid, _skill.fx_sprite, _skill.fx_frames, Skill_FxSpeed(_skill, true));
@@ -6459,7 +6459,7 @@ function Scenario_StepShotsEconomy(_s) {
                 var _bc = instance_find(obj_battle_controller, 0);
                 _bc.battle_state = BSTATE_ITEM_MENU;
                 _bc.item_index = 3;
-                _bc.wait_timer = 9999;
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
             }
             if (_s.t == 55) {
                 _s.shot = "shot_throw_items.png";
@@ -6491,7 +6491,7 @@ function Scenario_StepShotsEconomy(_s) {
                 if (!_inb2) { Scenario_Finish(); return; }
                 var _bc4 = instance_find(obj_battle_controller, 0);
                 Scenario_Check("shots_eco_elite_is_armored", _bc4.e.is_elite && _bc4.e.elite == "armored");
-                _bc4.wait_timer = 9999;
+                _bc4.wait_timer = COMBAT_HOLD_FOREVER_MS;
                 _bc4.e.hp = _bc4.e.max_hp - 3;
                 _bc4.enemy_hp_shown = _bc4.e.hp;
             }
@@ -6633,7 +6633,7 @@ function Scenario_StepShotsBattleUi(_s) {
                 Scenario_Check("shots_battleui_in_battle_" + _scenes[_s.di], _inb, "room=" + room_get_name(room));
                 if (!_inb) { Scenario_Finish(); return; }
                 var _bc = instance_find(obj_battle_controller, 0);
-                _bc.wait_timer = 9999;
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
                 _bc.p.skills = [SKILL_HILT_BASH, SKILL_MUSCLE_UP, SKILL_WOUND];
                 _bc.p.hp = 6;
                 _bc.p.mp = 4;
@@ -8200,7 +8200,7 @@ function Scenario_StepShotsFairUi(_s) {
             Scenario_Check("shots_fairui_in_battle_" + _scenes[_s.di], _inb, "room=" + room_get_name(room));
             if (!_inb) { Scenario_Finish(); return; }
             var _bc = instance_find(obj_battle_controller, 0);
-            _bc.wait_timer = 9999;
+            _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
             _bc.pops = [];
             _bc.combat_log = [];
             if (_s.di == 1) _bc.run_fails = 1;

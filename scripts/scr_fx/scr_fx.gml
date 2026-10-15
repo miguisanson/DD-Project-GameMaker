@@ -1,89 +1,97 @@
-function SpriteShake_Start(_inst, _dir, _mag, _frames, _flash_frames, _flash_rate) {
+// ---- Shakes and flashes on a ms clock (D108 F2b-1) ----
+// A shake keeps its own elapsed ms. Step advances it ONCE per frame (SpriteShake_Step / CameraShake_Step, from the battle controller's Step, with
+// Presentation_StepMs(delta_time)); the *_Offset readers only look at the clock, so any number of draws in a frame (the debug HP text reads the
+// enemy's offset a second time) cannot make a shake run faster. The look is the old 60 fps one: the offset flips sign every 2 frames (33.3 ms),
+// the last frame is still, and a flash blinks every flash_rate ms counting down from its end.
+
+// The shake's sign at an elapsed time: 1 or -1 (+ - - + + - - + ...), 0 once the last frame is reached or the shake is over.
+function Fx_ShakeSign(_elapsed_ms, _total_ms) {
+    if (_elapsed_ms + FX_EDGE_SLACK_MS >= _total_ms - FX_FRAME_MS) return 0;
+    var n = floor((_elapsed_ms + FX_EDGE_SLACK_MS) / FX_FRAME_MS) + 1;   // 1 on the frame the shake started
+    return ((n div 2) mod 2 == 0) ? 1 : -1;
+}
+
+// True while the flash is lit: blinks every rate ms counting down from the flash's end, lit first.
+function Fx_FlashOn(_elapsed_ms, _flash_ms, _rate_ms) {
+    var left = _flash_ms - _elapsed_ms;
+    if (left <= FX_EDGE_SLACK_MS) return false;
+    return (floor((left + FX_EDGE_SLACK_MS) / max(1, _rate_ms)) mod 2 == 0);
+}
+
+function Fx_ShakeXY(_dir, _mag, _sign) {
+    var s = _sign * _mag;
+    if (_dir == SHAKE_DIR_H) return { x: s, y: 0 };
+    if (_dir == SHAKE_DIR_V) return { x: 0, y: s };
+    return { x: s, y: s };
+}
+
+function SpriteShake_Start(_inst, _dir, _mag, _ms, _flash_ms, _flash_rate_ms) {
     if (!instance_exists(_inst)) return;
     _inst.shake_dir = _dir;
     _inst.shake_mag = _mag;
-    _inst.shake_timer = _frames;
-    _inst.flash_timer = _flash_frames;
-    _inst.flash_rate = _flash_rate;
-    if (!variable_instance_exists(_inst, "shake_phase")) _inst.shake_phase = 0;
+    _inst.shake_ms = _ms;
+    _inst.shake_elapsed_ms = 0;
+    _inst.flash_ms = _flash_ms;
+    _inst.flash_rate_ms = _flash_rate_ms;
 }
 
+// Once per frame: moves the sprite's shake clock on by _step_ms.
+function SpriteShake_Step(_inst, _step_ms) {
+    if (!instance_exists(_inst) || !variable_instance_exists(_inst, "shake_elapsed_ms")) return;
+    if (_inst.shake_elapsed_ms < _inst.shake_ms) _inst.shake_elapsed_ms += _step_ms;
+}
+
+// Where the sprite is nudged now and whether its flash is lit. Pure: it does not move the clock, so call it as often as needed.
 function SpriteShake_Offset(_inst) {
-    if (!instance_exists(_inst) || !variable_instance_exists(_inst, "shake_timer") || _inst.shake_timer <= 0) return { x: 0, y: 0, flash: false };
-
-    _inst.shake_phase += 1;
-    var dir = _inst.shake_dir;
-    var mag = _inst.shake_mag;
-
-    var sx = 0;
-    var sy = 0;
-    var s = (( _inst.shake_phase div 2 ) mod 2 == 0) ? 1 : -1;
-
-    if (dir == SHAKE_DIR_H) {
-        sx = s * mag;
-    } else if (dir == SHAKE_DIR_V) {
-        sy = s * mag;
-    } else {
-        sx = s * mag;
-        sy = s * mag;
-    }
-
-    _inst.shake_timer -= 1;
-    if (_inst.shake_timer <= 0) {
-        _inst.shake_timer = 0;
-        sx = 0;
-        sy = 0;
-    }
-
-    var flash = false;
-    if (variable_instance_exists(_inst, "flash_timer") && _inst.flash_timer > 0) {
-        if ((_inst.flash_timer div max(1, _inst.flash_rate)) mod 2 == 0) flash = true;
-        _inst.flash_timer -= 1;
-        if (_inst.flash_timer < 0) _inst.flash_timer = 0;
-    }
-
-    return { x: sx, y: sy, flash: flash };
+    if (!instance_exists(_inst) || !variable_instance_exists(_inst, "shake_elapsed_ms")) return { x: 0, y: 0, flash: false };
+    if (_inst.shake_elapsed_ms + FX_EDGE_SLACK_MS >= _inst.shake_ms) return { x: 0, y: 0, flash: false };
+    var xy = Fx_ShakeXY(_inst.shake_dir, _inst.shake_mag, Fx_ShakeSign(_inst.shake_elapsed_ms, _inst.shake_ms));
+    return { x: xy.x, y: xy.y, flash: Fx_FlashOn(_inst.shake_elapsed_ms, _inst.flash_ms, _inst.flash_rate_ms) };
 }
 
-function CameraShake_Start(_mag, _frames, _dir) {
+function CameraShake_Start(_mag, _ms, _dir) {
     if (!Settings_ShakeOn()) return;   // D0: the Screen shake setting
     var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "cam_shake")) gs.cam_shake = { mag: 0, timer: 0, dir: SHAKE_DIR_H, phase: 0 };
+    if (!variable_struct_exists(gs, "cam_shake")) gs.cam_shake = { mag: 0, ms: 0, elapsed_ms: 0, dir: SHAKE_DIR_H };
     gs.cam_shake.mag = _mag;
-    gs.cam_shake.timer = _frames;
+    gs.cam_shake.ms = _ms;
+    gs.cam_shake.elapsed_ms = 0;
     gs.cam_shake.dir = _dir;
-    gs.cam_shake.phase = 0;
 }
 
+// Once per frame: moves the camera shake clock on by _step_ms.
+function CameraShake_Step(_step_ms) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "cam_shake")) return;
+    if (gs.cam_shake.elapsed_ms < gs.cam_shake.ms) gs.cam_shake.elapsed_ms += _step_ms;
+}
+
+// The camera nudge now. Pure, like SpriteShake_Offset.
 function CameraShake_Offset() {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "cam_shake")) return { x: 0, y: 0 };
-    if (gs.cam_shake.timer <= 0) return { x: 0, y: 0 };
+    var cs = gs.cam_shake;
+    if (cs.elapsed_ms + FX_EDGE_SLACK_MS >= cs.ms) return { x: 0, y: 0 };
+    return Fx_ShakeXY(cs.dir, cs.mag, Fx_ShakeSign(cs.elapsed_ms, cs.ms));
+}
 
-    gs.cam_shake.phase += 1;
-    var s = (( gs.cam_shake.phase div 2 ) mod 2 == 0) ? 1 : -1;
-    var mag = gs.cam_shake.mag;
-    var dir = gs.cam_shake.dir;
+// Both shakes of a battle frame, advanced once (the battle controller's Step calls this before anything can exit early).
+function Fx_BattleShakesStep(_enemy_inst, _step_ms) {
+    SpriteShake_Step(_enemy_inst, _step_ms);
+    CameraShake_Step(_step_ms);
+}
 
-    var ox = 0;
-    var oy = 0;
-    if (dir == SHAKE_DIR_H) {
-        ox = s * mag;
-    } else if (dir == SHAKE_DIR_V) {
-        oy = s * mag;
-    } else {
-        ox = s * mag;
-        oy = s * mag;
-    }
+// The HUD hurt flash (the player panel shakes when hit or ticked): ms left on the flash. Hud_HurtFlashStep counts it down once per frame and
+// snaps to 0 within FX_EDGE_SLACK_MS; Hud_HurtFlashSign is the panel's nudge direction (1 / -1, flipping every 2 frames of 60 fps, the old
+// "hurt mod 4"), 0 when the flash is over.
+function Hud_HurtFlashStep(_ms, _step_ms) {
+    var left = _ms - _step_ms;
+    return (left <= FX_EDGE_SLACK_MS) ? 0 : left;
+}
 
-    gs.cam_shake.timer -= 1;
-    if (gs.cam_shake.timer <= 0) {
-        gs.cam_shake.timer = 0;
-        ox = 0;
-        oy = 0;
-    }
-
-    return { x: ox, y: oy };
+function Hud_HurtFlashSign(_ms) {
+    if (_ms <= 0) return 0;
+    return ((floor((_ms + FX_EDGE_SLACK_MS) / (2 * FX_FRAME_MS)) mod 2) == 0) ? 1 : -1;
 }
 
 // ---- Icons (D94): the v2 strips (art/IMPORT-CHECKLIST.md) by category and frame ----

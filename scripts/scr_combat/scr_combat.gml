@@ -305,19 +305,26 @@ function Combat_Log(_text, _icon_sprite = noone, _icon_subimg = 0) {
     bc.combat_log = log;
 }
 
-// Seconds -> game frames at the current room speed (frame-rate independent waits).
-function Combat_SecToFrames(_seconds) {
-    var game_fps = game_get_speed(gamespeed_fps);
-    if (!is_real(game_fps) || game_fps <= 0) game_fps = 60;
-    return max(1, round(_seconds * game_fps));
+// D108 F2b-1: a message hold is a ms countdown (wait_timer), counted down once per step by Presentation_StepMs(delta_time), so it lasts the same
+// time at any frame rate. The hold is spent when within COMBAT_HOLD_SLACK_MS of 0.
+function Combat_ActionHoldMs() {
+    return COMBAT_ACTION_HOLD_SEC * 1000;   // D55: the pause after a player or enemy action (0.3 s)
 }
 
-function Battle_Message(_bc, _text, _next_state, _fx = noone, _hold_frames = -1) {
+function Combat_HoldActive(_timer_ms) {
+    return _timer_ms > COMBAT_HOLD_SLACK_MS;
+}
+
+function Combat_HoldStep(_timer_ms, _step_ms) {
+    return max(0, _timer_ms - _step_ms);
+}
+
+function Battle_Message(_bc, _text, _next_state, _fx = noone, _hold_ms = -1) {
     _bc.message_text = _text;
     _bc.message_next_state = _next_state;
     _bc.battle_state = BSTATE_MESSAGE;
     _bc.wait_fx = _fx;
-    _bc.wait_timer = (_hold_frames >= 0) ? _hold_frames : Combat_SecToFrames(COMBAT_ACTION_HOLD_SEC);
+    _bc.wait_timer = (_hold_ms >= 0) ? _hold_ms : Combat_ActionHoldMs();
     Combat_Log(_text);
 }
 
@@ -682,7 +689,7 @@ function Battle_StaggerHit(_bc, _power, _stun_skill, _perfect, _hits = 1) {
     var last_key = global.sfx_last_key;   // the BREAK sound is a second layer on top of the grade sound: the grade stays the "last key" the bot checks
     SFX_Play(Qte_GradeSfxKey(QTE_PERFECT));
     global.sfx_last_key = last_key;
-    CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_FRAMES, SHAKE_DIR_H);
+    CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_MS, SHAKE_DIR_H);
     var note = " " + Loc_T("combat.msg.break", "BREAK! {name} takes +50% damage!", { name: e.name });
     var cancelled = EnemyAI_Break(_bc.ai);   // B4 (D75): a BREAK during a wind-up cancels the big attack
     if (cancelled >= 0) {
@@ -769,7 +776,7 @@ function Battle_CheckEnd(_bc, _p, _e) {
         var gs = GameState_Get();
         gs.pending_post_battle_dialogue_lines = Battle_BuildVictoryDialogueLines(_e, rewards, _p);
 
-        Battle_Message(_bc, Loc_T("combat.msg.enemy_slain", "{enemy} has been slain.", { enemy: _e.name }), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY);
+        Battle_Message(_bc, Loc_T("combat.msg.enemy_slain", "{enemy} has been slain.", { enemy: _e.name }), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY_MS);
         return true;
     }
 
@@ -1239,10 +1246,10 @@ function Battle_AttackTimingBegin(_bc) {
 // The enemy shake and the small camera shakes of a landed hit. After a Perfect's hit-stop Step_0 calls this again, so the freeze comes first.
 function Battle_QteImpactFeedback(_bc) {
     if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst)) {
-        SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_FRAMES, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
+        SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_MS, ENEMY_FLASH_MS, ENEMY_FLASH_RATE_MS);
     }
-    if (_bc.qte_result_key == QTE_PERFECT) CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_FRAMES, SHAKE_DIR_H);
-    if (_bc.qte_result_key == QTE_GOOD) CameraShake_Start(QTE_SHAKE_GOOD_MAG, QTE_SHAKE_GOOD_FRAMES, SHAKE_DIR_H);
+    if (_bc.qte_result_key == QTE_PERFECT) CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_MS, SHAKE_DIR_H);
+    if (_bc.qte_result_key == QTE_GOOD) CameraShake_Start(QTE_SHAKE_GOOD_MAG, QTE_SHAKE_GOOD_MS, SHAKE_DIR_H);
 }
 
 // The player's basic attack always lands (D20): damage = base x the grade's multiplier, never 0.
@@ -1613,7 +1620,7 @@ function Battle_ThrowResolve(_bc, _timing) {
         EnemyPersist_ResolveBattle(false);
         _bc.p = p;
         _bc.e = e;
-        Battle_Message(_bc, res.msg, BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY);
+        Battle_Message(_bc, res.msg, BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY_MS);
         return;
     }
     Battle_Message(_bc, res.msg + note, BSTATE_ENEMY_ACT);
@@ -1665,7 +1672,7 @@ function Battle_RunAttempt(_bc) {
         if (enemy_id == ENEMY_STRANGER) {
             Dialogue_NarrativeOnStrangerEncounterResolved();
         }
-        Battle_Message(_bc, Loc_T("combat.msg.player_ran", "You ran away!"), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY);
+        Battle_Message(_bc, Loc_T("combat.msg.player_ran", "You ran away!"), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY_MS);
     } else {
         // R-022: a failed Run is a spent turn: message, then the same finaliser as Guard (Status_Tick, death/victory check, timeline advance).
         // A successful Run (above) ends the battle and clears every status in Battle_EndRun, so it does not tick.
@@ -1955,7 +1962,7 @@ function Battle_DefenceStart(_bc, _skill, _res, _follow_state, _player_hp_before
         status_ids: Battle_SkillStatusIds(_skill)
     };
     if (instance_exists(_bc.enemy_inst)) {   // the enemy flashes as it winds up
-        SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, QTE_TELEGRAPH_MS * 60 div 1000, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
+        SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, QTE_TELEGRAPH_MS, ENEMY_FLASH_MS, ENEMY_FLASH_RATE_MS);
     }
     _bc.battle_state = BSTATE_ENEMY_DEFENCE;
     Tutorial_Trigger("defence");   // D45
@@ -2026,7 +2033,7 @@ function Battle_DefenceResolve(_bc, _key) {
     _bc.last_crit = crit;
     _bc.last_dmg = final_dmg;
     if (final_dmg > 0 && _key != QTE_PERFECT) {
-        CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
+        CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_MS, PLAYER_SHAKE_DIR);
     }
     if (final_dmg > 0) Battle_PlayerHitPop(_bc, final_dmg, crit);
 
@@ -2267,7 +2274,7 @@ function Battle_EnemyWindup(_bc, _skill_id) {
     _bc.skill_banner_name = text;
     SFX_PlayEnemySpecial(e.id);
     if (instance_exists(_bc.enemy_inst)) {
-        SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, QTE_TELEGRAPH_MS * 60 div 1000, ENEMY_FLASH_FRAMES, ENEMY_FLASH_RATE);
+        SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, QTE_TELEGRAPH_MS, ENEMY_FLASH_MS, ENEMY_FLASH_RATE_MS);
     }
     _bc.enemy_actions_remaining = max(0, _bc.enemy_actions_remaining - 1);
     var follow_state = (_bc.enemy_actions_remaining > 0) ? BSTATE_ENEMY_ACT : BSTATE_MENU;
@@ -2288,7 +2295,7 @@ function Battle_EnemyAct(_bc) {
         _bc.skill_banner_active = true;
         _bc.skill_banner_name = phase_text;
         SFX_PlayEnemySpecial(e.id);
-        CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_FRAMES, SHAKE_DIR_H);
+        CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_MS, SHAKE_DIR_H);
         Battle_Message(_bc, phase_text, BSTATE_ENEMY_ACT);
         return;
     }
@@ -2375,7 +2382,7 @@ function Battle_EnemyAct(_bc) {
             SFX_PlayMissOrBlocked(true, miss_class_id);
         }
         if (res.hit && res.dmg > 0) {
-            CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
+            CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_MS, PLAYER_SHAKE_DIR);
             Battle_PlayerHitPop(_bc, res.dmg, res.crit);
         }
 
@@ -2427,7 +2434,7 @@ function Battle_EnemyAct(_bc) {
         }
 
         if (_bc.last_hit && _bc.last_dmg > 0) {
-            CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_FRAMES, PLAYER_SHAKE_DIR);
+            CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_MS, PLAYER_SHAKE_DIR);
             Battle_PlayerHitPop(_bc, _bc.last_dmg, _bc.last_crit);
         }
 
@@ -3187,8 +3194,8 @@ function Battle_DrawPlayerPanel(_bc, _z, _alpha) {
     hud.clock = now;
     hud.hp_shown = Ui_Glide(hud.hp_shown, ch.hp, dt, 140);
     hud.mp_shown = Ui_Glide(hud.mp_shown, ch.mp, dt, 140);
-    var hurt = instance_exists(obj_ui_controller) ? obj_ui_controller.hud_hurt_flash_timer : 0;   // set by a hit or a poison / burn tick (frames)
-    var shake = (hurt > 0) ? (((hurt mod 4) < 2) ? p : -p) : 0;
+    var hurt = instance_exists(obj_ui_controller) ? obj_ui_controller.hud_hurt_flash_ms : 0;   // set by a hit or a poison / burn tick (ms left)
+    var shake = Hud_HurtFlashSign(hurt) * p;   // the panel nudges one way then the other every 2 frames at 60 fps (the old "mod 4")
 
     var r = _z.player;
     var rx = r.x + shake;
