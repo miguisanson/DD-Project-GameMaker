@@ -2060,7 +2060,20 @@ function Card_ClassCharacter(_old, _class_id) {
         var lvl = variable_struct_exists(_old, "level") ? max(1, round(_old.level)) : 1;
         ch.level = lvl;
         if (variable_struct_exists(_old, "exp")) ch.exp = _old.exp;
-        if (variable_struct_exists(_old, "inventory")) ch.inventory = variable_clone(_old.inventory);
+        if (variable_struct_exists(_old, "inventory")) {
+            ch.inventory = variable_clone(_old.inventory);
+            // D84: a class carries 5 of a throwable, only Nobody 8; the extra units are dropped when the class is picked
+            var cap = Throw_Cap(ch);
+            var throw_ids = [];
+            for (var ti = 0; ti < array_length(ch.inventory); ti++) {
+                var tid = ch.inventory[ti].id;
+                if (Item_IsThrowable(ItemDB_Get(tid)) && !array_contains(throw_ids, tid)) array_push(throw_ids, tid);
+            }
+            for (var tj = 0; tj < array_length(throw_ids); tj++) {
+                var over = Inv_Count(ch.inventory, throw_ids[tj]) - cap;
+                if (over > 0) ch.inventory = Inv_Remove(ch.inventory, throw_ids[tj], over);
+            }
+        }
         if (variable_struct_exists(_old, "equip")) ch.equip = variable_clone(_old.equip);
         if (variable_struct_exists(_old, "status")) ch.status = variable_clone(_old.status);
         var banked = variable_struct_exists(_old, "stat_points") ? _old.stat_points : 0;
