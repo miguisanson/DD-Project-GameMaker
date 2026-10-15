@@ -1642,7 +1642,9 @@ function Battle_RunChance(_spd_player, _spd_enemy, _fails = 0) {
 // R1b (D124): the flee chance as a whole percent for the RUN row; -1 against a boss (the same rule Battle_RunAttempt uses).
 function Battle_RunPct(_p, _e, _fails) {
     if (is_struct(_e) && variable_struct_exists(_e, "id") && (_e.id == ENEMY_MINI_BOSS || _e.id == ENEMY_FINAL_BOSS)) return -1;
-    return round(Battle_RunChance(Combat_EffectiveStat(_p, STAT_SPD), Combat_EffectiveStat(_e, STAT_SPD), _fails) * 100);
+    var chance = Battle_RunChance(Combat_EffectiveStat(_p, STAT_SPD), Combat_EffectiveStat(_e, STAT_SPD), _fails);
+    if (chance >= 1) return 100;   // review 1: 100 only for a sure thing; 0.9955 must not read "100%" while the escape can still fail
+    return min(99, floor(chance * 100));
 }
 
 function Battle_RunAttempt(_bc) {

@@ -3349,6 +3349,7 @@ function Scenario_StepShotsUi(_s) {
         case 82:   // down to Settings -> confirm (D35: no difficulty panel between the title and here)
             if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
             if (_s.t == 10) { RunSave_Delete(); _c.title_refresh = true; }   // C1: an earlier shot started a run; with no run save Continue is greyed and Down lands on Settings
+            if (_s.t == 20) Ui_MenuFixCursor(_c.title_stk.menus[0], 0);   // review 1: with a run saved the title started on Continue; back to New Game so Down lands on Settings
             if (_s.t == 30) Scenario_Tap("menu_down");
             if (_s.t == 36) Scenario_Tap("confirm");
             if (_s.t == 60) Ui_MenuFixCursor(_sp.menu, 0);   // an earlier shot left the remembered cursor on the Window row
