@@ -193,6 +193,7 @@ function Icon_StripSprite(_category) {
     if (!variable_global_exists("icon_lookups")) global.icon_lookups = 0;
     global.icon_lookups++;
     var spr = asset_get_index("spr_icons_" + _category);
+    if (spr == -1) spr = asset_get_index(_category + "_strip");   // the owner's import named the strips after their files (status_strip, ...)
     variable_struct_set(global.icon_strip_sprites, _category, spr);
     return spr;
 }

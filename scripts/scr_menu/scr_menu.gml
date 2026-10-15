@@ -2221,7 +2221,7 @@ function Item_IconSprite(_item) {
     if (variable_struct_exists(_item, "sprite") && _item.sprite != noone && _item.sprite != -1) return { spr: _item.sprite, sub: 0 };
     var sub = variable_struct_exists(_item, "icon_sub") ? _item.icon_sub : 0;
     var spr = -1;
-    if (variable_struct_exists(_item, "icon_kind")) spr = asset_get_index("spr_icons_" + string(_item.icon_kind));
+    if (variable_struct_exists(_item, "icon_kind")) spr = Icon_StripSprite(string(_item.icon_kind));
     if (spr == -1 || !sprite_exists(spr)) return { spr: noone, sub: sub };
     return { spr: spr, sub: clamp(sub, 0, max(0, sprite_get_number(spr) - 1)) };
 }

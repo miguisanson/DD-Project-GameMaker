@@ -5863,9 +5863,10 @@ function Test_IconLookups() {
     var _same = true;
     for (var _c = 0; _c < array_length(_cats); _c++) {
         var _want = asset_get_index("spr_icons_" + _cats[_c]);
+        if (_want == -1) _want = asset_get_index(_cats[_c] + "_strip");   // the owner's import names (2026-10-16)
         for (var _i = 0; _i < 50; _i++) if (Icon_StripSprite(_cats[_c]) != _want) _same = false;
     }
-    Test_True("Fx (D108) the cached strip sprite is the one asset_get_index gives, for every category", _same);
+    Test_True("Fx (D108) the cached strip sprite is the one asset_get_index gives (either import name), for every category", _same);
     Test_True("Fx (D108) 350 strip lookups ask asset_get_index at most once per category (" + string(global.icon_lookups) + ")", global.icon_lookups <= array_length(_cats));
 }
 
@@ -6890,7 +6891,16 @@ function Test_Suite_Economy() {
     var _glow_ok = true;
     for (var _gm = 0; _gm < 3600; _gm += 37) { var _ga2 = Merchant_GlowAlpha(_gm); if (_ga2 < 0.35 - 0.0001 || _ga2 > 1.0 + 0.0001) _glow_ok = false; }
     Test_True("D113 glow: every alpha stays inside 0.35 to 1.0", _glow_ok);
-    Test_Eq("D113 glow: the merchant sprite is looked up as spr_merchant_idle", Merchant_SpriteName(), "spr_merchant_idle");
+    // the owner imported candidate A as "spr_merchant_idle_strip" (2026-10-16); the lookup takes either name
+    Test_True("D113 glow: the merchant sprite is looked up by its imported name", Merchant_SpriteName() == "spr_merchant_idle" || Merchant_SpriteName() == "spr_merchant_idle_strip");
+    var _msp = asset_get_index(Merchant_SpriteName());
+    Test_True("D113 import: the merchant sprite exists with its 2 idle frames", _msp != -1 && sprite_get_number(_msp) == 2);
+    var _icats = ["status", "skill", "throwable", "passive", "accessory", "misc", "skill_up"];
+    var _iframes = [17, 15, 4, 8, 2, 1, 15];
+    for (var _ic = 0; _ic < array_length(_icats); _ic++) {
+        var _isp = Icon_StripSprite(_icats[_ic]);
+        Test_True("D94 import: icon strip '" + _icats[_ic] + "' is found with " + string(_iframes[_ic]) + " frames of 16x16", _isp != -1 && sprite_get_number(_isp) == _iframes[_ic] && sprite_get_width(_isp) == 16 && sprite_get_height(_isp) == 16);
+    }
 
     var _kz = Test_Hero(CLASS_KNIGHT);
     var _ssa = Shop_StockGenerate(4321, 0, _kz);

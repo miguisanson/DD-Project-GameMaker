@@ -636,6 +636,7 @@ function Merchant_SpotFor(_room) {
 
 // The merchant's sprite (D113, candidate A: art/merchant/spr_merchant_idle, two idle frames, imported by the owner). Looked up by name (D94).
 function Merchant_SpriteName() {
+    if (asset_get_index("spr_merchant_idle") == -1 && asset_get_index("spr_merchant_idle_strip") != -1) return "spr_merchant_idle_strip";   // the owner's import name
     return "spr_merchant_idle";
 }
 
