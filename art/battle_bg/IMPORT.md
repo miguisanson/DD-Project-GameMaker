@@ -1,5 +1,9 @@
 # Import the battle backgrounds in the IDE (D151)
 
+**Update 2026-10-16: you only need to import `spr_battle_bg_boss` now.** `spr_battle_bg_forest` (A1), `spr_battle_bg_caves` (B2) and
+`spr_battle_bg_ruins` (C3) are already done. The boss picture comes from the new row D (`candidates/D4.png` ... `D13.png`, see `PICK.md`;
+the old D1-D3 are gone). The steps below are the same; just do them once, for the boss sprite.
+
 Why: the IDE owns the `.yyp`/`.yy` files, so agents cannot create sprites. The code looks each sprite up by its exact name with
 `asset_get_index(...)` (`Battle_BgSprite` in `scripts/scr_fx/scr_fx.gml`) and keeps today's background (`battle_screen`) until the sprite
 exists, so the game runs before, during and after the import. You can import one, two or all four.
@@ -17,7 +21,7 @@ Pick the files first (`PICK.md`), then for each of the 4 sprites:
 | `spr_battle_bg_forest` | the fight is on floor 1, 2 or 3 (not a boss) | `art/battle_bg/candidates/A?.png` |
 | `spr_battle_bg_caves`  | the fight is on floor 4, 5 or 6 (not a boss) | `art/battle_bg/candidates/B?.png` |
 | `spr_battle_bg_ruins`  | the fight is on floor 7, 8 or 9 (not a boss) | `art/battle_bg/candidates/C?.png` |
-| `spr_battle_bg_boss`   | any boss fight (the mini boss and the final boss), whatever the floor | `art/battle_bg/candidates/D?.png` |
+| `spr_battle_bg_boss`   | any boss fight (the mini boss and the final boss), whatever the floor | `art/battle_bg/candidates/D<n>.png` (your pick from D4..D13, no D7) |
 
 Half floors count with the floor below (rm_floor6_5 is the caves, rm_floor9_5 the ruins). A battle with no known floor keeps the old background.
 
