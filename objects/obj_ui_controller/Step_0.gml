@@ -64,40 +64,13 @@ if (gs.ui.mode == UI_BED) {
     exit;
 }
 
-if (SettingsPopup_IsOpen("pause") || HelpUi_IsOpen()) {
-    PauseMenu_HandleInput();
-    exit;
-}
-
-// Pause menu (Esc / controller top face button)
-if (k_pause) {
-    if (gs.ui.mode == UI_PAUSE) {
-        PauseMenu_Close();
-        exit;
-    }
-    if (gs.ui.mode == UI_NONE) {
-        var pl = gs.player_inst;
-        if (instance_exists(pl) && Player_IsSettled(pl)) {
-            PauseMenu_Open();
-            exit;
-        }
-    }
-}
-
-if (gs.ui.mode == UI_PAUSE) {
-    PauseMenu_HandleInput();
-    exit;
-}
-
-if (k_menu && !Menu_CaptureActive()) {
-    if (gs.ui.mode == UI_MENU) {
-        Menu_Close();
-    } else if (gs.ui.mode == UI_NONE) {
-        var pl = gs.player_inst;
-        if (instance_exists(pl) && Player_IsSettled(pl)) {
-            Menu_Open();
-        }
-    }
+// D140: Esc and Tab (the pad's X, Y and Start) are the same menu, on the map and in a fight. Inside it Tab closes from any depth and Esc is Back (it closes at the root
+// of a tab). In a fight Esc is Back in a list, so there the battle controller opens the menu on Esc at the root command menu; Tab opens it anywhere that is safe.
+if (gs.ui.mode == UI_MENU) {
+    if (k_menu && !Menu_CaptureActive()) Menu_Close();
+} else if ((k_menu || (k_pause && room != rm_battle)) && Menu_CanOpen()) {
+    Menu_Open();
+    exit;   // the key that opened it does not answer it
 }
 
 if (gs.ui.mode == UI_MENU) {

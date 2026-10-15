@@ -294,7 +294,12 @@ function Scenario_InputOverride() {
     var _s = global.scn;
     if (_s.mode != "bot" && _s.mode != "smoke" && _s.mode != "shots" && _s.mode != "gridshots") return;   // shots taps through the dialogues of the display flow
     if (_s.tap_action != "" && _s.f == _s.last_tap) {
-        variable_struct_set(global.input.state, _s.tap_action, { held: true, pressed: true });
+        if (_s.tap_action == "esc") {   // the Esc key is two actions at once (pause and cancel), as the real keyboard makes it
+            variable_struct_set(global.input.state, "pause", { held: true, pressed: true });
+            variable_struct_set(global.input.state, "cancel", { held: true, pressed: true });
+        } else {
+            variable_struct_set(global.input.state, _s.tap_action, { held: true, pressed: true });
+        }
     }
     for (var _i = 0; _i < array_length(_s.holds); _i++) {
         var _h = _s.holds[_i];
@@ -465,10 +470,10 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeBattleUi(_s);   // D1a: the battle menus (wrap, lists, details, back, Guard) and the dialogue box (typewriter, choices)
             break;
         case 181: case 182: case 183: case 184: case 185: case 186: case 187: case 188: case 189: case 190: case 191: case 192: case 193: case 194: case 195:
-            Scenario_StepSmokeTabMenu(_s);   // D1b: the Tab menu (tabs wrap, remembered cursors, a potion, equip, Codex, settings) and the pause menu
+            Scenario_StepSmokeTabMenu(_s);   // D1b: the Tab menu (tabs wrap, remembered cursors, a potion, equip, Codex, settings) and Esc opening the same menu (D140)
             break;
         case 200: case 201: case 202: case 203: case 204: case 205: case 206: case 207: case 208: case 209:
-            Scenario_StepSmokeFairUi(_s);   // R1b: the window loses focus -> the pause menu (the battle clock stops), the RUN chance
+            Scenario_StepSmokeFairUi(_s);   // R1b: the window loses focus -> the one menu (never over a running bar), the RUN chance
             break;
         case 210: case 211: case 212: case 213: case 214: case 215: case 216: case 217: case 218: case 219:
             Scenario_StepSmokeNotice(_s);   // F3a (D96): the notice pop-up through the real title (old slot file, a Continue that fails) and the keys around it
@@ -515,7 +520,11 @@ function Scenario_StepSmoke(_s) {
             break;
         case 520: case 521: case 522: case 523: case 524: case 525: case 526: case 527: case 528: case 529:
         case 530: case 531: case 532: case 533: case 534: case 535: case 536: case 537: case 538: case 539:
-            Scenario_StepSmokeLevelUp(_s);   // H4 (D143): the level-up screen shows the class growth, Max HP +3 / Max MP +2 with real keys; its last step calls Scenario_NoticeEnd
+            Scenario_StepSmokeLevelUp(_s);   // H4 (D143): the level-up screen shows the class growth, Max HP +3 / Max MP +2 with real keys; its last step goes on with H1 (470..489)
+            break;
+        case 470: case 471: case 472: case 473: case 474: case 475: case 476: case 477: case 478: case 479:
+        case 480: case 481: case 482: case 483: case 484: case 485: case 486: case 487: case 488: case 489:
+            Scenario_StepSmokeOneMenu(_s);   // H1 (D140, D141): Esc and Tab are one menu, in the fight too; Quit in a fight comes back to just before it; its last step calls Scenario_NoticeEnd
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -534,7 +543,7 @@ function Scenario_StepSmoke(_s) {
 
 // D0 / D95: the title menu and the settings screen driven by Scenario_Tap / Scenario_Hold (the game's own input state), so the
 // shared menu component is checked end to end: wrap-around, disabled items skipped, confirm opens a level, back goes up ONE level,
-// the cursor is remembered, left/right changes a pending value and Back throws it away, holding scrolls after a delay.
+// the cursor is remembered, left/right changes a value at once (D140: no pending copy, no Apply), holding scrolls after a delay.
 // A fresh save area has no save, so Load Game is greyed: the title cursor visits New Game, Settings, Exit Game only.
 function Scenario_StepSmokeUi(_s) {
     var _c = obj_start_controller;
@@ -564,7 +573,7 @@ function Scenario_StepSmokeUi(_s) {
             Scenario_Tap("menu_up");
             break;
         case 28:
-            Scenario_Check("ui_settings_up_from_the_first_row_lands_on_the_last", _sp.menu.cursor == array_length(_sp.menu.items) - 1 && _sp.menu.items[_sp.menu.cursor].id == "apply", "cursor=" + string(_sp.menu.cursor));
+            Scenario_Check("ui_settings_up_from_the_first_row_lands_on_the_last", _sp.menu.cursor == array_length(_sp.menu.items) - 1 && _sp.menu.items[_sp.menu.cursor].id == "controls", "cursor=" + string(_sp.menu.cursor));
             Scenario_Tap("menu_down");
             break;
         case 34:
@@ -572,13 +581,15 @@ function Scenario_StepSmokeUi(_s) {
             Scenario_Tap("menu_left");
             break;
         case 40:
-            Scenario_Check("ui_settings_left_lowers_the_pending_volume", abs(_sp.pending.audio_ui - 0.95) < 0.001, "ui=" + string(_sp.pending.audio_ui));
-            Scenario_Check("ui_settings_change_is_pending_not_applied", abs(GameSettings_Ensure().audio_ui - 1) < 0.001);
+            Scenario_Check("ui_settings_left_lowers_the_volume", abs(GameSettings_Ensure().audio_ui - 0.95) < 0.001, "ui=" + string(GameSettings_Ensure().audio_ui));
+            Scenario_Check("ui_settings_change_is_live_at_once", abs(global.vol_ui - 0.95) < 0.001, "live=" + string(global.vol_ui));
             Scenario_Tap("cancel");
             break;
         case 60:
             Scenario_Check("ui_back_leaves_settings_one_level", _c.state == "main" && !SettingsPopup_IsOpen("title"), "state=" + string(_c.state));
-            Scenario_Check("ui_back_throws_the_pending_change_away", abs(GameSettings_Ensure().audio_ui - 1) < 0.001);
+            Scenario_Check("ui_back_keeps_the_change", abs(GameSettings_Ensure().audio_ui - 0.95) < 0.001);
+            Settings_Change("vol_ui", 1);   // put it back for the steps after this one
+            Scenario_Check("ui_the_volume_is_back_at_100", abs(GameSettings_Ensure().audio_ui - 1) < 0.001);
             Scenario_Check("ui_title_cursor_is_remembered", is_struct(_top) && _top.cursor == 2, "cursor=" + string(_top.cursor));
             Scenario_Tap("menu_down");
             break;
@@ -665,7 +676,7 @@ function Scenario_StepSmokeUiToFloor(_s) {
     }
 }
 
-// The other user of the settings screen: pause -> Settings -> Back (one level, back to the pause menu) -> Back (the game).
+// The other user of the settings screen: Esc -> the one menu -> Q Q (Settings) -> Back (the game; D140: Back at the root of a tab closes the whole menu).
 function Scenario_StepSmokePause(_s) {
     var _gs = GameState_Get();
     switch (_s.t) {
@@ -677,28 +688,23 @@ function Scenario_StepSmokePause(_s) {
             room_goto(rm_floor1);
             break;
         case 120:
+            Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);
             Scenario_Tap("pause");
             break;
         case 126:
-            Scenario_Check("ui_pause_menu_opens", _gs.ui.mode == UI_PAUSE, "mode=" + string(_gs.ui.mode) + " room=" + room_get_name(room));
-            Scenario_Tap("menu_down");   // Resume, Help, Settings
+            Scenario_Check("ui_esc_opens_the_one_menu", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode) + " room=" + room_get_name(room));
+            Scenario_Tap("tab_prev");   // Status -> System
             break;
-        case 130:
-            Scenario_Tap("menu_down");
-            break;
-        case 134:
-            Scenario_Tap("confirm");
+        case 132:
+            Scenario_Tap("tab_prev");   // System -> Settings
             break;
         case 140:
-            Scenario_Check("ui_pause_settings_opens", SettingsPopup_IsOpen("pause"));
+            Scenario_Check("ui_menu_settings_tab_opens", SettingsPopup_IsOpen("tab"));
             Scenario_Tap("cancel");
             break;
         case 165:
-            Scenario_Check("ui_pause_settings_back_returns_to_the_pause_menu", !SettingsPopup_IsOpen("pause") && _gs.ui.mode == UI_PAUSE, "open=" + string(SettingsPopup_IsOpen("pause")) + " mode=" + string(_gs.ui.mode));
-            Scenario_Tap("cancel");
-            break;
-        case 190:
-            Scenario_Check("ui_pause_back_returns_to_the_game", _gs.ui.mode == UI_NONE, "mode=" + string(_gs.ui.mode));
+            Scenario_Check("ui_menu_settings_back_closes_the_menu", !SettingsPopup_IsOpen("tab") && _gs.ui.mode == UI_NONE, "open=" + string(SettingsPopup_IsOpen("tab")) + " mode=" + string(_gs.ui.mode));
+            Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);
             room_goto(rm_start);
             break;
         case 220:
@@ -2872,7 +2878,7 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsNotice(_s);   // F3a: the notice pop-up over the title (old-save text at two sizes, the damaged-run text, Korean)
             break;
         case 210: case 211: case 212: case 213: case 214: case 215: case 216: case 217: case 218: case 219: case 220: case 221: case 222: case 223: case 224: case 225: case 226: case 227: case 228: case 229:
-            Scenario_StepShotsTabMenu(_s);   // D1b: every tab, the gear comparison, the Codex pages, settings, pause; two sizes, Korean once
+            Scenario_StepShotsTabMenu(_s);   // D1b: every tab, the gear comparison, the Codex pages, settings; two sizes, Korean once
             break;
         case 300: case 301: case 302: case 303: case 304: case 305: case 306: case 307: case 308: case 309:
         case 310: case 311: case 312: case 313: case 314: case 315: case 316: case 317: case 318: case 319:
@@ -2888,7 +2894,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsRunStats(_s);   // G9 (D137): the run summary with the stats (English, Korean), the Codex run history with and without stats; goes on with H4 (540..549)
             break;
         case 540: case 541: case 542: case 543: case 544: case 545: case 546: case 547: case 548: case 549:
-            Scenario_StepShotsLevelUp(_s);   // H4 (D143): the free-point screen with the class growth line, two sizes and Korean; finishes the run
+            Scenario_StepShotsLevelUp(_s);   // H4 (D143): the free-point screen with the class growth line, two sizes and Korean; goes on with H1 (490..499)
+            break;
+        case 490: case 491: case 492: case 493: case 494: case 495: case 496: case 497: case 498: case 499:
+            Scenario_StepShotsOneMenu(_s);   // H1 (D140): the System tab, the Settings tab and the "Keep this?" prompt, two sizes; finishes the run
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -3466,7 +3475,7 @@ function Scenario_StepShotsWindow(_s) {
                 with (obj_start_controller) { state = "settings"; }
                 SettingsPopup_Open("title");
                 var _sp = GameState_Get().ui.settings_popup;
-                _sp.pending.window_mode = WINDOW_MODE_BORDERLESS;
+                GameSettings_Ensure().window_mode = WINDOW_MODE_BORDERLESS;   // shown for the picture: the next frame of a scripted run puts it back
                 SettingsPopup_Refresh();
                 Ui_MenuFixCursor(_sp.menu, 7);   // the Window row (G8: Rumble sits above it)
             }
@@ -3578,11 +3587,16 @@ function Scenario_StepShotsUi(_s) {
                 Scenario_Next(_s, 85);
             }
             break;
-        case 85:   // Back restores English and leaves the settings
+        case 85:   // Back leaves the settings with the language kept (D140: it was live and saved at once); then English is put back for the pictures after this one
             if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
             if (_s.t == 4) Scenario_Tap("cancel");
             if (_s.t == 50) {
-                Scenario_Check("shots_ui_back_restores_english", Loc_GetLanguage() == "en" && _c.state == "main", "lang=" + Loc_GetLanguage() + " state=" + string(_c.state));
+                Scenario_Check("shots_ui_back_keeps_the_language", Loc_GetLanguage() == "ko" && GameSettings_Ensure().language == "ko" && _c.state == "main", "lang=" + Loc_GetLanguage() + " state=" + string(_c.state));
+                var _en = GameSettings_Copy(GameSettings_Ensure());
+                _en.language = "en";
+                GameSettings_Commit(_en, true, false);
+                _c.title_refresh = true;
+                Scenario_Check("shots_ui_english_is_back", Loc_GetLanguage() == "en");
                 global.scn.uikit = true;
                 Scenario_Next(_s, 86);
             }
@@ -4741,18 +4755,18 @@ function Scenario_StepSmokeRun(_s) {
             }
             if (_s.t > 600) { Scenario_Check("continue_enters_the_saved_room", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
-        case 109:   // pause menu > Abandon run: down x3, confirm twice
+        case 109:   // the menu's System tab > Abandon run: down once, confirm twice
             if (_s.t == 1) {
                 Scenario_ClearUi();
-                PauseMenu_Open();
+                Menu_Open(6);
             }
-            if (_s.t == 12 || _s.t == 24 || _s.t == 36) Scenario_Tap("menu_down");   // Resume, Help, Settings, Abandon Run (D1b)
+            if (_s.t == 12) Scenario_Tap("menu_down");   // Help, Abandon run
             if (_s.t == 60) {
-                Scenario_Check("abandon_cursor_is_on_the_abandon_row", PauseMenu_Cursor() == PAUSE_ABANDON_INDEX, "index=" + string(PauseMenu_Cursor()));
+                Scenario_Check("abandon_cursor_is_on_the_abandon_row", is_struct(TabMenu_TopMenu()) && TabMenu_TopMenu().items[TabMenu_TopMenu().cursor].id == "abandon", "cursor=" + string(is_struct(TabMenu_TopMenu()) ? TabMenu_TopMenu().cursor : -1));
                 Scenario_Tap("confirm");
             }
             if (_s.t == 72) {
-                Scenario_Check("abandon_asks_before_it_acts", PauseMenu_Get().armed && Run_IsActive());
+                Scenario_Check("abandon_asks_before_it_acts", TabSystem_Armed() && Run_IsActive());
                 Scenario_Tap("confirm");
             }
             if (_s.t > 74) Scenario_TapCutscene(_s);
@@ -5506,18 +5520,18 @@ function Scenario_StepSmokeRest(_s) {
             }
             if (_s.t > 600) { Scenario_Check("rest_third_bed_flow", false, "open=" + string(BedUi_IsOpen()) + " c1=" + string(variable_struct_exists(_rc, "c1"))); Scenario_Finish(); }
             break;
-        case 165:   // pause menu > Help: all eleven, Back returns to the pause menu
+        case 165:   // the menu's System tab > Help: all eleven, Back returns to the System list
             if (_s.t == 1) {
                 Scenario_ClearUi();
                 if (instance_exists(_rc.bed)) with (_rc.bed) instance_destroy();
-                PauseMenu_Open();
-                Ui_MenuFixCursor(Ui_StackTop(PauseMenu_Get().stk), 1);   // Help
+                Menu_Open(6);
+                Ui_MenuFixCursor(TabMenu_TopMenu(), 0);   // Help
                 _rc.q = ["confirm"];
             }
-            if (HelpUi_IsOpen() && !variable_struct_exists(_rc, "h1")) {
+            if (is_struct(TabMenu_Get()) && TabMenu_Depth() == 2 && !variable_struct_exists(_rc, "h1")) {
                 _rc.h1 = true;
-                var _hm = Ui_StackTop(global.help_ui.stk);
-                Scenario_Check("help_opens_from_the_pause_menu", _gs.ui.mode == UI_PAUSE && PauseMenu_Cursor() == 1 && _hm.id == "help");
+                var _hm = TabMenu_TopMenu();
+                Scenario_Check("help_opens_from_the_system_tab", _gs.ui.mode == UI_MENU && TabMenu_Get().tab == 6 && _hm.id == "help");
                 Scenario_Check("help_lists_all_eleven_mechanics", array_length(_hm.items) == 11 && _hm.items[0].id == "timeline" && _hm.items[10].id == "status");
                 Scenario_Check("help_rows_carry_their_text", string_length(_hm.items[1].help) > 20 && string_pos("{confirm}", _hm.items[1].help) > 0);
                 Ui_MenuFixCursor(_hm, 1);
@@ -5525,30 +5539,29 @@ function Scenario_StepSmokeRest(_s) {
                 _rc.q = ["cancel"];
                 _rc.h2 = true;
             }
-            if (variable_struct_exists(_rc, "h2") && !HelpUi_IsOpen() && !variable_struct_exists(_rc, "h3")) {
+            if (variable_struct_exists(_rc, "h2") && is_struct(TabMenu_Get()) && TabMenu_Depth() == 1 && !variable_struct_exists(_rc, "h3")) {
                 _rc.h3 = true;
-                Scenario_Check("help_back_returns_to_the_pause_menu", _gs.ui.mode == UI_PAUSE && is_struct(PauseMenu_Get()) && PauseMenu_Cursor() == 1);
-                PauseMenu_Close(true);
+                Scenario_Check("help_back_returns_to_the_system_list", _gs.ui.mode == UI_MENU && TabMenu_Get().tab == 6 && TabMenu_TopMenu().id == "tab_system" && TabMenu_TopMenu().cursor == 0);
+                Menu_Close(true);
                 Scenario_Next(_s, 166);
             }
-            if (_s.t > 600) { Scenario_Check("help_page_flow", false, "help=" + string(HelpUi_IsOpen()) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+            if (_s.t > 600) { Scenario_Check("help_page_flow", false, "depth=" + string(TabMenu_Depth()) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
             break;
-        case 166:   // pause > Settings > Controls: rebind Interact to T, back, Apply; reset to defaults, Apply
+        case 166:   // the menu's Settings tab > Controls: rebind Interact to T (live at once), back; reset to defaults (live at once)
             SettingsPopup_Ensure();
             var _sp = _gs.ui.settings_popup;
             if (_s.t == 1) {
                 Scenario_ClearUi();
-                PauseMenu_Open();
-                Ui_MenuFixCursor(Ui_StackTop(PauseMenu_Get().stk), 2);   // Settings
-                _rc.q = ["confirm"];
+                Menu_Open(5);
             }
-            if (SettingsPopup_IsOpen("pause") && !variable_struct_exists(_rc, "k1") && _idle) {
-                _rc.k1 = true;
+            if (SettingsPopup_IsOpen("tab") && !variable_struct_exists(_rc, "k0") && _s.t > 5) {
+                _rc.k0 = true;
                 var _ci = -1;
                 for (var _i = 0; _i < array_length(_sp.menu.items); _i++) if (_sp.menu.items[_i].id == "controls") _ci = _i;
-                Scenario_Check("controls_row_is_in_the_settings", _ci >= 0 && _ci == array_length(_sp.menu.items) - 2);
+                Scenario_Check("controls_row_is_the_last_one_of_the_settings", _ci >= 0 && _ci == array_length(_sp.menu.items) - 1);
                 Ui_MenuFixCursor(_sp.menu, max(0, _ci));
                 _rc.q = ["confirm"];
+                _rc.k1 = true;
             }
             if (variable_struct_exists(_rc, "k1") && is_struct(_sp.controls) && !variable_struct_exists(_rc, "k2") && _idle) {
                 _rc.k2 = true;
@@ -5562,56 +5575,38 @@ function Scenario_StepSmokeRest(_s) {
                 _rc.k3 = true;
                 Scenario_Check("controls_confirm_waits_for_a_key", _sp.controls.menu.items[9].value == Loc_T("controls.press_key", "Press a key..."));
                 ControlsPage_OnKey(_sp, ord("T"));   // the key press itself cannot reach a window that is not in front; the handler is the same
-                Scenario_Check("controls_the_pending_keys_change", _sp.pending.keys.interact[0] == ord("T") && _sp.dirty && _sp.controls.capture == "");
-                Scenario_Check("controls_nothing_is_applied_before_Apply", GameSettings_Ensure().keys.interact[0] == vk_space && global.input.bindings.interact[0] == vk_space);
+                Scenario_Check("controls_the_new_key_is_live_at_once", GameSettings_Ensure().keys.interact[0] == ord("T") && _sp.controls.capture == "");
+                Scenario_Check("controls_the_input_is_rebound_at_once", global.input.bindings.interact[0] == ord("T") && Prompt_Info("interact", "keyboard").label == "T");
                 Scenario_Check("controls_the_row_shows_the_new_key", _sp.controls.menu.items[9].value == "T");
                 _rc.q = ["cancel"];
             }
-            if (variable_struct_exists(_rc, "k3") && !is_struct(_sp.controls) && SettingsPopup_IsOpen("pause") && !variable_struct_exists(_rc, "k4") && _idle) {
+            if (variable_struct_exists(_rc, "k3") && !is_struct(_sp.controls) && SettingsPopup_IsOpen("tab") && !variable_struct_exists(_rc, "k4") && _idle) {
                 _rc.k4 = true;
-                Scenario_Check("controls_back_goes_up_one_level_to_the_list", SettingsPopup_IsOpen("pause") && _sp.dirty);
-                Ui_MenuFixCursor(_sp.menu, array_length(_sp.menu.items) - 1);   // Apply
-                _rc.q = ["confirm"];
-            }
-            if (variable_struct_exists(_rc, "k4") && !_sp.dirty && !variable_struct_exists(_rc, "k5") && _idle) {
-                _rc.k5 = true;
                 var _disk = Save_ReadSettingsConfig();
-                Scenario_Check("controls_apply_sets_the_live_settings", GameSettings_Ensure().keys.interact[0] == ord("T"));
-                Scenario_Check("controls_apply_rebinds_the_input", global.input.bindings.interact[0] == ord("T") && Prompt_Info("interact", "keyboard").label == "T");
-                Scenario_Check("controls_apply_writes_the_settings_file", is_struct(_disk) && _disk.keys.interact[0] == ord("T"));
+                Scenario_Check("controls_back_goes_up_one_level_to_the_list", SettingsPopup_IsOpen("tab") && is_struct(TabMenu_Get()));
+                Scenario_Check("controls_the_change_is_in_the_settings_file", is_struct(_disk) && _disk.keys.interact[0] == ord("T"));
                 Scenario_Check("controls_other_keys_are_untouched", global.input.bindings.confirm[0] == vk_space && global.input.bindings.cancel[0] == vk_escape);
                 var _ci2 = -1;
                 for (var _j = 0; _j < array_length(_sp.menu.items); _j++) if (_sp.menu.items[_j].id == "controls") _ci2 = _j;
                 Ui_MenuFixCursor(_sp.menu, _ci2);
                 _rc.q = ["confirm"];
             }
-            if (variable_struct_exists(_rc, "k5") && is_struct(_sp.controls) && !variable_struct_exists(_rc, "k6") && _idle) {
+            if (variable_struct_exists(_rc, "k4") && is_struct(_sp.controls) && !variable_struct_exists(_rc, "k6") && _idle) {
                 _rc.k6 = true;
                 Ui_MenuFixCursor(_sp.controls.menu, 10);   // Reset to defaults
                 _rc.q = ["confirm"];
             }
-            if (variable_struct_exists(_rc, "k6") && !variable_struct_exists(_rc, "k7") && _idle && _sp.pending.keys.interact[0] == vk_space) {
+            if (variable_struct_exists(_rc, "k6") && !variable_struct_exists(_rc, "k7") && _idle && GameSettings_Ensure().keys.interact[0] == vk_space) {
                 _rc.k7 = true;
-                Scenario_Check("controls_reset_puts_the_defaults_in_the_pending_copy", _sp.dirty && _sp.pending.keys.interact[0] == vk_space && GameSettings_Ensure().keys.interact[0] == ord("T"));
-                _rc.q = ["cancel"];
-            }
-            if (variable_struct_exists(_rc, "k7") && !is_struct(_sp.controls) && !variable_struct_exists(_rc, "k8") && _idle) {
-                _rc.k8 = true;
-                Ui_MenuFixCursor(_sp.menu, array_length(_sp.menu.items) - 1);
-                _rc.q = ["confirm"];
-            }
-            if (variable_struct_exists(_rc, "k8") && !_sp.dirty && !variable_struct_exists(_rc, "k9") && _idle) {
-                _rc.k9 = true;
                 var _disk2 = Save_ReadSettingsConfig();
-                Scenario_Check("controls_reset_then_Apply_restores_the_keys", global.input.bindings.interact[0] == vk_space && Prompt_Info("interact", "keyboard").label == "Space" && is_struct(_disk2) && _disk2.keys.interact[0] == vk_space);
-                _rc.q = ["cancel"];   // leave the settings
+                Scenario_Check("controls_reset_puts_the_defaults_back_at_once", global.input.bindings.interact[0] == vk_space && Prompt_Info("interact", "keyboard").label == "Space" && is_struct(_disk2) && _disk2.keys.interact[0] == vk_space);
+                _rc.q = ["cancel", "cancel"];   // leave the Controls page, then the menu
             }
-            if (variable_struct_exists(_rc, "k9") && !SettingsPopup_IsOpen("pause") && !variable_struct_exists(_rc, "k10")) {
+            if (variable_struct_exists(_rc, "k7") && !SettingsPopup_IsOpen("tab") && !is_struct(TabMenu_Get()) && !variable_struct_exists(_rc, "k10")) {
                 _rc.k10 = true;
-                PauseMenu_Close(true);
                 Scenario_Next(_s, 167);
             }
-            if (_s.t > 1200) { Scenario_Check("controls_page_flow", false, "k1=" + string(variable_struct_exists(_rc, "k1")) + " k3=" + string(variable_struct_exists(_rc, "k3")) + " k5=" + string(variable_struct_exists(_rc, "k5")) + " k7=" + string(variable_struct_exists(_rc, "k7")) + " k9=" + string(variable_struct_exists(_rc, "k9")) + " open=" + string(SettingsPopup_IsOpen("pause"))); Scenario_Finish(); }
+            if (_s.t > 1200) { Scenario_Check("controls_page_flow", false, "k1=" + string(variable_struct_exists(_rc, "k1")) + " k3=" + string(variable_struct_exists(_rc, "k3")) + " k4=" + string(variable_struct_exists(_rc, "k4")) + " k7=" + string(variable_struct_exists(_rc, "k7")) + " open=" + string(SettingsPopup_IsOpen("tab"))); Scenario_Finish(); }
             break;
         case 167:   // two pop-ups at once: the first shows, the second waits behind it; confirm dismisses; nothing comes back
             if (_s.t == 1) {
@@ -5944,18 +5939,18 @@ function Scenario_StepShotsRest(_s) {
                 Scenario_Next(_s, 167);
             }
             break;
-        case 167:   // the Help page from the pause menu
+        case 167:   // the Help page from the System tab
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 Tutorial_Dismiss();
                 global.tutorial_off = true;
                 Scenario_SetWindowScale(3);
-                PauseMenu_Open();
-                HelpUi_Open();
-                Ui_StackTop(global.help_ui.stk).cursor = 2;   // Arrow skills: the longest text, with the arrow keys
+                Menu_Open(6);
+                TabHelp_Open();
+                TabMenu_TopMenu().cursor = 2;   // Arrow skills: the longest text, with the arrow keys
             }
             if (_s.t == 60) {
-                Scenario_Check("shots_help_open", HelpUi_IsOpen() && _gs.ui.mode == UI_PAUSE);
+                Scenario_Check("shots_help_open", TabMenu_Depth() == 2 && TabMenu_TopMenu().id == "help" && _gs.ui.mode == UI_MENU);
                 Scenario_ShotUi(_s, "help");
                 Scenario_Next(_s, 168);
             }
@@ -5963,8 +5958,7 @@ function Scenario_StepShotsRest(_s) {
         case 168:   // the Controls page: Confirm and Back swapped, the Interact row waiting for a key
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
-                HelpUi_Close();
-                PauseMenu_Close(true);
+                Menu_Close(true);
                 room_goto(rm_start);
             }
             if (_s.t == 50) {
@@ -5972,7 +5966,7 @@ function Scenario_StepShotsRest(_s) {
                 with (obj_start_controller) { state = "settings"; }
                 SettingsPopup_Open("title");
                 var _sp = GameState_Get().ui.settings_popup;
-                _sp.pending.keys = Binds_Assign(Binds_Defaults(), "confirm", ord("X")).keys;
+                Settings_SetKeys(Binds_Assign(Binds_Defaults(), "confirm", ord("X")).keys);   // shown for the picture; put back below
                 ControlsPage_Open(_sp);
                 _sp.controls.capture = "interact";
                 _sp.controls.msg_row = "interact";
@@ -5983,6 +5977,7 @@ function Scenario_StepShotsRest(_s) {
             if (_s.t == 100) {
                 Scenario_Check("shots_controls_open", is_struct(GameState_Get().ui.settings_popup.controls));
                 Scenario_ShotUi(_s, "controls");
+                Settings_SetKeys(Binds_Defaults());
                 Scenario_Next(_s, 169);
             }
             break;
@@ -7353,7 +7348,7 @@ function Scenario_StepSmokeTabMenu(_s) {
                     Scenario_Tap("tab_prev");
                     break;
                 case 22:
-                    Scenario_Check("tabmenu_Q_on_the_first_tab_wraps_to_settings", _u.tab == 5 && SettingsPopup_IsOpen("tab") && _m.id == "settings", "tab=" + string(_u.tab));
+                    Scenario_Check("tabmenu_Q_on_the_first_tab_wraps_to_system", _u.tab == 6 && _m.id == "tab_system", "tab=" + string(_u.tab));
                     Scenario_Tap("tab_next");
                     break;
                 case 29:
@@ -7444,26 +7439,30 @@ function Scenario_StepSmokeTabMenu(_s) {
                 case 22:
                     Scenario_Check("tabmenu_three_Q_go_back_to_status", _u.tab == 0, "tab=" + string(_u.tab));
                     Scenario_Check("tabmenu_status_shows_the_new_defence", _m.items[1].value == string(Stat_Get(_gs.player_ch, STAT_DEF)), _m.items[1].value);
-                    Scenario_Tap("tab_prev");   // wraps to settings; E four times is shorter from there
+                    Scenario_Tap("tab_prev");   // wraps to System (the last tab); E four times is shorter from Codex
                     break;
                 case 29:
-                    Scenario_Check("tabmenu_settings_is_the_last_tab", _u.tab == 5);
+                    Scenario_Check("tabmenu_system_is_the_last_tab", _u.tab == 6 && _m.id == "tab_system");
                     Scenario_Tap("tab_prev");
                     break;
                 case 36:
+                    Scenario_Check("tabmenu_Q_from_system_is_settings", _u.tab == 5 && SettingsPopup_IsOpen("tab"));
+                    Scenario_Tap("tab_prev");
+                    break;
+                case 43:
                     Scenario_Check("tabmenu_Q_from_settings_is_the_codex", _u.tab == 4 && _m.id == "tab_codex");
                     Scenario_Check("tabmenu_codex_starts_empty", _m.items[0].value == "0/10" && _m.items[1].value == "0/8", _m.items[0].value + " " + _m.items[1].value);
                     Scenario_Tap("confirm");
                     break;
-                case 44:
+                case 51:
                     Scenario_Check("tabmenu_confirm_opens_the_bestiary_one_level_down", TabMenu_Depth() == 2 && _m.id == "codex_bestiary", "depth=" + string(TabMenu_Depth()));
                     Scenario_Check("tabmenu_nothing_met_is_all_question_marks", _m.items[0].label == "???" && _m.items[9].label == "???");
                     Scenario_Tap("menu_down");
                     break;
-                case 51:
+                case 58:
                     Scenario_Tap("cancel");
                     break;
-                case 59:
+                case 66:
                     Scenario_Check("tabmenu_back_goes_up_one_level_only", TabMenu_Depth() == 1 && _m.id == "tab_codex" && _u.closed_ms < 0, "depth=" + string(TabMenu_Depth()));
                     Scenario_Check("tabmenu_codex_cursor_is_remembered", _m.cursor == 0);
                     Scenario_Next(_s, 186);
@@ -7536,7 +7535,7 @@ function Scenario_StepSmokeTabMenu(_s) {
             }
             if (_s.t > 600) { Scenario_Check("tabmenu_note_flow", false, "note=" + string(variable_struct_exists(_s, "note"))); Scenario_Finish(); }
             break;
-        case 188:   // the settings as a tab: a change is thrown away by Back
+        case 188:   // the settings as a tab: a change is live at once and Back keeps it (D140)
             switch (_s.t) {
                 case 1:
                     _s.ts0 = GameSettings_Ensure().text_speed;
@@ -7557,37 +7556,42 @@ function Scenario_StepSmokeTabMenu(_s) {
                     Scenario_Tap("menu_right");
                     break;
                 case 48:
-                    Scenario_Check("tabmenu_a_setting_changes_in_the_pending_copy", GameState_Get().ui.settings_popup.dirty && GameState_Get().ui.settings_popup.pending.text_speed != _s.ts0);
-                    Scenario_Check("tabmenu_it_is_not_applied_yet", GameSettings_Ensure().text_speed == _s.ts0);
+                    Scenario_Check("tabmenu_a_setting_changes_at_once", GameSettings_Ensure().text_speed != _s.ts0);
+                    Scenario_Check("tabmenu_the_row_shows_the_new_value", _m.items[_m.cursor].value == Settings_TextSpeedText(GameSettings_Ensure().text_speed));
                     Scenario_Tap("cancel");
                     break;
                 case 70:
-                    Scenario_Check("tabmenu_back_closes_the_menu_and_drops_the_change", _gs.ui.mode == UI_NONE && !SettingsPopup_IsOpen("tab") && GameSettings_Ensure().text_speed == _s.ts0, "mode=" + string(_gs.ui.mode) + " popup=" + string(SettingsPopup_IsOpen("tab")) + " speed=" + string(GameSettings_Ensure().text_speed) + " was " + string(_s.ts0));
+                    Scenario_Check("tabmenu_back_closes_the_menu_and_keeps_the_change", _gs.ui.mode == UI_NONE && !SettingsPopup_IsOpen("tab") && GameSettings_Ensure().text_speed != _s.ts0, "mode=" + string(_gs.ui.mode) + " popup=" + string(SettingsPopup_IsOpen("tab")) + " speed=" + string(GameSettings_Ensure().text_speed) + " was " + string(_s.ts0));
+                    var _back = GameSettings_Copy(GameSettings_Ensure());
+                    _back.text_speed = _s.ts0;
+                    GameSettings_Commit(_back, true, false);
                     Scenario_Next(_s, 189);
                     break;
             }
             break;
-        case 189:   // the pause menu: Resume, Help, Settings, Abandon Run, Quit to Title; it wraps; Back resumes
+        case 189:   // Esc opens the same menu; its System tab: Help, Abandon run, Quit to title; it wraps; Back closes (D140)
             switch (_s.t) {
                 case 1:
                     Scenario_Tap("pause");
                     break;
                 case 12:
-                    Scenario_Check("pausemenu_the_pause_key_opens_it", _gs.ui.mode == UI_PAUSE && PauseMenu_IsOpen());
-                    Scenario_Check("pausemenu_starts_on_resume", PauseMenu_Cursor() == 0);
-                    Scenario_Check("pausemenu_has_the_five_rows", array_length(Ui_StackTop(PauseMenu_Get().stk).items) == 5);
+                    Scenario_Check("tabmenu_the_pause_key_opens_the_same_menu", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                    Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 6);
+                    TabMenu_Switch(TabMenu_Get(), 6);
+                    Scenario_Check("tabmenu_system_has_the_three_rows_and_starts_on_help", array_length(TabMenu_TopMenu().items) == 3 && TabMenu_TopMenu().cursor == 0);
                     Scenario_Tap("menu_up");
                     break;
                 case 19:
-                    Scenario_Check("pausemenu_up_from_resume_wraps_to_quit", PauseMenu_Cursor() == 4, "cursor=" + string(PauseMenu_Cursor()));
+                    Scenario_Check("tabmenu_system_up_from_help_wraps_to_quit", TabMenu_TopMenu().cursor == 2, "cursor=" + string(TabMenu_TopMenu().cursor));
                     Scenario_Tap("menu_down");
                     break;
                 case 26:
-                    Scenario_Check("pausemenu_down_from_quit_wraps_to_resume", PauseMenu_Cursor() == 0);
+                    Scenario_Check("tabmenu_system_down_from_quit_wraps_to_help", TabMenu_TopMenu().cursor == 0);
                     Scenario_Tap("cancel");
                     break;
                 case 50:
-                    Scenario_Check("pausemenu_back_resumes", _gs.ui.mode == UI_NONE && !is_struct(PauseMenu_Get()), "mode=" + string(_gs.ui.mode));
+                    Scenario_Check("tabmenu_back_closes_the_system_tab", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                    Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);
                     Scenario_Next(_s, 200);   // R1b: focus loss in a battle and on the map (200..205)
                     break;
             }
@@ -7595,7 +7599,7 @@ function Scenario_StepSmokeTabMenu(_s) {
     }
 }
 
-// ---- R1b (D122, D124): focus loss and the odds. A scenario cannot unfocus the window (the runner is never in front, so the UI controller skips its own
+// ---- R1b (D122, D124, D140): focus loss and the odds. A scenario cannot unfocus the window (the runner is never in front, so the UI controller skips its own
 // focus check in scripted runs); it calls Focus_Step(false) / Focus_Step(true), the same function the controller calls with window_has_focus(). ----
 function Scenario_StepSmokeFairUi(_s) {
     var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
@@ -7620,85 +7624,66 @@ function Scenario_StepSmokeFairUi(_s) {
             }
             if (_s.t > 300) { Scenario_Check("fairui_the_bar_runs", false, "state=" + string(_bc != noone ? _bc.battle_state : -1) + " qte=" + string(_bc != noone ? _bc.qte_ms : 0)); Scenario_Finish(); }
             break;
-        case 202:   // unfocused: the pause menu is open, the clock is frozen, Abandon and Quit are off, the music is down
-            switch (_s.t) {
-                case 1:
-                    Scenario_Check("fairui_losing_focus_in_a_battle_opens_the_pause_menu", _gs.ui.mode == UI_PAUSE && PauseMenu_IsOpen(), "mode=" + string(_gs.ui.mode));
-                    Scenario_Check("fairui_it_is_the_battle_variant", is_struct(PauseMenu_Get()) && PauseMenu_Get().in_battle);
-                    var _it = Ui_StackTop(PauseMenu_Get().stk).items;
-                    Scenario_Check("fairui_abandon_and_quit_are_off_in_a_battle", !_it[3].enabled && !_it[4].enabled && _it[0].enabled && _it[1].enabled && _it[2].enabled);
-                    Scenario_Check("fairui_the_music_is_lowered_while_unfocused", BGM_Duck() < 1, "duck=" + string(BGM_Duck()));
-                    break;
-                case 2:
-                    _s.fu_q1 = _bc.qte_ms;
-                    Scenario_Check("fairui_the_bar_was_mid_sweep_when_paused", _s.fu_q1 >= _s.fu_q0 && _s.fu_q1 - _s.fu_q0 < 60, "q0=" + string(_s.fu_q0) + " q1=" + string(_s.fu_q1));
-                    break;
-                case 14:
-                    Scenario_Check("fairui_the_bar_clock_does_not_advance_while_paused", _bc.qte_ms == _s.fu_q1 && _bc.battle_state == BSTATE_ATTACK_TIMING, "q1=" + string(_s.fu_q1) + " now=" + string(_bc.qte_ms));
-                    Scenario_Tap("menu_up");
-                    break;
-                case 21:
-                    Scenario_Check("fairui_the_cursor_skips_the_greyed_rows", PauseMenu_Cursor() == 2, "cursor=" + string(PauseMenu_Cursor()));
-                    Ui_StackTop(PauseMenu_Get().stk).cursor = 4;   // force it onto Quit to title, then press confirm
-                    Scenario_Tap("confirm");
-                    break;
-                case 28:
-                    Scenario_Check("fairui_a_greyed_row_does_nothing", PauseMenu_IsOpen() && PauseMenu_Get().pending == "" && PauseMenu_Get().closed_ms < 0, "mode=" + string(_gs.ui.mode));
-                    Ui_MenuFixCursor(Ui_StackTop(PauseMenu_Get().stk), 0);
-                    Scenario_Next(_s, 203);
-                    break;
+        case 202:   // unfocused over a running bar: the menu does NOT open (the bar is never interrupted) until the bar is over; the music is down
+            if (_s.t == 1) {
+                Scenario_Check("fairui_losing_focus_over_a_running_bar_does_not_open_the_menu", _gs.ui.mode == UI_NONE && _bc.battle_state == BSTATE_ATTACK_TIMING, "mode=" + string(_gs.ui.mode) + " state=" + string(_bc.battle_state));
+                Scenario_Check("fairui_the_music_is_lowered_while_unfocused", BGM_Duck() < 1, "duck=" + string(BGM_Duck()));
+                _s.fu_q1 = _bc.qte_ms;
             }
+            if (_s.t == 6) Scenario_Check("fairui_the_bar_clock_keeps_running_over_a_focus_loss", _bc.qte_ms > _s.fu_q1 || _bc.battle_state != BSTATE_ATTACK_TIMING, "q1=" + string(_s.fu_q1) + " now=" + string(_bc.qte_ms));
+            if (_gs.ui.mode == UI_NONE) Focus_Step(false);   // the UI controller asks again every step; the loss waits (pending) until it can open
+            if (_gs.ui.mode == UI_MENU) {
+                Scenario_Check("fairui_the_menu_opens_once_the_bar_is_over", !Battle_QteBusy(_bc) && is_struct(TabMenu_Get()), "state=" + string(_bc.battle_state));
+                Scenario_Next(_s, 203);
+            }
+            if (_s.t > 600) { Scenario_Check("fairui_the_menu_opens_after_the_bar", false, "state=" + string(_bc.battle_state) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
             break;
-        case 203:   // focus returns: the pause menu stays open and the music comes back; Back resumes and the bar goes on from where it stopped
+        case 203:   // focus returns: the menu stays open and the music comes back; Back closes it and the fight goes on
             switch (_s.t) {
                 case 1:
                     Focus_Step(true);
-                    Scenario_Check("fairui_focus_back_does_not_close_the_pause_menu", PauseMenu_IsOpen() && _gs.ui.mode == UI_PAUSE);
+                    Scenario_Check("fairui_focus_back_does_not_close_the_menu", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()));
                     Scenario_Check("fairui_the_music_is_back_to_full_volume", BGM_Duck() == 1, "duck=" + string(BGM_Duck()));
                     break;
                 case 10:
-                    Scenario_Check("fairui_the_bar_is_still_frozen_after_focus_returns", _bc.qte_ms == _s.fu_q1);
                     Scenario_Tap("cancel");
                     break;
                 default:
                     if (_s.t > 12 && _gs.ui.mode == UI_NONE) {
+                        Scenario_Check("fairui_back_closes_the_menu_over_the_fight", !is_struct(TabMenu_Get()));
                         _s.fu_q2 = _bc.qte_ms;
-                        Scenario_Check("fairui_back_resumes_the_battle", !is_struct(PauseMenu_Get()));
-                        Scenario_Check("fairui_the_bar_resumes_where_it_stopped", _s.fu_q2 - _s.fu_q1 >= 0 && _s.fu_q2 - _s.fu_q1 < 60, "q1=" + string(_s.fu_q1) + " q2=" + string(_s.fu_q2));
                         Scenario_Next(_s, 204);
                     }
-                    if (_s.t > 120) { Scenario_Check("fairui_back_resumes_the_battle", false, "mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+                    if (_s.t > 120) { Scenario_Check("fairui_back_closes_the_menu_over_the_fight", false, "mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
                     break;
             }
             break;
-        case 204:   // the clock moves again (or the bar has run out and the fight went on); then the map
+        case 204:   // the fight goes on after the menu; then the map
             if (_s.t == 12) {
-                Scenario_Check("fairui_the_bar_moves_again", _bc.qte_ms > _s.fu_q2 || _bc.battle_state != BSTATE_ATTACK_TIMING, "q2=" + string(_s.fu_q2) + " now=" + string(_bc.qte_ms));
+                Scenario_Check("fairui_the_fight_goes_on_after_the_menu", _bc.battle_state != BSTATE_ATTACK_TIMING || _bc.qte_ms != _s.fu_q2 || !_bc.battle_over, "state=" + string(_bc.battle_state));
                 Scenario_ClearUi();
                 Scenario_NewKnight();
                 room_goto(rm_floor1);
                 Scenario_Next(_s, 205);
             }
             break;
-        case 205:   // walking around: the same call opens the ordinary pause menu, with Abandon and Quit on
+        case 205:   // walking around: the same call opens the one menu
             if (_s.t > 40 && Scenario_FloorReady(rm_floor1)) {
                 Focus_Step(false);
-                Scenario_Check("fairui_losing_focus_on_the_map_opens_the_pause_menu", PauseMenu_IsOpen(), "mode=" + string(_gs.ui.mode));
-                var _it2 = Ui_StackTop(PauseMenu_Get().stk).items;
-                Scenario_Check("fairui_abandon_and_quit_stay_on_outside_a_battle", _it2[3].enabled && _it2[4].enabled && !PauseMenu_Get().in_battle);
-                // Review 1: Resume while the window is still unfocused must stay resumed (the pause opens on the loss EDGE only)
-                PauseMenu_Close(true);
+                Scenario_Check("fairui_losing_focus_on_the_map_opens_the_menu", Menu_IsOpen(), "mode=" + string(_gs.ui.mode));
+                // Review 1: closing the menu while the window is still unfocused must stay closed (the menu opens on the loss EDGE only)
+                Menu_Close(true);
                 Focus_Step(false);
                 Focus_Step(false);
                 Focus_Step(false);
-                Scenario_Check("fairui_resume_while_unfocused_does_not_reopen_the_pause", !PauseMenu_IsOpen() && !is_struct(PauseMenu_Get()), "mode=" + string(_gs.ui.mode));
+                Scenario_Check("fairui_closing_while_unfocused_does_not_reopen_the_menu", !Menu_IsOpen(), "mode=" + string(_gs.ui.mode));
                 Scenario_Check("fairui_the_music_stays_lowered_while_unfocused", BGM_Duck() < 1, "duck=" + string(BGM_Duck()));
                 Focus_Step(true);
-                Scenario_Check("fairui_focus_back_with_no_pause_open_changes_nothing", !PauseMenu_IsOpen() && BGM_Duck() == 1);
+                Scenario_Check("fairui_focus_back_with_no_menu_open_changes_nothing", !Menu_IsOpen() && BGM_Duck() == 1);
                 Focus_Step(false);
-                Scenario_Check("fairui_losing_focus_again_opens_the_pause_once", PauseMenu_IsOpen(), "mode=" + string(_gs.ui.mode));
+                Scenario_Check("fairui_losing_focus_again_opens_the_menu_once", Menu_IsOpen(), "mode=" + string(_gs.ui.mode));
                 Focus_Step(true);
-                PauseMenu_Close(true);
+                Menu_Close(true);
                 Scenario_Next(_s, 210);   // F3a: the notice pop-up on the title
             }
             if (_s.t > 600) { Scenario_Check("fairui_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_Finish(); }
@@ -8500,7 +8485,7 @@ function Scenario_StepSmokeHunt2(_s) {
                     Scenario_Next(_s, (_h.v < 3) ? 250 : 253);
                 }
             } else {
-                var _open = (_h.v == 0) ? PauseMenu_IsOpen() : ((_h.v == 1) ? (_gs.ui.mode == UI_MENU) : Tutorial_IsOpen());
+                var _open = (_h.v == 0) ? Menu_IsOpen() : ((_h.v == 1) ? (_gs.ui.mode == UI_MENU) : Tutorial_IsOpen());
                 if (_open && _s.t >= _h.t1 + 3) {
                     Scenario_Check("hunt2_" + _nm + "_is_open_while_the_wolf_chases", true);
                     _h.x0 = _w.x;
@@ -8530,7 +8515,7 @@ function Scenario_StepSmokeHunt2(_s) {
                     if (_h.drift > 0 || _started) {   // the red case: no need to wait for the fight
                         with (obj_enemy) instance_destroy();
                         if (room != rm_floor1 || Transition_IsActive()) _h.need_run = true;
-                        if (_h.v == 0) { Focus_Step(true); if (PauseMenu_IsOpen()) PauseMenu_Close(true); }
+                        if (_h.v == 0) { Focus_Step(true); if (Menu_IsOpen()) Menu_Close(true); }
                         if (_h.v == 2) { Tutorial_Dismiss(); global.tutorial_off = true; }
                         if (_h.v == 1 && _gs.ui.mode == UI_MENU) Scenario_Tap("menu");
                         _h.v++;
@@ -8538,7 +8523,7 @@ function Scenario_StepSmokeHunt2(_s) {
                         Scenario_Next(_s, (_h.v < 3) ? 250 : 253);
                         break;
                     }
-                    if (_h.v == 0) { Focus_Step(true); PauseMenu_Close(true); }
+                    if (_h.v == 0) { Focus_Step(true); Menu_Close(true); }
                     else if (_h.v == 1) Scenario_Tap("menu");
                     else { Tutorial_Dismiss(); global.tutorial_off = true; }
                     _h.ph = 1;
@@ -8757,7 +8742,7 @@ function Scenario_StepSmokeRumble(_s) {
             }
             if (_s.t > 900) { Scenario_Check("g8_new_game_reaches_the_intro", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
-        case 361:   // through the rm_floor1 intro dialogue; then the pause menu with the real key
+        case 361:   // through the rm_floor1 intro dialogue; then the menu with the real Esc key
             if (_s.t > 1200) { Scenario_Check("g8_new_game_reaches_rm_floor1", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
             if (room == rm_floor1 && !Transition_IsActive()) {
                 if (_gs.ui.mode == UI_DIALOGUE) {
@@ -8770,28 +8755,28 @@ function Scenario_StepSmokeRumble(_s) {
                     with (obj_dialogue_trigger) instance_destroy();
                     Scenario_Check("g8_rumble_defaults_to_on", GameSettings_Ensure().rumble == 1);
                     Scenario_Check("g8_the_rumble_state_is_idle", Rumble_Get().left == 0 && Rumble_Get().right == 0 && Rumble_Get().ms == 0);
+                    Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);
                     Scenario_Tap("pause");
                     Scenario_Next(_s, 362);
                 }
             }
             break;
-        case 362:   // pause -> Settings (the third row)
+        case 362:   // Esc -> the menu on Status -> Q Q -> the Settings tab
             if (_s.t == 12) {
-                Scenario_Check("g8_the_pause_menu_is_open", PauseMenu_IsOpen());
-                Scenario_Tap("menu_down");
+                Scenario_Check("g8_the_menu_is_open", Menu_IsOpen());
+                Scenario_Tap("tab_prev");
             }
-            if (_s.t == 19) Scenario_Tap("menu_down");
+            if (_s.t == 19) Scenario_Tap("tab_prev");
             if (_s.t == 26) {
-                Scenario_Check("g8_the_pause_cursor_is_on_settings", PauseMenu_Cursor() == 2, "cursor=" + string(PauseMenu_Cursor()));
-                Scenario_Tap("confirm");
+                Scenario_Check("g8_the_menu_is_on_the_settings_tab", is_struct(TabMenu_Get()) && TabMenu_Get().tab == 5, "tab=" + string(is_struct(TabMenu_Get()) ? TabMenu_Get().tab : -1));
             }
             if (_s.t == 45) {
-                Scenario_Check("g8_settings_is_open", SettingsPopup_IsOpen("pause"));
+                Scenario_Check("g8_settings_is_open", SettingsPopup_IsOpen("tab"));
                 Scenario_Next(_s, 363);
             }
-            if (_s.t > 200) { Scenario_Check("g8_settings_opens_from_the_pause_menu", false, "mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            if (_s.t > 200) { Scenario_Check("g8_settings_opens_from_the_menu", false, "mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
             break;
-        case 363:   // five Downs: vol_ui -> vol_sfx -> vol_bgm -> text_speed -> shake -> rumble; Right flips it in the pending copy
+        case 363:   // five Downs: vol_ui -> vol_sfx -> vol_bgm -> text_speed -> shake -> rumble; Right flips it at once
             if (_s.t == 1) Ui_MenuFixCursor(_sp.menu, 0);   // the cursor is remembered from an earlier visit (the title's Settings)
             if (_s.t == 8 || _s.t == 15 || _s.t == 22 || _s.t == 29 || _s.t == 36) Scenario_Tap("menu_down");
             if (_s.t == 48) {
@@ -8801,19 +8786,16 @@ function Scenario_StepSmokeRumble(_s) {
             }
             if (_s.t == 58) {
                 var _ri = Scenario_RumbleRowIndex(_sp, "rumble");
-                Scenario_Check("g8_right_flips_rumble_in_the_pending_copy", _ri >= 0 && _sp.pending.rumble == 0 && _sp.dirty);
+                Scenario_Check("g8_right_flips_rumble_at_once", _ri >= 0 && GameSettings_Ensure().rumble == 0 && !Settings_RumbleOn());
                 Scenario_Check("g8_the_row_now_says_off", _ri >= 0 && _sp.menu.items[_ri].value == Loc_T("settings.value.off", "Off"));
-                Scenario_Check("g8_it_is_not_applied_yet", GameSettings_Ensure().rumble == 1 && Settings_RumbleOn());
-                Ui_MenuFixCursor(_sp.menu, array_length(_sp.menu.items) - 1);   // Apply
-                Scenario_Tap("confirm");
                 Scenario_Next(_s, 364);
             }
             break;
-        case 364:   // Apply: the live settings and the file say Off; a reload from the file keeps it
+        case 364:   // the live settings and the file say Off (saved at once); a reload from the file keeps it
             if (_s.t == 15) {
                 var _disk = Save_ReadSettingsConfig();
-                Scenario_Check("g8_apply_makes_rumble_off_live", GameSettings_Ensure().rumble == 0 && !Settings_RumbleOn() && !_sp.dirty);
-                Scenario_Check("g8_apply_writes_it_to_the_settings_file", is_struct(_disk) && _disk.rumble == 0);
+                Scenario_Check("g8_the_change_makes_rumble_off_live", GameSettings_Ensure().rumble == 0 && !Settings_RumbleOn());
+                Scenario_Check("g8_the_change_writes_it_to_the_settings_file", is_struct(_disk) && _disk.rumble == 0);
                 _gs.settings = _disk;   // what the next start does: the settings come back from the file
                 Scenario_Check("g8_a_reload_from_the_file_keeps_rumble_off", GameSettings_Ensure().rumble == 0);
                 Scenario_Check("g8_with_rumble_off_an_event_starts_nothing", !Rumble_Dispatch("death") && Rumble_Get().ms == 0 && Rumble_Get().left == 0);
@@ -8821,35 +8803,30 @@ function Scenario_StepSmokeRumble(_s) {
                 GameSettings_Ensure().rumble = 1;
                 Scenario_Check("g8_with_the_keyboard_as_last_device_an_event_starts_nothing", !Rumble_Dispatch("death") && Rumble_Get().ms == 0 && Rumble_Get().left == 0);
                 GameSettings_Ensure().rumble = 0;
-                Scenario_Tap("cancel");   // leave Settings (nothing pending)
+                Scenario_Tap("cancel");   // Back at the root of Settings closes the menu (everything is saved already)
                 Scenario_Next(_s, 365);
             }
             break;
-        case 365:   // open Settings again: the row shows Off; flip it back On the same way and save
+        case 365:   // open the menu again (it opens on Settings, the tab used last): the row shows Off; flip it back On the same way
             if (_s.t == 30) {
-                Scenario_Check("g8_back_leaves_settings", !SettingsPopup_IsOpen("pause") && PauseMenu_IsOpen());
-                Scenario_Tap("confirm");   // the pause cursor is still on Settings
+                Scenario_Check("g8_back_closes_the_menu", !SettingsPopup_IsOpen("tab") && !Menu_IsOpen());
+                Scenario_Tap("pause");
             }
             if (_s.t == 55) {
-                Scenario_Check("g8_settings_opens_again", SettingsPopup_IsOpen("pause"));
+                Scenario_Check("g8_settings_opens_again", SettingsPopup_IsOpen("tab"));
                 var _r2 = Scenario_RumbleRowIndex(_sp, "rumble");
                 Scenario_Check("g8_the_screen_shows_rumble_off_after_the_reload", _r2 >= 0 && _sp.menu.items[_r2].value == Loc_T("settings.value.off", "Off"));
                 Ui_MenuFixCursor(_sp.menu, _r2);
                 Scenario_Tap("menu_right");
             }
             if (_s.t == 65) {
-                Scenario_Check("g8_right_flips_it_back_on", _sp.pending.rumble == 1 && _sp.dirty);
-                Ui_MenuFixCursor(_sp.menu, array_length(_sp.menu.items) - 1);
-                Scenario_Tap("confirm");
-            }
-            if (_s.t == 80) {
+                Scenario_Check("g8_right_flips_it_back_on", GameSettings_Ensure().rumble == 1);
                 var _disk2 = Save_ReadSettingsConfig();
-                Scenario_Check("g8_apply_saves_rumble_on_again", GameSettings_Ensure().rumble == 1 && is_struct(_disk2) && _disk2.rumble == 1);
+                Scenario_Check("g8_the_change_saves_rumble_on_again", GameSettings_Ensure().rumble == 1 && is_struct(_disk2) && _disk2.rumble == 1);
                 Scenario_Tap("cancel");
             }
             if (_s.t == 105) {
-                Scenario_Check("g8_the_pause_menu_is_back", !SettingsPopup_IsOpen("pause") && PauseMenu_IsOpen());
-                PauseMenu_Close(true);
+                Scenario_Check("g8_the_menu_is_closed_again", !SettingsPopup_IsOpen("tab") && !Menu_IsOpen());
                 Scenario_Next(_s, 340);   // G5 (D130, 340..359): the echo after the class pick; the chain ends there
             }
             break;
@@ -9157,7 +9134,7 @@ function Scenario_StepShotsFairUi(_s) {
                 var _bc2 = instance_find(obj_battle_controller, 0);
                 if (_s.di == 3) {
                     Focus_Step(false);   // the real call the UI controller makes when the window loses focus
-                    Scenario_Check("shots_fairui_the_pause_menu_opens_in_the_battle", PauseMenu_IsOpen() && PauseMenu_Get().in_battle);
+                    Scenario_Check("shots_fairui_the_menu_opens_in_the_battle", Menu_IsOpen() && room == rm_battle);
                 } else {
                     _bc2.ui_cmd.cursor = 4;
                     _bc2.menu_index = 4;
@@ -9179,7 +9156,7 @@ function Scenario_StepShotsFairUi(_s) {
         case 203:
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
-                if (is_struct(PauseMenu_Get())) { Focus_Step(true); PauseMenu_Close(true); }
+                if (Menu_IsOpen()) { Focus_Step(true); Menu_Close(true); }
                 Scenario_ClearUi();
                 _s.si++;
                 if (_s.si >= array_length(_scales)) { _s.si = 0; _s.di++; }
@@ -9365,14 +9342,14 @@ function Scenario_StepShotsTitle(_s) {
     }
 }
 
-// ---- pictures 210..213: every tab, the gear comparison, the Codex pages, the settings tab and the pause menu at windowed scale 3 (480 x 432)
+// ---- pictures 210..213: every tab, the gear comparison, the Codex pages and the settings tab at windowed scale 3 (480 x 432)
 // and 5 (800 x 720); the Korean gear tab once. Each is the real draw of the real menu on a real room; the layout is asserted on the rectangles. ----
 function Scenario_TabScenes() {
-    return ["status", "skills", "items", "gear", "gear_compare", "codex", "bestiary", "notes", "history", "unlocks", "settings", "pause", "korean"];
+    return ["status", "skills", "items", "gear", "gear_compare", "codex", "bestiary", "notes", "history", "unlocks", "settings", "korean"];
 }
 
 function Scenario_TabScales(_di) {
-    return (_di == 12) ? [3] : [3, 5];
+    return (_di == 11) ? [3] : [3, 5];
 }
 
 function Scenario_TabCursorOn(_id) {
@@ -9413,12 +9390,6 @@ function Scenario_StepShotsTabMenu(_s) {
                 case "history": Menu_Open(4); TabCodex_Open("history"); break;
                 case "unlocks": Menu_Open(4); TabCodex_Open("unlocks"); break;
                 case "settings": Menu_Open(5); Ui_MenuFixCursor(TabMenu_TopMenu(), 3); break;
-                case "pause":
-                    PauseMenu_Open();
-                    PauseMenu_Get().armed = true;
-                    Ui_StackTop(PauseMenu_Get().stk).items = PauseMenu_Items(true);
-                    Ui_MenuFixCursor(Ui_StackTop(PauseMenu_Get().stk), PAUSE_ABANDON_INDEX);
-                    break;
                 case "korean":
                     Loc_SetLanguage("ko");
                     Menu_Open(3);
@@ -9430,9 +9401,8 @@ function Scenario_StepShotsTabMenu(_s) {
         case 212:   // let the panels slide in, check the layout, take the picture
             if (_s.t >= 24) {
                 var _tag = _scenes[_s.di] + "_" + string(Scenario_TabScales(_s.di)[_s.si]);
-                var _is_pause = (_scenes[_s.di] == "pause");
-                Scenario_Check("shots_tabmenu_open_" + _tag, _is_pause ? PauseMenu_IsOpen() : (_gs.ui.mode == UI_MENU && is_struct(TabMenu_Get())), "mode=" + string(_gs.ui.mode));
-                if (!_is_pause) Scenario_TabLayoutChecks(_tag);
+                Scenario_Check("shots_tabmenu_open_" + _tag, _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                Scenario_TabLayoutChecks(_tag);
                 _s.shot = "shot_tabmenu_" + _scenes[_s.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
                 Scenario_ShotLayout(_s.shot);
                 Scenario_Next(_s, 213);
@@ -9443,7 +9413,6 @@ function Scenario_StepShotsTabMenu(_s) {
                 var _scales = Scenario_TabScales(_s.di);
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 if (is_struct(TabMenu_Get())) Menu_Close(true);
-                if (is_struct(PauseMenu_Get())) PauseMenu_Close(true);
                 Scenario_ClearUi();
                 _s.si++;
                 if (_s.si >= array_length(_scales)) { _s.si = 0; _s.di++; }
@@ -10242,16 +10211,16 @@ function Scenario_StepSmokeRunStats(_s) {
             if (_rs.quiet > 30) Scenario_Next(_s, 444);
             if (_s.t > 1500) { Scenario_Check("g9_the_level_up_screens_are_answered", false, "mode=" + string(_gs.ui.mode) + " cards=" + string(CardsUi_IsOpen()) + " owed=" + Cards_NextOwed(_gs.player_ch)); Scenario_NoticeEnd(); }
             break;
-        case 444:   // the pause menu stops the time; Abandon run through the pause menu (down x3, confirm twice)
+        case 444:   // H1 (D140): the menu stops the time; Abandon run through the System tab (down once, confirm twice)
             if (_s.t == 1) {
                 Scenario_ClearUi();
-                PauseMenu_Open();
+                Menu_Open(6);
             }
             if (_s.t == 10) _rs.pa = _gs.run.stats.play_ms;
-            if (_s.t == 50) Scenario_Check("g9_run_time_stops_under_the_pause_menu", PauseMenu_IsOpen() && _gs.run.stats.play_ms == _rs.pa, "paused at " + string(_rs.pa) + ", 40 frames later " + string(_gs.run.stats.play_ms));
-            if (_s.t == 80 || _s.t == 92 || _s.t == 104) Scenario_Tap("menu_down");
+            if (_s.t == 50) Scenario_Check("g9_run_time_stops_under_the_menu", Menu_IsOpen() && _gs.run.stats.play_ms == _rs.pa, "paused at " + string(_rs.pa) + ", 40 frames later " + string(_gs.run.stats.play_ms));
+            if (_s.t == 80) Scenario_Tap("menu_down");   // Help, Abandon run
             if (_s.t == 125) {
-                Scenario_Check("g9_the_pause_cursor_is_on_abandon", PauseMenu_Cursor() == PAUSE_ABANDON_INDEX, "index=" + string(PauseMenu_Cursor()));
+                Scenario_Check("g9_the_menu_cursor_is_on_abandon", is_struct(TabMenu_TopMenu()) && TabMenu_TopMenu().items[TabMenu_TopMenu().cursor].id == "abandon", "cursor=" + string(is_struct(TabMenu_TopMenu()) ? TabMenu_TopMenu().cursor : -1));
                 Scenario_Tap("confirm");
             }
             if (_s.t == 137) Scenario_Tap("confirm");
@@ -10776,9 +10745,232 @@ function Scenario_StepSmokeLevelUp(_s) {
             }
             if (variable_struct_exists(_lu, "p2") && array_length(_lu.q) == 0 && _s.t > 150 && !CardsUi_IsOpen()) {
                 Scenario_Check("levelup_nothing_is_owed_at_the_end", Cards_NextOwed(_ch) == "");
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 470);   // H1 (D140, D141, 470..489) goes on; its last step ends the chain
             }
             if (_s.t > 900) { Scenario_Check("levelup_the_second_point_and_pick_are_answered", false, "kind=" + CardsUi_Kind() + " q=" + string(array_length(_lu.q))); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ============================================================================
+// H1 (D140, D141): one menu. Smoke steps 470-489 (the end of the chain: the last step calls Scenario_NoticeEnd).
+//   470  a fresh run in rm_floor1, nothing else on screen
+//   471  on the map: Esc opens the tab menu, Esc closes it, Tab opens the same menu, Tab closes it, Q from the first tab is System
+//   472  the player steps onto a real enemy: a real fight starts (the encounter takes the snapshot)
+//   473  in the fight: Esc at the root command menu opens the menu and Esc closes it; in the item list Esc is Back (no menu), Tab opens the menu there
+//   474  in the fight: System tab -> Quit to title (the fight is left at once)
+//   475  the title: Continue puts the run back just before the fight (HP, MP, potions, the enemy alive) with a battle cooldown, so no fight starts at once
+// ============================================================================
+function Scenario_StepSmokeOneMenu(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "om")) _s.om = { };
+    var _o = _s.om;
+    var _T = GRID_TILE_SIZE;
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+    var _u = TabMenu_Get();
+    switch (_s.step) {
+        case 470:   // a new run, then rm_floor1 with nothing in the way
+            if (!variable_struct_exists(_o, "begun")) {
+                if (!Scenario_Hunt2Begin(_s, _o, 7501)) {
+                    if (_s.t > 1500) { Scenario_Check("onemenu_a_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                    break;
+                }
+                _o.begun = true;
+                _s.t = 0;
+                break;
+            }
+            if (!Scenario_FloorReady(rm_floor1)) {
+                if (_s.t > 600) { Scenario_Check("onemenu_rm_floor1_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                break;
+            }
+            if (_s.t > 5) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                with (obj_dialogue_trigger) instance_destroy();
+                Scenario_Next(_s, 471);
+            }
+            break;
+        case 471:   // Esc and Tab are the same menu
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);   // the menu opens on Status
+                Ui_MemSet(Ui_MemGlobal(), "tab_system", 0);   // the System list remembers its cursor: G9 (440..447) left it on Abandon run, this step starts from Help
+            }
+            if (_s.t == 8) Scenario_Tap("esc");
+            if (_s.t == 20) {
+                _u = TabMenu_Get();
+                Scenario_Check("onemenu_esc_on_the_map_opens_the_tab_menu", _gs.ui.mode == UI_MENU && is_struct(_u), "mode=" + string(_gs.ui.mode));
+                Scenario_Check("onemenu_it_has_seven_tabs", array_length(TabMenu_Labels()) == 7 && is_struct(_u) && array_length(_u.pages) == 7);
+                Scenario_Tap("esc");   // Esc at the root of a tab is Back: it closes
+            }
+            if (_s.t == 40) {
+                Scenario_Check("onemenu_esc_closes_it_again", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                Scenario_Tap("menu");
+            }
+            if (_s.t == 52) {
+                _u = TabMenu_Get();
+                Scenario_Check("onemenu_tab_on_the_map_opens_the_same_menu", _gs.ui.mode == UI_MENU && is_struct(_u) && _u.tab == 0 && array_length(_u.pages) == 7, "mode=" + string(_gs.ui.mode));
+                Scenario_Tap("menu");
+            }
+            if (_s.t == 72) {
+                Scenario_Check("onemenu_tab_closes_it", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                Scenario_Tap("esc");
+            }
+            if (_s.t == 84) Scenario_Tap("tab_prev");   // Q from the first tab wraps to the last
+            if (_s.t == 96) {
+                _u = TabMenu_Get();
+                var _tm = TabMenu_TopMenu();
+                Scenario_Check("onemenu_Q_from_status_wraps_to_system", is_struct(_u) && _u.tab == 6 && TabMenu_Ids()[_u.tab] == "system", "tab=" + string(is_struct(_u) ? _u.tab : -1));
+                Scenario_Check("onemenu_system_has_help_abandon_and_quit", is_struct(_tm) && array_length(_tm.items) == 3 && _tm.items[0].id == "help" && _tm.items[1].id == "abandon" && _tm.items[2].id == "quit");
+                Scenario_Tap("esc");
+            }
+            if (_s.t == 120) {
+                Scenario_Check("onemenu_the_menu_is_closed_again", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()));
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);   // the next opening is on Status
+                Scenario_Next(_s, 472);
+            }
+            break;
+        case 472:   // an enemy of the room, the player on top of it: a real fight
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                var _en = instance_find(obj_enemy, 0);
+                if (!instance_exists(_en)) { Scenario_Check("onemenu_the_room_has_an_enemy", false); Scenario_NoticeEnd(); break; }
+                with (obj_enemy) { if (id != _en) instance_destroy(); }
+                var _ch = _gs.player_ch;
+                _ch.hp = max(1, _ch.max_hp - 3);
+                _ch.mp = max(0, _ch.max_mp - 1);
+                _ch.inventory = Inv_Add(_ch.inventory, 11, 2);
+                GameState_SetPlayer(_ch);
+                if (instance_exists(obj_player) && variable_instance_exists(obj_player, "character")) obj_player.character = _gs.player_ch;
+                _o.hp0 = _gs.player_ch.hp;
+                _o.mp0 = _gs.player_ch.mp;
+                _o.pot0 = Inv_Count(_gs.player_ch.inventory, 11);
+                _o.gold0 = Run_Get().gold;
+                Scenario_PlaceEnemy(_en, round(_en.x / _T), round(_en.y / _T));
+                Scenario_PlacePlayer(round(_en.x / _T), round(_en.y / _T));
+                _o.fight_t = _s.t;
+            }
+            if (room == rm_battle && !Transition_IsActive()) {
+                _o.pid = _gs.battle.enemy_persist_id;
+                Scenario_Check("onemenu_the_fight_started_from_the_map", _o.pid != "", "pid=" + string(_o.pid));
+                Scenario_Next(_s, 473);
+            }
+            if (_s.t > 900) { Scenario_Check("onemenu_an_enemy_starts_a_fight", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 473:   // the fight: Esc at the command menu, Esc inside the item list, Tab inside the list
+            if (_bc == noone && variable_struct_exists(_o, "k0")) { Scenario_Check("onemenu_the_battle_is_still_there", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); break; }
+            if (_bc == noone || !(_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && is_struct(_bc.ui_cmd))) {
+                if (!variable_struct_exists(_o, "k0")) {
+                    if (_s.t > 900) { Scenario_Check("onemenu_the_battle_reaches_the_player_menu", false, "state=" + string((_bc != noone) ? _bc.battle_state : -1)); Scenario_NoticeEnd(); }
+                    _o.k_wait = _s.t;
+                    break;
+                }
+            }
+            if (!variable_struct_exists(_o, "k0")) {
+                if (_s.t < _o.k_wait + 20) break;   // let the command panel settle
+                _o.k0 = _s.t;
+                Scenario_Check("onemenu_the_encounter_took_the_snapshot", EnemyPersist_HasSnapshot());
+            }
+            var _k = _s.t - _o.k0;
+            if (_k == 0) Scenario_Tap("esc");
+            if (_k == 12) {
+                Scenario_Check("onemenu_esc_at_the_battle_command_menu_opens_the_menu", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && _bc.battle_state == BSTATE_MENU, "mode=" + string(_gs.ui.mode) + " state=" + string(_bc.battle_state));
+                Scenario_Tap("esc");
+            }
+            if (_k == 30) {
+                Scenario_Check("onemenu_esc_closes_it_back_to_the_battle", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()) && _bc.battle_state == BSTATE_MENU, "mode=" + string(_gs.ui.mode));
+                Scenario_Tap("menu_down");
+            }
+            if (_k == 42) Scenario_Tap("menu_down");
+            if (_k == 54) {
+                Scenario_Check("onemenu_the_battle_cursor_is_on_item", _bc.menu_index == 2, "i=" + string(_bc.menu_index));
+                Scenario_Tap("confirm");
+            }
+            if (_k == 70) {
+                Scenario_Check("onemenu_the_item_list_is_open", _bc.battle_state == BSTATE_ITEM_MENU, "state=" + string(_bc.battle_state));
+                Scenario_Tap("esc");
+            }
+            if (_k == 84) {
+                Scenario_Check("onemenu_esc_in_a_battle_list_is_back_not_the_menu", _bc.battle_state == BSTATE_MENU && _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "state=" + string(_bc.battle_state) + " mode=" + string(_gs.ui.mode));
+                Scenario_Tap("confirm");
+            }
+            if (_k == 100) {
+                Scenario_Check("onemenu_the_item_list_opens_again", _bc.battle_state == BSTATE_ITEM_MENU, "state=" + string(_bc.battle_state));
+                Scenario_Tap("menu");
+            }
+            if (_k == 112) {
+                Scenario_Check("onemenu_tab_opens_the_menu_inside_a_battle_list", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && _bc.battle_state == BSTATE_ITEM_MENU, "mode=" + string(_gs.ui.mode));
+                Scenario_Tap("menu");
+            }
+            if (_k == 130) {
+                Scenario_Check("onemenu_tab_closes_it_and_the_list_is_still_there", _gs.ui.mode == UI_NONE && _bc.battle_state == BSTATE_ITEM_MENU, "mode=" + string(_gs.ui.mode) + " state=" + string(_bc.battle_state));
+                Scenario_Tap("esc");
+            }
+            if (_k == 145) {
+                Scenario_Check("onemenu_back_to_the_command_menu", _bc.battle_state == BSTATE_MENU && _gs.ui.mode == UI_NONE);
+                Scenario_Next(_s, 474);
+            }
+            break;
+        case 474:   // System > Quit to title, in the fight
+            if (_s.t == 1) Scenario_Tap("esc");
+            if (_s.t == 14) {
+                _u = TabMenu_Get();
+                Scenario_Check("onemenu_the_menu_is_open_in_the_fight", _gs.ui.mode == UI_MENU && is_struct(_u));
+                Scenario_Tap("tab_prev");
+            }
+            if (_s.t == 28) {
+                _u = TabMenu_Get();
+                var _tm2 = TabMenu_TopMenu();
+                Scenario_Check("onemenu_Q_reaches_system_in_the_fight", is_struct(_u) && _u.tab == 6, "tab=" + string(is_struct(_u) ? _u.tab : -1));
+                Scenario_Check("onemenu_abandon_and_quit_are_on_in_the_fight", is_struct(_tm2) && array_length(_tm2.items) == 3 && _tm2.items[1].enabled && _tm2.items[2].enabled);
+                _bc.p.hp = 1;   // the fight goes on in the meantime: none of it may come back
+                _bc.p.mp = 0;
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 40) Scenario_Tap("menu_down");
+            if (_s.t == 52) {
+                var _tm3 = TabMenu_TopMenu();
+                Scenario_Check("onemenu_the_cursor_is_on_quit", is_struct(_tm3) && _tm3.cursor == 2 && _tm3.items[2].id == "quit", "cursor=" + string(is_struct(_tm3) ? _tm3.cursor : -1));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 60 && room == rm_start && !Transition_IsActive()) {
+                Scenario_Check("onemenu_quit_in_the_fight_goes_to_the_title", _gs.in_main_menu && !is_struct(TabMenu_Get()) && _gs.ui.mode == UI_NONE);
+                Scenario_Check("onemenu_the_run_save_is_there", RunSave_HasSave());
+                Scenario_Next(_s, 475);
+            }
+            if (_s.t > 600) { Scenario_Check("onemenu_quit_in_the_fight_reaches_the_title", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 475:   // Continue: back just before the fight
+            var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+            if (room == rm_start && _sc != noone && !Transition_IsActive() && !variable_struct_exists(_o, "cont")) {
+                if (_sc.state != "main") { _sc.state = "main"; break; }
+                if (is_struct(_sc.title_stk) && _s.t > 20) {
+                    Scenario_Check("onemenu_the_title_cursor_is_on_continue", Ui_StackTop(_sc.title_stk).cursor == 1, "cursor=" + string(Ui_StackTop(_sc.title_stk).cursor));
+                    Scenario_Tap("confirm");
+                    _o.cont = _s.t;
+                }
+            }
+            if (variable_struct_exists(_o, "cont") && !variable_struct_exists(_o, "arrived") && Scenario_FloorReady(rm_floor1) && !_gs.load_spawn_pending) {
+                _o.arrived = _s.t;
+            }
+            if (variable_struct_exists(_o, "arrived") && _s.t == _o.arrived + 6) {
+                var _pl = instance_find(obj_player, 0);
+                Scenario_Check("onemenu_continue_restores_the_hp_from_before_the_fight", _gs.player_ch.hp == _o.hp0, "hp=" + string(_gs.player_ch.hp) + " want " + string(_o.hp0));
+                Scenario_Check("onemenu_continue_restores_the_mp_from_before_the_fight", _gs.player_ch.mp == _o.mp0, "mp=" + string(_gs.player_ch.mp) + " want " + string(_o.mp0));
+                Scenario_Check("onemenu_continue_restores_the_potions", Inv_Count(_gs.player_ch.inventory, 11) == _o.pot0, "potions=" + string(Inv_Count(_gs.player_ch.inventory, 11)) + " want " + string(_o.pot0));
+                Scenario_Check("onemenu_continue_restores_the_gold", Run_Get().gold == _o.gold0);
+                _o.found = false;
+                with (obj_enemy) { if (variable_instance_exists(id, "persist_id") && persist_id == _o.pid) _o.found = true; }
+                var _d = RoomState_Get(rm_floor1, _o.pid);
+                Scenario_Check("onemenu_the_enemy_is_back_on_the_map", _o.found && !(is_struct(_d) && variable_struct_exists(_d, "removed") && _d.removed), "found=" + string(_o.found));
+                Scenario_Check("onemenu_the_player_has_a_battle_cooldown", instance_exists(_pl) && _pl.battle_cooldown > 0, "cooldown=" + string(instance_exists(_pl) ? _pl.battle_cooldown : -1));
+            }
+            if (variable_struct_exists(_o, "arrived") && _s.t == _o.arrived + 30) {
+                Scenario_Check("onemenu_no_fight_starts_at_once_after_continue", room == rm_floor1 && !Transition_IsActive(), "room=" + room_get_name(room) + " fx=" + json_stringify(_gs.transition_fx) + " cooldown=" + string(instance_exists(obj_player) ? instance_find(obj_player, 0).battle_cooldown : -1));
+                Scenario_NoticeEnd();
+            }
+            if (_s.t > 1500) { Scenario_Check("onemenu_continue_reaches_rm_floor1", false, "room=" + room_get_name(room) + " cont=" + string(variable_struct_exists(_o, "cont"))); Scenario_NoticeEnd(); }
             break;
     }
 }
@@ -10848,7 +11040,90 @@ function Scenario_StepShotsLevelUp(_s) {
                 _gs.player_ch.stat_points = 0;
                 _gs.player_ch.card_picks = 0;
                 CardsUi_Close();
-                Scenario_NoticeEnd();   // removes the files and the profile the G9 pictures made, then ends the run
+                Scenario_Next(_s, 490);   // H1 (D140, pictures 490..493) goes on; its last step ends the run (Scenario_Finish)
+            }
+            break;
+    }
+}
+
+// ---- H1 (D140) pictures 490..493: the System tab, the Settings tab and the "Keep this?" prompt at windowed scale 3 (480 x 432) and 5 (800 x 720).
+// Each is the real draw of the real menu on a real room; the layout is asserted on the rectangles. The last picture of the run: it ends the run. ----
+function Scenario_OneMenuShotScenes() {
+    return ["system", "settings", "keep"];
+}
+
+function Scenario_StepShotsOneMenu(_s) {
+    var _scenes = Scenario_OneMenuShotScenes();
+    var _scales = [3, 5];
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "om")) _s.om = { n: 0, di: 0, si: 0 };
+    var _o = _s.om;
+    switch (_s.step) {
+        case 490:   // enter a room at this scale (the two floors take turns: entering the room we are in would not spawn the player again)
+            if (_s.t == 1) {
+                Scenario_TabFixture();
+                Loc_SetLanguage("en");
+                Scenario_SetWindowScale(_scales[_o.si]);
+                _o.n++;
+                room_goto((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3);
+            }
+            if (_s.t >= 30 && Scenario_FloorReady((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3)) Scenario_Next(_s, 491);
+            if (_s.t > 600) { Scenario_Check("shots_onemenu_enters_the_room", false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 491:   // set the scene up
+            with (obj_enemy) instance_destroy();
+            Scenario_ClearUi();
+            switch (_scenes[_o.di]) {
+                case "system":
+                    Menu_Open(6);
+                    Ui_MenuFixCursor(TabMenu_TopMenu(), 2);   // Quit to title, with its help sentence
+                    break;
+                case "settings":
+                    Menu_Open(5);
+                    Ui_MenuFixCursor(TabMenu_TopMenu(), 7);   // the Window row
+                    break;
+                case "keep":
+                    Menu_Open(5);
+                    Ui_MenuFixCursor(TabMenu_TopMenu(), 7);
+                    var _ks = GameSettings_Copy(GameSettings_Ensure());
+                    _ks.window_mode = WINDOW_MODE_WINDOWED;
+                    _ks.display_scale = _scales[_o.si];   // the setting says the scale the window is at, so the change does not resize it
+                    _gs.settings = _ks;
+                    Settings_Change("window", 1, 5);   // Borderless asks "Keep this?" (a test run keeps its own window as it is)
+                    SettingsPopup_Refresh();
+                    break;
+            }
+            Scenario_Next(_s, 492);
+            break;
+        case 492:   // let the panels slide in, check the layout, take the picture
+            if (_s.t >= 24) {
+                var _tag = _scenes[_o.di] + "_" + string(_scales[_o.si]);
+                Scenario_Check("shots_onemenu_open_" + _tag, _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                Scenario_Check("shots_onemenu_has_seven_tabs_" + _tag, array_length(TabMenu_Labels()) == 7 && global.ui_tabs_rects[6].x + global.ui_tabs_rects[6].w <= Display_GuiW());
+                Scenario_TabLayoutChecks(_tag);
+                if (_scenes[_o.di] == "keep") {
+                    var _kr = variable_global_exists("keep_this_rect") ? global.keep_this_rect : { x: -1, y: -1, w: 0, h: 0 };
+                    Scenario_Check("shots_onemenu_the_prompt_is_up_" + _tag, KeepThis_Active());
+                    Scenario_Check("shots_onemenu_the_prompt_is_on_screen_" + _tag, _kr.w > 0 && _kr.x >= 0 && _kr.y >= 0 && _kr.x + _kr.w <= Display_GuiW() && _kr.y + _kr.h <= Display_GuiH(), json_stringify(_kr));
+                }
+                _s.shot = "shot_onemenu_" + _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 493);
+            }
+            break;
+        case 493:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                if (KeepThis_Active()) KeepThis_Revert();
+                if (is_struct(TabMenu_Get())) Menu_Close(true);
+                Scenario_ClearUi();
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Scenario_Finish();   // the end of the pictures
+                } else {
+                    Scenario_Next(_s, 490);
+                }
             }
             break;
     }

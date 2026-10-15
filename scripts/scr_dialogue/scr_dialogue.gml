@@ -920,7 +920,7 @@ function Dialogue_TypewriterRevealInstant() {
 
 // D108 F4b: the one place a dialogue box is opened. The three Dialogue_Start* openers below only choose the speaker and the raw lines.
 function Dialogue_Open(_speaker, _lines_raw) {
-    if (PauseMenu_IsOpen()) PauseMenu_Close();
+    if (is_struct(TabMenu_Get())) Menu_Close(true);   // D140: the one menu closes first
     Dialogue_EnsureUI();
     var gs = GameState_Get();
     gs.ui.speaker = _speaker;

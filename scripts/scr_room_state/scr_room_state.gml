@@ -275,6 +275,7 @@ function EnemyPersist_BeginEncounter(_enemy_inst, _player_inst) {
     var lvl = variable_instance_exists(_enemy_inst, "enemy_level") ? _enemy_inst.enemy_level : 0;
     GameState_SetBattleEnemy(_enemy_inst.persist_id, _enemy_inst.enemy_id, lvl);
     GameState_Get().battle.enemy_elite = variable_instance_exists(_enemy_inst, "elite_mod") ? _enemy_inst.elite_mod : "";   // C3 (D86)
+    EnemyPersist_SnapshotRun();   // D141: Quit to title in the fight comes back to this moment
     return true;
 }
 
@@ -962,9 +963,9 @@ function RunStats_FightWon(_run = undefined) {
     st.fights_won += 1;
 }
 
-// Run time counts while the window is in front, nothing is paused and the title screen is not up.
+// Run time counts while the window is in front, the menu (Esc / Tab, H1: the one menu) is not open and the title screen is not up.
 function RunStats_Counting(_has_focus, _ui_mode, _in_main_menu) {
-    return _has_focus && !_in_main_menu && _ui_mode != UI_PAUSE;
+    return _has_focus && !_in_main_menu && _ui_mode != UI_MENU;
 }
 
 function RunStats_AdvanceMs(_run, _ms, _counting) {
@@ -1023,4 +1024,22 @@ function RunStats_Lines(_entry) {
         { label: Loc_T("stat.fights_won", "Fights won"), value: has ? string(st.fights_won) : "-" },
         { label: Loc_T("stat.time", "Run time"), value: has ? RunStats_TimeText(st.play_ms) : "-" }
     ];
+}
+
+// D141: the run as it was just before a fight, kept as text (so nothing the fight does to the live structs can reach it). Taken by
+// EnemyPersist_BeginEncounter once the room state is saved; Quit to title in the fight writes it as the run save (no state of the fight is ever saved).
+function EnemyPersist_SnapshotRun() {
+    global.encounter_snapshot = json_stringify(RunSave_Build());
+    return is_string(global.encounter_snapshot);
+}
+
+function EnemyPersist_HasSnapshot() {
+    return variable_global_exists("encounter_snapshot") && is_string(global.encounter_snapshot);
+}
+
+// Writes the snapshot as the run save the way every run save is written (a temp file, verified, the old one kept as .bak). false when there is none.
+function EnemyPersist_WriteSnapshot(_path = undefined) {
+    if (!EnemyPersist_HasSnapshot()) return false;
+    var path = is_undefined(_path) ? RunSave_Path() : _path;
+    return Save_WriteFileAtomic(path, global.encounter_snapshot, RunSave_IsCurrentRaw);
 }

@@ -1,9 +1,11 @@
 // ==========================================================================================================================
-// THE TAB MENU (D90, D92, D95, D96, D97, D100, D115): Status · Skills · Items · Gear · Codex · Settings on the UI framework.
+// THE ONE MENU (D90, D92, D95, D96, D97, D100, D115, D140, D141): Status · Skills · Items · Gear · Codex · Settings · System on the UI framework.
+// Esc and Tab (or the pad's X / Y / Start) open this same menu on the map and in a fight; there is no separate pause menu. System holds Help, Abandon run and
+// Quit to title. Settings apply at once; a window mode or scale change asks "Keep this?" for 10 s (KeepThis_*).
 // Q / E (or LB / RB) switch tabs and wrap; each tab is a list on the left with icons and a details panel on the right (one plain sentence and
 // the numbers from the data, a before / after comparison for gear). Back goes up ONE level (a Codex page to the Codex list, a tab to the game);
 // the cursor of every tab is remembered. The rows come from pure functions (Tab*_Items, Gear_*, Codex_*), tested without a screen.
-// global.tab_ui = { tab, pages (one { stk } per tab), opened_ms, closed_ms, toast, toast_ms } while it is open, with gs.ui.mode = UI_MENU.
+// global.tab_ui = { tab, pages (one { stk } per tab), opened_ms, closed_ms, toast, toast_ms, sys_armed, pending } while it is open, with gs.ui.mode = UI_MENU.
 // ==========================================================================================================================
 // D108 F1c: the tab ids and icons never change, so they are built once (TabMenu_DataBuilds counts the builds) and read-only for callers; the
 // labels are kept per language (TabMenu_LabelBuilds counts them).
@@ -20,15 +22,16 @@ function TabMenu_Data() {
     if (is_struct(d)) return d;
     global.tabmenu_data_builds = TabMenu_DataBuilds() + 1;
     d = {
-        ids: ["status", "skills", "items", "gear", "codex", "settings"],
-        // One 8 x 8 icon per tab: a bust, a sparkle, a flask, a shield, a page, a cog.
+        ids: ["status", "skills", "items", "gear", "codex", "settings", "system"],
+        // One 8 x 8 icon per tab: a bust, a sparkle, a flask, a shield, a page, a cog, a power ring.
         icons: [
             ["..3333..", ".333333.", ".333333.", "..3333..", ".333333.", "33333333", "33333333", "33333333"],
             ["...33...", "...33...", "..3333..", "33333333", "33333333", "..3333..", "...33...", "...33..."],
             ["..3333..", "...33...", "...33...", "..3333..", ".333333.", "33333333", "33333333", ".333333."],
             ["33333333", "33333333", "33333333", "33333333", ".333333.", ".333333.", "..3333..", "...33..."],
             ["33333333", "3......3", "3.3333.3", "3......3", "3.3333.3", "3......3", "3.33...3", "33333333"],
-            ["...33...", ".3.33.3.", "..3333..", "333..333", "333..333", "..3333..", ".3.33.3.", "...33..."]
+            ["...33...", ".3.33.3.", "..3333..", "333..333", "333..333", "..3333..", ".3.33.3.", "...33..."],
+            ["...33...", ".3.33.3.", "3..33..3", "3......3", "3......3", ".3....3.", "..3333..", "........"]
         ]
     };
     global.tabmenu_data = d;
@@ -43,6 +46,11 @@ function TabMenu_Icons() {
     return TabMenu_Data().icons;
 }
 
+// The one place the number of tabs comes from (the open, the Q / E step and the memory all read it).
+function TabMenu_Count() {
+    return array_length(TabMenu_Ids());
+}
+
 function TabMenu_Labels() {
     var lang = Loc_GetLanguage();
     var c = variable_global_exists("tabmenu_labels") ? global.tabmenu_labels : undefined;
@@ -50,7 +58,7 @@ function TabMenu_Labels() {
     global.tabmenu_label_builds = TabMenu_LabelBuilds() + 1;
     var labels = [
         Loc_T("tab.status", "Status"), Loc_T("tab.skills", "Skills"), Loc_T("tab.items", "Items"),
-        Loc_T("tab.gear", "Gear"), Loc_T("tab.codex", "Codex"), Loc_T("tab.settings", "Settings")
+        Loc_T("tab.gear", "Gear"), Loc_T("tab.codex", "Codex"), Loc_T("tab.settings", "Settings"), Loc_T("tab.system", "System")
     ];
     global.tabmenu_labels = { lang: lang, labels: labels };
     return labels;
@@ -489,6 +497,7 @@ function TabMenu_ListShare(_tid) {
         case "codex_history": return 0.58;
         case "gear": case "items": case "skills": return 0.55;   // long names with icons
         case "settings": return 0.6;                              // a name and a value on every row
+        case "system": return 0.5;
         case "status": return 0.48;
     }
     return 0.52;
@@ -534,6 +543,7 @@ function TabMenu_Title(_id, _ch) {
         case "items": return Loc_T("tab.title.items", "Items");
         case "gear": return Loc_T("tab.title.gear", "Gear");
         case "codex": return Loc_T("tab.title.codex", "Codex");
+        case "system": return Loc_T("tab.title.system", "System");
     }
     return "";
 }
@@ -545,6 +555,7 @@ function TabMenu_ItemsFor(_id, _ch) {
         case "items": return TabItems_Items(_ch);
         case "gear": return TabGear_Items(_ch);
         case "codex": return TabCodex_Items(Profile_Get());
+        case "system": return TabSystem_Items(TabSystem_Armed(), room == rm_battle);
     }
     return [];
 }
@@ -565,6 +576,45 @@ function TabMenu_BuildPage(_id) {
     return pg;
 }
 
+// ---- the System tab (D140, D141): Help, Abandon run (two presses), Quit to title; all on in a fight too ----
+function TabSystem_Items(_armed = false, _in_battle = false) {
+    return [
+        { id: "help", label: Loc_T("pause.option.help", "Help"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.help", "Every hint the game has: the ones you have seen and the ones still to come.") },
+        { id: "abandon", value: "", kind: "button", enabled: true, lines: [],
+          label: _armed ? Loc_T("pause.option.abandon_confirm", "Sure? Confirm again") : Loc_T("pause.option.abandon", "Abandon run"),
+          help: _armed ? Loc_T("pause.help.abandon_armed", "Confirm once more to end this run now. Back or another row cancels.")
+                       : Loc_T("pause.help.abandon", "Ends this run now. It counts as a death, but you keep the echo.") },
+        { id: "quit", label: Loc_T("pause.option.quit", "Quit to title"), value: "", kind: "button", enabled: true, lines: [],
+          help: _in_battle ? Loc_T("tab.system.quit_battle_help", "Goes back to the title. Continue puts you back just before this fight.")
+                           : Loc_T("pause.help.quit", "Saves the run and goes to the title. Continue picks it up again.") }
+    ];
+}
+
+function TabSystem_Armed() {
+    var u = TabMenu_Get();
+    return is_struct(u) && variable_struct_exists(u, "sys_armed") && u.sys_armed;
+}
+
+// Abandon asks twice: any move of the cursor or another row puts the label back.
+function TabSystem_Disarm() {
+    var u = TabMenu_Get();
+    if (!is_struct(u) || !u.sys_armed) return;
+    u.sys_armed = false;
+    TabMenu_Refresh();
+}
+
+// The Help page: every tutorial, seen or not, as a page on top of the System list.
+function TabHelp_Open() {
+    var u = TabMenu_Get();
+    var pg = u.pages[u.tab];
+    var m = Ui_MenuNew("help", Tutorial_HelpItems(), {
+        data: { tab: "help_page" },
+        layout: { title: Loc_T("help.title", "Help"), anchor: "center", details: true, details_pos: "right", hides_below: true }
+    });
+    Ui_MenuFixCursor(m, m.cursor);
+    Ui_StackPush(pg.stk, m);
+}
+
 // The settings are the existing screen (D0), opened as a tab: the same list, rows and Controls page, fitted to the body.
 function TabSettings_Popup() {
     SettingsPopup_Ensure();
@@ -577,14 +627,12 @@ function TabSettings_Popup() {
     return sp;
 }
 
-// Leaving the Tab menu throws away settings that were not applied (the preview language comes back too).
+// Leaving the menu closes the settings page. A window change nobody confirmed is put back first (D140). Every other change is already live.
 function TabSettings_Discard() {
+    if (KeepThis_Active()) KeepThis_Revert();
     if (!SettingsPopup_IsOpen("tab")) return;
     var sp = GameState_Get().ui.settings_popup;
-    sp.pending = GameSettings_Copy(GameSettings_Ensure());
-    sp.dirty = false;
     sp.controls = undefined;
-    Loc_SetLanguage(GameSettings_Ensure().language);
     SettingsPopup_Close(true);
 }
 
@@ -628,8 +676,8 @@ function TabMenu_Switch(_u, _tab) {
 // Opens the Tab menu on the tab you used last (or _tab).
 function Menu_Open(_tab = -1) {
     var gs = GameState_Get();
-    var tab = (_tab >= 0) ? _tab : Ui_MemGet(Ui_MemGlobal(), "tab_menu_active", 6);
-    var u = { tab: tab, pages: array_create(6, undefined), opened_ms: current_time, opened_frame: Input_Frame(), closed_ms: -1, toast: "", toast_ms: -100000 };
+    var tab = (_tab >= 0) ? _tab : Ui_MemGet(Ui_MemGlobal(), "tab_menu_active", TabMenu_Count());
+    var u = { tab: tab, pages: array_create(TabMenu_Count(), undefined), opened_ms: current_time, opened_frame: Input_Frame(), closed_ms: -1, toast: "", toast_ms: -100000, sys_armed: false, pending: "" };
     global.tab_ui = u;
     gs.ui.mode = UI_MENU;
     TabMenu_Switch(u, tab);
@@ -653,10 +701,69 @@ function Menu_Close(_immediate = false) {
     SFX_PlayUI("ui_openclose");
 }
 
+// Once the fade is over: Abandon run ends the run (a fall that keeps the echo); Quit to title leaves for the title (Menu_QuitToTitle).
 function Menu_CloseFinalize() {
     var gs = GameState_Get();
+    var u = TabMenu_Get();
+    var pending = (is_struct(u) && variable_struct_exists(u, "pending")) ? u.pending : "";
     global.tab_ui = undefined;
     if (gs.ui.mode == UI_MENU) gs.ui.mode = UI_NONE;
+    if (pending == "abandon") {
+        Run_Abandon();   // C1 (D92): counts as a death, keeps the echo; the death scene and the echo pick follow. Also in a fight (D141)
+    } else if (pending == "quit") {
+        Menu_QuitToTitle();
+    }
+}
+
+// D46 / D141: on the map the run is saved as it is; in a fight there is no save of the fight: the run goes back to the snapshot taken when the
+// fight began (the enemy back on the map, HP, MP and items as they were). Then the title.
+function Menu_QuitToTitle() {
+    var gs = GameState_Get();
+    if (room == rm_battle) {
+        EnemyPersist_WriteSnapshot();   // no snapshot (a fight that did not start from the map) leaves the last autosave as the run
+        GameState_SetJustReturned(false);
+    } else {
+        Run_AutoSave();   // C1 (D46): leaving to the title keeps the run; Continue picks it up
+    }
+    gs.in_main_menu = true;
+    gs.player_inst = noone;
+    if (variable_struct_exists(gs, "ui")) {
+        gs.ui.lines = [];
+        gs.ui.index = 0;
+        gs.ui.speaker = "";
+        gs.ui.confirm_action = "";
+    }
+    if (room != rm_start) {
+        RoomState_OnRoomExit();
+        Transition_RequestLoadingRoomFade(rm_start);
+    }
+}
+
+// Where the menu may open in a fight: in any list or message, never while a bar is running (the QTE timing is never interrupted).
+// Esc is Back inside a list, so only the fight itself opens the menu on Esc, at the root command menu (obj_battle_controller Step).
+function Menu_BattleAllowed(_battle_state, _qte_busy, _over) {
+    if (_qte_busy || _over) return false;
+    return (_battle_state == BSTATE_MENU || _battle_state == BSTATE_SKILL_MENU || _battle_state == BSTATE_ITEM_MENU || _battle_state == BSTATE_MESSAGE);
+}
+
+function Menu_BattleOpenNow() {
+    if (room != rm_battle || !instance_exists(obj_battle_controller)) return false;
+    var bc = instance_find(obj_battle_controller, 0);
+    return Menu_BattleAllowed(bc.battle_state, Battle_QteBusy(bc), bc.battle_over);
+}
+
+// The map: when the player is settled. A fight: Menu_BattleOpenNow.
+function Menu_CanOpen() {
+    var gs = GameState_Get();
+    if (gs.ui.mode != UI_NONE || gs.in_main_menu) return false;
+    if (room == rm_battle) return Menu_BattleOpenNow();
+    var pl = gs.player_inst;
+    return instance_exists(pl) && Player_IsSettled(pl);
+}
+
+// True while the one menu is up (opening, open or fading out).
+function Menu_IsOpen() {
+    return GameState_Get().ui.mode == UI_MENU && is_struct(TabMenu_Get());
 }
 
 // 0..1 for the whole screen's fade (in while opening, out once closing).
@@ -666,8 +773,9 @@ function Menu_Alpha() {
     return (u.closed_ms >= 0) ? (1 - Ui_AnimT(u.closed_ms, current_time)) : Ui_AnimT(u.opened_ms, current_time);
 }
 
-// True while the Controls page waits for a key: Q, E and the menu key belong to the rebinding then.
+// True while the Controls page waits for a key or the "Keep this?" prompt is up: Q, E and the menu key belong to them then.
 function Menu_CaptureActive() {
+    if (KeepThis_Active()) return true;
     if (!SettingsPopup_IsOpen("tab")) return false;
     var sp = GameState_Get().ui.settings_popup;
     return is_struct(sp.controls) && sp.controls.capture != "";
@@ -754,6 +862,27 @@ function TabMenu_OnConfirm(_m, _i) {
         case "codex":
             TabCodex_Open(it.id);
             break;
+        case "system":
+            if (it.id != "abandon") TabSystem_Disarm();
+            switch (it.id) {
+                case "help":
+                    TabHelp_Open();
+                    break;
+                case "abandon":
+                    if (!u.sys_armed) {   // the first press asks, the second abandons the run
+                        u.sys_armed = true;
+                        TabMenu_Refresh();
+                    } else {
+                        u.pending = "abandon";
+                        Menu_Close();
+                    }
+                    break;
+                case "quit":
+                    u.pending = "quit";
+                    Menu_Close();
+                    break;
+            }
+            break;
     }
 }
 
@@ -772,7 +901,7 @@ function Menu_HandleInput() {
     // Q / E (or the shoulder buttons) change the tab and wrap; a click on a label goes straight to it
     if (!Menu_CaptureActive() && current_time - u.opened_ms >= UI_INPUT_LOCK_MS) {
         var d = (Input_Pressed("tab_next") ? 1 : 0) - (Input_Pressed("tab_prev") ? 1 : 0);
-        var to = (d != 0) ? Ui_TabStep(u.tab, 6, d) : u.tab;
+        var to = (d != 0) ? Ui_TabStep(u.tab, TabMenu_Count(), d) : u.tab;
         if (d == 0 && mouse_check_button_pressed(mb_left) && variable_global_exists("ui_tabs_rects")) {
             var mp = Ui_MousePos();
             var hi = Ui_HoverIndex(global.ui_tabs_rects, mp.x, mp.y);
@@ -785,19 +914,19 @@ function Menu_HandleInput() {
         }
     }
     if (tid == "settings") {
-        var sp = TabSettings_Popup();
-        if (is_struct(sp.controls)) ControlsPage_Handle(sp);
-        else Ui_MenuUpdate(sp.menu);
+        SettingsPage_Handle(TabSettings_Popup());
         return;
     }
     var pg = u.pages[u.tab];
-    Ui_MenuUpdate(Ui_StackTop(pg.stk), pg.stk);
+    var ev = Ui_MenuUpdate(Ui_StackTop(pg.stk), pg.stk);
+    if (ev.moved && tid == "system") TabSystem_Disarm();
 }
 
 // The prompts for the footer: what Confirm does on the row under the cursor, then what Back does.
 function TabMenu_Hint() {
     var m = TabMenu_TopMenu();
     var txt = "";
+    if (KeepThis_Active()) return "";   // the prompt box carries its own keys
     if (is_struct(m) && array_length(m.items) > 0) {
         var it = m.items[clamp(m.cursor, 0, array_length(m.items) - 1)];
         if (variable_struct_exists(it, "hint")) txt = it.hint;
@@ -941,6 +1070,7 @@ function Menu_Draw() {
         }
     }
     TabMenu_DrawFooter(z, a);
+    KeepThis_Draw(a);
     if (u.toast != "" && now - u.toast_ms < TAB_TOAST_MS) {
         var tw = UI_TextWidth(u.toast) + 8 * p;
         var th = mt.line_h + 6 * p;
@@ -1715,54 +1845,8 @@ function Notice_Draw() {
     draw_set_color(c_white);
 }
 
-// ---- the Help page (pause menu): every tutorial, seen or not, in the framework's list with the details panel ----------------------------
-// global.help_ui = { stk, lock, opened_ms }.
-function HelpUi_IsOpen() {
-    return variable_global_exists("help_ui") && is_struct(global.help_ui);
-}
-
-function HelpUi_Open() {
-    var u = { stk: Ui_StackNew(), lock: InputLock_New(HELP_UI_INPUT_DELAY_MS), opened_ms: current_time };
-    var m = Ui_MenuNew("help", Tutorial_HelpItems(), {
-        on_back: HelpUi_OnBack,
-        layout: { title: Loc_T("help.title", "Help"), anchor: "center", details: true }
-    });
-    Ui_StackPush(u.stk, m);
-    global.help_ui = u;
-    SFX_PlayUI("ui_openclose");
-}
-
-function HelpUi_Close() {
-    global.help_ui = undefined;
-}
-
-function HelpUi_OnBack(_m, _res) {
-    HelpUi_Close();
-}
-
-function HelpUi_Handle() {
-    if (!HelpUi_IsOpen()) return;
-    var u = global.help_ui;
-    if (InputLock_Active(u.lock)) return;   // the press that opened it
-    var top = Ui_StackTop(u.stk);
-    if (is_struct(top)) Ui_MenuUpdate(top, u.stk);
-}
-
-function HelpUi_Draw() {
-    if (!HelpUi_IsOpen()) return;
-    var u = global.help_ui;
-    var a = Ui_AnimT(u.opened_ms, current_time);
-    UI_SetFont();
-    draw_set_alpha(1);
-    Ui_DimBackdrop(0.6 * a);
-    Ui_StackDraw(u.stk, 0.5);
-    draw_set_alpha(1);
-    draw_set_color(c_white);
-}
-
 // ---- the Controls page of the settings (D49) ---------------------------------------------------------------------------------------------
-// The rows are the rebindable actions; confirming one waits for a key (Esc or right click cancels). The page edits the settings' pending copy
-// (sp.pending.keys); Apply on the settings list saves and applies, Back throws the change away, like every other row.
+// The rows are the rebindable actions; confirming one waits for a key (Esc or right click cancels). A new key is live and saved at once (D140).
 function Controls_RowHelp(_id) {
     if (_id == "reset") return Loc_T("controls.help.reset", "Puts every keyboard key back to how it was. The controller is never changed.");
     return Loc_T("controls.help.row", "Confirm, then press the new key. If another action already uses it, the two swap. Esc cancels.");
@@ -1796,7 +1880,7 @@ function Controls_Capture(_keys, _row, _key) {
     } else if (r.swapped != "") {
         msg = Loc_T("controls.swapped", "{other} had that key, so the two swapped.", { other: Binds_RowLabel(r.swapped) });
     } else {
-        msg = Loc_T("controls.set", "Key changed. Apply saves it.");
+        msg = Loc_T("controls.set", "Key changed.");
     }
     return { ok: r.ok, keys: r.keys, message: msg };
 }
@@ -1813,7 +1897,7 @@ function Controls_PollKey() {
 function ControlsPage_Open(_sp) {
     _sp.controls = { menu: undefined, capture: "", msg_row: "", msg: "", lock: undefined };
     var c = _sp.controls;
-    c.menu = Ui_MenuNew("controls", Controls_Items(_sp.pending.keys, ""), {
+    c.menu = Ui_MenuNew("controls", Controls_Items(GameSettings_Ensure().keys, ""), {
         on_confirm: ControlsPage_OnConfirm, on_back: ControlsPage_OnBack,
         layout: { title: Loc_T("controls.title", "Controls"), anchor: "center", details: true }
     });
@@ -1822,7 +1906,7 @@ function ControlsPage_Open(_sp) {
 function ControlsPage_Refresh(_sp) {
     var c = _sp.controls;
     if (!is_struct(c)) return;
-    c.menu.items = Controls_Items(_sp.pending.keys, c.capture, c.msg_row, c.msg);
+    c.menu.items = Controls_Items(GameSettings_Ensure().keys, c.capture, c.msg_row, c.msg);
 }
 
 function ControlsPage_OnConfirm(_m, _i) {
@@ -1830,10 +1914,9 @@ function ControlsPage_OnConfirm(_m, _i) {
     var c = sp.controls;
     var rid = _m.items[_i].id;
     if (rid == "reset") {
-        sp.pending.keys = Binds_Defaults();
-        sp.dirty = true;
+        Settings_SetKeys(Binds_Defaults());
         c.msg_row = "reset";
-        c.msg = Loc_T("controls.reset_done", "Keys are back to the defaults. Apply saves them.");
+        c.msg = Loc_T("controls.reset_done", "Keys are back to the defaults.");
         SettingsPopup_Refresh();
         ControlsPage_Refresh(sp);
         return;
@@ -1845,7 +1928,7 @@ function ControlsPage_OnConfirm(_m, _i) {
     ControlsPage_Refresh(sp);
 }
 
-// Back leaves the Controls page for the settings list (the change stays pending).
+// Back leaves the Controls page for the settings list.
 function ControlsPage_OnBack(_m, _res) {
     var sp = GameState_Get().ui.settings_popup;
     sp.controls = undefined;
@@ -1864,12 +1947,11 @@ function ControlsPage_OnKey(_sp, _key) {
         SFX_PlayUI("ui_back");
         return true;
     }
-    var r = Controls_Capture(_sp.pending.keys, c.capture, _key);
+    var r = Controls_Capture(GameSettings_Ensure().keys, c.capture, _key);
     c.msg_row = c.capture;
     c.msg = r.message;
     if (r.ok) {
-        _sp.pending.keys = r.keys;
-        _sp.dirty = true;
+        Settings_SetKeys(r.keys);
         c.capture = "";
         SFX_PlayUI("ui_confirm");
         SettingsPopup_Refresh();
@@ -2313,9 +2395,10 @@ function Item_DrawIcon(_item, _x, _y, _size, _alpha = 1) {
 }
 
 // --------------------
-// SETTINGS SCREEN (D0 pilot on the UI framework; opened from the title and from the pause menu)
+// SETTINGS SCREEN (D0 pilot on the UI framework; opened from the title and as the Settings tab of the one menu)
 // --------------------
-// Rows work on a pending copy of the settings; Apply commits and saves, Back leaves without saving. The window rows keep D91's logic
+// D140: every row changes the live settings at once (Settings_Change) and saves; the window mode and scale rows then ask "Keep this?" for 10 s and
+// go back by themselves (KeepThis_*). The window rows keep D91's logic
 // (Display_WindowedMaxScaleNow decides the largest windowed scale; scale only matters while windowed).
 function Settings_TextSpeedMul(_idx) {
     switch (clamp(round(_idx), 0, SETTINGS_TEXT_SPEED_MAX)) {
@@ -2377,6 +2460,121 @@ function Settings_Adjust(_p, _id, _dir, _scale_max) {
     return false;
 }
 
+// ---- D140: a change is live at once; the window rows ask "Keep this?" ----
+#macro KEEP_THIS_MS 10000   // the countdown of the "Keep this?" prompt
+
+function KeepThis_Active() {
+    return variable_global_exists("keep_this") && is_struct(global.keep_this);
+}
+
+// A window change was just made: remember what it was before. _now is the clock the countdown runs on (a check passes its own).
+function KeepThis_Begin(_prev_mode, _prev_scale, _now = current_time) {
+    global.keep_this = { prev_mode: _prev_mode, prev_scale: _prev_scale, start_ms: _now, lock_ms: current_time };
+}
+
+function KeepThis_Remaining(_now = current_time) {
+    if (!KeepThis_Active()) return 0;
+    return clamp(KEEP_THIS_MS - (_now - global.keep_this.start_ms), 0, KEEP_THIS_MS);
+}
+
+// Keep: the new window state stays and is saved.
+function KeepThis_Confirm() {
+    if (!KeepThis_Active()) return false;
+    global.keep_this = undefined;
+    Save_WriteSettingsConfig(GameSettings_Ensure());
+    return true;
+}
+
+// Back, or no answer: the window goes back to what it was.
+function KeepThis_Revert() {
+    if (!KeepThis_Active()) return false;
+    var k = global.keep_this;
+    global.keep_this = undefined;
+    var s = GameSettings_Copy(GameSettings_Ensure());
+    s.window_mode = k.prev_mode;
+    s.display_scale = k.prev_scale;
+    GameSettings_Commit(s, true);
+    return true;
+}
+
+// True when the time ran out this call and the change was put back.
+function KeepThis_Tick(_now = current_time) {
+    if (!KeepThis_Active()) return false;
+    if (_now - global.keep_this.start_ms < KEEP_THIS_MS) return false;
+    KeepThis_Revert();
+    return true;
+}
+
+// One row change on the live settings. Returns true when something changed. Volume, text, language and the rest are live and saved at once;
+// the window rows are live at once and saved when kept.
+function Settings_Change(_id, _dir, _scale_max = DISPLAY_SCALE_MAX, _now = current_time) {
+    var live = GameSettings_Ensure();
+    var s = GameSettings_Copy(live);
+    if (!Settings_Adjust(s, _id, _dir, _scale_max)) return false;
+    var display = (_id == "window" || _id == "scale");
+    if (display) {
+        if (!KeepThis_Active()) {
+            KeepThis_Begin(live.window_mode, live.display_scale, _now);
+        } else {
+            global.keep_this.start_ms = _now;
+            global.keep_this.lock_ms = current_time;
+        }
+    }
+    GameSettings_Commit(s, !display, display);
+    return true;
+}
+
+// New keys (the Controls page): live and saved at once.
+function Settings_SetKeys(_keys) {
+    var s = GameSettings_Copy(GameSettings_Ensure());
+    s.keys = _keys;
+    GameSettings_Commit(s, true, false);
+}
+
+// The "Keep this?" box over the settings page: what happened, the seconds left, the two keys.
+function KeepThis_Draw(_a = 1) {
+    if (!KeepThis_Active()) return;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var iw = min(mt.gw - 2 * mt.margin - 8 * p, 130 * p);
+    var t1 = Loc_T("settings.keep.title", "Keep this setting?");
+    var t2 = Loc_T("settings.keep.body", "It goes back by itself in {n} s.", { n: string(ceil(KeepThis_Remaining() / 1000)) });
+    var t3 = Loc_T("settings.keep.hint", "{confirm} Keep   {back} Revert");
+    var l1 = Prompt_RichLayout(t1, iw);
+    var l2 = Prompt_RichLayout(t2, iw);
+    var l3 = Prompt_RichLayout(t3, iw);
+    var bh = 8 * p + l1.h + l2.h + l3.h + 4 * p;
+    var bw = iw + 8 * p;
+    var bx = round((mt.gw - bw) / 2);
+    var by = round((mt.gh - bh) / 2);
+    global.keep_this_rect = { x: bx, y: by, w: bw, h: bh };
+    Ui_DimBackdrop(0.5 * _a);
+    Ui_DrawFrame(bx, by, bw, bh, _a, p);
+    var yy = by + 4 * p;
+    Prompt_RichDraw(bx + 4 * p, yy, t1, iw, UI_C_LIGHTEST, fa_center, _a);
+    yy += l1.h + 2 * p;
+    Prompt_RichDraw(bx + 4 * p, yy, t2, iw, UI_C_TEXT, fa_center, _a);
+    yy += l2.h + 2 * p;
+    Prompt_RichDraw(bx + 4 * p, yy, t3, iw, UI_C_LIGHT, fa_center, _a);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
+// While the prompt is up the page answers only to it: Confirm keeps, Back (or the menu key, a right click) puts the window back, time does the same.
+function KeepThis_Step(_sp) {
+    if (KeepThis_Tick()) { SettingsPopup_Refresh(); return; }
+    if (current_time - global.keep_this.lock_ms < UI_INPUT_LOCK_MS) return;   // the press that made the change
+    if (Input_UIConfirm() || mouse_check_button_pressed(mb_left)) {
+        SFX_PlayUI("ui_confirm");
+        KeepThis_Confirm();
+        SettingsPopup_Refresh();
+    } else if (Input_UIBack() || Input_UIPressed("menu") || mouse_check_button_pressed(mb_right)) {
+        SFX_PlayUI("ui_back");
+        KeepThis_Revert();
+        SettingsPopup_Refresh();
+    }
+}
+
 function Settings_WindowModeText(_mode) {
     if (_mode == WINDOW_MODE_WINDOWED) return Loc_T("settings.value.window_windowed", "Windowed");
     if (_mode == WINDOW_MODE_BORDERLESS) return Loc_T("settings.value.window_borderless", "Borderless");
@@ -2399,9 +2597,9 @@ function Settings_VolumeRow(_id, _label, _v, _help) {
     return r;
 }
 
-// The menu items for a pending settings struct: labels, values, slider fills, help sentences and number lines (D100: the numbers
+// The menu items for a settings struct: labels, values, slider fills, help sentences and number lines (D100: the numbers
 // come from the real data, never typed in twice).
-function SettingsMenu_Items(_p, _scale_max, _dirty = false) {
+function SettingsMenu_Items(_p, _scale_max) {
     var ts = clamp(_p.text_speed, 0, SETTINGS_TEXT_SPEED_MAX);
     var windowed = (_p.window_mode == WINDOW_MODE_WINDOWED);
     var items = [];
@@ -2460,11 +2658,6 @@ function SettingsMenu_Items(_p, _scale_max, _dirty = false) {
         Loc_T("settings.help.controls", "Change the keyboard keys. The controller stays as it is."));
     array_push(items, r_ct);
 
-    var r_ap = Settings_Row("apply", Loc_T("settings.row.apply", "Apply"), "button",
-        _dirty ? Loc_T("settings.value.pending", "Pending") : Loc_T("settings.value.saved", "Saved"),
-        Loc_T("settings.help.apply", "Saves your changes and applies them now. Back leaves without saving."));
-    r_ap.measure = [Loc_T("settings.value.pending", "Pending"), Loc_T("settings.value.saved", "Saved")];
-    array_push(items, r_ap);
     return items;
 }
 
@@ -2473,8 +2666,8 @@ function SettingsPopup_Ensure() {
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
     if (!variable_struct_exists(gs.ui, "settings_popup")) {
         gs.ui.settings_popup = {
-            open: false, owner: "", menu: undefined, pending: GameSettings_Copy(GameSettings_Ensure()),
-            dirty: false, closing: false, closed_ms: -1, scale_max: DISPLAY_SCALE_MAX, controls: undefined
+            open: false, owner: "", menu: undefined,
+            closing: false, closed_ms: -1, scale_max: DISPLAY_SCALE_MAX, controls: undefined
         };
     }
 }
@@ -2487,12 +2680,12 @@ function SettingsPopup_IsOpen(_owner = "") {
     return true;
 }
 
-// Rebuilds the rows from the pending settings (after any change; the cursor stays where it is).
+// Rebuilds the rows from the live settings (after any change; the cursor stays where it is).
 function SettingsPopup_Refresh() {
     SettingsPopup_Ensure();
     var sp = GameState_Get().ui.settings_popup;
     if (!sp.open || !is_struct(sp.menu)) return;
-    sp.menu.items = SettingsMenu_Items(sp.pending, sp.scale_max, sp.dirty);
+    sp.menu.items = SettingsMenu_Items(GameSettings_Ensure(), sp.scale_max);
 }
 
 function SettingsPopup_Open(_owner = "", _quiet = false) {
@@ -2501,12 +2694,10 @@ function SettingsPopup_Open(_owner = "", _quiet = false) {
     sp.open = true;
     sp.owner = string(_owner);
     sp.controls = undefined;
-    sp.dirty = false;
     sp.closing = false;
     sp.closed_ms = -1;
-    sp.pending = GameSettings_Copy(GameSettings_Ensure());
     sp.scale_max = clamp(Display_WindowedMaxScaleNow(), 1, DISPLAY_SCALE_MAX);
-    sp.menu = Ui_MenuNew("settings", SettingsMenu_Items(sp.pending, sp.scale_max), {
+    sp.menu = Ui_MenuNew("settings", SettingsMenu_Items(GameSettings_Ensure(), sp.scale_max), {
         on_confirm: SettingsMenu_OnConfirm, on_adjust: SettingsMenu_OnAdjust, on_back: SettingsMenu_OnBack,
         layout: { title: Loc_T("settings.title", "Settings"), anchor: "center", details: true, hides_below: true }
     });
@@ -2535,19 +2726,15 @@ function SettingsPopup_CloseFinalize() {
     sp.owner = "";
     sp.closing = false;
     sp.closed_ms = -1;
-    sp.dirty = false;
     sp.menu = undefined;
     sp.controls = undefined;
-    sp.pending = GameSettings_Copy(GameSettings_Ensure());
 }
 
-// Applies one change to the pending copy and refreshes the rows; the language row previews at once.
+// Applies one change to the live settings and refreshes the rows; the language row changes every text at once.
 function SettingsPopup_Change(_id, _dir) {
     var sp = GameState_Get().ui.settings_popup;
-    var changed = Settings_Adjust(sp.pending, _id, _dir, sp.scale_max);
+    var changed = Settings_Change(_id, _dir, sp.scale_max);
     if (changed) {
-        sp.dirty = true;
-        if (_id == "language") Loc_SetLanguage(sp.pending.language);
         SettingsPopup_Refresh();
         if (_id == "language") sp.menu.layout.title = Loc_T("settings.title", "Settings");
     }
@@ -2558,7 +2745,7 @@ function SettingsMenu_OnAdjust(_m, _i, _dir) {
     return SettingsPopup_Change(_m.items[_i].id, _dir);
 }
 
-// Confirm: Apply commits and saves; a choice row steps forward (so a toggle flips with the confirm key too).
+// Confirm: Controls opens its page; a choice row steps forward (so a toggle flips with the confirm key too).
 function SettingsMenu_OnConfirm(_m, _i) {
     var rid = _m.items[_i].id;
     var sp = GameState_Get().ui.settings_popup;
@@ -2566,25 +2753,24 @@ function SettingsMenu_OnConfirm(_m, _i) {
         ControlsPage_Open(sp);
         return;
     }
-    if (rid == "apply") {
-        var committed = GameSettings_Commit(sp.pending, true);
-        sp.pending = GameSettings_Copy(committed);
-        sp.dirty = false;
-        SettingsPopup_Refresh();
-        return;
-    }
     if (_m.items[_i].kind == "choice") SettingsPopup_Change(rid, 1);
 }
 
-// Back: leave without saving, restoring the saved language.
+// Back: leave (everything is already saved).
 function SettingsMenu_OnBack(_m, _res) {
-
     var sp = GameState_Get().ui.settings_popup;
-    sp.pending = GameSettings_Copy(GameSettings_Ensure());
-    sp.dirty = false;
     sp.controls = undefined;
-    Loc_SetLanguage(GameSettings_Ensure().language);
     SettingsPopup_Close(false);
+}
+
+// One frame of the settings page (the title's popup and the Settings tab): the "Keep this?" prompt first, then the Controls page, then the list.
+function SettingsPage_Handle(_sp) {
+    if (KeepThis_Active()) {
+        KeepThis_Step(_sp);
+        return;
+    }
+    if (is_struct(_sp.controls)) ControlsPage_Handle(_sp);
+    else Ui_MenuUpdate(_sp.menu);
 }
 
 function SettingsPopup_HandleInput() {
@@ -2595,11 +2781,7 @@ function SettingsPopup_HandleInput() {
         if (current_time - sp.closed_ms >= UI_PANEL_MS) SettingsPopup_CloseFinalize();
         return;
     }
-    if (is_struct(sp.controls)) {   // D49: the Controls page sits on top of the list
-        ControlsPage_Handle(sp);
-        return;
-    }
-    Ui_MenuUpdate(sp.menu);
+    SettingsPage_Handle(sp);
 }
 
 function SettingsPopup_Draw(_draw_backdrop = true) {
@@ -2610,6 +2792,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     if (_draw_backdrop) Ui_DimBackdrop(0.6 * a);
     if (is_struct(sp.controls)) Ui_MenuDraw(sp.controls.menu, a);
     else Ui_MenuDraw(sp.menu, a);
+    KeepThis_Draw(a);
     draw_set_alpha(1);
     draw_set_color(c_white);
 }
@@ -2962,30 +3145,7 @@ function Title_DrawSplash(_c) {
 }
 
 // --------------------
-// PAUSE MENU (D92, D95): Resume, Help, Settings, Abandon Run (two presses), Quit to Title, on the UI framework
-// --------------------
-// global.pause_ui = { stk, opened_ms, closed_ms, armed, pending, in_battle } while it is open, with gs.ui.mode = UI_PAUSE. Settings and Help open above it
-// (their own screens). A choice that leaves the game (Abandon, Quit) fades the menu out first, then acts (PauseMenu_CloseFinalize).
-#macro PAUSE_ABANDON_INDEX 3   // Resume, Help, Settings, Abandon Run, Quit to Title
-
-// R1b (D122): in a battle Abandon run and Quit to title are switched off (the fight cannot be saved or left from here).
-function PauseMenu_Items(_armed, _in_battle = false) {
-    return [
-        { id: "resume", label: Loc_T("pause.option.resume", "Resume"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.resume", "Back to the game.") },
-        { id: "help", label: Loc_T("pause.option.help", "Help"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.help", "Every hint the game has: the ones you have seen and the ones still to come.") },
-        { id: "settings", label: Loc_T("pause.option.settings", "Settings"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.settings", "Sound, text, window, language and keys.") },
-        { id: "abandon", value: "", kind: "button", enabled: !_in_battle, lines: [],
-          label: _armed ? Loc_T("pause.option.abandon_confirm", "Sure? Confirm again") : Loc_T("pause.option.abandon", "Abandon run"),
-          help: _in_battle ? Loc_T("pause.help.in_battle", "Not available during a battle.")
-                : (_armed ? Loc_T("pause.help.abandon_armed", "Confirm once more to end this run now. Back or another row cancels.")
-                          : Loc_T("pause.help.abandon", "Ends this run now. It counts as a death, but you keep the echo.")) },
-        { id: "quit", label: Loc_T("pause.option.quit", "Quit to title"), value: "", kind: "button", enabled: !_in_battle, lines: [],
-          help: _in_battle ? Loc_T("pause.help.in_battle", "Not available during a battle.") : Loc_T("pause.help.quit", "Saves the run and goes to the title. Continue picks it up again.") }
-    ];
-}
-
-// --------------------
-// FOCUS LOSS (R1b, D122): the window loses focus -> the pause menu opens (the battle variant in a fight) and the music is lowered
+// FOCUS LOSS (R1b, D122, D140): the window loses focus -> the one menu opens (in a fight too, but never over a running bar) and the music is lowered
 // --------------------
 #macro FOCUS_MUSIC_DUCK 0.25   // the music's share of its normal volume while the window is not in front
 
@@ -2995,16 +3155,16 @@ function Focus_ShouldPause(_has_focus, _ui_mode, _in_main_menu, _in_battle, _in_
     return _ui_mode == UI_NONE;
 }
 
-// Review 1: the pause opens on the focused -> unfocused EDGE only (the first frame counts as focused). A Resume while the window is still
-// in the background must stay resumed, not reopen next frame. The loss is remembered (global.focus_pending) until the pause could open
-// (a dialogue or a room change may be in the way) or the window comes back.
+// Review 1: the menu opens on the focused -> unfocused EDGE only (the first frame counts as focused). Closing it while the window is still
+// in the background must stay closed, not reopen next frame. The loss is remembered (global.focus_pending) until the pause could open
+// (a dialogue, a room change or a QTE bar may be in the way) or the window comes back.
 function Focus_Edge(_has_focus) {
     var prev = variable_global_exists("focus_prev") ? global.focus_prev : true;
     global.focus_prev = _has_focus;
     return prev && !_has_focus;
 }
 
-// Called by the UI controller every Step with window_has_focus(). Coming back does not close the pause menu: the player resumes.
+// Called by the UI controller every Step with window_has_focus(). Coming back does not close the menu: the player closes it.
 function Focus_Step(_has_focus) {
     Rumble_FocusStep(_has_focus);   // G8 (D136): no vibration while the window is out of focus
     BGM_SetDuck(_has_focus ? 1 : FOCUS_MUSIC_DUCK);   // the music follows the current state, not the edge
@@ -3013,174 +3173,16 @@ function Focus_Step(_has_focus) {
     if (!variable_global_exists("focus_pending") || !global.focus_pending) return;
     var gs = GameState_Get();
     if (!is_struct(gs) || !variable_struct_exists(gs, "ui")) return;
-    if (gs.ui.mode == UI_PAUSE) { global.focus_pending = false; return; }   // already paused (by this loss or by hand)
+    if (gs.ui.mode == UI_MENU) { global.focus_pending = false; return; }   // already in the menu (by this loss or by hand)
     var in_battle = (room == rm_battle);
     if (!Focus_ShouldPause(_has_focus, gs.ui.mode, gs.in_main_menu, in_battle, Transition_IsActive())) return;
     if (Tutorial_IsOpen()) return;   // a pop-up owns the keys; the battle waits for it already
     if (in_battle) {
-        if (instance_exists(obj_battle_controller)) { PauseMenu_Open(true); global.focus_pending = false; }
+        if (Menu_BattleOpenNow()) { Menu_Open(); global.focus_pending = false; }   // a running bar is never interrupted: the loss stays pending until it is over
     } else if (instance_exists(gs.player_inst) && Player_IsSettled(gs.player_inst)) {
-        PauseMenu_Open();
+        Menu_Open();
         global.focus_pending = false;
     }
-}
-
-function PauseMenu_Get() {
-    return (variable_global_exists("pause_ui") && is_struct(global.pause_ui)) ? global.pause_ui : undefined;
-}
-
-function PauseMenu_IsOpen() {
-    var gs = GameState_Get();
-    return variable_struct_exists(gs, "ui") && gs.ui.mode == UI_PAUSE;
-}
-
-// The row under the cursor, for the scripted runs.
-function PauseMenu_Cursor() {
-    var u = PauseMenu_Get();
-    return is_struct(u) ? Ui_StackTop(u.stk).cursor : -1;
-}
-
-function PauseMenu_Open(_in_battle = false) {
-    var gs = GameState_Get();
-    var u = { stk: Ui_StackNew(), opened_ms: current_time, closed_ms: -1, armed: false, pending: "", in_battle: _in_battle };
-    var m = Ui_MenuNew("pause", PauseMenu_Items(false, _in_battle), {
-        on_confirm: PauseMenu_OnConfirm, on_back: PauseMenu_OnBack,
-        layout: { title: Loc_T("pause.title", "Paused"), anchor: "center", details: true }
-    });
-    Ui_MenuFixCursor(m, 0);   // a pause always starts on Resume
-    Ui_StackPush(u.stk, m);
-    global.pause_ui = u;
-    gs.ui.mode = UI_PAUSE;
-    SFX_PlayUI("ui_openclose");
-}
-
-function PauseMenu_Close(_immediate = false) {
-    var u = PauseMenu_Get();
-    if (!is_struct(u)) return;
-    var gs = GameState_Get();
-    if (_immediate) {
-        global.pause_ui = undefined;
-        if (gs.ui.mode == UI_PAUSE) gs.ui.mode = UI_NONE;
-        SFX_PlayUI("ui_openclose");
-        return;
-    }
-    if (u.closed_ms >= 0) return;
-    u.closed_ms = current_time;
-    Ui_MenuClose(Ui_StackTop(u.stk));
-    SFX_PlayUI("ui_openclose");
-}
-
-// Once the fade is over: Abandon Run ends the run (a fall that keeps the echo); Quit to Title saves it and goes to the title.
-function PauseMenu_CloseFinalize() {
-    var gs = GameState_Get();
-    var u = PauseMenu_Get();
-    var pending = is_struct(u) ? u.pending : "";
-    global.pause_ui = undefined;
-    if (gs.ui.mode == UI_PAUSE) gs.ui.mode = UI_NONE;
-
-    if (pending == "abandon") {
-        Run_Abandon();   // C1 (D92): counts as a death, keeps the echo; the death scene and the echo pick follow
-        return;
-    }
-    if (pending == "quit") {
-        Run_AutoSave();   // C1 (D46): leaving to the title keeps the run; Continue picks it up
-        gs.in_main_menu = true;
-        gs.player_inst = noone;
-        if (variable_struct_exists(gs, "ui")) {
-            gs.ui.lines = [];
-            gs.ui.index = 0;
-            gs.ui.speaker = "";
-            gs.ui.confirm_action = "";
-        }
-        if (room != rm_start) {
-            RoomState_OnRoomExit();
-            Transition_RequestLoadingRoomFade(rm_start);
-        }
-    }
-}
-
-function PauseMenu_Disarm() {
-    var u = PauseMenu_Get();
-    if (!is_struct(u) || !u.armed) return;
-    u.armed = false;
-    Ui_StackTop(u.stk).items = PauseMenu_Items(false, u.in_battle);
-}
-
-function PauseMenu_OnBack(_m, _res) {
-    PauseMenu_Close();
-}
-
-function PauseMenu_OnConfirm(_m, _i) {
-    var u = PauseMenu_Get();
-    var rid = _m.items[_i].id;
-    if (rid != "abandon") PauseMenu_Disarm();
-    switch (rid) {
-        case "resume":
-            PauseMenu_Close();
-            break;
-        case "help":
-            HelpUi_Open();
-            break;
-        case "settings":
-            SettingsPopup_Open("pause");
-            break;
-        case "abandon":
-            if (!u.armed) {   // the first press asks, the second abandons the run
-                u.armed = true;
-                _m.items = PauseMenu_Items(true);
-            } else {
-                u.pending = "abandon";
-                PauseMenu_Close();
-            }
-            break;
-        case "quit":
-            u.pending = "quit";
-            PauseMenu_Close();
-            break;
-    }
-}
-
-function PauseMenu_HandleInput() {
-    var u = PauseMenu_Get();
-    if (!is_struct(u)) {
-        var gs = GameState_Get();
-        if (gs.ui.mode == UI_PAUSE) gs.ui.mode = UI_NONE;
-        return;
-    }
-    if (SettingsPopup_IsOpen("pause")) {
-        SettingsPopup_HandleInput();
-        return;
-    }
-    if (HelpUi_IsOpen()) {   // D45: the Help page
-        HelpUi_Handle();
-        return;
-    }
-    if (u.closed_ms >= 0) {
-        if (current_time - u.closed_ms >= UI_PANEL_MS) PauseMenu_CloseFinalize();
-        return;
-    }
-    var ev = Ui_MenuUpdate(Ui_StackTop(u.stk));
-    if (ev.moved) PauseMenu_Disarm();
-}
-
-function PauseMenu_Draw() {
-    var u = PauseMenu_Get();
-    if (!is_struct(u)) return;
-    var now = current_time;
-    var a = (u.closed_ms >= 0) ? (1 - Ui_AnimT(u.closed_ms, now)) : Ui_AnimT(u.opened_ms, now);
-    UI_SetFont();
-    draw_set_alpha(1);
-    Ui_DimBackdrop(0.6 * a);
-    if (SettingsPopup_IsOpen("pause")) {
-        SettingsPopup_Draw(false);
-    } else if (HelpUi_IsOpen()) {
-        HelpUi_Draw();
-    } else {
-        var m = Ui_StackTop(u.stk);
-        Ui_MenuDraw(m, Ui_MenuAlpha(m, now));
-    }
-    draw_set_alpha(1);
-    draw_set_color(c_white);
 }
 
 

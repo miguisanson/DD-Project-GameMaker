@@ -40,7 +40,6 @@ switch (ui_mode_id) {
     case UI_DIALOGUE: ui_mode_name = "Dialogue"; break;
     case UI_MENU: ui_mode_name = "Menu"; break;
     case UI_SAVE: ui_mode_name = "Save"; break;
-    case UI_PAUSE: ui_mode_name = "Pause"; break;
     case UI_CLASS_SELECT: ui_mode_name = "Class Select"; break;
     case UI_CARDS: ui_mode_name = "Cards"; break;
     case UI_SHOP: ui_mode_name = "Shop"; break;

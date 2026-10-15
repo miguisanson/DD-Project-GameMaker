@@ -943,11 +943,11 @@ function UI_InterruptCloseAll(_fade_dim = true) {
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
 
     // Immediately hide all modal/popups to avoid stale mode locks during transitions.
-    if (is_struct(TabMenu_Get())) {   // D1b: the Tab menu and the pause menu are framework screens held in globals
+    if (KeepThis_Active()) KeepThis_Revert();   // D140: a window change nobody confirmed goes back
+    if (is_struct(TabMenu_Get())) {   // D1b: the one menu is a framework screen held in a global
         TabSettings_Discard();
         global.tab_ui = undefined;
     }
-    if (is_struct(PauseMenu_Get())) global.pause_ui = undefined;
 
     Notice_Interrupt();
 
@@ -961,7 +961,6 @@ function UI_InterruptCloseAll(_fade_dim = true) {
         sp.owner = "";
         sp.closing = false;
         sp.closed_ms = -1;
-        sp.dirty = false;
         sp.menu = undefined;
         gs.ui.settings_popup = sp;
     }
@@ -1080,18 +1079,19 @@ function GameSettings_ApplyAll() {
     Binds_Apply(settings.keys);   // D49: the player's keys
 }
 
-// Settings > Apply: the only caller that asks the display for something (boot does the same from Display_Init).
+// Settings (a window row, kept or put back): the only caller that asks the display for something (boot does the same from Display_Init).
 function GameSettings_ApplyDisplayRequest() {
     var settings = GameSettings_Ensure();
     Display_Request({ mode: settings.window_mode, scale: settings.display_scale });
 }
 
-function GameSettings_Commit(_settings, _save_config = false) {
+// _apply_display = false for a change that cannot move the window (a volume, the keys): no window request is made for it.
+function GameSettings_Commit(_settings, _save_config = false, _apply_display = true) {
     var gs = GameState_Get();
     gs.settings = GameSettings_Normalize(_settings);
     GameState_SyncLegacy();
     GameSettings_ApplyAll();
-    GameSettings_ApplyDisplayRequest();
+    if (_apply_display) GameSettings_ApplyDisplayRequest();
     if (_save_config) {
         Save_WriteSettingsConfig(gs.settings);
     }
