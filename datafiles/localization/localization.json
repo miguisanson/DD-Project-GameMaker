@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T10:59:24Z",
-    "row_count": 1035
+    "generated_at_utc": "2026-10-15T12:12:52Z",
+    "row_count": 1041
   },
   "default_lang": "en",
   "languages": [
@@ -993,8 +993,8 @@
       "ko": "기본값으로"
     },
     "controls.reset_done": {
-      "en": "Keys are back to the defaults. Apply saves them.",
-      "ko": "키가 기본값으로 돌아갔습니다. 적용을 누르면 저장됩니다."
+      "en": "Keys are back to the defaults.",
+      "ko": "키가 기본값으로 돌아갔습니다."
     },
     "controls.row.back": {
       "en": "Back",
@@ -1037,8 +1037,8 @@
       "ko": "위"
     },
     "controls.set": {
-      "en": "Key changed. Apply saves it.",
-      "ko": "키가 바뀌었습니다. 적용을 누르면 저장됩니다."
+      "en": "Key changed.",
+      "ko": "키가 바뀌었습니다."
     },
     "controls.swapped": {
       "en": "{other} had that key, so the two swapped.",
@@ -3065,8 +3065,8 @@
       "ko": "완벽한 공격, 브레이크, 큰 피해, 쓰러질 때 컨트롤러가 짧게 진동합니다."
     },
     "settings.help.scale": {
-      "en": "How many times the picture is enlarged in a window. Only used when windowed.",
-      "ko": "창 모드에서 화면을 몇 배로 키울지 정합니다. 창 모드에서만 쓰입니다."
+      "en": "How many times the picture is enlarged in a window. Only used when windowed. You are asked to keep a change.",
+      "ko": "창 모드에서 화면을 몇 배로 키울지 정합니다. 창 모드에서만 쓰입니다. 바꾸면 유지할지 물어봅니다."
     },
     "settings.help.shake": {
       "en": "Turns the screen shake on hits on or off.",
@@ -3089,8 +3089,20 @@
       "ko": "메뉴 소리와 인터페이스 효과음의 크기입니다."
     },
     "settings.help.window": {
-      "en": "Windowed, borderless fullscreen, or exclusive fullscreen.",
-      "ko": "창 모드, 테두리 없는 전체 화면, 전용 전체 화면 중에서 고릅니다."
+      "en": "Windowed, borderless fullscreen, or exclusive fullscreen. You are asked to keep a change.",
+      "ko": "창 모드, 테두리 없는 전체 화면, 전용 전체 화면 중에서 고릅니다. 바꾸면 유지할지 물어봅니다."
+    },
+    "settings.keep.body": {
+      "en": "It goes back by itself in {n} s.",
+      "ko": "{n}초 뒤에 자동으로 원래대로 돌아갑니다."
+    },
+    "settings.keep.hint": {
+      "en": "{confirm} Keep   {back} Revert",
+      "ko": "{confirm} 유지   {back} 되돌리기"
+    },
+    "settings.keep.title": {
+      "en": "Keep this setting?",
+      "ko": "이 설정을 유지할까요?"
     },
     "settings.lang.english": {
       "en": "English",
@@ -3928,6 +3940,14 @@
       "en": "Status",
       "ko": "상태"
     },
+    "tab.system": {
+      "en": "System",
+      "ko": "시스템"
+    },
+    "tab.system.quit_battle_help": {
+      "en": "Goes back to the title. Continue puts you back just before this fight.",
+      "ko": "타이틀로 나갑니다. 이어하기를 하면 이 전투 직전부터 다시 시작합니다."
+    },
     "tab.title.codex": {
       "en": "Codex",
       "ko": "도감"
@@ -3947,6 +3967,10 @@
     "tab.title.status": {
       "en": "Stats",
       "ko": "능력치"
+    },
+    "tab.title.system": {
+      "en": "System",
+      "ko": "시스템"
     },
     "tab.unlock.nobody": {
       "en": "Nobody",

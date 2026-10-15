@@ -8,7 +8,7 @@ var real_ms = Presentation_StepMs(delta_time);
 var time_scale = Battle_TimeScale(self);
 var step_ms = real_ms * time_scale;
 Fx_BattleShakesStep(enemy_inst, step_ms);
-if (gs.ui.mode == UI_MENU || gs.ui.mode == UI_PAUSE || Tutorial_IsOpen() || Tutorial_JustClosed()) exit;
+if (gs.ui.mode == UI_MENU || Tutorial_IsOpen() || Tutorial_JustClosed()) exit;
 Battle_FeelStep(self, step_ms, real_ms);   // D138 / D139: the feel clock, the death pop's clock, the low-HP heartbeat and the push-in (before any exit below)
 if (battle_over && battle_state != BSTATE_MESSAGE) exit;
 
@@ -80,6 +80,11 @@ if (battle_state == BSTATE_MENU) {
     }
     Tutorial_Trigger("timeline");   // C4 (D45): the first time the strip and the menu are both up
     if (variable_struct_exists(e, "is_elite") && e.is_elite) Tutorial_Trigger("elite");   // C4 (D45): the first elite fight
+    // D140: Esc on the root command menu opens the one menu (inside a list Esc stays Back; Tab / Start open it anywhere safe from the UI controller)
+    if (Input_UIPressed("pause") && Menu_BattleAllowed(battle_state, Battle_QteBusy(self), battle_over)) {
+        Menu_Open();
+        exit;
+    }
     Battle_MenusStep(self);
     exit;
 }

@@ -197,7 +197,7 @@ function Input_GamepadButtons(_action) {
         case "interact":
         case "confirm": return [gp_face1];
         case "cancel": return [gp_face2];
-        case "menu": return [gp_face3];
+        case "menu": return [gp_face3, gp_start];   // D140: Start opens the one menu too
         case "pause": return [gp_face4];
         case "tab_prev": return [gp_shoulderl];
         case "tab_next": return [gp_shoulderr];
@@ -1138,7 +1138,7 @@ function Rumble_Snapshot() {
 function Rumble_Step(_step_ms) {
     var st = Rumble_Get();
     var gs = GameState_Get();
-    var paused = (variable_struct_exists(gs, "ui") && gs.ui.mode == UI_PAUSE);
+    var paused = (variable_struct_exists(gs, "ui") && gs.ui.mode == UI_MENU);   // D140: the one menu is the pause
     var room_prev = (st.room == -1) ? room : st.room;   // the very first step is not a room change
     st.room = room;
     if (room_prev != room) st.snap = undefined;   // a new room is a new fight: nothing to compare with yet

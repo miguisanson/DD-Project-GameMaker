@@ -4716,7 +4716,7 @@ function Test_Suite_MenuMeasure() {
         var _ids_i = TabMenu_Ids();
         var _icons_i = TabMenu_Icons();
         var _lb_i = TabMenu_Labels();
-        if (array_length(_ids_i) != 6 || array_length(_icons_i) != 6 || array_length(_lb_i) != 6) _same = false;
+        if (array_length(_ids_i) != 7 || array_length(_icons_i) != 7 || array_length(_lb_i) != 7) _same = false;
     }
     Test_Eq("F1c 300 TabMenu_Ids and TabMenu_Icons calls build nothing more", TabMenu_DataBuilds() - _tb0, 0);
     Test_Eq("F1c 300 TabMenu_Labels calls build nothing more", TabMenu_LabelBuilds() - _tl0, 0);
@@ -9462,31 +9462,31 @@ function Test_Suite_OneMenu() {
     // ---- Keep this? 10 s countdown (injectable clock) ----
     var _a = GameSettings_Copy(_s0);
     _a.window_mode = WINDOW_MODE_WINDOWED;
-    _a.display_scale = 2;
+    _a.display_scale = 3;   // A (the smallest window scale is 3)
     _gs.settings = _a;
     Test_False("D140 no Keep this prompt before a window change", KeepThis_Active());
-    Test_True("D140 a window scale change is made", Settings_Change("scale", 1, 4, 1000));
-    Test_Eq("D140 the new scale B is live at once", GameSettings_Ensure().display_scale, 3);
+    Test_True("D140 a window scale change is made", Settings_Change("scale", 1, 5, 1000));
+    Test_Eq("D140 the new scale B is live at once", GameSettings_Ensure().display_scale, 4);
     Test_True("D140 a window scale change asks Keep this", KeepThis_Active());
     Test_Eq("D140 the countdown starts at 10 000 ms", KeepThis_Remaining(1000), 10000);
     Test_Eq("D140 4 s later 6 000 ms are left", KeepThis_Remaining(5000), 6000);
     Test_Eq("D140 the countdown never goes below zero", KeepThis_Remaining(99000), 0);
     Test_False("D140 just under 10 s nothing is reverted", KeepThis_Tick(1000 + 9999));
-    Test_Eq("D140 the new scale is still live at 9 999 ms", GameSettings_Ensure().display_scale, 3);
+    Test_Eq("D140 the new scale is still live at 9 999 ms", GameSettings_Ensure().display_scale, 4);
     Test_True("D140 past 10 s with no answer it is reverted", KeepThis_Tick(1000 + 10001));
-    Test_Eq("D140 the scale is back at A", GameSettings_Ensure().display_scale, 2);
+    Test_Eq("D140 the scale is back at A", GameSettings_Ensure().display_scale, 3);
     Test_False("D140 the prompt is gone after the revert", KeepThis_Active());
-    Test_True("D140 a second scale change is made", Settings_Change("scale", 1, 4, 0));
+    Test_True("D140 a second scale change is made", Settings_Change("scale", 1, 5, 0));
     Test_True("D140 Keep confirms", KeepThis_Confirm());
     Test_False("D140 the prompt is gone after Keep", KeepThis_Active());
     Test_False("D140 a late tick after Keep reverts nothing", KeepThis_Tick(20000));
-    Test_Eq("D140 confirming before 10 s leaves scale B", GameSettings_Ensure().display_scale, 3);
+    Test_Eq("D140 confirming before 10 s leaves scale B", GameSettings_Ensure().display_scale, 4);
     Test_True("D140 a window mode change is made", Settings_Change("window", 1, 4, 0));
     Test_Eq("D140 window mode changed at once", GameSettings_Ensure().window_mode, WINDOW_MODE_BORDERLESS);
     Test_True("D140 a window mode change asks Keep this", KeepThis_Active());
     Test_True("D140 Back reverts at once", KeepThis_Revert());
     Test_Eq("D140 the window mode is back", GameSettings_Ensure().window_mode, WINDOW_MODE_WINDOWED);
-    Test_Eq("D140 and the scale is the one before the change", GameSettings_Ensure().display_scale, 3);
+    Test_Eq("D140 and the scale is the one before the change", GameSettings_Ensure().display_scale, 4);
     var _made = Settings_Change("window", 1, 4, 0);
     var _timed_out = KeepThis_Tick(10000);
     Test_True("D140 a window mode change reverts at 10 s too", _made && _timed_out);

@@ -275,6 +275,7 @@ function EnemyPersist_BeginEncounter(_enemy_inst, _player_inst) {
     var lvl = variable_instance_exists(_enemy_inst, "enemy_level") ? _enemy_inst.enemy_level : 0;
     GameState_SetBattleEnemy(_enemy_inst.persist_id, _enemy_inst.enemy_id, lvl);
     GameState_Get().battle.enemy_elite = variable_instance_exists(_enemy_inst, "elite_mod") ? _enemy_inst.elite_mod : "";   // C3 (D86)
+    EnemyPersist_SnapshotRun();   // D141: Quit to title in the fight comes back to this moment
     return true;
 }
 
@@ -869,7 +870,20 @@ function RunFlow_Draw() {
     draw_set_alpha(1);
 }
 
-// D141 - STUBS: red on purpose, replaced by the real functions in the next commit.
-function EnemyPersist_SnapshotRun() { return false; }
-function EnemyPersist_HasSnapshot() { return false; }
-function EnemyPersist_WriteSnapshot(_path = undefined) { return false; }
+// D141: the run as it was just before a fight, kept as text (so nothing the fight does to the live structs can reach it). Taken by
+// EnemyPersist_BeginEncounter once the room state is saved; Quit to title in the fight writes it as the run save (no state of the fight is ever saved).
+function EnemyPersist_SnapshotRun() {
+    global.encounter_snapshot = json_stringify(RunSave_Build());
+    return is_string(global.encounter_snapshot);
+}
+
+function EnemyPersist_HasSnapshot() {
+    return variable_global_exists("encounter_snapshot") && is_string(global.encounter_snapshot);
+}
+
+// Writes the snapshot as the run save the way every run save is written (a temp file, verified, the old one kept as .bak). false when there is none.
+function EnemyPersist_WriteSnapshot(_path = undefined) {
+    if (!EnemyPersist_HasSnapshot()) return false;
+    var path = is_undefined(_path) ? RunSave_Path() : _path;
+    return Save_WriteFileAtomic(path, global.encounter_snapshot, RunSave_IsCurrentRaw);
+}

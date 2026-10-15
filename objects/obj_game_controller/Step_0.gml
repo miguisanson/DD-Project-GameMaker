@@ -73,8 +73,23 @@ if (variable_struct_exists(gs, "load_spawn_pending") && gs.load_spawn_pending) {
             if (variable_instance_exists(pl_load, "move_timer")) pl_load.move_timer = 0;
             if (variable_instance_exists(pl_load, "move_dir")) pl_load.move_dir = -1;
             Player_ArmExitIgnore(pl_load);   // D64: Continue / load put the player on an exit tile: it ignores them until they step off it
+            gs.load_cooldown = true;   // D141: an enemy standing on the spot (Quit in a fight) does not start the fight again at once: see below
         }
         gs.load_spawn_pending = false;
+    }
+}
+
+// D141: after Continue the player has a short battle cooldown that starts when the loading fade is over (the fade would eat it): it is kept full until then.
+if (variable_struct_exists(gs, "load_cooldown") && gs.load_cooldown) {
+    if (room == rm_start || room == rm_battle) {
+        gs.load_cooldown = false;
+    } else if (instance_exists(obj_player)) {
+        var pl_cd = instance_find(obj_player, 0);
+        if (Transition_IsActive()) {
+            if (variable_instance_exists(pl_cd, "battle_cooldown")) pl_cd.battle_cooldown = max(pl_cd.battle_cooldown, BATTLE_COOLDOWN_FRAMES);
+        } else {
+            gs.load_cooldown = false;
+        }
     }
 }
 
