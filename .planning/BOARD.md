@@ -1,6 +1,6 @@
 # DD-Project board
 Updated after every step that lands. The full build list is `.planning/BUILD-PLAN.md`; the design spec is `.planning/research/DECISIONS.md` (D1-D125).
-Build: **PLAYTEST NOW** — build 943ce6d-20261015 | Mode: BIG BUILD, then one big playtest (D71) | Release then stop (D28)
+Build: PAUSED (session 4 ended) — latest playable build 943ce6d-20261015; round 3 (your 41 playtest notes, D140-D159) planned in BUILD-PLAN | Release then stop (D28)
 
 ## Now — PLAYTEST NOW
 - Play: `E:\Games\DD-Project Playtest\943ce6d-20261015\DD-Project.exe` (fresh start: your old saves are in `old-saves-2026-10-15`).

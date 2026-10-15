@@ -90,7 +90,8 @@ Leave frame-counted: player grid step, enemy AI pacing, fx ages, cine pan (gamep
 | H8 | Text & prompts: keyword highlights, status labels, device-aware prompts (arrows, controller glyphs), fewer battle hints, XP bar style, "Worn" header, Help stats page, full-HP bed/potion refusal sweep | D149, D150, D156 | Prompt_Rich*, HUD, scr_input prompts, help | todo |
 | H9 | AI battle backgrounds (4) + contact sheet + IDE import checklist | D151 | art/, tools (ComfyUI) | in flight |
 | H10 | Seed input on New Game | D152 | title New Game flow | todo |
-| H11 | Smarter map AI + hiding spots | D153 | scr_enemy, room data | todo |
+| H11 | Smarter map AI + hiding spots + no spawn camping at exits | D153, D158 | scr_enemy, room data | todo |
+| H14 | Lighting: darker rooms, fires/torches cast flickering light pools, enemy vision cones as wall-occluded light (light spill) | D157, D159 | world fx (lighting surface), scr_enemy sight data | todo (after H11; load game-feel) |
 | H12 | Writing overhaul (style guide + full rewrite) + small flavour choices | D154, D155 | workbook, scr_dialogue | todo |
 | H13 | Elite outline follows the sprite; old death image reused; card/panel text overflow sweep with an automated "text fits" check | D156 | scr_loot fx, death scene, Ui text | todo |
 | G10/G11 | One-style audit + consistency pass (last, after H1-H13) | D129, D133 | all screens | todo |

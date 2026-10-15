@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | next f59c2b1 = round 2 G1-G8 merged (fast 4260/0, smoke 719/0). Owner playtest of 943ce6d -> 41 notes -> grill -> D140-D156 -> round 3 (BUILD-PLAN H1-H13). In flight (Sonnet): G9 run stats, H1 one menu + battle quit, H3 review-4 fixes + elites floor 3 + press-back exits, H9 AI battle backgrounds. Then H2, H4-H8, H10-H13, G10/G11, Opus review, clean full gate + build. |
+| WIP | PAUSED end of session 4 (2026-10-16, owner moving to a new session). READ .planning/RESUME.md first: next f59c2b1 (round 2 G1-G8 merged); paused worktrees g9 (nearly done, wip b2a9bfc), h1/h3 (not started, design notes), h9 (notes only; LoRA already on disk). Round 3 = BUILD-PLAN H1-H14 (D140-D159), then G10/G11, review, full gate, build. |
 | Unplayed features | 61 playtest entries (PLAYTEST-QUEUE, build dbc678a-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
