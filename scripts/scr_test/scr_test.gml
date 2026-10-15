@@ -115,6 +115,7 @@ function Test_RunAll() {
     Test_RunSuite("Audio", Test_Suite_Audio);
     Test_RunSuite("Transition", Test_Suite_Transition);
     Test_RunSuite("Hunt2", Test_Suite_Hunt2);
+    Test_RunSuite("Title", Test_Suite_Title);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -7822,4 +7823,141 @@ function Test_Suite_Hunt2() {
     Test_True("hunt2 unknown vars are still dropped", !variable_struct_exists(_v, "junk"));
     var _old = RoomState_SanitizeEnemyVars({ x: 112, y: 96, enemy_id: ENEMY_SLIME }, ENEMY_SLIME);
     Test_True("hunt2 an old save without a home keeps none (the enemy keeps its authored home)", !variable_struct_exists(_old, "home_x") && !variable_struct_exists(_old, "home_y"));
+}
+
+// G2 (D128): the title screen. The card text builder (class, floor, gold, optional time) and the living-background maths (breathing offset,
+// dust, blink, fade-in) are pure functions: bounded, whole art pixels, deterministic. Expected values come from the packet's spec.
+function Test_Suite_Title() {
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+
+    // breathing: a sine over 3 s, 0..2 whole art pixels, 0 at rest
+    Test_Eq("D128 breath: rest at t=0", Title_BreathOffset(0, false), 0);
+    Test_Eq("D128 breath: a quarter period is one pixel", Title_BreathOffset(750, false), 1);
+    Test_Eq("D128 breath: half a period (1.5 s) is the 2 px peak", Title_BreathOffset(1500, false), 2);
+    Test_Eq("D128 breath: three quarters is one pixel", Title_BreathOffset(2250, false), 1);
+    Test_Eq("D128 breath: the period is 3 s", Title_BreathOffset(3000 + 1500, false), 2);
+    var _b_ok = true;
+    var _b_max = 0;
+    for (var _t = 0; _t < 9000; _t += 37) {
+        var _b = Title_BreathOffset(_t, false);
+        if (_b < 0 || _b > 2 || _b != floor(_b)) _b_ok = false;
+        _b_max = max(_b_max, _b);
+        if (Title_BreathOffset(_t, false) != _b) _b_ok = false;   // the same time gives the same answer
+        if (Title_BreathOffset(_t, true) != 0) _b_ok = false;     // reduced motion: no movement
+    }
+    Test_True("D128 breath: always 0..2 whole pixels, deterministic, still when motion is off", _b_ok);
+    Test_Eq("D128 breath: reaches the peak", _b_max, 2);
+
+    // dust: a few dozen dots, inside the art, whole pixels, drifting up
+    Test_Eq("D128 dust: a few dozen dots", Title_DustCount(), 32);
+    var _d_ok = true;
+    var _d_msg = "";
+    var _cols = [false, false, false];
+    var _sizes = [false, false, false];
+    for (var _i = 0; _i < Title_DustCount(); _i++) {
+        var _v = Title_DustSpeed(_i);
+        if (_v < 2 || _v > 8 || _v != floor(_v)) { _d_ok = false; _d_msg = "speed " + string(_i); }
+        var _d0 = Title_DustAt(_i, 0, false);
+        var _d1 = Title_DustAt(_i, 1000, false);
+        if (((_d0.y - _d1.y) + (TITLE_ART_H - 1)) mod (TITLE_ART_H - 1) != _v) { _d_ok = false; _d_msg = "drift " + string(_i); }   // one second: _v pixels up (wrapping)
+        for (var _t2 = 0; _t2 < 60000; _t2 += 1733) {
+            var _d = Title_DustAt(_i, _t2, false);
+            if (_d.x < 0 || _d.x + _d.size > TITLE_ART_W || _d.y < 0 || _d.y + _d.size > TITLE_ART_H || _d.x != floor(_d.x) || _d.y != floor(_d.y)) { _d_ok = false; _d_msg = "bounds " + string(_i) + "@" + string(_t2); }
+            var _dx = abs(_d.x - _d0.x);
+            if (_dx > 2 && _dx < TITLE_ART_W - 3) { _d_ok = false; _d_msg = "sway " + string(_i); }
+            var _again = Title_DustAt(_i, _t2, false);
+            if (_again.x != _d.x || _again.y != _d.y || _again.size != _d.size || _again.col != _d.col) { _d_ok = false; _d_msg = "determinism " + string(_i); }
+            var _still = Title_DustAt(_i, _t2, true);
+            if (_still.x != _d0.x || _still.y != _d0.y) { _d_ok = false; _d_msg = "calm " + string(_i); }
+        }
+        if (_d0.col < 0 || _d0.col > 2) _d_ok = false; else _cols[_d0.col] = true;
+        if (_d0.size < 1 || _d0.size > 2) _d_ok = false; else _sizes[_d0.size] = true;
+    }
+    Test_True("D128 dust: inside the art, whole pixels, deterministic, 2..8 px/s upward, still when motion is off " + _d_msg, _d_ok);
+    Test_True("D128 dust: all three palette colours are used", _cols[0] && _cols[1] && _cols[2]);
+    Test_True("D128 dust: dots are 1 or 2 pixels", _sizes[1] && _sizes[2]);
+
+    // splash: the prompt blinks (600 ms on, 400 ms off), the art fades in over 1.2 s, the first 200 ms ignore a key
+    Test_True("D128 blink: on at the start", Title_BlinkOn(0));
+    Test_True("D128 blink: still on at 599 ms", Title_BlinkOn(599));
+    Test_True("D128 blink: off at 600 ms", !Title_BlinkOn(600));
+    Test_True("D128 blink: off at 999 ms", !Title_BlinkOn(999));
+    Test_True("D128 blink: on again at 1000 ms", Title_BlinkOn(1000));
+    Test_Eq("D128 fade-in: black at the start", Title_FadeIn(0), 0);
+    Test_Eq("D128 fade-in: fully in after 1.2 s", Title_FadeIn(1200), 1);
+    Test_True("D128 fade-in: half way is between", Title_FadeIn(600) > 0.2 && Title_FadeIn(600) < 0.8);
+    Test_True("D128 fade-in: never goes back", Title_FadeIn(300) <= Title_FadeIn(600) && Title_FadeIn(600) <= Title_FadeIn(900));
+    Test_True("D128 splash: a key in the first 200 ms is ignored", !Title_SplashAccepts(0) && !Title_SplashAccepts(199));
+    Test_True("D128 splash: a key after 200 ms is taken", Title_SplashAccepts(200));
+    Test_Eq("D128 splash prompt: keyboard", Title_SplashPrompt("keyboard"), "Press any key");
+    Test_Eq("D128 splash prompt: controller", Title_SplashPrompt("gamepad"), "Press any button");
+
+    // the Continue card text
+    var _gold_l = Loc_T("tab.lbl.gold", "Gold");
+    var _floor_l = Loc_T("tab.lbl.floor", "Floor");
+    var _run = { run_version: RUN_SAVE_VERSION, seed: 5, gold: 137, floor: 4, statData: { selected_class: CLASS_ARCHER } };
+    var _m = Title_CardModel({ status: "ok", run: _run });
+    Test_Eq("D128 card: a good save shows the run", _m.kind, "run");
+    var _t_ok = Title_CardText(_m);
+    Test_Eq("D128 card: title is the class", _t_ok.title, "Archer");
+    Test_Eq("D128 card: without a time, two rows (floor, gold)", array_length(_t_ok.rows), 2);
+    Test_Eq("D128 card: floor row", json_stringify(_t_ok.rows[0]), json_stringify({ label: _floor_l, value: "4" }));
+    Test_Eq("D128 card: gold row", json_stringify(_t_ok.rows[1]), json_stringify({ label: _gold_l, value: "137" }));
+    Test_Eq("D128 card: no class in the save is Unknown", Title_CardText(Title_CardModel({ status: "ok", run: { gold: 1, floor: 1, statData: {} } })).title, Loc_T("class.name.unknown", "Unknown"));
+    Test_Eq("D128 card: a sub-floor room (2.5) shows floor 2", Title_CardText(Title_CardModel({ status: "ok", run: { gold: 0, floor: 2.5, statData: { selected_class: CLASS_KNIGHT } } })).rows[0].value, "2");
+    Test_Eq("D128 card: no gold in the save is 0", Title_CardText(Title_CardModel({ status: "ok", run: { floor: 1, statData: { selected_class: CLASS_KNIGHT } } })).rows[1].value, "0");
+    Test_Eq("D128 card: no floor drops the floor row", array_length(Title_CardText(Title_CardModel({ status: "ok", run: { gold: 9, floor: 0, statData: { selected_class: CLASS_KNIGHT } } })).rows), 1);
+    var _run_t = { gold: 1, floor: 3, play_ms: 3725000, statData: { selected_class: CLASS_MAGE } };
+    var _tt = Title_CardText(Title_CardModel({ status: "ok", run: _run_t }));
+    Test_Eq("D128 card: a tracked play time adds a third row", array_length(_tt.rows), 3);
+    Test_Eq("D128 card: play time reads h:mm:ss", _tt.rows[2].value, "1:02:05");
+    Test_Eq("D128 time: under an hour reads m:ss", Title_FormatTime(125000), "2:05");
+    Test_Eq("D128 time: zero", Title_FormatTime(0), "0:00");
+    Test_Eq("D128 card: no run, no card", Title_CardModel({ status: "missing", run: undefined }).kind, "none");
+    var _bad = ["old", "newer", "corrupt"];
+    for (var _k = 0; _k < 3; _k++) {
+        var _mb = Title_CardModel({ status: _bad[_k], run: undefined });
+        Test_Eq("D128 card: a " + _bad[_k] + " save says it cannot continue", _mb.kind, "cant");
+        var _tb = Title_CardText(_mb);
+        Test_Eq("D128 card: " + _bad[_k] + " shows the short line", _tb.title, "Can't continue");
+        Test_Eq("D128 card: " + _bad[_k] + " has no rows", array_length(_tb.rows), 0);
+    }
+    Test_Eq("D128 card text: nothing for no card", Title_CardText(Title_CardModel({ status: "missing", run: undefined })).title, "");
+
+    // where the card goes: beside the menu when it fits, else under it, else above it
+    var _pl1 = Title_CardPlace({ x: 20, y: 100, w: 120, h: 100 }, 480, 432, 9, 140, 70);
+    Test_Eq("D128 card place: beside the menu when it fits (x)", _pl1.x, 149);
+    Test_Eq("D128 card place: beside the menu when it fits (y)", _pl1.y, 100);
+    var _pl2 = Title_CardPlace({ x: 150, y: 100, w: 180, h: 150 }, 480, 432, 9, 140, 70);
+    Test_Eq("D128 card place: too wide for the side goes under the menu (y)", _pl2.y, 259);
+    Test_Eq("D128 card place: under the menu is centred on it (x)", _pl2.x, 170);
+    var _pl3 = Title_CardPlace({ x: 150, y: 260, w: 180, h: 150 }, 480, 432, 9, 140, 70);
+    Test_Eq("D128 card place: no room under the menu goes above it (y)", _pl3.y, 181);
+
+    // reading the card from a file does not apply the run
+    var _gs = GameState_Get();
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_class = _gs.selected_class;
+    _gs.run = Run_Create(777);
+    _gs.run.gold = 11;
+    var _f = "test_title_card.sav";
+    Test_RawWrite(_f, json_stringify({ run_version: RUN_SAVE_VERSION, seed: 99, gold: 250, floor: 6, rng: {}, started_at: 0, statData: { selected_class: CLASS_MAGE } }));
+    var _m_file = Title_CardLoad(_f);
+    Test_Eq("D128 card: read from a file, the class", Title_CardText(_m_file).title, "Mage");
+    Test_Eq("D128 card: read from a file, the gold", Title_CardText(_m_file).rows[1].value, "250");
+    Test_Eq("D128 card: reading does not touch the live run's gold", _gs.run.gold, 11);
+    Test_Eq("D128 card: reading does not touch the live run's seed", _gs.run.seed, 777);
+    Test_Eq("D128 card: reading does not change the class", _gs.selected_class, _old_class);
+    if (file_exists(_f)) file_delete(_f);
+    Test_Eq("D128 card: a missing file is no card", Title_CardLoad("test_title_card_missing.sav").kind, "none");
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+
+    // Korean: the card and the prompt use the Korean strings
+    Loc_SetLanguage("ko");
+    Test_Eq("D128 ko: the Continue card class is Korean", Title_CardText(Title_CardModel({ status: "ok", run: _run })).title, Loc_T("class.name.class_archer", "Archer"));
+    Test_True("D128 ko: the prompt is not the English one", Title_SplashPrompt("keyboard") != "Press any key");
+    Test_True("D128 ko: the cannot-continue line is not the English one", Title_CardText(Title_CardModel({ status: "corrupt", run: undefined })).title != "Can't continue");
+    Loc_SetLanguage(_lang0);
 }

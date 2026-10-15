@@ -49,7 +49,8 @@ if (state == "boot_logo") {
             boot_logo_timer += step_ms;
             boot_logo_alpha = 0;
             if (boot_logo_timer + TRANSITION_DONE_SLACK_MS >= max(0, boot_logo_black_hold_ms)) {
-                state = "main";
+                state = "splash";   // D128: the title art with a blinking prompt; a key goes on to the menu (Title_SplashStep)
+                title_t0 = current_time;
                 Transition_RequestBlackFlash(1, TRANSITION_CUTSCENE_FADE_IN_FRAMES);
             }
             break;
@@ -72,6 +73,11 @@ if (state == "credits_end") return;
 
 if (state == "run_flow") {   // C1: run summary, echo pick, new run (scr_room_state RunFlow_*)
     RunFlow_Step();
+    return;
+}
+
+if (state == "splash") {   // D128: the menu takes no key until the splash is over
+    Title_SplashStep(id);
     return;
 }
 

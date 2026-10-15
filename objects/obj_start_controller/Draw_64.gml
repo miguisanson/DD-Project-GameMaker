@@ -40,7 +40,11 @@ var loading_into_game = Transition_IsActive()
 && !gs.in_main_menu;
 
 if (room == rm_start && title_bg_sprite != noone) {
-    draw_sprite_stretched(title_bg_sprite, 0, 0, 0, w, h);
+    Title_DrawBackground(id);   // scr_menu.gml (D128): the breathing picture, the dust, the launch fade-in
+}
+
+if (state == "splash" && !loading_into_game) {
+    Title_DrawSplash(id);
 }
 
 if (state == "main" && !Notice_IsOpen() && !loading_into_game) {
