@@ -17,7 +17,7 @@ function TabMenu_LabelBuilds() {
 
 function TabMenu_Data() {
     var d = variable_global_exists("tabmenu_data") ? global.tabmenu_data : undefined;
-    if (false && is_struct(d)) return d;
+    if (is_struct(d)) return d;
     global.tabmenu_data_builds = TabMenu_DataBuilds() + 1;
     d = {
         ids: ["status", "skills", "items", "gear", "codex", "settings"],
@@ -46,7 +46,7 @@ function TabMenu_Icons() {
 function TabMenu_Labels() {
     var lang = Loc_GetLanguage();
     var c = variable_global_exists("tabmenu_labels") ? global.tabmenu_labels : undefined;
-    if (false && is_struct(c) && c.lang == lang) return c.labels;
+    if (is_struct(c) && c.lang == lang) return c.labels;
     global.tabmenu_label_builds = TabMenu_LabelBuilds() + 1;
     var labels = [
         Loc_T("tab.status", "Status"), Loc_T("tab.skills", "Skills"), Loc_T("tab.items", "Items"),
@@ -819,7 +819,7 @@ function TabMenu_CardBuilds() {
 function TabMenu_CardData(_mt) {
     var lang = Loc_GetLanguage();
     var c = variable_global_exists("tabmenu_card") ? global.tabmenu_card : undefined;
-    if (false && is_struct(c) && c.lang == lang && c.mt == _mt) return c;
+    if (is_struct(c) && c.lang == lang && c.mt == _mt) return c;
     global.tabmenu_card_builds = TabMenu_CardBuilds() + 1;
     c = {
         lang: lang, mt: _mt,
@@ -3038,7 +3038,11 @@ function Ui_MousePos() {
 // From the game's own input actions, so the keyboard, the pad and the bot all drive menus the same way. Confirm / back are
 // Input_UIConfirm / Input_UIBack (today Space / Esc and pad A / B: see the report on D95's Z, Enter, X).
 function Ui_ReadInput() {
-    var s = Ui_SnapNew();
+    var s = variable_global_exists("ui_snap") ? global.ui_snap : undefined;   // D108 F1c: one snapshot struct, every field set again each frame (callers only read it within the frame)
+    if (!is_struct(s)) {
+        s = Ui_SnapNew();
+        global.ui_snap = s;
+    }
     s.up_p = Input_Pressed("menu_up");
     s.down_p = Input_Pressed("menu_down");
     s.left_p = Input_Pressed("menu_left");
@@ -3050,9 +3054,9 @@ function Ui_ReadInput() {
     s.confirm = Input_UIConfirm();
     s.back = Input_UIBack();
     s.tab = (Input_Pressed("tab_next") ? 1 : 0) - (Input_Pressed("tab_prev") ? 1 : 0);   // bound by the screens that have tabs
-    var mp = Ui_MousePos();
-    s.mx = mp.x;
-    s.my = mp.y;
+    var lay = Display_Layout();   // the mouse as Ui_MousePos works it out, without its struct
+    s.mx = (window_mouse_get_x() - lay.gui_x) / lay.ui_scale;
+    s.my = (window_mouse_get_y() - lay.gui_y) / lay.ui_scale;
     if (!variable_global_exists("ui_mouse") || !is_struct(global.ui_mouse)) global.ui_mouse = { x: s.mx, y: s.my };
     s.mouse_moved = (s.mx != global.ui_mouse.x || s.my != global.ui_mouse.y);
     global.ui_mouse.x = s.mx;
@@ -3530,28 +3534,20 @@ function Ui_MenuDetailsBuilds() {
     return variable_global_exists("ui_md_builds") ? global.ui_md_builds : 0;
 }
 
-// The text of one signature field of a row: strings as they are, anything else (a missing field, a number) as a string.
-function Ui_MenuSigText(_it, _key) {
-    var v = variable_struct_get(_it, _key);
-    return is_string(v) ? v : string(v);
-}
-
-function Ui_MenuSigCount(_it, _key) {
-    var v = variable_struct_get(_it, _key);
-    return is_array(v) ? array_length(v) : 0;
-}
-
-// Five entries per row: label, value, help, number-line count, arrow count.
+// Five entries per row: label, value, help (as they are: a missing field is undefined), number-line count, arrow count. This runs every
+// frame for every row, so it reads the struct directly and calls nothing of ours.
 function Ui_MenuSigBuild(_items, _n) {
-    var sig = array_create(_n * 5, "");
+    var sig = array_create(_n * 5, 0);
     for (var i = 0; i < _n; i++) {
         var it = _items[i];
         var b = i * 5;
-        sig[b] = Ui_MenuSigText(it, "label");
-        sig[b + 1] = Ui_MenuSigText(it, "value");
-        sig[b + 2] = Ui_MenuSigText(it, "help");
-        sig[b + 3] = Ui_MenuSigCount(it, "lines");
-        sig[b + 4] = Ui_MenuSigCount(it, "seq");
+        sig[b] = variable_struct_get(it, "label");
+        sig[b + 1] = variable_struct_get(it, "value");
+        sig[b + 2] = variable_struct_get(it, "help");
+        var nl_ = variable_struct_get(it, "lines");
+        sig[b + 3] = is_array(nl_) ? array_length(nl_) : 0;
+        var ns_ = variable_struct_get(it, "seq");
+        sig[b + 4] = is_array(ns_) ? array_length(ns_) : 0;
     }
     return sig;
 }
@@ -3560,11 +3556,13 @@ function Ui_MenuSigSame(_items, _sig, _n) {
     for (var i = 0; i < _n; i++) {
         var it = _items[i];
         var b = i * 5;
-        if (Ui_MenuSigText(it, "label") != _sig[b]) return false;
-        if (Ui_MenuSigText(it, "value") != _sig[b + 1]) return false;
-        if (Ui_MenuSigText(it, "help") != _sig[b + 2]) return false;
-        if (Ui_MenuSigCount(it, "lines") != _sig[b + 3]) return false;
-        if (Ui_MenuSigCount(it, "seq") != _sig[b + 4]) return false;
+        if (variable_struct_get(it, "label") != _sig[b]) return false;
+        if (variable_struct_get(it, "value") != _sig[b + 1]) return false;
+        if (variable_struct_get(it, "help") != _sig[b + 2]) return false;
+        var nl_ = variable_struct_get(it, "lines");
+        if ((is_array(nl_) ? array_length(nl_) : 0) != _sig[b + 3]) return false;
+        var ns_ = variable_struct_get(it, "seq");
+        if ((is_array(ns_) ? array_length(ns_) : 0) != _sig[b + 4]) return false;
     }
     return true;
 }
@@ -3639,13 +3637,13 @@ function Ui_MenuMeasure(_m, _mt) {
     var n = array_length(_m.items);
     var lang = Loc_GetLanguage();
     var mc = variable_struct_get(_m, "mc");
-    var fresh = false && is_struct(mc) && mc.items == _m.items && mc.n == n && mc.mt == _mt && mc.lang == lang && mc.title == L.title && Ui_MenuSigSame(_m.items, mc.sig, n);
+    var fresh = is_struct(mc) && mc.items == _m.items && mc.n == n && mc.mt == _mt && mc.lang == lang && mc.title == L.title && Ui_MenuSigSame(_m.items, mc.sig, n);
     if (!fresh) {
         mc = Ui_MenuMeasureRows(_m, _mt, lang);
         _m.mc = mc;
     }
     var cur = (L.details && L.details_pos == "above" && n > 0) ? clamp(_m.cursor, 0, n - 1) : -1;
-    var fresh2 = false && mc.l2 && mc.l2_pw == L.panel_w && mc.l2_details == L.details && mc.l2_pos == L.details_pos && mc.l2_cols == L.details_cols && mc.l2_cur == cur;
+    var fresh2 = mc.l2 && mc.l2_pw == L.panel_w && mc.l2_details == L.details && mc.l2_pos == L.details_pos && mc.l2_cols == L.details_cols && mc.l2_cur == cur;
     if (!fresh2) {
         Ui_MenuMeasureSizes(_m, _mt, mc, cur);
         mc.l2 = true;

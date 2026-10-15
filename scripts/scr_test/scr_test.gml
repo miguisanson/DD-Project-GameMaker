@@ -4177,6 +4177,23 @@ function Test_Suite_MenuMeasure() {
     Test_Eq("F1c ko to en measures the rows exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
     Test_MenuSame("F1c back in en", _mc, Test_MenuRef(_m, Ui_Metrics()));
 
+    // ---- a row that gains or loses a field, or changes its type, in place is seen (and comparing the kinds never throws) ----
+    var _mx = Ui_MenuNew("f1c_mixed", Test_MenuRows(6, "M"), { layout: { title: "Mixed", details: true } });
+    Test_MenuFrames(_mx, 3);
+    _b0 = Ui_MenuMeasureBuilds();
+    variable_struct_remove(_mx.items[2], "help");
+    _mc = Test_MenuFrames(_mx, 5);
+    Test_Eq("F1c a sentence removed in place measures exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+    _b0 = Ui_MenuMeasureBuilds();
+    _mx.items[2].help = "A sentence is back.";
+    _mc = Test_MenuFrames(_mx, 5);
+    Test_Eq("F1c a sentence added in place measures exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+    _b0 = Ui_MenuMeasureBuilds();
+    _mx.items[1].value = 75;
+    _mx.items[1].kind = "slider";
+    _mc = Test_MenuFrames(_mx, 5);
+    Test_Eq("F1c a value that turns into a number measures exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+
     // ---- [PERF] 1000 frames of the measuring path of a 25-row details menu (no assertion: the time depends on the PC) ----
     var _mp = Ui_MenuNew("f1c_perf", Test_MenuRows(25, "P"), { layout: { title: "Shop", details: true } });
     var _t0 = get_timer();
