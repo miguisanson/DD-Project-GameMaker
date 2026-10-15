@@ -330,6 +330,21 @@ function Run_NewSeed() {
     return irandom_range(1, RNG_MOD - 2);
 }
 
+// ---- seed input (D152) ---- STUBS: the check comes first (H10); the real functions replace these.
+function Seed_IsValid(_n) { return false; }
+function SeedParse(_str) { return -1; }
+function SeedEntry_New() { return { digits: [], cur: 0 }; }
+function SeedEntry_Text(_e) { return "?"; }
+function SeedEntry_Value(_e) { return -1; }
+function SeedEntry_CanConfirm(_e) { return true; }
+function SeedEntry_Move(_e, _dir) { }
+function SeedEntry_Cycle(_e, _dir) { }
+function SeedEntry_Type(_e, _d) { }
+function SeedEntry_Backspace(_e) { }
+function Seed_Label(_seed) { return ""; }
+function Run_ResolveSeed(_seed = undefined) { return -1; }
+function RunFlow_SummaryRows(_entry) { return []; }
+
 function Run_Create(_seed) {
     return {
         active: true,
