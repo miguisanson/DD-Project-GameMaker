@@ -13,6 +13,8 @@ e = Elite_Apply(e, Elite_BattleMod());   // C3 (D86): the map enemy's modifier (
 Codex_RecordMeeting(e.id, e.is_elite);   // D88: the bestiary lists the enemies met
 throw_item = -1;                          // C3 (D84): the throwable whose bar is running, -1 = a plain attack
 Card_OnBattleStart(p, e);   // C2: Opening Blow
+var bg_room = gs.battle.enemy_room;
+Battle_BgApply(room_exists(bg_room) ? Run_FloorOfRoomName(room_get_name(bg_room)) : 0, e.is_boss);   // H9 (D151): the backdrop by depth, a boss fight gets the arena
 
 // --------------------
 // CREATE ENEMY VISUAL (CENTERED)

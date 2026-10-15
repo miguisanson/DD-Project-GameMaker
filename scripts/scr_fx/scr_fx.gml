@@ -1043,3 +1043,31 @@ function MapFx_OpenedAt(_inst, _loot, _card) {
     if (!instance_exists(_inst)) return;
     MapFx_Opened(floor((_inst.bbox_left + _inst.bbox_right) / 2), _inst.bbox_top + 2, _loot, _card);
 }
+
+// ---- battle backgrounds (H9, D151): the picture behind the fight by dungeon depth ----
+// Floors 1-3 the forest tunnel, 4-6 the caves, 7-9 the ruins, any boss fight the arena; "" when the floor is unknown (a debug battle).
+// The owner imports the four sprites in the IDE (art/battle_bg/IMPORT.md); until a name exists the old picture stays.
+function Battle_BgSpriteName(_floor, _boss) {
+    if (_boss) return "spr_battle_bg_boss";
+    var f = floor(_floor);
+    if (f < 1) return "";
+    if (f <= 3) return "spr_battle_bg_forest";
+    if (f <= 6) return "spr_battle_bg_caves";
+    return "spr_battle_bg_ruins";
+}
+
+// The sprite for a name, or today's background (battle_screen) when the name is empty or not imported yet.
+function Battle_BgSprite(_name) {
+    var spr = (_name == "") ? -1 : asset_get_index(_name);
+    if (spr == -1 || !sprite_exists(spr)) return battle_screen;
+    return spr;
+}
+
+// Puts the picture on rm_battle's Background layer (obj_battle_controller Create).
+function Battle_BgApply(_floor, _boss) {
+    var layer_id = layer_get_id("Background");
+    if (layer_id == -1) return;
+    var bg = layer_background_get_id(layer_id);
+    if (bg == -1) return;
+    layer_background_sprite(bg, Battle_BgSprite(Battle_BgSpriteName(_floor, _boss)));
+}
