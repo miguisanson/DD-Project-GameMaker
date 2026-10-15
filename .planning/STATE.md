@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PAUSED end of session 4 (2026-10-16, owner moving to a new session). READ .planning/RESUME.md first: next f59c2b1 (round 2 G1-G8 merged); paused worktrees g9 (nearly done, wip b2a9bfc), h1/h3 (not started, design notes), h9 (notes only; LoRA already on disk). Round 3 = BUILD-PLAN H1-H14 (D140-D159), then G10/G11, review, full gate, build. |
+| WIP | Session 5 (2026-10-15): fast gate PASS on next f59c2b1. Sonnet agents re-dispatched in worktrees g9 (finish), h1, h3, h9 (briefs = RESUME.md notes + BUILD-PLAN round 3). Merge one at a time into next, re-gate after each. Then H2, H4-H8, H10-H14, G10/G11 (RESUME "Left to do"). |
 | Unplayed features | 61 playtest entries (PLAYTEST-QUEUE, build dbc678a-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
