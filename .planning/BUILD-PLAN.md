@@ -80,15 +80,15 @@ Leave frame-counted: player grid step, enemy AI pacing, fx ages, cine pan (gamep
 
 | # | Packet | Decisions | Main files | Status |
 |---|---|---|---|---|
-| H1 | One menu (Esc = Tab, System tab, one Settings, instant apply + "Keep this?" revert) + menu in battle with quit-before-fight | D140, D141 | scr_menu (TabMenu/Pause/Settings), obj_ui_controller, run save | todo |
+| H1 | One menu (Esc = Tab, System tab, one Settings, instant apply + "Keep this?" revert) + menu in battle with quit-before-fight | D140, D141 | scr_menu (TabMenu/Pause/Settings), obj_ui_controller, run save | in flight |
 | H2 | Shared Yes/No confirm pop-up for every important action | D156 | scr_menu (Ui framework) | todo (after H1) |
-| H3 | Review-4 fixes (enemy deck keeps cards, multi-hit preview, rumble Perfect flag, BREAK flag) + elites from floor 3 + press toward the exit leaves | D142, D145, review 4 | scr_db_enemy, scr_combat, scr_input, obj_battle_controller, scr_loot, obj_room_transition | todo |
+| H3 | Review-4 fixes (enemy deck keeps cards, multi-hit preview, rumble Perfect flag, BREAK flag) + elites from floor 3 + press toward the exit leaves | D142, D145, review 4 | scr_db_enemy, scr_combat, scr_input, obj_battle_controller, scr_loot, obj_room_transition | in flight |
 | H4 | Level-up shows class growth; free point may go to Max HP/MP; balance re-check | D143 | scr_levelup, level-up screen, sim | todo |
 | H5 | Skill memory; echo = discovered skills of the picked class; class select (Nobody greyed, sprite preview, ??? skills) | D144, D148 | scr_room_state, profile, class screen | todo |
 | H6 | Cutscene skip (prompt after 1 s, skip at 2 s) + cutscene text in the shared dialogue box | D146, D156 | scr_input skip, scr_dialogue, obj_start_controller | todo |
 | H7 | Notes picked up, read from a Notes list | D147 | note object code, scr_interact, codex | todo |
 | H8 | Text & prompts: keyword highlights, status labels, device-aware prompts (arrows, controller glyphs), fewer battle hints, XP bar style, "Worn" header, Help stats page, full-HP bed/potion refusal sweep | D149, D150, D156 | Prompt_Rich*, HUD, scr_input prompts, help | todo |
-| H9 | AI battle backgrounds (4) + contact sheet + IDE import checklist | D151 | art/, tools (ComfyUI) | todo |
+| H9 | AI battle backgrounds (4) + contact sheet + IDE import checklist | D151 | art/, tools (ComfyUI) | in flight |
 | H10 | Seed input on New Game | D152 | title New Game flow | todo |
 | H11 | Smarter map AI + hiding spots | D153 | scr_enemy, room data | todo |
 | H12 | Writing overhaul (style guide + full rewrite) + small flavour choices | D154, D155 | workbook, scr_dialogue | todo |
