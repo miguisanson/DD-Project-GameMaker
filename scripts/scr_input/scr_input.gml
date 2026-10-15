@@ -2,7 +2,11 @@ function Input_PreStep() {
     Input_Update();
 }
 
+// D108 F1a: runs its body once (init_done, set at the end); about 14 input calls per Ui_ReadInput made it re-allocate the tables every frame.
+// Input_Bind clears init_done, so the D95 repair below still applies after a bind made before Binds_Apply. Binds_Apply needs no reset:
+// binds_applied only ever goes false -> true, and the repair is skipped from then on.
 function Input_Init() {
+    if (variable_global_exists("input") && is_struct(global.input) && variable_struct_exists(global.input, "init_done") && global.input.init_done) return;
     if (!variable_global_exists("input") || !is_struct(global.input)) {
         global.input = {};
     }
@@ -90,6 +94,8 @@ function Input_Init() {
     if (!variable_struct_exists(inp, "move_order")) {
         inp.move_order = [];
     }
+    inp.init_done = true;
+    global.input_init_runs = (variable_global_exists("input_init_runs") ? global.input_init_runs : 0) + 1;   // read by Test_Suite_Input
 }
 
 function Input_KeyCodeFromName(_name) {
@@ -463,6 +469,7 @@ function Input_Bind(_action, _keys) {
     Input_Init();
     if (!is_array(_keys)) _keys = [_keys];
     variable_struct_set(global.input.bindings, _action, _keys);
+    global.input.init_done = false;   // the next Input_Init repairs the table again, as it did before D108
 }
 
 // ---- hold-to-skip (D48, I-055) ----------------------------------------------------------------------------------------------------

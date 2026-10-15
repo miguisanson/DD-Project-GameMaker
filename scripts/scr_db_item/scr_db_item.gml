@@ -534,8 +534,23 @@ function ItemDB_Get(_id) {
     return { id: 0, name: Loc_T("item.name.0", "None"), type: ITEM_KEY, stackable: false, max_stack: 0, equip_slot: "", power: 0, stat_type: -1, acc: 0, preferred_class: -1, sprite: noone, bonus: { atk:0, def:0, spd:0, mag:0 }, use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 }, value: 0 };
 }
 
+// D108 F1a: a serial number for "the language and string table as they are now". It changes when the language, its revision (Loc_SetLanguage)
+// or the string table (Loc_Reload / a payload load) changes, so each item localizes once per change instead of on every ItemDB_Get.
+function Item_LocSerial() {
+    Loc_Init();
+    var loc = Loc_GetData();
+    var st = variable_global_exists("item_loc_stamp") ? global.item_loc_stamp : undefined;
+    if (!is_struct(st) || st.lang != loc.lang || st.rev != loc.revision || st.strings != loc.strings) {
+        global.item_loc_stamp = { lang: loc.lang, rev: loc.revision, strings: loc.strings, serial: is_struct(st) ? st.serial + 1 : 1 };
+    }
+    return global.item_loc_stamp.serial;
+}
+
 function Item_LocalizeRuntime(_item) {
     if (!is_struct(_item)) return _item;
+    var serial = Item_LocSerial();
+    if (variable_struct_exists(_item, "loc_serial") && _item.loc_serial == serial) return _item;
+    _item.loc_serial = serial;
 
     if (!variable_struct_exists(_item, "name_en")) _item.name_en = string(_item.name);
     _item.name = Loc_T("item.name." + string(_item.id), string(_item.name_en));
@@ -591,6 +606,12 @@ function ItemDB_GetPassiveTemplate(_item_id) {
 
 function ItemDB_AssignEquipPassives(_db) {
     if (!ds_exists(_db, ds_type_map)) return;
+    // D108 F1a: once per database. Item 1 already carrying its passive means ItemDB_Init (or an earlier call) did the assignment, and nothing
+    // changes the passives afterwards; a fresh map from ItemDB_Init has no passive_params yet, so it is assigned again.
+    if (ds_map_exists(_db, 1)) {
+        var first = _db[? 1];
+        if (is_struct(first) && variable_struct_exists(first, "passive_params")) return;
+    }
     var ids = [1,2,3,4,5,6,7,8,9,20,21,22,23,24,25,44,45,46];
     for (var i = 0; i < array_length(ids); i++) {
         var iid = ids[i];
