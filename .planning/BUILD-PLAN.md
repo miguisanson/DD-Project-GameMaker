@@ -29,3 +29,22 @@ game exports JSON with `-exportdata` for the Python simulator (no Included File 
 Order: A1+A2 → (B1 ∥ D0) → (B2 ∥ C1) → B3 → (B4 ∥ C2) → C3 → C4 → C5 → D1 (∥ D2 art) → D3 → F1 → E1 → E2.
 
 Step-number ranges (C4: smoke 161-170, shots 160-169, bot v=9) (avoid scenario clashes): smoke C1 100-112, C5 113-121, C2 133-141; shots UI 80-89, B3 90-97, C2 120-128, B4 140-149, C3 150-159, C4 160-169, D1 170-199.
+
+## F1 packets (from the read-only audit, 2026-10-15; evidence lines were at next aebc9db)
+
+| # | Packet | Files | Risk | Status |
+|---|---|---|---|---|
+| R1 | Fairer randomness D117-D121, D123, D125 (+ sim) | scr_loot, scr_combat, scr_status, scr_save, sim.py | - | MERGED to next |
+| R1b | Focus-loss pause D122 + odds text D124 | scr_menu, scr_combat, scr_status, obj_ui_controller, workbook | low | in flight |
+| FIX-diff | Title still offers Easy/Normal/Hard after New Game (D35 leftover) | scr_menu (title) | low | todo |
+| F1a | Input_Init + ItemDB passives re-run on every call -> run once | scr_input, scr_db_item | low | in flight |
+| F1b | Text scale / Ui_Metrics recomputed per call -> cache per layout+language | scr_player, scr_menu, scr_localization | med-low | todo |
+| F3a | Notice popup -> Ui framework, then delete dead slot save menu (~600 lines) | scr_save_menu, scr_menu, obj_ui/obj_start/obj_game controllers, scr_save | med | todo |
+| F1c | Menu draw re-measures rows / rebuilds tab icons every frame -> cache | scr_menu | low-med | todo |
+| F3b | Unreachable-code sweep: 62 dead functions, ~20 unused macros, P audio-debug key in obj_sfx_manager | many (split audio/input vs rest) | low | todo |
+| F1d | Battle HUD per-frame duplicates, credits layout x2/frame, icon lookups, sight-ring math | scr_combat, scr_dialogue, scr_fx, scr_enemy | low-med | todo |
+| F2a | Presentation clocks frames -> ms (transitions, boot logo, cutscene holds, credits) | scr_room_transition, obj_start_controller | med | after E2 |
+| F2b | Battle message/shake + dialogue/typewriter/input-lock clocks -> ms | scr_combat, scr_fx, scr_dialogue, scr_menu, scr_input | med-high (feel) | after E2 |
+| F4 | Palette literals -> UI_C_*, shared helpers, global sprawl, wording/sound consistency (F4d needs owner) | many | varies | after E2 |
+
+Leave frame-counted: player grid step, enemy AI pacing, fx ages, cine pan (gameplay feel).
