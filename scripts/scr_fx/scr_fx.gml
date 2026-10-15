@@ -1084,8 +1084,7 @@ function Battle_BgApply(_floor, _boss) {
 // ROOM LIGHTING (H14, D157, D159). Every floor room is a little dark and light is what is cut out of the dark:
 //   - the darkness is one layer, UI_C_DARKEST (#071821) at LIGHT_DARK_ALPHA over the whole view (not a blackout: the 4-colour picture stays readable);
 //   - every lit fire stand and torch cuts a soft pool out of it (three nested circles, so three steps of brightness like the rest of the art) that flickers;
-//   - every enemy cuts the cells it can see out of it (Vis_Cone, the very set EnemyAI_CanSee uses, so what is lit is what is watched): standing behind cover is
-//     visibly standing in the dark, and a hidden player (D153) sits in a dark pocket.
+//   - enemies cut nothing out (D160, amends D157): their sight is not shown; the stats keep a cones field that stays 0.
 // One pass per frame: one view-sized surface, filled with the darkness, the light shapes drawn into it with a blend that only lowers its alpha, then drawn over the world.
 // The pass runs at the start of World_DrawFx: the characters and the floor are darkened with the rest (a figure standing in the dark must look like it),
 // while everything World_DrawFx draws after it (the "!" and "?", the interact arrow, the elite outline, the merchant glow, chest bursts) stays at full brightness.
@@ -1209,10 +1208,9 @@ function Light_PerfMaxMs() {
 
 // The pass (called first by World_DrawFx, a layer script, see World_RegisterFx). Everything is in view pixels: the world position minus the camera's corner.
 function Light_DrawPass() {
-    // how much of the darkness each step of light removes (a pool: outer, middle, inner ring; an enemy's light: far, middle, near cells)
+    // how much of the darkness each step of light removes (a pool: outer, middle, inner ring)
     static _pool_r = [1.0, 0.7, 0.4];
     static _pool_cut = [0.30, 0.40, 0.50];
-    static _cone_cut = [0.42, 0.55, 0.68];
     if (!Fx_IsWorldPass()) return;
     var _t0 = get_timer();
     var _cam = view_camera[0];
@@ -1228,13 +1226,6 @@ function Light_DrawPass() {
     var _ms = Light_Now();
     var _oc = draw_get_colour();
     var _oa = draw_get_alpha();
-    var _hcx = -1;
-    var _hcy = -1;
-    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
-    if (_pl != noone && Player_IsHidden(_pl)) {
-        _hcx = Nav_CellOf(_pl.x + _T / 2);
-        _hcy = Nav_CellOf(_pl.y + _T / 2);
-    }
     var _g = Nav_Get().grid;
     var _lights = 0;
     var _cones = 0;
@@ -1256,38 +1247,7 @@ function Light_DrawPass() {
         }
         _lights++;
     }
-    with (obj_enemy) {
-        if (defeated || !variable_instance_exists(id, "prof")) continue;
-        var _tiles = Vis_EnemyTiles(prof, ai_mode);
-        if (_tiles <= 0) continue;
-        var _ecx = Nav_CellOf(x + _T / 2);
-        var _ecy = Nav_CellOf(y + _T / 2);
-        if ((_ecx + _tiles + 1) * _T < _vx || (_ecx - _tiles) * _T > _vx + _vw || (_ecy + _tiles + 1) * _T < _vy || (_ecy - _tiles) * _T > _vy + _vh) continue;
-        var _cone = Vis_Cone(_g, _ecx, _ecy, _tiles, prof.see_through);
-        var _runs = _cone.runs;
-        var _skip = Light_PocketCell(_ecx, _ecy, _hcx, _hcy);
-        var _ox = _ecx * _T - _vx;
-        var _oy = _ecy * _T - _vy;
-        var _band = -1;
-        for (var _k = 0; _k < array_length(_runs); _k += 4) {
-            if (_runs[_k + 3] != _band) {
-                _band = _runs[_k + 3];
-                draw_set_alpha(_cone_cut[_band]);
-            }
-            var _len = _runs[_k + 2];
-            var _x0 = _ox + _runs[_k] * _T;
-            var _y0 = _oy + _runs[_k + 1] * _T;
-            if (_skip && _ecy + _runs[_k + 1] == _hcy && _hcx >= _ecx + _runs[_k] && _hcx < _ecx + _runs[_k] + _len) {
-                var _left = _hcx - (_ecx + _runs[_k]);   // the hidden player's cell is left dark: the run is drawn in two pieces round it
-                var _right = _len - _left - 1;
-                if (_left > 0) draw_rectangle(_x0, _y0, _x0 + _left * _T - 1, _y0 + _T - 1, false);
-                if (_right > 0) draw_rectangle(_x0 + (_left + 1) * _T, _y0, _x0 + _len * _T - 1, _y0 + _T - 1, false);
-            } else {
-                draw_rectangle(_x0, _y0, _x0 + _len * _T - 1, _y0 + _T - 1, false);
-            }
-        }
-        _cones++;
-    }
+    // D160 (amends D157): enemies are not light sources. Their sight (Vis_Cone, EnemyAI_CanSee) works as before, it is just not drawn.
     gpu_set_blendmode(bm_normal);
     surface_reset_target();
     draw_set_alpha(1);
