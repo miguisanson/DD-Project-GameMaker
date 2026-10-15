@@ -133,6 +133,7 @@ function Test_RunAll() {
     Test_RunSuite("Confirm", Test_Suite_Confirm);
     Test_RunSuite("CutSkip", Test_Suite_CutSkip);
     Test_RunSuite("Lighting", Test_Suite_Lighting);
+    Test_RunSuite("D164Light", Test_Suite_D164);
     Test_RunSuite("Notes", Test_Suite_Notes);
     Test_RunSuite("ClassMem", Test_Suite_ClassMem);
     Test_RunSuite("EliteDeath", Test_Suite_EliteDeath);
@@ -11505,7 +11506,7 @@ function Test_LightSources() {
 }
 
 function Test_LightLook() {
-    Test_Eq("H14 look: the darkness alpha is the agreed 0.4", LIGHT_DARK_ALPHA, 0.4);
+    Test_Eq("H14 look: the base darkness alpha is 0.28 (D164 amends the 0.4 of D159)", LIGHT_DARK_ALPHA, 0.28);
     Test_Eq("H14 look: the darkness colour is #071821 (red 7)", colour_get_red(LIGHT_DARK_COLOUR), 7);
     Test_Eq("H14 look: the darkness colour is #071821 (green 24)", colour_get_green(LIGHT_DARK_COLOUR), 24);
     Test_Eq("H14 look: the darkness colour is #071821 (blue 33)", colour_get_blue(LIGHT_DARK_COLOUR), 33);
@@ -11544,6 +11545,142 @@ function Test_Suite_Lighting() {
     Test_LightConsistency();
     Test_LightSources();
     Test_LightLook();
+}
+
+// ---- D164 (amends D159): lighter rooms, daylight rooms with sun spots, extra torches placed in code ----
+// Expected values come from D164 and the packet brief, not from the code: the base darkness is lighter than the 0.4 of D159 but not barely dimmed
+// (0.2 .. 0.4 for a plain room), a room open to the sky (rm_floor2) is about 0.10 (never above 0.15), every daylight room has at least one sun spot,
+// every sun spot is inside its room, and an extra torch sits on a wall cell that faces a floor cell, never on an exit or a spawn, at most 3 to a room, 4 tiles apart.
+function Test_D164Rooms() {
+    return ["rm_floor1", "rm_floor2", "rm_floor3", "rm_floor4", "rm_floor5", "rm_floor6", "rm_floor6_5", "rm_floor7", "rm_floor8", "rm_floor9", "rm_floor9_5"];
+}
+
+function Test_D164RoomIds() {
+    return [rm_floor1, rm_floor2, rm_floor3, rm_floor4, rm_floor5, rm_floor6, rm_floor6_5, rm_floor7, rm_floor8, rm_floor9, rm_floor9_5];
+}
+
+function Test_D164Dark() {
+    Test_True("D164 dark: a plain room (rm_floor3) is lighter than 0.4 (" + string(Light_RoomDark("rm_floor3")) + ")", Light_RoomDark("rm_floor3") < 0.4);
+    Test_True("D164 dark: a plain room (rm_floor3) keeps the effect, 0.2 or more", Light_RoomDark("rm_floor3") >= 0.2);
+    Test_True("D164 dark: the daylight room rm_floor2 is 0.15 or less (" + string(Light_RoomDark("rm_floor2")) + ")", Light_RoomDark("rm_floor2") <= 0.15);
+    Test_True("D164 dark: the daylight room is not pitch bright either (0.05 or more)", Light_RoomDark("rm_floor2") >= 0.05);
+    Test_Eq("D164 dark: the base darkness macro is 0.28", LIGHT_DARK_ALPHA, 0.28);
+    Test_Eq("D164 dark: an unknown room gets the base darkness", Light_RoomDark("rm_nothing"), LIGHT_DARK_ALPHA);
+    var _day = Light_DaylightRooms();
+    var _bad = "";
+    var _rooms = Test_D164Rooms();
+    for (var _i = 0; _i < array_length(_rooms); _i++) {
+        var _d = Light_RoomDark(_rooms[_i]);
+        var _is_day = false;
+        for (var _k = 0; _k < array_length(_day); _k++) if (_day[_k] == _rooms[_i]) _is_day = true;
+        if (_is_day) { if (!(_d <= 0.15 && _d >= 0.05)) _bad += " " + _rooms[_i] + ":" + string(_d); }
+        else if (!(_d >= 0.2 && _d < 0.4)) _bad += " " + _rooms[_i] + ":" + string(_d);
+    }
+    Test_Eq("D164 dark: every daylight room is 0.05..0.15 and every other room 0.2..0.4 (bad:" + _bad + ")", _bad, "");
+    var _has2 = false;
+    for (var _k2 = 0; _k2 < array_length(_day); _k2++) if (_day[_k2] == "rm_floor2") _has2 = true;
+    Test_True("D164 dark: rm_floor2 is a daylight room", _has2);
+}
+
+function Test_D164Sun() {
+    var _day = Light_DaylightRooms();
+    var _bad_day = "";
+    for (var _i = 0; _i < array_length(_day); _i++) {
+        var _n = 0;
+        var _src = Light_AllSources(_day[_i]);
+        for (var _k = 0; _k < array_length(_src); _k++) if (_src[_k].sun) _n++;
+        if (_n < 1) _bad_day += " " + _day[_i];
+    }
+    Test_Eq("D164 sun: every daylight room has at least one sun spot (bad:" + _bad_day + ")", _bad_day, "");
+    var _bad_in = "";
+    var _bad_shape = "";
+    var _suns = 0;
+    var _rooms = Test_D164Rooms();
+    var _rm = Test_D164RoomIds();
+    for (var _ri = 0; _ri < array_length(_rooms); _ri++) {
+        var _info = room_get_info(_rm[_ri], false, false, false, false, false);
+        var _w = ceil(_info.width / GRID_TILE_SIZE);
+        var _h = ceil(_info.height / GRID_TILE_SIZE);
+        var _all = Light_AllSources(_rooms[_ri]);
+        for (var _q = 0; _q < array_length(_all); _q++) {
+            var _s = _all[_q];
+            if (!_s.sun) continue;
+            _suns++;
+            if (!(_s.cx >= 0 && _s.cy >= 0 && _s.cx < _w && _s.cy < _h)) _bad_in += " " + _rooms[_ri] + ":" + string(_s.cx) + "," + string(_s.cy);
+            if (!(_s.r >= 2 && _s.r <= 6 && _s.obj == noone && Light_IsLit(_s))) _bad_shape += " " + _rooms[_ri] + ":" + string(_s.cx) + "," + string(_s.cy);
+        }
+    }
+    Test_Eq("D164 sun: every sun spot is inside its room grid (bad:" + _bad_in + ")", _bad_in, "");
+    Test_Eq("D164 sun: every sun spot has a radius of 2..6 tiles, no object and is always lit (bad:" + _bad_shape + ")", _bad_shape, "");
+    Test_True("D164 sun: the rooms list at least 4 sun spots (" + string(_suns) + ")", _suns >= 4);
+    var _s1 = Light_Sun(3, 4, 5);
+    Test_True("D164 sun: Light_Sun makes a sun source (no object, always lit)", _s1.sun && _s1.obj == noone && _s1.cx == 3 && _s1.cy == 4 && _s1.r == 5 && Light_IsLit(_s1));
+    Test_False("D164 sun: a fire stand or torch is not a sun", Light_Fire(1, 1).sun || Light_Torch(1, 1).sun);
+    Test_Eq("D164 sun: the fixtures of the room art are unchanged (rm_floor3 lists its fire stand only)", array_length(Light_Sources("rm_floor3")), 1);
+}
+
+function Test_D164Torches() {
+    var _rooms = Test_D164Rooms();
+    var _rm = Test_D164RoomIds();
+    var _bad_wall = "";
+    var _bad_face = "";
+    var _bad_exit = "";
+    var _bad_gap = "";
+    var _bad_over = "";
+    var _bad_fix = "";
+    var _total = 0;
+    var _with = 0;
+    for (var _ri = 0; _ri < array_length(_rooms); _ri++) {
+        var _list = Light_ExtraTorches(_rooms[_ri]);
+        if (array_length(_list) > 0) _with++;
+        _total += array_length(_list);
+        if (array_length(_list) > 3) _bad_over += " " + _rooms[_ri];
+        var _m = Test_H11Model(_rm[_ri]);
+        var _g = _m.grid;
+        var _fix = Light_Sources(_rooms[_ri]);
+        for (var _i = 0; _i < array_length(_list); _i++) {
+            var _c = _list[_i];
+            var _tag = " " + _rooms[_ri] + ":" + string(_c.cx) + "," + string(_c.cy);
+            if (!(Nav_CellBlocked(_g, _c.cx, _c.cy) && Nav_SightBlocked(_g, _c.cx, _c.cy))) _bad_wall += _tag;
+            var _free = (!Nav_CellBlocked(_g, _c.cx + 1, _c.cy)) || (!Nav_CellBlocked(_g, _c.cx - 1, _c.cy)) || (!Nav_CellBlocked(_g, _c.cx, _c.cy + 1)) || (!Nav_CellBlocked(_g, _c.cx, _c.cy - 1));
+            if (!_free) _bad_face += _tag;
+            for (var _e = 0; _e < array_length(_m.exits); _e++) if (max(abs(_m.exits[_e][0] - _c.cx), abs(_m.exits[_e][1] - _c.cy)) < 2) { _bad_exit += _tag; break; }
+            for (var _sp = 0; _sp < array_length(_m.spawns); _sp++) if (max(abs(_m.spawns[_sp][0] - _c.cx), abs(_m.spawns[_sp][1] - _c.cy)) < 2) { _bad_exit += _tag; break; }
+            for (var _j = _i + 1; _j < array_length(_list); _j++) {
+                if (point_distance(_c.cx, _c.cy, _list[_j].cx, _list[_j].cy) < 4) _bad_gap += _tag + "~" + string(_list[_j].cx) + "," + string(_list[_j].cy);
+            }
+            for (var _f = 0; _f < array_length(_fix); _f++) if (_fix[_f].cx == _c.cx && _fix[_f].cy == _c.cy) _bad_fix += _tag;
+        }
+    }
+    Test_Eq("D164 torches: every extra torch stands on a wall cell of the nav grid (bad:" + _bad_wall + ")", _bad_wall, "");
+    Test_Eq("D164 torches: every extra torch has a free 4-neighbour (faces a floor cell) (bad:" + _bad_face + ")", _bad_face, "");
+    Test_Eq("D164 torches: no extra torch is on or next to an exit or a spawn (bad:" + _bad_exit + ")", _bad_exit, "");
+    Test_Eq("D164 torches: extra torches in a room are 4 tiles apart or more (bad:" + _bad_gap + ")", _bad_gap, "");
+    Test_Eq("D164 torches: at most 3 extra torches in a room (bad:" + _bad_over + ")", _bad_over, "");
+    Test_Eq("D164 torches: no extra torch on a cell that already holds a fire stand or torch (bad:" + _bad_fix + ")", _bad_fix, "");
+    Test_True("D164 torches: more torches (" + string(_total) + " extra, at least 8)", _total >= 8);
+    Test_True("D164 torches: at least 5 rooms get extra torches (" + string(_with) + ")", _with >= 5);
+    Test_Eq("D164 torches: a daylight room gets none (rm_floor2)", array_length(Light_ExtraTorches("rm_floor2")), 0);
+    Test_Eq("D164 torches: an unknown room gets none", array_length(Light_ExtraTorches("rm_nothing")), 0);
+    // the full list of a room = the room art's fixtures + sun spots + the extra torches
+    var _suns3 = 0;
+    var _all3 = Light_AllSources("rm_floor3");
+    for (var _q = 0; _q < array_length(_all3); _q++) if (_all3[_q].sun) _suns3++;
+    Test_Eq("D164 torches: rm_floor3's full list is its fixtures, its sun spots and its extra torches", array_length(_all3), array_length(Light_Sources("rm_floor3")) + _suns3 + array_length(Light_ExtraTorches("rm_floor3")));
+    Test_True("D164 torches: rm_floor3's extra torches are in its full list and lit by an obj_torch", array_length(_all3) >= 3 && _all3[array_length(_all3) - 1].obj == obj_torch);
+}
+
+function Test_Suite_D164() {
+    var _need = ["Light_RoomDark", "Light_Sun", "Light_DaylightRooms", "Light_ExtraTorches", "Light_AllSources", "Light_PlaceExtraTorches"];
+    var _missing = "";
+    for (var _i = 0; _i < array_length(_need); _i++) {
+        if (asset_get_index(_need[_i]) == -1) _missing += " " + _need[_i];
+    }
+    Test_Eq("D164 the lighting functions exist (missing:" + _missing + ")", _missing, "");
+    if (_missing != "") return;
+    Test_D164Dark();
+    Test_D164Sun();
+    Test_D164Torches();
 }
 
 // ---- H7: lore notes (D147) ----

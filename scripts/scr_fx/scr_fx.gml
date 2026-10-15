@@ -1082,22 +1082,30 @@ function Battle_BgApply(_floor, _boss) {
 
 // ============================================================================
 // ROOM LIGHTING (H14, D157, D159). Every floor room is a little dark and light is what is cut out of the dark:
-//   - the darkness is one layer, UI_C_DARKEST (#071821) at LIGHT_DARK_ALPHA over the whole view (not a blackout: the 4-colour picture stays readable);
+//   - the darkness is one layer, UI_C_DARKEST (#071821) at the room's alpha (Light_RoomDark: LIGHT_DARK_ALPHA, much lighter in the rooms open to the sky) over the whole view
+//     (not a blackout: the 4-colour picture stays readable);
 //   - every lit fire stand and torch cuts a soft pool out of it (three nested circles, so three steps of brightness like the rest of the art) that flickers;
-//   - every enemy cuts the cells it can see out of it (Vis_Cone, the very set EnemyAI_CanSee uses, so what is lit is what is watched): standing behind cover is
-//     visibly standing in the dark, and a hidden player (D153) sits in a dark pocket.
+//   - a sun spot (D164) is a pool that is always lit and does not flicker: a patch where daylight falls into the room;
+//   - enemies cut nothing out (D160, amends D157): their sight is not shown; the stats keep a cones field that stays 0.
 // One pass per frame: one view-sized surface, filled with the darkness, the light shapes drawn into it with a blend that only lowers its alpha, then drawn over the world.
 // The pass runs at the start of World_DrawFx: the characters and the floor are darkened with the rest (a figure standing in the dark must look like it),
 // while everything World_DrawFx draws after it (the "!" and "?", the interact arrow, the elite outline, the merchant glow, chest bursts) stays at full brightness.
 // ============================================================================
-#macro LIGHT_DARK_ALPHA 0.4          // how dark a room is where no light reaches (D159: slightly darker, not a blackout)
+#macro LIGHT_DARK_ALPHA 0.28         // how dark a room is where no light reaches (D159: 0.4; D164: lighter, 0.28 is a first value for the owner to judge; still not barely dimmed)
+#macro LIGHT_DAY_ALPHA 0.10          // a room open to the sky (D164)
 #macro LIGHT_DARK_COLOUR UI_C_DARKEST   // #071821
 #macro LIGHT_FLICKER_AMP 0.12         // a light's radius moves within +-12%
 #macro LIGHT_FLICKER_STEP_MS 90       // and changes about 11 times a second
 
-// One light source: cell, radius in tiles, palette colour, the object that must still be lit (a fire stand or torch put out in the game stops lighting).
-function Light_Src(_cx, _cy, _r, _col, _obj) {
-    return { cx: _cx, cy: _cy, r: _r, col: _col, obj: _obj };
+// One light source: cell, radius in tiles, palette colour, the object that must still be lit (a fire stand or torch put out in the game stops lighting),
+// sun (D164): daylight falling in, tied to no object, always lit, does not flicker.
+function Light_Src(_cx, _cy, _r, _col, _obj, _sun = false) {
+    return { cx: _cx, cy: _cy, r: _r, col: _col, obj: _obj, sun: _sun };
+}
+
+// A patch of daylight: cell, radius in tiles. Always lit.
+function Light_Sun(_cx, _cy, _r) {
+    return Light_Src(_cx, _cy, _r, UI_C_LIGHTEST, noone, true);
 }
 
 function Light_Fire(_cx, _cy) {
@@ -1125,8 +1133,80 @@ function Light_Sources(_room_name) {
     return [];
 }
 
-// Is the fire stand or torch of this source still burning in the room it is in?
+// D164: how dark a room is where no light reaches. The rooms open to the sky are daylight rooms (Light_DaylightRooms), the others have the base darkness.
+// rm_floor2: a forest grew through a big hole in the tunnel. rm_floor4: a clearing ringed by trees, open overhead (a little darker, it has a fire stand and a way down).
+function Light_RoomDark(_room_name) {
+    switch (_room_name) {
+        case "rm_floor2": return LIGHT_DAY_ALPHA;
+        case "rm_floor4": return 0.14;
+    }
+    return LIGHT_DARK_ALPHA;
+}
+
+function Light_DaylightRooms() {
+    return ["rm_floor2", "rm_floor4"];
+}
+
+// D164: the patches of daylight in a room, read from the room art (16 px grid, cell x,y): a clearing with no roof or a place where the trees grew in.
+function Light_SunSpots(_room_name) {
+    switch (_room_name) {
+        case "rm_floor2": return [Light_Sun(4, 5, 5), Light_Sun(11, 5, 5)];   // the open forest clearing: bright floor from wall to wall under the hole in the tunnel roof
+        case "rm_floor4": return [Light_Sun(6, 5, 5.5)];                      // the tree-ringed clearing, open to the sky
+        case "rm_floor5": return [Light_Sun(9, 7, 3.5)];                      // the foot of the tree trunk that grew up through the ceiling
+        case "rm_floor9": return [Light_Sun(14, 5, 3.5)];                     // the east half, where the trees grew over the room
+    }
+    return [];
+}
+
+// D164: more torches, placed in code at room start (Light_PlaceExtraTorches). Each cell is a wall cell of the north (brick) wall with a free floor cell
+// right below it, away from exits, spawns and chests' access, at least 4 tiles from the others of its room, at most 3 to a room. The art's own torches
+// and fire stands are in Light_Sources and are not repeated here.
+function Light_ExtraTorches(_room_name) {
+    switch (_room_name) {
+        case "rm_floor1": return [Light_Cell(2, 4), Light_Cell(10, 2)];
+        case "rm_floor3": return [Light_Cell(5, 2), Light_Cell(12, 2)];
+        case "rm_floor5": return [Light_Cell(4, 1), Light_Cell(13, 1)];
+        case "rm_floor6": return [Light_Cell(8, 2)];
+        case "rm_floor7": return [Light_Cell(8, 1), Light_Cell(10, 10)];
+        case "rm_floor9": return [Light_Cell(5, 2)];
+    }
+    return [];
+}
+
+function Light_Cell(_cx, _cy) {
+    return { cx: _cx, cy: _cy };
+}
+
+// Everything that lights a room: the fixtures of its art, then the sun spots, then the extra torches.
+function Light_AllSources(_room_name) {
+    var _out = Light_Sources(_room_name);
+    var _sun = Light_SunSpots(_room_name);
+    for (var _i = 0; _i < array_length(_sun); _i++) array_push(_out, _sun[_i]);
+    var _tor = Light_ExtraTorches(_room_name);
+    for (var _k = 0; _k < array_length(_tor); _k++) array_push(_out, Light_Torch(_tor[_k].cx, _tor[_k].cy));
+    return _out;
+}
+
+// Room start (obj_game_controller Create): puts the extra torches of this room on their wall cells. Safe to call twice: a cell that already holds a torch is left alone.
+// Returns how many it made. No .yy edit: the room assets are untouched.
+function Light_PlaceExtraTorches() {
+    var _list = Light_ExtraTorches(room_get_name(room));
+    var _t = GRID_TILE_SIZE;
+    var _made = 0;
+    for (var _i = 0; _i < array_length(_list); _i++) {
+        var _cx = _list[_i].cx;
+        var _cy = _list[_i].cy;
+        if (instance_position(_cx * _t + _t / 2, _cy * _t + _t / 2, obj_torch) != noone) continue;
+        if (instance_position(_cx * _t + _t / 2, _cy * _t + _t / 2, obj_torch_off) != noone) continue;
+        instance_create_layer(_cx * _t, _cy * _t, "Instances", obj_torch);
+        _made++;
+    }
+    return _made;
+}
+
+// Is the fire stand or torch of this source still burning in the room it is in? (A sun spot is always lit.)
 function Light_IsLit(_src) {
+    if (_src.sun) return true;
     var _t = GRID_TILE_SIZE;
     var _i = instance_position(_src.cx * _t + _t / 2, _src.cy * _t + _t / 2, _src.obj);
     if (_i == noone) return false;
@@ -1143,9 +1223,16 @@ function Light_Now() {
 function Light_RoomSources() {
     if (!variable_global_exists("light_room") || global.light_room != room) {
         global.light_room = room;
-        global.light_srcs = Light_Sources(room_get_name(room));
+        global.light_srcs = Light_AllSources(room_get_name(room));
+        global.light_dark = Light_RoomDark(room_get_name(room));
     }
     return global.light_srcs;
+}
+
+// The darkness of the current room (D164), kept with the sources.
+function Light_RoomDarkNow() {
+    Light_RoomSources();
+    return global.light_dark;
 }
 
 // The flickering radius (pixels) of a light with base radius _r_px at game time _ms: always inside Light_FlickerRange, a pure function of (radius, seed, time),
@@ -1209,10 +1296,9 @@ function Light_PerfMaxMs() {
 
 // The pass (called first by World_DrawFx, a layer script, see World_RegisterFx). Everything is in view pixels: the world position minus the camera's corner.
 function Light_DrawPass() {
-    // how much of the darkness each step of light removes (a pool: outer, middle, inner ring; an enemy's light: far, middle, near cells)
+    // how much of the darkness each step of light removes (a pool: outer, middle, inner ring)
     static _pool_r = [1.0, 0.7, 0.4];
     static _pool_cut = [0.30, 0.40, 0.50];
-    static _cone_cut = [0.42, 0.55, 0.68];
     if (!Fx_IsWorldPass()) return;
     var _t0 = get_timer();
     var _cam = view_camera[0];
@@ -1228,26 +1314,19 @@ function Light_DrawPass() {
     var _ms = Light_Now();
     var _oc = draw_get_colour();
     var _oa = draw_get_alpha();
-    var _hcx = -1;
-    var _hcy = -1;
-    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
-    if (_pl != noone && Player_IsHidden(_pl)) {
-        _hcx = Nav_CellOf(_pl.x + _T / 2);
-        _hcy = Nav_CellOf(_pl.y + _T / 2);
-    }
     var _g = Nav_Get().grid;
     var _lights = 0;
     var _cones = 0;
+    var _src = Light_RoomSources();
     surface_set_target(_surf);
-    draw_clear_alpha(LIGHT_DARK_COLOUR, LIGHT_DARK_ALPHA);
+    draw_clear_alpha(LIGHT_DARK_COLOUR, global.light_dark);
     gpu_set_blendmode_ext_sepalpha(bm_zero, bm_one, bm_zero, bm_inv_src_alpha);   // colour untouched, alpha * (1 - source alpha): a light only takes darkness away
     draw_set_colour(c_white);
-    var _src = Light_RoomSources();
     for (var _i = 0; _i < array_length(_src); _i++) {
         var _s = _src[_i];
         var _px = _s.cx * _T + _T / 2 - _vx;
-        var _py = _s.cy * _T + 5 - _vy;   // the flame, a little above the middle of the tile
-        var _r = Light_FlickerRadius(_s.r * _T, _s.cx * 7 + _s.cy * 13, _ms);
+        var _py = _s.cy * _T + (_s.sun ? _T / 2 : 5) - _vy;   // the flame, a little above the middle of the tile (a sun spot: the middle)
+        var _r = _s.sun ? _s.r * _T : Light_FlickerRadius(_s.r * _T, _s.cx * 7 + _s.cy * 13, _ms);   // D164: daylight does not flicker
         if (_px + _r < 0 || _py + _r < 0 || _px - _r > _vw || _py - _r > _vh) continue;
         if (!Light_IsLit(_s)) continue;
         for (var _b = 0; _b < 3; _b++) {
@@ -1256,38 +1335,7 @@ function Light_DrawPass() {
         }
         _lights++;
     }
-    with (obj_enemy) {
-        if (defeated || !variable_instance_exists(id, "prof")) continue;
-        var _tiles = Vis_EnemyTiles(prof, ai_mode);
-        if (_tiles <= 0) continue;
-        var _ecx = Nav_CellOf(x + _T / 2);
-        var _ecy = Nav_CellOf(y + _T / 2);
-        if ((_ecx + _tiles + 1) * _T < _vx || (_ecx - _tiles) * _T > _vx + _vw || (_ecy + _tiles + 1) * _T < _vy || (_ecy - _tiles) * _T > _vy + _vh) continue;
-        var _cone = Vis_Cone(_g, _ecx, _ecy, _tiles, prof.see_through);
-        var _runs = _cone.runs;
-        var _skip = Light_PocketCell(_ecx, _ecy, _hcx, _hcy);
-        var _ox = _ecx * _T - _vx;
-        var _oy = _ecy * _T - _vy;
-        var _band = -1;
-        for (var _k = 0; _k < array_length(_runs); _k += 4) {
-            if (_runs[_k + 3] != _band) {
-                _band = _runs[_k + 3];
-                draw_set_alpha(_cone_cut[_band]);
-            }
-            var _len = _runs[_k + 2];
-            var _x0 = _ox + _runs[_k] * _T;
-            var _y0 = _oy + _runs[_k + 1] * _T;
-            if (_skip && _ecy + _runs[_k + 1] == _hcy && _hcx >= _ecx + _runs[_k] && _hcx < _ecx + _runs[_k] + _len) {
-                var _left = _hcx - (_ecx + _runs[_k]);   // the hidden player's cell is left dark: the run is drawn in two pieces round it
-                var _right = _len - _left - 1;
-                if (_left > 0) draw_rectangle(_x0, _y0, _x0 + _left * _T - 1, _y0 + _T - 1, false);
-                if (_right > 0) draw_rectangle(_x0 + (_left + 1) * _T, _y0, _x0 + _len * _T - 1, _y0 + _T - 1, false);
-            } else {
-                draw_rectangle(_x0, _y0, _x0 + _len * _T - 1, _y0 + _T - 1, false);
-            }
-        }
-        _cones++;
-    }
+    // D160 (amends D157): enemies are not light sources. Their sight (Vis_Cone, EnemyAI_CanSee) works as before, it is just not drawn.
     gpu_set_blendmode(bm_normal);
     surface_reset_target();
     draw_set_alpha(1);

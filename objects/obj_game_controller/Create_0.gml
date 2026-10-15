@@ -8,3 +8,4 @@ Display_Init();      // once per run: the display owner (scr_display); needs the
 Room_StampBump();    // every room start: layer scripts registered earlier belong to a room that is gone (I-056)
 Display_BindRoom();  // every room start: the room's own view and camera replaced by the one design (scr_display)
 SFX_EnsureManager();
+Light_PlaceExtraTorches();   // D164: the extra wall torches of this room, put on their cells in code (the room assets are not edited); safe to call twice
