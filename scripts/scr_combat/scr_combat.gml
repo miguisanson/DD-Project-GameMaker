@@ -2530,6 +2530,16 @@ function Battle_StatusChips(_ch) {
 
 // Chips for the HUD: the real statuses, then Steadfast (turns left) and BREAK, which live on the turn timeline and the stagger meter.
 function Battle_FighterChips(_bc, _who) {
+    var fr = Battle_HudFrame();
+    if (is_struct(fr)) {   // inside a Draw GUI frame: built once per fighter
+        if (!is_array(fr.chips[_who])) fr.chips[_who] = Battle_FighterChipsBuild(_bc, _who);
+        return fr.chips[_who];
+    }
+    return Battle_FighterChipsBuild(_bc, _who);
+}
+
+function Battle_FighterChipsBuild(_bc, _who) {
+    if (_who == TL_PLAYER) Battle_HudBuilds().chips_player++; else Battle_HudBuilds().chips_enemy++;
     var ch = (_who == TL_PLAYER) ? _bc.p : _bc.e;
     var chips = Battle_StatusChips(ch);
     var f = Turn_Find(_bc.tl, _who);
@@ -2852,9 +2862,46 @@ function Battle_DrawMenus(_bc) {
     }
 }
 
+// ---- per-frame HUD data (D108 F1d-1) ----
+// How many times the battle HUD data was really built (the tests assert one build per Draw GUI frame). Counted in the builders below.
+function Battle_HudBuilds() {
+    if (!variable_global_exists("battle_hud_builds")) global.battle_hud_builds = { metrics: 0, header: 0, chips_player: 0, chips_enemy: 0 };
+    return global.battle_hud_builds;
+}
+
+function Battle_HudBuildsReset() {
+    global.battle_hud_builds = { metrics: 0, header: 0, chips_player: 0, chips_enemy: 0 };
+}
+
+// One Draw GUI frame of the battle controller is bracketed by Battle_HudFrameBegin / Battle_HudFrameEnd (obj_battle_controller Draw_64). Inside the
+// bracket the timeline metrics, the enemy header rect and each fighter's chips are built on first use and shared by every later caller of that
+// frame: nothing they read (HP, statuses, layout, the enemy's place) changes while one Draw GUI event runs. Outside a bracket (Step code, the
+// scenarios, the tests) every call builds from the live data, as before.
+function Battle_HudFrameBegin(_bc) {
+    global.battle_hud_frame = { bc: _bc, tm: undefined, hdr: undefined, chips: [undefined, undefined] };   // chips[TL_PLAYER], chips[TL_ENEMY]
+}
+
+function Battle_HudFrameEnd() {
+    global.battle_hud_frame = undefined;
+}
+
+function Battle_HudFrame() {
+    return variable_global_exists("battle_hud_frame") ? global.battle_hud_frame : undefined;
+}
+
 // ---- the turn strip (D74): a plate with the current actor first (ringed, gently bobbing), then the next four ----
 // Sizes of the strip in GUI units. Sprites are drawn at a whole multiple (k) of the window pixel so they stay crisp at every window size.
 function Battle_TimelineMetrics(_bc = noone) {
+    var fr = Battle_HudFrame();
+    if (is_struct(fr)) {   // inside a Draw GUI frame: built once, for the frame's battle controller
+        if (!is_struct(fr.tm)) fr.tm = Battle_TimelineMetricsBuild(fr.bc);
+        return fr.tm;
+    }
+    return Battle_TimelineMetricsBuild(_bc);
+}
+
+function Battle_TimelineMetricsBuild(_bc) {
+    Battle_HudBuilds().metrics++;
     var mt = Ui_Metrics();
     var p = mt.p;
     var k = Battle_IconK();
@@ -2865,7 +2912,7 @@ function Battle_TimelineMetrics(_bc = noone) {
     var w = n * slot + (n - 1) * gap + 8 * p;
     var plate_h = slot + 8 * p;
     var caption_h = mt.line_h + p;
-    var fore = (_bc != noone && instance_exists(_bc) && Status_Has(_bc.p, STATUS_HIT_UP));   // the Foresight caption needs a line under the plate
+    var fore = (is_struct(_bc) || (_bc != noone && instance_exists(_bc))) && Status_Has(_bc.p, STATUS_HIT_UP);   // the Foresight caption needs a line under the plate
     return { p: p, k: k, icon: icon, slot: slot, gap: gap, w: w, x0: round((mt.gw - w) * 0.5), y0: mt.margin, plate_h: plate_h, caption_h: caption_h,
              h: plate_h + (fore ? p + caption_h : 0), line_h: mt.line_h };
 }
@@ -3002,6 +3049,16 @@ function Battle_DrawBanner(_bc, _alpha) {
 // Where the block sits: { cx, x1, y1 (plate top), bw (plate width), h (plate height), chips_x, chips_y, chips_align }. The status chips sit beside
 // the plate (right of it, or left when there is no room), so the block is no taller than the plate. Also keeps the BREAK word clear of it.
 function Battle_EnemyHeaderRect(_bc) {
+    var fr = Battle_HudFrame();
+    if (is_struct(fr)) {   // inside a Draw GUI frame: built once
+        if (!is_struct(fr.hdr)) fr.hdr = Battle_EnemyHeaderRectBuild(_bc);
+        return fr.hdr;
+    }
+    return Battle_EnemyHeaderRectBuild(_bc);
+}
+
+function Battle_EnemyHeaderRectBuild(_bc) {
+    Battle_HudBuilds().header++;
     var mt = Ui_Metrics();
     var p = mt.p;
     var sx = Display_WorldScale();

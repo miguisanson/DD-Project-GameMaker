@@ -133,12 +133,27 @@ function Icon_SkillName(_skill_id) {
 
 // The frame of a named icon in a category (the position in art/strips_v2/<category>_strip.txt), or -1.
 function Icon_Frame(_category, _name) {
-    if (_name == "") return -1;
+    if (!is_string(_name) || _name == "" || !is_string(_category)) return -1;
+    var idx = Icon_FrameIndex();
+    if (!variable_struct_exists(idx, _category)) return -1;
+    var by_name = variable_struct_get(idx, _category);
+    return variable_struct_exists(by_name, _name) ? variable_struct_get(by_name, _name) : -1;
+}
+
+// category -> (icon name -> frame), built once from the strip ids (D108 F1d-1: was a linear scan per call). The first position wins, as the scan did.
+function Icon_FrameIndex() {
+    if (variable_global_exists("icon_frame_index")) return global.icon_frame_index;
     var d = Icon_FallbackData();
-    if (!variable_struct_exists(d, _category)) return -1;
-    var ids = variable_struct_get(d, _category).ids;
-    for (var i = 0; i < array_length(ids); i++) if (ids[i] == _name) return i;
-    return -1;
+    var out = {};
+    var cats = variable_struct_get_names(d);
+    for (var c = 0; c < array_length(cats); c++) {
+        var ids = variable_struct_get(d, cats[c]).ids;
+        var by_name = {};
+        for (var i = 0; i < array_length(ids); i++) if (!variable_struct_exists(by_name, ids[i])) variable_struct_set(by_name, ids[i], i);
+        variable_struct_set(out, cats[c], by_name);
+    }
+    global.icon_frame_index = out;
+    return out;
 }
 
 function Icon_StatusFrame(_status_id) { return Icon_Frame("status", Icon_StatusName(_status_id)); }
@@ -162,11 +177,39 @@ function Icon_PaletteColour(_ch) {
     return $CFF8E0;
 }
 
+// The imported strip sprite "spr_icons_<category>", or -1 while it is not imported yet (D94). Looked up once per category for the run (the
+// asset table of a running game does not change; the owner imports the strips in the IDE, then the game is started again). Lookups are counted for the tests.
+function Icon_StripSprite(_category) {
+    if (!variable_global_exists("icon_strip_sprites")) global.icon_strip_sprites = {};
+    if (variable_struct_exists(global.icon_strip_sprites, _category)) return variable_struct_get(global.icon_strip_sprites, _category);
+    if (!variable_global_exists("icon_lookups")) global.icon_lookups = 0;
+    global.icon_lookups++;
+    var spr = asset_get_index("spr_icons_" + _category);
+    variable_struct_set(global.icon_strip_sprites, _category, spr);
+    return spr;
+}
+
 // The sprite and subimage to draw for an icon: the imported strip, else one sprite per icon made from its rows (kept for the run).
-// Returns undefined when the category or frame does not exist.
+// Returns undefined when the category or frame does not exist. The answer is kept per category and frame (D108 F1d-1): one shared struct, read only.
 function Icon_Get(_category, _frame) {
     if (_frame < 0) return undefined;
-    var spr = asset_get_index("spr_icons_" + _category);
+    if (!variable_global_exists("icon_pics")) global.icon_pics = {};
+    var pics = variable_struct_get(global.icon_pics, _category);
+    if (is_array(pics) && _frame < array_length(pics) && is_struct(pics[_frame])) return pics[_frame];
+    var made = Icon_GetBuild(_category, _frame);
+    if (is_struct(made)) {
+        if (!is_array(pics)) {
+            pics = [];
+            variable_struct_set(global.icon_pics, _category, pics);
+        }
+        if (array_length(pics) <= _frame) array_resize(pics, _frame + 1);
+        pics[_frame] = made;
+    }
+    return made;
+}
+
+function Icon_GetBuild(_category, _frame) {
+    var spr = Icon_StripSprite(_category);
     if (is_real(spr) && spr != -1 && sprite_exists(spr)) return { spr: spr, sub: _frame };
     if (!variable_global_exists("icon_cache")) global.icon_cache = {};
     var key = _category + ":" + string(_frame);
