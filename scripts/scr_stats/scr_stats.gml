@@ -49,8 +49,11 @@ function Resource_MaxMp(_mp_gain, _level, _mag) {
 function RecomputeResources(_ch) {
     var cfg = _ch.class_cfg;
 
-    _ch.max_hp = max(1, Resource_MaxHp(cfg.hd, _ch.level));
-    _ch.max_mp = max(0, Resource_MaxMp(cfg.mp_gain, _ch.level, _ch.stats.mag));
+    // D143: + the Max HP / Max MP bought with free points (absent on a character made before them)
+    var hp_bonus = variable_struct_exists(_ch, "hp_bonus") ? _ch.hp_bonus : 0;
+    var mp_bonus = variable_struct_exists(_ch, "mp_bonus") ? _ch.mp_bonus : 0;
+    _ch.max_hp = max(1, Resource_MaxHp(cfg.hd, _ch.level) + hp_bonus);
+    _ch.max_mp = max(0, Resource_MaxMp(cfg.mp_gain, _ch.level, _ch.stats.mag) + mp_bonus);
 
     _ch.hp = clamp(_ch.hp, 0, _ch.max_hp);
     _ch.mp = clamp(_ch.mp, 0, _ch.max_mp);

@@ -9483,8 +9483,9 @@ function Test_Suite_LevelUpGrowth() {
     Test_True("D143 with no point left a second Max HP placement does nothing", _hp3.max_hp == _hp_max0 + 3 && _hp3.hp == _hp_cur0 + 3 && _hp3.stat_points == 0);
     var _hp_re = RecomputeResources(variable_clone(_hp2));
     Test_Eq("D143 the Max HP bonus survives a resource recompute (a load, a level-up)", _hp_re.max_hp, _hp_max0 + 3);
+    var _hp_lvl0 = _hp2.level;   // LevelUp_ApplyLevel changes the struct it is given
     var _hp_lv = LevelUp_ApplyLevel(_hp2);
-    Test_Eq("D143 the Max HP bonus is kept on the next level", _hp_lv.max_hp, Resource_MaxHp(_hp2.class_cfg.hd, _hp2.level + 1) + 3);
+    Test_Eq("D143 the Max HP bonus is kept on the next level", _hp_lv.max_hp, Resource_MaxHp(_hp_lv.class_cfg.hd, _hp_lvl0 + 1) + 3);
 
     var _mp = Test_CardPlayer(CLASS_KNIGHT);
     _mp.stat_points = 1;
