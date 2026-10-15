@@ -70,6 +70,8 @@ Do not start Phase 4 until the G3 save contract is written. Do not start any com
 
 ## Learned, not obvious from code
 
+- **Owner import 2026-10-16** (d866147): GameMaker named the sprites after their files (status_strip ... skill_up_strip, spr_merchant_idle_strip, card_frame); the code accepts both names (Icon_StripSprite, Merchant_SpriteName). card_frame is unused (frames are code-drawn). The owner opens the `next` worktree in GameMaker; pause merges into next while it is open.
+
 - **D123 as chosen doubles elites** (R1-sim, 2026-10-15): per-floor elites with "at least 1 from floor 2" = ~6.3 elites/run vs ~2.8 with the old 15% roll; sim win rate average profile Knight 94->88, Archer 96->92, Mage 87->84, Nobody 26->25; gold/run +7-10%. Kept as the owner chose; flagged in PLAYTEST-QUEUE balance entry. Fallback if too hard: drop the minimum of 1.
 
 - **Test runs still take focus**: the game window becomes foreground ~273 ms after a minimized launch (display spike). Never run window modes while the owner uses the PC until fixed (I-053).
