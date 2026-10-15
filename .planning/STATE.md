@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PLAYTEST NOW: build 8762d9b-20261015 (FULL gate PASS 3529/0), E:/Games/DD-Project Playtest/8762d9b-20261015. Improvement mode on next (df66aea, after the build): I4 merged. In flight (Sonnet): F2b-1 battle clocks -> ms (wt/f2b1), F4c write-only globals (wt/f4c). Skipped on purpose: audio manager restructure (no by-ear check overnight). F4d needs owner. |
+| WIP | PLAYTEST NOW: build 8762d9b-20261015 (FULL gate PASS 3529/0). Improvement mode on next f4f966d (FULL gate PASS 3562/0; shots vs 8762d9b: layouts identical, only build stamp + animation-phase noise): I4, F4c, F2b-1 merged. In flight: F2b-2 dialogue/UI clocks (Sonnet, wt/f2b2). Then: Opus review 3, rebuild the playtest build from final next and repoint BOARD/QUEUE. |
 | Unplayed features | 59 playtest entries (PLAYTEST-QUEUE, build 8762d9b-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
