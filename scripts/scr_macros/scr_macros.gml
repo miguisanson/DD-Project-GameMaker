@@ -222,10 +222,11 @@
 #macro QTE_SHAKE_GOOD_FRAMES 8
 #macro QTE_BAR_W 96                // bar size in base units (the picture is 160 x 144)
 #macro QTE_BAR_H 8
-#macro QTE_COL_DARKEST $211807     // the four palette colours (D10) as GameMaker BGR: #071821 #306850 #86C06C #E0F8CF
-#macro QTE_COL_DARK $506830
-#macro QTE_COL_LIGHT $6CC086
-#macro QTE_COL_LIGHTEST $CFF8E0
+#macro QTE_COL_DARKEST UI_C_DARKEST     // the four palette colours (D10, D108): the QTE bar uses the same UI_C_* macros as every other screen (defined in scr_menu)
+#macro QTE_COL_DARK UI_C_DARK
+#macro QTE_COL_LIGHT UI_C_LIGHT
+#macro QTE_COL_LIGHTEST UI_C_LIGHTEST
+#macro UI_C_MERCHANT_GOLD $47C5E8     // the merchant's gold glow, #E8C547 as GameMaker BGR: the one owner-approved colour outside the four palette colours (D113)
 // QTE part 2 (D57-D59): the arrow sequence for a player skill and the defence bar. All times are ms from delta_time.
 #macro QTE_SEQ_LEAD_IN_MS 300      // the arrows are up and the bar is full before the clock starts; presses in it are dropped
 #macro QTE_SEQ_PENALTY_MS 250      // a wrong arrow takes this much off the time bar

@@ -673,7 +673,7 @@ function Merchant_EnsureInRoom() {
 function Merchant_DrawWorldFx() {
     if (!Fx_IsWorldPass()) return;
     if (!instance_exists(obj_npc)) return;
-    var _gold = make_color_rgb(232, 197, 71);
+    var _gold = UI_C_MERCHANT_GOLD;
     var _idle = asset_get_index(Merchant_SpriteName());
     var _alpha = Merchant_GlowAlpha(current_time);
     var _oa = draw_get_alpha();
@@ -761,9 +761,9 @@ function Elite_Regen(_e) {
 function Elite_DrawWorldFx() {
     if (!Fx_IsWorldPass()) return;
     if (!instance_exists(obj_enemy)) return;
-    var c_a = make_color_rgb(224, 248, 207);
-    var c_b = make_color_rgb(134, 192, 108);
-    var c_c = make_color_rgb(7, 24, 33);
+    var c_a = UI_C_LIGHTEST;
+    var c_b = UI_C_LIGHT;
+    var c_c = UI_C_DARKEST;
     var oc = draw_get_color();
     var oa = draw_get_alpha();
     draw_set_alpha(1);

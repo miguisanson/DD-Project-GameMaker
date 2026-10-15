@@ -170,11 +170,11 @@ function Icon_Rows(_category, _frame) {
 
 function Icon_PaletteColour(_ch) {
     switch (_ch) {
-        case "0": return $211807;
-        case "1": return $506830;
-        case "2": return $6CC086;
+        case "0": return UI_C_DARKEST;
+        case "1": return UI_C_DARK;
+        case "2": return UI_C_LIGHT;
     }
-    return $CFF8E0;
+    return UI_C_LIGHTEST;
 }
 
 // The imported strip sprite "spr_icons_<category>", or -1 while it is not imported yet (D94). Looked up once per category for the run (the

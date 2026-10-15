@@ -1561,10 +1561,10 @@ function Note_Read(_inst) {
 function Note_DrawWorldFx() {
     if (!Fx_IsWorldPass()) return;
     if (!instance_exists(obj_interactable)) return;
-    var c0 = make_color_rgb(7, 24, 33);
-    var c1 = make_color_rgb(48, 104, 80);
-    var c2 = make_color_rgb(134, 192, 108);
-    var c3 = make_color_rgb(224, 248, 207);
+    var c0 = UI_C_DARKEST;
+    var c1 = UI_C_DARK;
+    var c2 = UI_C_LIGHT;
+    var c3 = UI_C_LIGHTEST;
     var oc = draw_get_color();
     var oa = draw_get_alpha();
     draw_set_alpha(1);
