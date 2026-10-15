@@ -66,6 +66,7 @@ function Test_RunAll() {
     Test_RunSuite("Combat", Test_Suite_Combat);
     Test_RunSuite("Fx", Test_Suite_Fx);
     Test_RunSuite("BattleClock", Test_Suite_BattleClock);
+    Test_RunSuite("UiClock", Test_Suite_UiClock);
     Test_RunSuite("Qte", Test_Suite_Qte);
     Test_RunSuite("QteArrows", Test_Suite_QteArrows);
     Test_RunSuite("QteDefence", Test_Suite_QteDefence);
@@ -724,6 +725,228 @@ function Test_Suite_BattleClock() {
     Test_Eq("F2b-1 hurt flash at 33.333 ms steps shows for 3 frames (about 100 ms)", _on, 3);
     Test_Eq("F2b-1 a 200 ms hitch takes at most 50 ms off the hurt flash", Hud_HurtFlashStep(UI_HUD_HURT_FLASH_MS * 2, Presentation_StepMs(200000)), UI_HUD_HURT_FLASH_MS * 2 - 50);
     Test_Eq("F2b-1 no hurt flash reads zero", Hud_HurtFlashSign(0), 0);
+}
+
+// ---- D108 F2b-2: dialogue typewriter, dialogue lock and icon blink, open-block, banner, hold-to-skip and the input locks on a ms clock ----------------
+// Every helper drives the pure step function at one step size (16.667 ms = 60 fps, 33.333 ms = 30 fps, Presentation_StepMs(200000) = a hitch capped at 50 ms).
+// Expected frame counts are the old 60 fps numbers (frame counters), expected times come from the design (60 chars/s, 1 s skip hold, 1 s banner).
+
+function Test_UiTw(_cps, _hold_ms) {
+    return { dialogue_state: UI_DIALOGUE_STATE_REVEALING, dialogue_visible_count: 0, dialogue_reveal_accum: 0, dialogue_chars_per_sec: _cps, dialogue_hold_ms: 0, dialogue_hold_duration_ms: _hold_ms };
+}
+
+// Characters shown after _steps steps of _step_ms on a very long line.
+function Test_TwChars(_cps, _step_ms, _steps) {
+    var _u = Test_UiTw(_cps, 150);
+    for (var _i = 0; _i < _steps; _i++) Typewriter_Step(_u, 100000, _step_ms);
+    return _u.dialogue_visible_count;
+}
+
+// Steps until a line of _len characters is READY (revealed and held), 100000 when it never is.
+function Test_TwReadySteps(_len, _cps, _hold_ms, _step_ms) {
+    var _u = Test_UiTw(_cps, _hold_ms);
+    for (var _i = 1; _i <= 100000; _i++) {
+        Typewriter_Step(_u, _len, _step_ms);
+        if (_u.dialogue_state == UI_DIALOGUE_STATE_READY) return _i;
+    }
+    return 100000;
+}
+
+// Steps until the one-step dialogue lock is spent (100000 when it never is).
+function Test_LockSpentSteps(_step_ms) {
+    var _l = UI_DIALOGUE_REOPEN_LOCK_MS;
+    for (var _i = 1; _i <= 100000; _i++) {
+        _l = Dialogue_LockStep(_l, _step_ms);
+        if (_l <= 0) return _i;
+    }
+    return 100000;
+}
+
+// Steps until the icon blink has flipped once (icon_frame reached 1).
+function Test_IconFlipSteps(_step_ms) {
+    var _ic = 0;
+    for (var _i = 1; _i <= 100000; _i++) {
+        _ic = Dialogue_IconStep(_ic, _step_ms);
+        if (_ic >= 1) return _i;
+    }
+    return 100000;
+}
+
+// Frames an input lock refuses keys, counting from the frame it was made in (frame 100) with one tick per frame.
+function Test_LockBlockedFrames(_ms, _min_frames, _step_ms) {
+    var _lk = InputLock_New(_ms, _min_frames, 100);
+    for (var _i = 0; _i < 100000; _i++) {
+        if (!InputLock_Tick(_lk, 100 + _i, _step_ms)) return _i;
+    }
+    return 100000;
+}
+
+// Steps of a shown banner until it is over.
+function Test_BannerSteps(_step_ms) {
+    Banner_Show("Test");
+    for (var _i = 1; _i <= 100000; _i++) {
+        Banner_Step(_step_ms);
+        if (!Banner_Active()) return _i;
+    }
+    return 100000;
+}
+
+// Steps of holding confirm (pressed on the first) until the skip fires, 100000 when it never does.
+function Test_SkipFireSteps(_step_ms) {
+    var _st = Skip_StateNew();
+    for (var _i = 1; _i <= 100000; _i++) {
+        _st = Skip_Step(_st, true, _i == 1, true, _step_ms);
+        if (_st.fired) return _i;
+    }
+    return 100000;
+}
+
+// Steps from the press (the confirm is released at once) until the "hold to skip" hint is gone.
+function Test_SkipHintSteps(_step_ms) {
+    var _st = Skip_Step(Skip_StateNew(), true, true, false, _step_ms);
+    for (var _i = 1; _i <= 100000; _i++) {
+        _st = Skip_Step(_st, true, false, false, _step_ms);
+        if (_st.hint <= 0) return _i;
+    }
+    return 100000;
+}
+
+function Test_Suite_UiClock() {
+    var _f60 = Presentation_StepMs(16667);   // 16.667 ms
+    var _f30 = Presentation_StepMs(33333);   // 33.333 ms
+    var _hit = Presentation_StepMs(200000);  // a 200 ms hitch, capped at 50 ms
+
+    // --- the typewriter reveals UI_DIALOGUE_CHARS_PER_SEC (60) characters per second, however often the game steps
+    Test_Eq("F2b-2 the dialogue speed is 60 chars per second", UI_DIALOGUE_CHARS_PER_SEC, 60);
+    Test_Eq("F2b-2 the typewriter shows one character per 60 fps step", Test_TwChars(60, _f60, 1), 1);
+    var _n = Test_TwChars(60, _f60, 60);
+    Test_True("F2b-2 60 chars/s: 60 +-1 characters after 1 s of 60 fps steps (got " + string(_n) + ")", abs(_n - 60) <= 1);
+    _n = Test_TwChars(60, _f30, 30);
+    Test_True("F2b-2 60 chars/s: 60 +-1 characters after 1 s of 30 fps steps (got " + string(_n) + ")", abs(_n - 60) <= 1);
+    _n = Test_TwChars(30, _f60, 60);
+    Test_True("F2b-2 30 chars/s: 30 +-1 characters after 1 s of 60 fps steps (got " + string(_n) + ")", abs(_n - 30) <= 1);
+    _n = Test_TwChars(30, _f30, 30);
+    Test_True("F2b-2 30 chars/s: 30 +-1 characters after 1 s of 30 fps steps (got " + string(_n) + ")", abs(_n - 30) <= 1);
+    Test_Eq("F2b-2 a 200 ms hitch reveals only 50 ms of text (3 characters at 60 chars/s)", Test_TwChars(60, _hit, 1), 3);
+
+    // --- the hold after the last character: a text-only cutscene line 0.75 s, a boxed line 0.15 s (45 and 9 frames at 60 fps)
+    _n = Test_TwReadySteps(5, 60, 750, _f60);
+    Test_True("F2b-2 a 5-character cutscene line is ready after 5 + 45 steps at 60 fps +-1 (got " + string(_n) + ")", abs(_n - 50) <= 1);
+    _n = Test_TwReadySteps(5, 60, 150, _f60);
+    Test_True("F2b-2 a 5-character boxed line is ready after 5 + 9 steps at 60 fps +-1 (got " + string(_n) + ")", abs(_n - 14) <= 1);
+    _n = Test_TwReadySteps(6, 60, 750, _f30);
+    Test_True("F2b-2 a cutscene line at 30 fps is ready after its reveal plus 750 ms, +- 1 step (got " + string(_n) + " steps)", abs(_n * _f30 - (100 + 750)) <= _f30 + 0.01);
+    _n = Test_TwReadySteps(6, 60, 150, _f30);
+    Test_True("F2b-2 a boxed line at 30 fps is ready after its reveal plus 150 ms, +- 1 step (got " + string(_n) + " steps)", abs(_n * _f30 - (100 + 150)) <= _f30 + 0.01);
+    var _hu = Test_UiTw(60, 750);
+    _hu.dialogue_state = UI_DIALOGUE_STATE_HOLDING;
+    _hu.dialogue_visible_count = 5;
+    _hu.dialogue_hold_ms = 750;
+    Typewriter_Step(_hu, 5, _hit);
+    Test_Eq("F2b-2 a 200 ms hitch takes at most 50 ms off the line hold", _hu.dialogue_hold_ms, 700);
+    Test_Eq("F2b-2 a line that is still held is not ready", _hu.dialogue_state, UI_DIALOGUE_STATE_HOLDING);
+
+    // --- the dialogue lock after a close (1 frame): lasts a real step at any rate, never zero steps
+    Test_True("F2b-2 the dialogue reopen lock is 1 frame (16.67 ms)", abs(UI_DIALOGUE_REOPEN_LOCK_MS - 1000 / 60) < 0.01);
+    Test_Eq("F2b-2 the dialogue lock lasts 1 step at 16.667 ms", Test_LockSpentSteps(_f60), 1);
+    Test_Eq("F2b-2 the dialogue lock lasts 1 step at 33.333 ms", Test_LockSpentSteps(_f30), 1);
+    Test_Eq("F2b-2 the dialogue lock lasts 1 step after a hitch", Test_LockSpentSteps(_hit), 1);
+    Test_True("F2b-2 a step of zero ms does not clear the dialogue lock", Dialogue_LockStep(UI_DIALOGUE_REOPEN_LOCK_MS, 0) > 0);
+    Test_Eq("F2b-2 a spent dialogue lock stays 0", Dialogue_LockStep(0, _f60), 0);
+
+    // --- the "continue" arrow blink: UI_DIALOGUE_ARROW_FPS (2) per second, flips every 0.5 s (30 frames at 60 fps)
+    _n = Test_IconFlipSteps(_f60);
+    Test_True("F2b-2 the arrow flips after 30 +-1 steps at 60 fps (got " + string(_n) + ")", abs(_n - 30) <= 1);
+    _n = Test_IconFlipSteps(_f30);
+    Test_True("F2b-2 the arrow flips after 15 +-1 steps at 30 fps (got " + string(_n) + ")", abs(_n - 15) <= 1);
+    var _ic = 0;
+    for (var _i = 0; _i < 120; _i++) _ic = Dialogue_IconStep(_ic, _f60);
+    Test_True("F2b-2 the arrow blink wraps at 2 s (120 steps at 60 fps is back at the start, got " + string(_ic) + ")", _ic < 0.1);
+    Test_True("F2b-2 the arrow blink never leaves 0 to 2", Dialogue_IconStep(1.99, _hit) >= 0 && Dialogue_IconStep(1.99, _hit) < 2);
+    Test_True("F2b-2 a 200 ms hitch moves the arrow on by 50 ms (0.1)", abs(Dialogue_IconStep(0, _hit) - 0.1) < 0.000001);
+
+    // --- the input locks: the old frame counts at 60 fps, the same ms at 30 fps, and the open frame and the next one never answer a key
+    var _locks = [
+        { n: "cards screen",    ms: CARDS_UI_INPUT_DELAY_MS,   old: 10, minf: 2, want_ms: 10000 / 60 },
+        { n: "shop",            ms: SHOP_UI_INPUT_DELAY_MS,    old: 10, minf: 2, want_ms: 10000 / 60 },
+        { n: "tutorial",        ms: TUTORIAL_INPUT_DELAY_MS,   old: 12, minf: 2, want_ms: 200 },
+        { n: "help page",       ms: HELP_UI_INPUT_DELAY_MS,    old: 4,  minf: 2, want_ms: 4000 / 60 },
+        { n: "controls",        ms: CONTROLS_CAPTURE_DELAY_MS, old: 2,  minf: 2, want_ms: 2000 / 60 },
+        { n: "tutorial closed", ms: TUTORIAL_CLOSED_GUARD_MS,  old: 2,  minf: 2, want_ms: 2000 / 60 }
+    ];
+    for (var _k = 0; _k < array_length(_locks); _k++) {
+        var _lc = _locks[_k];
+        Test_True("F2b-2 " + _lc.n + " lock is " + string(_lc.old) + " frames in ms", abs(_lc.ms - _lc.want_ms) < 0.01);
+        _n = Test_LockBlockedFrames(_lc.ms, _lc.minf, _f60);
+        Test_True("F2b-2 " + _lc.n + " lock refuses " + string(_lc.old) + " +-1 frames at 16.667 ms (got " + string(_n) + ")", abs(_n - _lc.old) <= 1);
+        _n = Test_LockBlockedFrames(_lc.ms, _lc.minf, _f30);
+        Test_True("F2b-2 " + _lc.n + " lock lasts its ms +- 1 step at 33.333 ms (got " + string(_n) + " frames)",
+            _n * _f30 >= _lc.ms - _f30 - 0.01 && _n * _f30 <= max(_lc.ms, _lc.minf * _f30) + _f30 + 0.01);
+        _n = Test_LockBlockedFrames(_lc.ms, _lc.minf, _hit);
+        Test_True("F2b-2 " + _lc.n + " lock holds the open frame and the next one even after a hitch (got " + string(_n) + ")", _n >= 2);
+        _n = Test_LockBlockedFrames(_lc.ms, _lc.minf, 5);
+        Test_True("F2b-2 " + _lc.n + " lock does not end sooner at a very high frame rate (got " + string(_n) + ")", _n >= _lc.old);
+    }
+    // the dialogue open block: 2 frames after the open frame (the old "frame <= open + 2") = the open frame plus 2 = 50 ms; the open frame alone at least
+    Test_True("F2b-2 the cutscene advance block is 3 frames (50 ms: the open frame and 2 after)", abs(UI_CUTSCENE_ADVANCE_BLOCK_MS - 3000 / 60) < 0.01);
+    _n = Test_LockBlockedFrames(UI_CUTSCENE_ADVANCE_BLOCK_MS, 1, _f60);
+    Test_Eq("F2b-2 the cutscene advance block refuses 3 frames at 16.667 ms", _n, 3);
+    _n = Test_LockBlockedFrames(UI_CUTSCENE_ADVANCE_BLOCK_MS, 1, _f30);
+    Test_True("F2b-2 the cutscene advance block refuses its 50 ms +- 1 step at 33.333 ms (got " + string(_n) + " frames)", _n * _f30 >= 50 - _f30 - 0.01 && _n * _f30 <= 50 + _f30 + 0.01);
+    _n = Test_LockBlockedFrames(UI_CUTSCENE_ADVANCE_BLOCK_MS, 1, _hit);
+    Test_True("F2b-2 the cutscene advance block refuses at least the open frame after a hitch (got " + string(_n) + ")", _n >= 1);
+    Test_Eq("F2b-2 a box with no cutscene text blocks the open frame only", Test_LockBlockedFrames(0, 1, _f60), 1);
+    // one tick per frame, however often it is asked; a lock nobody asked about for a while is spent when asked
+    var _lk = InputLock_New(CARDS_UI_INPUT_DELAY_MS, 2, 200);
+    InputLock_Tick(_lk, 200, _f60);
+    InputLock_Tick(_lk, 200, _f60);
+    InputLock_Tick(_lk, 201, _f60);
+    InputLock_Tick(_lk, 201, _f60);
+    Test_True("F2b-2 a lock steps once per frame however often it is read (1 frame = 16.7 ms off)", abs(_lk.ms - (CARDS_UI_INPUT_DELAY_MS - _f60)) < 0.01);
+    _lk = InputLock_New(CARDS_UI_INPUT_DELAY_MS, 2, 300);
+    Test_True("F2b-2 a lock first asked about 6 frames later still has 66.7 ms to go", InputLock_Tick(_lk, 306, _f60) && abs(_lk.ms - (CARDS_UI_INPUT_DELAY_MS - 6 * _f60)) < 0.01);
+    Test_False("F2b-2 a lock first asked about 12 frames later is spent", InputLock_Tick(_lk, 312, _f60));
+    Test_True("F2b-2 a spent lock reads as settled with no margin", InputLock_Settled(_lk, 0));
+    Test_False("F2b-2 a lock that has only just run out is not settled 4 frames later", InputLock_Settled(InputLock_New(CARDS_UI_INPUT_DELAY_MS, 2, 400), 4000 / 60));
+    Test_False("F2b-2 no lock (undefined) refuses nothing", InputLock_Active(undefined));
+
+    // --- the boss name banner (D106): 1 s, 60 frames at 60 fps; the fade is a fifth at each end
+    Test_Eq("F2b-2 the boss banner lasts 1000 ms", Banner_DurMs(), 1000);
+    var _had_b = variable_global_exists("banner");
+    var _old_b = _had_b ? global.banner : undefined;
+    _n = Test_BannerSteps(_f60);
+    Test_True("F2b-2 the banner lasts 60 +-1 steps at 16.667 ms (got " + string(_n) + ")", abs(_n - 60) <= 1);
+    _n = Test_BannerSteps(_f30);
+    Test_True("F2b-2 the banner lasts 1000 ms +- 1 step at 33.333 ms (got " + string(_n) + " steps)", abs(_n * _f30 - 1000) <= _f30 + 0.01);
+    Banner_Show("Test");
+    Banner_Step(_hit);
+    Test_Eq("F2b-2 a 200 ms hitch moves the banner on by 50 ms", global.banner.t, 50);
+    Test_True("F2b-2 the banner is still showing after the hitch", Banner_Active());
+    global.banner = _old_b;
+    var _bad = 0;
+    for (var _f = 0; _f <= 60; _f++) {
+        var _want = clamp(min(_f / 12, (60 - _f) / 12), 0, 1);   // the old per-frame alpha: a fifth (12 frames) in and out
+        if (abs(Banner_Alpha(_f * 1000 / 60, Banner_DurMs()) - _want) > 0.001) _bad++;
+    }
+    Test_Eq("F2b-2 the banner alpha at 60 fps equals the old per-frame fade for all 61 frames", _bad, 0);
+
+    // --- hold-to-skip (D48): confirm held for 1 s, at 60 and at 30 fps; the hint fills for 2.5 s after the press
+    Test_Eq("F2b-2 the skip hold is 1000 ms", SKIP_HOLD_MS, 1000);
+    Test_Eq("F2b-2 the skip hint stays 2500 ms (150 frames)", SKIP_HINT_MS, 2500);
+    _n = Test_SkipFireSteps(_f60);
+    Test_True("F2b-2 hold-to-skip fires after 60 +-1 steps at 60 fps (got " + string(_n) + ")", abs(_n - 60) <= 1);
+    Test_True("F2b-2 hold-to-skip needs about 1 s at 60 fps (got " + string(_n * _f60) + " ms)", _n * _f60 >= 983 && _n * _f60 <= 1020);
+    _n = Test_SkipFireSteps(_f30);
+    Test_True("F2b-2 hold-to-skip fires after 30 +-1 steps at 30 fps (got " + string(_n) + ")", abs(_n - 30) <= 1);
+    Test_True("F2b-2 hold-to-skip needs about 1 s at 30 fps (got " + string(_n * _f30) + " ms)", _n * _f30 >= 966 && _n * _f30 <= 1034);
+    var _sk = Skip_Step(Skip_StateNew(), true, true, true, _hit);
+    Test_Eq("F2b-2 a 200 ms hitch adds 50 ms to the skip hold", _sk.held_ms, 50);
+    Test_Eq("F2b-2 a 200 ms hitch cannot fire the skip on its own", _sk.fired, false);
+    _n = Test_SkipHintSteps(_f60);
+    Test_True("F2b-2 the skip hint fades after 150 +-1 steps at 60 fps (got " + string(_n) + ")", abs(_n - 150) <= 1);
+    _n = Test_SkipHintSteps(_f30);
+    Test_True("F2b-2 the skip hint fades after 75 +-1 steps at 30 fps (got " + string(_n) + ")", abs(_n - 75) <= 1);
+    Test_True("F2b-2 the skip hint fade-out is 20 frames (333 ms)", abs(SKIP_HINT_FADE_MS - 20000 / 60) < 0.01);
 }
 
 // QTE part 1 (D5, D6, D20, D35, D56, D60, D61; QTE-01, 03, 07, 14). Expected values are the owner's decisions written out, not read from the macros:
@@ -2751,35 +2974,38 @@ function Test_Suite_WindowModes() {
     Test_Eq("DISP-10 world -> gui includes the narrow-room shift", _wp.x, 36);
 }
 
-// D48 / I-055: hold-to-skip. Skip_Step is the pure core: a fresh press arms it, holding confirm for SKIP_HOLD_FRAMES fires it, a tap never does.
+// D48 / I-055: hold-to-skip. Skip_Step is the pure core: a fresh press arms it, holding confirm for SKIP_HOLD_MS (one step = 1/60 s here, D108 F2b-2) fires it, a tap never does.
 function Test_Suite_Skip() {
+    var _f60 = Presentation_StepMs(16667);   // D108 F2b-2: the steps are ms now; one 60 fps frame
+    var _hold_frames = round(SKIP_HOLD_MS / _f60);   // 60
+    var _hint_frames = round(SKIP_HINT_MS / _f60);   // 150
     var _st = Skip_StateNew();
-    var _r = Skip_Step(_st, true, true, true);   // first frame: pressed and held
+    var _r = Skip_Step(_st, true, true, true, _f60);   // first frame: pressed and held
     Test_Eq("D48 first press: not fired", _r.fired, false);
     Test_Eq("D48 first press: shows the hint", _r.hint > 0, true);
-    Test_Eq("D48 first press: progress started", _r.held_frames, 1);
+    Test_Eq("D48 first press: progress started", _r.held_ms, _f60);
     _st = _r;
-    for (var _i = 2; _i < SKIP_HOLD_FRAMES; _i++) {
-        _st = Skip_Step(_st, true, false, true);
+    for (var _i = 2; _i < _hold_frames; _i++) {
+        _st = Skip_Step(_st, true, false, true, _f60);
         if (_st.fired) break;
     }
     Test_Eq("D48 held for one frame less than the hold time: not fired", _st.fired, false);
-    _st = Skip_Step(_st, true, false, true);
+    _st = Skip_Step(_st, true, false, true, _f60);
     Test_Eq("D48 held for the whole hold time: fires", _st.fired, true);
-    Test_Eq("D48 firing resets the hold", _st.held_frames, 0);
+    Test_Eq("D48 firing resets the hold", _st.held_ms, 0);
 
     // A tap (a few frames, then released) never skips and the count restarts on the next press.
     _st = Skip_StateNew();
-    _st = Skip_Step(_st, true, true, true);
-    _st = Skip_Step(_st, true, false, true);
-    _st = Skip_Step(_st, true, false, true);
-    _st = Skip_Step(_st, true, false, false);   // released
+    _st = Skip_Step(_st, true, true, true, _f60);
+    _st = Skip_Step(_st, true, false, true, _f60);
+    _st = Skip_Step(_st, true, false, true, _f60);
+    _st = Skip_Step(_st, true, false, false, _f60);   // released
     Test_Eq("D48 tap: not fired", _st.fired, false);
-    Test_Eq("D48 tap: hold count back to 0", _st.held_frames, 0);
+    Test_Eq("D48 tap: hold count back to 0", _st.held_ms, 0);
     Test_Eq("D48 tap: hint stays on screen for a while", _st.hint > 0, true);
     var _fired = false;
-    for (var _i = 0; _i < SKIP_HOLD_FRAMES * 3; _i++) {   // many taps, one every 10 frames
-        _st = Skip_Step(_st, true, (_i mod 10) == 0, (_i mod 10) < 3);
+    for (var _i = 0; _i < _hold_frames * 3; _i++) {   // many taps, one every 10 frames
+        _st = Skip_Step(_st, true, (_i mod 10) == 0, (_i mod 10) < 3, _f60);
         if (_st.fired) _fired = true;
     }
     Test_Eq("D48 repeated taps never skip", _fired, false);
@@ -2787,24 +3013,24 @@ function Test_Suite_Skip() {
     // A key already held when the scene starts (no new press) never skips.
     _st = Skip_StateNew();
     _fired = false;
-    for (var _i = 0; _i < SKIP_HOLD_FRAMES * 2; _i++) {
-        _st = Skip_Step(_st, true, false, true);
+    for (var _i = 0; _i < _hold_frames * 2; _i++) {
+        _st = Skip_Step(_st, true, false, true, _f60);
         if (_st.fired) _fired = true;
     }
     Test_Eq("D48 a key held from before the scene does not skip", _fired, false);
 
     // Not allowed (no skippable scene): everything resets.
-    _st = Skip_Step(Skip_StateNew(), true, true, true);
-    _st = Skip_Step(_st, false, false, true);
-    Test_Eq("D48 leaving the scene resets the count", _st.held_frames, 0);
+    _st = Skip_Step(Skip_StateNew(), true, true, true, _f60);
+    _st = Skip_Step(_st, false, false, true, _f60);
+    Test_Eq("D48 leaving the scene resets the count", _st.held_ms, 0);
     Test_Eq("D48 leaving the scene hides the hint", _st.hint, 0);
 
-    // The hint fades after SKIP_HINT_FRAMES without a press.
-    _st = Skip_Step(Skip_StateNew(), true, true, true);
-    _st = Skip_Step(_st, true, false, false);
-    for (var _i = 0; _i < SKIP_HINT_FRAMES + 2; _i++) _st = Skip_Step(_st, true, false, false);
+    // The hint fades after _hint_frames without a press.
+    _st = Skip_Step(Skip_StateNew(), true, true, true, _f60);
+    _st = Skip_Step(_st, true, false, false, _f60);
+    for (var _i = 0; _i < _hint_frames + 2; _i++) _st = Skip_Step(_st, true, false, false, _f60);
     Test_Eq("D48 the hint goes away", _st.hint, 0);
-    Test_Eq("D48 progress fraction", Skip_Fraction(SKIP_HOLD_FRAMES div 2), 0.5);
+    Test_Eq("D48 progress fraction", Skip_Fraction(SKIP_HOLD_MS / 2), 0.5);
 }
 
 // DISP-14 / SAVE-06 / D91: settings_version 8. Old fit_screen + scale fields become a window mode; a fresh install is borderless.
@@ -3954,12 +4180,12 @@ function Test_Suite_Story() {
     Test_True("D102 the wake lines darken too", WakeLine_Pick(1).key != WakeLine_Pick(8).key);
 
     // --- banner (D106)
-    var _bf = Banner_Frames(60);
-    Test_True("D106 the boss banner lasts about 1 s", _bf >= 54 && _bf <= 72);
+    var _bf = Banner_DurMs();   // D108 F2b-2: ms (was Banner_Frames(60) = 60 frames)
+    Test_True("D106 the boss banner lasts about 1 s", _bf >= 900 && _bf <= 1200);
     Test_Eq("D106 banner is clear before it starts", Banner_Alpha(0, _bf), 0);
-    Test_Eq("D106 banner is full in the middle", Banner_Alpha(round(_bf / 2), _bf), 1);
+    Test_Eq("D106 banner is full in the middle", Banner_Alpha(_bf / 2, _bf), 1);
     Test_Eq("D106 banner is clear when it ends", Banner_Alpha(_bf, _bf), 0);
-    Test_True("D106 banner fades in", Banner_Alpha(4, _bf) > 0 && Banner_Alpha(4, _bf) < 1);
+    Test_True("D106 banner fades in", Banner_Alpha(4000 / 60, _bf) > 0 && Banner_Alpha(4000 / 60, _bf) < 1);   // 4 frames in
 
     // --- notes (D107)
     var _defs = Note_Defs();
@@ -4097,11 +4323,11 @@ function Test_DialogueStartChecks() {
     // Dialogue_StartLines: no speaker, the given lines; a stale text-only flag is cleared when no cutscene is on
     var _lines = ["First line.", "Second line."];
     _ui.choice = { stale: true };
-    _ui.dialogue_open_block_frame = 12345;
+    _ui.dialogue_open_lock = undefined;   // D108 F2b-2: was dialogue_open_block_frame = 12345
     Dialogue_StartLines(_lines);
     Test_DialogueStartCheck("F4b StartLines", _gs, "", _lines);
     Test_False("F4b StartLines clears the text-only flag outside a cutscene", _gs.ui.cutscene_text_only);
-    Test_Eq("F4b StartLines open block frame is the open frame (no cutscene text)", _gs.ui.dialogue_open_block_frame, _gs.ui.opened_frame);
+    Test_True("F4b StartLines open block is the open frame only (no cutscene text)", is_struct(_gs.ui.dialogue_open_lock) && _gs.ui.dialogue_open_lock.frame0 == _gs.ui.opened_frame && _gs.ui.dialogue_open_lock.ms == 0);
     Test_True("F4b StartLines stamps the slide-in time", _gs.ui.dialogue_open_ms <= current_time && _gs.ui.dialogue_open_ms >= 0);
     Dialogue_StartLines("nope");
     Test_Eq("F4b StartLines with a non-array gives no raw lines", array_length(_gs.ui.lines_raw), 0);
@@ -4128,11 +4354,11 @@ function Test_DialogueStartChecks() {
     _gs.ui.cutscene_text_only = true;
     Dialogue_StartLines(_lines);
     Test_True("F4b StartLines keeps the text-only flag during a cutscene", _gs.ui.cutscene_text_only);
-    Test_Eq("F4b StartLines in a text-only cutscene blocks the advance for the shared frames", _gs.ui.dialogue_open_block_frame, _gs.ui.opened_frame + max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES));
+    Test_True("F4b StartLines in a text-only cutscene blocks the advance for the shared frames", is_struct(_gs.ui.dialogue_open_lock) && _gs.ui.dialogue_open_lock.frame0 == _gs.ui.opened_frame && _gs.ui.dialogue_open_lock.ms == UI_CUTSCENE_ADVANCE_BLOCK_MS);
     Dialogue_StartWithSpeaker("Hero", _lines);
-    Test_Eq("F4b StartWithSpeaker in a text-only cutscene blocks the advance for the shared frames", _gs.ui.dialogue_open_block_frame, _gs.ui.opened_frame + max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES));
+    Test_True("F4b StartWithSpeaker in a text-only cutscene blocks the advance for the shared frames", is_struct(_gs.ui.dialogue_open_lock) && _gs.ui.dialogue_open_lock.frame0 == _gs.ui.opened_frame && _gs.ui.dialogue_open_lock.ms == UI_CUTSCENE_ADVANCE_BLOCK_MS);
     Dialogue_Start("first_encounter_slime");
-    Test_Eq("F4b Start in a text-only cutscene blocks the advance for the shared frames", _gs.ui.dialogue_open_block_frame, _gs.ui.opened_frame + max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES));
+    Test_True("F4b Start in a text-only cutscene blocks the advance for the shared frames", is_struct(_gs.ui.dialogue_open_lock) && _gs.ui.dialogue_open_lock.frame0 == _gs.ui.opened_frame && _gs.ui.dialogue_open_lock.ms == UI_CUTSCENE_ADVANCE_BLOCK_MS);
     _gs.ui.cutscene_active = false;
 
     // opening closes the pause menu first
@@ -6092,7 +6318,8 @@ function Test_Suite_Tutorial() {
     Tutorial_Dismiss();
     Test_False("D45 dismissing the last one closes it", Tutorial_IsOpen());
     Test_True("D45 the frame it closes in still blocks (the closing press must not answer what is behind)", Tutorial_JustClosed() && UI_IsBlocking());
-    global.tutorial_closed_frame = Input_Frame() - 5;   // the next frame
+    Test_True("F2b-2 the closing press is still guarded one 33 ms frame later", InputLock_Tick(global.tutorial_closed, Input_Frame() + 1, Presentation_StepMs(33333)));
+    global.tutorial_closed = undefined;   // D108 F2b-2: was tutorial_closed_frame = Input_Frame() - 5, i.e. long past
     Test_False("D45 a closed pop-up does not block", UI_IsBlocking());
     Test_False("D45 an unknown id opens nothing", Tutorial_Trigger("dance"));
     Test_False("D45 an unknown id marks nothing", Story_Seen("tutorial:dance"));
