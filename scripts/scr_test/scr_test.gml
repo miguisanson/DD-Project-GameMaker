@@ -126,6 +126,7 @@ function Test_RunAll() {
     Test_RunSuite("BattleBg", Test_Suite_BattleBg);
     Test_RunSuite("RunStats", Test_Suite_RunStats);
     Test_RunSuite("CutSkip", Test_Suite_CutSkip);
+    Test_RunSuite("EliteDeath", Test_Suite_EliteDeath);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -9788,4 +9789,144 @@ function Test_Suite_CutSkip() {
     _gs.ui.cutscene_active = false;
     if (_had_ui) _gs.ui = _ui0; else variable_struct_remove(_gs, "ui");
     if (!_had_ctl && instance_exists(obj_ui_controller)) instance_destroy(obj_ui_controller);
+}
+
+
+// ============================================================================================================
+// H13a (D156): the elite outline follows the sprite's shape; the old death picture (GAME_OVER) is the backdrop of the death line.
+// Expected values come from the brief: a 1 px outline round the opaque pixels (no rectangle), the pulse's two beats a second in the two light
+// palette colours, the picture "GAME_OVER" in the four palette colours, inside the GUI and clear of the text block at 480 x 432 and 800 x 720.
+// ============================================================================================================
+
+// The alpha > 0 mask (24 x 24, the sprite drawn at 4,4) of a sprite frame: _mode "sprite" = the sprite itself, "outline" = what Elite_DrawOutline draws.
+function Test_EliteMask(_spr, _img, _mode) {
+    var _surf = surface_create(24, 24);
+    surface_set_target(_surf);
+    draw_clear_alpha(c_black, 0);
+    if (_mode == "sprite") draw_sprite_ext(_spr, _img, 4, 4, 1, 1, 0, c_white, 1);
+    else Elite_DrawOutline(_spr, _img, 4, 4, 1, 1, 0, c_white, 1);
+    surface_reset_target();
+    var _m = array_create(24 * 24, false);
+    for (var _y = 0; _y < 24; _y++) {
+        for (var _x = 0; _x < 24; _x++) _m[_y * 24 + _x] = (((surface_getpixel_ext(_surf, _x, _y) >> 24) & 255) > 0);
+    }
+    surface_free(_surf);
+    return _m;
+}
+
+// How many pixels of the outline differ from "every pixel one step (8 ways) from an opaque pixel of the sprite".
+// 0 = the outline is exactly the sprite's silhouette pushed 1 px in 8 directions: nothing farther than 1 px, no rectangle, no gap.
+function Test_EliteOutlineDiff(_spr, _img) {
+    var _sp = Test_EliteMask(_spr, _img, "sprite");
+    var _ol = Test_EliteMask(_spr, _img, "outline");
+    var _diff = 0;
+    for (var _y = 0; _y < 24; _y++) {
+        for (var _x = 0; _x < 24; _x++) {
+            var _want = false;
+            for (var _dy = -1; _dy <= 1; _dy++) {
+                for (var _dx = -1; _dx <= 1; _dx++) {
+                    if (_dx == 0 && _dy == 0) continue;
+                    var _sx = _x - _dx;
+                    var _sy = _y - _dy;
+                    if (_sx >= 0 && _sy >= 0 && _sx < 24 && _sy < 24 && _sp[_sy * 24 + _sx]) _want = true;
+                }
+            }
+            if (_want != _ol[_y * 24 + _x]) _diff++;
+        }
+    }
+    return _diff;
+}
+
+function Test_Suite_EliteDeath() {
+    // --- 1. the outline: 8 one-pixel steps, the same pulse
+    var _off = Elite_OutlineOffsets();
+    Test_Eq("H13 the outline is drawn at 8 offsets", array_length(_off), 8);
+    var _seen = {};
+    var _far = 0;
+    var _zero = 0;
+    for (var _i = 0; _i < array_length(_off); _i++) {
+        if (max(abs(_off[_i][0]), abs(_off[_i][1])) > 1) _far++;
+        if (_off[_i][0] == 0 && _off[_i][1] == 0) _zero++;
+        variable_struct_set(_seen, string(_off[_i][0]) + "," + string(_off[_i][1]), true);
+    }
+    Test_Eq("H13 no outline offset is farther than 1 px", _far, 0);
+    Test_Eq("H13 no outline offset is the sprite's own place", _zero, 0);
+    Test_Eq("H13 the 8 outline offsets are all different", array_length(variable_struct_get_names(_seen)), 8);
+    Test_Eq("H13 the pulse starts on the lightest colour", Elite_OutlineColor(0), UI_C_LIGHTEST);
+    Test_Eq("H13 the first beat lasts 250 ms", Elite_OutlineColor(249), UI_C_LIGHTEST);
+    Test_Eq("H13 the second beat is the light colour", Elite_OutlineColor(250), UI_C_LIGHT);
+    Test_Eq("H13 the second beat ends at 500 ms", Elite_OutlineColor(499), UI_C_LIGHT);
+    Test_Eq("H13 two beats a second: back to the lightest at 500 ms", Elite_OutlineColor(500), UI_C_LIGHTEST);
+    Test_Eq("H13 the light colour again at 750 ms", Elite_OutlineColor(750), UI_C_LIGHT);
+
+    // --- 2. what it draws: the sprite's silhouette one pixel out, for every frame of a short and a tall enemy
+    var _names = ["slime_moving", "killer_plant_moving", "dire_wolf_moving"];
+    for (var _n = 0; _n < array_length(_names); _n++) {
+        var _spr = asset_get_index(_names[_n]);
+        Test_True("H13 the sprite " + _names[_n] + " exists", _spr != -1);
+        if (_spr == -1) continue;
+        for (var _f = 0; _f < sprite_get_number(_spr); _f++) {
+            Test_Eq("H13 outline of " + _names[_n] + " frame " + string(_f) + " is the silhouette 1 px out (pixels off)", Test_EliteOutlineDiff(_spr, _f), 0);
+        }
+    }
+
+    // --- 3. the death picture is the old GAME_OVER sprite, in the four palette colours
+    Test_Eq("H13 the death scene's picture is the sprite GAME_OVER", RunFlow_DeathImageName(), "GAME_OVER");
+    var _go = asset_get_index("GAME_OVER");
+    Test_True("H13 the sprite GAME_OVER exists", _go != -1 && asset_get_type("GAME_OVER") == asset_sprite);
+    Test_Eq("H13 palette: the darkest colour stays", DeathImage_NearestColor(7, 24, 33), UI_C_DARKEST);
+    Test_Eq("H13 palette: a dark green goes to the dark colour", DeathImage_NearestColor(60, 115, 85), UI_C_DARK);
+    Test_Eq("H13 palette: a mid green goes to the light colour", DeathImage_NearestColor(120, 180, 100), UI_C_LIGHT);
+    Test_Eq("H13 palette: a pale green goes to the lightest colour", DeathImage_NearestColor(210, 245, 195), UI_C_LIGHTEST);
+    var _pic = RunFlow_DeathImage();
+    Test_True("H13 the death picture is made", sprite_exists(_pic));
+    if (sprite_exists(_pic) && _go != -1) {
+        Test_Eq("H13 the death picture is as wide as GAME_OVER", sprite_get_width(_pic), sprite_get_width(_go));
+        Test_Eq("H13 the death picture is as high as GAME_OVER", sprite_get_height(_pic), sprite_get_height(_go));
+        var _w = sprite_get_width(_pic);
+        var _h = sprite_get_height(_pic);
+        var _surf = surface_create(_w, _h);
+        surface_set_target(_surf);
+        draw_clear_alpha(c_black, 0);
+        draw_sprite(_pic, 0, 0, 0);
+        surface_reset_target();
+        var _bad = 0;
+        for (var _y = 0; _y < _h; _y++) {
+            for (var _x = 0; _x < _w; _x++) {
+                var _c = surface_getpixel(_surf, _x, _y);
+                if (_c != UI_C_DARKEST && _c != UI_C_DARK && _c != UI_C_LIGHT && _c != UI_C_LIGHTEST) _bad++;
+            }
+        }
+        surface_free(_surf);
+        Test_Eq("H13 every pixel of the death picture is one of the four palette colours (others)", _bad, 0);
+    }
+
+    // --- 4. the layout: the picture inside the GUI and clear of the text block, at 480 x 432 and 800 x 720
+    var _lang0 = Loc_GetLanguage();
+    var _disp0 = variable_global_exists("display") ? global.display : undefined;
+    var _f0 = draw_get_font();
+    Loc_SetLanguage("en");
+    var _lines = ["A slime. You were beaten by a slime.", "The tunnel took you again. It did not hurry, and it did not look away, and the slime that did it was in no way special or kind."];
+    var _sizes = [[480, 432], [800, 720]];
+    for (var _z = 0; _z < array_length(_sizes); _z++) {
+        var _sw = _sizes[_z][0];
+        var _sh = _sizes[_z][1];
+        global.display = { layout: Display_CalcLayout(_sw, _sh), apply_count: 0 };
+        var _mt = Ui_Metrics();
+        for (var _t = 0; _t < array_length(_lines); _t++) {
+            var _tag = "H13 " + string(_sw) + "x" + string(_sh) + " line " + string(_t) + ": ";
+            var _L = RunFlow_DeathLayoutNow(_lines[_t]);
+            Test_True(_tag + "the picture is shown", _L.show);
+            Test_True(_tag + "the picture is inside the GUI", _L.img_x >= 0 && _L.img_y >= 0 && _L.img_x + _L.img_w <= _mt.gw && _L.img_y + _L.img_h <= _mt.gh);
+            Test_True(_tag + "the text block is inside the GUI", _L.text_x >= 0 && _L.text_y >= 0 && _L.text_x + _L.text_w <= _mt.gw && _L.text_y + _L.text_h <= _mt.gh);
+            Test_True(_tag + "the picture does not touch the text block", _L.img_y + _L.img_h <= _L.text_y || _L.text_y + _L.text_h <= _L.img_y);
+            Test_True(_tag + "the picture is centred across", abs((_L.img_x + _L.img_w / 2) - _mt.gw / 2) <= 1);
+            Test_True(_tag + "the picture keeps its 160 : 144 shape", abs(_L.img_w * 144 - _L.img_h * 160) <= 160);
+            Test_Eq(_tag + "the text block is as tall as the line needs", _L.text_h, Ui_TextBlockH(_lines[_t], _L.text_w));
+            Test_True(_tag + "the picture leaves room: at most 70% of the height", _L.img_h <= floor(_mt.gh * 0.7));
+        }
+    }
+    global.display = _disp0;
+    Loc_SetLanguage(_lang0);
+    draw_set_font(_f0);
 }
