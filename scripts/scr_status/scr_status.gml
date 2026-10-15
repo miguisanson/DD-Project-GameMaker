@@ -741,7 +741,7 @@ function Status_TickFeedbackInfo(_status_id, _hp_lost) {
     return {
         line: Loc_T("combat.msg.status_tick", "{status} hurts you for {dmg}.", { status: status_name, dmg: _hp_lost }),
         sfx: "skill_bleed",   // existing bleed sound; no new assets
-        flash_frames: UI_HUD_HURT_FLASH_FRAMES * 2
+        flash_ms: UI_HUD_HURT_FLASH_MS * 2
     };
 }
 
@@ -753,7 +753,7 @@ function Status_TickFeedback(_status_id, _hp_lost) {
     Combat_Log(info.line);
     SFX_Play(info.sfx);
     if (instance_exists(obj_ui_controller)) {
-        with (obj_ui_controller) hud_hurt_flash_timer = max(hud_hurt_flash_timer, info.flash_frames);
+        with (obj_ui_controller) hud_hurt_flash_ms = max(hud_hurt_flash_ms, info.flash_ms);
     }
     return info;
 }

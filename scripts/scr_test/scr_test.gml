@@ -65,6 +65,7 @@ function Test_RunAll() {
     Test_RunSuite("Stats", Test_Suite_Stats);
     Test_RunSuite("Combat", Test_Suite_Combat);
     Test_RunSuite("Fx", Test_Suite_Fx);
+    Test_RunSuite("BattleClock", Test_Suite_BattleClock);
     Test_RunSuite("Qte", Test_Suite_Qte);
     Test_RunSuite("QteArrows", Test_Suite_QteArrows);
     Test_RunSuite("QteDefence", Test_Suite_QteDefence);
@@ -568,12 +569,161 @@ function Test_Suite_Fx() {
     Test_True("I-060 Ice Spear on a 32 px slime is drawn 48 px (1.5 x) of visible effect", abs(FX_ContentSide(ice_spear_effect) * FX_ScaleFor(ice_spear_effect, 32) - 48) < 0.01);
     Test_True("I-060 an effect on a 64 px target is drawn 64 px", abs(FX_ContentSide(ice_spear_effect) * FX_ScaleFor(ice_spear_effect, 64) - 64) < 0.01);
     Test_True("I-060 an effect on an 80 px target is capped at 64 px", abs(FX_ContentSide(ice_spear_effect) * FX_ScaleFor(ice_spear_effect, 80) - 64) < 0.01);
-    Test_Eq("D55 hold after an action is 18 frames", Combat_SecToFrames(COMBAT_ACTION_HOLD_SEC), 18);
+    Test_Eq("D55 hold after an action is 300 ms", Combat_ActionHoldMs(), 300);   // F2b-1: was "18 frames" (Combat_SecToFrames); the same 0.3 s on a ms clock
     // The pure helpers themselves: a 48 px sprite at 8 fps, 12 frames... uses the real sprites: ice_spear_effect has 12 frames at 8 fps.
     Test_Eq("Fx: ice spear at image_speed 1 plays 12 frames in 90 game frames", FX_PlaybackFrames(ice_spear_effect, 1), 90);
     Test_Eq("Fx: ice spear at image_speed 2 plays in 45 game frames", FX_PlaybackFrames(ice_spear_effect, 2), 45);
     Test_True("Fx: SpeedForMaxFrames never slows an effect down", FX_SpeedForMaxFrames(ice_spear_effect, 5, 42) == 5);
     Test_True("Fx: SpeedForMaxFrames raises a slow effect to fit", FX_PlaybackFrames(ice_spear_effect, FX_SpeedForMaxFrames(ice_spear_effect, 0.1, 42)) <= 42);
+}
+
+// D108 F2b-1: the battle message hold, the sprite and camera shakes and the HUD hurt flash run on a ms clock. Expected values are the OLD 60 fps frame
+// counts and rhythms written out by hand (60 frames = 1000 ms, 18 frames = 300 ms, the shake sign pattern + - - + + - - +, the flash on/off blocks,
+// the hurt flash "mod 4" rhythm), not read from the macros.
+function Test_HoldSteps(_start_ms, _step_ms) {
+    var _t = _start_ms;
+    var _n = 0;
+    while (Combat_HoldActive(_t) && _n < 100000) {
+        _t = Combat_HoldStep(_t, _step_ms);
+        _n++;
+    }
+    return _n;
+}
+
+// The frames of an enemy sprite shake the way the battle controller runs them: Step advances the clock once, then Draw reads the offset _reads times.
+function Test_SpriteShakeFrames(_inst, _frames, _step_ms, _reads) {
+    var _out = { x: [], flash: [], stable: true };
+    for (var _f = 0; _f < _frames; _f++) {
+        if (_f > 0) SpriteShake_Step(_inst, _step_ms);
+        var _first = SpriteShake_Offset(_inst);
+        for (var _r = 1; _r < _reads; _r++) {
+            var _again = SpriteShake_Offset(_inst);
+            if (_again.x != _first.x || _again.y != _first.y || _again.flash != _first.flash) _out.stable = false;
+        }
+        array_push(_out.x, _first.x);
+        array_push(_out.flash, _first.flash ? 1 : 0);
+    }
+    return _out;
+}
+
+function Test_CameraShakeFrames(_frames, _step_ms, _reads) {
+    var _out = { x: [], stable: true };
+    for (var _f = 0; _f < _frames; _f++) {
+        if (_f > 0) CameraShake_Step(_step_ms);
+        var _first = CameraShake_Offset();
+        for (var _r = 1; _r < _reads; _r++) {
+            var _again = CameraShake_Offset();
+            if (_again.x != _first.x || _again.y != _first.y) _out.stable = false;
+        }
+        array_push(_out.x, _first.x);
+    }
+    return _out;
+}
+
+function Test_SameList(_got, _want, _tol) {
+    if (array_length(_got) != array_length(_want)) return false;
+    for (var _i = 0; _i < array_length(_want); _i++) { if (abs(_got[_i] - _want[_i]) > _tol) return false; }
+    return true;
+}
+
+// The HUD hurt flash the way obj_ui_controller Step runs it: arm on a hit, count down once per frame, then Draw reads the sign.
+function Test_HurtFlashSigns(_arm_ms, _frames, _step_ms) {
+    var _signs = [];
+    var _ms = max(0, _arm_ms);
+    for (var _f = 0; _f < _frames; _f++) {
+        if (_ms > 0) _ms = Hud_HurtFlashStep(_ms, _step_ms);
+        array_push(_signs, Hud_HurtFlashSign(_ms));
+    }
+    return _signs;
+}
+
+function Test_Suite_BattleClock() {
+    var _f60 = Presentation_StepMs(16667);   // 16.667 ms
+    var _f30 = Presentation_StepMs(33333);   // 33.333 ms
+
+    // --- the message hold: 60 frames (intro, kill, run-away) = 1000 ms; the D55 pause after an action, 18 frames = 300 ms
+    Test_Eq("F2b-1 COMBAT_ACTION_DELAY_MS is 1000 ms (was 60 frames)", COMBAT_ACTION_DELAY_MS, 1000);
+    Test_Eq("F2b-1 the hold after an action is 300 ms", Combat_ActionHoldMs(), 300);
+    var _n = Test_HoldSteps(COMBAT_ACTION_DELAY_MS, _f60);
+    Test_True("F2b-1 the 1000 ms hold lasts 60 +-1 steps at 16.667 ms (got " + string(_n) + ")", abs(_n - 60) <= 1);
+    _n = Test_HoldSteps(Combat_ActionHoldMs(), _f60);
+    Test_True("F2b-1 the 300 ms post-action pause lasts 18 +-1 steps at 16.667 ms (got " + string(_n) + ")", abs(_n - 18) <= 1);
+    _n = Test_HoldSteps(COMBAT_ACTION_DELAY_MS, _f30);
+    Test_True("F2b-1 the 1000 ms hold at 33.333 ms steps lasts 1000 ms +- 1 step (got " + string(_n) + " steps)", abs(_n * _f30 - 1000) <= _f30 + 0.01);
+    _n = Test_HoldSteps(Combat_ActionHoldMs(), _f30);
+    Test_True("F2b-1 the 300 ms pause at 33.333 ms steps lasts 300 ms +- 1 step (got " + string(_n) + " steps)", abs(_n * _f30 - 300) <= _f30 + 0.01);
+    Test_Eq("F2b-1 a 200 ms hitch takes at most 50 ms off the hold", Combat_HoldStep(1000, Presentation_StepMs(200000)), 950);
+    Test_False("F2b-1 a spent hold is not active", Combat_HoldActive(0));
+    Test_True("F2b-1 the hold-forever value outlasts the old 9999 frames", COMBAT_HOLD_FOREVER_MS >= 9999 * 1000 / 60 - 1);
+    var _bm = {};
+    Battle_Message(_bm, "x", BSTATE_ENEMY_ACT);
+    Test_Eq("F2b-1 Battle_Message holds 300 ms by default", _bm.wait_timer, 300);
+    Battle_Message(_bm, "x", BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY_MS);
+    Test_Eq("F2b-1 Battle_Message holds the long delay it is given (ms)", _bm.wait_timer, 1000);
+
+    // --- the shake lengths, in ms: 12 frames = 200 ms, 10 frames = 166.67 ms, 8 frames = 133.33 ms, the flash rate 3 frames = 50 ms
+    Test_Eq("F2b-1 enemy shake is 200 ms", ENEMY_SHAKE_MS, 200);
+    Test_Eq("F2b-1 enemy flash is 200 ms", ENEMY_FLASH_MS, 200);
+    Test_Eq("F2b-1 enemy flash rate is 50 ms", ENEMY_FLASH_RATE_MS, 50);
+    Test_Eq("F2b-1 player shake is 200 ms", PLAYER_SHAKE_MS, 200);
+    Test_True("F2b-1 perfect camera shake is 10 frames (166.67 ms)", abs(QTE_SHAKE_PERFECT_MS - 10000 / 60) < 0.01);
+    Test_True("F2b-1 good camera shake is 8 frames (133.33 ms)", abs(QTE_SHAKE_GOOD_MS - 8000 / 60) < 0.01);
+    Test_True("F2b-1 hurt flash is 8 frames (133.33 ms)", abs(UI_HUD_HURT_FLASH_MS - 8000 / 60) < 0.01);
+
+    // --- the enemy sprite shake: the old per-frame offset signs (+ - - + + - - + + - - then still) and flash (on 1, off 3, on 3, off 3, on 2)
+    var _m = 0.3;
+    var _want_x = [_m, -_m, -_m, _m, _m, -_m, -_m, _m, _m, -_m, -_m, 0, 0, 0];
+    var _want_fl = [1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0];
+    var _inst = instance_create_depth(0, 0, 0, obj_enemy_battle);
+    SpriteShake_Start(_inst, SHAKE_DIR_H, _m, ENEMY_SHAKE_MS, ENEMY_FLASH_MS, ENEMY_FLASH_RATE_MS);
+    var _r = Test_SpriteShakeFrames(_inst, 14, _f60, 1);
+    Test_True("F2b-1 enemy shake offsets at 60 fps equal the old frame pattern (got " + string(_r.x) + ")", Test_SameList(_r.x, _want_x, 0.001));
+    Test_True("F2b-1 enemy flash at 60 fps equals the old on/off pattern (got " + string(_r.flash) + ")", Test_SameList(_r.flash, _want_fl, 0));
+    SpriteShake_Start(_inst, SHAKE_DIR_H, _m, ENEMY_SHAKE_MS, ENEMY_FLASH_MS, ENEMY_FLASH_RATE_MS);
+    _r = Test_SpriteShakeFrames(_inst, 14, _f60, 3);
+    Test_True("F2b-1 enemy shake advances once per frame however often it is read (3 reads per frame)", Test_SameList(_r.x, _want_x, 0.001) && Test_SameList(_r.flash, _want_fl, 0));
+    Test_True("F2b-1 reading the shake offset again in the same frame gives the same answer", _r.stable);
+    SpriteShake_Start(_inst, SHAKE_DIR_H, _m, ENEMY_SHAKE_MS, ENEMY_FLASH_MS, ENEMY_FLASH_RATE_MS);
+    _r = Test_SpriteShakeFrames(_inst, 8, _f30, 2);
+    var _moving = 0;
+    for (var _i = 0; _i < array_length(_r.x); _i++) { if (_r.x[_i] != 0) _moving++; }
+    Test_Eq("F2b-1 enemy shake at 33.333 ms steps moves for 6 frames (about 200 ms)", _moving, 6);
+    SpriteShake_Start(_inst, SHAKE_DIR_H, _m, ENEMY_SHAKE_MS, ENEMY_FLASH_MS, ENEMY_FLASH_RATE_MS);
+    SpriteShake_Step(_inst, Presentation_StepMs(200000));
+    Test_Eq("F2b-1 a 200 ms hitch moves the shake on by 50 ms, not to its end", SpriteShake_Offset(_inst).x, _m);
+    var _still = instance_create_depth(0, 0, 0, obj_enemy_battle);
+    Test_Eq("F2b-1 a sprite that never shook reads zero", SpriteShake_Offset(_still).x, 0);
+    instance_destroy(_still);
+    instance_destroy(_inst);
+
+    // --- the camera shake (QTE Perfect): 10 frames, the same + - - + + - - + + then still, advanced once per frame however often it is read
+    var _gs = GameState_Get();
+    var _had = variable_struct_exists(_gs, "cam_shake");
+    var _old = _had ? _gs.cam_shake : undefined;
+    var _cm = QTE_SHAKE_PERFECT_MAG;
+    var _want_c = [_cm, -_cm, -_cm, _cm, _cm, -_cm, -_cm, _cm, _cm, 0, 0];
+    CameraShake_Start(_cm, QTE_SHAKE_PERFECT_MS, SHAKE_DIR_H);
+    var _c = Test_CameraShakeFrames(11, _f60, 1);
+    Test_True("F2b-1 camera shake offsets at 60 fps equal the old frame pattern (got " + string(_c.x) + ")", Test_SameList(_c.x, _want_c, 0.001));
+    CameraShake_Start(_cm, QTE_SHAKE_PERFECT_MS, SHAKE_DIR_H);
+    _c = Test_CameraShakeFrames(11, _f60, 3);
+    Test_True("F2b-1 camera shake advances once per frame however often it is read", Test_SameList(_c.x, _want_c, 0.001) && _c.stable);
+    CameraShake_Start(_cm, QTE_SHAKE_PERFECT_MS, SHAKE_DIR_H);
+    CameraShake_Step(Presentation_StepMs(200000));
+    Test_Eq("F2b-1 a 200 ms hitch moves the camera shake on by 50 ms, not to its end", CameraShake_Offset().x, _cm);
+    if (_had) _gs.cam_shake = _old; else variable_struct_remove(_gs, "cam_shake");
+
+    // --- the HUD hurt flash: 8 frames, drawn as - - + + - - + then off (the old "hurt mod 4" rhythm); a poison tick lasts twice as long
+    var _sg = Test_HurtFlashSigns(UI_HUD_HURT_FLASH_MS, 10, _f60);
+    Test_True("F2b-1 hurt flash at 60 fps equals the old mod-4 rhythm for 7 frames (got " + string(_sg) + ")", Test_SameList(_sg, [-1, -1, 1, 1, -1, -1, 1, 0, 0, 0], 0));
+    _sg = Test_HurtFlashSigns(UI_HUD_HURT_FLASH_MS * 2, 18, _f60);
+    Test_True("F2b-1 a tick's hurt flash at 60 fps lasts 15 frames of - - + + (got " + string(_sg) + ")", Test_SameList(_sg, [-1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, 0, 0, 0], 0));
+    _sg = Test_HurtFlashSigns(UI_HUD_HURT_FLASH_MS, 8, _f30);
+    var _on = 0;
+    for (var _k = 0; _k < array_length(_sg); _k++) { if (_sg[_k] != 0) _on++; }
+    Test_Eq("F2b-1 hurt flash at 33.333 ms steps shows for 3 frames (about 100 ms)", _on, 3);
+    Test_Eq("F2b-1 a 200 ms hitch takes at most 50 ms off the hurt flash", Hud_HurtFlashStep(UI_HUD_HURT_FLASH_MS * 2, Presentation_StepMs(200000)), UI_HUD_HURT_FLASH_MS * 2 - 50);
+    Test_Eq("F2b-1 no hurt flash reads zero", Hud_HurtFlashSign(0), 0);
 }
 
 // QTE part 1 (D5, D6, D20, D35, D56, D60, D61; QTE-01, 03, 07, 14). Expected values are the owner's decisions written out, not read from the macros:
@@ -1024,7 +1174,7 @@ function Test_Suite_Status() {
     Test_True("BUG-08 player poison tick raises feedback", is_struct(_fb));
     Test_True("BUG-08 tick log line names Poison and the HP lost", is_struct(_fb) && string_pos("Poison", _fb.line) > 0 && string_pos(string(_fhp - _fp.hp), _fb.line) > 0);
     Test_True("BUG-08 tick plays a sound", is_struct(_fb) && _fb.sfx != "");
-    Test_True("BUG-08 tick flashes the HP bar", is_struct(_fb) && _fb.flash_frames > 0);
+    Test_True("BUG-08 tick flashes the HP bar", is_struct(_fb) && _fb.flash_ms > 0);   // F2b-1: was flash_frames
     global.status_tick_last = undefined;
     var _fe = Status_Tick(Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_POISON, 2, 0));
     Test_True("BUG-08 an enemy poison tick raises no player feedback", !(variable_global_exists("status_tick_last") && is_struct(global.status_tick_last)));

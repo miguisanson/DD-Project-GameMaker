@@ -7,9 +7,8 @@ Transition_Update();
 if (!variable_global_exists("scn")) Focus_Step(window_has_focus());   // R1b (D122): the window lost focus -> pause, lower the music (scripted runs are never in front: they call Focus_Step themselves)
 if (Tutorial_Step()) exit;   // C4 (D45): a tutorial pop-up takes every key until it is dismissed
 
-if (!variable_instance_exists(id, "hud_hurt_flash_timer")) hud_hurt_flash_timer = 0;
+if (!variable_instance_exists(id, "hud_hurt_flash_ms")) hud_hurt_flash_ms = 0;
 if (!variable_instance_exists(id, "hud_prev_hp")) hud_prev_hp = -1;
-if (!variable_instance_exists(id, "hud_prev_mp")) hud_prev_mp = -1;
 
 var hud_ch = gs.player_ch;
 if (room == rm_battle && instance_exists(obj_battle_controller)) {
@@ -17,14 +16,12 @@ if (room == rm_battle && instance_exists(obj_battle_controller)) {
     if (instance_exists(hud_bc) && is_struct(hud_bc.p)) hud_ch = hud_bc.p;
 }
 if (is_struct(hud_ch)) {
-    if (hud_prev_hp >= 0 && hud_ch.hp < hud_prev_hp) hud_hurt_flash_timer = max(hud_hurt_flash_timer, UI_HUD_HURT_FLASH_FRAMES);
+    if (hud_prev_hp >= 0 && hud_ch.hp < hud_prev_hp) hud_hurt_flash_ms = max(hud_hurt_flash_ms, UI_HUD_HURT_FLASH_MS);
     hud_prev_hp = hud_ch.hp;
-    hud_prev_mp = hud_ch.mp;
 } else {
     hud_prev_hp = -1;
-    hud_prev_mp = -1;
 }
-if (hud_hurt_flash_timer > 0) hud_hurt_flash_timer -= 1;
+if (hud_hurt_flash_ms > 0) hud_hurt_flash_ms = Hud_HurtFlashStep(hud_hurt_flash_ms, Presentation_StepMs(delta_time));   // D108 F2b-1: ms, was frames
 
 if (Transition_IsInputLocked()) exit;
 

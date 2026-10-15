@@ -1,5 +1,9 @@
 Input_PreStep();
 var gs = GameState_Get();
+// D108 F2b-1: the message hold and the shakes run on a ms clock. The shakes advance here, once a frame, before any early exit (they used to count down
+// inside Draw, so a second read of the offset made them run twice as fast).
+var step_ms = Presentation_StepMs(delta_time);
+Fx_BattleShakesStep(enemy_inst, step_ms);
 if (gs.ui.mode == UI_MENU || gs.ui.mode == UI_PAUSE || Tutorial_IsOpen() || Tutorial_JustClosed()) exit;
 if (battle_over && battle_state != BSTATE_MESSAGE) exit;
 
@@ -40,8 +44,8 @@ if (turn == TURN_PLAYER) {
 if (battle_state == BSTATE_MESSAGE) {
     if (wait_fx != noone && !instance_exists(wait_fx)) wait_fx = noone;
     if (wait_fx != noone) exit;
-    if (wait_timer > 0) {
-        wait_timer -= 1;
+    if (Combat_HoldActive(wait_timer)) {
+        wait_timer = Combat_HoldStep(wait_timer, step_ms);
         exit;
     }
     skill_banner_active = false;
