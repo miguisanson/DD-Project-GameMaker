@@ -78,13 +78,6 @@ if (variable_struct_exists(gs, "load_spawn_pending") && gs.load_spawn_pending) {
     }
 }
 
-if (variable_struct_exists(gs, "pending_save_success_popup") && gs.pending_save_success_popup) {
-    if (!Transition_IsActive() && gs.ui.mode == UI_NONE) {
-        gs.pending_save_success_popup = false;
-        Notice_Open(Save_SuccessText());
-    }
-}
-
 if (room != rm_battle && variable_struct_exists(gs, "pending_post_battle_dialogue_lines") && is_array(gs.pending_post_battle_dialogue_lines) && array_length(gs.pending_post_battle_dialogue_lines) > 0) {
     if (!Transition_IsActive() && instance_exists(obj_player) && gs.ui.mode == UI_NONE && array_length(gs.ui.lines) <= 0) {
         var lines = gs.pending_post_battle_dialogue_lines;

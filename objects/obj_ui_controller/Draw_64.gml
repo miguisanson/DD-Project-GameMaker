@@ -12,8 +12,6 @@ draw_set_alpha(1);
 
 // The battle's HUD (HP, MP, statuses, strip, log, menus) is drawn by obj_battle_controller (D99).
 
-UI_DrawModalDim();
-
 if (gs.ui.mode == UI_PAUSE) {
     if (room != rm_battle) PauseMenu_Draw();   // R1b (D122): in a battle the battle controller draws it, after its own HUD
     exit;

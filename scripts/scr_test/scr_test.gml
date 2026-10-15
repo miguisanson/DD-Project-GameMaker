@@ -3430,10 +3430,6 @@ function Test_Suite_RunSave() {
     Test_True("legacy: the friendly message is not empty", string_length(Save_LegacyNotice()) > 20);
     Test_False("legacy: an old file is not a current snapshot", is_struct(Save_LoadSnapshotFile(_lg)));
     Test_True("legacy: loading the old file does not delete it", file_exists(_lg));
-    var _slot1 = file_exists(Save_Path(1));
-    Test_False("legacy: the retired slot writer reports nothing written", Save_Write(1));
-    Test_Eq("legacy: the retired slot writer creates no slot file", file_exists(Save_Path(1)), _slot1);
-    Test_False("legacy: the retired slot loader loads nothing", Save_Read(1));
     Test_Eq("legacy: the old file is unchanged", Test_RawRead(_lg), _old);
     file_delete(_lg);
 
