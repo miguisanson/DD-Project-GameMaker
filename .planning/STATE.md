@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Session 4 overnight: next a73a078 = R1, R1b, F1a, F3b-1/2, F1d-1, fix-diff merged (fast gate PASS 3166/0; last FULL gate PASS at b28a2eb). In flight (Sonnet): F1d-3 world/audio (wt/f1d3), F1b metrics cache (wt/f1b). Queue: F3a (notice popup + dead slot save menu), F1c (menu draw), then FULL gate + E2 build; F2/F4/F1d-2 after E2. |
+| WIP | Session 4 overnight: next d9ab5c2 = R1, R1b, F1a, F1b, F1d-1, F1d-3, F3b-1/2, fix-diff merged (fast gate PASS 3207/0). In flight: F3a notice popup + dead slot menu (Sonnet, wt/f3a); Opus deep review of e1a322d..next (read-only, owner asked for a periodic Opus review). Then: fix review findings, F1c, FULL gate + E2 build; F2/F4/F1d-2 after E2. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
