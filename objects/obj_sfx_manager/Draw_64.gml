@@ -18,7 +18,7 @@ draw_set_valign(fa_top);
 
 var gs = GameState_Get();
 var class_name = "Unknown";
-var class_id = variable_global_exists("selected_class") ? global.selected_class : -1;
+var class_id = variable_struct_exists(gs, "selected_class") ? gs.selected_class : -1;
 switch (class_id) {
     case CLASS_KNIGHT: class_name = "Knight"; break;
     case CLASS_ARCHER: class_name = "Archer"; break;
@@ -27,7 +27,7 @@ switch (class_id) {
 }
 
 var difficulty_name = "Unknown";
-var diff_id = variable_global_exists("difficulty") ? global.difficulty : DIFFICULTY_NORMAL;
+var diff_id = variable_struct_exists(gs, "difficulty") ? gs.difficulty : DIFFICULTY_NORMAL;
 switch (diff_id) {
     case DIFFICULTY_EASY: difficulty_name = "Easy"; break;
     case DIFFICULTY_NORMAL: difficulty_name = "Normal"; break;

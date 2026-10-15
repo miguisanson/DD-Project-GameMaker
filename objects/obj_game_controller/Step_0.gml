@@ -19,7 +19,6 @@ if (gs.last_room != room) {
     Merchant_EnsureInRoom();   // C3 (D85): the merchant of floors 2, 5 and 8 stands in an existing room
 
     if (variable_struct_exists(gs, "skip_room_save")) gs.skip_room_save = false;
-    global.skipRoomSave = false;
 
     // ensure player exists if no transition pending (e.g. initial room / battle return)
     // Cutscene room must never spawn player visuals.

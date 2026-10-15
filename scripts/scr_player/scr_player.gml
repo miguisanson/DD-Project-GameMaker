@@ -64,7 +64,6 @@ function Difficulty_Profile(_difficulty = -1) {
 function Difficulty_SetCurrent(_difficulty) {
     var gs = GameState_Get();
     gs.difficulty = Difficulty_Normalize(_difficulty);
-    global.difficulty = gs.difficulty;
     return gs.difficulty;
 }
 
@@ -1262,11 +1261,6 @@ function GameState_SyncLegacy() {
 
     Input_Init();
 
-    global.selected_class = gs.selected_class;
-    global.difficulty = gs.difficulty;
-    global.defeated_enemies = gs.defeated_enemies;
-    global.player_ch = gs.player_ch;
-
     if (variable_struct_exists(gs, "item_db")) {
         global.item_db = gs.item_db;
     }
@@ -1286,47 +1280,22 @@ function GameState_SyncLegacy() {
     if (variable_struct_exists(gs, "dialogue_db")) {
         global.dialogue_db = gs.dialogue_db;
     }
-
-
-    if (variable_struct_exists(gs, "battle")) {
-        global.battle_return_room = gs.battle.return_room;
-        global.battle_return_x = gs.battle.return_x;
-        global.battle_return_y = gs.battle.return_y;
-        global.battle_enemy_persist_id = gs.battle.enemy_persist_id;
-        global.battle_enemy_id = gs.battle.enemy_id;
-        global.battle_enemy_level = gs.battle.enemy_level;
-        global.battle_enemy_room = gs.battle.enemy_room;
-        global.just_returned_from_battle = gs.battle.just_returned;
-    }
-
-    if (variable_struct_exists(gs, "uid_counter")) {
-        global.uid_counter = gs.uid_counter;
-    }
-
-    if (variable_struct_exists(gs, "settings")) {
-        global.settings = gs.settings;
-    }
-
-    global.player_inst = gs.player_inst;
 }
 
 function GameState_SetSelectedClass(_class_id) {
     var gs = GameState_Get();
     gs.selected_class = _class_id;
-    global.selected_class = _class_id;
 }
 
 function GameState_SetPlayer(_ch) {
     if (is_struct(_ch)) _ch = Player_NormalizeProgression(_ch, true);
     var gs = GameState_Get();
     gs.player_ch = _ch;
-    global.player_ch = _ch;
 }
 
 function GameState_SetPlayerInst(_inst) {
     var gs = GameState_Get();
     gs.player_inst = _inst;
-    global.player_inst = _inst;
 }
 
 function GameState_SetBattleReturn(_room, _x, _y, _face, _snap_to_grid = true) {
@@ -1340,11 +1309,6 @@ function GameState_SetBattleReturn(_room, _x, _y, _face, _snap_to_grid = true) {
     gs.battle.return_x = _x;
     gs.battle.return_y = _y;
     gs.battle.return_face = (argument_count >= 4) ? _face : -1;
-
-    global.battle_return_room = _room;
-    global.battle_return_x = _x;
-    global.battle_return_y = _y;
-    global.battle_return_face = gs.battle.return_face;
 }
 
 function GameState_SetBattleEnemy(_persist_id, _enemy_id, _enemy_level = 0) {
@@ -1355,11 +1319,6 @@ function GameState_SetBattleEnemy(_persist_id, _enemy_id, _enemy_level = 0) {
     gs.battle.enemy_room = room;
     gs.battle.enemy_elite = "";   // C3 (D86): EnemyPersist_BeginEncounter sets the map enemy's modifier after this
 
-    global.battle_enemy_persist_id = _persist_id;
-    global.battle_enemy_id = _enemy_id;
-    global.battle_enemy_level = gs.battle.enemy_level;
-    global.battle_enemy_room = room;
-
     // Entering battle should not leave any lingering modal/dim state behind.
     UI_InterruptCloseAll(true);
 }
@@ -1367,7 +1326,6 @@ function GameState_SetBattleEnemy(_persist_id, _enemy_id, _enemy_level = 0) {
 function GameState_SetJustReturned(_flag) {
     var gs = GameState_Get();
     gs.battle.just_returned = _flag;
-    global.just_returned_from_battle = _flag;
 }
 
 function GameState_SetCheckpoint(_room, _x, _y) {

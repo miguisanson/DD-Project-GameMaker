@@ -386,7 +386,6 @@ function Test_FixRestore() {
     if (!(variable_global_exists("test_fix") && is_struct(global.test_fix))) return;
     var _gs = GameState_Get();
     _gs.difficulty = global.test_fix.diff;
-    global.difficulty = _gs.difficulty;
     _gs.player_ch = global.test_fix.player;
     _gs.flags = global.test_fix.flags;
     global.test_fix = undefined;

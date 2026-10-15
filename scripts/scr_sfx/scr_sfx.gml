@@ -720,7 +720,6 @@ function SFX_DebugAuditRequired(_log = true) {
         if (!info.ok) missing += 1;
     }
 
-    global.audio_debug_map_report = report;
     global.audio_debug_missing_count = missing;
     global.audio_debug_total_count = array_length(keys);
 
@@ -930,11 +929,9 @@ function BGM_MixApplyForRoom(_room_id, _fade_in_ms = -1, _fade_out_ms = -1) {
         var primary_handle = variable_struct_exists(global.bgm_mix_handles, primary) ? variable_struct_get(global.bgm_mix_handles, primary) : -1;
         global.bgm_current_key = primary;
         global.bgm_current_handle = primary_handle;
-        global.bgm_current_sound = BGM_GetSound(primary);
     } else {
         global.bgm_current_key = "";
         global.bgm_current_handle = -1;
-        global.bgm_current_sound = noone;
     }
 }
 

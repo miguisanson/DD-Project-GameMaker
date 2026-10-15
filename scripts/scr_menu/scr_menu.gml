@@ -982,7 +982,7 @@ function CardsUi_Interrupt() {
 // A changed copy of the character becomes the player (the world object keeps pointing at the live one).
 function CardsUi_Commit(_ch) {
     GameState_SetPlayer(_ch);
-    if (instance_exists(obj_player)) obj_player.character = global.player_ch;
+    if (instance_exists(obj_player)) obj_player.character = GameState_Get().player_ch;
     GameState_SyncLegacy();
 }
 
@@ -1111,8 +1111,8 @@ function ClassSelect_ApplyClass(_class_id) {
 
     if (instance_exists(obj_player)) {
         with (obj_player) {
-            character = global.player_ch;
-            Player_ApplyClassSprites(global.selected_class);
+            character = GameState_Get().player_ch;
+            Player_ApplyClassSprites(GameState_Get().selected_class);
             sprite_index = sprite[face];
             image_index = 0;
             mask_index = sprite[DOWN];
@@ -2807,7 +2807,6 @@ function PauseMenu_CloseFinalize() {
         Run_AutoSave();   // C1 (D46): leaving to the title keeps the run; Continue picks it up
         gs.in_main_menu = true;
         gs.player_inst = noone;
-        global.player_inst = noone;
         if (variable_struct_exists(gs, "ui")) {
             gs.ui.lines = [];
             gs.ui.index = 0;
