@@ -125,6 +125,7 @@ function Test_RunAll() {
     Test_RunSuite("MapJuice", Test_Suite_MapJuice);
     Test_RunSuite("OneMenu", Test_Suite_OneMenu);
     Test_RunSuite("Confirm", Test_Suite_Confirm);
+    Test_RunSuite("ClassMem", Test_Suite_ClassMem);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -9883,4 +9884,329 @@ function Test_Suite_Confirm() {
     Test_ConfirmPart("skill swap", Test_ConfirmReplace);
     Test_ConfirmPart("selling gear", Test_ConfirmSell);
     Test_ConfirmPart("no press-twice path left", Test_ConfirmNoArmed);
+}
+
+// ============================================================================
+// H5 (D144, D148): skill memory in the profile (version 2), the echo of discovered skills of the picked class, and the class screen
+// (undiscovered skills read ???, a locked Nobody is greyed, a sprite preview, lore text with no "to find"). Expected values come from the brief.
+// ============================================================================
+function Test_ClassMemV1Json() {
+    return "{\"profile_version\":1,\"story_seen\":{\"cutscene:intro\":true},\"unlocks\":{\"nobody_class\":true,\"item_9\":true},\"echo_pool\":[{\"kind\":\"item\",\"id\":11}],"
+        + "\"history\":[{\"seed\":5,\"class_id\":1,\"level\":4,\"floor\":3,\"room\":\"rm_floor3\",\"result\":\"died\",\"cause\":\"enemy 0\",\"kills\":6,\"gold\":0}],"
+        + "\"bestiary\":{\"e1\":{\"met\":3,\"elite\":false}},\"deaths\":4,\"wins\":1,\"runs_started\":6,\"best_floor\":3,\"legacy_notice_seen\":true}";
+}
+
+function Test_ClassMemSet(_ids) {
+    var _p = Profile_Default();
+    for (var _i = 0; _i < array_length(_ids); _i++) Profile_SkillLearn(_p, _ids[_i]);
+    return _p;
+}
+
+function Test_ClassMemSameSet(_a, _ids) {
+    if (array_length(_a) != array_length(_ids)) return false;
+    for (var _i = 0; _i < array_length(_ids); _i++) { if (!array_contains(_a, _ids[_i])) return false; }
+    return true;
+}
+
+function Test_ClassMemOfferIds(_opts) {
+    var _out = [];
+    for (var _i = 0; _i < array_length(_opts); _i++) array_push(_out, _opts[_i].id);
+    return _out;
+}
+
+function Test_ClassMemRowTexts(_m) {
+    var _t = "";
+    for (var _i = 0; _i < array_length(_m.items); _i++) {
+        var _it = _m.items[_i];
+        _t += "|" + string(_it.label) + "|" + string(_it.value) + "|" + string(_it.help);
+        for (var _l = 0; _l < array_length(_it.lines); _l++) _t += "|" + string(_it.lines[_l].label) + "|" + string(_it.lines[_l].value);
+    }
+    return _t;
+}
+
+function Test_ClassMemMigration() {
+    // 1. a hand-written v1 profile loads as v2 with an empty skill memory and every other field intact
+    var _f = "test_profile_h5.sav";
+    Save_DeleteFileSet(_f);
+    Test_RawWrite(_f, Test_ClassMemV1Json());
+    var _r = Profile_Load(_f);
+    var _p = _r.profile;
+    Test_Eq("H5 migration: a v1 file still loads (not rejected as old)", _r.status, "ok");
+    Test_Eq("H5 migration: the profile version is now 2", _p.profile_version, 2);
+    Test_Eq("H5 migration: PROFILE_VERSION is 2", PROFILE_VERSION, 2);
+    Test_True("H5 migration: the skill memory exists and is empty", variable_struct_exists(_p, "skills_known") && is_struct(_p.skills_known) && array_length(variable_struct_get_names(_p.skills_known)) == 0);
+    Test_Eq("H5 migration: deaths kept", _p.deaths, 4);
+    Test_Eq("H5 migration: wins kept", _p.wins, 1);
+    Test_Eq("H5 migration: runs started kept", _p.runs_started, 6);
+    Test_Eq("H5 migration: best floor kept", _p.best_floor, 3);
+    Test_True("H5 migration: legacy_notice_seen kept", _p.legacy_notice_seen);
+    Test_True("H5 migration: story kept", Profile_StorySeen(_p, "cutscene:intro"));
+    Test_True("H5 migration: unlocks kept", Profile_IsUnlocked(_p, "nobody_class") && Profile_IsUnlocked(_p, "item_9"));
+    Test_True("H5 migration: history kept", array_length(_p.history) == 1 && _p.history[0].room == "rm_floor3" && _p.history[0].seed == 5 && _p.history[0].kills == 6);
+    Test_True("H5 migration: bestiary kept", variable_struct_exists(_p.bestiary, "e1") && _p.bestiary.e1.met == 3);
+    Test_True("H5 migration: the old echo_pool field is still readable", is_array(_p.echo_pool) && array_length(_p.echo_pool) == 1 && _p.echo_pool[0].id == 11);
+    // a v1 file that already carries a skills_known key is not trusted: the memory starts empty
+    var _v1x = Profile_Normalize({ profile_version: 1, skills_known: { "2": true } });
+    Test_Eq("H5 migration: a v1 profile ignores a stray skills_known", array_length(variable_struct_get_names(_v1x.skills_known)), 0);
+    // saved again it is a v2 file, and reads back the same
+    Test_True("H5 migration: the migrated profile can be written", Profile_SaveTo(_f, _p));
+    Test_True("H5 migration: the file now says version 2", string_pos("\"profile_version\":2", Test_RawRead(_f)) > 0);
+    var _r2 = Profile_Load(_f);
+    Test_True("H5 migration: the written v2 reads back with the same counters", _r2.status == "ok" && _r2.profile.deaths == 4 && _r2.profile.wins == 1 && _r2.profile.runs_started == 6 && array_length(_r2.profile.history) == 1);
+    // 2. v2 round trip
+    var _w = Test_ClassMemSet([SKILL_WOUND, SKILL_FIREBALL, SKILL_REV_UP]);
+    Profile_StoryMark(_w, "cutscene:intro");
+    Test_True("H5 round trip: write", Profile_SaveTo(_f, _w));
+    var _r3 = Profile_Load(_f);
+    Test_Eq("H5 round trip: reads back ok", _r3.status, "ok");
+    Test_True("H5 round trip: the three skills are known", Profile_SkillKnown(_r3.profile, SKILL_WOUND) && Profile_SkillKnown(_r3.profile, SKILL_FIREBALL) && Profile_SkillKnown(_r3.profile, SKILL_REV_UP));
+    Test_False("H5 round trip: another skill is not known", Profile_SkillKnown(_r3.profile, SKILL_HILT_BASH));
+    Test_Eq("H5 round trip: exactly three entries", array_length(variable_struct_get_names(_r3.profile.skills_known)), 3);
+    Test_True("H5 round trip: the rest of the profile is intact", Profile_StorySeen(_r3.profile, "cutscene:intro"));
+    // junk in the memory is dropped
+    var _junk = Profile_Normalize({ profile_version: 2, skills_known: { "2": true, "x": true, "3": false, "-1": true, "4": "yes" } });
+    Test_True("H5 normalize: only valid true entries are kept", Profile_SkillKnown(_junk, 2) && !Profile_SkillKnown(_junk, 3) && !Profile_SkillKnown(_junk, 4) && array_length(variable_struct_get_names(_junk.skills_known)) == 1);
+    var _bad = Profile_Normalize({ profile_version: 2, skills_known: [1, 2] });
+    Test_Eq("H5 normalize: a wrong-typed memory falls back to empty", array_length(variable_struct_get_names(_bad.skills_known)), 0);
+    // a newer file is still refused
+    Test_RawWrite(_f, json_stringify({ profile_version: 3, deaths: 1 }));
+    Test_Eq("H5 migration: version 3 is still newer", Profile_Load(_f).status, "newer");
+    Save_DeleteFileSet(_f);
+}
+
+function Test_ClassMemRecording() {
+    Profile_ResetForTest();
+    var _p = Profile_Get();
+    Test_False("H5 record: nothing is known on a fresh profile", Profile_SkillKnown(_p, SKILL_FIREBALL));
+    // card pick
+    var _m = CharacterCreate_Player(CLASS_MAGE);
+    var _r = Card_Take(_m, Card_SkillId(SKILL_FIREBALL));
+    Test_True("H5 record: a card pick records the skill", Profile_SkillKnown(Profile_Get(), SKILL_FIREBALL));
+    Test_True("H5 record: and the character has it", array_contains(_r.ch.skills, SKILL_FIREBALL));
+    // recording twice is harmless
+    Card_Take(_r.ch, Card_SkillId(SKILL_FIREBALL));
+    Test_Eq("H5 record: taking it again adds no second entry", array_length(variable_struct_get_names(Profile_Get().skills_known)), 1);
+    Test_True("H5 record: the helper says new once, then not new", Skill_Discover(SKILL_ICE_SPEAR) && !Skill_Discover(SKILL_ICE_SPEAR));
+    // an upgrade of a skill is not a new skill
+    Card_Take(CharacterCreate_Player(CLASS_KNIGHT), Card_UpgradeId(SKILL_WOUND));
+    Test_False("H5 record: an upgrade card does not record its skill", Profile_SkillKnown(Profile_Get(), SKILL_WOUND));
+    // a full skill list: the card is not learned yet; the swap records it
+    var _full = CharacterCreate_Player(CLASS_MAGE);
+    _full.skills = [SKILL_FIREBALL, SKILL_ICE_SPEAR, SKILL_FORESIGHT];
+    var _rf = Card_Take(_full, Card_SkillId(SKILL_MEDITATION));
+    Test_True("H5 record: a card that needs a swap asks first", _rf.needs_replace);
+    Test_False("H5 record: and is not recorded before the swap", Profile_SkillKnown(Profile_Get(), SKILL_MEDITATION));
+    Card_ReplaceSkill(_full, SKILL_ICE_SPEAR, SKILL_MEDITATION);
+    Test_True("H5 record: the swap records the new skill", Profile_SkillKnown(Profile_Get(), SKILL_MEDITATION));
+    // the echo take
+    var _e = CharacterCreate_Player(CLASS_KNIGHT);
+    _e.echo_offer = [{ kind: "skill", id: SKILL_HORIZ_SLASH }];
+    var _et = Run_EchoTake(_e, 0);
+    Test_True("H5 record: taking an echo skill records it", Profile_SkillKnown(Profile_Get(), SKILL_HORIZ_SLASH) && array_contains(_et.skills, SKILL_HORIZ_SLASH));
+    // a skill learned directly (any other path through Player_LearnSkill)
+    Player_LearnSkill(CharacterCreate_Player(CLASS_ARCHER), SKILL_TAKE_AIM);
+    Test_True("H5 record: learning a skill directly records it", Profile_SkillKnown(Profile_Get(), SKILL_TAKE_AIM));
+    // the character's whole list (class pick, run end)
+    var _all = CharacterCreate_Player(CLASS_KNIGHT);
+    _all.skills = [SKILL_MUSCLE_UP, SKILL_HILT_BASH];
+    Skills_DiscoverAll(_all.skills);
+    Test_True("H5 record: a whole skill list is recorded", Profile_SkillKnown(Profile_Get(), SKILL_MUSCLE_UP) && Profile_SkillKnown(Profile_Get(), SKILL_HILT_BASH));
+    // not skills: nonsense and enemy skills
+    Test_False("H5 record: -1 is never recorded", Skill_Discover(-1));
+    Test_False("H5 record: an id that is no skill is never recorded", Skill_Discover(9999));
+    Test_False("H5 record: an enemy skill is never recorded", Skill_Discover(SKILL_BITE));
+    Test_False("H5 record: the enemy skill is not in the memory", Profile_SkillKnown(Profile_Get(), SKILL_BITE));
+    // it is flushed: a reload from disk still has it
+    var _disk = Profile_Load(Profile_Path());
+    Test_True("H5 record: the memory was written to the profile file", _disk.status == "ok" && Profile_SkillKnown(_disk.profile, SKILL_FIREBALL) && Profile_SkillKnown(_disk.profile, SKILL_TAKE_AIM));
+}
+
+function Test_ClassMemClassLists() {
+    Test_True("H5 class skills: Knight has Wound, Hilt Bash, Muscle Up, Rev Up, Horizontal Slash", Test_ClassMemSameSet(Skill_IdsOfClass(CLASS_KNIGHT), [SKILL_WOUND, SKILL_HILT_BASH, SKILL_MUSCLE_UP, SKILL_REV_UP, SKILL_HORIZ_SLASH]));
+    Test_True("H5 class skills: Archer has Rev Up, Poison Arrow, Evasion, Double Shot, Take Aim", Test_ClassMemSameSet(Skill_IdsOfClass(CLASS_ARCHER), [SKILL_REV_UP, SKILL_POISON_ARROW, SKILL_EVASION, SKILL_DOUBLE_SHOT, SKILL_TAKE_AIM]));
+    Test_True("H5 class skills: Mage has Fireball, Poison Mist, Ice Spear, Meditation, Foresight", Test_ClassMemSameSet(Skill_IdsOfClass(CLASS_MAGE), [SKILL_FIREBALL, SKILL_POISON_MIST, SKILL_ICE_SPEAR, SKILL_MEDITATION, SKILL_FORESIGHT]));
+    Test_Eq("H5 class skills: Nobody has none", array_length(Skill_IdsOfClass(CLASS_NOBODY)), 0);
+    var _p = Test_ClassMemSet([SKILL_WOUND, SKILL_REV_UP, SKILL_FIREBALL]);
+    Test_True("H5 known of class: a Knight knows Wound and Rev Up only", Test_ClassMemSameSet(Skill_KnownOfClass(_p, CLASS_KNIGHT), [SKILL_WOUND, SKILL_REV_UP]));
+    Test_True("H5 known of class: an Archer knows Rev Up only (the skill is shared)", Test_ClassMemSameSet(Skill_KnownOfClass(_p, CLASS_ARCHER), [SKILL_REV_UP]));
+    Test_True("H5 known of class: a Mage knows Fireball only", Test_ClassMemSameSet(Skill_KnownOfClass(_p, CLASS_MAGE), [SKILL_FIREBALL]));
+    Test_Eq("H5 known of class: Nobody knows none", array_length(Skill_KnownOfClass(_p, CLASS_NOBODY)), 0);
+}
+
+function Test_ClassMemEcho() {
+    // 0 discovered: no offer
+    var _none = Profile_Default();
+    Test_Eq("H5 echo: a class with 0 discovered skills offers nothing", array_length(Run_EchoSkillOptions(_none, CLASS_KNIGHT, 5)), 0);
+    var _other = Test_ClassMemSet([SKILL_FIREBALL, SKILL_ICE_SPEAR]);
+    Test_Eq("H5 echo: other classes' skills do not count (Knight)", array_length(Run_EchoSkillOptions(_other, CLASS_KNIGHT, 5)), 0);
+    Test_Eq("H5 echo: Nobody is never offered anything", array_length(Run_EchoSkillOptions(Test_ClassMemSet([SKILL_WOUND, SKILL_FIREBALL]), CLASS_NOBODY, 5)), 0);
+    // 2 discovered: exactly those two
+    var _two = Test_ClassMemSet([SKILL_WOUND, SKILL_HILT_BASH, SKILL_FIREBALL]);
+    var _o2 = Run_EchoSkillOptions(_two, CLASS_KNIGHT, 5);
+    Test_True("H5 echo: 2 discovered Knight skills -> exactly those 2", Test_ClassMemSameSet(Test_ClassMemOfferIds(_o2), [SKILL_WOUND, SKILL_HILT_BASH]));
+    // 5 discovered: exactly 3 distinct, of the class, same for the same seed
+    var _five = Test_ClassMemSet([SKILL_WOUND, SKILL_HILT_BASH, SKILL_MUSCLE_UP, SKILL_REV_UP, SKILL_HORIZ_SLASH, SKILL_FIREBALL]);
+    var _o5 = Run_EchoSkillOptions(_five, CLASS_KNIGHT, 777);
+    var _ids5 = Test_ClassMemOfferIds(_o5);
+    var _distinct = array_length(_ids5) == 3 && _ids5[0] != _ids5[1] && _ids5[0] != _ids5[2] && _ids5[1] != _ids5[2];
+    Test_Eq("H5 echo: 5 discovered -> exactly 3 offered", array_length(_o5), 3);
+    Test_True("H5 echo: the 3 are distinct", _distinct);
+    var _allk = true; var _allskill = true;
+    for (var _i = 0; _i < array_length(_o5); _i++) {
+        if (!array_contains(Skill_IdsOfClass(CLASS_KNIGHT), _o5[_i].id)) _allk = false;
+        if (_o5[_i].kind != "skill") _allskill = false;
+    }
+    Test_True("H5 echo: all 3 are Knight skills", _allk);
+    Test_True("H5 echo: never an item", _allskill);
+    var _o5b = Run_EchoSkillOptions(_five, CLASS_KNIGHT, 777);
+    Test_True("H5 echo: the same seed gives the same 3 in the same order", json_stringify(_o5) == json_stringify(_o5b));
+    var _seen = {};
+    for (var _sd = 1; _sd <= 30; _sd++) variable_struct_set(_seen, json_stringify(Test_ClassMemOfferIds(Run_EchoSkillOptions(_five, CLASS_KNIGHT, _sd))), true);
+    Test_True("H5 echo: other seeds can give other offers", array_length(variable_struct_get_names(_seen)) > 1);
+    // a shared skill is offered to both its classes, never to the Mage
+    var _rev = Test_ClassMemSet([SKILL_REV_UP]);
+    Test_Eq("H5 echo: Rev Up is offered to a Knight", array_length(Run_EchoSkillOptions(_rev, CLASS_KNIGHT, 1)), 1);
+    Test_Eq("H5 echo: and to an Archer", array_length(Run_EchoSkillOptions(_rev, CLASS_ARCHER, 1)), 1);
+    Test_Eq("H5 echo: but not to a Mage", array_length(Run_EchoSkillOptions(_rev, CLASS_MAGE, 1)), 0);
+    // a skill the character already holds is not offered again
+    var _own = Run_EchoSkillOptions(_two, CLASS_KNIGHT, 5, [SKILL_WOUND]);
+    Test_True("H5 echo: a skill already held is left out", Test_ClassMemSameSet(Test_ClassMemOfferIds(_own), [SKILL_HILT_BASH]));
+
+    // the class pick: Run_EchoGrant reads the profile
+    Profile_ResetForTest();
+    var _base = Card_ClassCharacter(CharacterCreate_Player(CLASS_NOBODY), CLASS_KNIGHT);
+    var _g0 = Run_EchoGrant(_base);
+    Test_Eq("H5 grant: nothing discovered -> no echo offer", array_length(_g0.echo_offer), 0);
+    Test_True("H5 grant: and nothing is owed (the run goes on)", Cards_NextOwed(_g0) != "echo");
+    Skill_Discover(SKILL_WOUND);
+    Skill_Discover(SKILL_FIREBALL);
+    var _g1 = Run_EchoGrant(Card_ClassCharacter(CharacterCreate_Player(CLASS_NOBODY), CLASS_KNIGHT));
+    Test_True("H5 grant: a Knight is offered only the discovered Knight skill", Test_ClassMemSameSet(Test_ClassMemOfferIds(_g1.echo_offer), [SKILL_WOUND]));
+    Test_Eq("H5 grant: and the echo screen is owed", Cards_NextOwed(_g1), "echo");
+    var _g2 = Run_EchoGrant(Card_ClassCharacter(CharacterCreate_Player(CLASS_NOBODY), CLASS_MAGE));
+    Test_True("H5 grant: a Mage is offered only the discovered Mage skill", Test_ClassMemSameSet(Test_ClassMemOfferIds(_g2.echo_offer), [SKILL_FIREBALL]));
+    var _g3 = Run_EchoGrant(Card_ClassCharacter(CharacterCreate_Player(CLASS_NOBODY), CLASS_ARCHER));
+    Test_Eq("H5 grant: an Archer with none of its own gets no echo", array_length(_g3.echo_offer), 0);
+    // taking it puts it in the deck
+    var _taken = Run_EchoTake(_g1, 0);
+    Test_True("H5 grant: taking the echo puts the skill in the deck", array_contains(_taken.skills, SKILL_WOUND) && array_length(_taken.echo_offer) == 0);
+    // an old item pool in the profile is read, ignored, and cleared by the class pick
+    var _pf = Profile_Get();
+    _pf.echo_pool = [{ kind: "item", id: 11 }];
+    var _g4 = Run_EchoGrant(Card_ClassCharacter(CharacterCreate_Player(CLASS_NOBODY), CLASS_ARCHER));
+    Test_Eq("H5 legacy: an old item pool never becomes an offer", array_length(_g4.echo_offer), 0);
+    Test_Eq("H5 legacy: and is cleared by the class pick", array_length(Profile_Get().echo_pool), 0);
+    Profile_ResetForTest();
+}
+
+function Test_ClassMemMenu() {
+    Loc_SetLanguage("en");
+    var _fresh = Profile_Default();
+    var _m = CardsUi_ClassMenu(_fresh);
+    Test_Eq("H5 menu: four rows", array_length(_m.items), 4);
+    Test_Eq("H5 menu: the unknown skill reads ???", Loc_T("class.skill.unknown", "x"), "???");
+    for (var _c = 0; _c < 3; _c++) {
+        var _it = _m.items[_c];
+        Test_Eq("H5 menu: class " + string(_c) + " has five skill rows", array_length(_it.skills), 5);
+        var _qs = 0;
+        for (var _k = 0; _k < array_length(_it.skills); _k++) { if (_it.skills[_k].label == "???" && !_it.skills[_k].known) _qs++; }
+        Test_Eq("H5 menu: a fresh profile shows all five skills as ??? (class " + string(_c) + ")", _qs, 5);
+        var _lq = 0;
+        for (var _l = 0; _l < array_length(_it.lines); _l++) { if (_it.lines[_l].label == "???") _lq++; }
+        Test_Eq("H5 menu: and the details panel lines show them too (class " + string(_c) + ")", _lq, 5);
+    }
+    // discovered ones show by name
+    var _known = Test_ClassMemSet([SKILL_WOUND, SKILL_HILT_BASH, SKILL_REV_UP]);
+    var _m2 = CardsUi_ClassMenu(_known);
+    var _kn = _m2.items[0];
+    var _names = [];
+    var _qs2 = 0;
+    for (var _k2 = 0; _k2 < array_length(_kn.skills); _k2++) {
+        if (_kn.skills[_k2].known) array_push(_names, _kn.skills[_k2].label); else if (_kn.skills[_k2].label == "???") _qs2++;
+    }
+    Test_True("H5 menu: the Knight shows Wound, Hilt Bash and Rev Up by name", array_length(_names) == 3 && array_contains(_names, SkillDB_GetBase(SKILL_WOUND).name) && array_contains(_names, SkillDB_GetBase(SKILL_HILT_BASH).name) && array_contains(_names, SkillDB_GetBase(SKILL_REV_UP).name));
+    Test_Eq("H5 menu: and the other two stay ???", _qs2, 2);
+    var _ar = _m2.items[1];
+    var _arn = 0;
+    for (var _k3 = 0; _k3 < array_length(_ar.skills); _k3++) { if (_ar.skills[_k3].known) _arn++; }
+    Test_Eq("H5 menu: the Archer shows the shared Rev Up only", _arn, 1);
+    var _ma = _m2.items[2];
+    var _man = 0;
+    for (var _k4 = 0; _k4 < array_length(_ma.skills); _k4++) { if (_ma.skills[_k4].known) _man++; }
+    Test_Eq("H5 menu: the Mage shows none", _man, 0);
+    // the lines carry the names too
+    var _hasname = false;
+    for (var _l2 = 0; _l2 < array_length(_kn.lines); _l2++) { if (_kn.lines[_l2].label == SkillDB_GetBase(SKILL_WOUND).name) _hasname = true; }
+    Test_True("H5 menu: the details lines show the discovered name", _hasname);
+
+    // Nobody: locked is greyed and cannot be picked
+    var _nb = _m.items[3];
+    Test_True("H5 menu: Nobody is locked on a fresh profile", _nb.locked);
+    Test_True("H5 menu: and greyed (dim)", variable_struct_exists(_nb, "dim") && _nb.dim);
+    Test_False("H5 menu: the other classes are not greyed", variable_struct_exists(_m.items[0], "dim") && _m.items[0].dim);
+    Confirm_Close();
+    CardsUi_ClassConfirm(_m, 3);
+    Test_False("H5 menu: confirming the locked Nobody opens no pop-up", Confirm_IsOpen());
+    Test_True("H5 menu: the locked row says it is locked", string_length(_nb.help) > 0 && _nb.help == Loc_T("class.nobody.locked_hint", "Win a run to unlock this path."));
+    var _won = Profile_Default();
+    Profile_Unlock(_won, "nobody_class");
+    var _m3 = CardsUi_ClassMenu(_won);
+    Test_False("H5 menu: Nobody is open after a win", _m3.items[3].locked);
+    Test_False("H5 menu: and not greyed", variable_struct_exists(_m3.items[3], "dim") && _m3.items[3].dim);
+    CardsUi_ClassConfirm(_m3, 3);
+    Test_True("H5 menu: an open Nobody can be asked about", Confirm_IsOpen());
+    Confirm_Close();
+
+    // a preview sprite for every row
+    for (var _r = 0; _r < 4; _r++) {
+        var _row = _m.items[_r];
+        var _hasspr = variable_struct_exists(_row, "pic") && is_struct(_row.pic) && sprite_exists(_row.pic.spr);
+        Test_True("H5 menu: row " + string(_r) + " has a preview sprite that exists", _hasspr);
+        Test_True("H5 menu: row " + string(_r) + " has a sprite with more than one frame to animate", _hasspr && sprite_get_number(_row.pic.spr) >= 2);
+    }
+    Test_True("H5 menu: the Knight preview is the Knight's own sprite", _m.items[0].pic.spr == DB_PlayerClass(CLASS_KNIGHT).sprites.down);
+    Test_True("H5 menu: the Mage preview is the Mage's own sprite", _m.items[2].pic.spr == DB_PlayerClass(CLASS_MAGE).sprites.down);
+}
+
+function Test_ClassMemText() {
+    var _bad = ["to find", chr(52286)];   // the Korean word for "find" is the second one
+    var _langs = ["en", "ko"];
+    var _won = Profile_Default();
+    Profile_Unlock(_won, "nobody_class");
+    for (var _g = 0; _g < 2; _g++) {
+        Loc_SetLanguage(_langs[_g]);
+        for (var _v = 0; _v < 2; _v++) {
+            var _t = Test_ClassMemRowTexts(CardsUi_ClassMenu(_v == 0 ? Profile_Default() : _won));
+            for (var _b = 0; _b < 2; _b++) Test_False("H5 text (" + _langs[_g] + "): the class screen has no find wording " + string(_b) + " (profile " + string(_v) + ")", string_pos(_bad[_b], _t) > 0);
+        }
+        var _lines = "";
+        var _ids = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE, CLASS_NOBODY];
+        var _distinct = {};
+        for (var _i = 0; _i < 4; _i++) {
+            var _s = Card_ClassSentence(_ids[_i]);
+            _lines += _s;
+            Test_True("H5 text (" + _langs[_g] + "): class " + string(_i) + " has a description", string_length(_s) > 20);
+            variable_struct_set(_distinct, _s, true);
+        }
+        Test_Eq("H5 text (" + _langs[_g] + "): the four descriptions differ", array_length(variable_struct_get_names(_distinct)), 4);
+        for (var _b2 = 0; _b2 < 2; _b2++) Test_False("H5 text (" + _langs[_g] + "): no description has find wording " + string(_b2), string_pos(_bad[_b2], _lines) > 0);
+        Test_Eq("H5 text (" + _langs[_g] + "): the unknown-skill mark", Loc_T("class.skill.unknown", "x"), "???");
+    }
+    Loc_SetLanguage("en");
+}
+
+function Test_Suite_ClassMem() {
+    var _keep = variable_global_exists("profile") ? global.profile : undefined;
+    var _keep_st = variable_global_exists("profile_status") ? global.profile_status : "missing";
+    var _lang = Loc_GetLanguage();
+    Test_ClassMemMigration();
+    Test_ClassMemClassLists();
+    Test_ClassMemRecording();
+    Test_ClassMemEcho();
+    Test_ClassMemMenu();
+    Test_ClassMemText();
+    Loc_SetLanguage(_lang);
+    Profile_ResetForTest();
+    global.profile = _keep;
+    global.profile_status = _keep_st;
 }
