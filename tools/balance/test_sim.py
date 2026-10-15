@@ -360,15 +360,32 @@ class FairRng(unittest.TestCase):
         self.assertEqual(run.drop_dry, 0)
         self.assertEqual(run.p.inv[10], 3)
 
-    # ---- D123 elites per floor ----
+    # ---- D123 / D145 elites per floor: none on floors 1 and 2 (hunt5a: the simulator used to give floor 2 at least one) ----
     def test_elite_count_rule(self):
         self.assertEqual(sim.elite_count(1, 0), 0)
         self.assertEqual(sim.elite_count(3, 0), 0)
-        self.assertEqual(sim.elite_count(1, 3), 0)                   # round(0.45) = 0, floor 1 has no minimum
-        self.assertEqual(sim.elite_count(1, 10), 2)                  # 1.5 rounds up
-        self.assertEqual(sim.elite_count(2, 3), 1)                   # floor 2 and up: at least one
+        self.assertEqual(sim.elite_count(1, 3), 0)
+        self.assertEqual(sim.elite_count(1, 10), 0)                  # D145: floor 1 has none, however many enemies
+        self.assertEqual(sim.elite_count(1, 20), 0)
+        self.assertEqual(sim.elite_count(2, 1), 0)                   # D145: floor 2 has none (was: at least one)
+        self.assertEqual(sim.elite_count(2, 3), 0)
+        self.assertEqual(sim.elite_count(2, 20), 0)
+        self.assertEqual(sim.elite_count(3, 1), 1)                   # from floor 3: at least one
+        self.assertEqual(sim.elite_count(3, 3), 1)                   # round(0.45) = 0, raised to the minimum of 1
+        self.assertEqual(sim.elite_count(4, 3), 1)
+        self.assertEqual(sim.elite_count(4, 10), 2)                  # 1.5 rounds up
         self.assertEqual(sim.elite_count(5, 1), 1)
         self.assertEqual(sim.elite_count(4, 20), 3)
+        self.assertEqual(sim.elite_count(6, 20), 3)
+        self.assertEqual(sim.elite_count(9, 0), 0)
+
+    def test_floors_1_and_2_have_no_elites_in_a_simulated_run(self):
+        for seed in range(1, 25):
+            run = sim.RunSim(D, "knight", "average", seed, rules=R)
+            for f in (1, 2):
+                lay, enemies = run.make_floor(f)
+                self.assertTrue(len(enemies) > 0)
+                self.assertEqual([el for (_, _, el) in enemies if el], [], "seed %d floor %s" % (seed, f))
 
     def test_each_floor_has_exactly_the_planned_number_of_elites(self):
         for seed in range(1, 25):
