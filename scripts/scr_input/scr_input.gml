@@ -781,6 +781,7 @@ function Prompt_ActionOfRow(_name) {
         case "down": return "move_down";
         case "left": return "move_left";
         case "right": return "move_right";
+        case "start": return "menu";
     }
     return _name;
 }
@@ -793,6 +794,7 @@ function Prompt_PadLabel(_action) {
         case "back": return "B";
         case "menu": return "X";
         case "pause": return "Y";
+        case "start": return "Start";
         case "tab_prev": return "LB";
         case "tab_next": return "RB";
         case "run": return "LT";
@@ -803,13 +805,38 @@ function Prompt_PadLabel(_action) {
     return string(_action);
 }
 
-// { kind: "key" | "pad", label, action }: what to draw for an action on a device (the live one when _device is undefined).
+// "up", "down", "left" or "right" for a move prompt (a row name, a move_ or a menu_ action), "" for every other action.
+function Prompt_DirOf(_action) {
+    switch (_action) {
+        case "up": case "move_up": case "menu_up": return "up";
+        case "down": case "move_down": case "menu_down": return "down";
+        case "left": case "move_left": case "menu_left": return "left";
+        case "right": case "move_right": case "menu_right": return "right";
+    }
+    return "";
+}
+
+function Prompt_ArrowKey(_dir) {
+    switch (_dir) {
+        case "up": return vk_up;
+        case "down": return vk_down;
+        case "left": return vk_left;
+        case "right": return vk_right;
+    }
+    return -1;
+}
+
+// { kind: "key" | "pad", label, action, dir, dirs }: what to draw for an action on a device (the live one when _device is undefined).
+// dir is "up" / "down" / "left" / "right" when the prompt is drawn as an arrow (D156): a pad's d-pad always, a keyboard's move prompt while an
+// arrow key is bound to it (a rebound letter shows as that letter); dirs lists the d-pad arms to light (a run of arrows is one glyph).
 function Prompt_Info(_action, _device = undefined) {
     var dev = is_undefined(_device) ? Prompt_Device() : _device;
-    if (dev == "gamepad") return { kind: "pad", label: Prompt_PadLabel(_action), action: _action };
+    var dir = Prompt_DirOf(_action);
+    if (dev == "gamepad") return { kind: "pad", label: Prompt_PadLabel(_action), action: _action, dir: dir, dirs: (dir == "") ? [] : [dir] };
     Input_Init();
     var act = Prompt_ActionOfRow(_action);
     var label = string(_action);
+    var arrow = false;
     if (variable_struct_exists(global.input.bindings, act)) {
         var keys = variable_struct_get(global.input.bindings, act);
         if (is_struct(keys) && variable_struct_exists(keys, "keys")) keys = keys.keys;
@@ -817,26 +844,166 @@ function Prompt_Info(_action, _device = undefined) {
             var code = keys[0];
             if (is_string(code)) code = Input_KeyCodeFromName(code);
             label = Input_KeyLabel(code);
+            if (dir != "") {
+                for (var k = 0; k < array_length(keys); k++) {
+                    var kc = is_string(keys[k]) ? Input_KeyCodeFromName(keys[k]) : keys[k];
+                    if (kc == Prompt_ArrowKey(dir)) arrow = true;
+                }
+            }
         }
     }
-    return { kind: "key", label: label, action: _action };
+    return { kind: "key", label: label, action: _action, dir: arrow ? dir : "", dirs: arrow ? [dir] : [] };
 }
 
 function Prompt_Text(_action, _device = undefined) {
     return Prompt_Info(_action, _device).label;
 }
 
-// The action names a sentence may hold between braces. Anything else in braces stays plain text.
+// ============================================================================================================================
+// H8b (D149, D156): the text markup. One parser (Markup_Parse), one layout (Prompt_RichLayout) and one drawer (Prompt_RichDraw / Markup_DrawLine)
+// serve every place that shows sentences: the dialogue box, cards, tooltips, notes, tutorials, hints. The rules for writers are in docs/text-markup.md.
+//   [t]Poison[/t]   a game term, in the palette's bright green (UI_C_TERM)
+//   [a]BREAK[/a]    the one accent, merchant gold #E8C547 (UI_C_ACCENT): only BREAK, Perfect and a newly received item
+//   [k:confirm]     the button for an action, by the device used last: a key name (arrows for the move keys) or a pad glyph
+//   {confirm}       the older spelling of [k:confirm], still read
+// Tags do not nest. A tag that is not closed, nested, unknown or stray is dropped and its text stays; no bracket ever reaches the screen.
+// Width and wrapping count the words and the real width of a glyph; the markup itself has no width.
+// ============================================================================================================================
+
+// The action names a prompt may name (in [k:..] or {..}).
 function Prompt_IsAction(_name) {
     switch (_name) {
         case "confirm": case "back": case "cancel": case "up": case "down": case "left": case "right":
-        case "interact": case "run": case "tab_prev": case "tab_next": case "menu": case "pause": return true;
+        case "interact": case "run": case "tab_prev": case "tab_next": case "menu": case "pause": case "start": return true;
     }
     return false;
 }
 
+// What the text between "[" and "]" is: "t" / "a" (opening tags), "/t" / "/a" (closing), "k:<action>" (a button), "?" (shaped like a tag but not one we
+// know: dropped), "" (not a tag at all: plain text, e.g. "[ b ]").
+function Markup_TagKind(_inner) {
+    var n = string_length(_inner);
+    if (n == 0) return "";
+    var i = (string_char_at(_inner, 1) == "/") ? 2 : 1;
+    var j = i;
+    while (j <= n) {
+        var c = ord(string_char_at(_inner, j));
+        if (c >= 97 && c <= 122) j++; else break;
+    }
+    if (j == i) return "";
+    var nm = string_copy(_inner, i, j - i);
+    var arg = "";
+    if (j <= n) {
+        if (i == 2 || string_char_at(_inner, j) != ":") return "";
+        arg = string_copy(_inner, j + 1, n - j);
+        if (arg == "") return "";
+        for (var q = 1; q <= string_length(arg); q++) {
+            var ac = ord(string_char_at(arg, q));
+            if (!((ac >= 97 && ac <= 122) || ac == 95)) return "";
+        }
+    }
+    if (i == 2) return (nm == "t" || nm == "a") ? "/" + nm : "?";
+    if (arg != "") return (nm == "k" && Prompt_IsAction(arg)) ? "k:" + arg : "?";
+    return (nm == "t" || nm == "a") ? nm : "?";
+}
+
+// True when the text holds anything shaped like a tag.
+function Markup_HasTag(_s) {
+    var rest = string(_s);
+    while (true) {
+        var o = string_pos("[", rest);
+        if (o == 0) return false;
+        rest = string_delete(rest, 1, o);
+        var c = string_pos("]", rest);
+        if (c > 1 && Markup_TagKind(string_copy(rest, 1, c - 1)) != "") return true;
+    }
+    return false;
+}
+
+// "Press [k:confirm] to go, [t]Poison[/t] hurts" -> [{ kind: "text", s: "Press ", st: "" }, { kind: "action", s: "confirm" }, { kind: "text", s: " to go, ", st: "" },
+// { kind: "text", s: "Poison", st: "term" }, ...]. st is "", "term" or "accent". _problems (an array, optional) collects a word for everything dropped.
+function Markup_Parse(_text, _problems = undefined) {
+    var out = [];
+    var s = string(_text);
+    var buf = "";
+    while (string_length(s) > 0) {
+        var ob = string_pos("[", s);
+        var oc = string_pos("{", s);
+        var o = (ob == 0) ? oc : ((oc == 0) ? ob : min(ob, oc));
+        if (o == 0) { buf += s; break; }
+        var rest = string_delete(s, 1, o);
+        if (string_char_at(s, o) == "{") {   // the older {action} spelling; any other {name} stays text (it is filled in before the text gets here)
+            var cb = string_pos("}", rest);
+            var inb = (cb > 1) ? string_copy(rest, 1, cb - 1) : "";
+            if (cb > 1 && Prompt_IsAction(inb)) {
+                buf += string_copy(s, 1, o - 1);
+                if (buf != "") array_push(out, { kind: "text", s: buf, st: "" });
+                buf = "";
+                array_push(out, { kind: "action", s: inb });
+                s = string_delete(rest, 1, cb);
+            } else {
+                buf += string_copy(s, 1, o);
+                s = rest;
+            }
+            continue;
+        }
+        var c = string_pos("]", rest);
+        var kind = (c > 1) ? Markup_TagKind(string_copy(rest, 1, c - 1)) : "";
+        if (kind == "") {   // a bracket that is not a tag
+            buf += string_copy(s, 1, o);
+            s = rest;
+            continue;
+        }
+        buf += string_copy(s, 1, o - 1);
+        var after = string_delete(rest, 1, c);
+        if (kind == "t" || kind == "a") {
+            var cp = string_pos("[/" + kind + "]", after);
+            var body = (cp > 0) ? string_copy(after, 1, cp - 1) : "";
+            if (cp > 0 && !Markup_HasTag(body)) {
+                if (buf != "") array_push(out, { kind: "text", s: buf, st: "" });
+                buf = "";
+                if (body != "") array_push(out, { kind: "text", s: body, st: (kind == "t") ? "term" : "accent" });
+                s = string_delete(after, 1, cp + 3);
+                continue;
+            }
+            if (is_array(_problems)) array_push(_problems, (cp > 0) ? ("nested [" + kind + "]") : ("unclosed [" + kind + "]"));
+        } else if (string_copy(kind, 1, 2) == "k:") {
+            if (buf != "") array_push(out, { kind: "text", s: buf, st: "" });
+            buf = "";
+            array_push(out, { kind: "action", s: string_delete(kind, 1, 2) });
+            s = after;
+            continue;
+        } else if (is_array(_problems)) {
+            array_push(_problems, (kind == "?") ? ("unknown tag [" + string_copy(rest, 1, c - 1) + "]") : ("stray [" + kind + "]"));
+        }
+        s = after;   // the tag is dropped, the text around it stays
+    }
+    if (buf != "") array_push(out, { kind: "text", s: buf, st: "" });
+    return out;
+}
+
+function Prompt_Tokens(_text) {
+    return Markup_Parse(_text);
+}
+
+// What is wrong with a string's markup, one word each (empty when it is well formed). For the audit in the tests and tools/localization/lint_markup.py.
+function Markup_Problems(_text) {
+    var probs = [];
+    Markup_Parse(_text, probs);
+    return probs;
+}
+
+// True when the text holds markup or a prompt: that is, when it must go through the rich layout and drawer.
 function Prompt_HasTokens(_text) {
-    return string_pos("{", string(_text)) > 0 && Prompt_TokensHaveAction(Prompt_Tokens(_text));
+    var s = string(_text);
+    if (string_pos("[", s) == 0 && string_pos("{", s) == 0) return false;
+    var toks = Markup_Parse(s);
+    var plain = "";
+    for (var i = 0; i < array_length(toks); i++) {
+        if (toks[i].kind == "action" || toks[i].st != "") return true;
+        plain += toks[i].s;
+    }
+    return plain != s;   // a tag was dropped
 }
 
 function Prompt_TokensHaveAction(_toks) {
@@ -844,56 +1011,218 @@ function Prompt_TokensHaveAction(_toks) {
     return false;
 }
 
-// "Press {confirm} to go" -> [{ kind: "text", s: "Press " }, { kind: "action", s: "confirm" }, { kind: "text", s: " to go" }]
-function Prompt_Tokens(_text) {
+// The colour a styled span is drawn in: terms in the palette's bright green, the accent in merchant gold, everything else in _base.
+function Markup_Colour(_style, _base) {
+    if (_style == "term") return UI_C_TERM;
+    if (_style == "accent") return UI_C_ACCENT;
+    return _base;
+}
+
+// Segments: the tokens with each button resolved for the device (the live one when _device is undefined): { kind: "text", s, st } or
+// { kind: "glyph", s (the action), acts, info, st: "" }. On a pad a run of move prompts is one d-pad glyph whose dirs list every arm.
+function Markup_Segments(_text, _device = undefined) {
+    var dev = is_undefined(_device) ? Prompt_Device() : _device;
+    var toks = Markup_Parse(_text);
     var out = [];
-    var s = string(_text);
-    var buf = "";
-    while (string_length(s) > 0) {
-        var o = string_pos("{", s);
-        if (o == 0) { buf += s; break; }
-        var rest = string_delete(s, 1, o);
-        var c = string_pos("}", rest);
-        var inner = (c > 1) ? string_copy(rest, 1, c - 1) : "";
-        if (c > 1 && Prompt_IsAction(inner)) {
-            buf += string_copy(s, 1, o - 1);
-            if (buf != "") array_push(out, { kind: "text", s: buf });
-            buf = "";
-            array_push(out, { kind: "action", s: inner });
-            s = string_delete(rest, 1, c);
-        } else {
-            buf += string_copy(s, 1, o);
-            s = rest;
+    for (var i = 0; i < array_length(toks); i++) {
+        var tk = toks[i];
+        if (tk.kind == "text") { array_push(out, { kind: "text", s: tk.s, st: tk.st }); continue; }
+        var info = Prompt_Info(tk.s, dev);
+        var last = (array_length(out) > 0) ? out[array_length(out) - 1] : undefined;
+        if (dev == "gamepad" && info.dir != "" && is_struct(last) && last.kind == "glyph" && last.info.dir != "") {
+            if (!array_contains(last.info.dirs, info.dir)) array_push(last.info.dirs, info.dir);
+            array_push(last.acts, tk.s);
+            continue;
         }
+        array_push(out, { kind: "glyph", s: tk.s, acts: [tk.s], info: info, st: "" });
     }
-    if (buf != "") array_push(out, { kind: "text", s: buf });
     return out;
 }
 
-// The sentence with each prompt replaced by its label ("Press A."): for logs and places that cannot draw glyphs.
-function Prompt_Plain(_text, _device = undefined) {
-    var toks = Prompt_Tokens(_text);
+// The text with each button replaced by its label ("Press A."): for logs and for plain draws that cannot show glyphs.
+function Markup_Strip(_text, _device = undefined) {
+    var seg = Markup_Segments(_text, _device);
     var out = "";
-    for (var i = 0; i < array_length(toks); i++) out += (toks[i].kind == "text") ? toks[i].s : Prompt_Text(toks[i].s, _device);
+    for (var i = 0; i < array_length(seg); i++) out += (seg[i].kind == "text") ? seg[i].s : seg[i].info.label;
     return out;
 }
 
-// ---- drawing: the glyphs and sentences with prompts (GUI grid, palette colours, whole multiples of one font pixel) ----
+function Prompt_Plain(_text, _device = undefined) {
+    return Markup_Strip(_text, _device);
+}
+
+// How many characters the player sees: the text without tags, a button counting one. The dialogue typewriter reveals this many.
+function Markup_Length(_text) {
+    var toks = Markup_Parse(_text);
+    var n = 0;
+    for (var i = 0; i < array_length(toks); i++) n += (toks[i].kind == "text") ? string_length(toks[i].s) : 1;
+    return n;
+}
+
+function Markup_Serialise(_s, _style) {
+    if (_style == "term") return "[t]" + _s + "[/t]";
+    if (_style == "accent") return "[a]" + _s + "[/a]";
+    return _s;
+}
+
+// The first _n visible characters as markup (a cut span stays closed). A button is shown whole or not at all.
+function Markup_Reveal(_text, _n) {
+    var toks = Markup_Parse(_text);
+    var out = "";
+    var left = _n;
+    for (var i = 0; i < array_length(toks) && left > 0; i++) {
+        var tk = toks[i];
+        if (tk.kind == "action") { out += "[k:" + tk.s + "]"; left -= 1; continue; }
+        var len = string_length(tk.s);
+        out += Markup_Serialise((left >= len) ? tk.s : string_copy(tk.s, 1, left), tk.st);
+        left -= len;
+    }
+    return out;
+}
+
+// The pieces of one run of markup, ready to lay out: { kind: "word" | "glyph", s, st, info, acts, w, sp, nl }. sp: a space came before it;
+// nl: how many hard line breaks came before it. Words are split at spaces and keep their style.
+function Markup_Pieces(_text, _device = undefined) {
+    var mt = Ui_Metrics();
+    var seg = Markup_Segments(_text, _device);
+    var out = [];
+    var pending = false;
+    var nl = 0;
+    for (var t = 0; t < array_length(seg); t++) {
+        var sg = seg[t];
+        if (sg.kind == "glyph") {
+            array_push(out, { kind: "glyph", s: sg.s, acts: sg.acts, st: "", info: sg.info, w: Prompt_GlyphW(sg.info), sp: pending, nl: nl });
+            pending = false;
+            nl = 0;
+            continue;
+        }
+        var s = sg.s;
+        var word = "";
+        var n = string_length(s);
+        if (n > 0 && (string_char_at(s, 1) == " " || string_char_at(s, 1) == "\n")) pending = (array_length(out) > 0) || pending;
+        for (var i = 1; i <= n + 1; i++) {
+            var ch = (i <= n) ? string_char_at(s, i) : " ";
+            if (ch == " " || ch == "\n") {
+                if (word != "") {
+                    array_push(out, { kind: "word", s: word, st: sg.st, w: UI_TextWidth(word), sp: pending, nl: nl });
+                    pending = false;
+                    nl = 0;
+                    word = "";
+                }
+                if (ch == "\n" && i <= n) { nl++; pending = false; }
+                else if (i <= n) pending = true;
+            } else {
+                word += ch;
+            }
+        }
+        if (n > 0 && string_char_at(s, n) != " " && string_char_at(s, n) != "\n") pending = false;
+    }
+    return out;
+}
+
+function Prompt_SpaceW() {
+    var mt = Ui_Metrics();
+    return max(mt.p, UI_TextWidth("a a") - UI_TextWidth("aa"));
+}
+
+// The width of the text on one line: the words, a space between those that had one, a glyph at its own width. Tags cost nothing.
+function Markup_Width(_text, _device = undefined) {
+    var pcs = Markup_Pieces(_text, _device);
+    var sw = Prompt_SpaceW();
+    var wx = 0;
+    for (var i = 0; i < array_length(pcs); i++) {
+        if (wx > 0 && pcs[i].sp) wx += sw;
+        wx += pcs[i].w;
+    }
+    return wx;
+}
+
+function Markup_PieceText(_pc) {
+    if (_pc.kind == "glyph") {
+        var out = "";
+        for (var a = 0; a < array_length(_pc.acts); a++) out += "[k:" + _pc.acts[a] + "]";
+        return out;
+    }
+    return Markup_Serialise(_pc.s, _pc.st);
+}
+
+// Wraps markup to lines no wider than _w: an array of markup strings (a tag never crosses a line; each word carries its own). A plain word longer
+// than a line is cut (Dialogue_BreakWordToLines); a styled word or a glyph is kept whole.
+function Markup_Wrap(_text, _w, _device = undefined) {
+    var pcs = Markup_Pieces(_text, _device);
+    var sw = Prompt_SpaceW();
+    var lines = [];
+    var cur = "";
+    var cx = 0;
+    for (var i = 0; i < array_length(pcs); i++) {
+        var pc = pcs[i];
+        for (var k = 0; k < pc.nl; k++) { array_push(lines, cur); cur = ""; cx = 0; }
+        var gap = (cx > 0 && pc.sp) ? sw : 0;
+        if (cx > 0 && cx + gap + pc.w > _w) { array_push(lines, cur); cur = ""; cx = 0; gap = 0; }
+        if (cx == 0 && pc.kind == "word" && pc.st == "" && pc.w > _w) {
+            var chunks = Dialogue_BreakWordToLines(pc.s, _w);
+            for (var c = 0; c < array_length(chunks) - 1; c++) array_push(lines, chunks[c]);
+            cur = chunks[array_length(chunks) - 1];
+            cx = UI_TextWidth(cur);
+            continue;
+        }
+        cur += ((gap > 0) ? " " : "") + Markup_PieceText(pc);
+        cx += gap + pc.w;
+    }
+    array_push(lines, cur);
+    return lines;
+}
+
+// ---- drawing: the glyphs and sentences with markup (GUI grid, palette colours, whole multiples of one font pixel) ----
 function Prompt_GlyphH() {
     var mt = Ui_Metrics();
     return max(5, round(mt.line_h / mt.p)) * mt.p;
 }
 
+// A direction prompt is drawn as an arrow (a keycap with an arrow, or the d-pad cross) when it has a dir and the glyph is tall enough for the 5 x 5 arrow.
+function Prompt_ArrowOk(_info) {
+    var mt = Ui_Metrics();
+    return _info.dir != "" && Prompt_GlyphH() / mt.p >= 8;
+}
+
 function Prompt_GlyphW(_info) {
     var mt = Ui_Metrics();
-    var tw = UI_TextWidth(_info.label);
     var h = Prompt_GlyphH();
+    if (Prompt_ArrowOk(_info)) {   // square, and an odd number of font pixels across a keycap so the arrow sits in the middle
+        var hc = h / mt.p;
+        return ((_info.kind == "pad") ? hc : hc + ((hc mod 2 == 0) ? 1 : 0)) * mt.p;
+    }
+    var tw = UI_TextWidth(_info.label);
     var w = (_info.kind == "pad") ? max(h, tw + 3 * mt.p) : max(h, tw + 4 * mt.p);
     return ceil(w / mt.p) * mt.p;
 }
 
-// Draws one glyph with its top-left at (_x, _y), one text line tall. Keyboard: a keycap (light outline, dark face, a lower edge).
-// Pad: a light round button (a pill for LB / RB / D-Pad) with the label cut out in dark. Returns its width.
+// 5 x 5 arrow masks, '.' clear.
+function Prompt_ArrowMask(_dir) {
+    switch (_dir) {
+        case "up": return ["..#..", ".###.", "#####", "..#..", "..#.."];
+        case "down": return ["..#..", "..#..", "#####", ".###.", "..#.."];
+        case "left": return ["..#..", ".##..", "#####", ".##..", "..#.."];
+        case "right": return ["..#..", "..##.", "#####", "..##.", "..#.."];
+    }
+    return [];
+}
+
+// The d-pad: a plus sign in the light green with the arms in _dirs lit.
+function Prompt_DrawDpad(_x, _y, _hc, _dirs, _p) {
+    var t = (_hc mod 2 == 1) ? 3 : 2;
+    var c0 = (_hc - t) div 2;
+    var c1 = c0 + t;
+    Ui_Box(_x + c0 * _p, _y + c0 * _p, _x + c1 * _p, _y + c1 * _p, UI_C_LIGHT);
+    Ui_Box(_x + c0 * _p, _y, _x + c1 * _p, _y + c0 * _p, array_contains(_dirs, "up") ? UI_C_LIGHTEST : UI_C_LIGHT);
+    Ui_Box(_x + c0 * _p, _y + c1 * _p, _x + c1 * _p, _y + _hc * _p, array_contains(_dirs, "down") ? UI_C_LIGHTEST : UI_C_LIGHT);
+    Ui_Box(_x, _y + c0 * _p, _x + c0 * _p, _y + c1 * _p, array_contains(_dirs, "left") ? UI_C_LIGHTEST : UI_C_LIGHT);
+    Ui_Box(_x + c1 * _p, _y + c0 * _p, _x + _hc * _p, _y + c1 * _p, array_contains(_dirs, "right") ? UI_C_LIGHTEST : UI_C_LIGHT);
+}
+
+// Draws one glyph with its top-left at (_x, _y), one text line tall. Keyboard: a keycap (light outline, dark face, a lower edge) with the key's name,
+// or an arrow for a move key. Pad: a light round button (a pill for LB / RB) with the label cut out in dark; the d-pad is a plus sign with the arrows
+// that count lit. Returns its width.
 function Prompt_DrawGlyph(_x, _y, _info, _alpha = 1) {
     var mt = Ui_Metrics();
     var p = mt.p;
@@ -901,7 +1230,10 @@ function Prompt_DrawGlyph(_x, _y, _info, _alpha = 1) {
     var h = Prompt_GlyphH();
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
-    if (_info.kind == "pad") {
+    var arrow = Prompt_ArrowOk(_info);
+    if (_info.kind == "pad" && arrow) {
+        Prompt_DrawDpad(_x, _y, h / p, _info.dirs, p);
+    } else if (_info.kind == "pad") {
         var hc = h / p;
         var wc = w / p;
         var rad = hc / 2;
@@ -916,72 +1248,43 @@ function Prompt_DrawGlyph(_x, _y, _info, _alpha = 1) {
         Ui_Box(_x, _y + p, _x + w, _y + h - p, UI_C_LIGHTEST);
         Ui_Box(_x + p, _y + p, _x + w - p, _y + h - 2 * p, UI_C_DARK);
         Ui_Box(_x + p, _y + h - 2 * p, _x + w - p, _y + h - p, UI_C_LIGHT);   // the key's lower edge
-        Ui_Text(_x + w / 2, _y + (h - 2 * p - mt.line_h) div 2 + p, _info.label, UI_C_LIGHTEST, fa_center);
+        if (arrow) {
+            var fc = h / p - 3;   // the face's rows
+            Ui_DrawMask(_x + ((w / p - 5) div 2) * p, _y + (1 + (fc - 5) div 2) * p, Prompt_ArrowMask(_info.dir), p, UI_C_LIGHTEST);
+        } else {
+            Ui_Text(_x + w / 2, _y + (h - 2 * p - mt.line_h) div 2 + p, _info.label, UI_C_LIGHTEST, fa_center);
+        }
     }
     draw_set_alpha(a0);
     return w;
 }
 
-// Lays a sentence with prompts out in a column _w wide. Returns { items, h, lines, line_w }: each item is a word or a glyph with its
-// own x, y (line pitch = one text line + one font pixel) and line number. On a pad, a run of direction prompts shows one D-Pad.
+// Lays a sentence with markup out in a column _w wide. Returns { items, h, lines, line_w }: each item is a word (with its style st) or a glyph with its
+// own x, y (line pitch = one text line + one font pixel) and line number.
 function Prompt_RichLayout(_text, _w, _device = undefined) {
     var mt = Ui_Metrics();
     var p = mt.p;
     var pitch = mt.line_h + p;
-    var space_w = max(p, UI_TextWidth("a a") - UI_TextWidth("aa"));
-    var toks = Prompt_Tokens(_text);
+    var space_w = Prompt_SpaceW();
+    var pcs = Markup_Pieces(_text, _device);
     var items = [];
     var line_w = [0];
     var cx = 0;
     var line = 0;
-    var pending = false;
-    var dev = is_undefined(_device) ? Prompt_Device() : _device;
-    var last_dir = false;
-    for (var t = 0; t < array_length(toks); t++) {
-        var tk = toks[t];
-        if (tk.kind == "action") {
-            var is_dir = (tk.s == "up" || tk.s == "down" || tk.s == "left" || tk.s == "right");
-            if (dev == "gamepad" && is_dir && last_dir) continue;   // one D-Pad stands for the whole run
-            var info = Prompt_Info(tk.s, dev);
-            var gw = Prompt_GlyphW(info);
-            if (cx > 0 && pending) cx += space_w;
-            if (cx > 0 && cx + gw > _w) { line_w[line] = cx; line++; array_push(line_w, 0); cx = 0; }
-            array_push(items, { kind: "glyph", info: info, x: cx, y: line * pitch, line: line, w: gw });
-            cx += gw;
-            pending = false;
-            last_dir = is_dir;
-            continue;
-        }
-        var s = tk.s;
-        var word = "";
-        var n = string_length(s);
-        if (n > 0 && (string_char_at(s, 1) == " " || string_char_at(s, 1) == "\n")) pending = (cx > 0) || pending;
-        for (var i = 1; i <= n + 1; i++) {
-            var ch = (i <= n) ? string_char_at(s, i) : " ";
-            if (ch == " " || ch == "\n") {
-                if (word != "") {
-                    var ww = UI_TextWidth(word);
-                    if (cx > 0 && pending) cx += space_w;
-                    if (cx > 0 && cx + ww > _w) { line_w[line] = cx; line++; array_push(line_w, 0); cx = 0; }
-                    array_push(items, { kind: "word", s: word, x: cx, y: line * pitch, line: line, w: ww });
-                    cx += ww;
-                    pending = false;
-                    last_dir = false;
-                    word = "";
-                }
-                if (ch == "\n" && i <= n) { line_w[line] = cx; line++; array_push(line_w, 0); cx = 0; pending = false; }
-                else if (i <= n) pending = true;
-            } else {
-                word += ch;
-            }
-        }
-        if (n > 0 && string_char_at(s, n) != " " && string_char_at(s, n) != "\n") pending = false;
+    for (var i = 0; i < array_length(pcs); i++) {
+        var pc = pcs[i];
+        for (var k = 0; k < pc.nl; k++) { line_w[line] = cx; line++; array_push(line_w, 0); cx = 0; }
+        if (cx > 0 && pc.sp) cx += space_w;
+        if (cx > 0 && cx + pc.w > _w) { line_w[line] = cx; line++; array_push(line_w, 0); cx = 0; }
+        if (pc.kind == "glyph") array_push(items, { kind: "glyph", info: pc.info, x: cx, y: line * pitch, line: line, w: pc.w });
+        else array_push(items, { kind: "word", s: pc.s, st: pc.st, x: cx, y: line * pitch, line: line, w: pc.w });
+        cx += pc.w;
     }
     line_w[line] = cx;
     return { items: items, h: (line + 1) * pitch - p, lines: line + 1, line_w: line_w };
 }
 
-// Draws a sentence with prompts, top-left (_x, _y) or centred on _x + _w / 2 with _halign = fa_center.
+// Draws a sentence with markup, top-left (_x, _y) or centred on _x + _w / 2 with _halign = fa_center. _col is the colour of plain text.
 function Prompt_RichDraw(_x, _y, _text, _w, _col, _halign = fa_left, _alpha = 1) {
     var lay = Prompt_RichLayout(_text, _w);
     var a0 = draw_get_alpha();
@@ -990,10 +1293,32 @@ function Prompt_RichDraw(_x, _y, _text, _w, _col, _halign = fa_left, _alpha = 1)
         var it = lay.items[i];
         var off = (_halign == fa_center) ? round((_w - lay.line_w[it.line]) / 2) : 0;
         if (it.kind == "glyph") Prompt_DrawGlyph(_x + off + it.x, _y + it.y, it.info, _alpha);
-        else Ui_Text(_x + off + it.x, _y + it.y, it.s, _col);
+        else Ui_Text(_x + off + it.x, _y + it.y, it.s, Markup_Colour(it.st, _col));
     }
     draw_set_alpha(a0);
     return lay.h;
+}
+
+// One line of markup at (_x, _y), no wrapping (the dialogue box wraps first with Markup_Wrap). _flat (a colour) draws every word in that one colour and no
+// glyphs: the shadow under cutscene text. Returns the width.
+function Markup_DrawLine(_x, _y, _text, _col, _alpha = 1, _device = undefined, _flat = -1) {
+    var pcs = Markup_Pieces(_text, _device);
+    var sw = Prompt_SpaceW();
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    var cx = 0;
+    for (var i = 0; i < array_length(pcs); i++) {
+        var pc = pcs[i];
+        if (cx > 0 && pc.sp) cx += sw;
+        if (pc.kind == "glyph") {
+            if (_flat == -1) Prompt_DrawGlyph(_x + cx, _y, pc.info, _alpha);
+        } else {
+            Ui_Text(_x + cx, _y, pc.s, (_flat == -1) ? Markup_Colour(pc.st, _col) : _flat);
+        }
+        cx += pc.w;
+    }
+    draw_set_alpha(a0);
+    return cx;
 }
 
 // ============================================================================================================================

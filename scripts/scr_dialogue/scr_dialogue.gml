@@ -184,8 +184,7 @@ function DialogueDB_Get(_dialogue_id) {
             array_push(localized, Loc_T("dialogue." + did + "." + string(i), fallback));
         }
     }
-    var vars = { interact: Prompt_Text("interact"), confirm: Prompt_Text("confirm"), cancel: Prompt_Text("cancel") };   // D92: the last-used device's label
-    return Dialogue_FormatLines(localized, vars);
+    return localized;   // D149: a button in a line is [k:interact] / [k:confirm] markup, drawn for the device used last (it used to be filled in here as a label)
 }
 
 function Dialogue_EventConfigEnsure() {
@@ -681,6 +680,7 @@ function Dialogue_BreakWordToLines(_word, _max_w) {
 function Dialogue_WrapToLines(_text, _max_w) {
     var src = string_replace_all(string(_text), "\r", "");
     var max_w = max(1, _max_w);
+    if (Prompt_HasTokens(src)) return Markup_Wrap(src, max_w);   // D149: terms, accents and buttons: words and real glyph widths, tags kept whole on a line
     var paragraphs = string_split(src, "\n");
     var out = [];
 
@@ -797,6 +797,16 @@ function Dialogue_RebuildPagedLines() {
     gs.ui.dialogue_layout_has_speaker = layout.has_speaker;
     gs.ui.dialogue_layout_box_y = layout.box.y;
     gs.ui.dialogue_layout_box_h = layout.box.h;
+    gs.ui.dialogue_layout_dev = Prompt_Device();
+}
+
+// True when a raw line holds a button prompt: its width depends on the device, so the pages are laid out again when the device changes.
+function Dialogue_RawHasPrompt(_lines_raw) {
+    if (!is_array(_lines_raw)) return false;
+    for (var i = 0; i < array_length(_lines_raw); i++) {
+        if (Prompt_TokensHaveAction(Prompt_Tokens(Dialogue_LineText(_lines_raw[i])))) return true;
+    }
+    return false;
 }
 
 function Dialogue_EnsurePagedLinesCurrent() {
@@ -814,6 +824,7 @@ function Dialogue_EnsurePagedLinesCurrent() {
     if (!variable_struct_exists(gs.ui, "dialogue_layout_has_speaker") || gs.ui.dialogue_layout_has_speaker != layout.has_speaker) needs_rebuild = true;
     if (!variable_struct_exists(gs.ui, "dialogue_layout_box_y") || gs.ui.dialogue_layout_box_y != layout.box.y) needs_rebuild = true;
     if (!variable_struct_exists(gs.ui, "dialogue_layout_box_h") || gs.ui.dialogue_layout_box_h != layout.box.h) needs_rebuild = true;
+    if (!needs_rebuild && variable_struct_exists(gs.ui, "dialogue_layout_dev") && gs.ui.dialogue_layout_dev != Prompt_Device() && Dialogue_RawHasPrompt(gs.ui.lines_raw)) needs_rebuild = true;   // D156: the prompt switches with the last device used
 
     if (needs_rebuild) {
         var prev_index = gs.ui.index;
@@ -854,7 +865,7 @@ function Dialogue_TypewriterPrepareCurrentLine() {
         gs.ui.dialogue_tw_line_index = gs.ui.index;
     }
 
-    var max_len = string_length(gs.ui.dialogue_full_text);
+    var max_len = Markup_Length(gs.ui.dialogue_full_text);   // D149: what is seen (tags cost nothing, a button is one character)
     gs.ui.dialogue_visible_count = clamp(gs.ui.dialogue_visible_count, 0, max_len);
 }
 
@@ -863,7 +874,7 @@ function Dialogue_TypewriterStep() {
     if (gs.ui.mode != UI_DIALOGUE) return;
 
     Dialogue_TypewriterPrepareCurrentLine();
-    Typewriter_Step(gs.ui, string_length(gs.ui.dialogue_full_text), Presentation_StepMs(delta_time));
+    Typewriter_Step(gs.ui, Markup_Length(gs.ui.dialogue_full_text), Presentation_StepMs(delta_time));
 }
 
 // D108 F2b-2: one typewriter step of _step_ms (Presentation_StepMs). The reveal is chars-per-second times the time of the step, so the speed is exact at any
@@ -911,7 +922,7 @@ function Dialogue_TypewriterRevealInstant() {
     var gs = GameState_Get();
     if (gs.ui.mode != UI_DIALOGUE) return;
     Dialogue_TypewriterPrepareCurrentLine();
-    var full_len = string_length(gs.ui.dialogue_full_text);
+    var full_len = Markup_Length(gs.ui.dialogue_full_text);
     gs.ui.dialogue_visible_count = full_len;
     gs.ui.dialogue_reveal_accum = 0;
     gs.ui.dialogue_state = UI_DIALOGUE_STATE_HOLDING;
@@ -1151,6 +1162,13 @@ function Dialogue_DrawArrowDown(_x, _y, _p, _col) {
     Ui_Box(_x + 2 * _p, _y + 2 * _p, _x + 3 * _p, _y + 3 * _p, _col);
 }
 
+// D149: wrapped lines of markup (the pages are made by Markup_Wrap), one Markup_DrawLine per line at the font's own line pitch. _flat: one colour, no glyphs (a shadow).
+function Dialogue_DrawRich(_x, _y, _text, _col, _alpha, _flat) {
+    var lines = string_split(_text, "\n");
+    var pitch = string_height("A") * UI_GetFontScale();
+    for (var i = 0; i < array_length(lines); i++) Markup_DrawLine(_x, round(_y + i * pitch), lines[i], _col, _alpha, undefined, _flat);
+}
+
 function Dialogue_Draw() {
     var gs = GameState_Get();
     if (!(gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0)) return;
@@ -1194,8 +1212,9 @@ function Dialogue_Draw() {
 
     Dialogue_TypewriterPrepareCurrentLine();
     var page_text = variable_struct_exists(gs.ui, "dialogue_full_text") ? gs.ui.dialogue_full_text : line;
-    var visible_count = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : string_length(page_text);
-    var visible_text = string_copy(page_text, 1, clamp(visible_count, 0, string_length(page_text)));
+    var visible_count = variable_struct_exists(gs.ui, "dialogue_visible_count") ? gs.ui.dialogue_visible_count : Markup_Length(page_text);
+    var rich = Prompt_HasTokens(page_text);   // D149: terms, accents and buttons go through the one markup drawer
+    var visible_text = rich ? Markup_Reveal(page_text, visible_count) : string_copy(page_text, 1, clamp(visible_count, 0, string_length(page_text)));
 
     draw_set_halign(fa_left);
     draw_set_valign(fa_top);
@@ -1207,16 +1226,25 @@ function Dialogue_Draw() {
             UI_DrawText(layout.speaker_x, layout.speaker_y, speaker + ":");
         }
         if (icon_draw_w > 0) draw_sprite_ext(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1, icon_scale, icon_scale, 0, c_white, 1);
-        draw_set_color(c_black);
-        UI_DrawText(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text);
-        draw_set_color(c_white);
-        UI_DrawText(text_x, text_y, visible_text);
+        if (rich) {
+            Dialogue_DrawRich(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text, c_black, 1, c_black);
+            Dialogue_DrawRich(text_x, text_y, visible_text, c_white, 1, -1);
+        } else {
+            draw_set_color(c_black);
+            UI_DrawText(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text);
+            draw_set_color(c_white);
+            UI_DrawText(text_x, text_y, visible_text);
+        }
     } else {
         var a0 = draw_get_alpha();
         draw_set_alpha(open_t);
         if (icon_draw_w > 0) draw_sprite_ext(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1, icon_scale, icon_scale, 0, c_white, open_t);
-        draw_set_color(UI_C_TEXT);
-        UI_DrawText(text_x, text_y, visible_text);
+        if (rich) {
+            Dialogue_DrawRich(text_x, text_y, visible_text, UI_C_TEXT, open_t, -1);
+        } else {
+            draw_set_color(UI_C_TEXT);
+            UI_DrawText(text_x, text_y, visible_text);
+        }
         draw_set_alpha(a0);
     }
 
@@ -1865,13 +1893,13 @@ function Tutorial_Get(_id) {
                 body: Loc_T("tutorial.timeline.body", "The strip at the top shows who acts next. Faster fighters act more often, and some skills push an enemy back a turn.") };
         case "bar":
             return { id: _id, title: Loc_T("tutorial.bar.title", "The sliding bar"),
-                body: Loc_T("tutorial.bar.body", "A cursor slides along the bar. Press {confirm} when it is over the bright zone. The closer to the middle, the harder you hit.") };
+                body: Loc_T("tutorial.bar.body", "A cursor slides along the bar. Press [k:confirm] when it is over the bright zone. The closer to the middle, the harder you hit.") };
         case "arrows":
             return { id: _id, title: Loc_T("tutorial.arrows.title", "Arrow skills"),
-                body: Loc_T("tutorial.arrows.body", "Skills show a row of arrows. Press {up}{down}{left}{right} in that order before the time bar runs out. A wrong press costs time.") };
+                body: Loc_T("tutorial.arrows.body", "Skills show a row of arrows. Press [k:up][k:down][k:left][k:right] in that order before the time bar runs out. A wrong press costs time.") };
         case "defence":
             return { id: _id, title: Loc_T("tutorial.defence.title", "Defending"),
-                body: Loc_T("tutorial.defence.body", "When an enemy winds up a big attack, a bar appears. Press {confirm} on the bright zone to take less damage and shake off its effects.") };
+                body: Loc_T("tutorial.defence.body", "When an enemy winds up a big attack, a bar appears. Press [k:confirm] on the bright zone to take less damage and shake off its effects.") };
         case "stagger":
             return { id: _id, title: Loc_T("tutorial.stagger.title", "Stagger and BREAK"),
                 body: Loc_T("tutorial.stagger.body", "Good hits fill the enemy's stagger meter. When it is full the enemy is BROKEN: it loses a turn and takes +50% damage.") };
@@ -1898,7 +1926,7 @@ function Tutorial_Get(_id) {
 }
 
 function Tutorial_Footer() {
-    return Loc_T("tutorial.footer", "{confirm} Continue");
+    return Loc_T("tutorial.footer", "[k:confirm] Continue");
 }
 
 function Tutorial_Seen(_id) {

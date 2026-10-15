@@ -1696,11 +1696,11 @@ function Test_Suite_StatusRules() {
 
     // ---- D100 / BUG-16: the text comes from the real numbers ----
     var _dp = Status_Describe(STATUS_POISON, { id: STATUS_POISON, turns: 3, power: 0, stacks: 3 });
-    Test_True("Describe: Poison with 3 stacks says it hurts for 3", string_pos("3 HP", _dp.line) > 0 && _dp.tick == 3 && _dp.stacks == 3);
+    Test_True("Describe: Poison with 3 stacks says it hurts for 3", string_pos("3 HP", Markup_Strip(_dp.line)) > 0 && _dp.tick == 3 && _dp.stacks == 3);
     var _db = Status_Describe(STATUS_BURN, { id: STATUS_BURN, turns: 2, power: 4, stacks: 1 });
-    Test_True("Describe: Burning says 4 HP, 2 turns and its DEF change", string_pos("4 HP", _db.line) > 0 && string_pos("2 more turns", _db.line) > 0 && string_pos("DEF -25%", _db.line) > 0);
+    Test_True("Describe: Burning says 4 HP, 2 turns and its DEF change", string_pos("4 HP", Markup_Strip(_db.line)) > 0 && string_pos("2 more turns", Markup_Strip(_db.line)) > 0 && string_pos("DEF -25%", Markup_Strip(_db.line)) > 0);
     var _dl = Status_Describe(STATUS_BLEED, { id: STATUS_BLEED, turns: 3, power: 0, stacks: 2 });
-    Test_True("Describe: Bleeding with 2 stacks says 4 HP per action", string_pos("4 HP", _dl.line) > 0 && _dl.tick == 4);
+    Test_True("Describe: Bleeding with 2 stacks says 4 HP per action", string_pos("4 HP", Markup_Strip(_dl.line)) > 0 && _dl.tick == 4);
     var _df = Status_Describe(STATUS_HIT_UP);
     Test_True("Describe: Foresight says 3 turns and +50%", string_pos("3 turns", _df.line) > 0 && string_pos("50%", _df.line) > 0);
     var _burn_cfg = StatusDB_Get(STATUS_BURN);
@@ -6317,9 +6317,9 @@ function Test_Suite_Tutorial() {
         var _e = Tutorial_Get(_ids[_j]);
         Test_True("D45 " + _ids[_j] + " has a title and a short text", is_struct(_e) && string_length(_e.title) > 2 && string_length(_e.body) > 20 && string_length(_e.body) < 260);
     }
-    Test_True("D45 the bar text says what to press", string_pos("{confirm}", Tutorial_Get("bar").body) > 0);
-    Test_True("D45 the arrows text names the arrow keys", string_pos("{up}", Tutorial_Get("arrows").body) > 0);
-    Test_True("D45 the defence text says what to press", string_pos("{confirm}", Tutorial_Get("defence").body) > 0);
+    Test_True("D45 the bar text says what to press", string_pos("[k:confirm]", Tutorial_Get("bar").body) > 0);
+    Test_True("D45 the arrows text names the arrow keys", string_pos("[k:up]", Tutorial_Get("arrows").body) > 0);
+    Test_True("D45 the defence text says what to press", string_pos("[k:confirm]", Tutorial_Get("defence").body) > 0);
     Test_False("D45 an unknown tutorial is nothing", is_struct(Tutorial_Get("dance")));
 
     var _was_off = variable_global_exists("tutorial_off") ? global.tutorial_off : true;
@@ -8270,7 +8270,7 @@ function Test_BagsFixed() {
     }
     Test_True("D126 fixed: a Meditation tick restores exactly 3 MP (the average of 2-4)", _all3);
     var _desc = Status_Describe(STATUS_MEDITATION).line;
-    Test_True("D126 fixed: the Meditation text says the single number (3 MP), not a range", string_pos("3 MP", _desc) > 0 && string_pos("2-4", _desc) == 0);
+    Test_True("D126 fixed: the Meditation text says the single number (3 MP), not a range", string_pos("3 MP", Markup_Strip(_desc)) > 0 && string_pos("2-4", _desc) == 0);
 }
 
 function Test_BagsGold() {
@@ -10344,7 +10344,9 @@ function Test_Suite_RichText() {
     Test_Eq("RT a keyboard confirm prompt has no direction", Prompt_Info("confirm", "keyboard").dir, "");
     var _sk = Binds_Assign(Binds_Defaults(), "left", ord("J")).keys;
     Binds_Apply(_sk);
-    Test_True("RT a move key rebound to a letter shows that letter", Prompt_Info("left", "keyboard").dir == "" && Prompt_Info("left", "keyboard").label == "J");
+    Test_True("RT a move key rebound to a letter while the arrow is still bound shows the arrow", Prompt_Info("left", "keyboard").dir == "left");
+    global.input.bindings.move_left = [ord("J")];
+    Test_True("RT a move key bound to a letter only shows that letter", Prompt_Info("left", "keyboard").dir == "" && Prompt_Info("left", "keyboard").label == "J");
     Binds_Apply(Binds_Defaults());
     Test_True("RT the default move keys show the arrow", Prompt_Info("left", "keyboard").dir == "left");
     var _pl = Markup_Segments("[k:left][k:right]", "gamepad");
