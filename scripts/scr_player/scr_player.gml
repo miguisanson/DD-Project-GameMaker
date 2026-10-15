@@ -193,6 +193,15 @@ function Player_ArmExitIgnore(_pl, _gx = undefined, _gy = undefined) {
     return _exit_here;
 }
 
+// D127 (stub until implemented): the first class chest cannot be skipped.
+function ClassGuard_Applies(_ch, _room) {
+    return false;
+}
+
+function ClassGuard_BackDir(_dir) {
+    return -1;
+}
+
 function Player_EnsureDialogueSettle(_pl, _recover_frames = PLAYER_DIALOGUE_SETTLE_FRAMES) {
     if (!instance_exists(_pl)) return;
     if (variable_instance_exists(_pl, "auto_resolve_recover_timer") && _pl.auto_resolve_recover_timer > 0) return;

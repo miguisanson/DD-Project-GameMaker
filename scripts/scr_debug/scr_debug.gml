@@ -483,6 +483,10 @@ function Scenario_StepSmoke(_s) {
         case 260: case 261: case 262: case 263: case 264: case 265: case 266: case 267: case 268: case 269:
             Scenario_StepSmokeHunt2(_s);   // bug hunt 2: enemies freeze under menus (D122), homes survive re-entry (D33), the exit tile after a battle / Continue (D64), auto-resolve + Continue
             break;
+        case 320: case 321: case 322: case 323: case 324: case 325: case 326: case 327: case 328: case 329:
+        case 330: case 331: case 332: case 333: case 334: case 335: case 336: case 337: case 338: case 339:
+            Scenario_StepSmokeClassGuard(_s);   // G4 (D127): the first class chest cannot be skipped; its last step calls Scenario_NoticeEnd
+            break;
         case 30:
             Scenario_StepSmokeUi(_s);
             break;
@@ -8520,9 +8524,126 @@ function Scenario_StepSmokeHunt2(_s) {
                 var _sigD = Scenario_EcoLayoutSig();
                 Scenario_Check("hunt2_the_auto_resolved_enemy_stays_gone_after_continue", instance_number(obj_enemy) == 2, "n=" + string(instance_number(obj_enemy)));
                 Scenario_Check("hunt2_continue_after_an_auto_resolve_keeps_the_layout_of_the_room", _sigD == _h.sigR, _h.sigR + " vs " + _sigD);
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 320);   // G4 (D127, 320..339) goes on from here; its last step calls Scenario_NoticeEnd
             }
             if (_s.t > 900) { Scenario_Check("hunt2_continue_reaches_rm_floor4_again", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ============================================================================
+// G4 (D127): the first class chest of a run cannot be skipped (smoke steps 320-339, after bug hunt 2). A new run in rm_floor1, the class not chosen:
+// walking into the exit (real held key) does not leave the room, plays the two lines (each confirmed) and ends with the player one tile back inside
+// the room; the same again; then the class chest is opened by the interact key and a class picked through the screen, and the exit leaves the room.
+// ============================================================================
+function Scenario_StepSmokeClassGuard(_s) {
+    var _gs = GameState_Get();
+    var _T = GRID_TILE_SIZE;
+    if (!variable_struct_exists(_s, "cg")) _s.cg = { attempt: 1, c0: 0, maxidx: -1, q: [], qset: false, quiet: 0, closed_t: -1 };
+    var _cg = _s.cg;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _talk = (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0);
+    switch (_s.step) {
+        case 320:   // a new run (from another room: restarting the room the player is in would not spawn him again); the player one tile from the exit
+            if (!variable_struct_exists(_cg, "begun")) {
+                if (!Scenario_Hunt2Begin(_s, _cg, 7301)) {
+                    if (_s.t > 1500) { Scenario_Check("g4_a_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                    break;
+                }
+                _cg.begun = true;
+                _s.t = 0;
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                with (obj_enemy) instance_destroy();
+                with (obj_dialogue_trigger) instance_destroy();
+                Scenario_Check("g4_a_new_run_has_not_chosen_a_class", !_gs.player_ch.class_chosen && _gs.player_ch.class_id == CLASS_NOBODY);
+                _pl = Scenario_PlacePlayer(17, 3);   // the exit of rm_floor1 is the tile (18, 3), entered moving right
+                _pl.face = RIGHT;
+                _cg.c0 = Scenario_ExitCount();
+                Scenario_Hold("move_right", 60);
+                Scenario_Next(_s, 321);
+            }
+            break;
+        case 321:   // the held key walks into the exit: the room stays, the lines open
+            if (room != rm_floor1 || Transition_IsActive()) {
+                Scenario_Release();
+                Scenario_Check("g4_try" + string(_cg.attempt) + "_the_exit_does_not_fire_before_the_class_chest", false, "room=" + room_get_name(room));
+                Scenario_NoticeEnd();
+                break;
+            }
+            if (_gs.ui.mode == UI_DIALOGUE) {
+                Scenario_Release();
+                var _raw = _gs.ui.lines_raw;
+                Scenario_Check("g4_try" + string(_cg.attempt) + "_the_room_does_not_change", room == rm_floor1 && Scenario_ExitCount() == _cg.c0 && !Transition_IsActive());
+                Scenario_Check("g4_try" + string(_cg.attempt) + "_two_lines_open", array_length(_raw) == 2, "lines=" + string(array_length(_raw)));
+                Scenario_Check("g4_try" + string(_cg.attempt) + "_line_1", array_length(_raw) > 0 && string(_raw[0]) == "Wait, there was a chest back there. I think I should open it...");
+                Scenario_Check("g4_try" + string(_cg.attempt) + "_line_2", array_length(_raw) > 1 && string(_raw[1]) == "...there might be something I can use to protect myself.");
+                _cg.maxidx = 0;
+                _cg.closed_t = -1;
+                Scenario_Next(_s, 322);
+            } else if (_s.t > 120) {
+                Scenario_Release();
+                Scenario_Check("g4_try" + string(_cg.attempt) + "_the_lines_open_at_the_exit", false, "x=" + ((_pl != noone) ? string(_pl.x) : "?") + " room=" + room_get_name(room));
+                Scenario_NoticeEnd();
+            }
+            break;
+        case 322:   // each line confirmed; then the player steps back one tile (away from the exit) and stands still
+            if (_gs.ui.mode == UI_DIALOGUE) {
+                _cg.maxidx = max(_cg.maxidx, _gs.ui.index);
+                if ((_s.f - _s.last_tap) >= 12) Scenario_Tap("confirm");
+            }
+            if (!_talk && !UI_IsBlocking() && _cg.closed_t < 0) _cg.closed_t = _s.t;
+            if (_cg.closed_t >= 0 && _s.t - _cg.closed_t > 60 && _pl != noone && Player_IsSettled(_pl)) {
+                Scenario_Check("g4_try" + string(_cg.attempt) + "_two_boxes_were_shown", _cg.maxidx == 1, "last box index=" + string(_cg.maxidx));
+                Scenario_Check("g4_try" + string(_cg.attempt) + "_still_in_rm_floor1_and_no_exit_fired", room == rm_floor1 && Scenario_ExitCount() == _cg.c0 && !Transition_IsActive());
+                Scenario_Check("g4_try" + string(_cg.attempt) + "_the_player_stepped_back_one_tile_on_the_grid", _pl.x == 16 * _T && _pl.y == 3 * _T, "at " + string(_pl.x) + "," + string(_pl.y));
+                if (_cg.attempt == 1) {
+                    _cg.attempt = 2;   // again, from here: two tiles of walking (a turn first), the same refusal
+                    Scenario_Hold("move_right", 70);
+                    Scenario_Next(_s, 321);
+                } else {
+                    Scenario_Next(_s, 323);
+                }
+            }
+            if (_s.t > 900) { Scenario_Check("g4_try" + string(_cg.attempt) + "_the_lines_end_and_the_player_settles", false, "ui=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 323:   // the class chest (rm_floor1's own, tile (6, 5)) opened with the interact key; the class screen: Knight, "are you sure": Yes
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                _pl = Scenario_PlacePlayer(5, 5);
+                _pl.face = RIGHT;
+            }
+            if (_s.t == 20) Scenario_Tap("interact");
+            Scenario_CardsTapQueue(_s, _cg);
+            if (_talk && (_s.f - _s.last_tap) >= 12) Scenario_Tap("confirm");
+            if (_s.t > 30 && CardsUi_Kind() == "class" && !_cg.qset) {
+                _cg.qset = true;
+                _cg.q = ["confirm", "menu_up", "confirm"];
+            }
+            if (_gs.player_ch.class_chosen && !_talk && !Transition_IsActive() && !CardsUi_IsOpen() && !UI_IsBlocking()) _cg.quiet++;
+            else _cg.quiet = 0;
+            if (_cg.quiet > 40) {
+                Scenario_Check("g4_the_class_chest_gives_a_class", _gs.player_ch.class_chosen && _gs.player_ch.class_id == CLASS_KNIGHT, "class=" + string(_gs.player_ch.class_id));
+                Scenario_Next(_s, 324);
+            }
+            if (_s.t > 1500) { Scenario_Check("g4_the_class_is_picked_at_the_chest", false, "kind=" + CardsUi_Kind() + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 324:   // the class chosen: the exit works as before
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                with (obj_enemy) instance_destroy();
+                _pl = Scenario_PlacePlayer(17, 3);
+                _pl.face = RIGHT;
+                _cg.c0 = Scenario_ExitCount();
+                Scenario_Hold("move_right", 40);
+            }
+            if (room == rm_floor2 || _s.t > 400) {
+                Scenario_Check("g4_with_a_class_the_exit_leaves_rm_floor1", room == rm_floor2 && Scenario_ExitCount() - _cg.c0 == 1, "room=" + room_get_name(room) + " exits=" + string(Scenario_ExitCount() - _cg.c0));
+                Scenario_NoticeEnd();
+            }
             break;
     }
 }

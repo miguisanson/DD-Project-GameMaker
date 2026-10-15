@@ -115,6 +115,7 @@ function Test_RunAll() {
     Test_RunSuite("Audio", Test_Suite_Audio);
     Test_RunSuite("Transition", Test_Suite_Transition);
     Test_RunSuite("Hunt2", Test_Suite_Hunt2);
+    Test_RunSuite("ClassGuard", Test_Suite_ClassGuard);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -7804,4 +7805,32 @@ function Test_Suite_Hunt2() {
     Test_True("hunt2 unknown vars are still dropped", !variable_struct_exists(_v, "junk"));
     var _old = RoomState_SanitizeEnemyVars({ x: 112, y: 96, enemy_id: ENEMY_SLIME }, ENEMY_SLIME);
     Test_True("hunt2 an old save without a home keeps none (the enemy keeps its authored home)", !variable_struct_exists(_old, "home_x") && !variable_struct_exists(_old, "home_y"));
+}
+
+// D127: the first class chest cannot be skipped. The predicate that says when floor 1's exit must refuse the player, the step-back direction,
+// and the two lines (checked against the owner's wording, not copied from the code).
+function Test_Suite_ClassGuard() {
+    var _nobody = CharacterCreate_Player(CLASS_NOBODY);
+    var _knight = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_True("g4 a new run (Nobody, no class chosen yet) in floor 1 is guarded", ClassGuard_Applies(_nobody, rm_floor1));
+    Test_False("g4 the guard is for floor 1 only (a debug jump to floor 2 is not trapped)", ClassGuard_Applies(_nobody, rm_floor2));
+    Test_False("g4 a character with a class is not guarded", ClassGuard_Applies(_knight, rm_floor1));
+    var _owed = Cards_ChestOpened(_nobody);
+    Test_True("g4 the chest opened but the class not yet picked is still guarded", ClassGuard_Applies(_owed, rm_floor1));
+    var _picked = Card_ClassCharacter(_owed, CLASS_MAGE);
+    Test_False("g4 once the class is chosen the exit behaves as before", ClassGuard_Applies(_picked, rm_floor1));
+    var _old_nobody = { class_id: CLASS_NOBODY };
+    var _old_knight = { class_id: CLASS_KNIGHT };
+    Test_True("g4 a character struct without class_chosen and Nobody is guarded", ClassGuard_Applies(_old_nobody, rm_floor1));
+    Test_False("g4 a character struct without class_chosen but with a class is not", ClassGuard_Applies(_old_knight, rm_floor1));
+    Test_False("g4 no character at all is never guarded", ClassGuard_Applies(undefined, rm_floor1));
+    Test_Eq("g4 back from RIGHT is LEFT", ClassGuard_BackDir(RIGHT), LEFT);
+    Test_Eq("g4 back from LEFT is RIGHT", ClassGuard_BackDir(LEFT), RIGHT);
+    Test_Eq("g4 back from UP is DOWN", ClassGuard_BackDir(UP), DOWN);
+    Test_Eq("g4 back from DOWN is UP", ClassGuard_BackDir(DOWN), UP);
+    Test_Eq("g4 back from no direction is none", ClassGuard_BackDir(-1), -1);
+    var _lines = DialogueDB_Get("sys_class_chest_guard");
+    Test_Eq("g4 the guard speaks two lines", array_length(_lines), 2);
+    Test_Eq("g4 line 1", array_length(_lines) > 0 ? _lines[0] : "", "Wait, there was a chest back there. I think I should open it...");
+    Test_Eq("g4 line 2", array_length(_lines) > 1 ? _lines[1] : "", "...there might be something I can use to protect myself.");
 }
