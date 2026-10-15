@@ -347,3 +347,41 @@ function Icon_FallbackData() {
     return d;
 }
 // ---- ICON FALLBACK END ----
+
+// ---- Battle feel (D138, D139): STUBS so the checks in Test_Suite_BattleFeel fail on values; the real curves land with the implementation ----
+#macro FEEL_FREEZE_NORMAL_MS 40
+#macro FEEL_FREEZE_PERFECT_MS 80
+#macro FEEL_FREEZE_HEAVY_MS 120
+#macro FEEL_DEATH_FREEZE_MS 120
+#macro FEEL_DEATH_BURST_MS 500
+#macro FEEL_DEATH_BURST_BOSS_MS 900
+#macro FEEL_JOLT_MS 80
+#macro FEEL_RECOIL_MS 150
+#macro FEEL_PUNCH_MS 150
+#macro FEEL_PUNCH_PX 4
+#macro FEEL_LAG_MS 400
+#macro FEEL_EDGE_MS 150
+#macro FEEL_SPARK_MS 240
+function Feel_FreezeMs(_key, _crit, _break) { return 0; }
+function Feel_JoltPx(_key, _crit) { return 0; }
+function Feel_InsetPx(_hit_elapsed_ms, _jolt_px, _punch_elapsed_ms, _punch_on, _shake_on) { return 0; }
+function Feel_ZoomRegion(_inset, _cx, _cy) { return { sx: 0, sy: 0, sw: DISPLAY_BASE_W, sh: DISPLAY_BASE_H, kx: 1, ky: 1, zoom: 1 }; }
+function Feel_RecoilScale(_elapsed_ms, _shake_on) { return { x: 1, y: 1 }; }
+function Feel_LagShown(_from, _to, _elapsed_ms) { return _to; }
+function Feel_LagStep(_hud, _hp, _now, _dt) { return _hp; }
+function Feel_IsBigHit(_dmg, _max_hp, _heavy) { return false; }
+function Feel_EdgeAlpha(_elapsed_ms) { return 0; }
+function Feel_PanelJoltPx(_elapsed_ms, _big, _shake_on) { return 0; }
+function Feel_LowHpActive(_hp, _max_hp) { return false; }
+function Feel_BeatCount(_ms) { return 0; }
+function Feel_BeatVol(_second) { return 0; }
+function Feel_PulseAlpha(_ms, _active) { return 0; }
+function Feel_DeathTotalMs(_boss) { return 0; }
+function Feel_DeathPhase(_t_ms, _boss) { return 0; }
+function Feel_SpriteVisible(_t_ms) { return true; }
+function Feel_ParticleAlpha(_t_ms, _burst_ms) { return 1; }
+function Feel_ParticlePos(_p, _t_ms) { return { x: _p.x + 1000, y: _p.y + 1000 }; }
+function Feel_SparkCount(_key, _crit, _break) { return 0; }
+function Feel_SparkSize(_key, _crit, _break) { return 0; }
+function Feel_Sparks(_cx, _cy, _key, _crit, _break) { return []; }
+function Feel_SparkPos(_s, _cx, _cy, _elapsed_ms) { return { x: _cx + 1000, y: _cy + 1000, alive: true }; }

@@ -3369,3 +3369,32 @@ function Battle_DrawPops(_bc) {
     draw_set_alpha(a0);
     draw_set_color(c_white);
 }
+
+// ---- Battle feel (D138, D139): the controller's feel fields, then STUBS so the checks fail on values ----
+function Battle_FeelInit(_bc) {
+    _bc.feel_ms = 0;                    // the feel clock (ms): stands still in a hit freeze
+    _bc.feel_hit_start = -100000;       // when the last hit's jolt and recoil began (feel clock)
+    _bc.feel_hit_px = 2;                // that jolt's size, px
+    _bc.feel_punch_start = -100000;     // the crit / BREAK zoom punch
+    _bc.feel_punch_on = false;
+    _bc.feel_break = false;             // a BREAK landed with this hit (its freeze and zoom)
+    _bc.feel_contact = false;           // the freeze is long enough to show the contact flash
+    _bc.feel_edge_start = -100000;      // the dark screen-edge flash of a big hit taken
+    _bc.feel_pjolt_start = -100000;     // the HP panel's jolt
+    _bc.feel_pjolt_big = false;
+    _bc.feel_inset = 0;
+    _bc.feel_zr = Feel_ZoomRegion(0, 0, 0);
+    _bc.feel_zoom_on = false;
+    _bc.sparks = undefined;
+    _bc.death_pop = undefined;
+    _bc.lowhp_ms = 0;
+    _bc.lowhp_on = false;
+    _bc.beat_n = 0;
+}
+function Battle_HitFreeze(_bc, _key, _crit) { }
+function Battle_FeelInset(_bc) { return 0; }
+function Battle_FeelStep(_bc, _step_ms) { }
+function Battle_PlayerHurtFeel(_bc, _dmg, _max_hp, _heavy) { }
+function Battle_DeathPopBegin(_bc, _e, _text) { return false; }
+function Battle_DeathPopAdvance(_bc, _ms) { }
+function Battle_DeathPopStep(_bc) { return false; }
