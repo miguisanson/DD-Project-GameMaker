@@ -2286,6 +2286,11 @@ function Settings_ShakeOn() {
     return GameSettings_Ensure().screen_shake != 0;
 }
 
+// G8 (D136): the Rumble setting (Rumble_Fire / Rumble_Step in scr_input read it).
+function Settings_RumbleOn() {
+    return GameSettings_Ensure().rumble != 0;
+}
+
 // One change to the pending settings struct by row id. Returns true when something changed. The language row only flips the code;
 // the caller applies the preview (Loc_SetLanguage).
 function Settings_Adjust(_p, _id, _dir, _scale_max) {
@@ -2306,6 +2311,9 @@ function Settings_Adjust(_p, _id, _dir, _scale_max) {
             return ts_changed;
         case "shake":
             _p.screen_shake = (_p.screen_shake != 0) ? 0 : 1;
+            return true;
+        case "rumble":
+            _p.rumble = (_p.rumble != 0) ? 0 : 1;
             return true;
         case "qte_assist":
             _p.qte_assist = (_p.qte_assist != 0) ? 0 : 1;
@@ -2372,6 +2380,12 @@ function SettingsMenu_Items(_p, _scale_max, _dirty = false) {
         Loc_T("settings.help.shake", "Turns the screen shake on hits on or off."));
     r_sh.measure = [Loc_T("settings.value.on", "On"), Loc_T("settings.value.off", "Off")];
     array_push(items, r_sh);
+
+    var r_rm = Settings_Row("rumble", Loc_T("settings.row.rumble", "Rumble"), "choice",
+        (_p.rumble != 0) ? Loc_T("settings.value.on", "On") : Loc_T("settings.value.off", "Off"),
+        Loc_T("settings.help.rumble", "Short controller vibration on Perfect hits, BREAK, big hits and defeat."));
+    r_rm.measure = [Loc_T("settings.value.on", "On"), Loc_T("settings.value.off", "Off")];
+    array_push(items, r_rm);
 
     var r_qa = Settings_Row("qte_assist", Loc_T("settings.row.qte_assist", "QTE assist"), "choice",
         (_p.qte_assist != 0) ? Loc_T("settings.value.on", "On") : Loc_T("settings.value.off", "Off"),
@@ -2949,6 +2963,7 @@ function Focus_Edge(_has_focus) {
 
 // Called by the UI controller every Step with window_has_focus(). Coming back does not close the pause menu: the player resumes.
 function Focus_Step(_has_focus) {
+    Rumble_FocusStep(_has_focus);   // G8 (D136): no vibration while the window is out of focus
     BGM_SetDuck(_has_focus ? 1 : FOCUS_MUSIC_DUCK);   // the music follows the current state, not the edge
     if (Focus_Edge(_has_focus)) global.focus_pending = true;
     if (_has_focus) global.focus_pending = false;

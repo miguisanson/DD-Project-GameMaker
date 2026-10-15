@@ -8450,6 +8450,19 @@ function Test_Suite_Rumble() {
     Rumble_Update(_st3, 1000, false);
     Test_True("D136 Update past the time resets to 0", _st3.left == 0 && _st3.right == 0 && _st3.ms == 0);
 
+    // --- focus loss on the live state (no pad is attached here, so nothing reaches the motors): the state is zero straight away
+    var _live = Rumble_Get();
+    Rumble_Stop(_live);
+    Test_True("D136 the live state takes a rumble on a pad as the last device", Rumble_Fire(_live, "death", true, "gamepad", 0));
+    Rumble_FocusStep(true);
+    Test_True("D136 focus kept: the rumble goes on", _live.ms == 400 && _live.left > 0);
+    Rumble_FocusStep(false);
+    Test_True("D136 focus lost: the live state is reset to 0 at once", _live.left == 0 && _live.right == 0 && _live.ms == 0 && !_live.focused);
+    Rumble_FocusStep(true);
+    Test_True("D136 focus back: the state is usable again", _live.focused);
+    Rumble_StopNow();
+    Test_True("D136 StopNow leaves the live state at 0", _live.left == 0 && _live.right == 0 && _live.ms == 0);
+
     // --- the setting: default On, a 0/1 flag, saved and loaded; an old file without the field loads On
     Test_Eq("D136 rumble defaults to on", GameSettings_Defaults().rumble, 1);
     Test_Eq("D136 normalizing nothing gives rumble on", GameSettings_Normalize(undefined).rumble, 1);

@@ -124,6 +124,8 @@ function Save_ReadSettingsConfig(_path = undefined) {
     if (variable_struct_exists(raw, "text_speed")) out.text_speed = raw.text_speed;
     if (variable_struct_exists(raw, "screen_shake")) out.screen_shake = raw.screen_shake;
     if (variable_struct_exists(raw, "qte_assist")) out.qte_assist = raw.qte_assist;
+    // G8 (D136): rumble. No version bump: a file of any version without the field gets the default (On) from GameSettings_Normalize.
+    if (variable_struct_exists(raw, "rumble")) out.rumble = raw.rumble;
     // Version 10 (D49): keys, the keyboard keys per rebindable action. An older file has none and gets the default keys.
     if (settings_version >= 10 && variable_struct_exists(raw, "keys")) out.keys = raw.keys;
 
@@ -158,6 +160,7 @@ function Save_WriteSettingsConfig(_settings, _path = undefined) {
         language: s.language,
         text_speed: s.text_speed,
         screen_shake: s.screen_shake,
+        rumble: s.rumble,
         qte_assist: s.qte_assist,
         keys: s.keys
     };

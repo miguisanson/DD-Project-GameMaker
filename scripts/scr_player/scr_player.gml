@@ -1016,6 +1016,7 @@ function GameSettings_Defaults() {
         language: "en",
         text_speed: 1,    // settings_version 9 (D0): 0 slow, 1 normal, 2 fast (Settings_TextSpeedMul)
         screen_shake: 1,  // 1 on, 0 off
+        rumble: 1,        // G8 (D136): controller rumble, 1 on, 0 off. No settings_version bump: a file without the field loads On.
         qte_assist: 0,    // 1 on: zones x1.5 and arrow time x1.3 (D35, Qte_AssistMult / Qte_AssistTimeMultNow)
         keys: Binds_Defaults()   // settings_version 10 (D49): the keyboard keys per rebindable action (scr_input, Binds_*)
     };
@@ -1033,6 +1034,7 @@ function GameSettings_Normalize(_settings) {
         if (variable_struct_exists(_settings, "language")) out.language = _settings.language;
         if (variable_struct_exists(_settings, "text_speed")) out.text_speed = _settings.text_speed;
         if (variable_struct_exists(_settings, "screen_shake")) out.screen_shake = _settings.screen_shake;
+        if (variable_struct_exists(_settings, "rumble")) out.rumble = _settings.rumble;
         if (variable_struct_exists(_settings, "qte_assist")) out.qte_assist = _settings.qte_assist;
         if (variable_struct_exists(_settings, "keys")) out.keys = _settings.keys;
     }
@@ -1045,6 +1047,7 @@ function GameSettings_Normalize(_settings) {
     out.language = GameSettings_NormalizeLanguage(out.language);
     out.text_speed = clamp(round(GameSettings_ToReal(out.text_speed, 1)), 0, SETTINGS_TEXT_SPEED_MAX);
     out.screen_shake = (GameSettings_ToReal(out.screen_shake, 1) != 0) ? 1 : 0;
+    out.rumble = (GameSettings_ToReal(out.rumble, 1) != 0) ? 1 : 0;
     out.qte_assist = (GameSettings_ToReal(out.qte_assist, 0) != 0) ? 1 : 0;
     out.keys = Binds_Normalize(out.keys);
     return out;

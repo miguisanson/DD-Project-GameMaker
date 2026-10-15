@@ -6,6 +6,7 @@ Banner_Step(step_ms);     // C5 (D106): the boss name banner (about 1 s)
 var gs = GameState_Get();
 Transition_Update();
 if (!variable_global_exists("scn")) Focus_Step(window_has_focus());   // R1b (D122): the window lost focus -> pause, lower the music (scripted runs are never in front: they call Focus_Step themselves)
+Rumble_Step(step_ms);   // G8 (D136): controller rumble reads the Perfect freeze, BREAK, HP drops and death; it stops on pause, focus loss and a room change
 if (Tutorial_Step()) exit;   // C4 (D45): a tutorial pop-up takes every key until it is dismissed
 
 if (!variable_instance_exists(id, "hud_hurt_flash_ms")) hud_hurt_flash_ms = 0;

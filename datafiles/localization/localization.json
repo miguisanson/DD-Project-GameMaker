@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T09:52:02Z",
-    "row_count": 1026
+    "generated_at_utc": "2026-10-15T10:07:41Z",
+    "row_count": 1028
   },
   "default_lang": "en",
   "languages": [
@@ -3032,6 +3032,10 @@
       "en": "Wider bar zones and more time on arrow skills.",
       "ko": "막대 판정 구간이 넓어지고 화살표 스킬의 시간이 늘어납니다."
     },
+    "settings.help.rumble": {
+      "en": "Short controller vibration on Perfect hits, BREAK, big hits and defeat.",
+      "ko": "완벽한 공격, 브레이크, 큰 피해, 쓰러질 때 컨트롤러가 짧게 진동합니다."
+    },
     "settings.help.scale": {
       "en": "How many times the picture is enlarged in a window. Only used when windowed.",
       "ko": "창 모드에서 화면을 몇 배로 키울지 정합니다. 창 모드에서만 쓰입니다."
@@ -3103,6 +3107,10 @@
     "settings.row.qte_assist": {
       "en": "Timing assist",
       "ko": "타이밍 보조"
+    },
+    "settings.row.rumble": {
+      "en": "Rumble",
+      "ko": "진동"
     },
     "settings.row.scale": {
       "en": "Scale",
