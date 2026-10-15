@@ -12686,6 +12686,47 @@ function Test_ChoiceLaterLines() {
     global.profile_status = _keep_st;
 }
 
+// D147 + D154: a note asks its question in the Codex reader, not on pickup. The reader's line list: before an answer the note's own lines and the question;
+// with global.choice_off, or a note without a choice, only the note; after an answer the note's lines and the later line; right after the pick, the note's lines
+// and the reply.
+function Test_ChoiceNoteReader() {
+    var _keep = variable_global_exists("profile") ? global.profile : undefined;
+    var _keep_st = variable_global_exists("profile_status") ? global.profile_status : "missing";
+    var _keep_off = variable_global_exists("choice_off") ? global.choice_off : false;
+    Test_True("D147+D154 the reader's functions exist", script_exists(asset_get_index("Note_ReaderLines")) && script_exists(asset_get_index("Note_AsksQuestion")) && script_exists(asset_get_index("Note_ReplyLines")));
+    if (script_exists(asset_get_index("Note_ReaderLines")) && script_exists(asset_get_index("Note_AsksQuestion")) && script_exists(asset_get_index("Note_ReplyLines"))) {
+        var _note = Note_Find("map_page");
+        var _def = Choice_Def("map_page");
+        var _n = array_length(_note.lines);
+        global.choice_off = false;
+        global.profile = Profile_Default();
+        Test_True("D147+D154 reader: an unanswered note with a choice asks", Note_AsksQuestion(_note));
+        var _q = Note_ReaderLines(_note);
+        Test_Eq("D147+D154 reader: unanswered, the note's lines and the question's lines", array_length(_q), _n + array_length(_def.ask));
+        Test_True("D147+D154 reader: the note's own lines come first, then the question", _q[0] == _note.lines[0] && _q[_n - 1] == _note.lines[_n - 1] && _q[_n] == _def.ask[0] && _q[array_length(_q) - 1] == _def.ask[array_length(_def.ask) - 1]);
+        Test_Eq("D147+D154 reply: the note's lines and the reply of the second answer", json_stringify(Note_ReplyLines(_note, 1)), json_stringify(array_concat(_note.lines, _def.reply[1])));
+        Test_Eq("D147+D154 reply: the first answer has its own reply", Note_ReplyLines(_note, 0)[_n], _def.reply[0][0]);
+        Choice_Set(global.profile, "map_page", 2);
+        Test_True("D147+D154 reader: an answered note does not ask again", !Note_AsksQuestion(_note));
+        var _a = Note_ReaderLines(_note);
+        Test_Eq("D147+D154 reader: answered, the note's lines and the later line", json_stringify(_a), json_stringify(array_concat(_note.lines, _def.again[1])));
+        Test_Eq("D147+D154 reader: answered, it is the same list the dialogue helper gives", json_stringify(_a), json_stringify(Note_ReadLines(_note)));
+        global.profile = Profile_Default();
+        global.choice_off = true;
+        Test_True("D147+D154 reader: with the questions off a note does not ask", !Note_AsksQuestion(_note));
+        Test_Eq("D147+D154 reader: with the questions off, only the note's lines", json_stringify(Note_ReaderLines(_note)), json_stringify(_note.lines));
+        global.choice_off = false;
+        var _plain = Note_Find("wall_breath");
+        Test_True("D147+D154 reader: a note without a choice never asks", !Note_AsksQuestion(_plain));
+        Test_Eq("D147+D154 reader: a note without a choice reads as its lines", json_stringify(Note_ReaderLines(_plain)), json_stringify(_plain.lines));
+        var _bad = Note_Find("no_such_note");
+        Test_True("D147+D154 reader: an unknown note does not ask", !Note_AsksQuestion(_bad));
+    }
+    global.choice_off = _keep_off;
+    global.profile = _keep;
+    global.profile_status = _keep_st;
+}
+
 // Remembering an answer touches the unlocks map and nothing else of the profile, and never the character or the run.
 function Test_ChoiceNoEffect() {
     var _gs = GameState_Get();
@@ -12775,6 +12816,7 @@ function Test_Suite_Choices() {
     Test_ChoiceStorage();
     Test_ChoiceSaveLoad();
     Test_ChoiceLaterLines();
+    Test_ChoiceNoteReader();
     Test_ChoiceNoEffect();
     Test_ChoiceText();
     Loc_SetLanguage(_lang);

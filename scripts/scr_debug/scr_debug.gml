@@ -12999,7 +12999,7 @@ function Scenario_StepShotsD164(_s) {
 // ---- H7 (D147) pictures 700..704: the Codex Notes page, a found note in the reader and a long text in the reader (scrolled, with its bar) at windowed
 // scale 3 (480 x 432) and 5 (800 x 720). The last pictures of the run: they end it. ----
 function Scenario_NotesShotScenes() {
-    return ["list", "reader", "long"];
+    return ["list", "reader", "long", "ask"];
 }
 
 function Scenario_StepShotsNotes(_s) {
@@ -13038,6 +13038,10 @@ function Scenario_StepShotsNotes(_s) {
                     for (var _k = 0; _k < 14; _k++) array_push(_fake.lines, "Day " + string(_k + 1) + ". The tunnel is quiet and the walls keep their secrets, and I keep walking all the same.");
                     TabNote_OpenReader(_fake);
                     break;
+                case "ask":   // D147 + D154: the survey page's question under its text, the replies awake (the questions are switched on for this picture only)
+                    global.choice_off = false;
+                    TabNote_OpenReader(Note_Find("map_page"));
+                    break;
             }
             Scenario_Next(_s, 702);
             break;
@@ -13056,13 +13060,16 @@ function Scenario_StepShotsNotes(_s) {
                     var _n = array_length(_m.data.wrapped);
                     if (_scenes[_o.di] == "reader") {
                         Scenario_Check("shots_notes_the_whole_note_fits_" + _tag, _n > 0 && _n <= _m.data.visible, "lines=" + string(_n) + " visible=" + string(_m.data.visible));
+                    } else if (_scenes[_o.di] == "ask") {
+                        Scenario_Check("shots_notes_ask_the_question_is_open_" + _tag, _m.data.ask && array_length(_m.data.labels) == 2);
+                        _m.data.scroll = 1000000;   // read to the end (the draw keeps it inside the text); two frames later the replies are awake
                     } else {
                         Scenario_Check("shots_notes_the_long_text_needs_scrolling_" + _tag, _n > _m.data.visible, "lines=" + string(_n) + " visible=" + string(_m.data.visible));
                         Scenario_Check("shots_notes_the_footer_offers_scrolling_" + _tag, string_pos("{up}{down}", TabMenu_Hint()) > 0, TabMenu_Hint());
                         _m.data.scroll = 3;   // a picture of the text part-way down
                     }
                 }
-                if (_scenes[_o.di] != "long") {
+                if (_scenes[_o.di] != "long" && _scenes[_o.di] != "ask") {
                     _s.shot = "shot_notes_" + _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
                     Scenario_ShotLayout(_s.shot);
                     Scenario_Next(_s, 703);
@@ -13073,7 +13080,16 @@ function Scenario_StepShotsNotes(_s) {
             break;
         case 704:
             if (_s.t >= 2) {
-                _s.shot = "shot_notes_long_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                if (_scenes[_o.di] == "ask") {
+                    var _ma = TabMenu_TopMenu();
+                    var _tga = "ask_" + string(_scales[_o.si]);
+                    var _ra = _ma.rect;
+                    var _rra = _ma.data.reply_rects;
+                    Scenario_Check("shots_notes_ask_the_replies_are_awake_" + _tga, NoteReader_Armed(_ma) && array_length(_rra) == 2);
+                    Scenario_Check("shots_notes_ask_the_replies_sit_inside_the_panel_" + _tga, array_length(_rra) == 2 && _rra[0].x >= _ra.x && _rra[0].x + _rra[0].w <= _ra.x + _ra.w && _rra[0].y > _ra.y && _rra[1].y + _rra[1].h <= _ra.y + _ra.h && _rra[1].y >= _rra[0].y + _rra[0].h, json_stringify(_rra) + " " + json_stringify(_ra));
+                    Scenario_Check("shots_notes_ask_the_footer_offers_select_" + _tga, string_pos("{confirm}", TabMenu_Hint()) > 0, TabMenu_Hint());
+                }
+                _s.shot = "shot_notes_" + _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
                 Scenario_ShotLayout(_s.shot);
                 Scenario_Next(_s, 703);
             }
@@ -13081,6 +13097,7 @@ function Scenario_StepShotsNotes(_s) {
         case 703:
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.choice_off = true;   // the "ask" picture switched the questions on
                 if (is_struct(TabMenu_Get())) Menu_Close(true);
                 Scenario_ClearUi();
                 _o.si++;
@@ -13760,7 +13777,9 @@ function Scenario_StepShotsLabels(_s) {
 //            profile the first reply shows another next line
 //   894-896  the Stranger: his question comes before your reaction to him; the first reply is picked; the reaction follows; the next run he greets without asking
 //   897-898  the wake line: the question follows it; the second reply; the next time a line that remembers follows the wake line instead
-//   899-900  the torn survey page: the question follows the note; the later line is part of the note the next time
+//   899-902  the torn survey page (D147 + D154): walked onto it is picked up and nothing is asked; in the Codex Notes reader the question comes after the
+//            note's lines, the replies wake when the text is read to its end, Down / Up / Confirm pick the first one (stored, in the file), the reply is read;
+//            reopened, the later line is part of the note and nothing is asked
 //   909      the end (the files are removed)
 // Nothing in any of it may change HP, MP, gold, items or stats (Scenario_ChoiceVitals).
 // ============================================================================
@@ -13829,12 +13848,6 @@ function Scenario_ChoiceLeaveShop(_s, _h) {
     if (!ShopUi_IsOpen()) return true;
     if (InputLock_Settled(global.shop_ui.lock, 4 * TRANSITION_FRAME_MS) && (_s.f - _s.last_tap) >= 14) Scenario_Tap("cancel");
     return false;
-}
-
-function Scenario_ChoiceFindNote(_id) {
-    var _n = noone;
-    with (obj_interactable) { if (variable_instance_exists(id, "note_id") && note_id == _id) _n = id; }
-    return _n;
 }
 
 function Scenario_StepSmokeChoices(_s) {
@@ -14048,58 +14061,141 @@ function Scenario_StepSmokeChoices(_s) {
             }
             if (_s.t > 900) { Scenario_Check("choices_wake_next_time_flow_ends", false, "boxes=" + string(array_length(_c.boxes)) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
             break;
-        case 899:   // the torn survey page: read, then the question under its title; the first reply
+        case 899:   // the torn survey page: walked onto with a real key it is picked up and nothing is asked
             if (_s.t == 1) {
+                Dialogue_CloseNow();
                 Scenario_ClearUi();
                 Profile_ResetForTest();
+                with (obj_enemy) instance_destroy();
+                Notes_SpawnForRoom();   // a clean profile: the note stands on its tile again (a room start would do the same)
                 _h.c = Scenario_ChoiceNew();
             }
             if (_s.t == 10) {
-                var _note = Scenario_ChoiceFindNote("map_page");
-                Scenario_Check("choices_note_the_survey_page_stands_in_the_first_room", _note != noone);
-                if (_note == noone) { Scenario_NoticeEnd(); break; }
-                Note_Read(_note);
+                var _dn = Note_Find("map_page");
+                Scenario_Check("choices_note_the_survey_page_stands_in_the_first_room", Notes_LiveCount("rm_floor1") == 1 && Notes_LiveAtTile("rm_floor1", _dn.tx, _dn.ty) == "map_page", "live=" + string(Notes_LiveCount("rm_floor1")));
+                var _plw = Scenario_PlacePlayer(_dn.tx + 1, _dn.ty);
+                _plw.face = LEFT;
+                Scenario_Hold("move_left", 10);
             }
-            if (_s.t > 10) {
-                var _done7 = Scenario_ChoiceDrive(_s, _h.c, 0);
-                var _cn = _h.c;
-                var _nd = Note_Find("map_page");
-                if (array_length(_cn.boxes) == 2 && !variable_struct_exists(_h.flags, "n_ask")) {
-                    _h.flags.n_ask = true;
-                    Scenario_Check("choices_note_it_opens_with_its_own_lines_as_before", !_cn.boxes[0].asking && json_stringify(_cn.boxes[0].lines) == json_stringify(_nd.lines) && _cn.boxes[0].speaker == _nd.title, json_stringify(_cn.boxes[0].lines));
-                    Scenario_Check("choices_note_the_question_follows_under_its_title", _cn.boxes[1].asking && _cn.boxes[1].speaker == _nd.title && json_stringify(_cn.boxes[1].lines) == json_stringify(Choice_Def("map_page").ask));
-                }
-                if (array_length(_cn.boxes) == 3 && !variable_struct_exists(_h.flags, "n_reply")) {
-                    _h.flags.n_reply = true;
-                    Scenario_Check("choices_note_the_first_reply_is_the_next_line", _cn.cursor_pick == 0 && json_stringify(_cn.boxes[2].lines) == json_stringify(Choice_Def("map_page").reply[0]), json_stringify(_cn.boxes[2].lines));
-                    Scenario_Check("choices_note_the_answer_is_remembered", Choice_Get(Profile_Get(), "map_page") == 1);
-                    Scenario_Check("choices_note_it_is_still_recorded_as_read", Note_IsCollected(Profile_Get(), "map_page"));
-                }
-                if (_done7) {
-                    Scenario_Check("choices_note_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
-                    _h.c = Scenario_ChoiceNew();
-                    Scenario_Next(_s, 900);
-                }
+            if (_s.t > 12 && Notes_LiveCount("rm_floor1") == 0 && !variable_struct_exists(_h.flags, "n_got")) {
+                _h.flags.n_got = _s.t;
+                Scenario_Release();
             }
-            if (_s.t > 1500) { Scenario_Check("choices_note_flow_ends", false, "q=" + string(_h.c.q) + " boxes=" + string(array_length(_h.c.boxes)) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            if (variable_struct_exists(_h.flags, "n_got") && _s.t == _h.flags.n_got + 20) {
+                Scenario_Check("choices_note_walking_onto_it_picks_it_up", Note_IsCollected(Profile_Get(), "map_page") && Notes_LiveCount("rm_floor1") == 0);
+                Scenario_Check("choices_note_pickup_asks_nothing", _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && !Dialogue_ChoiceIsOpen() && Choice_Enabled(), "mode=" + string(_gs.ui.mode));
+                Scenario_Check("choices_note_pickup_stores_no_answer", Choice_Get(Profile_Get(), "map_page") == 0);
+                Scenario_Check("choices_note_it_is_still_recorded_as_read", Note_IsCollected(Profile_Get(), "map_page"));
+                Scenario_Check("choices_note_pickup_changed_nothing_in_the_character", Scenario_ChoiceVitals() == _h.vit);
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);
+                Ui_MemSet(Ui_MemGlobal(), "tab_codex", 0);     // the menus remember their cursors: start both Codex lists on their first row
+                Ui_MemSet(Ui_MemGlobal(), "codex_notes", 0);
+                Scenario_Next(_s, 900);
+            }
+            if (_s.t > 200 && !variable_struct_exists(_h.flags, "n_got")) { Scenario_Release(); Scenario_Check("choices_note_walking_onto_it_picks_it_up", false, "live=" + string(Notes_LiveCount("rm_floor1"))); Scenario_NoticeEnd(); }
             break;
-        case 900:   // read again: the later line is part of the note, and nothing is asked
-            if (_s.t == 10) {
-                var _note2 = Scenario_ChoiceFindNote("map_page");
-                Note_Read(_note2);
+        case 900:   // Tab, E x4 (Codex), Notes, the survey page: its reader opens with the note's lines and the question's lines
+            var _ndr = Note_Find("map_page");
+            var _mr = TabMenu_TopMenu();
+            switch (_s.t) {
+                case 5: Scenario_Tap("menu"); break;
+                case 20: Scenario_Tap("tab_next"); break;
+                case 28: Scenario_Tap("tab_next"); break;
+                case 36: Scenario_Tap("tab_next"); break;
+                case 44: Scenario_Tap("tab_next"); break;
+                case 54:
+                    Scenario_Check("choices_note_the_codex_is_reached_with_the_keys", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && TabMenu_Get().tab == 4 && _mr.id == "tab_codex", "mode=" + string(_gs.ui.mode));
+                    Scenario_Tap("menu_down");
+                    break;
+                case 62: Scenario_Tap("confirm"); break;
+                case 76:
+                    Scenario_Check("choices_note_the_notes_page_lists_the_found_page", _mr.id == "codex_notes" && _mr.items[0].label == _ndr.title, _mr.id);
+                    Scenario_Tap("confirm");
+                    break;
+                case 92:
+                    Scenario_Check("choices_note_confirm_opens_the_reader", _mr.id == "codex_note_read" && TabMenu_Depth() == 3, "id=" + _mr.id);
+                    if (_mr.id != "codex_note_read") { Scenario_NoticeEnd(); break; }
+                    Scenario_Check("choices_note_the_reader_asks_its_question", _mr.data.ask && Note_AsksQuestion(_ndr), "ask=" + string(_mr.data.ask));
+                    Scenario_Check("choices_note_the_reader_text_is_its_lines_then_the_question", _mr.data.text == NoteReader_Join(array_concat(_ndr.lines, Choice_Def("map_page").ask)), _mr.data.text);
+                    Scenario_Check("choices_note_the_reader_holds_the_two_replies", json_stringify(_mr.data.labels) == json_stringify(Choice_Def("map_page").labels), json_stringify(_mr.data.labels));
+                    Scenario_Check("choices_note_nothing_is_stored_before_the_pick", Choice_Get(Profile_Get(), "map_page") == 0);
+                    Scenario_Next(_s, 901);
+                    break;
             }
-            if (_s.t > 10) {
-                var _done8 = Scenario_ChoiceDrive(_s, _c, -1);
-                if (_done8) {
-                    var _nd2 = Note_Find("map_page");
-                    var _want = json_stringify(Note_ReadLines(_nd2));
-                    Scenario_Check("choices_note_next_time_one_box_with_no_question", array_length(_c.boxes) == 1 && !_c.boxes[0].asking);
-                    Scenario_Check("choices_note_next_time_the_later_line_ends_the_note", json_stringify(_c.boxes[0].lines) == _want && array_length(_c.boxes[0].lines) == array_length(_nd2.lines) + 1 && _c.boxes[0].lines[array_length(_nd2.lines)] == Choice_Def("map_page").again[0][0], json_stringify(_c.boxes[0].lines));
-                    Scenario_Check("choices_note_next_time_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
-                    Scenario_Next(_s, 909);
+            if (_s.t > 140) { Scenario_Check("choices_note_the_reader_opens", false, "id=" + (is_struct(_mr) ? _mr.id : "none") + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 901:   // read to the end (Down), the replies wake up; Down and Up move between them; Confirm picks the first
+            var _ndq = Note_Find("map_page");
+            var _mq = TabMenu_TopMenu();
+            var _rdy = (_s.f - _s.last_tap) >= 12;
+            if (!is_struct(_mq) || _mq.id != "codex_note_read") { Scenario_Check("choices_note_the_reader_stays_open_until_the_pick", false, "mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); break; }
+            if (!variable_struct_exists(_h.flags, "n_armed")) {
+                if (NoteReader_Armed(_mq) && array_length(_mq.data.reply_rects) == 2) {
+                    _h.flags.n_armed = true;
+                    var _rr = _mq.data.reply_rects;
+                    var _rc = _mq.rect;
+                    Scenario_Check("choices_note_the_replies_wake_when_the_text_is_read_to_its_end", _mq.data.scroll >= NoteReader_MaxScroll(array_length(_mq.data.wrapped), _mq.data.visible));
+                    Scenario_Check("choices_note_the_replies_sit_inside_the_reader", _rr[0].x >= _rc.x && _rr[0].x + _rr[0].w <= _rc.x + _rc.w && _rr[1].y + _rr[1].h <= _rc.y + _rc.h && _rr[1].y >= _rr[0].y + _rr[0].h && _rr[0].y > _rc.y, json_stringify(_rr) + " " + json_stringify(_rc));
+                    Scenario_Check("choices_note_the_cursor_starts_on_the_first_reply", _mq.data.pick == 0);
+                    Scenario_Check("choices_note_the_footer_offers_select", string_pos("{confirm}", TabMenu_Hint()) > 0, TabMenu_Hint());
+                    Scenario_Check("choices_note_nothing_is_stored_before_the_confirm", Choice_Get(Profile_Get(), "map_page") == 0);
+                    Scenario_Tap("menu_down");
+                } else if (_rdy) {
+                    Scenario_Tap("menu_down");   // the text is longer than the window: read on
                 }
+            } else if (!variable_struct_exists(_h.flags, "n_down") && _rdy) {
+                _h.flags.n_down = true;
+                Scenario_Check("choices_note_down_moves_to_the_second_reply", _mq.data.pick == 1, "pick=" + string(_mq.data.pick));
+                Scenario_Tap("menu_up");
+            } else if (variable_struct_exists(_h.flags, "n_down") && !variable_struct_exists(_h.flags, "n_up") && _rdy) {
+                _h.flags.n_up = true;
+                Scenario_Check("choices_note_up_goes_back_to_the_first_reply", _mq.data.pick == 0 && NoteReader_Armed(_mq), "pick=" + string(_mq.data.pick));
+                Scenario_Tap("confirm");
+            } else if (variable_struct_exists(_h.flags, "n_up") && _rdy) {
+                var _dq = _mq.data;
+                Scenario_Check("choices_note_the_first_reply_is_picked_and_remembered", Choice_Get(Profile_Get(), "map_page") == 1 && !_dq.ask);
+                var _diskn = Profile_Load(Profile_Path());
+                Scenario_Check("choices_note_the_answer_is_in_the_profile_file", _diskn.status == "ok" && Choice_Get(_diskn.profile, "map_page") == 1, "status=" + _diskn.status);
+                Scenario_Check("choices_note_the_first_reply_is_the_next_line", _dq.text == NoteReader_Join(Note_ReplyLines(_ndq, 0)) && string_pos(Choice_Def("map_page").reply[0][0], _dq.text) > 0, _dq.text);
+                Scenario_Check("choices_note_the_question_is_gone_from_the_text", string_pos(Choice_Def("map_page").ask[1], _dq.text) == 0);
+                Scenario_Check("choices_note_the_replies_are_gone", array_length(_dq.reply_rects) == 0 && !NoteReader_Armed(_mq));
+                Scenario_Check("choices_note_the_reader_stays_open_after_the_pick", TabMenu_TopMenu().id == "codex_note_read" && TabMenu_Depth() == 3);
+                Scenario_Check("choices_note_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
+                Scenario_Tap("cancel");
+                Scenario_Next(_s, 902);
             }
-            if (_s.t > 900) { Scenario_Check("choices_note_next_time_flow_ends", false, "boxes=" + string(array_length(_c.boxes)) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            if (_s.t > 500) { Scenario_Check("choices_note_the_question_is_answered", false, "armed=" + string(NoteReader_Armed(_mq)) + " scroll=" + string(_mq.data.scroll)); Scenario_NoticeEnd(); }
+            break;
+        case 902:   // read again: the later line is part of the note, nothing is asked, Confirm does nothing; Back closes the menu
+            var _nd2 = Note_Find("map_page");
+            var _m2 = TabMenu_TopMenu();
+            switch (_s.t) {
+                case 14:
+                    Scenario_Check("choices_note_back_closes_the_reader", _m2.id == "codex_notes" && TabMenu_Depth() == 2, "id=" + _m2.id);
+                    Scenario_Tap("confirm");
+                    break;
+                case 30:
+                    Scenario_Check("choices_note_next_time_the_reader_opens_again", _m2.id == "codex_note_read" && TabMenu_Depth() == 3, "id=" + _m2.id);
+                    if (_m2.id != "codex_note_read") { Scenario_NoticeEnd(); break; }
+                    Scenario_Check("choices_note_next_time_no_question", !_m2.data.ask && array_length(_m2.data.reply_rects) == 0 && !NoteReader_Armed(_m2));
+                    Scenario_Check("choices_note_next_time_the_later_line_ends_the_note", _m2.data.text == NoteReader_Join(Note_ReadLines(_nd2)) && array_length(Note_ReadLines(_nd2)) == array_length(_nd2.lines) + 1 && string_pos(Choice_Def("map_page").again[0][0], _m2.data.text) > 0, _m2.data.text);
+                    Scenario_Check("choices_note_next_time_the_question_is_not_in_the_text", string_pos(Choice_Def("map_page").ask[1], _m2.data.text) == 0);
+                    Scenario_Check("choices_note_next_time_the_footer_does_not_offer_select", string_pos("{confirm}", TabMenu_Hint()) == 0, TabMenu_Hint());
+                    Scenario_Tap("confirm");
+                    break;
+                case 46:
+                    Scenario_Check("choices_note_next_time_confirm_changes_nothing", _m2.id == "codex_note_read" && Choice_Get(Profile_Get(), "map_page") == 1 && _m2.data.text == NoteReader_Join(Note_ReadLines(_nd2)));
+                    Scenario_Check("choices_note_next_time_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
+                    Scenario_Tap("cancel");
+                    break;
+                case 60: Scenario_Tap("cancel"); break;
+                case 74: Scenario_Tap("cancel"); break;
+                case 100:
+                    Scenario_Check("choices_note_back_back_back_closes_the_menu", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                    Scenario_Next(_s, 909);
+                    break;
+            }
+            if (_s.t > 200) { Scenario_Check("choices_note_next_time_flow_ends", false, "mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
             break;
         case 909:   // the end: the questions go off again for whatever is chained after, the files are removed
             if (_s.t == 2) {

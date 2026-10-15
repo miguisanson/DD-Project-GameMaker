@@ -1163,7 +1163,7 @@ function Dialogue_OnClose(_fn) {
 }
 
 // ---- D154: small flavour choices ----
-// Four moments (the Stranger, the merchant, one lore note, the wake line) ask a question with 2 replies. The reply changes the next line and is
+// Four moments (the Stranger, the merchant, one lore note, the wake line) ask a question with 2 replies; the note asks it in the Codex reader (D147), not on pickup. The reply changes the next line and is
 // remembered in the profile's unlocks map as "choice_<id>" = 1 or 2 (no format change; Profile_IsUnlocked does not read these keys, Choice_Get does).
 // Once an answer is stored a later line changes instead of the question coming again. Nothing here touches HP, MP, items, gold or stats.
 // global.choice_off (set by the scripted runs, like global.tutorial_off) switches the questions off.
@@ -1181,7 +1181,7 @@ function Choice_Enabled() {
 
 // The English texts. ask = the question, labels = the 2 replies, reply[k] = the next line after reply k + 1, again[k] = the later line once k + 1 is
 // stored. again_box: the later line gets a box of its own where the question would have been (the Stranger, the wake line); false = the caller shows
-// it (the merchant's first greeting, the last line of the note).
+// it (the merchant's first greeting; the note's later line is part of the Codex reader's text).
 function Choice_Raw(_id) {
     switch (_id) {
         case "stranger": return {
@@ -1837,20 +1837,42 @@ function Notes_StepPlayer(_pl) {
     return true;
 }
 
-// The lines a note opens with: its own, and the later line of its choice once that is answered (D154).
-function Note_ReadLines(_def) {
+// The lines a note is read with once its question is answered: its own, and the later line of its choice (D154). _p = the profile (default: the game's).
+function Note_ReadLines(_def, _p = undefined) {
     var lines = [];
     for (var i = 0; i < array_length(_def.lines); i++) array_push(lines, _def.lines[i]);
     if (Choice_Exists(_def.id)) {
-        var later = Choice_AgainLines(_def.id);
+        var later = Choice_AgainLines(_def.id, _p);
         for (var j = 0; j < array_length(later); j++) array_push(lines, later[j]);
     }
     return lines;
 }
 
-// Bound to the note's id and title (method): the question follows the note's own lines, under the note's title.
-function Note_RunChoice() {
-    Choice_Run(cid, undefined, title);
+// D147 + D154: a note never asks on pickup (it is a banner and a page that rises); its question is asked in the Codex reader, the first time the note is read
+// there. True when _def has a choice that is not answered yet and the questions are on (global.choice_off switches them off). _p = the profile (default: the game's).
+function Note_AsksQuestion(_def, _p = undefined) {
+    if (!is_struct(_def) || !Choice_Enabled() || !Choice_Exists(_def.id)) return false;
+    return Choice_Get(is_undefined(_p) ? Profile_Get() : _p, _def.id) == 0;
+}
+
+// What the Codex reader shows for a note: its own lines and, while its question is open, the question's lines (the two replies are drawn under the text by
+// the reader); once answered, its own lines and the later line (Note_ReadLines).
+function Note_ReaderLines(_def, _p = undefined) {
+    if (!Note_AsksQuestion(_def, _p)) return Note_ReadLines(_def, _p);
+    var lines = [];
+    for (var i = 0; i < array_length(_def.lines); i++) array_push(lines, _def.lines[i]);
+    var ask = Choice_Lines(_def.id, "ask");
+    for (var j = 0; j < array_length(ask); j++) array_push(lines, ask[j]);
+    return lines;
+}
+
+// What the reader shows right after reply _k (0 or 1) is picked: the note's own lines and that reply's line(s).
+function Note_ReplyLines(_def, _k) {
+    var lines = [];
+    for (var i = 0; i < array_length(_def.lines); i++) array_push(lines, _def.lines[i]);
+    var reply = Choice_Lines(_def.id, "reply", clamp(_k, 0, 1));
+    for (var j = 0; j < array_length(reply); j++) array_push(lines, reply[j]);
+    return lines;
 }
 
 // A small page, 16 x 16, top-left at (_x, _y): the note on the map and the one that rises off it. Four palette colours.
