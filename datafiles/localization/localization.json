@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T09:52:02Z",
-    "row_count": 1026
+    "generated_at_utc": "2026-10-15T10:18:22Z",
+    "row_count": 1032
   },
   "default_lang": "en",
   "languages": [
@@ -64,6 +64,10 @@
       "en": "Cannot be stunned.",
       "ko": "기절하지 않습니다."
     },
+    "battle.det.damage": {
+      "en": "Damage",
+      "ko": "피해"
+    },
     "battle.det.hits": {
       "en": "Hits",
       "ko": "타수"
@@ -75,6 +79,10 @@
     "battle.det.mp": {
       "en": "MP",
       "ko": "MP"
+    },
+    "battle.det.perfect": {
+      "en": "Perfect",
+      "ko": "완벽"
     },
     "battle.hint.list": {
       "en": "{confirm} Choose   {back} Back",
@@ -135,6 +143,22 @@
     "battle.menu.skill_row": {
       "en": "{name} ({mp} MP)",
       "ko": "{name} ({mp} MP)"
+    },
+    "battle.preview.damage": {
+      "en": "Damage {n}",
+      "ko": "피해 {n}"
+    },
+    "battle.preview.hits": {
+      "en": "{n} x{hits}",
+      "ko": "{n} x{hits}"
+    },
+    "battle.preview.perfect": {
+      "en": "Perfect {n}",
+      "ko": "완벽 {n}"
+    },
+    "battle.speed.mark": {
+      "en": "x2",
+      "ko": "x2"
     },
     "bed.help.back": {
       "en": "Go back without choosing.",

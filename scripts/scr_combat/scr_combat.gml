@@ -2693,10 +2693,10 @@ function Battle_SkillDetails(_skill, _cost = -1, _pv = undefined) {
     var lines = [];
     var sentence = Card_SkillSentence(_skill);
     if (_skill.effect == "damage") {
+        var pv_lines = Battle_PreviewLines(_pv);   // D135: what the hit does now, first (the two numbers share a row of the two-column panel)
+        for (var pli = 0; pli < array_length(pv_lines); pli++) array_push(lines, pv_lines[pli]);
         array_push(lines, { label: Loc_T("card.lbl.power", "Power"), value: string(round(_skill.power)) });
         if (variable_struct_exists(_skill, "hits") && _skill.hits > 1) array_push(lines, { label: Loc_T("battle.det.hits", "Hits"), value: string(round(_skill.hits)) });
-        var pv_lines = Battle_PreviewLines(_pv);
-        for (var pli = 0; pli < array_length(pv_lines); pli++) array_push(lines, pv_lines[pli]);
     }
     array_push(lines, { label: Loc_T("card.lbl.mp", "MP"), value: string((_cost >= 0) ? _cost : round(_skill.mp_cost)) });
     if (_skill.status != -1) {
@@ -3678,7 +3678,7 @@ function Battle_QteBusy(_bc) {
 
 // D134: the battle time scale from its two inputs. 2 only while run is held and no QTE is up, 1 otherwise.
 function Battle_TimeScaleOf(_run_held, _qte_busy) {
-    return 1;   // STUB (red): not implemented yet
+    return (_run_held && !_qte_busy) ? BATTLE_SPEEDUP_MULT : 1;
 }
 
 // The one time-scale factor of a battle (the controller Step, the effect animations). Every NON-QTE ms clock of the battle runs on Battle_StepMs / this;
@@ -3699,7 +3699,6 @@ function Battle_StepMs(_delta_us, _bc = undefined) {
 // D135: the damage of ONE player hit at a grade multiplier, from the same pieces the hit is dealt with (Combat_HitDamage, then the gear passives' bonus
 // pressure, which reads the enemy HP after the hit), changing nothing. A crit is luck and is not shown. _src is { power, stat_type } of the attack or skill.
 function Battle_HitPreview(_p, _e, _src, _is_skill, _grade_mult) {
-    return 0;   // STUB (red): not implemented yet
     var base = Combat_HitDamage(_p, _e, _src, 1, 1, _grade_mult);
     if (base <= 0) return 0;
     var left = max(0, _e.hp - base);
@@ -3735,7 +3734,6 @@ function Battle_PreviewValue(_n, _hits) {
 // The two number lines a skill details panel gets (D100: the same numbers the hit deals). [] without a preview.
 function Battle_PreviewLines(_pv) {
     if (!is_struct(_pv)) return [];
-    return [];   // STUB (red): not implemented yet
     return [
         { label: Loc_T("battle.det.damage", "Damage"), value: Battle_PreviewValue(_pv.ok, _pv.hits) },
         { label: Loc_T("battle.det.perfect", "Perfect"), value: Battle_PreviewValue(_pv.perfect, _pv.hits) }

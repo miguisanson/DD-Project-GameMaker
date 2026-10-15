@@ -2,10 +2,14 @@ Input_PreStep();
 var gs = GameState_Get();
 // D108 F2b-1: the message hold and the shakes run on a ms clock. The shakes advance here, once a frame, before any early exit (they used to count down
 // inside Draw, so a second read of the offset made them run twice as fast).
-var step_ms = Presentation_StepMs(delta_time);
+// D134: holding run plays the battle's own clocks (messages, effect animations, the freeze, the shakes, the feel effects, the death pop) at 2x. time_scale is 1
+// whenever a QTE is up, and the QTE clocks (Qte_StepMs below, in scr_combat) never read it. real_ms is the unscaled step (the low-HP heartbeat keeps its own pace).
+var real_ms = Presentation_StepMs(delta_time);
+var time_scale = Battle_TimeScale(self);
+var step_ms = real_ms * time_scale;
 Fx_BattleShakesStep(enemy_inst, step_ms);
 if (gs.ui.mode == UI_MENU || gs.ui.mode == UI_PAUSE || Tutorial_IsOpen() || Tutorial_JustClosed()) exit;
-Battle_FeelStep(self, step_ms);   // D138 / D139: the feel clock, the death pop's clock, the low-HP heartbeat and the push-in (before any exit below)
+Battle_FeelStep(self, step_ms, real_ms);   // D138 / D139: the feel clock, the death pop's clock, the low-HP heartbeat and the push-in (before any exit below)
 if (battle_over && battle_state != BSTATE_MESSAGE) exit;
 
 // helper input keys
@@ -18,7 +22,7 @@ if (qte_result_ms > 0) qte_result_ms = max(0, qte_result_ms - Qte_StepMs(delta_t
 // A bar in its timing window never freezes (the freeze starts after a bar is resolved; this is the guard).
 if (hitstop_ms > 0 && (qte_active || sq_active || def_active)) hitstop_ms = 0;
 if (hitstop_ms > 0) {
-    hitstop_ms -= Qte_StepMs(delta_time);
+    hitstop_ms -= Qte_StepMs(delta_time) * time_scale;   // D134: the freeze is battle time (a bar is never up here, so time_scale is 2 only while run is held)
     if (hitstop_ms > 0) exit;
     hitstop_ms = 0;
     Battle_QteImpactFeedback(self);

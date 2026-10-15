@@ -32,6 +32,7 @@ var sy = sx;
 Battle_HudFrameBegin(self);   // D108 F1d-1: the strip's metrics, the enemy header rect and the chips are built once for this frame (End below)
 var zones = Battle_Zones();   // D99: where the panels, the log and the menus sit
 hud.rects.log = undefined;
+hud.rects.preview = undefined;   // D135: the plate beside the command menu (Battle_DrawAttackPreview sets it while the cursor is on ATTACK)
 
 // enemy sprite draw with shake/flash. D138 / D139: through the picture's push-in (zr), squashed by the recoil, light-flashed in the hit freeze and the death
 // freeze, and not drawn once it has burst.
@@ -150,6 +151,7 @@ if (variable_global_exists("debug") && is_struct(global.debug) && global.debug.e
 
 // The command menu, or the skill / item list with its details panel (D95, D99, D100): last, so it is on top of everything.
 Battle_DrawMenus(self);
+Battle_DrawSpeedMark(self);   // D134: "x2" in the top right corner while run is held and no QTE is up
 
 // what the last draw used, for the tests (nothing may overlap, I-067) and the shots
 hud.rects.zones = zones;
