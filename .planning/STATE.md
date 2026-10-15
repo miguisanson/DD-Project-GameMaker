@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Owner playing build 63deaae-20261015. Round 2 (D126-D139), 4 Sonnet implementers (owner raised the cap 2026-10-16): G1 bags (wt/g1), G2 title (wt/g2, menu keeps the shared framed style), G3 battle feel (wt/g3), G4 chest guard (wt/g4). Queue: G5 echo after class, G6 map juice, G7 speed-up + preview, G8 rumble + save-on-close, G9 run stats, G10 one-style audit, G11 consistency. |
+| WIP | Round 2 (D126-D139): G1 bags, G2 title, G4 chest guard + owner art/sound import MERGED (next 2aa555d, fast PASS 3852/0, smoke 625/0). In flight (Sonnet): G3 battle feel (wt/g3), G5 echo after class (wt/g5), G8 rumble (wt/g8). Next when G3 lands: G6 map juice, G7 speed-up + preview, G9 run stats; then G10 one-style audit (incl. KO 800x720 build-id overlapping the title menu), G11 consistency; Opus review; full gate + new build. Owner will playtest later. |
 | Unplayed features | 61 playtest entries (PLAYTEST-QUEUE, build dbc678a-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
