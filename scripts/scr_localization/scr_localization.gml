@@ -173,7 +173,7 @@ function Loc_T(_key, _fallback = "", _vars = undefined) {
     Loc_Init();
 
     var loc = Loc_GetData();
-    var lang = Loc_GetLanguage();
+    var lang = (loc.lang == "") ? loc.default_lang : loc.lang;   // what Loc_GetLanguage answers, without a second Loc_Init
     var text = Loc_GetRaw(_key, lang);
 
     if (text == "" && lang != loc.default_lang) {

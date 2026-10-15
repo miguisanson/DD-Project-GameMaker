@@ -3053,8 +3053,19 @@ function Ui_Px() {
     return max(1, round(UI_GetTextScale() * DISPLAY_FONT_PX));
 }
 
+// Cached per (layout struct, language); the SAME struct comes back until one changes, so callers must treat it as read-only (none writes to it).
+// The font is still set on every call (callers rely on it), from the font the build ended with.
 function Ui_Metrics() {
-    return Ui_MetricsBuild();
+    var _l = Display_Layout();
+    var _lang = Loc_GetLanguage();
+    var _c = variable_global_exists("ui_mt_cache") ? global.ui_mt_cache : undefined;
+    if (is_struct(_c) && _c.layout == _l && _c.lang == _lang) {
+        draw_set_font(_c.font);
+        return _c.mt;
+    }
+    var _mt = Ui_MetricsBuild();
+    global.ui_mt_cache = { layout: _l, lang: _lang, font: draw_get_font(), mt: _mt };
+    return _mt;
 }
 
 // The uncached computation of Ui_Metrics (sets the UI font). Counted (Ui_MetricsBuilds) so a check can see how often it runs.
