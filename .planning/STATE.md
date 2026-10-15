@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Session 4 (2026-10-15): D117-D125 locked. Full gate on next running (worktree E:/Github_Projects/DD-Project-GameMaker-wt/next, log E:/Temp/dd-gate-next-full.log). R1 checks written on branch r1-rng (worktree DD-Project-GameMaker-wt/r1, uncommitted): Test_Suite_FairRng + runsave drop_dry + flee vectors; contract in that worktree at .planning/R1-CONTRACT.md. Next: confirm R1 checks fail, dispatch R1a (game logic) + R1-sim (python) Sonnet packets, then R1b (focus pause + odds text), F1, E2. |
+| WIP | Session 4 overnight (2026-10-15): full gate on next = GATE PASS (e1a322d, 795 s). R1 checks committed on r1-rng (627abc0), confirmed failing for the right reason. In flight (Sonnet): R1a game logic in worktree DD-Project-GameMaker-wt/r1 (r1-rng); R1-sim in DD-Project-GameMaker-wt/r1sim (r1-sim); PLAYTEST-QUEUE draft in the main checkout (uncommitted). Contract: r1-rng:.planning/R1-CONTRACT.md. Next: review+merge R1a, R1-sim; R1b (D122 focus pause, D124 odds text); F1; E2 build. Owner asleep: wants playtest-ready on return, Sonnet helpers, improvement mode after. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
