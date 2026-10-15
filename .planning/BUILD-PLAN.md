@@ -53,7 +53,7 @@ Leave frame-counted: player grid step, enemy AI pacing, fx ages, cine pan (gamep
 
 | # | Item | Source | Status |
 |---|---|---|---|
-| I1 | `lint_hardcoded_text.py` exits 1 on the `"{n}"` templates at scr_menu.gml ~858/882 (F1c): add `{n}` to its allow list or route through Loc_T | regression run | todo |
-| I2 | Automate regression gaps: R-007 (mini boss 60 s, fight within 4 tiles, stays removed), R-017 (dialogue end on floor 5 / 9.5), R-022 (status tick on a failed Run turn), R-028 (no cutscene background after Continue), R-036 (death from a status tick / in a transition) | regression run | todo |
-| I3 | R-021 negative-control plants for a syntax error and an unknown function | regression run | todo |
-| F2a / F4a | ms clocks for transitions/credits; palette literals | F1 audit | in flight |
+| I1 (in flight) | `lint_hardcoded_text.py` exits 1 on the `"{n}"` templates at scr_menu.gml ~858/882 (F1c): add `{n}` to its allow list or route through Loc_T | regression run | todo |
+| I2 (in flight) | Automate regression gaps: R-007 (mini boss 60 s, fight within 4 tiles, stays removed), R-017 (dialogue end on floor 5 / 9.5), R-022 (status tick on a failed Run turn), R-028 (no cutscene background after Continue), R-036 (death from a status tick / in a transition) | regression run | todo |
+| I3 (in flight) | R-021 negative-control plants for a syntax error and an unknown function | regression run | todo |
+| F2a / F4a | ms clocks for transitions/credits; palette literals | F1 audit | MERGED to next (after the playtest build) |
