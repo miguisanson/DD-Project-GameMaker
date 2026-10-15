@@ -7124,7 +7124,7 @@ function Test_Suite_LayoutCache() {
     Test_Eq("F1d2 the page text is unchanged by the layout checks", Dialogue_LineText(_ui.lines[_ui.index]), _page);
     Test_Eq("F1d2 the cached dialogue layout equals the uncached one", json_stringify(_tl), json_stringify(Dialogue_TextLayoutBuild("Hero")));
     Test_Eq("F1d2 the cached dialogue layout without a speaker equals the uncached one", json_stringify(Dialogue_TextLayout("")), json_stringify(Dialogue_TextLayoutBuild("")));
-    Test_Eq("F1d2 the cached box rect equals the uncached layout's box", json_stringify(Dialogue_BoxRect()), json_stringify(Dialogue_TextLayoutBuild("Hero").box));
+    Test_Eq("F1d2 the cached box rect equals the uncached layout's box", json_stringify(Dialogue_BoxRect()), json_stringify(Dialogue_BoxRectBuild()));
 
     // cutscene text only and the half-height box each give their own (equal-to-uncached) layout
     _ui.cutscene_text_only = true;
@@ -7134,7 +7134,7 @@ function Test_Suite_LayoutCache() {
     _ui.cutscene_text_only = false;
     _ui.dialogue_box_half = true;
     Test_Eq("F1d2 the half-height box layout equals the uncached one", json_stringify(Dialogue_TextLayout("Hero")), json_stringify(Dialogue_TextLayoutBuild("Hero")));
-    Test_Eq("F1d2 the half-height box rect equals the uncached one", json_stringify(Dialogue_BoxRect()), json_stringify(Dialogue_TextLayoutBuild("Hero").box));
+    Test_Eq("F1d2 the half-height box rect equals the uncached one", json_stringify(Dialogue_BoxRect()), json_stringify(Dialogue_BoxRectBuild()));
     Test_True("F1d2 the half-height box is taller than the boxed one", Dialogue_BoxRect().h > _tl.box.h);
     _ui.dialogue_box_half = false;
     Test_Eq("F1d2 back to the boxed layout the cached one equals the first", json_stringify(Dialogue_TextLayout("Hero")), json_stringify(_tl));
@@ -7162,7 +7162,7 @@ function Test_Suite_LayoutCache() {
     Test_Eq("F1d2 a relayout rebuilds the dialogue text layout exactly once", Dialogue_TextLayoutBuilds() - _db0, 1);
     Test_Eq("F1d2 the relayout dialogue layout equals the uncached one", json_stringify(_tl_big), json_stringify(Dialogue_TextLayoutBuild("Hero")));
     Test_True("F1d2 the relayout dialogue layout has another text width", _tl_big.text_w != _tl.text_w);
-    Test_Eq("F1d2 the relayout box rect equals the uncached one", json_stringify(Dialogue_BoxRect()), json_stringify(Dialogue_TextLayoutBuild("Hero").box));
+    Test_Eq("F1d2 the relayout box rect equals the uncached one", json_stringify(Dialogue_BoxRect()), json_stringify(Dialogue_BoxRectBuild()));
     _d.layout = _layout0;
 
     // [PERF] 1000 x Credits_Layout and 1000 x Dialogue_TextLayout (no assertion: the time depends on the PC)
