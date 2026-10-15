@@ -381,6 +381,69 @@ class FairRng(unittest.TestCase):
                 self.assertEqual(len(enemies), free + len(lay["enemies_fixed"]))
 
 
+class MarbleBags(unittest.TestCase):
+    """D126: marble bags for status chances, enemy moves, gold and finds; heals and ticks give their exact average."""
+
+    def test_a_75_percent_bag_gives_three_in_four(self):
+        store, rng = {}, random.Random(5)
+        for _ in range(25):
+            self.assertEqual(sum(sim.bag_draw(store, "k", 0.75, rng) for _ in range(4)), 3)
+
+    def test_a_sure_or_impossible_chance_needs_no_bag(self):
+        store, rng = {}, random.Random(5)
+        self.assertTrue(sim.bag_draw(store, "k", 1, rng))
+        self.assertFalse(sim.bag_draw(store, "k", 0, rng))
+        self.assertEqual(store, {})
+
+    def test_a_changed_chance_refills_the_bag(self):
+        store, rng = {}, random.Random(5)
+        sim.bag_draw(store, "k", 0.6, rng)
+        self.assertEqual(len(store["k"]["left"]), 4)               # 3 of 5, one drawn
+        sim.bag_draw(store, "k", 0.85, rng)
+        self.assertEqual(len(store["k"]["left"]), 19)              # 17 of 20, one drawn
+
+    def test_status_roll_is_a_bag_per_skill_per_user(self):
+        b = battle("knight", "slime", seed=3)
+        got = [b.status_roll(b.p, 7, 0.6) for _ in range(5)]
+        self.assertEqual(sum(got), 3)
+        other = [b.status_roll(b.e, 7, 0.6) for _ in range(5)]     # another user, another bag
+        self.assertEqual(sum(other), 3)
+        self.assertEqual(sum(b.status_roll(b.p, 8, 0.75) for _ in range(4)), 3)   # another skill, another bag
+
+    def test_whole_number_weights(self):
+        self.assertEqual(sim.int_weights([3, 1]), [3, 1])
+        self.assertEqual(sim.int_weights([2, 2]), [1, 1])
+        self.assertEqual(sim.int_weights([0.5, 1.5]), [1, 3])
+        self.assertEqual(sum(sim.int_weights([37, 61, 11])) <= 41, True)
+
+    def test_a_4_to_1_enemy_uses_its_rare_move_once_in_five(self):   # the Slime: attack 4, Solidify 1 (its hurt rule does not hold at full health)
+        b = battle("knight", "slime", seed=9)
+        picks = [b.ai_choose(b.e, b.p, [])[1] for _ in range(50)]
+        for d in range(10):
+            self.assertEqual(sum(1 for x in picks[d * 5:d * 5 + 5] if x != -1), 1)
+
+    def test_a_rule_with_a_chance_uses_its_own_bag(self):
+        b = battle("knight", "slime", seed=9)
+        b.e.brain = dict(rules=[dict(label="h", when=[], act="skill", skill=b.e.skills_e[0], chance=0.5, max_uses=-1)], weights=[dict(act="attack", skill=-1, w=1)], phases=[])
+        picks = [b.ai_choose(b.e, b.p, [])[1] for _ in range(20)]
+        for i in range(10):
+            self.assertEqual(sum(1 for x in picks[i * 2:i * 2 + 2] if x != -1), 1)
+
+    def test_heals_and_ticks_give_their_average(self):
+        self.assertEqual(sim.tick_amount(2, 4), 3)
+        self.assertEqual(sim.tick_amount(5, 10), 8)                  # 7.5 rounds up
+        self.assertEqual(sim.item_amount(R, sim.new_player(R, sim.CLASS_IDS["knight"]), {"min": 4, "max": 8}, random.Random(1)), 6)
+
+    def test_gold_offsets_average_out(self):
+        offs = sim.gold_offsets(0.25)
+        self.assertEqual(offs, [-0.25, -0.125, 0.0, 0.125, 0.25])
+        self.assertAlmostEqual(sum(offs), 0)
+
+    def test_the_find_bag_gives_three_in_ten(self):
+        store, rng = {}, random.Random(2)
+        self.assertEqual(sum(sim.bag_draw(store, "find", 0.3, rng) for _ in range(10)), 3)
+
+
 def ref_burn(mag):
     return sim.ref.burn_tick(mag)
 

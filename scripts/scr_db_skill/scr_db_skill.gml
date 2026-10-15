@@ -1052,6 +1052,12 @@ function Skill_PlayerFxIds() {
 }
 
 // _grade_mult is the QTE grade's damage multiplier (D61). 1.00 = grade OK, which is what every player skill uses until the arrow QTE (D57) lands.
+// D126: does the status of this skill land? One marble bag per skill per user (per status for Curse), shuffled with the run's combat stream.
+// The bag refills when the chance changes (an upgrade adds 0.25). A chance of 1 needs no bag.
+function Skill_StatusRoll(_user, _skill_id, _chance, _slot = "") {
+    return Bag_Draw(_user, "status_" + string(_skill_id) + _slot, _chance, Run_Stream("combat"));
+}
+
 function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
     var s = SkillDB_Get(_skill_id);
     var user_is_player = (variable_struct_exists(_user, "is_player") && _user.is_player);
@@ -1136,7 +1142,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
             for (var m = 0; m < array_length(s.status_list); m++) {
                 var sid_m = s.status_list[m];
                 if (sid_m == -1) continue;
-                if (multi_chance < 1 && random(1) > multi_chance) continue;
+                if (!Skill_StatusRoll(_user, _skill_id, multi_chance, "_" + string(m))) continue;   // D126: one bag per status
                 var turns_m = status_turns_default;
                 if (m < array_length(turns_list)) turns_m = max(1, round(real(turns_list[m])));
                 var args_m = Skill_StatusApplyArgs(_user, _target, sid_m, turns_m, Skill_BaseStacks(s, m));
@@ -1299,7 +1305,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
         var status_chance = variable_struct_exists(s, "status_chance") ? real(s.status_chance) : 1;
 
         if (s.status != -1 && any_hit) {
-            if (status_chance >= 1 || random(1) <= status_chance) {
+            if (Skill_StatusRoll(_user, _skill_id, status_chance)) {
                 var args_h = Skill_StatusApplyArgs(_user, _target, s.status, status_turns_default, Skill_BaseStacks(s));
                 var adjh = Equip_PassiveAdjustIncomingStatus(_user, _target, s.status, args_h.turns);
                 if (adjh.apply) {
@@ -1317,7 +1323,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
 
         if (variable_struct_exists(s, "status_list") && is_array(s.status_list) && any_hit) {
             var turns_list_d = variable_struct_exists(s, "status_turns_list") && is_array(s.status_turns_list) ? s.status_turns_list : [];
-            if (status_chance >= 1 || random(1) <= status_chance) {
+            if (Skill_StatusRoll(_user, _skill_id, status_chance, "_list")) {
                 for (var sd = 0; sd < array_length(s.status_list); sd++) {
                     var sid_d = s.status_list[sd];
                     if (sid_d == -1) continue;
@@ -1588,7 +1594,7 @@ function Card_OnVictory(_ch) {
     var mp = round(Card_PassiveSum(_ch, "mp_after_fight"));
     if (mp > 0 && variable_struct_exists(_ch, "max_mp")) _ch.mp = clamp(_ch.mp + mp, 0, _ch.max_mp);
     var find = Card_PassiveSum(_ch, "find_potion_pct");
-    if (find > 0 && variable_struct_exists(_ch, "inventory") && RunRng_Chance("loot", find)) _ch.inventory = Inv_Add(_ch.inventory, 10, 1);
+    if (find > 0 && variable_struct_exists(_ch, "inventory") && Bag_Draw(Run_BagHolder(), "find", find, Run_Stream("loot"))) _ch.inventory = Inv_Add(_ch.inventory, 10, 1);
     return _ch;
 }
 

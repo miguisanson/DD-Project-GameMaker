@@ -3,7 +3,7 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T09:32:57Z",
+    "generated_at_utc": "2026-10-15T09:52:02Z",
     "row_count": 1026
   },
   "default_lang": "en",
@@ -2273,12 +2273,12 @@
       "ko": "{status} 상태를 치료합니다."
     },
     "item.sent.heal": {
-      "en": "Restores {min} to {max} HP.",
-      "ko": "HP를 {min}에서 {max}만큼 회복합니다."
+      "en": "Restores {n} HP.",
+      "ko": "HP를 {n}만큼 회복합니다."
     },
     "item.sent.mp": {
-      "en": "Restores {min} to {max} MP.",
-      "ko": "MP를 {min}에서 {max}만큼 회복합니다."
+      "en": "Restores {n} MP.",
+      "ko": "MP를 {n}만큼 회복합니다."
     },
     "item.sent.throw": {
       "en": "Throw it at the enemy. Costs your turn.",
@@ -2469,12 +2469,12 @@
       "ko": "치료: {status}"
     },
     "menu.tooltip.item.heal_hp": {
-      "en": "Restore HP {min}-{max}",
-      "ko": "HP 회복 {min}-{max}"
+      "en": "Restore HP {n}",
+      "ko": "HP {n} 회복"
     },
     "menu.tooltip.item.restore_mp": {
-      "en": "Restore MP {min}-{max}",
-      "ko": "MP 회복 {min}-{max}"
+      "en": "Restore MP {n}",
+      "ko": "MP {n} 회복"
     },
     "menu.tooltip.item.scale_with_level": {
       "en": "Amount scales with level.",
@@ -3529,8 +3529,8 @@
       "ko": "{turns}턴 동안 적의 다음 행동이 보이고 모든 완벽 구간이 {pct}% 넓어집니다."
     },
     "status.desc.status_meditation": {
-      "en": "Recover {lo}-{hi} MP each turn.",
-      "ko": "매 턴 MP를 {lo}-{hi} 회복합니다."
+      "en": "Recover {n} MP each turn.",
+      "ko": "매 턴 MP를 {n} 회복합니다."
     },
     "status.desc.status_solidify": {
       "en": "Takes {pct}% less damage from the next hit.",

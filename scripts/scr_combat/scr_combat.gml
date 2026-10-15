@@ -95,22 +95,54 @@ function Crit_BagSize(_p) {
     return { n: 20, reds: round(20 * _p) };
 }
 
+// D126: the marble bag as a reusable helper. A bag is { p, left } stored on the holder (a fighter, or the run) under "<key>_bag":
+// `left` holds the marbles not drawn yet (true = the chance came up). It is drawn from the given stream without putting back and refilled
+// (shuffled with that stream) when it runs dry or when the chance changed. A chance of 1 or 0 needs no bag and draws no random number.
+function Bag_Field(_key) {
+    return string(_key) + "_bag";
+}
+
+// Marbles left in the holder's bag for this key (0 when it has none).
+function Bag_Left(_holder, _key) {
+    var f = Bag_Field(_key);
+    if (is_struct(_holder) && variable_struct_exists(_holder, f)) {
+        var b = variable_struct_get(_holder, f);
+        if (is_struct(b) && is_array(b.left)) return array_length(b.left);
+    }
+    return 0;
+}
+
+// Throws the bag away (a fresh one is filled on the next draw).
+function Bag_Clear(_holder, _key) {
+    var f = Bag_Field(_key);
+    if (is_struct(_holder) && variable_struct_exists(_holder, f)) variable_struct_remove(_holder, f);
+}
+
+// One draw from the bag (_holder, _key) for the chance _p, shuffled with _rng when it has to be filled.
+function Bag_Draw(_holder, _key, _p, _rng) {
+    if (_p >= 0.999999) { Bag_Clear(_holder, _key); return true; }
+    if (_p <= 0) { Bag_Clear(_holder, _key); return false; }
+    var f = Bag_Field(_key);
+    var b = variable_struct_exists(_holder, f) ? variable_struct_get(_holder, f) : undefined;
+    if (!is_struct(b) || !is_array(b.left) || array_length(b.left) <= 0 || abs(b.p - _p) > 0.000001) {
+        var size = Crit_BagSize(_p);
+        var marbles = [];
+        for (var i = 0; i < size.n; i++) array_push(marbles, i < size.reds);
+        b = { p: _p, left: Rng_Shuffle(_rng, marbles) };
+        variable_struct_set(_holder, f, b);
+    }
+    return array_pop(b.left);
+}
+
 // Marbles left in the fighter's crit bag (0 when it has none).
 function Crit_BagLeft(_f) {
-    if (is_struct(_f) && variable_struct_exists(_f, "crit_bag") && is_struct(_f.crit_bag)) return array_length(_f.crit_bag.left);
-    return 0;
+    return Bag_Left(_f, "crit");
 }
 
 function Combat_CritCheck(_attacker, _crit_bonus) {
     var chance = Combat_CritChance(_crit_bonus);
     if (chance <= 0) return false;
-    if (Crit_BagLeft(_attacker) <= 0 || abs(_attacker.crit_bag.p - chance) > 0.000001) {
-        var size = Crit_BagSize(chance);
-        var marbles = [];
-        for (var i = 0; i < size.n; i++) array_push(marbles, i < size.reds);
-        _attacker.crit_bag = { p: chance, left: Rng_Shuffle(Run_Stream("combat"), marbles) };   // C1: run randomness comes from the run's combat stream
-    }
-    return array_pop(_attacker.crit_bag.left);
+    return Bag_Draw(_attacker, "crit", chance, Run_Stream("combat"));   // C1: run randomness comes from the run's combat stream
 }
 
 // D80: no dice. The only way an enemy action fails to land is Evasion on the PLAYER: the next damaging enemy action is fully dodged and Evasion is used up.
@@ -2652,13 +2684,11 @@ function Battle_ItemDetails(_item, _user) {
         switch (use.effect) {
             case "heal":
                 sentence = Loc_T("battle.item.heal", "Restores your HP.");
-                var rh = Item_AmountRange(_user, use);
-                array_push(lines, { label: Loc_T("battle.det.hp", "HP"), value: (rh.lo == rh.hi) ? string(rh.lo) : (string(rh.lo) + "-" + string(rh.hi)) });
+                array_push(lines, { label: Loc_T("battle.det.hp", "HP"), value: string(Item_ComputeAmount(_user, use)) });   // D126: one exact number
                 break;
             case "mp":
                 sentence = Loc_T("battle.item.mp", "Restores your MP.");
-                var rm = Item_AmountRange(_user, use);
-                array_push(lines, { label: Loc_T("battle.det.mp", "MP"), value: (rm.lo == rm.hi) ? string(rm.lo) : (string(rm.lo) + "-" + string(rm.hi)) });
+                array_push(lines, { label: Loc_T("battle.det.mp", "MP"), value: string(Item_ComputeAmount(_user, use)) });
                 break;
             case "cure":
                 sentence = Loc_T("battle.item.cure", "Cures {status}.", { status: Card_StatusNameSafe(use.status) });

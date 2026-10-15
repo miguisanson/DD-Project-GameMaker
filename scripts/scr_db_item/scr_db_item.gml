@@ -644,20 +644,17 @@ function Item_AdjustAmount(_user, _use, _base) {
     return amt;
 }
 
-// The smallest and largest amount a use can give this user right now (the battle's details panel shows it, D100).
-function Item_AmountRange(_user, _use) {
+// D126: a heal or MP use that is written as min..max gives the exact average (rounded half up), then the user's level scaling and potion passives.
+// No dice: the same potion heals the same every time, and the details panel shows that one number.
+function Item_BaseAmount(_use) {
     var minv = variable_struct_exists(_use, "min") ? _use.min : _use.power;
     var maxv = variable_struct_exists(_use, "max") ? _use.max : _use.power;
     if (maxv < minv) maxv = minv;
-    return { lo: Item_AdjustAmount(_user, _use, minv), hi: Item_AdjustAmount(_user, _use, maxv) };
+    return RoundHalfUp((minv + maxv) / 2);
 }
 
 function Item_ComputeAmount(_user, _use) {
-    var minv = variable_struct_exists(_use, "min") ? _use.min : _use.power;
-    var maxv = variable_struct_exists(_use, "max") ? _use.max : _use.power;
-    if (maxv < minv) maxv = minv;
-    var amt = (minv == maxv) ? minv : RunRng_Range("combat", minv, maxv);
-    return Item_AdjustAmount(_user, _use, amt);
+    return Item_AdjustAmount(_user, _use, Item_BaseAmount(_use));
 }
 
 function Item_Use(_item_id, _user, _target) {
@@ -848,8 +845,8 @@ function Item_Sentence(_item) {
     if (_item.type == ITEM_CONSUMABLE && variable_struct_exists(_item, "use")) {
         var us = _item.use;
         switch (us.effect) {
-            case "heal": return Loc_T("item.sent.heal", "Restores {min} to {max} HP.", { min: string(us.min), max: string(us.max) });
-            case "mp": return Loc_T("item.sent.mp", "Restores {min} to {max} MP.", { min: string(us.min), max: string(us.max) });
+            case "heal": return Loc_T("item.sent.heal", "Restores {n} HP.", { n: string(Item_BaseAmount(us)) });   // D126: one number
+            case "mp": return Loc_T("item.sent.mp", "Restores {n} MP.", { n: string(Item_BaseAmount(us)) });
             case "cure": return Loc_T("item.sent.cure", "Cures {status}.", { status: StatusDB_Get(us.status).name });
         }
     }
@@ -894,8 +891,8 @@ function Item_NumberLines(_item, _ch) {
     }
     if (_item.type == ITEM_CONSUMABLE && variable_struct_exists(_item, "use")) {
         var us = _item.use;
-        if (us.effect == "heal") array_push(lines, { label: Loc_T("shop.lbl.hp", "HP"), value: string(us.min) + "-" + string(us.max) });
-        else if (us.effect == "mp") array_push(lines, { label: Loc_T("shop.lbl.mp", "MP"), value: string(us.min) + "-" + string(us.max) });
+        if (us.effect == "heal") array_push(lines, { label: Loc_T("shop.lbl.hp", "HP"), value: string(Item_BaseAmount(us)) });   // D126: the exact average
+        else if (us.effect == "mp") array_push(lines, { label: Loc_T("shop.lbl.mp", "MP"), value: string(Item_BaseAmount(us)) });
         else if (us.effect == "cure") array_push(lines, { label: Loc_T("shop.lbl.cures", "Cures"), value: StatusDB_Get(us.status).name });
         return lines;
     }

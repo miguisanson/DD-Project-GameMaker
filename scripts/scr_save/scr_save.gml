@@ -788,6 +788,8 @@ function RunSave_Build() {
         cards: run.cards,
         kills: run.kills,
         drop_dry: run.drop_dry,   // R1 (D120), run save v2
+        gold_bag: run.gold_bag,   // D126: no version bump; a save without them loads with empty bags
+        find_bag: run.find_bag,
         started_at: run.started_at,
         floor: Run_FloorOfRoomName(where.room_name),
         statData: stat,
@@ -819,6 +821,15 @@ function RunSave_ApplyState(_raw) {
     if (variable_struct_exists(_raw, "cards")) run.cards = Card_StateNormalize(_raw.cards);
     if (variable_struct_exists(_raw, "kills")) run.kills = Save_ToReal(_raw.kills, 0);
     if (variable_struct_exists(_raw, "drop_dry")) run.drop_dry = Save_ToReal(_raw.drop_dry, 0);
+    if (variable_struct_exists(_raw, "gold_bag") && is_array(_raw.gold_bag)) {   // D126
+        run.gold_bag = [];
+        for (var gb = 0; gb < array_length(_raw.gold_bag); gb++) array_push(run.gold_bag, Save_ToReal(_raw.gold_bag[gb], 0));
+    }
+    if (variable_struct_exists(_raw, "find_bag") && is_struct(_raw.find_bag) && variable_struct_exists(_raw.find_bag, "left") && is_array(_raw.find_bag.left)) {
+        var fb_left = [];
+        for (var fb = 0; fb < array_length(_raw.find_bag.left); fb++) array_push(fb_left, bool(_raw.find_bag.left[fb]));
+        run.find_bag = { p: variable_struct_exists(_raw.find_bag, "p") ? Save_ToReal(_raw.find_bag.p, 0) : 0, left: fb_left };
+    }
     if (variable_struct_exists(_raw, "started_at")) run.started_at = Save_ToReal(_raw.started_at, run.started_at);
     gs.run = run;
     return info;

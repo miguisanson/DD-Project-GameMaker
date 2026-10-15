@@ -494,9 +494,8 @@ function Status_Describe(_status_id, _data = undefined) {
             break;
         case STATUS_MEDITATION:
             var mt = Status_Cfg(_status_id, "tick", { mp_min: 0, mp_max: 0 });
-            vars.lo = mt.mp_min;
-            vars.hi = mt.mp_max;
-            line = Loc_T("status.desc.status_meditation", "Recover {lo}-{hi} MP each turn.", vars);
+            vars.n = Status_TickAmount(min(mt.mp_min, mt.mp_max), max(mt.mp_min, mt.mp_max));   // D126: the exact average
+            line = Loc_T("status.desc.status_meditation", "Recover {n} MP each turn.", vars);
             break;
         case STATUS_SOLIDIFY:
             vars.pct = round((1 - Status_Cfg(_status_id, "guard_mult", 1)) * 100);
@@ -608,7 +607,7 @@ function Status_ClearAll(_ch) {
 function Status_Add(_ch, _status_id, _turns, _power, _stacks = 1) {
     if (!is_array(_ch.status)) _ch.status = [];
     var cfg = StatusDB_Get(_status_id);
-    if (Status_Cfg(_status_id, "crit_bonus", 0) > 0 && variable_struct_exists(_ch, "crit_bag")) variable_struct_remove(_ch, "crit_bag");   // R1 (D119): a fresh bag for a re-applied crit buff
+    if (Status_Cfg(_status_id, "crit_bonus", 0) > 0) Bag_Clear(_ch, "crit");   // R1 (D119): a fresh bag for a re-applied crit buff
 
     // Stun is only a marker (D75): the battle turns it into a push-back on the turn timeline at once (Battle_ConsumeStun); Steadfast lives there too.
 
@@ -769,6 +768,11 @@ function Status_TickFeedbackEnemy(_status_id, _hp_lost, _enemy_name) {
     return info;
 }
 
+// D126: a tick given as a range (lo..hi) is worth its average, rounded half up, every time.
+function Status_TickAmount(_lo, _hi) {
+    return RoundHalfUp((_lo + _hi) / 2);
+}
+
 // HP lost by one status entry on _ch (its DoT table or its legacy hp tick); clamps HP and reports it to the player/enemy feedback.
 function Status_ApplyHpTick(_ch, _entry, _cfg, _acted) {
     var delta_hp = 0;
@@ -779,7 +783,7 @@ function Status_ApplyHpTick(_ch, _entry, _cfg, _acted) {
         var hp_max = variable_struct_exists(_cfg.tick, "hp_max") ? _cfg.tick.hp_max : 0;
         var hp_low = min(hp_min, hp_max);
         var hp_high = max(hp_min, hp_max);
-        if (hp_low != 0 || hp_high != 0) delta_hp = (hp_low == hp_high) ? hp_low : irandom_range(hp_low, hp_high);
+        if (hp_low != 0 || hp_high != 0) delta_hp = Status_TickAmount(hp_low, hp_high);   // D126: the exact average, no dice
     }
     if (delta_hp == 0) return _ch;
     var hp_before = _ch.hp;
@@ -832,7 +836,7 @@ function Status_Tick(_ch, _acted = true) {
         var mp_low = min(mp_min, mp_max);
         var mp_high = max(mp_min, mp_max);
         if (mp_low != 0 || mp_high != 0) {
-            var delta_mp = (mp_low == mp_high) ? mp_low : irandom_range(mp_low, mp_high);
+            var delta_mp = Status_TickAmount(mp_low, mp_high);   // D126: the exact average, no dice
             _ch.mp = clamp(_ch.mp + delta_mp, 0, _ch.max_mp);
         }
 

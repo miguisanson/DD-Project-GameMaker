@@ -104,6 +104,7 @@ function Test_RunAll() {
     Test_RunSuite("BalanceD111", Test_Suite_BalanceD111);
     Test_RunSuite("FairRng", Test_Suite_FairRng);
     Test_RunSuite("FairUi", Test_Suite_FairUi);
+    Test_RunSuite("Bags", Test_Suite_Bags);
     Test_RunSuite("Save", Test_Suite_Save); // last: Save_ApplySnapshot replaces global state
     Test_RunSuite("Mem", Test_Suite_Mem);
     Test_RunSuite("Input", Test_Suite_Input);
@@ -1418,7 +1419,7 @@ function Test_Suite_Status() {
     Test_Eq("meditation tick clamps MP at max", _med.mp, _med.max_mp);
     _med.mp = 0;
     _med = Status_Tick(_med);
-    Test_True("meditation tick restores 2-4 MP", _med.mp >= 2 && _med.mp <= 4);
+    Test_Eq("meditation tick restores exactly 3 MP, the average of 2-4 (D126)", _med.mp, 3);
     // Non-stackable re-apply refreshes to the longer duration (Guard); the three DoTs no longer exclude each other (D78, StatusRules covers them).
     var _r = CharacterCreate_Player(CLASS_KNIGHT);
     _r = Status_Add(_r, STATUS_GUARD, 2, 0);
@@ -1888,6 +1889,9 @@ function Test_AICtx(_turn = 1, _phase = 0) {
 function Test_AIDraws(_e, _p, _ctx, _seed, _n) {
     var _rng = Rng_New(_seed, "combat");
     var _out = [];
+    if (variable_struct_exists(_e, "move_deck")) variable_struct_remove(_e, "move_deck");   // D126: each call starts with a fresh deck and fresh rule bags, so a seed means a sequence
+    var _bag_names = variable_struct_get_names(_e);
+    for (var _b = 0; _b < array_length(_bag_names); _b++) { if (string_pos("rule_", _bag_names[_b]) == 1) variable_struct_remove(_e, _bag_names[_b]); }
     for (var _i = 0; _i < _n; _i++) array_push(_out, EnemyAI_Choose(_e, _p, _ctx, _rng).skill_id);
     return _out;
 }
@@ -5684,19 +5688,16 @@ function Test_Suite_BattleUi() {
     Test_Eq("BattleUi a buff shows no Power line", Test_RowValue(Battle_SkillDetails(_mu).lines, Loc_T("card.lbl.power", "Power")), "");
     var _hp = ItemDB_Get(10);
     var _idet = Battle_ItemDetails(_hp, _player);
-    var _rng = Item_AmountRange(_player, _hp.use);
-    Test_Eq("BattleUi HP Potion Lv1 range at level 1 is the data's 5-10", string(_rng.lo) + "-" + string(_rng.hi), "5-10");
-    Test_Eq("BattleUi HP Potion row shows that range", Test_RowValue(_idet.lines, Loc_T("battle.det.hp", "HP")), "5-10");
+    Test_Eq("BattleUi HP Potion Lv1 at level 1 heals the average of the data's 5-10, rounded up: 8 (D126)", Item_ComputeAmount(_player, _hp.use), 8);
+    Test_Eq("BattleUi HP Potion row shows that one number (D126)", Test_RowValue(_idet.lines, Loc_T("battle.det.hp", "HP")), "8");
     var _lvl5 = CharacterCreate_Player(CLASS_KNIGHT);
     _lvl5.level = 5;
-    var _rng5 = Item_AmountRange(_lvl5, _hp.use);
-    Test_Eq("BattleUi HP Potion Lv1 range at level 5 adds the level scaling (4 levels x 1.0)", string(_rng5.lo) + "-" + string(_rng5.hi), "9-14");
-    var _inside = true;
+    Test_Eq("BattleUi HP Potion Lv1 at level 5 adds the level scaling to the average (8 + 4 levels x 1.0) (D126)", Item_ComputeAmount(_lvl5, _hp.use), 12);
+    var _same = true;
     for (var _t = 0; _t < 40; _t++) {
-        var _a = Item_ComputeAmount(_lvl5, _hp.use);
-        if (_a < _rng5.lo || _a > _rng5.hi) _inside = false;
+        if (string(Item_ComputeAmount(_lvl5, _hp.use)) != Test_RowValue(Battle_ItemDetails(_hp, _lvl5).lines, Loc_T("battle.det.hp", "HP"))) _same = false;
     }
-    Test_True("BattleUi the real roll always falls inside the shown range", _inside);
+    Test_True("BattleUi the real heal is always the number the details show (D126)", _same);
 
     // ---- rows of the skill list: MP, arrows, greyed when the MP is short ----
     var _kn = CharacterCreate_Player(CLASS_KNIGHT);
@@ -6554,7 +6555,10 @@ function Test_Suite_Economy() {
     Test_True("C3 gold: 300 rolls of base 12 stay inside 9..15", _gok);
     Test_True("C3 gold: the rolls reach both ends of the range", _gmin == 9 && _gmax == 15);
     var _ga = Rng_New(55, "gold"); var _gb = Rng_New(55, "gold");
-    Test_Eq("C3 gold: the same stream gives the same roll", Gold_Roll(_ga, 20), Gold_Roll(_gb, 20));
+    Run_BagHolder().gold_bag = [];   // D126: the bag is run state, so each roll starts from an empty one
+    var _gra = Gold_Roll(_ga, 20);
+    Run_BagHolder().gold_bag = [];
+    Test_Eq("C3 gold: the same stream gives the same roll (from an empty bag, D126)", _gra, Gold_Roll(_gb, 20));
     var _kn = Test_Hero(CLASS_KNIGHT);
     Test_Eq("C3 gold: no bonus = the plain amount", Gold_Scale(12, _kn), 12);
     var _cs = Card_Take(_kn, "pas:coin_sense").ch;
@@ -7054,7 +7058,7 @@ function Test_Suite_Economy() {
     Test_True("C3 text: the sentence of every throwable has its numbers", string_pos("3", Item_Sentence(_fb)) > 0 && string_pos("4", Item_Sentence(ItemDB_Get(31))) > 0 && string_pos("2", Item_Sentence(ItemDB_Get(33))) > 0);
     Test_True("C3 text: an accessory has a sentence and a line", string_length(Item_Sentence(ItemDB_Get(44))) > 8 && array_length(Item_NumberLines(ItemDB_Get(44), _kn)) >= 1);
     Test_True("C3 text: a stat ring says +1", string_pos("1", Item_Sentence(ItemDB_Get(40))) > 0 && Item_NumberLines(ItemDB_Get(40), _kn)[0].value == "+1");
-    Test_True("C3 text: a potion lists its numbers", Item_NumberLines(ItemDB_Get(10), _kn)[0].value == "5-10");
+    Test_True("C3 text: a potion lists its one number, the average of 5-10 rounded up (D126)", Item_NumberLines(ItemDB_Get(10), _kn)[0].value == "8");
     var _row_it = ShopUi_ItemFor({ kind: "item", id: 30, qty: 2, price: 27 }, _kn, 100);
     Test_True("C3 text: a shop row shows the price and can be bought when it can be paid", _row_it.value == "27" && _row_it.can_buy && _row_it.enabled && string_length(_row_it.help) > 8 && array_length(_row_it.lines) >= 2);
     var _row_no = ShopUi_ItemFor({ kind: "item", id: 30, qty: 2, price: 27 }, _kn, 10);
@@ -7989,4 +7993,369 @@ function Test_Suite_ClassGuard() {
     Test_Eq("g4 the guard speaks two lines", array_length(_lines), 2);
     Test_Eq("g4 line 1", array_length(_lines) > 0 ? _lines[0] : "", "Wait, there was a chest back there. I think I should open it...");
     Test_Eq("g4 line 2", array_length(_lines) > 1 ? _lines[1] : "", "...there might be something I can use to protect myself.");
+}
+
+// ============================================================================================================
+// D126: the marble bag everywhere. Status chances, enemy moves, gold per fight and the Scrounger find come from shuffled bags that
+// are drawn without putting back; heals and ticks give their exact average. Expected values come from the decision text and the
+// bag arithmetic (75% = 3 of 4, 60% = 3 of 5, weights 3:1 = 3 of 4), not from the code.
+// ============================================================================================================
+function Test_BagsPart(_name, _fn) {
+    try { _fn(); } catch (_e) { Test_Eq("D126 bags: " + _name + " runs without an error: " + string(_e.message), false, true); }
+}
+
+// _n uses of a damage skill with a status by the installed player; one entry per use: did the status land?
+function Test_BagsStatusUses(_hero, _skill_id, _status_id, _n) {
+    var _out = [];
+    for (var _i = 0; _i < _n; _i++) {
+        _hero.mp = 999;
+        var _foe = EnemyCreate(ENEMY_FINAL_BOSS);
+        _foe.hp = 99999; _foe.max_hp = 99999;
+        Skill_Use(_hero, _foe, _skill_id);
+        array_push(_out, Status_Has(_foe, _status_id));
+    }
+    return _out;
+}
+
+function Test_BagsCount(_arr) {
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_arr); _i++) { if (_arr[_i]) _n++; }
+    return _n;
+}
+
+// The longest run of `false` entries.
+function Test_BagsWorstDry(_arr) {
+    var _dry = 0; var _worst = 0;
+    for (var _i = 0; _i < array_length(_arr); _i++) {
+        if (_arr[_i]) _dry = 0; else { _dry++; _worst = max(_worst, _dry); }
+    }
+    return _worst;
+}
+
+// A slime with a hand-made brain (rules, weights) that can bite.
+function Test_BagsFoe(_rules, _weights) {
+    var _e = EnemyCreate(ENEMY_SLIME);
+    _e.skills = [SKILL_BITE];
+    _e.brain = { rules: _rules, weights: _weights, phases: [] };
+    return _e;
+}
+
+function Test_BagsPicks(_e, _p, _rng, _n, _ctx = undefined) {
+    var _out = [];
+    for (var _i = 0; _i < _n; _i++) array_push(_out, EnemyAI_Choose(_e, _p, is_undefined(_ctx) ? Test_AICtx() : _ctx, _rng).skill_id);
+    return _out;
+}
+
+function Test_Suite_Bags() {
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_cp = _gs.checkpoint; var _old_persist = _gs.persist; var _old_flags = _gs.flags; var _old_sel = _gs.selected_class;
+    EnemyDB_Init(); SkillDB_Init(); StatusDB_Init();
+
+    Test_BagsPart("the helper", Test_BagsHelper);
+    Test_BagsPart("status chances", Test_BagsStatus);
+    Test_BagsPart("enemy moves", Test_BagsMoves);
+    Test_BagsPart("fixed heals and ticks", Test_BagsFixed);
+    Test_BagsPart("gold per fight", Test_BagsGold);
+    Test_BagsPart("the Scrounger find", Test_BagsFind);
+
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+    _gs.checkpoint = _old_cp; _gs.persist = _old_persist; _gs.flags = _old_flags; _gs.selected_class = _old_sel;
+}
+
+function Test_BagsHelper() {
+    var _gs = GameState_Get();
+    _gs.run = Run_Create(2601);
+    var _h = {};
+    var _got = [];
+    for (var _i = 0; _i < 4; _i++) array_push(_got, Bag_Draw(_h, "t", 0.75, Run_Stream("combat")));
+    Test_Eq("D126 helper: a 75% bag gives exactly 3 hits in 4 draws", Test_BagsCount(_got), 3);
+    Test_Eq("D126 helper: the bag is empty after 4 draws", Bag_Left(_h, "t"), 0);
+    Bag_Draw(_h, "t", 0.75, Run_Stream("combat"));
+    Test_Eq("D126 helper: the next draw fills a new bag of 4 and takes one (3 left)", Bag_Left(_h, "t"), 3);
+    Bag_Draw(_h, "t", 0.5, Run_Stream("combat"));
+    Test_Eq("D126 helper: a different chance refills with the new size (50% = 2, one drawn)", Bag_Left(_h, "t"), 1);
+    var _rng = Rng_New(3, "combat");
+    var _calls = _rng.calls;
+    Test_True("D126 helper: a chance of 1 is always true", Bag_Draw(_h, "sure", 1, _rng));
+    Test_False("D126 helper: a chance of 0 is always false", Bag_Draw(_h, "never", 0, _rng));
+    Test_Eq("D126 helper: chances of 0 and 1 draw no random number", _rng.calls, _calls);
+    Test_Eq("D126 helper: no bag for a chance of 1", Bag_Left(_h, "sure"), 0);
+    var _a = {}; var _b = {};
+    var _ra = Rng_New(77, "combat"); var _rb = Rng_New(77, "combat");
+    var _sa = []; var _sb = [];
+    for (var _k = 0; _k < 40; _k++) { array_push(_sa, Bag_Draw(_a, "x", 0.3, _ra)); array_push(_sb, Bag_Draw(_b, "x", 0.3, _rb)); }
+    Test_True("D126 helper: the same seed gives the same draws", Test_SameArray(_sa, _sb));
+    Test_Eq("D126 helper: 40 draws at 30% (bags of 10 with 3) hit exactly 12 times", Test_BagsCount(_sa), 12);
+    var _c = {};
+    var _rc = Rng_New(78, "combat");
+    var _sc = [];
+    for (var _k2 = 0; _k2 < 40; _k2++) array_push(_sc, Bag_Draw(_c, "x", 0.3, _rc));
+    Test_False("D126 helper: another seed gives another order", Test_SameArray(_sa, _sc));
+    var _two = {};
+    Bag_Draw(_two, "a", 0.75, _ra);
+    Test_Eq("D126 helper: another key has its own bag (still empty)", Bag_Left(_two, "b"), 0);
+    Bag_Clear(_two, "a");
+    Test_Eq("D126 helper: Bag_Clear empties a bag", Bag_Left(_two, "a"), 0);
+}
+
+function Test_BagsStatus() {
+    var _gs = GameState_Get();
+    // Wound: bleed 75%. Hilt Bash: stun 60%. The data's chances, a knight with no gear bonus.
+    _gs.run = Run_Create(4401);
+    var _k = Test_CardPlayer(CLASS_KNIGHT, [SKILL_WOUND, SKILL_HILT_BASH]);
+    _gs.player_ch = _k;
+    var _w4 = Test_BagsStatusUses(_k, SKILL_WOUND, STATUS_BLEED, 4);
+    Test_Eq("D126 status: a 75% status skill applies its status exactly 3 times in 4 uses", Test_BagsCount(_w4), 3);
+    var _w100 = Test_BagsStatusUses(_k, SKILL_WOUND, STATUS_BLEED, 100);
+    Test_Eq("D126 status: 100 more uses of the 75% skill land exactly 75 times", Test_BagsCount(_w100), 75);
+    Test_True("D126 status: the 75% skill never misses more than 2 in a row", Test_BagsWorstDry(_w100) <= 2);
+
+    _gs.run = Run_Create(4402);
+    var _k6 = Test_CardPlayer(CLASS_KNIGHT, [SKILL_WOUND, SKILL_HILT_BASH]);
+    _gs.player_ch = _k6;
+    var _h5 = Test_BagsStatusUses(_k6, SKILL_HILT_BASH, STATUS_STUN, 5);
+    Test_Eq("D126 status: a 60% status skill applies its status exactly 3 times in 5 uses", Test_BagsCount(_h5), 3);
+    var _h30 = Test_BagsStatusUses(_k6, SKILL_HILT_BASH, STATUS_STUN, 30);
+    Test_Eq("D126 status: 30 more uses of the 60% skill land exactly 18 times", Test_BagsCount(_h30), 18);
+
+    // an upgrade (+0.25) changes the chance: the bag is refilled with the new size (85% = 17 of 20)
+    _gs.run = Run_Create(4403);
+    var _ku = Test_CardPlayer(CLASS_KNIGHT, [SKILL_HILT_BASH]);
+    _gs.player_ch = _ku;
+    Test_BagsStatusUses(_ku, SKILL_HILT_BASH, STATUS_STUN, 2);
+    Test_Eq("D126 status: 2 uses of a 60% skill leave 3 marbles in its bag", Bag_Left(_ku, "status_" + string(SKILL_HILT_BASH)), 3);
+    _ku.upgrades = [SKILL_HILT_BASH];
+    var _first = Test_BagsStatusUses(_ku, SKILL_HILT_BASH, STATUS_STUN, 1);
+    Test_Eq("D126 status: after the upgrade (85%) the bag is a new one of 20, one drawn", Bag_Left(_ku, "status_" + string(SKILL_HILT_BASH)), 19);
+    var _rest = Test_BagsStatusUses(_ku, SKILL_HILT_BASH, STATUS_STUN, 19);
+    Test_Eq("D126 status: the 85% skill lands exactly 17 times in its bag of 20", Test_BagsCount(_first) + Test_BagsCount(_rest), 17);
+
+    // same seed, same sequence; the shuffle comes from the run's combat stream
+    var _runs = [];
+    for (var _s = 0; _s < 2; _s++) {
+        _gs.run = Run_Create(4404);
+        var _kd = Test_CardPlayer(CLASS_KNIGHT, [SKILL_HILT_BASH]);
+        _gs.player_ch = _kd;
+        array_push(_runs, Test_BagsStatusUses(_kd, SKILL_HILT_BASH, STATUS_STUN, 40));
+    }
+    Test_True("D126 status: the same seed gives the same 40 results", Test_SameArray(_runs[0], _runs[1]));
+    _gs.run = Run_Create(4405);
+    var _kd2 = Test_CardPlayer(CLASS_KNIGHT, [SKILL_HILT_BASH]);
+    _gs.player_ch = _kd2;
+    var _other = Test_BagsStatusUses(_kd2, SKILL_HILT_BASH, STATUS_STUN, 40);
+    Test_False("D126 status: another seed gives another sequence", Test_SameArray(_runs[0], _other));
+    _gs.run = Run_Create(4404);
+    var _kd3 = Test_CardPlayer(CLASS_KNIGHT, [SKILL_HILT_BASH]);
+    _gs.player_ch = _kd3;
+    var _calls0 = _gs.run.rng.combat.calls;
+    Test_BagsStatusUses(_kd3, SKILL_HILT_BASH, STATUS_STUN, 5);
+    Test_True("D126 status: the bag is shuffled with the run's combat stream", _gs.run.rng.combat.calls > _calls0);
+
+    // a chance of 1 needs no bag (Wound+ is 75% + 25%)
+    _gs.run = Run_Create(4406);
+    var _kc = Test_CardPlayer(CLASS_KNIGHT, [SKILL_WOUND], [SKILL_WOUND]);
+    _gs.player_ch = _kc;
+    var _c10 = Test_BagsStatusUses(_kc, SKILL_WOUND, STATUS_BLEED, 10);
+    Test_Eq("D126 status: a 100% status always lands", Test_BagsCount(_c10), 10);
+    Test_Eq("D126 status: and keeps no bag", Bag_Left(_kc, "status_" + string(SKILL_WOUND)), 0);
+}
+
+function Test_BagsMoves() {
+    var _p = CharacterCreate_Player(CLASS_KNIGHT);
+    var _w31 = [ AI_Weight("attack", -1, 3), AI_Weight("skill", SKILL_BITE, 1) ];
+
+    var _e = Test_BagsFoe([], _w31);
+    var _p8 = Test_BagsPicks(_e, _p, Rng_New(11, "combat"), 8);
+    var _first = []; var _second = [];
+    for (var _i = 0; _i < 4; _i++) { array_push(_first, _p8[_i]); array_push(_second, _p8[4 + _i]); }
+    Test_Eq("D126 moves: weights 3:1 use the rare move exactly once in the first 4 picks", Test_AICount(_first, SKILL_BITE), 1);
+    Test_Eq("D126 moves: and exactly once in the next 4", Test_AICount(_second, SKILL_BITE), 1);
+    Test_Eq("D126 moves: and the common move 3 times in each 4", Test_AICount(_first, -1), 3);
+    var _many = Test_BagsPicks(Test_BagsFoe([], _w31), _p, Rng_New(12, "combat"), 400);
+    var _decks_ok = true; var _bites = 0;
+    for (var _d = 0; _d < 100; _d++) {
+        var _n = 0;
+        for (var _j = 0; _j < 4; _j++) { if (_many[_d * 4 + _j] == SKILL_BITE) _n++; }
+        if (_n != 1) _decks_ok = false;
+        _bites += _n;
+    }
+    Test_True("D126 moves: every deck of 4 picks holds exactly one rare move (no spam, no drought) over 100 decks", _decks_ok);
+    Test_Eq("D126 moves: 400 picks use the rare move exactly 100 times", _bites, 100);
+    var _pos_vary = false;
+    for (var _d2 = 1; _d2 < 100; _d2++) { for (var _q = 0; _q < 4; _q++) { if (_many[_d2 * 4 + _q] == SKILL_BITE && _many[_q] != SKILL_BITE) _pos_vary = true; } }
+    Test_True("D126 moves: the rare move is shuffled (it does not always come in the same slot)", _pos_vary);
+
+    // the deck follows the eligible set: a move the enemy cannot use is not in it; when it can again, a new deck is built
+    var _e3 = Test_BagsFoe([], _w31);
+    var _rng3 = Rng_New(13, "combat");
+    Test_BagsPicks(_e3, _p, _rng3, 1);
+    _e3.skills = [];
+    var _alone = Test_BagsPicks(_e3, _p, _rng3, 5);
+    Test_Eq("D126 moves: with the rare move unusable every pick is the common one", Test_AICount(_alone, -1), 5);
+    _e3.skills = [SKILL_BITE];
+    var _back = Test_BagsPicks(_e3, _p, _rng3, 4);
+    Test_Eq("D126 moves: once it is usable again a fresh deck has exactly one of it in 4", Test_AICount(_back, SKILL_BITE), 1);
+
+    // 2:1:1 weights make a deck of 4
+    var _e4 = Test_BagsFoe([], [ AI_Weight("attack", -1, 2), AI_Weight("skill", SKILL_BITE, 1), AI_Weight("skill", SKILL_POISON_FANGS, 1) ]);
+    _e4.skills = [SKILL_BITE, SKILL_POISON_FANGS];
+    var _p4 = Test_BagsPicks(_e4, _p, Rng_New(14, "combat"), 4);
+    Test_True("D126 moves: weights 2:1:1 give 2 attacks, 1 Bite, 1 Poison Fangs in 4 picks", Test_AICount(_p4, -1) == 2 && Test_AICount(_p4, SKILL_BITE) == 1 && Test_AICount(_p4, SKILL_POISON_FANGS) == 1);
+
+    // rules still win over the deck
+    var _always = [ { label: "r", when: [Test_AICond("always")], act: "skill", skill: SKILL_BITE, chance: 1, max_uses: -1 } ];
+    var _pr = Test_BagsPicks(Test_BagsFoe(_always, [ AI_Weight("attack", -1, 1) ]), _p, Rng_New(15, "combat"), 10);
+    Test_Eq("D126 moves: a rule that holds beats the deck every time", Test_AICount(_pr, SKILL_BITE), 10);
+    var _never = [ { label: "n", when: [Test_AICond("hp_below", 0.01)], act: "skill", skill: SKILL_BITE, chance: 1, max_uses: -1 } ];
+    var _pn = Test_BagsPicks(Test_BagsFoe(_never, [ AI_Weight("attack", -1, 1) ]), _p, Rng_New(16, "combat"), 10);
+    Test_Eq("D126 moves: a rule whose condition fails falls through to the deck", Test_AICount(_pn, -1), 10);
+    var _maxed = [ { label: "m", when: [Test_AICond("always")], act: "skill", skill: SKILL_BITE, chance: 1, max_uses: 1 } ];
+    var _ctx_m = Test_AICtx();
+    variable_struct_set(_ctx_m.uses, "m", 1);
+    Test_Eq("D126 moves: a spent once-per-battle rule falls through to the deck", Test_BagsPicks(Test_BagsFoe(_maxed, [ AI_Weight("attack", -1, 1) ]), _p, Rng_New(17, "combat"), 1, _ctx_m)[0], -1);
+
+    // a rule with a chance gates through its own bag: 50% = exactly 1 in every 2 turns
+    var _half = [ { label: "h", when: [Test_AICond("always")], act: "skill", skill: SKILL_BITE, chance: 0.5, max_uses: -1 } ];
+    var _ph = Test_BagsPicks(Test_BagsFoe(_half, [ AI_Weight("attack", -1, 1) ]), _p, Rng_New(18, "combat"), 20);
+    var _pairs_ok = true;
+    for (var _h = 0; _h < 10; _h++) { if ((_ph[_h * 2] == SKILL_BITE) == (_ph[_h * 2 + 1] == SKILL_BITE)) _pairs_ok = false; }
+    Test_True("D126 moves: a 50% rule fires exactly once in every 2 turns", _pairs_ok);
+    var _third = [ { label: "s", when: [Test_AICond("always")], act: "skill", skill: SKILL_BITE, chance: 0.3, max_uses: -1 } ];
+    var _p30 = Test_BagsPicks(Test_BagsFoe(_third, [ AI_Weight("attack", -1, 1) ]), _p, Rng_New(19, "combat"), 100);
+    Test_Eq("D126 moves: a 30% rule fires exactly 30 times in 100 turns", Test_AICount(_p30, SKILL_BITE), 30);
+
+    // determinism: the same seed gives the same picks, another seed another order
+    var _da = Test_BagsPicks(Test_BagsFoe([], _w31), _p, Rng_New(21, "combat"), 100);
+    var _db = Test_BagsPicks(Test_BagsFoe([], _w31), _p, Rng_New(21, "combat"), 100);
+    var _dc = Test_BagsPicks(Test_BagsFoe([], _w31), _p, Rng_New(22, "combat"), 100);
+    Test_True("D126 moves: the same seed gives the same 100 picks", Test_SameArray(_da, _db));
+    Test_False("D126 moves: another seed gives another order", Test_SameArray(_da, _dc));
+
+    // a real enemy from the data: the Slime is 4 attacks : 1 Solidify (its hurt-rule does not hold at full health)
+    var _sl = EnemyCreate(ENEMY_SLIME);
+    var _sp = Test_BagsPicks(_sl, _p, Rng_New(23, "combat"), 10);
+    Test_Eq("D126 moves: a Slime uses Solidify exactly twice in 10 picks (weights 4:1)", Test_AICount(_sp, SKILL_SOLIDIFY), 2);
+}
+
+function Test_BagsFixed() {
+    var _kn = Test_Hero(CLASS_KNIGHT);
+    var _all6 = true;
+    for (var _i = 0; _i < 30; _i++) { if (Item_ComputeAmount(_kn, { min: 4, max: 8 }) != 6) _all6 = false; }
+    Test_True("D126 fixed: a 4-8 potion heals exactly 6 every time", _all6);
+    var _all8 = true;
+    for (var _j = 0; _j < 30; _j++) { if (Item_ComputeAmount(_kn, ItemDB_Get(10).use) != 8) _all8 = false; }
+    Test_True("D126 fixed: the HP Potion Lv1 (5-10) heals exactly 8 (7.5 rounds up)", _all8);
+    var _lv5 = CharacterCreate_Player(CLASS_KNIGHT);
+    _lv5.level = 5;
+    Test_Eq("D126 fixed: at level 5 the average plus the level scaling (8 + 4) is 12", Item_ComputeAmount(_lv5, ItemDB_Get(10).use), 12);
+    var _hp = ItemDB_Get(10);
+    Test_Eq("D126 fixed: the battle details show the single number", Test_RowValue(Battle_ItemDetails(_hp, _kn).lines, Loc_T("battle.det.hp", "HP")), "8");
+    Test_Eq("D126 fixed: the shop line shows the single number", Item_NumberLines(_hp, _kn)[0].value, "8");
+    var _hurt = Test_Hero(CLASS_KNIGHT);
+    _hurt.hp = 1;
+    Item_Use(10, _hurt, _hurt);
+    Test_Eq("D126 fixed: using the potion heals exactly 8", _hurt.hp - 1, 8);
+
+    // status ticks: Meditation (2-4 MP) gives exactly 3 each turn
+    var _all3 = true;
+    for (var _m = 0; _m < 20; _m++) {
+        var _med = Status_Add(CharacterCreate_Player(CLASS_MAGE), STATUS_MEDITATION, 3, 0);
+        _med.mp = 0;
+        _med = Status_Tick(_med);
+        if (_med.mp != 3) _all3 = false;
+    }
+    Test_True("D126 fixed: a Meditation tick restores exactly 3 MP (the average of 2-4)", _all3);
+    var _desc = Status_Describe(STATUS_MEDITATION).line;
+    Test_True("D126 fixed: the Meditation text says the single number (3 MP), not a range", string_pos("3 MP", _desc) > 0 && string_pos("2-4", _desc) == 0);
+}
+
+function Test_BagsGold() {
+    var _gs = GameState_Get();
+    var _bases = [12, 20, 31, 40, 78];
+    var _all_exact = true; var _all_in = true;
+    for (var _b = 0; _b < array_length(_bases); _b++) {
+        _gs.run = Run_Create(5100 + _b);
+        var _rng = Rng_New(5100 + _b, "gold");
+        var _base = _bases[_b];
+        var _r = Gold_Range(_base);
+        var _sum = 0;
+        for (var _f = 0; _f < 5; _f++) {
+            var _g = Gold_Roll(_rng, _base);
+            _sum += _g;
+            if (_g < _r.lo || _g > _r.hi) _all_in = false;
+        }
+        if (abs(_sum - 5 * _base) > 1) _all_exact = false;
+    }
+    Test_True("D126 gold: every fight is within +-25% of its base", _all_in);
+    Test_True("D126 gold: 5 fights add up to 5 x the base (+-1 for rounding) for bases 12, 20, 31, 40 and 78", _all_exact);
+    _gs.run = Run_Create(5200);
+    var _rg = Rng_New(5200, "gold");
+    var _tot = 0;
+    for (var _t = 0; _t < 50; _t++) _tot += Gold_Roll(_rg, 40);
+    Test_Eq("D126 gold: 50 fights of base 40 pay exactly 2000 (10 whole bags, 40 is a multiple of 8)", _tot, 2000);
+    var _seen = {};
+    _gs.run = Run_Create(5201);
+    var _rg2 = Rng_New(5201, "gold");
+    for (var _s = 0; _s < 5; _s++) variable_struct_set(_seen, string(Gold_Roll(_rg2, 40)), true);
+    Test_Eq("D126 gold: one bag of 5 pays 5 different amounts (30 35 40 45 50)", array_length(variable_struct_get_names(_seen)), 5);
+    var _ra = []; var _rb = [];
+    for (var _k = 0; _k < 2; _k++) {
+        _gs.run = Run_Create(5202);
+        var _rr = Rng_New(5202, "gold");
+        var _arr = (_k == 0) ? _ra : _rb;
+        for (var _n = 0; _n < 12; _n++) array_push(_arr, Gold_Roll(_rr, 31));
+    }
+    Test_True("D126 gold: the same seed pays the same gold", Test_SameArray(_ra, _rb));
+
+    // the bag is part of the run save and continues where it stopped
+    _gs.run = Run_Create(5300);
+    Test_True("D126 gold: a new run has an empty gold bag", variable_struct_exists(_gs.run, "gold_bag") && is_array(_gs.run.gold_bag) && array_length(_gs.run.gold_bag) == 0);
+    var _rs = Rng_New(5300, "gold");
+    var _pre = [Gold_Roll(_rs, 40), Gold_Roll(_rs, 40)];
+    Test_Eq("D126 gold: two fights leave 3 offsets in the bag", variable_struct_exists(_gs.run, "gold_bag") ? array_length(_gs.run.gold_bag) : -1, 3);
+    var _raw = json_parse(json_stringify(RunSave_Build()));
+    Test_True("D126 gold: the run save carries the gold bag", variable_struct_exists(_raw, "gold_bag") && is_array(_raw.gold_bag) && array_length(_raw.gold_bag) == 3);
+    var _expect = [Gold_Roll(_rs, 40), Gold_Roll(_rs, 40), Gold_Roll(_rs, 40)];
+    _gs.run = Run_Create(1);
+    RunSave_ApplyState(_raw);
+    Test_Eq("D126 gold: a loaded run has the 3 offsets back", variable_struct_exists(_gs.run, "gold_bag") ? array_length(_gs.run.gold_bag) : -1, 3);
+    var _after = [Gold_Roll(_rs, 40), Gold_Roll(_rs, 40), Gold_Roll(_rs, 40)];
+    Test_True("D126 gold: the loaded run pays the rest of the bag (200 in all)", Test_SameArray(_expect, _after) && (_pre[0] + _pre[1] + _after[0] + _after[1] + _after[2]) == 200);
+    // an older save without the fields starts empty bags
+    var _old = json_parse(json_stringify(RunSave_Build()));
+    if (variable_struct_exists(_old, "gold_bag")) variable_struct_remove(_old, "gold_bag");
+    if (variable_struct_exists(_old, "find_bag")) variable_struct_remove(_old, "find_bag");
+    _gs.run = Run_Create(2);
+    RunSave_ApplyState(_old);
+    Test_True("D126 gold: a save without the bags loads with empty ones", variable_struct_exists(_gs.run, "gold_bag") && is_array(_gs.run.gold_bag) && array_length(_gs.run.gold_bag) == 0);
+    Test_Eq("D126 gold: the run save version is still 2", RUN_SAVE_VERSION, 2);
+}
+
+function Test_BagsFind() {
+    var _gs = GameState_Get();
+    // Scrounger: 30% = a bag of 10 with 3
+    _gs.run = Run_Create(6100);
+    var _sc = Test_CardPlayer(CLASS_KNIGHT, [], [], ["pas:n_scrounger"]);
+    _gs.player_ch = _sc;
+    var _p0 = Inv_Count(_sc.inventory, 10);
+    for (var _i = 0; _i < 10; _i++) _sc = Card_OnVictory(_sc);
+    Test_Eq("D126 find: Scrounger (30%) finds a potion exactly 3 times in 10 won fights", Inv_Count(_sc.inventory, 10) - _p0, 3);
+    for (var _j = 0; _j < 20; _j++) _sc = Card_OnVictory(_sc);
+    Test_Eq("D126 find: and exactly 6 more in the next 20", Inv_Count(_sc.inventory, 10) - _p0, 9);
+    // the bag is on the run and is saved with it
+    _gs.run = Run_Create(6101);
+    var _s2 = Test_CardPlayer(CLASS_KNIGHT, [], [], ["pas:n_scrounger"]);
+    _gs.player_ch = _s2;
+    var _q0 = Inv_Count(_s2.inventory, 10);
+    for (var _k = 0; _k < 4; _k++) _s2 = Card_OnVictory(_s2);
+    Test_Eq("D126 find: 4 fights leave 6 marbles in the run's find bag", variable_struct_exists(_gs.run, "find_bag") && is_struct(_gs.run.find_bag) ? array_length(_gs.run.find_bag.left) : -1, 6);
+    var _raw = json_parse(json_stringify(RunSave_Build()));
+    Test_True("D126 find: the run save carries the find bag", variable_struct_exists(_raw, "find_bag") && is_struct(_raw.find_bag) && array_length(_raw.find_bag.left) == 6);
+    _gs.run = Run_Create(1);
+    RunSave_ApplyState(_raw);
+    Test_Eq("D126 find: a loaded run has the 6 marbles back", variable_struct_exists(_gs.run, "find_bag") && is_struct(_gs.run.find_bag) ? array_length(_gs.run.find_bag.left) : -1, 6);
+    for (var _m = 0; _m < 6; _m++) _s2 = Card_OnVictory(_s2);
+    Test_Eq("D126 find: the loaded run finishes the bag: 3 potions in the 10 fights, none lost or doubled", Inv_Count(_s2.inventory, 10) - _q0, 3);
 }
