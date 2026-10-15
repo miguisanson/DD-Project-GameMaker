@@ -10317,6 +10317,24 @@ function Test_Suite_RichText() {
     Test_True("RT the term is still a term on its line", array_length(_wl) > 0 && array_length(Test_RT_Spans(_wl[0], "term")) == 1);
     Test_Eq("RT a hard newline starts a new line", array_length(Markup_Wrap("one\ntwo", 9999, "keyboard")), 2);
     Test_Eq("RT plain text wraps to its own words", Markup_Wrap("plain", 9999, "keyboard")[0], "plain");
+    // laid-out text is kept per text and device, and follows a rebound key at once
+    var _wk0 = Markup_Width("[k:confirm]", "keyboard");
+    Test_Eq("RT the same text measures the same twice (from the kept layout)", Markup_Width("[k:confirm]", "keyboard"), _wk0);
+    Binds_Apply(Binds_Assign(Binds_Defaults(), "confirm", ord("T")).keys);
+    Test_True("RT a rebound key changes the width of the button at once", Markup_Width("[k:confirm]", "keyboard") != _wk0);
+    Binds_Apply(Binds_Defaults());
+    Test_Eq("RT the default key is back at once", Markup_Width("[k:confirm]", "keyboard"), _wk0);
+    // pieces that hang on to the one before (no space) never part from it at a line end
+    var _gl = Prompt_GlyphW(Prompt_Info("left", "keyboard"));
+    var _w2 = Markup_Width("aaaa", "keyboard") + _sp + _gl + 1;   // room for the first arrow, not for the second
+    var _pair = Markup_Wrap("aaaa [k:left][k:right]", _w2, "keyboard");
+    Test_Eq("RT two arrows in a row go to the next line together", array_length(_pair), 2);
+    Test_True("RT the pair of arrows is on one line", array_length(_pair) == 2 && Test_RT_Count(_pair[0], "glyph") == 0 && Test_RT_Count(_pair[1], "glyph") == 2);
+    var _w3 = Markup_Width("aaaa", "keyboard") + _sp + _gk + 1;   // room for the glyph, not for the full stop after it
+    var _dot = Markup_Wrap("aaaa [k:confirm].", _w3, "keyboard");
+    Test_True("RT a full stop stays with the button before it", array_length(_dot) == 2 && Test_RT_Count(_dot[1], "glyph") == 1 && Markup_Strip(_dot[1], "keyboard") == "Space.");
+    var _lay2 = Prompt_RichLayout("aaaa [k:left][k:right]", _w2, "keyboard");
+    Test_True("RT the layout keeps the arrows together too", _lay2.lines == 2 && _lay2.items[1].line == 1 && _lay2.items[2].line == 1);
 
     // ---- 2. device-aware prompts ----
     var _ck = Markup_Segments("[k:confirm]", "keyboard");

@@ -24,7 +24,7 @@ $GameModes = @(
     @{ Name = 'runtests'; Flag = '-runtests'; Timeout = 30;  Impl = $true;  Strict = $true  }
     @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 540;  Impl = $true;  Strict = $false }
     @{ Name = 'bot';      Flag = '-bot';      Timeout = 480; Impl = $true;  Strict = $false }
-    @{ Name = 'shots';    Flag = '-shots';    Timeout = 480; Impl = $true;  Strict = $false; Shots = 207 }   # Shots = number of [SHOT] lines required. (H1: the pause-menu pictures are gone (-2), the one-menu pictures are in (+6).)
+    @{ Name = 'shots';    Flag = '-shots';    Timeout = 480; Impl = $true;  Strict = $false; Shots = 217 }   # Shots = number of [SHOT] lines required. (H1: the pause-menu pictures are gone (-2), the one-menu pictures are in (+6). H8b: +10, the rich text pictures.)
     @{ Name = 'exportdata'; Flag = '-exportdata'; Timeout = 60; Impl = $true;  Strict = $false; Export = $true; Explicit = $true }   # B1: the game's classes/enemies/skills/items/statuses/level table as JSON -> <WorkRoot>\export\export_data.json. Run with -Only exportdata.
     @{ Name = 'gridshots'; Flag = '-gridshots'; Timeout = 120; Impl = $true;  Strict = $false; Shots = 11; ShotDir = 'gridshots'; Explicit = $true }   # D65: 16 px grid over every floor room -> <WorkRoot>\gridshots. Not part of -Mode full: run with -Only gridshots.
 )

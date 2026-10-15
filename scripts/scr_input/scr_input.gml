@@ -733,6 +733,7 @@ function Binds_Apply(_keys) {
     var names = variable_struct_get_names(acts);
     for (var i = 0; i < array_length(names); i++) variable_struct_set(global.input.bindings, names[i], variable_struct_get(acts, names[i]));
     global.input.binds_applied = true;
+    global.prompt_rev = (variable_global_exists("prompt_rev") ? global.prompt_rev : 0) + 1;   // D149: the glyph widths of laid-out text may have changed
 }
 
 function Binds_KeysText(_arr) {
@@ -1084,6 +1085,23 @@ function Markup_Reveal(_text, _n) {
 // nl: how many hard line breaks came before it. Words are split at spaces and keep their style.
 function Markup_Pieces(_text, _device = undefined) {
     var mt = Ui_Metrics();
+    var dev = is_undefined(_device) ? Prompt_Device() : _device;
+    // kept per text and device while the metrics (layout, language) and the key table stay the same: the same sentence is laid out several times a frame
+    var rev = variable_global_exists("prompt_rev") ? global.prompt_rev : 0;
+    var cache = variable_global_exists("markup_cache") ? global.markup_cache : undefined;
+    if (!is_struct(cache) || cache.mt != mt || cache.rev != rev || cache.n > 96) {
+        cache = { mt: mt, rev: rev, n: 0, map: {} };
+        global.markup_cache = cache;
+    }
+    var key = dev + "|" + string(_text);
+    if (variable_struct_exists(cache.map, key)) return variable_struct_get(cache.map, key);
+    var out = Markup_PiecesBuild(_text, dev);
+    variable_struct_set(cache.map, key, out);
+    cache.n++;
+    return out;
+}
+
+function Markup_PiecesBuild(_text, _device) {
     var seg = Markup_Segments(_text, _device);
     var out = [];
     var pending = false;
@@ -1118,6 +1136,18 @@ function Markup_Pieces(_text, _device = undefined) {
         if (n > 0 && string_char_at(s, n) != " " && string_char_at(s, n) != "\n") pending = false;
     }
     return out;
+}
+
+// A piece that follows with no space and no line break ("[k:confirm])", "[k:left][k:right]", "[k:confirm]을(를)") hangs on to the one before it: a line
+// never breaks between them, the whole group moves down together.
+function Markup_Attached(_pcs, _i) {
+    return _i > 0 && !_pcs[_i].sp && _pcs[_i].nl == 0;
+}
+
+function Markup_GroupW(_pcs, _i) {
+    var gw = _pcs[_i].w;
+    for (var j = _i + 1; j < array_length(_pcs) && Markup_Attached(_pcs, j); j++) gw += _pcs[j].w;
+    return gw;
 }
 
 function Prompt_SpaceW() {
@@ -1158,8 +1188,8 @@ function Markup_Wrap(_text, _w, _device = undefined) {
         var pc = pcs[i];
         for (var k = 0; k < pc.nl; k++) { array_push(lines, cur); cur = ""; cx = 0; }
         var gap = (cx > 0 && pc.sp) ? sw : 0;
-        if (cx > 0 && cx + gap + pc.w > _w) { array_push(lines, cur); cur = ""; cx = 0; gap = 0; }
-        if (cx == 0 && pc.kind == "word" && pc.st == "" && pc.w > _w) {
+        if (cx > 0 && !Markup_Attached(pcs, i) && cx + gap + Markup_GroupW(pcs, i) > _w) { array_push(lines, cur); cur = ""; cx = 0; gap = 0; }
+        if (cx == 0 && !Markup_Attached(pcs, i) && pc.kind == "word" && pc.st == "" && pc.w > _w) {
             var chunks = Dialogue_BreakWordToLines(pc.s, _w);
             for (var c = 0; c < array_length(chunks) - 1; c++) array_push(lines, chunks[c]);
             cur = chunks[array_length(chunks) - 1];
@@ -1190,34 +1220,38 @@ function Prompt_GlyphW(_info) {
     var h = Prompt_GlyphH();
     if (Prompt_ArrowOk(_info)) {   // square, and an odd number of font pixels across a keycap so the arrow sits in the middle
         var hc = h / mt.p;
-        return ((_info.kind == "pad") ? hc : hc + ((hc mod 2 == 0) ? 1 : 0)) * mt.p;
+        return ((_info.kind == "pad") ? hc : hc + ((hc mod 2 == 0) ? 1 : 0)) * mt.p;   // the arrow's mask is centred in the face either way
     }
     var tw = UI_TextWidth(_info.label);
     var w = (_info.kind == "pad") ? max(h, tw + 3 * mt.p) : max(h, tw + 4 * mt.p);
     return ceil(w / mt.p) * mt.p;
 }
 
-// 5 x 5 arrow masks, '.' clear.
+// Solid triangle masks for the arrow keycap (the same shape as the menu cursor), '.' clear.
 function Prompt_ArrowMask(_dir) {
     switch (_dir) {
-        case "up": return ["..#..", ".###.", "#####", "..#..", "..#.."];
-        case "down": return ["..#..", "..#..", "#####", ".###.", "..#.."];
-        case "left": return ["..#..", ".##..", "#####", ".##..", "..#.."];
-        case "right": return ["..#..", "..##.", "#####", "..##.", "..#.."];
+        case "up": return ["..#..", ".###.", "#####"];
+        case "down": return ["#####", ".###.", "..#.."];
+        case "left": return ["..#", ".##", "###", ".##", "..#"];
+        case "right": return ["#..", "##.", "###", "##.", "#.."];
     }
     return [];
 }
 
-// The d-pad: a plus sign in the light green with the arms in _dirs lit.
+// The d-pad's plus sign (arms one font pixel thick, 5 x 5) inside the round button: the arms that count are dark, the others the light green.
 function Prompt_DrawDpad(_x, _y, _hc, _dirs, _p) {
-    var t = (_hc mod 2 == 1) ? 3 : 2;
-    var c0 = (_hc - t) div 2;
-    var c1 = c0 + t;
-    Ui_Box(_x + c0 * _p, _y + c0 * _p, _x + c1 * _p, _y + c1 * _p, UI_C_LIGHT);
-    Ui_Box(_x + c0 * _p, _y, _x + c1 * _p, _y + c0 * _p, array_contains(_dirs, "up") ? UI_C_LIGHTEST : UI_C_LIGHT);
-    Ui_Box(_x + c0 * _p, _y + c1 * _p, _x + c1 * _p, _y + _hc * _p, array_contains(_dirs, "down") ? UI_C_LIGHTEST : UI_C_LIGHT);
-    Ui_Box(_x, _y + c0 * _p, _x + c0 * _p, _y + c1 * _p, array_contains(_dirs, "left") ? UI_C_LIGHTEST : UI_C_LIGHT);
-    Ui_Box(_x + c1 * _p, _y + c0 * _p, _x + _hc * _p, _y + c1 * _p, array_contains(_dirs, "right") ? UI_C_LIGHTEST : UI_C_LIGHT);
+    var o = (_hc - 5) div 2;
+    var cx = _x + (o + 2) * _p;
+    var cy = _y + (o + 2) * _p;
+    Ui_Box(cx, cy, cx + _p, cy + _p, UI_C_LIGHT);
+    var lit_u = array_contains(_dirs, "up") ? UI_C_DARKEST : UI_C_LIGHT;
+    var lit_d = array_contains(_dirs, "down") ? UI_C_DARKEST : UI_C_LIGHT;
+    var lit_l = array_contains(_dirs, "left") ? UI_C_DARKEST : UI_C_LIGHT;
+    var lit_r = array_contains(_dirs, "right") ? UI_C_DARKEST : UI_C_LIGHT;
+    Ui_Box(cx, cy - 2 * _p, cx + _p, cy, lit_u);
+    Ui_Box(cx, cy + _p, cx + _p, cy + 3 * _p, lit_d);
+    Ui_Box(cx - 2 * _p, cy, cx, cy + _p, lit_l);
+    Ui_Box(cx + _p, cy, cx + 3 * _p, cy + _p, lit_r);
 }
 
 // Draws one glyph with its top-left at (_x, _y), one text line tall. Keyboard: a keycap (light outline, dark face, a lower edge) with the key's name,
@@ -1231,9 +1265,7 @@ function Prompt_DrawGlyph(_x, _y, _info, _alpha = 1) {
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
     var arrow = Prompt_ArrowOk(_info);
-    if (_info.kind == "pad" && arrow) {
-        Prompt_DrawDpad(_x, _y, h / p, _info.dirs, p);
-    } else if (_info.kind == "pad") {
+    if (_info.kind == "pad") {
         var hc = h / p;
         var wc = w / p;
         var rad = hc / 2;
@@ -1242,15 +1274,17 @@ function Prompt_DrawGlyph(_x, _y, _info, _alpha = 1) {
             var inset = round(rad - sqrt(max(0, rad * rad - yc * yc)));
             Ui_Box(_x + inset * p, _y + r * p, _x + (wc - inset) * p, _y + (r + 1) * p, UI_C_LIGHTEST);
         }
-        Ui_Text(_x + w / 2, _y + (h - mt.line_h) div 2, _info.label, UI_C_DARKEST, fa_center);
+        if (arrow) Prompt_DrawDpad(_x, _y, hc, _info.dirs, p);
+        else Ui_Text(_x + w / 2, _y + (h - mt.line_h) div 2, _info.label, UI_C_DARKEST, fa_center);
     } else {
         Ui_Box(_x + p, _y, _x + w - p, _y + h, UI_C_LIGHTEST);
         Ui_Box(_x, _y + p, _x + w, _y + h - p, UI_C_LIGHTEST);
         Ui_Box(_x + p, _y + p, _x + w - p, _y + h - 2 * p, UI_C_DARK);
         Ui_Box(_x + p, _y + h - 2 * p, _x + w - p, _y + h - p, UI_C_LIGHT);   // the key's lower edge
         if (arrow) {
+            var mk = Prompt_ArrowMask(_info.dir);
             var fc = h / p - 3;   // the face's rows
-            Ui_DrawMask(_x + ((w / p - 5) div 2) * p, _y + (1 + (fc - 5) div 2) * p, Prompt_ArrowMask(_info.dir), p, UI_C_LIGHTEST);
+            Ui_DrawMask(_x + ((w / p - string_length(mk[0])) div 2) * p, _y + (1 + (fc - array_length(mk)) div 2) * p, mk, p, UI_C_LIGHTEST);
         } else {
             Ui_Text(_x + w / 2, _y + (h - 2 * p - mt.line_h) div 2 + p, _info.label, UI_C_LIGHTEST, fa_center);
         }
@@ -1275,7 +1309,7 @@ function Prompt_RichLayout(_text, _w, _device = undefined) {
         var pc = pcs[i];
         for (var k = 0; k < pc.nl; k++) { line_w[line] = cx; line++; array_push(line_w, 0); cx = 0; }
         if (cx > 0 && pc.sp) cx += space_w;
-        if (cx > 0 && cx + pc.w > _w) { line_w[line] = cx; line++; array_push(line_w, 0); cx = 0; }
+        if (cx > 0 && !Markup_Attached(pcs, i) && cx + Markup_GroupW(pcs, i) > _w) { line_w[line] = cx; line++; array_push(line_w, 0); cx = 0; }
         if (pc.kind == "glyph") array_push(items, { kind: "glyph", info: pc.info, x: cx, y: line * pitch, line: line, w: pc.w });
         else array_push(items, { kind: "word", s: pc.s, st: pc.st, x: cx, y: line * pitch, line: line, w: pc.w });
         cx += pc.w;

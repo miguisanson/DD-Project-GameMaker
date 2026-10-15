@@ -243,7 +243,7 @@ function Scenario_Boot() {
     random_set_seed(12345);
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 24000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 26000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -524,7 +524,10 @@ function Scenario_StepSmoke(_s) {
             break;
         case 470: case 471: case 472: case 473: case 474: case 475: case 476: case 477: case 478: case 479:
         case 480: case 481: case 482: case 483: case 484: case 485: case 486: case 487: case 488: case 489:
-            Scenario_StepSmokeOneMenu(_s);   // H1 (D140, D141): Esc and Tab are one menu, in the fight too; Quit in a fight comes back to just before it; its last step calls Scenario_NoticeEnd
+            Scenario_StepSmokeOneMenu(_s);   // H1 (D140, D141): Esc and Tab are one menu, in the fight too; Quit in a fight comes back to just before it; its last step goes on with H8b (850..)
+            break;
+        case 850: case 851: case 852: case 853: case 854: case 855: case 856: case 857: case 858: case 859:
+            Scenario_StepSmokeRichText(_s);   // H8b (D149, D156): a dialogue line with a term, an accent and a button through the real box, the device switch, the battle prompt line; its last step calls Scenario_NoticeEnd
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -2897,7 +2900,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsLevelUp(_s);   // H4 (D143): the free-point screen with the class growth line, two sizes and Korean; goes on with H1 (490..499)
             break;
         case 490: case 491: case 492: case 493: case 494: case 495: case 496: case 497: case 498: case 499:
-            Scenario_StepShotsOneMenu(_s);   // H1 (D140): the System tab, the Settings tab and the "Keep this?" prompt, two sizes; finishes the run
+            Scenario_StepShotsOneMenu(_s);   // H1 (D140): the System tab, the Settings tab and the "Keep this?" prompt, two sizes; goes on with H8b (870..)
+            break;
+        case 870: case 871: case 872: case 873: case 874: case 875: case 876: case 877: case 878: case 879:
+            Scenario_StepShotsRichText(_s);   // H8b (D149, D156): the dialogue box and the card pick with terms, accents and buttons (keyboard, pad), the battle prompt line; two sizes; finishes the run
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -10968,7 +10974,7 @@ function Scenario_StepSmokeOneMenu(_s) {
             }
             if (variable_struct_exists(_o, "arrived") && _s.t == _o.arrived + 30) {
                 Scenario_Check("onemenu_no_fight_starts_at_once_after_continue", room == rm_floor1 && !Transition_IsActive(), "room=" + room_get_name(room) + " fx=" + json_stringify(_gs.transition_fx) + " cooldown=" + string(instance_exists(obj_player) ? instance_find(obj_player, 0).battle_cooldown : -1));
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 850);   // H8b goes on; its last step calls Scenario_NoticeEnd
             }
             if (_s.t > 1500) { Scenario_Check("onemenu_continue_reaches_rm_floor1", false, "room=" + room_get_name(room) + " cont=" + string(variable_struct_exists(_o, "cont"))); Scenario_NoticeEnd(); }
             break;
@@ -11120,9 +11126,251 @@ function Scenario_StepShotsOneMenu(_s) {
                 _o.si++;
                 if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
                 if (_o.di >= array_length(_scenes)) {
-                    Scenario_Finish();   // the end of the pictures
+                    Scenario_Next(_s, 870);   // H8b pictures follow
                 } else {
                     Scenario_Next(_s, 490);
+                }
+            }
+            break;
+    }
+}
+
+// ---- H8b (D149, D156) steps 850..859: the text markup in the running game. A dialogue line with a term, an accent and a button goes through the real
+// dialogue box (pages fit, the typewriter counts what is seen, the glyph follows the device used last and the box lays itself out again when it changes,
+// confirm completes and advances), a tutorial text fits its pop-up, and the battle skill list shows one prompt line. A pad cannot be plugged into a
+// headless run, so "the last device" is set the way Prompt_DeviceStep sets it (global.input.last_device); the glyph and the layout then follow for real.
+// Its last step calls Scenario_NoticeEnd (the end of the smoke chain). ----
+function Scenario_RichPagesFit(_gs) {
+    var _lay = Dialogue_TextLayout(_gs.ui.speaker);
+    var _ok = array_length(_gs.ui.lines) > 0;
+    for (var _i = 0; _i < array_length(_gs.ui.lines); _i++) {
+        var _rows = string_split(Dialogue_LineText(_gs.ui.lines[_i]), "\n");
+        if (array_length(_rows) > _lay.max_lines) _ok = false;
+        for (var _r = 0; _r < array_length(_rows); _r++) if (Markup_Width(_rows[_r]) > _lay.text_w) _ok = false;
+    }
+    return _ok;
+}
+
+function Scenario_StepSmokeRichText(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "rt")) _s.rt = {};
+    var _o = _s.rt;
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+    switch (_s.step) {
+        case 850:   // a dialogue line with markup, the keyboard in hand
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                global.input.last_device = "keyboard";
+                Dialogue_StartWithSpeaker(Loc_T("smoke.rt.speaker", "Stranger"), [
+                    Loc_T("smoke.rt.line.0", "A [t]Poison[/t] crept in, and the [a]BREAK[/a] is near. Press [k:confirm] to go on, or [k:left][k:right] to look about."),
+                    Loc_T("smoke.rt.line.1", "[t]Steadfast[/t] holds; [k:confirm] again.")]);
+            }
+            if (_s.t == 6) {
+                Scenario_Check("richtext_the_dialogue_box_is_open", _gs.ui.mode == UI_DIALOGUE, "mode=" + string(_gs.ui.mode));
+                Scenario_Check("richtext_the_pages_keep_their_markup", array_length(_gs.ui.lines) >= 2 && Prompt_HasTokens(Dialogue_LineText(_gs.ui.lines[0])), "pages=" + string(array_length(_gs.ui.lines)));
+                Scenario_Check("richtext_every_page_line_fits_the_box", Scenario_RichPagesFit(_gs));
+                Scenario_Check("richtext_the_box_was_laid_out_for_the_keyboard", _gs.ui.dialogue_layout_dev == "keyboard", "dev=" + string(_gs.ui.dialogue_layout_dev));
+                var _seg = Markup_Segments(Dialogue_LineText(_gs.ui.lines[0]));
+                var _g = -1;
+                for (var _i = 0; _i < array_length(_seg); _i++) if (_seg[_i].kind == "glyph") { _g = _i; break; }
+                Scenario_Check("richtext_the_first_button_is_a_keycap", _g >= 0 && _seg[_g].info.kind == "key" && _seg[_g].info.label == "Space");
+            }
+            if (_s.t > 6 && _gs.ui.mode == UI_DIALOGUE && variable_struct_exists(_gs.ui, "dialogue_state") && _gs.ui.dialogue_state == UI_DIALOGUE_STATE_READY) {
+                var _full = _gs.ui.dialogue_full_text;
+                Scenario_Check("richtext_the_typewriter_reveals_every_visible_character", _gs.ui.dialogue_visible_count == Markup_Length(_full), "shown=" + string(_gs.ui.dialogue_visible_count) + " of " + string(Markup_Length(_full)));
+                Scenario_Check("richtext_no_bracket_is_on_the_screen", string_pos("[", Markup_Strip(Markup_Reveal(_full, _gs.ui.dialogue_visible_count))) == 0);
+                Scenario_Next(_s, 851);
+            }
+            if (_s.t > 900) { Scenario_Check("richtext_the_line_finishes_typing", false, "state=" + string(variable_struct_exists(_gs.ui, "dialogue_state") ? _gs.ui.dialogue_state : -1)); Scenario_NoticeEnd(); }
+            break;
+        case 851:   // the device changes: the buttons follow, the box lays itself out again and keeps its place
+            if (_s.t == 1) {
+                _o.idx = _gs.ui.index;
+                global.input.last_device = "gamepad";
+            }
+            if (_s.t == 4) {
+                Scenario_Check("richtext_the_box_lays_itself_out_again_for_the_pad", _gs.ui.dialogue_layout_dev == "gamepad", "dev=" + string(_gs.ui.dialogue_layout_dev));
+                Scenario_Check("richtext_the_pages_still_fit_with_the_pad_glyphs", Scenario_RichPagesFit(_gs));
+                Scenario_Check("richtext_the_box_keeps_its_page", _gs.ui.mode == UI_DIALOGUE && _gs.ui.index == _o.idx, "index=" + string(_gs.ui.index) + " want " + string(_o.idx));
+                var _seg2 = Markup_Segments(Dialogue_LineText(_gs.ui.lines[_gs.ui.index]));
+                var _gp = -1;
+                for (var _j = 0; _j < array_length(_seg2); _j++) if (_seg2[_j].kind == "glyph") { _gp = _j; break; }
+                Scenario_Check("richtext_the_button_is_now_the_pad_A", _gp >= 0 && _seg2[_gp].info.kind == "pad" && _seg2[_gp].info.label == "A");
+                global.input.last_device = "keyboard";
+            }
+            if (_s.t == 10) {
+                Scenario_Check("richtext_the_keyboard_comes_back", _gs.ui.dialogue_layout_dev == "keyboard");
+                Dialogue_TypewriterPrepareCurrentLine();
+                Dialogue_TypewriterRevealInstant();
+                _gs.ui.dialogue_state = UI_DIALOGUE_STATE_READY;
+            }
+            if (_s.t == 16) Scenario_Tap("confirm");
+            if (_s.t == 24) {
+                Scenario_Check("richtext_confirm_moves_to_the_next_page", _gs.ui.mode == UI_DIALOGUE && _gs.ui.index == _o.idx + 1, "index=" + string(_gs.ui.index) + " mode=" + string(_gs.ui.mode));
+                Dialogue_TypewriterPrepareCurrentLine();
+                Dialogue_TypewriterRevealInstant();
+                _gs.ui.dialogue_state = UI_DIALOGUE_STATE_READY;
+            }
+            if (_s.t == 30) Scenario_Tap("confirm");
+            if (_s.t == 40) {
+                Scenario_Check("richtext_confirm_on_the_last_page_closes_the_box", _gs.ui.mode == UI_NONE, "mode=" + string(_gs.ui.mode));
+                Scenario_Next(_s, 852);
+            }
+            break;
+        case 852:   // the first-time texts: the bar, arrows and defence pop-ups name their buttons, and every tutorial text fits its pop-up
+            if (_s.t == 1) {
+                var _ids = Tutorial_Ids();
+                var _fit = true;
+                var _tw = round(Ui_Metrics().gw * 0.7);
+                for (var _t = 0; _t < array_length(_ids); _t++) {
+                    var _b = Tutorial_Get(_ids[_t]).body;
+                    if (string_pos("[", Markup_Strip(_b)) > 0 || Prompt_RichLayout(_b, _tw).lines < 1) _fit = false;
+                }
+                Scenario_Check("richtext_every_tutorial_text_lays_out_without_a_bracket", _fit);
+                Scenario_Check("richtext_the_bar_text_has_its_button", Prompt_HasTokens(Tutorial_Get("bar").body) && Prompt_TokensHaveAction(Prompt_Tokens(Tutorial_Get("bar").body)));
+                Scenario_Check("richtext_the_arrows_text_has_four_arrows", array_length(Markup_Segments(Tutorial_Get("arrows").body, "keyboard")) >= 5);
+                Scenario_Check("richtext_the_footer_is_a_button_and_a_word", Markup_Strip(Tutorial_Footer(), "gamepad") == "A Continue", Markup_Strip(Tutorial_Footer(), "gamepad"));
+                Scenario_NewKnight();
+                Scenario_GotoBattle("smoke_richtext", ENEMY_SLIME);
+            }
+            if (_s.t > 20 && _bc != noone && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && is_struct(_bc.ui_cmd)) {
+                _bc.p.skills = [SKILL_HILT_BASH, SKILL_MUSCLE_UP];
+                _bc.p.hp = _bc.p.max_hp;
+                Scenario_Check("richtext_the_command_menu_draws_no_hint_label", array_length(Battle_HintLabels(_bc.battle_state)) == 0);
+                Scenario_Next(_s, 853);
+            }
+            if (_s.t > 600) { Scenario_Check("richtext_the_battle_reaches_the_player_menu", false, "state=" + string(_bc != noone ? _bc.battle_state : -1)); Scenario_NoticeEnd(); }
+            break;
+        case 853:   // the skill list: one prompt line, on one line
+            if (_s.t == 1) Scenario_Tap("menu_down");
+            if (_s.t == 8) Scenario_Tap("confirm");
+            if (_s.t == 26) {
+                var _hl = Battle_HintLabels(_bc.battle_state);
+                Scenario_Check("richtext_the_skill_list_is_open", _bc.battle_state == BSTATE_SKILL_MENU, "state=" + string(_bc.battle_state));
+                Scenario_Check("richtext_the_skill_list_has_one_prompt_label", array_length(_hl) == 1 && _hl[0].action == "confirm", "labels=" + string(array_length(_hl)));
+                Scenario_Check("richtext_the_prompt_line_is_one_line_in_the_panel", _bc.ui_skill.det_rect.w > 0 && Prompt_RichLayout(_hl[0].text, _bc.ui_skill.det_rect.w).lines == 1);
+                Scenario_BattleUiOverlaps(_bc, "richtext_skill_list");
+                Scenario_Tap("esc");
+            }
+            if (_s.t == 40) {
+                Scenario_Check("richtext_back_still_goes_up_without_a_back_label", _bc.battle_state == BSTATE_MENU, "state=" + string(_bc.battle_state));
+                Scenario_NoticeEnd();
+            }
+            break;
+    }
+}
+
+// ---- H8b (D149, D156) pictures 870..879: shot_richtext_<scene>_<w>x<h>.png at 480x432 and 800x720. Scenes: the dialogue box with a term, an accent and a
+// button (keyboard, pad), the card pick with terms and its hint line (keyboard arrows, pad d-pad), the battle skill list with its one prompt line. ----
+function Scenario_RichShotScenes() {
+    return ["dialogue_kb", "dialogue_pad", "card_kb", "card_pad", "battle_prompt"];
+}
+
+function Scenario_StepShotsRichText(_s) {
+    var _scenes = Scenario_RichShotScenes();
+    var _scales = [3, 5];
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "rs")) _s.rs = { di: 0, si: 0 };
+    var _o = _s.rs;
+    var _scene = _scenes[_o.di];
+    var _pad = (string_pos("pad", _scene) > 0);
+    var _is_battle = (_scene == "battle_prompt");
+    switch (_s.step) {
+        case 870:   // enter the room at this scale
+            if (_s.t == 1) {
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(_scales[_o.si]);
+                if (_is_battle) Scenario_GotoBattle("shots_richtext_" + string(_o.di) + "_" + string(_o.si), ENEMY_SPIDER);
+                else room_goto(rm_floor1);
+            }
+            if (_s.t >= 25) Scenario_Next(_s, 871);
+            break;
+        case 871:   // set the scene up
+            Loc_SetLanguage("en");
+            global.tutorial_off = true;
+            global.input.last_device = _pad ? "gamepad" : "keyboard";
+            if (_is_battle) {
+                var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+                Scenario_Check("shots_richtext_in_battle", _inb, "room=" + room_get_name(room));
+                if (!_inb) { Scenario_Finish(); return; }
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
+                _bc.p.skills = [SKILL_HILT_BASH, SKILL_MUSCLE_UP, SKILL_WOUND];
+                _bc.p.hp = 6;
+                _bc.p.mp = 4;
+                _bc.hud.hp_shown = 6;
+                _bc.hud.mp_shown = 4;
+                _bc.pops = [];
+                _bc.combat_log = [];
+                _bc.tl_who = TL_PLAYER;
+                _bc.turn = TURN_PLAYER;
+                _bc.enemy_action_pending = false;
+                _bc.battle_state = BSTATE_MENU;
+            } else if (string_pos("dialogue", _scene) == 1) {
+                Scenario_ClearUi();
+                Dialogue_StartWithSpeaker(Loc_T("shots.rt.speaker", "Stranger"), [Loc_T("shots.rt.line", "A [t]Poison[/t] crept in, and the [a]BREAK[/a] is near. Press [k:confirm] to go on, or [k:left][k:right] to look about. [t]Steadfast[/t] holds.")]);
+            } else {
+                Scenario_ClearUi();
+                var _ch = _gs.player_ch;
+                _ch.skills = [SKILL_FIREBALL];
+                _ch.card_picks = 2;
+                _ch.offer = [Card_SkillId(SKILL_POISON_ARROW), Card_SkillId(SKILL_MUSCLE_UP), "pas:steady_hands"];
+                CardsUi_Open("cards");
+            }
+            Scenario_Next(_s, 872);
+            break;
+        case 872:   // let the menus build, then open what the scene shows
+            if (_s.t >= 4) {
+                if (_is_battle) {
+                    var _bc2 = instance_find(obj_battle_controller, 0);
+                    Battle_OpenList(_bc2, BSTATE_SKILL_MENU);
+                    _bc2.ui_skill.cursor = 1;
+                } else if (string_pos("dialogue", _scene) == 1) {
+                    Dialogue_TypewriterPrepareCurrentLine();
+                    Dialogue_TypewriterRevealInstant();
+                    _gs.ui.dialogue_state = UI_DIALOGUE_STATE_READY;
+                }
+                Scenario_Next(_s, 873);
+            }
+            break;
+        case 873:   // checks, then the picture
+            if (_s.t >= 30) {
+                var _tag = _scene + "_" + string(_scales[_o.si]);
+                if (_is_battle) {
+                    var _bc3 = instance_find(obj_battle_controller, 0);
+                    var _hl = Battle_HintLabels(_bc3.battle_state);
+                    Scenario_Check("shots_richtext_the_list_is_open_" + _tag, _bc3.battle_state == BSTATE_SKILL_MENU);
+                    Scenario_Check("shots_richtext_one_prompt_label_" + _tag, array_length(_hl) == 1);
+                    Scenario_Check("shots_richtext_the_prompt_is_one_line_" + _tag, array_length(_hl) == 1 && Prompt_RichLayout(_hl[0].text, _bc3.ui_skill.det_rect.w).lines == 1);
+                    Scenario_BattleUiOverlaps(_bc3, "richtext_" + _tag);
+                } else if (string_pos("dialogue", _scene) == 1) {
+                    Scenario_Check("shots_richtext_the_dialogue_is_open_" + _tag, _gs.ui.mode == UI_DIALOGUE);
+                    Scenario_Check("shots_richtext_the_pages_fit_" + _tag, Scenario_RichPagesFit(_gs));
+                    var _sg = Markup_Segments(Dialogue_LineText(_gs.ui.lines[0]));
+                    var _gi = -1;
+                    for (var _i = 0; _i < array_length(_sg); _i++) if (_sg[_i].kind == "glyph") { _gi = _i; break; }
+                    Scenario_Check("shots_richtext_the_button_follows_the_device_" + _tag, _gi >= 0 && _sg[_gi].info.kind == (_pad ? "pad" : "key"));
+                } else {
+                    Scenario_Check("shots_richtext_the_card_pick_is_open_" + _tag, CardsUi_Kind() == "cards" && array_length(global.cards_ui.pick.ids) == 3);
+                }
+                _s.shot = "shot_richtext_" + _scene + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 874);
+            }
+            break;
+        case 874:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                if (_gs.ui.mode == UI_DIALOGUE) Dialogue_CloseNow();
+                if (CardsUi_Kind() == "cards") CardsUi_Close();
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                global.input.last_device = "keyboard";
+                if (_o.di >= array_length(_scenes)) {
+                    Scenario_Finish();   // the end of the pictures
+                } else {
+                    Scenario_Next(_s, 870);
                 }
             }
             break;
