@@ -340,8 +340,8 @@ function Test-Shots([string[]]$lines, [int]$expect, [string]$dirKey = 'shots') {
             else {
                 if ($w[1] -gt 0) { $problems += ('{0}: {1} pixels differ in the top-left 24x24 corner of the picture (a world mark drawn at the corner)' -f $r.File, [int]$w[1]) }
                 if ($w[0] -gt 0) { $problems += ('{0}: {1} marked pixels outside the places the marks belong (first at window {2},{3})' -f $r.File, [int]$w[0], [int]$w[2], [int]$w[3]) }
-                if ($w[5] -lt 4) { $problems += ('{0}: only {1} sight-ring probes on the picture (stage wrong)' -f $r.File, [int]$w[5]) }
-                elseif ($w[4] -lt [math]::Ceiling(0.75 * $w[5])) { $problems += ('{0}: sight ring missing or not centred on the enemy ({1} of {2} ring dots found where Display_WorldToGui puts them)' -f $r.File, [int]$w[4], [int]$w[5]) }
+                if ($w[5] -lt 4) { $problems += ('{0}: only {1} light probes on the picture (stage wrong)' -f $r.File, [int]$w[5]) }
+                elseif ($w[4] -lt [math]::Ceiling(0.75 * $w[5])) { $problems += ('{0}: the light of the enemy is missing or not centred on it ({1} of {2} lit floor cells found where Display_WorldToGui puts them)' -f $r.File, [int]$w[4], [int]$w[5]) }
                 if ($w[6] -lt $w[7]) { $problems += ('{0}: the "!" is not where it belongs' -f $r.File) }
                 if ($w[8] -lt $w[9]) { $problems += ('{0}: the interact arrow has no #071821 outline where expected ({1} of {2} probes)' -f $r.File, [int]$w[8], [int]$w[9]) }
             }

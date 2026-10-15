@@ -4399,17 +4399,31 @@ function Scenario_WorldFlags(_w, _fileB) {
     var _sl = _w.sl, _ch = _w.chest, _pl = instance_find(obj_player, 0);
     var _t = GRID_TILE_SIZE;
     var _cx = _sl.x + _t / 2, _cy = _sl.y + _t / 2;
-    var _r = _sl.prof.sight * _t;
-    var _n = max(12, round(2 * pi * _r / 6));
-    var _cn = Scenario_WorldWin(_cx, _cy);
-    var _sc = _cn.s;
+    var _sc = Scenario_WorldWin(_cx, _cy).s;
+    // D157: the slime's sight is light now (the dotted ring of D63 is gone). Every run of lit cells of its set is a place where A (slime there) may differ from B (slime gone);
+    // the probes are free floor cells of the set that must differ (about 24 of them, those on the picture).
+    var _g = Nav_Get().grid;
+    var _ecx = Nav_CellOf(_cx), _ecy = Nav_CellOf(_cy);
+    var _cone = Vis_Cone(_g, _ecx, _ecy, Vis_EnemyTiles(_sl.prof, _sl.ai_mode), false);
+    var _lboxes = "";
+    for (var _q = 0; _q < array_length(_cone.runs); _q += 4) {
+        var _lw = Scenario_WorldWin((_ecx + _cone.runs[_q]) * _t, (_ecy + _cone.runs[_q + 1]) * _t);
+        _lboxes += ";" + string(floor(_lw.x)) + "," + string(floor(_lw.y)) + "," + string(_cone.runs[_q + 2] * _t * _sc) + "," + string(_t * _sc);
+    }
     var _rp = "";
-    for (var _k = 0; _k < _n; _k += max(1, _n div 24)) {   // about 24 dots round the ring, those on the picture
-        var _ang = (_k / _n) * 2 * pi;
-        var _dx = floor(_cx + cos(_ang) * _r), _dy = floor(_cy + sin(_ang) * _r);
-        if (!Scenario_WorldInView(_dx, _dy, 3)) continue;
-        var _p = Scenario_WorldWin(_dx + 0.5, _dy + 0.5);
-        _rp += ((_rp == "") ? "" : ";") + string(round(_p.x)) + "," + string(round(_p.y));
+    var _nrp = 0;
+    for (var _ly = -_cone.r; _ly <= _cone.r; _ly++) {
+        for (var _lx = -_cone.r; _lx <= _cone.r; _lx++) {
+            var _lcx = _ecx + _lx, _lcy = _ecy + _ly;
+            if (!Vis_Has(_cone, _lcx, _lcy) || Nav_CellBlocked(_g, _lcx, _lcy) || (_lx == 0 && _ly == 0)) continue;
+            if (abs(_lx) + abs(_ly) < 2) continue;   // not the cells next to the slime (its own box covers them)
+            var _wx = _lcx * _t + _t / 2, _wy = _lcy * _t + _t / 2;
+            if (!Scenario_WorldInView(_wx, _wy, 3)) continue;
+            if (_nrp >= 24) continue;
+            var _lp = Scenario_WorldWin(_wx + 0.5, _wy + 0.5);
+            _rp += ((_rp == "") ? "" : ";") + string(round(_lp.x)) + "," + string(round(_lp.y));
+            _nrp++;
+        }
     }
     // "!" (alert_pop is held on): same numbers as Nav_DrawWorldFx
     var _bx = floor(_cx), _by = floor(_sl.y) - 11;
@@ -4438,13 +4452,13 @@ function Scenario_WorldFlags(_w, _fileB) {
     }
     var _cc = Scenario_WorldWin(camera_get_view_x(view_camera[0]), camera_get_view_y(view_camera[0]));
     return "pair=" + _fileB + " corner=24 cornerxy=" + string(round(_cc.x)) + "," + string(round(_cc.y))
-        + " ringc=" + string(round(_cn.x)) + "," + string(round(_cn.y)) + "," + string(_r * _sc) + "," + string(2.5 * _sc)
         + " rp=" + _rp + " bp=" + string(round(_bp1.x)) + "," + string(round(_bp1.y)) + ";" + string(round(_bp2.x)) + "," + string(round(_bp2.y))
         + " ap=" + _ap
-        + " boxes=" + _boxes;
+        + " boxes=" + _boxes + _lboxes;
 }
 
 function Scenario_WorldStage(_w) {
+    global.light_clock = 0;   // D159: the fires flicker with the game clock; the pictures A and B must not differ by a flicker step
     with (obj_enemy) instance_destroy();
     _w.sl = instance_create_layer(1 * GRID_TILE_SIZE, 7 * GRID_TILE_SIZE, "Instances", obj_slime);   // in the open lit part of the room, over light and dark floor (frozen, so its sight does not matter)
     Scenario_PlaceEnemy(_w.sl, 1, 7);
@@ -10704,6 +10718,7 @@ function Scenario_StepSmokeH14(_s) {
                 _h.pillar = Scenario_Block(obj_wall, 10, 6);
                 _h.e = Scenario_H11Enemy(obj_slime, 12, 6, 4);
                 Scenario_PlacePlayer(9, 6);
+                _pl.face = UP;   // already facing the way it will walk: a tap on a new direction only turns (D69)
                 _h.bad = false;
                 Scenario_Next(_s, 711);
             }
@@ -10806,15 +10821,15 @@ function Scenario_StepSmokeH14(_s) {
 //   forest   rm_floor2: a dire wolf's light on the open floor, the player outside it
 //   cave     rm_floor7: the torches along the rock wall and a spider's light
 //   torches  rm_floor6: the two torches (no enemy): the light pools alone
-//   shadow   rm_floor9: a dire wolf with the player behind the wall column: in the dark, not seen
+//   shadow   rm_floor3: a dire wolf with the player behind the wall under the barrels at (4,3), (4,4): in the dark, not seen
 //   hidden   rm_floor3: the player hidden on the hiding cell (3,4), a wolf 2 tiles away: the cell stays in shadow
 // ============================================================================
 function Scenario_H14Scene(_i) {
     switch (_i) {
-        case 0: return { name: "forest", rm: rm_floor2, pcx: 4, pcy: 5, foes: [[obj_dire_wolf, 10, 5]], wait: 40 };
-        case 1: return { name: "cave", rm: rm_floor7, pcx: 6, pcy: 4, foes: [[obj_spider, 11, 5]], wait: 40 };
+        case 0: return { name: "forest", rm: rm_floor2, pcx: 3, pcy: 5, foes: [[obj_dire_wolf, 9, 5]], wait: 40 };
+        case 1: return { name: "cave", rm: rm_floor7, pcx: 3, pcy: 4, foes: [[obj_spider, 8, 5]], wait: 40 };
         case 2: return { name: "torches", rm: rm_floor6, pcx: 8, pcy: 4, foes: [], wait: 40 };
-        case 3: return { name: "shadow", rm: rm_floor9, pcx: 2, pcy: 6, foes: [[obj_dire_wolf, 7, 6]], wait: 40 };
+        case 3: return { name: "shadow", rm: rm_floor3, pcx: 2, pcy: 4, foes: [[obj_dire_wolf, 7, 4]], wait: 40 };
         case 4: return { name: "hidden", rm: rm_floor3, pcx: 3, pcy: 4, foes: [[obj_dire_wolf, 3, 6]], wait: HIDE_SETTLE_FRAMES + 30 };
     }
     return undefined;
@@ -10831,6 +10846,7 @@ function Scenario_StepShotsH14(_s) {
             if (asset_get_index("Vis_Cone") == -1 || asset_get_index("Light_PocketCell") == -1) { Scenario_Check("shots_h14_the_lighting_code_exists", false); Scenario_Finish(); break; }
             if (_s.t == 1) {
                 Scenario_Release();
+                global.light_clock = 1500;   // the fires' flicker is frozen at one step, so a picture can be taken again
                 Scenario_NewKnight(CLASS_KNIGHT);
                 Scenario_SetWindowScale(3);
                 _h.via = (_sc.rm == rm_floor2) ? rm_floor3 : rm_floor2;
@@ -10892,6 +10908,8 @@ function Scenario_H14Judge(_h, _sc, _pl) {
         if (_h.e[_k].ai_mode != "idle" || _h.e[_k].alert_pop > 0) _quiet = false;
     }
     Scenario_Check("shots_h14_" + _sc.name + "_nobody_has_seen_the_player", _quiet);
+    var _gs = GameState_Get();
+    Scenario_Check("shots_h14_" + _sc.name + "_no_dialogue_is_open", _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0);
     var _pcx = Nav_CellOf(_pl.x + _T / 2);
     var _pcy = Nav_CellOf(_pl.y + _T / 2);
     if (_sc.name == "shadow" || _sc.name == "hidden") {

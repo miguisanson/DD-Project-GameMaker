@@ -871,7 +871,7 @@ function Room_Stamp() {
     return variable_global_exists("room_stamp") ? global.room_stamp : 0;
 }
 
-// ONE layer script draws every world mark (the sight rings and "!" of enemies, the interact arrow of the player): a layer has only one end script,
+// ONE layer script draws every world mark (the darkness and the light of D157/D159, the "!" of enemies, the interact arrow of the player): a layer has only one end script,
 // and the player and the enemies share the "Instances" layer, so two registrations would replace each other (measured: the arrow vanished).
 // Registered once per room START by whoever gets here first (the player's Step, an enemy's update): a re-entered room (after a battle, a run,
 // a save load) has new layers, and the old once-ever flag left it without any mark (I-056).
@@ -880,11 +880,13 @@ function World_RegisterFx(_inst) {
     if (variable_global_exists("world_fx_stamp") && global.world_fx_stamp == _st) return;
     if (!layer_exists(_inst.layer)) return;
     global.world_fx_stamp = _st;
-    layer_script_end(_inst.layer, World_DrawFx);
+    // the top layer of the world: a room with a Foreground layer (rm_floor1, rm_floor2) has its canopy above the Instances layer, and the darkness (D159) must cover that too
+    layer_script_end(layer_exists("Foreground") ? layer_get_id("Foreground") : _inst.layer, World_DrawFx);
 }
 
 function World_DrawFx() {
     Note_DrawWorldFx();   // C5 (D107): the lore notes lie under everything else
+    Light_DrawPass();   // H14 (D157, D159): the room's darkness with the enemies' sight and the fires cut out of it; everything drawn below this line stays at full brightness
     Nav_DrawWorldFx();
     Player_DrawWorldFx();
     Elite_DrawWorldFx();   // C3 (D86): the pulsing outline round elites
@@ -892,6 +894,7 @@ function World_DrawFx() {
     MapFx_DrawWorldFx();   // D138 (G6): chest burst, the rising item, the level-up sparkle, the player's step squash
 }
 
+// (D157: the sight ring is no longer drawn; this cache stays only until D108's clean-up removes it with Test_SightRingCache.)
 // D108 F1d-3: the dot offsets of a sight ring depend only on its radius in pixels, so they are built once per radius (cos/sin of each dot, NOT yet
 // floored: the draw floors cx + offset, the same float sum as the per-frame formula it replaced, so every dot lands on the same pixel).
 // Returns { n, ox[], oy[] }. global.nav_ring_builds counts the builds (Test_SightRingCache).
@@ -920,18 +923,15 @@ function Nav_FxColors() {
     return global.nav_fx_colors;
 }
 
-// Called by World_DrawFx (a layer script, see World_RegisterFx): the "!" over an enemy that just spotted the
-// player and a faint dotted ring of its sight range while the player is near. 4-colour palette, no new assets.
+// Called by World_DrawFx (a layer script, see World_RegisterFx): the "!" over an enemy that just spotted the player and the "?" over one that gave up.
+// The old dotted ring of its sight range (D63) is gone: sight is shown as light now (D157, Light_DrawPass). 4-colour palette, no new assets.
 function Nav_DrawWorldFx() {
     if (!Fx_IsWorldPass()) return;
     if (!variable_global_exists("nav_fx_calls")) global.nav_fx_calls = 0;
     global.nav_fx_calls++;
     if (!instance_exists(obj_enemy)) return;
-    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
     var _pal = Nav_FxColors();
     var _c0 = _pal.c0;
-    var _c1 = _pal.c1;
-    var _c2 = _pal.c2;
     var _c3 = _pal.c3;
     var _oc = draw_get_color();
     var _oa = draw_get_alpha();
@@ -940,18 +940,6 @@ function Nav_DrawWorldFx() {
         if (!defeated && variable_instance_exists(id, "prof")) {
             var _cx = x + GRID_TILE_SIZE / 2;
             var _cy = y + GRID_TILE_SIZE / 2;
-            if (instance_exists(_pl) && prof.sight > 0 && !prof.fixed && point_distance(_cx, _cy, _pl.x + 8, _pl.y + 8) <= (prof.sight + 2) * GRID_TILE_SIZE) {
-                var _ring = Nav_SightRing(prof.sight * GRID_TILE_SIZE);
-                var _ox = _ring.ox;
-                var _oy = _ring.oy;
-                var _n = _ring.n;
-                for (var _k = 0; _k < _n; _k++) {
-                    draw_set_color((_k mod 2 == 0) ? _c1 : _c2);   // two greens: faint on both a light and a dark floor
-                    var _px = floor(_cx + _ox[_k]);
-                    var _py = floor(_cy + _oy[_k]);
-                    draw_rectangle(_px, _py, _px, _py, false);
-                }
-            }
             if (alert_pop > 0) {
                 var _bx = floor(_cx);
                 var _by = floor(y) - 11;
@@ -989,7 +977,7 @@ function Nav_DrawWorldFx() {
 
 // ============================================================================
 // NAV (D63, I-047): pure grid pathfinding, line of sight and cell reservations.
-// A grid is a struct { w, h, block[], sight[], exits[] } of 16 px cells with the origin at world (0,0) (D65: room sizes are not changed).
+// A grid is a struct { w, h, block[], sight[], exits[], vis } of 16 px cells (vis: the sets of light kept per cell, see Vis_Cone) with the origin at world (0,0) (D65: room sizes are not changed).
 // block = movement blocked (wall, rock, chest, exit tile); sight = line of sight blocked (wall only); exits = [[cx, cy], ...] the exit cells (D158).
 // Nothing here touches instances, so Test_Suite_Nav can run it on hand-made maps. Room integration is Nav_Get() further down.
 // ============================================================================
@@ -1004,7 +992,7 @@ function Nav_WorldOf(_c) {
 function Nav_GridCreate(_w, _h) {
     _w = max(1, _w);
     _h = max(1, _h);
-    return { w: _w, h: _h, block: array_create(_w * _h, 0), sight: array_create(_w * _h, 0), exits: [] };
+    return { w: _w, h: _h, block: array_create(_w * _h, 0), sight: array_create(_w * _h, 0), exits: [], vis: undefined };
 }
 
 // rows: array of strings. "." free, "#" wall (blocks movement and sight), "~" blocks movement only.
@@ -1031,7 +1019,10 @@ function Nav_GridSet(_g, _cx, _cy, _block, _sight) {
     if (!Nav_GridInside(_g, _cx, _cy)) return;
     var _i = _cy * _g.w + _cx;
     if (_block) _g.block[_i] = 1;
-    if (_sight) _g.sight[_i] = 1;
+    if (_sight) {
+        _g.sight[_i] = 1;
+        _g.vis = undefined;   // the sets of light worked out so far (Vis_Cone) no longer hold
+    }
 }
 
 // Outside the map counts as blocked.
@@ -1063,6 +1054,135 @@ function Nav_LineClear(_g, _x0, _y0, _x1, _y1) {
         if (_e2 < _dx) { _err += _dx; _y += _sy; }
     }
     return true;
+}
+
+// ---- vision as a set of cells (D157, D159): ONE set per enemy, used for the sight test AND for the light that is drawn ----
+// Shadowcasting on the 16 px grid, from the middle of the viewer's cell: a cell is lit when some part of it can be seen past the cells that block sight
+// (a wall cell itself is lit on its near face). Only cells whose middle is within the radius count (the circle of D63). A ghost that sees through walls gets
+// the whole circle. A set is { cx, cy, tiles, r, side, see_through, cells[], runs[] }: cells is (2r+1)^2 flags, row by row from (cx-r, cy-r);
+// runs is the same set as horizontal runs [dx, dy, length, band] (dx, dy from the viewer's cell, band 2 = near .. 0 = far), sorted by band, for drawing.
+// The sets are kept on the grid per (cell, radius) and dropped when a sight blocker is added (Nav_GridSet), so a still enemy costs nothing per frame.
+
+function Vis_BuildCount() {
+    return variable_global_exists("vis_builds") ? global.vis_builds : 0;
+}
+
+function Vis_Mark(_cone, _dx, _dy) {
+    _cone.cells[(_dy + _cone.r) * _cone.side + _dx + _cone.r] = 1;
+}
+
+// Scans one octant row by row (_row = distance from the viewer, _start .. _end the slopes still open).
+// The eight octants (static tables): how a (column, row) step of the scan maps onto the grid.
+function Vis_Scan(_g, _cone, _row, _start, _end, _oct, _r2) {
+    static _xx = [1, 0, 0, -1, -1, 0, 0, 1];
+    static _xy = [0, 1, -1, 0, 0, -1, 1, 0];
+    static _yx = [0, 1, 1, 0, 0, -1, -1, 0];
+    static _yy = [1, 0, 0, 1, -1, 0, 0, -1];
+    if (_start < _end) return;
+    var _r = _cone.r;
+    var _new_start = _start;
+    for (var _j = _row; _j <= _r; _j++) {
+        var _dy = -_j;
+        var _dx = -_j - 1;
+        var _blocked = false;
+        while (_dx <= 0) {
+            _dx++;
+            var _mx = _dx * _xx[_oct] + _dy * _xy[_oct];
+            var _my = _dx * _yx[_oct] + _dy * _yy[_oct];
+            var _l = (_dx - 0.5) / (_dy + 0.5);
+            var _rs = (_dx + 0.5) / (_dy - 0.5);
+            if (_start < _rs) continue;
+            if (_end > _l) break;
+            if (_dx * _dx + _dy * _dy <= _r2) Vis_Mark(_cone, _mx, _my);
+            var _wall = Nav_SightBlocked(_g, _cone.cx + _mx, _cone.cy + _my);
+            if (_blocked) {
+                if (_wall) {
+                    _new_start = _rs;
+                    continue;
+                }
+                _blocked = false;
+                _start = _new_start;
+            } else if (_wall && _j < _r) {
+                _blocked = true;
+                Vis_Scan(_g, _cone, _j + 1, _start, _l, _oct, _r2);
+                _new_start = _rs;
+            }
+        }
+        if (_blocked) break;
+    }
+}
+
+// The set of cells lit from cell (_cx,_cy) with radius _tiles (not kept: Vis_Cone is the cached way).
+function Vis_Compute(_g, _cx, _cy, _tiles, _see_through = false) {
+    var _r = max(0, floor(_tiles));
+    var _side = 2 * _r + 1;
+    var _cone = { cx: _cx, cy: _cy, tiles: _tiles, r: _r, side: _side, see_through: _see_through, cells: array_create(_side * _side, 0), runs: [] };
+    var _r2 = _tiles * _tiles;
+    Vis_Mark(_cone, 0, 0);
+    if (_see_through) {
+        for (var _dy = -_r; _dy <= _r; _dy++) {
+            for (var _dx = -_r; _dx <= _r; _dx++) {
+                if (_dx * _dx + _dy * _dy <= _r2) Vis_Mark(_cone, _dx, _dy);
+            }
+        }
+    } else {
+        for (var _oct = 0; _oct < 8; _oct++) Vis_Scan(_g, _cone, 1, 1.0, 0.0, _oct, _r2);
+    }
+    // the runs for drawing: three bands by distance, near ones first
+    for (var _b = 2; _b >= 0; _b--) {
+        for (var _y = -_r; _y <= _r; _y++) {
+            var _x = -_r;
+            while (_x <= _r) {
+                if (Vis_Band(_cone, _x, _y) != _b) { _x++; continue; }
+                var _x0 = _x;
+                while (_x <= _r && Vis_Band(_cone, _x, _y) == _b) _x++;
+                array_push(_cone.runs, _x0, _y, _x - _x0, _b);
+            }
+        }
+    }
+    global.vis_builds = Vis_BuildCount() + 1;
+    return _cone;
+}
+
+// The band of the cell (_dx,_dy) from the viewer: 2 within 40% of the radius, 1 within 75%, 0 beyond; -1 when the cell is not lit.
+function Vis_Band(_cone, _dx, _dy) {
+    if (_cone.cells[(_dy + _cone.r) * _cone.side + _dx + _cone.r] == 0) return -1;
+    var _d = sqrt(_dx * _dx + _dy * _dy) / max(0.001, _cone.tiles);
+    return (_d <= 0.4) ? 2 : ((_d <= 0.75) ? 1 : 0);
+}
+
+// The set for a cell and radius, worked out once and kept on the grid.
+function Vis_Cone(_g, _cx, _cy, _tiles, _see_through = false) {
+    if (!Nav_GridInside(_g, _cx, _cy)) return Vis_Compute(_g, _cx, _cy, _tiles, _see_through);
+    if (!is_array(_g.vis)) _g.vis = array_create(_g.w * _g.h, undefined);
+    var _i = _cy * _g.w + _cx;
+    var _list = _g.vis[_i];
+    if (is_array(_list)) {
+        for (var _k = 0; _k < array_length(_list); _k++) {
+            var _c = _list[_k];
+            if (_c.tiles == _tiles && _c.see_through == _see_through) return _c;
+        }
+    } else {
+        _list = [];
+        _g.vis[_i] = _list;
+    }
+    var _n = Vis_Compute(_g, _cx, _cy, _tiles, _see_through);
+    array_push(_list, _n);
+    return _n;
+}
+
+// Is the cell (_cx,_cy) lit in this set? (a cell outside the set's window is not)
+function Vis_Has(_cone, _cx, _cy) {
+    var _dx = _cx - _cone.cx + _cone.r;
+    var _dy = _cy - _cone.cy + _cone.r;
+    if (_dx < 0 || _dy < 0 || _dx >= _cone.side || _dy >= _cone.side) return false;
+    return (_cone.cells[_dy * _cone.side + _dx] != 0);
+}
+
+// The radius (tiles) an enemy sees and lights with: its sight, one more while it chases (the same extra tile EnemyAI_Update gives it), nothing for a boss.
+function Vis_EnemyTiles(_prof, _ai_mode) {
+    if (_prof.fixed || _prof.sight <= 0) return 0;
+    return _prof.sight + ((_ai_mode == "chase") ? 1 : 0);
 }
 
 // ---- reservations: which enemy holds which cell (its own cell and the one it is stepping into) ----
@@ -1392,18 +1512,17 @@ function Sight_PlayerHidden(_cells, _pcx, _pcy, _moving, _still_frames) {
     return false;
 }
 
-// Can an enemy at pixel (_ex,_ey) see a player at pixel (_px,_py)? A circle of _tiles, a clear line unless _see_through, and a hidden player only from HIDE_SEEN_TILES.
+// Can an enemy at pixel (_ex,_ey) see a player at pixel (_px,_py)? The player's cell must be one the enemy's light reaches (Vis_Cone: a circle of _tiles cut off by walls,
+// the same set that is drawn as its light, D157), unless _see_through; a hidden player only from HIDE_SEEN_TILES.
 function Sight_CanSee(_g, _ex, _ey, _px, _py, _tiles, _see_through, _hidden) {
     if (_tiles <= 0) return false;
     var _half = GRID_TILE_SIZE / 2;
-    if (point_distance(_ex, _ey, _px, _py) > _tiles * GRID_TILE_SIZE) return false;
     var _ecx = Nav_CellOf(_ex + _half);
     var _ecy = Nav_CellOf(_ey + _half);
     var _pcx = Nav_CellOf(_px + _half);
     var _pcy = Nav_CellOf(_py + _half);
     if (_hidden && max(abs(_ecx - _pcx), abs(_ecy - _pcy)) > HIDE_SEEN_TILES) return false;
-    if (_see_through) return true;
-    return Nav_LineClear(_g, _ecx, _ecy, _pcx, _pcy);
+    return Vis_Has(Vis_Cone(_g, _ecx, _ecy, _tiles, _see_through), _pcx, _pcy);
 }
 
 // What an enemy (profile _prof, pixel position _ex,_ey) notices of a player at pixel (_px,_py): { sees, heard }. heard only counts when it does not see him.
