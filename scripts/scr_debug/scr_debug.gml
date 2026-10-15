@@ -488,7 +488,11 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeTitle(_s);   // G2 (D128): launch -> logo -> press-any-key splash -> menu slides in, Continue card, wrap-around, the New Game guard
         case 320: case 321: case 322: case 323: case 324: case 325: case 326: case 327: case 328: case 329:
         case 330: case 331: case 332: case 333: case 334: case 335: case 336: case 337: case 338: case 339:
-            Scenario_StepSmokeClassGuard(_s);   // G4 (D127): the first class chest cannot be skipped; its last step calls Scenario_NoticeEnd
+            Scenario_StepSmokeClassGuard(_s);   // G4 (D127): the first class chest cannot be skipped
+            break;
+        case 360: case 361: case 362: case 363: case 364: case 365: case 366: case 367: case 368: case 369:
+        case 370: case 371: case 372: case 373: case 374: case 375: case 376: case 377: case 378: case 379:
+            Scenario_StepSmokeRumble(_s);   // G8 (D136): the Rumble row in Settings with real keys, saved and loaded; the last step calls Scenario_NoticeEnd
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -888,7 +892,7 @@ function Scenario_StepSmokeTitle(_s) {
             if (_s.t == 3) Scenario_Tap("confirm");
             if (_s.t == 9) {
                 Scenario_Check("title_new_game_without_a_run_starts_at_once", is_struct(_sc.title_exit) || room != rm_start || Transition_IsActive());
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 360);   // G8 (D136): the Rumble setting through the real pause menu and Settings (360..369); the last one ends the run
             }
             break;
     }
@@ -2814,7 +2818,7 @@ function Scenario_StepShots(_s) {
         case 60: case 61: case 62: case 63: case 64: case 65: case 66: case 67: case 68:
             Scenario_StepShotsWorld(_s);
             break;
-        case 80: case 82: case 83: case 84: case 85: case 86: case 87: case 88: case 89:
+        case 80: case 81: case 82: case 83: case 84: case 85: case 86: case 87: case 88: case 89:
             Scenario_StepShotsUi(_s);
             break;
         case 90: case 91: case 92: case 93: case 94: case 95: case 96: case 97:
@@ -3425,7 +3429,7 @@ function Scenario_StepShotsWindow(_s) {
                 var _sp = GameState_Get().ui.settings_popup;
                 _sp.pending.window_mode = WINDOW_MODE_BORDERLESS;
                 SettingsPopup_Refresh();
-                Ui_MenuFixCursor(_sp.menu, 6);   // the Window row
+                Ui_MenuFixCursor(_sp.menu, 7);   // the Window row (G8: Rumble sits above it)
             }
             if (_s.t == 90) {
                 _s.shot = "shot_settings_window_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
@@ -3513,12 +3517,21 @@ function Scenario_StepShotsUi(_s) {
             if (_s.t == 60) {
                 Scenario_Check("shots_ui_settings_on_text_speed", _sp.menu.items[_sp.menu.cursor].id == "text_speed", "row=" + string(_sp.menu.items[_sp.menu.cursor].id));
                 Scenario_ShotUi(_s, "settings_details");
+                Scenario_Next(_s, 81);
+            }
+            break;
+        case 81:   // G8 (D136): the Rumble row (two Downs from text speed): its help line in the details panel
+            if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+            if (_s.t == 4 || _s.t == 10) Scenario_Tap("menu_down");
+            if (_s.t == 60) {
+                Scenario_Check("shots_ui_settings_on_rumble", _sp.menu.items[_sp.menu.cursor].id == "rumble", "row=" + string(_sp.menu.items[_sp.menu.cursor].id));
+                Scenario_ShotUi(_s, "settings_rumble");
                 Scenario_Next(_s, 84);
             }
             break;
         case 84:   // language row, right: Korean
             if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
-            if (_s.t == 4 || _s.t == 10 || _s.t == 16 || _s.t == 22 || _s.t == 28) Scenario_Tap("menu_down");
+            if (_s.t == 4 || _s.t == 10 || _s.t == 16 || _s.t == 22) Scenario_Tap("menu_down");   // G8: from the Rumble row (was five Downs from text speed)
             if (_s.t == 34) Scenario_Tap("menu_right");
             if (_s.t == 90) {
                 Scenario_Check("shots_ui_settings_is_korean", Loc_GetLanguage() == "ko" && _sp.menu.items[_sp.menu.cursor].id == "language", "lang=" + Loc_GetLanguage());
@@ -8658,6 +8671,125 @@ function Scenario_StepSmokeHunt2(_s) {
                 Scenario_Next(_s, 320);   // G4 (D127, 320..339) first; it goes on to the title steps (270..275), which end the run
             }
             if (_s.t > 900) { Scenario_Check("hunt2_continue_reaches_rm_floor4_again", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ============================================================================
+// G8 (D136): the Rumble setting (smoke steps 360-379, the end of the chain). A new run in rm_floor1; the pause key, Settings, five Downs to the Rumble
+// row (real keys), Right flips it in the pending copy only; Apply saves it; the file and the live settings say Off; a reload from the file keeps Off;
+// the Settings screen shows it; flipped back On the same way. With the setting Off, or the keyboard as the last device, an event starts no rumble.
+// No pad is attached to the gate PC: the motors themselves (gamepad_set_vibration) are not reached here.
+// ============================================================================
+function Scenario_RumbleRowIndex(_sp, _id) {
+    var _r = -1;
+    for (var _i = 0; _i < array_length(_sp.menu.items); _i++) if (_sp.menu.items[_i].id == _id) _r = _i;
+    return _r;
+}
+
+function Scenario_StepSmokeRumble(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "rm")) _s.rm = { begun: false };
+    var _rm = _s.rm;
+    var _sp = _gs.ui.settings_popup;
+    switch (_s.step) {
+        case 360:   // a new run (from another room, as the class guard does); then the pause menu with the real key
+            if (!_rm.begun) {
+                if (!Scenario_Hunt2Begin(_s, _rm, 7401)) {
+                    if (_s.t > 1500) { Scenario_Check("g8_a_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                    break;
+                }
+                _rm.begun = true;
+                _s.t = 0;
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                with (obj_enemy) instance_destroy();
+                with (obj_dialogue_trigger) instance_destroy();
+                Scenario_Check("g8_rumble_defaults_to_on", GameSettings_Ensure().rumble == 1);
+                Scenario_Check("g8_the_rumble_state_is_idle", Rumble_Get().left == 0 && Rumble_Get().right == 0 && Rumble_Get().ms == 0);
+                Scenario_Tap("pause");
+                Scenario_Next(_s, 361);
+            }
+            break;
+        case 361:   // pause -> Settings (the third row)
+            if (_s.t == 12) {
+                Scenario_Check("g8_the_pause_menu_is_open", PauseMenu_IsOpen());
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 19) Scenario_Tap("menu_down");
+            if (_s.t == 26) {
+                Scenario_Check("g8_the_pause_cursor_is_on_settings", PauseMenu_Cursor() == 2, "cursor=" + string(PauseMenu_Cursor()));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 45) {
+                Scenario_Check("g8_settings_is_open", SettingsPopup_IsOpen("pause"));
+                Scenario_Next(_s, 362);
+            }
+            if (_s.t > 200) { Scenario_Check("g8_settings_opens_from_the_pause_menu", false, "mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 362:   // five Downs: vol_ui -> vol_sfx -> vol_bgm -> text_speed -> shake -> rumble; Right flips it in the pending copy
+            if (_s.t == 1 || _s.t == 8 || _s.t == 15 || _s.t == 22 || _s.t == 29) Scenario_Tap("menu_down");
+            if (_s.t == 40) {
+                Scenario_Check("g8_the_cursor_is_on_the_rumble_row", _sp.menu.items[_sp.menu.cursor].id == "rumble", "row=" + string(_sp.menu.items[_sp.menu.cursor].id));
+                Scenario_Check("g8_the_rumble_row_says_on", _sp.menu.items[_sp.menu.cursor].value == Loc_T("settings.value.on", "On"));
+                Scenario_Tap("menu_right");
+            }
+            if (_s.t == 50) {
+                var _ri = Scenario_RumbleRowIndex(_sp, "rumble");
+                Scenario_Check("g8_right_flips_rumble_in_the_pending_copy", _ri >= 0 && _sp.pending.rumble == 0 && _sp.dirty);
+                Scenario_Check("g8_the_row_now_says_off", _ri >= 0 && _sp.menu.items[_ri].value == Loc_T("settings.value.off", "Off"));
+                Scenario_Check("g8_it_is_not_applied_yet", GameSettings_Ensure().rumble == 1 && Settings_RumbleOn());
+                Ui_MenuFixCursor(_sp.menu, array_length(_sp.menu.items) - 1);   // Apply
+                Scenario_Tap("confirm");
+                Scenario_Next(_s, 363);
+            }
+            break;
+        case 363:   // Apply: the live settings and the file say Off; a reload from the file keeps it
+            if (_s.t == 15) {
+                var _disk = Save_ReadSettingsConfig();
+                Scenario_Check("g8_apply_makes_rumble_off_live", GameSettings_Ensure().rumble == 0 && !Settings_RumbleOn() && !_sp.dirty);
+                Scenario_Check("g8_apply_writes_it_to_the_settings_file", is_struct(_disk) && _disk.rumble == 0);
+                _gs.settings = _disk;   // what the next start does: the settings come back from the file
+                Scenario_Check("g8_a_reload_from_the_file_keeps_rumble_off", GameSettings_Ensure().rumble == 0);
+                Scenario_Check("g8_with_rumble_off_an_event_starts_nothing", !Rumble_Dispatch("death") && Rumble_Get().ms == 0 && Rumble_Get().left == 0);
+                global.input.last_device = "keyboard";
+                GameSettings_Ensure().rumble = 1;
+                Scenario_Check("g8_with_the_keyboard_as_last_device_an_event_starts_nothing", !Rumble_Dispatch("death") && Rumble_Get().ms == 0 && Rumble_Get().left == 0);
+                GameSettings_Ensure().rumble = 0;
+                Scenario_Tap("cancel");   // leave Settings (nothing pending)
+                Scenario_Next(_s, 364);
+            }
+            break;
+        case 364:   // open Settings again: the row shows Off; flip it back On the same way and save
+            if (_s.t == 30) {
+                Scenario_Check("g8_back_leaves_settings", !SettingsPopup_IsOpen("pause") && PauseMenu_IsOpen());
+                Scenario_Tap("confirm");   // the pause cursor is still on Settings
+            }
+            if (_s.t == 55) {
+                Scenario_Check("g8_settings_opens_again", SettingsPopup_IsOpen("pause"));
+                var _r2 = Scenario_RumbleRowIndex(_sp, "rumble");
+                Scenario_Check("g8_the_screen_shows_rumble_off_after_the_reload", _r2 >= 0 && _sp.menu.items[_r2].value == Loc_T("settings.value.off", "Off"));
+                Ui_MenuFixCursor(_sp.menu, _r2);
+                Scenario_Tap("menu_right");
+            }
+            if (_s.t == 65) {
+                Scenario_Check("g8_right_flips_it_back_on", _sp.pending.rumble == 1 && _sp.dirty);
+                Ui_MenuFixCursor(_sp.menu, array_length(_sp.menu.items) - 1);
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 80) {
+                var _disk2 = Save_ReadSettingsConfig();
+                Scenario_Check("g8_apply_saves_rumble_on_again", GameSettings_Ensure().rumble == 1 && is_struct(_disk2) && _disk2.rumble == 1);
+                Scenario_Tap("cancel");
+            }
+            if (_s.t == 105) {
+                Scenario_Check("g8_the_pause_menu_is_back", !SettingsPopup_IsOpen("pause") && PauseMenu_IsOpen());
+                PauseMenu_Close(true);
+                Scenario_NoticeEnd();
+            }
             break;
     }
 }

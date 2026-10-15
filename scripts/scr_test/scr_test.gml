@@ -118,6 +118,7 @@ function Test_RunAll() {
     Test_RunSuite("Hunt2", Test_Suite_Hunt2);
     Test_RunSuite("Title", Test_Suite_Title);
     Test_RunSuite("ClassGuard", Test_Suite_ClassGuard);
+    Test_RunSuite("Rumble", Test_Suite_Rumble);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -5085,14 +5086,14 @@ function Test_Suite_UI() {
     var _si = SettingsMenu_Items(GameSettings_Defaults(), 16);
     var _ids = "";
     for (var _i = 0; _i < array_length(_si); _i++) _ids += ((_i > 0) ? "," : "") + _si[_i].id;
-    Test_Eq("D0 settings rows, in order", _ids, "vol_ui,vol_sfx,vol_bgm,text_speed,shake,qte_assist,window,scale,language,controls,apply");   // C4 adds Controls (D49)
+    Test_Eq("D0 settings rows, in order", _ids, "vol_ui,vol_sfx,vol_bgm,text_speed,shake,rumble,qte_assist,window,scale,language,controls,apply");   // C4 adds Controls (D49); G8 adds Rumble (D136)
     Test_Eq("D0 settings volume row shows a percentage", _si[2].value, "60%");
     Test_Eq("D0 settings volume row carries its slider fill", _si[2].amount, 0.6);
-    Test_False("D0 scale row is greyed outside windowed (borderless is the default)", _si[7].enabled);
+    Test_False("D0 scale row is greyed outside windowed (borderless is the default)", _si[8].enabled);
     var _pw = GameSettings_Defaults();
     _pw.window_mode = WINDOW_MODE_WINDOWED;
-    Test_True("D0 scale row is live while windowed", SettingsMenu_Items(_pw, 16)[7].enabled);
-    Test_True("D100 every settings row has a plain help sentence", string_length(_si[0].help) > 0 && string_length(_si[6].help) > 0 && string_length(_si[9].help) > 0);
+    Test_True("D0 scale row is live while windowed", SettingsMenu_Items(_pw, 16)[8].enabled);
+    Test_True("D100 every settings row has a plain help sentence", string_length(_si[0].help) > 0 && string_length(_si[7].help) > 0 && string_length(_si[10].help) > 0);
     var _tm = Title_MainItems(false);
     Test_Eq("D0 title menu has four items", array_length(_tm), 4);
     Test_False("D0 Load Game is greyed with no save", _tm[1].enabled);
@@ -8358,4 +8359,142 @@ function Test_BagsFind() {
     Test_Eq("D126 find: a loaded run has the 6 marbles back", variable_struct_exists(_gs.run, "find_bag") && is_struct(_gs.run.find_bag) ? array_length(_gs.run.find_bag.left) : -1, 6);
     for (var _m = 0; _m < 6; _m++) _s2 = Card_OnVictory(_s2);
     Test_Eq("D126 find: the loaded run finishes the bag: 3 potions in the 10 fights, none lost or doubled", Inv_Count(_s2.inventory, 10) - _q0, 3);
+}
+
+// ============================================================================
+// G8 (D136): controller rumble. Pure core: the event table, the detector (two snapshots -> an event), the timer state, the gate (setting, last device,
+// pad), the stop rules, and the setting's save / load. The motors themselves (gamepad_set_vibration) are only reached through Rumble_Send; no pad is
+// attached to the test PC, so that one call is checked by reading the code and by the smoke run (it must not run with the keyboard as the last device).
+// ============================================================================
+function Test_RumbleSnap(_hit, _broken, _hp, _max, _def) {
+    return { hitstop: _hit, broken: _broken, hp: _hp, max_hp: _max, def: _def };
+}
+
+function Test_Suite_Rumble() {
+    var _fns = ["Rumble_Spec", "Rumble_Detect", "Rumble_New", "Rumble_Fire", "Rumble_Tick", "Rumble_Stop", "Rumble_Blocked", "Rumble_Update", "Settings_RumbleOn"];
+    var _all = true;
+    for (var _i = 0; _i < array_length(_fns); _i++) {
+        var _there = (asset_get_index(_fns[_i]) != -1);
+        Test_True("D136 " + _fns[_i] + " exists", _there);
+        if (!_there) _all = false;
+    }
+    var _has_field = variable_struct_exists(GameSettings_Defaults(), "rumble");
+    Test_True("D136 the settings carry a rumble field", _has_field);
+    if (!_all || !_has_field) return;
+
+    // --- the table: event -> strength and milliseconds (D136: Perfect light ~80, BREAK medium ~150, big hit medium-strong ~200, death strong ~400)
+    Test_Eq("D136 Perfect lasts 80 ms", Rumble_Spec("perfect").ms, 80);
+    Test_Eq("D136 BREAK lasts 150 ms", Rumble_Spec("break").ms, 150);
+    Test_Eq("D136 a big hit lasts 200 ms", Rumble_Spec("big_hit").ms, 200);
+    Test_Eq("D136 death lasts 400 ms", Rumble_Spec("death").ms, 400);
+    Test_True("D136 strength grows: Perfect < BREAK < big hit < death", Rumble_Spec("perfect").strength < Rumble_Spec("break").strength && Rumble_Spec("break").strength < Rumble_Spec("big_hit").strength && Rumble_Spec("big_hit").strength < Rumble_Spec("death").strength);
+    Test_True("D136 every strength is in (0, 1]", Rumble_Spec("perfect").strength > 0 && Rumble_Spec("death").strength <= 1);
+    Test_True("D136 an unknown event has no rumble", is_undefined(Rumble_Spec("nonsense")));
+
+    // --- the detector: this step's snapshot against the last one
+    var _a = Test_RumbleSnap(false, false, 100, 100, false);
+    Test_Eq("D136 nothing changed: no event", Rumble_Detect(_a, Test_RumbleSnap(false, false, 100, 100, false)), "");
+    Test_Eq("D136 no earlier snapshot: no event (first step in a fight)", Rumble_Detect(undefined, Test_RumbleSnap(true, true, 10, 100, false)), "");
+    Test_Eq("D136 the Perfect freeze starts: perfect", Rumble_Detect(_a, Test_RumbleSnap(true, false, 100, 100, false)), "perfect");
+    Test_Eq("D136 the freeze going on is not a new Perfect", Rumble_Detect(Test_RumbleSnap(true, false, 100, 100, false), Test_RumbleSnap(true, false, 100, 100, false)), "");
+    Test_Eq("D136 the enemy becomes broken: break", Rumble_Detect(_a, Test_RumbleSnap(false, true, 100, 100, false)), "break");
+    Test_Eq("D136 staying broken is not a new BREAK", Rumble_Detect(Test_RumbleSnap(false, true, 100, 100, false), Test_RumbleSnap(false, true, 100, 100, false)), "");
+    Test_Eq("D136 losing 24% of max HP is not a big hit", Rumble_Detect(_a, Test_RumbleSnap(false, false, 76, 100, false)), "");
+    Test_Eq("D136 losing exactly 25% of max HP is a big hit", Rumble_Detect(_a, Test_RumbleSnap(false, false, 75, 100, false)), "big_hit");
+    Test_Eq("D136 the 25% is of MAX HP, not of current HP", Rumble_Detect(Test_RumbleSnap(false, false, 40, 100, false), Test_RumbleSnap(false, false, 20, 100, false)), "");
+    Test_Eq("D136 a heavy move that lands (defence bar over) with any damage is a big hit", Rumble_Detect(Test_RumbleSnap(false, false, 100, 100, true), Test_RumbleSnap(false, false, 90, 100, false)), "big_hit");
+    Test_Eq("D136 a heavy move fully blocked (no damage) is nothing", Rumble_Detect(Test_RumbleSnap(false, false, 100, 100, true), Test_RumbleSnap(false, false, 100, 100, false)), "");
+    Test_Eq("D136 the defence bar still up: nothing yet", Rumble_Detect(Test_RumbleSnap(false, false, 100, 100, true), Test_RumbleSnap(false, false, 100, 100, true)), "");
+    Test_Eq("D136 healing is not a hit", Rumble_Detect(Test_RumbleSnap(false, false, 20, 100, false), Test_RumbleSnap(false, false, 90, 100, false)), "");
+    Test_Eq("D136 HP reaching 0: death", Rumble_Detect(Test_RumbleSnap(false, false, 10, 100, false), Test_RumbleSnap(false, false, 0, 100, false)), "death");
+    Test_Eq("D136 staying at 0 HP is not a new death", Rumble_Detect(Test_RumbleSnap(false, false, 0, 100, false), Test_RumbleSnap(false, false, 0, 100, false)), "");
+    Test_Eq("D136 death beats a big hit on the same step", Rumble_Detect(_a, Test_RumbleSnap(false, false, 0, 100, false)), "death");
+    Test_Eq("D136 a big hit beats BREAK on the same step", Rumble_Detect(_a, Test_RumbleSnap(false, true, 50, 100, false)), "big_hit");
+    Test_Eq("D136 BREAK beats Perfect on the same step", Rumble_Detect(_a, Test_RumbleSnap(true, true, 100, 100, false)), "break");
+
+    // --- the gate and the timer
+    var _st = Rumble_New();
+    Test_True("D136 a new state is idle", _st.left == 0 && _st.right == 0 && _st.ms == 0);
+    Test_False("D136 setting Off: no rumble", Rumble_Fire(_st, "death", false, "gamepad", 0));
+    Test_False("D136 keyboard as the last device: no rumble", Rumble_Fire(_st, "death", true, "keyboard", 0));
+    Test_False("D136 no pad connected: no rumble", Rumble_Fire(_st, "death", true, "gamepad", -1));
+    Test_False("D136 an unknown event: no rumble", Rumble_Fire(_st, "nonsense", true, "gamepad", 0));
+    Test_True("D136 none of those left anything running", _st.left == 0 && _st.right == 0 && _st.ms == 0);
+    Test_True("D136 Perfect on the pad starts", Rumble_Fire(_st, "perfect", true, "gamepad", 2));
+    Test_True("D136 the motors run for the table's time on that pad", (_st.left > 0 || _st.right > 0) && _st.ms == 80 && _st.pad == 2);
+    Rumble_Tick(_st, 79);
+    Test_True("D136 79 ms in: still running", (_st.left > 0 || _st.right > 0) && _st.ms == 1);
+    Rumble_Tick(_st, 2);
+    Test_True("D136 past 80 ms: reset to 0", _st.left == 0 && _st.right == 0 && _st.ms == 0);
+    Test_True("D136 death starts", Rumble_Fire(_st, "death", true, "gamepad", 0));
+    Test_False("D136 a weaker rumble does not cut a stronger one short", Rumble_Fire(_st, "perfect", true, "gamepad", 0));
+    Test_Eq("D136 the death rumble is still the one running", _st.ms, 400);
+    var _st2 = Rumble_New();
+    Rumble_Fire(_st2, "perfect", true, "gamepad", 0);
+    Test_True("D136 BREAK replaces a running Perfect", Rumble_Fire(_st2, "break", true, "gamepad", 0) && _st2.ms == 150);
+    Rumble_Stop(_st2);
+    Test_True("D136 Stop resets the motors to 0", _st2.left == 0 && _st2.right == 0 && _st2.ms == 0);
+
+    // --- the stop rules: pause, focus loss, room change (D122); the same Update the game calls every step
+    Test_False("D136 playing in the same room: not blocked", Rumble_Blocked(true, false, 5, 5));
+    Test_True("D136 the window lost focus: blocked", Rumble_Blocked(false, false, 5, 5));
+    Test_True("D136 the pause menu is open: blocked", Rumble_Blocked(true, true, 5, 5));
+    Test_True("D136 the room changed: blocked", Rumble_Blocked(true, false, 5, 6));
+    var _st3 = Rumble_New();
+    Rumble_Fire(_st3, "death", true, "gamepad", 0);
+    Rumble_Update(_st3, 16, false);
+    Test_Eq("D136 Update counts the timer down", _st3.ms, 384);
+    Rumble_Update(_st3, 16, true);
+    Test_True("D136 Update with a stop reason resets the motors to 0", _st3.left == 0 && _st3.right == 0 && _st3.ms == 0);
+    Rumble_Fire(_st3, "break", true, "gamepad", 0);
+    Rumble_Update(_st3, 1000, false);
+    Test_True("D136 Update past the time resets to 0", _st3.left == 0 && _st3.right == 0 && _st3.ms == 0);
+
+    // --- the setting: default On, a 0/1 flag, saved and loaded; an old file without the field loads On
+    Test_Eq("D136 rumble defaults to on", GameSettings_Defaults().rumble, 1);
+    Test_Eq("D136 normalizing nothing gives rumble on", GameSettings_Normalize(undefined).rumble, 1);
+    Test_Eq("D136 a struct without the field gets rumble on", GameSettings_Normalize({ audio_bgm: 0.5 }).rumble, 1);
+    Test_Eq("D136 rumble off is kept", GameSettings_Normalize({ rumble: 0 }).rumble, 0);
+    Test_Eq("D136 rumble is a 0/1 flag", GameSettings_Normalize({ rumble: 7 }).rumble, 1);
+    Test_Eq("D136 rumble reads a boolean", GameSettings_Normalize({ rumble: false }).rumble, 0);
+    var _f = "test_settings_rumble.json";
+    Save_DeleteFileSet(_f);
+    var _off = GameSettings_Defaults();
+    _off.rumble = 0;
+    Save_WriteSettingsConfig(_off, _f);
+    var _back = Save_ReadSettingsConfig(_f);
+    Test_Eq("D136 rumble off survives a save and load", is_struct(_back) ? _back.rumble : -1, 0);
+    var _raw = json_parse(Test_RawRead(_f));
+    Test_Eq("D136 the file has the field", variable_struct_exists(_raw, "rumble") ? _raw.rumble : -1, 0);
+    Save_DeleteFileSet(_f);
+    Save_WriteSettingsConfig(GameSettings_Defaults(), _f);
+    var _on = Save_ReadSettingsConfig(_f);
+    Test_Eq("D136 rumble on survives a save and load", is_struct(_on) ? _on.rumble : -1, 1);
+    Save_DeleteFileSet(_f);
+    Test_RawWrite(_f, "{\"settings_version\":10,\"text_speed\":2,\"screen_shake\":0}");
+    var _old = Save_ReadSettingsConfig(_f);
+    Test_Eq("D136 an old file (version 10, no rumble field) loads with rumble on", is_struct(_old) ? _old.rumble : -1, 1);
+    Test_Eq("D136 an old file keeps its other settings", is_struct(_old) ? _old.screen_shake : -1, 0);
+    Save_DeleteFileSet(_f);
+    Test_RawWrite(_f, "{\"settings_version\":8,\"display_scale\":4,\"window_mode\":0}");
+    var _v8 = Save_ReadSettingsConfig(_f);
+    Test_Eq("D136 a version 8 file loads with rumble on", is_struct(_v8) ? _v8.rumble : -1, 1);
+    Save_DeleteFileSet(_f);
+    var _p = GameSettings_Defaults();
+    Test_True("D136 the Rumble row toggles", Settings_Adjust(_p, "rumble", 1, 16));
+    Test_Eq("D136 rumble is now off", _p.rumble, 0);
+    Test_True("D136 and back on", Settings_Adjust(_p, "rumble", -1, 16));
+    Test_Eq("D136 rumble is on again", _p.rumble, 1);
+    var _items = SettingsMenu_Items(GameSettings_Defaults(), 16);
+    var _row = undefined;
+    var _prev_id = "";
+    for (var _j = 1; _j < array_length(_items); _j++) {
+        if (_items[_j].id == "rumble") { _row = _items[_j]; _prev_id = _items[_j - 1].id; }
+    }
+    Test_True("D136 the Settings screen has a Rumble row", is_struct(_row));
+    Test_Eq("D136 the Rumble row sits right under Screen shake", _prev_id, "shake");
+    Test_Eq("D136 the row is a choice like Screen shake", is_struct(_row) ? _row.kind : "", "choice");
+    Test_Eq("D136 the row says On by default", is_struct(_row) ? _row.value : "", Loc_T("settings.value.on", "On"));
+    Test_True("D136 the row has a help line", is_struct(_row) && string_length(_row.help) > 0);
+    Test_True("D136 the label and the help are in the workbook, English and Korean", Loc_GetRaw("settings.row.rumble", "en") != "" && Loc_GetRaw("settings.row.rumble", "ko") != "" && Loc_GetRaw("settings.help.rumble", "en") != "" && Loc_GetRaw("settings.help.rumble", "ko") != "");
 }
