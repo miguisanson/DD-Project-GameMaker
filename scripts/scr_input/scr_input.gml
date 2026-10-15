@@ -995,3 +995,158 @@ function Prompt_RichDraw(_x, _y, _text, _w, _col, _halign = fa_left, _alpha = 1)
     draw_set_alpha(a0);
     return lay.h;
 }
+
+// ============================================================================================================================
+// G8 (D136): controller rumble. A short vibration on a Perfect hit, a BREAK, a big hit taken and the player's death.
+// The events are READ, never called from the combat code: Rumble_Step (obj_ui_controller's Step) takes a snapshot each step (the Perfect freeze,
+// the enemy's broken flag, the fighter's HP, the defence bar) and Rumble_Detect turns two snapshots into an event. A heavy move is a telegraphed
+// one: it goes through the defence bar, so "the bar was up last step and is gone now with HP lost" is the heavy hit landing.
+// Only the pad the player used last (D92) buzzes, never with the keyboard or mouse as the last device, and never with the setting Off.
+// It stops at once on pause, focus loss (D122), a room change and game end. The motors are only touched in Rumble_Send (gamepad_set_vibration).
+// ============================================================================================================================
+
+// event -> strength (0..1, the stronger motor), the two motors (left = low-frequency, right = high-frequency) and the time in ms. Unknown event: undefined.
+function Rumble_Spec(_event) {
+    switch (_event) {
+        case "perfect": return { strength: 0.4, left: 0,   right: 0.4, ms: 80 };    // light tick
+        case "break":   return { strength: 0.5, left: 0.5, right: 0.4, ms: 150 };   // medium
+        case "big_hit": return { strength: 0.8, left: 0.8, right: 0.6, ms: 200 };   // medium-strong
+        case "death":   return { strength: 1,   left: 1,   right: 0.8, ms: 400 };   // strong
+    }
+    return undefined;
+}
+
+// Pure: last step's snapshot and this step's -> "" or the strongest event. A snapshot is { hitstop, broken, hp, max_hp, def }.
+// Big hit = HP lost >= 25% of max HP in one step, or any HP lost when the defence bar of a heavy move just ended.
+function Rumble_Detect(_prev, _cur) {
+    if (!is_struct(_prev) || !is_struct(_cur)) return "";
+    if (_cur.hp <= 0 && _prev.hp > 0) return "death";
+    var lost = _prev.hp - _cur.hp;
+    if (lost > 0 && (lost >= 0.25 * _cur.max_hp || (_prev.def && !_cur.def))) return "big_hit";
+    if (_cur.broken && !_prev.broken) return "break";
+    if (_cur.hitstop && !_prev.hitstop) return "perfect";
+    return "";
+}
+
+function Rumble_New() {
+    return { left: 0, right: 0, ms: 0, strength: 0, pad: -1, sent_l: 0, sent_r: 0, sent_pad: -1, snap: undefined, room: -1, focused: true };
+}
+
+// Starts an event when the setting is On, the last device is the pad, a pad is there (_pad >= 0) and the event is known. A weaker event never cuts a
+// stronger one that is still running; an equal or stronger one replaces it. Returns whether it started.
+function Rumble_Fire(_st, _event, _on, _device, _pad) {
+    if (!_on || _device != "gamepad" || _pad < 0) return false;
+    var sp = Rumble_Spec(_event);
+    if (is_undefined(sp)) return false;
+    if (_st.ms > 0 && sp.strength < _st.strength) return false;
+    _st.left = sp.left;
+    _st.right = sp.right;
+    _st.ms = sp.ms;
+    _st.strength = sp.strength;
+    _st.pad = _pad;
+    return true;
+}
+
+function Rumble_Stop(_st) {
+    _st.left = 0;
+    _st.right = 0;
+    _st.ms = 0;
+    _st.strength = 0;
+}
+
+// Counts the time down by _step_ms (Presentation_StepMs); at 0 the motors go back to 0.
+function Rumble_Tick(_st, _step_ms) {
+    if (_st.ms <= 0) { Rumble_Stop(_st); return; }
+    _st.ms -= _step_ms;
+    if (_st.ms <= 0) Rumble_Stop(_st);
+}
+
+// The reasons to stop at once (pure): the window lost focus, the pause menu is open, the room changed.
+function Rumble_Blocked(_focused, _paused, _room_now, _room_prev) {
+    return !_focused || _paused || _room_now != _room_prev;
+}
+
+function Rumble_Update(_st, _step_ms, _blocked) {
+    if (_blocked) Rumble_Stop(_st);
+    else Rumble_Tick(_st, _step_ms);
+}
+
+// ---- the live side ----
+function Rumble_Get() {
+    if (!variable_global_exists("rumble") || !is_struct(global.rumble)) global.rumble = Rumble_New();
+    return global.rumble;
+}
+
+// The pad that buzzes: the first connected one (what Input_Update reads), and only while the pad is the last device used.
+function Rumble_ActivePad() {
+    if (Prompt_Device() != "gamepad") return -1;
+    return Input_GamepadDevice();
+}
+
+function Rumble_Dispatch(_event) {
+    return Rumble_Fire(Rumble_Get(), _event, Settings_RumbleOn(), Prompt_Device(), Rumble_ActivePad());
+}
+
+// The only call that reaches the motors. Sends when the wanted values differ from the last ones sent (and zeroes a pad it is no longer using).
+function Rumble_Send(_st) {
+    if (_st.sent_pad >= 0 && _st.sent_pad != _st.pad && (_st.sent_l != 0 || _st.sent_r != 0)) {
+        if (gamepad_is_connected(_st.sent_pad)) gamepad_set_vibration(_st.sent_pad, 0, 0);
+        _st.sent_l = 0;
+        _st.sent_r = 0;
+    }
+    if (_st.pad < 0) return;
+    if (_st.left == _st.sent_l && _st.right == _st.sent_r) { _st.sent_pad = _st.pad; return; }
+    if (gamepad_is_connected(_st.pad)) gamepad_set_vibration(_st.pad, _st.left, _st.right);
+    _st.sent_l = _st.left;
+    _st.sent_r = _st.right;
+    _st.sent_pad = _st.pad;
+}
+
+// Stop and send the zero now (game end, focus loss).
+function Rumble_StopNow() {
+    var st = Rumble_Get();
+    Rumble_Stop(st);
+    Rumble_Send(st);
+}
+
+// Called by Focus_Step with window_has_focus(): losing focus stops the motors at once, in the same step.
+function Rumble_FocusStep(_has_focus) {
+    var st = Rumble_Get();
+    st.focused = _has_focus;
+    if (!_has_focus) Rumble_StopNow();
+}
+
+// What the detector looks at, from the battle controller when in a fight, else the player on the map. undefined when there is no fighter.
+function Rumble_Snapshot() {
+    var gs = GameState_Get();
+    var ch = gs.player_ch;
+    var hit = false;
+    var broken = false;
+    var def = false;
+    if (room == rm_battle && instance_exists(obj_battle_controller)) {
+        var bc = instance_find(obj_battle_controller, 0);
+        if (variable_instance_exists(bc, "p") && is_struct(bc.p)) ch = bc.p;
+        if (variable_instance_exists(bc, "hitstop_ms")) hit = (bc.hitstop_ms > FEEL_FREEZE_NORMAL_MS);   // D138: every hit freezes 40 ms; only a Perfect (80) or a crit / BREAK (120) freezes longer
+        if (variable_instance_exists(bc, "def_active")) def = bc.def_active;
+        if (variable_instance_exists(bc, "e") && is_struct(bc.e) && variable_struct_exists(bc.e, "broken")) broken = bc.e.broken;
+    }
+    if (!is_struct(ch) || !variable_struct_exists(ch, "hp") || !variable_struct_exists(ch, "max_hp")) return undefined;
+    return { hitstop: hit, broken: broken, hp: ch.hp, max_hp: ch.max_hp, def: def };
+}
+
+// One step of the live rumble (obj_ui_controller's Step, before any early exit). Events found while a stop reason holds are dropped.
+function Rumble_Step(_step_ms) {
+    var st = Rumble_Get();
+    var gs = GameState_Get();
+    var paused = (variable_struct_exists(gs, "ui") && gs.ui.mode == UI_PAUSE);
+    var room_prev = (st.room == -1) ? room : st.room;   // the very first step is not a room change
+    st.room = room;
+    if (room_prev != room) st.snap = undefined;   // a new room is a new fight: nothing to compare with yet
+    var blocked = Rumble_Blocked(st.focused, paused, room, room_prev) || !Settings_RumbleOn() || Prompt_Device() != "gamepad";
+    var cur = Rumble_Snapshot();
+    var ev = Rumble_Detect(st.snap, cur);
+    st.snap = cur;
+    Rumble_Update(st, _step_ms, blocked);
+    if (ev != "" && !blocked) Rumble_Dispatch(ev);
+    Rumble_Send(st);
+}
