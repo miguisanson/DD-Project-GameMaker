@@ -6,6 +6,7 @@ if (bump_applied) {
 }
 prompt_target = noone;
 World_RegisterFx(id);   // the interact prompt is drawn by the world layer script: objects have no Draw event (no .yy edits)
+MapFx_Step();           // D138 (G6): finish old effects, sparkle on a level gained
 
 var gs = GameState_Get();
 Player_EnsureSpriteSet();
@@ -145,6 +146,7 @@ if (!moving) {
         move_timer = tile_size;
         step_from_x = x;
         step_from_y = y;
+        squash_start = MapFx_Now();   // D138 (G6): the squash starts with the step
         // D70: the run key doubles the speed; fixed for the whole step so the step always ends exactly on a tile
         step_speed = (Input_Held("run") && (tile_size mod run_speed) == 0) ? run_speed : walk_speed;
         image_speed = step_speed / max(1, walk_speed);   // I-063: running plays the same walk animation, faster (twice as fast at twice the speed), it never freezes
@@ -191,6 +193,11 @@ if (!moving) {
 }
 
 mask_index = sprite[DOWN];
+
+// D138 (G6): the step squash. The position and the mask stay exactly as they were (tile-snapped, D69); only the picture changes, and it is drawn by
+// MapFx_DrawPlayerSquash in whole pixels while the plain sprite is off. Off with Screen shake off (D49).
+squash_on = Settings_ShakeOn() && ((MapFx_Now() - squash_start) < FEEL_SQUASH_MS);
+visible = !squash_on;
 
 // D70: apply the bump nudge last (taken back at the top of the next step)
 if (bump_timer > 0) {

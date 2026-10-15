@@ -309,6 +309,7 @@ function Interact_Handle(_inst) {
             _inst.swapped = true;
             RoomState_SaveInstance(_inst, ["swapped","sprite_index"], false);
             SFX_Play("chest_open");
+            MapFx_OpenedAt(_inst, [], true);   // D138 (G6): the burst and a small card rising out
             if (is_struct(gs.player_ch)) GameState_SetPlayer(Cards_ChestOpened(gs.player_ch));
             if (instance_exists(obj_player)) obj_player.character = gs.player_ch;
             Dialogue_StartWithSpeaker(name, DialogueDB_Get("chest_open"));
@@ -452,6 +453,7 @@ function Interact_Handle(_inst) {
                     if (Run_IsActive() && RoomState_EnsurePersistId(_inst)) loot = Shuffle_ChestLoot(Run_Get().seed, room_get_name(room), _inst.persist_id, lvl, key, gs.player_ch);   // C3 (D33): contents come from the seed and this chest
                     else loot = Loot_RollContainer(lvl, key);
                 }
+                MapFx_OpenedAt(_inst, loot, false);   // D138 (G6): the burst, and the first thing found rises out (display only: the rewards below are unchanged)
                 if (is_array(loot) && array_length(loot) > 0) {
                     gs.player_ch.inventory = Loot_Grant(gs.player_ch.inventory, loot);
 

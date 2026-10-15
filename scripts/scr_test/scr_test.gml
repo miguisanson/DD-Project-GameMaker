@@ -122,6 +122,7 @@ function Test_RunAll() {
     Test_RunSuite("Rumble", Test_Suite_Rumble);
     Test_RunSuite("EchoAfterClass", Test_Suite_EchoAfterClass);
     Test_RunSuite("SpeedPreview", Test_Suite_SpeedPreview);
+    Test_RunSuite("MapJuice", Test_Suite_MapJuice);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -8695,8 +8696,7 @@ function Test_Suite_BattleFeel() {
     GameSettings_Ensure().screen_shake = _shake_keep;
 }
 
-// ==============================================================
-// G8 (D136): controller rumble. Pure core: the event table, the detector (two snapshots -> an event), the timer state, the gate (setting, last device,
+// =======================================================// G8 (D136): controller rumble. Pure core: the event table, the detector (two snapshots -> an event), the timer state, the gate (setting, last device,
 // pad), the stop rules, and the setting's save / load. The motors themselves (gamepad_set_vibration) are only reached through Rumble_Send; no pad is
 // attached to the test PC, so that one call is checked by reading the code and by the smoke run (it must not run with the keyboard as the last device).
 // ============================================================================
@@ -9210,4 +9210,197 @@ function Test_Suite_SpeedPreview() {
     var _rows = Battle_SkillRows(_pr, EnemyCreate(ENEMY_SLIME));
     Test_Eq("D135: the Hilt Bash row carries the Damage line", Test_RowValue(_rows[0].lines, Loc_T("battle.det.damage", "Damage")), "7");
     Test_Eq("D135: the Muscle Up row has no Damage line", Test_RowValue(_rows[1].lines, Loc_T("battle.det.damage", "Damage")), "");
+}
+
+// ============================================================================
+// G6 (D138, map part): chest burst, the item that rises out, the level-up sparkle, the gold counter that ticks up, the step squash.
+// Pure curves first (no room, no instance), then the small effect list (MapFx_*) with the clock passed in.
+// ============================================================================
+function Test_Suite_MapJuice() {
+    // ---- the chest burst: a few palette pixels from the lid, bounded, gone at FEEL_BURST_MS ----
+    var _b = Feel_ChestBurst(80, 60);
+    Test_True("mapjuice: the burst is 8 to 14 pixels", array_length(_b) >= 8 && array_length(_b) <= 14);
+    var _in_box = true;
+    var _pal = true;
+    var _alpha_ok = true;
+    var _prev_a = 2;
+    for (var _t = 0; _t <= FEEL_BURST_MS; _t += 10) {
+        var _a = Feel_BurstAlpha(_t);
+        if (_a > _prev_a + 0.0001 || _a < 0 || _a > 1) _alpha_ok = false;
+        _prev_a = _a;
+        for (var _i = 0; _i < array_length(_b); _i++) {
+            var _q = Feel_ParticlePos(_b[_i], _t);
+            if (abs(_q.x - 80) > 24 || _q.y < 60 - 24 || _q.y > 60 + 6) _in_box = false;
+        }
+    }
+    for (var _i2 = 0; _i2 < array_length(_b); _i2++) {
+        var _c = _b[_i2].col;
+        if (_c != UI_C_DARKEST && _c != UI_C_DARK && _c != UI_C_LIGHT && _c != UI_C_LIGHTEST) _pal = false;
+    }
+    Test_True("mapjuice: every burst pixel stays within 24 px sideways and 24 px up of the lid", _in_box);
+    Test_True("mapjuice: every burst pixel is one of the four palette colours", _pal);
+    Test_True("mapjuice: the burst only fades out (never brighter again)", _alpha_ok);
+    Test_Eq("mapjuice: the burst is solid at the start", Feel_BurstAlpha(0), 1);
+    Test_Eq("mapjuice: the burst is invisible at FEEL_BURST_MS", Feel_BurstAlpha(FEEL_BURST_MS), 0);
+    Test_True("mapjuice: the burst is alive just before its end", Feel_BurstAlive(FEEL_BURST_MS - 1));
+    Test_False("mapjuice: the burst is over at FEEL_BURST_MS", Feel_BurstAlive(FEEL_BURST_MS));
+
+    // ---- the item that rises out: 0 -> 12 px, eased out; alpha 1 -> 0 over ~600 ms ----
+    Test_Eq("mapjuice: the rise is 600 ms", FEEL_RISE_MS, 600);
+    Test_Eq("mapjuice: the rise is 12 px", FEEL_RISE_PX, 12);
+    Test_Eq("mapjuice: the item starts at the chest (0 px)", Feel_RiseY(0), 0);
+    Test_Eq("mapjuice: before the start it is still at the chest", Feel_RiseY(-40), 0);
+    Test_Eq("mapjuice: the item is 12 px up at 600 ms", Feel_RiseY(600), 12);
+    Test_Eq("mapjuice: and stays at 12 px afterwards", Feel_RiseY(900), 12);
+    Test_Eq("mapjuice: eased out: 9 px of 12 at half the time", Feel_RiseY(300), 9);
+    var _rise_ok = true;
+    var _prev_y = -1;
+    var _prev_al = 2;
+    var _al_ok = true;
+    for (var _t2 = 0; _t2 <= 700; _t2 += 10) {
+        var _y = Feel_RiseY(_t2);
+        if (_y < _prev_y || _y > 12 || _y != floor(_y)) _rise_ok = false;
+        _prev_y = _y;
+        var _al = Feel_RiseAlpha(_t2);
+        if (_al > _prev_al + 0.0001 || _al < 0 || _al > 1) _al_ok = false;
+        _prev_al = _al;
+    }
+    Test_True("mapjuice: the rise only goes up, never past 12 px, whole pixels", _rise_ok);
+    Test_True("mapjuice: the item only fades (alpha never goes up, stays 0..1)", _al_ok);
+    Test_Eq("mapjuice: the item is fully visible at the start", Feel_RiseAlpha(0), 1);
+    Test_Eq("mapjuice: the item is gone at 600 ms", Feel_RiseAlpha(600), 0);
+    Test_True("mapjuice: half way it is partly faded", Feel_RiseAlpha(450) > 0 && Feel_RiseAlpha(450) < 1);
+
+    // ---- the gold counter: the real value at once, the display counts up over 400 ms and never overshoots ----
+    Test_Eq("mapjuice: the gold tick is 400 ms", FEEL_GOLD_TICK_MS, 400);
+    Test_Eq("mapjuice: the gold display starts at the old number", Feel_GoldShown(100, 160, 0), 100);
+    Test_Eq("mapjuice: the gold display is the real number at 400 ms", Feel_GoldShown(100, 160, 400), 160);
+    Test_Eq("mapjuice: and after", Feel_GoldShown(100, 160, 5000), 160);
+    var _g_ok = true;
+    var _g_prev = 0;
+    for (var _t3 = 0; _t3 <= 600; _t3 += 5) {
+        var _gv = Feel_GoldShown(100, 160, _t3);
+        if (_gv < _g_prev || _gv > 160 || _gv < 100 || _gv != floor(_gv)) _g_ok = false;
+        _g_prev = _gv;
+    }
+    Test_True("mapjuice: the gold display only counts up, whole numbers, never past the real value", _g_ok);
+    Test_True("mapjuice: half way it is between the numbers", Feel_GoldShown(100, 160, 200) > 100 && Feel_GoldShown(100, 160, 200) < 160);
+    Test_Eq("mapjuice: gold that goes down shows at once", Feel_GoldShown(160, 100, 40), 100);
+    var _gs0 = Feel_GoldNew(50);
+    Test_Eq("mapjuice: a new gold display shows the real number", Feel_GoldStep(_gs0, 50, 1000), 50);
+    Test_Eq("mapjuice: a gain starts counting from the old number", Feel_GoldStep(_gs0, 80, 2000), 50);
+    Test_Eq("mapjuice: the display remembers the real value at once", _gs0.to, 80);
+    var _mid = Feel_GoldStep(_gs0, 80, 2200);
+    Test_True("mapjuice: 200 ms in, it is between 50 and 80", _mid > 50 && _mid < 80);
+    Test_Eq("mapjuice: 400 ms in, it shows 80", Feel_GoldStep(_gs0, 80, 2400), 80);
+    var _gs1 = Feel_GoldNew(10);
+    Feel_GoldStep(_gs1, 20, 100);
+    var _mid1 = Feel_GoldStep(_gs1, 20, 300);
+    Test_Eq("mapjuice: another gain in the middle of a count starts from the shown number", Feel_GoldStep(_gs1, 35, 300), _mid1);
+    Test_Eq("mapjuice: and ends at the newest real value", Feel_GoldStep(_gs1, 35, 700), 35);
+    var _gs2 = Feel_GoldNew(90);
+    Test_Eq("mapjuice: gold that drops (a purchase, a new run) shows at once", Feel_GoldStep(_gs2, 20, 50), 20);
+    Test_Eq("mapjuice: the bounce lifts 1 px at the start of a count", Feel_GoldBounce(10, true), 1);
+    Test_Eq("mapjuice: and is down again in the middle", Feel_GoldBounce(200, true), 0);
+    Test_Eq("mapjuice: and lifts once more as the number lands", Feel_GoldBounce(410, true), 1);
+    Test_Eq("mapjuice: and is down after", Feel_GoldBounce(600, true), 0);
+    Test_Eq("mapjuice: no bounce with Screen shake off (D49)", Feel_GoldBounce(10, false), 0);
+
+    // ---- the step squash: x 1.08 / y 0.92, back to 1.0 by 120 ms, nothing with Screen shake off ----
+    var _s0 = Feel_SquashScale(0, true);
+    Test_True("mapjuice: the squash starts at x 1.08", abs(_s0.x - 1.08) < 0.0001);
+    Test_True("mapjuice: the squash starts at y 0.92", abs(_s0.y - 0.92) < 0.0001);
+    var _s1 = Feel_SquashScale(FEEL_SQUASH_MS, true);
+    Test_True("mapjuice: the squash is back to 1.0 at 120 ms", _s1.x == 1 && _s1.y == 1);
+    var _s2 = Feel_SquashScale(500, true);
+    Test_True("mapjuice: and stays at 1.0", _s2.x == 1 && _s2.y == 1);
+    var _sq_ok = true;
+    var _px = 9;
+    for (var _t4 = 0; _t4 <= 140; _t4 += 4) {
+        var _sc = Feel_SquashScale(_t4, true);
+        if (_sc.x > _px + 0.0001 || _sc.x < 1 || _sc.y > 1 || _sc.y < 0.92 - 0.0001) _sq_ok = false;
+        _px = _sc.x;
+    }
+    Test_True("mapjuice: the squash eases back (wider and shorter, never past 1.0 the other way)", _sq_ok);
+    var _s3 = Feel_SquashScale(0, false);
+    Test_True("mapjuice: no squash with Screen shake off (D49)", _s3.x == 1 && _s3.y == 1);
+    var _bx = Feel_SquashBox(0, true, 16);
+    Test_True("mapjuice: at the start the 16 px sprite is 17 wide and 15 tall", _bx.w == 17 && _bx.h == 15);
+    var _bx_ok = true;
+    for (var _t5 = 0; _t5 <= 160; _t5 += 4) {
+        var _bb = Feel_SquashBox(_t5, true, 16);
+        if (_bb.dy + _bb.h != 16 || _bb.dx > 0 || _bb.dx < -1 || _bb.w != floor(_bb.w) || _bb.h != floor(_bb.h)) _bx_ok = false;
+        if (_bb.dx + _bb.w < 16 || _bb.dx + _bb.w > 17) _bx_ok = false;
+    }
+    Test_True("mapjuice: whole pixels, the feet stay on the tile's bottom edge, at most 1 px sideways", _bx_ok);
+    var _bx1 = Feel_SquashBox(FEEL_SQUASH_MS, true, 16);
+    Test_True("mapjuice: after 120 ms the box is the plain 16 x 16 at the tile", _bx1.w == 16 && _bx1.h == 16 && _bx1.dx == 0 && _bx1.dy == 0);
+    var _bx2 = Feel_SquashBox(0, false, 16);
+    Test_True("mapjuice: with Screen shake off the box is always the plain tile", _bx2.w == 16 && _bx2.h == 16 && _bx2.dx == 0 && _bx2.dy == 0);
+
+    // ---- the level-up sparkle: a ring of 10, radius 5 -> 18 px, gone at 500 ms ----
+    var _ring = Feel_SparkleRing();
+    Test_Eq("mapjuice: the sparkle ring has 10 sparkles", array_length(_ring), FEEL_SPARKLE_N);
+    var _r_ok = true;
+    var _alive0 = true;
+    for (var _t6 = 0; _t6 < FEEL_SPARKLE_MS; _t6 += 10) {
+        for (var _k = 0; _k < array_length(_ring); _k++) {
+            var _p = Feel_SparklePos(_ring[_k], 100, 100, _t6);
+            var _d = point_distance(100, 100, _p.x, _p.y);
+            if (_d < FEEL_SPARKLE_R0 - 0.01 || _d > FEEL_SPARKLE_R1 + 0.01) _r_ok = false;
+            if (_t6 == 0 && !_p.alive) _alive0 = false;
+        }
+    }
+    Test_True("mapjuice: every sparkle stays between the inner and the outer radius", _r_ok);
+    Test_True("mapjuice: the sparkles are all there at the start", _alive0);
+    var _pe = Feel_SparklePos(_ring[0], 100, 100, FEEL_SPARKLE_MS);
+    Test_False("mapjuice: the sparkles are gone at 500 ms", _pe.alive);
+    var _pm = Feel_SparklePos(_ring[0], 100, 100, 250);
+    var _p0 = Feel_SparklePos(_ring[0], 100, 100, 0);
+    Test_True("mapjuice: the ring grows (eased out)", point_distance(100, 100, _pm.x, _pm.y) > point_distance(100, 100, _p0.x, _p0.y));
+    Test_True("mapjuice: the sparkle radius limits are 5 and 18", FEEL_SPARKLE_R0 == 5 && FEEL_SPARKLE_R1 == 18);
+
+    // ---- what rises out of a chest ----
+    Test_Eq("mapjuice: an item rises as an item", MapFx_RiseKind({ item_id: 3, qty: 1 }), "item");
+    Test_Eq("mapjuice: gold rises as the coin", MapFx_RiseKind({ gold: 15 }), "gold");
+    Test_Eq("mapjuice: a card chest shows the card glyph", MapFx_RiseKind("card"), "card");
+    Test_Eq("mapjuice: nothing recognisable rises as nothing", MapFx_RiseKind(undefined), "");
+
+    // ---- the effect list, with the clock passed in ----
+    MapFx_Clear();
+    MapFx_Opened(80, 64, [{ item_id: 1, qty: 1 }], false, 10000);
+    Test_Eq("mapjuice: opening a chest starts one burst", MapFx_Count("burst"), 1);
+    Test_Eq("mapjuice: and one rising item", MapFx_Count("rise"), 1);
+    MapFx_Prune(10000 + FEEL_BURST_MS - 1);
+    Test_Eq("mapjuice: the burst is still there just before its end", MapFx_Count("burst"), 1);
+    MapFx_Prune(10000 + FEEL_BURST_MS);
+    Test_Eq("mapjuice: the burst is removed at its end", MapFx_Count("burst"), 0);
+    Test_Eq("mapjuice: the item is still rising then", MapFx_Count("rise"), 1);
+    MapFx_Prune(10000 + FEEL_RISE_MS);
+    Test_Eq("mapjuice: the item is removed at 600 ms", MapFx_Count("rise"), 0);
+    MapFx_Opened(80, 64, [], false, 20000);
+    Test_Eq("mapjuice: an empty chest still bursts", MapFx_Count("burst"), 1);
+    Test_Eq("mapjuice: but nothing rises", MapFx_Count("rise"), 0);
+    MapFx_Clear();
+    MapFx_Opened(80, 64, [], true, 30000);
+    Test_Eq("mapjuice: a card chest makes its card rise", MapFx_Count("rise"), 1);
+    MapFx_Clear();
+    MapFx_Sparkle(40000);
+    Test_Eq("mapjuice: a level-up starts the sparkle", MapFx_Count("sparkle"), 1);
+    MapFx_Prune(40000 + FEEL_SPARKLE_MS - 1);
+    Test_Eq("mapjuice: still sparkling just before 500 ms", MapFx_Count("sparkle"), 1);
+    MapFx_Prune(40000 + FEEL_SPARKLE_MS);
+    Test_Eq("mapjuice: the sparkle is removed at 500 ms", MapFx_Count("sparkle"), 0);
+    MapFx_Clear();
+    Test_Eq("mapjuice: clearing empties the list", MapFx_Count(""), 0);
+
+    // ---- when a level gain sparkles ----
+    var _lv = MapFx_LevelGate("a", 2, "a", 3);
+    Test_True("mapjuice: a level gained in the same run sparkles", _lv.fire && _lv.seen == 3);
+    var _lv2 = MapFx_LevelGate("a", 2, "b", 5);
+    Test_True("mapjuice: a different run (a load, a new run) does not sparkle", !_lv2.fire && _lv2.seen == 5 && _lv2.key == "b");
+    var _lv3 = MapFx_LevelGate("a", 4, "a", 1);
+    Test_True("mapjuice: a lower level (a new character) does not sparkle and is remembered", !_lv3.fire && _lv3.seen == 1);
+    var _lv4 = MapFx_LevelGate("a", 3, "a", 3);
+    Test_True("mapjuice: the same level does not sparkle", !_lv4.fire && _lv4.seen == 3);
 }

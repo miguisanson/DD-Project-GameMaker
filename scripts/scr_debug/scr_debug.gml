@@ -501,6 +501,10 @@ function Scenario_StepSmoke(_s) {
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step calls Scenario_NoticeEnd
             break;
+        case 380: case 381: case 382: case 383: case 384: case 385: case 386: case 387: case 388: case 389:
+        case 390: case 391: case 392: case 393: case 394: case 395: case 396: case 397: case 398: case 399:
+            Scenario_StepSmokeMapJuice(_s);   // G6 (D138, map part): chest burst + rising item, gold ticks up, step squash, level-up sparkle; its last step calls Scenario_NoticeEnd
+            break;
         case 30:
             Scenario_StepSmokeUi(_s);
             break;
@@ -2864,6 +2868,8 @@ function Scenario_StepShots(_s) {
             break;
         case 430: case 431: case 432: case 433: case 434: case 435: case 436: case 437: case 438: case 439:
             Scenario_StepShotsSpeed(_s);   // g7 (D134, D135): the command menu with the damage plate, the skill list with its lines, the x2 marker; finishes the run
+        case 400: case 401: case 402: case 403: case 404: case 405: case 406: case 407: case 408: case 409:
+            Scenario_StepShotsMapJuice(_s);   // G6 (D138, map part): the chest burst, the rising item, the gold counter, the level-up sparkle, the step squash
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -9613,7 +9619,7 @@ function Scenario_StepShotsFeel(_s) {
 //   413  the enemy's turn timed from its first frame to the player's menu: mode 0 is the baseline, mode 1 (run held) must take about half
 //   414  the sliding bar with run held: its clock keeps real time (qte_ms moves as fast as current_time) and the time scale is 1
 //   415  the preview equals the damage the real resolve paths deal (attack and Hilt Bash, OK and Perfect); then the run ends
-// ============================================================================
+// =====================================================================
 function Scenario_StepSmokeSpeed(_s) {
     var _bc = instance_exists(obj_battle_controller) ? instance_find(obj_battle_controller, 0) : noone;
     if (!variable_struct_exists(_s, "g7")) _s.g7 = { mode: 0, base_f: -1, base_ms: -1, phase: 0, f0: 0, ct0: 0, scale_max: 1, qphase: 0, q0: 0, c0: 0 };
@@ -9777,7 +9783,7 @@ function Scenario_StepSmokeSpeed(_s) {
                 Battle_PlayerSkill(_bc, SKILL_HILT_BASH, Qte_Result(_grades[_gi]));
                 Scenario_Check("g7_hilt_bash_at_" + _grades[_gi] + "_deals_the_preview", !_bc.last_crit && _bc.last_dmg == _want_s, "dealt=" + string(_bc.last_dmg) + " preview=" + string(_want_s));
             }
-            Scenario_NoticeEnd();   // the last step of the smoke chain
+            Scenario_Next(_s, 380);   // G6 (D138, 380..399) goes on; its last step ends the smoke chain
             break;
     }
 }
@@ -9791,7 +9797,7 @@ function Scenario_StepShotsSpeed(_s) {
     var _names = Scenario_SpeedShotScenes();
     if (!variable_struct_exists(_s, "g7i")) _s.g7i = 0;
     if (_s.g7i >= array_length(_names)) {
-        Scenario_Finish();
+        Scenario_Next(_s, 400);   // G6 (D138, map part) pictures (400..409) finish the run
         return;
     }
     var _tag = _names[_s.g7i];
@@ -9854,6 +9860,383 @@ function Scenario_StepShotsSpeed(_s) {
                 _s.g7i++;
                 Scenario_Next(_s, 430);
             }
+            break;
+    }
+}
+
+// G6 (D138, map part): chest burst, the item that rises out, the gold counter, the step squash, the level-up sparkle.
+// Smoke steps 380-399 (a new run, rm_floor3's lv2 chest opened with the interact key; the gold counter; a step with Screen shake on and off; a level-up),
+// pictures 400-409 (the clock of the effects is frozen at an exact age so the pictures do not depend on frame times: MapFx_Now / global.mapfx_clock).
+// ============================================================================
+
+// Finds rm_floor3's lv2 chest, a seed whose chest is not empty, and stands the player next to it facing it. _mj gets chest, want, before, placed.
+function Scenario_MapJuiceStage(_mj) {
+    var _gs = GameState_Get();
+    with (obj_enemy) instance_destroy();
+    var _chest = instance_exists(obj_chest_lv2) ? instance_find(obj_chest_lv2, 0) : noone;
+    _mj.chest = _chest;
+    _mj.placed = false;
+    _mj.want = [];
+    _mj.before = [];
+    if (_chest == noone) return false;
+    RoomState_EnsurePersistId(_chest);
+    var _want = [];
+    var _seed = 9100;
+    while (_seed < 9300) {
+        _want = Shuffle_ChestLoot(_seed, "rm_floor3", _chest.persist_id, _chest.container_level, _chest.loot_table_key, _gs.player_ch);
+        if (array_length(_want) > 0) break;
+        _seed++;
+    }
+    _gs.run.seed = _seed;
+    _mj.want = _want;
+    for (var _w = 0; _w < array_length(_want); _w++) array_push(_mj.before, Scenario_ItemCount(_gs.player_ch, _want[_w].item_id));
+    var _pl = instance_find(obj_player, 0);
+    var _dirs = [[-1, 0, RIGHT], [1, 0, LEFT], [0, 1, UP], [0, -1, DOWN]];
+    for (var _d = 0; _d < 4 && !_mj.placed; _d++) {
+        var _tx = _chest.x + _dirs[_d][0] * 16;
+        var _ty = _chest.y + _dirs[_d][1] * 16;
+        if (!Player_TileBlocked(_pl, _tx, _ty)) {
+            _pl.x = _tx; _pl.y = _ty; _pl.moving = false; _pl.move_timer = 0; _pl.face = _dirs[_d][2];
+            _mj.placed = true;
+        }
+    }
+    return _mj.placed && array_length(_want) > 0;
+}
+
+// A direction the player can walk one tile in: { act, face, dx, dy }, or undefined.
+function Scenario_MapJuiceFreeDir(_pl) {
+    var _opts = [
+        { act: "move_left", face: LEFT, dx: -1, dy: 0 }, { act: "move_right", face: RIGHT, dx: 1, dy: 0 },
+        { act: "move_up", face: UP, dx: 0, dy: -1 }, { act: "move_down", face: DOWN, dx: 0, dy: 1 }
+    ];
+    for (var _i = 0; _i < 4; _i++) {
+        if (!Player_TileBlocked(_pl, _pl.x + _opts[_i].dx * 16, _pl.y + _opts[_i].dy * 16)) return _opts[_i];
+    }
+    return undefined;
+}
+
+function Scenario_StepSmokeMapJuice(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "mj")) _s.mj = { };
+    var _mj = _s.mj;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    switch (_s.step) {
+        case 380:   // a new run, then rm_floor3 (the chest step of the economy smoke does the same)
+            if (!variable_struct_exists(_mj, "left_title")) {   // the step before pressed New Game at the title: let it leave the title and land
+                if (_s.t < 30 || room == rm_start || Transition_IsActive()) {
+                    if (_s.t > 1500) { Scenario_Check("mapjuice_the_title_is_left", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                    break;
+                }
+                _mj.left_title = true;
+                _s.t = 0;
+            }
+            if (!variable_struct_exists(_mj, "begun")) {
+                if (!Scenario_Hunt2Begin(_s, _mj, 7401)) {
+                    if (_s.t > 1500) { Scenario_Check("mapjuice_a_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                    break;
+                }
+                _mj.begun = true;
+                _s.t = 0;
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                _gs.persist = {};
+                _gs.persist_applied = {};
+                MapFx_Clear();
+                room_goto(rm_floor3);
+                Scenario_Next(_s, 381);
+            }
+            break;
+        case 381:   // stand next to the chest, open it with the interact key: the burst and the rising item start, the reward comes once
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor3) && !variable_struct_exists(_mj, "staged")) {
+                _mj.staged = true;
+                var _staged_ok = Scenario_MapJuiceStage(_mj);
+                Scenario_Check("mapjuice_a_chest_with_loot_is_staged", _staged_ok, "chest=" + string(_mj.chest) + " placed=" + string(_mj.placed) + " loot=" + string(array_length(_mj.want)));
+                MapFx_Clear();
+                _mj.t1 = _s.t;
+            }
+            if (variable_struct_exists(_mj, "staged") && !variable_struct_exists(_mj, "tapped") && _s.t >= _mj.t1 + 25) {
+                _mj.tapped = true;
+                Scenario_Tap("interact");
+            }
+            if (variable_struct_exists(_mj, "tapped") && !variable_struct_exists(_mj, "open_ms") && instance_exists(_mj.chest) && _mj.chest.swapped) {
+                _mj.open_ms = current_time;
+                Scenario_Check("mapjuice_opening_the_chest_starts_the_burst", MapFx_Count("burst") == 1, "burst=" + string(MapFx_Count("burst")));
+                Scenario_Check("mapjuice_opening_the_chest_makes_the_item_rise", MapFx_Count("rise") == 1, "rise=" + string(MapFx_Count("rise")));
+            }
+            if (variable_struct_exists(_mj, "open_ms") && !variable_struct_exists(_mj, "chime_checked") && current_time - _mj.open_ms > 250) {
+                _mj.chime_checked = true;
+                var _chimed = false;
+                var _fxl = MapFx_List();
+                for (var _fi = 0; _fi < array_length(_fxl); _fi++) if (_fxl[_fi].kind == "rise" && _fxl[_fi].chime) _chimed = true;
+                Scenario_Check("mapjuice_the_rising_item_has_played_its_chime", _chimed);
+                Scenario_Check("mapjuice_the_chime_does_not_become_the_last_sound", global.sfx_last_key != "ui_confirm", "last=" + string(global.sfx_last_key));
+            }
+            if (variable_struct_exists(_mj, "open_ms")) Scenario_CardsTalk(_s);
+            if (variable_struct_exists(_mj, "open_ms") && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && current_time - _mj.open_ms > 900) {
+                Scenario_Check("mapjuice_the_burst_and_the_item_are_over", MapFx_Count("") == 0, "left=" + string(MapFx_Count("")));
+                var _same = true;
+                for (var _w2 = 0; _w2 < array_length(_mj.want); _w2++) {
+                    var _gotn = Scenario_ItemCount(_gs.player_ch, _mj.want[_w2].item_id);
+                    var _it = ItemDB_Get(_mj.want[_w2].item_id);
+                    var _unique = (_it.type == ITEM_WEAPON || _it.type == ITEM_ARMOR || _it.type == ITEM_ACCESSORY);
+                    if (_unique ? (_gotn < 1) : (_gotn != _mj.before[_w2] + _mj.want[_w2].qty)) _same = false;
+                }
+                Scenario_Check("mapjuice_the_reward_is_granted_exactly_once", _same && _mj.chest.swapped, json_stringify(_mj.want));
+                Scenario_Next(_s, 382);
+            }
+            if (_s.t > 900) { Scenario_Check("mapjuice_the_chest_flow_ends", false, "tapped=" + string(variable_struct_exists(_mj, "tapped")) + " open=" + string(variable_struct_exists(_mj, "open_ms")) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 382:   // gold: the real value changes at once, the HUD number counts up to it in 400 ms
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                _mj.g0 = _gs.run.gold;
+            }
+            if (_s.t == 6) {
+                var _gd = Feel_GoldState();
+                Scenario_Check("mapjuice_the_gold_display_starts_at_the_real_gold", _gd.shown == _mj.g0 && _gd.to == _mj.g0, "shown=" + string(_gd.shown) + " to=" + string(_gd.to) + " gold=" + string(_mj.g0));
+                _gs.run.gold += 60;
+                _mj.g1 = _gs.run.gold;
+                _mj.gold_ms = current_time;
+                Scenario_Check("mapjuice_the_real_gold_changes_at_once", Gold_Get() == _mj.g0 + 60);
+            }
+            if (_s.t == 9) {
+                var _gd2 = Feel_GoldState();
+                Scenario_Check("mapjuice_the_display_is_counting_up", _gd2.to == _mj.g1 && _gd2.shown >= _mj.g0 && _gd2.shown < _mj.g1, "shown=" + string(_gd2.shown) + " to=" + string(_gd2.to));
+            }
+            if (_s.t > 9 && current_time - _mj.gold_ms > 500) {
+                var _gd3 = Feel_GoldState();
+                Scenario_Check("mapjuice_the_display_reaches_the_real_gold", _gd3.shown == _mj.g1 && Gold_Get() == _mj.g1, "shown=" + string(_gd3.shown) + " gold=" + string(Gold_Get()));
+                Scenario_Next(_s, 383);
+            }
+            if (_s.t > 300) { Scenario_Check("mapjuice_the_gold_display_ends", false, "t=" + string(_s.t)); Scenario_NoticeEnd(); }
+            break;
+        case 383:   // one step with Screen shake on: the squash is drawn and ends within ~120 ms, the position stays on the grid
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                GameSettings_Ensure().screen_shake = 1;
+                _mj.dir = Scenario_MapJuiceFreeDir(_pl);
+                Scenario_Check("mapjuice_the_player_has_a_free_tile_to_step_to", is_struct(_mj.dir));
+                if (!is_struct(_mj.dir)) { Scenario_NoticeEnd(); break; }
+                _pl.face = _mj.dir.face;
+                _mj.x0 = _pl.x;
+                _mj.y0 = _pl.y;
+                _mj.sq_first = -1;
+                _mj.sq_last = -1;
+                _mj.hidden = true;
+                _mj.on_grid = true;
+                _mj.hold_f = _s.f;
+                Scenario_Hold(_mj.dir.act, 10);
+            }
+            if (_s.t > 1 && is_struct(_mj.dir)) {
+                if (_pl.squash_on) {
+                    if (_mj.sq_first < 0) _mj.sq_first = MapFx_Now();
+                    _mj.sq_last = MapFx_Now();
+                    if (_pl.visible) _mj.hidden = false;   // the squashed sprite is drawn by the world layer script: the plain one must be off
+                }
+                if (_pl.x != round(_pl.x) || _pl.y != round(_pl.y)) _mj.on_grid = false;
+            }
+            if (_s.t > 40 && Player_IsSettled(_pl)) {
+                Scenario_Check("mapjuice_a_step_with_shake_on_squashes_the_player", _mj.sq_first >= 0);
+                Scenario_Check("mapjuice_the_squash_hides_the_plain_sprite_while_it_is_drawn", _mj.hidden);
+                Scenario_Check("mapjuice_the_squash_is_over_within_150_ms", _mj.sq_last - _mj.sq_first <= 150, "ms=" + string(_mj.sq_last - _mj.sq_first));
+                Scenario_Check("mapjuice_the_player_is_on_the_next_tile", _pl.x == _mj.x0 + _mj.dir.dx * 16 && _pl.y == _mj.y0 + _mj.dir.dy * 16, "at " + string(_pl.x) + "," + string(_pl.y));
+                Scenario_Check("mapjuice_the_position_is_whole_pixels_all_through_the_step", _mj.on_grid);
+                Scenario_Check("mapjuice_the_plain_sprite_is_back_after_the_squash", _pl.visible && !_pl.squash_on);
+                Scenario_Next(_s, 384);
+            }
+            if (_s.t > 300) { Scenario_Release(); Scenario_Check("mapjuice_the_step_ends", false); Scenario_NoticeEnd(); }
+            break;
+        case 384:   // the same step back with Screen shake off: no squash at all (D49)
+            if (_s.t == 1) {
+                GameSettings_Ensure().screen_shake = 0;
+                _pl.face = (_mj.dir.face == LEFT) ? RIGHT : ((_mj.dir.face == RIGHT) ? LEFT : ((_mj.dir.face == UP) ? DOWN : UP));
+                _mj.back = (_mj.dir.act == "move_left") ? "move_right" : ((_mj.dir.act == "move_right") ? "move_left" : ((_mj.dir.act == "move_up") ? "move_down" : "move_up"));
+                _mj.sq_seen_off = false;
+                _mj.vis_off = true;
+                Scenario_Hold(_mj.back, 10);
+            }
+            if (_s.t > 1) {
+                if (_pl.squash_on) _mj.sq_seen_off = true;
+                if (!_pl.visible) _mj.vis_off = false;
+            }
+            if (_s.t > 40 && Player_IsSettled(_pl)) {
+                Scenario_Check("mapjuice_the_step_back_happened", _pl.x == _mj.x0 && _pl.y == _mj.y0, "at " + string(_pl.x) + "," + string(_pl.y));
+                Scenario_Check("mapjuice_no_squash_with_shake_off", !_mj.sq_seen_off);
+                Scenario_Check("mapjuice_the_plain_sprite_stays_on_with_shake_off", _mj.vis_off);
+                GameSettings_Ensure().screen_shake = 1;
+                Scenario_Next(_s, 385);
+            }
+            if (_s.t > 300) { Scenario_Release(); GameSettings_Ensure().screen_shake = 1; Scenario_Check("mapjuice_the_step_back_ends", false); Scenario_NoticeEnd(); }
+            break;
+        case 385:   // a level-up on the map: the ring of sparkles starts and ends
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                MapFx_Clear();
+                _mj.lv0 = _gs.player_ch.level;
+                var _chl = Player_AddExp(_gs.player_ch, max(1, _gs.player_ch.exp_next));
+                GameState_SetPlayer(_chl);
+                if (instance_exists(obj_player)) obj_player.character = _gs.player_ch;
+                Scenario_Check("mapjuice_the_character_gained_a_level", _gs.player_ch.level == _mj.lv0 + 1, "level=" + string(_gs.player_ch.level));
+                _mj.spark_ms = -1;
+            }
+            if (_s.t > 1 && _mj.spark_ms < 0 && MapFx_Count("sparkle") > 0) {
+                _mj.spark_ms = current_time;
+                Scenario_Check("mapjuice_a_level_up_starts_one_sparkle_ring", MapFx_Count("sparkle") == 1, "n=" + string(MapFx_Count("sparkle")));
+            }
+            if (_mj.spark_ms >= 0 && current_time - _mj.spark_ms > 700) {
+                Scenario_Check("mapjuice_the_sparkle_ring_is_over", MapFx_Count("sparkle") == 0);
+                _gs.player_ch.card_picks = 0;
+                _gs.player_ch.stat_points = 0;
+                CardsUi_Close();
+                Scenario_NoticeEnd();
+            }
+            if (_s.t > 300) { Scenario_Check("mapjuice_a_level_up_starts_the_sparkle", false, "n=" + string(MapFx_Count("sparkle"))); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ---- G6 pictures 400-409 (scale 3 = 480 x 432): the chest burst with the item just out, the item higher and fading, the gold counter part way, the level-up
+// sparkle, the player in the middle of a squash. The effect clock is frozen at an exact age for each picture. ----
+function Scenario_StepShotsMapJuice(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "mjs")) _s.mjs = { };
+    var _mj = _s.mjs;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    switch (_s.step) {
+        case 400:   // a run with some gold, rm_floor3, the player next to the lv2 chest
+            if (_s.t == 1) {
+                var _g0 = Scenario_NewKnight(CLASS_KNIGHT);
+                _g0.run = Run_Create(2469);
+                _g0.run.gold = 87;
+                Scenario_SetWindowScale(3);
+                MapFx_Clear();
+                global.mapfx_clock = -1;
+                room_goto(rm_floor3);
+            }
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor3) && !variable_struct_exists(_mj, "staged")) {   // the fade from the battle room is over
+                _mj.staged = true;
+                Scenario_ClearUi();
+                var _staged_ok = Scenario_MapJuiceStage(_mj);
+                Scenario_Check("shots_mapjuice_the_chest_is_staged", _staged_ok);
+                MapFx_Clear();
+                _mj.t1 = _s.t;
+            }
+            if (variable_struct_exists(_mj, "staged") && !variable_struct_exists(_mj, "tapped") && _s.t >= _mj.t1 + 25) {
+                _mj.tapped = true;
+                Scenario_Tap("interact");
+            }
+            if (variable_struct_exists(_mj, "tapped") && MapFx_Count("burst") > 0) {
+                _mj.t0 = MapFx_Start("burst");
+                global.mapfx_clock = _mj.t0 + 170;   // the burst 170 ms old (spread out, still opaque enough), the item a few pixels up
+                Scenario_Next(_s, 401);
+            }
+            if (_s.t > 900) { Scenario_Check("shots_mapjuice_the_chest_opens", false); Scenario_Finish(); }
+            break;
+        case 401:
+            if (_s.t == 3) {
+                _s.shot = "shot_mapjuice_burst.png";
+                Scenario_ShotLayout(_s.shot);
+            }
+            if (_s.t >= 6) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.mapfx_clock = _mj.t0 + 330;   // the burst is over, the item has almost risen and is fading
+                Scenario_Next(_s, 402);
+            }
+            break;
+        case 402:
+            if (_s.t == 3) {
+                _s.shot = "shot_mapjuice_rise.png";
+                Scenario_ShotLayout(_s.shot);
+            }
+            if (_s.t >= 6) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.mapfx_clock = -1;
+                MapFx_Clear();
+                Scenario_Next(_s, 403);
+            }
+            break;
+        case 403:   // the dialogue of the chest is over; the gold goes up, the counter is 200 ms into its count
+            if (_s.t == 1) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+            }
+            if (_s.t == 15) {
+                _gs.run.gold += 60;
+                _mj.gold_t0 = current_time;
+            }
+            if (_s.t == 20) {
+                var _gd = Feel_GoldState();
+                _mj.gold_start = _gd.start;
+                global.mapfx_clock = _gd.start + 200;
+            }
+            if (_s.t == 24) {
+                _s.shot = "shot_mapjuice_gold.png";
+                var _gd2 = Feel_GoldState();
+                Scenario_Check("shots_mapjuice_the_gold_number_is_part_way", _gd2.shown > 87 && _gd2.shown < 147, "shown=" + string(_gd2.shown));
+                Scenario_ShotLayout(_s.shot);
+            }
+            if (_s.t >= 27) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.mapfx_clock = -1;
+                Scenario_Next(_s, 404);
+            }
+            break;
+        case 404:   // a level-up: the sparkle ring 200 ms in
+            if (_s.t == 1) {
+                MapFx_Clear();
+                var _chl = Player_AddExp(_gs.player_ch, max(1, _gs.player_ch.exp_next));
+                _chl.card_picks = 0;   // the level's screens (stat point, card pick) would open over the picture
+                _chl.stat_points = 0;
+                GameState_SetPlayer(_chl);
+                if (instance_exists(obj_player)) obj_player.character = _gs.player_ch;
+            }
+            if (_s.t > 1 && MapFx_Count("sparkle") > 0 && !variable_struct_exists(_mj, "sp0")) {
+                _mj.sp0 = MapFx_Start("sparkle");
+                global.mapfx_clock = _mj.sp0 + 200;
+                _mj.sp_t = _s.t;
+            }
+            if (variable_struct_exists(_mj, "sp0") && _s.t == _mj.sp_t + 3) {
+                _s.shot = "shot_mapjuice_levelup.png";
+                Scenario_ShotLayout(_s.shot);
+            }
+            if (variable_struct_exists(_mj, "sp0") && _s.t >= _mj.sp_t + 6) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.mapfx_clock = -1;
+                MapFx_Clear();
+                _gs.player_ch.card_picks = 0;
+                _gs.player_ch.stat_points = 0;
+                CardsUi_Close();
+                Scenario_Next(_s, 405);
+            }
+            if (_s.t > 300) { Scenario_Check("shots_mapjuice_the_sparkle_starts", false); Scenario_Finish(); }
+            break;
+        case 405:   // a step: the picture is taken 10 ms into its squash
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                _mj.dir = Scenario_MapJuiceFreeDir(_pl);
+                if (!is_struct(_mj.dir)) { Scenario_Check("shots_mapjuice_the_player_has_a_free_tile", false); Scenario_Finish(); break; }
+                _pl.face = _mj.dir.face;
+                Scenario_Hold(_mj.dir.act, 10);
+            }
+            if (_s.t > 1 && is_struct(_mj.dir) && _pl.squash_on && !variable_struct_exists(_mj, "sq_t")) {
+                _mj.sq_t = _s.t;
+                global.mapfx_clock = _pl.squash_start + 10;
+            }
+            if (variable_struct_exists(_mj, "sq_t") && _s.t == _mj.sq_t + 3) {
+                _s.shot = "shot_mapjuice_squash.png";
+                Scenario_Check("shots_mapjuice_the_player_is_mid_step_and_squashed", _pl.moving && _pl.squash_on && !_pl.visible);
+                Scenario_ShotLayout(_s.shot);
+            }
+            if (variable_struct_exists(_mj, "sq_t") && _s.t >= _mj.sq_t + 6) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.mapfx_clock = -1;
+                Scenario_Release();
+                Scenario_Finish();
+            }
+            if (_s.t > 200) { Scenario_Release(); Scenario_Check("shots_mapjuice_the_step_squashes", false); Scenario_Finish(); }
             break;
     }
 }

@@ -678,3 +678,368 @@ function Feel_DrawEdge(_gw, _gh, _unit, _alpha) {
     draw_set_alpha(a0);
     draw_set_colour(c0);
 }
+
+// ---- Map juice (D138, map part): chest burst, the item that rises out, the level-up sparkle, the gold counter that ticks up, the step squash ----
+// Pure curves first (a function of ms and the Screen shake setting), then a small effect list (global.map_fx) the world layer script draws (MapFx_DrawWorldFx,
+// World_DrawFx in scr_enemy). Everything is code-drawn in the four palette colours; the sounds are existing ones played through Feel_PlayKeep. D49: with Screen
+// shake off the squash and the gold bounce are off (the chest burst, the rising item, the sparkle and the count-up are not motion of the picture).
+#macro FEEL_BURST_MS 320                // the chest burst
+#macro FEEL_RISE_MS 600                 // the item rises and fades over this
+#macro FEEL_RISE_PX 12                  // ... this far
+#macro FEEL_GOLD_TICK_MS 400            // the HUD gold counts up over this
+#macro FEEL_SQUASH_MS 120               // the step squash eases back over this
+#macro FEEL_SQUASH_X 1.08               // wider ...
+#macro FEEL_SQUASH_Y 0.92               // ... and shorter at the start of a step
+#macro FEEL_SPARKLE_MS 500              // the level-up ring
+#macro FEEL_SPARKLE_N 10
+#macro FEEL_SPARKLE_R0 5                // world px from the player's centre: the ring starts here ...
+#macro FEEL_SPARKLE_R1 18               // ... and ends here
+
+// ---- the chest burst ----
+// A fan of palette pixels thrown up from the lid at (_cx, _cy): each { x, y, vx, vy, col, size } for Feel_ParticlePos (world px, px per second, gravity FEEL_GRAVITY).
+function Feel_ChestBurst(_cx, _cy) {
+    var n = 12;
+    var out = [];
+    var cols = [UI_C_LIGHTEST, UI_C_LIGHT, UI_C_DARK, UI_C_LIGHT];   // drawn with a dark shadow pixel (MapFx_DrawWorldFx), so they read on a light floor and a dark one
+    for (var i = 0; i < n; i++) {
+        var u = (i + 0.5) / n;                          // 0..1 across the lid
+        var h1 = Feel_Hash01(i, 11);
+        var h2 = Feel_Hash01(i, 12);
+        array_push(out, {
+            x: _cx + (u - 0.5) * 8,
+            y: _cy,
+            vx: (u - 0.5) * 84 + (h1 - 0.5) * 12,       // about -44 .. 44 px per second
+            vy: -(40 + h2 * 40),                         // -40 .. -80: about 12 px up at the top of the arc
+            col: cols[i mod 4],
+            size: ((i mod 4) == 3) ? 1 : 2
+        });
+    }
+    return out;
+}
+
+function Feel_BurstAlive(_t_ms) {
+    return _t_ms >= 0 && _t_ms < FEEL_BURST_MS;
+}
+
+// Solid for the first 40%, then fading to 0 at FEEL_BURST_MS (the same shape as the death pop).
+function Feel_BurstAlpha(_t_ms) {
+    if (_t_ms >= FEEL_BURST_MS) return 0;
+    return Feel_ParticleAlpha(max(0, _t_ms), FEEL_BURST_MS);
+}
+
+// ---- the item that rises out ----
+// Whole pixels up from the chest, eased out: 0 at the start, FEEL_RISE_PX at FEEL_RISE_MS.
+function Feel_RiseY(_t_ms) {
+    if (_t_ms <= 0) return 0;
+    return round(FEEL_RISE_PX * Feel_Ease(_t_ms / FEEL_RISE_MS));
+}
+
+// Opacity: solid for the first 35%, then a straight fade to 0 at FEEL_RISE_MS.
+function Feel_RiseAlpha(_t_ms) {
+    var u = _t_ms / FEEL_RISE_MS;
+    if (u <= 0.35) return 1;
+    return clamp(1 - (u - 0.35) / 0.65, 0, 1);
+}
+
+// What a loot entry (or "card") rises as: "item" (an { item_id }), "gold" (a { gold }), "card" (the string "card"), "" for anything else.
+function MapFx_RiseKind(_what) {
+    if (is_string(_what)) return (_what == "card") ? "card" : "";
+    if (!is_struct(_what)) return "";
+    if (variable_struct_exists(_what, "gold")) return "gold";
+    if (variable_struct_exists(_what, "item_id")) return "item";
+    return "";
+}
+
+// ---- the gold counter ----
+// The number shown _t_ms after a gain from _from to _to: counts up, eased out, whole numbers, reaches _to at FEEL_GOLD_TICK_MS and never passes it.
+// Gold that goes down (a purchase) is shown at once.
+function Feel_GoldShown(_from, _to, _t_ms) {
+    if (_to <= _from || _t_ms >= FEEL_GOLD_TICK_MS) return _to;
+    if (_t_ms <= 0) return _from;
+    return clamp(_from + floor((_to - _from) * Feel_Ease(_t_ms / FEEL_GOLD_TICK_MS)), _from, _to);
+}
+
+function Feel_GoldNew(_gold) {
+    return { shown: _gold, from: _gold, to: _gold, start: 0 };
+}
+
+// One frame of the display: _st = the counter's state, _gold = the real gold, _now = ms. A new real value starts a count from what is shown now. Returns the number to draw.
+function Feel_GoldStep(_st, _gold, _now) {
+    if (_gold != _st.to) {
+        if (_gold < _st.to) {
+            _st.shown = _gold;
+            _st.from = _gold;
+        } else {
+            _st.from = _st.shown;
+        }
+        _st.to = _gold;
+        _st.start = _now;
+    }
+    _st.shown = Feel_GoldShown(_st.from, _st.to, _now - _st.start);
+    return _st.shown;
+}
+
+// 1 px lift at the start of a count and again as the number lands, 80 ms each. 0 with Screen shake off (D49).
+function Feel_GoldBounce(_t_ms, _shake_on) {
+    if (!_shake_on) return 0;
+    if (_t_ms >= 0 && _t_ms < 80) return 1;
+    if (_t_ms >= FEEL_GOLD_TICK_MS && _t_ms < FEEL_GOLD_TICK_MS + 80) return 1;
+    return 0;
+}
+
+// The HUD's gold display, one for the game (kept across rooms, so the number does not restart from the real value at every room change).
+function Feel_GoldState() {
+    if (!variable_global_exists("gold_disp") || !is_struct(global.gold_disp)) global.gold_disp = Feel_GoldNew(Gold_Get());
+    return global.gold_disp;
+}
+
+// ---- the step squash ----
+// x wider and y shorter at the start of a tile step (FEEL_SQUASH_X / FEEL_SQUASH_Y), easing back to 1 x 1 at FEEL_SQUASH_MS. 1 x 1 with Screen shake off (D49).
+function Feel_SquashScale(_t_ms, _shake_on) {
+    if (!_shake_on || _t_ms >= FEEL_SQUASH_MS) return { x: 1, y: 1 };
+    var e = 1 - Feel_Ease(max(0, _t_ms) / FEEL_SQUASH_MS);   // 1 at the start, 0 at the end
+    return { x: 1 + (FEEL_SQUASH_X - 1) * e, y: 1 - (1 - FEEL_SQUASH_Y) * e };
+}
+
+// The same in whole pixels for a _size px sprite whose top-left sits on the tile: { w, h, dx, dy } = the drawn width and height and where its top-left goes relative to the
+// tile. The feet stay on the tile's bottom edge (dy + h = _size) and the sprite stays centred on the tile (at most 1 px out sideways). Pixel-safe: no half pixels.
+function Feel_SquashBox(_t_ms, _shake_on, _size) {
+    var sc = Feel_SquashScale(_t_ms, _shake_on);
+    var w = round(_size * sc.x);
+    var h = round(_size * sc.y);
+    return { w: w, h: h, dx: floor((_size - w) / 2), dy: _size - h };
+}
+
+// ---- the level-up sparkle ----
+// A ring of FEEL_SPARKLE_N sparkles: each an angle, a size (1 or 2 px) and a palette colour.
+function Feel_SparkleRing() {
+    var out = [];
+    for (var i = 0; i < FEEL_SPARKLE_N; i++) {
+        array_push(out, { a: (i / FEEL_SPARKLE_N) * 2 * pi + Feel_Hash01(i, 21) * 0.2, size: ((i mod 2) == 0) ? 2 : 1, col: ((i mod 2) == 0) ? UI_C_LIGHTEST : UI_C_LIGHT });
+    }
+    return out;
+}
+
+// A sparkle round the centre (_cx, _cy) _t_ms after the level-up (world px): the ring grows from FEEL_SPARKLE_R0 to FEEL_SPARKLE_R1 (eased out) and turns a little.
+// Gone at FEEL_SPARKLE_MS; it blinks off for its last quarter.
+function Feel_SparklePos(_s, _cx, _cy, _t_ms) {
+    var u = clamp(_t_ms / FEEL_SPARKLE_MS, 0, 1);
+    var r = FEEL_SPARKLE_R0 + (FEEL_SPARKLE_R1 - FEEL_SPARKLE_R0) * Feel_Ease(u);
+    var a = _s.a + u * 0.7;
+    var alive = (_t_ms >= 0) && (_t_ms < FEEL_SPARKLE_MS) && (u < 0.75 || (floor(_t_ms / 30) mod 2 == 0));
+    return { x: _cx + cos(a) * r, y: _cy + sin(a) * r, alive: alive };
+}
+
+// ---- the effect list ----
+// The clock of the effects: ms. Normally the game clock; the picture scenario freezes it (global.mapfx_clock >= 0) so a picture shows an exact age.
+function MapFx_Now() {
+    if (variable_global_exists("mapfx_clock") && global.mapfx_clock >= 0) return global.mapfx_clock;
+    return current_time;
+}
+
+function MapFx_List() {
+    if (!variable_global_exists("map_fx") || !is_array(global.map_fx)) global.map_fx = [];
+    return global.map_fx;
+}
+
+function MapFx_Clear() {
+    global.map_fx = [];
+}
+
+// How many effects of a kind ("burst", "rise", "sparkle"; "" = all) are in the list.
+function MapFx_Count(_kind) {
+    var l = MapFx_List();
+    if (_kind == "") return array_length(l);
+    var n = 0;
+    for (var i = 0; i < array_length(l); i++) if (l[i].kind == _kind) n++;
+    return n;
+}
+
+// The start time (ms) of the first effect of a kind, or -1.
+function MapFx_Start(_kind) {
+    var l = MapFx_List();
+    for (var i = 0; i < array_length(l); i++) if (l[i].kind == _kind) return l[i].start;
+    return -1;
+}
+
+function MapFx_Life(_kind) {
+    switch (_kind) {
+        case "burst": return FEEL_BURST_MS;
+        case "rise": return FEEL_RISE_MS;
+        case "sparkle": return FEEL_SPARKLE_MS;
+    }
+    return 0;
+}
+
+// Removes the effects that are over at _now.
+function MapFx_Prune(_now) {
+    var l = MapFx_List();
+    for (var i = array_length(l) - 1; i >= 0; i--) {
+        if (_now - l[i].start >= MapFx_Life(l[i].kind)) array_delete(l, i, 1);
+    }
+}
+
+// A chest or barrel opened: the lid is at (_cx, _top). The burst always; the first thing it gives (an entry of _loot, or "card" when _card) rises out of it.
+// The existing chime for the rising item plays from MapFx_Step a moment after the chest's own sound (Feel_PlayKeep: it does not become "the last sound").
+function MapFx_Opened(_cx, _top, _loot, _card, _now = MapFx_Now()) {
+    var l = MapFx_List();
+    array_push(l, { kind: "burst", start: _now, room: room, x: _cx, y: _top, parts: Feel_ChestBurst(_cx, _top) });
+    var what = undefined;
+    if (_card) what = "card";
+    else if (is_array(_loot) && array_length(_loot) > 0) what = _loot[0];
+    if (MapFx_RiseKind(what) != "") {
+        array_push(l, { kind: "rise", start: _now, room: room, x: _cx, y: _top, what: what, chime: false });
+    }
+}
+
+// A level-up: a ring of sparkles round the player (the player's place is read when it is drawn, so the ring follows him).
+function MapFx_Sparkle(_now = MapFx_Now()) {
+    array_push(MapFx_List(), { kind: "sparkle", start: _now, room: room, ring: Feel_SparkleRing(), chime: false });
+}
+
+// The sounds that are due: the rising item's chime 140 ms after the chest's sound, the level-up chime at once (an existing UI sound, higher). Once each.
+function MapFx_Sounds(_now) {
+    var l = MapFx_List();
+    for (var i = 0; i < array_length(l); i++) {
+        var e = l[i];
+        if ((e.kind != "rise" && e.kind != "sparkle") || e.chime) continue;
+        if (e.kind == "rise" && _now - e.start >= 140) {
+            e.chime = true;
+            Feel_PlayKeep("ui_confirm", 0.5, 1.3);
+        } else if (e.kind == "sparkle") {
+            e.chime = true;
+            Feel_PlayKeep("ui_confirm", 0.6, 1.5);
+        }
+    }
+}
+
+// Whether a level gain should sparkle. _key identifies the run (and character) the level belongs to: a different key (a load, a new run) or a lower level only
+// remembers the new level. Returns { fire, seen, key }.
+function MapFx_LevelGate(_seen_key, _seen_level, _key, _level) {
+    if (_key != _seen_key) return { fire: false, seen: _level, key: _key };
+    return { fire: (_level > _seen_level), seen: _level, key: _key };
+}
+
+// Run every frame from the player's Step: drops finished effects and watches the character's level. A level gained on the map (an auto-resolved fight) or in a battle
+// (seen when the player is back) sparkles once.
+function MapFx_Step() {
+    MapFx_Prune(MapFx_Now());
+    MapFx_Sounds(MapFx_Now());
+    var gs = GameState_Get();
+    if (!is_struct(gs.player_ch) || !variable_struct_exists(gs.player_ch, "level")) return;
+    var run = Run_Get();
+    var key = (is_struct(run) && run.active) ? (string(run.seed) + ":" + string(run.started_at)) : "none";
+    var seen_key = variable_global_exists("mapfx_level_key") ? global.mapfx_level_key : "";
+    var seen_level = variable_global_exists("mapfx_level_seen") ? global.mapfx_level_seen : gs.player_ch.level;
+    var g = MapFx_LevelGate(seen_key, seen_level, key, gs.player_ch.level);
+    if (g.fire && (Transition_IsActive() || room == rm_battle)) return;   // not under a fade: the next frame tries again
+    global.mapfx_level_key = g.key;
+    global.mapfx_level_seen = g.seen;
+    if (g.fire) MapFx_Sparkle();
+}
+
+// ---- drawing (World_DrawFx, the world pass) ----
+function Feel_DrawCardGlyph(_x, _y, _alpha) {
+    var a0 = draw_get_alpha();
+    var c0 = draw_get_colour();
+    draw_set_alpha(_alpha);
+    draw_set_colour(UI_C_DARKEST);
+    draw_rectangle(_x + 3, _y + 1, _x + 12, _y + 14, false);        // 10 x 14 card with a dark edge
+    draw_set_colour(UI_C_LIGHTEST);
+    draw_rectangle(_x + 4, _y + 2, _x + 11, _y + 13, false);
+    draw_set_colour(UI_C_LIGHT);
+    draw_rectangle(_x + 6, _y + 4, _x + 9, _y + 7, false);          // a small emblem
+    draw_set_colour(UI_C_DARK);
+    draw_rectangle(_x + 6, _y + 9, _x + 9, _y + 9, false);
+    draw_rectangle(_x + 6, _y + 11, _x + 9, _y + 11, false);
+    draw_set_alpha(a0);
+    draw_set_colour(c0);
+}
+
+// The 16 x 16 picture of what rises, top-left at (_x, _y): an item's icon, the coin, or the card glyph.
+function MapFx_DrawWhat(_what, _x, _y, _alpha) {
+    switch (MapFx_RiseKind(_what)) {
+        case "item":
+            var item = ItemDB_Get(_what.item_id);
+            if (is_struct(item)) Item_DrawIcon(item, _x, _y, 16, _alpha);
+            break;
+        case "gold":
+            Icon_Draw("misc", Icon_Frame("misc", "gold_coin"), _x, _y, 1, _alpha);
+            break;
+        case "card":
+            Feel_DrawCardGlyph(_x, _y, _alpha);
+            break;
+    }
+}
+
+function MapFx_DrawWorldFx() {
+    if (!Fx_IsWorldPass()) return;
+    var now = MapFx_Now();
+    var l = MapFx_List();
+    var a0 = draw_get_alpha();
+    var c0 = draw_get_colour();
+    for (var i = 0; i < array_length(l); i++) {
+        var e = l[i];
+        if (e.room != room) continue;
+        var t = now - e.start;
+        if (t < 0) continue;
+        switch (e.kind) {
+            case "burst":
+                if (!Feel_BurstAlive(t)) break;
+                draw_set_alpha(Feel_BurstAlpha(t));
+                for (var k = 0; k < array_length(e.parts); k++) {
+                    var p = e.parts[k];
+                    var q = Feel_ParticlePos(p, t);
+                    var px = floor(q.x);
+                    var py = floor(q.y);
+                    draw_set_colour(UI_C_DARKEST);
+                    draw_rectangle(px + 1, py + 1, px + p.size, py + p.size, false);   // a one pixel shadow down and right
+                    draw_set_colour(p.col);
+                    draw_rectangle(px, py, px + p.size - 1, py + p.size - 1, false);
+                }
+                break;
+            case "rise":
+                if (t >= FEEL_RISE_MS) break;
+                MapFx_DrawWhat(e.what, e.x - 8, e.y - 8 - Feel_RiseY(t), Feel_RiseAlpha(t));
+                break;
+            case "sparkle":
+                if (t >= FEEL_SPARKLE_MS || !instance_exists(obj_player)) break;
+                var pl = instance_find(obj_player, 0);
+                var cx = round(pl.x) + 8;
+                var cy = round(pl.y) + 8;
+                for (var m = 0; m < array_length(e.ring); m++) {
+                    var s = e.ring[m];
+                    var sp = Feel_SparklePos(s, cx, cy, t);
+                    if (!sp.alive) continue;
+                    draw_set_alpha(1);
+                    draw_set_colour(UI_C_DARKEST);
+                    var sx = floor(sp.x);
+                    var sy = floor(sp.y);
+                    draw_rectangle(sx - 1, sy - 1, sx + s.size, sy + s.size, false);   // a dark edge so it reads on a light floor
+                    draw_set_colour(s.col);
+                    draw_rectangle(sx, sy, sx + s.size - 1, sy + s.size - 1, false);
+                }
+                break;
+        }
+    }
+    draw_set_alpha(a0);
+    draw_set_colour(c0);
+    MapFx_DrawPlayerSquash();
+}
+
+// The player while a step's squash is on: the sprite is drawn here (Player's own draw is off for those frames, see obj_player Step) in whole pixels, feet on the tile.
+function MapFx_DrawPlayerSquash() {
+    if (!instance_exists(obj_player)) return;
+    var pl = instance_find(obj_player, 0);
+    if (!variable_instance_exists(pl, "squash_on") || !pl.squash_on) return;
+    var box = Feel_SquashBox(MapFx_Now() - pl.squash_start, Settings_ShakeOn(), 16);
+    var spr = pl.sprite_index;
+    if (!sprite_exists(spr)) return;
+    draw_sprite_ext(spr, pl.image_index, round(pl.x) + box.dx, round(pl.y) + box.dy, box.w / sprite_get_width(spr), box.h / sprite_get_height(spr), 0, pl.image_blend, pl.image_alpha);
+}
+
+// A chest, barrel or card chest (an obj_interactable) was just opened: the lid is the top middle of the instance.
+function MapFx_OpenedAt(_inst, _loot, _card) {
+    if (!instance_exists(_inst)) return;
+    MapFx_Opened(floor((_inst.bbox_left + _inst.bbox_right) / 2), _inst.bbox_top + 2, _loot, _card);
+}
