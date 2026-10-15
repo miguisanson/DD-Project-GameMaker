@@ -162,11 +162,18 @@ function Icon_PaletteColour(_ch) {
     return $CFF8E0;
 }
 
+// The imported strip sprite "spr_icons_<category>", or -1 while it is not imported yet (D94). asset_get_index lookups are counted for the tests.
+function Icon_StripSprite(_category) {
+    if (!variable_global_exists("icon_lookups")) global.icon_lookups = 0;
+    global.icon_lookups++;
+    return asset_get_index("spr_icons_" + _category);
+}
+
 // The sprite and subimage to draw for an icon: the imported strip, else one sprite per icon made from its rows (kept for the run).
 // Returns undefined when the category or frame does not exist.
 function Icon_Get(_category, _frame) {
     if (_frame < 0) return undefined;
-    var spr = asset_get_index("spr_icons_" + _category);
+    var spr = Icon_StripSprite(_category);
     if (is_real(spr) && spr != -1 && sprite_exists(spr)) return { spr: spr, sub: _frame };
     if (!variable_global_exists("icon_cache")) global.icon_cache = {};
     var key = _category + ":" + string(_frame);

@@ -4747,6 +4747,136 @@ function Test_Suite_BattleUi() {
     Test_Eq("BattleUi (I-065) normalising keeps max HP", _lv2.max_hp, _lv_before.max_hp);
     Test_Eq("BattleUi (I-065) normalising keeps HP", _lv2.hp, _lv_before.hp);
     Test_Eq("BattleUi (I-065) normalising keeps the stats", string(_lv2.stats.atk) + "/" + string(_lv2.stats.def) + "/" + string(_lv2.stats.spd) + "/" + string(_lv2.stats.mag), string(_lv_before.atk) + "/" + string(_lv_before.def) + "/" + string(_lv_before.spd) + "/" + string(_lv_before.mag));
+
+    Test_BattleHudFrame();    // D108 F1d-1: the HUD data is built once per Draw GUI frame
+    Test_IconFrames();        // D108 F1d-1: Icon_Frame answers are unchanged
+    Test_IconLookups();       // D108 F1d-1: the strip sprite is looked up once per category
+}
+
+// ---- D108 F1d-1: battle HUD data built once per Draw GUI frame; icon lookups cached -------------------------------------------------
+// A stand-in for obj_battle_controller with the fields the HUD data reads: the player (burning, Steadfast on the timeline), the enemy (poisoned,
+// BROKEN) standing as a real obj_enemy_battle instance, and a skill banner up. Returns the struct; the caller destroys bc.enemy_inst.
+function Test_HudFakeBattle() {
+    var _pl = CharacterCreate_Player(CLASS_MAGE);
+    _pl = Status_Add(_pl, STATUS_BURN, 2, 3);
+    var _en = EnemyCreate(ENEMY_SLIME);
+    _en = Status_Add(_en, STATUS_POISON, 0, 0, 3);
+    _en.broken = true;
+    var _tl = Turn_New([Turn_Fighter(TL_PLAYER, 5), Turn_Fighter(TL_ENEMY, 4)]);
+    _tl.fighters[0].steadfast = 2;
+    var _inst = instance_create_depth(0, 0, 0, obj_enemy_battle);
+    _inst.sprite_index = _en.sprite;
+    _inst.x = 72;
+    _inst.y = 60;
+    return { p: _pl, e: _en, tl: _tl, enemy_inst: _inst, cam_base_x: 0, cam_base_y: 0, skill_banner_active: true, skill_banner_name: "Fireball",
+             battle_state: BSTATE_ATTACK_TIMING, hud: { clock: 0, hp_shown: 1, mp_shown: 1, rects: {} } };
+}
+
+// The data calls one Draw GUI frame of the battle controller makes, in the order it makes them (Draw_64.gml and the Battle_Draw* it calls, as they
+// were before F1d-1: the zones, the enemy header, the strip, the banner, the player panel, the pops, then the rects kept for the tests).
+function Test_HudDrawPattern(_bc) {
+    var _o = {};
+    Battle_Zones();
+    _o.hdr = Battle_EnemyHeaderRect(_bc);
+    Battle_FighterChips(_bc, TL_ENEMY);
+    _o.tm = Battle_TimelineMetrics(_bc);
+    Battle_BannerRect(_bc);
+    _o.chips_p = Battle_FighterChips(_bc, TL_PLAYER);
+    Battle_TimelineBottom();
+    Battle_TimelineMetrics(_bc);
+    Battle_TimelineMetrics(_bc);
+    Battle_TimelineMetrics(_bc);
+    Battle_TimelineMetrics(_bc);
+    Battle_EnemyHeaderRect(_bc);
+    _o.chips_e = Battle_FighterChips(_bc, TL_ENEMY);
+    return _o;
+}
+
+function Test_HudJson(_a, _b) {
+    return json_stringify(_a) == json_stringify(_b);
+}
+
+function Test_BattleHudFrame() {
+    var _bc = Test_HudFakeBattle();
+    // outside a frame nothing is shared (Step code and the scenarios call these between frames): every call builds and answers from the live data
+    Battle_HudBuildsReset();
+    var _live = Test_HudDrawPattern(_bc);
+    Test_True("BattleUi (D108) outside a frame every call builds (metrics " + string(Battle_HudBuilds().metrics) + ")", Battle_HudBuilds().metrics > 1);
+
+    Battle_HudBuildsReset();
+    Battle_HudFrameBegin(_bc);
+    var _f1 = Test_HudDrawPattern(_bc);
+    Battle_HudFrameEnd();
+    var _b = Battle_HudBuilds();
+    Test_Eq("BattleUi (D108) one draw frame builds the timeline metrics once", _b.metrics, 1);
+    Test_Eq("BattleUi (D108) one draw frame builds the enemy header rect once", _b.header, 1);
+    Test_Eq("BattleUi (D108) one draw frame builds the enemy chips once", _b.chips_enemy, 1);
+    Test_Eq("BattleUi (D108) one draw frame builds the player chips once", _b.chips_player, 1);
+    Test_True("BattleUi (D108) the frame's timeline metrics equal the live ones", Test_HudJson(_f1.tm, _live.tm));
+    Test_True("BattleUi (D108) the frame's enemy header rect equals the live one", Test_HudJson(_f1.hdr, _live.hdr));
+    Test_True("BattleUi (D108) the frame's enemy chips equal the live ones", Test_HudJson(_f1.chips_e, _live.chips_e));
+    Test_True("BattleUi (D108) the frame's player chips equal the live ones", Test_HudJson(_f1.chips_p, _live.chips_p));
+    Test_Eq("BattleUi (D108) the test fighters wear 2 enemy chips (poison, BREAK) and 2 player chips (burn, Steadfast)", array_length(_f1.chips_e) * 10 + array_length(_f1.chips_p), 22);
+
+    // the next frame sees what changed in between: a new status, a new HP
+    _bc.p = Status_Add(_bc.p, STATUS_BLEED, 3, 2, 2);
+    _bc.e.hp = max(1, _bc.e.hp - 1);
+    Battle_HudBuildsReset();
+    Battle_HudFrameBegin(_bc);
+    var _f2 = Test_HudDrawPattern(_bc);
+    Battle_HudFrameEnd();
+    var _b2 = Battle_HudBuilds();
+    Test_Eq("BattleUi (D108) the next frame builds each piece once again", _b2.metrics * 1000 + _b2.header * 100 + _b2.chips_enemy * 10 + _b2.chips_player, 1111);
+    Test_Eq("BattleUi (D108) the next frame shows the new status chip", array_length(_f2.chips_p), array_length(_f1.chips_p) + 1);
+
+    // [PERF] the data path of 1000 frames (no assertion: the time depends on the PC)
+    var _t0 = get_timer();
+    for (var _i = 0; _i < 1000; _i++) {
+        Battle_HudFrameBegin(_bc);
+        Test_HudDrawPattern(_bc);
+        Battle_HudFrameEnd();
+    }
+    var _ms = (get_timer() - _t0) / 1000;
+    show_debug_message("[PERF] battle HUD data path, 1000 frames: " + string_format(_ms, 1, 2) + " ms");
+    instance_destroy(_bc.enemy_inst);
+}
+
+// Frames of every known icon, taken ONCE from the Icon_Frame of the commit before F1d-1 (the linear scan over the strip's ids) and kept here as literals.
+// Icon_Frame must keep answering exactly this. "" and unknown names or categories answer -1.
+function Test_IconFrames() {
+    var _table = [
+        ["skill", [["wound", 0], ["hilt_bash", 1], ["muscle_up", 2], ["rev_up", 3], ["horizontal_slash", 4], ["power_strike", 5], ["poison_arrow", 6], ["evasion", 7], ["double_shot", 8], ["take_aim", 9], ["fireball", 10], ["poison_mist", 11], ["ice_spear", 12], ["meditation", 13], ["foresight", 14]]],
+        ["status", [["poison", 0], ["burn", 1], ["bleed", 2], ["stun", 3], ["steadfast", 4], ["break", 5], ["guard", 6], ["rev_up", 7], ["evasion", 8], ["take_aim", 9], ["foresight", 10], ["meditation", 11], ["solidify", 12], ["bloodthirsty", 13], ["blessing", 14], ["sundered", 15], ["curse", 16]]],
+        ["accessory", [["ring", 0], ["charm", 1]]],
+        ["misc", [["gold_coin", 0]]],
+        ["throwable", [["firebomb", 0], ["poison_pot", 1], ["ice_flask", 2], ["smoke_bomb", 3]]],
+        ["passive", [["attack", 0], ["defense", 1], ["vitality", 2], ["magic", 3], ["speed", 4], ["critical", 5], ["greed", 6], ["recovery", 7]]]
+    ];
+    var _n = 0;
+    var _bad = "";
+    for (var _c = 0; _c < array_length(_table); _c++) {
+        for (var _i = 0; _i < array_length(_table[_c][1]); _i++) {
+            _n++;
+            var _got = Icon_Frame(_table[_c][0], _table[_c][1][_i][0]);
+            if (_got != _table[_c][1][_i][1]) _bad += " " + _table[_c][0] + "/" + _table[_c][1][_i][0] + "=" + string(_got);
+        }
+    }
+    Test_Eq("Fx (D108) Icon_Frame answers the same frame for all " + string(_n) + " known icons" + _bad, _bad, "");
+    Test_Eq("Fx (D108) Icon_Frame counts 47 known icons", _n, 47);
+    Test_Eq("Fx (D108) Icon_Frame of an unknown name, an empty name and an unknown category is -1", Icon_Frame("status", "nope") + Icon_Frame("status", "") + Icon_Frame("nocat", "poison"), -3);
+    Test_Eq("Fx (D108) Icon_Frame is per category: rev_up is 7 as a status and 3 as a skill", Icon_Frame("status", "rev_up") * 10 + Icon_Frame("skill", "rev_up"), 73);
+}
+
+function Test_IconLookups() {
+    global.icon_lookups = 0;
+    var _cats = ["status", "skill", "throwable", "passive", "accessory", "misc", "no_such_category"];
+    var _same = true;
+    for (var _c = 0; _c < array_length(_cats); _c++) {
+        var _want = asset_get_index("spr_icons_" + _cats[_c]);
+        for (var _i = 0; _i < 50; _i++) if (Icon_StripSprite(_cats[_c]) != _want) _same = false;
+    }
+    Test_True("Fx (D108) the cached strip sprite is the one asset_get_index gives, for every category", _same);
+    Test_True("Fx (D108) 350 strip lookups ask asset_get_index at most once per category (" + string(global.icon_lookups) + ")", global.icon_lookups <= array_length(_cats));
 }
 
 // ---- D1b: the Tab menu (D90), the pause menu (D92, D95), the Codex (D88, D107), white text (D115) ----------------------------------------
