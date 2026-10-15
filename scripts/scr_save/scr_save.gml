@@ -377,15 +377,11 @@ function Save_ApplySnapshotState(_snap, _keep_enemies = false) {
     RoomTransition_Clear();
     Transition_Finish();
 
-    global.statData = stat;
-    global.levelData = gs.persist;
-
     GameState_SyncLegacy();
     GameSettings_ApplyAll();
     Save_WriteSettingsConfig(gs.settings);
 
     gs.skip_room_save = true;
-    global.skipRoomSave = true;
 
     gs.load_spawn_pending = true;
     gs.load_spawn_room = room_id;

@@ -310,7 +310,7 @@ function Interact_Handle(_inst) {
             RoomState_SaveInstance(_inst, ["swapped","sprite_index"], false);
             SFX_Play("chest_open");
             if (is_struct(gs.player_ch)) GameState_SetPlayer(Cards_ChestOpened(gs.player_ch));
-            if (instance_exists(obj_player)) obj_player.character = global.player_ch;
+            if (instance_exists(obj_player)) obj_player.character = gs.player_ch;
             Dialogue_StartWithSpeaker(name, DialogueDB_Get("chest_open"));
         } else {
             Dialogue_StartWithSpeaker(name, DialogueDB_Get("chest_empty"));

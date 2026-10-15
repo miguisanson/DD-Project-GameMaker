@@ -12,7 +12,6 @@ global.vol_ui = _settings.audio_ui;
 global.vol_sfx = _settings.audio_sfx;
 global.vol_music = _settings.audio_bgm;
 
-global.bgm_current_sound = noone;
 global.bgm_current_handle = -1;
 global.bgm_current_key = "";
 global.sfx_last_key = "";
@@ -33,7 +32,6 @@ global.audio_debug_group_loaded = false;
 global.audio_group_load_requested = false;
 global.audio_debug_missing_count = 0;
 global.audio_debug_total_count = 0;
-global.audio_debug_map_report = [];
 global.mouse_cursor_hidden = false;
 global.skillbook_mana_ambience_handle = -1;
 global.skillbook_mana_ambience_gain = 0;
