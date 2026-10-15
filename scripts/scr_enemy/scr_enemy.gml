@@ -144,12 +144,16 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
         p.last_auto_stat_gained = 0;
     }
 
+    var run_ar = Run_Get();
+    var dry_before = (is_struct(run_ar) && run_ar.active) ? run_ar.drop_dry : 0;
     var loot = Loot_RollEnemy({ id: _enemy_id, level: _enemy_level, loot_key: _loot_key });
     if (loot_mult < 1 && is_array(loot)) {
         var kept = [];
         for (var i = 0; i < array_length(loot); i++) {
             if (RunRng_Float("loot") <= loot_mult) array_push(kept, loot[i]);
         }
+        // R1 (D120): an item thinned away here was never received, so the fight still counts as a dry one
+        if (array_length(loot) > 0 && array_length(kept) == 0 && is_struct(run_ar) && run_ar.active) run_ar.drop_dry = dry_before + 1;
         loot = kept;
     }
     p.inventory = Loot_Grant(p.inventory, loot);
