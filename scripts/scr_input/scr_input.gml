@@ -66,6 +66,11 @@ function Input_Init() {
     if (!variable_struct_exists(inp.bindings, "debug_kill")) inp.bindings.debug_kill = [ord("J")];
     if (!variable_struct_exists(inp.bindings, "debug_enemy_damage_skill")) inp.bindings.debug_enemy_damage_skill = [ord("U")];
     if (!variable_struct_exists(inp.bindings, "debug_display_metrics")) inp.bindings.debug_display_metrics = [ord("O")];
+    for (var sd = 0; sd < 10; sd++) {   // D152: the seed entry types digits (top row and number pad) and deletes with Backspace; fixed keys, not on the Controls page
+        var seed_action = "seed_d" + string(sd);
+        if (!variable_struct_exists(inp.bindings, seed_action)) variable_struct_set(inp.bindings, seed_action, [ord("0") + sd, vk_numpad0 + sd]);
+    }
+    if (!variable_struct_exists(inp.bindings, "seed_back")) inp.bindings.seed_back = [vk_backspace];
     if (!variable_struct_exists(inp, "state")) {
         inp.state = {};
     }

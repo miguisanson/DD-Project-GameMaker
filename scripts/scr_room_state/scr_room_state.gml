@@ -330,20 +330,112 @@ function Run_NewSeed() {
     return irandom_range(1, RNG_MOD - 2);
 }
 
-// ---- seed input (D152) ---- STUBS: the check comes first (H10); the real functions replace these.
-function Seed_IsValid(_n) { return false; }
-function SeedParse(_str) { return -1; }
-function SeedEntry_New() { return { digits: [], cur: 0 }; }
-function SeedEntry_Text(_e) { return "?"; }
-function SeedEntry_Value(_e) { return -1; }
-function SeedEntry_CanConfirm(_e) { return true; }
-function SeedEntry_Move(_e, _dir) { }
-function SeedEntry_Cycle(_e, _dir) { }
-function SeedEntry_Type(_e, _d) { }
-function SeedEntry_Backspace(_e) { }
-function Seed_Label(_seed) { return ""; }
-function Run_ResolveSeed(_seed = undefined) { return -1; }
-function RunFlow_SummaryRows(_entry) { return []; }
+// ---- seed input (D152) ----
+// New Game offers a random seed (the default) or one the player types. A typed seed is up to 9 digits (so it stays a positive 32-bit whole number
+// well under RNG_MOD); the entry is a string of digits plus a cursor, not a padded number: "000123" is the seed 123. Seeds run 1 .. RNG_MOD - 2 (the
+// range Run_NewSeed draws from), so an empty or all-zero entry cannot be confirmed. Pure functions: the title screen only calls them.
+#macro SEED_DIGITS_MAX 9
+
+function Seed_IsValid(_n) {
+    return is_real(_n) && _n >= 1 && _n <= RNG_MOD - 2 && _n == floor(_n);
+}
+
+// The digits of a string as a whole number: anything that is not a digit is skipped, leading zeros fall away, only the first 9 digits count.
+function SeedParse(_str) {
+    var s = string(_str);
+    var v = 0;
+    var n = 0;
+    for (var i = 1; i <= string_length(s) && n < SEED_DIGITS_MAX; i++) {
+        var o = ord(string_char_at(s, i));
+        if (o < 48 || o > 57) continue;
+        v = v * 10 + (o - 48);
+        n++;
+    }
+    return v;
+}
+
+// { digits: [0..9, ...] (at most 9), cur }. cur is the slot the cursor is on: 0 .. the number of digits (the blank slot after them), at most 8.
+function SeedEntry_New() {
+    return { digits: [], cur: 0 };
+}
+
+function SeedEntry_CursorMax(_e) {
+    return min(array_length(_e.digits), SEED_DIGITS_MAX - 1);
+}
+
+function SeedEntry_Text(_e) {
+    var s = "";
+    for (var i = 0; i < array_length(_e.digits); i++) s += string(_e.digits[i]);
+    return s;
+}
+
+function SeedEntry_Value(_e) {
+    return SeedParse(SeedEntry_Text(_e));
+}
+
+function SeedEntry_CanConfirm(_e) {
+    return Seed_IsValid(SeedEntry_Value(_e));
+}
+
+// Left / right: the cursor moves one slot and stops at both ends.
+function SeedEntry_Move(_e, _dir) {
+    _e.cur = clamp(_e.cur + sign(_dir), 0, SeedEntry_CursorMax(_e));
+}
+
+// Up (+1) / down (-1): the digit under the cursor goes round 0-9 (9 up is 0, 0 down is 9). The blank slot counts as a 0, so up makes a 1 and down a 9.
+function SeedEntry_Cycle(_e, _dir) {
+    var d = (_e.cur < array_length(_e.digits)) ? _e.digits[_e.cur] : 0;
+    d = (d + sign(_dir) + 10) mod 10;
+    if (_e.cur < array_length(_e.digits)) _e.digits[_e.cur] = d;
+    else array_push(_e.digits, d);
+}
+
+// A digit key: goes in at the cursor (over the digit there, or into the blank slot) and the cursor steps on; a full entry changes its last digit.
+function SeedEntry_Type(_e, _d) {
+    if (_d < 0 || _d > 9) return;
+    if (_e.cur < array_length(_e.digits)) _e.digits[_e.cur] = _d;
+    else if (array_length(_e.digits) < SEED_DIGITS_MAX) array_push(_e.digits, _d);
+    _e.cur = min(_e.cur + 1, SeedEntry_CursorMax(_e));
+}
+
+// Backspace: removes the digit the cursor is on; on the blank slot after the last digit it removes the digit before (the cursor steps back onto the blank slot).
+function SeedEntry_Backspace(_e) {
+    if (_e.cur < array_length(_e.digits)) {
+        array_delete(_e.digits, _e.cur, 1);
+    } else if (_e.cur > 0) {
+        array_delete(_e.digits, _e.cur - 1, 1);
+        _e.cur -= 1;
+    }
+    _e.cur = min(_e.cur, SeedEntry_CursorMax(_e));
+}
+
+// "Seed: 12345", the Status tab's line and anywhere else the seed is told in one piece.
+function Seed_Label(_seed) {
+    return Loc_T("tab.lbl.seed_small", "Seed: {n}", { n: string(_seed) });
+}
+
+// The seed the next run takes: the one the caller gives, else the one picked on the title (once), else a new random one.
+function Run_ResolveSeed(_seed = undefined) {
+    if (!is_undefined(_seed)) return _seed;
+    if (variable_global_exists("run_next_seed") && !is_undefined(global.run_next_seed)) {
+        var s = global.run_next_seed;
+        global.run_next_seed = undefined;
+        return s;
+    }
+    return Run_NewSeed();
+}
+
+// The rows of the run summary (RunFlow_Draw): where the run ended, who, how it went, and the seed it was played on.
+function RunFlow_SummaryRows(_entry) {
+    return [
+        { label: Loc_T("runflow.sum.floor", "Floor reached"), value: string(_entry.floor) },
+        { label: Loc_T("runflow.sum.class", "Class"), value: string(DB_PlayerClass(_entry.class_id).name) },
+        { label: Loc_T("runflow.sum.level", "Level"), value: string(_entry.level) },
+        { label: Loc_T("runflow.sum.kills", "Foes beaten"), value: string(_entry.kills) },
+        { label: Loc_T("runflow.sum.falls", "Falls so far"), value: string(Profile_Get().deaths) },
+        { label: Loc_T("tab.lbl.seed", "Seed"), value: string(variable_struct_exists(_entry, "seed") ? _entry.seed : 0) }
+    ];
+}
 
 function Run_Create(_seed) {
     return {
@@ -627,7 +719,7 @@ function Run_Finish(_result, _cause) {
 function Run_StartNew(_intro_dialogue = false, _seed = undefined) {
     var gs = GameState_Get();
     var prof = Profile_Get();
-    var seed = is_undefined(_seed) ? Run_NewSeed() : _seed;
+    var seed = Run_ResolveSeed(_seed);   // D152: the seed picked on the title, else a random one
 
     if (ds_exists(gs.defeated_enemies, ds_type_list)) ds_list_clear(gs.defeated_enemies);
     gs.room_states = {};
@@ -862,14 +954,7 @@ function RunFlow_Draw() {
         draw_set_alpha(1);
     } else if (f.phase == "summary") {
         var title = Loc_T("runflow.title", "The tunnel keeps you.");
-        var cls = DB_PlayerClass(f.entry.class_id).name;
-        var rows = [
-            { label: Loc_T("runflow.sum.floor", "Floor reached"), value: string(f.entry.floor) },
-            { label: Loc_T("runflow.sum.class", "Class"), value: string(cls) },
-            { label: Loc_T("runflow.sum.level", "Level"), value: string(f.entry.level) },
-            { label: Loc_T("runflow.sum.kills", "Foes beaten"), value: string(f.entry.kills) },
-            { label: Loc_T("runflow.sum.falls", "Falls so far"), value: string(Profile_Get().deaths) }
-        ];
+        var rows = RunFlow_SummaryRows(f.entry);
         var sentence = RunFlow_CauseLine(f.entry);
         var footer = Loc_T("runflow.continue", "Press confirm to go on");
         var pw = min(w - 2 * mt.margin, round(w * 0.62));

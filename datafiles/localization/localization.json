@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T10:59:24Z",
-    "row_count": 1035
+    "generated_at_utc": "2026-10-15T14:03:32Z",
+    "row_count": 1044
   },
   "default_lang": "en",
   "languages": [
@@ -3032,6 +3032,42 @@
       "en": "Save game",
       "ko": "게임 저장"
     },
+    "seed.choice.enter": {
+      "en": "Enter seed",
+      "ko": "시드 입력"
+    },
+    "seed.choice.random": {
+      "en": "Random seed",
+      "ko": "무작위 시드"
+    },
+    "seed.choice.title": {
+      "en": "Choose a seed",
+      "ko": "시드 선택"
+    },
+    "seed.entry.hint": {
+      "en": "{up}{down} Digit   {left}{right} Move",
+      "ko": "{up}{down} 숫자   {left}{right} 이동"
+    },
+    "seed.entry.hint2": {
+      "en": "{confirm} Start",
+      "ko": "{confirm} 시작"
+    },
+    "seed.entry.hint3": {
+      "en": "{back} Back   {tab_prev} Delete",
+      "ko": "{back} 뒤로   {tab_prev} 지우기"
+    },
+    "seed.entry.info": {
+      "en": "Up to 9 digits. Same seed, same run.",
+      "ko": "최대 9자리. 같은 시드, 같은 모험."
+    },
+    "seed.entry.need": {
+      "en": "Enter a seed above zero.",
+      "ko": "0보다 큰 시드를 입력하세요."
+    },
+    "seed.entry.title": {
+      "en": "Enter seed",
+      "ko": "시드 입력"
+    },
     "settings.difficulty.option.0": {
       "en": "Easy",
       "ko": "쉬움"
@@ -3881,8 +3917,8 @@
       "ko": "시드"
     },
     "tab.lbl.seed_small": {
-      "en": "Seed {n}",
-      "ko": "시드 {n}"
+      "en": "Seed: {n}",
+      "ko": "시드: {n}"
     },
     "tab.lbl.total": {
       "en": "Total",

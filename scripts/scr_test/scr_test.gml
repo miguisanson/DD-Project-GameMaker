@@ -9428,7 +9428,7 @@ function Test_Suite_BattleBg() {
 
 // H10 (D152): seed input on New Game. The entry is a string of up to 9 digits with a cursor (no leading-zero padding): up / down cycle the digit under
 // the cursor (a blank slot counts as 0), left / right move the cursor (clamped to the digits typed plus the one blank slot), a typed digit goes in at the
-// cursor, Backspace removes the digit before the cursor. "000123" is 123; empty and all zeros cannot be confirmed (a seed is 1 .. RNG_MOD - 2).
+// cursor, Backspace removes the digit under the cursor (the one before it from the blank slot). "000123" is 123; empty and all zeros cannot be confirmed (a seed is 1 .. RNG_MOD - 2).
 function Test_Suite_SeedInput() {
     // ---- parsing ----
     Test_Eq("seed: 12345 parses to 12345", SeedParse("12345"), 12345);
@@ -9509,19 +9509,45 @@ function Test_Suite_SeedInput() {
     var _g = SeedEntry_New();
     for (var _k2 = 1; _k2 <= 3; _k2++) SeedEntry_Type(_g, _k2);
     SeedEntry_Backspace(_g);
-    Test_Eq("seed entry: Backspace removes the last digit", SeedEntry_Text(_g), "12");
+    Test_Eq("seed entry: Backspace on the blank slot removes the last digit", SeedEntry_Text(_g), "12");
     Test_Eq("seed entry: and the cursor follows", _g.cur, 2);
     SeedEntry_Move(_g, -1);
     SeedEntry_Backspace(_g);
-    Test_Eq("seed entry: Backspace removes the digit before the cursor", SeedEntry_Text(_g), "2");
-    Test_Eq("seed entry: the cursor is on the first slot again", _g.cur, 0);
+    Test_Eq("seed entry: Backspace removes the digit the cursor is on", SeedEntry_Text(_g), "1");
+    Test_Eq("seed entry: the cursor stays where it was (now the blank slot)", _g.cur, 1);
     SeedEntry_Backspace(_g);
-    Test_Eq("seed entry: Backspace at the start does nothing", SeedEntry_Text(_g), "2");
+    Test_Eq("seed entry: Backspace on the blank slot again removes the one before", SeedEntry_Text(_g), "");
+    Test_Eq("seed entry: and the cursor is on the first slot", _g.cur, 0);
+    SeedEntry_Backspace(_g);
+    Test_Eq("seed entry: Backspace on an empty entry does nothing", SeedEntry_Text(_g), "");
+    var _mid = SeedEntry_New();
+    for (var _k4 = 1; _k4 <= 3; _k4++) SeedEntry_Type(_mid, _k4);
+    SeedEntry_Move(_mid, -1);
+    SeedEntry_Move(_mid, -1);
+    SeedEntry_Backspace(_mid);
+    Test_Eq("seed entry: Backspace in the middle removes that digit", SeedEntry_Text(_mid), "13");
+    Test_Eq("seed entry: and the cursor stays on the digit that moved up", _mid.cur, 1);
     var _h = SeedEntry_New();
     for (var _k3 = 1; _k3 <= 9; _k3++) SeedEntry_Type(_h, _k3);
     SeedEntry_Backspace(_h);
     Test_Eq("seed entry: Backspace on a full entry removes the digit under the cursor", SeedEntry_Text(_h), "12345678");
     Test_Eq("seed entry: and the cursor ends on the blank slot", _h.cur, 8);
+    var _ud = SeedEntry_New();
+    SeedEntry_Cycle(_ud, 1);
+    SeedEntry_Backspace(_ud);
+    Test_Eq("seed entry: Backspace takes back a digit made with up on the blank slot", SeedEntry_Text(_ud), "");
+
+    // ---- the keys: digits (top row and number pad) and Backspace are input actions, so a pad-less keyboard and the bot reach them the same way ----
+    Input_Init();
+    var _kb = global.input.bindings;
+    var _keys_ok = true;
+    for (var _kd = 0; _kd < 10; _kd++) {
+        var _ka = variable_struct_exists(_kb, "seed_d" + string(_kd)) ? variable_struct_get(_kb, "seed_d" + string(_kd)) : [];
+        if (!array_contains(_ka, ord("0") + _kd) || !array_contains(_ka, vk_numpad0 + _kd)) _keys_ok = false;
+    }
+    Test_True("seed keys: every digit has its top-row key and its number-pad key", _keys_ok);
+    Test_True("seed keys: Backspace deletes", array_contains(_kb.seed_back, vk_backspace));
+    Test_False("seed keys: no digit key is also a menu key", array_contains(_kb.confirm, ord("5")) || array_contains(_kb.cancel, ord("5")) || array_contains(_kb.menu_up, ord("5")));
 
     // ---- what can be confirmed ----
     var _z = SeedEntry_New();
