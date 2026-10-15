@@ -868,3 +868,8 @@ function RunFlow_Draw() {
     }
     draw_set_alpha(1);
 }
+
+// D141 - STUBS: red on purpose, replaced by the real functions in the next commit.
+function EnemyPersist_SnapshotRun() { return false; }
+function EnemyPersist_HasSnapshot() { return false; }
+function EnemyPersist_WriteSnapshot(_path = undefined) { return false; }

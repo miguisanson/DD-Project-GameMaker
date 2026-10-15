@@ -243,7 +243,7 @@ function Scenario_Boot() {
     random_set_seed(12345);
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 24000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 27000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -503,7 +503,11 @@ function Scenario_StepSmoke(_s) {
             break;
         case 380: case 381: case 382: case 383: case 384: case 385: case 386: case 387: case 388: case 389:
         case 390: case 391: case 392: case 393: case 394: case 395: case 396: case 397: case 398: case 399:
-            Scenario_StepSmokeMapJuice(_s);   // G6 (D138, map part): chest burst + rising item, gold ticks up, step squash, level-up sparkle; its last step calls Scenario_NoticeEnd
+            Scenario_StepSmokeMapJuice(_s);   // G6 (D138, map part): chest burst + rising item, gold ticks up, step squash, level-up sparkle
+            break;
+        case 470: case 471: case 472: case 473: case 474: case 475: case 476: case 477: case 478: case 479:
+        case 480: case 481: case 482: case 483: case 484: case 485: case 486: case 487: case 488: case 489:
+            Scenario_StepSmokeOneMenu(_s);   // H1 (D140, D141): Esc and Tab are one menu, in the fight too; Quit in a fight comes back to just before it; its last step calls Scenario_NoticeEnd
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -10091,7 +10095,7 @@ function Scenario_StepSmokeMapJuice(_s) {
                 _gs.player_ch.card_picks = 0;
                 _gs.player_ch.stat_points = 0;
                 CardsUi_Close();
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 470);   // H1 (D140, D141, 470..475) goes on; its last step ends the chain (Scenario_NoticeEnd removes the files and the profile)
             }
             if (_s.t > 300) { Scenario_Check("mapjuice_a_level_up_starts_the_sparkle", false, "n=" + string(MapFx_Count("sparkle"))); Scenario_NoticeEnd(); }
             break;
@@ -10237,6 +10241,225 @@ function Scenario_StepShotsMapJuice(_s) {
                 Scenario_Finish();
             }
             if (_s.t > 200) { Scenario_Release(); Scenario_Check("shots_mapjuice_the_step_squashes", false); Scenario_Finish(); }
+            break;
+    }
+}
+
+// ============================================================================
+// H1 (D140, D141): one menu. Smoke steps 470-489 (the end of the chain: the last step calls Scenario_NoticeEnd).
+//   470  a fresh run in rm_floor1, nothing else on screen
+//   471  on the map: Esc opens the tab menu, Esc closes it, Tab opens the same menu, Tab closes it, Q from the first tab is System
+//   472  the player steps onto a real enemy: a real fight starts (the encounter takes the snapshot)
+//   473  in the fight: Esc at the root command menu opens the menu and Esc closes it; in the item list Esc is Back (no menu), Tab opens the menu there
+//   474  in the fight: System tab -> Quit to title (the fight is left at once)
+//   475  the title: Continue puts the run back just before the fight (HP, MP, potions, the enemy alive) with a battle cooldown, so no fight starts at once
+// ============================================================================
+function Scenario_StepSmokeOneMenu(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "om")) _s.om = { };
+    var _o = _s.om;
+    var _T = GRID_TILE_SIZE;
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+    var _u = TabMenu_Get();
+    switch (_s.step) {
+        case 470:   // a new run, then rm_floor1 with nothing in the way
+            if (!variable_struct_exists(_o, "begun")) {
+                if (!Scenario_Hunt2Begin(_s, _o, 7501)) {
+                    if (_s.t > 1500) { Scenario_Check("onemenu_a_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                    break;
+                }
+                _o.begun = true;
+                _s.t = 0;
+                break;
+            }
+            if (!Scenario_FloorReady(rm_floor1)) {
+                if (_s.t > 600) { Scenario_Check("onemenu_rm_floor1_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                break;
+            }
+            if (_s.t > 5) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                with (obj_dialogue_trigger) instance_destroy();
+                Scenario_Next(_s, 471);
+            }
+            break;
+        case 471:   // Esc and Tab are the same menu
+            if (_s.t == 1) Scenario_ClearUi();
+            if (_s.t == 8) Scenario_Tap("pause");
+            if (_s.t == 20) {
+                _u = TabMenu_Get();
+                Scenario_Check("onemenu_esc_on_the_map_opens_the_tab_menu", _gs.ui.mode == UI_MENU && is_struct(_u), "mode=" + string(_gs.ui.mode));
+                Scenario_Check("onemenu_it_has_seven_tabs", array_length(TabMenu_Labels()) == 7 && is_struct(_u) && array_length(_u.pages) == 7);
+                Scenario_Tap("pause");   // Esc at the root of a tab is Back: it closes
+            }
+            if (_s.t == 40) {
+                Scenario_Check("onemenu_esc_closes_it_again", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                Scenario_Tap("menu");
+            }
+            if (_s.t == 52) {
+                _u = TabMenu_Get();
+                Scenario_Check("onemenu_tab_on_the_map_opens_the_same_menu", _gs.ui.mode == UI_MENU && is_struct(_u) && _u.tab == 0 && array_length(_u.pages) == 7, "mode=" + string(_gs.ui.mode));
+                Scenario_Tap("menu");
+            }
+            if (_s.t == 72) {
+                Scenario_Check("onemenu_tab_closes_it", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                Scenario_Tap("pause");
+            }
+            if (_s.t == 84) Scenario_Tap("tab_prev");   // Q from the first tab wraps to the last
+            if (_s.t == 96) {
+                _u = TabMenu_Get();
+                var _tm = TabMenu_TopMenu();
+                Scenario_Check("onemenu_Q_from_status_wraps_to_system", is_struct(_u) && _u.tab == 6 && TabMenu_Ids()[_u.tab] == "system", "tab=" + string(is_struct(_u) ? _u.tab : -1));
+                Scenario_Check("onemenu_system_has_help_abandon_and_quit", is_struct(_tm) && array_length(_tm.items) == 3 && _tm.items[0].id == "help" && _tm.items[1].id == "abandon" && _tm.items[2].id == "quit");
+                Scenario_Tap("pause");
+            }
+            if (_s.t == 120) {
+                Scenario_Check("onemenu_the_menu_is_closed_again", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()));
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);   // the next opening is on Status
+                Scenario_Next(_s, 472);
+            }
+            break;
+        case 472:   // an enemy of the room, the player on top of it: a real fight
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                var _en = instance_find(obj_enemy, 0);
+                if (!instance_exists(_en)) { Scenario_Check("onemenu_the_room_has_an_enemy", false); Scenario_NoticeEnd(); break; }
+                with (obj_enemy) { if (id != _en) instance_destroy(); }
+                var _ch = _gs.player_ch;
+                _ch.hp = max(1, _ch.max_hp - 3);
+                _ch.mp = max(0, _ch.max_mp - 1);
+                _ch.inventory = Inv_Add(_ch.inventory, 11, 2);
+                GameState_SetPlayer(_ch);
+                if (instance_exists(obj_player) && variable_instance_exists(obj_player, "character")) obj_player.character = _gs.player_ch;
+                _o.hp0 = _gs.player_ch.hp;
+                _o.mp0 = _gs.player_ch.mp;
+                _o.pot0 = Inv_Count(_gs.player_ch.inventory, 11);
+                _o.gold0 = Run_Get().gold;
+                Scenario_PlaceEnemy(_en, round(_en.x / _T), round(_en.y / _T));
+                Scenario_PlacePlayer(round(_en.x / _T), round(_en.y / _T));
+                _o.fight_t = _s.t;
+            }
+            if (room == rm_battle && !Transition_IsActive()) {
+                _o.pid = _gs.battle.enemy_persist_id;
+                Scenario_Check("onemenu_the_fight_started_from_the_map", _o.pid != "", "pid=" + string(_o.pid));
+                Scenario_Next(_s, 473);
+            }
+            if (_s.t > 900) { Scenario_Check("onemenu_an_enemy_starts_a_fight", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 473:   // the fight: Esc at the command menu, Esc inside the item list, Tab inside the list
+            if (_bc == noone && variable_struct_exists(_o, "k0")) { Scenario_Check("onemenu_the_battle_is_still_there", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); break; }
+            if (_bc == noone || !(_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && is_struct(_bc.ui_cmd))) {
+                if (!variable_struct_exists(_o, "k0")) {
+                    if (_s.t > 900) { Scenario_Check("onemenu_the_battle_reaches_the_player_menu", false, "state=" + string((_bc != noone) ? _bc.battle_state : -1)); Scenario_NoticeEnd(); }
+                    _o.k_wait = _s.t;
+                    break;
+                }
+            }
+            if (!variable_struct_exists(_o, "k0")) {
+                if (_s.t < _o.k_wait + 20) break;   // let the command panel settle
+                _o.k0 = _s.t;
+                Scenario_Check("onemenu_the_encounter_took_the_snapshot", EnemyPersist_HasSnapshot());
+            }
+            var _k = _s.t - _o.k0;
+            if (_k == 0) Scenario_Tap("pause");
+            if (_k == 12) {
+                Scenario_Check("onemenu_esc_at_the_battle_command_menu_opens_the_menu", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && _bc.battle_state == BSTATE_MENU, "mode=" + string(_gs.ui.mode) + " state=" + string(_bc.battle_state));
+                Scenario_Tap("pause");
+            }
+            if (_k == 30) {
+                Scenario_Check("onemenu_esc_closes_it_back_to_the_battle", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()) && _bc.battle_state == BSTATE_MENU, "mode=" + string(_gs.ui.mode));
+                Scenario_Tap("menu_down");
+            }
+            if (_k == 42) Scenario_Tap("menu_down");
+            if (_k == 54) {
+                Scenario_Check("onemenu_the_battle_cursor_is_on_item", _bc.menu_index == 2, "i=" + string(_bc.menu_index));
+                Scenario_Tap("confirm");
+            }
+            if (_k == 70) {
+                Scenario_Check("onemenu_the_item_list_is_open", _bc.battle_state == BSTATE_ITEM_MENU, "state=" + string(_bc.battle_state));
+                Scenario_Tap("pause");
+            }
+            if (_k == 84) {
+                Scenario_Check("onemenu_esc_in_a_battle_list_is_back_not_the_menu", _bc.battle_state == BSTATE_MENU && _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "state=" + string(_bc.battle_state) + " mode=" + string(_gs.ui.mode));
+                Scenario_Tap("confirm");
+            }
+            if (_k == 100) {
+                Scenario_Check("onemenu_the_item_list_opens_again", _bc.battle_state == BSTATE_ITEM_MENU, "state=" + string(_bc.battle_state));
+                Scenario_Tap("menu");
+            }
+            if (_k == 112) {
+                Scenario_Check("onemenu_tab_opens_the_menu_inside_a_battle_list", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && _bc.battle_state == BSTATE_ITEM_MENU, "mode=" + string(_gs.ui.mode));
+                Scenario_Tap("menu");
+            }
+            if (_k == 130) {
+                Scenario_Check("onemenu_tab_closes_it_and_the_list_is_still_there", _gs.ui.mode == UI_NONE && _bc.battle_state == BSTATE_ITEM_MENU, "mode=" + string(_gs.ui.mode) + " state=" + string(_bc.battle_state));
+                Scenario_Tap("pause");
+            }
+            if (_k == 145) {
+                Scenario_Check("onemenu_back_to_the_command_menu", _bc.battle_state == BSTATE_MENU && _gs.ui.mode == UI_NONE);
+                Scenario_Next(_s, 474);
+            }
+            break;
+        case 474:   // System > Quit to title, in the fight
+            if (_s.t == 1) Scenario_Tap("pause");
+            if (_s.t == 14) {
+                _u = TabMenu_Get();
+                Scenario_Check("onemenu_the_menu_is_open_in_the_fight", _gs.ui.mode == UI_MENU && is_struct(_u));
+                Scenario_Tap("tab_prev");
+            }
+            if (_s.t == 28) {
+                _u = TabMenu_Get();
+                var _tm2 = TabMenu_TopMenu();
+                Scenario_Check("onemenu_Q_reaches_system_in_the_fight", is_struct(_u) && _u.tab == 6, "tab=" + string(is_struct(_u) ? _u.tab : -1));
+                Scenario_Check("onemenu_abandon_and_quit_are_on_in_the_fight", is_struct(_tm2) && array_length(_tm2.items) == 3 && _tm2.items[1].enabled && _tm2.items[2].enabled);
+                _bc.p.hp = 1;   // the fight goes on in the meantime: none of it may come back
+                _bc.p.mp = 0;
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 40) Scenario_Tap("menu_down");
+            if (_s.t == 52) {
+                var _tm3 = TabMenu_TopMenu();
+                Scenario_Check("onemenu_the_cursor_is_on_quit", is_struct(_tm3) && _tm3.cursor == 2 && _tm3.items[2].id == "quit", "cursor=" + string(is_struct(_tm3) ? _tm3.cursor : -1));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 60 && room == rm_start && !Transition_IsActive()) {
+                Scenario_Check("onemenu_quit_in_the_fight_goes_to_the_title", _gs.in_main_menu && !is_struct(TabMenu_Get()) && _gs.ui.mode == UI_NONE);
+                Scenario_Check("onemenu_the_run_save_is_there", RunSave_HasSave());
+                Scenario_Next(_s, 475);
+            }
+            if (_s.t > 600) { Scenario_Check("onemenu_quit_in_the_fight_reaches_the_title", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 475:   // Continue: back just before the fight
+            var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+            if (room == rm_start && _sc != noone && !Transition_IsActive() && !variable_struct_exists(_o, "cont")) {
+                if (_sc.state != "main") { _sc.state = "main"; break; }
+                if (is_struct(_sc.title_stk) && _s.t > 20) {
+                    Scenario_Check("onemenu_the_title_cursor_is_on_continue", Ui_StackTop(_sc.title_stk).cursor == 1, "cursor=" + string(Ui_StackTop(_sc.title_stk).cursor));
+                    Scenario_Tap("confirm");
+                    _o.cont = _s.t;
+                }
+            }
+            if (variable_struct_exists(_o, "cont") && !variable_struct_exists(_o, "arrived") && Scenario_FloorReady(rm_floor1) && !_gs.load_spawn_pending) {
+                _o.arrived = _s.t;
+            }
+            if (variable_struct_exists(_o, "arrived") && _s.t == _o.arrived + 6) {
+                var _pl = instance_find(obj_player, 0);
+                Scenario_Check("onemenu_continue_restores_the_hp_from_before_the_fight", _gs.player_ch.hp == _o.hp0, "hp=" + string(_gs.player_ch.hp) + " want " + string(_o.hp0));
+                Scenario_Check("onemenu_continue_restores_the_mp_from_before_the_fight", _gs.player_ch.mp == _o.mp0, "mp=" + string(_gs.player_ch.mp) + " want " + string(_o.mp0));
+                Scenario_Check("onemenu_continue_restores_the_potions", Inv_Count(_gs.player_ch.inventory, 11) == _o.pot0, "potions=" + string(Inv_Count(_gs.player_ch.inventory, 11)) + " want " + string(_o.pot0));
+                Scenario_Check("onemenu_continue_restores_the_gold", Run_Get().gold == _o.gold0);
+                _o.found = false;
+                with (obj_enemy) { if (variable_instance_exists(id, "persist_id") && persist_id == _o.pid) _o.found = true; }
+                var _d = RoomState_Get(rm_floor1, _o.pid);
+                Scenario_Check("onemenu_the_enemy_is_back_on_the_map", _o.found && !(is_struct(_d) && variable_struct_exists(_d, "removed") && _d.removed), "found=" + string(_o.found));
+                Scenario_Check("onemenu_the_player_has_a_battle_cooldown", instance_exists(_pl) && _pl.battle_cooldown > 0, "cooldown=" + string(instance_exists(_pl) ? _pl.battle_cooldown : -1));
+            }
+            if (variable_struct_exists(_o, "arrived") && _s.t == _o.arrived + 30) {
+                Scenario_Check("onemenu_no_fight_starts_at_once_after_continue", room == rm_floor1 && !Transition_IsActive(), "room=" + room_get_name(room));
+                Scenario_NoticeEnd();
+            }
+            if (_s.t > 1500) { Scenario_Check("onemenu_continue_reaches_rm_floor1", false, "room=" + room_get_name(room) + " cont=" + string(variable_struct_exists(_o, "cont"))); Scenario_NoticeEnd(); }
             break;
     }
 }

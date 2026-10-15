@@ -123,6 +123,7 @@ function Test_RunAll() {
     Test_RunSuite("EchoAfterClass", Test_Suite_EchoAfterClass);
     Test_RunSuite("SpeedPreview", Test_Suite_SpeedPreview);
     Test_RunSuite("MapJuice", Test_Suite_MapJuice);
+    Test_RunSuite("OneMenu", Test_Suite_OneMenu);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -4381,8 +4382,8 @@ function Test_DialogueStartChecks() {
     Test_True("F4b Start in a text-only cutscene blocks the advance for the shared frames", is_struct(_gs.ui.dialogue_open_lock) && _gs.ui.dialogue_open_lock.frame0 == _gs.ui.opened_frame && _gs.ui.dialogue_open_lock.ms == UI_CUTSCENE_ADVANCE_BLOCK_MS);
     _gs.ui.cutscene_active = false;
 
-    // opening closes the pause menu first
-    _gs.ui.mode = UI_PAUSE;
+    // opening closes the menu first (D140: there is one menu, the old pause menu is gone)
+    _gs.ui.mode = UI_MENU;
     Dialogue_StartLines(_lines);
     Test_Eq("F4b opening over the pause menu leaves the dialogue open", _gs.ui.mode, UI_DIALOGUE);
 
@@ -5090,7 +5091,7 @@ function Test_Suite_UI() {
     var _si = SettingsMenu_Items(GameSettings_Defaults(), 16);
     var _ids = "";
     for (var _i = 0; _i < array_length(_si); _i++) _ids += ((_i > 0) ? "," : "") + _si[_i].id;
-    Test_Eq("D0 settings rows, in order", _ids, "vol_ui,vol_sfx,vol_bgm,text_speed,shake,rumble,qte_assist,window,scale,language,controls,apply");   // C4 adds Controls (D49); G8 adds Rumble (D136)
+    Test_Eq("D0 settings rows, in order", _ids, "vol_ui,vol_sfx,vol_bgm,text_speed,shake,rumble,qte_assist,window,scale,language,controls");   // C4 adds Controls (D49); G8 adds Rumble (D136); D140 drops Apply (settings apply at once)
     Test_Eq("D0 settings volume row shows a percentage", _si[2].value, "60%");
     Test_Eq("D0 settings volume row carries its slider fill", _si[2].amount, 0.6);
     Test_False("D0 scale row is greyed outside windowed (borderless is the default)", _si[8].enabled);
@@ -5905,10 +5906,14 @@ function Test_Suite_TabMenu() {
 
     // ---- D90: six tabs, in this order; Q / E wrap (D95) ----
     var _ids = TabMenu_Ids();
-    Test_Eq("D90 six tabs", array_length(_ids), 6);
-    Test_Eq("D90 tab order", _ids[0] + "/" + _ids[1] + "/" + _ids[2] + "/" + _ids[3] + "/" + _ids[4] + "/" + _ids[5], "status/skills/items/gear/codex/settings");
+    Test_Eq("D90 seven tabs (D140 added System)", array_length(_ids), 7);
+    var _ord = "";
+    var _lbs = "";
     var _lb = TabMenu_Labels();
-    Test_Eq("D90 tab labels", _lb[0] + "," + _lb[1] + "," + _lb[2] + "," + _lb[3] + "," + _lb[4] + "," + _lb[5], "Status,Skills,Items,Gear,Codex,Settings");
+    for (var _oi = 0; _oi < array_length(_ids); _oi++) _ord += ((_oi > 0) ? "/" : "") + _ids[_oi];
+    for (var _li = 0; _li < array_length(_lb); _li++) _lbs += ((_li > 0) ? "," : "") + _lb[_li];
+    Test_Eq("D90 tab order", _ord, "status/skills/items/gear/codex/settings/system");
+    Test_Eq("D90 tab labels", _lbs, "Status,Skills,Items,Gear,Codex,Settings,System");
     Test_Eq("D95 Q on the first tab wraps to the last", Ui_TabStep(0, 6, -1), 5);
     Test_Eq("D95 E on the last tab wraps to the first", Ui_TabStep(5, 6, 1), 0);
 
@@ -6063,13 +6068,6 @@ function Test_Suite_TabMenu() {
     var _u2 = Codex_UnlockRows(Profile_Default());
     Test_True("D88 before any win it is locked and says how", _u2[0].value == Loc_T("tab.val.locked", "Locked") && _u2[0].help != "");
 
-    // ---- the pause menu (D92, D95): Resume, Help, Settings, Abandon run (two presses), Quit to title ----
-    var _pm = PauseMenu_Items(false);
-    Test_Eq("D92 pause rows", _pm[0].id + "/" + _pm[1].id + "/" + _pm[2].id + "/" + _pm[3].id + "/" + _pm[4].id, "resume/help/settings/abandon/quit");
-    Test_Eq("D92 pause labels", _pm[0].label + "," + _pm[1].label + "," + _pm[2].label + "," + _pm[3].label + "," + _pm[4].label, "Resume,Help,Settings,Abandon run,Quit to title");
-    Test_Eq("D92 Abandon is where the constant says", PAUSE_ABANDON_INDEX, 3);
-    Test_Eq("D92 the armed Abandon row asks again", PauseMenu_Items(true)[3].label, Loc_T("pause.option.abandon_confirm", "Sure? Confirm again"));
-    Test_True("D100 every pause row explains itself", string_length(_pm[0].help) > 0 && string_length(_pm[3].help) > 0 && string_length(_pm[4].help) > 0);
 }
 
 // ---- C4: QTE assist (D35), key rebinding (D49), button prompts (D92), tutorial prompts (D45), beds (D47) ----------------------------------
@@ -7518,16 +7516,10 @@ function Test_Suite_FairUi() {
     Test_True("R1b D122: unfocused, walking around -> pause", Focus_ShouldPause(false, UI_NONE, false, false, false));
     Test_True("R1b D122: unfocused, in a battle -> pause", Focus_ShouldPause(false, UI_NONE, false, true, false));
     Test_False("R1b D122: focused -> no pause", Focus_ShouldPause(true, UI_NONE, false, false, false));
-    Test_False("R1b D122: already paused -> nothing new", Focus_ShouldPause(false, UI_PAUSE, false, false, false));
+    Test_False("R1b D122: already paused -> nothing new", Focus_ShouldPause(false, UI_MENU, false, false, false));   // D140: "paused" is the one menu being open
     Test_False("R1b D122: on the title screen -> nothing", Focus_ShouldPause(false, UI_NONE, true, false, false));
     Test_False("R1b D122: during a room transition -> nothing", Focus_ShouldPause(false, UI_NONE, false, false, true));
     Test_False("R1b D122: in the shop -> nothing (it waits for input anyway)", Focus_ShouldPause(false, UI_SHOP, false, false, false));
-    var _pm = PauseMenu_Items(false, true);
-    Test_True("R1b D122: the pause menu in a battle keeps Resume, Help and Settings", _pm[0].enabled && _pm[1].enabled && _pm[2].enabled);
-    Test_False("R1b D122: the pause menu in a battle disables Abandon run", _pm[3].enabled);
-    Test_False("R1b D122: the pause menu in a battle disables Quit to title", _pm[4].enabled);
-    var _pm2 = PauseMenu_Items(false);
-    Test_True("R1b D122: outside a battle Abandon and Quit stay enabled", _pm2[3].enabled && _pm2[4].enabled);
 
     // ---- D124: the flee chance is shown on the RUN command ----
     var _k = CharacterCreate_Player(CLASS_KNIGHT);
@@ -9403,4 +9395,175 @@ function Test_Suite_MapJuice() {
     Test_True("mapjuice: a lower level (a new character) does not sparkle and is remembered", !_lv3.fire && _lv3.seen == 1);
     var _lv4 = MapFx_LevelGate("a", 3, "a", 3);
     Test_True("mapjuice: the same level does not sparkle", !_lv4.fire && _lv4.seen == 3);
+}
+
+// ---- H1 (D140, D141): one menu. Esc and Tab open the same seven-tab menu, settings apply at once ("Keep this?" for the window), the menu works in battle,
+// Quit to title in a battle goes back to just before the fight. Expected values come from DECISIONS D140 / D141 and the packet brief. ----
+function Test_Suite_OneMenu() {
+    // ---- the tabs: one list, seven entries, System last, Settings at index 5 ----
+    var _ids = TabMenu_Ids();
+    var _lb = TabMenu_Labels();
+    Test_Eq("D140 the tab label list has 7 entries", array_length(_lb), 7);
+    Test_Eq("D140 the tab id list has 7 entries", array_length(_ids), 7);
+    Test_Eq("D140 the tab count comes from the one list", TabMenu_Count(), array_length(_ids));
+    Test_Eq("D140 the 7th label is the System label", (array_length(_lb) > 6) ? _lb[6] : "", "System");
+    Test_Eq("D140 the 7th tab is system", (array_length(_ids) > 6) ? _ids[6] : "", "system");
+    Test_Eq("D140 Settings is at index 5", array_get_index(_ids, "settings"), 5);
+    Test_Eq("D140 one icon per tab", array_length(TabMenu_Icons()), array_length(_ids));
+    Test_Eq("D140 wrapping on the 7th tab goes to the 1st", Ui_TabStep(6, TabMenu_Count(), 1), 0);
+    Test_Eq("D140 Q on the first tab wraps to System", Ui_TabStep(0, TabMenu_Count(), -1), 6);
+
+    // ---- the System tab: Help, Abandon run, Quit to title; all on in a battle too (D141) ----
+    var _sys = TabSystem_Items(false, false);
+    var _sys_ids = "";
+    var _sys_lb = "";
+    for (var _i = 0; _i < array_length(_sys); _i++) {
+        _sys_ids += ((_i > 0) ? "/" : "") + _sys[_i].id;
+        _sys_lb += ((_i > 0) ? "," : "") + _sys[_i].label;
+    }
+    Test_Eq("D140 System rows", _sys_ids, "help/abandon/quit");
+    Test_Eq("D140 System labels", _sys_lb, "Help,Abandon run,Quit to title");
+    var _all_on = (array_length(_sys) == 3);
+    var _all_help = (array_length(_sys) == 3);
+    for (var _i3 = 0; _i3 < array_length(_sys); _i3++) {
+        _all_on = _all_on && _sys[_i3].enabled;
+        _all_help = _all_help && string_length(_sys[_i3].help) > 0;
+    }
+    Test_True("D140 all three System rows are on on the map", _all_on);
+    Test_True("D100 every System row explains itself", _all_help);
+    var _sysb = TabSystem_Items(false, true);
+    var _all_on_b = (array_length(_sysb) == 3);
+    for (var _i4 = 0; _i4 < array_length(_sysb); _i4++) _all_on_b = _all_on_b && _sysb[_i4].enabled;
+    Test_True("D141 Abandon run and Quit to title are on in a battle", _all_on_b);
+    Test_Eq("D141 in a battle Quit says it returns to just before the fight", (array_length(_sysb) == 3) ? _sysb[2].help : "", Loc_T("tab.system.quit_battle_help", "Goes back to the title. Continue puts you back just before this fight."));
+    var _sysa = TabSystem_Items(true, false);
+    Test_Eq("D92 the armed Abandon row asks again", (array_length(_sysa) == 3) ? _sysa[1].label : "", Loc_T("pause.option.abandon_confirm", "Sure? Confirm again"));
+
+    // ---- Settings: no Apply row, no pending copy; a change is live at once ----
+    var _items = SettingsMenu_Items(GameSettings_Defaults(), 16);
+    var _has_apply = false;
+    for (var _j = 0; _j < array_length(_items); _j++) { if (_items[_j].id == "apply") _has_apply = true; }
+    Test_False("D140 Settings has no Apply row", _has_apply);
+    Test_Eq("D140 the last Settings row is Controls", _items[array_length(_items) - 1].id, "controls");
+    SettingsPopup_Ensure();
+    Test_False("D140 the Settings popup keeps no pending copy", variable_struct_exists(GameState_Get().ui.settings_popup, "pending"));
+    var _gs = GameState_Get();
+    var _s0 = GameSettings_Copy(GameSettings_Ensure());
+    var _w = GameSettings_Copy(_s0);
+    _w.audio_bgm = 0.6;
+    _gs.settings = _w;
+    Audio_SetMusicVolume(0.6);
+    Test_True("D140 the music volume changes through the settings function", Settings_Change("vol_bgm", -1, 16, 0));
+    Test_True("D140 the live setting changed at once", abs(GameSettings_Ensure().audio_bgm - 0.55) < 0.0001);
+    Test_True("D140 the live music volume changed at once", abs(global.vol_music - 0.55) < 0.0001);
+    Test_False("D140 a volume change starts no Keep this prompt", KeepThis_Active());
+    Test_True("D140 text speed changes at once", Settings_Change("text_speed", 1, 16, 0) && GameSettings_Ensure().text_speed == 2);
+
+    // ---- Keep this? 10 s countdown (injectable clock) ----
+    var _a = GameSettings_Copy(_s0);
+    _a.window_mode = WINDOW_MODE_WINDOWED;
+    _a.display_scale = 2;
+    _gs.settings = _a;
+    Test_False("D140 no Keep this prompt before a window change", KeepThis_Active());
+    Test_True("D140 a window scale change is made", Settings_Change("scale", 1, 4, 1000));
+    Test_Eq("D140 the new scale B is live at once", GameSettings_Ensure().display_scale, 3);
+    Test_True("D140 a window scale change asks Keep this", KeepThis_Active());
+    Test_Eq("D140 the countdown starts at 10 000 ms", KeepThis_Remaining(1000), 10000);
+    Test_Eq("D140 4 s later 6 000 ms are left", KeepThis_Remaining(5000), 6000);
+    Test_Eq("D140 the countdown never goes below zero", KeepThis_Remaining(99000), 0);
+    Test_False("D140 just under 10 s nothing is reverted", KeepThis_Tick(1000 + 9999));
+    Test_Eq("D140 the new scale is still live at 9 999 ms", GameSettings_Ensure().display_scale, 3);
+    Test_True("D140 past 10 s with no answer it is reverted", KeepThis_Tick(1000 + 10001));
+    Test_Eq("D140 the scale is back at A", GameSettings_Ensure().display_scale, 2);
+    Test_False("D140 the prompt is gone after the revert", KeepThis_Active());
+    Test_True("D140 a second scale change is made", Settings_Change("scale", 1, 4, 0));
+    Test_True("D140 Keep confirms", KeepThis_Confirm());
+    Test_False("D140 the prompt is gone after Keep", KeepThis_Active());
+    Test_False("D140 a late tick after Keep reverts nothing", KeepThis_Tick(20000));
+    Test_Eq("D140 confirming before 10 s leaves scale B", GameSettings_Ensure().display_scale, 3);
+    Test_True("D140 a window mode change is made", Settings_Change("window", 1, 4, 0));
+    Test_Eq("D140 window mode changed at once", GameSettings_Ensure().window_mode, WINDOW_MODE_BORDERLESS);
+    Test_True("D140 a window mode change asks Keep this", KeepThis_Active());
+    Test_True("D140 Back reverts at once", KeepThis_Revert());
+    Test_Eq("D140 the window mode is back", GameSettings_Ensure().window_mode, WINDOW_MODE_WINDOWED);
+    Test_Eq("D140 and the scale is the one before the change", GameSettings_Ensure().display_scale, 3);
+    var _made = Settings_Change("window", 1, 4, 0);
+    var _timed_out = KeepThis_Tick(10000);
+    Test_True("D140 a window mode change reverts at 10 s too", _made && _timed_out);
+    Test_Eq("D140 the window mode is back after the timeout", GameSettings_Ensure().window_mode, WINDOW_MODE_WINDOWED);
+
+    // put the owner's settings back (the file too: Settings_Change writes it)
+    _gs.settings = _s0;
+    Audio_SetMusicVolume(_s0.audio_bgm);
+    GameSettings_Commit(_s0, true);
+
+    // ---- the menu in a battle: only where no QTE bar can be interrupted (D140, brief) ----
+    Test_True("D140 the menu opens at the battle command menu", Menu_BattleAllowed(BSTATE_MENU, false, false));
+    Test_True("D140 the menu opens inside the skill list", Menu_BattleAllowed(BSTATE_SKILL_MENU, false, false));
+    Test_True("D140 the menu opens inside the item list", Menu_BattleAllowed(BSTATE_ITEM_MENU, false, false));
+    Test_False("D140 the menu never opens during the attack bar", Menu_BattleAllowed(BSTATE_ATTACK_TIMING, true, false));
+    Test_False("D140 the menu never opens during the arrow sequence", Menu_BattleAllowed(BSTATE_SKILL_QTE, true, false));
+    Test_False("D140 the menu never opens during the defence bar", Menu_BattleAllowed(BSTATE_ENEMY_DEFENCE, true, false));
+    Test_False("D140 the menu never opens while a bar is up, whatever the state", Menu_BattleAllowed(BSTATE_MENU, true, false));
+    Test_False("D140 the menu does not open once the battle is over", Menu_BattleAllowed(BSTATE_MENU, false, true));
+
+    // ---- D141: Quit to title in a battle returns to the moment just before the fight ----
+    var _gs2 = Test_FixBegin(DIFFICULTY_NORMAL);
+    var _had_run = variable_struct_exists(_gs2, "run");
+    var _old_run = _had_run ? _gs2.run : undefined;
+    var _old_cp = _gs2.checkpoint;
+    var _old_persist = _gs2.persist;
+    var _old_ch = _gs2.player_ch;
+    var _old_flags = _gs2.flags;
+    _gs2.run = Run_Create(5150);
+    _gs2.run.gold = 5;
+    _gs2.run.kills = 1;
+    var _p = CharacterCreate_Player(CLASS_MAGE);
+    _p.hp = 7;
+    _p.mp = 4;
+    _p.inventory = Inv_Add(_p.inventory, 11, 2);
+    _gs2.player_ch = _p;
+    _gs2.selected_class = CLASS_MAGE;
+    _gs2.flags = {};
+    _gs2.checkpoint = { room: rm_floor2, x: 48, y: 64 };
+    _gs2.persist = {};
+    RoomState_SetAlive(rm_floor2, "om_e1");
+    global.encounter_snapshot = undefined;
+    Test_False("D141 no snapshot before an encounter", EnemyPersist_HasSnapshot());
+    Test_True("D141 an encounter takes the snapshot", EnemyPersist_SnapshotRun());
+    Test_True("D141 the snapshot is held", EnemyPersist_HasSnapshot());
+    // the fight goes on: HP and MP drop, the potions are gone, the gold changes, the enemy falls
+    var _p2 = CharacterCreate_Player(CLASS_MAGE);
+    _p2.hp = 1;
+    _p2.mp = 0;
+    _gs2.player_ch = _p2;
+    _gs2.run.gold = 99;
+    RoomState_SetRemoved(rm_floor2, "om_e1", obj_enemy, 0);
+    var _f = "test_onemenu_run.sav";
+    Save_DeleteFileSet(_f);
+    Test_True("D141 Quit writes the snapshot as the run save", EnemyPersist_WriteSnapshot(_f));
+    Test_True("D141 the run save file exists", RunSave_ExistsAt(_f));
+    var _l = RunSave_LoadFrom(_f);
+    Test_Eq("D141 the written save reads back ok", _l.status, "ok");
+    _gs2.run = Run_Create(1);
+    _gs2.persist = {};
+    if (is_struct(_l.run)) RunSave_ApplyState(_l.run);
+    var _r = _gs2.player_ch;
+    Test_Eq("D141 loaded HP is the pre-encounter HP", _r.hp, 7);
+    Test_Eq("D141 loaded MP is the pre-encounter MP", _r.mp, 4);
+    Test_True("D141 the pre-encounter potions are back (MP potion x2)", Inv_Has(_r.inventory, 11, 2));
+    Test_Eq("D141 loaded gold is the pre-encounter gold", _gs2.run.gold, 5);
+    Test_Eq("D141 loaded kills are the pre-encounter kills", _gs2.run.kills, 1);
+    var _en = RoomState_Get(rm_floor2, "om_e1");
+    Test_True("D141 the enemy is on the map", is_struct(_en));
+    Test_False("D141 the enemy is not marked defeated", is_struct(_en) && variable_struct_exists(_en, "removed") && _en.removed);
+    Save_DeleteFileSet(_f);
+    global.encounter_snapshot = undefined;
+    Test_False("D141 no snapshot, no write", EnemyPersist_WriteSnapshot("test_onemenu_none.sav"));
+    Test_False("D141 and no file appears", RunSave_ExistsAt("test_onemenu_none.sav"));
+    if (_had_run) _gs2.run = _old_run; else variable_struct_remove(_gs2, "run");
+    _gs2.checkpoint = _old_cp;
+    _gs2.persist = _old_persist;
+    _gs2.player_ch = _old_ch;
+    _gs2.flags = _old_flags;
 }

@@ -4200,3 +4200,16 @@ function Ui_DimBackdrop(_a) {
     Ui_Box(0, 0, Display_GuiW(), Display_GuiH(), UI_C_DARKEST);
     draw_set_alpha(a0);
 }
+
+// ==========================================================================================================================
+// ONE MENU (D140, D141) - STUBS: red on purpose, replaced by the real functions in the next commit.
+// ==========================================================================================================================
+function TabMenu_Count() { return 6; }
+function TabSystem_Items(_armed = false, _in_battle = false) { return []; }
+function Settings_Change(_id, _dir, _scale_max = DISPLAY_SCALE_MAX, _now = current_time) { return false; }
+function KeepThis_Active() { return false; }
+function KeepThis_Remaining(_now = current_time) { return 0; }
+function KeepThis_Tick(_now = current_time) { return false; }
+function KeepThis_Confirm() { return false; }
+function KeepThis_Revert() { return false; }
+function Menu_BattleAllowed(_battle_state, _qte_busy, _over) { return true; }
