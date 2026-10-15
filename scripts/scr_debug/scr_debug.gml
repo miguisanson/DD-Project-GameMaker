@@ -483,6 +483,10 @@ function Scenario_StepSmoke(_s) {
         case 260: case 261: case 262: case 263: case 264: case 265: case 266: case 267: case 268: case 269:
             Scenario_StepSmokeHunt2(_s);   // bug hunt 2: enemies freeze under menus (D122), homes survive re-entry (D33), the exit tile after a battle / Continue (D64), auto-resolve + Continue
             break;
+        case 270: case 271: case 272: case 273: case 274: case 275: case 276: case 277: case 278: case 279:
+        case 280: case 281: case 282: case 283: case 284: case 285: case 286: case 287: case 288: case 289:
+            Scenario_StepSmokeTitle(_s);   // G2 (D128): launch -> logo -> press-any-key splash -> menu slides in, Continue card, wrap-around, the New Game guard
+            break;
         case 30:
             Scenario_StepSmokeUi(_s);
             break;
@@ -757,6 +761,130 @@ function Scenario_StepSmokeNewGameGuard(_s) {
                     Scenario_Check("newgame_guard_new_run_is_not_the_saved_one", Run_IsActive() && _gs.run.seed != 4242, "seed=" + (Run_IsActive() ? string(_gs.run.seed) : "no run"));
                     Scenario_Next(_s, 1);
                 }
+            }
+            break;
+    }
+}
+
+// G2 (D128): the launch through the real flow. A run is saved (Archer, floor 4, 137 gold), the game is put back to the state of a fresh launch
+// (the logo not seen yet) and the title is entered: logo -> press-any-key splash (the menu takes no input yet) -> one key -> the menu slides in with the cursor on
+// Continue and the card showing the saved run -> wrap-around -> the New Game guard asks twice -> a damaged save shows "Can't continue" on the card.
+// Writes the real run.sav: only inside the gate (Scenario_CanSaveSlot).
+function Scenario_StepSmokeTitle(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _m = (_sc != noone && is_struct(_sc.title_stk) && array_length(_sc.title_stk.menus) > 0) ? _sc.title_stk.menus[0] : undefined;
+    if (!variable_struct_exists(_s, "ti")) _s.ti = {};
+    var _ti = _s.ti;
+    var _armed = Loc_T("pause.option.abandon_confirm", "Sure? Confirm again");
+    var _plain = Loc_T("menu.main.option.0", "New Game");
+    switch (_s.step) {
+        case 270:   // save a run, then back to a fresh launch of the title
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP title splash (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_NoticeEnd();
+                    break;
+                }
+                RunSave_Delete();
+                _gs.selected_class = CLASS_ARCHER;
+                if (Run_IsActive()) _gs.run.gold = 137;
+                Scenario_Check("title_run_save_written_for_the_card", Run_IsActive() && RunSave_WriteTo() && RunSave_HasSave());
+                _gs.startup_logo_seen = false;   // what a fresh launch has: the logo plays, then the splash
+                _ti.boot = false;
+                Scenario_NoticeToTitle();
+                Scenario_Next(_s, 271);
+            }
+            break;
+        case 271:   // logo first, then the splash
+            if (room == rm_start && _sc != noone && _sc.state == "boot_logo") _ti.boot = true;
+            if (room == rm_start && _sc != noone && _sc.state == "splash") {
+                Scenario_Check("title_launch_plays_the_logo_before_the_splash", _ti.boot);
+                Scenario_Check("title_splash_is_the_state_after_the_logo", _sc.state == "splash");
+                Scenario_Next(_s, 272);
+                break;
+            }
+            if (_s.t > 1500) { Scenario_Check("title_launch_reaches_the_splash", false, "room=" + room_get_name(room) + " state=" + ((_sc != noone) ? string(_sc.state) : "none")); Scenario_NoticeEnd(); }
+            break;
+        case 272:   // the splash waits for a key; the key that ends it must not answer the menu (confirm would pick Continue)
+            if (_s.t == 90) {
+                Scenario_Check("title_splash_waits_for_a_key", _sc.state == "splash" && room == rm_start);
+                Scenario_Check("title_splash_has_no_run_started", !is_struct(_sc.title_exit) && !Notice_IsOpen());
+                _ti.tap_ms = current_time;
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 98) {
+                Scenario_Check("title_a_key_ends_the_splash", _sc.state == "main", "state=" + string(_sc.state));
+                Scenario_Check("title_the_ending_key_did_not_pick_continue", room == rm_start && !is_struct(_sc.title_exit) && !Transition_IsActive(), "room=" + room_get_name(room));
+                Scenario_Check("title_the_menu_slide_starts_with_the_key", is_struct(_m) && _m.opened_ms >= _ti.tap_ms, "opened=" + (is_struct(_m) ? string(_m.opened_ms) : "no menu") + " tap=" + string(_ti.tap_ms));
+                Scenario_Next(_s, 273);
+            }
+            break;
+        case 273:   // slid in; the cursor on Continue; the card shows the saved run
+            if (is_struct(_m) && Ui_MenuAlpha(_m, current_time) >= 1) {
+                Scenario_Check("title_menu_has_slid_in", current_time - _m.opened_ms >= UI_PANEL_MS);
+                Scenario_Check("title_cursor_starts_on_continue_with_a_run_saved", _m.cursor == 1 && _m.items[1].enabled, "cursor=" + string(_m.cursor));
+                var _ct = Title_CardText(_sc.title_card);
+                Scenario_Check("title_card_shows_the_saved_run", _sc.title_card.kind == "run");
+                Scenario_Check("title_card_class_is_the_saved_class", _ct.title == Loc_T("class.name.class_archer", "Archer"), "title=" + string(_ct.title));
+                Scenario_Check("title_card_has_floor_and_gold", array_length(_ct.rows) >= 2 && _ct.rows[0].value == "4" && _ct.rows[1].value == "137", json_stringify(_ct.rows));
+                Scenario_Check("title_card_did_not_apply_the_run", !Run_IsActive());
+                Scenario_Next(_s, 274);
+            }
+            if (_s.t > 120) { Scenario_Check("title_menu_slides_in", false, "alpha=" + (is_struct(_m) ? string(Ui_MenuAlpha(_m, current_time)) : "no menu")); Scenario_NoticeEnd(); }
+            break;
+        case 274:   // wrap-around through real keys: Continue -> New Game -> (up) Exit Game -> (down) New Game -> Continue
+            switch (_s.t) {
+                case 3: Scenario_Tap("menu_up"); break;
+                case 9:
+                    Scenario_Check("title_up_from_continue_is_new_game", _m.cursor == 0, "cursor=" + string(_m.cursor));
+                    Scenario_Tap("menu_up");
+                    break;
+                case 15:
+                    Scenario_Check("title_up_from_the_first_item_wraps_to_exit", _m.cursor == 3, "cursor=" + string(_m.cursor));
+                    Scenario_Tap("menu_down");
+                    break;
+                case 21:
+                    Scenario_Check("title_down_from_the_last_item_wraps_to_new_game", _m.cursor == 0, "cursor=" + string(_m.cursor));
+                    Scenario_Tap("menu_down");
+                    break;
+                case 27:
+                    Scenario_Check("title_down_from_new_game_is_continue", _m.cursor == 1, "cursor=" + string(_m.cursor));
+                    Scenario_Tap("menu_up");
+                    break;
+                case 33:
+                    Scenario_Check("title_back_on_new_game", _m.cursor == 0 && _sc.state == "main");
+                    Scenario_Tap("confirm");   // the first press on New Game with a run saved only asks
+                    break;
+                case 39:
+                    Scenario_Check("title_new_game_asks_again", _m.items[0].label == _armed && RunSave_HasSave() && room == rm_start && !is_struct(_sc.title_exit), "label=" + string(_m.items[0].label));
+                    Scenario_Check("title_card_stays_while_the_guard_asks", _sc.title_card.kind == "run");
+                    Scenario_Tap("cancel");
+                    break;
+                case 45:
+                    Scenario_Check("title_back_puts_the_new_game_label_back", _m.items[0].label == _plain && RunSave_HasSave(), "label=" + string(_m.items[0].label));
+                    RunSave_Delete();
+                    Test_RawWrite(RunSave_Path(), "{{ not json");   // a damaged save: the card says so
+                    _sc.title_refresh = true;
+                    break;
+                case 50:
+                    Scenario_Check("title_a_damaged_save_shows_cant_continue", _sc.title_card.kind == "cant" && Title_CardText(_sc.title_card).title == Loc_T("title.card.cant", "Can't continue"), "kind=" + string(_sc.title_card.kind));
+                    Scenario_Check("title_the_continue_row_stays_selectable_for_the_notice", _m.items[1].enabled);
+                    RunSave_Delete();
+                    _sc.title_refresh = true;
+                    break;
+                case 56:
+                    Scenario_Check("title_no_save_no_card", _sc.title_card.kind == "none");
+                    Scenario_Check("title_no_save_greys_continue", !_m.items[1].enabled);
+                    Scenario_Next(_s, 275);
+                    break;
+            }
+            break;
+        case 275:   // with no run the guard is out of the way: New Game starts at once (one press); then the scenario ends
+            if (_s.t == 3) Scenario_Tap("confirm");
+            if (_s.t == 9) {
+                Scenario_Check("title_new_game_without_a_run_starts_at_once", is_struct(_sc.title_exit) || room != rm_start || Transition_IsActive());
+                Scenario_NoticeEnd();
             }
             break;
     }
@@ -2705,6 +2833,9 @@ function Scenario_StepShots(_s) {
             break;
         case 200: case 201: case 202: case 203: case 204: case 205: case 206: case 207: case 208: case 209:
             Scenario_StepShotsFairUi(_s);   // R1b: the battle command menu with the RUN chance, the pause menu opened in a battle
+            break;
+        case 290: case 291: case 292: case 293: case 294: case 295: case 296: case 297: case 298: case 299:
+            Scenario_StepShotsTitle(_s);   // G2 (D128): the splash, the menu without a run, the menu with the Continue card, Korean; two sizes
             break;
         case 230: case 231: case 232: case 233: case 234: case 235: case 236: case 237: case 238: case 239:
             Scenario_StepShotsNotice(_s);   // F3a: the notice pop-up over the title (old-save text at two sizes, the damaged-run text, Korean)
@@ -8520,7 +8651,7 @@ function Scenario_StepSmokeHunt2(_s) {
                 var _sigD = Scenario_EcoLayoutSig();
                 Scenario_Check("hunt2_the_auto_resolved_enemy_stays_gone_after_continue", instance_number(obj_enemy) == 2, "n=" + string(instance_number(obj_enemy)));
                 Scenario_Check("hunt2_continue_after_an_auto_resolve_keeps_the_layout_of_the_room", _sigD == _h.sigR, _h.sigR + " vs " + _sigD);
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 270);   // G2 (D128): the launch splash, the menu and the Continue card (270..277); the last one calls Scenario_NoticeEnd
             }
             if (_s.t > 900) { Scenario_Check("hunt2_continue_reaches_rm_floor4_again", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
@@ -8664,9 +8795,99 @@ function Scenario_StepShotsNotice(_s) {
                     Loc_SetLanguage("en");
                     _s.si = 0;
                     _s.di = 0;
-                    Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
+                    Scenario_Next(_s, 290);   // G2 title pictures (290..292), then the D91 / DISP-10 / D48 pictures (50) and the skill animations
                 } else {
                     Scenario_Next(_s, 230);
+                }
+            }
+            break;
+    }
+}
+
+// ---- G2 (D128) pictures 290..292: the press-any-key splash, the menu with no run, the menu with the Continue card, and the Korean menu with the card,
+// at windowed scale 3 (480 x 432) and 5 (800 x 720). Each is the real draw of the real title; the card and the menu are asserted on their rectangles.
+// Files shot_title_<scene>_<w>x<h>.png. The scenes with a card write the real run.sav (the gate's scratch folder only). ----
+function Scenario_TitleScenes() {
+    return ["splash", "menu", "continue", "korean"];
+}
+
+function Scenario_TitleRunFile() {
+    Test_RawWrite(RunSave_Path(), json_stringify({ run_version: RUN_SAVE_VERSION, seed: 4242, gold: 137, floor: 4, rng: {}, started_at: 0, statData: { selected_class: CLASS_ARCHER } }));
+}
+
+function Scenario_StepShotsTitle(_s) {
+    var _scenes = Scenario_TitleScenes();
+    var _scales = [3, 5];
+    var _sc = _scenes[_s.di];
+    var _tag = _sc + "_" + string(_scales[_s.si]);
+    var _c = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _gs = GameState_Get();
+    switch (_s.step) {
+        case 290:   // set the scene: language, window scale, the run file, then a fresh title (the splash scene replays the logo)
+            if (_s.t == 1) {
+                if ((_sc == "continue" || _sc == "korean") && !Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP title card shot " + _tag + " (LOCALAPPDATA is not the gate scratch folder)");
+                    _s.shot = "";
+                    Scenario_Next(_s, 292);
+                    break;
+                }
+                Scenario_ClearUi();
+                Notice_Interrupt();
+                Loc_SetLanguage((_sc == "korean") ? "ko" : "en");
+                Scenario_SetWindowScale(_scales[_s.si]);
+                RunSave_Delete();
+                if (_sc == "continue" || _sc == "korean") Scenario_TitleRunFile();
+                _gs.in_main_menu = true;
+                _gs.startup_logo_seen = (_sc != "splash");   // the splash is only after the logo of a fresh launch
+                room_goto(rm_start);
+            }
+            if (_s.t >= 40 && room == rm_start && _c != noone && !Transition_IsActive()) Scenario_Next(_s, 291);
+            if (_s.t > 900) { Scenario_Check("shots_title_reaches_the_title_" + _tag, false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 291:   // wait until the scene is settled, assert the layout, take the picture
+            var _ready = false;
+            var _mt = Ui_Metrics();
+            if (_c != noone) {
+                if (_sc == "splash") _ready = (_c.state == "splash" && Title_FadeIn(current_time - _c.title_t0) >= 1 && Title_BlinkOn(current_time - _c.title_t0));
+                else _ready = (_c.state == "main" && is_struct(_c.title_stk) && Ui_MenuAlpha(_c.title_stk.menus[0], current_time) >= 1);
+            }
+            if (_ready) {
+                if (_sc == "splash") {
+                    var _pr = _c.title_prompt_rect;
+                    Scenario_Check("shots_title_prompt_is_inside_the_gui_" + _tag, _pr.w > 0 && _pr.x >= 0 && _pr.y >= 0 && _pr.x + _pr.w <= _mt.gw && _pr.y + _pr.h <= _mt.gh, json_stringify(_pr));
+                } else {
+                    var _mr = _c.title_stk.menus[0].rect;
+                    Scenario_Check("shots_title_menu_is_inside_the_gui_" + _tag, _mr.x >= 0 && _mr.y >= 0 && _mr.x + _mr.w <= _mt.gw && _mr.y + _mr.h <= _mt.gh, json_stringify(_mr));
+                    if (_sc == "menu") {
+                        Scenario_Check("shots_title_no_card_without_a_run_" + _tag, _c.title_card.kind == "none");
+                    } else {
+                        var _cr = _c.title_card_rect;
+                        Scenario_Check("shots_title_card_is_shown_" + _tag, _c.title_card.kind == "run" && _cr.w > 0);
+                        Scenario_Check("shots_title_card_is_inside_the_gui_" + _tag, _cr.x >= 0 && _cr.y >= 0 && _cr.x + _cr.w <= _mt.gw && _cr.y + _cr.h <= _mt.gh, json_stringify(_cr));
+                        Scenario_Check("shots_title_card_does_not_overlap_the_menu_" + _tag, _cr.x + _cr.w <= _mr.x || _mr.x + _mr.w <= _cr.x || _cr.y + _cr.h <= _mr.y || _mr.y + _mr.h <= _cr.y, json_stringify(_cr) + " vs " + json_stringify(_mr));
+                        Scenario_Check("shots_title_cursor_is_on_continue_" + _tag, _c.title_stk.menus[0].cursor == 1);
+                    }
+                }
+                _s.shot = "shot_title_" + _sc + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 292);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_title_scene_is_ready_" + _tag, false, "state=" + ((_c != noone) ? string(_c.state) : "none")); Scenario_Finish(); }
+            break;
+        case 292:
+            if (_s.t >= 3) {
+                if (_s.shot != "") Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _s.si++;
+                if (_s.si >= array_length(_scales)) { _s.si = 0; _s.di++; }
+                if (_s.di >= array_length(_scenes)) {
+                    Loc_SetLanguage("en");
+                    RunSave_Delete();
+                    _gs.startup_logo_seen = true;
+                    _s.si = 0;
+                    _s.di = 0;
+                    Scenario_Next(_s, 50);   // D91 / DISP-10 / D48 pictures, then the skill animations
+                } else {
+                    Scenario_Next(_s, 290);
                 }
             }
             break;
