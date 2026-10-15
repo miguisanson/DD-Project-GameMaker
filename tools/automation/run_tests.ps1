@@ -36,7 +36,8 @@ $BadLine = 'UNHANDLED|CRASH|\[TEST\] ERROR'
 # ---- helpers ----------------------------------------------------------------------------------
 function Refuse([string]$msg) { Write-Host "GATE REFUSED: $msg"; exit 2 }
 $script:failed = $false
-function Fail([string]$msg) { Write-Host "FAIL $msg"; $script:failed = $true }
+$script:failCount = 0                      # counts Fail calls; a step compares it with its own starting value, so one step's FAIL never leaks into the next
+function Fail([string]$msg) { Write-Host "FAIL $msg"; $script:failed = $true; $script:failCount++ }
 function Step([string]$name, [string]$state, $sw) { Write-Host ('{0,-9} {1,-4} {2:N1}s' -f $name, $state, $sw.Elapsed.TotalSeconds) }
 
 function Get-DriveRoots([string]$path) {   # the path's own drive, plus the target drive of any existing junction/symlink on it
@@ -398,7 +399,7 @@ function Finish {
 # functions, and nobody may read display_get_gui_*. -NegativeControl plants a violation, so this step (and the gate) must go red.
 $lintPy = Join-Path $ProjectDir 'tools\display\lint_display_calls.py'
 if (Test-Path $lintPy) {
-    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $sw = [Diagnostics.Stopwatch]::StartNew(); $fails0 = $script:failCount
     $pyExe = Get-Command python -ErrorAction SilentlyContinue
     if (-not $pyExe) { Fail 'lint: python not found (the display source guard needs it)' }
     else {
@@ -406,13 +407,13 @@ if (Test-Path $lintPy) {
         $lintOut = @(& $pyExe.Source @lintArgs)
         if ($LASTEXITCODE -ne 0) { $lintOut | Select-Object -First 12 | ForEach-Object { Write-Host "  $_" }; Fail 'lint: display source guard found violations' }
     }
-    Step 'lint' $(if ($script:failed) { 'FAIL' } else { 'OK' }) $sw
+    Step 'lint' $(if ($script:failCount -gt $fails0) { 'FAIL' } else { 'OK' }) $sw
 }
 
 # ---- hardcoded English (I1): no new player-facing literals in the scoped GML files; the lint's own self-check runs first.
 $txtPy = Join-Path $ProjectDir 'tools\localization\lint_hardcoded_text.py'
 if (Test-Path $txtPy) {
-    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $sw = [Diagnostics.Stopwatch]::StartNew(); $fails0 = $script:failCount
     $pyExe = Get-Command python -ErrorAction SilentlyContinue
     if (-not $pyExe) { Fail 'text lint: python not found' }
     else {
@@ -426,20 +427,20 @@ if (Test-Path $txtPy) {
         if ($LASTEXITCODE -ne 0) { $txtOut | Select-Object -First 12 | ForEach-Object { Write-Host "  $_" }; Fail 'text lint: hardcoded player-facing literals found' }
         $ErrorActionPreference = 'Stop'
     }
-    Step 'text-lint' $(if ($script:failed) { 'FAIL' } else { 'OK' }) $sw
+    Step 'text-lint' $(if ($script:failCount -gt $fails0) { 'FAIL' } else { 'OK' }) $sw
 }
 
 # ---- missing Korean (D9): every workbook row needs a real ko (tools/localization/check_missing_ko.py, allowlist in ko_allowlist.txt).
 $koPy = Join-Path $ProjectDir 'tools\localization\check_missing_ko.py'
 if (Test-Path $koPy) {
-    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $sw = [Diagnostics.Stopwatch]::StartNew(); $fails0 = $script:failCount
     $pyExe = Get-Command python -ErrorAction SilentlyContinue
     if (-not $pyExe) { Fail 'ko check: python not found' }
     else {
         $koOut = @(& $pyExe.Source $koPy)
         if ($LASTEXITCODE -ne 0) { $koOut | Select-Object -First 12 | ForEach-Object { Write-Host "  $_" }; Fail 'ko check: rows without a Korean translation' }
     }
-    Step 'ko-check' $(if ($script:failed) { 'FAIL' } else { 'OK' }) $sw
+    Step 'ko-check' $(if ($script:failCount -gt $fails0) { 'FAIL' } else { 'OK' }) $sw
 }
 
 # ---- fresh work dirs; copy working tree (tracked + untracked-not-ignored) -----------------------
@@ -492,8 +493,10 @@ if ($NegativeControl -and $Plant -ne 'test') {
         Write-Host 'plant     syntax error appended to the scratch scr_test.gml (expect: build fails)'
     } else {
         $hook = 'Test_Reset();'
-        $at = $plantText.IndexOf($hook, $plantText.IndexOf('function Test_RunAll()'))
-        if ($at -lt 0) { Fail 'plant: Test_RunAll anchor not found in scr_test.gml'; Finish }
+        $fnAt = $plantText.IndexOf('function Test_RunAll()')
+        if ($fnAt -lt 0) { Fail 'plant anchor not found: function Test_RunAll() is missing from the scratch scr_test.gml'; Finish }
+        $at = $plantText.IndexOf($hook, $fnAt)
+        if ($at -lt 0) { Fail "plant anchor not found: '$hook' is missing after function Test_RunAll()"; Finish }
         # Igor compiles an unknown function name without complaint; only running the call raises the error
         $plantText = $plantText.Insert($at + $hook.Length, "`n" + '    Test_RunSuite("PlantUnknownFn", function() { __plant_no_such_function_xyz(); });')
         Write-Host 'plant     call to an unknown function added to the scratch Test_RunAll (expect: build ok, test run fails)'
