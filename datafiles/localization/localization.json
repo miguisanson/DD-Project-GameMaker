@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T14:55:03Z",
-    "row_count": 1062
+    "generated_at_utc": "2026-10-15T15:31:15Z",
+    "row_count": 1067
   },
   "default_lang": "en",
   "languages": [
@@ -987,6 +987,34 @@
     "common.ok": {
       "en": "OK",
       "ko": "확인"
+    },
+    "confirm.abandon": {
+      "en": "Abandon this run? It counts as a death, but you keep the echo.",
+      "ko": "이번 도전을 포기할까요? 죽은 것으로 기록되지만 메아리는 남습니다."
+    },
+    "confirm.echo": {
+      "en": "Keep {name} as your echo?",
+      "ko": "{name}을(를) 메아리로 남길까요?"
+    },
+    "confirm.new_game": {
+      "en": "Start a new game? The saved run will be abandoned.",
+      "ko": "새 게임을 시작할까요? 저장된 도전은 사라집니다."
+    },
+    "confirm.quit": {
+      "en": "Quit to title? The run is saved and Continue picks it up again.",
+      "ko": "타이틀로 나갈까요? 도전은 저장되며 이어하기로 계속할 수 있습니다."
+    },
+    "confirm.quit_battle": {
+      "en": "Quit to title? Continue puts you back just before this fight.",
+      "ko": "타이틀로 나갈까요? 이어하기를 하면 이 전투 직전으로 돌아옵니다."
+    },
+    "confirm.replace": {
+      "en": "Forget {forget} and learn {learn}?",
+      "ko": "{forget}을(를) 잊고 {learn}을(를) 배울까요?"
+    },
+    "confirm.sell": {
+      "en": "Sell {name} for {price}?",
+      "ko": "{name}을(를) {price}에 팔까요?"
     },
     "controls.help.reset": {
       "en": "Puts every keyboard key back to how it was. The controller is never changed.",
@@ -2860,10 +2888,6 @@
       "en": "Ends this run now. It counts as a death, but you keep the echo.",
       "ko": "지금 도전을 끝냅니다. 죽음으로 기록되지만 메아리는 그대로 가져갑니다."
     },
-    "pause.help.abandon_armed": {
-      "en": "Confirm once more to end this run now. Back or another row cancels.",
-      "ko": "한 번 더 확인하면 지금 도전이 끝납니다. 뒤로 가기나 다른 항목을 고르면 취소됩니다."
-    },
     "pause.help.help": {
       "en": "Every hint the game has: the ones you have seen and the ones still to come.",
       "ko": "게임이 알려 주는 모든 도움말입니다. 본 것도, 앞으로 볼 것도 있습니다."
@@ -2887,10 +2911,6 @@
     "pause.option.abandon": {
       "en": "Abandon run",
       "ko": "도전 포기"
-    },
-    "pause.option.abandon_confirm": {
-      "en": "Sure? Confirm again",
-      "ko": "정말입니까? 한 번 더 확인"
     },
     "pause.option.exit_main": {
       "en": "Exit to main menu",

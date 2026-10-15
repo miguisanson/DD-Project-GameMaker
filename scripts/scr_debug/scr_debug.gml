@@ -532,7 +532,11 @@ function Scenario_StepSmoke(_s) {
         case 580: case 581: case 582: case 583: case 584: case 585: case 586: case 587: case 588: case 589:
         case 590: case 591: case 592: case 593: case 594: case 595: case 596: case 597: case 598: case 599:
         case 600: case 601: case 602: case 603: case 604: case 605: case 606: case 607: case 608: case 609:
-            Scenario_StepSmokeH11(_s);   // H11 (D153, D158): hearing a run, the flee-direction search and the one "?", hiding, no camping at the exit; its last step calls Scenario_NoticeEnd (the end of the chain)
+            Scenario_StepSmokeH11(_s);   // H11 (D153, D158): hearing a run, the flee-direction search and the one "?", hiding, no camping at the exit; its last step goes on with H2 (649..669)
+            break;
+        case 649: case 650: case 651: case 652: case 653: case 654: case 655: case 656: case 657: case 658: case 659:
+        case 660: case 661: case 662: case 663: case 664: case 665: case 666: case 667: case 668: case 669:
+            Scenario_StepSmokeConfirm(_s);   // H2 (D156): the one Yes / No pop-up through real keys (abandon, quit, New Game over a saved run); its last step calls Scenario_NoticeEnd (the end of the chain)
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -723,13 +727,12 @@ function Scenario_StepSmokePause(_s) {
 }
 
 // Review 1 (HIGH): one confirm on New Game used to delete the saved run. With a run saved, the title starts on Continue and New Game
-// asks "Sure? Confirm again" (the pause menu's Abandon pattern): the run save survives the first press; moving or Back disarms; the
-// second press starts a new run. Real key input throughout. Then the smoke run goes on as before: a new run in rm_floor1.
+// opens the shared Yes / No pop-up (D156) with No highlighted: the run save survives the first press; No and Back close it and start nothing;
+// Yes starts a new run. Real key input throughout. Then the smoke run goes on as before: a new run in rm_floor1.
 function Scenario_StepSmokeNewGameGuard(_s) {
     var _gs = GameState_Get();
     var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
     var _m = (_sc != noone && is_struct(_sc.title_stk)) ? _sc.title_stk.menus[0] : undefined;
-    var _armed = Loc_T("pause.option.abandon_confirm", "Sure? Confirm again");
     var _plain = Loc_T("menu.main.option.0", "New Game");
     switch (_s.step) {
         case 220:   // wait for the title, save a run, build the title again as a launch does
@@ -761,39 +764,42 @@ function Scenario_StepSmokeNewGameGuard(_s) {
                 case 40:
                     Scenario_Tap("confirm");   // the first press on New Game
                     break;
-                case 46:
+                case 48:
                     Scenario_Check("newgame_guard_first_confirm_keeps_the_run_save", RunSave_HasSave());
-                    Scenario_Check("newgame_guard_first_confirm_asks_again", _m.items[0].label == _armed, "label=" + string(_m.items[0].label));
+                    Scenario_Check("newgame_guard_first_confirm_opens_the_popup", Confirm_IsOpen() && Confirm_Question() == "Start a new game? The saved run will be abandoned.", "open=" + string(Confirm_IsOpen()));
+                    Scenario_Check("newgame_guard_popup_starts_on_no", Confirm_IsOpen() && Confirm_Menu().cursor == 1);
                     Scenario_Check("newgame_guard_first_confirm_does_not_start_a_game", room == rm_start && _sc != noone && !is_struct(_sc.title_exit) && _sc.state == "main");
-                    Scenario_Tap("menu_down");
+                    Scenario_Check("newgame_guard_the_row_still_says_new_game", _m.items[0].label == _plain, "label=" + string(_m.items[0].label));
+                    Scenario_Tap("confirm");   // No
                     break;
-                case 52:
-                    Scenario_Check("newgame_guard_moving_the_cursor_disarms", _m.cursor == 1 && _m.items[0].label == _plain, "cursor=" + string(_m.cursor) + " label=" + string(_m.items[0].label));
-                    Scenario_Tap("menu_up");
-                    break;
-                case 58:
-                    Scenario_Tap("confirm");   // arm again
+                case 56:
+                    Scenario_Check("newgame_guard_no_closes_the_popup", !Confirm_IsOpen() && _m.cursor == 0 && _m.items[0].label == _plain && RunSave_HasSave() && room == rm_start && !is_struct(_sc.title_exit), "cursor=" + string(_m.cursor));
+                    Scenario_Tap("confirm");   // ask again
                     break;
                 case 64:
-                    Scenario_Check("newgame_guard_arms_again_after_a_move", _m.cursor == 0 && _m.items[0].label == _armed && RunSave_HasSave(), "label=" + string(_m.items[0].label));
-                    Scenario_Tap("cancel");
+                    Scenario_Check("newgame_guard_asks_again_after_no", Confirm_IsOpen() && Confirm_Menu().cursor == 1 && RunSave_HasSave());
+                    Scenario_Tap("cancel");   // Back is No
                     break;
-                case 70:
-                    Scenario_Check("newgame_guard_back_disarms", _m.items[0].label == _plain && RunSave_HasSave() && room == rm_start && _sc.state == "main", "label=" + string(_m.items[0].label));
-                    Scenario_Tap("confirm");   // arm
+                case 72:
+                    Scenario_Check("newgame_guard_back_closes_the_popup", !Confirm_IsOpen() && _m.items[0].label == _plain && RunSave_HasSave() && room == rm_start && _sc.state == "main" && !is_struct(_sc.title_exit), "label=" + string(_m.items[0].label));
+                    Scenario_Tap("confirm");   // ask once more
                     break;
-                case 76:
-                    Scenario_Check("newgame_guard_armed_once_more", _m.items[0].label == _armed && RunSave_HasSave());
-                    Scenario_Tap("confirm");   // the second press starts the new run
+                case 80:
+                    Scenario_Check("newgame_guard_asks_once_more", Confirm_IsOpen() && RunSave_HasSave());
+                    Scenario_Tap("menu_up");   // No -> Yes
                     break;
-                case 82:
-                    Scenario_Check("newgame_guard_second_confirm_asks_for_a_seed", _sc != noone && is_struct(_sc.title_stk) && Ui_StackTop(_sc.title_stk).id == "seed_choice" && !is_struct(_sc.title_exit) && RunSave_HasSave(), "room=" + room_get_name(room));   // D152
+                case 88:
+                    Scenario_Check("newgame_guard_up_reaches_yes", Confirm_IsOpen() && Confirm_Menu().cursor == 0 && RunSave_HasSave() && !is_struct(_sc.title_exit));
+                    Scenario_Tap("confirm");   // Yes starts the new run
                     break;
-                case 96:
+                case 94:
+                    Scenario_Check("newgame_guard_yes_asks_for_a_seed", _sc != noone && is_struct(_sc.title_stk) && Ui_StackTop(_sc.title_stk).id == "seed_choice" && !is_struct(_sc.title_exit) && RunSave_HasSave(), "room=" + room_get_name(room));   // D152 after D156: New Game -> pop-up (a run is saved) -> seed pick
+                    break;
+                case 108:
                     Scenario_Tap("confirm");   // D152: Random seed, the first row
                     break;
-                case 104:
-                    Scenario_Check("newgame_guard_second_confirm_starts_a_new_run", (_sc != noone && is_struct(_sc.title_exit)) || room != rm_start || Transition_IsActive(), "room=" + room_get_name(room));
+                case 116:
+                    Scenario_Check("newgame_guard_yes_then_the_seed_pick_starts_a_new_run", (_sc != noone && is_struct(_sc.title_exit)) || room != rm_start || Transition_IsActive(), "room=" + room_get_name(room));
                     _s.ng_held = false;
                     Scenario_Next(_s, 222);
                     break;
@@ -819,7 +825,7 @@ function Scenario_StepSmokeNewGameGuard(_s) {
 
 // G2 (D128): the launch through the real flow. A run is saved (Archer, floor 4, 137 gold), the game is put back to the state of a fresh launch
 // (the logo not seen yet) and the title is entered: logo -> press-any-key splash (the menu takes no input yet) -> one key -> the menu slides in with the cursor on
-// Continue and the card showing the saved run -> wrap-around -> the New Game guard asks twice -> a damaged save shows "Can't continue" on the card.
+// Continue and the card showing the saved run -> wrap-around -> the New Game guard asks (the shared Yes / No pop-up, D156) -> a damaged save shows "Can't continue" on the card.
 // Writes the real run.sav: only inside the gate (Scenario_CanSaveSlot).
 function Scenario_StepSmokeTitle(_s) {
     var _gs = GameState_Get();
@@ -827,7 +833,6 @@ function Scenario_StepSmokeTitle(_s) {
     var _m = (_sc != noone && is_struct(_sc.title_stk) && array_length(_sc.title_stk.menus) > 0) ? _sc.title_stk.menus[0] : undefined;
     if (!variable_struct_exists(_s, "ti")) _s.ti = {};
     var _ti = _s.ti;
-    var _armed = Loc_T("pause.option.abandon_confirm", "Sure? Confirm again");
     var _plain = Loc_T("menu.main.option.0", "New Game");
     switch (_s.step) {
         case 270:   // save a run, then back to a fresh launch of the title
@@ -909,12 +914,12 @@ function Scenario_StepSmokeTitle(_s) {
                     Scenario_Tap("confirm");   // the first press on New Game with a run saved only asks
                     break;
                 case 39:
-                    Scenario_Check("title_new_game_asks_again", _m.items[0].label == _armed && RunSave_HasSave() && room == rm_start && !is_struct(_sc.title_exit), "label=" + string(_m.items[0].label));
+                    Scenario_Check("title_new_game_asks_first", Confirm_IsOpen() && RunSave_HasSave() && room == rm_start && !is_struct(_sc.title_exit), "open=" + string(Confirm_IsOpen()));
                     Scenario_Check("title_card_stays_while_the_guard_asks", _sc.title_card.kind == "run");
                     Scenario_Tap("cancel");
                     break;
                 case 45:
-                    Scenario_Check("title_back_puts_the_new_game_label_back", _m.items[0].label == _plain && RunSave_HasSave(), "label=" + string(_m.items[0].label));
+                    Scenario_Check("title_back_closes_the_new_game_question", !Confirm_IsOpen() && _m.items[0].label == _plain && RunSave_HasSave(), "label=" + string(_m.items[0].label));
                     RunSave_Delete();
                     Test_RawWrite(RunSave_Path(), "{{ not json");   // a damaged save: the card says so
                     _sc.title_refresh = true;
@@ -2917,10 +2922,13 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsOneMenu(_s);   // H1 (D140): the System tab, the Settings tab and the "Keep this?" prompt, two sizes; goes on with H10 (570..579)
             break;
         case 570: case 571: case 572: case 573: case 574: case 575: case 576: case 577: case 578: case 579:
-            Scenario_StepShotsSeed(_s);   // H10 (D152): the seed pick and the entry screen, two sizes, Korean once; goes on with H10 (570..579)
+            Scenario_StepShotsSeed(_s);   // H10 (D152): the seed pick and the entry screen, two sizes, Korean once; goes on with H11 (610..619)
             break;
         case 610: case 611: case 612: case 613: case 614: case 615: case 616: case 617: case 618: case 619:
-            Scenario_StepShotsH11(_s);   // H11 (D153): the ? over an enemy that gave up, the hidden player, the same spot one step off; finishes the run
+            Scenario_StepShotsH11(_s);   // H11 (D153): the ? over an enemy that gave up, the hidden player, the same spot one step off; goes on with H2 (670..679)
+            break;
+        case 670: case 671: case 672: case 673: case 674: case 675: case 676: case 677: case 678: case 679:
+            Scenario_StepShotsConfirm(_s);   // H2 (D156): the shared Yes / No pop-up over the System tab and the title, two sizes, Korean once; finishes the run
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -4778,7 +4786,7 @@ function Scenario_StepSmokeRun(_s) {
             }
             if (_s.t > 600) { Scenario_Check("continue_enters_the_saved_room", false, "room=" + room_get_name(room)); Scenario_Finish(); }
             break;
-        case 109:   // the menu's System tab > Abandon run: down once, confirm twice
+        case 109:   // the menu's System tab > Abandon run: down once, confirm (the Yes / No pop-up opens on No), up to Yes, confirm
             if (_s.t == 1) {
                 Scenario_ClearUi();
                 Menu_Open(6);
@@ -4789,11 +4797,15 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_Tap("confirm");
             }
             if (_s.t == 72) {
-                Scenario_Check("abandon_asks_before_it_acts", TabSystem_Armed() && Run_IsActive());
+                Scenario_Check("abandon_asks_before_it_acts", Confirm_IsOpen() && Confirm_Menu().cursor == 1 && Run_IsActive());
+                Scenario_Tap("menu_up");   // No -> Yes
+            }
+            if (_s.t == 84) {
+                Scenario_Check("abandon_popup_is_on_yes_and_the_run_still_runs", Confirm_IsOpen() && Confirm_Menu().cursor == 0 && Run_IsActive());
                 Scenario_Tap("confirm");
             }
-            if (_s.t > 74) Scenario_TapCutscene(_s);
-            if (_s.t > 74 && _sc != noone && _sc.state == "run_flow") {
+            if (_s.t > 86) Scenario_TapCutscene(_s);
+            if (_s.t > 86 && _sc != noone && _sc.state == "run_flow") {
                 var _pf3 = Profile_Get();
                 Scenario_Check("abandon_counts_as_a_death", _pf3.deaths == 2, "deaths=" + string(_pf3.deaths));
                 Scenario_Check("abandon_history_says_abandoned", array_length(_pf3.history) == 2 && _pf3.history[1].result == "abandoned" && _pf3.history[1].floor == 2, "history=" + json_stringify(_pf3.history));
@@ -5271,9 +5283,14 @@ function Scenario_StepShotsStory(_s) {
             }
             if (_s.ec == 1 && _s.t == _s.ec_t + 4) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
-                Scenario_Tap("confirm");   // take the first option
+                Scenario_Tap("confirm");   // take the first option: the shared Yes / No pop-up asks (D156)
             }
-            if (_s.ec == 1 && _s.t > _s.ec_t + 10 && !CardsUi_IsOpen()) {
+            if (_s.ec == 1 && _s.t == _s.ec_t + 16) {
+                Scenario_Check("shots_story_echo_pick_asks_first", Confirm_IsOpen() && Confirm_Menu().cursor == 1 && CardsUi_IsOpen());
+                Scenario_Tap("menu_up");   // No -> Yes
+            }
+            if (_s.ec == 1 && _s.t == _s.ec_t + 28) Scenario_Tap("confirm");
+            if (_s.ec == 1 && _s.t > _s.ec_t + 34 && !CardsUi_IsOpen()) {
                 Scenario_Check("shots_story_echo_pick_is_answered", Cards_NextOwed(_gs.player_ch) == "" && array_length(Profile_Get().echo_pool) == 0);
                 Scenario_Next(_s, 156);
             }
@@ -5743,9 +5760,9 @@ function Scenario_StepSmokeCards(_s) {
             }
             if (array_length(_cd.q) == 2 && !variable_struct_exists(_cd, "c3") && (_s.f - _s.last_tap) >= 6) {
                 _cd.c3 = true;
-                var _m3 = Ui_StackTop(global.cards_ui.stk);
-                Scenario_Check("cards_class_asks_are_you_sure", Ui_StackDepth(global.cards_ui.stk) == 2 && _m3.id == "cards_class_sure", "depth=" + string(Ui_StackDepth(global.cards_ui.stk)));
-                Scenario_Check("cards_are_you_sure_starts_on_no", _m3.cursor == 1, "cursor=" + string(_m3.cursor));
+                Scenario_Check("cards_class_asks_are_you_sure", Confirm_IsOpen() && Ui_StackDepth(global.cards_ui.stk) == 1, "open=" + string(Confirm_IsOpen()));
+                Scenario_Check("cards_are_you_sure_starts_on_no", Confirm_IsOpen() && Confirm_Menu().cursor == 1, "cursor=" + (Confirm_IsOpen() ? string(Confirm_Menu().cursor) : "no pop-up"));
+                Scenario_Check("confirm_the_class_is_not_picked_before_yes", _ch.class_id == CLASS_NOBODY && _ch.class_pick && CardsUi_IsOpen(), "class=" + string(_ch.class_id));
             }
             if (array_length(_cd.q) == 0 && _s.t > 150) Scenario_Next(_s, 135);
             if (_s.t > 900) { Scenario_Check("cards_class_screen_answers", false, "kind=" + CardsUi_Kind()); Scenario_Finish(); }
@@ -5847,7 +5864,12 @@ function Scenario_StepSmokeCards(_s) {
         case 141:   // replace Ice Spear (second row); its upgrade goes with it
             if (_s.t > 60 && array_length(_cd.q) == 0 && CardsUi_Kind() == "replace" && !variable_struct_exists(_cd, "r4")) {
                 _cd.r4 = true;
-                _cd.q = ["menu_down", "confirm"];
+                _cd.q = ["menu_down", "confirm", "menu_up", "confirm"];   // the second row, confirm, the pop-up opens on No: up to Yes, confirm
+            }
+            if (variable_struct_exists(_cd, "r4") && array_length(_cd.q) == 2 && !variable_struct_exists(_cd, "r5") && (_s.f - _s.last_tap) >= 6) {
+                _cd.r5 = true;
+                Scenario_Check("confirm_replace_asks_before_it_swaps", Confirm_IsOpen() && Confirm_Menu().cursor == 1, "open=" + string(Confirm_IsOpen()));
+                Scenario_Check("confirm_replace_keeps_the_skills_before_yes", array_length(_ch.skills) == 3 && _ch.skills[1] == SKILL_ICE_SPEAR && _ch.skill_pending == SKILL_MEDITATION && _ch.card_picks == 1, "skills=" + json_stringify(_ch.skills));
             }
             if (variable_struct_exists(_cd, "r4") && array_length(_cd.q) == 0 && _s.t > 120 && !CardsUi_IsOpen()) {
                 Scenario_Check("cards_replace_swaps_ice_spear_for_meditation", array_length(_ch.skills) == 3 && _ch.skills[0] == SKILL_FIREBALL && _ch.skills[1] == SKILL_MEDITATION && _ch.skills[2] == SKILL_FORESIGHT, "skills=" + json_stringify(_ch.skills));
@@ -6051,7 +6073,7 @@ function Scenario_StepShotsCards(_s) {
                 CardsUi_ClassConfirm(_top, 2);
             }
             if (_s.t == 50) {
-                Scenario_Check("shots_cards_class_sure_open", Ui_StackDepth(global.cards_ui.stk) == 2);
+                Scenario_Check("shots_cards_class_sure_open", Confirm_IsOpen() && Confirm_Menu().cursor == 1);
                 Scenario_ShotUi(_s, "cards_class_sure");
                 Scenario_Next(_s, 122);
             }
@@ -6059,6 +6081,7 @@ function Scenario_StepShotsCards(_s) {
         case 122:   // the card pick: a skill, an upgrade, a passive; two picks left
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Confirm_Close();   // D156: the class question is the shared pop-up, over the class screen
                 CardsUi_Close();
                 var _ch = _gs.player_ch;
                 _ch.skills = [SKILL_FIREBALL];
@@ -9081,12 +9104,17 @@ function Scenario_StepSmokeEcho(_s) {
                 Scenario_Check("g5_the_echo_pick_shows_only_the_item", array_length(_m.items) == 1 && array_length(_ch.echo_offer) == 1 && _ch.echo_offer[0].kind == "item" && _ch.echo_offer[0].id == 11, "offer=" + json_stringify(_ch.echo_offer));
                 Scenario_Check("g5_the_pool_still_waits_until_the_answer", array_length(Profile_Get().echo_pool) == 2);
                 _eo.items_before = Scenario_ItemCount(_ch, 11);
-                _eo.q = ["confirm"];
+                _eo.q = ["confirm", "menu_up", "confirm"];   // the pick, the pop-up opens on No: up to Yes, confirm
                 Scenario_Next(_s, 345);
             }
             if (_s.t > 1500) { Scenario_Check("g5_the_echo_pick_opens_after_the_class", false, "kind=" + CardsUi_Kind() + " class=" + string(_ch.class_id) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
             break;
         case 345:   // taken: the item is in the inventory, the pool is empty, nothing is owed any more
+            if (array_length(_eo.q) == 2 && !variable_struct_exists(_eo, "asked") && (_s.f - _s.last_tap) >= 6) {
+                _eo.asked = true;
+                Scenario_Check("confirm_the_echo_asks_before_it_is_taken", Confirm_IsOpen() && Confirm_Menu().cursor == 1 && CardsUi_Kind() == "echo", "open=" + string(Confirm_IsOpen()));
+                Scenario_Check("confirm_the_echo_is_not_taken_before_yes", Scenario_ItemCount(_ch, 11) == _eo.items_before && array_length(Profile_Get().echo_pool) == 2, "items=" + string(Scenario_ItemCount(_ch, 11)));
+            }
             if (array_length(_eo.q) == 0 && !CardsUi_IsOpen() && _s.t > 20) {
                 var _pf3 = Profile_Get();
                 Scenario_Check("g5_the_echo_item_is_in_the_inventory", Scenario_ItemCount(_ch, 11) == _eo.items_before + 1, "before=" + string(_eo.items_before) + " now=" + string(Scenario_ItemCount(_ch, 11)));
@@ -10235,7 +10263,7 @@ function Scenario_StepSmokeRunStats(_s) {
             if (_rs.quiet > 30) Scenario_Next(_s, 444);
             if (_s.t > 1500) { Scenario_Check("g9_the_level_up_screens_are_answered", false, "mode=" + string(_gs.ui.mode) + " cards=" + string(CardsUi_IsOpen()) + " owed=" + Cards_NextOwed(_gs.player_ch)); Scenario_NoticeEnd(); }
             break;
-        case 444:   // H1 (D140): the menu stops the time; Abandon run through the System tab (down once, confirm twice)
+        case 444:   // H1 (D140): the menu stops the time; Abandon run through the System tab (down once, confirm, Yes in the pop-up, confirm)
             if (_s.t == 1) {
                 Scenario_ClearUi();
                 Menu_Open(6);
@@ -10247,9 +10275,13 @@ function Scenario_StepSmokeRunStats(_s) {
                 Scenario_Check("g9_the_menu_cursor_is_on_abandon", is_struct(TabMenu_TopMenu()) && TabMenu_TopMenu().items[TabMenu_TopMenu().cursor].id == "abandon", "cursor=" + string(is_struct(TabMenu_TopMenu()) ? TabMenu_TopMenu().cursor : -1));
                 Scenario_Tap("confirm");
             }
-            if (_s.t == 137) Scenario_Tap("confirm");
-            if (_s.t > 140) Scenario_TapCutscene(_s);
-            if (_s.t > 140 && _sc != noone && _sc.state == "run_flow" && variable_global_exists("run_flow") && is_struct(global.run_flow)) Scenario_Next(_s, 445);
+            if (_s.t == 137) {   // H2 (D156): the first confirm opens the Yes / No pop-up (cursor on No); up to Yes, then confirm
+                Scenario_Check("g9_abandon_asks_in_the_shared_popup", Confirm_IsOpen() && Confirm_Menu().cursor == 1, "open=" + string(Confirm_IsOpen()));
+                Scenario_Tap("menu_up");
+            }
+            if (_s.t == 149) Scenario_Tap("confirm");
+            if (_s.t > 160) Scenario_TapCutscene(_s);
+            if (_s.t > 160 && _sc != noone && _sc.state == "run_flow" && variable_global_exists("run_flow") && is_struct(global.run_flow)) Scenario_Next(_s, 445);
             if (_s.t > 1500) { Scenario_Check("g9_abandon_reaches_the_death_flow", false, "room=" + room_get_name(room) + " state=" + (_sc != noone ? string(_sc.state) : "none") + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
             break;
         case 445:   // the death line passes; the summary shows the numbers of the fight
@@ -10777,7 +10809,7 @@ function Scenario_StepSmokeLevelUp(_s) {
 }
 
 // ============================================================================
-// H1 (D140, D141): one menu. Smoke steps 470-489 (the end of the chain: the last step calls Scenario_NoticeEnd).
+// H1 (D140, D141): one menu. Smoke steps 470-489 (the chain goes on with H2's steps 650-669).
 //   470  a fresh run in rm_floor1, nothing else on screen
 //   471  on the map: Esc opens the tab menu, Esc closes it, Tab opens the same menu, Tab closes it, Q from the first tab is System
 //   472  the player steps onto a real enemy: a real fight starts (the encounter takes the snapshot)
@@ -10958,7 +10990,16 @@ function Scenario_StepSmokeOneMenu(_s) {
                 Scenario_Check("onemenu_the_cursor_is_on_quit", is_struct(_tm3) && _tm3.cursor == 2 && _tm3.items[2].id == "quit", "cursor=" + string(is_struct(_tm3) ? _tm3.cursor : -1));
                 Scenario_Tap("confirm");
             }
-            if (_s.t > 60 && room == rm_start && !Transition_IsActive()) {
+            if (_s.t == 64) {   // D156: the first press only asks, in the fight too
+                Scenario_Check("confirm_quit_in_the_fight_asks_first", Confirm_IsOpen() && Confirm_Menu().cursor == 1 && room == rm_battle && Confirm_Question() == "Quit to title? Continue puts you back just before this fight.", "open=" + string(Confirm_IsOpen()) + " room=" + room_get_name(room));
+                Scenario_Check("confirm_quit_in_the_fight_has_not_left_yet", is_struct(TabMenu_Get()) && TabMenu_Get().pending == "" && !_gs.in_main_menu);
+                Scenario_Tap("menu_up");   // No -> Yes
+            }
+            if (_s.t == 76) {
+                Scenario_Check("confirm_quit_in_the_fight_popup_is_on_yes", Confirm_IsOpen() && Confirm_Menu().cursor == 0 && room == rm_battle);
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 80 && room == rm_start && !Transition_IsActive()) {
                 Scenario_Check("onemenu_quit_in_the_fight_goes_to_the_title", _gs.in_main_menu && !is_struct(TabMenu_Get()) && _gs.ui.mode == UI_NONE);
                 Scenario_Check("onemenu_the_run_save_is_there", RunSave_HasSave());
                 Scenario_Next(_s, 475);
@@ -11228,8 +11269,185 @@ function Scenario_StepShotsLevelUp(_s) {
     }
 }
 
+// ============================================================================
+// H2 (D156): the one Yes / No pop-up, through real keys. Smoke steps 650-669 (the end of the chain: the last step calls Scenario_NoticeEnd).
+//   650  System tab > Abandon run on the map: the first confirm only asks (cursor on No); confirming No closes it and the run goes on
+//   651  System tab > Quit to title: asks; Esc is No; asks again; Up to Yes + confirm leaves for the title
+//   652  the title with the run saved: New Game asks; No keeps the title and the save; Back too; then Continue
+//   653  System tab > Abandon run again: No, then Yes: the run is abandoned (counts as a death), the death scene and the summary follow
+// ============================================================================
+function Scenario_StepSmokeConfirm(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "cf")) _s.cf = {};
+    var _h = _s.cf;
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _u = TabMenu_Get();
+    var _qa = "Abandon this run? It counts as a death, but you keep the echo.";
+    var _qq = "Quit to title? The run is saved and Continue picks it up again.";
+    var _qn = "Start a new game? The saved run will be abandoned.";
+    switch (_s.step) {
+        case 649:   // setup (merge order): the step before (H11, D153) ends in rm_floor3; the run goes on in rm_floor1, where the System tab asks about it
+            if (_s.t == 1) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                room_goto(rm_floor1);
+            }
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor1) && instance_exists(obj_player) && Player_IsSettled(instance_find(obj_player, 0))) Scenario_Next(_s, 650);
+            if (_s.t > 600) { Scenario_Check("confirm_rm_floor1_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 650:   // Abandon run: the first confirm asks, No leaves the run alone
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                _h.deaths0 = Profile_Get().deaths;
+                _h.seed0 = Run_IsActive() ? _gs.run.seed : -1;
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 6);   // the menu opens on System
+                Scenario_Tap("menu");
+            }
+            if (_s.t == 16) {
+                Scenario_Check("confirm_the_menu_opens_on_system", _gs.ui.mode == UI_MENU && is_struct(_u) && TabMenu_Ids()[_u.tab] == "system", "mode=" + string(_gs.ui.mode));
+                Scenario_Check("confirm_a_run_is_going", Run_IsActive());
+                Ui_MenuFixCursor(TabMenu_TopMenu(), 0);   // the list remembers where it was left: start from Help
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 30) {
+                var _tm = TabMenu_TopMenu();
+                Scenario_Check("confirm_the_cursor_is_on_abandon", is_struct(_tm) && _tm.items[_tm.cursor].id == "abandon", "cursor=" + string(is_struct(_tm) ? _tm.cursor : -1));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 44) {
+                Scenario_Check("confirm_abandon_opens_the_popup", Confirm_IsOpen(), "open=" + string(Confirm_IsOpen()));
+                Scenario_Check("confirm_abandon_question", Confirm_IsOpen() && Confirm_Question() == _qa, Confirm_IsOpen() ? Confirm_Question() : "none");
+                Scenario_Check("confirm_abandon_popup_starts_on_no", Confirm_IsOpen() && Confirm_Menu().cursor == 1);
+                Scenario_Check("confirm_the_first_confirm_has_not_abandoned", Run_IsActive() && is_struct(_u) && _u.pending == "" && _u.closed_ms < 0 && _gs.ui.mode == UI_MENU);
+                Scenario_Tap("confirm");   // No
+            }
+            if (_s.t == 58) {
+                Scenario_Check("confirm_no_closes_the_popup", !Confirm_IsOpen());
+                Scenario_Check("confirm_no_leaves_the_run_and_the_menu", Run_IsActive() && _gs.run.seed == _h.seed0 && is_struct(_u) && _u.pending == "" && _u.closed_ms < 0 && _gs.ui.mode == UI_MENU && Profile_Get().deaths == _h.deaths0, "deaths=" + string(Profile_Get().deaths));
+                Scenario_Next(_s, 651);
+            }
+            break;
+        case 651:   // Quit to title on the map: asks, Esc is No, asks again, Yes leaves
+            if (_s.t == 1) Scenario_Tap("menu_down");
+            if (_s.t == 14) {
+                var _tm2 = TabMenu_TopMenu();
+                Scenario_Check("confirm_the_cursor_is_on_quit", is_struct(_tm2) && _tm2.items[_tm2.cursor].id == "quit", "cursor=" + string(is_struct(_tm2) ? _tm2.cursor : -1));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 28) {
+                Scenario_Check("confirm_quit_asks_first", Confirm_IsOpen() && Confirm_Question() == _qq && Confirm_Menu().cursor == 1 && room == rm_floor1, Confirm_IsOpen() ? Confirm_Question() : "none");
+                Scenario_Check("confirm_quit_has_not_left", is_struct(_u) && _u.pending == "" && !_gs.in_main_menu);
+                Scenario_Tap("esc");   // Esc is No
+            }
+            if (_s.t == 42) {
+                Scenario_Check("confirm_esc_closes_the_popup_as_no", !Confirm_IsOpen() && is_struct(_u) && _u.pending == "" && _u.closed_ms < 0 && room == rm_floor1 && !_gs.in_main_menu && _gs.ui.mode == UI_MENU);
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 56) {
+                Scenario_Check("confirm_quit_asks_again", Confirm_IsOpen() && Confirm_Menu().cursor == 1);
+                Scenario_Tap("menu_up");   // No -> Yes
+            }
+            if (_s.t == 70) {
+                Scenario_Check("confirm_quit_popup_is_on_yes", Confirm_IsOpen() && Confirm_Menu().cursor == 0 && room == rm_floor1 && is_struct(_u) && _u.pending == "");
+                Scenario_Tap("confirm");   // Yes
+            }
+            if (_s.t > 74 && room == rm_start && !Transition_IsActive()) {
+                Scenario_Check("confirm_quit_yes_goes_to_the_title", _gs.in_main_menu && !is_struct(TabMenu_Get()) && !Confirm_IsOpen());
+                Scenario_Check("confirm_quit_keeps_the_run_save", RunSave_HasSave());
+                Scenario_Next(_s, 652);
+            }
+            if (_s.t > 600) { Scenario_Check("confirm_quit_reaches_the_title", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 652:   // the title with the run saved: New Game asks; No and Back keep the title; Continue goes on
+            if (room == rm_start && _sc != noone && !Transition_IsActive() && !variable_struct_exists(_h, "tt")) {
+                if (_sc.state != "main") { _sc.state = "main"; break; }
+                if (is_struct(_sc.title_stk) && _s.t > 20) {
+                    _h.tt = _s.t;
+                    Scenario_Check("confirm_the_title_cursor_is_on_continue", Ui_StackTop(_sc.title_stk).cursor == 1, "cursor=" + string(Ui_StackTop(_sc.title_stk).cursor));
+                    Scenario_Tap("menu_up");
+                }
+            }
+            if (!variable_struct_exists(_h, "tt")) {
+                if (_s.t > 900) { Scenario_Check("confirm_the_title_is_reached", false, "room=" + room_get_name(room) + " state=" + ((_sc != noone) ? string(_sc.state) : "none")); Scenario_NoticeEnd(); }
+                break;
+            }
+            var _k = _s.t - _h.tt;
+            var _tm0 = (_sc != noone && is_struct(_sc.title_stk)) ? _sc.title_stk.menus[0] : undefined;
+            if (_k == 14) {
+                Scenario_Check("confirm_up_from_continue_is_new_game", is_struct(_tm0) && _tm0.cursor == 0 && _tm0.items[0].id == "new", "cursor=" + (is_struct(_tm0) ? string(_tm0.cursor) : "none"));
+                Scenario_Tap("confirm");
+            }
+            if (_k == 28) {
+                Scenario_Check("confirm_new_game_over_a_saved_run_asks", Confirm_IsOpen() && Confirm_Question() == _qn && Confirm_Menu().cursor == 1, Confirm_IsOpen() ? Confirm_Question() : "none");
+                Scenario_Check("confirm_new_game_has_not_started", room == rm_start && !is_struct(_sc.title_exit) && RunSave_HasSave());
+                Scenario_Tap("confirm");   // No
+            }
+            if (_k == 42) {
+                Scenario_Check("confirm_no_stays_on_the_title", !Confirm_IsOpen() && room == rm_start && _sc.state == "main" && !is_struct(_sc.title_exit) && RunSave_HasSave() && !Transition_IsActive());
+                Scenario_Tap("confirm");
+            }
+            if (_k == 56) {
+                Scenario_Check("confirm_new_game_asks_again", Confirm_IsOpen() && Confirm_Menu().cursor == 1);
+                Scenario_Tap("cancel");   // Back is No
+            }
+            if (_k == 70) {
+                Scenario_Check("confirm_back_stays_on_the_title", !Confirm_IsOpen() && room == rm_start && _sc.state == "main" && !is_struct(_sc.title_exit) && RunSave_HasSave());
+                Scenario_Tap("menu_down");
+            }
+            if (_k == 84) {
+                Scenario_Check("confirm_down_is_continue_again", is_struct(_tm0) && _tm0.cursor == 1 && _tm0.items[1].id == "load");
+                Scenario_Tap("confirm");
+                _h.cont = _s.t;
+            }
+            if (variable_struct_exists(_h, "cont") && _s.t > _h.cont + 10 && Scenario_FloorReady(rm_floor1) && !_gs.load_spawn_pending) {
+                Scenario_Check("confirm_continue_brings_the_run_back", Run_IsActive() && _gs.run.seed == _h.seed0, "seed=" + (Run_IsActive() ? string(_gs.run.seed) : "no run"));
+                Scenario_Next(_s, 653);
+            }
+            if (_s.t > _h.tt + 900) { Scenario_Check("confirm_continue_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 653:   // Abandon run: No, then Yes; the run is abandoned and counts as a death
+            if (_s.t == 30) {
+                Scenario_ClearUi();
+                Scenario_Tap("menu");
+            }
+            if (_s.t == 44) {
+                Scenario_Check("confirm_the_menu_opens_again_on_system", _gs.ui.mode == UI_MENU && is_struct(_u) && TabMenu_Ids()[_u.tab] == "system", "mode=" + string(_gs.ui.mode));
+                Ui_MenuFixCursor(TabMenu_TopMenu(), 0);
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 58) Scenario_Tap("confirm");
+            if (_s.t == 72) {
+                Scenario_Check("confirm_abandon_asks_again", Confirm_IsOpen() && Confirm_Question() == _qa && Confirm_Menu().cursor == 1 && Run_IsActive());
+                Scenario_Tap("confirm");   // No
+            }
+            if (_s.t == 86) {
+                Scenario_Check("confirm_no_still_in_the_run", !Confirm_IsOpen() && Run_IsActive() && Profile_Get().deaths == _h.deaths0 && is_struct(_u) && _u.pending == "");
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 100) {
+                Scenario_Check("confirm_abandon_asks_a_third_time", Confirm_IsOpen() && Confirm_Menu().cursor == 1);
+                Scenario_Tap("menu_up");   // No -> Yes
+            }
+            if (_s.t == 114) {
+                Scenario_Check("confirm_abandon_popup_is_on_yes", Confirm_IsOpen() && Confirm_Menu().cursor == 0 && Run_IsActive());
+                Scenario_Tap("confirm");   // Yes
+            }
+            if (_s.t > 118) Scenario_TapCutscene(_s);
+            if (_s.t > 118 && _sc != noone && _sc.state == "run_flow") {
+                var _pf = Profile_Get();
+                Scenario_Check("confirm_yes_abandons_and_counts_as_a_death", _pf.deaths == _h.deaths0 + 1, "deaths=" + string(_pf.deaths) + " was " + string(_h.deaths0));
+                Scenario_Check("confirm_history_says_abandoned", array_length(_pf.history) >= 1 && _pf.history[array_length(_pf.history) - 1].result == "abandoned");
+                Scenario_Check("confirm_abandon_deletes_the_run_save", !RunSave_HasSave() && !Run_IsActive());
+                Scenario_Check("confirm_the_popup_is_gone_after_yes", !Confirm_IsOpen());
+                Scenario_NoticeEnd();
+            }
+            if (_s.t > 1500) { Scenario_Check("confirm_abandon_reaches_the_run_summary", false, "room=" + room_get_name(room) + " state=" + ((_sc != noone) ? string(_sc.state) : "none") + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
 // ---- H1 (D140) pictures 490..493: the System tab, the Settings tab and the "Keep this?" prompt at windowed scale 3 (480 x 432) and 5 (800 x 720).
-// Each is the real draw of the real menu on a real room; the layout is asserted on the rectangles. The last picture of the run: it ends the run. ----
+// Each is the real draw of the real menu on a real room; the layout is asserted on the rectangles. The chain goes on with H2's pictures 670..673. ----
 function Scenario_OneMenuShotScenes() {
     return ["system", "settings", "keep"];
 }
@@ -11397,6 +11615,110 @@ function Scenario_StepShotsSeed(_s) {
                     Scenario_Next(_s, 610);   // H11 (D153, pictures 610..614) finish the run
                 } else {
                     Scenario_Next(_s, 570);
+                }
+            }
+            break;
+    }
+}
+
+// ---- H2 (D156) pictures 670..673: the shared Yes / No pop-up over the System tab (Abandon run), over the title (New Game with a run saved) and in Korean
+// over the System tab, at windowed scale 3 (480 x 432) and 5 (800 x 720). Each is the real draw of the real screen; the pop-up is asserted on its rectangles
+// (on screen, centred, the two rows inside it, the cursor on No). Files shot_confirm_<scene>_<w>x<h>.png. The title scene writes the real run.sav
+// (the gate's scratch folder only). The last picture of the run: it ends the run. ----
+function Scenario_ConfirmShotScenes() {
+    return ["system", "title", "korean"];
+}
+
+function Scenario_StepShotsConfirm(_s) {
+    var _scenes = Scenario_ConfirmShotScenes();
+    var _scales = [3, 5];
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "cfm")) _s.cfm = { di: 0, si: 0, n: 0 };
+    var _o = _s.cfm;
+    var _sc = _scenes[_o.di];
+    var _tag = _sc + "_" + string(_scales[_o.si]);
+    var _c = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    switch (_s.step) {
+        case 670:   // the room and the window scale of this picture
+            if (_s.t == 1) {
+                if (_sc == "title" && !Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP confirm title shot " + _tag + " (LOCALAPPDATA is not the gate scratch folder)");
+                    _s.shot = "";
+                    Scenario_Next(_s, 673);
+                    break;
+                }
+                Scenario_ClearUi();
+                Confirm_Close();
+                Loc_SetLanguage("en");
+                Scenario_SetWindowScale(_scales[_o.si]);
+                if (_sc == "title") {
+                    RunSave_Delete();
+                    Scenario_TitleRunFile();
+                    _gs.in_main_menu = true;
+                    _gs.startup_logo_seen = true;
+                    room_goto(rm_start);
+                } else {
+                    Scenario_TabFixture();
+                    _o.n++;
+                    room_goto((room == rm_floor3) ? rm_floor2 : rm_floor3);
+                }
+            }
+            if (_s.t >= 40 && _sc == "title" && room == rm_start && _c != noone && _c.state == "main" && is_struct(_c.title_stk) && !Transition_IsActive() && Ui_MenuAlpha(_c.title_stk.menus[0], current_time) >= 1) Scenario_Next(_s, 671);
+            if (_s.t >= 30 && _sc != "title" && (room == rm_floor2 || room == rm_floor3) && Scenario_FloorReady(room)) Scenario_Next(_s, 671);
+            if (_s.t > 900) { Scenario_Check("shots_confirm_reaches_the_room_" + _tag, false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 671:   // open the pop-up the way the game does
+            if (_sc == "title") {
+                var _tm = _c.title_stk.menus[0];
+                Ui_MenuFixCursor(_tm, 0);
+                Title_OnConfirm(_tm, 0);
+            } else {
+                with (obj_enemy) instance_destroy();
+                Scenario_ClearUi();
+                if (_sc == "korean") Loc_SetLanguage("ko");
+                Menu_Open(6);
+                Ui_MenuFixCursor(TabMenu_TopMenu(), 1);   // Abandon run
+                TabMenu_OnConfirm(TabMenu_TopMenu(), 1);
+            }
+            Scenario_Next(_s, 672);
+            break;
+        case 672:   // let it slide in, check the layout, take the picture
+            if (_s.t >= 24) {
+                var _mt = Ui_Metrics();
+                var _r = variable_global_exists("confirm_rect") ? global.confirm_rect : { x: -1, y: -1, w: 0, h: 0 };
+                Scenario_Check("shots_confirm_is_open_" + _tag, Confirm_IsOpen());
+                Scenario_Check("shots_confirm_cursor_is_on_no_" + _tag, Confirm_IsOpen() && Confirm_Menu().cursor == 1);
+                Scenario_Check("shots_confirm_is_on_screen_" + _tag, _r.w > 0 && _r.x >= 0 && _r.y >= 0 && _r.x + _r.w <= _mt.gw && _r.y + _r.h <= _mt.gh, json_stringify(_r));
+                Scenario_Check("shots_confirm_is_centred_" + _tag, abs((_r.x + _r.w / 2) - _mt.gw / 2) <= _mt.p && abs((_r.y + _r.h / 2) - _mt.gh / 2) <= 2 * _mt.p, json_stringify(_r));
+                var _rows_ok = Confirm_IsOpen() && array_length(Confirm_Menu().rects) == 2;
+                if (_rows_ok) {
+                    for (var _i = 0; _i < 2; _i++) {
+                        var _rr = Confirm_Menu().rects[_i];
+                        _rows_ok = _rows_ok && _rr.w > 0 && _rr.x >= _r.x && _rr.y >= _r.y && _rr.x + _rr.w <= _r.x + _r.w && _rr.y + _rr.h <= _r.y + _r.h;
+                    }
+                }
+                Scenario_Check("shots_confirm_rows_are_inside_the_box_" + _tag, _rows_ok);
+                if (_sc != "title") Scenario_Check("shots_confirm_the_menu_stays_open_behind_" + _tag, _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()));
+                if (_sc == "korean") Scenario_Check("shots_confirm_question_is_korean_" + _tag, Loc_GetLanguage() == "ko" && Confirm_Question() != "Abandon this run? It counts as a death, but you keep the echo.", Confirm_Question());
+                _s.shot = "shot_confirm_" + _sc + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 673);
+            }
+            break;
+        case 673:
+            if (_s.t >= 3) {
+                if (_s.shot != "") Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Confirm_Close();
+                if (is_struct(TabMenu_Get())) Menu_Close(true);
+                Scenario_ClearUi();
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Loc_SetLanguage("en");
+                    RunSave_Delete();
+                    Scenario_Finish();   // the end of the pictures
+                } else {
+                    Scenario_Next(_s, 670);
                 }
             }
             break;
@@ -11614,7 +11936,7 @@ function Scenario_StepSmokeH11(_s) {
                 var _near = 0;
                 with (obj_enemy) { if (point_distance(Nav_CellOf(x + 8), Nav_CellOf(y + 8), _pc.cx, _pc.cy) < AI_ARRIVAL_CLEAR_TILES) _near++; }
                 Scenario_Check("h11_nobody_within_3_tiles_of_the_arrival_tile", _near == 0, "near=" + string(_near));
-                Scenario_NoticeEnd();   // H11 ends the smoke chain
+                Scenario_Next(_s, 649);   // H2 (D156, 649..669) goes on; its last step ends the smoke chain
             }
             if (_s.t > 600) { Scenario_Release(); Scenario_Check("h11_the_player_is_back_in_rm_floor3", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
@@ -11693,7 +12015,7 @@ function Scenario_StepShotsH11(_s) {
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 with (obj_enemy) instance_destroy();
-                Scenario_Finish();
+                Scenario_Next(_s, 670);   // H2 (D156, pictures 670..673) finish the run
             }
             break;
     }

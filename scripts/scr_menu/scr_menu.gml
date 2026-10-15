@@ -5,7 +5,8 @@
 // Q / E (or LB / RB) switch tabs and wrap; each tab is a list on the left with icons and a details panel on the right (one plain sentence and
 // the numbers from the data, a before / after comparison for gear). Back goes up ONE level (a Codex page to the Codex list, a tab to the game);
 // the cursor of every tab is remembered. The rows come from pure functions (Tab*_Items, Gear_*, Codex_*), tested without a screen.
-// global.tab_ui = { tab, pages (one { stk } per tab), opened_ms, closed_ms, toast, toast_ms, sys_armed, pending } while it is open, with gs.ui.mode = UI_MENU.
+// Abandon run and Quit to title ask first through the one Yes / No pop-up (Confirm_*, D156).
+// global.tab_ui = { tab, pages (one { stk } per tab), opened_ms, closed_ms, toast, toast_ms, pending } while it is open, with gs.ui.mode = UI_MENU.
 // ==========================================================================================================================
 // D108 F1c: the tab ids and icons never change, so they are built once (TabMenu_DataBuilds counts the builds) and read-only for callers; the
 // labels are kept per language (TabMenu_LabelBuilds counts them).
@@ -555,7 +556,7 @@ function TabMenu_ItemsFor(_id, _ch) {
         case "items": return TabItems_Items(_ch);
         case "gear": return TabGear_Items(_ch);
         case "codex": return TabCodex_Items(Profile_Get());
-        case "system": return TabSystem_Items(TabSystem_Armed(), room == rm_battle);
+        case "system": return TabSystem_Items(room == rm_battle);
     }
     return [];
 }
@@ -576,31 +577,35 @@ function TabMenu_BuildPage(_id) {
     return pg;
 }
 
-// ---- the System tab (D140, D141): Help, Abandon run (two presses), Quit to title; all on in a fight too ----
-function TabSystem_Items(_armed = false, _in_battle = false) {
+// ---- the System tab (D140, D141): Help, Abandon run, Quit to title; all on in a fight too. The last two ask first (D156) ----
+function TabSystem_Items(_in_battle = false) {
     return [
         { id: "help", label: Loc_T("pause.option.help", "Help"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.help", "Every hint the game has: the ones you have seen and the ones still to come.") },
         { id: "abandon", value: "", kind: "button", enabled: true, lines: [],
-          label: _armed ? Loc_T("pause.option.abandon_confirm", "Sure? Confirm again") : Loc_T("pause.option.abandon", "Abandon run"),
-          help: _armed ? Loc_T("pause.help.abandon_armed", "Confirm once more to end this run now. Back or another row cancels.")
-                       : Loc_T("pause.help.abandon", "Ends this run now. It counts as a death, but you keep the echo.") },
+          label: Loc_T("pause.option.abandon", "Abandon run"),
+          help: Loc_T("pause.help.abandon", "Ends this run now. It counts as a death, but you keep the echo.") },
         { id: "quit", label: Loc_T("pause.option.quit", "Quit to title"), value: "", kind: "button", enabled: true, lines: [],
           help: _in_battle ? Loc_T("tab.system.quit_battle_help", "Goes back to the title. Continue puts you back just before this fight.")
                            : Loc_T("pause.help.quit", "Saves the run and goes to the title. Continue picks it up again.") }
     ];
 }
 
-function TabSystem_Armed() {
-    var u = TabMenu_Get();
-    return is_struct(u) && variable_struct_exists(u, "sys_armed") && u.sys_armed;
+// D156: the question a System row asks before it acts (a fight says what Continue will do).
+function TabSystem_Question(_id, _in_battle = false) {
+    switch (_id) {
+        case "abandon": return Loc_T("confirm.abandon", "Abandon this run? It counts as a death, but you keep the echo.");
+        case "quit": return _in_battle ? Loc_T("confirm.quit_battle", "Quit to title? Continue puts you back just before this fight.")
+                                       : Loc_T("confirm.quit", "Quit to title? The run is saved and Continue picks it up again.");
+    }
+    return "";
 }
 
-// Abandon asks twice: any move of the cursor or another row puts the label back.
-function TabSystem_Disarm() {
+// Yes: the menu fades out and Menu_CloseFinalize does it (_d.id = "abandon" | "quit").
+function TabSystem_Yes(_d) {
     var u = TabMenu_Get();
-    if (!is_struct(u) || !u.sys_armed) return;
-    u.sys_armed = false;
-    TabMenu_Refresh();
+    if (!is_struct(u)) return;
+    u.pending = _d.id;
+    Menu_Close();
 }
 
 // The Help page: every tutorial, seen or not, as a page on top of the System list.
@@ -677,7 +682,7 @@ function TabMenu_Switch(_u, _tab) {
 function Menu_Open(_tab = -1) {
     var gs = GameState_Get();
     var tab = (_tab >= 0) ? _tab : Ui_MemGet(Ui_MemGlobal(), "tab_menu_active", TabMenu_Count());
-    var u = { tab: tab, pages: array_create(TabMenu_Count(), undefined), opened_ms: current_time, opened_frame: Input_Frame(), closed_ms: -1, toast: "", toast_ms: -100000, sys_armed: false, pending: "" };
+    var u = { tab: tab, pages: array_create(TabMenu_Count(), undefined), opened_ms: current_time, opened_frame: Input_Frame(), closed_ms: -1, toast: "", toast_ms: -100000, pending: "" };
     global.tab_ui = u;
     gs.ui.mode = UI_MENU;
     TabMenu_Switch(u, tab);
@@ -836,7 +841,6 @@ function TabCodex_Open(_kind) {
 }
 
 function TabMenu_OnConfirm(_m, _i) {
-    var u = TabMenu_Get();
     var gs = GameState_Get();
     var ch = gs.player_ch;
     var it = _m.items[_i];
@@ -863,23 +867,13 @@ function TabMenu_OnConfirm(_m, _i) {
             TabCodex_Open(it.id);
             break;
         case "system":
-            if (it.id != "abandon") TabSystem_Disarm();
             switch (it.id) {
                 case "help":
                     TabHelp_Open();
                     break;
                 case "abandon":
-                    if (!u.sys_armed) {   // the first press asks, the second abandons the run
-                        u.sys_armed = true;
-                        TabMenu_Refresh();
-                    } else {
-                        u.pending = "abandon";
-                        Menu_Close();
-                    }
-                    break;
                 case "quit":
-                    u.pending = "quit";
-                    Menu_Close();
+                    Confirm_Open(TabSystem_Question(it.id, room == rm_battle), TabSystem_Yes, { id: it.id });   // D156
                     break;
             }
             break;
@@ -918,8 +912,7 @@ function Menu_HandleInput() {
         return;
     }
     var pg = u.pages[u.tab];
-    var ev = Ui_MenuUpdate(Ui_StackTop(pg.stk), pg.stk);
-    if (ev.moved && tid == "system") TabSystem_Disarm();
+    Ui_MenuUpdate(Ui_StackTop(pg.stk), pg.stk);
 }
 
 // The prompts for the footer: what Confirm does on the row under the cursor, then what Back does.
@@ -1071,6 +1064,7 @@ function Menu_Draw() {
     }
     TabMenu_DrawFooter(z, a);
     KeepThis_Draw(a);
+    Confirm_Draw();   // D156: Abandon run and Quit to title ask over the whole menu
     if (u.toast != "" && now - u.toast_ms < TAB_TOAST_MS) {
         var tw = UI_TextWidth(u.toast) + 8 * p;
         var th = mt.line_h + 6 * p;
@@ -1204,23 +1198,11 @@ function CardsUi_ClassConfirm(_m, _i) {
         SFX_PlayUI("ui_back");
         return;
     }
-    var yes = { label: Loc_T("menu.common.yes", "Yes"), yes: true, class_id: it.class_id };
-    var no = { label: Loc_T("menu.common.no", "No"), yes: false, class_id: it.class_id };
-    var sure = Ui_MenuNew("cards_class_sure", [yes, no], {
-        on_confirm: CardsUi_ClassSure, on_back: CardsUi_NoBack,
-        layout: { title: Loc_T("class.select.become", "Become {cls}?", { cls: it.label }), anchor: "center", center: true }
-    });
-    Ui_MenuFixCursor(sure, 1);   // No first, for safety
-    Ui_StackPush(global.cards_ui.stk, sure);
+    Confirm_Open(Loc_T("class.select.become", "Become {cls}?", { cls: it.label }), CardsUi_ClassYes, { class_id: it.class_id });   // D156: the shared pop-up, No first
 }
 
-function CardsUi_ClassSure(_m, _i) {
-    var it = _m.items[_i];
-    if (!it.yes) {
-        Ui_StackBack(global.cards_ui.stk);
-        return;
-    }
-    var cid = it.class_id;
+function CardsUi_ClassYes(_d) {
+    var cid = _d.class_id;
     CardsUi_Close();
     // the black flash covers the swap of the character, as it did with the old popup
     var queued = Transition_RequestBlackFlash(TRANSITION_CLASS_SELECT_FADE_OUT_FRAMES, TRANSITION_CLASS_SELECT_FADE_IN_FRAMES, cid);
@@ -1284,9 +1266,20 @@ function CardsUi_EchoMenu() {
     return m;
 }
 
+// The name of what an echo option gives (a skill's or an item's), for the question.
+function CardsUi_EchoName(_o) {
+    return (_o.kind == "skill") ? SkillDB_Get(_o.id).name : ItemDB_Get(_o.id).name;
+}
+
 function CardsUi_EchoConfirm(_m, _i) {
+    var idx = _m.items[_i].echo_index;
+    var o = GameState_Get().player_ch.echo_offer[idx];
+    Confirm_Open(Loc_T("confirm.echo", "Keep {name} as your echo?", { name: CardsUi_EchoName(o) }), CardsUi_EchoYes, { echo_index: idx });   // D156
+}
+
+function CardsUi_EchoYes(_d) {
     var gs = GameState_Get();
-    CardsUi_Commit(Run_EchoTake(gs.player_ch, _m.items[_i].echo_index));
+    CardsUi_Commit(Run_EchoTake(gs.player_ch, _d.echo_index));
     Run_EchoDone();
     CardsUi_Close();
 }
@@ -1366,7 +1359,12 @@ function CardsUi_ReplaceConfirm(_m, _i) {
         CardsUi_ReplaceBack(_m, "root");
         return;
     }
-    var out = Card_ReplaceSkill(ch, old_id, ch.skill_pending);
+    Confirm_Open(Loc_T("confirm.replace", "Forget {forget} and learn {learn}?", { forget: SkillDB_Get(old_id).name, learn: SkillDB_GetBase(ch.skill_pending).name }), CardsUi_ReplaceYes, { old_id: old_id });   // D156
+}
+
+function CardsUi_ReplaceYes(_d) {
+    var ch = GameState_Get().player_ch;
+    var out = Card_ReplaceSkill(ch, _d.old_id, ch.skill_pending);
     out = Cards_ConsumePick(out);
     CardsUi_Commit(out);
     CardsUi_Close();
@@ -2207,18 +2205,34 @@ function ShopUi_BuyConfirm(_m, _i) {
     ShopUi_Refresh(_m, "buy");
 }
 
+// D156: gear is sold only after Yes; a worn piece is refused by the sale itself ("Take it off first"), and the rest sells at once.
 function ShopUi_SellConfirm(_m, _i) {
     var gs = GameState_Get();
     var it = _m.items[_i];
     if (it.item_id < 0) return;
-    var r = Shop_Sell(gs.player_ch, Run_Get(), it.item_id);
+    var def = ItemDB_Get(it.item_id);
+    var gear = (def.type == ITEM_WEAPON || def.type == ITEM_ARMOR || def.type == ITEM_ACCESSORY);
+    if (gear && !Menu_IsEquipped(gs.player_ch, it.item_id)) {
+        Confirm_Open(Loc_T("confirm.sell", "Sell {name} for {price}?", { name: def.name, price: string(Shop_SellPrice(it.item_id)) }), ShopUi_SellYes, { menu: _m, item_id: it.item_id });
+        return;
+    }
+    ShopUi_SellNow(_m, it.item_id);
+}
+
+function ShopUi_SellYes(_d) {
+    if (ShopUi_IsOpen()) ShopUi_SellNow(_d.menu, _d.item_id);
+}
+
+function ShopUi_SellNow(_m, _item_id) {
+    var gs = GameState_Get();
+    var r = Shop_Sell(gs.player_ch, Run_Get(), _item_id);
     if (!r.ok) {
         SFX_PlayUI("ui_back");
         ShopUi_Say(r.reason);
         return;
     }
     CardsUi_Commit(r.ch);
-    ShopUi_Say("sold", { name: ItemDB_Get(it.item_id).name, price: string(r.gold) }, "sell");
+    ShopUi_Say("sold", { name: ItemDB_Get(_item_id).name, price: string(r.gold) }, "sell");
     ShopUi_Refresh(_m, "sell");
 }
 
@@ -2801,10 +2815,10 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
 // TITLE MENU (D0 pilot on the UI framework)
 // --------------------
 // obj_start_controller keeps `state` ("main" | "settings" | "boot_logo" | "splash" | "cutscene") and holds the menu stack in title_stk: [title].
-// Settings is the popup above. New Game starts the run at once on Normal (D35: one difficulty only).
-function Title_MainItems(_can_load, _new_armed = false) {
+// Settings is the popup above. New Game starts the run at once on Normal (D35: one difficulty only); over a saved run it asks first (D156).
+function Title_MainItems(_can_load) {
     return [
-        { id: "new", label: _new_armed ? Loc_T("pause.option.abandon_confirm", "Sure? Confirm again") : Loc_T("menu.main.option.0", "New Game"), kind: "button", enabled: true },
+        { id: "new", label: Loc_T("menu.main.option.0", "New Game"), kind: "button", enabled: true },
         { id: "load", label: Loc_T("menu.main.option.continue", "Continue"), kind: "button", enabled: _can_load },   // C1 (D46): Continue run
         { id: "settings", label: Loc_T("menu.main.option.2", "Settings"), kind: "button", enabled: true },
         { id: "exit", label: Loc_T("menu.main.option.3", "Exit Game"), kind: "button", enabled: true }
@@ -2815,12 +2829,11 @@ function Title_Build(_c) {
     _c.title_stk = Ui_StackNew();
     var has_run = RunSave_HasSave();
     var m = Ui_MenuNew("title", Title_MainItems(has_run), {
-        owner: _c, on_confirm: Title_OnConfirm, on_back: Title_OnBack,
+        owner: _c, on_confirm: Title_OnConfirm,
         layout: { anchor: "bottom", y_frac: 0.62, center: true }
     });
     if (has_run) Ui_MenuFixCursor(m, 1);   // review 1: with a run saved the cursor starts on Continue, not on New Game
     Ui_StackPush(_c.title_stk, m);
-    _c.title_new_armed = false;
     _c.title_refresh = false;
     _c.title_seed = undefined;   // D152: the seed entry screen (a SeedEntry struct while it is open)
     _c.title_card = has_run ? Title_CardLoad() : Title_CardNone();   // D128: read, never applied
@@ -2830,41 +2843,37 @@ function Title_Build(_c) {
 function Title_Refresh(_c) {
     var m = _c.title_stk.menus[0];
     var has_run = RunSave_HasSave();
-    if (!has_run) _c.title_new_armed = false;
-    m.items = Title_MainItems(has_run, Title_NewArmed(_c));
+    m.items = Title_MainItems(has_run);
     Ui_MenuFixCursor(m, m.cursor);
     _c.title_refresh = false;
     _c.title_card = has_run ? Title_CardLoad() : Title_CardNone();
 }
 
-function Title_NewArmed(_c) {
-    return variable_instance_exists(_c, "title_new_armed") && _c.title_new_armed;
+// D35: no difficulty menu. D152: New Game goes on to the seed pick (Random seed first, or Enter seed); the title fades out after that pick (Title_NewGameGo),
+// then the run (or the intro cutscene) is requested.
+function Title_NewGo(_c, _m) {
+    Title_SeedChoiceOpen(_c);
 }
 
-// New Game asks twice while a run is saved (it would be abandoned): moving the cursor or Back puts the label back.
-function Title_DisarmNew(_c) {
-    if (!Title_NewArmed(_c)) return;
-    _c.title_new_armed = false;
-    if (is_struct(_c.title_stk)) _c.title_stk.menus[0].items = Title_MainItems(RunSave_HasSave(), false);
+function Title_NewYes(_d) {
+    Title_NewGo(_d.c, _d.m);
 }
 
-function Title_OnBack(_m, _res) {
-    Title_DisarmNew(_m.owner);
+// New Game: a saved run is abandoned by it (review 1), so with one saved the shared Yes / No pop-up asks first (D156); otherwise it starts at once.
+function Title_NewPress(_c, _m, _has_run) {
+    if (_has_run) {
+        Confirm_Open(Loc_T("confirm.new_game", "Start a new game? The saved run will be abandoned."), Title_NewYes, { c: _c, m: _m });
+        return;
+    }
+    Title_NewGo(_c, _m);
 }
 
 function Title_OnConfirm(_m, _i) {
     var c = _m.owner;
     var rid = _m.items[_i].id;
-    if (rid != "new") Title_DisarmNew(c);
     switch (rid) {
-        case "new":   // D35: no difficulty menu. The title fades out, then the run (or the intro cutscene) is requested.
-            if (RunSave_HasSave() && !Title_NewArmed(c)) {   // review 1: a saved run is abandoned by New Game, so the first press only asks
-                c.title_new_armed = true;
-                _m.items = Title_MainItems(true, true);
-                break;
-            }
-            c.title_new_armed = false;
-            Title_SeedChoiceOpen(c);   // D152: Random seed (first) or Enter seed; the title fades out after that pick
+        case "new":
+            Title_NewPress(c, _m, RunSave_HasSave());
             break;
         case "load":   // C1 (D46): Continue run
             var cont = Run_Continue();
@@ -3052,6 +3061,7 @@ function Title_Step(_c) {
         }
         return;
     }
+    if (Confirm_Step()) return;   // D156: New Game over a saved run asks; nothing else on the title answers until it is answered
     if (_c.state == "settings") {
         SettingsPopup_HandleInput();
         if (!SettingsPopup_IsOpen("title")) {
@@ -3065,8 +3075,7 @@ function Title_Step(_c) {
         return;
     }
     if (_c.title_refresh) Title_Refresh(_c);
-    var ev = Ui_MenuUpdate(Ui_StackTop(_c.title_stk), _c.title_stk);
-    if (ev.moved) Title_DisarmNew(_c);
+    Ui_MenuUpdate(Ui_StackTop(_c.title_stk), _c.title_stk);
 }
 
 function Title_Draw(_c) {
@@ -3079,6 +3088,7 @@ function Title_Draw(_c) {
     }
     draw_set_alpha(1);
     draw_set_color(c_white);
+    Confirm_Draw();   // D156
 }
 
 // --------------------
@@ -4367,4 +4377,148 @@ function Ui_DimBackdrop(_a) {
     draw_set_alpha(_a);
     Ui_Box(0, 0, Display_GuiW(), Display_GuiH(), UI_C_DARKEST);
     draw_set_alpha(a0);
+}
+
+// ==========================================================================================================================
+// THE ONE YES / NO POP-UP (D156). Every important action asks through this one pop-up: Abandon run, Quit to title, New Game over a saved run,
+// picking a class, keeping an echo, swapping a skill, selling gear. Confirm_Open(question, on_yes, data) shows the question in the shared frame, centred
+// on the GUI grid, with Yes and No under it and the cursor on No. No, Back (Esc, the pad's B, a right click) close it and run nothing; Yes closes it
+// and then runs on_yes(data) exactly once. It answers to the same keys, pad and mouse as every menu and takes all input while it is up.
+// global.confirm_ui = { question, on_yes, data, menu, opened_ms } while it is open; the screen under it keeps its own state until the answer.
+// Whoever steps a screen calls Confirm_Step first and stops when it returns true (obj_ui_controller Step, Title_Step); whoever draws a screen draws
+// Confirm_Draw last (Menu_Draw, Title_Draw, obj_ui_controller Draw GUI). UI_InterruptCloseAll closes it.
+// ==========================================================================================================================
+function Confirm_IsOpen() {
+    return variable_global_exists("confirm_ui") && is_struct(global.confirm_ui);
+}
+
+function Confirm_Menu() {
+    return Confirm_IsOpen() ? global.confirm_ui.menu : undefined;
+}
+
+function Confirm_Question() {
+    return Confirm_IsOpen() ? global.confirm_ui.question : "";
+}
+
+function Confirm_YesAction() {
+    return Confirm_IsOpen() ? global.confirm_ui.on_yes : undefined;
+}
+
+function Confirm_Data() {
+    return Confirm_IsOpen() ? global.confirm_ui.data : undefined;
+}
+
+// Opens the pop-up (one that is already up is replaced and its Yes can no longer run). on_yes is called with data once, after the pop-up is gone.
+function Confirm_Open(_question, _on_yes, _data = undefined) {
+    var m = Ui_MenuNew("confirm", [
+        { label: Loc_T("menu.common.yes", "Yes"), yes: true },
+        { label: Loc_T("menu.common.no", "No"), yes: false }
+    ], { layout: { title: "", anchor: "center", center: true } });
+    Ui_MenuFixCursor(m, 1);   // No first, for safety (the remembered cursor of an earlier pop-up does not count); Ui_MenuNew set lock_ms: the press that opened it cannot answer it
+    global.confirm_ui = { question: string(_question), on_yes: _on_yes, data: _data, menu: m, opened_ms: current_time };
+    SFX_PlayUI("ui_openclose");
+    return true;
+}
+
+// Drops the pop-up without an answer (a room change, a test). Runs nothing.
+function Confirm_Close() {
+    global.confirm_ui = undefined;
+}
+
+// The answer: closes the pop-up, then runs the Yes action if Yes was meant. Returns true when it ran it.
+function Confirm_Resolve(_yes) {
+    if (!Confirm_IsOpen()) return false;
+    var c = global.confirm_ui;
+    global.confirm_ui = undefined;
+    global.confirm_last_frame = Input_Frame();   // the screen under it must not see this frame's press
+    if (_yes && is_callable(c.on_yes)) {
+        c.on_yes(c.data);
+        return true;
+    }
+    return false;
+}
+
+// Confirm on the row under the cursor: Yes runs the action, No closes it. Returns true when the action ran.
+function Confirm_Choose() {
+    if (!Confirm_IsOpen()) return false;
+    var m = global.confirm_ui.menu;
+    return Confirm_Resolve(m.items[clamp(m.cursor, 0, array_length(m.items) - 1)].yes);
+}
+
+// Back is No.
+function Confirm_Back() {
+    Confirm_Resolve(false);
+}
+
+// One frame. Returns true while the pop-up owns the input: it is open, or it was answered earlier in this very frame (so the same press
+// cannot reach the screen under it, whichever controller steps first). The live keys are read once per frame however often it is called.
+// _snap and _now are injectable for a check (a given snapshot is always stepped).
+function Confirm_Step(_snap = undefined, _now = current_time) {
+    if (!Confirm_IsOpen()) return variable_global_exists("confirm_last_frame") && global.confirm_last_frame == Input_Frame();
+    var m = global.confirm_ui.menu;
+    if (is_undefined(_snap)) {   // the live path: two controllers may both call this in one frame (the title room has two); the keys count once
+        var frame = Input_Frame();
+        if (variable_global_exists("confirm_step_frame") && global.confirm_step_frame == frame) return true;
+        global.confirm_step_frame = frame;
+        _snap = Ui_ReadInput();
+    }
+    var ev = Ui_MenuStep(m, _snap, _now);
+    if (ev.moved) SFX_PlayUI("ui_move");
+    if (_now - m.lock_ms >= UI_INPUT_LOCK_MS) {   // the press that opened it (or that came back to it) must not answer it
+        if (ev.confirm) {
+            SFX_PlayUI("ui_confirm");
+            Confirm_Choose();
+        } else if (ev.back) {
+            SFX_PlayUI("ui_back");
+            Confirm_Back();
+        }
+    }
+    return true;
+}
+
+// The pop-up in the shared frame, centred: the question (wrapped to the box), a rule, Yes and No with the gliding band and the marker. Drawn over
+// everything the screen under it draws. global.confirm_rect = the box (for the pictures).
+function Confirm_Draw(_a = 1) {
+    if (!Confirm_IsOpen()) return;
+    var c = global.confirm_ui;
+    var m = c.menu;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var now = current_time;
+    var a = Ui_AnimT(c.opened_ms, now) * _a;
+    var w = min(mt.gw - 2 * mt.margin, max(round(mt.gw * 0.6), 80 * p));
+    var iw = w - 8 * p;
+    var qh = Ui_TextBlockH(c.question, iw);
+    var h = 11 * p + qh + 2 * mt.row_h;   // 4p above, the question, 3p with the rule, two rows, 4p below
+    var bx = round((mt.gw - w) / 2);
+    var by = max(mt.margin, round((mt.gh - h) / 2));
+    var slide = p * round((1 - a) * 3);   // slides down into place in three pixel steps, like the other panels
+    global.confirm_rect = { x: bx, y: by, w: w, h: h };
+    var y0 = by - slide;
+    var x0 = bx + 4 * p;
+    var x1 = bx + w - 4 * p;
+    var rows_y0 = y0 + 4 * p + qh + 3 * p;
+    var n = array_length(m.items);
+    var rects = array_create(n);
+    for (var r = 0; r < n; r++) rects[r] = { x: bx + 2 * p, y: by + 4 * p + qh + 3 * p + r * mt.row_h, w: w - 4 * p, h: mt.row_h };
+    m.rects = rects;
+    draw_set_alpha(1);
+    Ui_DimBackdrop(0.55 * a);
+    Ui_DrawFrame(bx, y0, w, h, a, p);
+    draw_set_alpha(a);
+    Ui_TextBlock(x0, y0 + 4 * p, c.question, iw, UI_C_TEXT);
+    Ui_Box(bx + 3 * p, y0 + 4 * p + qh + p, bx + w - 3 * p, y0 + 4 * p + qh + 2 * p, UI_C_DARK);
+    var target_y = rows_y0 + m.cursor * mt.row_h;
+    if (m.cur_y < 0) m.cur_y = target_y;
+    m.cur_y = Ui_Glide(m.cur_y, target_y, now - m.last_draw_ms);
+    m.last_draw_ms = now;
+    var band_y = round(m.cur_y);
+    Ui_Box(bx + 3 * p, band_y, bx + w - 3 * p, band_y + mt.row_h, UI_C_DARK);
+    for (var k = 0; k < n; k++) {
+        var ty = rows_y0 + k * mt.row_h + (mt.row_h - mt.line_h) div 2;
+        Ui_Text((x0 + x1) / 2, ty, m.items[k].label, UI_C_TEXT, fa_center);
+    }
+    Ui_Arrow(x0 + Ui_Bob(now) * p, band_y + (mt.row_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
 }
