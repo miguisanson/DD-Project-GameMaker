@@ -1654,8 +1654,9 @@ function Battle_RunAttempt(_bc) {
     var enemy_id = -1;
     if (is_struct(e) && variable_struct_exists(e, "id")) enemy_id = e.id;
     if (enemy_id == ENEMY_MINI_BOSS || enemy_id == ENEMY_FINAL_BOSS) {
-        Battle_TurnAdvance(_bc);
+        // R-022: a refused Run is still a spent turn, so the statuses tick like after any action (Battle_PlayerFinalizeTurn also advances the timeline).
         Battle_Message(_bc, Loc_T("combat.msg.player_cant_escape_this", "You can't run away from this."), BSTATE_ENEMY_ACT);
+        Battle_PlayerFinalizeTurn(_bc, p, e);
         return;
     }
 
@@ -1666,9 +1667,11 @@ function Battle_RunAttempt(_bc) {
         }
         Battle_Message(_bc, Loc_T("combat.msg.player_ran", "You ran away!"), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY);
     } else {
+        // R-022: a failed Run is a spent turn: message, then the same finaliser as Guard (Status_Tick, death/victory check, timeline advance).
+        // A successful Run (above) ends the battle and clears every status in Battle_EndRun, so it does not tick.
         _bc.run_fails += 1;
-        Battle_TurnAdvance(_bc);
         Battle_Message(_bc, Loc_T("combat.msg.player_couldnt_escape", "Couldn't escape!"), BSTATE_ENEMY_ACT);
+        Battle_PlayerFinalizeTurn(_bc, p, e);
     }
 }
 

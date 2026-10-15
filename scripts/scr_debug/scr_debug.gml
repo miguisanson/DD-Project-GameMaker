@@ -7653,8 +7653,8 @@ function Scenario_StepSmokeNotice(_s) {
 // ---- I2 (regression gaps, checks only): R-028, R-036, R-022, R-017, R-007. One chain of smoke steps (230..249), after the notice steps: ----
 //   230..232  R-028  the intro cutscene of a new game, hold-skipped; rm_floor1 has no cutscene state; quit to the title with stale state set; Continue clears it
 //   233..235  R-036  a poison tick takes the last HP in a battle: the death scene, the run save gone, the echo pick, the next run is fresh
-//   236..237  R-022  a failed Run with Poison on (SPD forced so the flee cannot succeed). The tick checks need the flag -regbugs: they expose an open
-//                    bug (Battle_RunAttempt never ticks the player's statuses), so the default run only checks that the Run really failed.
+//   236..238  R-022  a failed Run with Poison on (SPD forced so the flee cannot succeed), and a Run against the mini boss ("You can't run away"): both
+//                    are a turn, so the Poison must tick (HP, stacks, the log line). The tick checks run by default.
 //   239..241  R-017  the boss dialogue (pan, text, pan back) of rm_floor5 and rm_floor9_5: view, GUI scale and the player's screen place are unchanged
 //   242..249  R-007  rm_floor5's mini boss: 60 s (3600 frames) at its post, the fight starts within 4 tiles, stays removed after the win, a new run brings it back
 // Writes profile.sav / run.sav in the gate's scratch folder (the notice steps already checked Scenario_CanSaveSlot). Every failure path ends with Scenario_NoticeEnd.
@@ -7955,16 +7955,52 @@ function Scenario_StepSmokeReg(_s) {
             if (variable_struct_exists(_rg.r, "sent") && _bc.run_fails >= 1 && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && !_bc.battle_over) {
                 Scenario_Check("regr_r022_the_run_attempt_failed", _bc.run_fails == 1 && room == rm_battle, "run_fails=" + string(_bc.run_fails));
                 Scenario_Check("regr_r022_the_log_says_it_failed", Scenario_BotLogCount(_bc, "escape") >= 1);
-                if (Scenario_RegBugs()) {
-                    Scenario_Check("regr_r022_a_failed_run_ticks_poison_hp", _bc.p.hp == _rg.r.hp0 - 3, "hp " + string(_rg.r.hp0) + " -> " + string(_bc.p.hp));
-                    Scenario_Check("regr_r022_a_failed_run_ticks_poison_stacks", Status_Stacks(_bc.p, STATUS_POISON) == 2, "stacks=" + string(Status_Stacks(_bc.p, STATUS_POISON)));
-                    Scenario_Check("regr_r022_a_failed_run_logs_the_tick", Scenario_BotLogCount(_bc, "Poison hurts you") >= 1);
-                } else {
-                    show_debug_message("[TEST] SKIP regr_r022 tick checks (open bug: a failed Run does not tick statuses; run the game with -regbugs to see them fail). Poison hp " + string(_rg.r.hp0) + " -> " + string(_bc.p.hp) + ", stacks " + string(Status_Stacks(_bc.p, STATUS_POISON)));
-                }
-                Scenario_Next(_s, 239);
+                Scenario_Check("regr_r022_a_failed_run_ticks_poison_hp", _bc.p.hp == _rg.r.hp0 - 3, "hp " + string(_rg.r.hp0) + " -> " + string(_bc.p.hp));
+                Scenario_Check("regr_r022_a_failed_run_ticks_poison_stacks", Status_Stacks(_bc.p, STATUS_POISON) == 2, "stacks=" + string(Status_Stacks(_bc.p, STATUS_POISON)));
+                Scenario_Check("regr_r022_a_failed_run_logs_the_tick", Scenario_BotLogCount(_bc, "Poison hurts you") >= 1);
+                Scenario_Next(_s, 238);
             }
             if (_s.t > 1200) { Scenario_Check("regr_r022_the_run_attempt_ends", false, "sent=" + string(variable_struct_exists(_rg.r, "sent")) + " fails=" + string(_bc.run_fails) + " state=" + string(_bc.battle_state)); Scenario_NoticeEnd(); }
+            break;
+        case 238:   // the same with the mini boss: RUN is refused ("You can't run away from this."), and that turn is spent too, so the Poison ticks
+            if (_s.t == 1) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_NewKnight();
+                Scenario_GotoBattle("regr_boss_run", ENEMY_MINI_BOSS);
+                _rg.r = {};
+            }
+            if (_bc != noone && !variable_struct_exists(_rg.r, "set") && _s.t > 10 && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && is_struct(_bc.ui_cmd)) {
+                _rg.r.set = true;
+                _bc.e.max_hp = 9999;
+                _bc.e.hp = 9999;
+                Turn_Push(_bc.tl, TL_ENEMY, 100000000);   // the boss never acts
+                _bc.p.max_hp = 99;
+                _bc.p.hp = 99;
+                _bc.p = Status_Add(_bc.p, STATUS_POISON, 0, 0, 3);
+                _rg.r.hp0 = _bc.p.hp;
+                Scenario_Check("regr_r022_boss_poison_is_on_before_the_run", Status_Stacks(_bc.p, STATUS_POISON) == 3);
+            }
+            if (_bc == noone) {
+                if (_s.t > 60 && variable_struct_exists(_rg.r, "set")) { Scenario_Check("regr_r022_boss_stays_in_the_battle", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                break;
+            }
+            if (variable_struct_exists(_rg.r, "set") && !variable_struct_exists(_rg.r, "sent") && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && !_bc.battle_over && _ready_tap) {
+                if (_bc.ui_cmd.cursor != 4) {
+                    Scenario_Tap("menu_down");
+                } else {
+                    _rg.r.sent = true;
+                    Scenario_Tap("confirm");
+                }
+            }
+            if (variable_struct_exists(_rg.r, "sent") && Scenario_BotLogCount(_bc, "can't run away") >= 1 && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && !_bc.battle_over) {
+                Scenario_Check("regr_r022_boss_the_run_was_refused", _bc.run_fails == 0 && room == rm_battle, "run_fails=" + string(_bc.run_fails));
+                Scenario_Check("regr_r022_boss_cant_run_ticks_poison_hp", _bc.p.hp == _rg.r.hp0 - 3, "hp " + string(_rg.r.hp0) + " -> " + string(_bc.p.hp));
+                Scenario_Check("regr_r022_boss_cant_run_ticks_poison_stacks", Status_Stacks(_bc.p, STATUS_POISON) == 2, "stacks=" + string(Status_Stacks(_bc.p, STATUS_POISON)));
+                Scenario_Check("regr_r022_boss_cant_run_logs_the_tick", Scenario_BotLogCount(_bc, "Poison hurts you") >= 1);
+                Scenario_Next(_s, 239);
+            }
+            if (_s.t > 1200) { Scenario_Check("regr_r022_boss_run_attempt_ends", false, "sent=" + string(variable_struct_exists(_rg.r, "sent")) + " state=" + string(_bc.battle_state)); Scenario_NoticeEnd(); }
             break;
         // ---------------------------------------------------------------- R-017
         case 239:   // a clean profile (the boss triggers are unseen) and a new run
