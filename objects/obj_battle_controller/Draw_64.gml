@@ -29,6 +29,7 @@ var port_y = 0;
 var sx = Display_WorldScale();
 var sy = sx;
 
+Battle_HudFrameBegin(self);   // D108 F1d-1: the strip's metrics, the enemy header rect and the chips are built once for this frame (End below)
 var zones = Battle_Zones();   // D99: where the panels, the log and the menus sit
 hud.rects.log = undefined;
 
@@ -128,12 +129,14 @@ Battle_DrawMenus(self);
 
 // what the last draw used, for the tests (nothing may overlap, I-067) and the shots
 hud.rects.zones = zones;
-hud.rects.timeline = { x: Battle_TimelineMetrics().x0, y: Battle_TimelineMetrics().y0, w: Battle_TimelineMetrics().w, h: Battle_TimelineMetrics().plate_h };
+var tl_m = Battle_TimelineMetrics(self);
+hud.rects.timeline = { x: tl_m.x0, y: tl_m.y0, w: tl_m.w, h: tl_m.plate_h };
 var hdr_r = Battle_EnemyHeaderRect(self);
 hud.rects.header = { x: hdr_r.x1, y: hdr_r.y1, w: hdr_r.bw, h: hdr_r.h };
 hud.rects.cmd = is_struct(ui_cmd) ? ui_cmd.rect : undefined;
 hud.rects.list = (battle_state == BSTATE_SKILL_MENU) ? ui_skill.rect : ((battle_state == BSTATE_ITEM_MENU) ? ui_item.rect : undefined);
 hud.rects.details = (battle_state == BSTATE_SKILL_MENU) ? ui_skill.det_rect : ((battle_state == BSTATE_ITEM_MENU) ? ui_item.det_rect : undefined);
+Battle_HudFrameEnd();
 
 draw_set_alpha(1);
 draw_set_color(c_white);

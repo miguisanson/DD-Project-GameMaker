@@ -2530,6 +2530,15 @@ function Battle_StatusChips(_ch) {
 
 // Chips for the HUD: the real statuses, then Steadfast (turns left) and BREAK, which live on the turn timeline and the stagger meter.
 function Battle_FighterChips(_bc, _who) {
+    var fr = Battle_HudFrame();
+    if (is_struct(fr)) {   // inside a Draw GUI frame: built once per fighter
+        if (!is_array(fr.chips[_who])) fr.chips[_who] = Battle_FighterChipsBuild(_bc, _who);
+        return fr.chips[_who];
+    }
+    return Battle_FighterChipsBuild(_bc, _who);
+}
+
+function Battle_FighterChipsBuild(_bc, _who) {
     if (_who == TL_PLAYER) Battle_HudBuilds().chips_player++; else Battle_HudBuilds().chips_enemy++;
     var ch = (_who == TL_PLAYER) ? _bc.p : _bc.e;
     var chips = Battle_StatusChips(ch);
@@ -2864,18 +2873,34 @@ function Battle_HudBuildsReset() {
     global.battle_hud_builds = { metrics: 0, header: 0, chips_player: 0, chips_enemy: 0 };
 }
 
-// One Draw GUI frame of the battle controller: Begin ... End.
+// One Draw GUI frame of the battle controller is bracketed by Battle_HudFrameBegin / Battle_HudFrameEnd (obj_battle_controller Draw_64). Inside the
+// bracket the timeline metrics, the enemy header rect and each fighter's chips are built on first use and shared by every later caller of that
+// frame: nothing they read (HP, statuses, layout, the enemy's place) changes while one Draw GUI event runs. Outside a bracket (Step code, the
+// scenarios, the tests) every call builds from the live data, as before.
 function Battle_HudFrameBegin(_bc) {
-    global.battle_hud_frame = { bc: _bc };
+    global.battle_hud_frame = { bc: _bc, tm: undefined, hdr: undefined, chips: [undefined, undefined] };   // chips[TL_PLAYER], chips[TL_ENEMY]
 }
 
 function Battle_HudFrameEnd() {
     global.battle_hud_frame = undefined;
 }
 
+function Battle_HudFrame() {
+    return variable_global_exists("battle_hud_frame") ? global.battle_hud_frame : undefined;
+}
+
 // ---- the turn strip (D74): a plate with the current actor first (ringed, gently bobbing), then the next four ----
 // Sizes of the strip in GUI units. Sprites are drawn at a whole multiple (k) of the window pixel so they stay crisp at every window size.
 function Battle_TimelineMetrics(_bc = noone) {
+    var fr = Battle_HudFrame();
+    if (is_struct(fr)) {   // inside a Draw GUI frame: built once, for the frame's battle controller
+        if (!is_struct(fr.tm)) fr.tm = Battle_TimelineMetricsBuild(fr.bc);
+        return fr.tm;
+    }
+    return Battle_TimelineMetricsBuild(_bc);
+}
+
+function Battle_TimelineMetricsBuild(_bc) {
     Battle_HudBuilds().metrics++;
     var mt = Ui_Metrics();
     var p = mt.p;
@@ -3024,6 +3049,15 @@ function Battle_DrawBanner(_bc, _alpha) {
 // Where the block sits: { cx, x1, y1 (plate top), bw (plate width), h (plate height), chips_x, chips_y, chips_align }. The status chips sit beside
 // the plate (right of it, or left when there is no room), so the block is no taller than the plate. Also keeps the BREAK word clear of it.
 function Battle_EnemyHeaderRect(_bc) {
+    var fr = Battle_HudFrame();
+    if (is_struct(fr)) {   // inside a Draw GUI frame: built once
+        if (!is_struct(fr.hdr)) fr.hdr = Battle_EnemyHeaderRectBuild(_bc);
+        return fr.hdr;
+    }
+    return Battle_EnemyHeaderRectBuild(_bc);
+}
+
+function Battle_EnemyHeaderRectBuild(_bc) {
     Battle_HudBuilds().header++;
     var mt = Ui_Metrics();
     var p = mt.p;
