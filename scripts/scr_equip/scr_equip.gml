@@ -171,27 +171,9 @@ function Equip_TargetHasAnyStatus(_ch) {
     return is_struct(_ch) && variable_struct_exists(_ch, "status") && is_array(_ch.status) && array_length(_ch.status) > 0;
 }
 
-function Equip_PassiveRuntimeEnsure(_ch) {
-    if (!is_struct(_ch)) return {};
-    if (!variable_struct_exists(_ch, "passive_runtime") || !is_struct(_ch.passive_runtime)) {
-        _ch.passive_runtime = {
-            battle_turn: 0,
-            first_hit_done: false,
-            steady_strike_turn: -1,
-            aim_assist_turn: -1,
-            pinning_cooldown: 0,
-            first_impact_used: false,
-            brace_guard_ready: false,
-            brace_cooldown: 0,
-            mirror_used: false
-        };
-    }
-    return _ch.passive_runtime;
-}
-
-function Equip_PassiveBattleReset(_ch) {
-    if (!is_struct(_ch)) return _ch;
-    _ch.passive_runtime = {
+// D108 F4b: the per-battle passive state of one character, in its starting values (Ensure and BattleReset both build it here).
+function Equip_PassiveRuntimeNew() {
+    return {
         battle_turn: 0,
         first_hit_done: false,
         steady_strike_turn: -1,
@@ -202,6 +184,19 @@ function Equip_PassiveBattleReset(_ch) {
         brace_cooldown: 0,
         mirror_used: false
     };
+}
+
+function Equip_PassiveRuntimeEnsure(_ch) {
+    if (!is_struct(_ch)) return {};
+    if (!variable_struct_exists(_ch, "passive_runtime") || !is_struct(_ch.passive_runtime)) {
+        _ch.passive_runtime = Equip_PassiveRuntimeNew();
+    }
+    return _ch.passive_runtime;
+}
+
+function Equip_PassiveBattleReset(_ch) {
+    if (!is_struct(_ch)) return _ch;
+    _ch.passive_runtime = Equip_PassiveRuntimeNew();
     return _ch;
 }
 

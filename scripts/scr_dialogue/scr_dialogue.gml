@@ -897,12 +897,13 @@ function Dialogue_TypewriterRevealInstant() {
     gs.ui.dialogue_hold_frames = gs.ui.dialogue_hold_duration;
 }
 
-function Dialogue_Start(_dialogue_id) {
+// D108 F4b: the one place a dialogue box is opened. The three Dialogue_Start* openers below only choose the speaker and the raw lines.
+function Dialogue_Open(_speaker, _lines_raw) {
     if (PauseMenu_IsOpen()) PauseMenu_Close();
     Dialogue_EnsureUI();
     var gs = GameState_Get();
-    gs.ui.speaker = "";
-    gs.ui.lines_raw = DialogueDB_Get(_dialogue_id);
+    gs.ui.speaker = _speaker;
+    gs.ui.lines_raw = _lines_raw;
     gs.ui.lines = [];
     gs.ui.index = 0;
     gs.ui.mode = UI_DIALOGUE;
@@ -921,28 +922,41 @@ function Dialogue_Start(_dialogue_id) {
     SFX_Play("dialogue_open");
 }
 
-function Dialogue_StartLines(_lines) {
-    if (PauseMenu_IsOpen()) PauseMenu_Close();
-    Dialogue_EnsureUI();
+function Dialogue_Start(_dialogue_id) {
+    Dialogue_Open("", DialogueDB_Get(_dialogue_id));
+}
+
+// D108 F4b: puts one cutscene segment on screen (text mode, text speed, picture) and opens its lines, or clears the box for a picture-only
+// segment. Returns the hold time in ms for a segment with no lines (0 when it has lines). obj_start_controller sets the hold timer from it.
+function Cutscene_SegmentApply(_seg) {
     var gs = GameState_Get();
-    gs.ui.speaker = "";
-    gs.ui.lines_raw = is_array(_lines) ? _lines : [];
-    gs.ui.lines = [];
-    gs.ui.index = 0;
-    gs.ui.mode = UI_DIALOGUE;
-    Dialogue_SetActiveAmbienceSfxKey("");
-    if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
-        gs.ui.cutscene_text_only = false;
+    var seg_text_only = true;
+    if (variable_struct_exists(_seg, "text_only")) seg_text_only = _seg.text_only;
+    gs.ui.cutscene_text_only = seg_text_only;
+    if (variable_struct_exists(_seg, "chars_per_sec")) gs.ui.cutscene_chars_per_sec = real(_seg.chars_per_sec);
+    else gs.ui.cutscene_chars_per_sec = -1;
+    var seg_sprite = noone;
+    if (variable_struct_exists(_seg, "sprite")) seg_sprite = _seg.sprite;
+    if ((is_undefined(seg_sprite) || seg_sprite == noone || seg_sprite == -1) && variable_struct_exists(_seg, "sprite_name")) {
+        seg_sprite = asset_get_index(string(_seg.sprite_name));
     }
-    gs.ui.dialogue_open_ms = current_time;   // D97: the box slides in
-    gs.ui.choice = undefined;
-    gs.ui.opened_frame = Input_Frame();
-    var open_block_frames = Dialogue_IsCutsceneTextOnly() ? max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES) : 0;
-    gs.ui.dialogue_open_block_frame = gs.ui.opened_frame + open_block_frames;
-    gs.ui.confirm_action = "confirm";
-    Dialogue_RebuildPagedLines();
-    Dialogue_ResetTypewriter();
-    SFX_Play("dialogue_open");
+    if (is_undefined(seg_sprite) || seg_sprite == -1 || seg_sprite == noone) seg_sprite = black_screen;
+    gs.ui.cutscene_bg_sprite = seg_sprite;
+    var seg_lines = variable_struct_exists(_seg, "lines") ? _seg.lines : [];
+    if (is_array(seg_lines) && array_length(seg_lines) > 0) {
+        Dialogue_StartLines(seg_lines);
+        return 0;
+    }
+    gs.ui.mode = UI_NONE;
+    gs.ui.lines = [];
+    gs.ui.lines_raw = [];
+    gs.ui.index = 0;
+    gs.ui.speaker = "";
+    return max(0, variable_struct_exists(_seg, "hold_ms") ? _seg.hold_ms : 0);
+}
+
+function Dialogue_StartLines(_lines) {
+    Dialogue_Open("", is_array(_lines) ? _lines : []);
 }
 
 function Dialogue_FormatLines(_lines, _vars) {
@@ -986,27 +1000,7 @@ function DialogueDB_GetFormatted(_dialogue_id, _vars) {
 }
 
 function Dialogue_StartWithSpeaker(_speaker, _lines) {
-    if (PauseMenu_IsOpen()) PauseMenu_Close();
-    Dialogue_EnsureUI();
-    var gs = GameState_Get();
-    gs.ui.speaker = _speaker;
-    gs.ui.lines_raw = is_array(_lines) ? _lines : [];
-    gs.ui.lines = [];
-    gs.ui.index = 0;
-    gs.ui.mode = UI_DIALOGUE;
-    Dialogue_SetActiveAmbienceSfxKey("");
-    if (!variable_struct_exists(gs.ui, "cutscene_active") || !gs.ui.cutscene_active) {
-        gs.ui.cutscene_text_only = false;
-    }
-    gs.ui.dialogue_open_ms = current_time;   // D97: the box slides in
-    gs.ui.choice = undefined;
-    gs.ui.opened_frame = Input_Frame();
-    var open_block_frames = Dialogue_IsCutsceneTextOnly() ? max(0, UI_CUTSCENE_ADVANCE_BLOCK_FRAMES) : 0;
-    gs.ui.dialogue_open_block_frame = gs.ui.opened_frame + open_block_frames;
-    gs.ui.confirm_action = "confirm";
-    Dialogue_RebuildPagedLines();
-    Dialogue_ResetTypewriter();
-    SFX_Play("dialogue_open");
+    Dialogue_Open(_speaker, is_array(_lines) ? _lines : []);
 }
 
 function Dialogue_Advance() {
