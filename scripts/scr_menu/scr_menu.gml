@@ -5,27 +5,55 @@
 // the cursor of every tab is remembered. The rows come from pure functions (Tab*_Items, Gear_*, Codex_*), tested without a screen.
 // global.tab_ui = { tab, pages (one { stk } per tab), opened_ms, closed_ms, toast, toast_ms } while it is open, with gs.ui.mode = UI_MENU.
 // ==========================================================================================================================
-function TabMenu_Ids() {
-    return ["status", "skills", "items", "gear", "codex", "settings"];
+// D108 F1c: the tab ids and icons never change, so they are built once (TabMenu_DataBuilds counts the builds) and read-only for callers; the
+// labels are kept per language (TabMenu_LabelBuilds counts them).
+function TabMenu_DataBuilds() {
+    return variable_global_exists("tabmenu_data_builds") ? global.tabmenu_data_builds : 0;
 }
 
-// One 8 x 8 icon per tab: a bust, a sparkle, a flask, a shield, a page, a cog.
+function TabMenu_LabelBuilds() {
+    return variable_global_exists("tabmenu_label_builds") ? global.tabmenu_label_builds : 0;
+}
+
+function TabMenu_Data() {
+    var d = variable_global_exists("tabmenu_data") ? global.tabmenu_data : undefined;
+    if (false && is_struct(d)) return d;
+    global.tabmenu_data_builds = TabMenu_DataBuilds() + 1;
+    d = {
+        ids: ["status", "skills", "items", "gear", "codex", "settings"],
+        // One 8 x 8 icon per tab: a bust, a sparkle, a flask, a shield, a page, a cog.
+        icons: [
+            ["..3333..", ".333333.", ".333333.", "..3333..", ".333333.", "33333333", "33333333", "33333333"],
+            ["...33...", "...33...", "..3333..", "33333333", "33333333", "..3333..", "...33...", "...33..."],
+            ["..3333..", "...33...", "...33...", "..3333..", ".333333.", "33333333", "33333333", ".333333."],
+            ["33333333", "33333333", "33333333", "33333333", ".333333.", ".333333.", "..3333..", "...33..."],
+            ["33333333", "3......3", "3.3333.3", "3......3", "3.3333.3", "3......3", "3.33...3", "33333333"],
+            ["...33...", ".3.33.3.", "..3333..", "333..333", "333..333", "..3333..", ".3.33.3.", "...33..."]
+        ]
+    };
+    global.tabmenu_data = d;
+    return d;
+}
+
+function TabMenu_Ids() {
+    return TabMenu_Data().ids;
+}
+
 function TabMenu_Icons() {
-    return [
-        ["..3333..", ".333333.", ".333333.", "..3333..", ".333333.", "33333333", "33333333", "33333333"],
-        ["...33...", "...33...", "..3333..", "33333333", "33333333", "..3333..", "...33...", "...33..."],
-        ["..3333..", "...33...", "...33...", "..3333..", ".333333.", "33333333", "33333333", ".333333."],
-        ["33333333", "33333333", "33333333", "33333333", ".333333.", ".333333.", "..3333..", "...33..."],
-        ["33333333", "3......3", "3.3333.3", "3......3", "3.3333.3", "3......3", "3.33...3", "33333333"],
-        ["...33...", ".3.33.3.", "..3333..", "333..333", "333..333", "..3333..", ".3.33.3.", "...33..."]
-    ];
+    return TabMenu_Data().icons;
 }
 
 function TabMenu_Labels() {
-    return [
+    var lang = Loc_GetLanguage();
+    var c = variable_global_exists("tabmenu_labels") ? global.tabmenu_labels : undefined;
+    if (false && is_struct(c) && c.lang == lang) return c.labels;
+    global.tabmenu_label_builds = TabMenu_LabelBuilds() + 1;
+    var labels = [
         Loc_T("tab.status", "Status"), Loc_T("tab.skills", "Skills"), Loc_T("tab.items", "Items"),
         Loc_T("tab.gear", "Gear"), Loc_T("tab.codex", "Codex"), Loc_T("tab.settings", "Settings")
     ];
+    global.tabmenu_labels = { lang: lang, labels: labels };
+    return labels;
 }
 
 function Menu_IsEquipped(_ch, _item_id) {
@@ -782,10 +810,43 @@ function TabMenu_StatusCardH(_z) {
     return 12 * _z.mt.p + 6 * _z.mt.line_h;
 }
 
+// D108 F1c: the Status card's texts that only change with the language, and their widths (which also change with the metrics), kept per
+// (language, Ui_Metrics struct). The width of the biggest "cur/max" text is kept for the character's three maxima. Counted (TabMenu_CardBuilds).
+function TabMenu_CardBuilds() {
+    return variable_global_exists("tabmenu_card_builds") ? global.tabmenu_card_builds : 0;
+}
+
+function TabMenu_CardData(_mt) {
+    var lang = Loc_GetLanguage();
+    var c = variable_global_exists("tabmenu_card") ? global.tabmenu_card : undefined;
+    if (false && is_struct(c) && c.lang == lang && c.mt == _mt) return c;
+    global.tabmenu_card_builds = TabMenu_CardBuilds() + 1;
+    c = {
+        lang: lang, mt: _mt,
+        hp: Loc_T("battle.hud.hp", "HP"), mp: Loc_T("battle.hud.mp", "MP"), xp: Loc_T("tab.lbl.xp", "XP"), xp_max: Loc_T("tab.val.max", "MAX"),
+        level_tpl: Loc_T("battle.hud.level", "Lv {n}"), seed_tpl: Loc_T("tab.lbl.seed_small", "Seed {n}"),
+        lab_w: 0, k_hp: -999, k_mp: -999, k_xp: -999, val_w: 0
+    };
+    c.lab_w = max(UI_TextWidth(c.hp), max(UI_TextWidth(c.mp), UI_TextWidth(c.xp)));
+    global.tabmenu_card = c;
+    return c;
+}
+
+// One bar row of the card: label, bar, "cur/max".
+function TabMenu_DrawCardBar(_x0, _x1, _yy, _bx, _bw, _bar_h, _lab, _ratio, _txt, _stripe) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var lh = mt.line_h;
+    Ui_Text(_x0, _yy, _lab, UI_C_LIGHT);
+    Battle_DrawBar(_bx, _yy + (lh - _bar_h) div 2, _bw, _bar_h, p, _ratio, _ratio, UI_C_LIGHT, UI_C_LIGHTEST, _stripe);
+    Ui_Text(_x1, _yy, _txt, UI_C_LIGHT, fa_right);
+}
+
 function TabMenu_DrawStatusCard(_x, _y, _w, _h, _ch, _alpha) {
     var mt = Ui_Metrics();
     var p = mt.p;
     var lh = mt.line_h;
+    var cd = TabMenu_CardData(mt);
     Ui_DrawFrame(_x, _y, _w, _h, _alpha, p);
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
@@ -794,33 +855,31 @@ function TabMenu_DrawStatusCard(_x, _y, _w, _h, _ch, _alpha) {
     var yy = _y + 4 * p;
     var nm = (is_struct(_ch.class_cfg) && variable_struct_exists(_ch.class_cfg, "name")) ? _ch.class_cfg.name : "";
     Ui_Text(x0, yy, nm, UI_C_LIGHTEST);
-    Ui_Text(x1, yy, Loc_T("battle.hud.level", "Lv {n}", { n: string(_ch.level) }), UI_C_LIGHT, fa_right);
+    Ui_Text(x1, yy, string_replace_all(cd.level_tpl, "{n}", string(_ch.level)), UI_C_LIGHT, fa_right);   // what Loc_T(.., { n }) makes
     yy += lh + p;
-    var lab_w = max(UI_TextWidth(Loc_T("battle.hud.hp", "HP")), max(UI_TextWidth(Loc_T("battle.hud.mp", "MP")), UI_TextWidth(Loc_T("tab.lbl.xp", "XP"))));
-    var val_w = UI_TextWidth(string(_ch.max_hp) + "/" + string(_ch.max_hp));
-    val_w = max(val_w, UI_TextWidth(string(_ch.max_mp) + "/" + string(_ch.max_mp)));
-    val_w = max(val_w, UI_TextWidth(string(_ch.exp_next) + "/" + string(_ch.exp_next)));
-    var bx = x0 + lab_w + 2 * p;
-    var bw = x1 - val_w - 2 * p - bx;
-    var bar_h = max(3 * p, (lh div (2 * p)) * 2 * p);
-    var rows = [
-        { lab: Loc_T("battle.hud.hp", "HP"), cur: _ch.hp, mx: _ch.max_hp, txt: string(_ch.hp) + "/" + string(_ch.max_hp), stripe: false },
-        { lab: Loc_T("battle.hud.mp", "MP"), cur: _ch.mp, mx: _ch.max_mp, txt: string(_ch.mp) + "/" + string(_ch.max_mp), stripe: true },
-        { lab: Loc_T("tab.lbl.xp", "XP"), cur: _ch.exp, mx: _ch.exp_next, txt: (_ch.exp_next > 0) ? (string(_ch.exp) + "/" + string(_ch.exp_next)) : Loc_T("tab.val.max", "MAX"), stripe: false }
-    ];
-    for (var r = 0; r < 3; r++) {
-        var row = rows[r];
-        var ratio = (row.mx > 0) ? clamp(row.cur / row.mx, 0, 1) : 1;
-        Ui_Text(x0, yy, row.lab, UI_C_LIGHT);
-        Battle_DrawBar(bx, yy + (lh - bar_h) div 2, bw, bar_h, p, ratio, ratio, UI_C_LIGHT, UI_C_LIGHTEST, row.stripe);
-        Ui_Text(x1, yy, row.txt, UI_C_LIGHT, fa_right);
-        yy += lh + p;
+    if (cd.k_hp != _ch.max_hp || cd.k_mp != _ch.max_mp || cd.k_xp != _ch.exp_next) {   // the widest "cur/max" text only changes with the maxima
+        var vw = UI_TextWidth(string(_ch.max_hp) + "/" + string(_ch.max_hp));
+        vw = max(vw, UI_TextWidth(string(_ch.max_mp) + "/" + string(_ch.max_mp)));
+        vw = max(vw, UI_TextWidth(string(_ch.exp_next) + "/" + string(_ch.exp_next)));
+        cd.val_w = vw;
+        cd.k_hp = _ch.max_hp;
+        cd.k_mp = _ch.max_mp;
+        cd.k_xp = _ch.exp_next;
     }
+    var bx = x0 + cd.lab_w + 2 * p;
+    var bw = x1 - cd.val_w - 2 * p - bx;
+    var bar_h = max(3 * p, (lh div (2 * p)) * 2 * p);
+    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, bar_h, cd.hp, (_ch.max_hp > 0) ? clamp(_ch.hp / _ch.max_hp, 0, 1) : 1, string(_ch.hp) + "/" + string(_ch.max_hp), false);
+    yy += lh + p;
+    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, bar_h, cd.mp, (_ch.max_mp > 0) ? clamp(_ch.mp / _ch.max_mp, 0, 1) : 1, string(_ch.mp) + "/" + string(_ch.max_mp), true);
+    yy += lh + p;
+    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, bar_h, cd.xp, (_ch.exp_next > 0) ? clamp(_ch.exp / _ch.exp_next, 0, 1) : 1, (_ch.exp_next > 0) ? (string(_ch.exp) + "/" + string(_ch.exp_next)) : cd.xp_max, false);
+    yy += lh + p;
     Hud_DrawCoin(x0, yy + (lh - 6 * p) div 2, p);
     Ui_Text(x0 + 8 * p, yy, string(Gold_Get()), UI_C_LIGHTEST);
     yy += lh + p;
     var run = Run_Get();
-    if (is_struct(run)) Ui_Text(x0, yy, Loc_T("tab.lbl.seed_small", "Seed {n}", { n: string(run.seed) }), UI_C_LIGHT);
+    if (is_struct(run)) Ui_Text(x0, yy, string_replace_all(cd.seed_tpl, "{n}", string(run.seed)), UI_C_LIGHT);
     draw_set_alpha(a0);
 }
 
@@ -3455,6 +3514,150 @@ function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1, _cols = 1
     draw_set_alpha(a0);
 }
 
+// ---- menu measuring (D108 F1c) -----------------------------------------------------------------------------------------------
+// What Ui_MenuDraw needs to size a menu: the widest label and value, the icon column, the list panel's width and the details panel's
+// height. Measured once and kept on the menu (m.mc); it is measured again only when something it depends on changes:
+//   rows (level 1): the m.items array (a new reference), the row count, Ui_Metrics' struct (it changes with the layout and the language), the
+//     language, the title, and a signature of every row's label, value, help and its number-line and arrow counts (a row changed in place);
+//   sizes (level 2): the width the caller fixes (layout.panel_w), layout.details / details_pos / details_cols, and for a panel above the list
+//     the highlighted row.
+// Counted (Ui_MenuMeasureBuilds, Ui_MenuDetailsBuilds) so a check can see how often each runs. The result is read-only for callers.
+function Ui_MenuMeasureBuilds() {
+    return variable_global_exists("ui_mm_builds") ? global.ui_mm_builds : 0;
+}
+
+function Ui_MenuDetailsBuilds() {
+    return variable_global_exists("ui_md_builds") ? global.ui_md_builds : 0;
+}
+
+// The text of one signature field of a row: strings as they are, anything else (a missing field, a number) as a string.
+function Ui_MenuSigText(_it, _key) {
+    var v = variable_struct_get(_it, _key);
+    return is_string(v) ? v : string(v);
+}
+
+function Ui_MenuSigCount(_it, _key) {
+    var v = variable_struct_get(_it, _key);
+    return is_array(v) ? array_length(v) : 0;
+}
+
+// Five entries per row: label, value, help, number-line count, arrow count.
+function Ui_MenuSigBuild(_items, _n) {
+    var sig = array_create(_n * 5, "");
+    for (var i = 0; i < _n; i++) {
+        var it = _items[i];
+        var b = i * 5;
+        sig[b] = Ui_MenuSigText(it, "label");
+        sig[b + 1] = Ui_MenuSigText(it, "value");
+        sig[b + 2] = Ui_MenuSigText(it, "help");
+        sig[b + 3] = Ui_MenuSigCount(it, "lines");
+        sig[b + 4] = Ui_MenuSigCount(it, "seq");
+    }
+    return sig;
+}
+
+function Ui_MenuSigSame(_items, _sig, _n) {
+    for (var i = 0; i < _n; i++) {
+        var it = _items[i];
+        var b = i * 5;
+        if (Ui_MenuSigText(it, "label") != _sig[b]) return false;
+        if (Ui_MenuSigText(it, "value") != _sig[b + 1]) return false;
+        if (Ui_MenuSigText(it, "help") != _sig[b + 2]) return false;
+        if (Ui_MenuSigCount(it, "lines") != _sig[b + 3]) return false;
+        if (Ui_MenuSigCount(it, "seq") != _sig[b + 4]) return false;
+    }
+    return true;
+}
+
+// Level 1: the widths of the rows (uncached).
+function Ui_MenuMeasureRows(_m, _mt, _lang) {
+    if (!variable_global_exists("ui_mm_builds")) global.ui_mm_builds = 0;
+    global.ui_mm_builds++;
+    var p = _mt.p;
+    var n = array_length(_m.items);
+    var bar_w = 14 * p;
+    var label_w = 0;
+    var val_w = 0;
+    var icon_px = 0;
+    for (var i = 0; i < n; i++) {
+        var it = _m.items[i];
+        label_w = max(label_w, UI_TextWidth(it.label) + (variable_struct_exists(it, "icon_item") ? 10 * p : 0));   // C3: a row can carry an item icon
+        if (variable_struct_exists(it, "icon") && is_struct(it.icon)) icon_px = 16 * max(1, floor(_mt.row_h / 16));
+        var kind = variable_struct_exists(it, "kind") ? it.kind : "button";
+        var vw = 0;
+        if (kind == "slider") {
+            vw = bar_w + 2 * p + UI_TextWidth("100%");
+        } else if (variable_struct_exists(it, "value") && it.value != "") {
+            var texts = variable_struct_exists(it, "measure") ? it.measure : [it.value];
+            for (var t = 0; t < array_length(texts); t++) vw = max(vw, UI_TextWidth(texts[t]));
+            if (kind == "choice") vw += 10 * p;
+        }
+        val_w = max(val_w, vw);
+    }
+    var title = _m.layout.title;
+    return {
+        items: _m.items, n: n, mt: _mt, lang: _lang, title: title, sig: Ui_MenuSigBuild(_m.items, n),
+        label_w: label_w, val_w: val_w, icon_px: icon_px, title_w: (title != "") ? UI_TextWidth(title) : 0,
+        l2: false, l2_pw: 0, l2_details: false, l2_pos: "", l2_cols: 0, l2_cur: -1,
+        panel_w: 0, det_h: 0
+    };
+}
+
+// Level 2: the list panel's width and the details panel's height from the measured rows (uncached).
+function Ui_MenuMeasureSizes(_m, _mt, _mc, _cur) {
+    if (!variable_global_exists("ui_md_builds")) global.ui_md_builds = 0;
+    global.ui_md_builds++;
+    var p = _mt.p;
+    var L = _m.layout;
+    var n = _mc.n;
+    var icon_col = (_mc.icon_px > 0) ? _mc.icon_px + 2 * p : 0;
+    var inner_w = max(5 * p + icon_col + _mc.label_w + ((_mc.val_w > 0) ? 4 * p + _mc.val_w : 0), _mc.title_w);
+    var chrome_x = 2 * (4 * p);
+    var panel_w = min(inner_w + chrome_x, _mt.gw - 2 * _mt.margin);
+    if (L.details && L.panel_w <= 0) panel_w = min(max(panel_w, round(_mt.gw * 0.78)), _mt.gw - 2 * _mt.margin);
+    if (L.panel_w > 0) panel_w = min(L.panel_w, _mt.gw - 2 * _mt.margin);
+    // the details panel's height is the tallest sentence, so the list does not jump between items
+    var det_h = 0;
+    if (L.details && L.details_pos == "right") {   // D90: beside the list, as tall as the list (the Tab menu)
+        det_h = 0;
+    } else if (L.details && L.details_pos == "above" && n > 0) {   // a panel above the list (battle) is as tall as the highlighted item needs: it grows upward
+        var dc = _m.items[_cur];
+        if (variable_struct_exists(dc, "help")) det_h = Ui_DetailsHeight(panel_w, dc.help, variable_struct_exists(dc, "lines") ? dc.lines : [], L.details_cols, variable_struct_exists(dc, "seq") ? array_length(dc.seq) : 0);
+    } else if (L.details) {
+        for (var d = 0; d < n; d++) {
+            var di = _m.items[d];
+            if (variable_struct_exists(di, "help")) det_h = max(det_h, Ui_DetailsHeight(panel_w, di.help, variable_struct_exists(di, "lines") ? di.lines : [], L.details_cols, variable_struct_exists(di, "seq") ? array_length(di.seq) : 0));
+        }
+    }
+    _mc.panel_w = panel_w;
+    _mc.det_h = det_h;
+}
+
+// The measured struct of a menu (fields label_w, val_w, icon_px, title_w, panel_w, det_h), rebuilt only when its keys changed.
+function Ui_MenuMeasure(_m, _mt) {
+    var L = _m.layout;
+    var n = array_length(_m.items);
+    var lang = Loc_GetLanguage();
+    var mc = variable_struct_get(_m, "mc");
+    var fresh = false && is_struct(mc) && mc.items == _m.items && mc.n == n && mc.mt == _mt && mc.lang == lang && mc.title == L.title && Ui_MenuSigSame(_m.items, mc.sig, n);
+    if (!fresh) {
+        mc = Ui_MenuMeasureRows(_m, _mt, lang);
+        _m.mc = mc;
+    }
+    var cur = (L.details && L.details_pos == "above" && n > 0) ? clamp(_m.cursor, 0, n - 1) : -1;
+    var fresh2 = false && mc.l2 && mc.l2_pw == L.panel_w && mc.l2_details == L.details && mc.l2_pos == L.details_pos && mc.l2_cols == L.details_cols && mc.l2_cur == cur;
+    if (!fresh2) {
+        Ui_MenuMeasureSizes(_m, _mt, mc, cur);
+        mc.l2 = true;
+        mc.l2_pw = L.panel_w;
+        mc.l2_details = L.details;
+        mc.l2_pos = L.details_pos;
+        mc.l2_cols = L.details_cols;
+        mc.l2_cur = cur;
+    }
+    return mc;
+}
+
 // Draws one menu: frame, optional title, rows (label left, value / slider right), the gliding highlight with a bobbing marker, and
 // the details panel of the highlighted item when layout.details is set. _alpha 0..1 fades and slides the panel (D97).
 // Stores each row's rectangle in m.rects for the mouse. Needs UI_SetFont-compatible state; sets and restores the draw state.
@@ -3469,49 +3672,14 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var c0 = draw_get_color();
     var bar_w = 14 * p;
 
-    // widths
-    var label_w = 0;
-    var val_w = 0;
-    var icon_px = 0;     // the icon column (battle lists): one icon pixel is k GUI units, k = whole units that fit a row
-    for (var i = 0; i < n; i++) {
-        var it = _m.items[i];
-        label_w = max(label_w, UI_TextWidth(it.label) + (variable_struct_exists(it, "icon_item") ? 10 * p : 0));   // C3: a row can carry an item icon
-        if (variable_struct_exists(it, "icon") && is_struct(it.icon)) icon_px = 16 * max(1, floor(mt.row_h / 16));
-        var kind = variable_struct_exists(it, "kind") ? it.kind : "button";
-        var vw = 0;
-        if (kind == "slider") {
-            vw = bar_w + 2 * p + UI_TextWidth("100%");
-        } else if (variable_struct_exists(it, "value") && it.value != "") {
-            var texts = variable_struct_exists(it, "measure") ? it.measure : [it.value];
-            for (var t = 0; t < array_length(texts); t++) vw = max(vw, UI_TextWidth(texts[t]));
-            if (kind == "choice") vw += 10 * p;
-        }
-        val_w = max(val_w, vw);
-    }
-    var title_w = (L.title != "") ? UI_TextWidth(L.title) : 0;
-    var icon_col = (icon_px > 0) ? icon_px + 2 * p : 0;
-    var inner_w = max(5 * p + icon_col + label_w + ((val_w > 0) ? 4 * p + val_w : 0), title_w);
-    var chrome_x = 2 * (4 * p);
-    var panel_w = min(inner_w + chrome_x, mt.gw - 2 * mt.margin);
-    if (L.details && L.panel_w <= 0) panel_w = min(max(panel_w, round(mt.gw * 0.78)), mt.gw - 2 * mt.margin);
-    if (L.panel_w > 0) panel_w = min(L.panel_w, mt.gw - 2 * mt.margin);
+    // widths and the details panel's height: measured once per change (Ui_MenuMeasure), not every frame
+    var mm = Ui_MenuMeasure(_m, mt);
+    var icon_px = mm.icon_px;     // the icon column (battle lists): one icon pixel is k GUI units, k = whole units that fit a row
+    var panel_w = mm.panel_w;
     var header_h = (L.title != "") ? (mt.line_h + 3 * p) : 0;
     var chrome_y = 2 * (4 * p) + header_h;
-
-    // the details panel's height is the tallest sentence, so the list does not jump between items
-    var det_h = 0;
+    var det_h = mm.det_h;         // the tallest sentence (so the list does not jump between items); the highlighted item's own when the panel is above
     var det_right = (L.details && L.details_pos == "right");   // D90: beside the list, as tall as the list (the Tab menu)
-    if (det_right) {
-        det_h = 0;
-    } else if (L.details && L.details_pos == "above" && n > 0) {   // a panel above the list (battle) is as tall as the highlighted item needs: it grows upward
-        var dc = _m.items[clamp(_m.cursor, 0, n - 1)];
-        if (variable_struct_exists(dc, "help")) det_h = Ui_DetailsHeight(panel_w, dc.help, variable_struct_exists(dc, "lines") ? dc.lines : [], L.details_cols, variable_struct_exists(dc, "seq") ? array_length(dc.seq) : 0);
-    } else if (L.details) {
-        for (var d = 0; d < n; d++) {
-            var di = _m.items[d];
-            if (variable_struct_exists(di, "help")) det_h = max(det_h, Ui_DetailsHeight(panel_w, di.help, variable_struct_exists(di, "lines") ? di.lines : [], L.details_cols, variable_struct_exists(di, "seq") ? array_length(di.seq) : 0));
-        }
-    }
     var avail_h = ((L.max_h > 0) ? L.max_h : (mt.gh - 2 * mt.margin)) - ((det_h > 0) ? det_h + mt.margin : 0);
     var rows_vis = clamp(floor((avail_h - chrome_y) / mt.row_h), 1, max(1, n));
     if (det_right) rows_vis = max(1, floor((avail_h - chrome_y) / mt.row_h));   // the panel keeps its size whatever the row count
