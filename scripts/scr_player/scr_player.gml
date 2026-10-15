@@ -993,6 +993,8 @@ function UI_InterruptCloseAll(_fade_dim = true) {
     }
     if (is_struct(PauseMenu_Get())) global.pause_ui = undefined;
 
+    Notice_Interrupt();
+
     if (variable_struct_exists(gs.ui, "save_menu") && is_struct(gs.ui.save_menu)) {
         var sm = gs.ui.save_menu;
         sm.open = false;

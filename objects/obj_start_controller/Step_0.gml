@@ -1,8 +1,8 @@
 Input_PreStep();
 var gs = GameState_Get();
 
-if (gs.ui.mode == UI_SAVE) {
-    title_refresh = true;   // a save may have been made or deleted in there
+if (Notice_IsOpen()) {   // F3a: the notice pop-up owns the keys (the ui controller steps it); the title waits behind it
+    title_refresh = true;   // a save may have been made or deleted meanwhile
     exit;
 }
 if (Transition_IsInputLocked() && state != "cutscene") return;

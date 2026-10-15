@@ -58,8 +58,8 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     exit;
 }
 
-if (gs.ui.mode == UI_SAVE) {
-    SaveMenu_Handle();
+if (Notice_IsOpen()) {   // F3a: the notice pop-up (title and in game) takes every key until it is gone
+    Notice_Step();
     exit;
 }
 

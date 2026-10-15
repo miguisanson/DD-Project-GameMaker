@@ -1507,6 +1507,115 @@ function Tutorial_Draw() {
     draw_set_color(c_white);
 }
 
+// ---- the notice pop-up (D96, D108 F3a) ---------------------------------------------------------------------------------------------------
+// One message and Confirm to dismiss it: why Continue failed, why an old save cannot be loaded. global.notice_ui = { text, opened_ms, closed_ms }
+// (closed_ms is -1 while it is up). It is laid out and drawn like the tutorial pop-up (frame, text block, prompt footer). Its clock is milliseconds
+// only: Confirm and Back are ignored for UI_INPUT_LOCK_MS after it opens (the press that caused it must not close it), it fades in over UI_PANEL_MS
+// and fades out over UI_PANEL_MS after a dismissal. gs.ui.mode stays UI_NOTICE for as long as it is up, fade-out included, so the title and the
+// world behind it take no key and the dismissing press cannot answer them either. Notice_Update is the whole model; the live Step and the checks
+// both go through it.
+function Notice_IsOpen() {
+    return variable_global_exists("notice_ui") && is_struct(global.notice_ui);
+}
+
+function Notice_Closing() {
+    return Notice_IsOpen() && global.notice_ui.closed_ms >= 0;
+}
+
+function Notice_Text() {
+    return Notice_IsOpen() ? global.notice_ui.text : "";
+}
+
+function Notice_Footer() {
+    return "{confirm} " + Loc_T("common.ok", "OK");
+}
+
+// Opens the pop-up with _text (a notice that is up is replaced and starts its own lock). _now is the clock, current_time in the game.
+function Notice_Open(_text, _now = current_time) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
+    global.notice_ui = { text: string(_text), opened_ms: _now, closed_ms: -1 };
+    gs.ui.mode = UI_NOTICE;
+}
+
+// Removes it at once (a room change, a battle) and gives the UI mode back.
+function Notice_Interrupt() {
+    global.notice_ui = undefined;
+    var gs = GameState_Get();
+    if (is_struct(gs) && variable_struct_exists(gs, "ui") && is_struct(gs.ui) && gs.ui.mode == UI_NOTICE) gs.ui.mode = UI_NONE;
+}
+
+// True while it is up and past the input lock (and not on its way out).
+function Notice_CanAnswer(_now = current_time) {
+    return Notice_IsOpen() && global.notice_ui.closed_ms < 0 && _now - global.notice_ui.opened_ms >= UI_INPUT_LOCK_MS;
+}
+
+// 0..1: in over UI_PANEL_MS after it opens, out over UI_PANEL_MS after it is dismissed (from wherever the fade-in had got to).
+function Notice_Alpha(_now = current_time) {
+    if (!Notice_IsOpen()) return 0;
+    var n = global.notice_ui;
+    var a = Ui_AnimT(n.opened_ms, _now);
+    if (n.closed_ms >= 0) a = min(a, 1 - Ui_AnimT(n.closed_ms, _now));
+    return a;
+}
+
+// One step at clock _now. _pressed: Confirm or Back was pressed this step. Returns true while the pop-up is still up.
+function Notice_Update(_now = current_time, _pressed = false) {
+    if (!Notice_IsOpen()) return false;
+    var n = global.notice_ui;
+    if (n.closed_ms < 0) {
+        if (_pressed && _now - n.opened_ms >= UI_INPUT_LOCK_MS) n.closed_ms = _now;
+    } else if (_now - n.closed_ms >= UI_PANEL_MS) {
+        Notice_Interrupt();
+        return false;
+    }
+    return true;
+}
+
+// The ui controller's Step (and the title's) calls this while Notice_IsOpen: true while it is up.
+function Notice_Step() {
+    if (!Notice_IsOpen()) return false;
+    var was_closing = Notice_Closing();
+    var pressed = Notice_CanAnswer() && (Input_UIConfirm() || Input_UIBack());
+    var up = Notice_Update(current_time, pressed);
+    if (!was_closing && Notice_Closing()) SFX_PlayUI("ui_confirm");
+    return up;
+}
+
+// The box of a text: { x, y, w, h, iw, body_h } centred on the GUI grid (no title row: the text is the whole message).
+function Notice_Box(_text, _slide = 0) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var w = min(mt.gw - 2 * mt.margin, round(mt.gw * 0.7));
+    var iw = w - 8 * p;
+    var body_h = Ui_TextBlockH(_text, iw);
+    var h = 8 * p + body_h + 3 * p + mt.line_h;
+    return { x: round((mt.gw - w) / 2), y: max(mt.margin, round((mt.gh - h) / 2)) - _slide, w: w, h: h, iw: iw, body_h: body_h };
+}
+
+// Drawn by the ui controller over everything it draws except the fade (like the tutorial pop-up).
+function Notice_Draw() {
+    if (!Notice_IsOpen()) return;
+    var n = global.notice_ui;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var a = Notice_Alpha(current_time);
+    UI_SetFont();
+    draw_set_alpha(1);
+    Ui_DimBackdrop(0.55 * a);
+    var slide = p * round((1 - a) * 3);
+    var b = Notice_Box(n.text, slide);
+    Ui_DrawFrame(b.x, b.y, b.w, b.h, a, p);
+    draw_set_alpha(a);
+    var x0 = b.x + 4 * p;
+    var ty = b.y + 4 * p;
+    Ui_TextBlock(x0, ty, n.text, b.iw, UI_C_TEXT);
+    ty += b.body_h + 3 * p;
+    Prompt_RichDraw(x0, ty, Notice_Footer(), b.iw, UI_C_LIGHTEST, fa_center, a);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+
 // ---- the Help page (pause menu): every tutorial, seen or not, in the framework's list with the details panel ----------------------------
 // global.help_ui = { stk, opened_frame, opened_ms }.
 function HelpUi_IsOpen() {
@@ -2430,7 +2539,7 @@ function Title_OnConfirm(_m, _i) {
             break;
         case "load":   // C1 (D46): Continue run
             var cont = Run_Continue();
-            if (!cont.ok) SaveMenu_OpenMessage(Run_ContinueFailText(cont.status), true);
+            if (!cont.ok) Notice_Open(Run_ContinueFailText(cont.status));
             break;
         case "settings":
             SettingsPopup_Open("title");
@@ -2454,7 +2563,7 @@ function Title_Step(_c) {
             notice_text = Save_LegacyNotice();
         }
         if (notice_text != "") {
-            SaveMenu_OpenMessage(notice_text, true);
+            Notice_Open(notice_text);
             return;
         }
     }
