@@ -128,6 +128,7 @@ function Test_RunAll() {
     Test_RunSuite("H3", Test_Suite_H3);
     Test_RunSuite("LevelUpGrowth", Test_Suite_LevelUpGrowth);
     Test_RunSuite("OneMenu", Test_Suite_OneMenu);
+    Test_RunSuite("RichText", Test_Suite_RichText);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -10224,4 +10225,181 @@ function Test_Suite_OneMenu() {
     _gs2.persist = _old_persist;
     _gs2.player_ch = _old_ch;
     _gs2.flags = _old_flags;
+}
+
+// ============================================================================================================================
+// H8b (D149, D156): one text markup for terms, accents and button prompts, and device-aware prompts. Expected values come from the packet
+// brief: [t]..[/t] is a game term in the palette's bright green, [a]..[/a] the one accent #E8C547, [k:action] a button glyph by device;
+// the keyboard shows key names (arrows for the move keys), the pad Xbox-style glyphs; battle lists carry one prompt label.
+// ============================================================================================================================
+function Test_RT_Spans(_text, _style) {
+    var _out = [];
+    var _seg = Markup_Segments(_text, "keyboard");
+    for (var _i = 0; _i < array_length(_seg); _i++) if (_seg[_i].kind == "text" && _seg[_i].st == _style) array_push(_out, _seg[_i].s);
+    return _out;
+}
+
+function Test_RT_Count(_text, _kind) {
+    var _n = 0;
+    var _seg = Markup_Segments(_text, "keyboard");
+    for (var _i = 0; _i < array_length(_seg); _i++) if (_seg[_i].kind == _kind) _n++;
+    return _n;
+}
+
+function Test_Suite_RichText() {
+    if (!script_exists(asset_get_index("Markup_Segments"))) {
+        Test_True("RT the markup parser exists (Markup_Segments): not implemented", false);
+        return;
+    }
+    Ui_Metrics();   // sets the UI font, so the widths below are real
+    Binds_Apply(Binds_Defaults());
+    var _dev0 = global.input.last_device;
+
+    // ---- 1. the parser ----
+    var _seg = Markup_Segments("[t]Poison[/t] hurts", "keyboard");
+    Test_Eq("RT '[t]Poison[/t] hurts' makes two segments", array_length(_seg), 2);
+    Test_True("RT the first segment is the term 'Poison'", array_length(_seg) == 2 && _seg[0].kind == "text" && _seg[0].s == "Poison" && _seg[0].st == "term");
+    Test_True("RT the second segment is plain ' hurts'", array_length(_seg) == 2 && _seg[1].kind == "text" && _seg[1].s == " hurts" && _seg[1].st == "");
+    Test_Eq("RT a term is drawn in the palette's bright green", Markup_Colour("term", UI_C_TEXT), make_color_rgb($86, $C0, $6C));
+    Test_Eq("RT plain text keeps the colour it was given", Markup_Colour("", UI_C_LIGHT), UI_C_LIGHT);
+    Test_Eq("RT the stripped text has no markup", Markup_Strip("[t]Poison[/t] hurts", "keyboard"), "Poison hurts");
+    Test_Eq("RT '[a]BREAK[/a]' is one accent segment", array_length(Test_RT_Spans("Hit [a]BREAK[/a] now", "accent")), 1);
+    Test_Eq("RT the accent segment is BREAK", Test_RT_Spans("Hit [a]BREAK[/a] now", "accent")[0], "BREAK");
+    // nested, unknown, unclosed and stray tags degrade to plain text and never leave a bracket
+    var _nest = "[t]one [a]two[/a] three[/t]";
+    Test_Eq("RT nested tags: no term survives", array_length(Test_RT_Spans(_nest, "term")), 0);
+    Test_Eq("RT nested tags: the text is all there", Markup_Strip(_nest, "keyboard"), "one two three");
+    Test_Eq("RT an unknown tag is dropped, its text kept", Markup_Strip("a [zz]b[/zz] c", "keyboard"), "a b c");
+    Test_Eq("RT an unknown tag makes no styled segment", array_length(Test_RT_Spans("a [zz]b[/zz] c", "term")) + array_length(Test_RT_Spans("a [zz]b[/zz] c", "accent")), 0);
+    Test_Eq("RT an unclosed tag is plain", Markup_Strip("a [t]b c", "keyboard"), "a b c");
+    Test_Eq("RT an unclosed tag makes no term", array_length(Test_RT_Spans("a [t]b c", "term")), 0);
+    Test_Eq("RT a stray closing tag is dropped", Markup_Strip("a b[/t] c", "keyboard"), "a b c");
+    Test_Eq("RT an unknown action is dropped", Markup_Strip("Press [k:dance] now", "keyboard"), "Press  now");
+    Test_Eq("RT a lone bracket stays text", Markup_Strip("a [ b ] c", "keyboard"), "a [ b ] c");
+    Test_Eq("RT the old {confirm} spelling still works", Markup_Strip("Press {confirm}.", "gamepad"), "Press A.");
+    Test_True("RT the problems list names a nested tag", array_length(Markup_Problems(_nest)) > 0);
+    Test_True("RT the problems list names an unknown tag", array_length(Markup_Problems("[zz]x[/zz]")) > 0);
+    Test_True("RT the problems list names an unclosed tag", array_length(Markup_Problems("[t]x")) > 0);
+    Test_True("RT the problems list names an unknown action", array_length(Markup_Problems("[k:dance]")) > 0);
+    Test_Eq("RT well-formed markup has no problems", array_length(Markup_Problems("[t]a[/t] [a]b[/a] [k:confirm] {n}")), 0);
+    Test_True("RT markup is told from plain text", Prompt_HasTokens("[t]a[/t]") && Prompt_HasTokens("x [a]b[/a]") && Prompt_HasTokens("[k:back]") && !Prompt_HasTokens("plain [x") && !Prompt_HasTokens("plain"));
+    // width: the markup costs nothing, a glyph costs its real width
+    var _sp = UI_TextWidth("a a") - UI_TextWidth("aa");
+    Test_Eq("RT the width of marked text is the width of the plain words", Markup_Width("[t]Poison[/t] hurts", "keyboard"), UI_TextWidth("Poison") + _sp + UI_TextWidth("hurts"));
+    Test_Eq("RT marked and plain text are the same width", Markup_Width("[t]Poison[/t] [a]hurts[/a]", "keyboard"), Markup_Width("Poison hurts", "keyboard"));
+    var _gk = Prompt_GlyphW(Prompt_Info("confirm", "keyboard"));
+    Test_Eq("RT a key glyph counts its real width (keyboard)", Markup_Width("Press [k:confirm]", "keyboard"), UI_TextWidth("Press") + _sp + _gk);
+    var _gp = Prompt_GlyphW(Prompt_Info("confirm", "gamepad"));
+    Test_Eq("RT a pad glyph counts its real width (pad)", Markup_Width("Press [k:confirm]", "gamepad"), UI_TextWidth("Press") + _sp + _gp);
+    Test_Eq("RT a glyph next to text with no space adds no space", Markup_Width("[k:confirm]x", "keyboard"), _gk + UI_TextWidth("x"));
+    // length and reveal (the typewriter counts what is seen: a glyph is one character)
+    Test_Eq("RT visible length ignores the tags", Markup_Length("[t]Poison[/t] hurts"), 12);
+    Test_Eq("RT a glyph is one visible character", Markup_Length("Press [k:confirm]."), 8);
+    Test_Eq("RT reveal cuts inside a tag and keeps it closed", Markup_Reveal("[t]Poison[/t] hurts", 3), "[t]Poi[/t]");
+    Test_Eq("RT reveal past a tag goes on", Markup_Reveal("[t]Poison[/t] hurts", 8), "[t]Poison[/t] h");
+    Test_Eq("RT reveal stops before a glyph that is not due", Markup_Reveal("Press [k:confirm].", 6), "Press ");
+    Test_Eq("RT reveal shows the glyph when it is due", Markup_Reveal("Press [k:confirm].", 7), "Press [k:confirm]");
+    Test_Eq("RT reveal of everything is the text", Markup_Reveal("[t]Poison[/t] hurts", 99), "[t]Poison[/t] hurts");
+    Test_Eq("RT reveal of plain text is the plain prefix", Markup_Reveal("plain text", 5), "plain");
+    // wrap: lines of markup, every line fits, the words and the term survive
+    var _wtxt = "The [t]Poison[/t] stings and the [a]BREAK[/a] hurts a great deal, so press [k:confirm] soon.";
+    var _ww = Markup_Width("The Poison stings and the BREAK", "keyboard") + 2;
+    var _wl = Markup_Wrap(_wtxt, _ww, "keyboard");
+    var _fits = true;
+    var _joined = "";
+    for (var _i = 0; _i < array_length(_wl); _i++) {
+        if (Markup_Width(_wl[_i], "keyboard") > _ww) _fits = false;
+        _joined += ((_i > 0) ? " " : "") + Markup_Strip(_wl[_i], "keyboard");
+    }
+    Test_True("RT the wrap makes more than one line", array_length(_wl) > 1);
+    Test_True("RT every wrapped line fits the width", _fits);
+    Test_Eq("RT the wrapped lines hold every word", _joined, Markup_Strip(_wtxt, "keyboard"));
+    Test_True("RT the term is still a term on its line", array_length(_wl) > 0 && array_length(Test_RT_Spans(_wl[0], "term")) == 1);
+    Test_Eq("RT a hard newline starts a new line", array_length(Markup_Wrap("one\ntwo", 9999, "keyboard")), 2);
+    Test_Eq("RT plain text wraps to its own words", Markup_Wrap("plain", 9999, "keyboard")[0], "plain");
+
+    // ---- 2. device-aware prompts ----
+    var _ck = Markup_Segments("[k:confirm]", "keyboard");
+    Test_True("RT [k:confirm] on the keyboard is the key name", array_length(_ck) == 1 && _ck[0].kind == "glyph" && _ck[0].info.kind == "key" && _ck[0].info.label == "Space");
+    var _cp = Markup_Segments("[k:confirm]", "gamepad");
+    Test_True("RT [k:confirm] on the pad is the A button", array_length(_cp) == 1 && _cp[0].kind == "glyph" && _cp[0].info.kind == "pad" && _cp[0].info.label == "A");
+    global.input.last_device = "gamepad";
+    Test_Eq("RT after a pad input the live prompt is the pad glyph", Markup_Segments("[k:confirm]")[0].info.kind, "pad");
+    Test_Eq("RT after a pad input the plain text is the button", Markup_Strip("[k:confirm]"), "A");
+    global.input.last_device = "keyboard";
+    Test_Eq("RT after a key press the live prompt is the keyboard", Markup_Segments("[k:confirm]")[0].info.kind, "key");
+    Test_Eq("RT after a key press the plain text is the key name", Markup_Strip("[k:confirm]"), "Space");
+    Test_Eq("RT the interact key is Space", Markup_Strip("[k:interact]", "keyboard"), "Space");
+    Test_Eq("RT the pad back button is B", Markup_Strip("[k:back]", "gamepad"), "B");
+    Test_Eq("RT the pad shoulders are LB and RB", Markup_Strip("[k:tab_prev][k:tab_next]", "gamepad"), "LBRB");
+    Test_Eq("RT the pad Start button exists", Markup_Strip("[k:start]", "gamepad"), "Start");
+    Test_Eq("RT the pad X button is the menu", Markup_Strip("[k:menu]", "gamepad"), "X");
+    // arrows instead of letters
+    Test_Eq("RT a keyboard left prompt is an arrow glyph", Prompt_Info("left", "keyboard").dir, "left");
+    Test_Eq("RT a keyboard right prompt is an arrow glyph", Prompt_Info("right", "keyboard").dir, "right");
+    Test_Eq("RT a keyboard up prompt is an arrow glyph", Prompt_Info("up", "keyboard").dir, "up");
+    Test_Eq("RT a keyboard down prompt is an arrow glyph", Prompt_Info("down", "keyboard").dir, "down");
+    Test_Eq("RT a pad left prompt is a d-pad glyph", Prompt_Info("left", "gamepad").dir, "left");
+    Test_Eq("RT a pad confirm prompt has no direction", Prompt_Info("confirm", "gamepad").dir, "");
+    Test_Eq("RT a keyboard confirm prompt has no direction", Prompt_Info("confirm", "keyboard").dir, "");
+    var _sk = Binds_Assign(Binds_Defaults(), "left", ord("J")).keys;
+    Binds_Apply(_sk);
+    Test_True("RT a move key rebound to a letter shows that letter", Prompt_Info("left", "keyboard").dir == "" && Prompt_Info("left", "keyboard").label == "J");
+    Binds_Apply(Binds_Defaults());
+    Test_True("RT the default move keys show the arrow", Prompt_Info("left", "keyboard").dir == "left");
+    var _pl = Markup_Segments("[k:left][k:right]", "gamepad");
+    Test_Eq("RT a run of d-pad prompts is one glyph", array_length(_pl), 1);
+    Test_True("RT the run lights both arms", array_length(_pl) == 1 && array_length(_pl[0].info.dirs) == 2);
+    Test_Eq("RT on the keyboard each arrow is its own glyph", array_length(Markup_Segments("[k:up][k:down][k:left][k:right]", "keyboard")), 4);
+    Test_True("RT an arrow keycap is at least as wide as tall", Prompt_GlyphW(Prompt_Info("left", "keyboard")) >= Prompt_GlyphH());
+
+    // no key letters are left in the English text (arrows and glyphs come from the markup)
+    Loc_Init();
+    var _keys = variable_struct_get_names(Loc_GetData().strings);
+    Test_True("RT the workbook is loaded for the text audit", array_length(_keys) > 500);
+    var _bad = "";
+    var _problems = "";
+    var _acc_bad = "";
+    var _par_bad = "";
+    var _pats = ["A/D", "W/S", "WASD", "A / D", "Up / Down", "Left / Right", "Press Z", "Press X", "Press Space", "Press Enter", "Press Esc"];
+    var _allowed = ["BREAK", "Perfect", "{item}"];
+    for (var _k = 0; _k < array_length(_keys); _k++) {
+        var _e = variable_struct_get(Loc_GetData().strings, _keys[_k]);
+        if (!is_struct(_e)) continue;
+        var _en = variable_struct_exists(_e, "en") ? string(_e.en) : "";
+        var _ko = variable_struct_exists(_e, "ko") ? string(_e.ko) : "";
+        for (var _q = 0; _q < array_length(_pats); _q++) if (string_pos(_pats[_q], _en) > 0) _bad += _keys[_k] + " ";
+        if (array_length(Markup_Problems(_en)) > 0 || array_length(Markup_Problems(_ko)) > 0) _problems += _keys[_k] + " ";
+        var _acc = Test_RT_Spans(_en, "accent");
+        for (var _a = 0; _a < array_length(_acc); _a++) if (!array_contains(_allowed, _acc[_a])) _acc_bad += _keys[_k] + ":" + _acc[_a] + " ";
+        if (array_length(Test_RT_Spans(_en, "accent")) != array_length(Test_RT_Spans(_ko, "accent")) || Test_RT_Count(_en, "glyph") != Test_RT_Count(_ko, "glyph")) _par_bad += _keys[_k] + " ";
+    }
+    Test_Eq("RT no English string names keys as letters or slashes", _bad, "");
+    Test_Eq("RT every English and Korean string has well-formed markup", _problems, "");
+    Test_Eq("RT [a] holds only BREAK, Perfect or a received item", _acc_bad, "");
+    Test_Eq("RT English and Korean carry the same accents and buttons", _par_bad, "");
+    Test_True("RT the key terms are marked in English (tutorial, status, stat text)", array_length(Test_RT_Spans(Loc_T("tutorial.stagger.body"), "accent")) >= 1 && array_length(Test_RT_Spans(Loc_T("status.desc.poison"), "term")) >= 1 && array_length(Test_RT_Spans(Loc_T("menu.tooltip.stat.atk.desc"), "term")) >= 1);
+    Test_True("RT the button mentions are button markup", Test_RT_Count(Loc_T("tutorial.bar.body"), "glyph") >= 1 && Test_RT_Count(Loc_T("tutorial.arrows.body"), "glyph") == 4 && Test_RT_Count(Loc_T("runflow.continue"), "glyph") == 1);
+
+    // ---- 3. the accent colour ----
+    Test_Eq("RT the accent is exactly #E8C547", Markup_Colour("accent", UI_C_TEXT), make_color_rgb($E8, $C5, $47));
+    Test_Eq("RT the accent macro is #E8C547 too", UI_C_ACCENT, make_color_rgb($E8, $C5, $47));
+    Test_True("RT the term colour is not the accent", Markup_Colour("term", UI_C_TEXT) != UI_C_ACCENT);
+    Test_True("RT plain text is never the accent", Markup_Colour("", UI_C_TEXT) != UI_C_ACCENT && Markup_Colour("", UI_C_LIGHT) != UI_C_ACCENT && Markup_Colour("", UI_C_DARK) != UI_C_ACCENT);
+    Test_True("RT an unknown style falls back to the base colour", Markup_Colour("zz", UI_C_LIGHT) == UI_C_LIGHT);
+
+    // ---- 4. battle hint labels: one prompt line ----
+    Test_Eq("RT the battle command menu draws no hint label", array_length(Battle_HintLabels(BSTATE_MENU)), 0);
+    Test_Eq("RT the skill list draws one hint label", array_length(Battle_HintLabels(BSTATE_SKILL_MENU)), 1);
+    Test_Eq("RT the item list draws one hint label", array_length(Battle_HintLabels(BSTATE_ITEM_MENU)), 1);
+    Test_Eq("RT the attack bar draws no hint label", array_length(Battle_HintLabels(BSTATE_ATTACK_TIMING)), 0);
+    Test_Eq("RT the arrow bar draws no hint label", array_length(Battle_HintLabels(BSTATE_SKILL_QTE)), 0);
+    Test_Eq("RT the defence bar draws no hint label", array_length(Battle_HintLabels(BSTATE_ENEMY_DEFENCE)), 0);
+    var _hl = Battle_HintLabels(BSTATE_SKILL_MENU);
+    Test_True("RT the one label is the confirm prompt", array_length(_hl) == 1 && _hl[0].action == "confirm");
+    Test_Eq("RT the battle prompt line has one button", Test_RT_Count(Loc_T("battle.hint.list"), "glyph"), 1);
+    Test_Eq("RT the battle prompt line is not a Back hint", string_pos("Back", Loc_T("battle.hint.list")), 0);
+
+    global.input.last_device = _dev0;
+    Binds_Apply(Binds_Defaults());
 }
