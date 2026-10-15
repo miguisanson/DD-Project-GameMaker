@@ -496,7 +496,11 @@ function Scenario_StepSmoke(_s) {
             break;
         case 340: case 341: case 342: case 343: case 344: case 345: case 346: case 347: case 348: case 349:
         case 350: case 351: case 352: case 353: case 354: case 355: case 356: case 357: case 358: case 359:
-            Scenario_StepSmokeEcho(_s);   // G5 (D130): the echo is offered after the class pick; the end of the chain (its last step calls Scenario_NoticeEnd)
+            Scenario_StepSmokeEcho(_s);   // G5 (D130): the echo is offered after the class pick; goes on to the run stats steps (440..), the end of the chain
+            break;
+        case 440: case 441: case 442: case 443: case 444: case 445: case 446: case 447: case 448: case 449:
+        case 450: case 451: case 452: case 453: case 454: case 455: case 456: case 457: case 458: case 459:
+            Scenario_StepSmokeRunStats(_s);   // G9 (D137): the run stats from a real fight on the summary and in the Codex run history; the end of the chain (its last step calls Scenario_NoticeEnd)
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -2858,6 +2862,9 @@ function Scenario_StepShots(_s) {
         case 300: case 301: case 302: case 303: case 304: case 305: case 306: case 307: case 308: case 309:
         case 310: case 311: case 312: case 313: case 314: case 315: case 316: case 317: case 318: case 319:
             Scenario_StepShotsFeel(_s);   // g3 (D138, D139): the death burst, Perfect sparks, the BREAK zoom punch, the low-HP edge pulse, the HP lag bar
+            break;
+        case 460: case 461: case 462: case 463: case 464: case 465: case 466: case 467: case 468: case 469:
+            Scenario_StepShotsRunStats(_s);   // G9 (D137): the run summary with the stats (English, Korean), the Codex run history with and without stats; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -9065,7 +9072,7 @@ function Scenario_StepSmokeEcho(_s) {
             if (_s.t > 90 && !CardsUi_IsOpen() && _gs.ui.mode == UI_NONE) {
                 Scenario_Check("g5_a_pool_nothing_fits_opens_no_pick", !_eo.ever_echo && Cards_NextOwed(_gs.player_ch) == "" && array_length(_gs.player_ch.echo_offer) == 0);
                 Scenario_Check("g5_and_the_pool_is_cleared_quietly", array_length(Profile_Get().echo_pool) == 0);
-                Scenario_NoticeEnd();   // the end of the chain: removes the files and the profile the steps made
+                Scenario_Next(_s, 440);   // G9 (D137, 440..459): the run stats; the chain ends there
             }
             if (_s.t > 600) { Scenario_Check("g5_the_class_pick_without_a_fitting_echo_ends", false, "kind=" + CardsUi_Kind() + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
             break;
@@ -9496,7 +9503,7 @@ function Scenario_StepShotsFeel(_s) {
     if (!variable_struct_exists(_s, "fe")) _s.fe = 0;
     var _names = ["death_burst", "sparks_perfect", "zoom_break", "lowhp_edge", "hp_lag", "hurt_edge"];
     if (_s.fe >= array_length(_names)) {
-        Scenario_Finish();
+        Scenario_Next(_s, 460);   // G9 (D137): the run stats pictures (460..466) end the run
         return;
     }
     var _tag = _names[_s.fe];
@@ -9594,6 +9601,312 @@ function Scenario_StepShotsFeel(_s) {
                 Display_ClearZoom();   // the parked push-in must not carry into the next scene
                 _s.fe++;
                 Scenario_Next(_s, 300);
+            }
+            break;
+    }
+}
+
+// ============================================================================
+// G9 (D137): run stats (smoke steps 440-459, the end of the chain; shots 460-469, the end of the pictures chain).
+// Smoke: a new run; a dire wolf chases the player into a real battle that is fought with the attack bar and the defence bar (Perfect presses) until it is won;
+// back on the floor the run counts 1 fight won, damage dealt and taken and Perfect grades, and its time has advanced; the pause menu stops the time; Abandon run
+// through the real pause menu -> the summary shows the same numbers, the history entry carries them, the Codex run history shows them; Continue keeps the time.
+// The last smoke step ends the chain (Scenario_NoticeEnd removes the files and the profile the steps made). Writes profile.sav / run.sav: only inside the gate.
+// ============================================================================
+function Scenario_RsDrive(_s, _bc) {
+    var _ready = (_s.f - _s.last_tap) >= 4;
+    switch (_bc.battle_state) {
+        case BSTATE_MENU:
+            if (_bc.turn == TURN_PLAYER && _ready) Scenario_Tap((_bc.menu_index != 0) ? "menu_up" : "confirm");   // ATTACK
+            break;
+        case BSTATE_ATTACK_TIMING:   // a press on the zone centre (to within a frame and a half): a Perfect
+            if (_ready && _bc.qte_active && (Qte_ZoneCentreMs(_bc.qte_params) - _bc.qte_ms) <= Qte_StepMs(delta_time) * 1.5) Scenario_Tap("confirm");
+            break;
+        case BSTATE_ENEMY_DEFENCE:
+            Scenario_BotDefend(_s, _bc);
+            break;
+    }
+}
+
+function Scenario_RsAll0(_st) {
+    return _st.qte_total == 0 && _st.qte_perfect == 0 && _st.crits == 0 && _st.dmg_dealt == 0 && _st.dmg_taken == 0 && _st.fights_won == 0;
+}
+
+function Scenario_StepSmokeRunStats(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _T = GRID_TILE_SIZE;
+    if (!variable_struct_exists(_s, "rs")) _s.rs = { w: noone, seen: false, sum_t: -1, quiet: 0 };
+    var _rs = _s.rs;
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+    var _fw = Loc_T("stat.fights_won", "Fights won");
+    var _dd = Loc_T("stat.dmg_dealt", "Damage dealt");
+    var _dt = Loc_T("stat.dmg_taken", "Damage taken");
+    var _pf = Loc_T("stat.perfect", "Perfect rate");
+    var _tm = Loc_T("stat.time", "Run time");
+    switch (_s.step) {
+        case 440:   // a clean profile and a new run
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP run stats (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_NoticeEnd();
+                    break;
+                }
+                if (Transition_IsActive()) { _s.t = 0; break; }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Profile_ResetForTest();
+                RunSave_Delete();
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 9137);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                Scenario_Check("g9_a_new_run_starts_with_no_counts", Scenario_RsAll0(_gs.run.stats), json_stringify(_gs.run.stats));
+                _gs.pending_wake_line = false;
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                with (obj_enemy) instance_destroy();
+                _rs.w = instance_create_layer(16 * _T, 9 * _T, "Instances", obj_dire_wolf);   // the same stage as bug hunt 2: it sees the player 3 tiles away and runs at him
+                Scenario_PlaceEnemy(_rs.w, 16, 9);
+                Scenario_PlacePlayer(19, 9);
+                _rs.ms0 = _gs.run.stats.play_ms;
+                _s.boost = { hp: 99, mp: 11 };   // the fight is played to its end whatever the wolf does
+                Scenario_Next(_s, 441);
+            }
+            if (_s.t > 900) { Scenario_Check("g9_a_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 441:   // the wolf catches the player: a real battle
+            if (_bc != noone) {
+                Scenario_Check("g9_run_time_advances_while_playing", _gs.run.stats.play_ms > _rs.ms0, "from " + string(_rs.ms0) + " to " + string(_gs.run.stats.play_ms));
+                _rs.fight_f0 = _s.f;
+                Scenario_Next(_s, 442);
+            }
+            if (_s.t > 900) { Scenario_Check("g9_the_wolf_catches_the_player", false, "room=" + room_get_name(room) + " wolf=" + string(instance_exists(_rs.w))); Scenario_NoticeEnd(); }
+            break;
+        case 442:   // the fight, played with Perfect presses on the attack bar and the defence bar; back on the floor the run has counted it
+            if (_bc != noone) {
+                _rs.seen = true;
+                if (!_bc.battle_over) Scenario_RsDrive(_s, _bc);
+            }
+            if (_rs.seen && _bc == noone && Scenario_FloorReady(rm_floor1) && _s.t > 30) {
+                var _st = _gs.run.stats;
+                show_debug_message("[BOT] g9_stats_after_the_fight " + json_stringify(_st));
+                Scenario_Check("g9_one_fight_won", _st.fights_won == 1, "fights_won=" + string(_st.fights_won));
+                Scenario_Check("g9_damage_dealt_is_counted", _st.dmg_dealt > 0, "dmg_dealt=" + string(_st.dmg_dealt));
+                Scenario_Check("g9_damage_taken_is_counted", _st.dmg_taken > 0, "dmg_taken=" + string(_st.dmg_taken));
+                Scenario_Check("g9_graded_qtes_are_counted_with_some_Perfect", _st.qte_total >= 2 && _st.qte_perfect >= 1 && _st.qte_perfect <= _st.qte_total, "perfect " + string(_st.qte_perfect) + " of " + string(_st.qte_total));
+                Scenario_Check("g9_the_Perfect_rate_reads_as_a_percent", string_pos("%", RunStats_PerfectText(_st)) > 1, RunStats_PerfectText(_st));
+                _rs.snap = variable_clone(_st);
+                _rs.quiet = 0;
+                Scenario_Next(_s, 443);
+            }
+            if (_s.f - _rs.fight_f0 > 8000) { Scenario_Check("g9_the_fight_ends", false, "state=" + string(_bc != noone ? _bc.battle_state : -1) + " room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 443:   // the level-up screens the fight owes (a free stat point, a card) are answered with confirm; then it is quiet
+            if (CardsUi_IsOpen() || _gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0) {
+                _rs.quiet = 0;
+                if ((_s.f - _s.last_tap) >= 12) Scenario_Tap("confirm");
+            } else if (_gs.ui.mode == UI_NONE && Cards_NextOwed(_gs.player_ch) == "" && !Transition_IsActive()) {
+                _rs.quiet++;
+            } else {
+                _rs.quiet = 0;
+            }
+            if (_rs.quiet > 30) Scenario_Next(_s, 444);
+            if (_s.t > 1500) { Scenario_Check("g9_the_level_up_screens_are_answered", false, "mode=" + string(_gs.ui.mode) + " cards=" + string(CardsUi_IsOpen()) + " owed=" + Cards_NextOwed(_gs.player_ch)); Scenario_NoticeEnd(); }
+            break;
+        case 444:   // the pause menu stops the time; Abandon run through the pause menu (down x3, confirm twice)
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                PauseMenu_Open();
+            }
+            if (_s.t == 10) _rs.pa = _gs.run.stats.play_ms;
+            if (_s.t == 50) Scenario_Check("g9_run_time_stops_under_the_pause_menu", PauseMenu_IsOpen() && _gs.run.stats.play_ms == _rs.pa, "paused at " + string(_rs.pa) + ", 40 frames later " + string(_gs.run.stats.play_ms));
+            if (_s.t == 80 || _s.t == 92 || _s.t == 104) Scenario_Tap("menu_down");
+            if (_s.t == 125) {
+                Scenario_Check("g9_the_pause_cursor_is_on_abandon", PauseMenu_Cursor() == PAUSE_ABANDON_INDEX, "index=" + string(PauseMenu_Cursor()));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 137) Scenario_Tap("confirm");
+            if (_s.t > 140) Scenario_TapCutscene(_s);
+            if (_s.t > 140 && _sc != noone && _sc.state == "run_flow" && variable_global_exists("run_flow") && is_struct(global.run_flow)) Scenario_Next(_s, 445);
+            if (_s.t > 1500) { Scenario_Check("g9_abandon_reaches_the_death_flow", false, "room=" + room_get_name(room) + " state=" + (_sc != noone ? string(_sc.state) : "none") + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 445:   // the death line passes; the summary shows the numbers of the fight
+            Scenario_TapCutscene(_s);
+            if (_rs.sum_t < 0 && global.run_flow.phase == "summary") _rs.sum_t = _s.t;
+            if (_rs.sum_t >= 0 && _s.t == _rs.sum_t + 30) {
+                var _e = global.run_flow.entry;
+                var _rows = RunFlow_SummaryRows(_e);
+                Scenario_Check("g9_the_summary_is_up", global.run_flow.phase == "summary");
+                Scenario_Check("g9_the_summary_shows_fights_won_1", Test_RowValue(_rows, _fw) == "1", "got " + Test_RowValue(_rows, _fw));
+                Scenario_Check("g9_the_summary_shows_the_damage_dealt", Test_RowValue(_rows, _dd) == string(_rs.snap.dmg_dealt) && _rs.snap.dmg_dealt > 0, "got " + Test_RowValue(_rows, _dd) + " want " + string(_rs.snap.dmg_dealt));
+                Scenario_Check("g9_the_summary_shows_the_damage_taken", Test_RowValue(_rows, _dt) == string(_rs.snap.dmg_taken), "got " + Test_RowValue(_rows, _dt) + " want " + string(_rs.snap.dmg_taken));
+                Scenario_Check("g9_the_summary_shows_the_perfect_rate", Test_RowValue(_rows, _pf) == RunStats_PerfectText(_rs.snap), "got " + Test_RowValue(_rows, _pf) + " want " + RunStats_PerfectText(_rs.snap));
+                Scenario_Check("g9_the_summary_shows_a_run_time", Test_RowValue(_rows, _tm) != "-" && Test_RowValue(_rows, _tm) == RunStats_TimeText(_e.stats.play_ms) && _e.stats.play_ms > 0, "got " + Test_RowValue(_rows, _tm));
+                Scenario_Check("g9_the_time_under_the_pause_menu_was_not_counted", _e.stats.play_ms == _rs.pa, "entry " + string(_e.stats.play_ms) + " pause " + string(_rs.pa));
+                var _hist = Profile_Get().history;
+                Scenario_Check("g9_the_history_entry_carries_the_stats", array_length(_hist) == 1 && variable_struct_exists(_hist[0], "stats") && _hist[0].stats.fights_won == 1 && _hist[0].stats.dmg_dealt == _rs.snap.dmg_dealt, json_stringify(_hist));
+                _rs.entry_ms = _e.stats.play_ms;
+            }
+            if (_rs.sum_t >= 0 && _s.t == _rs.sum_t + 70) {
+                Scenario_Check("g9_run_time_stops_when_the_run_is_over", !Run_IsActive() && _gs.run.stats.play_ms == _rs.entry_ms, "run " + string(_gs.run.stats.play_ms) + " entry " + string(_rs.entry_ms));
+                Scenario_Tap("confirm");   // on to the next run
+            }
+            if (_rs.sum_t >= 0 && _s.t > _rs.sum_t + 75 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) {
+                _gs.pending_wake_line = false;
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_Check("g9_the_next_run_starts_its_stats_again", Scenario_RsAll0(_gs.run.stats), json_stringify(_gs.run.stats));
+                Menu_Open(4);
+                TabCodex_Open("history");
+                Scenario_Next(_s, 446);
+            }
+            if (_s.t > 2400) { Scenario_Check("g9_the_summary_and_the_next_run", false, "phase=" + string(global.run_flow.phase) + " room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 446:   // the Codex run history shows the same numbers
+            if (_s.t >= 24) {
+                var _m = TabMenu_TopMenu();
+                Scenario_Check("g9_the_codex_runs_page_is_open", is_struct(_m) && _m.id == "codex_history" && array_length(_m.items) >= 1, is_struct(_m) ? _m.id : "none");
+                if (is_struct(_m) && array_length(_m.items) >= 1) {
+                    var _ln = _m.items[0].lines;
+                    Scenario_Check("g9_the_codex_runs_page_shows_fights_won_1", Test_RowValue(_ln, _fw) == "1", "got " + Test_RowValue(_ln, _fw));
+                    Scenario_Check("g9_the_codex_runs_page_shows_the_damage", Test_RowValue(_ln, _dd) == string(_rs.snap.dmg_dealt) && Test_RowValue(_ln, _dt) == string(_rs.snap.dmg_taken), "dealt " + Test_RowValue(_ln, _dd) + " taken " + Test_RowValue(_ln, _dt));
+                    Scenario_Check("g9_the_codex_runs_page_shows_the_perfect_rate_and_the_time", Test_RowValue(_ln, _pf) == RunStats_PerfectText(_rs.snap) && Test_RowValue(_ln, _tm) == RunStats_TimeText(_rs.entry_ms), "perfect " + Test_RowValue(_ln, _pf) + " time " + Test_RowValue(_ln, _tm));
+                }
+                Menu_Close(true);
+                Scenario_ClearUi();
+                Scenario_Next(_s, 447);
+            }
+            break;
+        case 447:   // Continue keeps the run time
+            if (_s.t == 1) {
+                _rs.c0 = _gs.run.stats.play_ms;
+                Scenario_Check("g9_the_new_run_has_some_time_before_it_is_saved", _rs.c0 > 0, "play_ms=" + string(_rs.c0));
+                Scenario_Check("g9_the_run_is_saved", RunSave_WriteTo());
+                Scenario_Check("g9_continue_starts", Run_Continue().ok);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && !(variable_struct_exists(_gs, "load_spawn_pending") && _gs.load_spawn_pending)) {
+                Scenario_Check("g9_continue_keeps_the_run_time_and_it_goes_on", _gs.run.stats.play_ms >= _rs.c0 && _gs.run.stats.play_ms < _rs.c0 + 8000, "saved " + string(_rs.c0) + " now " + string(_gs.run.stats.play_ms));
+                Scenario_NoticeEnd();   // the end of the chain: removes the files and the profile the steps made
+            }
+            if (_s.t > 900) { Scenario_Check("g9_continue_reaches_the_floor", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ---- pictures 460..469 (480 x 432, display scale 3): the run summary with the stats (English, Korean), the Codex run history with a run that has stats and
+// one from before D137 (shown as "-"). ----
+function Scenario_ShotRunStats(_s, _name) {
+    _s.shot = "shot_runstats_" + _name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+    Scenario_ShotLayout(_s.shot);
+}
+
+function Scenario_StepShotsRunStats(_s) {
+    var _gs = GameState_Get();
+    var _flow = (variable_global_exists("run_flow") && is_struct(global.run_flow)) ? global.run_flow : undefined;
+    var _scn = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    switch (_s.step) {
+        case 460:   // a run whose stats are set, and a death by a spider (an older run without stats is in the history)
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP run stats shots (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_Finish();
+                    break;
+                }
+                Scenario_ClearUi();
+                Profile_ResetForTest();
+                RunSave_Delete();
+                Scenario_SetWindowScale(3);
+                Loc_SetLanguage("en");
+                global.tutorial_off = true;
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 9138);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && _s.t > 40) {
+                Scenario_ClearUi();
+                Profile_RecordRun(Profile_Get(), { seed: 40111, class_id: CLASS_KNIGHT, level: 4, floor: 3, room: "rm_floor3", result: "died", cause: "Spider", kills: 7, gold: 52, at: 0 });
+                GameState_SetBattleEnemy("g9_shot", ENEMY_SPIDER, 1);
+                var _chd = _gs.player_ch;
+                _chd.level = 5;
+                GameState_SetPlayer(_chd);
+                _gs.run.kills = 6;
+                _gs.run.stats = { qte_total: 23, qte_perfect: 14, crits: 3, dmg_dealt: 186, dmg_taken: 94, fights_won: 6, play_ms: 1334000 };   // 61%, 22:14
+                Player_OnDeath(_gs.player_ch);
+                Scenario_Next(_s, 461);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_runstats_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 461:   // the death line has begun: jump to the summary (the death line itself is a smoke check)
+            if (is_struct(_flow) && _scn != noone && _scn.state == "run_flow" && _flow.phase == "death" && _flow.t >= 10) {
+                _flow.phase = "summary";
+                _flow.t = 0;
+                Scenario_Next(_s, 462);
+            }
+            if (_s.t > 900) { Scenario_Check("shots_runstats_reaches_the_death_flow", false, "state=" + (_scn != noone ? string(_scn.state) : "none")); Scenario_NoticeEnd(); }
+            break;
+        case 462:   // the summary with the stats
+            if (_s.t == 30) {
+                var _rows = RunFlow_SummaryRows(_flow.entry);
+                Scenario_Check("shots_runstats_summary_perfect_rate", Test_RowValue(_rows, Loc_T("stat.perfect", "Perfect rate")) == "61%");
+                Scenario_Check("shots_runstats_summary_run_time", Test_RowValue(_rows, Loc_T("stat.time", "Run time")) == "22:14");
+                Scenario_ShotRunStats(_s, "summary");
+            }
+            if (_s.t == 34) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Loc_SetLanguage("ko");
+            }
+            if (_s.t == 64) Scenario_ShotRunStats(_s, "summary_ko");
+            if (_s.t == 68) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Loc_SetLanguage("en");
+                Scenario_SetWindowScale(5);   // 800 x 720: the eleven rows do not fit one under the other, the summary goes to two columns
+            }
+            if (_s.t == 110) Scenario_ShotRunStats(_s, "summary");
+            if (_s.t == 114) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_SetWindowScale(3);
+                Scenario_Next(_s, 463);
+            }
+            break;
+        case 463:   // confirm -> the next run; the Codex run history (newest first: the run with stats)
+            if (_s.t == 20) Scenario_Tap("confirm");
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) {
+                _gs.pending_wake_line = false;
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                with (obj_enemy) instance_destroy();
+                Menu_Open(4);
+                TabCodex_Open("history");
+                Scenario_Next(_s, 464);
+            }
+            if (_s.t > 900) { Scenario_Check("shots_runstats_the_next_run_starts", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 464:   // the run with stats under the cursor
+            if (_s.t >= 24) {
+                Scenario_Check("shots_runstats_codex_runs_open", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && TabMenu_TopMenu().id == "codex_history", "mode=" + string(_gs.ui.mode));
+                Scenario_TabLayoutChecks("runstats_codex_3");
+                Scenario_ShotRunStats(_s, "codex_runs");
+                Scenario_Next(_s, 465);
+            }
+            break;
+        case 465:   // the older run (from before D137, no stats) under the cursor
+            if (_s.t == 4) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Ui_MenuFixCursor(TabMenu_TopMenu(), 1);
+            }
+            if (_s.t >= 24) {
+                Scenario_TabLayoutChecks("runstats_codex_old_3");
+                Scenario_ShotRunStats(_s, "codex_runs_old");
+                Scenario_Next(_s, 466);
+            }
+            break;
+        case 466:
+            if (_s.t >= 4) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                if (is_struct(TabMenu_Get())) Menu_Close(true);
+                Scenario_ClearUi();
+                Scenario_NoticeEnd();   // the end of the pictures: removes the files and the profile the steps made
             }
             break;
     }

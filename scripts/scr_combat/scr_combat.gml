@@ -806,6 +806,7 @@ function Battle_HealPop(_bc, _amount) {
 // --------------------
 function Battle_CheckEnd(_bc, _p, _e) {
     if (_e.hp <= 0) {
+        if (!_bc.battle_over) RunStats_FightWon();   // G9 (D137)
         _bc.battle_over = true;
         var rewards = Battle_GrantRewards(_p, _e);
         _p = rewards.player;
@@ -1347,6 +1348,7 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
     }
 
     _bc.last_dmg = dealt;
+    RunStats_Qte(timing_key); RunStats_Dealt(dealt, _bc.last_crit);   // G9 (D137)
     Battle_HitPop(_bc, dealt, timing_key, _bc.last_crit);
     p = Equip_PlayerPerfectHitApply(p, timing_key);
 
@@ -1495,6 +1497,7 @@ function Battle_SkillQteStep(_bc) {
 
     if (st.done) {
         _bc.sq_active = false;
+        RunStats_Qte(st.key);   // G9 (D137)
         Battle_PlayerSkill(_bc, _bc.sq_skill, Qte_Result(st.key));
     }
 }
@@ -1519,6 +1522,7 @@ function Battle_SkillGradeFeedback(_bc, _skill, _grade, _res) {
 
     _bc.last_dmg = max(0, _res.dmg);
     _bc.last_crit = (_res.dmg > 0) && variable_struct_exists(_res, "crit") && _res.crit;
+    RunStats_Dealt(_bc.last_dmg, _bc.last_crit);   // G9 (D137)
     if (_res.dmg > 0) Battle_HitPop(_bc, _res.dmg, _grade.key, _res.crit);
     if (_res.dmg < 0) Battle_HealPop(_bc, -_res.dmg);
     if (_res.dmg > 0) Battle_HitFreeze(_bc, _grade.key, _bc.last_crit);
@@ -1646,6 +1650,7 @@ function Battle_ThrowResolve(_bc, _timing) {
     _bc.last_hit = true;
     _bc.last_dmg = res.dmg;
     _bc.last_crit = false;
+    RunStats_Qte(_timing.key); RunStats_Dealt(res.dmg, false);   // G9 (D137)
     Battle_HitPop(_bc, res.dmg, _timing.key);
     Battle_HitFreeze(_bc, _timing.key, false);
 
@@ -2071,6 +2076,7 @@ function Battle_DefenceResolve(_bc, _key) {
     _bc.last_hit = true;
     _bc.last_crit = crit;
     _bc.last_dmg = final_dmg;
+    RunStats_Qte(_key); RunStats_Taken(final_dmg);   // G9 (D137)
     if (final_dmg > 0 && _key != QTE_PERFECT) {
         CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_MS, PLAYER_SHAKE_DIR);
     }
@@ -2427,6 +2433,7 @@ function Battle_EnemyAct(_bc) {
             CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_MS, PLAYER_SHAKE_DIR);
             Battle_PlayerHitPop(_bc, res.dmg, res.crit);
             Battle_PlayerHurtFeel(_bc, res.dmg, p.max_hp, false);
+            RunStats_Taken(res.dmg);   // G9 (D137)
         }
 
         if (Battle_CheckEnd(_bc, p, e)) return;
@@ -2480,6 +2487,7 @@ function Battle_EnemyAct(_bc) {
             CameraShake_Start(PLAYER_SHAKE_MAG, PLAYER_SHAKE_MS, PLAYER_SHAKE_DIR);
             Battle_PlayerHitPop(_bc, _bc.last_dmg, _bc.last_crit);
             Battle_PlayerHurtFeel(_bc, _bc.last_dmg, p.max_hp, false);
+            RunStats_Taken(_bc.last_dmg);   // G9 (D137)
         }
 
         var end_attack_pack = Battle_EnemyFinalizeTurnState(_bc, p, e);

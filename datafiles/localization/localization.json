@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T10:48:49Z",
-    "row_count": 1029
+    "generated_at_utc": "2026-10-15T11:03:47Z",
+    "row_count": 1035
   },
   "default_lang": "en",
   "languages": [
@@ -3479,6 +3479,30 @@
     "skill.name.unknown": {
       "en": "Unknown",
       "ko": "알 수 없음"
+    },
+    "stat.crits": {
+      "en": "Crits landed",
+      "ko": "치명타 횟수"
+    },
+    "stat.dmg_dealt": {
+      "en": "Damage dealt",
+      "ko": "준 피해"
+    },
+    "stat.dmg_taken": {
+      "en": "Damage taken",
+      "ko": "받은 피해"
+    },
+    "stat.fights_won": {
+      "en": "Fights won",
+      "ko": "승리한 전투"
+    },
+    "stat.perfect": {
+      "en": "Perfect rate",
+      "ko": "퍼펙트 비율"
+    },
+    "stat.time": {
+      "en": "Run time",
+      "ko": "플레이 시간"
     },
     "status.desc.bleed": {
       "en": "Lose {tick} HP per stack each time you act. Stacks up to {max}, lasts {dur} turns.{mods}",

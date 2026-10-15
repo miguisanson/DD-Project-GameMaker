@@ -791,6 +791,7 @@ function RunSave_Build() {
         shop: run.shop,        // C3 (D85)
         cards: run.cards,
         kills: run.kills,
+        stats: RunStats_Of(run),   // G9 (D137): no version bump; a save without them loads with zeros
         drop_dry: run.drop_dry,   // R1 (D120), run save v2
         gold_bag: run.gold_bag,   // D126: no version bump; a save without them loads with empty bags
         find_bag: run.find_bag,
@@ -824,6 +825,7 @@ function RunSave_ApplyState(_raw) {
     if (variable_struct_exists(_raw, "shop") && is_struct(_raw.shop)) run.shop = _raw.shop;   // C3 (D85)
     if (variable_struct_exists(_raw, "cards")) run.cards = Card_StateNormalize(_raw.cards);
     if (variable_struct_exists(_raw, "kills")) run.kills = Save_ToReal(_raw.kills, 0);
+    if (variable_struct_exists(_raw, "stats") && is_struct(_raw.stats)) run.stats = RunStats_Normalize(_raw.stats);   // G9 (D137)
     if (variable_struct_exists(_raw, "drop_dry")) run.drop_dry = Save_ToReal(_raw.drop_dry, 0);
     if (variable_struct_exists(_raw, "gold_bag") && is_array(_raw.gold_bag)) {   // D126
         run.gold_bag = [];

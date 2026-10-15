@@ -91,6 +91,7 @@ if (room != rm_battle) {
     Dialogue_NarrativeTryStartPending();
 }
 
+RunStats_Tick(Presentation_StepMs(delta_time));   // G9 (D137): run time, only while the run is active, in front and not paused
 Run_AutosaveTick();   // C1 (D46): also every few seconds of a quiet moment, so closing the window loses almost nothing
 
 // apply persistence once on initial room load
