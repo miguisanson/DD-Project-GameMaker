@@ -7043,6 +7043,7 @@ function Test_Suite_Economy() {
 
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
     Test_PassiveRuntimeChecks();
+    Test_Hunt1Checks();
 }
 
 // D108 F4b: the passive runtime struct after Equip_PassiveRuntimeEnsure and after Equip_PassiveBattleReset (characterization: one constructor).
@@ -7058,6 +7059,107 @@ function Test_PassiveRuntimeFields(_tag, _rt) {
     Test_Eq(_tag + " brace_guard_ready", _rt.brace_guard_ready, false);
     Test_Eq(_tag + " brace_cooldown", _rt.brace_cooldown, 0);
     Test_Eq(_tag + " mirror_used", _rt.mirror_used, false);
+}
+
+// hunt1: three bugs from the read-only hunt. Expected values come from DECISIONS.md (D5, D80, D84), not from the code.
+function Test_Hunt1Bc(_p, _e) {
+    return {
+        p: _p, e: _e, ai: EnemyAI_StateNew(),
+        tl: Turn_New([Turn_Fighter(TL_PLAYER, 10), Turn_Fighter(TL_ENEMY, 10)]),
+        tl_who: TL_PLAYER, tl_prev_who: TL_PLAYER, turn_log: [], turn: TURN_PLAYER, battle_over: false
+    };
+}
+
+function Test_Hunt1Checks() {
+    var _gs = GameState_Get();
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init(); CardDB_Init();
+
+    // 1. a thief's stolen items come back when the thief dies, and the victory lines list drops and recovered items
+    _gs.run = Run_Create(4242);
+    _gs.run.drop_dry = 10;   // R1: the drop chance is 100% after enough dry fights
+    var _kn = Test_Hero(CLASS_KNIGHT);
+    var _thief = EnemyCreate(ENEMY_SLIME);
+    _thief.stolen_items = [{ id: 31, qty: 1 }];   // as Skill_StealRecord stores them
+    var _before = Inv_Count(_kn.inventory, 31);
+    var _rw = Battle_GrantRewards(_kn, _thief);
+    Test_True("hunt1 stolen item comes back into the inventory", Inv_Count(_rw.player.inventory, 31) >= _before + 1);
+    var _got31 = false;
+    var _all_item_id = true;
+    for (var _i = 0; _i < array_length(_rw.loot); _i++) {
+        if (!variable_struct_exists(_rw.loot[_i], "item_id")) _all_item_id = false;
+        else if (_rw.loot[_i].item_id == 31 && _rw.loot[_i].qty >= 1) _got31 = true;
+    }
+    Test_True("hunt1 rewards.loot lists the recovered item under item_id", _got31);
+    Test_True("hunt1 every rewards.loot entry uses the item_id key", _all_item_id && array_length(_rw.loot) >= 1);
+    Test_Eq("hunt1 the thief's stolen list is emptied", array_length(_thief.stolen_items), 0);
+    var _lines = Battle_BuildVictoryDialogueLines(_thief, _rw, _rw.player);
+    var _has_loot_line = false;
+    for (var _j = 0; _j < array_length(_lines); _j++) {
+        if (is_struct(_lines[_j]) && string_pos("x", _lines[_j].text) > 0 && string_pos(string(ItemDB_Get(31).name), _lines[_j].text) > 0) _has_loot_line = true;
+    }
+    Test_True("hunt1 the victory lines name the recovered Poison Pot", _has_loot_line);
+
+    // a normal drop (no thief) is listed too: the drop is rolled to 100% here
+    _gs.run.drop_dry = 10;
+    var _kn2 = Test_Hero(CLASS_KNIGHT);
+    var _rw2 = Battle_GrantRewards(_kn2, EnemyCreate(ENEMY_SLIME));
+    Test_True("hunt1 a normal drop appears in rewards.loot", array_length(_rw2.loot) >= 1 && variable_struct_exists(_rw2.loot[0], "item_id"));
+    var _lines2 = Battle_BuildVictoryDialogueLines(EnemyCreate(ENEMY_SLIME), _rw2, _rw2.player);
+    var _n_loot_lines = 0;
+    for (var _k = 0; _k < array_length(_lines2); _k++) if (is_struct(_lines2[_k]) && string_pos(Loc_T("combat.msg.loot_prefix", "Loot: "), _lines2[_k].text) == 1) _n_loot_lines++;
+    Test_True("hunt1 the victory message lists the drop (a Loot: line)", _n_loot_lines >= 1);
+
+    // 2. Evasion put on by the player's own action survives that action's end-of-turn tick (D80), at any grade (D5)
+    var _grades = [QTE_PERFECT, QTE_GOOD, QTE_OK, QTE_WEAK];
+    for (var _g = 0; _g < 4; _g++) {
+        var _pe = Test_Hero(CLASS_KNIGHT);
+        var _ee = EnemyCreate(ENEMY_SLIME);
+        Throw_Resolve(33, _pe, _ee, _grades[_g]);
+        var _bc = Test_Hunt1Bc(_pe, _ee);
+        Battle_PlayerFinalizeTurn(_bc, _pe, _ee);
+        Test_True("hunt1 Smoke Bomb " + _grades[_g] + ": Evasion survives the end of the throw turn", Status_Has(_bc.p, STATUS_EVASION));
+        var _dg = Combat_TryDodge(_bc.e, _bc.p);
+        Test_True("hunt1 Smoke Bomb " + _grades[_g] + ": the next enemy attack is dodged", _dg.dodged);
+        Test_False("hunt1 Smoke Bomb " + _grades[_g] + ": the dodge uses the Evasion up", Status_Has(_dg.defender, STATUS_EVASION));
+    }
+    for (var _g2 = 0; _g2 < 4; _g2++) {
+        var _pa = Test_Hero(CLASS_ARCHER);
+        _pa.mp = _pa.max_mp;
+        var _ea = EnemyCreate(ENEMY_SLIME);
+        var _sr = Skill_Use(_pa, _pa, SKILL_EVASION, Qte_GradeMult(_grades[_g2]));
+        Test_True("hunt1 Archer Evasion " + _grades[_g2] + ": cast", _sr.ok && Status_Has(_pa, STATUS_EVASION));
+        var _bca = Test_Hunt1Bc(_pa, _ea);
+        Battle_PlayerFinalizeTurn(_bca, _pa, _ea);
+        Test_True("hunt1 Archer Evasion " + _grades[_g2] + ": survives the end of the cast turn", Status_Has(_bca.p, STATUS_EVASION));
+        var _dga = Combat_TryDodge(_bca.e, _bca.p);
+        Test_True("hunt1 Archer Evasion " + _grades[_g2] + ": the next enemy attack is dodged", _dga.dodged);
+        Test_False("hunt1 Archer Evasion " + _grades[_g2] + ": the dodge uses the Evasion up", Status_Has(_dga.defender, STATUS_EVASION));
+    }
+    // it still wears off: it is not forever (the skill gives 6 turns, so the 6th later tick removes it)
+    var _pl = Test_Hero(CLASS_ARCHER);
+    _pl.mp = _pl.max_mp;
+    Skill_Use(_pl, _pl, SKILL_EVASION, 1);
+    for (var _t = 0; _t < 6; _t++) _pl = Status_Tick(_pl);   // the first tick only clears the fresh flag
+    Test_True("hunt1 Archer Evasion is still there after 5 counted turns", Status_Has(_pl, STATUS_EVASION));
+    _pl = Status_Tick(_pl);
+    Test_False("hunt1 Archer Evasion wears off after its 6 turns", Status_Has(_pl, STATUS_EVASION));
+
+    // 3. D84: 5 of a throwable for a class, 8 only for Nobody; picking a class trims the stack
+    var _nb = CharacterCreate_Player(CLASS_NOBODY);
+    _nb.inventory = Inv_Add(_nb.inventory, 30, 8);
+    _nb.inventory = Inv_Add(_nb.inventory, 33, 3);
+    Test_Eq("hunt1 Nobody carries 8 firebombs", Inv_Count(_nb.inventory, 30), 8);
+    var _classes = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE];
+    for (var _c = 0; _c < 3; _c++) {
+        var _picked = Card_ClassCharacter(_nb, _classes[_c]);
+        Test_Eq("hunt1 class " + string(_classes[_c]) + " keeps at most 5 firebombs", Inv_Count(_picked.inventory, 30), 5);
+        Test_Eq("hunt1 class " + string(_classes[_c]) + " keeps the 3 smoke bombs it can hold", Inv_Count(_picked.inventory, 33), 3);
+    }
+    Test_Eq("hunt1 the old Nobody inventory is untouched by the pick", Inv_Count(_nb.inventory, 30), 8);
+
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }
 
 function Test_PassiveRuntimeChecks() {
