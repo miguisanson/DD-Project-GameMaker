@@ -7,7 +7,6 @@
 #macro STAT_MAX 60 // change to 99 if you want
 #macro LEVEL_CAP 10 // final game cap
 #macro LEVEL_CAP_TECHNICAL LEVEL_CAP
-#macro LEVEL_EFFECTIVE_CAMPAIGN_CAP LEVEL_CAP
 
 #macro CLASS_ARCHER 0
 #macro CLASS_KNIGHT 1
@@ -58,11 +57,6 @@
 #macro COMBAT_CRIT_CHANCE_MAX 0.5
 #macro ROUND_HALF_UP_EPS 0.000001
 
-#macro ACTION_ATTACK 0
-#macro ACTION_SKILL  1
-#macro ACTION_ITEM   2
-#macro ACTION_RUN    3
-
 #macro ITEM_WEAPON     0
 #macro ITEM_ARMOR      1
 #macro ITEM_CONSUMABLE 2
@@ -72,11 +66,8 @@
 #macro TGT_ENEMY       0
 #macro TGT_SELF        1
 #macro TGT_ALL_ENEMIES 2
-#macro TGT_ALL_ALLIES  3
-#macro TGT_ALL         4
 // Relative target aliases for readability (especially enemy-authored skills).
 #macro TGT_OPPONENT       TGT_ENEMY
-#macro TGT_ALL_OPPONENTS  TGT_ALL_ENEMIES
 
 #macro STATUS_POISON     0
 #macro STATUS_BLEED      1
@@ -136,7 +127,6 @@
 #macro ENEMY_SCAN_RADIUS_DEFAULT 32
 
 #macro INTERACT_NONE       0
-#macro INTERACT_CHEST      1
 #macro INTERACT_DOOR       2
 #macro INTERACT_SWITCH     3
 #macro INTERACT_DIALOGUE   4
@@ -151,7 +141,6 @@
 #macro UI_BED 6
 #macro UI_CARDS 7   // C2: class choice, stat point, card pick, replace-a-skill screens (CardsUi_*)
 #macro UI_SHOP 8    // C3 (D85): the merchant's shop (ShopUi_*)
-#macro UI_BAR_SCALE 3
 #macro UI_FONT retro_gaming
 #macro GRID_TILE_SIZE 16
 #macro PLAYER_MOVE_SPEED_DEFAULT 1
@@ -171,7 +160,6 @@
 #macro UI_DIALOGUE_STATE_READY 2
 #macro UI_DIALOGUE_ARROW_FPS 2
 #macro UI_HUD_HURT_FLASH_FRAMES 8
-#macro UI_HUD_HURT_FLASH_ALPHA 0.70
 #macro UI_TEXT_SCALE_BASE 2.00
 #macro UI_TEXT_SCALE_MIN 1.00
 #macro UI_TEXT_SCALE_MAX 4.00
@@ -184,12 +172,10 @@
 #macro UI_CUTSCENE_TEXT_SHADOW_X 1
 #macro UI_CUTSCENE_TEXT_SHADOW_Y 1
 #macro UI_CUTSCENE_DIALOGUE_CHARS_PER_SEC 24
-#macro UI_CUTSCENE_GAME_OVER_CHARS_PER_SEC 8
 #macro UI_CUTSCENE_ADVANCE_BLOCK_FRAMES 2
 
 #macro SHAKE_DIR_H 0
 #macro SHAKE_DIR_V 1
-#macro SHAKE_DIR_D 2
 
 #macro ENEMY_SHAKE_MAG 0.3
 #macro ENEMY_SHAKE_FRAMES 12
@@ -201,16 +187,8 @@
 #macro PLAYER_SHAKE_FRAMES 12
 #macro PLAYER_SHAKE_DIR SHAKE_DIR_V
 
-#macro ACTION_BUFFER_FRAMES 6
-#macro ACTION_COOLDOWN_FRAMES 4
-
 #macro SPR_SPEED_FPS 0
-#macro SPR_SPEED_FRAMES 1
 
-#macro UI_NAV_REPEAT_DELAY 4
-#macro UI_NAV_REPEAT_RATE 2
-#macro MENU_REPEAT_DELAY 4
-#macro MENU_REPEAT_INTERVAL 2
 #macro COMBAT_ACTION_DELAY 60   // long hold: battle intro, kill and run-away messages
 #macro COMBAT_ACTION_HOLD_SEC 0.3   // D55: hold after a player or enemy action, in seconds (use Combat_SecToFrames)
 #macro COMBAT_LOG_MAX 30
@@ -301,7 +279,6 @@
 #macro SKIP_HOLD_FRAMES 60
 #macro SKIP_HINT_FRAMES 150
 #macro SETTINGS_VOLUME_STEP 0.05
-#macro AUDIO_DEBUG_TOOLS 0
 
 #macro TRANSITION_TYPE_NONE 0
 #macro TRANSITION_TYPE_ROOM 1
@@ -325,9 +302,6 @@
 #macro TRANSITION_FLASH_FADE_IN_FRAMES 14
 #macro TRANSITION_CLASS_SELECT_FADE_OUT_FRAMES 22
 #macro TRANSITION_CLASS_SELECT_FADE_IN_FRAMES 24
-// Frames the "Yes" option is greyed out / locked after the class confirm prompt
-// appears (~2s at 60fps), so the player can't accidentally accept the wrong class.
-#macro CLASS_SELECT_CONFIRM_ACCEPT_DELAY 120
 #macro TRANSITION_CUTSCENE_SEGMENT_FADE_OUT_FRAMES 14
 #macro TRANSITION_CUTSCENE_SEGMENT_FADE_IN_FRAMES 16
 #macro TRANSITION_CUTSCENE_SEGMENT_SLOW_FADE_OUT_FRAMES 44
@@ -335,7 +309,6 @@
 #macro TRANSITION_LOADING_FADE_OUT_FRAMES 28
 #macro TRANSITION_LOADING_BLACK_HOLD_FRAMES 18
 #macro TRANSITION_LOADING_FADE_IN_FRAMES 32
-#macro CUTSCENE_LAST_SCENE_HOLD_FRAMES 90
 
 #macro SAVE_SNAPSHOT_VERSION 2
 

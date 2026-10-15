@@ -188,15 +188,3 @@ if (skillbook_should_play) {
 if (global.skillbook_mana_ambience_handle != -1 && audio_is_playing(global.skillbook_mana_ambience_handle)) {
     audio_sound_gain(global.skillbook_mana_ambience_handle, global.skillbook_mana_ambience_gain, 0);
 }
-
-if (global.bgm_pending_stop_frames > 0) {
-    global.bgm_pending_stop_frames -= 1;
-    if (global.bgm_pending_stop_frames <= 0) {
-        var h = global.bgm_pending_stop_handle;
-        if (h != -1 && audio_is_playing(h)) {
-            audio_stop_sound(h);
-        }
-        global.bgm_pending_stop_handle = -1;
-        global.bgm_pending_stop_frames = 0;
-    }
-}
