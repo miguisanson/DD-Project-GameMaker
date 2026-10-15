@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PLAYTEST NOW: build 63deaae-20261015 (= next 63deaae, FULL gate PASS 3695/0 + smoke + bot + shots). Owner back 2026-10-16, playing it; grill in progress for new work (marble bag everywhere, chest-skip guard, main menu refresh, open questions). Do NOT run tests on the PC while the owner plays unless they say so. |
+| WIP | Owner playing build 63deaae-20261015. Round 2 (D126-D138, BUILD-PLAN 'Round 2'): G1 marble bags (wt/g1) + G2 title refresh (wt/g2) in flight (Sonnet). Then G3 battle feel, G4 chest guard, G5 echo after class, G6 map juice, G7 speed-up + preview, G8 rumble + save-on-close, G9 run stats, G10 screens, G11 consistency; Opus review every ~5 packets; then full gate + new build; then improvement mode. |
 | Unplayed features | 61 playtest entries (PLAYTEST-QUEUE, build dbc678a-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
