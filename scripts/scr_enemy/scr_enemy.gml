@@ -883,7 +883,7 @@ function Nav_SightRing(_r) {
 // The 4-colour palette of the world marks, built once (make_color_rgb every frame was the old cost).
 function Nav_FxColors() {
     if (!variable_global_exists("nav_fx_colors") || !is_struct(global.nav_fx_colors)) {
-        global.nav_fx_colors = { c0: make_color_rgb(7, 24, 33), c1: make_color_rgb(48, 104, 80), c2: make_color_rgb(134, 192, 108), c3: make_color_rgb(224, 248, 207) };
+        global.nav_fx_colors = { c0: UI_C_DARKEST, c1: UI_C_DARK, c2: UI_C_LIGHT, c3: UI_C_LIGHTEST };
     }
     return global.nav_fx_colors;
 }
@@ -1212,8 +1212,8 @@ function Player_DrawWorldFx() {
     var _pl = instance_find(obj_player, 0);
     if (!variable_instance_exists(_pl, "prompt_target") || !instance_exists(_pl.prompt_target)) return;
     var _t = _pl.prompt_target;
-    var _c0 = make_color_rgb(7, 24, 33);
-    var _c3 = make_color_rgb(224, 248, 207);
+    var _c0 = UI_C_DARKEST;
+    var _c3 = UI_C_LIGHTEST;
     var _oc = draw_get_color();
     var _oa = draw_get_alpha();
     draw_set_alpha(1);

@@ -4275,6 +4275,25 @@ function Test_Suite_MenuMeasure() {
 }
 
 function Test_Suite_UI() {
+    // --- D108 F4a: the palette macros equal the literals they replaced (written out here, not read from the macros)
+    Test_Eq("D108 UI_C_DARKEST = #071821", UI_C_DARKEST, make_color_rgb(7, 24, 33));
+    Test_Eq("D108 UI_C_DARK = #306850", UI_C_DARK, make_color_rgb(48, 104, 80));
+    Test_Eq("D108 UI_C_LIGHT = #86C06C", UI_C_LIGHT, make_color_rgb(134, 192, 108));
+    Test_Eq("D108 UI_C_LIGHTEST = #E0F8CF", UI_C_LIGHTEST, make_color_rgb(224, 248, 207));
+    Test_Eq("D108 QTE_COL_DARKEST was $211807", QTE_COL_DARKEST, $211807);
+    Test_Eq("D108 QTE_COL_DARK was $506830", QTE_COL_DARK, $506830);
+    Test_Eq("D108 QTE_COL_LIGHT was $6CC086", QTE_COL_LIGHT, $6CC086);
+    Test_Eq("D108 QTE_COL_LIGHTEST was $CFF8E0", QTE_COL_LIGHTEST, $CFF8E0);
+    Test_Eq("D108 Icon_PaletteColour 0 was $211807", Icon_PaletteColour("0"), $211807);
+    Test_Eq("D108 Icon_PaletteColour 1 was $506830", Icon_PaletteColour("1"), $506830);
+    Test_Eq("D108 Icon_PaletteColour 2 was $6CC086", Icon_PaletteColour("2"), $6CC086);
+    Test_Eq("D108 Icon_PaletteColour 3 was $CFF8E0", Icon_PaletteColour("3"), $CFF8E0);
+    var _navc = Nav_FxColors();
+    Test_Eq("D108 Nav_FxColors c0", _navc.c0, make_color_rgb(7, 24, 33));
+    Test_Eq("D108 Nav_FxColors c1", _navc.c1, make_color_rgb(48, 104, 80));
+    Test_Eq("D108 Nav_FxColors c2", _navc.c2, make_color_rgb(134, 192, 108));
+    Test_Eq("D108 Nav_FxColors c3", _navc.c3, make_color_rgb(224, 248, 207));
+    Test_Eq("D113 UI_C_MERCHANT_GOLD was make_color_rgb(232, 197, 71)", UI_C_MERCHANT_GOLD, make_color_rgb(232, 197, 71));
     // --- list cursor with wrap-around
     var _all = [true, true, true, true];
     Test_Eq("D95 up from the first item wraps to the last", Ui_CursorMove(0, -1, _all), 3);
