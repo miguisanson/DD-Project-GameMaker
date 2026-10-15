@@ -107,6 +107,7 @@ function Test_RunAll() {
     Test_RunSuite("Input", Test_Suite_Input);
     Test_RunSuite("UI", Test_Suite_UI);
     Test_RunSuite("MetricsCache", Test_Suite_MetricsCache);
+    Test_RunSuite("MenuMeasure", Test_Suite_MenuMeasure);
     Test_RunSuite("SfxInit", Test_Suite_SfxInit);
     Test_RunSuite("Audio", Test_Suite_Audio);
     if (Test_HasFlag("-testcontrol")) {
@@ -4019,6 +4020,254 @@ function Test_Suite_MetricsCache() {
     for (var _i6 = 0; _i6 < 1000; _i6++) UI_TextWidth("Wooden Sword");
     var _t2 = get_timer();
     Test_Log("[PERF] 1000 x Ui_Metrics: " + string(_t1 - _t0) + " us, 1000 x UI_TextWidth: " + string(_t2 - _t1) + " us");
+
+    draw_set_font(_f0);
+    if (_own) global.display = _disp0;
+    Loc_SetLanguage(_lang0);
+}
+
+// D108 F1c: the menus measure their rows once per change, and the Tab menu's data is built once.
+// A 25-row menu with a details panel (the shop's shape): item rows with a name, a value, a sentence and number lines, one slider row and one choice row.
+function Test_MenuRows(_n, _tag) {
+    var _rows = [];
+    for (var _i = 0; _i < _n; _i++) {
+        var _r = {
+            id: "r" + string(_i), kind: "button", enabled: true,
+            label: _tag + " row " + string(_i) + (((_i mod 5) == 0) ? " with a longer name" : ""),
+            value: string(_i * 10) + "g", help: "", lines: []
+        };
+        repeat ((_i mod 4) + 1) _r.help += "A sentence about row " + string(_i) + " that is long enough to wrap in the details panel. ";
+        repeat (_i mod 3) array_push(_r.lines, { label: "Stat", value: string(_i) });
+        if (_i == 3) { _r.kind = "slider"; _r.value = "50%"; _r.amount = 0.5; }
+        if (_i == 4) { _r.kind = "choice"; _r.value = "On"; _r.measure = ["On", "Off"]; }
+        array_push(_rows, _r);
+    }
+    return _rows;
+}
+
+// The measuring as it was before the cache (every frame): the expected widths and heights.
+function Test_MenuRef(_m, _mt) {
+    var _p = _mt.p;
+    var _L = _m.layout;
+    var _lw = 0;
+    var _vw = 0;
+    for (var _i = 0; _i < array_length(_m.items); _i++) {
+        var _it = _m.items[_i];
+        _lw = max(_lw, UI_TextWidth(_it.label));
+        var _kind = variable_struct_exists(_it, "kind") ? _it.kind : "button";
+        var _w = 0;
+        if (_kind == "slider") _w = 14 * _p + 2 * _p + UI_TextWidth("100%");
+        else if (variable_struct_exists(_it, "value") && _it.value != "") {
+            var _texts = variable_struct_exists(_it, "measure") ? _it.measure : [_it.value];
+            for (var _t = 0; _t < array_length(_texts); _t++) _w = max(_w, UI_TextWidth(_texts[_t]));
+            if (_kind == "choice") _w += 10 * _p;
+        }
+        _vw = max(_vw, _w);
+    }
+    var _title_w = (_L.title != "") ? UI_TextWidth(_L.title) : 0;
+    var _inner = max(5 * _p + _lw + ((_vw > 0) ? 4 * _p + _vw : 0), _title_w);
+    var _pw = min(_inner + 8 * _p, _mt.gw - 2 * _mt.margin);
+    if (_L.details && _L.panel_w <= 0) _pw = min(max(_pw, round(_mt.gw * 0.78)), _mt.gw - 2 * _mt.margin);
+    if (_L.panel_w > 0) _pw = min(_L.panel_w, _mt.gw - 2 * _mt.margin);
+    var _dh = 0;
+    if (_L.details) {
+        for (var _d = 0; _d < array_length(_m.items); _d++) {
+            var _di = _m.items[_d];
+            _dh = max(_dh, Ui_DetailsHeight(_pw, _di.help, _di.lines, _L.details_cols, 0));
+        }
+    }
+    return { label_w: _lw, val_w: _vw, panel_w: _pw, det_h: _dh };
+}
+
+function Test_MenuSame(_name, _mc, _ref) {
+    Test_Eq(_name + ": label width", _mc.label_w, _ref.label_w);
+    Test_Eq(_name + ": value width", _mc.val_w, _ref.val_w);
+    Test_Eq(_name + ": panel width", _mc.panel_w, _ref.panel_w);
+    Test_Eq(_name + ": details height", _mc.det_h, _ref.det_h);
+}
+
+// The measuring path the way Ui_MenuDraw calls it: Ui_Metrics, then Ui_MenuMeasure. Returns the measured struct of the last call.
+function Test_MenuFrames(_m, _n) {
+    var _mc = undefined;
+    for (var _i = 0; _i < _n; _i++) _mc = Ui_MenuMeasure(_m, Ui_Metrics());
+    return _mc;
+}
+
+function Test_Suite_MenuMeasure() {
+    var _lang0 = Loc_GetLanguage();
+    var _disp0 = variable_global_exists("display") ? global.display : undefined;
+    var _own = !(is_struct(_disp0) && is_struct(_disp0.layout));
+    if (_own) global.display = { layout: Display_CalcLayout(480, 432), apply_count: 0 };
+    var _f0 = draw_get_font();
+    Loc_SetLanguage("en");
+    var _mt = Ui_Metrics();
+
+    // ---- a 25-row details menu: 300 frames measure once ----
+    var _m = Ui_MenuNew("f1c_measure", Test_MenuRows(25, "A"), { layout: { title: "Shop", details: true } });
+    var _b0 = Ui_MenuMeasureBuilds();
+    var _d0 = Ui_MenuDetailsBuilds();
+    var _mc = Test_MenuFrames(_m, 300);
+    Test_Eq("F1c 300 frames of a 25-row details menu measure the rows once", Ui_MenuMeasureBuilds() - _b0, 1);
+    Test_Eq("F1c 300 frames of a 25-row details menu measure the details height once", Ui_MenuDetailsBuilds() - _d0, 1);
+    Test_True("F1c the details panel has a height", _mc.det_h > 0);
+    Test_MenuSame("F1c first measure equals the per-frame one", _mc, Test_MenuRef(_m, Ui_Metrics()));
+
+    // ---- a new items array (a shop after a purchase, a refreshed list) measures again, once ----
+    _b0 = Ui_MenuMeasureBuilds();
+    _d0 = Ui_MenuDetailsBuilds();
+    _m.items = Test_MenuRows(25, "Bb");
+    _mc = Test_MenuFrames(_m, 300);
+    Test_Eq("F1c a new items array measures the rows exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+    Test_Eq("F1c a new items array measures the details height exactly once", Ui_MenuDetailsBuilds() - _d0, 1);
+    Test_MenuSame("F1c new items array", _mc, Test_MenuRef(_m, Ui_Metrics()));
+    _b0 = Ui_MenuMeasureBuilds();
+    _m.items = array_concat(_m.items, [Test_MenuRows(1, "Extra row with a much longer name than all the others")[0]]);   // one more row
+    _mc = Test_MenuFrames(_m, 50);
+    Test_Eq("F1c one more row measures exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+    Test_MenuSame("F1c one more row", _mc, Test_MenuRef(_m, Ui_Metrics()));
+
+    // ---- a row changed in place: a settings volume 50% -> 60%, a label, a sentence ----
+    _b0 = Ui_MenuMeasureBuilds();
+    _m.items[3].value = "60%";
+    _mc = Test_MenuFrames(_m, 50);
+    Test_Eq("F1c a value changed in place measures exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+    Test_MenuSame("F1c slider value in place", _mc, Test_MenuRef(_m, Ui_Metrics()));
+    _b0 = Ui_MenuMeasureBuilds();
+    var _lw0 = _mc.label_w;
+    _m.items[7].label = "A label changed in place to something very much longer than before, and then some more words to make it the longest label in the whole menu by far";
+    _mc = Test_MenuFrames(_m, 50);
+    Test_Eq("F1c a label changed in place measures exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+    Test_True("F1c the longer label widens the menu", _mc.label_w > _lw0);
+    Test_MenuSame("F1c label in place", _mc, Test_MenuRef(_m, Ui_Metrics()));
+    _b0 = Ui_MenuMeasureBuilds();
+    var _dh0 = _mc.det_h;
+    repeat (12) _m.items[9].help += "Many more words that make this sentence a good deal taller than any other. ";
+    _mc = Test_MenuFrames(_m, 50);
+    Test_Eq("F1c a sentence changed in place measures exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+    Test_True("F1c the taller sentence makes the details panel taller", _mc.det_h > _dh0);
+    Test_MenuSame("F1c sentence in place", _mc, Test_MenuRef(_m, Ui_Metrics()));
+    _b0 = Ui_MenuMeasureBuilds();
+    repeat (8) array_push(_m.items[11].lines, { label: "More", value: "1" });   // number lines added in place
+    _mc = Test_MenuFrames(_m, 50);
+    Test_Eq("F1c number lines added in place measure exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+    Test_MenuSame("F1c lines in place", _mc, Test_MenuRef(_m, Ui_Metrics()));
+
+    // ---- the details width or columns change: only the sizes are measured again ----
+    _b0 = Ui_MenuMeasureBuilds();
+    _d0 = Ui_MenuDetailsBuilds();
+    _m.layout.panel_w = 200;
+    _mc = Test_MenuFrames(_m, 50);
+    Test_Eq("F1c a fixed panel width leaves the rows alone", Ui_MenuMeasureBuilds() - _b0, 0);
+    Test_Eq("F1c a fixed panel width measures the details height exactly once", Ui_MenuDetailsBuilds() - _d0, 1);
+    Test_MenuSame("F1c fixed panel width", _mc, Test_MenuRef(_m, Ui_Metrics()));
+    _d0 = Ui_MenuDetailsBuilds();
+    _m.layout.details_cols = 2;
+    _mc = Test_MenuFrames(_m, 50);
+    Test_Eq("F1c other details columns measure the details height exactly once", Ui_MenuDetailsBuilds() - _d0, 1);
+    Test_MenuSame("F1c details columns", _mc, Test_MenuRef(_m, Ui_Metrics()));
+    _m.layout.panel_w = 0;
+    _m.layout.details_cols = 1;
+    Test_MenuFrames(_m, 2);
+
+    // ---- a panel above the list follows the highlighted row ----
+    var _ma = Ui_MenuNew("f1c_above", Test_MenuRows(25, "C"), { layout: { title: "", details: true, details_pos: "above", panel_w: 300 } });
+    _d0 = Ui_MenuDetailsBuilds();
+    Test_MenuFrames(_ma, 100);
+    Test_Eq("F1c an above panel measures the highlighted row once", Ui_MenuDetailsBuilds() - _d0, 1);
+    _d0 = Ui_MenuDetailsBuilds();
+    _ma.cursor = 9;
+    _mc = Test_MenuFrames(_ma, 100);
+    Test_Eq("F1c an above panel measures again once when the cursor moves", Ui_MenuDetailsBuilds() - _d0, 1);
+    Test_Eq("F1c an above panel is as tall as the highlighted row needs", _mc.det_h, Ui_DetailsHeight(_mc.panel_w, _ma.items[9].help, _ma.items[9].lines, 1, 0));
+
+    // ---- the language changes: measured again, once each way ----
+    _b0 = Ui_MenuMeasureBuilds();
+    Loc_SetLanguage("ko");
+    _mc = Test_MenuFrames(_m, 300);
+    Test_Eq("F1c en to ko measures the rows exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+    Test_MenuSame("F1c ko", _mc, Test_MenuRef(_m, Ui_Metrics()));
+    _b0 = Ui_MenuMeasureBuilds();
+    Loc_SetLanguage("en");
+    _mc = Test_MenuFrames(_m, 300);
+    Test_Eq("F1c ko to en measures the rows exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+    Test_MenuSame("F1c back in en", _mc, Test_MenuRef(_m, Ui_Metrics()));
+
+    // ---- a row that gains or loses a field, or changes its type, in place is seen (and comparing the kinds never throws) ----
+    var _mx = Ui_MenuNew("f1c_mixed", Test_MenuRows(6, "M"), { layout: { title: "Mixed", details: true } });
+    Test_MenuFrames(_mx, 3);
+    _b0 = Ui_MenuMeasureBuilds();
+    variable_struct_remove(_mx.items[2], "help");
+    _mc = Test_MenuFrames(_mx, 5);
+    Test_Eq("F1c a sentence removed in place measures exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+    _b0 = Ui_MenuMeasureBuilds();
+    _mx.items[2].help = "A sentence is back.";
+    _mc = Test_MenuFrames(_mx, 5);
+    Test_Eq("F1c a sentence added in place measures exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+    _b0 = Ui_MenuMeasureBuilds();
+    _mx.items[1].value = 75;
+    _mx.items[1].kind = "slider";
+    _mc = Test_MenuFrames(_mx, 5);
+    Test_Eq("F1c a value that turns into a number measures exactly once", Ui_MenuMeasureBuilds() - _b0, 1);
+
+    // ---- [PERF] 1000 frames of the measuring path of a 25-row details menu (no assertion: the time depends on the PC) ----
+    var _mp = Ui_MenuNew("f1c_perf", Test_MenuRows(25, "P"), { layout: { title: "Shop", details: true } });
+    var _t0 = get_timer();
+    for (var _pf = 0; _pf < 1000; _pf++) Ui_MenuMeasure(_mp, Ui_Metrics());
+    Test_Log("[PERF] 1000 x Ui_MenuMeasure (25-row details menu): " + string(get_timer() - _t0) + " us");
+
+    // ---- the Tab menu: ids and icons are built once, the labels once per language ----
+    var _ids = TabMenu_Ids();
+    var _icons = TabMenu_Icons();
+    TabMenu_Labels();
+    var _tb0 = TabMenu_DataBuilds();
+    var _tl0 = TabMenu_LabelBuilds();
+    var _same = true;
+    for (var _ti = 0; _ti < 300; _ti++) {
+        var _ids_i = TabMenu_Ids();
+        var _icons_i = TabMenu_Icons();
+        var _lb_i = TabMenu_Labels();
+        if (array_length(_ids_i) != 6 || array_length(_icons_i) != 6 || array_length(_lb_i) != 6) _same = false;
+    }
+    Test_Eq("F1c 300 TabMenu_Ids and TabMenu_Icons calls build nothing more", TabMenu_DataBuilds() - _tb0, 0);
+    Test_Eq("F1c 300 TabMenu_Labels calls build nothing more", TabMenu_LabelBuilds() - _tl0, 0);
+    Test_True("F1c the tab data keeps its shape", _same && _ids[5] == "settings" && array_length(_icons[0]) == 8 && string_length(_icons[5][7]) == 8);
+    _tl0 = TabMenu_LabelBuilds();
+    Loc_SetLanguage("ko");
+    var _lb_ko = TabMenu_Labels();
+    for (var _tj = 0; _tj < 300; _tj++) TabMenu_Labels();
+    Test_Eq("F1c en to ko builds the tab labels exactly once", TabMenu_LabelBuilds() - _tl0, 1);
+    Test_Eq("F1c the ko tab labels are the language's own", _lb_ko[2], Loc_T("tab.items", "Items"));
+    _tl0 = TabMenu_LabelBuilds();
+    Loc_SetLanguage("en");
+    var _lb_en = TabMenu_Labels();
+    for (var _tk = 0; _tk < 300; _tk++) TabMenu_Labels();
+    Test_Eq("F1c ko to en builds the tab labels exactly once", TabMenu_LabelBuilds() - _tl0, 1);
+    Test_Eq("F1c the en tab labels come back", _lb_en[0] + "," + _lb_en[5], "Status,Settings");
+
+    // ---- the Status card's texts: once per (language, metrics) ----
+    _mt = Ui_Metrics();
+    var _cd = TabMenu_CardData(_mt);
+    var _cb0 = TabMenu_CardBuilds();
+    for (var _ci = 0; _ci < 300; _ci++) TabMenu_CardData(Ui_Metrics());
+    Test_Eq("F1c 300 Status card data calls build nothing more", TabMenu_CardBuilds() - _cb0, 0);
+    Test_Eq("F1c the Status card knows its labels", _cd.hp + _cd.mp + _cd.xp, Loc_T("battle.hud.hp", "HP") + Loc_T("battle.hud.mp", "MP") + Loc_T("tab.lbl.xp", "XP"));
+    Test_Eq("F1c the Status card's label width is the widest label", _cd.lab_w, max(UI_TextWidth(_cd.hp), max(UI_TextWidth(_cd.mp), UI_TextWidth(_cd.xp))));
+    Test_Eq("F1c the level text equals Loc_T's", string_replace_all(_cd.level_tpl, "{n}", "7"), Loc_T("battle.hud.level", "Lv {n}", { n: "7" }));
+    Test_Eq("F1c the seed text equals Loc_T's", string_replace_all(_cd.seed_tpl, "{n}", "123"), Loc_T("tab.lbl.seed_small", "Seed {n}", { n: "123" }));
+    _cb0 = TabMenu_CardBuilds();
+    Loc_SetLanguage("ko");
+    for (var _cj = 0; _cj < 300; _cj++) TabMenu_CardData(Ui_Metrics());
+    Test_Eq("F1c en to ko builds the Status card data exactly once", TabMenu_CardBuilds() - _cb0, 1);
+    Loc_SetLanguage("en");
+    Ui_Metrics();
+
+    // ---- input: one snapshot struct is reused and starts clean every frame ----
+    var _s1 = Ui_ReadInput();
+    _s1.click = true;
+    _s1.wheel = 1;
+    var _s2 = Ui_ReadInput();
+    Test_True("F1c Ui_ReadInput reuses one snapshot struct", _s1 == _s2);
+    Test_True("F1c a reused snapshot starts clean", !_s2.click && _s2.wheel == 0);
 
     draw_set_font(_f0);
     if (_own) global.display = _disp0;
