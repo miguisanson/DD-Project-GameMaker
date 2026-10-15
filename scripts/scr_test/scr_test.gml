@@ -7961,6 +7961,8 @@ function Test_Suite_Title() {
     Test_True("D128 ko: the prompt is not the English one", Title_SplashPrompt("keyboard") != "Press any key");
     Test_True("D128 ko: the cannot-continue line is not the English one", Title_CardText(Title_CardModel({ status: "corrupt", run: undefined })).title != "Can't continue");
     Loc_SetLanguage(_lang0);
+}
+
 // D127: the first class chest cannot be skipped. The predicate that says when floor 1's exit must refuse the player, the step-back direction,
 // and the two lines (checked against the owner's wording, not copied from the code).
 function Test_Suite_ClassGuard() {
