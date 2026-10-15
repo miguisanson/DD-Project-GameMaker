@@ -140,14 +140,15 @@ def drop_chance(base, dry):
     return min(1.0, base + LOOT_DRY_STEP * dry)
 
 
+ELITE_FIRST_FLOOR = 3   # D145: no elites on floors 1 and 2 (the game's Shuffle_EliteCount in scr_loot.gml hard-codes the same 3; the export has no field for it)
+
+
 def elite_count(floor, free, chance=0.15):
-    """D123 Shuffle_EliteCount: elites on one floor, out of its `free` (non-fixed) enemy slots (chance = ELITE_CHANCE, exported as economy.elite_chance)."""
-    if free <= 0:
+    """D123 / D145 Shuffle_EliteCount: elites on one floor, out of its `free` (non-fixed) enemy slots (chance = ELITE_CHANCE, exported as economy.elite_chance).
+    None below floor 3; from floor 3, ~chance of the free slots (rounded half up), at least 1, never more than there are."""
+    if free <= 0 or int(floor) < ELITE_FIRST_FLOOR:
         return 0
-    c = rhu(chance * free)
-    if int(floor) >= 2:
-        c = max(c, 1)
-    return min(c, free)
+    return min(max(rhu(chance * free), 1), free)
 
 
 KEY = {"atk": "atk", "df": "def", "spd": "spd", "mag": "mag"}   # the fighter's stat key -> the key the game's data uses
