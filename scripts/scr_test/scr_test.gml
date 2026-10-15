@@ -125,6 +125,7 @@ function Test_RunAll() {
     Test_RunSuite("MapJuice", Test_Suite_MapJuice);
     Test_RunSuite("H3", Test_Suite_H3);
     Test_RunSuite("MapAI", Test_Suite_MapAI);
+    Test_RunSuite("Lighting", Test_Suite_Lighting);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -10067,4 +10068,290 @@ function Test_Suite_MapAI() {
     Test_H11Hear();
     Test_H11Hide();
     Test_H11Spots();
+}
+
+// ============================================================================
+// H14 (D157, D159): enemy vision as light, and the darker rooms with their light pools. Expected sets below are worked out by hand
+// (a lit cell is one where some part can be seen from the middle of the viewer's cell), never copied from the code's output.
+// Map characters: "." free, "#" wall (blocks sight and movement).
+// A row of a visible set (Test_LightRows): "@" the viewer, "X" lit, "." inside the radius but dark, " " outside the radius, "!" lit but outside the radius (a bug).
+// ============================================================================
+function Test_LightRows(_g, _cx, _cy, _tiles, _see_through = false) {
+    var _cone = Vis_Cone(_g, _cx, _cy, _tiles, _see_through);
+    var _r = floor(_tiles);
+    var _out = "";
+    for (var _dy = -_r; _dy <= _r; _dy++) {
+        var _row = "";
+        for (var _dx = -_r; _dx <= _r; _dx++) {
+            var _in = (_dx * _dx + _dy * _dy <= _tiles * _tiles);
+            var _ch = " ";
+            if (_dx == 0 && _dy == 0) _ch = "@";
+            else if (Vis_Has(_cone, _cx + _dx, _cy + _dy)) _ch = _in ? "X" : "!";
+            else if (_in) _ch = ".";
+            _row += _ch;
+        }
+        _out += (_dy > -_r ? "|" : "") + _row;
+    }
+    return _out;
+}
+
+function Test_LightCount(_g, _cx, _cy, _tiles, _see_through = false) {
+    var _cone = Vis_Cone(_g, _cx, _cy, _tiles, _see_through);
+    var _r = floor(_tiles);
+    var _n = 0;
+    for (var _dy = -_r; _dy <= _r; _dy++) {
+        for (var _dx = -_r; _dx <= _r; _dx++) {
+            if (Vis_Has(_cone, _cx + _dx, _cy + _dy)) _n++;
+        }
+    }
+    return _n;
+}
+
+function Test_LightOpen(_w, _h) {
+    var _rows = [];
+    var _row = "";
+    for (var _i = 0; _i < _w; _i++) _row += ".";
+    for (var _j = 0; _j < _h; _j++) array_push(_rows, _row);
+    return _rows;
+}
+
+function Test_LightVis() {
+    // an open room: the lit cells are exactly the circle (cells whose middle is within the radius)
+    var _open = Nav_GridFromRows(Test_LightOpen(7, 7));
+    Test_Eq("H14 vis: open room, radius 2 is the round 13-cell shape", Test_LightRows(_open, 3, 3, 2),
+        "  X  | XXX |XX@XX| XXX |  X  ");
+    var _big = Nav_GridFromRows(Test_LightOpen(13, 13));
+    Test_Eq("H14 vis: open room, radius 1 lights 5 cells", Test_LightCount(_big, 6, 6, 1), 5);
+    Test_Eq("H14 vis: open room, radius 2 lights 13 cells", Test_LightCount(_big, 6, 6, 2), 13);
+    Test_Eq("H14 vis: open room, radius 3 lights 29 cells", Test_LightCount(_big, 6, 6, 3), 29);
+    Test_Eq("H14 vis: open room, radius 4 lights 49 cells", Test_LightCount(_big, 6, 6, 4), 49);
+    Test_Eq("H14 vis: open room, radius 5 lights 81 cells", Test_LightCount(_big, 6, 6, 5), 81);
+    Test_Eq("H14 vis: open room, radius 2.5 lights 21 cells (2,1 is in, 2,2 is out)", Test_LightCount(_big, 6, 6, 2.5), 21);
+
+    // one pillar two cells to the right: the two cells straight behind it are dark, the pillar itself and the cells beside the shadow are lit
+    var _pil = Nav_GridFromRows(["...........", "...........", "...........", "...........", ".......#...", "...........", "...........", "...........", "..........."]);
+    Test_Eq("H14 vis: a pillar casts a shadow behind it, radius 4", Test_LightRows(_pil, 5, 4, 4),
+        "    X    |  XXXXX  | XXXXXXX | XXXXXXX |XXXX@XX..| XXXXXXX | XXXXXXX |  XXXXX  |    X    ");
+
+    // a wall two cells to the right with a one-cell gap on the viewer's row: the light goes through the gap in a thin beam
+    var _gap = Nav_GridFromRows(["......#..", "......#..", "......#..", "......#..", ".........", "......#..", "......#..", "......#..", "......#.."]);
+    Test_Eq("H14 vis: a wall with a gap lets a thin beam through, radius 4", Test_LightRows(_gap, 4, 4, 4),
+        "    X    |  XXXXX  | XXXXXX. | XXXXXXX |XXXX@XXXX| XXXXXXX | XXXXXX. |  XXXXX  |    X    ");
+
+    // a room's edge counts as a wall: from the corner only the quarter inside the grid is lit, and nothing crashes
+    var _corner = Nav_GridFromRows(Test_LightOpen(5, 5));
+    var _cc = Vis_Cone(_corner, 0, 0, 2);
+    var _in_ok = Vis_Has(_cc, 0, 0) && Vis_Has(_cc, 1, 0) && Vis_Has(_cc, 2, 0) && Vis_Has(_cc, 0, 1) && Vis_Has(_cc, 1, 1) && Vis_Has(_cc, 0, 2);
+    Test_True("H14 vis: from a corner the six cells of the quarter circle are lit", _in_ok);
+    Test_False("H14 vis: from a corner (2,1) is outside the circle", Vis_Has(_cc, 2, 1));
+    Test_False("H14 vis: a cell far outside the cone's window is never lit", Vis_Has(_cc, 40, 40));
+
+    // an enemy that sees through walls (ghosts): the whole circle, walls or not
+    var _col = Nav_GridFromRows([".....#...", ".....#...", ".....#...", ".....#...", ".....#...", ".....#...", ".....#..."]);
+    Test_Eq("H14 vis: a ghost's circle ignores the wall, radius 3 lights 29 cells", Test_LightCount(_col, 3, 3, 3, true), 29);
+    Test_True("H14 vis: a ghost lights the cell behind the wall", Vis_Has(Vis_Cone(_col, 3, 3, 3, true), 6, 3));
+    Test_False("H14 vis: a normal enemy does not light the cell behind the wall", Vis_Has(Vis_Cone(_col, 3, 3, 3, false), 6, 3));
+    Test_True("H14 vis: a normal enemy lights the wall in front of it", Vis_Has(Vis_Cone(_col, 3, 3, 3, false), 5, 3));
+
+    // the sight test and the light are the same set
+    var _T = GRID_TILE_SIZE;
+    Test_False("H14 vis: Sight_CanSee does not see the cell behind the pillar", Sight_CanSee(_pil, 5 * _T, 4 * _T, 8 * _T, 4 * _T, 4, false, false));
+    Test_True("H14 vis: Sight_CanSee sees the cell beside the shadow", Sight_CanSee(_pil, 5 * _T, 4 * _T, 8 * _T, 3 * _T, 4, false, false));
+    Test_True("H14 vis: Sight_CanSee sees the pillar's own cell", Sight_CanSee(_pil, 5 * _T, 4 * _T, 7 * _T, 4 * _T, 4, false, false));
+    Test_False("H14 vis: Sight_CanSee does not see outside the radius", Sight_CanSee(_pil, 5 * _T, 4 * _T, 5 * _T, 9 * _T, 4, false, false));
+    Test_True("H14 vis: a ghost's Sight_CanSee goes through the wall", Sight_CanSee(_col, 3 * _T, 3 * _T, 6 * _T, 3 * _T, 3, true, false));
+    Test_False("H14 vis: a hidden player two cells away is not seen though the cell is lit", Sight_CanSee(_pil, 5 * _T, 4 * _T, 3 * _T, 4 * _T, 4, false, true));
+    Test_True("H14 vis: a hidden player one cell away is seen", Sight_CanSee(_pil, 5 * _T, 4 * _T, 4 * _T, 4 * _T, 4, false, true));
+
+    // the radius an enemy sees (and lights) with: its sight, one more while it chases, none for a boss
+    var _slime = EnemyAI_Profile(ENEMY_SLIME);
+    var _wolf = EnemyAI_Profile(ENEMY_DIREWOLF);
+    var _boss = EnemyAI_Profile(ENEMY_FINAL_BOSS);
+    Test_Eq("H14 vis: a slime lights a radius of 4 while idle", Vis_EnemyTiles(_slime, "idle"), 4);
+    Test_Eq("H14 vis: a slime lights a radius of 5 while it chases (+1 tile)", Vis_EnemyTiles(_slime, "chase"), 5);
+    Test_Eq("H14 vis: a slime lights a radius of 4 while it searches", Vis_EnemyTiles(_slime, "search"), 4);
+    Test_Eq("H14 vis: a dire wolf lights a radius of 5 while idle", Vis_EnemyTiles(_wolf, "idle"), 5);
+    Test_Eq("H14 vis: a dire wolf lights a radius of 6 while it chases", Vis_EnemyTiles(_wolf, "chase"), 6);
+    Test_Eq("H14 vis: the final boss lights nothing", Vis_EnemyTiles(_boss, "idle"), 0);
+
+    // the set is worked out once per (cell, radius) and again only when the grid changes
+    var _cg = Nav_GridFromRows(Test_LightOpen(12, 12));
+    var _b0 = Vis_BuildCount();
+    for (var _i = 0; _i < 50; _i++) Sight_CanSee(_cg, 5 * _T, 5 * _T, (3 + (_i mod 5)) * _T, 5 * _T, 4, false, false);
+    Test_Eq("H14 vis: 50 sight tests from one cell build the set once", Vis_BuildCount() - _b0, 1);
+    Sight_CanSee(_cg, 6 * _T, 5 * _T, 3 * _T, 5 * _T, 4, false, false);
+    Test_Eq("H14 vis: another cell builds one more", Vis_BuildCount() - _b0, 2);
+    Sight_CanSee(_cg, 5 * _T, 5 * _T, 3 * _T, 5 * _T, 5, false, false);
+    Test_Eq("H14 vis: another radius builds one more", Vis_BuildCount() - _b0, 3);
+    Sight_CanSee(_cg, 5 * _T, 5 * _T, 3 * _T, 5 * _T, 4, false, false);
+    Sight_CanSee(_cg, 6 * _T, 5 * _T, 3 * _T, 5 * _T, 4, false, false);
+    Test_Eq("H14 vis: going back to a known cell and radius builds nothing", Vis_BuildCount() - _b0, 3);
+    Nav_GridSet(_cg, 7, 5, true, true);
+    Sight_CanSee(_cg, 5 * _T, 5 * _T, 3 * _T, 5 * _T, 4, false, false);
+    Test_Eq("H14 vis: a changed grid builds the set again", Vis_BuildCount() - _b0, 4);
+    Test_False("H14 vis: the new wall now hides the cell behind it", Sight_CanSee(_cg, 5 * _T, 5 * _T, 9 * _T, 5 * _T, 4, false, false));
+}
+
+// For every floor room and every enemy slot at its home cell, every cell within the radius is lit exactly when EnemyAI_CanSee would see a (not hidden) player standing there;
+// a hidden player is seen only within 1 tile (D153). Also: the circle, the viewer's own cell, and a bigger radius never lights less.
+function Test_LightConsistency() {
+    var _rooms = Scenario_GridRooms();
+    var _T = GRID_TILE_SIZE;
+    var _bad = "";
+    var _bad_h = "";
+    var _bad_sub = "";
+    var _bad_circle = "";
+    var _cells = 0;
+    var _cones = 0;
+    var _prof = EnemyAI_Profile(ENEMY_SLIME);
+    for (var _ri = 0; _ri < array_length(_rooms); _ri++) {
+        var _name = room_get_name(_rooms[_ri]);
+        var _m = Test_H11Model(_rooms[_ri]);
+        var _g = _m.grid;
+        var _nav = { grid: _g };
+        for (var _si = 0; _si < array_length(_m.slots); _si++) {
+            var _ex = _m.slots[_si].x;
+            var _ey = _m.slots[_si].y;
+            var _ecx = Nav_CellOf(_ex + _T / 2);
+            var _ecy = Nav_CellOf(_ey + _T / 2);
+            var _inst = { x: _ecx * _T, y: _ecy * _T, prof: _prof };
+            for (var _tiles = 3; _tiles <= 6; _tiles++) {
+                var _cone = Vis_Cone(_g, _ecx, _ecy, _tiles, false);
+                var _bigger = Vis_Cone(_g, _ecx, _ecy, _tiles + 1, false);
+                _cones++;
+                if (!Vis_Has(_cone, _ecx, _ecy)) _bad_circle += " " + _name + "/" + string(_ecx) + "," + string(_ecy) + ":own-cell";
+                for (var _dy = -_tiles - 1; _dy <= _tiles + 1; _dy++) {
+                    for (var _dx = -_tiles - 1; _dx <= _tiles + 1; _dx++) {
+                        var _cx = _ecx + _dx;
+                        var _cy = _ecy + _dy;
+                        var _lit = Vis_Has(_cone, _cx, _cy);
+                        var _in = (_dx * _dx + _dy * _dy <= _tiles * _tiles);
+                        if (_lit && !_in) _bad_circle += " " + _name + "/" + string(_ecx) + "," + string(_ecy) + ":outside(" + string(_dx) + "," + string(_dy) + ")";
+                        if (_lit && !Vis_Has(_bigger, _cx, _cy)) _bad_sub += " " + _name + "/" + string(_ecx) + "," + string(_ecy) + ":r" + string(_tiles) + "(" + string(_dx) + "," + string(_dy) + ")";
+                        if (!_in || !Nav_GridInside(_g, _cx, _cy)) continue;
+                        _cells++;
+                        var _pl = { x: _cx * _T, y: _cy * _T };
+                        var _sees = EnemyAI_CanSee(_inst, _pl, _nav, _tiles, false);
+                        if (_sees != _lit && string_length(_bad) < 400) _bad += " " + _name + "/" + string(_ecx) + "," + string(_ecy) + ":r" + string(_tiles) + "(" + string(_dx) + "," + string(_dy) + ")" + (_lit ? "lit-not-seen" : "seen-not-lit");
+                        var _seesh = EnemyAI_CanSee(_inst, _pl, _nav, _tiles, true);
+                        var _want_h = _lit && (max(abs(_dx), abs(_dy)) <= HIDE_SEEN_TILES);
+                        if (_seesh != _want_h && string_length(_bad_h) < 400) _bad_h += " " + _name + "/" + string(_ecx) + "," + string(_ecy) + ":r" + string(_tiles) + "(" + string(_dx) + "," + string(_dy) + ")";
+                    }
+                }
+            }
+        }
+    }
+    Test_True("H14 consistency: the rooms hold cones to check (" + string(_cones) + " cones, " + string(_cells) + " cells)", _cones >= 50 && _cells > 2000);
+    Test_Eq("H14 consistency: a cell is lit exactly when EnemyAI_CanSee sees a player there (bad:" + _bad + ")", _bad, "");
+    Test_Eq("H14 consistency: a hidden player is seen only on a lit cell within 1 tile (bad:" + _bad_h + ")", _bad_h, "");
+    Test_Eq("H14 consistency: the set stays inside the circle and holds the enemy's own cell (bad:" + _bad_circle + ")", _bad_circle, "");
+    Test_Eq("H14 consistency: a bigger radius never lights less (bad:" + _bad_sub + ")", _bad_sub, "");
+}
+
+// Light sources: one entry per LIT fire stand or torch placed in the room (the objects are read from the room asset here, not from the table).
+function Test_LightSources() {
+    var _rooms = Scenario_GridRooms();
+    var _with = 0;
+    var _bad = "";
+    var _bad_shape = "";
+    var _pal = [UI_C_DARKEST, UI_C_DARK, UI_C_LIGHT, UI_C_LIGHTEST];
+    for (var _ri = 0; _ri < array_length(_rooms); _ri++) {
+        var _name = room_get_name(_rooms[_ri]);
+        var _info = room_get_info(_rooms[_ri], false, true, false, false, false);
+        var _want = [];
+        for (var _i = 0; _i < array_length(_info.instances); _i++) {
+            var _in = _info.instances[_i];
+            var _o = _in.object_index;
+            if (is_string(_o)) _o = asset_get_index(_o);
+            if (_o == obj_fire_stand || _o == obj_torch) array_push(_want, string(Nav_CellOf(_in.x + 8)) + "," + string(Nav_CellOf(_in.y + 8)));
+        }
+        var _src = Light_Sources(_name);
+        var _got = [];
+        for (var _k = 0; _k < array_length(_src); _k++) {
+            array_push(_got, string(_src[_k].cx) + "," + string(_src[_k].cy));
+            var _ok_col = false;
+            for (var _p = 0; _p < 4; _p++) if (_src[_k].col == _pal[_p]) _ok_col = true;
+            if (!(_src[_k].r >= 2 && _src[_k].r <= 5 && _ok_col)) _bad_shape += " " + _name + ":" + string(_k);
+        }
+        array_sort(_want, true);
+        array_sort(_got, true);
+        var _ws = "";
+        var _gs = "";
+        for (var _q = 0; _q < array_length(_want); _q++) _ws += _want[_q] + ";";
+        for (var _q2 = 0; _q2 < array_length(_got); _q2++) _gs += _got[_q2] + ";";
+        if (_ws != _gs) _bad += " " + _name + ":want[" + _ws + "]got[" + _gs + "]";
+        if (array_length(_got) > 0) _with++;
+    }
+    Test_Eq("H14 light: every lit fire stand and torch of every room is a listed source (bad:" + _bad + ")", _bad, "");
+    Test_Eq("H14 light: every source has a radius of 2..5 tiles and a palette colour (bad:" + _bad_shape + ")", _bad_shape, "");
+    Test_Eq("H14 light: 9 rooms have light sources", _with, 9);
+    Test_Eq("H14 light: rm_floor2 has none", array_length(Light_Sources("rm_floor2")), 0);
+    Test_Eq("H14 light: an unknown room has none", array_length(Light_Sources("rm_nothing")), 0);
+    Test_Eq("H14 light: rm_floor8 lists 6 fire stands", array_length(Light_Sources("rm_floor8")), 6);
+    Test_Eq("H14 light: rm_floor6 lists 2 torches and 2 fire stands", array_length(Light_Sources("rm_floor6")), 4);
+
+    // flicker: inside its stated range, deterministic for a given time, steady inside one tick, and it does move
+    var _r_px = 3.5 * GRID_TILE_SIZE;
+    var _rng = Light_FlickerRange(_r_px);
+    Test_True("H14 light: the flicker range is the radius -12% .. +12%", abs(_rng.lo - _r_px * 0.88) < 0.001 && abs(_rng.hi - _r_px * 1.12) < 0.001);
+    var _out = 0;
+    var _lo = 1000000;
+    var _hi = -1000000;
+    var _nondet = 0;
+    for (var _seed = 0; _seed < 20; _seed++) {
+        for (var _ms = 0; _ms < 60000; _ms += 41) {
+            var _v = Light_FlickerRadius(_r_px, _seed, _ms);
+            if (_v < _rng.lo - 0.0001 || _v > _rng.hi + 0.0001) _out++;
+            if (_v != Light_FlickerRadius(_r_px, _seed, _ms)) _nondet++;
+            _lo = min(_lo, _v);
+            _hi = max(_hi, _v);
+        }
+    }
+    Test_Eq("H14 light: the flickering radius never leaves its range (60000 ms, 20 seeds)", _out, 0);
+    Test_Eq("H14 light: the flicker is deterministic for a given time", _nondet, 0);
+    Test_True("H14 light: the flicker really moves (spread " + string(_hi - _lo) + " of " + string(_rng.hi - _rng.lo) + ")", (_hi - _lo) > 0.6 * (_rng.hi - _rng.lo));
+    Test_Eq("H14 light: the flicker is steady inside one 90 ms tick", Light_FlickerRadius(_r_px, 3, 900), Light_FlickerRadius(_r_px, 3, 950));
+    Test_True("H14 light: two seeds do not flicker in step", Light_FlickerRadius(_r_px, 1, 900) != Light_FlickerRadius(_r_px, 2, 900) || Light_FlickerRadius(_r_px, 1, 1800) != Light_FlickerRadius(_r_px, 2, 1800));
+}
+
+function Test_LightLook() {
+    Test_Eq("H14 look: the darkness alpha is the agreed 0.4", LIGHT_DARK_ALPHA, 0.4);
+    Test_Eq("H14 look: the darkness colour is #071821 (red 7)", colour_get_red(LIGHT_DARK_COLOUR), 7);
+    Test_Eq("H14 look: the darkness colour is #071821 (green 24)", colour_get_green(LIGHT_DARK_COLOUR), 24);
+    Test_Eq("H14 look: the darkness colour is #071821 (blue 33)", colour_get_blue(LIGHT_DARK_COLOUR), 33);
+    Test_Eq("H14 look: the darkness colour is the palette's darkest", LIGHT_DARK_COLOUR, UI_C_DARKEST);
+
+    // the pocket a hidden player sits in: dark unless the enemy is within 1 tile of the player
+    Test_True("H14 pocket: a hidden player's cell is dark for an enemy 3 tiles away", Light_PocketCell(8, 4, 5, 4));
+    Test_False("H14 pocket: not for an enemy next to it", Light_PocketCell(6, 4, 5, 4));
+    Test_False("H14 pocket: not for an enemy diagonally next to it", Light_PocketCell(6, 5, 5, 4));
+    Test_False("H14 pocket: no hidden player, no pocket", Light_PocketCell(8, 4, -1, -1));
+
+    // the light surface: made on demand, made again when it was lost, resized when the view changes
+    var _s1 = Light_EnsureSurface(160, 144);
+    Test_True("H14 surface: the light surface exists", surface_exists(_s1));
+    Test_Eq("H14 surface: it is as big as the view (160 wide)", surface_get_width(_s1), 160);
+    Test_Eq("H14 surface: it is as big as the view (144 high)", surface_get_height(_s1), 144);
+    surface_free(_s1);
+    Test_False("H14 surface: it is gone after a loss", surface_exists(_s1));
+    var _s2 = Light_EnsureSurface(160, 144);
+    Test_True("H14 surface: it is made again after a loss", surface_exists(_s2));
+    var _s3 = Light_EnsureSurface(80, 72);
+    Test_True("H14 surface: it follows a new view size", surface_exists(_s3) && surface_get_width(_s3) == 80 && surface_get_height(_s3) == 72);
+    Light_FreeSurface();
+    Test_False("H14 surface: freed on request", surface_exists(_s3));
+}
+
+function Test_Suite_Lighting() {
+    var _need = ["Vis_Cone", "Vis_Has", "Vis_BuildCount", "Vis_EnemyTiles", "Light_Sources", "Light_FlickerRadius", "Light_FlickerRange", "Light_PocketCell", "Light_EnsureSurface", "Light_FreeSurface"];
+    var _missing = "";
+    for (var _i = 0; _i < array_length(_need); _i++) {
+        if (asset_get_index(_need[_i]) == -1) _missing += " " + _need[_i];
+    }
+    Test_Eq("H14 the lighting functions exist (missing:" + _missing + ")", _missing, "");
+    if (_missing != "") return;
+    Test_LightVis();
+    Test_LightConsistency();
+    Test_LightSources();
+    Test_LightLook();
 }

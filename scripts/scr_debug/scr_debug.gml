@@ -512,7 +512,11 @@ function Scenario_StepSmoke(_s) {
         case 580: case 581: case 582: case 583: case 584: case 585: case 586: case 587: case 588: case 589:
         case 590: case 591: case 592: case 593: case 594: case 595: case 596: case 597: case 598: case 599:
         case 600: case 601: case 602: case 603: case 604: case 605: case 606: case 607: case 608: case 609:
-            Scenario_StepSmokeH11(_s);   // H11 (D153, D158): hearing a run, the flee-direction search and the one "?", hiding, no camping at the exit; its last step calls Scenario_NoticeEnd
+            Scenario_StepSmokeH11(_s);   // H11 (D153, D158): hearing a run, the flee-direction search and the one "?", hiding, no camping at the exit; goes on with H14 (710)
+            break;
+        case 710: case 711: case 712: case 713: case 714: case 715: case 716: case 717: case 718: case 719:
+        case 720: case 721: case 722: case 723: case 724: case 725: case 726: case 727: case 728: case 729:
+            Scenario_StepSmokeH14(_s);   // H14 (D157, D159): behind a pillar inside the radius is not seen, one step into the cone is; the lights; the pass under 1 ms; no dotted outline; its last step calls Scenario_NoticeEnd
             break;
         case 30:
             Scenario_StepSmokeUi(_s);
@@ -2881,7 +2885,11 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsMapJuice(_s);   // G6 (D138, map part): the chest burst, the rising item, the gold counter, the level-up sparkle, the step squash
             break;
         case 610: case 611: case 612: case 613: case 614: case 615: case 616: case 617: case 618: case 619:
-            Scenario_StepShotsH11(_s);   // H11 (D153): the ? over an enemy that gave up, the hidden player, the same spot one step off; finishes the run
+            Scenario_StepShotsH11(_s);   // H11 (D153): the ? over an enemy that gave up, the hidden player, the same spot one step off; goes on with H14 (730)
+            break;
+        case 730: case 731: case 732: case 733: case 734: case 735: case 736: case 737: case 738: case 739:
+        case 740: case 741: case 742: case 743: case 744: case 745: case 746: case 747: case 748: case 749:
+            Scenario_StepShotsH14(_s);   // H14 (D157, D159): five scenes at two sizes (forest, cave, torches, shadow behind cover, hidden pocket); finishes the run
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -10580,7 +10588,7 @@ function Scenario_StepSmokeH11(_s) {
                 var _near = 0;
                 with (obj_enemy) { if (point_distance(Nav_CellOf(x + 8), Nav_CellOf(y + 8), _pc.cx, _pc.cy) < AI_ARRIVAL_CLEAR_TILES) _near++; }
                 Scenario_Check("h11_nobody_within_3_tiles_of_the_arrival_tile", _near == 0, "near=" + string(_near));
-                Scenario_NoticeEnd();   // H11 ends the smoke chain
+                Scenario_Next(_s, 710);   // goes on with H14 (710)
             }
             if (_s.t > 600) { Scenario_Release(); Scenario_Check("h11_the_player_is_back_in_rm_floor3", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
@@ -10659,8 +10667,238 @@ function Scenario_StepShotsH11(_s) {
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 with (obj_enemy) instance_destroy();
-                Scenario_Finish();
+                Scenario_Next(_s, 730);   // goes on with H14 (730)
             }
             break;
+    }
+}
+
+// ============================================================================
+// H14 (D157, D159), smoke steps 710..729 (the game's own input state; rm_floor3, then rm_floor6 for the cost):
+//   710-712: a slime at (12,6) with sight 4, a pillar (a wall) at (10,6). The player stands at (9,6) straight behind it, inside the radius: 40 frames, no sighting; the
+//            light set says the same. One real step up to (9,5), inside the cone: the slime spots him.
+//   713:     the room's lights (the fire stand of rm_floor3) are listed, lit, and the lighting pass has been running every frame.
+//   714-716: rm_floor6 (two torches, two fire stands), the player in the middle of the lights and every enemy of the room plus extra slimes standing blind inside the view:
+//            the lighting pass is timed for 130 frames, average under 1 ms.
+//   717:     the dotted sight outline (D63) is gone: its ring cache was never built in the whole run.
+// ============================================================================
+function Scenario_H14Free(_cx, _cy) {
+    return !Nav_CellBlocked(Nav_Get().grid, _cx, _cy);
+}
+
+function Scenario_StepSmokeH14(_s) {
+    if (!variable_struct_exists(_s, "h14")) _s.h14 = { };
+    var _h = _s.h14;
+    var _T = GRID_TILE_SIZE;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _e = (variable_struct_exists(_h, "e") && instance_exists(_h.e)) ? _h.e : noone;
+    switch (_s.step) {
+        case 710:   // the slime at (12,6), the pillar at (10,6), the player at (9,6) behind it
+            if (asset_get_index("Vis_Cone") == -1 || asset_get_index("Light_Stats") == -1) { Scenario_Check("h14_the_lighting_code_exists", false); Scenario_NoticeEnd(); break; }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor3) && Player_IsSettled(_pl)) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_Release();
+                Scenario_Check("h14_the_stage_cells_of_rm_floor3_are_free", Scenario_H14Free(12, 6) && Scenario_H14Free(10, 6) && Scenario_H14Free(9, 6) && Scenario_H14Free(9, 5));
+                _h.pillar = Scenario_Block(obj_wall, 10, 6);
+                _h.e = Scenario_H11Enemy(obj_slime, 12, 6, 4);
+                Scenario_PlacePlayer(9, 6);
+                _h.bad = false;
+                Scenario_Next(_s, 711);
+            }
+            if (_s.t > 600) { Scenario_Check("h14_rm_floor3_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 711:   // behind the pillar, inside the radius: not seen, and not lit
+            if (_e == noone) { Scenario_Check("h14_the_slime_is_alive", false); Scenario_NoticeEnd(); break; }
+            if (_e.ai_mode != "idle" || _e.alert_pop > 0) _h.bad = true;
+            if (_s.t == 5) {
+                var _g = Nav_Get().grid;
+                var _cone = Vis_Cone(_g, 12, 6, 4, false);
+                Scenario_Check("h14_the_pillar_blocks_sight_in_the_room_grid", Nav_SightBlocked(_g, 10, 6));
+                Scenario_Check("h14_the_cell_behind_the_pillar_is_dark", !Vis_Has(_cone, 9, 6) && !Vis_Has(_cone, 8, 6));
+                Scenario_Check("h14_the_pillar_and_the_cells_in_front_are_lit", Vis_Has(_cone, 10, 6) && Vis_Has(_cone, 11, 6) && Vis_Has(_cone, 9, 5) && Vis_Has(_cone, 9, 7));
+                Scenario_Check("h14_the_player_is_inside_the_radius_behind_the_pillar", point_distance(12, 6, Nav_CellOf(_pl.x + _T / 2), Nav_CellOf(_pl.y + _T / 2)) <= 4);
+            }
+            if (_s.t >= 50) {
+                Scenario_Check("h14_behind_the_pillar_inside_the_radius_the_player_is_not_seen", !_h.bad, "mode=" + _e.ai_mode);
+                Scenario_Hold("move_up", 4);   // one real step to (9,5)
+                Scenario_Next(_s, 712);
+            }
+            break;
+        case 712:   // one step out into the cone: seen
+            if (_e == noone) { Scenario_Check("h14_the_slime_is_alive_after_the_step", false); Scenario_NoticeEnd(); break; }
+            if (_e.ai_mode == "chase" && !variable_struct_exists(_h, "spot_t")) {
+                _h.spot_t = _s.t;
+                _h.spot_cx = Nav_CellOf(_pl.x + _T / 2);
+                _h.spot_cy = Nav_CellOf(_pl.y + _T / 2);
+            }
+            if (variable_struct_exists(_h, "spot_t") || _s.t > 90) {
+                Scenario_Release();
+                Scenario_Check("h14_stepping_out_of_the_shadow_into_the_cone_is_seen", variable_struct_exists(_h, "spot_t"), "mode=" + _e.ai_mode);
+                Scenario_Check("h14_it_saw_him_in_the_lit_cell_above", variable_struct_exists(_h, "spot_t") && _h.spot_cx == 9 && _h.spot_cy == 5, "cell " + (variable_struct_exists(_h, "spot_t") ? string(_h.spot_cx) + "," + string(_h.spot_cy) : "none"));
+                Scenario_Check("h14_the_exclamation_mark_is_up", _e.alert_pop > 0);
+                if (instance_exists(_h.pillar)) with (_h.pillar) instance_destroy();
+                with (obj_enemy) instance_destroy();
+                Scenario_Next(_s, 713);
+            }
+            break;
+        case 713:   // the room's light sources and the pass
+            var _src = Light_Sources(room_get_name(room));
+            Scenario_Check("h14_rm_floor3_lists_its_fire_stand_at_8_3", array_length(_src) == 1 && _src[0].cx == 8 && _src[0].cy == 3, "n=" + string(array_length(_src)));
+            Scenario_Check("h14_that_fire_stand_is_lit", array_length(_src) == 1 && Light_IsLit(_src[0]));
+            Scenario_Check("h14_the_lighting_pass_ran_every_frame_of_the_room", Light_PerfFrames() >= 100, "frames=" + string(Light_PerfFrames()));
+            Scenario_ClearUi();
+            room_goto(rm_floor2);
+            Scenario_Next(_s, 714);
+            break;
+        case 714:
+            if (_s.t > 20 && room == rm_floor2) {
+                room_goto(rm_floor6);
+                Scenario_Next(_s, 715);
+            }
+            if (_s.t > 300) { Scenario_Check("h14_rm_floor2_is_reached", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 715:   // rm_floor6: the player at (13,4) between the torch (12,2) and the fire stand (16,5); every enemy blind and still, 4 extra slimes in the view
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor6) && Player_IsSettled(_pl)) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_Release();
+                Scenario_PlacePlayer(13, 4);
+                var _extra = [[10, 5], [9, 6], [15, 6], [14, 7]];
+                for (var _k = 0; _k < array_length(_extra); _k++) {
+                    if (Scenario_H14Free(_extra[_k][0], _extra[_k][1])) Scenario_H11Enemy(obj_slime, _extra[_k][0], _extra[_k][1], -1);
+                }
+                with (obj_enemy) {
+                    EnemyAI_Init(id);
+                    spot_cooldown = 99999;   // blind: it only stands there, and its light is drawn all the same
+                    idle_timer = 100000;
+                }
+                _h.n_enemies = instance_number(obj_enemy);
+                Scenario_Check("h14_rm_floor6_has_lights_and_enemies_for_the_cost_run", array_length(Light_Sources("rm_floor6")) == 4 && _h.n_enemies >= 6, "enemies=" + string(_h.n_enemies));
+                Light_PerfReset();
+                Scenario_Next(_s, 716);
+            }
+            if (_s.t > 600) { Scenario_Check("h14_rm_floor6_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 716:   // 130 frames of the pass
+            if (_s.t >= 130) {
+                var _avg = Light_PerfAvgMs();
+                var _st = Light_Stats();
+                show_debug_message("[LIGHT-PERF] room=rm_floor6 enemies=" + string(_h.n_enemies) + " cones_drawn=" + string(_st.cones) + " lights_drawn=" + string(_st.lights)
+                    + " frames=" + string(Light_PerfFrames()) + " avg_ms=" + string_format(_avg, 1, 4) + " max_ms=" + string_format(Light_PerfMaxMs(), 1, 4));
+                Scenario_Check("h14_the_pass_ran_130_frames", Light_PerfFrames() >= 120, "frames=" + string(Light_PerfFrames()));
+                Scenario_Check("h14_the_view_holds_cones_and_lights", _st.cones >= 3 && _st.lights >= 2, "cones=" + string(_st.cones) + " lights=" + string(_st.lights));
+                Scenario_Check("h14_the_lighting_pass_costs_under_1_ms_per_frame", _avg < 1.0, "avg_ms=" + string(_avg));
+                Scenario_Next(_s, 717);
+            }
+            break;
+        case 717:
+            Scenario_Check("h14_the_dotted_sight_outline_is_not_drawn_any_more", !variable_global_exists("nav_ring_builds") || global.nav_ring_builds == 0, "ring builds=" + string(variable_global_exists("nav_ring_builds") ? global.nav_ring_builds : 0));
+            with (obj_enemy) instance_destroy();
+            Scenario_NoticeEnd();   // H14 ends the smoke chain
+            break;
+    }
+}
+
+// ============================================================================
+// H14 (D157, D159) pictures 730-749, five scenes, each at scale 3 (480 x 432) and scale 5 (800 x 720), shot_h14_<scene>_<w>x<h>.png:
+//   forest   rm_floor2: a dire wolf's light on the open floor, the player outside it
+//   cave     rm_floor7: the torches along the rock wall and a spider's light
+//   torches  rm_floor6: the two torches (no enemy): the light pools alone
+//   shadow   rm_floor9: a dire wolf with the player behind the wall column: in the dark, not seen
+//   hidden   rm_floor3: the player hidden on the hiding cell (3,4), a wolf 2 tiles away: the cell stays in shadow
+// ============================================================================
+function Scenario_H14Scene(_i) {
+    switch (_i) {
+        case 0: return { name: "forest", rm: rm_floor2, pcx: 4, pcy: 5, foes: [[obj_dire_wolf, 10, 5]], wait: 40 };
+        case 1: return { name: "cave", rm: rm_floor7, pcx: 6, pcy: 4, foes: [[obj_spider, 11, 5]], wait: 40 };
+        case 2: return { name: "torches", rm: rm_floor6, pcx: 8, pcy: 4, foes: [], wait: 40 };
+        case 3: return { name: "shadow", rm: rm_floor9, pcx: 2, pcy: 6, foes: [[obj_dire_wolf, 7, 6]], wait: 40 };
+        case 4: return { name: "hidden", rm: rm_floor3, pcx: 3, pcy: 4, foes: [[obj_dire_wolf, 3, 6]], wait: HIDE_SETTLE_FRAMES + 30 };
+    }
+    return undefined;
+}
+
+function Scenario_StepShotsH14(_s) {
+    if (!variable_struct_exists(_s, "h14s")) _s.h14s = { i: 0, e: [] };
+    var _h = _s.h14s;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _sc = Scenario_H14Scene(_h.i);
+    switch (_s.step) {
+        case 730:   // build the scene _h.i
+            if (_sc == undefined) { Scenario_Finish(); break; }
+            if (asset_get_index("Vis_Cone") == -1 || asset_get_index("Light_PocketCell") == -1) { Scenario_Check("shots_h14_the_lighting_code_exists", false); Scenario_Finish(); break; }
+            if (_s.t == 1) {
+                Scenario_Release();
+                Scenario_NewKnight(CLASS_KNIGHT);
+                Scenario_SetWindowScale(3);
+                _h.via = (_sc.rm == rm_floor2) ? rm_floor3 : rm_floor2;
+                room_goto(_h.via);   // via another room: the controller only spawns the player on a room change
+            }
+            if (_s.t == 30 && room == _h.via) room_goto(_sc.rm);
+            if (_s.t > 70 && Scenario_FloorReady(_sc.rm) && Player_IsSettled(_pl)) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_PlacePlayer(_sc.pcx, _sc.pcy);
+                _h.e = [];
+                for (var _k = 0; _k < array_length(_sc.foes); _k++) {
+                    array_push(_h.e, Scenario_H11Enemy(_sc.foes[_k][0], _sc.foes[_k][1], _sc.foes[_k][2], -1));
+                }
+                Scenario_Next(_s, 731);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_h14_" + _sc.name + "_room_is_ready", false, "room=" + room_get_name(room) + " player=" + string(_pl != noone)); Scenario_Finish(); }
+            break;
+        case 731:   // scale 3, wait, shoot
+            if (_s.t == 1) Scenario_SetWindowScale(3);
+            if (_s.t >= _sc.wait) {
+                Scenario_H14Judge(_h, _sc, _pl);
+                _s.shot = "shot_h14_" + _sc.name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 732);
+            }
+            break;
+        case 732:   // scale 5
+            if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+            if (_s.t == 4) Scenario_SetWindowScale(5);
+            if (_s.t >= 40) {
+                _s.shot = "shot_h14_" + _sc.name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 733);
+            }
+            break;
+        case 733:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _h.i++;
+                if (Scenario_H14Scene(_h.i) == undefined) {
+                    with (obj_enemy) instance_destroy();
+                    Scenario_Finish();
+                } else {
+                    Scenario_Next(_s, 730);
+                }
+            }
+            break;
+    }
+}
+
+// What each picture is about, checked at the moment of the shot: nobody has seen the player.
+function Scenario_H14Judge(_h, _sc, _pl) {
+    var _T = GRID_TILE_SIZE;
+    var _quiet = true;
+    for (var _k = 0; _k < array_length(_h.e); _k++) {
+        if (!instance_exists(_h.e[_k])) { _quiet = false; continue; }
+        if (_h.e[_k].ai_mode != "idle" || _h.e[_k].alert_pop > 0) _quiet = false;
+    }
+    Scenario_Check("shots_h14_" + _sc.name + "_nobody_has_seen_the_player", _quiet);
+    var _pcx = Nav_CellOf(_pl.x + _T / 2);
+    var _pcy = Nav_CellOf(_pl.y + _T / 2);
+    if (_sc.name == "shadow" || _sc.name == "hidden") {
+        var _g = Nav_Get().grid;
+        var _ec = Scenario_H11Cell(_h.e[0]);
+        var _cone = Vis_Cone(_g, _ec.cx, _ec.cy, _h.e[0].prof.sight, _h.e[0].prof.see_through);
+        if (_sc.name == "shadow") Scenario_Check("shots_h14_shadow_the_player_stands_in_the_dark_inside_the_radius", !Vis_Has(_cone, _pcx, _pcy) && point_distance(_ec.cx, _ec.cy, _pcx, _pcy) <= _h.e[0].prof.sight);
+        else Scenario_Check("shots_h14_hidden_the_player_is_hidden_and_the_cell_is_a_dark_pocket", Player_IsHidden(_pl) && Light_PocketCell(_ec.cx, _ec.cy, _pcx, _pcy));
     }
 }
