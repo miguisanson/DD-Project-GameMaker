@@ -548,9 +548,9 @@ function Scenario_StepSmoke(_s) {
             break;
         case 680: case 681: case 682: case 683: case 684: case 685: case 686: case 687: case 688: case 689:
         case 690: case 691: case 692: case 693: case 694: case 695: case 696: case 697: case 698: case 699:
-            Scenario_StepSmokeNotes(_s);   // H7 (D147): lore notes are picked up by walking onto them, never block, stay gone; the Codex Notes page and its reader; its last step goes on with D164 (790)
+            Scenario_StepSmokeNotes(_s);   // H7 (D147): lore notes are picked up by walking onto them, never block, stay gone; the Codex Notes page and its reader; its last step goes on with D164 (820)
             break;
-        case 790: case 791: case 792: case 793: case 794: case 795: case 796: case 797: case 798: case 799:
+        case 820: case 821: case 822: case 823: case 824: case 825: case 826: case 827: case 828: case 829:
             Scenario_StepSmokeD164(_s);   // D164 (amends D159): the daylight room, the extra torches placed once per room start; its last step calls Scenario_NoticeEnd
             break;
         case 30:
@@ -2952,8 +2952,8 @@ function Scenario_StepShots(_s) {
         case 740: case 741: case 742: case 743: case 744: case 745: case 746: case 747: case 748: case 749:
             Scenario_StepShotsH14(_s);   // H14 (D157, D159): five scenes at two sizes (forest, cave, torches, shadow behind cover, hidden pocket); goes on with H7 (700)
             break;
-        case 790: case 791: case 792: case 793: case 794: case 795: case 796: case 797: case 798: case 799:
-            Scenario_StepShotsD164(_s);   // D164: three scenes at two sizes (daylight forest, extra wall torches, sun spot); goes on with H7 (700)
+        case 830: case 831: case 832: case 833: case 834: case 835: case 836: case 837: case 838: case 839:
+            Scenario_StepShotsD164(_s);   // D164 (830..839): three scenes at two sizes (daylight forest, extra wall torches, sun spot); goes on with H7 (700)
             break;
         case 700: case 701: case 702: case 703: case 704: case 705: case 706: case 707: case 708: case 709:
             Scenario_StepShotsNotes(_s);   // H7 (D147): the Codex Notes page, a note in the reader, a long text in the reader; two sizes; finishes the run
@@ -12423,7 +12423,7 @@ function Scenario_StepShotsH14(_s) {
                 _h.i++;
                 if (Scenario_H14Scene(_h.i) == undefined) {
                     with (obj_enemy) instance_destroy();
-                    Scenario_Next(_s, 790);   // goes on with D164 (790..799) and then H7 (700..709), the end of the pictures
+                    Scenario_Next(_s, 830);   // goes on with D164 (830..839) and then H7 (700..709), the end of the pictures
                 } else {
                     Scenario_Next(_s, 730);
                 }
@@ -12655,7 +12655,7 @@ function Scenario_StepSmokeNotes(_s) {
                 case 70: Scenario_Tap("cancel"); break;
                 case 90:
                     Scenario_Check("notes_back_back_back_closes_the_menu", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
-                    Scenario_Next(_s, 790);   // goes on with D164 (790..799), the end of the chain
+                    Scenario_Next(_s, 820);   // goes on with D164 (820..829), the end of the chain
                     break;
             }
             break;
@@ -12663,13 +12663,13 @@ function Scenario_StepSmokeNotes(_s) {
 }
 
 // ============================================================================
-// D164 (amends D159): lighter rooms, daylight rooms with sun spots, extra torches placed in code. Smoke steps 790-799 (the end of the chain after H7:
-// the last step calls Scenario_NoticeEnd), pictures 790-799 (go on with H7's pictures, 700).
-//   790  rm_floor2 (daylight): its darkness is the daylight value, its source list holds a sun spot, the pass draws it
-//   791  rm_floor3 (two extra torches): the room holds exactly its extra torches, each on its cell and lit; the pass draws lights
-//   792  leave to rm_floor2
-//   793  back to rm_floor3: still exactly the same torches (a room start does not stack a second set), the placement called again adds none
-//   794  the end of the chain
+// D164 (amends D159): lighter rooms, daylight rooms with sun spots, extra torches placed in code. Smoke steps 820-829 (the end of the chain after H7:
+// the last step calls Scenario_NoticeEnd), pictures 830-839 (go on with H7's pictures, 700).
+//   820  rm_floor2 (daylight): its darkness is the daylight value, its source list holds a sun spot, the pass draws it
+//   821  rm_floor3 (two extra torches): the room holds exactly its extra torches, each on its cell and lit; the pass draws lights
+//   822  leave to rm_floor2
+//   823  back to rm_floor3: still exactly the same torches (a room start does not stack a second set), the placement called again adds none
+//   824  the end of the chain
 // ============================================================================
 function Scenario_D164TorchCount(_name) {
     var _list = Light_ExtraTorches(_name);
@@ -12684,7 +12684,7 @@ function Scenario_D164TorchCount(_name) {
 function Scenario_StepSmokeD164(_s) {
     var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
     switch (_s.step) {
-        case 790:   // rm_floor2: daylight
+        case 820:   // rm_floor2: daylight
             if (asset_get_index("Light_RoomDark") == -1 || asset_get_index("Light_ExtraTorches") == -1) { Scenario_Check("d164_the_lighting_code_exists", false); Scenario_NoticeEnd(); break; }
             if (_s.t == 1) {
                 Scenario_Release();
@@ -12703,11 +12703,11 @@ function Scenario_StepSmokeD164(_s) {
                 Scenario_Check("d164_rm_floor2_has_a_sun_spot_in_the_live_source_list", _suns >= 1, "suns=" + string(_suns));
                 Scenario_Check("d164_rm_floor2_gets_no_extra_torch", instance_number(obj_torch) == 0, "torches=" + string(instance_number(obj_torch)));
                 Light_PerfReset();
-                Scenario_Next(_s, 791);
+                Scenario_Next(_s, 821);
             }
             if (_s.t > 600) { Scenario_Check("d164_rm_floor2_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
-        case 791:   // the pass runs in rm_floor2 for a while, then rm_floor3
+        case 821:   // the pass runs in rm_floor2 for a while, then rm_floor3
             if (_s.t == 40) {
                 Scenario_Check("d164_the_pass_draws_the_sun_spots_of_rm_floor2", Light_Stats().lights >= 1, "lights=" + string(Light_Stats().lights));
                 room_goto(rm_floor3);
@@ -12722,16 +12722,16 @@ function Scenario_StepSmokeD164(_s) {
                 Scenario_Check("d164_every_extra_torch_is_lit", _lit == _c.want, "lit=" + string(_lit));
                 Scenario_Check("d164_rm_floor3_is_the_plain_darkness", Light_RoomDarkNow() == LIGHT_DARK_ALPHA, "now=" + string(Light_RoomDarkNow()));
                 _s.d164 = { total: _c.total };
-                Scenario_Next(_s, 792);
+                Scenario_Next(_s, 822);
             }
             if (_s.t > 600) { Scenario_Check("d164_rm_floor3_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
-        case 792:   // leave
+        case 822:   // leave
             if (_s.t == 1) room_goto(rm_floor2);
-            if (_s.t > 20 && Scenario_FloorReady(rm_floor2)) Scenario_Next(_s, 793);
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor2)) Scenario_Next(_s, 823);
             if (_s.t > 600) { Scenario_Check("d164_back_in_rm_floor2", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
-        case 793:   // come back: not twice
+        case 823:   // come back: not twice
             if (_s.t == 1) room_goto(rm_floor3);
             if (_s.t > 40 && Scenario_FloorReady(rm_floor3) && Player_IsSettled(_pl)) {
                 var _c = Scenario_D164TorchCount("rm_floor3");
@@ -12739,17 +12739,17 @@ function Scenario_StepSmokeD164(_s) {
                 var _made = Light_PlaceExtraTorches();
                 Scenario_Check("d164_placing_again_adds_nothing", _made == 0 && instance_number(obj_torch) == _c.total, "made=" + string(_made) + " total=" + string(instance_number(obj_torch)));
                 Scenario_Check("d164_the_torches_still_light_the_room", array_length(Light_RoomSources()) >= 1 + _c.want);
-                Scenario_Next(_s, 794);
+                Scenario_Next(_s, 824);
             }
             if (_s.t > 600) { Scenario_Check("d164_rm_floor3_is_ready_again", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
-        case 794:
+        case 824:
             Scenario_NoticeEnd();   // the end of the chain
             break;
     }
 }
 
-// D164 pictures 790-799: three scenes, each at scale 3 (480 x 432) and scale 5 (800 x 720), shot_d164_<scene>_<w>x<h>.png:
+// D164 pictures 830-839: three scenes, each at scale 3 (480 x 432) and scale 5 (800 x 720), shot_d164_<scene>_<w>x<h>.png:
 //   daylight  rm_floor2: the open forest clearing, lit as day
 //   torches   rm_floor3: the two extra wall torches beside the fire stand
 //   shine     rm_floor9: the sun spot where the trees grew over the room
@@ -12768,7 +12768,7 @@ function Scenario_StepShotsD164(_s) {
     var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
     var _sc = Scenario_D164Scene(_h.i);
     switch (_s.step) {
-        case 790:   // build the scene _h.i
+        case 830:   // build the scene _h.i
             if (_sc == undefined) { Scenario_Next(_s, 700); break; }
             if (asset_get_index("Light_RoomDark") == -1) { Scenario_Check("shots_d164_the_lighting_code_exists", false); Scenario_Finish(); break; }
             if (_s.t == 1) {
@@ -12785,11 +12785,11 @@ function Scenario_StepShotsD164(_s) {
                 Dialogue_CloseNow();
                 Scenario_ClearUi();
                 Scenario_PlacePlayer(_sc.pcx, _sc.pcy);
-                Scenario_Next(_s, 791);
+                Scenario_Next(_s, 831);
             }
             if (_s.t > 600) { Scenario_Check("shots_d164_" + _sc.name + "_room_is_ready", false, "room=" + room_get_name(room) + " player=" + string(_pl != noone)); Scenario_Finish(); }
             break;
-        case 791:   // scale 3, wait, shoot
+        case 831:   // scale 3, wait, shoot
             if (_s.t == 1) Scenario_SetWindowScale(3);
             if (_s.t >= _sc.wait) {
                 var _gs = GameState_Get();
@@ -12797,24 +12797,24 @@ function Scenario_StepShotsD164(_s) {
                 Scenario_Check("shots_d164_" + _sc.name + "_the_darkness_is_the_room_value", Light_RoomDarkNow() == Light_RoomDark(room_get_name(_sc.rm)), "now=" + string(Light_RoomDarkNow()));
                 _s.shot = "shot_d164_" + _sc.name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
                 Scenario_ShotLayout(_s.shot);
-                Scenario_Next(_s, 792);
+                Scenario_Next(_s, 832);
             }
             break;
-        case 792:   // scale 5
+        case 832:   // scale 5
             if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
             if (_s.t == 4) Scenario_SetWindowScale(5);
             if (_s.t >= 40) {
                 _s.shot = "shot_d164_" + _sc.name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
                 Scenario_ShotLayout(_s.shot);
-                Scenario_Next(_s, 793);
+                Scenario_Next(_s, 833);
             }
             break;
-        case 793:
+        case 833:
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 _h.i++;
                 if (Scenario_D164Scene(_h.i) == undefined) Scenario_Next(_s, 700);   // goes on with H7 (700..709), the end of the pictures
-                else Scenario_Next(_s, 790);
+                else Scenario_Next(_s, 830);
             }
             break;
     }

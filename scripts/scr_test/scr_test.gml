@@ -11504,7 +11504,7 @@ function Test_LightSources() {
 }
 
 function Test_LightLook() {
-    Test_Eq("H14 look: the darkness alpha is the agreed 0.4", LIGHT_DARK_ALPHA, 0.4);
+    Test_Eq("H14 look: the base darkness alpha is 0.28 (D164 amends the 0.4 of D159)", LIGHT_DARK_ALPHA, 0.28);
     Test_Eq("H14 look: the darkness colour is #071821 (red 7)", colour_get_red(LIGHT_DARK_COLOUR), 7);
     Test_Eq("H14 look: the darkness colour is #071821 (green 24)", colour_get_green(LIGHT_DARK_COLOUR), 24);
     Test_Eq("H14 look: the darkness colour is #071821 (blue 33)", colour_get_blue(LIGHT_DARK_COLOUR), 33);
