@@ -3443,7 +3443,7 @@ function Ui_MenuNew(_id, _items, _opts) {
         rep_v: Ui_RepeatNew(), rep_h: Ui_RepeatNew(),
         on_confirm: undefined, on_back: undefined, on_adjust: undefined,
         owner: noone, data: {}, lock_ms: current_time,
-        layout: { title: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false,
+        layout: { title: "", note: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false,
                   x_anchor: "center", panel_w: 0, y_bottom: -1, max_h: 0, details_pos: "below", details_cols: 1, rows_max: 0,
                   y_top: -1, det_w: 0, det_art: false, det_top: -1, det_h: -1 },
         rect: { x: 0, y: 0, w: 0, h: 0 }, det_rect: { x: 0, y: 0, w: 0, h: 0 },

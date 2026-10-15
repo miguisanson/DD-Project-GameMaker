@@ -273,6 +273,19 @@ function Cards_ChestOpened(_ch) {
     return ch;
 }
 
+// STUB (H4 checks first): the real text comes with the implementation.
+function LevelUp_GrowthText(_class_id, _level) {
+    return "";
+}
+
+// STUB (H4 checks first).
+function Cards_FreePointOptions(_ch) {
+    var out = Cards_StatOptions(_ch);
+    array_push(out, { stat: -1, label: "", from: 0, to: 0 });
+    array_push(out, { stat: -1, label: "", from: 0, to: 0 });
+    return out;
+}
+
 // The four rows of the free-point prompt: the stat, its value now and after the point.
 function Cards_StatOptions(_ch) {
     var ids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG];
