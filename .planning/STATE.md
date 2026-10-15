@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | Session 4 overnight: next = R1 + R1b + F1a + F3b-1 + F3b-2 merged (b28a2eb); FULL gate running (log E:/Temp/dd-gate-next-full.log). In flight (Sonnet): fix-diff (wt/fixdiff, D35 difficulty menu removal), F1d-1 battle HUD per-frame (wt/f1d1). Queue: F1b, F3a, F1c, then E2 build; F2/F4/F1d-2/3 after. |
+| WIP | Session 4 overnight: next a73a078 = R1, R1b, F1a, F3b-1/2, F1d-1, fix-diff merged (fast gate PASS 3166/0; last FULL gate PASS at b28a2eb). In flight (Sonnet): F1d-3 world/audio (wt/f1d3), F1b metrics cache (wt/f1b). Queue: F3a (notice popup + dead slot save menu), F1c (menu draw), then FULL gate + E2 build; F2/F4/F1d-2 after E2. |
 | Unplayed features | no cap (D71); one big playtest at E2 |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
