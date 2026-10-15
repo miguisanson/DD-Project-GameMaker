@@ -74,8 +74,8 @@ if (state == "run_flow") {   // C1: run summary, echo pick, new run (scr_room_st
     return;
 }
 
-if (state == "main" || state == "difficulty" || state == "settings") {
-    Title_Step(id);   // scr_menu.gml: the title menu stack, the difficulty panel, the settings popup
+if (state == "main" || state == "settings") {
+    Title_Step(id);   // scr_menu.gml: the title menu, the settings popup
     return;
 }
 

@@ -2392,8 +2392,8 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
 // --------------------
 // TITLE MENU (D0 pilot on the UI framework)
 // --------------------
-// obj_start_controller keeps `state` ("main" | "difficulty" | "settings" | "boot_logo" | "cutscene") and holds the menu stack in
-// title_stk: [title] or [title, difficulty]. Settings is the popup above.
+// obj_start_controller keeps `state` ("main" | "settings" | "boot_logo" | "cutscene") and holds the menu stack in title_stk: [title].
+// Settings is the popup above. New Game starts the run at once on Normal (D35: one difficulty only).
 function Title_MainItems(_can_load) {
     return [
         { id: "new", label: Loc_T("menu.main.option.0", "New Game"), kind: "button", enabled: true },
@@ -2401,20 +2401,6 @@ function Title_MainItems(_can_load) {
         { id: "settings", label: Loc_T("menu.main.option.2", "Settings"), kind: "button", enabled: true },
         { id: "exit", label: Loc_T("menu.main.option.3", "Exit Game"), kind: "button", enabled: true }
     ];
-}
-
-function Title_DifficultyItems() {
-    return [
-        { id: "easy", label: Loc_T("settings.difficulty.option.0", "Easy"), kind: "button", enabled: true },
-        { id: "normal", label: Loc_T("settings.difficulty.option.1", "Normal"), kind: "button", enabled: true },
-        { id: "hard", label: Loc_T("settings.difficulty.option.2", "Hard"), kind: "button", enabled: true },
-        { id: "back", label: Loc_T("menu.common.back", "Back"), kind: "button", enabled: true }
-    ];
-}
-
-function Title_DifficultyValue(_i) {
-    var vals = [DIFFICULTY_EASY, DIFFICULTY_NORMAL, DIFFICULTY_HARD];
-    return vals[clamp(_i, 0, 2)];
 }
 
 function Title_Build(_c) {
@@ -2434,43 +2420,14 @@ function Title_Refresh(_c) {
     _c.title_refresh = false;
 }
 
-function Title_OpenDifficulty(_c) {
-    var gs = GameState_Get();
-    UI_ModalRootBegin("title_difficulty");
-    var m = Ui_MenuNew("difficulty", Title_DifficultyItems(), {
-        owner: _c, on_confirm: Title_OnConfirm, on_back: Title_OnBack,
-        layout: { title: Loc_T("menu.difficulty.title", "Select Difficulty"), anchor: "center" }
-    });
-    var cur = DIFFICULTY_NORMAL;
-    if (variable_struct_exists(gs, "difficulty")) cur = Difficulty_Normalize(gs.difficulty);
-    for (var i = 0; i < 3; i++) if (Title_DifficultyValue(i) == cur) Ui_MenuFixCursor(m, i);
-    Ui_StackPush(_c.title_stk, m);
-    _c.state = "difficulty";
-}
-
-// The difficulty menu was left by Back (the stack already popped it).
-function Title_OnBack(_m, _res) {
-    if (_m.id != "difficulty") return;
-    UI_ModalRootEnd(false);
-    _m.owner.state = "main";
-}
-
 function Title_OnConfirm(_m, _i) {
     var c = _m.owner;
     var rid = _m.items[_i].id;
-    if (_m.id == "difficulty") {
-        if (rid == "back") {
-            if (Ui_StackBack(c.title_stk) == "pop") Title_OnBack(_m, "pop");
-            return;
-        }
-        // start: the panel fades out, then the intro cutscene is requested (the dim holds until the room changes)
-        UI_ModalRootHold("title_room_change");
-        c.title_exit = { value: Title_DifficultyValue(_i), at: current_time + UI_PANEL_MS };
-        Ui_MenuClose(_m);
-        return;
-    }
     switch (rid) {
-        case "new": Title_OpenDifficulty(c); break;
+        case "new":   // D35: no difficulty menu. The title fades out, then the run (or the intro cutscene) is requested.
+            c.title_exit = { at: current_time + UI_PANEL_MS };
+            Ui_MenuClose(_m);
+            break;
         case "load":   // C1 (D46): Continue run
             var cont = Run_Continue();
             if (!cont.ok) SaveMenu_OpenMessage(Run_ContinueFailText(cont.status), true);
@@ -2483,7 +2440,7 @@ function Title_OnConfirm(_m, _i) {
     }
 }
 
-// One Step for the title in states main / difficulty / settings.
+// One Step for the title in states main / settings.
 function Title_Step(_c) {
     var gs = GameState_Get();
     if (!is_struct(_c.title_stk)) Title_Build(_c);
@@ -2503,9 +2460,8 @@ function Title_Step(_c) {
     }
     if (is_struct(_c.title_exit)) {
         if (current_time >= _c.title_exit.at) {
-            var v = _c.title_exit.value;
             _c.title_exit = undefined;
-            Difficulty_SetCurrent(v);
+            Difficulty_SetCurrent(DIFFICULTY_NORMAL);   // D35: the one difficulty
             gs.in_main_menu = false;
             Run_BeginNewGame();   // C1: the intro plays once per profile, later runs start at once
         }
@@ -2528,13 +2484,6 @@ function Title_Draw(_c) {
     Ui_StackDraw(_c.title_stk);
     draw_set_alpha(1);
     draw_set_color(c_white);
-}
-
-// For the shared modal dim (UI_GetModalVisualAlpha) while the difficulty panel is up.
-function Title_ModalAlpha(_c) {
-    if (!is_struct(_c.title_stk)) return 1;
-    var top = Ui_StackTop(_c.title_stk);
-    return is_struct(top) ? Ui_MenuAlpha(top, current_time) : 1;
 }
 
 // --------------------

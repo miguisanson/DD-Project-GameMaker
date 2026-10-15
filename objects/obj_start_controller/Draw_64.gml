@@ -43,7 +43,7 @@ if (room == rm_start && title_bg_sprite != noone) {
     draw_sprite_stretched(title_bg_sprite, 0, 0, 0, w, h);
 }
 
-if ((state == "main" || state == "difficulty") && gs.ui.mode != UI_SAVE && !loading_into_game) {
+if (state == "main" && gs.ui.mode != UI_SAVE && !loading_into_game) {
     Title_Draw(id);   // scr_menu.gml: the menu stack on the UI framework
 }
 

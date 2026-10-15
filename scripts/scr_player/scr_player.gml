@@ -1025,16 +1025,6 @@ function UI_GetModalVisualAlpha() {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) return -1;
 
-    if (room == rm_start && instance_exists(obj_start_controller)) {
-        var sc = instance_find(obj_start_controller, 0);
-        if (instance_exists(sc)
-        && variable_instance_exists(sc, "state")
-        && string(sc.state) == "difficulty"
-        && variable_instance_exists(sc, "title_stk")) {
-            return Title_ModalAlpha(sc);
-        }
-    }
-
     switch (gs.ui.mode) {
         case UI_SAVE:
             if (variable_struct_exists(gs.ui, "save_menu")) {
@@ -1068,21 +1058,6 @@ function UI_UpdateModalDimState() {
             if (!Transition_IsActive()
             && variable_struct_exists(gs, "in_main_menu")
             && !gs.in_main_menu) {
-                root.active = false;
-                root.owner = "";
-                root.opened_frame = UI_OPENED_FRAME_NONE;
-                root.closing = false;
-                root.close_frame = UI_OPENED_FRAME_NONE;
-                root.hold_until_transition = false;
-                root.hold_mode = "";
-                alpha = 0;
-            }
-        } else if (root.hold_mode == "title_room_change") {
-            var title_visual_alpha = UI_GetModalVisualAlpha();
-            if (title_visual_alpha >= 0) alpha = title_visual_alpha * 0.6;
-            else alpha = 0.6;
-
-            if (room != rm_start) {
                 root.active = false;
                 root.owner = "";
                 root.opened_frame = UI_OPENED_FRAME_NONE;

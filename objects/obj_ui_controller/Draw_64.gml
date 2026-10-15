@@ -12,16 +12,7 @@ draw_set_alpha(1);
 
 // The battle's HUD (HP, MP, statuses, strip, log, menus) is drawn by obj_battle_controller (D99).
 
-var skip_shared_modal_dim = false;
-if (room == rm_start && instance_exists(obj_start_controller)) {
-    var start_ctrl = instance_find(obj_start_controller, 0);
-    if (instance_exists(start_ctrl)
-    && variable_instance_exists(start_ctrl, "state")
-    && string(start_ctrl.state) == "difficulty") {
-        skip_shared_modal_dim = true;
-    }
-}
-if (!skip_shared_modal_dim) UI_DrawModalDim();
+UI_DrawModalDim();
 
 if (gs.ui.mode == UI_PAUSE) {
     if (room != rm_battle) PauseMenu_Draw();   // R1b (D122): in a battle the battle controller draws it, after its own HUD
