@@ -507,6 +507,9 @@ function Scenario_StepSmoke(_s) {
         case 450: case 451: case 452: case 453: case 454: case 455: case 456: case 457: case 458: case 459:
             Scenario_StepSmokeRunStats(_s);   // G9 (D137): the run stats from a real fight on the summary and in the Codex run history; its last step goes on to H3 (500), the end of the chain
             break;
+        case 790: case 791: case 792: case 793: case 794: case 795: case 796: case 797: case 798: case 799:
+            Scenario_StepSmokeEliteDeath(_s);   // H13a (D156): an elite on the map draws its sprite outline, a death shows its picture and reaches the summary; the end of the chain (its last step calls Scenario_NoticeEnd)
+            break;
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step goes on to G6 (380)
             break;
@@ -2958,6 +2961,9 @@ function Scenario_StepShots(_s) {
             break;
         case 770: case 771: case 772: case 773: case 774: case 775: case 776: case 777: case 778: case 779:
             Scenario_StepShotsClassMem(_s);   // H5 (D144, D148): the class screen (some skills ???, the sprite preview, the locked Nobody) and the echo screen, two sizes; finishes the run
+            break;
+        case 800: case 801: case 802: case 803: case 804: case 805: case 806: case 807: case 808: case 809:
+            Scenario_StepShotsEliteDeath(_s);   // H13a (D156): an elite slime and an elite plant on the map, the death scene with its picture, 480 x 432 and 800 x 720; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -11615,7 +11621,7 @@ function Scenario_StepSmokeClassMem(_s) {
             if (_s.t == 2) {
                 var _disk = Profile_Load(Profile_Path());
                 Scenario_Check("classmem_the_profile_file_holds_the_memory", _disk.status == "ok" && _disk.profile.profile_version == 2 && Profile_SkillKnown(_disk.profile, SKILL_WOUND) && Profile_SkillKnown(_disk.profile, SKILL_HILT_BASH) && Profile_SkillKnown(_disk.profile, SKILL_FIREBALL));
-                Scenario_NoticeEnd();
+                Scenario_Next(_s, 790);   // goes on with H13a (790..799), the end of the chain
             }
             break;
     }
@@ -13012,11 +13018,180 @@ function Scenario_StepShotsClassMem(_s) {
                 if (_o.di >= array_length(_scenes)) {
                     global.profile = undefined;   // the next Profile_Get reads the real (scratch) file again
                     RunSave_Delete();
-                    Scenario_Finish();   // the end of the pictures
+                    _s.eg_i = 0;
+                    Scenario_Next(_s, 800);   // goes on with H13a (800..809), the end of the pictures
                 } else {
                     Scenario_Next(_s, 770);
                 }
             }
+            break;
+    }
+}
+
+// ---- H13a (D156): the elite outline follows the sprite; the death scene shows the old GAME_OVER picture (smoke steps 790-799, the end of the chain; pictures 800-809) ----
+// An elite on the map of floor 2 draws its outline every frame for 40 frames (Elite_FxDrawCount counts the elites the world pass drew, so a missing or failing draw shows); a death then shows its
+// picture (RunFlow_DeathPicDraws counts the frames the picture was drawn) and reaches the summary. Writes the profile and the run: only inside the gate (NoticeEnd removes them).
+function Scenario_StepSmokeEliteDeath(_s) {
+    var _gs = GameState_Get();
+    var _scn = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _flow = (variable_global_exists("run_flow") && is_struct(global.run_flow)) ? global.run_flow : undefined;
+    if (!variable_struct_exists(_s, "ed")) _s.ed = { elite: noone, draws0: 0, pics0: 0, seen: false };
+    var _ed = _s.ed;
+    switch (_s.step) {
+        case 790:   // floor 2, one enemy made an elite and frozen
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP elite and death smoke (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_NoticeEnd();
+                    break;
+                }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                room_goto(rm_floor2);
+            }
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor2)) {
+                var _first = noone;
+                with (obj_enemy) { cine_lock_count = 1; if (_first == noone && !defeated) _first = id; }
+                Scenario_Check("elitedeath_floor2_has_an_enemy", instance_exists(_first));
+                if (!instance_exists(_first)) { Scenario_NoticeEnd(); break; }
+                _first.elite_mod = "brutal";
+                _ed.elite = _first.id;
+                _ed.draws0 = Elite_FxDrawCount();
+                Scenario_Next(_s, 791);
+            }
+            if (_s.t > 600) { Scenario_Check("elitedeath_floor2_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 791:   // 40 frames later: the outline was drawn each frame, then the player dies
+            if (_s.t == 40) {
+                var _n = Elite_FxDrawCount() - _ed.draws0;
+                Scenario_Check("elitedeath_the_elite_outline_is_drawn_every_frame", _n >= 38 && _n <= 44, "draws=" + string(_n));
+                Scenario_Check("elitedeath_the_elite_still_stands", instance_exists(_ed.elite) && !_ed.elite.defeated);
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                GameState_SetBattleEnemy("h13_smoke", ENEMY_SLIME, 1);
+                Player_OnDeath(_gs.player_ch);
+                Scenario_Next(_s, 792);
+            }
+            break;
+        case 792:   // the death scene: the picture is there while the line shows, then the summary
+            if (is_struct(_flow) && _scn != noone && _scn.state == "run_flow" && _flow.phase == "death" && !_ed.seen) {
+                _ed.seen = true;
+                _ed.pics0 = RunFlow_DeathPicDraws();
+                Scenario_Check("elitedeath_the_death_picture_is_the_sprite_GAME_OVER", RunFlow_DeathImageName() == "GAME_OVER" && sprite_exists(RunFlow_DeathImage()));
+            }
+            if (_ed.seen && is_struct(_flow) && _flow.phase == "summary") {
+                var _d = RunFlow_DeathPicDraws() - _ed.pics0;
+                Scenario_Check("elitedeath_the_picture_is_drawn_through_the_death_line", _d >= 100, "frames=" + string(_d));
+                Scenario_Check("elitedeath_the_death_reaches_the_summary", true);
+                Scenario_NoticeEnd();   // the end of the chain: removes the files and the profile the steps made
+            }
+            if (_s.t > 900) { Scenario_Check("elitedeath_the_death_reaches_the_summary", false, "phase=" + (is_struct(_flow) ? string(_flow.phase) : "none") + " seen=" + string(_ed.seen)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// Pictures 800-809 (480 x 432 = scale 3, then 800 x 720 = scale 5): an elite slime and an elite plant on the map (the outline follows the sprite), the death scene with its picture.
+function Scenario_ShotEliteDeath(_s, _name) {
+    _s.shot = "shot_elitedeath_" + _name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+    Scenario_ShotLayout(_s.shot, (_name == "death") ? "fade=1" : "");   // the death scene is a picture on a dark screen with a fade: the edge check does not apply
+}
+
+function Scenario_EliteShotRetype(_inst, _enemy_id) {
+    _inst.enemy_id = _enemy_id;
+    Enemy_ReapplyConfig(_inst);
+    _inst.elite_mod = "armored";
+    _inst.image_index = 0;
+}
+
+function Scenario_StepShotsEliteDeath(_s) {
+    var _gs = GameState_Get();
+    var _flow = (variable_global_exists("run_flow") && is_struct(global.run_flow)) ? global.run_flow : undefined;
+    var _scn = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _scales = [3, 5];
+    switch (_s.step) {
+        case 800:   // floor 4, the first enemy a frozen elite slime, the player three tiles from it
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP elite and death shots (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_NoticeEnd();
+                    break;
+                }
+                Scenario_SetWindowScale(_scales[_s.eg_i]);
+                Loc_SetLanguage("en");
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                _gs.pending_wake_line = false;   // run 2 of the first pass owes its wake line: it would open over the map
+                var _g = Scenario_NewKnight(CLASS_KNIGHT);
+                _g.run = Run_Create(2468);
+                room_goto(rm_floor4);
+            }
+            if (_s.t == 60) {
+                Scenario_ClearUi();
+                var _pl = instance_find(obj_player, 0);
+                var _first = noone;
+                with (obj_enemy) { cine_lock_count = 1; if (_first == noone) _first = id; }
+                Scenario_Check("shots_elitedeath_map_has_enemies", instance_exists(_first));
+                if (!instance_exists(_first)) { Scenario_NoticeEnd(); break; }
+                Scenario_EliteShotRetype(_first, ENEMY_SLIME);
+                _s.eg_enemy = _first;
+                _pl.x = Grid_Snap(_first.x - 48);
+                _pl.y = Grid_Snap(_first.y);
+                _pl.moving = false;
+                _pl.move_timer = 0;
+            }
+            if (_s.t == 100) Scenario_ShotEliteDeath(_s, "slime");
+            if (_s.t == 106) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_EliteShotRetype(_s.eg_enemy, ENEMY_KILLER_PLANT);
+            }
+            if (_s.t == 120) Scenario_ShotEliteDeath(_s, "plant");
+            if (_s.t == 126) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_Next(_s, 801);
+            }
+            break;
+        case 801:   // a run on a clean profile, then a death by a slime
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Profile_ResetForTest();
+                RunSave_Delete();
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 5551);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && _s.t > 40) {
+                Scenario_ClearUi();
+                GameState_SetBattleEnemy("h13_shot", ENEMY_SLIME, 1);
+                Player_OnDeath(_gs.player_ch);
+                Scenario_Next(_s, 802);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_elitedeath_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 802:   // the death line, faded in, with its picture
+            if (is_struct(_flow) && _scn != noone && _scn.state == "run_flow" && _flow.phase == "death" && _flow.t >= 70) {
+                Scenario_Check("shots_elitedeath_the_picture_is_there", RunFlow_DeathLayoutNow(_flow.ctx.text).show);
+                Scenario_ShotEliteDeath(_s, "death");
+                Scenario_Next(_s, 803);
+            }
+            if (_s.t > 900) { Scenario_Check("shots_elitedeath_reaches_the_death_line", false, "state=" + (_scn != noone ? string(_scn.state) : "none")); Scenario_NoticeEnd(); }
+            break;
+        case 803:
+            if (_s.t >= 4) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _s.eg_i++;
+                if (_s.eg_i >= array_length(_scales)) {
+                    Scenario_SetWindowScale(3);
+                    Scenario_NoticeEnd();   // the end of the pictures: removes the files and the profile the steps made
+                } else {
+                    _flow.phase = "summary";
+                    _flow.t = 0;
+                    Scenario_Next(_s, 804);
+                }
+            }
+            break;
+        case 804:   // confirm on the summary: run 2 starts; then back to the first picture at the next size
+            if (_s.t == 20) Scenario_Tap("confirm");
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) Scenario_Next(_s, 800);
+            if (_s.t > 900) { Scenario_Check("shots_elitedeath_back_to_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
     }
 }

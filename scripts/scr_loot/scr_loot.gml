@@ -767,29 +767,59 @@ function Elite_Regen(_e) {
     return amt;
 }
 
-// The outline pulse drawn round an elite on the map (World_DrawFx, scr_enemy): the palette's light colours, two beats a second.
+// The outline pulse drawn round an elite on the map (World_DrawFx, scr_enemy): two beats a second, the palette's two light colours (D86).
+#macro ELITE_BEAT_MS 250
+
+function Elite_OutlineColor(_ms) {
+    return ((_ms div ELITE_BEAT_MS) mod 2 == 0) ? UI_C_LIGHTEST : UI_C_LIGHT;
+}
+
+// The eight one-pixel steps the silhouette is drawn at (D156, H13a): together they cover every pixel next to an opaque one, corners included.
+function Elite_OutlineOffsets() {
+    return [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+}
+
+// The sixteen two-pixel steps of the dark rim: with the light outline's eight they cover everything within 2 px of the sprite, so the light outline always has a dark edge to stand
+// against (the lightest palette colour on the pale ground would not show: the old rectangle had the same dark outer line).
+function Elite_RimOffsets() {
+    return [[-2, -2], [-1, -2], [0, -2], [1, -2], [2, -2], [-2, -1], [2, -1], [-2, 0], [2, 0], [-2, 1], [2, 1], [-2, 2], [-1, 2], [0, 2], [1, 2], [2, 2]];
+}
+
+// One sprite frame's silhouette in one colour, pushed 1 px out in eight directions (fog paints every opaque pixel in the colour and keeps the alpha). The sprite itself is NOT drawn.
+function Elite_DrawOutline(_spr, _img, _x, _y, _xs, _ys, _ang, _col, _alpha) {
+    var _off = Elite_OutlineOffsets();
+    gpu_set_fog(true, _col, 0, 1);
+    for (var _i = 0; _i < array_length(_off); _i++) draw_sprite_ext(_spr, _img, _x + _off[_i][0], _y + _off[_i][1], _xs, _ys, _ang, c_white, _alpha);
+    gpu_set_fog(false, c_white, 0, 1);
+}
+
+// The dark rim: the same silhouette in one colour at the sixteen two-pixel steps (drawn first, the light outline over it). The sprite itself is NOT drawn.
+function Elite_DrawRim(_spr, _img, _x, _y, _xs, _ys, _ang, _col, _alpha) {
+    var _off = Elite_RimOffsets();
+    gpu_set_fog(true, _col, 0, 1);
+    for (var _i = 0; _i < array_length(_off); _i++) draw_sprite_ext(_spr, _img, _x + _off[_i][0], _y + _off[_i][1], _xs, _ys, _ang, c_white, _alpha);
+    gpu_set_fog(false, c_white, 0, 1);
+}
+
+// How many elite outlines the world pass has drawn (a check reads it: a missing or failing draw shows).
+function Elite_FxDrawCount() {
+    return variable_global_exists("elite_fx_drawn") ? global.elite_fx_drawn : 0;
+}
+
+// Round every live elite (D156, H13a): the sprite's own shape one pixel out in the pulse colour with a dark rim outside it, then the sprite on top again (the merchant's glow does the same; the layer script runs after the instances).
 function Elite_DrawWorldFx() {
     if (!Fx_IsWorldPass()) return;
     if (!instance_exists(obj_enemy)) return;
-    var c_a = UI_C_LIGHTEST;
-    var c_b = UI_C_LIGHT;
-    var c_c = UI_C_DARKEST;
-    var oc = draw_get_color();
+    var col = Elite_OutlineColor(current_time);
     var oa = draw_get_alpha();
-    draw_set_alpha(1);
-    var beat = (current_time div 250) mod 2;
+    if (!variable_global_exists("elite_fx_drawn")) global.elite_fx_drawn = 0;
     with (obj_enemy) {
-        if (defeated || !variable_instance_exists(id, "elite_mod") || elite_mod == "") continue;
-        var l = floor(bbox_left) - 1;
-        var r = floor(bbox_right) + 1;
-        var t = floor(bbox_top) - 1;
-        var b = floor(bbox_bottom) + 1;
-        draw_set_color(c_c);
-        draw_rectangle(l - 1, t - 1, r + 1, b + 1, true);
-        draw_set_color(beat == 0 ? c_a : c_b);
-        draw_rectangle(l, t, r, b, true);
+        if (defeated || !variable_instance_exists(id, "elite_mod") || elite_mod == "" || sprite_index == -1) continue;
+        Elite_DrawRim(sprite_index, image_index, x, y, image_xscale, image_yscale, image_angle, UI_C_DARKEST, image_alpha);
+        Elite_DrawOutline(sprite_index, image_index, x, y, image_xscale, image_yscale, image_angle, col, image_alpha);
+        draw_sprite_ext(sprite_index, image_index, x, y, image_xscale, image_yscale, image_angle, image_blend, image_alpha);
+        global.elite_fx_drawn++;
     }
-    draw_set_color(oc);
     draw_set_alpha(oa);
 }
 

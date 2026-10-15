@@ -899,6 +899,7 @@ function RunFlow_Begin() {
     var ctx = (variable_global_exists("death_ctx") && is_struct(global.death_ctx)) ? global.death_ctx : Death_BuildContext(entry.result, entry.cause);
     global.death_ctx = undefined;
     global.run_flow = { phase: "death", entry: entry, t: 0, ctx: ctx };
+    RunFlow_DeathImage();   // H13a (D156): the picture is made now (once per session), not in the middle of the first Draw
     Skip_Reset();
     Cutscene_ClearUiState();
 }
@@ -955,6 +956,111 @@ function RunFlow_SummaryRows(_entry) {
     return rows;
 }
 
+// ---- H13a (D156): the old death picture behind the death line ----
+// The picture the game showed at GAME_OVER before the roguelike death scene (the sprite GAME_OVER, 160 x 144, a fly on a green eye: cutscene art, found by name). It was drawn
+// with hundreds of shades of green; the death scene redraws it once in the four palette colours (nearest colour of each pixel) as a runtime sprite, so no resource changes.
+function RunFlow_DeathImageName() {
+    return "GAME_OVER";
+}
+
+// The palette colour (BGR) nearest to an RGB colour, by squared distance.
+function DeathImage_NearestColor(_r, _g, _b) {
+    var pal = [UI_C_DARKEST, UI_C_DARK, UI_C_LIGHT, UI_C_LIGHTEST];
+    var best = pal[0];
+    var best_d = -1;
+    for (var i = 0; i < array_length(pal); i++) {
+        var dr = color_get_red(pal[i]) - _r;
+        var dg = color_get_green(pal[i]) - _g;
+        var db = color_get_blue(pal[i]) - _b;
+        var d = dr * dr + dg * dg + db * db;
+        if (best_d < 0 || d < best_d) { best_d = d; best = pal[i]; }
+    }
+    return best;
+}
+
+// The death picture in the four palette colours: made on first use and kept (a runtime sprite); -1 when GAME_OVER is not in the project.
+function RunFlow_DeathImage() {
+    if (variable_global_exists("death_img") && sprite_exists(global.death_img)) return global.death_img;
+    var name = RunFlow_DeathImageName();
+    var src = asset_get_index(name);
+    if (src == -1 || asset_get_type(name) != asset_sprite) return -1;
+    var w = sprite_get_width(src);
+    var h = sprite_get_height(src);
+    var surf = surface_create(w, h);
+    surface_set_target(surf);
+    draw_clear_alpha(c_black, 0);
+    draw_sprite(src, 0, 0, 0);
+    surface_reset_target();
+    var n = w * h * 4;
+    var buf = buffer_create(n, buffer_fixed, 1);
+    buffer_get_surface(buf, surf, 0);
+    var seen = ds_map_create();   // the picture has a few hundred shades: each is matched once
+    for (var i = 0; i < n; i += 4) {
+        if (buffer_peek(buf, i + 3, buffer_u8) == 0) continue;
+        var r = buffer_peek(buf, i, buffer_u8);
+        var g = buffer_peek(buf, i + 1, buffer_u8);
+        var b = buffer_peek(buf, i + 2, buffer_u8);
+        var key = r * 65536 + g * 256 + b;
+        var c = seen[? key];
+        if (is_undefined(c)) {
+            c = DeathImage_NearestColor(r, g, b);
+            seen[? key] = c;
+        }
+        buffer_poke(buf, i, buffer_u8, color_get_red(c));
+        buffer_poke(buf, i + 1, buffer_u8, color_get_green(c));
+        buffer_poke(buf, i + 2, buffer_u8, color_get_blue(c));
+    }
+    ds_map_destroy(seen);
+    buffer_set_surface(buf, surf, 0);
+    var spr = sprite_create_from_surface(surf, 0, 0, w, h, false, false, 0, 0);
+    buffer_delete(buf);
+    surface_free(surf);
+    global.death_img = spr;
+    return spr;
+}
+
+// Where the death scene puts its picture and its line, in GUI units: the picture (a whole-number scale when it can, never more than 70% of the height) over the text block, the two together
+// centred; the picture is left out when it would not fit. Pure: sizes in, rects out. _col_w / _text_h = the text block the line needs.
+function RunFlow_DeathLayout(_gw, _gh, _margin, _col_w, _text_h, _img_w, _img_h) {
+    var gap = _margin;
+    var out = { show: false, img_x: 0, img_y: 0, img_w: 0, img_h: 0, scale: 0, text_x: round((_gw - _col_w) / 2), text_y: 0, text_w: _col_w, text_h: _text_h };
+    var k = 0;
+    if (_img_w > 0 && _img_h > 0) {
+        var max_h = min(_gh - 2 * _margin - gap - _text_h, floor(_gh * 0.7));
+        var max_w = _gw - 2 * _margin;
+        k = min(max_w / _img_w, max_h / _img_h);
+        if (k >= 1) k = floor(k);
+    }
+    if (k * _img_h >= 8) {
+        out.show = true;
+        out.scale = k;
+        out.img_w = round(_img_w * k);
+        out.img_h = round(_img_h * k);
+        var y0 = max(0, round((_gh - (out.img_h + gap + _text_h)) / 2));
+        out.img_x = round((_gw - out.img_w) / 2);
+        out.img_y = y0;
+        out.text_y = y0 + out.img_h + gap;
+    } else {
+        out.text_y = round((_gh - _text_h) / 2);
+    }
+    return out;
+}
+
+// The layout for the window as it is now and a death line.
+function RunFlow_DeathLayoutNow(_text) {
+    var mt = Ui_Metrics();
+    var col_w = min(mt.gw - 2 * mt.margin, round(mt.gw * 0.6));
+    var pic = RunFlow_DeathImage();
+    var iw = sprite_exists(pic) ? sprite_get_width(pic) : 0;
+    var ih = sprite_exists(pic) ? sprite_get_height(pic) : 0;
+    return RunFlow_DeathLayout(mt.gw, mt.gh, mt.margin, col_w, Ui_TextBlockH(_text, col_w), iw, ih);
+}
+
+// How many frames the death picture has been drawn (a check reads it).
+function RunFlow_DeathPicDraws() {
+    return variable_global_exists("run_flow_pic_draws") ? global.run_flow_pic_draws : 0;
+}
+
 function RunFlow_Draw() {
     if (!RunFlow_Active()) return;
     var f = global.run_flow;
@@ -965,17 +1071,20 @@ function RunFlow_Draw() {
     draw_set_alpha(1);
     Ui_Box(0, 0, w, h, UI_C_DARKEST);
     if (f.phase == "death") {
-        // the line fades in, holds, fades out; centred on the screen
+        // the picture and the line fade in, hold, fade out; the picture (D156: the old GAME_OVER art, in the palette) above the line, the two centred on the screen
         var fade = 30;
         var a = clamp(min(f.t / fade, (f.ctx.frames - f.t) / fade), 0, 1);
-        var col_w = min(w - 2 * mt.margin, round(w * 0.6));
-        var th = Ui_TextBlockH(f.ctx.text, col_w);
+        var lay = RunFlow_DeathLayoutNow(f.ctx.text);
         var s = max(0.0001, UI_GetFontScale());
+        if (lay.show) {
+            draw_sprite_ext(RunFlow_DeathImage(), 0, lay.img_x, lay.img_y, lay.scale, lay.scale, 0, c_white, a);
+            global.run_flow_pic_draws = RunFlow_DeathPicDraws() + 1;
+        }
         draw_set_alpha(a);
         draw_set_halign(fa_center);
         draw_set_valign(fa_top);
         draw_set_color(UI_C_TEXT);
-        draw_text_ext_transformed(round(w / 2), round((h - th) / 2), f.ctx.text, -1, max(1, round(col_w / s)), s, s, 0);
+        draw_text_ext_transformed(round(w / 2), lay.text_y, f.ctx.text, -1, max(1, round(lay.text_w / s)), s, s, 0);
         draw_set_halign(fa_left);
         draw_set_alpha(1);
     } else if (f.phase == "summary") {
