@@ -119,6 +119,7 @@ function Test_RunAll() {
     Test_RunSuite("Title", Test_Suite_Title);
     Test_RunSuite("ClassGuard", Test_Suite_ClassGuard);
     Test_RunSuite("BattleFeel", Test_Suite_BattleFeel);
+    Test_RunSuite("SpeedPreview", Test_Suite_SpeedPreview);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -8690,4 +8691,210 @@ function Test_Suite_BattleFeel() {
     instance_destroy(_db.enemy_inst);
 
     GameSettings_Ensure().screen_shake = _shake_keep;
+}
+
+// ============================================================================
+// g7 (D134 battle speed-up, D135 damage preview). Expected values are worked by hand from the spec (combat-spec.md section 4; the D61 grades OK 1.00,
+// Perfect 1.30); the "actual" side is the real path the battle deals damage through (Battle_PlayerAttackHit, Skill_Use), never a copy of the formula.
+//   Knight ATK 11 with the Wooden Sword (power 3, formula power 6) vs Slime DEF 7: raw 6x11/18 = 3.67 -> OK 4, Perfect 4.77 -> 5.
+//   Hilt Bash (power 4) with that sword: formula power 2 x (4 + 0.5 x 3) = 11, raw 11x11/18 = 6.72 -> OK 7, Perfect 8.74 -> 9.
+//   A BREAK (+50%): basic raw 5.5 -> OK 6, Perfect 7.15 -> 7. An Armored elite (+4 DEF = 11): basic raw 3.0 -> OK 3, Perfect 3.9 -> 4.
+// ============================================================================
+function Test_SpFresh(_class = CLASS_KNIGHT) {
+    var _p = CharacterCreate_Player(_class);
+    _p.equip.weapon = 1;   // the Wooden Sword
+    return _p;
+}
+
+function Test_SpBc(_state = BSTATE_MENU) {
+    return { battle_state: _state, qte_active: false, sq_active: false, def_active: false };
+}
+
+function Test_Suite_SpeedPreview() {
+    // ---- D134: the battle time scale ----
+    Test_Eq("D134: BATTLE_SPEEDUP_MULT is 2", BATTLE_SPEEDUP_MULT, 2);
+    Test_Eq("D134: run held, no QTE: 2", Battle_TimeScaleOf(true, false), 2);
+    Test_Eq("D134: run not held: 1", Battle_TimeScaleOf(false, false), 1);
+    Test_Eq("D134: run held but a QTE is up: 1", Battle_TimeScaleOf(true, true), 1);
+    Test_Eq("D134: neither: 1", Battle_TimeScaleOf(false, true), 1);
+
+    Input_Init();
+    var _inp = global.input;
+    _inp.frozen = true;   // tests inject the input state
+    variable_struct_set(_inp.state, "run", { held: true, pressed: false });
+    Test_Eq("D134: the real run action held in the command menu: 2", Battle_TimeScale(Test_SpBc(BSTATE_MENU)), 2);
+    Test_Eq("D134: held during a message: 2", Battle_TimeScale(Test_SpBc(BSTATE_MESSAGE)), 2);
+    Test_Eq("D134: held during the enemy's turn: 2", Battle_TimeScale(Test_SpBc(BSTATE_ENEMY_ACT)), 2);
+    Test_Eq("D134: held in the sliding bar state: 1", Battle_TimeScale(Test_SpBc(BSTATE_ATTACK_TIMING)), 1);
+    Test_Eq("D134: held in the arrow sequence state: 1", Battle_TimeScale(Test_SpBc(BSTATE_SKILL_QTE)), 1);
+    Test_Eq("D134: held in the defence bar state: 1", Battle_TimeScale(Test_SpBc(BSTATE_ENEMY_DEFENCE)), 1);
+    var _qa = Test_SpBc(BSTATE_MESSAGE);
+    _qa.qte_active = true;
+    Test_Eq("D134: held while a bar is active (qte_active): 1", Battle_TimeScale(_qa), 1);
+    var _qs = Test_SpBc(BSTATE_MESSAGE);
+    _qs.sq_active = true;
+    Test_Eq("D134: held while an arrow sequence is active (sq_active): 1", Battle_TimeScale(_qs), 1);
+    var _qd = Test_SpBc(BSTATE_MESSAGE);
+    _qd.def_active = true;
+    Test_Eq("D134: held while the defence bar is active (def_active): 1", Battle_TimeScale(_qd), 1);
+
+    // a message hold of 1000 ms: 60 real steps at 16.667 ms, about 30 when run is held (500 ms of real time)
+    var _step = 16667;
+    var _held_steps = 0;
+    var _t = 1000;
+    while (Combat_HoldActive(_t) && _held_steps < 1000) { _t = Combat_HoldStep(_t, Battle_StepMs(_step, Test_SpBc(BSTATE_MESSAGE))); _held_steps++; }
+    Test_True("D134: a 1000 ms hold ends in about 30 real steps while run is held (got " + string(_held_steps) + ")", abs(_held_steps - 30) <= 1);
+    Test_True("D134: a 1000 ms hold lasts about 500 ms of real time while held", abs(_held_steps * _step / 1000 - 500) <= 17);
+    Test_True("D134: a bar state's step is the real one while held", abs(Battle_StepMs(_step, Test_SpBc(BSTATE_ATTACK_TIMING)) - Presentation_StepMs(_step)) < 0.001);
+    Test_True("D134: the QTE clock itself never reads the run key", abs(Qte_StepMs(_step) - _step / 1000) < 0.001);
+    // the bar's own Step with run held: its clock moves by the real step, not twice that
+    var _bar = Test_SpBc(BSTATE_ATTACK_TIMING);
+    _bar.qte_active = true;
+    _bar.qte_ms = 0;
+    _bar.qte_params = { sweep_ms: 99999999, perfect_half_width: 1, good_half_width: 2, ok_half_width: 3 };
+    _bar.throw_item = -1;
+    Battle_PlayerAttackTimingStep(_bar, false);
+    Test_True("D134: the sliding bar's clock advanced by the real step with run held", abs(_bar.qte_ms - Qte_StepMs(delta_time)) < 0.001);
+
+    variable_struct_set(_inp.state, "run", { held: false, pressed: false });
+    Test_Eq("D134: run released: 1 in the command menu", Battle_TimeScale(Test_SpBc(BSTATE_MENU)), 1);
+    var _rel_steps = 0;
+    _t = 1000;
+    while (Combat_HoldActive(_t) && _rel_steps < 1000) { _t = Combat_HoldStep(_t, Battle_StepMs(_step, Test_SpBc(BSTATE_MESSAGE))); _rel_steps++; }
+    Test_True("D134: the same hold takes about 60 real steps when run is not held (got " + string(_rel_steps) + ")", abs(_rel_steps - 60) <= 1);
+    _inp.frozen = false;
+
+    // the HUD marker sits in the top right corner and clears the turn strip at every size
+    var _sizes = [[480, 432], [640, 576], [800, 720], [960, 864]];
+    for (var _i = 0; _i < array_length(_sizes); _i++) {
+        var _gw = _sizes[_i][0], _gh = _sizes[_i][1], _pp = _gw div 160, _lh = 8 * _pp;
+        var _r = BattleHud_SpeedRect(_gw, _gh, _pp, _lh, 2 * _pp * 8);
+        var _slot = 16 * round(_pp * 0.6) + 4 * _pp;
+        var _tlw = 5 * _slot + 4 * _pp + 8 * _pp;
+        var _tl = { x: round((_gw - _tlw) * 0.5), y: 3 * _pp, w: _tlw, h: _slot + 8 * _pp };
+        Test_True("D134: the x2 marker is inside the screen at " + string(_gw), _r.x >= 0 && _r.y >= 0 && _r.x + _r.w <= _gw && _r.y + _r.h <= _gh);
+        Test_False("D134: the x2 marker does not touch the turn strip at " + string(_gw), Test_RectsOverlap(_r, _tl));
+    }
+
+    // ---- D135: the damage preview equals what the hit does ----
+    var _wood = ItemDB_Get(1);
+    var _p = Test_SpFresh();
+    var _slime = EnemyCreate(ENEMY_SLIME);
+    var _a = Battle_AttackPreview(_p, _slime, _wood);
+    Test_Eq("D135: basic attack vs Slime, OK: 4 (hand: 6x11/18 = 3.67)", _a.ok, 4);
+    Test_Eq("D135: basic attack vs Slime, Perfect: 5 (hand: 3.67 x 1.3 = 4.77)", _a.perfect, 5);
+    Test_Eq("D135: a basic attack is one hit", _a.hits, 1);
+    var _hp0 = _slime.hp;
+    var _stat0 = array_length(_slime.status);
+    Test_True("D135: asking changed nothing (enemy HP, statuses)", _slime.hp == _hp0 && array_length(_slime.status) == _stat0);
+    Test_Eq("D135 actual: the attack's hit at OK equals the preview", Battle_PlayerAttackHit(_p, EnemyCreate(ENEMY_SLIME), _wood, false, Qte_GradeMult(QTE_OK), QTE_OK).dealt, _a.ok);
+    Test_Eq("D135 actual: the attack's hit at Perfect equals the preview", Battle_PlayerAttackHit(_p, EnemyCreate(ENEMY_SLIME), _wood, false, Qte_GradeMult(QTE_PERFECT), QTE_PERFECT).dealt, _a.perfect);
+
+    // a skill with the weapon's share
+    var _s1 = Battle_SkillPreview(_p, _slime, SKILL_HILT_BASH);
+    Test_True("D135: a damaging skill has a preview", is_struct(_s1));
+    if (is_struct(_s1)) {
+        Test_Eq("D135: Hilt Bash with the Wooden Sword, OK: 7 (hand: 11x11/18 = 6.72)", _s1.ok, 7);
+        Test_Eq("D135: Hilt Bash with the Wooden Sword, Perfect: 9 (hand: 6.72 x 1.3 = 8.74)", _s1.perfect, 9);
+        Test_Eq("D135: Hilt Bash is one hit", _s1.hits, 1);
+        var _pk = Test_SpFresh();
+        var _rk = Skill_Use(_pk, EnemyCreate(ENEMY_SLIME), SKILL_HILT_BASH, Qte_GradeMult(QTE_OK));
+        Test_True("D135 actual: Hilt Bash at OK equals the preview (no crit rolled)", !_rk.crit && _rk.dmg == _s1.ok);
+        _pk = Test_SpFresh();
+        _rk = Skill_Use(_pk, EnemyCreate(ENEMY_SLIME), SKILL_HILT_BASH, Qte_GradeMult(QTE_PERFECT));
+        Test_True("D135 actual: Hilt Bash at Perfect equals the preview (no crit rolled)", !_rk.crit && _rk.dmg == _s1.perfect);
+    }
+    var _mp0 = _p.mp;
+    Battle_SkillPreview(_p, _slime, SKILL_HILT_BASH);
+    Test_Eq("D135: asking about a skill spends no MP", _p.mp, _mp0);
+    Test_True("D135: a status-only skill has no preview (Muscle Up)", is_undefined(Battle_SkillPreview(_p, _slime, SKILL_MUSCLE_UP)));
+
+    // several hits: per-hit damage and the count (Double Shot, an Archer)
+    var _ar = Test_SpFresh(CLASS_ARCHER);
+    var _s2 = Battle_SkillPreview(_ar, EnemyCreate(ENEMY_SLIME), SKILL_DOUBLE_SHOT);
+    Test_True("D135: Double Shot has a preview", is_struct(_s2));
+    if (is_struct(_s2)) {
+        Test_Eq("D135: Double Shot shows 2 hits", _s2.hits, 2);
+        var _ar2 = Test_SpFresh(CLASS_ARCHER);
+        var _foe = EnemyCreate(ENEMY_SLIME);
+        _foe.max_hp = 500;
+        _foe.hp = 500;
+        var _s2b = Battle_SkillPreview(_ar2, _foe, SKILL_DOUBLE_SHOT);
+        var _r2 = Skill_Use(_ar2, _foe, SKILL_DOUBLE_SHOT, Qte_GradeMult(QTE_OK));
+        Test_True("D135 actual: Double Shot's two hits at OK are the preview per hit x 2", !_r2.crit && _r2.dmg == _s2b.ok * _s2b.hits);
+    }
+
+    // a target with BREAK (+50%)
+    var _brk = EnemyCreate(ENEMY_SLIME);
+    _brk.broken = true;
+    var _b = Battle_AttackPreview(_p, _brk, _wood);
+    Test_Eq("D135: against a BROKEN target, OK: 6 (hand: 5.5)", _b.ok, 6);
+    Test_Eq("D135: against a BROKEN target, Perfect: 7 (hand: 7.15)", _b.perfect, 7);
+    var _brk2 = EnemyCreate(ENEMY_SLIME);
+    _brk2.broken = true;
+    Test_Eq("D135 actual: BREAK at OK equals the preview", Battle_PlayerAttackHit(_p, _brk2, _wood, false, Qte_GradeMult(QTE_OK), QTE_OK).dealt, _b.ok);
+    var _brk3 = EnemyCreate(ENEMY_SLIME);
+    _brk3.broken = true;
+    Test_Eq("D135 actual: BREAK at Perfect equals the preview", Battle_PlayerAttackHit(_p, _brk3, _wood, false, Qte_GradeMult(QTE_PERFECT), QTE_PERFECT).dealt, _b.perfect);
+    var _bs = Battle_SkillPreview(_p, _brk, SKILL_HILT_BASH);
+    var _brk4 = EnemyCreate(ENEMY_SLIME);
+    _brk4.broken = true;
+    var _rb = Skill_Use(Test_SpFresh(), _brk4, SKILL_HILT_BASH, Qte_GradeMult(QTE_PERFECT));
+    Test_True("D135 actual: a skill on a BROKEN target at Perfect equals the preview", is_struct(_bs) && !_rb.crit && _rb.dmg == _bs.perfect);
+
+    // an Armored elite (+4 DEF)
+    var _arm = Elite_Apply(EnemyCreate(ENEMY_SLIME), "armored");
+    var _e1 = Battle_AttackPreview(_p, _arm, _wood);
+    Test_Eq("D135: against an Armored elite (DEF 11), OK: 3 (hand: 3.0)", _e1.ok, 3);
+    Test_Eq("D135: against an Armored elite, Perfect: 4 (hand: 3.9)", _e1.perfect, 4);
+    Test_Eq("D135 actual: Armored at OK equals the preview", Battle_PlayerAttackHit(_p, Elite_Apply(EnemyCreate(ENEMY_SLIME), "armored"), _wood, false, Qte_GradeMult(QTE_OK), QTE_OK).dealt, _e1.ok);
+    Test_Eq("D135 actual: Armored at Perfect equals the preview", Battle_PlayerAttackHit(_p, Elite_Apply(EnemyCreate(ENEMY_SLIME), "armored"), _wood, false, Qte_GradeMult(QTE_PERFECT), QTE_PERFECT).dealt, _e1.perfect);
+    var _es = Battle_SkillPreview(_p, _arm, SKILL_HILT_BASH);
+    var _re = Skill_Use(Test_SpFresh(), Elite_Apply(EnemyCreate(ENEMY_SLIME), "armored"), SKILL_HILT_BASH, Qte_GradeMult(QTE_OK));
+    Test_True("D135 actual: a skill on an Armored elite at OK equals the preview", is_struct(_es) && !_re.crit && _re.dmg == _es.ok);
+
+    // statuses on either side: Rev Up on the player (x2), a guard on the enemy (Solidify x0.25) is read, not used up
+    var _up = Status_Add(Test_SpFresh(), STATUS_DMG_UP, 3, 0);
+    var _u = Battle_AttackPreview(_up, EnemyCreate(ENEMY_SLIME), _wood);
+    Test_Eq("D135 actual: with Rev Up the attack at OK equals the preview", Battle_PlayerAttackHit(_up, EnemyCreate(ENEMY_SLIME), _wood, false, Qte_GradeMult(QTE_OK), QTE_OK).dealt, _u.ok);
+    Test_True("D135: Rev Up doubles the shown number", _u.ok > _a.ok);
+    var _sol = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_SOLIDIFY, 3, 0);
+    var _g = Battle_AttackPreview(_p, _sol, _wood);
+    Test_True("D135: asking did not use up the enemy's guard", Status_Has(_sol, STATUS_SOLIDIFY));
+    var _sol2 = Status_Add(EnemyCreate(ENEMY_SLIME), STATUS_SOLIDIFY, 3, 0);
+    Test_Eq("D135 actual: against a guarded enemy at OK equals the preview", Battle_PlayerAttackHit(_p, _sol2, _wood, false, Qte_GradeMult(QTE_OK), QTE_OK).dealt, _g.ok);
+
+    // gear passives that add damage: Executioner (item 3, +35% under 35% HP) counts, and Sunder Edge (item 2) is not triggered by asking
+    var _ex = Test_SpFresh();
+    _ex.equip.weapon = 3;
+    var _big = EnemyCreate(ENEMY_SLIME);
+    _big.max_hp = 100;
+    _big.hp = 40;
+    var _x = Battle_AttackPreview(_ex, _big, ItemDB_Get(3));
+    var _big2 = EnemyCreate(ENEMY_SLIME);
+    _big2.max_hp = 100;
+    _big2.hp = 40;
+    Test_True("D135: the Executioner bonus is in the shown number", _x.ok > Combat_HitDamage(_ex, _big, Combat_BasicSource(ItemDB_Get(3)), 1, 1, 1));
+    Test_Eq("D135 actual: with Executioner at OK equals the preview", Battle_PlayerAttackHit(_ex, _big2, ItemDB_Get(3), false, Qte_GradeMult(QTE_OK), QTE_OK).dealt, _x.ok);
+    var _sd = Test_SpFresh();
+    _sd.equip.weapon = 2;
+    var _sfoe = EnemyCreate(ENEMY_SLIME);
+    Battle_AttackPreview(_sd, _sfoe, ItemDB_Get(2));
+    Test_False("D135: asking does not spend Sunder Edge's first hit", Equip_PassiveRuntimeEnsure(_sd).first_hit_done);
+    Test_False("D135: asking does not put Sunder on the enemy", Status_Has(_sfoe, STATUS_SUNDER));
+
+    // the lines the skill list shows (D100: numbers from the same data)
+    var _lines = Battle_PreviewLines(_s1);
+    Test_Eq("D135: the skill list's Damage line", Test_RowValue(_lines, Loc_T("battle.det.damage", "Damage")), "7");
+    Test_Eq("D135: the skill list's Perfect line", Test_RowValue(_lines, Loc_T("battle.det.perfect", "Perfect")), "9");
+    if (is_struct(_s2)) {
+        var _l2 = Battle_PreviewLines(_s2);
+        Test_Eq("D135: a two-hit skill shows the per-hit number x hits", Test_RowValue(_l2, Loc_T("battle.det.damage", "Damage")), string(_s2.ok) + " x2");
+    }
+    Test_Eq("D135: no preview, no lines", array_length(Battle_PreviewLines(undefined)), 0);
+    var _pr = Test_SpFresh();
+    _pr.skills = [SKILL_HILT_BASH, SKILL_MUSCLE_UP];
+    var _rows = Battle_SkillRows(_pr, EnemyCreate(ENEMY_SLIME));
+    Test_Eq("D135: the Hilt Bash row carries the Damage line", Test_RowValue(_rows[0].lines, Loc_T("battle.det.damage", "Damage")), "7");
+    Test_Eq("D135: the Muscle Up row has no Damage line", Test_RowValue(_rows[1].lines, Loc_T("battle.det.damage", "Damage")), "");
 }

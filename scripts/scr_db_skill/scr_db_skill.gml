@@ -1058,6 +1058,14 @@ function Skill_StatusRoll(_user, _skill_id, _chance, _slot = "") {
     return Bag_Draw(_user, "status_" + string(_skill_id) + _slot, _chance, Run_Stream("combat"));
 }
 
+// What a damaging skill hits with: { power (final formula power), stat_type, acc }. A player's weapon adds to the power (D22); power_mult is part of it.
+// Skill_Use deals through it and the damage preview (Battle_SkillPreview, D135) reads the same struct.
+function Skill_DamageSource(_user, _s) {
+    var user_is_player = (variable_struct_exists(_user, "is_player") && _user.is_player);
+    var formula_power = user_is_player ? Combat_PowerSkill(_s.power, _s.power_mult, Combat_WeaponPower(_user)) : Combat_PowerEnemySkill(_s.power, _s.power_mult);
+    return { power: formula_power, stat_type: _s.stat_type, acc: _s.acc };
+}
+
 function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
     var s = SkillDB_Get(_skill_id);
     var user_is_player = (variable_struct_exists(_user, "is_player") && _user.is_player);
@@ -1260,8 +1268,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
         var total_dmg = 0;
 
         var crit_bonus = Status_GetSum(_user, "crit_bonus");
-        // Spec section 4: the formula power. A player's weapon adds to it (D22); power_mult is part of it.
-        var skill_power = user_is_player ? Combat_PowerSkill(s.power, s.power_mult, Combat_WeaponPower(_user)) : Combat_PowerEnemySkill(s.power, s.power_mult);
+        var weapon = Skill_DamageSource(_user, s);   // spec section 4: the formula power and the stat the hit uses
 
         for (var h = 0; h < hits; h++) {
             // D6/D80: nothing rolls to hit. A player skill always lands; an enemy skill lands unless the player's Evasion dodges it.
@@ -1273,7 +1280,6 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
             }
 
             if (hit_res.hit) {
-                var weapon = { power: skill_power, stat_type: s.stat_type, acc: s.acc };
                 var crit = Combat_CritCheck(_user, crit_bonus);
                 var dmg_ctx_skill = { is_skill: true };
                 if (user_is_player) dmg_ctx_skill.grade_mult = _grade_mult;
