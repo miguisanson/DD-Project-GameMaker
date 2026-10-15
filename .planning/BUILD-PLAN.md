@@ -68,10 +68,29 @@ Leave frame-counted: player grid step, enemy AI pacing, fx ages, cine pan (gamep
 | G3 | Battle game feel: death pop, hit sparks + per-hit freeze, heavier player hurt + HP lag bar, hit jolt + enemy recoil, crit/BREAK zoom punch, subtle low-HP heartbeat | D138, D139 | scr_combat, scr_fx, obj_battle_controller | MERGED to next |
 | G4 | Class chest guard | D127 | obj_room_transition / scr_interact, workbook | MERGED to next |
 | G5 | Echo after class pick, filtered | D130 | scr_room_state, scr_menu (cards/echo) | MERGED to next |
-| G6 | Map juice: chest burst, item rise, level-up sparkle, gold tick, step squash | D138 | scr_interact, obj_player, scr_fx, HUD | in flight |
+| G6 | Map juice: chest burst, item rise, level-up sparkle, gold tick, step squash | D138 | scr_interact, obj_player, scr_fx, HUD | MERGED to next |
 | G7 | Battle speed-up hold + damage preview | D134, D135 | scr_combat | MERGED to next |
 | G8 | Controller rumble + setting; save-on-close code + IDE step | D136, D132 | scr_input, settings, obj_game_controller | MERGED to next (Perfect detection fixed at merge for the D138 per-hit freeze) |
 | G9 | Run stats at run end + history | D137 | scr_room_state, run-end screen | in flight |
 | G10 | One UI style audit: every screen uses the shared frame/highlight/cursor/fonts/colours/spacing/motion/sounds; fix any screen that differs (incl. G2/G3/G6 additions) | D129 | Ui_* framework + every screen | todo (after G2) |
 | G11 | Consistency pass: Title Case, one word per meaning, one sound per action, one dim | D133 | workbook, scr_menu, scr_combat | todo (last) |
 | — | D131: no milestone unlocks (docs only) | D131 | — | done (decision) |
+
+## Round 3 (owner playtest of 943ce6d, 2026-10-16: D140-D156) — Sonnet packets, max 4 at once
+
+| # | Packet | Decisions | Main files | Status |
+|---|---|---|---|---|
+| H1 | One menu (Esc = Tab, System tab, one Settings, instant apply + "Keep this?" revert) + menu in battle with quit-before-fight | D140, D141 | scr_menu (TabMenu/Pause/Settings), obj_ui_controller, run save | todo |
+| H2 | Shared Yes/No confirm pop-up for every important action | D156 | scr_menu (Ui framework) | todo (after H1) |
+| H3 | Review-4 fixes (enemy deck keeps cards, multi-hit preview, rumble Perfect flag, BREAK flag) + elites from floor 3 + press toward the exit leaves | D142, D145, review 4 | scr_db_enemy, scr_combat, scr_input, obj_battle_controller, scr_loot, obj_room_transition | todo |
+| H4 | Level-up shows class growth; free point may go to Max HP/MP; balance re-check | D143 | scr_levelup, level-up screen, sim | todo |
+| H5 | Skill memory; echo = discovered skills of the picked class; class select (Nobody greyed, sprite preview, ??? skills) | D144, D148 | scr_room_state, profile, class screen | todo |
+| H6 | Cutscene skip (prompt after 1 s, skip at 2 s) + cutscene text in the shared dialogue box | D146, D156 | scr_input skip, scr_dialogue, obj_start_controller | todo |
+| H7 | Notes picked up, read from a Notes list | D147 | note object code, scr_interact, codex | todo |
+| H8 | Text & prompts: keyword highlights, status labels, device-aware prompts (arrows, controller glyphs), fewer battle hints, XP bar style, "Worn" header, Help stats page, full-HP bed/potion refusal sweep | D149, D150, D156 | Prompt_Rich*, HUD, scr_input prompts, help | todo |
+| H9 | AI battle backgrounds (4) + contact sheet + IDE import checklist | D151 | art/, tools (ComfyUI) | todo |
+| H10 | Seed input on New Game | D152 | title New Game flow | todo |
+| H11 | Smarter map AI + hiding spots | D153 | scr_enemy, room data | todo |
+| H12 | Writing overhaul (style guide + full rewrite) + small flavour choices | D154, D155 | workbook, scr_dialogue | todo |
+| H13 | Elite outline follows the sprite; old death image reused; card/panel text overflow sweep with an automated "text fits" check | D156 | scr_loot fx, death scene, Ui text | todo |
+| G10/G11 | One-style audit + consistency pass (last, after H1-H13) | D129, D133 | all screens | todo |
