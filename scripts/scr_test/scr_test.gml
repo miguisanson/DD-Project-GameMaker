@@ -140,6 +140,7 @@ function Test_RunAll() {
     Test_RunSuite("Labels", Test_Suite_Labels);
     Test_RunSuite("RichText", Test_Suite_RichText);
     Test_RunSuite("Hunt5a", Test_Suite_Hunt5a);
+    Test_RunSuite("Choices", Test_Suite_Choices);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -12836,4 +12837,258 @@ function Test_Suite_Hunt5a() {
     _gs.battle.enemy_persist_id = _old_pid;
     _gs.battle.enemy_id = _old_eid;
     _gs.battle.enemy_room = _old_room;
+}
+
+// ---- H12a (D154): small flavour choices (the Stranger, the merchant, a note, the wake line) -----------------------------------------------------------
+// Expected values come from the brief: at least 4 choice points, 2 replies each, the reply changes the NEXT line, the answer is remembered in the profile's
+// unlocks map ("choice_<id>" = 1 or 2, no format change: PROFILE_VERSION stays 2), a stored answer changes a LATER line, and nothing changes HP / MP / items /
+// gold / stats. The English texts of the merchant's greeting variants are the ones the writer fixed in the brief.
+function Test_ChoiceIds() {
+    return ["stranger", "merchant", "map_page", "wake"];
+}
+
+function Test_ChoiceProfileWith(_n) {
+    var _p = Profile_Default();
+    var _ids = Test_ChoiceIds();
+    for (var _i = 0; _i < array_length(_ids); _i++) Choice_Set(_p, _ids[_i], _n);
+    return _p;
+}
+
+function Test_ChoiceDefs() {
+    var _ids = Test_ChoiceIds();
+    Test_Eq("D154 the choice points, in order", json_stringify(Choice_Ids()), json_stringify(_ids));
+    for (var _i = 0; _i < array_length(_ids); _i++) {
+        var _id = _ids[_i];
+        var _d = Choice_Def(_id);
+        Test_Eq("D154 " + _id + ": the profile key", Choice_Key(_id), "choice_" + _id);
+        Test_Eq("D154 " + _id + ": exactly 2 replies to pick", array_length(_d.labels), 2);
+        Test_True("D154 " + _id + ": the two replies read differently", _d.labels[0] != _d.labels[1] && _d.labels[0] != "" && _d.labels[1] != "");
+        Test_True("D154 " + _id + ": a question of at least one line", array_length(_d.ask) >= 1 && _d.ask[0] != "");
+        Test_True("D154 " + _id + ": each reply has a next line", array_length(_d.reply) == 2 && array_length(_d.reply[0]) >= 1 && array_length(_d.reply[1]) >= 1);
+        Test_True("D154 " + _id + ": reply 1 and reply 2 show a different next line", _d.reply[0][0] != _d.reply[1][0] && json_stringify(_d.reply[0]) != json_stringify(_d.reply[1]));
+        Test_True("D154 " + _id + ": each answer has a later line", array_length(_d.again) == 2 && array_length(_d.again[0]) >= 1 && array_length(_d.again[1]) >= 1);
+        Test_True("D154 " + _id + ": the later line differs by answer", _d.again[0][0] != _d.again[1][0]);
+    }
+}
+
+function Test_ChoiceStorage() {
+    var _ids = Test_ChoiceIds();
+    for (var _i = 0; _i < array_length(_ids); _i++) {
+        var _id = _ids[_i];
+        var _p = Profile_Default();
+        Test_Eq("D154 " + _id + ": unanswered reads 0", Choice_Get(_p, _id), 0);
+        Test_Eq("D154 " + _id + ": no later line before an answer", array_length(Choice_AgainLines(_id, _p)), 0);
+        Test_True("D154 " + _id + ": answer 1 is stored", Choice_Set(_p, _id, 1) && Choice_Get(_p, _id) == 1);
+        Test_True("D154 " + _id + ": stored as the number 1 in the unlocks map", is_real(variable_struct_get(_p.unlocks, "choice_" + _id)) && variable_struct_get(_p.unlocks, "choice_" + _id) == 1);
+        Test_Eq("D154 " + _id + ": answer 1 gives the first later line", json_stringify(Choice_AgainLines(_id, _p)), json_stringify(Choice_Def(_id).again[0]));
+        Test_True("D154 " + _id + ": the answer can be changed to 2", Choice_Set(_p, _id, 2) && Choice_Get(_p, _id) == 2);
+        Test_Eq("D154 " + _id + ": answer 2 gives the second later line", json_stringify(Choice_AgainLines(_id, _p)), json_stringify(Choice_Def(_id).again[1]));
+        Test_False("D154 " + _id + ": 3 is no answer", Choice_Set(_p, _id, 3));
+        Test_False("D154 " + _id + ": 0 is no answer", Choice_Set(_p, _id, 0));
+        Test_Eq("D154 " + _id + ": a refused answer leaves the stored one", Choice_Get(_p, _id), 2);
+    }
+    // junk in a file reads as unanswered
+    var _j = Profile_Normalize({ profile_version: 2, unlocks: { choice_stranger: "x", choice_wake: 7, choice_merchant: true, choice_map_page: 2 } });
+    Test_Eq("D154 junk: a text value is no answer", Choice_Get(_j, "stranger"), 0);
+    Test_Eq("D154 junk: 7 is no answer", Choice_Get(_j, "wake"), 0);
+    Test_Eq("D154 junk: true is no answer", Choice_Get(_j, "merchant"), 0);
+    Test_Eq("D154 junk: 2 is an answer", Choice_Get(_j, "map_page"), 2);
+}
+
+function Test_ChoiceSaveLoad() {
+    var _f = "test_profile_h12.sav";
+    Save_DeleteFileSet(_f);
+    var _w = Profile_Default();
+    Profile_Unlock(_w, "nobody_class");
+    Profile_StoryMark(_w, "cutscene:intro");
+    _w.deaths = 3;
+    Choice_Set(_w, "stranger", 2);
+    Choice_Set(_w, "merchant", 1);
+    Choice_Set(_w, "map_page", 1);
+    Choice_Set(_w, "wake", 2);
+    Test_True("D154 save: the profile writes", Profile_SaveTo(_f, _w));
+    Test_True("D154 save: the file still says version 2 (no format change)", string_pos("\"profile_version\":2", Test_RawRead(_f)) > 0);
+    var _r = Profile_Load(_f);
+    Test_Eq("D154 save: reads back ok", _r.status, "ok");
+    Test_Eq("D154 save: PROFILE_VERSION is still 2", PROFILE_VERSION, 2);
+    Test_Eq("D154 load: the Stranger's answer survives", Choice_Get(_r.profile, "stranger"), 2);
+    Test_Eq("D154 load: the merchant's answer survives", Choice_Get(_r.profile, "merchant"), 1);
+    Test_Eq("D154 load: the note's answer survives", Choice_Get(_r.profile, "map_page"), 1);
+    Test_Eq("D154 load: the wake answer survives", Choice_Get(_r.profile, "wake"), 2);
+    Test_Eq("D154 load: the later line follows the loaded answer", json_stringify(Choice_AgainLines("stranger", _r.profile)), json_stringify(Choice_Def("stranger").again[1]));
+    Test_True("D154 load: the other unlocks and the story are intact", Profile_IsUnlocked(_r.profile, "nobody_class") && Profile_StorySeen(_r.profile, "cutscene:intro") && _r.profile.deaths == 3);
+    Test_Eq("D154 load: the unlocks map holds only the old key and the four answers", array_length(variable_struct_get_names(_r.profile.unlocks)), 5);
+    // a profile from before this packet (no answers) loads and reads unanswered
+    var _old = Profile_Default();
+    Profile_Unlock(_old, "nobody_class");
+    Test_True("D154 old file: writes", Profile_SaveTo(_f, _old));
+    var _r0 = Profile_Load(_f);
+    Test_True("D154 old file: every choice reads unanswered", Choice_Get(_r0.profile, "stranger") == 0 && Choice_Get(_r0.profile, "merchant") == 0 && Choice_Get(_r0.profile, "map_page") == 0 && Choice_Get(_r0.profile, "wake") == 0);
+    Save_DeleteFileSet(_f);
+}
+
+function Test_ChoiceLaterLines() {
+    var _keep = variable_global_exists("profile") ? global.profile : undefined;
+    var _keep_st = variable_global_exists("profile_status") ? global.profile_status : "missing";
+    // the merchant's greeting: the first of his four lines changes with the answer, the other three do not
+    global.profile = Profile_Default();
+    var _plain = Merchant_Line("greet", 0);
+    Test_Eq("D154 merchant: unanswered, the first greeting is the old one", _plain, "You came a long way down. Brave. Or lost.");
+    global.profile = Test_ChoiceProfileWith(1);
+    Test_Eq("D154 merchant: answer 1 (a way out) greets with the first variant", Merchant_Line("greet", 0), "Found your way out yet? No? Then buy something.");
+    global.profile = Test_ChoiceProfileWith(2);
+    Test_Eq("D154 merchant: answer 2 (something to buy) greets with the second variant", Merchant_Line("greet", 0), "Back to spend, I hope. That I understand.");
+    Test_True("D154 merchant: the other greetings do not change", Merchant_Line("greet", 1) == "Coins keep the dark away. Mostly." && Merchant_Line("greet", 2) == "Don't ask where I sleep." && Merchant_Line("greet", 3) == "Buy something. Please.");
+    Test_True("D154 merchant: buy / sell / leave lines do not change", Merchant_Line("buy", 0) == "Good choice. You will need it." && Merchant_Line("sell", 0) == "I'll take it. No questions." && Merchant_Line("leave", 0) == "Come back. They always do.");
+    // the note: a read note with an answer carries the later line after its own lines; without one it is unchanged
+    var _note = Note_Find("map_page");
+    global.profile = Profile_Default();
+    Test_Eq("D154 note: unanswered, the note reads as it did", array_length(Note_ReadLines(_note)), array_length(_note.lines));
+    global.profile = Test_ChoiceProfileWith(2);
+    var _lines = Note_ReadLines(_note);
+    Test_Eq("D154 note: answered, the later line follows the note's own lines", array_length(_lines), array_length(_note.lines) + 1);
+    Test_True("D154 note: the note's own lines come first, unchanged", _lines[0] == _note.lines[0] && _lines[array_length(_note.lines) - 1] == _note.lines[array_length(_note.lines) - 1]);
+    Test_Eq("D154 note: the added line is the answer's", _lines[array_length(_lines) - 1], Choice_Def("map_page").again[1][0]);
+    var _other = Note_Find("wall_breath");
+    Test_Eq("D154 note: a note without a choice never changes", array_length(Note_ReadLines(_other)), array_length(_other.lines));
+    global.profile = _keep;
+    global.profile_status = _keep_st;
+}
+
+// D147 + D154: a note asks its question in the Codex reader, not on pickup. The reader's line list: before an answer the note's own lines and the question;
+// with global.choice_off, or a note without a choice, only the note; after an answer the note's lines and the later line; right after the pick, the note's lines
+// and the reply.
+function Test_ChoiceNoteReader() {
+    var _keep = variable_global_exists("profile") ? global.profile : undefined;
+    var _keep_st = variable_global_exists("profile_status") ? global.profile_status : "missing";
+    var _keep_off = variable_global_exists("choice_off") ? global.choice_off : false;
+    Test_True("D147+D154 the reader's functions exist", script_exists(asset_get_index("Note_ReaderLines")) && script_exists(asset_get_index("Note_AsksQuestion")) && script_exists(asset_get_index("Note_ReplyLines")));
+    if (script_exists(asset_get_index("Note_ReaderLines")) && script_exists(asset_get_index("Note_AsksQuestion")) && script_exists(asset_get_index("Note_ReplyLines"))) {
+        var _note = Note_Find("map_page");
+        var _def = Choice_Def("map_page");
+        var _n = array_length(_note.lines);
+        global.choice_off = false;
+        global.profile = Profile_Default();
+        Test_True("D147+D154 reader: an unanswered note with a choice asks", Note_AsksQuestion(_note));
+        var _q = Note_ReaderLines(_note);
+        Test_Eq("D147+D154 reader: unanswered, the note's lines and the question's lines", array_length(_q), _n + array_length(_def.ask));
+        Test_True("D147+D154 reader: the note's own lines come first, then the question", _q[0] == _note.lines[0] && _q[_n - 1] == _note.lines[_n - 1] && _q[_n] == _def.ask[0] && _q[array_length(_q) - 1] == _def.ask[array_length(_def.ask) - 1]);
+        Test_Eq("D147+D154 reply: the note's lines and the reply of the second answer", json_stringify(Note_ReplyLines(_note, 1)), json_stringify(array_concat(_note.lines, _def.reply[1])));
+        Test_Eq("D147+D154 reply: the first answer has its own reply", Note_ReplyLines(_note, 0)[_n], _def.reply[0][0]);
+        Choice_Set(global.profile, "map_page", 2);
+        Test_True("D147+D154 reader: an answered note does not ask again", !Note_AsksQuestion(_note));
+        var _a = Note_ReaderLines(_note);
+        Test_Eq("D147+D154 reader: answered, the note's lines and the later line", json_stringify(_a), json_stringify(array_concat(_note.lines, _def.again[1])));
+        Test_Eq("D147+D154 reader: answered, it is the same list the dialogue helper gives", json_stringify(_a), json_stringify(Note_ReadLines(_note)));
+        global.profile = Profile_Default();
+        global.choice_off = true;
+        Test_True("D147+D154 reader: with the questions off a note does not ask", !Note_AsksQuestion(_note));
+        Test_Eq("D147+D154 reader: with the questions off, only the note's lines", json_stringify(Note_ReaderLines(_note)), json_stringify(_note.lines));
+        global.choice_off = false;
+        var _plain = Note_Find("wall_breath");
+        Test_True("D147+D154 reader: a note without a choice never asks", !Note_AsksQuestion(_plain));
+        Test_Eq("D147+D154 reader: a note without a choice reads as its lines", json_stringify(Note_ReaderLines(_plain)), json_stringify(_plain.lines));
+        var _bad = Note_Find("no_such_note");
+        Test_True("D147+D154 reader: an unknown note does not ask", !Note_AsksQuestion(_bad));
+    }
+    global.choice_off = _keep_off;
+    global.profile = _keep;
+    global.profile_status = _keep_st;
+}
+
+// Remembering an answer touches the unlocks map and nothing else of the profile, and never the character or the run.
+function Test_ChoiceNoEffect() {
+    var _gs = GameState_Get();
+    var _ch = CharacterCreate_Player(CLASS_KNIGHT);
+    _ch.inventory = Inv_Add(_ch.inventory, 10, 2);
+    var _old_ch = _gs.player_ch;
+    _gs.player_ch = _ch;
+    var _had_run = variable_struct_exists(_gs, "run") && is_struct(_gs.run);
+    var _old_run = _had_run ? _gs.run : undefined;
+    _gs.run = Run_Create(2468);
+    _gs.run.gold = 31;
+    var _ch0 = json_stringify(_gs.player_ch);
+    var _run0 = json_stringify(_gs.run);
+    var _ids = Test_ChoiceIds();
+    for (var _i = 0; _i < array_length(_ids); _i++) {
+        for (var _n = 1; _n <= 2; _n++) {
+            var _p = Profile_Default();
+            Profile_SkillLearn(_p, SKILL_WOUND);
+            _p.deaths = 2;
+            _p.wins = 1;
+            var _hist0 = array_length(_p.history);
+            Choice_Set(_p, _ids[_i], _n);
+            var _tag = _ids[_i] + " answer " + string(_n);
+            Test_Eq("D154 no effect (" + _tag + "): HP, MP, stats, items, skills of the character", json_stringify(_gs.player_ch), _ch0);
+            Test_Eq("D154 no effect (" + _tag + "): gold and the rest of the run", json_stringify(_gs.run), _run0);
+            Test_True("D154 no effect (" + _tag + "): the profile counters and memory", _p.deaths == 2 && _p.wins == 1 && array_length(_p.history) == _hist0 && Profile_SkillKnown(_p, SKILL_WOUND) && array_length(variable_struct_get_names(_p.unlocks)) == 1);
+        }
+    }
+    _gs.player_ch = _old_ch;
+    if (_had_run) _gs.run = _old_run;
+    else variable_struct_remove(_gs, "run");
+}
+
+// Every line of every text fits one page of the real dialogue box, in both languages, and the two replies fit beside the box.
+function Test_ChoiceAllDiffer(_a, _b) {
+    var _ok = true;
+    for (var _i = 0; _i < array_length(_a.ask); _i++) { if (_a.ask[_i] == _b.ask[_i]) _ok = false; }
+    for (var _l = 0; _l < 2; _l++) {
+        if (_a.labels[_l] == _b.labels[_l]) _ok = false;
+        for (var _r = 0; _r < array_length(_a.reply[_l]); _r++) { if (_a.reply[_l][_r] == _b.reply[_l][_r]) _ok = false; }
+        for (var _y = 0; _y < array_length(_a.again[_l]); _y++) { if (_a.again[_l][_y] == _b.again[_l][_y]) _ok = false; }
+    }
+    return _ok;
+}
+
+function Test_ChoiceText() {
+    var _lang = Loc_GetLanguage();
+    var _ids = Test_ChoiceIds();
+    var _langs = ["en", "ko"];
+    var _en = {};
+    for (var _g = 0; _g < 2; _g++) {
+        Loc_SetLanguage(_langs[_g]);
+        UI_SetFont();
+        var _lay = Dialogue_TextLayout("Merchant");
+        var _box = Dialogue_BoxRect();
+        for (var _i = 0; _i < array_length(_ids); _i++) {
+            var _d = Choice_Def(_ids[_i]);
+            var _all = [];
+            for (var _a = 0; _a < array_length(_d.ask); _a++) array_push(_all, _d.ask[_a]);
+            for (var _k = 0; _k < 2; _k++) {
+                for (var _r = 0; _r < array_length(_d.reply[_k]); _r++) array_push(_all, _d.reply[_k][_r]);
+                for (var _y = 0; _y < array_length(_d.again[_k]); _y++) array_push(_all, _d.again[_k][_y]);
+            }
+            var _fits = true;
+            var _empty = false;
+            for (var _l = 0; _l < array_length(_all); _l++) {
+                if (_all[_l] == "") _empty = true;
+                if (array_length(Dialogue_WrapToLines(_all[_l], _lay.text_w)) > _lay.max_lines) _fits = false;
+            }
+            Test_False("D154 text (" + _langs[_g] + "): " + _ids[_i] + " has no empty line", _empty);
+            Test_True("D154 text (" + _langs[_g] + "): " + _ids[_i] + " every line fits one page of the box", _fits);
+            Test_True("D154 text (" + _langs[_g] + "): " + _ids[_i] + " the replies fit beside the box", UI_TextWidth(_d.labels[0]) <= _box.w / 2 && UI_TextWidth(_d.labels[1]) <= _box.w / 2);
+            if (_g == 0) variable_struct_set(_en, _ids[_i], json_stringify(_d));
+            else Test_True("D154 text (ko): " + _ids[_i] + " is translated (every piece differs from the English)", Test_ChoiceAllDiffer(_d, json_parse(variable_struct_get(_en, _ids[_i]))));
+        }
+    }
+    Loc_SetLanguage(_lang);
+}
+
+function Test_Suite_Choices() {
+    var _keep = variable_global_exists("profile") ? global.profile : undefined;
+    var _keep_st = variable_global_exists("profile_status") ? global.profile_status : "missing";
+    var _lang = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    Test_True("D154 the choice functions exist", script_exists(asset_get_index("Choice_Ids")) && script_exists(asset_get_index("Choice_Def")) && script_exists(asset_get_index("Choice_Get")) && script_exists(asset_get_index("Choice_Set")) && script_exists(asset_get_index("Choice_AgainLines")) && script_exists(asset_get_index("Note_ReadLines")));
+    Test_ChoiceDefs();
+    Test_ChoiceStorage();
+    Test_ChoiceSaveLoad();
+    Test_ChoiceLaterLines();
+    Test_ChoiceNoteReader();
+    Test_ChoiceNoEffect();
+    Test_ChoiceText();
+    Loc_SetLanguage(_lang);
+    global.profile = _keep;
+    global.profile_status = _keep_st;
 }

@@ -915,10 +915,14 @@ function TabCodex_Open(_kind) {
 // ---- the note reader (D147) ----
 // A found note opened from the Notes page: its whole text on one panel over the page, title on top. A long text scrolls with Up / Down (or the wheel);
 // Back goes up one level. The text is wrapped at draw time to the panel's width and only the lines that fit are drawn, so nothing needs clipping.
-function NoteReader_Text(_def) {
+function NoteReader_Join(_lines) {
     var txt = "";
-    for (var j = 0; j < array_length(_def.lines); j++) txt += ((j > 0) ? "\n\n" : "") + _def.lines[j];   // a gap between the note's lines
+    for (var j = 0; j < array_length(_lines); j++) txt += ((j > 0) ? "\n\n" : "") + _lines[j];   // a gap between the note's lines
     return txt;
+}
+
+function NoteReader_Text(_def) {
+    return NoteReader_Join(_def.lines);
 }
 
 function NoteReader_Lines(_text, _w) {
@@ -935,11 +939,38 @@ function NoteReader_Scroll(_cur, _dir, _n, _vis) {
     return clamp(_cur + _dir, 0, NoteReader_MaxScroll(_n, _vis));
 }
 
+// D147 + D154: the reader shows Note_ReaderLines. While the note's question is open (data.ask) its two replies stand under the text, in a strip of their own;
+// they can be used once the text has been read to its end (NoteReader_Armed). The answer is stored and flushed at once, then the reply's line is read.
 function NoteReader_New(_def) {
+    var ask = Note_AsksQuestion(_def);
     return Ui_MenuNew("codex_note_read", [], {
-        data: { tab: "codex_page", reader: true, note_id: _def.id, text: NoteReader_Text(_def), scroll: 0, wrapped: [], wrap_w: -1, visible: 8 },
+        data: { tab: "codex_page", reader: true, note_id: _def.id, text: NoteReader_Join(Note_ReaderLines(_def)), scroll: 0, wrapped: [], wrap_w: -1, visible: 8,
+                ask: ask, labels: ask ? Choice_Lines(_def.id, "label") : [], pick: 0, reply_rects: [] },
         layout: { title: _def.title, anchor: "center", hides_below: true }
     });
+}
+
+// True while the replies can be used: the question is open and the whole text has been drawn and scrolled to its end.
+function NoteReader_Armed(_m) {
+    if (!TabNote_IsReader(_m) || !_m.data.ask || _m.data.wrap_w < 0) return false;
+    return _m.data.scroll >= NoteReader_MaxScroll(array_length(_m.data.wrapped), _m.data.visible);
+}
+
+// Reply _i (0 or 1) is chosen: remembered in the profile and written to the file, the question is over, the reader goes on with that reply's line.
+function NoteReader_Pick(_m, _i) {
+    var d = _m.data;
+    var def = Note_Find(d.note_id);
+    if (!d.ask || !is_struct(def)) return false;
+    var k = clamp(_i, 0, 1);
+    if (!Choice_Remember(def.id, k + 1)) return false;
+    SFX_PlayUI("ui_confirm");
+    d.ask = false;
+    d.pick = k;
+    d.text = NoteReader_Join(Note_ReplyLines(def, k));
+    d.wrap_w = -1;       // wrapped again at the next draw
+    d.scroll = 1000000;  // and shown from its end (the draw keeps it inside the text)
+    d.reply_rects = [];
+    return true;
 }
 
 function TabNote_OpenReader(_def) {
@@ -959,18 +990,39 @@ function TabNote_IsReader(_m) {
     return is_struct(_m) && is_struct(_m.data) && variable_struct_exists(_m.data, "reader") && _m.data.reader;
 }
 
-// Up / Down (held keys repeat) and the wheel move the text; called after the menu's own step.
+// Up / Down (held keys repeat) and the wheel move the text; called after the menu's own step. With the question open and the text read to its end, Up / Down
+// move between the two replies instead (Up on the first one scrolls the text back), Confirm or a click picks the one under the cursor, the mouse moves it.
 function TabNote_ReaderInput(_m) {
     if (!TabNote_IsReader(_m) || !variable_global_exists("ui_snap")) return;
     var sn = global.ui_snap;
+    var d = _m.data;
+    var armed = NoteReader_Armed(_m);
+    if (armed) {
+        var rr = d.reply_rects;
+        var hv = Ui_HoverIndex(rr, sn.mx, sn.my);
+        if (sn.mouse_moved && hv >= 0 && hv != d.pick) { d.pick = hv; SFX_PlayUI("ui_move"); }
+        if (current_time - _m.lock_ms >= UI_INPUT_LOCK_MS) {   // the press that opened the reader must not answer it
+            if (sn.click && hv >= 0) { NoteReader_Pick(_m, hv); return; }
+            if (sn.confirm) { NoteReader_Pick(_m, d.pick); return; }
+        }
+    }
     var dv = (sn.down ? 1 : 0) - (sn.up ? 1 : 0);
     var step = 0;
     if (Ui_RepeatStep(_m.rep_v, dv, sn.up_p || sn.down_p, current_time) > 0) step = dv;
+    if (armed && step != 0) {
+        var to_pick = clamp(d.pick + step, 0, array_length(d.labels) - 1);
+        if (step < 0 && d.pick == 0) {
+            // Up on the first reply: the text scrolls back (the next draw no longer arms the replies)
+        } else {
+            if (to_pick != d.pick) { d.pick = to_pick; SFX_PlayUI("ui_move"); }
+            step = 0;
+        }
+    }
     if (sn.wheel != 0) step = -sn.wheel;   // wheel up = towards the top
     if (step == 0) return;
-    var to = NoteReader_Scroll(_m.data.scroll, step, array_length(_m.data.wrapped), _m.data.visible);
-    if (to != _m.data.scroll) {
-        _m.data.scroll = to;
+    var to = NoteReader_Scroll(d.scroll, step, array_length(d.wrapped), d.visible);
+    if (to != d.scroll) {
+        d.scroll = to;
         SFX_PlayUI("ui_move");
     }
 }
@@ -998,8 +1050,11 @@ function TabNote_ReaderDraw(_m, _alpha) {
     ty += mt.line_h + 3 * p;
     var pitch = mt.line_h + p;
     var bottom = ry + rh - 4 * p;
-    var vis = max(1, floor((bottom - ty) / pitch));
     var d = _m.data;
+    var text_bottom = bottom;
+    var rows_y0 = bottom - 2 * mt.row_h;   // D154: while the note's question is open, its two replies stand in a strip under the text
+    if (d.ask) text_bottom = rows_y0 - 3 * p;
+    var vis = max(1, floor((text_bottom - ty) / pitch));
     if (d.wrap_w != x1 - x0 || d.visible != vis) {
         d.wrap_w = x1 - x0;
         d.wrapped = NoteReader_Lines(d.text, d.wrap_w);
@@ -1018,6 +1073,20 @@ function TabNote_ReaderDraw(_m, _alpha) {
         var max_s = NoteReader_MaxScroll(n, vis);
         var thumb_y = ty + round((track_h - thumb_h) * d.scroll / max_s / p) * p;
         Ui_Box(bx, thumb_y, bx + p, thumb_y + thumb_h, UI_C_LIGHT);
+    }
+    if (d.ask) {   // the replies: pale until the text is read to its end, then the row under the cursor gets the menu's band and marker
+        var armed = NoteReader_Armed(_m);
+        Ui_Box(rx + 3 * p, rows_y0 - 2 * p, rx + rw - 3 * p, rows_y0 - p, UI_C_DARK);
+        var rects = [];
+        for (var r = 0; r < array_length(d.labels); r++) {
+            var row_y = rows_y0 + r * mt.row_h;
+            var sel = armed && (r == d.pick);
+            if (sel) Ui_Box(rx + 3 * p, row_y, rx + rw - 3 * p, row_y + mt.row_h, UI_C_DARK);
+            Ui_Text(x0 + 5 * p, row_y + (mt.row_h - mt.line_h) div 2, Ui_FitText(d.labels[r], x1 - x0 - 5 * p), Ui_RowColor(sel, true, !armed));
+            if (sel) Ui_Arrow(x0 + Ui_Bob(current_time) * p, row_y + (mt.row_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
+            array_push(rects, { x: rx + 2 * p, y: row_y, w: rw - 4 * p, h: mt.row_h });
+        }
+        d.reply_rects = armed ? rects : [];
     }
     draw_set_alpha(a0);
 }
@@ -1114,8 +1183,9 @@ function TabMenu_Hint() {
         else if (TabMenu_Ids()[TabMenu_Get().tab] == "settings") txt = Loc_T("tab.hint.select", "[k:confirm] Select");
     }
     if (TabNote_IsReader(m) && NoteReader_MaxScroll(array_length(m.data.wrapped), m.data.visible) > 0) txt = Loc_T("tab.hint.scroll", "[k:up][k:down] Scroll");
+    if (NoteReader_Armed(m)) txt = Loc_T("tab.hint.select", "[k:confirm] Select");   // D154: the note's question is open and its replies can be used
     if (txt != "") txt += "    ";
-    return txt + ((TabMenu_Depth() > 1) ? Loc_T("tab.hint.back", "{back} Back") : Loc_T("tab.hint.close", "{back} Close"));
+    return txt + ((TabMenu_Depth() > 1) ? Loc_T("tab.hint.back", "[k:back] Back") : Loc_T("tab.hint.close", "[k:back] Close"));
 }
 
 // The Status card (class, level, HP, MP, XP, gold, the run's seed small).
@@ -2242,7 +2312,10 @@ function Merchant_Line(_kind, _idx) {
     switch (_kind) {
         case "greet":
             switch (i) {
-                case 0: return Loc_T("merchant.greet.0", "You came a long way down. Brave. Or lost.");
+                case 0:
+                    var later = Choice_AgainLines("merchant");   // D154: once he has been answered, his first greeting remembers it
+                    if (array_length(later) > 0) return later[0];
+                    return Loc_T("merchant.greet.0", "You came a long way down. Brave. Or lost.");
                 case 1: return Loc_T("merchant.greet.1", "Coins keep the dark away. Mostly.");
                 case 2: return Loc_T("merchant.greet.2", "Don't ask where I sleep.");
                 default: return Loc_T("merchant.greet.3", "Buy something. Please.");

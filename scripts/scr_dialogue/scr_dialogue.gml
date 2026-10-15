@@ -420,6 +420,11 @@ function Dialogue_NarrativeOnLootGranted(_loot) {
     return false;
 }
 
+// D154: your reaction to the first Stranger encounter, once the Stranger's question (Choice_Run) is over.
+function Dialogue_StrangerReactionOpen() {
+    Dialogue_StartLines(DialogueDB_Get("sys_first_stranger_encounter_reaction"));
+}
+
 function Dialogue_NarrativeCanStartNow() {
     if (room == rm_battle) return false;
     if (Transition_IsActive()) return false;
@@ -455,6 +460,12 @@ function Dialogue_NarrativeTryStartPending() {
         if (did == "") {
             Dialogue_NarrativeMarkDone(event_id);
             continue;
+        }
+
+        if (event_id == "first_stranger_encounter_reaction" && Choice_Enabled()) {   // D154: the Stranger's question first, then your reaction
+            Dialogue_NarrativeMarkDone(event_id);
+            Choice_Run("stranger", Dialogue_StrangerReactionOpen);
+            return true;
         }
 
         var lines = DialogueDB_Get(did);
@@ -945,6 +956,7 @@ function Dialogue_Open(_speaker, _lines_raw) {
     }
     gs.ui.dialogue_open_ms = current_time;   // D97: the box slides in
     gs.ui.choice = undefined;
+    gs.ui.on_close = undefined;   // D154: set by the caller after this, if the next box follows
     gs.ui.opened_frame = Input_Frame();
     gs.ui.dialogue_open_lock = InputLock_New(Dialogue_IsCutsceneTextOnly() ? UI_CUTSCENE_ADVANCE_BLOCK_MS : 0, 1, gs.ui.opened_frame);   // the open frame always; a text-only cutscene line a little longer
     gs.ui.confirm_action = "confirm";
@@ -1066,7 +1078,9 @@ function Dialogue_Advance() {
             Dialogue_ChoiceOpen();
             return;
         }
+        var on_close = variable_struct_exists(gs.ui, "on_close") ? gs.ui.on_close : undefined;   // D154: read before Dialogue_CloseNow drops it
         Dialogue_CloseNow();
+        if (is_callable(on_close)) on_close();
     }
 }
 
@@ -1085,6 +1099,7 @@ function Dialogue_CloseNow() {
     gs.ui.dialogue_lock = UI_DIALOGUE_REOPEN_LOCK_MS;
     gs.ui.dialogue_require_release = true;
     gs.ui.choice = undefined;
+    gs.ui.on_close = undefined;
     Dialogue_SetActiveAmbienceSfxKey("");
     if (Dialogue_IsSkillbookFirstReadUIActive()) {
         Dialogue_SkillbookFirstReadMarkDone();
@@ -1150,6 +1165,175 @@ function Dialogue_ChoiceBack(_m, _res) {
 function Dialogue_ChoiceStep() {
     var ch = Dialogue_Choice();
     if (is_struct(ch) && is_struct(ch.menu)) Ui_MenuUpdate(ch.menu);
+}
+
+// What runs when the box that is open is read to its end (set after the box is opened; Dialogue_Open clears it, Dialogue_CloseNow drops it, so a box
+// that is closed from outside, hold-to-skip or a scenario, never runs it). Used to chain one box into the next.
+function Dialogue_OnClose(_fn) {
+    GameState_Get().ui.on_close = _fn;
+}
+
+// ---- D154: small flavour choices ----
+// Four moments (the Stranger, the merchant, one lore note, the wake line) ask a question with 2 replies; the note asks it in the Codex reader (D147), not on pickup. The reply changes the next line and is
+// remembered in the profile's unlocks map as "choice_<id>" = 1 or 2 (no format change; Profile_IsUnlocked does not read these keys, Choice_Get does).
+// Once an answer is stored a later line changes instead of the question coming again. Nothing here touches HP, MP, items, gold or stats.
+// global.choice_off (set by the scripted runs, like global.tutorial_off) switches the questions off.
+function Choice_Ids() {
+    return ["stranger", "merchant", "map_page", "wake"];
+}
+
+function Choice_Key(_id) {
+    return "choice_" + string(_id);
+}
+
+function Choice_Enabled() {
+    return !(variable_global_exists("choice_off") && global.choice_off);
+}
+
+// The English texts. ask = the question, labels = the 2 replies, reply[k] = the next line after reply k + 1, again[k] = the later line once k + 1 is
+// stored. again_box: the later line gets a box of its own where the question would have been (the Stranger, the wake line); false = the caller shows
+// it (the merchant's first greeting; the note's later line is part of the Codex reader's text).
+function Choice_Raw(_id) {
+    switch (_id) {
+        case "stranger": return {
+            speaker_key: "enemy.name.enemy_stranger", speaker: "Stranger", again_box: true,
+            ask: ["There you are.", "Do you remember me?"],
+            labels: ["Should I?", "Back off."],
+            reply: [["Not yet.", "Ask again when the tunnel has had you a few more times."], ["Ha. Fair.", "Nobody does, at first."]],
+            again: [["Still asking if you should?", "You'll know me when you stop asking."], ["Still telling me to back off?", "I'm patient. I've had practice."]] };
+        case "merchant": return {
+            speaker_key: "merchant.name", speaker: "Merchant", again_box: false,
+            ask: ["Tell me, friend.", "Looking for a way out, or something to buy?"],
+            labels: ["A way out.", "Something to buy."],
+            reply: [["Ha. They all say that.", "Shop first. Hope walks better with a full pack."], ["Good. Buying I understand.", "Asking after exits gets people killed."]],
+            again: [["Found your way out yet? No? Then buy something."], ["Back to spend, I hope. That I understand."]] };
+        case "map_page": return {
+            speaker_key: "", speaker: "", again_box: false,
+            ask: ["You read it twice.", "Whose hand is this?"],
+            labels: ["Mine.", "Someone else's."],
+            reply: [["Yours. You say it out loud.", "The ink seems to settle."], ["Not yours. You say it out loud.", "The ink shivers."]],
+            again: [["The ink is dry now. You've stopped doubting the hand."], ["The ink is dry now. You still say it isn't yours."]] };
+        case "wake": return {
+            speaker_key: "", speaker: "", again_box: true,
+            ask: ["Your head swims.", "Your body waits for you to decide."],
+            labels: ["Sit up.", "Lie still."],
+            reply: [["You push up. The stone lets go of your back slowly."], ["You lie still. The ceiling says nothing. Neither do you."]],
+            again: [["Your body already knows how to get up."], ["You lie still a while first. You always do now."]] };
+    }
+    return undefined;
+}
+
+function Choice_Exists(_id) {
+    return is_struct(Choice_Raw(_id));
+}
+
+// One kind of text ("ask", "label", "reply" or "again"; _k = 0 or 1 for the last two) of a choice, in the language of the moment. Keys:
+// choice.<id>.ask.<n>, choice.<id>.label.<n>, choice.<id>.reply<1|2>.<n>, choice.<id>.again<1|2>.<n>.
+function Choice_Lines(_id, _part, _k = 0) {
+    var r = Choice_Raw(_id);
+    if (!is_struct(r)) return [];
+    var src = r.ask;
+    var key = "choice." + string(_id) + "." + _part + ".";
+    if (_part == "label") src = r.labels;
+    else if (_part == "reply") { src = r.reply[_k]; key = "choice." + string(_id) + ".reply" + string(_k + 1) + "."; }
+    else if (_part == "again") { src = r.again[_k]; key = "choice." + string(_id) + ".again" + string(_k + 1) + "."; }
+    var out = [];
+    for (var i = 0; i < array_length(src); i++) array_push(out, Loc_T(key + string(i), src[i]));
+    return out;
+}
+
+function Choice_Def(_id) {
+    var r = Choice_Raw(_id);
+    if (!is_struct(r)) return undefined;
+    return {
+        id: _id,
+        speaker: (r.speaker_key != "") ? Loc_T(r.speaker_key, r.speaker) : "",
+        again_box: r.again_box,
+        ask: Choice_Lines(_id, "ask"),
+        labels: Choice_Lines(_id, "label"),
+        reply: [Choice_Lines(_id, "reply", 0), Choice_Lines(_id, "reply", 1)],
+        again: [Choice_Lines(_id, "again", 0), Choice_Lines(_id, "again", 1)]
+    };
+}
+
+// 0 = not answered, else 1 or 2. Anything else in the file (a text, true, 7) reads as not answered.
+function Choice_Get(_p, _id) {
+    if (!is_struct(_p) || !variable_struct_exists(_p, "unlocks") || !is_struct(_p.unlocks)) return 0;
+    var key = Choice_Key(_id);
+    if (!variable_struct_exists(_p.unlocks, key)) return 0;
+    var v = variable_struct_get(_p.unlocks, key);
+    if (is_bool(v) || !is_real(v)) return 0;
+    if (v == 1) return 1;
+    if (v == 2) return 2;
+    return 0;
+}
+
+// Stores an answer (1 or 2) in the given profile's unlocks map. Returns false for anything else. Does not write the file (Choice_Remember does).
+function Choice_Set(_p, _id, _n) {
+    if (!is_struct(_p) || !is_real(_n) || !Choice_Exists(_id)) return false;
+    var n = floor(_n);
+    if (n != 1 && n != 2) return false;
+    if (!variable_struct_exists(_p, "unlocks") || !is_struct(_p.unlocks)) _p.unlocks = {};
+    variable_struct_set(_p.unlocks, Choice_Key(_id), n);
+    return true;
+}
+
+// The later line for the stored answer ([] before any answer). _p = the profile (default: the game's).
+function Choice_AgainLines(_id, _p = undefined) {
+    var n = Choice_Get(is_undefined(_p) ? Profile_Get() : _p, _id);
+    if (n == 0) return [];
+    return Choice_Lines(_id, "again", n - 1);
+}
+
+function Choice_Remember(_id, _n) {
+    if (!Choice_Set(Profile_Get(), _id, _n)) return false;
+    Profile_Flush();
+    return true;
+}
+
+function Choice_OpenBox(_speaker, _lines) {
+    if (string(_speaker) != "") Dialogue_StartWithSpeaker(_speaker, _lines);
+    else Dialogue_StartLines(_lines);
+}
+
+// The moment of a choice. Not answered: the question opens as a box with the 2 replies above it; the pick is remembered, its reply opens, and _after
+// (a function, may be undefined) runs when that box is read to its end. Answered: the later line gets its own box when the choice has one, then _after;
+// otherwise _after runs at once. _speaker overrides the name tab (a note speaks under its title). Returns true when a box was opened.
+function Choice_Run(_id, _after = undefined, _speaker = undefined) {
+    var d = Choice_Def(_id);
+    if (!is_struct(d) || !Choice_Enabled()) {
+        if (is_callable(_after)) _after();
+        return false;
+    }
+    var spk = is_undefined(_speaker) ? d.speaker : string(_speaker);
+    global.choice_run = { id: _id, after: _after, speaker: spk };
+    if (Choice_Get(Profile_Get(), _id) == 0) {
+        Dialogue_StartChoice(spk, d.ask, d.labels, Choice_OnPick);
+        return true;
+    }
+    var later = d.again_box ? Choice_AgainLines(_id) : [];
+    if (array_length(later) > 0) {
+        Choice_OpenBox(spk, later);
+        Dialogue_OnClose(_after);
+        return true;
+    }
+    if (is_callable(_after)) _after();
+    return false;
+}
+
+// Dialogue_StartChoice's callback: remember the answer, open its reply.
+function Choice_OnPick(_i) {
+    if (!variable_global_exists("choice_run") || !is_struct(global.choice_run)) return;
+    var run = global.choice_run;
+    var k = clamp(_i, 0, 1);
+    Choice_Remember(run.id, k + 1);
+    Choice_OpenBox(run.speaker, Choice_Lines(run.id, "reply", k));
+    Dialogue_OnClose(run.after);
+}
+
+// The wake line is already open; this is what follows it.
+function Choice_RunWake() {
+    Choice_Run("wake");
 }
 
 // A 5 x 3 arrow pointing down, cells _p x _p, top-left at (_x, _y).
@@ -1679,6 +1863,44 @@ function Notes_StepPlayer(_pl) {
     Banner_Show(Note_FoundText(d));
     MapFx_NoteFound(tx * GRID_TILE_SIZE + GRID_TILE_SIZE / 2, ty * GRID_TILE_SIZE + GRID_TILE_SIZE / 2);
     return true;
+}
+
+// The lines a note is read with once its question is answered: its own, and the later line of its choice (D154). _p = the profile (default: the game's).
+function Note_ReadLines(_def, _p = undefined) {
+    var lines = [];
+    for (var i = 0; i < array_length(_def.lines); i++) array_push(lines, _def.lines[i]);
+    if (Choice_Exists(_def.id)) {
+        var later = Choice_AgainLines(_def.id, _p);
+        for (var j = 0; j < array_length(later); j++) array_push(lines, later[j]);
+    }
+    return lines;
+}
+
+// D147 + D154: a note never asks on pickup (it is a banner and a page that rises); its question is asked in the Codex reader, the first time the note is read
+// there. True when _def has a choice that is not answered yet and the questions are on (global.choice_off switches them off). _p = the profile (default: the game's).
+function Note_AsksQuestion(_def, _p = undefined) {
+    if (!is_struct(_def) || !Choice_Enabled() || !Choice_Exists(_def.id)) return false;
+    return Choice_Get(is_undefined(_p) ? Profile_Get() : _p, _def.id) == 0;
+}
+
+// What the Codex reader shows for a note: its own lines and, while its question is open, the question's lines (the two replies are drawn under the text by
+// the reader); once answered, its own lines and the later line (Note_ReadLines).
+function Note_ReaderLines(_def, _p = undefined) {
+    if (!Note_AsksQuestion(_def, _p)) return Note_ReadLines(_def, _p);
+    var lines = [];
+    for (var i = 0; i < array_length(_def.lines); i++) array_push(lines, _def.lines[i]);
+    var ask = Choice_Lines(_def.id, "ask");
+    for (var j = 0; j < array_length(ask); j++) array_push(lines, ask[j]);
+    return lines;
+}
+
+// What the reader shows right after reply _k (0 or 1) is picked: the note's own lines and that reply's line(s).
+function Note_ReplyLines(_def, _k) {
+    var lines = [];
+    for (var i = 0; i < array_length(_def.lines); i++) array_push(lines, _def.lines[i]);
+    var reply = Choice_Lines(_def.id, "reply", clamp(_k, 0, 1));
+    for (var j = 0; j < array_length(reply); j++) array_push(lines, reply[j]);
+    return lines;
 }
 
 // A small page, 16 x 16, top-left at (_x, _y): the note on the map and the one that rises off it. Four palette colours.

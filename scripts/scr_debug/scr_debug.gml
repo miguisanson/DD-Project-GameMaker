@@ -242,6 +242,7 @@ function Scenario_Boot() {
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
+    global.choice_off = true;   // D154: nor the small flavour questions (the Stranger, the merchant, a note, the wake line) unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
                    cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 32000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
@@ -565,7 +566,11 @@ function Scenario_StepSmoke(_s) {
             break;
         case 750: case 751: case 752: case 753: case 754: case 755: case 756: case 757: case 758: case 759:
         case 760: case 761: case 762: case 763: case 764: case 765: case 766: case 767: case 768: case 769:
-            Scenario_StepSmokeClassMem(_s);   // H5 (D144, D148): the class screen and the echo of discovered skills through real keys; its last step calls Scenario_NoticeEnd
+            Scenario_StepSmokeClassMem(_s);   // H5 (D144, D148): the class screen and the echo of discovered skills through real keys; goes on with H12a (890)
+            break;
+        case 890: case 891: case 892: case 893: case 894: case 895: case 896: case 897: case 898: case 899:
+        case 900: case 901: case 902: case 903: case 904: case 905: case 906: case 907: case 908: case 909:
+            Scenario_StepSmokeChoices(_s);   // H12a (D154): the small flavour choices (merchant, Stranger, wake line, note in the Codex reader) through real keys; goes on with H13a (790)
             break;
         case 800: case 801: case 802: case 803: case 804: case 805: case 806: case 807: case 808: case 809:
             Scenario_StepSmokeHunt5a(_s);   // hunt 5a: the quit-before-fight snapshot is gone when a fight is won or lost; its last step goes on with D164 (820)
@@ -2983,7 +2988,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsLabels(_s);   // H8a (D150, D156): status labels in battle (highlighted, Korean), the Status tab with the XP bar, the Gear header, the Help stats page; goes on with H8b (930)
             break;
         case 930: case 931: case 932: case 933: case 934: case 935: case 936: case 937: case 938: case 939:
-            Scenario_StepShotsRichText(_s);   // H8b (D149, D156): the dialogue box and the card pick with terms, accents and buttons (keyboard, pad), the battle prompt line; two sizes; goes on with H13a (800)
+            Scenario_StepShotsRichText(_s);   // H8b (D149, D156): the dialogue box and the card pick with terms, accents and buttons (keyboard, pad), the battle prompt line; two sizes; goes on with H12a (910)
+            break;
+        case 910: case 911: case 912: case 913: case 914: case 915: case 916: case 917: case 918: case 919:
+            Scenario_StepShotsChoices(_s);   // H12a (D154): the merchant's question with its two replies open above the box, English and Korean, two sizes; goes on with H13a (800)
             break;
         case 800: case 801: case 802: case 803: case 804: case 805: case 806: case 807: case 808: case 809:
             Scenario_StepShotsEliteDeath(_s);   // H13a (D156): an elite slime and an elite plant on the map, the death scene with its picture, 480 x 432 and 800 x 720; the end of the pictures
@@ -11646,7 +11654,7 @@ function Scenario_StepSmokeClassMem(_s) {
             if (_s.t == 2) {
                 var _disk = Profile_Load(Profile_Path());
                 Scenario_Check("classmem_the_profile_file_holds_the_memory", _disk.status == "ok" && _disk.profile.profile_version == 2 && Profile_SkillKnown(_disk.profile, SKILL_WOUND) && Profile_SkillKnown(_disk.profile, SKILL_HILT_BASH) && Profile_SkillKnown(_disk.profile, SKILL_FIREBALL));
-                Scenario_Next(_s, 790);   // goes on with H13a (790..799), the end of the chain
+                Scenario_Next(_s, 890);   // goes on with H12a (890..909), then H13a (790..), the end of the chain
             }
             break;
     }
@@ -13002,7 +13010,7 @@ function Scenario_StepShotsD164(_s) {
 // ---- H7 (D147) pictures 700..704: the Codex Notes page, a found note in the reader and a long text in the reader (scrolled, with its bar) at windowed
 // scale 3 (480 x 432) and 5 (800 x 720). The last pictures of the run: they end it. ----
 function Scenario_NotesShotScenes() {
-    return ["list", "reader", "long"];
+    return ["list", "reader", "long", "ask"];
 }
 
 function Scenario_StepShotsNotes(_s) {
@@ -13041,6 +13049,10 @@ function Scenario_StepShotsNotes(_s) {
                     for (var _k = 0; _k < 14; _k++) array_push(_fake.lines, "Day " + string(_k + 1) + ". The tunnel is quiet and the walls keep their secrets, and I keep walking all the same.");
                     TabNote_OpenReader(_fake);
                     break;
+                case "ask":   // D147 + D154: the survey page's question under its text, the replies awake (the questions are switched on for this picture only)
+                    global.choice_off = false;
+                    TabNote_OpenReader(Note_Find("map_page"));
+                    break;
             }
             Scenario_Next(_s, 702);
             break;
@@ -13059,13 +13071,16 @@ function Scenario_StepShotsNotes(_s) {
                     var _n = array_length(_m.data.wrapped);
                     if (_scenes[_o.di] == "reader") {
                         Scenario_Check("shots_notes_the_whole_note_fits_" + _tag, _n > 0 && _n <= _m.data.visible, "lines=" + string(_n) + " visible=" + string(_m.data.visible));
+                    } else if (_scenes[_o.di] == "ask") {
+                        Scenario_Check("shots_notes_ask_the_question_is_open_" + _tag, _m.data.ask && array_length(_m.data.labels) == 2);
+                        _m.data.scroll = 1000000;   // read to the end (the draw keeps it inside the text); two frames later the replies are awake
                     } else {
                         Scenario_Check("shots_notes_the_long_text_needs_scrolling_" + _tag, _n > _m.data.visible, "lines=" + string(_n) + " visible=" + string(_m.data.visible));
                         Scenario_Check("shots_notes_the_footer_offers_scrolling_" + _tag, string_pos("[k:up][k:down]", TabMenu_Hint()) > 0, TabMenu_Hint());
                         _m.data.scroll = 3;   // a picture of the text part-way down
                     }
                 }
-                if (_scenes[_o.di] != "long") {
+                if (_scenes[_o.di] != "long" && _scenes[_o.di] != "ask") {
                     _s.shot = "shot_notes_" + _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
                     Scenario_ShotLayout(_s.shot);
                     Scenario_Next(_s, 703);
@@ -13076,7 +13091,16 @@ function Scenario_StepShotsNotes(_s) {
             break;
         case 704:
             if (_s.t >= 2) {
-                _s.shot = "shot_notes_long_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                if (_scenes[_o.di] == "ask") {
+                    var _ma = TabMenu_TopMenu();
+                    var _tga = "ask_" + string(_scales[_o.si]);
+                    var _ra = _ma.rect;
+                    var _rra = _ma.data.reply_rects;
+                    Scenario_Check("shots_notes_ask_the_replies_are_awake_" + _tga, NoteReader_Armed(_ma) && array_length(_rra) == 2);
+                    Scenario_Check("shots_notes_ask_the_replies_sit_inside_the_panel_" + _tga, array_length(_rra) == 2 && _rra[0].x >= _ra.x && _rra[0].x + _rra[0].w <= _ra.x + _ra.w && _rra[0].y > _ra.y && _rra[1].y + _rra[1].h <= _ra.y + _ra.h && _rra[1].y >= _rra[0].y + _rra[0].h, json_stringify(_rra) + " " + json_stringify(_ra));
+                    Scenario_Check("shots_notes_ask_the_footer_offers_select_" + _tga, string_pos("[k:confirm]", TabMenu_Hint()) > 0, TabMenu_Hint());
+                }
+                _s.shot = "shot_notes_" + _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
                 Scenario_ShotLayout(_s.shot);
                 Scenario_Next(_s, 703);
             }
@@ -13084,6 +13108,7 @@ function Scenario_StepShotsNotes(_s) {
         case 703:
             if (_s.t >= 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                global.choice_off = true;   // the "ask" picture switched the questions on
                 if (is_struct(TabMenu_Get())) Menu_Close(true);
                 Scenario_ClearUi();
                 _o.si++;
@@ -13987,8 +14012,7 @@ function Scenario_StepShotsRichText(_s) {
                 if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
                 global.input.last_device = "keyboard";
                 if (_o.di >= array_length(_scenes)) {
-                    _s.eg_i = 0;
-                    Scenario_Next(_s, 800);   // goes on with H13a (800..809), the end of the pictures
+                    Scenario_Next(_s, 910);   // goes on with H12a (910..913), then H13a (800..), the end of the pictures
                 } else {
                     Scenario_Next(_s, 930);
                 }
@@ -14081,6 +14105,531 @@ function Scenario_StepSmokeHunt5a(_s) {
             if (room == rm_cutscene && _s.t mod 30 == 0) Scenario_Tap("confirm");   // a wake / intro line on the way: one tap a line
             if (variable_struct_exists(_h, "sum_t") && _s.t > _h.sum_t + 40 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) Scenario_Next(_s, 820);   // goes on with D164 (820..829)
             if (_s.t > 1500) { Scenario_Check("hunt5a_the_next_run_starts_after_the_summary", false, "room=" + room_get_name(room) + " phase=" + (is_struct(_fl) ? string(_fl.phase) : "none")); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ============================================================================
+// H12a (D154): the small flavour choices, through real keys (smoke steps 890-909, the end of the chain). Writes the real profile.sav: only inside the gate
+// (Scenario_CanSaveSlot). The questions are switched on for these steps only (global.choice_off).
+//   890      a Knight with 87 gold in a run, a clean profile; on to the merchant's room
+//   891-893  the merchant: interact opens his question as a box, the replies open above it, the second one is picked, its reply is read, the shop opens; the
+//            answer is in the profile (memory and file); the next visit opens the shop at once and his first greeting remembers the answer; with a clean
+//            profile the first reply shows another next line
+//   894-896  the Stranger: his question comes before your reaction to him; the first reply is picked; the reaction follows; the next run he greets without asking
+//   897-898  the wake line: the question follows it; the second reply; the next time a line that remembers follows the wake line instead
+//   899-902  the torn survey page (D147 + D154): walked onto it is picked up and nothing is asked; in the Codex Notes reader the question comes after the
+//            note's lines, the replies wake when the text is read to its end, Down / Up / Confirm pick the first one (stored, in the file), the reply is read;
+//            reopened, the later line is part of the note and nothing is asked
+//   909      the end (the files are removed)
+// Nothing in any of it may change HP, MP, gold, items or stats (Scenario_ChoiceVitals).
+// ============================================================================
+function Scenario_ChoiceVitals() {
+    var _gs = GameState_Get();
+    var _c = _gs.player_ch;
+    return json_stringify({ hp: _c.hp, mp: _c.mp, max_hp: _c.max_hp, max_mp: _c.max_mp, stats: _c.stats, inv: _c.inventory, skills: _c.skills, level: _c.level, gold: _gs.run.gold });
+}
+
+// A Knight in a run with 87 gold and a few potions, owed nothing (no card or stat screen opens by itself).
+function Scenario_ChoiceFixture() {
+    var _gs = Scenario_NewKnight(CLASS_KNIGHT);
+    var _k = _gs.player_ch;
+    _k.inventory = Inv_Add(_k.inventory, 10, 2);
+    _k.inventory = Inv_Add(_k.inventory, 30, 1);
+    _k.hp = max(1, _k.max_hp - 3);
+    _k.mp = max(0, _k.max_mp - 1);
+    GameState_SetPlayer(_k);
+    _gs.run = Run_Create(8901);
+    _gs.run.gold = 87;
+    return _gs;
+}
+
+function Scenario_ChoiceNew() {
+    return { boxes: [], sig: "", q: 0, labels: [], cursor_start: -1, cursor_pick: -1, watch: "", watched: false };
+}
+
+// Drives one moment through the real keys and writes down what it sees. Every dialogue box that opens is read with Confirm; a box with replies waits for them to open,
+// _pick (0 or 1; -1 = no question is expected) is chosen with Down / Confirm. _c.boxes = [{ lines, speaker, asking }] in order, _c.labels / cursor_start / cursor_pick
+// of the replies; _c.watch (a lines_raw as json) sets _c.watched when that box shows. True once every box is closed and the keys have had time to act.
+function Scenario_ChoiceDrive(_s, _c, _pick) {
+    var _gs = GameState_Get();
+    var _ready = (_s.f - _s.last_tap) >= 14;
+    var _in_box = (_gs.ui.mode == UI_DIALOGUE);
+    if (_in_box) {
+        var _asking = is_struct(Dialogue_Choice());
+        var _sig = json_stringify(_gs.ui.lines_raw) + "|" + string(_gs.ui.speaker) + "|" + string(_asking);
+        if (_sig != _c.sig) {
+            _c.sig = _sig;
+            array_push(_c.boxes, { lines: _gs.ui.lines_raw, speaker: _gs.ui.speaker, asking: _asking });
+            if (json_stringify(_gs.ui.lines_raw) == _c.watch) _c.watched = true;
+        }
+        if (Dialogue_ChoiceIsOpen() && _pick >= 0) {
+            var _m = Dialogue_Choice().menu;
+            if (_c.q == 0) {
+                _c.labels = [];
+                for (var _i = 0; _i < array_length(_m.items); _i++) array_push(_c.labels, _m.items[_i].label);
+                _c.cursor_start = _m.cursor;
+                if (_pick > 0) Scenario_Tap("menu_down");
+                _c.q = 1;
+            } else if (_c.q == 1 && _ready) {
+                _c.cursor_pick = _m.cursor;
+                Scenario_Tap("confirm");
+                _c.q = 2;
+            }
+        } else if (_ready) {
+            Scenario_Tap("confirm");
+        }
+        return false;
+    }
+    return (array_length(_c.boxes) > 0 && (_s.f - _s.last_tap) >= 20);
+}
+
+// Closes the shop through its own back key once its input delay is over. True when it is closed.
+function Scenario_ChoiceLeaveShop(_s, _h) {
+    if (!ShopUi_IsOpen()) return true;
+    if (InputLock_Settled(global.shop_ui.lock, 4 * TRANSITION_FRAME_MS) && (_s.f - _s.last_tap) >= 14) Scenario_Tap("cancel");
+    return false;
+}
+
+function Scenario_StepSmokeChoices(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "chs")) _s.chs = { c: Scenario_ChoiceNew(), vit: "", reply2: "", flags: {} };
+    var _h = _s.chs;
+    var _c = _h.c;
+    switch (_s.step) {
+        case 890:   // a Knight with 87 gold in a run, a clean profile, the merchant's room
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP flavour choices (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_NoticeEnd();
+                    break;
+                }
+                if (Transition_IsActive()) { _s.t = 0; break; }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                RunSave_Delete();
+                _gs = Scenario_ChoiceFixture();
+                Profile_ResetForTest();
+                _gs.pending_wake_line = false;
+                global.choice_off = false;
+                _h.vit = Scenario_ChoiceVitals();
+                Scenario_Check("choices_the_questions_are_on_for_these_steps", Choice_Enabled() && Choice_Get(Profile_Get(), "merchant") == 0);
+                Scenario_Check("choices_the_fixture_is_owed_nothing", Cards_NextOwed(_gs.player_ch) == "");
+                room_goto(rm_floor2);
+            }
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor2)) {
+                with (obj_enemy) instance_destroy();   // the room's enemies would hunt the player
+                var _plm = Scenario_PlacePlayer(12, 5);
+                _plm.face = UP;
+                _h.c = Scenario_ChoiceNew();
+                Scenario_Next(_s, 891);
+            }
+            if (_s.t > 900) { Scenario_Check("choices_reach_the_merchants_room", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 891:   // the merchant, a clean profile: his question, the second reply, then the shop
+            if (_s.t == 25) Scenario_Tap("interact");
+            if (_s.t > 25) {
+                var _done = Scenario_ChoiceDrive(_s, _c, 1);
+                if (array_length(_c.boxes) == 1 && !variable_struct_exists(_h.flags, "m_ask")) {
+                    _h.flags.m_ask = true;
+                    Scenario_Check("choices_merchant_interact_opens_his_question_not_the_shop", !ShopUi_IsOpen() && _c.boxes[0].asking && _c.boxes[0].speaker == Loc_T("merchant.name", "Merchant"));
+                    Scenario_Check("choices_merchant_the_question_is_his_two_lines", json_stringify(_c.boxes[0].lines) == json_stringify(Choice_Def("merchant").ask), json_stringify(_c.boxes[0].lines));
+                    Scenario_Check("choices_merchant_nothing_is_stored_before_the_pick", Choice_Get(Profile_Get(), "merchant") == 0);
+                }
+                if (_c.q == 1 && !variable_struct_exists(_h.flags, "m_menu")) {
+                    _h.flags.m_menu = true;
+                    Scenario_Check("choices_merchant_two_replies_open_above_the_box", array_length(_c.labels) == 2 && _c.labels[0] == Choice_Def("merchant").labels[0] && _c.labels[1] == Choice_Def("merchant").labels[1], json_stringify(_c.labels));
+                    Scenario_Check("choices_merchant_the_cursor_starts_on_the_first_reply", _c.cursor_start == 0);
+                    Scenario_Check("choices_merchant_the_replies_sit_above_the_box", Dialogue_Choice().menu.rect.y + Dialogue_Choice().menu.rect.h <= Dialogue_BoxRect().y);
+                }
+                if (array_length(_c.boxes) == 2 && !variable_struct_exists(_h.flags, "m_reply")) {
+                    _h.flags.m_reply = true;
+                    Scenario_Check("choices_merchant_down_picked_the_second_reply", _c.cursor_pick == 1);
+                    Scenario_Check("choices_merchant_the_second_reply_is_his_next_line", json_stringify(_c.boxes[1].lines) == json_stringify(Choice_Def("merchant").reply[1]) && !_c.boxes[1].asking && _c.boxes[1].speaker == _c.boxes[0].speaker, json_stringify(_c.boxes[1].lines));
+                    Scenario_Check("choices_merchant_the_answer_is_remembered", Choice_Get(Profile_Get(), "merchant") == 2);
+                    var _disk = Profile_Load(Profile_Path());
+                    Scenario_Check("choices_merchant_the_answer_is_in_the_profile_file", _disk.status == "ok" && Choice_Get(_disk.profile, "merchant") == 2 && _disk.profile.profile_version == 2, "status=" + _disk.status);
+                    Scenario_Check("choices_merchant_the_shop_waits_for_the_reply", !ShopUi_IsOpen());
+                    _h.reply2 = json_stringify(_c.boxes[1].lines);
+                }
+                if (_done) {
+                    Scenario_Check("choices_merchant_two_boxes_then_the_shop", array_length(_c.boxes) == 2 && ShopUi_IsOpen() && _gs.ui.mode == UI_SHOP);
+                    Scenario_Check("choices_merchant_nothing_changed_in_the_character_or_the_gold", Scenario_ChoiceVitals() == _h.vit);
+                    Scenario_Check("choices_merchant_his_first_greeting_remembers_the_answer", Merchant_Line("greet", 0) == Choice_Def("merchant").again[1][0]);
+                    Scenario_Next(_s, 892);
+                }
+            }
+            if (_s.t > 1500) { Scenario_Check("choices_merchant_flow_ends", false, "q=" + string(_c.q) + " boxes=" + string(array_length(_c.boxes)) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 892:   // leave the shop; the next visit opens it at once, without a question
+            if (!variable_struct_exists(_h.flags, "left1")) {
+                if (Scenario_ChoiceLeaveShop(_s, _h)) { _h.flags.left1 = _s.t; Scenario_Check("choices_merchant_cancel_leaves_the_shop", _gs.ui.mode == UI_NONE); }
+            } else if (_s.t == _h.flags.left1 + 40) {
+                _h.flags.box_seen = false;
+                Scenario_Tap("interact");
+            }
+            if (variable_struct_exists(_h.flags, "left1") && _s.t > _h.flags.left1 + 40) {
+                if (_gs.ui.mode == UI_DIALOGUE) _h.flags.box_seen = true;
+                if (ShopUi_IsOpen()) {
+                    Scenario_Check("choices_merchant_answered_the_shop_opens_without_a_question", !_h.flags.box_seen);
+                    Scenario_Check("choices_merchant_the_answer_is_still_there", Choice_Get(Profile_Get(), "merchant") == 2);
+                    Scenario_Next(_s, 893);
+                }
+            }
+            if (_s.t > 600) { Scenario_Check("choices_merchant_second_visit_opens_the_shop", false, "mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 893:   // a clean profile again: the first reply shows another next line
+            if (!variable_struct_exists(_h.flags, "left2")) {
+                if (Scenario_ChoiceLeaveShop(_s, _h)) {
+                    _h.flags.left2 = _s.t;
+                    Profile_ResetForTest();
+                    _h.c = Scenario_ChoiceNew();
+                }
+            } else if (_s.t == _h.flags.left2 + 40) {
+                Scenario_Tap("interact");
+            }
+            if (variable_struct_exists(_h.flags, "left2") && _s.t > _h.flags.left2 + 40) {
+                var _done2 = Scenario_ChoiceDrive(_s, _h.c, 0);
+                if (array_length(_h.c.boxes) == 2 && !variable_struct_exists(_h.flags, "m2_reply")) {
+                    _h.flags.m2_reply = true;
+                    Scenario_Check("choices_merchant_the_first_reply_is_picked", _h.c.cursor_pick == 0 && Choice_Get(Profile_Get(), "merchant") == 1);
+                    Scenario_Check("choices_merchant_the_first_reply_shows_another_next_line", json_stringify(_h.c.boxes[1].lines) == json_stringify(Choice_Def("merchant").reply[0]) && json_stringify(_h.c.boxes[1].lines) != _h.reply2, json_stringify(_h.c.boxes[1].lines));
+                }
+                if (_done2) {
+                    Scenario_Check("choices_merchant_the_shop_opens_again", ShopUi_IsOpen());
+                    Scenario_Check("choices_merchant_the_first_answer_greets_with_its_own_line", Merchant_Line("greet", 0) == Choice_Def("merchant").again[0][0] && Merchant_Line("greet", 0) != Choice_Def("merchant").again[1][0]);
+                    Scenario_Check("choices_merchant_still_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
+                    Scenario_Next(_s, 894);
+                }
+            }
+            if (_s.t > 1500) { Scenario_Check("choices_merchant_first_reply_flow_ends", false, "q=" + string(_h.c.q) + " boxes=" + string(array_length(_h.c.boxes)) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 894:   // the Stranger: the first room, a clean profile and a fresh run's flags; his encounter is owed the way the end of his battle leaves it
+            if (_s.t == 1) {
+                ShopUi_Close();
+                Scenario_ClearUi();
+                Profile_ResetForTest();
+                _gs.flags = {};
+                room_goto(rm_floor1);
+            }
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor1)) {
+                _gs.pending_wake_line = false;
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                with (obj_enemy) instance_destroy();
+                _h.c = Scenario_ChoiceNew();
+                _h.c.watch = json_stringify(DialogueDB_Get("sys_first_stranger_encounter_reaction"));
+                Scenario_Check("choices_stranger_the_encounter_is_queued_once", Dialogue_NarrativeOnStrangerEncounterResolved());
+                Scenario_Next(_s, 895);
+            }
+            if (_s.t > 900) { Scenario_Check("choices_reach_the_first_room", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 895:   // his question comes first, the first reply, then your reaction
+            var _done3 = Scenario_ChoiceDrive(_s, _c, 0);
+            if (array_length(_c.boxes) == 1 && !variable_struct_exists(_h.flags, "s_ask")) {
+                _h.flags.s_ask = true;
+                Scenario_Check("choices_stranger_his_question_opens_first_under_his_name", _c.boxes[0].asking && _c.boxes[0].speaker == Loc_T("enemy.name.enemy_stranger", "Stranger") && json_stringify(_c.boxes[0].lines) == json_stringify(Choice_Def("stranger").ask), json_stringify(_c.boxes[0].lines));
+                Scenario_Check("choices_stranger_the_reaction_has_not_started", !_c.watched);
+            }
+            if (array_length(_c.boxes) == 2 && !variable_struct_exists(_h.flags, "s_reply")) {
+                _h.flags.s_reply = true;
+                Scenario_Check("choices_stranger_the_first_reply_is_his_next_line", json_stringify(_c.boxes[1].lines) == json_stringify(Choice_Def("stranger").reply[0]) && _c.boxes[1].speaker == _c.boxes[0].speaker && _c.cursor_pick == 0, json_stringify(_c.boxes[1].lines));
+                Scenario_Check("choices_stranger_the_answer_is_remembered", Choice_Get(Profile_Get(), "stranger") == 1);
+            }
+            if (_done3) {
+                Scenario_Check("choices_stranger_your_reaction_follows_his_reply", _c.watched && array_length(_c.boxes) == 3);
+                Scenario_Check("choices_stranger_the_encounter_is_used_up", !Dialogue_NarrativeIsPending("first_stranger_encounter_reaction") && Dialogue_NarrativeIsDone("first_stranger_encounter_reaction"));
+                Scenario_Check("choices_stranger_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
+                _gs.flags = {};   // the next run: its flags are new, the profile remembers
+                _h.c = Scenario_ChoiceNew();
+                _h.c.watch = json_stringify(DialogueDB_Get("sys_first_stranger_encounter_reaction"));
+                Dialogue_NarrativeOnStrangerEncounterResolved();
+                Scenario_Next(_s, 896);
+            }
+            if (_s.t > 1500) { Scenario_Check("choices_stranger_flow_ends", false, "q=" + string(_c.q) + " boxes=" + string(array_length(_c.boxes)) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 896:   // the next run: he greets without asking, in the words of the first answer, then your reaction
+            var _done4 = Scenario_ChoiceDrive(_s, _c, -1);
+            if (array_length(_c.boxes) == 1 && !variable_struct_exists(_h.flags, "s_again")) {
+                _h.flags.s_again = true;
+                Scenario_Check("choices_stranger_next_run_he_greets_without_asking", !_c.boxes[0].asking && _c.boxes[0].speaker == Loc_T("enemy.name.enemy_stranger", "Stranger"));
+                Scenario_Check("choices_stranger_next_run_the_greeting_is_the_first_answers", json_stringify(_c.boxes[0].lines) == json_stringify(Choice_Def("stranger").again[0]), json_stringify(_c.boxes[0].lines));
+            }
+            if (_done4) {
+                Scenario_Check("choices_stranger_next_run_your_reaction_follows_his_greeting", _c.watched && array_length(_c.boxes) == 2);
+                Scenario_Check("choices_stranger_next_run_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
+                Scenario_Next(_s, 897);
+            }
+            if (_s.t > 1500) { Scenario_Check("choices_stranger_next_run_flow_ends", false, "boxes=" + string(array_length(_c.boxes)) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 897:   // the wake line: a clean profile, the 1st death; the line, then the question
+            if (_s.t == 1) {
+                Profile_ResetForTest();
+                Profile_Get().deaths = 1;
+                _gs.pending_wake_line = true;
+                _h.c = Scenario_ChoiceNew();
+                _h.wake = WakeLine_Pick(1);
+            }
+            if (_s.t > 1) {
+                var _done5 = Scenario_ChoiceDrive(_s, _h.c, 1);
+                var _cw = _h.c;
+                if (array_length(_cw.boxes) == 2 && !variable_struct_exists(_h.flags, "w_ask")) {
+                    _h.flags.w_ask = true;
+                    Scenario_Check("choices_wake_the_wake_line_comes_first_as_before", array_length(_cw.boxes[0].lines) == 1 && _cw.boxes[0].lines[0] == Loc_T(_h.wake.key, _h.wake.text) && !_cw.boxes[0].asking, json_stringify(_cw.boxes[0].lines));
+                    Scenario_Check("choices_wake_the_question_follows_it", _cw.boxes[1].asking && json_stringify(_cw.boxes[1].lines) == json_stringify(Choice_Def("wake").ask) && _cw.boxes[1].speaker == "", json_stringify(_cw.boxes[1].lines));
+                }
+                if (array_length(_cw.boxes) == 3 && !variable_struct_exists(_h.flags, "w_reply")) {
+                    _h.flags.w_reply = true;
+                    Scenario_Check("choices_wake_the_second_reply_is_the_next_line", _cw.cursor_pick == 1 && json_stringify(_cw.boxes[2].lines) == json_stringify(Choice_Def("wake").reply[1]), json_stringify(_cw.boxes[2].lines));
+                    Scenario_Check("choices_wake_the_answer_is_remembered", Choice_Get(Profile_Get(), "wake") == 2);
+                }
+                if (_done5) {
+                    Scenario_Check("choices_wake_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
+                    _gs.pending_wake_line = true;   // the next death
+                    _h.c = Scenario_ChoiceNew();
+                    Scenario_Next(_s, 898);
+                }
+            }
+            if (_s.t > 1500) { Scenario_Check("choices_wake_flow_ends", false, "q=" + string(_h.c.q) + " boxes=" + string(array_length(_h.c.boxes)) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 898:   // the next wake: the wake line, then a line that remembers the answer, and no question
+            var _done6 = Scenario_ChoiceDrive(_s, _c, -1);
+            if (_done6) {
+                Scenario_Check("choices_wake_next_time_the_wake_line_comes_as_before", array_length(_c.boxes) == 2 && array_length(_c.boxes[0].lines) == 1 && _c.boxes[0].lines[0] == Loc_T(_h.wake.key, _h.wake.text));
+                Scenario_Check("choices_wake_next_time_a_line_follows_that_remembers_the_answer", array_length(_c.boxes) == 2 && !_c.boxes[1].asking && json_stringify(_c.boxes[1].lines) == json_stringify(Choice_Def("wake").again[1]), json_stringify(_c.boxes));
+                Scenario_Check("choices_wake_next_time_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
+                Scenario_Next(_s, 899);
+            }
+            if (_s.t > 900) { Scenario_Check("choices_wake_next_time_flow_ends", false, "boxes=" + string(array_length(_c.boxes)) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 899:   // the torn survey page: walked onto with a real key it is picked up and nothing is asked
+            if (_s.t == 1) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Profile_ResetForTest();
+                with (obj_enemy) instance_destroy();
+                Notes_SpawnForRoom();   // a clean profile: the note stands on its tile again (a room start would do the same)
+                _h.c = Scenario_ChoiceNew();
+            }
+            if (_s.t == 10) {
+                var _dn = Note_Find("map_page");
+                Scenario_Check("choices_note_the_survey_page_stands_in_the_first_room", Notes_LiveCount("rm_floor1") == 1 && Notes_LiveAtTile("rm_floor1", _dn.tx, _dn.ty) == "map_page", "live=" + string(Notes_LiveCount("rm_floor1")));
+                var _plw = Scenario_PlacePlayer(_dn.tx + 1, _dn.ty);
+                _plw.face = LEFT;
+                Scenario_Hold("move_left", 10);
+            }
+            if (_s.t > 12 && Notes_LiveCount("rm_floor1") == 0 && !variable_struct_exists(_h.flags, "n_got")) {
+                _h.flags.n_got = _s.t;
+                Scenario_Release();
+            }
+            if (variable_struct_exists(_h.flags, "n_got") && _s.t == _h.flags.n_got + 20) {
+                Scenario_Check("choices_note_walking_onto_it_picks_it_up", Note_IsCollected(Profile_Get(), "map_page") && Notes_LiveCount("rm_floor1") == 0);
+                Scenario_Check("choices_note_pickup_asks_nothing", _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && !Dialogue_ChoiceIsOpen() && Choice_Enabled(), "mode=" + string(_gs.ui.mode));
+                Scenario_Check("choices_note_pickup_stores_no_answer", Choice_Get(Profile_Get(), "map_page") == 0);
+                Scenario_Check("choices_note_it_is_still_recorded_as_read", Note_IsCollected(Profile_Get(), "map_page"));
+                Scenario_Check("choices_note_pickup_changed_nothing_in_the_character", Scenario_ChoiceVitals() == _h.vit);
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);
+                Ui_MemSet(Ui_MemGlobal(), "tab_codex", 0);     // the menus remember their cursors: start both Codex lists on their first row
+                Ui_MemSet(Ui_MemGlobal(), "codex_notes", 0);
+                Scenario_Next(_s, 900);
+            }
+            if (_s.t > 200 && !variable_struct_exists(_h.flags, "n_got")) { Scenario_Release(); Scenario_Check("choices_note_walking_onto_it_picks_it_up", false, "live=" + string(Notes_LiveCount("rm_floor1"))); Scenario_NoticeEnd(); }
+            break;
+        case 900:   // Tab, E x4 (Codex), Notes, the survey page: its reader opens with the note's lines and the question's lines
+            var _ndr = Note_Find("map_page");
+            var _mr = TabMenu_TopMenu();
+            switch (_s.t) {
+                case 5: Scenario_Tap("menu"); break;
+                case 20: Scenario_Tap("tab_next"); break;
+                case 28: Scenario_Tap("tab_next"); break;
+                case 36: Scenario_Tap("tab_next"); break;
+                case 44: Scenario_Tap("tab_next"); break;
+                case 54:
+                    Scenario_Check("choices_note_the_codex_is_reached_with_the_keys", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && TabMenu_Get().tab == 4 && _mr.id == "tab_codex", "mode=" + string(_gs.ui.mode));
+                    Scenario_Tap("menu_down");
+                    break;
+                case 62: Scenario_Tap("confirm"); break;
+                case 76:
+                    Scenario_Check("choices_note_the_notes_page_lists_the_found_page", _mr.id == "codex_notes" && _mr.items[0].label == _ndr.title, _mr.id);
+                    Scenario_Tap("confirm");
+                    break;
+                case 92:
+                    Scenario_Check("choices_note_confirm_opens_the_reader", _mr.id == "codex_note_read" && TabMenu_Depth() == 3, "id=" + _mr.id);
+                    if (_mr.id != "codex_note_read") { Scenario_NoticeEnd(); break; }
+                    Scenario_Check("choices_note_the_reader_asks_its_question", _mr.data.ask && Note_AsksQuestion(_ndr), "ask=" + string(_mr.data.ask));
+                    Scenario_Check("choices_note_the_reader_text_is_its_lines_then_the_question", _mr.data.text == NoteReader_Join(array_concat(_ndr.lines, Choice_Def("map_page").ask)), _mr.data.text);
+                    Scenario_Check("choices_note_the_reader_holds_the_two_replies", json_stringify(_mr.data.labels) == json_stringify(Choice_Def("map_page").labels), json_stringify(_mr.data.labels));
+                    Scenario_Check("choices_note_nothing_is_stored_before_the_pick", Choice_Get(Profile_Get(), "map_page") == 0);
+                    Scenario_Next(_s, 901);
+                    break;
+            }
+            if (_s.t > 140) { Scenario_Check("choices_note_the_reader_opens", false, "id=" + (is_struct(_mr) ? _mr.id : "none") + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 901:   // read to the end (Down), the replies wake up; Down and Up move between them; Confirm picks the first
+            var _ndq = Note_Find("map_page");
+            var _mq = TabMenu_TopMenu();
+            var _rdy = (_s.f - _s.last_tap) >= 12;
+            if (!is_struct(_mq) || _mq.id != "codex_note_read") { Scenario_Check("choices_note_the_reader_stays_open_until_the_pick", false, "mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); break; }
+            if (!variable_struct_exists(_h.flags, "n_armed")) {
+                if (NoteReader_Armed(_mq) && array_length(_mq.data.reply_rects) == 2) {
+                    _h.flags.n_armed = true;
+                    var _rr = _mq.data.reply_rects;
+                    var _rc = _mq.rect;
+                    Scenario_Check("choices_note_the_replies_wake_when_the_text_is_read_to_its_end", _mq.data.scroll >= NoteReader_MaxScroll(array_length(_mq.data.wrapped), _mq.data.visible));
+                    Scenario_Check("choices_note_the_replies_sit_inside_the_reader", _rr[0].x >= _rc.x && _rr[0].x + _rr[0].w <= _rc.x + _rc.w && _rr[1].y + _rr[1].h <= _rc.y + _rc.h && _rr[1].y >= _rr[0].y + _rr[0].h && _rr[0].y > _rc.y, json_stringify(_rr) + " " + json_stringify(_rc));
+                    Scenario_Check("choices_note_the_cursor_starts_on_the_first_reply", _mq.data.pick == 0);
+                    Scenario_Check("choices_note_the_footer_offers_select", string_pos("[k:confirm]", TabMenu_Hint()) > 0, TabMenu_Hint());
+                    Scenario_Check("choices_note_nothing_is_stored_before_the_confirm", Choice_Get(Profile_Get(), "map_page") == 0);
+                    Scenario_Tap("menu_down");
+                } else if (_rdy) {
+                    Scenario_Tap("menu_down");   // the text is longer than the window: read on
+                }
+            } else if (!variable_struct_exists(_h.flags, "n_down") && _rdy) {
+                _h.flags.n_down = true;
+                Scenario_Check("choices_note_down_moves_to_the_second_reply", _mq.data.pick == 1, "pick=" + string(_mq.data.pick));
+                Scenario_Tap("menu_up");
+            } else if (variable_struct_exists(_h.flags, "n_down") && !variable_struct_exists(_h.flags, "n_up") && _rdy) {
+                _h.flags.n_up = true;
+                Scenario_Check("choices_note_up_goes_back_to_the_first_reply", _mq.data.pick == 0 && NoteReader_Armed(_mq), "pick=" + string(_mq.data.pick));
+                Scenario_Tap("confirm");
+            } else if (variable_struct_exists(_h.flags, "n_up") && _rdy) {
+                var _dq = _mq.data;
+                Scenario_Check("choices_note_the_first_reply_is_picked_and_remembered", Choice_Get(Profile_Get(), "map_page") == 1 && !_dq.ask);
+                var _diskn = Profile_Load(Profile_Path());
+                Scenario_Check("choices_note_the_answer_is_in_the_profile_file", _diskn.status == "ok" && Choice_Get(_diskn.profile, "map_page") == 1, "status=" + _diskn.status);
+                Scenario_Check("choices_note_the_first_reply_is_the_next_line", _dq.text == NoteReader_Join(Note_ReplyLines(_ndq, 0)) && string_pos(Choice_Def("map_page").reply[0][0], _dq.text) > 0, _dq.text);
+                Scenario_Check("choices_note_the_question_is_gone_from_the_text", string_pos(Choice_Def("map_page").ask[1], _dq.text) == 0);
+                Scenario_Check("choices_note_the_replies_are_gone", array_length(_dq.reply_rects) == 0 && !NoteReader_Armed(_mq));
+                Scenario_Check("choices_note_the_reader_stays_open_after_the_pick", TabMenu_TopMenu().id == "codex_note_read" && TabMenu_Depth() == 3);
+                Scenario_Check("choices_note_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
+                Scenario_Tap("cancel");
+                Scenario_Next(_s, 902);
+            }
+            if (_s.t > 500) { Scenario_Check("choices_note_the_question_is_answered", false, "armed=" + string(NoteReader_Armed(_mq)) + " scroll=" + string(_mq.data.scroll)); Scenario_NoticeEnd(); }
+            break;
+        case 902:   // read again: the later line is part of the note, nothing is asked, Confirm does nothing; Back closes the menu
+            var _nd2 = Note_Find("map_page");
+            var _m2 = TabMenu_TopMenu();
+            switch (_s.t) {
+                case 14:
+                    Scenario_Check("choices_note_back_closes_the_reader", _m2.id == "codex_notes" && TabMenu_Depth() == 2, "id=" + _m2.id);
+                    Scenario_Tap("confirm");
+                    break;
+                case 30:
+                    Scenario_Check("choices_note_next_time_the_reader_opens_again", _m2.id == "codex_note_read" && TabMenu_Depth() == 3, "id=" + _m2.id);
+                    if (_m2.id != "codex_note_read") { Scenario_NoticeEnd(); break; }
+                    Scenario_Check("choices_note_next_time_no_question", !_m2.data.ask && array_length(_m2.data.reply_rects) == 0 && !NoteReader_Armed(_m2));
+                    Scenario_Check("choices_note_next_time_the_later_line_ends_the_note", _m2.data.text == NoteReader_Join(Note_ReadLines(_nd2)) && array_length(Note_ReadLines(_nd2)) == array_length(_nd2.lines) + 1 && string_pos(Choice_Def("map_page").again[0][0], _m2.data.text) > 0, _m2.data.text);
+                    Scenario_Check("choices_note_next_time_the_question_is_not_in_the_text", string_pos(Choice_Def("map_page").ask[1], _m2.data.text) == 0);
+                    Scenario_Check("choices_note_next_time_the_footer_does_not_offer_select", string_pos("[k:confirm]", TabMenu_Hint()) == 0, TabMenu_Hint());
+                    Scenario_Tap("confirm");
+                    break;
+                case 46:
+                    Scenario_Check("choices_note_next_time_confirm_changes_nothing", _m2.id == "codex_note_read" && Choice_Get(Profile_Get(), "map_page") == 1 && _m2.data.text == NoteReader_Join(Note_ReadLines(_nd2)));
+                    Scenario_Check("choices_note_next_time_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
+                    Scenario_Tap("cancel");
+                    break;
+                case 60: Scenario_Tap("cancel"); break;
+                case 74: Scenario_Tap("cancel"); break;
+                case 100:
+                    Scenario_Check("choices_note_back_back_back_closes_the_menu", _gs.ui.mode == UI_NONE && !is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                    Scenario_Next(_s, 909);
+                    break;
+            }
+            if (_s.t > 200) { Scenario_Check("choices_note_next_time_flow_ends", false, "mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 909:   // the end: the questions go off again for whatever is chained after, the files are removed
+            if (_s.t == 2) {
+                Scenario_Check("choices_the_profile_file_holds_the_answers", Choice_Get(Profile_Load(Profile_Path()).profile, "map_page") == 1);
+                global.choice_off = true;
+                Scenario_Next(_s, 790);   // goes on with H13a (790..799), the end of the chain
+            }
+            break;
+    }
+}
+
+// ---- H12a (D154) pictures 910..913: the merchant's question with its two replies open above the dialogue box, English and Korean, at windowed scale 3 (480 x 432)
+// and 5 (800 x 720). Each is the real draw of the real box on a real room; the replies and the box are asserted on their rectangles (on screen, the replies above the
+// box, every line of the question on one page). Files shot_choice_<lang>_<w>x<h>.png. The last picture of the run: it ends the run. ----
+function Scenario_StepShotsChoices(_s) {
+    var _langs = ["en", "ko"];
+    var _scales = [3, 5];
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "chz")) _s.chz = { di: 0, si: 0, rm: rm_floor2 };
+    var _o = _s.chz;
+    var _tag = _langs[_o.di] + "_" + string(_scales[_o.si]);
+    switch (_s.step) {
+        case 910:   // the room and the window scale of this picture (two floors take turns), a clean profile, the questions on
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Scenario_ChoiceFixture();
+                global.profile = Profile_Default();
+                global.profile_status = "missing";
+                global.choice_off = false;
+                Scenario_SetWindowScale(_scales[_o.si]);
+                _o.rm = (room == rm_floor2) ? rm_floor3 : rm_floor2;   // entering the room we are in would not spawn the player again
+                room_goto(_o.rm);
+            }
+            if (_s.t >= 30 && Scenario_FloorReady(_o.rm)) Scenario_Next(_s, 911);
+            if (_s.t > 900) { Scenario_Check("shots_choices_reaches_the_room_" + _tag, false, "room=" + room_get_name(room)); Scenario_Finish(); }
+            break;
+        case 911:   // open the merchant's question the way the game does; at its last line the replies open
+            if (_s.t == 1) {
+                with (obj_enemy) instance_destroy();
+                Scenario_ClearUi();
+                Loc_SetLanguage(_langs[_o.di]);   // after the room is up: entering it reads the saved language again
+                Choice_Run("merchant");
+            }
+            if (_s.t == 6) {
+                _gs.ui.index = max(0, array_length(_gs.ui.lines) - 1);
+                Dialogue_TypewriterPrepareCurrentLine();
+                Dialogue_TypewriterRevealInstant();
+                _gs.ui.dialogue_state = UI_DIALOGUE_STATE_READY;
+                Dialogue_ChoiceOpen();
+                Dialogue_Choice().menu.cursor = 0;
+                Scenario_Next(_s, 912);
+            }
+            break;
+        case 912:   // let it settle, check the layout, take the picture
+            if (_s.t >= 16) {
+                var _gw = Display_GuiW();
+                var _box = Dialogue_BoxRect();
+                var _m = Dialogue_ChoiceIsOpen() ? Dialogue_Choice().menu : undefined;
+                Scenario_Check("shots_choices_is_open_" + _tag, _gs.ui.mode == UI_DIALOGUE && is_struct(_m) && array_length(_m.items) == 2);
+                if (is_struct(_m)) {
+                    var _r = _m.rect;
+                    Scenario_Check("shots_choices_replies_on_screen_" + _tag, _r.w > 0 && _r.x >= 0 && _r.y >= 0 && _r.x + _r.w <= _gw, json_stringify(_r));
+                    Scenario_Check("shots_choices_replies_sit_above_the_box_" + _tag, _r.y + _r.h <= _box.y, json_stringify(_r) + " box=" + json_stringify(_box));
+                    Scenario_Check("shots_choices_replies_show_their_words_in_full_" + _tag, _m.items[0].label == Choice_Def("merchant").labels[0] && _m.items[1].label == Choice_Def("merchant").labels[1]);
+                }
+                var _lay = Dialogue_TextLayout(_gs.ui.speaker);
+                var _fits = true;
+                for (var _i = 0; _i < array_length(_gs.ui.lines); _i++) { if (array_length(Dialogue_WrapToLines(Dialogue_LineText(_gs.ui.lines[_i]), _lay.text_w)) > _lay.max_lines) _fits = false; }
+                Scenario_Check("shots_choices_every_line_of_the_question_fits_the_box_" + _tag, _fits);
+                Scenario_Check("shots_choices_the_box_is_on_screen_" + _tag, _box.x >= 0 && _box.y >= 0 && _box.x + _box.w <= _gw && _box.y + _box.h <= Display_GuiH());
+                Scenario_Check("shots_choices_the_language_is_" + _langs[_o.di], Loc_GetLanguage() == _langs[_o.di] && (_o.di == 0 || Choice_Def("merchant").labels[0] != "A way out."));
+                _s.shot = "shot_choice_" + _langs[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 913);
+            }
+            break;
+        case 913:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_langs)) {
+                    Loc_SetLanguage("en");
+                    global.choice_off = true;
+                    global.profile = undefined;   // the next Profile_Get reads the real (scratch) file again
+                    _s.eg_i = 0;
+                    Scenario_Next(_s, 800);   // goes on with H13a (800..809), the end of the pictures
+                } else {
+                    Scenario_Next(_s, 910);
+                }
+            }
             break;
     }
 }

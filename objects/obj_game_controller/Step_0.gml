@@ -55,6 +55,7 @@ if (room == rm_floor1 && variable_struct_exists(gs, "pending_wake_line") && gs.p
         gs.pending_wake_line = false;
         var wake = WakeLine_Pick(Profile_Get().deaths);
         Dialogue_StartLines([Loc_T(wake.key, wake.text)]);
+        Dialogue_OnClose(Choice_RunWake);   // D154: the question follows the wake line (once answered, a later line follows it instead)
     }
 }
 
