@@ -200,7 +200,8 @@ function StatusDB_Init() {
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         force_dodge: true,
-        consume_on_defend: true
+        consume_on_defend: true,
+        no_tick_on_apply: true   // put on by the player's own action (a skill or a Smoke Bomb): that action's end-of-turn tick must not use up the first turn
     };
 
     global.status_db[? STATUS_CRIT_UP] = {

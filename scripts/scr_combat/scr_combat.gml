@@ -335,22 +335,25 @@ function Battle_LootAppendNormalized(_dest, _src) {
 
     for (var i = 0; i < array_length(_src); i++) {
         var it = _src[i];
-        if (!is_struct(it) || !variable_struct_exists(it, "id")) continue;
-        var iid = round(real(it.id));
+        // a drop is { item_id, qty }; a stolen item is recorded as { id, qty } (Skill_StealRecord). Both are accepted; the result is always { item_id, qty }.
+        if (!is_struct(it)) continue;
+        var key = variable_struct_exists(it, "item_id") ? "item_id" : (variable_struct_exists(it, "id") ? "id" : "");
+        if (key == "") continue;
+        var iid = round(real(variable_struct_get(it, key)));
         var qty = variable_struct_exists(it, "qty") ? max(0, round(real(it.qty))) : 0;
         if (qty <= 0) continue;
 
         var merged = false;
         for (var j = 0; j < array_length(out); j++) {
-            if (!is_struct(out[j]) || !variable_struct_exists(out[j], "id")) continue;
-            if (out[j].id != iid) continue;
+            if (!is_struct(out[j]) || !variable_struct_exists(out[j], "item_id")) continue;
+            if (out[j].item_id != iid) continue;
             var prev_qty = variable_struct_exists(out[j], "qty") ? max(0, round(real(out[j].qty))) : 0;
             out[j].qty = prev_qty + qty;
             merged = true;
             break;
         }
 
-        if (!merged) array_push(out, { id: iid, qty: qty });
+        if (!merged) array_push(out, { item_id: iid, qty: qty });
     }
 
     return out;
