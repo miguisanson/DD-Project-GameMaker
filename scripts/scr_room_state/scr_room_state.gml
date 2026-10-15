@@ -26,6 +26,8 @@ function RoomState_SanitizeEnemyVars(_vars, _fallback_enemy_id = -1) {
         if (variable_struct_exists(_vars, "enemy_uid")) out.enemy_uid = _vars.enemy_uid;
         if (variable_struct_exists(_vars, "enemy_level")) out.enemy_level = _vars.enemy_level;
         if (variable_struct_exists(_vars, "elite_mod")) out.elite_mod = _vars.elite_mod;   // C3 (D86)
+        if (variable_struct_exists(_vars, "home_x")) out.home_x = _vars.home_x;   // D33, D63, D66: the dealt spot the enemy idles around and walks back to (an old save has none: the authored spot stays)
+        if (variable_struct_exists(_vars, "home_y")) out.home_y = _vars.home_y;
     }
     if (!variable_struct_exists(out, "enemy_id") && _fallback_enemy_id != -1) {
         out.enemy_id = _fallback_enemy_id;
@@ -252,7 +254,7 @@ function RoomState_Save(_room) {
 
     // Enemy positions are the single source of truth for overworld battle return.
     with (obj_enemy) {
-        RoomState_SaveInstance(id, ["x", "y", "enemy_id", "enemy_uid", "enemy_level", "elite_mod"], false);
+        RoomState_SaveInstance(id, ["x", "y", "enemy_id", "enemy_uid", "enemy_level", "elite_mod", "home_x", "home_y"], false);
     }
 }
 

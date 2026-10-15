@@ -72,6 +72,7 @@ if (variable_struct_exists(gs, "load_spawn_pending") && gs.load_spawn_pending) {
             if (variable_instance_exists(pl_load, "moving")) pl_load.moving = false;
             if (variable_instance_exists(pl_load, "move_timer")) pl_load.move_timer = 0;
             if (variable_instance_exists(pl_load, "move_dir")) pl_load.move_dir = -1;
+            Player_ArmExitIgnore(pl_load);   // D64: Continue / load put the player on an exit tile: it ignores them until they step off it
         }
         gs.load_spawn_pending = false;
     }
