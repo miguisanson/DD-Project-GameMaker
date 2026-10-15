@@ -1682,7 +1682,7 @@ function Battle_ThrowResolve(_bc, _timing) {
     if (res.dmg > 0) note += Battle_StaggerHit(_bc, COMBAT_POWER_SCALE * ItemDB_Get(iid).use.power, res.stun, _timing.key == QTE_PERFECT);
     note += Battle_StunResolve(_bc);
     if (res.escape) {
-        EnemyPersist_ResolveBattle(false);
+        Battle_EscapeResolve(e);
         _bc.p = p;
         _bc.e = e;
         Battle_Message(_bc, res.msg, BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY_MS);
@@ -1733,10 +1733,7 @@ function Battle_RunAttempt(_bc) {
     }
 
     if (RunRng_Float("combat") < Battle_RunChance(Combat_EffectiveStat(p, STAT_SPD), Combat_EffectiveStat(e, STAT_SPD), _bc.run_fails)) {
-        EnemyPersist_ResolveBattle(false);
-        if (enemy_id == ENEMY_STRANGER) {
-            Dialogue_NarrativeOnStrangerEncounterResolved();
-        }
+        Battle_EscapeResolve(e);
         Battle_Message(_bc, Loc_T("combat.msg.player_ran", "You ran away!"), BSTATE_END_RUN, noone, COMBAT_ACTION_DELAY_MS);
     } else {
         // R-022: a failed Run is a spent turn: message, then the same finaliser as Guard (Status_Tick, death/victory check, timeline advance).
@@ -1745,6 +1742,14 @@ function Battle_RunAttempt(_bc) {
         Battle_Message(_bc, Loc_T("combat.msg.player_couldnt_escape", "Couldn't escape!"), BSTATE_ENEMY_ACT);
         Battle_PlayerFinalizeTurn(_bc, p, e);
     }
+}
+
+// The player got away (Run, or a Perfect Smoke Bomb): the enemy stays on the map alive and keeps what it stole (hunt 6, I-072), and the Stranger's
+// first-meeting line is queued the same way for both ways out.
+function Battle_EscapeResolve(_e) {
+    var stolen = (is_struct(_e) && variable_struct_exists(_e, "stolen_items") && is_array(_e.stolen_items)) ? _e.stolen_items : [];
+    EnemyPersist_ResolveBattle(false, stolen);
+    if (is_struct(_e) && variable_struct_exists(_e, "id") && _e.id == ENEMY_STRANGER) Dialogue_NarrativeOnStrangerEncounterResolved();
 }
 
 function Battle_EndRun(_bc) {
@@ -1976,6 +1981,7 @@ function Battle_EnemyFinalizeTurnState(_bc, _p, _e) {
 
     var enemy_turn_finished = (_bc.enemy_actions_remaining <= 0);
     if (enemy_turn_finished) EnemyAI_EndTurn(_bc.ai);   // B4: the enemy's own turn number (every_nth rules)
+    if (enemy_turn_finished) p = Status_TickEnemyTurn(p);   // hunt 6: Guard's Brace counts the enemy's turns, whether or not it hit
     if (enemy_turn_finished) e = Status_Tick(e);        // the turn's tick, which includes this last action's bleeding
     else e = Status_ActionTick(e);                       // D78: Bleeding hurts after every action of a chain
     if (Battle_CheckEnd(_bc, p, e)) {

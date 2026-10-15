@@ -148,7 +148,8 @@ function TabSkills_Items(_ch) {
 }
 
 // ---- Items: potions, throwables and key items with counts; equipment lives in Gear ----
-function TabItems_Items(_ch) {
+// _in_battle: the menu opened in a fight is read-only (the battle's own ITEM command is the turn), so no row offers "Use".
+function TabItems_Items(_ch, _in_battle = false) {
     var items = [];
     var groups = [0, 1, 2];   // potions, throwables, key items
     for (var g = 0; g < 3; g++) {
@@ -163,7 +164,7 @@ function TabItems_Items(_ch) {
             array_push(lines, { label: Loc_T("shop.lbl.have", "You have"), value: string(inv.qty) });
             array_push(items, {
                 id: "item_" + string(it.id), label: it.name, value: "x" + string(inv.qty), kind: "button", enabled: true, item_id: it.id, throwable: Item_IsThrowable(it),
-                help: sentence, lines: lines, icon_item: it, hint: (grp == 0) ? Loc_T("tab.hint.use", "[k:confirm] Use") : ""
+                help: sentence, lines: lines, icon_item: it, hint: (grp == 0 && !_in_battle) ? Loc_T("tab.hint.use", "[k:confirm] Use") : ""
             });
         }
     }
@@ -174,9 +175,14 @@ function TabItems_Items(_ch) {
 }
 
 // Uses a potion or an antidote from the menu. Returns { ok, msg, ch }; the item is spent only when it did something.
-function TabItems_Use(_ch, _item_id) {
+// In a fight (_in_battle) nothing is used here: a potion costs the turn, and only the battle's ITEM command spends one (hunt 6, D99).
+function TabItems_Use(_ch, _item_id, _in_battle = false) {
     var item = ItemDB_Get(_item_id);
     var out = { ok: false, msg: Loc_T("item.msg.cant_use", "Can't use that."), ch: _ch };
+    if (_in_battle) {
+        out.msg = Loc_T("menu.msg.items_in_fight", "In a fight, use ITEM in the battle menu.");
+        return out;
+    }
     if (!is_struct(item) || item.id == 0 || !Inv_Has(_ch.inventory, _item_id, 1)) return out;
     var r = Item_Use(_item_id, _ch, _ch);
     out.msg = r.msg;
@@ -249,7 +255,7 @@ function TabGear_Row(_ch, _item, _slot, _worn) {
     };
 }
 
-function TabGear_Items(_ch) {
+function TabGear_Items(_ch, _in_battle = false) {
     var items = [];
     array_push(items, { id: "head_worn", kind: "head", label: Loc_T("tab.gear.worn", "Worn"), value: "", enabled: false, help: "", lines: [], hint: "" });
     var slots = Gear_Slots();
@@ -277,13 +283,20 @@ function TabGear_Items(_ch) {
         array_push(items, { id: "head_bag", kind: "head", label: Loc_T("tab.gear.bag", "Bag"), value: "", enabled: false, help: "", lines: [], hint: "" });
         for (var b = 0; b < array_length(bag); b++) array_push(items, bag[b]);
     }
+    if (_in_battle) {   // read-only in a fight: no "Equip" / "Take off" hint (Gear_Toggle refuses)
+        for (var h = 0; h < array_length(items); h++) items[h].hint = "";
+    }
     return items;
 }
 
-// Puts a bag item on, or takes a worn one off. Returns { ok, equipped, msg, ch }.
-function Gear_Toggle(_ch, _item_id) {
+// Puts a bag item on, or takes a worn one off. Returns { ok, equipped, msg, ch }. In a fight (_in_battle) gear cannot change: a swap would cost no turn (hunt 6).
+function Gear_Toggle(_ch, _item_id, _in_battle = false) {
     var item = ItemDB_Get(_item_id);
     var out = { ok: false, equipped: false, msg: Loc_T("menu.msg.cant_equip", "Can't equip that."), ch: _ch };
+    if (_in_battle) {
+        out.msg = Loc_T("menu.msg.gear_in_fight", "You can't change gear in a fight.");
+        return out;
+    }
     if (!is_struct(item) || item.id == 0) return out;
     var slot = variable_struct_exists(item, "equip_slot") ? string(item.equip_slot) : "";
     if (slot != "" && Equip_SlotGet(_ch, slot) == item.id) {
@@ -560,8 +573,8 @@ function TabMenu_ItemsFor(_id, _ch) {
     switch (_id) {
         case "status": return TabStatus_Items(_ch);
         case "skills": return TabSkills_Items(_ch);
-        case "items": return TabItems_Items(_ch);
-        case "gear": return TabGear_Items(_ch);
+        case "items": return TabItems_Items(_ch, room == rm_battle);
+        case "gear": return TabGear_Items(_ch, room == rm_battle);
         case "codex": return TabCodex_Items(Profile_Get());
         case "system": return TabSystem_Items(room == rm_battle);
     }
@@ -1033,14 +1046,14 @@ function TabMenu_OnConfirm(_m, _i) {
                 TabMenu_Toast(Loc_T("item.msg.throw_in_battle", "Throw it at an enemy in battle."));
                 break;
             }
-            var r = TabItems_Use(ch, it.item_id);
+            var r = TabItems_Use(ch, it.item_id, room == rm_battle);
             if (r.ok) CardsUi_Commit(r.ch); else SFX_PlayUI("ui_back");
             TabMenu_Toast(r.msg);
             TabMenu_Refresh();
             break;
         case "gear":
             if (it.item_id < 0) break;
-            var g = Gear_Toggle(ch, it.item_id);
+            var g = Gear_Toggle(ch, it.item_id, room == rm_battle);
             if (g.ok) CardsUi_Commit(g.ch); else SFX_PlayUI("ui_back");
             TabMenu_Toast(g.msg);
             TabMenu_Refresh();

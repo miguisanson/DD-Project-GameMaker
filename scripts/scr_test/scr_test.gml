@@ -5750,7 +5750,9 @@ function Test_Suite_BattleUi() {
     _g2 = Status_Tick(_g2);
     Test_True("BattleUi Brace survives the Guard turn's own tick", Status_Has(_g2, STATUS_BRACE));
     _g2 = Status_Tick(_g2);
-    Test_False("BattleUi Brace fades after one more turn when nothing hit", Status_Has(_g2, STATUS_BRACE));
+    Test_True("BattleUi Brace is not worn off by the player's own turns (hunt 6: it counts the enemy's turns)", Status_Has(_g2, STATUS_BRACE));
+    _g2 = Status_TickEnemyTurn(Status_TickEnemyTurn(_g2));
+    Test_False("BattleUi Brace fades after two enemy turns when nothing hit", Status_Has(_g2, STATUS_BRACE));
 
     // ---- I-065: level gains survive the battle's own normalisation (GameState_Init runs it at every battle start) ----
     var _lv = CharacterCreate_Player(CLASS_KNIGHT);

@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T22:45:34Z",
-    "row_count": 1110
+    "generated_at_utc": "2026-10-15T23:26:41Z",
+    "row_count": 1112
   },
   "default_lang": "en",
   "languages": [
@@ -2531,6 +2531,14 @@
     "menu.msg.equipped": {
       "en": "Equipped {item}.",
       "ko": "{item}을(를) 장착했습니다."
+    },
+    "menu.msg.gear_in_fight": {
+      "en": "You can't change gear in a fight.",
+      "ko": "전투 중에는 장비를 바꿀 수 없습니다."
+    },
+    "menu.msg.items_in_fight": {
+      "en": "In a fight, use ITEM in the battle menu.",
+      "ko": "전투 중에는 전투 메뉴의 아이템을 사용하세요."
     },
     "menu.msg.no_items": {
       "en": "No items.",

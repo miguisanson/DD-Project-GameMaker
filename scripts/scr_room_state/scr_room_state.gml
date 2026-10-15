@@ -147,7 +147,28 @@ function RoomState_SaveInstance(_inst, _vars, _removed) {
         data.enemy_id = _inst.enemy_id;
         data.vars = RoomState_SanitizeEnemyVars(data.vars, _inst.enemy_id);
     }
+    data = RoomState_CarryStolen(room, _inst.persist_id, data);   // hunt 6: what the Stranger took stays on him
     RoomState_Set(room, _inst.persist_id, data);
+}
+
+// Hunt 6 (I-072): an item the Stranger stole is not lost when the player gets away. It stays on him, in his room-state record as `stolen_items`
+// ([{ id, qty }], saved with the run); the next fight starts with it on him again (EnemyPersist_RestoreStolen) and beating him gives it back.
+// A record that is rebuilt (the room is left, the enemy is set alive) copies the field from the old one; a removed (beaten) record has none.
+function RoomState_CarryStolen(_room, _persist_id, _data) {
+    var old = RoomState_Get(_room, _persist_id);
+    if (!is_struct(old) || !is_struct(_data)) return _data;
+    if (variable_struct_exists(_data, "removed") && _data.removed) return _data;
+    if (variable_struct_exists(old, "stolen_items") && is_array(old.stolen_items) && array_length(old.stolen_items) > 0) _data.stolen_items = old.stolen_items;
+    return _data;
+}
+
+function RoomState_CopyStolen(_list) {
+    var out = [];
+    if (!is_array(_list)) return out;
+    for (var i = 0; i < array_length(_list); i++) {
+        if (is_struct(_list[i]) && variable_struct_exists(_list[i], "id") && variable_struct_exists(_list[i], "qty")) array_push(out, { id: _list[i].id, qty: _list[i].qty });
+    }
+    return out;
 }
 
 function RoomState_SetRemoved(_room, _persist_id, _obj_type = noone, _enemy_id = -1) {
@@ -190,6 +211,7 @@ function RoomState_SetAlive(_room, _persist_id) {
         alive.vars = {};
     }
 
+    alive = RoomState_CarryStolen(_room, _persist_id, alive);
     RoomState_Set(_room, _persist_id, alive);
 }
 
@@ -279,7 +301,9 @@ function EnemyPersist_BeginEncounter(_enemy_inst, _player_inst) {
     return true;
 }
 
-function EnemyPersist_ResolveBattle(_defeated) {
+// _stolen: on an escape, what the enemy took from the player ([{ id, qty }], the battle copy's stolen_items). It stays on the map enemy (undefined keeps
+// what the record already holds); a win removes the record, and Battle_GrantRewards gives the loot back.
+function EnemyPersist_ResolveBattle(_defeated, _stolen = undefined) {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "battle")) return;
     if (gs.battle.enemy_persist_id == "") return;
@@ -291,7 +315,24 @@ function EnemyPersist_ResolveBattle(_defeated) {
         RoomState_SetRemoved(gs.battle.enemy_room, gs.battle.enemy_persist_id, obj_enemy, gs.battle.enemy_id);
     } else {
         RoomState_SetAlive(gs.battle.enemy_room, gs.battle.enemy_persist_id);
+        if (is_array(_stolen)) {
+            var rec = RoomState_Get(gs.battle.enemy_room, gs.battle.enemy_persist_id);
+            if (is_struct(rec)) {
+                if (array_length(_stolen) > 0) rec.stolen_items = RoomState_CopyStolen(_stolen);
+                else if (variable_struct_exists(rec, "stolen_items")) variable_struct_remove(rec, "stolen_items");
+            }
+        }
     }
+}
+
+// A fight with an enemy that kept the player's things from an earlier escape: they are on the battle copy again (Create of the battle controller).
+function EnemyPersist_RestoreStolen(_e) {
+    var gs = GameState_Get();
+    if (!is_struct(_e) || !variable_struct_exists(gs, "battle") || gs.battle.enemy_persist_id == "") return;
+    var rec = RoomState_Get(gs.battle.enemy_room, gs.battle.enemy_persist_id);
+    if (!is_struct(rec) || !variable_struct_exists(rec, "stolen_items")) return;
+    var held = RoomState_CopyStolen(rec.stolen_items);
+    if (array_length(held) > 0) _e.stolen_items = held;
 }
 
 function RoomState_Apply(_room) {
@@ -858,11 +899,19 @@ function Run_AutosaveTick() {
 }
 
 // D132: the window is closing (obj_game_controller's Game End event calls this). Saves the run the way an autosave would (never in a
-// battle, a cutscene, a transition or on the title). The test harness and scripted runs end the game on purpose, so they never save here;
-// _ignore_harness lets the tests reach the rest of the rule.
-function Run_SaveOnClose(_ignore_harness = false) {
+// cutscene, a transition or on the title). In a fight there is no save of the fight (D141): it writes the moment just before the encounter, the
+// same file Quit to title writes, so a chest or a card taken since the last autosave is kept. The test harness and scripted runs end the game on
+// purpose, so they never save here; _ignore_harness lets the tests reach the rest of the rule, _in_room and _path let them stand in for the
+// battle room and a scratch file.
+function Run_SaveOnClose(_ignore_harness = false, _in_room = room, _path = undefined) {
     if (!_ignore_harness && (Test_HasFlag("-runtests") || (variable_global_exists("scn") && is_struct(global.scn)))) return false;
     if (Transition_IsActive()) return false;
+    if (_in_room == rm_battle) {
+        if (!Run_IsActive()) return false;
+        var gs = GameState_Get();
+        if (!is_struct(gs.player_ch) || gs.player_ch.hp <= 0) return false;   // a dead player's run is over (the death flow ends it)
+        return EnemyPersist_WriteSnapshot(_path);   // no snapshot (a fight that did not start from the map): the last autosave stays the run
+    }
     return Run_AutoSave();
 }
 
