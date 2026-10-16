@@ -20,20 +20,14 @@ Battle_BgApply(room_exists(bg_room) ? Run_FloorOfRoomName(room_get_name(bg_room)
 // --------------------
 // CREATE ENEMY VISUAL (CENTERED)
 // --------------------
-var sw = 16;
-var sh = 16;
-if (e.sprite != noone) {
-    sw = sprite_get_width(e.sprite);
-    sh = sprite_get_height(e.sprite);
-}
-
 // fixed battle resolution (GB-style)
 var cx = DISPLAY_BASE_W div 2;
 var cy = (DISPLAY_BASE_H div 2) - 14;   // D99: a little above the middle, so the bottom panels, the lists and the log have room under it
 
+var enemy_at = Battle_EnemyPlace(e.sprite);   // R3 (note 23): every enemy's opaque bottom on one ground line, so a full-canvas sprite does not sit high
 enemy_inst = instance_create_layer(
-    cx - sw div 2,
-    cy - sh div 2,
+    enemy_at.x,
+    enemy_at.y,
     "Instances",
     obj_enemy_battle
 );
