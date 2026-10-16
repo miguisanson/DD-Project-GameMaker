@@ -8,26 +8,26 @@ function DialogueDB_Init() {
 	// in-game dialogues
 	global.dialogue_db[? "first_encounter_slime"] = ["What...", "...the hell is that?"];
 	global.dialogue_db[? "first_encounter_mini_boss"] = [
-	"...",
-	"Oh, what the hell is that?",
-	"Some sort of half-cow, half-man?",
-	"This is insane...",
-	"And he's blocking my only path forward.",
-	"...",
-	"Fuck."
-	];
+        "...",
+        "Oh, what the hell is that?",
+        "Half cow, half man?",
+        "That breathing. Those horns...",
+        "And he's blocking the only way forward.",
+        "...",
+        "Fuck."
+    ];
     global.dialogue_db[? "first_encounter_final_boss"] = [
         "...",
         "Another demon.",
-        "This one seems different.",
+        "This one is different.",
         "As if it's looking for something...",
         "...",
         "...someone."
     ];
 	global.dialogue_db[? "entering_second_floor"] = 
 	["I don't understand.", 
-	"How can such creatures exist?",
-	"Some sort of mutated animals...",
+	"I grew up in these hills. None of that lived here.",
+	"Sick animals, maybe. Something in the water...",
 	"...Monsters?"];
 
     // system
@@ -36,27 +36,27 @@ function DialogueDB_Init() {
     global.dialogue_db[? "sys_load_missing"] = ["No save found."];
     global.dialogue_db[? "sys_class_chest_prompt"] = 
 						["How convenient...", 
-						"Just what I need to get out of this place."];
+						"Something in there might get me out of here."];
     global.dialogue_db[? "sys_floor1_intro"] = 
 						["*Thud* *Crash*",
-						"Wha... What just happened?",
+						"Ugh... What just happened?",
 						"Where am I?", 
 						"...", 
-						"I knew it. There's something wrong about this place.",
-						"I need to get back."];
+						"I knew it. This tunnel was never right.",
+						"I have to get back up."];
     global.dialogue_db[? "sys_class_chest_guard"] = [   // D127: floor 1's exit before the class chest was opened
-        "Wait, there was a chest back there. I think I should open it...",
-        "...there might be something I can use to protect myself."
+        "Wait. There was a chest back there.",
+        "...Something in it might keep me alive."
     ];
     global.dialogue_db[? "after_class_chest_knight"] = [
         "Heavy... but it fits.",
         "Like it's been mine for years.",
-        "This chest shouldn't know me."
+        "How does a chest know my size?"
     ];
     global.dialogue_db[? "after_class_chest_archer"] = [
         "Light. Balanced.",
         "No rust. No wear.",
-        "Like it was waiting here."
+        "Like it was waiting for a hand like mine."
     ];
     global.dialogue_db[? "after_class_chest_mage"] = [
         "Why does it feel cold...?",
@@ -67,7 +67,7 @@ function DialogueDB_Init() {
     global.dialogue_db[? "after_skillbook_chest_knight"] = [
         "Diagrams... simple forms.",
         "I read it once.",
-        "Somehow... my hands already know."
+        "My hands already know it."
     ];
     global.dialogue_db[? "after_skillbook_chest_archer"] = [
         "Angles and breath marks.",
@@ -76,79 +76,77 @@ function DialogueDB_Init() {
     ];
     global.dialogue_db[? "after_skillbook_chest_mage"] = [
         "I can't read this...",
-        "...The page is filled with symbols.",
+        "...Just symbols, page after page.",
         "A voice folds into my thoughts.",
-        "And I understand. It shows me where to place my hands."
+        "Then I understand. It shows me where to put my hands."
     ];
     global.dialogue_db[? "sys_floor2_dire_wolf_reaction"] = [
         "*Pant*... Whew.",
-        "Now a bloody wolf?",
-        "Where did they come from?",
+        "A wolf now? Seriously?",
+        "Where do these things come from?",
         "...",
-        "I won't get any answers this way.",
-        "Let's keep going."
+        "Standing here won't answer that.",
+        "Keep moving."
     ];
     global.dialogue_db[? "sys_first_stranger_encounter_reaction"] = [
         "Get your hands off me...",
-        "I can't believe such demons exist.",
-        "Are these demons?",
-        "I can only assume they are.",
+        "He smiled the whole time.",
+        "Are they all demons down here?",
+        "What else would they be.",
         "...",
-        "I have to move."
+        "I have to keep moving."
     ];
     global.dialogue_db[? "sys_first_level_up_reaction"] = [
         "...",
-        "I'm feeling a bit dizzy.",
-        "I think I'm going to vomit...",
-        "Why does my body feel sore?",
+        "The walls tilt. Easy... easy.",
+        "I think I'm going to be sick...",
+        "Why does it feel like I've been training for years?",
         "...",
         "...and different."
     ];
     global.dialogue_db[? "sys_first_equippable_item_reaction"] = [
         "This might come in handy.",
         "...",
-        "How come there are so many treasures here?",
-        "As if...",
-        "...someone placed them here intentionally.",
-        "But why?",
-        "Why go the extra steps if their intentions were to have us killed?",
-        "It's not making sense, and it's creeping me out."
+        "Chests every few steps.",
+        "Gear that fits like it was made for me.",
+        "Somebody wants me armed.",
+        "But why arm us, if they wanted us dead?"
     ];
     global.dialogue_db[? "sys_final_boss_defeated_reaction"] = [
         "*Huff*... *Wheeze*... Fuck.",
         "...",
-        "I did it.",
+        "I did it. I actually did it.",
         "...",
         "Still...",
-        "Nothing makes sense.",
-        "Am I the only one experiencing this?",
-        "Fuck. Who cares. The exit is here.",
-        "I'll be able to regroup with the others and find a way home."
+        "Nothing here makes sense.",
+        "Am I the only one seeing this?",
+        "Who cares. The exit is right there.",
+        "Time to find the others, and a way home."
     ];
     global.dialogue_db[? "sys_floor9_5_exit_reaction"] = [
         "...",
-        "(You start to see vivid colors.)",
-        "(Black tendrils appear and disappear from your vision.)",
-        "(You snap back to reality.)",
+        "(Colors flood in, far too bright.)",
+        "(Black threads curl through your sight, then vanish.)",
+        "(The tunnel snaps back around you.)",
         "Huh?",
         "...",
         "My head...",
-        "It's about to burst...",
+        "It feels like it's about to split.",
         "(You clutch your head while walking toward the exit.)"
     ];
 
     // interactables
-    global.dialogue_db[? "tree"] = ["A sturdy tree."];
-    global.dialogue_db[? "tree_stump"] = ["A cut tree stump."];
+    global.dialogue_db[? "tree"] = ["A tree, growing where none should."];
+    global.dialogue_db[? "tree_stump"] = ["A stump, cut clean with a saw."];
     global.dialogue_db[? "tall_grass"] = ["It rustles in the wind."];
     global.dialogue_db[? "rock"] = ["Just a rock."];
     global.dialogue_db[? "skull"] = ["A cracked skull."];
     global.dialogue_db[? "horned_skull"] = ["It stares back at you."];
-    global.dialogue_db[? "bone"] = ["A pile of old bones."];
+    global.dialogue_db[? "bone"] = ["A pile of bones. Old, and picked clean."];
     global.dialogue_db[? "dung_pile"] = ["Better not touch that."];
 
     global.dialogue_db[? "barrel_break"] = ["You smash the barrel."];
-    global.dialogue_db[? "barrel_broken"] = ["It's broken."];
+    global.dialogue_db[? "barrel_broken"] = ["Splinters and a rusted hoop."];
 
     global.dialogue_db[? "chest_open"] = ["You open the chest."];
     global.dialogue_db[? "chest_empty"] = ["It's empty."];
@@ -156,10 +154,10 @@ function DialogueDB_Init() {
 
     global.dialogue_db[? "loot_empty"] = ["Nothing was found."];
 
-    global.dialogue_db[? "fire_stand_extinguish"] = ["You extinguish the flame."];
-    global.dialogue_db[? "fire_stand_off"] = ["The flame is out."];
+    global.dialogue_db[? "fire_stand_extinguish"] = ["You put out the flame. The dark leans in."];
+    global.dialogue_db[? "fire_stand_off"] = ["Only cold ash is left."];
 
-    global.dialogue_db[? "torch_extinguish"] = ["You extinguish the torch."];
+    global.dialogue_db[? "torch_extinguish"] = ["You put out the torch. The corner goes black."];
     global.dialogue_db[? "torch_off"] = ["The torch is cold."];
 
 
@@ -1199,7 +1197,7 @@ function Choice_Raw(_id) {
             speaker_key: "enemy.name.enemy_stranger", speaker: "Stranger", again_box: true,
             ask: ["There you are.", "Do you remember me?"],
             labels: ["Should I?", "Back off."],
-            reply: [["Not yet.", "Ask again when the tunnel has had you a few more times."], ["Ha. Fair.", "Nobody does, at first."]],
+            reply: [["Not yet.", "Ask again when the tunnel has had you a bit longer."], ["Ha. Fair.", "Nobody does, at first."]],
             again: [["Still asking if you should?", "You'll know me when you stop asking."], ["Still telling me to back off?", "I'm patient. I've had practice."]] };
         case "merchant": return {
             speaker_key: "merchant.name", speaker: "Merchant", again_box: false,
@@ -1471,22 +1469,22 @@ function DeathLine_Defs() {
         tiers: [
             [   // 1st death: shock, still sure it is the end
                 { key: "death.t1.0", text: "The dark takes you. Quietly." },
-                { key: "death.t1.1", text: "So this is how it ends." },
-                { key: "death.t1.2", text: "The floor gives way beneath you." }
+                { key: "death.t1.1", text: "Is this it? It is so quiet." },
+                { key: "death.t1.2", text: "Your own breath is the last thing you hear." }
             ],
             [   // 2nd-3rd: disbelief
-                { key: "death.t2.0", text: "You were sure that was the end." },
+                { key: "death.t2.0", text: "You were sure that was it. You were wrong." },
                 { key: "death.t2.1", text: "The tunnel is not finished with you." },
                 { key: "death.t2.2", text: "Cold stone. A fall. Again." }
             ],
             [   // 4th-6th: it becomes a habit
                 { key: "death.t3.0", text: "You know this fall by heart now." },
                 { key: "death.t3.1", text: "How many times has it been?" },
-                { key: "death.t3.2", text: "Dying is starting to feel like routine." }
+                { key: "death.t3.2", text: "You know the ceiling before you open your eyes." }
             ],
             [   // 7th-10th: numb
                 { key: "death.t4.0", text: "You stopped counting. The walls didn't." },
-                { key: "death.t4.1", text: "{killer}. You don't even flinch anymore." },
+                { key: "death.t4.1", text: "{killer}. Your hands don't even shake." },
                 { key: "death.t4.2", text: "Nobody is coming. Nobody ever did." }
             ],
             [   // 11th on: the tunnel has become the safe place
@@ -1575,9 +1573,9 @@ function DeathScene_Frames(_text, _fps) {
 function WakeLine_Pick(_deaths) {
     var tier = min(DeathLine_Tier(_deaths), 4);
     switch (tier) {
-        case 1: return { key: "wake.t1", text: "You wake where you first fell. Alive." };
-        case 2: return { key: "wake.t2", text: "The same stone. The same cold. You wake again." };
-        case 3: return { key: "wake.t3", text: "You wake at the entrance. It almost feels like home." };
+        case 1: return { key: "wake.t1", text: "Cold stone under your cheek. You are where you fell. Alive, at least." };
+        case 2: return { key: "wake.t2", text: "The same stone, the same cold. You almost expected it." };
+        case 3: return { key: "wake.t3", text: "The stone is almost warm now. It feels a little like home." };
     }
     return { key: "wake.t4", text: "You wake. You no longer ask why." };
 }
@@ -1718,7 +1716,7 @@ function Note_Defs() {
             "\"Don't.\"" ] },
         { id: "three_marks", room: "rm_floor2", tx: 8, ty: 6, min_deaths: 3, title: "Three marks", lines: [
             "Three short scratches in the stone.",
-            "You made these. You don't remember making them." ] },
+            "Your thumb fits the groove exactly." ] },
         { id: "mapmaker_scrap", room: "rm_floor4", tx: 2, ty: 8, min_deaths: 3, title: "Mapmaker's scrap", lines: [
             "A scrap of paper in your own hand:",
             "\"The fall was no accident. It wanted a mapmaker.\"",
@@ -1936,9 +1934,9 @@ function Note_DrawWorldFx() {
 function Story_ClosingLines() {
     return [
         "Thank you for playing...",
-        "We're glad you made it all the way to the end.",
-        "We're looking to use what we learned from this game for our next title.",
-        "Please support our next development :)",
+        "You made it to the end. We're glad.",
+        "What we learned here goes into our next game.",
+        "Please support our next game.",
         "by PaleRook",
         "..."
     ];

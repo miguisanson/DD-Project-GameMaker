@@ -30,17 +30,17 @@ cutscene_definitions.intro = [
     {
         sprite: black_screen,
         lines: [
-            "This is not a world of fantasy, magic, and dragons.",
+            "This is not a world of magic and dragons.",
             "There were no monsters.",
             "Only monsters among men.",
-            "This is a world of gritty medieval kingdoms and warring countries.",
+            "This is a world of mud, borders and kings.",
             "...",
             "Or is it?",
             "...",
             "You were a mapmaker in a remote village, scraping by penny to penny.",
-            "There were rumors of conscription for the war between two kingdoms.",
-            "The reward was enough to set you up for a year...",
-            "It was worth it...",
+            "Word came that the crown was drafting men for the war.",
+            "The pay would feed you for a year...",
+            "It seemed worth it...",
             "You signed up."
         ],
         hold_ms: 0,
@@ -49,20 +49,20 @@ cutscene_definitions.intro = [
     {
         sprite: very_first_cut_scene,
         lines: [
-            "The plan was to ambush the enemy using a shortcut.",
-            "Good thing you grew up here and knew the forest.",
+            "The plan was to ambush the enemy by a shortcut.",
+            "You grew up in these woods. You knew every path.",
             "Then the scouts reported a tunnel near the mountain.",
-            "You'd never heard of such a tunnel in all your life.",
-            "You couldn't help thinking it was a joke...",
+            "You had never heard of a tunnel there. Not once.",
+            "You took it for a joke...",
             "But it wasn't.",
-            "There really was a tunnel. You could hardly believe it.",
-            "The group ventured deep into the tunnel, heading toward the enemy castle...",
-            "You were just the navigator for this raid party.",
-            "And this place never existed before...",
-            "You knew it was a mistake. You could feel it.",
+            "The tunnel was real. None of your maps had room for it.",
+            "The raid party went in, toward the enemy castle...",
+            "You were only the navigator.",
+            "The day before, there was only hillside.",
+            "Your stomach knew it was a mistake.",
             "Before you could speak up.",
-            "You hear cracking...",
-            "Small tremors..."
+            "Stone cracks somewhere overhead...",
+            "Dust sifts onto your shoulders..."
         ],
         hold_ms: 0,
         transition_speed: "normal"
@@ -82,9 +82,9 @@ cutscene_definitions.ending = [
     {
         sprite: ending_scene,
         lines: [
-            "Thank the Almighty...",
+            "Air. Actual air...",
             "An exit...",
-            "I need to find out where I am."
+            "First, I need to know where I am."
         ],
         hold_ms: 0,
         transition_speed: "normal"
@@ -94,9 +94,9 @@ cutscene_definitions.ending = [
         lines: [
             "Huh?",
             "...",
-            "Isn't this the raid party?",
+            "Is that... the raid party?",
             "They're all dead.",
-            "... What on earth..."
+            "...What happened out here?"
         ],
         hold_ms: 0,
         transition_speed: "normal"
@@ -107,7 +107,7 @@ cutscene_definitions.ending = [
             "...",
             "Oh.",
             "...",
-            "I wasn't so lucky after all."
+            "So much for lucky."
         ],
         hold_ms: 0,
         transition_speed: "normal"
