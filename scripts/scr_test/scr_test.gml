@@ -175,6 +175,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Balance", Test_Suite_R3Balance);
     Test_RunSuite("R4Final2", Test_Suite_R4Final2);
     Test_RunSuite("Release", Test_Suite_Release);
+    Test_RunSuite("R4Polish", Test_Suite_R4Polish);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -10034,7 +10035,7 @@ function Test_Suite_LevelUpGrowth() {
     _gs.player_ch = _lv;
     var _menu = CardsUi_StatMenu();
     Test_Eq("D143 the free-point screen has six rows", array_length(_menu.items), 6);
-    Test_Eq("D143 the free-point screen shows the gold legend (D177), no longer the class growth line", _menu.layout.note, "Gold = your class grows these");
+    Test_Eq("D143 the free-point screen shows the gold legend (D177), no longer the class growth line", _menu.layout.note, "Gold numbers: your class's growth");
     Test_Eq("D143 the free-point screen still opens first when a point is owed", Cards_NextOwed(_lv), "stat");
     var _mt = Ui_Metrics();
     var _mc = Ui_MenuMeasure(_menu, _mt);
@@ -17964,7 +17965,7 @@ function Test_LvScreen() {
     Test_Eq("levelup screen: the DEF row's Now / After are the stat now and after growth + the point", Test_RowValue(_m.items[1].lines, "Now") + ">" + Test_RowValue(_m.items[1].lines, "After"), "12>14");
     Test_Eq("levelup screen: the VIG row shows Max HP now and after (VIG 13 = 19)", Test_RowValue(_m.items[4].lines, Loc_T("cards.stat.hp_now", "Max HP Now")) + ">" + Test_RowValue(_m.items[4].lines, Loc_T("cards.stat.hp_after", "Max HP After")), "10>19");
     Test_Eq("levelup screen: the MND row shows Max MP now and after (MND 13 = 13)", Test_RowValue(_m.items[5].lines, Loc_T("cards.stat.mp_now", "Max MP Now")) + ">" + Test_RowValue(_m.items[5].lines, Loc_T("cards.stat.mp_after", "Max MP After")), "11>13");
-    Test_Eq("levelup screen: the Korean-or-English legend replaces the 'Knight growth' line", _m.layout.note, Loc_T("levelup.legend", "Gold = your class grows these"));
+    Test_Eq("levelup screen: the Korean-or-English legend replaces the 'Knight growth' line", _m.layout.note, Loc_T("levelup.legend", "Gold numbers: your class's growth"));
     Test_True("levelup screen: the legend is not the old growth line", string_pos("growth:", _m.layout.note) == 0);
     Test_Eq("levelup screen: the legend is drawn in gold", _m.layout.note_col, UI_C_MERCHANT_GOLD);
     Test_Eq("levelup screen: the title names the level being confirmed", _m.layout.title, "Level 2: Place 1 Point");
@@ -17997,7 +17998,7 @@ function Test_LvScreen() {
     Test_Eq("levelup screen: every row reads only the number, the one under the cursor (DEF) now > now + 1", Test_LvRowValues(_om), "11|12 > 13|9|3|10|11");
     Loc_SetLanguage("ko");
     var _ko = CardsUi_StatMenu();
-    Test_True("levelup screen: the Korean legend is not the English one", _ko.layout.note != "Gold = your class grows these");
+    Test_True("levelup screen: the Korean legend is not the English one", _ko.layout.note != "Gold numbers: your class's growth");
     Loc_SetLanguage(_lang0);
     // keyboard: Down moves the cursor one row and the +1 moves with it
     var _kb = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1));
@@ -19798,4 +19799,118 @@ function Test_ReleaseFit() {
         TextFit_CentreMenu(_fails, "title", Title_MainItems(true, true), "");
         return _fails;
     });
+}
+
+// ---- R4 polish (R-131, R-132): the battle message toast never stands on the enemy, and the level-up legend says what the gold number is ----
+function Test_Suite_R4Polish() {
+    Test_RunSuite("R4Polish.toast", Test_R4PolishToast);
+    Test_RunSuite("R4Polish.legend", Test_R4PolishLegend);
+}
+
+// Where the toast for _txt goes (Battle_LogPlace), as { where, lines, x, y, w, h }. While Battle_LogPlace is missing, the toast's old place stands in for it: centred over the msg zone, right above the HUD row.
+function Test_R4PolishPlace(_bc, _z, _txt, _menu) {
+    if (asset_get_index("Battle_LogPlace") != -1) return Battle_LogPlace(_bc, _z, _txt, _menu);
+    var _mt = Ui_Metrics();
+    var _wr = Battle_LogWrap(_txt, _z.msg.w - 8 * _mt.p);
+    var _lines = [];
+    for (var _i = max(0, array_length(_wr) - 2); _i < array_length(_wr); _i++) array_push(_lines, _wr[_i]);
+    var _tw = 0;
+    for (var _k = 0; _k < array_length(_lines); _k++) _tw = max(_tw, Ui_LineWidth(_lines[_k]));
+    var _w = min(_tw + 8 * _mt.p, _z.msg.w);
+    var _h = 8 * _mt.p + array_length(_lines) * _mt.line_h + (array_length(_lines) - 1) * _mt.p;
+    return { where: "old", lines: _lines, x: round(_z.msg.x + (_z.msg.w - _w) * 0.5), y: _z.msg.y + _z.msg.h - _h, w: _w, h: _h };
+}
+
+// Contract (R-131): at 480 x 432, 640 x 576 and 800 x 720, English and Korean, for every enemy, with the longest toast text and a short one, in the message state (the command menu is
+// not up) and with the command menu up: the toast, when it is drawn, stands on none of the enemy's opaque rect, its shadow, its name plate or its status chips, is inside the screen,
+// holds its text on lines that fit it, and (menu up) is not over the player's panel or the command menu. In the message state it is always drawn.
+function Test_R4PolishToast() {
+    var _s = TextFit_Begin();
+    var _sizes = TextFit_Sizes();
+    var _langs = ["en", "ko"];
+    var _bad_enemy = "";
+    var _bad_shadow = "";
+    var _bad_plate = "";
+    var _bad_chips = "";
+    var _bad_screen = "";
+    var _bad_fit = "";
+    var _bad_menu = "";
+    var _bad_hidden = "";
+    var _n = 0;
+    for (var _l = 0; _l < 2; _l++) {
+        for (var _z = 0; _z < array_length(_sizes); _z++) {
+            TextFit_Set(_sizes[_z][0], _sizes[_z][1], _langs[_l]);
+            var _mt = Ui_Metrics();
+            var _zn = Battle_Zones();
+            var _tag0 = _langs[_l] + "@" + string(_sizes[_z][0]) + "x" + string(_sizes[_z][1]);
+            var _cmd_w = Battle_CmdPanelW(_zn, _mt);
+            var _cmd = { x: _zn.right.x + _zn.right.w - _cmd_w, y: _zn.band_top, w: _cmd_w, h: _zn.list_bottom - _zn.band_top };
+            for (var _id = ENEMY_SLIME; _id <= ENEMY_FINAL_BOSS; _id++) {
+                var _bc = Test_R3Make(_id, "", 2, false, false);
+                var _er = Battle_EnemyRect(_bc);
+                var _sh = Battle_EnemyShadowRect(_bc);
+                var _hd = Battle_EnemyHeaderRect(_bc);
+                var _plate = Test_R3Rect(_hd.x1, _hd.y1, _hd.bw, _hd.h);
+                var _chips = _hd.chips_rect;
+                var _long = Loc_T("combat.msg.skill_crit", "Critical skill! {dmg} damage!", { dmg: 999 }) + " " + Loc_T("combat.msg.break", "BREAK! {name} takes +50% damage!", { name: _bc.e.name }) + " "
+                          + Loc_T("combat.msg.windup_broken", "{enemy}'s {skill} is broken off!", { enemy: _bc.e.name, skill: "Fireball" });
+                var _texts = [_long, Loc_T("combat.msg.player_hit", "You hit for {dmg} damage!", { dmg: 7 })];
+                for (var _t = 0; _t < 2; _t++) {
+                    for (var _menu = 0; _menu < 2; _menu++) {
+                        var _r = Test_R4PolishPlace(_bc, _zn, _texts[_t], _menu == 1);
+                        var _tag = _tag0 + " e" + string(_id) + (_t == 0 ? " long" : " short") + (_menu == 1 ? " menu" : " msg") + " ";
+                        _n++;
+                        if (_menu == 0 && _r.where == "none") _bad_hidden += _tag;
+                        if (_r.where == "none") continue;
+                        if (Test_RectsOverlap(_r, _er)) _bad_enemy += _tag + json_stringify(_r) + " vs " + json_stringify(_er) + "; ";
+                        if (Test_RectsOverlap(_r, _sh)) _bad_shadow += _tag + json_stringify(_r) + " vs " + json_stringify(_sh) + "; ";
+                        if (_hd.h > 0 && Test_RectsOverlap(_r, _plate)) _bad_plate += _tag + json_stringify(_r) + " vs " + json_stringify(_plate) + "; ";
+                        if (_chips.w > 0 && Test_RectsOverlap(_r, _chips)) _bad_chips += _tag + json_stringify(_r) + " vs " + json_stringify(_chips) + "; ";
+                        if (_r.x < 0 || _r.y < 0 || _r.x + _r.w > _mt.gw || _r.y + _r.h > _mt.gh) _bad_screen += _tag + json_stringify(_r) + "; ";
+                        var _tw = 0;
+                        for (var _k = 0; _k < array_length(_r.lines); _k++) _tw = max(_tw, Ui_LineWidth(_r.lines[_k]));
+                        if (array_length(_r.lines) < 1 || _tw + 8 * _mt.p > _r.w || _r.h != 8 * _mt.p + array_length(_r.lines) * _mt.line_h + (array_length(_r.lines) - 1) * _mt.p) _bad_fit += _tag + "w=" + string(_tw) + "/" + string(_r.w) + " n=" + string(array_length(_r.lines)) + "; ";
+                        if (_menu == 1 && (Test_RectsOverlap(_r, _zn.player) || Test_RectsOverlap(_r, _cmd))) _bad_menu += _tag + json_stringify(_r) + "; ";
+                        if (_menu == 0 && Test_RectsOverlap(_r, _zn.player)) _bad_menu += _tag + "(msg) over the player panel " + json_stringify(_r) + "; ";
+                    }
+                }
+                instance_destroy(_bc.enemy_inst);
+            }
+        }
+    }
+    TextFit_End(_s);
+    Test_True("r4polish toast: (setup) " + string(_n) + " enemy x size x language x text x state cases were looked at", _n >= 240);
+    Test_Eq("r4polish toast: never on the enemy's opaque rect (R-131)", _bad_enemy, "");
+    Test_Eq("r4polish toast: never on the enemy's shadow", _bad_shadow, "");
+    Test_Eq("r4polish toast: never on the name plate", _bad_plate, "");
+    Test_Eq("r4polish toast: never on the status chips", _bad_chips, "");
+    Test_Eq("r4polish toast: inside the screen", _bad_screen, "");
+    Test_Eq("r4polish toast: its lines fit its box", _bad_fit, "");
+    Test_Eq("r4polish toast: never over the player's panel or the command menu", _bad_menu, "");
+    Test_Eq("r4polish toast: always drawn while no menu is up (the message state)", _bad_hidden, "");
+}
+
+// R-132: only the NEW number is gold on the level-up screen, so the legend says what the gold number is: what the class adds this level. One line at every size, English and Korean.
+function Test_R4PolishLegend() {
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    var _k = Test_LvRunBegin();
+    var _gs = GameState_Get();
+    _gs.player_ch = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1));
+    Test_Eq("r4polish legend: the English legend", CardsUi_StatMenu().layout.note, "Gold numbers: your class's growth");
+    Loc_SetLanguage("ko");
+    var _ko = CardsUi_StatMenu().layout.note;
+    Test_Eq("r4polish legend: the Korean legend", _ko, "금색 숫자: 직업의 성장");
+    Loc_SetLanguage("en");
+    TextFit_Each("r4polish legend", function(_w, _h, _lang) {
+        var _fails = [];
+        var _m = CardsUi_StatMenu();
+        var _mt = Ui_Metrics();
+        var _mm = Ui_MenuMeasure(_m, _mt);
+        var _g = Ui_MenuGeom(_m, _mt, _mm, 1);
+        TextFit_Line(_fails, "legend", _m.layout.note, _g.panel_w - 8 * _mt.p);
+        return _fails;
+    });
+    Test_LvRunEnd(_k);
+    Loc_SetLanguage(_lang0);
 }

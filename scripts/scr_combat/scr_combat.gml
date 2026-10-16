@@ -3831,43 +3831,95 @@ function Battle_LogWrap(_text, _w) {
     return Dialogue_WrapToLines(_text, _w);
 }
 
-// The lines to show: the newest entry if it is still fresh, at most its last 2 lines. Returns { lines, age (ms of the entry) }.
-function Battle_LogLines(_log, _w, _now) {
-    var pool = [];
-    var age = 100000;
+// The newest log entry while it is still fresh: { text, age (ms of the entry) }, or undefined.
+function Battle_LogFresh(_log, _now) {
     for (var i = array_length(_log) - 1; i >= 0; i--) {
         var en = _log[i];
         if (!is_struct(en) || !variable_struct_exists(en, "at")) continue;
-        age = _now - en.at;
-        if (age > LOG_TOAST_MS) break;
-        var wrapped = Battle_LogWrap(string(en.text), _w);
-        for (var w = max(0, array_length(wrapped) - 2); w < array_length(wrapped); w++) array_push(pool, wrapped[w]);
-        break;
+        var age = _now - en.at;
+        if (age > LOG_TOAST_MS) return undefined;
+        return { text: string(en.text), age: age };
     }
-    return { lines: pool, age: age };
+    return undefined;
+}
+
+// R-131: do two rects come within _gap of each other (or overlap)? Pure.
+function Battle_RectsNear(_a, _b, _gap) {
+    return _a.x < _b.x + _b.w + _gap && _b.x < _a.x + _a.w + _gap && _a.y < _b.y + _b.h + _gap && _b.y < _a.y + _a.h + _gap;
+}
+
+// The last _max lines of _text wrapped to _inner wide, and the box they make: { lines, w, h } (w is at most _room). Pure.
+function Battle_LogBox(_text, _inner, _room, _max, _mt) {
+    var wr = Battle_LogWrap(_text, _inner);
+    var lines = [];
+    for (var i = max(0, array_length(wr) - _max); i < array_length(wr); i++) array_push(lines, wr[i]);
+    var n = array_length(lines);
+    var tw = 0;
+    for (var j = 0; j < n; j++) tw = max(tw, Ui_LineWidth(lines[j]));   // D178: a line can carry an item's name in its rarity colour
+    return { lines: lines, w: min(tw + 8 * _mt.p, _room), h: 8 * _mt.p + n * _mt.line_h + max(0, n - 1) * _mt.p };
+}
+
+// R-131: where the message toast goes. The enemy's feet are on the HUD row's top edge, so the old place (right above that row) was the monster's lower body. It never stands on the enemy's
+// opaque rect, its shadow, its name plate or its status chips (each with a one-pixel air gap), in this order:
+//   "top"  under the turn strip, centred, up to two lines, when the box fits above the enemy's name plate (a small enemy in a big window)
+//   "hud"  over the right column of the bottom HUD row (the command menu's column, empty while no menu is up), right-aligned like the menu, as many lines as the row holds
+//   "none" the command menu is up and the top has no room: the toast waits (it is in the combat log) rather than cover the enemy, the panel or the menu
+// _menu_up = the command menu is drawn. Returns { where, lines, x, y, w, h }. Pure (reads the enemy's place).
+function Battle_LogPlace(_bc, _z, _text, _menu_up) {
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var out = { where: "none", lines: [], x: 0, y: 0, w: 0, h: 0 };
+    var txt = string(_text);
+    if (txt == "") return out;
+    var obs = [];
+    if (instance_exists(_bc.enemy_inst) && _bc.enemy_inst.sprite_index != noone) {
+        var er = Battle_EnemyRect(_bc);
+        if (er.w > 0) array_push(obs, er);
+        var sh = Battle_EnemyShadowRect(_bc);
+        if (sh.w > 0) array_push(obs, { x: sh.x, y: sh.y, w: sh.w, h: sh.h });
+        var hd = Battle_EnemyHeaderRect(_bc);
+        if (hd.h > 0) array_push(obs, { x: hd.x1, y: hd.y1, w: hd.bw, h: hd.h });
+        if (hd.chips_rect.w > 0) array_push(obs, hd.chips_rect);
+    }
+    // top
+    var tb = Battle_LogBox(txt, _z.msg.w - 8 * p, _z.msg.w, 2, mt);
+    if (array_length(tb.lines) <= 0) return out;
+    var ty = Battle_TimelineBottom() + p;
+    var ban = Battle_BannerRect(_bc);
+    if (is_struct(ban)) ty = ban.y + ban.h + p;
+    var tr = { x: round(_z.msg.x + (_z.msg.w - tb.w) * 0.5), y: ty, w: tb.w, h: tb.h };
+    var ok = (tr.y + tr.h <= _z.band_top);
+    for (var i = 0; ok && i < array_length(obs); i++) if (Battle_RectsNear(tr, obs[i], p)) ok = false;
+    if (ok) return { where: "top", lines: tb.lines, x: tr.x, y: tr.y, w: tr.w, h: tr.h };
+    if (_menu_up) return out;
+    // hud: the right column, bottom aligned; its top stays under the HUD row's top edge and under the shadow that spills into it
+    var top = _z.band_top;
+    for (var k = 0; k < array_length(obs); k++) if (obs[k].x + obs[k].w + p > _z.right.x) top = max(top, obs[k].y + obs[k].h + p);
+    var max_lines = floor(((_z.list_bottom - top) - 8 * p + p) / (mt.line_h + p));
+    if (max_lines < 1) return out;
+    var hb = Battle_LogBox(txt, _z.right.w - 8 * p, _z.right.w, max_lines, mt);
+    var hr = { x: _z.right.x + _z.right.w - hb.w, y: _z.list_bottom - hb.h, w: hb.w, h: hb.h };
+    for (var m = 0; m < array_length(obs); m++) if (Battle_RectsNear(hr, obs[m], p)) return out;
+    return { where: "hud", lines: hb.lines, x: hr.x, y: hr.y, w: hr.w, h: hr.h };
 }
 
 function Battle_DrawLog(_bc, _z) {
     if (!is_array(_bc.combat_log) || array_length(_bc.combat_log) <= 0) return;
+    var fresh = Battle_LogFresh(_bc.combat_log, current_time);
+    if (!is_struct(fresh)) return;
     var mt = Ui_Metrics();
     var p = mt.p;
-    var inner = _z.msg.w - 8 * p;
-    var res = Battle_LogLines(_bc.combat_log, inner, current_time);
-    var n = array_length(res.lines);
-    if (n <= 0) return;
-    var alpha = clamp((LOG_TOAST_MS - res.age) / 400, 0, 1) * clamp(res.age / 60 + 0.4, 0, 1);
-    var tw = 0;
-    for (var i = 0; i < n; i++) tw = max(tw, Ui_LineWidth(res.lines[i]));   // D178: a line can carry an item's name in its rarity colour
-    var w = min(tw + 8 * p, _z.msg.w);
-    var h = 8 * p + n * mt.line_h + (n - 1) * p;
-    var lx = round(_z.msg.x + (_z.msg.w - w) * 0.5);
-    var ly = _z.msg.y + _z.msg.h - h;
-    Ui_DrawFrame(lx, ly, w, h, alpha, p);
+    var menu_up = (_bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && is_struct(_bc.ui_cmd));   // the same test as Battle_DrawMenus
+    var pl = Battle_LogPlace(_bc, _z, fresh.text, menu_up);
+    var n = array_length(pl.lines);
+    if (pl.where == "none" || n <= 0) return;
+    var alpha = clamp((LOG_TOAST_MS - fresh.age) / 400, 0, 1) * clamp(fresh.age / 60 + 0.4, 0, 1);
+    Ui_DrawFrame(pl.x, pl.y, pl.w, pl.h, alpha, p);
     var a0 = draw_get_alpha();
     draw_set_alpha(alpha);
-    for (var j = 0; j < n; j++) Ui_LineDraw(lx + w * 0.5, ly + 4 * p + j * (mt.line_h + p), res.lines[j], w, UI_C_LIGHTEST, fa_center);
+    for (var j = 0; j < n; j++) Ui_LineDraw(pl.x + pl.w * 0.5, pl.y + 4 * p + j * (mt.line_h + p), pl.lines[j], pl.w, UI_C_LIGHTEST, fa_center);
     draw_set_alpha(a0);
-    _bc.hud.rects.log = { x: lx, y: ly, w: w, h: h };
+    _bc.hud.rects.log = { x: pl.x, y: pl.y, w: pl.w, h: pl.h, where: pl.where };
 }
 
 // Floating numbers (D92). Pop in (+35% for 100 ms), rise ~14 design pixels, fade in the last 200 ms. Perfect largest, Weak smallest and dimmest.

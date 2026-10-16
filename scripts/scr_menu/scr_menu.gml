@@ -1843,7 +1843,7 @@ function CardsUi_StatMenu() {
     }
     var m = Ui_MenuNew("cards_stat", items, {
         on_confirm: CardsUi_StatConfirm, on_back: CardsUi_NoBack,
-        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(plvl) }), note: any_growth ? Loc_T("levelup.legend", "Gold = your class grows these") : "", note_col: UI_C_MERCHANT_GOLD, anchor: "center", details: true, snap_band: true }   // I-109: the bar sits on the cursor row in the same frame as the +1 and the details (no glide)
+        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(plvl) }), note: any_growth ? Loc_T("levelup.legend", "Gold numbers: your class's growth") : "", note_col: UI_C_MERCHANT_GOLD, anchor: "center", details: true, snap_band: true }   // I-109: the bar sits on the cursor row in the same frame as the +1 and the details (no glide)
     });
     Ui_MenuFixCursor(m, clamp(DB_PlayerClass(ch.class_id).free_default, 0, 5));   // the class's usual stat first
     CardsUi_StatRefresh(m);
