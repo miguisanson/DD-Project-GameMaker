@@ -7340,6 +7340,9 @@ function Scenario_StepSmokeBattleUi(_s) {
         case 173:   // the enemy answers and the turn comes back to the player
             if (_s.t > 30 && _bc != noone && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) {
                 Scenario_Check("battleui_the_fight_goes_on_after_guard", true);
+                var _enemy_acted = false;
+                for (var _tg = 0; _tg < array_length(_bc.turn_log); _tg++) if (_bc.turn_log[_tg] == TL_ENEMY) _enemy_acted = true;
+                Scenario_Check("battleui_guard_ends_when_the_players_next_turn_starts", !_enemy_acted || !Status_Has(_bc.p, STATUS_BRACE), "enemy_acted=" + string(_enemy_acted));   // D180 (R-102)
                 Scenario_BattleUiOverlaps(_bc, "after_guard");
                 Scenario_Next(_s, 174);
             }

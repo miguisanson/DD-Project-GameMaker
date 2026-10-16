@@ -159,6 +159,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Stealth", Test_Suite_R3Stealth);
     Test_RunSuite("R3StealthB", Test_Suite_R3StealthB);
     Test_RunSuite("R3FixDet", Test_Suite_R3FixDet);
+    Test_RunSuite("R3Guard", Test_Suite_R3Guard);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -16182,4 +16183,92 @@ function Test_R3FixDetGold() {
     Test_False("r3fixdet gold: the Tab menu hides it", Hud_GoldShown(UI_MENU, rm_floor1, false));
     Test_False("r3fixdet gold: a cutscene hides it", Hud_GoldShown(UI_NONE, rm_floor1, true));
     Test_False("r3fixdet gold: the title does not show it", Hud_GoldShown(UI_NONE, rm_start, false));
+}
+
+// ---- R3 guardsmall item 1 (D180, R-102): Guard halves ALL damage until the player's next turn starts, and gives back 25% of max MP (at least 2, capped). ----
+// Expected values come from the owner's decision: 25% of max MP rounded down, minimum 2, never above max MP; max MP per class and level from the class vectors above.
+
+// One Guard through the real turn order: the Guard turn, then the enemy's turn (two hits in it when _hits), up to the player's next turn. Returns what happened.
+function Test_R3GuardSequence(_hits, _src, _plain) {
+    var _slime = EnemyCreate(ENEMY_SLIME);
+    var _bp = CharacterCreate_Player(CLASS_KNIGHT);
+    _bp.max_hp = 999; _bp.hp = 999;   // the hits must not end the fight
+    var _bc = Test_Hunt1Bc(_bp, EnemyCreate(ENEMY_SLIME));
+    _bc.p = Battle_GuardApply(_bc.p);
+    Battle_PlayerFinalizeTurn(_bc, _bc.p, _bc.e);   // the Guard turn
+    var _r = { enemy_turns: 0, braced_all_enemy: true, halved: true, gone_at_player: false, who: _bc.tl_who };
+    for (var _k = 0; _k < 8; _k++) {
+        if (_bc.tl_who == TL_ENEMY) {
+            if (!Status_Has(_bc.p, STATUS_BRACE)) _r.braced_all_enemy = false;
+            if (_hits) {
+                var _a = Combat_ApplyDamage(_slime, _bc.p, _src, 1, 1, { is_skill: false });
+                var _b = Combat_ApplyDamage(_slime, _a.defender, _src, 1, 1, { is_skill: false });
+                if (abs(_a.dmg - _plain * 0.5) > 1 || _b.dmg != _a.dmg) _r.halved = false;
+            }
+            _bc.enemy_actions_remaining = 0;
+            Battle_EnemyFinalizeTurnState(_bc, _bc.p, _bc.e);
+            _r.enemy_turns++;
+        } else if (_r.enemy_turns > 0) {
+            _r.gone_at_player = !Status_Has(_bc.p, STATUS_BRACE);
+            break;
+        } else {
+            Battle_PlayerFinalizeTurn(_bc, _bc.p, _bc.e);   // a faster player acts again before the enemy: the Brace waits for the enemy
+        }
+    }
+    _r.who = _bc.tl_who;
+    return _r;
+}
+
+function Test_Suite_R3Guard() {
+    var _slime = EnemyCreate(ENEMY_SLIME);
+    var _src = { power: 30, stat_type: STAT_ATK };
+    var _plain = Combat_ApplyDamage(_slime, CharacterCreate_Player(CLASS_KNIGHT), _src, 1, 1, { is_skill: false }).dmg;
+    Test_True("r3guard: (setup) an unguarded hit is big enough to halve (" + string(_plain) + ")", _plain >= 8);
+
+    // two hits in one enemy turn (a chain) or in two enemy turns: both halved, the Brace is not used up by the first
+    var _g = Battle_GuardApply(CharacterCreate_Player(CLASS_KNIGHT));
+    var _h1 = Combat_ApplyDamage(_slime, _g, _src, 1, 1, { is_skill: false });
+    Test_True("r3guard: the first hit is halved (" + string(_plain) + " -> " + string(_h1.dmg) + ")", abs(_h1.dmg - _plain * 0.5) <= 1);
+    Test_True("r3guard: the Brace is still up after the first hit", Status_Has(_h1.defender, STATUS_BRACE));
+    var _h2 = Combat_ApplyDamage(_slime, _h1.defender, _src, 1, 1, { is_skill: false });
+    Test_Eq("r3guard: the second hit is halved the same", _h2.dmg, _h1.dmg);
+    Test_True("r3guard: the Brace is still up after the second hit", Status_Has(_h2.defender, STATUS_BRACE));
+    Test_True("r3guard: the damage preview shows the halved number", Combat_HitDamage(_slime, _g, _src) < _plain);
+
+    // MP back: 25% of max MP, rounded down, minimum 2; max MP Knight 11 / 13, Archer 12 / 16, Mage 16 / 23, Nobody 11 / 14 at levels 1 / 3
+    var _cls = [[CLASS_KNIGHT, "Knight"], [CLASS_ARCHER, "Archer"], [CLASS_MAGE, "Mage"], [CLASS_NOBODY, "Nobody"]];
+    var _want = [[2, 3], [3, 4], [4, 5], [2, 3]];
+    var _maxmp = [[11, 13], [12, 16], [16, 23], [11, 14]];
+    for (var _c = 0; _c < 4; _c++) {
+        for (var _lv = 0; _lv < 2; _lv++) {
+            var _pl = CharacterCreate_Player(_cls[_c][0]);
+            if (_lv == 1) { _pl = LevelUp_ApplyLevel(_pl); _pl = LevelUp_ApplyLevel(_pl); }
+            var _tag = "r3guard: " + _cls[_c][1] + " level " + string(_lv * 2 + 1);
+            Test_Eq(_tag + " (setup) max MP", _pl.max_mp, _maxmp[_c][_lv]);
+            _pl.mp = 0;
+            Test_Eq(_tag + " gets 25% of max MP (min 2) back from empty", Battle_GuardApply(_pl).mp, _want[_c][_lv]);
+        }
+    }
+    var _lo = CharacterCreate_Player(CLASS_KNIGHT);
+    _lo.max_mp = 6; _lo.mp = 0;
+    Test_Eq("r3guard: a small MP pool still gets 2 back (25% of 6 rounds down to 1)", Battle_GuardApply(_lo).mp, 2);
+    var _cap = CharacterCreate_Player(CLASS_MAGE);
+    _cap.mp = _cap.max_mp - 1;
+    Test_Eq("r3guard: the MP never goes above max MP", Battle_GuardApply(_cap).mp, _cap.max_mp);
+    var _full = CharacterCreate_Player(CLASS_ARCHER);
+    Test_Eq("r3guard: full MP stays full", Battle_GuardApply(_full).mp, _full.max_mp);
+
+    // it still stacks with the defence bar: the bar takes its share off the already halved hit
+    var _half = Combat_ApplyDamage(_slime, Battle_GuardApply(CharacterCreate_Player(CLASS_KNIGHT)), _src, 1, 1, { is_skill: false }).dmg;
+    Test_True("r3guard: a Good block (half through) of the halved hit is about a quarter of the plain hit (" + string(_plain) + " -> " + string(Qte_DefenceDamage(_half, QTE_GOOD)) + ")", abs(Qte_DefenceDamage(_half, QTE_GOOD) - _plain * 0.25) <= 1.5);
+
+    // the Brace ends when the player's next turn starts (after the enemy has acted): follow the real turn order
+    var _s1 = Test_R3GuardSequence(true, _src, _plain);
+    Test_True("r3guard: the enemy got a turn in the sequence", _s1.enemy_turns >= 1);
+    Test_True("r3guard: the player was Braced for the enemy's whole turn", _s1.braced_all_enemy);
+    Test_True("r3guard: both of its hits in that turn were halved", _s1.halved);
+    Test_True("r3guard: and the Brace is gone as the player's next turn starts", _s1.gone_at_player && _s1.who == TL_PLAYER);
+    var _s2 = Test_R3GuardSequence(false, _src, _plain);   // an enemy turn without a hit (a wind-up): the Brace still ends with it
+    Test_True("r3guard: a turn with no hit: the player was Braced throughout it", _s2.enemy_turns >= 1 && _s2.braced_all_enemy);
+    Test_True("r3guard: a turn with no hit: the Brace is gone as the player's next turn starts", _s2.gone_at_player && _s2.who == TL_PLAYER);
 }
