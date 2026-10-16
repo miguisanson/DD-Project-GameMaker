@@ -16681,6 +16681,7 @@ function Test_Suite_R3LevelUp() {
     Test_LvClassTable();
     Test_LvStatRules();
     Test_LvMigration();
+    Test_LvDeferred();
 }
 
 // A class at a level with its free point on the class's usual stat (auto-placed outside a run): VIG, MND, Max HP, Max MP.
@@ -16930,4 +16931,136 @@ function Test_LvMigration() {
     _gs.persist = _old_persist;
     Test_Eq("levelup save: a run written now is version 4", _l4.status == "ok" ? _l4.run.run_version : -1, 4);
     Test_True("levelup save: with the Mage's VIG 13 and MND 22 in it", _l4.status == "ok" && _l4.run.statData.player.stats.vig == 13 && _l4.run.statData.player.stats.mnd == 22);
+}
+
+// ---- note 14 (D177): winning a fight does not change level, stats or Max HP / Max MP; the owed levels apply, one at a time, when the player confirms the screen ----
+function Test_LvRunBegin() {
+    var _gs = GameState_Get();
+    var _keep = { had: variable_struct_exists(_gs, "run"), run: variable_struct_exists(_gs, "run") ? _gs.run : undefined, player: _gs.player_ch };
+    _gs.run = Run_Create(5);
+    return _keep;
+}
+
+function Test_LvRunEnd(_keep) {
+    var _gs = GameState_Get();
+    if (_keep.had) _gs.run = _keep.run; else variable_struct_remove(_gs, "run");
+    _gs.player_ch = _keep.player;
+}
+
+function Test_LvDeferred() {
+    var _k = Test_LvRunBegin();
+    Test_False("levelup owed: a run is going, so level-ups are not auto-placed", Level_AutoPlaceEnabled());
+    // one level's EXP: nothing changes but the debt
+    var _a = CharacterCreate_Player(CLASS_KNIGHT);
+    var _a0 = { atk: _a.stats.atk, def: _a.stats.def, vig: _a.stats.vig, mnd: _a.stats.mnd, hp: _a.max_hp, mp: _a.max_mp };
+    _a = Player_AddExp(_a, Exp_NextLevel(1));
+    Test_Eq("levelup owed: the level stays 1 after the EXP is won", _a.level, 1);
+    Test_Eq("levelup owed: one level is owed", _a.levels_owed, 1);
+    Test_True("levelup owed: ATK, DEF, VIG and MND are what they were", _a.stats.atk == _a0.atk && _a.stats.def == _a0.def && _a.stats.vig == _a0.vig && _a.stats.mnd == _a0.mnd);
+    Test_True("levelup owed: Max HP and Max MP are what they were", _a.max_hp == _a0.hp && _a.max_mp == _a0.mp);
+    Test_Eq("levelup owed: no free point is banked yet", _a.stat_points, 0);
+    Test_Eq("levelup owed: no card pick is owed yet", _a.card_picks, 0);
+    Test_Eq("levelup owed: the fight reports one level gained", _a.last_levels_gained, 1);
+    Test_Eq("levelup owed: and one stat point gained (R-113: it was never set above 0)", _a.last_stat_points_gained, 1);
+    Test_Eq("levelup owed: the EXP bar is on level 2's bar with nothing carried over", _a.exp_next, Exp_NextLevel(2));
+    Test_Eq("levelup owed: nothing carried over", _a.exp, 0);
+    Test_Eq("levelup owed: the screen is owed first", Cards_NextOwed(_a), "stat");
+    Test_Eq("levelup owed: and it is the screen for level 2", LevelUp_PromptLevel(_a), 2);
+    // more than one level in one grant: one owed per level, the rest of the EXP kept
+    var _b = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1) + Exp_NextLevel(2) + 5);
+    Test_Eq("levelup owed: two levels owed from one fight", _b.levels_owed, 2);
+    Test_Eq("levelup owed: still level 1", _b.level, 1);
+    Test_Eq("levelup owed: the EXP left over is kept", _b.exp, 5);
+    Test_Eq("levelup owed: on level 3's bar", _b.exp_next, Exp_NextLevel(3));
+    Test_Eq("levelup owed: two points gained", _b.last_stat_points_gained, 2);
+    // a second fight on top of an owed level adds to it
+    var _c = Player_AddExp(variable_clone(_a), Exp_NextLevel(2));
+    Test_Eq("levelup owed: a second fight before the screen adds a level (2 owed)", _c.levels_owed, 2);
+    Test_Eq("levelup owed: and that fight reports 1 gained", _c.last_levels_gained, 1);
+    // what the screen shows: the character as it will be, the real one untouched
+    var _pv = LevelUp_PreviewCharacter(_a);
+    Test_Eq("levelup owed: the preview is level 2", _pv.level, 2);
+    Test_True("levelup owed: with the class growth in its stats (ATK +1, DEF +1, VIG +2, MND +1)", _pv.stats.atk == _a0.atk + 1 && _pv.stats.def == _a0.def + 1 && _pv.stats.vig == _a0.vig + 2 && _pv.stats.mnd == _a0.mnd + 1);
+    Test_True("levelup owed: the character itself did not move", _a.level == 1 && _a.levels_owed == 1 && _a.stats.atk == _a0.atk && _a.max_hp == _a0.hp);
+    // confirming: the level, the growth and the chosen point, together
+    _a.hp = 7;
+    var _d = Cards_PlaceStat(variable_clone(_a), STAT_DEF);
+    Test_Eq("levelup confirm: now level 2", _d.level, 2);
+    Test_Eq("levelup confirm: nothing is owed any more", _d.levels_owed, 0);
+    Test_Eq("levelup confirm: ATK got the growth", _d.stats.atk, _a0.atk + 1);
+    Test_Eq("levelup confirm: DEF got the growth and the point", _d.stats.def, _a0.def + 2);
+    Test_Eq("levelup confirm: VIG got the growth", _d.stats.vig, _a0.vig + 2);
+    Test_Eq("levelup confirm: Max HP follows VIG (16)", _d.max_hp, 16);
+    Test_Eq("levelup confirm: the current HP rises with it (7 + 6)", _d.hp, 13);
+    Test_Eq("levelup confirm: the point is spent", _d.stat_points, 0);
+    Test_Eq("levelup confirm: a card pick is owed now", _d.card_picks, 1);
+    Test_Eq("levelup confirm: the card screen is next", Cards_NextOwed(_d), "cards");
+    // two owed: one screen each
+    var _e = Cards_PlaceStat(variable_clone(_b), STAT_ATK);
+    Test_True("levelup confirm: two owed, the first confirm gives level 2 and leaves one owed", _e.level == 2 && _e.levels_owed == 1);
+    Test_Eq("levelup confirm: the next screen is for level 3", LevelUp_PromptLevel(_e), 3);
+    Test_Eq("levelup confirm: and it is a stat screen again before any card pick", Cards_NextOwed(_e), "stat");
+    var _f = Cards_PlaceStat(_e, STAT_SPD);
+    Test_True("levelup confirm: the second confirm gives level 3 and clears the debt", _f.level == 3 && _f.levels_owed == 0);
+    Test_Eq("levelup confirm: two card picks are owed by then", _f.card_picks, 2);
+    Test_Eq("levelup confirm: the EXP carried over is still there", _f.exp, 5);
+    // the cap: the debt never goes past level 10, the EXP bar has nothing to fill
+    var _g = CharacterCreate_Player(CLASS_KNIGHT);
+    _g.level = 9;
+    _g = Player_NormalizeProgression(_g, true);
+    _g = Player_AddExp(_g, 5000);
+    Test_True("levelup owed: level 9 with a huge grant owes only the one level to the cap", _g.level == 9 && _g.levels_owed == 1);
+    Test_Eq("levelup owed: the bar is empty at the cap", _g.exp_next, 0);
+    var _g2 = Player_AddExp(_g, 100);
+    Test_True("levelup owed: at the owed cap more EXP changes nothing", _g2.levels_owed == 1 && _g2.last_levels_gained == 0);
+    // saving and loading keep the debt and the EXP (the normalisation a load runs must not clamp it away)
+    var _h = Player_NormalizeProgression(variable_clone(_b), true);
+    Test_True("levelup owed: a load keeps the owed levels and the EXP", _h.levels_owed == 2 && _h.exp == 5 && _h.level == 1);
+    // the run summary counts the owed levels (a death before the screen keeps today's numbers)
+    Test_Eq("levelup owed: the effective level is the level plus the debt", Player_EffLevel(_b), 3);
+    var _hist = Run_MakeHistoryEntry(Run_Get(), _b, "rm_floor2", "died", "Slime");
+    Test_Eq("levelup owed: a death before the screen counts the owed levels in the history", _hist.level, 3);
+    var _raw = { seed: 1, floor: 2, statData: { player: { class_id: CLASS_KNIGHT, level: 4, levels_owed: 1 }, save_room_name: "rm_floor2" } };
+    Test_Eq("levelup owed: an abandoned save counts them too", Run_HistoryEntryFromSave(_raw).level, 5);
+    var _gs = GameState_Get();
+    var _cp0 = _gs.checkpoint;
+    var _ps0 = _gs.persist;
+    _gs.checkpoint = { room: rm_floor3, x: 48, y: 64 };
+    _gs.persist = {};
+    _gs.player_ch = _b;
+    var _sv = RunSave_Build();
+    _gs.checkpoint = _cp0;
+    _gs.persist = _ps0;
+    Test_Eq("levelup owed: the save's summary level counts them", _sv.summary.level, 3);
+    Test_Eq("levelup owed: and the player in the save still has the debt", _sv.statData.player.levels_owed, 2);
+    // the status card: the bar is full and says so, nothing else changes
+    var _bar = TabMenu_XpBar(_a);
+    Test_True("levelup owed: the EXP bar is full", _bar.ratio == 1);
+    Test_Eq("levelup owed: and says Level Up", _bar.text, Loc_T("tab.val.level_up", "Level Up"));
+    var _bar2 = TabMenu_XpBar(Test_LvAfterExp(CLASS_KNIGHT, 5));
+    Test_True("levelup owed: with no debt the bar is EXP over the bar", abs(_bar2.ratio - 5 / Exp_NextLevel(1)) < 0.0001 && _bar2.text == "5/" + string(Exp_NextLevel(1)));
+    // winning a battle: Battle_GrantRewards leaves the player as he was, with the debt
+    EnemyDB_Init(); SkillDB_Init(); Loot_Init();
+    var _p = CharacterCreate_Player(CLASS_KNIGHT);
+    _p.exp = _p.exp_next - 1;
+    var _rw = Battle_GrantRewards(variable_clone(_p), EnemyCreate(ENEMY_SLIME));
+    Test_Eq("levelup battle: the rewards say one level was gained", _rw.levels_gained, 1);
+    Test_Eq("levelup battle: and one stat point", _rw.stat_points_gained, 1);
+    Test_True("levelup battle: the player coming out is still level 1 with the same Max HP / Max MP and stats", _rw.player.level == 1 && _rw.player.max_hp == _p.max_hp && _rw.player.max_mp == _p.max_mp && _rw.player.stats.atk == _p.stats.atk && _rw.player.stats.vig == _p.stats.vig);
+    Test_Eq("levelup battle: with the level owed", _rw.player.levels_owed, 1);
+    // a class chosen with a level owed keeps the debt
+    var _cc = Card_ClassCharacter(variable_clone(_b), CLASS_MAGE);
+    Test_True("levelup class: choosing a class keeps the owed levels and the level", _cc.levels_owed == 2 && _cc.level == 1);
+    Test_Eq("levelup class: and the EXP", _cc.exp, 5);
+    Test_LvRunEnd(_k);
+    // outside a run (tests, tools) EXP still levels at once, and the points are still auto-placed
+    var _o = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1) + Exp_NextLevel(2));
+    Test_True("levelup owed: outside a run EXP levels the character at once (level 3, nothing owed)", _o.level == 3 && _o.levels_owed == 0);
+    Test_Eq("levelup owed: and reports 2 stat points gained (R-113)", _o.last_stat_points_gained, 2);
+}
+
+// A fresh character of a class with _exp EXP won (outside a run: nothing levels).
+function Test_LvAfterExp(_class, _exp) {
+    var _c = CharacterCreate_Player(_class);
+    return Player_AddExp(_c, _exp);
 }
