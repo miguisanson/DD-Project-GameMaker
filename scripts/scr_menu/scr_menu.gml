@@ -159,7 +159,7 @@ function TabItems_Items(_ch, _in_battle = false) {
             if (!is_struct(it) || it.id == 0) continue;
             var grp = (it.type == ITEM_KEY) ? 2 : (Item_IsThrowable(it) ? 1 : ((it.type == ITEM_CONSUMABLE) ? 0 : -1));
             if (grp != g) continue;
-            var sentence = (it.type == ITEM_KEY) ? Loc_T("tab.items.key", "An item you keep for the way ahead.") : Item_Sentence(it);
+            var sentence = (it.type == ITEM_KEY) ? Loc_T("tab.items.key", "An item you keep for the way ahead.") : Item_Sentence(it, _ch);
             var lines = (it.type == ITEM_KEY) ? [] : Item_NumberLines(it, _ch);
             array_push(lines, { label: Loc_T("shop.lbl.have", "You Have"), value: string(inv.qty) });
             array_push(items, {
@@ -252,7 +252,7 @@ function Gear_CompareLines(_ch, _item) {
 
 function TabGear_Row(_ch, _item, _slot, _worn) {
     var can = _worn ? { ok: true, msg: "" } : Equip_CanEquip(_ch, _item);
-    var sentence = Item_Sentence(_item);
+    var sentence = Item_Sentence(_item, _ch);
     if (!_worn && !can.ok) sentence += " " + can.msg;
     var cur_id = _worn ? 0 : Equip_SlotGet(_ch, string(_item.equip_slot));
     if (!_worn && can.ok && cur_id != 0) sentence += " " + Loc_T("tab.gear.replaces", "Replaces {item}.", { item: ItemDB_Get(cur_id).name });
@@ -1597,7 +1597,7 @@ function ClassSelect_ApplyClass(_class_id) {
 function CardsUi_EchoDetails(_o) {
     if (_o.kind == "skill") return Battle_SkillDetails(SkillDB_Get(_o.id));
     var it = ItemDB_Get(_o.id);
-    return { sentence: Item_Sentence(it), lines: Item_NumberLines(it, GameState_Get().player_ch) };
+    return { sentence: Item_Sentence(it, GameState_Get().player_ch), lines: Item_NumberLines(it, GameState_Get().player_ch) };
 }
 
 function CardsUi_EchoMenu() {
@@ -1652,6 +1652,7 @@ function CardsUi_StatHelp(_stat_id) {
 function CardsUi_StatMenu() {
     var ch = GameState_Get().player_ch;
     var opts = Cards_FreePointOptions(ch);   // D143: the four stats, Max HP, Max MP
+    var plvl = LevelUp_PromptLevel(ch);   // hunt 7: a fight that gave several levels steps through each level's growth, oldest first
     var items = [];
     for (var i = 0; i < array_length(opts); i++) {
         var o = opts[i];
@@ -1663,7 +1664,7 @@ function CardsUi_StatMenu() {
     }
     var m = Ui_MenuNew("cards_stat", items, {
         on_confirm: CardsUi_StatConfirm, on_back: CardsUi_NoBack,
-        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(ch.level) }), note: LevelUp_GrowthText(ch.class_id, ch.level), anchor: "center", details: true }
+        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(plvl) }), note: LevelUp_GrowthText(ch.class_id, plvl), anchor: "center", details: true }
     });
     Ui_MenuFixCursor(m, clamp(DB_PlayerClass(ch.class_id).free_default, 0, 3));   // the class's usual stat first
     return m;
@@ -2452,7 +2453,7 @@ function ShopUi_ItemFor(_row, _ch, _gold) {
     } else {
         var it = ItemDB_Get(_row.id);
         out.label = it.name;
-        out.help = Item_Sentence(it);
+        out.help = Item_Sentence(it, _ch);
         out.lines = Item_NumberLines(it, _ch);
         out.icon_item = it;
         if (it.type != ITEM_WEAPON && it.type != ITEM_ARMOR && it.type != ITEM_ACCESSORY) array_push(out.lines, { label: Loc_T("shop.lbl.have", "You Have"), value: string(Inv_Count(_ch.inventory, it.id)) });
@@ -2490,7 +2491,7 @@ function ShopUi_SellItems() {
         array_push(lines, { label: Loc_T("shop.lbl.have", "You Have"), value: string(n) });
         array_push(items, {
             enabled: true, dim: worn, label: it.name + ((n > 1) ? " x" + string(n) : ""), value: worn ? Loc_T("shop.worn", "Worn") : string(Shop_SellPrice(iid)),
-            help: Item_Sentence(it), lines: lines, icon_item: it, item_id: iid
+            help: Item_Sentence(it, ch), lines: lines, icon_item: it, item_id: iid
         });
     }
     if (array_length(items) <= 0) array_push(items, { enabled: false, label: Loc_T("shop.nothing_to_sell", "Nothing to Sell"), value: "", help: "", lines: [], item_id: -1 });
