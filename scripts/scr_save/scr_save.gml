@@ -516,6 +516,7 @@ function Profile_Default() {
         best_floor: 0,
         legacy_notice_seen: false,
         name: "",                              // D175: a copy of the profile's name in the index (the index is authoritative); "" until a flush
+        last_title: "",                        // D183: the text key of the run summary's title shown last, so the next one differs ("" = none yet; an older file reads as none)
         settings_file: Save_SettingsPath()     // settings stay in their own file
     };
 }
@@ -583,6 +584,7 @@ function Profile_Normalize(_raw) {
     }
     if (variable_struct_exists(_raw, "legacy_notice_seen")) p.legacy_notice_seen = (Save_ToReal(_raw.legacy_notice_seen, 0) != 0);
     if (variable_struct_exists(_raw, "name") && is_string(_raw.name)) p.name = _raw.name;
+    if (variable_struct_exists(_raw, "last_title") && is_string(_raw.last_title)) p.last_title = _raw.last_title;
     return p;
 }
 

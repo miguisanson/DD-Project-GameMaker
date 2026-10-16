@@ -998,7 +998,7 @@ function RunFlow_Begin() {
     var entry = (variable_global_exists("run_last") && is_struct(global.run_last)) ? global.run_last : Run_MakeHistoryEntry(Run_Create(0), undefined, "rm_floor1", "died", "");
     var ctx = (variable_global_exists("death_ctx") && is_struct(global.death_ctx)) ? global.death_ctx : Death_BuildContext(entry.result, entry.cause);
     global.death_ctx = undefined;
-    global.run_flow = { phase: "death", entry: entry, t: 0, ctx: ctx };
+    global.run_flow = { phase: "death", entry: entry, t: 0, ctx: ctx, title: RunTitle_Choose(entry) };   // D183 (R-105): the summary's title is picked now, once
     RunFlow_DeathImage();   // H13a (D156): the picture is made now (once per session), not in the middle of the first Draw
     Skip_Reset();
     Cutscene_ClearUiState();
@@ -1040,7 +1040,10 @@ function RunFlow_Step() {
 function RunTitle_Choose(_entry) {
     var prof = Profile_Get();
     var salt = (variable_struct_exists(_entry, "seed") ? _entry.seed : 0) + prof.deaths;
-    return RunTitle_Pick(_entry.result, prof.deaths, "", salt);
+    var pick = RunTitle_Pick(_entry.result, prof.deaths, prof.last_title, salt);
+    prof.last_title = pick.key;
+    Profile_Flush();
+    return pick;
 }
 
 function RunFlow_CauseLine(_entry) {
@@ -1201,7 +1204,7 @@ function RunFlow_Draw() {
         }
         draw_set_alpha(1);
     } else if (f.phase == "summary") {
-        var title = Loc_T("runflow.title", "The tunnel keeps you.");
+        var title = variable_struct_exists(f, "title") ? RunTitle_Text(f.title) : Loc_T("runflow.title", "The tunnel keeps you.");
         var rows = RunFlow_SummaryRows(f.entry);
         var sentence = RunFlow_CauseLine(f.entry);
         var footer = Loc_T("runflow.continue", "Press [k:confirm] to continue");

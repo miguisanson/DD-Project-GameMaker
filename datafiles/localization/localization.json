@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T12:58:30Z",
-    "row_count": 1215
+    "generated_at_utc": "2026-10-16T13:04:02Z",
+    "row_count": 1235
   },
   "default_lang": "en",
   "languages": [
@@ -3531,6 +3531,86 @@
     "runflow.title": {
       "en": "The tunnel keeps you.",
       "ko": "터널이 당신을 놓아주지 않는다."
+    },
+    "runflow.title.abandoned.0": {
+      "en": "You let go.",
+      "ko": "당신은 손을 놓았다."
+    },
+    "runflow.title.abandoned.1": {
+      "en": "The tunnel waits.",
+      "ko": "터널은 기다린다."
+    },
+    "runflow.title.abandoned.2": {
+      "en": "You turned back.",
+      "ko": "당신은 돌아섰다."
+    },
+    "runflow.title.t1.1": {
+      "en": "The dark closes over you.",
+      "ko": "어둠이 당신을 덮는다."
+    },
+    "runflow.title.t1.2": {
+      "en": "Is this the end?",
+      "ko": "이게 끝일까?"
+    },
+    "runflow.title.t2.0": {
+      "en": "Not the end.",
+      "ko": "끝이 아니다."
+    },
+    "runflow.title.t2.1": {
+      "en": "It begins again.",
+      "ko": "다시 시작된다."
+    },
+    "runflow.title.t2.2": {
+      "en": "Back so soon.",
+      "ko": "벌써 돌아왔다."
+    },
+    "runflow.title.t3.0": {
+      "en": "You know the way.",
+      "ko": "길을 안다."
+    },
+    "runflow.title.t3.1": {
+      "en": "The same fall.",
+      "ko": "같은 추락."
+    },
+    "runflow.title.t3.2": {
+      "en": "Down, once more.",
+      "ko": "다시, 아래로."
+    },
+    "runflow.title.t4.0": {
+      "en": "Nothing new.",
+      "ko": "새로울 것 없다."
+    },
+    "runflow.title.t4.1": {
+      "en": "Quiet again.",
+      "ko": "다시 고요하다."
+    },
+    "runflow.title.t4.2": {
+      "en": "No one came.",
+      "ko": "아무도 오지 않았다."
+    },
+    "runflow.title.t5.0": {
+      "en": "Home again.",
+      "ko": "다시 집이다."
+    },
+    "runflow.title.t5.1": {
+      "en": "As expected.",
+      "ko": "짐작대로다."
+    },
+    "runflow.title.t5.2": {
+      "en": "You stay.",
+      "ko": "당신은 남는다."
+    },
+    "runflow.title.won.0": {
+      "en": "The choir falls silent.",
+      "ko": "성가대가 침묵한다."
+    },
+    "runflow.title.won.1": {
+      "en": "The tunnel lets go.",
+      "ko": "터널이 당신을 놓아준다."
+    },
+    "runflow.title.won.2": {
+      "en": "The way is open.",
+      "ko": "길이 열렸다."
     },
     "save.back": {
       "en": "Back",
