@@ -1,5 +1,5 @@
 {
- "build": "49ed115-20261017-dirty",
+ "build": "93e11be-20261017-dirty",
  "cards": [
   {
    "classes": [
@@ -58,7 +58,7 @@
    "kind": "skill",
    "name": "Horizontal Slash",
    "params": {},
-   "sentence": "Hit for 4 power.",
+   "sentence": "Hit for 5 power.",
    "skill_id": 5.0,
    "up": {}
   },
@@ -239,7 +239,7 @@
    "kind": "upgrade",
    "name": "Horizontal Slash+",
    "params": {},
-   "sentence": "Hit for 6 power.",
+   "sentence": "Hit for 7 power.",
    "skill_id": 5.0,
    "up": {
     "power": 2.0,
@@ -696,7 +696,7 @@
      "mag": 4.0,
      "mnd": 12.0,
      "mp": 12.0,
-     "spd": 11.0,
+     "spd": 12.0,
      "vig": 10.0
     },
     {
@@ -707,7 +707,7 @@
      "mag": 4.0,
      "mnd": 14.0,
      "mp": 14.0,
-     "spd": 12.0,
+     "spd": 13.0,
      "vig": 12.0
     },
     {
@@ -718,7 +718,7 @@
      "mag": 4.0,
      "mnd": 16.0,
      "mp": 16.0,
-     "spd": 12.0,
+     "spd": 14.0,
      "vig": 14.0
     },
     {
@@ -729,7 +729,7 @@
      "mag": 4.0,
      "mnd": 18.0,
      "mp": 18.0,
-     "spd": 13.0,
+     "spd": 15.0,
      "vig": 16.0
     },
     {
@@ -740,7 +740,7 @@
      "mag": 4.0,
      "mnd": 20.0,
      "mp": 20.0,
-     "spd": 13.0,
+     "spd": 16.0,
      "vig": 18.0
     },
     {
@@ -751,7 +751,7 @@
      "mag": 4.0,
      "mnd": 22.0,
      "mp": 22.0,
-     "spd": 14.0,
+     "spd": 17.0,
      "vig": 20.0
     },
     {
@@ -762,7 +762,7 @@
      "mag": 4.0,
      "mnd": 24.0,
      "mp": 24.0,
-     "spd": 14.0,
+     "spd": 18.0,
      "vig": 22.0
     },
     {
@@ -773,7 +773,7 @@
      "mag": 4.0,
      "mnd": 26.0,
      "mp": 26.0,
-     "spd": 15.0,
+     "spd": 19.0,
      "vig": 24.0
     },
     {
@@ -784,7 +784,7 @@
      "mag": 4.0,
      "mnd": 28.0,
      "mp": 28.0,
-     "spd": 15.0,
+     "spd": 20.0,
      "vig": 26.0
     },
     {
@@ -795,7 +795,7 @@
      "mag": 4.0,
      "mnd": 30.0,
      "mp": 30.0,
-     "spd": 16.0,
+     "spd": 21.0,
      "vig": 28.0
     }
    ],
@@ -818,7 +818,7 @@
       "def": 0.0,
       "mag": 0.0,
       "mnd": 2.0,
-      "spd": 0.0,
+      "spd": 1.0,
       "vig": 2.0
      },
      "level": 3.0
@@ -840,7 +840,7 @@
       "def": 0.0,
       "mag": 0.0,
       "mnd": 2.0,
-      "spd": 0.0,
+      "spd": 1.0,
       "vig": 2.0
      },
      "level": 5.0
@@ -862,7 +862,7 @@
       "def": 0.0,
       "mag": 0.0,
       "mnd": 2.0,
-      "spd": 0.0,
+      "spd": 1.0,
       "vig": 2.0
      },
      "level": 7.0
@@ -884,7 +884,7 @@
       "def": 0.0,
       "mag": 0.0,
       "mnd": 2.0,
-      "spd": 0.0,
+      "spd": 1.0,
       "vig": 2.0
      },
      "level": 9.0
@@ -910,7 +910,7 @@
     "def": 8.0,
     "mag": 4.0,
     "mnd": 12.0,
-    "spd": 11.0,
+    "spd": 12.0,
     "vig": 10.0
    }
   },
@@ -1379,113 +1379,113 @@
    "base_mp": 10.0,
    "by_level": [
     {
-     "atk": 9.0,
+     "atk": 10.0,
      "def": 9.0,
      "hp": 10.0,
      "level": 1.0,
      "mag": 3.0,
      "mnd": 11.0,
      "mp": 11.0,
-     "spd": 11.0,
+     "spd": 12.0,
      "vig": 10.0
     },
     {
-     "atk": 11.0,
+     "atk": 12.0,
      "def": 9.0,
      "hp": 16.0,
      "level": 2.0,
      "mag": 3.0,
      "mnd": 12.0,
      "mp": 12.0,
-     "spd": 12.0,
+     "spd": 13.0,
      "vig": 12.0
     },
     {
-     "atk": 12.0,
+     "atk": 13.0,
      "def": 10.0,
      "hp": 22.0,
      "level": 3.0,
      "mag": 4.0,
      "mnd": 13.0,
      "mp": 13.0,
-     "spd": 12.0,
+     "spd": 13.0,
      "vig": 14.0
     },
     {
-     "atk": 14.0,
+     "atk": 15.0,
      "def": 10.0,
      "hp": 28.0,
      "level": 4.0,
      "mag": 4.0,
      "mnd": 14.0,
      "mp": 14.0,
-     "spd": 13.0,
+     "spd": 14.0,
      "vig": 16.0
     },
     {
-     "atk": 15.0,
+     "atk": 16.0,
      "def": 11.0,
      "hp": 34.0,
      "level": 5.0,
      "mag": 5.0,
      "mnd": 16.0,
      "mp": 16.0,
-     "spd": 13.0,
+     "spd": 14.0,
      "vig": 18.0
     },
     {
-     "atk": 17.0,
+     "atk": 18.0,
      "def": 11.0,
      "hp": 40.0,
      "level": 6.0,
      "mag": 5.0,
      "mnd": 17.0,
      "mp": 17.0,
-     "spd": 14.0,
+     "spd": 15.0,
      "vig": 20.0
     },
     {
-     "atk": 18.0,
+     "atk": 19.0,
      "def": 12.0,
      "hp": 46.0,
      "level": 7.0,
      "mag": 6.0,
      "mnd": 18.0,
      "mp": 18.0,
-     "spd": 14.0,
+     "spd": 15.0,
      "vig": 22.0
     },
     {
-     "atk": 20.0,
+     "atk": 21.0,
      "def": 12.0,
      "hp": 52.0,
      "level": 8.0,
      "mag": 6.0,
      "mnd": 19.0,
      "mp": 19.0,
-     "spd": 15.0,
+     "spd": 16.0,
      "vig": 24.0
     },
     {
-     "atk": 21.0,
+     "atk": 22.0,
      "def": 13.0,
      "hp": 58.0,
      "level": 9.0,
      "mag": 7.0,
      "mnd": 21.0,
      "mp": 21.0,
-     "spd": 15.0,
+     "spd": 16.0,
      "vig": 26.0
     },
     {
-     "atk": 23.0,
+     "atk": 24.0,
      "def": 13.0,
      "hp": 64.0,
      "level": 10.0,
      "mag": 7.0,
      "mnd": 22.0,
      "mp": 22.0,
-     "spd": 16.0,
+     "spd": 17.0,
      "vig": 28.0
     }
    ],
@@ -1596,11 +1596,11 @@
    "mp_gain": 1.0,
    "name": "Nobody",
    "stats": {
-    "atk": 9.0,
+    "atk": 10.0,
     "def": 9.0,
     "mag": 3.0,
     "mnd": 11.0,
-    "spd": 11.0,
+    "spd": 12.0,
     "vig": 10.0
    }
   }
@@ -1674,7 +1674,7 @@
    "stagger_stun_mult": 1.5,
    "steadfast_turns": 2.0
   },
-  "unarmed_power": 2.0,
+  "unarmed_power": 5.0,
   "weapon_skill_share": 0.5
  },
  "enemies": [
@@ -4673,7 +4673,7 @@
    "mp_cost": 5.0,
    "name": "Horizontal Slash",
    "name_en": "Horizontal Slash",
-   "power": 4.0,
+   "power": 5.0,
    "power_mult": 1.5,
    "sequence_length": 5.0,
    "stat_type": 0.0,
