@@ -17253,6 +17253,7 @@ function Test_R3MouseScreens() {
     var _p = GameSettings_Copy(GameSettings_Ensure());
     Test_R3MouseMenuRows("settings", Ui_MenuNew("r3m_settings", SettingsMenu_Items(_p, 5), {}));
     Test_R3MouseMenuRows("class choice", Ui_MenuNew("r3m_class", CardsUi_ClassMenu(Profile_Default()).items, {}));
+    Test_R3MouseMenuRows("shop", ShopUi_RootMenu());
     Confirm_Open("Test?", undefined);
     var _cm = Confirm_Menu();
     Test_R3MouseMenuRows("yes / no", _cm);

@@ -13,7 +13,7 @@ Battle_FeelStep(self, step_ms, real_ms);   // D138 / D139: the feel clock, the d
 if (battle_over && battle_state != BSTATE_MESSAGE) exit;
 
 // helper input keys
-var k_ok = Input_UIConfirm();
+var k_ok = Battle_ConfirmInput();   // D182: Confirm or a left click presses the QTE bars (the same path, so the grade is the same)
 
 // The grade word runs on real time, also through a hit-stop.
 if (qte_result_ms > 0) qte_result_ms = max(0, qte_result_ms - Qte_StepMs(delta_time));

@@ -1013,7 +1013,7 @@ function RunFlow_Step() {
     var f = global.run_flow;
     f.t += 1;
     if (Transition_IsActive()) return;
-    var ok = Input_UIConfirm();
+    var ok = Input_UIConfirm() || Input_ClickConfirm();   // D182: a click goes on from the summary
     if (f.phase == "death") {
         Skip_Claim();
         if (f.t == 1) SFX_Play("metal_resonance");   // the crack

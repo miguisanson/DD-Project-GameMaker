@@ -3055,7 +3055,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsTextFit2(_s);   // round 3 textfit2 (R-106): the Skills tab, the battle Skill list and the Controls page with the long names, three sizes; the end of the pictures
             break;
         case 1060: case 1061: case 1062: case 1063: case 1064: case 1065: case 1066: case 1067: case 1068: case 1069:
-            Scenario_StepShotsR3Saves2(_s);   // saves2 (D175): the title with its buttons, Load Game, the overwrite picker, the profile screen, the name entry, the Codex from the title; three sizes, English and Korean; the end of the pictures
+            Scenario_StepShotsR3Saves2(_s);   // saves2 (D175): the title with its buttons, Load Game, the overwrite picker, the profile screen, the name entry, the Codex from the title; three sizes, English and Korean; goes on with mouse (1090)
+            break;
+        case 1090: case 1091: case 1092: case 1093: case 1094: case 1095: case 1096: case 1097: case 1098: case 1099:
+            Scenario_StepShotsR3Mouse(_s);   // mouse (D182, R-111): the cursor over the title, pressed, over a battle menu and over a Settings slider, three sizes; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -15719,7 +15722,7 @@ function Scenario_StepShotsR3Saves2(_s) {
                 if (_o.di >= array_length(_scenes)) {
                     Loc_SetLanguage("en");
                     Scenario_SetWindowScale(3);
-                    Scenario_S2End();   // the end of the pictures: removes the files and the profiles the scenes made
+                    Scenario_Next(_s, 1090);   // goes on with mouse (1090), the end of the pictures
                 } else {
                     Scenario_Next(_s, 1060);
                 }
@@ -17190,6 +17193,9 @@ function Scenario_StepShotsR3Bvis(_s) {
 // click = Back), the Profile and Codex buttons, the seed entry (wheel, arrows, cells, Start, right click). The last step ends the run (Scenario_MouseEnd).
 //   1100: a fresh profile and the title           1101: the title menu, Settings, sliders, a toggle, Back
 //   1102: the corner buttons, the Codex, the seed pick and the seed entry
+//   1103: a fight: the command menu and the skill list by hover and click, Back by right click, the attack bar by CLICK (and by the key on the next turn: the same grade)
+//   1104: the Tab menu: a tab label, a row, the Controls page (a click starts the wait for a key, a right click ends it), right click closes the menu
+//   1105: a notice and a dialogue by click, the Yes / No pop-up by click    1106: the card pick by click    1109: the end
 // ============================================================================
 function Scenario_MouseWin(_gx, _gy) {   // a GUI point as a window pixel (what the mouse reports)
     var _l = Display_Layout();
@@ -17306,8 +17312,9 @@ function Scenario_StepSmokeR3Mouse(_s) {
             if (_s.t == 18) {
                 var _pt = Ui_StackTop(_sc.title_stk);
                 Scenario_Check("r3mouse_smoke_a_click_on_the_profile_button_opens_the_profile_screen", Ui_StackDepth(_sc.title_stk) == 2 && _pt.id == "profiles", _pt.id);
-                Scenario_MouseClick(mb_right);
+                Scenario_MouseTo(1, 1);   // a right click on a row of this screen asks to delete it: away from every row, it is Back
             }
+            if (_s.t == 22) Scenario_MouseClick(mb_right);
             if (_s.t == 28) {
                 Scenario_Check("r3mouse_smoke_a_right_click_goes_back_to_the_title", Ui_StackDepth(_sc.title_stk) == 1);
                 Scenario_MouseToRect(_sc.title_btn.codex);
@@ -17373,12 +17380,369 @@ function Scenario_StepSmokeR3Mouse(_s) {
             }
             if (_s.t == 192) {
                 Scenario_Check("r3mouse_smoke_and_again_to_the_title_menu", Ui_StackDepth(_sc.title_stk) == 1 && !is_struct(_sc.title_exit));
-                Scenario_Next(_s, 1109);
+                Scenario_Next(_s, 1103);
             }
             if (_s.t > 500) { Scenario_Check("r3mouse_smoke_the_title_by_mouse_finishes", false, "t=" + string(_s.t)); Scenario_MouseEnd(); }
             break;
+        case 1103:   // a fight: the command menu and the skill list by hover and click, Back by right click, the attack bar by a click (then by the key on the next turn)
+            if (_s.t == 1) {
+                Scenario_MouseTo(1, 1);
+                var _kg = Scenario_NewKnight();   // Scenario_EnterBattle with two skills and a potion in the bag, so the Skill and Item lists have rows
+                _kg.player_ch.skills = [SKILL_WOUND, SKILL_HILT_BASH];
+                _kg.player_ch.inventory = Inv_Add(_kg.player_ch.inventory, 30, 2);
+                Scenario_GotoBattle("mouse_slime");
+                _s.boost = { hp: 900, mp: 90 };   // the knight lives through the slime's turn between the two attacks
+                _d.ph = 0;
+                _d.t0 = 0;
+                _d.clicked = false;
+                _d.keyed = false;
+            }
+            var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+            var _menu_up = (_bc != noone && !_bc.battle_over && !Transition_IsActive() && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && is_struct(_bc.ui_cmd) && Ui_MenuAlpha(_bc.ui_cmd, current_time) >= 1 && array_length(_bc.ui_cmd.rects) > 0 && _bc.ui_cmd.rects[0].w > 0);
+            var _dt = _s.t - _d.t0;
+            switch (_d.ph) {
+                case 0:   // the player's turn is up: the mouse goes to the Skill row
+                    if (_menu_up && _s.t > 30) {
+                        _d.ri_skill = Scenario_R3RowIndex(_bc.ui_cmd, "skill");
+                        _d.ri_item = Scenario_R3RowIndex(_bc.ui_cmd, "item");
+                        _d.ri_attack = Scenario_R3RowIndex(_bc.ui_cmd, "attack");
+                        Scenario_MouseToRect(_bc.ui_cmd.rects[_d.ri_skill]);
+                        _d.ph = 1;
+                        _d.t0 = _s.t;
+                    }
+                    if (_s.t > 900) { Scenario_Check("r3mouse_smoke_the_fight_starts", false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+                    break;
+                case 1:
+                    if (_dt == 6) {
+                        Scenario_Check("r3mouse_smoke_hover_moves_the_battle_command_cursor_to_the_row_under_the_mouse", _bc.menu_index == _d.ri_skill, "index=" + string(_bc.menu_index));
+                        Scenario_MouseClick(mb_left);
+                    }
+                    if (_dt == 16) {
+                        Scenario_Check("r3mouse_smoke_a_click_on_the_skill_row_opens_the_skill_list", _bc.battle_state == BSTATE_SKILL_MENU, "state=" + string(_bc.battle_state));
+                        Scenario_MouseTo(1, 1);
+                    }
+                    if (_dt == 24) Scenario_MouseClick(mb_right);
+                    if (_dt == 34) {
+                        Scenario_Check("r3mouse_smoke_a_right_click_in_the_skill_list_is_back_to_the_commands", _bc.battle_state == BSTATE_MENU, "state=" + string(_bc.battle_state));
+                        Scenario_MouseToRect(_bc.ui_cmd.rects[_d.ri_item]);
+                    }
+                    if (_dt == 40) Scenario_MouseClick(mb_left);
+                    if (_dt == 50) {
+                        Scenario_Check("r3mouse_smoke_a_click_on_the_item_row_opens_the_item_list", _bc.battle_state == BSTATE_ITEM_MENU, "state=" + string(_bc.battle_state));
+                        Scenario_MouseTo(1, 1);
+                    }
+                    if (_dt == 56) Scenario_MouseClick(mb_right);
+                    if (_dt == 66) {
+                        Scenario_Check("r3mouse_smoke_a_right_click_in_the_item_list_is_back_to_the_commands", _bc.battle_state == BSTATE_MENU, "state=" + string(_bc.battle_state));
+                        Scenario_MouseToRect(_bc.ui_cmd.rects[_d.ri_attack]);
+                    }
+                    if (_dt == 72) Scenario_MouseClick(mb_left);
+                    if (_dt == 82) {
+                        Scenario_Check("r3mouse_smoke_a_click_on_attack_starts_the_attack_bar", _bc.battle_state == BSTATE_ATTACK_TIMING, "state=" + string(_bc.battle_state));
+                        _d.ph = 2;
+                    }
+                    if (_dt > 160) { Scenario_Check("r3mouse_smoke_the_battle_menus_by_mouse_finish", false, "state=" + string(_bc.battle_state)); Scenario_MouseEnd(); }
+                    break;
+                case 2:   // the bar is running: a left click near the middle of the bright zone, as the bot's Perfect press
+                    if (_bc.battle_state == BSTATE_ATTACK_TIMING && _bc.qte_active && !_d.clicked && (Qte_ZoneCentreMs(_bc.qte_params) - _bc.qte_ms) <= Qte_StepMs(delta_time) * 1.5) {
+                        _d.clicked = true;
+                        Scenario_MouseClick(mb_left);
+                        _d.ph = 3;
+                        _d.t0 = _s.t;
+                    }
+                    if (_s.t - _d.t0 > 600) { Scenario_Check("r3mouse_smoke_the_attack_bar_is_reached", false); Scenario_MouseEnd(); }
+                    break;
+                case 3:   // the click pressed the bar: a Perfect grade
+                    if (_bc.battle_state != BSTATE_ATTACK_TIMING) {
+                        _d.grade_click = Qte_Grade(_bc.qte_press_ms, _bc.qte_params, _bc.qte_assist);
+                        Scenario_Check("r3mouse_smoke_a_left_click_presses_the_attack_bar_like_confirm", _bc.qte_press_ms != QTE_NO_PRESS, string(_bc.qte_press_ms));
+                        Scenario_Check("r3mouse_smoke_a_click_at_the_middle_of_the_zone_grades_perfect", _d.grade_click == QTE_PERFECT, _d.grade_click);
+                        _d.ph = 4;
+                        _d.t0 = _s.t;
+                    }
+                    if (_dt > 60) { Scenario_Check("r3mouse_smoke_the_click_ends_the_attack_bar", false); Scenario_MouseEnd(); }
+                    break;
+                case 4:   // the enemy's turn passes; the player's turn again: Attack by the key (the cursor is remembered on it)
+                    if (_menu_up && _dt > 20 && _bc.menu_index == _d.ri_attack && (_s.f - _s.last_tap) >= 8) {
+                        Scenario_Tap("confirm");
+                        _d.ph = 5;
+                        _d.t0 = _s.t;
+                    }
+                    if (_dt > 1500) { Scenario_Check("r3mouse_smoke_the_second_turn_comes", false, "state=" + string(_bc.battle_state)); Scenario_MouseEnd(); }
+                    break;
+                case 5:
+                    if (_bc.battle_state == BSTATE_ATTACK_TIMING && _bc.qte_active && !_d.keyed && (Qte_ZoneCentreMs(_bc.qte_params) - _bc.qte_ms) <= Qte_StepMs(delta_time) * 1.5) {
+                        _d.keyed = true;
+                        Scenario_Tap("confirm");
+                        _d.ph = 6;
+                        _d.t0 = _s.t;
+                    }
+                    if (_dt > 600) { Scenario_Check("r3mouse_smoke_the_second_attack_bar_is_reached", false); Scenario_MouseEnd(); }
+                    break;
+                case 6:
+                    if (_bc.battle_state != BSTATE_ATTACK_TIMING) {
+                        var _grade_key = Qte_Grade(_bc.qte_press_ms, _bc.qte_params, _bc.qte_assist);
+                        Scenario_Check("r3mouse_smoke_the_key_at_the_same_place_gives_the_same_grade_as_the_click", _grade_key == _d.grade_click, _grade_key + " vs " + _d.grade_click);
+                        Scenario_Next(_s, 1104);
+                    }
+                    if (_dt > 60) { Scenario_Check("r3mouse_smoke_the_key_ends_the_attack_bar", false); Scenario_MouseEnd(); }
+                    break;
+            }
+            break;
+        case 1104:   // the Tab menu by mouse: a tab label, a row, the Controls page, right click closes
+            var _u = TabMenu_Get();
+            if (_s.t == 1) {
+                Scenario_MouseTo(1, 1);
+                Scenario_TabFixture();
+                Profile_ResetForTest();
+                global.ui_mem = Ui_MemNew();
+                room_goto(rm_floor2);
+            }
+            if (_s.t == 60) {
+                with (obj_enemy) instance_destroy();
+                Scenario_ClearUi();
+                Scenario_Tap("menu");
+            }
+            if (_s.t == 90) {
+                Scenario_Check("r3mouse_smoke_the_tab_menu_is_open", _gs.ui.mode == UI_MENU && is_struct(_u), "mode=" + string(_gs.ui.mode));
+                if (!is_struct(_u)) { Scenario_MouseEnd(); break; }
+                Scenario_Check("r3mouse_smoke_the_tab_labels_keep_their_rectangles", variable_global_exists("ui_tabs_rects") && array_length(global.ui_tabs_rects) == TabMenu_Count());
+                _d.sti = array_get_index(TabMenu_Ids(), "settings");
+                Scenario_MouseToRect(global.ui_tabs_rects[1]);
+            }
+            if (_s.t == 96) Scenario_MouseClick(mb_left);
+            if (_s.t == 106) {
+                Scenario_Check("r3mouse_smoke_a_click_on_a_tab_label_goes_to_that_tab", _u.tab == 1, "tab=" + string(_u.tab));
+                var _tm = TabMenu_TopMenu();
+                Scenario_MouseToRect(_tm.rects[min(1, array_length(_tm.rects) - 1)]);
+            }
+            if (_s.t == 112) {
+                var _tm2 = TabMenu_TopMenu();
+                Scenario_Check("r3mouse_smoke_hover_moves_the_cursor_to_the_row_under_the_mouse_in_a_tab", _tm2.cursor == min(1, array_length(_tm2.rects) - 1), "cursor=" + string(_tm2.cursor));
+                Scenario_MouseToRect(global.ui_tabs_rects[_d.sti]);
+            }
+            if (_s.t == 118) Scenario_MouseClick(mb_left);
+            if (_s.t == 140) {
+                Scenario_Check("r3mouse_smoke_a_click_goes_to_the_settings_tab", _u.tab == _d.sti, "tab=" + string(_u.tab));
+                var _sp = _gs.ui.settings_popup;
+                _d.ci = Scenario_R3RowIndex(_sp.menu, "controls");
+                Scenario_MouseToRect(_sp.menu.rects[_d.ci]);
+            }
+            if (_s.t == 146) Scenario_MouseClick(mb_left);
+            if (_s.t == 170) {
+                var _sp2 = _gs.ui.settings_popup;
+                Scenario_Check("r3mouse_smoke_a_click_on_controls_opens_the_page", is_struct(_sp2.controls));
+                if (!is_struct(_sp2.controls)) { Scenario_MouseEnd(); break; }
+                var _cm = _sp2.controls.menu;
+                _d.cr = -1;
+                for (var _ci = 0; _ci < array_length(_cm.items); _ci++) {
+                    if (_cm.items[_ci].enabled && (!variable_struct_exists(_cm.items[_ci], "kind") || _cm.items[_ci].kind != "head") && _cm.rects[_ci].w > 0) { _d.cr = _ci; break; }
+                }
+                Scenario_Check("r3mouse_smoke_the_controls_page_has_a_row_to_click", _d.cr >= 0);
+                if (_d.cr >= 0) Scenario_MouseToRect(_cm.rects[_d.cr]);
+            }
+            if (_s.t == 176) Scenario_MouseClick(mb_left);
+            if (_s.t == 190) {
+                var _sp3 = _gs.ui.settings_popup;
+                Scenario_Check("r3mouse_smoke_a_click_on_a_control_row_waits_for_a_key", is_struct(_sp3.controls) && _sp3.controls.capture != "");
+                Scenario_MouseTo(1, 1);
+            }
+            if (_s.t == 196) Scenario_MouseClick(mb_right);
+            if (_s.t == 210) {
+                var _sp4 = _gs.ui.settings_popup;
+                Scenario_Check("r3mouse_smoke_a_right_click_ends_the_wait_for_a_key", is_struct(_sp4.controls) && _sp4.controls.capture == "");
+                Scenario_MouseClick(mb_right);
+            }
+            if (_s.t == 230) {
+                Scenario_Check("r3mouse_smoke_and_again_goes_back_to_the_settings_list", !is_struct(_gs.ui.settings_popup.controls) && Menu_IsOpen());
+                Scenario_MouseClick(mb_right);
+            }
+            if (_s.t == 290) {
+                Scenario_Check("r3mouse_smoke_a_right_click_at_the_root_closes_the_menu_like_back", !Menu_IsOpen(), "mode=" + string(_gs.ui.mode));
+                Scenario_Next(_s, 1105);
+            }
+            if (_s.t > 600) { Scenario_Check("r3mouse_smoke_the_tab_menu_by_mouse_finishes", false); Scenario_MouseEnd(); }
+            break;
+        case 1105:   // a notice and a dialogue by click, the Yes / No pop-up by click
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                _d.yes = false;
+                Notice_Open("A mouse notice.");
+            }
+            if (_s.t == 24) {
+                Scenario_Check("r3mouse_smoke_the_notice_is_up_and_answers", Notice_IsOpen() && Notice_CanAnswer());
+                Scenario_MouseTo(40, 40);
+            }
+            if (_s.t == 28) Scenario_MouseClick(mb_left);
+            if (_s.t == 40) {
+                Scenario_Check("r3mouse_smoke_a_click_closes_the_notice", !Notice_IsOpen() || Notice_Closing());
+                Confirm_Open("Yes or no?", function(_dd) { global.scn.r3m.yes = true; });
+            }
+            if (_s.t == 70) {
+                var _cmn = Confirm_Menu();
+                Scenario_Check("r3mouse_smoke_the_yes_no_pop_up_keeps_its_row_rectangles", is_struct(_cmn) && array_length(_cmn.rects) == 2 && _cmn.rects[0].w > 0);
+                if (is_struct(_cmn)) Scenario_MouseToRect(_cmn.rects[0]);
+            }
+            if (_s.t == 76) {
+                Scenario_Check("r3mouse_smoke_hover_moves_the_pop_up_cursor_from_No_to_Yes", Confirm_IsOpen() && Confirm_Menu().cursor == 0);
+                Scenario_MouseClick(mb_left);
+            }
+            if (_s.t == 86) {
+                Scenario_Check("r3mouse_smoke_a_click_on_yes_answers_it", !Confirm_IsOpen() && _d.yes);
+                Dialogue_Open("Mouse", ["First line.", "Second line."]);
+            }
+            if (_s.t == 140) {
+                Scenario_Check("r3mouse_smoke_the_dialogue_is_up", _gs.ui.mode == UI_DIALOGUE && array_length(_gs.ui.lines) >= 2, "mode=" + string(_gs.ui.mode));
+                Scenario_MouseClick(mb_left);
+            }
+            if (_s.t == 170) Scenario_MouseClick(mb_left);
+            if (_s.t == 200) {
+                Scenario_Check("r3mouse_smoke_clicks_advance_the_dialogue_to_the_second_line", _gs.ui.index >= 1 || array_length(_gs.ui.lines) == 0, "index=" + string(_gs.ui.index));
+                Scenario_MouseClick(mb_left);
+            }
+            if (_s.t == 230) Scenario_MouseClick(mb_left);
+            if (_s.t == 270) {
+                Scenario_Check("r3mouse_smoke_and_the_last_click_closes_it", _gs.ui.mode != UI_DIALOGUE && array_length(_gs.ui.lines) == 0, "mode=" + string(_gs.ui.mode));
+                Scenario_Next(_s, 1106);
+            }
+            if (_s.t > 600) { Scenario_Check("r3mouse_smoke_notice_confirm_and_dialogue_by_mouse_finish", false); Scenario_MouseEnd(); }
+            break;
+        case 1106:   // the card pick by click
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Dialogue_CloseNow();
+                CardsUi_Close();
+                Scenario_CardsHarmless();
+                _gs.player_ch.card_picks = 1;
+                CardsUi_Open("cards");
+                Scenario_CardsHarmless();
+            }
+            if (_s.t == 40) {
+                Scenario_Check("r3mouse_smoke_the_card_pick_is_up_with_three_card_rectangles", CardsUi_Kind() == "cards" && array_length(global.cards_ui.pick.rects) == 3 && global.cards_ui.pick.rects[2].w > 0);
+                if (CardsUi_Kind() == "cards") Scenario_MouseToRect(global.cards_ui.pick.rects[2]);
+            }
+            if (_s.t == 46) {
+                Scenario_Check("r3mouse_smoke_hover_moves_the_card_cursor_to_the_third_card", CardsUi_Kind() == "cards" && global.cards_ui.pick.cursor == 2, CardsUi_Kind());
+                Scenario_MouseClick(mb_left);
+            }
+            if (_s.t == 70) {
+                Scenario_Check("r3mouse_smoke_a_click_on_a_card_takes_it_and_closes_the_pick", !CardsUi_IsOpen(), CardsUi_Kind());
+                Scenario_Next(_s, 1109);
+            }
+            if (_s.t > 300) { Scenario_Check("r3mouse_smoke_the_card_pick_by_mouse_finishes", false); Scenario_MouseEnd(); }
+            break;
         case 1109:   // the end of the chain: the fake mouse, the settings and the profiles the steps made are put away
             Scenario_MouseEnd();
+            break;
+    }
+}
+
+// ============================================================================
+// Round 3, packet mouse (D182, R-111), pictures 1090..1099: the mouse cursor drawn over the title menu, over the title menu pressed (a button held down), over the battle's command
+// menu, and over a Settings slider, at window scale 3 (480 x 432), 4 (640 x 576) and 5 (800 x 720). shot_r3mouse_<scene>_<w>x<h>.png. A fake mouse puts the cursor where the picture
+// needs it (the real one would be wherever the gate run's machine has it). The last pictures of the run: they end it (Scenario_MouseEnd).
+// ============================================================================
+function Scenario_R3MouseScenes() {
+    return ["title", "title_pressed", "battle", "settings"];
+}
+
+function Scenario_R3MouseScales() {
+    return [3, 4, 5];
+}
+
+function Scenario_StepShotsR3Mouse(_s) {
+    var _scenes = Scenario_R3MouseScenes();
+    var _scales = Scenario_R3MouseScales();
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "r3ms")) _s.r3ms = { di: 0, si: 0 };
+    var _o = _s.r3ms;
+    var _scene = _scenes[_o.di];
+    var _tag = _scene + "_" + string(_scales[_o.si]);
+    var _c = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+    if (_s.step > 1090 && variable_global_exists("mouse_cur")) MouseCursor_Poke(MouseCursor_Get(), current_time);   // the 3 s of the cursor's life never run out between two frames of a picture
+    switch (_s.step) {
+        case 1090:   // this picture's window scale and room, then wait for the screen
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP r3mouse shots (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_Finish();   // not a wipe: outside the gate it would touch the real profile files
+                    break;
+                }
+                Mouse_FakeClear();
+                Mouse_FakeSet(0, 0);
+                Scenario_ClearUi();
+                Confirm_Close();
+                Notice_Interrupt();
+                Loc_SetLanguage("en");
+                Scenario_SetWindowScale(_scales[_o.si]);
+                if (_scene == "battle") {
+                    Scenario_EnterBattle("shots_mouse");
+                } else {
+                    Scenario_S2Setup("title");
+                    Scenario_NewKnight(CLASS_KNIGHT);
+                    _gs.in_main_menu = true;
+                    _gs.startup_logo_seen = true;
+                    room_goto(rm_start);
+                }
+            }
+            var _ready = false;
+            if (_scene == "battle") _ready = (_bc != noone && !_bc.battle_over && !Transition_IsActive() && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && is_struct(_bc.ui_cmd) && Ui_MenuAlpha(_bc.ui_cmd, current_time) >= 1 && array_length(_bc.ui_cmd.rects) > 0 && _bc.ui_cmd.rects[0].w > 0);
+            else _ready = (room == rm_start && _c != noone && _c.state == "main" && is_struct(_c.title_stk) && !Transition_IsActive() && !Notice_IsOpen() && Ui_MenuAlpha(_c.title_stk.menus[0], current_time) >= 1 && _c.title_stk.menus[0].rect.w > 0);
+            if (_s.t >= 40 && _ready) Scenario_Next(_s, 1091);
+            if (_s.t > 900) { Scenario_Check("shots_r3mouse_reaches_the_screen_" + _tag, false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+            break;
+        case 1091:   // the mouse goes where the picture wants it
+            if (_s.t == 1) {
+                switch (_scene) {
+                    case "title":
+                    case "title_pressed":
+                        Scenario_MouseToRect(_c.title_stk.menus[0].rects[1]);   // New Game
+                        break;
+                    case "battle":
+                        Scenario_MouseToRect(_bc.ui_cmd.rects[Scenario_R3RowIndex(_bc.ui_cmd, "skill")]);
+                        break;
+                    case "settings":
+                        Title_OnConfirm(_c.title_stk.menus[0], 3);
+                        break;
+                }
+                if (_scene == "title_pressed") Mouse_FakeHold(mb_left, true);
+            }
+            if (_scene == "settings" && _s.t == 40) {
+                var _sm = _gs.ui.settings_popup.menu;
+                var _bar = _sm.bars[2];   // the BGM slider: the arrow tip at 60 % of the bar
+                Scenario_MouseTo(_bar.x + _bar.w * 0.6, _bar.y + _bar.h * 0.5);
+            }
+            if (_s.t >= ((_scene == "settings") ? 70 : 16)) Scenario_Next(_s, 1092);
+            break;
+        case 1092:   // assert, take the picture
+            if (_s.t == 2) {
+                var _mt = Ui_Metrics();
+                var _mp = Ui_MousePos();
+                Scenario_Check("shots_r3mouse_the_cursor_is_shown_" + _tag, MouseCursor_Visible(MouseCursor_Get(), current_time, MouseCursor_Focused()));
+                Scenario_Check("shots_r3mouse_the_tip_is_inside_the_gui_" + _tag, _mp.x >= 0 && _mp.y >= 0 && _mp.x < _mt.gw && _mp.y < _mt.gh, string(_mp.x) + "," + string(_mp.y));
+                if (_scene == "title" || _scene == "title_pressed") Scenario_Check("shots_r3mouse_the_title_cursor_is_on_new_game_" + _tag, _c.title_stk.menus[0].cursor == 1, "cursor=" + string(_c.title_stk.menus[0].cursor));
+                if (_scene == "battle") Scenario_Check("shots_r3mouse_the_battle_cursor_is_on_skill_" + _tag, _bc.menu_index == Scenario_R3RowIndex(_bc.ui_cmd, "skill"), "index=" + string(_bc.menu_index));
+                if (_scene == "settings") Scenario_Check("shots_r3mouse_the_settings_cursor_is_on_the_bgm_row_" + _tag, _gs.ui.settings_popup.menu.cursor == 2, "cursor=" + string(_gs.ui.settings_popup.menu.cursor));
+                _s.shot = "shot_r3mouse_" + _scene + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1093);
+            }
+            break;
+        case 1093:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Mouse_FakeHold(mb_left, false);
+                Scenario_ClearUi();
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Scenario_SetWindowScale(3);
+                    Scenario_MouseEnd();   // the end of the pictures: the fake mouse and the files the scenes made go
+                } else {
+                    Scenario_Next(_s, 1090);
+                }
+            }
             break;
     }
 }
