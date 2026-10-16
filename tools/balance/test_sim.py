@@ -501,6 +501,129 @@ class WeakPoints(unittest.TestCase):
             self.assertEqual((e.weak, e.resist), (-1, -1))
 
 
+class ExportCarriesWeakPoints(unittest.TestCase):
+    """R-118: the committed export is the CURRENT build's (the weak / resist fields of D173 are in it), so the simulator plays weak points. Expected: scr_db_enemy.gml."""
+
+    def test_every_enemy_has_a_weak_and_a_resist_field(self):
+        for eid, e in D.enemies.items():
+            self.assertIn("weak", e, e["name"])
+            self.assertIn("resist", e, e["name"])
+
+    def test_the_lists_are_the_games(self):
+        want = {0: (sim.BURN, sim.BLEED), 1: (sim.BURN, sim.POISON), 2: (sim.BLEED, sim.POISON), 3: (sim.POISON, sim.BURN), 8: (sim.BURN, -1), 9: (sim.POISON, -1)}
+        for eid, (w, r) in want.items():
+            e = sim.make_enemy(R, eid, 1)
+            self.assertEqual((e.weak, e.resist), (w, r), D.enemies[eid]["name"])
+
+    def test_the_braced_status_is_in_the_export(self):               # D180: STATUS_BRACE 14, every hit half until the player's next turn
+        s = D.status[sim.BRACED]
+        self.assertEqual(s["guard_mult"], 0.5)
+        self.assertTrue(s["until_player_turn"])
+
+
+class GuardCommand(unittest.TestCase):
+    """D99 / D180: Guard spends the turn; every hit until the player's next turn deals half; max(2, floor(25% max MP)) MP comes back, never above max MP."""
+
+    def test_mp_gain_is_a_quarter_of_max_rounded_down_at_least_two_capped(self):
+        b = battle("mage")
+        b.p.mmp, b.p.mp = 26, 0
+        self.assertEqual(b.guard_mp_gain(), 6)                       # floor(6.5)
+        b.p.mmp = 11
+        self.assertEqual(b.guard_mp_gain(), 2)                       # floor(2.75) = 2
+        b.p.mmp = 7
+        self.assertEqual(b.guard_mp_gain(), 2)                       # floor(1.75) = 1 -> at least 2
+        b.p.mmp, b.p.mp = 26, 24
+        self.assertEqual(b.guard_mp_gain(), 2)                       # only 2 fit
+        b.p.mp = 26
+        self.assertEqual(b.guard_mp_gain(), 0)
+
+    def test_guard_restores_mp_and_braces(self):
+        b = battle("mage")
+        b.p.mmp, b.p.mp = 26, 3
+        b.p_guard()
+        self.assertEqual(b.p.mp, 9)
+        self.assertTrue(sim.st_has(b.p, sim.BRACED))
+
+    def test_a_braced_player_takes_half_of_a_hit(self):
+        b = battle("knight", "dire_wolf", 3)
+        base = sim.ref.damage(float(b.e.basic_power), R.eff(b.e, "atk"), R.eff(b.p, "df"), 1.0, 1.0)
+        half = sim.ref.damage(float(b.e.basic_power), R.eff(b.e, "atk"), R.eff(b.p, "df"), 1.0, 0.5)
+        self.assertGreater(base, half)
+        b.p_guard()
+        b.p.hp = b.p.mhp
+        got = b.hit(b.e, b.p, float(b.e.basic_power), "atk", 1.0, False)
+        self.assertEqual(got, half)
+
+    def test_brace_outlives_the_players_own_tick_and_ends_at_his_next_turn_after_an_enemy_turn(self):
+        b = battle("knight", "slime", 1)
+        b.p_guard()
+        R.tick(b.p, random.Random(1), True)                         # the end of the guarding turn
+        self.assertTrue(sim.st_has(b.p, sim.BRACED))
+        b.player_turn_start()                                        # up again before the enemy acted (a fast player): still braced
+        self.assertTrue(sim.st_has(b.p, sim.BRACED))
+        b.enemy_turn()
+        self.assertTrue(sim.st_has(b.p, sim.BRACED))                 # it lasts until the player's turn STARTS
+        b.player_turn_start()
+        self.assertFalse(sim.st_has(b.p, sim.BRACED))
+
+
+class GuardPolicy(unittest.TestCase):
+    """The greedy player guards (1) when the enemy is winding up a heavy hit that would take a quarter of his max HP or more, (2) when a caster cannot pay for any skill in a fight that is not easy and HP is not low."""
+
+    def test_guards_into_a_telegraphed_heavy_hit(self):
+        b = battle("knight", "palehorn", 8)
+        b.p.hp = b.p.mhp
+        b.e.ai["windup"] = next(s for s in b.e.skills_e if R.skills[s].get("telegraphed"))
+        self.assertGreaterEqual(sim.Policy(R).next_hit(b), 0.25 * b.p.mhp)
+        self.assertEqual(sim.Policy(R).choose(b), ("guard",))
+
+    def test_does_not_guard_into_a_small_hit(self):
+        b = battle("knight", "slime", 1)
+        b.e.ai["windup"] = -1
+        self.assertNotEqual(sim.Policy(R).choose(b), ("guard",))
+
+    def test_a_caster_with_no_mp_for_any_skill_guards_in_a_hard_fight(self):
+        b = battle("mage", "ghost_sword", 6)
+        b.p.skills = [10, 11]
+        b.p.mp = 0
+        b.p.hp = b.p.mhp
+        b.p.inv = {}
+        self.assertEqual(sim.Policy(R).choose(b), ("guard",))
+
+    def test_does_not_guard_when_a_skill_can_be_paid(self):
+        b = battle("mage", "ghost_sword", 6)
+        b.p.skills = [10]
+        b.p.mp = b.p.mmp
+        self.assertNotEqual(sim.Policy(R).choose(b), ("guard",))
+
+
+class ForcedPick(unittest.TestCase):
+    """D174: no Skip, one of the three cards is always taken. The greedy player's valuation must not make a card look good that only wastes turns: Meditation (+2..4 MP a turn) is worth
+    only the MP that fits under max MP, so it is not cast with a full bar."""
+
+    def meditate_score(self, mp):
+        b = battle("mage", "ghost_sword", 6)
+        b.p.skills = [13]
+        b.p.mp = mp
+        pol = sim.Policy(R)
+        opts = pol.attack_options(b)
+        return next(o for o in opts if o[0] == "skill" and o[1] == 13)[2]
+
+    def test_meditation_is_worth_nothing_with_a_full_bar(self):
+        b = battle("mage")
+        self.assertEqual(self.meditate_score(b.p.mmp), 0.0)
+
+    def test_meditation_is_worth_something_with_an_empty_bar(self):
+        self.assertGreater(self.meditate_score(3), 0.0)
+
+    def test_a_pick_is_always_made(self):
+        r = sim.RunSim(D, "mage", "average", 3, "greedy", rules=R)
+        r.p.picks = 4
+        r.do_picks()
+        self.assertEqual(len(r.rec["picks"]), 4)
+        self.assertEqual(r.p.picks, 0)
+
+
 def ref_burn(mag):
     return sim.ref.burn_tick(mag)
 
