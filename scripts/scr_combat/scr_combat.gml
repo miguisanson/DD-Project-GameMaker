@@ -3021,6 +3021,11 @@ function Battle_MenusLayout(_bc) {
     _bc.ui_skill.layout.y_bottom = z.list_bottom;
     _bc.ui_item.layout.panel_w = z.right.w;
     _bc.ui_item.layout.y_bottom = z.list_bottom;
+    // G10 (D129): the details panel stands above the list and grows upward; it stops just under the enemy (the list and the panel give way, Ui_MenuDraw)
+    var er = Battle_EnemyRect(_bc);
+    var floor_y = (er.w > 0 && er.h > 0) ? er.y + er.h + Ui_Px() : -1;
+    _bc.ui_skill.layout.det_floor_y = floor_y;
+    _bc.ui_item.layout.det_floor_y = floor_y;
 }
 
 function Battle_ItemSig(_p) {

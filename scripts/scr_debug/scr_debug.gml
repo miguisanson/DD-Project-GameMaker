@@ -183,21 +183,31 @@ function Debug_Update() {
 // Output contract (stdout): [TEST] PASS|FAIL ..., [TEST] ERROR UNHANDLED / [TEST] CRASH, [TEST-BUILD] <id>,
 // [SHOT] file= w= h=, and a final [TEST-SUMMARY] pass= fail= errors= before game_end.
 // ============================================================================
-// Where the build id stands on the GUI grid: { x, y, w, h } (the lower right corner). A check reads it to keep every screen's panels clear of it.
-function Build_IdRect() {
-    var _w = UI_TextWidth(BUILD_ID);
-    var _h = UI_TextHeight(BUILD_ID);
-    return { x: Display_GuiW() - _w - 4, y: Display_GuiH() - _h - 2, w: _w, h: _h };
+// G10 (D129): the build id on the screen is the short form so it never reaches a panel: the commit (the text before the first "-") and a star when the
+// build came from uncommitted files ("88be979*"). "dev" (a build outside the gate) stays "dev". The full id is in the [TEST-BUILD] line.
+function Build_IdShort() {
+    var _id = string(BUILD_ID);
+    var _dash = string_pos("-", _id);
+    var _short = (_dash > 1) ? string_copy(_id, 1, _dash - 1) : _id;
+    if (string_length(_id) >= 6 && string_copy(_id, string_length(_id) - 5, 6) == "-dirty") _short += "*";
+    return _short;
 }
 
+// Where the build id stands on the GUI grid: { x, y, w, h } (the lower right corner, one margin in). A check reads it to keep every screen's panels clear of it.
+function Build_IdRect() {
+    var _mt = Ui_Metrics();
+    var _w = UI_TextWidth(Build_IdShort());
+    return { x: _mt.gw - _w - _mt.margin, y: _mt.gh - _mt.line_h - _mt.margin, w: _w, h: _mt.line_h };
+}
+
+// The one text style (palette white with the dark one-pixel shadow the splash prompt uses), so it reads over the art and over a panel alike.
 function Build_DrawId() {
     var _c = draw_get_color(), _a = draw_get_alpha(), _h = draw_get_halign(), _v = draw_get_valign();
-    draw_set_halign(fa_left);
-    draw_set_valign(fa_top);
-    draw_set_color(c_white);
-    draw_set_alpha(0.7);
     var _r = Build_IdRect();
-    UI_DrawText(_r.x, _r.y, BUILD_ID);
+    var _p = Ui_Px();
+    draw_set_alpha(1);
+    Ui_Text(_r.x + _p, _r.y + _p, Build_IdShort(), UI_C_DARKEST);
+    Ui_Text(_r.x, _r.y, Build_IdShort(), UI_C_TEXT);
     draw_set_color(_c);
     draw_set_alpha(_a);
     draw_set_halign(_h);
