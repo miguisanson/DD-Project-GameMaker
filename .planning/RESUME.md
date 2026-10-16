@@ -7,7 +7,7 @@ Game code is on branch `next` (worktree `E:\Github_Projects\DD-Project-GameMaker
 ## In flight
 | Worktree | Branch | Brief | State |
 |---|---|---|---|
-| wt\lootglow | feat-r4lootglow | lootglow.md | D195 gold outline on containers that still hold loot |
+| (none) | | | all packets merged into next; final full gate running |
 A full gate on next (with final2 + release merged) was started; re-run if its result is unknown.
 
 ## Then, in order
