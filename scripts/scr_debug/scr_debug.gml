@@ -512,7 +512,10 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeEliteDeath(_s);   // H13a (D156): an elite on the map draws its sprite outline, a death shows its picture and reaches the summary; goes on to the kept run file (840)
             break;
         case 840: case 841: case 842: case 843: case 844: case 845: case 846: case 847: case 848: case 849:
-            Scenario_StepSmokeHunt6Run(_s);   // hunt6run: starting a new run keeps a newer-version run.sav; the end of the chain (its last step calls Scenario_NoticeEnd)
+            Scenario_StepSmokeHunt6Run(_s);   // hunt6run: starting a new run keeps a newer-version run.sav; goes on to hunt6ui (950)
+            break;
+        case 950: case 951: case 952: case 953: case 954: case 955: case 956: case 957: case 958: case 959:
+            Scenario_StepSmokeHunt6Ui(_s);   // hunt6ui: Esc / Tab mid-step, Y closes the menu, a pad leaves "Press a key...", a quick double press and "Keep this?"; the end of the chain (its last step calls Scenario_NoticeEnd)
             break;
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step goes on to G6 (380)
@@ -13309,7 +13312,7 @@ function Scenario_StepSmokeEliteDeath(_s) {
     }
 }
 
-// ---- hunt6run (smoke steps 840-849, the end of the chain) ----
+// ---- hunt6run (smoke steps 840-849, goes on to hunt6ui 950) ----
 function Hunt6Run_NewerRunText() {
     return json_stringify({ run_version: RUN_SAVE_VERSION + 50, seed: 1, marker: "keep me" });
 }
@@ -13324,9 +13327,214 @@ function Scenario_StepSmokeHunt6Run(_s) {
             if (_s.t == 30) Scenario_Tap("confirm");
             if (_s.t > 30 && Run_IsActive()) {
                 Scenario_Check("hunt6run_a_new_run_keeps_a_newer_version_run_file", RunSave_ExistsAt(RunSave_Path()) && Save_ReadTextFile(RunSave_Path()) == Hunt6Run_NewerRunText(), "exists=" + string(RunSave_ExistsAt(RunSave_Path())));
-                Scenario_NoticeEnd();   // the end of the chain: removes the files and the profile the steps made
+                Scenario_Next(_s, 950);   // goes on with the menu / input checks (950), the end of the chain
             }
             if (_s.t > 600) { Scenario_Check("hunt6run_the_new_run_started", false, "phase=" + (is_struct(_flow) ? string(_flow.phase) : "none")); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ---- hunt6ui (smoke steps 950-959, the end of the chain; bug hunt session 6, findings in .planning/research/bughunt-session6-ui.md) ----
+// A straight run of free tiles for the player to walk along: { cx, cy, act } (the start tile and the move action), or undefined.
+function Scenario_Hunt6UiCorridor(_pl) {
+    var _T = GRID_TILE_SIZE;
+    var _dirs = [{ act: "move_right", dx: 1, dy: 0 }, { act: "move_left", dx: -1, dy: 0 }, { act: "move_down", dx: 0, dy: 1 }, { act: "move_up", dx: 0, dy: -1 }];
+    var _c0x = round(_pl.x / _T);
+    var _c0y = round(_pl.y / _T);
+    for (var _ring = 0; _ring <= 10; _ring++) {
+        for (var _oy = -_ring; _oy <= _ring; _oy++) {
+            for (var _ox = -_ring; _ox <= _ring; _ox++) {
+                if (max(abs(_ox), abs(_oy)) != _ring) continue;
+                for (var _d = 0; _d < 4; _d++) {
+                    var _ok = true;
+                    for (var _k = 0; _k <= 6 && _ok; _k++) {
+                        var _tx = (_c0x + _ox + _dirs[_d].dx * _k) * _T;
+                        var _ty = (_c0y + _oy + _dirs[_d].dy * _k) * _T;
+                        if (_tx < 0 || _ty < 0 || _tx >= room_width - _T || _ty >= room_height - _T) { _ok = false; break; }
+                        if (Player_TileBlocked(_pl, _tx, _ty) || instance_position(_tx + _T / 2, _ty + _T / 2, obj_room_transition) != noone) _ok = false;
+                    }
+                    if (_ok) return { cx: _c0x + _ox, cy: _c0y + _oy, act: _dirs[_d].act };
+                }
+            }
+        }
+    }
+    return undefined;
+}
+
+function Scenario_StepSmokeHunt6Ui(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "h6u")) _s.h6u = { round: 0 };
+    var _h = _s.h6u;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    switch (_s.step) {
+        case 950:   // the new run's first floor: a straight run of free tiles, nothing else on the map
+            if (_s.t < 600) {
+                Dialogue_CloseNow();
+                _gs.pending_wake_line = false;
+            }
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor1) && Player_IsSettled(_pl) && _gs.ui.mode == UI_NONE) {
+                Scenario_ClearUi();
+                with (obj_enemy) instance_destroy();
+                var _cor = Scenario_Hunt6UiCorridor(_pl);
+                Scenario_Check("hunt6ui_the_floor_has_a_corridor_to_walk", is_struct(_cor));
+                if (!is_struct(_cor)) { Scenario_NoticeEnd(); break; }
+                _h.cor = _cor;
+                Scenario_Next(_s, 951);
+            }
+            if (_s.t > 900) { Scenario_Check("hunt6ui_the_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 951:   // walk along the corridor and press Esc (round 0) or Tab (round 1) in the middle of a step: the press is not thrown away
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                _pl = Scenario_PlacePlayer(_h.cor.cx, _h.cor.cy);
+                Scenario_Hold(_h.cor.act, 400);
+            }
+            if (_s.t > 3 && !Player_IsSettled(_pl) && _pl.move_timer > 0 && _pl.move_timer <= 10) {
+                _h.tap_f = _s.f;
+                _h.mid = true;
+                Scenario_Tap((_h.round == 0) ? "esc" : "menu");
+                Scenario_Next(_s, 952);
+            }
+            if (_s.t > 120) { Scenario_Release(); Scenario_Check("hunt6ui_the_player_walks_the_corridor", false, "x=" + string(_pl.x) + " y=" + string(_pl.y)); Scenario_NoticeEnd(); }
+            break;
+        case 952:   // the menu opens on the first settled frame within the buffer window, and not before
+            var _name = (_h.round == 0) ? "esc" : "tab";
+            if (_gs.ui.mode == UI_MENU && is_struct(TabMenu_Get())) {
+                Scenario_Release();
+                Scenario_Check("hunt6ui_" + _name + "_pressed_mid_step_opens_the_menu", true);
+                Scenario_Check("hunt6ui_" + _name + "_it_opens_with_the_player_settled", Player_IsSettled(_pl), "x=" + string(_pl.x) + " move_timer=" + string(_pl.move_timer));
+                Scenario_Check("hunt6ui_" + _name + "_it_opens_within_one_step", _s.f - _h.tap_f <= 20, "frames=" + string(_s.f - _h.tap_f));
+                if (_h.round == 0) {
+                    Menu_Close(true);
+                    _h.round = 1;
+                    Scenario_Next(_s, 951);
+                } else {
+                    Scenario_Next(_s, 953);
+                }
+            } else if (_s.t > 40) {
+                Scenario_Release();
+                Scenario_Check("hunt6ui_" + _name + "_pressed_mid_step_opens_the_menu", false, "mode=" + string(_gs.ui.mode) + " settled=" + string(Player_IsSettled(_pl)));
+                Scenario_NoticeEnd();
+            }
+            break;
+        case 953:   // the menu is up: the pad's Y (the open button) closes it again, as Esc does
+            if (_s.t == 1) global.input.last_device = "gamepad";
+            if (_s.t > 1 && is_struct(TabMenu_Get()) && !variable_struct_exists(_h, "ytap") && current_time - TabMenu_Get().opened_ms >= UI_INPUT_LOCK_MS + 120) {
+                _h.ytap = true;
+                _h.ytap_t = _s.t;
+                Scenario_Tap("pause");
+            }
+            if (variable_struct_exists(_h, "ytap") && _s.t > _h.ytap_t + 3) {
+                Scenario_Check("hunt6ui_pad_y_closes_the_menu_it_opened", !is_struct(TabMenu_Get()) || TabMenu_Get().closed_ms >= 0);
+                Menu_Close(true);
+                Scenario_ClearUi();
+                Scenario_Next(_s, 954);
+            }
+            if (_s.t > 90) { Scenario_Check("hunt6ui_pad_y_closes_the_menu_it_opened", false, "mode=" + string(_gs.ui.mode)); Menu_Close(true); Scenario_ClearUi(); Scenario_Next(_s, 954); }
+            break;
+        case 954:   // Settings > Controls > the Confirm row waits for a key; a pad leaves it with Back / Start, a keyboard X is a key to bind
+            SettingsPopup_Ensure();
+            var _sp = _gs.ui.settings_popup;
+            if (_s.t == 1) {
+                global.input.last_device = "keyboard";
+                Menu_Open(5);
+            }
+            if (!variable_struct_exists(_h, "c0") && SettingsPopup_IsOpen("tab") && _s.t > 10 && current_time - _sp.menu.lock_ms >= UI_INPUT_LOCK_MS + 80) {
+                _h.c0 = true;
+                var _ci = -1;
+                for (var _i = 0; _i < array_length(_sp.menu.items); _i++) if (_sp.menu.items[_i].id == "controls") _ci = _i;
+                Ui_MenuFixCursor(_sp.menu, max(0, _ci));
+                Scenario_Tap("confirm");
+                _h.c0_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "c0") && !variable_struct_exists(_h, "c1") && is_struct(_sp.controls) && _s.t > _h.c0_t + 10) {
+                _h.c1 = true;
+                Ui_MenuFixCursor(_sp.controls.menu, 0);   // the Confirm row
+                Scenario_Tap("confirm");
+                _h.c1_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "c1") && !variable_struct_exists(_h, "c2") && is_struct(_sp.controls) && _sp.controls.capture != "" && _s.t > _h.c1_t + 10 && !InputLock_Active(_sp.controls.lock)) {
+                _h.c2 = true;
+                Scenario_Check("hunt6ui_capture_the_confirm_row_waits_for_a_key", _sp.controls.capture == "confirm");
+                Scenario_Tap("cancel");   // with the keyboard as the last device: the key X is a key to bind, not a cancel
+                _h.c2_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "c2") && !variable_struct_exists(_h, "c3") && _s.t > _h.c2_t + 6) {
+                _h.c3 = true;
+                Scenario_Check("hunt6ui_capture_a_keyboard_back_press_is_not_a_cancel", is_struct(_sp.controls) && _sp.controls.capture == "confirm");
+                global.input.last_device = "gamepad";
+                Scenario_Tap("cancel");   // the pad's B
+                _h.c3_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "c3") && !variable_struct_exists(_h, "c4") && _s.t > _h.c3_t + 6) {
+                _h.c4 = true;
+                Scenario_Check("hunt6ui_capture_pad_b_leaves_press_a_key", is_struct(_sp.controls) && _sp.controls.capture == "");
+                Scenario_Check("hunt6ui_capture_pad_b_stays_on_the_controls_page", SettingsPopup_IsOpen("tab") && is_struct(_sp.controls));
+                Scenario_Check("hunt6ui_capture_nothing_was_rebound", global.input.bindings.confirm[0] == vk_space);
+                if (is_struct(_sp.controls)) Ui_MenuFixCursor(_sp.controls.menu, 0);
+                Scenario_Tap("confirm");   // wait for a key again, now with the pad as the last device: the prompt names the pad's Back button
+                _h.c4_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "c4") && !variable_struct_exists(_h, "c5") && is_struct(_sp.controls) && _sp.controls.capture != "" && _s.t > _h.c4_t + 10 && !InputLock_Active(_sp.controls.lock)) {
+                _h.c5 = true;
+                Scenario_Check("hunt6ui_capture_the_prompt_on_a_pad_names_the_back_button", string_pos("[k:back]", _sp.controls.menu.items[0].help) > 0, _sp.controls.menu.items[0].help);
+                Scenario_Tap("menu");   // the pad's Start
+                _h.c5_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "c5") && !variable_struct_exists(_h, "c6") && _s.t > _h.c5_t + 6) {
+                _h.c6 = true;
+                Scenario_Check("hunt6ui_capture_pad_start_leaves_press_a_key", is_struct(_sp.controls) && _sp.controls.capture == "");
+                Menu_Close(true);
+                Scenario_ClearUi();
+                Scenario_Next(_s, 955);
+            }
+            if (_s.t > 400) { Scenario_Check("hunt6ui_the_controls_page_flow", false, "c0=" + string(variable_struct_exists(_h, "c0")) + " c1=" + string(variable_struct_exists(_h, "c1")) + " c2=" + string(variable_struct_exists(_h, "c2")) + " c4=" + string(variable_struct_exists(_h, "c4")) + " c5=" + string(variable_struct_exists(_h, "c5"))); Menu_Close(true); Scenario_ClearUi(); Scenario_Next(_s, 955); }
+            break;
+        case 955:   // Settings > Window: the second press of a quick double press does not answer "Keep this?"; a deliberate one later does
+            SettingsPopup_Ensure();
+            var _sp2 = _gs.ui.settings_popup;
+            if (_s.t == 1) {
+                global.input.last_device = "keyboard";
+                _h.old_settings = GameSettings_Copy(GameSettings_Ensure());
+                Menu_Open(5);
+            }
+            if (!variable_struct_exists(_h, "k0") && SettingsPopup_IsOpen("tab") && _s.t > 10 && current_time - _sp2.menu.lock_ms >= UI_INPUT_LOCK_MS + 80) {
+                _h.k0 = true;
+                var _wi = -1;
+                for (var _j = 0; _j < array_length(_sp2.menu.items); _j++) if (_sp2.menu.items[_j].id == "window") _wi = _j;
+                Scenario_Check("hunt6ui_keep_the_settings_have_a_window_row", _wi >= 0);
+                Ui_MenuFixCursor(_sp2.menu, max(0, _wi));
+                Scenario_Tap("confirm");   // the first press changes the window mode
+                _h.k0_ms = current_time;
+            }
+            if (variable_struct_exists(_h, "k0") && !variable_struct_exists(_h, "k1") && KeepThis_Active() && current_time - _h.k0_ms >= 120) {
+                _h.k1 = true;
+                _h.k1_dt = current_time - _h.k0_ms;
+                Scenario_Tap("confirm");   // the second press of a quick double press
+                _h.k1_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "k1") && !variable_struct_exists(_h, "k2") && _s.t > _h.k1_t + 6) {
+                _h.k2 = true;
+                if (_h.k1_dt > 380) show_debug_message("[TEST] SKIP keep: the machine stalled (" + string(_h.k1_dt) + " ms), that was not a quick double press");
+                else Scenario_Check("hunt6ui_keep_a_quick_second_press_does_not_answer_keep_this", KeepThis_Active(), "dt=" + string(_h.k1_dt));
+            }
+            if (variable_struct_exists(_h, "k2") && !variable_struct_exists(_h, "k3") && KeepThis_Active() && current_time - _h.k0_ms >= KEEP_THIS_ANSWER_LOCK_MS + 250) {
+                _h.k3 = true;
+                Scenario_Tap("confirm");   // a deliberate answer later
+                _h.k3_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "k3") && !variable_struct_exists(_h, "k4") && _s.t > _h.k3_t + 6) {
+                _h.k4 = true;
+                Scenario_Check("hunt6ui_keep_a_later_confirm_keeps_the_change", !KeepThis_Active());
+                GameSettings_Commit(_h.old_settings, true, true);   // put the settings back as they were
+                Menu_Close(true);
+                Scenario_ClearUi();
+                Scenario_Next(_s, 956);
+            }
+            if (_s.t > 500) { Scenario_Check("hunt6ui_the_keep_this_flow", false, "k0=" + string(variable_struct_exists(_h, "k0")) + " k1=" + string(variable_struct_exists(_h, "k1")) + " k3=" + string(variable_struct_exists(_h, "k3")) + " active=" + string(KeepThis_Active())); if (KeepThis_Active()) KeepThis_Revert(); GameSettings_Commit(_h.old_settings, true, true); Menu_Close(true); Scenario_ClearUi(); Scenario_Next(_s, 956); }
+            break;
+        case 956:   // the end of the chain: removes the files and the profile the steps made
+            Scenario_NoticeEnd();
             break;
     }
 }

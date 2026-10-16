@@ -143,6 +143,7 @@ function Test_RunAll() {
     Test_RunSuite("Choices", Test_Suite_Choices);
     Test_RunSuite("Hunt6Run", Test_Suite_Hunt6Run);
     Test_RunSuite("Hunt6Combat", Test_Suite_Hunt6Combat);
+    Test_RunSuite("Hunt6Ui", Test_Suite_Hunt6Ui);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -13355,4 +13356,83 @@ function Test_Suite_Hunt6Combat() {
     _gs.persist = _old_persist;
     _gs.player_ch = _old_ch;
     _gs.flags = _old_flags;
+}
+
+// ---- Hunt 6 menus, UI and input (bug hunt session 6, findings 1 to 5 in .planning/research/bughunt-session6-ui.md) ----
+// Expected values come from the decisions, not from the code: D140 (Esc / Tab / Start open the one menu and Esc is Back inside it, the pad's Y is its Esc, window changes
+// revert unless confirmed), D95 (Back works the same everywhere, pad included), D99 / hunt 6 combat (the menu in a fight is read-only and says what to do instead).
+function Test_Suite_Hunt6Ui() {
+    // ---- 1. a menu press while the player is mid-step is kept for a short window and opens the menu on the first settled frame ----
+    var _b = MenuOpenBuf_New();
+    Test_True("hunt6ui buffer: a press on a settled frame opens at once", MenuOpenBuf_Step(_b, 1000, 10, true, true, true));
+    _b = MenuOpenBuf_New();
+    Test_False("hunt6ui buffer: a press mid-step does not open yet", MenuOpenBuf_Step(_b, 1000, 10, true, true, false));
+    Test_False("hunt6ui buffer: still mid-step next frame", MenuOpenBuf_Step(_b, 1016, 11, false, true, false));
+    Test_True("hunt6ui buffer: it opens on the first settled frame", MenuOpenBuf_Step(_b, 1033, 12, false, true, true));
+    Test_False("hunt6ui buffer: the request is used once", MenuOpenBuf_Step(_b, 1050, 13, false, true, true));
+    _b = MenuOpenBuf_New();
+    MenuOpenBuf_Step(_b, 1000, 10, true, true, false);
+    Test_False("hunt6ui buffer: a request older than the window is forgotten", MenuOpenBuf_Step(_b, 1000 + MENU_OPEN_BUFFER_MS + 1, 11, false, true, true));
+    Test_True("hunt6ui buffer: the window covers a whole walking step (16 frames = 267 ms)", MENU_OPEN_BUFFER_MS >= 267);
+    _b = MenuOpenBuf_New();
+    MenuOpenBuf_Step(_b, 1000, 10, true, true, false);
+    MenuOpenBuf_Step(_b, 1016, 11, false, false, false);   // a dialogue or a menu took over for a frame
+    Test_False("hunt6ui buffer: a request is dropped when the map was not free", MenuOpenBuf_Step(_b, 1033, 12, false, true, true));
+    _b = MenuOpenBuf_New();
+    MenuOpenBuf_Step(_b, 1000, 10, true, true, false);
+    Test_False("hunt6ui buffer: frames the controller skipped (a transition, a pop-up) drop it", MenuOpenBuf_Step(_b, 1100, 15, false, true, true));
+    _b = MenuOpenBuf_New();
+    MenuOpenBuf_Step(_b, 1000, 10, true, false, false);   // pressed in a dialogue or a battle transition: nothing to keep
+    Test_False("hunt6ui buffer: a press when the map is not free is not kept", MenuOpenBuf_Step(_b, 1016, 11, false, true, true));
+
+    // ---- 2. a pad cancels the Controls page's "Press a key..." (Back, X / Start or Y); a keyboard X is a key to bind, never a cancel ----
+    Test_True("hunt6ui capture: pad Back cancels", Controls_CaptureCancel("gamepad", true, false, false));
+    Test_True("hunt6ui capture: pad Start / X cancels", Controls_CaptureCancel("gamepad", false, true, false));
+    Test_True("hunt6ui capture: pad Y cancels", Controls_CaptureCancel("gamepad", false, false, true));
+    Test_False("hunt6ui capture: nothing pressed cancels nothing", Controls_CaptureCancel("gamepad", false, false, false));
+    Test_False("hunt6ui capture: the keyboard's X is a key to bind, not a cancel", Controls_CaptureCancel("keyboard", true, false, false));
+    Test_False("hunt6ui capture: the keyboard's menu key is not a cancel here", Controls_CaptureCancel("keyboard", false, true, true));
+    Test_True("hunt6ui capture: the prompt on a pad names the Back button", string_pos("[k:back]", Controls_WaitingText("Confirm", "gamepad")) > 0);
+    Test_True("hunt6ui capture: the prompt on a keyboard still says Esc", string_pos("Esc", Controls_WaitingText("Confirm", "keyboard")) > 0);
+    Test_True("hunt6ui capture: the prompt names the action", string_pos("Confirm", Controls_WaitingText("Confirm", "gamepad")) > 0);
+
+    // ---- 3. Esc stays Back when Back is rebound (it is reserved, so no other row can take it) ----
+    var _bk = Binds_Assign(Binds_Defaults(), "back", vk_backspace);
+    Test_True("hunt6ui back: Back can be rebound to Backspace", _bk.ok);
+    var _act = Binds_ToActions(_bk.keys);
+    Test_Eq("hunt6ui back: the player's key is first", _act.cancel[0], vk_backspace);
+    Test_True("hunt6ui back: Esc still works as Back", array_contains(_act.cancel, vk_escape));
+    Test_True("hunt6ui back: the second Back key stays", array_contains(_act.cancel, ord("X")));
+    var _dact = Binds_ToActions(Binds_Defaults());
+    var _esc_n = 0;
+    for (var _i = 0; _i < array_length(_dact.cancel); _i++) if (_dact.cancel[_i] == vk_escape) _esc_n++;
+    Test_Eq("hunt6ui back: with the defaults Esc is there once", _esc_n, 1);
+    Test_True("hunt6ui back: the Controls page still shows the player's own keys, not Esc", Test_SameArray(_bk.keys.back, [vk_backspace, ord("X")]));
+
+    // ---- 4. the "Keep this?" prompt is not answered by the second click of a double click ----
+    Test_False("hunt6ui keep: a click 100 ms after the change does not answer", KeepThis_AnswerReady(1000, 1100, false));
+    Test_False("hunt6ui keep: nor one 350 ms after (a slow double click)", KeepThis_AnswerReady(1000, 1350, false));
+    Test_True("hunt6ui keep: one after the lock does", KeepThis_AnswerReady(1000, 1000 + KEEP_THIS_ANSWER_LOCK_MS + 10, false));
+    Test_False("hunt6ui keep: never while the window is still changing", KeepThis_AnswerReady(1000, 9000, true));
+    var _rect = { x: 40, y: 50, w: 100, h: 60 };
+    Test_True("hunt6ui keep: a click inside the box answers", KeepThis_ClickOk(_rect, 60, 70));
+    Test_False("hunt6ui keep: a click outside the box does not", KeepThis_ClickOk(_rect, 10, 10));
+    Test_False("hunt6ui keep: a click when the box was never drawn does not", KeepThis_ClickOk({ x: -1, y: -1, w: 0, h: 0 }, 0, 0));
+
+    // ---- 5. the Items tab in a fight says the read-only reason for a throwable too, not the map's throw text ----
+    ItemDB_Init();
+    var _ch = CharacterCreate_Player(CLASS_KNIGHT);
+    _ch.inventory = Inv_Add(_ch.inventory, 30, 1);
+    var _rows = TabItems_Items(_ch, true);
+    var _row = undefined;
+    for (var _r = 0; _r < array_length(_rows); _r++) if (variable_struct_exists(_rows[_r], "throwable") && _rows[_r].throwable) _row = _rows[_r];
+    Test_True("hunt6ui items: the bag lists the Firebomb as a throwable", is_struct(_row));
+    if (is_struct(_row)) {
+        var _fight = TabItems_Press(_ch, _row, true);
+        Test_False("hunt6ui items: nothing is thrown from the menu in a fight", _fight.ok);
+        Test_Eq("hunt6ui items: in a fight the throwable row says the read-only reason", _fight.msg, Loc_T("menu.msg.items_in_fight", "In a fight, use ITEM in the battle menu."));
+        var _map = TabItems_Press(_ch, _row, false);
+        Test_Eq("hunt6ui items: on the map the throwable row still says to throw it in a battle", _map.msg, Loc_T("item.msg.throw_in_battle", "Throw it at an enemy in battle."));
+        Test_Eq("hunt6ui items: the Firebomb is not spent either way", Inv_Count(_ch.inventory, 30), 1);
+    }
 }

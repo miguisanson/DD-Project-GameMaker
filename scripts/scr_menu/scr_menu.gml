@@ -174,6 +174,14 @@ function TabItems_Items(_ch, _in_battle = false) {
     return items;
 }
 
+// STUB (check first): the old behaviour, a throwable row always says the map text.
+function TabItems_Press(_ch, _it, _in_battle) {
+    if (variable_struct_exists(_it, "throwable") && _it.throwable) {
+        return { ok: false, msg: Loc_T("item.msg.throw_in_battle", "Throw it at an enemy in battle."), ch: _ch };
+    }
+    return TabItems_Use(_ch, _it.item_id, _in_battle);
+}
+
 // Uses a potion or an antidote from the menu. Returns { ok, msg, ch }; the item is spent only when it did something.
 // In a fight (_in_battle) nothing is used here: a potion costs the turn, and only the battle's ITEM command spends one (hunt 6, D99).
 function TabItems_Use(_ch, _item_id, _in_battle = false) {
@@ -848,6 +856,15 @@ function Menu_CanOpen() {
     if (room == rm_battle) return Menu_BattleOpenNow();
     var pl = gs.player_inst;
     return instance_exists(pl) && Player_IsSettled(pl);
+}
+
+// STUB (check first): the old behaviour, a press that cannot open the menu is thrown away.
+#macro MENU_OPEN_BUFFER_MS 300
+function MenuOpenBuf_New() {
+    return { until: 0, frame: -1 };
+}
+function MenuOpenBuf_Step(_b, _now, _frame, _pressed, _free, _can_open) {
+    return _pressed && _can_open;
 }
 
 // True while the one menu is up (opening, open or fading out).
@@ -2203,6 +2220,14 @@ function Controls_PollKey() {
     return k;
 }
 
+// STUB (check first): the old behaviour, a pad cannot cancel a capture and the prompt names only Esc.
+function Controls_CaptureCancel(_device, _back, _menu, _pause) {
+    return false;
+}
+function Controls_WaitingText(_label, _device) {
+    return Loc_T("controls.waiting", "Press the new key for {action}. Esc cancels.", { action: _label });
+}
+
 function ControlsPage_Open(_sp) {
     _sp.controls = { menu: undefined, capture: "", msg_row: "", msg: "", lock: undefined };
     var c = _sp.controls;
@@ -2886,6 +2911,15 @@ function KeepThis_Draw(_a = 1) {
     Prompt_RichDraw(bx + 4 * p, yy, t3, iw, UI_C_LIGHT, fa_center, _a);
     draw_set_alpha(1);
     draw_set_color(c_white);
+}
+
+// STUB (check first): the old behaviour, 60 ms after the change any click answers.
+#macro KEEP_THIS_ANSWER_LOCK_MS 400
+function KeepThis_AnswerReady(_since_ms, _now, _display_busy) {
+    return _now - _since_ms >= UI_INPUT_LOCK_MS;
+}
+function KeepThis_ClickOk(_rect, _mx, _my) {
+    return true;
 }
 
 // While the prompt is up the page answers only to it: Confirm keeps, Back (or the menu key, a right click) puts the window back, time does the same.
