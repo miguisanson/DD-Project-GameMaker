@@ -16754,10 +16754,10 @@ function Test_Suite_R3Guard() {
     Test_True("r3guard: the Brace is still up after the second hit", Status_Has(_h2.defender, STATUS_BRACE));
     Test_True("r3guard: the damage preview shows the halved number", Combat_HitDamage(_slime, _g, _src) < _plain);
 
-    // MP back: 25% of max MP, rounded down, minimum 2; max MP Knight 11 / 13, Archer 12 / 16, Mage 16 / 23, Nobody 11 / 14 at levels 1 / 3
+    // MP back: 25% of max MP, rounded down, minimum 2; max MP Knight 11 / 13, Archer 12 / 16, Mage 16 / 22, Nobody 11 / 13 at levels 1 / 3
     var _cls = [[CLASS_KNIGHT, "Knight"], [CLASS_ARCHER, "Archer"], [CLASS_MAGE, "Mage"], [CLASS_NOBODY, "Nobody"]];
     var _want = [[2, 3], [3, 4], [4, 5], [2, 3]];
-    var _maxmp = [[11, 13], [12, 16], [16, 23], [11, 14]];
+    var _maxmp = [[11, 13], [12, 16], [16, 22], [11, 13]];   // D176 (r3levelup): max MP from MND; Mage 22 and Nobody 13 at level 3 (were 23 / 14 with MAG adding MP); 25% still rounds to 5 / 3
     for (var _c = 0; _c < 4; _c++) {
         for (var _lv = 0; _lv < 2; _lv++) {
             var _pl = CharacterCreate_Player(_cls[_c][0]);
