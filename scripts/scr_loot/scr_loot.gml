@@ -406,13 +406,13 @@ function Loot_BuildMessageEntries(_loot, _prefix = "Loot: ") {
 // C3 ECONOMY (D23 D33 D84 D85 D86 D92): gold, prices, the merchant's stock, elites, per-run shuffles. Pure functions first (Test_Suite_Economy),
 // the room and battle hooks that call them are in scr_room_state / scr_combat / scr_menu and are marked "C3".
 // Numbers are starting values for the simulator (balance proposals go to the owner):
-//   gold per fight = (10 + 2 x enemy level) x (1.2 for threat rank 2, x3 for a boss, x2 for an elite), rolled +-25%, then Coin Sense / Lucky Charm
+//   gold per fight = (3 + 0.5 x enemy level) [D193; it was 10 + 2 x level] x (1.2 for threat rank 2, x3 for a boss, x2 for an elite), rolled +-25%, then Coin Sense / Lucky Charm
 //   price = ceil(item value x 1.5), sell = half; a card is 80 (skill) / 60 (upgrade) / 55 (passive)
 // Everything random about a layout (enemies, elites, chest contents, the stock) is derived from the run's seed and a label (research/roguelike-cases.md 4.2),
 // so the same seed gives the same run whatever order things happen in; the run's own streams are not used for layout.
 // ============================================================================================================
-#macro GOLD_BASE 10
-#macro GOLD_PER_LEVEL 2
+#macro GOLD_BASE 3            // D193 (less gold): was 10
+#macro GOLD_PER_LEVEL 0.5     // D193: was 2
 #macro GOLD_RANK2_MULT 1.2
 #macro GOLD_BOSS_MULT 3
 #macro GOLD_ELITE_MULT 2

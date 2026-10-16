@@ -1,5 +1,5 @@
 {
- "build": "cab84ad-20261017-dirty",
+ "build": "49ed115-20261017-dirty",
  "cards": [
   {
    "classes": [
@@ -664,9 +664,9 @@
    "kind": "fallback",
    "name": "Coin Purse",
    "params": {
-    "gold": 15.0
+    "gold": 8.0
    },
-   "sentence": "Take 15 gold.",
+   "sentence": "Take 8 gold.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -1627,10 +1627,10 @@
    "elite_regen_frac": 0.1,
    "elite_spd": 3.0,
    "elite_venom_stacks": 2.0,
-   "gold_base": 10.0,
+   "gold_base": 3.0,
    "gold_boss_mult": 3.0,
    "gold_elite_mult": 2.0,
-   "gold_per_level": 2.0,
+   "gold_per_level": 0.5,
    "gold_rank2_mult": 1.2,
    "gold_spread": 0.25,
    "merchant_floors": [
@@ -1671,7 +1671,7 @@
    "break_mult": 1.5,
    "gauge_max": 100.0,
    "stagger_perfect_mult": 1.5,
-   "stagger_stun_mult": 2.0,
+   "stagger_stun_mult": 1.5,
    "steadfast_turns": 2.0
   },
   "unarmed_power": 2.0,
