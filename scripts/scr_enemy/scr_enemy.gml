@@ -862,8 +862,11 @@ function Room_Stamp() {
     return variable_global_exists("room_stamp") ? global.room_stamp : 0;
 }
 
-// ONE layer script draws every world mark (the darkness and the light of D157/D159, the "!" of enemies, the interact arrow of the player): a layer has only one end script,
-// and the player and the enemies share the "Instances" layer, so two registrations would replace each other (measured: the arrow vanished).
+// The world pass draws in TWO places (R-089..R-091), because a room's Foreground layer (rm_floor1, rm_floor2: a pale haze above the Instances) lies between them:
+//   body pass, the end of the Instances layer: the pictures of world objects that have no Draw event of their own (the player's step squash, the merchant's glow). They are
+//     drawn where the plain player, the enemies and the merchant's sprite are, under the haze and before the darkness, so they look like them whatever the player is doing.
+//   top pass, the end of the Foreground layer (the end of Instances in a room without one): the lore notes, the darkness (D159: it covers the haze too) and the marks after it.
+// A layer has only one end script, and a room without a Foreground layer has one layer for both, so that room gets one script that draws every part in order.
 // Registered once per room START by whoever gets here first (the player's Step, an enemy's update): a re-entered room (after a battle, a run,
 // a save load) has new layers, and the old once-ever flag left it without any mark (I-056).
 function World_RegisterFx(_inst) {
@@ -871,23 +874,34 @@ function World_RegisterFx(_inst) {
     if (variable_global_exists("world_fx_stamp") && global.world_fx_stamp == _st) return;
     if (!layer_exists(_inst.layer)) return;
     global.world_fx_stamp = _st;
-    // the top layer of the world: a room with a Foreground layer (rm_floor1, rm_floor2) has its canopy above the Instances layer, and the darkness (D159) must cover that too
-    layer_script_end(layer_exists("Foreground") ? layer_get_id("Foreground") : _inst.layer, World_DrawFx);
+    var _plan = World_FxPlan(layer_exists("Foreground"));
+    if (_plan.split) {
+        layer_script_end(layer_exists(_plan.body_layer) ? layer_get_id(_plan.body_layer) : _inst.layer, World_DrawBodyFx);
+        layer_script_end(layer_get_id(_plan.top_layer), World_DrawFx);
+    } else {
+        layer_script_end(_inst.layer, World_DrawFx);
+    }
+}
+
+// Where the passes run, by name: body_layer is the layer the player and the enemies are on; top_layer is the top layer of the world; split: two scripts instead of one.
+function World_FxPlan(_has_foreground) {
+    return { body_layer: "Instances", top_layer: _has_foreground ? "Foreground" : "Instances", split: _has_foreground };
 }
 
 // The parts of the world pass in drawing order (bug hunt 7). body: the part draws a picture of a WORLD OBJECT (a figure, a note on the floor), which belongs under the room's
 // darkness like the figures drawn by their own Draw events: a figure standing in the dark must look like it, also for the 120 ms of a step squash. The marks (the "!" and "?", the
-// interact arrow, the elite outline, the merchant's glow, chest bursts) come after the darkness and stay bright. Test_Hunt7MapDraw holds the order.
+// interact arrow, the elite outline, chest bursts) come after the darkness and stay bright. pass (R-089..R-091): "body" parts are drawn at the end of the Instances layer
+// (World_DrawBodyFx, under the Foreground haze), "top" parts at the end of the top layer (World_DrawFx). Test_Hunt7MapDraw and Test_R3LightParts hold the order.
 function World_FxParts() {
     static _parts = [
-        { name: "note", body: true },            // C5 (D107): the lore notes lie under everything else
-        { name: "player_squash", body: true },   // D138 (G6): the player's step squash, drawn here while his plain sprite is off
-        { name: "light", body: false },          // H14 (D157, D159): the room's darkness with the fires cut out of it; everything after it stays at full brightness
-        { name: "nav", body: false },
-        { name: "player_prompt", body: false },
-        { name: "elite", body: false },          // C3 (D86): the pulsing outline round elites
-        { name: "merchant_glow", body: false },  // D113: the pulsing gold glow round the merchant
-        { name: "mapfx", body: false }           // D138 (G6): chest burst, the rising item, the level-up sparkle
+        { name: "note", body: true, pass: "top" },             // C5 (D107): the lore notes lie under everything else
+        { name: "player_squash", body: true, pass: "body" },   // D138 (G6): the player's step squash, drawn here while his plain sprite is off
+        { name: "merchant_glow", body: true, pass: "body" },   // D113: the pulsing gold glow round the merchant, darkened like him (R-091)
+        { name: "light", body: false, pass: "top" },           // H14 (D157, D159): the room's darkness with the fires cut out of it; everything after it stays at full brightness
+        { name: "nav", body: false, pass: "top" },
+        { name: "player_prompt", body: false, pass: "top" },
+        { name: "elite", body: false, pass: "top" },          // C3 (D86): the pulsing outline round elites
+        { name: "mapfx", body: false, pass: "top" }           // D138 (G6): chest burst, the rising item, the level-up sparkle
     ];
     return _parts;
 }
@@ -905,10 +919,24 @@ function World_DrawFxPart(_name) {
     }
 }
 
-function World_DrawFx() {
-    global.world_pass_layer = layer_exists("Foreground") ? "Foreground" : "Instances";   // R-089 record, see Fx_NotePlayerDraw
+// Draws the parts of one pass in order ("" = every part, for a room with one script); _layer_name is recorded for the checks (Fx_NotePlayerDraw).
+function World_DrawFxParts(_pass, _layer_name) {
+    global.world_pass_layer = _layer_name;
     var _parts = World_FxParts();
-    for (var _i = 0; _i < array_length(_parts); _i++) World_DrawFxPart(_parts[_i].name);
+    for (var _i = 0; _i < array_length(_parts); _i++) {
+        if (_pass == "" || _parts[_i].pass == _pass) World_DrawFxPart(_parts[_i].name);
+    }
+}
+
+// The layer script at the end of the Instances layer in a room with a Foreground layer (World_RegisterFx).
+function World_DrawBodyFx() {
+    World_DrawFxParts("body", World_FxPlan(true).body_layer);
+}
+
+// The layer script at the end of the top layer: only the top parts when the body parts have their own script, else every part.
+function World_DrawFx() {
+    var _plan = World_FxPlan(layer_exists("Foreground"));
+    World_DrawFxParts(_plan.split ? "top" : "", _plan.top_layer);
 }
 
 // (D157: the sight ring is no longer drawn; this cache stays only until D108's clean-up removes it with Test_SightRingCache.)

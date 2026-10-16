@@ -1100,9 +1100,9 @@ function Battle_BgApply(_floor, _boss) {
 //   - a sun spot (D164) is a pool that is always lit and does not flicker: a patch where daylight falls into the room;
 //   - enemies cut nothing out (D160, amends D157): their sight is not shown; the stats keep a cones field that stays 0.
 // One pass per frame: one view-sized surface, filled with the darkness, the light shapes drawn into it with a blend that only lowers its alpha, then drawn over the world.
-// The pass runs at the start of World_DrawFx: the characters and the floor are darkened with the rest (a figure standing in the dark must look like it),
-// while everything World_DrawFx draws after it (the "!" and "?", the interact arrow, the elite outline, the merchant glow, chest bursts) stays at full brightness
-// (World_FxParts: the pictures of world objects, the player's step squash among them, are drawn before it).
+// The pass runs at the start of the top part of World_DrawFx: the characters and the floor are darkened with the rest (a figure standing in the dark must look like it),
+// while everything World_DrawFx draws after it (the "!" and "?", the interact arrow, the elite outline, chest bursts) stays at full brightness
+// (World_FxParts: the pictures of world objects, the player's step squash and the merchant's glow among them, are drawn before it, under the Foreground haze).
 // ============================================================================
 #macro LIGHT_DARK_ALPHA 0.28         // how dark a room is where no light reaches (D159: 0.4; D164: lighter, 0.28 is a first value for the owner to judge; still not barely dimmed)
 #macro LIGHT_DAY_ALPHA 0.10          // a room open to the sky (D164)

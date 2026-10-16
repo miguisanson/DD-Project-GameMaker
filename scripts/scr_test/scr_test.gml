@@ -14244,7 +14244,7 @@ function Test_Hunt7MapDraw() {
     Test_Eq("hunt7map draw: nothing but the darkness itself is a mark before it", _early_mark, "");
     var _names = "";
     for (var _k = _light + 1; _k < array_length(_parts); _k++) _names += _parts[_k].name + " ";
-    Test_Eq("hunt7map draw: after the darkness only the marks stay bright", _names, "nav player_prompt elite merchant_glow mapfx ");
+    Test_Eq("hunt7map draw: after the darkness only the marks stay bright", _names, "nav player_prompt elite mapfx ");   // R-091: the merchant's glow moved before the darkness
 }
 
 // 1b. The merchant's gold glow is a ring round his shape with his own pixels cut out (as the elite's marks): the sprite itself is the object's own draw, under the darkness.

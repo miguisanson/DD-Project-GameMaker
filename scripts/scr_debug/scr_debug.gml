@@ -6359,9 +6359,9 @@ function Scenario_StepSmokeEconomy(_s) {
                 var _mer = Scenario_EcoMerchant();
                 Scenario_Check("shop_floor2_has_a_merchant", _mer != noone);
                 if (_mer == noone) { Scenario_Finish(); break; }
-                Scenario_Check("shop_the_merchant_is_at_its_spot_for_shop_0", _mer.x == 192 && _mer.y == 64 && _mer.shop_index == 0, "x=" + string(_mer.x) + " y=" + string(_mer.y));
+                Scenario_Check("shop_the_merchant_is_at_its_spot_for_shop_0", _mer.x == Merchant_SpotFor(rm_floor2).x && _mer.y == Merchant_SpotFor(rm_floor2).y && _mer.shop_index == 0, "x=" + string(_mer.x) + " y=" + string(_mer.y));
                 Scenario_Check("shop_the_merchant_is_drawn_and_can_be_talked_to", _mer.sprite_index != -1 && _mer.interact_kind == INTERACT_DIALOGUE);
-                var _plm = Scenario_PlacePlayer(12, 5);
+                var _plm = Scenario_PlacePlayer(Merchant_SpotFor(rm_floor2).x div GRID_TILE_SIZE, Merchant_SpotFor(rm_floor2).y div GRID_TILE_SIZE + 1);   // the cell below him
                 _plm.face = UP;
                 _ec.t0 = _s.t;
             }
@@ -6908,7 +6908,7 @@ function Scenario_StepShotsEconomy(_s) {
                 Scenario_ClearUi();
                 with (obj_enemy) instance_destroy();
                 Scenario_Check("shots_eco_merchant_stands_in_floor2", Scenario_EcoMerchant() != noone);
-                var _pl2 = Scenario_PlacePlayer(12, 5);
+                var _pl2 = Scenario_PlacePlayer(Merchant_SpotFor(rm_floor2).x div GRID_TILE_SIZE, Merchant_SpotFor(rm_floor2).y div GRID_TILE_SIZE + 1);
                 _pl2.face = UP;
             }
             if (_s.t == 215) {
@@ -13893,13 +13893,14 @@ function Scenario_R3LightDir(_pl, _last) {
     return undefined;
 }
 
-// How many floor cells the player can reach from his own, with the cell (_bx, _by) blocked as well; near: a free neighbour of that cell was reached.
-function Scenario_R3LightReach(_g, _sx, _sy, _bx, _by) {
+// How many floor cells the player can reach from his own, with the cell (_bx, _by) blocked as well; near: a free neighbour of that cell was reached; hit: the cell (_hx, _hy) was reached.
+function Scenario_R3LightReach(_g, _sx, _sy, _bx, _by, _hx = -100, _hy = -100) {
     var _seen = array_create(_g.w * _g.h, false);
     var _q = [_sy * _g.w + _sx];
     _seen[_sy * _g.w + _sx] = true;
     var _n = 0;
     var _near = false;
+    var _hit = false;
     var _dxs = [1, 0, -1, 0];
     var _dys = [0, -1, 0, 1];
     while (array_length(_q) > 0) {
@@ -13908,6 +13909,7 @@ function Scenario_R3LightReach(_g, _sx, _sy, _bx, _by) {
         _n++;
         var _cx = _cur mod _g.w;
         var _cy = _cur div _g.w;
+        if (_cx == _hx && _cy == _hy) _hit = true;
         if (abs(_cx - _bx) + abs(_cy - _by) == 1) _near = true;
         for (var _d = 0; _d < 4; _d++) {
             var _nx = _cx + _dxs[_d];
@@ -13920,7 +13922,7 @@ function Scenario_R3LightReach(_g, _sx, _sy, _bx, _by) {
             array_push(_q, _ny * _g.w + _nx);
         }
     }
-    return { n: _n, near: _near };
+    return { n: _n, near: _near, hit: _hit };
 }
 
 function Scenario_StepSmokeR3Light(_s) {
@@ -14042,10 +14044,15 @@ function Scenario_StepSmokeR3Light(_s) {
                     var _mcy = round(_mer.y / 16);
                     var _pcx = round(_pl.x / 16);
                     var _pcy = round(_pl.y / 16);
-                    var _free = Scenario_R3LightReach(_g, _pcx, _pcy, -100, -100);
+                    // the merchant is an interactable: his own cell is blocked in the grid; take that off for the count without him, then make the grid build again
+                    _g.block[_mcy * _g.w + _mcx] = 0;
+                    var _free = Scenario_R3LightReach(_g, _pcx, _pcy, -100, -100, _mcx, _mcy);
                     var _with = Scenario_R3LightReach(_g, _pcx, _pcy, _mcx, _mcy);
-                    Scenario_Check("r3light_" + _name2 + "_the_merchants_cell_is_a_floor_cell", !Nav_CellBlocked(_g, _mcx, _mcy), "cell=" + string(_mcx) + "," + string(_mcy));
-                    Scenario_Check("r3light_" + _name2 + "_the_merchant_cuts_no_part_of_the_floor_off", _with.n == _free.n - 1, "reach without=" + string(_free.n) + " with=" + string(_with.n));
+                    Nav_Get().nw = -1;
+                    var _px8 = _mcx * 16 + 8;
+                    var _py8 = _mcy * 16 + 8;
+                    Scenario_Check("r3light_" + _name2 + "_the_merchants_cell_is_a_floor_cell", instance_position(_px8, _py8, obj_wall) == noone && instance_position(_px8, _py8, obj_room_transition) == noone && _free.hit, "cell=" + string(_mcx) + "," + string(_mcy));
+                    Scenario_Check("r3light_" + _name2 + "_the_merchant_cuts_no_part_of_the_floor_off", _free.hit && _with.n == _free.n - 1, "reach without=" + string(_free.n) + " with=" + string(_with.n));
                     Scenario_Check("r3light_" + _name2 + "_a_free_cell_next_to_the_merchant_can_be_reached", _with.near);
                 }
                 _h.mi++;
@@ -14980,7 +14987,7 @@ function Scenario_StepSmokeChoices(_s) {
             }
             if (_s.t > 40 && Scenario_FloorReady(rm_floor2)) {
                 with (obj_enemy) instance_destroy();   // the room's enemies would hunt the player
-                var _plm = Scenario_PlacePlayer(12, 5);
+                var _plm = Scenario_PlacePlayer(Merchant_SpotFor(rm_floor2).x div GRID_TILE_SIZE, Merchant_SpotFor(rm_floor2).y div GRID_TILE_SIZE + 1);   // the cell below him
                 _plm.face = UP;
                 _h.c = Scenario_ChoiceNew();
                 Scenario_Next(_s, 891);

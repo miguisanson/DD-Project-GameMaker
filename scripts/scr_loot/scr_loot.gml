@@ -652,9 +652,10 @@ function Shop_Sell(_ch, _run, _item_id) {
 // ---- the merchant's places (D85): existing rooms, on the 16 px grid, off the path to the exit ----
 function Merchant_SpotFor(_room) {
     switch (_room) {
-        case rm_floor2: return { x: 192, y: 64, shop: 0 };
-        case rm_floor5: return { x: 240, y: 64, shop: 1 };
-        case rm_floor8: return { x: 128, y: 64, shop: 2 };   // an alcove off the stair (its only free side is the cell below); (16,48) was behind the carved-arrow note
+        // R-091: none of them lies within the inner half of the radius of a light pool of its floor (Test_R3LightSpots), so the light and the dark can be seen on him.
+        case rm_floor2: return { x: 128, y: 64, shop: 0 };   // between the two sun spots, off the path along row 5 (was (12,4), inside the sun spot at (11,5))
+        case rm_floor5: return { x: 240, y: 64, shop: 1 };   // on the rim of the fire stand at (12,5)
+        case rm_floor8: return { x: 64, y: 80, shop: 2 };    // a nook off the stair path, two tiles below a fire stand (was the alcove (8,4) next to the fire at (7,4)); (16,48) is behind the carved-arrow note
     }
     return undefined;
 }
@@ -694,7 +695,8 @@ function Merchant_EnsureInRoom() {
     return inst;
 }
 
-// The gold glow round the merchant on the map (World_DrawFx, scr_enemy): the sprite's silhouette in #E8C547 one pixel out in 8 directions, pulsing with Merchant_GlowAlpha.
+// The gold glow round the merchant on the map (the body pass of the world pass, scr_enemy: under the Foreground haze and before the darkness, like the merchant's own sprite
+// and an enemy on the same cell, R-091): the sprite's silhouette in #E8C547 one pixel out in 8 directions, pulsing with Merchant_GlowAlpha.
 // The glow is a ring round his shape with his own pixels cut out (Merchant_FxRing): the sprite itself is the object's own draw, under the room's darkness like every other figure
 // (bug hunt 7: it used to be drawn again on top of the darkness, so he stood at full brightness in a dark room). obj_npc has no Draw event, so this also steps the 2-frame idle (2 fps).
 function Merchant_DrawWorldFx() {
