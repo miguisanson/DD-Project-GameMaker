@@ -13,6 +13,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import vig_mnd  # noqa: E402  (D176: Max HP and Max MP come from VIG and MND; hp_max / mp_max below are the pre-D176 curves, kept as the reference the new table is compared with)
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 VECTORS = os.path.join(ROOT, ".planning", "research", "combat-vectors.json")
 TESTS = os.path.join(ROOT, "scripts", "scr_test", "scr_test.gml")
@@ -82,7 +85,7 @@ def class_state(cls, level):
         for i in range(4):
             s[i] = min(STAT_MAX, s[i] + g[i])
         s[k["free"]] = min(STAT_MAX, s[k["free"]] + 1)
-    return dict(atk=s[0], df=s[1], spd=s[2], mag=s[3], hp=hp_max(k["hd"], level), mp=mp_max(k["mp_gain"], level, s[3]))
+    return dict(atk=s[0], df=s[1], spd=s[2], mag=s[3], hp=vig_mnd.new_hp(cls, level), mp=vig_mnd.new_mp(cls, level))   # D176: VIG / MND (tools/balance/vig_mnd.py)
 
 
 EXP_NEXT = [12, 24, 40, 58, 80, 105, 135, 170, 210]

@@ -160,6 +160,7 @@ function Test_RunAll() {
     Test_RunSuite("R3StealthB", Test_Suite_R3StealthB);
     Test_RunSuite("R3FixDet", Test_Suite_R3FixDet);
     Test_RunSuite("R3Saves2", Test_Suite_R3Saves2);
+    Test_RunSuite("R3LevelUp", Test_Suite_R3LevelUp);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -286,23 +287,23 @@ function Test_Suite_Stats() {
     Test_Eq("vec mp_2_1_12", Resource_MaxMp(2, 1, 12), 16);
     Test_Eq("vec mp_1_5_4", Resource_MaxMp(1, 5, 4), 16);
     Test_ClassAt("vec cls_knight_1", CLASS_KNIGHT, 1, 11, 12, 10, 3, 10, 11);
-    Test_ClassAt("vec cls_knight_2", CLASS_KNIGHT, 2, 12, 14, 10, 3, 17, 12);
-    Test_ClassAt("vec cls_knight_3", CLASS_KNIGHT, 3, 13, 16, 10, 3, 24, 13);
-    Test_ClassAt("vec cls_knight_5", CLASS_KNIGHT, 5, 15, 20, 10, 3, 38, 15);
-    Test_ClassAt("vec cls_knight_10", CLASS_KNIGHT, 10, 20, 30, 10, 3, 73, 20);
+    Test_ClassAt("vec cls_knight_2", CLASS_KNIGHT, 2, 12, 14, 10, 3, 16, 12);
+    Test_ClassAt("vec cls_knight_3", CLASS_KNIGHT, 3, 13, 16, 10, 3, 22, 13);
+    Test_ClassAt("vec cls_knight_5", CLASS_KNIGHT, 5, 15, 20, 10, 3, 37, 15);
+    Test_ClassAt("vec cls_knight_10", CLASS_KNIGHT, 10, 20, 30, 10, 3, 70, 20);
     Test_ClassAt("vec cls_archer_1", CLASS_ARCHER, 1, 9, 8, 13, 4, 10, 12);
     Test_ClassAt("vec cls_archer_2", CLASS_ARCHER, 2, 11, 8, 14, 4, 16, 14);
     Test_ClassAt("vec cls_archer_3", CLASS_ARCHER, 3, 13, 8, 15, 4, 22, 16);
     Test_ClassAt("vec cls_archer_5", CLASS_ARCHER, 5, 17, 8, 17, 4, 34, 20);
     Test_ClassAt("vec cls_archer_10", CLASS_ARCHER, 10, 27, 8, 22, 4, 64, 30);
     Test_ClassAt("vec cls_mage_1", CLASS_MAGE, 1, 5, 7, 10, 12, 10, 16);
-    Test_ClassAt("vec cls_mage_2", CLASS_MAGE, 2, 5, 7, 10, 15, 15, 19);
-    Test_ClassAt("vec cls_mage_3", CLASS_MAGE, 3, 5, 7, 10, 18, 20, 23);
-    Test_ClassAt("vec cls_mage_5", CLASS_MAGE, 5, 5, 7, 10, 24, 30, 30);
-    Test_ClassAt("vec cls_mage_10", CLASS_MAGE, 10, 5, 7, 10, 39, 55, 47);
+    Test_ClassAt("vec cls_mage_2", CLASS_MAGE, 2, 5, 7, 10, 15, 16, 19);
+    Test_ClassAt("vec cls_mage_3", CLASS_MAGE, 3, 5, 7, 10, 18, 19, 22);
+    Test_ClassAt("vec cls_mage_5", CLASS_MAGE, 5, 5, 7, 10, 24, 28, 28);
+    Test_ClassAt("vec cls_mage_10", CLASS_MAGE, 10, 5, 7, 10, 39, 52, 43);
     Test_ClassAt("vec cls_nobody_1", CLASS_NOBODY, 1, 8, 8, 9, 3, 10, 11);
     Test_ClassAt("vec cls_nobody_2", CLASS_NOBODY, 2, 10, 8, 10, 3, 16, 12);
-    Test_ClassAt("vec cls_nobody_3", CLASS_NOBODY, 3, 11, 9, 10, 4, 22, 14);
+    Test_ClassAt("vec cls_nobody_3", CLASS_NOBODY, 3, 11, 9, 10, 4, 22, 13);
     Test_ClassAt("vec cls_nobody_5", CLASS_NOBODY, 5, 14, 10, 11, 5, 34, 16);
     Test_ClassAt("vec cls_nobody_10", CLASS_NOBODY, 10, 22, 12, 14, 7, 64, 22);
     Test_Eq("vec exp_1", Exp_NextLevel(1), 12);
@@ -16664,4 +16665,264 @@ function Test_R3s2Buttons() {
     Test_Eq("saves2 buttons: the right and bottom edges are outside", Title_ButtonHit(_c, 70, 110) + Title_ButtonHit(_c, 20, 130), "");
     var _z = { title_btn: { profile: { x: 0, y: 0, w: 0, h: 0 }, codex: { x: 0, y: 0, w: 0, h: 0 } } };
     Test_Eq("saves2 buttons: a button that was not drawn is not hit", Title_ButtonHit(_z, 0, 0), "");
+}
+
+// ==========================================================================================================================
+// R3 levelup (D176, D177, D184; owner notes 14, 15, 16): VIG and MND stats, level gains on confirm, the level-up screen.
+// Expected numbers come from tools/balance/vig_mnd.py (the table in E:\Temp\dd-briefs\out\vig-mnd-table.md), written before the GML.
+// ==========================================================================================================================
+function Test_Suite_R3LevelUp() {
+    Test_LvCurves();
+    Test_LvClassTable();
+    Test_LvStatRules();
+    Test_LvMigration();
+}
+
+// A class at a level with its free point on the class's usual stat (auto-placed outside a run): VIG, MND, Max HP, Max MP.
+function Test_LvAt(_name, _class, _level, _vig, _mnd, _hp, _mp) {
+    var _c = CharacterCreate_Player(_class);
+    for (var _i = 1; _i < _level; _i++) _c = LevelUp_ApplyLevel(_c);
+    Test_Eq(_name + " level", _c.level, _level);
+    Test_Eq(_name + " VIG", _c.stats.vig, _vig);
+    Test_Eq(_name + " MND", _c.stats.mnd, _mnd);
+    Test_Eq(_name + " max HP", _c.max_hp, _hp);
+    Test_Eq(_name + " max MP", _c.max_mp, _mp);
+}
+
+// Every free point put on VIG (or MND) from level 2 to 10, the way a player in a run places it.
+function Test_LvDump(_class, _stat) {
+    var _c = CharacterCreate_Player(_class);
+    global.levelup_auto_place = false;
+    for (var _i = 2; _i <= 10; _i++) {
+        _c = LevelUp_ApplyLevel(_c);
+        _c = Cards_PlaceStat(_c, _stat);
+    }
+    global.levelup_auto_place = true;
+    return _c;
+}
+
+function Test_LvCurves() {
+    // Max HP from VIG: 3 per point above 10 up to VIG 28, then 2 up to VIG 38, then 1
+    Test_Eq("levelup curve: VIG 10 is Max HP 10", Resource_MaxHpOfVig(10), 10);
+    Test_Eq("levelup curve: VIG 12 is Max HP 16", Resource_MaxHpOfVig(12), 16);
+    Test_Eq("levelup curve: VIG 28 is Max HP 64 (the last full point)", Resource_MaxHpOfVig(28), 64);
+    Test_Eq("levelup curve: VIG 31 is Max HP 70 (soft cap: 2 a point)", Resource_MaxHpOfVig(31), 70);
+    Test_Eq("levelup curve: VIG 38 is Max HP 84", Resource_MaxHpOfVig(38), 84);
+    Test_Eq("levelup curve: VIG 39 is Max HP 85 (soft cap: 1 a point)", Resource_MaxHpOfVig(39), 85);
+    Test_Eq("levelup curve: VIG 50 is Max HP 96", Resource_MaxHpOfVig(50), 96);
+    Test_Eq("levelup curve: VIG below 10 is no less than 10", Resource_MaxHpOfVig(4), 10);
+    // Max MP from MND: 1 per point above 10 up to MND 44, then 1/2 up to 56, then 1/4 (floored)
+    Test_Eq("levelup curve: MND 11 is Max MP 11", Resource_MaxMpOfMnd(11), 11);
+    Test_Eq("levelup curve: MND 16 is Max MP 16", Resource_MaxMpOfMnd(16), 16);
+    Test_Eq("levelup curve: MND 44 is Max MP 44", Resource_MaxMpOfMnd(44), 44);
+    Test_Eq("levelup curve: MND 45 is still Max MP 44 (half a point)", Resource_MaxMpOfMnd(45), 44);
+    Test_Eq("levelup curve: MND 46 is Max MP 45", Resource_MaxMpOfMnd(46), 45);
+    Test_Eq("levelup curve: MND 56 is Max MP 50", Resource_MaxMpOfMnd(56), 50);
+    Test_Eq("levelup curve: MND 60 is Max MP 51 (a quarter a point)", Resource_MaxMpOfMnd(60), 51);
+}
+
+function Test_LvClassTable() {
+    // class growth on reaching a level: VIG and MND next to ATK DEF SPD MAG
+    var _g = LevelUp_ClassGrowthGain(CLASS_KNIGHT, 2);
+    Test_True("levelup growth: Knight L2 is ATK+1 DEF+1 VIG+2 MND+1", _g.atk == 1 && _g.def == 1 && _g.spd == 0 && _g.mag == 0 && _g.vig == 2 && _g.mnd == 1);
+    Test_Eq("levelup growth: Knight VIG L3", LevelUp_ClassGrowthGain(CLASS_KNIGHT, 3).vig, 2);
+    Test_Eq("levelup growth: Knight VIG L4 is +3", LevelUp_ClassGrowthGain(CLASS_KNIGHT, 4).vig, 3);
+    Test_Eq("levelup growth: Knight VIG L7 is +3", LevelUp_ClassGrowthGain(CLASS_KNIGHT, 7).vig, 3);
+    Test_Eq("levelup growth: Knight VIG L10 is +3", LevelUp_ClassGrowthGain(CLASS_KNIGHT, 10).vig, 3);
+    _g = LevelUp_ClassGrowthGain(CLASS_ARCHER, 6);
+    Test_True("levelup growth: Archer is ATK+1 SPD+1 VIG+2 MND+2", _g.atk == 1 && _g.def == 0 && _g.spd == 1 && _g.mag == 0 && _g.vig == 2 && _g.mnd == 2);
+    _g = LevelUp_ClassGrowthGain(CLASS_MAGE, 2);
+    Test_True("levelup growth: Mage L2 is MAG+2 VIG+2 MND+3", _g.atk == 0 && _g.mag == 2 && _g.vig == 2 && _g.mnd == 3);
+    Test_Eq("levelup growth: Mage VIG on an odd level is only +1", LevelUp_ClassGrowthGain(CLASS_MAGE, 3).vig, 1);
+    Test_Eq("levelup growth: Mage VIG on level 10 is +2", LevelUp_ClassGrowthGain(CLASS_MAGE, 10).vig, 2);
+    Test_Eq("levelup growth: Nobody VIG is +2", LevelUp_ClassGrowthGain(CLASS_NOBODY, 7).vig, 2);
+    Test_Eq("levelup growth: Nobody MND L2 is +1", LevelUp_ClassGrowthGain(CLASS_NOBODY, 2).mnd, 1);
+    Test_Eq("levelup growth: Nobody MND L5 is +2", LevelUp_ClassGrowthGain(CLASS_NOBODY, 5).mnd, 2);
+    Test_Eq("levelup growth: Nobody MND L6 is +1", LevelUp_ClassGrowthGain(CLASS_NOBODY, 6).mnd, 1);
+    Test_Eq("levelup growth: Nobody MND L9 is +2", LevelUp_ClassGrowthGain(CLASS_NOBODY, 9).mnd, 2);
+    Test_Eq("levelup growth: a class with no growth has no VIG", LevelUp_ClassGrowthGain(99, 2).vig, 0);
+    // the table: VIG, MND, Max HP, Max MP per class at levels 1, 2, 3, 5, 10 (the free point on the class's usual stat)
+    Test_LvAt("levelup table knight 1", CLASS_KNIGHT, 1, 10, 11, 10, 11);
+    Test_LvAt("levelup table knight 2", CLASS_KNIGHT, 2, 12, 12, 16, 12);
+    Test_LvAt("levelup table knight 3", CLASS_KNIGHT, 3, 14, 13, 22, 13);
+    Test_LvAt("levelup table knight 5", CLASS_KNIGHT, 5, 19, 15, 37, 15);
+    Test_LvAt("levelup table knight 10", CLASS_KNIGHT, 10, 31, 20, 70, 20);
+    Test_LvAt("levelup table archer 1", CLASS_ARCHER, 1, 10, 12, 10, 12);
+    Test_LvAt("levelup table archer 2", CLASS_ARCHER, 2, 12, 14, 16, 14);
+    Test_LvAt("levelup table archer 3", CLASS_ARCHER, 3, 14, 16, 22, 16);
+    Test_LvAt("levelup table archer 5", CLASS_ARCHER, 5, 18, 20, 34, 20);
+    Test_LvAt("levelup table archer 10", CLASS_ARCHER, 10, 28, 30, 64, 30);
+    Test_LvAt("levelup table mage 1", CLASS_MAGE, 1, 10, 16, 10, 16);
+    Test_LvAt("levelup table mage 2", CLASS_MAGE, 2, 12, 19, 16, 19);
+    Test_LvAt("levelup table mage 3", CLASS_MAGE, 3, 13, 22, 19, 22);
+    Test_LvAt("levelup table mage 5", CLASS_MAGE, 5, 16, 28, 28, 28);
+    Test_LvAt("levelup table mage 10", CLASS_MAGE, 10, 24, 43, 52, 43);
+    Test_LvAt("levelup table nobody 1", CLASS_NOBODY, 1, 10, 11, 10, 11);
+    Test_LvAt("levelup table nobody 2", CLASS_NOBODY, 2, 12, 12, 16, 12);
+    Test_LvAt("levelup table nobody 3", CLASS_NOBODY, 3, 14, 13, 22, 13);
+    Test_LvAt("levelup table nobody 5", CLASS_NOBODY, 5, 18, 16, 34, 16);
+    Test_LvAt("levelup table nobody 10", CLASS_NOBODY, 10, 28, 22, 64, 22);
+    // D184: every class's Max HP and Max MP at every level stays within 10% of what the old silent growth gave (the free point on the class's usual stat);
+    // the Mage is the most fragile
+    var _classes = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE, CLASS_NOBODY];
+    var _off = "";
+    var _frail = "";
+    for (var _ci = 0; _ci < 4; _ci++) {
+        var _c = CharacterCreate_Player(_classes[_ci]);
+        for (var _l = 1; _l <= 10; _l++) {
+            if (_l > 1) _c = LevelUp_ApplyLevel(_c);
+            var _old_hp = Resource_MaxHp(_c.class_cfg.hd, _l);
+            var _old_mp = Resource_MaxMp(_c.class_cfg.mp_gain, _l, _c.stats.mag);
+            if (abs(_c.max_hp / _old_hp - 1) > 0.10) _off += " " + string(_classes[_ci]) + "/L" + string(_l) + "/hp";
+            if (abs(_c.max_mp / _old_mp - 1) > 0.10) _off += " " + string(_classes[_ci]) + "/L" + string(_l) + "/mp";
+            if (_l >= 2 && _classes[_ci] != CLASS_MAGE) {
+                var _mage = CharacterCreate_Player(CLASS_MAGE);
+                for (var _m = 2; _m <= _l; _m++) _mage = LevelUp_ApplyLevel(_mage);
+                if (_mage.max_hp >= _c.max_hp) _frail += " " + string(_classes[_ci]) + "/L" + string(_l);
+            }
+        }
+    }
+    Test_Eq("levelup D184: HP and MP stay within 10% of the old numbers at every level (off:" + _off + ")", _off, "");
+    Test_Eq("levelup D184: the Mage has the least Max HP of every class at every level from 2 (not less:" + _frail + ")", _frail, "");
+    // D184: leveling VIG is not easy mode: all nine free points on VIG, against the class with its points elsewhere
+    Test_Eq("levelup soft cap: a Knight with every free point on VIG has 86 Max HP at level 10 (not 70 + 27)", Test_LvDump(CLASS_KNIGHT, STAT_VIG).max_hp, 86);
+    Test_Eq("levelup soft cap: an Archer's is 82", Test_LvDump(CLASS_ARCHER, STAT_VIG).max_hp, 82);
+    Test_Eq("levelup soft cap: a Mage's is 74", Test_LvDump(CLASS_MAGE, STAT_VIG).max_hp, 74);
+    Test_Eq("levelup soft cap: a Nobody's is 82", Test_LvDump(CLASS_NOBODY, STAT_VIG).max_hp, 82);
+    Test_Eq("levelup soft cap: a Knight with every free point on MND has 29 Max MP", Test_LvDump(CLASS_KNIGHT, STAT_MND).max_mp, 29);
+    Test_Eq("levelup soft cap: a Mage with every free point on MND has 48 Max MP", Test_LvDump(CLASS_MAGE, STAT_MND).max_mp, 48);
+}
+
+function Test_LvStatRules() {
+    Test_Eq("levelup stats: STAT_VIG is 4", STAT_VIG, 4);
+    Test_Eq("levelup stats: STAT_MND is 5", STAT_MND, 5);
+    Test_Eq("levelup stats: VIG key", Stat_Key(STAT_VIG), "vig");
+    Test_Eq("levelup stats: MND key", Stat_Key(STAT_MND), "mnd");
+    Test_Eq("levelup stats: VIG name", Stat_ShortName(STAT_VIG), "VIG");
+    Test_Eq("levelup stats: MND name", Stat_ShortName(STAT_MND), "MND");
+    var _k = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_True("levelup stats: a new character has vig and mnd in its stats", variable_struct_exists(_k.stats, "vig") && variable_struct_exists(_k.stats, "mnd"));
+    Test_Eq("levelup stats: Stat_Get reads VIG", Stat_Get(_k, STAT_VIG), 10);
+    Test_Eq("levelup stats: Stat_Get reads MND", Stat_Get(_k, STAT_MND), 11);
+    // D176: MAG no longer adds Max MP
+    var _wiz = CharacterCreate_Player(CLASS_KNIGHT); _wiz.stats.mag = 41; _wiz = RecomputeResources(_wiz);
+    Test_Eq("levelup stats: more MAG gives no Max MP", _wiz.max_mp, 11);
+    // the free point on VIG / MND: +1 stat, the Max HP / Max MP it gives, and the current HP / MP rise with it
+    var _p = CharacterCreate_Player(CLASS_KNIGHT);
+    _p.stat_points = 2;
+    _p.hp = 7;
+    _p.mp = 5;
+    var _p1 = Cards_PlaceStat(_p, STAT_VIG);
+    Test_Eq("levelup point: VIG +1", _p1.stats.vig, 11);
+    Test_Eq("levelup point: Max HP +3", _p1.max_hp, 13);
+    Test_Eq("levelup point: HP rises by the same 3", _p1.hp, 10);
+    Test_Eq("levelup point: it costs the point", _p1.stat_points, 1);
+    var _p2 = Cards_PlaceStat(_p1, STAT_MND);
+    Test_Eq("levelup point: MND +1", _p2.stats.mnd, 12);
+    Test_Eq("levelup point: Max MP +1", _p2.max_mp, 12);
+    Test_Eq("levelup point: MP rises by the same 1", _p2.mp, 6);
+    var _p3 = Cards_PlaceStat(_p2, STAT_VIG);
+    Test_Eq("levelup point: with no point left nothing changes", _p3.stats.vig, 11);
+    var _bad = CharacterCreate_Player(CLASS_KNIGHT); _bad.stat_points = 1;
+    _bad = Level_ApplyFreePoint(_bad, 17);
+    Test_Eq("levelup point: an unknown stat keeps the point", _bad.stat_points, 1);
+    // the prompt's rows: ATK DEF SPD MAG VIG MND, each value now > after
+    var _o = Cards_FreePointOptions(CharacterCreate_Player(CLASS_MAGE));
+    Test_Eq("levelup rows: six rows", array_length(_o), 6);
+    Test_Eq("levelup rows: in the order ATK DEF SPD MAG VIG MND", _o[0].label + _o[1].label + _o[2].label + _o[3].label + _o[4].label + _o[5].label, "ATKDEFSPDMAGVIGMND");
+    Test_True("levelup rows: the fifth is VIG, the sixth MND", _o[4].stat == STAT_VIG && _o[5].stat == STAT_MND);
+    Test_True("levelup rows: a Mage's VIG goes 10 > 11, MND 16 > 17", _o[4].from == 10 && _o[4].to == 11 && _o[5].from == 16 && _o[5].to == 17);
+    // the stat cap
+    var _cap = CharacterCreate_Player(CLASS_KNIGHT); _cap.stats.vig = 60; _cap.stat_points = 1;
+    _cap = Level_ApplyFreePoint(_cap, STAT_VIG);
+    Test_Eq("levelup stats: VIG clamps at the stat maximum (60)", _cap.stats.vig, 60);
+}
+
+// What an old save held: no vig / mnd, the Max HP / Max MP bought with free points as hp_bonus (+3 a point) and mp_bonus (+2 a point).
+function Test_LvLegacy(_class, _level, _hp_bonus, _mp_bonus) {
+    var _s = DB_PlayerClass(_class).stats;
+    return { class_id: _class, level: _level, exp: 0, hp: 5, mp: 3, stat_points: 0, hp_bonus: _hp_bonus, mp_bonus: _mp_bonus,
+             stats: { atk: _s.atk, def: _s.def, spd: _s.spd, mag: _s.mag } };
+}
+
+function Test_LvMigration() {
+    // each bonus point becomes a point of VIG / MND on top of the class's own growth to that level
+    var _a = Player_MigrateVigMnd(Test_LvLegacy(CLASS_KNIGHT, 5, 6, 4));
+    Test_Eq("levelup migrate: Knight L5 with hp_bonus 6 (2 points) has VIG 19 + 2", _a.stats.vig, 21);
+    Test_Eq("levelup migrate: and mp_bonus 4 (2 points) has MND 15 + 2", _a.stats.mnd, 17);
+    Test_False("levelup migrate: hp_bonus is gone", variable_struct_exists(_a, "hp_bonus"));
+    Test_False("levelup migrate: mp_bonus is gone", variable_struct_exists(_a, "mp_bonus"));
+    var _a2 = Player_MigrateVigMnd(_a);
+    Test_True("levelup migrate: doing it twice changes nothing", _a2.stats.vig == 21 && _a2.stats.mnd == 17);
+    var _m = Player_MigrateVigMnd(Test_LvLegacy(CLASS_MAGE, 1, 0, 0));
+    Test_True("levelup migrate: a fresh Mage is VIG 10 MND 16", _m.stats.vig == 10 && _m.stats.mnd == 16);
+    var _r = Player_MigrateVigMnd(Test_LvLegacy(CLASS_ARCHER, 3, 3, 2));
+    Test_True("levelup migrate: Archer L3 with 1 + 1 points is VIG 14 + 1, MND 16 + 1", _r.stats.vig == 15 && _r.stats.mnd == 17);
+    var _n = Player_MigrateVigMnd(Test_LvLegacy(CLASS_NOBODY, 10, 9, 6));
+    Test_True("levelup migrate: Nobody L10 with 3 + 3 points is VIG 28 + 3, MND 22 + 3", _n.stats.vig == 31 && _n.stats.mnd == 25);
+    var _f = Player_MigrateVigMnd(Test_LvLegacy(CLASS_KNIGHT, 2, 4, 3));
+    Test_True("levelup migrate: a bonus that is not a whole number of points rounds down (4 > 1 point, 3 > 1 point)", _f.stats.vig == 13 && _f.stats.mnd == 13);
+    var _bare = Player_MigrateVigMnd({ class_id: CLASS_KNIGHT, level: 3 });
+    Test_False("levelup migrate: a struct with no stats is left alone", variable_struct_exists(_bare, "stats"));
+    // loading normalises: the Max HP / Max MP come from the new stats, the current HP / MP are kept (up to the maxima)
+    var _lo = Player_NormalizeProgression(Test_LvLegacy(CLASS_KNIGHT, 5, 6, 4), true);
+    Test_Eq("levelup migrate: Knight L5 loads with Max HP 43 (VIG 21)", _lo.max_hp, 43);
+    Test_Eq("levelup migrate: and Max MP 17 (MND 17)", _lo.max_mp, 17);
+    Test_Eq("levelup migrate: the current HP is kept", _lo.hp, 5);
+    Test_Eq("levelup migrate: the current MP is kept", _lo.mp, 3);
+    // a run file written before (version 2 and 3) loads migrated to the current version with its player converted
+    Test_Eq("levelup save: RUN_SAVE_VERSION is 4", RUN_SAVE_VERSION, 4);
+    var _f3 = "test_levelup_v3_run.sav";
+    var _f2 = "test_levelup_v2_run.sav";
+    Save_DeleteFileSet(_f3);
+    Save_DeleteFileSet(_f2);
+    var _raw3 = { run_version: 3, seed: 9, floor: 2, gold: 5, kills: 1, rng: {}, summary: { class_id: CLASS_KNIGHT, level: 5, floor: 2, run_time_ms: 1000, seed: 9, saved_at: 3 },
+                  statData: { selected_class: CLASS_KNIGHT, player: Test_LvLegacy(CLASS_KNIGHT, 5, 6, 4), save_room_name: "rm_floor2", saved_at: 3 } };
+    var _raw2 = { run_version: 2, seed: 9, floor: 2, gold: 5, kills: 1, rng: {}, statData: { selected_class: CLASS_ARCHER, player: Test_LvLegacy(CLASS_ARCHER, 3, 3, 2), save_room_name: "rm_floor2", saved_at: 3 } };
+    Test_RawWrite(_f3, json_stringify(_raw3));
+    Test_RawWrite(_f2, json_stringify(_raw2));
+    var _l3 = RunSave_LoadFrom(_f3);
+    Test_Eq("levelup save: a version 3 file still loads", _l3.status, "ok");
+    if (_l3.status == "ok") {
+        Test_Eq("levelup save: and comes back as version 4", _l3.run.run_version, 4);
+        var _pl = _l3.run.statData.player;
+        Test_True("levelup save: its player has VIG 21 and MND 17", _pl.stats.vig == 21 && _pl.stats.mnd == 17);
+        Test_False("levelup save: and no hp_bonus", variable_struct_exists(_pl, "hp_bonus"));
+        Test_Eq("levelup save: the summary level is the saved level", _l3.run.summary.level, 5);
+    }
+    var _l2 = RunSave_LoadFrom(_f2);
+    Test_Eq("levelup save: a version 2 file still loads", _l2.status, "ok");
+    if (_l2.status == "ok") {
+        Test_Eq("levelup save: and comes back as version 4 too", _l2.run.run_version, 4);
+        Test_True("levelup save: its Archer has VIG 14 + 1 and MND 16 + 1", _l2.run.statData.player.stats.vig == 15 && _l2.run.statData.player.stats.mnd == 17);
+    }
+    Save_DeleteFileSet(_f3);
+    Save_DeleteFileSet(_f2);
+    Test_Eq("levelup save: a file one version ahead is newer", RunSave_Check({ run_version: 5, seed: 1, statData: {} }), "newer");
+    Test_Eq("levelup save: a version 4 file is ok", RunSave_Check({ run_version: 4, seed: 1, statData: {} }), "ok");
+    // a save written by this build carries the new stats and loads back the same
+    var _gs = GameState_Get();
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_p = _gs.player_ch;
+    var _old_cp = _gs.checkpoint;
+    var _old_persist = _gs.persist;
+    _gs.run = Run_Create(4321);
+    _gs.checkpoint = { room: rm_floor3, x: 48, y: 64 };
+    _gs.persist = {};
+    var _pc = CharacterCreate_Player(CLASS_MAGE);
+    _pc = LevelUp_ApplyLevel(_pc);
+    _pc = LevelUp_ApplyLevel(_pc);
+    _gs.player_ch = _pc;
+    var _ff = "test_levelup_v4_run.sav";
+    Save_DeleteFileSet(_ff);
+    RunSave_WriteTo(_ff);
+    var _l4 = RunSave_LoadFrom(_ff);
+    Save_DeleteFileSet(_ff);
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+    _gs.player_ch = _old_p;
+    _gs.checkpoint = _old_cp;
+    _gs.persist = _old_persist;
+    Test_Eq("levelup save: a run written now is version 4", _l4.status == "ok" ? _l4.run.run_version : -1, 4);
+    Test_True("levelup save: with the Mage's VIG 13 and MND 22 in it", _l4.status == "ok" && _l4.run.statData.player.stats.vig == 13 && _l4.run.statData.player.stats.mnd == 22);
 }
