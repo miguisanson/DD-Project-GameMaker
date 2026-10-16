@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PLAYTEST BUILD (owner): E:\Games\DD-Project Playtest\7f4d08e-20261016 (checklist PLAYTEST-QUEUE "Build 7f4d08e-20261016"). IMPROVEMENT MODE on next (D161): since the build, merged + full gate PASS: H13b text-fit (fcf6b28), progression fixes R-071..074, map fixes R-075..079, text shortening (c7e787d), QTE/audio/Korean fixes R-080..084 (b9285c0). Regression list first full run: 60 green / 0 red / 15 owner / 4 unmapped (R-021 now red-as-required). Next: Opus review #2 of 7f4d08e..next, then fixes; a new playtest build only after the owner finishes the current one. Owner questions on BOARD: boss bg import, ideas, 5 checklist questions, names that do not fit, battle/boss music. Worktrees to clean (all merged): h5 h7 h8 h8b h12 h13 h14 hunt5a hunt6run hunt6combat hunt6ui review6 d160 d164 g10 g11 h12b1 h12b2 h13b integ integ13b build hunt7prog hunt7map hunt7feel shorten. |
+| WIP | PAUSED by the owner 2026-10-17 (playtesting build 7f4d08e-20261016; the next session runs on another account). Read .planning/RESUME.md first: next @ a1d23bb (playtest build + improvement fixes + boss bg import); not merged: wt/review7 (committed, gate unconfirmed), wt/d168 (started), CC0 audio search (not started). No builds, gates or agents until the owner says resume. |
 | Unplayed features | 61 playtest entries (PLAYTEST-QUEUE, build dbc678a-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
