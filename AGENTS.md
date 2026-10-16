@@ -220,3 +220,4 @@ options/    GameMaker build options per platform; only Windows is built and ship
 - **`.claude/commands/` already holds GSD's own commands** (`gsd-*.md`) —
   this repo's own command lives alongside them as
   `continue_DD-Project-GameMaker.md`.
+- **Never kill game processes by name** (`taskkill /IM DD-Project.exe`, `Stop-Process -Name`): the owner may be playing and other gate runs may be going. Kill only the PID your own run started, or let the gate timeout end it. (2026-10-17: a packet agent killed every DD-Project.exe at once.)
