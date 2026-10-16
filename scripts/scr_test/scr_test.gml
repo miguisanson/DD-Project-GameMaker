@@ -16682,6 +16682,8 @@ function Test_Suite_R3LevelUp() {
     Test_LvStatRules();
     Test_LvMigration();
     Test_LvDeferred();
+    Test_LvScreen();
+    Test_LvTextFit();
 }
 
 // A class at a level with its free point on the class's usual stat (auto-placed outside a run): VIG, MND, Max HP, Max MP.
@@ -17063,4 +17065,152 @@ function Test_LvDeferred() {
 function Test_LvAfterExp(_class, _exp) {
     var _c = CharacterCreate_Player(_class);
     return Player_AddExp(_c, _exp);
+}
+
+// ---- D177 (owner note 15): the level-up screen. Six rows ATK DEF SPD MAG VIG MND; the class's growth rows in gold with "now > now+growth", the other rows only the number;
+// the row under the cursor (keyboard or mouse) shows its "> +1" (a growth row "now > now+growth+1"). Details: what the stat does, Now / After (VIG: Max HP, MND: Max MP). ----
+function Test_LvRowValues(_m) {
+    var _out = "";
+    for (var _i = 0; _i < array_length(_m.items); _i++) _out += (_i > 0 ? "|" : "") + _m.items[_i].value;
+    return _out;
+}
+
+function Test_LvGoldRows(_m) {
+    var _out = "";
+    for (var _i = 0; _i < array_length(_m.items); _i++) {
+        var _it = _m.items[_i];
+        if (variable_struct_exists(_it, "col") && _it.col == UI_C_MERCHANT_GOLD) _out += (_out != "" ? "," : "") + _it.label;
+    }
+    return _out;
+}
+
+function Test_LvScreen() {
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    var _k = Test_LvRunBegin();
+    var _gs = GameState_Get();
+    // the value rule, on its own
+    Test_Eq("levelup screen: a growth row shows now > now + growth", Cards_StatRowValue(12, 1, false), "12 > 13");
+    Test_Eq("levelup screen: a hovered growth row shows now > now + growth + 1", Cards_StatRowValue(12, 1, true), "12 > 14");
+    Test_Eq("levelup screen: a row that does not grow shows only the number", Cards_StatRowValue(10, 0, false), "10");
+    Test_Eq("levelup screen: hovered, it shows now > now + 1", Cards_StatRowValue(10, 0, true), "10 > 11");
+    Test_Eq("levelup screen: a growth of 3 reads 10 > 13", Cards_StatRowValue(10, 3, false), "10 > 13");
+    Test_Eq("levelup screen: a value at the cap does not pass 60", Cards_StatRowValue(60, 0, true), "60 > 60");
+    // a Knight with a level owed: ATK +1, DEF +1, VIG +2, MND +1 are the growth rows
+    var _kn = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1));
+    _gs.player_ch = _kn;
+    var _m = CardsUi_StatMenu();
+    Test_Eq("levelup screen: six rows", array_length(_m.items), 6);
+    Test_Eq("levelup screen: ATK DEF SPD MAG VIG MND in that order", _m.items[0].label + _m.items[1].label + _m.items[2].label + _m.items[3].label + _m.items[4].label + _m.items[5].label, "ATKDEFSPDMAGVIGMND");
+    Test_Eq("levelup screen: the Knight's growth rows are gold", Test_LvGoldRows(_m), "ATK,DEF,VIG,MND");
+    Test_Eq("levelup screen: the cursor starts on the class stat (DEF)", _m.cursor, STAT_DEF);
+    Test_Eq("levelup screen: so DEF reads 12 > 14, the other growth rows now > now + growth, the rest only the number", Test_LvRowValues(_m), "11 > 12|12 > 14|10|3|10 > 12|11 > 12");
+    _m.cursor = STAT_SPD;
+    CardsUi_StatRefresh(_m);
+    Test_Eq("levelup screen: with the cursor on SPD it reads 10 > 11 and DEF goes back to 12 > 13", Test_LvRowValues(_m), "11 > 12|12 > 13|10 > 11|3|10 > 12|11 > 12");
+    _m.cursor = STAT_VIG;
+    CardsUi_StatRefresh(_m);
+    Test_Eq("levelup screen: on VIG it reads 10 > 13 (growth 2 + the point)", _m.items[4].value, "10 > 13");
+    Test_Eq("levelup screen: the gold rows stay gold under the cursor", Test_LvGoldRows(_m), "ATK,DEF,VIG,MND");
+    // a row's own colour is the text colour of that row, selected or not; a greyed row stays grey
+    Test_Eq("levelup screen: a gold row draws gold", Ui_RowStyle(_m.items[0], false).text, UI_C_MERCHANT_GOLD);
+    Test_Eq("levelup screen: and gold when selected", Ui_RowStyle(_m.items[0], true).text, UI_C_MERCHANT_GOLD);
+    Test_Eq("levelup screen: a plain row is white", Ui_RowStyle(_m.items[2], false).text, UI_C_TEXT);
+    Test_Eq("levelup screen: a greyed row stays grey whatever its colour", Ui_RowStyle({ label: "x", value: "", enabled: false, col: UI_C_MERCHANT_GOLD }, false).text, UI_C_DARK);
+    // the details: what it does, Now and After
+    Test_True("levelup screen: every row has a one-line explanation", string_length(_m.items[0].help) > 0 && string_length(_m.items[4].help) > 0 && string_length(_m.items[5].help) > 0);
+    Test_Eq("levelup screen: the DEF row's Now / After are the stat now and after growth + the point", Test_RowValue(_m.items[1].lines, "Now") + ">" + Test_RowValue(_m.items[1].lines, "After"), "12>14");
+    Test_Eq("levelup screen: the VIG row shows Max HP now and after (VIG 13 = 19)", Test_RowValue(_m.items[4].lines, Loc_T("cards.stat.hp_now", "Max HP Now")) + ">" + Test_RowValue(_m.items[4].lines, Loc_T("cards.stat.hp_after", "Max HP After")), "10>19");
+    Test_Eq("levelup screen: the MND row shows Max MP now and after (MND 13 = 13)", Test_RowValue(_m.items[5].lines, Loc_T("cards.stat.mp_now", "Max MP Now")) + ">" + Test_RowValue(_m.items[5].lines, Loc_T("cards.stat.mp_after", "Max MP After")), "11>13");
+    Test_Eq("levelup screen: the Korean-or-English legend replaces the 'Knight growth' line", _m.layout.note, Loc_T("levelup.legend", "Gold = your class grows these"));
+    Test_True("levelup screen: the legend is not the old growth line", string_pos("growth:", _m.layout.note) == 0);
+    Test_Eq("levelup screen: the legend is drawn in gold", _m.layout.note_col, UI_C_MERCHANT_GOLD);
+    Test_Eq("levelup screen: the title names the level being confirmed", _m.layout.title, "Level 2: Place 1 Point");
+    Test_Eq("levelup screen: the character itself has not moved", _kn.level + _kn.levels_owed * 10, 11);
+    // a Mage: MAG, VIG and MND grow; ATK DEF SPD do not
+    var _mg = Player_AddExp(CharacterCreate_Player(CLASS_MAGE), Exp_NextLevel(1));
+    _gs.player_ch = _mg;
+    var _mm = CardsUi_StatMenu();
+    Test_Eq("levelup screen: the Mage's growth rows are MAG, VIG, MND", Test_LvGoldRows(_mm), "MAG,VIG,MND");
+    Test_Eq("levelup screen: the cursor starts on MAG (12 > 15 hovered), VIG 10 > 12, MND 16 > 19", Test_LvRowValues(_mm), "5|7|10|12 > 15|10 > 12|16 > 19");
+    // Nobody rotates: level 2's growth is ATK +1, SPD +1 (plus VIG +2, MND +1)
+    var _nb = Player_AddExp(CharacterCreate_Player(CLASS_NOBODY), Exp_NextLevel(1));
+    _gs.player_ch = _nb;
+    var _nm = CardsUi_StatMenu();
+    Test_Eq("levelup screen: Nobody's growth rows follow the rotation (level 2: ATK, SPD, VIG, MND)", Test_LvGoldRows(_nm), "ATK,SPD,VIG,MND");
+    // two levels owed: the second screen is level 3's, with level 3's growth
+    var _two = Player_AddExp(CharacterCreate_Player(CLASS_NOBODY), Exp_NextLevel(1) + Exp_NextLevel(2));
+    _two = Cards_PlaceStat(_two, STAT_ATK);
+    _gs.player_ch = _two;
+    var _m3 = CardsUi_StatMenu();
+    Test_Eq("levelup screen: the second owed level's screen is titled level 3", _m3.layout.title, "Level 3: Place 1 Point");
+    Test_Eq("levelup screen: with level 3's growth rows (DEF, MAG, VIG, MND)", Test_LvGoldRows(_m3), "DEF,MAG,VIG,MND");
+    // a point banked by an older save and no level owed: no growth, no gold, no legend
+    var _old = CharacterCreate_Player(CLASS_KNIGHT);
+    _old.stat_points = 1;
+    _gs.player_ch = _old;
+    var _om = CardsUi_StatMenu();
+    Test_Eq("levelup screen: a banked point alone has no gold rows", Test_LvGoldRows(_om), "");
+    Test_Eq("levelup screen: and no legend", _om.layout.note, "");
+    Test_Eq("levelup screen: every row reads only the number, the one under the cursor (DEF) now > now + 1", Test_LvRowValues(_om), "11|12 > 13|10|3|10|11");
+    Loc_SetLanguage("ko");
+    var _ko = CardsUi_StatMenu();
+    Test_True("levelup screen: the Korean legend is not the English one", _ko.layout.note != "Gold = your class grows these");
+    Loc_SetLanguage(_lang0);
+    // keyboard: Down moves the cursor one row and the +1 moves with it
+    var _kb = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1));
+    _gs.player_ch = _kb;
+    var _km = CardsUi_StatMenu();
+    var _sn = Ui_SnapNew();
+    _sn.down = true;
+    _sn.down_p = true;
+    var _ev = Ui_MenuStep(_km, _sn, 5000);
+    CardsUi_StatRefresh(_km);
+    Test_True("levelup screen: Down moves the cursor from DEF to SPD", _ev.moved && _km.cursor == STAT_SPD);
+    Test_Eq("levelup screen: and the +1 moves with it (SPD 10 > 11, DEF back to 12 > 13)", _km.items[2].value + "|" + _km.items[1].value, "10 > 11|12 > 13");
+    // mouse: the row under the pointer is the cursor, a click confirms it
+    var _mm2 = CardsUi_StatMenu();
+    var _rects = [];
+    for (var _ri = 0; _ri < 6; _ri++) array_push(_rects, { x: 0, y: _ri * 10, w: 100, h: 10 });
+    _mm2.rects = _rects;
+    var _ms2 = Ui_SnapNew();
+    _ms2.mx = 5;
+    _ms2.my = 35;
+    _ms2.mouse_moved = true;
+    var _ev2 = Ui_MenuStep(_mm2, _ms2, 5000);
+    CardsUi_StatRefresh(_mm2);
+    Test_True("levelup screen: the pointer over the MAG row moves the cursor there", _ev2.moved && _mm2.cursor == STAT_MAG);
+    Test_Eq("levelup screen: MAG shows 3 > 4 under the pointer", _mm2.items[3].value, "3 > 4");
+    Test_Eq("levelup screen: DEF is back to 12 > 13", _mm2.items[1].value, "12 > 13");
+    _ms2.click = true;
+    var _ev3 = Ui_MenuStep(_mm2, _ms2, 5000);
+    Test_True("levelup screen: a click on the row confirms it", _ev3.confirm && _ev3.index == STAT_MAG);
+    Test_LvRunEnd(_k);
+}
+
+// D177: every size and language the screen is drawn in: the rows, the title, the legend and the explanations fit (every cursor position: the value under the cursor is the longest).
+function Test_LvFitFails(_class) {
+    var _gs = GameState_Get();
+    _gs.player_ch = Player_AddExp(CharacterCreate_Player(_class), 12);
+    var _mt = Ui_Metrics();
+    var _m = CardsUi_StatMenu();
+    var _fails = [];
+    var _mc = undefined;
+    for (var _cur = 0; _cur < array_length(_m.items); _cur++) {
+        _m.cursor = _cur;
+        CardsUi_StatRefresh(_m);
+        _mc = Ui_MenuMeasure(_m, _mt);
+        for (var _i = 0; _i < array_length(_m.items); _i++) TextFit_Row(_fails, "levelup row", _m.items[_i].label, _m.items[_i].value, _mc.panel_w, _mt.p, _mc.icon_px, false, _mt);
+    }
+    TextFit_Title(_fails, "levelup title", _m.layout.title, _mc.panel_w - 8 * _mt.p, _mt);
+    if (_m.layout.note != "") TextFit_Line(_fails, "levelup legend", _m.layout.note, _mc.panel_w - 8 * _mt.p);
+    for (var _h = 0; _h < array_length(_m.items); _h++) TextFit_Block(_fails, "levelup help " + _m.items[_h].label, _m.items[_h].help, _mc.panel_w - 8 * _mt.p, _mt.p);
+    return _fails;
+}
+
+function Test_LvTextFit() {
+    var _k = Test_LvRunBegin();
+    TextFit_Each("levelup screen (Knight)", function(_w, _h, _l) { return Test_LvFitFails(CLASS_KNIGHT); });
+    TextFit_Each("levelup screen (Mage)", function(_w, _h, _l) { return Test_LvFitFails(CLASS_MAGE); });
+    Test_LvRunEnd(_k);
 }
