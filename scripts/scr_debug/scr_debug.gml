@@ -265,7 +265,7 @@ function Scenario_Boot() {
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.choice_off = true;   // D154: nor the small flavour questions (the Stranger, the merchant, a note, the wake line) unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 32000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 21000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 32000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -2957,6 +2957,9 @@ function Scenario_StepShots(_s) {
         case 120: case 121: case 122: case 123: case 124: case 125: case 126: case 127: case 128:
             Scenario_StepShotsCards(_s);
             break;
+        case 1020: case 1021: case 1022: case 1023: case 1024: case 1025: case 1026: case 1027: case 1028: case 1029:
+            Scenario_StepShotsCardNames(_s);   // R3 (D168): the pick with the longest card names, three sizes, Korean once; goes on with C3 (170)
+            break;
         case 140: case 141: case 142: case 143: case 144: case 145: case 146: case 147: case 148: case 149:
             Scenario_StepShotsAI(_s);   // B4: wind-up, Foresight on it, phase banner
             break;
@@ -4459,7 +4462,7 @@ function Export_Build() {
         var cd = card_all[cdi];
         array_push(data.cards, Export_Clean({ id: cd.id, kind: cd.kind, skill_id: cd.skill_id, classes: cd.classes, params: cd.params, up: cd.up, name: Card_Name(cd), sentence: Card_Sentence(cd) }));
     }
-    data.constants.cards = { pity_offers: CARD_PITY_OFFERS, max_skills: CARD_MAX_SKILLS, offer_size: CARD_OFFER_SIZE, skip_gold: CARD_SKIP_GOLD };
+    data.constants.cards = { pity_offers: CARD_PITY_OFFERS, max_skills: CARD_MAX_SKILLS, offer_size: CARD_OFFER_SIZE };
     // C3: the economy the simulator needs (gold per fight, price rule, throw rules, elites). Item prices are ceil(item.value x price_mult).
     data.constants.economy = {
         gold_base: GOLD_BASE, gold_per_level: GOLD_PER_LEVEL, gold_rank2_mult: GOLD_RANK2_MULT, gold_boss_mult: GOLD_BOSS_MULT, gold_elite_mult: GOLD_ELITE_MULT,
@@ -5808,7 +5811,7 @@ function Scenario_StepSmokeRest(_s) {
 // ============================================================================
 // C2: the card screens through the real flows (smoke steps 133-141, between the third run's start and the first win):
 // a class chest opened by the interact key -> the class screen (Nobody locked, wrap-around, "are you sure") -> Mage; a skill chest -> a 1-of-3
-// pick -> a skill taken; a level-up -> the stat point prompt -> the card pick -> Skip pays gold; a 4th skill -> replace prompt, Keep returns to
+// pick -> a skill taken; a level-up -> the stat point prompt -> the card pick (three cards, no Skip row: down stays on the card, confirm takes it); a 4th skill -> replace prompt, Keep returns to
 // the same cards, then replace Ice Spear (its upgrade goes with it). Every key goes through Scenario_Tap, the game's own input path.
 // ============================================================================
 function Scenario_CardsTapQueue(_s, _cd) {
@@ -5824,6 +5827,13 @@ function Scenario_CardsTalk(_s) {
     var _talk = (_gs.ui.mode == UI_DIALOGUE || array_length(_gs.ui.lines) > 0);
     if (_talk && (_s.f - _s.last_tap) >= 12) Scenario_Tap("confirm");
     return _talk;
+}
+
+// R3: the pick has no Skip. A scenario that only needs a pick answered shows three harmless cards (Second Breath first) and takes the first one.
+function Scenario_CardsHarmless() {
+    var _ch = GameState_Get().player_ch;
+    _ch.offer = ["fb:rest", "fb:gold", "fb:focus"];
+    if (CardsUi_Kind() == "cards") global.cards_ui.pick.ids = _ch.offer;
 }
 
 function Scenario_CardsChest(_cd, _obj, _pid) {
@@ -5935,16 +5945,23 @@ function Scenario_StepSmokeCards(_s) {
             }
             if (_s.t > 900) { Scenario_Check("cards_level_up_opens_the_stat_prompt", false, "kind=" + CardsUi_Kind()); Scenario_Finish(); }
             break;
-        case 139:   // the point is placed; the card pick comes next; Skip pays gold
+        case 139:   // the point is placed; the card pick comes next: three cards, down does not leave them, confirm takes the highlighted one
             if (_s.t > 30 && array_length(_cd.q) == 0 && CardsUi_Kind() == "cards" && !variable_struct_exists(_cd, "p1")) {
                 _cd.p1 = true;
                 Scenario_Check("cards_stat_point_goes_to_spd", _ch.stats.spd == _cd.spd0 + 1 + LevelUp_ClassGrowthGain(CLASS_MAGE, 2).spd && _ch.stat_points == 0, "spd=" + string(_ch.stats.spd) + " was " + string(_cd.spd0));
                 Scenario_Check("cards_the_pick_follows_the_stat_point", _ch.card_picks == 1 && array_length(global.cards_ui.pick.ids) == 3);
-                _cd.q = ["menu_down", "confirm"];   // Skip
+                Scenario_CardsHarmless();
+                _cd.q = ["menu_down"];
             }
-            if (variable_struct_exists(_cd, "p1") && array_length(_cd.q) == 0 && _s.t > 150 && !CardsUi_IsOpen()) {
-                Scenario_Check("cards_skip_pays_5_gold", _gs.run.gold == _cd.gold0 + 5, "gold=" + string(_gs.run.gold));
-                Scenario_Check("cards_skip_answers_the_pick", _ch.card_picks == 0 && array_length(_ch.offer) == 0 && Cards_NextOwed(_ch) == "");
+            if (variable_struct_exists(_cd, "p1") && !variable_struct_exists(_cd, "p2") && array_length(_cd.q) == 0 && (_s.f - _s.last_tap) >= 10 && CardsUi_Kind() == "cards") {
+                _cd.p2 = true;
+                Scenario_Check("cards_the_pick_has_no_row_but_the_three_cards", array_length(global.cards_ui.pick.rects) == 3, "rects=" + string(array_length(global.cards_ui.pick.rects)));
+                Scenario_Check("cards_down_stays_on_the_card", global.cards_ui.pick.cursor == 0, "cursor=" + string(global.cards_ui.pick.cursor));
+                _cd.q = ["menu_right", "menu_left", "confirm"];   // right and back: the cursor wraps between the cards only; confirm takes the first
+            }
+            if (variable_struct_exists(_cd, "p2") && array_length(_cd.q) == 0 && _s.t > 150 && !CardsUi_IsOpen()) {
+                Scenario_Check("cards_confirm_takes_the_highlighted_card_and_pays_no_gold", _gs.run.gold == _cd.gold0, "gold=" + string(_gs.run.gold) + " was " + string(_cd.gold0));
+                Scenario_Check("cards_the_card_answers_the_pick", _ch.card_picks == 0 && array_length(_ch.offer) == 0 && Cards_NextOwed(_ch) == "");
                 // the 4th skill: three held (Ice Spear upgraded), a pick offering Meditation
                 _ch.skills = [SKILL_FIREBALL, SKILL_ICE_SPEAR, SKILL_FORESIGHT];
                 _ch.upgrades = [SKILL_ICE_SPEAR];
@@ -6220,14 +6237,15 @@ function Scenario_StepShotsCards(_s) {
                 Scenario_Next(_s, 124);
             }
             break;
-        case 124:   // Skip selected, at scale 5
+        case 124:   // the last card selected, at scale 5 (R3: there is no Skip row under the cards)
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
-                global.cards_ui.pick.cursor = 3;
+                global.cards_ui.pick.cursor = 2;
                 Scenario_SetWindowScale(5);
             }
             if (_s.t == 50) {
-                Scenario_ShotUi(_s, "cards_pick_skip");
+                Scenario_Check("shots_cards_pick_has_only_the_three_cards", array_length(global.cards_ui.pick.rects) == 3, "rects=" + string(array_length(global.cards_ui.pick.rects)));
+                Scenario_ShotUi(_s, "cards_pick_last");
                 Scenario_Next(_s, 125);
             }
             break;
@@ -6283,7 +6301,59 @@ function Scenario_StepShotsCards(_s) {
                 _gs.player_ch.stat_points = 0;
                 _gs.player_ch.offer = [];
                 CardsUi_Close();
-                Scenario_Next(_s, 170);   // C3: the economy pictures (170-179), then the B4 pictures (140..148), then the D91 / DISP-10 / D48 pictures and the skill animations
+                Scenario_Next(_s, 1020);   // R3: the longest card names (1020..1021), then C3: the economy pictures (170-179), then the B4 pictures (140..148), then the D91 / DISP-10 / D48 pictures and the skill animations
+            }
+            break;
+    }
+}
+
+// R3 (D168, owner notes 10 and 28; steps 1020..1021): the pick screen with the cards that have the longest names, at 480 x 432, 640 x 576 and 800 x 720: A = Horizontal
+// Slash+, Spellweave, Meditation+ (English, then Korean); B = Foresight+, Apothecary, Whetstone (English). Nine pictures; each also goes through the fit recorder
+// (no text may leave its frame). Goes on with C3 (170).
+function Scenario_StepShotsCardNames(_s) {
+    var _gs = GameState_Get();
+    var _sets = [
+        { tag: "a_en", lang: "en", ids: [Card_UpgradeId(SKILL_HORIZ_SLASH), "pas:m_spellweave", Card_UpgradeId(SKILL_MEDITATION)] },
+        { tag: "b_en", lang: "en", ids: [Card_UpgradeId(SKILL_FORESIGHT), "pas:n_apothecary", "fb:focus"] },
+        { tag: "a_ko", lang: "ko", ids: [Card_UpgradeId(SKILL_HORIZ_SLASH), "pas:m_spellweave", Card_UpgradeId(SKILL_MEDITATION)] }
+    ];
+    var _scales = [3, 4, 5];
+    if (!variable_struct_exists(_s, "cn")) _s.cn = { i: 0 };
+    var _o = _s.cn;
+    var _set = _sets[_o.i div 3];
+    var _scale = _scales[_o.i mod 3];
+    switch (_s.step) {
+        case 1020:   // open the pick with this set at this size
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Loc_SetLanguage(_set.lang);
+                Scenario_SetWindowScale(_scale);
+                var _ch = _gs.player_ch;
+                _ch.skills = [SKILL_FIREBALL];
+                _ch.card_picks = 1;
+                _ch.offer = _set.ids;
+                CardsUi_Open("cards");
+            }
+            if (_s.t == 20) {
+                Scenario_Check("shots_cardnames_open_" + _set.tag + "_" + string(_scale), CardsUi_Kind() == "cards" && array_length(global.cards_ui.pick.ids) == 3 && array_length(global.cards_ui.pick.rects) == 3, "kind=" + CardsUi_Kind());
+                global.cards_ui.pick.cursor = 1;
+                global.cards_ui.pick.last = 1;
+            }
+            if (_s.t == 26) {
+                Scenario_ShotUi(_s, "cards_names_" + _set.tag);
+                Scenario_Next(_s, 1021);
+            }
+            break;
+        case 1021:
+            if (_s.t == 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                CardsUi_Close();
+                _gs.player_ch.card_picks = 0;
+                _gs.player_ch.offer = [];
+                Loc_SetLanguage("en");
+                _o.i++;
+                if (_o.i >= 9) Scenario_Next(_s, 170);   // C3: the economy pictures (170-179), then the B4 pictures and the rest
+                else Scenario_Next(_s, 1020);
             }
             break;
     }
@@ -6600,7 +6670,8 @@ function Scenario_StepSmokeEconomy(_s) {
             if (variable_struct_exists(_ec, "won") && CardsUi_Kind() == "cards" && !variable_struct_exists(_ec, "pick_seen")) {
                 _ec.pick_seen = true;
                 Scenario_Check("elite_the_card_pick_opens_by_itself", array_length(global.cards_ui.pick.ids) == 3);
-                _ec.q = ["menu_down", "confirm"];   // Skip: a clean answer whatever the cards are
+                Scenario_CardsHarmless();   // R3: no Skip any more; a harmless first card is a clean answer whatever the cards were
+                _ec.q = ["confirm"];
             }
             if (variable_struct_exists(_ec, "pick_seen") && !CardsUi_IsOpen() && Scenario_EcoIdle(_s, _ec)) {
                 Scenario_Check("elite_the_pick_is_answered", _gs.player_ch.card_picks == _ec.picks_e0 && Cards_NextOwed(_gs.player_ch) == "");
@@ -10970,7 +11041,8 @@ function Scenario_StepSmokeLevelUp(_s) {
                 Scenario_Check("levelup_current_hp_went_up_by_the_level_and_by_3", _ch.hp == _lu.hp0 + (Resource_MaxHp(_hd, 2) - Resource_MaxHp(_hd, 1)) + 3, "hp=" + string(_ch.hp) + " was " + string(_lu.hp0));
                 Scenario_Check("levelup_the_point_is_spent_once", _ch.stat_points == 0);
                 Scenario_Check("levelup_only_the_class_growth_reached_the_stats", _ch.stats.atk == _lu.atk0 + 1 && _ch.stats.def == _lu.def0 + 1, "atk=" + string(_ch.stats.atk) + " def=" + string(_ch.stats.def));
-                _lu.q = ["menu_down", "confirm"];   // Skip
+                Scenario_CardsHarmless();
+                _lu.q = ["confirm"];   // R3: no Skip any more; the first card (a harmless one) answers the pick
             }
             if (variable_struct_exists(_lu, "p1") && array_length(_lu.q) == 0 && _s.t > 150 && !CardsUi_IsOpen()) {
                 Scenario_Check("levelup_nothing_is_owed_after_the_pick", Cards_NextOwed(_ch) == "");
@@ -10999,7 +11071,8 @@ function Scenario_StepSmokeLevelUp(_s) {
                 Scenario_Check("levelup_current_mp_went_up_with_the_level_and_by_2", _ch.mp == min(_ch.max_mp, _lu.mp1 + (Resource_MaxMp(_ch.class_cfg.mp_gain, 3, _ch.stats.mag) - Resource_MaxMp(_ch.class_cfg.mp_gain, 2, _ch.stats.mag)) + 2), "mp=" + string(_ch.mp));
                 Scenario_Check("levelup_the_earlier_max_hp_bonus_is_kept", _ch.max_hp == Resource_MaxHp(_hd3, 3) + 3, "max_hp=" + string(_ch.max_hp));
                 Scenario_Check("levelup_the_second_point_is_spent_once", _ch.stat_points == 0);
-                _lu.q = ["menu_down", "confirm"];   // Skip
+                Scenario_CardsHarmless();
+                _lu.q = ["confirm"];   // R3: no Skip any more; the first card (a harmless one) answers the pick
             }
             if (variable_struct_exists(_lu, "p2") && array_length(_lu.q) == 0 && _s.t > 150 && !CardsUi_IsOpen()) {
                 Scenario_Check("levelup_nothing_is_owed_at_the_end", Cards_NextOwed(_ch) == "");

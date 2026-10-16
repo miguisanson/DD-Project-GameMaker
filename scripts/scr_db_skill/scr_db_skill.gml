@@ -1389,11 +1389,9 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
 #macro CARD_PITY_OFFERS 2     // offers without an upgrade (while one was possible) before the next one must hold one
 #macro CARD_MAX_SKILLS 3      // D82
 #macro CARD_OFFER_SIZE 3      // D81
-#macro CARD_SKIP_GOLD 5       // D81: a small payout for refusing an offer (about one early fight's gold)
 
 function Card_SkillId(_skill_id) { return "skill:" + string(_skill_id); }
 function Card_UpgradeId(_skill_id) { return "up:" + string(_skill_id); }
-function Card_SkipGold() { return CARD_SKIP_GOLD; }
 
 function Card_ArrayHas(_arr, _v) {
     if (!is_array(_arr)) return false;
@@ -1953,13 +1951,6 @@ function Card_OfferFromRun(_ch) {
     var off = Card_OfferGenerate(Run_Stream("cards"), _ch, st);
     if (is_struct(run)) run.cards = off.state;
     return off;
-}
-
-// Refusing an offer pays CARD_SKIP_GOLD into the run (D81).
-function Card_SkipOffer() {
-    var run = Run_Get();
-    if (is_struct(run)) run.gold += Card_SkipGold();
-    return Card_SkipGold();
 }
 
 // ---- taking a card -------------------------------------------------------------------------------------------------------

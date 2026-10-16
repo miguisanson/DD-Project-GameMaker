@@ -150,6 +150,7 @@ function Test_RunAll() {
     Test_RunSuite("Hunt7Map", Test_Suite_Hunt7Map);
     Test_RunSuite("Hunt7Feel", Test_Suite_Hunt7Feel);
     Test_RunSuite("Review7", Test_Suite_Review7);
+    Test_RunSuite("R3Cards", Test_Suite_R3Cards);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -5466,10 +5467,6 @@ function Test_Suite_Cards() {
     _fb_hp.hp = 2;
     var _tk5 = Card_Take(_fb_hp, "fb:rest");
     Test_Eq("C2 Second Wind (fallback) heals half of max HP", _tk5.ch.hp, min(_fb_hp.max_hp, 2 + floor(_fb_hp.max_hp / 2)));
-    Test_Eq("C2 Skip pays a small gold amount", Card_SkipGold(), 5);
-    _gs.run = Run_Create(1);
-    Card_SkipOffer();
-    Test_Eq("C2 skipping adds the gold to the run", _gs.run.gold, 5);
 
     // ---- passives that act in the game ----
     var _pm = Test_CardPlayer(CLASS_KNIGHT, [], [], ["pas:field_medic"]);
@@ -5612,13 +5609,10 @@ function Test_Suite_Cards() {
     Profile_Unlock(_prof, "nobody_class");
     Test_False("C2 Nobody is open once the profile has won", Card_ClassChoices(_prof)[3].locked);
 
-    // the pick screen's cursor model (D95: wrap-around): cards left/right, Skip below
+    // the pick screen's cursor model (D95: wrap-around): cards left/right; R3: no Skip row, up / down stay (the rest is Test_Suite_R3Cards)
     Test_Eq("C2 pick cursor: right moves to the next card", Cards_PickMove(0, 3, 1, 0, 0), 1);
     Test_Eq("C2 pick cursor: left from the first card wraps to the last", Cards_PickMove(0, 3, -1, 0, 0), 2);
     Test_Eq("C2 pick cursor: right from the last card wraps to the first", Cards_PickMove(2, 3, 1, 0, 2), 0);
-    Test_Eq("C2 pick cursor: down goes to Skip", Cards_PickMove(1, 3, 0, 1, 1), 3);
-    Test_Eq("C2 pick cursor: up from Skip returns to the card it left", Cards_PickMove(3, 3, 0, -1, 1), 1);
-    Test_Eq("C2 pick cursor: left/right on Skip stay on Skip", Cards_PickMove(3, 3, 1, 0, 1), 3);
 
     // skill books are gone (D18)
     var _books = 0;
@@ -13934,12 +13928,7 @@ function TextFit_Known() {
         { where: "tab skills 800x720 en", has: "'Horizontal Slash'" },
         { where: "battle lists 640x576 en", has: "'Horizontal Slash'" },
         { where: "battle lists 800x720 en", has: "'Horizontal Slash'" },
-        { where: "battle lists 800x720 en", has: "'Poison Arrow'" },
-        { where: "card pick 640x576 en", has: "'Meditation+'" },
-        { where: "card pick 640x576 en", has: "'Apothecary'" },
-        { where: "card pick 800x720 en", has: "card name" },          // one-word names of 10 to 11 letters ("Meditation+", "Foresight+", "Spellweave", "Apothecary", "Horizontal") are wider than a column
-        { where: "codex bestiary 800x720 en", has: "details of" },   // "The Pale Choirbeast" asks the list for 502 of 764 units, which leaves the details too narrow
-        { where: "codex bestiary 800x720 en", has: "line value" }
+        { where: "battle lists 800x720 en", has: "'Poison Arrow'" }
     ];
 }
 
@@ -14132,21 +14121,23 @@ function Test_Suite_TextFit() {
         return _f;
     });
 
-    // ---- the card pick: every card at the pick's column width, and the whole screen (title, cards, Skip, hint) on the screen ----
+    // ---- the card pick: every card at the pick's column width (the draw's own CardsUi_PickColumns / CardsUi_InnerW / CardsUi_NameFit), and the whole screen (title, cards, hint) on the screen ----
     TextFit_Each("card pick", function(_w, _h, _l) {
         var _f = [];
         var _mt = Ui_Metrics();
         var _p = _mt.p;
-        var _gap = 4 * _p;
-        var _cw = floor((_mt.gw - 2 * _mt.margin - 2 * _gap) / 3);
-        var _iw = _cw - 8 * _p;
+        var _col = CardsUi_PickColumns(_mt, 3);
+        var _cw = _col.cw;
+        var _iw = CardsUi_InnerW(_cw, _mt);
         var _all = CardDB_All();
-        var _skip = Loc_T("cards.pick.skip", "Skip: +{gold} gold", { gold: string(Card_SkipGold()) });
         var _hint = Loc_T("cards.pick.hint", "[k:left][k:right] Choose   [k:confirm] Take");
+        if (3 * _cw + 2 * _col.gap > _mt.gw - 2 * _p) array_push(_f, "the three cards (" + string(_cw) + " each) do not fit the screen " + string(_mt.gw));
         for (var _i = 0; _i < array_length(_all); _i++) {
             var _c = _all[_i];
             var _name = Card_Name(_c);
-            TextFit_Block(_f, "card name", _name, _iw - 5 * _p, _p);
+            var _nf = CardsUi_NameFit(_name, _iw - 5 * _p, _mt);
+            if (_nf.w > _iw - 5 * _p) array_push(_f, "card name '" + _name + "' needs " + string(_nf.w) + " has " + string(_iw - 5 * _p) + " (type step " + string(_nf.step) + ")");
+            if (_nf.lines > 2) array_push(_f, "card name '" + _name + "' takes " + string(_nf.lines) + " lines");
             TextFit_Block(_f, "card tag", Card_TypeTag(_c), _iw - 5 * _p, _p);
             TextFit_Block(_f, "card sentence of '" + _name + "'", Card_Sentence(_c), _iw, _p);
             var _ls = Card_Lines(_c);
@@ -14154,7 +14145,7 @@ function Test_Suite_TextFit() {
                 TextFit_Block(_f, "card line label of '" + _name + "'", _ls[_k].label, _iw, _p);
                 TextFit_Line(_f, "card line value of '" + _name + "'", _ls[_k].value, _iw);
             }
-            var _one = CardsUi_PickPlan([_c], _cw, _skip, _hint, _mt);   // the screen with this card as the tallest
+            var _one = CardsUi_PickPlan([_c], _cw, _hint, _mt);   // the screen with this card as the tallest
             if (_one.lay.bottom > _mt.gh - _mt.p) array_push(_f, "pick screen with '" + _name + "' (" + string(_one.ch_max) + ") ends at " + string(_one.lay.bottom) + " of " + string(_mt.gh));
         }
         return _f;
@@ -14463,4 +14454,58 @@ function Test_Review7HistoryCols() {
     }
     Test_True("review7 history: (setup) some resize changes the column count, so the check can fail", _differs);
     TextFit_End(_s);
+}
+
+// ============================================================================
+// Round 3 playtest, the card pick (owner notes 11, 10, 28; D168; R-095): the pick screen has the three cards and nothing else (no Skip, no gold for refusing),
+// every card's text fits its frame (Test_Suite_TextFit "card pick" proves every card at every size), "The Pale Choirbeast" is "Pale Choirbeast".
+// ============================================================================
+function Test_Suite_R3Cards() {
+    Test_RunSuite("R3Cards.cursor", Test_R3CardsCursor);
+    Test_RunSuite("R3Cards.skip", Test_R3CardsSkip);
+    Test_RunSuite("R3Cards.names", Test_R3CardsNames);
+}
+
+// The cursor moves between the cards only: left / right wrap, up / down do nothing, and no input ever leads to a row past the last card.
+function Test_R3CardsCursor() {
+    Test_Eq("r3cards cursor: right moves to the next card", Cards_PickMove(0, 3, 1, 0, 0), 1);
+    Test_Eq("r3cards cursor: left from the first card wraps to the last", Cards_PickMove(0, 3, -1, 0, 0), 2);
+    Test_Eq("r3cards cursor: right from the last card wraps to the first", Cards_PickMove(2, 3, 1, 0, 2), 0);
+    Test_Eq("r3cards cursor: down stays on the card (there is no row below)", Cards_PickMove(1, 3, 0, 1, 1), 1);
+    Test_Eq("r3cards cursor: up stays on the card", Cards_PickMove(1, 3, 0, -1, 1), 1);
+    Test_Eq("r3cards cursor: down on the last card stays on it", Cards_PickMove(2, 3, 0, 1, 2), 2);
+    var _past = 0;
+    for (var _cur = 0; _cur < 3; _cur++) {
+        for (var _dx = -1; _dx <= 1; _dx++) {
+            for (var _dy = -1; _dy <= 1; _dy++) {
+                var _to = Cards_PickMove(_cur, 3, _dx, _dy, _cur);
+                if (_to < 0 || _to > 2) _past++;
+            }
+        }
+    }
+    Test_Eq("r3cards cursor: no input reaches a row other than the three cards", _past, 0);
+}
+
+// No Skip: the offer is three cards, the Skip text is gone from the workbook in both languages.
+function Test_R3CardsSkip() {
+    var _gs = GameState_Get();
+    var _old = _gs.player_ch;
+    CardDB_Init();
+    var _ch = Test_CardPlayer(CLASS_MAGE, [SKILL_FIREBALL]);
+    _ch.offer = [Card_SkillId(SKILL_ICE_SPEAR), Card_UpgradeId(SKILL_FIREBALL), "fb:rest"];
+    _gs.player_ch = _ch;
+    var _pk = CardsUi_PickNew();
+    Test_Eq("r3cards skip: the pick screen holds exactly the three cards", array_length(_pk.ids), 3);
+    _gs.player_ch = _old;
+    Test_Eq("r3cards skip: no Skip text in English", Loc_GetRaw("cards.pick.skip", "en"), "");
+    Test_Eq("r3cards skip: no Skip text in Korean", Loc_GetRaw("cards.pick.skip", "ko"), "");
+}
+
+// D168: the final boss is "Pale Choirbeast" (no article), in the workbook and in the DB's own fallback.
+function Test_R3CardsNames() {
+    EnemyDB_Init();
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    Test_Eq("r3cards names: the final boss is Pale Choirbeast", EnemyDB_Get(ENEMY_FINAL_BOSS).name, "Pale Choirbeast");
+    Loc_SetLanguage(_lang0);
 }

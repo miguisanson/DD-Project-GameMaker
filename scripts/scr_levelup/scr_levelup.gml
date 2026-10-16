@@ -350,14 +350,11 @@ function Cards_PlaceStat(_ch, _stat_id) {
     return _ch;
 }
 
-// The pick screen's cursor: positions 0.._n-1 are the cards, _n is Skip. Left / right walk the cards (wrapping, D95); down goes to Skip; up
-// returns to the card it came from (_last).
+// The pick screen's cursor: positions 0.._n-1 are the cards, nothing else (R3: the Skip row is gone). Left / right walk the cards (wrapping, D95); up and
+// down stay where they are. _last is kept for the callers' signature.
 function Cards_PickMove(_cur, _n, _dx, _dy, _last) {
-    if (_cur >= _n) {
-        if (_dy < 0) return clamp(_last, 0, _n - 1);
-        return _n;
-    }
-    if (_dy > 0) return _n;
+    if (_n <= 0) return 0;
+    _cur = clamp(_cur, 0, _n - 1);
     if (_dx != 0) return (_cur + ((_dx < 0) ? -1 : 1) + _n) mod _n;
     return _cur;
 }

@@ -1708,7 +1708,7 @@ class RunSim:
         st["spd"] += int(round(R.passive_sum(p, "stat_spd")))
         st["mag"] += int(round(R.passive_sum(p, "stat_mag")))
         for k, v in p.__dict__.get("extra", {}).items():
-            st[k] += v
+            st[ST_KEY.get(k, k)] += v   # the game's stat names (def) are the table's keys (df)
         # D143: a free point placed on Max HP / Max MP is not on the class stat the class table (by_level) counts it on
         hp_pts, mp_pts = p.__dict__.get("hp_pts", 0), p.__dict__.get("mp_pts", 0)
         if hp_pts + mp_pts:
@@ -1970,7 +1970,7 @@ class RunSim:
                 key = self.free_stat_key()
                 q.extra[key] = q.extra.get(key, 0) + 1
                 q.st = dict(p.st)
-                q.st[key] += 1
+                q.st[ST_KEY.get(key, key)] += 1
                 return (base_v - self.value(q)) * n
             return 0.0
         q = clone_player(p)
@@ -2146,7 +2146,8 @@ class RunSim:
                 self.sync_stats()
 
     def do_picks(self):
-        """Answer every owed card pick with the greedy policy: the card with the best expected gain, or skip for a little gold."""
+        """Answer every owed card pick with the greedy policy: the card with the best expected gain. There is no Skip (owner note 11): one of the three cards is
+        always taken, the first of the best when none helps."""
         p = self.p
         while p.picks > 0:
             p.picks -= 1
@@ -2155,18 +2156,16 @@ class RunSim:
             self.rec["card_offers"].append(list(offer))
             base_v = self.value(p)
             base_rb = self.run_bonus(p)
-            best, best_g = None, 0.05   # a player takes the best card unless nothing helps at all (5 gold is not worth a card)
+            best, best_g = None, None
             for cid in offer:
                 g = self.card_value(self.d.cards[cid], base_v, base_rb)
                 self.rec["card_gain"].append((cid, g))
-                if g is not None and g > best_g:
+                if g is not None and (best_g is None or g > best_g):
                     best, best_g = cid, g
             if best is None:
-                self.gold += self.d.const["cards"]["skip_gold"]
-                self.rec["picks"].append("skip")
-            else:
-                self.take_card(best)
-                self.rec["picks"].append(best)
+                best = offer[0]   # nothing helps at all: the highlighted card (the first) is taken
+            self.take_card(best)
+            self.rec["picks"].append(best)
 
     # ---- shops ----
     def shop_stock(self, idx):
@@ -2617,7 +2616,7 @@ def aggregate(results, d):
     final_share = {}
     if wins:
         for r in wins:
-            taken = set(x for x in r["picks"] if x != "skip") | set(r["buys"])
+            taken = set(r["picks"]) | set(r["buys"])
             for c in taken:
                 share[c] = share.get(c, 0) + 1
             for s in r["final_skills"]:
@@ -2627,7 +2626,7 @@ def aggregate(results, d):
     early = {}
     if wins:
         for r in wins:
-            for c in set(x for x in r["picks"][:3] if x != "skip"):
+            for c in set(r["picks"][:3]):
                 early[c] = early.get(c, 0) + 1
         early = {k: v / len(wins) for k, v in early.items()}
     out["card_early_share_win"] = dict(sorted(early.items(), key=lambda kv: -kv[1]))
@@ -2645,11 +2644,9 @@ def aggregate(results, d):
         for o, t in zip(r["card_offers"], r["picks"]):
             for c in o:
                 off[c] = off.get(c, 0) + 1
-            if t != "skip":
-                tak[t] = tak.get(t, 0) + 1
+            tak[t] = tak.get(t, 0) + 1
     out["card_offered"] = off
     out["card_taken"] = tak
-    out["skip_share"] = mean([1.0 if t == "skip" else 0.0 for r in results for t in r["picks"]]) if any(r["picks"] for r in results) else 0.0
     # skill use per run
     use = {}
     for r in results:
