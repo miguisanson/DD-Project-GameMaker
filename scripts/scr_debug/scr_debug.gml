@@ -3128,7 +3128,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsR4Final2(_s);   // r4final2 (I-111): slime, snake, wolf, Palehorn, Choirbeast with their feet on the HUD row's top edge, and the Skill list against the Choirbeast; three sizes; the end of the pictures
             break;
         case 1190: case 1191: case 1192: case 1193: case 1194: case 1195: case 1196: case 1197: case 1198: case 1199:
-            Scenario_StepShotsRelease(_s);   // release (D188-D190): the title with its version label and Credits row, the credits page top and bottom (English and Korean), the keys that scroll it; three sizes; the end of the pictures
+            Scenario_StepShotsRelease(_s);   // release (D188-D190): the title with its version label and Credits row, the credits page top and bottom (English and Korean), the keys that scroll it; three sizes; goes on with r4polish (1200)
+            break;
+        case 1200: case 1201: case 1202: case 1203: case 1204: case 1205: case 1206: case 1207: case 1208: case 1209:
+            Scenario_StepShotsR4Polish(_s);   // r4polish (R-131): the battle message toast over a slime and the Pale Choirbeast (message state and command menu up, English; Korean once), clear of the enemy; three sizes; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -11701,7 +11704,7 @@ function Scenario_StepShotsLevelUp(_s) {
                 }
                 Scenario_Check("shots_levelup_the_rows_read_by_the_rule_" + _tag, _vals == _want_vals, "vals=" + _vals + " want=" + _want_vals);
                 Scenario_Check("shots_levelup_the_class_growth_rows_have_a_gold_new_number_" + _tag, _gold == _want_gold, "gold=" + _gold);
-                Scenario_Check("shots_levelup_the_legend_is_gold_text_not_the_growth_line_" + _tag, _m.layout.note == Loc_T("levelup.legend", "Gold = your class grows these") && string_pos("growth:", _m.layout.note) == 0, "note=" + string(_m.layout.note));
+                Scenario_Check("shots_levelup_the_legend_is_gold_text_not_the_growth_line_" + _tag, _m.layout.note == Loc_T("levelup.legend", "Gold numbers: your class's growth") && string_pos("growth:", _m.layout.note) == 0, "note=" + string(_m.layout.note));
                 Scenario_TF2RowsFit(_m, "levelup_" + _tag);
                 _s.shot = "shot_ui_levelup_" + _scene + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
                 Scenario_ShotLayout(_s.shot);
@@ -19063,7 +19066,7 @@ function Scenario_StepShotsR4Final2(_s) {
     }
 }
 
-// Release packet (D188, D189, D190): pictures 1190..1197, shot_release_<scene>_<w>x<h>.png at scales 3, 4, 5. The end of the pictures: the last step calls Scenario_MouseEnd.
+// Release packet (D188, D189, D190): pictures 1190..1197, shot_release_<scene>_<w>x<h>.png at scales 3, 4, 5. The last step goes on with r4polish (1200).
 //   title            the title with the version stamp ("v1.0" over the build id) at the lower right and the Credits row (cursor on it)
 //   credits_top      the Credits page at its top
 //   credits_bottom   the same scrolled to the end
@@ -19210,9 +19213,107 @@ function Scenario_StepShotsRelease(_s) {
             if (_o.di >= array_length(_scenes)) {
                 Loc_SetLanguage("en");
                 Scenario_SetWindowScale(3);
-                Scenario_MouseEnd();   // the end of the pictures
+                Scenario_Next(_s, 1200);   // goes on with the r4polish pictures (1200..1203), the end
             } else {
                 Scenario_Next(_s, 1190);
+            }
+            break;
+    }
+}
+
+// ============================================================================
+// R4 polish (R-131) pictures 1200..1203, shot_r4polish_<scene>_<w>x<h>.png at scales 3, 4, 5. The end of the pictures: the last step calls Scenario_MouseEnd.
+//   slime_msg, choir_msg: the message state (no menu) with the longest toast text over a slime and over the Pale Choirbeast
+//   slime_menu, choir_menu: the command menu is up with the same toast still showing
+//   choir_ko: the Choirbeast in Korean, message state
+// The toast stands on none of the enemy's opaque rect, its shadow, its name plate or its chips; with the menu up it is clear of the menu too (or not drawn).
+// ============================================================================
+function Scenario_R4PolishScenes() {
+    return ["slime_msg", "slime_menu", "choir_msg", "choir_menu", "choir_ko"];
+}
+
+function Scenario_StepShotsR4Polish(_s) {
+    if (!variable_struct_exists(_s, "r4p")) _s.r4p = { di: 0, si: 0 };
+    var _o = _s.r4p;
+    var _scenes = Scenario_R4PolishScenes();
+    var _scales = [3, 4, 5];
+    var _scene = _scenes[_o.di];
+    var _menu = (string_pos("_menu", _scene) > 0);
+    var _ko = (string_pos("_ko", _scene) > 0);
+    var _enemy = (string_pos("slime", _scene) == 1) ? ENEMY_SLIME : ENEMY_FINAL_BOSS;
+    switch (_s.step) {
+        case 1200:   // scene _o.di at scale _o.si: enter the battle
+            if (_s.t == 1) {
+                Mouse_FakeClear();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Loc_SetLanguage("en");   // the room restart reads the saved language again: Korean is set once the battle is up (step 1201)
+                Scenario_NewKnight(CLASS_KNIGHT);
+                Scenario_SetWindowScale(_scales[_o.si]);
+                Scenario_GotoBattle("shots_r4polish_" + string(_o.di) + "_" + string(_o.si), _enemy);
+            }
+            if (_s.t >= 25) Scenario_Next(_s, 1201);
+            break;
+        case 1201:   // set the scene up: park the battle on the state, put the longest toast text in the log
+            var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+            Scenario_Check("shots_r4polish_in_battle_" + _scene, _inb, "room=" + room_get_name(room));
+            if (!_inb) { Scenario_MouseEnd(); return; }
+            if (_ko) Loc_SetLanguage("ko");
+            var _bc = instance_find(obj_battle_controller, 0);
+            _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
+            _bc.pops = [];
+            _bc.tl_who = TL_PLAYER;
+            _bc.turn = TURN_PLAYER;
+            _bc.enemy_action_pending = false;
+            _bc.message_next_state = BSTATE_MENU;
+            _bc.battle_state = _menu ? BSTATE_MENU : BSTATE_MESSAGE;
+            _bc.ui_cmd = undefined;   // the menus are built again from the character
+            var _long = Loc_T("combat.msg.skill_crit", "Critical skill! {dmg} damage!", { dmg: 999 }) + " " + Loc_T("combat.msg.break", "BREAK! {name} takes +50% damage!", { name: _bc.e.name }) + " "
+                      + Loc_T("combat.msg.windup_broken", "{enemy}'s {skill} is broken off!", { enemy: _bc.e.name, skill: "Fireball" });
+            _bc.combat_log = [{ text: _long, icon_sprite: noone, icon_subimg: 0, at: current_time }];
+            Scenario_Next(_s, 1202);
+            break;
+        case 1202:   // build the menu, keep the toast fresh, check, take the picture
+            var _bc2 = instance_find(obj_battle_controller, 0);
+            if (_s.t == 1) Battle_MenusBuild(_bc2);
+            _bc2.combat_log[0].at = current_time - 400;   // an entry 400 ms old: fully shown
+            if (_s.t >= 20) {
+                var _tag = _scene + "_" + string(window_get_width()) + "x" + string(window_get_height());
+                var _lg = _bc2.hud.rects.log;
+                var _er = Battle_EnemyRect(_bc2);
+                var _sh = Battle_EnemyShadowRect(_bc2);
+                var _hd = Battle_EnemyHeaderRect(_bc2);
+                var _zn = Battle_Zones();
+                var _shown = is_struct(_lg);
+                Scenario_Check("shots_r4polish_the_language_is_" + _tag, Loc_GetLanguage() == (_ko ? "ko" : "en"));
+                if (!_menu) Scenario_Check("shots_r4polish_the_toast_is_drawn_in_the_message_state_" + _tag, _shown, "log=" + json_stringify(_lg));
+                if (_menu) Scenario_Check("shots_r4polish_the_command_menu_is_up_" + _tag, _bc2.battle_state == BSTATE_MENU && _bc2.ui_cmd.rect.w > 0);
+                if (_shown) {
+                    Scenario_Check("shots_r4polish_the_toast_is_clear_of_the_enemy_" + _tag, !Test_RectsOverlap(_lg, _er), json_stringify(_lg) + " enemy=" + json_stringify(_er));
+                    Scenario_Check("shots_r4polish_the_toast_is_clear_of_the_shadow_" + _tag, !Test_RectsOverlap(_lg, _sh), json_stringify(_lg) + " shadow=" + json_stringify(_sh));
+                    Scenario_Check("shots_r4polish_the_toast_is_clear_of_the_name_plate_" + _tag, !Test_RectsOverlap(_lg, Test_R3Rect(_hd.x1, _hd.y1, _hd.bw, _hd.h)), json_stringify(_lg) + " plate=" + string(_hd.x1) + "," + string(_hd.y1) + "," + string(_hd.bw) + "," + string(_hd.h));
+                    Scenario_Check("shots_r4polish_the_toast_is_clear_of_the_chips_" + _tag, _hd.chips_rect.w <= 0 || !Test_RectsOverlap(_lg, _hd.chips_rect), json_stringify(_lg));
+                    Scenario_Check("shots_r4polish_the_toast_is_clear_of_the_player_panel_" + _tag, !Test_RectsOverlap(_lg, _zn.player), json_stringify(_lg));
+                    if (_menu) Scenario_Check("shots_r4polish_the_toast_is_clear_of_the_command_menu_" + _tag, !Test_RectsOverlap(_lg, _bc2.ui_cmd.rect), json_stringify(_lg) + " menu=" + json_stringify(_bc2.ui_cmd.rect));
+                }
+                show_debug_message("[R4POLISH] " + _tag + " toast=" + (_shown ? _lg.where : "none"));
+                _s.shot = "shot_r4polish_" + _tag + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1203);
+            }
+            break;
+        case 1203:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Loc_SetLanguage("en");
+                    Scenario_SetWindowScale(3);
+                    Scenario_MouseEnd();   // the end of the pictures
+                } else {
+                    Scenario_Next(_s, 1200);
+                }
             }
             break;
     }

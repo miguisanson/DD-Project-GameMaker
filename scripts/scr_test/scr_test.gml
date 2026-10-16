@@ -10035,7 +10035,7 @@ function Test_Suite_LevelUpGrowth() {
     _gs.player_ch = _lv;
     var _menu = CardsUi_StatMenu();
     Test_Eq("D143 the free-point screen has six rows", array_length(_menu.items), 6);
-    Test_Eq("D143 the free-point screen shows the gold legend (D177), no longer the class growth line", _menu.layout.note, "Gold = your class grows these");
+    Test_Eq("D143 the free-point screen shows the gold legend (D177), no longer the class growth line", _menu.layout.note, "Gold numbers: your class's growth");
     Test_Eq("D143 the free-point screen still opens first when a point is owed", Cards_NextOwed(_lv), "stat");
     var _mt = Ui_Metrics();
     var _mc = Ui_MenuMeasure(_menu, _mt);
@@ -17965,7 +17965,7 @@ function Test_LvScreen() {
     Test_Eq("levelup screen: the DEF row's Now / After are the stat now and after growth + the point", Test_RowValue(_m.items[1].lines, "Now") + ">" + Test_RowValue(_m.items[1].lines, "After"), "12>14");
     Test_Eq("levelup screen: the VIG row shows Max HP now and after (VIG 13 = 19)", Test_RowValue(_m.items[4].lines, Loc_T("cards.stat.hp_now", "Max HP Now")) + ">" + Test_RowValue(_m.items[4].lines, Loc_T("cards.stat.hp_after", "Max HP After")), "10>19");
     Test_Eq("levelup screen: the MND row shows Max MP now and after (MND 13 = 13)", Test_RowValue(_m.items[5].lines, Loc_T("cards.stat.mp_now", "Max MP Now")) + ">" + Test_RowValue(_m.items[5].lines, Loc_T("cards.stat.mp_after", "Max MP After")), "11>13");
-    Test_Eq("levelup screen: the Korean-or-English legend replaces the 'Knight growth' line", _m.layout.note, Loc_T("levelup.legend", "Gold = your class grows these"));
+    Test_Eq("levelup screen: the Korean-or-English legend replaces the 'Knight growth' line", _m.layout.note, Loc_T("levelup.legend", "Gold numbers: your class's growth"));
     Test_True("levelup screen: the legend is not the old growth line", string_pos("growth:", _m.layout.note) == 0);
     Test_Eq("levelup screen: the legend is drawn in gold", _m.layout.note_col, UI_C_MERCHANT_GOLD);
     Test_Eq("levelup screen: the title names the level being confirmed", _m.layout.title, "Level 2: Place 1 Point");
@@ -17998,7 +17998,7 @@ function Test_LvScreen() {
     Test_Eq("levelup screen: every row reads only the number, the one under the cursor (DEF) now > now + 1", Test_LvRowValues(_om), "11|12 > 13|9|3|10|11");
     Loc_SetLanguage("ko");
     var _ko = CardsUi_StatMenu();
-    Test_True("levelup screen: the Korean legend is not the English one", _ko.layout.note != "Gold = your class grows these");
+    Test_True("levelup screen: the Korean legend is not the English one", _ko.layout.note != "Gold numbers: your class's growth");
     Loc_SetLanguage(_lang0);
     // keyboard: Down moves the cursor one row and the +1 moves with it
     var _kb = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1));

@@ -3,7 +3,7 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T21:38:25Z",
+    "generated_at_utc": "2026-10-16T21:50:02Z",
     "row_count": 1319
   },
   "default_lang": "en",
@@ -2961,8 +2961,8 @@
       "ko": "위력 {power}의 무기입니다."
     },
     "levelup.legend": {
-      "en": "Gold = your class grows these",
-      "ko": "금색 = 직업이 성장시키는 능력치"
+      "en": "Gold numbers: your class's growth",
+      "ko": "금색 숫자: 직업의 성장"
     },
     "menu.common.back": {
       "en": "Back",
