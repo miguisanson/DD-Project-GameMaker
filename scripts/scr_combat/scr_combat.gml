@@ -3018,10 +3018,25 @@ function Battle_MenusBuild(_bc) {
     _bc.ui_sig = { mp: _bc.p.mp, items: Battle_ItemSig(_bc.p), rev: Loc_GetRevision(), run: Battle_RunPct(_bc.p, _bc.e, _bc.run_fails), pv: Battle_SkillPreviewSig(_bc.p, _bc.e) };
 }
 
+// H13b (D156): the panel width the command menu needs so that no label is cut: the widest label (RUN with its chance, worst case "100%"), the marker column
+// and the inset. The menu is half the right column unless that is too little. Pure.
+function Battle_CmdNeed(_mt) {
+    var rows = Battle_CmdItems();
+    var w = 0;
+    for (var i = 0; i < array_length(rows); i++) {
+        w = max(w, UI_TextWidth(rows[i].label) + ((rows[i].id == "run") ? UI_TextWidth("100%") + 3 * _mt.p : 0));
+    }
+    return w + 13 * _mt.p;
+}
+
+function Battle_CmdPanelW(_z, _mt) {
+    return min(max(round(_z.right.w * 0.5), Battle_CmdNeed(_mt)), _z.right.w);
+}
+
 // The menus' place follows the window (the zones change with the size): set every frame before a menu is stepped or drawn.
 function Battle_MenusLayout(_bc) {
     var z = Battle_Zones();
-    _bc.ui_cmd.layout.panel_w = round(z.right.w * 0.5);
+    _bc.ui_cmd.layout.panel_w = Battle_CmdPanelW(z, Ui_Metrics());
     _bc.ui_cmd.layout.y_bottom = z.list_bottom;
     _bc.ui_skill.layout.panel_w = z.right.w;
     _bc.ui_skill.layout.y_bottom = z.list_bottom;
@@ -4009,19 +4024,40 @@ function Battle_SkillPreviewSig(_p, _e) {
     return sig;
 }
 
-// Where the plate sits: left of the command menu (_cmd = its rect), top aligned with it, clear of the player panel (_player = its zone rect). Pure.
-function BattleHud_PreviewRect(_cmd, _player, _m, _p, _lh, _text_w) {
-    var avail = _cmd.x - _m - (_player.x + _player.w + _m);
-    var w = min(_text_w + 12 * _p, max(avail, 12 * _p));
-    var h = 2 * _lh + 9 * _p;
-    return { x: _cmd.x - _m - w, y: _cmd.y, w: w, h: h };
-}
-
 // The "x2" marker of D134: a small plate in the top right corner, clear of the turn strip in the middle. Pure.
 function BattleHud_SpeedRect(_gw, _gh, _p, _lh, _text_w) {
     var m = 3 * _p;
     var w = _text_w + 12 * _p;
     return { x: _gw - m - w, y: m, w: w, h: _lh + 8 * _p };
+}
+
+// H13b (D156): the plate for the preview _pv beside the command menu _cmd (top aligned with it, clear of the player panel), in the zones _z:
+// { r, lines, plate, stacked, text_w, fit_w, pad, ok }. It is two lines ("Damage 4" over "Perfect 5") with 6p of air each side when that fits the gap; with
+// 4p of air when only that fits; else four lines (the label, then its number, twice), which needs half the width. r is the plate's rectangle, lines what is
+// drawn, plate the two plain lines (what the checks compare), fit_w the width a line may take, ok whether every line fits it whole. Pure.
+function Battle_PreviewPlateLayout(_cmd, _z, _mt, _pv) {
+    var p = _mt.p;
+    var lh = _mt.line_h;
+    var plate = Battle_PreviewPlateLines(_pv);
+    var avail = _cmd.x - _z.m - (_z.player.x + _z.player.w + _z.m);
+    var tw = max(UI_TextWidth(plate[0]), UI_TextWidth(plate[1]));
+    var lines = plate;
+    var pad = 12 * p;
+    var h = 2 * lh + 9 * p;
+    var stacked = false;
+    if (tw + pad > avail) pad = 8 * p;
+    if (tw + pad > avail) {
+        stacked = true;
+        lines = [Loc_T("battle.det.damage", "Damage"), Battle_PreviewHitsText(_pv.ok_hits), Loc_T("battle.det.perfect", "Perfect"), Battle_PreviewHitsText(_pv.perfect_hits)];
+        tw = 0;
+        for (var i = 0; i < 4; i++) tw = max(tw, UI_TextWidth(lines[i]));
+        h = 4 * lh + 11 * p;
+    }
+    var w = min(tw + pad, max(avail, 12 * p));
+    var fit_w = w - pad;
+    var shown = [];
+    for (var j = 0; j < array_length(lines); j++) array_push(shown, Ui_FitText(lines[j], fit_w));
+    return { r: { x: _cmd.x - _z.m - w, y: _cmd.y, w: w, h: h }, lines: shown, plate: plate, stacked: stacked, text_w: tw, fit_w: fit_w, pad: pad, ok: (tw <= fit_w) };
 }
 
 // D135: with the cursor on ATTACK in the command menu, a plate beside it shows the damage against the current enemy at OK and at Perfect.
@@ -4034,19 +4070,18 @@ function Battle_DrawAttackPreview(_bc, _alpha) {
     var mt = Ui_Metrics();
     var p = mt.p;
     var z = Battle_Zones();
-    var lines = Battle_PreviewPlateLines(Battle_AttackPreview(_bc.p, _bc.e, Battle_PlayerWeapon(_bc)));
-    var tw = max(UI_TextWidth(lines[0]), UI_TextWidth(lines[1]));
-    var r = BattleHud_PreviewRect(m.rect, z.player, z.m, p, mt.line_h, tw);
-    var fit_w = r.w - 12 * p;
-    lines = [Ui_FitText(lines[0], fit_w), Ui_FitText(lines[1], fit_w)];
+    var pl = Battle_PreviewPlateLayout(m.rect, z, mt, Battle_AttackPreview(_bc.p, _bc.e, Battle_PlayerWeapon(_bc)));
+    var r = pl.r;
     Ui_DrawFrame(r.x, r.y, r.w, r.h, _alpha, p);
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
-    Ui_Text(r.x + 6 * p, r.y + 4 * p, lines[0], UI_C_LIGHTEST);
-    Ui_Text(r.x + 6 * p, r.y + 5 * p + mt.line_h, lines[1], UI_C_LIGHT);
+    for (var i = 0; i < array_length(pl.lines); i++) {
+        var accent = pl.stacked ? (i mod 2 == 1) : (i == 0);   // the number (stacked) or the first line (two lines) is the bright one
+        Ui_Text(r.x + pl.pad div 2, r.y + 4 * p + i * (mt.line_h + p), pl.lines[i], accent ? UI_C_LIGHTEST : UI_C_LIGHT);
+    }
     draw_set_alpha(a0);
     _bc.hud.rects.preview = r;
-    _bc.hud.preview_text = lines;
+    _bc.hud.preview_text = pl.plate;
 }
 
 // D134: "x2" in the top right corner while the battle runs at double speed.

@@ -1151,6 +1151,7 @@ function RunFlow_Draw() {
         if (Prompt_HasTokens(f.ctx.text)) {   // D149: terms and buttons in the line (laid out in the text column under the death picture, H13a)
             Prompt_RichDraw(round((w - lay.text_w) / 2), lay.text_y, f.ctx.text, lay.text_w, UI_C_TEXT, fa_center, a);
         } else {
+            if (UiFit_On()) UiFit_BlockDrawn(round((w - lay.text_w) / 2), lay.text_y, f.ctx.text, lay.text_w);   // H13b (D156)
             draw_set_halign(fa_center);
             draw_set_valign(fa_top);
             draw_set_color(UI_C_TEXT);

@@ -453,17 +453,11 @@ function Codex_HistoryRows(_prof) {
         var res = variable_struct_exists(h, "result") ? string(h.result) : "died";
         var cause = variable_struct_exists(h, "cause") ? string(h.cause) : "";
         var sentence;
-        var value;
-        if (res == "won") {
-            sentence = Loc_T("tab.hist.won", "You climbed out of the tunnel.");
-            value = Loc_T("tab.val.won", "Won");
-        } else if (res == "abandoned") {
-            sentence = Loc_T("tab.hist.abandoned", "You abandoned this run on floor {n}.", { n: string(fl) });
-            value = Loc_T("tab.val.abandoned", "Abandoned");
-        } else {
-            sentence = (cause != "") ? Loc_T("tab.hist.died_to", "Floor {n}: felled by {name}.", { name: cause, n: string(fl) }) : Loc_T("tab.hist.died", "You fell on floor {n}.", { n: string(fl) });
-            value = Loc_T("tab.val.floor", "Floor {n}", { n: string(fl) });
-        }
+        if (res == "won") sentence = Loc_T("tab.hist.won", "You climbed out of the tunnel.");
+        else if (res == "abandoned") sentence = Loc_T("tab.hist.abandoned", "You abandoned this run on floor {n}.", { n: string(fl) });
+        else sentence = (cause != "") ? Loc_T("tab.hist.died_to", "Floor {n}: felled by {name}.", { name: cause, n: string(fl) }) : Loc_T("tab.hist.died", "You fell on floor {n}.", { n: string(fl) });
+        // H13c (D156): the row is the class and level alone. The result (won / gave up / floor and killer) is the sentence in the details panel; a value column on every row
+        // made the list ask for so much width that the number lines had to put each value under its label and the panel outgrew the screen.
         // G9 (D137): the six run stats made eleven lines, which do not fit the details panel at 800 x 720. The level is in the row's title, the gold is gone with the run
         // (D23), so those two lines gave way; the floor, the foes beaten and the seed stay.
         var lines = [
@@ -474,11 +468,30 @@ function Codex_HistoryRows(_prof) {
         for (var sl = 0; sl < array_length(stat_lines); sl++) array_push(lines, stat_lines[sl]);
         array_push(lines, { label: Loc_T("tab.lbl.seed", "Seed"), value: string(variable_struct_exists(h, "seed") ? h.seed : 0) });
         array_push(rows, {
-            id: "run_" + string(i), label: Loc_T("tab.hist.row", "{cls} Lv {n}", { cls: string(cname), n: string(h.level) }), value: value, kind: "button", enabled: true, help: sentence, hint: "",
+            id: "run_" + string(i), label: Loc_T("tab.hist.row", "{cls} Lv {n}", { cls: string(cname), n: string(h.level) }), value: "", kind: "button", enabled: true, help: sentence, hint: "",
             lines: lines
         });
     }
     return rows;
+}
+
+// H13c (D156): how many columns the run history's number lines use in the details panel (1 or 2). A run has nine lines: one to a row is the look, but in a language whose
+// sentences wrap more (Korean) that is taller than the body, so two to a row (the run summary's way) is used then; it is also the choice when it is the shorter of the two
+// and the one-column page does not fit. Measured at the details width this page really gets.
+function Codex_HistoryCols(_rows) {
+    if (array_length(_rows) <= 0) return 1;
+    var z = TabMenu_Zones("codex_history");
+    var mt = z.mt;
+    var p = mt.p;
+    var m = Ui_MenuNew("fit_history", _rows, { layout: { title: Loc_T("tab.codex.history", "Run History"), anchor: "center", details: true, details_pos: "right", details_cols: 1, det_art: true, hides_below: true } });
+    var lneed = Ui_MenuListNeed(Ui_MenuMeasureRowsFresh(m, mt), p);
+    var hs = [0, 0];
+    for (var c = 1; c <= 2; c++) {
+        var det_w = TabMenu_Widths(z, lneed, Ui_MenuDetailsNeed(_rows, p, c)).det_w;
+        for (var i = 0; i < array_length(_rows); i++) hs[c - 1] = max(hs[c - 1], Ui_DetailsHeight(det_w, _rows[i].help, _rows[i].lines, c));
+    }
+    if (hs[0] - 2 * p <= z.body_h) return 1;   // the same allowance the fit check makes: the text may use 2p of the 4p kept under the last line
+    return (hs[1] < hs[0]) ? 2 : 1;
 }
 
 function Codex_UnlockRows(_prof) {
@@ -523,7 +536,7 @@ function TabMenu_ListShare(_tid) {
     switch (_tid) {
         case "codex_bestiary": return 0.4;   // the page on the right has the long text and the numbers
         case "codex_notes": return 0.5;      // D147: room for the note titles and "Notes found 2/8" (the details text of a note must still fit at 800 x 720 too)
-        case "codex_history": return 0.58;
+        case "codex_history": return 0.4;    // H13c: rows are the class and level alone now (no value column), so the details panel gets the width
         case "gear": case "items": case "skills": return 0.55;   // long names with icons
         case "settings": return 0.6;                              // a name and a value on every row
         case "system": return 0.5;
@@ -549,16 +562,33 @@ function TabMenu_Zones(_tid = "") {
     return z;
 }
 
+// H13b (D156): the widths of the list and of the details panel of one Tab page: { list_w, det_w }. _z is TabMenu_Zones (the share the page starts from),
+// _list_need and _det_need what the rows and the number lines ask for (Ui_MenuListNeed, Ui_MenuDetailsNeed). Pure.
+// The page keeps its share when the share holds both; when a row's label or a number line asks for more, the other panel gives way (the list never takes more than
+// two thirds of the body; the rows that still do not fit are for the text side).
+function TabMenu_Widths(_z, _list_need, _det_need) {
+    var p = _z.mt.p;
+    var total = _z.list_w + _z.det_w;
+    var lneed = ceil(_list_need / p) * p;
+    var dneed = ceil(_det_need / p) * p;
+    var cap = total - ceil(round(total / 3) / p) * p;
+    var w = clamp(_z.list_w, lneed, max(lneed, total - dneed));
+    w = min(w, cap);
+    return { list_w: w, det_w: total - w };
+}
+
 // Fits a list menu into the Tab menu's body; _top_extra is room kept above the list (the Status card).
 function TabMenu_FitMenu(_m, _z, _top_extra = 0) {
     var L = _m.layout;
+    var mc = Ui_MenuMeasureRowsFresh(_m, _z.mt);
+    var wd = TabMenu_Widths(_z, Ui_MenuListNeed(mc, _z.mt.p), mc.det_need);
     L.x_anchor = "left";
-    L.panel_w = _z.list_w;
+    L.panel_w = wd.list_w;
     L.y_top = _z.body_y + _top_extra;
     L.max_h = _z.body_h - _top_extra;
     L.details = true;
     L.details_pos = "right";
-    L.det_w = _z.det_w;
+    L.det_w = wd.det_w;
     L.det_top = _z.body_y;
     L.det_h = _z.body_h;
     L.det_art = true;
@@ -938,32 +968,27 @@ function TabMenu_Depth() {
     return is_struct(u.pages[u.tab]) ? Ui_StackDepth(u.pages[u.tab].stk) : 1;
 }
 
+// H13b (D156): one Codex page: { rows, title, cols } (cols = the number lines' columns in the details panel). The suite builds the same pages.
+function TabCodex_Page(_kind, _prof) {
+    switch (_kind) {
+        case "bestiary":
+            var brows = Codex_BestiaryRows(_prof);
+            return { rows: brows, title: Loc_T("tab.codex.bestiary_title", "Bestiary {n}/{max}", { n: string(Codex_BestiaryCount(_prof)), max: string(array_length(brows)) }), cols: 2 };
+        case "notes": return { rows: Codex_NoteRows(_prof), title: Codex_NotesTitle(_prof), cols: 1 };
+        case "history":
+            var hrows = Codex_HistoryRows(_prof);
+            return { rows: hrows, title: Loc_T("tab.codex.history", "Run History"), cols: Codex_HistoryCols(hrows) };
+    }
+    return { rows: Codex_UnlockRows(_prof), title: Loc_T("tab.codex.unlocks", "Unlocks"), cols: 1 };
+}
+
 function TabCodex_Open(_kind) {
     var u = TabMenu_Get();
     var pg = u.pages[u.tab];
-    var prof = Profile_Get();
-    var rows;
-    var title;
-    var cols = 1;
-    switch (_kind) {
-        case "bestiary":
-            rows = Codex_BestiaryRows(prof);
-            title = Loc_T("tab.codex.bestiary_title", "Bestiary {n}/{max}", { n: string(Codex_BestiaryCount(prof)), max: string(array_length(rows)) });
-            cols = 2;
-            break;
-        case "notes":
-            rows = Codex_NoteRows(prof);
-            title = Codex_NotesTitle(prof);
-            break;
-        case "history":
-            rows = Codex_HistoryRows(prof);
-            title = Loc_T("tab.codex.history", "Run History");
-            break;
-        default:
-            rows = Codex_UnlockRows(prof);
-            title = Loc_T("tab.codex.unlocks", "Unlocks");
-            break;
-    }
+    var page = TabCodex_Page(_kind, Profile_Get());
+    var rows = page.rows;
+    var title = page.title;
+    var cols = page.cols;
     if (array_length(rows) <= 0) return;
     var m = Ui_MenuNew("codex_" + _kind, rows, {
         data: { tab: "codex_page" },
@@ -1802,23 +1827,36 @@ function CardsUi_LineStacked(_line, _iw, _mt) {
     return UI_TextWidth(_line.label) + 3 * _mt.p + UI_TextWidth(_line.value) > _iw;
 }
 
-function CardsUi_CardHeight(_c, _w, _mt) {
+// H13b (D156): the height of a number line's label on a card: one line, or more when the label is wider than the card (it wraps, nothing is cut). A wrapped
+// label always has its value on the row below.
+function CardsUi_LabelH(_line, _iw, _mt) {
+    return max(_mt.line_h, Ui_TextBlockH(_line.label, _iw));
+}
+
+// _g: the space between a card's blocks (2p; p on a screen that is tight, CardsUi_PickPlan).
+function CardsUi_CardHeight(_c, _w, _mt, _g = -1) {
     var p = _mt.p;
+    var g = (_g < 0) ? 2 * p : _g;
     var iw = _w - 8 * p;
     var h = 8 * p;
-    h += max(Ui_TextBlockH(Card_Name(_c), iw - 5 * p), _mt.line_h) + 2 * p;
-    h += _mt.line_h + 3 * p;
-    h += Ui_TextBlockH(Card_Sentence(_c), iw) + 2 * p;
+    h += max(Ui_TextBlockH(Card_Name(_c), iw - 5 * p), _mt.line_h) + g;
+    h += max(Ui_TextBlockH(Card_TypeTag(_c), iw - 5 * p), _mt.line_h) + p + p + g;   // the tag (it wraps), the rule
+    h += Ui_TextBlockH(Card_Sentence(_c), iw) + g;
     var seq = Card_Sequence(_c);
-    if (array_length(seq) > 0) h += 13 * clamp(floor(iw / 60), 1, 3) + 2 * p;
+    if (array_length(seq) > 0) h += 13 * clamp(floor(iw / 60), 1, 3) + g;
     var lines = Card_Lines(_c);
-    for (var i = 0; i < array_length(lines); i++) h += (CardsUi_LineStacked(lines[i], iw, _mt) ? 2 : 1) * (_mt.line_h + p);
+    for (var i = 0; i < array_length(lines); i++) {
+        var lh = CardsUi_LabelH(lines[i], iw, _mt);
+        if (lh > _mt.line_h) h += lh + p + _mt.line_h + p;
+        else h += (CardsUi_LineStacked(lines[i], iw, _mt) ? 2 : 1) * (_mt.line_h + p);
+    }
     return h;
 }
 
-function CardsUi_DrawCard(_x, _y, _w, _h, _c, _sel, _a) {
+function CardsUi_DrawCard(_x, _y, _w, _h, _c, _sel, _a, _g = -1) {
     var mt = Ui_Metrics();
     var p = mt.p;
+    var g = (_g < 0) ? 2 * p : _g;
     var iw = _w - 8 * p;
     if (_sel) {   // a bright halo outside the frame
         Ui_Box(_x + p, _y - p, _x + _w - p, _y, UI_C_LIGHT);
@@ -1836,26 +1874,88 @@ function CardsUi_DrawCard(_x, _y, _w, _h, _c, _sel, _a) {
         Ui_Arrow(x0 + Ui_Bob(current_time) * p, ty + (mt.line_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
     }
     Ui_TextBlock(x0 + 5 * p, ty, name, iw - 5 * p, UI_C_TEXT);
-    ty += nh + 2 * p;
-    Ui_Text(x0 + 5 * p, ty, Card_TypeTag(_c), UI_C_LIGHT);
-    ty += mt.line_h + p;
+    ty += nh + g;
+    var tag = Card_TypeTag(_c);
+    Ui_TextBlock(x0 + 5 * p, ty, tag, iw - 5 * p, UI_C_LIGHT);
+    ty += max(Ui_TextBlockH(tag, iw - 5 * p), mt.line_h) + p;
     Ui_Box(_x + 3 * p, ty, _x + _w - 3 * p, ty + p, UI_C_DARK);
-    ty += 2 * p;
+    ty += p + g;
     var sentence = Card_Sentence(_c);
     Ui_TextBlock(x0, ty, sentence, iw, UI_C_LIGHTEST);
-    ty += Ui_TextBlockH(sentence, iw) + 2 * p;
+    ty += Ui_TextBlockH(sentence, iw) + g;
     var seq = Card_Sequence(_c);
     if (array_length(seq) > 0) {
         var u = clamp(floor(iw / 60), 1, 3);
-        ty += CardsUi_DrawArrows(x0, ty, iw, seq, u) + 2 * p;
+        ty += CardsUi_DrawArrows(x0, ty, iw, seq, u) + g;
     }
     var lines = Card_Lines(_c);
     for (var i = 0; i < array_length(lines); i++) {
-        Ui_Text(x0, ty, lines[i].label, UI_C_LIGHT);
-        if (CardsUi_LineStacked(lines[i], iw, mt)) ty += mt.line_h + p;
+        var lab_h = CardsUi_LabelH(lines[i], iw, mt);
+        if (lab_h > mt.line_h) {   // a label wider than the card wraps; its value goes under it
+            Ui_TextBlock(x0, ty, lines[i].label, iw, UI_C_LIGHT);
+            ty += lab_h + p;
+        } else {
+            Ui_Text(x0, ty, lines[i].label, UI_C_LIGHT);
+            if (CardsUi_LineStacked(lines[i], iw, mt)) ty += mt.line_h + p;
+        }
         Ui_Text(x0 + iw, ty, lines[i].value, UI_C_LIGHTEST, fa_right);
         ty += mt.line_h + p;
     }
+}
+
+// H13b (D156): where the pick screen's parts stand, from the tallest card's height (_ch_max): { total, y0, cards_y, skip_y, skip_w, skip_h, hint_y, bottom }.
+// _slide moves the title and the cards up while the screen slides in. Pure; `bottom` is where the hint line ends and must stay on the screen.
+function CardsUi_PickLayout(_ch_max, _skip_label, _hint, _mt, _slide = 0, _tight = false) {
+    var p = _mt.p;
+    var gap = _tight ? 2 * p : 3 * p;   // between the title, the cards and the bottom row
+    var skip_w = UI_TextWidth(_skip_label) + (_tight ? 14 : 24) * p;
+    var skip_h = _mt.row_h + (_tight ? 2 * p : 4 * p);
+    var skip_x, hint_x, hint_w, hint_h, row_h, skip_dy, hint_dy;
+    var hint_parts = [_hint];
+    if (_tight) {   // the Skip box on the left with the hint beside it (one row), not the hint under a centred box
+        hint_w = _mt.gw - 2 * _mt.margin - skip_w - 4 * p;
+        hint_h = UiFit_Measure(_hint, hint_w, true).h;
+        if (UiFit_Measure(_hint, hint_w, true).lines > 1 && string_pos("   ", _hint) > 0) {   // too long for one line: one button and its word per line, never a button apart from its word
+            hint_parts = string_split(_hint, "   ");
+            hint_h = array_length(hint_parts) * (_mt.line_h + p) - p;
+        }
+        row_h = max(skip_h, hint_h);
+        skip_x = _mt.margin;
+        hint_x = _mt.margin + skip_w + 4 * p;
+        skip_dy = (row_h - skip_h) div 2;
+        hint_dy = (row_h - hint_h) div 2;
+    } else {
+        hint_w = round(_mt.gw * 0.8);
+        hint_h = UiFit_Measure(_hint, hint_w, true).h;
+        row_h = skip_h + 2 * p + hint_h;
+        skip_x = round((_mt.gw - skip_w) / 2);
+        hint_x = round(_mt.gw * 0.1);
+        skip_dy = 0;
+        hint_dy = skip_h + 2 * p;
+    }
+    var total = _mt.line_h + gap + _ch_max + gap + row_h;
+    var y0 = max(_tight ? _mt.pad : _mt.margin, round((_mt.gh - total) / 2));
+    var cy = y0 + _mt.line_h + gap - _slide;
+    var sy = cy + _ch_max + gap;
+    return { total: total, tight: _tight, y0: y0 - _slide, cards_y: cy, skip_x: skip_x, skip_y: sy + skip_dy, skip_w: skip_w, skip_h: skip_h,
+             hint_x: hint_x, hint_y: sy + hint_dy, hint_w: hint_w, hint_h: hint_h, hint_parts: hint_parts, bottom: sy + row_h };
+}
+
+// H13b (D156): the plan of the pick screen for the cards _cards, each _cw wide: { tight, g, ch_max, lay }. The roomy spacing (2p between a card's blocks, 3p between the
+// parts of the screen) when the whole screen ends a margin above the bottom with it; the tight spacing (p and 2p, a smaller Skip box) when it does not. Pure.
+function CardsUi_PickPlan(_cards, _cw, _skip_label, _hint, _mt, _slide = 0) {
+    var p = _mt.p;
+    var plan = undefined;
+    for (var pass = 0; pass < 2; pass++) {
+        var tight = (pass == 1);
+        var g = tight ? p : 2 * p;
+        var chm = 0;
+        for (var i = 0; i < array_length(_cards); i++) chm = max(chm, CardsUi_CardHeight(_cards[i], _cw, _mt, g));
+        var lay = CardsUi_PickLayout(chm, _skip_label, _hint, _mt, _slide, tight);
+        plan = { tight: tight, g: g, ch_max: chm, lay: lay };
+        if (lay.bottom <= _mt.gh - _mt.margin) break;
+    }
+    return plan;
 }
 
 function CardsUi_DrawPick(_u, _a) {
@@ -1867,42 +1967,41 @@ function CardsUi_DrawPick(_u, _a) {
     var margin = mt.margin;
     var cw = floor((mt.gw - 2 * margin - (n - 1) * gap) / n);
     var cards = [];
-    var ch_max = 0;
-    for (var i = 0; i < n; i++) {
-        var c = CardDB_Get(pk.ids[i]);
-        array_push(cards, c);
-        ch_max = max(ch_max, CardsUi_CardHeight(c, cw, mt));
-    }
+    for (var i = 0; i < n; i++) array_push(cards, CardDB_Get(pk.ids[i]));
     var picks = GameState_Get().player_ch.card_picks;
     var title = Loc_T("cards.pick.title", "Choose a Card");
     if (picks > 1) title += "  " + Loc_T("cards.pick.left", "({n} picks left)", { n: string(picks) });
     var skip_label = Loc_T("cards.pick.skip", "Skip: +{gold} Gold", { gold: string(Card_SkipGold()) });
-    var skip_w = UI_TextWidth(skip_label) + 24 * p;
-    var skip_h = mt.row_h + 4 * p;
     var hint = Loc_T("cards.pick.hint", "[k:left][k:right] Choose   [k:confirm] Take");
-    var total = mt.line_h + 3 * p + ch_max + 3 * p + skip_h + 2 * p + mt.line_h;
-    var y0 = max(margin, round((mt.gh - total) / 2));
     var slide = p * round((1 - _a) * 3);
-    Ui_Text(mt.gw / 2, y0 - slide, title, UI_C_LIGHTEST, fa_center);
-    var cy = y0 + mt.line_h + 3 * p - slide;
+    var plan = CardsUi_PickPlan(cards, cw, skip_label, hint, mt, slide);
+    var ch_max = plan.ch_max;
+    var pl = plan.lay;
+    var skip_w = pl.skip_w;
+    var skip_h = pl.skip_h;
+    Ui_Text(mt.gw / 2, pl.y0, title, UI_C_LIGHTEST, fa_center);
+    var cy = pl.cards_y;
     var rects = [];
     for (var k = 0; k < n; k++) {
         var cx = margin + k * (cw + gap);
-        CardsUi_DrawCard(cx, cy, cw, ch_max, cards[k], k == pk.cursor, _a);
+        CardsUi_DrawCard(cx, cy, cw, ch_max, cards[k], k == pk.cursor, _a, plan.g);
         array_push(rects, { x: cx, y: cy, w: cw, h: ch_max });
     }
-    var sx = round((mt.gw - skip_w) / 2);
-    var sy = cy + ch_max + 3 * p;
+    var sx = pl.skip_x;
+    var sy = pl.skip_y;
     var skip_sel = (pk.cursor >= n);
     if (skip_sel) {
         Ui_Box(sx - p, sy - p, sx + skip_w + p, sy + skip_h + p, UI_C_LIGHT);
     }
     Ui_DrawFrame(sx, sy, skip_w, skip_h, _a, p);
     if (skip_sel) Ui_Arrow(sx + 5 * p + Ui_Bob(current_time) * p, sy + (skip_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
-    Ui_Text(sx + skip_w / 2, sy + (skip_h - mt.line_h) div 2, skip_label, skip_sel ? UI_C_LIGHTEST : UI_C_LIGHT, fa_center);
+    if (pl.tight) Ui_Text(sx + 9 * p, sy + (skip_h - mt.line_h) div 2, skip_label, skip_sel ? UI_C_LIGHTEST : UI_C_LIGHT);   // the narrow box: past the marker
+    else Ui_Text(sx + skip_w / 2, sy + (skip_h - mt.line_h) div 2, skip_label, skip_sel ? UI_C_LIGHTEST : UI_C_LIGHT, fa_center);
     array_push(rects, { x: sx, y: sy, w: skip_w, h: skip_h });
     pk.rects = rects;
-    Prompt_RichDraw(round(mt.gw * 0.1), sy + skip_h + 2 * p, hint, round(mt.gw * 0.8), UI_C_LIGHT, fa_center, _a);
+    for (var hp = 0; hp < array_length(pl.hint_parts); hp++) {
+        Prompt_RichDraw(pl.hint_x, pl.hint_y + hp * (mt.line_h + p), pl.hint_parts[hp], pl.hint_w, UI_C_LIGHT, pl.tight ? fa_left : fa_center, _a);
+    }
 }
 
 function CardsUi_Draw() {
@@ -4210,6 +4309,7 @@ function Ui_Text(_x, _y, _txt, _col, _halign = fa_left) {
     draw_set_valign(fa_top);
     draw_set_color(Ui_TextColor(_col));
     if (is_string(_txt) && string_pos("[", _txt) > 0) _txt = Markup_Strip(_txt);   // D149: markup never reaches a plain draw as brackets
+    if (UiFit_On()) UiFit_TextDrawn(_x, _y, _txt, _halign);   // H13b (D156): a scripted run records text that leaves its frame or the screen
     UI_DrawText(round(_x), round(_y), _txt);
     draw_set_halign(fa_left);
 }
@@ -4225,6 +4325,7 @@ function Ui_Arrow(_x, _y, _dir, _p, _col) {
 // The frame (D89, D96): a 1p light outline with notched corners, a 1p dark band, a dark-green fill. Border + band = 2p on every side.
 function Ui_DrawFrame(_x, _y, _w, _h, _alpha = 1, _p = -1) {
     if (_p < 0) _p = Ui_Px();
+    if (UiFit_On()) UiFit_FramePush(_x, _y, _w, _h, _p);
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
     var p = _p;
@@ -4338,6 +4439,7 @@ function Ui_TextBlockH(_txt, _w) {
 
 function Ui_TextBlock(_x, _y, _txt, _w, _col) {
     if (Prompt_HasTokens(_txt)) { Prompt_RichDraw(_x, _y, string(_txt), _w, _col); return; }
+    if (UiFit_On()) UiFit_BlockDrawn(_x, _y, _txt, _w);
     var s = max(0.0001, UI_GetFontScale());
     draw_set_halign(fa_left);
     draw_set_valign(fa_top);
@@ -4351,9 +4453,186 @@ function Ui_FitText(_txt, _max_w) {
     var t = string(_txt);
     if (string_pos("[", t) > 0) t = Markup_Strip(t);   // D149: the width of what is drawn, not of the tags
     if (UI_TextWidth(t) <= _max_w) return t;
+    if (UiFit_On()) UiFit_Fail("cut", t, _max_w, UI_TextWidth(t));   // H13b (D156): a cut is a fit failure
     while (string_length(t) > 1 && UI_TextWidth(t + "..") > _max_w) t = string_copy(t, 1, string_length(t) - 1);
     return t + "..";
 }
+
+// ---- H13b (D156): THE "text fits" check ---------------------------------------------------------------------------------------
+// One question, asked the same way everywhere: does this text, wrapped the way the draw wraps it, fit this box? The measuring uses the draw's own
+// functions (Prompt_RichLayout for a sentence with prompts or styled words, string_width_ext for a plain block, UI_TextWidth for a line), so the
+// answer is what the player sees. Two users:
+//   * the unit suite (Test_Suite_TextFit) feeds every workbook row of the known card / plate / list types through UiFit_Check at 480 x 432 and 800 x 720;
+//   * the scripted runs switch the recorder on (UiFit_Enable): Ui_DrawFrame remembers each frame drawn this frame, and Ui_Text / Ui_TextBlock note any
+//     text that starts inside a frame and ends outside its inner edge (or leaves the screen); Ui_FitText notes every cut ("..").
+//     Each note is a "fit failure" { kind, panel, text, size, lang, have, need }; every -shots picture asserts that none arrived since the last one.
+// Ellipsis (Ui_FitText) is never meant to fire on a workbook row: the layout widens, wraps or lowers instead. Nothing may cut a row silently.
+
+// The measure of _txt in a column _w units wide (_wrap) or on one line: { w: the widest line, h: the height, lines }.
+function UiFit_Measure(_txt, _w, _wrap = true) {
+    var t = string(_txt);
+    var mt = Ui_Metrics();
+    if (Prompt_HasTokens(t)) {
+        if (_wrap) {
+            var lay = Prompt_RichLayout(t, _w);
+            var ww = 0;
+            for (var i = 0; i < array_length(lay.items); i++) ww = max(ww, lay.items[i].x + lay.items[i].w);   // the right edge of the last word (line_w counts the space after it)
+            return { w: ww, h: lay.h, lines: lay.lines };
+        }
+        return { w: Markup_Width(t), h: mt.line_h, lines: 1 };
+    }
+    if (string_pos("[", t) > 0) t = Markup_Strip(t);
+    if (!_wrap) return { w: UI_TextWidth(t), h: UI_TextHeight(t), lines: 1 + string_count("\n", t) };
+    var s = max(0.0001, UI_GetFontScale());
+    var sep_w = max(1, round(_w / s));
+    var h = round(string_height_ext(t, -1, sep_w) * s);
+    return { w: round(string_width_ext(t, -1, sep_w) * s), h: h, lines: max(1, round(h / max(1, mt.line_h))) };
+}
+
+// Does _txt fit a box _w wide (and _h tall when _h >= 0)? { ok, w, h, lines }: what it needs. _wrap false = one line.
+function UiFit_Check(_txt, _w, _h = -1, _wrap = true) {
+    var m = UiFit_Measure(_txt, _w, _wrap);
+    m.ok = (m.w <= _w) && (_h < 0 || m.h <= _h);
+    return m;
+}
+
+function UiFit_Enable(_on) {
+    if (!variable_global_exists("uifit") || !is_struct(global.uifit)) global.uifit = { frames: [], fails: [], seen: {}, logged: {}, total: 0 };
+    global.uifit_on = _on;
+}
+
+function UiFit_On() {
+    return variable_global_exists("uifit_on") && global.uifit_on;
+}
+
+// Called once at the start of a frame's Draw GUI (Display_DrawFrame): the frames of the last frame are gone.
+function UiFit_FrameBegin() {
+    if (UiFit_On()) global.uifit.frames = [];
+}
+
+function UiFit_FramePush(_x, _y, _w, _h, _p) {
+    var f = global.uifit.frames;
+    if (array_length(f) >= 48) array_delete(f, 0, 1);
+    array_push(f, { x: _x, y: _y, w: _w, h: _h, p: _p });
+}
+
+// The drawing function that asked for the text: the first frame of the call stack that is not one of the text helpers.
+function UiFit_PanelName() {
+    var cs = debug_get_callstack();
+    for (var i = 0; i < array_length(cs); i++) {
+        var n = string(cs[i]);
+        n = string_replace(n, "gml_Script_", "");
+        n = string_replace(n, "gml_Object_", "");
+        var sp = string_pos(" (", n);
+        if (sp > 0) n = string_copy(n, 1, sp - 1);
+        if (string_copy(n, 1, 6) == "UiFit_" || string_copy(n, 1, 3) == "Ui_" || string_copy(n, 1, 7) == "Markup_" || string_copy(n, 1, 12) == "Prompt_Rich" || string_copy(n, 1, 3) == "UI_") continue;
+        if (n == "" || n == "0") continue;
+        return n;
+    }
+    return "?";
+}
+
+// Notes one failure (once per kind / panel / text / window size / language until the next UiFit_Take).
+function UiFit_Fail(_kind, _txt, _have, _need) {
+    var u = global.uifit;
+    var l = Display_Layout();
+    var size = string(l.win_w) + "x" + string(l.win_h);
+    var lang = Loc_GetLanguage();
+    var panel = UiFit_PanelName();
+    var txt = string_copy(string(_txt), 1, 48);
+    var key = _kind + "|" + panel + "|" + txt + "|" + size + "|" + lang;
+    var fr = UiFit_Frame();
+    if (variable_struct_exists(u.seen, key)) {   // the same failure again: it is still on the screen
+        variable_struct_get(u.seen, key).frame = fr;
+        return;
+    }
+    var rec = { kind: _kind, panel: panel, text: txt, size: size, lang: lang, have: _have, need: _need, frame: fr };
+    variable_struct_set(u.seen, key, rec);
+    array_push(u.fails, rec);
+    u.total++;
+    if (!variable_struct_exists(u.logged, key)) {
+        variable_struct_set(u.logged, key, true);
+        show_debug_message("[FIT] " + _kind + " panel=" + panel + " size=" + size + " lang=" + lang + " have=" + string(_have) + " need=" + string(_need) + " text=" + txt);
+    }
+}
+
+// The game frame counter (Display_Update's), the clock a failure is stamped with.
+function UiFit_Frame() {
+    return (variable_global_exists("display") && is_struct(global.display)) ? global.display.frame : 0;
+}
+
+// The failures that are on the screen now: those noted in the last two frames, since the last call. A panel that was still sliding in, or a layout the
+// window change had not reached yet, is not the picture; whatever is still wrong when the picture is taken is.
+function UiFit_Take() {
+    if (!UiFit_On()) return [];
+    var u = global.uifit;
+    var now = UiFit_Frame();
+    var out = [];
+    for (var i = 0; i < array_length(u.fails); i++) {
+        if (u.fails[i].frame >= now - 2) array_push(out, u.fails[i]);
+    }
+    u.fails = [];
+    u.seen = {};
+    return out;
+}
+
+function UiFit_Describe(_fails) {
+    var s = "";
+    for (var i = 0; i < min(4, array_length(_fails)); i++) {
+        var f = _fails[i];
+        s += ((i > 0) ? "; " : "") + f.kind + " " + f.panel + " '" + f.text + "' " + string(f.need) + ">" + string(f.have);
+    }
+    if (array_length(_fails) > 4) s += "; +" + string(array_length(_fails) - 4) + "x";
+    return s;
+}
+
+// The newest frame (drawn this frame) that holds the point; undefined when none does.
+function UiFit_FrameAt(_ax, _ay) {
+    var f = global.uifit.frames;
+    for (var i = array_length(f) - 1; i >= 0; i--) {
+        var fr = f[i];
+        if (_ax >= fr.x && _ax <= fr.x + fr.w && _ay >= fr.y && _ay < fr.y + fr.h) return fr;
+    }
+    return undefined;
+}
+
+// A box of text [_l, _r] x [_t, _b] drawn with its anchor at (_ax, _ay): outside the screen, or starting in a frame and ending outside its inner edge (the border and
+// the dark band are 2p) is a failure.
+function UiFit_BoxDrawn(_txt, _l, _t, _r, _b, _ax, _ay) {
+    var l = Display_Layout();
+    if (variable_global_exists("uifit_skip") && global.uifit_skip) return;   // the build stamp (Build_DrawId) is a corner mark over whatever is there, not a panel's text
+    if (_l < -0.5 || _r > l.gui_w + 0.5) {
+        UiFit_Fail("screen_w", _txt, l.gui_w, (_l < -0.5) ? -_l : _r);
+        return;
+    }
+    var scroll = variable_global_exists("uifit_scroll") && global.uifit_scroll;   // a roll that scrolls through the top and the bottom (the credits)
+    if (_b > l.gui_h + 0.5 && !scroll) {
+        UiFit_Fail("screen_h", _txt, l.gui_h, _b);
+        return;
+    }
+    var fr = UiFit_FrameAt(_ax, _ay);
+    if (!is_struct(fr)) return;
+    var inset = 2 * fr.p;
+    if (_l < fr.x + inset - 0.5 || _r > fr.x + fr.w - inset + 0.5) UiFit_Fail("frame_w", _txt, fr.w - 2 * inset, _r - _l);
+    else if (_b > fr.y + fr.h - inset + 0.5 && !scroll) UiFit_Fail("frame_h", _txt, fr.h - 2 * inset, _b - fr.y - inset);
+}
+
+function UiFit_TextDrawn(_x, _y, _txt, _halign) {
+    var t = string(_txt);
+    if (t == "") return;
+    var tw = UI_TextWidth(t);
+    var th = UI_TextHeight(t);
+    var lx = (_halign == fa_center) ? _x - tw / 2 : ((_halign == fa_right) ? _x - tw : _x);
+    UiFit_BoxDrawn(t, lx, _y, lx + tw, _y + th, _x, _y);
+}
+
+function UiFit_BlockDrawn(_x, _y, _txt, _w) {
+    var t = string(_txt);
+    if (t == "") return;
+    var m = UiFit_Measure(t, _w, true);
+    UiFit_BoxDrawn(t, _x, _y, _x + m.w, _y + m.h, _x, _y);
+}
+
 
 // The picture a menu item brings to a details panel (D90): an enemy portrait { spr, sub } in item.pic, or an item's icon in item.icon_item.
 function Ui_ArtKind(_it) {
@@ -4414,7 +4693,7 @@ function Ui_DetailsHeight(_w, _sentence, _lines, _cols = 1, _seq_n = 0, _art = u
     var h = 2 * (2 * mt.p + mt.pad) + Ui_TextBlockH(_sentence, inner);
     if (Ui_ArtKind(_art) != "") h += Ui_ArtSize() + 2 * mt.p;
     if (_seq_n > 0) h += 13 * max(1, round(mt.p / 2)) + mt.p;
-    if (array_length(_lines) > 0) h += mt.p * 2 + ceil(array_length(_lines) / max(1, _cols)) * (mt.line_h + mt.p);
+    if (array_length(_lines) > 0) h += mt.p * 2 + Ui_DetailsLinesH(_lines, inner, _cols, mt);
     return h;
 }
 
@@ -4440,15 +4719,24 @@ function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1, _cols = 1
         ty0 += p;
         var cols = max(1, _cols);
         var col_w = (x1 - x0 - (cols - 1) * 3 * p) / cols;
+        var row_h = 0;   // H13b (D156): a number line that does not fit one row puts its value on the row below; a label wider than the column wraps
         for (var i = 0; i < array_length(_lines); i++) {
             var cx0 = x0 + (i mod cols) * (col_w + 3 * p);
             var vtxt = string(_lines[i].value);
-            Ui_Text(cx0, ty0, Ui_FitText(_lines[i].label, col_w - UI_TextWidth(vtxt) - 4 * p), UI_C_LIGHT);   // a long label gives way to the number
-            Ui_Text(cx0 + col_w, ty0, _lines[i].value, UI_C_LIGHTEST, fa_right);
-            if (variable_struct_exists(_lines[i], "delta") && _lines[i].delta != 0) {
-                Ui_DeltaMark(cx0 + col_w - UI_TextWidth(_lines[i].value) - 7 * p, ty0 + (mt.line_h - 3 * p) div 2, _lines[i].delta, p, (_lines[i].delta > 0) ? UI_C_LIGHTEST : UI_C_LIGHT);
+            var has_delta = variable_struct_exists(_lines[i], "delta") && _lines[i].delta != 0;
+            var lh_i = Ui_DetailsLineH(_lines[i].label, vtxt, col_w, p, has_delta, mt);
+            row_h = max(row_h, lh_i);
+            var vy = ty0 + lh_i - (mt.line_h + p);   // the value is on the line's last row
+            if (UI_TextWidth(_lines[i].label) > col_w) Ui_TextBlock(cx0, ty0, _lines[i].label, col_w, UI_C_LIGHT);
+            else Ui_Text(cx0, ty0, _lines[i].label, UI_C_LIGHT);
+            Ui_Text(cx0 + col_w, vy, _lines[i].value, UI_C_LIGHTEST, fa_right);
+            if (has_delta) {
+                Ui_DeltaMark(cx0 + col_w - UI_TextWidth(_lines[i].value) - 7 * p, vy + (mt.line_h - 3 * p) div 2, _lines[i].delta, p, (_lines[i].delta > 0) ? UI_C_LIGHTEST : UI_C_LIGHT);
             }
-            if ((i mod cols) == cols - 1 || i == array_length(_lines) - 1) ty0 += mt.line_h + p;
+            if ((i mod cols) == cols - 1 || i == array_length(_lines) - 1) {
+                ty0 += row_h;
+                row_h = 0;
+            }
         }
     }
     draw_set_alpha(a0);
@@ -4503,6 +4791,71 @@ function Ui_MenuSigSame(_items, _sig, _n) {
     return true;
 }
 
+// H13b (D156): the width a row's label may take in a panel _panel_w wide (a list with the label on the left and an optional value on the right): the
+// inner width, less the marker column (5p), the icon column (a skill / status icon, or an item's picture) and the value with its 3p gap.
+function Ui_MenuLabelRoom(_panel_w, _p, _icon_px, _icon_item, _value) {
+    var lx = 4 * _p + 5 * _p + ((_icon_px > 0) ? _icon_px + 2 * _p : 0) + (_icon_item ? 10 * _p : 0);
+    var vtxt = is_undefined(_value) ? "" : string(_value);
+    var vw = (vtxt != "") ? UI_TextWidth(vtxt) + 3 * _p : 0;
+    return (_panel_w - 4 * _p) - lx - vw;
+}
+
+// The panel width a list needs so that no label is cut: the widest row (marker column, icon column, label, value) or the title or the note, plus the
+// 4p inset each side. _mc is the measured struct of Ui_MenuMeasure.
+function Ui_MenuListNeed(_mc, _p) {
+    var icon_col = (_mc.icon_px > 0) ? _mc.icon_px + 2 * _p : 0;
+    return max(_mc.row_w + icon_col, _mc.title_w, _mc.note_w) + 8 * _p;
+}
+
+// The width one number line (label on the left, value on the right) needs on a single row: 3p of air between the two (the cards' rule); a line with a change mark keeps 7p for it.
+function Ui_DetailsLineNeed(_label, _value, _p, _delta = false) {
+    return UI_TextWidth(_label) + UI_TextWidth(string(_value)) + (_delta ? 7 * _p : 3 * _p);
+}
+
+// The details panel width a menu's number lines need so that each stays on one row: the widest label + value, plus the 4p inset each side. 0 without lines.
+function Ui_MenuDetailsNeed(_items, _p, _cols = 1) {
+    var w = 0;
+    for (var i = 0; i < array_length(_items); i++) {
+        var ls = variable_struct_get(_items[i], "lines");
+        if (!is_array(ls)) continue;
+        for (var j = 0; j < array_length(ls); j++) {
+            w = max(w, Ui_DetailsLineNeed(ls[j].label, ls[j].value, _p, variable_struct_exists(ls[j], "delta") && ls[j].delta != 0));
+        }
+    }
+    var cols = max(1, _cols);
+    return (w > 0) ? cols * w + (cols - 1) * 3 * _p + 8 * _p : 0;
+}
+
+// Does a number line not fit one row of a column _col_w wide? Then the label keeps its row and the value goes right-aligned on the row below (the cards
+// do the same, CardsUi_LineStacked): nothing is cut.
+function Ui_DetailsLineStacked(_label, _value, _col_w, _p, _delta = false) {
+    return Ui_DetailsLineNeed(_label, _value, _p, _delta) > _col_w;
+}
+
+// The height of one number line in a column _col_w wide: a row; two rows when the value goes under the label; the label's own wrapped lines plus the value's row
+// when the label alone is wider than the column (it wraps, nothing is cut).
+function Ui_DetailsLineH(_label, _value, _col_w, _p, _delta, _mt) {
+    if (UI_TextWidth(_label) > _col_w) return max(_mt.line_h, Ui_TextBlockH(_label, _col_w)) + _p + _mt.line_h + _p;
+    return (Ui_DetailsLineStacked(_label, _value, _col_w, _p, _delta) ? 2 : 1) * (_mt.line_h + _p);
+}
+
+// The number lines' height in a details panel whose inner width is _inner, _cols to a row.
+function Ui_DetailsLinesH(_lines, _inner, _cols, _mt) {
+    var p = _mt.p;
+    var cols = max(1, _cols);
+    var col_w = (_inner - (cols - 1) * 3 * p) / cols;
+    var n = array_length(_lines);
+    var h = 0;
+    for (var i = 0; i < n; i += cols) {
+        var rh = 0;
+        for (var c = 0; c < cols && i + c < n; c++) {
+            rh = max(rh, Ui_DetailsLineH(_lines[i + c].label, _lines[i + c].value, col_w, p, variable_struct_exists(_lines[i + c], "delta") && _lines[i + c].delta != 0, _mt));
+        }
+        h += rh;
+    }
+    return h;
+}
+
 // Level 1: the widths of the rows (uncached).
 function Ui_MenuMeasureRows(_m, _mt, _lang) {
     if (!variable_global_exists("ui_mm_builds")) global.ui_mm_builds = 0;
@@ -4512,6 +4865,7 @@ function Ui_MenuMeasureRows(_m, _mt, _lang) {
     var bar_w = 14 * p;
     var label_w = 0;
     var val_w = 0;
+    var row_w = 0;   // H13b: the widest single row (marker column, label, value), not the widest label plus the widest value of other rows
     var icon_px = 0;
     for (var i = 0; i < n; i++) {
         var it = _m.items[i];
@@ -4527,12 +4881,13 @@ function Ui_MenuMeasureRows(_m, _mt, _lang) {
             if (kind == "choice") vw += 10 * p;
         }
         val_w = max(val_w, vw);
+        row_w = max(row_w, 5 * p + UI_TextWidth(it.label) + (variable_struct_exists(it, "icon_item") ? 10 * p : 0) + ((vw > 0) ? 3 * p + vw : 0));   // the 3p of Ui_MenuLabelRoom
     }
     var title = _m.layout.title;
     var note = _m.layout.note;
     return {
-        items: _m.items, n: n, mt: _mt, lang: _lang, title: title, note: note, sig: Ui_MenuSigBuild(_m.items, n),
-        label_w: label_w, val_w: val_w, icon_px: icon_px, title_w: (title != "") ? UI_TextWidth(title) : 0, note_w: (note != "") ? UI_TextWidth(note) : 0,
+        items: _m.items, n: n, mt: _mt, lang: _lang, title: title, note: note, sig: Ui_MenuSigBuild(_m.items, n), det_need: Ui_MenuDetailsNeed(_m.items, p, _m.layout.details_cols),
+        label_w: label_w, val_w: val_w, row_w: row_w, icon_px: icon_px, title_w: (title != "") ? UI_TextWidth(title) : 0, note_w: (note != "") ? UI_TextWidth(note) : 0,
         l2: false, l2_pw: 0, l2_details: false, l2_pos: "", l2_cols: 0, l2_cur: -1,
         panel_w: 0, det_h: 0
     };
@@ -4568,8 +4923,8 @@ function Ui_MenuMeasureSizes(_m, _mt, _mc, _cur) {
     _mc.det_h = det_h;
 }
 
-// The measured struct of a menu (fields label_w, val_w, icon_px, title_w, panel_w, det_h), rebuilt only when its keys changed.
-function Ui_MenuMeasure(_m, _mt) {
+// Level 1 only (the rows' widths), rebuilt only when its keys changed: what TabMenu_FitMenu reads before it fixes the panel widths.
+function Ui_MenuMeasureRowsFresh(_m, _mt) {
     var L = _m.layout;
     var n = array_length(_m.items);
     var lang = Loc_GetLanguage();
@@ -4579,6 +4934,14 @@ function Ui_MenuMeasure(_m, _mt) {
         mc = Ui_MenuMeasureRows(_m, _mt, lang);
         _m.mc = mc;
     }
+    return mc;
+}
+
+// The measured struct of a menu (fields label_w, val_w, icon_px, title_w, panel_w, det_h), rebuilt only when its keys changed.
+function Ui_MenuMeasure(_m, _mt) {
+    var L = _m.layout;
+    var n = array_length(_m.items);
+    var mc = Ui_MenuMeasureRowsFresh(_m, _mt);
     var cur = (L.details && L.details_pos == "above" && n > 0) ? clamp(_m.cursor, 0, n - 1) : -1;
     var fresh2 = mc.l2 && mc.l2_pw == L.panel_w && mc.l2_details == L.details && mc.l2_pos == L.details_pos && mc.l2_cols == L.details_cols && mc.l2_cur == cur;
     if (!fresh2) {
@@ -4718,7 +5081,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         }
         var shown_label = row.label;
         if (!L.center) {   // a fixed-width panel (battle): a long name gives way to ".." before it reaches the value
-            var vroom = x1 - label_x - ((variable_struct_exists(row, "value") && row.value != "") ? UI_TextWidth(row.value) + 3 * p : 0);
+            var vroom = Ui_MenuLabelRoom(panel_w, p, icon_px, variable_struct_exists(row, "icon_item"), variable_struct_exists(row, "value") ? row.value : "");
             shown_label = Ui_FitText(row.label, vroom);
         }
         if (L.center) Ui_Text((x0 + x1) / 2, ty, row.label, col, fa_center);
@@ -4797,6 +5160,7 @@ function Ui_StackDraw(_stk, _dim_alpha = UI_DIM_POPUP) {
 
 function Ui_DimBackdrop(_a) {
     if (_a <= 0) return;
+    if (UiFit_On()) global.uifit.frames = [];   // H13b: a full-screen dim starts a new layer; text after it is not measured against the panels under it
     var a0 = draw_get_alpha();
     draw_set_alpha(_a);
     Ui_Box(0, 0, Display_GuiW(), Display_GuiH(), UI_C_DARKEST);
@@ -4902,6 +5266,16 @@ function Confirm_Step(_snap = undefined, _now = current_time) {
 
 // The pop-up in the shared frame, centred: the question (wrapped to the box), a rule, Yes and No with the gliding band and the marker. Drawn over
 // everything the screen under it draws. global.confirm_rect = the box (for the pictures).
+// H13b (D156): the box of the confirm pop-up for _question: { x, y, w, h, iw, qh }, centred on the GUI grid. Pure.
+function Confirm_Box(_question, _mt) {
+    var p = _mt.p;
+    var w = min(_mt.gw - 2 * _mt.margin, max(round(_mt.gw * 0.6), 80 * p));
+    var iw = w - 8 * p;
+    var qh = Ui_TextBlockH(_question, iw);
+    var h = 11 * p + qh + 2 * _mt.row_h;   // 4p above, the question, 3p with the rule, two rows, 4p below
+    return { x: round((_mt.gw - w) / 2), y: max(_mt.margin, round((_mt.gh - h) / 2)), w: w, h: h, iw: iw, qh: qh };
+}
+
 function Confirm_Draw(_a = 1) {
     if (!Confirm_IsOpen()) return;
     var c = global.confirm_ui;
@@ -4910,12 +5284,13 @@ function Confirm_Draw(_a = 1) {
     var p = mt.p;
     var now = current_time;
     var a = Ui_AnimT(c.opened_ms, now) * _a;
-    var w = min(mt.gw - 2 * mt.margin, max(round(mt.gw * 0.6), 80 * p));
-    var iw = w - 8 * p;
-    var qh = Ui_TextBlockH(c.question, iw);
-    var h = 11 * p + qh + 2 * mt.row_h;   // 4p above, the question, 3p with the rule, two rows, 4p below
-    var bx = round((mt.gw - w) / 2);
-    var by = max(mt.margin, round((mt.gh - h) / 2));
+    var cb = Confirm_Box(c.question, mt);
+    var w = cb.w;
+    var iw = cb.iw;
+    var qh = cb.qh;
+    var h = cb.h;
+    var bx = cb.x;
+    var by = cb.y;
     var slide = p * round((1 - a) * 3);   // slides down into place in three pixel steps, like the other panels
     global.confirm_rect = { x: bx, y: by, w: w, h: h };
     var y0 = by - slide;
