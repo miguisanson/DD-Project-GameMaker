@@ -166,7 +166,7 @@ if (global.skillbook_mana_ambience_handle != -1 && !audio_is_playing(global.skil
 var skillbook_target = 0;
 if (skillbook_should_play || global.skillbook_mana_ambience_gain > 0) {
     SFX_ClampVolumes();
-    var skillbook_trim = SFX_GetGain(ambience_key);
+    var skillbook_trim = SFX_GetGain(ambience_key) * SFX_AssetGain(skillbook_asset);   // R-119: the ambience loop's table gain too
     skillbook_target = clamp(SKILLBOOK_MANA_AMBIENCE_BASE_GAIN, 0, 1) * skillbook_trim * global.vol_master * global.vol_sfx;
 }
 

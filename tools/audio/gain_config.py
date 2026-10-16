@@ -1,25 +1,26 @@
 """One place for the loudness targets, the groups and the deliberate exceptions (R-119).
 
 All levels are LUFS. The brief's relative targets were music/ambience -20, SFX -18, UI -21; the
-whole set is shifted down 4 dB (K = -4) so that typical stacking of simultaneous sounds keeps
-headroom below 0 dBFS. SFX and UI are judged by their momentary maximum (400 ms), loops by their
+whole set is shifted down 8 dB (K = -8) so that typical stacking of simultaneous sounds keeps
+headroom below 0 dBFS and almost no sound needs a boost (the gain is mostly a cut). Change the one
+number below and re-run write_gain_table.py to move the whole game up or down. SFX and UI are judged by their momentary maximum (400 ms), loops by their
 integrated loudness (see measure_loudness.py).
 """
 import json
 import os
 import re
 
-HEADROOM_SHIFT_DB = -4.0
+HEADROOM_SHIFT_DB = -8.0
 TARGETS = {
-    "sfx": -18.0 + HEADROOM_SHIFT_DB,       # -22
-    "ui": -21.0 + HEADROOM_SHIFT_DB,        # -25  (3 dB below SFX)
-    "music": -20.0 + HEADROOM_SHIFT_DB,     # -24
-    "ambience": -20.0 + HEADROOM_SHIFT_DB,  # -24
+    "sfx": -18.0 + HEADROOM_SHIFT_DB,       # -26
+    "ui": -21.0 + HEADROOM_SHIFT_DB,        # -29  (3 dB below SFX)
+    "music": -20.0 + HEADROOM_SHIFT_DB,     # -28
+    "ambience": -20.0 + HEADROOM_SHIFT_DB,  # -28
 }
 TOLERANCE_DB = 3.0          # after the table every sound is within this of its group target
 PEAK_CEILING_DBFS = -1.0    # after the table no sample peak is above this
 GEN_PEAK_CEILING_DBFS = -1.9  # what the generator aims at (leaves room for the D116 +10 % volume variation, 0.83 dB)
-MAX_BOOST_DB = 18.0
+MAX_BOOST_DB = 12.0
 MIN_CUT_DB = -40.0
 STEP_DB = 0.5               # table values are rounded to half a dB
 
@@ -93,7 +94,12 @@ def used_sound_names(root, all_names):
     text = ""
     for rel in ("scripts/scr_sfx/scr_sfx.gml", "scripts/scr_db_skill/scr_db_skill.gml"):
         with open(os.path.join(root, rel), encoding="utf-8") as fh:
-            text += fh.read()
+            body = fh.read()
+        a = body.find("BEGIN GENERATED SFX GAIN TABLE")
+        b = body.find("END GENERATED SFX GAIN TABLE")
+        if a >= 0 and b > a:   # the generated table names every sound: leave it out
+            body = body[:a] + body[b:]
+        text += body
     quoted = set(re.findall(r'"([A-Za-z0-9_ ]+)"', text))
     used = set()
     for n in all_names:

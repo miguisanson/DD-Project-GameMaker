@@ -62,16 +62,16 @@ class MeasureTests(unittest.TestCase):
 class TableTests(unittest.TestCase):
     def test_gain_math(self):
         import gain_config as cfg
-        # a SFX measured at -30 LUFS (peak -20) is raised to the -22 target: +8 dB
-        self.assertEqual(cfg.desired_gain_db("some_sfx", {"judged_lufs": -30.0, "sample_peak_dbfs": -20.0}), 8.0)
-        # a loud one is cut: -5 -> -22 is -17
-        self.assertEqual(cfg.desired_gain_db("some_sfx", {"judged_lufs": -5.0, "sample_peak_dbfs": -1.0}), -17.0)
+        # a SFX measured at -30 LUFS (peak -20) is raised to the -26 target: +4 dB
+        self.assertEqual(cfg.desired_gain_db("some_sfx", {"judged_lufs": -30.0, "sample_peak_dbfs": -20.0}), 4.0)
+        # a loud one is cut: -5 -> -26 is -21
+        self.assertEqual(cfg.desired_gain_db("some_sfx", {"judged_lufs": -5.0, "sample_peak_dbfs": -1.0}), -21.0)
         # UI is 3 dB below SFX
-        self.assertEqual(cfg.desired_gain_db("Modern5", {"judged_lufs": -25.0, "sample_peak_dbfs": -10.0}), 0.0)
-        # a loop aims at -24
-        self.assertEqual(cfg.desired_gain_db("overall_bgm", {"judged_lufs": -24.0, "sample_peak_dbfs": -9.0}), 0.0)
+        self.assertEqual(cfg.desired_gain_db("Modern5", {"judged_lufs": -29.0, "sample_peak_dbfs": -10.0}), 0.0)
+        # a loop aims at -28
+        self.assertEqual(cfg.desired_gain_db("overall_bgm", {"judged_lufs": -28.0, "sample_peak_dbfs": -9.0}), 0.0)
         # the boss roar stays 2 dB louder
-        self.assertEqual(cfg.desired_gain_db("Monster_Roar_9", {"judged_lufs": -22.0, "sample_peak_dbfs": -9.0}), 2.0)
+        self.assertEqual(cfg.desired_gain_db("Monster_Roar_9", {"judged_lufs": -26.0, "sample_peak_dbfs": -9.0}), 2.0)
         # the peak ceiling wins over the target (-3 dBFS peak, ceiling -1.9: at most +1.0 after rounding to half a dB)
         self.assertEqual(cfg.desired_gain_db("some_sfx", {"judged_lufs": -40.0, "sample_peak_dbfs": -3.0}), 1.0)
 
@@ -91,8 +91,8 @@ class TableTests(unittest.TestCase):
         import check_gain_table as chk
         loud = {"fireball": {"judged_lufs": -8.0, "sample_peak_dbfs": -0.1}}
         fails, _ = chk.evaluate(loud, {"fireball": 0.0})
-        self.assertEqual(len(fails), 2)          # 14 dB above target and a peak above -1 dBFS
-        fails, _ = chk.evaluate(loud, {"fireball": -14.0})
+        self.assertEqual(len(fails), 2)          # 18 dB above target and a peak above -1 dBFS
+        fails, _ = chk.evaluate(loud, {"fireball": -18.0})
         self.assertEqual(fails, [])
 
 
