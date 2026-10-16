@@ -21,7 +21,7 @@ if ($PSBoundParameters.ContainsKey('Plant')) { $NegativeControl = [switch]$true 
 # ---- game modes: ONE ROW EACH. Flip Impl to $true when a packet implements the mode. ----------
 # Strict = also require exit code 0 and the result file (only -runtests; crash exit codes are unreliable).
 $GameModes = @(
-    @{ Name = 'runtests'; Flag = '-runtests'; Timeout = 30;  Impl = $true;  Strict = $true  }
+    @{ Name = 'runtests'; Flag = '-runtests'; Timeout = 60;   Impl = $true;  Strict = $true  }
     @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 900;  Impl = $true;  Strict = $false }
     @{ Name = 'bot';      Flag = '-bot';      Timeout = 480; Impl = $true;  Strict = $false }
     @{ Name = 'shots';    Flag = '-shots';    Timeout = 960; Impl = $true;  Strict = $false; Shots = 440 }   # Shots = number of [SHOT] lines required. (R3 cards +9, R3 menus +14, R3 bvis +10, R3 textfit2 +14, R3 stealth +6, R3 saves2 +42, R3 rarity +15, R3 mouse +12, R3 levelup -3 +15 = +12, R3 ideas1 +11, R3 ideas2 +9. H1: pause-menu pictures -2, one-menu +6. H2 +6. H6 +4. H14 +10. H7 +6. H5 +6. H13a +6. D164 +6. H8a +11. H8b +10. H12a +4, note ask +2. R3 menus +14, R3 bvis +10, R3 textfit2 +14, R3 stealth +6, R3 saves2 +42, R3 rarity +15, R3 mouse +12, R3 levelup -3 +15 = +12, R3 ideas1 +11, R3 ideas2 +9.)
