@@ -350,6 +350,7 @@ function Interact_Handle(_inst) {
             class_id = gs.player_ch.class_id;
         }
 
+        Grave_MarkSearched(_inst);   // D195 (R-133): the gold outline goes out with the first search, and stays out (room state)
         var grave_reward = GraveLoot_TryRollReward(class_id);
         if (is_struct(grave_reward) && variable_struct_exists(grave_reward, "awarded") && grave_reward.awarded) {
             var reward_loot = variable_struct_exists(grave_reward, "loot") ? grave_reward.loot : [];

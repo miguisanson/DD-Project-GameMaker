@@ -748,6 +748,105 @@ function Merchant_FxRing(_spr, _img, _col) {
     return { surf: _surf, r: _r };
 }
 
+// ---- the gold outline on things that still hold loot (D195, R-133) ----
+// The merchant's glow (D113) reused, softer and slower, on every chest, barrel and grave that still gives something: it tells the player what can still be had. It goes out the moment
+// the thing is opened, broken or searched, and stays out after a Continue or a room re-entry (the flags are the ones the room state already keeps). No settings toggle.
+
+// Does this instance still hold loot? A chest or barrel (swap_on_interact, with a loot table, a card pick or the class choice behind it) until it has been swapped (opened / broken, `swapped`);
+// a grave until it has been searched (`searched`). A trapped chest glows like any other (no tell). Doors, NPCs (the merchant has his own glow), notes, torches, beds, opened chests and broken
+// barrels (their own objects) and plain props never do.
+function LootGlow_Has(_inst) {
+    if (!instance_exists(_inst)) return false;
+    if (LootGlow_Flag(_inst, "swap_on_interact")) return (LootGlow_Flag(_inst, "is_container") || LootGlow_Flag(_inst, "card_chest") || LootGlow_Flag(_inst, "class_select_chest")) && !LootGlow_Flag(_inst, "swapped");
+    if (LootGlow_Flag(_inst, "grave_interactable")) return !LootGlow_Flag(_inst, "searched");
+    return false;
+}
+
+// A true/false variable of an instance; a missing one is false.
+function LootGlow_Flag(_inst, _name) {
+    return variable_instance_exists(_inst, _name) && variable_instance_get(_inst, _name) == true;
+}
+
+// A grave was searched (Interact_Handle): the flag is kept in the room state, so it stays searched after a Continue or a room re-entry.
+function Grave_MarkSearched(_inst) {
+    _inst.searched = true;
+    RoomState_SaveInstance(_inst, ["searched"], false);
+}
+
+// The pulse (D195): alpha 0.35..0.70, a cosine with a 1.6 s period, brightest at 0 ms. Softer and slower than the merchant's (Merchant_GlowAlpha: 0.35..1.0, 1.2 s). Pure: ms in, alpha out.
+function LootGlow_Alpha(_ms) {
+    var _phase = (_ms mod 1600) / 1600;
+    return 0.525 + 0.175 * cos(_phase * 2 * pi);
+}
+
+// The clock the pulse runs on: the game clock, unless a scenario froze it (global.lootglow_clock >= 0, like global.light_clock for the fires): two pictures of the same stage must not differ by a pulse step.
+function LootGlow_Clock() {
+    if (variable_global_exists("lootglow_clock") && global.lootglow_clock >= 0) return global.lootglow_clock;
+    return current_time;
+}
+
+// Every instance in the room that glows now.
+function LootGlow_Targets() {
+    var _out = [];
+    with (obj_interactable) {
+        if (LootGlow_Has(id)) array_push(_out, id);
+    }
+    return _out;
+}
+
+// How many outlines have been built (a check reads it: the cache must make this go up once per sprite frame, not once per frame drawn).
+function LootGlow_BuildCount() {
+    return variable_global_exists("lootglow_builds") ? global.lootglow_builds : 0;
+}
+
+// One sprite frame's outline as a picture, built once and kept (R-133, performance: no per-pixel work each frame). Returns { surf, r } like Merchant_FxRing: the sprite's origin is at (r, r)
+// in the 2r x 2r surface; the outline is the sprite's silhouette one pixel out in the merchant's gold (fully opaque, the pulse is the alpha it is drawn with), with the sprite's own pixels
+// cut out. A surface the system lost is built again.
+function LootGlow_Ring(_spr, _img) {
+    if (!variable_global_exists("lootglow_cache") || !is_struct(global.lootglow_cache)) global.lootglow_cache = {};
+    if (!variable_global_exists("lootglow_builds")) global.lootglow_builds = 0;
+    var _key = string(_spr) + ":" + string(_img);
+    if (variable_struct_exists(global.lootglow_cache, _key)) {
+        var _hit = variable_struct_get(global.lootglow_cache, _key);
+        if (surface_exists(_hit.surf)) return _hit;
+    }
+    var _r = ceil(point_distance(0, 0, sprite_get_width(_spr), sprite_get_height(_spr))) + 3;
+    var _surf = surface_create(_r * 2, _r * 2);
+    surface_set_target(_surf);
+    draw_clear_alpha(c_black, 0);
+    Elite_DrawOutline(_spr, _img, _r, _r, 1, 1, 0, UI_C_MERCHANT_GOLD, 1);
+    gpu_set_blendmode_ext_sepalpha(bm_zero, bm_one, bm_zero, bm_inv_src_alpha);   // colour untouched, alpha * (1 - source alpha): the sprite's pixels take the outline away
+    draw_sprite_ext(_spr, _img, _r, _r, 1, 1, 0, c_white, 1);
+    gpu_set_blendmode(bm_normal);
+    surface_reset_target();
+    var _ring = { surf: _surf, r: _r };
+    variable_struct_set(global.lootglow_cache, _key, _ring);
+    global.lootglow_builds++;
+    return _ring;
+}
+
+// How many outlines the world pass has drawn (a check reads it: a missing or failing draw shows).
+function LootGlow_DrawCount() {
+    return variable_global_exists("lootglow_drawn") ? global.lootglow_drawn : 0;
+}
+
+// The outline on the map (the body pass of the world pass, scr_enemy: under the Foreground haze and before the darkness, like the merchant's glow, so it dims with the room, R-091).
+function LootGlow_DrawWorldFx() {
+    if (!Fx_IsWorldPass()) return;
+    if (!instance_exists(obj_interactable)) return;
+    var _alpha = LootGlow_Alpha(LootGlow_Clock());
+    var _oa = draw_get_alpha();
+    if (!variable_global_exists("lootglow_drawn")) global.lootglow_drawn = 0;
+    with (obj_interactable) {
+        if (!visible || sprite_index == -1 || !LootGlow_Has(id)) continue;
+        global.lootglow_drawn++;
+        var _ring = LootGlow_Ring(sprite_index, floor(image_index) mod max(1, sprite_get_number(sprite_index)));
+        var _side = _ring.r * 2;
+        draw_surface_part_ext(_ring.surf, 0, 0, _side, _side, x - _ring.r, y - _ring.r, 1, 1, c_white, _alpha * image_alpha);
+    }
+    draw_set_alpha(_oa);
+}
+
 // ---- elites (D86) ----
 function Elite_Mods() {
     return ["armored", "venomous", "swift", "brutal", "regenerating"];

@@ -947,6 +947,7 @@ function World_FxParts() {
         { name: "sight", body: true, pass: "top" },            // D179 (R-098): the very faint cone in front of each enemy, a tint on the floor under the darkness
         { name: "player_squash", body: true, pass: "body" },   // D138 (G6): the player's step squash, drawn here while his plain sprite is off
         { name: "merchant_glow", body: true, pass: "body" },   // D113: the pulsing gold glow round the merchant, darkened like him (R-091)
+        { name: "loot_glow", body: true, pass: "body" },       // D195 (R-133): the softer, slower gold outline on every chest, barrel and grave that still holds loot, darkened like them
         { name: "light", body: false, pass: "top" },           // H14 (D157, D159): the room's darkness with the fires cut out of it; everything after it stays at full brightness
         { name: "nav", body: false, pass: "top" },
         { name: "player_prompt", body: false, pass: "top" },
@@ -966,6 +967,7 @@ function World_DrawFxPart(_name) {
         case "player_prompt": Player_DrawWorldFx(); break;
         case "elite": Elite_DrawWorldFx(); break;
         case "merchant_glow": Merchant_DrawWorldFx(); break;
+        case "loot_glow": LootGlow_DrawWorldFx(); break;
         case "mapfx": MapFx_DrawWorldFx(); break;
     }
 }
