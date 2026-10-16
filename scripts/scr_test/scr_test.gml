@@ -171,6 +171,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Ideas2", Test_Suite_R3Ideas2);
     Test_RunSuite("R4NoDebug", Test_Suite_R4NoDebug);
     Test_RunSuite("R3Loudness", Test_Suite_R3Loudness);
+    Test_RunSuite("R4Final1", Test_Suite_R4Final1);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -19047,4 +19048,156 @@ function Test_Suite_R3Loudness() {
     Test_Eq("loudness: another sound's copies do not count (Punch_2 once: no victim)", SFX_SameSoundOverflow(_four, Punch_2, SFX_MAX_SAME_SOUND), -1);
     var _skip = [{ handle: 31, asset: Punch_2 }, { handle: 32, asset: Punch_1 }, { handle: 33, asset: Punch_1 }, { handle: 34, asset: Punch_1 }];
     Test_Eq("loudness: the victim is the oldest copy of that sound (index 1, not the other sound at 0)", SFX_SameSoundOverflow(_skip, Punch_1, SFX_MAX_SAME_SOUND), 1);
+}
+
+
+// ============================================================================================================================
+// Round 4 final fixes, packet final1. I-107 (R-121): the battle Skill and Item lists always show how many entries there are and that they scroll: at least two rows when the list has
+// two or more entries (the details panel gives way first), an up / down triangle in the frame when rows are hidden above / below, and a "3/7" counter in the frame's corner; the
+// "Choose" hint stays on screen. I-108 (R-122): every status chip label (buff or debuff, the enemy's or the player's) is plain white; the last-turn blink toggles white / light green.
+// ============================================================================================================================
+function Test_Suite_R4Final1() {
+    Test_RunSuite("R4Final1.lists", Test_R4Final1Lists);
+    Test_RunSuite("R4Final1.chips", Test_R4Final1Chips);
+}
+
+// A character of class _cls: _full = every skill of the class and a full inventory; else the level 1 kit.
+function Test_R4Final1Char(_cls, _full) {
+    var _ch = _full ? TextFit_Char() : CharacterCreate_Player(_cls);
+    if (_full) {
+        _ch.skills = Skill_IdsOfClass(_cls);
+        _ch.upgrades = [];
+    }
+    _ch.mp = _ch.max_mp;
+    return _ch;
+}
+
+function Test_R4Final1Rect(_r) {
+    return (_r.w > 0 && _r.h > 0);
+}
+
+function Test_R4Final1Lists() {
+    var _s = TextFit_Begin();
+    var _gs = GameState_Get();
+    var _old = _gs.player_ch;
+    var _langs = ["en", "ko"];
+    var _sizes = TextFit_Sizes();
+    var _classes = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE];
+    var _enemies = [ENEMY_FINAL_BOSS, ENEMY_SLIME];
+    var _f = { rows: "", count: "", up: "", down: "", cue: "", screen: "", enemy: "", hint: "", plan: "" };
+    var _n = 0;
+    var _multi = 0;
+    var _scrolls = 0;
+    for (var _l = 0; _l < 2; _l++) {
+        for (var _z = 0; _z < array_length(_sizes); _z++) {
+            TextFit_Set(_sizes[_z][0], _sizes[_z][1], _langs[_l]);
+            var _mt = Ui_Metrics();
+            var _gw = Display_GuiW();
+            var _gh = Display_GuiH();
+            for (var _c = 0; _c < 3; _c++) {
+                for (var _v = 0; _v < 2; _v++) {
+                    for (var _e = 0; _e < 2; _e++) {
+                        var _ch = Test_R4Final1Char(_classes[_c], _v == 1);
+                        _gs.player_ch = _ch;
+                        var _bc = Test_R3Make(_enemies[_e], "", 0, false, false);
+                        _bc.p = _ch;
+                        _bc.run_fails = 0;
+                        _bc.ui_cmd = undefined;
+                        Battle_MenusBuild(_bc);
+                        Battle_MenusLayout(_bc);
+                        var _er = Battle_EnemyRect(_bc);
+                        var _lists = [_bc.ui_skill, _bc.ui_item];
+                        for (var _k = 0; _k < 2; _k++) {
+                            var _m = _lists[_k];
+                            var _state = (_k == 0) ? BSTATE_SKILL_MENU : BSTATE_ITEM_MENU;
+                            var _cnt = array_length(_m.items);
+                            if (_cnt <= 0) continue;
+                            if (_k == 1 && !(_c == 0 && _v == 1 && _e == 0)) continue;   // the item list: once per language and size, the full inventory against the boss
+                            var _top = 0;
+                            var _seq = [];
+                            for (var _a = 0; _a < _cnt; _a++) array_push(_seq, _a);
+                            for (var _b = _cnt - 2; _b >= 0; _b--) array_push(_seq, _b);
+                            for (var _q = 0; _q < array_length(_seq); _q++) {
+                                _m.cursor = _seq[_q];
+                                var _mc = Ui_MenuMeasure(_m, _mt);
+                                var _g = Ui_MenuGeom(_m, _mt, _mc, 1);
+                                var _tag = _langs[_l] + " " + string(_sizes[_z][0]) + " " + ((_k == 0) ? "skill" : "item") + " class " + string(_classes[_c]) + " full=" + string(_v) + " enemy " + string(_enemies[_e]) + " cur " + string(_seq[_q]) + "/" + string(_cnt) + "; ";
+                                _n++;
+                                if (_cnt >= 2) _multi++;
+                                if (_cnt >= 2 && _g.rows_vis < 2) _f.rows += _tag + "rows=" + string(_g.rows_vis) + "; ";
+                                var _hr = Battle_ListHintRect(_g.det_rect, _state, _g.hint_hidden);
+                                if (_hr.w > 0 && (_hr.x < 0 || _hr.x + _hr.w > _gw || _hr.y < 0)) _f.hint += _tag + json_stringify(_hr) + "; ";
+                                if (!variable_struct_exists(_g, "cue_on") || !_g.cue_on || !variable_struct_exists(_m.layout, "scroll_cue") || !_m.layout.scroll_cue) {
+                                    _f.cue += _tag + "no scroll cue; ";
+                                    continue;
+                                }
+                                _top = Ui_ScrollTopH(_m.cursor, _top, _g.rhs, _g.list_room);
+                                var _end = Ui_RowsEnd(_g.rhs, _top, _g.list_room);
+                                var _cue = Ui_MenuCue(_m, _mt, _g, _top);
+                                if (_top > 0 || _end < _cnt - 1) _scrolls++;
+                                if (_cue.counter != string(_m.cursor + 1) + "/" + string(_cnt)) _f.count += _tag + "counter '" + _cue.counter + "'; ";
+                                if (Test_R4Final1Rect(_cue.up) != (_top > 0)) _f.up += _tag + "top=" + string(_top) + " up=" + json_stringify(_cue.up) + "; ";
+                                if (Test_R4Final1Rect(_cue.down) != (_end < _cnt - 1)) _f.down += _tag + "end=" + string(_end) + " down=" + json_stringify(_cue.down) + "; ";
+                                var _parts = [_cue.counter_rect, _cue.up, _cue.down];
+                                for (var _r = 0; _r < 3; _r++) {
+                                    var _pr = _parts[_r];
+                                    if (!Test_R4Final1Rect(_pr)) continue;
+                                    if (_pr.x < _g.rect.x || _pr.x + _pr.w > _g.rect.x + _g.rect.w) _f.screen += _tag + "cue " + string(_r) + " outside the frame's width " + json_stringify(_pr) + "; ";
+                                    if (_pr.x < 0 || _pr.y < 0 || _pr.x + _pr.w > _gw || _pr.y + _pr.h > _gh) _f.screen += _tag + "cue " + string(_r) + " off screen " + json_stringify(_pr) + "; ";
+                                    if (Test_RectsOverlap(_pr, _er)) _f.enemy += _tag + "cue " + string(_r) + " on the enemy; ";
+                                }
+                                if (!Test_R4Final1Rect(_cue.counter_rect)) _f.plan += _tag + "no counter; ";
+                            }
+                        }
+                        instance_destroy(_bc.enemy_inst);
+                    }
+                }
+            }
+        }
+    }
+    _gs.player_ch = _old;
+    Test_True("r4final1 lists: (setup) many cursor positions were looked at (" + string(_n) + ", " + string(_multi) + " with 2+ entries)", _n >= 300 && _multi >= 300);
+    Test_Eq("r4final1 lists: a list with 2+ entries always shows at least 2 rows (480, 640, 800; en, ko; every class, level 1 kit and full kit; boss and slime)", _f.rows, "");
+    Test_Eq("r4final1 lists: the list has a scroll cue (a counter and arrows)", _f.cue, "");
+    Test_True("r4final1 lists: (setup) some lists really scroll (" + string(_scrolls) + " positions with hidden rows)", _scrolls >= 100);
+    Test_Eq("r4final1 lists: the counter reads current/total", _f.count, "");
+    Test_Eq("r4final1 lists: the up arrow shows exactly when rows are hidden above", _f.up, "");
+    Test_Eq("r4final1 lists: the down arrow shows exactly when rows are hidden below", _f.down, "");
+    Test_Eq("r4final1 lists: the cue stays inside the frame's width and on screen", _f.screen, "");
+    Test_Eq("r4final1 lists: the cue never stands on the enemy", _f.enemy, "");
+    Test_Eq("r4final1 lists: the counter is always there", _f.plan, "");
+    Test_Eq("r4final1 lists: the Choose hint is fully on screen", _f.hint, "");
+    TextFit_End(_s);
+}
+
+// I-108 / R-122: every chip label is plain white (UI_C_TEXT), a buff or a debuff, on the player's chips and on the enemy's; the last turn toggles white / light green with the outline.
+function Test_R4Final1Chips() {
+    Test_True("r4final1 chips: (setup) UI_C_TEXT is white", UI_C_TEXT == $FFFFFF);
+    var _ch = TextFit_Char();   // every status at once, buffs and debuffs
+    var _en = EnemyCreate(ENEMY_DIREWOLF);
+    var _sids = Status_AllIds();
+    for (var _t = 0; _t < array_length(_sids); _t++) _en = Status_Add(_en, _sids[_t], 3, 2);
+    var _who = ["player", "enemy"];
+    var _fighters = [_ch, _en];
+    var _bad = "";
+    var _seen = [0, 0, 0, 0];   // player buffs, player debuffs, enemy buffs, enemy debuffs
+    for (var _w = 0; _w < 2; _w++) {
+        var _chips = Battle_StatusChips(_fighters[_w]);
+        for (var _i = 0; _i < array_length(_chips); _i++) {
+            var _c = _chips[_i];
+            if (!variable_struct_exists(_c, "lab_name") || _c.lab_name == "") continue;
+            _seen[_w * 2 + (_c.negative ? 1 : 0)]++;
+            var _calm0 = Battle_ChipBlink(false, _c.negative, 0).label_col;
+            var _calm1 = Battle_ChipBlink(false, _c.negative, 250).label_col;
+            var _last0 = Battle_ChipBlink(true, _c.negative, 0).label_col;
+            var _last1 = Battle_ChipBlink(true, _c.negative, 250).label_col;
+            if (_calm0 != UI_C_TEXT || _calm1 != UI_C_TEXT) _bad += _who[_w] + " " + _c.lab_name + " (" + (_c.negative ? "debuff" : "buff") + ") calm colour " + string(_calm0) + "; ";
+            if (_last0 != UI_C_TEXT || _last1 != UI_C_LIGHT) _bad += _who[_w] + " " + _c.lab_name + " last-turn blink " + string(_last0) + " / " + string(_last1) + "; ";
+        }
+    }
+    Test_True("r4final1 chips: (setup) a buff and a debuff label were looked at on both sides (" + json_stringify(_seen) + ")", _seen[0] > 0 && _seen[1] > 0 && _seen[2] > 0 && _seen[3] > 0);
+    Test_Eq("r4final1 chips: every label is white, and blinks white / light green on its last turn", _bad, "");
+    var _on = Battle_ChipBlink(true, false, 0);
+    var _off = Battle_ChipBlink(true, false, 250);
+    Test_True("r4final1 chips: the outline still blinks with the label (on at 0 ms, off at 250 ms)", _on.outline && !_off.outline);
 }
