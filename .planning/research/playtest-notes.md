@@ -49,3 +49,6 @@
 28. spellweaver class card doesnt fully fit also and texts spill out from the frame. make sure all skill cards dont have this problem
 29. enemies have a huge detection range... maybe shorten their vision. and they seem to still find me at my last location.. so its actually impossible right now to get away from an enemy as simple as a slime right now without going to the next room.. how should we change this (grill me)
 "lets focus fixing these first"
+
+## Owner playtest round 4 (build 8d176ba-20261017, 2026-10-17)
+1. (screenshot: typing a profile name, the DEBUG OVERLAY opened) "shift + P still does this, please delete this debug overlay"
