@@ -15060,6 +15060,9 @@ function Scenario_StepShotsR3Saves2(_s) {
                         Scenario_Check("shots_s2_title_card_is_shown_" + _tag, _c.title_card.kind == "run" && Scenario_S2Inside(_cr, _mt), json_stringify(_cr));
                         Scenario_Check("shots_s2_title_card_clear_of_the_menu_and_the_build_id_" + _tag, !Test_RectsOverlap(_cr, _m1.rect) && !Test_RectsOverlap(_cr, _idr), json_stringify(_cr));
                         Scenario_Check("shots_s2_title_has_five_rows_" + _tag, array_length(_m1.items) == 5 && _m1.items[0].id == "continue" && _m1.cursor == 0);
+                        var _pb = _c.title_btn.profile;   // D175: the profile button, lower left: inside the picture, clear of the menu, the card and the build id
+                        Scenario_Check("shots_s2_title_profile_button_inside_the_gui_" + _tag, Scenario_S2Inside(_pb, _mt), json_stringify(_pb));
+                        Scenario_Check("shots_s2_title_profile_button_clear_of_the_menu_the_card_and_the_build_id_" + _tag, !Test_RectsOverlap(_pb, _m1.rect) && !Test_RectsOverlap(_pb, _cr) && !Test_RectsOverlap(_pb, _idr), json_stringify(_pb) + " vs " + json_stringify(_m1.rect) + " " + json_stringify(_cr));
                         break;
                     case "name":
                         var _nr = _c.title_name_rects;
@@ -15073,7 +15076,8 @@ function Scenario_StepShotsR3Saves2(_s) {
                         }
                         Scenario_Check("shots_s2_name_grid_cells_inside_the_panel_" + _tag, _cells_ok);
                         Scenario_Check("shots_s2_name_field_inside_the_panel_" + _tag, _nr.field.w > 0 && _nr.field.x >= _nr.panel.x && _nr.field.x + _nr.field.w <= _nr.panel.x + _nr.panel.w && _nr.field.y >= _nr.panel.y && _nr.field.y + _nr.field.h <= _nr.panel.y + _nr.panel.h, json_stringify(_nr.field));
-                        Scenario_Check("shots_s2_name_hints_inside_the_panel_" + _tag, _nr.hint_y > 0 && _nr.hint_y + _nr.hint_h <= _nr.panel.y + _nr.panel.h, json_stringify(_nr));
+                        Scenario_Check("shots_s2_name_key_line_inside_the_gui_" + _tag, Scenario_S2Inside(_nr.hint, _mt), json_stringify(_nr.hint));
+                        Scenario_Check("shots_s2_name_key_line_clear_of_the_panel_and_the_build_id_" + _tag, !Test_RectsOverlap(_nr.hint, _nr.panel) && !Test_RectsOverlap(_nr.hint, _idr), json_stringify(_nr.hint) + " vs " + json_stringify(_nr.panel));
                         break;
                     case "profiles":
                     case "load":

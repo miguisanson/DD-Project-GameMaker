@@ -3418,7 +3418,12 @@ function Title_Refresh(_c) {
     var m = _c.title_stk.menus[0];
     var st = Title_State();
     m.items = Title_MainItems(st.cont >= 0, st.any);
-    Ui_MenuFixCursor(m, m.cursor);
+    if (variable_instance_exists(_c, "title_cursor_reset") && _c.title_cursor_reset) {   // another profile: the cursor starts where a fresh title would put it
+        Ui_MenuFixCursor(m, (st.cont >= 0) ? 0 : 1);
+        _c.title_cursor_reset = false;
+    } else {
+        Ui_MenuFixCursor(m, m.cursor);
+    }
     _c.title_refresh = false;
     _c.title_card = Title_CardOf(st);
 }
@@ -3465,8 +3470,9 @@ function Title_PickerOpen(_c, _mode) {
     return m;
 }
 
+// The screens above the title with their own key line: the two save file pickers and the profile screen.
 function Title_IsPicker(_m) {
-    return is_struct(_m) && is_struct(_m.data) && variable_struct_exists(_m.data, "mode") && (_m.id == "slots_load" || _m.id == "slots_overwrite");
+    return is_struct(_m) && is_struct(_m.data) && variable_struct_exists(_m.data, "mode") && (_m.id == "slots_load" || _m.id == "slots_overwrite" || _m.id == "profiles");
 }
 
 // Loads a save file: it becomes the active one (what autosaves write to) and the run is entered. A file this build cannot read says why. Returns true when the load began.
@@ -3523,16 +3529,18 @@ function Title_DeleteYes(_d) {
     Ui_MenuFixCursor(_d.m, _d.m.cursor);
 }
 
-// The keys only the pickers have, before the menu steps: the delete key (Q / the pad's LB), or a right click on a row (a right click elsewhere is Back). True when it was used.
+// The keys only the pickers have, before the menu steps: the delete key (Q / the pad's LB), or a right click on a row (a right click elsewhere is Back); on Load Game and on the
+// profile screen. True when it was used.
 function Title_PickerKeys(_c, _m) {
-    if (!Title_IsPicker(_m) || _m.data.mode != "load" || current_time - _m.lock_ms < UI_INPUT_LOCK_MS) return false;
-    if (Input_Pressed("tab_prev")) return Title_PickerDeleteAsk(_c, _m);
+    if (!Title_IsPicker(_m) || (_m.data.mode != "load" && _m.data.mode != "profiles") || current_time - _m.lock_ms < UI_INPUT_LOCK_MS) return false;
+    var prof = (_m.data.mode == "profiles");
+    if (Input_Pressed("tab_prev")) return prof ? Title_ProfileDeleteAsk(_c, _m) : Title_PickerDeleteAsk(_c, _m);
     if (mouse_check_button_pressed(mb_right)) {
         var mp = Ui_MousePos();
         var hv = Ui_HoverIndex(_m.rects, mp.x, mp.y);
         if (hv >= 0) {
             _m.cursor = hv;
-            return Title_PickerDeleteAsk(_c, _m);
+            return prof ? Title_ProfileDeleteAsk(_c, _m) : Title_PickerDeleteAsk(_c, _m);
         }
     }
     return false;
@@ -3590,6 +3598,11 @@ function Title_HintGroups(_m) {
     var back = Loc_T("tab.hint.back", "[k:back] Back");
     if (_m.id == "slots_load") return [Loc_T("save.hint.load", "[k:confirm] Load"), Loc_T("save.hint.delete", "[k:tab_prev] Delete"), back];
     if (_m.id == "slots_overwrite") return [Loc_T("save.hint.overwrite", "[k:confirm] Overwrite"), back];
+    if (_m.id == "profiles") {
+        var row = (array_length(_m.items) > 0) ? _m.items[clamp(_m.cursor, 0, array_length(_m.items) - 1)] : undefined;
+        if (is_struct(row) && row.pid < 0) return [Loc_T("profile.hint.create", "[k:confirm] Create"), back];
+        return [Loc_T("profile.hint.switch", "[k:confirm] Switch"), Loc_T("save.hint.delete", "[k:tab_prev] Delete"), back];
+    }
     return [];
 }
 
@@ -3599,19 +3612,18 @@ function Title_HintJoin(_groups, _sep) {
     return out;
 }
 
-// The key line's text, layout and rectangle: { txt, lay, inner_w, rect } (rect.w = 0 and no text when the screen on top has no key line).
-function Title_HintPlan(_c, _m) {
-    var groups = Title_HintGroups(_m);
+// The key line for a list of groups: { txt, lay, inner_w, rect } (rect.w = 0 and no text without groups).
+function Title_HintPlanOf(_groups) {
     var plan = { txt: "", lay: undefined, inner_w: 0, rect: { x: 0, y: 0, w: 0, h: 0 } };
-    if (array_length(groups) <= 0) return plan;
+    if (array_length(_groups) <= 0) return plan;
     var mt = Ui_Metrics();
     var p = mt.p;
     var idr = Build_IdRect();
     plan.inner_w = max(8 * p, idr.x - 2 * mt.margin - 4 * p - 8 * p);
-    plan.txt = Title_HintJoin(groups, "    ");
+    plan.txt = Title_HintJoin(_groups, "    ");
     plan.lay = Prompt_RichLayout(plan.txt, plan.inner_w);
     if (plan.lay.lines > 1) {
-        plan.txt = Title_HintJoin(groups, chr(10));
+        plan.txt = Title_HintJoin(_groups, chr(10));
         plan.lay = Prompt_RichLayout(plan.txt, plan.inner_w);
     }
     var lw = 0;
@@ -3622,23 +3634,66 @@ function Title_HintPlan(_c, _m) {
     return plan;
 }
 
-// A picker keeps clear of the key line: centred on the screen as usual, but its bottom edge stops above the line when the line would otherwise be covered (it is
-// worked out from the rectangles of the last draw, so the very first frame is centred).
+// The key line of the screen on top of the title.
+function Title_HintPlan(_c, _m) {
+    return Title_HintPlanOf(Title_HintGroups(_m));
+}
+
+// A picker keeps clear of the key line and of the build id: the list with its details below it, centred between the top margin and the key line, when that fits; else (a big
+// text size) the details stand beside the list, in the same band. Called before the draw; the layout it sets is what the draw uses.
 function Title_PickerFit(_c, _m) {
     if (!Title_IsPicker(_m)) return;
     var mt = Ui_Metrics();
+    var p = mt.p;
+    var L = _m.layout;
     var hp = Title_HintPlan(_c, _m);
-    if (hp.rect.w <= 0 || _m.rect.w <= 0) {
-        _m.layout.y_bottom = -1;
+    var top_y = mt.margin;
+    var bot_y = ((hp.rect.w > 0) ? hp.rect.y : mt.gh - mt.margin) - mt.margin;
+    var avail = bot_y - top_y;
+    L.details_pos = "below";   // measured first as the stacked layout
+    L.x_anchor = "center";
+    L.panel_w = 0;
+    L.y_top = -1;
+    L.det_w = 0;
+    L.det_top = -1;
+    L.det_h = -1;
+    L.max_h = 0;
+    var mm = Ui_MenuMeasure(_m, mt);
+    var n = array_length(_m.items);
+    var chrome = 8 * p + ((L.title != "") ? (mt.line_h + 3 * p) : 0);
+    var below_h = chrome + n * mt.row_h + ((mm.det_h > 0) ? mt.margin + mm.det_h : 0);
+    if (below_h <= avail) {
+        L.y_top = top_y + round((avail - below_h) / 2);
         return;
     }
-    var block_h = (_m.det_rect.w > 0) ? (_m.det_rect.y + _m.det_rect.h - _m.rect.y) : _m.rect.h;
-    var centred_bottom = max(mt.margin, round((mt.gh - block_h) / 2)) + block_h;
-    var limit = hp.rect.y - mt.margin;
-    _m.layout.y_bottom = (centred_bottom > limit) ? limit : -1;
+    var mc = Ui_MenuMeasureRowsFresh(_m, mt);
+    var total_w = mt.gw - 3 * mt.margin;
+    var half_w = floor(total_w * 0.5 / p) * p;
+    var z = { mt: mt, list_w: half_w, det_w: total_w - half_w };
+    var wd = TabMenu_Widths(z, Ui_MenuListNeed(mc, p), mc.det_need);
+    var det_need_h = 0;   // the tallest details text at the narrower width it has beside the list
+    for (var di = 0; di < n; di++) det_need_h = max(det_need_h, Ui_DetailsHeight(wd.det_w, _m.items[di].help, variable_struct_exists(_m.items[di], "lines") ? _m.items[di].lines : [], 1));
+    var need_h = max(chrome + n * mt.row_h, det_need_h);
+    var h = min(avail, need_h);
+    L.details_pos = "right";
+    L.x_anchor = "left";
+    L.panel_w = wd.list_w;
+    L.y_top = top_y + round((avail - h) / 2);
+    L.max_h = h;
+    L.det_w = wd.det_w;
+    L.det_top = L.y_top;
+    L.det_h = h;
 }
 
 // Draws that line; the rectangle is kept in _c.title_hint_rect for -shots.
+function Title_DrawKeyPlan(_hp, _a) {
+    var p = Ui_Metrics().p;
+    var r = _hp.rect;
+    Ui_DrawFrame(r.x, r.y, r.w, r.h, _a, p);
+    Prompt_RichDraw(r.x + 4 * p, r.y + 4 * p, _hp.txt, _hp.inner_w, UI_C_LIGHT, fa_left, _a);
+    draw_set_alpha(1);
+}
+
 function Title_DrawHints(_c) {
     _c.title_hint_rect = { x: 0, y: 0, w: 0, h: 0 };
     var top = Ui_StackTop(_c.title_stk);
@@ -3646,12 +3701,439 @@ function Title_DrawHints(_c) {
     if (hp.txt == "") return;
     var a = Ui_MenuAlpha(top, current_time);
     if (a <= 0) return;
-    var p = Ui_Metrics().p;
-    var r = hp.rect;
-    _c.title_hint_rect = r;
-    Ui_DrawFrame(r.x, r.y, r.w, r.h, a, p);
-    Prompt_RichDraw(r.x + 4 * p, r.y + 4 * p, hp.txt, hp.inner_w, UI_C_LIGHT, fa_left, a);
-    draw_set_alpha(1);
+    _c.title_hint_rect = hp.rect;
+    Title_DrawKeyPlan(hp, a);
+}
+
+// ---- D175: the name entry (a new profile's name) ----
+// A name is 1..PROFILE_NAME_MAX characters from A-Z, 0-9 and space (no space first, none twice in a row); the entry starts on a suggestion ("Profile 2") that the first typed
+// character or Backspace replaces. Keys: the letter and digit keys type, Backspace (or LB) deletes, Enter finishes, Esc cancels; an on-screen grid (9 columns of letters and digits,
+// then Space / Delete / OK) is for the pad and the mouse: the d-pad moves, Confirm presses the cell. This model is pure; the screen is Title_NameStep / Title_NameDraw.
+#macro NAME_GRID_COLS 9
+#macro NAME_GRID_ROWS 4   // rows of letters and digits; one more row holds the three buttons
+
+// The letters and digits of the grid, in order (built once).
+function NameEntry_Chars() {
+    if (!variable_global_exists("name_chars")) {
+        var t = "";
+        for (var i = 0; i < 26; i++) t += chr(65 + i);
+        for (var d = 0; d < 10; d++) t += string(d);
+        global.name_chars = t;
+    }
+    return global.name_chars;
+}
+
+function NameEntry_New(_text) {
+    return { text: string(_text), fresh: (string(_text) != ""), cx: 0, cy: 0 };
+}
+
+function NameEntry_CharOk(_ch) {
+    if (!is_string(_ch) || string_length(_ch) != 1) return false;
+    var o = ord(_ch);
+    return (o >= 65 && o <= 90) || (o >= 48 && o <= 57) || o == 32;
+}
+
+// Adds one character; false when it is not allowed (not a letter, digit or space, a space first or doubled, the name already full).
+function NameEntry_Type(_e, _ch) {
+    if (!NameEntry_CharOk(_ch)) return false;
+    if (_e.fresh) {
+        _e.text = "";
+        _e.fresh = false;
+    }
+    var n = string_length(_e.text);
+    if (n >= PROFILE_NAME_MAX) return false;
+    if (_ch == " " && (n == 0 || string_char_at(_e.text, n) == " ")) return false;
+    _e.text += _ch;
+    return true;
+}
+
+// Takes the last character away (the whole suggestion, while it is still the suggestion). false when there was nothing to take.
+function NameEntry_Backspace(_e) {
+    if (_e.fresh) {
+        _e.text = "";
+        _e.fresh = false;
+        return true;
+    }
+    var n = string_length(_e.text);
+    if (n <= 0) return false;
+    _e.text = string_delete(_e.text, n, 1);
+    return true;
+}
+
+// The name that would be made: trimmed, at most 12 characters (Profiles_CleanName).
+function NameEntry_Value(_e) {
+    return Profiles_CleanName(_e.text);
+}
+
+function NameEntry_CanConfirm(_e) {
+    return NameEntry_Value(_e) != "";
+}
+
+// The letter or digit of a grid cell ("" outside the letter rows).
+function NameEntry_CellChar(_cx, _cy) {
+    if (_cy < 0 || _cy >= NAME_GRID_ROWS || _cx < 0 || _cx >= NAME_GRID_COLS) return "";
+    return string_char_at(NameEntry_Chars(), _cy * NAME_GRID_COLS + _cx + 1);
+}
+
+// The last row's three buttons each take a third of the columns.
+function NameEntry_ButtonAt(_cx) {
+    var b = clamp(_cx div 3, 0, 2);
+    return (b == 0) ? "space" : ((b == 1) ? "delete" : "ok");
+}
+
+// The grid cursor moves and wraps (columns 0..8, rows 0..4).
+function NameEntry_Move(_e, _dx, _dy) {
+    _e.cx = (_e.cx + _dx + NAME_GRID_COLS) mod NAME_GRID_COLS;
+    _e.cy = (_e.cy + _dy + NAME_GRID_ROWS + 1) mod (NAME_GRID_ROWS + 1);
+}
+
+// What pressing the cell under the cursor does: { kind: "char" (ch), "space", "delete" or "ok", ch }.
+function NameEntry_Press(_e) {
+    if (_e.cy >= NAME_GRID_ROWS) return { kind: NameEntry_ButtonAt(_e.cx), ch: "" };
+    return { kind: "char", ch: NameEntry_CellChar(_e.cx, _e.cy) };
+}
+
+function Title_NameOf(_c) {
+    return (variable_instance_exists(_c, "title_name") && is_struct(_c.title_name)) ? _c.title_name : undefined;
+}
+
+// Opens the entry above the profile screen, on the suggestion "Profile N" (N = the id the new profile will get, plus one).
+function Title_NameOpen(_c) {
+    var pid = 0;
+    while (is_struct(Profiles_FindEntry(pid))) pid++;
+    _c.title_name = { e: NameEntry_New(Profiles_DefaultName(pid)), t: current_time, msg: false, rep: { v: Ui_RepeatNew(), h: Ui_RepeatNew() }, cells: [] };
+}
+
+// Makes the profile and switches to it (a new profile starts fresh: no Codex, no history, the story from the beginning); the entry and the profile screen close. An empty name
+// is refused with a line saying why. true when it made one.
+function Title_NameConfirm(_c) {
+    var n = Title_NameOf(_c);
+    if (!is_struct(n)) return false;
+    if (!NameEntry_CanConfirm(n.e)) {
+        n.msg = true;
+        SFX_PlayUI("ui_deny");
+        return false;
+    }
+    var pid = Profiles_Create(NameEntry_Value(n.e));
+    if (pid < 0) {
+        n.msg = true;
+        SFX_PlayUI("ui_deny");
+        return false;
+    }
+    Profiles_Switch(pid);
+    _c.title_name = undefined;
+    _c.title_refresh = true;
+    _c.title_cursor_reset = true;
+    Ui_StackBack(_c.title_stk);   // the profile screen
+    SFX_PlayUI("ui_confirm");
+    return true;
+}
+
+// Esc: back to the profile screen, nothing made. The profile screen is told its press must not answer it.
+function Title_NameCancel(_c) {
+    _c.title_name = undefined;
+    var top = Ui_StackTop(_c.title_stk);
+    if (is_struct(top)) top.lock_ms = current_time;
+}
+
+// The character typed this frame by a key (letters through name_a..name_z, digits through the seed digits' keys, Space), "" when none. They are separate actions, so a
+// letter that is also a menu key (W A S D Q E Z X I) types its letter here.
+function Title_NameTyped() {
+    for (var i = 0; i < 26; i++) {
+        if (Input_Pressed("name_" + chr(97 + i))) return chr(65 + i);
+    }
+    for (var d = 0; d < 10; d++) {
+        if (Input_Pressed("seed_d" + string(d))) return string(d);
+    }
+    if (Input_Pressed("name_space")) return " ";
+    return "";
+}
+
+// One frame of the entry. A typed character wins over everything else that frame (Z, X, Space, W A S D Q are letters here, not Confirm, Back or moves); Enter finishes; Esc, Back
+// or a right click cancels; the grid answers the d-pad / arrows (moves), Confirm (presses) and the mouse (hover moves, click presses). The press that opened the entry is ignored.
+function Title_NameStep(_c) {
+    var n = _c.title_name;
+    var e = n.e;
+    var snap = Ui_ReadInput();
+    var now = current_time;
+    var typed = Title_NameTyped();
+    var changed = false;
+    if (typed != "") {
+        if (NameEntry_Type(e, typed)) changed = true;
+        else SFX_PlayUI("ui_deny");
+    } else {
+        if (Input_Pressed("seed_back") || snap.tab < 0) {
+            if (NameEntry_Backspace(e)) changed = true;
+        }
+        var dv = (snap.down ? 1 : 0) - (snap.up ? 1 : 0);
+        if (Ui_RepeatStep(n.rep.v, dv, snap.up_p || snap.down_p, now) > 0) { NameEntry_Move(e, 0, dv); changed = true; }
+        var dh = (snap.right ? 1 : 0) - (snap.left ? 1 : 0);
+        if (Ui_RepeatStep(n.rep.h, dh, snap.left_p || snap.right_p, now) > 0) { NameEntry_Move(e, dh, 0); changed = true; }
+        var hv = Ui_HoverIndex(n.cells, snap.mx, snap.my);
+        if (snap.mouse_moved && hv >= 0 && (n.cells[hv].cx != e.cx || n.cells[hv].cy != e.cy)) {
+            e.cx = n.cells[hv].cx;
+            e.cy = n.cells[hv].cy;
+            changed = true;
+        }
+    }
+    if (changed) {
+        n.msg = false;
+        SFX_PlayUI("ui_move");
+    }
+    if (now - n.t < UI_INPUT_LOCK_MS) return;
+    if (Input_Pressed("name_ok")) {
+        Title_NameConfirm(_c);
+        return;
+    }
+    if (typed != "") return;
+    if (snap.back || snap.rclick) {
+        SFX_PlayUI("ui_back");
+        Title_NameCancel(_c);
+        return;
+    }
+    var press = snap.confirm;
+    if (snap.click) {
+        var hc = Ui_HoverIndex(n.cells, snap.mx, snap.my);
+        if (hc >= 0) {
+            e.cx = n.cells[hc].cx;
+            e.cy = n.cells[hc].cy;
+            press = true;
+        }
+    }
+    if (!press) return;
+    var act = NameEntry_Press(e);
+    SFX_PlayUI("ui_confirm");
+    switch (act.kind) {
+        case "char":
+            if (NameEntry_Type(e, act.ch)) n.msg = false;
+            break;
+        case "space":
+            if (NameEntry_Type(e, " ")) n.msg = false;
+            break;
+        case "delete":
+            NameEntry_Backspace(e);
+            n.msg = false;
+            break;
+        case "ok":
+            Title_NameConfirm(_c);
+            break;
+    }
+}
+
+// The entry screen: a framed panel with the title, the name field (the suggestion pale, a block after typed text), a line of help (or why Confirm said no) and the grid (the
+// cursor's cell lit); the keys stand in a framed line in the lower left corner, as on the other title screens. Measured from Ui_Metrics, so it fits 480 x 432 and the larger
+// windows. The rectangles are kept in _c.title_name_rects for -shots.
+function Title_NameDraw(_c) {
+    var n = _c.title_name;
+    var e = n.e;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var lh = mt.line_h;
+    var a = Ui_AnimT(n.t, current_time);
+    var cols = NAME_GRID_COLS;
+    var gap = p;
+    var cw0 = UI_TextWidth("W") + 4 * p;
+    var pw = min(mt.gw - 2 * mt.margin, max(cols * cw0 + (cols - 1) * gap + 12 * p, round(mt.gw * 0.7)));
+    var cw = floor((pw - 12 * p - (cols - 1) * gap) / cols);
+    var grid_w = cols * cw + (cols - 1) * gap;
+    var ch = lh + 2 * p;
+    var inner_w = pw - 8 * p;
+    var pad = (Prompt_Device() == "gamepad");   // a keyboard types (so its Space, Z, Q are letters here) and has no Pick key; a pad picks cells on the grid
+    var info = n.msg ? Loc_T("profile.name.need", "Enter a name.") : (pad ? Loc_T("profile.name.info_pad", "Up to 12 letters. Pick them on the grid.") : Loc_T("profile.name.info_kb", "Up to 12 letters. Backspace deletes, Enter finishes."));
+    var info_h = Ui_TextBlockH(info, inner_w);
+    var groups = pad ? [Loc_T("profile.name.hint_pick", "[k:confirm] Pick"), Loc_T("save.hint.delete", "[k:tab_prev] Delete"), Loc_T("profile.name.hint_cancel", "[k:back] Cancel")] : [Loc_T("profile.name.hint_cancel", "[k:back] Cancel")];
+    var hp = Title_HintPlanOf(groups);
+    var field_h = lh + 3 * p;
+    var ph = 4 * p + (lh + 3 * p) + 3 * p + field_h + 3 * p + info_h + 3 * p + (NAME_GRID_ROWS + 1) * (ch + gap) + 3 * p;
+    var px = round((mt.gw - pw) / 2);
+    var avail = hp.rect.y - 2 * mt.margin;
+    var py = mt.margin + max(0, round((avail - ph) / 2)) - p * round((1 - a) * 3);
+    Ui_DimBackdrop(UI_DIM_POPUP * a);
+    Ui_DrawFrame(px, py, pw, ph, a, p);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(a);
+    var x0 = px + 4 * p;
+    var yy = py + 4 * p;
+    Ui_Text(x0, yy, Loc_T("profile.row.new", "New Profile"), UI_C_LIGHTEST);
+    Ui_Box(px + 3 * p, yy + lh + p, px + pw - 3 * p, yy + lh + 2 * p, UI_C_DARK);
+    yy += lh + 3 * p + 3 * p;
+    var field = { x: x0, y: yy, w: inner_w, h: field_h };
+    Ui_Box(field.x, field.y, field.x + field.w, field.y + field.h, UI_C_LIGHTEST);
+    Ui_Box(field.x + p, field.y + p, field.x + field.w - p, field.y + field.h - p, UI_C_DARKEST);
+    var shown = Ui_FitText(e.text, inner_w - 4 * p - UI_TextWidth("W"));
+    var ty = field.y + (field.h - lh) div 2;
+    Ui_Text(field.x + 2 * p, ty, shown, e.fresh ? UI_C_LIGHT : UI_C_LIGHTEST);
+    if (!e.fresh && string_length(e.text) < PROFILE_NAME_MAX && Title_BlinkOn(current_time - n.t)) {   // the block after typed text: where the next letter goes
+        var bx = field.x + 2 * p + UI_TextWidth(shown);
+        Ui_Box(bx + p, ty + lh - 2 * p, bx + p + UI_TextWidth("W") - p, ty + lh, UI_C_LIGHTEST);
+    }
+    yy += field_h + 3 * p;
+    Ui_TextBlock(x0, yy, info, inner_w, n.msg ? UI_C_LIGHTEST : UI_C_LIGHT);
+    yy += info_h + 3 * p;
+    var gx = px + round((pw - grid_w) / 2);
+    var cells = [];
+    for (var r = 0; r < NAME_GRID_ROWS; r++) {
+        for (var c = 0; c < cols; c++) {
+            var gcx = gx + c * (cw + gap);
+            var gcy = yy + r * (ch + gap);
+            var on = (e.cy == r && e.cx == c);
+            Ui_Box(gcx, gcy, gcx + cw, gcy + ch, on ? UI_C_LIGHTEST : UI_C_DARK);
+            Ui_Box(gcx + p, gcy + p, gcx + cw - p, gcy + ch - p, on ? UI_C_DARK : UI_C_DARKEST);
+            Ui_Text(gcx + cw / 2, gcy + (ch - lh) div 2, NameEntry_CellChar(c, r), UI_C_LIGHTEST, fa_center);
+            array_push(cells, { x: gcx, y: gcy, w: cw, h: ch, cx: c, cy: r });
+        }
+    }
+    var by = yy + NAME_GRID_ROWS * (ch + gap);
+    var bw = floor((grid_w - 2 * gap) / 3);
+    var blabels = [Loc_T("profile.name.key_space", "Space"), Loc_T("profile.name.key_delete", "Delete"), Loc_T("profile.name.key_ok", "OK")];
+    for (var b = 0; b < 3; b++) {
+        var bcx = gx + b * (bw + gap);
+        var bon = (e.cy == NAME_GRID_ROWS && NameEntry_ButtonAt(e.cx) == NameEntry_ButtonAt(b * 3));
+        Ui_Box(bcx, by, bcx + bw, by + ch, bon ? UI_C_LIGHTEST : UI_C_DARK);
+        Ui_Box(bcx + p, by + p, bcx + bw - p, by + ch - p, bon ? UI_C_DARK : UI_C_DARKEST);
+        Ui_Text(bcx + bw / 2, by + (ch - lh) div 2, Ui_FitText(blabels[b], bw - 2 * p), UI_C_LIGHTEST, fa_center);
+        array_push(cells, { x: bcx, y: by, w: bw, h: ch, cx: b * 3 + 1, cy: NAME_GRID_ROWS });
+    }
+    n.cells = cells;
+    draw_set_alpha(a0);
+    Title_DrawKeyPlan(hp, a);
+    _c.title_hint_rect = hp.rect;
+    _c.title_name_rects = { panel: { x: px, y: py, w: pw, h: ph }, field: field, cells: cells, hint: hp.rect };
+}
+
+// ---- D175: the profile screen (switch, create, delete) ----
+// A profile's numbers for its row: the active one from memory, any other from its own file (read, never applied). { runs, wins, best_floor }
+function Title_ProfileStats(_pid) {
+    var pr = (_pid == Profiles_Active()) ? Profile_Get() : Profile_Load(Profiles_PathOf(_pid)).profile;
+    return { runs: floor(Save_ToReal(pr.runs_started, 0)), wins: floor(Save_ToReal(pr.wins, 0)), best_floor: floor(Save_ToReal(pr.best_floor, 0)) };
+}
+
+// One row per profile (name; "Active" on the one in use; Runs / Wins / Best Floor in the details) and a "New Profile" row while there are fewer than PROFILES_MAX.
+function Title_ProfileRows() {
+    var list = Profiles_List();
+    var act = Profiles_Active();
+    var rows = [];
+    for (var i = 0; i < array_length(list); i++) {
+        var st = Title_ProfileStats(list[i].id);
+        array_push(rows, {
+            id: "prof_" + string(list[i].id), pid: list[i].id, label: list[i].name, value: (list[i].id == act) ? Loc_T("profile.val.active", "Active") : "",
+            status: "profile", kind: "button", enabled: true, dim: false, hint: "",
+            help: (list[i].id == act) ? Loc_T("profile.help.active", "The profile in use. Its Codex, run history and story are the ones you see.") : Loc_T("profile.help.other", "Switch to this profile. Its Codex, run history, story and save files come with it."),
+            lines: [
+                { label: Loc_T("profile.lbl.runs", "Runs"), value: string(st.runs) },
+                { label: Loc_T("tab.lbl.wins", "Wins"), value: string(st.wins) },
+                { label: Loc_T("tab.lbl.best_floor", "Best Floor"), value: string(st.best_floor) }
+            ]
+        });
+    }
+    if (array_length(list) < PROFILES_MAX) {
+        array_push(rows, {
+            id: "prof_new", pid: -1, label: Loc_T("profile.row.new", "New Profile"), value: "", status: "new", kind: "button", enabled: true, dim: false, hint: "",
+            help: Loc_T("profile.help.new", "Start a new profile. Its Codex and run history are empty and the story begins again."), lines: []
+        });
+    }
+    return rows;
+}
+
+// The row of the active profile (where the cursor starts).
+function Title_ProfileActiveRow(_rows) {
+    for (var i = 0; i < array_length(_rows); i++) if (_rows[i].pid == Profiles_Active()) return i;
+    return 0;
+}
+
+function Title_ProfileOpen(_c) {
+    var rows = Title_ProfileRows();
+    var m = Ui_MenuNew("profiles", rows, {
+        owner: _c, on_confirm: Title_ProfileConfirm, data: { mode: "profiles" },
+        layout: { title: Loc_T("profile.title", "Profiles"), anchor: "center", details: true, hides_below: true }
+    });
+    Ui_MenuFixCursor(m, Title_ProfileActiveRow(rows));
+    Ui_StackPush(_c.title_stk, m);
+    return m;
+}
+
+// Confirm: New Profile opens the name entry; another profile becomes the active one (the title refreshes: its name, what Continue and Load Game can do) and the screen closes.
+function Title_ProfileConfirm(_m, _i) {
+    var c = _m.owner;
+    var row = _m.items[_i];
+    if (row.pid < 0) {
+        Title_NameOpen(c);
+        return;
+    }
+    if (row.pid != Profiles_Active()) {
+        Profiles_Switch(row.pid);
+        c.title_cursor_reset = true;
+    }
+    c.title_refresh = true;
+    Ui_StackBack(c.title_stk);
+}
+
+// The delete key on a profile row: asks Yes / No. New Profile has nothing to delete. Returns true when it asked.
+function Title_ProfileDeleteAsk(_c, _m) {
+    if (!is_struct(_m) || _m.id != "profiles" || array_length(_m.items) <= 0) return false;
+    var row = _m.items[clamp(_m.cursor, 0, array_length(_m.items) - 1)];
+    if (row.pid < 0) {
+        SFX_PlayUI("ui_deny");
+        return false;
+    }
+    Confirm_Open(Loc_T("profile.delete.ask", "Delete profile {name}? Its Codex, history and save files are lost.", { name: row.label }), Title_ProfileDeleteYes, { c: _c, m: _m, pid: row.pid });
+    return true;
+}
+
+// Yes: the profile and its three save files go (deleting the active one makes the first remaining one active, the last one a fresh "Profile 1": the data layer's rules).
+function Title_ProfileDeleteYes(_d) {
+    Profiles_Delete(_d.pid);
+    _d.c.title_refresh = true;
+    _d.c.title_cursor_reset = true;
+    var rows = Title_ProfileRows();
+    _d.m.items = rows;
+    Ui_MenuFixCursor(_d.m, Title_ProfileActiveRow(rows));
+}
+
+// ---- D175: the corner buttons of the title ----
+// Profile: lower left, two lines: its key ("[Q] Profile") and the active profile's name. It is clear of the menu (the name is cut to the room beside it). Clicking it or the key opens
+// the profile screen. The rectangle is kept in _c.title_btn.profile for the mouse and -shots.
+function Title_DrawButtons(_c) {
+    _c.title_btn = { profile: { x: 0, y: 0, w: 0, h: 0 } };
+    var m = _c.title_stk.menus[0];
+    var a = Ui_MenuAlpha(m, current_time);
+    if (a <= 0 || m.rect.w <= 0) return;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var label = Loc_T("profile.btn", "[k:tab_prev] Profile");
+    var room_w = max(12 * p, m.rect.x - 2 * mt.margin - 8 * p);
+    var name = Ui_FitText(Profiles_ActiveName(), room_w);
+    var llay = Prompt_RichLayout(label, 100000);
+    var w = max(llay.line_w[0], UI_TextWidth(name)) + 8 * p;
+    var h = 2 * mt.line_h + p + 8 * p;
+    var bx = mt.margin;
+    var by = mt.gh - mt.margin - h;
+    var mp = Ui_MousePos();
+    var hot = (mp.x >= bx && mp.x < bx + w && mp.y >= by && mp.y < by + h);
+    _c.title_btn = { profile: { x: bx, y: by, w: w, h: h } };
+    Ui_DrawFrame(bx, by, w, h, a, p);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(a);
+    if (hot) Ui_Box(bx + 2 * p, by + 2 * p, bx + w - 2 * p, by + h - 2 * p, UI_C_DARK);
+    Prompt_RichDraw(bx + 4 * p, by + 4 * p, label, w - 8 * p, UI_C_LIGHT, fa_left, a);
+    Ui_Text(bx + 4 * p, by + 4 * p + mt.line_h + p, name, UI_C_LIGHTEST);
+    draw_set_alpha(a0);
+}
+
+// The title's own keys: the profile button's key (Q, the pad's LB) or a click on it. Only on the title menu itself, once it takes input. True when it was used.
+function Title_ButtonKeys(_c) {
+    var m = _c.title_stk.menus[0];
+    if (current_time - m.lock_ms < UI_INPUT_LOCK_MS || Ui_MenuAlpha(m, current_time) < 1) return false;
+    var hit = Input_Pressed("tab_prev");
+    if (!hit && mouse_check_button_pressed(mb_left)) {
+        var mp = Ui_MousePos();
+        var r = _c.title_btn.profile;
+        hit = (r.w > 0 && mp.x >= r.x && mp.x < r.x + r.w && mp.y >= r.y && mp.y < r.y + r.h);
+    }
+    if (!hit) return false;
+    SFX_PlayUI("ui_confirm");
+    Title_ProfileOpen(_c);
+    return true;
 }
 
 // ---- D152: the seed pick after New Game ----
@@ -3849,7 +4331,12 @@ function Title_Step(_c) {
         Title_SeedEntryStep(_c);
         return;
     }
+    if (is_struct(Title_NameOf(_c))) {   // D175: the name entry is above the profile screen
+        Title_NameStep(_c);
+        return;
+    }
     if (_c.title_refresh) Title_Refresh(_c);
+    if (Ui_StackDepth(_c.title_stk) == 1 && Title_ButtonKeys(_c)) return;   // D175: the profile button's key, or a click on it
     var top = Ui_StackTop(_c.title_stk);
     if (Title_PickerKeys(_c, top)) return;   // D175: the delete key on a Load Game row
     var depth0 = Ui_StackDepth(_c.title_stk);
@@ -3861,6 +4348,8 @@ function Title_Draw(_c) {
     if (!is_struct(_c.title_stk) || _c.state == "settings") return;
     if (is_struct(Title_SeedEntryOf(_c))) {   // D152: the entry screen stands alone over the dimmed picture
         Title_SeedEntryDraw(_c);
+    } else if (is_struct(Title_NameOf(_c))) {   // D175: so does the name entry
+        Title_NameDraw(_c);
     } else {
         var pk = (Ui_StackDepth(_c.title_stk) >= 2 && Title_IsPicker(_c.title_stk.menus[1])) ? _c.title_stk.menus[1] : undefined;
         if (is_struct(pk)) {   // D175: a save file picker stands alone over the dimmed picture (the title menu is not drawn under it), clear of its key line
@@ -3868,8 +4357,12 @@ function Title_Draw(_c) {
             Ui_DimBackdrop(UI_DIM_POPUP * Ui_MenuAlpha(pk, current_time));
         }
         Ui_StackDraw(_c.title_stk);
-        if (Ui_StackDepth(_c.title_stk) <= 1) Title_DrawCard(_c);   // the Continue card makes way for the seed pick
-        else Title_DrawHints(_c);   // D175: the keys of a save file picker
+        if (Ui_StackDepth(_c.title_stk) <= 1) {
+            Title_DrawCard(_c);   // the Continue card makes way for the seed pick
+            Title_DrawButtons(_c);   // D175: the profile button
+        } else {
+            Title_DrawHints(_c);   // D175: the keys of a save file picker or of the profile screen
+        }
     }
     draw_set_alpha(1);
     draw_set_color(c_white);

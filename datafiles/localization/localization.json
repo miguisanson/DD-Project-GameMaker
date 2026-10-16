@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T11:19:46Z",
-    "row_count": 1224
+    "generated_at_utc": "2026-10-16T12:18:14Z",
+    "row_count": 1243
   },
   "default_lang": "en",
   "languages": [
@@ -3432,9 +3432,73 @@
       "en": "Paused",
       "ko": "일시 정지"
     },
+    "profile.btn": {
+      "en": "[k:tab_prev] Profile",
+      "ko": "[k:tab_prev] 프로필"
+    },
     "profile.default_name": {
       "en": "Profile",
       "ko": "프로필"
+    },
+    "profile.delete.ask": {
+      "en": "Delete profile {name}? Its Codex, history and save files are lost.",
+      "ko": "프로필 {name}을(를) 삭제할까요? 도감, 기록, 저장 파일이 모두 사라집니다."
+    },
+    "profile.help.active": {
+      "en": "The profile in use. Its Codex, run history and story are the ones you see.",
+      "ko": "지금 쓰는 프로필입니다. 도감, 도전 기록, 이야기는 이 프로필의 것입니다."
+    },
+    "profile.help.new": {
+      "en": "Start a new profile. Its Codex and run history are empty and the story begins again.",
+      "ko": "새 프로필을 만듭니다. 도감과 도전 기록은 비어 있고 이야기는 처음부터 시작합니다."
+    },
+    "profile.help.other": {
+      "en": "Switch to this profile. Its Codex, run history, story and save files come with it.",
+      "ko": "이 프로필로 바꿉니다. 도감, 도전 기록, 이야기, 저장 파일도 함께 바뀝니다."
+    },
+    "profile.hint.create": {
+      "en": "[k:confirm] Create",
+      "ko": "[k:confirm] 만들기"
+    },
+    "profile.hint.switch": {
+      "en": "[k:confirm] Switch",
+      "ko": "[k:confirm] 바꾸기"
+    },
+    "profile.lbl.runs": {
+      "en": "Runs",
+      "ko": "도전 횟수"
+    },
+    "profile.name.hint_cancel": {
+      "en": "[k:back] Cancel",
+      "ko": "[k:back] 취소"
+    },
+    "profile.name.hint_pick": {
+      "en": "[k:confirm] Pick",
+      "ko": "[k:confirm] 선택"
+    },
+    "profile.name.info_kb": {
+      "en": "Up to 12 letters. Backspace deletes, Enter finishes.",
+      "ko": "최대 12자. Backspace로 지우고 Enter로 끝냅니다."
+    },
+    "profile.name.info_pad": {
+      "en": "Up to 12 letters. Pick them on the grid.",
+      "ko": "최대 12자. 칸에서 골라 입력하세요."
+    },
+    "profile.name.key_delete": {
+      "en": "Delete",
+      "ko": "삭제"
+    },
+    "profile.name.key_ok": {
+      "en": "OK",
+      "ko": "확인"
+    },
+    "profile.name.key_space": {
+      "en": "Space",
+      "ko": "띄어쓰기"
+    },
+    "profile.name.need": {
+      "en": "Enter a name.",
+      "ko": "이름을 입력하세요."
     },
     "profile.notice.corrupt": {
       "en": "Your profile file was damaged, so a fresh one was started. The damaged file was kept next to it.",
@@ -3443,6 +3507,18 @@
     "profile.notice.locked": {
       "en": "Your profile was saved by a different version of the game. It has been left untouched, and progress will not be saved this time.",
       "ko": "다른 버전의 게임에서 저장된 프로필입니다. 그대로 두며, 이번에는 진행 상황이 저장되지 않습니다."
+    },
+    "profile.row.new": {
+      "en": "New Profile",
+      "ko": "새 프로필"
+    },
+    "profile.title": {
+      "en": "Profiles",
+      "ko": "프로필"
+    },
+    "profile.val.active": {
+      "en": "Active",
+      "ko": "사용 중"
     },
     "run.continue.corrupt": {
       "en": "The run save is damaged and cannot be loaded.",

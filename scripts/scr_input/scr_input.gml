@@ -71,6 +71,12 @@ function Input_Init() {
         if (!variable_struct_exists(inp.bindings, seed_action)) variable_struct_set(inp.bindings, seed_action, [ord("0") + sd, vk_numpad0 + sd]);
     }
     if (!variable_struct_exists(inp.bindings, "seed_back")) inp.bindings.seed_back = [vk_backspace];
+    for (var nl = 0; nl < 26; nl++) {   // D175: the profile name entry types letters (fixed keys, not on the Controls page); A-Z are also menu keys, so the entry reads these actions, not the menu ones
+        var name_action = "name_" + chr(97 + nl);
+        if (!variable_struct_exists(inp.bindings, name_action)) variable_struct_set(inp.bindings, name_action, [ord("A") + nl]);
+    }
+    if (!variable_struct_exists(inp.bindings, "name_space")) inp.bindings.name_space = [vk_space];
+    if (!variable_struct_exists(inp.bindings, "name_ok")) inp.bindings.name_ok = [vk_enter];
     if (!variable_struct_exists(inp, "state")) {
         inp.state = {};
     }
