@@ -9844,7 +9844,8 @@ function Scenario_StepSmokeSpeed(_s) {
                     Scenario_Check("g7_the_preview_plate_is_drawn_on_attack", is_struct(_bc.hud.rects.preview) && _bc.hud.rects.preview.w > 0);
                     Scenario_Check("g7_the_plate_numbers_are_4_and_5_for_the_wooden_sword_vs_a_slime", _pv.ok == 4 && _pv.perfect == 5, "ok=" + string(_pv.ok) + " perfect=" + string(_pv.perfect));
                     var _want = Battle_PreviewPlateLines(_pv);
-                    Scenario_Check("g7_the_plate_says_damage_and_perfect_from_the_preview", array_length(_bc.hud.preview_text) == 2 && _bc.hud.preview_text[0] == _want[0] && _bc.hud.preview_text[1] == _want[1], json_stringify(_bc.hud.preview_text));
+                    // R-085: preview_text is what was DRAWN (the wrapped, fitted lines), so a cut ("Dam..") or a stacked plate differs from the full text of the fit helper
+                    Scenario_Check("g7_the_plate_says_damage_and_perfect_from_the_preview", array_length(_bc.hud.preview_text) == 2 && _bc.hud.preview_text[0] == _want[0] && _bc.hud.preview_text[1] == _want[1] && _bc.hud[$ "preview_stacked"] == false, json_stringify(_bc.hud.preview_text));
                     if (is_struct(_bc.hud.rects.preview)) {
                         var _pr = _bc.hud.rects.preview;
                         var _hr = _bc.hud.rects;
