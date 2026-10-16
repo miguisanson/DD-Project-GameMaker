@@ -1753,8 +1753,8 @@ function CardsUi_StatHelp(_stat_id) {
     return "";
 }
 
-// D177: the level-up screen. Rows ATK DEF SPD MAG VIG MND. The rows the class grows are gold and read "now > now + growth"; the others read only the number; the row under the
-// cursor adds its "+1" (CardsUi_StatRefresh, every frame). The details say what the stat does and Now / After (VIG: Max HP, MND: Max MP), with the class growth and the
+// D177 (amended I-109): the level-up screen. Rows ATK DEF SPD MAG VIG MND. The rows the class grows read "now > now + growth" with only the NEW number gold (the label and the old number
+// are white); the others read only the number; the row under the cursor adds its "+1" (its new number gold too; CardsUi_StatRefresh, every frame). The details say what the stat does and Now / After (VIG: Max HP, MND: Max MP), with the class growth and the
 // point both counted. "Now" is the character as he is, "After" the preview of the level the screen is for (LevelUp_PreviewCharacter).
 function CardsUi_StatMenu() {
     var ch = GameState_Get().player_ch;
@@ -1773,16 +1773,13 @@ function CardsUi_StatMenu() {
         if (sid == STAT_VIG) lines = [ { label: Loc_T("cards.stat.hp_now", "Max HP Now"), value: string(ch.max_hp) }, { label: Loc_T("cards.stat.hp_after", "Max HP After"), value: string(Resource_MaxHpOfVig(after)) } ];
         else if (sid == STAT_MND) lines = [ { label: Loc_T("cards.stat.mp_now", "Max MP Now"), value: string(ch.max_mp) }, { label: Loc_T("cards.stat.mp_after", "Max MP After"), value: string(Resource_MaxMpOfMnd(after)) } ];
         else lines = [ { label: Loc_T("cards.stat.now", "Now"), value: string(now) }, { label: Loc_T("cards.stat.after", "After"), value: string(after) } ];
-        var row = { label: Stat_ShortName(sid), value: "", help: CardsUi_StatHelp(sid), lines: lines, stat: sid, now: now, grow: grow };
-        if (grow > 0) {
-            row.col = UI_C_MERCHANT_GOLD;
-            any_growth = true;
-        }
+        var row = { label: Stat_ShortName(sid), value: "", help: CardsUi_StatHelp(sid), lines: lines, stat: sid, now: now, grow: grow, new_col: UI_C_MERCHANT_GOLD };   // I-109: only the NEW number (after ">") is gold; the label and the old number are white
+        if (grow > 0) any_growth = true;
         array_push(items, row);
     }
     var m = Ui_MenuNew("cards_stat", items, {
         on_confirm: CardsUi_StatConfirm, on_back: CardsUi_NoBack,
-        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(plvl) }), note: any_growth ? Loc_T("levelup.legend", "Gold = your class grows these") : "", note_col: UI_C_MERCHANT_GOLD, anchor: "center", details: true }
+        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(plvl) }), note: any_growth ? Loc_T("levelup.legend", "Gold = your class grows these") : "", note_col: UI_C_MERCHANT_GOLD, anchor: "center", details: true, snap_band: true }   // I-109: the bar sits on the cursor row in the same frame as the +1 and the details (no glide)
     });
     Ui_MenuFixCursor(m, clamp(DB_PlayerClass(ch.class_id).free_default, 0, 5));   // the class's usual stat first
     CardsUi_StatRefresh(m);
@@ -5216,7 +5213,7 @@ function Ui_MenuNew(_id, _items, _opts) {
         owner: noone, data: {}, lock_ms: current_time,
         layout: { title: "", note: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false,
                   x_anchor: "center", panel_w: 0, y_bottom: -1, max_h: 0, details_pos: "below", details_cols: 1, rows_max: 0,
-                  y_top: -1, det_w: 0, det_art: false, det_top: -1, det_h: -1, det_floor_y: -1, det_floor_alt: -1 },
+                  y_top: -1, det_w: 0, det_art: false, det_top: -1, det_h: -1, det_floor_y: -1, det_floor_alt: -1, snap_band: false },
         rect: { x: 0, y: 0, w: 0, h: 0 }, det_rect: { x: 0, y: 0, w: 0, h: 0 }, hint_hidden: false,
         opened_ms: current_time, closed_ms: -1, cur_y: -1, last_draw_ms: current_time
     };
@@ -5233,6 +5230,30 @@ function Ui_MenuNew(_id, _items, _opts) {
     }
     Ui_MenuFixCursor(m, Ui_MemGet(Ui_MemGlobal(), _id, array_length(_items)));
     return m;
+}
+
+// Where the highlight band is this frame: it glides toward _target_y (Ui_Glide), except on a menu that sets layout.snap_band (the level-up screen, I-109), where it is at the
+// target at once, so the band, the "+1" and the details panel always show the same row. Pure.
+function Ui_MenuBandY(_m, _target_y, _dt) {
+    if (variable_struct_exists(_m.layout, "snap_band") && _m.layout.snap_band) return _target_y;
+    return Ui_Glide(_m.cur_y, _target_y, _dt);
+}
+
+// I-109: how a row's value is drawn: { old, new, old_col, new_col }. A row with new_col whose value reads "12 > 13" draws "12 > " in the row colour and "13" in new_col (right
+// aligned together); any other row (or a plain number) is one colour: old = the whole value, new = "". Pure.
+function Ui_RowValueSpec(_row, _sel = false) {
+    var v = variable_struct_exists(_row, "value") ? string(_row.value) : "";
+    var base = Ui_RowStyle(_row, _sel).text;
+    var spec = { old: v, new: "", old_col: base, new_col: base };
+    if (variable_struct_exists(_row, "new_col") && Ui_ItemEnabled(_row)) {
+        var at = string_pos(" > ", v);
+        if (at > 0) {
+            spec.old = string_copy(v, 1, at + 2);
+            spec.new = string_copy(v, at + 3, string_length(v));
+            spec.new_col = _row.new_col;
+        }
+    }
+    return spec;
 }
 
 // Puts the cursor on _want, or the next enabled item when that one is disabled.
@@ -6611,7 +6632,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var cur_i = clamp(_m.cursor, 0, max(0, n - 1));
     var target_y = rows_y0 + offs[cur_i] - top_off;
     if (_m.cur_y < 0) _m.cur_y = target_y;
-    _m.cur_y = Ui_Glide(_m.cur_y, target_y, now - _m.last_draw_ms);
+    _m.cur_y = Ui_MenuBandY(_m, target_y, now - _m.last_draw_ms);
     _m.last_draw_ms = now;
     var band_y = round(_m.cur_y);
     var band_h = (n > 0) ? rhs[cur_i] : mt.row_h;
@@ -6692,7 +6713,13 @@ function Ui_MenuDraw(_m, _alpha = 1) {
             Ui_Box(bx, by, bx + fill, by + 2 * p, sel ? UI_C_LIGHTEST : UI_C_LIGHT);
             bars[k] = { x: bx, y: ry, w: bar_w, h: rh };
         } else if (variable_struct_exists(row, "value") && row.value != "") {
-            Ui_Text(x1, vty, row.value, col, fa_right);
+            var vspec = Ui_RowValueSpec(row, sel);
+            if (vspec.new != "") {   // I-109: "12 > " in the row colour, the new number in its own (gold)
+                Ui_Text(x1, vty, vspec.new, vspec.new_col, fa_right);
+                Ui_Text(x1 - UI_TextWidth(vspec.new), vty, vspec.old, vspec.old_col, fa_right);
+            } else {
+                Ui_Text(x1, vty, row.value, col, fa_right);
+            }
         }
     }
     // marker: follows the glide, bobs one pixel

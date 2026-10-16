@@ -11167,8 +11167,8 @@ function Scenario_StepSmokeLevelUp(_s) {
                 Scenario_Check("levelup_the_cursor_starts_on_the_class_stat", _ms.cursor == STAT_DEF, "cursor=" + string(_ms.cursor));
                 // D177: the Knight's growth rows (ATK, DEF, VIG, MND) are gold, SPD and MAG are not; growth rows read now > now + growth, the hovered one now > now + growth + 1
                 var _gold = "";
-                for (var _gi = 0; _gi < array_length(_ms.items); _gi++) if (variable_struct_exists(_ms.items[_gi], "col") && _ms.items[_gi].col == UI_C_MERCHANT_GOLD) _gold += _ms.items[_gi].label + ",";
-                Scenario_Check("levelup_the_class_growth_rows_are_gold", _gold == "ATK,DEF,VIG,MND,", "gold=" + _gold);
+                for (var _gi = 0; _gi < array_length(_ms.items); _gi++) if (_ms.items[_gi].grow > 0) _gold += _ms.items[_gi].label + ",";
+                Scenario_Check("levelup_the_class_growth_rows_have_a_gold_new_number", _gold == "ATK,DEF,VIG,MND,", "gold=" + _gold);
                 Scenario_Check("levelup_a_growth_row_reads_now_to_now_plus_growth", _ms.items[0].value == string(_lu.b.atk) + " > " + string(_lu.b.atk + 1), "ATK=" + _ms.items[0].value);
                 Scenario_Check("levelup_the_hovered_growth_row_adds_the_point", _ms.items[1].value == string(_lu.b.def) + " > " + string(_lu.b.def + 2), "DEF=" + _ms.items[1].value);
                 Scenario_Check("levelup_VIG_reads_its_growth_of_3_on_level_4", _ms.items[4].value == string(_lu.b.vig) + " > " + string(_lu.b.vig + 3), "VIG=" + _ms.items[4].value);
@@ -11651,7 +11651,7 @@ function Scenario_StepShotsLevelUp(_s) {
                 var _gold = "";
                 for (var _i = 0; _i < array_length(_m.items); _i++) {
                     _vals += (_i > 0 ? "|" : "") + _m.items[_i].value;
-                    if (variable_struct_exists(_m.items[_i], "col") && _m.items[_i].col == UI_C_MERCHANT_GOLD) _gold += _m.items[_i].label + ",";
+                    if (_m.items[_i].grow > 0) _gold += _m.items[_i].label + ",";
                 }
                 var _want_vals = "";
                 var _want_gold = "ATK,DEF,VIG,MND,";
@@ -11663,7 +11663,7 @@ function Scenario_StepShotsLevelUp(_s) {
                     case "knight_ko": _want_vals = "11 > 12|12 > 13|10|3|10 > 13|11 > 12"; break;
                 }
                 Scenario_Check("shots_levelup_the_rows_read_by_the_rule_" + _tag, _vals == _want_vals, "vals=" + _vals + " want=" + _want_vals);
-                Scenario_Check("shots_levelup_the_class_growth_rows_are_gold_" + _tag, _gold == _want_gold, "gold=" + _gold);
+                Scenario_Check("shots_levelup_the_class_growth_rows_have_a_gold_new_number_" + _tag, _gold == _want_gold, "gold=" + _gold);
                 Scenario_Check("shots_levelup_the_legend_is_gold_text_not_the_growth_line_" + _tag, _m.layout.note == Loc_T("levelup.legend", "Gold = your class grows these") && string_pos("growth:", _m.layout.note) == 0, "note=" + string(_m.layout.note));
                 Scenario_TF2RowsFit(_m, "levelup_" + _tag);
                 _s.shot = "shot_ui_levelup_" + _scene + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
