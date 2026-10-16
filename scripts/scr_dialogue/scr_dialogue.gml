@@ -1401,19 +1401,19 @@ function Dialogue_Draw() {
     draw_set_valign(fa_top);
     if (cutscene_text_only) {   // over the cutscene's art: plain text with a 1 px shadow, as before
         if (speaker != "") {
-            draw_set_color(c_black);
+            draw_set_color(UI_C_DARKEST);
             UI_DrawText(layout.speaker_x + UI_CUTSCENE_TEXT_SHADOW_X, layout.speaker_y + UI_CUTSCENE_TEXT_SHADOW_Y, speaker + ":");
-            draw_set_color(c_white);
+            draw_set_color(UI_C_TEXT);
             UI_DrawText(layout.speaker_x, layout.speaker_y, speaker + ":");
         }
         if (icon_draw_w > 0) draw_sprite_ext(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1, icon_scale, icon_scale, 0, c_white, 1);
         if (rich) {
-            Dialogue_DrawRich(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text, c_black, 1, c_black);
-            Dialogue_DrawRich(text_x, text_y, visible_text, c_white, 1, -1);
+            Dialogue_DrawRich(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text, UI_C_DARKEST, 1, UI_C_DARKEST);
+            Dialogue_DrawRich(text_x, text_y, visible_text, UI_C_TEXT, 1, -1);
         } else {
-            draw_set_color(c_black);
+            draw_set_color(UI_C_DARKEST);
             UI_DrawText(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text);
-            draw_set_color(c_white);
+            draw_set_color(UI_C_TEXT);
             UI_DrawText(text_x, text_y, visible_text);
         }
     } else {
@@ -1434,8 +1434,8 @@ function Dialogue_Draw() {
     && variable_struct_exists(gs.ui, "dialogue_state") && gs.ui.dialogue_state == UI_DIALOGUE_STATE_READY) {
         var blink = (floor(gs.ui.icon_frame) mod 2);
         if (cutscene_text_only) {
-            draw_set_color(c_white);
-            Dialogue_DrawArrowDown(round(layout.box.x + layout.box.w - 6 * p), round(layout.box.y + layout.box.h - 4 * p + (blink ? 0 : p)), p, c_white);
+            draw_set_color(UI_C_TEXT);
+            Dialogue_DrawArrowDown(round(layout.box.x + layout.box.w - 6 * p), round(layout.box.y + layout.box.h - 4 * p + (blink ? 0 : p)), p, UI_C_TEXT);
         } else {
             Dialogue_DrawArrowDown(box.x + box.w - 10 * p, box.y + rise + box.h - 8 * p + (blink ? 0 : p), p, UI_C_LIGHTEST);
         }

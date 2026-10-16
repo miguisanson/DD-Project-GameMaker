@@ -3027,6 +3027,11 @@ function Battle_MenusLayout(_bc) {
     _bc.ui_skill.layout.y_bottom = z.list_bottom;
     _bc.ui_item.layout.panel_w = z.right.w;
     _bc.ui_item.layout.y_bottom = z.list_bottom;
+    // G10 (D129): the details panel stands above the list and grows upward; it stops just under the enemy (the list and the panel give way, Ui_MenuDraw)
+    var er = Battle_EnemyRect(_bc);
+    var floor_y = (er.w > 0 && er.h > 0) ? er.y + er.h + Ui_Px() : -1;
+    _bc.ui_skill.layout.det_floor_y = floor_y;
+    _bc.ui_item.layout.det_floor_y = floor_y;
 }
 
 function Battle_ItemSig(_p) {
@@ -3315,6 +3320,22 @@ function Battle_EnemyHeaderRect(_bc) {
         return fr.hdr;
     }
     return Battle_EnemyHeaderRectBuild(_bc);
+}
+
+// G10 (D129): where the enemy's visible pixels stand on the GUI grid { x, y, w, h } (the sprite's bounding box at rest, before the feel push-in).
+// A menu panel must not cover it. A zero rect when there is no enemy.
+function Battle_EnemyRect(_bc) {
+    if (!instance_exists(_bc.enemy_inst) || _bc.enemy_inst.sprite_index == noone) return { x: 0, y: 0, w: 0, h: 0 };
+    var inst = _bc.enemy_inst;
+    var spr = inst.sprite_index;
+    var sx = Display_WorldScale();
+    var xs = abs(inst.image_xscale);
+    var ys = abs(inst.image_yscale);
+    var x0 = (inst.x - sprite_get_xoffset(spr) * xs + sprite_get_bbox_left(spr) * xs - _bc.cam_base_x) * sx;
+    var x1 = (inst.x - sprite_get_xoffset(spr) * xs + (sprite_get_bbox_right(spr) + 1) * xs - _bc.cam_base_x) * sx;
+    var y0 = (inst.y - sprite_get_yoffset(spr) * ys + sprite_get_bbox_top(spr) * ys - _bc.cam_base_y) * sx;
+    var y1 = (inst.y - sprite_get_yoffset(spr) * ys + (sprite_get_bbox_bottom(spr) + 1) * ys - _bc.cam_base_y) * sx;
+    return { x: round(x0), y: round(y0), w: round(x1 - x0), h: round(y1 - y0) };
 }
 
 function Battle_EnemyHeaderRectBuild(_bc) {

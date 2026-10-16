@@ -1165,11 +1165,13 @@ function RunFlow_Draw() {
             dh = Ui_DetailsHeight(pw, sentence, rows, cols);
             total = mt.line_h + 3 * p + dh + 3 * p + mt.line_h;
         }
-        var y0 = max(mt.margin, round((h - total) / 2));
+        var sa = Ui_AnimT(0, Transition_FramesToMs(f.t));   // G10 (D129): the shared open motion: fades in and slides down in three pixel steps, like every panel
+        var y0 = max(mt.margin, round((h - total) / 2)) - p * round((1 - sa) * 3);
         var px = round((w - pw) / 2);
+        draw_set_alpha(sa);
         Ui_Text(w / 2, y0, title, UI_C_LIGHTEST, fa_center);
-        Ui_DrawDetails(px, y0 + mt.line_h + 3 * p, pw, dh, sentence, rows, 1, cols);
-        Prompt_RichDraw(round(w * 0.1), y0 + mt.line_h + 3 * p + dh + 3 * p, footer, round(w * 0.8), UI_C_LIGHT, fa_center);   // D156: the button of the device in use
+        Ui_DrawDetails(px, y0 + mt.line_h + 3 * p, pw, dh, sentence, rows, sa, cols);
+        Prompt_RichDraw(round(w * 0.1), y0 + mt.line_h + 3 * p + dh + 3 * p, footer, round(w * 0.8), UI_C_LIGHT, fa_center, sa);   // D156: the button of the device in use
     }
     draw_set_alpha(1);
 }

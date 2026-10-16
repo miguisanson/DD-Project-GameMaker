@@ -183,13 +183,31 @@ function Debug_Update() {
 // Output contract (stdout): [TEST] PASS|FAIL ..., [TEST] ERROR UNHANDLED / [TEST] CRASH, [TEST-BUILD] <id>,
 // [SHOT] file= w= h=, and a final [TEST-SUMMARY] pass= fail= errors= before game_end.
 // ============================================================================
+// G10 (D129): the build id on the screen is the short form so it never reaches a panel: the commit (the text before the first "-") and a star when the
+// build came from uncommitted files ("88be979*"). "dev" (a build outside the gate) stays "dev". The full id is in the [TEST-BUILD] line.
+function Build_IdShort() {
+    var _id = string(BUILD_ID);
+    var _dash = string_pos("-", _id);
+    var _short = (_dash > 1) ? string_copy(_id, 1, _dash - 1) : _id;
+    if (string_length(_id) >= 6 && string_copy(_id, string_length(_id) - 5, 6) == "-dirty") _short += "*";
+    return _short;
+}
+
+// Where the build id stands on the GUI grid: { x, y, w, h } (the lower right corner, one margin in). A check reads it to keep every screen's panels clear of it.
+function Build_IdRect() {
+    var _mt = Ui_Metrics();
+    var _w = UI_TextWidth(Build_IdShort());
+    return { x: _mt.gw - _w - _mt.margin, y: _mt.gh - _mt.line_h - _mt.margin, w: _w, h: _mt.line_h };
+}
+
+// The one text style (palette white with the dark one-pixel shadow the splash prompt uses), so it reads over the art and over a panel alike.
 function Build_DrawId() {
     var _c = draw_get_color(), _a = draw_get_alpha(), _h = draw_get_halign(), _v = draw_get_valign();
-    draw_set_halign(fa_left);
-    draw_set_valign(fa_top);
-    draw_set_color(c_white);
-    draw_set_alpha(0.7);
-    UI_DrawText(Display_GuiW() - UI_TextWidth(BUILD_ID) - 4, Display_GuiH() - UI_TextHeight(BUILD_ID) - 2, BUILD_ID);
+    var _r = Build_IdRect();
+    var _p = Ui_Px();
+    draw_set_alpha(1);
+    Ui_Text(_r.x + _p, _r.y + _p, Build_IdShort(), UI_C_DARKEST);
+    Ui_Text(_r.x, _r.y, Build_IdShort(), UI_C_TEXT);
     draw_set_color(_c);
     draw_set_alpha(_a);
     draw_set_halign(_h);
@@ -6935,6 +6953,14 @@ function Scenario_BattleUiOverlaps(_bc, _tag) {
         if (Test_RectsOverlap(_a, _b)) _bad += _pairs[_i][0] + "/" + _pairs[_i][1] + " ";
     }
     Scenario_Check("shots_battleui_nothing_overlaps_" + _tag, _bad == "", _bad);
+    // G10 (D129): a list or its details panel never covers the enemy it is picked against (the taller skill details used to at 480 x 432)
+    var _er = Battle_EnemyRect(_bc);
+    var _cover = "";
+    if (_er.w > 0) {
+        if (is_struct(_r.details) && _r.details.w > 0 && Test_RectsOverlap(_r.details, _er)) _cover += "details" + json_stringify(_r.details) + " ";
+        if (is_struct(_r.list) && _r.list.w > 0 && Test_RectsOverlap(_r.list, _er)) _cover += "list" + json_stringify(_r.list) + " ";
+    }
+    Scenario_Check("shots_battleui_menus_leave_the_enemy_clear_" + _tag, _cover == "", _cover + "enemy" + json_stringify(_er));
 }
 
 function Scenario_StepShotsBattleUi(_s) {
@@ -9427,10 +9453,13 @@ function Scenario_StepShotsTitle(_s) {
             if (_ready) {
                 if (_sc == "splash") {
                     var _pr = _c.title_prompt_rect;
+                    Scenario_Check("shots_title_build_id_clear_of_the_prompt_" + _tag, !Test_RectsOverlap(Build_IdRect(), _pr), json_stringify(Build_IdRect()) + " vs " + json_stringify(_pr));
                     Scenario_Check("shots_title_prompt_is_inside_the_gui_" + _tag, _pr.w > 0 && _pr.x >= 0 && _pr.y >= 0 && _pr.x + _pr.w <= _mt.gw && _pr.y + _pr.h <= _mt.gh, json_stringify(_pr));
                 } else {
                     var _mr = _c.title_stk.menus[0].rect;
                     Scenario_Check("shots_title_menu_is_inside_the_gui_" + _tag, _mr.x >= 0 && _mr.y >= 0 && _mr.x + _mr.w <= _mt.gw && _mr.y + _mr.h <= _mt.gh, json_stringify(_mr));
+                    var _br = Build_IdRect();   // G10 (D129): the build id stands in the lower right corner; no panel may reach it, at any size or language
+                    Scenario_Check("shots_title_build_id_clear_of_the_menu_" + _tag, !Test_RectsOverlap(_br, _mr), json_stringify(_br) + " vs " + json_stringify(_mr));
                     if (_sc == "korean") Scenario_Check("shots_title_labels_are_korean_" + _tag, Loc_GetLanguage() == "ko" && _c.title_stk.menus[0].items[0].label != "New Game" && _c.title_stk.menus[0].items[0].label != "New game", "label=" + string(_c.title_stk.menus[0].items[0].label));
                     if (_sc == "menu") {
                         Scenario_Check("shots_title_no_card_without_a_run_" + _tag, _c.title_card.kind == "none");
@@ -9439,6 +9468,7 @@ function Scenario_StepShotsTitle(_s) {
                         Scenario_Check("shots_title_card_is_shown_" + _tag, _c.title_card.kind == "run" && _cr.w > 0);
                         Scenario_Check("shots_title_card_is_inside_the_gui_" + _tag, _cr.x >= 0 && _cr.y >= 0 && _cr.x + _cr.w <= _mt.gw && _cr.y + _cr.h <= _mt.gh, json_stringify(_cr));
                         Scenario_Check("shots_title_card_does_not_overlap_the_menu_" + _tag, _cr.x + _cr.w <= _mr.x || _mr.x + _mr.w <= _cr.x || _cr.y + _cr.h <= _mr.y || _mr.y + _mr.h <= _cr.y, json_stringify(_cr) + " vs " + json_stringify(_mr));
+                        Scenario_Check("shots_title_build_id_clear_of_the_card_" + _tag, !Test_RectsOverlap(_br, _cr), json_stringify(_br) + " vs " + json_stringify(_cr));
                         Scenario_Check("shots_title_cursor_is_on_continue_" + _tag, _c.title_stk.menus[0].cursor == 1);
                     }
                 }

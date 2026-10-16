@@ -1308,7 +1308,7 @@ function Menu_Draw() {
     var ch = gs.player_ch;
     UI_SetFont();
     draw_set_alpha(1);
-    Ui_DimBackdrop(0.9 * a);
+    Ui_DimBackdrop(UI_DIM_SCREEN * a);
     Ui_DrawTabs(z.x, z.tabs_y, z.w, TabMenu_Labels(), u.tab, a, TabMenu_Icons());
     var extra = 0;
     if (tid == "status") {
@@ -1866,7 +1866,7 @@ function CardsUi_Draw() {
     var a = Ui_AnimT(u.opened_ms, current_time);
     UI_SetFont();
     draw_set_alpha(1);
-    Ui_DimBackdrop(0.8 * a);
+    Ui_DimBackdrop(UI_DIM_SCREEN * a);
     if (u.kind == "cards") CardsUi_DrawPick(u, a);
     else Ui_StackDraw(u.stk, 0.5);
     draw_set_alpha(1);
@@ -1984,7 +1984,7 @@ function BedUi_Draw() {
     var a = Ui_AnimT(u.opened_ms, current_time);
     UI_SetFont();
     draw_set_alpha(1);
-    Ui_DimBackdrop(0.6 * a);
+    Ui_DimBackdrop(UI_DIM_POPUP * a);
     Ui_StackDraw(u.stk, 0.5);
     draw_set_alpha(1);
     draw_set_color(c_white);
@@ -2026,7 +2026,7 @@ function Tutorial_Draw() {
     var a = Ui_AnimT(t.opened_ms, current_time);
     UI_SetFont();
     draw_set_alpha(1);
-    Ui_DimBackdrop(0.55 * a);
+    Ui_DimBackdrop(UI_DIM_POPUP * a);
     var slide = p * round((1 - a) * 3);
     var b = Tutorial_Box(e, slide);
     Ui_DrawFrame(b.x, b.y, b.w, b.h, a, p);
@@ -2140,7 +2140,7 @@ function Notice_Draw() {
     var a = Notice_Alpha(current_time);
     UI_SetFont();
     draw_set_alpha(1);
-    Ui_DimBackdrop(0.55 * a);
+    Ui_DimBackdrop(UI_DIM_POPUP * a);
     var slide = p * round((1 - a) * 3);
     var b = Notice_Box(n.text, slide);
     Ui_DrawFrame(b.x, b.y, b.w, b.h, a, p);
@@ -2623,7 +2623,7 @@ function ShopUi_Draw() {
     var a = Ui_AnimT(u.opened_ms, current_time);
     UI_SetFont();
     draw_set_alpha(1);
-    Ui_DimBackdrop(0.8 * a);
+    Ui_DimBackdrop(UI_DIM_SCREEN * a);
     Ui_StackDraw(u.stk, 0.5);
     // the last thing the shop said, and the merchant's line, at the bottom, for a moment
     if (current_time - u.msg_ms < SHOP_MSG_MS) {
@@ -2876,7 +2876,7 @@ function KeepThis_Draw(_a = 1) {
     var bx = round((mt.gw - bw) / 2);
     var by = round((mt.gh - bh) / 2);
     global.keep_this_rect = { x: bx, y: by, w: bw, h: bh };
-    Ui_DimBackdrop(0.5 * _a);
+    Ui_DimBackdrop(UI_DIM_POPUP * _a);
     Ui_DrawFrame(bx, by, bw, bh, _a, p);
     var yy = by + 4 * p;
     Prompt_RichDraw(bx + 4 * p, yy, t1, iw, UI_C_LIGHTEST, fa_center, _a);
@@ -3117,7 +3117,7 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
     var sp = GameState_Get().ui.settings_popup;
     if (!sp.open || !is_struct(sp.menu)) return;
     var a = Ui_MenuAlpha(sp.menu, current_time);
-    if (_draw_backdrop) Ui_DimBackdrop(0.6 * a);
+    if (_draw_backdrop) Ui_DimBackdrop(UI_DIM_POPUP * a);
     if (is_struct(sp.controls)) Ui_MenuDraw(sp.controls.menu, a);
     else Ui_MenuDraw(sp.menu, a);
     KeepThis_Draw(a);
@@ -3313,7 +3313,7 @@ function Title_SeedEntryDraw(_c) {
     var ph = 4 * p + (lh + 3 * p) + 5 * p + ch + 5 * p + 3 * p + info_h + 3 * p + hint_h + 4 * p;
     var px = round((mt.gw - pw) / 2);
     var py = max(mt.margin, round((mt.gh - ph) / 2)) - p * round((1 - a) * 3);
-    Ui_DimBackdrop(0.6 * a);
+    Ui_DimBackdrop(UI_DIM_POPUP * a);
     Ui_DrawFrame(px, py, pw, ph, a, p);
     var a0 = draw_get_alpha();
     draw_set_alpha(a);
@@ -3684,6 +3684,8 @@ function Focus_Step(_has_focus) {
 #macro UI_REPEAT_START_MS 140    // the first repeat gap; each next one is 20 percent shorter ...
 #macro UI_REPEAT_MIN_MS 45       // ... down to this
 #macro UI_PANEL_MS 120           // D97: panels slide and fade in this long
+#macro UI_DIM_POPUP 0.6          // G10 (D129, D133): how far a pop-up or a menu above another dims what is under it ...
+#macro UI_DIM_SCREEN 0.8         // ... and how far a whole-screen page (the Tab menu, the card pick, the shop) dims the world. Two strengths, nothing else.
 #macro UI_INPUT_LOCK_MS 60       // C4: a menu ignores confirm and back this long after it opens or becomes the top one again (a key seen on two frames cannot answer two menus)
 #macro SETTINGS_TEXT_SPEED_MAX 2
 
@@ -3923,6 +3925,8 @@ function Ui_ReadInput() {
 // directions drawn in the details panel under the sentence), dim (greyed but still selectable), kind "head" (a section title: light green, never selected).
 // Tab menu (D90) fields: y_top (the list's top edge), details_pos "right" (the details panel stands beside the list, det_w wide (0 = the rest of the
 // width), from det_top (default: the list's top) and det_h tall (default: as tall as the list)), det_art (the details panel starts with the item's or enemy's picture: item field pic { spr, sub } or icon_item).
+// G10 (D129): det_floor_y (for details_pos "above"; -1 = none) is the highest line the details panel may reach (the battle sets it to just below the enemy): when the panel
+// and the list would not fit under it, the list shows two rows, then the details drop the arrow strip, then the list shows one row.
 // Number lines may carry delta (-1 / 0 / +1): a small arrow shows before the value (a better or worse number).
 // After a draw m.rect and m.det_rect hold the panel and details rectangles.
 function Ui_MenuNew(_id, _items, _opts) {
@@ -3933,7 +3937,7 @@ function Ui_MenuNew(_id, _items, _opts) {
         owner: noone, data: {}, lock_ms: current_time,
         layout: { title: "", note: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false,
                   x_anchor: "center", panel_w: 0, y_bottom: -1, max_h: 0, details_pos: "below", details_cols: 1, rows_max: 0,
-                  y_top: -1, det_w: 0, det_art: false, det_top: -1, det_h: -1 },
+                  y_top: -1, det_w: 0, det_art: false, det_top: -1, det_h: -1, det_floor_y: -1 },
         rect: { x: 0, y: 0, w: 0, h: 0 }, det_rect: { x: 0, y: 0, w: 0, h: 0 },
         opened_ms: current_time, closed_ms: -1, cur_y: -1, last_draw_ms: current_time
     };
@@ -4532,11 +4536,29 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var note_h = (L.note != "") ? (mt.line_h + 2 * p) : 0;   // D143: one line under the title (the level-up screen's class growth)
     var chrome_y = 2 * (4 * p) + header_h + note_h;
     var det_h = mm.det_h;         // the tallest sentence (so the list does not jump between items); the highlighted item's own when the panel is above
+    var rows_lim = n;             // G10: fewest rows the details panel's floor may force
+    var seq_drop = false;         // G10: the arrow strip is left out of the details when nothing else makes room
+    if (L.details && L.details_pos == "above" && det_h > 0 && n > 0 && L.det_floor_y >= 0) {
+        var fit_bottom = (L.y_bottom >= 0) ? L.y_bottom : (mt.gh - mt.margin);
+        var fit_room = fit_bottom - L.det_floor_y;
+        var fit_rows = (L.rows_max > 0) ? min(n, L.rows_max) : n;
+        if (det_h + mt.margin + chrome_y + fit_rows * mt.row_h > fit_room) {
+            fit_rows = min(2, fit_rows);
+            if (det_h + mt.margin + chrome_y + fit_rows * mt.row_h > fit_room) {
+                var fc = _m.items[clamp(_m.cursor, 0, n - 1)];
+                var det_flat = Ui_DetailsHeight(panel_w, fc.help, variable_struct_exists(fc, "lines") ? fc.lines : [], L.details_cols, 0);
+                if (variable_struct_exists(fc, "seq") && array_length(fc.seq) > 0 && det_flat < det_h) { det_h = det_flat; seq_drop = true; }
+                if (det_h + mt.margin + chrome_y + fit_rows * mt.row_h > fit_room) fit_rows = 1;
+            }
+            rows_lim = fit_rows;
+        }
+    }
     var det_right = (L.details && L.details_pos == "right");   // D90: beside the list, as tall as the list (the Tab menu)
     var avail_h = ((L.max_h > 0) ? L.max_h : (mt.gh - 2 * mt.margin)) - ((det_h > 0) ? det_h + mt.margin : 0);
     var rows_vis = clamp(floor((avail_h - chrome_y) / mt.row_h), 1, max(1, n));
     if (det_right) rows_vis = max(1, floor((avail_h - chrome_y) / mt.row_h));   // the panel keeps its size whatever the row count
     if (L.rows_max > 0) rows_vis = min(rows_vis, L.rows_max);
+    rows_vis = min(rows_vis, max(1, rows_lim));
     var panel_h = det_right ? avail_h : (chrome_y + rows_vis * mt.row_h);
     var total_h = panel_h + ((det_h > 0) ? mt.margin + det_h : 0);
     var px = round((mt.gw - panel_w) / 2);
@@ -4655,7 +4677,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     if (det_h > 0 && n > 0) {
         var cur = _m.items[_m.cursor];
         if (variable_struct_exists(cur, "help")) {
-            Ui_DrawDetails(px, det_y, panel_w, det_h, cur.help, variable_struct_exists(cur, "lines") ? cur.lines : [], _alpha, L.details_cols, variable_struct_exists(cur, "seq") ? cur.seq : []);
+            Ui_DrawDetails(px, det_y, panel_w, det_h, cur.help, variable_struct_exists(cur, "lines") ? cur.lines : [], _alpha, L.details_cols, (variable_struct_exists(cur, "seq") && !seq_drop) ? cur.seq : []);
         }
     }
     if (det_right && n > 0 && _m.det_rect.w > 0) {
@@ -4671,7 +4693,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
 
 // Draws a stack bottom to top from the last menu that hides what is below it, plus a menu that is on its way out. Each menu above
 // the first dims what is under it. Menus alpha-fade with Ui_MenuAlpha.
-function Ui_StackDraw(_stk, _dim_alpha = 0.6) {
+function Ui_StackDraw(_stk, _dim_alpha = UI_DIM_POPUP) {
     var n = array_length(_stk.menus);
     var from = 0;
     for (var i = 0; i < n; i++) if (_stk.menus[i].layout.hides_below) from = i;
@@ -4825,7 +4847,7 @@ function Confirm_Draw(_a = 1) {
     for (var r = 0; r < n; r++) rects[r] = { x: bx + 2 * p, y: by + 4 * p + qh + 3 * p + r * mt.row_h, w: w - 4 * p, h: mt.row_h };
     m.rects = rects;
     draw_set_alpha(1);
-    Ui_DimBackdrop(0.55 * a);
+    Ui_DimBackdrop(UI_DIM_POPUP * a);
     Ui_DrawFrame(bx, y0, w, h, a, p);
     draw_set_alpha(a);
     Ui_TextBlock(x0, y0 + 4 * p, c.question, iw, UI_C_TEXT);
