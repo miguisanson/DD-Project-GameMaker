@@ -175,6 +175,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Balance", Test_Suite_R3Balance);
     Test_RunSuite("R4Final2", Test_Suite_R4Final2);
     Test_RunSuite("Release", Test_Suite_Release);
+    Test_RunSuite("R4LootGlow", Test_Suite_R4LootGlow);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -19798,4 +19799,198 @@ function Test_ReleaseFit() {
         TextFit_CentreMenu(_fails, "title", Title_MainItems(true, true), "");
         return _fails;
     });
+}
+
+// ============================================================================================================================================================
+// R4 lootglow (D195, R-133): the merchant's gold outline, softer and slower, on every chest, barrel and grave that still holds loot; gone the moment it is opened, broken or
+// searched, and gone after a Continue or a room re-entry (the room state). Expected values come from the brief: 35%..70% alpha over 1.6 s, 1 px outline, body pass.
+// ============================================================================================================================================================
+function Test_Suite_R4LootGlow() {
+    Test_RunSuite("R4LootGlow.rule", Test_R4LootGlowRule);
+    Test_RunSuite("R4LootGlow.pulse", Test_R4LootGlowPulse);
+    Test_RunSuite("R4LootGlow.part", Test_R4LootGlowPart);
+    Test_RunSuite("R4LootGlow.ring", Test_R4LootGlowRing);
+    Test_RunSuite("R4LootGlow.state", Test_R4LootGlowState);
+}
+
+// 1. The has-loot rule per object type and state (R-133: no outline on a container that is empty).
+function Test_R4LootGlowRule() {
+    var _yes = [obj_chest, obj_chest_lv1, obj_chest_lv2, obj_chest_lv3, obj_chest_skillbook, obj_chest_class_select, obj_barrel, obj_barrel_lv1, obj_barrel_lv2, obj_barrel_lv3, obj_grave];
+    for (var _i = 0; _i < array_length(_yes); _i++) {
+        var _a = instance_create_depth(0, 0, 0, _yes[_i]);
+        Test_True("r4lootglow rule: " + object_get_name(_yes[_i]) + " as it stands holds loot, so it glows", LootGlow_Has(_a));
+        instance_destroy(_a);
+    }
+    var _no = [obj_chest_opened, obj_barrel_broken, obj_door, obj_npc, obj_torch, obj_torch_off, obj_fire_stand, obj_fire_stand_off, obj_bed, obj_switch, obj_dung_pile, obj_interactable, obj_tall_grass];
+    for (var _j = 0; _j < array_length(_no); _j++) {
+        var _b = instance_create_depth(0, 0, 0, _no[_j]);
+        Test_False("r4lootglow rule: " + object_get_name(_no[_j]) + " holds no loot, so it does not glow", LootGlow_Has(_b));
+        instance_destroy(_b);
+    }
+    // the merchant is an obj_npc with his own (stronger) glow: no loot outline on him
+    var _m = instance_create_depth(0, 0, 0, obj_npc);
+    _m.merchant = true;
+    Test_False("r4lootglow rule: the merchant keeps his own glow and gets no loot outline", LootGlow_Has(_m));
+    instance_destroy(_m);
+    // opened, broken, searched: the same instance stops
+    var _c = instance_create_depth(0, 0, 0, obj_chest_lv1);
+    _c.swapped = true;
+    Test_False("r4lootglow rule: a chest that has been opened does not glow", LootGlow_Has(_c));
+    instance_destroy(_c);
+    var _sk = instance_create_depth(0, 0, 0, obj_chest_skillbook);
+    _sk.swapped = true;
+    Test_False("r4lootglow rule: an opened skill chest does not glow", LootGlow_Has(_sk));
+    instance_destroy(_sk);
+    var _ba = instance_create_depth(0, 0, 0, obj_barrel_lv1);
+    _ba.swapped = true;
+    Test_False("r4lootglow rule: a broken barrel does not glow", LootGlow_Has(_ba));
+    instance_destroy(_ba);
+    var _g = instance_create_depth(0, 0, 0, obj_grave);
+    Grave_MarkSearched(_g);
+    Test_False("r4lootglow rule: a grave that has been searched does not glow", LootGlow_Has(_g));
+    instance_destroy(_g);
+    Test_False("r4lootglow rule: a missing instance does not glow (no error)", LootGlow_Has(noone));
+}
+
+// 2. The pulse: 35% .. 70% alpha over 1.6 s, softer and slower than the merchant's.
+function Test_R4LootGlowPulse() {
+    var _lo = 99;
+    var _hi = -99;
+    for (var _ms = 0; _ms < 1600; _ms += 10) {
+        var _a = LootGlow_Alpha(_ms);
+        _lo = min(_lo, _a);
+        _hi = max(_hi, _a);
+    }
+    Test_True("r4lootglow pulse: the dimmest is 35%", abs(_lo - 0.35) < 0.002);
+    Test_True("r4lootglow pulse: the brightest is 70%", abs(_hi - 0.70) < 0.002);
+    Test_True("r4lootglow pulse: one period is 1.6 s", abs(LootGlow_Alpha(0) - LootGlow_Alpha(1600)) < 0.0001 && abs(LootGlow_Alpha(0) - LootGlow_Alpha(800)) > 0.3);
+    Test_True("r4lootglow pulse: softer than the merchant's glow (his brightest is 100%)", _hi < Merchant_GlowAlpha(0) - 0.2);
+    Test_True("r4lootglow pulse: slower than the merchant's glow (his period is 1.2 s)", abs(LootGlow_Alpha(1200) - LootGlow_Alpha(0)) > 0.1 && abs(Merchant_GlowAlpha(1200) - Merchant_GlowAlpha(0)) < 0.0001);
+}
+
+// 3. The outline is a part of the world pass in the body pass, under the Foreground haze and before the darkness, like the merchant's glow (R-091).
+function Test_R4LootGlowPart() {
+    var _parts = World_FxParts();
+    var _at = -1;
+    var _light = -1;
+    for (var _i = 0; _i < array_length(_parts); _i++) {
+        if (_parts[_i].name == "loot_glow") _at = _i;
+        if (_parts[_i].name == "light") _light = _i;
+    }
+    Test_True("r4lootglow part: loot_glow is a part of the world pass", _at >= 0);
+    Test_True("r4lootglow part: it comes before the darkness", _at >= 0 && _at < _light);
+    Test_Eq("r4lootglow part: it is drawn in the body pass (end of the Instances layer)", (_at >= 0 && variable_struct_exists(_parts[_at], "pass")) ? _parts[_at].pass : "(no pass)", "body");
+    Test_True("r4lootglow part: it is a picture of a world object (body)", _at >= 0 && _parts[_at].body);
+}
+
+// 4. The outline is a 1 px ring of the gold round the sprite's own pixels, cached per sprite frame.
+function Test_R4LootGlowRing() {
+    var _sprs = [chest_asset, barrel_asset];
+    for (var _i = 0; _i < array_length(_sprs); _i++) {
+        var _spr = _sprs[_i];
+        var _ring = LootGlow_Ring(_spr, 0);
+        var _o = Test_RingOverSprite(_ring, _spr, 0, UI_C_MERCHANT_GOLD);
+        Test_Eq("r4lootglow ring " + sprite_get_name(_spr) + ": nothing is painted over the sprite's own pixels", _o.inside, 0);
+        Test_True("r4lootglow ring " + sprite_get_name(_spr) + ": the gold is there round it", _o.outside > 0);
+        Test_True("r4lootglow ring " + sprite_get_name(_spr) + ": it is the merchant's gold, fully opaque (the pulse is the draw's alpha)", _o.bright == _o.outside);
+        Test_Eq("r4lootglow ring " + sprite_get_name(_spr) + ": it is one pixel wide", Test_R4LootRingWidth(_ring, _spr), 1);
+    }
+    // cached: the same frame twice builds once; a lost surface builds again
+    var _s = chest_asset;
+    LootGlow_Ring(_s, 0);
+    var _b1 = LootGlow_BuildCount();
+    LootGlow_Ring(_s, 0);
+    LootGlow_Ring(_s, 0);
+    Test_Eq("r4lootglow ring: the same sprite frame is built once, not every frame", LootGlow_BuildCount(), _b1);
+    var _r = LootGlow_Ring(_s, 0);
+    surface_free(_r.surf);
+    var _r2 = LootGlow_Ring(_s, 0);
+    Test_True("r4lootglow ring: a lost surface is built again", surface_exists(_r2.surf) && LootGlow_BuildCount() == _b1 + 1);
+}
+
+// The furthest ring pixel from the sprite's own pixels, in king-move steps (1 = every ring pixel touches the sprite).
+function Test_R4LootRingWidth(_ring, _spr) {
+    var _side = _ring.r * 2;
+    var _w = surface_get_width(_ring.surf);
+    var _buf = buffer_create(_w * surface_get_height(_ring.surf) * 4, buffer_fixed, 1);
+    buffer_get_surface(_buf, _ring.surf, 0);
+    var _spr_surf = surface_create(_side, _side);
+    surface_set_target(_spr_surf);
+    draw_clear_alpha(c_black, 0);
+    draw_sprite_ext(_spr, 0, _ring.r, _ring.r, 1, 1, 0, c_white, 1);
+    surface_reset_target();
+    var _sp = Test_SurfaceAlpha(_spr_surf, _side);
+    surface_free(_spr_surf);
+    var _far = 0;
+    for (var _y = 0; _y < _side; _y++) {
+        for (var _x = 0; _x < _side; _x++) {
+            if (buffer_peek(_buf, (_y * _w + _x) * 4 + 3, buffer_u8) <= 0) continue;
+            var _d = 99;
+            for (var _dy = -3; _dy <= 3; _dy++) {
+                for (var _dx = -3; _dx <= 3; _dx++) {
+                    var _xx = _x + _dx;
+                    var _yy = _y + _dy;
+                    if (_xx < 0 || _yy < 0 || _xx >= _side || _yy >= _side) continue;
+                    if (_sp[_yy * _side + _xx] > 0) _d = min(_d, max(abs(_dx), abs(_dy)));
+                }
+            }
+            _far = max(_far, _d);
+        }
+    }
+    buffer_delete(_buf);
+    return _far;
+}
+
+// 5. Opening a chest takes the part's draw away; a room re-entry (the saved room state) keeps it gone.
+function Test_R4LootGlowState() {
+    RoomState_Init();
+    var _c = instance_create_depth(0, 0, 0, obj_chest_lv1);
+    _c.persist_id = "r4lootglow_chest";
+    var _b = instance_create_depth(16, 0, 0, obj_barrel_lv1);
+    _b.persist_id = "r4lootglow_barrel";
+    var _o = instance_create_depth(32, 0, 0, obj_chest_opened);
+    var _g = instance_create_depth(48, 0, 0, obj_grave);
+    _g.persist_id = "r4lootglow_grave";
+    var _t = LootGlow_Targets();
+    Test_True("r4lootglow state: a closed chest, a whole barrel and an unsearched grave are drawn", array_contains(_t, _c.id) && array_contains(_t, _b.id) && array_contains(_t, _g.id));
+    Test_False("r4lootglow state: an opened chest is not drawn", array_contains(_t, _o.id));
+    // opened / broken / searched, as Interact_Handle leaves them
+    _c.swapped = true;
+    _c.sprite_index = _c.swap_sprite;
+    RoomState_SaveInstance(_c, ["swapped", "sprite_index"], false);
+    _b.swapped = true;
+    RoomState_SaveInstance(_b, ["swapped", "sprite_index"], false);
+    Grave_MarkSearched(_g);
+    _t = LootGlow_Targets();
+    Test_False("r4lootglow state: after opening, the chest's outline is gone", array_contains(_t, _c.id));
+    Test_False("r4lootglow state: after breaking, the barrel's outline is gone", array_contains(_t, _b.id));
+    Test_False("r4lootglow state: after searching, the grave's outline is gone", array_contains(_t, _g.id));
+    // the room is left and entered again: fresh instances read the room state
+    instance_destroy(_c);
+    instance_destroy(_b);
+    instance_destroy(_g);
+    var _c2 = instance_create_depth(0, 0, 0, obj_chest_lv1);
+    _c2.persist_id = "r4lootglow_chest";
+    var _b2 = instance_create_depth(16, 0, 0, obj_barrel_lv1);
+    _b2.persist_id = "r4lootglow_barrel";
+    var _g2 = instance_create_depth(48, 0, 0, obj_grave);
+    _g2.persist_id = "r4lootglow_grave";
+    Test_True("r4lootglow state: before the room state is applied the new instances would glow", LootGlow_Has(_c2) && LootGlow_Has(_b2) && LootGlow_Has(_g2));
+    RoomState_ApplyInstance(_c2);
+    RoomState_ApplyInstance(_b2);
+    RoomState_ApplyInstance(_g2);
+    Test_False("r4lootglow state: a re-entered room keeps the opened chest without an outline", LootGlow_Has(_c2));
+    Test_False("r4lootglow state: a re-entered room keeps the broken barrel without an outline", LootGlow_Has(_b2));
+    Test_False("r4lootglow state: a re-entered room keeps the searched grave without an outline", LootGlow_Has(_g2));
+    // through the save file's own text
+    var _rec = json_parse(json_stringify(RoomState_Get(room, "r4lootglow_grave")));
+    Test_True("r4lootglow state: the searched grave is saved as a plain flag", is_struct(_rec) && variable_struct_exists(_rec.vars, "searched") && _rec.vars.searched == true);
+    instance_destroy(_c2);
+    instance_destroy(_b2);
+    instance_destroy(_g2);
+    instance_destroy(_o);
+    var _gs = GameState_Get();
+    variable_struct_remove(_gs.persist, RoomState_Key(room, "r4lootglow_chest"));
+    variable_struct_remove(_gs.persist, RoomState_Key(room, "r4lootglow_barrel"));
+    variable_struct_remove(_gs.persist, RoomState_Key(room, "r4lootglow_grave"));
 }
