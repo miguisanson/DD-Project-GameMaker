@@ -26,6 +26,7 @@ Build: READY - playtest build 7f4d08e-20261016 (all of round 3: D140-D165); agen
 ext`): Sprites → Create → Sprite, name `spr_battle_bg_boss`, Import `art\battle_bg\candidates\D13.png` (160 x 144), Origin Top Left, Ctrl+S, close GameMaker, tell me "imported".
 - **Pick ideas** for after the playtest: `.planning/IDEAS.md` (25 ideas, my top 5 at the end). Reply with the ids you want.
 - **5 quick questions** at the end of the playtest checklist (battle menu read-only in fights, the Stranger loot rule, the reworded chest lines, QTE grade capitals, a real refuse sound).
+- **Names that do not fit their cards/panels at big window sizes** (your call): Horizontal Slash, Poison Arrow, Meditation+, Apothecary (cards at 640x576/800x720), The Pale Choirbeast (bestiary). Options: shorter names (e.g. "Pale Choirbeast" without "The" fits), or the card shows the name on two lines. Say which.
 - Final cleanup (optional, at the end): delete unused sprites `spr_attack_timing_target`, `spr_attack_timing_falling` in GameMaker.
 - At the very end (before release): send the sound/music creator names for the credits.
 - DONE 2026-10-16: icons, merchant, card frame, 30 monster sounds imported; Game End event added (save on close). Optional: OK to download the Pixel Art XL LoRA (~170 MB, huggingface nerijs/pixel-art-xl) + 2 ComfyUI nodes for better AI icons? Today's icons are script-drawn.
