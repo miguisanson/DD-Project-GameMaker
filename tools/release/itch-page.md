@@ -85,7 +85,7 @@ Free, pay what you want: set the price to "$0 or more" (no minimum); a suggested
 
 1. `screenshots/1.png` - the title screen
 2. `screenshots/2.png` - a boss fight (the Palehorn)
-3. `screenshots/3.png` - the battle skill list with the turn-order strip
+3. `screenshots/3.png` - a boss fight: the skill list with the turn-order strip (the Pale Choirbeast)
 4. `screenshots/4.png` - choosing a card
-5. `screenshots/5.png` - exploring a floor
+5. `screenshots/5.png` - exploring a floor (gold outlines mark what still holds loot)
 6. `screenshots/6.png` - the Codex bestiary with weak points and resistances
