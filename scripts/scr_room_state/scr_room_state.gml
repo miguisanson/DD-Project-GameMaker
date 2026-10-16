@@ -1157,14 +1157,41 @@ function RunFlow_DeathLayout(_gw, _gh, _margin, _col_w, _text_h, _img_w, _img_h)
     return out;
 }
 
-// The layout for the window as it is now and a death line.
-function RunFlow_DeathLayoutNow(_text) {
+// The layout for the window as it is now, a death line and (D185, IDEA-25) the tip under it ("" = none): the text block is the line, a gap and the tip, in one column.
+// Adds line_h, tip_y and tip_h to the layout (tip_h 0 without a tip; then text_h is just the line's, as before).
+function RunFlow_DeathLayoutNow(_text, _tip = "") {
     var mt = Ui_Metrics();
     var col_w = min(mt.gw - 2 * mt.margin, round(mt.gw * 0.6));
     var pic = RunFlow_DeathImage();
     var iw = sprite_exists(pic) ? sprite_get_width(pic) : 0;
     var ih = sprite_exists(pic) ? sprite_get_height(pic) : 0;
-    return RunFlow_DeathLayout(mt.gw, mt.gh, mt.margin, col_w, Ui_TextBlockH(_text, col_w), iw, ih);
+    var line_h = Ui_TextBlockH(_text, col_w);
+    var tip_h = (_tip != "") ? Ui_TextBlockH(_tip, col_w) : 0;
+    var tip_gap = (_tip != "") ? max(3 * mt.p, round(mt.line_h * 0.75)) : 0;
+    var lay = RunFlow_DeathLayout(mt.gw, mt.gh, mt.margin, col_w, line_h + tip_gap + tip_h, iw, ih);
+    lay.line_h = line_h;
+    lay.tip_h = tip_h;
+    lay.tip_y = lay.text_y + line_h + tip_gap;
+    return lay;
+}
+
+// One block of the death scene's text, centred in the layout's column at _y: a sentence with styled words or buttons through the rich drawer, a plain one wrapped.
+function RunFlow_DrawBlock(_lay, _y, _text, _col, _a) {
+    var mt = Ui_Metrics();
+    var w = mt.gw;
+    var s = max(0.0001, UI_GetFontScale());
+    draw_set_alpha(_a);
+    if (Prompt_HasTokens(_text)) {   // D149: terms and buttons in the line (laid out in the text column under the death picture, H13a)
+        Prompt_RichDraw(round((w - _lay.text_w) / 2), _y, _text, _lay.text_w, _col, fa_center, _a);
+    } else {
+        if (UiFit_On()) UiFit_BlockDrawn(round((w - _lay.text_w) / 2), _y, _text, _lay.text_w);   // H13b (D156)
+        draw_set_halign(fa_center);
+        draw_set_valign(fa_top);
+        draw_set_color(_col);
+        draw_text_ext_transformed(round(w / 2), _y, _text, -1, max(1, round(_lay.text_w / s)), s, s, 0);
+        draw_set_halign(fa_left);
+    }
+    draw_set_alpha(1);
 }
 
 // How many frames the death picture has been drawn (a check reads it).
@@ -1185,23 +1212,14 @@ function RunFlow_Draw() {
         // the picture and the line fade in, hold, fade out; the picture (D156: the old GAME_OVER art, in the palette) above the line, the two centred on the screen
         var fade = 30;
         var a = clamp(min(f.t / fade, (f.ctx.frames - f.t) / fade), 0, 1);
-        var lay = RunFlow_DeathLayoutNow(f.ctx.text);
-        var s = max(0.0001, UI_GetFontScale());
+        var tip = variable_struct_exists(f.ctx, "tip") ? f.ctx.tip : "";   // D185 (IDEA-25): the tip under the line
+        var lay = RunFlow_DeathLayoutNow(f.ctx.text, tip);
         if (lay.show) {
             draw_sprite_ext(RunFlow_DeathImage(), 0, lay.img_x, lay.img_y, lay.scale, lay.scale, 0, c_white, a);
             global.run_flow_pic_draws = RunFlow_DeathPicDraws() + 1;
         }
-        draw_set_alpha(a);
-        if (Prompt_HasTokens(f.ctx.text)) {   // D149: terms and buttons in the line (laid out in the text column under the death picture, H13a)
-            Prompt_RichDraw(round((w - lay.text_w) / 2), lay.text_y, f.ctx.text, lay.text_w, UI_C_TEXT, fa_center, a);
-        } else {
-            if (UiFit_On()) UiFit_BlockDrawn(round((w - lay.text_w) / 2), lay.text_y, f.ctx.text, lay.text_w);   // H13b (D156)
-            draw_set_halign(fa_center);
-            draw_set_valign(fa_top);
-            draw_set_color(UI_C_TEXT);
-            draw_text_ext_transformed(round(w / 2), lay.text_y, f.ctx.text, -1, max(1, round(lay.text_w / s)), s, s, 0);
-            draw_set_halign(fa_left);
-        }
+        RunFlow_DrawBlock(lay, lay.text_y, f.ctx.text, UI_C_TEXT, a);
+        if (tip != "") RunFlow_DrawBlock(lay, lay.tip_y, tip, UI_C_LIGHT, a);
         draw_set_alpha(1);
     } else if (f.phase == "summary") {
         var title = variable_struct_exists(f, "title") ? RunTitle_Text(f.title) : Loc_T("runflow.title", "The tunnel keeps you.");

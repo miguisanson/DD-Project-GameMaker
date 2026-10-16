@@ -509,13 +509,14 @@ function Profile_Default() {
         echo_pool: [],                         // OLD (D130): the item pool of the lost run. D144 stopped filling it; it is still read so an old file loads, and the class pick empties it
         skills_known: {},                      // D148: "<skill id>" -> true for every player skill the profile has ever had in a run (skill memory); the class screen and the echo (D144) read it
         history: [],                           // one entry per finished run, newest last
-        bestiary: {},                          // "e<enemy id>" -> { met, elite }: the enemies met in a fight, for the Codex (D88; Codex_Met)
+        bestiary: {},                          // "e<enemy id>" -> { met, elite, weak_seen?, resist_seen? }: the enemies met in a fight, for the Codex (D88; Codex_Met; D173 the two optional flags: Codex_NoteWeakPoint)
         deaths: 0,
         wins: 0,
         runs_started: 0,
         best_floor: 0,
         legacy_notice_seen: false,
         name: "",                              // D175: a copy of the profile's name in the index (the index is authoritative); "" until a flush
+        last_tip: "",                          // D185 (IDEA-25): the text key of the death tip shown last, so a generic tip never repeats back to back ("" = none yet; an older file reads as none)
         last_title: "",                        // D183: the text key of the run summary's title shown last, so the next one differs ("" = none yet; an older file reads as none)
         settings_file: Save_SettingsPath()     // settings stay in their own file
     };
@@ -574,7 +575,10 @@ function Profile_Normalize(_raw) {
         for (var bi = 0; bi < array_length(bkeys); bi++) {
             var be = variable_struct_get(_raw.bestiary, bkeys[bi]);
             if (is_struct(be) && variable_struct_exists(be, "met")) {
-                variable_struct_set(p.bestiary, bkeys[bi], { met: max(1, Save_ToReal(be.met, 1)), elite: variable_struct_exists(be, "elite") && (Save_ToReal(be.elite, 0) != 0) });
+                var bent = { met: max(1, Save_ToReal(be.met, 1)), elite: variable_struct_exists(be, "elite") && (Save_ToReal(be.elite, 0) != 0) };
+                if (variable_struct_exists(be, "weak_seen") && Save_ToReal(be.weak_seen, 0) != 0) bent.weak_seen = true;       // D173 (IDEA-07): the Codex has seen the weakness / the resistance
+                if (variable_struct_exists(be, "resist_seen") && Save_ToReal(be.resist_seen, 0) != 0) bent.resist_seen = true;
+                variable_struct_set(p.bestiary, bkeys[bi], bent);
             }
         }
     }
@@ -585,6 +589,7 @@ function Profile_Normalize(_raw) {
     if (variable_struct_exists(_raw, "legacy_notice_seen")) p.legacy_notice_seen = (Save_ToReal(_raw.legacy_notice_seen, 0) != 0);
     if (variable_struct_exists(_raw, "name") && is_string(_raw.name)) p.name = _raw.name;
     if (variable_struct_exists(_raw, "last_title") && is_string(_raw.last_title)) p.last_title = _raw.last_title;
+    if (variable_struct_exists(_raw, "last_tip") && is_string(_raw.last_tip)) p.last_tip = _raw.last_tip;
     return p;
 }
 

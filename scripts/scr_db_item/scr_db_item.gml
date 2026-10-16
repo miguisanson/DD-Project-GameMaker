@@ -810,11 +810,18 @@ function Throw_BurnBase(_ch) {
     return RoundHalfUp(Status_BurnTick(Throw_Stat(_ch)) * Throw_Mult(_ch));
 }
 
+// D173 (IDEA-07): a thrown status always lands, unless the target resists it: then it lands with the halved chance (a sure 100% -> 50%). One marble bag per status on the thrower.
+function Throw_StatusLands(_user, _target, _status_id) {
+    var ch = WeakPoint_ResistChance(_target, _status_id, 1);
+    if (ch >= 1) return true;
+    return Bag_Draw(_user, "throw_resist_" + string(_status_id), ch, Run_Stream("combat"));
+}
+
 // Throws item _item_id at _target for _user at grade _key. Changes both (damage, statuses). The caller removes the item from the inventory.
-// Returns { ok, msg, dmg, burn, stacks, stun, evade, escape }.
+// Returns { ok, msg, dmg, burn, stacks, stun, evade, escape, weak_status, resist_status } (the last two: the weak point the throw met, -1 for none, for the Codex).
 function Throw_Resolve(_item_id, _user, _target, _key) {
     var item = ItemDB_Get(_item_id);
-    var res = { ok: false, msg: "", dmg: 0, burn: 0, stacks: 0, stun: false, evade: 0, escape: false };
+    var res = { ok: false, msg: "", dmg: 0, burn: 0, stacks: 0, stun: false, evade: 0, escape: false, weak_status: -1, resist_status: -1 };
     if (!Item_IsThrowable(item)) {
         res.msg = Loc_T("item.msg.cant_use", "Can't use that.");
         return res;
@@ -837,14 +844,29 @@ function Throw_Resolve(_item_id, _user, _target, _key) {
         array_push(parts, Loc_T("throw.msg.damage", "{dmg} damage.", { dmg: string(res.dmg) }));
     }
     if (u.burn_turns > 0 && _target.hp > 0) {
-        res.burn = Qte_ScaleAmount(Throw_BurnBase(_user), gm, 1);
-        Status_Add(_target, STATUS_BURN, u.burn_turns, res.burn);
-        array_push(parts, Loc_T("throw.msg.burn", "It burns for {n} a turn.", { n: string(res.burn) }));
+        if (Throw_StatusLands(_user, _target, STATUS_BURN)) {
+            res.burn = Qte_ScaleAmount(Throw_BurnBase(_user), gm, 1);
+            var wp_burn = WeakPoint_Adjust(_target, STATUS_BURN, u.burn_turns, 1);   // D173: a weak target burns longer
+            Status_Add(_target, STATUS_BURN, wp_burn.turns, res.burn);
+            array_push(parts, Loc_T("throw.msg.burn", "It burns for {n} a turn.", { n: string(res.burn) }));
+            if (wp_burn.weak) { res.weak_status = STATUS_BURN; var wl_b = WeakPoint_WeakMsg(_target, STATUS_BURN); if (wl_b != "") array_push(parts, wl_b); }
+        } else {
+            res.resist_status = STATUS_BURN;
+            array_push(parts, WeakPoint_ResistMsg(_target, STATUS_BURN));
+        }
     }
     if (u.stacks > 0) {
-        res.stacks = Throw_Stacks(RoundHalfUp(u.stacks * nm), _key);
-        Status_Add(_target, STATUS_POISON, res.stacks, 1, res.stacks);
-        array_push(parts, Loc_T("throw.msg.poison", "{n} stacks of poison.", { n: string(res.stacks) }));
+        if (Throw_StatusLands(_user, _target, STATUS_POISON)) {
+            var base_stacks = Throw_Stacks(RoundHalfUp(u.stacks * nm), _key);
+            var wp_poison = WeakPoint_Adjust(_target, STATUS_POISON, base_stacks, base_stacks);   // D173: a weak target takes one more stack (never past 10)
+            res.stacks = wp_poison.stacks;
+            Status_Add(_target, STATUS_POISON, res.stacks, 1, res.stacks);
+            array_push(parts, Loc_T("throw.msg.poison", "{n} stacks of poison.", { n: string(res.stacks) }));
+            if (wp_poison.weak) { res.weak_status = STATUS_POISON; var wl_p = WeakPoint_WeakMsg(_target, STATUS_POISON); if (wl_p != "") array_push(parts, wl_p); }
+        } else {
+            res.resist_status = STATUS_POISON;
+            array_push(parts, WeakPoint_ResistMsg(_target, STATUS_POISON));
+        }
     }
     if (u.stun && _key != QTE_WEAK && _target.hp > 0) {
         Status_Add(_target, STATUS_STUN, 1, 1);

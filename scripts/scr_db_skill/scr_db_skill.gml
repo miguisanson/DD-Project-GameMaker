@@ -971,15 +971,13 @@ function Skill_StatusStacks(_user, _target, _status_id, _base_stacks) {
     return stacks;
 }
 
-// Everything Status_Add needs for one status of a skill: { turns, stacks, power }. power = Burning's HP per tick, from the caster's effective MAG.
+// Everything Status_Add needs for one status of a skill: { turns, stacks, power, weak }. power = Burning's HP per tick, from the caster's effective MAG.
+// D173 (IDEA-07): an enemy that is weak to the status takes more turns or stacks (WeakPoint_Adjust, never past the D78 caps); weak = it added something.
 function Skill_StatusApplyArgs(_user, _target, _status_id, _base_turns, _base_stacks = 1) {
     var tick_power = 1;
     if (_status_id == STATUS_BURN) tick_power = Status_BurnTick(Combat_EffectiveStat(_user, STAT_MAG));
-    return {
-        turns: Skill_AdjustStatusTurns(_user, _target, _status_id, _base_turns),
-        stacks: Skill_StatusStacks(_user, _target, _status_id, _base_stacks),
-        power: tick_power
-    };
+    var wp = WeakPoint_Adjust(_target, _status_id, Skill_AdjustStatusTurns(_user, _target, _status_id, _base_turns), Skill_StatusStacks(_user, _target, _status_id, _base_stacks));
+    return { turns: wp.turns, stacks: wp.stacks, power: tick_power, weak: wp.weak };
 }
 
 // The stacks the skill gives for its status at index _i of status_list (or its single status when _i < 0).
@@ -1058,6 +1056,41 @@ function Skill_StatusRoll(_user, _skill_id, _chance, _slot = "") {
     return Bag_Draw(_user, "status_" + string(_skill_id) + _slot, _chance, Run_Stream("combat"));
 }
 
+// D173 (IDEA-07): the same roll against _target, whose resistance halves the chance (WeakPoint_ResistChance). { landed, resisted }: resisted = it failed and the resistance was in play.
+function Skill_StatusTry(_user, _target, _skill_id, _chance, _status_id, _slot = "") {
+    var ch = WeakPoint_ResistChance(_target, _status_id, _chance);
+    var landed = Skill_StatusRoll(_user, _skill_id, ch, _slot);
+    return { landed: landed, resisted: (!landed && ch < _chance) };
+}
+
+// A status that a skill has no chance roll for (status-only skills, the rest of a list that already rolled): only a resisting target rolls, for the halved sure thing.
+function Skill_StatusResistTry(_user, _target, _skill_id, _status_id, _slot) {
+    var ch = WeakPoint_ResistChance(_target, _status_id, 1);
+    if (ch >= 1) return { landed: true, resisted: false };
+    var landed = Skill_StatusRoll(_user, _skill_id, ch, _slot);
+    return { landed: landed, resisted: !landed };
+}
+
+// Puts what the weak point did on the skill's result: weak_status / resist_status (the Codex learns from them) and the log line (weak: once per fight, resisted: every time).
+function Skill_NoteWeakPoint(_result, _target, _status_id, _weak, _resisted) {
+    var line = "";
+    if (_resisted) {
+        _result.resist_status = _status_id;
+        line = WeakPoint_ResistMsg(_target, _status_id);
+    }
+    if (_weak) {
+        _result.weak_status = _status_id;
+        line = WeakPoint_WeakMsg(_target, _status_id);
+    }
+    if (line != "") _result.wp_msg = (_result.wp_msg == "") ? line : (_result.wp_msg + " " + line);
+}
+
+// The weak point lines go at the end of the skill's log text.
+function Skill_AppendWeakPoint(_result) {
+    if (_result.wp_msg != "") _result.msg = (_result.msg == "") ? _result.wp_msg : (_result.msg + " " + _result.wp_msg);
+    return _result;
+}
+
 // What a damaging skill hits with: { power (final formula power), stat_type, acc }. A player's weapon adds to the power (D22); power_mult is part of it.
 // Skill_Use deals through it and the damage preview (Battle_SkillPreview, D135) reads the same struct.
 function Skill_DamageSource(_user, _s) {
@@ -1081,7 +1114,10 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
         fx_speed: fx_speed,
         free_action: (variable_struct_exists(s, "free_action") && s.free_action),
         extra_turns: variable_struct_exists(s, "extra_turns") ? max(0, round(real(s.extra_turns))) : 0,
-        set_enemy_actions: variable_struct_exists(s, "set_enemy_actions") ? max(0, round(real(s.set_enemy_actions))) : 0
+        set_enemy_actions: variable_struct_exists(s, "set_enemy_actions") ? max(0, round(real(s.set_enemy_actions))) : 0,
+        weak_status: -1,     // D173 (IDEA-07): the status the target is weak to when the weakness added something, else -1
+        resist_status: -1,   // the status a resisting target shrugged off, else -1
+        wp_msg: ""
     };
 
     var final_mp_cost = s.mp_cost;
@@ -1112,7 +1148,10 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
 
     // status-only skills
     if (s.effect == "status") {
-        if (s.status != -1) {
+        var try_1 = Skill_StatusResistTry(_user, _target, _skill_id, s.status, "_s");   // D173: only a resisting target rolls
+        if (s.status != -1 && !try_1.landed) {
+            Skill_NoteWeakPoint(result, _target, s.status, false, true);
+        } else if (s.status != -1) {
             var st_args = Skill_StatusApplyArgs(_user, _target, s.status, status_turns_default, Skill_BaseStacks(s));
             var adj1 = Equip_PassiveAdjustIncomingStatus(_user, _target, s.status, st_args.turns);
             if (adj1.apply) {
@@ -1122,6 +1161,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
                     array_push(applied_status_names, cfg.name);
                     applied_any_status = true;
                 }
+                if (st_args.weak) Skill_NoteWeakPoint(result, _target, s.status, true, false);
             }
             if (adj1.reflect) {
                 _user = Status_Add(_user, s.status, adj1.turns, st_args.power, st_args.stacks);
@@ -1139,7 +1179,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
             if (result.msg != "" && msg_status != "") result.msg += " ";
             result.msg += msg_status;
         }
-        return result;
+        return Skill_AppendWeakPoint(result);
     }
 
     if (s.effect == "multi_status") {
@@ -1150,7 +1190,11 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
             for (var m = 0; m < array_length(s.status_list); m++) {
                 var sid_m = s.status_list[m];
                 if (sid_m == -1) continue;
-                if (!Skill_StatusRoll(_user, _skill_id, multi_chance, "_" + string(m))) continue;   // D126: one bag per status
+                var try_m = Skill_StatusTry(_user, _target, _skill_id, multi_chance, sid_m, "_" + string(m));   // D126: one bag per status (D173: halved by a resistance)
+                if (!try_m.landed) {
+                    if (try_m.resisted) Skill_NoteWeakPoint(result, _target, sid_m, false, true);
+                    continue;
+                }
                 var turns_m = status_turns_default;
                 if (m < array_length(turns_list)) turns_m = max(1, round(real(turns_list[m])));
                 var args_m = Skill_StatusApplyArgs(_user, _target, sid_m, turns_m, Skill_BaseStacks(s, m));
@@ -1162,6 +1206,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
                         array_push(applied_status_names, cfg_m.name);
                         applied_any_status = true;
                     }
+                    if (args_m.weak) Skill_NoteWeakPoint(result, _target, sid_m, true, false);
                 }
                 if (adjm.reflect) _user = Status_Add(_user, sid_m, adjm.turns, args_m.power, args_m.stacks);
                 if (adjm.msg != "" && result.msg == "") result.msg = adjm.msg;
@@ -1175,7 +1220,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
         } else if (result.msg == "") {
             result.msg = Loc_T("combat.msg.multi_status_none", "Nothing took hold.");
         }
-        return result;
+        return Skill_AppendWeakPoint(result);
     }
 
     if (s.effect == "dispel") {
@@ -1311,7 +1356,8 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
         var status_chance = variable_struct_exists(s, "status_chance") ? real(s.status_chance) : 1;
 
         if (s.status != -1 && any_hit) {
-            if (Skill_StatusRoll(_user, _skill_id, status_chance)) {
+            var try_h = Skill_StatusTry(_user, _target, _skill_id, status_chance, s.status);   // D173: halved by a resistance
+            if (try_h.landed) {
                 var args_h = Skill_StatusApplyArgs(_user, _target, s.status, status_turns_default, Skill_BaseStacks(s));
                 var adjh = Equip_PassiveAdjustIncomingStatus(_user, _target, s.status, args_h.turns);
                 if (adjh.apply) {
@@ -1321,9 +1367,12 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
                         array_push(applied_status_names, cfg2.name);
                         applied_any_status = true;
                     }
+                    if (args_h.weak) Skill_NoteWeakPoint(result, _target, s.status, true, false);
                 }
                 if (adjh.reflect) _user = Status_Add(_user, s.status, adjh.turns, args_h.power, args_h.stacks);
                 if (adjh.msg != "" && result.msg == "") result.msg = adjh.msg;
+            } else if (try_h.resisted) {
+                Skill_NoteWeakPoint(result, _target, s.status, false, true);
             }
         }
 
@@ -1333,6 +1382,11 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
                 for (var sd = 0; sd < array_length(s.status_list); sd++) {
                     var sid_d = s.status_list[sd];
                     if (sid_d == -1) continue;
+                    var try_d = Skill_StatusResistTry(_user, _target, _skill_id, sid_d, "_listres" + string(sid_d));   // D173: the list rolled once; a resisting target rolls the halved rest
+                    if (!try_d.landed) {
+                        Skill_NoteWeakPoint(result, _target, sid_d, false, true);
+                        continue;
+                    }
                     var turns_d = status_turns_default;
                     if (sd < array_length(turns_list_d)) turns_d = max(1, round(real(turns_list_d[sd])));
                     var args_d = Skill_StatusApplyArgs(_user, _target, sid_d, turns_d, Skill_BaseStacks(s, sd));
@@ -1344,6 +1398,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
                             array_push(applied_status_names, cfg_d.name);
                             applied_any_status = true;
                         }
+                        if (args_d.weak) Skill_NoteWeakPoint(result, _target, sid_d, true, false);
                     }
                     if (adjd.reflect) _user = Status_Add(_user, sid_d, adjd.turns, args_d.power, args_d.stacks);
                     if (adjd.msg != "" && result.msg == "") result.msg = adjd.msg;
@@ -1358,6 +1413,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
         } else if (variable_struct_exists(s, "use_msg")) {
             result.msg = string(s.use_msg);
         }
+        result = Skill_AppendWeakPoint(result);
     }
 
     if (s.effect == "heal") {

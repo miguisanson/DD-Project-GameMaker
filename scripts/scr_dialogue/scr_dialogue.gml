@@ -1675,6 +1675,17 @@ function Death_NoteDotKill(_status_id) {
     global.death_dot_kill = _status_id;
 }
 
+// D185 (IDEA-25): the enemy move that last struck (-1 = a plain attack), noted when the enemy acts (Battle_EnemyAct); Death_KillSkill reads and clears it, so a death tip is about the last blow.
+function Death_NoteKillSkill(_skill_id) {
+    global.death_kill_skill = _skill_id;
+}
+
+function Death_KillSkill() {
+    var sk = variable_global_exists("death_kill_skill") ? global.death_kill_skill : -1;
+    global.death_kill_skill = -1;
+    return sk;
+}
+
 // "enemy_slime" ... for the enemy of the last battle, "status_poison" / "status_burn" / "status_bleed" for a tick that finished you,
 // "abandoned" for giving up the run, "" when unknown. Reads and clears the status note.
 function Death_KillerKey(_result = "died") {
@@ -1698,9 +1709,108 @@ function Death_BuildContext(_result, _cause_name) {
     var run = Run_Get();
     var salt = (is_struct(run) ? run.seed : 0) + deaths;
     var killer = Death_KillerKey(_result);
+    var kill_skill = Death_KillSkill();
     var pick = DeathLine_Pick(deaths, killer, salt);
     var text = DeathLine_Format(pick, _cause_name);
-    return { deaths: deaths, killer: killer, pick: pick, text: text, frames: DeathScene_Frames(text, max(1, game_get_speed(gamespeed_fps))) };
+    var fps_now = max(1, game_get_speed(gamespeed_fps));
+    var frames = DeathScene_Frames(text, fps_now);
+    // D185 (IDEA-25): one tip under the line, from the killer (status, then the last move, then a generic one that is never the one shown last)
+    var prof = Profile_Get();
+    var last_tip = (variable_struct_exists(prof, "last_tip") && is_string(prof.last_tip)) ? prof.last_tip : "";
+    var tip = DeathTip_Pick(killer, kill_skill, last_tip, salt + 3);
+    var tip_text = DeathTip_Text(tip);
+    if (tip.key != "") {
+        frames += DeathScene_TipFrames(tip_text, fps_now);
+        prof.last_tip = tip.key;
+        Profile_Flush();
+    }
+    return { deaths: deaths, killer: killer, pick: pick, text: text, tip_key: tip.key, tip: tip_text, frames: frames };
+}
+
+
+// ---- the death tip (D185, IDEA-25): one plain sentence under the death line, from what killed you ----
+// Chosen from DeathTip_Defs: the killer status first (poison, bleed, burn), then the enemy move that struck the last blow (a big move says how to beat it), then a generic pool of
+// true-to-the-rules tips that never shows the same one twice running (the profile keeps the last key, `last_tip`). An abandoned run has no killer and no tip. A tip is { key, text (English,
+// with {skill} / {pct} slots), skill (the move it is about, or -1) }; DeathTip_Text fills the slots in the language of the moment, from the game's own data (D100).
+function DeathTip_Defs() {
+    if (variable_global_exists("death_tip_defs") && is_struct(global.death_tip_defs)) return global.death_tip_defs;
+    global.death_tip_defs = {
+        status: [
+            { killer: "status_poison", key: "death.tip.status_poison", text: "Poison killed you: an Antidote cures it." },
+            { killer: "status_bleed", key: "death.tip.status_bleed", text: "Bleeding hurts when you act: a Bandage stops it." },
+            { killer: "status_burn", key: "death.tip.status_burn", text: "Burn lowers your DEF while it lasts: Guard to halve the hits." }
+        ],
+        skills: [
+            { skill: SKILL_PALE_HYMN, key: "death.tip.skill_pale_hymn", text: "{skill}: [a]BREAK[/a] it before it lands." },
+            { skill: SKILL_RAMMING, key: "death.tip.skill_ramming", text: "{skill}: [a]BREAK[/a] it first, or Guard and time the defence bar." },
+            { skill: SKILL_VINE_TRAP, key: "death.tip.skill_windup", text: "{skill} comes after a wind-up: [a]BREAK[/a] it first, or Guard." },
+            { skill: SKILL_GHOST_CUT, key: "death.tip.skill_windup", text: "{skill} comes after a wind-up: [a]BREAK[/a] it first, or Guard." }
+        ],
+        generic: [
+            { key: "death.tip.gen_guard", text: "Guard halves all hits until your next turn and restores {pct}% of max MP." },
+            { key: "death.tip.gen_weak", text: "Every enemy has a weak point and a resistance. The Codex remembers them." },
+            { key: "death.tip.gen_bed", text: "Each bed restores all your HP and MP, once per run." },
+            { key: "death.tip.gen_break", text: "When an enemy hits [a]BREAK[/a], it loses a turn and takes {pct}% more damage." },
+            { key: "death.tip.gen_smoke", text: "A [a]Perfect[/a] Smoke Bomb throw gets you out of any battle but a boss." },
+            { key: "death.tip.gen_throw", text: "A thrown Firebomb or Poison Pot finds weak points like a skill does." }
+        ]
+    };
+    return global.death_tip_defs;
+}
+
+function DeathTip_GenericPool() {
+    var g = DeathTip_Defs().generic;
+    var out = [];
+    for (var i = 0; i < array_length(g); i++) array_push(out, { key: g[i].key, text: g[i].text, skill: -1 });
+    return out;
+}
+
+// Every tip there is, one entry per (key, move): what the fit check and the workbook check walk through.
+function DeathTip_All() {
+    var d = DeathTip_Defs();
+    var out = [];
+    for (var i = 0; i < array_length(d.status); i++) array_push(out, { key: d.status[i].key, text: d.status[i].text, skill: -1 });
+    for (var j = 0; j < array_length(d.skills); j++) array_push(out, { key: d.skills[j].key, text: d.skills[j].text, skill: d.skills[j].skill });
+    var gen = DeathTip_GenericPool();
+    for (var k = 0; k < array_length(gen); k++) array_push(out, gen[k]);
+    return out;
+}
+
+// The tip for a death: _killer is Death_KillerKey's answer ("status_poison", "enemy_slime", "abandoned", ""), _skill the enemy move that struck last (-1 = a plain attack or none),
+// _last_key the key shown last (a generic tip is never that one), _salt rotates through the generic pool. { key: "" } when there is none to show.
+function DeathTip_Pick(_killer, _skill, _last_key, _salt) {
+    var d = DeathTip_Defs();
+    if (_killer == "abandoned") return { key: "", text: "", skill: -1 };
+    for (var i = 0; i < array_length(d.status); i++) {
+        if (d.status[i].killer == _killer) return { key: d.status[i].key, text: d.status[i].text, skill: -1 };
+    }
+    for (var j = 0; j < array_length(d.skills); j++) {
+        if (d.skills[j].skill == _skill) return { key: d.skills[j].key, text: d.skills[j].text, skill: _skill };
+    }
+    var pool = DeathTip_GenericPool();
+    var left = [];
+    for (var k = 0; k < array_length(pool); k++) if (pool[k].key != _last_key) array_push(left, pool[k]);
+    if (array_length(left) <= 0) left = pool;
+    return left[abs(floor(_salt)) mod array_length(left)];
+}
+
+// The percent a generic tip names, from the game's own rule (Guard's MP share, the BREAK damage bonus).
+function DeathTip_Pct(_key) {
+    if (_key == "death.tip.gen_guard") return round(GUARD_MP_PCT * 100);
+    if (_key == "death.tip.gen_break") return round((BREAK_DAMAGE_MULT - 1) * 100);
+    return 0;
+}
+
+// The tip as the player reads it (markup still in: the death scene draws it).
+function DeathTip_Text(_pick) {
+    if (!is_struct(_pick) || _pick.key == "") return "";
+    var nm = (_pick.skill >= 0) ? string(SkillDB_GetBase(_pick.skill).name) : "";
+    return Loc_T(_pick.key, _pick.text, { skill: nm, pct: string(DeathTip_Pct(_pick.key)) });
+}
+
+// How long the tip adds to the death scene: about a second and a half to three seconds, longer for a longer sentence (hold confirm to skip, D48).
+function DeathScene_TipFrames(_tip, _fps) {
+    return clamp(round(_fps * (1.0 + Markup_Length(_tip) * 0.04)), _fps * 1.5, _fps * 3);
 }
 
 // ---- the boss name banner (D106) ----

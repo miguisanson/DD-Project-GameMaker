@@ -23,6 +23,8 @@ function AI_Brain(_rules, _weights, _phases = []) {
     return { rules: _rules, weights: _weights, phases: _phases };
 }
 
+// D173 (IDEA-07 weak points): every enemy record has `weak` (the status it takes a bit better: +1 turn or +1 stack, never past the D78 caps) and `resist` (the status that lands with half
+// the chance; -1 = none, the bosses). Poison, Bleeding or Burning only, never both the same. The numbers of the rule are in WeakPoint_Table (scr_status); the list per enemy is here.
 function EnemyDB_Init() {
     if (variable_global_exists("enemy_db") && ds_exists(global.enemy_db, ds_type_map)) {
         return;
@@ -58,7 +60,9 @@ function EnemyDB_Init() {
             [ AI_Rule("solidify_when_hurt", [AI_Cond("hp_below", 0.5), AI_Cond("self_missing_status", 0, STATUS_SOLIDIFY)], "skill", SKILL_SOLIDIFY) ],
             [ AI_Weight("attack", -1, 4), AI_Weight("skill", SKILL_SOLIDIFY, 1) ]),
         traits: [],
-        is_boss: false
+        is_boss: false,
+        weak: STATUS_BURN,
+        resist: STATUS_BLEED
     };
 
     global.enemy_db[? ENEMY_SPIDER] = {
@@ -90,7 +94,9 @@ function EnemyDB_Init() {
               AI_Rule("open_with_poison", [AI_Cond("player_missing_status", 0, STATUS_POISON)], "skill", SKILL_POISON_FANGS, 0.6) ],
             [ AI_Weight("attack", -1, 3), AI_Weight("skill", SKILL_POISON_FANGS, 1) ]),
         traits: [],
-        is_boss: false
+        is_boss: false,
+        weak: STATUS_BURN,
+        resist: STATUS_POISON
     };
 
     global.enemy_db[? ENEMY_SNAKE] = {
@@ -122,7 +128,9 @@ function EnemyDB_Init() {
               AI_Rule("open_with_bite", [AI_Cond("player_missing_status", 0, STATUS_BLEED)], "skill", SKILL_BITE, 0.5) ],
             [ AI_Weight("attack", -1, 2), AI_Weight("skill", SKILL_BITE, 1) ]),
         traits: [],
-        is_boss: false
+        is_boss: false,
+        weak: STATUS_BLEED,
+        resist: STATUS_POISON
     };
 
     global.enemy_db[? ENEMY_MADWHISP] = {
@@ -153,7 +161,9 @@ function EnemyDB_Init() {
             [ AI_Rule("snuff_buffs", [AI_Cond("player_buffed")], "skill", SKILL_SNUFF) ],
             [ AI_Weight("attack", -1, 3), AI_Weight("skill", SKILL_SCORCHING_TOUCH, 2) ]),
         traits: [],
-        is_boss: false
+        is_boss: false,
+        weak: STATUS_POISON,
+        resist: STATUS_BURN
     };
 
     global.enemy_db[? ENEMY_KILLER_PLANT] = {
@@ -185,7 +195,9 @@ function EnemyDB_Init() {
               AI_Rule("vine_every_3rd", [AI_Cond("every_nth", 3)], "skill", SKILL_VINE_TRAP) ],
             [ AI_Weight("attack", -1, 1) ]),
         traits: [],
-        is_boss: false
+        is_boss: false,
+        weak: STATUS_BURN,
+        resist: STATUS_BLEED
     };
 
     global.enemy_db[? ENEMY_DIREWOLF] = {
@@ -216,7 +228,9 @@ function EnemyDB_Init() {
             [ AI_Rule("howl_first", [AI_Cond("self_missing_status", 0, STATUS_BLOODTHIRSTY)], "skill", SKILL_BLOODTHIRSTY, 0.5) ],
             [ AI_Weight("attack", -1, 1) ]),
         traits: [],
-        is_boss: false
+        is_boss: false,
+        weak: STATUS_BLEED,
+        resist: STATUS_POISON
     };
 
     global.enemy_db[? ENEMY_GHOSTSWORD] = {
@@ -247,7 +261,9 @@ function EnemyDB_Init() {
             [ AI_Rule("cut_every_3rd", [AI_Cond("every_nth", 3)], "skill", SKILL_GHOST_CUT) ],
             [ AI_Weight("attack", -1, 1) ]),
         traits: [],
-        is_boss: false
+        is_boss: false,
+        weak: STATUS_POISON,
+        resist: STATUS_BLEED
     };
 
     global.enemy_db[? ENEMY_STRANGER] = {
@@ -278,7 +294,9 @@ function EnemyDB_Init() {
             [ AI_Rule("grab_when_hurt", [AI_Cond("hp_below", 0.5)], "skill", SKILL_STEAL, 1, 1) ],
             [ AI_Weight("attack", -1, 5), AI_Weight("skill", SKILL_STEAL, 1) ]),
         traits: [],
-        is_boss: false
+        is_boss: false,
+        weak: STATUS_BLEED,
+        resist: STATUS_BURN
     };
 
     global.enemy_db[? ENEMY_MINI_BOSS] = {
@@ -315,7 +333,9 @@ function EnemyDB_Init() {
                   [ AI_Rule("ram_every_2nd", [AI_Cond("every_nth", 2)], "skill", SKILL_RAMMING) ],
                   [ AI_Weight("attack", -1, 1), AI_Weight("skill", SKILL_GORE, 2) ]) ]),
         traits: [],
-        is_boss: true
+        is_boss: true,
+        weak: STATUS_BURN,
+        resist: -1
     };
 
     global.enemy_db[? ENEMY_FINAL_BOSS] = {
@@ -353,7 +373,9 @@ function EnemyDB_Init() {
                   [ AI_Rule("hymn_every_2nd", [AI_Cond("every_nth", 2)], "skill", SKILL_PALE_HYMN) ],
                   [ AI_Weight("attack", -1, 2), AI_Weight("skill", SKILL_CURSE, 1) ]) ]),
         traits: [],
-        is_boss: true
+        is_boss: true,
+        weak: STATUS_POISON,
+        resist: -1
     };
 
     if (variable_global_exists("state") && is_struct(global.state)) {
@@ -629,7 +651,9 @@ function EnemyDB_Get(_enemy_id) {
         skills: [],
         brain: AI_Brain([], [ AI_Weight("attack", -1, 1) ]),
         traits: [],
-        is_boss: false
+        is_boss: false,
+        weak: -1,
+        resist: -1
     };
 }
 

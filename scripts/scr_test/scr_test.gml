@@ -1575,7 +1575,7 @@ function Test_Suite_StatusRules() {
     // the tick comes from the CASTER's MAG when a skill applies it
     var _mage = CharacterCreate_Player(CLASS_MAGE);
     _mage.mp = 99;
-    var _burn_target = EnemyCreate(ENEMY_SLIME);
+    var _burn_target = EnemyCreate(ENEMY_SNAKE);   // r3ideas1: a Snake is neutral to Burning (a Slime is weak to it, +1 turn)
     var _fb_chance = SkillDB_Get(SKILL_FIREBALL).status_chance;
     SkillDB_Get(SKILL_FIREBALL).status_chance = 1;
     Skill_Use(_mage, _burn_target, SKILL_FIREBALL);
@@ -1644,7 +1644,7 @@ function Test_Suite_StatusRules() {
     Test_Eq("Poison Arrow twice: 3 + 3 = 6 stacks on the enemy", Status_Stacks(_arrow_foe, STATUS_POISON), 6);
     var _kn = CharacterCreate_Player(CLASS_KNIGHT);
     _kn.mp = 99;
-    var _wound_foe = EnemyCreate(ENEMY_SLIME);
+    var _wound_foe = EnemyCreate(ENEMY_SPIDER);   // r3ideas1: a Spider is neutral to Bleeding (a Slime resists it)
     var _wound_chance = SkillDB_Get(SKILL_WOUND).status_chance;
     SkillDB_Get(SKILL_WOUND).status_chance = 1;
     Skill_Use(_kn, _wound_foe, SKILL_WOUND);
@@ -6700,7 +6700,7 @@ function Test_Suite_Economy() {
     var _s1 = EnemyCreate(ENEMY_SLIME);
     Throw_Resolve(30, Test_Hero(CLASS_KNIGHT), _s1, QTE_OK);
     var _bn = Status_Find(_s1, STATUS_BURN);
-    Test_True("C3 firebomb OK: burn 4 for 2 turns", _bn.power == 4 && _bn.turns == 2);
+    Test_True("C3 firebomb OK: burn 4 for 3 turns (a Slime is weak to Burning: +1 turn, r3ideas1)", _bn.power == 4 && _bn.turns == 3);
     var _s2 = EnemyCreate(ENEMY_SLIME);
     Throw_Resolve(30, Test_Hero(CLASS_KNIGHT), _s2, QTE_PERFECT);
     Test_Eq("C3 firebomb Perfect: burn 5 per turn", Status_Find(_s2, STATUS_BURN).power, 5);
@@ -17300,6 +17300,7 @@ function Test_Suite_R3Ideas1() {
     Test_RunSuite("R3Ideas1.tippure", Test_R3IdTipPure);
     Test_ProfRun("tpi_", Test_R3IdTipRun);
     Test_RunSuite("R3Ideas1.tipfit", Test_R3IdTipFit);
+    Test_RunSuite("R3Ideas1.codexfit", Test_R3IdCodexFit);
     Test_RunSuite("R3Ideas1.workbook", Test_R3IdWorkbook);
     Loc_SetLanguage(_lang);
 }
@@ -17552,13 +17553,13 @@ function Test_R3IdTipPure() {
         if (_pool[_t].key == "death.tip.gen_guard") _guard = DeathTip_Text(_pool[_t]);
         if (_pool[_t].key == "death.tip.gen_break") _brk = DeathTip_Text(_pool[_t]);
     }
-    Test_True("r3ideas1 tip: the Guard tip carries the MP share of the game's rule (" + string(round(GUARD_MP_PCT * 100)) + "%)", string_pos(string(round(GUARD_MP_PCT * 100)) + "%", _guard) > 0 && string_pos("half", _guard) > 0);
+    Test_True("r3ideas1 tip: the Guard tip carries the MP share of the game's rule (" + string(round(GUARD_MP_PCT * 100)) + "%)", string_pos(string(round(GUARD_MP_PCT * 100)) + "%", _guard) > 0 && string_pos("halves", _guard) > 0);
     Test_True("r3ideas1 tip: the BREAK tip carries the BREAK bonus of the game's rule (" + string(round((BREAK_DAMAGE_MULT - 1) * 100)) + "%)", string_pos(string(round((BREAK_DAMAGE_MULT - 1) * 100)) + "%", _brk) > 0);
     // every tip is one short sentence
     var _all = DeathTip_All();
     var _long = "";
-    for (var _a = 0; _a < array_length(_all); _a++) { var _tx = DeathTip_Text(_all[_a]); if (string_length(_tx) > 72) _long += _all[_a].key + " "; }
-    Test_Eq("r3ideas1 tip: every tip is short (72 characters at most)", _long, "");
+    for (var _a = 0; _a < array_length(_all); _a++) { var _tx = DeathTip_Text(_all[_a]); if (string_length(_tx) > 80) _long += _all[_a].key + " "; }
+    Test_Eq("r3ideas1 tip: every tip is short (80 characters at most, tags counted)", _long, "");
 }
 
 function Test_R3IdTipRun(_prefix) {
@@ -17624,6 +17625,19 @@ function Test_R3IdTipFit() {
             TextFit_Block(_fails, _what, Prompt_Plain(_tip), _L.text_w, _mt.p);
         }
         return _fails;
+    });
+}
+
+// The bestiary page with every weakness and resistance seen (the longest values: the Codex of a veteran profile), at the three sizes and both languages.
+function Test_R3IdCodexFit() {
+    TextFit_Each("r3ideas1 codex bestiary seen", function(_w, _h, _l) {
+        var _f = [];
+        var _prof = TextFit_Profile();
+        var _ids = Codex_EnemyIds();
+        for (var _i = 0; _i < array_length(_ids); _i++) { Codex_NoteWeakPoint(_prof, _ids[_i], "weak"); Codex_NoteWeakPoint(_prof, _ids[_i], "resist"); }
+        var _pg = TabCodex_Page("bestiary", _prof);
+        TextFit_TabPage(_f, "codex_bestiary", _pg.rows, _pg.title, _pg.cols);
+        return _f;
     });
 }
 
