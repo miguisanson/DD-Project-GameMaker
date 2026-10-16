@@ -8006,8 +8006,8 @@ function Test_Suite_ClassGuard() {
     Test_Eq("g4 back from no direction is none", ClassGuard_BackDir(-1), -1);
     var _lines = DialogueDB_Get("sys_class_chest_guard");
     Test_Eq("g4 the guard speaks two lines", array_length(_lines), 2);
-    Test_Eq("g4 line 1", array_length(_lines) > 0 ? _lines[0] : "", "Wait, there was a chest back there. I think I should open it...");
-    Test_Eq("g4 line 2", array_length(_lines) > 1 ? _lines[1] : "", "...there might be something I can use to protect myself.");
+    Test_Eq("g4 line 1", array_length(_lines) > 0 ? _lines[0] : "", "Wait. There was a chest back there.");
+    Test_Eq("g4 line 2", array_length(_lines) > 1 ? _lines[1] : "", "...Something in it might keep me alive.");
 }
 
 // =====================================================================================================

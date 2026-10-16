@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-15T23:38:19Z",
-    "row_count": 1150
+    "generated_at_utc": "2026-10-16T00:05:02Z",
+    "row_count": 1205
   },
   "default_lang": "en",
   "languages": [
@@ -777,8 +777,8 @@
       "ko": "아직은 아니야."
     },
     "choice.stranger.reply1.1": {
-      "en": "Ask again when the tunnel has had you a few more times.",
-      "ko": "터널이 널 몇 번 더 삼키면 다시 물어봐."
+      "en": "Ask again when the tunnel has had you a bit longer.",
+      "ko": "터널이 널 좀 더 삼키면 다시 물어봐."
     },
     "choice.stranger.reply2.0": {
       "en": "Ha. Fair.",
@@ -961,12 +961,12 @@
       "ko": "(경험치 +{exp})"
     },
     "combat.msg.floor1_reaction.0": {
-      "en": "How was that even alive?! I nearly died.",
-      "ko": "저게 어떻게 살아 있지?! 죽을 뻔했어."
+      "en": "That thing was alive. And I nearly wasn't.",
+      "ko": "저 녀석, 살아 있었어. 난 하마터면 죽을 뻔했고."
     },
     "combat.msg.floor1_reaction.1": {
-      "en": "God, I just need to get out of here.",
-      "ko": "맙소사... 어서 여기서 나가야 해."
+      "en": "Okay. Okay. I just need to get out of here.",
+      "ko": "좋아. 좋아. 어서 여기서 나가야 해."
     },
     "combat.msg.foresee": {
       "en": "You foresee: {action}",
@@ -1325,16 +1325,16 @@
       "ko": "도구"
     },
     "cutscene.ending.0.0": {
-      "en": "Thank the Almighty...",
-      "ko": "신이시여, 감사합니다..."
+      "en": "Air. Actual air...",
+      "ko": "공기다. 진짜 공기..."
     },
     "cutscene.ending.0.1": {
       "en": "An exit...",
       "ko": "출구다..."
     },
     "cutscene.ending.0.2": {
-      "en": "I need to find out where I am.",
-      "ko": "여기가 어딘지 알아내야 해."
+      "en": "First, I need to know where I am.",
+      "ko": "먼저 여기가 어딘지 알아야 해."
     },
     "cutscene.ending.1.0": {
       "en": "Huh?",
@@ -1345,7 +1345,7 @@
       "ko": "..."
     },
     "cutscene.ending.1.2": {
-      "en": "Isn't this the raid party?",
+      "en": "Is that... the raid party?",
       "ko": "저건... 토벌대 아닌가?"
     },
     "cutscene.ending.1.3": {
@@ -1353,8 +1353,8 @@
       "ko": "모두... 죽었어."
     },
     "cutscene.ending.1.4": {
-      "en": "... What on earth...",
-      "ko": "...대체 이게 무슨..."
+      "en": "...What happened out here?",
+      "ko": "...여기서 무슨 일이 있었던 거지?"
     },
     "cutscene.ending.2.0": {
       "en": "...",
@@ -1369,8 +1369,8 @@
       "ko": "..."
     },
     "cutscene.ending.2.3": {
-      "en": "I wasn't so lucky after all.",
-      "ko": "결국 나는 운이 좋았던 게 아니었어."
+      "en": "So much for lucky.",
+      "ko": "운이 좋았다니, 웃기네."
     },
     "cutscene.ending.3.0": {
       "en": "There is no hope.",
@@ -1381,16 +1381,16 @@
       "ko": "플레이해 주셔서 감사합니다..."
     },
     "cutscene.ending.4.1": {
-      "en": "We're glad you made it all the way to the end.",
-      "ko": "끝까지 함께해 주셔서 정말 기쁩니다."
+      "en": "You made it to the end. We're glad.",
+      "ko": "끝까지 와 주셔서 기쁩니다."
     },
     "cutscene.ending.4.2": {
-      "en": "We're looking to use what we learned from this game for our next title.",
-      "ko": "우리는 이 게임에서 배운 점들을 다음 작품에 담아낼 계획입니다."
+      "en": "What we learned here goes into our next game.",
+      "ko": "이번에 배운 것은 다음 작품에 담겠습니다."
     },
     "cutscene.ending.4.3": {
-      "en": "Please support our next development :)",
-      "ko": "다음 작품도 응원해 주세요 :)"
+      "en": "Please support our next game.",
+      "ko": "다음 작품도 응원해 주세요."
     },
     "cutscene.ending.4.4": {
       "en": "by PaleRook",
@@ -1405,16 +1405,16 @@
       "ko": "게임 오버."
     },
     "cutscene.intro.0.0": {
-      "en": "This is not a world of fantasy, magic, and dragons.",
-      "ko": "이곳은 환상과 마법, 용의 세계가 아니다."
+      "en": "This is not a world of magic and dragons.",
+      "ko": "이곳은 마법과 용의 세계가 아니다."
     },
     "cutscene.intro.0.1": {
       "en": "There were no monsters.",
       "ko": "괴물은 없었다."
     },
     "cutscene.intro.0.10": {
-      "en": "It was worth it...",
-      "ko": "그만한 가치는 있었다..."
+      "en": "It seemed worth it...",
+      "ko": "그만한 가치가 있어 보였다..."
     },
     "cutscene.intro.0.11": {
       "en": "You signed up.",
@@ -1425,8 +1425,8 @@
       "ko": "있는 것은 인간 속의 괴물뿐."
     },
     "cutscene.intro.0.3": {
-      "en": "This is a world of gritty medieval kingdoms and warring countries.",
-      "ko": "이곳은 거칠고 투박한 중세 왕국과 전쟁 중인 나라들의 세계다."
+      "en": "This is a world of mud, borders and kings.",
+      "ko": "이곳은 진흙과 국경, 그리고 왕들의 세계다."
     },
     "cutscene.intro.0.4": {
       "en": "...",
@@ -1445,68 +1445,68 @@
       "ko": "당신은 외딴 마을의 지도 제작자였다. 한 푼 두 푼 겨우 모아 살았다."
     },
     "cutscene.intro.0.8": {
-      "en": "There were rumors of conscription for the war between two kingdoms.",
-      "ko": "두 왕국의 전쟁을 위해 징집이 있을 거라는 소문이 돌았다."
+      "en": "Word came that the crown was drafting men for the war.",
+      "ko": "전쟁에 나갈 사람들을 징집한다는 소문이 돌았다."
     },
     "cutscene.intro.0.9": {
-      "en": "The reward was enough to set you up for a year...",
-      "ko": "보수는 1년을 먹고살기에 충분했다..."
+      "en": "The pay would feed you for a year...",
+      "ko": "보수면 1년은 먹고살 수 있었다..."
     },
     "cutscene.intro.1.0": {
-      "en": "The plan was to ambush the enemy using a shortcut.",
+      "en": "The plan was to ambush the enemy by a shortcut.",
       "ko": "계획은 지름길로 가서 적을 기습하는 것이었다."
     },
     "cutscene.intro.1.1": {
-      "en": "Good thing you grew up here and knew the forest.",
-      "ko": "이곳에서 자라 숲을 잘 아는 게 다행이었다."
+      "en": "You grew up in these woods. You knew every path.",
+      "ko": "당신은 이 숲에서 자랐다. 길이란 길은 다 알았다."
     },
     "cutscene.intro.1.10": {
-      "en": "You knew it was a mistake. You could feel it.",
-      "ko": "잘못된 일이라는 걸 알았다. 느낄 수 있었다."
+      "en": "Your stomach knew it was a mistake.",
+      "ko": "배 속이 먼저 알았다. 이건 잘못이라고."
     },
     "cutscene.intro.1.11": {
       "en": "Before you could speak up.",
       "ko": "입을 열기도 전에."
     },
     "cutscene.intro.1.12": {
-      "en": "You hear cracking...",
-      "ko": "갈라지는 소리가 들린다..."
+      "en": "Stone cracks somewhere overhead...",
+      "ko": "머리 위 어딘가에서 돌이 갈라진다..."
     },
     "cutscene.intro.1.13": {
-      "en": "Small tremors...",
-      "ko": "작은 떨림..."
+      "en": "Dust sifts onto your shoulders...",
+      "ko": "어깨 위로 먼지가 내려앉는다..."
     },
     "cutscene.intro.1.2": {
       "en": "Then the scouts reported a tunnel near the mountain.",
       "ko": "그러던 중 정찰병이 산 근처에서 터널을 발견했다고 보고했다."
     },
     "cutscene.intro.1.3": {
-      "en": "You'd never heard of such a tunnel in all your life.",
-      "ko": "평생 그런 터널은 들어 본 적이 없었다."
+      "en": "You had never heard of a tunnel there. Not once.",
+      "ko": "그곳에 터널이 있다는 말은 들어 본 적이 없었다. 한 번도."
     },
     "cutscene.intro.1.4": {
-      "en": "You couldn't help thinking it was a joke...",
-      "ko": "농담이라고 생각할 수밖에 없었다..."
+      "en": "You took it for a joke...",
+      "ko": "농담인 줄 알았다..."
     },
     "cutscene.intro.1.5": {
       "en": "But it wasn't.",
       "ko": "하지만 농담이 아니었다."
     },
     "cutscene.intro.1.6": {
-      "en": "There really was a tunnel. You could hardly believe it.",
-      "ko": "터널은 정말로 있었다. 믿기 어려웠다."
+      "en": "The tunnel was real. None of your maps had room for it.",
+      "ko": "터널은 진짜였다. 당신의 어떤 지도에도 들어갈 자리가 없었다."
     },
     "cutscene.intro.1.7": {
-      "en": "The group ventured deep into the tunnel, heading toward the enemy castle...",
-      "ko": "일행은 적의 성을 향해 터널 깊숙이 들어갔다..."
+      "en": "The raid party went in, toward the enemy castle...",
+      "ko": "토벌대는 적의 성을 향해 터널 안으로 들어갔다..."
     },
     "cutscene.intro.1.8": {
-      "en": "You were just the navigator for this raid party.",
-      "ko": "당신은 이 토벌대의 길잡이일 뿐이었다."
+      "en": "You were only the navigator.",
+      "ko": "당신은 길잡이일 뿐이었다."
     },
     "cutscene.intro.1.9": {
-      "en": "And this place never existed before...",
-      "ko": "그리고 이곳은 전에는 없던 곳이었다..."
+      "en": "The day before, there was only hillside.",
+      "ko": "전날까지만 해도 그곳엔 산비탈뿐이었다."
     },
     "cutscene.intro.2.0": {
       "en": "But it was already too late.",
@@ -1581,16 +1581,16 @@
       "ko": "어둠이 당신을 조용히 데려간다."
     },
     "death.t1.1": {
-      "en": "So this is how it ends.",
-      "ko": "결국 이렇게 끝나는구나."
+      "en": "Is this it? It is so quiet.",
+      "ko": "이게 끝인가? 너무 조용하다."
     },
     "death.t1.2": {
-      "en": "The floor gives way beneath you.",
-      "ko": "발밑의 바닥이 꺼진다."
+      "en": "Your own breath is the last thing you hear.",
+      "ko": "마지막으로 들리는 건 자기 숨소리다."
     },
     "death.t2.0": {
-      "en": "You were sure that was the end.",
-      "ko": "분명 이게 끝이라고 생각했다."
+      "en": "You were sure that was it. You were wrong.",
+      "ko": "이게 끝이라고 확신했다. 틀렸다."
     },
     "death.t2.1": {
       "en": "The tunnel is not finished with you.",
@@ -1609,16 +1609,16 @@
       "ko": "벌써 몇 번째일까?"
     },
     "death.t3.2": {
-      "en": "Dying is starting to feel like routine.",
-      "ko": "죽는 일이 일상처럼 느껴지기 시작한다."
+      "en": "You know the ceiling before you open your eyes.",
+      "ko": "눈을 뜨기도 전에 천장이 어떤지 안다."
     },
     "death.t4.0": {
       "en": "You stopped counting. The walls didn't.",
       "ko": "세는 건 그만뒀다. 벽은 아니었다."
     },
     "death.t4.1": {
-      "en": "{killer}. You don't even flinch anymore.",
-      "ko": "{killer}. 이제 놀라지도 않는다."
+      "en": "{killer}. Your hands don't even shake.",
+      "ko": "{killer}. 이제 손도 떨리지 않는다."
     },
     "death.t4.2": {
       "en": "Nobody is coming. Nobody ever did.",
@@ -1645,8 +1645,8 @@
       "ko": "녹도, 닳은 흔적도 없다."
     },
     "dialogue.after_class_chest_archer.2": {
-      "en": "Like it was waiting here.",
-      "ko": "마치 여기서 기다리고 있었던 것처럼."
+      "en": "Like it was waiting for a hand like mine.",
+      "ko": "나 같은 손을 기다리고 있었던 것처럼."
     },
     "dialogue.after_class_chest_knight.0": {
       "en": "Heavy... but it fits.",
@@ -1657,8 +1657,8 @@
       "ko": "몇 년 동안 내 것이었던 것처럼."
     },
     "dialogue.after_class_chest_knight.2": {
-      "en": "This chest shouldn't know me.",
-      "ko": "이 상자가 나를 알 리 없는데."
+      "en": "How does a chest know my size?",
+      "ko": "상자가 내 몸 치수를 어떻게 알지?"
     },
     "dialogue.after_class_chest_mage.0": {
       "en": "Why does it feel cold...?",
@@ -1697,36 +1697,36 @@
       "ko": "한 번 읽었을 뿐인데."
     },
     "dialogue.after_skillbook_chest_knight.2": {
-      "en": "Somehow... my hands already know.",
-      "ko": "어쩐지... 손이 이미 알고 있어."
+      "en": "My hands already know it.",
+      "ko": "손이 이미 알고 있어."
     },
     "dialogue.after_skillbook_chest_mage.0": {
       "en": "I can't read this...",
       "ko": "읽을 수가 없어..."
     },
     "dialogue.after_skillbook_chest_mage.1": {
-      "en": "...The page is filled with symbols.",
-      "ko": "...페이지가 온통 기호투성이야."
+      "en": "...Just symbols, page after page.",
+      "ko": "...페이지마다 기호뿐이야."
     },
     "dialogue.after_skillbook_chest_mage.2": {
       "en": "A voice folds into my thoughts.",
       "ko": "어떤 목소리가 내 생각 속으로 스며든다."
     },
     "dialogue.after_skillbook_chest_mage.3": {
-      "en": "And I understand. It shows me where to place my hands.",
-      "ko": "그러자 이해가 된다. 손을 어디에 둬야 하는지 알려 준다."
+      "en": "Then I understand. It shows me where to put my hands.",
+      "ko": "그러자 이해가 돼. 손을 어디에 둬야 하는지 알려 줘."
     },
     "dialogue.barrel_break.0": {
       "en": "You smash the barrel.",
       "ko": "통을 부수었다."
     },
     "dialogue.barrel_broken.0": {
-      "en": "It's broken.",
-      "ko": "이미 부서졌다."
+      "en": "Splinters and a rusted hoop.",
+      "ko": "나뭇조각과 녹슨 쇠테."
     },
     "dialogue.bone.0": {
-      "en": "A pile of old bones.",
-      "ko": "오래된 뼈 무더기."
+      "en": "A pile of bones. Old, and picked clean.",
+      "ko": "오래된 뼈 무더기. 살점 하나 남지 않았다."
     },
     "dialogue.chest_empty.0": {
       "en": "It's empty.",
@@ -1749,24 +1749,76 @@
       "ko": "이해할 수 없어."
     },
     "dialogue.entering_second_floor.1": {
-      "en": "How can such creatures exist?",
-      "ko": "이런 생물이 어떻게 존재하지?"
+      "en": "I grew up in these hills. None of that lived here.",
+      "ko": "난 이 산골에서 자랐어. 저런 건 없었다고."
     },
     "dialogue.entering_second_floor.2": {
-      "en": "Some sort of mutated animals...",
-      "ko": "돌연변이 짐승 같은 건가..."
+      "en": "Sick animals, maybe. Something in the water...",
+      "ko": "병든 짐승일지도. 물 때문인가..."
     },
     "dialogue.entering_second_floor.3": {
       "en": "...Monsters?",
       "ko": "...괴물?"
     },
     "dialogue.fire_stand_extinguish.0": {
-      "en": "You extinguish the flame.",
-      "ko": "불을 껐다."
+      "en": "You put out the flame. The dark leans in.",
+      "ko": "불을 껐다. 어둠이 가까이 다가온다."
     },
     "dialogue.fire_stand_off.0": {
-      "en": "The flame is out.",
-      "ko": "불이 꺼져 있다."
+      "en": "Only cold ash is left.",
+      "ko": "식은 재만 남아 있다."
+    },
+    "dialogue.first_encounter_final_boss.0": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.first_encounter_final_boss.1": {
+      "en": "Another demon.",
+      "ko": "또 악마인가."
+    },
+    "dialogue.first_encounter_final_boss.2": {
+      "en": "This one is different.",
+      "ko": "이번 놈은 달라."
+    },
+    "dialogue.first_encounter_final_boss.3": {
+      "en": "As if it's looking for something...",
+      "ko": "무언가를 찾는 것 같아..."
+    },
+    "dialogue.first_encounter_final_boss.4": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.first_encounter_final_boss.5": {
+      "en": "...someone.",
+      "ko": "...누군가를."
+    },
+    "dialogue.first_encounter_mini_boss.0": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.first_encounter_mini_boss.1": {
+      "en": "Oh, what the hell is that?",
+      "ko": "아니, 저게 대체 뭐야?"
+    },
+    "dialogue.first_encounter_mini_boss.2": {
+      "en": "Half cow, half man?",
+      "ko": "반은 소, 반은 사람?"
+    },
+    "dialogue.first_encounter_mini_boss.3": {
+      "en": "That breathing. Those horns...",
+      "ko": "저 숨소리. 저 뿔..."
+    },
+    "dialogue.first_encounter_mini_boss.4": {
+      "en": "And he's blocking the only way forward.",
+      "ko": "하필 하나뿐인 길을 막고 서 있어."
+    },
+    "dialogue.first_encounter_mini_boss.5": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.first_encounter_mini_boss.6": {
+      "en": "Fuck.",
+      "ko": "젠장."
     },
     "dialogue.first_encounter_slime.0": {
       "en": "What...",
@@ -1797,28 +1849,136 @@
       "ko": "금이 간 두개골."
     },
     "dialogue.sys_class_chest_guard.0": {
-      "en": "Wait, there was a chest back there. I think I should open it...",
-      "ko": "잠깐, 저 뒤에 상자가 있었어. 열어 봐야겠어..."
+      "en": "Wait. There was a chest back there.",
+      "ko": "잠깐. 저 뒤에 상자가 있었어."
     },
     "dialogue.sys_class_chest_guard.1": {
-      "en": "...there might be something I can use to protect myself.",
-      "ko": "...나를 지킬 만한 뭔가가 들어 있을지도 몰라."
+      "en": "...Something in it might keep me alive.",
+      "ko": "...안에 살아남는 데 쓸 만한 게 있을지도 몰라."
     },
     "dialogue.sys_class_chest_prompt.0": {
       "en": "How convenient...",
       "ko": "마침 잘됐군..."
     },
     "dialogue.sys_class_chest_prompt.1": {
-      "en": "Just what I need to get out of this place.",
-      "ko": "여기서 나가려면 꼭 필요한 것이다."
+      "en": "Something in there might get me out of here.",
+      "ko": "저 안에 여기서 나갈 방법이 있을지도 몰라."
+    },
+    "dialogue.sys_final_boss_defeated_reaction.0": {
+      "en": "*Huff*... *Wheeze*... Fuck.",
+      "ko": "*헉*... *쌕*... 젠장."
+    },
+    "dialogue.sys_final_boss_defeated_reaction.1": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.sys_final_boss_defeated_reaction.2": {
+      "en": "I did it. I actually did it.",
+      "ko": "해냈어. 정말 해냈어."
+    },
+    "dialogue.sys_final_boss_defeated_reaction.3": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.sys_final_boss_defeated_reaction.4": {
+      "en": "Still...",
+      "ko": "그런데..."
+    },
+    "dialogue.sys_final_boss_defeated_reaction.5": {
+      "en": "Nothing here makes sense.",
+      "ko": "여긴 아무것도 말이 안 돼."
+    },
+    "dialogue.sys_final_boss_defeated_reaction.6": {
+      "en": "Am I the only one seeing this?",
+      "ko": "이걸 보는 게 나뿐인가?"
+    },
+    "dialogue.sys_final_boss_defeated_reaction.7": {
+      "en": "Who cares. The exit is right there.",
+      "ko": "아무렴 어때. 출구가 바로 저기야."
+    },
+    "dialogue.sys_final_boss_defeated_reaction.8": {
+      "en": "Time to find the others, and a way home.",
+      "ko": "동료들을 찾아서 집으로 가는 길을 찾자."
+    },
+    "dialogue.sys_first_equippable_item_reaction.0": {
+      "en": "This might come in handy.",
+      "ko": "쓸모가 있겠는걸."
+    },
+    "dialogue.sys_first_equippable_item_reaction.1": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.sys_first_equippable_item_reaction.2": {
+      "en": "Chests every few steps.",
+      "ko": "몇 걸음마다 상자가 있어."
+    },
+    "dialogue.sys_first_equippable_item_reaction.3": {
+      "en": "Gear that fits like it was made for me.",
+      "ko": "내 몸에 맞춘 듯한 장비들."
+    },
+    "dialogue.sys_first_equippable_item_reaction.4": {
+      "en": "Somebody wants me armed.",
+      "ko": "누군가 내가 무장하길 바라는 거야."
+    },
+    "dialogue.sys_first_equippable_item_reaction.5": {
+      "en": "But why arm us, if they wanted us dead?",
+      "ko": "우리를 죽일 셈이면 왜 무기를 쥐여 주지?"
+    },
+    "dialogue.sys_first_level_up_reaction.0": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.sys_first_level_up_reaction.1": {
+      "en": "The walls tilt. Easy... easy.",
+      "ko": "벽이 기운다. 진정해... 진정해."
+    },
+    "dialogue.sys_first_level_up_reaction.2": {
+      "en": "I think I'm going to be sick...",
+      "ko": "토할 것 같아..."
+    },
+    "dialogue.sys_first_level_up_reaction.3": {
+      "en": "Why does it feel like I've been training for years?",
+      "ko": "왜 몇 년 동안 훈련한 것처럼 몸이 쑤시지?"
+    },
+    "dialogue.sys_first_level_up_reaction.4": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.sys_first_level_up_reaction.5": {
+      "en": "...and different.",
+      "ko": "...그리고 달라졌어."
+    },
+    "dialogue.sys_first_stranger_encounter_reaction.0": {
+      "en": "Get your hands off me...",
+      "ko": "손 치워..."
+    },
+    "dialogue.sys_first_stranger_encounter_reaction.1": {
+      "en": "He smiled the whole time.",
+      "ko": "그 녀석, 내내 웃고 있었어."
+    },
+    "dialogue.sys_first_stranger_encounter_reaction.2": {
+      "en": "Are they all demons down here?",
+      "ko": "여기 있는 건 전부 악마야?"
+    },
+    "dialogue.sys_first_stranger_encounter_reaction.3": {
+      "en": "What else would they be.",
+      "ko": "달리 뭐겠어."
+    },
+    "dialogue.sys_first_stranger_encounter_reaction.4": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.sys_first_stranger_encounter_reaction.5": {
+      "en": "I have to keep moving.",
+      "ko": "계속 움직여야 해."
     },
     "dialogue.sys_floor1_intro.0": {
       "en": "*Thud* *Crash*",
       "ko": "*쿵* *와장창*"
     },
     "dialogue.sys_floor1_intro.1": {
-      "en": "Wha... What just happened?",
-      "ko": "뭐... 방금 무슨 일이 일어난 거야?"
+      "en": "Ugh... What just happened?",
+      "ko": "으윽... 방금 무슨 일이야?"
     },
     "dialogue.sys_floor1_intro.2": {
       "en": "Where am I?",
@@ -1829,12 +1989,72 @@
       "ko": "..."
     },
     "dialogue.sys_floor1_intro.4": {
-      "en": "I knew it. There's something wrong about this place.",
-      "ko": "역시 그랬어. 이곳은 뭔가 이상해."
+      "en": "I knew it. This tunnel was never right.",
+      "ko": "역시. 이 터널은 처음부터 이상했어."
     },
     "dialogue.sys_floor1_intro.5": {
-      "en": "I need to get back.",
-      "ko": "돌아가야 해."
+      "en": "I have to get back up.",
+      "ko": "위로 돌아가야 해."
+    },
+    "dialogue.sys_floor2_dire_wolf_reaction.0": {
+      "en": "*Pant*... Whew.",
+      "ko": "*헉*... 휴."
+    },
+    "dialogue.sys_floor2_dire_wolf_reaction.1": {
+      "en": "A wolf now? Seriously?",
+      "ko": "이번엔 늑대라고? 진짜로?"
+    },
+    "dialogue.sys_floor2_dire_wolf_reaction.2": {
+      "en": "Where do these things come from?",
+      "ko": "이것들은 다 어디서 나오는 거야?"
+    },
+    "dialogue.sys_floor2_dire_wolf_reaction.3": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.sys_floor2_dire_wolf_reaction.4": {
+      "en": "Standing here won't answer that.",
+      "ko": "여기 서 있어도 답은 안 나와."
+    },
+    "dialogue.sys_floor2_dire_wolf_reaction.5": {
+      "en": "Keep moving.",
+      "ko": "계속 가자."
+    },
+    "dialogue.sys_floor9_5_exit_reaction.0": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.sys_floor9_5_exit_reaction.1": {
+      "en": "(Colors flood in, far too bright.)",
+      "ko": "(색이 쏟아져 들어온다. 너무 밝다.)"
+    },
+    "dialogue.sys_floor9_5_exit_reaction.2": {
+      "en": "(Black threads curl through your sight, then vanish.)",
+      "ko": "(검은 실 같은 것이 시야를 휘감았다가 사라진다.)"
+    },
+    "dialogue.sys_floor9_5_exit_reaction.3": {
+      "en": "(The tunnel snaps back around you.)",
+      "ko": "(터널이 다시 당신을 에워싼다.)"
+    },
+    "dialogue.sys_floor9_5_exit_reaction.4": {
+      "en": "Huh?",
+      "ko": "응?"
+    },
+    "dialogue.sys_floor9_5_exit_reaction.5": {
+      "en": "...",
+      "ko": "..."
+    },
+    "dialogue.sys_floor9_5_exit_reaction.6": {
+      "en": "My head...",
+      "ko": "머리가..."
+    },
+    "dialogue.sys_floor9_5_exit_reaction.7": {
+      "en": "It feels like it's about to split.",
+      "ko": "쪼개질 것 같아."
+    },
+    "dialogue.sys_floor9_5_exit_reaction.8": {
+      "en": "(You clutch your head while walking toward the exit.)",
+      "ko": "(머리를 부여잡고 출구를 향해 걷는다.)"
     },
     "dialogue.sys_load_missing.0": {
       "en": "No save found.",
@@ -1853,20 +2073,20 @@
       "ko": "바람에 바스락거린다."
     },
     "dialogue.torch_extinguish.0": {
-      "en": "You extinguish the torch.",
-      "ko": "횃불을 껐다."
+      "en": "You put out the torch. The corner goes black.",
+      "ko": "횃불을 껐다. 한쪽 구석이 까맣게 잠긴다."
     },
     "dialogue.torch_off.0": {
       "en": "The torch is cold.",
       "ko": "횃불이 식어 있다."
     },
     "dialogue.tree.0": {
-      "en": "A sturdy tree.",
-      "ko": "튼튼한 나무."
+      "en": "A tree, growing where none should.",
+      "ko": "있을 리 없는 곳에 나무가 자라고 있다."
     },
     "dialogue.tree_stump.0": {
-      "en": "A cut tree stump.",
-      "ko": "베어 낸 나무 그루터기."
+      "en": "A stump, cut clean with a saw.",
+      "ko": "톱으로 깨끗이 베어 낸 그루터기."
     },
     "echo.pick.title": {
       "en": "Keep one skill you remember",
@@ -2049,8 +2269,8 @@
       "ko": "돌에는 금이 갔고, 이름은 오래전에 지워졌다."
     },
     "interact.grave.line.obj_grave.3": {
-      "en": "You brush away dust from a weathered grave.",
-      "ko": "비바람에 깎인 무덤의 먼지를 털어 낸다."
+      "en": "You brush the dust from the stone. No name under it.",
+      "ko": "돌의 먼지를 털어 낸다. 그 밑에도 이름은 없다."
     },
     "interact.grave.line.obj_grave.4": {
       "en": "A faded grave stands in the silence.",
@@ -2061,16 +2281,16 @@
       "ko": "무덤 가장자리를 이끼가 뒤덮고 있다."
     },
     "interact.grave.line.obj_grave.6": {
-      "en": "The earth around this grave feels recently disturbed.",
-      "ko": "이 무덤 주위의 흙은 최근에 파헤쳐진 듯하다."
+      "en": "The earth is loose, as if turned this morning.",
+      "ko": "흙이 푹신하다. 오늘 아침에 파헤친 것처럼."
     },
     "interact.grave.line.obj_grave.7": {
       "en": "A neglected grave marker leans to one side.",
       "ko": "돌보는 이 없는 묘비가 한쪽으로 기울어 있다."
     },
     "interact.grave.line.obj_grave.8": {
-      "en": "This grave has been here for a long, long time.",
-      "ko": "이 무덤은 아주 오래전부터 여기 있었다."
+      "en": "Older than the tunnel, by the look of it.",
+      "ko": "생김새로 보아 터널보다 오래된 무덤이다."
     },
     "interact.grave.line.obj_grave.9": {
       "en": "Only silence answers from this old grave.",
@@ -3101,8 +3321,8 @@
       "ko": "돌에 짧은 긁힘이 세 개 있다."
     },
     "note.three_marks.1": {
-      "en": "You made these. You don't remember making them.",
-      "ko": "당신이 새긴 것이다. 새긴 기억은 없다."
+      "en": "Your thumb fits the groove exactly.",
+      "ko": "당신의 엄지가 홈에 꼭 맞는다."
     },
     "note.three_marks.title": {
       "en": "Three marks",
@@ -4597,16 +4817,16 @@
       "ko": "길게 눌러 건너뛰기"
     },
     "wake.t1": {
-      "en": "You wake where you first fell. Alive.",
-      "ko": "처음 떨어진 곳에서 눈을 뜬다. 살아 있다."
+      "en": "Cold stone under your cheek. You are where you fell. Alive, at least.",
+      "ko": "뺨에 차가운 돌이 닿는다. 떨어진 그 자리다. 적어도 살아 있다."
     },
     "wake.t2": {
-      "en": "The same stone. The same cold. You wake again.",
-      "ko": "같은 돌바닥. 같은 냉기. 다시 눈을 뜬다."
+      "en": "The same stone, the same cold. You almost expected it.",
+      "ko": "같은 돌바닥, 같은 냉기. 어쩐지 예상했던 일이다."
     },
     "wake.t3": {
-      "en": "You wake at the entrance. It almost feels like home.",
-      "ko": "입구에서 눈을 뜬다. 어쩐지 집처럼 느껴진다."
+      "en": "The stone is almost warm now. It feels a little like home.",
+      "ko": "돌바닥이 이제 거의 따뜻하다. 어쩐지 집 같다."
     },
     "wake.t4": {
       "en": "You wake. You no longer ask why.",

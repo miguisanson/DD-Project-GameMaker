@@ -511,8 +511,8 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
     }
 
     if (!floor1_slime_done && killed_floor1_slime) {
-        array_push(lines, Loc_T("combat.msg.floor1_reaction.0", "How was that even alive?! I almost died."));
-        array_push(lines, Loc_T("combat.msg.floor1_reaction.1", "God, I just need to get out of here."));
+        array_push(lines, Loc_T("combat.msg.floor1_reaction.0", "That thing was alive. And I nearly wasn't."));
+        array_push(lines, Loc_T("combat.msg.floor1_reaction.1", "Okay. Okay. I just need to get out of here."));
         variable_struct_set(gs.flags, floor1_slime_key, true);
     }
 

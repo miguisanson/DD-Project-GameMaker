@@ -8994,8 +8994,8 @@ function Scenario_StepSmokeClassGuard(_s) {
                 var _raw = _gs.ui.lines_raw;
                 Scenario_Check("g4_try" + string(_cg.attempt) + "_the_room_does_not_change", room == rm_floor1 && Scenario_ExitCount() == _cg.c0 && !Transition_IsActive());
                 Scenario_Check("g4_try" + string(_cg.attempt) + "_two_lines_open", array_length(_raw) == 2, "lines=" + string(array_length(_raw)));
-                Scenario_Check("g4_try" + string(_cg.attempt) + "_line_1", array_length(_raw) > 0 && string(_raw[0]) == "Wait, there was a chest back there. I think I should open it...");
-                Scenario_Check("g4_try" + string(_cg.attempt) + "_line_2", array_length(_raw) > 1 && string(_raw[1]) == "...there might be something I can use to protect myself.");
+                Scenario_Check("g4_try" + string(_cg.attempt) + "_line_1", array_length(_raw) > 0 && string(_raw[0]) == "Wait. There was a chest back there.");
+                Scenario_Check("g4_try" + string(_cg.attempt) + "_line_2", array_length(_raw) > 1 && string(_raw[1]) == "...Something in it might keep me alive.");
                 _cg.maxidx = 0;
                 _cg.closed_t = -1;
                 Scenario_Next(_s, 322);
