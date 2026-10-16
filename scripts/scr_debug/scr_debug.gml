@@ -536,7 +536,10 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeReview6(_s);   // review 6: the snapshot of a won fight is held until the map is back; goes on to hunt6ui (950)
             break;
         case 950: case 951: case 952: case 953: case 954: case 955: case 956: case 957: case 958: case 959:
-            Scenario_StepSmokeHunt6Ui(_s);   // hunt6ui: Esc / Tab mid-step, Y closes the menu, a pad leaves "Press a key...", a quick double press and "Keep this?"; the end of the chain (its last step calls Scenario_NoticeEnd)
+            Scenario_StepSmokeHunt6Ui(_s);   // hunt6ui: Esc / Tab mid-step, Y closes the menu, a pad leaves "Press a key...", a quick double press and "Keep this?"; goes on to hunt7map (980)
+            break;
+        case 980: case 981: case 982: case 983: case 984: case 985: case 986: case 987: case 988: case 989:
+            Scenario_StepSmokeHunt7Map(_s);   // hunt7map: the Stranger in the arrival clean-up and in the run save, the post-Run grace holds in a menu; the end of the chain (its last step calls Scenario_NoticeEnd)
             break;
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step goes on to G6 (380)
@@ -10074,6 +10077,28 @@ function Scenario_MapJuiceStage(_mj) {
 }
 
 // A direction the player can walk one tile in: { act, face, dx, dy }, or undefined.
+// The mean brightness (0..255) of a box of the world picture, read from the game's own picture (the application surface) at the world position (_wx, _wy), _w x _h pixels.
+function Scenario_AppBoxLuminance(_wx, _wy, _w, _h) {
+    var _cam = view_camera[0];
+    var _x0 = round(_wx) - floor(camera_get_view_x(_cam));
+    var _y0 = round(_wy) - floor(camera_get_view_y(_cam));
+    var _sw = surface_get_width(application_surface);
+    var _sh = surface_get_height(application_surface);
+    var _buf = buffer_create(_sw * _sh * 4, buffer_fixed, 1);
+    buffer_get_surface(_buf, application_surface, 0);
+    var _sum = 0;
+    var _n = 0;
+    for (var _y = max(0, _y0); _y < min(_sh, _y0 + _h); _y++) {
+        for (var _x = max(0, _x0); _x < min(_sw, _x0 + _w); _x++) {
+            var _o = (_y * _sw + _x) * 4;
+            _sum += (buffer_peek(_buf, _o, buffer_u8) + buffer_peek(_buf, _o + 1, buffer_u8) + buffer_peek(_buf, _o + 2, buffer_u8)) / 3;
+            _n++;
+        }
+    }
+    buffer_delete(_buf);
+    return (_n > 0) ? _sum / _n : -1;
+}
+
 function Scenario_MapJuiceFreeDir(_pl) {
     var _opts = [
         { act: "move_left", face: LEFT, dx: -1, dy: 0 }, { act: "move_right", face: RIGHT, dx: 1, dy: 0 },
@@ -10597,9 +10622,42 @@ function Scenario_StepShotsMapJuice(_s) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 global.mapfx_clock = -1;
                 Scenario_Release();
-                Scenario_Next(_s, 460);   // G9 (D137, pictures 460..466) goes on; its last step ends the run
+                Scenario_Next(_s, 406);   // hunt7map: the same squash is under the room's darkness
             }
             if (_s.t > 200) { Scenario_Release(); Scenario_Check("shots_mapjuice_the_step_squashes", false); Scenario_Finish(); }
+            break;
+        case 406:   // hunt7map: in a very dark room with no light source, the player squashed is as dark as the player plain, on the same tile and in the same frame
+            if (_s.t < 4 || !Player_IsSettled(_pl)) {
+                if (_s.t > 200) { Scenario_Check("shots_hunt7map_the_player_settles", false); Scenario_Finish(); }
+                break;
+            }
+            if (!variable_struct_exists(_mj, "p7")) {
+                Light_RoomSources();
+                _mj.p7 = { dark: global.light_dark, srcs: global.light_srcs, f: _s.f, now: MapFx_Now() };
+                global.light_dark = 0.85;   // so dark that a lit pixel cannot be mistaken for a dark one
+                global.light_srcs = [];     // no fire or sun spot lightens the tile
+                global.mapfx_clock = _mj.p7.now;
+                global.light_clock = _mj.p7.now;
+                _pl.squash_start = _mj.p7.now - 1000;   // plain: the squash is long over
+            }
+            var _p7 = _mj.p7;
+            if (_s.f == _p7.f + 4) {
+                _p7.lum_plain = Scenario_AppBoxLuminance(_pl.x, _pl.y, 16, 16);
+                Scenario_Check("shots_hunt7map_the_plain_player_is_drawn_for_the_control", _pl.visible && !_pl.squash_on);
+                _pl.squash_start = _p7.now - 10;   // squashed: 10 ms into it
+            }
+            if (_s.f == _p7.f + 8) {
+                _p7.lum_sq = Scenario_AppBoxLuminance(_pl.x, _pl.y, 16, 16);
+                Scenario_Check("shots_hunt7map_the_squashed_player_is_drawn", _pl.squash_on && !_pl.visible);
+                Scenario_Check("shots_hunt7map_the_squashed_player_is_as_dark_as_the_plain_one", _p7.lum_sq <= _p7.lum_plain * 1.10 + 2, "plain=" + string(_p7.lum_plain) + " squashed=" + string(_p7.lum_sq));
+                global.light_dark = _p7.dark;
+                global.light_srcs = _p7.srcs;
+                global.mapfx_clock = -1;
+                global.light_clock = -1;
+                _pl.squash_start = -100000;
+                Scenario_Next(_s, 460);   // G9 (D137, pictures 460..466) goes on; its last step ends the run
+            }
+            if (_s.t > 300) { Scenario_Check("shots_hunt7map_the_probe_ends", false); Scenario_Finish(); }
             break;
     }
 }
@@ -13623,7 +13681,144 @@ function Scenario_StepSmokeHunt6Ui(_s) {
             }
             if (_s.t > 500) { Scenario_Check("hunt6ui_the_keep_this_flow", false, "k0=" + string(variable_struct_exists(_h, "k0")) + " k1=" + string(variable_struct_exists(_h, "k1")) + " k3=" + string(variable_struct_exists(_h, "k3")) + " active=" + string(KeepThis_Active())); if (KeepThis_Active()) KeepThis_Revert(); GameSettings_Commit(_h.old_settings, true, true); Menu_Close(true); Scenario_ClearUi(); Scenario_Next(_s, 956); }
             break;
-        case 956:   // the end of the chain: removes the files and the profile the steps made
+        case 956:   // goes on with hunt7map (980..), the end of the chain
+            Scenario_Next(_s, 980);
+            break;
+    }
+}
+
+// ============================================================================
+// Bug hunt 7, map and world (hunt7map), smoke steps 980..989. They go on from the new run of the steps before; the last one calls Scenario_NoticeEnd.
+//   980-983: a fresh rm_floor8, the Stranger put 2 tiles from the exit to floor 7, the player leaves and comes back: he is 4 tiles from the exit and nobody is within 3 tiles of the
+//            arrival tile (D158 has no exception for him), and the run save already holds him where the clean-up put him (a Continue shows the same room).
+//   984-987: the post-Run grace period (battle_cooldown) does not run down while the Tab menu is open, and runs down again once it is closed.
+// ============================================================================
+function Scenario_StepSmokeHunt7Map(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "h7m")) _s.h7m = {};
+    var _h = _s.h7m;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _T = GRID_TILE_SIZE;
+    switch (_s.step) {
+        case 980:   // a fresh rm_floor8 (its own enemies): via another room, the controller only restores a room on a room change
+            if (_s.t == 1) {
+                Scenario_Release();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                room_goto(rm_floor7);
+            }
+            if (_s.t > 20 && room == rm_floor7) {
+                room_goto(rm_floor8);
+                Scenario_Next(_s, 981);
+            }
+            if (_s.t > 900) { Scenario_Check("hunt7map_rm_floor7_is_reached", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 981:   // the Stranger 2 tiles from the exit to floor 7; the player on that exit leaves
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor8) && Player_IsSettled(_pl)) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                var _st = instance_exists(obj_stranger) ? instance_find(obj_stranger, 0) : noone;
+                Scenario_Check("hunt7map_rm_floor8_has_the_stranger", _st != noone);
+                var _ex = noone;
+                with (obj_room_transition) { if (transition_id == "floor8_to_floor7") _ex = id; }
+                Scenario_Check("hunt7map_the_exit_to_floor_7_is_there", _ex != noone);
+                if (_st == noone || _ex == noone) { Scenario_NoticeEnd(); break; }
+                with (obj_enemy) { if (id != _st) instance_destroy(); }
+                EnemyAI_Init(_st);
+                _st.prof.sight = 0;   // he only has to stand there: he followed the player to the exit
+                _h.ex_cx = round(_ex.bbox_left / _T);
+                _h.ex_cy = round(_ex.bbox_top / _T);
+                var _g = Nav_Get().grid;
+                var _at = undefined;
+                for (var _dy = -2; _dy <= 2 && is_undefined(_at); _dy++) {
+                    for (var _dx = -2; _dx <= 2 && is_undefined(_at); _dx++) {
+                        var _d = point_distance(0, 0, _dx, _dy);
+                        if (_d < 1.9 || _d > 2.5) continue;
+                        if (Nav_CellBlocked(_g, _h.ex_cx + _dx, _h.ex_cy + _dy)) continue;
+                        _at = [_h.ex_cx + _dx, _h.ex_cy + _dy];
+                    }
+                }
+                Scenario_Check("hunt7map_there_is_a_free_cell_2_tiles_from_the_exit", !is_undefined(_at));
+                if (is_undefined(_at)) { Scenario_NoticeEnd(); break; }
+                Scenario_PlaceEnemy(_st, _at[0], _at[1]);
+                _h.st_pid = _st.persist_id;
+                Scenario_PlacePlayer(_h.ex_cx, _h.ex_cy);
+                Scenario_Hold(Scenario_Hunt2DirAction(_ex.require_dir), 4);
+                Scenario_Next(_s, 982);
+            }
+            if (_s.t > 900) { Scenario_Check("hunt7map_a_fresh_rm_floor8_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 982:   // in rm_floor7, on the exit back: leave again
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor7) && Player_IsSettled(_pl)) {
+                Scenario_Release();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                var _ex2 = instance_position(_pl.x + _T / 2, _pl.y + _T / 2, obj_room_transition);
+                Scenario_Check("hunt7map_arrived_in_rm_floor7_on_an_exit", _ex2 != noone);
+                if (_ex2 == noone) { Scenario_NoticeEnd(); break; }
+                Scenario_Hold(Scenario_Hunt2DirAction(_ex2.require_dir), 6);
+                Scenario_Next(_s, 983);
+            }
+            if (_s.t > 900) { Scenario_Check("hunt7map_the_player_arrives_in_rm_floor7", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 983:   // back in rm_floor8, looked at on the first frame after the arrival was applied (before he can react)
+            if (room == rm_floor8 && instance_exists(obj_player) && instance_exists(obj_stranger) && !_gs.transition.pending) {
+                Scenario_Release();
+                var _st2 = instance_find(obj_stranger, 0);
+                var _cs = Scenario_H11Cell(_st2);
+                var _pc = Scenario_H11Cell(_pl);
+                Scenario_Check("hunt7map_the_player_arrived_on_the_exit_he_left_by", _pc.cx == _h.ex_cx && _pc.cy == _h.ex_cy, "player at " + string(_pc.cx) + "," + string(_pc.cy));
+                Scenario_Check("hunt7map_the_stranger_who_waited_at_the_exit_is_4_tiles_from_it", point_distance(_cs.cx, _cs.cy, _h.ex_cx, _h.ex_cy) >= AI_EXIT_RELOCATE_TILES, "stranger at " + string(_cs.cx) + "," + string(_cs.cy));
+                var _near = 0;
+                with (obj_enemy) { if (point_distance(Nav_CellOf(x + 8), Nav_CellOf(y + 8), _pc.cx, _pc.cy) < AI_ARRIVAL_CLEAR_TILES) _near++; }
+                Scenario_Check("hunt7map_nobody_within_3_tiles_of_the_arrival_tile_the_stranger_included", _near == 0, "near=" + string(_near));
+                // a Continue loads what the run save holds: it must hold him where the clean-up put him
+                var _lv = RunSave_Build().levelData;
+                var _key = RoomState_Key(rm_floor8, _h.st_pid);
+                var _rec = variable_struct_exists(_lv, _key) ? variable_struct_get(_lv, _key) : undefined;
+                Scenario_Check("hunt7map_the_run_save_has_the_stranger", is_struct(_rec) && is_struct(_rec.vars) && variable_struct_exists(_rec.vars, "x") && variable_struct_exists(_rec.vars, "y"));
+                if (is_struct(_rec) && is_struct(_rec.vars) && variable_struct_exists(_rec.vars, "x")) {
+                    var _sx = Nav_CellOf(_rec.vars.x + _T / 2);
+                    var _sy = Nav_CellOf(_rec.vars.y + _T / 2);
+                    Scenario_Check("hunt7map_the_run_save_holds_him_where_the_clean_up_put_him_4_tiles_from_the_exit", point_distance(_sx, _sy, _h.ex_cx, _h.ex_cy) >= AI_EXIT_RELOCATE_TILES, "saved at " + string(_sx) + "," + string(_sy));
+                }
+                Scenario_Next(_s, 984);
+            }
+            if (_s.t > 900) { Scenario_Release(); Scenario_Check("hunt7map_the_player_is_back_in_rm_floor8", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 984:   // a quiet map, the grace period full, the Tab menu opened
+            if (_s.t > 10 && Scenario_FloorReady(rm_floor8) && Player_IsSettled(_pl) && _gs.ui.mode == UI_NONE) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                _pl.battle_cooldown = BATTLE_COOLDOWN_FRAMES;
+                Scenario_Tap("menu");
+                Scenario_Next(_s, 985);
+            }
+            if (_s.t > 900) { Scenario_Check("hunt7map_the_map_is_free_for_the_menu", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_NoticeEnd(); }
+            break;
+        case 985:   // 40 frames with the menu open: the grace period has not run down
+            if (!variable_struct_exists(_h, "cd0")) {
+                if (_gs.ui.mode == UI_MENU && is_struct(TabMenu_Get())) {
+                    _h.cd0 = _pl.battle_cooldown;
+                    _h.cd_f = _s.f;
+                }
+            } else if (_s.f - _h.cd_f >= 40) {
+                Scenario_Check("hunt7map_the_grace_period_does_not_run_down_while_the_menu_is_open", _pl.battle_cooldown == _h.cd0, "was " + string(_h.cd0) + " now " + string(_pl.battle_cooldown));
+                Scenario_Check("hunt7map_the_menu_was_open_all_that_time", _gs.ui.mode == UI_MENU);
+                Menu_Close(true);
+                Scenario_ClearUi();
+                Scenario_Next(_s, 986);
+            }
+            if (_s.t > 300) { Scenario_Check("hunt7map_the_tab_menu_opens", false, "mode=" + string(_gs.ui.mode)); Menu_Close(true); Scenario_ClearUi(); Scenario_NoticeEnd(); }
+            break;
+        case 986:   // the menu is closed: the grace period runs down again
+            if (_s.t == 12) {
+                Scenario_Check("hunt7map_the_grace_period_runs_down_again_once_the_menu_is_closed", _pl.battle_cooldown < _h.cd0, "was " + string(_h.cd0) + " now " + string(_pl.battle_cooldown));
+                Scenario_Next(_s, 987);
+            }
+            break;
+        case 987:   // the end of the chain: removes the files and the profile the steps made
             Scenario_NoticeEnd();
             break;
     }
