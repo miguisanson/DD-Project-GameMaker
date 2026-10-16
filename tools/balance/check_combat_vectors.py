@@ -155,11 +155,13 @@ STEADFAST_TURNS = 2
 
 
 def stagger_gain(power, stun, perfect):
-    return max(1, rhu(power * 0.5 * (2 if stun else 1) * (1.5 if perfect else 1)))
+    # D191: stun skills fill x1.5 (was x2); Perfect x1.5. A multi-hit skill fills like ONE hit (the caller does not multiply by the hits).
+    return max(1, rhu(power * 0.5 * (1.5 if stun else 1) * (1.5 if perfect else 1)))
 
 
 def stagger_max(rank, boss):
-    return (4 + 4 * rank) * (2 if boss else 1)
+    # D191: meters 50% bigger than before ((4 + 4 x rank) x 2 for a boss): normal 12 / 18, Palehorn 48, the final boss 60
+    return rhu(1.5 * (4 + 4 * rank) * (2 if boss else 1))
 
 
 class Timeline:

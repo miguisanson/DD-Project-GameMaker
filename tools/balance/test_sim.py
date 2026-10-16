@@ -123,16 +123,26 @@ class Timeline(unittest.TestCase):
         self.assertTrue(b.tl_stun(1))
         self.assertFalse(b.tl_stun(1))
 
-    def test_stagger_fills_to_a_break_that_pushes_back_one_turn(self):  # Slime rank 1 meter 8; Wooden Sword hit power 6 adds 3
+    def test_stagger_fills_to_a_break_that_pushes_back_one_turn(self):  # D191: Slime rank 1 meter 12; Wooden Sword hit power 6 adds 3: the fourth hit breaks
         b = battle("knight", "slime")
         b.e.mhp = b.e.hp = 100
+        self.assertEqual(b.e.smax, 12)
         g0 = b.gauge[1]
-        b.stagger_hit(6.0, False, False)
-        b.stagger_hit(6.0, False, False)
+        for _ in range(3):
+            b.stagger_hit(6.0, False, False)
         self.assertFalse(b.e.broken)
         b.stagger_hit(6.0, False, False)
         self.assertTrue(b.e.broken)
         self.assertEqual(b.gauge[1], g0 - 100)
+
+    def test_a_multi_hit_skill_fills_like_one_hit_and_a_stun_skill_x1_5(self):   # D191
+        b = battle("archer", "slime")
+        b.e.mhp = b.e.hp = 100
+        b.stagger_hit(6.0, False, False, 3)
+        self.assertEqual(b.e.stagger, 3)                                   # one hit's 3, not 9
+        b2 = battle("knight", "slime")
+        b2.stagger_hit(6.0, True, False)
+        self.assertEqual(b2.e.stagger, 5)                                  # 6 x 0.5 x 1.5 = 4.5 -> 5 (x2 gave 6)
 
 
 class AI(unittest.TestCase):

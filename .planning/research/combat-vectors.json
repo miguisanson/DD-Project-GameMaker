@@ -961,7 +961,7 @@
    "power": 11,
    "stun": true,
    "perfect": false,
-   "want": 11
+   "want": 8
   },
   {
    "id": "stagger_gain_11_sp",
@@ -969,7 +969,7 @@
    "power": 11,
    "stun": true,
    "perfect": true,
-   "want": 17
+   "want": 12
   },
   {
    "id": "stagger_gain_1_no",
@@ -992,35 +992,35 @@
    "kind": "max",
    "rank": 1,
    "boss": false,
-   "want": 8
+   "want": 12
   },
   {
    "id": "stagger_max_2_norm",
    "kind": "max",
    "rank": 2,
    "boss": false,
-   "want": 12
+   "want": 18
   },
   {
    "id": "stagger_max_3_boss",
    "kind": "max",
    "rank": 3,
    "boss": true,
-   "want": 32
+   "want": 48
   },
   {
    "id": "stagger_max_4_boss",
    "kind": "max",
    "rank": 4,
    "boss": true,
-   "want": 40
+   "want": 60
   },
   {
    "id": "stagger_max_4_norm",
    "kind": "max",
    "rank": 4,
    "boss": false,
-   "want": 20
+   "want": 30
   }
  ],
  "timeline": [
