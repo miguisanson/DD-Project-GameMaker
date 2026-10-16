@@ -19221,6 +19221,7 @@ function Test_R4Final1Chips() {
 function Test_Suite_R4Final2() {
     Test_RunSuite("R4Final2.levelup", Test_R4Final2LevelUp);
     Test_RunSuite("R4Final2.bush", Test_R4Final2Bush);
+    Test_RunSuite("R4Final2.ground", Test_R4Final2Ground);
 }
 
 // I-109 (D177 amended): the stat label and the current number are white; only the NEW number (after ">") is gold. A class growth row shows it always, the hovered row shows its "+1"
@@ -19413,4 +19414,74 @@ function Test_R4Final2Bush() {
     instance_destroy(_grass);
     instance_destroy(_grass2);
     instance_destroy(_grass3);
+}
+
+// ---- I-111 (amends R3 bvis note 23): the battle ground line is the top edge of the bottom HUD row (the player panel's top border; the preview plate and the command menu are not higher), so
+// every enemy's opaque bottom (its feet) stands just on it, at every window size, computed from the HUD layout (Battle_GroundY: whole world pixels, never below the line). Tall sprites keep
+// their top under the turn strip. The shadow is right under the feet. ----
+function Test_R4Final2Ground() {
+    if (asset_get_index("Battle_GroundY") == -1) { Test_True("r4final2 ground: Battle_GroundY exists (not implemented yet)", false); return; }
+    var _s = TextFit_Begin();
+    var _sizes = [[480, 432], [640, 576], [800, 720], [960, 880], [960, 864], [1280, 1152], [1366, 768], [1920, 1080], [1920, 1200]];
+    var _langs = ["en", "ko"];
+    var _bad_feet = "";
+    var _bad_top = "";
+    var _bad_shadow = "";
+    var _bad_hud = "";
+    var _bad_same = "";
+    var _n = 0;
+    for (var _l = 0; _l < 2; _l++) {
+        for (var _z = 0; _z < array_length(_sizes); _z++) {
+            TextFit_Set(_sizes[_z][0], _sizes[_z][1], _langs[_l]);
+            var _ws = Display_WorldScale();
+            var _zn = Battle_Zones();
+            var _mt = Ui_Metrics();
+            var _tag0 = _langs[_l] + "@" + string(_sizes[_z][0]) + "x" + string(_sizes[_z][1]);
+            // the HUD row's top edge: the player panel's top border; the command menu and the plate are not higher (the menu is as tall as the row, the plate is aligned with it)
+            if (_zn.player.y != _zn.band_top || Battle_GroundY() * _ws > _zn.band_top + 0.001 || Battle_GroundY() * _ws < _zn.band_top - _ws) _bad_hud += _tag0 + " ground=" + string(Battle_GroundY()) + " band=" + string(_zn.band_top) + "; ";
+            var _bottom0 = undefined;
+            for (var _id = ENEMY_SLIME; _id <= ENEMY_FINAL_BOSS; _id++) {
+                var _bc = Test_R3Make(_id, "", 0, false, false);
+                var _er = Battle_EnemyRect(_bc);
+                var _sh = Battle_EnemyShadowRect(_bc);
+                var _tag = _tag0 + " e" + string(_id) + " ";
+                _n++;
+                // feet: on the line, less than one world pixel above it, never into the HUD
+                var _feet = _er.y + _er.h;
+                if (_feet > _zn.band_top || _feet < _zn.band_top - _ws - 0.5) _bad_feet += _tag + "feet=" + string(_feet) + " line=" + string(_zn.band_top) + "; ";
+                if (is_undefined(_bottom0)) _bottom0 = _feet; else if (_feet != _bottom0) _bad_same += _tag;
+                // a tall sprite: its top stays under the turn strip
+                if (_er.y < Battle_TimelineBottom()) _bad_top += _tag + "top=" + string(_er.y) + " strip=" + string(Battle_TimelineBottom()) + "; ";
+                // the shadow's centre is a world pixel under the feet, so its upper half is covered by the feet
+                var _below = (_sh.y + _sh.h * 0.5) - _feet;
+                if (_below < _ws - 1 || _below > 2 * _ws + 1 || _sh.w <= 0) _bad_shadow += _tag + "below=" + string(_below) + "; ";
+                instance_destroy(_bc.enemy_inst);
+            }
+        }
+    }
+    Test_True("r4final2 ground: (setup) " + string(_n) + " enemy x size x language cases were looked at", _n >= 150);
+    Test_Eq("r4final2 ground: the line is the player panel's top edge (whole world pixels, never below it, under one pixel above it)", _bad_hud, "");
+    Test_Eq("r4final2 ground: every enemy's feet stand on the HUD row's top edge at every size (slime, spider, snake, whisp, plant, wolf, ghost sword, stranger, Palehorn, Choirbeast)", _bad_feet, "");
+    Test_Eq("r4final2 ground: all enemies' feet are on one GUI y at each size", _bad_same, "");
+    Test_Eq("r4final2 ground: a tall sprite (Palehorn, Choirbeast) still has its top under the turn strip", _bad_top, "");
+    Test_Eq("r4final2 ground: the shadow is right under the feet", _bad_shadow, "");
+    // the window size changes in a fight: the enemy follows the layout
+    TextFit_Set(480, 432, "en");
+    var _bc2 = Test_R3Make(ENEMY_FINAL_BOSS, "", 0, false, false);
+    var _spr = _bc2.enemy_inst.sprite_index;
+    TextFit_Set(800, 720, "en");
+    var _mv = Battle_EnemyRegound(_bc2.enemy_inst, _spr);
+    Test_True("r4final2 ground: a new window size moves the enemy onto the new line", _mv);
+    Test_Eq("r4final2 ground: and it is where Battle_EnemyPlace puts it", _bc2.enemy_inst.y, Battle_EnemyPlace(_spr).y);
+    Test_False("r4final2 ground: nothing moves when the layout has not changed", Battle_EnemyRegound(_bc2.enemy_inst, _spr));
+    instance_destroy(_bc2.enemy_inst);
+    TextFit_End(_s);
+    // R-126: both bosses fight on the boss arena (D165), whatever the floor; every other enemy on its floor's picture
+    var _boss_bad = "";
+    for (var _b = ENEMY_MINI_BOSS; _b <= ENEMY_FINAL_BOSS; _b++) {
+        var _db = EnemyDB_Get(_b);
+        for (var _f = 1; _f <= 9; _f++) if (Battle_BgSpriteName(_f, _db.is_boss) != "spr_battle_bg_boss") _boss_bad += string(_b) + "@" + string(_f) + " ";
+    }
+    Test_Eq("r4final2 ground: Palehorn and the Choirbeast both use spr_battle_bg_boss on every floor", _boss_bad, "");
+    Test_True("r4final2 ground: the boss arena sprite is imported (it is not the plain fallback)", Battle_BgSprite("spr_battle_bg_boss") != battle_screen);
 }
