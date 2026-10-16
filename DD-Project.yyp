@@ -430,6 +430,7 @@
     {"id":{"name":"snake_profile","path":"sprites/snake_profile/snake_profile.yy",},},
     {"id":{"name":"spider_moving","path":"sprites/spider_moving/spider_moving.yy",},},
     {"id":{"name":"spider_profile","path":"sprites/spider_profile/spider_profile.yy",},},
+    {"id":{"name":"spr_battle_bg_boss","path":"sprites/spr_battle_bg_boss/spr_battle_bg_boss.yy",},},
     {"id":{"name":"spr_battle_bg_caves","path":"sprites/spr_battle_bg_caves/spr_battle_bg_caves.yy",},},
     {"id":{"name":"spr_battle_bg_forest","path":"sprites/spr_battle_bg_forest/spr_battle_bg_forest.yy",},},
     {"id":{"name":"spr_battle_bg_ruins","path":"sprites/spr_battle_bg_ruins/spr_battle_bg_ruins.yy",},},
