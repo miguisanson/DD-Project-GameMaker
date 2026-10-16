@@ -265,7 +265,7 @@ function Scenario_Boot() {
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.choice_off = true;   // D154: nor the small flavour questions (the Stranger, the merchant, a note, the wake line) unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 29000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 36000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 31000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 36000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -549,7 +549,11 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeR3Menus(_s);   // round 3 menus (R-096, R-097): Controls > Reset to Defaults asks, No and Esc change nothing, Yes resets and a notice says so, the changed row flashes; goes on with r3light (1000)
             break;
         case 1000: case 1001: case 1002: case 1003: case 1004: case 1005: case 1006: case 1007: case 1008: case 1009:
-            Scenario_StepSmokeR3Light(_s);   // r3light: the player's layer over a walk and a run, the same picture plain and squashed, the merchant's cell; the end of the chain (its last step calls Scenario_NoticeEnd)
+            Scenario_StepSmokeR3Light(_s);   // r3light: the player's layer over a walk and a run, the same picture plain and squashed, the merchant's cell; goes on with r3stealth (1050)
+            break;
+        case 1050: case 1051: case 1052: case 1053: case 1054: case 1055: case 1056: case 1057: case 1058: case 1059:
+        case 1060: case 1061: case 1062: case 1063: case 1064: case 1065: case 1066: case 1067: case 1068: case 1069:
+            Scenario_StepSmokeR3Stealth(_s);   // r3stealth (D179, R-098, R-099): a slime spots the player and loses him (it stands and searches 3 s, one ?, home in 7 s), 2 s of ignoring, hiding in a bush; the end of the chain (its last step calls Scenario_NoticeEnd)
             break;
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step goes on to G6 (380)
@@ -3048,7 +3052,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsEliteDeath(_s);   // H13a (D156): an elite slime and an elite plant on the map, the death scene with its picture, 480 x 432 and 800 x 720; goes on with the round 3 menus (1030)
             break;
         case 1030: case 1031: case 1032: case 1033: case 1034: case 1035: case 1036: case 1037: case 1038: case 1039:
-            Scenario_StepShotsR3Menus(_s);   // round 3 menus (R-096, R-097): the Gear and Skills headers, the reset question and notice in the game and on the title; the end of the pictures
+            Scenario_StepShotsR3Menus(_s);   // round 3 menus (R-096, R-097): the Gear and Skills headers, the reset question and notice in the game and on the title; goes on with r3stealth (1040)
+            break;
+        case 1040: case 1041: case 1042: case 1043: case 1044: case 1045: case 1046: case 1047: case 1048: case 1049:
+            Scenario_StepShotsR3Stealth(_s);   // r3stealth (D179, R-098): the faint sight cone in a dark cave, the daylight clearing and while chasing; three scenes, two sizes; the end of the pictures
             break;
         case 1050: case 1051: case 1052: case 1053: case 1054: case 1055: case 1056: case 1057: case 1058: case 1059:
             Scenario_StepShotsTextFit2(_s);   // round 3 textfit2 (R-106): the Skills tab, the battle Skill list and the Controls page with the long names, three sizes; the end of the pictures
@@ -3895,6 +3902,13 @@ function Scenario_PlaceEnemy(_e, _cx, _cy) {
     }
 }
 
+// D179: an enemy sees in a cone, so a stage that needs it to notice the player says which way it faces (and keeps it so: no idle turning).
+function Scenario_FaceEnemy(_e, _dir) {
+    EnemyAI_Init(_e);
+    _e.look_dir = _dir;
+    _e.turn_timer = 100000;
+}
+
 function Scenario_PlacePlayer(_cx, _cy) {
     var _pl = instance_find(obj_player, 0);
     _pl.x = _cx * GRID_TILE_SIZE;
@@ -3954,6 +3968,7 @@ function Scenario_StepMove(_s) {
             with (obj_enemy) instance_destroy();   // the room's own slime is not part of the stage
             _mv.sl = instance_create_layer(15 * GRID_TILE_SIZE, 9 * GRID_TILE_SIZE, "Instances", (_s.mp == 4) ? obj_ghost_sword : obj_dire_wolf);
             Scenario_PlaceEnemy(_mv.sl, 15, 9);
+            Scenario_FaceEnemy(_mv.sl, RIGHT);   // D179: toward the player, who stands to its right
             Scenario_PlacePlayer(19, 9);
             switch (_s.mp) {
                 case 0:   // A: a rock on the straight line, sight is clear
@@ -3976,6 +3991,7 @@ function Scenario_StepMove(_s) {
                     Scenario_PlaceEnemy(_mv.sl, 16, 8);
                     _mv.other = instance_create_layer(16 * GRID_TILE_SIZE, 10 * GRID_TILE_SIZE, "Instances", obj_dire_wolf);
                     Scenario_PlaceEnemy(_mv.other, 16, 10);
+                    Scenario_FaceEnemy(_mv.other, RIGHT);
                     break;
                 case 4:   // E: a ghost behind a wall: sees through it and flies over it
                     Scenario_Block(obj_wall, 17, 8);
@@ -4578,11 +4594,11 @@ function Scenario_WorldFlags(_w, _fileB) {
     var _t = GRID_TILE_SIZE;
     var _cx = _sl.x + _t / 2, _cy = _sl.y + _t / 2;
     var _sc = Scenario_WorldWin(_cx, _cy).s;
-    // D157: the slime's sight is light now (the dotted ring of D63 is gone). Every run of lit cells of its set is a place where A (slime there) may differ from B (slime gone);
-    // the probes are free floor cells of the set that must differ (about 24 of them, those on the picture).
+    // D179 (replaces D160: sight is invisible): the slime's sight is drawn as a very faint cone (Sight_DrawWorldFx). Every run of drawn cells of its cone is a place where A (slime there)
+    // may differ from B (slime gone); the probes are free floor cells of the cone that must differ (about 24 of them, those on the picture; at least 2 have to: a tint changes no pixel that is already the lightest colour).
     var _g = Nav_Get().grid;
     var _ecx = Nav_CellOf(_cx), _ecy = Nav_CellOf(_cy);
-    var _cone = Vis_Cone(_g, _ecx, _ecy, Vis_EnemyTiles(_sl.prof, _sl.ai_mode), false);
+    var _cone = Vis_Cone(_g, _ecx, _ecy, Vis_EnemyTiles(_sl.prof, _sl.ai_mode), false, _sl.look_dir);
     var _lboxes = "";
     for (var _q = 0; _q < array_length(_cone.runs); _q += 4) {
         var _lw = Scenario_WorldWin((_ecx + _cone.runs[_q]) * _t, (_ecy + _cone.runs[_q + 1]) * _t);
@@ -4632,7 +4648,7 @@ function Scenario_WorldFlags(_w, _fileB) {
     return "pair=" + _fileB + " corner=24 cornerxy=" + string(round(_cc.x)) + "," + string(round(_cc.y))
         + " rp=" + _rp + " bp=" + string(round(_bp1.x)) + "," + string(round(_bp1.y)) + ";" + string(round(_bp2.x)) + "," + string(round(_bp2.y))
         + " ap=" + _ap
-        + " boxes=" + _boxes;   // D160: no allowed boxes for the sight cells: the slime casts no light, so a difference there is a stray mark
+        + " boxes=" + _boxes + _lboxes;   // D179: the drawn cells of the cone are allowed places
 }
 
 function Scenario_WorldStage(_w) {
@@ -4642,6 +4658,8 @@ function Scenario_WorldStage(_w) {
     Scenario_PlaceEnemy(_w.sl, 1, 7);
     EnemyAI_Init(_w.sl);   // freeze it before its first update (that update may be late after a battle, and would pick a wander step): no wandering, no spotting, "!" held on
     _w.sl.idle_timer = 1000000;
+    _w.sl.turn_timer = 1000000;   // D179: it keeps facing the player (the cone is part of the picture)
+    _w.sl.look_dir = RIGHT;
     _w.sl.spot_cooldown = 1000000;
     _w.sl.alert_pop = 1000000;
     _w.chest = Scenario_Block(obj_chest_lv1, 5, 7);   // right of the player and clear of the room's light shaft (it dims what is under it)
@@ -8733,6 +8751,7 @@ function Scenario_StepSmokeHunt2(_s) {
                 with (obj_enemy) instance_destroy();
                 _h.w = instance_create_layer(16 * _T, 9 * _T, "Instances", obj_dire_wolf);
                 Scenario_PlaceEnemy(_h.w, 16, 9);
+                Scenario_FaceEnemy(_h.w, RIGHT);   // D179: toward the player, who stands to its right
                 Scenario_PlacePlayer(19, 9);
                 _h.ph = 0;
                 Scenario_Next(_s, 251);
@@ -10482,6 +10501,7 @@ function Scenario_StepSmokeRunStats(_s) {
                 with (obj_enemy) instance_destroy();
                 _rs.w = instance_create_layer(16 * _T, 9 * _T, "Instances", obj_dire_wolf);   // the same stage as bug hunt 2: it sees the player 3 tiles away and runs at him
                 Scenario_PlaceEnemy(_rs.w, 16, 9);
+                Scenario_FaceEnemy(_rs.w, RIGHT);   // D179: toward the player, who stands to its right
                 Scenario_PlacePlayer(19, 9);
                 _rs.ms0 = _gs.run.stats.play_ms;
                 _s.boost = { hp: 99, mp: 11 };   // the fight is played to its end whatever the wolf does
@@ -12175,17 +12195,19 @@ function Scenario_StepShotsConfirm(_s) {
 
 // ============================================================================
 // H11 (D153, D158), smoke steps 580..609 (rm_floor3, the game's own input state; the enemies are stood still on purpose, the checks are about what they notice).
-//   580-583: a slime (sight cut to 1 tile, so only its ears count) at (12,6): RUNNING 5 tiles away does not move it, WALKING 4 tiles away does not, RUNNING within 4 does.
-//   584-585: the player is gone: it walks to the cell it heard him last, searches 4 tiles down the way he ran, raises ONE "?", walks home.
-//   586-588: a dire wolf 2 tiles from the hiding cell (3,4): the player stands still there, no "!" and no battle; one step off the cell and the wolf spots him.
+//   580-583: a slime (sight cut to 1 tile, so only its ears count) at (12,6): RUNNING 5 tiles away does not move it, WALKING 4 tiles away does not, RUNNING within 2 does (D179).
+//   584-585: the player is gone: it walks to the cell it heard him last, STANDS there for 3 s (no walk on the way he ran), raises ONE "?", walks home.
+//   586-588: a dire wolf 3 tiles from the bush cell (12,3): the player stands still there, no "!" and no battle; one step off the bush and the wolf spots him.
 //   589-592: a spider put next to the exit chased to: the player leaves and comes back, the spider is 4 tiles from the exit, nobody within 3 tiles of the arrival tile.
 // ============================================================================
-function Scenario_H11Enemy(_obj, _cx, _cy, _sight) {
+function Scenario_H11Enemy(_obj, _cx, _cy, _sight, _face = -1) {
     var _e = instance_create_layer(_cx * GRID_TILE_SIZE, _cy * GRID_TILE_SIZE, "Instances", _obj);
     EnemyAI_Init(_e);
     Scenario_PlaceEnemy(_e, _cx, _cy);
     if (_sight >= 0) _e.prof.sight = _sight;
     _e.idle_timer = 100000;   // it stays where it is until it has a reason to move
+    _e.turn_timer = 100000;   // D179: and keeps the way it faces (a cone has a front); _face -1 leaves the facing it was given
+    if (_face >= 0) _e.look_dir = _face;
     return _e;
 }
 
@@ -12235,27 +12257,27 @@ function Scenario_StepSmokeH11(_s) {
                 Scenario_Next(_s, 582);
             }
             break;
-        case 582:   // WALKING 4 tiles away: silent
+        case 582:   // WALKING 4 tiles away: silent (the stage of the next step is 3 tiles below the slime)
             if (_e != noone && _e.ai_mode != "idle" && !variable_struct_exists(_h, "a2_bad")) _h.a2_bad = _e.ai_mode;
             if (_s.t >= 48) {
                 Scenario_Release();
                 Scenario_Check("h11_the_player_walked_at_least_a_tile", _pl.y >= _h.y0 + _T, "y=" + string(_pl.y) + " from " + string(_h.y0));
                 Scenario_Check("h11_walking_4_tiles_away_is_not_heard", !variable_struct_exists(_h, "a2_bad"), "mode=" + (variable_struct_exists(_h, "a2_bad") ? _h.a2_bad : ""));
-                Scenario_PlacePlayer(8, 5);   // (8,6) is 4 tiles from (12,6): the first run step crosses into the hearing circle
-                Scenario_Hold("move_down", 60);
+                Scenario_PlacePlayer(12, 9);   // 3 tiles below the slime at (12,6), a clear line up the column: the first run step crosses into the hearing circle of 2 tiles (D179)
+                Scenario_Hold("move_up", 60);
                 Scenario_Hold("run", 60);
                 _h.heard = false;
                 Scenario_Next(_s, 583);
             }
             break;
-        case 583:   // RUNNING within 4 tiles, out of its sight: it reacts, without a "!"
+        case 583:   // RUNNING within 2 tiles, out of its sight (sight 1): it reacts, without a "!"
             if (_e != noone && _e.ai_mode == "chase" && !_h.heard) {
                 _h.heard = true;
                 _h.pop_at_hear = _e.alert_pop;
                 _h.heard_t = _s.t;
             }
             if (_h.heard && _s.t >= _h.heard_t + 2) {
-                Scenario_Check("h11_running_within_4_tiles_out_of_sight_is_heard", true);
+                Scenario_Check("h11_running_within_2_tiles_out_of_sight_is_heard", true);
                 Scenario_Check("h11_a_heard_player_is_no_sighting_no_exclamation_mark", _h.pop_at_hear == 0, "alert_pop=" + string(_h.pop_at_hear));
                 // the player is gone: far away, out of sight and hearing
                 Scenario_Release();
@@ -12269,35 +12291,34 @@ function Scenario_StepSmokeH11(_s) {
                 Scenario_PlacePlayer(3, 4);
                 Scenario_Next(_s, 584);
             }
-            if (_s.t > 90) { Scenario_Check("h11_running_within_4_tiles_out_of_sight_is_heard", false, "mode=" + ((_e != noone) ? _e.ai_mode : "gone")); Scenario_Release(); Scenario_NoticeEnd(); }
+            if (_s.t > 90) { Scenario_Check("h11_running_within_2_tiles_out_of_sight_is_heard", false, "mode=" + ((_e != noone) ? _e.ai_mode : "gone")); Scenario_Release(); Scenario_NoticeEnd(); }
             break;
-        case 584:   // last heard cell -> searches down the column (the way he ran) -> ONE "?" -> home
+        case 584:   // last heard cell -> stands there looking round for 3 s (does not walk on the way he ran) -> ONE "?" -> home
             if (_e == noone) { Scenario_Check("h11_the_searcher_is_alive", false); Scenario_NoticeEnd(); break; }
             var _cb = Scenario_H11Cell(_e);
             _h.max_cy = max(_h.max_cy, _cb.cy);
             if (_e.ai_mode == "return") _h.saw_return = true;
             if (_e.q_pops > 1) _h.many = true;
             if (_h.saw_return && _e.ai_mode == "idle") {
-                var _want_cy = min(_h.ls_cy + AI_FLEE_SEARCH_TILES, 9);   // rm_floor3: column 8 is free down to row 9, row 10 is wall
-                Scenario_Check("h11_the_search_went_down_the_way_he_ran", _h.max_cy == _want_cy, "max_cy=" + string(_h.max_cy) + " want=" + string(_want_cy) + " last_heard=" + string(_h.ls_cx) + "," + string(_h.ls_cy));
+                Scenario_Check("h11_the_search_stayed_on_the_last_heard_cell_and_did_not_walk_on_the_way_he_ran", _h.max_cy == _h.ls_cy, "max_cy=" + string(_h.max_cy) + " last_heard=" + string(_h.ls_cx) + "," + string(_h.ls_cy));
                 Scenario_Check("h11_it_gave_up_with_exactly_one_question_mark", _e.q_pops == 1 && !variable_struct_exists(_h, "many"), "q_pops=" + string(_e.q_pops));
                 Scenario_Check("h11_then_it_walked_home", _cb.cx == 12 && _cb.cy == 6 && !_e.moving, "at " + string(_cb.cx) + "," + string(_cb.cy));
                 Scenario_Next(_s, 585);
             }
             if (_s.f - _h.t_b > 2400) { Scenario_Check("h11_the_search_ends_at_home_in_2400_frames", false, "mode=" + _e.ai_mode + " q=" + string(_e.q_pops) + " max_cy=" + string(_h.max_cy)); Scenario_NoticeEnd(); }
             break;
-        case 585:   // the hiding cell (3,4): the player stands still on it, then a dire wolf appears 2 tiles away with a clear line
+        case 585:   // the bush cell (12,3) (the patch (11,3), (12,3) of rm_floor3): the player stands still in it, then a dire wolf appears 3 tiles below him with a clear line
             with (obj_enemy) instance_destroy();
-            Scenario_PlacePlayer(3, 4);
+            Scenario_PlacePlayer(12, 3);
             _pl.face = DOWN;
             _h.e = noone;
             Scenario_Next(_s, 586);
             break;
         case 586:
             if (_s.t == HIDE_SETTLE_FRAMES + 10) {
-                Scenario_Check("h11_standing_still_on_the_hiding_cell_hides_the_player", Player_IsHidden(_pl));
+                Scenario_Check("h11_standing_still_in_the_bush_hides_the_player", Player_IsHidden(_pl));
                 Scenario_Check("h11_the_hidden_player_is_drawn_see_through", abs(_pl.image_alpha - HIDE_PLAYER_ALPHA) < 0.01, "alpha=" + string(_pl.image_alpha));
-                _h.e = Scenario_H11Enemy(obj_dire_wolf, 3, 6, -1);   // sight 5, as in the game; 2 tiles below, clear line over (3,5)
+                _h.e = Scenario_H11Enemy(obj_dire_wolf, 12, 6, -1, UP);   // sight 4 (D179), as in the game; 3 tiles below, clear line over (12,4) and (12,5), facing him
                 _h.t_c = _s.f;
                 _h.spotted = false;
                 Scenario_Next(_s, 587);
@@ -12306,10 +12327,10 @@ function Scenario_StepSmokeH11(_s) {
         case 587:   // 150 frames: the wolf must not notice, no battle starts
             if (_e != noone && (_e.ai_mode != "idle" || _e.alert_pop > 0)) _h.spotted = true;
             if (_s.f - _h.t_c >= 150) {
-                Scenario_Check("h11_a_wolf_2_tiles_away_does_not_see_the_hidden_player", !_h.spotted, "mode=" + ((_e != noone) ? _e.ai_mode : "gone"));
+                Scenario_Check("h11_a_wolf_3_tiles_away_in_front_of_him_does_not_see_the_hidden_player", !_h.spotted, "mode=" + ((_e != noone) ? _e.ai_mode : "gone"));
                 Scenario_Check("h11_no_battle_started", room == rm_floor3 && !Transition_IsActive());
-                Scenario_Check("h11_the_player_is_still_hidden_and_in_place", Player_IsHidden(_pl) && _pl.x == 3 * _T && _pl.y == 4 * _T);
-                Scenario_Hold("move_left", 30);   // one step off the cell (2,4): not hidden any more, 2.2 tiles from the wolf
+                Scenario_Check("h11_the_player_is_still_hidden_and_in_place", Player_IsHidden(_pl) && _pl.x == 12 * _T && _pl.y == 3 * _T);
+                Scenario_Hold("move_down", 30);   // one step off the bush onto (12,4): not hidden any more, 2 tiles from the wolf
                 _h.t_c = _s.f;
                 Scenario_Next(_s, 588);
             }
@@ -12318,7 +12339,7 @@ function Scenario_StepSmokeH11(_s) {
             if (_e != noone && (_e.ai_mode == "chase") && !variable_struct_exists(_h, "spot_f")) _h.spot_f = _s.f - _h.t_c;
             if (variable_struct_exists(_h, "spot_f") || _s.f - _h.t_c > 120) {
                 Scenario_Release();
-                Scenario_Check("h11_one_step_off_the_hiding_cell_the_same_wolf_spots_the_player", variable_struct_exists(_h, "spot_f"), "mode=" + ((_e != noone) ? _e.ai_mode : "gone"));
+                Scenario_Check("h11_one_step_off_the_bush_the_same_wolf_spots_the_player", variable_struct_exists(_h, "spot_f"), "mode=" + ((_e != noone) ? _e.ai_mode : "gone"));
                 if (instance_exists(obj_enemy)) with (obj_enemy) instance_destroy();
                 Scenario_Next(_s, 589);
             }
@@ -12417,7 +12438,7 @@ function Scenario_StepShotsH11(_s) {
                 Scenario_PlacePlayer(6, 6);
                 _h.e = Scenario_H11Enemy(obj_slime, 9, 6, 0);   // sight 0: it only stands there and searches
                 _h.e.ai_mode = "search";
-                _h.e.srch = Search_Create(9, 6, -1, 10);
+                _h.e.srch = Search_Create(9, 6, 30);   // a short search (D179: 3 s in the game): the ? goes up as it ends
                 Scenario_Next(_s, 611);
             }
             if (_s.t > 600) { Scenario_Check("shots_h11_rm_floor3_is_ready", false, "room=" + room_get_name(room) + " player=" + string(_pl != noone)); Scenario_Finish(); }
@@ -12431,12 +12452,12 @@ function Scenario_StepShotsH11(_s) {
             }
             if (_s.t > 400) { Scenario_Check("shots_h11_the_search_gives_up", false, "mode=" + ((_e != noone) ? _e.ai_mode : "gone")); Scenario_Finish(); }
             break;
-        case 612:   // the hiding cell (3,4), a slime 2 tiles below with a clear line
+        case 612:   // the bush cell (12,3), a slime 3 tiles below with a clear line (sight 3 reaches him)
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 with (obj_enemy) instance_destroy();
-                Scenario_PlacePlayer(3, 4);
-                _h.e = Scenario_H11Enemy(obj_slime, 3, 6, -1);
+                Scenario_PlacePlayer(12, 3);
+                _h.e = Scenario_H11Enemy(obj_slime, 12, 6, -1, UP);   // D179: it faces him
             }
             if (_s.t == HIDE_SETTLE_FRAMES + 20) {
                 Scenario_Check("shots_h11_the_player_is_hidden_and_unseen", Player_IsHidden(_pl) && _h.e.ai_mode == "idle" && _h.e.alert_pop == 0);
@@ -12445,10 +12466,10 @@ function Scenario_StepShotsH11(_s) {
                 Scenario_Next(_s, 613);
             }
             break;
-        case 613:   // one cell to the side: no longer on the hiding cell, the slime spots him
+        case 613:   // one cell down: no longer in the bush, 2 tiles from the slime: it spots him
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
-                Scenario_PlacePlayer(2, 4);
+                Scenario_PlacePlayer(12, 4);
             }
             if (_s.t > 3 && _e != noone && _e.alert_pop > 0 && !variable_struct_exists(_h, "seen_t")) _h.seen_t = _s.t;
             if (variable_struct_exists(_h, "seen_t") && _s.t >= _h.seen_t + 3) {
@@ -12668,7 +12689,7 @@ function Scenario_StepSmokeH14(_s) {
                 Scenario_Release();
                 Scenario_Check("h14_the_stage_cells_of_rm_floor3_are_free", Scenario_H14Free(12, 6) && Scenario_H14Free(10, 6) && Scenario_H14Free(9, 6) && Scenario_H14Free(9, 5));
                 _h.pillar = Scenario_Block(obj_wall, 10, 6);
-                _h.e = Scenario_H11Enemy(obj_slime, 12, 6, 4);
+                _h.e = Scenario_H11Enemy(obj_slime, 12, 6, 4, LEFT);   // D179: it faces the pillar and the player behind it
                 Scenario_PlacePlayer(9, 6);
                 _pl.face = UP;   // already facing the way it will walk: a tap on a new direction only turns (D69)
                 _h.bad = false;
@@ -12778,15 +12799,15 @@ function Scenario_StepSmokeH14(_s) {
 //   cave     rm_floor7: the torches along the rock wall and a spider's light
 //   torches  rm_floor6: the two torches (no enemy): the light pools alone
 //   shadow   rm_floor3: a dire wolf with the player behind the wall under the barrels at (4,3), (4,4): in the dark, not seen
-//   hidden   rm_floor3: the player hidden on the hiding cell (3,4), a wolf 2 tiles away: the cell stays in shadow
+//   hidden   rm_floor3: the player hidden in the bush at (12,3) (D179), a wolf 3 tiles below facing him: he is not seen
 // ============================================================================
 function Scenario_H14Scene(_i) {
     switch (_i) {
         case 0: return { name: "forest", rm: rm_floor2, pcx: 3, pcy: 5, foes: [[obj_dire_wolf, 9, 5]], wait: 40 };
         case 1: return { name: "cave", rm: rm_floor7, pcx: 3, pcy: 4, foes: [[obj_spider, 8, 5]], wait: 40 };
         case 2: return { name: "torches", rm: rm_floor6, pcx: 8, pcy: 4, foes: [], wait: 40 };
-        case 3: return { name: "shadow", rm: rm_floor3, pcx: 2, pcy: 4, foes: [[obj_dire_wolf, 7, 4]], wait: 40 };
-        case 4: return { name: "hidden", rm: rm_floor3, pcx: 3, pcy: 4, foes: [[obj_dire_wolf, 3, 6]], wait: HIDE_SETTLE_FRAMES + 30 };
+        case 3: return { name: "shadow", rm: rm_floor3, pcx: 2, pcy: 4, foes: [[obj_dire_wolf, 6, 4, LEFT]], wait: 40 };   // D179: sight 4 and a cone: it stands 4 tiles from him, facing the wall
+        case 4: return { name: "hidden", rm: rm_floor3, pcx: 12, pcy: 3, foes: [[obj_dire_wolf, 12, 6, UP]], wait: HIDE_SETTLE_FRAMES + 30 };
     }
     return undefined;
 }
@@ -12816,7 +12837,7 @@ function Scenario_StepShotsH14(_s) {
                 Scenario_PlacePlayer(_sc.pcx, _sc.pcy);
                 _h.e = [];
                 for (var _k = 0; _k < array_length(_sc.foes); _k++) {
-                    array_push(_h.e, Scenario_H11Enemy(_sc.foes[_k][0], _sc.foes[_k][1], _sc.foes[_k][2], -1));
+                    array_push(_h.e, Scenario_H11Enemy(_sc.foes[_k][0], _sc.foes[_k][1], _sc.foes[_k][2], -1, (array_length(_sc.foes[_k]) > 3) ? _sc.foes[_k][3] : -1));
                 }
                 Scenario_Next(_s, 731);
             }
@@ -12871,7 +12892,7 @@ function Scenario_H14Judge(_h, _sc, _pl) {
     if (_sc.name == "shadow" || _sc.name == "hidden") {
         var _g = Nav_Get().grid;
         var _ec = Scenario_H11Cell(_h.e[0]);
-        var _cone = Vis_Cone(_g, _ec.cx, _ec.cy, _h.e[0].prof.sight, _h.e[0].prof.see_through);
+        var _cone = Vis_Cone(_g, _ec.cx, _ec.cy, _h.e[0].prof.sight, _h.e[0].prof.see_through, _h.e[0].look_dir);
         if (_sc.name == "shadow") Scenario_Check("shots_h14_shadow_the_player_stands_in_the_dark_inside_the_radius", !Vis_Has(_cone, _pcx, _pcy) && point_distance(_ec.cx, _ec.cy, _pcx, _pcy) <= _h.e[0].prof.sight);
         else Scenario_Check("shots_h14_hidden_the_player_is_hidden_and_the_cell_is_a_dark_pocket", Player_IsHidden(_pl) && Light_PocketCell(_ec.cx, _ec.cy, _pcx, _pcy));
     }
@@ -14343,7 +14364,213 @@ function Scenario_StepSmokeR3Light(_s) {
             }
             if (_s.t > 900) { Scenario_Check("r3light_a_merchant_floor_is_reached", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
-        case 1004:   // the end of the chain: removes the files and the profile the steps made
+        case 1004:   // goes on with r3stealth (1050..1059), the end of the chain
+            Scenario_Next(_s, 1050);
+            break;
+    }
+}
+
+// ============================================================================
+// Round 3 packet stealth (D179; R-098, R-099), smoke steps 1050..1059 (rm_floor3, the game's own input state; the end of the chain: the last step calls Scenario_NoticeEnd).
+//   1050-1053: a slime facing left at (5,6) spots the player 3 tiles ahead of it at (2,6): "!", it turns to him. He RUNS away (down two tiles, then right along row 8 to the grass
+//              at (9,8), which he can walk into) and stands still there. The slime walks to the last cell it saw him on, STANDS there searching about 3 s, puts up ONE "?",
+//              goes home (5,6) and is idle there within 6 s of starting to search, and cannot notice him for 2 s from the moment it gives up (spot_cooldown 120).
+//   1054-1055: R-099 re-acquire: the slime has just given up, the player stands in plain view 3 tiles in front of it: nothing for 110 frames, then it notices him.
+//   1056-1058: hiding: the player stands still in the bush patch (3,5): hidden, drawn see-through. A slime walks home along row 7 past the edge of its cone (2 tiles diagonally
+//              from him): no sighting. The control: the same pass with the player standing in the open on (4,5): spotted.
+// ============================================================================
+function Scenario_StepSmokeR3Stealth(_s) {
+    if (!variable_struct_exists(_s, "st")) _s.st = { };
+    var _h = _s.st;
+    var _T = GRID_TILE_SIZE;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _e = (variable_struct_exists(_h, "e") && instance_exists(_h.e)) ? _h.e : noone;
+    switch (_s.step) {
+        case 1050:   // rm_floor3 by a real room change; the slime at (5,6) facing left, the player at (2,6)
+            if (asset_get_index("Bush_Patches") == -1 || asset_get_index("EnemyAI_GiveUp") == -1) { Scenario_Check("r3stealth_the_stealth_code_exists", false); Scenario_NoticeEnd(); break; }
+            if (_s.t == 1) {
+                Scenario_Release();
+                Scenario_ClearUi();
+                Dialogue_CloseNow();
+                Scenario_NewKnight(CLASS_KNIGHT);
+                room_goto(rm_floor2);
+            }
+            if (_s.t == 30 && room == rm_floor2) room_goto(rm_floor3);
+            if (_s.t > 70 && Scenario_FloorReady(rm_floor3) && Player_IsSettled(_pl)) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                var _pp = Bush_Patches("rm_floor3");
+                var _made = (array_length(_pp) >= 2);
+                var _cells = 0;
+                for (var _i = 0; _i < array_length(_pp); _i++) {
+                    for (var _k = 0; _k < array_length(_pp[_i]); _k++) {
+                        _cells++;
+                        if (instance_position(_pp[_i][_k][0] * _T + _T / 2, _pp[_i][_k][1] * _T + _T / 2, obj_tall_grass) == noone) _made = false;
+                    }
+                }
+                Scenario_Check("r3stealth_the_bushes_of_rm_floor3_stand_in_the_room", _made && _cells >= 4, "cells=" + string(_cells));
+                Scenario_Check("r3stealth_the_room_has_its_own_grass_at_9_8_where_the_run_ends", instance_position(9 * _T + _T / 2, 8 * _T + _T / 2, obj_tall_grass) != noone);
+                _h.e = Scenario_H11Enemy(obj_slime, 5, 6, -1, LEFT);
+                Scenario_PlacePlayer(2, 6);
+                _pl.face = DOWN;   // already facing the way he will run: a tap on a new direction only turns (D69)
+                _h.f0 = _s.f;
+                Scenario_Next(_s, 1051);
+            }
+            if (_s.t > 600) { Scenario_Check("r3stealth_rm_floor3_is_ready", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1051:   // spotted at once (3 tiles ahead, in its cone)
+            if (_e == noone) { Scenario_Check("r3stealth_the_slime_is_alive", false); Scenario_NoticeEnd(); break; }
+            if (_e.ai_mode == "chase") {
+                _h.spot_f = _s.f;
+                Scenario_Check("r3stealth_a_slime_facing_the_player_3_tiles_away_spots_him", _s.f - _h.f0 <= 20, "after " + string(_s.f - _h.f0) + " frames");
+                Scenario_Check("r3stealth_the_exclamation_mark_is_up", _e.alert_pop > 0);
+                Scenario_Check("r3stealth_it_faces_him", _e.look_dir == LEFT);
+                _h.search_f = -1;
+                _h.return_f = -1;
+                _h.home_f = -1;
+                _h.moved_in_search = false;
+                _h.walked_in_bush = false;
+                _h.min_row = 6;
+                Scenario_Hold("move_down", 18);   // 2 tiles at the run speed (16 frames): (2,9) is a fire stand, so he stops at (2,8)
+                Scenario_Hold("run", 90);
+                Scenario_Next(_s, 1052);
+            }
+            if (_s.t > 60) { Scenario_Check("r3stealth_a_slime_facing_the_player_3_tiles_away_spots_him", false, "mode=" + _e.ai_mode); Scenario_NoticeEnd(); }
+            break;
+        case 1052:   // down two tiles, then right along row 8
+            if (_s.t == 20) Scenario_Hold("move_right", 70);   // 7 tiles to the grass at (9,8); the skull at (10,8) stops him
+            if (instance_position(_pl.x + _T / 2, _pl.y + _T / 2, obj_tall_grass) != noone) _h.walked_in_bush = true;
+            if (_s.t == 90) Scenario_Next(_s, 1053);
+            break;
+        case 1053:   // watch the slime until it is idle at home again
+            if (_s.t == 5) {
+                var _bc = Scenario_H11Cell(_pl);
+                Scenario_Check("r3stealth_the_player_ran_to_the_grass_at_9_8", _bc.cx == 9 && _bc.cy == 8 && !_pl.moving, "at " + string(_bc.cx) + "," + string(_bc.cy));
+            }
+            if (_e == noone) { Scenario_Check("r3stealth_the_slime_is_alive_after_the_run", false); Scenario_NoticeEnd(); break; }
+            var _ec = Scenario_H11Cell(_e);
+            var _pc = Scenario_H11Cell(_pl);
+            if (instance_position(_pl.x + _T / 2, _pl.y + _T / 2, obj_tall_grass) != noone) _h.walked_in_bush = true;
+            if (_e.ai_mode == "search") {
+                if (_h.search_f < 0) {
+                    _h.search_f = _s.f;
+                    _h.search_cx = _ec.cx;
+                    _h.search_cy = _ec.cy;
+                    Scenario_Check("r3stealth_the_search_starts_on_the_last_cell_it_saw_him", _ec.cx == _e.last_seen_cx && _ec.cy == _e.last_seen_cy, "at " + string(_ec.cx) + "," + string(_ec.cy) + " last seen " + string(_e.last_seen_cx) + "," + string(_e.last_seen_cy));
+                }
+                if (_ec.cx != _h.search_cx || _ec.cy != _h.search_cy) _h.moved_in_search = true;
+            }
+            if (_e.ai_mode == "return" && _h.return_f < 0) {
+                _h.return_f = _s.f;
+                _h.cooldown = _e.spot_cooldown;
+                _h.pops = _e.q_pops;
+            }
+            if (_e.ai_mode == "idle" && _h.return_f >= 0 && _h.home_f < 0) {
+                _h.home_f = _s.f;
+                Scenario_Check("r3stealth_the_slime_is_home_again", _ec.cx == 5 && _ec.cy == 6 && !_e.moving, "at " + string(_ec.cx) + "," + string(_ec.cy));
+            }
+            if (_h.home_f >= 0 || _s.f - _h.spot_f > 700) {
+                Scenario_Release();
+                var _took = _h.home_f - _h.spot_f;
+                Scenario_Check("r3stealth_it_found_its_way_home", _h.home_f >= 0, "mode=" + _e.ai_mode);
+                Scenario_Check("r3stealth_the_slime_is_home_within_6_seconds_of_starting_to_search", _h.home_f >= 0 && _h.search_f >= 0 && (_h.home_f - _h.search_f) <= 360, "took " + string(_h.home_f - _h.search_f) + " frames");
+                Scenario_Check("r3stealth_and_within_9_seconds_of_spotting_him", _h.home_f >= 0 && _took <= 540, "took " + string(_took) + " frames");
+                Scenario_Check("r3stealth_it_searched_for_about_3_seconds", _h.search_f >= 0 && _h.return_f >= 0 && (_h.return_f - _h.search_f) >= 150 && (_h.return_f - _h.search_f) <= 230, "frames " + string(_h.return_f - _h.search_f));
+                Scenario_Check("r3stealth_it_stood_still_while_it_searched", _h.search_f >= 0 && !_h.moved_in_search);
+                Scenario_Check("r3stealth_it_put_up_exactly_one_question_mark", _h.return_f >= 0 && _h.pops == 1 && _e.q_pops == 1, "q_pops=" + string(_e.q_pops));
+                Scenario_Check("r3stealth_it_cannot_notice_him_for_2_seconds_after_giving_up", _h.return_f >= 0 && _h.cooldown >= 115 && _h.cooldown <= 120, "cooldown=" + string(variable_struct_exists(_h, "cooldown") ? _h.cooldown : -1));
+                Scenario_Check("r3stealth_the_player_walked_into_the_bush_with_real_keys", _h.walked_in_bush);
+                Scenario_Check("r3stealth_he_was_still_hidden_when_it_gave_up", Player_IsHidden(_pl));
+                Scenario_Check("r3stealth_no_fight_started", room == rm_floor3 && !Transition_IsActive());
+                Scenario_Next(_s, 1054);
+            }
+            break;
+        case 1054:   // the slime has just given up; the player stands in plain view 3 tiles in front of it
+            if (_e == noone) { Scenario_Check("r3stealth_the_slime_is_alive_for_the_ignore", false); Scenario_NoticeEnd(); break; }
+            Scenario_PlaceEnemy(_e, 5, 6);
+            _e.look_dir = LEFT;
+            _e.turn_timer = 100000;
+            _e.idle_timer = 100000;
+            _e.ai_mode = "search";
+            _e.srch = Search_Create(5, 6, 180);
+            EnemyAI_GiveUp(_e);   // as the search does when it is over
+            Scenario_PlacePlayer(2, 6);
+            _pl.face = RIGHT;
+            _h.g0 = _s.f;
+            _h.cf = -1;
+            Scenario_Next(_s, 1055);
+            break;
+        case 1055:   // 110 frames of nothing, then it notices him
+            if (_e == noone) { Scenario_Check("r3stealth_the_slime_is_alive_in_the_ignore", false); Scenario_NoticeEnd(); break; }
+            if (_e.ai_mode == "idle") {   // it stands at home facing him (a slime that has got home would wander off after a pause: the stage keeps it still)
+                _e.idle_timer = 100000;
+                _e.look_dir = LEFT;
+            }
+            if (_e.ai_mode == "chase" && _h.cf < 0) _h.cf = _s.f - _h.g0;
+            if (_s.t >= 170) {
+                Scenario_Check("r3stealth_in_plain_view_it_does_not_notice_him_for_2_seconds_after_giving_up", _h.cf < 0 || _h.cf >= 115, "noticed after " + string(_h.cf) + " frames");
+                Scenario_Check("r3stealth_and_then_it_does", _h.cf >= 115 && _h.cf <= 160, "noticed after " + string(_h.cf) + " frames");
+                with (obj_enemy) instance_destroy();
+                Scenario_Next(_s, 1056);
+            }
+            break;
+        case 1056:   // the player stands still in the bush patch (3,5)
+            if (_s.t == 1) {
+                Scenario_PlacePlayer(3, 5);
+                _pl.face = DOWN;
+            }
+            if (_s.t == HIDE_SETTLE_FRAMES + 10) {
+                Scenario_Check("r3stealth_standing_still_in_the_bush_hides_the_player", Player_IsHidden(_pl));
+                Scenario_Check("r3stealth_the_hidden_player_is_drawn_see_through", abs(_pl.image_alpha - HIDE_PLAYER_ALPHA) < 0.01, "alpha=" + string(_pl.image_alpha));
+                _h.e = Scenario_H11Enemy(obj_slime, 7, 7, -1, LEFT);   // it walks home along row 7 (2,7), past the edge of its cone: 2 tiles diagonally from the player
+                _h.e.ai_mode = "return";
+                _h.e.home_cx = 2;
+                _h.e.home_cy = 7;
+                _h.e.home_x = 2 * _T;
+                _h.e.home_y = 7 * _T;
+                _h.g0 = _s.f;
+                _h.min_cx = 7;
+                _h.bad = false;
+                Scenario_Next(_s, 1057);
+            }
+            break;
+        case 1057:   // the pass: not seen
+            if (_e == noone) { Scenario_Check("r3stealth_the_passing_slime_is_alive", false); Scenario_NoticeEnd(); break; }
+            var _ec2 = Scenario_H11Cell(_e);
+            _h.min_cx = min(_h.min_cx, _ec2.cx);
+            if (_e.ai_mode == "chase" || _e.alert_pop > 0) _h.bad = true;
+            if (_s.f - _h.g0 >= 190) {
+                Scenario_Check("r3stealth_the_slime_walked_past_the_hidden_player", _h.min_cx <= 3, "min cx " + string(_h.min_cx));
+                Scenario_Check("r3stealth_a_slime_passing_the_edge_of_its_cone_2_tiles_from_a_hidden_player_does_not_spot_him", !_h.bad && Player_IsHidden(_pl), "mode=" + _e.ai_mode);
+                with (obj_enemy) instance_destroy();
+                Scenario_PlacePlayer(4, 5);   // the control: the same pass, the player in the open (not grass) on (4,5)
+                _pl.face = DOWN;
+                Scenario_Next(_s, 1058);
+            }
+            break;
+        case 1058:   // control: spotted
+            if (_s.t == HIDE_SETTLE_FRAMES + 10) {
+                Scenario_Check("r3stealth_control_standing_still_in_the_open_does_not_hide", !Player_IsHidden(_pl));
+                _h.e = Scenario_H11Enemy(obj_slime, 7, 7, -1, LEFT);
+                _h.e.ai_mode = "return";
+                _h.e.home_cx = 2;
+                _h.e.home_cy = 7;
+                _h.e.home_x = 2 * _T;
+                _h.e.home_y = 7 * _T;
+                _h.g0 = _s.f;
+                _h.spotted = false;
+            }
+            if (_s.t > HIDE_SETTLE_FRAMES + 10) {
+                if (instance_exists(_h.e) && _h.e.ai_mode == "chase") _h.spotted = true;
+                if (_h.spotted || _s.f - _h.g0 >= 190) {
+                    Scenario_Check("r3stealth_control_the_same_pass_in_the_open_spots_him", _h.spotted);
+                    with (obj_enemy) instance_destroy();
+                    Scenario_Next(_s, 1059);
+                }
+            }
+            break;
+        case 1059:   // the end of the chain: removes the files and the profile the steps made
             Scenario_NoticeEnd();
             break;
     }
@@ -14489,7 +14716,7 @@ function Scenario_StepShotsTextFit2(_s) {
                 if (_o.di >= array_length(_scenes)) {
                     Loc_SetLanguage("en");
                     Scenario_SetWindowScale(3);
-                    Scenario_NoticeEnd();   // the end of the pictures: removes the files and the profile the steps made
+                    Scenario_Next(_s, 1040);   // goes on with r3stealth pictures (1040..1043), the end of the pictures
                 } else {
                     Scenario_Next(_s, 1050);
                 }
@@ -14663,10 +14890,113 @@ function Scenario_StepShotsR3Menus(_s) {
                 if (_o.si >= array_length(Scenario_R3Scales(_o.di))) { _o.si = 0; _o.di++; }
                 if (_o.di >= array_length(_scenes)) {
                     Scenario_SetWindowScale(3);
-                    Scenario_Next(_s, 1050);   // goes on with the round 3 textfit2 pictures, the end of the pictures
+                    Scenario_Next(_s, 1050);   // goes on with the round 3 textfit2 pictures, then r3stealth (1040..1043, the end)
                 } else {
                     Scenario_Next(_s, 1030);
                 }
+            }
+            break;
+    }
+}
+
+// ============================================================================
+// Round 3 packet stealth (D179, R-098) pictures 1040-1049, three scenes at scale 3 (480 x 432) and scale 5 (800 x 720), shot_r3stealth_<scene>_<w>x<h>.png:
+//   dark   rm_floor7 (a dark cave): a spider facing right, the very faint cone in front of it, the player standing behind it, not seen
+//   lit    rm_floor2 (the daylight clearing): a dire wolf facing right (sight 4: a longer cone), the player behind it
+//   chase  rm_floor3: a slime that chases (a little stronger cone, sight 4 instead of 3)
+// The checks at the moment of the picture: exactly one cone was drawn, it is faint (0.10 calm, 0.16 chasing at most), the enemy faces the way the picture is built for,
+// and the player stands outside the cone.
+// ============================================================================
+function Scenario_R3StealthScene(_i) {
+    switch (_i) {
+        case 0: return { name: "dark", rm: rm_floor7, pcx: 2, pcy: 5, foe: obj_spider, ecx: 5, ecy: 5, face: RIGHT, chase: false, wait: 40 };
+        case 1: return { name: "lit", rm: rm_floor2, pcx: 3, pcy: 6, foe: obj_dire_wolf, ecx: 6, ecy: 6, face: RIGHT, chase: false, wait: 40 };
+        case 2: return { name: "chase", rm: rm_floor3, pcx: 2, pcy: 6, foe: obj_slime, ecx: 5, ecy: 6, face: RIGHT, chase: true, wait: 40 };
+    }
+    return undefined;
+}
+
+function Scenario_R3StealthJudge(_h, _sc, _pl) {
+    var _T = GRID_TILE_SIZE;
+    var _tag = "shots_r3stealth_" + _sc.name + "_";
+    var _e = instance_exists(_h.e) ? _h.e : noone;
+    Scenario_Check(_tag + "the_enemy_is_alive", _e != noone);
+    Scenario_Check(_tag + "no_dialogue_is_open", GameState_Get().ui.mode == UI_NONE && array_length(GameState_Get().ui.lines) == 0);
+    if (_e == noone) return;
+    if (asset_get_index("Sight_ConeStats") == -1) { Scenario_Check(_tag + "the_cone_drawing_exists", false); return; }
+    var _st = Sight_ConeStats();
+    Scenario_Check(_tag + "exactly_one_cone_was_drawn_with_cells", _st.enemies == 1 && _st.cells > 0, "enemies=" + string(_st.enemies) + " cells=" + string(_st.cells));
+    var _max = _sc.chase ? 0.16 : 0.10;
+    Scenario_Check(_tag + "the_cone_is_faint", _st.alpha_max >= 0.05 && _st.alpha_max <= _max + 0.0001, "alpha_max=" + string(_st.alpha_max));
+    Scenario_Check(_tag + "the_enemy_faces_the_way_the_picture_is_built_for", variable_instance_exists(_e, "look_dir") && _e.look_dir == _sc.face);
+    Scenario_Check(_tag + "the_enemy_is_" + (_sc.chase ? "chasing" : "calm"), _sc.chase ? (_e.ai_mode == "chase") : (_e.ai_mode == "idle" && _e.alert_pop == 0), "mode=" + _e.ai_mode);
+    var _ec = Scenario_H11Cell(_e);
+    var _pcx = Nav_CellOf(_pl.x + _T / 2);
+    var _pcy = Nav_CellOf(_pl.y + _T / 2);
+    var _cone = Vis_Cone(Nav_Get().grid, _ec.cx, _ec.cy, Vis_EnemyTiles(_e.prof, _e.ai_mode), _e.prof.see_through, _e.look_dir);
+    Scenario_Check(_tag + "the_player_stands_outside_the_cone", !Vis_Has(_cone, _pcx, _pcy));
+}
+
+function Scenario_StepShotsR3Stealth(_s) {
+    if (!variable_struct_exists(_s, "r3st")) _s.r3st = { i: 0, e: noone };
+    var _h = _s.r3st;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _sc = Scenario_R3StealthScene(_h.i);
+    switch (_s.step) {
+        case 1040:   // build the scene _h.i
+            if (_sc == undefined) { Scenario_SetWindowScale(3); Scenario_NoticeEnd(); break; }   // the end of the pictures: removes the files and the profile the steps made
+            if (_s.t == 1) {
+                Scenario_Release();
+                Scenario_ClearUi();
+                Dialogue_CloseNow();
+                global.light_clock = 1500;   // the fires' flicker is frozen at one step, so a picture can be taken again
+                Scenario_NewKnight(CLASS_KNIGHT);
+                Scenario_SetWindowScale(3);
+                _h.via = (_sc.rm == rm_floor2) ? rm_floor3 : rm_floor2;
+                room_goto(_h.via);   // via another room: the controller only spawns the player on a room change
+            }
+            if (_s.t == 30 && room == _h.via) room_goto(_sc.rm);
+            if (_s.t > 70 && Scenario_FloorReady(_sc.rm) && Player_IsSettled(_pl)) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_PlacePlayer(_sc.pcx, _sc.pcy);
+                _pl.face = RIGHT;
+                _h.e = Scenario_H11Enemy(_sc.foe, _sc.ecx, _sc.ecy, -1, _sc.face);
+                if (_sc.chase) {
+                    _h.e.ai_mode = "chase";   // standing in chase mode: its cone is the chasing one and it has not seen the player (he is behind it)
+                    _h.e.react_timer = 100000;
+                    _h.e.last_seen_cx = _sc.pcx;
+                    _h.e.last_seen_cy = _sc.pcy;
+                }
+                Scenario_Next(_s, 1041);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_r3stealth_" + _sc.name + "_room_is_ready", false, "room=" + room_get_name(room) + " player=" + string(_pl != noone)); Scenario_NoticeEnd(); }
+            break;
+        case 1041:   // scale 3, wait, shoot
+            if (_s.t == 1) Scenario_SetWindowScale(3);
+            if (_s.t >= _sc.wait) {
+                Scenario_R3StealthJudge(_h, _sc, _pl);
+                _s.shot = "shot_r3stealth_" + _sc.name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1042);
+            }
+            break;
+        case 1042:   // scale 5
+            if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+            if (_s.t == 4) Scenario_SetWindowScale(5);
+            if (_s.t >= 40) {
+                _s.shot = "shot_r3stealth_" + _sc.name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1043);
+            }
+            break;
+        case 1043:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                with (obj_enemy) instance_destroy();
+                _h.i++;
+                Scenario_Next(_s, 1040);
             }
             break;
     }
