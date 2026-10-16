@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T17:22:40Z",
-    "row_count": 1296
+    "generated_at_utc": "2026-10-16T19:55:55Z",
+    "row_count": 1307
   },
   "default_lang": "en",
   "languages": [
@@ -1211,6 +1211,10 @@
     "confirm.replace": {
       "en": "Forget {forget} and learn {learn}?",
       "ko": "{forget}을(를) 잊고 {learn}을(를) 배울까요?"
+    },
+    "confirm.save_quit": {
+      "en": "Save and quit to title? Continue picks it up from here.",
+      "ko": "저장하고 타이틀로 나갈까요? 이어하기로 여기서부터 계속할 수 있습니다."
     },
     "confirm.sell": {
       "en": "Sell {name} for {price}?",
@@ -3472,6 +3476,14 @@
       "en": "Back to the game.",
       "ko": "게임으로 돌아갑니다."
     },
+    "pause.help.save": {
+      "en": "Saves your run now. Continue picks it up from here.",
+      "ko": "지금 도전을 저장합니다. 이어하기로 여기서부터 계속할 수 있습니다."
+    },
+    "pause.help.save_quit": {
+      "en": "Saves your run, then goes to the title. Continue picks it up from here.",
+      "ko": "도전을 저장하고 타이틀로 갑니다. 이어하기로 여기서부터 계속할 수 있습니다."
+    },
     "pause.help.settings": {
       "en": "Sound, text, window, language and keys.",
       "ko": "소리, 글자, 창, 언어, 키를 바꿉니다."
@@ -3495,6 +3507,14 @@
     "pause.option.resume": {
       "en": "Resume",
       "ko": "계속하기"
+    },
+    "pause.option.save": {
+      "en": "Save",
+      "ko": "저장하기"
+    },
+    "pause.option.save_quit": {
+      "en": "Save & Quit to Title",
+      "ko": "저장하고 타이틀로 나가기"
     },
     "pause.option.settings": {
       "en": "Settings",
@@ -3779,6 +3799,14 @@
     "save.delete.ask": {
       "en": "Delete Save {n}? The run in it will be lost.",
       "ko": "저장 {n}을(를) 삭제할까요? 그 안의 도전은 사라집니다."
+    },
+    "save.done": {
+      "en": "Game saved.",
+      "ko": "게임이 저장되었습니다."
+    },
+    "save.failed": {
+      "en": "The game could not be saved.",
+      "ko": "게임을 저장하지 못했습니다."
     },
     "save.hint.delete": {
       "en": "[k:tab_prev] Delete",
@@ -4931,6 +4959,22 @@
     "tab.system.quit_battle_help": {
       "en": "Goes back to the title. Continue puts you back just before this battle.",
       "ko": "타이틀로 나갑니다. 이어하기를 하면 이 전투 직전부터 다시 시작합니다."
+    },
+    "tab.system.save_battle": {
+      "en": "You cannot save during a battle.",
+      "ko": "전투 중에는 저장할 수 없습니다."
+    },
+    "tab.system.save_busy": {
+      "en": "You cannot save right now.",
+      "ko": "지금은 저장할 수 없습니다."
+    },
+    "tab.system.save_cutscene": {
+      "en": "You cannot save during a cutscene.",
+      "ko": "컷신 중에는 저장할 수 없습니다."
+    },
+    "tab.system.save_none": {
+      "en": "There is no run to save.",
+      "ko": "저장할 도전이 없습니다."
     },
     "tab.title.codex": {
       "en": "Codex",

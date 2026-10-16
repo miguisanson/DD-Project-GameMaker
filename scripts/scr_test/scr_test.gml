@@ -10111,7 +10111,7 @@ function Test_Suite_OneMenu() {
     Test_Eq("D140 wrapping on the 7th tab goes to the 1st", Ui_TabStep(6, TabMenu_Count(), 1), 0);
     Test_Eq("D140 Q on the first tab wraps to System", Ui_TabStep(0, TabMenu_Count(), -1), 6);
 
-    // ---- the System tab: Help, Abandon run, Quit to title; all on in a battle too (D141) ----
+    // ---- the System tab: Help, Save, Save & Quit to Title, Abandon run, Quit to title (I-112 added the two Save rows); Abandon and Quit are on in a battle too (D141) ----
     var _sys = TabSystem_Items();
     var _sys_ids = "";
     var _sys_lb = "";
@@ -10119,23 +10119,22 @@ function Test_Suite_OneMenu() {
         _sys_ids += ((_i > 0) ? "/" : "") + _sys[_i].id;
         _sys_lb += ((_i > 0) ? "," : "") + _sys[_i].label;
     }
-    Test_Eq("D140 System rows", _sys_ids, "help/abandon/quit");
-    Test_Eq("D140 System labels", _sys_lb, "Help,Abandon Run,Quit to Title");
-    var _all_on = (array_length(_sys) == 3);
-    var _all_help = (array_length(_sys) == 3);
+    Test_Eq("D140 System rows", _sys_ids, "help/save/save_quit/abandon/quit");
+    Test_Eq("D140 System labels", _sys_lb, "Help,Save,Save & Quit to Title,Abandon Run,Quit to Title");
+    var _all_on = (array_length(_sys) == 5);
+    var _all_help = (array_length(_sys) == 5);
     for (var _i3 = 0; _i3 < array_length(_sys); _i3++) {
         _all_on = _all_on && _sys[_i3].enabled;
         _all_help = _all_help && string_length(_sys[_i3].help) > 0;
     }
-    Test_True("D140 all three System rows are on on the map", _all_on);
+    Test_True("D140 all five System rows are on on the map", _all_on);
     Test_True("D100 every System row explains itself", _all_help);
-    var _sysb = TabSystem_Items(true);
-    var _all_on_b = (array_length(_sysb) == 3);
-    for (var _i4 = 0; _i4 < array_length(_sysb); _i4++) _all_on_b = _all_on_b && _sysb[_i4].enabled;
-    Test_True("D141 Abandon run and Quit to title are on in a battle", _all_on_b);
-    Test_Eq("D141 in a battle Quit says it returns to just before the fight", (array_length(_sysb) == 3) ? _sysb[2].help : "", Loc_T("tab.system.quit_battle_help", "Goes back to the title. Continue puts you back just before this battle."));
+    var _sysb = TabSystem_Items(true, "battle");
+    var _all_on_b = (array_length(_sysb) == 5) && _sysb[0].enabled && _sysb[3].enabled && _sysb[4].enabled;
+    Test_True("D141 Abandon run and Quit to title are on in a battle (the two Save rows are greyed, I-112)", _all_on_b);
+    Test_Eq("D141 in a battle Quit says it returns to just before the fight", (array_length(_sysb) == 5) ? _sysb[4].help : "", Loc_T("tab.system.quit_battle_help", "Goes back to the title. Continue puts you back just before this battle."));
     // D156 replaced the press-twice Abandon row by the shared Yes / No pop-up: the row always reads "Abandon run" (Test_Suite_Confirm checks the pop-up).
-    Test_Eq("D156 the Abandon row always reads Abandon run", (array_length(_sys) == 3) ? _sys[1].label : "", "Abandon Run");
+    Test_Eq("D156 the Abandon row always reads Abandon run", (array_length(_sys) == 5) ? _sys[3].label : "", "Abandon Run");
 
     // ---- Settings: no Apply row, no pending copy; a change is live at once ----
     var _items = SettingsMenu_Items(GameSettings_Defaults(), 16);
@@ -10834,14 +10833,14 @@ function Test_ConfirmSystem() {
     Menu_Open(6);
     var _u = TabMenu_Get();
     var _m = TabMenu_TopMenu();
-    Test_Eq("H2 the System list has Help, Abandon run and Quit to title", (array_length(_m.items) == 3) ? (_m.items[0].id + "/" + _m.items[1].id + "/" + _m.items[2].id) : "", "help/abandon/quit");
+    Test_Eq("H2 the System list has Help, Save, Save & Quit, Abandon run and Quit to title (I-112)", (array_length(_m.items) == 5) ? (_m.items[0].id + "/" + _m.items[1].id + "/" + _m.items[2].id + "/" + _m.items[3].id + "/" + _m.items[4].id) : "", "help/save/save_quit/abandon/quit");
     // Help opens its page at once, no question
     TabMenu_OnConfirm(_m, 0);
     Test_False("H2 Help asks nothing", Confirm_IsOpen());
     Test_Eq("H2 Help opens its page", Ui_StackDepth(_u.pages[_u.tab].stk), 2);
     Ui_StackBack(_u.pages[_u.tab].stk);
     // Abandon run
-    TabMenu_OnConfirm(_m, 1);
+    TabMenu_OnConfirm(_m, 3);
     Test_True("H2 Abandon run opens the pop-up", Confirm_IsOpen());
     Test_Eq("H2 the Abandon question", Confirm_Question(), "Abandon this run? It counts as a death, but you keep the echo.");
     Test_Eq("H2 the Abandon pop-up starts on No", Confirm_Menu().cursor, 1);
@@ -10850,7 +10849,7 @@ function Test_ConfirmSystem() {
     Confirm_Back();
     Test_Eq("H2 No leaves the run alone", _u.pending, "");
     Test_True("H2 and the menu open", _u.closed_ms < 0);
-    TabMenu_OnConfirm(_m, 1);
+    TabMenu_OnConfirm(_m, 3);
     Test_True("H2 Abandon run Yes is answered", Test_ConfirmSayYes());
     Test_Eq("H2 Yes abandons", _u.pending, "abandon");
     Test_True("H2 and the menu starts to close", _u.closed_ms >= 0);
@@ -10859,14 +10858,14 @@ function Test_ConfirmSystem() {
     Menu_Open(6);
     _u = TabMenu_Get();
     _m = TabMenu_TopMenu();
-    TabMenu_OnConfirm(_m, 2);
+    TabMenu_OnConfirm(_m, 4);
     Test_True("H2 Quit to title opens the pop-up", Confirm_IsOpen());
     Test_Eq("H2 the Quit question on the map", Confirm_Question(), "Quit to title? The run is saved and Continue picks it up again.");
     Test_Eq("H2 the Quit pop-up starts on No", Confirm_Menu().cursor, 1);
     Test_Eq("H2 the first press has not quit", _u.pending, "");
     Confirm_Back();
     Test_Eq("H2 No does not quit", _u.pending, "");
-    TabMenu_OnConfirm(_m, 2);
+    TabMenu_OnConfirm(_m, 4);
     Test_True("H2 Quit to title Yes is answered", Test_ConfirmSayYes());
     Test_Eq("H2 Yes quits", _u.pending, "quit");
     Menu_Close(true);
@@ -11022,16 +11021,16 @@ function Test_ConfirmNoArmed() {
     Test_True("H2 TabSystem_Disarm is gone", asset_get_index("TabSystem_Disarm") == -1);
     Test_True("H2 Title_NewArmed is gone", asset_get_index("Title_NewArmed") == -1);
     Test_True("H2 Title_DisarmNew is gone", asset_get_index("Title_DisarmNew") == -1);
-    Test_Eq("H2 the Abandon row never reads Sure", TabSystem_Items()[1].label, "Abandon Run");
+    Test_Eq("H2 the Abandon row never reads Sure", TabSystem_Items()[3].label, "Abandon Run");
     Test_Eq("H2 the title row never reads Sure", Title_MainItems(true, true)[1].label, "New Game");
     var _gs = Test_Hero(CLASS_KNIGHT);
     var _mem = Ui_MemGet(Ui_MemGlobal(), "tab_menu_active", TabMenu_Count());
     Menu_Open(6);
     var _u = TabMenu_Get();
     Test_False("H2 the open menu keeps no sys_armed flag", variable_struct_exists(_u, "sys_armed"));
-    TabMenu_OnConfirm(TabMenu_TopMenu(), 1);
+    TabMenu_OnConfirm(TabMenu_TopMenu(), 3);
     Test_False("H2 pressing Abandon sets no armed flag", variable_struct_exists(_u, "sys_armed"));
-    Test_Eq("H2 and leaves the row as it was", TabMenu_TopMenu().items[1].label, "Abandon Run");
+    Test_Eq("H2 and leaves the row as it was", TabMenu_TopMenu().items[3].label, "Abandon Run");
     Confirm_Close();
     Menu_Close(true);
     Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", _mem);
@@ -19524,7 +19523,7 @@ function Test_R4Final2SaveRows() {
     Test_Eq("r4final2 save: the System labels", _lb, "Help,Save,Save & Quit to Title,Abandon Run,Quit to Title");
     Test_True("r4final2 save: every row is on on the map and explains itself", _all_on && _all_help);
     var _why = ["battle", "cutscene", "none"];
-    var _text = ["You cannot save during a fight.", "You cannot save during a cutscene.", "There is no run to save."];
+    var _text = ["You cannot save during a battle.", "You cannot save during a cutscene.", "There is no run to save."];
     for (var _w = 0; _w < 3; _w++) {
         var _rows = TabSystem_Items(_why[_w] == "battle", _why[_w]);
         Test_False("r4final2 save: Save is greyed (" + _why[_w] + ")", _rows[1].enabled);
@@ -19579,7 +19578,7 @@ function Test_R4Final2SaveFile(_p) {
     // blocked: nothing is written
     var _b = Menu_SaveNow("battle");
     Test_False("r4final2 save: in a fight nothing is saved", _b.ok);
-    Test_Eq("r4final2 save: and the answer says why", _b.text, "You cannot save during a fight.");
+    Test_Eq("r4final2 save: and the answer says why", _b.text, "You cannot save during a battle.");
     Test_Eq("r4final2 save: the file is untouched (saved at 5)", Slots_Summary(Profiles_Active())[Slot_Active()].saved_at, 5);
     // allowed: the same file, written now, this run
     var _r = Menu_SaveNow("");
