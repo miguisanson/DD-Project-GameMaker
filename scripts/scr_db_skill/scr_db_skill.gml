@@ -1473,7 +1473,7 @@ function CardDB_Init() {
         ["m_cold_focus",  "Cold Focus",    "Statuses you inflict last {n} turn longer.",                M,  "status_turn_bonus",{ status_turn_bonus: 1 }],
         ["n_tonic",       "Tonic Blend",   "Healing potions also restore {n} MP.",                      N,  "potion_mp",        { potion_mp: 2 }],
         ["n_apothecary",  "Apothecary",    "Potions work {n}% better.",                                 N,  "item_power",       { item_power: 0.30 }],
-        ["n_scrounger",   "Scrounger",     "{n}% chance to find a potion after each battle you win.",    N,  "find_potion_pct",  { find_potion_pct: 0.30 }]
+        ["n_scrounger",   "Scrounger",     "After each win, {n}% to find a potion.",    N,  "find_potion_pct",  { find_potion_pct: 0.30 }]
     ];
     for (var p = 0; p < array_length(pas); p++) {
         var row = pas[p];
@@ -1715,9 +1715,9 @@ function Card_SkillSentence(_s) {
     var status = Card_StatusNameSafe(_s.status);
     if (_s.effect == "damage") {
         var hits = variable_struct_exists(_s, "hits") ? round(_s.hits) : 1;
-        var txt = (hits > 1) ? Loc_T("card.skill.hits", "Strike {hits} times for {power} power each.", { hits: string(hits), power: pw })
-                             : Loc_T("card.skill.hit", "Strike for {power} power.", { power: pw });
-        if (status != "" && _s.status_chance > 0) txt += " " + Loc_T("card.skill.hit_status", "{chance}% to inflict {status}.", { chance: string(round(_s.status_chance * 100)), status: status });
+        var txt = (hits > 1) ? Loc_T("card.skill.hits", "Hit {hits} times for {power} power each.", { hits: string(hits), power: pw })
+                             : Loc_T("card.skill.hit", "Hit for {power} power.", { power: pw });
+        if (status != "" && _s.status_chance > 0) txt += " " + Loc_T("card.skill.hit_status", "{chance}% {status}.", { chance: string(round(_s.status_chance * 100)), status: status });
         return txt;
     }
     if (_s.effect == "status" && status != "") return Loc_T("card.skill.buff", "Gain {status} for {turns} turns.", { status: status, turns: string(round(_s.status_turns)) });

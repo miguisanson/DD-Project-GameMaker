@@ -13930,14 +13930,9 @@ function TextFit_Known() {
         { where: "battle lists 800x720 en", has: "'Poison Arrow'" },
         { where: "card pick 640x576 en", has: "'Meditation+'" },
         { where: "card pick 640x576 en", has: "'Apothecary'" },
-        { where: "card pick 640x576 en", has: "'Scrounger'" },
         { where: "card pick 800x720 en", has: "card name" },          // one-word names of 10 to 11 letters ("Meditation+", "Foresight+", "Spellweave", "Apothecary", "Horizontal") are wider than a column
-        { where: "card pick 800x720 en", has: "pick screen with" },   // the tall upgrade cards: three columns of Skill / Upgrade text do not fit the height of 800 x 720
-        { where: "tab items 800x720 en", has: "details of" },        // throwables: the sentence and six number lines are 20 to 64 units taller than the details panel
-        { where: "tab items 800x720 ko", has: "details of" },
         { where: "codex bestiary 800x720 en", has: "details of" },   // "The Pale Choirbeast" asks the list for 502 of 764 units, which leaves the details too narrow
-        { where: "codex bestiary 800x720 en", has: "line value" },
-        { where: "codex bestiary 800x720 ko", has: "details of" }
+        { where: "codex bestiary 800x720 en", has: "line value" }
     ];
 }
 

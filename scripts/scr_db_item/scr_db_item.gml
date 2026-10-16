@@ -838,10 +838,10 @@ function Item_Sentence(_item, _ch = undefined) {
     if (Item_IsThrowable(_item)) {
         var u = _item.use;
         switch (_item.id) {
-            case 30: return Loc_T("item.sent.30", "Hits for {power} power and inflicts [t]Burn[/t] for {turns} turns. Costs your turn.", { power: string(u.power), turns: string(u.burn_turns) });
+            case 30: return Loc_T("item.sent.30", "Hits for {power} power. Inflicts [t]Burn[/t] for {turns} turns. Costs your turn.", { power: string(u.power), turns: string(u.burn_turns) });
             case 31: return Loc_T("item.sent.31", "Inflicts {n} stacks of [t]Poison[/t]. Costs your turn.", { n: string(u.stacks) });
-            case 32: return Loc_T("item.sent.32", "Hits for {power} power and inflicts [t]Stun[/t], pushing the enemy back. Costs your turn.", { power: string(u.power) });
-            case 33: return Loc_T("item.sent.33", "Dodge the next attack ({turns} turns). A [a]Perfect[/a] throw lets you slip away. Costs your turn.", { turns: string(u.evade_turns) });
+            case 32: return Loc_T("item.sent.32", "Hits for {power} power. [t]Stun[/t] and push back. Costs your turn.", { power: string(u.power) });
+            case 33: return Loc_T("item.sent.33", "Dodge for {turns} turns. [a]Perfect[/a]: escape. Costs your turn.", { turns: string(u.evade_turns) });
         }
         return Loc_T("item.sent.throw", "Throw it at the enemy. Costs your turn.");
     }
