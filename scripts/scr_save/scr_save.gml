@@ -774,6 +774,23 @@ function RunSave_Delete(_path = undefined) {
     Save_DeleteFileSet(is_undefined(_path) ? RunSave_Path() : _path);
 }
 
+// The files RunSave_KeepAside left next to a run file ("run.kept-<unix time>.sav", "run.kept-<unix time>-2.sav" ...), oldest name first. Names are relative to the save folder like the run file's own.
+function RunSave_KeptFiles(_path = undefined) {
+    var path = is_undefined(_path) ? RunSave_Path() : _path;
+    var dir = filename_path(path);
+    var ext = filename_ext(path);
+    var base = filename_change_ext(filename_name(path), "");
+    var out = [];
+    var f = file_find_first(dir + base + ".kept-*" + ext, 0);
+    while (f != "") {
+        array_push(out, dir + f);
+        f = file_find_next();
+    }
+    file_find_close();
+    array_sort(out, true);
+    return out;
+}
+
 // Returns { status, run }: status as for Profile_Load (ok, missing, newer, old, corrupt); run is the parsed save when ok.
 function RunSave_LoadFrom(_path = undefined) {
     var path = is_undefined(_path) ? RunSave_Path() : _path;

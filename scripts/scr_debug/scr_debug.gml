@@ -530,7 +530,10 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeEliteDeath(_s);   // H13a (D156): an elite on the map draws its sprite outline, a death shows its picture and reaches the summary; goes on to the kept run file (840)
             break;
         case 840: case 841: case 842: case 843: case 844: case 845: case 846: case 847: case 848: case 849:
-            Scenario_StepSmokeHunt6Run(_s);   // hunt6run: starting a new run keeps a newer-version run.sav; the end of the chain (its last step calls Scenario_NoticeEnd)
+            Scenario_StepSmokeHunt6Run(_s);   // hunt6run: starting a new run keeps a newer-version run.sav (moved aside, review 6); goes on to review 6 (960)
+            break;
+        case 960: case 961: case 962: case 963: case 964: case 965: case 966: case 967: case 968: case 969:
+            Scenario_StepSmokeReview6(_s);   // review 6: the snapshot of a won fight is held until the map is back; the end of the chain (its last step calls Scenario_NoticeEnd)
             break;
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step goes on to G6 (380)
@@ -7862,6 +7865,8 @@ function Scenario_NoticeToTitle() {
 function Scenario_NoticeEnd() {
     Scenario_NoticeLegacyFile(false);
     RunSave_Delete();
+    var _kf = RunSave_KeptFiles();   // review 6: the run files a new game moved aside (the hunt6run steps make one)
+    for (var _ki = 0; _ki < array_length(_kf); _ki++) Save_DeleteFileSet(_kf[_ki]);
     Profile_ResetForTest();
     Scenario_Finish();
 }
@@ -13342,24 +13347,76 @@ function Scenario_StepSmokeEliteDeath(_s) {
     }
 }
 
-// ---- hunt6run (smoke steps 840-849, the end of the chain) ----
+// ---- hunt6run (smoke steps 840-849; goes on to review 6, 960) ----
 function Hunt6Run_NewerRunText() {
     return json_stringify({ run_version: RUN_SAVE_VERSION + 50, seed: 1, marker: "keep me" });
 }
 
-// The summary after a death is up and a run.sav of a newer build sits in the save folder. Confirm: the next run starts (Run_StartNew, as New Game does) and the file stays as it was.
-// Checked on the first frame the new run is active, before anything can autosave over it.
+// The summary after a death is up and a run.sav of a newer build sits in the save folder. Confirm: the next run starts (Run_StartNew, as New Game does), the newer file is moved aside
+// (review 6, finding 1: it used to stay at run.sav, and the new run's first autosave, a frame after the room change, wrote over it). Checked AFTER that first autosave: run.sav is the new run
+// and the kept file still holds the newer run's text.
 function Scenario_StepSmokeHunt6Run(_s) {
     var _flow = (variable_global_exists("run_flow") && is_struct(global.run_flow)) ? global.run_flow : undefined;
     switch (_s.step) {
         case 840:
             if (_s.t == 1) Scenario_Check("hunt6run_the_newer_run_file_is_there_before_the_new_run", RunSave_ExistsAt(RunSave_Path()) && RunSave_LoadFrom().status == "newer");
             if (_s.t == 30) Scenario_Tap("confirm");
-            if (_s.t > 30 && Run_IsActive()) {
-                Scenario_Check("hunt6run_a_new_run_keeps_a_newer_version_run_file", RunSave_ExistsAt(RunSave_Path()) && Save_ReadTextFile(RunSave_Path()) == Hunt6Run_NewerRunText(), "exists=" + string(RunSave_ExistsAt(RunSave_Path())));
-                Scenario_NoticeEnd();   // the end of the chain: removes the files and the profile the steps made
+            if (_s.t > 30 && Scenario_FloorReady(rm_floor1) && Run_IsActive() && RunSave_LoadFrom().status == "ok") {   // the new run has made its first autosave
+                var _kept = RunSave_KeptFiles();
+                Scenario_Check("hunt6run_the_first_autosave_wrote_the_new_run_to_run_sav", RunSave_LoadFrom().status == "ok");
+                Scenario_Check("hunt6run_a_new_run_keeps_a_newer_version_run_file", array_length(_kept) == 1 && Save_ReadTextFile(array_length(_kept) > 0 ? _kept[0] : "") == Hunt6Run_NewerRunText(), "kept=" + string(array_length(_kept)));
+                Scenario_Next(_s, 960);   // goes on with review 6
             }
-            if (_s.t > 600) { Scenario_Check("hunt6run_the_new_run_started", false, "phase=" + (is_struct(_flow) ? string(_flow.phase) : "none")); Scenario_NoticeEnd(); }
+            if (_s.t > 900) { Scenario_Check("hunt6run_the_new_run_started_and_saved", false, "room=" + room_get_name(room) + " active=" + string(Run_IsActive()) + " save=" + RunSave_LoadFrom().status + " phase=" + (is_struct(_flow) ? string(_flow.phase) : "none")); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ---- Review 6 (smoke steps 960-969, the end of the chain) ----
+// 960/961: a fight from the map is won. While the "slain" message shows (the fight is decided, the map is not back) the snapshot of the moment before it is still held, so Quit or close
+// there saves the run (finding 3: it was already cleared). Once the map is back and its room-entry autosave has run, the snapshot is gone.
+function Scenario_StepSmokeReview6(_s) {
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+    if (!variable_struct_exists(_s, "r6")) _s.r6 = {};
+    var _h = _s.r6;
+    var _ready_tap = ((_s.f - _s.last_tap) >= 4);
+    switch (_s.step) {
+        case 960:   // a snapshot as BeginEncounter takes it, then a fight that is won
+            if (_s.t == 1) {
+                Scenario_Release();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                Scenario_Check("review6_a_snapshot_is_taken_before_the_fight", EnemyPersist_SnapshotRun() && EnemyPersist_HasSnapshot());
+                _s.boost = { hp: 9999, mp: 99 };
+                Scenario_GotoBattle("r6_win", ENEMY_SLIME);
+                Scenario_Next(_s, 961);
+            }
+            if (_s.t > 600) { Scenario_Check("review6_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 961:   // 1 HP left on the enemy at the menu, ATTACK through it; look while the message shows, then back on the map
+            if (_bc != noone) {
+                if (_bc.battle_over && !variable_struct_exists(_h, "over")) {
+                    _h.over = true;
+                    Scenario_Check("review6_the_snapshot_is_held_while_the_slain_message_shows", EnemyPersist_HasSnapshot());
+                }
+                if (_s.t > 10 && !_bc.battle_over && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && _ready_tap) {
+                    if (!variable_struct_exists(_h, "e1")) { _h.e1 = true; _bc.e.hp = 1; }
+                    Scenario_Tap((_bc.menu_index != 0) ? "menu_up" : "confirm");
+                }
+            }
+            if (variable_struct_exists(_h, "over") && room == rm_floor1 && Scenario_FloorReady(rm_floor1)) {
+                if (!variable_struct_exists(_h, "back")) _h.back = _s.t;
+                if (!EnemyPersist_HasSnapshot()) {
+                    Scenario_Check("review6_the_snapshot_is_gone_once_the_map_has_saved", true);
+                    Scenario_NoticeEnd();   // the end of the chain: removes the files (the kept run file too) and the profile the steps made
+                } else if (_s.t > _h.back + 120) {
+                    Scenario_Check("review6_the_snapshot_is_gone_once_the_map_has_saved", false, "still held 120 frames after the map came back");
+                    Scenario_NoticeEnd();
+                }
+            }
+            if (_s.t > 3000) { Scenario_Check("review6_the_fight_is_won", false, "room=" + room_get_name(room) + " state=" + string(_bc != noone ? _bc.battle_state : -1)); Scenario_NoticeEnd(); }
             break;
     }
 }
