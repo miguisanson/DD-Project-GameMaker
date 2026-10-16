@@ -152,6 +152,7 @@ function Test_RunAll() {
     Test_RunSuite("Review7", Test_Suite_Review7);
     Test_RunSuite("R3Cards", Test_Suite_R3Cards);
     Test_RunSuite("R3Menus", Test_Suite_R3Menus);
+    Test_RunSuite("R3Light", Test_Suite_R3Light);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -14235,7 +14236,7 @@ function Test_Hunt7MapDraw() {
     Test_Eq("hunt7map draw: nothing but the darkness itself is a mark before it", _early_mark, "");
     var _names = "";
     for (var _k = _light + 1; _k < array_length(_parts); _k++) _names += _parts[_k].name + " ";
-    Test_Eq("hunt7map draw: after the darkness only the marks stay bright", _names, "nav player_prompt elite merchant_glow mapfx ");
+    Test_Eq("hunt7map draw: after the darkness only the marks stay bright", _names, "nav player_prompt elite mapfx ");   // R-091: the merchant's glow moved before the darkness
 }
 
 // 1b. The merchant's gold glow is a ring round his shape with his own pixels cut out (as the elite's marks): the sprite itself is the object's own draw, under the darkness.
@@ -14623,4 +14624,77 @@ function Test_R3Reset() {
     Test_True("r3 reset: the question has a Korean text", Loc_T("controls.reset_ask", "?") != "Reset every key to its default?" && Loc_T("controls.reset_ask", "?") != "?");
     Test_True("r3 reset: the already-defaults notice has a Korean text", Loc_T("controls.reset_same", "?") != "Keys were already the defaults." && Loc_T("controls.reset_same", "?") != "?");
     Loc_SetLanguage("en");
+}
+
+// ============================================================================================================================
+// Round 3 playtest, packet light (owner notes 1, 2, 18): R-089 the player flashes light and dark when he moves, R-090 he stays bright when he runs,
+// R-091 the merchant is not touched by the light. (The player's layer over a real walk and run in rm_floor1 and rm_floor3, the same picture plain and squashed
+// in rm_floor1, and the merchant's cell on each merchant floor are checked in smoke steps 1000..1004.)
+// ============================================================================================================================
+function Test_Suite_R3Light() {
+    Test_RunSuite("R3Light.parts", Test_R3LightParts);
+    Test_RunSuite("R3Light.plan", Test_R3LightPlan);
+    Test_RunSuite("R3Light.spots", Test_R3LightSpots);
+}
+
+// 1. R-089/R-090/R-091: the pictures of the player's squash and of the merchant's glow are "body" parts: drawn at the end of the Instances layer (where the plain
+// player and the enemies are drawn), under the Foreground haze and before the darkness; everything else of the world pass stays at the end of the top layer.
+function Test_R3LightParts() {
+    var _parts = World_FxParts();
+    var _light = -1;
+    for (var _i = 0; _i < array_length(_parts); _i++) {
+        if (_parts[_i].name == "light") _light = _i;
+    }
+    Test_True("r3light parts: the darkness is a part of the world pass", _light >= 0);
+    var _bodies = ["player_squash", "merchant_glow"];
+    for (var _b = 0; _b < array_length(_bodies); _b++) {
+        var _at = -1;
+        for (var _i = 0; _i < array_length(_parts); _i++) {
+            if (_parts[_i].name == _bodies[_b]) _at = _i;
+        }
+        Test_True("r3light parts: " + _bodies[_b] + " is a part of the world pass", _at >= 0);
+        Test_True("r3light parts: " + _bodies[_b] + " comes before the darkness", _at >= 0 && _at < _light);
+        Test_Eq("r3light parts: " + _bodies[_b] + " is drawn in the body pass (end of the Instances layer)", (_at >= 0 && variable_struct_exists(_parts[_at], "pass")) ? _parts[_at].pass : "(no pass)", "body");
+    }
+    for (var _j = 0; _j < array_length(_parts); _j++) {
+        if (_parts[_j].name == "light" || _parts[_j].name == "nav" || _parts[_j].name == "player_prompt" || _parts[_j].name == "elite" || _parts[_j].name == "mapfx") {
+            Test_Eq("r3light parts: " + _parts[_j].name + " stays in the top pass", variable_struct_exists(_parts[_j], "pass") ? _parts[_j].pass : "(no pass)", "top");
+        }
+    }
+}
+
+// 2. Where the passes run: with a Foreground layer (rm_floor1, rm_floor2) the body pass is the end of Instances and the top pass the end of Foreground; a room without one
+// has a single script at the end of Instances that draws both. Either way the player's squash is on the layer the player's plain sprite is on.
+function Test_R3LightPlan() {
+    var _fg = World_FxPlan(true);
+    var _no = World_FxPlan(false);
+    Test_Eq("r3light plan: with a Foreground layer the body pass is at the end of Instances", _fg.body_layer, "Instances");
+    Test_Eq("r3light plan: with a Foreground layer the top pass is at the end of Foreground", _fg.top_layer, "Foreground");
+    Test_True("r3light plan: with a Foreground layer there are two scripts", _fg.split);
+    Test_Eq("r3light plan: without a Foreground layer the body pass is at the end of Instances", _no.body_layer, "Instances");
+    Test_Eq("r3light plan: without a Foreground layer the top pass is at the end of Instances too", _no.top_layer, "Instances");
+    Test_False("r3light plan: without a Foreground layer there is one script", _no.split);
+}
+
+// 3. R-091: no merchant spot lies within the inner half of the radius of any light pool of its floor (a pool's centre as the light pass puts it: the middle of the tile for a
+// sun spot, the flame a little above the middle for a fire or torch).
+function Test_R3LightSpots() {
+    var _rooms = [rm_floor2, rm_floor5, rm_floor8];
+    var _T = GRID_TILE_SIZE;
+    for (var _r = 0; _r < array_length(_rooms); _r++) {
+        var _name = room_get_name(_rooms[_r]);
+        var _sp = Merchant_SpotFor(_rooms[_r]);
+        var _src = Light_AllSources(_name);
+        Test_True("r3light spots: " + _name + " has a merchant spot and light pools to check against", is_struct(_sp) && array_length(_src) > 0);
+        if (!is_struct(_sp)) continue;
+        var _mx = _sp.x + _T / 2;
+        var _my = _sp.y + _T / 2;
+        for (var _i = 0; _i < array_length(_src); _i++) {
+            var _s = _src[_i];
+            var _px = _s.cx * _T + _T / 2;
+            var _py = _s.cy * _T + (_s.sun ? _T / 2 : 5);
+            var _d = point_distance(_mx, _my, _px, _py);
+            Test_True("r3light spots: " + _name + " merchant is outside the inner half of the pool at " + string(_s.cx) + "," + string(_s.cy) + " (" + string(round(_d)) + " px of " + string(_s.r * _T * 0.5) + ")", _d > _s.r * _T * 0.5);
+        }
+    }
 }
