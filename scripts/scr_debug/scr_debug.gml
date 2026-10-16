@@ -6824,6 +6824,8 @@ function Scenario_StepBotEconomy(_s) {
                 _bc.e.skills = [];
                 _bc.e.stats.atk = 1;
                 _bc.e.stagger_max = 0;
+                _bc.e.weak = -1;     // D185 weak points: a neutral enemy, so the throws keep their own numbers (a Slime is weak to Burning)
+                _bc.e.resist = -1;
                 _bc.wait_timer = 0;
                 _t.ph = 1;
             }
