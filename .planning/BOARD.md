@@ -6,7 +6,7 @@ Build: fixing round-3 playtest notes on `next` (next playtest build after batch 
 - Final fixes in progress: skill list rows + counter, all status labels white, level-up gold only on the new number, bushes break the chase, enemies' feet on the HUD line, boss background, Save / Save & Quit in the system menu, debug overlay removed (done), sound loudness (done).
 - Balance in progress: BREAK harder (D191), SPD toned down (D192), less gold (D193), class nudges (D186).
 - Then the release: v1.0, credits screen (PaleRook + all sources), zip in `E:\Games\NO HOPE Release\`, itch.io page text + screenshots for you to upload (D188-D190).
-- Waiting on you (optional): music picks in `art\audio_candidates\PICK.md` (import in GameMaker); without them the game ships with its current music.
+- Music: none added (D194); the game ships with its current music.
 
 ## Done
 - Overnight 2026-10-15/16: fairer randomness (D117-D125), alt-tab pause, flee % and crit odds shown, difficulty list removed, New Game asks twice when a run is saved, optimisation pass (menus ~22x, items ~20x, battle HUD ~2.6x faster), ~1,400 lines of dead code removed, an extra Opus review (1 real bug fixed).
