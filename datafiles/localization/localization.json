@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T19:55:55Z",
-    "row_count": 1307
+    "generated_at_utc": "2026-10-16T21:38:25Z",
+    "row_count": 1319
   },
   "default_lang": "en",
   "languages": [
@@ -1316,33 +1316,81 @@
       "en": "Press the new key for {action}. [k:back] cancels.",
       "ko": "{action}에 쓸 새 키를 누르세요. [k:back] 버튼으로 취소합니다."
     },
+    "credits.art": {
+      "en": "Art",
+      "ko": "그림"
+    },
+    "credits.art_ai": {
+      "en": "The battle backgrounds and the first drafts of some icons were made with AI assistance (Stable Diffusion XL 1.0 with the Pixel Art XL LoRA by nerijs), then chosen and edited by PaleRook.",
+      "ko": "전투 배경과 일부 아이콘의 초안은 AI의 도움으로 만들었습니다(Stable Diffusion XL 1.0, nerijs의 Pixel Art XL LoRA). PaleRook이 고르고 다듬었습니다."
+    },
+    "credits.art_by": {
+      "en": "Game art by PaleRook",
+      "ko": "게임 그림: PaleRook"
+    },
+    "credits.art_kenney": {
+      "en": "Thanks to the Kenney 1-Bit Pack (CC0), kenney.nl",
+      "ko": "Kenney 1-Bit Pack (CC0)에 감사드립니다, kenney.nl"
+    },
     "credits.by": {
       "en": "by PaleRook",
       "ko": "PaleRook 제작"
     },
-    "credits.creator": {
-      "en": "creator: {name}",
-      "ko": "제작: {name}"
+    "credits.engine": {
+      "en": "Engine",
+      "ko": "엔진"
     },
     "credits.font_galmuri": {
-      "en": "Galmuri by Lee Minseo (OFL-1.1)",
-      "ko": "Galmuri - Lee Minseo (OFL-1.1)"
+      "en": "Galmuri by Lee Minseo, SIL Open Font License 1.1 (OFL-1.1)",
+      "ko": "Galmuri - Lee Minseo, SIL Open Font License 1.1 (OFL-1.1)"
     },
     "credits.font_pixel": {
-      "en": "Retro Gaming pixel font",
-      "ko": "Retro Gaming 픽셀 글꼴"
+      "en": "Retro Gaming by Daymarius, a free font (dafont.com)",
+      "ko": "Retro Gaming - Daymarius, 무료 글꼴 (dafont.com)"
     },
     "credits.fonts": {
       "en": "Fonts",
       "ko": "글꼴"
     },
     "credits.game_by": {
-      "en": "Game and art by PaleRook",
-      "ko": "게임과 그림: PaleRook"
+      "en": "a game by PaleRook",
+      "ko": "PaleRook 제작 게임"
+    },
+    "credits.hint": {
+      "en": "[k:up][k:down] Scroll",
+      "ko": "[k:up][k:down] 스크롤"
+    },
+    "credits.music": {
+      "en": "Music",
+      "ko": "음악"
+    },
+    "credits.music_ifness": {
+      "en": "Fantasy Vol. 3 Kingdoms by Ifness (Justin Allan Arnold), CC BY 4.0, ifnessfreemusic.com",
+      "ko": "Ifness(Justin Allan Arnold)의 Fantasy Vol. 3 Kingdoms, CC BY 4.0, ifnessfreemusic.com"
+    },
+    "credits.snd_atelier": {
+      "en": "Monster sounds: Atelier Magicae, Beasts SFX Vol.1 and Monster SFX Vol.1",
+      "ko": "몬스터 소리: Atelier Magicae, Beasts SFX Vol.1과 Monster SFX Vol.1"
+    },
+    "credits.snd_cc0": {
+      "en": "Creature sounds (CC0): rubberduck, Ogrebane and Darsycho, from OpenGameArt",
+      "ko": "생물 소리(CC0): rubberduck, Ogrebane, Darsycho (OpenGameArt)"
+    },
+    "credits.snd_fesliyan": {
+      "en": "Sound effects: Fesliyan Studios, fesliyanstudios.com",
+      "ko": "효과음: Fesliyan Studios, fesliyanstudios.com"
+    },
+    "credits.snd_horror": {
+      "en": "Horror sounds: YourPalRob, Must-Have Horror Sound Effects",
+      "ko": "공포 효과음: YourPalRob, Must-Have Horror Sound Effects"
+    },
+    "credits.snd_ui": {
+      "en": "UI sounds: Universal UI/Menu Soundpack by Nathan Gibson (Cyrex Studios), CC BY 4.0",
+      "ko": "UI 효과음: Nathan Gibson(Cyrex Studios)의 Universal UI/Menu Soundpack, CC BY 4.0"
     },
     "credits.sounds": {
-      "en": "Sound and music",
-      "ko": "효과음과 음악"
+      "en": "Sound",
+      "ko": "효과음"
     },
     "credits.thanks": {
       "en": "Thank you for playing.",
@@ -1355,10 +1403,6 @@
     "credits.tool_gamemaker": {
       "en": "Made with GameMaker",
       "ko": "GameMaker로 제작"
-    },
-    "credits.tools": {
-      "en": "Tools",
-      "ko": "도구"
     },
     "cutscene.ending.0.0": {
       "en": "Air. Actual air...",
@@ -2975,6 +3019,10 @@
     "menu.main.option.continue": {
       "en": "Continue",
       "ko": "이어하기"
+    },
+    "menu.main.option.credits": {
+      "en": "Credits",
+      "ko": "크레딧"
     },
     "menu.msg.already_equipped": {
       "en": "Already equipped.",

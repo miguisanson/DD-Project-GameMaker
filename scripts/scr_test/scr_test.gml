@@ -174,6 +174,7 @@ function Test_RunAll() {
     Test_RunSuite("R4Final1", Test_Suite_R4Final1);
     Test_RunSuite("R3Balance", Test_Suite_R3Balance);
     Test_RunSuite("R4Final2", Test_Suite_R4Final2);
+    Test_RunSuite("Release", Test_Suite_Release);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -4332,36 +4333,7 @@ function Test_Suite_Story() {
     Test_True("D105 credits: the OFL-1.1 licence", string_pos("OFL-1.1", _cr) > 0);
     Test_True("D105 credits: GameMaker", string_pos("GameMaker", _cr) > 0);
     Test_True("D105 credits: the existing pixel font", string_pos("Retro Gaming", _cr) > 0);
-    var _snd = Credits_SoundAssets();
-    var _snd_missing = "";
-    var _snd_dup = false;
-    for (var _si = 0; _si < array_length(_snd); _si++) {
-        if (string_pos(_snd[_si].asset, _cr) == 0) _snd_missing = _snd[_si].asset;
-        for (var _sj = _si + 1; _sj < array_length(_snd); _sj++) { if (_snd[_sj].asset == _snd[_si].asset) _snd_dup = true; }
-    }
-    // (asset_get_index cannot vouch for every name: a build leaves out sounds no code uses. The list was generated from the sounds/ folder; a Python comparison of the two ran when it was written.)
-    Test_True("D40 sounds the game plays are in the list", asset_get_index("Body_falling_wood") != -1 && _snd[array_length(_snd) - 1].asset != "" && string_pos("Body_falling_wood", _cr) > 0 && string_pos("Metal_resonance", _cr) > 0);
-    Test_False("D40 no sound listed twice", _snd_dup);
-    Test_Eq("D40 every credited sound appears in the credits text", _snd_missing, "");
-    var _old_n = 0, _new_n = 0, _new_bad = "", _creators_ok = true;
-    for (var _ni = 0; _ni < array_length(_snd); _ni++) {
-        if (_snd[_ni].creator == CREDITS_CREATOR_TBD) { _old_n++; continue; }
-        _new_n++;
-        if (_snd[_ni].creator != "rubberduck" && _snd[_ni].creator != "Ogrebane" && _snd[_ni].creator != "Darsycho") _creators_ok = false;
-        var _nm = _snd[_ni].asset;   // <monster>_spawn_N or <monster>_attack_N, N = 2..4 (D116)
-        var _us = string_last_pos("_", _nm);
-        var _n_ok = _us > 0 && string_digits(string_copy(_nm, _us + 1, 9)) != "" && real(string_copy(_nm, _us + 1, 9)) >= 2 && real(string_copy(_nm, _us + 1, 9)) <= 4;
-        var _stem = _us > 0 ? string_copy(_nm, 1, _us - 1) : _nm;
-        var _ev_ok = string_pos("_spawn", _stem) == string_length(_stem) - 5 || string_pos("_attack", _stem) == string_length(_stem) - 6;
-        if (!_n_ok || !_ev_ok) _new_bad += _nm + " ";
-    }
-    Test_Eq("D40 all 126 original sounds and music tracks are listed (creator still to supply)", _old_n, 126);
-    Test_Eq("D116 the 30 new CC0 monster takes are credited by name", _new_n, 30);
-    Test_True("D116 each new take is credited to rubberduck, Ogrebane or Darsycho", _creators_ok);
-    Test_Eq("D116 new take names follow <monster>_spawn_N / <monster>_attack_N", _new_bad, "");
-    Test_True("D116 the credits name rubberduck, Ogrebane and Darsycho", string_pos("rubberduck", _cr) > 0 && string_pos("Ogrebane", _cr) > 0 && string_pos("Darsycho", _cr) > 0);
-    Test_True("D116 the credited takes run from slime_spawn_2 to final_boss_attack_3", _new_n == 30 && string_pos("slime_spawn_2", _cr) > 0 && string_pos("final_boss_attack_3", _cr) > 0);
-    Test_Eq("D40 until the owner sends names the creator is the marked placeholder", _snd[0].creator, CREDITS_CREATOR_TBD);
+    // D40 / D116 (removed in the release packet, D190): the per-file sound list is gone; the credits name each pack and creator (Test_ReleaseCredits).
     Test_True("D105 credits come with headings and spacing", array_length(Credits_Lines()) > array_length(Credits_PlainLines()));
     Test_DialogueStartChecks();
 }
@@ -5159,8 +5131,8 @@ function Test_Suite_UI() {
     _pw.window_mode = WINDOW_MODE_WINDOWED;
     Test_True("D0 scale row is live while windowed", SettingsMenu_Items(_pw, 16)[8].enabled);
     Test_True("D100 every settings row has a plain help sentence", string_length(_si[0].help) > 0 && string_length(_si[7].help) > 0 && string_length(_si[10].help) > 0);
-    var _tm = Title_MainItems(false, false);   // D175: Continue, New Game, Load Game, Settings, Quit
-    Test_Eq("D0 title menu has five items (D175)", array_length(_tm), 5);
+    var _tm = Title_MainItems(false, false);   // D175: Continue, New Game, Load Game, Settings, Quit; release packet: Credits before Quit
+    Test_Eq("D0 title menu has six items (D175, release: Credits)", array_length(_tm), 6);
     Test_False("D0 Load Game is greyed with no save", _tm[2].enabled);
     Test_True("D0 Load Game is live with a save", Title_MainItems(false, true)[2].enabled);
 }
@@ -14183,7 +14155,7 @@ function Test_Suite_TextFit() {
         var _cl = Credits_Layout();
         for (var _i = 0; _i < array_length(_cl.rows); _i++) {
             var _r = _cl.rows[_i];
-            if (_r.kind == "names") TextFit_Block(_f, "credits names", _r.text, _cl.col_w, _mt.p);
+            if (_r.kind == "names" || _r.kind == "para") TextFit_Block(_f, "credits names", _r.text, _cl.col_w, _mt.p);   // release: the wrapped paragraphs are "para" now
             else if (_r.kind != "gap") TextFit_Line(_f, "credits " + _r.kind, _r.text, _mt.gw - 2 * _mt.margin);
         }
         return _f;
@@ -16271,14 +16243,14 @@ function Test_R3s2Title() {
 
 function Test_R3s2Items(_p) {
     var _a = Title_MainItems(false, false);
-    Test_Eq("saves2 items: the rows in order (D175: Continue, New Game, Load Game, Settings, Quit)", Test_R3s2Ids(_a), "continue,new,load,settings,exit");
+    Test_Eq("saves2 items: the rows in order (D175: Continue, New Game, Load Game, Settings, Quit; release: Credits before Quit)", Test_R3s2Ids(_a), "continue,new,load,settings,credits,exit");
     Test_Eq("saves2 items: Continue reads Continue", _a[0].label, "Continue");
     Test_Eq("saves2 items: New Game reads New Game", _a[1].label, "New Game");
     Test_Eq("saves2 items: Load Game reads Load Game", _a[2].label, "Load Game");
-    Test_Eq("saves2 items: no save file: only New Game, Settings and Quit are on", Test_R3s2Enabled(_a), "01011");
-    Test_Eq("saves2 items: a Continue target turns Continue on", Test_R3s2Enabled(Title_MainItems(true, false)), "11011");
-    Test_Eq("saves2 items: a save file turns Load Game on", Test_R3s2Enabled(Title_MainItems(false, true)), "01111");
-    Test_Eq("saves2 items: both on", Test_R3s2Enabled(Title_MainItems(true, true)), "11111");
+    Test_Eq("saves2 items: no save file: only New Game, Settings and Quit are on", Test_R3s2Enabled(_a), "010111");
+    Test_Eq("saves2 items: a Continue target turns Continue on", Test_R3s2Enabled(Title_MainItems(true, false)), "110111");
+    Test_Eq("saves2 items: a save file turns Load Game on", Test_R3s2Enabled(Title_MainItems(false, true)), "011111");
+    Test_Eq("saves2 items: both on", Test_R3s2Enabled(Title_MainItems(true, true)), "111111");
     Test_Eq("saves2 items: New Game with an empty save file starts in it", Title_NewPlan(2).kind, "start");
     Test_Eq("saves2 items: and says which one", Title_NewPlan(2).slot, 2);
     Test_Eq("saves2 items: New Game with no empty save file asks which to overwrite", Title_NewPlan(-1).kind, "overwrite");
@@ -16298,7 +16270,7 @@ function Test_R3s2State(_p) {
     Test_Eq("saves2 state: the only save file is the Continue target", _st.cont, 1);
     Test_Eq("saves2 state: the first empty one is still save 1", _st.first_empty, 0);
     Test_True("saves2 state: there is something to load", _st.any);
-    Test_Eq("saves2 state: the items follow", Test_R3s2Enabled(Title_MainItems(_st.cont >= 0, _st.any)), "11111");
+    Test_Eq("saves2 state: the items follow", Test_R3s2Enabled(Title_MainItems(_st.cont >= 0, _st.any)), "111111");
     Test_ProfPutRun(_p + "run_0_0.sav", 3, 12, CLASS_MAGE, 1, 1, 1000, 30);
     Test_ProfPutRun(_p + "run_0_2.sav", 3, 13, CLASS_ARCHER, 2, 1, 1000, 20);
     _st = Title_State();
@@ -16311,7 +16283,7 @@ function Test_R3s2State(_p) {
     Test_Eq("saves2 state: the new profile has nothing to continue", _st.cont, -1);
     Test_False("saves2 state: nor to load", _st.any);
     Test_Eq("saves2 state: its first empty save file is its first", _st.first_empty, 0);
-    Test_Eq("saves2 state: the items go grey again", Test_R3s2Enabled(Title_MainItems(_st.cont >= 0, _st.any)), "01011");
+    Test_Eq("saves2 state: the items go grey again", Test_R3s2Enabled(Title_MainItems(_st.cont >= 0, _st.any)), "010111");
     Test_True("saves2 state: back to the first profile", Profiles_Switch(0));
     _st = Title_State();
     Test_True("saves2 state: its save files are back", _st.any && _st.first_empty == -1);
@@ -19692,3 +19664,138 @@ function Test_R4Final2SaveFile(_p) {
 }
 
 function Test_R4Final2SaveFileRun() { Test_ProfRun("tpc_", Test_R4Final2SaveFile); }
+
+// ============================================================================================================================
+// Release packet (D188, D189, D190, D194): NO HOPE v1.0. The version shows next to the build id, the window reads NO HOPE, the title has a Credits entry that opens a
+// scrolling page, and the credits name every source the game really uses (nothing pending, no music that is not in the game). The expected strings come from the brief
+// and from the verified report (.planning/research/credits-check.md), not from the code.
+// ============================================================================================================================
+function Test_Suite_Release() {
+    Test_RunSuite("Release.version", Test_ReleaseVersion);
+    Test_RunSuite("Release.title", Test_ReleaseTitle);
+    Test_RunSuite("Release.credits", Test_ReleaseCredits);
+    Test_RunSuite("Release.scroll", Test_ReleaseScroll);
+    Test_RunSuite("Release.fit", Test_ReleaseFit);
+}
+
+function Test_ReleaseVersion() {
+    Test_Eq("release: VERSION is 1.0", VERSION, "1.0");
+    Test_Eq("release: GAME_TITLE is NO HOPE", GAME_TITLE, "NO HOPE");
+    var _ll = Build_LabelLines();
+    Test_Eq("release: the corner stamp is two lines, the version over the short build id", _ll[0] + "|" + _ll[1], "v1.0|" + Build_IdShort());
+    var _mtr = Ui_Metrics();
+    var _ir = Build_IdRect();
+    Test_Eq("release: the stamp is as wide as its wider line", _ir.w, max(UI_TextWidth(_ll[0]), UI_TextWidth(_ll[1])));
+    Test_Eq("release: and two lines tall", _ir.h, 2 * _mtr.line_h);
+    Test_True("release: and stands one margin in from the lower right corner", _ir.x + _ir.w == _mtr.gw - _mtr.margin && _ir.y + _ir.h == _mtr.gh - _mtr.margin);
+    window_set_caption("something else");
+    Display_ApplyCaption();
+    Test_Eq("release: the window caption reads NO HOPE", window_get_caption(), "NO HOPE");
+}
+
+function Test_ReleaseIds(_items) {
+    var _out = "";
+    for (var _i = 0; _i < array_length(_items); _i++) _out += ((_i > 0) ? "," : "") + _items[_i].id;
+    return _out;
+}
+
+function Test_ReleaseTitle() {
+    var _a = Title_MainItems(false, false);
+    Test_Eq("release title: the rows in order, Credits between Settings and Quit", Test_ReleaseIds(_a), "continue,new,load,settings,credits,exit");
+    Test_Eq("release title: the Credits row reads Credits", _a[4].label, "Credits");
+    Test_True("release title: Credits is always on", _a[4].enabled);
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("ko");
+    var _k = Title_MainItems(false, false);
+    Test_True("release title: the Credits row has a Korean label", _k[4].label != "Credits" && _k[4].label != "");
+    Loc_SetLanguage(_lang0);
+    var _c = Test_R3s2Title();
+    var _m = _c.title_stk.menus[0];
+    Title_OnConfirm(_m, 4);
+    Test_True("release title: confirming Credits opens the credits page", is_struct(Title_CreditsOf(_c)));
+    Test_Eq("release title: the page starts at the top", Title_CreditsOf(_c).scroll, 0);
+    Title_CreditsClose(_c);
+    Test_False("release title: closing it leaves the title", is_struct(Title_CreditsOf(_c)));
+    Test_True("release title: and the press that closed it must not answer the title", current_time - _m.lock_ms < UI_INPUT_LOCK_MS);
+}
+
+// Every credit the brief and D190 name, as the text a player reads (proper names do not change in Korean).
+function Test_ReleaseNeeds() {
+    return ["NO HOPE", "PaleRook", "GameMaker", "Kenney 1-Bit Pack", "CC0", "Stable Diffusion", "Pixel Art XL", "Nathan Gibson", "Cyrex Studios", "Universal UI/Menu Soundpack",
+        "CC BY 4.0", "Fesliyan Studios", "Atelier Magicae", "Beasts SFX Vol.1", "Monster SFX Vol.1", "YourPalRob", "Must-Have Horror Sound Effects", "Ifness", "Fantasy Vol. 3 Kingdoms",
+        "rubberduck", "Ogrebane", "Darsycho", "OpenGameArt", "Galmuri", "Lee Minseo", "OFL", "Retro Gaming"];
+}
+
+function Test_ReleaseCredits() {
+    var _lang0 = Loc_GetLanguage();
+    var _en_rows = [];
+    var _ko_rows = [];
+    var _langs = ["en", "ko"];
+    for (var _l = 0; _l < 2; _l++) {
+        Loc_SetLanguage(_langs[_l]);
+        var _rows = Credits_PlainLines();
+        var _all = Test_StoryJoin(_rows);
+        if (_l == 0) _en_rows = _rows; else _ko_rows = _rows;
+        var _needs = Test_ReleaseNeeds();
+        var _missing = "";
+        for (var _i = 0; _i < array_length(_needs); _i++) { if (string_pos(_needs[_i], _all) == 0) _missing += _needs[_i] + "|"; }
+        Test_Eq("release credits " + _langs[_l] + ": every required credit is there", _missing, "");
+        var _low = string_lower(_all);
+        Test_True("release credits " + _langs[_l] + ": no battle / boss music line (D194: no new music)", string_pos("boss", _low) == 0 && string_pos("battle music", _low) == 0 && string_pos("owner", _low) == 0);
+        Test_True("release credits " + _langs[_l] + ": nothing pending or to supply", string_pos("pending", _low) == 0 && string_pos("to supply", _low) == 0 && string_pos("tbd", _low) == 0);
+        Test_True("release credits " + _langs[_l] + ": no per-file sound list any more", string_pos("Modern1", _all) == 0 && string_pos("Punch_1", _all) == 0 && string_pos("slime_spawn_2", _all) == 0);
+        Test_True("release credits " + _langs[_l] + ": the music is credited to the pack it came from (Ifness) and to no candidate pick", string_pos("Ifness", _all) > 0 && string_pos("Wolfgang", _all) == 0 && string_pos("MintoDog", _all) == 0);
+        Test_True("release credits " + _langs[_l] + ": the title line says NO HOPE and the next one a game by PaleRook", _rows[0] == "NO HOPE" && string_pos("PaleRook", _rows[1]) > 0);
+    }
+    var _changed = 0;
+    for (var _r = 0; _r < min(array_length(_en_rows), array_length(_ko_rows)); _r++) { if (_en_rows[_r] != _ko_rows[_r]) _changed++; }
+    Test_Eq("release credits: en and ko have the same number of rows", array_length(_ko_rows), array_length(_en_rows));
+    Test_True("release credits: the Korean rows are really translated (headings and sentences differ from English)", _changed >= 12);
+    Loc_SetLanguage(_lang0);
+    var _full = Credits_Lines();
+    Test_True("release credits: headings and gaps still frame the rows", array_length(_full) > array_length(_en_rows));
+}
+
+function Test_ReleaseScroll() {
+    Test_Eq("release scroll: the most a page can scroll is the part of the roll below the body", Credits_ScrollMax(1000, 400), 600);
+    Test_Eq("release scroll: a roll that fits never scrolls", Credits_ScrollMax(300, 400), 0);
+    Test_Eq("release scroll: above the top clamps to 0", Credits_ScrollClamp(-5, 1000, 400), 0);
+    Test_Eq("release scroll: below the end clamps to the end", Credits_ScrollClamp(700, 1000, 400), 600);
+    Test_Eq("release scroll: inside is left alone", Credits_ScrollClamp(123, 1000, 400), 123);
+    // line 10 px, body 100 px, roll 1000 px: a held key moves 6 lines (60 px) a second, one wheel notch 3 lines, a page the body less two lines, a drag as far as the pointer went
+    Test_Eq("release scroll: Down held for one second moves 60 px", Credits_ScrollInput(0, 1000, 100, 10, 1000, 1, 0, 0, 0), 60);
+    Test_Eq("release scroll: Up held for half a second moves 30 px back", Credits_ScrollInput(100, 1000, 100, 10, 500, -1, 0, 0, 0), 70);
+    Test_Eq("release scroll: Up at the top stays at the top", Credits_ScrollInput(0, 1000, 100, 10, 1000, -1, 0, 0, 0), 0);
+    Test_Eq("release scroll: one wheel notch down moves 30 px", Credits_ScrollInput(0, 1000, 100, 10, 16, 0, 0, -1, 0), 30);
+    Test_Eq("release scroll: one wheel notch up moves 30 px back", Credits_ScrollInput(100, 1000, 100, 10, 16, 0, 0, 1, 0), 70);
+    Test_Eq("release scroll: a page forward moves the body less two lines (80 px)", Credits_ScrollInput(0, 1000, 100, 10, 16, 0, 1, 0, 0), 80);
+    Test_Eq("release scroll: a page back from the top stays", Credits_ScrollInput(0, 1000, 100, 10, 16, 0, -1, 0, 0), 0);
+    Test_Eq("release scroll: dragging the page up by 17 px reads 17 px further down", Credits_ScrollInput(50, 1000, 100, 10, 16, 0, 0, 0, 17), 67);
+    Test_Eq("release scroll: never past the end", Credits_ScrollInput(880, 1000, 100, 10, 1000, 1, 0, 0, 0), 900);
+}
+
+// Every row of the roll fits at 480 x 432, 640 x 576 and 800 x 720, in English and Korean: short rows in the width between the margins, paragraphs wrapped in the roll's column;
+// the title menu with its sixth row still fits.
+function Test_ReleaseFit() {
+    TextFit_Each("release credits rows", function(_w, _h, _lang) {
+        var _fails = [];
+        var _mt = Ui_Metrics();
+        var _l = Credits_Layout();
+        var _lines = Credits_Lines();
+        var _ymax = 0;
+        for (var _i = 0; _i < array_length(_l.rows); _i++) {
+            var _r = _l.rows[_i];
+            if (_r.kind == "title" || _r.kind == "head" || _r.kind == "line") TextFit_Line(_fails, "credits " + _r.kind, _r.text, _mt.gw - 2 * _mt.margin);
+            else if (_r.kind == "para") TextFit_Block(_fails, "credits para", _r.text, _l.col_w, _mt.p);
+            _ymax = max(_ymax, _r.y + _r.h);
+        }
+        if (array_length(_l.rows) != array_length(_lines)) array_push(_fails, "layout has " + string(array_length(_l.rows)) + " rows for " + string(array_length(_lines)));
+        if (_l.total < _ymax) array_push(_fails, "total " + string(_l.total) + " is shorter than the last row " + string(_ymax));
+        return _fails;
+    });
+    TextFit_Each("release title menu", function(_w, _h, _lang) {
+        var _fails = [];
+        TextFit_CentreMenu(_fails, "title", Title_MainItems(true, true), "");
+        return _fails;
+    });
+}

@@ -1,0 +1,68 @@
+NO HOPE
+a game by PaleRook
+
+NO HOPE v1.0 is free. This file lists everyone whose work is in the game, with the
+licences. The same credits are in the game (Credits on the title screen).
+
+
+Engine
+Made with GameMaker
+  https://gamemaker.io
+
+
+Art
+Game art by PaleRook
+The battle backgrounds and the first drafts of some icons were made with AI assistance (Stable Diffusion XL 1.0 with the Pixel Art XL LoRA by nerijs), then chosen and edited by PaleRook.
+  Stable Diffusion XL 1.0: Stability AI, CreativeML Open RAIL++-M licence
+  Pixel Art XL LoRA: nerijs, CreativeML OpenRAIL-M licence
+Thanks to the Kenney 1-Bit Pack (CC0), kenney.nl
+  https://kenney.nl/assets/1-bit-pack
+  Licence: CC0 1.0 Universal (public domain; credit is not required and is given as a courtesy)
+
+
+Sound
+UI sounds: Universal UI/Menu Soundpack by Nathan Gibson (Cyrex Studios), CC BY 4.0
+  https://cyrex-studios.itch.io/universal-ui-soundpack
+  Licence: Creative Commons Attribution 4.0 International (CC BY 4.0)
+  https://creativecommons.org/licenses/by/4.0/
+  Creator: Nathan Gibson. The game plays the sounds at an adjusted volume.
+Sound effects: Fesliyan Studios, fesliyanstudios.com
+  https://www.fesliyanstudios.com
+  Used under the Fesliyan Studios sound effects policy (video games are a permitted use).
+Monster sounds: Atelier Magicae, Beasts SFX Vol.1 and Monster SFX Vol.1
+  https://ateliermagicae.itch.io/beasts-sfx-vol1
+  https://ateliermagicae.itch.io/monster-sound-effects-vol1
+  Used with the creator's permission (any purpose, no redistribution as-is).
+Horror sounds: YourPalRob, Must-Have Horror Sound Effects
+  https://yourpalrob.itch.io/must-have-horror-sound-effects
+  Used under the pack's licence (personal, commercial and non-commercial projects; no standalone redistribution).
+Creature sounds (CC0): rubberduck, Ogrebane and Darsycho, from OpenGameArt
+  rubberduck: 80 CC0 creature SFX, 80 CC0 creture SFX #2
+    https://opengameart.org/content/80-cc0-creature-sfx
+    https://opengameart.org/content/80-cc0-creture-sfx-2
+  Ogrebane: Monster Sound Effects Pack
+    https://opengameart.org/content/monster-sound-effects-pack
+  Darsycho: Monster snarls
+    https://opengameart.org/content/monster-snarls
+  Licence: CC0 1.0 Universal (public domain)
+
+
+Music
+Fantasy Vol. 3 Kingdoms by Ifness (Justin Allan Arnold), CC BY 4.0, ifnessfreemusic.com
+  https://ifness.itch.io/fantasy-vol-3-kingdoms
+  https://ifnessfreemusic.com
+  Licence: Creative Commons Attribution 4.0 International (CC BY 4.0)
+  https://creativecommons.org/licenses/by/4.0/
+  Creator: Justin Allan Arnold (Ifness). The game plays the music at an adjusted volume.
+
+
+Fonts
+Galmuri by Lee Minseo, SIL Open Font License 1.1 (OFL-1.1)
+  https://galmuri.quiple.dev
+  The licence text is in LICENSES\OFL-Galmuri.txt (and next to the font, in fonts\galmuri).
+Retro Gaming by Daymarius, a free font (dafont.com)
+  https://www.dafont.com/retro-gaming.font (listed there as 100% Free)
+
+
+Thank you for playing.
+by PaleRook

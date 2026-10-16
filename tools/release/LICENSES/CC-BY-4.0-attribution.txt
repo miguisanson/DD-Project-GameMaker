@@ -1,0 +1,32 @@
+Attribution for the Creative Commons BY 4.0 material in NO HOPE
+================================================================
+
+Two works in the game are licensed under Creative Commons Attribution 4.0
+International (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/
+The licence lets anyone use the material, also commercially, as long as the
+creator is credited, the licence is linked and changes are marked. This file
+is that notice.
+
+
+1. Universal UI/Menu Soundpack
+   Creator:  Nathan Gibson (Cyrex Studios)
+   Source:   https://cyrex-studios.itch.io/universal-ui-soundpack
+   Licence:  Creative Commons Attribution 4.0 International (CC BY 4.0)
+             https://creativecommons.org/licenses/by/4.0/
+   Used for: the menu and interface sounds of the game (52 sounds).
+   Changes:  none to the files; the game plays them at an adjusted volume.
+
+2. Fantasy Vol. 3 Kingdoms (music)
+   Creator:  Justin Allan Arnold (Ifness)
+   Source:   https://ifness.itch.io/fantasy-vol-3-kingdoms
+             https://ifnessfreemusic.com
+   Licence:  Creative Commons Attribution 4.0 International (CC BY 4.0)
+             https://creativecommons.org/licenses/by/4.0/
+   Used for: the music of the game.
+   Changes:  none to the files; the game plays them at an adjusted volume.
+
+
+No endorsement by the creators is stated or implied.
+
+The other licences and credits are in CREDITS.txt. The licence text of the
+Galmuri font (SIL Open Font License 1.1) is in OFL-Galmuri.txt.
