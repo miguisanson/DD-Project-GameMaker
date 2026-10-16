@@ -19229,6 +19229,8 @@ function Test_Suite_R4Final2() {
     Test_RunSuite("R4Final2.levelup", Test_R4Final2LevelUp);
     Test_RunSuite("R4Final2.bush", Test_R4Final2Bush);
     Test_RunSuite("R4Final2.ground", Test_R4Final2Ground);
+    Test_RunSuite("R4Final2.saverows", Test_R4Final2SaveRows);
+    Test_RunSuite("R4Final2.savefile", Test_R4Final2SaveFileRun);
 }
 
 // I-109 (D177 amended): the stat label and the current number are white; only the NEW number (after ">") is gold. A class growth row shows it always, the hovered row shows its "+1"
@@ -19493,3 +19495,108 @@ function Test_R4Final2Ground() {
     Test_Eq("r4final2 ground: Palehorn and the Choirbeast both use spr_battle_bg_boss on every floor", _boss_bad, "");
     Test_True("r4final2 ground: the boss arena sprite is imported (it is not the plain fallback)", Battle_BgSprite("spr_battle_bg_boss") != battle_screen);
 }
+
+// ---- I-112: the System tab gets "Save" (saves the run now, a notice "Game saved.") and "Save & Quit to Title"; both are greyed, with the reason as their help line, in a fight, in a cutscene and
+// when there is no run. The write is the autosave's (RunSave_WriteTo on the active slot). ----
+function Test_R4Final2SaveRows() {
+    if (asset_get_index("Menu_SaveBlock") == -1) { Test_True("r4final2 save: Menu_SaveBlock exists (not implemented yet)", false); return; }
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    // when saving is blocked (pure: the room and whether a run is going)
+    Test_Eq("r4final2 save: on a floor with a run going saving is allowed", Menu_SaveBlock(rm_floor1, true), "");
+    Test_Eq("r4final2 save: in a fight it is blocked (battle)", Menu_SaveBlock(rm_battle, true), "battle");
+    Test_Eq("r4final2 save: in a cutscene it is blocked (cutscene)", Menu_SaveBlock(rm_cutscene, true), "cutscene");
+    Test_Eq("r4final2 save: with no run it is blocked (none)", Menu_SaveBlock(rm_floor1, false), "none");
+    Test_Eq("r4final2 save: no run wins over a fight", Menu_SaveBlock(rm_battle, false), "none");
+    // the rows
+    var _ok = TabSystem_Items(false, "");
+    var _ids = "";
+    var _lb = "";
+    var _all_on = true;
+    var _all_help = true;
+    for (var _i = 0; _i < array_length(_ok); _i++) {
+        _ids += ((_i > 0) ? "/" : "") + _ok[_i].id;
+        _lb += ((_i > 0) ? "," : "") + _ok[_i].label;
+        _all_on = _all_on && _ok[_i].enabled;
+        _all_help = _all_help && string_length(_ok[_i].help) > 0;
+    }
+    Test_Eq("r4final2 save: the System rows", _ids, "help/save/save_quit/abandon/quit");
+    Test_Eq("r4final2 save: the System labels", _lb, "Help,Save,Save & Quit to Title,Abandon Run,Quit to Title");
+    Test_True("r4final2 save: every row is on on the map and explains itself", _all_on && _all_help);
+    var _why = ["battle", "cutscene", "none"];
+    var _text = ["You cannot save during a fight.", "You cannot save during a cutscene.", "There is no run to save."];
+    for (var _w = 0; _w < 3; _w++) {
+        var _rows = TabSystem_Items(_why[_w] == "battle", _why[_w]);
+        Test_False("r4final2 save: Save is greyed (" + _why[_w] + ")", _rows[1].enabled);
+        Test_False("r4final2 save: Save & Quit is greyed (" + _why[_w] + ")", _rows[2].enabled);
+        Test_Eq("r4final2 save: Save says why (" + _why[_w] + ")", _rows[1].help, _text[_w]);
+        Test_Eq("r4final2 save: Save & Quit says why (" + _why[_w] + ")", _rows[2].help, _text[_w]);
+        Test_True("r4final2 save: Help, Abandon and Quit stay on (" + _why[_w] + ")", _rows[0].enabled && _rows[3].enabled && _rows[4].enabled);
+    }
+    Test_Eq("r4final2 save: the Save & Quit question", TabSystem_Question("save_quit", false), "Save and quit to title? Continue picks it up from here.");
+    // the mouse: a click on an enabled row confirms it, a greyed row does not answer
+    var _m = Ui_MenuNew("r4f2_sys", TabSystem_Items(false, ""), {});
+    var _rects = [];
+    for (var _r = 0; _r < array_length(_m.items); _r++) array_push(_rects, { x: 0, y: _r * 10, w: 100, h: 10 });
+    _m.rects = _rects;
+    var _sn = Ui_SnapNew();
+    _sn.mx = 5;
+    _sn.my = 15;   // the Save row
+    _sn.mouse_moved = true;
+    _sn.click = true;
+    var _ev = Ui_MenuStep(_m, _sn, 5000);
+    Test_True("r4final2 save: a click on the Save row confirms it", _ev.confirm && _m.items[_ev.index].id == "save", string(_ev.index));
+    var _g = Ui_MenuNew("r4f2_sys2", TabSystem_Items(true, "battle"), {});
+    _g.rects = _rects;
+    var _ev2 = Ui_MenuStep(_g, _sn, 5000);
+    Test_False("r4final2 save: a click on the greyed Save row does nothing", _ev2.confirm);
+    // Korean: the new rows have their own text (not the English fallback)
+    Loc_SetLanguage("ko");
+    var _ko = TabSystem_Items(false, "");
+    Test_True("r4final2 save: the Korean labels are Korean", _ko[1].label != "Save" && _ko[2].label != "Save & Quit to Title" && string_length(_ko[1].help) > 0);
+    Loc_SetLanguage(_lang0);
+}
+
+function Test_R4Final2SaveFile(_p) {
+    if (asset_get_index("Menu_SaveNow") == -1) { Test_True("r4final2 save: Menu_SaveNow exists (not implemented yet)", false); return; }
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_cp = _gs.checkpoint;
+    var _old_persist = _gs.persist;
+    var _old_class = _gs.selected_class;
+    _gs.run = Run_Create(6161);
+    _gs.run.gold = 44;
+    var _pl = CharacterCreate_Player(CLASS_MAGE);
+    _pl.level = 3;
+    _gs.player_ch = _pl;
+    _gs.selected_class = CLASS_MAGE;
+    _gs.checkpoint = { room: rm_floor3, x: 48, y: 64 };
+    _gs.persist = {};
+    var _path = RunSave_Path();
+    Test_Eq("r4final2 save: the active slot's file is run_0_0", _path, _p + "run_0_0.sav");
+    Test_ProfPutRun(_path, 4, 777, CLASS_KNIGHT, 2, 1, 1000, 5);   // an older save in the slot (saved at 5)
+    // blocked: nothing is written
+    var _b = Menu_SaveNow("battle");
+    Test_False("r4final2 save: in a fight nothing is saved", _b.ok);
+    Test_Eq("r4final2 save: and the answer says why", _b.text, "You cannot save during a fight.");
+    Test_Eq("r4final2 save: the file is untouched (saved at 5)", Slots_Summary(Profiles_Active())[Slot_Active()].saved_at, 5);
+    // allowed: the same file, written now, this run
+    var _r = Menu_SaveNow("");
+    Test_True("r4final2 save: Save writes the run", _r.ok);
+    Test_Eq("r4final2 save: the notice reads Game saved.", _r.text, "Game saved.");
+    var _sm = Slots_Summary(Profiles_Active())[Slot_Active()];
+    Test_Eq("r4final2 save: the active slot's file is this run now (seed)", _sm.seed, 6161);
+    Test_True("r4final2 save: its saved_at moved on", _sm.saved_at > 5);
+    Test_Eq("r4final2 save: it is a good run file", _sm.status, "ok");
+    var _l = RunSave_LoadFrom(_path);
+    Test_Eq("r4final2 save: it loads back with this run's gold", is_struct(_l.run) ? _l.run.gold : -1, 44);
+    // the other save files are not touched
+    Test_False("r4final2 save: slot 1 is still empty", Slots_Summary(Profiles_Active())[1].exists);
+    _gs.checkpoint = _old_cp;
+    _gs.persist = _old_persist;
+    _gs.selected_class = _old_class;
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+function Test_R4Final2SaveFileRun() { Test_ProfRun("tpc_", Test_R4Final2SaveFile); }

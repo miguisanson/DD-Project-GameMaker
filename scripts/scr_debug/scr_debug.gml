@@ -583,6 +583,9 @@ function Scenario_StepSmoke(_s) {
         case 1130: case 1131: case 1132: case 1133: case 1134: case 1135: case 1136: case 1137: case 1138: case 1139:
             Scenario_StepSmokeR4Bush(_s);   // r4final2 (I-110, R-124): a slime chases the player, he walks into a bush with real keys: "?" at once, it stands 2.5 s, then roams, never re-spots him in the bush; goes on with the Save step (1140)
             break;
+        case 1140: case 1141: case 1142: case 1143: case 1144: case 1145: case 1146: case 1147: case 1148: case 1149:
+            Scenario_StepSmokeR4Save(_s);   // r4final2 (I-112, R-127): Tab > System > Save (notice "Game saved.", the run file is newer), Save & Quit to Title, Continue; the end of the chain (its last step calls Scenario_MouseEnd)
+            break;
         case 1110: case 1111: case 1112: case 1113: case 1114: case 1115: case 1116: case 1117: case 1118: case 1119:
             Scenario_StepSmokeR3Ideas1(_s);   // r3ideas1 (D173, D185, R-114, R-115): a resisted Bleeding is said and remembered by the Codex; a poison tick kills and the death tip is the poison one; goes on with saves2 (1070)
             break;
@@ -18828,10 +18831,119 @@ function Scenario_StepSmokeR4Bush(_s) {
             }
             if (_s.t > 150) { Scenario_Check("r4final2_smoke_out_of_the_bush_it_spots_him_again", false, "mode=" + _e.ai_mode + " cooldown=" + string(_e.spot_cooldown)); Scenario_Next(_s, 1134); }
             break;
-        case 1134:   // the end of the chain (until the Save steps are added)
+        case 1134:   // goes on with the Save steps (1140)
             with (obj_enemy) instance_destroy();
             Scenario_Release();
-            Scenario_MouseEnd();
+            Scenario_Next(_s, 1140);
+            break;
+    }
+}
+
+// ============================================================================
+// Round 4 final fixes, packet final2, smoke steps 1140..1149 (rm_floor1, real keys). I-112 (R-127): the System tab's Save and Save & Quit to Title.
+//   1140: a run on rm_floor1, the run file written once (its saved_at is the reference)
+//   1141: Tab opens the menu on System, down to Save, confirm: the notice "Game saved." and the run file's saved_at is newer; the notice is answered
+//   1142: down to Save & Quit to Title, confirm: the pop-up asks (cursor on No), Yes: the run is saved and the title is reached; the run file is not older
+//   1143: the title: Continue is on and resumes the run on the same floor; the end of the chain (Scenario_MouseEnd)
+// ============================================================================
+function Scenario_StepSmokeR4Save(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "r4s")) _s.r4s = { };
+    var _h = _s.r4s;
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _u = TabMenu_Get();
+    switch (_s.step) {
+        case 1140:   // a run on rm_floor1
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP r4final2 save smoke (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_Finish();   // not MouseEnd / a wipe: outside the gate those would touch the real profile files
+                    break;
+                }
+                Scenario_Release();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Confirm_Close();
+                Scenario_NewKnight(CLASS_KNIGHT);
+                if (!Run_IsActive()) _gs.run = Run_Create(7788);
+                room_goto(rm_floor1);
+            }
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor1) && Player_IsSettled(instance_find(obj_player, 0))) {
+                _h.seed0 = _gs.run.seed;
+                Run_AutoSave();   // the reference: what the file holds now
+                _h.t0 = Slots_Summary(Profiles_Active())[Slot_Active()].saved_at;
+                Scenario_Check("r4final2_smoke_the_run_file_is_there_to_start_with", RunSave_HasSave() && _h.t0 > 0, "saved_at=" + string(_h.t0));
+                Scenario_Next(_s, 1141);
+            }
+            if (_s.t > 600) { Scenario_Check("r4final2_smoke_rm_floor1_is_ready", false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+            break;
+        case 1141:   // the menu on System, Save
+            if (_s.t == 1) {
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 6);   // the menu opens on System
+                Scenario_Tap("menu");
+            }
+            if (_s.t == 140) {   // (a long wait: the saved_at of two saves differ by whole seconds)
+                Scenario_Check("r4final2_smoke_the_menu_opens_on_system", _gs.ui.mode == UI_MENU && is_struct(_u) && TabMenu_Ids()[_u.tab] == "system", "mode=" + string(_gs.ui.mode));
+                Ui_MenuFixCursor(TabMenu_TopMenu(), 0);   // start from Help
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 154) {
+                var _tm = TabMenu_TopMenu();
+                Scenario_Check("r4final2_smoke_down_from_help_is_save", is_struct(_tm) && _tm.items[_tm.cursor].id == "save" && _tm.items[_tm.cursor].enabled, "cursor=" + string(is_struct(_tm) ? _tm.cursor : -1));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 170) {
+                Scenario_Check("r4final2_smoke_a_notice_says_game_saved", Notice_IsOpen() && Notice_Text() == "Game saved.", Notice_IsOpen() ? Notice_Text() : "no notice");
+                var _sm = Slots_Summary(Profiles_Active())[Slot_Active()];
+                Scenario_Check("r4final2_smoke_the_run_file_is_newer", _sm.saved_at > _h.t0 && _sm.status == "ok", "saved_at=" + string(_sm.saved_at) + " was " + string(_h.t0));
+                Scenario_Check("r4final2_smoke_it_is_the_same_run", _sm.seed == _h.seed0, "seed=" + string(_sm.seed));
+                _h.t1 = _sm.saved_at;
+                Scenario_Check("r4final2_smoke_the_menu_is_still_open_under_the_notice", _gs.ui.mode == UI_MENU && is_struct(_u) && _u.closed_ms < 0);
+                Scenario_Tap("confirm");   // answers the notice
+            }
+            if (_s.t == 200) {
+                Scenario_Check("r4final2_smoke_the_notice_is_gone_and_the_menu_stays", !Notice_IsOpen() && _gs.ui.mode == UI_MENU && is_struct(_u) && _u.closed_ms < 0, "notice=" + string(Notice_IsOpen()));
+                Scenario_Next(_s, 1142);
+            }
+            break;
+        case 1142:   // Save & Quit to Title
+            if (_s.t == 1) Scenario_Tap("menu_down");
+            if (_s.t == 14) {
+                var _tm2 = TabMenu_TopMenu();
+                Scenario_Check("r4final2_smoke_down_from_save_is_save_and_quit", is_struct(_tm2) && _tm2.items[_tm2.cursor].id == "save_quit" && _tm2.items[_tm2.cursor].enabled, "cursor=" + string(is_struct(_tm2) ? _tm2.cursor : -1));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 28) {
+                Scenario_Check("r4final2_smoke_save_and_quit_asks_first", Confirm_IsOpen() && Confirm_Question() == "Save and quit to title? Continue picks it up from here." && Confirm_Menu().cursor == 1 && room == rm_floor1, Confirm_IsOpen() ? Confirm_Question() : "none");
+                Scenario_Tap("menu_up");   // No -> Yes
+            }
+            if (_s.t == 42) {
+                Scenario_Check("r4final2_smoke_the_popup_is_on_yes", Confirm_IsOpen() && Confirm_Menu().cursor == 0);
+                Scenario_Tap("confirm");   // Yes
+            }
+            if (_s.t > 46 && room == rm_start && !Transition_IsActive()) {
+                var _sm2 = Slots_Summary(Profiles_Active())[Slot_Active()];
+                Scenario_Check("r4final2_smoke_save_and_quit_reaches_the_title", _gs.in_main_menu && !is_struct(TabMenu_Get()) && !Confirm_IsOpen());
+                Scenario_Check("r4final2_smoke_the_run_file_is_not_older_than_the_save", _sm2.saved_at >= _h.t1 && _sm2.status == "ok" && _sm2.seed == _h.seed0, "saved_at=" + string(_sm2.saved_at) + " save was " + string(_h.t1));
+                Scenario_Next(_s, 1143);
+            }
+            if (_s.t > 600) { Scenario_Check("r4final2_smoke_save_and_quit_reaches_the_title", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_MouseEnd(); }
+            break;
+        case 1143:   // the title: Continue resumes the run on the same floor
+            if (room == rm_start && _sc != noone && !Transition_IsActive() && !variable_struct_exists(_h, "tt")) {
+                if (_sc.state != "main") { _sc.state = "main"; break; }
+                if (is_struct(_sc.title_stk) && _s.t > 20) {
+                    _h.tt = _s.t;
+                    var _top = Ui_StackTop(_sc.title_stk);
+                    Scenario_Check("r4final2_smoke_continue_is_on_and_has_the_cursor", _top.items[0].id == "continue" && _top.items[0].enabled && _top.cursor == 0, "cursor=" + string(_top.cursor));
+                    Scenario_Tap("confirm");
+                }
+            }
+            if (variable_struct_exists(_h, "tt") && _s.t > _h.tt + 10 && Scenario_FloorReady(rm_floor1) && !_gs.load_spawn_pending) {
+                Scenario_Check("r4final2_smoke_continue_resumes_the_same_run_on_the_same_floor", Run_IsActive() && _gs.run.seed == _h.seed0 && room == rm_floor1, "seed=" + (Run_IsActive() ? string(_gs.run.seed) : "no run") + " room=" + room_get_name(room));
+                Scenario_MouseEnd();   // the end of the chain
+            }
+            if (_s.t > 900) { Scenario_Check("r4final2_smoke_continue_reaches_the_floor", false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
             break;
     }
 }
