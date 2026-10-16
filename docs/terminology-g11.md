@@ -44,6 +44,7 @@ Sentence case: messages, help lines, descriptions, confirm questions, tutorial b
 - `Continue`: the title row that loads a run (이어하기) and the tutorial footer that closes a pop-up (계속).
 - `Damage Taken`: the run-summary total (받은 피해) and the shop line for what a potion or armour reduces (받는 피해).
 - `Brace`: a passive (대비) and the chip of the Braced status (태세).
+- `Weak`: the hit grade for a poor timing press (약함) and the Codex line for the status an enemy takes better (약점, D173). Kept; the lint allows the two Korean words.
 - `Health.` / `Magic points.` in `help.line.hp` / `help.line.mp` are the definitions of HP and MP, not labels, so they stay.
 - Glossary note: Inventory (소지품) is now `Bag` in English; the Korean word is unchanged. The glossary file lives outside the committed folders, so this line is the record.
 

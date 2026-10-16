@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T15:37:06Z",
-    "row_count": 1272
+    "generated_at_utc": "2026-10-16T16:27:47Z",
+    "row_count": 1288
   },
   "default_lang": "en",
   "languages": [
@@ -1080,6 +1080,10 @@
       "en": "You are pushed back!",
       "ko": "턴이 뒤로 밀렸습니다!"
     },
+    "combat.msg.resists": {
+      "en": "{enemy} resists [t]{status}[/t].",
+      "ko": "{enemy}은(는) [t]{status}[/t]에 저항합니다."
+    },
     "combat.msg.sentence_dot": {
       "en": ".",
       "ko": "."
@@ -1147,6 +1151,10 @@
     "combat.msg.victory_prefix": {
       "en": "You defeated {enemy}.",
       "ko": "{enemy}을(를) 쓰러뜨렸습니다."
+    },
+    "combat.msg.weak_to": {
+      "en": "{enemy} is weak to [t]{status}[/t]!",
+      "ko": "{enemy}은(는) [t]{status}[/t]에 약합니다!"
     },
     "combat.msg.windup.skill_ghost_cut": {
       "en": "{enemy} raises its blade!",
@@ -1659,6 +1667,54 @@
     "death.t5.2": {
       "en": "Down here, at least, you know what to expect.",
       "ko": "적어도 여기서는 무엇이 올지 안다."
+    },
+    "death.tip.gen_bed": {
+      "en": "Each bed restores all your HP and MP, once per run.",
+      "ko": "침대는 도전마다 한 번, HP와 MP를 모두 회복해 줍니다."
+    },
+    "death.tip.gen_break": {
+      "en": "When an enemy hits [a]BREAK[/a], it loses a turn and takes {pct}% more damage.",
+      "ko": "적이 [a]브레이크[/a] 상태가 되면 한 턴을 잃고 피해를 {pct}% 더 받습니다."
+    },
+    "death.tip.gen_guard": {
+      "en": "Guard halves all hits until your next turn and restores {pct}% of max MP.",
+      "ko": "방어는 다음 턴까지 모든 피해를 반으로 줄이고 최대 MP의 {pct}%를 회복합니다."
+    },
+    "death.tip.gen_smoke": {
+      "en": "A [a]Perfect[/a] Smoke Bomb throw gets you out of any battle but a boss.",
+      "ko": "연막탄을 [a]완벽[/a]하게 던지면 보스 전투를 뺀 모든 전투에서 빠져나갑니다."
+    },
+    "death.tip.gen_throw": {
+      "en": "A thrown Firebomb or Poison Pot finds weak points like a skill does.",
+      "ko": "던진 화염병이나 독 항아리도 스킬처럼 약점을 찌릅니다."
+    },
+    "death.tip.gen_weak": {
+      "en": "Every enemy has a weak point and a resistance. The Codex remembers them.",
+      "ko": "모든 적에게는 약점과 저항이 있습니다. 도감이 기억해 줍니다."
+    },
+    "death.tip.skill_pale_hymn": {
+      "en": "{skill}: [a]BREAK[/a] it before it lands.",
+      "ko": "{skill}: 공격이 닿기 전에 [a]브레이크[/a]시키세요."
+    },
+    "death.tip.skill_ramming": {
+      "en": "{skill}: [a]BREAK[/a] it first, or Guard and time the defence bar.",
+      "ko": "{skill}: 먼저 [a]브레이크[/a]시키거나, 방어하고 막대의 타이밍을 맞추세요."
+    },
+    "death.tip.skill_windup": {
+      "en": "{skill} comes after a wind-up: [a]BREAK[/a] it first, or Guard.",
+      "ko": "{skill}은(는) 준비 동작 뒤에 옵니다. 먼저 [a]브레이크[/a]시키거나 방어하세요."
+    },
+    "death.tip.status_bleed": {
+      "en": "Bleeding hurts when you act: a Bandage stops it.",
+      "ko": "출혈은 행동할 때 피해를 줍니다. 붕대로 멈출 수 있습니다."
+    },
+    "death.tip.status_burn": {
+      "en": "Burn lowers your DEF while it lasts: Guard to halve the hits.",
+      "ko": "화상이 지속되는 동안 DEF가 낮아집니다. 방어로 피해를 반으로 줄이세요."
+    },
+    "death.tip.status_poison": {
+      "en": "Poison killed you: an Antidote cures it.",
+      "ko": "독에 쓰러졌습니다. 해독제로 치료할 수 있습니다."
     },
     "dialogue.after_class_chest_archer.0": {
       "en": "Light. Balanced.",
@@ -4808,6 +4864,10 @@
       "en": "Met",
       "ko": "만남"
     },
+    "tab.lbl.resists": {
+      "en": "Resists",
+      "ko": "저항"
+    },
     "tab.lbl.seed": {
       "en": "Seed",
       "ko": "시드"
@@ -4823,6 +4883,10 @@
     "tab.lbl.upgrade": {
       "en": "Upgrade",
       "ko": "강화"
+    },
+    "tab.lbl.weak": {
+      "en": "Weak",
+      "ko": "약점"
     },
     "tab.lbl.wins": {
       "en": "Wins",

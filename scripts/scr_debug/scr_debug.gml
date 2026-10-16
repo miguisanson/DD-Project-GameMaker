@@ -569,6 +569,9 @@ function Scenario_StepSmoke(_s) {
         case 1100: case 1101: case 1102: case 1103: case 1104: case 1105: case 1106: case 1107: case 1108: case 1109:
             Scenario_StepSmokeR3Mouse(_s);   // mouse (D182, R-111): the title, Settings sliders, the seed entry through a fake mouse; the end of the chain (its last step calls Scenario_MouseEnd)
             break;
+        case 1110: case 1111: case 1112: case 1113: case 1114: case 1115: case 1116: case 1117: case 1118: case 1119:
+            Scenario_StepSmokeR3Ideas1(_s);   // r3ideas1 (D173, D185, R-114, R-115): a resisted Bleeding is said and remembered by the Codex; a poison tick kills and the death tip is the poison one; goes on with saves2 (1070)
+            break;
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step goes on to G6 (380)
             break;
@@ -3060,7 +3063,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsR3Stealth(_s);   // r3stealth (D179, R-098): the faint sight cone in a dark cave, the daylight clearing and while chasing; three scenes, two sizes; goes on with r3rarity (1080)
             break;
         case 1080: case 1081: case 1082: case 1083: case 1084: case 1085: case 1086: case 1087: case 1088: case 1089:
-            Scenario_StepShotsRarity(_s);   // r3rarity (D178, R-110): item names in their rarity colour and the gem on the icons: a chest line, a battle drop, the Items and Gear tabs, the shop; three sizes; the end of the pictures
+            Scenario_StepShotsRarity(_s);   // r3rarity (D178, R-110): item names in their rarity colour and the gem on the icons: a chest line, a battle drop, the Items and Gear tabs, the shop; three sizes; goes on with r3ideas1 (1110)
+            break;
+        case 1110: case 1111: case 1112: case 1113: case 1114: case 1115: case 1116: case 1117: case 1118: case 1119:
+            Scenario_StepShotsR3Ideas1(_s);   // r3ideas1 (D173, D185, R-114, R-115): the Codex bestiary with Weak / Resists (three sizes, Korean) and the death scene with a tip; goes on with saves2 (1060..1069), the end of the pictures
             break;
         case 1050: case 1051: case 1052: case 1053: case 1054: case 1055: case 1056: case 1057: case 1058: case 1059:
             Scenario_StepShotsTextFit2(_s);   // round 3 textfit2 (R-106): the Skills tab, the battle Skill list and the Controls page with the long names, three sizes; the end of the pictures
@@ -5174,12 +5180,13 @@ function Scenario_StepSmokeStory(_s) {
                 Scenario_Check("death_scene_has_a_line_of_the_first_tier", _ctx.pick.tier == 1 && _ctx.text != "" && _ctx.deaths == 1, "deaths=" + string(_ctx.deaths) + " text=" + string(_ctx.text));
                 Scenario_Check("death_scene_line_is_not_game_over", string_pos("GAME OVER", string_upper(_ctx.text)) == 0);
                 var _fps = game_get_speed(gamespeed_fps);
-                Scenario_Check("death_scene_is_2_to_4_seconds", _ctx.frames >= 2 * _fps && _ctx.frames <= 4 * _fps, "frames=" + string(_ctx.frames));
+                _st.tip_extra = _ctx.frames - DeathScene_Frames(_ctx.text, _fps);   // D185 (IDEA-25): the death tip adds its reading time (1.5 to 3 s) to the line's 2 to 4 s
+                Scenario_Check("death_scene_is_2_to_4_seconds", DeathScene_Frames(_ctx.text, _fps) >= 2 * _fps && DeathScene_Frames(_ctx.text, _fps) <= 4 * _fps && ((_ctx.tip == "" && _st.tip_extra == 0) || (_ctx.tip != "" && _st.tip_extra >= 1.5 * _fps && _st.tip_extra <= 3 * _fps)), "frames=" + string(_ctx.frames) + " tip=" + string(_st.tip_extra));
             }
             if (_s.t <= 8 && global.sfx_last_key == "metal_resonance") _st.crack = true;
             if (global.run_flow.phase == "summary") {
                 Scenario_Check("death_scene_cracks_as_the_line_comes", _st.crack);
-                Scenario_Check("death_scene_runs_by_itself_before_the_summary", _s.t >= 110 && _s.t <= 250, "t=" + string(_s.t));
+                Scenario_Check("death_scene_runs_by_itself_before_the_summary", _s.t >= 110 && _s.t <= 250 + _st.tip_extra, "t=" + string(_s.t));
                 Scenario_Next(_s, 103);
             }
             if (_s.t > 600) { Scenario_Check("death_scene_ends_in_the_summary", false, "phase=" + string(global.run_flow.phase)); Scenario_Finish(); }
@@ -14641,7 +14648,7 @@ function Scenario_StepSmokeR3Stealth(_s) {
             }
             break;
         case 1059:   // the end of the chain: removes the files and the profile the steps made
-            Scenario_Next(_s, 1070);   // goes on with saves2 (1070..1089), the end of the chain
+            Scenario_Next(_s, 1110);   // goes on with r3ideas1 (1110..1113), then saves2 (1070..1089), the end of the chain
             break;
     }
 }
@@ -17388,7 +17395,7 @@ function Scenario_StepShotsRarity(_s) {
                 if (_o.di >= array_length(_scenes)) {
                     global.rarity_clock = -1;
                     Scenario_SetWindowScale(3);
-                    Scenario_Next(_s, 1060);   // goes on with the saves2 title pictures (1060..1069), the end of the pictures
+                    Scenario_Next(_s, 1110);   // goes on with the r3ideas1 pictures (1110..1117), then the saves2 title pictures (1060..1069), the end of the pictures
                 } else {
                     Scenario_Next(_s, 1080);
                 }
@@ -17952,6 +17959,274 @@ function Scenario_StepShotsR3Mouse(_s) {
                     Scenario_Next(_s, 1090);
                 }
             }
+            break;
+    }
+}
+
+// ============================================================================================================================
+// Round 3 packet ideas1 (D173, D185; IDEA-07 weak points, IDEA-25 death tip).
+// SMOKE 1110-1114 (goes on with saves2, 1070): a real battle against a Slime (it resists Bleeding): Wound with a chance of 1% is resisted, the log says so and the Codex remembers the
+//   resistance; then the player is at 1 HP with Poison and Guards through the real keys: the poison tick kills, the death scene's context holds the poison tip, the summary follows
+//   and a confirm starts the next run.
+// SHOTS 1110-1116 (goes on with saves2, 1060): the Codex bestiary from the title (Mad Whisp with only its weakness seen, Killer Plant with both seen, Palehorn with its single weakness
+//   unseen) at 480 x 432, 640 x 576 and 800 x 720 and in Korean, then the death scene with a tip (Pale Hymn, poison, a generic one).
+// ============================================================================================================================
+function Scenario_StepSmokeR3Ideas1(_s) {
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
+    var _gs = GameState_Get();
+    var _scn = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _flow = (variable_global_exists("run_flow") && is_struct(global.run_flow)) ? global.run_flow : undefined;
+    if (!variable_struct_exists(_s, "i1")) _s.i1 = { chance: -1 };
+    var _o = _s.i1;
+    var _menu = (_bc != noone && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER && is_struct(_bc.ui_cmd));
+    switch (_s.step) {
+        case 1110:   // a fresh battle against a Slime; Wound with a 1% chance
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP r3ideas1 smoke (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_Next(_s, 1070);
+                    break;
+                }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_NewKnight();
+                Scenario_GotoBattle("smoke_r3i1", ENEMY_SLIME);
+            }
+            if (_s.t > 20 && _menu) {
+                _bc.p.skills = [SKILL_WOUND];
+                _bc.p.mp = _bc.p.max_mp;
+                _bc.p.hp = _bc.p.max_hp;
+                _o.chance = SkillDB_GetBase(SKILL_WOUND).status_chance;
+                SkillDB_GetBase(SKILL_WOUND).status_chance = 0.01;   // a sure failure for the 37% of a Slime: only the resistance can make the chance this small
+                Battle_PlayerSkill(_bc, SKILL_WOUND, Qte_Result(QTE_OK));
+                Scenario_Next(_s, 1111);
+            }
+            if (_s.t > 600) { Scenario_Check("r3ideas1_smoke_reaches_the_player_menu", false, "state=" + string(_bc != noone ? _bc.battle_state : -1)); Scenario_NoticeEnd(); }
+            break;
+        case 1111:   // the resistance was said and remembered; the player's next menu: 1 HP and Poison, then Guard through the keys
+            if (_s.t == 2 && _bc != noone) {
+                SkillDB_GetBase(SKILL_WOUND).status_chance = _o.chance;
+                var _txt = "";
+                for (var _l = 0; _l < array_length(_bc.combat_log); _l++) _txt += _bc.combat_log[_l].text + "|";
+                Scenario_Check("r3ideas1_smoke_the_log_says_the_slime_resists_bleeding", string_pos(Loc_T("combat.msg.resists", "{enemy} resists [t]{status}[/t].", { enemy: _bc.e.name, status: StatusDB_Get(STATUS_BLEED).name }), _txt) > 0, _txt);
+                Scenario_Check("r3ideas1_smoke_the_slime_has_no_bleeding", !Status_Has(_bc.e, STATUS_BLEED));
+                var _ent = Codex_Entry(Profile_Get(), ENEMY_SLIME);
+                Scenario_Check("r3ideas1_smoke_the_codex_remembers_the_resistance", is_struct(_ent) && variable_struct_exists(_ent, "resist_seen") && _ent.resist_seen, is_struct(_ent) ? json_stringify(_ent) : "no entry");
+                Scenario_Check("r3ideas1_smoke_and_not_a_weakness", is_struct(_ent) && !variable_struct_exists(_ent, "weak_seen"));
+            }
+            if (_s.t > 20 && _menu) {
+                _bc.p.hp = 1;
+                Status_Add(_bc.p, STATUS_POISON, 1, 1, 5);
+                Scenario_Next(_s, 1112);
+            }
+            if (_s.t > 900) { Scenario_Check("r3ideas1_smoke_the_player_menu_comes_back", false, "state=" + string(_bc != noone ? _bc.battle_state : -1)); Scenario_NoticeEnd(); }
+            break;
+        case 1112:   // Down x3 to Guard, confirm: the poison tick ends the run
+            switch (_s.t) {
+                case 3: Scenario_Tap("menu_down"); break;
+                case 9: Scenario_Tap("menu_down"); break;
+                case 15: Scenario_Tap("menu_down"); break;
+                case 21:
+                    Scenario_Check("r3ideas1_smoke_the_cursor_is_on_guard", _bc != noone && _bc.menu_index == 3, "i=" + string(_bc != noone ? _bc.menu_index : -1));
+                    Scenario_Tap("confirm");
+                    break;
+            }
+            if (_s.t > 25 && is_struct(_flow) && _scn != noone && _scn.state == "run_flow" && _flow.phase == "death") {
+                var _tip = _flow.ctx.tip;
+                var _lay = RunFlow_DeathLayoutNow(_flow.ctx.text, _tip);
+                Scenario_Check("r3ideas1_smoke_a_poison_tick_death_has_the_poison_tip", _flow.ctx.tip_key == "death.tip.status_poison" && string_pos("Antidote", _tip) > 0, _flow.ctx.tip_key + ": " + _tip);
+                Scenario_Check("r3ideas1_smoke_the_tip_is_inside_the_screen", _lay.tip_h > 0 && _lay.tip_y + _lay.tip_h <= Display_GuiH(), json_stringify(_lay));
+                Scenario_Check("r3ideas1_smoke_the_scene_lasts_longer_than_the_line_alone", _flow.ctx.frames > DeathScene_Frames(_flow.ctx.text, max(1, game_get_speed(gamespeed_fps))));
+                Scenario_Check("r3ideas1_smoke_the_profile_keeps_the_tip", Profile_Get().last_tip == "death.tip.status_poison");
+                Scenario_Next(_s, 1113);
+            }
+            if (_s.t > 900) { Scenario_Check("r3ideas1_smoke_the_poison_tick_ends_the_run", false, "state=" + (_scn != noone ? string(_scn.state) : "none") + " room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1113:   // the summary, a confirm, the next run starts; then on to saves2
+            if (is_struct(_flow) && _flow.phase == "summary" && _flow.t == 25) Scenario_Tap("confirm");
+            if (_s.t > 60 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) Scenario_Next(_s, 1070);
+            if (_s.t > 1500) { Scenario_Check("r3ideas1_smoke_the_next_run_starts", false, "room=" + room_get_name(room) + " phase=" + (is_struct(_flow) ? string(_flow.phase) : "none")); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+function Scenario_R3I1CodexScenes() {
+    // scale, language, the enemy whose row the cursor is on, what the profile has seen of it
+    return [
+        { scale: 3, lang: "en", enemy: ENEMY_MADWHISP, weak: true, resist: false },
+        { scale: 4, lang: "en", enemy: ENEMY_KILLER_PLANT, weak: true, resist: true },
+        { scale: 5, lang: "en", enemy: ENEMY_MADWHISP, weak: true, resist: false },
+        { scale: 5, lang: "en", enemy: ENEMY_MINI_BOSS, weak: false, resist: false },
+        { scale: 4, lang: "ko", enemy: ENEMY_MADWHISP, weak: true, resist: false },
+        { scale: 3, lang: "ko", enemy: ENEMY_KILLER_PLANT, weak: true, resist: true }
+    ];
+}
+
+function Scenario_R3I1DeathScenes() {
+    // scale, language, the killer: a move (skill), a poison tick (dot) or a plain attack (none)
+    return [
+        { scale: 3, lang: "en", enemy: ENEMY_FINAL_BOSS, skill: SKILL_PALE_HYMN, dot: -1, tip: "death.tip.skill_pale_hymn" },
+        { scale: 4, lang: "en", enemy: ENEMY_FINAL_BOSS, skill: SKILL_PALE_HYMN, dot: -1, tip: "death.tip.skill_pale_hymn" },
+        { scale: 5, lang: "en", enemy: ENEMY_FINAL_BOSS, skill: SKILL_PALE_HYMN, dot: -1, tip: "death.tip.skill_pale_hymn" },
+        { scale: 4, lang: "ko", enemy: ENEMY_SPIDER, skill: -1, dot: STATUS_POISON, tip: "death.tip.status_poison" },
+        { scale: 3, lang: "en", enemy: ENEMY_MINI_BOSS, skill: SKILL_RAMMING, dot: -1, tip: "death.tip.skill_ramming" }
+    ];
+}
+
+function Scenario_StepShotsR3Ideas1(_s) {
+    var _cs = Scenario_R3I1CodexScenes();
+    var _ds = Scenario_R3I1DeathScenes();
+    var _gs = GameState_Get();
+    var _c = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _flow = (variable_global_exists("run_flow") && is_struct(global.run_flow)) ? global.run_flow : undefined;
+    if (!variable_struct_exists(_s, "i1")) _s.i1 = { ci: 0, di: 0 };
+    var _o = _s.i1;
+    var _cs_now = (_o.ci < array_length(_cs)) ? _cs[_o.ci] : _cs[0];
+    var _ds_now = (_o.di < array_length(_ds)) ? _ds[_o.di] : _ds[0];
+    var _ctag = "codex_" + _cs_now.lang + "_" + string(_cs_now.scale) + "_" + string(_o.ci);
+    var _dtag = "death_" + _ds_now.lang + "_" + string(_ds_now.scale) + "_" + string(_o.di);
+    switch (_s.step) {
+        case 1110:   // a profile that has met everyone, the window scale and language of the picture, the title
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP r3ideas1 shots (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_Next(_s, 1060);
+                    break;
+                }
+                Scenario_ClearUi();
+                Confirm_Close();
+                Notice_Interrupt();
+                Loc_SetLanguage("en");
+                Scenario_SetWindowScale(_cs_now.scale);
+                Scenario_ProfilesWipe();
+                var _pr = Profile_Get();
+                var _ids = Codex_EnemyIds();
+                for (var _i = 0; _i < array_length(_ids); _i++) Codex_Met(_pr, _ids[_i], (_ids[_i] == ENEMY_STRANGER));
+                if (_cs_now.weak) Codex_NoteWeakPoint(_pr, _cs_now.enemy, "weak");
+                if (_cs_now.resist) Codex_NoteWeakPoint(_pr, _cs_now.enemy, "resist");
+                Profile_Flush();
+                Scenario_NewKnight(CLASS_KNIGHT);
+                _gs.in_main_menu = true;
+                _gs.startup_logo_seen = true;
+                room_goto(rm_start);
+            }
+            if (_s.t >= 40 && room == rm_start && _c != noone && _c.state == "main" && is_struct(_c.title_stk) && !Transition_IsActive() && !Notice_IsOpen() && Ui_MenuAlpha(_c.title_stk.menus[0], current_time) >= 1) {
+                if (_cs_now.lang == "ko") {
+                    Loc_SetLanguage("ko");
+                    _c.title_refresh = true;
+                }
+                Scenario_Next(_s, 1111);
+            }
+            if (_s.t > 900) { Scenario_Check("shots_r3ideas1_reaches_the_title_" + _ctag, false, "room=" + room_get_name(room)); Scenario_S2End(); }
+            break;
+        case 1111:   // the Codex, the Bestiary, the cursor on the enemy of the picture
+            if (_s.t == 1) {
+                Title_CodexOpen(_c);
+                Title_CodexPage(_c, "bestiary");
+                var _cx = Title_CodexOf(_c);
+                var _bm = Ui_StackTop(_cx.stk);
+                var _ids2 = Codex_EnemyIds();
+                for (var _j = 0; _j < array_length(_ids2); _j++) if (_ids2[_j] == _cs_now.enemy) _bm.cursor = _j;
+                Ui_MenuFixCursor(_bm, _bm.cursor);
+            }
+            if (_s.t >= 30) Scenario_Next(_s, 1112);
+            break;
+        case 1112:   // assert the page, take the picture
+            var _cdx = (_c != noone) ? Title_CodexOf(_c) : undefined;
+            if (_s.t >= 4 && is_struct(_cdx) && Ui_AnimT(_cdx.t, current_time) >= 1 && Ui_MenuAlpha(Ui_StackTop(_cdx.stk), current_time) >= 1 && Ui_StackTop(_cdx.stk).rect.w > 0) {
+                var _mt = Ui_Metrics();
+                var _ct = Ui_StackTop(_cdx.stk);
+                var _row = _ct.items[_ct.cursor];
+                var _lw = Loc_T("tab.lbl.weak", "Weak");
+                var _lr = Loc_T("tab.lbl.resists", "Resists");
+                var _cfg = EnemyDB_Get(_cs_now.enemy);
+                Scenario_Check("shots_r3ideas1_the_language_is_" + _ctag, Loc_GetLanguage() == _cs_now.lang);
+                Scenario_Check("shots_r3ideas1_the_bestiary_is_open_" + _ctag, _ct.id == "codex_bestiary", _ct.id);
+                Scenario_Check("shots_r3ideas1_the_cursor_is_on_the_enemy_" + _ctag, _row.enemy_id == _cs_now.enemy);
+                Scenario_Check("shots_r3ideas1_details_inside_the_gui_" + _ctag, Scenario_S2Inside(_ct.det_rect, _mt), json_stringify(_ct.det_rect));
+                Scenario_Check("shots_r3ideas1_list_and_details_do_not_overlap_" + _ctag, !Test_RectsOverlap(_ct.rect, _ct.det_rect));
+                Scenario_Check("shots_r3ideas1_weak_line_" + _ctag, Test_RowValue(_row.lines, _lw) == (_cs_now.weak ? string(StatusDB_Get(_cfg.weak).name) : "?"), Test_RowValue(_row.lines, _lw));
+                if (_cfg.resist >= 0) Scenario_Check("shots_r3ideas1_resists_line_" + _ctag, Test_RowValue(_row.lines, _lr) == (_cs_now.resist ? string(StatusDB_Get(_cfg.resist).name) : "?"), Test_RowValue(_row.lines, _lr));
+                else Scenario_Check("shots_r3ideas1_a_boss_has_no_resists_line_" + _ctag, Test_RowValue(_row.lines, _lr) == "");
+                _s.shot = "shot_r3ideas1_codex_" + string(_o.ci) + "_" + _cs_now.lang + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1113);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_r3ideas1_the_codex_is_ready_" + _ctag, false); Scenario_S2End(); }
+            break;
+        case 1113:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_ClearUi();
+                _o.ci++;
+                if (_o.ci >= array_length(_cs)) {
+                    Loc_SetLanguage("en");
+                    Scenario_NewKnight(CLASS_KNIGHT);
+                    Scenario_Next(_s, 1114);
+                } else {
+                    Scenario_Next(_s, 1110);
+                }
+            }
+            break;
+        case 1114:   // a run on a clean profile; a death by the killer of the picture
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                _gs.settings.language = "en";
+                Loc_SetLanguage("en");
+                UI_SetFont();
+                Scenario_SetWindowScale(_ds_now.scale);
+                Profile_ResetForTest();
+                RunSave_Delete();
+                _gs.pending_wake_line = false;
+                _gs.in_main_menu = false;
+                Run_StartNew(false, 5560 + _o.di);
+            }
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && _s.t > 40) {
+                Scenario_ClearUi();
+                if (_ds_now.lang == "ko") { _gs.settings.language = "ko"; Loc_SetLanguage("ko"); UI_SetFont(); }   // as the settings row sets it: the rooms of the death flow read the language from the settings again
+                GameState_SetBattleEnemy("r3i1_shot", _ds_now.enemy, 1);
+                if (_ds_now.skill >= 0) Death_NoteKillSkill(_ds_now.skill);
+                if (_ds_now.dot >= 0) Death_NoteDotKill(_ds_now.dot);
+                Player_OnDeath(_gs.player_ch);
+                Scenario_Next(_s, 1115);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_r3ideas1_run_reaches_rm_floor1_" + _dtag, false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1115:   // the death line and the tip under it, faded in
+            if (is_struct(_flow) && _c != noone && _c.state == "run_flow" && _flow.phase == "death" && _flow.t >= 90) {
+                var _lay = RunFlow_DeathLayoutNow(_flow.ctx.text, _flow.ctx.tip);
+                var _mt2 = Ui_Metrics();
+                Scenario_Check("shots_r3ideas1_the_tip_is_the_one_of_the_killer_" + _dtag, _flow.ctx.tip_key == _ds_now.tip, _flow.ctx.tip_key);
+                Scenario_Check("shots_r3ideas1_the_text_block_is_inside_the_screen_" + _dtag, _lay.text_y >= 0 && _lay.text_y + _lay.text_h <= _mt2.gh && _lay.text_x >= 0 && _lay.text_x + _lay.text_w <= _mt2.gw, json_stringify(_lay));
+                Scenario_Check("shots_r3ideas1_the_tip_is_under_the_line_" + _dtag, _lay.tip_h > 0 && _lay.tip_y >= _lay.text_y + _lay.line_h);
+                Scenario_Check("shots_r3ideas1_the_picture_is_clear_of_the_text_" + _dtag, !_lay.show || _lay.img_y + _lay.img_h <= _lay.text_y);
+                _s.shot = "shot_r3ideas1_death_" + string(_o.di) + "_" + _ds_now.lang + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot, "fade=1");   // a picture on a dark screen with a fade: the edge check does not apply
+                Scenario_Next(_s, 1116);
+            }
+            if (_s.t > 1200) { Scenario_Check("shots_r3ideas1_reaches_the_death_line_" + _dtag, false, "state=" + (_c != noone ? string(_c.state) : "none")); Scenario_NoticeEnd(); }
+            break;
+        case 1116:
+            if (_s.t >= 4) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _o.di++;
+                _gs.settings.language = "en";
+                Loc_SetLanguage("en");
+                UI_SetFont();
+                if (_o.di >= array_length(_ds)) {
+                    Scenario_SetWindowScale(3);
+                    Scenario_Next(_s, 1060);   // goes on with the saves2 title pictures (1060..1069), the end of the pictures
+                } else {
+                    _flow.phase = "summary";
+                    _flow.t = 0;
+                    Scenario_Next(_s, 1117);
+                }
+            }
+            break;
+        case 1117:   // confirm on the summary: the next run starts; then the next death picture
+            if (_s.t == 20) Scenario_Tap("confirm");
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) Scenario_Next(_s, 1114);
+            if (_s.t > 900) { Scenario_Check("shots_r3ideas1_back_to_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
     }
 }

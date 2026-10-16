@@ -321,6 +321,8 @@ function EnemyCreate(_enemy_id) {
     ch.skills = base.skills;
     ch.status = [];
     ch.is_boss = base.is_boss;
+    ch.weak = variable_struct_exists(base, "weak") ? base.weak : -1;       // D173 (IDEA-07): see WeakPoint_Table
+    ch.resist = variable_struct_exists(base, "resist") ? base.resist : -1;
     ch.brain = variable_struct_exists(base, "brain") ? base.brain : AI_Brain([], [ AI_Weight("attack", -1, 1) ]);   // B4: the battle AI's rules (read only; a phase changes the stats above, not this)
     ch.threat_rank = variable_struct_exists(base, "threat_rank") ? base.threat_rank : 1;
     ch.stagger_max = Stagger_Max(ch.threat_rank, ch.is_boss);   // spec section 11: the BREAK meter

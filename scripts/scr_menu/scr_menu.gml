@@ -359,6 +359,33 @@ function Codex_RecordMeeting(_enemy_id, _elite) {
     if (fresh) Profile_Flush();
 }
 
+// D173 (IDEA-07): a fight showed the profile this enemy's weakness (_kind "weak") or resistance ("resist"): the Codex entry keeps a flag per kind, and shows the status once it is set.
+// true when it was new (the profile file should be written); false when already known or when the enemy has no entry yet.
+function Codex_NoteWeakPoint(_prof, _enemy_id, _kind) {
+    var e = Codex_Entry(_prof, _enemy_id);
+    if (!is_struct(e)) return false;
+    var f = (_kind == "resist") ? "resist_seen" : "weak_seen";
+    if (variable_struct_exists(e, f) && variable_struct_get(e, f)) return false;
+    variable_struct_set(e, f, true);
+    return true;
+}
+
+// The weak point a skill or a throw met in a fight (its result's weak_status / resist_status): the profile of the game learns it, and the file is written when something is new.
+function Codex_RecordWeakPoint(_enemy_id, _res) {
+    if (!is_struct(_res)) return;
+    var prof = Profile_Get();
+    var fresh = false;
+    if (variable_struct_exists(_res, "weak_status") && _res.weak_status >= 0 && Codex_NoteWeakPoint(prof, _enemy_id, "weak")) fresh = true;
+    if (variable_struct_exists(_res, "resist_status") && _res.resist_status >= 0 && Codex_NoteWeakPoint(prof, _enemy_id, "resist")) fresh = true;
+    if (fresh) Profile_Flush();
+}
+
+// The value of the Weak / Resists line: the status name once seen, "?" before.
+function Codex_WeakPointValue(_ent, _flag, _status_id) {
+    var seen = variable_struct_exists(_ent, _flag) && variable_struct_get(_ent, _flag);
+    return (seen && _status_id >= 0) ? string(StatusDB_Get(_status_id).name) : "?";
+}
+
 function Codex_Entry(_prof, _enemy_id) {
     if (!variable_struct_exists(_prof, "bestiary") || !is_struct(_prof.bestiary)) return undefined;
     var k = Codex_Key(_enemy_id);
@@ -411,8 +438,10 @@ function Codex_BestiaryRows(_prof) {
             { label: Stat_ShortName(STAT_DEF), value: string(e_lo.stats.def) },
             { label: Stat_ShortName(STAT_SPD), value: string(e_lo.stats.spd) },
             { label: Stat_ShortName(STAT_MAG), value: string(e_lo.stats.mag) },
+            { label: Loc_T("tab.lbl.weak", "Weak"), value: Codex_WeakPointValue(ent, "weak_seen", cfg.weak) },   // D173 (IDEA-07): "?" until a fight showed it
             { label: Loc_T("tab.lbl.met", "Met"), value: string(ent.met) }
         ];
+        if (cfg.resist >= 0) array_insert(lines, array_length(lines) - 1, { label: Loc_T("tab.lbl.resists", "Resists"), value: Codex_WeakPointValue(ent, "resist_seen", cfg.resist) });
         if (ent.elite) array_push(lines, { label: Loc_T("tab.lbl.elite", "Elite"), value: Loc_T("tab.val.seen", "Seen") });
         array_push(rows, {
             id: "enemy_" + string(eid), label: cfg.name, value: lvl, kind: "button", enabled: true, enemy_id: eid,
@@ -498,6 +527,23 @@ function Codex_HistoryCols(_rows) {
     }
     if (hs[0] - 2 * p <= z.body_h) return 1;   // the same allowance the fit check makes: the text may use 2p of the 4p kept under the last line
     return (hs[1] < hs[0]) ? 2 : 1;
+}
+
+// D173 (IDEA-07): the Weak and Resists lines make the bestiary's details panel taller than the body at the largest window (p = 4), where the page was already nearly full. Then every
+// portrait is drawn in the smaller box (pic.small, 20 font pixels instead of 32), which gives back about 50 units; at the smaller windows the page fits with the full box and nothing changes.
+// Measured at the details width the page really gets; the rows are changed in place (and set back when the window gets smaller again, see TabCodex_HistoryRefit).
+function Codex_BestiaryFitArt(_rows) {
+    if (array_length(_rows) <= 0) return;
+    var z = TabMenu_Zones("codex_bestiary");
+    var p = z.mt.p;
+    for (var i = 0; i < array_length(_rows); i++) if (variable_struct_exists(_rows[i], "pic") && is_struct(_rows[i].pic)) _rows[i].pic.small = false;
+    var m = Ui_MenuNew("fit_bestiary", _rows, { layout: { title: "", anchor: "center", details: true, details_pos: "right", details_cols: 2, det_art: true, hides_below: true } });
+    var lneed = Ui_MenuListNeed(Ui_MenuMeasureRowsFresh(m, z.mt), p);
+    var det_w = TabMenu_Widths(z, lneed, Ui_MenuDetailsNeed(_rows, p, 2)).det_w;
+    var worst = 0;
+    for (var j = 0; j < array_length(_rows); j++) worst = max(worst, Ui_DetailsHeight(det_w, _rows[j].help, _rows[j].lines, 2, 0, _rows[j]));
+    if (worst - 2 * p <= z.body_h) return;   // the same allowance the fit check makes: the text may use 2p of the 4p kept under the last line
+    for (var k = 0; k < array_length(_rows); k++) if (variable_struct_exists(_rows[k], "pic") && is_struct(_rows[k].pic)) _rows[k].pic.small = true;
 }
 
 function Codex_UnlockRows(_prof) {
@@ -980,6 +1026,7 @@ function TabCodex_Page(_kind, _prof) {
     switch (_kind) {
         case "bestiary":
             var brows = Codex_BestiaryRows(_prof);
+            Codex_BestiaryFitArt(brows);   // D173 (IDEA-07): the portrait box that lets the page fit
             return { rows: brows, title: Loc_T("tab.codex.bestiary_title", "Bestiary {n}/{max}", { n: string(Codex_BestiaryCount(_prof)), max: string(array_length(brows)) }), cols: 2 };
         case "notes": return { rows: Codex_NoteRows(_prof), title: Codex_NotesTitle(_prof), cols: 1 };
         case "history":
@@ -1000,10 +1047,11 @@ function TabCodex_MakeMenu(_kind, _page) {
 // R-088: the Run History page picks its number-line columns for the window it is in. The window or the text scale changing while the page is open (Ui_Metrics
 // hands out a new struct then) picks again, like the widths TabMenu_FitMenu re-fits every frame. Cheap while nothing changed: one compare.
 function TabCodex_HistoryRefit(_m, _z) {
-    if (_m.id != "codex_history" || !is_struct(_m.data)) return;
+    if ((_m.id != "codex_history" && _m.id != "codex_bestiary") || !is_struct(_m.data)) return;
     if (variable_struct_exists(_m.data, "cols_mt") && _m.data.cols_mt == _z.mt) return;
     _m.data.cols_mt = _z.mt;
-    _m.layout.details_cols = Codex_HistoryCols(_m.items);
+    if (_m.id == "codex_bestiary") Codex_BestiaryFitArt(_m.items);   // D173: the portrait box follows the window
+    else _m.layout.details_cols = Codex_HistoryCols(_m.items);
 }
 
 function TabCodex_Open(_kind) {
@@ -5861,9 +5909,10 @@ function Ui_ArtKind(_it) {
     return "";
 }
 
-// Side of the square picture box, in GUI units (32 font pixels).
-function Ui_ArtSize() {
-    return 32 * Ui_Px();
+// Side of the square picture box, in GUI units (32 font pixels; 20 for a picture marked `small`, D173: the bestiary at the largest window).
+function Ui_ArtSize(_it = undefined) {
+    var small = is_struct(_it) && variable_struct_exists(_it, "pic") && is_struct(_it.pic) && variable_struct_exists(_it.pic, "small") && _it.pic.small;
+    return (small ? 20 : 32) * Ui_Px();
 }
 
 // Draws the item's picture in a dark box centred on _cx with its top at _y. Returns the height used.
@@ -5871,7 +5920,7 @@ function Ui_DrawArt(_cx, _y, _it, _alpha = 1) {
     var kind = Ui_ArtKind(_it);
     if (kind == "") return 0;
     var p = Ui_Px();
-    var side = Ui_ArtSize();
+    var side = Ui_ArtSize(_it);
     var bx = round(_cx - side / 2);
     var a0 = draw_get_alpha();
     draw_set_alpha(_alpha);
@@ -5914,7 +5963,7 @@ function Ui_DetailsHeight(_w, _sentence, _lines, _cols = 1, _seq_n = 0, _art = u
     var mt = Ui_Metrics();
     var inner = _w - 2 * (4 * mt.p);
     var h = 2 * (2 * mt.p + (_tight ? mt.p : mt.pad)) + Ui_DetailsSentenceH(_sentence, inner, _step);
-    if (Ui_ArtKind(_art) != "") h += Ui_ArtSize() + 2 * mt.p;
+    if (Ui_ArtKind(_art) != "") h += Ui_ArtSize(_art) + 2 * mt.p;
     if (_seq_n > 0) h += 13 * max(1, round(mt.p / 2)) + mt.p;
     if (array_length(_lines) > 0) h += mt.p * 2 + Ui_DetailsLinesH(_lines, inner, _cols, mt);
     return h;

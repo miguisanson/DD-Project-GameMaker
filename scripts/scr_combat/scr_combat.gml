@@ -1575,6 +1575,7 @@ function Battle_PlayerSkill(_bc, _skill_id, _grade = undefined) {
     var skill = SkillDB_Get(_skill_id);
     var target = (skill.target == TGT_SELF) ? p : e;
     var res = Skill_Use(p, target, _skill_id, grade.mult);
+    if (res.ok && skill.target != TGT_SELF) Codex_RecordWeakPoint(e.id, res);   // D173 (IDEA-07): the Codex learns a weakness / resistance the fight showed
     if (res.ok) {
         _bc.skill_banner_active = true;
         _bc.skill_banner_name = skill.name;
@@ -1684,6 +1685,7 @@ function Battle_ThrowResolve(_bc, _timing) {
     SFX_Play(Qte_GradeSfxKey(_timing.key));
 
     var res = Throw_Resolve(iid, p, e, _timing.key);
+    Codex_RecordWeakPoint(e.id, res);   // D173 (IDEA-07)
     p.inventory = Inv_Remove(p.inventory, iid, 1);
     _bc.last_hit = true;
     _bc.last_dmg = res.dmg;
@@ -2444,6 +2446,7 @@ function Battle_EnemyAct(_bc) {
     }
 
     _bc.enemy_last_skill_id = use_skill ? skill_id : -1;   // what it really did (tests compare it with the Foresight preview)
+    Death_NoteKillSkill(_bc.enemy_last_skill_id);          // D185 (IDEA-25): if this move is the one that kills, the death tip is about it
 
     if (use_skill) {
         if (res.ok) {

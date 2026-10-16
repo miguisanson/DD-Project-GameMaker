@@ -461,6 +461,46 @@ class MarbleBags(unittest.TestCase):
         self.assertEqual(sum(sim.bag_draw(store, "find", 0.3, rng) for _ in range(10)), 3)
 
 
+class WeakPoints(unittest.TestCase):
+    """D173 (IDEA-07): the simulator plays WeakPoint_Table (scr_status): +1 Burning turn (cap 4), +1 stack (never past 10 / 3), chance halved and rounded down to a whole percent."""
+
+    def foe(self, weak=-1, resist=-1):
+        e = sim.F("x", False)
+        e.weak, e.resist = weak, resist
+        return e
+
+    def test_a_weak_enemy_burns_one_turn_longer_up_to_four(self):
+        e = self.foe(weak=sim.BURN)
+        self.assertEqual(R.wp_adjust(e, sim.BURN, 2, 1), (3, 1))
+        self.assertEqual(R.wp_adjust(e, sim.BURN, 3, 1), (4, 1))
+        self.assertEqual(R.wp_adjust(e, sim.BURN, 4, 1), (4, 1))
+        self.assertEqual(R.wp_adjust(self.foe(), sim.BURN, 2, 1), (2, 1))
+
+    def test_stacks_stop_at_the_d78_caps(self):
+        e = self.foe(weak=sim.POISON)
+        self.assertEqual(R.wp_adjust(e, sim.POISON, 1, 2), (1, 3))
+        R.status_add(e, sim.POISON, 1, 1, 8)
+        self.assertEqual(R.wp_adjust(e, sim.POISON, 1, 2), (1, 2))        # 8 + 2 reaches the cap of 10: no room for the bonus
+        b = self.foe(weak=sim.BLEED)
+        R.status_add(b, sim.BLEED, 3, 0, 2)
+        self.assertEqual(R.wp_adjust(b, sim.BLEED, 3, 1), (3, 1))         # 2 + 1 + 1 would pass the cap of 3
+
+    def test_a_resisted_chance_is_halved_and_rounded_down(self):
+        e = self.foe(resist=sim.POISON)
+        self.assertEqual(R.wp_resist_chance(e, sim.POISON, 0.75), 0.37)
+        self.assertEqual(R.wp_resist_chance(e, sim.POISON, 1), 0.5)
+        self.assertEqual(R.wp_resist_chance(e, sim.POISON, 0.65), 0.32)
+        self.assertEqual(R.wp_resist_chance(e, sim.BURN, 0.75), 0.75)
+        p = sim.F("p", True)
+        p.resist = sim.POISON
+        self.assertEqual(R.wp_resist_chance(p, sim.POISON, 0.75), 0.75)   # never on the player
+
+    def test_the_rule_is_off_when_the_data_has_no_weak_points(self):
+        e = sim.make_enemy(R, sim.ENEMY_IDS["slime"], 1)
+        if "weak" not in R.d.enemies[sim.ENEMY_IDS["slime"]]:
+            self.assertEqual((e.weak, e.resist), (-1, -1))
+
+
 def ref_burn(mag):
     return sim.ref.burn_tick(mag)
 

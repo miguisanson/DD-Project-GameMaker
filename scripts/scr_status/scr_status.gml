@@ -398,6 +398,68 @@ function Status_Stacks(_ch, _status_id) {
     return variable_struct_exists(s, "stacks") ? s.stacks : 1;
 }
 
+// ---- weak points (D173, IDEA-07) ----
+// Every enemy takes one of Poison / Bleeding / Burning a bit better (`weak` in scr_db_enemy) and resists another (`resist`). The one table of numbers is WeakPoint_Table; the rule is applied in
+// ONE place for skills and throwables: Skill_StatusApplyArgs (weak: more turns or stacks) and the status roll (resist: a smaller chance). Never on the player.
+function WeakPoint_Table() {
+    return {
+        turn_bonus: 1,      // a weak enemy: +1 turn of a status that lasts turns (Burning)...
+        stack_bonus: 1,     // ...or +1 stack of one that stacks (Poison, Bleeding)
+        burn_turn_cap: 4,   // the weakness never takes Burning past 4 turns (the stack caps are the D78 max_stacks of the status table: Poison 10, Bleeding 3)
+        resist_mult: 0.5    // a resisting enemy: the chance of the status times this, rounded down to a whole percent (a sure 100% becomes 50%)
+    };
+}
+
+// The status id an enemy (a battle struct from EnemyCreate) takes better / resists, -1 for none, for the player and for anything that is not an enemy.
+function WeakPoint_Field(_ch, _field) {
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "is_player") || _ch.is_player) return -1;
+    if (variable_struct_exists(_ch, _field)) return variable_struct_get(_ch, _field);
+    if (!variable_struct_exists(_ch, "id")) return -1;
+    var cfg = EnemyDB_Get(_ch.id);
+    return (is_struct(cfg) && variable_struct_exists(cfg, _field)) ? variable_struct_get(cfg, _field) : -1;
+}
+
+function Enemy_WeakStatus(_ch) {
+    return WeakPoint_Field(_ch, "weak");
+}
+
+function Enemy_ResistStatus(_ch) {
+    return WeakPoint_Field(_ch, "resist");
+}
+
+// What a status lands with on _target: { turns, stacks, weak }. weak = the weakness added something (the log and the Codex say so); a bonus the D78 caps leave no room for is not given.
+function WeakPoint_Adjust(_target, _status_id, _turns, _stacks) {
+    var out = { turns: _turns, stacks: _stacks, weak: false };
+    if (_status_id < 0 || Enemy_WeakStatus(_target) != _status_id) return out;
+    var t = WeakPoint_Table();
+    var dot = Status_Cfg(_status_id, "dot_kind", "");
+    if (dot == "poison" || dot == "bleed") {
+        var headroom = Status_Cfg(_status_id, "max_stacks", 1) - (Status_Stacks(_target, _status_id) + _stacks);
+        if (headroom >= t.stack_bonus) { out.stacks = _stacks + t.stack_bonus; out.weak = true; }
+    } else if (dot == "burn") {
+        if (_turns < t.burn_turn_cap) { out.turns = min(t.burn_turn_cap, _turns + t.turn_bonus); out.weak = true; }
+    }
+    return out;
+}
+
+// The chance a status lands with on _target: halved (rounded down to a whole percent) when the enemy resists it, else _chance as it is.
+function WeakPoint_ResistChance(_target, _status_id, _chance) {
+    if (_status_id < 0 || _chance <= 0 || Enemy_ResistStatus(_target) != _status_id) return _chance;
+    return floor(_chance * 100 * WeakPoint_Table().resist_mult + 0.000001) / 100;
+}
+
+// The log line the first time per fight a weakness adds something ("" afterwards: the enemy remembers it was said).
+function WeakPoint_WeakMsg(_target, _status_id) {
+    if (variable_struct_exists(_target, "weak_noted") && _target.weak_noted) return "";
+    _target.weak_noted = true;
+    return Loc_T("combat.msg.weak_to", "{enemy} is weak to [t]{status}[/t]!", { enemy: _target.name, status: StatusDB_Get(_status_id).name });
+}
+
+// The log line of a status that failed because of the resistance (every time).
+function WeakPoint_ResistMsg(_target, _status_id) {
+    return Loc_T("combat.msg.resists", "{enemy} resists [t]{status}[/t].", { enemy: _target.name, status: StatusDB_Get(_status_id).name });
+}
+
 // HP a DoT entry takes on its owner's tick. _acted: the owner acted this turn (a stunned owner does not bleed).
 function Status_DotDamage(_entry, _cfg, _acted = true) {
     if (!is_struct(_cfg) || !variable_struct_exists(_cfg, "dot_kind")) return 0;

@@ -50,6 +50,12 @@ POISON, BLEED, BURN, STUN, GUARD, DMG_UP, EVASION, CRIT_UP, HIT_UP, MEDITATION, 
 # skill ids (scr_macros)
 SK_REGROW, SK_SNUFF, SK_STEAL = 28, 29, 22
 STATS = ("atk", "def", "spd", "mag")
+# D173 (IDEA-07 weak points): the numbers of WeakPoint_Table in scr_status. DD_SIM_NO_WEAK_POINTS=1 plays the old way (as does an export_data.json that has no weak / resist).
+WEAK_POINTS = os.environ.get("DD_SIM_NO_WEAK_POINTS", "") != "1"   # set DD_SIM_NO_WEAK_POINTS=1 to play without them (the workers re-read it)
+WP_TURN_BONUS = 1     # a weak enemy: +1 Burning turn
+WP_STACK_BONUS = 1    # +1 Poison / Bleeding stack, never past the status table's max_stacks
+WP_BURN_TURN_CAP = 4  # the weakness never takes Burning past 4 turns
+WP_RESIST_MULT = 0.5  # a resisting enemy: the chance times this, rounded down to a whole percent (a sure 100% -> 50%)
 BEDS_HEAL_FRAC = 1.0   # C4 (D47): a bed heals all HP and MP (scr_levelup Bed_Heal on branch c4-rest)
 # H4 (D143): the level's free point may go to Max HP (+FREE_POINT_HP_GAIN) or Max MP (+FREE_POINT_MP_GAIN) instead of the class stat (scr_macros). what-if knobs:
 # constants.free_point_choices=0 plays the old way (always the class stat), constants.free_point_hp_gain / free_point_mp_gain change the amounts.
@@ -292,6 +298,8 @@ class F:
         self.broken = False
         self.base_exp = 0
         self.ai = None
+        self.weak = -1            # D173: the status it takes better / resists (-1 none)
+        self.resist = -1
 
 
 def st_find(f, sid):
@@ -318,6 +326,25 @@ class Rules:
         self.sdb = data.status
         self.items = data.items
         self.skills = data.skills
+
+    # ---- weak points (D173): WeakPoint_Adjust / WeakPoint_ResistChance ----
+    def wp_adjust(self, target, sid, turns, stacks):
+        """(turns, stacks) a status lands with on target: a weak enemy takes +1 Burning turn (cap 4) or +1 stack (never past max_stacks)."""
+        if not WEAK_POINTS or target.is_player or sid < 0 or target.weak != sid:
+            return turns, stacks
+        dot = self.sdb[sid].get("dot_kind", "")
+        if dot in ("poison", "bleed"):
+            if self.sdb[sid].get("max_stacks", 1) - (st_stacks(target, sid) + stacks) >= WP_STACK_BONUS:
+                return turns, stacks + WP_STACK_BONUS
+        elif dot == "burn":
+            if turns < WP_BURN_TURN_CAP:
+                return min(WP_BURN_TURN_CAP, turns + WP_TURN_BONUS), stacks
+        return turns, stacks
+
+    def wp_resist_chance(self, target, sid, chance):
+        if not WEAK_POINTS or target.is_player or sid < 0 or chance <= 0 or target.resist != sid:
+            return chance
+        return math.floor(chance * 100 * WP_RESIST_MULT + 0.000001) / 100
 
     # ---- statuses ----
     def status_remove(self, f, sid):
@@ -552,6 +579,8 @@ def make_enemy(R, eid, level, elite=""):
     e.skills_e = list(cfg["skills"])
     e.rank = cfg["threat_rank"]
     e.is_boss = cfg["is_boss"]
+    e.weak = cfg.get("weak", -1)
+    e.resist = cfg.get("resist", -1)
     e.base_exp = max(1, round(cfg["exp"] * min(1.4, max(0.7, 1 + (level - cfg["level"]) * 0.10))))
     e.brain = cfg["brain"]
     e.smax = ref.stagger_max(e.rank, e.is_boss)
@@ -809,6 +838,7 @@ class Battle:
         power = ref.burn_tick(R.eff(user, "mag")) if sid == BURN else 1
         turns = self.status_turns(user, target, sid, base_turns)
         stacks = self.status_stacks(user, target, sid, base_stacks)
+        turns, stacks = R.wp_adjust(target, sid, turns, stacks)
         R.status_add(target, sid, turns, power, stacks)
 
     def crit_roll(self, f):
@@ -838,14 +868,17 @@ class Battle:
         eff = s["effect"]
         if eff == "status":
             if s["status"] != -1:
-                self.apply_status(user, target if s["target"] != 1 else user, s["status"], s.get("status_turns", 1), s.get("status_stacks", 1))
+                tgt = target if s["target"] != 1 else user
+                rc = R.wp_resist_chance(tgt, s["status"], 1)
+                if rc >= 1 or self.status_roll(user, sid, rc, "_s"):
+                    self.apply_status(user, tgt, s["status"], s.get("status_turns", 1), s.get("status_stacks", 1))
             return res
         if eff == "multi_status":
             ch = s.get("status_chance", 1)
             turns = s.get("status_turns_list", [])
             stacks = s.get("status_stacks_list", [])
             for i, sid_m in enumerate(s["status_list"]):
-                if not self.status_roll(user, sid, ch, "_%d" % i):
+                if not self.status_roll(user, sid, R.wp_resist_chance(target, sid_m, ch), "_%d" % i):
                     continue
                 self.apply_status(user, target, sid_m, turns[i] if i < len(turns) else s.get("status_turns", 1), stacks[i] if i < len(stacks) else 1)
             return res
@@ -885,13 +918,16 @@ class Battle:
         if any_hit:
             if s["status"] != -1:
                 res["before"] = None
-                if self.status_roll(user, sid, chance):
+                if self.status_roll(user, sid, R.wp_resist_chance(target, s["status"], chance)):
                     res["status_ids"].append(s["status"])
                     self.apply_status(user, target, s["status"], max(1, s.get("status_turns", 1)), s.get("status_stacks", 1))
             if "status_list" in s:
                 if self.status_roll(user, sid, chance, "_list"):
                     tl = s.get("status_turns_list", [])
                     for i, sid_d in enumerate(s["status_list"]):
+                        rc = R.wp_resist_chance(target, sid_d, 1)
+                        if rc < 1 and not self.status_roll(user, sid, rc, "_listres%d" % sid_d):
+                            continue
                         res["status_ids"].append(sid_d)
                         self.apply_status(user, target, sid_d, tl[i] if i < len(tl) else max(1, s.get("status_turns", 1)), 1)
         res["power"] = power
@@ -968,13 +1004,19 @@ class Battle:
             dmg = ref.damage(ref.power_basic(u["power"]), stat_val, R.eff(e, "df"), gm, mult)
             e.hp = max(0, e.hp - dmg)
         if u["burn_turns"] > 0 and e.hp > 0:
-            base = rhu(ref.burn_tick(stat_val) * nm)
-            burn = qte_scale(base, gm, 1)
-            R.status_add(e, BURN, u["burn_turns"], burn)
+            rc = R.wp_resist_chance(e, BURN, 1)
+            if rc >= 1 or bag_draw(p.bags, "throw_resist_%d" % BURN, rc, self.rng):
+                base = rhu(ref.burn_tick(stat_val) * nm)
+                burn = qte_scale(base, gm, 1)
+                bt, _ = R.wp_adjust(e, BURN, u["burn_turns"], 1)
+                R.status_add(e, BURN, bt, burn)
         if u["stacks"] > 0:
-            n = rhu(u["stacks"] * nm)
-            st = n + 1 if g == "PERFECT" else (max(1, n - 1) if g == "WEAK" else n)
-            R.status_add(e, POISON, st, 1, st)
+            rc = R.wp_resist_chance(e, POISON, 1)
+            if rc >= 1 or bag_draw(p.bags, "throw_resist_%d" % POISON, rc, self.rng):
+                n = rhu(u["stacks"] * nm)
+                st = n + 1 if g == "PERFECT" else (max(1, n - 1) if g == "WEAK" else n)
+                _, st = R.wp_adjust(e, POISON, st, st)
+                R.status_add(e, POISON, st, 1, st)
         stun = False
         if u["stun"] and g != "WEAK" and e.hp > 0:
             R.status_add(e, STUN, 1, 1)

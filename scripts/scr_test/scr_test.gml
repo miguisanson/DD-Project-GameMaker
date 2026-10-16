@@ -167,6 +167,7 @@ function Test_RunAll() {
     Test_RunSuite("Rarity", Test_Suite_Rarity);
     Test_RunSuite("R3Mouse", Test_Suite_R3Mouse);
     Test_RunSuite("R3LevelUp", Test_Suite_R3LevelUp);
+    Test_RunSuite("R3Ideas1", Test_Suite_R3Ideas1);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -1576,7 +1577,7 @@ function Test_Suite_StatusRules() {
     // the tick comes from the CASTER's MAG when a skill applies it
     var _mage = CharacterCreate_Player(CLASS_MAGE);
     _mage.mp = 99;
-    var _burn_target = EnemyCreate(ENEMY_SLIME);
+    var _burn_target = EnemyCreate(ENEMY_SNAKE);   // r3ideas1: a Snake is neutral to Burning (a Slime is weak to it, +1 turn)
     var _fb_chance = SkillDB_Get(SKILL_FIREBALL).status_chance;
     SkillDB_Get(SKILL_FIREBALL).status_chance = 1;
     Skill_Use(_mage, _burn_target, SKILL_FIREBALL);
@@ -1645,7 +1646,7 @@ function Test_Suite_StatusRules() {
     Test_Eq("Poison Arrow twice: 3 + 3 = 6 stacks on the enemy", Status_Stacks(_arrow_foe, STATUS_POISON), 6);
     var _kn = CharacterCreate_Player(CLASS_KNIGHT);
     _kn.mp = 99;
-    var _wound_foe = EnemyCreate(ENEMY_SLIME);
+    var _wound_foe = EnemyCreate(ENEMY_SPIDER);   // r3ideas1: a Spider is neutral to Bleeding (a Slime resists it)
     var _wound_chance = SkillDB_Get(SKILL_WOUND).status_chance;
     SkillDB_Get(SKILL_WOUND).status_chance = 1;
     Skill_Use(_kn, _wound_foe, SKILL_WOUND);
@@ -6705,7 +6706,7 @@ function Test_Suite_Economy() {
     var _s1 = EnemyCreate(ENEMY_SLIME);
     Throw_Resolve(30, Test_Hero(CLASS_KNIGHT), _s1, QTE_OK);
     var _bn = Status_Find(_s1, STATUS_BURN);
-    Test_True("C3 firebomb OK: burn 4 for 2 turns", _bn.power == 4 && _bn.turns == 2);
+    Test_True("C3 firebomb OK: burn 4 for 3 turns (a Slime is weak to Burning: +1 turn, r3ideas1)", _bn.power == 4 && _bn.turns == 3);
     var _s2 = EnemyCreate(ENEMY_SLIME);
     Throw_Resolve(30, Test_Hero(CLASS_KNIGHT), _s2, QTE_PERFECT);
     Test_Eq("C3 firebomb Perfect: burn 5 per turn", Status_Find(_s2, STATUS_BURN).power, 5);
@@ -18073,4 +18074,385 @@ function Test_LvTextFit() {
     TextFit_Each("levelup screen (Knight)", function(_w, _h, _l) { return Test_LvFitFails(CLASS_KNIGHT); });
     TextFit_Each("levelup screen (Mage)", function(_w, _h, _l) { return Test_LvFitFails(CLASS_MAGE); });
     Test_LvRunEnd(_k);
+}
+
+// ============================================================================================================================
+// Round 3 packet ideas1 (D173, D185): IDEA-07 weak points and IDEA-25 the death-screen tip (R-114, R-115).
+// Expected values are the brief's: every enemy takes one of Poison / Bleeding / Burning better (+1 turn for Burning, +1 stack for Poison and Bleeding, never past the D78 caps
+// of 10 and 3 stacks, and a Burning of 4 turns) and resists another (its chance is halved, rounded down to a whole percent, a sure 100% becomes 50%). The brief's examples:
+// the Killer Plant burns longer, the Snake shrugs off Poison, the Ghost Sword does not bleed. The messages are "<Enemy> is weak to <Status>!" and "<Enemy> resists <Status>.".
+// The Codex shows "Weak: ?" until the profile has seen the weakness. The death tip: the killer status first (poison, bleed, burn), then the enemy move (a boss's big move says
+// how to beat it), then a generic pool that never shows the same tip twice running.
+// ============================================================================================================================
+function Test_Suite_R3Ideas1() {
+    if (!script_exists(asset_get_index("WeakPoint_Table"))) {
+        Test_True("r3ideas1: WeakPoint_Table exists: not implemented", false);
+        return;
+    }
+    var _lang = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    Test_RunSuite("R3Ideas1.table", Test_R3IdTable);
+    Test_RunSuite("R3Ideas1.math", Test_R3IdMath);
+    Test_RunSuite("R3Ideas1.skills", Test_R3IdSkills);
+    Test_RunSuite("R3Ideas1.throws", Test_R3IdThrows);
+    Test_RunSuite("R3Ideas1.codex", Test_R3IdCodex);
+    Test_RunSuite("R3Ideas1.tippure", Test_R3IdTipPure);
+    Test_ProfRun("tpi_", Test_R3IdTipRun);
+    Test_RunSuite("R3Ideas1.tipfit", Test_R3IdTipFit);
+    Test_RunSuite("R3Ideas1.codexfit", Test_R3IdCodexFit);
+    Test_RunSuite("R3Ideas1.workbook", Test_R3IdWorkbook);
+    Loc_SetLanguage(_lang);
+}
+
+function Test_R3IdTable() {
+    var _ids = Codex_EnemyIds();
+    var _bad = "";
+    var _weak_n = [0, 0, 0];
+    var _res_n = [0, 0, 0];
+    for (var _i = 0; _i < array_length(_ids); _i++) {
+        var _c = EnemyDB_Get(_ids[_i]);
+        if (!variable_struct_exists(_c, "weak") || !variable_struct_exists(_c, "resist")) { _bad += _c.name + ":missing "; continue; }
+        var _w = _c.weak;
+        var _r = _c.resist;
+        if (_w < STATUS_POISON || _w > STATUS_BURN) _bad += _c.name + ":weak " + string(_w) + " ";
+        else _weak_n[_w]++;
+        if (_c.is_boss) {
+            if (_r != -1 && (_r < STATUS_POISON || _r > STATUS_BURN)) _bad += _c.name + ":resist " + string(_r) + " ";
+        } else {
+            if (_r < STATUS_POISON || _r > STATUS_BURN) _bad += _c.name + ":resist " + string(_r) + " ";
+        }
+        if (_r >= 0 && _r == _w) _bad += _c.name + ":same ";
+        if (_r >= STATUS_POISON && _r <= STATUS_BURN) _res_n[_r]++;
+    }
+    Test_Eq("r3ideas1 table: every enemy has a weak and a resist field in Poison / Bleeding / Burning, never both the same", _bad, "");
+    Test_True("r3ideas1 table: each of the three statuses is the weakness of some enemy", _weak_n[0] > 0 && _weak_n[1] > 0 && _weak_n[2] > 0);
+    Test_True("r3ideas1 table: each of the three statuses is the resistance of some enemy", _res_n[0] > 0 && _res_n[1] > 0 && _res_n[2] > 0);
+    Test_Eq("r3ideas1 table: the Killer Plant burns longer (weak to Burning)", EnemyDB_Get(ENEMY_KILLER_PLANT).weak, STATUS_BURN);
+    Test_Eq("r3ideas1 table: the Snake shrugs off Poison", EnemyDB_Get(ENEMY_SNAKE).resist, STATUS_POISON);
+    Test_Eq("r3ideas1 table: the Ghost Sword does not bleed", EnemyDB_Get(ENEMY_GHOSTSWORD).resist, STATUS_BLEED);
+    Test_Eq("r3ideas1 table: both bosses have a weakness", (EnemyDB_Get(ENEMY_MINI_BOSS).weak >= 0) + (EnemyDB_Get(ENEMY_FINAL_BOSS).weak >= 0), 2);
+    var _t = WeakPoint_Table();
+    Test_Eq("r3ideas1 table: a weak enemy takes +1 Burning turn", _t.turn_bonus, 1);
+    Test_Eq("r3ideas1 table: a weak enemy takes +1 stack", _t.stack_bonus, 1);
+    Test_Eq("r3ideas1 table: a resisted status lands with half the chance", _t.resist_mult, 0.5);
+    Test_Eq("r3ideas1 table: Burning never lasts past 4 turns by a weakness", _t.burn_turn_cap, 4);
+    Test_Eq("r3ideas1 table: a battle enemy reads its weakness from the database", Enemy_WeakStatus(EnemyCreate(ENEMY_KILLER_PLANT)), STATUS_BURN);
+    Test_Eq("r3ideas1 table: and its resistance", Enemy_ResistStatus(EnemyCreate(ENEMY_SNAKE)), STATUS_POISON);
+    Test_Eq("r3ideas1 table: the player has no weakness", Enemy_WeakStatus(CharacterCreate_Player(CLASS_KNIGHT)), -1);
+    Test_Eq("r3ideas1 table: a bare struct has none", Enemy_ResistStatus({ hp: 1 }), -1);
+}
+
+function Test_R3IdMath() {
+    var _hero = Test_Hero(CLASS_MAGE);
+    var _plant = EnemyCreate(ENEMY_KILLER_PLANT);   // weak to Burning, resists Bleeding
+    var _snake = EnemyCreate(ENEMY_SNAKE);          // weak to Bleeding, resists Poison
+    var _whisp = EnemyCreate(ENEMY_MADWHISP);       // weak to Poison, resists Burning
+    var _slime = EnemyCreate(ENEMY_SLIME);          // weak to Burning, resists Bleeding
+    // turns: Burning 2 turns base
+    Test_Eq("r3ideas1 math: Burning on a Killer Plant lasts 3 turns, not 2", Skill_StatusApplyArgs(_hero, _plant, STATUS_BURN, 2).turns, 3);
+    Test_Eq("r3ideas1 math: Burning on a Snake (not weak) lasts 2 turns", Skill_StatusApplyArgs(_hero, _snake, STATUS_BURN, 2).turns, 2);
+    Test_Eq("r3ideas1 math: a weak target is flagged", Skill_StatusApplyArgs(_hero, _plant, STATUS_BURN, 2).weak, true);
+    Test_Eq("r3ideas1 math: a neutral target is not", Skill_StatusApplyArgs(_hero, _snake, STATUS_BURN, 2).weak, false);
+    Test_Eq("r3ideas1 math: Burning turns reach the cap of 4 (3 -> 4)", Skill_StatusApplyArgs(_hero, _plant, STATUS_BURN, 3).turns, 4);
+    Test_Eq("r3ideas1 math: and never go past it (4 stays 4)", Skill_StatusApplyArgs(_hero, _plant, STATUS_BURN, 4).turns, 4);
+    Test_Eq("r3ideas1 math: (5 stays 5: the weakness never takes turns away)", Skill_StatusApplyArgs(_hero, _plant, STATUS_BURN, 5).turns, 5);
+    // stacks: Poison cap 10, Bleeding cap 3 (D78)
+    Test_Eq("r3ideas1 math: Poison on a Mad Whisp adds a stack (2 -> 3)", Skill_StatusApplyArgs(_hero, _whisp, STATUS_POISON, 1, 2).stacks, 3);
+    Test_Eq("r3ideas1 math: Poison on a Slime (not weak) is 2", Skill_StatusApplyArgs(_hero, _slime, STATUS_POISON, 1, 2).stacks, 2);
+    var _w7 = Status_Add(EnemyCreate(ENEMY_MADWHISP), STATUS_POISON, 1, 1, 7);
+    Test_Eq("r3ideas1 math: 7 stacks + 2 + the weakness's 1 reaches the cap of 10", Skill_StatusApplyArgs(_hero, _w7, STATUS_POISON, 1, 2).stacks, 3);
+    var _w8 = Status_Add(EnemyCreate(ENEMY_MADWHISP), STATUS_POISON, 1, 1, 8);
+    Test_Eq("r3ideas1 math: at 8 stacks the 2 reach the cap and the weakness adds nothing", Skill_StatusApplyArgs(_hero, _w8, STATUS_POISON, 1, 2).stacks, 2);
+    Test_Eq("r3ideas1 math: ... and it is not flagged when it added nothing", Skill_StatusApplyArgs(_hero, _w8, STATUS_POISON, 1, 2).weak, false);
+    var _bl = Skill_StatusApplyArgs(_hero, _snake, STATUS_BLEED, 3, 1);
+    Test_Eq("r3ideas1 math: Bleeding on a Snake adds a stack (1 -> 2), the turns stay 3", _bl.stacks * 10 + _bl.turns, 23);
+    var _b2 = Status_Add(EnemyCreate(ENEMY_SNAKE), STATUS_BLEED, 3, 0, 2);
+    Test_Eq("r3ideas1 math: Bleeding at 2 stacks: 2 + 1 + 1 would pass the cap of 3, so just 1", Skill_StatusApplyArgs(_hero, _b2, STATUS_BLEED, 3, 1).stacks, 1);
+    var _b1 = Status_Add(EnemyCreate(ENEMY_SNAKE), STATUS_BLEED, 3, 0, 1);
+    Test_Eq("r3ideas1 math: Bleeding at 1 stack: 1 + 1 + 1 reaches the cap of 3", Skill_StatusApplyArgs(_hero, _b1, STATUS_BLEED, 3, 1).stacks, 2);
+    // the player never has a weak point
+    var _pl = Test_Hero(CLASS_KNIGHT);
+    Test_Eq("r3ideas1 math: a status on the player is never boosted", Skill_StatusApplyArgs(_hero, _pl, STATUS_BURN, 2).turns, 2);
+    // resistance: halved, rounded down to a whole percent
+    Test_Eq("r3ideas1 math: 75% on a resisting Snake is 37%", WeakPoint_ResistChance(_snake, STATUS_POISON, 0.75), 0.37);
+    Test_Eq("r3ideas1 math: 100% becomes 50%", WeakPoint_ResistChance(_snake, STATUS_POISON, 1), 0.5);
+    Test_Eq("r3ideas1 math: 70% becomes 35%", WeakPoint_ResistChance(_snake, STATUS_POISON, 0.7), 0.35);
+    Test_Eq("r3ideas1 math: 65% becomes 32% (rounded down)", WeakPoint_ResistChance(_snake, STATUS_POISON, 0.65), 0.32);
+    Test_Eq("r3ideas1 math: 60% becomes 30%", WeakPoint_ResistChance(_snake, STATUS_POISON, 0.6), 0.3);
+    Test_Eq("r3ideas1 math: a status the enemy does not resist keeps its chance", WeakPoint_ResistChance(_snake, STATUS_BURN, 0.75), 0.75);
+    Test_Eq("r3ideas1 math: a status on the player keeps its chance", WeakPoint_ResistChance(_pl, STATUS_POISON, 0.75), 0.75);
+    Test_Eq("r3ideas1 math: a chance of 0 stays 0", WeakPoint_ResistChance(_snake, STATUS_POISON, 0), 0);
+}
+
+// Skill_Use: the log says so, the chance is halved, the Burning is longer.
+function Test_R3IdSkills() {
+    var _archer = CharacterCreate_Player(CLASS_ARCHER);
+    var _landed = 0;
+    var _resist_msg = 0;
+    var _silent_fail = 0;
+    var _exact = "";
+    for (var _i = 0; _i < 100; _i++) {
+        var _snake = EnemyCreate(ENEMY_SNAKE);
+        _archer.mp = 99;
+        var _r = Skill_Use(_archer, _snake, SKILL_POISON_ARROW);
+        if (Status_Has(_snake, STATUS_POISON)) {
+            _landed++;
+            if (string_pos("resists", _r.msg) > 0) _resist_msg++;
+        } else {
+            if (string_pos("resists", _r.msg) > 0) { _resist_msg++; _exact = _r.msg; } else _silent_fail++;
+        }
+    }
+    Test_True("r3ideas1 skills: Poison Arrow (75%) on a Snake lands about 37 times in 100 (" + string(_landed) + ")", _landed >= 25 && _landed <= 50);
+    Test_Eq("r3ideas1 skills: every try that failed says the Snake resists", _silent_fail, 0);
+    Test_Eq("r3ideas1 skills: and a landed try never does", _resist_msg, 100 - _landed);
+    Test_Eq("r3ideas1 skills: the resist message", _exact, "Snake resists [t]Poison[/t].");
+    // a neutral enemy: the full chance, no message
+    var _land2 = 0;
+    var _msg2 = 0;
+    for (var _j = 0; _j < 100; _j++) {
+        var _slime = EnemyCreate(ENEMY_SLIME);
+        _archer.mp = 99;
+        var _r2 = Skill_Use(_archer, _slime, SKILL_POISON_ARROW);
+        if (Status_Has(_slime, STATUS_POISON)) _land2++;
+        if (string_pos("resists", _r2.msg) > 0 || string_pos("weak to", _r2.msg) > 0) _msg2++;
+    }
+    Test_True("r3ideas1 skills: Poison Arrow on a Slime keeps its 75% (" + string(_land2) + " in 100)", _land2 >= 60 && _land2 <= 90);
+    Test_Eq("r3ideas1 skills: a neutral enemy gets no weak / resist message", _msg2, 0);
+    // a weakness: longer Burning, the message once per fight, the flag every time
+    var _mage = CharacterCreate_Player(CLASS_MAGE);
+    var _fb_chance = SkillDB_Get(SKILL_FIREBALL).status_chance;
+    SkillDB_Get(SKILL_FIREBALL).status_chance = 1;
+    var _plant = EnemyCreate(ENEMY_KILLER_PLANT);
+    _mage.mp = 99;
+    var _w1 = Skill_Use(_mage, _plant, SKILL_FIREBALL);
+    _mage.mp = 99;
+    var _w2 = Skill_Use(_mage, _plant, SKILL_FIREBALL);
+    var _snake2 = EnemyCreate(ENEMY_SNAKE);
+    _mage.mp = 99;
+    var _w3 = Skill_Use(_mage, _snake2, SKILL_FIREBALL);
+    SkillDB_Get(SKILL_FIREBALL).status_chance = _fb_chance;
+    Test_Eq("r3ideas1 skills: Fireball's Burning lasts 3 turns on a Killer Plant", Battle_StatusCurrentTurns(_plant, STATUS_BURN), 3);
+    Test_Eq("r3ideas1 skills: and 2 on a Snake", Battle_StatusCurrentTurns(_snake2, STATUS_BURN), 2);
+    Test_True("r3ideas1 skills: the first Burning on the plant says it is weak to Burning", string_pos("Killer Plant is weak to [t]Burn[/t]!", _w1.msg) > 0);
+    Test_False("r3ideas1 skills: the second one does not say it again", string_pos("weak to", _w2.msg) > 0);
+    Test_Eq("r3ideas1 skills: the result still names the weakness (the Codex learns it)", _w1.weak_status * 100 + _w2.weak_status, STATUS_BURN * 100 + STATUS_BURN);
+    Test_Eq("r3ideas1 skills: a neutral target's result names none", _w3.weak_status, -1);
+    Test_Eq("r3ideas1 skills: and no resistance was met", _w1.resist_status, -1);
+}
+
+function Test_R3IdThrows() {
+    var _hero = Test_Hero(CLASS_KNIGHT);
+    var _plant = EnemyCreate(ENEMY_KILLER_PLANT);
+    var _snake = EnemyCreate(ENEMY_SNAKE);
+    var _r1 = Throw_Resolve(30, _hero, _plant, QTE_OK);
+    var _r2 = Throw_Resolve(30, _hero, _snake, QTE_OK);
+    Test_Eq("r3ideas1 throws: a Firebomb burns a Killer Plant for 3 turns", Battle_StatusCurrentTurns(_plant, STATUS_BURN), 3);
+    Test_Eq("r3ideas1 throws: and a Snake for 2", Battle_StatusCurrentTurns(_snake, STATUS_BURN), 2);
+    Test_True("r3ideas1 throws: the throw says the plant is weak to Burning", string_pos("Killer Plant is weak to [t]Burn[/t]!", _r1.msg) > 0);
+    Test_Eq("r3ideas1 throws: the result names the weakness", _r1.weak_status, STATUS_BURN);
+    Test_Eq("r3ideas1 throws: a neutral throw names none", _r2.weak_status, -1);
+    // Poison Pot (4 stacks at OK): +1 on a weak Mad Whisp
+    var _whisp = EnemyCreate(ENEMY_MADWHISP);
+    Throw_Resolve(31, Test_Hero(CLASS_KNIGHT), _whisp, QTE_OK);
+    Test_Eq("r3ideas1 throws: a Poison Pot puts 5 stacks on a Mad Whisp (weak to Poison)", Status_Stacks(_whisp, STATUS_POISON), 5);
+    var _slime = EnemyCreate(ENEMY_SLIME);
+    Throw_Resolve(31, Test_Hero(CLASS_KNIGHT), _slime, QTE_OK);
+    Test_Eq("r3ideas1 throws: and 4 on a Slime", Status_Stacks(_slime, STATUS_POISON), 4);
+    // a resisting Snake: half the pots do nothing
+    var _thrower = Test_Hero(CLASS_KNIGHT);
+    var _landed = 0;
+    var _say = 0;
+    for (var _i = 0; _i < 40; _i++) {
+        var _sn = EnemyCreate(ENEMY_SNAKE);
+        var _rr = Throw_Resolve(31, _thrower, _sn, QTE_OK);
+        if (Status_Has(_sn, STATUS_POISON)) _landed++;
+        else if (_rr.resist_status == STATUS_POISON && string_pos("Snake resists [t]Poison[/t].", _rr.msg) > 0) _say++;
+    }
+    Test_True("r3ideas1 throws: a Poison Pot (a sure 100%) lands about half the time on a Snake (" + string(_landed) + " in 40)", _landed >= 12 && _landed <= 28);
+    Test_Eq("r3ideas1 throws: each pot that did nothing says why", _say, 40 - _landed);
+}
+
+function Test_R3IdCodex() {
+    var _p = Profile_Default();
+    Codex_Met(_p, ENEMY_SNAKE, false);
+    Codex_Met(_p, ENEMY_MINI_BOSS, false);
+    var _ids = Codex_EnemyIds();
+    var _si = 0;
+    var _bi = 0;
+    for (var _i = 0; _i < array_length(_ids); _i++) { if (_ids[_i] == ENEMY_SNAKE) _si = _i; if (_ids[_i] == ENEMY_MINI_BOSS) _bi = _i; }
+    var _lw = Loc_T("tab.lbl.weak", "Weak");
+    var _lr = Loc_T("tab.lbl.resists", "Resists");
+    var _rows = Codex_BestiaryRows(_p);
+    Test_Eq("r3ideas1 codex: an unseen weakness shows ?", Test_RowValue(_rows[_si].lines, _lw), "?");
+    Test_Eq("r3ideas1 codex: an unseen resistance shows ?", Test_RowValue(_rows[_si].lines, _lr), "?");
+    Test_True("r3ideas1 codex: the rows are labelled Weak and Resists", _lw == "Weak" && _lr == "Resists");
+    Test_True("r3ideas1 codex: a Snake not met yet is still ???", Codex_BestiaryRows(Profile_Default())[_si].label == "???");
+    Test_True("r3ideas1 codex: the first sighting of a weakness is new", Codex_NoteWeakPoint(_p, ENEMY_SNAKE, "weak"));
+    Test_False("r3ideas1 codex: the second is not", Codex_NoteWeakPoint(_p, ENEMY_SNAKE, "weak"));
+    _rows = Codex_BestiaryRows(_p);
+    Test_Eq("r3ideas1 codex: a seen weakness names the status", Test_RowValue(_rows[_si].lines, _lw), StatusDB_Get(STATUS_BLEED).name);
+    Test_Eq("r3ideas1 codex: the resistance is still ?", Test_RowValue(_rows[_si].lines, _lr), "?");
+    Test_True("r3ideas1 codex: a seen resistance is new", Codex_NoteWeakPoint(_p, ENEMY_SNAKE, "resist"));
+    _rows = Codex_BestiaryRows(_p);
+    Test_Eq("r3ideas1 codex: a seen resistance names the status", Test_RowValue(_rows[_si].lines, _lr), StatusDB_Get(STATUS_POISON).name);
+    Test_Eq("r3ideas1 codex: a boss has a Weak row", Test_RowValue(_rows[_bi].lines, _lw), "?");
+    var _boss_has_res = false;
+    for (var _l = 0; _l < array_length(_rows[_bi].lines); _l++) if (_rows[_bi].lines[_l].label == _lr) _boss_has_res = true;
+    Test_False("r3ideas1 codex: a boss without a resistance has no Resists row", _boss_has_res);
+    Test_False("r3ideas1 codex: a weakness of an enemy not met yet is not kept", Codex_NoteWeakPoint(_p, ENEMY_SLIME, "weak"));
+    var _pn = Profile_Normalize(json_parse(json_stringify(_p)));
+    var _e = Codex_Entry(_pn, ENEMY_SNAKE);
+    Test_True("r3ideas1 codex: both flags survive the profile file", is_struct(_e) && variable_struct_exists(_e, "weak_seen") && _e.weak_seen && variable_struct_exists(_e, "resist_seen") && _e.resist_seen);
+    Test_Eq("r3ideas1 codex: and the met count", _e.met, 1);
+    Test_Eq("r3ideas1 codex: a row read back from the file shows the status", Test_RowValue(Codex_BestiaryRows(_pn)[_si].lines, _lw), StatusDB_Get(STATUS_BLEED).name);
+}
+
+function Test_R3IdTipPure() {
+    if (!script_exists(asset_get_index("DeathTip_Pick"))) { Test_True("r3ideas1 tip: DeathTip_Pick exists: not implemented", false); return; }
+    var _p = DeathTip_Pick("status_poison", -1, "", 0);
+    Test_Eq("r3ideas1 tip: a poison death gets the poison tip", _p.key, "death.tip.status_poison");
+    Test_True("r3ideas1 tip: it names the Antidote", string_pos("Antidote", DeathTip_Text(_p)) > 0);
+    Test_True("r3ideas1 tip: it says Poison killed you", string_pos("Poison", DeathTip_Text(_p)) == 1);
+    var _b = DeathTip_Pick("status_bleed", -1, "", 0);
+    Test_Eq("r3ideas1 tip: a bleed death", _b.key, "death.tip.status_bleed");
+    Test_True("r3ideas1 tip: names the Bandage", string_pos("Bandage", DeathTip_Text(_b)) > 0);
+    var _f = DeathTip_Pick("status_burn", -1, "", 0);
+    Test_Eq("r3ideas1 tip: a burn death", _f.key, "death.tip.status_burn");
+    Test_Eq("r3ideas1 tip: the killer status comes before the enemy move", DeathTip_Pick("status_poison", SKILL_PALE_HYMN, "", 3).key, "death.tip.status_poison");
+    var _h = DeathTip_Pick("enemy_final_boss", SKILL_PALE_HYMN, "", 0);
+    Test_Eq("r3ideas1 tip: Pale Hymn has its tip", _h.key, "death.tip.skill_pale_hymn");
+    Test_True("r3ideas1 tip: it names the move and says BREAK it before it lands", string_pos("Pale Hymn", DeathTip_Text(_h)) > 0 && string_pos("BREAK", DeathTip_Text(_h)) > 0 && string_pos("before it lands", DeathTip_Text(_h)) > 0);
+    var _ram = DeathTip_Pick("enemy_mini_boss", SKILL_RAMMING, "", 0);
+    Test_Eq("r3ideas1 tip: Palehorn's Ramming has its tip", _ram.key, "death.tip.skill_ramming");
+    Test_True("r3ideas1 tip: it says BREAK, Guard and the defence bar", string_pos("BREAK", DeathTip_Text(_ram)) > 0 && string_pos("Guard", DeathTip_Text(_ram)) > 0 && string_pos("defence bar", DeathTip_Text(_ram)) > 0);
+    Test_Eq("r3ideas1 tip: an abandoned run has no tip", DeathTip_Pick("abandoned", -1, "", 0).key, "");
+    // the generic pool
+    var _pool = DeathTip_GenericPool();
+    Test_True("r3ideas1 tip: the generic pool has at least 5 tips", array_length(_pool) >= 5);
+    var _dup = false;
+    for (var _i = 0; _i < array_length(_pool); _i++) for (var _j = _i + 1; _j < array_length(_pool); _j++) if (_pool[_i].key == _pool[_j].key) _dup = true;
+    Test_False("r3ideas1 tip: no generic tip twice", _dup);
+    var _again = false;
+    var _seen = {};
+    for (var _k = 0; _k < array_length(_pool); _k++) {
+        for (var _s = 0; _s < 14; _s++) {
+            var _g = DeathTip_Pick("enemy_slime", -1, _pool[_k].key, _s);
+            if (_g.key == _pool[_k].key) _again = true;
+            variable_struct_set(_seen, _g.key, true);
+        }
+    }
+    Test_False("r3ideas1 tip: a generic pick is never the tip shown last", _again);
+    Test_Eq("r3ideas1 tip: across picks every generic tip comes up", array_length(variable_struct_get_names(_seen)), array_length(_pool));
+    var _unk = DeathTip_Pick("enemy_snake", SKILL_BITE, "", 2);
+    Test_True("r3ideas1 tip: a move with no tip of its own falls back to the generic pool", string_pos("death.tip.gen", _unk.key) == 1);
+    // true to the rules
+    var _guard = "";
+    var _brk = "";
+    for (var _t = 0; _t < array_length(_pool); _t++) {
+        if (_pool[_t].key == "death.tip.gen_guard") _guard = DeathTip_Text(_pool[_t]);
+        if (_pool[_t].key == "death.tip.gen_break") _brk = DeathTip_Text(_pool[_t]);
+    }
+    Test_True("r3ideas1 tip: the Guard tip carries the MP share of the game's rule (" + string(round(GUARD_MP_PCT * 100)) + "%)", string_pos(string(round(GUARD_MP_PCT * 100)) + "%", _guard) > 0 && string_pos("halves", _guard) > 0);
+    Test_True("r3ideas1 tip: the BREAK tip carries the BREAK bonus of the game's rule (" + string(round((BREAK_DAMAGE_MULT - 1) * 100)) + "%)", string_pos(string(round((BREAK_DAMAGE_MULT - 1) * 100)) + "%", _brk) > 0);
+    // every tip is one short sentence
+    var _all = DeathTip_All();
+    var _long = "";
+    for (var _a = 0; _a < array_length(_all); _a++) { var _tx = DeathTip_Text(_all[_a]); if (string_length(_tx) > 80) _long += _all[_a].key + " "; }
+    Test_Eq("r3ideas1 tip: every tip is short (80 characters at most, tags counted)", _long, "");
+}
+
+function Test_R3IdTipRun(_prefix) {
+    if (!script_exists(asset_get_index("DeathTip_Pick"))) { Test_True("r3ideas1 death: DeathTip_Pick exists: not implemented", false); return; }
+    var _prof = Profile_Get();
+    _prof.deaths = 3;
+    _prof.last_tip = "";
+    Death_KillerKey("died");
+    Death_KillSkill();
+    var _fps = max(1, game_get_speed(gamespeed_fps));
+    // a poison tick that took the last HP
+    Death_NoteDotKill(STATUS_POISON);
+    var _c1 = Death_BuildContext("died", "Spider");
+    Test_Eq("r3ideas1 death: a poison tick death gets the poison tip", _c1.tip_key, "death.tip.status_poison");
+    Test_True("r3ideas1 death: the context carries the tip text", string_pos("Antidote", _c1.tip) > 0);
+    Test_True("r3ideas1 death: the tip adds time to the scene", _c1.frames > DeathScene_Frames(_c1.text, _fps));
+    Test_Eq("r3ideas1 death: the profile remembers the tip", Profile_Get().last_tip, "death.tip.status_poison");
+    // an enemy move that took the last HP
+    Death_NoteKillSkill(SKILL_PALE_HYMN);
+    var _c2 = Death_BuildContext("died", "Pale Choirbeast");
+    Test_Eq("r3ideas1 death: a Pale Hymn death gets the Pale Hymn tip", _c2.tip_key, "death.tip.skill_pale_hymn");
+    Test_True("r3ideas1 death: and says BREAK", string_pos("BREAK", _c2.tip) > 0);
+    // the note is spent: the next death without a move is generic
+    var _c3 = Death_BuildContext("died", "Slime");
+    Test_True("r3ideas1 death: the move note is used up, the next death gets a generic tip", string_pos("death.tip.gen", _c3.tip_key) == 1);
+    // twelve generic deaths in a row never show the same tip twice running
+    var _prev = _c3.tip_key;
+    var _same = 0;
+    for (var _d = 0; _d < 12; _d++) {
+        var _cx = Death_BuildContext("died", "Slime");
+        if (_cx.tip_key == _prev) _same++;
+        _prev = _cx.tip_key;
+    }
+    Test_Eq("r3ideas1 death: twelve generic deaths in a row never repeat the tip back to back", _same, 0);
+    Profile_Flush();
+    Test_ProfRelaunch();
+    Test_Eq("r3ideas1 death: the last tip is in the profile file", Profile_Get().last_tip, _prev);
+    // an abandoned run
+    var _before = Profile_Get().last_tip;
+    var _ca = Death_BuildContext("abandoned", "");
+    Test_Eq("r3ideas1 death: an abandoned run has no tip", _ca.tip, "");
+    Test_Eq("r3ideas1 death: and leaves the last tip alone", Profile_Get().last_tip, _before);
+    Test_Eq("r3ideas1 death: a context without a tip takes only the line's time", _ca.frames, DeathScene_Frames(_ca.text, _fps));
+}
+
+// The death scene's layout with a tip, at the three sizes, in both languages: everything inside the GUI, no word wider than its column.
+function Test_R3IdTipFit() {
+    if (!script_exists(asset_get_index("DeathTip_All"))) { Test_True("r3ideas1 tipfit: DeathTip_All exists: not implemented", false); return; }
+    TextFit_Each("r3ideas1 death tip", function(_w, _h, _lang) {
+        var _fails = [];
+        var _mt = Ui_Metrics();
+        var _all = DeathTip_All();
+        var _line = (_lang == "en") ? "The tunnel took you again. It did not hurry, and it did not look away, and the slime that did it was in no way special or kind." : Loc_T("death.t3.1", "How many times has it been?");
+        for (var _i = 0; _i < array_length(_all); _i++) {
+            var _tip = DeathTip_Text(_all[_i]);
+            var _L = RunFlow_DeathLayoutNow(_line, _tip);
+            var _what = "tip " + _all[_i].key;
+            if (_L.text_x < 0 || _L.text_y < 0 || _L.text_x + _L.text_w > _mt.gw || _L.text_y + _L.text_h > _mt.gh) array_push(_fails, _what + " outside the GUI");
+            if (_L.show && !(_L.img_y + _L.img_h <= _L.text_y)) array_push(_fails, _what + " touches the picture");
+            if (_L.tip_y + _L.tip_h != _L.text_y + _L.text_h) array_push(_fails, _what + " block is not the end of the text");
+            if (_L.tip_y < _L.text_y + _L.line_h) array_push(_fails, _what + " starts inside the line");
+            if (_L.tip_h != Ui_TextBlockH(_tip, _L.text_w)) array_push(_fails, _what + " height is not what the tip needs");
+            TextFit_Block(_fails, _what, Prompt_Plain(_tip), _L.text_w, _mt.p);
+        }
+        return _fails;
+    });
+}
+
+// The bestiary page with every weakness and resistance seen (the longest values: the Codex of a veteran profile), at the three sizes and both languages.
+function Test_R3IdCodexFit() {
+    TextFit_Each("r3ideas1 codex bestiary seen", function(_w, _h, _l) {
+        var _f = [];
+        var _prof = TextFit_Profile();
+        var _ids = Codex_EnemyIds();
+        for (var _i = 0; _i < array_length(_ids); _i++) { Codex_NoteWeakPoint(_prof, _ids[_i], "weak"); Codex_NoteWeakPoint(_prof, _ids[_i], "resist"); }
+        var _pg = TabCodex_Page("bestiary", _prof);
+        TextFit_TabPage(_f, "codex_bestiary", _pg.rows, _pg.title, _pg.cols);
+        return _f;
+    });
+}
+
+function Test_R3IdWorkbook() {
+    Loc_Init();
+    var _keys = ["combat.msg.weak_to", "combat.msg.resists", "tab.lbl.weak", "tab.lbl.resists", "death.tip.status_poison", "death.tip.status_bleed", "death.tip.status_burn",
+                 "death.tip.skill_pale_hymn", "death.tip.skill_ramming", "death.tip.skill_windup", "death.tip.gen_guard", "death.tip.gen_weak", "death.tip.gen_bed", "death.tip.gen_break",
+                 "death.tip.gen_smoke", "death.tip.gen_throw"];
+    var _miss = "";
+    var _same = "";
+    var _st = Loc_GetData().strings;
+    for (var _k = 0; _k < array_length(_keys); _k++) {
+        var _e = variable_struct_exists(_st, _keys[_k]) ? variable_struct_get(_st, _keys[_k]) : undefined;
+        if (!is_struct(_e) || !variable_struct_exists(_e, "en") || !variable_struct_exists(_e, "ko") || string(_e.en) == "" || string(_e.ko) == "") { _miss += _keys[_k] + " "; continue; }
+        if (string(_e.en) == string(_e.ko)) _same += _keys[_k] + " ";
+    }
+    Test_Eq("r3ideas1 workbook: every new string is in the workbook in English and Korean", _miss, "");
+    Test_Eq("r3ideas1 workbook: the Korean is not the English", _same, "");
 }
