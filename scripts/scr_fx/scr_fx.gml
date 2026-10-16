@@ -1045,6 +1045,17 @@ function MapFx_DrawPlayerSquash() {
     var spr = pl.sprite_index;
     if (!sprite_exists(spr)) return;
     draw_sprite_ext(spr, pl.image_index, round(pl.x) + box.dx, round(pl.y) + box.dy, box.w / sprite_get_width(spr), box.h / sprite_get_height(spr), 0, pl.image_blend, pl.image_alpha);
+    Fx_NotePlayerDraw();
+}
+
+// R-089/R-090 record: which layer's end the world pass that drew the player's squash ran at (global.world_pass_layer, set by the pass), counted per layer name.
+// The smoke run (R3Light) reads it: the squash must come from the same layer the plain sprite is on, whatever the room has above it.
+function Fx_NotePlayerDraw() {
+    if (!variable_global_exists("player_draw_log") || !is_struct(global.player_draw_log)) global.player_draw_log = { n: 0, layers: {} };
+    var _l = variable_global_exists("world_pass_layer") ? global.world_pass_layer : "?";
+    global.player_draw_log.n++;
+    var _c = variable_struct_exists(global.player_draw_log.layers, _l) ? variable_struct_get(global.player_draw_log.layers, _l) : 0;
+    variable_struct_set(global.player_draw_log.layers, _l, _c + 1);
 }
 
 // A chest, barrel or card chest (an obj_interactable) was just opened: the lid is the top middle of the instance.

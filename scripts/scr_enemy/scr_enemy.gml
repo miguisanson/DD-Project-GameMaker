@@ -906,6 +906,7 @@ function World_DrawFxPart(_name) {
 }
 
 function World_DrawFx() {
+    global.world_pass_layer = layer_exists("Foreground") ? "Foreground" : "Instances";   // R-089 record, see Fx_NotePlayerDraw
     var _parts = World_FxParts();
     for (var _i = 0; _i < array_length(_parts); _i++) World_DrawFxPart(_parts[_i].name);
 }

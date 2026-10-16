@@ -543,7 +543,10 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeHunt6Ui(_s);   // hunt6ui: Esc / Tab mid-step, Y closes the menu, a pad leaves "Press a key...", a quick double press and "Keep this?"; goes on to hunt7map (980)
             break;
         case 980: case 981: case 982: case 983: case 984: case 985: case 986: case 987: case 988: case 989:
-            Scenario_StepSmokeHunt7Map(_s);   // hunt7map: the Stranger in the arrival clean-up and in the run save, the post-Run grace holds in a menu; the end of the chain (its last step calls Scenario_NoticeEnd)
+            Scenario_StepSmokeHunt7Map(_s);   // hunt7map: the Stranger in the arrival clean-up and in the run save, the post-Run grace holds in a menu; goes on to r3light (1000)
+            break;
+        case 1000: case 1001: case 1002: case 1003: case 1004: case 1005: case 1006: case 1007: case 1008: case 1009:
+            Scenario_StepSmokeR3Light(_s);   // r3light: the player's layer over a walk and a run, the same picture plain and squashed, the merchant's cell; the end of the chain (its last step calls Scenario_NoticeEnd)
             break;
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step goes on to G6 (380)
@@ -13848,7 +13851,209 @@ function Scenario_StepSmokeHunt7Map(_s) {
                 Scenario_Next(_s, 987);
             }
             break;
-        case 987:   // the end of the chain: removes the files and the profile the steps made
+        case 987:   // goes on with r3light (1000), the end of the chain
+            Scenario_Next(_s, 1000);
+            break;
+    }
+}
+
+// ============================================================================
+// Round 3, packet light (R-089, R-090, R-091), smoke steps 1000..1004. They go on from hunt7map (987); the last one calls Scenario_NoticeEnd.
+//   1000-1001: a walk of 6 tiles and then a run of 8 in rm_floor1 (a Foreground layer over the Instances) and in rm_floor3 (none), with real key input and Screen shake on:
+//              every squashed frame of the player is drawn by the pass at the end of the layer the player is on.
+//   1002:      rm_floor1, the same tile, the picture of the player plain and squashed 10 ms in: as bright as each other (the haze over the room must not decide).
+//   1003:      on each merchant floor the merchant's cell cuts no part of the floor off, and he can be talked to from a free cell.
+// ============================================================================
+function Scenario_R3LightDir(_pl, _last) {
+    var _opts = [
+        { act: "move_left", dx: -1, dy: 0 }, { act: "move_right", dx: 1, dy: 0 },
+        { act: "move_up", dx: 0, dy: -1 }, { act: "move_down", dx: 0, dy: 1 }
+    ];
+    var _order = [];   // the last way first, then the sides, then back
+    if (_last >= 0) array_push(_order, _last);
+    for (var _i = 0; _i < 4; _i++) {
+        if (_i == _last) continue;
+        if (_last >= 0 && _opts[_i].dx == -_opts[_last].dx && _opts[_i].dy == -_opts[_last].dy) continue;
+        array_push(_order, _i);
+    }
+    if (_last >= 0) {
+        for (var _j = 0; _j < 4; _j++) {
+            if (_opts[_j].dx == -_opts[_last].dx && _opts[_j].dy == -_opts[_last].dy) array_push(_order, _j);
+        }
+    }
+    for (var _o = 0; _o < array_length(_order); _o++) {
+        var _c = _order[_o];
+        var _nx = _pl.x + _opts[_c].dx * 16;
+        var _ny = _pl.y + _opts[_c].dy * 16;
+        if (Player_TileBlocked(_pl, _nx, _ny)) continue;
+        if (instance_position(_nx + 8, _ny + 8, obj_room_transition) != noone) continue;   // never walk out of the room
+        if (instance_position(_nx + 8, _ny + 8, obj_npc) != noone) continue;
+        return { i: _c, act: _opts[_c].act };
+    }
+    return undefined;
+}
+
+// How many floor cells the player can reach from his own, with the cell (_bx, _by) blocked as well; near: a free neighbour of that cell was reached.
+function Scenario_R3LightReach(_g, _sx, _sy, _bx, _by) {
+    var _seen = array_create(_g.w * _g.h, false);
+    var _q = [_sy * _g.w + _sx];
+    _seen[_sy * _g.w + _sx] = true;
+    var _n = 0;
+    var _near = false;
+    var _dxs = [1, 0, -1, 0];
+    var _dys = [0, -1, 0, 1];
+    while (array_length(_q) > 0) {
+        var _cur = _q[0];
+        array_delete(_q, 0, 1);
+        _n++;
+        var _cx = _cur mod _g.w;
+        var _cy = _cur div _g.w;
+        if (abs(_cx - _bx) + abs(_cy - _by) == 1) _near = true;
+        for (var _d = 0; _d < 4; _d++) {
+            var _nx = _cx + _dxs[_d];
+            var _ny = _cy + _dys[_d];
+            if (!Nav_GridInside(_g, _nx, _ny)) continue;
+            if (_nx == _bx && _ny == _by) continue;
+            if (Nav_CellBlocked(_g, _nx, _ny)) continue;
+            if (_seen[_ny * _g.w + _nx]) continue;
+            _seen[_ny * _g.w + _nx] = true;
+            array_push(_q, _ny * _g.w + _nx);
+        }
+    }
+    return { n: _n, near: _near };
+}
+
+function Scenario_StepSmokeR3Light(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "r3l")) _s.r3l = { ri: 0, mi: 0, tiles: 0, dir: -1, cell: -1, run: false, sq: 0 };
+    var _h = _s.r3l;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _walk_rooms = [rm_floor1, rm_floor3];
+    var _merch_rooms = [rm_floor2, rm_floor5, rm_floor8];
+    switch (_s.step) {
+        case 1000:   // a room to walk in
+            if (_h.ri >= array_length(_walk_rooms)) { Scenario_Next(_s, 1002); break; }
+            if (_s.t == 1) {
+                Scenario_Release();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                MapFx_Clear();
+                room_goto(_walk_rooms[_h.ri]);
+            }
+            if (_s.t > 40 && Scenario_FloorReady(_walk_rooms[_h.ri]) && Player_IsSettled(_pl)) {
+                with (obj_enemy) instance_destroy();   // the room's enemies would start a fight
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                GameSettings_Ensure().screen_shake = 1;
+                global.player_draw_log = { n: 0, layers: {} };
+                _h.tiles = 0;
+                _h.dir = -1;
+                _h.cell = -1;
+                _h.run = false;
+                _h.sq = 0;
+                Scenario_Next(_s, 1001);
+            }
+            if (_s.t > 900) { Scenario_Check("r3light_" + room_get_name(_walk_rooms[_h.ri]) + "_is_reached", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1001:   // 6 tiles walked, then 8 run: one key press per tile, as a player holds them
+            if (!instance_exists(_pl)) { Scenario_Check("r3light_the_player_exists", false); Scenario_NoticeEnd(); break; }
+            if (_pl.squash_on) _h.sq++;
+            if (_gs.ui.mode != UI_NONE || array_length(_gs.ui.lines) > 0) { Dialogue_CloseNow(); Scenario_ClearUi(); }
+            if (Player_IsSettled(_pl)) {
+                var _cell = round(_pl.x / 16) + round(_pl.y / 16) * 1000;
+                if (_cell != _h.cell) { _h.cell = _cell; _h.tiles++; }
+                if (_h.tiles > 6) _h.run = true;
+                if (_h.tiles > 14) {
+                    var _name = room_get_name(room);
+                    var _log = variable_global_exists("player_draw_log") ? global.player_draw_log : { n: 0, layers: {} };
+                    var _lname = layer_get_name(_pl.layer);
+                    var _on_own = variable_struct_exists(_log.layers, _lname) ? variable_struct_get(_log.layers, _lname) : 0;
+                    Scenario_Release();
+                    Scenario_Check("r3light_" + _name + "_the_player_squashed_while_he_walked_and_ran", _h.sq >= 6 && _log.n >= 6, "squash frames=" + string(_h.sq) + " drawn=" + string(_log.n));
+                    Scenario_Check("r3light_" + _name + "_every_squash_frame_is_drawn_at_the_end_of_the_layer_the_player_is_on", _log.n > 0 && _on_own == _log.n, "player layer=" + _lname + " passes=" + json_stringify(_log.layers));
+                    _h.ri++;
+                    Scenario_Next(_s, 1000);
+                    break;
+                }
+                var _d = Scenario_R3LightDir(_pl, _h.dir);
+                if (is_struct(_d)) {
+                    _h.dir = _d.i;
+                    _pl.face = [LEFT, RIGHT, UP, DOWN][_d.i];
+                    Scenario_Hold(_d.act, 2);
+                    if (_h.run) Scenario_Hold("run", 2);
+                }
+            }
+            if (_s.t > 1500) { Scenario_Release(); Scenario_Check("r3light_the_walk_and_run_end", false, "tiles=" + string(_h.tiles) + " room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1002:   // rm_floor1 again: the same tile, the player plain and squashed, in the same light and under the same haze
+            if (_s.t == 1) {
+                Scenario_Release();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                MapFx_Clear();
+                room_goto(rm_floor1);
+            }
+            if (_s.t < 40 || !Scenario_FloorReady(rm_floor1) || !Player_IsSettled(_pl)) {
+                if (_s.t > 900) { Scenario_Check("r3light_rm_floor1_is_reached_for_the_picture_check", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                break;
+            }
+            if (!variable_struct_exists(_h, "p")) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                GameSettings_Ensure().screen_shake = 1;
+                var _now = MapFx_Now();
+                _h.p = { f: _s.f, now: _now };
+                global.mapfx_clock = _now;   // a frozen clock: the flicker of the fire and the squash do not move between the two pictures
+                global.light_clock = _now;
+                _pl.squash_start = _now - 1000;   // plain: the squash is long over
+            }
+            if (_s.f == _h.p.f + 4) {
+                _h.p.lum_plain = Scenario_AppBoxLuminance(_pl.x, _pl.y, 16, 16);
+                Scenario_Check("r3light_the_plain_player_is_drawn_for_the_control", _pl.visible && !_pl.squash_on);
+                _pl.squash_start = _h.p.now - 10;   // squashed: 10 ms into it
+            }
+            if (_s.f == _h.p.f + 8) {
+                _h.p.lum_sq = Scenario_AppBoxLuminance(_pl.x, _pl.y, 16, 16);
+                Scenario_Check("r3light_the_squashed_player_is_drawn", _pl.squash_on && !_pl.visible);
+                Scenario_Check("r3light_the_squashed_player_is_as_bright_as_the_plain_one", abs(_h.p.lum_sq - _h.p.lum_plain) <= _h.p.lum_plain * 0.12 + 3, "plain=" + string(_h.p.lum_plain) + " squashed=" + string(_h.p.lum_sq));
+                global.mapfx_clock = -1;
+                global.light_clock = -1;
+                _pl.squash_start = -100000;
+                Scenario_Next(_s, 1003);
+            }
+            if (_s.t > 300) { Scenario_Check("r3light_the_picture_check_ends", false); Scenario_NoticeEnd(); }
+            break;
+        case 1003:   // each merchant floor: the merchant cuts no part of the floor off and has a free cell next to him
+            if (_h.mi >= array_length(_merch_rooms)) { Scenario_Next(_s, 1004); break; }
+            if (_s.t == 1) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                MapFx_Clear();
+                room_goto(_merch_rooms[_h.mi]);
+            }
+            if (_s.t > 40 && Scenario_FloorReady(_merch_rooms[_h.mi])) {
+                var _name2 = room_get_name(room);
+                var _mer = Merchant_EnsureInRoom();
+                Scenario_Check("r3light_" + _name2 + "_has_a_merchant", _mer != noone);
+                if (_mer != noone) {
+                    var _g = Nav_Get().grid;
+                    var _mcx = round(_mer.x / 16);
+                    var _mcy = round(_mer.y / 16);
+                    var _pcx = round(_pl.x / 16);
+                    var _pcy = round(_pl.y / 16);
+                    var _free = Scenario_R3LightReach(_g, _pcx, _pcy, -100, -100);
+                    var _with = Scenario_R3LightReach(_g, _pcx, _pcy, _mcx, _mcy);
+                    Scenario_Check("r3light_" + _name2 + "_the_merchants_cell_is_a_floor_cell", !Nav_CellBlocked(_g, _mcx, _mcy), "cell=" + string(_mcx) + "," + string(_mcy));
+                    Scenario_Check("r3light_" + _name2 + "_the_merchant_cuts_no_part_of_the_floor_off", _with.n == _free.n - 1, "reach without=" + string(_free.n) + " with=" + string(_with.n));
+                    Scenario_Check("r3light_" + _name2 + "_a_free_cell_next_to_the_merchant_can_be_reached", _with.near);
+                }
+                _h.mi++;
+                _s.t = 0;
+            }
+            if (_s.t > 900) { Scenario_Check("r3light_a_merchant_floor_is_reached", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1004:   // the end of the chain: removes the files and the profile the steps made
             Scenario_NoticeEnd();
             break;
     }
