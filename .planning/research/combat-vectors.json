@@ -328,7 +328,7 @@
    "level": 1,
    "atk": 11,
    "df": 12,
-   "spd": 10,
+   "spd": 9,
    "mag": 3,
    "hp": 10,
    "mp": 11
@@ -339,7 +339,7 @@
    "level": 2,
    "atk": 12,
    "df": 14,
-   "spd": 10,
+   "spd": 9,
    "mag": 3,
    "hp": 16,
    "mp": 12
@@ -350,7 +350,7 @@
    "level": 3,
    "atk": 13,
    "df": 16,
-   "spd": 10,
+   "spd": 9,
    "mag": 3,
    "hp": 22,
    "mp": 13
@@ -361,7 +361,7 @@
    "level": 5,
    "atk": 15,
    "df": 20,
-   "spd": 10,
+   "spd": 9,
    "mag": 3,
    "hp": 37,
    "mp": 15
@@ -372,7 +372,7 @@
    "level": 10,
    "atk": 20,
    "df": 30,
-   "spd": 10,
+   "spd": 9,
    "mag": 3,
    "hp": 70,
    "mp": 20
@@ -381,9 +381,9 @@
    "id": "cls_archer_1",
    "cls": "archer",
    "level": 1,
-   "atk": 9,
+   "atk": 8,
    "df": 8,
-   "spd": 13,
+   "spd": 12,
    "mag": 4,
    "hp": 10,
    "mp": 12
@@ -392,9 +392,9 @@
    "id": "cls_archer_2",
    "cls": "archer",
    "level": 2,
-   "atk": 11,
+   "atk": 10,
    "df": 8,
-   "spd": 14,
+   "spd": 13,
    "mag": 4,
    "hp": 16,
    "mp": 14
@@ -403,9 +403,9 @@
    "id": "cls_archer_3",
    "cls": "archer",
    "level": 3,
-   "atk": 13,
+   "atk": 12,
    "df": 8,
-   "spd": 15,
+   "spd": 14,
    "mag": 4,
    "hp": 22,
    "mp": 16
@@ -414,9 +414,9 @@
    "id": "cls_archer_5",
    "cls": "archer",
    "level": 5,
-   "atk": 17,
+   "atk": 16,
    "df": 8,
-   "spd": 17,
+   "spd": 16,
    "mag": 4,
    "hp": 34,
    "mp": 20
@@ -425,9 +425,9 @@
    "id": "cls_archer_10",
    "cls": "archer",
    "level": 10,
-   "atk": 27,
+   "atk": 26,
    "df": 8,
-   "spd": 22,
+   "spd": 21,
    "mag": 4,
    "hp": 64,
    "mp": 30
@@ -491,9 +491,9 @@
    "id": "cls_nobody_1",
    "cls": "nobody",
    "level": 1,
-   "atk": 8,
-   "df": 8,
-   "spd": 9,
+   "atk": 10,
+   "df": 9,
+   "spd": 12,
    "mag": 3,
    "hp": 10,
    "mp": 11
@@ -502,9 +502,9 @@
    "id": "cls_nobody_2",
    "cls": "nobody",
    "level": 2,
-   "atk": 10,
-   "df": 8,
-   "spd": 10,
+   "atk": 12,
+   "df": 9,
+   "spd": 13,
    "mag": 3,
    "hp": 16,
    "mp": 12
@@ -513,9 +513,9 @@
    "id": "cls_nobody_3",
    "cls": "nobody",
    "level": 3,
-   "atk": 11,
-   "df": 9,
-   "spd": 10,
+   "atk": 13,
+   "df": 10,
+   "spd": 13,
    "mag": 4,
    "hp": 22,
    "mp": 13
@@ -524,9 +524,9 @@
    "id": "cls_nobody_5",
    "cls": "nobody",
    "level": 5,
-   "atk": 14,
-   "df": 10,
-   "spd": 11,
+   "atk": 16,
+   "df": 11,
+   "spd": 14,
    "mag": 5,
    "hp": 34,
    "mp": 16
@@ -535,9 +535,9 @@
    "id": "cls_nobody_10",
    "cls": "nobody",
    "level": 10,
-   "atk": 22,
-   "df": 12,
-   "spd": 14,
+   "atk": 24,
+   "df": 13,
+   "spd": 17,
    "mag": 7,
    "hp": 64,
    "mp": 22
@@ -961,7 +961,7 @@
    "power": 11,
    "stun": true,
    "perfect": false,
-   "want": 11
+   "want": 8
   },
   {
    "id": "stagger_gain_11_sp",
@@ -969,7 +969,7 @@
    "power": 11,
    "stun": true,
    "perfect": true,
-   "want": 17
+   "want": 12
   },
   {
    "id": "stagger_gain_1_no",
@@ -992,35 +992,35 @@
    "kind": "max",
    "rank": 1,
    "boss": false,
-   "want": 8
+   "want": 12
   },
   {
    "id": "stagger_max_2_norm",
    "kind": "max",
    "rank": 2,
    "boss": false,
-   "want": 12
+   "want": 18
   },
   {
    "id": "stagger_max_3_boss",
    "kind": "max",
    "rank": 3,
    "boss": true,
-   "want": 32
+   "want": 48
   },
   {
    "id": "stagger_max_4_boss",
    "kind": "max",
    "rank": 4,
    "boss": true,
-   "want": 40
+   "want": 60
   },
   {
    "id": "stagger_max_4_norm",
    "kind": "max",
    "rank": 4,
    "boss": false,
-   "want": 20
+   "want": 30
   }
  ],
  "timeline": [
@@ -1030,7 +1030,7 @@
    "spd_enemy": 9,
    "boss": false,
    "script": "n n n n n n n n n",
-   "want": "PEPEPPEPE"
+   "want": "PEPEPEPEP"
   },
   {
    "id": "turn_2x",
@@ -1038,7 +1038,7 @@
    "spd_enemy": 10,
    "boss": false,
    "script": "n n n n n n n n n n n n",
-   "want": "PPEPPEPPEPPE"
+   "want": "PEPPEPEPPEPE"
   },
   {
    "id": "turn_tie",
@@ -1054,7 +1054,7 @@
    "spd_enemy": 13,
    "boss": false,
    "script": "n n n n n n",
-   "want": "EPEPEE"
+   "want": "EPEPEP"
   },
   {
    "id": "turn_preview",
@@ -1062,7 +1062,7 @@
    "spd_enemy": 9,
    "boss": false,
    "script": "p5 n n p5 n n n",
-   "want": "(PEPEP)PE(PEPPE)PEP"
+   "want": "(PEPEP)PE(PEPEP)PEP"
   },
   {
    "id": "turn_stun",
@@ -1110,7 +1110,7 @@
    "spd_enemy": 8,
    "boss": false,
    "script": "n n n n n n n",
-   "want": "PPEPPPE"
+   "want": "PEPPEPP"
   }
  ]
 }

@@ -172,6 +172,7 @@ function Test_RunAll() {
     Test_RunSuite("R4NoDebug", Test_Suite_R4NoDebug);
     Test_RunSuite("R3Loudness", Test_Suite_R3Loudness);
     Test_RunSuite("R4Final1", Test_Suite_R4Final1);
+    Test_RunSuite("R3Balance", Test_Suite_R3Balance);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -297,26 +298,26 @@ function Test_Suite_Stats() {
     Test_Eq("vec mp_2_10_39", Resource_MaxMp(2, 10, 39), 47);
     Test_Eq("vec mp_2_1_12", Resource_MaxMp(2, 1, 12), 16);
     Test_Eq("vec mp_1_5_4", Resource_MaxMp(1, 5, 4), 16);
-    Test_ClassAt("vec cls_knight_1", CLASS_KNIGHT, 1, 11, 12, 10, 3, 10, 11);
-    Test_ClassAt("vec cls_knight_2", CLASS_KNIGHT, 2, 12, 14, 10, 3, 16, 12);
-    Test_ClassAt("vec cls_knight_3", CLASS_KNIGHT, 3, 13, 16, 10, 3, 22, 13);
-    Test_ClassAt("vec cls_knight_5", CLASS_KNIGHT, 5, 15, 20, 10, 3, 37, 15);
-    Test_ClassAt("vec cls_knight_10", CLASS_KNIGHT, 10, 20, 30, 10, 3, 70, 20);
-    Test_ClassAt("vec cls_archer_1", CLASS_ARCHER, 1, 9, 8, 13, 4, 10, 12);
-    Test_ClassAt("vec cls_archer_2", CLASS_ARCHER, 2, 11, 8, 14, 4, 16, 14);
-    Test_ClassAt("vec cls_archer_3", CLASS_ARCHER, 3, 13, 8, 15, 4, 22, 16);
-    Test_ClassAt("vec cls_archer_5", CLASS_ARCHER, 5, 17, 8, 17, 4, 34, 20);
-    Test_ClassAt("vec cls_archer_10", CLASS_ARCHER, 10, 27, 8, 22, 4, 64, 30);
+    Test_ClassAt("vec cls_knight_1", CLASS_KNIGHT, 1, 11, 12, 9, 3, 10, 11);
+    Test_ClassAt("vec cls_knight_2", CLASS_KNIGHT, 2, 12, 14, 9, 3, 16, 12);
+    Test_ClassAt("vec cls_knight_3", CLASS_KNIGHT, 3, 13, 16, 9, 3, 22, 13);
+    Test_ClassAt("vec cls_knight_5", CLASS_KNIGHT, 5, 15, 20, 9, 3, 37, 15);
+    Test_ClassAt("vec cls_knight_10", CLASS_KNIGHT, 10, 20, 30, 9, 3, 70, 20);
+    Test_ClassAt("vec cls_archer_1", CLASS_ARCHER, 1, 8, 8, 12, 4, 10, 12);
+    Test_ClassAt("vec cls_archer_2", CLASS_ARCHER, 2, 10, 8, 13, 4, 16, 14);
+    Test_ClassAt("vec cls_archer_3", CLASS_ARCHER, 3, 12, 8, 14, 4, 22, 16);
+    Test_ClassAt("vec cls_archer_5", CLASS_ARCHER, 5, 16, 8, 16, 4, 34, 20);
+    Test_ClassAt("vec cls_archer_10", CLASS_ARCHER, 10, 26, 8, 21, 4, 64, 30);
     Test_ClassAt("vec cls_mage_1", CLASS_MAGE, 1, 5, 7, 10, 12, 10, 16);
     Test_ClassAt("vec cls_mage_2", CLASS_MAGE, 2, 5, 7, 10, 15, 16, 19);
     Test_ClassAt("vec cls_mage_3", CLASS_MAGE, 3, 5, 7, 10, 18, 19, 22);
     Test_ClassAt("vec cls_mage_5", CLASS_MAGE, 5, 5, 7, 10, 24, 28, 28);
     Test_ClassAt("vec cls_mage_10", CLASS_MAGE, 10, 5, 7, 10, 39, 52, 43);
-    Test_ClassAt("vec cls_nobody_1", CLASS_NOBODY, 1, 8, 8, 9, 3, 10, 11);
-    Test_ClassAt("vec cls_nobody_2", CLASS_NOBODY, 2, 10, 8, 10, 3, 16, 12);
-    Test_ClassAt("vec cls_nobody_3", CLASS_NOBODY, 3, 11, 9, 10, 4, 22, 13);
-    Test_ClassAt("vec cls_nobody_5", CLASS_NOBODY, 5, 14, 10, 11, 5, 34, 16);
-    Test_ClassAt("vec cls_nobody_10", CLASS_NOBODY, 10, 22, 12, 14, 7, 64, 22);
+    Test_ClassAt("vec cls_nobody_1", CLASS_NOBODY, 1, 10, 9, 12, 3, 10, 11);
+    Test_ClassAt("vec cls_nobody_2", CLASS_NOBODY, 2, 12, 9, 13, 3, 16, 12);
+    Test_ClassAt("vec cls_nobody_3", CLASS_NOBODY, 3, 13, 10, 13, 4, 22, 13);
+    Test_ClassAt("vec cls_nobody_5", CLASS_NOBODY, 5, 16, 11, 14, 5, 34, 16);
+    Test_ClassAt("vec cls_nobody_10", CLASS_NOBODY, 10, 24, 13, 17, 7, 64, 22);
     Test_Eq("vec exp_1", Exp_NextLevel(1), 12);
     Test_Eq("vec exp_2", Exp_NextLevel(2), 24);
     Test_Eq("vec exp_3", Exp_NextLevel(3), 40);
@@ -392,10 +393,10 @@ function Test_Suite_Stats() {
     Test_True("D76 free points auto-place until the level-up UI exists", Level_AutoPlaceEnabled());
     _c.stat_points = 1;
     var _c2 = Level_ApplyFreePoint(_c, STAT_SPD);
-    Test_Eq("Level_ApplyFreePoint adds +1 to the chosen stat", _c2.stats.spd, 11);   // Knight SPD 10 (D111) + 1
+    Test_Eq("Level_ApplyFreePoint adds +1 to the chosen stat", _c2.stats.spd, 10);   // Knight SPD 9 (D186; it was 10) + 1
     Test_Eq("Level_ApplyFreePoint spends the point", _c2.stat_points, 0);
     var _c3 = Level_ApplyFreePoint(_c2, STAT_SPD);
-    Test_Eq("Level_ApplyFreePoint with no points left changes nothing", _c3.stats.spd, 11);
+    Test_Eq("Level_ApplyFreePoint with no points left changes nothing", _c3.stats.spd, 10);
     var _c4 = CharacterCreate_Player(CLASS_KNIGHT); _c4.stat_points = 1;
     _c4 = Level_ApplyFreePoint(_c4, 17);
     Test_Eq("Level_ApplyFreePoint rejects an unknown stat and keeps the point", _c4.stat_points, 1);
@@ -408,7 +409,7 @@ function Test_Suite_Stats() {
     _bank = LevelUp_ApplyLevel(_bank);
     global.levelup_auto_place = true;
     Test_Eq("D76 level-up with auto-place off banks 1 free point", _bank.stat_points, 1);
-    Test_Eq("D76 level-up with auto-place off still applies the fixed growth (Archer SPD+1 ATK+1)", _bank.stats.spd + _bank.stats.atk, 13 + 9 + 2);
+    Test_Eq("D76 level-up with auto-place off still applies the fixed growth (Archer SPD+1 ATK+1)", _bank.stats.spd + _bank.stats.atk, 12 + 8 + 2);   // D186: Archer SPD 12 and ATK 8 at level 1; SPD and ATK grow by 1 a level
     Test_Eq("LevelUp_ApplyLevel gives the HP gain as current HP (Archer L2 = 16)", _bank.hp, 16);
     // EXP: 834 exactly reaches the cap; 624 (a clean pass to the final boss) is level 9.
     var _run = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), 834);
@@ -1810,26 +1811,26 @@ function Test_Suite_Turns() {
     // ---- the vectors (generated by the reference; the checker fails if one of these lines is missing or differs) ----
     Test_Eq("vec stagger_gain_6_no", Stagger_Gain(6, false, false), 3);
     Test_Eq("vec stagger_gain_6_np", Stagger_Gain(6, false, true), 5);
-    Test_Eq("vec stagger_gain_11_so", Stagger_Gain(11, true, false), 11);
-    Test_Eq("vec stagger_gain_11_sp", Stagger_Gain(11, true, true), 17);
+    Test_Eq("vec stagger_gain_11_so", Stagger_Gain(11, true, false), 8);
+    Test_Eq("vec stagger_gain_11_sp", Stagger_Gain(11, true, true), 12);
     Test_Eq("vec stagger_gain_1_no", Stagger_Gain(1, false, false), 1);
     Test_Eq("vec stagger_gain_2_np", Stagger_Gain(2, false, true), 2);
-    Test_Eq("vec stagger_max_1_norm", Stagger_Max(1, false), 8);
-    Test_Eq("vec stagger_max_2_norm", Stagger_Max(2, false), 12);
-    Test_Eq("vec stagger_max_3_boss", Stagger_Max(3, true), 32);
-    Test_Eq("vec stagger_max_4_boss", Stagger_Max(4, true), 40);
-    Test_Eq("vec stagger_max_4_norm", Stagger_Max(4, false), 20);
-    Test_Eq("vec turn_13_9", Test_TurnScript(13, 9, false, "n n n n n n n n n"), "PEPEPPEPE");
-    Test_Eq("vec turn_2x", Test_TurnScript(20, 10, false, "n n n n n n n n n n n n"), "PPEPPEPPEPPE");
+    Test_Eq("vec stagger_max_1_norm", Stagger_Max(1, false), 12);
+    Test_Eq("vec stagger_max_2_norm", Stagger_Max(2, false), 18);
+    Test_Eq("vec stagger_max_3_boss", Stagger_Max(3, true), 48);
+    Test_Eq("vec stagger_max_4_boss", Stagger_Max(4, true), 60);
+    Test_Eq("vec stagger_max_4_norm", Stagger_Max(4, false), 30);
+    Test_Eq("vec turn_13_9", Test_TurnScript(13, 9, false, "n n n n n n n n n"), "PEPEPEPEP");
+    Test_Eq("vec turn_2x", Test_TurnScript(20, 10, false, "n n n n n n n n n n n n"), "PEPPEPEPPEPE");
     Test_Eq("vec turn_tie", Test_TurnScript(10, 10, false, "n n n n"), "PEPE");
-    Test_Eq("vec turn_slow_player", Test_TurnScript(9, 13, false, "n n n n n n"), "EPEPEE");
-    Test_Eq("vec turn_preview", Test_TurnScript(13, 9, false, "p5 n n p5 n n n"), "(PEPEP)PE(PEPPE)PEP");
+    Test_Eq("vec turn_slow_player", Test_TurnScript(9, 13, false, "n n n n n n"), "EPEPEP");
+    Test_Eq("vec turn_preview", Test_TurnScript(13, 9, false, "p5 n n p5 n n n"), "(PEPEP)PE(PEPEP)PEP");
     Test_Eq("vec turn_stun", Test_TurnScript(10, 10, false, "n sE p5 n n n n n n"), "P!(PEPEP)PEPEPE");
     Test_Eq("vec turn_stun_steadfast", Test_TurnScript(10, 10, false, "n sE n sE n sE n n sE n"), "P!P~E~PE!P");
     Test_Eq("vec turn_stun_boss", Test_TurnScript(10, 10, true, "n sE n n n n"), "P!EPEP");
     Test_Eq("vec turn_stun_player", Test_TurnScript(10, 10, false, "n n sP n n n n"), "PE!EPEP");
     Test_Eq("vec turn_break", Test_TurnScript(10, 10, false, "n bE n n n n"), "PBPEPE");
-    Test_Eq("vec turn_fast_double", Test_TurnScript(20, 8, false, "n n n n n n n"), "PPEPPPE");
+    Test_Eq("vec turn_fast_double", Test_TurnScript(20, 8, false, "n n n n n n n"), "PEPPEPP");
 
     // ---- behaviour ----
     var _tl = Turn_New([Turn_Fighter(TL_PLAYER, 13), Turn_Fighter(TL_ENEMY, 9)]);
@@ -1841,15 +1842,15 @@ function Test_Suite_Turns() {
     for (var _i = 0; _i < 7; _i++) array_push(_real, Turn_Next(_tl));
     Test_True("Turn_Preview is exactly what the next Turn_Next calls return", Test_SameArray(_a, _real));
 
-    // a fighter with 2x SPD acts about 2x as often (30 turns of 18 vs 9: 20 to 10)
+    // D192: the gauge fills by 10 + SPD, so a fighter with 2x SPD acts about 1.5x as often (rates 28 : 19, 30 turns of 18 vs 9: 28/47 x 30 = 17.9 -> 18 to 12; it was 20 to 10)
     var _two = Turn_New([Turn_Fighter(TL_PLAYER, 18), Turn_Fighter(TL_ENEMY, 9)]);
     var _np = 0;
     for (var _j = 0; _j < 30; _j++) { if (Turn_Next(_two) == TL_PLAYER) _np++; }
-    Test_Eq("2x SPD acts twice as often (20 of 30 turns)", _np, 20);
+    Test_Eq("2x SPD acts about 1.5x as often (18 of 30 turns; was 20)", _np, 18);
     var _three = Turn_New([Turn_Fighter(TL_PLAYER, 9), Turn_Fighter(TL_ENEMY, 27)]);
     var _ne = 0;
     for (var _j2 = 0; _j2 < 40; _j2++) { if (Turn_Next(_three) == TL_ENEMY) _ne++; }
-    Test_Eq("3x SPD acts three times as often (30 of 40 turns)", _ne, 30);
+    Test_Eq("3x SPD acts about 2x as often (rates 37 : 19, 37/56 x 40 = 26.4 -> 27 of 40 turns; was 30)", _ne, 27);
 
     // SPD is read again every turn (Bleeding SPD-2 slows the next turns); a tie goes to the player; SPD never drops below 1
     var _slow = Turn_New([Turn_Fighter(TL_PLAYER, 10), Turn_Fighter(TL_ENEMY, 10)]);
@@ -1904,15 +1905,15 @@ function Test_Suite_Turns() {
     Test_Eq("the player can be pushed back too (Vine Trap)", Battle_ConsumeStun(_tl2, _hero, TL_PLAYER), "pushed");
 
     // stagger meters
-    Test_Eq("Slime stagger meter (rank 1)", EnemyCreate(ENEMY_SLIME).stagger_max, 8);
-    Test_Eq("Ghost Sword stagger meter (rank 2)", EnemyCreate(ENEMY_GHOSTSWORD).stagger_max, 12);
-    Test_Eq("Palehorn (boss, rank 3) stagger meter", EnemyCreate(ENEMY_MINI_BOSS).stagger_max, 32);
-    Test_Eq("The Pale Choirbeast (boss, rank 4) stagger meter", EnemyCreate(ENEMY_FINAL_BOSS).stagger_max, 40);
+    Test_Eq("Slime stagger meter (rank 1)", EnemyCreate(ENEMY_SLIME).stagger_max, 12);   // D191: x1.5 (was 8)
+    Test_Eq("Ghost Sword stagger meter (rank 2)", EnemyCreate(ENEMY_GHOSTSWORD).stagger_max, 18);   // was 12
+    Test_Eq("Palehorn (boss, rank 3) stagger meter", EnemyCreate(ENEMY_MINI_BOSS).stagger_max, 48);   // was 32
+    Test_Eq("The Pale Choirbeast (boss, rank 4) stagger meter", EnemyCreate(ENEMY_FINAL_BOSS).stagger_max, 60);   // was 40
     var _sl = EnemyCreate(ENEMY_SLIME);
     Test_True("a new enemy has an empty meter and is not broken", _sl.stagger == 0 && !_sl.broken);
     Test_False("a hit below the meter does not break", Stagger_Add(_sl, 5));
     Test_Eq("the meter shows the hits so far", _sl.stagger, 5);
-    Test_True("filling the meter is a BREAK", Stagger_Add(_sl, 3));
+    Test_True("filling the meter is a BREAK", Stagger_Add(_sl, 7));   // D191: the meter is 12 (5 + 7)
     Test_True("broken: the flag is set", _sl.broken);
     Test_Eq("broken: the meter resets to 0", _sl.stagger, 0);
     Test_False("while broken the meter does not fill and cannot break again", Stagger_Add(_sl, 9) || _sl.stagger != 0);
@@ -5277,7 +5278,7 @@ function Test_Suite_Cards() {
     Test_Eq("C2 Ice Spear+ needs 1 arrow less", Card_UpgradedSequenceLength(SKILL_ICE_SPEAR, [SKILL_ICE_SPEAR]), 4);
     Test_Eq("C2 an upgrade of another skill leaves the arrows alone", Card_UpgradedSequenceLength(SKILL_ICE_SPEAR, [SKILL_FIREBALL]), 5);
     var _wu = Skill_WithUpgrade(SkillDB_Get(SKILL_WOUND), CardDB_Get(Card_UpgradeId(SKILL_WOUND)));
-    Test_True("C2 Wound+ power 4 -> 6 and bleed chance 75% -> 100%", _wu.power == 6 && _wu.status_chance == 1);
+    Test_True("C2 Wound+ power 3 -> 5 and bleed chance 75% -> 100%", _wu.power == 5 && _wu.status_chance == 1);   // D186: Wound power 3 (was 4)
     var _hu = Skill_WithUpgrade(SkillDB_Get(SKILL_HILT_BASH), CardDB_Get(Card_UpgradeId(SKILL_HILT_BASH)));
     Test_True("C2 Hilt Bash+ power 4 -> 5 and stun chance 60% -> 85%", _hu.power == 5 && abs(_hu.status_chance - 0.85) < 0.0001);
     var _mu = Skill_WithUpgrade(SkillDB_Get(SKILL_MUSCLE_UP), CardDB_Get(Card_UpgradeId(SKILL_MUSCLE_UP)));
@@ -6593,14 +6594,14 @@ function Test_Suite_Economy() {
     ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init(); CardDB_Init();
 
     // ---- gold (D23): 10 + 2 per level; rank 2 x1.2; boss x3; elite x2 ----
-    Test_Eq("C3 gold: level 1 normal enemy = 12", Gold_Base(1, 1, false, false), 12);
-    Test_Eq("C3 gold: level 2 = 14", Gold_Base(2, 1, false, false), 14);
-    Test_Eq("C3 gold: level 5 = 20", Gold_Base(5, 1, false, false), 20);
-    Test_Eq("C3 gold: an elite pays double (level 5: 40)", Gold_Base(5, 1, false, true), 40);
-    Test_Eq("C3 gold: rank 2 pays x1.2 (level 5: 24)", Gold_Base(5, 2, false, false), 24);
-    Test_Eq("C3 gold: level 8 rank 2 = 31 (31.2 rounded)", Gold_Base(8, 2, false, false), 31);
-    Test_Eq("C3 gold: the mini boss (level 8, boss) = 78", Gold_Base(8, 3, true, false), 78);
-    Test_Eq("C3 gold: a rank 2 elite at level 8 = 62", Gold_Base(8, 2, false, true), 62);
+    Test_Eq("C3 gold: level 1 normal enemy = 4 (3.5 rounded; D193, was 12)", Gold_Base(1, 1, false, false), 4);
+    Test_Eq("C3 gold: level 2 = 4 (D193, was 14)", Gold_Base(2, 1, false, false), 4);
+    Test_Eq("C3 gold: level 5 = 6 (5.5 rounded; D193, was 20)", Gold_Base(5, 1, false, false), 6);
+    Test_Eq("C3 gold: an elite pays double (level 5: 11; D193, was 40)", Gold_Base(5, 1, false, true), 11);
+    Test_Eq("C3 gold: rank 2 pays x1.2 (level 5: 6.6 -> 7; D193, was 24)", Gold_Base(5, 2, false, false), 7);
+    Test_Eq("C3 gold: level 8 rank 2 = 8 (8.4 rounded; D193, was 31)", Gold_Base(8, 2, false, false), 8);
+    Test_Eq("C3 gold: the mini boss (level 8, boss) = 21 (D193, was 78)", Gold_Base(8, 3, true, false), 21);
+    Test_Eq("C3 gold: a rank 2 elite at level 8 = 17 (16.8 rounded; D193, was 62)", Gold_Base(8, 2, false, true), 17);
     var _r12 = Gold_Range(12);
     Test_True("C3 gold: the range of 12 is 9..15 (+-25%)", _r12.lo == 9 && _r12.hi == 15);
     var _r40 = Gold_Range(40);
@@ -6649,8 +6650,8 @@ function Test_Suite_Economy() {
     Test_Eq("C3 gold: the run history keeps the gold the run had", _hist.gold, 25);
 
     // income against prices (the target: a floor of gold buys one or two things)
-    Test_True("C3 balance: two fights of floor 2 (28 gold) buy a Smoke Bomb (21)", Gold_Base(2, 1, false, false) * 2 >= Shop_Price(33));
-    Test_True("C3 balance: but not a Smoke Bomb and a Firebomb together (48)", Gold_Base(2, 1, false, false) * 2 < Shop_Price(33) + Shop_Price(30));
+    Test_True("C3 balance (D193): two fights of floor 2 (8 gold) no longer buy a Smoke Bomb (21; it was 28 gold)", Gold_Base(2, 1, false, false) * 2 < Shop_Price(33));
+    Test_True("C3 balance (D193): it takes about six floor-2 fights to buy a Smoke Bomb", Gold_Base(2, 1, false, false) * 6 >= Shop_Price(33));
 
     // ---- prices: ceil(value x 1.5); sell = half ----
     Test_Eq("C3 price: HP Potion Lv1 (value 8) = 12", Shop_Price(10), 12);
@@ -6848,21 +6849,21 @@ function Test_Suite_Economy() {
     var _rk = Test_Hero(CLASS_KNIGHT);
     var _picks0 = _rk.card_picks;
     var _rw = Battle_GrantRewards(_rk, EnemyCreate(ENEMY_SLIME));
-    Test_True("C3 reward: a Slime (level 1) pays 9..15 gold", _rw.gold >= 9 && _rw.gold <= 15);
+    Test_True("C3 reward: a Slime (level 1) pays 3..5 gold (D193, was 9..15)", _rw.gold >= 3 && _rw.gold <= 5);
     Test_Eq("C3 reward: the gold went into the run", _gs.run.gold, _rw.gold);
     Test_False("C3 reward: a normal enemy gives no card pick", _rw.card_pick);
     Test_Eq("C3 reward: no pick owed", _rw.player.card_picks, _picks0);
     _gs.run.gold = 0;
     var _rk2 = Test_Hero(CLASS_KNIGHT);
     var _rw2 = Battle_GrantRewards(_rk2, Elite_Apply(EnemyCreate(ENEMY_SLIME), "brutal"));
-    Test_True("C3 reward: an elite Slime pays 18..30 gold (double)", _rw2.gold >= 18 && _rw2.gold <= 30);
+    Test_True("C3 reward: an elite Slime pays 5..9 gold (double; D193, was 18..30)", _rw2.gold >= 5 && _rw2.gold <= 9);
     Test_True("C3 reward: an elite gives a card pick", _rw2.card_pick);
     Test_Eq("C3 reward: the pick is owed by the character", _rw2.player.card_picks, _picks0 + 1);
     _gs.run.gold = 0;
     var _rk3 = Test_Hero(CLASS_KNIGHT);
     _rk3 = Card_Take(_rk3, "pas:coin_sense").ch;
     var _rw3 = Battle_GrantRewards(_rk3, EnemyCreate(ENEMY_MINI_BOSS));
-    Test_True("C3 reward: the mini boss pays about 78 (58..98), +10% with Coin Sense", _rw3.gold >= 58 && _rw3.gold <= 116);
+    Test_True("C3 reward: the mini boss pays about 21 (15..27), +10% with Coin Sense (D193, was about 78)", _rw3.gold >= 15 && _rw3.gold <= 30);
 
     // ---- per-run shuffles (D33): enemy pools, placement, elites, chests ----
     var _bad_pool = false;
@@ -7342,8 +7343,8 @@ function Test_Suite_BalanceD111() {
 
     // E1-5: Knight base SPD 8 -> 10
     var _kn = CharacterCreate_Player(CLASS_KNIGHT);
-    Test_Eq("D111 Knight SPD 10", _kn.stats.spd, 10);
-    Test_Eq("D111 Knight SPD still 10 at level 2 (fixed growth has none)", LevelUp_ApplyLevel(_kn).stats.spd, 10);
+    Test_Eq("D111 Knight SPD 9 (D186: was 10)", _kn.stats.spd, 9);
+    Test_Eq("D111 Knight SPD still 9 at level 2 (fixed growth has none)", LevelUp_ApplyLevel(_kn).stats.spd, 9);
 
     // E1-6: Nobody gets two fixed points a level (the old one plus the one two steps further on the ATK-DEF-SPD-MAG cycle), throwables x2
     Test_D111_Gain("D111 Nobody L2 gain", 2, 1, 0, 1, 0);
@@ -7357,7 +7358,7 @@ function Test_Suite_BalanceD111() {
     Test_D111_Gain("D111 Nobody L10 gain", 10, 1, 0, 1, 0);
     var _nb = CharacterCreate_Player(CLASS_NOBODY);
     for (var _l = 2; _l <= 10; _l++) _nb = LevelUp_ApplyLevel(_nb);
-    Test_True("D111 Nobody L10 stats ATK 22 DEF 12 SPD 14 MAG 7 (8+5+9, 8+4, 9+5, 3+4)", _nb.stats.atk == 22 && _nb.stats.def == 12 && _nb.stats.spd == 14 && _nb.stats.mag == 7);
+    Test_True("D111 Nobody L10 stats ATK 24 DEF 13 SPD 17 MAG 7 (10+5+9, 9+4, 12+5, 3+4; D186 start 10/9/12)", _nb.stats.atk == 24 && _nb.stats.def == 13 && _nb.stats.spd == 17 && _nb.stats.mag == 7);
     Test_Eq("D111 THROW_NOBODY_MULT is 2", THROW_NOBODY_MULT, 2);
     Test_Eq("D111 Nobody's throws are x2", Throw_Mult(CharacterCreate_Player(CLASS_NOBODY)), 2);
     Test_Eq("D111 the Knight's throws are x1", Throw_Mult(CharacterCreate_Player(CLASS_KNIGHT)), 1);
@@ -7585,8 +7586,8 @@ function Test_Suite_FairUi() {
     var _sl = EnemyCreate(ENEMY_SLIME);
     // Review 1: the shown percent never rounds up to a sure thing (floor, 99 at most) and says 100 only when the chance is exactly 1.
     // D124 says "a whole percent"; round() showed 100% for 0.9955 while the escape could still fail, so the two figures below are floored (spec refinement).
-    Test_Eq("R1b D124: Knight (SPD 10) vs Slime (SPD 9): 10/19 = 52.6 -> 52%", Battle_RunPct(_k, _sl, 0), 52);
-    Test_Eq("R1b D124: after one failed try: 77.6 -> 77%", Battle_RunPct(_k, _sl, 1), 77);
+    Test_Eq("R1b D124: Knight (SPD 9) vs Slime (SPD 9): 9/18 = 50%", Battle_RunPct(_k, _sl, 0), 50);
+    Test_Eq("R1b D124: after one failed try: 75%", Battle_RunPct(_k, _sl, 1), 75);
     var _fast = CharacterCreate_Player(CLASS_KNIGHT);
     var _slow = EnemyCreate(ENEMY_SLIME);
     _fast.stats.spd = 41;
@@ -7601,7 +7602,7 @@ function Test_Suite_FairUi() {
     Test_Eq("Review1: equal SPD, no failed try -> 50%", Battle_RunPct(_fast, _slow, 0), 50);
     Test_Eq("R1b D124: a boss cannot be fled (-1)", Battle_RunPct(_k, EnemyCreate(ENEMY_MINI_BOSS), 0), -1);
     var _cmd = Battle_CmdItems({ p: _k, e: _sl, run_fails: 0 });
-    Test_Eq("R1b D124: the RUN row shows the chance", _cmd[4].value, "52%");
+    Test_Eq("R1b D124: the RUN row shows the chance", _cmd[4].value, "50%");
     var _cmd_b = Battle_CmdItems({ p: _k, e: EnemyCreate(ENEMY_FINAL_BOSS), run_fails: 0 });
     Test_Eq("R1b D124: against a boss the RUN row says no", _cmd_b[4].value, Loc_T("battle.action.run_no", "No"));
     Test_Eq("R1b D124: without a battle the RUN row has no number", Battle_CmdItems()[4].value, "");
@@ -17969,10 +17970,10 @@ function Test_LvScreen() {
     Test_Eq("levelup screen: ATK DEF SPD MAG VIG MND in that order", _m.items[0].label + _m.items[1].label + _m.items[2].label + _m.items[3].label + _m.items[4].label + _m.items[5].label, "ATKDEFSPDMAGVIGMND");
     Test_Eq("levelup screen: the Knight's growth rows are gold", Test_LvGoldRows(_m), "ATK,DEF,VIG,MND");
     Test_Eq("levelup screen: the cursor starts on the class stat (DEF)", _m.cursor, STAT_DEF);
-    Test_Eq("levelup screen: so DEF reads 12 > 14, the other growth rows now > now + growth, the rest only the number", Test_LvRowValues(_m), "11 > 12|12 > 14|10|3|10 > 12|11 > 12");
+    Test_Eq("levelup screen: so DEF reads 12 > 14, the other growth rows now > now + growth, the rest only the number", Test_LvRowValues(_m), "11 > 12|12 > 14|9|3|10 > 12|11 > 12");
     _m.cursor = STAT_SPD;
     CardsUi_StatRefresh(_m);
-    Test_Eq("levelup screen: with the cursor on SPD it reads 10 > 11 and DEF goes back to 12 > 13", Test_LvRowValues(_m), "11 > 12|12 > 13|10 > 11|3|10 > 12|11 > 12");
+    Test_Eq("levelup screen: with the cursor on SPD it reads 9 > 10 and DEF goes back to 12 > 13", Test_LvRowValues(_m), "11 > 12|12 > 13|9 > 10|3|10 > 12|11 > 12");
     _m.cursor = STAT_VIG;
     CardsUi_StatRefresh(_m);
     Test_Eq("levelup screen: on VIG it reads 10 > 13 (growth 2 + the point)", _m.items[4].value, "10 > 13");
@@ -18017,7 +18018,7 @@ function Test_LvScreen() {
     var _om = CardsUi_StatMenu();
     Test_Eq("levelup screen: a banked point alone has no gold rows", Test_LvGoldRows(_om), "");
     Test_Eq("levelup screen: and no legend", _om.layout.note, "");
-    Test_Eq("levelup screen: every row reads only the number, the one under the cursor (DEF) now > now + 1", Test_LvRowValues(_om), "11|12 > 13|10|3|10|11");
+    Test_Eq("levelup screen: every row reads only the number, the one under the cursor (DEF) now > now + 1", Test_LvRowValues(_om), "11|12 > 13|9|3|10|11");
     Loc_SetLanguage("ko");
     var _ko = CardsUi_StatMenu();
     Test_True("levelup screen: the Korean legend is not the English one", _ko.layout.note != "Gold = your class grows these");
@@ -18032,7 +18033,7 @@ function Test_LvScreen() {
     var _ev = Ui_MenuStep(_km, _sn, 5000);
     CardsUi_StatRefresh(_km);
     Test_True("levelup screen: Down moves the cursor from DEF to SPD", _ev.moved && _km.cursor == STAT_SPD);
-    Test_Eq("levelup screen: and the +1 moves with it (SPD 10 > 11, DEF back to 12 > 13)", _km.items[2].value + "|" + _km.items[1].value, "10 > 11|12 > 13");
+    Test_Eq("levelup screen: and the +1 moves with it (SPD 9 > 10, DEF back to 12 > 13)", _km.items[2].value + "|" + _km.items[1].value, "9 > 10|12 > 13");
     // mouse: the row under the pointer is the cursor, a click confirms it
     var _mm2 = CardsUi_StatMenu();
     var _rects = [];
@@ -19211,4 +19212,96 @@ function Test_R4Final1Chips() {
     var _on = Battle_ChipBlink(true, false, 0);
     var _off = Battle_ChipBlink(true, false, 250);
     Test_True("r4final1 chips: the outline still blinks with the label (on at 0 ms, off at 250 ms)", _on.outline && !_off.outline);
+}
+
+// D186 (R3 balance, R-118): the class-spread nudges. Expected values are the owner-approved numbers of tools/balance (balance-r3.md), not read back from the code.
+// The class stat lines are the `vec cls_*` vectors; here the skill cost and the Archer growth rule.
+function Test_Suite_R3Balance() {
+    SkillDB_Init();
+    Test_RunSuite("R3Balance.stagger", Test_R3BalanceStagger);
+    Test_RunSuite("R3Balance.turns", Test_R3BalanceTurns);
+    Test_RunSuite("R3Balance.gold", Test_R3BalanceGold);
+    Test_Eq("r3balance: Wound power is 3 (it was 4)", SkillDB_Get(SKILL_WOUND).power, 3);
+    Test_Eq("r3balance: Wound still costs 3 MP (so still 3 arrows)", SkillDB_Get(SKILL_WOUND).mp_cost, 3);
+    Test_Eq("r3balance (retuned after D191-D193): Horizontal Slash is back to power 5, cost 5", string(SkillDB_Get(SKILL_HORIZ_SLASH).power) + " " + string(SkillDB_Get(SKILL_HORIZ_SLASH).mp_cost), "5 5");
+    Test_Eq("r3balance (retuned): Archer gains SPD 1 on every level again (level 3)", LevelUp_ClassGrowthGain(CLASS_ARCHER, 3).spd, 1);
+    Test_Eq("r3balance: Archer still gains ATK 1 on level 3", LevelUp_ClassGrowthGain(CLASS_ARCHER, 3).atk, 1);
+    Test_Eq("r3balance: Knight starts at SPD 9", CharacterCreate_Player(CLASS_KNIGHT).stats.spd, 9);
+    Test_Eq("r3balance: Nobody starts at ATK 10 DEF 9 SPD 12", string(CharacterCreate_Player(CLASS_NOBODY).stats.atk) + " " + string(CharacterCreate_Player(CLASS_NOBODY).stats.def) + " " + string(CharacterCreate_Player(CLASS_NOBODY).stats.spd), "10 9 12");
+    Test_Eq("r3balance: Archer starts at ATK 8 SPD 12", string(CharacterCreate_Player(CLASS_ARCHER).stats.atk) + " " + string(CharacterCreate_Player(CLASS_ARCHER).stats.spd), "8 12");
+    Test_Eq("r3balance (retuned): fists stay at weapon power 2 (a bigger number lifts every class that has not found a weapon yet)", COMBAT_UNARMED_POWER, 2);
+}
+
+// D191 (BREAK harder): a multi-hit skill fills the meter like ONE hit; a stun skill fills x1.5 (not x2). Expected values by hand from the owner's rule.
+function Test_R3BalanceStagger() {
+    var _b1 = Test_H3Bc(5);
+    _b1.e.stagger_max = 12;
+    Battle_StaggerHit(_b1, 6, false, false, 3);   // three hits of power 6: ONE hit's fill, 6 x 0.5 = 3 (it was 3 x 3 = 9)
+    Test_Eq("r3balance D191: a 3-hit skill fills like one hit (3, not 9)", _b1.e.stagger, 3);
+    instance_destroy(_b1.enemy_inst);
+    var _b2 = Test_H3Bc(5);
+    _b2.e.stagger_max = 12;
+    Battle_StaggerHit(_b2, 6, true, false, 1);    // a stun skill: 6 x 0.5 x 1.5 = 4.5 -> 5 (it was x2 = 6)
+    Test_Eq("r3balance D191: a stun skill fills x1.5 (4.5 -> 5, not 6)", _b2.e.stagger, 5);
+    instance_destroy(_b2.enemy_inst);
+}
+
+// D192 (SPD toned down): the gauge fills by 10 + SPD, and nobody gets a third turn in a row; the strip shows the order the battle plays.
+function Test_R3BalanceTurns() {
+    // Archer SPD 11 against SPD 9 (rates 21 and 19), by hand: the gauge reaches 100 for P at tick 5 (105), for E at tick 6 (114); E keeps 14, P keeps 5 ...
+    // the first four turns are P E P E (the rule never matters this close).
+    var _tl = Turn_New([Turn_Fighter(TL_PLAYER, 11), Turn_Fighter(TL_ENEMY, 9)]);
+    var _s = "";
+    for (var _i = 0; _i < 4; _i++) _s += (Turn_Next(_tl) == TL_PLAYER) ? "P" : "E";
+    Test_Eq("r3balance D192: SPD 11 against 9 opens P E P E", _s, "PEPE");
+    // SPD 40 against 1 (rates 50 and 11): the fast one would take 4 or 5 turns a round; never more than 2 in a row, and the slow one still acts.
+    var _tl2 = Turn_New([Turn_Fighter(TL_PLAYER, 40), Turn_Fighter(TL_ENEMY, 1)]);
+    var _run = 0;
+    var _longest = 0;
+    var _enemy_turns = 0;
+    var _prev = -1;
+    for (var _j = 0; _j < 40; _j++) {
+        var _w = Turn_Next(_tl2);
+        _run = (_w == _prev) ? _run + 1 : 1;
+        _prev = _w;
+        _longest = max(_longest, _run);
+        if (_w == TL_ENEMY) _enemy_turns++;
+    }
+    Test_Eq("r3balance D192: nobody gets a third turn in a row (SPD 40 against 1)", _longest, 2);
+    Test_True("r3balance D192: the slow side acts every third turn at the latest (13 or more of 40)", _enemy_turns >= 13);
+    // the strip (Turn_Preview) is the order the battle then plays, with the cap in it
+    var _tl3 = Turn_New([Turn_Fighter(TL_PLAYER, 40), Turn_Fighter(TL_ENEMY, 1)]);
+    var _pv = Turn_Preview(_tl3, 9);
+    var _play = [];
+    for (var _k = 0; _k < 9; _k++) array_push(_play, Turn_Next(_tl3));
+    var _same = true;
+    for (var _m = 0; _m < 9; _m++) { if (_pv[_m] != _play[_m]) _same = false; }
+    Test_True("r3balance D192: the preview shows the order that is played", _same);
+    // a timeline of one fighter has nobody to hand a third turn to: it simply goes on
+    var _solo = Turn_New([Turn_Fighter(TL_PLAYER, 10)]);
+    var _solo_ok = true;
+    for (var _q = 0; _q < 6; _q++) { if (Turn_Next(_solo) != TL_PLAYER) _solo_ok = false; }
+    Test_True("r3balance D192: a one-fighter timeline keeps giving its turn to that fighter", _solo_ok);
+    // R-022's setup: SPD 1 against SPD 99999 with the enemy's gauge pushed far below zero; the player takes two turns, the third goes to the enemy once it has filled (1000 ticks), by hand P P E P P E
+    var _tl5 = Turn_New([Turn_Fighter(TL_PLAYER, 1), Turn_Fighter(TL_ENEMY, 99999)]);
+    Turn_Push(_tl5, TL_ENEMY, 100000000);
+    var _o5 = "";
+    for (var _r = 0; _r < 6; _r++) _o5 += (Turn_Next(_tl5) == TL_PLAYER) ? "P" : "E";
+    Test_Eq("r3balance D192: SPD 1 against a far-pushed SPD 99999 plays P P E P P E", _o5, "PPEPPE");
+    var _tl6 = Turn_New([Turn_Fighter(TL_PLAYER, 1), Turn_Fighter(TL_ENEMY, 60)]);
+    Turn_Push(_tl6, TL_ENEMY, 100000000);
+    var _pv6 = Turn_Preview(_tl6, 5);
+    Test_Eq("r3balance D192: the strip of that far-pushed enemy is P P E P P", string(_pv6[0]) + string(_pv6[1]) + string(_pv6[2]) + string(_pv6[3]) + string(_pv6[4]), "00100");
+    // a stun still pushes back a full turn
+    var _tl4 = Turn_New([Turn_Fighter(TL_PLAYER, 10), Turn_Fighter(TL_ENEMY, 10)]);
+    Turn_Next(_tl4);
+    Test_True("r3balance D192: a stun still lands and makes the target Steadfast", Turn_Stun(_tl4, TL_ENEMY) && Turn_Find(_tl4, TL_ENEMY).steadfast == TURN_STEADFAST_TURNS);
+}
+
+// D193 (less gold): enemies pay (3 + 0.5 x level) x rank / boss / elite (it was 10 + 2 x level), the Coin Purse card gives 8 (it was 15); prices stay.
+function Test_R3BalanceGold() {
+    Test_Eq("r3balance D193: GOLD_BASE is 3", GOLD_BASE, 3);
+    Test_Eq("r3balance D193: GOLD_PER_LEVEL is 0.5", GOLD_PER_LEVEL, 0.5);
+    Test_Eq("r3balance D193: the Coin Purse card gives 8 gold", CardDB_Get("fb:gold").params.gold, 8);
+    Test_Eq("r3balance D193: prices stay (Smoke Bomb 21)", Shop_Price(33), 21);
 }

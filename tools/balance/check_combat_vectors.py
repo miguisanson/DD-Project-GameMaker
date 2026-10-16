@@ -67,12 +67,13 @@ def nobody_fixed(lv):
     return tuple(x + y for x, y in zip(a, b))
 
 
+# D186 (R3 balance, retuned after D191-D193): Knight SPD 10->9 (and Wound power 3, scr_db_skill); Archer ATK 9->8, SPD 13->12; Nobody ATK 8->10, SPD 9->12, DEF 8->9.
 CLASSES = {
     # name: base atk,def,spd,mag, hd, mp_gain, fixed growth fn(level) -> (atk,def,spd,mag), free-point default stat index (0 atk 1 def 2 spd 3 mag)
-    "knight": dict(base=(11, 12, 10, 3), hd=10, mp_gain=1, fixed=lambda lv: (1, 1, 0, 0), free=1),
-    "archer": dict(base=(9, 8, 13, 4), hd=8, mp_gain=2, fixed=lambda lv: (1, 0, 1, 0), free=0),
+    "knight": dict(base=(11, 12, 9, 3), hd=10, mp_gain=1, fixed=lambda lv: (1, 1, 0, 0), free=1),
+    "archer": dict(base=(8, 8, 12, 4), hd=8, mp_gain=2, fixed=lambda lv: (1, 0, 1, 0), free=0),
     "mage": dict(base=(5, 7, 10, 12), hd=6, mp_gain=2, fixed=lambda lv: (0, 0, 0, 2), free=3),
-    "nobody": dict(base=(8, 8, 9, 3), hd=8, mp_gain=1,
+    "nobody": dict(base=(10, 9, 12, 3), hd=8, mp_gain=1,
                    fixed=lambda lv: nobody_fixed(lv), free=0),
 }
 
@@ -150,15 +151,19 @@ def widen_perfect(half_width, widen):
 
 # ---- Turn timeline, stagger, BREAK (spec section 11, packet B3). Deliberately written tick by tick: the game solves the same thing in closed form. ----
 TURN_MAX = 100
+TURN_SPD_BASE = 10     # D192: a fighter's gauge gains 10 + SPD a tick (it was SPD)
+TURN_MAX_IN_ROW = 2    # D192: nobody gets a third turn in a row
 STEADFAST_TURNS = 2
 
 
 def stagger_gain(power, stun, perfect):
-    return max(1, rhu(power * 0.5 * (2 if stun else 1) * (1.5 if perfect else 1)))
+    # D191: stun skills fill x1.5 (was x2); Perfect x1.5. A multi-hit skill fills like ONE hit (the caller does not multiply by the hits).
+    return max(1, rhu(power * 0.5 * (1.5 if stun else 1) * (1.5 if perfect else 1)))
 
 
 def stagger_max(rank, boss):
-    return (4 + 4 * rank) * (2 if boss else 1)
+    # D191: meters 50% bigger than before ((4 + 4 x rank) x 2 for a boss): normal 12 / 18, Palehorn 48, the final boss 60
+    return rhu(1.5 * (4 + 4 * rank) * (2 if boss else 1))
 
 
 class Timeline:
@@ -166,22 +171,32 @@ class Timeline:
 
     def __init__(self, spd_p, spd_e, boss=False):
         self.f = [dict(c="P", spd=spd_p, g=0, sf=0, boss=False), dict(c="E", spd=spd_e, g=0, sf=0, boss=boss)]
+        self.last = None
+        self.streak = 0
 
     def copy(self):
         t = Timeline(0, 0)
         t.f = [dict(x) for x in self.f]
+        t.last, t.streak = self.last, self.streak
         return t
 
     def next(self):
-        while not any(x["g"] >= TURN_MAX for x in self.f):
+        # D192: the gauge fills by TURN_SPD_BASE + SPD a tick, and nobody acts more than TURN_MAX_IN_ROW times in a row: the third goes to the other side
+        blocked = self.last if self.streak >= TURN_MAX_IN_ROW else None
+        cand = [x for x in self.f if x["c"] != blocked]
+        while not any(x["g"] >= TURN_MAX for x in cand):
             for x in self.f:
-                x["g"] += max(1, x["spd"])
+                x["g"] += TURN_SPD_BASE + max(1, x["spd"])
         best = None
-        for x in self.f:
+        for x in cand:
             if x["g"] >= TURN_MAX and (best is None or x["g"] > best["g"]):
                 best = x
         best["g"] -= TURN_MAX
         best["sf"] = max(0, best["sf"] - 1)
+        if self.last == best["c"]:
+            self.streak += 1
+        else:
+            self.last, self.streak = best["c"], 1
         return best["c"]
 
     def who(self, c):

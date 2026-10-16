@@ -47,6 +47,7 @@ ENEMY_IDS = {"slime": 0, "dire_wolf": 1, "ghost_sword": 2, "spider": 3, "mad_whi
 ENEMY_NAMES = {v: k for k, v in ENEMY_IDS.items()}
 # status ids (scr_macros)
 POISON, BLEED, BURN, STUN, GUARD, DMG_UP, EVASION, CRIT_UP, HIT_UP, MEDITATION, SOLIDIFY, BLOODTHIRSTY, BLESSING, SUNDER = range(14)
+BRACED = 14   # STATUS_BRACE: the Guard command (D99, D180): every hit deals half until the player's next turn starts (export: guard_mult 0.5, until_player_turn)
 # skill ids (scr_macros)
 SK_REGROW, SK_SNUFF, SK_STEAL = 28, 29, 22
 STATS = ("atk", "def", "spd", "mag")
@@ -56,6 +57,11 @@ WP_TURN_BONUS = 1     # a weak enemy: +1 Burning turn
 WP_STACK_BONUS = 1    # +1 Poison / Bleeding stack, never past the status table's max_stacks
 WP_BURN_TURN_CAP = 4  # the weakness never takes Burning past 4 turns
 WP_RESIST_MULT = 0.5  # a resisting enemy: the chance times this, rounded down to a whole percent (a sure 100% -> 50%)
+# D180: the Guard command gives back max(GUARD_MP_MIN, floor(GUARD_MP_PCT x max MP)) MP, never above max MP (GUARD_MP_PCT / GUARD_MP_MIN in scr_macros; the export has no field for them)
+GUARD_MP_PCT = 0.25
+GUARD_MP_MIN = 2
+TURN_SPD_BASE = 10     # D192: the turn gauge fills by 10 + SPD a tick
+TURN_MAX_IN_ROW = 2    # D192: nobody gets a third turn in a row
 BEDS_HEAL_FRAC = 1.0   # C4 (D47): a bed heals all HP and MP (scr_levelup Bed_Heal on branch c4-rest)
 # H4 (D143): the level's free point may go to Max HP (+FREE_POINT_HP_GAIN) or Max MP (+FREE_POINT_MP_GAIN) instead of the class stat (scr_macros). what-if knobs:
 # constants.free_point_choices=0 plays the old way (always the class stat), constants.free_point_hp_gain / free_point_mp_gain change the amounts.
@@ -440,6 +446,8 @@ class Rules:
                 s["fresh"] = False
                 continue
             cfg = self.sdb[s["id"]]
+            if cfg.get("until_player_turn"):   # D180: Braced is not counted down by the owner's own turns; it ends in expire_at_player_turn
+                continue
             self.status_hp_tick(f, s, acted)
             t = cfg.get("tick", {})
             lo, hi = t.get("mp_min", 0), t.get("mp_max", 0)
@@ -454,6 +462,16 @@ class Rules:
                 s["turns"] -= 1
                 if s["turns"] <= 0:
                     f.status.remove(s)
+
+    def enemy_turn_done(self, f):
+        """Status_TickEnemyTurn: the enemy has had its turn, so a status that lasts until the player's next turn (Braced) may now end."""
+        for s in f.status:
+            if self.sdb[s["id"]].get("until_player_turn"):
+                s["enemy_done"] = True
+
+    def expire_at_player_turn(self, f):
+        """Status_ExpireAtPlayerTurn: a player turn starts; Braced ends once the enemy has had a turn since it was applied (a fast player who guards and is up again first keeps it)."""
+        f.status = [s for s in f.status if not (self.sdb[s["id"]].get("until_player_turn") and s.get("enemy_done"))]
 
     # ---- stats ----
     def equip_bonus(self, f, k):
@@ -639,6 +657,8 @@ class Battle:
         self.ctx = ctx
         self.probs = PROFILES[profile] if isinstance(profile, str) else profile
         self.gauge = [0, 0]      # player, enemy
+        self.tl_last = -1        # D192: who acted last and how many turns in a row
+        self.tl_streak = 0
         self.steadfast = [0, 0]
         self.p_turns = 0
         self.e_actions = 0
@@ -682,17 +702,24 @@ class Battle:
     # ---- timeline (spec section 11) ----
     def tl_next(self):
         R = self.R
-        spd = [max(1, R.eff(self.p, "spd")), max(1, R.eff(self.e, "spd"))]
+        rate = [TURN_SPD_BASE + max(1, R.eff(self.p, "spd")), TURN_SPD_BASE + max(1, R.eff(self.e, "spd"))]   # D192: the gauge fills by 10 + SPD
         g = self.gauge
         gm = R.d.tl["gauge_max"]
-        if g[0] < gm and g[1] < gm:
-            ticks = min(max(1, -(-(gm - g[0]) // spd[0])), max(1, -(-(gm - g[1]) // spd[1])))
-            g[0] += spd[0] * ticks
-            g[1] += spd[1] * ticks
-        who = 0
-        if g[1] >= gm and (g[0] < gm or g[1] > g[0]):
-            who = 1
+        blocked = self.tl_last if self.tl_streak >= TURN_MAX_IN_ROW else -1   # D192: nobody acts three times in a row
+        cand = [i for i in (0, 1) if i != blocked]
+        if not any(g[i] >= gm for i in cand):
+            ticks = min(max(1, -(-(gm - g[i]) // rate[i])) for i in cand)
+            g[0] += rate[0] * ticks
+            g[1] += rate[1] * ticks
+        who = cand[0]
+        for i in cand[1:]:
+            if g[i] >= gm and (g[who] < gm or g[i] > g[who]):
+                who = i
         g[who] -= gm
+        if self.tl_last == who:
+            self.tl_streak += 1
+        else:
+            self.tl_last, self.tl_streak = who, 1
         self.steadfast[who] = max(0, self.steadfast[who] - 1)
         return who
 
@@ -715,7 +742,7 @@ class Battle:
         e = self.e
         if e.hp <= 0:
             return
-        gain = ref.stagger_gain(power, stun, perfect) * max(1, hits)
+        gain = ref.stagger_gain(power, stun, perfect)   # D191: a multi-hit skill fills like ONE hit
         if e.broken or e.smax <= 0:
             return
         e.stagger = min(e.smax, e.stagger + gain)
@@ -1237,9 +1264,26 @@ class Battle:
             break
         e.ai["turns"] += 1
         R.tick(e, self.rng, True)
+        R.enemy_turn_done(p)
+
+    def guard_mp_gain(self):
+        """Battle_GuardMpGain: max(2, floor(25% max MP)), at most what fits under max MP."""
+        p = self.p
+        want = max(GUARD_MP_MIN, int(math.floor(p.mmp * GUARD_MP_PCT + 1e-9)))
+        return max(0, min(want, p.mmp - p.mp))
+
+    def p_guard(self):
+        """The Guard command (D99, D180): the turn is spent, every hit until the player's next turn deals half, and a quarter of max MP comes back."""
+        p = self.p
+        gain = self.guard_mp_gain()
+        self.R.status_add(p, BRACED, 1, 0)
+        p.mp += gain
+        self.count("guard")
+        self.log["guards"] = self.log.get("guards", 0) + 1
 
     def player_turn_start(self):
         R, p = self.R, self.p
+        R.expire_at_player_turn(p)
         self.p_turn_counter += 1
         self.rt["once_turn"] = False
         if self.rt["brace_cd"] > 0:
@@ -1291,8 +1335,11 @@ class Battle:
             self.p_throw(act[1])
         elif kind == "item":
             self.p_item(act[1])
+        elif kind == "guard":
+            self.p_guard()
         else:
             self.p_basic()
+        self.rt["guarded_last"] = (kind == "guard")
         if e.hp <= 0:
             return
         R.tick(p, self.rng, True)
@@ -1464,7 +1511,7 @@ class Policy:
         out.append(("basic", -1, basic, 0, basic))
         e_dpa = self.enemy_dpa(b)
         my_spd, e_spd = R.eff(p, "spd"), R.eff(e, "spd")
-        e_per_p = e_spd / max(1, my_spd)
+        e_per_p = (TURN_SPD_BASE + e_spd) / (TURN_SPD_BASE + max(1, my_spd))   # D192: gauge rate = 10 + SPD
         exch = basic / max(0.5, e_dpa * e_per_p)       # enemy HP removed per player HP lost
         remaining = max(1.0, e.hp / max(0.5, basic))   # player turns the fight still needs on basic attacks
         self.last_ctx = dict(basic=basic, e_dpa=e_dpa, e_per_p=e_per_p, exch=exch, remaining=remaining)
@@ -1514,8 +1561,15 @@ class Policy:
                     n = min(9, remaining)
                     score = 0.25 * basic * max(0.0, n - 1)
                 elif sid2 == MEDITATION and not st_has(p, MEDITATION):
+                    # R-118 (forced pick, D174): Meditation is worth the MP that FITS under max MP, not 3 MP a turn for n turns. With a full bar it is a wasted turn (the old rule cast it
+                    # at the start of every fight and cost the Mage about 40 points of win rate). The fight itself spends MP too: its casts make room for the regeneration.
                     n = min(9, remaining)
-                    score = 3.0 * n * self.mp_price_of(b) * basic
+                    tk = R.sdb[MEDITATION].get("tick", {})
+                    per_turn = (tk.get("mp_min", 0) + tk.get("mp_max", 0)) / 2.0 or 3.0
+                    dmg_costs = [R.player_skill(p, x)["mp_cost"] for x in p.skills if R.skills[x]["effect"] == "damage"]
+                    spend = (sum(dmg_costs) / len(dmg_costs)) * max(0.0, n - 1) * 0.6 if dmg_costs else 0.0
+                    usable = min(per_turn * n, max(0.0, (p.mmp - p.mp) + spend))
+                    score = usable * self.mp_price_of(b) * basic
                 elif sid2 == HIT_UP and not st_has(p, HIT_UP):
                     pr2 = b.grade_probs(b.p_widen() * 1.5)
                     gain = exp_damage(ref.power_basic(wp), R.eff(p, stat), d_e, mult, pr2, grades, crit_p) - basic
@@ -1541,6 +1595,25 @@ class Policy:
             return self.enemy_skill_dmg(b, e.ai["windup"])
         return self.enemy_dpa(b)
 
+    def guard_wanted(self, b, diff, basic, danger):
+        """R-118 (D180): when the simple 'average player' presses Guard (halves every hit until his next turn, gives back max(2, 25% max MP)). Never twice in a row, never into a fight that
+        one more attack ends. Reasons, first that holds wins:
+          1. the enemy is winding up (telegraphed) a hit that would take a quarter of his max HP or more: halve it;
+          2. a caster (it owns skills) in a fight that is not easy cannot pay for its cheapest skill, has no MP potion, is above half HP, and the MP Guard gives back would pay for it;
+          3. a hit that could kill him is coming, there is no potion to drink (the heal rule came first), and half of it he survives."""
+        p, e = b.p, b.e
+        if st_has(p, BRACED) or b.rt.get("guarded_last") or e.hp <= basic:
+            return False
+        if e.ai["windup"] >= 0 and self.next_hit(b) >= 0.25 * p.mhp:
+            return True
+        if p.skills and diff != "easy" and p.hp >= 0.5 * p.mhp:
+            cheapest = min(self.R.player_skill(p, s)["mp_cost"] for s in p.skills)
+            if p.mp < cheapest and p.mp + b.guard_mp_gain() >= cheapest:
+                return True
+        if p.hp <= danger * 1.15 and p.hp > 0.5 * danger * 1.15:
+            return True
+        return False
+
     def choose(self, b):
         R, p, e = self.R, b.p, b.e
         diff = self.difficulty(b)
@@ -1548,7 +1621,7 @@ class Policy:
         max_hit = self.enemy_max_hit(b)
         if st_has(p, GUARD) or st_has(p, EVASION):
             max_hit = self.enemy_dpa(b)
-        e_acts = max(1.0, R.eff(e, "spd") / max(1, R.eff(p, "spd")))
+        e_acts = max(1.0, (TURN_SPD_BASE + R.eff(e, "spd")) / (TURN_SPD_BASE + max(1, R.eff(p, "spd"))))
         danger = max_hit * (1.0 if e_acts < 1.5 else min(2.0, e_acts)) + self.dot_pending(p)
         # 1. heal
         if (hp <= danger * 1.15 or hp < 0.30 * p.mhp):
@@ -1566,6 +1639,8 @@ class Policy:
         thr = self.pick_throw(b, diff)
         opts = self.attack_options(b)
         ctx = self.last_ctx
+        if self.guard_wanted(b, diff, ctx["basic"], danger):
+            return ("guard",)
         if thr is not None:
             return ("throw", thr)
         # 4. skills
@@ -2276,6 +2351,10 @@ class RunSim:
         rows = self.shop_stock(idx)
         spent = 0
         bought = []
+        gold_in = self.gold   # D193: what the run carries to this merchant, and what his shelf holds
+        stock_value = sum(r["price"] * r["qty"] for r in rows)
+        stock_n = sum(r["qty"] for r in rows)
+        prices = sorted(r["price"] for r in rows for _ in range(r["qty"]))
         while True:
             base_v = self.value(p)
             base_rb = self.run_bonus(p)
@@ -2302,7 +2381,7 @@ class RunSim:
             else:
                 self.take_card(r["id"])
             bought.append(r["id"])
-        self.rec["shops"].append(dict(idx=idx, spent=spent, bought=bought))
+        self.rec["shops"].append(dict(idx=idx, spent=spent, bought=bought, gold_in=gold_in, stock_value=stock_value, stock_n=stock_n, prices=prices))
         self.rec["buys"].extend(bought)
 
     def row_value(self, r, base_v, base_rb):
@@ -2801,11 +2880,11 @@ def fast_timeline_script(spd_p, spd_e, boss, script):
     b = Battle(R, p, e, "average", random.Random(1), Policy(R), None)
 
     def prev(n):
-        saved = (list(b.gauge), list(b.steadfast))
+        saved = (list(b.gauge), list(b.steadfast), b.tl_last, b.tl_streak)
         s = ""
         for _ in range(n):
             s += "PE"[b.tl_next()]
-        b.gauge, b.steadfast = saved
+        b.gauge, b.steadfast, b.tl_last, b.tl_streak = saved
         return "(" + s + ")"
 
     out = ""

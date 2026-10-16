@@ -7,7 +7,7 @@ function SkillDB_Init() {
         id: SKILL_WOUND,
         name: "Wound",
         mp_cost: 3,
-        power: 4,
+        power: 3,   // D186 (R3 balance): was 4
         power_mult: 1,
         stat_type: STAT_ATK,
         acc: 0,
@@ -1539,7 +1539,7 @@ function CardDB_Init() {
     // fallbacks: when an offer cannot be filled from the pool
     var fbs = [
         ["rest",  "Second Breath", "Restore {n}% of your HP and MP now.",       "heal_pct",  { heal_pct: 0.5 }],
-        ["gold",  "Coin Purse",    "Take {n} gold.",                            "gold",      { gold: 15 }],
+        ["gold",  "Coin Purse",    "Take {n} gold.",                            "gold",      { gold: 8 }],   // D193: was 15
         ["focus", "Whetstone",     "Your main stat grows by {n} for good.",     "stat_main", { stat_main: 1 }]
     ];
     for (var f = 0; f < array_length(fbs); f++) {

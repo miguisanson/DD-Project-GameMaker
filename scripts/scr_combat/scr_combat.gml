@@ -543,7 +543,9 @@ function Player_OnDeath(_p) {
 // ---- The turn timeline, stun push-back, stagger and BREAK (spec section 11; D19 D74 D75 D79 D92) ----
 // Pure: the numbers live in these functions so check_combat_vectors.py can pin them down. The battle owns one timeline (bc.tl) with two fighters,
 // TL_PLAYER (listed first, so it wins ties) and TL_ENEMY.
-#macro TURN_GAUGE_MAX 100          // a fighter acts when its gauge reaches this; one tick adds its SPD
+#macro TURN_GAUGE_MAX 100          // a fighter acts when its gauge reaches this; one tick adds TURN_SPD_BASE + its SPD (D192)
+#macro TURN_SPD_BASE 10            // D192: the gauge fills by 10 + SPD a tick (it was SPD): speed counts for less
+#macro TURN_MAX_IN_ROW 2           // D192: nobody takes a third turn in a row; the third goes to the other side
 #macro TURN_STEADFAST_TURNS 2      // after a stun the fighter is stun-immune for this many of its own turns
 #macro TURN_PREVIEW_COUNT 5        // the strip shows the next 5 turns (D74)
 #macro TURN_BOSS_PUSH 0.5          // a boss as the target of a stun is pushed back half as far (D75)
@@ -551,14 +553,14 @@ function Player_OnDeath(_p) {
 #macro TL_ENEMY 1
 #macro BREAK_DAMAGE_MULT 1.5       // a BROKEN enemy takes +50% damage until its next turn
 #macro STAGGER_PERFECT_MULT 1.5
-#macro STAGGER_STUN_MULT 2
+#macro STAGGER_STUN_MULT 1.5      // D191: was 2
 
 function Turn_Fighter(_id, _spd, _boss = false) {
     return { id: _id, spd: max(1, round(_spd)), gauge: 0, steadfast: 0, boss: _boss };
 }
 
 function Turn_New(_fighters) {
-    return { fighters: _fighters };
+    return { fighters: _fighters, last: -1, streak: 0 };   // last / streak: who acted last and how many turns in a row (D192)
 }
 
 function Turn_Find(_tl, _id) {
@@ -574,7 +576,7 @@ function Turn_Copy(_tl) {
         var f = _tl.fighters[i];
         array_push(out, { id: f.id, spd: f.spd, gauge: f.gauge, steadfast: f.steadfast, boss: f.boss });
     }
-    return { fighters: out };
+    return { fighters: out, last: variable_struct_exists(_tl, "last") ? _tl.last : -1, streak: variable_struct_exists(_tl, "streak") ? _tl.streak : 0 };
 }
 
 function Turn_SetSpd(_tl, _id, _spd) {
@@ -582,28 +584,36 @@ function Turn_SetSpd(_tl, _id, _spd) {
     if (is_struct(f)) f.spd = max(1, round(_spd));
 }
 
-// Who acts next. Nobody ready: tick (every gauge += SPD) until somebody is. The highest gauge acts, a tie goes to the first in the list (the player).
+// Who acts next. Nobody ready: tick (every gauge += TURN_SPD_BASE + SPD, D192) until somebody is. The highest gauge acts, a tie goes to the first in the list (the player).
+// D192: a fighter that has just acted TURN_MAX_IN_ROW times in a row is skipped: the others tick until one is ready (the skipped one keeps filling).
 // The actor pays TURN_GAUGE_MAX (the overflow is kept) and its Steadfast counts down by one.
 function Turn_Next(_tl) {
     var fs = _tl.fighters;
     var n = array_length(fs);
+    var last = variable_struct_exists(_tl, "last") ? _tl.last : -1;
+    var streak = variable_struct_exists(_tl, "streak") ? _tl.streak : 0;
+    var blocked = (streak >= TURN_MAX_IN_ROW) ? last : -999;
+    if (n < 2) blocked = -999;   // a timeline of one fighter has nobody to hand the turn to
     var ready = false;
-    for (var i = 0; i < n; i++) { if (fs[i].gauge >= TURN_GAUGE_MAX) ready = true; }
+    for (var i = 0; i < n; i++) { if (fs[i].id != blocked && fs[i].gauge >= TURN_GAUGE_MAX) ready = true; }
     if (!ready) {
-        var ticks = 1000000;
+        var ticks = 1000000000000;   // (D192: the only fighter that can act may be one that is pushed back very far)
         for (var j = 0; j < n; j++) {
-            var need = max(1, (TURN_GAUGE_MAX - fs[j].gauge + fs[j].spd - 1) div fs[j].spd);
+            if (fs[j].id == blocked) continue;
+            var rate = TURN_SPD_BASE + fs[j].spd;
+            var need = max(1, (TURN_GAUGE_MAX - fs[j].gauge + rate - 1) div rate);
             ticks = min(ticks, need);
         }
-        for (var k = 0; k < n; k++) fs[k].gauge += fs[k].spd * ticks;
+        for (var k = 0; k < n; k++) fs[k].gauge += (TURN_SPD_BASE + fs[k].spd) * ticks;
     }
     var best = -1;
     for (var m = 0; m < n; m++) {
-        if (fs[m].gauge >= TURN_GAUGE_MAX && (best < 0 || fs[m].gauge > fs[best].gauge)) best = m;
+        if (fs[m].id != blocked && fs[m].gauge >= TURN_GAUGE_MAX && (best < 0 || fs[m].gauge > fs[best].gauge)) best = m;
     }
     var actor = fs[best];
     actor.gauge -= TURN_GAUGE_MAX;
     actor.steadfast = max(0, actor.steadfast - 1);
+    if (actor.id == last) { _tl.streak = streak + 1; } else { _tl.last = actor.id; _tl.streak = 1; }
     return actor.id;
 }
 
@@ -638,7 +648,7 @@ function Stagger_Gain(_power, _stun_skill, _perfect) {
 }
 
 function Stagger_Max(_rank, _boss) {
-    return (4 + 4 * max(1, _rank)) * (_boss ? 2 : 1);
+    return round(1.5 * (4 + 4 * max(1, _rank)) * (_boss ? 2 : 1));   // D191: 50% bigger (it was (4 + 4 x rank) x 2 for a boss): 12 / 18, Palehorn 48, the final boss 60
 }
 
 // Adds to the enemy's meter. Returns true when this fills it: BREAK (meter back to 0, broken until its next turn). Nothing fills while broken.
@@ -728,7 +738,7 @@ function Battle_BreakSfxKey(_perfect) {
 function Battle_StaggerHit(_bc, _power, _stun_skill, _perfect, _hits = 1) {
     var e = _bc.e;
     if (!is_struct(e) || e.hp <= 0) return "";
-    var gain = Stagger_Gain(_power, _stun_skill, _perfect) * max(1, _hits);
+    var gain = Stagger_Gain(_power, _stun_skill, _perfect);   // D191: a multi-hit skill fills like ONE hit (_hits is kept for the callers, no longer a factor)
     _bc.stagger_flash_start = current_time;
     Tutorial_Trigger("stagger");   // D45: the first time the meter fills
     if (!Stagger_Add(e, gain)) return "";

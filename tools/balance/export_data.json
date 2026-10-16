@@ -1,5 +1,5 @@
 {
- "build": "60b2bcb-20261016-dirty",
+ "build": "d9e8ae8-20261017-dirty",
  "cards": [
   {
    "classes": [
@@ -10,7 +10,7 @@
    "kind": "skill",
    "name": "Wound",
    "params": {},
-   "sentence": "Hit for 4 power. 75% [t]Bleed[/t].",
+   "sentence": "Hit for 3 power. 75% [t]Bleed[/t].",
    "skill_id": 1.0,
    "up": {}
   },
@@ -179,7 +179,7 @@
    "kind": "upgrade",
    "name": "Wound+",
    "params": {},
-   "sentence": "Hit for 6 power. 100% [t]Bleed[/t].",
+   "sentence": "Hit for 5 power. 100% [t]Bleed[/t].",
    "skill_id": 1.0,
    "up": {
     "power": 2.0,
@@ -664,9 +664,9 @@
    "kind": "fallback",
    "name": "Coin Purse",
    "params": {
-    "gold": 15.0
+    "gold": 8.0
    },
-   "sentence": "Take 15 gold.",
+   "sentence": "Take 8 gold.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -689,113 +689,113 @@
    "base_mp": 10.0,
    "by_level": [
     {
-     "atk": 9.0,
+     "atk": 8.0,
      "def": 8.0,
      "hp": 10.0,
      "level": 1.0,
      "mag": 4.0,
      "mnd": 12.0,
      "mp": 12.0,
-     "spd": 13.0,
+     "spd": 12.0,
      "vig": 10.0
     },
     {
-     "atk": 11.0,
+     "atk": 10.0,
      "def": 8.0,
      "hp": 16.0,
      "level": 2.0,
      "mag": 4.0,
      "mnd": 14.0,
      "mp": 14.0,
-     "spd": 14.0,
+     "spd": 13.0,
      "vig": 12.0
     },
     {
-     "atk": 13.0,
+     "atk": 12.0,
      "def": 8.0,
      "hp": 22.0,
      "level": 3.0,
      "mag": 4.0,
      "mnd": 16.0,
      "mp": 16.0,
-     "spd": 15.0,
+     "spd": 14.0,
      "vig": 14.0
     },
     {
-     "atk": 15.0,
+     "atk": 14.0,
      "def": 8.0,
      "hp": 28.0,
      "level": 4.0,
      "mag": 4.0,
      "mnd": 18.0,
      "mp": 18.0,
-     "spd": 16.0,
+     "spd": 15.0,
      "vig": 16.0
     },
     {
-     "atk": 17.0,
+     "atk": 16.0,
      "def": 8.0,
      "hp": 34.0,
      "level": 5.0,
      "mag": 4.0,
      "mnd": 20.0,
      "mp": 20.0,
-     "spd": 17.0,
+     "spd": 16.0,
      "vig": 18.0
     },
     {
-     "atk": 19.0,
+     "atk": 18.0,
      "def": 8.0,
      "hp": 40.0,
      "level": 6.0,
      "mag": 4.0,
      "mnd": 22.0,
      "mp": 22.0,
-     "spd": 18.0,
+     "spd": 17.0,
      "vig": 20.0
     },
     {
-     "atk": 21.0,
+     "atk": 20.0,
      "def": 8.0,
      "hp": 46.0,
      "level": 7.0,
      "mag": 4.0,
      "mnd": 24.0,
      "mp": 24.0,
-     "spd": 19.0,
+     "spd": 18.0,
      "vig": 22.0
     },
     {
-     "atk": 23.0,
+     "atk": 22.0,
      "def": 8.0,
      "hp": 52.0,
      "level": 8.0,
      "mag": 4.0,
      "mnd": 26.0,
      "mp": 26.0,
-     "spd": 20.0,
+     "spd": 19.0,
      "vig": 24.0
     },
     {
-     "atk": 25.0,
+     "atk": 24.0,
      "def": 8.0,
      "hp": 58.0,
      "level": 9.0,
      "mag": 4.0,
      "mnd": 28.0,
      "mp": 28.0,
-     "spd": 21.0,
+     "spd": 20.0,
      "vig": 26.0
     },
     {
-     "atk": 27.0,
+     "atk": 26.0,
      "def": 8.0,
      "hp": 64.0,
      "level": 10.0,
      "mag": 4.0,
      "mnd": 30.0,
      "mp": 30.0,
-     "spd": 22.0,
+     "spd": 21.0,
      "vig": 28.0
     }
    ],
@@ -906,11 +906,11 @@
    "mp_gain": 2.0,
    "name": "Archer",
    "stats": {
-    "atk": 9.0,
+    "atk": 8.0,
     "def": 8.0,
     "mag": 4.0,
     "mnd": 12.0,
-    "spd": 13.0,
+    "spd": 12.0,
     "vig": 10.0
    }
   },
@@ -926,7 +926,7 @@
      "mag": 3.0,
      "mnd": 11.0,
      "mp": 11.0,
-     "spd": 10.0,
+     "spd": 9.0,
      "vig": 10.0
     },
     {
@@ -937,7 +937,7 @@
      "mag": 3.0,
      "mnd": 12.0,
      "mp": 12.0,
-     "spd": 10.0,
+     "spd": 9.0,
      "vig": 12.0
     },
     {
@@ -948,7 +948,7 @@
      "mag": 3.0,
      "mnd": 13.0,
      "mp": 13.0,
-     "spd": 10.0,
+     "spd": 9.0,
      "vig": 14.0
     },
     {
@@ -959,7 +959,7 @@
      "mag": 3.0,
      "mnd": 14.0,
      "mp": 14.0,
-     "spd": 10.0,
+     "spd": 9.0,
      "vig": 17.0
     },
     {
@@ -970,7 +970,7 @@
      "mag": 3.0,
      "mnd": 15.0,
      "mp": 15.0,
-     "spd": 10.0,
+     "spd": 9.0,
      "vig": 19.0
     },
     {
@@ -981,7 +981,7 @@
      "mag": 3.0,
      "mnd": 16.0,
      "mp": 16.0,
-     "spd": 10.0,
+     "spd": 9.0,
      "vig": 21.0
     },
     {
@@ -992,7 +992,7 @@
      "mag": 3.0,
      "mnd": 17.0,
      "mp": 17.0,
-     "spd": 10.0,
+     "spd": 9.0,
      "vig": 24.0
     },
     {
@@ -1003,7 +1003,7 @@
      "mag": 3.0,
      "mnd": 18.0,
      "mp": 18.0,
-     "spd": 10.0,
+     "spd": 9.0,
      "vig": 26.0
     },
     {
@@ -1014,7 +1014,7 @@
      "mag": 3.0,
      "mnd": 19.0,
      "mp": 19.0,
-     "spd": 10.0,
+     "spd": 9.0,
      "vig": 28.0
     },
     {
@@ -1025,7 +1025,7 @@
      "mag": 3.0,
      "mnd": 20.0,
      "mp": 20.0,
-     "spd": 10.0,
+     "spd": 9.0,
      "vig": 31.0
     }
    ],
@@ -1140,7 +1140,7 @@
     "def": 12.0,
     "mag": 3.0,
     "mnd": 11.0,
-    "spd": 10.0,
+    "spd": 9.0,
     "vig": 10.0
    }
   },
@@ -1379,113 +1379,113 @@
    "base_mp": 10.0,
    "by_level": [
     {
-     "atk": 8.0,
-     "def": 8.0,
+     "atk": 10.0,
+     "def": 9.0,
      "hp": 10.0,
      "level": 1.0,
      "mag": 3.0,
      "mnd": 11.0,
      "mp": 11.0,
-     "spd": 9.0,
+     "spd": 12.0,
      "vig": 10.0
     },
     {
-     "atk": 10.0,
-     "def": 8.0,
+     "atk": 12.0,
+     "def": 9.0,
      "hp": 16.0,
      "level": 2.0,
      "mag": 3.0,
      "mnd": 12.0,
      "mp": 12.0,
-     "spd": 10.0,
+     "spd": 13.0,
      "vig": 12.0
     },
     {
-     "atk": 11.0,
-     "def": 9.0,
+     "atk": 13.0,
+     "def": 10.0,
      "hp": 22.0,
      "level": 3.0,
      "mag": 4.0,
      "mnd": 13.0,
      "mp": 13.0,
-     "spd": 10.0,
+     "spd": 13.0,
      "vig": 14.0
     },
     {
-     "atk": 13.0,
-     "def": 9.0,
+     "atk": 15.0,
+     "def": 10.0,
      "hp": 28.0,
      "level": 4.0,
      "mag": 4.0,
      "mnd": 14.0,
      "mp": 14.0,
-     "spd": 11.0,
+     "spd": 14.0,
      "vig": 16.0
     },
     {
-     "atk": 14.0,
-     "def": 10.0,
+     "atk": 16.0,
+     "def": 11.0,
      "hp": 34.0,
      "level": 5.0,
      "mag": 5.0,
      "mnd": 16.0,
      "mp": 16.0,
-     "spd": 11.0,
+     "spd": 14.0,
      "vig": 18.0
     },
     {
-     "atk": 16.0,
-     "def": 10.0,
+     "atk": 18.0,
+     "def": 11.0,
      "hp": 40.0,
      "level": 6.0,
      "mag": 5.0,
      "mnd": 17.0,
      "mp": 17.0,
-     "spd": 12.0,
+     "spd": 15.0,
      "vig": 20.0
     },
     {
-     "atk": 17.0,
-     "def": 11.0,
+     "atk": 19.0,
+     "def": 12.0,
      "hp": 46.0,
      "level": 7.0,
      "mag": 6.0,
      "mnd": 18.0,
      "mp": 18.0,
-     "spd": 12.0,
+     "spd": 15.0,
      "vig": 22.0
     },
     {
-     "atk": 19.0,
-     "def": 11.0,
+     "atk": 21.0,
+     "def": 12.0,
      "hp": 52.0,
      "level": 8.0,
      "mag": 6.0,
      "mnd": 19.0,
      "mp": 19.0,
-     "spd": 13.0,
+     "spd": 16.0,
      "vig": 24.0
     },
     {
-     "atk": 20.0,
-     "def": 12.0,
+     "atk": 22.0,
+     "def": 13.0,
      "hp": 58.0,
      "level": 9.0,
      "mag": 7.0,
      "mnd": 21.0,
      "mp": 21.0,
-     "spd": 13.0,
+     "spd": 16.0,
      "vig": 26.0
     },
     {
-     "atk": 22.0,
-     "def": 12.0,
+     "atk": 24.0,
+     "def": 13.0,
      "hp": 64.0,
      "level": 10.0,
      "mag": 7.0,
      "mnd": 22.0,
      "mp": 22.0,
-     "spd": 14.0,
+     "spd": 17.0,
      "vig": 28.0
     }
    ],
@@ -1596,11 +1596,11 @@
    "mp_gain": 1.0,
    "name": "Nobody",
    "stats": {
-    "atk": 8.0,
-    "def": 8.0,
+    "atk": 10.0,
+    "def": 9.0,
     "mag": 3.0,
     "mnd": 11.0,
-    "spd": 9.0,
+    "spd": 12.0,
     "vig": 10.0
    }
   }
@@ -1627,10 +1627,10 @@
    "elite_regen_frac": 0.1,
    "elite_spd": 3.0,
    "elite_venom_stacks": 2.0,
-   "gold_base": 10.0,
+   "gold_base": 3.0,
    "gold_boss_mult": 3.0,
    "gold_elite_mult": 2.0,
-   "gold_per_level": 2.0,
+   "gold_per_level": 0.5,
    "gold_rank2_mult": 1.2,
    "gold_spread": 0.25,
    "merchant_floors": [
@@ -1671,7 +1671,7 @@
    "break_mult": 1.5,
    "gauge_max": 100.0,
    "stagger_perfect_mult": 1.5,
-   "stagger_stun_mult": 2.0,
+   "stagger_stun_mult": 1.5,
    "steadfast_turns": 2.0
   },
   "unarmed_power": 2.0,
@@ -1738,6 +1738,7 @@
    "mp_gain": 0.0,
    "name": "Slime",
    "name_en": "Slime",
+   "resist": 1.0,
    "skills": [
     16.0
    ],
@@ -1752,6 +1753,7 @@
    },
    "threat_rank": 1.0,
    "traits": [],
+   "weak": 2.0,
    "weapon_id": 0.0
   },
   {
@@ -1804,6 +1806,7 @@
    "mp_gain": 0.0,
    "name": "Dire Wolf",
    "name_en": "Dire Wolf",
+   "resist": 0.0,
    "skills": [
     18.0
    ],
@@ -1818,6 +1821,7 @@
    },
    "threat_rank": 1.0,
    "traits": [],
+   "weak": 1.0,
    "weapon_id": 0.0
   },
   {
@@ -1870,6 +1874,7 @@
    "mp_gain": 1.0,
    "name": "Ghost Sword",
    "name_en": "Ghost Sword",
+   "resist": 1.0,
    "skills": [
     21.0
    ],
@@ -1884,6 +1889,7 @@
    },
    "threat_rank": 2.0,
    "traits": [],
+   "weak": 0.0,
    "weapon_id": 0.0
   },
   {
@@ -1955,6 +1961,7 @@
    "mp_gain": 0.0,
    "name": "Spider",
    "name_en": "Spider",
+   "resist": 0.0,
    "skills": [
     15.0
    ],
@@ -1969,6 +1976,7 @@
    },
    "threat_rank": 1.0,
    "traits": [],
+   "weak": 2.0,
    "weapon_id": 0.0
   },
   {
@@ -2026,6 +2034,7 @@
    "mp_gain": 2.0,
    "name": "Mad Whisp",
    "name_en": "Mad Whisp",
+   "resist": 2.0,
    "skills": [
     20.0,
     29.0
@@ -2041,6 +2050,7 @@
    },
    "threat_rank": 2.0,
    "traits": [],
+   "weak": 0.0,
    "weapon_id": 0.0
   },
   {
@@ -2112,6 +2122,7 @@
    "mp_gain": 0.0,
    "name": "Snake",
    "name_en": "Snake",
+   "resist": 0.0,
    "skills": [
     17.0
    ],
@@ -2126,6 +2137,7 @@
    },
    "threat_rank": 1.0,
    "traits": [],
+   "weak": 1.0,
    "weapon_id": 0.0
   },
   {
@@ -2192,6 +2204,7 @@
    "mp_gain": 1.0,
    "name": "Killer Plant",
    "name_en": "Killer Plant",
+   "resist": 1.0,
    "skills": [
     19.0,
     28.0
@@ -2207,6 +2220,7 @@
    },
    "threat_rank": 2.0,
    "traits": [],
+   "weak": 2.0,
    "weapon_id": 0.0
   },
   {
@@ -2264,6 +2278,7 @@
    "mp_gain": 2.0,
    "name": "Stranger",
    "name_en": "Stranger",
+   "resist": 2.0,
    "skills": [
     22.0
    ],
@@ -2278,6 +2293,7 @@
    },
    "threat_rank": 2.0,
    "traits": [],
+   "weak": 1.0,
    "weapon_id": 0.0
   },
   {
@@ -2401,6 +2417,7 @@
    "mp_gain": 2.0,
    "name": "Palehorn",
    "name_en": "Palehorn",
+   "resist": -1.0,
    "skills": [
     23.0,
     30.0
@@ -2416,6 +2433,7 @@
    },
    "threat_rank": 3.0,
    "traits": [],
+   "weak": 2.0,
    "weapon_id": 0.0
   },
   {
@@ -2558,6 +2576,7 @@
    "mp_gain": 3.0,
    "name": "Pale Choirbeast",
    "name_en": "Pale Choirbeast",
+   "resist": -1.0,
    "skills": [
     25.0,
     26.0,
@@ -2574,6 +2593,7 @@
    },
    "threat_rank": 4.0,
    "traits": [],
+   "weak": 0.0,
    "weapon_id": 0.0
   }
  ],
@@ -4564,7 +4584,7 @@
    "mp_cost": 3.0,
    "name": "Wound",
    "name_en": "Wound",
-   "power": 4.0,
+   "power": 3.0,
    "power_mult": 1.0,
    "sequence_length": 3.0,
    "stat_type": 0.0,
@@ -5665,8 +5685,7 @@
    }
   },
   {
-   "consume_on_hit": true,
-   "duration": 2.0,
+   "duration": 1.0,
    "guard_mult": 0.5,
    "id": 14.0,
    "name": "Braced",
@@ -5684,7 +5703,7 @@
     "mp_max": 0.0,
     "mp_min": 0.0
    },
-   "tick_on_enemy_turn": true
+   "until_player_turn": true
   }
  ],
  "version": 1.0

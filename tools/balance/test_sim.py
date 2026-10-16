@@ -109,12 +109,19 @@ class Damage(unittest.TestCase):
 
 class Timeline(unittest.TestCase):
     def test_archer_13_vs_slime_9_order(self):
-        # Worked by hand from the gauge rule (P 13, E 9, act at 100, overflow kept, ties to the player): P(t8) E(t12) P(t16) E(t23) P(t24) P(t32) E(t34) ...
-        # = PEPEPPEPE, which is also what the game's vector turn_13_9 says. (combat-spec.md section 11 prints "P E P P E P P E P" for this pair: a typo in the text.)
+        # D192: the gauge fills by 10 + SPD (P 23, E 19), act at 100, overflow kept, ties to the player, nobody three times in a row. By hand:
+        # P(t5 115) E(t6 114) P(t9 ...) ... = PEPEPEPEP, which is also what the game's vector turn_13_9 says.
         b = battle("archer", "slime")
         b.p.st["spd"], b.e.st["spd"] = 13, 9
         order = "".join("PE"[b.tl_next()] for _ in range(9))
-        self.assertEqual(order, "PEPEPPEPE")
+        self.assertEqual(order, "PEPEPEPEP")
+
+    def test_nobody_acts_three_times_in_a_row(self):                    # D192: SPD 40 against 1
+        b = battle("archer", "slime")
+        b.p.st["spd"], b.e.st["spd"] = 40, 1
+        order = "".join("PE"[b.tl_next()] for _ in range(40))
+        self.assertNotIn("PPP", order)
+        self.assertGreaterEqual(order.count("E"), 13)
 
     def test_stun_pushes_back_and_steadfast_blocks_the_second(self):
         b = battle("knight", "slime")
@@ -123,16 +130,26 @@ class Timeline(unittest.TestCase):
         self.assertTrue(b.tl_stun(1))
         self.assertFalse(b.tl_stun(1))
 
-    def test_stagger_fills_to_a_break_that_pushes_back_one_turn(self):  # Slime rank 1 meter 8; Wooden Sword hit power 6 adds 3
+    def test_stagger_fills_to_a_break_that_pushes_back_one_turn(self):  # D191: Slime rank 1 meter 12; Wooden Sword hit power 6 adds 3: the fourth hit breaks
         b = battle("knight", "slime")
         b.e.mhp = b.e.hp = 100
+        self.assertEqual(b.e.smax, 12)
         g0 = b.gauge[1]
-        b.stagger_hit(6.0, False, False)
-        b.stagger_hit(6.0, False, False)
+        for _ in range(3):
+            b.stagger_hit(6.0, False, False)
         self.assertFalse(b.e.broken)
         b.stagger_hit(6.0, False, False)
         self.assertTrue(b.e.broken)
         self.assertEqual(b.gauge[1], g0 - 100)
+
+    def test_a_multi_hit_skill_fills_like_one_hit_and_a_stun_skill_x1_5(self):   # D191
+        b = battle("archer", "slime")
+        b.e.mhp = b.e.hp = 100
+        b.stagger_hit(6.0, False, False, 3)
+        self.assertEqual(b.e.stagger, 3)                                   # one hit's 3, not 9
+        b2 = battle("knight", "slime")
+        b2.stagger_hit(6.0, True, False)
+        self.assertEqual(b2.e.stagger, 5)                                  # 6 x 0.5 x 1.5 = 4.5 -> 5 (x2 gave 6)
 
 
 class AI(unittest.TestCase):
@@ -164,10 +181,26 @@ class AI(unittest.TestCase):
 
 
 class Economy(unittest.TestCase):
-    def test_gold_of_a_level_5_rank_2_enemy_is_24_plus_minus_25_percent(self):   # (10 + 2*5) * 1.2
+    def test_gold_of_a_level_5_rank_2_enemy_is_7_plus_minus_25_percent(self):   # D193: (3 + 0.5*5) * 1.2 = 6.6 (was (10 + 2*5) * 1.2 = 24)
         g = D.eco
         base = sim.rhu((g["gold_base"] + g["gold_per_level"] * 5) * g["gold_rank2_mult"])
-        self.assertEqual(base, 24)
+        self.assertEqual(base, 7)
+
+    def test_the_coin_purse_gives_8_gold(self):                                # D193 (was 15)
+        self.assertEqual(D.cards["fb:gold"]["params"]["gold"], 8)
+
+    def test_the_first_merchant_is_about_two_items_away_from_what_a_run_carries(self):   # D193: gold for 1-2 items at the first merchant (the cheapest first), not the shelf
+        n = 0
+        for seed in range(1, 9):
+            r = sim.RunSim(D, "knight", "average", seed, rules=R)
+            r.play()
+            first = r.rec["shops"][0]
+            total = 0
+            for p in first["prices"]:
+                if total + p <= first["gold_in"]:
+                    total += p
+                    n += 1
+        self.assertLessEqual(n / 8.0, 2.0)
 
     def test_card_offer_has_three_distinct_cards_and_forces_an_upgrade_after_two_dry_offers(self):
         run = sim.RunSim(D, "knight", "average", 7, rules=R)
@@ -499,6 +532,129 @@ class WeakPoints(unittest.TestCase):
         e = sim.make_enemy(R, sim.ENEMY_IDS["slime"], 1)
         if "weak" not in R.d.enemies[sim.ENEMY_IDS["slime"]]:
             self.assertEqual((e.weak, e.resist), (-1, -1))
+
+
+class ExportCarriesWeakPoints(unittest.TestCase):
+    """R-118: the committed export is the CURRENT build's (the weak / resist fields of D173 are in it), so the simulator plays weak points. Expected: scr_db_enemy.gml."""
+
+    def test_every_enemy_has_a_weak_and_a_resist_field(self):
+        for eid, e in D.enemies.items():
+            self.assertIn("weak", e, e["name"])
+            self.assertIn("resist", e, e["name"])
+
+    def test_the_lists_are_the_games(self):
+        want = {0: (sim.BURN, sim.BLEED), 1: (sim.BLEED, sim.POISON), 2: (sim.POISON, sim.BLEED), 3: (sim.BURN, sim.POISON), 7: (sim.BLEED, sim.BURN), 8: (sim.BURN, -1), 9: (sim.POISON, -1)}   # slime, wolf, ghost sword, spider, stranger, mini boss, final boss
+        for eid, (w, r) in want.items():
+            e = sim.make_enemy(R, eid, 1)
+            self.assertEqual((e.weak, e.resist), (w, r), D.enemies[eid]["name"])
+
+    def test_the_braced_status_is_in_the_export(self):               # D180: STATUS_BRACE 14, every hit half until the player's next turn
+        s = D.status[sim.BRACED]
+        self.assertEqual(s["guard_mult"], 0.5)
+        self.assertTrue(s["until_player_turn"])
+
+
+class GuardCommand(unittest.TestCase):
+    """D99 / D180: Guard spends the turn; every hit until the player's next turn deals half; max(2, floor(25% max MP)) MP comes back, never above max MP."""
+
+    def test_mp_gain_is_a_quarter_of_max_rounded_down_at_least_two_capped(self):
+        b = battle("mage")
+        b.p.mmp, b.p.mp = 26, 0
+        self.assertEqual(b.guard_mp_gain(), 6)                       # floor(6.5)
+        b.p.mmp = 11
+        self.assertEqual(b.guard_mp_gain(), 2)                       # floor(2.75) = 2
+        b.p.mmp = 7
+        self.assertEqual(b.guard_mp_gain(), 2)                       # floor(1.75) = 1 -> at least 2
+        b.p.mmp, b.p.mp = 26, 24
+        self.assertEqual(b.guard_mp_gain(), 2)                       # only 2 fit
+        b.p.mp = 26
+        self.assertEqual(b.guard_mp_gain(), 0)
+
+    def test_guard_restores_mp_and_braces(self):
+        b = battle("mage")
+        b.p.mmp, b.p.mp = 26, 3
+        b.p_guard()
+        self.assertEqual(b.p.mp, 9)
+        self.assertTrue(sim.st_has(b.p, sim.BRACED))
+
+    def test_a_braced_player_takes_half_of_a_hit(self):
+        b = battle("knight", "dire_wolf", 3)
+        base = sim.ref.damage(float(b.e.basic_power), R.eff(b.e, "atk"), R.eff(b.p, "df"), 1.0, 1.0)
+        half = sim.ref.damage(float(b.e.basic_power), R.eff(b.e, "atk"), R.eff(b.p, "df"), 1.0, 0.5)
+        self.assertGreater(base, half)
+        b.p_guard()
+        b.p.hp = b.p.mhp
+        got = b.hit(b.e, b.p, float(b.e.basic_power), "atk", 1.0, False)
+        self.assertEqual(got, half)
+
+    def test_brace_outlives_the_players_own_tick_and_ends_at_his_next_turn_after_an_enemy_turn(self):
+        b = battle("knight", "slime", 1)
+        b.p_guard()
+        R.tick(b.p, random.Random(1), True)                         # the end of the guarding turn
+        self.assertTrue(sim.st_has(b.p, sim.BRACED))
+        b.player_turn_start()                                        # up again before the enemy acted (a fast player): still braced
+        self.assertTrue(sim.st_has(b.p, sim.BRACED))
+        b.enemy_turn()
+        self.assertTrue(sim.st_has(b.p, sim.BRACED))                 # it lasts until the player's turn STARTS
+        b.player_turn_start()
+        self.assertFalse(sim.st_has(b.p, sim.BRACED))
+
+
+class GuardPolicy(unittest.TestCase):
+    """The greedy player guards (1) when the enemy is winding up a heavy hit that would take a quarter of his max HP or more, (2) when a caster cannot pay for any skill in a fight that is not easy and HP is not low."""
+
+    def test_guards_into_a_telegraphed_heavy_hit(self):
+        b = battle("knight", "palehorn", 8)
+        b.p.hp = b.p.mhp
+        b.e.ai["windup"] = next(s for s in b.e.skills_e if R.skills[s].get("telegraphed"))
+        self.assertGreaterEqual(sim.Policy(R).next_hit(b), 0.25 * b.p.mhp)
+        self.assertEqual(sim.Policy(R).choose(b), ("guard",))
+
+    def test_does_not_guard_into_a_small_hit(self):
+        b = battle("knight", "slime", 1)
+        b.e.ai["windup"] = -1
+        self.assertNotEqual(sim.Policy(R).choose(b), ("guard",))
+
+    def test_a_caster_with_no_mp_for_any_skill_guards_in_a_hard_fight(self):
+        b = battle("mage", "ghost_sword", 6)
+        b.p.skills = [10, 11]
+        b.p.mp = 0
+        b.p.hp = b.p.mhp
+        b.p.inv = {}
+        self.assertEqual(sim.Policy(R).choose(b), ("guard",))
+
+    def test_does_not_guard_when_a_skill_can_be_paid(self):
+        b = battle("mage", "ghost_sword", 6)
+        b.p.skills = [10]
+        b.p.mp = b.p.mmp
+        self.assertNotEqual(sim.Policy(R).choose(b), ("guard",))
+
+
+class ForcedPick(unittest.TestCase):
+    """D174: no Skip, one of the three cards is always taken. The greedy player's valuation must not make a card look good that only wastes turns: Meditation (+2..4 MP a turn) is worth
+    only the MP that fits under max MP, so it is not cast with a full bar."""
+
+    def meditate_score(self, mp):
+        b = battle("mage", "ghost_sword", 6)
+        b.p.skills = [13]
+        b.p.mp = mp
+        pol = sim.Policy(R)
+        opts = pol.attack_options(b)
+        return next(o for o in opts if o[0] == "skill" and o[1] == 13)[2]
+
+    def test_meditation_is_worth_nothing_with_a_full_bar(self):
+        b = battle("mage")
+        self.assertEqual(self.meditate_score(b.p.mmp), 0.0)
+
+    def test_meditation_is_worth_something_with_an_empty_bar(self):
+        self.assertGreater(self.meditate_score(3), 0.0)
+
+    def test_a_pick_is_always_made(self):
+        r = sim.RunSim(D, "mage", "average", 3, "greedy", rules=R)
+        r.p.picks = 4
+        r.do_picks()
+        self.assertEqual(len(r.rec["picks"]), 4)
+        self.assertEqual(r.p.picks, 0)
 
 
 def ref_burn(mag):
