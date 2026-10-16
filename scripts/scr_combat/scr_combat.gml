@@ -2732,7 +2732,7 @@ function Battle_ChipMetrics(_n, _ic, _p, _max_w, _lws = undefined) {
     var total = 0;
     for (var t = 0; t < _n; t++) total += cells[t] + ((t > 0) ? _p : 0);
     var shown = max(0, _n);
-    if (total > _max_w && _n > 1) {   // leave room for the plus chip
+    if (total > _max_w && _n > 0) {   // leave room for the plus chip; R3 (R-093): a chip that does not fit is counted in the plus chip, never drawn cut
         shown = 0;
         var run = 0;
         for (var j = 0; j < _n; j++) {
@@ -2741,12 +2741,11 @@ function Battle_ChipMetrics(_n, _ic, _p, _max_w, _lws = undefined) {
             run = nw;
             shown++;
         }
-        shown = max(1, shown);
     }
     var w = 0;
     for (var s = 0; s < shown; s++) w += cells[s] + ((s > 0) ? _p : 0);
     var more = max(0, _n) - shown;
-    if (more > 0) w += _p + c;
+    if (more > 0) w += ((shown > 0) ? _p : 0) + c;
     return { c: c, shown: shown, more: more, w: w, cells: cells };
 }
 
@@ -2762,11 +2761,7 @@ function Battle_DrawChipLabel(_cx, _y, _ch, _q, _lab_h) {
     var w = _ch.lw;
     var lx = round(_cx - w * 0.5);
     var gy = _y + (_lab_h - 5 * _q) div 2;
-    var col = _ch.negative ? UI_C_LIGHTEST : UI_C_LIGHT;
-    if (_ch.last && (floor(current_time / 250) mod 2 == 0)) {
-        Ui_Box(lx - _q, _y, lx + w + _q, _y + _lab_h, UI_C_LIGHTEST);
-        col = UI_C_DARKEST;
-    }
+    var col = Battle_ChipBlink(_ch.last, _ch.negative, current_time).label_col;   // R3 (note 8): the last turn toggles the text colour, no filled box
     if (Battle_LabelIsMini(_ch.lab_name)) {
         Battle_DrawDigits(lx, gy, string_upper(_ch.lab_name) + ((_ch.lab_count != "") ? " " + _ch.lab_count : ""), _q, col);
     } else {
@@ -2796,6 +2791,12 @@ function Battle_DrawChips(_chips, _x, _y, _ic, _p, _max_w, _alpha, _align = fa_l
         var cx = cell_x + (cell - cm.c) div 2;
         Ui_Box(cx, _y, cx + cm.c, _y + cm.c, ch.negative ? UI_C_LIGHT : UI_C_DARK);
         Ui_Box(cx + _p, _y + _p, cx + cm.c - _p, _y + cm.c - _p, UI_C_DARKEST);
+        if (Battle_ChipBlink(ch.last, ch.negative, current_time).outline) {   // R3 (note 8): the last turn, a 1p lightest outline round the icon cell, on / off every 250 ms
+            Ui_Box(cx - _p, _y - _p, cx + cm.c + _p, _y, UI_C_LIGHTEST);
+            Ui_Box(cx - _p, _y + cm.c, cx + cm.c + _p, _y + cm.c + _p, UI_C_LIGHTEST);
+            Ui_Box(cx - _p, _y, cx, _y + cm.c, UI_C_LIGHTEST);
+            Ui_Box(cx + cm.c, _y, cx + cm.c + _p, _y + cm.c, UI_C_LIGHTEST);
+        }
         if (ch.frame >= 0) Icon_Draw("status", ch.frame, cx + _p, _y + _p, k, _alpha);
         else Ui_Text(cx + cm.c * 0.5, _y + (cm.c - UI_TextHeight("A")) * 0.5, string_upper(string_copy(ch.name, 1, 1)), UI_C_LIGHTEST, fa_center);
         if (variable_struct_exists(ch, "lab_name") && ch.lab_name != "") Battle_DrawChipLabel(cell_x + cell * 0.5, _y + cm.c + _p, ch, k, lab_h);
@@ -3375,29 +3376,86 @@ function Battle_EnemyRect(_bc) {
     return { x: round(x0), y: round(y0), w: round(x1 - x0), h: round(y1 - y0) };
 }
 
-// R3 (owner notes 5, 23, 8) -- STUBS of the old behaviour, so the check of this packet can run red; replaced by the implementation in the next commit.
+// R3 (owner note 23): the ground every enemy stands on, in world pixels. Every battle enemy's opaque bottom (its feet) sits on this one line, whatever the size of
+// its picture (the 32 x 32 enemies and the 48 and 64 high bosses): the biggest boss still clears the turn strip at every window size, and the shadow
+// under the feet is drawn on this line.
+#macro BATTLE_GROUND_Y 80
+
+// Where the enemy instance goes in the battle room (its top left corner, origin 0): centred across the picture, the opaque bottom on BATTLE_GROUND_Y.
 function Battle_EnemyPlace(_spr) {
-    var sw = 16;
-    var sh = 16;
-    if (_spr != noone) { sw = sprite_get_width(_spr); sh = sprite_get_height(_spr); }
-    return { x: (DISPLAY_BASE_W div 2) - sw div 2, y: ((DISPLAY_BASE_H div 2) - 14) - sh div 2 };
+    var cx = DISPLAY_BASE_W div 2;
+    if (_spr == noone) return { x: cx - 8, y: BATTLE_GROUND_Y - 16 };
+    var feet = sprite_get_bbox_bottom(_spr) + 1 - sprite_get_yoffset(_spr);
+    return { x: cx - sprite_get_width(_spr) div 2, y: BATTLE_GROUND_Y - feet };
 }
 
-function Battle_EnemyShadowRect(_bc) {
-    return { x: 0, y: 0, w: 0, h: 0, ix: 0, iy: 0, iw: 0, ih: 0, cx: 0, cy: 0 };
-}
-
+// R3 (owner note 5): the soft shadow under an enemy, two nested ellipses in the darkest colour. Pure: the sprite drawn with its origin at (_exs, _eys),
+// stretched by (_scx, _scy) GUI units per sprite pixel (push-in and recoil included), _ws = GUI units per world pixel. The outer ellipse is 70% of
+// the opaque width and a quarter of that high (as high as the squash of the draw leaves it), centred under the opaque bottom a world pixel below it;
+// the inner one is 60% of the outer. { x, y, w, h (outer bounds), ix, iy, iw, ih (inner bounds), cx, cy (the centre) }.
 function Battle_EnemyShadowGeom(_spr, _exs, _eys, _scx, _scy, _ws) {
-    return { x: 0, y: 0, w: 0, h: 0, ix: 0, iy: 0, iw: 0, ih: 0, cx: 0, cy: 0 };
+    if (_spr == noone || _spr == -1) return { x: 0, y: 0, w: 0, h: 0, ix: 0, iy: 0, iw: 0, ih: 0, cx: 0, cy: 0 };
+    var xo = sprite_get_xoffset(_spr);
+    var yo = sprite_get_yoffset(_spr);
+    var left = _exs + (sprite_get_bbox_left(_spr) - xo) * _scx;
+    var rgt = _exs + (sprite_get_bbox_right(_spr) + 1 - xo) * _scx;
+    var bottom = _eys + (sprite_get_bbox_bottom(_spr) + 1 - yo) * _scy;
+    var w = abs(rgt - left) * 0.7;
+    var squash = (_scx != 0) ? abs(_scy / _scx) : 1;
+    var h = max(2, w * 0.25 * squash);
+    var cx = (left + rgt) * 0.5;
+    var cy = bottom + _ws;
+    var iw = w * 0.6;
+    var ih = max(2, h * 0.6);
+    return { x: round(cx - w * 0.5), y: round(cy - h * 0.5), w: round(w), h: round(h),
+             ix: round(cx - iw * 0.5), iy: round(cy - ih * 0.5), iw: round(iw), ih: round(ih), cx: cx, cy: cy };
 }
 
+// The shadow of the enemy standing at rest (before the feel push-in and recoil), on the GUI grid. A zero rect when there is no enemy.
+function Battle_EnemyShadowRect(_bc) {
+    if (!instance_exists(_bc.enemy_inst) || _bc.enemy_inst.sprite_index == noone) return { x: 0, y: 0, w: 0, h: 0, ix: 0, iy: 0, iw: 0, ih: 0, cx: 0, cy: 0 };
+    var inst = _bc.enemy_inst;
+    var ws = Display_WorldScale();
+    return Battle_EnemyShadowGeom(inst.sprite_index, (inst.x - _bc.cam_base_x) * ws, (inst.y - _bc.cam_base_y) * ws,
+                                  abs(inst.image_xscale) * ws, abs(inst.image_yscale) * ws, ws);
+}
+
+// How strong the two ellipses are: 0.25 and 0.4, times the enemy's own fade.
 function Battle_EnemyShadowAlpha(_fade) {
-    return { outer: 0, inner: 0 };
+    var f = clamp(_fade, 0, 1);
+    return { outer: 0.25 * f, inner: 0.4 * f };
 }
 
+// Draws the shadow under the sprite just before the sprite is drawn (the feet cover its upper half).
+function Battle_DrawEnemyShadow(_spr, _exs, _eys, _scx, _scy, _ws, _fade) {
+    var a = Battle_EnemyShadowAlpha(_fade);
+    if (a.outer <= 0 || _spr == noone) return;
+    var g = Battle_EnemyShadowGeom(_spr, _exs, _eys, _scx, _scy, _ws);
+    if (g.w <= 0) return;
+    var a0 = draw_get_alpha();
+    var c0 = draw_get_color();
+    draw_set_color(UI_C_DARKEST);
+    draw_set_alpha(a.outer);
+    draw_ellipse(g.x, g.y, g.x + g.w, g.y + g.h, false);
+    draw_set_alpha(a.inner);
+    draw_ellipse(g.ix, g.iy, g.ix + g.iw, g.iy + g.ih, false);
+    draw_set_alpha(a0);
+    draw_set_color(c0);
+}
+
+// R3 (owner note 8): a chip on its last turn blinks by an outline round its icon cell (on / off every 250 ms) and its label toggling lightest / light;
+// never a filled box. { outline (draw the ring now), box (always false), label_col }.
 function Battle_ChipBlink(_last, _negative, _ms) {
-    var on = _last && (floor(_ms / 250) mod 2 == 0);
-    return { outline: false, box: on, label_col: _negative ? UI_C_LIGHTEST : UI_C_LIGHT };
+    var lit = _last && (floor(_ms / 250) mod 2 == 0);
+    var col = _negative ? UI_C_LIGHTEST : UI_C_LIGHT;
+    if (_last) col = lit ? UI_C_LIGHTEST : UI_C_LIGHT;
+    return { outline: lit, box: false, label_col: col };
+}
+
+// How a row of _n chips fits a room _room wide: { cm (Battle_ChipMetrics), score (-1 when even the plus chip does not fit, else how many chips show) }.
+function Battle_ChipFit(_n, _ic, _p, _room, _lws) {
+    var cm = Battle_ChipMetrics(_n, _ic, _p, max(0, _room), _lws);
+    return { cm: cm, score: (cm.w <= _room) ? cm.shown : -1 };
 }
 
 function Battle_EnemyHeaderRectBuild(_bc) {
@@ -3405,49 +3463,82 @@ function Battle_EnemyHeaderRectBuild(_bc) {
     var mt = Ui_Metrics();
     var p = mt.p;
     var sx = Display_WorldScale();
-    var out = { cx: Display_GuiW() * 0.5, x1: 0, y1: round(Display_GuiH() * 0.3), bw: round(36 * sx), h: 0, chips_x: 0, chips_y: 0, chips_align: fa_left, chips_max: mt.gw - 4 * mt.margin };
+    var out = { cx: Display_GuiW() * 0.5, x1: 0, y1: round(Display_GuiH() * 0.3), bw: round(36 * sx), h: 0, chips_x: 0, chips_y: 0, chips_align: fa_left, chips_max: mt.gw - 4 * mt.margin,
+                chips_shown: 0, chips_more: 0, chips_rect: { x: 0, y: 0, w: 0, h: 0 }, side: "above", name_lines: [] };
     if (!instance_exists(_bc.enemy_inst) || _bc.enemy_inst.sprite_index == noone) return out;
     var inst = _bc.enemy_inst;
     var spr = inst.sprite_index;
+    var er = Battle_EnemyRect(_bc);   // the opaque pixels: nothing of the header may stand on them (R3, R-092)
     out.cx = ((inst.x - sprite_get_xoffset(spr) - _bc.cam_base_x) + sprite_get_width(spr) * abs(inst.image_xscale) * 0.5) * sx;
-    var top = (inst.y - sprite_get_yoffset(spr) + sprite_get_bbox_top(spr) * abs(inst.image_yscale) - _bc.cam_base_y) * sx;
+    var spr_w = sprite_get_width(spr) * abs(inst.image_xscale) * sx;
     var name_w = UI_TextWidth(Battle_EnemyName(_bc.e)) + 10 * p;
-    out.bw = clamp(max(name_w, round(sprite_get_width(spr) * abs(inst.image_xscale) * sx * 0.9), 30 * p), 30 * p, mt.gw - 4 * mt.margin);
+    out.bw = clamp(max(name_w, round(spr_w * 0.9), 30 * p), 30 * p, mt.gw - 4 * mt.margin);
     out.h = 8 * p + mt.line_h + p + 4 * p + p + 3 * p;
     if (variable_struct_exists(_bc, "e") && is_struct(_bc.e) && variable_struct_exists(_bc.e, "is_elite") && _bc.e.is_elite) out.h += mt.line_h + p;   // C3 (D86): room for the ELITE tag
-    out.x1 = round(out.cx - out.bw * 0.5);
+    out.name_lines = [Battle_EnemyName(_bc.e)];
     var ban = Battle_BannerRect(_bc);
     var floor_y = Battle_TimelineBottom() + p + (is_struct(ban) ? ban.h + p : 0);
-    var want_y = top - out.h - 2 * p;
-    out.y1 = round(max(floor_y, want_y));
-    out.chips_y = out.y1 + p;
+    var limit = Battle_Zones().band_top;   // nothing of the header goes down into the player's panel
     var ech = Battle_FighterChips(_bc, TL_ENEMY);
-    var chip_w = Battle_ChipMetrics(array_length(ech), 16 * Battle_IconK(), p, mt.gw, Battle_ChipLws(ech)).w;
-    if (floor_y - want_y > 10 * p) {   // a big enemy (more than a few pixels short): no room over its head, so the plate stands beside it (left, else right) and its chips go under the plate
-        var spr_w = sprite_get_width(spr) * abs(inst.image_xscale) * sx;
-        var left_x = round(out.cx - spr_w * 0.5 - out.bw - 2 * p);
-        out.x1 = (left_x >= mt.margin) ? left_x : round(out.cx + spr_w * 0.5 + 2 * p);
-        out.x1 = clamp(out.x1, mt.margin, mt.gw - mt.margin - out.bw);
-        out.chips_x = out.x1;
-        out.chips_y = out.y1 + out.h + p;
-        out.chips_align = fa_left;
-        out.chips_max = mt.gw - mt.margin - out.chips_x;
-    } else if (out.x1 + out.bw + p + chip_w <= mt.gw - mt.margin) {
-        out.chips_x = out.x1 + out.bw + p;
-        out.chips_align = fa_left;
-        out.chips_max = mt.gw - mt.margin - out.chips_x;
-    } else {   // left of the plate; a row wider than the room is cut short with a plus chip, never off the screen (D150: the labels make the row wider)
-        out.chips_x = out.x1 - p;
-        out.chips_align = fa_right;
-        out.chips_max = max(0, out.chips_x - mt.margin);
+    var n = array_length(ech);
+    var ic = 16 * Battle_IconK();
+    var lws = Battle_ChipLws(ech);
+    var chip_h = ic + 2 * p + p + Battle_ChipLabelH();   // the icon cell, a gap and the label row
+    var gap = 2 * p;
+
+    // Over the head when the plate (and the row of chips beside it) fits between the strip and the sprite; else beside the sprite, on the side with more room.
+    var block_h = (n > 0) ? max(out.h, p + chip_h) : out.h;
+    var y_above = er.y - gap - block_h;
+    var cands = [];   // where the chips may go: { x (left edge, or right edge for fa_right), y, room, align }
+    if (y_above >= floor_y) {
+        out.side = "above";
+        out.y1 = y_above;
+        out.x1 = clamp(round(out.cx - out.bw * 0.5), mt.margin, mt.gw - mt.margin - out.bw);
+        var ry = out.y1 + p;
+        array_push(cands, { x: out.x1 + out.bw + p, y: ry, room: mt.gw - mt.margin - (out.x1 + out.bw + p), align: fa_left });
+        array_push(cands, { x: out.x1 - p, y: ry, room: (out.x1 - p) - mt.margin, align: fa_right });
+        var sy = max(ry, er.y + p);   // beside the sprite, below the plate
+        array_push(cands, { x: er.x + er.w + gap, y: sy, room: mt.gw - mt.margin - (er.x + er.w + gap), align: fa_left });
+        array_push(cands, { x: er.x - gap, y: sy, room: (er.x - gap) - mt.margin, align: fa_right });
+    } else {
+        var gs_ = p;   // beside the sprite every pixel counts: one font pixel to the sprite and to the screen edge
+        var room_l = er.x - gs_ - gs_;
+        var room_r = mt.gw - gs_ - (er.x + er.w + gs_);
+        var on_right = (room_r >= room_l);
+        var side_room = on_right ? room_r : room_l;
+        var text_w = UI_TextWidth(Battle_EnemyName(_bc.e)) + 6 * p;   // the name's lines keep 3p to each frame edge (Ui_DrawNameTab's padding)
+        out.bw = clamp(max(text_w, round(spr_w * 0.5), 30 * p), 30 * p, max(30 * p, side_room));
+        if (text_w > out.bw) {   // a long name goes on two lines (at its spaces) rather than past the room the sprite leaves
+            out.name_lines = Battle_LogWrap(Battle_EnemyName(_bc.e), out.bw - 6 * p);
+            out.h += (array_length(out.name_lines) - 1) * mt.line_h;
+        }
+        var total_h = out.h + ((n > 0) ? gap + chip_h + p : 0);
+        out.y1 = max(floor_y, min(er.y, limit - total_h));   // level with the sprite's head, higher if the chips under the plate would reach the panel
+        out.x1 = on_right ? (er.x + er.w + gs_) : (er.x - gs_ - out.bw);
+        var cy2 = out.y1 + out.h + gap;   // under the plate, on the same side
+        array_push(cands, { x: on_right ? (er.x + er.w + gs_) : (er.x - gs_), y: cy2, room: side_room, align: on_right ? fa_left : fa_right });
+        array_push(cands, { x: on_right ? (er.x - gs_) : (er.x + er.w + gs_), y: out.y1 + p, room: on_right ? room_l : room_r, align: on_right ? fa_right : fa_left });   // the other side of the sprite
     }
-    // R3 stub: the row as the old layout draws it (what the new check looks at)
-    var cm0 = Battle_ChipMetrics(array_length(ech), 16 * Battle_IconK(), p, out.chips_max, Battle_ChipLws(ech));
-    var cx0 = out.chips_x;
-    if (out.chips_align == fa_right) cx0 = out.chips_x - cm0.w;
-    out.chips_shown = cm0.shown;
-    out.chips_more = cm0.more;
-    out.chips_rect = { x: cx0 - p, y: out.chips_y - p, w: cm0.w + 2 * p, h: cm0.c + p + Battle_ChipLabelH() + 2 * p };
+
+    if (n > 0 && array_length(cands) > 0) {
+        var best = 0;
+        var best_score = -2;
+        for (var i = 0; i < array_length(cands); i++) {
+            var fit = Battle_ChipFit(n, ic, p, cands[i].room, lws);
+            if (cands[i].y + chip_h + p > limit) fit.score = -1;   // the row would reach the player's panel
+            if (fit.score > best_score) { best_score = fit.score; best = i; }
+        }
+        var cd = cands[best];
+        var cm = Battle_ChipMetrics(n, ic, p, max(0, cd.room), lws);
+        out.chips_x = cd.x;
+        out.chips_y = cd.y;
+        out.chips_align = cd.align;
+        out.chips_max = max(0, cd.room);
+        out.chips_shown = cm.shown;
+        out.chips_more = cm.more;
+        var x0 = (cd.align == fa_right) ? (cd.x - cm.w) : cd.x;
+        out.chips_rect = { x: x0 - p, y: cd.y - p, w: cm.w + 2 * p, h: chip_h + 2 * p };   // the ring of a blinking chip included
+    }
     return out;
 }
 
@@ -3496,8 +3587,10 @@ function Battle_DrawEnemyHeader(_bc, _alpha) {
         Ui_Text(hdr.x1 + hdr.bw * 0.5, yy, Loc_T("elite.tag", "Elite"), pulse_col, fa_center);
         yy += mt.line_h + p;
     }
-    Ui_Text(hdr.x1 + hdr.bw * 0.5, yy, Battle_EnemyName(e), UI_C_LIGHTEST, fa_center);
-    yy += mt.line_h + p;
+    for (var nl = 0; nl < array_length(hdr.name_lines); nl++) {   // one line, or two when the plate stands beside a sprite with little room
+        Ui_Text(hdr.x1 + hdr.bw * 0.5, yy, hdr.name_lines[nl], UI_C_LIGHTEST, fa_center);
+        yy += mt.line_h + ((nl == array_length(hdr.name_lines) - 1) ? p : 0);
+    }
     _bc.enemy_hp_shown = Ui_Glide(_bc.enemy_hp_shown, e.hp, current_time - _bc.enemy_hp_clock, 120);
     _bc.enemy_hp_clock = current_time;
     var hp_ratio = (e.max_hp > 0) ? clamp(e.hp / e.max_hp, 0, 1) : 0;

@@ -59,6 +59,7 @@ if (instance_exists(enemy_inst) && (!dying || Feel_SpriteVisible(dp.t_ms))) {
         exs = left + sprite_get_xoffset(espr) * scx;
         eys = top + sprite_get_yoffset(espr) * scy;
     }
+    Battle_DrawEnemyShadow(espr, exs, eys, scx, scy, sx * zr.ky, enemy_fade_alpha);   // R3 (note 5): a soft shadow under the feet, in the same guard as the sprite (gone once it has burst)
     var white = (dying && dp.t_ms < FEEL_DEATH_FREEZE_MS) || (hitstop_ms > 0 && feel_contact && last_dmg > 0);
     if (white) gpu_set_fog(true, UI_C_LIGHTEST, 0, 1);   // every opaque pixel in the lightest palette colour
     else if (off.flash) gpu_set_blendmode(bm_add);

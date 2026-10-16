@@ -265,7 +265,7 @@ function Scenario_Boot() {
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.choice_off = true;   // D154: nor the small flavour questions (the Stranger, the merchant, a note, the wake line) unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 32000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 21500 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 32000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -3040,6 +3040,9 @@ function Scenario_StepShots(_s) {
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
+            break;
+        case 1010: case 1011: case 1012: case 1013: case 1014: case 1015: case 1016: case 1017: case 1018: case 1019:
+            Scenario_StepShotsR3Bvis(_s);   // R3 bvis (notes 5, 23, 8): the enemy shadow, plate and chips clear of the sprite, the outline blink; five scenes, two sizes; the end of the pictures
             break;
         default:
             Scenario_StepShotsDisp(_s);
@@ -13944,7 +13947,7 @@ function Scenario_StepShotsEliteDeath(_s) {
                 _s.eg_i++;
                 if (_s.eg_i >= array_length(_scales)) {
                     Scenario_SetWindowScale(3);
-                    Scenario_NoticeEnd();   // the end of the pictures: removes the files and the profile the steps made
+                    Scenario_Next(_s, 1010);   // goes on with R3 bvis (1010..1013), the end of the pictures
                 } else {
                     _flow.phase = "summary";
                     _flow.t = 0;
@@ -15184,6 +15187,125 @@ function Scenario_StepShotsChoices(_s) {
                     Scenario_Next(_s, 800);   // goes on with H13a (800..809), the end of the pictures
                 } else {
                     Scenario_Next(_s, 910);
+                }
+            }
+            break;
+    }
+}
+
+// ---- Round 3 packet bvis (owner notes 5, 23, 8) pictures 1010..1013: a real battle against a slime, an elite snake wearing four statuses and BREAK (its bleed on
+// its last turn, so the chip blinks), a dire wolf, the final boss and the elite snake in Korean, at windowed scale 3 (480 x 432) and 5 (800 x 720).
+// shot_r3bvis_<scene>_<w>x<h>.png. Each picture also asserts, on the rectangles the real draw used, that the plate and the chips stand clear of the
+// opaque sprite and are on screen. The last picture of the run: it ends the run. ----
+function Scenario_R3BvisScenes() {
+    return ["slime", "snake_elite", "wolf", "boss", "snake_elite_ko"];
+}
+
+function Scenario_R3BvisEnemy(_di) {
+    return [ENEMY_SLIME, ENEMY_SNAKE, ENEMY_DIREWOLF, ENEMY_FINAL_BOSS, ENEMY_SNAKE][_di];
+}
+
+function Scenario_R3BvisChecks(_bc, _tag, _want_chips) {
+    var _gw = Display_GuiW();
+    var _gh = Display_GuiH();
+    var _er = Battle_EnemyRect(_bc);
+    var _h = _bc.hud.rects.header;
+    var _rs = _bc.hud.rects.chips;
+    var _sh = Battle_EnemyShadowRect(_bc);
+    var _bad_chip = "";
+    var _bad_screen = "";
+    var _bad_overlap = "";
+    var _ne = 0;
+    for (var _i = 0; _i < array_length(_rs); _i++) {
+        var _r = _rs[_i];
+        if (_r.who != TL_ENEMY) continue;
+        _ne++;
+        if (Test_RectsOverlap(_r, _er)) _bad_chip += string(_i) + " ";
+        if (_r.x < 0 || _r.y < 0 || _r.x + _r.w > _gw || _r.y + _r.h > _gh) _bad_screen += string(_i) + " ";
+        for (var _j = _i + 1; _j < array_length(_rs); _j++) if (_rs[_j].who == TL_ENEMY && Test_RectsOverlap(_r, _rs[_j])) _bad_overlap += string(_i) + "/" + string(_j) + " ";
+    }
+    Scenario_Check("shots_r3bvis_the_plate_leaves_the_sprite_clear_" + _tag, !Test_RectsOverlap(_h, _er), json_stringify(_h) + " sprite" + json_stringify(_er));
+    Scenario_Check("shots_r3bvis_the_plate_is_on_screen_" + _tag, _h.x >= 0 && _h.y >= 0 && _h.x + _h.w <= _gw && _h.y + _h.h <= _gh, json_stringify(_h));
+    Scenario_Check("shots_r3bvis_the_chips_leave_the_sprite_clear_" + _tag, _bad_chip == "", _bad_chip);
+    Scenario_Check("shots_r3bvis_the_chips_are_on_screen_" + _tag, _bad_screen == "", _bad_screen);
+    Scenario_Check("shots_r3bvis_no_chip_overlaps_another_" + _tag, _bad_overlap == "", _bad_overlap);
+    Scenario_Check("shots_r3bvis_the_shadow_is_under_the_feet_" + _tag, _sh.w > 0 && _sh.y + _sh.h * 0.5 >= _er.y + _er.h && _sh.y < _bc.hud.rects.zones.player.y, json_stringify(_sh) + " sprite" + json_stringify(_er));
+    Scenario_Check("shots_r3bvis_the_scene_shows_its_chips_" + _tag, _ne >= _want_chips, "n=" + string(_ne) + " want " + string(_want_chips));
+}
+
+function Scenario_StepShotsR3Bvis(_s) {
+    if (!variable_struct_exists(_s, "r3")) _s.r3 = { di: 0, si: 0 };
+    var _o = _s.r3;
+    var _scenes = Scenario_R3BvisScenes();
+    var _scales = [3, 5];
+    switch (_s.step) {
+        case 1010:   // scene _o.di at scale index _o.si: enter the battle
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Scenario_NewKnight();
+                Scenario_SetWindowScale(_scales[_o.si]);
+                var _gs = GameState_Get();
+                Scenario_GotoBattle("shots_r3bvis_" + string(_o.di) + "_" + string(_o.si), Scenario_R3BvisEnemy(_o.di));
+                _gs.battle.enemy_elite = (_o.di == 1 || _o.di == 4) ? "venomous" : "";
+            }
+            if (_s.t >= 25) Scenario_Next(_s, 1011);
+            break;
+        case 1011:   // set the scene up
+            if (_o.di == 4) Loc_SetLanguage("ko");   // after the room has loaded: a room controller reloads the language from the settings
+            else if (Loc_GetLanguage() != "en") Loc_SetLanguage("en");
+            var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+            Scenario_Check("shots_r3bvis_in_battle_" + _scenes[_o.di], _inb, "room=" + room_get_name(room));
+            if (!_inb) { Scenario_Finish(); return; }
+            var _bc = instance_find(obj_battle_controller, 0);
+            _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
+            _bc.pops = [];
+            _bc.combat_log = [];
+            _bc.p = Status_Add(_bc.p, STATUS_BRACE, 2, 0);
+            _bc.p = Status_Add(_bc.p, STATUS_POISON, 0, 0, 2);
+            _s.r3.want = 0;
+            if (_o.di == 1 || _o.di == 4) {   // the elite snake: four statuses and BREAK, the bleed on its last turn
+                _bc.e = Status_Add(_bc.e, STATUS_POISON, 0, 0, 3);
+                _bc.e = Status_Add(_bc.e, STATUS_BLEED, 1, 0, 3);
+                _bc.e = Status_Add(_bc.e, STATUS_BURN, 2, 3);
+                _bc.e = Status_Add(_bc.e, STATUS_BLOODTHIRSTY, 4, 0);
+                _bc.e.broken = true;
+                _s.r3.want = 1;
+            } else if (_o.di == 0) {   // a plain slime: the buff that flashed (Solidify), on its last turn
+                _bc.e = Status_Add(_bc.e, STATUS_SOLIDIFY, 1, 0);
+                _s.r3.want = 1;
+            } else if (_o.di == 3) {
+                _bc.e = Status_Add(_bc.e, STATUS_BURN, 2, 3);
+                _s.r3.want = 1;
+            }
+            _bc.e.hp = floor(_bc.e.max_hp * 0.8);
+            _bc.enemy_hp_shown = _bc.e.hp;
+            _bc.tl_who = TL_PLAYER;
+            _bc.turn = TURN_PLAYER;
+            _bc.enemy_action_pending = false;
+            _bc.battle_state = BSTATE_MENU;
+            Scenario_Next(_s, 1012);
+            break;
+        case 1012:   // a few frames for the menus, then the picture and the checks on what was drawn
+            if (_s.t >= 16) {
+                var _bc2 = instance_find(obj_battle_controller, 0);
+                var _tag = _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height());
+                Scenario_R3BvisChecks(_bc2, _tag, _o.want);
+                _s.shot = "shot_r3bvis_" + _tag + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1013);
+            }
+            break;
+        case 1013:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Loc_SetLanguage("en");
+                    Scenario_SetWindowScale(3);
+                    Scenario_NoticeEnd();   // the end of the pictures: removes the files and the profile the steps made
+                } else {
+                    Scenario_Next(_s, 1010);
                 }
             }
             break;

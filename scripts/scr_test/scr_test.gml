@@ -14584,7 +14584,7 @@ function Test_R3Layout() {
             array_push(_cases, { id: _id, em: "armored", nst: 0, brk: false });
         }
     }
-    var _f = { plate_sprite: "", chips_sprite: "", chips_plate: "", screen: "", strip: "", panel: "", count: "", cut: "", name: "", setup: "" };
+    var _f = { plate_sprite: "", chips_sprite: "", chips_plate: "", screen: "", strip: "", panel: "", count: "", cut: "", name: "", setup: "", sprite_room: "" };
     var _n = 0;
     for (var _l = 0; _l < 2; _l++) {
         for (var _z = 0; _z < array_length(_sizes); _z++) {
@@ -14609,15 +14609,24 @@ function Test_R3Layout() {
                     var _ban_r = Battle_BannerRect(_bc);
                     if (is_struct(_ban_r)) _top = max(_top, _ban_r.y + _ban_r.h);
                     var _zones = Battle_Zones();
+                    if (_ban == 0 && ((_k.id < ENEMY_MINI_BOSS && (_er.y < Battle_TimelineBottom() || _er.y + _er.h > _zones.band_top)) || (_k.id >= ENEMY_MINI_BOSS && _langs[_l] == "en" && _er.y + _er.h > _zones.band_top))) _f.sprite_room += _tag + json_stringify(_er) + "; ";
                     if (Test_RectsOverlap(_pl, _er)) _f.plate_sprite += _tag;
                     if (_have && Test_RectsOverlap(_cr, _er)) _f.chips_sprite += _tag;
                     if (_have && Test_RectsOverlap(_cr, _pl)) _f.chips_plate += _tag;
                     if (_pl.x < 0 || _pl.y < 0 || _pl.x + _pl.w > _gw || _pl.y + _pl.h > _gh || (_have && (_cr.x < 0 || _cr.y < 0 || _cr.x + _cr.w > _gw || _cr.y + _cr.h > _gh))) _f.screen += _tag;
                     if (_pl.y < _top || (_have && _cr.y < _top)) _f.strip += _tag;
-                    if (Test_RectsOverlap(_pl, _zones.player) || (_have && Test_RectsOverlap(_cr, _zones.player))) _f.panel += _tag;
+                    if (Test_RectsOverlap(_pl, _zones.player) || (_have && Test_RectsOverlap(_cr, _zones.player))) _f.panel += _tag + json_stringify(_pl) + json_stringify(_cr) + json_stringify(_zones.player) + _hdr.side + json_stringify(_er) + "; ";
                     if (_have && (_hdr.chips_shown + _hdr.chips_more != _nchips || _hdr.chips_shown < 1)) _f.count += _tag + "shown=" + string(_hdr.chips_shown) + " more=" + string(_hdr.chips_more) + "; ";
                     if (_have && _cr.w > _hdr.chips_max + 2 * _mt.p) _f.cut += _tag + "w=" + string(_cr.w) + " max=" + string(_hdr.chips_max) + "; ";
-                    if (_pl.w < UI_TextWidth(Battle_EnemyName(_bc.e)) + 8 * _mt.p) _f.name += _tag;
+                    var _nm_all = "";
+                    var _nm_bad = false;
+                    for (var _nl = 0; _nl < array_length(_hdr.name_lines); _nl++) {
+                        _nm_all += ((_nl > 0) ? " " : "") + _hdr.name_lines[_nl];
+                        if (_pl.w < UI_TextWidth(_hdr.name_lines[_nl]) + 6 * _mt.p) _nm_bad = true;
+                    }
+                    if (_nm_all != Battle_EnemyName(_bc.e)) _nm_bad = true;
+                    if (_pl.h < 8 * _mt.p + array_length(_hdr.name_lines) * _mt.line_h) _nm_bad = true;
+                    if (_nm_bad) _f.name += _tag + "w=" + string(_pl.w) + " " + _hdr.side + " " + json_stringify(_hdr.name_lines) + "; ";
                     instance_destroy(_bc.enemy_inst);
                 }
             }
@@ -14625,6 +14634,7 @@ function Test_R3Layout() {
     }
     Test_True("r3bvis layout: (setup) " + string(_n) + " layouts were looked at", _n >= 600);
     Test_Eq("r3bvis layout: (setup) the header rect exposes the chip row", _f.setup, "");
+    Test_Eq("r3bvis layout: the sprite stands between the turn strip and the player panel (a boss only has to clear the panel, and in English: too tall to clear both bars at every size)", _f.sprite_room, "");
     Test_Eq("r3bvis layout: the plate never covers the enemy's opaque sprite", _f.plate_sprite, "");
     Test_Eq("r3bvis layout: the chip row never covers the enemy's opaque sprite", _f.chips_sprite, "");
     Test_Eq("r3bvis layout: the chip row and the plate do not overlap", _f.chips_plate, "");
@@ -14633,7 +14643,7 @@ function Test_R3Layout() {
     Test_Eq("r3bvis layout: plate and chips stay off the player panel", _f.panel, "");
     Test_Eq("r3bvis layout: every chip is shown or counted in a plus chip, at least one shown", _f.count, "");
     Test_Eq("r3bvis layout: the chip row is never wider than the room it was given (no cut label)", _f.cut, "");
-    Test_Eq("r3bvis layout: the plate is wide enough for the longest name", _f.name, "");
+    Test_Eq("r3bvis layout: every line of the name (the whole name, on one line or two) fits inside the plate", _f.name, "");
     TextFit_End(_s);
 }
 
