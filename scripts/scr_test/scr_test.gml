@@ -3606,6 +3606,15 @@ function Test_Suite_Audio() {
     }
     Test_True("audio: all 10 monsters have spawn and special registered as variant keys " + _bad, _ok);
 
+    // D133/G11: one sound per UI action - move, confirm, back, open/close and refuse each have their own key, and the refuse key resolves
+    var _ui_keys = ["ui_move", "ui_confirm", "ui_back", "ui_openclose", "ui_deny"];
+    var _ui_bad = "";
+    for (var _u = 0; _u < array_length(_ui_keys); _u++) {
+        if (!SFX_DebugResolve(_ui_keys[_u]).ok) _ui_bad += _ui_keys[_u] + " ";
+    }
+    Test_Eq("audio: move, confirm, back, open/close and deny all resolve (missing: " + _ui_bad + ")", _ui_bad, "");
+    Test_True("audio: ui_deny is in the required-keys audit", array_contains(SFX_DebugRequiredKeys(), "ui_deny"));
+
     global.sfx_rng = _keep_rng;
     if (is_undefined(_keep_rng)) variable_global_set("sfx_rng", undefined);
     SFX_RegisterDefaults();

@@ -430,6 +430,23 @@ if (Test-Path $txtPy) {
     Step 'text-lint' $(if ($script:failCount -gt $fails0) { 'FAIL' } else { 'OK' }) $sw
 }
 
+# ---- one word per meaning, Title Case labels (D133, G11): tools/localization/lint_terms.py; its own self-check runs first.
+$termsPy = Join-Path $ProjectDir 'tools\localization\lint_terms.py'
+if (Test-Path $termsPy) {
+    $sw = [Diagnostics.Stopwatch]::StartNew(); $fails0 = $script:failCount
+    $pyExe = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $pyExe) { Fail 'terms lint: python not found' }
+    else {
+        $ErrorActionPreference = 'Continue'
+        $termsSelf = @(& $pyExe.Source $termsPy --selftest 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -notmatch '^System.Management.Automation.RemoteException' })
+        if ($LASTEXITCODE -ne 0) { $termsSelf | Select-Object -Last 12 | ForEach-Object { Write-Host "  $_" }; Fail 'terms lint: self-check failed' }
+        $termsOut = @(& $pyExe.Source $termsPy 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -notmatch '^System.Management.Automation.RemoteException' })
+        if ($LASTEXITCODE -ne 0) { $termsOut | Select-Object -First 12 | ForEach-Object { Write-Host "  $_" }; Fail 'terms lint: a banned variant or a label that is not Title Case (docs/terminology-g11.md)' }
+        $ErrorActionPreference = 'Stop'
+    }
+    Step 'terms-lint' $(if ($script:failCount -gt $fails0) { 'FAIL' } else { 'OK' }) $sw
+}
+
 # ---- missing Korean (D9): every workbook row needs a real ko (tools/localization/check_missing_ko.py, allowlist in ko_allowlist.txt).
 $koPy = Join-Path $ProjectDir 'tools\localization\check_missing_ko.py'
 if (Test-Path $koPy) {
