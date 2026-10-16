@@ -169,6 +169,7 @@ function Test_RunAll() {
     Test_RunSuite("R3LevelUp", Test_Suite_R3LevelUp);
     Test_RunSuite("R3Ideas1", Test_Suite_R3Ideas1);
     Test_RunSuite("R3Ideas2", Test_Suite_R3Ideas2);
+    Test_RunSuite("R3Loudness", Test_Suite_R3Loudness);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -18927,4 +18928,108 @@ function Test_I2Finisher() {
     Test_True("finisher: the killing Perfect's impact shake and jolt are held back during the finisher", GameState_Get().cam_shake.mag == 0);
     instance_destroy(_bc.enemy_inst);
     Display_ClearZoom();
+}
+
+
+// ---- R-119 (owner 2026-10-17): every sound at a similar loudness. One gain (dB) per sound asset, from tools/audio/loudness.json
+// (the Python check tools/audio/check_gain_table.py proves each sound's level after the gain). The expected values below are worked by hand from
+// the brief's targets (SFX -22, UI -25, music and ambience -24 LUFS) and the measured file levels, rounded to half a dB, so each is a +-0.5 dB band.
+function Test_LoudDb(_name, _asset, _lo, _hi) {
+    var _db = SFX_AssetGainDb(_asset);
+    Test_True("loudness: " + _name + " gets " + string(_lo) + " to " + string(_hi) + " dB from the table (got " + string(_db) + ")", _db >= _lo && _db <= _hi);
+}
+
+function Test_Suite_R3Loudness() {
+    var _fns = ["SFX_BuildGainTable", "SFX_GainTable", "SFX_GainTableHas", "SFX_AssetGainDb", "SFX_AssetGain", "SFX_DbToLinear", "SFX_ComputeGain", "BGM_TrackTrim", "SFX_SameSoundOverflow"];
+    var _miss = "";
+    for (var _f = 0; _f < array_length(_fns); _f++) if (!script_exists(asset_get_index(_fns[_f]))) _miss += _fns[_f] + " ";
+    Test_True("loudness: the packet's functions exist (missing: " + _miss + ")", _miss == "");
+    if (_miss != "") return;
+
+    // the table: a measured level, worked to its target
+    Test_LoudDb("Modern5 (UI, file -27.3 LUFS, target -25: +2.3)", Modern5, 2.0, 3.0);
+    Test_LoudDb("Monster_Roar_5 (file -5.2, target -22 +2 for a roar: -14.8)", "Monster_Roar_5", -15.5, -14.5);
+    Test_LoudDb("Fireball_2 (file -7.9, target -22: -14.1)", Fireball_2, -14.5, -13.5);
+    Test_LoudDb("final_boss_spawn (file -8.3, target -22 +2: -11.7)", "final_boss_spawn", -12.5, -10.5);
+    Test_LoudDb("overall_bgm (file -24.2, target -24: 0)", overall_bgm, -0.5, 0.5);
+    Test_LoudDb("forest_bgm (file -32.0, target -24: +8)", "forest_bgm__for_everymap_with_trees", 7.5, 8.5);
+    Test_LoudDb("Ambience_haunting (file -13.6, target -24: -10.4)", "Ambience_haunting", -11.0, -10.0);
+    Test_LoudDb("Crying_moaning_ambience_2 (file -35.0, target -24: +11)", "Crying_moaning_ambience_2", 10.5, 11.5);
+    Test_Eq("loudness: a sound with no table row gets 0 dB", SFX_AssetGainDb("no_such_sound_xyz"), 0);
+    Test_Eq("loudness: noone gets 0 dB", SFX_AssetGainDb(noone), 0);
+    Test_True("loudness: 0 dB is a gain of 1, +6 dB about 2, -6 dB about 0.5", SFX_DbToLinear(0) == 1 && abs(SFX_DbToLinear(6) - 1.995) < 0.01 && abs(SFX_DbToLinear(-6) - 0.501) < 0.01);
+
+    // every sound the game can play has a row (a new sound without a measurement would play at 0 dB: re-run tools/audio)
+    var _missing = "";
+    var _keys = ds_map_keys_to_array(global.sfx_db);
+    for (var _k = 0; _k < array_length(_keys); _k++) {
+        var _snd = global.sfx_db[? _keys[_k]];
+        if (SFX_IsValidSoundAsset(_snd) && !SFX_GainTableHas(_snd)) _missing += audio_get_name(_snd) + " ";
+        if (ds_map_exists(global.sfx_variant_db, _keys[_k])) {
+            var _list = global.sfx_variant_db[? _keys[_k]];
+            for (var _v = 0; _v < array_length(_list); _v++) if (!SFX_GainTableHas(_list[_v])) _missing += audio_get_name(_list[_v]) + " ";
+        }
+    }
+    var _bkeys = ds_map_keys_to_array(global.bgm_db);
+    for (var _b = 0; _b < array_length(_bkeys); _b++) {
+        var _bs = global.bgm_db[? _bkeys[_b]];
+        if (SFX_IsValidSoundAsset(_bs) && !SFX_GainTableHas(_bs)) _missing += audio_get_name(_bs) + " ";
+    }
+    Test_True("loudness: every registered sound and track has a gain-table row (missing: " + _missing + ")", _missing == "");
+    var _t = SFX_GainTable();
+    var _names = variable_struct_get_names(_t);
+    var _in_range = true;
+    for (var _n = 0; _n < array_length(_names); _n++) {
+        var _g = variable_struct_get(_t, _names[_n]);
+        if (_g < -40 || _g > 18) _in_range = false;
+    }
+    Test_True("loudness: every table row is between -40 and +18 dB", _in_range);
+    Test_True("loudness: the table lists the whole sound library (150+ rows)", array_length(_names) >= 150);
+
+    // the old per-key volume tweaks are folded into the table: every key trim is 1 now
+    Test_Eq("loudness: the dire wolf spawn key trim (was 0.216) is folded into the table", SFX_GetGain("enemy_spawn_dire_wolf"), 1);
+    Test_Eq("loudness: the monster key trim (was 0.8) is folded into the table", SFX_GetGain("enemy_special_slime"), 1);
+    Test_Eq("loudness: the bloodthirsty skill trim (was 0.64) is folded into the table", SFX_GetGain("enemy_skill_bloodthirsty"), 1);
+    Test_Eq("loudness: the haunting music trim (was 0.35) is folded into the table", BGM_GetGainByKey("haunting_bgm"), 1);
+
+    // the play path applies it, for a UI key, an enemy key (with its D116 volume variation) and a slider
+    var _keep = [global.vol_master, global.vol_ui, global.vol_sfx, global.vol_music];
+    global.vol_master = 1; global.vol_ui = 1; global.vol_sfx = 1;
+    SFX_Play("ui_confirm");
+    Test_True("loudness: SFX_Play(ui_confirm) records Modern5's table gain (2.0..3.0 dB)", global.sfx_last_gain_db >= 2.0 && global.sfx_last_gain_db <= 3.0);
+    Test_True("loudness: SFX_Play(ui_confirm) plays at that gain as a linear number (1.25..1.42)", global.sfx_last_gain >= 1.25 && global.sfx_last_gain <= 1.42);
+    global.vol_ui = 0.5;
+    SFX_Play("ui_confirm");
+    Test_True("loudness: the UI slider at 0.5 halves it (0.62..0.71)", global.sfx_last_gain >= 0.62 && global.sfx_last_gain <= 0.71);
+    global.vol_ui = 1;
+    global.sfx_rng = Rng_New(119, "sfx");
+    SFX_Play("enemy_spawn_final_boss");
+    var _want = SFX_DbToLinear(SFX_AssetGainDb(global.sfx_last_asset)) * global.sfx_last_vary;
+    Test_True("loudness: an enemy sound plays at its asset's table gain times the D116 variation", abs(global.sfx_last_gain - _want) < 0.001 && global.sfx_last_gain > 0.2 && global.sfx_last_gain < 0.4);
+    global.vol_master = 0;
+    SFX_Play("ui_confirm");
+    Test_Eq("loudness: master volume 0 is silence whatever the table says", global.sfx_last_gain, 0);
+    global.vol_master = _keep[0]; global.vol_ui = _keep[1]; global.vol_sfx = _keep[2]; global.vol_music = _keep[3];
+    Test_True("loudness: a loud table gain is capped (SFX_ComputeGain never above SFX_GAIN_MAX)", SFX_ComputeGain("ui_confirm", Modern5, 1000, 1) <= SFX_GAIN_MAX);
+
+    // music and ambience get their table gain too
+    var _fm = BGM_TrackTrim("forest_bgm");
+    Test_True("loudness: BGM_TrackTrim(forest_bgm) is +8 dB (2.37..2.67)", _fm >= 2.37 && _fm <= 2.67);
+    var _om = BGM_TrackTrim("overall_bgm");
+    Test_True("loudness: BGM_TrackTrim(overall_bgm) is 0 dB (0.94..1.06)", _om >= 0.94 && _om <= 1.06);
+    var _hm = BGM_TrackTrim("haunting_bgm");
+    Test_True("loudness: BGM_TrackTrim(haunting_bgm) is -10.4 dB (0.28..0.32)", _hm >= 0.28 && _hm <= 0.32);
+    Test_Eq("loudness: an unknown track key has trim 1", BGM_TrackTrim("no_such_track"), 1);
+    var _amb = SFX_AssetGain(Crying_moaning_ambience_2);
+    Test_True("loudness: the skillbook ambience (Crying_moaning_ambience_2) is +11 dB (3.2..4.0)", _amb >= 3.2 && _amb <= 4.0);
+
+    // simultaneous copies of one sound are capped (the oldest is stopped)
+    Test_Eq("loudness: at most 3 copies of one sound at once", SFX_MAX_SAME_SOUND, 3);
+    var _two = [{ handle: 11, asset: Punch_1 }, { handle: 12, asset: Punch_1 }];
+    Test_Eq("loudness: two copies are under the cap (no victim)", SFX_SameSoundOverflow(_two, Punch_1, SFX_MAX_SAME_SOUND), -1);
+    var _four = [{ handle: 21, asset: Punch_1 }, { handle: 22, asset: Punch_2 }, { handle: 23, asset: Punch_1 }, { handle: 24, asset: Punch_1 }];
+    Test_Eq("loudness: three copies of Punch_1 playing: the oldest (index 0) goes", SFX_SameSoundOverflow(_four, Punch_1, SFX_MAX_SAME_SOUND), 0);
+    Test_Eq("loudness: another sound's copies do not count (Punch_2 once: no victim)", SFX_SameSoundOverflow(_four, Punch_2, SFX_MAX_SAME_SOUND), -1);
+    var _skip = [{ handle: 31, asset: Punch_2 }, { handle: 32, asset: Punch_1 }, { handle: 33, asset: Punch_1 }, { handle: 34, asset: Punch_1 }];
+    Test_Eq("loudness: the victim is the oldest copy of that sound (index 1, not the other sound at 0)", SFX_SameSoundOverflow(_skip, Punch_1, SFX_MAX_SAME_SOUND), 1);
 }
