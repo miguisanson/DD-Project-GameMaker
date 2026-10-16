@@ -2,6 +2,409 @@
 
 What the owner needs to play, test or decide after the agents worked while the owner was away. Used by `IMPROVE.md`.
 
+
+## Build 7f4d08e-20261016 (round 3, 2026-10-17)
+
+This is the checklist for everything built since build 943ce6d (decisions D140-D165, plus the earlier G5-G9 items you have not played yet). Play ONE normal run from the title to the boss and do each item when it comes up. Items are in play order. For each item tick one box: good, bad or change, and write a few words if you like. If you never reach an item, leave the boxes empty.
+
+**Build to play:** `E:\Games\DD-Project Playtest\7f4d08e-20261016\DD-Project.exe` (the short build id is bottom-right of the title) | **Branch:** `next` | **Items:** 58, all unplayed
+
+**Known in this build:** a few long texts can still be cut short or crowd a panel (a note title, the attack preview plate, the Codex run history at 800x720). The fix (H13b "text fits") is done and lands in the next build. The boss fight keeps the old plain background until you import `spr_battle_bg_boss` (D13).
+
+**Before you play**
+- Keep GameMaker closed. If the game says an old run was dropped, that is expected.
+- The battle backgrounds for forest (floors 1-3), caves (4-6) and ruins (7-9) are imported. The boss arena background is NOT imported yet (D13 waits for your IDE import), so the boss fight still shows the plain background.
+- The refuse sound is a stand-in: it plays the same sound as Back.
+- Debug keys (testing only): press P once, then L = one level up, K = all items, J = die now. If you use them, say so in your note.
+
+**Keys (new)**
+- Esc or Tab (pad: X, Y or Start) opens ONE menu, on the map and in a battle. Q and E switch tabs. Back: X or Esc (pad: B or Y).
+- Walk: W A S D or arrows. Run: hold Shift. Talk, open, confirm: Space, Z or Enter.
+
+**How to mark an item:** put an x in one box. Write what you saw under "Your note". Afterwards say "merge the good ones"; good ones go to `v1.9`, bad ones are reverted and become issues.
+
+### Title and Settings
+
+### R3-01 | Build stamp and title words
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: start the game and look at the title. Read the small build id bottom-right.
+- You should see: a short id (7 characters, a star after it only if the build has uncommitted files), clear of the menu. The rows read New Game, Continue, Settings, Quit Game (not "Exit").
+- Your note:
+
+### R3-02 | Settings change at once
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: Settings. Change UI, SFX and BGM volume. Look for an Apply row. Go Back and open Settings again.
+- You should see: the volume changes as you press the key, there is no Apply row, and the values are still there when you return.
+- Your note:
+
+### R3-03 | "Keep this?" for window mode and size
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: Settings. Change Window mode or Scale. A "Keep this?" box counts down from 10. First do nothing and wait. Then change it again and choose Keep. Once, double-click Keep with the mouse.
+- You should see: doing nothing (or Back) puts the old window back after 10 seconds; Keep makes it stay; a double click counts as one click and does not press anything underneath.
+- Your note:
+
+### R3-04 | Key rebinding, now with the pad
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: Settings, Controls. Pick Run, confirm, and when it says "Press a key" press Esc. Do it again and press a new key. With a pad: start it again and press B (or any pad button).
+- You should see: Esc and the pad both cancel and leave the old key. A new key is saved at once.
+- Your note:
+
+### R3-05 | Prompts show arrows and follow your device
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: look at the hint lines in any menu (for example the seed screen, the next item).
+- You should see: arrow key pictures for moving (no "A/D" or "W/S" text), and key pictures with your real key names for confirm and back. Buttons are never written as plain letters.
+- Your note:
+
+### R3-06 | Controller prompts (skip if you have no pad)
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: touch a pad button, then look at a menu hint or a tutorial pop-up. Touch a keyboard key and look again.
+- You should see: a pad picture with the d-pad arrows lit, A / B / X / Y, LB / RB, and it switches by itself when you change device. Open text re-draws without losing its place.
+- Your note:
+
+### New Game, seed and intro
+
+### R3-07 | Seed choice on New Game
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: title, New Game.
+- You should see: "Choose a Seed" with Random Seed (first row) and Enter Seed. Random Seed starts a run straight away.
+- Your note:
+
+### R3-08 | Enter a seed
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: New Game, Enter Seed. Up and Down change a digit, Left and Right move, Q deletes. Try to start with 0. Then type 12345 and start. Later: Esc, Status tab.
+- You should see: up to 9 digits, "Enter a seed above zero." for 0 (with the refuse sound), a clear hint line. In the Status tab the Seed reads 12345.
+- Your note:
+
+### R3-09 | Hold to skip the cutscene
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: in the intro cutscene tap Space a few times, then HOLD Space.
+- You should see: taps only move the text on. After about 1 second of holding a "Hold to skip" box appears with a filling bar; at about 2 seconds the cutscene ends. Letting go early cancels it.
+- Your note:
+
+### R3-10 | Cutscene text box and wording
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: read the intro as it plays (start another new game if you skipped it).
+- You should see: the cutscene words in the same box as normal dialogue, in the game's palette (not plain white on black), short lines, no overflow. Mark lines you dislike in the note.
+- Your note:
+
+### The class chest and the class pick
+
+### R3-11 | Wake-up choice
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: on floor 1, after the first lines, you may be asked how you wake up. Pick an answer. After your first death, wake up again.
+- You should see: two short answers (like "Sit up." / "Lie still."), a different next line for each, and next time a line that remembers what you chose. Nothing changes HP, items or stats.
+- Your note:
+
+### R3-12 | The class chest cannot be skipped
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: do NOT open the first class chest. Walk to the room's exit.
+- You should see: two short lines from the hero about the chest (reworded by the writer), then you step back one tile. This repeats until you open it.
+- Your note:
+
+### R3-13 | Class screen
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: open the class chest. Look at each class: Knight, Archer, Mage, Nobody.
+- You should see: Nobody greyed and locked; a small animated picture of each class's character; a lore-and-playstyle description that fits the panel (five lines); skills shown as "???" until you have found them in some run.
+- Your note:
+
+### R3-14 | Yes/No pop-up for the class pick
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: choose a class.
+- You should see: a centred box "Become ...?" with Yes and No, the cursor on No. Esc or Back means No. Yes picks the class once.
+- Your note:
+
+### R3-15 | Chest and map juice
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: open a chest, pick up gold, and walk around.
+- You should see: a small burst from the chest lid, the item's icon rising and fading, the gold number counting up, a tiny squash with each step. With Screen shake Off the squash and bounce stop.
+- Your note:
+
+### First floors: light, notes, choices
+
+### R3-16 | Rooms are darker, but lighter than last time
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: on floor 1 look at the whole room, then walk next to the walls.
+- You should see: a slightly dark room that you can still read easily (lighter than the last build), with fire and torch light as soft round pools that flicker a little. Floor, chests and enemies stay clear.
+- Your note:
+
+### R3-17 | Enemies give off NO light
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: stand near an enemy, in front of it and behind a wall.
+- You should see: no light cone, no light spill and no dotted ring around the enemy. The enemy is just a sprite. (It still sees you by the same rules.)
+- Your note:
+
+### R3-18 | Notes are picked up by walking on them
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: on floor 1 find the note on the floor (a torn page) and walk onto it. Then walk through the spot again.
+- You should see: no text box. A "Note found" message, the page rises and fades, and it is gone from the map. A note never blocks you or an enemy, and it does not come back, even in a later run.
+- Your note:
+
+### R3-19 | Codex Notes reader and the note's question
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: Esc, Codex tab, Notes. The page says "Notes found 1/8". Open your note and read it to the end. Pick one of the two answers. Close and open it again.
+- You should see: a scrolling reader. At the end of the first reading a question ("Whose hand is this?") with two answers. Afterwards the note shows its lines plus one new line for your answer, and no question.
+- Your note:
+
+### R3-20 | Merchant choice
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: talk to the merchant the first time. Pick an answer. Talk again later.
+- You should see: a flat, dry merchant with two short answers ("A way out." / "Something to buy."), a different reply for each, and a different greeting next visit. The shop works as before, with "Sold Out" in Title Case.
+- Your note:
+
+### Map AI: hearing, searching, hiding
+
+### R3-21 | Enemies hear you run
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: stay out of an enemy's sight, about 4 tiles away, even behind a wall. First walk, then run (hold Shift).
+- You should see: walking is silent. Running makes the enemy turn and come to where you were.
+- Your note:
+
+### R3-22 | The "?" search
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: get seen, run, break the line of sight, and hide behind a wall or door.
+- You should see: the enemy goes to the last spot it saw you, then a few tiles the way you fled, then gives up with one "?" and goes home. Not a stream of question marks.
+- Your note:
+
+### R3-23 | Hiding spots (floors 2-7)
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: on floors 2 to 7 stand still on a dark grass patch or foliage by a wall (1-2 spots per room, floor 2 has two). Wait about a third of a second. Let an enemy walk past.
+- You should see: you turn see-through; an enemy only notices you from 1 tile away. Walking across the spot does not hide you.
+- Your note:
+
+### R3-24 | No camping at exits
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: lead an enemy to a door, leave the room and come back. Also look at where enemies are when you arrive in a new room.
+- You should see: no enemy waiting at the door or within about 3 tiles of the arrival tile; the enemy that chased you is back at its home or far from the door. Pressing TOWARD the door you arrived by leaves at once.
+- Your note:
+
+### Fights
+
+### R3-25 | Battle backgrounds
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: fight on floors 1-3, 4-6 and 7-9.
+- You should see: forest tunnel (floors 1-3), caves (4-6), ruins (7-9), all in the 4 game colours, with the enemy and the menu easy to read in front. Are they too busy?
+- Your note:
+
+### R3-26 | Damage preview
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: in a battle put the cursor on Attack, then on a damaging skill.
+- You should see: a small plate "Damage n / Perfect m" for Attack, and Damage and Perfect lines in the skill details (per hit, like "7 x2" for two hits). The numbers match what you really deal.
+- Your note:
+
+### R3-27 | Battle prompt line and status labels
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: look at the hints in a battle. Get a status on you or the enemy (poison, bleed, a buff). Move the cursor onto its icon.
+- You should see: ONE hint line instead of many labels. A short label under each status icon (like "PSN 3"); highlighting an icon shows the full sentence. Terms are in bright green, BREAK and Perfect in gold.
+- Your note:
+
+### R3-28 | Timing grade words
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: hit with several timing bars and read the grade.
+- You should see: the grades now read Perfect / Good / Weak (not all capitals). Do you prefer capitals?
+- Your note:
+
+### R3-29 | Hold run for double speed
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: in a battle hold Shift (pad LT) during messages and the enemy turn, and during a timing bar.
+- You should see: messages and animations at double speed with a "x2" mark top-right; the timing bars never speed up.
+- Your note:
+
+### R3-30 | The battle menu is read-only in a fight
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: in a battle press Esc (opens at the root command menu) or Tab. Open the Items and Gear tabs. Try to use or change something.
+- You should see: the menu opens (not during a timing bar); Items and Gear are read-only and say "In a battle, use Item in the battle menu." Use the ITEM command in the battle menu to drink a potion.
+- Your note:
+
+### R3-31 | Brace, Take Aim and Muscle Up last as written
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: use Brace and let the enemy miss or not attack. Use Take Aim and Muscle Up and count turns.
+- You should see: Brace lasts until the enemy's next hit, or two enemy turns if nothing hits. Take Aim lasts 9 turns and Muscle Up 6, matching their text.
+- Your note:
+
+### R3-32 | Elites from floor 3
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: look for an elite enemy on floors 1-2, then on floor 3 and deeper. Stand in a dark spot.
+- You should see: no elites on floors 1-2; from floor 3 at least one per floor. Its outline follows the sprite's shape and stays dark in a dark room (it is not bright over the darkness).
+- Your note:
+
+### R3-33 | The Stranger and his loot
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: meet the Stranger and pick an answer. Flee once, come back and beat him another time.
+- You should see: a friendly-but-wrong Stranger with two short answers, a different reply for each, and a changed line if you meet him again. Items he took are returned when you beat him later, even if you fled the first time.
+- Your note:
+
+### R3-34 | Level-up shows your class growth
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: gain a level.
+- You should see: a sparkle round you, a line like "Knight growth: ATK +1, DEF +1", and a free point you can put into a stat or into Max HP (+3) or Max MP (+2). The victory text does not list the automatic gains any more.
+- Your note:
+
+### R3-35 | EXP bar
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: look at the HUD and the Status tab after a fight.
+- You should see: an EXP bar that looks different from the HP and MP bars and fills as you win. The word is "EXP", not "XP".
+- Your note:
+
+### R3-36 | Rumble (skip if you have no pad)
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: with a pad, land a Perfect, break an enemy, take a big hit. Then switch Rumble off in Settings.
+- You should see: a short rumble on Perfect, BREAK, big hits and death; none once it is off.
+- Your note:
+
+### The one menu and the System tab
+
+### R3-37 | One menu for Esc and Tab
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: on the map press Esc, close it, press Tab. Use Q and E for tabs. Press the menu key while you are walking.
+- You should see: the same menu both times with seven tabs: Status, Skills, Items, Gear, Codex, Settings, System. Pressing the key mid-step still opens it as soon as you stand on the tile. No separate pause menu any more.
+- Your note:
+
+### R3-38 | System tab: Help, Abandon, Quit
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: open System. Open Help and find "Stats & terms". Open Abandon run and Quit to title but answer No.
+- You should see: Help is a page on the tab; Stats & terms explains Power, ATK, DEF and the other words. Abandon and Quit each open a Yes/No box with the cursor on No.
+- Your note:
+
+### R3-39 | Status tab and Gear tab words
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: open Status, then Gear.
+- You should see: Status shows the seed, EXP and status chips with labels. Gear says "Equipped" (not "Worn") and uses Equip / Unequip. All labels in Title Case.
+- Your note:
+
+### R3-40 | Refusals: full bed and full potion
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: at full HP use a bed, and try a healing potion. Try something you cannot buy.
+- You should see: the bed and the potion say why not and are not used up; each refusal makes the refuse sound (currently the Back sound).
+- Your note:
+
+### R3-41 | Yes/No pop-up everywhere
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: sell a piece of gear, swap a skill for a new one, and pick the echo (next run).
+- You should see: the same centred Yes/No box each time, cursor on No, the question names the item or skill.
+- Your note:
+
+### R3-42 | Quit during a fight
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: in a fight open the menu, System, Quit to title, Yes. Then Continue. Another time close the game window (the X) in a fight, then start and Continue.
+- You should see: Continue puts you back just BEFORE the fight: the enemy is on the map, HP, MP, items and gold as they were. After closing the window, the same.
+- Your note:
+
+### Death, summary and the next run
+
+### R3-43 | Death line and picture
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: die (J in debug is fine).
+- You should see: the old game-over picture behind a new death line, in the 4 colours, text readable. Does the line fit how you died?
+- Your note:
+
+### R3-44 | Run summary with stats and seed
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: read the summary. Then Esc, Codex, Runs.
+- You should see: the summary slides in like other panels and lists Perfect %, crits, damage dealt and taken, battles won, run time and the seed. The Codex Runs page shows the same for past runs.
+- Your note:
+
+### R3-45 | Continue card and New Game over a saved run
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: quit to title with a run going. Look at the Continue card. Then choose New Game.
+- You should see: the card shows class, floor, time played and gold. New Game asks "Start a new game? The saved run will be abandoned." in a Yes/No box with No highlighted.
+- Your note:
+
+### R3-46 | Skill memory and the echo
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: in the next run pick a class you used before. Look at its skills on the class screen, then the echo pick.
+- You should see: skills you found in earlier runs now show their names (others still "???"). After the class pick the echo offers up to 3 skills of THAT class that you found before, never items. Nothing found for the class: no echo.
+- Your note:
+
+### R3-47 | Death and wake lines
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: die a second and third time (J in debug is fine) and read the wake-up lines each time.
+- You should see: a different wake line each time that fits how many times you died, dry and short, with the odd bit of swearing allowed (D163). Mark lines you dislike.
+- Your note (lines I dislike):
+
+### Later floors
+
+### R3-48 | Daylight on floors 2 and 4, and sun spots
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: walk through floor 2 and floor 4. Also look at floors 5 and 9.
+- You should see: floors 2 and 4 are bright, like open sky. Sun spots (soft round patches of daylight that do not flicker) sit in the clearing on floor 2 (two) and floor 4 (one), at the foot of the tree on floor 5, and in the east half of floor 9.
+- Your note:
+
+### R3-49 | New wall torches on floors 1, 3, 5, 6, 7 and 9
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: visit these floors and look along the top wall. Floors 2, 4 and 8 get no new torches.
+- You should see: new wall torches with a flickering light pool: floor 1 two, floor 3 two, floor 5 two, floor 6 one, floor 7 two, floor 9 one. They are on the north wall, not in front of a door or chest. Too many, too few, or in odd places?
+- Your note:
+
+### R3-50 | Dark floors are still playable
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: on the deepest floors you reach, look for chests, exits and enemies far from any light.
+- You should see: you can still find your way; darkness never hides a chest, an exit or an enemy completely. Say if any room is too dark.
+- Your note:
+
+### R3-51 | More notes on deeper floors
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: after a few deaths look for notes on later floors (more appear as you die more) and read them in the Codex.
+- You should see: short, odd notes that fit the story; the Notes page counts up to 8.
+- Your note:
+
+### The new text and word changes
+
+### R3-52 | Skim the rewritten story text
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: as you play, read dialogue, cutscene lines, wake and death lines, the Stranger and the merchant, notes and graves. A few hero lines swear (allowed, D163).
+- You should see: short, dry, a little scared lines in the hero's voice. Write down any line you dislike (where it was and what it says) in the note.
+- Your note (lines I dislike):
+
+### R3-53 | Skim classes, items, tutorials and help
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: read the class descriptions, item and skill text, tutorial pop-ups and the Help page.
+- You should see: class lines as lore plus playstyle; item lines clear; tutorials that name buttons with pictures and game terms in bright green; no text running outside its box at a small (3x) or big (5x) window.
+- Your note (lines I dislike):
+
+### R3-54 | One word per meaning
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: notice words in menus and fights.
+- You should see: "enemy" (not foe or monster), "battle" (not fight), EXP, Equip / Equipped, Quit, Bag, Evasion, Sold Out, and Title Case for menu labels. Anything that still feels inconsistent?
+- Your note:
+
+### R3-55 | One style and the same dimming
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: open several screens in a row: the menu, a shop, a pop-up, a card pick, the summary.
+- You should see: the same frame, cursor, sounds and motion on all of them, and only two dimming levels behind them (a pop-up lighter, a full screen darker). The skill details in a fight do not cover the enemy.
+- Your note:
+
+### R3-56 | Korean (optional)
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: switch the language to Korean and skim the title, a dialogue, a class and a pop-up.
+- You should see: Korean in every one of them (including the 55 new dialogue lines), fitting their boxes.
+- Your note:
+
+### The boss
+
+### R3-57 | Boss fight background
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: reach the boss.
+- You should see: the plain background for now (the D13 picture comes after you import it in the IDE). Everything else in the battle works the same as in normal fights.
+- Your note:
+
+### R3-58 | Boss lines and ending text
+- Status: unplayed   [ ] good  [ ] bad  [ ] change
+- Do: read the boss intro and, if you win, the ending.
+- You should see: short rewritten lines that fit the world; the hero's reaction after the boss. Mark any line you dislike.
+- Your note:
+
+### Questions for you
+
+1. Battle menu read-only in a fight: is it OK that Items and Gear only show, and you use ITEM in the battle menu? (yes / no / change)
+2. The Stranger's loot rule: his items come back if you beat him later, even after you fled. OK? (yes / no / change)
+3. The class-chest lines (D127) were reworded by the writer. OK, or change them? (yes / no / which line)
+4. Timing grades: keep "Perfect / Good / Weak", or go back to capitals? (keep / capitals)
+5. Do you want a real refuse sound instead of the Back sound? (yes, pick one / no, keep)
+
+## Older builds (superseded)
+
+Everything below this heading belongs to older builds (playtest 2, build 63deaae and before). It is kept for reference; its entries are not needed for the round-3 build.
+
 **This is playtest 2:** everything built since playtest 1 (build d312bfb), played in ONE big session of about 60-90 minutes (D71). Playtest 1 is finished: the owner approved the new fights (D72) and its nine entries were replaced by this list (the old text is in git, commit 5ca29fa).
 
 ## How this file works
