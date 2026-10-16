@@ -3945,6 +3945,7 @@ function Scenario_NoOwed() {
         _k.skill_pending = -1;
         _k.card_picks = 0;
         _k.stat_points = 0;
+        _k.levels_owed = 0;   // D177: a level won and not yet confirmed opens the level-up screen too
         _k.offer = [];
         if (variable_struct_exists(_k, "echo_offer")) _k.echo_offer = [];
     }

@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T13:53:41Z",
-    "row_count": 1249
+    "generated_at_utc": "2026-10-16T14:44:18Z",
+    "row_count": 1248
   },
   "default_lang": "en",
   "languages": [
@@ -632,21 +632,21 @@
       "en": "After",
       "ko": "이후"
     },
-    "cards.stat.maxhp": {
-      "en": "Max HP +{n}",
-      "ko": "최대 HP +{n}"
+    "cards.stat.hp_after": {
+      "en": "Max HP After",
+      "ko": "최대 HP 이후"
     },
-    "cards.stat.maxhp.desc": {
-      "en": "Raises your max [t]HP[/t] by {n} and restores {n} [t]HP[/t].",
-      "ko": "최대 [t]HP[/t]가 {n} 오르고 [t]HP[/t]를 {n} 회복합니다."
+    "cards.stat.hp_now": {
+      "en": "Max HP Now",
+      "ko": "최대 HP 현재"
     },
-    "cards.stat.maxmp": {
-      "en": "Max MP +{n}",
-      "ko": "최대 MP +{n}"
+    "cards.stat.mp_after": {
+      "en": "Max MP After",
+      "ko": "최대 MP 이후"
     },
-    "cards.stat.maxmp.desc": {
-      "en": "Raises your max [t]MP[/t] by {n} and restores {n} [t]MP[/t].",
-      "ko": "최대 [t]MP[/t]가 {n} 오르고 [t]MP[/t]를 {n} 회복합니다."
+    "cards.stat.mp_now": {
+      "en": "Max MP Now",
+      "ko": "최대 MP 현재"
     },
     "cards.stat.now": {
       "en": "Now",
@@ -2848,13 +2848,9 @@
       "en": "A weapon with {power} power.",
       "ko": "위력 {power}의 무기입니다."
     },
-    "levelup.gain": {
-      "en": "{stat} +{n}",
-      "ko": "{stat} +{n}"
-    },
-    "levelup.growth": {
-      "en": "{name} growth: {gains}",
-      "ko": "{name} 성장: {gains}"
+    "levelup.legend": {
+      "en": "Gold = your class grows these",
+      "ko": "금색 = 직업이 성장시키는 능력치"
     },
     "menu.common.back": {
       "en": "Back",

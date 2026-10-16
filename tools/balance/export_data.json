@@ -1,5 +1,5 @@
 {
- "build": "e9685dc-20261015-dirty",
+ "build": "60b2bcb-20261016-dirty",
  "cards": [
   {
    "classes": [
@@ -10,7 +10,7 @@
    "kind": "skill",
    "name": "Wound",
    "params": {},
-   "sentence": "Strike for 4 power. 75% to inflict Bleeding.",
+   "sentence": "Hit for 4 power. 75% [t]Bleed[/t].",
    "skill_id": 1.0,
    "up": {}
   },
@@ -22,7 +22,7 @@
    "kind": "skill",
    "name": "Hilt Bash",
    "params": {},
-   "sentence": "Strike for 4 power. 60% to inflict Stun.",
+   "sentence": "Hit for 4 power. 60% [t]Stun[/t].",
    "skill_id": 2.0,
    "up": {}
   },
@@ -34,7 +34,7 @@
    "kind": "skill",
    "name": "Muscle Up",
    "params": {},
-   "sentence": "Gain Guard for 6 turns.",
+   "sentence": "Gain [t]Guard[/t] for 6 turns.",
    "skill_id": 3.0,
    "up": {}
   },
@@ -46,7 +46,7 @@
    "kind": "skill",
    "name": "Rev Up",
    "params": {},
-   "sentence": "Gain Rev Up for 6 turns.",
+   "sentence": "Gain [t]Rev Up[/t] for 6 turns.",
    "skill_id": 4.0,
    "up": {}
   },
@@ -58,7 +58,7 @@
    "kind": "skill",
    "name": "Horizontal Slash",
    "params": {},
-   "sentence": "Strike for 5 power.",
+   "sentence": "Hit for 5 power.",
    "skill_id": 5.0,
    "up": {}
   },
@@ -70,7 +70,7 @@
    "kind": "skill",
    "name": "Poison Arrow",
    "params": {},
-   "sentence": "Strike for 5 power. 75% to inflict Poison.",
+   "sentence": "Hit for 5 power. 75% [t]Poison[/t].",
    "skill_id": 6.0,
    "up": {}
   },
@@ -82,7 +82,7 @@
    "kind": "skill",
    "name": "Evasion",
    "params": {},
-   "sentence": "Gain Evasion for 6 turns.",
+   "sentence": "Gain [t]Evasion[/t] for 6 turns.",
    "skill_id": 7.0,
    "up": {}
   },
@@ -94,7 +94,7 @@
    "kind": "skill",
    "name": "Double Shot",
    "params": {},
-   "sentence": "Strike 2 times for 4 power each.",
+   "sentence": "Hit 2 times for 4 power each.",
    "skill_id": 8.0,
    "up": {}
   },
@@ -106,7 +106,7 @@
    "kind": "skill",
    "name": "Take Aim",
    "params": {},
-   "sentence": "Gain Take Aim for 9 turns.",
+   "sentence": "Gain [t]Take Aim[/t] for 9 turns.",
    "skill_id": 9.0,
    "up": {}
   },
@@ -118,7 +118,7 @@
    "kind": "skill",
    "name": "Fireball",
    "params": {},
-   "sentence": "Strike for 6 power. 60% to inflict Burning.",
+   "sentence": "Hit for 6 power. 60% [t]Burn[/t].",
    "skill_id": 10.0,
    "up": {}
   },
@@ -130,7 +130,7 @@
    "kind": "skill",
    "name": "Poison Mist",
    "params": {},
-   "sentence": "Strike for 4 power. 75% to inflict Poison.",
+   "sentence": "Hit for 4 power. 75% [t]Poison[/t].",
    "skill_id": 11.0,
    "up": {}
   },
@@ -142,7 +142,7 @@
    "kind": "skill",
    "name": "Ice Spear",
    "params": {},
-   "sentence": "Strike for 5 power. 60% to inflict Stun.",
+   "sentence": "Hit for 5 power. 60% [t]Stun[/t].",
    "skill_id": 12.0,
    "up": {}
   },
@@ -154,7 +154,7 @@
    "kind": "skill",
    "name": "Meditation",
    "params": {},
-   "sentence": "Gain Meditation for 9 turns.",
+   "sentence": "Gain [t]Meditation[/t] for 9 turns.",
    "skill_id": 13.0,
    "up": {}
   },
@@ -166,7 +166,7 @@
    "kind": "skill",
    "name": "Foresight",
    "params": {},
-   "sentence": "Gain Foresight for 3 turns.",
+   "sentence": "Gain [t]Foresight[/t] for 3 turns.",
    "skill_id": 14.0,
    "up": {}
   },
@@ -179,7 +179,7 @@
    "kind": "upgrade",
    "name": "Wound+",
    "params": {},
-   "sentence": "Strike for 6 power. 100% to inflict Bleeding.",
+   "sentence": "Hit for 6 power. 100% [t]Bleed[/t].",
    "skill_id": 1.0,
    "up": {
     "power": 2.0,
@@ -194,7 +194,7 @@
    "kind": "upgrade",
    "name": "Hilt Bash+",
    "params": {},
-   "sentence": "Strike for 5 power. 85% to inflict Stun.",
+   "sentence": "Hit for 5 power. 85% [t]Stun[/t].",
    "skill_id": 2.0,
    "up": {
     "power": 1.0,
@@ -209,7 +209,7 @@
    "kind": "upgrade",
    "name": "Muscle Up+",
    "params": {},
-   "sentence": "Gain Guard for 8 turns.",
+   "sentence": "Gain [t]Guard[/t] for 8 turns.",
    "skill_id": 3.0,
    "up": {
     "mp_cost": -1.0,
@@ -224,7 +224,7 @@
    "kind": "upgrade",
    "name": "Rev Up+",
    "params": {},
-   "sentence": "Gain Rev Up for 8 turns.",
+   "sentence": "Gain [t]Rev Up[/t] for 8 turns.",
    "skill_id": 4.0,
    "up": {
     "seq_trim": 1.0,
@@ -239,7 +239,7 @@
    "kind": "upgrade",
    "name": "Horizontal Slash+",
    "params": {},
-   "sentence": "Strike for 7 power.",
+   "sentence": "Hit for 7 power.",
    "skill_id": 5.0,
    "up": {
     "power": 2.0,
@@ -254,7 +254,7 @@
    "kind": "upgrade",
    "name": "Poison Arrow+",
    "params": {},
-   "sentence": "Strike for 5 power. 100% to inflict Poison.",
+   "sentence": "Hit for 5 power. 100% [t]Poison[/t].",
    "skill_id": 6.0,
    "up": {
     "status_chance": 0.25,
@@ -269,7 +269,7 @@
    "kind": "upgrade",
    "name": "Evasion+",
    "params": {},
-   "sentence": "Gain Evasion for 9 turns.",
+   "sentence": "Gain [t]Evasion[/t] for 9 turns.",
    "skill_id": 7.0,
    "up": {
     "mp_cost": -1.0,
@@ -284,7 +284,7 @@
    "kind": "upgrade",
    "name": "Double Shot+",
    "params": {},
-   "sentence": "Strike 2 times for 5 power each.",
+   "sentence": "Hit 2 times for 5 power each.",
    "skill_id": 8.0,
    "up": {
     "power": 1.0,
@@ -299,7 +299,7 @@
    "kind": "upgrade",
    "name": "Take Aim+",
    "params": {},
-   "sentence": "Gain Take Aim for 12 turns.",
+   "sentence": "Gain [t]Take Aim[/t] for 12 turns.",
    "skill_id": 9.0,
    "up": {
     "mp_cost": -1.0,
@@ -314,7 +314,7 @@
    "kind": "upgrade",
    "name": "Fireball+",
    "params": {},
-   "sentence": "Strike for 8 power. 85% to inflict Burning.",
+   "sentence": "Hit for 8 power. 85% [t]Burn[/t].",
    "skill_id": 10.0,
    "up": {
     "power": 2.0,
@@ -329,7 +329,7 @@
    "kind": "upgrade",
    "name": "Poison Mist+",
    "params": {},
-   "sentence": "Strike for 4 power. 75% to inflict Poison.",
+   "sentence": "Hit for 4 power. 75% [t]Poison[/t].",
    "skill_id": 11.0,
    "up": {
     "seq_trim": 1.0,
@@ -344,7 +344,7 @@
    "kind": "upgrade",
    "name": "Ice Spear+",
    "params": {},
-   "sentence": "Strike for 7 power. 60% to inflict Stun.",
+   "sentence": "Hit for 7 power. 60% [t]Stun[/t].",
    "skill_id": 12.0,
    "up": {
     "power": 2.0,
@@ -359,7 +359,7 @@
    "kind": "upgrade",
    "name": "Meditation+",
    "params": {},
-   "sentence": "Gain Meditation for 12 turns.",
+   "sentence": "Gain [t]Meditation[/t] for 12 turns.",
    "skill_id": 13.0,
    "up": {
     "mp_cost": -1.0,
@@ -374,7 +374,7 @@
    "kind": "upgrade",
    "name": "Foresight+",
    "params": {},
-   "sentence": "Gain Foresight for 5 turns.",
+   "sentence": "Gain [t]Foresight[/t] for 5 turns.",
    "skill_id": 14.0,
    "up": {
     "seq_trim": 1.0,
@@ -389,7 +389,7 @@
    "params": {
     "stat_spd": 1.0
    },
-   "sentence": "Light on your feet: +1 SPD for good.",
+   "sentence": "Light on your feet: +1 [t]SPD[/t] for good.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -401,7 +401,7 @@
    "params": {
     "poison_stacks": 1.0
    },
-   "sentence": "Poison you apply lands 1 extra stack.",
+   "sentence": "[t]Poison[/t] you inflict adds 1 extra stack.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -413,7 +413,7 @@
    "params": {
     "heal_after_fight": 3.0
    },
-   "sentence": "Heal 3 HP after each fight you win.",
+   "sentence": "Restore 3 [t]HP[/t] after each battle you win.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -425,7 +425,7 @@
    "params": {
     "perfect_widen": 0.1
    },
-   "sentence": "Perfect zones are 10% wider.",
+   "sentence": "[a]Perfect[/a] zones are 10% wider.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -450,7 +450,7 @@
     "every_n_turns": 1.0,
     "mp_gain": 1.0
    },
-   "sentence": "Regain 1 MP at the start of each of your turns.",
+   "sentence": "Regain 1 [t]MP[/t] at the start of each of your turns.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -474,7 +474,7 @@
    "params": {
     "start_stagger": 1.0
    },
-   "sentence": "Enemies start each fight with 1 stagger.",
+   "sentence": "Enemies start each battle with 1 [t]stagger[/t].",
    "skill_id": -1.0,
    "up": {}
   },
@@ -488,7 +488,7 @@
    "params": {
     "stat_def": 2.0
    },
-   "sentence": "Thick armour sense: +2 DEF for good.",
+   "sentence": "Thicker hide: +2 [t]DEF[/t] for good.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -502,7 +502,7 @@
    "params": {
     "guard_turns": 3.0
    },
-   "sentence": "Guard on yourself lasts 3 turns longer.",
+   "sentence": "[t]Guard[/t] on yourself lasts 3 turns longer.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -516,7 +516,7 @@
    "params": {
     "stat_atk": 2.0
    },
-   "sentence": "A harder swing: +2 ATK for good.",
+   "sentence": "A harder swing: +2 [t]ATK[/t] for good.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -530,7 +530,7 @@
    "params": {
     "stat_spd": 2.0
    },
-   "sentence": "Quicker than the wind: +2 SPD for good.",
+   "sentence": "Quicker than the wind: +2 [t]SPD[/t] for good.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -558,7 +558,7 @@
    "params": {
     "mp_after_fight": 2.0
    },
-   "sentence": "Regain 2 MP after each fight you win.",
+   "sentence": "Regain 2 [t]MP[/t] after each battle you win.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -572,7 +572,7 @@
    "params": {
     "stat_mag": 2.0
    },
-   "sentence": "A deeper well: +2 MAG for good.",
+   "sentence": "A deeper well: +2 [t]MAG[/t] for good.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -586,7 +586,7 @@
    "params": {
     "mp_cost_less": 1.0
    },
-   "sentence": "Your skills cost 1 MP less (never below 1).",
+   "sentence": "Your skills cost 1 [t]MP[/t] less (never below 1).",
    "skill_id": -1.0,
    "up": {}
   },
@@ -614,7 +614,7 @@
    "params": {
     "potion_mp": 2.0
    },
-   "sentence": "Healing potions also restore 2 MP.",
+   "sentence": "Healing potions also restore 2 [t]MP[/t].",
    "skill_id": -1.0,
    "up": {}
   },
@@ -642,7 +642,7 @@
    "params": {
     "find_potion_pct": 0.3
    },
-   "sentence": "30% chance to find a potion after each fight you win.",
+   "sentence": "After each win, 30% to find a potion.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -654,7 +654,7 @@
    "params": {
     "heal_pct": 0.5
    },
-   "sentence": "Restore 50% of your HP and MP now.",
+   "sentence": "Restore 50% of your [t]HP[/t] and [t]MP[/t] now.",
    "skill_id": -1.0,
    "up": {}
   },
@@ -694,8 +694,10 @@
      "hp": 10.0,
      "level": 1.0,
      "mag": 4.0,
+     "mnd": 12.0,
      "mp": 12.0,
-     "spd": 13.0
+     "spd": 13.0,
+     "vig": 10.0
     },
     {
      "atk": 11.0,
@@ -703,8 +705,10 @@
      "hp": 16.0,
      "level": 2.0,
      "mag": 4.0,
+     "mnd": 14.0,
      "mp": 14.0,
-     "spd": 14.0
+     "spd": 14.0,
+     "vig": 12.0
     },
     {
      "atk": 13.0,
@@ -712,8 +716,10 @@
      "hp": 22.0,
      "level": 3.0,
      "mag": 4.0,
+     "mnd": 16.0,
      "mp": 16.0,
-     "spd": 15.0
+     "spd": 15.0,
+     "vig": 14.0
     },
     {
      "atk": 15.0,
@@ -721,8 +727,10 @@
      "hp": 28.0,
      "level": 4.0,
      "mag": 4.0,
+     "mnd": 18.0,
      "mp": 18.0,
-     "spd": 16.0
+     "spd": 16.0,
+     "vig": 16.0
     },
     {
      "atk": 17.0,
@@ -730,8 +738,10 @@
      "hp": 34.0,
      "level": 5.0,
      "mag": 4.0,
+     "mnd": 20.0,
      "mp": 20.0,
-     "spd": 17.0
+     "spd": 17.0,
+     "vig": 18.0
     },
     {
      "atk": 19.0,
@@ -739,8 +749,10 @@
      "hp": 40.0,
      "level": 6.0,
      "mag": 4.0,
+     "mnd": 22.0,
      "mp": 22.0,
-     "spd": 18.0
+     "spd": 18.0,
+     "vig": 20.0
     },
     {
      "atk": 21.0,
@@ -748,8 +760,10 @@
      "hp": 46.0,
      "level": 7.0,
      "mag": 4.0,
+     "mnd": 24.0,
      "mp": 24.0,
-     "spd": 19.0
+     "spd": 19.0,
+     "vig": 22.0
     },
     {
      "atk": 23.0,
@@ -757,8 +771,10 @@
      "hp": 52.0,
      "level": 8.0,
      "mag": 4.0,
+     "mnd": 26.0,
      "mp": 26.0,
-     "spd": 20.0
+     "spd": 20.0,
+     "vig": 24.0
     },
     {
      "atk": 25.0,
@@ -766,8 +782,10 @@
      "hp": 58.0,
      "level": 9.0,
      "mag": 4.0,
+     "mnd": 28.0,
      "mp": 28.0,
-     "spd": 21.0
+     "spd": 21.0,
+     "vig": 26.0
     },
     {
      "atk": 27.0,
@@ -775,8 +793,10 @@
      "hp": 64.0,
      "level": 10.0,
      "mag": 4.0,
+     "mnd": 30.0,
      "mp": 30.0,
-     "spd": 22.0
+     "spd": 22.0,
+     "vig": 28.0
     }
    ],
    "free_default": 0.0,
@@ -786,7 +806,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 2.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 2.0
     },
@@ -795,7 +817,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 2.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 3.0
     },
@@ -804,7 +828,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 2.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 4.0
     },
@@ -813,7 +839,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 2.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 5.0
     },
@@ -822,7 +850,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 2.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 6.0
     },
@@ -831,7 +861,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 2.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 7.0
     },
@@ -840,7 +872,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 2.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 8.0
     },
@@ -849,7 +883,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 2.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 9.0
     },
@@ -858,7 +894,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 2.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 10.0
     }
@@ -871,7 +909,9 @@
     "atk": 9.0,
     "def": 8.0,
     "mag": 4.0,
-    "spd": 13.0
+    "mnd": 12.0,
+    "spd": 13.0,
+    "vig": 10.0
    }
   },
   {
@@ -884,26 +924,32 @@
      "hp": 10.0,
      "level": 1.0,
      "mag": 3.0,
+     "mnd": 11.0,
      "mp": 11.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 10.0
     },
     {
      "atk": 12.0,
      "def": 14.0,
-     "hp": 17.0,
+     "hp": 16.0,
      "level": 2.0,
      "mag": 3.0,
+     "mnd": 12.0,
      "mp": 12.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 12.0
     },
     {
      "atk": 13.0,
      "def": 16.0,
-     "hp": 24.0,
+     "hp": 22.0,
      "level": 3.0,
      "mag": 3.0,
+     "mnd": 13.0,
      "mp": 13.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 14.0
     },
     {
      "atk": 14.0,
@@ -911,26 +957,32 @@
      "hp": 31.0,
      "level": 4.0,
      "mag": 3.0,
+     "mnd": 14.0,
      "mp": 14.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 17.0
     },
     {
      "atk": 15.0,
      "def": 20.0,
-     "hp": 38.0,
+     "hp": 37.0,
      "level": 5.0,
      "mag": 3.0,
+     "mnd": 15.0,
      "mp": 15.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 19.0
     },
     {
      "atk": 16.0,
      "def": 22.0,
-     "hp": 45.0,
+     "hp": 43.0,
      "level": 6.0,
      "mag": 3.0,
+     "mnd": 16.0,
      "mp": 16.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 21.0
     },
     {
      "atk": 17.0,
@@ -938,35 +990,43 @@
      "hp": 52.0,
      "level": 7.0,
      "mag": 3.0,
+     "mnd": 17.0,
      "mp": 17.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 24.0
     },
     {
      "atk": 18.0,
      "def": 26.0,
-     "hp": 59.0,
+     "hp": 58.0,
      "level": 8.0,
      "mag": 3.0,
+     "mnd": 18.0,
      "mp": 18.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 26.0
     },
     {
      "atk": 19.0,
      "def": 28.0,
-     "hp": 66.0,
+     "hp": 64.0,
      "level": 9.0,
      "mag": 3.0,
+     "mnd": 19.0,
      "mp": 19.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 28.0
     },
     {
      "atk": 20.0,
      "def": 30.0,
-     "hp": 73.0,
+     "hp": 70.0,
      "level": 10.0,
      "mag": 3.0,
+     "mnd": 20.0,
      "mp": 20.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 31.0
     }
    ],
    "free_default": 1.0,
@@ -976,7 +1036,9 @@
       "atk": 1.0,
       "def": 1.0,
       "mag": 0.0,
-      "spd": 0.0
+      "mnd": 1.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 2.0
     },
@@ -985,7 +1047,9 @@
       "atk": 1.0,
       "def": 1.0,
       "mag": 0.0,
-      "spd": 0.0
+      "mnd": 1.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 3.0
     },
@@ -994,7 +1058,9 @@
       "atk": 1.0,
       "def": 1.0,
       "mag": 0.0,
-      "spd": 0.0
+      "mnd": 1.0,
+      "spd": 0.0,
+      "vig": 3.0
      },
      "level": 4.0
     },
@@ -1003,7 +1069,9 @@
       "atk": 1.0,
       "def": 1.0,
       "mag": 0.0,
-      "spd": 0.0
+      "mnd": 1.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 5.0
     },
@@ -1012,7 +1080,9 @@
       "atk": 1.0,
       "def": 1.0,
       "mag": 0.0,
-      "spd": 0.0
+      "mnd": 1.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 6.0
     },
@@ -1021,7 +1091,9 @@
       "atk": 1.0,
       "def": 1.0,
       "mag": 0.0,
-      "spd": 0.0
+      "mnd": 1.0,
+      "spd": 0.0,
+      "vig": 3.0
      },
      "level": 7.0
     },
@@ -1030,7 +1102,9 @@
       "atk": 1.0,
       "def": 1.0,
       "mag": 0.0,
-      "spd": 0.0
+      "mnd": 1.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 8.0
     },
@@ -1039,7 +1113,9 @@
       "atk": 1.0,
       "def": 1.0,
       "mag": 0.0,
-      "spd": 0.0
+      "mnd": 1.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 9.0
     },
@@ -1048,7 +1124,9 @@
       "atk": 1.0,
       "def": 1.0,
       "mag": 0.0,
-      "spd": 0.0
+      "mnd": 1.0,
+      "spd": 0.0,
+      "vig": 3.0
      },
      "level": 10.0
     }
@@ -1061,7 +1139,9 @@
     "atk": 11.0,
     "def": 12.0,
     "mag": 3.0,
-    "spd": 10.0
+    "mnd": 11.0,
+    "spd": 10.0,
+    "vig": 10.0
    }
   },
   {
@@ -1074,26 +1154,32 @@
      "hp": 10.0,
      "level": 1.0,
      "mag": 12.0,
+     "mnd": 16.0,
      "mp": 16.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 10.0
     },
     {
      "atk": 5.0,
      "def": 7.0,
-     "hp": 15.0,
+     "hp": 16.0,
      "level": 2.0,
      "mag": 15.0,
+     "mnd": 19.0,
      "mp": 19.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 12.0
     },
     {
      "atk": 5.0,
      "def": 7.0,
-     "hp": 20.0,
+     "hp": 19.0,
      "level": 3.0,
      "mag": 18.0,
-     "mp": 23.0,
-     "spd": 10.0
+     "mnd": 22.0,
+     "mp": 22.0,
+     "spd": 10.0,
+     "vig": 13.0
     },
     {
      "atk": 5.0,
@@ -1101,62 +1187,76 @@
      "hp": 25.0,
      "level": 4.0,
      "mag": 21.0,
-     "mp": 26.0,
-     "spd": 10.0
+     "mnd": 25.0,
+     "mp": 25.0,
+     "spd": 10.0,
+     "vig": 15.0
     },
     {
      "atk": 5.0,
      "def": 7.0,
-     "hp": 30.0,
+     "hp": 28.0,
      "level": 5.0,
      "mag": 24.0,
-     "mp": 30.0,
-     "spd": 10.0
+     "mnd": 28.0,
+     "mp": 28.0,
+     "spd": 10.0,
+     "vig": 16.0
     },
     {
      "atk": 5.0,
      "def": 7.0,
-     "hp": 35.0,
+     "hp": 34.0,
      "level": 6.0,
      "mag": 27.0,
-     "mp": 33.0,
-     "spd": 10.0
+     "mnd": 31.0,
+     "mp": 31.0,
+     "spd": 10.0,
+     "vig": 18.0
     },
     {
      "atk": 5.0,
      "def": 7.0,
-     "hp": 40.0,
+     "hp": 37.0,
      "level": 7.0,
      "mag": 30.0,
-     "mp": 37.0,
-     "spd": 10.0
+     "mnd": 34.0,
+     "mp": 34.0,
+     "spd": 10.0,
+     "vig": 19.0
     },
     {
      "atk": 5.0,
      "def": 7.0,
-     "hp": 45.0,
+     "hp": 43.0,
      "level": 8.0,
      "mag": 33.0,
-     "mp": 40.0,
-     "spd": 10.0
+     "mnd": 37.0,
+     "mp": 37.0,
+     "spd": 10.0,
+     "vig": 21.0
     },
     {
      "atk": 5.0,
      "def": 7.0,
-     "hp": 50.0,
+     "hp": 46.0,
      "level": 9.0,
      "mag": 36.0,
-     "mp": 44.0,
-     "spd": 10.0
+     "mnd": 40.0,
+     "mp": 40.0,
+     "spd": 10.0,
+     "vig": 22.0
     },
     {
      "atk": 5.0,
      "def": 7.0,
-     "hp": 55.0,
+     "hp": 52.0,
      "level": 10.0,
      "mag": 39.0,
-     "mp": 47.0,
-     "spd": 10.0
+     "mnd": 43.0,
+     "mp": 43.0,
+     "spd": 10.0,
+     "vig": 24.0
     }
    ],
    "free_default": 3.0,
@@ -1166,7 +1266,9 @@
       "atk": 0.0,
       "def": 0.0,
       "mag": 2.0,
-      "spd": 0.0
+      "mnd": 3.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 2.0
     },
@@ -1175,7 +1277,9 @@
       "atk": 0.0,
       "def": 0.0,
       "mag": 2.0,
-      "spd": 0.0
+      "mnd": 3.0,
+      "spd": 0.0,
+      "vig": 1.0
      },
      "level": 3.0
     },
@@ -1184,7 +1288,9 @@
       "atk": 0.0,
       "def": 0.0,
       "mag": 2.0,
-      "spd": 0.0
+      "mnd": 3.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 4.0
     },
@@ -1193,7 +1299,9 @@
       "atk": 0.0,
       "def": 0.0,
       "mag": 2.0,
-      "spd": 0.0
+      "mnd": 3.0,
+      "spd": 0.0,
+      "vig": 1.0
      },
      "level": 5.0
     },
@@ -1202,7 +1310,9 @@
       "atk": 0.0,
       "def": 0.0,
       "mag": 2.0,
-      "spd": 0.0
+      "mnd": 3.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 6.0
     },
@@ -1211,7 +1321,9 @@
       "atk": 0.0,
       "def": 0.0,
       "mag": 2.0,
-      "spd": 0.0
+      "mnd": 3.0,
+      "spd": 0.0,
+      "vig": 1.0
      },
      "level": 7.0
     },
@@ -1220,7 +1332,9 @@
       "atk": 0.0,
       "def": 0.0,
       "mag": 2.0,
-      "spd": 0.0
+      "mnd": 3.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 8.0
     },
@@ -1229,7 +1343,9 @@
       "atk": 0.0,
       "def": 0.0,
       "mag": 2.0,
-      "spd": 0.0
+      "mnd": 3.0,
+      "spd": 0.0,
+      "vig": 1.0
      },
      "level": 9.0
     },
@@ -1238,7 +1354,9 @@
       "atk": 0.0,
       "def": 0.0,
       "mag": 2.0,
-      "spd": 0.0
+      "mnd": 3.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 10.0
     }
@@ -1251,7 +1369,9 @@
     "atk": 5.0,
     "def": 7.0,
     "mag": 12.0,
-    "spd": 10.0
+    "mnd": 16.0,
+    "spd": 10.0,
+    "vig": 10.0
    }
   },
   {
@@ -1264,8 +1384,10 @@
      "hp": 10.0,
      "level": 1.0,
      "mag": 3.0,
+     "mnd": 11.0,
      "mp": 11.0,
-     "spd": 9.0
+     "spd": 9.0,
+     "vig": 10.0
     },
     {
      "atk": 10.0,
@@ -1273,8 +1395,10 @@
      "hp": 16.0,
      "level": 2.0,
      "mag": 3.0,
+     "mnd": 12.0,
      "mp": 12.0,
-     "spd": 10.0
+     "spd": 10.0,
+     "vig": 12.0
     },
     {
      "atk": 11.0,
@@ -1282,8 +1406,10 @@
      "hp": 22.0,
      "level": 3.0,
      "mag": 4.0,
-     "mp": 14.0,
-     "spd": 10.0
+     "mnd": 13.0,
+     "mp": 13.0,
+     "spd": 10.0,
+     "vig": 14.0
     },
     {
      "atk": 13.0,
@@ -1291,8 +1417,10 @@
      "hp": 28.0,
      "level": 4.0,
      "mag": 4.0,
-     "mp": 15.0,
-     "spd": 11.0
+     "mnd": 14.0,
+     "mp": 14.0,
+     "spd": 11.0,
+     "vig": 16.0
     },
     {
      "atk": 14.0,
@@ -1300,8 +1428,10 @@
      "hp": 34.0,
      "level": 5.0,
      "mag": 5.0,
+     "mnd": 16.0,
      "mp": 16.0,
-     "spd": 11.0
+     "spd": 11.0,
+     "vig": 18.0
     },
     {
      "atk": 16.0,
@@ -1309,8 +1439,10 @@
      "hp": 40.0,
      "level": 6.0,
      "mag": 5.0,
+     "mnd": 17.0,
      "mp": 17.0,
-     "spd": 12.0
+     "spd": 12.0,
+     "vig": 20.0
     },
     {
      "atk": 17.0,
@@ -1318,8 +1450,10 @@
      "hp": 46.0,
      "level": 7.0,
      "mag": 6.0,
-     "mp": 19.0,
-     "spd": 12.0
+     "mnd": 18.0,
+     "mp": 18.0,
+     "spd": 12.0,
+     "vig": 22.0
     },
     {
      "atk": 19.0,
@@ -1327,8 +1461,10 @@
      "hp": 52.0,
      "level": 8.0,
      "mag": 6.0,
-     "mp": 20.0,
-     "spd": 13.0
+     "mnd": 19.0,
+     "mp": 19.0,
+     "spd": 13.0,
+     "vig": 24.0
     },
     {
      "atk": 20.0,
@@ -1336,8 +1472,10 @@
      "hp": 58.0,
      "level": 9.0,
      "mag": 7.0,
+     "mnd": 21.0,
      "mp": 21.0,
-     "spd": 13.0
+     "spd": 13.0,
+     "vig": 26.0
     },
     {
      "atk": 22.0,
@@ -1345,8 +1483,10 @@
      "hp": 64.0,
      "level": 10.0,
      "mag": 7.0,
+     "mnd": 22.0,
      "mp": 22.0,
-     "spd": 14.0
+     "spd": 14.0,
+     "vig": 28.0
     }
    ],
    "free_default": 0.0,
@@ -1356,7 +1496,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 1.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 2.0
     },
@@ -1365,7 +1507,9 @@
       "atk": 0.0,
       "def": 1.0,
       "mag": 1.0,
-      "spd": 0.0
+      "mnd": 1.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 3.0
     },
@@ -1374,7 +1518,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 1.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 4.0
     },
@@ -1383,7 +1529,9 @@
       "atk": 0.0,
       "def": 1.0,
       "mag": 1.0,
-      "spd": 0.0
+      "mnd": 2.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 5.0
     },
@@ -1392,7 +1540,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 1.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 6.0
     },
@@ -1401,7 +1551,9 @@
       "atk": 0.0,
       "def": 1.0,
       "mag": 1.0,
-      "spd": 0.0
+      "mnd": 1.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 7.0
     },
@@ -1410,7 +1562,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 1.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 8.0
     },
@@ -1419,7 +1573,9 @@
       "atk": 0.0,
       "def": 1.0,
       "mag": 1.0,
-      "spd": 0.0
+      "mnd": 2.0,
+      "spd": 0.0,
+      "vig": 2.0
      },
      "level": 9.0
     },
@@ -1428,7 +1584,9 @@
       "atk": 1.0,
       "def": 0.0,
       "mag": 0.0,
-      "spd": 1.0
+      "mnd": 1.0,
+      "spd": 1.0,
+      "vig": 2.0
      },
      "level": 10.0
     }
@@ -1441,7 +1599,9 @@
     "atk": 8.0,
     "def": 8.0,
     "mag": 3.0,
-    "spd": 9.0
+    "mnd": 11.0,
+    "spd": 9.0,
+    "vig": 10.0
    }
   }
  ],
@@ -1450,8 +1610,7 @@
   "cards": {
    "max_skills": 3.0,
    "offer_size": 3.0,
-   "pity_offers": 2.0,
-   "skip_gold": 5.0
+   "pity_offers": 2.0
   },
   "crit_chance_max": 0.5,
   "crit_mult": 2.0,
@@ -1501,7 +1660,9 @@
    "atk": 0.0,
    "def": 1.0,
    "mag": 3.0,
-   "spd": 2.0
+   "mnd": 5.0,
+   "spd": 2.0,
+   "vig": 4.0
   },
   "stat_max": 60.0,
   "stat_min": 1.0,
@@ -2395,8 +2556,8 @@
    "level": 10.0,
    "loot_key": "enemy_boss",
    "mp_gain": 3.0,
-   "name": "The Pale Choirbeast",
-   "name_en": "The Pale Choirbeast",
+   "name": "Pale Choirbeast",
+   "name_en": "Pale Choirbeast",
    "skills": [
     25.0,
     26.0,
@@ -2504,12 +2665,13 @@
    },
    "equip_slot": "weapon",
    "id": 1.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Wooden Sword",
    "name_en": "Wooden Sword",
    "passive_desc": [
     "Steady Strike",
-    "MISS->BAD, BAD->OKAY (1/turn)"
+    "A [t]Weak[/t] press counts as [t]OK[/t] (once per turn)"
    ],
    "passive_desc_en": [
     "Steady Strike",
@@ -2546,16 +2708,17 @@
    },
    "equip_slot": "weapon",
    "id": 2.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Iron Sword",
    "name_en": "Iron Sword",
    "passive_desc": [
     "Sunder Edge",
-    "1st hit: -1 DEF for 2 turns"
+    "Your first hit cuts the enemy's [t]DEF[/t] by 1 for 2 turns"
    ],
    "passive_desc_en": [
     "Sunder Edge",
-    "1st hit: -1 DEF for 2 turns"
+    "Your first hit cuts the enemy's [t]DEF[/t] by 1 for 2 turns"
    ],
    "passive_id": "sunder_edge",
    "passive_params": {
@@ -2589,16 +2752,17 @@
    },
    "equip_slot": "weapon",
    "id": 3.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Platinum Sword",
    "name_en": "Platinum Sword",
    "passive_desc": [
     "Executioner",
-    "+35% damage vs <35% HP"
+    "+35% damage to enemies under 35% [t]HP[/t]"
    ],
    "passive_desc_en": [
     "Executioner",
-    "+35% damage vs <35% HP"
+    "+35% damage to enemies under 35% [t]HP[/t]"
    ],
    "passive_id": "executioner",
    "passive_params": {
@@ -2632,12 +2796,13 @@
    },
    "equip_slot": "weapon",
    "id": 4.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Wooden Bow",
    "name_en": "Wooden Bow",
    "passive_desc": [
     "Aim Assist",
-    "GOOD->PERFECT (1/turn)"
+    "A [t]Good[/t] press counts as [a]Perfect[/a] (once per turn)"
    ],
    "passive_desc_en": [
     "Aim Assist",
@@ -2674,16 +2839,17 @@
    },
    "equip_slot": "weapon",
    "id": 5.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Iron Bow",
    "name_en": "Iron Bow",
    "passive_desc": [
     "Pinning Shot",
-    "GOOD+: may Stun (cd 3 turns)"
+    "A [t]Good[/t] or [a]Perfect[/a] press may [t]Stun[/t] the enemy (3-turn cooldown)"
    ],
    "passive_desc_en": [
     "Pinning Shot",
-    "GOOD+: may Stun (cd 3 turns)"
+    "A [t]Good[/t] or [a]Perfect[/a] press may [t]Stun[/t] the enemy (3-turn cooldown)"
    ],
    "passive_id": "pinning_shot",
    "passive_params": {
@@ -2719,16 +2885,17 @@
    },
    "equip_slot": "weapon",
    "id": 6.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Platinum Bow",
    "name_en": "Platinum Bow",
    "passive_desc": [
     "Predator",
-    "+30% damage vs statused foes"
+    "+30% damage to enemies with a status"
    ],
    "passive_desc_en": [
     "Predator",
-    "+30% damage vs statused foes"
+    "+30% damage to enemies with a status"
    ],
    "passive_id": "predator",
    "passive_params": {
@@ -2762,12 +2929,13 @@
    },
    "equip_slot": "weapon",
    "id": 7.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Wooden Staff",
    "name_en": "Wooden Staff",
    "passive_desc": [
     "Mana Trickle",
-    "+1 MP every 2 turns"
+    "+1 [t]MP[/t] every 2 turns"
    ],
    "passive_desc_en": [
     "Mana Trickle",
@@ -2805,16 +2973,17 @@
    },
    "equip_slot": "weapon",
    "id": 8.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Ruby Staff",
    "name_en": "Ruby Staff",
    "passive_desc": [
     "Ember Lens",
-    "+15% skill damage, +1 status turn"
+    "Skills deal +15% damage; your statuses last 1 turn longer"
    ],
    "passive_desc_en": [
     "Ember Lens",
-    "+15% skill damage, +1 status turn"
+    "Skills deal +15% damage; your statuses last 1 turn longer"
    ],
    "passive_id": "ember_lens",
    "passive_params": {
@@ -2848,16 +3017,17 @@
    },
    "equip_slot": "weapon",
    "id": 9.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Diamond Staff",
    "name_en": "Diamond Staff",
    "passive_desc": [
     "Arcane Surge",
-    "+25% skill damage, PERFECT +1 MP"
+    "Skills deal +25% damage; a [a]Perfect[/a] press gives +1 [t]MP[/t]"
    ],
    "passive_desc_en": [
     "Arcane Surge",
-    "+25% skill damage, PERFECT +1 MP"
+    "Skills deal +25% damage; a [a]Perfect[/a] press gives +1 [t]MP[/t]"
    ],
    "passive_id": "arcane_surge",
    "passive_params": {
@@ -2891,6 +3061,7 @@
    },
    "equip_slot": "",
    "id": 10.0,
+   "loc_serial": 1.0,
    "max_stack": 99.0,
    "name": "HP Potion Lv1",
    "name_en": "HP Potion Lv1",
@@ -2923,6 +3094,7 @@
    },
    "equip_slot": "",
    "id": 11.0,
+   "loc_serial": 1.0,
    "max_stack": 99.0,
    "name": "MP Potion Lv1",
    "name_en": "MP Potion Lv1",
@@ -2955,6 +3127,7 @@
    },
    "equip_slot": "",
    "id": 12.0,
+   "loc_serial": 1.0,
    "max_stack": 99.0,
    "name": "Antidote",
    "name_en": "Antidote",
@@ -2985,6 +3158,7 @@
    },
    "equip_slot": "",
    "id": 13.0,
+   "loc_serial": 1.0,
    "max_stack": 99.0,
    "name": "Bandage",
    "name_en": "Bandage",
@@ -3015,6 +3189,7 @@
    },
    "equip_slot": "",
    "id": 14.0,
+   "loc_serial": 1.0,
    "max_stack": 99.0,
    "name": "HP Potion Lv2",
    "name_en": "HP Potion Lv2",
@@ -3047,6 +3222,7 @@
    },
    "equip_slot": "",
    "id": 15.0,
+   "loc_serial": 1.0,
    "max_stack": 99.0,
    "name": "HP Potion Lv3",
    "name_en": "HP Potion Lv3",
@@ -3079,6 +3255,7 @@
    },
    "equip_slot": "",
    "id": 17.0,
+   "loc_serial": 1.0,
    "max_stack": 99.0,
    "name": "MP Potion Lv2",
    "name_en": "MP Potion Lv2",
@@ -3111,6 +3288,7 @@
    },
    "equip_slot": "",
    "id": 18.0,
+   "loc_serial": 1.0,
    "max_stack": 99.0,
    "name": "MP Potion Lv3",
    "name_en": "MP Potion Lv3",
@@ -3147,16 +3325,17 @@
    },
    "equip_slot": "body",
    "id": 20.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Leather Armor",
    "name_en": "Leather Armor",
    "passive_desc": [
     "First Impact",
-    "1st hit -3 damage (each battle)"
+    "The first hit you take deals 3 less damage (once per battle)"
    ],
    "passive_desc_en": [
     "First Impact",
-    "1st hit -3 damage (each battle)"
+    "The first hit you take deals 3 less damage (once per battle)"
    ],
    "passive_id": "first_impact",
    "passive_params": {
@@ -3193,16 +3372,17 @@
    },
    "equip_slot": "body",
    "id": 21.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Iron Armor",
    "name_en": "Iron Armor",
    "passive_desc": [
     "Brace",
-    "After hit: next hit -40% (cd2)"
+    "After you are hit, the next hit deals 40% less (2-turn cooldown)"
    ],
    "passive_desc_en": [
     "Brace",
-    "After hit: next hit -40% (cd2)"
+    "After you are hit, the next hit deals 40% less (2-turn cooldown)"
    ],
    "passive_id": "brace",
    "passive_params": {
@@ -3240,16 +3420,17 @@
    },
    "equip_slot": "body",
    "id": 22.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Platinum Armor",
    "name_en": "Platinum Armor",
    "passive_desc": [
     "Debt Plate",
-    "Big hits reduced by 30%"
+    "Big hits deal 30% less damage"
    ],
    "passive_desc_en": [
     "Debt Plate",
-    "Big hits reduced by 30%"
+    "Big hits deal 30% less damage"
    ],
    "passive_id": "debt_plate",
    "passive_params": {
@@ -3285,16 +3466,17 @@
    },
    "equip_slot": "body",
    "id": 23.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Cloth Robe",
    "name_en": "Cloth Robe",
    "passive_desc": [
     "Thin Veil",
-    "+1 MP/2 turns, take +1 phys damage"
+    "+1 [t]MP[/t] every 2 turns, but physical hits deal 1 more damage"
    ],
    "passive_desc_en": [
     "Thin Veil",
-    "+1 MP/2 turns, take +1 phys damage"
+    "+1 [t]MP[/t] every 2 turns, but physical hits deal 1 more damage"
    ],
    "passive_id": "thin_veil",
    "passive_params": {
@@ -3331,16 +3513,17 @@
    },
    "equip_slot": "body",
    "id": 24.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Silk Robe",
    "name_en": "Silk Robe",
    "passive_desc": [
     "Silk Flow",
-    "+10% skill damage, +1 status turn"
+    "Skills deal +10% damage; your statuses last 1 turn longer"
    ],
    "passive_desc_en": [
     "Silk Flow",
-    "+10% skill damage, +1 status turn"
+    "Skills deal +10% damage; your statuses last 1 turn longer"
    ],
    "passive_id": "silk_flow",
    "passive_params": {
@@ -3376,16 +3559,17 @@
    },
    "equip_slot": "body",
    "id": 25.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Mithril Robe",
    "name_en": "Mithril Robe",
    "passive_desc": [
     "Mirror Stitch",
-    "Reflect 1st status (cost 1 MP)"
+    "Reflects the first status cast on you (once per battle, costs 1 [t]MP[/t])"
    ],
    "passive_desc_en": [
     "Mirror Stitch",
-    "Reflect 1st status (cost 1 MP)"
+    "Reflects the first status cast on you (once per battle, costs 1 [t]MP[/t])"
    ],
    "passive_id": "mirror_stitch",
    "passive_params": {
@@ -3420,6 +3604,7 @@
    "icon_kind": "throwable",
    "icon_sub": 0.0,
    "id": 30.0,
+   "loc_serial": 1.0,
    "max_stack": 8.0,
    "name": "Firebomb",
    "name_en": "Firebomb",
@@ -3458,6 +3643,7 @@
    "icon_kind": "throwable",
    "icon_sub": 1.0,
    "id": 31.0,
+   "loc_serial": 1.0,
    "max_stack": 8.0,
    "name": "Poison Pot",
    "name_en": "Poison Pot",
@@ -3496,6 +3682,7 @@
    "icon_kind": "throwable",
    "icon_sub": 2.0,
    "id": 32.0,
+   "loc_serial": 1.0,
    "max_stack": 8.0,
    "name": "Ice Flask",
    "name_en": "Ice Flask",
@@ -3534,6 +3721,7 @@
    "icon_kind": "throwable",
    "icon_sub": 3.0,
    "id": 33.0,
+   "loc_serial": 1.0,
    "max_stack": 8.0,
    "name": "Smoke Bomb",
    "name_en": "Smoke Bomb",
@@ -3572,6 +3760,7 @@
    "icon_kind": "accessory",
    "icon_sub": 0.0,
    "id": 40.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Copper Ring",
    "name_en": "Copper Ring",
@@ -3603,6 +3792,7 @@
    "icon_kind": "accessory",
    "icon_sub": 0.0,
    "id": 41.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Guard Ring",
    "name_en": "Guard Ring",
@@ -3634,6 +3824,7 @@
    "icon_kind": "accessory",
    "icon_sub": 1.0,
    "id": 42.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Swift Charm",
    "name_en": "Swift Charm",
@@ -3665,6 +3856,7 @@
    "icon_kind": "accessory",
    "icon_sub": 1.0,
    "id": 43.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Sage Charm",
    "name_en": "Sage Charm",
@@ -3696,6 +3888,7 @@
    "icon_kind": "accessory",
    "icon_sub": 1.0,
    "id": 44.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Stone Charm",
    "name_en": "Stone Charm",
@@ -3739,12 +3932,13 @@
    "icon_kind": "accessory",
    "icon_sub": 0.0,
    "id": 45.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Spring Ring",
    "name_en": "Spring Ring",
    "passive_desc": [
     "Spring",
-    "+1 MP every 3 turns"
+    "+1 [t]MP[/t] every 3 turns"
    ],
    "passive_desc_en": [
     "Spring",
@@ -3783,6 +3977,7 @@
    "icon_kind": "accessory",
    "icon_sub": 1.0,
    "id": 46.0,
+   "loc_serial": 1.0,
    "max_stack": 1.0,
    "name": "Lucky Charm",
    "name_en": "Lucky Charm",
@@ -3968,26 +4163,19 @@
     {
      "item_id": 1.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 1.0,
      "weight": 6.0
     },
     {
      "item_id": 4.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 1.0,
      "weight": 6.0
     }
    ],
    "chest": [
-    {
-     "item_id": 0.0,
-     "qty_max": 0.0,
-     "qty_min": 0.0,
-     "tier": 1.0,
-     "weight": 6.0
-    },
     {
      "item_id": 10.0,
      "qty_max": 3.0,
@@ -4019,35 +4207,35 @@
     {
      "item_id": 1.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 1.0,
      "weight": 8.0
     },
     {
      "item_id": 4.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 1.0,
      "weight": 8.0
     },
     {
      "item_id": 7.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 1.0,
      "weight": 8.0
     },
     {
      "item_id": 20.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 1.0,
      "weight": 6.0
     },
     {
      "item_id": 23.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 1.0,
      "weight": 6.0
     },
@@ -4068,35 +4256,35 @@
     {
      "item_id": 2.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 2.0,
      "weight": 7.0
     },
     {
      "item_id": 5.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 2.0,
      "weight": 7.0
     },
     {
      "item_id": 8.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 2.0,
      "weight": 6.0
     },
     {
      "item_id": 21.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 2.0,
      "weight": 6.0
     },
     {
      "item_id": 24.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 2.0,
      "weight": 6.0
     },
@@ -4117,35 +4305,35 @@
     {
      "item_id": 3.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 3.0,
      "weight": 5.0
     },
     {
      "item_id": 6.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 3.0,
      "weight": 5.0
     },
     {
      "item_id": 9.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 3.0,
      "weight": 4.0
     },
     {
      "item_id": 22.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 3.0,
      "weight": 4.0
     },
     {
      "item_id": 25.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 3.0,
      "weight": 4.0
     }
@@ -4196,28 +4384,28 @@
     {
      "item_id": 2.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 2.0,
      "weight": 4.0
     },
     {
      "item_id": 5.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 2.0,
      "weight": 4.0
     },
     {
      "item_id": 3.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 3.0,
      "weight": 2.0
     },
     {
      "item_id": 6.0,
      "qty_max": 1.0,
-     "qty_min": 0.0,
+     "qty_min": 1.0,
      "tier": 3.0,
      "weight": 2.0
     },
@@ -4235,6 +4423,59 @@
      "tier": 2.0,
      "weight": 4.0
     }
+   ]
+  },
+  "tier_odds": {
+   "barrel": [
+    [
+     0.95,
+     0.05,
+     0.0
+    ],
+    [
+     0.85,
+     0.15,
+     0.0
+    ],
+    [
+     0.74,
+     0.26,
+     0.0
+    ]
+   ],
+   "chest": [
+    [
+     0.87,
+     0.115,
+     0.015
+    ],
+    [
+     0.65,
+     0.285,
+     0.065
+    ],
+    [
+     0.43,
+     0.38,
+     0.19
+    ]
+   ],
+   "enemy": [
+    [
+     0.914,
+     0.084,
+     0.002
+    ],
+    [
+     0.754,
+     0.236,
+     0.01
+    ],
+    [
+     0.588,
+     0.376,
+     0.036
+    ]
    ]
   },
   "tier_weights": [
@@ -4625,12 +4866,6 @@
   {
    "acc": 0.0,
    "class_list": [],
-   "defence": {
-    "good_half_width": 120.0,
-    "ok_half_width": 200.0,
-    "perfect_half_width": 55.0,
-    "sweep_ms": 900.0
-   },
    "effect": "damage",
    "fx_frames": 12.0,
    "fx_speed": 0.2,
@@ -4652,7 +4887,7 @@
    "status_stacks": 2.0,
    "status_turns": 2.0,
    "target": 0.0,
-   "uses_defensive_qte": true
+   "uses_defensive_qte": false
   },
   {
    "acc": 0.0,
@@ -4683,12 +4918,6 @@
   {
    "acc": 0.0,
    "class_list": [],
-   "defence": {
-    "good_half_width": 115.0,
-    "ok_half_width": 190.0,
-    "perfect_half_width": 55.0,
-    "sweep_ms": 800.0
-   },
    "effect": "damage",
    "fx_frames": 12.0,
    "fx_speed": 0.2,
@@ -4709,7 +4938,7 @@
    "status_chance": 0.75,
    "status_turns": 3.0,
    "target": 0.0,
-   "uses_defensive_qte": true
+   "uses_defensive_qte": false
   },
   {
    "acc": 0.0,
@@ -4773,12 +5002,6 @@
   {
    "acc": 0.0,
    "class_list": [],
-   "defence": {
-    "good_half_width": 120.0,
-    "ok_half_width": 195.0,
-    "perfect_half_width": 55.0,
-    "sweep_ms": 1000.0
-   },
    "effect": "damage",
    "fx_frames": 12.0,
    "fx_speed": 0.2,
@@ -4799,7 +5022,7 @@
    "status_chance": 0.7,
    "status_turns": 2.0,
    "target": 0.0,
-   "uses_defensive_qte": true
+   "uses_defensive_qte": false
   },
   {
    "acc": 0.0,
@@ -5078,8 +5301,8 @@
    "status_chance": 1.0,
    "status_turns": 0.0,
    "target": 0.0,
-   "use_msg": "Your enchantments are snuffed out!",
-   "use_msg_en": "Your enchantments are snuffed out!"
+   "use_msg": "Your buffs are snuffed out!",
+   "use_msg_en": "Your buffs are snuffed out!"
   },
   {
    "acc": 0.0,
@@ -5169,7 +5392,7 @@
    "icon_subimg": 0.0,
    "id": 1.0,
    "max_stacks": 3.0,
-   "name": "Bleeding",
+   "name": "Bleed",
    "name_en": "Bleeding",
    "stackable": false,
    "stat_mods": {
@@ -5191,7 +5414,7 @@
    "icon_subimg": 0.0,
    "id": 2.0,
    "max_stacks": 1.0,
-   "name": "Burning",
+   "name": "Burn",
    "name_en": "Burning",
    "stackable": false,
    "stat_mods": {
@@ -5241,6 +5464,7 @@
    "id": 4.0,
    "name": "Guard",
    "name_en": "Guard",
+   "no_tick_on_apply": true,
    "stackable": false,
    "stat_mods": {
     "atk": 0.0,
@@ -5283,6 +5507,7 @@
    "id": 6.0,
    "name": "Evasion",
    "name_en": "Evasion",
+   "no_tick_on_apply": true,
    "stackable": false,
    "stat_mods": {
     "atk": 0.0,
@@ -5303,6 +5528,7 @@
    "id": 7.0,
    "name": "Take Aim",
    "name_en": "Take Aim",
+   "no_tick_on_apply": true,
    "stackable": false,
    "stat_mods": {
     "atk": 0.0,
@@ -5437,6 +5663,28 @@
     "mp_max": 0.0,
     "mp_min": 0.0
    }
+  },
+  {
+   "consume_on_hit": true,
+   "duration": 2.0,
+   "guard_mult": 0.5,
+   "id": 14.0,
+   "name": "Braced",
+   "name_en": "Braced",
+   "stackable": false,
+   "stat_mods": {
+    "atk": 0.0,
+    "def": 0.0,
+    "mag": 0.0,
+    "spd": 0.0
+   },
+   "tick": {
+    "hp_max": 0.0,
+    "hp_min": 0.0,
+    "mp_max": 0.0,
+    "mp_min": 0.0
+   },
+   "tick_on_enemy_turn": true
   }
  ],
  "version": 1.0

@@ -85,7 +85,7 @@ function Enemy_AutoResolveBuildMessage(_cfg, _result, _verb_prefix = undefined) 
     var stat_points = (variable_struct_exists(_result, "stat_points_gained")) ? max(0, round(real(_result.stat_points_gained))) : 0;
     if (levels > 0) {
         var lvl_msg = Loc_T("combat.msg.level_up", "Level up x{levels}!", { levels: levels });
-        // D143: the class's automatic gains are shown on the level-up screen (LevelUp_GrowthText), no longer listed here
+        // D143, D177: the class's gains are the gold rows of the level-up screen, never listed here
         if (stat_points == 1) lvl_msg += " (" + Loc_T("combat.msg.stat_point_one", "+{n} stat point", { n: stat_points }) + ")";
         else if (stat_points > 1) lvl_msg += " (" + Loc_T("combat.msg.stat_points_many", "+{n} stat points", { n: stat_points }) + ")";
         array_push(parts, lvl_msg);

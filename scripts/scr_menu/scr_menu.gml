@@ -1705,25 +1705,48 @@ function CardsUi_StatHelp(_stat_id) {
     return "";
 }
 
+// D177: the level-up screen. Rows ATK DEF SPD MAG VIG MND. The rows the class grows are gold and read "now > now + growth"; the others read only the number; the row under the
+// cursor adds its "+1" (CardsUi_StatRefresh, every frame). The details say what the stat does and Now / After (VIG: Max HP, MND: Max MP), with the class growth and the
+// point both counted. "Now" is the character as he is, "After" the preview of the level the screen is for (LevelUp_PreviewCharacter).
 function CardsUi_StatMenu() {
     var ch = GameState_Get().player_ch;
-    var opts = Cards_FreePointOptions(ch);   // D176: ATK DEF SPD MAG VIG MND
+    var pv = LevelUp_PreviewCharacter(ch);   // the level the screen is for, class growth in, the point not placed
     var plvl = LevelUp_PromptLevel(ch);   // hunt 7: a fight that gave several levels steps through each level's growth, oldest first
+    var ids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG, STAT_VIG, STAT_MND];
     var items = [];
-    for (var i = 0; i < array_length(opts); i++) {
-        var o = opts[i];
-        array_push(items, {
-            label: o.label, value: string(o.from) + " > " + string(o.to), help: CardsUi_StatHelp(o.stat),
-            lines: [ { label: Loc_T("cards.stat.now", "Now"), value: string(o.from) }, { label: Loc_T("cards.stat.after", "After"), value: string(o.to) } ],
-            stat: o.stat
-        });
+    var any_growth = false;
+    for (var i = 0; i < array_length(ids); i++) {
+        var sid = ids[i];
+        var key = Stat_Key(sid);
+        var now = variable_struct_get(ch.stats, key);
+        var grow = max(0, variable_struct_get(pv.stats, key) - now);
+        var after = StatClamp(variable_struct_get(pv.stats, key) + 1);   // growth and the point
+        var lines = [];
+        if (sid == STAT_VIG) lines = [ { label: Loc_T("cards.stat.hp_now", "Max HP Now"), value: string(ch.max_hp) }, { label: Loc_T("cards.stat.hp_after", "Max HP After"), value: string(Resource_MaxHpOfVig(after)) } ];
+        else if (sid == STAT_MND) lines = [ { label: Loc_T("cards.stat.mp_now", "Max MP Now"), value: string(ch.max_mp) }, { label: Loc_T("cards.stat.mp_after", "Max MP After"), value: string(Resource_MaxMpOfMnd(after)) } ];
+        else lines = [ { label: Loc_T("cards.stat.now", "Now"), value: string(now) }, { label: Loc_T("cards.stat.after", "After"), value: string(after) } ];
+        var row = { label: Stat_ShortName(sid), value: "", help: CardsUi_StatHelp(sid), lines: lines, stat: sid, now: now, grow: grow };
+        if (grow > 0) {
+            row.col = UI_C_MERCHANT_GOLD;
+            any_growth = true;
+        }
+        array_push(items, row);
     }
     var m = Ui_MenuNew("cards_stat", items, {
         on_confirm: CardsUi_StatConfirm, on_back: CardsUi_NoBack,
-        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(plvl) }), note: LevelUp_GrowthText(ch.class_id, plvl), anchor: "center", details: true }
+        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(plvl) }), note: any_growth ? Loc_T("levelup.legend", "Gold = your class grows these") : "", note_col: UI_C_MERCHANT_GOLD, anchor: "center", details: true }
     });
     Ui_MenuFixCursor(m, clamp(DB_PlayerClass(ch.class_id).free_default, 0, 5));   // the class's usual stat first
+    CardsUi_StatRefresh(m);
     return m;
+}
+
+// The rows' values follow the cursor: the row under it shows its +1. Called when the menu is made and every frame it is drawn.
+function CardsUi_StatRefresh(_m) {
+    for (var i = 0; i < array_length(_m.items); i++) {
+        var it = _m.items[i];
+        it.value = Cards_StatRowValue(it.now, it.grow, i == _m.cursor);
+    }
 }
 
 function CardsUi_StatConfirm(_m, _i) {
@@ -2029,6 +2052,7 @@ function CardsUi_Draw() {
     UI_SetFont();
     draw_set_alpha(1);
     Ui_DimBackdrop(UI_DIM_SCREEN * a);
+    if (u.kind == "stat" && is_struct(Ui_StackTop(u.stk)) && Ui_StackTop(u.stk).id == "cards_stat") CardsUi_StatRefresh(Ui_StackTop(u.stk));   // D177: the row under the cursor shows its +1
     if (u.kind == "cards") CardsUi_DrawPick(u, a);
     else Ui_StackDraw(u.stk, 0.5);
     draw_set_alpha(1);
@@ -5239,7 +5263,9 @@ function Ui_RowStyle(_row, _sel = false) {
     var kd = variable_struct_exists(_row, "kind") ? _row.kind : "button";
     if (kd == "head") return { text: UI_C_LIGHTEST, strip: -1, rule: UI_C_LIGHT };
     var dim = variable_struct_exists(_row, "dim") && _row.dim;
-    return { text: Ui_RowColor(_sel, Ui_ItemEnabled(_row), dim), strip: -1, rule: -1 };
+    var txt = Ui_RowColor(_sel, Ui_ItemEnabled(_row), dim);
+    if (variable_struct_exists(_row, "col") && Ui_ItemEnabled(_row)) txt = _row.col;   // D177: a row with a colour of its own (the level-up screen's gold growth rows), selected or not
+    return { text: txt, strip: -1, rule: -1 };
 }
 
 // The header's place inside its row: the whole width, a gap of one pixel unit above it unless it is the first row of the list. Pure. { x, y, w, h }
@@ -6277,7 +6303,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         ty0 += header_h;
     }
     if (L.note != "") {
-        Ui_Text(x0, ty0, Ui_FitText(L.note, x1 - x0), UI_C_LIGHT);
+        Ui_Text(x0, ty0, Ui_FitText(L.note, x1 - x0), variable_struct_exists(L, "note_col") ? L.note_col : UI_C_LIGHT);
         ty0 += note_h;
     }
     var rows_y0 = ty0;

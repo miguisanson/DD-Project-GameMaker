@@ -9988,21 +9988,7 @@ function Test_Suite_LevelUpGrowth() {
     if (_own) global.display = { layout: Display_CalcLayout(480, 432), apply_count: 0 };
     var _f0 = draw_get_font();
 
-    // ---- the growth line, class by class ----
-    Test_Eq("D143 Knight growth line (D176: with VIG and MND)", LevelUp_GrowthText(CLASS_KNIGHT, 2), "Knight growth: ATK +1, DEF +1, VIG +2, MND +1");
-    Test_Eq("D143 Knight growth line on level 7 (VIG +3)", LevelUp_GrowthText(CLASS_KNIGHT, 7), "Knight growth: ATK +1, DEF +1, VIG +3, MND +1");
-    Test_Eq("D143 Archer growth line", LevelUp_GrowthText(CLASS_ARCHER, 2), "Archer growth: ATK +1, SPD +1, VIG +2, MND +2");
-    Test_Eq("D143 Mage growth line", LevelUp_GrowthText(CLASS_MAGE, 2), "Mage growth: MAG +2, VIG +2, MND +3");
-    // Nobody rotates (D83/D111): the point that cycles ATK, DEF, SPD, MAG from level 2, plus the one two steps further on
-    Test_Eq("D143 Nobody growth line at level 2", LevelUp_GrowthText(CLASS_NOBODY, 2), "Nobody growth: ATK +1, SPD +1, VIG +2, MND +1");
-    Test_Eq("D143 Nobody growth line at level 3", LevelUp_GrowthText(CLASS_NOBODY, 3), "Nobody growth: DEF +1, MAG +1, VIG +2, MND +1");
-    Test_Eq("D143 Nobody growth line at level 4", LevelUp_GrowthText(CLASS_NOBODY, 4), "Nobody growth: ATK +1, SPD +1, VIG +2, MND +1");
-    Test_Eq("D143 Nobody growth line at level 5", LevelUp_GrowthText(CLASS_NOBODY, 5), "Nobody growth: DEF +1, MAG +1, VIG +2, MND +2");
-    Test_Eq("D143 an unknown class has no growth line", LevelUp_GrowthText(99, 2), "");
-    Loc_SetLanguage("ko");
-    Test_True("D143 the growth line resolves in Korean, not the English fallback", Loc_GetRaw("levelup.growth", "ko") != "{class} growth: {gains}" && Loc_GetRaw("levelup.growth", "ko") != "");
-    Test_True("D143 the Korean growth line is not the English one", LevelUp_GrowthText(CLASS_KNIGHT, 2) != "Knight growth: ATK +1, DEF +1, VIG +2, MND +1");
-    Loc_SetLanguage("en");
+    // ---- the growth is the gold rows of the screen now (D177), not a line of text: Test_LvScreen checks them class by class ----
 
     // ---- the free-point menu: ATK DEF SPD MAG VIG MND (D176: VIG and MND replace the Max HP +3 / Max MP +2 rows) ----
     var _kn = Test_CardPlayer(CLASS_KNIGHT);
@@ -10057,11 +10043,11 @@ function Test_Suite_LevelUpGrowth() {
 
     // ---- the screen shows the growth line and the six rows ----
     _gs.run = Run_Create(5);
-    var _lv = LevelUp_ApplyLevel(Test_CardPlayer(CLASS_KNIGHT));
+    var _lv = Player_AddExp(Test_CardPlayer(CLASS_KNIGHT), Exp_NextLevel(1));   // D177: a level won in a run is owed until the screen is answered
     _gs.player_ch = _lv;
     var _menu = CardsUi_StatMenu();
     Test_Eq("D143 the free-point screen has six rows", array_length(_menu.items), 6);
-    Test_Eq("D143 the free-point screen shows the class growth line", _menu.layout.note, "Knight growth: ATK +1, DEF +1, VIG +2, MND +1");
+    Test_Eq("D143 the free-point screen shows the gold legend (D177), no longer the class growth line", _menu.layout.note, "Gold = your class grows these");
     Test_Eq("D143 the free-point screen still opens first when a point is owed", Cards_NextOwed(_lv), "stat");
     var _mt = Ui_Metrics();
     var _mc = Ui_MenuMeasure(_menu, _mt);
@@ -13779,21 +13765,19 @@ function Test_Suite_Hunt7Prog() {
     // ---- 4. P3: a level-up that gives several levels steps through each level's growth (D143) ----
     _gs.run = Run_Create(31);
     var _lvn = CharacterCreate_Player(CLASS_NOBODY);
-    _lvn.exp = Exp_NextLevel(1) + Exp_NextLevel(2);
-    _lvn = LevelUp_FromExp(_lvn);
-    Test_True("h7prog levelup: (setup) one fight took the Nobody from level 1 to 3 with two points owed", _lvn.level == 3 && _lvn.stat_points == 2);
+    _lvn = Player_AddExp(_lvn, Exp_NextLevel(1) + Exp_NextLevel(2));
+    Test_True("h7prog levelup: (setup) one fight owes the Nobody two levels (D177: he is still level 1 until the screens are answered)", _lvn.level == 1 && _lvn.levels_owed == 2);
     _gs.player_ch = _lvn;
     var _m1 = CardsUi_StatMenu();
     Test_Eq("h7prog levelup: the first prompt is level 2", _m1.layout.title, "Level 2: Place 1 Point");
-    Test_Eq("h7prog levelup: with level 2's growth", _m1.layout.note, "Nobody growth: ATK +1, SPD +1, VIG +2, MND +1");
+    Test_Eq("h7prog levelup: with level 2's growth rows gold (ATK, SPD, VIG, MND)", Test_LvGoldRows(_m1), "ATK,SPD,VIG,MND");
     _lvn = Cards_PlaceStat(_lvn, STAT_ATK);
     _gs.player_ch = _lvn;
     var _m2 = CardsUi_StatMenu();
     Test_Eq("h7prog levelup: the second prompt is level 3", _m2.layout.title, "Level 3: Place 1 Point");
-    Test_Eq("h7prog levelup: with level 3's growth", _m2.layout.note, "Nobody growth: DEF +1, MAG +1, VIG +2, MND +1");
+    Test_Eq("h7prog levelup: with level 3's growth rows gold (DEF, MAG, VIG, MND)", Test_LvGoldRows(_m2), "DEF,MAG,VIG,MND");
     var _lvk = CharacterCreate_Player(CLASS_KNIGHT);
-    _lvk.exp = Exp_NextLevel(1) + Exp_NextLevel(2) + Exp_NextLevel(3);
-    _lvk = LevelUp_FromExp(_lvk);
+    _lvk = Player_AddExp(_lvk, Exp_NextLevel(1) + Exp_NextLevel(2) + Exp_NextLevel(3));
     _gs.player_ch = _lvk;
     var _ttl = [];
     for (var _p = 0; _p < 3; _p++) {

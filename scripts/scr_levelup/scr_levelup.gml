@@ -396,21 +396,12 @@ function Cards_ChestOpened(_ch) {
     return ch;
 }
 
-// D143: the line the level-up screen shows: what the class gains by itself at _level, e.g. "Knight growth: ATK +1, DEF +1" (Nobody's rotates, so the
-// level matters). "" for a class with no growth.
-function LevelUp_GrowthText(_class_id, _level) {
-    var g = LevelUp_ClassGrowthGain(_class_id, _level);
-    var keys = ["atk", "def", "spd", "mag", "vig", "mnd"];
-    var ids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG, STAT_VIG, STAT_MND];
-    var gains = "";
-    for (var i = 0; i < 6; i++) {
-        var n = variable_struct_get(g, keys[i]);
-        if (n <= 0) continue;
-        if (gains != "") gains += ", ";
-        gains += Loc_T("levelup.gain", "{stat} +{n}", { stat: Stat_ShortName(ids[i]), n: n });
-    }
-    if (gains == "") return "";
-    return Loc_T("levelup.growth", "{name} growth: {gains}", { name: DB_PlayerClass(_class_id).name, gains: gains });
+// D177: what a row of the level-up screen reads. A row the class grows shows "now > now + growth" (gold); a row it does not grow shows only the number; the row under the
+// cursor (keyboard or mouse) shows its "> +1" on top: a growth row "now > now + growth + 1", another "now > now + 1". Never past the stat maximum.
+function Cards_StatRowValue(_now, _grow, _hover) {
+    var g = max(0, _grow);
+    if (g <= 0 && !_hover) return string(_now);
+    return string(_now) + " > " + string(StatClamp(_now + g + (_hover ? 1 : 0)));
 }
 
 // Hunt 7 (D143): the level a free-point prompt is for. A fight that gives several levels owes one point per level and the prompts open one by one, so the
