@@ -152,6 +152,7 @@ function Test_RunAll() {
     Test_RunSuite("Review7", Test_Suite_Review7);
     Test_RunSuite("R3Cards", Test_Suite_R3Cards);
     Test_RunSuite("R3Menus", Test_Suite_R3Menus);
+    Test_RunSuite("Profiles", Test_Suite_Profiles);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -7536,7 +7537,7 @@ function Test_Suite_FairRng() {
     Test_True("R1 D123: floor 6 with 10 free slots always has exactly 2 elites", _two_ok);
 
     // ---- D125: run save version 2 ----
-    Test_Eq("R1 D125: the run save version is 2", RUN_SAVE_VERSION, 2);
+    Test_Eq("R1 D125: the run save version is 3 (saves1: summary fields)", RUN_SAVE_VERSION, 3);
 
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }
@@ -8359,7 +8360,7 @@ function Test_BagsGold() {
     _gs.run = Run_Create(2);
     RunSave_ApplyState(_old);
     Test_True("D126 gold: a save without the bags loads with empty ones", variable_struct_exists(_gs.run, "gold_bag") && is_array(_gs.run.gold_bag) && array_length(_gs.run.gold_bag) == 0);
-    Test_Eq("D126 gold: the run save version is still 2", RUN_SAVE_VERSION, 2);
+    Test_Eq("D126 gold: the run save version is 3 (saves1: summary fields)", RUN_SAVE_VERSION, 3);
 }
 
 function Test_BagsFind() {
@@ -9025,7 +9026,7 @@ function Test_Suite_EchoAfterClass() {
     var _gm_first = variable_struct_exists(_gm, "echo_offer") && array_length(_gm.echo_offer) > 0 ? _gm.echo_offer[0].id : -998;
     Test_Eq("D130 run save: the same first option", (variable_struct_exists(_back, "echo_offer") && array_length(_back.echo_offer) > 0) ? _back.echo_offer[0].id : -999, _gm_first);
     Test_Eq("D130 run save: the loaded character is still owed the pick", Cards_NextOwed(_back), "echo");
-    Test_Eq("D130 run save: the version is still 2", RUN_SAVE_VERSION, 2);
+    Test_Eq("D130 run save: the version is 3 (saves1: summary fields)", RUN_SAVE_VERSION, 3);
     _gs.player_ch = _old_pl;
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }
@@ -11835,8 +11836,8 @@ function Test_ClassMemMigration() {
     var _r = Profile_Load(_f);
     var _p = _r.profile;
     Test_Eq("H5 migration: a v1 file still loads (not rejected as old)", _r.status, "ok");
-    Test_Eq("H5 migration: the profile version is now 2", _p.profile_version, 2);
-    Test_Eq("H5 migration: PROFILE_VERSION is 2", PROFILE_VERSION, 2);
+    Test_Eq("H5 migration: the profile version is now 3 (saves1: name)", _p.profile_version, 3);
+    Test_Eq("H5 migration: PROFILE_VERSION is 3 (saves1: name)", PROFILE_VERSION, 3);
     Test_True("H5 migration: the skill memory exists and is empty", variable_struct_exists(_p, "skills_known") && is_struct(_p.skills_known) && array_length(variable_struct_get_names(_p.skills_known)) == 0);
     Test_Eq("H5 migration: deaths kept", _p.deaths, 4);
     Test_Eq("H5 migration: wins kept", _p.wins, 1);
@@ -11853,7 +11854,7 @@ function Test_ClassMemMigration() {
     Test_Eq("H5 migration: a v1 profile ignores a stray skills_known", array_length(variable_struct_get_names(_v1x.skills_known)), 0);
     // saved again it is a v2 file, and reads back the same
     Test_True("H5 migration: the migrated profile can be written", Profile_SaveTo(_f, _p));
-    Test_True("H5 migration: the file now says version 2", string_pos("\"profile_version\":2", Test_RawRead(_f)) > 0);
+    Test_True("H5 migration: the file now says version 3 (saves1: name)", string_pos("\"profile_version\":3", Test_RawRead(_f)) > 0);
     var _r2 = Profile_Load(_f);
     Test_True("H5 migration: the written v2 reads back with the same counters", _r2.status == "ok" && _r2.profile.deaths == 4 && _r2.profile.wins == 1 && _r2.profile.runs_started == 6 && array_length(_r2.profile.history) == 1);
     // 2. v2 round trip
@@ -11873,8 +11874,8 @@ function Test_ClassMemMigration() {
     Test_Eq("H5 normalize: a wrong-typed memory falls back to empty", array_length(variable_struct_get_names(_bad.skills_known)), 0);
     // a newer file is still refused
     Save_DeleteFileSet(_f);
-    Test_RawWrite(_f, json_stringify({ profile_version: 3, deaths: 1 }));
-    Test_Eq("H5 migration: version 3 is still newer", Profile_Load(_f).status, "newer");
+    Test_RawWrite(_f, json_stringify({ profile_version: 4, deaths: 1 }));
+    Test_Eq("H5 migration: version 4 is newer (saves1: was version 3)", Profile_Load(_f).status, "newer");
     Save_DeleteFileSet(_f);
 }
 
@@ -12935,10 +12936,10 @@ function Test_ChoiceSaveLoad() {
     Choice_Set(_w, "map_page", 1);
     Choice_Set(_w, "wake", 2);
     Test_True("D154 save: the profile writes", Profile_SaveTo(_f, _w));
-    Test_True("D154 save: the file still says version 2 (no format change)", string_pos("\"profile_version\":2", Test_RawRead(_f)) > 0);
+    Test_True("D154 save: the file says version 3 (saves1: name)", string_pos("\"profile_version\":3", Test_RawRead(_f)) > 0);
     var _r = Profile_Load(_f);
     Test_Eq("D154 save: reads back ok", _r.status, "ok");
-    Test_Eq("D154 save: PROFILE_VERSION is still 2", PROFILE_VERSION, 2);
+    Test_Eq("D154 save: PROFILE_VERSION is 3 (saves1: name)", PROFILE_VERSION, 3);
     Test_Eq("D154 load: the Stranger's answer survives", Choice_Get(_r.profile, "stranger"), 2);
     Test_Eq("D154 load: the merchant's answer survives", Choice_Get(_r.profile, "merchant"), 1);
     Test_Eq("D154 load: the note's answer survives", Choice_Get(_r.profile, "map_page"), 1);
@@ -14623,4 +14624,568 @@ function Test_R3Reset() {
     Test_True("r3 reset: the question has a Korean text", Loc_T("controls.reset_ask", "?") != "Reset every key to its default?" && Loc_T("controls.reset_ask", "?") != "?");
     Test_True("r3 reset: the already-defaults notice has a Korean text", Loc_T("controls.reset_same", "?") != "Keys were already the defaults." && Loc_T("controls.reset_same", "?") != "?");
     Loc_SetLanguage("en");
+}
+
+// ============================================================================================================
+// Packet saves1 (D175): up to 4 profiles, each with 3 save files. Every test runs in a sandbox: a file-name prefix of its own (global.save_prefix) and its own in-memory
+// profile index / profile, so the real scratch profile the other suites use is never touched. Expected values come from the packet brief, not from the code.
+// ============================================================================================================
+function Test_Suite_Profiles() {
+    Test_RunSuite("Profiles.versions", Test_ProfVersions);
+    Test_RunSuite("Profiles.create", Test_ProfCreateRun);
+    Test_RunSuite("Profiles.separate", Test_ProfSeparateRun);
+    Test_RunSuite("Profiles.delete", Test_ProfDeleteRun);
+    Test_RunSuite("Profiles.slots", Test_ProfSlotsRun);
+    Test_RunSuite("Profiles.slotdelete", Test_ProfSlotDeleteRun);
+    Test_RunSuite("Profiles.continue", Test_ProfContinueRun);
+    Test_RunSuite("Profiles.migrate", Test_ProfMigrateRun);
+    Test_RunSuite("Profiles.migrate_locked", Test_ProfMigrateLockedRun);
+    Test_RunSuite("Profiles.migrate_partial", Test_ProfMigratePartialRun);
+    Test_RunSuite("Profiles.index", Test_ProfIndexRun);
+    Test_RunSuite("Profiles.reset", Test_ProfResetRun);
+    Test_RunSuite("Profiles.runsummary", Test_ProfRunSummary);
+}
+
+function Test_ProfCreateRun() { Test_ProfRun("tp1_", Test_ProfCreate); }
+function Test_ProfSeparateRun() { Test_ProfRun("tp2_", Test_ProfSeparate); }
+function Test_ProfDeleteRun() { Test_ProfRun("tp3_", Test_ProfDelete); }
+function Test_ProfSlotsRun() { Test_ProfRun("tp4_", Test_ProfSlots); }
+function Test_ProfSlotDeleteRun() { Test_ProfRun("tp5_", Test_ProfSlotDelete); }
+function Test_ProfContinueRun() { Test_ProfRun("tp6_", Test_ProfContinue); }
+function Test_ProfMigrateRun() { Test_ProfRun("tp7_", Test_ProfMigrate); }
+function Test_ProfMigrateLockedRun() { Test_ProfRun("tp8_", Test_ProfMigrateLocked); }
+function Test_ProfMigratePartialRun() { Test_ProfRun("tp9_", Test_ProfMigratePartial); }
+function Test_ProfIndexRun() { Test_ProfRun("tpa_", Test_ProfIndex); }
+function Test_ProfResetRun() { Test_ProfRun("tpb_", Test_ProfReset); }
+
+// Runs _fn inside a sandbox with the given file prefix; always puts the globals back and removes the files.
+function Test_ProfRun(_prefix, _fn) {
+    var _saved = {
+        prefix: variable_global_exists("save_prefix") ? global.save_prefix : "",
+        index: variable_global_exists("profiles_index") ? global.profiles_index : undefined,
+        profile: variable_global_exists("profile") ? global.profile : undefined,
+        status: variable_global_exists("profile_status") ? global.profile_status : "missing",
+        slot: variable_global_exists("save_slot_active") ? global.save_slot_active : 0
+    };
+    Test_ProfClean(_prefix);
+    global.save_prefix = _prefix;
+    global.profiles_index = undefined;
+    global.profile = undefined;
+    global.profile_status = "missing";
+    global.save_slot_active = 0;
+    Loc_SetLanguage("en");
+    try {
+        _fn(_prefix);
+    } catch (_e) {
+        global.test.errors++;
+        Test_Log("[TEST] ERROR profiles sandbox " + _prefix + " " + string(_e.message));
+    }
+    Test_ProfClean(_prefix);
+    global.save_prefix = _saved.prefix;
+    global.profiles_index = _saved.index;
+    global.profile = _saved.profile;
+    global.profile_status = _saved.status;
+    global.save_slot_active = _saved.slot;
+}
+
+function Test_ProfDeleteAll(_path) {
+    var _tails = ["", ".pre-profiles", ".corrupt"];
+    for (var _t = 0; _t < array_length(_tails); _t++) {
+        Save_DeleteFileSet(_path + _tails[_t]);
+    }
+    var _kept = RunSave_KeptFiles(_path);
+    for (var _k = 0; _k < array_length(_kept); _k++) Save_DeleteFileSet(_kept[_k]);
+}
+
+function Test_ProfClean(_prefix) {
+    Test_ProfDeleteAll(_prefix + "profiles.sav");
+    Test_ProfDeleteAll(_prefix + "profile.sav");
+    Test_ProfDeleteAll(_prefix + "run.sav");
+    for (var _i = 0; _i < 4; _i++) {
+        Test_ProfDeleteAll(_prefix + "profile_" + string(_i) + ".sav");
+        for (var _s = 0; _s < 3; _s++) Test_ProfDeleteAll(_prefix + "run_" + string(_i) + "_" + string(_s) + ".sav");
+    }
+}
+
+// Forget the in-memory index and profile: the next call reads profiles.sav again, like a new launch.
+function Test_ProfRelaunch() {
+    global.profiles_index = undefined;
+    global.profile = undefined;
+    global.profile_status = "missing";
+}
+
+function Test_ProfIds() {
+    var _l = Profiles_List();
+    var _out = [];
+    for (var _i = 0; _i < array_length(_l); _i++) array_push(_out, _l[_i].id);
+    return _out;
+}
+
+function Test_ProfEntry(_id) {
+    var _l = Profiles_List();
+    for (var _i = 0; _i < array_length(_l); _i++) if (_l[_i].id == _id) return _l[_i];
+    return undefined;
+}
+
+function Test_ProfName(_id) {
+    var _e = Test_ProfEntry(_id);
+    return is_struct(_e) ? _e.name : "<none>";
+}
+
+// A run file as JSON text. Version 3 carries the summary block; version 2 does not. _ms < 0: no play time recorded.
+function Test_ProfRunText(_ver, _seed, _cls, _level, _floor, _ms, _saved) {
+    var _r = {
+        run_version: _ver, seed: _seed, floor: _floor, gold: 10, kills: 2, rng: {},
+        statData: { selected_class: _cls, player: { class_id: _cls, level: _level }, save_room_name: "rm_floor" + string(_floor), saved_at: _saved }
+    };
+    if (_ms >= 0) _r.stats = { play_ms: _ms };
+    if (_ver >= 3) _r.summary = { class_id: _cls, level: _level, floor: _floor, run_time_ms: _ms, seed: _seed, saved_at: _saved };
+    return json_stringify(_r);
+}
+
+function Test_ProfPutRun(_path, _ver, _seed, _cls, _level, _floor, _ms, _saved) {
+    return Save_WriteFileAtomic(_path, Test_ProfRunText(_ver, _seed, _cls, _level, _floor, _ms, _saved), RunSave_IsCurrentRaw);
+}
+
+function Test_ProfVersions() {
+    Test_Eq("profiles: PROFILE_VERSION is 3 (adds name)", PROFILE_VERSION, 3);
+    Test_Eq("profiles: RUN_SAVE_VERSION is 3 (adds the summary fields)", RUN_SAVE_VERSION, 3);
+    Test_Eq("profiles: the default profile has an empty name until the index gives one", Profile_Default().name, "");
+    Test_Eq("profiles: a v3 profile keeps its name copy", Profile_Normalize({ profile_version: 3, name: "Zed" }).name, "Zed");
+    Test_Eq("profiles: a v2 profile has no name (the index is authoritative)", Profile_Normalize({ profile_version: 2, deaths: 1 }).name, "");
+    var _v2 = json_parse(Test_ProfRunText(2, 5, CLASS_KNIGHT, 3, 2, 9000, 40));
+    var _v1 = json_parse(Test_ProfRunText(1, 5, CLASS_KNIGHT, 3, 2, 9000, 40));
+    var _v3 = json_parse(Test_ProfRunText(3, 5, CLASS_KNIGHT, 3, 2, 9000, 40));
+    var _v4 = json_parse(Test_ProfRunText(4, 5, CLASS_KNIGHT, 3, 2, 9000, 40));
+    Test_Eq("profiles: a v2 run file is still ok (migrated, not refused)", RunSave_Check(_v2), "ok");
+    Test_Eq("profiles: a v3 run file is ok", RunSave_Check(_v3), "ok");
+    Test_Eq("profiles: a v1 run file is old", RunSave_Check(_v1), "old");
+    Test_Eq("profiles: a run file one version ahead is newer", RunSave_Check(_v4), "newer");
+    Test_True("profiles: a v2 run file passes the write validator", RunSave_IsCurrentRaw(_v2));
+    // loading a v2 file migrates it in memory: it comes back as version 3 with a summary block derived from what the file has
+    var _f = "test_prof_v2_run.sav";
+    Save_DeleteFileSet(_f);
+    Test_RawWrite(_f, Test_ProfRunText(2, 5, CLASS_KNIGHT, 3, 2, 9000, 40));
+    var _l = RunSave_LoadFrom(_f);
+    Test_Eq("profiles: a v2 run file loads with status ok", _l.status, "ok");
+    Test_Eq("profiles: and comes back as version 3", _l.status == "ok" ? _l.run.run_version : -1, 3);
+    Test_True("profiles: with a summary block", _l.status == "ok" && variable_struct_exists(_l.run, "summary") && is_struct(_l.run.summary));
+    if (_l.status == "ok" && variable_struct_exists(_l.run, "summary")) {
+        Test_Eq("profiles: derived summary class", _l.run.summary.class_id, CLASS_KNIGHT);
+        Test_Eq("profiles: derived summary level", _l.run.summary.level, 3);
+        Test_Eq("profiles: derived summary floor", _l.run.summary.floor, 2);
+        Test_Eq("profiles: derived summary run time", _l.run.summary.run_time_ms, 9000);
+        Test_Eq("profiles: derived summary seed", _l.run.summary.seed, 5);
+        Test_Eq("profiles: derived summary saved_at", _l.run.summary.saved_at, 40);
+    }
+    Save_DeleteFileSet(_f);
+}
+
+function Test_ProfCreate(_p) {
+    var _l0 = Profiles_List();
+    Test_Eq("profiles: a fresh save folder starts with one profile", array_length(_l0), 1);
+    Test_Eq("profiles: it is named Profile 1", Test_ProfName(0), "Profile 1");
+    Test_Eq("profiles: it is id 0 and the active one", Profiles_Active(), 0);
+    Test_True("profiles: the index file was written", file_exists(_p + "profiles.sav"));
+    Test_True("profiles: the first profile's file was written", file_exists(_p + "profile_0.sav"));
+    Test_Eq("profiles: Profile_Path is the active profile's file", Profile_Path(), _p + "profile_0.sav");
+    Test_Eq("profiles: RunSave_Path is the active profile's save file 1", RunSave_Path(), _p + "run_0_0.sav");
+    Test_Eq("profiles: the index says version 1", json_parse(Test_RawRead(_p + "profiles.sav")).index_version, 1);
+    // names: trimmed, limited to 12, empty refused
+    Test_Eq("profiles: create returns the next id", Profiles_Create("  Ann  "), 1);
+    Test_Eq("profiles: the name is trimmed", Test_ProfName(1), "Ann");
+    Test_Eq("profiles: a long name is accepted", Profiles_Create("ABCDEFGHIJKLMNOP"), 2);
+    Test_Eq("profiles: the name is limited to 12 letters", Test_ProfName(2), "ABCDEFGHIJKL");
+    Test_Eq("profiles: an empty name is refused", Profiles_Create(""), -1);
+    Test_Eq("profiles: a blank name is refused", Profiles_Create("    "), -1);
+    Test_Eq("profiles: a refused name made no profile", array_length(Profiles_List()), 3);
+    Test_Eq("profiles: the 4th profile gets id 3", Profiles_Create("Dee"), 3);
+    Test_Eq("profiles: the 5th is refused", Profiles_Create("Eve"), -1);
+    Test_Eq("profiles: there are 4", array_length(Profiles_List()), 4);
+    Test_Eq("profiles: the list is sorted by id", string(Test_ProfIds()), string([0, 1, 2, 3]));
+    Test_True("profiles: a created profile has its own file", file_exists(_p + "profile_3.sav"));
+    // it is all on disk
+    Test_ProfRelaunch();
+    Test_Eq("profiles: after a relaunch the 4 profiles are still there", array_length(Profiles_List()), 4);
+    Test_Eq("profiles: names survive", Test_ProfName(2), "ABCDEFGHIJKL");
+    Test_Eq("profiles: the active one survives", Profiles_Active(), 0);
+    // rename
+    Test_True("profiles: rename works", Profiles_Rename(1, "  Zed "));
+    Test_Eq("profiles: rename trims", Test_ProfName(1), "Zed");
+    Test_False("profiles: rename to empty is refused", Profiles_Rename(1, ""));
+    Test_Eq("profiles: a refused rename keeps the name", Test_ProfName(1), "Zed");
+    Test_False("profiles: rename of an unknown id is refused", Profiles_Rename(9, "Nope"));
+    Test_True("profiles: rename limits to 12 letters", Profiles_Rename(0, "ABCDEFGHIJKLMNOP"));
+    Test_Eq("profiles: the renamed active profile is cut to 12", Test_ProfName(0), "ABCDEFGHIJKL");
+    Test_ProfRelaunch();
+    Test_Eq("profiles: a rename is saved in the index", Test_ProfName(1), "Zed");
+    Test_Eq("profiles: and in the profile file's name copy", Profile_Load(_p + "profile_1.sav").profile.name, "Zed");
+    Test_Eq("profiles: and for the active profile too", Profile_Load(_p + "profile_0.sav").profile.name, "ABCDEFGHIJKL");
+    // a freed id is reused
+    Test_True("profiles: delete works", Profiles_Delete(2));
+    Test_Eq("profiles: the lowest free id is reused", Profiles_Create("New"), 2);
+    Test_True("profiles: switch works", Profiles_Switch(2));
+    Test_Eq("profiles: Profile_Path follows the active profile", Profile_Path(), _p + "profile_2.sav");
+    Test_Eq("profiles: and its save file 1", RunSave_Path(), _p + "run_2_0.sav");
+}
+
+function Test_ProfSeparate(_p) {
+    var _intro = Story_CutsceneKey("intro");
+    var _end = Story_CutsceneKey("ending");
+    Test_False("profiles: profile A has not seen the intro", Story_Seen(_intro));
+    Story_Mark(_intro);
+    Codex_RecordMeeting(0, false);
+    Test_True("profiles: A has seen the intro", Story_Seen(_intro));
+    var _b = Profiles_Create("Bea");
+    Test_True("profiles: switching to B works", Profiles_Switch(_b));
+    Test_Eq("profiles: B is active", Profiles_Active(), _b);
+    Test_False("profiles: B has not seen the intro (a new profile starts fresh)", Story_Seen(_intro));
+    Test_Eq("profiles: B's Codex is empty", Codex_BestiaryCount(Profile_Get()), 0);
+    Test_Eq("profiles: B starts without runs", Profile_Get().runs_started, 0);
+    Test_Eq("profiles: the status of a fresh profile file is ok", global.profile_status, "ok");
+    Story_Mark(_end);
+    Test_True("profiles: B has seen the ending", Story_Seen(_end));
+    Test_True("profiles: switching back to A works", Profiles_Switch(0));
+    Test_True("profiles: A still has the intro", Story_Seen(_intro));
+    Test_False("profiles: A has not seen B's ending", Story_Seen(_end));
+    Test_Eq("profiles: A keeps its Codex entry", Codex_BestiaryCount(Profile_Get()), 1);
+    // the data is on disk per profile
+    var _da = Profile_Load(_p + "profile_0.sav").profile;
+    var _db = Profile_Load(_p + "profile_" + string(_b) + ".sav").profile;
+    Test_True("profiles: A's file holds the intro, not the ending", Profile_StorySeen(_da, _intro) && !Profile_StorySeen(_db, _intro) && !Profile_StorySeen(_da, _end));
+    Test_True("profiles: B's file holds the ending", Profile_StorySeen(_db, _end));
+    Test_Eq("profiles: the file name copy is the index name", _db.name, "Bea");
+    // after a relaunch the same
+    Test_ProfRelaunch();
+    Test_True("profiles: after a relaunch A still has the intro", Story_Seen(_intro));
+    Test_False("profiles: switching to a profile that does not exist is refused", Profiles_Switch(3));
+    Test_Eq("profiles: and the active profile is unchanged", Profiles_Active(), 0);
+    // switching flushes the profile it leaves
+    Profile_Get().deaths = 7;
+    Profiles_Switch(_b);
+    Test_Eq("profiles: leaving a profile saved what it held", Profile_Load(_p + "profile_0.sav").profile.deaths, 7);
+    Profiles_Switch(0);
+    Test_Eq("profiles: and it is back after switching in", Profile_Get().deaths, 7);
+    // the save file in use follows the profile
+    Slot_SetActive(2);
+    Profiles_Switch(_b);
+    Test_Eq("profiles: B starts on its own save file 1", RunSave_Path(), _p + "run_" + string(_b) + "_0.sav");
+    Profiles_Switch(0);
+    Test_Eq("profiles: A comes back on the save file it last used", RunSave_Path(), _p + "run_0_2.sav");
+}
+
+function Test_ProfDelete(_p) {
+    var _b = Profiles_Create("Bea");
+    var _c = Profiles_Create("Cy");
+    Test_ProfPutRun(_p + "run_1_0.sav", 3, 11, CLASS_KNIGHT, 2, 1, 1000, 10);
+    Test_ProfPutRun(_p + "run_1_2.sav", 3, 12, CLASS_MAGE, 2, 1, 1000, 11);
+    Test_True("profiles: B's runs exist", RunSave_ExistsAt(_p + "run_1_0.sav") && RunSave_ExistsAt(_p + "run_1_2.sav"));
+    Profiles_Switch(_b);
+    Story_Mark("cutscene:intro");
+    Test_True("profiles: delete the active profile", Profiles_Delete(_b));
+    Test_Eq("profiles: the lowest remaining profile becomes active", Profiles_Active(), 0);
+    Test_Eq("profiles: the list is 0 and 2", string(Test_ProfIds()), string([0, 2]));
+    Test_False("profiles: the deleted profile's file is gone", file_exists(_p + "profile_1.sav"));
+    Test_False("profiles: and its run files", RunSave_ExistsAt(_p + "run_1_0.sav") || RunSave_ExistsAt(_p + "run_1_2.sav"));
+    Test_False("profiles: the profile now loaded is not the deleted one's", Story_Seen("cutscene:intro"));
+    Profile_Flush();
+    Test_False("profiles: the deleted profile's file did not come back on a flush", file_exists(_p + "profile_1.sav"));
+    Test_False("profiles: deleting an unknown id is refused", Profiles_Delete(3));
+    Test_True("profiles: deleting a profile that is not active keeps the active one", Profiles_Delete(_c) && Profiles_Active() == 0);
+    Test_Eq("profiles: one left", string(Test_ProfIds()), string([0]));
+    Story_Mark("cutscene:intro");
+    Test_True("profiles: delete the last profile", Profiles_Delete(0));
+    Test_Eq("profiles: a fresh profile is made", array_length(Profiles_List()), 1);
+    Test_Eq("profiles: it is id 0, active", Profiles_Active(), 0);
+    Test_Eq("profiles: it is named Profile 1", Test_ProfName(0), "Profile 1");
+    Test_False("profiles: it is fresh, nothing seen", Story_Seen("cutscene:intro"));
+    Test_True("profiles: and it has its file", file_exists(_p + "profile_0.sav"));
+    Test_ProfRelaunch();
+    Test_Eq("profiles: after a relaunch it is still the only one", string(Test_ProfIds()), string([0]));
+}
+
+function Test_ProfSlots(_p) {
+    var _r0 = _p + "run_0_0.sav";
+    var _r1 = _p + "run_0_1.sav";
+    var _r2 = _p + "run_0_2.sav";
+    Test_ProfPutRun(_r0, 3, 111, CLASS_KNIGHT, 4, 2, 125000, 5);
+    Test_ProfPutRun(_r2, 2, 222, CLASS_MAGE, 7, 5, 300000, 9);   // a version 2 file: no summary block
+    var _s = Slots_Summary(0);
+    Test_Eq("slots: three entries", array_length(_s), 3);
+    Test_Eq("slots: entry 0 has slot 0", _s[0].slot, 0);
+    Test_True("slots: slot 0 exists", _s[0].exists);
+    Test_Eq("slots: slot 0 is ok", _s[0].status, "ok");
+    Test_Eq("slots: slot 0 class", _s[0].class_id, CLASS_KNIGHT);
+    Test_Eq("slots: slot 0 level", _s[0].level, 4);
+    Test_Eq("slots: slot 0 floor", _s[0].floor, 2);
+    Test_Eq("slots: slot 0 run time", _s[0].run_time_ms, 125000);
+    Test_Eq("slots: slot 0 seed", _s[0].seed, 111);
+    Test_Eq("slots: slot 0 saved_at", _s[0].saved_at, 5);
+    Test_False("slots: slot 1 does not exist", _s[1].exists);
+    Test_Eq("slots: slot 1 is empty", _s[1].status, "empty");
+    Test_Eq("slots: slot 2 is ok", _s[2].status, "ok");
+    Test_Eq("slots: slot 2 (a v2 file) class", _s[2].class_id, CLASS_MAGE);
+    Test_Eq("slots: slot 2 level", _s[2].level, 7);
+    Test_Eq("slots: slot 2 floor", _s[2].floor, 5);
+    Test_Eq("slots: slot 2 run time", _s[2].run_time_ms, 300000);
+    Test_Eq("slots: slot 2 seed", _s[2].seed, 222);
+    Test_Eq("slots: first empty is slot 1", Slots_FirstEmpty(0), 1);
+    // the other statuses
+    Test_RawWrite(_r1, "{{ not json");
+    Test_Eq("slots: a damaged file is corrupt", Slots_Summary(0)[1].status, "corrupt");
+    Test_True("slots: a damaged file exists", Slots_Summary(0)[1].exists);
+    Test_Eq("slots: a damaged file is not an empty slot", Slots_FirstEmpty(0), -1);
+    Test_RawWrite(_r1, json_stringify({ run_version: 99, seed: 1 }));
+    Test_Eq("slots: a newer file is newer", Slots_Summary(0)[1].status, "newer");
+    Test_RawWrite(_r1, json_stringify({ seed: 1, statData: {} }));
+    Test_Eq("slots: a file without a version is old", Slots_Summary(0)[1].status, "old");
+    Test_Eq("slots: an unreadable slot shows its fields as missing (class)", Slots_Summary(0)[1].class_id, -1);
+    Test_Eq("slots: an unreadable slot shows its fields as missing (run time)", Slots_Summary(0)[1].run_time_ms, -1);
+    // a v2 file without a play time: that field is missing
+    Test_ProfPutRun(_r1, 2, 333, CLASS_ARCHER, 2, 1, -1, 12);
+    Test_Eq("slots: a file without a play time lists it as missing", Slots_Summary(0)[1].run_time_ms, -1);
+    Test_Eq("slots: but the rest is there", Slots_Summary(0)[1].seed, 333);
+    Test_Eq("slots: all three used, no empty slot", Slots_FirstEmpty(0), -1);
+    // another profile has its own slots
+    var _b = Profiles_Create("Bea");
+    Test_Eq("slots: a new profile has all three empty", Slots_FirstEmpty(_b), 0);
+    Test_Eq("slots: and lists them empty", Slots_Summary(_b)[0].status + Slots_Summary(_b)[1].status + Slots_Summary(_b)[2].status, "emptyemptyempty");
+    Test_Eq("slots: an unknown profile has no slots", Slots_FirstEmpty(3), -1);
+    // the active slot
+    Test_Eq("slots: the active slot starts at 0", Slot_Active(), 0);
+    Slot_SetActive(2);
+    Test_Eq("slots: setting it changes RunSave_Path", RunSave_Path(), _r2);
+    Test_Eq("slots: and Slot_Active", Slot_Active(), 2);
+    Slot_SetActive(7);
+    Test_Eq("slots: a slot outside 0..2 is refused (keeps the last)", Slot_Active(), 2);
+    Test_True("slots: RunSave_HasSave reads the active slot", RunSave_HasSave());
+    RunSave_Delete();
+    Test_False("slots: RunSave_Delete removes the active slot's file", RunSave_ExistsAt(_r2));
+    Test_True("slots: and leaves the others", RunSave_ExistsAt(_r0) && RunSave_ExistsAt(_r1));
+    Test_Eq("slots: the freed slot is the first empty", Slots_FirstEmpty(0), 2);
+    Slot_SetActive(1);
+    Test_Eq("slots: RunSave_Path follows the slot", RunSave_Path(), _r1);
+}
+
+function Test_ProfSlotDelete(_p) {
+    var _r0 = _p + "run_0_0.sav";
+    Test_ProfPutRun(_r0, 3, 444, CLASS_KNIGHT, 5, 3, 60000, 7);
+    Test_Eq("slot delete: no history yet", array_length(Profile_Get().history), 0);
+    Test_True("slot delete: a saved run is deleted", Slot_Delete(0, 0));
+    Test_False("slot delete: the file set is gone", file_exists(_r0) || file_exists(_r0 + ".bak"));
+    Test_Eq("slot delete: it counts as one abandoned run", array_length(Profile_Get().history), 1);
+    if (array_length(Profile_Get().history) == 1) {
+        var _h = Profile_Get().history[0];
+        Test_Eq("slot delete: the entry says abandoned", _h.result, "abandoned");
+        Test_Eq("slot delete: the entry keeps the seed", _h.seed, 444);
+        Test_Eq("slot delete: the entry keeps the class", _h.class_id, CLASS_KNIGHT);
+        Test_Eq("slot delete: the entry keeps the level", _h.level, 5);
+    }
+    Test_Eq("slot delete: the history is written to the profile file", array_length(Profile_Load(Profile_Path()).profile.history), 1);
+    Test_False("slot delete: an empty slot has nothing to delete", Slot_Delete(0, 1));
+    Test_Eq("slot delete: and records nothing", array_length(Profile_Get().history), 1);
+    Test_False("slot delete: a slot outside 0..2 is refused", Slot_Delete(0, 5));
+    // a run of another profile is recorded in that profile, not the active one
+    var _b = Profiles_Create("Bea");
+    var _rb = _p + "run_" + string(_b) + "_1.sav";
+    Test_ProfPutRun(_rb, 3, 555, CLASS_MAGE, 2, 1, 1000, 8);
+    Test_True("slot delete: a slot of another profile", Slot_Delete(_b, 1));
+    Test_False("slot delete: its file is gone", RunSave_ExistsAt(_rb));
+    Test_Eq("slot delete: the active profile's history is unchanged", array_length(Profile_Get().history), 1);
+    var _pb = Profile_Load(_p + "profile_" + string(_b) + ".sav").profile;
+    Test_Eq("slot delete: the other profile's file got the abandoned entry", array_length(_pb.history) == 1 ? _pb.history[0].seed : -1, 555);
+    // a damaged file is not destroyed: it is moved aside and the slot is empty
+    var _r2 = _p + "run_0_2.sav";
+    Test_RawWrite(_r2, "{{ not json");
+    Test_True("slot delete: a damaged slot can be cleared", Slot_Delete(0, 2));
+    Test_False("slot delete: the slot is empty", RunSave_ExistsAt(_r2));
+    Test_Eq("slot delete: but the damaged file is kept next to it", array_length(RunSave_KeptFiles(_r2)), 1);
+    Test_Eq("slot delete: and records no history for it", array_length(Profile_Get().history), 1);
+}
+
+function Test_ProfContinue(_p) {
+    Test_Eq("continue: no saves, nothing to continue", Slots_ContinueTarget(0), -1);
+    Test_ProfPutRun(_p + "run_0_1.sav", 3, 1, CLASS_KNIGHT, 1, 1, 10, 100);
+    Test_Eq("continue: last_slot (0) has no file: the only existing slot", Slots_ContinueTarget(0), 1);
+    Test_ProfPutRun(_p + "run_0_2.sav", 3, 2, CLASS_MAGE, 1, 1, 10, 200);
+    Test_Eq("continue: last_slot has no file: the newest existing slot", Slots_ContinueTarget(0), 2);
+    Test_ProfPutRun(_p + "run_0_0.sav", 3, 3, CLASS_ARCHER, 1, 1, 10, 50);
+    Test_Eq("continue: last_slot has a file: it wins even when older", Slots_ContinueTarget(0), 0);
+    Slot_SetActive(1);
+    Test_Eq("continue: the slot last used is the target", Slots_ContinueTarget(0), 1);
+    Test_ProfRelaunch();
+    Test_Eq("continue: it is remembered across a relaunch", Slots_ContinueTarget(0), 1);
+    Test_Eq("continue: and a relaunch starts on it", Slot_Active(), 1);
+    Test_Eq("continue: so the old RunSave_Path call is the Continue file", RunSave_Path(), _p + "run_0_1.sav");
+    RunSave_Delete(_p + "run_0_1.sav");
+    Test_Eq("continue: the file of last_slot is gone: newest of the rest", Slots_ContinueTarget(0), 2);
+    RunSave_Delete(_p + "run_0_0.sav");
+    RunSave_Delete(_p + "run_0_2.sav");
+    Test_Eq("continue: nothing left, Continue is off", Slots_ContinueTarget(0), -1);
+    var _b = Profiles_Create("Bea");
+    Test_Eq("continue: another profile with no saves has none", Slots_ContinueTarget(_b), -1);
+    Test_Eq("continue: an unknown profile has none", Slots_ContinueTarget(3), -1);
+}
+
+function Test_ProfLegacyProfileText() {
+    return json_stringify({ profile_version: 2, story_seen: { "cutscene:intro": true }, unlocks: { nobody_class: true }, deaths: 3, wins: 1, runs_started: 5, history: [], bestiary: {}, skills_known: { "2": true } });
+}
+
+function Test_ProfMigrate(_p) {
+    // the owner's files from before profiles: profile.sav and run.sav, both version 2 (the run file written twice so it has a .bak)
+    Save_WriteFileAtomic(_p + "profile.sav", Test_ProfLegacyProfileText(), Profile_IsCurrentRaw);
+    Test_ProfPutRun(_p + "run.sav", 2, 776, CLASS_KNIGHT, 2, 1, 1, 1);
+    Test_ProfPutRun(_p + "run.sav", 2, 777, CLASS_ARCHER, 3, 2, 90000, 30);
+    var _legacy_run = Test_RawRead(_p + "run.sav");
+    var _legacy_profile = Test_RawRead(_p + "profile.sav");
+    Test_True("migrate: the run file has a .bak to carry over", file_exists(_p + "run.sav.bak"));
+    Test_False("migrate: no index yet", file_exists(_p + "profiles.sav"));
+    var _l = Profiles_List();
+    Test_Eq("migrate: one profile", array_length(_l), 1);
+    Test_Eq("migrate: it is id 0", _l[0].id, 0);
+    Test_Eq("migrate: it is named Profile 1", _l[0].name, "Profile 1");
+    Test_Eq("migrate: it is active", Profiles_Active(), 0);
+    Test_Eq("migrate: its last slot is 0", _l[0].last_slot, 0);
+    Test_True("migrate: profile_0.sav exists", file_exists(_p + "profile_0.sav"));
+    Test_True("migrate: run_0_0.sav exists", file_exists(_p + "run_0_0.sav"));
+    var _pr = Profile_Load(_p + "profile_0.sav");
+    Test_Eq("migrate: the profile loads ok", _pr.status, "ok");
+    Test_True("migrate: the story is kept", Profile_StorySeen(_pr.profile, "cutscene:intro"));
+    Test_Eq("migrate: the counters are kept", _pr.profile.deaths * 100 + _pr.profile.wins * 10 + _pr.profile.runs_started, 315);
+    Test_True("migrate: the unlock and skill memory are kept", Profile_IsUnlocked(_pr.profile, "nobody_class") && Profile_SkillKnown(_pr.profile, 2));
+    var _rr = RunSave_LoadFrom(_p + "run_0_0.sav");
+    Test_Eq("migrate: the run loads ok", _rr.status, "ok");
+    Test_Eq("migrate: it is the owner's run", _rr.status == "ok" ? _rr.run.seed : -1, 777);
+    Test_Eq("migrate: the run file is the same text", Test_RawRead(_p + "run_0_0.sav"), _legacy_run);
+    Test_True("migrate: the run's .bak came along", file_exists(_p + "run_0_0.sav.bak"));
+    Test_Eq("migrate: the profile file is the same text", Test_RawRead(_p + "profile_0.sav"), _legacy_profile);
+    Test_True("migrate: the profile original is kept as .pre-profiles", file_exists(_p + "profile.sav.pre-profiles"));
+    Test_True("migrate: the run original is kept as .pre-profiles", file_exists(_p + "run.sav.pre-profiles"));
+    Test_Eq("migrate: the kept profile is untouched", Test_RawRead(_p + "profile.sav.pre-profiles"), _legacy_profile);
+    Test_Eq("migrate: the kept run is untouched", Test_RawRead(_p + "run.sav.pre-profiles"), _legacy_run);
+    Test_False("migrate: the old names are free", file_exists(_p + "profile.sav") || file_exists(_p + "run.sav"));
+    Test_Eq("migrate: Continue points at the migrated run", Slots_ContinueTarget(0), 0);
+    Test_Eq("migrate: the active paths are the migrated files", Profile_Path() + "|" + RunSave_Path(), _p + "profile_0.sav|" + _p + "run_0_0.sav");
+    // the second launch does nothing, even if an old-named file shows up again
+    var _idx = Test_RawRead(_p + "profiles.sav");
+    Test_RawWrite(_p + "profile.sav", json_stringify({ profile_version: 2, deaths: 99 }));
+    Test_ProfRelaunch();
+    Test_Eq("migrate: the second launch still has one profile", array_length(Profiles_List()), 1);
+    Test_Eq("migrate: the index file is unchanged", Test_RawRead(_p + "profiles.sav"), _idx);
+    Test_Eq("migrate: the profile is unchanged (deaths still 3)", Profile_Get().deaths, 3);
+    Test_True("migrate: a file with the old name is left alone", file_exists(_p + "profile.sav"));
+    Test_Eq("migrate: the migrated profile file is unchanged", Test_RawRead(_p + "profile_0.sav"), _legacy_profile);
+}
+
+function Test_ProfMigrateLocked(_p) {
+    // a profile.sav written by a newer build is copied as it is and still reported as locked
+    var _newer = json_stringify({ profile_version: PROFILE_VERSION + 50, deaths: 3, marker: "keep me" });
+    Test_RawWrite(_p + "profile.sav", _newer);
+    Test_Eq("migrate locked: one profile", array_length(Profiles_List()), 1);
+    Test_Eq("migrate locked: the copy is byte for byte the original", Test_RawRead(_p + "profile_0.sav"), _newer);
+    Test_Eq("migrate locked: Profile_Load still reports newer", Profile_Load(_p + "profile_0.sav").status, "newer");
+    Test_Eq("migrate locked: the game reports it too", Profile_Get().locked, true);
+    Test_Eq("migrate locked: and the status is newer", global.profile_status, "newer");
+    Test_False("migrate locked: a flush never writes over it", Profile_Flush());
+    Test_Eq("migrate locked: the file is unchanged after a flush", Test_RawRead(_p + "profile_0.sav"), _newer);
+    Test_True("migrate locked: the original is kept as .pre-profiles", file_exists(_p + "profile.sav.pre-profiles"));
+}
+
+function Test_ProfMigratePartial(_p) {
+    // only a run.sav exists: the profile is new, the run is save file 1
+    Test_ProfPutRun(_p + "run.sav", 2, 888, CLASS_MAGE, 2, 1, 1000, 3);
+    Test_Eq("migrate partial: a run with no profile gives one profile", array_length(Profiles_List()), 1);
+    Test_True("migrate partial: it has a profile file", file_exists(_p + "profile_0.sav"));
+    Test_Eq("migrate partial: the run is save file 1", RunSave_LoadFrom(_p + "run_0_0.sav").status, "ok");
+    Test_True("migrate partial: the run original is kept", file_exists(_p + "run.sav.pre-profiles"));
+    Test_Eq("migrate partial: Continue is on", Slots_ContinueTarget(0), 0);
+    Test_ProfClean(_p);
+    Test_ProfRelaunch();
+    // only a profile.sav: no save files
+    Save_WriteFileAtomic(_p + "profile.sav", Test_ProfLegacyProfileText(), Profile_IsCurrentRaw);
+    Test_Eq("migrate partial: a profile with no run gives one profile", array_length(Profiles_List()), 1);
+    Test_Eq("migrate partial: its progress is kept", Profile_Get().deaths, 3);
+    Test_Eq("migrate partial: Continue is off", Slots_ContinueTarget(0), -1);
+    Test_Eq("migrate partial: all three slots are empty", Slots_FirstEmpty(0), 0);
+}
+
+function Test_ProfIndex(_p) {
+    Profiles_Rename(0, "Ann");
+    var _b = Profiles_Create("Bob");
+    Profiles_Switch(_b);
+    Story_Mark("cutscene:intro");
+    Test_ProfPutRun(_p + "run_1_2.sav", 3, 1, CLASS_KNIGHT, 1, 1, 10, 100);
+    // a damaged index (and no usable .bak): rebuilt from the profile files, the damaged file is kept
+    Test_ProfRelaunch();
+    Save_DeleteFileSet(_p + "profiles.sav");
+    Test_RawWrite(_p + "profiles.sav", "{{ not json");
+    Test_Eq("index: rebuilt with both profiles", string(Test_ProfIds()), string([0, 1]));
+    Test_Eq("index: names come from the profile files", Test_ProfName(0) + "|" + Test_ProfName(1), "Ann|Bob");
+    Test_Eq("index: the lowest id is active", Profiles_Active(), 0);
+    Test_Eq("index: the last slot is the newest save file of that profile", Test_ProfEntry(1).last_slot, 2);
+    Test_True("index: the damaged index is kept", file_exists(_p + "profiles.sav.corrupt"));
+    Test_True("index: the new index is valid", is_struct(Save_ReadJsonFile(_p + "profiles.sav", Profiles_IndexIsValid)));
+    Test_False("index: the active profile did not get the other's story", Story_Seen("cutscene:intro"));
+    Profiles_Switch(1);
+    Test_True("index: the other profile kept its story", Story_Seen("cutscene:intro"));
+    // a valid file of the wrong shape counts as damaged too
+    Test_ProfRelaunch();
+    Save_DeleteFileSet(_p + "profiles.sav");
+    Save_DeleteFileSet(_p + "profiles.sav.corrupt");
+    Test_RawWrite(_p + "profiles.sav", json_stringify({ index_version: 1, active: 5, profiles: [] }));
+    Test_Eq("index: an empty list is rebuilt", string(Test_ProfIds()), string([0, 1]));
+    // a damaged main file with a good .bak: read from the .bak
+    Test_ProfRelaunch();
+    Profiles_Rename(1, "Bobby");
+    Test_True("index: a .bak exists after a second write", file_exists(_p + "profiles.sav.bak"));
+    Test_RawWrite(_p + "profiles.sav", "garbage");
+    Test_ProfRelaunch();
+    Test_Eq("index: the .bak still lists both profiles", array_length(Profiles_List()), 2);
+    Test_Eq("index: and the first name", Test_ProfName(0), "Ann");
+    // the validator
+    Test_False("index: validator refuses 5 profiles", Profiles_IndexIsValid({ index_version: 1, active: 0, profiles: [{ id: 0, name: "a" }, { id: 1, name: "a" }, { id: 2, name: "a" }, { id: 3, name: "a" }, { id: 4, name: "a" }] }));
+    Test_False("index: validator refuses duplicate ids", Profiles_IndexIsValid({ index_version: 1, active: 0, profiles: [{ id: 0, name: "a" }, { id: 0, name: "b" }] }));
+    Test_False("index: validator refuses an id above 3", Profiles_IndexIsValid({ index_version: 1, active: 0, profiles: [{ id: 4, name: "a" }] }));
+    Test_False("index: validator refuses another version", Profiles_IndexIsValid({ index_version: 2, active: 0, profiles: [{ id: 0, name: "a" }] }));
+    Test_True("index: validator accepts a good index", Profiles_IndexIsValid({ index_version: 1, active: 0, profiles: [{ id: 0, name: "a", created: 1, last_slot: 0, last_played: 0 }] }));
+}
+
+function Test_ProfReset(_p) {
+    Profile_Get().deaths = 5;
+    Profile_Flush();
+    Test_Eq("reset: the profile file has the deaths", Profile_Load(Profile_Path()).profile.deaths, 5);
+    Profile_ResetForTest();
+    Test_Eq("reset: the profile in memory is fresh", Profile_Get().deaths, 0);
+    Test_Eq("reset: and says missing", global.profile_status, "missing");
+    Test_False("reset: the profile file is gone", file_exists(Profile_Path()));
+    Test_Eq("reset: the profile list is untouched", array_length(Profiles_List()), 1);
+    Test_Eq("reset: the path is still the active profile's", Profile_Path(), _p + "profile_0.sav");
+}
+
+function Test_ProfRunSummary() {
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_cp = _gs.checkpoint;
+    _gs.run = Run_Create(12345);
+    _gs.run.stats.play_ms = 61000;
+    var _pl = CharacterCreate_Player(CLASS_MAGE);
+    _pl.level = 3;
+    _gs.player_ch = _pl;
+    _gs.selected_class = CLASS_MAGE;
+    _gs.checkpoint = { room: rm_floor3, x: 48, y: 64 };
+    var _raw = RunSave_Build();
+    Test_True("run summary: the run file carries a summary block", variable_struct_exists(_raw, "summary") && is_struct(_raw.summary));
+    if (variable_struct_exists(_raw, "summary")) {
+        var _s = _raw.summary;
+        Test_Eq("run summary: class", _s.class_id, CLASS_MAGE);
+        Test_Eq("run summary: level", _s.level, 3);
+        Test_Eq("run summary: floor", _s.floor, 3);
+        Test_Eq("run summary: run time", _s.run_time_ms, 61000);
+        Test_Eq("run summary: seed", _s.seed, 12345);
+        Test_Eq("run summary: saved at matches the save", _s.saved_at, _raw.statData.saved_at);
+    }
+    Test_Eq("run summary: the file says version 3", _raw.run_version, 3);
+    _gs.checkpoint = _old_cp;
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }
