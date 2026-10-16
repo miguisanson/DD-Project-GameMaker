@@ -69,7 +69,9 @@ if (gs.ui.mode == UI_BED) {
 // of a tab). In a fight Esc is Back in a list, so there the battle controller opens the menu on Esc at the root command menu; Tab opens it anywhere that is safe.
 if (gs.ui.mode == UI_MENU) {
     if (k_menu && !Menu_CaptureActive()) Menu_Close();
-} else if ((k_menu || (k_pause && room != rm_battle)) && Menu_CanOpen()) {
+} else if (MenuOpenBuf_Step(MenuOpenBuf_Get(), current_time, global.display.frame, (k_menu || (k_pause && room != rm_battle)), Menu_MapFree(), Menu_CanOpen())) {
+    // Hunt 6 UI: a press while the player is mid-step waits (MENU_OPEN_BUFFER_MS) and opens the menu on the first settled frame. The frame number is the display's (one per
+    // Step of this object, counted at the top before any early exit), so a frame this controller left early shows as a gap and drops the request
     Menu_Open();
     exit;   // the key that opened it does not answer it
 }

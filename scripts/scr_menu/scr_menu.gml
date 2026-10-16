@@ -174,9 +174,9 @@ function TabItems_Items(_ch, _in_battle = false) {
     return items;
 }
 
-// STUB (check first): the old behaviour, a throwable row always says the map text.
+// Confirm on an Items row: { ok, msg, ch }. A throwable says to throw it in a battle on the map; in a fight every row says the read-only reason (hunt 6, D99).
 function TabItems_Press(_ch, _it, _in_battle) {
-    if (variable_struct_exists(_it, "throwable") && _it.throwable) {
+    if (!_in_battle && variable_struct_exists(_it, "throwable") && _it.throwable) {
         return { ok: false, msg: Loc_T("item.msg.throw_in_battle", "Throw it at an enemy in battle."), ch: _ch };
     }
     return TabItems_Use(_ch, _it.item_id, _in_battle);
@@ -858,13 +858,45 @@ function Menu_CanOpen() {
     return instance_exists(pl) && Player_IsSettled(pl);
 }
 
-// STUB (check first): the old behaviour, a press that cannot open the menu is thrown away.
+// Hunt 6 UI (D140): the player is settled for one frame per tile while walking, so a menu press during a step is kept for a short window and the menu opens on the
+// first settled frame (single use). 300 ms is a little more than one walking step (16 frames, 267 ms), so the next end of a step always falls inside it.
 #macro MENU_OPEN_BUFFER_MS 300
+
 function MenuOpenBuf_New() {
     return { until: 0, frame: -1 };
 }
+
+function MenuOpenBuf_Get() {
+    if (!variable_global_exists("menu_open_buf") || !is_struct(global.menu_open_buf)) global.menu_open_buf = MenuOpenBuf_New();
+    return global.menu_open_buf;
+}
+
+// Called by the UI controller on the frames it reaches the open test, with a frame number that counts every Step of that controller (any frame it leaves early, for a
+// transition, a pop-up or a dialogue, breaks the run of frames and drops the request). _pressed: Esc / Tab / Start this frame; _free: the map is free (no menu, dialogue or fight) so a refused press may wait;
+// _can_open: Menu_CanOpen() now. Returns true on the frame the menu should open.
 function MenuOpenBuf_Step(_b, _now, _frame, _pressed, _free, _can_open) {
-    return _pressed && _can_open;
+    var live = (_b.until > 0 && _frame == _b.frame + 1 && _now < _b.until && _free);
+    _b.frame = _frame;
+    if (!live) _b.until = 0;
+    if (_pressed) {
+        if (_can_open) {
+            _b.until = 0;
+            return true;
+        }
+        if (_free) _b.until = _now + MENU_OPEN_BUFFER_MS;
+        return false;
+    }
+    if (live && _can_open) {
+        _b.until = 0;
+        return true;
+    }
+    return false;
+}
+
+// The map with nothing on top of it: a menu press that cannot open yet (the player is mid-step) may be kept.
+function Menu_MapFree() {
+    var gs = GameState_Get();
+    return gs.ui.mode == UI_NONE && !gs.in_main_menu && room != rm_battle && instance_exists(gs.player_inst);
 }
 
 // True while the one menu is up (opening, open or fading out).
@@ -1127,12 +1159,7 @@ function TabMenu_OnConfirm(_m, _i) {
     var it = _m.items[_i];
     switch (_m.data.tab) {
         case "items":
-            if (variable_struct_exists(it, "throwable") && it.throwable) {
-                SFX_PlayUI("ui_back");
-                TabMenu_Toast(Loc_T("item.msg.throw_in_battle", "Throw it at an enemy in battle."));
-                break;
-            }
-            var r = TabItems_Use(ch, it.item_id, room == rm_battle);
+            var r = TabItems_Press(ch, it, room == rm_battle);
             if (r.ok) CardsUi_Commit(r.ch); else SFX_PlayUI("ui_back");
             TabMenu_Toast(r.msg);
             TabMenu_Refresh();
@@ -2220,11 +2247,15 @@ function Controls_PollKey() {
     return k;
 }
 
-// STUB (check first): the old behaviour, a pad cannot cancel a capture and the prompt names only Esc.
+// Hunt 6 UI (D95): "Press a key..." takes every keyboard key, so a pad needs its own way out. With the pad as the last device its Back, Start / X and Y cancel the capture;
+// with the keyboard none of them does (the key X is Back's second key and a fine key to bind). Esc and a right click cancel on either.
 function Controls_CaptureCancel(_device, _back, _menu, _pause) {
-    return false;
+    return _device == "gamepad" && (_back || _menu || _pause);
 }
+
+// The row's help line while it waits for a key; the pad's line names the pad's Back button.
 function Controls_WaitingText(_label, _device) {
+    if (_device == "gamepad") return Loc_T("controls.waiting_pad", "Press the new key for {action}. [k:back] cancels.", { action: _label });
     return Loc_T("controls.waiting", "Press the new key for {action}. Esc cancels.", { action: _label });
 }
 
@@ -2258,7 +2289,7 @@ function ControlsPage_OnConfirm(_m, _i) {
     c.capture = rid;
     c.lock = InputLock_New(CONTROLS_CAPTURE_DELAY_MS);   // the press that chose the row must not be taken as the new key
     c.msg_row = rid;
-    c.msg = Loc_T("controls.waiting", "Press the new key for {action}. Esc cancels.", { action: Binds_RowLabel(rid) });
+    c.msg = Controls_WaitingText(Binds_RowLabel(rid), Prompt_Device());
     ControlsPage_Refresh(sp);
 }
 
@@ -2300,7 +2331,7 @@ function ControlsPage_Handle(_sp) {
     var c = _sp.controls;
     if (c.capture != "") {
         if (InputLock_Active(c.lock)) return;
-        if (mouse_check_button_pressed(mb_right)) { ControlsPage_OnKey(_sp, vk_escape); return; }
+        if (mouse_check_button_pressed(mb_right) || Controls_CaptureCancel(Prompt_Device(), Input_UIBack(), Input_UIPressed("menu"), Input_UIPressed("pause"))) { ControlsPage_OnKey(_sp, vk_escape); return; }
         var k = Controls_PollKey();
         if (k >= 0) ControlsPage_OnKey(_sp, k);
         return;
@@ -2913,24 +2944,38 @@ function KeepThis_Draw(_a = 1) {
     draw_set_color(c_white);
 }
 
-// STUB (check first): the old behaviour, 60 ms after the change any click answers.
+// Hunt 6 UI (D140): the prompt takes an answer only once the last change is KEEP_THIS_ANSWER_LOCK_MS old and the window request has finished, so the second
+// press or click of a double click (which made the change) never keeps a window that has not even changed yet. Back / revert is always quick.
 #macro KEEP_THIS_ANSWER_LOCK_MS 400
-function KeepThis_AnswerReady(_since_ms, _now, _display_busy) {
-    return _now - _since_ms >= UI_INPUT_LOCK_MS;
-}
-function KeepThis_ClickOk(_rect, _mx, _my) {
-    return true;
+
+function KeepThis_DisplayBusy() {
+    return variable_global_exists("display") && is_struct(global.display) && is_struct(global.display.req);
 }
 
-// While the prompt is up the page answers only to it: Confirm keeps, Back (or the menu key, a right click) puts the window back, time does the same.
+function KeepThis_AnswerReady(_since_ms, _now, _display_busy) {
+    return !_display_busy && _now - _since_ms >= KEEP_THIS_ANSWER_LOCK_MS;
+}
+
+// A click answers only inside the prompt's box (_rect: where it was last drawn; w = 0 means not drawn yet).
+function KeepThis_ClickOk(_rect, _mx, _my) {
+    return _rect.w > 0 && _mx >= _rect.x && _mx < _rect.x + _rect.w && _my >= _rect.y && _my < _rect.y + _rect.h;
+}
+
+// While the prompt is up the page answers only to it: Confirm (or a click on the box) keeps, Back (or the menu key, a right click) puts the window back, time does the same.
 function KeepThis_Step(_sp) {
     if (KeepThis_Tick()) { SettingsPopup_Refresh(); return; }
     if (current_time - global.keep_this.lock_ms < UI_INPUT_LOCK_MS) return;   // the press that made the change
-    if (Input_UIConfirm() || mouse_check_button_pressed(mb_left)) {
+    var ready = KeepThis_AnswerReady(global.keep_this.lock_ms, current_time, KeepThis_DisplayBusy());
+    var click = false;
+    if (ready && mouse_check_button_pressed(mb_left)) {
+        var mp = Ui_MousePos();
+        click = KeepThis_ClickOk(variable_global_exists("keep_this_rect") ? global.keep_this_rect : { x: -1, y: -1, w: 0, h: 0 }, mp.x, mp.y);
+    }
+    if (ready && (Input_UIConfirm() || click)) {
         SFX_PlayUI("ui_confirm");
         KeepThis_Confirm();
         SettingsPopup_Refresh();
-    } else if (Input_UIBack() || Input_UIPressed("menu") || mouse_check_button_pressed(mb_right)) {
+    } else if (Input_UIBack() || Input_UIPressed("menu") || Input_UIPressed("pause") || mouse_check_button_pressed(mb_right)) {
         SFX_PlayUI("ui_back");
         KeepThis_Revert();
         SettingsPopup_Refresh();
@@ -3933,7 +3978,7 @@ function Ui_ReadInput() {
     s.left = s.left_p || Input_Held("menu_left");
     s.right = s.right_p || Input_Held("menu_right");
     s.confirm = Input_UIConfirm();
-    s.back = Input_UIBack();
+    s.back = Input_UIBack() || (Menu_IsOpen() && Input_UIPressed("pause"));   // Hunt 6 UI (D140): the pad's Y opens the one menu, so inside it Y is Back (Esc is both keys already)
     s.tab = (Input_Pressed("tab_next") ? 1 : 0) - (Input_Pressed("tab_prev") ? 1 : 0);   // bound by the screens that have tabs
     var lay = Display_Layout();   // the mouse as Ui_MousePos works it out, without its struct
     s.mx = (window_mouse_get_x() - lay.gui_x) / lay.ui_scale;
