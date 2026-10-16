@@ -187,7 +187,11 @@ class RealRun(unittest.TestCase):
         z = zipfile.ZipFile(os.path.join(self.dest, PKG + ".zip"))
         names = {n for n in z.namelist() if not n.endswith("/")}
         self.assertEqual(names, {PKG + "/" + f for f in EXPECTED_FILES})
-        self.assertTrue(all("\\" not in n for n in z.namelist()), "zip entries must use forward slashes")
+        # zipfile turns backslashes into slashes on Windows when it reads, so look at the bytes: the entry names are stored as they are
+        with open(os.path.join(self.dest, PKG + ".zip"), "rb") as zf:
+            raw = zf.read()
+        self.assertFalse((PKG + "\\").encode() in raw, "zip entries must be stored with forward slashes")
+        self.assertTrue((PKG + "/fonts/galmuri/OFL-Galmuri.txt").encode() in raw)
         self.assertIsNone(z.testzip())
         self.assertIn("RELEASE OK", text)
         code, text = self.run_it()

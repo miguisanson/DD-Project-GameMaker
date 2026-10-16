@@ -126,9 +126,25 @@ foreach ($p in $plan) {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
     Copy-Item -LiteralPath $p.Src -Destination $dst -Force
 }
+Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 if (Test-Path -LiteralPath $ZipPath) { Remove-Item -LiteralPath $ZipPath -Force }
-[IO.Compression.ZipFile]::CreateFromDirectory($PkgDir, $ZipPath, [IO.Compression.CompressionLevel]::Optimal, $true)
+# Entry names are written by hand with forward slashes: ZipFile.CreateFromDirectory on Windows PowerShell 5.1 stores backslashes, which the zip format does not allow
+# (Explorer and 7-Zip cope, other unzip tools do not).
+$zipStream = [IO.File]::Open($ZipPath, [IO.FileMode]::CreateNew)
+try {
+    $archive = New-Object IO.Compression.ZipArchive($zipStream, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach ($p in $plan) {
+            $entry = $archive.CreateEntry($PkgName + '/' + $p.Rel, [IO.Compression.CompressionLevel]::Optimal)
+            $es = $entry.Open()
+            try {
+                $fs = [IO.File]::OpenRead($p.Src)
+                try { $fs.CopyTo($es) } finally { $fs.Dispose() }
+            } finally { $es.Dispose() }
+        }
+    } finally { $archive.Dispose() }
+} finally { $zipStream.Dispose() }
 $zipInfo = Get-Item -LiteralPath $ZipPath
 $hash = (Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash
 Write-Host ("RELEASE OK {0} ({1:N1} MB) sha256 {2}" -f $ZipPath, ($zipInfo.Length / 1MB), $hash)
