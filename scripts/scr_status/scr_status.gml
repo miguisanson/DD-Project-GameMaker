@@ -177,7 +177,8 @@ function StatusDB_Init() {
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         guard_mult: 0,
-        consume_on_hit: true
+        consume_on_hit: true,
+        no_tick_on_apply: true   // Muscle Up: the tooltip's turns are the turns it lasts after the cast (the cast turn's own tick does not count)
     };
 
     global.status_db[? STATUS_DMG_UP] = {
@@ -211,7 +212,8 @@ function StatusDB_Init() {
         stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
-        crit_bonus: 25
+        crit_bonus: 25,
+        no_tick_on_apply: true   // Take Aim: the tooltip's turns are the turns it lasts after the cast (the cast turn's own tick does not count)
     };
 
     global.status_db[? STATUS_HIT_UP] = {
@@ -285,13 +287,15 @@ function StatusDB_Init() {
     global.status_db[? STATUS_BRACE] = {
         id: STATUS_BRACE,
         name: "Braced",
-        // D99: the Guard command. The next hit deals half; it fades after the enemy's turn (duration 2: one tick on the Guard turn itself).
+        // D99: the Guard command. The next hit deals half. It is counted in ENEMY turns (Status_TickEnemyTurn, not the player's own ticks): a fast
+        // player acting twice, or an enemy turn that does not hit (a wind-up, a buff), does not wear it off. Two enemy turns, then it fades.
         icon_sprite: noone,
         stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         guard_mult: 0.5,
         duration: 2,
+        tick_on_enemy_turn: true,
         consume_on_hit: true
     };
 
@@ -826,6 +830,7 @@ function Status_Tick(_ch, _acted = true) {
             continue;
         }
         var cfg = StatusDB_Get(s.id);
+        if (variable_struct_exists(cfg, "tick_on_enemy_turn") && cfg.tick_on_enemy_turn) continue;   // counted by Status_TickEnemyTurn
 
         _ch = Status_ApplyHpTick(_ch, s, cfg, _acted);
 
@@ -853,6 +858,20 @@ function Status_Tick(_ch, _acted = true) {
         }
     }
 
+    return _ch;
+}
+
+// Once per ENEMY turn, on the player: the statuses that count the enemy's turns (Guard's Brace, `tick_on_enemy_turn`) lose one. The player's own
+// ticks (Status_Tick) leave them alone. Hunt 6: Brace used to wear off on the player's turns, so it could be gone before the enemy's hit.
+function Status_TickEnemyTurn(_ch) {
+    if (!is_array(_ch.status)) return _ch;
+    for (var i = array_length(_ch.status) - 1; i >= 0; i--) {
+        var s = _ch.status[i];
+        var cfg = StatusDB_Get(s.id);
+        if (!variable_struct_exists(cfg, "tick_on_enemy_turn") || !cfg.tick_on_enemy_turn) continue;
+        s.turns -= 1;
+        if (s.turns <= 0) array_delete(_ch.status, i, 1);
+    }
     return _ch;
 }
 
