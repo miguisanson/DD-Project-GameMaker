@@ -56,3 +56,4 @@
 3. (screenshot: Dire Wolf chip label "THIRST 3" in green) "I also liked the buffs text before just make it plain white. not green"
 4. (screenshot: level-up screen, growth rows fully gold) "just color gold the right most number or the "new number" not the whole row" (same shot: mouse over DEF shows DEF's "+1" and DEF details while the highlight bar stays on SPD)
 5. "also make it so that when you enter bushes its super forgiving and monsater stop chasing you and and immeditely does a ? and start patroling after a few seconds (make him stand a bit then move) so that hiding actually matters too"
+6. (screenshot: the Pale Choirbeast fight) "this is the last can you move the choir beast a bit down actually. could you move ALL monsters sprites lower they feel like they are floating somewhat maybe line their feet all the way to the top of the 3 windows on the bottom the line on top"

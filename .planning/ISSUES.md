@@ -158,6 +158,8 @@ Found by audits and reviews (no person's words):
 | I-109 | owner playtest round 4 note 4 (8d176ba): level-up growth rows are gold over the whole row; wants only the new (right-most) number gold. Same shot: mouse hover shows DEF's +1 and DEF details while the highlight bar stays on SPD | UI | P2 | 8d176ba-20261017 | level up, hover rows with the mouse | only the new number is gold (label + old number white); mouse hover moves the highlight, the +1 and the details together | open: final fixes |
 | I-110 | owner playtest round 4 note 5 (8d176ba): entering a bush should be super forgiving: a chasing monster stops at once, shows ?, stands a few seconds, then patrols | DESIGN (owner-directed) | P1 | 8d176ba-20261017 | get chased, walk into a bush | stepping into a bush (moving or still) breaks any chase at once: ? immediately, stand ~2-3 s, then patrol/return home; hiding matters | open: final fixes |
 
+| I-111 | owner playtest round 4 note 6 (8d176ba): enemies still look like they float; put every enemy's feet on the top line of the three bottom HUD windows (Choirbeast too). Same shot: the final boss fight shows the forest background | UI/ART | P2 | 8d176ba-20261017 | any battle; the final boss | feet on the HUD's top edge at every size; bosses use the boss background if that was intended | open: final fixes |
+
 ---
 
-*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-111.*
+*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-112.*
