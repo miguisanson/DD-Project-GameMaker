@@ -120,6 +120,36 @@ Found by audits and reviews (no person's words):
 | I-075 | bug hunt 2: after a battle or Continue on an exit tile the first key press fires the exit (D64) | BUG | P2 | next | arrive on floor 1 from floor 2, fight the slime at once | exit ignores the player until they step off | fixed on next (63deaae); in the next playtest build |
 | I-076 | bug hunt 2: auto-resolve + autosave + Continue re-deals the room (types/places/elites change, D33) | BUG | P3 | next | auto-resolve 1 of 3 enemies, wait 10 s, quit, Continue | same layout after Continue | fixed on next (63deaae); in the next playtest build |
 
+| I-077 | owner playtest round 3 note 1 (7f4d08e-20261016): player sprite flashes light/dark while walking (squash frames drawn above the Foreground haze) | BUG | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #1 | see status | open: packet light (R-089) |
+| I-078 | owner playtest round 3 note 2 (7f4d08e-20261016): player stays bright while running (same cause as I-077) | BUG | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #2 | see status | open: packet light (R-090) |
+| I-079 | owner playtest round 3 note 3 (7f4d08e-20261016): no Load Game / multiple runs | FEATURE | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #3 | see status | open: D175 profiles + 3 save files |
+| I-080 | owner playtest round 3 note 4 (7f4d08e-20261016): New Game skips the intro and keeps old data (profile is global, D26) | DESIGN | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #4 | see status | open: D175 |
+| I-081 | owner playtest round 3 note 5 (7f4d08e-20261016): enemies float in battle: want a soft shadow under each | ART/UI | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #5 | see status | open: packet bvis |
+| I-082 | owner playtest round 3 note 6 (7f4d08e-20261016): Attack preview plate reads 'Damag..' / 'Perfec..' | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #6 | see status | open: fixed on next (61a27c6, R-085 check) |
+| I-083 | owner playtest round 3 note 7 (7f4d08e-20261016): is Guard viable? (no: halves one hit only) | BALANCE | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #7 | see status | open: D180 |
+| I-084 | owner playtest round 3 note 8 (7f4d08e-20261016): last-turn status blink (solid box) hard to see; want an outline | UI | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #8 | see status | open: packet bvis (R-094) |
+| I-085 | owner playtest round 3 note 9 (7f4d08e-20261016): QTE grades in ALL CAPS | TEXT | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #9 | see status | open: D171 decided; packet menus |
+| I-086 | owner playtest round 3 note 10 (7f4d08e-20261016): 'Horizontal Slash' does not fit its card | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #10 | see status | open: packet cards (R-095, D168) |
+| I-087 | owner playtest round 3 note 11 (7f4d08e-20261016): card pick 'Skip: +5 Gold' not worth it: remove | DESIGN | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #11 | see status | open: D174; packet cards |
+| I-088 | owner playtest round 3 note 12 (7f4d08e-20261016): no visible mouse cursor; wants mouse control | FEATURE | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #12 | see status | open: D182 |
+| I-089 | owner playtest round 3 note 13 (7f4d08e-20261016): point-and-click movement? | QUESTION | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #13 | see status | open: D182: no |
+| I-090 | owner playtest round 3 note 14 (7f4d08e-20261016): level-up stats/max HP show on the HUD right after the kill, before the level-up screen | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #14 | see status | open: D177 |
+| I-091 | owner playtest round 3 note 15 (7f4d08e-20261016): level-up screen: class growth unclear; arrows on every row | UI | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #15 | see status | open: D177 |
+| I-092 | owner playtest round 3 note 16 (7f4d08e-20261016): Max HP/MP as stats like Elden Ring Vigor/Mind | DESIGN | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #16 | see status | open: D176 (balance proposal first) |
+| I-093 | owner playtest round 3 note 17 (7f4d08e-20261016): wolf reaction dialogue replays after already seen (flag reaches the profile only on autosave) | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #17 | see status | open: flush flag to profile at once |
+| I-094 | owner playtest round 3 note 18 (7f4d08e-20261016): merchant not affected by lighting | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #18 | see status | open: packet light (R-091) |
+| I-095 | owner playtest round 3 note 19 (7f4d08e-20261016): item name colours inconsistent (chest gold, drops white) | UI/DESIGN | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #19 | see status | open: D178 rarity colours |
+| I-096 | owner playtest round 3 note 20 (7f4d08e-20261016): buying past the carry limit: gold safe? | CHECK | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #20 | see status | open: verified safe (Shop_Buy refuses before spending); dim full rows |
+| I-097 | owner playtest round 3 note 21 (7f4d08e-20261016): Gear: 'Equipped'/'Bag' headers blend with 'No Armor' rows | UI | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #21 | see status | open: packet menus (R-096) |
+| I-098 | owner playtest round 3 note 22 (7f4d08e-20261016): enemies see through objects; no hiding in bushes | BUG/DESIGN | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #22 | see status | open: D179 |
+| I-099 | owner playtest round 3 note 23 (7f4d08e-20261016): snake sprite covered by its nameplate and chips | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #23 | see status | open: packet bvis (R-092) |
+| I-100 | owner playtest round 3 note 24 (7f4d08e-20261016): which stat affects stagger? too easy? | QUESTION | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #24 | see status | open: D181: stays |
+| I-101 | owner playtest round 3 note 25 (7f4d08e-20261016): Controls 'Reset to defaults' gives no clear feedback | UI | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #25 | see status | open: packet menus (R-097) |
+| I-102 | owner playtest round 3 note 26 (7f4d08e-20261016): death summary title is always the same | CONTENT | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #26 | see status | open: D183 |
+| I-103 | owner playtest round 3 note 27 (7f4d08e-20261016): run summary 'Enemies Beat..' / 'Perfect Ra..' cut | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #27 | see status | open: fixed on next (61a27c6); add a fit check |
+| I-104 | owner playtest round 3 note 28 (7f4d08e-20261016): Spellweave card name/tag/text spill out of the frame | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #28 | see status | open: packet cards (R-095) |
+| I-105 | owner playtest round 3 note 29 (7f4d08e-20261016): huge enemy sight; enemies find you at your last spot; cannot escape a slime | DESIGN | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #29 | see status | open: D179 |
+
 ---
 
-*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-069.*
+*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-106.*

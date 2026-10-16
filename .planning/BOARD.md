@@ -1,13 +1,13 @@
 # DD-Project board
 Updated after every step that lands. The full build list is `.planning/BUILD-PLAN.md`; the design spec is `.planning/research/DECISIONS.md` (D1-D125).
-Build: PAUSED for your playtest of 7f4d08e-20261016 - agents stopped; `next` holds ~25 more fixes + the boss background for the next build | Release then stop (D28)
+Build: fixing round-3 playtest notes on `next` (next playtest build after batch 2) | Release then stop (D28)
 
-## Now — PLAYTEST NOW
-- Play: `E:\Games\DD-Project Playtest\7f4d08e-20261016\DD-Project.exe` (your saves carry over; old builds 943ce6d and earlier can be deleted).
-- Checklist: `.planning/PLAYTEST-QUEUE.md`, section "Build 7f4d08e-20261016" — 58 items in play order + 5 questions at the end. Mark good / bad / change, then say "merge the good ones".
-- In this build: one Esc/Tab menu, Yes/No pop-up, seed entry, class screen + skill memory + echo, hold-to-skip, notes + Codex reader + note question, flavour choices, lighting (lighter, daylight rooms, sun spots, more torches, enemies give no light), smarter map AI, level-up choice, status labels + XP bar + Help, device-aware prompts, the full text rewrite + one word per meaning, the UI style pass, 3 battle backgrounds, and 19 bug fixes from tonight's hunts and review. Full gate PASS on every merge (unit, smoke, bot fight, 286 screenshots).
-- Known: a few long texts can still crowd a panel (fixed on `next`, lands in the next build). The boss keeps the old background until you import D13 (below).
-- While you play, the agents keep going on `next` (improvement mode: text-fit fixes, bug hunts, the ideas list); nothing changes this build.
+## Now — FIXING YOUR ROUND-3 NOTES (29 items)
+- Your notes are logged (ISSUES I-077..I-105) and your answers are locked as D174-D183 (profiles + 3 save files, VIG/MND, gold growth rows, rarity colours, stealth package + faint cone, Guard + MP, stagger unchanged, Skip removed, ALL CAPS grades, mouse cursor without click-to-move).
+- Batch 1 building now: lighting flicker + merchant light, enemy shadows + snake position + buff blink, card Skip removal + card text fit, caps grades + Gear headers + reset pop-up.
+- Batch 2 next: profiles/save files, stealth, rarity, Guard, mouse, level-up screen, wolf dialogue, death titles.
+- Waiting on you soon: the VIG/MND numbers (a short balance proposal).
+- Already fixed on `next` (in the next build): the "Damag.."/"Perfec.." plate, the run summary labels.
 
 ## Done
 - Overnight 2026-10-15/16: fairer randomness (D117-D125), alt-tab pause, flee % and crit odds shown, difficulty list removed, New Game asks twice when a run is saved, optimisation pass (menus ~22x, items ~20x, battle HUD ~2.6x faster), ~1,400 lines of dead code removed, an extra Opus review (1 real bug fixed).

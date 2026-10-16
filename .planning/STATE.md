@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | PAUSED by the owner 2026-10-17 (playtesting build 7f4d08e-20261016; the next session runs on another account). Read .planning/RESUME.md first: next @ a1d23bb (playtest build + improvement fixes + boss bg import); not merged: wt/review7 (committed, gate unconfirmed), wt/d168 (started), CC0 audio search (not started). No builds, gates or agents until the owner says resume. |
+| WIP | RESUMED 2026-10-17 on the owner's round-3 playtest notes (29 items, I-077..I-105; decisions D174-D183). review7 merged into next (844d98b, R-085..088). Batch 1 in flight off next@844d98b (worktrees wt/light, wt/bvis, wt/cards, wt/menus; briefs E:\Temp\dd-briefs\*.md): light = notes 1,2,18; bvis = 5,23,8; cards = 11,10,28 (+D168, replaces wt/d168); menus = 9,21,25. Batch 2 (after batch 1 merges): D175 profiles+3 save files, D179 stealth, D178 rarity, D180 guard, D182 mouse, D177 level-up order+screen, small fixes (17 wolf flag flush, 26 death title, 20 shop dims full rows). D176 VIG/MND waits for an owner-approved balance proposal. |
 | Unplayed features | 61 playtest entries (PLAYTEST-QUEUE, build dbc678a-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive C: free | 80 GB (after cleanup, 2026-10-14; rule is 80-90 GB or more) |
