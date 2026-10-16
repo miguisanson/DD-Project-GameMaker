@@ -30,17 +30,14 @@ The build stamp (`Build_DrawId`) and the scrolling credits roll (top and bottom 
 6. **Ellipsis** (`Ui_FitText`): no decision allows it for a workbook row. It stays in `Ui_MenuDraw` rows, the details labels and the reader replies as the
    last resort, and every use is a recorded fit failure.
 
-## Rows no layout fits (for the text side)
+## Rows no layout fits (for the owner: names)
 
-`TextFit_Known` in scr_test lists them; each entry must still fail somewhere, so the day the text is shortened the entry is deleted.
+`TextFit_Known` in scr_test lists them; each entry must still fail somewhere, so the day the name is changed the entry is deleted. Every sentence that did not
+fit was shortened (the throwables' sentences, the "Hit for ... / 100% Poison." card sentence, Scrounger, the Korean Met / Seen lines); what is left is a name.
 
 | Where | Row | What it needs |
 |---|---|---|
 | Skill lists (en) | Horizontal Slash | 326 units; the battle list has 238 at 800 x 720 (207 at 640 x 576), the Tab list 302 |
 | Battle list (en) | Poison Arrow | 258 of 238 at 800 x 720 |
-| Card names (en) | Meditation(+), Foresight+, Spellweave, Apothecary, Horizontal | one word of 10 to 11 letters is wider than a column at 640 x 576 / 800 x 720 (up to 232 of 196) |
-| Card sentence (en) | Scrounger | 182 of 175 at 640 x 576 |
-| Card pick (en, 800 x 720) | the upgrade cards (Poison Arrow+, Poison Mist+, Ice Spear+ and six more) | three columns of Skill / Upgrade text are 607 tall; the screen ends at 755 of 720 |
-| Items tab (en and ko, 800 x 720) | throwables (Firebomb, Ice Flask, Smoke Bomb) | the sentence and the number lines are 20 to 64 units taller than the details panel |
-| Bestiary (en, 800 x 720) | The Pale Choirbeast | the name asks the list for 502 of 764 units, which leaves the details panel too narrow for every other enemy |
-| Run history (en and ko, 640 / 800) | "Foes beaten", "Damage taken", "{class} Lv 10" with "Gave up" | the list rows and the number lines ask for more than the body has |
+| Card names (en) | Meditation(+), Foresight+, Spellweave, Apothecary, Scrounger, Whetstone, Horizontal Slash(+) | one word of 9 to 11 letters is wider than a column at 640 x 576 / 800 x 720 (up to 232 of 196) |
+| Bestiary (en, 800 x 720) | The Pale Choirbeast | the name asks the list for 502 of 764 units, which leaves the details panel too narrow for every other enemy; "Pale Choirbeast" (no "The") passes every check |

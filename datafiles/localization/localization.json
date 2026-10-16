@@ -3,7 +3,7 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T02:21:28Z",
+    "generated_at_utc": "2026-10-16T05:02:54Z",
     "row_count": 1208
   },
   "default_lang": "en",
@@ -489,7 +489,7 @@
       "ko": "약제사"
     },
     "card.pas.n_scrounger.line": {
-      "en": "{n}% chance to find a potion after each battle you win.",
+      "en": "After each win, {n}% to find a potion.",
       "ko": "전투에서 이길 때마다 {n}% 확률로 물약을 줍는다."
     },
     "card.pas.n_scrounger.name": {
@@ -549,15 +549,15 @@
       "ko": "[t]{status}[/t] 효과를 {turns}턴 동안 얻는다."
     },
     "card.skill.hit": {
-      "en": "Strike for {power} power.",
+      "en": "Hit for {power} power.",
       "ko": "위력 {power}로 공격한다."
     },
     "card.skill.hit_status": {
-      "en": "{chance}% to inflict [t]{status}[/t].",
+      "en": "{chance}% [t]{status}[/t].",
       "ko": "{chance}% 확률로 [t]{status}[/t] 부여."
     },
     "card.skill.hits": {
-      "en": "Strike {hits} times for {power} power each.",
+      "en": "Hit {hits} times for {power} power each.",
       "ko": "{hits}번 공격한다. 한 번에 위력 {power}."
     },
     "card.skill.other": {
@@ -2785,7 +2785,7 @@
       "ko": "비전 쇄도"
     },
     "item.sent.30": {
-      "en": "Hits for {power} power and inflicts [t]Burn[/t] for {turns} turns. Costs your turn.",
+      "en": "Hits for {power} power. Inflicts [t]Burn[/t] for {turns} turns. Costs your turn.",
       "ko": "위력 {power}의 피해를 주고 {turns}턴 동안 [t]화상[/t]을 입힙니다. 턴을 소모합니다."
     },
     "item.sent.31": {
@@ -2793,12 +2793,12 @@
       "ko": "적에게 [t]독[/t] {n}중첩을 겁니다. 턴을 소모합니다."
     },
     "item.sent.32": {
-      "en": "Hits for {power} power and inflicts [t]Stun[/t], pushing the enemy back. Costs your turn.",
+      "en": "Hits for {power} power. [t]Stun[/t] and push back. Costs your turn.",
       "ko": "위력 {power}의 피해를 주고 [t]기절[/t]시켜 적을 뒤로 밉니다. 턴을 소모합니다."
     },
     "item.sent.33": {
-      "en": "Dodge the next attack ({turns} turns). A [a]Perfect[/a] throw lets you slip away. Costs your turn.",
-      "ko": "다음 공격을 피합니다({turns}턴). [a]완벽[/a]하게 던지면 도망칩니다. 턴을 소모합니다."
+      "en": "Dodge for {turns} turns. [a]Perfect[/a]: escape. Costs your turn.",
+      "ko": "{turns}턴 회피. [a]완벽[/a]하면 도망. 턴을 소모합니다."
     },
     "item.sent.accessory": {
       "en": "A ring or charm for the accessory slot.",
@@ -4554,7 +4554,7 @@
     },
     "tab.lbl.met": {
       "en": "Met",
-      "ko": "만난 횟수"
+      "ko": "만남"
     },
     "tab.lbl.seed": {
       "en": "Seed",
@@ -4678,7 +4678,7 @@
     },
     "tab.val.seen": {
       "en": "Seen",
-      "ko": "목격"
+      "ko": "봄"
     },
     "tab.val.unlocked": {
       "en": "Unlocked",
