@@ -3934,6 +3934,28 @@ function Scenario_ClearUi() {
     if (_gs.ui.mode != UI_NONE || array_length(_gs.ui.lines) > 0) UI_InterruptCloseAll(false);
 }
 
+// R-109: a picture of the bare map or of a menu must not have a level-up or card screen over it. The scenes before it can leave a character that owes a stat point, a card pick or a skill
+// replacement (a level-up from a fixture's experience); the next floor would open that screen over the picture. Clears what is owed on the character and closes the screen.
+function Scenario_NoOwed() {
+    var _gs = GameState_Get();
+    var _k = _gs.player_ch;
+    if (is_struct(_k)) {
+        _k.skill_pending = -1;
+        _k.card_picks = 0;
+        _k.stat_points = 0;
+        _k.offer = [];
+        if (variable_struct_exists(_k, "echo_offer")) _k.echo_offer = [];
+    }
+    CardsUi_Close();
+}
+
+// ... and the check that holds when the picture is taken: no card / level-up screen is open and nothing is owed (so none can open this frame).
+function Scenario_NoOwedCheck(_name) {
+    var _gs = GameState_Get();
+    var _owed = is_struct(_gs.player_ch) ? Cards_NextOwed(_gs.player_ch) : "";
+    Scenario_Check(_name, !CardsUi_IsOpen() && _gs.ui.mode != UI_CARDS && _owed == "", "open=" + string(CardsUi_IsOpen()) + " mode=" + string(_gs.ui.mode) + " owed=" + _owed);
+}
+
 function Scenario_Block(_obj, _cx, _cy) {
     return instance_create_layer(_cx * GRID_TILE_SIZE, _cy * GRID_TILE_SIZE, "Instances", _obj);
 }
@@ -14684,6 +14706,7 @@ function Scenario_StepShotsTextFit2(_s) {
                 break;
             }
             _s.shot = "shot_r3textfit2_" + _scene + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+            Scenario_NoOwedCheck("shots_r3textfit2_no_card_or_level_up_screen_is_open_" + _tag);   // R-109
             if (_battle) {
                 var _bc3 = instance_find(obj_battle_controller, 0);
                 Scenario_Check("shots_r3textfit2_the_skill_list_is_open_" + _tag, _bc3.battle_state == BSTATE_SKILL_MENU && array_length(_bc3.ui_skill.items) == 6, "state=" + string(_bc3.battle_state));
@@ -14843,6 +14866,7 @@ function Scenario_StepShotsR3Menus(_s) {
                 break;
             }
             _s.shot = "shot_r3menus_" + _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+            Scenario_NoOwedCheck("shots_r3menus_no_card_or_level_up_screen_is_open_" + _tag);   // R-109
             switch (_scenes[_o.di]) {
                 case "gear":
                     Scenario_Check("shots_r3menus_gear_menu_is_open_" + _tag, _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
@@ -14922,6 +14946,7 @@ function Scenario_R3StealthJudge(_h, _sc, _pl) {
     var _e = instance_exists(_h.e) ? _h.e : noone;
     Scenario_Check(_tag + "the_enemy_is_alive", _e != noone);
     Scenario_Check(_tag + "no_dialogue_is_open", GameState_Get().ui.mode == UI_NONE && array_length(GameState_Get().ui.lines) == 0);
+    Scenario_NoOwedCheck(_tag + "no_card_or_level_up_screen_is_open");   // R-109
     if (_e == noone) return;
     if (asset_get_index("Sight_ConeStats") == -1) { Scenario_Check(_tag + "the_cone_drawing_exists", false); return; }
     var _st = Sight_ConeStats();

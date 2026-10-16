@@ -2838,12 +2838,17 @@ function Hud_DrawCoin(_x, _y, _p) {
     Ui_Box(_x + 2 * _p, _y + 2 * _p, _x + 3 * _p, _y + 4 * _p, UI_C_LIGHTEST);
 }
 
+// R-109: when the gold box is drawn, by the screen state alone: only over the bare map (or a dialogue), never under a menu, a level-up or card screen (their panels cover the corner it stands in).
+function Hud_GoldShown(_mode, _room, _cutscene) {
+    if (_room == rm_start || _room == rm_cutscene) return false;
+    if (_mode != UI_NONE && _mode != UI_DIALOGUE) return false;
+    return !_cutscene;
+}
+
 function Hud_DrawGold() {
     if (!Run_IsActive()) return;
     var gs = GameState_Get();
-    if (room == rm_start || room == rm_cutscene) return;
-    if (gs.ui.mode != UI_NONE && gs.ui.mode != UI_DIALOGUE) return;
-    if (variable_struct_exists(gs.ui, "cutscene_active") && gs.ui.cutscene_active) return;
+    if (!Hud_GoldShown(gs.ui.mode, room, variable_struct_exists(gs.ui, "cutscene_active") && gs.ui.cutscene_active)) return;
     if (room != rm_battle && (room_width < DISPLAY_BASE_W || room_height < DISPLAY_BASE_H)) return;   // a room smaller than the view is centred with black round it (DISP-10): nothing may be drawn there
     var mt = Ui_Metrics();
     var p = mt.p;

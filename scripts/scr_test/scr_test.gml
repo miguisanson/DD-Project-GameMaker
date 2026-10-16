@@ -16006,6 +16006,7 @@ function Test_R3Bushes() {
 function Test_Suite_R3FixDet() {
     Test_RunSuite("R3FixDet.lists", Test_R3FixDetLists);
     Test_RunSuite("R3FixDet.pairs", Test_R3FixDetPairs);
+    Test_RunSuite("R3FixDet.gold", Test_R3FixDetGold);
 }
 
 // The lines a battle details panel keeps (by label): Damage, Perfect and MP for a skill; the first line for anything else (an item). In the last resort (nothing else makes room: one list row,
@@ -16171,4 +16172,14 @@ function Test_R3FixDetPairs() {
     }
     Test_Eq("r3fixdet pairs: at 480, 640, 800 in en and ko the Damage and Perfect lines each fit their cell", _bad, "");
     TextFit_End(_s);
+}
+
+// R-109: the gold box (top left) is not drawn under a level-up or card screen, a menu or the title; it is on the bare map and over a dialogue. The card screens' panels reach the corner it stands in.
+function Test_R3FixDetGold() {
+    Test_True("r3fixdet gold: the bare map shows the gold box", Hud_GoldShown(UI_NONE, rm_floor1, false));
+    Test_True("r3fixdet gold: a dialogue does not hide it", Hud_GoldShown(UI_DIALOGUE, rm_floor1, false));
+    Test_False("r3fixdet gold: the level-up and card screens hide it", Hud_GoldShown(UI_CARDS, rm_floor1, false));
+    Test_False("r3fixdet gold: the Tab menu hides it", Hud_GoldShown(UI_MENU, rm_floor1, false));
+    Test_False("r3fixdet gold: a cutscene hides it", Hud_GoldShown(UI_NONE, rm_floor1, true));
+    Test_False("r3fixdet gold: the title does not show it", Hud_GoldShown(UI_NONE, rm_start, false));
 }
