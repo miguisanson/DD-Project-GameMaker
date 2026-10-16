@@ -1000,6 +1000,7 @@ function UI_InterruptCloseAll(_fade_dim = true) {
     CardsUi_Interrupt();   // C2: what is owed opens again afterwards
     BedUi_Interrupt();     // C4: the bed stays free
     ShopUi_Interrupt();    // C3
+    TrapUi_Interrupt();    // R3 ideas2: a trapped chest's bar ends with no cost and no bonus (the chest's item was given when it opened)
 
     if (variable_struct_exists(gs.ui, "settings_popup") && is_struct(gs.ui.settings_popup)) {
         var sp = gs.ui.settings_popup;

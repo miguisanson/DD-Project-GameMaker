@@ -265,7 +265,7 @@ function Scenario_Boot() {
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.choice_off = true;   // D154: nor the small flavour questions (the Stranger, the merchant, a note, the wake line) unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 48000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 50000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 54000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 56000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -567,7 +567,10 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeR3Saves2(_s);   // saves2 (D175, R-107): the title with profiles and three save files through real keys; goes on with mouse (1100)
             break;
         case 1100: case 1101: case 1102: case 1103: case 1104: case 1105: case 1106: case 1107: case 1108: case 1109:
-            Scenario_StepSmokeR3Mouse(_s);   // mouse (D182, R-111): the title, Settings sliders, the seed entry through a fake mouse; the end of the chain (its last step calls Scenario_MouseEnd)
+            Scenario_StepSmokeR3Mouse(_s);   // mouse (D182, R-111): the title, Settings sliders, the seed entry through a fake mouse; goes on with ideas2 (1120)
+            break;
+        case 1120: case 1121: case 1122: case 1123: case 1124: case 1125: case 1126: case 1127: case 1128: case 1129:
+            Scenario_StepSmokeR3Ideas2(_s);   // ideas2 (D173, D185): a trapped chest on floor 2 through real keys: the line, the one-time tutorial, the bar (map paused), Perfect and Weak; the end of the chain (its last step calls Scenario_MouseEnd)
             break;
         case 1110: case 1111: case 1112: case 1113: case 1114: case 1115: case 1116: case 1117: case 1118: case 1119:
             Scenario_StepSmokeR3Ideas1(_s);   // r3ideas1 (D173, D185, R-114, R-115): a resisted Bleeding is said and remembered by the Codex; a poison tick kills and the death tip is the poison one; goes on with saves2 (1070)
@@ -3075,7 +3078,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsR3Saves2(_s);   // saves2 (D175): the title with its buttons, Load Game, the overwrite picker, the profile screen, the name entry, the Codex from the title; three sizes, English and Korean; goes on with mouse (1090)
             break;
         case 1090: case 1091: case 1092: case 1093: case 1094: case 1095: case 1096: case 1097: case 1098: case 1099:
-            Scenario_StepShotsR3Mouse(_s);   // mouse (D182, R-111): the cursor over the title, pressed, over a battle menu and over a Settings slider, three sizes; the end of the pictures
+            Scenario_StepShotsR3Mouse(_s);   // mouse (D182, R-111): the cursor over the title, pressed, over a battle menu and over a Settings slider, three sizes; goes on with ideas2 (1120)
+            break;
+        case 1120: case 1121: case 1122: case 1123: case 1124: case 1125: case 1126: case 1127: case 1128: case 1129:
+            Scenario_StepShotsR3Ideas2(_s);   // ideas2 (D173, D185): the trapped line and the bar on the map, the boss's zoom punch; three sizes; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -3946,6 +3952,7 @@ function Scenario_RestoreFocus() {
 // player and every enemy. Drop it (and any open dialogue) before a movement part starts.
 function Scenario_ClearUi() {
     Scenario_RestoreFocus();
+    TrapUi_Interrupt();   // R3 ideas2: a trapped chest's bar (or its wait behind the line) does not carry into the next scene
     var _gs = GameState_Get();
     _gs.pending_post_battle_dialogue_lines = [];
     if (_gs.ui.mode != UI_NONE || array_length(_gs.ui.lines) > 0) UI_InterruptCloseAll(false);
@@ -5763,7 +5770,7 @@ function Scenario_StepSmokeRest(_s) {
                 _rc.h1 = true;
                 var _hm = TabMenu_TopMenu();
                 Scenario_Check("help_opens_from_the_system_tab", _gs.ui.mode == UI_MENU && TabMenu_Get().tab == 6 && _hm.id == "help");
-                Scenario_Check("help_lists_all_eleven_mechanics", array_length(_hm.items) == 12 && _hm.items[0].id == "timeline" && _hm.items[10].id == "status" && _hm.items[11].id == "stats_terms");
+                Scenario_Check("help_lists_all_twelve_mechanics", array_length(_hm.items) == 13 && _hm.items[0].id == "timeline" && _hm.items[10].id == "status" && _hm.items[11].id == "trap" && _hm.items[12].id == "stats_terms");
                 Scenario_Check("help_rows_carry_their_text", string_length(_hm.items[1].help) > 20 && string_pos("[k:confirm]", _hm.items[1].help) > 0);
                 Ui_MenuFixCursor(_hm, 1);
                 Scenario_Check("help_cursor_row_is_the_sliding_bar", _hm.items[_hm.cursor].id == "bar");
@@ -16071,7 +16078,7 @@ function Scenario_StepSmokeLabels(_s) {
             }
             if (_s.t == 120) {
                 var _hm = TabMenu_TopMenu();
-                Scenario_Check("labels_help_opens_with_the_stats_page_added", TabMenu_Depth() == 2 && _hm.id == "help" && array_length(_hm.items) == 12, "depth=" + string(TabMenu_Depth()) + " items=" + string(array_length(_hm.items)));
+                Scenario_Check("labels_help_opens_with_the_stats_page_added", TabMenu_Depth() == 2 && _hm.id == "help" && array_length(_hm.items) == 13, "depth=" + string(TabMenu_Depth()) + " items=" + string(array_length(_hm.items)));
                 Scenario_Tap("menu_up");   // wraps to the last row
             }
             if (_s.t == 134) {
@@ -17849,8 +17856,9 @@ function Scenario_StepSmokeR3Mouse(_s) {
             }
             if (_s.t > 300) { Scenario_Check("r3mouse_smoke_the_card_pick_by_mouse_finishes", false); Scenario_MouseEnd(); }
             break;
-        case 1109:   // the end of the chain: the fake mouse, the settings and the profiles the steps made are put away
-            Scenario_MouseEnd();
+        case 1109:   // the end of this chain's own steps: the fake mouse goes; ideas2 (1120) goes on and puts the settings and the profiles away at the very end
+            Mouse_FakeClear();
+            Scenario_Next(_s, 1120);
             break;
     }
 }
@@ -17956,7 +17964,8 @@ function Scenario_StepShotsR3Mouse(_s) {
                 if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
                 if (_o.di >= array_length(_scenes)) {
                     Scenario_SetWindowScale(3);
-                    Scenario_MouseEnd();   // the end of the pictures: the fake mouse and the files the scenes made go
+                    Mouse_FakeClear();   // the end of this chain's own pictures: the fake mouse goes; ideas2 (1120) goes on and ends the run
+                    Scenario_Next(_s, 1120);
                 } else {
                     Scenario_Next(_s, 1090);
                 }
@@ -18229,6 +18238,372 @@ function Scenario_StepShotsR3Ideas1(_s) {
             if (_s.t == 20) Scenario_Tap("confirm");
             if (_s.t > 40 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) Scenario_Next(_s, 1114);
             if (_s.t > 900) { Scenario_Check("shots_r3ideas1_back_to_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+    }
+}
+
+// ============================================================================
+// Round 3, packet ideas2 (D173, D185; IDEA-03 trapped chests), smoke steps 1120..1129. They go on from mouse (1109). A new run, floor 2, a chest next to the player (the only chest
+// of the floor, so it is the trapped one), opened with the real interact key; the line, the first-time tutorial, the bar pressed with the real confirm key on the bright zone (Perfect),
+// then a second chest left unpressed (Weak). The last step ends the run (Scenario_MouseEnd puts the mouse and the settings away).
+//   1120: a new run on floor 1, then floor 2        1121: the chest is trapped, the key opens it, the line, the tutorial, the bar pauses the map and stops out of focus
+//   1122: the press on the zone: Perfect, the bonus item, no HP lost, the opened chest is a normal one now
+//   1123: a second chest, no press: Weak, the HP cost (never below 1 HP), the chest's item all the same    1124: the end
+// ============================================================================
+function Scenario_I2Stage(_d, _pid) {
+    var _gs = GameState_Get();
+    with (obj_enemy) instance_destroy();
+    if (instance_exists(_d.chest)) with (_d.chest) instance_destroy();
+    _d.chest = Scenario_Block(obj_chest_lv1, 5, 7);
+    _d.chest.persist_id = _pid;
+    var _pl = Scenario_PlacePlayer(4, 7);
+    _pl.face = RIGHT;
+    var _ch = _gs.player_ch;
+    _ch.hp = _ch.max_hp;
+    _d.hp0 = _ch.hp;
+    _d.max0 = _ch.max_hp;
+    _d.want = Shuffle_ChestLoot(_gs.run.seed, room_get_name(room), _pid, _d.chest.container_level, _d.chest.loot_table_key, _ch);
+    _d.before = [];
+    for (var _w = 0; _w < array_length(_d.want); _w++) array_push(_d.before, Scenario_ItemCount(_ch, _d.want[_w].item_id));
+    _d.bonus_before = Scenario_ItemCount(_ch, 10) + Scenario_ItemCount(_ch, 11) + Scenario_ItemCount(_ch, 12) + Scenario_ItemCount(_ch, 13);
+    _d.tapped = false;
+    _d.line_ok = false;
+    _d.t1 = -1;
+}
+
+function Scenario_I2GotItems(_d) {
+    var _gs = GameState_Get();
+    for (var _w = 0; _w < array_length(_d.want); _w++) {
+        var _gotn = Scenario_ItemCount(_gs.player_ch, _d.want[_w].item_id);
+        var _it = ItemDB_Get(_d.want[_w].item_id);
+        var _unique = (_it.type == ITEM_WEAPON || _it.type == ITEM_ARMOR || _it.type == ITEM_ACCESSORY);
+        if (_unique ? (_gotn < 1) : (_gotn < _d.before[_w] + _d.want[_w].qty)) return false;
+    }
+    return true;
+}
+
+function Scenario_StepSmokeR3Ideas2(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "i2")) _s.i2 = { chest: noone, pass: 0 };
+    var _d = _s.i2;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    switch (_s.step) {
+        case 1120:   // the packet's functions exist; a new run, then floor 2
+            if (!variable_struct_exists(_d, "init")) {
+                _d.init = true;
+                Mouse_FakeClear();
+                var _fns = ["Trap_PickPid", "Trap_IsTrapped", "Trap_Apply", "TrapUi_Open", "TrapUi_Step", "TrapUi_Draw", "TrapUi_Finish", "Feel_FinisherTotalMs"];
+                var _miss = "";
+                for (var _f = 0; _f < array_length(_fns); _f++) if (!script_exists(asset_get_index(_fns[_f]))) _miss += _fns[_f] + " ";
+                Scenario_Check("ideas2_smoke_the_trap_functions_exist", _miss == "", _miss);
+                if (_miss != "") { Scenario_MouseEnd(); break; }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Confirm_Close();
+                Scenario_NewKnight();
+                _d.hop = (room == rm_floor3) ? rm_floor1 : rm_floor3;   // the player is only spawned on a room change: hop to a floor that is not this one first
+                room_goto(_d.hop);
+            }
+            if (_s.t > 5 && !variable_struct_exists(_d, "hopped")) {
+                if (_s.t > 20 && Scenario_FloorReady(_d.hop)) { _d.hopped = true; _s.t = 6; }
+                else if (_s.t > 900) { Scenario_Check("ideas2_smoke_a_floor_is_reached", false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+                break;
+            }
+            if (_s.t > 5 && !variable_struct_exists(_d, "begun")) {
+                if (Scenario_Hunt2Begin(_s, _d, 7701)) { _d.begun = true; _s.t = 0; }
+                else if (_s.t > 1500) { Scenario_Check("ideas2_smoke_a_new_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+                break;
+            }
+            if (variable_struct_exists(_d, "begun") && _s.t > 5 && Scenario_FloorReady(rm_floor1)) {
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                _gs.persist = {};
+                _gs.persist_applied = {};
+                room_goto(rm_floor2);
+                Scenario_Next(_s, 1121);
+            }
+            break;
+        case 1121:   // the chest is trapped; the key opens it; the line; the tutorial; the bar pauses the map and a window out of front stops it
+            if (_s.t > 40 && Scenario_FloorReady(rm_floor2) && !variable_struct_exists(_d, "staged")) {
+                _d.staged = true;
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_NoOwed();
+                global.tutorial_off = false;   // the first trapped chest of a profile shows the one-time pop-up
+                Scenario_TutorialForget();
+                Scenario_I2Stage(_d, "i2_chest_a");
+                Scenario_Check("ideas2_smoke_the_only_chest_of_floor_2_is_the_trapped_one", Trap_IsTrapped(_d.chest) && Run_FloorOfRoomName(room_get_name(room)) == 2, "room=" + room_get_name(room));
+                Scenario_Check("ideas2_smoke_the_chest_has_loot_to_find", array_length(_d.want) > 0, json_stringify(_d.want));
+                _d.t0 = _s.t;
+            }
+            if (!variable_struct_exists(_d, "staged")) { if (_s.t > 900) { Scenario_Check("ideas2_smoke_floor_2_is_reached", false, "room=" + room_get_name(room)); Scenario_MouseEnd(); } break; }
+            if (!_d.tapped && _s.t >= _d.t0 + 25) { _d.tapped = true; Scenario_Tap("interact"); }
+            if (_d.tapped && instance_exists(_d.chest) && _d.chest.swapped && !_d.line_ok && _gs.ui.mode == UI_DIALOGUE && array_length(_gs.ui.lines) > 0) {
+                _d.line_ok = true;
+                var _l0 = Dialogue_LineText(_gs.ui.lines[0]);
+                Scenario_Check("ideas2_smoke_opening_it_says_it_is_trapped", _l0 == Loc_T("trap.line.trapped", "It's trapped!"), _l0);
+                Scenario_Check("ideas2_smoke_the_chest_item_is_already_in_the_bag", Scenario_I2GotItems(_d));
+            }
+            if (_d.line_ok && !TrapUi_IsOpen()) { Scenario_Check("ideas2_smoke_the_trap_screen_is_waiting_behind_the_line", false); Scenario_MouseEnd(); break; }
+            if (_d.line_ok && Tutorial_IsOpen()) {
+                if (!variable_struct_exists(_d, "tut_seen")) {
+                    _d.tut_seen = true;
+                    Scenario_Check("ideas2_smoke_the_first_trapped_chest_shows_the_pop_up", Tutorial_CurrentId() == "trap", Tutorial_CurrentId());
+                    Scenario_Check("ideas2_smoke_the_bar_has_not_started_behind_the_pop_up", global.trap_ui.ms <= -QTE_LEAD_IN_MS + 1, string(global.trap_ui.ms));
+                }
+                Scenario_TutorialTap(_s);
+                break;
+            }
+            if (_d.line_ok && !Tutorial_IsOpen() && _gs.ui.mode == UI_DIALOGUE) Scenario_CardsTalk(_s);   // the line is read with real confirm presses
+            if (_d.line_ok && TrapUi_IsOpen() && global.trap_ui.phase == "bar" && !variable_struct_exists(_d, "bar_seen")) {
+                _d.bar_seen = true;
+                _d.bar_t = _s.t;
+                _d.px = _pl.x;
+                _d.py = _pl.y;
+                Scenario_Check("ideas2_smoke_the_bar_is_up_and_the_map_is_paused", _gs.ui.mode == UI_TRAP && UI_IsBlocking() && Menu_MapFree() == false, "mode=" + string(_gs.ui.mode));
+                Scenario_Hold("move_up", 20);   // walking is ignored behind the bar
+            }
+            if (variable_struct_exists(_d, "bar_seen") && !variable_struct_exists(_d, "walk_checked") && _s.t >= _d.bar_t + 14) {
+                _d.walk_checked = true;
+                Scenario_Check("ideas2_smoke_a_held_move_key_does_not_walk_the_player_behind_the_bar", _pl.x == _d.px && _pl.y == _d.py && TrapUi_IsOpen(), "x=" + string(_pl.x) + " y=" + string(_pl.y));
+                _d.focus_t = _s.t;
+            }
+            // D122: the window leaves the front -> the bar stops; it comes back -> it goes on
+            if (variable_struct_exists(_d, "walk_checked") && !variable_struct_exists(_d, "focus_out") && _s.t >= _d.focus_t + 12 && TrapUi_IsOpen() && global.trap_ui.ms > 0 && global.trap_ui.ms < 350) {
+                _d.focus_out = true;
+                Focus_Step(false);
+                _d.ms_out = global.trap_ui.ms;
+                _d.out_t = _s.t;
+            }
+            if (variable_struct_exists(_d, "focus_out") && !variable_struct_exists(_d, "focus_back") && _s.t >= _d.out_t + 12) {
+                _d.focus_back = true;
+                Scenario_Check("ideas2_smoke_out_of_focus_the_bar_stands_still_and_no_menu_opens", abs(global.trap_ui.ms - _d.ms_out) < 0.5 && _gs.ui.mode == UI_TRAP, "ms " + string(_d.ms_out) + " -> " + string(global.trap_ui.ms) + " mode=" + string(_gs.ui.mode));
+                Scenario_RestoreFocus();
+                _d.ms_back = global.trap_ui.ms;
+                _d.back_t = _s.t;
+            }
+            if (variable_struct_exists(_d, "focus_back") && !variable_struct_exists(_d, "resumed") && _s.t >= _d.back_t + 6) {
+                _d.resumed = true;
+                Scenario_Check("ideas2_smoke_back_in_front_the_bar_goes_on_where_it_was", global.trap_ui.ms > _d.ms_back + 20 && global.trap_ui.ms < _d.ms_back + 400, "ms " + string(_d.ms_back) + " -> " + string(global.trap_ui.ms));
+                Scenario_Next(_s, 1122);
+            }
+            if (_s.t > 1500) { Scenario_Check("ideas2_smoke_the_trap_bar_flow_one_ends", false, "tapped=" + string(_d.tapped) + " line=" + string(_d.line_ok) + " mode=" + string(_gs.ui.mode)); Scenario_MouseEnd(); }
+            break;
+        case 1122:   // the real confirm key on the bright zone: Perfect, the bonus item, no HP lost; the opened chest is a normal one
+            if (TrapUi_IsOpen() && global.trap_ui.phase == "bar" && !variable_struct_exists(_d, "pressed")) {
+                var _centre = Qte_ZoneCentreMs(Trap_BarParams());
+                if (global.trap_ui.ms >= _centre - 12) {
+                    _d.pressed = true;
+                    _d.press_ms = global.trap_ui.ms;
+                    Scenario_Tap("confirm");
+                }
+            }
+            if (variable_struct_exists(_d, "pressed") && !variable_struct_exists(_d, "graded") && !TrapUi_IsOpen()) {
+                _d.graded = true;
+                var _tr = global.trap_result;
+                Scenario_Check("ideas2_smoke_a_press_on_the_zone_is_perfect", is_struct(_tr) && _tr.key == QTE_PERFECT, is_struct(_tr) ? (_tr.key + " pressed at " + string(_d.press_ms)) : "no result");
+                var _bonus_now = Scenario_ItemCount(_gs.player_ch, 10) + Scenario_ItemCount(_gs.player_ch, 11) + Scenario_ItemCount(_gs.player_ch, 12) + Scenario_ItemCount(_gs.player_ch, 13);
+                var _chest_extra = 0;
+                for (var _w = 0; _w < array_length(_d.want); _w++) if (_d.want[_w].item_id >= 10 && _d.want[_w].item_id <= 13) _chest_extra += _d.want[_w].qty;
+                Scenario_Check("ideas2_smoke_perfect_gives_one_bonus_consumable_on_top_of_the_item", _bonus_now == _d.bonus_before + _chest_extra + 1 && Scenario_I2GotItems(_d), "now=" + string(_bonus_now) + " before=" + string(_d.bonus_before) + " chest=" + string(_chest_extra));
+                Scenario_Check("ideas2_smoke_perfect_costs_no_hp", _gs.player_ch.hp == _d.hp0, string(_gs.player_ch.hp) + " of " + string(_d.hp0));
+                Scenario_Check("ideas2_smoke_the_result_is_said_in_a_dialogue", _gs.ui.mode == UI_DIALOGUE && array_length(_gs.ui.lines) >= 2, "mode=" + string(_gs.ui.mode));
+            }
+            if (variable_struct_exists(_d, "graded")) Scenario_CardsTalk(_s);
+            if (variable_struct_exists(_d, "graded") && _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && !variable_struct_exists(_d, "reopened") && _s.t > 30) {
+                _d.reopened = true;
+                _d.reopen_t = _s.t;
+                _d.items_after = Scenario_ItemCount(_gs.player_ch, 10) + Scenario_ItemCount(_gs.player_ch, 11) + Scenario_ItemCount(_gs.player_ch, 12) + Scenario_ItemCount(_gs.player_ch, 13);
+                Scenario_Tap("interact");
+            }
+            if (variable_struct_exists(_d, "reopened") && !variable_struct_exists(_d, "normal_checked") && _s.t >= _d.reopen_t + 20) {
+                _d.normal_checked = true;
+                Scenario_Check("ideas2_smoke_the_opened_chest_is_a_normal_chest_now", !TrapUi_IsOpen() && _gs.ui.mode != UI_TRAP && _gs.player_ch.hp == _d.hp0, "mode=" + string(_gs.ui.mode));
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                global.tutorial_off = true;
+                Scenario_Next(_s, 1123);
+            }
+            if (_s.t > 900) { Scenario_Check("ideas2_smoke_the_trap_bar_flow_two_ends", false, "pressed=" + string(variable_struct_exists(_d, "pressed")) + " mode=" + string(_gs.ui.mode)); Scenario_MouseEnd(); }
+            break;
+        case 1123:   // a second chest, no press: Weak, the HP cost (never below 1 HP), the chest's item all the same
+            if (!variable_struct_exists(_d, "staged2")) {
+                _d.staged2 = true;
+                Scenario_I2Stage(_d, "i2_chest_b");
+                Scenario_Check("ideas2_smoke_the_new_chest_is_the_trapped_one", Trap_IsTrapped(_d.chest));
+                _d.t0 = _s.t;
+            }
+            if (!_d.tapped && _s.t >= _d.t0 + 25) { _d.tapped = true; Scenario_Tap("interact"); }
+            if (_d.tapped && !variable_struct_exists(_d, "weak_done") && !(TrapUi_IsOpen() && global.trap_ui.phase == "bar")) Scenario_CardsTalk(_s);
+            if (_d.tapped && TrapUi_IsOpen() && global.trap_ui.phase == "bar" && !variable_struct_exists(_d, "weak_bar")) _d.weak_bar = true;
+            if (variable_struct_exists(_d, "weak_bar") && !TrapUi_IsOpen() && !variable_struct_exists(_d, "weak_done")) {
+                _d.weak_done = true;
+                var _tw = global.trap_result;
+                var _want_hp = max(1, _d.hp0 - Trap_Loss(_d.hp0, _d.max0));
+                Scenario_Check("ideas2_smoke_no_press_is_weak", is_struct(_tw) && _tw.key == QTE_WEAK, is_struct(_tw) ? _tw.key : "no result");
+                Scenario_Check("ideas2_smoke_weak_costs_15_percent_of_max_hp_rounded_up_never_below_1", _gs.player_ch.hp == _want_hp && _gs.player_ch.hp >= 1 && _want_hp < _d.hp0, "hp=" + string(_gs.player_ch.hp) + " want=" + string(_want_hp) + " max=" + string(_d.max0));
+                Scenario_Check("ideas2_smoke_weak_still_gives_the_chests_item", Scenario_I2GotItems(_d), json_stringify(_d.want));
+                Scenario_Check("ideas2_smoke_weak_gives_no_bonus", array_length(_tw.bonus) == 0);
+                var _wl = (array_length(_gs.ui.lines) > 0) ? Dialogue_LineText(_gs.ui.lines[0]) : "";
+                Scenario_Check("ideas2_smoke_the_weak_line_says_the_cost", _gs.ui.mode == UI_DIALOGUE && string_pos(string(_d.hp0 - _gs.player_ch.hp), _wl) > 0, _wl);
+            }
+            if (variable_struct_exists(_d, "weak_done")) {
+                Scenario_CardsTalk(_s);
+                if (_gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0 && _s.t > 30) Scenario_Next(_s, 1124);
+            }
+            if (_s.t > 1200) { Scenario_Check("ideas2_smoke_the_weak_flow_ends", false, "tapped=" + string(_d.tapped) + " mode=" + string(_gs.ui.mode) + " trap=" + string(TrapUi_IsOpen())); Scenario_MouseEnd(); }
+            break;
+        case 1124:   // the end of the chain
+            Scenario_RestoreFocus();
+            global.tutorial_off = true;
+            Scenario_MouseEnd();
+            break;
+    }
+}
+
+// ============================================================================
+// Round 3, packet ideas2 (D173, D185), pictures 1120..1129: the trapped chest's line ("It's trapped!") on the map, the sliding bar over the paused map (cursor parked mid-bar), and the boss's
+// zoom punch at its peak (the held frame of Palehorn's finisher), at window scale 3 (480 x 432), 4 (640 x 576) and 5 (800 x 720). shot_r3ideas2_<scene>_<w>x<h>.png.
+// The last pictures of the run: they end it (Scenario_MouseEnd).
+//   1120: enter the floor / the fight at this scale   1121: set the scene up   1122: wait for the moment   1123: the picture
+// ============================================================================
+function Scenario_R3Ideas2Scenes() {
+    return ["trap_line", "trap_bar", "boss_zoom"];
+}
+
+function Scenario_StepShotsR3Ideas2(_s) {
+    var _scenes = Scenario_R3Ideas2Scenes();
+    var _scales = [3, 4, 5];
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "i2s")) _s.i2s = { di: 0, si: 0, chest: noone };
+    var _o = _s.i2s;
+    var _scene = _scenes[_o.di];
+    var _tag = _scene + "_" + string(_scales[_o.si]);
+    var _boss = (_scene == "boss_zoom");
+    var _bc = instance_exists(obj_battle_controller) ? instance_find(obj_battle_controller, 0) : noone;
+    switch (_s.step) {
+        case 1120:   // a new knight and a run, at this scale: the floor, or the boss fight
+            if (_s.t == 1) {
+                Mouse_FakeClear();
+                Display_ClearZoom();
+                Loc_SetLanguage("en");
+                global.tutorial_off = true;
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                var _g = Scenario_NewKnight(CLASS_KNIGHT);
+                _g.run = Run_Create(4242);
+                _g.run.gold = 40;
+                GameSettings_Ensure().screen_shake = 1;
+                Scenario_NoOwed();
+                Scenario_SetWindowScale(_scales[_o.si]);
+                _o.hop = false;
+                if (_boss) Scenario_GotoBattle("shots_ideas2_boss", ENEMY_MINI_BOSS);
+                else if (room == rm_floor2) { room_goto(rm_floor1); _o.hop = true; }   // the player is only spawned on a room change: leave floor 2 first
+                else room_goto(rm_floor2);
+            }
+            if (_boss) {
+                if (_s.t >= 30 && room == rm_battle && _bc != noone) Scenario_Next(_s, 1121);
+            } else if (_o.hop && _s.t >= 25 && Scenario_FloorReady(rm_floor1)) {
+                _o.hop = false;
+                room_goto(rm_floor2);
+                _s.t = 2;
+            } else if (!_o.hop && _s.t >= 25 && Scenario_FloorReady(rm_floor2)) {
+                Scenario_Next(_s, 1121);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_r3ideas2_enters_the_scene_" + _tag, false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+            break;
+        case 1121:   // set the scene up
+            if (_boss) {
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;   // park the intro message
+                _bc.e.max_hp = 300;
+                _bc.e.hp = 0;
+                _bc.enemy_hp_shown = 0;
+                _bc.last_dmg = 20;
+                _bc.qte_result_key = QTE_PERFECT;
+                Scenario_Check("shots_r3ideas2_the_boss_dies_into_the_finisher_" + _tag, Battle_DeathPopBegin(_bc, _bc.e, "Palehorn has been slain.") && Battle_FinisherActive(_bc), "");
+                Scenario_Next(_s, 1122);
+                break;
+            }
+            with (obj_enemy) instance_destroy();
+            Dialogue_CloseNow();
+            Scenario_ClearUi();
+            Scenario_NoOwed();
+            if (instance_exists(_o.chest)) with (_o.chest) instance_destroy();
+            _o.chest = Scenario_Block(obj_chest_lv1, 5, 7);
+            _o.chest.persist_id = "r3i2_" + _tag;
+            var _pl = Scenario_PlacePlayer(4, 7);
+            _pl.face = RIGHT;
+            _gs.player_ch.hp = _gs.player_ch.max_hp;
+            Scenario_Check("shots_r3ideas2_the_chest_is_the_trapped_one_" + _tag, Trap_IsTrapped(_o.chest), "");
+            _o.tapped = false;
+            _o.t1 = _s.t;
+            Scenario_Next(_s, 1122);
+            break;
+        case 1122:   // wait for the moment
+            if (_boss) {
+                if (_bc == noone) { Scenario_Check("shots_r3ideas2_battle_still_there_" + _tag, false); Scenario_MouseEnd(); break; }
+                if (_bc.feel_inset >= FEEL_FINISHER_ZOOM_PX) { Scenario_Next(_s, 1123); }
+                else if (_s.t > 300) { Scenario_Check("shots_r3ideas2_the_zoom_peak_is_reached_" + _tag, false, "inset=" + string(_bc.feel_inset)); Scenario_MouseEnd(); }
+                break;
+            }
+            if (!_o.tapped && _s.t >= 20) { _o.tapped = true; Scenario_Tap("interact"); }
+            if (_scene == "trap_line") {
+                if (_o.tapped && _o.chest.swapped && _gs.ui.mode == UI_DIALOGUE && array_length(_gs.ui.lines) > 0) {
+                    Dialogue_TypewriterPrepareCurrentLine();
+                    Dialogue_TypewriterRevealInstant();
+                    _gs.ui.dialogue_state = UI_DIALOGUE_STATE_READY;
+                    Scenario_Next(_s, 1123);
+                }
+            } else {
+                if (_o.tapped && _o.chest.swapped && _gs.ui.mode == UI_DIALOGUE) Scenario_CardsTalk(_s);
+                if (TrapUi_IsOpen() && global.trap_ui.phase == "bar") Scenario_Next(_s, 1123);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_r3ideas2_the_moment_is_reached_" + _tag, false, "mode=" + string(_gs.ui.mode)); Scenario_MouseEnd(); }
+            break;
+        case 1123:   // park the moment, check it, take the picture
+            if (_boss) {
+                if (_s.t <= 3) _bc.death_pop.fin_ms = Feel_FinisherPeakMs();   // hold the punch at its peak: the picture is the same every run
+            } else if (_scene == "trap_bar" && _s.t <= 3) {
+                global.trap_ui.ms = 520;   // the cursor part-way along, before the bright zone
+                global.trap_ui.opened_ms = current_time - 1000;   // the plate has finished fading in, whatever the frame rate
+            }
+            if (_s.t == 3) {
+                var _mt = Ui_Metrics();
+                _s.shot = "shot_r3ideas2_" + _scene + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                switch (_scene) {
+                    case "trap_line":
+                        var _ln = (array_length(_gs.ui.lines) > 0) ? Dialogue_LineText(_gs.ui.lines[0]) : "";
+                        Scenario_Check("shots_r3ideas2_trap_line_is_up_" + _tag, _gs.ui.mode == UI_DIALOGUE && _ln == Loc_T("trap.line.trapped", "It's trapped!"), _ln);
+                        break;
+                    case "trap_bar":
+                        Scenario_Check("shots_r3ideas2_trap_bar_is_up_over_the_paused_map_" + _tag, TrapUi_IsOpen() && _gs.ui.mode == UI_TRAP && global.trap_ui.phase == "bar", "mode=" + string(_gs.ui.mode));
+                        var _bx = TrapUi_Box();
+                        Scenario_Check("shots_r3ideas2_trap_bar_is_inside_the_picture_" + _tag, _bx.x >= 0 && _bx.y >= 0 && _bx.x + _bx.w <= _mt.gw && _bx.y + _bx.h <= _mt.gh, json_stringify(_bx));
+                        break;
+                    case "boss_zoom":
+                        var _zr = _bc.feel_zr;
+                        Scenario_Check("shots_r3ideas2_the_boss_zoom_is_at_its_peak_" + _tag, _bc.feel_inset >= FEEL_FINISHER_ZOOM_PX && _zr.zoom >= 1.07 && _zr.zoom <= 1.09, "inset=" + string(_bc.feel_inset) + " zoom=" + string(_zr.zoom));
+                        Scenario_Check("shots_r3ideas2_the_boss_is_still_drawn_in_the_hold_" + _tag, Feel_SpriteVisible(_bc.death_pop.t_ms) && Battle_DeathPopHeld(_bc));
+                        Scenario_Check("shots_r3ideas2_the_display_is_zoomed_by_about_8_percent_" + _tag, global.display.zoom >= 1.07 && global.display.zoom <= 1.09, string(global.display.zoom));
+                        break;
+                }
+                Scenario_ShotLayout(_s.shot);
+            }
+            if (_s.t >= 7) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Display_ClearZoom();
+                if (TrapUi_IsOpen()) TrapUi_Interrupt();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Scenario_SetWindowScale(3);
+                    Scenario_MouseEnd();   // the end of the pictures: the fake mouse and the files the scenes made go
+                } else {
+                    Scenario_Next(_s, 1120);
+                }
+            }
             break;
     }
 }

@@ -1308,6 +1308,7 @@ function Battle_AttackTimingBegin(_bc) {
 
 // The enemy shake, the small camera shakes, the sparks, the jolt and the recoil of a landed hit. After the hit's freeze (every damaging hit, Battle_HitFreeze) Step_0 calls this, so the freeze comes first.
 function Battle_QteImpactFeedback(_bc) {
+    if (Battle_DeathPopHeld(_bc)) return;   // IDEA-21: the boss's killing hit has its finisher: no shake, jolt or sparks to break the held beat
     if (_bc.last_dmg > 0 && instance_exists(_bc.enemy_inst) && !Battle_DeathPopActive(_bc)) {
         SpriteShake_Start(_bc.enemy_inst, ENEMY_SHAKE_DIR, ENEMY_SHAKE_MAG, ENEMY_SHAKE_MS, ENEMY_FLASH_MS, ENEMY_FLASH_RATE_MS);
     }
@@ -3910,7 +3911,12 @@ function Battle_HitFeel(_bc) {
 
 // The picture's push-in now, px a side (the hit's jolt or the zoom punch; 0 with the Screen shake setting off).
 function Battle_FeelInset(_bc) {
-    return Feel_InsetPx(_bc.feel_ms - _bc.feel_hit_start, _bc.feel_hit_px, _bc.feel_ms - _bc.feel_punch_start, _bc.feel_punch_on, Settings_ShakeOn());
+    var inset = Feel_InsetPx(_bc.feel_ms - _bc.feel_hit_start, _bc.feel_hit_px, _bc.feel_ms - _bc.feel_punch_start, _bc.feel_punch_on, Settings_ShakeOn());
+    var dp = _bc.death_pop;
+    if (is_struct(dp) && dp.active && variable_struct_exists(dp, "fin_total") && dp.fin_total > 0 && dp.fin_ms < FEEL_FINISHER_ZOOM_MS) {
+        inset = max(inset, Feel_FinisherInsetPx(dp.fin_ms));   // IDEA-21: the boss's zoom punch is a zoom, not a shake: it is there with the Screen shake setting off too
+    }
+    return inset;
 }
 
 // Once per Step: the feel clock, the death pop's clock, the low-HP heartbeat, and the push-in handed to the display.
@@ -3975,8 +3981,13 @@ function Battle_DeathPopBegin(_bc, _e, _text) {
     var ys = abs(inst.image_yscale);
     _bc.death_pop = {
         active: true, t_ms: 0, boss: boss, text: _text, total_ms: Feel_DeathTotalMs(boss), burst_done: false,
+        fin_ms: 0, fin_total: boss ? Feel_FinisherTotalMs() : 0,   // R3 ideas2 (IDEA-21): a boss's finisher runs first, the pop's own clock (t_ms) waits for it
         parts: Feel_DeathParticles(spr, inst.image_index, inst.x - sprite_get_xoffset(spr) * xs, inst.y - sprite_get_yoffset(spr) * ys, xs, ys, boss)
     };
+    if (boss) {   // IDEA-21: the killing hit of a boss freezes the picture 250 ms (a clean held frame: no contact flash), then the zoom and the held beat
+        _bc.hitstop_ms = max(_bc.hitstop_ms, FEEL_FINISHER_FREEZE_MS);
+        _bc.feel_contact = false;
+    }
     _bc.battle_state = BSTATE_MESSAGE;       // the controller waits here until the pop is over (Step_0 exits through Battle_DeathPopStep)
     _bc.message_next_state = BSTATE_END_RUN;
     _bc.wait_fx = noone;
@@ -3988,10 +3999,24 @@ function Battle_DeathPopActive(_bc) {
     return is_struct(_bc.death_pop) && _bc.death_pop.active;
 }
 
+// IDEA-21: true while a boss's finisher (the freeze, the zoom punch and the held beat) is running: the boss is still drawn, nothing new shakes or sounds, the pop has not begun.
+function Battle_DeathPopHeld(_bc) {
+    var dp = _bc.death_pop;
+    return is_struct(dp) && dp.active && variable_struct_exists(dp, "fin_total") && dp.fin_ms < dp.fin_total;
+}
+
+function Battle_FinisherActive(_bc) {
+    return Battle_DeathPopHeld(_bc);
+}
+
 // The pop's clock (real ms). The sound and the shake of the burst start when the freeze is over.
 function Battle_DeathPopAdvance(_bc, _ms) {
     var dp = _bc.death_pop;
     if (!is_struct(dp) || !dp.active) return;
+    if (dp.fin_ms < dp.fin_total) {   // IDEA-21: the boss finisher's own clock; the pop (freeze, flash, burst) starts when it is over
+        dp.fin_ms += _ms;
+        return;
+    }
     dp.t_ms += _ms;
     if (!dp.burst_done && dp.t_ms >= FEEL_DEATH_FREEZE_MS) {
         dp.burst_done = true;

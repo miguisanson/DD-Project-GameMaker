@@ -168,6 +168,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Mouse", Test_Suite_R3Mouse);
     Test_RunSuite("R3LevelUp", Test_Suite_R3LevelUp);
     Test_RunSuite("R3Ideas1", Test_Suite_R3Ideas1);
+    Test_RunSuite("R3Ideas2", Test_Suite_R3Ideas2);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -6362,7 +6363,7 @@ function Test_Suite_Tutorial() {
     var _ids = Tutorial_Ids();
     var _txt = "";
     for (var _i = 0; _i < array_length(_ids); _i++) _txt += ((_i > 0) ? "," : "") + _ids[_i];
-    Test_Eq("D45 the eleven mechanics, in order", _txt, "timeline,bar,arrows,defence,stagger,cards,shop,throwables,bed,elite,status");
+    Test_Eq("D45 the twelve mechanics, in order (R3 ideas2 added the trapped chest)", _txt, "timeline,bar,arrows,defence,stagger,cards,shop,throwables,bed,elite,status,trap");
     for (var _j = 0; _j < array_length(_ids); _j++) {
         var _e = Tutorial_Get(_ids[_j]);
         Test_True("D45 " + _ids[_j] + " has a title and a short text", is_struct(_e) && string_length(_e.title) > 2 && string_length(_e.body) > 20 && string_length(_e.body) < 260);
@@ -6405,7 +6406,7 @@ function Test_Suite_Tutorial() {
     global.tutorial_off = false;
     // the Help page lists all eleven, seen or not
     var _help = Tutorial_HelpItems();
-    Test_Eq("D45 the Help page lists all eleven", array_length(_help), 11);
+    Test_Eq("D45 the Help page lists all twelve", array_length(_help), 12);
     Test_Eq("D45 the Help rows carry the titles", _help[1].label, Tutorial_Get("bar").title);
     Test_Eq("D45 the Help rows carry the text for the details panel", _help[1].help, Tutorial_Get("bar").body);
     Test_True("D45 the pop-up footer has a prompt", Prompt_HasTokens(Tutorial_Footer()));
@@ -12371,7 +12372,7 @@ function Test_Suite_Labels() {
 
     // ---- D156: the Help page "Stats & terms" ----
     var _hi = TabHelp_Items();
-    Test_Eq("D156 the Help list has the 11 hints and the stats page", array_length(_hi), 12);
+    Test_Eq("D156 the Help list has the 12 hints (R3 ideas2 added the trapped chest) and the stats page", array_length(_hi), 13);
     Test_Eq("D156 the stats page is the last row", _hi[array_length(_hi) - 1].id, "stats_terms");
     Test_Eq("D156 its title", _hi[array_length(_hi) - 1].label, "Stats & Terms");
     Test_Eq("D156 the hints keep their places", _hi[0].id, "timeline");
@@ -18455,4 +18456,475 @@ function Test_R3IdWorkbook() {
     }
     Test_Eq("r3ideas1 workbook: every new string is in the workbook in English and Korean", _miss, "");
     Test_Eq("r3ideas1 workbook: the Korean is not the English", _same, "");
+}
+
+// ==========================================================================================================================
+// R3 ideas2 (D173, D185; IDEA-03 trapped chests, IDEA-21 boss finisher). The agent sets the numbers (D185); every expected value below comes from the brief or from
+// plain arithmetic (15% of max HP rounded up, never below 1 HP; the bar is the sword attack's bar, D60; 250 ms freeze, ~8% zoom over ~300 ms, 600 ms held beat).
+// ==========================================================================================================================
+function Test_Suite_R3Ideas2() {
+    var _fns = ["Trap_PickPid", "Trap_ChestPids", "Trap_IsTrapped", "Trap_Loss", "Trap_Outcome", "Trap_BonusLoot", "Trap_Apply", "Trap_BarParams", "Trap_Grade", "TrapUi_New", "TrapUi_Open",
+        "TrapUi_Update", "TrapUi_Finish", "TrapUi_Step", "TrapUi_Draw", "TrapUi_Interrupt", "TrapUi_IsOpen", "Feel_FinisherTotalMs", "Feel_FinisherInsetPx", "Battle_FinisherActive"];
+    var _miss = "";
+    for (var _f = 0; _f < array_length(_fns); _f++) if (!script_exists(asset_get_index(_fns[_f]))) _miss += _fns[_f] + " ";
+    Test_True("ideas2: the packet's functions exist", _miss == "");
+    if (_miss != "") return;
+    var _shake_keep = GameSettings_Ensure().screen_shake;
+    Test_RunSuite("R3Ideas2.pick", Test_I2Pick);
+    Test_RunSuite("R3Ideas2.chests", Test_I2Chests);
+    Test_RunSuite("R3Ideas2.outcomes", Test_I2Outcomes);
+    Test_RunSuite("R3Ideas2.bar", Test_I2Bar);
+    Test_RunSuite("R3Ideas2.ui", Test_I2Ui);
+    Test_RunSuite("R3Ideas2.tutorial", Test_I2Tutorial);
+    Test_RunSuite("R3Ideas2.text", Test_I2Text);
+    Test_RunSuite("R3Ideas2.finisher", Test_I2Finisher);
+    GameSettings_Ensure().screen_shake = _shake_keep;
+}
+
+function Test_I2Pick() {
+    var _pids = ["c1", "c2", "c3", "c4"];
+    Test_Eq("trap pick: floor 1 has no trapped chest", Trap_PickPid(5, "rm_floor1", _pids), "");
+    Test_Eq("trap pick: a floor with no chest has none", Trap_PickPid(5, "rm_floor2", []), "");
+    Test_Eq("trap pick: the only chest of floor 2 is the trapped one", Trap_PickPid(5, "rm_floor2", ["only"]), "only");
+    Test_Eq("trap pick: a room that is no floor has none", Trap_PickPid(5, "rm_start", ["a"]), "");
+    Test_Eq("trap pick: the battle room has none", Trap_PickPid(5, "rm_battle", ["a"]), "");
+    Test_Eq("trap pick: floor 6.5 counts as a floor from 2 on", Trap_PickPid(5, "rm_floor6_5", ["a"]), "a");
+    Test_Eq("trap pick: floor 9 counts", Trap_PickPid(5, "rm_floor9", ["a", "b"]) != "", true);
+    var _seen = { c1: 0, c2: 0, c3: 0, c4: 0 };
+    var _member = true;
+    var _stable = true;
+    var _order = true;
+    for (var _sd = 1; _sd <= 200; _sd++) {
+        var _a = Trap_PickPid(_sd, "rm_floor3", _pids);
+        if (!array_contains(_pids, _a)) { _member = false; continue; }
+        variable_struct_set(_seen, _a, variable_struct_get(_seen, _a) + 1);
+        if (Trap_PickPid(_sd, "rm_floor3", _pids) != _a) _stable = false;
+        if (Trap_PickPid(_sd, "rm_floor3", ["c4", "c2", "c1", "c3"]) != _a) _order = false;
+    }
+    Test_True("trap pick: exactly one chest of the floor is picked, and it is one of them", _member);
+    Test_True("trap pick: the same seed picks the same chest (200 seeds, twice each)", _stable);
+    Test_True("trap pick: the order the chests were found in does not matter", _order);
+    Test_True("trap pick: every chest is the trapped one for some seeds (a fair spread over 200 seeds)", _seen.c1 >= 20 && _seen.c2 >= 20 && _seen.c3 >= 20 && _seen.c4 >= 20);
+    var _rooms = 0;
+    for (var _fl = 2; _fl <= 9; _fl++) if (Trap_PickPid(12345, "rm_floor" + string(_fl), _pids) != "") _rooms++;
+    Test_Eq("trap pick: every floor from 2 to 9 with a chest has a trapped one", _rooms, 8);
+}
+
+function Test_I2MakeChests(_pids, _obj) {
+    var _out = [];
+    for (var _i = 0; _i < array_length(_pids); _i++) {
+        var _c = instance_create_depth(16 + _i * 16, 16, 0, _obj);
+        _c.persist_id = _pids[_i];
+        array_push(_out, _c);
+    }
+    return _out;
+}
+
+function Test_I2Chests() {
+    var _gs = GameState_Get();
+    var _chests = Test_I2MakeChests(["t1", "t2", "t3"], obj_chest_lv1);
+    var _skill = Test_I2MakeChests(["s1"], obj_chest_skillbook);
+    var _barrel = Test_I2MakeChests(["b1"], obj_barrel);
+    var _ids = Trap_ChestPids();
+    Test_True("trap chests: the loot chests of the room are listed, sorted, and the skill chest and the barrel are not", array_length(_ids) == 3 && _ids[0] == "t1" && _ids[1] == "t2" && _ids[2] == "t3");
+    var _ok = true;
+    var _one = true;
+    for (var _sd = 700; _sd < 730; _sd++) {
+        var _n = 0;
+        for (var _i = 0; _i < 3; _i++) if (Trap_IsTrapped(_chests[_i], _sd, "rm_floor3")) _n++;
+        if (_n != 1) _one = false;
+        if (Trap_IsTrapped(_skill[0], _sd, "rm_floor3") || Trap_IsTrapped(_barrel[0], _sd, "rm_floor3")) _ok = false;
+        if (Trap_IsTrapped(_chests[0], _sd, "rm_floor1")) _ok = false;
+    }
+    Test_True("trap chests: exactly one of three chests is trapped on floor 3, for every seed", _one);
+    Test_True("trap chests: never the skill chest, never a barrel, never anything on floor 1", _ok);
+    var _want = Trap_PickPid(704, "rm_floor3", ["t1", "t2", "t3"]);
+    var _got = "";
+    for (var _j = 0; _j < 3; _j++) if (Trap_IsTrapped(_chests[_j], 704, "rm_floor3")) _got = _chests[_j].persist_id;
+    Test_Eq("trap chests: the chest that is trapped is the seed's pick", _got, _want);
+    // opened chests still count, so opening one never moves the trap to another chest
+    for (var _k = 0; _k < 3; _k++) _chests[_k].swapped = true;
+    var _after = "";
+    for (var _m = 0; _m < 3; _m++) if (Trap_IsTrapped(_chests[_m], 704, "rm_floor3")) _after = _chests[_m].persist_id;
+    Test_Eq("trap chests: opened chests stay in the draw (the pick does not move)", _after, _want);
+    // Continue: the room state is rebuilt from the save and the chests are made again with the same ids
+    _gs.persist = {};
+    _gs.persist_applied = {};
+    for (var _d = 0; _d < 3; _d++) instance_destroy(_chests[_d]);
+    var _again = Test_I2MakeChests(["t1", "t2", "t3"], obj_chest_lv1);
+    var _cont = "";
+    for (var _e = 0; _e < 3; _e++) if (Trap_IsTrapped(_again[_e], 704, "rm_floor3")) _cont = _again[_e].persist_id;
+    Test_Eq("trap chests: after Continue (state rebuilt, chests made again) the same chest is trapped", _cont, _want);
+    Test_False("trap chests: no run and no seed: nothing is trapped", Trap_IsTrapped(_again[0]));
+    for (var _x = 0; _x < 3; _x++) instance_destroy(_again[_x]);
+    instance_destroy(_skill[0]);
+    instance_destroy(_barrel[0]);
+}
+
+function Test_I2Count(_ch, _id) {
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_ch.inventory); _i++) if (_ch.inventory[_i].id == _id) _n += _ch.inventory[_i].qty;
+    return _n;
+}
+
+function Test_I2Outcomes() {
+    Test_Eq("trap loss: 15% of 20 is 3", Trap_Loss(20, 20), 3);
+    Test_Eq("trap loss: 15% of 100 is 15", Trap_Loss(100, 100), 15);
+    Test_Eq("trap loss: 15% of 10 is 1.5, rounded up to 2", Trap_Loss(10, 10), 2);
+    Test_Eq("trap loss: 15% of 7 is 1.05, rounded up to 2", Trap_Loss(7, 7), 2);
+    Test_Eq("trap loss: 15% of 6 is 0.9, rounded up to 1", Trap_Loss(6, 6), 1);
+    Test_Eq("trap loss: 15% of 200 is 30", Trap_Loss(200, 200), 30);
+    Test_Eq("trap loss: it is 15% of MAX HP, not of the HP left", Trap_Loss(50, 100), 15);
+    Test_Eq("trap loss: at 3 HP of 100 it takes 2 (never below 1 HP)", Trap_Loss(3, 100), 2);
+    Test_Eq("trap loss: at 1 HP it takes nothing", Trap_Loss(1, 100), 0);
+    Test_Eq("trap loss: at 1 of 1 it takes nothing", Trap_Loss(1, 1), 0);
+    Test_Eq("trap loss: a Max HP of 4 loses 1", Trap_Loss(4, 4), 1);
+    var _kills = 0;
+    var _neg = 0;
+    for (var _mx = 1; _mx <= 200; _mx++) {
+        for (var _hp = 1; _hp <= _mx; _hp++) {
+            var _l = Trap_Loss(_hp, _mx);
+            if (_hp - _l < 1) _kills++;
+            if (_l < 0) _neg++;
+        }
+    }
+    Test_Eq("trap loss: no HP / Max HP pair from 1 to 200 is ever taken below 1 HP", _kills, 0);
+    Test_Eq("trap loss: and it never heals", _neg, 0);
+    var _p = Trap_Outcome(QTE_PERFECT);
+    var _g = Trap_Outcome(QTE_GOOD);
+    var _o = Trap_Outcome(QTE_OK);
+    var _w = Trap_Outcome(QTE_WEAK);
+    Test_True("trap outcome: Perfect gives the bonus and costs nothing", _p.bonus && !_p.hurt);
+    Test_True("trap outcome: Good gives just the item", !_g.bonus && !_g.hurt);
+    Test_True("trap outcome: OK gives just the item", !_o.bonus && !_o.hurt);
+    Test_True("trap outcome: Weak costs HP and gives no bonus", !_w.bonus && _w.hurt);
+    // the bonus: one tier-1 consumable, from the seed
+    var _b1 = Trap_BonusLoot(900, "rm_floor3", "t1");
+    var _b2 = Trap_BonusLoot(900, "rm_floor3", "t1");
+    Test_True("trap bonus: one item", is_array(_b1) && array_length(_b1) == 1 && _b1[0].qty == 1);
+    Test_Eq("trap bonus: the same seed gives the same item", json_stringify(_b1), json_stringify(_b2));
+    var _tier1 = true;
+    var _kinds = {};
+    for (var _sd = 1; _sd <= 80; _sd++) {
+        var _b = Trap_BonusLoot(_sd, "rm_floor4", "c" + string(_sd mod 3));
+        var _it = ItemDB_Get(_b[0].item_id);
+        if (!(is_struct(_it) && _it.type == ITEM_CONSUMABLE && Item_Rarity(_b[0].item_id) == 1)) _tier1 = false;
+        variable_struct_set(_kinds, string(_b[0].item_id), 1);
+    }
+    Test_True("trap bonus: always a Common (tier 1) consumable", _tier1);
+    Test_True("trap bonus: more than one kind turns up over 80 seeds", array_length(variable_struct_get_names(_kinds)) >= 3);
+    // applying a grade to a character
+    var _ch = CharacterCreate_Player(CLASS_KNIGHT);
+    _ch.max_hp = 40;
+    _ch.hp = 40;
+    var _bonus = [{ item_id: 10, qty: 1 }];
+    var _n10 = Test_I2Count(_ch, 10);
+    var _rp = Trap_Apply(_ch, QTE_PERFECT, _bonus);
+    Test_True("trap apply: Perfect adds the bonus item and keeps every HP", Test_I2Count(_rp.ch, 10) == _n10 + 1 && _rp.ch.hp == 40 && _rp.lost == 0 && array_length(_rp.bonus) == 1);
+    Test_True("trap apply: Perfect works on a copy", Test_I2Count(_ch, 10) == _n10 && _ch.hp == 40);
+    var _rg = Trap_Apply(_ch, QTE_GOOD, _bonus);
+    var _ro = Trap_Apply(_ch, QTE_OK, _bonus);
+    Test_True("trap apply: Good and OK change nothing", _rg.ch.hp == 40 && _ro.ch.hp == 40 && Test_I2Count(_rg.ch, 10) == _n10 && Test_I2Count(_ro.ch, 10) == _n10 && array_length(_rg.bonus) == 0);
+    var _rw = Trap_Apply(_ch, QTE_WEAK, _bonus);
+    Test_True("trap apply: Weak costs 15% of Max HP (40 -> 6) and gives no bonus", _rw.ch.hp == 34 && _rw.lost == 6 && Test_I2Count(_rw.ch, 10) == _n10 && array_length(_rw.bonus) == 0);
+    _ch.hp = 1;
+    var _r1 = Trap_Apply(_ch, QTE_WEAK, _bonus);
+    Test_True("trap apply: Weak at 1 HP leaves 1 HP (trap damage never kills)", _r1.ch.hp == 1 && _r1.lost == 0);
+    _ch.hp = 3;
+    _ch.max_hp = 100;
+    var _r3 = Trap_Apply(_ch, QTE_WEAK, _bonus);
+    Test_True("trap apply: Weak at 3 of 100 HP leaves 1 HP", _r3.ch.hp == 1 && _r3.lost == 2);
+    _ch.max_hp = 4;
+    _ch.hp = 4;
+    var _r4 = Trap_Apply(_ch, QTE_WEAK, _bonus);
+    Test_True("trap apply: a Max HP of 4 loses 1", _r4.ch.hp == 3 && _r4.lost == 1);
+    var _all = true;
+    var _keys = [QTE_PERFECT, QTE_GOOD, QTE_OK, QTE_WEAK];
+    for (var _ki = 0; _ki < 4; _ki++) {
+        var _c2 = CharacterCreate_Player(CLASS_MAGE);
+        _c2.hp = 1;
+        var _res = Trap_Apply(_c2, _keys[_ki], _bonus);
+        if (_res.ch.hp < 1 || _res.ch.hp > _c2.max_hp) _all = false;
+    }
+    Test_True("trap apply: no grade leaves a character under 1 HP", _all);
+}
+
+function Test_I2Bar() {
+    var _par = Trap_BarParams();
+    Test_True("trap bar: it is the sword attack's bar (1100 ms, 60 / 120 / 200)", _par.sweep_ms == 1100 && _par.perfect_half_width == 60 && _par.good_half_width == 120 && _par.ok_half_width == 200);
+    var _c = Qte_ZoneCentreMs(_par);
+    Test_Eq("trap bar: a press on the zone's centre is Perfect", Trap_Grade(_c, 1), QTE_PERFECT);
+    Test_Eq("trap bar: 100 ms off is Good", Trap_Grade(_c + 100, 1), QTE_GOOD);
+    Test_Eq("trap bar: 180 ms off is OK", Trap_Grade(_c - 180, 1), QTE_OK);
+    Test_Eq("trap bar: a press at the start is Weak", Trap_Grade(0, 1), QTE_WEAK);
+    Test_Eq("trap bar: no press is Weak", Trap_Grade(QTE_NO_PRESS, 1), QTE_WEAK);
+    Test_Eq("trap bar: with the QTE assist the zones are x1.5 wider (80 ms off is Perfect)", Trap_Grade(_c + 80, 1.5), QTE_PERFECT);
+    Test_Eq("trap bar: without it the same press is Good", Trap_Grade(_c + 80, 1), QTE_GOOD);
+    var _same = true;
+    for (var _a = 0; _a < 2; _a++) {
+        var _as = (_a == 0) ? 1 : 1.5;
+        for (var _p = -1; _p <= 1100; _p += 10) {
+            if (Trap_Grade(_p, _as) != Qte_Result(Qte_Grade(_p, Qte_BarParams("default"), _as)).key) _same = false;
+        }
+    }
+    Test_True("trap bar: every press is graded exactly as the sword attack's bar grades it", _same);
+}
+
+// A fresh state for the screens: a run, a Knight, nothing open.
+function Test_I2Begin() {
+    var _gs = GameState_Get();
+    var _k = { had: variable_struct_exists(_gs, "run"), run: variable_struct_exists(_gs, "run") ? _gs.run : undefined, player: _gs.player_ch, tut: variable_global_exists("tutorial_off") ? global.tutorial_off : true };
+    _gs.run = Run_Create(5);
+    _gs.player_ch = CharacterCreate_Player(CLASS_KNIGHT);
+    global.trap_ui = undefined;
+    global.tutorial_off = true;
+    if (_gs.ui.mode == UI_DIALOGUE) Dialogue_CloseNow();
+    _gs.ui.mode = UI_NONE;
+    _gs.ui.lines = [];
+    return _k;
+}
+
+function Test_I2End(_k) {
+    var _gs = GameState_Get();
+    global.trap_ui = undefined;
+    global.tutorial_off = _k.tut;
+    if (_gs.ui.mode == UI_DIALOGUE) Dialogue_CloseNow();
+    _gs.ui.mode = UI_NONE;
+    _gs.ui.lines = [];
+    if (_k.had) _gs.run = _k.run; else variable_struct_remove(_gs, "run");
+    _gs.player_ch = _k.player;
+}
+
+function Test_I2Ui() {
+    var _k = Test_I2Begin();
+    var _gs = GameState_Get();
+    var _u = TrapUi_New({ name: "Chest", lines: [], loot: [], bonus: [{ item_id: 10, qty: 1 }], pid: "p", inst: noone });
+    Test_Eq("trap ui: it starts waiting (a line is read before the bar)", _u.phase, "wait");
+    Test_Eq("trap ui: the clock starts in the lead-in", _u.ms, -QTE_LEAD_IN_MS);
+    Test_Eq("trap ui: nothing happens while something else owns the screen", TrapUi_Update(_u, 16, true, false), "");
+    Test_True("trap ui: it is still waiting and the clock did not move", _u.phase == "wait" && _u.ms == -QTE_LEAD_IN_MS);
+    Test_Eq("trap ui: when the screen is free the bar comes up", TrapUi_Update(_u, 16, false, true), "");
+    Test_Eq("trap ui: the bar is up", _u.phase, "bar");
+    Test_Eq("trap ui: a press in the lead-in (the one that closed the line) is dropped", TrapUi_Update(_u, 16, true, true), "");
+    Test_Eq("trap ui: the bar goes on", _u.phase, "bar");
+    _u.ms = -40;
+    Test_Eq("trap ui: a press just before the sweep counts as 0 and is Weak", TrapUi_Update(_u, 10, true, true), QTE_WEAK);
+    Test_Eq("trap ui: one press, one result: the screen is done", _u.phase, "done");
+    Test_Eq("trap ui: nothing more happens after the result", TrapUi_Update(_u, 16, true, true), "");
+    var _v = TrapUi_New({ name: "Chest", lines: [], loot: [], bonus: [], pid: "p", inst: noone });
+    TrapUi_Update(_v, 16, false, true);
+    _v.ms = Qte_ZoneCentreMs(Trap_BarParams());
+    Test_Eq("trap ui: a press on the centre is Perfect", TrapUi_Update(_v, 0, true, true), QTE_PERFECT);
+    var _w = TrapUi_New({ name: "Chest", lines: [], loot: [], bonus: [], pid: "p", inst: noone });
+    TrapUi_Update(_w, 16, false, true);
+    var _res = "";
+    var _steps = 0;
+    while (_res == "" && _steps < 400) { _res = TrapUi_Update(_w, 16.6667, false, true); _steps++; }
+    Test_Eq("trap ui: no press ends the sweep as Weak", _res, QTE_WEAK);
+    Test_True("trap ui: the sweep lasted about 1.35 s (250 ms lead-in + 1100 ms sweep, 81 frames)", _steps >= 79 && _steps <= 83, string(_steps));
+    // D122: the clock is the QTE clock, so a window out of front stops it
+    var _fp = variable_global_exists("focus_prev") ? global.focus_prev : true;
+    global.focus_prev = false;
+    Test_Eq("trap ui: out of focus the bar's clock does not move (D122)", TrapUi_StepMs(16666), 0);
+    global.focus_prev = true;
+    Test_True("trap ui: in front it moves by the frame", abs(TrapUi_StepMs(16666) - 16.666) < 0.01);
+    global.focus_prev = _fp;
+
+    // the live path: it opens when the screen is free, pauses the map, and a result closes it and says what happened
+    TrapUi_Open({ name: "Chest", lines: ["Received it."], loot: [], bonus: [{ item_id: 10, qty: 1 }], pid: "p", inst: noone });
+    Test_True("trap ui: open", TrapUi_IsOpen());
+    Dialogue_StartWithSpeaker("Chest", ["It's trapped!"]);
+    Test_False("trap ui: the live step does not take the frame while the line is up", TrapUi_Step());
+    Test_Eq("trap ui: the map is not paused by it yet (the dialogue owns it)", _gs.ui.mode, UI_DIALOGUE);
+    Dialogue_CloseNow();
+    _gs.ui.lines = [];
+    Test_True("trap ui: with the screen free the live step takes the frame", TrapUi_Step());
+    Test_Eq("trap ui: the ui mode is the trap's (the map is paused: UI_IsBlocking)", _gs.ui.mode, UI_TRAP);
+    Test_True("trap ui: the world is blocked", UI_IsBlocking());
+    Test_False("trap ui: the Tab menu cannot open over it", Menu_MapFree());
+    var _hp0 = _gs.player_ch.hp;
+    var _n10 = Test_I2Count(_gs.player_ch, 10);
+    TrapUi_Finish(global.trap_ui, QTE_PERFECT);
+    Test_False("trap ui: a result closes the screen", TrapUi_IsOpen());
+    Test_Eq("trap ui: then the dialogue says what happened", _gs.ui.mode, UI_DIALOGUE);
+    Test_True("trap ui: Perfect gave the bonus item and cost nothing", Test_I2Count(_gs.player_ch, 10) == _n10 + 1 && _gs.player_ch.hp == _hp0);
+    Test_Eq("trap ui: the result is kept for the scripts", global.trap_result.key, QTE_PERFECT);
+    Dialogue_CloseNow();
+    _gs.ui.lines = [];
+    // Weak: the HP cost, never a death; the line says the number
+    _gs.player_ch.max_hp = 40;
+    _gs.player_ch.hp = 40;
+    TrapUi_Open({ name: "Chest", lines: [], loot: [], bonus: [], pid: "p", inst: noone });
+    TrapUi_Step();
+    TrapUi_Finish(global.trap_ui, QTE_WEAK);
+    Test_Eq("trap ui: Weak costs 6 of 40 HP", _gs.player_ch.hp, 34);
+    var _line = (array_length(_gs.ui.lines) > 0) ? Dialogue_LineText(_gs.ui.lines[0]) : "";
+    Test_True("trap ui: the Weak line says how much", string_pos("6", _line) > 0 && _line == Loc_T("trap.result.weak", "x", { hp: 6 }), _line);
+    Dialogue_CloseNow();
+    _gs.ui.lines = [];
+    _gs.player_ch.hp = 1;
+    TrapUi_Open({ name: "Chest", lines: [], loot: [], bonus: [], pid: "p", inst: noone });
+    TrapUi_Step();
+    TrapUi_Finish(global.trap_ui, QTE_WEAK);
+    Test_Eq("trap ui: Weak at 1 HP keeps 1 HP", _gs.player_ch.hp, 1);
+    _line = (array_length(_gs.ui.lines) > 0) ? Dialogue_LineText(_gs.ui.lines[0]) : "";
+    Test_Eq("trap ui: and says it barely hurt", _line, Loc_T("trap.result.weak_none", "x"));
+    Dialogue_CloseNow();
+    _gs.ui.lines = [];
+    // an interruption (a room change, a menu closed by force) ends it with no cost and no bonus; the chest's item was given when it opened
+    _gs.player_ch.hp = 30;
+    TrapUi_Open({ name: "Chest", lines: [], loot: [], bonus: [{ item_id: 10, qty: 1 }], pid: "p", inst: noone });
+    TrapUi_Step();
+    var _n10b = Test_I2Count(_gs.player_ch, 10);
+    TrapUi_Interrupt();
+    Test_False("trap ui: an interruption closes it", TrapUi_IsOpen());
+    Test_True("trap ui: and frees the map", _gs.ui.mode == UI_NONE);
+    Test_True("trap ui: with no cost and no bonus", _gs.player_ch.hp == 30 && Test_I2Count(_gs.player_ch, 10) == _n10b);
+    Test_I2End(_k);
+}
+
+function Test_I2Tutorial() {
+    var _k = Test_I2Begin();
+    var _ids = Tutorial_Ids();
+    Test_Eq("trap tutorial: twelve mechanics now, the trap last", array_length(_ids), 12);
+    Test_Eq("trap tutorial: the id is trap", _ids[11], "trap");
+    var _e = Tutorial_Get("trap");
+    Test_True("trap tutorial: it has a title and a short text that says what to press", is_struct(_e) && string_length(_e.title) > 2 && string_length(_e.body) > 20 && string_length(_e.body) < 260 && string_pos("[k:confirm]", _e.body) > 0);
+    global.tutorial_ui = undefined;
+    global.tutorial_off = false;
+    Profile_ResetForTest();
+    TrapUi_Open({ name: "Chest", lines: [], loot: [], bonus: [], pid: "p", inst: noone });
+    Test_False("trap tutorial: not shown before the bar", Tutorial_IsOpen());
+    TrapUi_Step();
+    Test_True("trap tutorial: the first trapped chest of a profile shows the pop-up", Tutorial_IsOpen() && Tutorial_CurrentId() == "trap");
+    Test_True("trap tutorial: it is remembered in the profile", Tutorial_Seen("trap") && Profile_StorySeen(Profile_Load(Profile_Path()).profile, "tutorial:trap"));
+    TrapUi_Finish(global.trap_ui, QTE_OK);
+    Dialogue_CloseNow();
+    GameState_Get().ui.lines = [];
+    Tutorial_Dismiss();
+    TrapUi_Open({ name: "Chest", lines: [], loot: [], bonus: [], pid: "p", inst: noone });
+    TrapUi_Step();
+    Test_False("trap tutorial: the second one does not", Tutorial_IsOpen());
+    TrapUi_Interrupt();
+    global.tutorial_ui = undefined;
+    Profile_ResetForTest();
+    Test_I2End(_k);
+}
+
+function Test_I2Text() {
+    var _keys = ["trap.line.trapped", "trap.bar.prompt", "trap.result.perfect", "trap.result.fine", "trap.result.weak", "trap.result.weak_none", "tutorial.trap.title", "tutorial.trap.body"];
+    var _gap = "";
+    for (var _i = 0; _i < array_length(_keys); _i++) {
+        if (Loc_GetRaw(_keys[_i], "en") == "" || Loc_GetRaw(_keys[_i], "ko") == "") _gap += _keys[_i] + " ";
+    }
+    Test_True("trap text: every string is in English and Korean", _gap == "", _gap);
+    Test_Eq("trap text: the line is the brief's", Loc_GetRaw("trap.line.trapped", "en"), "It's trapped!");
+    Test_True("trap text: the Korean line is not the English one", Loc_GetRaw("trap.line.trapped", "ko") != Loc_GetRaw("trap.line.trapped", "en"));
+    Test_True("trap text: the Weak line takes the number", string_pos("{hp}", Loc_GetRaw("trap.result.weak", "en")) > 0 && string_pos("{hp}", Loc_GetRaw("trap.result.weak", "ko")) > 0);
+}
+
+// One boss kill or one normal kill, frame by frame at 60 fps the way Step_0 runs it (the feel step, then the hit freeze, then the pop), with the killing hit's own freeze (a Perfect: 80 ms) in place.
+function Test_I2Sequence(_boss, _shake) {
+    GameSettings_Ensure().screen_shake = _shake ? 1 : 0;
+    var _gs = GameState_Get();
+    _gs.cam_shake = { mag: 0, ms: 0, elapsed_ms: 0, dir: SHAKE_DIR_H };
+    var _bc = Test_FeelFakeBattle(100, 100, _boss ? ENEMY_MINI_BOSS : ENEMY_SLIME);
+    _bc.e.hp = 0;
+    _bc.last_dmg = 20;
+    _bc.qte_result_key = QTE_PERFECT;
+    _bc.hitstop_ms = FEEL_FREEZE_PERFECT_MS;
+    var _dt = 1000 / 60;
+    var _r = { freeze_frames: 0, zoom_frames: 0, peak: 0, pop_start: -1, shake_first: -1, msg_frame: -1, hit0: 0, hold_sprite: true, began: false, finisher: false };
+    _r.began = Battle_DeathPopBegin(_bc, _bc.e, "Slain.");
+    _r.hit0 = _bc.hitstop_ms;
+    for (var _f = 1; _f <= 160; _f++) {
+        var _was = _bc.hitstop_ms;
+        Battle_FeelStep(_bc, _dt);
+        if (_was > 0) {
+            _r.freeze_frames++;
+            _bc.hitstop_ms -= _dt;
+            if (_bc.hitstop_ms <= 0) {
+                _bc.hitstop_ms = 0;
+                Battle_QteImpactFeedback(_bc);
+            }
+        } else {
+            Battle_DeathPopStep(_bc);
+        }
+        if (_bc.feel_inset > 0) _r.zoom_frames++;
+        _r.peak = max(_r.peak, _bc.feel_inset);
+        if (_r.pop_start < 0 && is_struct(_bc.death_pop) && _bc.death_pop.t_ms > 0) _r.pop_start = _f;
+        if (_r.shake_first < 0 && _gs.cam_shake.mag > 0) _r.shake_first = _f;
+        if (_r.msg_frame < 0 && _bc.message_text != "") _r.msg_frame = _f;
+        if (_r.pop_start < 0 && is_struct(_bc.death_pop) && !Feel_SpriteVisible(_bc.death_pop.t_ms)) _r.hold_sprite = false;
+    }
+    _r.finisher = Battle_FinisherActive(_bc);
+    instance_destroy(_bc.enemy_inst);
+    Display_ClearZoom();
+    return _r;
+}
+
+function Test_I2Finisher() {
+    Test_Eq("finisher: the freeze is 250 ms", FEEL_FINISHER_FREEZE_MS, 250);
+    Test_Eq("finisher: the zoom takes 300 ms", FEEL_FINISHER_ZOOM_MS, 300);
+    Test_Eq("finisher: the held beat is 600 ms", FEEL_FINISHER_BEAT_MS, 600);
+    Test_Eq("finisher: freeze plus beat is 850 ms before the pop", Feel_FinisherTotalMs(), 850);
+    Test_True("finisher: the freeze is more than double the longest normal hit freeze (120 ms)", FEEL_FINISHER_FREEZE_MS > 2 * FEEL_FREEZE_HEAVY_MS);
+    Test_Eq("finisher: no zoom at the start", Feel_FinisherInsetPx(0), 0);
+    Test_Eq("finisher: none once it has run its 300 ms", Feel_FinisherInsetPx(300), 0);
+    var _peak = 0;
+    var _mono_up = true;
+    var _prev = 0;
+    var _past = false;
+    var _mono_down = true;
+    for (var _t = 0; _t <= 300; _t += 5) {
+        var _in = Feel_FinisherInsetPx(_t);
+        _peak = max(_peak, _in);
+        if (_in < 0) _mono_up = false;
+        if (_in < _prev && !_past) _past = true;
+        if (_past && _in > _prev) _mono_down = false;
+        _prev = _in;
+    }
+    var _zr = Feel_ZoomRegion(_peak, 80, 58);
+    Test_True("finisher: the zoom peaks at about 8% (7 to 9%)", _zr.zoom >= 1.07 && _zr.zoom <= 1.09, string(_zr.zoom));
+    Test_True("finisher: it goes up and then back down, eased (never up again once it has come down)", _mono_up && _mono_down);
+    Test_True("finisher: it is a punch: the peak is in the first third", Feel_FinisherInsetPx(90) == _peak && Feel_FinisherInsetPx(30) >= 1);
+
+    var _b = Test_I2Sequence(true, true);
+    Test_True("finisher: a boss kill starts a death pop, and the finisher is over by the end", _b.began && _b.finisher == false);
+    Test_Eq("finisher: the boss kill freezes the picture 250 ms (not the hit's own 80)", _b.hit0, 250);
+    Test_True("finisher: 250 ms is 15 frames at 60 fps (14 to 16 seen)", _b.freeze_frames >= 14 && _b.freeze_frames <= 16, string(_b.freeze_frames));
+    Test_Eq("finisher: the zoom reaches 6 px a side", _b.peak, 6);
+    Test_True("finisher: the zoom lasts about 300 ms (14 to 18 frames of push-in)", _b.zoom_frames >= 14 && _b.zoom_frames <= 18, string(_b.zoom_frames));
+    Test_True("finisher: the pop starts after the freeze and the 600 ms beat: frame 50 to 53 (850 ms)", _b.pop_start >= 50 && _b.pop_start <= 53, string(_b.pop_start));
+    Test_True("finisher: the held beat is still: the sprite stays", _b.hold_sprite);
+    Test_True("finisher: and no camera shake is started before the pop", _b.shake_first < 0 || _b.shake_first >= _b.pop_start, "shake at " + string(_b.shake_first));
+    Test_True("finisher: the pop's own shake comes with the burst (after its 120 ms freeze)", _b.shake_first >= _b.pop_start + 6 && _b.shake_first <= _b.pop_start + 9, "shake at " + string(_b.shake_first) + " pop " + string(_b.pop_start));
+    Test_True("finisher: the slain text comes after the pop (850 + 1020 ms = frame 112)", _b.msg_frame >= 110 && _b.msg_frame <= 115, string(_b.msg_frame));
+
+    var _bn = Test_I2Sequence(true, false);
+    Test_Eq("finisher: with Screen shake off the zoom is still there", _bn.peak, 6);
+    Test_True("finisher: with Screen shake off no shake is ever started", _bn.shake_first < 0);
+    Test_True("finisher: with Screen shake off the freeze and the beat are the same", _bn.hit0 == 250 && _bn.pop_start >= 50 && _bn.pop_start <= 53, string(_bn.pop_start));
+
+    var _n = Test_I2Sequence(false, true);
+    Test_Eq("finisher: a normal enemy keeps its hit freeze (80 ms, no 250)", _n.hit0, FEEL_FREEZE_PERFECT_MS);
+    Test_Eq("finisher: a normal enemy's pop starts at once (frame 1)", _n.pop_start, 1);
+    Test_True("finisher: a normal enemy has no finisher", !_n.finisher);
+    Test_True("finisher: a normal enemy's slain text is as before (620 ms = frame 37)", _n.msg_frame >= 36 && _n.msg_frame <= 39, string(_n.msg_frame));
+    Test_True("finisher: a normal enemy's killing hit still shakes the camera at once", _n.shake_first >= 1 && _n.shake_first <= 8, string(_n.shake_first));
+    var _nn = Test_I2Sequence(false, false);
+    Test_True("finisher: a normal enemy with shake off: no shake", _nn.shake_first < 0);
+    // the boss's killing hit's own impact (a Perfect's camera shake) is not allowed to break the held beat
+    GameSettings_Ensure().screen_shake = 1;
+    GameState_Get().cam_shake = { mag: 0, ms: 0, elapsed_ms: 0, dir: SHAKE_DIR_H };
+    var _bc = Test_FeelFakeBattle(100, 100, ENEMY_MINI_BOSS);
+    _bc.e.hp = 0;
+    _bc.last_dmg = 20;
+    _bc.qte_result_key = QTE_PERFECT;
+    Battle_DeathPopBegin(_bc, _bc.e, "x");
+    Test_True("finisher: the finisher is active right after the kill", Battle_FinisherActive(_bc));
+    Battle_QteImpactFeedback(_bc);
+    Test_True("finisher: the killing Perfect's impact shake and jolt are held back during the finisher", GameState_Get().cam_shake.mag == 0);
+    instance_destroy(_bc.enemy_inst);
+    Display_ClearZoom();
 }

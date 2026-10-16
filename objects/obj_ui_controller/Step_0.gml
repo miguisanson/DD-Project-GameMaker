@@ -31,6 +31,7 @@ if (Confirm_Step()) exit;   // D156: the Yes / No pop-up takes every key until i
 // C2: the screens a character owes (class choice, free stat point, card pick, replace a skill) open and run here.
 if (CardsUi_Step()) exit;
 if (ShopUi_Step()) exit;   // C3 (D85): the merchant's shop
+if (TrapUi_Step()) exit;   // R3 ideas2 (D173): a trapped chest's sliding bar (the map is paused behind it; it waits for the chest's line to be read)
 
 gs.ui.icon_frame = Dialogue_IconStep(gs.ui.icon_frame, step_ms);
 

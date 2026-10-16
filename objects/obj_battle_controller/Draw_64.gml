@@ -60,7 +60,7 @@ if (instance_exists(enemy_inst) && (!dying || Feel_SpriteVisible(dp.t_ms))) {
         eys = top + sprite_get_yoffset(espr) * scy;
     }
     Battle_DrawEnemyShadow(espr, exs, eys, scx, scy, sx * zr.ky, enemy_fade_alpha);   // R3 (note 5): a soft shadow under the feet, in the same guard as the sprite (gone once it has burst)
-    var white = (dying && dp.t_ms < FEEL_DEATH_FREEZE_MS) || (hitstop_ms > 0 && feel_contact && last_dmg > 0);
+    var white = (dying && !Battle_DeathPopHeld(self) && dp.t_ms < FEEL_DEATH_FREEZE_MS) || (hitstop_ms > 0 && feel_contact && last_dmg > 0);   // IDEA-21: not during a boss's held beat (the flash is the pop's)
     if (white) gpu_set_fog(true, UI_C_LIGHTEST, 0, 1);   // every opaque pixel in the lightest palette colour
     else if (off.flash) gpu_set_blendmode(bm_add);
     draw_sprite_ext(enemy_inst.sprite_index, enemy_inst.image_index, exs, eys, scx, scy, enemy_inst.image_angle, c_white, enemy_fade_alpha);

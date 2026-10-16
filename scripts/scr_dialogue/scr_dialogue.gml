@@ -2366,7 +2366,7 @@ function Credits_Draw(_ms) {
 #macro TUTORIAL_CLOSED_GUARD_MS (2000 / 60)   // the closing press is guarded this long (the frame it closed in and the next one: 2 frames); D108 F2b-2: ms, was frame <= closed + 1
 
 function Tutorial_Ids() {
-    return ["timeline", "bar", "arrows", "defence", "stagger", "cards", "shop", "throwables", "bed", "elite", "status"];
+    return ["timeline", "bar", "arrows", "defence", "stagger", "cards", "shop", "throwables", "bed", "elite", "status", "trap"];
 }
 
 // { id, title, body } in the current language, or undefined. English is the fallback of Loc_T; the workbook holds EN and KO.
@@ -2405,6 +2405,9 @@ function Tutorial_Get(_id) {
         case "status":
             return { id: _id, title: Loc_T("tutorial.status.title", "Statuses"),
                 body: Loc_T("tutorial.status.body", "Icons under a name show a fighter's statuses, like [t]Poison[/t] or [t]Burn[/t]. They last a few turns.") };
+        case "trap":   // R3 ideas2 (D173, IDEA-03): the first trapped chest of a profile
+            return { id: _id, title: Loc_T("tutorial.trap.title", "Trapped Chest"),
+                body: Loc_T("tutorial.trap.body", "Each floor has one trapped chest. Press [k:confirm] on the bright zone: Perfect finds a bonus, Weak costs HP. You keep the chest's item.") };
     }
     return undefined;
 }
