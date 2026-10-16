@@ -1030,7 +1030,7 @@
    "spd_enemy": 9,
    "boss": false,
    "script": "n n n n n n n n n",
-   "want": "PEPEPPEPE"
+   "want": "PEPEPEPEP"
   },
   {
    "id": "turn_2x",
@@ -1038,7 +1038,7 @@
    "spd_enemy": 10,
    "boss": false,
    "script": "n n n n n n n n n n n n",
-   "want": "PPEPPEPPEPPE"
+   "want": "PEPPEPEPPEPE"
   },
   {
    "id": "turn_tie",
@@ -1054,7 +1054,7 @@
    "spd_enemy": 13,
    "boss": false,
    "script": "n n n n n n",
-   "want": "EPEPEE"
+   "want": "EPEPEP"
   },
   {
    "id": "turn_preview",
@@ -1062,7 +1062,7 @@
    "spd_enemy": 9,
    "boss": false,
    "script": "p5 n n p5 n n n",
-   "want": "(PEPEP)PE(PEPPE)PEP"
+   "want": "(PEPEP)PE(PEPEP)PEP"
   },
   {
    "id": "turn_stun",
@@ -1110,7 +1110,7 @@
    "spd_enemy": 8,
    "boss": false,
    "script": "n n n n n n n",
-   "want": "PPEPPPE"
+   "want": "PEPPEPP"
   }
  ]
 }

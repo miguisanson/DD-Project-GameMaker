@@ -1816,17 +1816,17 @@ function Test_Suite_Turns() {
     Test_Eq("vec stagger_max_3_boss", Stagger_Max(3, true), 48);
     Test_Eq("vec stagger_max_4_boss", Stagger_Max(4, true), 60);
     Test_Eq("vec stagger_max_4_norm", Stagger_Max(4, false), 30);
-    Test_Eq("vec turn_13_9", Test_TurnScript(13, 9, false, "n n n n n n n n n"), "PEPEPPEPE");
-    Test_Eq("vec turn_2x", Test_TurnScript(20, 10, false, "n n n n n n n n n n n n"), "PPEPPEPPEPPE");
+    Test_Eq("vec turn_13_9", Test_TurnScript(13, 9, false, "n n n n n n n n n"), "PEPEPEPEP");
+    Test_Eq("vec turn_2x", Test_TurnScript(20, 10, false, "n n n n n n n n n n n n"), "PEPPEPEPPEPE");
     Test_Eq("vec turn_tie", Test_TurnScript(10, 10, false, "n n n n"), "PEPE");
-    Test_Eq("vec turn_slow_player", Test_TurnScript(9, 13, false, "n n n n n n"), "EPEPEE");
-    Test_Eq("vec turn_preview", Test_TurnScript(13, 9, false, "p5 n n p5 n n n"), "(PEPEP)PE(PEPPE)PEP");
+    Test_Eq("vec turn_slow_player", Test_TurnScript(9, 13, false, "n n n n n n"), "EPEPEP");
+    Test_Eq("vec turn_preview", Test_TurnScript(13, 9, false, "p5 n n p5 n n n"), "(PEPEP)PE(PEPEP)PEP");
     Test_Eq("vec turn_stun", Test_TurnScript(10, 10, false, "n sE p5 n n n n n n"), "P!(PEPEP)PEPEPE");
     Test_Eq("vec turn_stun_steadfast", Test_TurnScript(10, 10, false, "n sE n sE n sE n n sE n"), "P!P~E~PE!P");
     Test_Eq("vec turn_stun_boss", Test_TurnScript(10, 10, true, "n sE n n n n"), "P!EPEP");
     Test_Eq("vec turn_stun_player", Test_TurnScript(10, 10, false, "n n sP n n n n"), "PE!EPEP");
     Test_Eq("vec turn_break", Test_TurnScript(10, 10, false, "n bE n n n n"), "PBPEPE");
-    Test_Eq("vec turn_fast_double", Test_TurnScript(20, 8, false, "n n n n n n n"), "PPEPPPE");
+    Test_Eq("vec turn_fast_double", Test_TurnScript(20, 8, false, "n n n n n n n"), "PEPPEPP");
 
     // ---- behaviour ----
     var _tl = Turn_New([Turn_Fighter(TL_PLAYER, 13), Turn_Fighter(TL_ENEMY, 9)]);
@@ -18463,6 +18463,7 @@ function Test_R3IdWorkbook() {
 function Test_Suite_R3Balance() {
     SkillDB_Init();
     Test_RunSuite("R3Balance.stagger", Test_R3BalanceStagger);
+    Test_RunSuite("R3Balance.turns", Test_R3BalanceTurns);
     Test_Eq("r3balance: Wound power is 3 (it was 4)", SkillDB_Get(SKILL_WOUND).power, 3);
     Test_Eq("r3balance: Wound still costs 3 MP (so still 3 arrows)", SkillDB_Get(SKILL_WOUND).mp_cost, 3);
     Test_Eq("r3balance: Horizontal Slash power is 4 (it was 5), cost 5", string(SkillDB_Get(SKILL_HORIZ_SLASH).power) + " " + string(SkillDB_Get(SKILL_HORIZ_SLASH).mp_cost), "4 5");
@@ -18488,4 +18489,41 @@ function Test_R3BalanceStagger() {
     Battle_StaggerHit(_b2, 6, true, false, 1);    // a stun skill: 6 x 0.5 x 1.5 = 4.5 -> 5 (it was x2 = 6)
     Test_Eq("r3balance D191: a stun skill fills x1.5 (4.5 -> 5, not 6)", _b2.e.stagger, 5);
     instance_destroy(_b2.enemy_inst);
+}
+
+// D192 (SPD toned down): the gauge fills by 10 + SPD, and nobody gets a third turn in a row; the strip shows the order the battle plays.
+function Test_R3BalanceTurns() {
+    // Archer SPD 11 against SPD 9 (rates 21 and 19), by hand: the gauge reaches 100 for P at tick 5 (105), for E at tick 6 (114); E keeps 14, P keeps 5 ...
+    // the first four turns are P E P E (the rule never matters this close).
+    var _tl = Turn_New([Turn_Fighter(TL_PLAYER, 11), Turn_Fighter(TL_ENEMY, 9)]);
+    var _s = "";
+    for (var _i = 0; _i < 4; _i++) _s += (Turn_Next(_tl) == TL_PLAYER) ? "P" : "E";
+    Test_Eq("r3balance D192: SPD 11 against 9 opens P E P E", _s, "PEPE");
+    // SPD 40 against 1 (rates 50 and 11): the fast one would take 4 or 5 turns a round; never more than 2 in a row, and the slow one still acts.
+    var _tl2 = Turn_New([Turn_Fighter(TL_PLAYER, 40), Turn_Fighter(TL_ENEMY, 1)]);
+    var _run = 0;
+    var _longest = 0;
+    var _enemy_turns = 0;
+    var _prev = -1;
+    for (var _j = 0; _j < 40; _j++) {
+        var _w = Turn_Next(_tl2);
+        _run = (_w == _prev) ? _run + 1 : 1;
+        _prev = _w;
+        _longest = max(_longest, _run);
+        if (_w == TL_ENEMY) _enemy_turns++;
+    }
+    Test_Eq("r3balance D192: nobody gets a third turn in a row (SPD 40 against 1)", _longest, 2);
+    Test_True("r3balance D192: the slow side acts every third turn at the latest (13 or more of 40)", _enemy_turns >= 13);
+    // the strip (Turn_Preview) is the order the battle then plays, with the cap in it
+    var _tl3 = Turn_New([Turn_Fighter(TL_PLAYER, 40), Turn_Fighter(TL_ENEMY, 1)]);
+    var _pv = Turn_Preview(_tl3, 9);
+    var _play = [];
+    for (var _k = 0; _k < 9; _k++) array_push(_play, Turn_Next(_tl3));
+    var _same = true;
+    for (var _m = 0; _m < 9; _m++) { if (_pv[_m] != _play[_m]) _same = false; }
+    Test_True("r3balance D192: the preview shows the order that is played", _same);
+    // a stun still pushes back a full turn
+    var _tl4 = Turn_New([Turn_Fighter(TL_PLAYER, 10), Turn_Fighter(TL_ENEMY, 10)]);
+    Turn_Next(_tl4);
+    Test_True("r3balance D192: a stun still lands and makes the target Steadfast", Turn_Stun(_tl4, TL_ENEMY) && Turn_Find(_tl4, TL_ENEMY).steadfast == TURN_STEADFAST_TURNS);
 }

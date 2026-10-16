@@ -151,6 +151,8 @@ def widen_perfect(half_width, widen):
 
 # ---- Turn timeline, stagger, BREAK (spec section 11, packet B3). Deliberately written tick by tick: the game solves the same thing in closed form. ----
 TURN_MAX = 100
+TURN_SPD_BASE = 10     # D192: a fighter's gauge gains 10 + SPD a tick (it was SPD)
+TURN_MAX_IN_ROW = 2    # D192: nobody gets a third turn in a row
 STEADFAST_TURNS = 2
 
 
@@ -169,22 +171,32 @@ class Timeline:
 
     def __init__(self, spd_p, spd_e, boss=False):
         self.f = [dict(c="P", spd=spd_p, g=0, sf=0, boss=False), dict(c="E", spd=spd_e, g=0, sf=0, boss=boss)]
+        self.last = None
+        self.streak = 0
 
     def copy(self):
         t = Timeline(0, 0)
         t.f = [dict(x) for x in self.f]
+        t.last, t.streak = self.last, self.streak
         return t
 
     def next(self):
-        while not any(x["g"] >= TURN_MAX for x in self.f):
+        # D192: the gauge fills by TURN_SPD_BASE + SPD a tick, and nobody acts more than TURN_MAX_IN_ROW times in a row: the third goes to the other side
+        blocked = self.last if self.streak >= TURN_MAX_IN_ROW else None
+        cand = [x for x in self.f if x["c"] != blocked]
+        while not any(x["g"] >= TURN_MAX for x in cand):
             for x in self.f:
-                x["g"] += max(1, x["spd"])
+                x["g"] += TURN_SPD_BASE + max(1, x["spd"])
         best = None
-        for x in self.f:
+        for x in cand:
             if x["g"] >= TURN_MAX and (best is None or x["g"] > best["g"]):
                 best = x
         best["g"] -= TURN_MAX
         best["sf"] = max(0, best["sf"] - 1)
+        if self.last == best["c"]:
+            self.streak += 1
+        else:
+            self.last, self.streak = best["c"], 1
         return best["c"]
 
     def who(self, c):

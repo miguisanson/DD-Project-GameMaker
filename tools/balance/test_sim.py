@@ -109,12 +109,19 @@ class Damage(unittest.TestCase):
 
 class Timeline(unittest.TestCase):
     def test_archer_13_vs_slime_9_order(self):
-        # Worked by hand from the gauge rule (P 13, E 9, act at 100, overflow kept, ties to the player): P(t8) E(t12) P(t16) E(t23) P(t24) P(t32) E(t34) ...
-        # = PEPEPPEPE, which is also what the game's vector turn_13_9 says. (combat-spec.md section 11 prints "P E P P E P P E P" for this pair: a typo in the text.)
+        # D192: the gauge fills by 10 + SPD (P 23, E 19), act at 100, overflow kept, ties to the player, nobody three times in a row. By hand:
+        # P(t5 115) E(t6 114) P(t9 ...) ... = PEPEPEPEP, which is also what the game's vector turn_13_9 says.
         b = battle("archer", "slime")
         b.p.st["spd"], b.e.st["spd"] = 13, 9
         order = "".join("PE"[b.tl_next()] for _ in range(9))
-        self.assertEqual(order, "PEPEPPEPE")
+        self.assertEqual(order, "PEPEPEPEP")
+
+    def test_nobody_acts_three_times_in_a_row(self):                    # D192: SPD 40 against 1
+        b = battle("archer", "slime")
+        b.p.st["spd"], b.e.st["spd"] = 40, 1
+        order = "".join("PE"[b.tl_next()] for _ in range(40))
+        self.assertNotIn("PPP", order)
+        self.assertGreaterEqual(order.count("E"), 13)
 
     def test_stun_pushes_back_and_steadfast_blocks_the_second(self):
         b = battle("knight", "slime")
