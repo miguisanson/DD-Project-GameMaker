@@ -14451,10 +14451,7 @@ function Test_Review7HistoryCols() {
         for (var _a = 0; _a < array_length(_sizes); _a++) {
             TextFit_Set(_sizes[_a][0], _sizes[_a][1], _langs[_l]);
             var _page = TabCodex_Page("history", TextFit_Profile());
-            var _m = Ui_MenuNew("codex_history", _page.rows, {
-                data: { tab: "codex_page" },
-                layout: { title: _page.title, anchor: "center", details: true, details_pos: "right", details_cols: _page.cols, det_art: true, hides_below: true }
-            });
+            var _m = TabCodex_MakeMenu("history", _page);
             for (var _b = 0; _b < array_length(_sizes); _b++) {
                 TextFit_Set(_sizes[_b][0], _sizes[_b][1], _langs[_l]);
                 TabMenu_FitMenu(_m, TabMenu_Zones("codex_history"));

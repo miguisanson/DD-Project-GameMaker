@@ -3886,9 +3886,17 @@ function Scenario_PlacePlayer(_cx, _cy) {
     return _pl;
 }
 
+// R-086: the one way back from a scenario's Focus_Step(false). A scenario that fails (or times out) with the window "unfocused" would leave global.focus_prev false and
+// freeze every later QTE of the run (Qte_StepMs is 0), turning one red check into a cascade of timeouts. Scenario_ClearUi, which every stage and every failure path goes
+// through before the next part, and the failure branches of the focus scenarios call it.
+function Scenario_RestoreFocus() {
+    if (variable_global_exists("focus_prev") && !global.focus_prev) Focus_Step(true);
+}
+
 // The abandoned battles before this suite leave a post-battle dialogue queued; it would pop up in the next room and freeze the
 // player and every enemy. Drop it (and any open dialogue) before a movement part starts.
 function Scenario_ClearUi() {
+    Scenario_RestoreFocus();
     var _gs = GameState_Get();
     _gs.pending_post_battle_dialogue_lines = [];
     if (_gs.ui.mode != UI_NONE || array_length(_gs.ui.lines) > 0) UI_InterruptCloseAll(false);
@@ -8637,6 +8645,7 @@ function Scenario_StepSmokeHunt2(_s) {
         case 251:   // the wolf runs at the player; then the screen opens (pause by Focus_Step(false), Tab menu by the real key, a tutorial pop-up)
             if (!instance_exists(_h.w) || room != rm_floor1) {
                 Scenario_Check("hunt2_" + _nm + "_the_wolf_is_in_the_room", false, "room=" + room_get_name(room));
+                Scenario_RestoreFocus();
                 _h.need_run = true;
                 _h.v++;
                 Scenario_Next(_s, (_h.v < 3) ? 250 : 253);
@@ -8656,6 +8665,7 @@ function Scenario_StepSmokeHunt2(_s) {
                     _h.t1 = _s.t;
                 } else if (_s.t > 150) {
                     Scenario_Check("hunt2_" + _nm + "_the_wolf_chases_the_player", false, "ai_mode=" + (variable_instance_exists(_w, "ai_mode") ? string(_w.ai_mode) : "none") + " moving=" + string(_w.moving));
+                    Scenario_RestoreFocus();
                     with (obj_enemy) instance_destroy();
                     _h.v++;
                     Scenario_Next(_s, (_h.v < 3) ? 250 : 253);
@@ -8673,6 +8683,7 @@ function Scenario_StepSmokeHunt2(_s) {
                     Scenario_Next(_s, 252);
                 } else if (_s.t > _h.t1 + 60) {
                     Scenario_Check("hunt2_" + _nm + "_is_open_while_the_wolf_chases", false, "mode=" + string(_gs.ui.mode));
+                    Scenario_RestoreFocus();
                     with (obj_enemy) instance_destroy();
                     _h.v++;
                     Scenario_Next(_s, (_h.v < 3) ? 250 : 253);
