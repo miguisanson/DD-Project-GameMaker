@@ -493,7 +493,7 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
     var floor1_slime_key = "floor1_slime_kill_reaction_done";
-    var floor1_slime_done = variable_struct_exists(gs.flags, floor1_slime_key) && variable_struct_get(gs.flags, floor1_slime_key);
+    var floor1_slime_done = (variable_struct_exists(gs.flags, floor1_slime_key) && variable_struct_get(gs.flags, floor1_slime_key) == true) || Story_FlagSeen(floor1_slime_key);   // R-103: or the profile has it
 
     var killed_floor1_slime = false;
     var defeated_enemy_id = -1;
@@ -513,7 +513,7 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
     if (!floor1_slime_done && killed_floor1_slime) {
         array_push(lines, Loc_T("combat.msg.floor1_reaction.0", "That thing was alive. And I nearly wasn't."));
         array_push(lines, Loc_T("combat.msg.floor1_reaction.1", "Okay. Okay. I just need to get out of here."));
-        variable_struct_set(gs.flags, floor1_slime_key, true);
+        Story_MarkFlag(floor1_slime_key);   // R-103: the run flag and the profile's story key, flushed now
     }
 
     if (defeated_enemy_id == ENEMY_FINAL_BOSS) {

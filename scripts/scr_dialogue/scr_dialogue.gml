@@ -349,8 +349,8 @@ function Dialogue_NarrativeEnsureFlags() {
 function Dialogue_NarrativeIsDone(_event_id) {
     var flags = Dialogue_NarrativeEnsureFlags();
     var key = Dialogue_NarrativeDoneFlagKey(_event_id);
-    if (!variable_struct_exists(flags, key)) return false;
-    return variable_struct_get(flags, key);
+    if (variable_struct_exists(flags, key) && variable_struct_get(flags, key) == true) return true;
+    return Story_FlagSeen(key);   // R-103: the profile may have it when the run's flags do not (the run was rebuilt from an older save)
 }
 
 function Dialogue_NarrativeIsPending(_event_id) {
@@ -367,8 +367,8 @@ function Dialogue_NarrativeSetPending(_event_id, _pending) {
 
 function Dialogue_NarrativeMarkDone(_event_id) {
     var flags = Dialogue_NarrativeEnsureFlags();
-    variable_struct_set(flags, Dialogue_NarrativeDoneFlagKey(_event_id), true);
     variable_struct_set(flags, Dialogue_NarrativePendingFlagKey(_event_id), false);
+    Story_MarkFlag(Dialogue_NarrativeDoneFlagKey(_event_id));   // R-103: the run flag and the profile's story key, flushed now
 }
 
 function Dialogue_NarrativeQueueOnce(_event_id) {

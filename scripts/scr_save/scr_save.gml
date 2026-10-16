@@ -759,6 +759,20 @@ function Story_IsFlagKey(_name) {
     return false;
 }
 
+// R-103: a one-time reaction that lives as a run flag has just been shown. Set the run flag AND the profile's story key, and flush the profile at once
+// (like Story_Mark for a trigger): the 10 s autosave, a run end or a clean close would be too late if the game is killed before them.
+function Story_MarkFlag(_name) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
+    variable_struct_set(gs.flags, _name, true);
+    Story_Mark("flag:" + _name);
+}
+
+// Has this profile seen the one-time reaction (whatever the run's flags say)?
+function Story_FlagSeen(_name) {
+    return Story_Seen("flag:" + _name);
+}
+
 function Story_CopyFlagsToProfile(_p, _flags) {
     if (!is_struct(_flags)) return false;
     var changed = false;
