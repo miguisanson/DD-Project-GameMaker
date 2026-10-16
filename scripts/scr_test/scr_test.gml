@@ -153,6 +153,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Cards", Test_Suite_R3Cards);
     Test_RunSuite("R3Menus", Test_Suite_R3Menus);
     Test_RunSuite("R3Light", Test_Suite_R3Light);
+    Test_RunSuite("TextFit2", Test_Suite_TextFit2);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -13974,6 +13975,22 @@ function TextFit_Line(_fails, _what, _txt, _room) {
     if (!_c.ok) array_push(_fails, _what + " '" + string(_txt) + "' " + string(_c.w) + ">" + string(_room));
 }
 
+// R-106: one list row's label in a panel _panel_w wide, laid out the way the draw does (Ui_RowFit): on one line, wrapped over at most two lines (a smaller type step for
+// one too-wide word), or with its value on a line under it. Pushes a failure text when no layout fits it. Returns the layout.
+function TextFit_Row(_fails, _what, _label, _val, _panel_w, _p, _icon_px, _icon_item, _mt) {
+    var _r = Ui_RowFit(_label, _val, _panel_w, _p, _icon_px, _icon_item, true, _mt);
+    if (!_r.ok) array_push(_fails, _what + " '" + string(_label) + "' fits no layout: " + string(UI_TextWidth(_label)) + ">" + string(_r.room));
+    else if (_r.lines > 2) array_push(_fails, _what + " '" + string(_label) + "' takes " + string(_r.lines) + " lines");
+    return _r;
+}
+
+// R-106: a menu title in the panel's inner width _room, laid out the way the draw does (Ui_TitleFit): wrapped over at most two lines.
+function TextFit_Title(_fails, _what, _title, _room, _mt) {
+    var _t = Ui_TitleFit(_title, _room, _mt);
+    if (_t.w > _room) array_push(_fails, _what + " '" + string(_title) + "' needs " + string(_t.w) + " has " + string(_room));
+    else if (_t.lines > 2) array_push(_fails, _what + " '" + string(_title) + "' takes " + string(_t.lines) + " lines");
+}
+
 // The rows of a Tab page against its list and details panels (the draw's own widths: TabMenu_Zones, TabMenu_Widths, Ui_MenuLabelRoom, Ui_DetailsHeight).
 function TextFit_TabPage(_fails, _tid, _rows, _title, _cols = 1) {
     var _z = TabMenu_Zones(_tid);
@@ -13983,14 +14000,15 @@ function TextFit_TabPage(_fails, _tid, _rows, _title, _cols = 1) {
     var _mc = Ui_MenuMeasureRowsFresh(_m, _mt);
     var _wd = TabMenu_Widths(_z, Ui_MenuListNeed(_mc, _p), _mc.det_need);
     if (_wd.list_w + _wd.det_w > _z.list_w + _z.det_w) array_push(_fails, _tid + " widths " + string(_wd.list_w) + "+" + string(_wd.det_w) + " exceed the body " + string(_z.list_w + _z.det_w));
-    TextFit_Line(_fails, _tid + " title", _title, _wd.list_w - 8 * _p);
+    TextFit_Title(_fails, _tid + " title", _title, _wd.list_w - 8 * _p, _mt);
     var _inner = _wd.det_w - 8 * _p;
     var _col_w = (_inner - (_cols - 1) * 3 * _p) / _cols;
     for (var _i = 0; _i < array_length(_rows); _i++) {
         var _r = _rows[_i];
         var _val = variable_struct_exists(_r, "value") ? _r.value : "";
         if (variable_struct_get(_r, "kind") != "head") {
-            TextFit_Line(_fails, _tid + " row", _r.label, Ui_MenuLabelRoom(_wd.list_w, _p, _mc.icon_px, variable_struct_exists(_r, "icon_item"), _val));
+            var _rf = TextFit_Row(_fails, _tid + " row", _r.label, _val, _wd.list_w, _p, _mc.icon_px, variable_struct_exists(_r, "icon_item"), _mt);
+            if (_rf.row_h > _z.body_h - 8 * _p) array_push(_fails, _tid + " row '" + string(_r.label) + "' is " + string(_rf.row_h) + " tall in a list " + string(_z.body_h) + " tall");
         }
         if (!variable_struct_exists(_r, "help") || _r.help == "") continue;
         var _lines = variable_struct_exists(_r, "lines") ? _r.lines : [];
@@ -14047,9 +14065,9 @@ function TextFit_CentreMenu(_fails, _what, _items, _title) {
     var _mc = Ui_MenuMeasure(_m, _mt);
     for (var _i = 0; _i < array_length(_items); _i++) {
         var _val = variable_struct_exists(_items[_i], "value") ? _items[_i].value : "";
-        TextFit_Line(_fails, _what + " row", _items[_i].label, Ui_MenuLabelRoom(_mc.panel_w, _mt.p, _mc.icon_px, false, _val));
+        TextFit_Row(_fails, _what + " row", _items[_i].label, _val, _mc.panel_w, _mt.p, _mc.icon_px, false, _mt);
     }
-    TextFit_Line(_fails, _what + " title", _title, _mc.panel_w - 8 * _mt.p);
+    TextFit_Title(_fails, _what + " title", _title, _mc.panel_w - 8 * _mt.p, _mt);
 }
 
 // A profile that has met every enemy (elite too), read every note, finished a run of each result.
@@ -14149,7 +14167,7 @@ function Test_Suite_TextFit() {
         for (var _s = 0; _s < 2; _s++) {
             for (var _i = 0; _i < array_length(_sets[_s]); _i++) {
                 var _r = _sets[_s][_i];
-                TextFit_Line(_f, (_s == 0) ? "skill" : "item", _r.label, Ui_MenuLabelRoom(_z.right.w, _p, (_s == 0) ? _icon_px : 0, (_s == 1), _r.value));
+                TextFit_Row(_f, (_s == 0) ? "skill" : "item", _r.label, _r.value, _z.right.w, _p, (_s == 0) ? _icon_px : 0, (_s == 1), _mt);
                 for (var _k = 0; _k < array_length(_r.lines); _k++) {
                     TextFit_Line(_f, "battle line value of '" + string(_r.label) + "'", _r.lines[_k].value, _col_w + 2 * _p);
                     if (UI_TextWidth(_r.lines[_k].label) > _col_w) TextFit_Block(_f, "battle line label of '" + string(_r.label) + "'", _r.lines[_k].label, _col_w, _p);
@@ -14606,7 +14624,8 @@ function Test_R3GradeWords() {
     TextFit_End(_s);
 }
 
-// Note 21 / R-096: a section header (kind "head") is a dark strip with pale text; an empty slot is a dim light-green row. Never selectable, one shared draw.
+// Note 21 / R-096 (and the review of it, R-106): a section header (kind "head") is pale text with a thin light rule after it and no fill, so it never looks like the cursor
+// band (the dark green); an empty slot is a dim light-green row. Never selectable, one shared draw.
 function Test_R3Headers() {
     var _head = { id: "h", kind: "head", label: "Equipped", value: "", enabled: false };
     var _dim = { id: "d", kind: "button", label: "No Armor", value: "", enabled: true, dim: true };
@@ -14614,16 +14633,20 @@ function Test_R3Headers() {
     var _hs = Ui_RowStyle(_head, false);
     var _ds = Ui_RowStyle(_dim, false);
     var _is = Ui_RowStyle(_item, false);
-    Test_Eq("r3 header: the strip is the dark green", _hs.strip, UI_C_DARK);
+    Test_Eq("r3 header: it has no fill", _hs.strip, -1);
+    Test_True("r3 header: its draw does not share the cursor band's fill (the dark green)", _hs.strip != UI_C_DARK);
+    Test_Eq("r3 header: the rule after the text is the light green", _hs.rule, UI_C_LIGHT);
     Test_Eq("r3 header: the text is the palette's lightest", _hs.text, UI_C_LIGHTEST);
-    Test_Eq("r3 header: it is the same with the cursor on it", Ui_RowStyle(_head, true).strip, UI_C_DARK);
+    Test_Eq("r3 header: it is the same with the cursor on it", Ui_RowStyle(_head, true).strip, -1);
     Test_True("r3 header: its text colour differs from a dim row's as drawn", Ui_TextColor(_hs.text) != Ui_TextColor(_ds.text));
-    Test_True("r3 header: its fill differs from a dim row's (which has none)", _hs.strip != _ds.strip);
+    Test_True("r3 header: its rule marks it out from a dim row (which has none)", _hs.rule != _ds.rule);
+    Test_Eq("r3 a dim row has no rule", _ds.rule, -1);
     Test_Eq("r3 an empty-slot (dim) row stays the light green", _ds.text, UI_C_LIGHT);
     Test_Eq("r3 an empty-slot (dim) row has no strip", _ds.strip, -1);
     Test_Eq("r3 an item row has no strip", _is.strip, -1);
+    Test_Eq("r3 an item row has no rule", _is.rule, -1);
     Test_Eq("r3 an item row keeps the main text colour", Ui_TextColor(_is.text), UI_C_TEXT);
-    // the strip: a gap above it, except for the first row of the list
+    // the header's place: a gap above it, except for the first row of the list
     var _first = Ui_HeadRect(10, 200, 50, 16, 3, true);
     var _later = Ui_HeadRect(10, 200, 50, 16, 3, false);
     Test_Eq("r3 header strip: the first one has no gap above", _first.y, 50);
@@ -14638,13 +14661,13 @@ function Test_R3Headers() {
     Test_True("r3 gear: the Equipped header is a head row", _g[0].kind == "head" && _g[0].label == "Equipped");
     Test_Eq("r3 gear: No Armor draws the dim light green", Ui_RowStyle(_armor, false).text, UI_C_LIGHT);
     Test_Eq("r3 gear: No Accessory draws the dim light green", Ui_RowStyle(_acc, false).text, UI_C_LIGHT);
-    Test_True("r3 gear: the header does not look like No Armor", Ui_RowStyle(_g[0], false).strip != Ui_RowStyle(_armor, false).strip);
+    Test_True("r3 gear: the header does not look like No Armor", Ui_RowStyle(_g[0], false).rule != Ui_RowStyle(_armor, false).rule);
     var _kn = CharacterCreate_Player(CLASS_KNIGHT);
     _kn.inventory = Inv_Add(_kn.inventory, 2, 1);
     var _g2 = TabGear_Items(_kn);
     var _bag = -1;
     for (var _i = 0; _i < array_length(_g2); _i++) if (_g2[_i].id == "head_bag") _bag = _i;
-    Test_True("r3 gear: the Bag header is a head row with a strip", _bag >= 0 && _g2[_bag].kind == "head" && Ui_RowStyle(_g2[_bag], false).strip == UI_C_DARK);
+    Test_True("r3 gear: the Bag header is a head row with a rule and no fill", _bag >= 0 && _g2[_bag].kind == "head" && Ui_RowStyle(_g2[_bag], false).rule == UI_C_LIGHT && Ui_RowStyle(_g2[_bag], false).strip == -1);
     // the cursor never rests on a header
     var _m = Ui_MenuNew("r3_head", _g2, {});
     Test_True("r3 gear: the cursor starts on a row, not a header", _m.items[_m.cursor].kind != "head");
@@ -14751,4 +14774,121 @@ function Test_R3LightSpots() {
             Test_True("r3light spots: " + _name + " merchant is outside the inner half of the pool at " + string(_s.cx) + "," + string(_s.cy) + " (" + string(round(_d)) + " px of " + string(_s.r * _T * 0.5) + ")", _d > _s.r * _T * 0.5);
         }
     }
+}
+
+// ============================================================================================================================
+// Round 3 playtest, packet textfit2 (owner: "make sure all skill card names fit in the skills tab"; R-106): a list row's label that does not fit beside its value wraps over
+// two lines (a taller row), takes the next smaller type step only for one too-wide word, or puts its value on a line under it; nothing is cut. The proof for every skill,
+// passive and card name at every size and language is Test_Suite_TextFit (TextFit_Known is empty); this suite checks the layout rules and the list's own bookkeeping.
+// The pictures are shots 1050..1059.
+// ============================================================================================================================
+function Test_Suite_TextFit2() {
+    Test_RunSuite("TextFit2.rowfit", Test_TextFit2RowFit);
+    Test_RunSuite("TextFit2.scroll", Test_TextFit2Scroll);
+    Test_RunSuite("TextFit2.menu", Test_TextFit2Menu);
+}
+
+// The panel width that leaves exactly _room for a label (no icon): the 4p inset each side, the 5p marker column and the 4p of the inner edge; with a value _value_w wide.
+function TextFit2_PanelFor(_room, _p, _value_w = 0) {
+    return _room + 13 * _p + ((_value_w > 0) ? _value_w + 3 * _p : 0);
+}
+
+function Test_TextFit2RowFit() {
+    var _s = TextFit_Begin();
+    TextFit_Set(640, 576, "en");
+    var _mt = Ui_Metrics();
+    var _p = _mt.p;
+    var _name = "Horizontal Slash+";
+    var _w = UI_TextWidth(_name);
+    Test_Eq("textfit2 the helper's panel leaves the room asked for", Ui_MenuLabelRoom(TextFit2_PanelFor(100, _p), _p, 0, false, ""), 100);
+    var _one = Ui_RowFit(_name, "", TextFit2_PanelFor(_w, _p), _p, 0, false, true, _mt);
+    Test_Eq("textfit2 a label that fits stays on one line", _one.mode, "one");
+    Test_Eq("textfit2 a one-line row is a normal row", _one.row_h, _mt.row_h);
+    var _wrap = Ui_RowFit(_name, "", TextFit2_PanelFor(_w - 1, _p), _p, 0, false, true, _mt);
+    Test_Eq("textfit2 a label one unit too wide wraps", _wrap.mode, "wrap");
+    Test_Eq("textfit2 it wraps over two lines", _wrap.lines, 2);
+    Test_Eq("textfit2 it keeps the type size when its words fit", _wrap.step, 0);
+    Test_True("textfit2 each wrapped line fits the room", _wrap.w <= _wrap.room);
+    Test_True("textfit2 a two-line row is two lines and the padding tall (give or take a rounding unit)", abs(_wrap.row_h - (2 * _mt.line_h + 2 * _p)) <= 1);
+    Test_True("textfit2 a two-line row is taller than a normal one", _wrap.row_h > _mt.row_h);
+    // one word wider than the room: one size smaller (D168)
+    var _cw = UI_TextWidth("Confirm");
+    var _sm = Ui_RowFit("Confirm", "", TextFit2_PanelFor(_cw - 1, _p), _p, 0, false, true, _mt);
+    Test_Eq("textfit2 one word too wide takes the smaller type step", _sm.step, 1);
+    Test_Eq("textfit2 it stays one line", _sm.lines, 1);
+    Test_True("textfit2 and fits", _sm.ok && _sm.w <= _sm.room);
+    Test_Eq("textfit2 on a normal row", _sm.row_h, _mt.row_h);
+    // a long value beside the word: the value goes on a line under the label (a button row only)
+    var _vtxt = "Space / Z / Enter";
+    var _st = Ui_RowFit("Confirm", _vtxt, TextFit2_PanelFor(_cw + 2, _p), _p, 0, false, true, _mt);
+    Test_Eq("textfit2 a word that cannot share the row with its value stacks the value under it", _st.mode, "stack");
+    Test_True("textfit2 a stacked row is a label line and a value line tall", abs(_st.row_h - (2 * _mt.line_h + 2 * _p)) <= 1 && _st.ok);
+    Test_True("textfit2 the value's line starts under the label", _st.value_y >= _p + _mt.line_h - 1);
+    Test_Eq("textfit2 the whole room is the label's when stacked", _st.room, Ui_MenuLabelRoom(TextFit2_PanelFor(_cw + 2, _p), _p, 0, false, ""));
+    var _nostack = Ui_RowFit("Confirm", _vtxt, TextFit2_PanelFor(_cw + 2, _p), _p, 0, false, false, _mt);
+    Test_Eq("textfit2 a row that may not stack (a setting with arrows or a bar) is cut", _nostack.mode, "cut");
+    Test_False("textfit2 and says it does not fit", _nostack.ok);
+    var _cut = Ui_RowFit("Confirm", "x", 14 * _p, _p, 0, false, true, _mt);
+    Test_False("textfit2 a panel too narrow for the word fits no layout", _cut.ok);
+    // an icon takes room from the label
+    var _ic = Ui_RowFit(_name, "9 MP", 400, _p, 16, false, true, _mt);
+    Test_Eq("textfit2 the icon column is part of the room", _ic.room, Ui_MenuLabelRoom(400, _p, 16, false, "9 MP"));
+    // a title: one line when it fits, wrapped when it does not
+    var _t = "Learn Horizontal Slash+: Replace Which?";
+    var _tw = UI_TextWidth(_t);
+    Test_Eq("textfit2 a title that fits is one line", Ui_TitleFit(_t, _tw, _mt).lines, 1);
+    var _t2 = Ui_TitleFit(_t, _tw - 1, _mt);
+    Test_Eq("textfit2 a title one unit too wide wraps over two lines", _t2.lines, 2);
+    Test_True("textfit2 and each line fits", _t2.w <= _tw - 1);
+    TextFit_End(_s);
+}
+
+function Test_TextFit2Scroll() {
+    var _eq = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10];
+    Test_Eq("textfit2 scroll: equal rows, the cursor below the window pulls it down", Ui_ScrollTopH(5, 0, _eq, 40), Ui_ScrollTop(5, 0, 4, 10));
+    Test_Eq("textfit2 scroll: equal rows, the cursor above the window pulls it up", Ui_ScrollTopH(0, 2, _eq, 40), Ui_ScrollTop(0, 2, 4, 10));
+    Test_Eq("textfit2 scroll: equal rows, the last item shows the last full window", Ui_ScrollTopH(9, 0, _eq, 40), Ui_ScrollTop(9, 0, 4, 10));
+    Test_Eq("textfit2 scroll: equal rows, a cursor inside the window leaves it alone", Ui_ScrollTopH(4, 3, _eq, 40), Ui_ScrollTop(4, 3, 4, 10));
+    Test_Eq("textfit2 scroll: a list that fits never scrolls", Ui_ScrollTopH(3, 2, [10, 10, 10, 10], 100), 0);
+    var _un = [10, 20, 10, 10, 10];
+    Test_Eq("textfit2 scroll: a tall row counts its height (cursor on row 3 in 40: 20 + 10 + 10)", Ui_ScrollTopH(3, 0, _un, 40), 1);
+    Test_Eq("textfit2 scroll: cursor on the last row of 10 + 20 + 10 + 10 + 10 in 40 shows the last three", Ui_ScrollTopH(4, 0, _un, 40), 2);
+    Test_Eq("textfit2 scroll: the window never stops short of the end when the end fits", Ui_ScrollTopH(4, 3, _un, 50), 1);
+    Test_Eq("textfit2 scroll: rows end: 20 + 10 + 10 fit 40", Ui_RowsEnd(_un, 1, 40), 3);
+    Test_Eq("textfit2 scroll: a row is never half in: 10 then 20 does not fit 25", Ui_RowsEnd(_un, 0, 25), 0);
+    Test_Eq("textfit2 scroll: a row taller than the window is still the first row", Ui_RowsEnd(_un, 1, 15), 1);
+    Test_Eq("textfit2 scroll: heights add up", Ui_RowsH(_un, 1, 3), 40);
+}
+
+// The real menu measure: the battle's skill list at 800 x 720 with every skill upgraded: the names that do not fit wrap and make their rows taller; the others stay normal.
+function Test_TextFit2Menu() {
+    var _s = TextFit_Begin();
+    TextFit_Set(800, 720, "en");
+    var _mt = Ui_Metrics();
+    var _z = Battle_Zones();
+    var _rows = TextFit_UpgradedRows("battle");
+    var _m = Ui_MenuNew("textfit2_battle", _rows, { layout: { x_anchor: "right", panel_w: _z.right.w, y_bottom: _z.list_bottom, details: true, details_pos: "above", details_cols: 2, rows_max: 3 } });
+    var _mc = Ui_MenuMeasure(_m, _mt);
+    Test_Eq("textfit2 menu: one height per row", array_length(_mc.rhs), array_length(_rows));
+    var _hs = -1;
+    var _short = -1;
+    for (var _i = 0; _i < array_length(_rows); _i++) {
+        if (_rows[_i].label == "Horizontal Slash+") _hs = _i;
+        if (_short < 0 || string_length(_rows[_i].label) < string_length(_rows[_short].label)) _short = _i;
+    }
+    Test_True("textfit2 menu: (setup) the list holds Horizontal Slash+ and a short name", _hs >= 0 && _short >= 0);
+    if (_hs >= 0) {
+        Test_Eq("textfit2 menu: Horizontal Slash+ wraps in the battle list at 800 x 720", _mc.fits[_hs].mode, "wrap");
+        Test_True("textfit2 menu: and its row is taller than a normal one", _mc.rhs[_hs] > _mt.row_h);
+        Test_True("textfit2 menu: the list knows the most any row is taller", _mc.extra_h >= _mc.rhs[_hs] - _mt.row_h && _mc.extra_h > 0);
+    }
+    if (_short >= 0) Test_Eq("textfit2 menu: a short name keeps a normal row", _mc.rhs[_short], _mt.row_h);
+    for (var _j = 0; _j < array_length(_rows); _j++) Test_True("textfit2 menu: " + _rows[_j].label + " is laid out (nothing is cut)", _mc.fits[_j].ok);
+    // the same list with nothing too long has no extra height at all
+    var _plain = [{ label: "Bite", value: "3 MP", enabled: true, help: "", lines: [] }, { label: "Wound", value: "4 MP", enabled: true, help: "", lines: [] }];
+    var _m2 = Ui_MenuNew("textfit2_plain", _plain, { layout: { x_anchor: "right", panel_w: _z.right.w, y_bottom: _z.list_bottom } });
+    var _mc2 = Ui_MenuMeasure(_m2, _mt);
+    Test_Eq("textfit2 menu: short names make no extra height", _mc2.extra_h, 0);
+    Test_Eq("textfit2 menu: and every row is a normal row", _mc2.rhs[0] + _mc2.rhs[1], 2 * _mt.row_h);
+    TextFit_End(_s);
 }

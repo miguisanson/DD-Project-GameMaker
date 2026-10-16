@@ -4350,16 +4350,18 @@ function Ui_RowColor(_sel, _enabled, _dim) {
     return UI_C_TEXT;
 }
 
-// R3 note 21 (R-096, D171): how a list row is drawn, in one place. A section header (kind "head": Equipped, Bag, Passives, any other) is the palette's lightest text on a
-// strip of the dark green; every other row has no strip and the colour Ui_RowColor gives (an empty slot is a dim row: the light green). Returns { text, strip } (strip -1 = none).
+// R3 note 21 (R-096, D171): how a list row is drawn, in one place. A section header (kind "head": Equipped, Bag, Passives, any other) is the palette's lightest text with
+// a thin light rule after it, from the end of the text to the right edge of the list (no fill: the cursor band is the dark green, and a filled header read as a selected
+// row); every other row has no rule and the colour Ui_RowColor gives (an empty slot is a dim row: the light green). Returns { text, strip, rule } (strip = the fill
+// colour, -1 = none: no row has one; rule = the colour of the line after the text, -1 = none).
 function Ui_RowStyle(_row, _sel = false) {
     var kd = variable_struct_exists(_row, "kind") ? _row.kind : "button";
-    if (kd == "head") return { text: UI_C_LIGHTEST, strip: UI_C_DARK };
+    if (kd == "head") return { text: UI_C_LIGHTEST, strip: -1, rule: UI_C_LIGHT };
     var dim = variable_struct_exists(_row, "dim") && _row.dim;
-    return { text: Ui_RowColor(_sel, Ui_ItemEnabled(_row), dim), strip: -1 };
+    return { text: Ui_RowColor(_sel, Ui_ItemEnabled(_row), dim), strip: -1, rule: -1 };
 }
 
-// The header strip inside its row: the whole width, a gap of one pixel unit above it unless it is the first row of the list. Pure. { x, y, w, h }
+// The header's place inside its row: the whole width, a gap of one pixel unit above it unless it is the first row of the list. Pure. { x, y, w, h }
 function Ui_HeadRect(_x1, _x2, _ry, _row_h, _p, _first) {
     var gap = _first ? 0 : _p;
     return { x: _x1, y: _ry + gap, w: _x2 - _x1, h: _row_h - gap };
@@ -4901,6 +4903,96 @@ function Ui_MenuLabelRoom(_panel_w, _p, _icon_px, _icon_item, _value) {
     return (_panel_w - 4 * _p) - lx - vw;
 }
 
+// R-106 (D168): how one list row lays out its label. Names keep their wording and their type size where they can: a label that fits beside its value stays on one line
+// ("one"); one that does not wraps by words into at most two lines in the room it has ("wrap"); a button row whose label does not fit that way puts the value on a line of
+// its own under the label, right-aligned ("stack"); only when no word can be made to fit at the UI's size does the label take the next smaller type step (one too-wide word,
+// CardsUi_NameFit), wrapped the same way, then stacked. "cut" (ok = false) is a row no layout can fit; the draw then falls back to Ui_FitText.
+// { mode, ok, step, lines, w (the widest label line), h (the label's height), y_off, room (the width the label may take), row_h (the row's height: a normal row, or taller
+// for the extra lines), value_y (stack: where the value's line starts in the row) }. Pure.
+function Ui_RowFit(_label, _value, _panel_w, _p, _icon_px, _icon_item, _stackable, _mt) {
+    var t = string(_label);
+    if (string_pos("[", t) > 0) t = Markup_Strip(t);
+    var vtxt = is_undefined(_value) ? "" : string(_value);
+    var avail = Ui_MenuLabelRoom(_panel_w, _p, _icon_px, _icon_item, vtxt);
+    var w1 = UI_TextWidth(t);
+    var fit = { mode: "one", ok: true, step: 0, lines: 1, w: w1, h: _mt.line_h, y_off: 0, room: avail, row_h: _mt.row_h, value_y: 0 };
+    if (w1 <= avail) return fit;
+    var stack = _stackable && vtxt != "";
+    var avail2 = stack ? Ui_MenuLabelRoom(_panel_w, _p, _icon_px, _icon_item, "") : 0;   // the room the label has when the value is on a line of its own
+    var steps = [0, 1];
+    for (var st = 0; st < 2; st++) {
+        for (var sk = 0; sk < (stack ? 2 : 1); sk++) {
+            var rm = (sk == 0) ? avail : avail2;
+            var m = Ui_TextBlockMeasureStep(t, rm, steps[st]);
+            if (steps[st] > 0 && m.step <= 0) continue;   // there is no smaller size to take
+            if (m.w <= 0 || m.w > rm || m.lines > 2) continue;
+            var lh = max(m.h, _mt.line_h);
+            fit.mode = (sk == 0) ? "wrap" : "stack";
+            fit.step = m.step;
+            fit.lines = m.lines;
+            fit.w = m.w;
+            fit.h = lh;
+            fit.y_off = max(0, (_mt.line_h - m.h) div 2);
+            fit.room = rm;
+            fit.row_h = (sk == 0) ? max(_mt.row_h, lh + 2 * _p) : (lh + _mt.line_h + 2 * _p);
+            fit.value_y = (sk == 0) ? 0 : (_p + lh);
+            return fit;
+        }
+    }
+    fit.mode = "cut";
+    fit.ok = false;
+    return fit;
+}
+
+// R-106: a menu title in a panel's inner width _room: one line, or wrapped by words (smaller type only for a single too-wide word). { step, w, h, lines, y_off }. Pure.
+function Ui_TitleFit(_title, _room, _mt) {
+    var w1 = UI_TextWidth(_title);
+    if (w1 <= _room) return { step: 0, w: w1, h: _mt.line_h, lines: 1, y_off: 0 };
+    return CardsUi_NameFit(string(_title), _room, _mt);
+}
+
+// The summed height of rows _a .. _b (inclusive) of a list whose rows have their own heights.
+function Ui_RowsH(_rhs, _a, _b) {
+    var h = 0;
+    for (var i = _a; i <= _b; i++) h += _rhs[i];
+    return h;
+}
+
+// R-106: Ui_ScrollTop for rows of different heights: the first visible row in a window _room tall. The cursor's row is whole inside, the window moves as little as possible,
+// and it does not stop short of the end of the list when the end fits. With equal rows it is Ui_ScrollTop.
+function Ui_ScrollTopH(_cur, _top, _rhs, _room) {
+    var n = array_length(_rhs);
+    if (n <= 0) return 0;
+    var top = clamp(_top, 0, n - 1);
+    if (_cur < top) top = _cur;
+    while (top < _cur && Ui_RowsH(_rhs, top, _cur) > _room) top++;
+    while (top > 0 && Ui_RowsH(_rhs, top - 1, n - 1) <= _room) top--;
+    return top;
+}
+
+// The most height _k rows of the list can add to _k normal rows: the sum of the _k biggest extras (a row's extra is its height less a normal row's).
+function Ui_ExtraSum(_rhs, _row_h, _k) {
+    var ex = [];
+    for (var i = 0; i < array_length(_rhs); i++) if (_rhs[i] > _row_h) array_push(ex, _rhs[i] - _row_h);
+    array_sort(ex, false);
+    var sum = 0;
+    for (var j = 0; j < min(_k, array_length(ex)); j++) sum += ex[j];
+    return sum;
+}
+
+// The last row (its index) that is whole inside a window _room tall that starts at row _top (at least _top itself).
+function Ui_RowsEnd(_rhs, _top, _room) {
+    var n = array_length(_rhs);
+    var h = 0;
+    var last = _top;
+    for (var i = _top; i < n; i++) {
+        h += _rhs[i];
+        if (h > _room && i > _top) break;
+        last = i;
+    }
+    return last;
+}
+
 // The panel width a list needs so that no label is cut: the widest row (marker column, icon column, label, value) or the title or the note, plus the
 // 4p inset each side. _mc is the measured struct of Ui_MenuMeasure.
 function Ui_MenuListNeed(_mc, _p) {
@@ -4988,6 +5080,7 @@ function Ui_MenuMeasureRows(_m, _mt, _lang) {
     var note = _m.layout.note;
     return {
         items: _m.items, n: n, mt: _mt, lang: _lang, title: title, note: note, sig: Ui_MenuSigBuild(_m.items, n), det_need: Ui_MenuDetailsNeed(_m.items, p, _m.layout.details_cols),
+        rhs: [], fits: [], extra_h: 0,   // R-106: each row's height and layout in the panel width (Ui_MenuMeasureSizes)
         label_w: label_w, val_w: val_w, row_w: row_w, icon_px: icon_px, title_w: (title != "") ? UI_TextWidth(title) : 0, note_w: (note != "") ? UI_TextWidth(note) : 0,
         l2: false, l2_pw: 0, l2_details: false, l2_pos: "", l2_cols: 0, l2_cur: -1,
         panel_w: 0, det_h: 0
@@ -5022,6 +5115,24 @@ function Ui_MenuMeasureSizes(_m, _mt, _mc, _cur) {
     }
     _mc.panel_w = panel_w;
     _mc.det_h = det_h;
+    // R-106 (D168): a label that does not fit beside its value wraps (a taller row) or stacks its value under it; the rows' heights follow
+    var rhs = array_create(n, _mt.row_h);
+    var fits = array_create(n, undefined);
+    var extra = 0;
+    if (!L.center) {
+        for (var r = 0; r < n; r++) {
+            var rw = _m.items[r];
+            var rk = variable_struct_exists(rw, "kind") ? rw.kind : "button";
+            if (rk == "head") continue;
+            var rf = Ui_RowFit(rw.label, variable_struct_exists(rw, "value") ? rw.value : "", panel_w, p, _mc.icon_px, variable_struct_exists(rw, "icon_item"), rk == "button", _mt);
+            fits[r] = rf;
+            rhs[r] = rf.row_h;
+            extra = max(extra, rf.row_h - _mt.row_h);
+        }
+    }
+    _mc.rhs = rhs;
+    _mc.fits = fits;
+    _mc.extra_h = extra;
 }
 
 // Level 1 only (the rows' widths), rebuilt only when its keys changed: what TabMenu_FitMenu reads before it fixes the panel widths.
@@ -5076,35 +5187,48 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var mm = Ui_MenuMeasure(_m, mt);
     var icon_px = mm.icon_px;     // the icon column (battle lists): one icon pixel is k GUI units, k = whole units that fit a row
     var panel_w = mm.panel_w;
-    var header_h = (L.title != "") ? (mt.line_h + 3 * p) : 0;
+    var title_fit = (L.title != "") ? Ui_TitleFit(L.title, panel_w - 8 * p, mt) : undefined;   // R-106: a title wider than the panel wraps (a long skill name in "Learn X: Replace Which?")
+    var header_h = (L.title != "") ? (title_fit.h + 3 * p) : 0;
     var note_h = (L.note != "") ? (mt.line_h + 2 * p) : 0;   // D143: one line under the title (the level-up screen's class growth)
     var chrome_y = 2 * (4 * p) + header_h + note_h;
+    var rhs = mm.rhs;             // R-106: each row's height (a label that wraps makes a taller row) and how its label is laid out
+    var extra = mm.extra_h;       // the most any row is taller than a normal one (0: every row is a normal row)
+    var all_h = (n > 0) ? Ui_RowsH(rhs, 0, n - 1) : 0;
     var det_h = mm.det_h;         // the tallest sentence (so the list does not jump between items); the highlighted item's own when the panel is above
     var rows_lim = n;             // G10: fewest rows the details panel's floor may force
     var seq_drop = false;         // G10: the arrow strip is left out of the details when nothing else makes room
+    var gap = mt.margin;          // the space between the list and its details panel
+    var one_row = false;          // R-106: the list is a window of one row, as tall as the highlighted row
     if (L.details && L.details_pos == "above" && det_h > 0 && n > 0 && L.det_floor_y >= 0) {
         var fit_bottom = (L.y_bottom >= 0) ? L.y_bottom : (mt.gh - mt.margin);
         var fit_room = fit_bottom - L.det_floor_y;
         var fit_rows = (L.rows_max > 0) ? min(n, L.rows_max) : n;
-        if (det_h + mt.margin + chrome_y + fit_rows * mt.row_h > fit_room) {
+        if (det_h + mt.margin + chrome_y + fit_rows * mt.row_h + Ui_ExtraSum(rhs, mt.row_h, fit_rows) > fit_room) {
             fit_rows = min(2, fit_rows);
-            if (det_h + mt.margin + chrome_y + fit_rows * mt.row_h > fit_room) {
+            if (det_h + mt.margin + chrome_y + fit_rows * mt.row_h + Ui_ExtraSum(rhs, mt.row_h, fit_rows) > fit_room) {
                 var fc = _m.items[clamp(_m.cursor, 0, n - 1)];
                 var det_flat = Ui_DetailsHeight(panel_w, fc.help, variable_struct_exists(fc, "lines") ? fc.lines : [], L.details_cols, 0);
                 if (variable_struct_exists(fc, "seq") && array_length(fc.seq) > 0 && det_flat < det_h) { det_h = det_flat; seq_drop = true; }
-                if (det_h + mt.margin + chrome_y + fit_rows * mt.row_h > fit_room) fit_rows = 1;
+                if (det_h + mt.margin + chrome_y + fit_rows * mt.row_h + Ui_ExtraSum(rhs, mt.row_h, fit_rows) > fit_room) fit_rows = 1;
             }
             rows_lim = fit_rows;
+            if (fit_rows == 1 && n > 0) {   // R-106: a window of one row is as tall as the highlighted row (not the tallest); still too tall for the room: the gap between the panels shrinks to one pixel unit
+                one_row = true;
+                if (det_h + gap + chrome_y + rhs[clamp(_m.cursor, 0, n - 1)] > fit_room) gap = p;
+            }
         }
     }
     var det_right = (L.details && L.details_pos == "right");   // D90: beside the list, as tall as the list (the Tab menu)
-    var avail_h = ((L.max_h > 0) ? L.max_h : (mt.gh - 2 * mt.margin)) - ((det_h > 0) ? det_h + mt.margin : 0);
+    var avail_h = ((L.max_h > 0) ? L.max_h : (mt.gh - 2 * mt.margin)) - ((det_h > 0) ? det_h + gap : 0);
     var rows_vis = clamp(floor((avail_h - chrome_y) / mt.row_h), 1, max(1, n));
+    while (rows_vis > 1 && rows_vis * mt.row_h + Ui_ExtraSum(rhs, mt.row_h, rows_vis) > avail_h - chrome_y) rows_vis--;   // R-106: rows that wrap are taller
     if (det_right) rows_vis = max(1, floor((avail_h - chrome_y) / mt.row_h));   // the panel keeps its size whatever the row count
     if (L.rows_max > 0) rows_vis = min(rows_vis, L.rows_max);
     rows_vis = min(rows_vis, max(1, rows_lim));
-    var panel_h = det_right ? avail_h : (chrome_y + rows_vis * mt.row_h);
-    var total_h = panel_h + ((det_h > 0) ? mt.margin + det_h : 0);
+    // the room the rows have: rows_vis rows, each as tall as the tallest rows are (so any window of that many rows is whole); the panel beside the list uses all it has
+    var list_room = (n <= 0) ? rows_vis * mt.row_h : (one_row ? rhs[clamp(_m.cursor, 0, n - 1)] : (det_right ? ((extra > 0) ? (avail_h - chrome_y) : rows_vis * mt.row_h) : min(all_h, rows_vis * mt.row_h + Ui_ExtraSum(rhs, mt.row_h, rows_vis))));
+    var panel_h = det_right ? avail_h : (chrome_y + list_room);
+    var total_h = panel_h + ((det_h > 0) ? gap + det_h : 0);
     var px = round((mt.gw - panel_w) / 2);
     if (L.x_anchor == "right") px = mt.gw - mt.margin - panel_w;
     else if (L.x_anchor == "left") px = mt.margin;
@@ -5116,8 +5240,8 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var slide = p * round((1 - _alpha) * 3);   // slides down into place in three pixel steps
     py += -slide;
     var det_above = (det_h > 0 && L.details_pos == "above");
-    var list_y = det_above ? (py + det_h + mt.margin) : py;     // the list panel's top; the details panel is above or below it
-    var det_y = det_above ? py : (py + panel_h + mt.margin);
+    var list_y = det_above ? (py + det_h + gap) : py;     // the list panel's top; the details panel is above or below it
+    var det_y = det_above ? py : (py + panel_h + gap);
     _m.rect = { x: px, y: list_y, w: panel_w, h: panel_h };
     _m.det_rect = (det_h > 0) ? { x: px, y: det_y, w: panel_w, h: det_h } : { x: 0, y: 0, w: 0, h: 0 };
     if (det_right) {
@@ -5125,7 +5249,11 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         _m.det_rect = { x: dx, y: ((L.det_top >= 0) ? L.det_top - slide : list_y), w: (L.det_w > 0) ? L.det_w : max(0, mt.gw - mt.margin - dx), h: (L.det_h >= 0) ? L.det_h : panel_h };
     }
 
-    _m.top = Ui_ScrollTop(_m.cursor, _m.top, rows_vis, n);
+    _m.top = Ui_ScrollTopH(_m.cursor, _m.top, rhs, list_room);
+    var vis_end = (n > 0) ? Ui_RowsEnd(rhs, _m.top, list_room) : -1;
+    var offs = array_create(n + 1, 0);   // where each row starts, from the first row
+    for (var o = 0; o < n; o++) offs[o + 1] = offs[o] + rhs[o];
+    var top_off = offs[_m.top];
     Ui_DrawFrame(px, list_y, panel_w, panel_h, _alpha, p);
     draw_set_alpha(_alpha);
 
@@ -5133,8 +5261,9 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var x1 = px + panel_w - 4 * p;
     var ty0 = list_y + 4 * p;
     if (L.title != "") {
-        Ui_Text(x0, ty0, L.title, UI_C_LIGHTEST);
-        Ui_Box(px + 3 * p, ty0 + mt.line_h + p, px + panel_w - 3 * p, ty0 + mt.line_h + 2 * p, UI_C_DARK);
+        if (title_fit.lines > 1 || title_fit.step > 0) Ui_TextBlockStep(x0, ty0 + title_fit.y_off, L.title, panel_w - 8 * p, UI_C_LIGHTEST, title_fit.step);
+        else Ui_Text(x0, ty0, L.title, UI_C_LIGHTEST);
+        Ui_Box(px + 3 * p, ty0 + title_fit.h + p, px + panel_w - 3 * p, ty0 + title_fit.h + 2 * p, UI_C_DARK);
         ty0 += header_h;
     }
     if (L.note != "") {
@@ -5146,86 +5275,104 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     // rectangles for the mouse (rows outside the window can't be hit)
     var rects = array_create(n);
     for (var r = 0; r < n; r++) {
-        var vis = (r >= _m.top && r < _m.top + rows_vis);
-        rects[r] = { x: px + 2 * p, y: rows_y0 + (r - _m.top) * mt.row_h, w: vis ? (panel_w - 4 * p) : 0, h: vis ? mt.row_h : 0 };
+        var vis = (r >= _m.top && r <= vis_end);
+        rects[r] = { x: px + 2 * p, y: rows_y0 + offs[r] - top_off, w: vis ? (panel_w - 4 * p) : 0, h: vis ? rhs[r] : 0 };
     }
     _m.rects = rects;
 
     // gliding highlight band
-    var target_y = rows_y0 + (_m.cursor - _m.top) * mt.row_h;
+    var cur_i = clamp(_m.cursor, 0, max(0, n - 1));
+    var target_y = rows_y0 + offs[cur_i] - top_off;
     if (_m.cur_y < 0) _m.cur_y = target_y;
     _m.cur_y = Ui_Glide(_m.cur_y, target_y, now - _m.last_draw_ms);
     _m.last_draw_ms = now;
     var band_y = round(_m.cur_y);
-    if (n > 0) Ui_Box(px + 2 * p + p, band_y, px + panel_w - 2 * p - p, band_y + mt.row_h, UI_C_DARK);
+    var band_h = (n > 0) ? rhs[cur_i] : mt.row_h;
+    if (n > 0) Ui_Box(px + 2 * p + p, band_y, px + panel_w - 2 * p - p, band_y + band_h, UI_C_DARK);
 
-    for (var k = _m.top; k < min(n, _m.top + rows_vis); k++) {
+    for (var k = _m.top; k <= vis_end; k++) {
         var row = _m.items[k];
-        var ry = rows_y0 + (k - _m.top) * mt.row_h;
-        var ty = ry + (mt.row_h - mt.line_h) div 2;
+        var ry = rows_y0 + offs[k] - top_off;
+        var rh = rhs[k];
+        var ty = ry + (rh - mt.line_h) div 2;
         var sel = (k == _m.cursor);
         var en = Ui_ItemEnabled(row);
         var kd = variable_struct_exists(row, "kind") ? row.kind : "button";
         var dim = variable_struct_exists(row, "dim") && row.dim;   // looks unavailable but can be selected (a shop row you cannot pay for, a skill you lack the MP for)
         var style = Ui_RowStyle(row, sel);   // D115: names are white, selected or not; R3: a header is a dark strip with pale text
         var col = style.text;
-        if (kd == "head") {
-            var hr = Ui_HeadRect(px + 3 * p, px + panel_w - 3 * p, ry, mt.row_h, p, k == 0);
-            Ui_Box(hr.x, hr.y, hr.x + hr.w, hr.y + hr.h, style.strip);
-            Ui_Box(hr.x, hr.y + hr.h - p, hr.x + hr.w, hr.y + hr.h, UI_C_DARKEST);   // a dark line under the strip: the cursor band of the row below is the same green and must not run into it
-            ty = hr.y + (hr.h - p - mt.line_h) div 2;
+        var hr = undefined;
+        if (kd == "head") {   // R-106 follow-up: no fill (the cursor band is the dark green); the text, then a thin rule to the right edge of the list (below)
+            hr = Ui_HeadRect(px + 3 * p, px + panel_w - 3 * p, ry, mt.row_h, p, k == 0);
+            ty = hr.y + (hr.h - mt.line_h) div 2;
         } else if (variable_struct_exists(row, "flash_at") && Ui_FlashOn(now - row.flash_at)) {   // R3 note 25: the Controls rows a reset changed blink
-            Ui_Box(px + 3 * p, ry, px + panel_w - 3 * p, ry + mt.row_h, UI_C_LIGHTEST);
+            Ui_Box(px + 3 * p, ry, px + panel_w - 3 * p, ry + rh, UI_C_LIGHTEST);
             col = UI_C_DARKEST;
         }
         var label_x = x0 + 5 * p;
         if (icon_px > 0) {   // { cat, frame }: an Icon_Get picture (skills, statuses)
             if (variable_struct_exists(row, "icon") && is_struct(row.icon)) {
                 var ic = Icon_Get(row.icon.cat, row.icon.frame);
-                if (is_struct(ic)) draw_sprite_ext(ic.spr, ic.sub, label_x, ry + (mt.row_h - icon_px) div 2, icon_px / 16, icon_px / 16, 0, c_white, (dim && !sel) ? _alpha * 0.55 : _alpha);
+                if (is_struct(ic)) draw_sprite_ext(ic.spr, ic.sub, label_x, ry + (rh - icon_px) div 2, icon_px / 16, icon_px / 16, 0, c_white, (dim && !sel) ? _alpha * 0.55 : _alpha);
             }
             label_x += icon_px + 2 * p;
         }
         if (variable_struct_exists(row, "icon_item")) {   // C3: an item's picture
-            Item_DrawIcon(row.icon_item, label_x, ry + (mt.row_h - 8 * p) div 2, 8 * p, dim ? 0.6 : 1);
+            Item_DrawIcon(row.icon_item, label_x, ry + (rh - 8 * p) div 2, 8 * p, dim ? 0.6 : 1);
             label_x += 10 * p;
         }
+        var fit = (!L.center && kd != "head") ? mm.fits[k] : undefined;   // R-106 (D168): how this row's label is laid out in the panel
+        var stacked = false;
+        var vty = ty;   // where the value's line is drawn
         var shown_label = row.label;
-        if (!L.center) {   // a fixed-width panel (battle): a long name gives way to ".." before it reaches the value
-            var vroom = Ui_MenuLabelRoom(panel_w, p, icon_px, variable_struct_exists(row, "icon_item"), variable_struct_exists(row, "value") ? row.value : "");
-            shown_label = Ui_FitText(row.label, vroom);
+        if (L.center) {
+            Ui_Text((x0 + x1) / 2, ty, row.label, col, fa_center);
+        } else if (is_struct(fit) && fit.ok && fit.mode != "one") {   // wrapped over two lines or a step smaller; a stacked row has its value on a line under the label
+            stacked = (fit.mode == "stack");
+            var lby = stacked ? (ry + p + fit.y_off) : (ry + (rh - fit.h) div 2 + fit.y_off);
+            Ui_TextBlockStep(label_x, lby, row.label, fit.room, col, fit.step);
+            if (stacked) vty = ry + fit.value_y;
+        } else {
+            if (!is_struct(fit) || !fit.ok) {   // a row no layout fits (a head row, or the last resort): ".." before it reaches the value
+                var vroom = Ui_MenuLabelRoom(panel_w, p, icon_px, variable_struct_exists(row, "icon_item"), variable_struct_exists(row, "value") ? row.value : "");
+                shown_label = Ui_FitText(row.label, vroom);
+            }
+            Ui_Text(label_x, ty, shown_label, col);
         }
-        if (L.center) Ui_Text((x0 + x1) / 2, ty, row.label, col, fa_center);
-        else Ui_Text(label_x, ty, shown_label, col);
+        if (is_struct(hr) && style.rule != -1 && !L.center) {   // the header's rule: 1 px, from the end of the text to the right edge of the list, level with the middle of the text
+            var rule_x = label_x + UI_TextWidth(row.label) + 2 * p;
+            var rule_y = ty + (mt.line_h - p) div 2;
+            Ui_Box(rule_x, rule_y, hr.x + hr.w, rule_y + p, style.rule);
+        }
         var vx = x1;
         if (kd == "choice" && variable_struct_exists(row, "value")) {
             if (sel && en) {
-                Ui_Arrow(x1 - 3 * p, ry + (mt.row_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
+                Ui_Arrow(x1 - 3 * p, ry + (rh - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
             }
             vx = x1 - 5 * p;
             Ui_Text(vx, ty, row.value, col, fa_right);
             if (sel && en) {
-                Ui_Arrow(vx - UI_TextWidth(row.value) - 5 * p, ry + (mt.row_h - 5 * p) div 2, -1, p, UI_C_LIGHTEST);
+                Ui_Arrow(vx - UI_TextWidth(row.value) - 5 * p, ry + (rh - 5 * p) div 2, -1, p, UI_C_LIGHTEST);
             }
         } else if (kd == "slider") {
             Ui_Text(x1, ty, row.value, col, fa_right);
             var bx = x1 - UI_TextWidth("100%") - 2 * p - bar_w;
-            var by = ry + (mt.row_h - 2 * p) div 2;
+            var by = ry + (rh - 2 * p) div 2;
             Ui_Box(bx, by, bx + bar_w, by + 2 * p, sel ? UI_C_DARKEST : UI_C_DARK);
             var fill = floor(clamp(row.amount, 0, 1) * (bar_w / p) + 0.5) * p;
             Ui_Box(bx, by, bx + fill, by + 2 * p, sel ? UI_C_LIGHTEST : UI_C_LIGHT);
         } else if (variable_struct_exists(row, "value") && row.value != "") {
-            Ui_Text(x1, ty, row.value, col, fa_right);
+            Ui_Text(x1, vty, row.value, col, fa_right);
         }
     }
     // marker: follows the glide, bobs one pixel
     if (n > 0) {
-        Ui_Arrow(x0 + Ui_Bob(now) * p, band_y + (mt.row_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
+        Ui_Arrow(x0 + Ui_Bob(now) * p, band_y + (band_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
     }
     // a scroll hint when the list is longer than its window
-    if (n > rows_vis) {
+    if (n > 0 && (_m.top > 0 || vis_end < n - 1)) {
         if (_m.top > 0) Ui_Box(px + panel_w - 4 * p, rows_y0 - p, px + panel_w - 3 * p, rows_y0, UI_C_LIGHT);
-        if (_m.top + rows_vis < n) Ui_Box(px + panel_w - 4 * p, rows_y0 + rows_vis * mt.row_h, px + panel_w - 3 * p, rows_y0 + rows_vis * mt.row_h + p, UI_C_LIGHT);
+        if (vis_end < n - 1) Ui_Box(px + panel_w - 4 * p, rows_y0 + list_room, px + panel_w - 3 * p, rows_y0 + list_room + p, UI_C_LIGHT);
     }
 
     if (det_h > 0 && n > 0) {
