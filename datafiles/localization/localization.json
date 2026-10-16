@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T12:52:00Z",
-    "row_count": 1213
+    "generated_at_utc": "2026-10-16T12:58:30Z",
+    "row_count": 1215
   },
   "default_lang": "en",
   "languages": [
@@ -3943,6 +3943,14 @@
     "shop.nothing_to_sell": {
       "en": "Nothing to Sell",
       "ko": "팔 것이 없습니다"
+    },
+    "shop.reason.full": {
+      "en": "Bag full for this item",
+      "ko": "이 아이템은 더 들 수 없습니다"
+    },
+    "shop.reason.owned": {
+      "en": "Already owned",
+      "ko": "이미 가지고 있습니다"
     },
     "shop.sell": {
       "en": "Sell",

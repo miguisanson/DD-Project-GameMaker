@@ -2580,7 +2580,8 @@ function ShopUi_Quote(_kind) {
 // One Buy row from a stock row: name, price (or sold out), the sentence and the number lines. can_buy says whether Confirm would work now.
 function ShopUi_ItemFor(_row, _ch, _gold) {
     var sold = (_row.qty <= 0);
-    var out = { enabled: true, row: _row, can_buy: (!sold && _gold >= _row.price), label: "", value: "", help: "", lines: [] };
+    var bag = sold ? "" : Shop_CarryRefusal(_ch, _row);   // R-104: a row the bag would refuse is dimmed too, and the details say why
+    var out = { enabled: true, row: _row, can_buy: (!sold && _gold >= _row.price && bag == ""), label: "", value: "", help: "", lines: [] };
     out.dim = !out.can_buy;
     out.value = sold ? Loc_T("shop.sold_out", "Sold Out") : string(_row.price);
     if (_row.kind == "card") {
@@ -2597,6 +2598,7 @@ function ShopUi_ItemFor(_row, _ch, _gold) {
         if (it.type != ITEM_WEAPON && it.type != ITEM_ARMOR && it.type != ITEM_ACCESSORY) array_push(out.lines, { label: Loc_T("shop.lbl.have", "You Have"), value: string(Inv_Count(_ch.inventory, it.id)) });
     }
     array_push(out.lines, { label: Loc_T("shop.lbl.in_stock", "In Stock"), value: string(max(0, _row.qty)) });
+    if (bag != "") out.help = ((bag == "owned") ? Loc_T("shop.reason.owned", "Already owned") : Loc_T("shop.reason.full", "Bag full for this item")) + ". " + out.help;
     return out;
 }
 
