@@ -2,12 +2,11 @@
 Updated after every step that lands. The full build list is `.planning/BUILD-PLAN.md`; the design spec is `.planning/research/DECISIONS.md` (D1-D125).
 Build: fixing round-3 playtest notes on `next` (next playtest build after batch 2) | Release then stop (D28)
 
-## Now — PLAYTEST NOW (build 8d176ba-20261017), then the final fixes and release
-- Play: `E:\Games\DD-Project Playtest\8d176ba-20261017\DD-Project.exe`. Your old save becomes Profile 1, save file 1 on first launch.
-- Checklist: `.planning/PLAYTEST-QUEUE.md`, section "Build 8d176ba-20261017" — 30 items + 3 questions. Send notes; they are the final fix round (D188).
-- In this build: all 29 round-3 notes, profiles + 3 save files, stealth + sight cone + bushes, rarity colours, mouse cursor, VIG/MND + new level-up screen, Guard + MP, weak points, death tips, trapped chests, boss finisher. Full gate PASS (unit, smoke, bot, 440 screenshots).
-- Not in this build yet: the sound loudness fix (agent working), the class-balance nudges (D186), your music picks (`artudio_candidates\PICK.md`).
-- Then: final fixes -> release v1.0 "NO HOPE" by PaleRook (zip + itch.io text, D188-D190).
+## Now - SHIPPING "NO HOPE" v1.0 (your last playtest is done)
+- Final fixes in progress: skill list rows + counter, all status labels white, level-up gold only on the new number, bushes break the chase, enemies' feet on the HUD line, boss background, Save / Save & Quit in the system menu, debug overlay removed (done), sound loudness (done).
+- Balance in progress: BREAK harder (D191), SPD toned down (D192), less gold (D193), class nudges (D186).
+- Then the release: v1.0, credits screen (PaleRook + all sources), zip in `E:\Games\NO HOPE Release\`, itch.io page text + screenshots for you to upload (D188-D190).
+- Waiting on you (optional): music picks in `art\audio_candidates\PICK.md` (import in GameMaker); without them the game ships with its current music.
 
 ## Done
 - Overnight 2026-10-15/16: fairer randomness (D117-D125), alt-tab pause, flee % and crit odds shown, difficulty list removed, New Game asks twice when a run is saved, optimisation pass (menus ~22x, items ~20x, battle HUD ~2.6x faster), ~1,400 lines of dead code removed, an extra Opus review (1 real bug fixed).
