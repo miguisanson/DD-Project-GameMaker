@@ -1419,6 +1419,7 @@ function Menu_Draw() {
     TabMenu_DrawFooter(z, a);
     KeepThis_Draw(a);
     Confirm_Draw();   // D156: Abandon run and Quit to title ask over the whole menu
+    Notice_Draw();   // R3 note 25: the notice after a Controls reset, over the menu (the controller's own Notice_Draw is not reached while the menu is up)
     if (u.toast != "" && now - u.toast_ms < TAB_TOAST_MS) {
         var tw = UI_TextWidth(u.toast) + 8 * p;
         var th = mt.line_h + 6 * p;
@@ -2230,7 +2231,7 @@ function Notice_Open(_text, _now = current_time) {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
     global.notice_ui = { text: string(_text), opened_ms: _now, closed_ms: -1 };
-    gs.ui.mode = UI_NOTICE;
+    if (gs.ui.mode != UI_MENU) gs.ui.mode = UI_NOTICE;   // R3 note 25: over the open menu (the Controls reset) the menu stays the mode, so it is still there, drawn and paused, when the notice is gone
 }
 
 // Removes it at once (a room change, a battle) and gives the UI mode back.
@@ -2319,7 +2320,7 @@ function Controls_RowHelp(_id) {
 }
 
 // The page's menu items for a key table. _capture_row is the row waiting for a key ("" = none); _msg_row / _msg replace that row's help.
-function Controls_Items(_keys, _capture_row, _msg_row = "", _msg = "") {
+function Controls_Items(_keys, _capture_row, _msg_row = "", _msg = "", _flash_rows = [], _flash_at = -1) {
     var items = [];
     var ids = Binds_RowIds();
     for (var i = 0; i < array_length(ids); i++) {
@@ -2330,11 +2331,30 @@ function Controls_Items(_keys, _capture_row, _msg_row = "", _msg = "") {
             value: waiting ? Loc_T("controls.press_key", "Press a key...") : Binds_KeysText(variable_struct_get(_keys, rid)),
             help: (rid == _msg_row && _msg != "") ? _msg : Controls_RowHelp(rid)
         });
+        if (_flash_at >= 0 && array_contains(_flash_rows, rid)) items[array_length(items) - 1].flash_at = _flash_at;   // R3 note 25: the rows a reset changed blink from this time
     }
     array_push(items, {
         id: "reset", label: Loc_T("controls.reset", "Reset to Defaults"), kind: "button", enabled: true, lines: [], value: "", help: Controls_RowHelp("reset")
     });
     return items;
+}
+
+// R3 note 25 (R-097): the ids of the rows whose keys differ between two key tables, in page order. Pure.
+function Controls_ChangedRows(_old, _new) {
+    var out = [];
+    var ids = Binds_RowIds();
+    for (var i = 0; i < array_length(ids); i++) {
+        var a = (is_struct(_old) && variable_struct_exists(_old, ids[i])) ? variable_struct_get(_old, ids[i]) : [];
+        var b = (is_struct(_new) && variable_struct_exists(_new, ids[i])) ? variable_struct_get(_new, ids[i]) : [];
+        if (string(a) != string(b)) array_push(out, ids[i]);
+    }
+    return out;
+}
+
+// What the notice after a reset says: keys changed, or nothing to change.
+function Controls_ResetText(_changed_count) {
+    if (_changed_count > 0) return Loc_T("controls.reset_done", "Keys are back to the defaults.");
+    return Loc_T("controls.reset_same", "Keys were already the defaults.");
 }
 
 // A key was pressed for a row: { ok, keys, message }. Pure: the caller stores the keys.
@@ -2373,7 +2393,7 @@ function Controls_WaitingText(_label, _device) {
 }
 
 function ControlsPage_Open(_sp) {
-    _sp.controls = { menu: undefined, capture: "", msg_row: "", msg: "", lock: undefined };
+    _sp.controls = { menu: undefined, capture: "", msg_row: "", msg: "", lock: undefined, flash_rows: [], flash_at: -1 };
     var c = _sp.controls;
     c.menu = Ui_MenuNew("controls", Controls_Items(GameSettings_Ensure().keys, ""), {
         on_confirm: ControlsPage_OnConfirm, on_back: ControlsPage_OnBack,
@@ -2384,19 +2404,15 @@ function ControlsPage_Open(_sp) {
 function ControlsPage_Refresh(_sp) {
     var c = _sp.controls;
     if (!is_struct(c)) return;
-    c.menu.items = Controls_Items(GameSettings_Ensure().keys, c.capture, c.msg_row, c.msg);
+    c.menu.items = Controls_Items(GameSettings_Ensure().keys, c.capture, c.msg_row, c.msg, c.flash_rows, c.flash_at);
 }
 
 function ControlsPage_OnConfirm(_m, _i) {
     var sp = GameState_Get().ui.settings_popup;
     var c = sp.controls;
     var rid = _m.items[_i].id;
-    if (rid == "reset") {
-        Settings_SetKeys(Binds_Defaults());
-        c.msg_row = "reset";
-        c.msg = Loc_T("controls.reset_done", "Keys are back to the defaults.");
-        SettingsPopup_Refresh();
-        ControlsPage_Refresh(sp);
+    if (rid == "reset") {   // R3 note 25 (R-097): ask first (the cursor on No); Yes resets, a notice says what changed and the changed rows blink
+        Confirm_Open(Loc_T("controls.reset_ask", "Reset every key to its default?"), ControlsPage_ResetYes, undefined);
         return;
     }
     c.capture = rid;
@@ -2404,6 +2420,25 @@ function ControlsPage_OnConfirm(_m, _i) {
     c.msg_row = rid;
     c.msg = Controls_WaitingText(Binds_RowLabel(rid), Prompt_Device());
     ControlsPage_Refresh(sp);
+}
+
+// Yes to "Reset every key to its default?": the defaults are saved, the notice names the result and the rows that changed are kept to blink once the notice is gone.
+function ControlsPage_ResetYes(_data) {
+    var sp = GameState_Get().ui.settings_popup;
+    var c = is_struct(sp) ? sp.controls : undefined;
+    if (!is_struct(c)) return;
+    var defaults = Binds_Defaults();
+    var changed = Controls_ChangedRows(GameSettings_Ensure().keys, defaults);
+    Settings_SetKeys(defaults);
+    c.capture = "";
+    c.msg_row = "reset";
+    c.msg = Controls_ResetText(array_length(changed));
+    c.flash_rows = changed;
+    c.flash_at = -1;
+    SettingsPopup_Refresh();
+    ControlsPage_Refresh(sp);
+    SFX_PlayUI("ui_confirm");
+    Notice_Open(c.msg);
 }
 
 // Back leaves the Controls page for the settings list.
@@ -2442,6 +2477,10 @@ function ControlsPage_OnKey(_sp, _key) {
 
 function ControlsPage_Handle(_sp) {
     var c = _sp.controls;
+    if (c.flash_at < 0 && array_length(c.flash_rows) > 0 && !Notice_IsOpen()) {   // the notice after a reset is gone: now the changed rows blink
+        c.flash_at = current_time;
+        ControlsPage_Refresh(_sp);
+    }
     if (c.capture != "") {
         if (InputLock_Active(c.lock)) return;
         if (mouse_check_button_pressed(mb_right) || Controls_CaptureCancel(Prompt_Device(), Input_UIBack(), Input_UIPressed("menu"), Input_UIPressed("pause"))) { ControlsPage_OnKey(_sp, vk_escape); return; }
@@ -4324,6 +4363,28 @@ function Ui_RowColor(_sel, _enabled, _dim) {
     return UI_C_TEXT;
 }
 
+// R3 note 21 (R-096, D171): how a list row is drawn, in one place. A section header (kind "head": Equipped, Bag, Passives, any other) is the palette's lightest text on a
+// strip of the dark green; every other row has no strip and the colour Ui_RowColor gives (an empty slot is a dim row: the light green). Returns { text, strip } (strip -1 = none).
+function Ui_RowStyle(_row, _sel = false) {
+    var kd = variable_struct_exists(_row, "kind") ? _row.kind : "button";
+    if (kd == "head") return { text: UI_C_LIGHTEST, strip: UI_C_DARK };
+    var dim = variable_struct_exists(_row, "dim") && _row.dim;
+    return { text: Ui_RowColor(_sel, Ui_ItemEnabled(_row), dim), strip: -1 };
+}
+
+// The header strip inside its row: the whole width, a gap of one pixel unit above it unless it is the first row of the list. Pure. { x, y, w, h }
+function Ui_HeadRect(_x1, _x2, _ry, _row_h, _p, _first) {
+    var gap = _first ? 0 : _p;
+    return { x: _x1, y: _ry + gap, w: _x2 - _x1, h: _row_h - gap };
+}
+
+// R3 note 25 (R-097): a row that flashes blinks twice in CONTROLS_FLASH_MS (pale with dark text, then as it was); _t = ms since the flash began. Pure.
+#macro CONTROLS_FLASH_MS 600
+function Ui_FlashOn(_t) {
+    if (_t < 0 || _t >= CONTROLS_FLASH_MS) return false;
+    return _t < 200 || (_t >= 300 && _t < 500);
+}
+
 function Ui_Text(_x, _y, _txt, _col, _halign = fa_left) {
     draw_set_halign(_halign);
     draw_set_valign(fa_top);
@@ -5086,7 +5147,17 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         var en = Ui_ItemEnabled(row);
         var kd = variable_struct_exists(row, "kind") ? row.kind : "button";
         var dim = variable_struct_exists(row, "dim") && row.dim;   // looks unavailable but can be selected (a shop row you cannot pay for, a skill you lack the MP for)
-        var col = (kd == "head") ? UI_C_LIGHT : Ui_RowColor(sel, en, dim);   // D115: names are white, selected or not
+        var style = Ui_RowStyle(row, sel);   // D115: names are white, selected or not; R3: a header is a dark strip with pale text
+        var col = style.text;
+        if (kd == "head") {
+            var hr = Ui_HeadRect(px + 3 * p, px + panel_w - 3 * p, ry, mt.row_h, p, k == 0);
+            Ui_Box(hr.x, hr.y, hr.x + hr.w, hr.y + hr.h, style.strip);
+            Ui_Box(hr.x, hr.y + hr.h - p, hr.x + hr.w, hr.y + hr.h, UI_C_DARKEST);   // a dark line under the strip: the cursor band of the row below is the same green and must not run into it
+            ty = hr.y + (hr.h - p - mt.line_h) div 2;
+        } else if (variable_struct_exists(row, "flash_at") && Ui_FlashOn(now - row.flash_at)) {   // R3 note 25: the Controls rows a reset changed blink
+            Ui_Box(px + 3 * p, ry, px + panel_w - 3 * p, ry + mt.row_h, UI_C_LIGHTEST);
+            col = UI_C_DARKEST;
+        }
         var label_x = x0 + 5 * p;
         if (icon_px > 0) {   // { cat, frame }: an Icon_Get picture (skills, statuses)
             if (variable_struct_exists(row, "icon") && is_struct(row.icon)) {

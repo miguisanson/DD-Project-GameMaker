@@ -2192,6 +2192,12 @@ function Qte_DrawBar(_x, _y, _w, _h, _params, _assist, _ms, _unit, _alpha = 1) {
     draw_set_color(c_white);
 }
 
+// The left edge of a word _w wide centred on _cx, held inside the screen (_gw wide) with _margin to spare on each side. Pure.
+function Qte_GradeWordLeft(_cx, _w, _gw, _margin) {
+    var left = _cx - _w * 0.5;
+    return clamp(left, _margin, max(_margin, _gw - _margin - _w));
+}
+
 // The grade word, centred on (_x, _y). Four colours only, so grades differ by size and motion too:
 // PERFECT biggest and pops, GOOD big, OK plain, WEAK small, hollow (dark with a light outline) and sinks. _left_ms counts down from QTE_RESULT_MS.
 function Qte_DrawGradeWord(_key, _text, _x, _y, _left_ms, _unit) {
@@ -2213,7 +2219,7 @@ function Qte_DrawGradeWord(_key, _text, _x, _y, _left_ms, _unit) {
 
     var tw = UI_TextWidth(_text) * scale;
     var th = UI_TextHeight(_text) * scale;
-    var tx = _x - tw * 0.5;
+    var tx = Qte_GradeWordLeft(_x, tw, Display_GuiW(), 4 * max(1, round(_unit)));   // R3 note 9: an enemy near a screen edge does not push the word off it
     var ty = yy - th * 0.5;
     var o = max(1, round(_unit));
     draw_set_alpha(a);

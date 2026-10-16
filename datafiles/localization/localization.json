@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T06:15:14Z",
-    "row_count": 1209
+    "generated_at_utc": "2026-10-16T08:27:14Z",
+    "row_count": 1211
   },
   "default_lang": "en",
   "languages": [
@@ -37,7 +37,7 @@
       "ko": "스킬"
     },
     "battle.action.timing.good": {
-      "en": "Good",
+      "en": "GOOD",
       "ko": "좋음"
     },
     "battle.action.timing.ok": {
@@ -45,11 +45,11 @@
       "ko": "무난"
     },
     "battle.action.timing.perfect": {
-      "en": "Perfect",
+      "en": "PERFECT",
       "ko": "완벽"
     },
     "battle.action.timing.weak": {
-      "en": "Weak",
+      "en": "WEAK",
       "ko": "약함"
     },
     "battle.chip.break.line": {
@@ -1220,9 +1220,17 @@
       "en": "Reset to Defaults",
       "ko": "기본값으로"
     },
+    "controls.reset_ask": {
+      "en": "Reset every key to its default?",
+      "ko": "모든 키를 기본값으로 되돌릴까요?"
+    },
     "controls.reset_done": {
       "en": "Keys are back to the defaults.",
       "ko": "키가 기본값으로 돌아갔습니다."
+    },
+    "controls.reset_same": {
+      "en": "Keys were already the defaults.",
+      "ko": "키가 이미 기본값입니다."
     },
     "controls.row.back": {
       "en": "Back",

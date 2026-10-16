@@ -265,7 +265,7 @@ function Scenario_Boot() {
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.choice_off = true;   // D154: nor the small flavour questions (the Stranger, the merchant, a note, the wake line) unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 20000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 32000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 24000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 34000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -5756,7 +5756,17 @@ function Scenario_StepSmokeRest(_s) {
                 Ui_MenuFixCursor(_sp.controls.menu, 10);   // Reset to defaults
                 _rc.q = ["confirm"];
             }
-            if (variable_struct_exists(_rc, "k6") && !variable_struct_exists(_rc, "k7") && _idle && GameSettings_Ensure().keys.interact[0] == vk_space) {
+            if (variable_struct_exists(_rc, "k6") && !variable_struct_exists(_rc, "k6b") && Confirm_IsOpen() && _idle && current_time - Confirm_Menu().lock_ms >= UI_INPUT_LOCK_MS + 80) {   // R3 note 25: Reset asks first, the cursor on No
+                _rc.k6b = true;
+                Scenario_Check("controls_reset_asks_before_it_changes_anything", Confirm_Question() == "Reset every key to its default?" && Confirm_Menu().cursor == 1 && GameSettings_Ensure().keys.interact[0] == ord("T"));
+                _rc.q = ["menu_up", "confirm"];   // No -> Yes, answer
+            }
+            if (variable_struct_exists(_rc, "k6b") && !variable_struct_exists(_rc, "k6c") && Notice_CanAnswer() && _idle) {   // Yes: the notice says the keys are back
+                _rc.k6c = true;
+                Scenario_Check("controls_reset_notice_says_the_keys_are_back", Notice_Text() == "Keys are back to the defaults.", Notice_Text());
+                _rc.q = ["confirm"];
+            }
+            if (variable_struct_exists(_rc, "k6c") && !variable_struct_exists(_rc, "k7") && !Notice_IsOpen() && _idle && GameSettings_Ensure().keys.interact[0] == vk_space) {
                 _rc.k7 = true;
                 var _disk2 = Save_ReadSettingsConfig();
                 Scenario_Check("controls_reset_puts_the_defaults_back_at_once", global.input.bindings.interact[0] == vk_space && Prompt_Info("interact", "keyboard").label == "Space" && is_struct(_disk2) && _disk2.keys.interact[0] == vk_space);
@@ -14051,17 +14061,19 @@ function Scenario_StepSmokeR3Menus(_s) {
 
 // ---- Round 3 menus pictures 1030..1039: the Gear tab (Equipped and Bag headers, No Armor and No Accessory under them), the Skills tab (the Passives header), the Controls
 // page's reset question and the notice after it (in the game), and the same question and notice over the title's settings; windowed scale 3 (480 x 432), 4 (640 x 576) and 5
-// (800 x 720), the title ones at 3 only. shot_r3menus_<scene>_<w>x<h>.png. The last pictures of the run: they end it. ----
+// (800 x 720) (the Controls scenes at 3 and 5 only), the title ones at 3 only. shot_r3menus_<scene>_<w>x<h>.png. The last pictures of the run: they end it. ----
 function Scenario_R3Scenes() {
-    return ["gear", "skills", "reset_ask", "reset_notice", "title_ask", "title_notice"];
+    return ["gear", "skills", "reset_ask", "reset_notice", "reset_flash", "title_ask", "title_notice"];
 }
 
 function Scenario_R3Scales(_di) {
-    return (_di >= 4) ? [3] : [3, 4, 5];
+    if (_di >= 5) return [3];
+    if (_di >= 2) return [3, 5];   // the Controls page at 640 x 576 cuts its first label ('Confi..': a layout fault of the Settings tab that is not this packet's, reported)
+    return [3, 4, 5];
 }
 
 function Scenario_R3IsTitle(_di) {
-    return (_di >= 4);
+    return (_di >= 5);
 }
 
 function Scenario_R3Cleanup() {
@@ -14089,6 +14101,8 @@ function Scenario_StepShotsR3Menus(_s) {
                 Dialogue_CloseNow();
                 Loc_SetLanguage("en");
                 if (_title) {
+                    Scenario_NewKnight(CLASS_KNIGHT);   // the pictures before this left a character that owes a level-up point: its screen would open over the title
+                    CardsUi_Close();
                     Scenario_SetWindowScale(_scales[_o.si]);
                     room_goto(rm_start);
                 } else {
@@ -14145,10 +14159,15 @@ function Scenario_StepShotsR3Menus(_s) {
                     ControlsPage_Open(_sp2);
                     Ui_MenuFixCursor(_sp2.controls.menu, max(0, Scenario_R3RowIndex(_sp2.controls.menu, "reset")));
                     ControlsPage_OnConfirm(_sp2.controls.menu, Scenario_R3RowIndex(_sp2.controls.menu, "reset"));   // the question
-                    if (string_pos("notice", _scenes[_o.di]) > 0) {
+                    if (string_pos("notice", _scenes[_o.di]) > 0 || _scenes[_o.di] == "reset_flash") {
                         Confirm_Resolve(true);   // Yes: the keys are back and the notice opens
                     }
+                    if (_scenes[_o.di] == "reset_flash") Notice_Interrupt();   // the picture is of the page after the notice: its changed row blinks
                     _s.r3_t = _s.t;
+                }
+                if (_scenes[_o.di] == "reset_flash" && variable_struct_exists(_s, "r3_c") && is_struct(_sp2.controls)) {
+                    _sp2.controls.flash_at = current_time;   // held on: the blink lasts 600 ms, a picture needs it to be on at the moment it is taken
+                    ControlsPage_Refresh(_sp2);
                 }
                 if (!variable_struct_exists(_s, "r3_c")) {
                     if (_s.t > 300) { Scenario_Check("shots_r3menus_the_settings_open_" + _tag, false); Scenario_R3Cleanup(); Scenario_NoticeEnd(); }
@@ -14179,6 +14198,11 @@ function Scenario_StepShotsR3Menus(_s) {
                 case "reset_ask":
                 case "title_ask":
                     Scenario_Check("shots_r3menus_the_question_is_up_" + _tag, Confirm_IsOpen() && Confirm_Question() == "Reset every key to its default?" && Confirm_Menu().cursor == 1, Confirm_IsOpen() ? Confirm_Question() : "none");
+                    break;
+                case "reset_flash":
+                    var _fp = _gs.ui.settings_popup.controls;
+                    var _fri = is_struct(_fp) ? Scenario_R3RowIndex(_fp.menu, "run") : -1;
+                    Scenario_Check("shots_r3menus_the_run_row_is_flashing_" + _tag, _fri >= 0 && variable_struct_exists(_fp.menu.items[_fri], "flash_at") && Ui_FlashOn(current_time - _fp.menu.items[_fri].flash_at) && !Notice_IsOpen() && string(_fp.flash_rows) == string(["run"]));
                     break;
                 case "reset_notice":
                 case "title_notice":

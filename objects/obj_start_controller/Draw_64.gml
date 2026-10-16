@@ -53,6 +53,7 @@ if (state == "main" && !Notice_IsOpen() && !loading_into_game) {
 
 if (SettingsPopup_IsOpen("title") && !loading_into_game) {
     SettingsPopup_Draw();
+    if (state == "settings") Confirm_Draw();   // R3 note 25: the Controls page's "Reset every key?" over the title's settings (Title_Draw, which draws the confirm, stands aside in this state)
 }
 draw_set_alpha(1);
 Scenario_DrawUiKit();   // inert unless the -shots run asks for the kit picture
