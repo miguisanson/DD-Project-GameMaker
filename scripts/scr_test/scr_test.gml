@@ -165,6 +165,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Shop", Test_Suite_R3Shop);
     Test_RunSuite("R3Title", Test_Suite_R3Title);
     Test_RunSuite("Rarity", Test_Suite_Rarity);
+    Test_RunSuite("R3Mouse", Test_Suite_R3Mouse);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -17274,4 +17275,269 @@ function Test_RarityWorkbook() {
     Test_True("r3rarity workbook: the workbook has strings to check", array_length(_keys) > 500);
     Test_Eq("r3rarity workbook: no string writes an item tag", _bad, "");
     Test_Eq("r3rarity workbook: no string puts the gold accent round an item", _acc, "");
+}
+
+// ============================================================================================================
+// Packet mouse (D182, R-111, owner notes 12 and 13): a pixel-art cursor drawn in the GUI layer (the OS cursor stays hidden, so there was none to see), full mouse support
+// (QTE bars, slider click / drag, the seed entry, notices, dialogue), right click = Back. Expected values come from the packet brief and D182, not from the code.
+//   cursor: a move or a click shows it for 3 s; a key or pad press hides it until the mouse moves again; an unfocused window shows the OS cursor and draws none of ours.
+//   art: an arrow 8 x 10 art pixels, a 1-px darkest outline round a lightest fill, scaled by the UI pixel; a pressed variant (1 px offset, a dimmer fill).
+// ============================================================================================================
+function Test_Suite_R3Mouse() {
+    var _need = ["Mouse_Fake", "Mouse_FakeSet", "Mouse_FakeClear", "Mouse_FakeClick", "Mouse_FakeHold", "Mouse_FakeWheel", "Mouse_WinX", "Mouse_WinY", "Mouse_Pressed", "Mouse_Held", "Mouse_WheelDir",
+        "MouseCursor_New", "MouseCursor_Step", "MouseCursor_Visible", "MouseCursor_OsHidden", "MouseCursor_Poke", "MouseCursor_Mask", "MouseCursor_Boxes", "Input_ClickConfirm", "Input_ClickBack",
+        "Battle_ConfirmInput", "Slider_ValueAt", "Settings_SetValue", "Title_SeedHit", "Title_SeedApply"];
+    var _missing = "";
+    for (var _i = 0; _i < array_length(_need); _i++) if (!script_exists(asset_get_index(_need[_i]))) _missing += ((_missing != "") ? "," : "") + _need[_i];
+    Test_Eq("r3mouse: every function of the mouse packet exists", _missing, "");
+    if (_missing != "") return;
+    Test_RunSuite("R3Mouse.cursor", Test_R3MouseCursor);
+    Test_RunSuite("R3Mouse.art", Test_R3MouseArt);
+    Test_RunSuite("R3Mouse.wrap", Test_R3MouseWrap);
+    Test_RunSuite("R3Mouse.slider", Test_R3MouseSlider);
+    Test_RunSuite("R3Mouse.seed", Test_R3MouseSeed);
+    Test_RunSuite("R3Mouse.screens", Test_R3MouseScreens);
+}
+
+function Test_R3MouseCursor() {
+    var _st = MouseCursor_New();
+    Test_False("r3mouse cursor: nothing is drawn before the mouse is used", MouseCursor_Visible(_st, 0, true));
+    MouseCursor_Step(_st, true, false, false, false, 1000);
+    Test_True("r3mouse cursor: a move shows it", MouseCursor_Visible(_st, 1000, true));
+    Test_True("r3mouse cursor: it is still there 2.9 s after the last move", MouseCursor_Visible(_st, 3900, true));
+    Test_False("r3mouse cursor: it is gone 3.1 s after the last move", MouseCursor_Visible(_st, 4100, true));
+    MouseCursor_Step(_st, false, true, false, false, 5000);
+    Test_True("r3mouse cursor: a click without a move shows it", MouseCursor_Visible(_st, 5000, true));
+    Test_True("r3mouse cursor: a click starts the 3 s again", MouseCursor_Visible(_st, 7900, true));
+    Test_False("r3mouse cursor: and 3.1 s after the click it is gone", MouseCursor_Visible(_st, 8100, true));
+    MouseCursor_Step(_st, true, false, false, false, 9000);
+    MouseCursor_Step(_st, false, false, true, false, 9500);
+    Test_False("r3mouse cursor: a key press hides it at once, 0.5 s after the move", MouseCursor_Visible(_st, 9500, true));
+    MouseCursor_Step(_st, false, false, false, false, 9700);
+    Test_False("r3mouse cursor: a quiet frame does not bring it back", MouseCursor_Visible(_st, 9700, true));
+    MouseCursor_Step(_st, true, false, false, false, 10000);
+    Test_True("r3mouse cursor: the mouse moving again does", MouseCursor_Visible(_st, 10000, true));
+    MouseCursor_Step(_st, false, false, false, true, 10400);
+    Test_False("r3mouse cursor: a pad press hides it as well", MouseCursor_Visible(_st, 10400, true));
+    MouseCursor_Step(_st, true, false, false, false, 11000);
+    Test_False("r3mouse cursor: an unfocused window draws no cursor of ours", MouseCursor_Visible(_st, 11000, false));
+    Test_True("r3mouse cursor: the OS cursor stays hidden while the window has focus (no double cursor)", MouseCursor_OsHidden(true));
+    Test_False("r3mouse cursor: the OS cursor shows normally when the window has no focus", MouseCursor_OsHidden(false));
+    var _p = MouseCursor_New();
+    MouseCursor_Poke(_p, 20000);
+    Test_True("r3mouse cursor: a poke (the scripted runs) shows it for the 3 s", MouseCursor_Visible(_p, 22000, true) && !MouseCursor_Visible(_p, 23500, true));
+}
+
+function Test_R3MouseArt() {
+    var _mask = MouseCursor_Mask();
+    Test_Eq("r3mouse art: the arrow is 10 art pixels tall", array_length(_mask), 10);
+    var _w_ok = true;
+    var _chars_ok = true;
+    var _fill = 0;
+    var _out = 0;
+    for (var _r = 0; _r < array_length(_mask); _r++) {
+        if (string_length(_mask[_r]) != 8) _w_ok = false;
+        for (var _c = 1; _c <= string_length(_mask[_r]); _c++) {
+            var _ch = string_char_at(_mask[_r], _c);
+            if (_ch == "F") _fill++;
+            else if (_ch == "X") _out++;
+            else if (_ch != ".") _chars_ok = false;
+        }
+    }
+    Test_True("r3mouse art: every row is 8 art pixels wide", _w_ok);
+    Test_True("r3mouse art: the pixels are outline (X), fill (F) or empty (.)", _chars_ok);
+    Test_Eq("r3mouse art: the tip (the hot spot) is the top left pixel and is outline", string_char_at(_mask[0], 1), "X");
+    Test_True("r3mouse art: there is a fill and an outline", _fill >= 10 && _out >= 14);
+    var _closed = true;   // a fill pixel never touches the empty space or the edge of the grid: the outline is 1 px all round
+    for (var _r2 = 0; _r2 < 10; _r2++) {
+        for (var _c2 = 0; _c2 < 8; _c2++) {
+            if (string_char_at(_mask[_r2], _c2 + 1) != "F") continue;
+            var _nb = [[_c2 - 1, _r2], [_c2 + 1, _r2], [_c2, _r2 - 1], [_c2, _r2 + 1]];
+            for (var _k = 0; _k < 4; _k++) {
+                var _nx = _nb[_k][0];
+                var _ny = _nb[_k][1];
+                if (_nx < 0 || _nx > 7 || _ny < 0 || _ny > 9 || string_char_at(_mask[_ny], _nx + 1) == ".") _closed = false;
+            }
+        }
+    }
+    Test_True("r3mouse art: the outline closes the fill on every side", _closed);
+    var _b = MouseCursor_Boxes(100, 50, 3, false);
+    var _inside = true;
+    var _area = 0;
+    var _cols_ok = true;
+    for (var _i = 0; _i < array_length(_b); _i++) {
+        var _bx = _b[_i];
+        if (_bx.x < 100 || _bx.y < 50 || _bx.x + _bx.w > 100 + 8 * 3 || _bx.y + _bx.h > 50 + 10 * 3) _inside = false;
+        _area += _bx.w * _bx.h;
+        if (_bx.col != UI_C_LIGHTEST && _bx.col != UI_C_DARKEST) _cols_ok = false;
+    }
+    Test_True("r3mouse art: the boxes stay inside 8 x 10 art pixels from the hot spot", _inside);
+    Test_Eq("r3mouse art: the boxes cover exactly the art pixels (3 GUI units each)", _area, (_fill + _out) * 9);
+    Test_True("r3mouse art: it is the palette's lightest fill with the darkest outline", _cols_ok);
+    var _b1 = MouseCursor_Boxes(0, 0, 1, false);
+    var _b4 = MouseCursor_Boxes(0, 0, 4, false);
+    var _a1 = 0;
+    var _a4 = 0;
+    for (var _j = 0; _j < array_length(_b1); _j++) _a1 += _b1[_j].w * _b1[_j].h;
+    for (var _j2 = 0; _j2 < array_length(_b4); _j2++) _a4 += _b4[_j2].w * _b4[_j2].h;
+    Test_Eq("r3mouse art: it scales with the UI pixel (area x 16 at 4 times the size)", _a4, _a1 * 16);
+    var _bp = MouseCursor_Boxes(100, 50, 3, true);
+    var _minx = 99999;
+    var _miny = 99999;
+    var _fills_dim = true;
+    for (var _k2 = 0; _k2 < array_length(_bp); _k2++) {
+        _minx = min(_minx, _bp[_k2].x);
+        _miny = min(_miny, _bp[_k2].y);
+        if (_bp[_k2].col == UI_C_LIGHTEST) _fills_dim = false;
+    }
+    Test_True("r3mouse art: the pressed arrow is one art pixel down and to the right", _minx == 103 && _miny == 53, string(_minx) + "," + string(_miny));
+    Test_True("r3mouse art: and its fill is not the lightest (it reads as pressed)", _fills_dim);
+}
+
+function Test_R3MouseWrap() {
+    Mouse_FakeClear();
+    Test_True("r3mouse wrap: with no fake the real mouse is read", is_undefined(Mouse_Fake()));
+    Mouse_FakeSet(120, 80);
+    Test_True("r3mouse wrap: a fake position is what the game sees (x, y)", Mouse_WinX() == 120 && Mouse_WinY() == 80);
+    Test_False("r3mouse wrap: no button is down yet", Mouse_Pressed(mb_left) || Mouse_Pressed(mb_right) || Mouse_Held(mb_left));
+    Mouse_FakeClick(mb_left);
+    Test_True("r3mouse wrap: a fake click is a left press this frame", Mouse_Pressed(mb_left));
+    Test_False("r3mouse wrap: and not a right one", Mouse_Pressed(mb_right));
+    Test_True("r3mouse wrap: the left click is the confirm press", Input_ClickConfirm());
+    Test_False("r3mouse wrap: and not the back press", Input_ClickBack());
+    Test_True("r3mouse wrap: the battle's confirm (QTE bars) sees the click like the key", Battle_ConfirmInput());
+    global.input.frame += 1;
+    Test_False("r3mouse wrap: a click lasts one frame", Mouse_Pressed(mb_left));
+    Test_False("r3mouse wrap: ... also for the battle's confirm", Battle_ConfirmInput());
+    Mouse_FakeClick(mb_right);
+    Test_True("r3mouse wrap: a right click is the back press", Input_ClickBack() && Mouse_Pressed(mb_right));
+    Test_False("r3mouse wrap: and not the confirm press", Input_ClickConfirm());
+    global.input.frame += 1;
+    Mouse_FakeHold(mb_left, true);
+    Test_True("r3mouse wrap: a held button is held", Mouse_Held(mb_left));
+    Mouse_FakeHold(mb_left, false);
+    Test_False("r3mouse wrap: and let go", Mouse_Held(mb_left));
+    Mouse_FakeWheel(1);
+    Test_Eq("r3mouse wrap: the wheel reads up as +1", Mouse_WheelDir(), 1);
+    global.input.frame += 1;
+    Test_Eq("r3mouse wrap: a wheel turn lasts one frame", Mouse_WheelDir(), 0);
+    var _lay = Display_Layout();
+    Mouse_FakeSet(_lay.gui_x + 50 * _lay.ui_scale, _lay.gui_y + 30 * _lay.ui_scale);
+    Mouse_FakeClick(mb_left);
+    Mouse_FakeHold(mb_left, true);
+    var _sn = Ui_ReadInput();
+    Test_True("r3mouse wrap: the menus' snapshot reads the click through it", _sn.click);
+    Test_True("r3mouse wrap: ... the held button", _sn.held);
+    Test_True("r3mouse wrap: ... and the position in GUI units", abs(_sn.mx - 50) < 0.01 && abs(_sn.my - 30) < 0.01, string(_sn.mx) + "," + string(_sn.my));
+    var _mp = Ui_MousePos();
+    Test_True("r3mouse wrap: Ui_MousePos agrees", abs(_mp.x - 50) < 0.01 && abs(_mp.y - 30) < 0.01);
+    Mouse_FakeClear();
+    global.ui_mouse = undefined;
+    global.input.frame += 1;
+    Test_False("r3mouse wrap: clearing the fake clears the click", Input_ClickConfirm());
+}
+
+function Test_R3MouseSlider() {
+    Test_True("r3mouse slider: the left end of the bar is 0", abs(Slider_ValueAt(100, 100, 42, 0.05)) < 0.0001);
+    Test_True("r3mouse slider: the right end of the bar is 1", abs(Slider_ValueAt(142, 100, 42, 0.05) - 1) < 0.0001);
+    Test_True("r3mouse slider: the middle is 0.5", abs(Slider_ValueAt(121, 100, 42, 0.05) - 0.5) < 0.0001);
+    Test_True("r3mouse slider: a value snaps to the 5 % step (26 % of the bar is 25 %)", abs(Slider_ValueAt(100 + 0.26 * 42, 100, 42, 0.05) - 0.25) < 0.0001);
+    Test_True("r3mouse slider: left of the bar is 0 and right of it is 1 (a drag may leave it)", Slider_ValueAt(50, 100, 42, 0.05) == 0 && Slider_ValueAt(400, 100, 42, 0.05) == 1);
+    var _p = GameSettings_Copy(GameSettings_Ensure());
+    _p.audio_bgm = 0.5;
+    Test_True("r3mouse slider: Settings_SetValue sets a volume and says it changed", Settings_SetValue(_p, "vol_bgm", 0.35));
+    Test_True("r3mouse slider: ... to that value", abs(_p.audio_bgm - 0.35) < 0.0001);
+    Test_False("r3mouse slider: the same value again changes nothing", Settings_SetValue(_p, "vol_bgm", 0.35));
+    Settings_SetValue(_p, "vol_sfx", 7);
+    Test_True("r3mouse slider: a value is clamped to 0..1", _p.audio_sfx == 1);
+    Test_False("r3mouse slider: a row that is not a slider is refused", Settings_SetValue(_p, "shake", 1));
+    var _m = Ui_MenuNew("r3mouse_slider", [
+        { id: "a", label: "A", kind: "slider", enabled: true, amount: 0.5, value: "50%" },
+        { id: "b", label: "B", kind: "choice", enabled: true, value: "On" }
+    ], {});
+    _m.rects = [{ x: 0, y: 0, w: 100, h: 10 }, { x: 0, y: 10, w: 100, h: 10 }];
+    _m.bars = [{ x: 50, y: 0, w: 40, h: 10 }, { x: 0, y: 0, w: 0, h: 0 }];
+    var _s = Ui_SnapNew();
+    _s.mx = 60; _s.my = 5; _s.click = true; _s.held = true;
+    var _ev = Ui_MenuStep(_m, _s, 90000);
+    Test_True("r3mouse slider: a click on the bar sets that point", is_struct(_ev.slide) && _ev.slide.index == 0 && abs(_ev.slide.value - 0.25) < 0.0001);
+    _s = Ui_SnapNew();
+    _s.mx = 80; _s.my = 5; _s.held = true; _s.mouse_moved = true;
+    _ev = Ui_MenuStep(_m, _s, 90016);
+    Test_True("r3mouse slider: dragging with the button down follows the mouse", is_struct(_ev.slide) && abs(_ev.slide.value - 0.75) < 0.0001);
+    _s = Ui_SnapNew();
+    _s.mx = 300; _s.my = 90; _s.held = true; _s.mouse_moved = true;
+    _ev = Ui_MenuStep(_m, _s, 90032);
+    Test_True("r3mouse slider: ... also once the mouse has left the bar (to the end)", is_struct(_ev.slide) && _ev.slide.value == 1);
+    _s = Ui_SnapNew();
+    _s.mx = 300; _s.my = 90;
+    _ev = Ui_MenuStep(_m, _s, 90048);
+    Test_False("r3mouse slider: letting go ends the drag", is_struct(_ev.slide));
+    _s = Ui_SnapNew();
+    _s.mx = 20; _s.my = 15; _s.click = true; _s.held = true;
+    _ev = Ui_MenuStep(_m, _s, 90064);
+    Test_False("r3mouse slider: a click on another row does not slide", is_struct(_ev.slide));
+    _s = Ui_SnapNew();
+    _s.mx = 80; _s.my = 5; _s.held = true; _s.mouse_moved = true;
+    _ev = Ui_MenuStep(_m, _s, 90080);
+    Test_False("r3mouse slider: a button held down from elsewhere does not start a drag", is_struct(_ev.slide));
+}
+
+function Test_R3MouseSeed() {
+    var _r = { panel: { x: 0, y: 0, w: 200, h: 100 }, cells: [], up: { x: 30, y: 30, w: 18, h: 8 }, down: { x: 30, y: 56, w: 18, h: 8 }, start: { x: 10, y: 80, w: 180, h: 10 } };
+    for (var _i = 0; _i < 9; _i++) array_push(_r.cells, { x: 10 + _i * 20, y: 40, w: 18, h: 14 });
+    var _e = { digits: [1, 2, 3], cur: 1 };   // the cursor can reach slots 0..3 (the blank slot after the digits)
+    Test_Eq("r3mouse seed: a click on a digit cell is that cell", Title_SeedHit(_r, _e, 15, 45).kind, "cell");
+    Test_Eq("r3mouse seed: ... and says which", Title_SeedHit(_r, _e, 15, 45).idx, 0);
+    Test_Eq("r3mouse seed: the blank slot after the digits can be clicked", Title_SeedHit(_r, _e, 10 + 3 * 20 + 2, 45).idx, 3);
+    Test_Eq("r3mouse seed: a cell the cursor cannot reach is not a hit", Title_SeedHit(_r, _e, 10 + 5 * 20 + 2, 45).kind, "");
+    Test_Eq("r3mouse seed: the arrow above the cursor's cell raises the digit", Title_SeedHit(_r, _e, 35, 33).kind, "up");
+    Test_Eq("r3mouse seed: the arrow below lowers it", Title_SeedHit(_r, _e, 35, 60).kind, "down");
+    Test_Eq("r3mouse seed: the Start line starts", Title_SeedHit(_r, _e, 100, 85).kind, "start");
+    Test_Eq("r3mouse seed: empty space is nothing", Title_SeedHit(_r, _e, 190, 5).kind, "");
+    Test_True("r3mouse seed: a cell click moves the cursor", Title_SeedApply(_e, { kind: "cell", idx: 3 }) && _e.cur == 3);
+    Test_True("r3mouse seed: the up arrow cycles the digit up (blank slot: 1)", Title_SeedApply(_e, { kind: "up", idx: -1 }) && array_length(_e.digits) == 4 && _e.digits[3] == 1);
+    Test_True("r3mouse seed: the down arrow cycles it down (1 -> 0)", Title_SeedApply(_e, { kind: "down", idx: -1 }) && _e.digits[3] == 0);
+    Test_False("r3mouse seed: a click on nothing changes nothing", Title_SeedApply(_e, { kind: "", idx: -1 }));
+}
+
+// One menu: a click on each enabled row confirms that row and a disabled row never; right click is Back; a click outside the rows does nothing.
+function Test_R3MouseMenuRows(_name, _m) {
+    var _n = array_length(_m.items);
+    var _rects = [];
+    for (var _i = 0; _i < _n; _i++) array_push(_rects, { x: 10, y: 10 + _i * 14, w: 100, h: 14 });
+    _m.rects = _rects;
+    var _en = Ui_ItemsEnabled(_m.items);
+    var _bad = "";
+    for (var _k = 0; _k < _n; _k++) {
+        var _s = Ui_SnapNew();
+        _s.mx = 20; _s.my = 10 + _k * 14 + 5; _s.click = true; _s.mouse_moved = true;
+        var _ev = Ui_MenuStep(_m, _s, 50000 + _k * 100);
+        if (_en[_k] && (!_ev.confirm || _ev.index != _k)) _bad += " row" + string(_k) + "-not-confirmed";
+        if (!_en[_k] && _ev.confirm) _bad += " row" + string(_k) + "-disabled-confirmed";
+    }
+    Test_Eq("r3mouse screens: " + _name + ": a click on each enabled row confirms it, a disabled row never", _bad, "");
+    var _sr = Ui_SnapNew();
+    _sr.rclick = true;
+    Test_True("r3mouse screens: " + _name + ": a right click is Back", Ui_MenuStep(_m, _sr, 60000).back);
+    var _sc = Ui_SnapNew();
+    _sc.mx = 500; _sc.my = 500; _sc.click = true;
+    Test_False("r3mouse screens: " + _name + ": a click outside every row does nothing", Ui_MenuStep(_m, _sc, 60100).confirm);
+}
+
+function Test_R3MouseScreens() {
+    var _p = GameSettings_Copy(GameSettings_Ensure());
+    Test_R3MouseMenuRows("settings", Ui_MenuNew("r3m_settings", SettingsMenu_Items(_p, 5), {}));
+    Test_R3MouseMenuRows("class choice", Ui_MenuNew("r3m_class", CardsUi_ClassMenu(Profile_Default()).items, {}));
+    Test_R3MouseMenuRows("shop", ShopUi_RootMenu());
+    Confirm_Open("Test?", undefined);
+    var _cm = Confirm_Menu();
+    Test_R3MouseMenuRows("yes / no", _cm);
+    Confirm_Close();
+    var _sy = Ui_MenuNew("r3m_wheel", [{ label: "A" }, { label: "B" }, { label: "C" }], {});
+    _sy.cursor = 1;
+    var _s = Ui_SnapNew();
+    _s.wheel = -1;
+    Ui_MenuStep(_sy, _s, 70000);
+    Test_Eq("r3mouse screens: the wheel scrolls a list (down = next row)", _sy.cursor, 2);
 }

@@ -354,7 +354,9 @@ function Input_Update() {
             inp.move_order = order;
         }
     }
-    inp.last_device = Prompt_DeviceStep(inp.last_device, Prompt_KeyboardActivity(), Prompt_PadActivity(gp_device, pad_deadzone));   // D92
+    var pad_act = Prompt_PadActivity(gp_device, pad_deadzone);
+    inp.last_device = Prompt_DeviceStep(inp.last_device, Prompt_KeyboardActivity(), pad_act);   // D92
+    MouseCursor_Update(pad_act);   // D182: the mouse cursor shows after a move or a click and hides on a key or pad press
     Scenario_InputOverride();   // scr_debug: no-op unless run with -bot
 }
 
@@ -418,6 +420,166 @@ function Input_UIConfirm() {
 
 function Input_UIBack() {
     return Input_UIPressed("cancel");
+}
+
+// ---- D182: the mouse -------------------------------------------------------------------------------------------------------------------------------------------------------
+// Every read of the mouse goes through these, so a scripted run can drive it as it drives the keys: Mouse_FakeSet puts the pointer at a window pixel, Mouse_FakeClick presses
+// a button for one game frame (the frame counter of the scenario, as Scenario_Tap does for keys), Mouse_FakeHold keeps one down, Mouse_FakeWheel turns the wheel once. While a
+// fake exists the real mouse is not read (a scripted run is deterministic); Mouse_FakeClear gives the real one back. The window position is what window_mouse_get_x / y say.
+function Mouse_Fake() {
+    return (variable_global_exists("mouse_fake") && is_struct(global.mouse_fake)) ? global.mouse_fake : undefined;
+}
+
+function Mouse_FrameNow() {
+    if (variable_global_exists("scn") && is_struct(global.scn)) return global.scn.f;
+    Input_Init();
+    return global.input.frame;
+}
+
+function Mouse_FakeEnsure() {
+    var f = Mouse_Fake();
+    if (!is_struct(f)) {
+        f = { x: window_mouse_get_x(), y: window_mouse_get_y(), press: [-1, -1, -1, -1], held: [false, false, false, false], wheel: 0, wheel_f: -1 };
+        global.mouse_fake = f;
+    }
+    return f;
+}
+
+function Mouse_FakeSet(_x, _y) {
+    var f = Mouse_FakeEnsure();
+    f.x = _x;
+    f.y = _y;
+}
+
+function Mouse_FakeClick(_btn) {
+    var f = Mouse_FakeEnsure();
+    f.press[clamp(_btn, 0, 3)] = Mouse_FrameNow();
+}
+
+function Mouse_FakeHold(_btn, _on) {
+    var f = Mouse_FakeEnsure();
+    f.held[clamp(_btn, 0, 3)] = _on;
+}
+
+function Mouse_FakeWheel(_dir) {
+    var f = Mouse_FakeEnsure();
+    f.wheel = sign(_dir);
+    f.wheel_f = Mouse_FrameNow();
+}
+
+function Mouse_FakeClear() {
+    global.mouse_fake = undefined;
+}
+
+function Mouse_WinX() {
+    var f = Mouse_Fake();
+    return is_struct(f) ? f.x : window_mouse_get_x();
+}
+
+function Mouse_WinY() {
+    var f = Mouse_Fake();
+    return is_struct(f) ? f.y : window_mouse_get_y();
+}
+
+function Mouse_Pressed(_btn) {
+    var f = Mouse_Fake();
+    if (is_struct(f)) return f.press[clamp(_btn, 0, 3)] == Mouse_FrameNow();
+    return mouse_check_button_pressed(_btn);
+}
+
+function Mouse_Held(_btn) {
+    var f = Mouse_Fake();
+    if (is_struct(f)) return f.held[clamp(_btn, 0, 3)];
+    return mouse_check_button(_btn);
+}
+
+// +1 the wheel turned up this frame, -1 down, 0 not.
+function Mouse_WheelDir() {
+    var f = Mouse_Fake();
+    if (is_struct(f)) return (f.wheel_f == Mouse_FrameNow()) ? f.wheel : 0;
+    return mouse_wheel_up() ? 1 : (mouse_wheel_down() ? -1 : 0);
+}
+
+// The left click is the confirm press wherever a confirm advances, answers or times something (the QTE bars, dialogue, notices, the run summary); the right click is Back.
+function Input_ClickConfirm() {
+    return Mouse_Pressed(mb_left);
+}
+
+function Input_ClickBack() {
+    return Mouse_Pressed(mb_right);
+}
+
+// The mouse cursor (D182). The OS cursor is hidden while the game has focus (obj_sfx_manager), so the game draws its own: it shows after the mouse moved or clicked in the last
+// MOUSE_CURSOR_SHOW_MS, and hides on a key or pad press until the mouse moves again. MouseCursor_Step is the pure core (one call per frame), MouseCursor_Visible reads it.
+#macro MOUSE_CURSOR_SHOW_MS 3000
+
+function MouseCursor_New() {
+    return { dev: "none", t: -100000, x: undefined, y: undefined };
+}
+
+function MouseCursor_Step(_st, _moved, _clicked, _key, _pad, _now) {
+    if (_key || _pad) _st.dev = "other";
+    if (_moved || _clicked) {   // within one frame the mouse counts as the later event
+        _st.dev = "mouse";
+        _st.t = _now;
+    }
+    return _st;
+}
+
+function MouseCursor_Poke(_st, _now) {
+    _st.dev = "mouse";
+    _st.t = _now;
+}
+
+function MouseCursor_Visible(_st, _now, _focused = true) {
+    return _focused && _st.dev == "mouse" && (_now - _st.t) <= MOUSE_CURSOR_SHOW_MS;
+}
+
+// True when the OS cursor stays hidden: only while the game window has focus (an unfocused window shows the normal cursor and draws none of ours).
+function MouseCursor_OsHidden(_focused) {
+    return _focused;
+}
+
+// The arrow, 8 x 10 art pixels: X outline, F fill, . empty; the tip (the hot spot) is the top left pixel. (Here, not in scr_menu: it is art, not text for the text lint.)
+function MouseCursor_Mask() {
+    return [
+        "X.......",
+        "XX......",
+        "XFX.....",
+        "XFFX....",
+        "XFFFX...",
+        "XFFFFX..",
+        "XFFFFFX.",
+        "XFFXFFX.",
+        "XFX.XFX.",
+        "XX..XXX."
+    ];
+}
+
+function MouseCursor_Get() {
+    if (!variable_global_exists("mouse_cur") || !is_struct(global.mouse_cur)) global.mouse_cur = MouseCursor_New();
+    return global.mouse_cur;
+}
+
+// A scripted run's window is never in front, and it moves the fake mouse: that counts as focus for the cursor.
+function MouseCursor_Focused() {
+    return window_has_focus() || is_struct(Mouse_Fake());
+}
+
+// Once per frame, from Input_Update: reads the mouse (moved, a button, the wheel), a key press and a pad press.
+function MouseCursor_Update(_pad_act) {
+    var st = MouseCursor_Get();
+    var wx = Mouse_WinX();
+    var wy = Mouse_WinY();
+    var moved = (!is_undefined(st.x) && (wx != st.x || wy != st.y)) || (Mouse_WheelDir() != 0);
+    st.x = wx;
+    st.y = wy;
+    var clicked = Mouse_Pressed(mb_left) || Mouse_Pressed(mb_right) || Mouse_Pressed(mb_middle);
+    if (!MouseCursor_Focused()) {
+        moved = false;
+        clicked = false;
+    }
+    MouseCursor_Step(st, moved, clicked, keyboard_check_pressed(vk_anykey), _pad_act, current_time);
 }
 
 // ---- hold-to-skip (D48, I-055, D146) ----------------------------------------------------------------------------------------------
@@ -489,7 +651,7 @@ function Skip_Claim() {
 function Skip_Tick(_step_ms) {
     Skip_Ensure();
     var _g = global.skip;
-    _g.st = Skip_Step(_g.st, (Skip_Frame() - _g.claim) <= 1, Input_Pressed("confirm"), Input_Held("confirm"), _step_ms);
+    _g.st = Skip_Step(_g.st, (Skip_Frame() - _g.claim) <= 1, Input_Pressed("confirm") || Input_ClickConfirm(), Input_Held("confirm") || Mouse_Held(mb_left), _step_ms);   // D182: holding the left mouse button skips too
     if (_g.st.fired) _g.latched = true;
 }
 

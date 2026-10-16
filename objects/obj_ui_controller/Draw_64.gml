@@ -14,6 +14,7 @@ draw_set_alpha(1);
 
 if (gs.ui.mode == UI_MENU) {
     if (room != rm_battle) Menu_Draw();   // D140: in a fight the battle controller draws it, after its own HUD
+    MouseCursor_Draw();   // D182: the mouse cursor, over the menu
     exit;
 }
 
@@ -59,3 +60,5 @@ if (room != rm_battle) Tutorial_Draw();   // C4 (D45): the first-time pop-up, ov
 Transition_DrawGUI();
 
 Skip_DrawHint();   // D48 / D146: the "Hold to skip" prompt after 1 s of holding (nothing on a tap or when no skippable scene is running)
+
+MouseCursor_Draw();   // D182: the mouse cursor, on top of everything above (the fade, the pop-ups, the tutorial); the battle controller draws it again after its own HUD

@@ -1245,7 +1245,7 @@ function Menu_HandleInput() {
     if (!Menu_CaptureActive() && current_time - u.opened_ms >= UI_INPUT_LOCK_MS) {
         var d = (Input_Pressed("tab_next") ? 1 : 0) - (Input_Pressed("tab_prev") ? 1 : 0);
         var to = (d != 0) ? Ui_TabStep(u.tab, TabMenu_Count(), d) : u.tab;
-        if (d == 0 && mouse_check_button_pressed(mb_left) && variable_global_exists("ui_tabs_rects")) {
+        if (d == 0 && Mouse_Pressed(mb_left) && variable_global_exists("ui_tabs_rects")) {
             var mp = Ui_MousePos();
             var hi = Ui_HoverIndex(global.ui_tabs_rects, mp.x, mp.y);
             if (hi >= 0) to = hi;
@@ -2142,7 +2142,7 @@ function Tutorial_Step() {
     if (!Tutorial_IsOpen()) return false;
     var t = global.tutorial_ui;
     if (!InputLock_Active(t.lock)) {
-        if (Input_UIConfirm() || Input_UIBack() || mouse_check_button_pressed(mb_left)) {
+        if (Input_UIConfirm() || Input_UIBack() || Mouse_Pressed(mb_left) || Mouse_Pressed(mb_right)) {   // D182: a click of either button
             SFX_PlayUI("ui_confirm");
             Tutorial_Dismiss();
         }
@@ -2259,7 +2259,7 @@ function Notice_Update(_now = current_time, _pressed = false) {
 function Notice_Step() {
     if (!Notice_IsOpen()) return false;
     var was_closing = Notice_Closing();
-    var pressed = Notice_CanAnswer() && (Input_UIConfirm() || Input_UIBack());
+    var pressed = Notice_CanAnswer() && (Input_UIConfirm() || Input_UIBack() || Input_ClickConfirm() || Input_ClickBack());   // D182: a click of either button closes it
     var up = Notice_Update(current_time, pressed);
     if (!was_closing && Notice_Closing()) SFX_PlayUI("ui_confirm");
     return up;
@@ -2470,7 +2470,7 @@ function ControlsPage_Handle(_sp) {
     }
     if (c.capture != "") {
         if (InputLock_Active(c.lock)) return;
-        if (mouse_check_button_pressed(mb_right) || Controls_CaptureCancel(Prompt_Device(), Input_UIBack(), Input_UIPressed("menu"), Input_UIPressed("pause"))) { ControlsPage_OnKey(_sp, vk_escape); return; }
+        if (Mouse_Pressed(mb_right) || Controls_CaptureCancel(Prompt_Device(), Input_UIBack(), Input_UIPressed("menu"), Input_UIPressed("pause"))) { ControlsPage_OnKey(_sp, vk_escape); return; }
         var k = Controls_PollKey();
         if (k >= 0) ControlsPage_OnKey(_sp, k);
         return;
@@ -3028,6 +3028,21 @@ function Settings_Adjust(_p, _id, _dir, _scale_max) {
     return false;
 }
 
+// D182: sets a volume row to _v (0..1, clamped) in the settings struct _p; true when it changed. Any other row is refused.
+function Settings_SetValue(_p, _id, _v) {
+    var field = "";
+    switch (_id) {
+        case "vol_ui": field = "audio_ui"; break;
+        case "vol_sfx": field = "audio_sfx"; break;
+        case "vol_bgm": field = "audio_bgm"; break;
+        default: return false;
+    }
+    var nv = clamp(round(_v * 100) / 100, 0, 1);
+    var old = variable_struct_get(_p, field);
+    variable_struct_set(_p, field, nv);
+    return abs(nv - old) > 0.0001;
+}
+
 // ---- D140: a change is live at once; the window rows ask "Keep this?" ----
 #macro KEEP_THIS_MS 10000   // the countdown of the "Keep this?" prompt
 
@@ -3151,7 +3166,7 @@ function KeepThis_Step(_sp) {
     if (current_time - global.keep_this.lock_ms < UI_INPUT_LOCK_MS) return;   // the press that made the change
     var ready = KeepThis_AnswerReady(global.keep_this.lock_ms, current_time, KeepThis_DisplayBusy());
     var click = false;
-    if (ready && mouse_check_button_pressed(mb_left)) {
+    if (ready && Mouse_Pressed(mb_left)) {
         var mp = Ui_MousePos();
         click = KeepThis_ClickOk(variable_global_exists("keep_this_rect") ? global.keep_this_rect : { x: -1, y: -1, w: 0, h: 0 }, mp.x, mp.y);
     }
@@ -3159,7 +3174,7 @@ function KeepThis_Step(_sp) {
         SFX_PlayUI("ui_confirm");
         KeepThis_Confirm();
         SettingsPopup_Refresh();
-    } else if (Input_UIBack() || Input_UIPressed("menu") || Input_UIPressed("pause") || mouse_check_button_pressed(mb_right)) {
+    } else if (Input_UIBack() || Input_UIPressed("menu") || Input_UIPressed("pause") || Mouse_Pressed(mb_right)) {
         SFX_PlayUI("ui_back");
         KeepThis_Revert();
         SettingsPopup_Refresh();
@@ -3289,7 +3304,7 @@ function SettingsPopup_Open(_owner = "", _quiet = false) {
     sp.closed_ms = -1;
     sp.scale_max = clamp(Display_WindowedMaxScaleNow(), 1, DISPLAY_SCALE_MAX);
     sp.menu = Ui_MenuNew("settings", SettingsMenu_Items(GameSettings_Ensure(), sp.scale_max), {
-        on_confirm: SettingsMenu_OnConfirm, on_adjust: SettingsMenu_OnAdjust, on_back: SettingsMenu_OnBack,
+        on_confirm: SettingsMenu_OnConfirm, on_adjust: SettingsMenu_OnAdjust, on_slide: SettingsMenu_OnSlide, on_back: SettingsMenu_OnBack,
         layout: { title: Loc_T("settings.title", "Settings"), anchor: "center", details: true, hides_below: true }
     });
     if (!_quiet) SFX_PlayUI("ui_openclose");
@@ -3334,6 +3349,15 @@ function SettingsPopup_Change(_id, _dir) {
 
 function SettingsMenu_OnAdjust(_m, _i, _dir) {
     return SettingsPopup_Change(_m.items[_i].id, _dir);
+}
+
+// D182: the mouse set a volume slider to _v (0..1): live and saved at once, like a left / right step.
+function SettingsMenu_OnSlide(_m, _i, _v) {
+    var s = GameSettings_Copy(GameSettings_Ensure());
+    if (!Settings_SetValue(s, _m.items[_i].id, _v)) return false;
+    GameSettings_Commit(s, true, false);
+    SettingsPopup_Refresh();
+    return true;
 }
 
 // Confirm: Controls opens its page; a choice row steps forward (so a toggle flips with the confirm key too).
@@ -3580,7 +3604,7 @@ function Title_PickerKeys(_c, _m) {
     if (!Title_IsPicker(_m) || (_m.data.mode != "load" && _m.data.mode != "profiles") || current_time - _m.lock_ms < UI_INPUT_LOCK_MS) return false;
     var prof = (_m.data.mode == "profiles");
     if (Input_Pressed("tab_prev")) return prof ? Title_ProfileDeleteAsk(_c, _m) : Title_PickerDeleteAsk(_c, _m);
-    if (mouse_check_button_pressed(mb_right)) {
+    if (Mouse_Pressed(mb_right)) {
         var mp = Ui_MousePos();
         var hv = Ui_HoverIndex(_m.rects, mp.x, mp.y);
         if (hv >= 0) {
@@ -4274,7 +4298,7 @@ function Title_ButtonKeys(_c) {
     var which = "";
     if (Input_Pressed("tab_prev")) which = "profile";
     else if (Input_Pressed("tab_next")) which = "codex";
-    else if (mouse_check_button_pressed(mb_left)) {
+    else if (Mouse_Pressed(mb_left)) {
         var mp = Ui_MousePos();
         which = Title_ButtonHit(_c, mp.x, mp.y);
     }
@@ -4351,12 +4375,19 @@ function Title_SeedEntryStep(_c) {
         SeedEntry_Move(e, dh);
         if (e.cur != was) changed = true;
     }
+    var mouse_start = false;
+    if (snap.wheel != 0) { SeedEntry_Cycle(e, snap.wheel); changed = true; }   // D182: the wheel turns the digit under the cursor (up = up)
+    if (snap.click && variable_instance_exists(_c, "title_seed_rects") && now - _c.title_seed_t >= UI_INPUT_LOCK_MS) {   // D182: a click on a cell, an arrow or the Start line
+        var hit = Title_SeedHit(_c.title_seed_rects, e, snap.mx, snap.my);
+        if (Title_SeedApply(e, hit)) changed = true;
+        if (hit.kind == "start") mouse_start = true;
+    }
     if (changed) {
         _c.title_seed_msg = false;
         SFX_PlayUI("ui_move");
     }
     if (now - _c.title_seed_t < UI_INPUT_LOCK_MS) return;
-    if (snap.confirm) {
+    if (snap.confirm || mouse_start) {
         if (SeedEntry_CanConfirm(e)) {
             SFX_PlayUI("ui_confirm");
             global.run_next_seed = SeedEntry_Value(e);
@@ -4371,6 +4402,35 @@ function Title_SeedEntryStep(_c) {
         _c.title_seed = undefined;
         Ui_StackTop(_c.title_stk).lock_ms = now;
     }
+}
+
+// D182: what a click at (_mx, _my) hits on the entry screen, from the rectangles the draw kept (_r: cells, up, down, start): { kind: "cell" (idx = the slot, only slots the cursor can
+// reach), "up" / "down" (the arrows beside the cursor's digit), "start" (the Start line) or "" }. Pure.
+function Title_SeedHit(_r, _e, _mx, _my) {
+    var names = ["up", "down", "start"];
+    for (var n = 0; n < 3; n++) {
+        var rr = variable_struct_get(_r, names[n]);
+        if (rr.w > 0 && _mx >= rr.x && _mx < rr.x + rr.w && _my >= rr.y && _my < rr.y + rr.h) return { kind: names[n], idx: -1 };
+    }
+    var cmax = SeedEntry_CursorMax(_e);
+    for (var i = 0; i < array_length(_r.cells) && i <= cmax; i++) {
+        var c = _r.cells[i];
+        if (_mx >= c.x && _mx < c.x + c.w && _my >= c.y && _my < c.y + c.h) return { kind: "cell", idx: i };
+    }
+    return { kind: "", idx: -1 };
+}
+
+// The effect of a hit on the entry: a cell moves the cursor, an arrow turns the digit; true when something changed (Start is the caller's).
+function Title_SeedApply(_e, _hit) {
+    switch (_hit.kind) {
+        case "cell":
+            var was = _e.cur;
+            _e.cur = clamp(_hit.idx, 0, SeedEntry_CursorMax(_e));
+            return _e.cur != was;
+        case "up": SeedEntry_Cycle(_e, 1); return true;
+        case "down": SeedEntry_Cycle(_e, -1); return true;
+    }
+    return false;
 }
 
 // A small arrow: 5p wide, 3p tall, pointing up (_dir -1) or down (+1); (_x, _y) is its top-left.
@@ -4416,6 +4476,9 @@ function Title_SeedEntryDraw(_c) {
     yy += lh + 3 * p + 5 * p;
     var rx = px + round((pw - row_w) / 2);
     var cells = [];
+    var up_r = { x: 0, y: 0, w: 0, h: 0 };
+    var down_r = { x: 0, y: 0, w: 0, h: 0 };
+    var start_r = { x: 0, y: 0, w: 0, h: 0 };
     for (var i = 0; i < n; i++) {
         var cx = rx + i * (cw + gap);
         var on = (i == e.cur);
@@ -4425,6 +4488,8 @@ function Title_SeedEntryDraw(_c) {
         if (on) {
             Title_SeedArrow(cx + (cw - 5 * p) div 2, yy - 4 * p, -1, p, UI_C_LIGHTEST);
             Title_SeedArrow(cx + (cw - 5 * p) div 2, yy + ch + p, 1, p, UI_C_LIGHTEST);
+            up_r = { x: cx, y: yy - 5 * p, w: cw, h: 5 * p };   // D182: where a click raises / lowers the digit
+            down_r = { x: cx, y: yy + ch, w: cw, h: 5 * p };
         }
         array_push(cells, { x: cx, y: yy, w: cw, h: ch });
     }
@@ -4434,9 +4499,10 @@ function Title_SeedEntryDraw(_c) {
     var hint_y = yy;
     for (var r = 0; r < array_length(hints); r++) {
         Prompt_RichDraw(x0, yy, hints[r], inner_w, UI_C_LIGHT, fa_left, a);
+        if (r == 1) start_r = { x: x0, y: yy, w: inner_w, h: Ui_TextBlockH(hints[r], inner_w) };   // D182: a click on the Start line starts
         yy += Ui_TextBlockH(hints[r], inner_w) + p;
     }
-    _c.title_seed_rects = { panel: { x: px, y: py, w: pw, h: ph }, cells: cells, hint_y: hint_y, hint_h: hint_h };
+    _c.title_seed_rects = { panel: { x: px, y: py, w: pw, h: ph }, cells: cells, hint_y: hint_y, hint_h: hint_h, up: up_r, down: down_r, start: start_r };
     draw_set_alpha(a0);
 }
 
@@ -4994,14 +5060,14 @@ function Ui_SnapNew() {
         up: false, down: false, left: false, right: false,
         up_p: false, down_p: false, left_p: false, right_p: false,
         confirm: false, back: false, tab: 0,
-        wheel: 0, mx: -1, my: -1, mouse_moved: false, click: false, rclick: false
+        wheel: 0, mx: -1, my: -1, mouse_moved: false, click: false, rclick: false, held: false
     };
 }
 
 // The mouse in GUI units from our own layout (window pixels minus the picture's corner, over the integer UI scale).
 function Ui_MousePos() {
     var lay = Display_Layout();
-    return { x: (window_mouse_get_x() - lay.gui_x) / lay.ui_scale, y: (window_mouse_get_y() - lay.gui_y) / lay.ui_scale };
+    return { x: (Mouse_WinX() - lay.gui_x) / lay.ui_scale, y: (Mouse_WinY() - lay.gui_y) / lay.ui_scale };   // D182: Mouse_* (a scripted run drives a fake)
 }
 
 // From the game's own input actions, so the keyboard, the pad and the bot all drive menus the same way. Confirm / back are
@@ -5024,15 +5090,16 @@ function Ui_ReadInput() {
     s.back = Input_UIBack() || (Menu_IsOpen() && Input_UIPressed("pause"));   // Hunt 6 UI (D140): the pad's Y opens the one menu, so inside it Y is Back (Esc is both keys already)
     s.tab = (Input_Pressed("tab_next") ? 1 : 0) - (Input_Pressed("tab_prev") ? 1 : 0);   // bound by the screens that have tabs
     var lay = Display_Layout();   // the mouse as Ui_MousePos works it out, without its struct
-    s.mx = (window_mouse_get_x() - lay.gui_x) / lay.ui_scale;
-    s.my = (window_mouse_get_y() - lay.gui_y) / lay.ui_scale;
+    s.mx = (Mouse_WinX() - lay.gui_x) / lay.ui_scale;
+    s.my = (Mouse_WinY() - lay.gui_y) / lay.ui_scale;
     if (!variable_global_exists("ui_mouse") || !is_struct(global.ui_mouse)) global.ui_mouse = { x: s.mx, y: s.my };
     s.mouse_moved = (s.mx != global.ui_mouse.x || s.my != global.ui_mouse.y);
     global.ui_mouse.x = s.mx;
     global.ui_mouse.y = s.my;
-    s.click = mouse_check_button_pressed(mb_left);
-    s.rclick = mouse_check_button_pressed(mb_right);
-    s.wheel = mouse_wheel_up() ? 1 : (mouse_wheel_down() ? -1 : 0);
+    s.click = Mouse_Pressed(mb_left);
+    s.rclick = Mouse_Pressed(mb_right);
+    s.held = Mouse_Held(mb_left);   // D182: a slider follows the mouse while the button stays down
+    s.wheel = Mouse_WheelDir();
     return s;
 }
 
@@ -5054,9 +5121,9 @@ function Ui_ReadInput() {
 // After a draw m.rect and m.det_rect hold the panel and details rectangles.
 function Ui_MenuNew(_id, _items, _opts) {
     var m = {
-        id: _id, items: _items, cursor: 0, top: 0, rects: [],
+        id: _id, items: _items, cursor: 0, top: 0, rects: [], bars: [], drag: -1,   // D182: bars = each slider row's bar rectangle (the draw keeps them), drag = the slider row a held click is moving (-1 none)
         rep_v: Ui_RepeatNew(), rep_h: Ui_RepeatNew(),
-        on_confirm: undefined, on_back: undefined, on_adjust: undefined, refuse: undefined,
+        on_confirm: undefined, on_back: undefined, on_adjust: undefined, on_slide: undefined, refuse: undefined,
         owner: noone, data: {}, lock_ms: current_time,
         layout: { title: "", note: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false,
                   x_anchor: "center", panel_w: 0, y_bottom: -1, max_h: 0, details_pos: "below", details_cols: 1, rows_max: 0,
@@ -5101,7 +5168,7 @@ function Ui_MenuAlpha(_m, _now) {
 // One frame of one menu from a snapshot. Moves the cursor and reports what happened; the caller plays sounds and calls back.
 // { moved, confirm (an enabled item), back, adjust (-1/0/+1 for left/right), index (cursor after the step) }
 function Ui_MenuStep(_m, _snap, _now) {
-    var ev = { moved: false, confirm: false, back: false, adjust: 0, index: _m.cursor };
+    var ev = { moved: false, confirm: false, back: false, adjust: 0, index: _m.cursor, slide: undefined };
     var en = Ui_ItemsEnabled(_m.items);
     var n = array_length(en);
     if (n > 0) {
@@ -5122,12 +5189,30 @@ function Ui_MenuStep(_m, _snap, _now) {
             ev.confirm = true;
         }
         if (_snap.confirm && en[_m.cursor]) ev.confirm = true;
+        // D182: a click on a slider's bar sets that point and, while the button stays down, the slider follows the mouse (even off the bar); { index, value 0..1 } in ev.slide
+        if (_m.drag >= 0 && !_snap.held) _m.drag = -1;
+        if (_snap.click) {
+            _m.drag = -1;
+            var sb = Ui_HoverIndex(_m.bars, _snap.mx, _snap.my, en);
+            if (sb >= 0 && variable_struct_exists(_m.items[sb], "kind") && _m.items[sb].kind == "slider") _m.drag = sb;
+        }
+        if (_m.drag >= 0 && _m.drag < array_length(_m.bars)) {
+            var br = _m.bars[_m.drag];
+            ev.slide = { index: _m.drag, value: Slider_ValueAt(_snap.mx, br.x, br.w, SETTINGS_VOLUME_STEP) };
+        }
         var dh = (_snap.right ? 1 : 0) - (_snap.left ? 1 : 0);
         if (Ui_RepeatStep(_m.rep_h, dh, _snap.left_p || _snap.right_p, _now) > 0) ev.adjust = dh;
     }
     if (_snap.back || _snap.rclick) ev.back = true;
     ev.index = _m.cursor;
     return ev;
+}
+
+// D182: where a click at _mx on a slider bar (left edge _bx, width _bw) puts the slider: 0..1, snapped to _step (the 5 % of the volume rows); left of the bar is 0, right of it 1.
+function Slider_ValueAt(_mx, _bx, _bw, _step) {
+    var f = clamp((_mx - _bx) / max(1, _bw), 0, 1);
+    var st = max(0.001, _step);
+    return clamp(round(round(f / st) * st * 1000) / 1000, 0, 1);
 }
 
 function Ui_StackNew() {
@@ -5182,7 +5267,10 @@ function Ui_MenuUpdate(_m, _stk = undefined) {
     if (ev.adjust != 0 && is_struct(it) && Ui_ItemEnabled(it) && is_callable(_m.on_adjust)) {
         if (_m.on_adjust(_m, _m.cursor, ev.adjust)) SFX_PlayUI("ui_move");
     }
-    if (ev.confirm && is_struct(it) && variable_struct_exists(it, "kind") && it.kind == "slider") ev.confirm = false;   // a slider moves with left/right only
+    if (is_struct(ev.slide) && is_callable(_m.on_slide)) {   // D182: the mouse set a slider
+        if (_m.on_slide(_m, ev.slide.index, ev.slide.value)) SFX_PlayUI("ui_move");
+    }
+    if (ev.confirm && is_struct(it) && variable_struct_exists(it, "kind") && it.kind == "slider") ev.confirm = false;   // a slider moves with left/right (or the mouse on its bar), a click does not confirm
     if (ev.confirm) {
         SFX_PlayUI(Ui_ConfirmSound(_m, ev.index));
         if (is_callable(_m.on_confirm)) _m.on_confirm(_m, ev.index);
@@ -5240,6 +5328,52 @@ function Ui_Box(_x1, _y1, _x2, _y2, _col) {
     if (_x2 <= _x1 || _y2 <= _y1) return;
     draw_set_color(_col);
     draw_rectangle(_x1, _y1, _x2 - 1, _y2 - 1, false);
+}
+
+// ---- D182: the mouse cursor ------------------------------------------------------------------------------------------------------------------------------
+// The OS cursor is hidden while the game has focus, so the game draws its own arrow, in the GUI layer on top of everything: 8 x 10 art pixels (one art pixel = one UI pixel, Ui_Px),
+// the lightest palette colour with a 1-px darkest outline, its tip (the hot spot) at the mouse. While a button is down it is the pressed variant: one art pixel down and to the right
+// with the dimmer fill. MouseCursor_Visible (scr_input) says when it is shown: after a move or a click in the last 3 s, never after a key or pad press until the mouse moves.
+// The arrow as filled boxes [{ x, y, w, h, col }]: runs of one colour per row, the tip at (_x, _y), _p GUI units per art pixel. Pure.
+function MouseCursor_Boxes(_x, _y, _p, _pressed) {
+    var mask = MouseCursor_Mask();
+    var out = [];
+    var ox = _pressed ? _p : 0;
+    var fill = _pressed ? UI_C_LIGHT : UI_C_LIGHTEST;
+    for (var r = 0; r < array_length(mask); r++) {
+        var row = mask[r];
+        var c = 1;
+        var n = string_length(row);
+        while (c <= n) {
+            var ch = string_char_at(row, c);
+            if (ch == ".") { c++; continue; }
+            var c2 = c;
+            while (c2 < n && string_char_at(row, c2 + 1) == ch) c2++;
+            array_push(out, { x: _x + ox + (c - 1) * _p, y: _y + ox + r * _p, w: (c2 - c + 1) * _p, h: _p, col: (ch == "F") ? fill : UI_C_DARKEST });
+            c = c2 + 1;
+        }
+    }
+    return out;
+}
+
+// Called last in the Draw GUI of the controllers (obj_ui_controller, obj_battle_controller), so nothing covers it.
+function MouseCursor_Draw() {
+    if (!MouseCursor_Visible(MouseCursor_Get(), current_time, MouseCursor_Focused())) return;
+    var lay = Display_Layout();
+    var mp = Ui_MousePos();
+    var p = Ui_Px();
+    var gx = floor(clamp(mp.x, 0, lay.gui_w - 1));
+    var gy = floor(clamp(mp.y, 0, lay.gui_h - 1));
+    var boxes = MouseCursor_Boxes(gx, gy, p, Mouse_Held(mb_left) || Mouse_Held(mb_right) || Mouse_Pressed(mb_left) || Mouse_Pressed(mb_right));
+    var a0 = draw_get_alpha();
+    var c0 = draw_get_color();
+    draw_set_alpha(1);
+    for (var i = 0; i < array_length(boxes); i++) {
+        var b = boxes[i];
+        Ui_Box(b.x, b.y, b.x + b.w, b.y + b.h, b.col);
+    }
+    draw_set_alpha(a0);
+    draw_set_color(c0);
 }
 
 // D115: THE text style, in one place. The palette's pale colour is the "main text" role and is drawn white (readability); every other colour
@@ -6344,6 +6478,9 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         rects[r] = { x: px + 2 * p, y: rows_y0 + offs[r] - top_off, w: vis ? (panel_w - 4 * p) : 0, h: vis ? rhs[r] : 0 };
     }
     _m.rects = rects;
+    var bars = array_create(n);   // D182: each slider row's bar, for a click and a drag
+    for (var br0 = 0; br0 < n; br0++) bars[br0] = { x: 0, y: 0, w: 0, h: 0 };
+    _m.bars = bars;
 
     // gliding highlight band
     var cur_i = clamp(_m.cursor, 0, max(0, n - 1));
@@ -6428,6 +6565,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
             Ui_Box(bx, by, bx + bar_w, by + 2 * p, sel ? UI_C_DARKEST : UI_C_DARK);
             var fill = floor(clamp(row.amount, 0, 1) * (bar_w / p) + 0.5) * p;
             Ui_Box(bx, by, bx + fill, by + 2 * p, sel ? UI_C_LIGHTEST : UI_C_LIGHT);
+            bars[k] = { x: bx, y: ry, w: bar_w, h: rh };
         } else if (variable_struct_exists(row, "value") && row.value != "") {
             Ui_Text(x1, vty, row.value, col, fa_right);
         }

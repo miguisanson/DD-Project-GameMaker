@@ -63,7 +63,7 @@ if (room != last_room_id) {
 }
 
 if (!variable_global_exists("mouse_cursor_hidden")) global.mouse_cursor_hidden = false;
-var hide_cursor = window_has_focus();
+var hide_cursor = MouseCursor_OsHidden(window_has_focus());   // D182: the OS cursor is hidden only while the game has focus; the game draws its own then (MouseCursor_Draw)
 if (hide_cursor != global.mouse_cursor_hidden) {
     if (hide_cursor) window_set_cursor(cr_none);
     else window_set_cursor(cr_default);

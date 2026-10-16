@@ -1415,6 +1415,11 @@ function Battle_PlayerAttackResolveTimed(_bc, _timing) {
 }
 
 // One Step of the bar. The clock is ms from delta_time; a press is stamped at the top of the Step that sees it (QTE-01).
+// D182: the QTE bars take a left click as the confirm press: it goes through the same _confirm_pressed argument, so the same press time gives the same grade.
+function Battle_ConfirmInput() {
+    return Input_UIConfirm() || Input_ClickConfirm();
+}
+
 function Battle_PlayerAttackTimingStep(_bc, _confirm_pressed) {
     if (!_bc.qte_active) {
         Battle_AttackTimingBegin(_bc);

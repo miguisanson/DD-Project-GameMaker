@@ -172,3 +172,4 @@ draw_set_color(c_white);
 
 if (gs.ui.mode == UI_MENU) Menu_Draw();   // R1b (D122), D140: the one menu goes over the battle HUD, dimming it
 Tutorial_Draw();   // C4 (D45): the first-time pop-up goes over the whole battle screen (the ui controller draws it in the other rooms)
+MouseCursor_Draw();   // D182: the mouse cursor, over the battle HUD, the menu and the pop-up (the ui controller draws it too, for the rooms without a fight)

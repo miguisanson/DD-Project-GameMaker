@@ -49,7 +49,7 @@ if (gs.ui.mode == UI_DIALOGUE || array_length(gs.ui.lines) > 0) {
     Dialogue_TypewriterStep();
     if (Dialogue_ChoiceIsOpen()) {
         Dialogue_ChoiceStep();   // D101: the choices above the box answer to the shared menu controls
-    } else if (k_ok) {
+    } else if (k_ok || Input_ClickConfirm()) {   // D182: a left click advances the text like Confirm
         Dialogue_Advance();
     }
     exit;
