@@ -7334,6 +7334,9 @@ function Scenario_StepSmokeBattleUi(_s) {
         case 173:   // the enemy answers and the turn comes back to the player
             if (_s.t > 30 && _bc != noone && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) {
                 Scenario_Check("battleui_the_fight_goes_on_after_guard", true);
+                var _enemy_acted = false;
+                for (var _tg = 0; _tg < array_length(_bc.turn_log); _tg++) if (_bc.turn_log[_tg] == TL_ENEMY) _enemy_acted = true;
+                Scenario_Check("battleui_guard_ends_when_the_players_next_turn_starts", !_enemy_acted || !Status_Has(_bc.p, STATUS_BRACE), "enemy_acted=" + string(_enemy_acted));   // D180 (R-102)
                 Scenario_BattleUiOverlaps(_bc, "after_guard");
                 Scenario_Next(_s, 174);
             }
@@ -10592,6 +10595,7 @@ function Scenario_StepSmokeRunStats(_s) {
                 var _e = global.run_flow.entry;
                 var _rows = RunFlow_SummaryRows(_e);
                 Scenario_Check("g9_the_summary_is_up", global.run_flow.phase == "summary");
+                Scenario_Check("r3title_an_abandoned_run_shows_an_abandoned_run_title", variable_struct_exists(global.run_flow, "title") && Test_ArrHasStr(Test_R3TitleKeys(RunTitle_Pool("abandoned", Profile_Get().deaths)), global.run_flow.title.key), variable_struct_exists(global.run_flow, "title") ? string(global.run_flow.title.key) : "no title");   // D183 (R-105)
                 Scenario_Check("g9_the_summary_shows_fights_won_1", Test_RowValue(_rows, _fw) == "1", "got " + Test_RowValue(_rows, _fw));
                 Scenario_Check("g9_the_summary_shows_the_damage_dealt", Test_RowValue(_rows, _dd) == string(_rs.snap.dmg_dealt) && _rs.snap.dmg_dealt > 0, "got " + Test_RowValue(_rows, _dd) + " want " + string(_rs.snap.dmg_dealt));
                 Scenario_Check("g9_the_summary_shows_the_damage_taken", Test_RowValue(_rows, _dt) == string(_rs.snap.dmg_taken), "got " + Test_RowValue(_rows, _dt) + " want " + string(_rs.snap.dmg_taken));
@@ -16763,7 +16767,8 @@ function Scenario_StepSmokeChoices(_s) {
                 Scenario_Check("choices_stranger_your_reaction_follows_his_reply", _c.watched && array_length(_c.boxes) == 3);
                 Scenario_Check("choices_stranger_the_encounter_is_used_up", !Dialogue_NarrativeIsPending("first_stranger_encounter_reaction") && Dialogue_NarrativeIsDone("first_stranger_encounter_reaction"));
                 Scenario_Check("choices_stranger_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
-                _gs.flags = {};   // the next run: its flags are new, the profile remembers
+                _gs.flags = {};   // the next run: its flags are new, the profile remembers the answer
+                variable_struct_remove(Profile_Get().story_seen, "flag:" + Dialogue_NarrativeDoneFlagKey("first_stranger_encounter_reaction"));   // R-103: the profile now remembers that the reaction was seen too (it would not play again); this scene checks the greeting, so it is forgotten here
                 _h.c = Scenario_ChoiceNew();
                 _h.c.watch = json_stringify(DialogueDB_Get("sys_first_stranger_encounter_reaction"));
                 Dialogue_NarrativeOnStrangerEncounterResolved();

@@ -606,6 +606,17 @@ function Shop_RunStock(_run, _idx, _ch) {
     return variable_struct_get(_run.shop, key);
 }
 
+// R-104: why the bag alone would refuse this row, without gold or stock in it: "owned" (gear the player has, worn or carried), "full" (Inv_AddCapped adds none:
+// the throwable cap), or "" (it fits; also for cards, whose limits are the card rules). The same two checks Shop_Buy makes, so a row dims for exactly the refusals.
+function Shop_CarryRefusal(_ch, _row) {
+    if (_row.kind != "item") return "";
+    var it = ItemDB_Get(_row.id);
+    var unique = (it.type == ITEM_WEAPON || it.type == ITEM_ARMOR || it.type == ITEM_ACCESSORY);
+    if (unique && Shop_Owned(_ch, _row.id)) return "owned";
+    if (Inv_AddCapped(variable_clone(_ch), _row.id, 1).added < 1) return "full";
+    return "";
+}
+
 // Buys one of a row. Returns { ok, reason ("gold" | "sold_out" | "full" | "owned" | "slots"), ch (a changed copy), price }. Changes the row's stock and the run's gold.
 function Shop_Buy(_ch, _run, _row) {
     var out = { ok: false, reason: "", ch: _ch, price: _row.price };

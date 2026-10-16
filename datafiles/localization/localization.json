@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T12:24:13Z",
-    "row_count": 1244
+    "generated_at_utc": "2026-10-16T13:25:55Z",
+    "row_count": 1268
   },
   "default_lang": "en",
   "languages": [
@@ -980,6 +980,10 @@
       "en": "You brace yourself.",
       "ko": "몸을 웅크립니다."
     },
+    "combat.msg.guard_mp": {
+      "en": "You brace yourself. +{mp} MP",
+      "ko": "몸을 웅크립니다. MP +{mp}"
+    },
     "combat.msg.level_up": {
       "en": "Level up x{levels}!",
       "ko": "레벨 업 x{levels}!"
@@ -1163,6 +1167,10 @@
     "combat.msg.windup_broken": {
       "en": "{enemy}'s {skill} is broken off!",
       "ko": "{enemy}의 {skill}이(가) 끊겼습니다!"
+    },
+    "combat.pop.guard_mp": {
+      "en": "+{mp} MP",
+      "ko": "MP +{mp}"
     },
     "common.cancel": {
       "en": "Cancel",
@@ -3604,6 +3612,86 @@
       "en": "The tunnel keeps you.",
       "ko": "터널이 당신을 놓아주지 않는다."
     },
+    "runflow.title.abandoned.0": {
+      "en": "You let go.",
+      "ko": "당신은 손을 놓았다."
+    },
+    "runflow.title.abandoned.1": {
+      "en": "The tunnel waits.",
+      "ko": "터널은 기다린다."
+    },
+    "runflow.title.abandoned.2": {
+      "en": "You turned back.",
+      "ko": "당신은 돌아섰다."
+    },
+    "runflow.title.t1.1": {
+      "en": "The dark closes over you.",
+      "ko": "어둠이 당신을 덮는다."
+    },
+    "runflow.title.t1.2": {
+      "en": "Is this the end?",
+      "ko": "이게 끝일까?"
+    },
+    "runflow.title.t2.0": {
+      "en": "Not the end.",
+      "ko": "끝이 아니다."
+    },
+    "runflow.title.t2.1": {
+      "en": "It begins again.",
+      "ko": "다시 시작된다."
+    },
+    "runflow.title.t2.2": {
+      "en": "Back so soon.",
+      "ko": "벌써 돌아왔다."
+    },
+    "runflow.title.t3.0": {
+      "en": "You know the way.",
+      "ko": "길을 안다."
+    },
+    "runflow.title.t3.1": {
+      "en": "The same fall.",
+      "ko": "같은 추락."
+    },
+    "runflow.title.t3.2": {
+      "en": "Down, once more.",
+      "ko": "다시, 아래로."
+    },
+    "runflow.title.t4.0": {
+      "en": "Nothing new.",
+      "ko": "새로울 것 없다."
+    },
+    "runflow.title.t4.1": {
+      "en": "Quiet again.",
+      "ko": "다시 고요하다."
+    },
+    "runflow.title.t4.2": {
+      "en": "No one came.",
+      "ko": "아무도 오지 않았다."
+    },
+    "runflow.title.t5.0": {
+      "en": "Home again.",
+      "ko": "다시 집이다."
+    },
+    "runflow.title.t5.1": {
+      "en": "As expected.",
+      "ko": "짐작대로다."
+    },
+    "runflow.title.t5.2": {
+      "en": "You stay.",
+      "ko": "당신은 남는다."
+    },
+    "runflow.title.won.0": {
+      "en": "The choir falls silent.",
+      "ko": "성가대가 침묵한다."
+    },
+    "runflow.title.won.1": {
+      "en": "The tunnel lets go.",
+      "ko": "터널이 당신을 놓아준다."
+    },
+    "runflow.title.won.2": {
+      "en": "The way is open.",
+      "ko": "길이 열렸다."
+    },
     "save.back": {
       "en": "Back",
       "ko": "뒤로"
@@ -4068,6 +4156,14 @@
       "en": "Nothing to Sell",
       "ko": "팔 것이 없습니다"
     },
+    "shop.reason.full": {
+      "en": "Bag full for this item",
+      "ko": "이 아이템은 더 들 수 없습니다"
+    },
+    "shop.reason.owned": {
+      "en": "Already owned",
+      "ko": "이미 가지고 있습니다"
+    },
     "shop.sell": {
       "en": "Sell",
       "ko": "판매"
@@ -4285,8 +4381,8 @@
       "ko": "맞을 때까지: 받는 피해 {take}% 감소, 주는 피해 {deal}% 증가."
     },
     "status.desc.status_brace": {
-      "en": "Braced for the next hit: it deals {pct}% less damage.",
-      "ko": "다음 공격에 대비합니다. 피해가 {pct}% 줄어듭니다."
+      "en": "Until your next turn every hit you take deals {pct}% less damage.",
+      "ko": "내 다음 턴까지 받는 모든 공격의 피해가 {pct}% 줄어듭니다."
     },
     "status.desc.status_crit_up": {
       "en": "1 in every {n} hits is a critical.",

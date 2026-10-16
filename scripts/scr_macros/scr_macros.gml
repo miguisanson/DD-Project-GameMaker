@@ -87,7 +87,9 @@
 #macro STATUS_BLOODTHIRSTY 11
 #macro STATUS_BLESSING   12
 #macro STATUS_SUNDER     13
-#macro STATUS_BRACE      14   // D1a: the Guard command (D99): the next hit deals half
+#macro STATUS_BRACE      14   // D1a: the Guard command (D99, D180): every hit deals half until the player's next turn starts
+#macro GUARD_MP_PCT      0.25 // D180: Guard gives back this share of max MP (rounded down)...
+#macro GUARD_MP_MIN      2    // ...at least this many
 
 #macro SKILL_POWER_STRIKE 0
 #macro SKILL_WOUND        1

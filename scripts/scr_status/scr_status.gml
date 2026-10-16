@@ -287,16 +287,16 @@ function StatusDB_Init() {
     global.status_db[? STATUS_BRACE] = {
         id: STATUS_BRACE,
         name: "Braced",
-        // D99: the Guard command. The next hit deals half. It is counted in ENEMY turns (Status_TickEnemyTurn, not the player's own ticks): a fast
-        // player acting twice, or an enemy turn that does not hit (a wind-up, a buff), does not wear it off. Two enemy turns, then it fades.
+        // D99 / D180: the Guard command. EVERY hit deals half (it is not used up by a hit) until the player's next turn starts (`until_player_turn`):
+        // Status_TickEnemyTurn notes that the enemy has had its turn (`enemy_done`), Status_ExpireAtPlayerTurn removes it as the player's next turn begins.
+        // A fast player acting twice in a row, or an enemy turn that does not hit (a wind-up, a buff), does not wear it off early (hunt 6).
         icon_sprite: noone,
         stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         guard_mult: 0.5,
-        duration: 2,
-        tick_on_enemy_turn: true,
-        consume_on_hit: true
+        duration: 1,
+        until_player_turn: true
     };
 
     Status_AssignCoreIcons();
@@ -519,7 +519,7 @@ function Status_Describe(_status_id, _data = undefined) {
             break;
         case STATUS_BRACE:
             vars.pct = round((1 - Status_Cfg(_status_id, "guard_mult", 1)) * 100);
-            line = Loc_T("status.desc.status_brace", "Braced for the next hit: it deals {pct}% less damage.", vars);
+            line = Loc_T("status.desc.status_brace", "Until your next turn every hit you take deals {pct}% less damage.", vars);
             break;
     }
 
@@ -831,6 +831,7 @@ function Status_Tick(_ch, _acted = true) {
         }
         var cfg = StatusDB_Get(s.id);
         if (variable_struct_exists(cfg, "tick_on_enemy_turn") && cfg.tick_on_enemy_turn) continue;   // counted by Status_TickEnemyTurn
+        if (variable_struct_exists(cfg, "until_player_turn") && cfg.until_player_turn) continue;   // ends at the player's next turn (Status_ExpireAtPlayerTurn)
 
         _ch = Status_ApplyHpTick(_ch, s, cfg, _acted);
 
@@ -868,9 +869,26 @@ function Status_TickEnemyTurn(_ch) {
     for (var i = array_length(_ch.status) - 1; i >= 0; i--) {
         var s = _ch.status[i];
         var cfg = StatusDB_Get(s.id);
+        if (variable_struct_exists(cfg, "until_player_turn") && cfg.until_player_turn) {   // D180: the enemy has had its turn: the status ends as the player's next one starts
+            s.enemy_done = true;
+            continue;
+        }
         if (!variable_struct_exists(cfg, "tick_on_enemy_turn") || !cfg.tick_on_enemy_turn) continue;
         s.turns -= 1;
         if (s.turns <= 0) array_delete(_ch.status, i, 1);
+    }
+    return _ch;
+}
+
+// D180: a turn of the PLAYER starts: the statuses that last until it (Guard's Brace) end, once the enemy has had a turn since they were applied.
+// (A fast player who guards and is up again before the enemy acts keeps the Brace for that enemy turn: hunt 6.)
+function Status_ExpireAtPlayerTurn(_ch) {
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "status") || !is_array(_ch.status)) return _ch;
+    for (var i = array_length(_ch.status) - 1; i >= 0; i--) {
+        var s = _ch.status[i];
+        var cfg = StatusDB_Get(s.id);
+        if (!variable_struct_exists(cfg, "until_player_turn") || !cfg.until_player_turn) continue;
+        if (variable_struct_exists(s, "enemy_done") && s.enemy_done) array_delete(_ch.status, i, 1);
     }
     return _ch;
 }
@@ -940,6 +958,7 @@ function Status_FullLine(_status_id, _data = undefined) {
     var cfg = StatusDB_Get(_status_id);
     if (is_struct(cfg) && variable_struct_exists(cfg, "dot_kind")) return line;
     if (_status_id == STATUS_HIT_UP || _status_id == STATUS_STUN) return line;
+    if (is_struct(cfg) && variable_struct_exists(cfg, "until_player_turn") && cfg.until_player_turn) return line;   // D180: it ends at your next turn, not after a number of turns
     var tail = (_data.turns == 1) ? Loc_T("status.turn_left", "1 turn left.") : Loc_T("status.turns_left", "{turns} turns left.", { turns: string(_data.turns) });
     return line + " " + tail;
 }

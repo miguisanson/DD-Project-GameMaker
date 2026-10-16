@@ -493,7 +493,7 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
     var floor1_slime_key = "floor1_slime_kill_reaction_done";
-    var floor1_slime_done = variable_struct_exists(gs.flags, floor1_slime_key) && variable_struct_get(gs.flags, floor1_slime_key);
+    var floor1_slime_done = (variable_struct_exists(gs.flags, floor1_slime_key) && variable_struct_get(gs.flags, floor1_slime_key) == true) || Story_FlagSeen(floor1_slime_key);   // R-103: or the profile has it
 
     var killed_floor1_slime = false;
     var defeated_enemy_id = -1;
@@ -513,7 +513,7 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
     if (!floor1_slime_done && killed_floor1_slime) {
         array_push(lines, Loc_T("combat.msg.floor1_reaction.0", "That thing was alive. And I nearly wasn't."));
         array_push(lines, Loc_T("combat.msg.floor1_reaction.1", "Okay. Okay. I just need to get out of here."));
-        variable_struct_set(gs.flags, floor1_slime_key, true);
+        Story_MarkFlag(floor1_slime_key);   // R-103: the run flag and the profile's story key, flushed now
     }
 
     if (defeated_enemy_id == ENEMY_FINAL_BOSS) {
@@ -689,6 +689,7 @@ function Battle_TurnAdvance(_bc) {
         if (regen > 0) Battle_PopAdd(_bc, "+" + string(regen), false, "heal", 1);
         _bc.turn = TURN_ENEMY;
     } else {
+        _bc.p = Status_ExpireAtPlayerTurn(_bc.p);   // D180: Guard's Brace ends as the player's next turn starts
         _bc.turn = TURN_PLAYER;
     }
     return who;
@@ -2957,15 +2958,30 @@ function Battle_ItemRows(_p) {
     return out;
 }
 
-// ---- the Guard command (D99): the turn is spent, the next hit deals half ----
+// ---- the Guard command (D99, D180): the turn is spent, every hit until the player's next turn deals half, and a quarter of max MP comes back ----
+// The MP Guard gives: 25% of max MP rounded down, at least 2, never above max MP (the part that would not fit is lost). Pure.
+function Battle_GuardMpGain(_p) {
+    var want = max(GUARD_MP_MIN, floor(_p.max_mp * GUARD_MP_PCT));
+    return clamp(min(want, _p.max_mp - _p.mp), 0, want);
+}
+
 function Battle_GuardApply(_p) {
-    return Status_Add(_p, STATUS_BRACE, Status_Cfg(STATUS_BRACE, "duration", 2), 0);
+    var gain = Battle_GuardMpGain(_p);
+    _p = Status_Add(_p, STATUS_BRACE, Status_Cfg(STATUS_BRACE, "duration", 1), 0);
+    _p.mp = _p.mp + gain;
+    return _p;
 }
 
 function Battle_PlayerGuard(_bc) {
+    var gain = Battle_GuardMpGain(_bc.p);
     var p = Battle_GuardApply(_bc.p);
     SFX_PlaySkill(SKILL_MUSCLE_UP);
-    Battle_Message(_bc, Loc_T("combat.msg.guard", "You brace yourself."), BSTATE_ENEMY_ACT);
+    var msg = Loc_T("combat.msg.guard", "You brace yourself.");
+    if (gain > 0) {
+        msg = Loc_T("combat.msg.guard_mp", "You brace yourself. +{mp} MP", { mp: gain });
+        Battle_PopAdd(_bc, Loc_T("combat.pop.guard_mp", "+{mp} MP", { mp: gain }), true, "heal", 1.0);
+    }
+    Battle_Message(_bc, msg, BSTATE_ENEMY_ACT);
     Battle_PlayerFinalizeTurn(_bc, p, _bc.e);
 }
 

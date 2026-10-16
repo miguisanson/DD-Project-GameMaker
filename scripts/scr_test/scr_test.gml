@@ -160,6 +160,10 @@ function Test_RunAll() {
     Test_RunSuite("R3StealthB", Test_Suite_R3StealthB);
     Test_RunSuite("R3FixDet", Test_Suite_R3FixDet);
     Test_RunSuite("R3Saves2", Test_Suite_R3Saves2);
+    Test_RunSuite("R3Guard", Test_Suite_R3Guard);
+    Test_RunSuite("R3Wolf", Test_Suite_R3Wolf);
+    Test_RunSuite("R3Shop", Test_Suite_R3Shop);
+    Test_RunSuite("R3Title", Test_Suite_R3Title);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -5758,7 +5762,7 @@ function Test_Suite_BattleUi() {
     var _irows = Battle_ItemRows(_player);
     Test_True("BattleUi the HP potion is in the item list with its quantity", array_length(_irows) >= 1 && _irows[0].item_id == 10 && _irows[0].qty == 2);
 
-    // ---- the Guard command (D99): the next hit deals half, then it is gone ----
+    // ---- the Guard command (D99, D180): every hit deals half until the player's next turn starts (the Brace is not used up by a hit) ----
     var _slime = EnemyCreate(ENEMY_SLIME);
     var _src = { power: 6, stat_type: STAT_ATK };
     var _g0 = CharacterCreate_Player(CLASS_KNIGHT);
@@ -5767,14 +5771,16 @@ function Test_Suite_BattleUi() {
     Test_True("BattleUi Guard leaves the player Braced", Status_Has(_g1, STATUS_BRACE));
     var _braced_hit = Combat_ApplyDamage(_slime, _g1, _src, 1, 1, { is_skill: false });
     Test_True("BattleUi a Braced hit deals about half (" + string(_plain_hit) + " -> " + string(_braced_hit.dmg) + ")", _plain_hit >= 2 && _braced_hit.dmg < _plain_hit && abs(_braced_hit.dmg - _plain_hit * 0.5) <= 1);
-    Test_False("BattleUi the hit used the Brace up", Status_Has(_braced_hit.defender, STATUS_BRACE));
+    Test_True("BattleUi the hit does not use the Brace up (D180)", Status_Has(_braced_hit.defender, STATUS_BRACE));
     var _g2 = Battle_GuardApply(CharacterCreate_Player(CLASS_KNIGHT));
     _g2 = Status_Tick(_g2);
     Test_True("BattleUi Brace survives the Guard turn's own tick", Status_Has(_g2, STATUS_BRACE));
     _g2 = Status_Tick(_g2);
     Test_True("BattleUi Brace is not worn off by the player's own turns (hunt 6: it counts the enemy's turns)", Status_Has(_g2, STATUS_BRACE));
     _g2 = Status_TickEnemyTurn(Status_TickEnemyTurn(_g2));
-    Test_False("BattleUi Brace fades after two enemy turns when nothing hit", Status_Has(_g2, STATUS_BRACE));
+    Test_True("BattleUi Brace stays through the enemy's turns (D180)", Status_Has(_g2, STATUS_BRACE));
+    _g2 = Status_ExpireAtPlayerTurn(_g2);
+    Test_False("BattleUi Brace is gone as the player's next turn starts, with or without a hit (D180)", Status_Has(_g2, STATUS_BRACE));
 
     // ---- I-065: level gains survive the battle's own normalisation (GameState_Init runs it at every battle start) ----
     var _lv = CharacterCreate_Player(CLASS_KNIGHT);
@@ -13365,7 +13371,7 @@ function Test_Suite_Hunt6Combat() {
     Test_Eq("hunt6 menu: the weapon stays worn", Equip_SlotGet(_g, "weapon"), 1);
     Test_True("hunt6 menu: outside a fight armor goes on", Gear_Toggle(_g, 22).ok);
 
-    // ---- 3. Guard (the Brace status) lasts until the enemy's turns are over, not through the player's own turns ----
+    // ---- 3. Guard (the Brace status) lasts until the player's next turn starts (D180), not through the player's own turns before the enemy acted ----
     var _slime = EnemyCreate(ENEMY_SLIME);
     var _src = { power: 6, stat_type: STAT_ATK };
     var _plain = Combat_ApplyDamage(_slime, CharacterCreate_Player(CLASS_KNIGHT), _src, 1, 1, { is_skill: false }).dmg;
@@ -13378,21 +13384,22 @@ function Test_Suite_Hunt6Combat() {
     Test_True("hunt6 guard: still braced after the player acted three times in a row", Status_Has(_bc.p, STATUS_BRACE));
     var _hit = Combat_ApplyDamage(_slime, _bc.p, _src, 1, 1, { is_skill: false });
     Test_True("hunt6 guard: the enemy's hit then deals about half (" + string(_plain) + " -> " + string(_hit.dmg) + ")", _plain >= 2 && abs(_hit.dmg - _plain * 0.5) <= 1);
-    Test_False("hunt6 guard: that hit used the Brace up", Status_Has(_hit.defender, STATUS_BRACE));
+    Test_True("hunt6 guard: that hit does not use the Brace up (D180)", Status_Has(_hit.defender, STATUS_BRACE));
     var _bp2 = CharacterCreate_Player(CLASS_KNIGHT);
     var _bc2 = Test_Hunt1Bc(_bp2, EnemyCreate(ENEMY_SLIME));
     Battle_GuardApply(_bp2);
-    Test_Eq("hunt6 guard: the chip reads 2 enemy turns", Battle_StatusCurrentTurns(_bc2.p, STATUS_BRACE), 2);
-    Battle_PlayerFinalizeTurn(_bc2, _bc2.p, _bc2.e);
+    Test_Eq("hunt6 guard: the chip reads 1: it lasts until the player's next turn (D180)", Battle_StatusCurrentTurns(_bc2.p, STATUS_BRACE), 1);
+    Battle_PlayerFinalizeTurn(_bc2, _bc2.p, _bc2.e);   // the Guard turn
+    Test_True("hunt6 guard: braced when the enemy's turn comes", Status_Has(_bc2.p, STATUS_BRACE));
     _bc2.enemy_actions_remaining = 0;
     Battle_EnemyFinalizeTurnState(_bc2, _bc2.p, _bc2.e);   // the enemy spends its turn on a wind-up: no hit
-    Test_True("hunt6 guard: braced after an enemy turn without a hit", Status_Has(_bc2.p, STATUS_BRACE));
-    Test_Eq("hunt6 guard: one enemy turn used", Battle_StatusCurrentTurns(_bc2.p, STATUS_BRACE), 1);
-    Battle_PlayerFinalizeTurn(_bc2, _bc2.p, _bc2.e);   // the player acts, the big attack comes next
-    Test_True("hunt6 guard: braced when the wind-up's attack arrives", Status_Has(_bc2.p, STATUS_BRACE));
-    _bc2.enemy_actions_remaining = 0;
-    Battle_EnemyFinalizeTurnState(_bc2, _bc2.p, _bc2.e);   // a second enemy turn with no hit
-    Test_False("hunt6 guard: gone after two enemy turns with no hit", Status_Has(_bc2.p, STATUS_BRACE));
+    for (var _more = 0; _more < 4 && _bc2.tl_who == TL_ENEMY; _more++) {   // a faster enemy acts again first; the Brace holds for those turns
+        Test_True("hunt6 guard: still braced for the enemy's next turn", Status_Has(_bc2.p, STATUS_BRACE));
+        _bc2.enemy_actions_remaining = 0;
+        Battle_EnemyFinalizeTurnState(_bc2, _bc2.p, _bc2.e);
+    }
+    Test_Eq("hunt6 guard: the player's turn is next", _bc2.tl_who, TL_PLAYER);
+    Test_False("hunt6 guard: gone as the player's next turn starts, even when the enemy's turn had no hit (D180)", Status_Has(_bc2.p, STATUS_BRACE));
 
     // ---- 4. Take Aim and Muscle Up last as many player actions as the tooltip says (the cast turn's own tick does not count) ----
     var _tk = [[CLASS_ARCHER, SKILL_TAKE_AIM, STATUS_CRIT_UP, 9, "Take Aim"], [CLASS_KNIGHT, SKILL_MUSCLE_UP, STATUS_GUARD, 6, "Muscle Up"]];
@@ -14182,6 +14189,45 @@ function Test_Suite_TextFit() {
             var _r = _cl.rows[_i];
             if (_r.kind == "names") TextFit_Block(_f, "credits names", _r.text, _cl.col_w, _mt.p);
             else if (_r.kind != "gap") TextFit_Line(_f, "credits " + _r.kind, _r.text, _mt.gw - 2 * _mt.margin);
+        }
+        return _f;
+    });
+
+    // ---- the run summary (R-105, note 27): the title, the cause line and the rows at one column and at two, for each result and class, as the draw lays them out ----
+    TextFit_Each("run summary", function(_w, _h, _l) {
+        var _f = [];
+        var _mt = Ui_Metrics();
+        var _p = _mt.p;
+        var _cls = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE, CLASS_NOBODY];
+        var _res = ["died", "abandoned", "won"];
+        var _foe = EnemyDB_Get(ENEMY_FINAL_BOSS).name;
+        var _run = Run_Create(99999999);
+        _run.kills = 9999;
+        _run.stats = { qte_total: 9999, qte_perfect: 9999, crits: 9999, dmg_dealt: 999999, dmg_taken: 999999, fights_won: 999, play_ms: 359999000 };
+        var _titles = RunTitle_All();
+        for (var _t = 0; _t < array_length(_titles); _t++) TextFit_Line(_f, "run summary title", RunTitle_Text(_titles[_t]), _mt.gw - 2 * _mt.margin);
+        for (var _c = 0; _c < array_length(_cls); _c++) {
+            for (var _r = 0; _r < array_length(_res); _r++) {
+                var _ch = CharacterCreate_Player(_cls[_c]);
+                _ch.level = LEVEL_CAP;
+                var _entry = Run_MakeHistoryEntry(_run, _ch, "rm_floor9", _res[_r], (_res[_r] == "died") ? _foe : "");
+                var _rows = RunFlow_SummaryRows(_entry);
+                var _sentence = RunFlow_CauseLine(_entry);
+                var _tag = "run summary (" + _res[_r] + ", class " + string(_cls[_c]) + ")";
+                for (var _cols = 1; _cols <= 2; _cols++) {   // the draw's own choice: one column, two when the one-column panel is too tall
+                    var _pw = (_cols == 1) ? min(_mt.gw - 2 * _mt.margin, round(_mt.gw * 0.62)) : min(_mt.gw - 2 * _mt.margin, round(_mt.gw * 0.9));
+                    var _dh = Ui_DetailsHeight(_pw, _sentence, _rows, _cols);
+                    var _total = _mt.line_h + 3 * _p + _dh + 3 * _p + _mt.line_h;
+                    var _inner = _pw - 8 * _p;
+                    var _col_w = (_inner - (_cols - 1) * 3 * _p) / _cols;
+                    TextFit_Block(_f, _tag + " cause line (" + string(_cols) + " col)", _sentence, _inner, _p);
+                    for (var _i = 0; _i < array_length(_rows); _i++) {
+                        TextFit_Line(_f, _tag + " value of '" + string(_rows[_i].label) + "' (" + string(_cols) + " col)", _rows[_i].value, _col_w + 2 * _p);
+                        if (UI_TextWidth(_rows[_i].label) > _col_w) TextFit_Block(_f, _tag + " label (" + string(_cols) + " col)", _rows[_i].label, _col_w, _p);
+                    }
+                    if (_cols == 2 && _total > _mt.gh - 2 * _mt.margin) array_push(_f, _tag + " two columns need " + string(_total) + " of " + string(_mt.gh - 2 * _mt.margin));
+                }
+            }
         }
         return _f;
     });
@@ -16664,4 +16710,292 @@ function Test_R3s2Buttons() {
     Test_Eq("saves2 buttons: the right and bottom edges are outside", Title_ButtonHit(_c, 70, 110) + Title_ButtonHit(_c, 20, 130), "");
     var _z = { title_btn: { profile: { x: 0, y: 0, w: 0, h: 0 }, codex: { x: 0, y: 0, w: 0, h: 0 } } };
     Test_Eq("saves2 buttons: a button that was not drawn is not hit", Title_ButtonHit(_z, 0, 0), "");
+}
+
+// ---- R3 guardsmall item 1 (D180, R-102): Guard halves ALL damage until the player's next turn starts, and gives back 25% of max MP (at least 2, capped). ----
+// Expected values come from the owner's decision: 25% of max MP rounded down, minimum 2, never above max MP; max MP per class and level from the class vectors above.
+
+// One Guard through the real turn order: the Guard turn, then the enemy's turn (two hits in it when _hits), up to the player's next turn. Returns what happened.
+function Test_R3GuardSequence(_hits, _src, _plain) {
+    var _slime = EnemyCreate(ENEMY_SLIME);
+    var _bp = CharacterCreate_Player(CLASS_KNIGHT);
+    _bp.max_hp = 999; _bp.hp = 999;   // the hits must not end the fight
+    var _bc = Test_Hunt1Bc(_bp, EnemyCreate(ENEMY_SLIME));
+    _bc.p = Battle_GuardApply(_bc.p);
+    Battle_PlayerFinalizeTurn(_bc, _bc.p, _bc.e);   // the Guard turn
+    var _r = { enemy_turns: 0, braced_all_enemy: true, halved: true, gone_at_player: false, who: _bc.tl_who };
+    for (var _k = 0; _k < 8; _k++) {
+        if (_bc.tl_who == TL_ENEMY) {
+            if (!Status_Has(_bc.p, STATUS_BRACE)) _r.braced_all_enemy = false;
+            if (_hits) {
+                var _a = Combat_ApplyDamage(_slime, _bc.p, _src, 1, 1, { is_skill: false });
+                var _b = Combat_ApplyDamage(_slime, _a.defender, _src, 1, 1, { is_skill: false });
+                if (abs(_a.dmg - _plain * 0.5) > 1 || _b.dmg != _a.dmg) _r.halved = false;
+            }
+            _bc.enemy_actions_remaining = 0;
+            Battle_EnemyFinalizeTurnState(_bc, _bc.p, _bc.e);
+            _r.enemy_turns++;
+        } else if (_r.enemy_turns > 0) {
+            _r.gone_at_player = !Status_Has(_bc.p, STATUS_BRACE);
+            break;
+        } else {
+            Battle_PlayerFinalizeTurn(_bc, _bc.p, _bc.e);   // a faster player acts again before the enemy: the Brace waits for the enemy
+        }
+    }
+    _r.who = _bc.tl_who;
+    return _r;
+}
+
+function Test_Suite_R3Guard() {
+    var _slime = EnemyCreate(ENEMY_SLIME);
+    var _src = { power: 30, stat_type: STAT_ATK };
+    var _plain = Combat_ApplyDamage(_slime, CharacterCreate_Player(CLASS_KNIGHT), _src, 1, 1, { is_skill: false }).dmg;
+    Test_True("r3guard: (setup) an unguarded hit is big enough to halve (" + string(_plain) + ")", _plain >= 8);
+
+    // two hits in one enemy turn (a chain) or in two enemy turns: both halved, the Brace is not used up by the first
+    var _g = Battle_GuardApply(CharacterCreate_Player(CLASS_KNIGHT));
+    var _h1 = Combat_ApplyDamage(_slime, _g, _src, 1, 1, { is_skill: false });
+    Test_True("r3guard: the first hit is halved (" + string(_plain) + " -> " + string(_h1.dmg) + ")", abs(_h1.dmg - _plain * 0.5) <= 1);
+    Test_True("r3guard: the Brace is still up after the first hit", Status_Has(_h1.defender, STATUS_BRACE));
+    var _h2 = Combat_ApplyDamage(_slime, _h1.defender, _src, 1, 1, { is_skill: false });
+    Test_Eq("r3guard: the second hit is halved the same", _h2.dmg, _h1.dmg);
+    Test_True("r3guard: the Brace is still up after the second hit", Status_Has(_h2.defender, STATUS_BRACE));
+    Test_True("r3guard: the damage preview shows the halved number", Combat_HitDamage(_slime, _g, _src) < _plain);
+
+    // MP back: 25% of max MP, rounded down, minimum 2; max MP Knight 11 / 13, Archer 12 / 16, Mage 16 / 23, Nobody 11 / 14 at levels 1 / 3
+    var _cls = [[CLASS_KNIGHT, "Knight"], [CLASS_ARCHER, "Archer"], [CLASS_MAGE, "Mage"], [CLASS_NOBODY, "Nobody"]];
+    var _want = [[2, 3], [3, 4], [4, 5], [2, 3]];
+    var _maxmp = [[11, 13], [12, 16], [16, 23], [11, 14]];
+    for (var _c = 0; _c < 4; _c++) {
+        for (var _lv = 0; _lv < 2; _lv++) {
+            var _pl = CharacterCreate_Player(_cls[_c][0]);
+            if (_lv == 1) { _pl = LevelUp_ApplyLevel(_pl); _pl = LevelUp_ApplyLevel(_pl); }
+            var _tag = "r3guard: " + _cls[_c][1] + " level " + string(_lv * 2 + 1);
+            Test_Eq(_tag + " (setup) max MP", _pl.max_mp, _maxmp[_c][_lv]);
+            _pl.mp = 0;
+            Test_Eq(_tag + " gets 25% of max MP (min 2) back from empty", Battle_GuardApply(_pl).mp, _want[_c][_lv]);
+        }
+    }
+    var _lo = CharacterCreate_Player(CLASS_KNIGHT);
+    _lo.max_mp = 6; _lo.mp = 0;
+    Test_Eq("r3guard: a small MP pool still gets 2 back (25% of 6 rounds down to 1)", Battle_GuardApply(_lo).mp, 2);
+    var _cap = CharacterCreate_Player(CLASS_MAGE);
+    _cap.mp = _cap.max_mp - 1;
+    Test_Eq("r3guard: the MP never goes above max MP", Battle_GuardApply(_cap).mp, _cap.max_mp);
+    var _full = CharacterCreate_Player(CLASS_ARCHER);
+    Test_Eq("r3guard: full MP stays full", Battle_GuardApply(_full).mp, _full.max_mp);
+
+    // it still stacks with the defence bar: the bar takes its share off the already halved hit
+    var _half = Combat_ApplyDamage(_slime, Battle_GuardApply(CharacterCreate_Player(CLASS_KNIGHT)), _src, 1, 1, { is_skill: false }).dmg;
+    Test_True("r3guard: a Good block (half through) of the halved hit is about a quarter of the plain hit (" + string(_plain) + " -> " + string(Qte_DefenceDamage(_half, QTE_GOOD)) + ")", abs(Qte_DefenceDamage(_half, QTE_GOOD) - _plain * 0.25) <= 1.5);
+
+    // the Brace ends when the player's next turn starts (after the enemy has acted): follow the real turn order
+    var _s1 = Test_R3GuardSequence(true, _src, _plain);
+    Test_True("r3guard: the enemy got a turn in the sequence", _s1.enemy_turns >= 1);
+    Test_True("r3guard: the player was Braced for the enemy's whole turn", _s1.braced_all_enemy);
+    Test_True("r3guard: both of its hits in that turn were halved", _s1.halved);
+    Test_True("r3guard: and the Brace is gone as the player's next turn starts", _s1.gone_at_player && _s1.who == TL_PLAYER);
+    var _s2 = Test_R3GuardSequence(false, _src, _plain);   // an enemy turn without a hit (a wind-up): the Brace still ends with it
+    Test_True("r3guard: a turn with no hit: the player was Braced throughout it", _s2.enemy_turns >= 1 && _s2.braced_all_enemy);
+    Test_True("r3guard: a turn with no hit: the Brace is gone as the player's next turn starts", _s2.gone_at_player && _s2.who == TL_PLAYER);
+}
+
+// ---- R3 guardsmall item 2 (R-103, owner note 17): a one-time reaction (the wolf's, the slime's) reaches the PROFILE the moment it is shown, so the game being killed or quit before the
+// next autosave cannot replay it; an event the profile has seen never queues, whatever the run's flags say. ----
+function Test_Suite_R3Wolf() { Test_ProfRun("tpw_", Test_R3WolfRun); }
+
+function Test_R3VictoryHasSlimeLine(_lines) {
+    var _want = Loc_T("combat.msg.floor1_reaction.0", "That thing was alive. And I nearly wasn't.");
+    for (var _i = 0; _i < array_length(_lines); _i++) if (is_string(_lines[_i]) && _lines[_i] == _want) return true;
+    return false;
+}
+
+function Test_R3WolfRun(_prefix) {
+    var _gs = GameState_Get();
+    var _old_flags = _gs.flags;
+    var _had_battle = variable_struct_exists(_gs, "battle") && is_struct(_gs.battle);
+    var _old_id = (_had_battle && variable_struct_exists(_gs.battle, "enemy_id")) ? _gs.battle.enemy_id : -1;
+    var _old_room = (_had_battle && variable_struct_exists(_gs.battle, "enemy_room")) ? _gs.battle.enemy_room : -1;
+    _gs.flags = {};
+    var _id = "floor2_dire_wolf_reaction";
+    var _key = "flag:" + Dialogue_NarrativeDoneFlagKey(_id);
+
+    // the wolf: killed, queued, shown (marked done)
+    Test_True("r3wolf: killing the Dire Wolf on floor 2 queues its reaction the first time", Dialogue_NarrativeOnEnemyDefeated(ENEMY_DIREWOLF, rm_floor2));
+    Dialogue_NarrativeMarkDone(_id);
+    Test_True("r3wolf: marking it done marks the profile's story key at once", Story_Seen(_key));
+    // the game being killed: the process dies before the 10 s autosave: the profile comes back from disk, the run is rebuilt from the last save (without the flag)
+    Test_ProfRelaunch();
+    _gs.flags = {};
+    Test_True("r3wolf: the profile file has it after the game was killed", Story_Seen(_key));
+    Test_True("r3wolf: so the event reads as done", Dialogue_NarrativeIsDone(_id));
+    Test_False("r3wolf: killing the wolf again does not queue the reaction", Dialogue_NarrativeOnEnemyDefeated(ENEMY_DIREWOLF, rm_floor2));
+    Test_False("r3wolf: and nothing is pending", Dialogue_NarrativeIsPending(_id));
+
+    // another event goes the same way (the Stranger's), and one nobody has seen is untouched
+    Dialogue_NarrativeMarkDone("first_stranger_encounter_reaction");
+    Test_ProfRelaunch();
+    _gs.flags = {};
+    Test_False("r3wolf: the Stranger's reaction does not queue again after the game was killed either", Dialogue_NarrativeOnStrangerEncounterResolved());
+    Test_True("r3wolf: an event nobody has seen still queues", Dialogue_NarrativeOnLevelUp(1));
+
+    // the slime's one-time lines after the first fight
+    Profile_ResetForTest();
+    _gs.flags = {};
+    if (!_had_battle) _gs.battle = {};
+    _gs.battle.enemy_id = ENEMY_SLIME;
+    _gs.battle.enemy_room = rm_floor1;
+    var _foe = EnemyCreate(ENEMY_SLIME);
+    var _hero = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_True("r3wolf: the first slime kill says its line", Test_R3VictoryHasSlimeLine(Battle_BuildVictoryDialogueLines(_foe, {}, _hero)));
+    Test_True("r3wolf: and marks the profile at once", Story_Seen("flag:floor1_slime_kill_reaction_done"));
+    Test_ProfRelaunch();
+    _gs.flags = {};
+    Test_False("r3wolf: after the game was killed the slime line does not come back", Test_R3VictoryHasSlimeLine(Battle_BuildVictoryDialogueLines(_foe, {}, _hero)));
+
+    _gs.flags = _old_flags;
+    if (_had_battle) { _gs.battle.enemy_id = _old_id; _gs.battle.enemy_room = _old_room; } else variable_struct_remove(_gs, "battle");
+}
+
+// ---- R3 guardsmall item 3 (R-104, owner note 20): a shop row the player cannot carry (full throwables, gear already owned) is dimmed and its details say why; buying is still refused and keeps the gold. ----
+function Test_Suite_R3Shop() {
+    var _gs = GameState_Get();
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    _gs.run = Run_Create(4711);
+    _gs.run.gold = 200;
+    var _full_txt = Loc_T("shop.reason.full", "Bag full for this item");
+    var _owned_txt = Loc_T("shop.reason.owned", "Already owned");
+
+    // full throwables: the Firebomb (30) row
+    var _kn = CharacterCreate_Player(CLASS_KNIGHT);
+    _kn.inventory = Inv_Add(_kn.inventory, 30, Throw_Cap(_kn));
+    var _row = { kind: "item", id: 30, qty: 2, price: 27 };
+    var _r1 = ShopUi_ItemFor(_row, _kn, 200);
+    Test_True("r3shop: a Firebomb row is dim when the throwable cap is reached (with gold to spare)", _r1.dim);
+    Test_False("r3shop: and cannot be bought", _r1.can_buy);
+    Test_True("r3shop: the row can still be looked at", _r1.enabled);
+    Test_True("r3shop: the details say 'Bag full for this item'", string_pos(_full_txt, _r1.help) > 0);
+    var _gold0 = _gs.run.gold;
+    var _buy = Shop_Buy(_kn, _gs.run, _row);
+    Test_False("r3shop: buying is still refused", _buy.ok);
+    Test_Eq("r3shop: with the reason 'full'", _buy.reason, "full");
+    Test_Eq("r3shop: the gold is unchanged", _gs.run.gold, _gold0);
+    Test_Eq("r3shop: the stock is unchanged", _row.qty, 2);
+
+    // room for one more: the same row is a normal buyable row, with no reason
+    var _kn2 = CharacterCreate_Player(CLASS_KNIGHT);
+    _kn2.inventory = Inv_Add(_kn2.inventory, 30, Throw_Cap(_kn2) - 1);
+    var _r2 = ShopUi_ItemFor({ kind: "item", id: 30, qty: 2, price: 27 }, _kn2, 200);
+    Test_True("r3shop: with room for one more the row is buyable", _r2.can_buy && !_r2.dim);
+    Test_True("r3shop: and shows no reason", string_pos(_full_txt, _r2.help) == 0 && string_pos(_owned_txt, _r2.help) == 0);
+
+    // gear already owned (worn or in the bag)
+    var _kn3 = CharacterCreate_Player(CLASS_KNIGHT);
+    _kn3.inventory = Inv_Add(_kn3.inventory, 1, 1);
+    Equip_Item(_kn3, 1);
+    var _r3 = ShopUi_ItemFor({ kind: "item", id: 1, qty: 1, price: 30 }, _kn3, 200);
+    Test_True("r3shop: a weapon the player already has is dim and cannot be bought", _r3.dim && !_r3.can_buy);
+    Test_True("r3shop: the details say 'Already owned'", string_pos(_owned_txt, _r3.help) > 0);
+    Test_False("r3shop: buying it is refused", Shop_Buy(_kn3, _gs.run, { kind: "item", id: 1, qty: 1, price: 30 }).ok);
+    var _r4 = ShopUi_ItemFor({ kind: "item", id: 2, qty: 1, price: 30 }, _kn3, 200);
+    Test_True("r3shop: a different weapon is buyable", _r4.can_buy && !_r4.dim && string_pos(_owned_txt, _r4.help) == 0);
+
+    // the old dims stay: no gold, and sold out, with no bag reason
+    var _r5 = ShopUi_ItemFor({ kind: "item", id: 10, qty: 3, price: 12 }, CharacterCreate_Player(CLASS_KNIGHT), 5);
+    Test_True("r3shop: too little gold still dims a row, with no bag reason", _r5.dim && !_r5.can_buy && string_pos(_full_txt, _r5.help) == 0 && string_pos(_owned_txt, _r5.help) == 0);
+    var _r6 = ShopUi_ItemFor({ kind: "item", id: 30, qty: 0, price: 27 }, _kn, 200);
+    Test_True("r3shop: a sold-out row is dim and says Sold Out, not the bag reason", _r6.dim && _r6.value == Loc_T("shop.sold_out", "Sold Out") && string_pos(_full_txt, _r6.help) == 0);
+
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+// ---- R3 guardsmall item 4 (D183, R-105, owner note 26): the run-end title varies by death tier, with its own titles for a win and for an abandoned run, and is never the same twice in a row for a profile. ----
+function Test_Suite_R3Title() { Test_ProfRun("tpt_", Test_R3TitleRun); }
+
+function Test_R3TitleKeys(_pool) {
+    var _k = [];
+    for (var _i = 0; _i < array_length(_pool); _i++) array_push(_k, _pool[_i].key);
+    return _k;
+}
+
+function Test_ArrHasStr(_arr, _s) {
+    for (var _i = 0; _i < array_length(_arr); _i++) if (_arr[_i] == _s) return true;
+    return false;
+}
+
+function Test_R3TitleRun(_prefix) {
+    var _tiers = [1, 2, 4, 7, 11];   // a death count in each tier (1st, 2nd-3rd, 4th-6th, 7th-10th, 11th on)
+    var _all_keys = {};
+    var _lines_ok = true;
+    for (var _t = 0; _t < array_length(_tiers); _t++) {
+        var _pool = RunTitle_Pool("died", _tiers[_t]);
+        Test_True("r3title: death " + string(_tiers[_t]) + " has at least 3 titles to pick from (" + string(array_length(_pool)) + ")", array_length(_pool) >= 3);
+        var _keys = Test_R3TitleKeys(_pool);
+        for (var _k = 0; _k < array_length(_keys); _k++) {
+            if (variable_struct_exists(_all_keys, _keys[_k])) _lines_ok = false;   // a title belongs to one tier only
+            variable_struct_set(_all_keys, _keys[_k], true);
+        }
+    }
+    Test_True("r3title: the five death tiers share no title", _lines_ok);
+    var _win = Test_R3TitleKeys(RunTitle_Pool("won", 5));
+    var _ab = Test_R3TitleKeys(RunTitle_Pool("abandoned", 5));
+    Test_True("r3title: a win has at least 2 titles of its own", array_length(_win) >= 2);
+    Test_True("r3title: an abandoned run has at least 2 titles of its own", array_length(_ab) >= 2);
+    var _shared = false;
+    for (var _w = 0; _w < array_length(_win); _w++) if (variable_struct_exists(_all_keys, _win[_w]) || Test_ArrHasStr(_ab, _win[_w])) _shared = true;
+    for (var _a = 0; _a < array_length(_ab); _a++) if (variable_struct_exists(_all_keys, _ab[_a])) _shared = true;
+    Test_False("r3title: the win and abandoned titles are not death titles, nor each other's", _shared);
+
+    // never the last title again, whatever the salt
+    var _again = false;
+    var _results = ["died", "abandoned", "won"];
+    for (var _r = 0; _r < 3; _r++) {
+        var _pl = RunTitle_Pool(_results[_r], 5);
+        if (array_length(_pl) < 2) _again = true;   // with one title there is no other to pick
+        for (var _l = 0; _l < array_length(_pl); _l++) {
+            for (var _salt = 0; _salt < 12; _salt++) if (RunTitle_Pick(_results[_r], 5, _pl[_l].key, _salt).key == _pl[_l].key) _again = true;
+        }
+    }
+    Test_False("r3title: a pick is never the title shown last", _again);
+    var _seen = {};
+    for (var _salt2 = 0; _salt2 < 12; _salt2++) variable_struct_set(_seen, RunTitle_Pick("died", 2, "", _salt2).key, true);
+    Test_True("r3title: across salts every title of a tier comes up", array_length(variable_struct_get_names(_seen)) == array_length(RunTitle_Pool("died", 2)) && array_length(RunTitle_Pool("died", 2)) >= 3);
+
+    // the real choice, through the profile: twelve deaths in a row, the same tier several times
+    var _prof = Profile_Get();
+    var _prev = "";
+    var _same = 0;
+    var _stored = true;
+    for (var _d = 1; _d <= 12; _d++) {
+        _prof.deaths = _d;
+        var _pick = RunTitle_Choose({ result: "died", seed: 1000 + _d });
+        if (_pick.key == _prev) _same++;
+        if (!variable_struct_exists(Profile_Get(), "last_title") || Profile_Get().last_title != _pick.key) _stored = false;
+        _prev = _pick.key;
+    }
+    Test_Eq("r3title: twelve deaths in a row never show the same title twice running", _same, 0);
+    Test_True("r3title: the profile keeps the key of the title it showed last", _stored);
+    Profile_Flush();
+    Test_ProfRelaunch();
+    Test_True("r3title: ... also after a relaunch (it is in the profile file)", variable_struct_exists(Profile_Get(), "last_title") && Profile_Get().last_title == _prev);
+    var _p2 = Profile_Get();
+    _p2.deaths = 5;
+    var _same2 = 0;
+    var _prev2 = _prev;
+    for (var _n = 0; _n < 8; _n++) {   // eight run ends in the same tier with the same seed, one after another
+        var _pk = RunTitle_Choose({ result: "died", seed: 7 });
+        if (_pk.key == _prev2) _same2++;
+        _prev2 = _pk.key;
+    }
+    Test_Eq("r3title: the same tier and the same seed still never repeat", _same2, 0);
+
+    // a win and an abandoned run show their own titles
+    var _tw = RunTitle_Choose({ result: "won", seed: 3 });
+    Test_True("r3title: a won run shows a win title", Test_ArrHasStr(_win, _tw.key));
+    var _tw2 = RunTitle_Choose({ result: "won", seed: 3 });
+    Test_True("r3title: and a second win shows another", _tw2.key != _tw.key && Test_ArrHasStr(_win, _tw2.key));
+    var _ta = RunTitle_Choose({ result: "abandoned", seed: 3 });
+    Test_True("r3title: an abandoned run shows an abandoned-run title", Test_ArrHasStr(_ab, _ta.key));
+    Test_True("r3title: the text is a real sentence in the language of the moment", string_length(RunTitle_Text(_ta)) > 3);
 }

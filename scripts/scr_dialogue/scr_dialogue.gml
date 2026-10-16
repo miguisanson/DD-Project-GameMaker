@@ -349,8 +349,8 @@ function Dialogue_NarrativeEnsureFlags() {
 function Dialogue_NarrativeIsDone(_event_id) {
     var flags = Dialogue_NarrativeEnsureFlags();
     var key = Dialogue_NarrativeDoneFlagKey(_event_id);
-    if (!variable_struct_exists(flags, key)) return false;
-    return variable_struct_get(flags, key);
+    if (variable_struct_exists(flags, key) && variable_struct_get(flags, key) == true) return true;
+    return Story_FlagSeen(key);   // R-103: the profile may have it when the run's flags do not (the run was rebuilt from an older save)
 }
 
 function Dialogue_NarrativeIsPending(_event_id) {
@@ -367,8 +367,8 @@ function Dialogue_NarrativeSetPending(_event_id, _pending) {
 
 function Dialogue_NarrativeMarkDone(_event_id) {
     var flags = Dialogue_NarrativeEnsureFlags();
-    variable_struct_set(flags, Dialogue_NarrativeDoneFlagKey(_event_id), true);
     variable_struct_set(flags, Dialogue_NarrativePendingFlagKey(_event_id), false);
+    Story_MarkFlag(Dialogue_NarrativeDoneFlagKey(_event_id));   // R-103: the run flag and the profile's story key, flushed now
 }
 
 function Dialogue_NarrativeQueueOnce(_event_id) {
@@ -1565,6 +1565,88 @@ function DeathLine_Pick(_deaths, _killer, _salt) {
 function DeathLine_Format(_pick, _killer_name) {
     var nm = (_killer_name != "") ? _killer_name : Loc_T("death.killer.unknown_name", "Something");
     return Loc_T(_pick.key, _pick.text, { killer: nm });
+}
+
+// ---- the run-end title (D183, R-105): the title over the run summary ----
+// A death's title follows the same tiers as its death line (DeathLine_Tier: 1st / 2nd-3rd / 4th-6th / 7th-10th / 11th on, same tone), three short titles each; a win and an
+// abandoned run have their own. RunTitle_Pool(_result, _deaths) the titles that may show for a run that ended with _result ("died", "abandoned", "won") when the profile has
+// _deaths deaths; RunTitle_Pick(_result, _deaths, _last_key, _salt) one of them, never _last_key while the pool has another (the profile keeps the last key, RunTitle_Choose);
+// RunTitle_All() every title { key, text }; RunTitle_Text(_pick) the one in the language of the moment. No title may hint at what is outside (D104).
+function RunTitle_Defs() {
+    if (variable_global_exists("run_title_defs") && is_struct(global.run_title_defs)) return global.run_title_defs;
+    global.run_title_defs = {
+        tiers: [
+            [   // 1st death
+                { key: "runflow.title", text: "The tunnel keeps you." },
+                { key: "runflow.title.t1.1", text: "The dark closes over you." },
+                { key: "runflow.title.t1.2", text: "Is this the end?" }
+            ],
+            [   // 2nd-3rd
+                { key: "runflow.title.t2.0", text: "Not the end." },
+                { key: "runflow.title.t2.1", text: "It begins again." },
+                { key: "runflow.title.t2.2", text: "Back so soon." }
+            ],
+            [   // 4th-6th
+                { key: "runflow.title.t3.0", text: "You know the way." },
+                { key: "runflow.title.t3.1", text: "The same fall." },
+                { key: "runflow.title.t3.2", text: "Down, once more." }
+            ],
+            [   // 7th-10th
+                { key: "runflow.title.t4.0", text: "Nothing new." },
+                { key: "runflow.title.t4.1", text: "Quiet again." },
+                { key: "runflow.title.t4.2", text: "No one came." }
+            ],
+            [   // 11th on
+                { key: "runflow.title.t5.0", text: "Home again." },
+                { key: "runflow.title.t5.1", text: "As expected." },
+                { key: "runflow.title.t5.2", text: "You stay." }
+            ]
+        ],
+        won: [
+            { key: "runflow.title.won.0", text: "The choir falls silent." },
+            { key: "runflow.title.won.1", text: "The tunnel lets go." },
+            { key: "runflow.title.won.2", text: "The way is open." }
+        ],
+        abandoned: [
+            { key: "runflow.title.abandoned.0", text: "You let go." },
+            { key: "runflow.title.abandoned.1", text: "The tunnel waits." },
+            { key: "runflow.title.abandoned.2", text: "You turned back." }
+        ]
+    };
+    return global.run_title_defs;
+}
+
+function RunTitle_All() {
+    var defs = RunTitle_Defs();
+    var out = [];
+    for (var t = 0; t < array_length(defs.tiers); t++) {
+        for (var i = 0; i < array_length(defs.tiers[t]); i++) array_push(out, defs.tiers[t][i]);
+    }
+    for (var w = 0; w < array_length(defs.won); w++) array_push(out, defs.won[w]);
+    for (var a = 0; a < array_length(defs.abandoned); a++) array_push(out, defs.abandoned[a]);
+    return out;
+}
+
+function RunTitle_Pool(_result, _deaths) {
+    var defs = RunTitle_Defs();
+    if (_result == "won") return defs.won;
+    if (_result == "abandoned") return defs.abandoned;
+    return defs.tiers[DeathLine_Tier(_deaths) - 1];
+}
+
+// One title of the pool (rotated by _salt), leaving out _last_key (the one the profile showed last) while another is left.
+function RunTitle_Pick(_result, _deaths, _last_key, _salt) {
+    var pool = RunTitle_Pool(_result, _deaths);
+    var left = [];
+    for (var i = 0; i < array_length(pool); i++) {
+        if (pool[i].key != _last_key) array_push(left, pool[i]);
+    }
+    if (array_length(left) <= 0) left = pool;
+    return left[abs(floor(_salt)) mod array_length(left)];
+}
+
+function RunTitle_Text(_pick) {
+    return Loc_T(_pick.key, _pick.text);
 }
 
 // How long the line stays up: 2 s at least, 4 s at most, longer for longer lines (D103).

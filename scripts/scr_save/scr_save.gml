@@ -516,6 +516,7 @@ function Profile_Default() {
         best_floor: 0,
         legacy_notice_seen: false,
         name: "",                              // D175: a copy of the profile's name in the index (the index is authoritative); "" until a flush
+        last_title: "",                        // D183: the text key of the run summary's title shown last, so the next one differs ("" = none yet; an older file reads as none)
         settings_file: Save_SettingsPath()     // settings stay in their own file
     };
 }
@@ -583,6 +584,7 @@ function Profile_Normalize(_raw) {
     }
     if (variable_struct_exists(_raw, "legacy_notice_seen")) p.legacy_notice_seen = (Save_ToReal(_raw.legacy_notice_seen, 0) != 0);
     if (variable_struct_exists(_raw, "name") && is_string(_raw.name)) p.name = _raw.name;
+    if (variable_struct_exists(_raw, "last_title") && is_string(_raw.last_title)) p.last_title = _raw.last_title;
     return p;
 }
 
@@ -757,6 +759,20 @@ function Story_IsFlagKey(_name) {
     if (_name == "skillbook_first_read_done") return true;
     if (string_pos("narrative_event_done_", _name) == 1) return true;
     return false;
+}
+
+// R-103: a one-time reaction that lives as a run flag has just been shown. Set the run flag AND the profile's story key, and flush the profile at once
+// (like Story_Mark for a trigger): the 10 s autosave, a run end or a clean close would be too late if the game is killed before them.
+function Story_MarkFlag(_name) {
+    var gs = GameState_Get();
+    if (!variable_struct_exists(gs, "flags") || !is_struct(gs.flags)) gs.flags = {};
+    variable_struct_set(gs.flags, _name, true);
+    Story_Mark("flag:" + _name);
+}
+
+// Has this profile seen the one-time reaction (whatever the run's flags say)?
+function Story_FlagSeen(_name) {
+    return Story_Seen("flag:" + _name);
 }
 
 function Story_CopyFlagsToProfile(_p, _flags) {
