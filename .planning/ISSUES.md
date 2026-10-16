@@ -155,6 +155,9 @@ Found by audits and reviews (no person's words):
 | I-107 | owner playtest round 4 note 2 (8d176ba): battle Skill list shows one row under the details panel; cannot tell there are more skills or that the list scrolls | UI | P1 | 8d176ba-20261017 | Archer L1 battle, open Skill | the list shows how many skills there are and that it scrolls (at least 2 rows visible where possible, arrows / 'n/m'); the 'Space Choose' hint is not cut at the right edge | open: final fixes |
 | I-108 | owner playtest round 4 note 3 (8d176ba): status chip labels (e.g. THIRST 3) are green; wants plain white like before | UI | P2 | 8d176ba-20261017 | Dire Wolf battle | chip label text white (UI text colour), the last-turn blink still readable | open: final fixes |
 
+| I-109 | owner playtest round 4 note 4 (8d176ba): level-up growth rows are gold over the whole row; wants only the new (right-most) number gold. Same shot: mouse hover shows DEF's +1 and DEF details while the highlight bar stays on SPD | UI | P2 | 8d176ba-20261017 | level up, hover rows with the mouse | only the new number is gold (label + old number white); mouse hover moves the highlight, the +1 and the details together | open: final fixes |
+| I-110 | owner playtest round 4 note 5 (8d176ba): entering a bush should be super forgiving: a chasing monster stops at once, shows ?, stands a few seconds, then patrols | DESIGN (owner-directed) | P1 | 8d176ba-20261017 | get chased, walk into a bush | stepping into a bush (moving or still) breaks any chase at once: ? immediately, stand ~2-3 s, then patrol/return home; hiding matters | open: final fixes |
+
 ---
 
-*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-109.*
+*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-111.*

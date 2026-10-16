@@ -54,3 +54,5 @@
 1. (screenshot: typing a profile name, the DEBUG OVERLAY opened) "shift + P still does this, please delete this debug overlay"
 2. (screenshot: battle Skill list shows only "Double Shot" under a big details panel) "choosing between skills i cant tell if there are multiple skills i have or i can cycle through them can you make it a bit more obvious during the skill screen in battle"
 3. (screenshot: Dire Wolf chip label "THIRST 3" in green) "I also liked the buffs text before just make it plain white. not green"
+4. (screenshot: level-up screen, growth rows fully gold) "just color gold the right most number or the "new number" not the whole row" (same shot: mouse over DEF shows DEF's "+1" and DEF details while the highlight bar stays on SPD)
+5. "also make it so that when you enter bushes its super forgiving and monsater stop chasing you and and immeditely does a ? and start patroling after a few seconds (make him stand a bit then move) so that hiding actually matters too"
