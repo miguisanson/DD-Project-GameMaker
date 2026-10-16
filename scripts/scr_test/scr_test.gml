@@ -13348,6 +13348,26 @@ function Test_Suite_Review6() {
         Test_Eq("review6 " + _w + ": it is the moment before the encounter (the gold then)", is_struct(_cl.run) ? _cl.run.gold : -1, 5);
         Save_DeleteFileSet(_cf);
     }
+    // the fade back to the map is part of "before the map is back": a close there writes the snapshot too (it is complete text, the fade does not matter to it)
+    _gs.run = Run_Create(6300);
+    _gs.run.gold = 5;
+    var _m4 = CharacterCreate_Player(CLASS_MAGE);
+    _m4.hp = 7;
+    _gs.player_ch = _m4;
+    _gs.flags = {};
+    _gs.checkpoint = { room: rm_floor2, x: 48, y: 64 };
+    _gs.persist = {};
+    global.encounter_snapshot = undefined;
+    EnemyPersist_SnapshotRun();
+    EnemyPersist_ResolveBattle(true);
+    Transition_Init();
+    var _tx_was = _gs.transition_fx.active;
+    _gs.transition_fx.active = true;
+    var _fade_ok = Run_SaveOnClose(true, rm_battle, _cf);
+    _gs.transition_fx.active = _tx_was;
+    Test_True("review6 fade: closing during the fade back to the map writes the pre-fight run", _fade_ok);
+    Test_Eq("review6 fade: it reads back ok", RunSave_LoadFrom(_cf).status, "ok");
+    Save_DeleteFileSet(_cf);
     _gs.battle.enemy_persist_id = _old_pid;
     _gs.battle.enemy_id = _old_eid;
     _gs.battle.enemy_room = _old_room;
