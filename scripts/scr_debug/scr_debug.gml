@@ -15152,7 +15152,7 @@ function Scenario_StepShotsR3Saves2(_s) {
                         Scenario_Check("shots_s2_codex_key_line_inside_the_gui_" + _tag, Scenario_S2Inside(_khr, _mt), json_stringify(_khr));
                         Scenario_Check("shots_s2_codex_key_line_clear_of_the_panels_and_the_build_id_" + _tag, !Test_RectsOverlap(_khr, _ct.rect) && !Test_RectsOverlap(_khr, _ct.det_rect) && !Test_RectsOverlap(_khr, _idr), json_stringify(_khr));
                         Scenario_Check("shots_s2_codex_build_id_clear_of_the_panels_" + _tag, !Test_RectsOverlap(_idr, _ct.rect) && !Test_RectsOverlap(_idr, _ct.det_rect));
-                        if (_scene == "codex_history") Scenario_Check("shots_s2_codex_history_lists_three_runs_" + _tag, array_length(_ct.items) == 3 && _ct.items[0].label == "Archer Lv 9", _ct.items[0].label);
+                        if (_scene == "codex_history") Scenario_Check("shots_s2_codex_history_lists_three_runs_" + _tag, array_length(_ct.items) == 3 && _ct.items[0].label == Loc_T("tab.hist.row", "{cls} Lv {n}", { cls: string(DB_PlayerClass(CLASS_ARCHER).name), n: "9" }), _ct.items[0].label);
                         break;
                     case "name":
                         var _nr = _c.title_name_rects;

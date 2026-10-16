@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T12:18:14Z",
-    "row_count": 1243
+    "generated_at_utc": "2026-10-16T12:24:13Z",
+    "row_count": 1244
   },
   "default_lang": "en",
   "languages": [
@@ -887,6 +887,10 @@
     "class.skill.unknown": {
       "en": "???",
       "ko": "???"
+    },
+    "codex.btn": {
+      "en": "[k:tab_next] Codex",
+      "ko": "[k:tab_next] 도감"
     },
     "combat.foresee.attack": {
       "en": "a plain attack",

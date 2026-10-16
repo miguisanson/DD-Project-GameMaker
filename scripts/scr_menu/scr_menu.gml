@@ -4090,49 +4090,153 @@ function Title_ProfileDeleteYes(_d) {
     Ui_MenuFixCursor(_d.m, Title_ProfileActiveRow(rows));
 }
 
+// ---- D175: the Codex and Run History from the title ----
+// The Codex pages of the ACTIVE profile (Bestiary, Notes, Run History, Unlocks), read-only, with the Tab menu's own rows, pages and layout (TabCodex_Items / TabCodex_Page /
+// TabMenu_FitMenu). A found note does not open its reader here (the reader can answer a note's question, which would write to the profile). Back goes up one level; Back at the
+// list closes the screen. c.title_codex = { stk, t } while it is open.
+function Title_CodexOf(_c) {
+    return (variable_instance_exists(_c, "title_codex") && is_struct(_c.title_codex)) ? _c.title_codex : undefined;
+}
+
+function Title_CodexOpen(_c) {
+    var stk = Ui_StackNew();
+    var m = Ui_MenuNew("title_codex", TabCodex_Items(Profile_Get()), {
+        owner: _c, on_confirm: Title_CodexOnConfirm, on_back: Title_CodexOnBack, data: { tab: "title_codex" },
+        layout: { title: Loc_T("tab.title.codex", "Codex"), anchor: "center", details: true, details_pos: "right", det_art: true, hides_below: true }
+    });
+    Ui_MenuFixCursor(m, m.cursor);
+    Ui_StackPush(stk, m);
+    _c.title_codex = { stk: stk, t: current_time };
+}
+
+function Title_CodexOnConfirm(_m, _i) {
+    Title_CodexPage(_m.owner, _m.items[_i].id);
+}
+
+// Opens one page ("bestiary", "notes", "history", "unlocks") above the list; false when it has no rows (Run History before the first run).
+function Title_CodexPage(_c, _kind) {
+    var cx = Title_CodexOf(_c);
+    if (!is_struct(cx)) return false;
+    var page = TabCodex_Page(_kind, Profile_Get());
+    if (array_length(page.rows) <= 0) return false;
+    var m = TabCodex_MakeMenu(_kind, page);
+    m.owner = _c;
+    Ui_MenuFixCursor(m, m.cursor);
+    Ui_StackPush(cx.stk, m);
+    return true;
+}
+
+function Title_CodexOnBack(_m, _res) {
+    if (_res == "root") Title_CodexClose(_m.owner);
+}
+
+function Title_CodexClose(_c) {
+    _c.title_codex = undefined;
+    _c.title_hint_rect = { x: 0, y: 0, w: 0, h: 0 };
+    if (is_struct(_c.title_stk) && array_length(_c.title_stk.menus) > 0) _c.title_stk.menus[0].lock_ms = current_time;   // the press that closed it must not answer the title
+}
+
+function Title_CodexStep(_c) {
+    var cx = Title_CodexOf(_c);
+    Ui_MenuUpdate(Ui_StackTop(cx.stk), cx.stk);
+}
+
+// The screen: the dimmed picture, the list or page (fitted into the whole body, as the Tab menu fits it), and the keys in the title's framed line at the lower left.
+function Title_CodexDraw(_c) {
+    var cx = Title_CodexOf(_c);
+    var stk = cx.stk;
+    var now = current_time;
+    var a = Ui_AnimT(cx.t, now);
+    var top = Ui_StackTop(stk);
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var row = (array_length(top.items) > 0) ? top.items[clamp(top.cursor, 0, array_length(top.items) - 1)] : undefined;
+    var groups = [];
+    if (is_struct(row) && variable_struct_exists(row, "hint") && row.hint != "") array_push(groups, row.hint);
+    array_push(groups, (Ui_StackDepth(stk) > 1) ? Loc_T("tab.hint.back", "[k:back] Back") : Loc_T("tab.hint.close", "[k:back] Close"));
+    var hp = Title_HintPlanOf(groups);
+    var z = TabMenu_Zones((string_pos("codex_", top.id) == 1) ? top.id : "codex");
+    z.body_y = z.tabs_y;   // no tabs header here: the body starts at the top margin and ends above the key line
+    z.body_h = hp.rect.y - mt.margin - z.body_y;
+    Ui_DimBackdrop(UI_DIM_SCREEN * a);
+    if (is_struct(stk.leaving) && Ui_MenuAlpha(stk.leaving, now) <= 0) stk.leaving = undefined;
+    TabMenu_FitMenu(top, z, 0);
+    Ui_MenuDraw(top, a * Ui_MenuAlpha(top, now));
+    if (is_struct(stk.leaving)) {
+        TabMenu_FitMenu(stk.leaving, z, 0);
+        Ui_MenuDraw(stk.leaving, a * Ui_MenuAlpha(stk.leaving, now));
+    }
+    Title_DrawKeyPlan(hp, a);
+    _c.title_hint_rect = hp.rect;
+    draw_set_alpha(1);
+}
+
+// Which corner button a point is on ("profile", "codex" or ""), from the rectangles the draw keeps in title_btn; the right and bottom edges are outside, a button that was not
+// drawn (width 0) is never hit.
+function Title_ButtonHit(_c, _x, _y) {
+    var names = ["profile", "codex"];
+    for (var i = 0; i < array_length(names); i++) {
+        var r = variable_struct_get(_c.title_btn, names[i]);
+        if (r.w > 0 && _x >= r.x && _x < r.x + r.w && _y >= r.y && _y < r.y + r.h) return names[i];
+    }
+    return "";
+}
+
 // ---- D175: the corner buttons of the title ----
-// Profile: lower left, two lines: its key ("[Q] Profile") and the active profile's name. It is clear of the menu (the name is cut to the room beside it). Clicking it or the key opens
-// the profile screen. The rectangle is kept in _c.title_btn.profile for the mouse and -shots.
+// Two small framed buttons in the lower left corner, one above the other, clear of the menu column (the name is cut to the room beside it) and of the build id in the lower
+// right: Profile (its key "[Q]", the active profile's name under it) and Codex above it (its key "[E]"). A click or the key opens the profile screen / the Codex. The rectangles are
+// kept in _c.title_btn for the mouse and -shots.
 function Title_DrawButtons(_c) {
-    _c.title_btn = { profile: { x: 0, y: 0, w: 0, h: 0 } };
+    _c.title_btn = { profile: { x: 0, y: 0, w: 0, h: 0 }, codex: { x: 0, y: 0, w: 0, h: 0 } };
     var m = _c.title_stk.menus[0];
     var a = Ui_MenuAlpha(m, current_time);
     if (a <= 0 || m.rect.w <= 0) return;
     var mt = Ui_Metrics();
     var p = mt.p;
-    var label = Loc_T("profile.btn", "[k:tab_prev] Profile");
+    var lh = mt.line_h;
+    var mp = Ui_MousePos();
+    var plabel = Loc_T("profile.btn", "[k:tab_prev] Profile");
+    var clabel = Loc_T("codex.btn", "[k:tab_next] Codex");
     var room_w = max(12 * p, m.rect.x - 2 * mt.margin - 8 * p);
     var name = Ui_FitText(Profiles_ActiveName(), room_w);
-    var llay = Prompt_RichLayout(label, 100000);
-    var w = max(llay.line_w[0], UI_TextWidth(name)) + 8 * p;
-    var h = 2 * mt.line_h + p + 8 * p;
-    var bx = mt.margin;
-    var by = mt.gh - mt.margin - h;
-    var mp = Ui_MousePos();
-    var hot = (mp.x >= bx && mp.x < bx + w && mp.y >= by && mp.y < by + h);
-    _c.title_btn = { profile: { x: bx, y: by, w: w, h: h } };
-    Ui_DrawFrame(bx, by, w, h, a, p);
+    var pw = max(Prompt_RichLayout(plabel, 100000).line_w[0], UI_TextWidth(name)) + 8 * p;
+    var ph = 2 * lh + p + 8 * p;
+    var px = mt.margin;
+    var py = mt.gh - mt.margin - ph;
+    var cw = Prompt_RichLayout(clabel, 100000).line_w[0] + 8 * p;
+    var chh = lh + 8 * p;
+    var cx = mt.margin;
+    var cy = py - p * 2 - chh;
+    _c.title_btn = { profile: { x: px, y: py, w: pw, h: ph }, codex: { x: cx, y: cy, w: cw, h: chh } };
+    var hot = Title_ButtonHit(_c, mp.x, mp.y);
     var a0 = draw_get_alpha();
+    Ui_DrawFrame(px, py, pw, ph, a, p);
+    Ui_DrawFrame(cx, cy, cw, chh, a, p);
     draw_set_alpha(a);
-    if (hot) Ui_Box(bx + 2 * p, by + 2 * p, bx + w - 2 * p, by + h - 2 * p, UI_C_DARK);
-    Prompt_RichDraw(bx + 4 * p, by + 4 * p, label, w - 8 * p, UI_C_LIGHT, fa_left, a);
-    Ui_Text(bx + 4 * p, by + 4 * p + mt.line_h + p, name, UI_C_LIGHTEST);
+    if (hot == "profile") Ui_Box(px + 2 * p, py + 2 * p, px + pw - 2 * p, py + ph - 2 * p, UI_C_DARK);
+    if (hot == "codex") Ui_Box(cx + 2 * p, cy + 2 * p, cx + cw - 2 * p, cy + chh - 2 * p, UI_C_DARK);
+    Prompt_RichDraw(px + 4 * p, py + 4 * p, plabel, pw - 8 * p, UI_C_LIGHT, fa_left, a);
+    Ui_Text(px + 4 * p, py + 4 * p + lh + p, name, UI_C_LIGHTEST);
+    Prompt_RichDraw(cx + 4 * p, cy + 4 * p, clabel, cw - 8 * p, UI_C_LIGHT, fa_left, a);
     draw_set_alpha(a0);
 }
 
-// The title's own keys: the profile button's key (Q, the pad's LB) or a click on it. Only on the title menu itself, once it takes input. True when it was used.
+// The title's own keys: the Profile button's key (Q, the pad's LB), the Codex button's key (E, RB) or a click on either button. Only on the title menu itself, once it takes input.
+// True when one was used.
 function Title_ButtonKeys(_c) {
     var m = _c.title_stk.menus[0];
     if (current_time - m.lock_ms < UI_INPUT_LOCK_MS || Ui_MenuAlpha(m, current_time) < 1) return false;
-    var hit = Input_Pressed("tab_prev");
-    if (!hit && mouse_check_button_pressed(mb_left)) {
+    var which = "";
+    if (Input_Pressed("tab_prev")) which = "profile";
+    else if (Input_Pressed("tab_next")) which = "codex";
+    else if (mouse_check_button_pressed(mb_left)) {
         var mp = Ui_MousePos();
-        var r = _c.title_btn.profile;
-        hit = (r.w > 0 && mp.x >= r.x && mp.x < r.x + r.w && mp.y >= r.y && mp.y < r.y + r.h);
+        which = Title_ButtonHit(_c, mp.x, mp.y);
     }
-    if (!hit) return false;
+    if (which == "") return false;
     SFX_PlayUI("ui_confirm");
-    Title_ProfileOpen(_c);
+    if (which == "profile") Title_ProfileOpen(_c);
+    else Title_CodexOpen(_c);
     return true;
 }
 
@@ -4335,6 +4439,10 @@ function Title_Step(_c) {
         Title_NameStep(_c);
         return;
     }
+    if (is_struct(Title_CodexOf(_c))) {   // D175: the Codex of the active profile
+        Title_CodexStep(_c);
+        return;
+    }
     if (_c.title_refresh) Title_Refresh(_c);
     if (Ui_StackDepth(_c.title_stk) == 1 && Title_ButtonKeys(_c)) return;   // D175: the profile button's key, or a click on it
     var top = Ui_StackTop(_c.title_stk);
@@ -4350,6 +4458,8 @@ function Title_Draw(_c) {
         Title_SeedEntryDraw(_c);
     } else if (is_struct(Title_NameOf(_c))) {   // D175: so does the name entry
         Title_NameDraw(_c);
+    } else if (is_struct(Title_CodexOf(_c))) {   // D175: and the Codex
+        Title_CodexDraw(_c);
     } else {
         var pk = (Ui_StackDepth(_c.title_stk) >= 2 && Title_IsPicker(_c.title_stk.menus[1])) ? _c.title_stk.menus[1] : undefined;
         if (is_struct(pk)) {   // D175: a save file picker stands alone over the dimmed picture (the title menu is not drawn under it), clear of its key line
