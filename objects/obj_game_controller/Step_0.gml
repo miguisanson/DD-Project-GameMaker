@@ -1,3 +1,4 @@
+Scenario_Step();   // scr_debug: inert without -smoke / -bot / -shots; runs before Input_PreStep so simulated keys are seen this frame
 Input_PreStep();
 Debug_Update();
 if (!instance_exists(obj_ui_controller)) {
@@ -15,9 +16,9 @@ if (gs.last_room != room) {
         RoomState_Apply(room);
     }
     RoomTransition_Apply();
+    Merchant_EnsureInRoom();   // C3 (D85): the merchant of floors 2, 5 and 8 stands in an existing room
 
     if (variable_struct_exists(gs, "skip_room_save")) gs.skip_room_save = false;
-    global.skipRoomSave = false;
 
     // ensure player exists if no transition pending (e.g. initial room / battle return)
     // Cutscene room must never spawn player visuals.
@@ -30,6 +31,9 @@ if (gs.last_room != room) {
             instance_create_layer(0, 0, "Instances", obj_player);
         }
     }
+
+    Notes_SpawnForRoom();   // C5 (D107): the lore notes of this room (by death count)
+    Run_AutoSave();   // C1 (D46): the run is saved on every room change; coming back from a fight is one too
 }
 
 // Safety: keep cutscene room free of stray player instance to avoid one-frame flash.
@@ -42,6 +46,16 @@ if (room == rm_floor1 && variable_struct_exists(gs, "pending_floor1_intro_dialog
         gs.pending_floor1_intro_dialogue = false;
         SFX_Play("body_falling_wood");
         Dialogue_Start("sys_floor1_intro");
+    }
+}
+
+// C5 (D102): after a death the next run starts at the tunnel entrance with one short wake line.
+if (room == rm_floor1 && variable_struct_exists(gs, "pending_wake_line") && gs.pending_wake_line) {
+    if (instance_exists(obj_player) && !Transition_IsActive() && gs.ui.mode == UI_NONE && array_length(gs.ui.lines) <= 0) {
+        gs.pending_wake_line = false;
+        var wake = WakeLine_Pick(Profile_Get().deaths);
+        Dialogue_StartLines([Loc_T(wake.key, wake.text)]);
+        Dialogue_OnClose(Choice_RunWake);   // D154: the question follows the wake line (once answered, a later line follows it instead)
     }
 }
 
@@ -59,15 +73,24 @@ if (variable_struct_exists(gs, "load_spawn_pending") && gs.load_spawn_pending) {
             if (variable_instance_exists(pl_load, "moving")) pl_load.moving = false;
             if (variable_instance_exists(pl_load, "move_timer")) pl_load.move_timer = 0;
             if (variable_instance_exists(pl_load, "move_dir")) pl_load.move_dir = -1;
+            Player_ArmExitIgnore(pl_load);   // D64: Continue / load put the player on an exit tile: it ignores them until they step off it
+            gs.load_cooldown = true;   // D141: an enemy standing on the spot (Quit in a fight) does not start the fight again at once: see below
         }
         gs.load_spawn_pending = false;
     }
 }
 
-if (variable_struct_exists(gs, "pending_save_success_popup") && gs.pending_save_success_popup) {
-    if (!Transition_IsActive() && gs.ui.mode == UI_NONE) {
-        gs.pending_save_success_popup = false;
-        SaveMenu_OpenMessage("Game saved.", true);
+// D141: after Continue the player has a short battle cooldown that starts when the loading fade is over (the fade would eat it): it is kept full until then.
+if (variable_struct_exists(gs, "load_cooldown") && gs.load_cooldown) {
+    if (room == rm_start || room == rm_battle) {
+        gs.load_cooldown = false;
+    } else if (instance_exists(obj_player)) {
+        var pl_cd = instance_find(obj_player, 0);
+        if (Transition_IsActive()) {
+            if (variable_instance_exists(pl_cd, "battle_cooldown")) pl_cd.battle_cooldown = max(pl_cd.battle_cooldown, BATTLE_COOLDOWN_FRAMES);
+        } else {
+            gs.load_cooldown = false;
+        }
     }
 }
 
@@ -83,6 +106,9 @@ if (room != rm_battle) {
     EndingExitSequence_Update();
     Dialogue_NarrativeTryStartPending();
 }
+
+RunStats_Tick(Presentation_StepMs(delta_time));   // G9 (D137): run time, only while the run is active, in front and not paused
+Run_AutosaveTick();   // C1 (D46): also every few seconds of a quiet moment, so closing the window loses almost nothing
 
 // apply persistence once on initial room load
 if (room != rm_battle && variable_global_exists("room_state_ready") && global.room_state_ready) {

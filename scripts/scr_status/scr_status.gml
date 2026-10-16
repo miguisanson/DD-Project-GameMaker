@@ -115,15 +115,18 @@ function StatusDB_Init() {
     }
     global.status_db = ds_map_create();
 
+    // D78 damage over time. All three coexist (no `excludes`). Numbers: combat-spec.md section 10.
+    // dot_kind drives Status_Add (stacking), Status_Tick (damage and decay) and Status_Describe (text).
     global.status_db[? STATUS_POISON] = {
         id: STATUS_POISON,
         name: "Poison",
         icon_sprite: poison_status,
         icon_subimg: 0,
-        stat_mods: { str:0, agi:0, def:0, intt:-1, luck:0 },
-        tick: { hp_min:-3, hp_max:-2, mp_min:0, mp_max:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:-1 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
-        excludes: [STATUS_BLEED, STATUS_BURN]
+        dot_kind: "poison",   // deals its stacks each turn, then loses one; reapply adds stacks
+        max_stacks: 10
     };
 
     global.status_db[? STATUS_BLEED] = {
@@ -131,10 +134,13 @@ function StatusDB_Init() {
         name: "Bleeding",
         icon_sprite: bleed_status,
         icon_subimg: 0,
-        stat_mods: { str:0, agi:-2, def:0, intt:0, luck:0 },
-        tick: { hp_min:-4, hp_max:-2, mp_min:0, mp_max:0 },
+        stat_mods: { atk:0, def:0, spd:-2, mag:0 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
-        excludes: [STATUS_POISON, STATUS_BURN]
+        dot_kind: "bleed",    // hurts only when the bleeder acts; reapply adds a stack and refreshes the turns
+        max_stacks: 3,
+        duration: 3,
+        damage_per_stack: 2
     };
 
     global.status_db[? STATUS_BURN] = {
@@ -142,10 +148,15 @@ function StatusDB_Init() {
         name: "Burning",
         icon_sprite: burn_status,
         icon_subimg: 0,
-        stat_mods: { str:-1, agi:0, def:0, intt:0, luck:0 },
-        tick: { hp_min:-6, hp_max:-4, mp_min:0, mp_max:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
+        stat_mult: { atk:1, def:0.75, spd:1, mag:1 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
-        excludes: [STATUS_BLEED, STATUS_POISON]
+        dot_kind: "burn",     // a fixed tick (power) for `duration` turns; reapply refreshes, never stacks
+        max_stacks: 1,
+        duration: 2,
+        tick_per_mag: 0.3,
+        tick_min: 2
     };
 
     global.status_db[? STATUS_STUN] = {
@@ -153,28 +164,28 @@ function StatusDB_Init() {
         name: "Stun",
         icon_sprite: stun_status,
         icon_subimg: 0,
-        stat_mods: { str:0, agi:-2, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:-2, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
-        stackable: false,
-        skip_turn: true
+        stackable: false
     };
 
     global.status_db[? STATUS_GUARD] = {
         id: STATUS_GUARD,
         name: "Guard",
         icon_sprite: rock1,
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         guard_mult: 0,
-        consume_on_hit: true
+        consume_on_hit: true,
+        no_tick_on_apply: true   // Muscle Up: the tooltip's turns are the turns it lasts after the cast (the cast turn's own tick does not count)
     };
 
     global.status_db[? STATUS_DMG_UP] = {
         id: STATUS_DMG_UP,
         name: "Rev Up",
         icon_sprite: torch_asset_moving,
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         dmg_mult: 2,
@@ -184,41 +195,47 @@ function StatusDB_Init() {
     global.status_db[? STATUS_EVASION] = {
         id: STATUS_EVASION,
         name: "Evasion",
+        // D80: the next damaging enemy action against the PLAYER is fully dodged (Combat_TryDodge); no effect on an enemy.
         icon_sprite: tall_grass_asset,
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         force_dodge: true,
-        consume_on_defend: true
+        consume_on_defend: true,
+        no_tick_on_apply: true   // put on by the player's own action (a skill or a Smoke Bomb): that action's end-of-turn tick must not use up the first turn
     };
 
     global.status_db[? STATUS_CRIT_UP] = {
         id: STATUS_CRIT_UP,
         name: "Take Aim",
         icon_sprite: skull_2_asset,
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
-        crit_bonus: 25
+        crit_bonus: 25,
+        no_tick_on_apply: true   // Take Aim: the tooltip's turns are the turns it lasts after the cast (the cast turn's own tick does not count)
     };
 
     global.status_db[? STATUS_HIT_UP] = {
         id: STATUS_HIT_UP,
         name: "Foresight",
+        // D79: for `duration` of the player's turns the enemy's next action is revealed and every Perfect zone of his QTEs is x1.5 wider.
         icon_sprite: Status_ResolveIcon("foresight_effect_Sheet", Status_ResolveIcon("take_aim_effect", skull_2_asset)),
         icon_subimg: 0,
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
-        always_hit: true,
-        consume_on_attack: true
+        duration: 3,
+        no_tick_on_apply: true,   // the cast itself is not one of the 3 turns
+        reveals_action: true,
+        perfect_widen: 1.5
     };
 
     global.status_db[? STATUS_MEDITATION] = {
         id: STATUS_MEDITATION,
         name: "Meditation",
         icon_sprite: mp_potion,
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:2, mp_max:4 },
         stackable: false
     };
@@ -226,19 +243,20 @@ function StatusDB_Init() {
     global.status_db[? STATUS_SOLIDIFY] = {
         id: STATUS_SOLIDIFY,
         name: "Solidify",
+        // D80: the Slime takes 75% less from the next hit (a guard_mult, consumed by that hit).
         icon_sprite: Status_ResolveIcon("stun_status", rock1),
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
-        force_dodge: true,
-        consume_on_defend: true
+        guard_mult: 0.25,
+        consume_on_hit: true
     };
 
     global.status_db[? STATUS_BLOODTHIRSTY] = {
         id: STATUS_BLOODTHIRSTY,
         name: "Bloodthirsty",
         icon_sprite: Status_ResolveIcon("bleed_status", torch_asset_moving),
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         guard_mult: 0.65,
@@ -250,7 +268,7 @@ function StatusDB_Init() {
         id: STATUS_BLESSING,
         name: "Blessing",
         icon_sprite: Status_ResolveIcon("burn_status", mp_potion),
-        stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 },
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false,
         guard_mult: 0.8,
@@ -261,9 +279,24 @@ function StatusDB_Init() {
         id: STATUS_SUNDER,
         name: "Sundered",
         icon_sprite: noone,
-        stat_mods: { str:0, agi:0, def:-1, intt:0, luck:0 },
+        stat_mods: { atk:0, def:-1, spd:0, mag:0 },
         tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
         stackable: false
+    };
+
+    global.status_db[? STATUS_BRACE] = {
+        id: STATUS_BRACE,
+        name: "Braced",
+        // D99 / D180: the Guard command. EVERY hit deals half (it is not used up by a hit) until the player's next turn starts (`until_player_turn`):
+        // Status_TickEnemyTurn notes that the enemy has had its turn (`enemy_done`), Status_ExpireAtPlayerTurn removes it as the player's next turn begins.
+        // A fast player acting twice in a row, or an enemy turn that does not hit (a wind-up, a buff), does not wear it off early (hunt 6).
+        icon_sprite: noone,
+        stat_mods: { atk:0, def:0, spd:0, mag:0 },
+        tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 },
+        stackable: false,
+        guard_mult: 0.5,
+        duration: 1,
+        until_player_turn: true
     };
 
     Status_AssignCoreIcons();
@@ -281,7 +314,7 @@ function StatusDB_Get(_status_id) {
     if (ds_map_exists(global.status_db, _status_id)) {
         return Status_LocalizeRuntime(global.status_db[? _status_id], _status_id);
     }
-    return { id: -1, name: Loc_T("status.name.unknown", "Unknown"), icon_sprite: noone, stat_mods: { str:0, agi:0, def:0, intt:0, luck:0 }, tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 }, stackable: false };
+    return { id: -1, name: Loc_T("status.name.unknown", "Unknown"), icon_sprite: noone, stat_mods: { atk:0, def:0, spd:0, mag:0 }, tick: { hp_min:0, hp_max:0, mp_min:0, mp_max:0 }, stackable: false };
 }
 
 function Status_LocalizationKey(_status_id) {
@@ -300,6 +333,7 @@ function Status_LocalizationKey(_status_id) {
         case STATUS_BLOODTHIRSTY: return "status_bloodthirsty";
         case STATUS_BLESSING: return "status_blessing";
         case STATUS_SUNDER: return "status_sunder";
+        case STATUS_BRACE: return "status_brace";
     }
     return "unknown";
 }
@@ -316,24 +350,289 @@ function Status_LocalizeRuntime(_status, _status_id = -1) {
     return _status;
 }
 
-function Status_Description(_status_id) {
-    switch (_status_id) {
-        case STATUS_POISON:      return Loc_T("status.desc.status_poison", "Lose 2-3 HP each turn.");
-        case STATUS_BLEED:       return Loc_T("status.desc.status_bleed", "Lose 2-4 HP each turn. AGI -2.");
-        case STATUS_BURN:        return Loc_T("status.desc.status_burn", "Lose 4-6 HP each turn. STR -1.");
-        case STATUS_STUN:        return Loc_T("status.desc.status_stun", "Cannot act.");
-        case STATUS_GUARD:       return Loc_T("status.desc.status_guard", "Blocks the next incoming hit.");
-        case STATUS_DMG_UP:      return Loc_T("status.desc.status_dmg_up", "Next attack deals double damage.");
-        case STATUS_EVASION:     return Loc_T("status.desc.status_evasion", "Dodges the next incoming attack.");
-        case STATUS_CRIT_UP:     return Loc_T("status.desc.status_crit_up", "Critical chance +25%.");
-        case STATUS_HIT_UP:      return Loc_T("status.desc.status_hit_up", "Next attack cannot miss.");
-        case STATUS_MEDITATION:  return Loc_T("status.desc.status_meditation", "Recover 2-4 MP each turn.");
-        case STATUS_SOLIDIFY:    return Loc_T("status.desc.status_solidify", "Dodges the next incoming attack.");
-        case STATUS_BLOODTHIRSTY:return Loc_T("status.desc.status_bloodthirsty", "Until hit: take -35%, deal +6% damage.");
-        case STATUS_BLESSING:    return Loc_T("status.desc.status_blessing", "Next incoming hit deals 20% less damage.");
-        case STATUS_SUNDER:      return Loc_T("status.desc.status_sunder", "DEF -1.");
+// ---- D78 / D100: pure helpers for the damage-over-time numbers (combat-spec.md section 10; vectors in combat-vectors.json) ----
+function Status_Cfg(_status_id, _field, _default) {
+    var cfg = StatusDB_Get(_status_id);
+    if (is_struct(cfg) && variable_struct_exists(cfg, _field)) return variable_struct_get(cfg, _field);
+    return _default;
+}
+
+// Burning: HP per tick = max(2, round_half_up(0.3 * the caster's MAG)), fixed when it is applied.
+function Status_BurnTick(_mag) {
+    return max(Status_Cfg(STATUS_BURN, "tick_min", 2), RoundHalfUp(Status_Cfg(STATUS_BURN, "tick_per_mag", 0.3) * _mag));
+}
+
+// Effective DEF of a burning character: DEF x 0.75, round half up, at least 1.
+function Status_BurnDef(_def) {
+    var m = Status_Cfg(STATUS_BURN, "stat_mult", { def: 0.75 });
+    return max(1, RoundHalfUp(_def * m.def));
+}
+
+// HP lost by a Poison of _n stacks left alone: n + (n-1) + ... + 1.
+function Status_PoisonTotal(_n) {
+    var n = clamp(round(_n), 1, Status_Cfg(STATUS_POISON, "max_stacks", 10));
+    return (n * (n + 1)) div 2;
+}
+
+function Status_PoisonAdd(_existing, _added) {
+    return min(Status_Cfg(STATUS_POISON, "max_stacks", 10), max(0, _existing) + max(0, _added));
+}
+
+// Bleeding: HP per action of the bleeder = 2 per stack.
+function Status_BleedTick(_stacks) {
+    return Status_Cfg(STATUS_BLEED, "damage_per_stack", 2) * clamp(round(_stacks), 1, Status_Cfg(STATUS_BLEED, "max_stacks", 3));
+}
+
+// The status entry of a character (the struct in ch.status), or undefined.
+function Status_Find(_ch, _status_id) {
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "status") || !is_array(_ch.status)) return undefined;
+    for (var i = 0; i < array_length(_ch.status); i++) {
+        if (_ch.status[i].id == _status_id) return _ch.status[i];
     }
-    return "";
+    return undefined;
+}
+
+function Status_Stacks(_ch, _status_id) {
+    var s = Status_Find(_ch, _status_id);
+    if (!is_struct(s)) return 0;
+    return variable_struct_exists(s, "stacks") ? s.stacks : 1;
+}
+
+// ---- weak points (D173, IDEA-07) ----
+// Every enemy takes one of Poison / Bleeding / Burning a bit better (`weak` in scr_db_enemy) and resists another (`resist`). The one table of numbers is WeakPoint_Table; the rule is applied in
+// ONE place for skills and throwables: Skill_StatusApplyArgs (weak: more turns or stacks) and the status roll (resist: a smaller chance). Never on the player.
+function WeakPoint_Table() {
+    return {
+        turn_bonus: 1,      // a weak enemy: +1 turn of a status that lasts turns (Burning)...
+        stack_bonus: 1,     // ...or +1 stack of one that stacks (Poison, Bleeding)
+        burn_turn_cap: 4,   // the weakness never takes Burning past 4 turns (the stack caps are the D78 max_stacks of the status table: Poison 10, Bleeding 3)
+        resist_mult: 0.5    // a resisting enemy: the chance of the status times this, rounded down to a whole percent (a sure 100% becomes 50%)
+    };
+}
+
+// The status id an enemy (a battle struct from EnemyCreate) takes better / resists, -1 for none, for the player and for anything that is not an enemy.
+function WeakPoint_Field(_ch, _field) {
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "is_player") || _ch.is_player) return -1;
+    if (variable_struct_exists(_ch, _field)) return variable_struct_get(_ch, _field);
+    if (!variable_struct_exists(_ch, "id")) return -1;
+    var cfg = EnemyDB_Get(_ch.id);
+    return (is_struct(cfg) && variable_struct_exists(cfg, _field)) ? variable_struct_get(cfg, _field) : -1;
+}
+
+function Enemy_WeakStatus(_ch) {
+    return WeakPoint_Field(_ch, "weak");
+}
+
+function Enemy_ResistStatus(_ch) {
+    return WeakPoint_Field(_ch, "resist");
+}
+
+// What a status lands with on _target: { turns, stacks, weak }. weak = the weakness added something (the log and the Codex say so); a bonus the D78 caps leave no room for is not given.
+function WeakPoint_Adjust(_target, _status_id, _turns, _stacks) {
+    var out = { turns: _turns, stacks: _stacks, weak: false };
+    if (_status_id < 0 || Enemy_WeakStatus(_target) != _status_id) return out;
+    var t = WeakPoint_Table();
+    var dot = Status_Cfg(_status_id, "dot_kind", "");
+    if (dot == "poison" || dot == "bleed") {
+        var headroom = Status_Cfg(_status_id, "max_stacks", 1) - (Status_Stacks(_target, _status_id) + _stacks);
+        if (headroom >= t.stack_bonus) { out.stacks = _stacks + t.stack_bonus; out.weak = true; }
+    } else if (dot == "burn") {
+        if (_turns < t.burn_turn_cap) { out.turns = min(t.burn_turn_cap, _turns + t.turn_bonus); out.weak = true; }
+    }
+    return out;
+}
+
+// The chance a status lands with on _target: halved (rounded down to a whole percent) when the enemy resists it, else _chance as it is.
+function WeakPoint_ResistChance(_target, _status_id, _chance) {
+    if (_status_id < 0 || _chance <= 0 || Enemy_ResistStatus(_target) != _status_id) return _chance;
+    return floor(_chance * 100 * WeakPoint_Table().resist_mult + 0.000001) / 100;
+}
+
+// The log line the first time per fight a weakness adds something ("" afterwards: the enemy remembers it was said).
+function WeakPoint_WeakMsg(_target, _status_id) {
+    if (variable_struct_exists(_target, "weak_noted") && _target.weak_noted) return "";
+    _target.weak_noted = true;
+    return Loc_T("combat.msg.weak_to", "{enemy} is weak to [t]{status}[/t]!", { enemy: _target.name, status: StatusDB_Get(_status_id).name });
+}
+
+// The log line of a status that failed because of the resistance (every time).
+function WeakPoint_ResistMsg(_target, _status_id) {
+    return Loc_T("combat.msg.resists", "{enemy} resists [t]{status}[/t].", { enemy: _target.name, status: StatusDB_Get(_status_id).name });
+}
+
+// HP a DoT entry takes on its owner's tick. _acted: the owner acted this turn (a stunned owner does not bleed).
+function Status_DotDamage(_entry, _cfg, _acted = true) {
+    if (!is_struct(_cfg) || !variable_struct_exists(_cfg, "dot_kind")) return 0;
+    var stacks = variable_struct_exists(_entry, "stacks") ? _entry.stacks : 1;
+    switch (_cfg.dot_kind) {
+        case "poison": return stacks;
+        case "burn":   return max(0, _entry.power);
+        case "bleed":  return _acted ? Status_BleedTick(stacks) : 0;
+    }
+    return 0;
+}
+
+// ---- D100: the plain sentence and the exact numbers of a status, from the real game data. _data = the entry in ch.status (turns, stacks, power), or
+// undefined for the status in general. No number is typed into the text: they come from the entry or from StatusDB. ----
+function Status_ModsText(_cfg) {
+    var out = "";
+    if (!is_struct(_cfg)) return out;
+    var ids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG];
+    if (variable_struct_exists(_cfg, "stat_mods")) {
+        for (var i = 0; i < 4; i++) {
+            var v = variable_struct_get(_cfg.stat_mods, Stat_Key(ids[i]));
+            if (v != 0) out += " " + Stat_ShortName(ids[i]) + " " + ((v > 0) ? "+" : "") + string(v) + ".";
+        }
+    }
+    if (variable_struct_exists(_cfg, "stat_mult")) {
+        for (var j = 0; j < 4; j++) {
+            var m = variable_struct_get(_cfg.stat_mult, Stat_Key(ids[j]));
+            if (m != 1) out += " " + Stat_ShortName(ids[j]) + " " + ((m > 1) ? "+" : "") + string(round((m - 1) * 100)) + "%.";
+        }
+    }
+    return out;
+}
+
+function Status_Describe(_status_id, _data = undefined) {
+    var cfg = StatusDB_Get(_status_id);
+    var has = is_struct(_data);
+    var dur = Status_Cfg(_status_id, "duration", 0);
+    var turns = (has && variable_struct_exists(_data, "turns")) ? _data.turns : dur;
+    var stacks = (has && variable_struct_exists(_data, "stacks")) ? _data.stacks : 1;
+    var entry_power = (has && variable_struct_exists(_data, "power")) ? _data.power : 0;
+    var max_stacks = Status_Cfg(_status_id, "max_stacks", 1);
+    var vars = { turns: turns, stacks: stacks, max: max_stacks, tick: 0, dur: dur, mods: Status_ModsText(cfg) };
+    var line = "";
+    var tick = 0;
+
+    switch (_status_id) {
+        case STATUS_POISON:
+            if (has) {
+                tick = Status_DotDamage(_data, cfg);
+                vars.tick = tick;
+                line = Loc_T("status.desc.poison.data", "Lose {tick} HP each turn, then 1 stack fades ({stacks} stacks, max {max}).{mods}", vars);
+            } else {
+                line = Loc_T("status.desc.poison", "Lose HP equal to its stacks each turn, then 1 stack fades. Stacks up to {max}.{mods}", vars);
+            }
+            break;
+        case STATUS_BLEED:
+            if (has) {
+                tick = Status_DotDamage(_data, cfg, true);
+                vars.tick = tick;
+                line = Loc_T("status.desc.bleed.data", "Lose {tick} HP each time you act ({stacks} stacks, max {max}), for {turns} more turns.{mods}", vars);
+            } else {
+                vars.tick = Status_BleedTick(1);
+                line = Loc_T("status.desc.bleed", "Lose {tick} HP per stack each time you act. Stacks up to {max}, lasts {dur} turns.{mods}", vars);
+            }
+            break;
+        case STATUS_BURN:
+            if (has) {
+                tick = Status_DotDamage(_data, cfg);
+                vars.tick = tick;
+                line = Loc_T("status.desc.burn.data", "Lose {tick} HP each turn for {turns} more turns.{mods}", vars);
+            } else {
+                line = Loc_T("status.desc.burn", "Lose a fixed amount of HP (it grows with the caster's MAG) each turn for {dur} turns. Does not stack.{mods}", vars);
+            }
+            break;
+        case STATUS_STUN:
+            line = Loc_T("status.desc.status_stun", "Pushed back on the turn strip. Then [t]Steadfast[/t]: cannot be stunned for 2 turns.");
+            break;
+        case STATUS_GUARD:
+            line = Loc_T("status.desc.status_guard", "Blocks the next hit.");
+            break;
+        case STATUS_DMG_UP:
+            vars.mult = Status_Cfg(_status_id, "dmg_mult", 1);
+            line = Loc_T("status.desc.status_dmg_up", "Next attack deals {mult} times the damage.", vars);
+            break;
+        case STATUS_EVASION:
+            line = Loc_T("status.desc.status_evasion", "Dodges the next attack.");
+            break;
+        case STATUS_CRIT_UP:
+            var bag = Crit_BagSize(Combat_CritChance(Status_Cfg(_status_id, "crit_bonus", 0)));   // R1b (D124): the odds in plain words, from the marble bag (D119)
+            vars.n = bag.n;
+            vars.reds = bag.reds;
+            if (bag.reds == 1) line = Loc_T("status.desc.status_crit_up", "1 in every {n} hits is a critical.", vars);
+            else line = Loc_T("status.desc.status_crit_up_many", "{reds} in every {n} hits are criticals.", vars);
+            break;
+        case STATUS_HIT_UP:
+            vars.pct = round((Status_Cfg(_status_id, "perfect_widen", 1) - 1) * 100);
+            line = Loc_T("status.desc.status_hit_up", "For {turns} turns: you see the enemy's next move and every Perfect zone is {pct}% wider.", vars);
+            break;
+        case STATUS_MEDITATION:
+            var mt = Status_Cfg(_status_id, "tick", { mp_min: 0, mp_max: 0 });
+            vars.n = Status_TickAmount(min(mt.mp_min, mt.mp_max), max(mt.mp_min, mt.mp_max));   // D126: the exact average
+            line = Loc_T("status.desc.status_meditation", "Restore {n} MP each turn.", vars);
+            break;
+        case STATUS_SOLIDIFY:
+            vars.pct = round((1 - Status_Cfg(_status_id, "guard_mult", 1)) * 100);
+            line = Loc_T("status.desc.status_solidify", "Takes {pct}% less damage from the next hit.", vars);
+            break;
+        case STATUS_BLOODTHIRSTY:
+            vars.take = round((1 - Status_Cfg(_status_id, "guard_mult", 1)) * 100);
+            vars.deal = round((Status_Cfg(_status_id, "dmg_mult", 1) - 1) * 100);
+            line = Loc_T("status.desc.status_bloodthirsty", "Until you are hit: take {take}% less damage, deal {deal}% more.", vars);
+            break;
+        case STATUS_BLESSING:
+            vars.pct = round((1 - Status_Cfg(_status_id, "guard_mult", 1)) * 100);
+            line = Loc_T("status.desc.status_blessing", "The next hit you take deals {pct}% less damage.", vars);
+            break;
+        case STATUS_SUNDER:
+            line = Loc_T("status.desc.status_sunder", "Lowers [t]DEF[/t].{mods}", vars);
+            break;
+        case STATUS_BRACE:
+            vars.pct = round((1 - Status_Cfg(_status_id, "guard_mult", 1)) * 100);
+            line = Loc_T("status.desc.status_brace", "Until your next turn every hit you take deals {pct}% less damage.", vars);
+            break;
+    }
+
+    var shown_turns = turns;
+    if (_status_id == STATUS_POISON) shown_turns = has ? stacks : 0;   // a poison lasts as many turns as it has stacks
+    return {
+        id: _status_id,
+        name: (is_struct(cfg) && variable_struct_exists(cfg, "name")) ? string(cfg.name) : "",
+        line: line,
+        turns: shown_turns,
+        stacks: has ? stacks : 0,
+        max_stacks: max_stacks,
+        tick: tick,
+        power: entry_power,
+        has_data: has
+    };
+}
+
+// The one-line description of a status (the details panels, D100): the status in general, numbers from the data.
+function Status_Description(_status_id) {
+    return Status_Describe(_status_id).line;
+}
+
+// HUD data (no drawing; the UI packet draws it): one row per status on a character. label: "x2" stacks and/or "3t" turns left.
+function Status_DisplayList(_ch) {
+    var out = [];
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "status") || !is_array(_ch.status)) return out;
+    for (var i = 0; i < array_length(_ch.status); i++) {
+        var s = _ch.status[i];
+        var cfg = StatusDB_Get(s.id);
+        var d = Status_Describe(s.id, s);
+        var label = "";
+        if (d.max_stacks > 1) label += "x" + string(d.stacks);
+        if (!(variable_struct_exists(cfg, "dot_kind") && cfg.dot_kind == "poison")) label += ((label != "") ? " " : "") + string(max(0, s.turns)) + "t";
+        array_push(out, {
+            id: s.id,
+            name: d.name,
+            turns: d.turns,
+            stacks: d.stacks,
+            tick: d.tick,
+            label: label,
+            line: d.line,
+            full: Status_FullLine(s.id, s),
+            short: Status_ShortName(s.id),
+            count: Status_LabelCount(s.id, s),
+            negative: Status_IsNegative(s.id),
+            icon_sprite: variable_struct_exists(cfg, "icon_sprite") ? cfg.icon_sprite : noone,
+            icon_subimg: variable_struct_exists(cfg, "icon_subimg") ? cfg.icon_subimg : 0
+        });
+    }
+    return out;
 }
 
 function Status_Has(_ch, _status_id) {
@@ -372,25 +671,54 @@ function Status_ClearAll(_ch) {
     return _ch;
 }
 
-function Status_Add(_ch, _status_id, _turns, _power) {
+// _stacks: the stack count a Poison or Bleeding hit adds (default 1); ignored by the other statuses. A Poison has no turn limit: its `turns`
+// mirror its stacks (ticks left), whatever _turns says. Burning and Bleeding use _turns; _power is Burning's HP per tick.
+function Status_Add(_ch, _status_id, _turns, _power, _stacks = 1) {
     if (!is_array(_ch.status)) _ch.status = [];
     var cfg = StatusDB_Get(_status_id);
+    if (Status_Cfg(_status_id, "crit_bonus", 0) > 0) Bag_Clear(_ch, "crit");   // R1 (D119): a fresh bag for a re-applied crit buff
 
-    if (variable_struct_exists(cfg, "excludes")) {
-        _ch = Status_RemoveList(_ch, cfg.excludes);
-    }
+    // Stun is only a marker (D75): the battle turns it into a push-back on the turn timeline at once (Battle_ConsumeStun); Steadfast lives there too.
 
-    if (!cfg.stackable && Status_Has(_ch, _status_id)) {
-        for (var i = 0; i < array_length(_ch.status); i++) {
-            if (_ch.status[i].id == _status_id) {
-                _ch.status[i].turns = max(_ch.status[i].turns, _turns);
-                _ch.status[i].power = max(_ch.status[i].power, _power);
-                return _ch;
-            }
+    var dot = variable_struct_exists(cfg, "dot_kind") ? cfg.dot_kind : "";
+    var max_stacks = variable_struct_exists(cfg, "max_stacks") ? cfg.max_stacks : 1;
+    var add_stacks = max(1, round(_stacks));
+    var fresh = variable_struct_exists(cfg, "no_tick_on_apply") && cfg.no_tick_on_apply;
+
+    var cur = Status_Find(_ch, _status_id);
+    if (is_struct(cur)) {
+        if (!variable_struct_exists(cur, "stacks")) cur.stacks = 1;
+        switch (dot) {
+            case "poison":   // reapply adds stacks
+                cur.stacks = Status_PoisonAdd(cur.stacks, add_stacks);
+                cur.turns = cur.stacks;
+                break;
+            case "bleed":    // reapply adds a stack and refreshes the turns
+                cur.stacks = min(max_stacks, cur.stacks + add_stacks);
+                cur.turns = max(cur.turns, _turns);
+                break;
+            case "burn":     // reapply refreshes: never stacks, the newer tick wins
+                cur.turns = max(cur.turns, _turns);
+                cur.power = _power;
+                break;
+            default:
+                cur.turns = max(cur.turns, _turns);
+                cur.power = max(cur.power, _power);
         }
+        if (fresh) cur.fresh = true;
+        return _ch;
     }
 
-    array_push(_ch.status, { id: _status_id, turns: _turns, power: _power });
+    var entry = { id: _status_id, turns: _turns, power: _power, stacks: 1 };
+    if (dot == "poison") {
+        entry.stacks = min(max_stacks, add_stacks);
+        entry.turns = entry.stacks;
+    } else if (dot == "bleed") {
+        entry.stacks = min(max_stacks, add_stacks);
+    }
+    if (fresh) entry.fresh = true;
+    array_push(_ch.status, entry);
+    if (room == rm_battle) Tutorial_Trigger("status");   // D45: the first status of the profile
     return _ch;
 }
 
@@ -403,15 +731,32 @@ function Status_ModStat(_ch, _stat_id) {
         var cfg = StatusDB_Get(s.id);
         var mods = cfg.stat_mods;
         switch (_stat_id) {
-            case STAT_STR:  total += mods.str; break;
-            case STAT_AGI:  total += mods.agi; break;
-            case STAT_DEF:  total += mods.def; break;
-            case STAT_INT:  total += mods.intt; break;
-            case STAT_LUCK: total += mods.luck; break;
+            case STAT_ATK: total += mods.atk; break;
+            case STAT_DEF: total += mods.def; break;
+            case STAT_SPD: total += mods.spd; break;
+            case STAT_MAG: total += mods.mag; break;
         }
     }
 
     return total;
+}
+
+// Multiplicative stat changes (Burning: DEF x0.75). 1 when there are none.
+function Status_StatMult(_ch, _stat_id) {
+    var mult = 1;
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "status") || !is_array(_ch.status)) return 1;
+    for (var i = 0; i < array_length(_ch.status); i++) {
+        var cfg = StatusDB_Get(_ch.status[i].id);
+        if (!variable_struct_exists(cfg, "stat_mult")) continue;
+        var sm = cfg.stat_mult;
+        switch (_stat_id) {
+            case STAT_ATK: mult *= sm.atk; break;
+            case STAT_DEF: mult *= sm.def; break;
+            case STAT_SPD: mult *= sm.spd; break;
+            case STAT_MAG: mult *= sm.mag; break;
+        }
+    }
+    return mult;
 }
 
 function Status_GetSum(_ch, _field) {
@@ -458,62 +803,161 @@ function Status_ConsumeByField(_ch, _field) {
     return _ch;
 }
 
-function Status_Tick(_ch) {
+// BUG-08: what the player sees and hears when a damage-over-time status ticks on them. Pure: no instances, no sound.
+function Status_TickFeedbackInfo(_status_id, _hp_lost) {
+    var cfg = StatusDB_Get(_status_id);
+    var status_name = (is_struct(cfg) && variable_struct_exists(cfg, "name")) ? string(cfg.name) : "Status";
+    return {
+        line: Loc_T("combat.msg.status_tick", "{status} hurts you for {dmg}.", { status: status_name, dmg: _hp_lost }),
+        sfx: "skill_bleed",   // existing bleed sound; no new assets
+        flash_ms: UI_HUD_HURT_FLASH_MS * 2
+    };
+}
+
+// Applies it in a battle: log line, sound, longer HUD bar flash. Always records the last event in global.status_tick_last (tests read it).
+function Status_TickFeedback(_status_id, _hp_lost) {
+    var info = Status_TickFeedbackInfo(_status_id, _hp_lost);
+    global.status_tick_last = info;
+    if (room != rm_battle || !instance_exists(obj_battle_controller)) return info;
+    Combat_Log(info.line);
+    SFX_Play(info.sfx);
+    if (instance_exists(obj_ui_controller)) {
+        with (obj_ui_controller) hud_hurt_flash_ms = max(hud_hurt_flash_ms, info.flash_ms);
+    }
+    return info;
+}
+
+// Enemy side of the tick feedback: a log line in the battle (the player's version also plays a sound and flashes the HUD).
+function Status_TickFeedbackEnemy(_status_id, _hp_lost, _enemy_name) {
+    var cfg = StatusDB_Get(_status_id);
+    var status_name = (is_struct(cfg) && variable_struct_exists(cfg, "name")) ? string(cfg.name) : "Status";
+    var info = { line: Loc_T("combat.msg.status_tick_enemy", "{status} hurts {enemy} for {dmg}.", { status: status_name, enemy: _enemy_name, dmg: _hp_lost }) };
+    global.status_tick_last_enemy = info;
+    if (room == rm_battle && instance_exists(obj_battle_controller)) Combat_Log(info.line);
+    return info;
+}
+
+// D126: a tick given as a range (lo..hi) is worth its average, rounded half up, every time.
+function Status_TickAmount(_lo, _hi) {
+    return RoundHalfUp((_lo + _hi) / 2);
+}
+
+// HP lost by one status entry on _ch (its DoT table or its legacy hp tick); clamps HP and reports it to the player/enemy feedback.
+function Status_ApplyHpTick(_ch, _entry, _cfg, _acted) {
+    var delta_hp = 0;
+    if (variable_struct_exists(_cfg, "dot_kind")) {
+        delta_hp = -Status_DotDamage(_entry, _cfg, _acted);
+    } else if (is_struct(_cfg.tick)) {
+        var hp_min = variable_struct_exists(_cfg.tick, "hp_min") ? _cfg.tick.hp_min : 0;
+        var hp_max = variable_struct_exists(_cfg.tick, "hp_max") ? _cfg.tick.hp_max : 0;
+        var hp_low = min(hp_min, hp_max);
+        var hp_high = max(hp_min, hp_max);
+        if (hp_low != 0 || hp_high != 0) delta_hp = Status_TickAmount(hp_low, hp_high);   // D126: the exact average, no dice
+    }
+    if (delta_hp == 0) return _ch;
+    var hp_before = _ch.hp;
+    _ch.hp = clamp(_ch.hp + delta_hp, 0, _ch.max_hp);
+    if (_ch.hp < hp_before) {
+        if (variable_struct_exists(_ch, "is_player") && _ch.is_player) {
+            Status_TickFeedback(_entry.id, hp_before - _ch.hp);
+            if (_ch.hp <= 0) Death_NoteDotKill(_entry.id);   // C5 (D103): the death line can say what finished you
+        }
+        else Status_TickFeedbackEnemy(_entry.id, hp_before - _ch.hp, variable_struct_exists(_ch, "name") ? string(_ch.name) : "");
+    }
+    return _ch;
+}
+
+// The per-ACTION part of a tick (D78): Bleeding hurts each time its owner acts. Used between the actions of an enemy turn that has several;
+// Status_Tick already includes it for the last (or only) action.
+function Status_ActionTick(_ch) {
+    if (!is_array(_ch.status)) return _ch;
+    for (var i = 0; i < array_length(_ch.status); i++) {
+        var s = _ch.status[i];
+        var cfg = StatusDB_Get(s.id);
+        if (variable_struct_exists(cfg, "dot_kind") && cfg.dot_kind == "bleed") _ch = Status_ApplyHpTick(_ch, s, cfg, true);
+    }
+    return _ch;
+}
+
+// Once per TURN of the owner. _acted = the owner took an action this turn (false for a stunned turn: a bleeder does not bleed then).
+// Poison: HP -= stacks, then stacks -= 1. Burning: HP -= power, turns -= 1. Bleeding: HP -= 2 x stacks if it acted, turns -= 1. A status applied this
+// turn with `no_tick_on_apply` (Foresight) skips its first decay.
+function Status_Tick(_ch, _acted = true) {
     if (!is_array(_ch.status)) return _ch;
 
     for (var i = array_length(_ch.status) - 1; i >= 0; i--) {
         var s = _ch.status[i];
+        if (variable_struct_exists(s, "fresh") && s.fresh) {
+            s.fresh = false;
+            continue;
+        }
         var cfg = StatusDB_Get(s.id);
-        var t = cfg.tick;
+        if (variable_struct_exists(cfg, "tick_on_enemy_turn") && cfg.tick_on_enemy_turn) continue;   // counted by Status_TickEnemyTurn
+        if (variable_struct_exists(cfg, "until_player_turn") && cfg.until_player_turn) continue;   // ends at the player's next turn (Status_ExpireAtPlayerTurn)
 
-        var hp_min = 0;
-        var hp_max = 0;
+        _ch = Status_ApplyHpTick(_ch, s, cfg, _acted);
+
+        var t = cfg.tick;
         var mp_min = 0;
         var mp_max = 0;
         if (is_struct(t)) {
-            if (variable_struct_exists(t, "hp_min")) hp_min = t.hp_min;
-            if (variable_struct_exists(t, "hp_max")) hp_max = t.hp_max;
             if (variable_struct_exists(t, "mp_min")) mp_min = t.mp_min;
             if (variable_struct_exists(t, "mp_max")) mp_max = t.mp_max;
         }
-
-        var hp_low = min(hp_min, hp_max);
-        var hp_high = max(hp_min, hp_max);
-        if (hp_low != 0 || hp_high != 0) {
-            var delta_hp = (hp_low == hp_high) ? hp_low : irandom_range(hp_low, hp_high);
-            _ch.hp = clamp(_ch.hp + delta_hp, 0, _ch.max_hp);
-        }
-
         var mp_low = min(mp_min, mp_max);
         var mp_high = max(mp_min, mp_max);
         if (mp_low != 0 || mp_high != 0) {
-            var delta_mp = (mp_low == mp_high) ? mp_low : irandom_range(mp_low, mp_high);
+            var delta_mp = Status_TickAmount(mp_low, mp_high);   // D126: the exact average, no dice
             _ch.mp = clamp(_ch.mp + delta_mp, 0, _ch.max_mp);
         }
 
-        s.turns -= 1;
-        if (s.turns <= 0) {
-            array_delete(_ch.status, i, 1);
+        if (variable_struct_exists(cfg, "dot_kind") && cfg.dot_kind == "poison") {
+            s.stacks = (variable_struct_exists(s, "stacks") ? s.stacks : 1) - 1;
+            s.turns = s.stacks;
+            if (s.stacks <= 0) array_delete(_ch.status, i, 1);
+        } else {
+            s.turns -= 1;
+            if (s.turns <= 0) array_delete(_ch.status, i, 1);
         }
     }
 
     return _ch;
 }
 
+// Once per ENEMY turn, on the player: the statuses that count the enemy's turns (Guard's Brace, `tick_on_enemy_turn`) lose one. The player's own
+// ticks (Status_Tick) leave them alone. Hunt 6: Brace used to wear off on the player's turns, so it could be gone before the enemy's hit.
+function Status_TickEnemyTurn(_ch) {
+    if (!is_array(_ch.status)) return _ch;
+    for (var i = array_length(_ch.status) - 1; i >= 0; i--) {
+        var s = _ch.status[i];
+        var cfg = StatusDB_Get(s.id);
+        if (variable_struct_exists(cfg, "until_player_turn") && cfg.until_player_turn) {   // D180: the enemy has had its turn: the status ends as the player's next one starts
+            s.enemy_done = true;
+            continue;
+        }
+        if (!variable_struct_exists(cfg, "tick_on_enemy_turn") || !cfg.tick_on_enemy_turn) continue;
+        s.turns -= 1;
+        if (s.turns <= 0) array_delete(_ch.status, i, 1);
+    }
+    return _ch;
+}
+
+// D180: a turn of the PLAYER starts: the statuses that last until it (Guard's Brace) end, once the enemy has had a turn since they were applied.
+// (A fast player who guards and is up again before the enemy acts keeps the Brace for that enemy turn: hunt 6.)
+function Status_ExpireAtPlayerTurn(_ch) {
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "status") || !is_array(_ch.status)) return _ch;
+    for (var i = array_length(_ch.status) - 1; i >= 0; i--) {
+        var s = _ch.status[i];
+        var cfg = StatusDB_Get(s.id);
+        if (!variable_struct_exists(cfg, "until_player_turn") || !cfg.until_player_turn) continue;
+        if (variable_struct_exists(s, "enemy_done") && s.enemy_done) array_delete(_ch.status, i, 1);
+    }
+    return _ch;
+}
+
 function Status_CanAct(_ch) {
     if (Status_HasFlag(_ch, "skip_turn")) return false;
     return true;
-}
-
-function Status_UsesCoreIconSprite(_status_id, _icon_sprite) {
-    if (_icon_sprite == noone || _icon_sprite == -1) return false;
-    switch (_status_id) {
-        case STATUS_POISON: return (_icon_sprite == poison_status);
-        case STATUS_BLEED:  return (_icon_sprite == bleed_status);
-        case STATUS_BURN:   return (_icon_sprite == burn_status);
-        case STATUS_STUN:   return (_icon_sprite == stun_status);
-    }
-    return false;
 }
 
 function Status_IsNegative(_status_id) {
@@ -537,69 +981,46 @@ function Status_LabelWithSign(_cfg, _status_id) {
     return name_txt + suffix;
 }
 
-function Status_DrawFallbackLabel(_cfg, _status_id, _x, _y) {
-    var txt = Status_LabelWithSign(_cfg, _status_id);
-    var text_scale = UI_STATUS_FALLBACK_TEXT_SCALE;
-
-    draw_set_color(c_black);
-    UI_DrawTextTransformed(_x + 1, _y + 1, txt, text_scale, text_scale, 0);
-    draw_set_color(c_white);
-    UI_DrawTextTransformed(_x, _y, txt, text_scale, text_scale, 0);
-
-    return max(1, round(UI_TextWidth(txt) * text_scale));
+// ---- D150: the short label under a status chip ("PSN 3", "BLD 2", "Thirst 4") and the full sentence shown when the status is highlighted ----
+// Every status id in order (the labels, the Help page and the tests walk this list).
+function Status_AllIds() {
+    return [STATUS_POISON, STATUS_BLEED, STATUS_BURN, STATUS_STUN, STATUS_GUARD, STATUS_DMG_UP, STATUS_EVASION, STATUS_CRIT_UP, STATUS_HIT_UP,
+            STATUS_MEDITATION, STATUS_SOLIDIFY, STATUS_BLOODTHIRSTY, STATUS_BLESSING, STATUS_SUNDER, STATUS_BRACE];
 }
 
-function Status_DrawIcons(_ch, _x, _y, _spacing = 10, _rtl = false, _noncore_text_fallback = false) {
-    if (!is_array(_ch.status)) return;
+// The short word under the chip: a text key per status, at most 6 characters in English (and 3 in Korean) so it fits under the chip.
+function Status_ShortName(_status_id) {
+    var cfg = StatusDB_Get(_status_id);
+    var fb = (is_struct(cfg) && variable_struct_exists(cfg, "name")) ? string_copy(string(cfg.name), 1, 6) : "?";
+    return Loc_T("status.short." + Status_LocalizationKey(_status_id), fb);
+}
 
-    var spacing = 10;
-    if (argument_count >= 4) spacing = _spacing;
-    var rtl = false;
-    if (argument_count >= 5) rtl = _rtl;
-    var noncore_text_fallback = false;
-    if (argument_count >= 6) noncore_text_fallback = _noncore_text_fallback;
-    var icon_scale = UI_GetSpriteScale();
-    var spacing_px = max(1, round(real(spacing) * icon_scale));
-    var icon_gap = max(2, round(4 * icon_scale));
+// The number next to the name: a poison's or a bleed's stacks, otherwise the turns left. "" when there is none to show.
+function Status_LabelCount(_status_id, _data = undefined) {
+    if (!is_struct(_data)) return "";
+    var cfg = StatusDB_Get(_status_id);
+    var dot = (is_struct(cfg) && variable_struct_exists(cfg, "dot_kind")) ? cfg.dot_kind : "";
+    var n = 0;
+    if (dot == "poison" || dot == "bleed") n = variable_struct_exists(_data, "stacks") ? _data.stacks : 1;
+    else n = variable_struct_exists(_data, "turns") ? _data.turns : 0;
+    return (n > 0) ? string(n) : "";
+}
 
-    var off = 0;
-    if (rtl) {
-        for (var i = array_length(_ch.status) - 1; i >= 0; i--) {
-            var cfg = StatusDB_Get(_ch.status[i].id);
-            var sid = _ch.status[i].id;
-            var has_sprite = (variable_struct_exists(cfg, "icon_sprite") && cfg.icon_sprite != noone);
-            var use_text_fallback = (!has_sprite) || (noncore_text_fallback && !Status_UsesCoreIconSprite(sid, cfg.icon_sprite));
-            if (use_text_fallback) {
-                var tag_w = Status_DrawFallbackLabel(cfg, sid, _x + off, _y);
-                off += max(spacing_px, tag_w + icon_gap);
-            } else if (has_sprite) {
-                var icon_sub = 0;
-                if (variable_struct_exists(cfg, "icon_subimg")) icon_sub = round(cfg.icon_subimg);
-                var icon_max = max(0, sprite_get_number(cfg.icon_sprite) - 1);
-                icon_sub = clamp(icon_sub, 0, icon_max);
-                draw_sprite_ext(cfg.icon_sprite, icon_sub, _x + off, _y, icon_scale, icon_scale, 0, c_white, 1);
-                var icon_w = round(sprite_get_width(cfg.icon_sprite) * icon_scale);
-                off += max(spacing_px, icon_w + icon_gap);
-            }
-        }
-    } else {
-        for (var i = 0; i < array_length(_ch.status); i++) {
-            var cfg2 = StatusDB_Get(_ch.status[i].id);
-            var sid2 = _ch.status[i].id;
-            var has_sprite2 = (variable_struct_exists(cfg2, "icon_sprite") && cfg2.icon_sprite != noone);
-            var use_text_fallback2 = (!has_sprite2) || (noncore_text_fallback && !Status_UsesCoreIconSprite(sid2, cfg2.icon_sprite));
-            if (use_text_fallback2) {
-                var tag_w2 = Status_DrawFallbackLabel(cfg2, sid2, _x + off, _y);
-                off += max(spacing_px, tag_w2 + icon_gap);
-            } else if (has_sprite2) {
-                var icon_sub2 = 0;
-                if (variable_struct_exists(cfg2, "icon_subimg")) icon_sub2 = round(cfg2.icon_subimg);
-                var icon_max2 = max(0, sprite_get_number(cfg2.icon_sprite) - 1);
-                icon_sub2 = clamp(icon_sub2, 0, icon_max2);
-                draw_sprite_ext(cfg2.icon_sprite, icon_sub2, _x + off, _y, icon_scale, icon_scale, 0, c_white, 1);
-                var icon_w2 = round(sprite_get_width(cfg2.icon_sprite) * icon_scale);
-                off += max(spacing_px, icon_w2 + icon_gap);
-            }
-        }
-    }
+// "PSN 3", "BLD 2", "Thirst 4"; the name alone when there is no number.
+function Status_ShortLabel(_status_id, _data = undefined) {
+    var n = Status_LabelCount(_status_id, _data);
+    return Status_ShortName(_status_id) + ((n != "") ? " " + n : "");
+}
+
+// The sentence for a highlighted status (Status tab, the chip's tip): what it does, then the turns left. A poison, a bleed and a burn already say
+// their stacks and turns, Foresight says its turns, and a Stun is used up at once, so they add nothing.
+function Status_FullLine(_status_id, _data = undefined) {
+    var line = Status_Describe(_status_id, _data).line;
+    if (!is_struct(_data) || !variable_struct_exists(_data, "turns") || _data.turns <= 0) return line;
+    var cfg = StatusDB_Get(_status_id);
+    if (is_struct(cfg) && variable_struct_exists(cfg, "dot_kind")) return line;
+    if (_status_id == STATUS_HIT_UP || _status_id == STATUS_STUN) return line;
+    if (is_struct(cfg) && variable_struct_exists(cfg, "until_player_turn") && cfg.until_player_turn) return line;   // D180: it ends at your next turn, not after a number of turns
+    var tail = (_data.turns == 1) ? Loc_T("status.turn_left", "1 turn left.") : Loc_T("status.turns_left", "{turns} turns left.", { turns: string(_data.turns) });
+    return line + " " + tail;
 }

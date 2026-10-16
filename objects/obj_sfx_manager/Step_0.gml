@@ -1,18 +1,4 @@
-if (!variable_global_exists("audio_debug_enabled")) global.audio_debug_enabled = false;
-if (!variable_global_exists("audio_debug_test_key")) global.audio_debug_test_key = "ui_confirm";
-if (!variable_global_exists("audio_debug_last_key")) global.audio_debug_last_key = global.audio_debug_test_key;
-if (!variable_global_exists("audio_debug_last_channel")) global.audio_debug_last_channel = -1;
-if (!variable_global_exists("audio_debug_last_status")) global.audio_debug_last_status = "Audio debug OFF";
-if (!variable_global_exists("audio_debug_last_ok")) global.audio_debug_last_ok = false;
-if (!variable_global_exists("audio_debug_last_asset")) global.audio_debug_last_asset = noone;
-if (!variable_global_exists("audio_debug_last_asset_name")) global.audio_debug_last_asset_name = "";
-if (!variable_global_exists("audio_debug_last_reason")) global.audio_debug_last_reason = "";
-if (!variable_global_exists("audio_debug_direct_handle")) global.audio_debug_direct_handle = -1;
-if (!variable_global_exists("audio_debug_direct_playing")) global.audio_debug_direct_playing = false;
-if (!variable_global_exists("audio_debug_group_loaded")) global.audio_debug_group_loaded = false;
-if (!variable_global_exists("audio_group_load_requested")) global.audio_group_load_requested = false;
-if (!variable_global_exists("audio_debug_missing_count")) global.audio_debug_missing_count = 0;
-if (!variable_global_exists("audio_debug_total_count")) global.audio_debug_total_count = 0;
+SFX_EnsureAudioGlobals();
 
 var group_loaded = audio_group_is_loaded(audiogroup_default);
 global.audio_debug_group_loaded = group_loaded;
@@ -22,37 +8,7 @@ if (!group_loaded && !global.audio_group_load_requested) {
 }
 if (group_loaded) global.audio_group_load_requested = false;
 
-if (keyboard_check_pressed(ord("P"))) {
-    global.audio_debug_enabled = !global.audio_debug_enabled;
-    if (global.audio_debug_enabled) {
-        global.audio_debug_last_key = global.audio_debug_test_key;
-        var _audit = SFX_DebugAuditRequired(true);
-        global.audio_debug_missing_count = _audit.missing;
-        global.audio_debug_total_count = _audit.total;
-        var test = SFX_DebugPlayTest(global.audio_debug_last_key);
-        global.audio_debug_last_channel = test.channel;
-        global.audio_debug_last_status = "Played: " + string(global.audio_debug_last_key) + " -> " + string(test.status);
-        if (is_struct(test.resolve)) {
-            global.audio_debug_last_ok = test.resolve.ok;
-            global.audio_debug_last_asset = test.resolve.asset;
-            global.audio_debug_last_asset_name = test.resolve.asset_name;
-            global.audio_debug_last_reason = test.resolve.reason;
-        }
-
-        // Direct engine smoke test to isolate mapping vs runtime audio path.
-        global.audio_debug_direct_handle = audio_play_sound(Modern5, 0, false);
-        global.audio_debug_direct_playing = (global.audio_debug_direct_handle != -1) && audio_is_playing(global.audio_debug_direct_handle);
-        if (global.audio_debug_direct_handle == -1) {
-            global.audio_debug_last_status += " | direct=FAILED";
-        } else if (!global.audio_debug_direct_playing) {
-            global.audio_debug_last_status += " | direct=CHANNEL NOT PLAYING";
-        } else {
-            global.audio_debug_last_status += " | direct=PLAYING";
-        }
-    } else {
-        global.audio_debug_last_status = "Audio debug OFF";
-    }
-}
+// R-120 (I-106): the audio debug overlay (P) is gone from the player's game.
 
 if (global.audio_debug_enabled) {
     var info = SFX_DebugResolve(global.audio_debug_last_key);
@@ -67,13 +23,6 @@ if (!variable_instance_exists(id, "last_room_id")) {
     last_room_id = room;
 }
 
-if (!variable_instance_exists(id, "last_window_w")) last_window_w = max(1, window_get_width());
-if (!variable_instance_exists(id, "last_window_h")) last_window_h = max(1, window_get_height());
-if (!variable_instance_exists(id, "last_display_w")) last_display_w = max(1, display_get_width());
-if (!variable_instance_exists(id, "last_display_h")) last_display_h = max(1, display_get_height());
-if (!variable_instance_exists(id, "last_transition_active")) last_transition_active = Transition_IsActive();
-
-var need_display_refresh = false;
 if (room != last_room_id) {
     var prev_room = last_room_id;
     last_room_id = room;
@@ -81,68 +30,10 @@ if (room != last_room_id) {
         global.bgm_mix_restart_main_menu = true;
     }
     BGM_ApplyForRoom(room);
-    need_display_refresh = true;
 }
-
-var transition_now_active = Transition_IsActive();
-if (!transition_now_active && last_transition_active) {
-    need_display_refresh = true;
-}
-
-var cur_display_w = max(1, display_get_width());
-var cur_display_h = max(1, display_get_height());
-var cur_window_w = max(1, window_get_width());
-var cur_window_h = max(1, window_get_height());
-if (cur_display_w != last_display_w || cur_display_h != last_display_h || cur_window_w != last_window_w || cur_window_h != last_window_h) {
-    need_display_refresh = true;
-}
-
-// Self-heal any stale/corrupt view state after room load/fullscreen transitions.
-if (!need_display_refresh && !transition_now_active && view_enabled) {
-    var view_bad = (view_wport[0] <= 0 || view_hport[0] <= 0);
-    for (var vi = 1; vi < 8; vi++) {
-        if (view_visible[vi]) {
-            view_bad = true;
-            break;
-        }
-    }
-
-    var cam = view_camera[0];
-    if (is_undefined(cam) || cam == -1) {
-        view_bad = true;
-    } else {
-        var cam_w = max(1, round(camera_get_view_width(cam)));
-        var cam_h = max(1, round(camera_get_view_height(cam)));
-        if (cam_w != DISPLAY_BASE_W || cam_h != DISPLAY_BASE_H) {
-            view_bad = true;
-        }
-        var cam_x = round(camera_get_view_x(cam));
-        var cam_y = round(camera_get_view_y(cam));
-        var cam_x_max = max(0, room_width - cam_w);
-        var cam_y_max = max(0, room_height - cam_h);
-        if (cam_x < 0 || cam_y < 0 || cam_x > cam_x_max || cam_y > cam_y_max) {
-            view_bad = true;
-        }
-    }
-
-    if (view_bad) need_display_refresh = true;
-}
-
-if (need_display_refresh) {
-    GameSettings_ApplyDisplay();
-    cur_display_w = max(1, display_get_width());
-    cur_display_h = max(1, display_get_height());
-    cur_window_w = max(1, window_get_width());
-    cur_window_h = max(1, window_get_height());
-}
-last_display_w = cur_display_w;
-last_display_h = cur_display_h;
-last_window_w = cur_window_w;
-last_window_h = cur_window_h;
-last_transition_active = transition_now_active;
 
 if (!variable_global_exists("mouse_cursor_hidden")) global.mouse_cursor_hidden = false;
-var hide_cursor = window_has_focus();
+var hide_cursor = MouseCursor_OsHidden(window_has_focus());   // D182: the OS cursor is hidden only while the game has focus; the game draws its own then (MouseCursor_Draw)
 if (hide_cursor != global.mouse_cursor_hidden) {
     if (hide_cursor) window_set_cursor(cr_none);
     else window_set_cursor(cr_default);
@@ -152,7 +43,7 @@ if (hide_cursor != global.mouse_cursor_hidden) {
 if (group_loaded) {
     var need_bgm_bootstrap = true;
     if (variable_global_exists("bgm_mix_handles") && is_struct(global.bgm_mix_handles)) {
-        need_bgm_bootstrap = (array_length(variable_struct_get_names(global.bgm_mix_handles)) <= 0);
+        need_bgm_bootstrap = (variable_struct_names_count(global.bgm_mix_handles) <= 0);   // D108 F1d-3: a count, not a names array built every frame
     }
     if (need_bgm_bootstrap) {
         BGM_ApplyForRoom(room);
@@ -160,12 +51,16 @@ if (group_loaded) {
 }
 
 // One-time skillbook ambience: loop only while the special dialogue is active.
-if (!variable_global_exists("skillbook_mana_ambience_handle")) global.skillbook_mana_ambience_handle = -1;
-if (!variable_global_exists("skillbook_mana_ambience_gain")) global.skillbook_mana_ambience_gain = 0;
-if (!variable_global_exists("skillbook_mana_ambience_playing")) global.skillbook_mana_ambience_playing = false;
-if (!variable_global_exists("skillbook_mana_ambience_tail_frames")) global.skillbook_mana_ambience_tail_frames = 0;
-if (!variable_global_exists("skillbook_mana_ambience_last_key")) global.skillbook_mana_ambience_last_key = "";
-if (!variable_global_exists("skillbook_mana_ambience_current_key")) global.skillbook_mana_ambience_current_key = "";
+// D108 F1d-3: Create sets these globals; the existence checks run once per object instead of six times per frame.
+if (!variable_instance_exists(id, "ambience_globals_checked")) {
+    ambience_globals_checked = true;
+    if (!variable_global_exists("skillbook_mana_ambience_handle")) global.skillbook_mana_ambience_handle = -1;
+    if (!variable_global_exists("skillbook_mana_ambience_gain")) global.skillbook_mana_ambience_gain = 0;
+    if (!variable_global_exists("skillbook_mana_ambience_playing")) global.skillbook_mana_ambience_playing = false;
+    if (!variable_global_exists("skillbook_mana_ambience_tail_frames")) global.skillbook_mana_ambience_tail_frames = 0;
+    if (!variable_global_exists("skillbook_mana_ambience_last_key")) global.skillbook_mana_ambience_last_key = "";
+    if (!variable_global_exists("skillbook_mana_ambience_current_key")) global.skillbook_mana_ambience_current_key = "";
+}
 
 var skillbook_should_play = false;
 var gs_audio = GameState_Get();
@@ -207,10 +102,12 @@ if (dialogue_active && ambience_key != "") {
 }
 
 var skillbook_asset = noone;
-if (variable_global_exists("sfx_db") && ds_exists(global.sfx_db, ds_type_map) && ds_map_exists(global.sfx_db, ambience_key)) {
-    skillbook_asset = global.sfx_db[? ambience_key];
+if (ambience_key != "") {   // idle (no ambience key): nothing to look up
+    if (variable_global_exists("sfx_db") && ds_exists(global.sfx_db, ds_type_map) && ds_map_exists(global.sfx_db, ambience_key)) {
+        skillbook_asset = global.sfx_db[? ambience_key];
+    }
+    if (!SFX_IsValidSoundAsset(skillbook_asset)) skillbook_asset = noone;
 }
-if (!SFX_IsValidSoundAsset(skillbook_asset)) skillbook_asset = noone;
 
 if (skillbook_should_play && ambience_key != "" && ambience_key != global.skillbook_mana_ambience_current_key) {
     if (global.skillbook_mana_ambience_handle != -1 && audio_is_playing(global.skillbook_mana_ambience_handle)) {
@@ -235,9 +132,13 @@ if (global.skillbook_mana_ambience_handle != -1 && !audio_is_playing(global.skil
     global.skillbook_mana_ambience_current_key = "";
 }
 
-SFX_ClampVolumes();
-var skillbook_trim = SFX_GetGain(ambience_key);
-var skillbook_target = clamp(SKILLBOOK_MANA_AMBIENCE_BASE_GAIN, 0, 1) * skillbook_trim * global.vol_master * global.vol_sfx;
+// The target gain is read only while the ambience plays or still fades out; idle frames skip the volume clamp and the gain lookup.
+var skillbook_target = 0;
+if (skillbook_should_play || global.skillbook_mana_ambience_gain > 0) {
+    SFX_ClampVolumes();
+    var skillbook_trim = SFX_GetGain(ambience_key) * SFX_AssetGain(skillbook_asset);   // R-119: the ambience loop's table gain too
+    skillbook_target = clamp(SKILLBOOK_MANA_AMBIENCE_BASE_GAIN, 0, 1) * skillbook_trim * global.vol_master * global.vol_sfx;
+}
 
 if (skillbook_should_play) {
     if (global.skillbook_mana_ambience_gain < skillbook_target) {
@@ -266,16 +167,4 @@ if (skillbook_should_play) {
 
 if (global.skillbook_mana_ambience_handle != -1 && audio_is_playing(global.skillbook_mana_ambience_handle)) {
     audio_sound_gain(global.skillbook_mana_ambience_handle, global.skillbook_mana_ambience_gain, 0);
-}
-
-if (global.bgm_pending_stop_frames > 0) {
-    global.bgm_pending_stop_frames -= 1;
-    if (global.bgm_pending_stop_frames <= 0) {
-        var h = global.bgm_pending_stop_handle;
-        if (h != -1 && audio_is_playing(h)) {
-            audio_stop_sound(h);
-        }
-        global.bgm_pending_stop_handle = -1;
-        global.bgm_pending_stop_frames = 0;
-    }
 }

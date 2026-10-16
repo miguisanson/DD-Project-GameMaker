@@ -8,28 +8,28 @@ function Equip_CanEquip(_ch, _item_or_id) {
     var item = _item_or_id;
     if (!is_struct(item)) item = ItemDB_Get(_item_or_id);
 
-    var out = { ok: false, msg: "Can't equip that.", item: item };
+    var out = { ok: false, msg: Loc_T("menu.msg.cant_equip", "Can't equip that."), item: item };
 
     if (!is_struct(_ch)) return out;
     if (!is_struct(item) || item.id == 0) return out;
-    if (item.type != ITEM_WEAPON && item.type != ITEM_ARMOR) return out;
+    if (item.type != ITEM_WEAPON && item.type != ITEM_ARMOR && item.type != ITEM_ACCESSORY) return out;   // C3: the accessory slot (D92)
     if (!variable_struct_exists(item, "equip_slot") || item.equip_slot == "") return out;
     if (!variable_struct_exists(_ch, "class_id")) return out;
 
     if (!variable_struct_exists(_ch, "inventory") || !is_array(_ch.inventory) || !Inv_Has(_ch.inventory, item.id, 1)) {
-        out.msg = "Item not in inventory.";
+        out.msg = Loc_T("menu.msg.not_in_inventory", "Item not in bag.");
         return out;
     }
 
     var slot = string(item.equip_slot);
     if (Equip_SlotGet(_ch, slot) == item.id) {
-        out.msg = "Already equipped.";
+        out.msg = Loc_T("menu.msg.already_equipped", "Already equipped.");
         return out;
     }
 
     if (variable_struct_exists(item, "preferred_class") && item.preferred_class != -1) {
         if (_ch.class_id != item.preferred_class) {
-            out.msg = Equip_ClassName(item.preferred_class) + " only.";
+            out.msg = Loc_T("menu.msg.class_only", "{class_name} only.", { class_name: Equip_ClassName(item.preferred_class) });
             return out;
         }
     }
@@ -49,14 +49,14 @@ function Equip_CanEquip(_ch, _item_or_id) {
                 if (j > 0) class_text += "/";
                 class_text += Equip_ClassName(item.allowed_classes[j]);
             }
-            if (class_text == "") class_text = "That";
-            out.msg = class_text + " only.";
+            if (class_text == "") out.msg = Loc_T("menu.msg.cant_equip", "Can't equip that.");
+            else out.msg = Loc_T("menu.msg.class_only", "{class_name} only.", { class_name: class_text });
             return out;
         }
     }
 
     out.ok = true;
-    out.msg = "Equipped " + string(item.name) + ".";
+    out.msg = Loc_T("menu.msg.equipped", "Equipped {item}.", { item: Item_NameMarked(item.id) });
     return out;
 }
 
@@ -89,7 +89,7 @@ function Equip_GetStatBonus(_ch, _stat_id) {
     var total = 0;
     if (!is_struct(_ch) || !variable_struct_exists(_ch, "equip") || !is_struct(_ch.equip)) return 0;
 
-    var keys = ["weapon", "head", "body", "ring1", "ring2"];
+    var keys = ["weapon", "head", "body", "ring1", "ring2", "accessory"];
     for (var i = 0; i < array_length(keys); i++) {
         var item_id = Equip_SlotGet(_ch, keys[i]);
         if (item_id == 0) continue;
@@ -98,11 +98,10 @@ function Equip_GetStatBonus(_ch, _stat_id) {
         if (is_struct(item) && variable_struct_exists(item, "bonus")) {
             var b = item.bonus;
             switch (_stat_id) {
-                case STAT_STR:  if (variable_struct_exists(b, "str")) total += b.str; break;
-                case STAT_AGI:  if (variable_struct_exists(b, "agi")) total += b.agi; break;
-                case STAT_DEF:  if (variable_struct_exists(b, "def")) total += b.def; break;
-                case STAT_INT:  if (variable_struct_exists(b, "intt")) total += b.intt; break;
-                case STAT_LUCK: if (variable_struct_exists(b, "luck")) total += b.luck; break;
+                case STAT_ATK: if (variable_struct_exists(b, "atk")) total += b.atk; break;
+                case STAT_DEF: if (variable_struct_exists(b, "def")) total += b.def; break;
+                case STAT_SPD: if (variable_struct_exists(b, "spd")) total += b.spd; break;
+                case STAT_MAG: if (variable_struct_exists(b, "mag")) total += b.mag; break;
             }
         }
     }
@@ -113,7 +112,7 @@ function Equip_GetStatBonus(_ch, _stat_id) {
 function Equip_GetEquippedItems(_ch) {
     var out = [];
     if (!is_struct(_ch)) return out;
-    var slots = ["weapon", "body", "head", "ring1", "ring2"];
+    var slots = ["weapon", "body", "head", "ring1", "ring2", "accessory"];
     for (var i = 0; i < array_length(slots); i++) {
         var iid = Equip_SlotGet(_ch, slots[i]);
         if (iid == 0) continue;
@@ -135,11 +134,9 @@ function Equip_GetPassives(_ch) {
         if (variable_struct_exists(it, "passive_params") && is_struct(it.passive_params)) pparams = it.passive_params;
         array_push(out, { id: pid, params: pparams, item_id: it.id, item_name: it.name });
     }
+    var card_passives = Card_EquipPassives(_ch);   // C2: passive cards read like equipment passives (Mana Spring)
+    for (var c = 0; c < array_length(card_passives); c++) array_push(out, card_passives[c]);
     return out;
-}
-
-function Equip_GetPassiveList(_ch) {
-    return Equip_GetPassives(_ch);
 }
 
 function Equip_HasPassive(_ch, _passive_id) {
@@ -174,27 +171,9 @@ function Equip_TargetHasAnyStatus(_ch) {
     return is_struct(_ch) && variable_struct_exists(_ch, "status") && is_array(_ch.status) && array_length(_ch.status) > 0;
 }
 
-function Equip_PassiveRuntimeEnsure(_ch) {
-    if (!is_struct(_ch)) return {};
-    if (!variable_struct_exists(_ch, "passive_runtime") || !is_struct(_ch.passive_runtime)) {
-        _ch.passive_runtime = {
-            battle_turn: 0,
-            first_hit_done: false,
-            steady_strike_turn: -1,
-            aim_assist_turn: -1,
-            pinning_cooldown: 0,
-            first_impact_used: false,
-            brace_guard_ready: false,
-            brace_cooldown: 0,
-            mirror_used: false
-        };
-    }
-    return _ch.passive_runtime;
-}
-
-function Equip_PassiveBattleReset(_ch) {
-    if (!is_struct(_ch)) return _ch;
-    _ch.passive_runtime = {
+// D108 F4b: the per-battle passive state of one character, in its starting values (Ensure and BattleReset both build it here).
+function Equip_PassiveRuntimeNew() {
+    return {
         battle_turn: 0,
         first_hit_done: false,
         steady_strike_turn: -1,
@@ -205,6 +184,19 @@ function Equip_PassiveBattleReset(_ch) {
         brace_cooldown: 0,
         mirror_used: false
     };
+}
+
+function Equip_PassiveRuntimeEnsure(_ch) {
+    if (!is_struct(_ch)) return {};
+    if (!variable_struct_exists(_ch, "passive_runtime") || !is_struct(_ch.passive_runtime)) {
+        _ch.passive_runtime = Equip_PassiveRuntimeNew();
+    }
+    return _ch.passive_runtime;
+}
+
+function Equip_PassiveBattleReset(_ch) {
+    if (!is_struct(_ch)) return _ch;
+    _ch.passive_runtime = Equip_PassiveRuntimeNew();
     return _ch;
 }
 
@@ -257,7 +249,7 @@ function Equip_PassiveAdjustIncomingStatus(_source, _target, _status_id, _turns)
         rt.mirror_used = true;
         out.apply = false;
         out.reflect = true;
-        out.msg = "Mirror Stitch repelled a status!";
+        out.msg = Loc_T("combat.msg.passive.mirror_stitch", "Mirror Stitch repelled a status!");
         if (variable_struct_exists(_target, "mp")) {
             var mp_cost = max(0, round(Equip_GetPassiveParam(_target, "mirror_stitch", "mp_cost_on_trigger", 1)));
             _target.mp = max(0, _target.mp - mp_cost);
@@ -267,52 +259,39 @@ function Equip_PassiveAdjustIncomingStatus(_source, _target, _status_id, _turns)
     return out;
 }
 
+// Passives that forgive or upgrade the bar's grade (D61 grades). steady_strike: a WEAK press counts as OK, once per turn.
+// aim_assist: a GOOD press counts as PERFECT, once per turn. Both rebuild the result from Qte_Result so the multiplier follows the grade.
 function Equip_ModifyTimedAttackResult(_ch, _timing) {
     var t = _timing;
     if (!is_struct(t)) return t;
 
-    var key = variable_struct_exists(t, "key") ? string_upper(string(t.key)) : "MISS";
-    var mult = variable_struct_exists(t, "mult") ? real(t.mult) : 0;
+    var key = variable_struct_exists(t, "key") ? string_upper(string(t.key)) : QTE_WEAK;
     var rt = Equip_PassiveRuntimeEnsure(_ch);
 
     if (Equip_HasPassive(_ch, "steady_strike") && rt.steady_strike_turn != rt.battle_turn) {
         var can_once = Equip_GetPassiveParam(_ch, "steady_strike", "once_per_turn", 1);
-        if (can_once) {
-            if (key == "MISS") {
-                key = "BAD";
-                mult = 0.25;
-                rt.steady_strike_turn = rt.battle_turn;
-            } else if (key == "BAD") {
-                key = "OKAY";
-                mult = 0.50;
-                rt.steady_strike_turn = rt.battle_turn;
-            }
+        if (can_once && key == QTE_WEAK) {
+            key = QTE_OK;
+            rt.steady_strike_turn = rt.battle_turn;
         }
     }
 
     if (Equip_HasPassive(_ch, "aim_assist") && rt.aim_assist_turn != rt.battle_turn) {
         var can_promote = Equip_GetPassiveParam(_ch, "aim_assist", "upgrade_good_to_perfect_once_per_turn", 1);
-        if (can_promote && key == "GOOD") {
-            key = "PERFECT";
-            mult = 1.00;
+        if (can_promote && key == QTE_GOOD) {
+            key = QTE_PERFECT;
             rt.aim_assist_turn = rt.battle_turn;
         }
     }
 
-    switch (key) {
-        case "PERFECT": return { key: "PERFECT", label: "PERFECT", mult: clamp(mult, 0, 1), hit: true };
-        case "GOOD":    return { key: "GOOD",    label: "GOOD",    mult: clamp(mult, 0, 1), hit: true };
-        case "OKAY":    return { key: "OKAY",    label: "OKAY",    mult: clamp(mult, 0, 1), hit: true };
-        case "BAD":     return { key: "BAD",     label: "BAD",     mult: clamp(mult, 0, 1), hit: true };
-    }
-    return { key: "MISS", label: "MISS", mult: 0.00, hit: false };
+    return Qte_Result(key);
 }
 
-function Equip_PlayerBonusDamage(_attacker, _defender, _base_damage, _is_skill = false, _timing_key = "") {
+// _preview (D135): the damage preview asks the same question without changing anything (no first-hit mark, no Sunder status on the defender).
+function Equip_PlayerBonusDamage(_attacker, _defender, _base_damage, _is_skill = false, _timing_key = "", _preview = false) {
     var base = max(0, round(real(_base_damage)));
     if (base <= 0) return 0;
 
-    var rt = Equip_PassiveRuntimeEnsure(_attacker);
     var def_ratio = 1;
     if (is_struct(_defender) && variable_struct_exists(_defender, "max_hp") && _defender.max_hp > 0 && variable_struct_exists(_defender, "hp")) {
         def_ratio = clamp(_defender.hp / _defender.max_hp, 0, 1);
@@ -320,7 +299,8 @@ function Equip_PlayerBonusDamage(_attacker, _defender, _base_damage, _is_skill =
 
     var mult = 1;
 
-    if (Equip_HasPassive(_attacker, "sunder_edge")) {
+    if (!_preview && Equip_HasPassive(_attacker, "sunder_edge")) {
+        var rt = Equip_PassiveRuntimeEnsure(_attacker);
         if (!rt.first_hit_done) {
             var def_down = max(0, round(Equip_GetPassiveParam(_attacker, "sunder_edge", "first_hit_def_down", 1)));
             var turns = max(1, round(Equip_GetPassiveParam(_attacker, "sunder_edge", "turns", 2)));
@@ -426,7 +406,7 @@ function Equip_PlayerTurnStartApply(_ch) {
 
 function Equip_PlayerPerfectHitApply(_ch, _timing_key) {
     if (!is_struct(_ch)) return _ch;
-    if (string_upper(string(_timing_key)) != "PERFECT") return _ch;
+    if (string_upper(string(_timing_key)) != QTE_PERFECT) return _ch;
     if (!variable_struct_exists(_ch, "max_mp") || !variable_struct_exists(_ch, "mp")) return _ch;
 
     if (Equip_HasPassive(_ch, "arcane_surge")) {
@@ -456,14 +436,14 @@ function Equip_PassiveOnAttackResolved(_attacker, _defender, _timing_key, _timin
     if (_timing_hit && _damage_done > 0 && Equip_HasPassive(_attacker, "pinning_shot")) {
         var key = string_upper(string(_timing_key));
         var req_gp = Equip_GetPassiveParam(_attacker, "pinning_shot", "requires_good_or_perfect", 1);
-        var timing_ok = (!req_gp || key == "GOOD" || key == "PERFECT");
+        var timing_ok = (!req_gp || key == QTE_GOOD || key == QTE_PERFECT);
         if (timing_ok && rt.pinning_cooldown <= 0) {
             var chance = clamp(Equip_GetPassiveParam(_attacker, "pinning_shot", "stun_chance", 0.15), 0, 1);
             if (random(1) <= chance) {
                 var stun_turns = max(1, round(Equip_GetPassiveParam(_attacker, "pinning_shot", "stun_turns", 1)));
                 _defender = Status_Add(_defender, STATUS_STUN, stun_turns, 1);
                 rt.pinning_cooldown = max(1, round(Equip_GetPassiveParam(_attacker, "pinning_shot", "cooldown_turns", 3)));
-                out.msg = "Pinning Shot stunned the enemy!";
+                out.msg = Loc_T("combat.msg.passive.pinning_shot", "Pinning Shot stunned the enemy!");
             }
         }
     }

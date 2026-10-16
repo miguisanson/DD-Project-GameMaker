@@ -1,0 +1,18 @@
+# sprite: spr_icons_status   frames: 17   16x16 each, left to right = subimage 0..16   (v2)
+0	poison
+1	burn
+2	bleed
+3	stun
+4	steadfast
+5	break
+6	guard
+7	rev_up
+8	evasion
+9	take_aim
+10	foresight
+11	meditation
+12	solidify
+13	bloodthirsty
+14	blessing
+15	sundered
+16	curse

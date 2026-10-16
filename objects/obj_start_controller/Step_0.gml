@@ -1,42 +1,23 @@
 Input_PreStep();
 var gs = GameState_Get();
 
-if (!variable_instance_exists(id, "difficulty_options") || !is_array(difficulty_options) || array_length(difficulty_options) <= 0) {
-    difficulty_options = [
-        Loc_T("settings.difficulty.option.0", "Easy"),
-        Loc_T("settings.difficulty.option.1", "Normal"),
-        Loc_T("settings.difficulty.option.2", "Hard")
-    ];
+if (Notice_IsOpen()) {   // F3a: the notice pop-up owns the keys (the ui controller steps it); the title waits behind it
+    title_refresh = true;   // a save may have been made or deleted meanwhile
+    exit;
 }
-if (!variable_instance_exists(id, "difficulty_values") || !is_array(difficulty_values) || array_length(difficulty_values) != array_length(difficulty_options)) {
-    difficulty_values = [DIFFICULTY_EASY, DIFFICULTY_NORMAL, DIFFICULTY_HARD];
-}
-if (!variable_instance_exists(id, "difficulty_index")) {
-    difficulty_index = 1;
-}
-var difficulty_row_count = array_length(difficulty_options) + 1; // + Back row
-difficulty_index = clamp(difficulty_index, 0, max(0, difficulty_row_count - 1));
-
-if (gs.ui.mode == UI_SAVE) exit;
 if (Transition_IsInputLocked() && state != "cutscene") return;
-
-var k_up = Input_UIPressed("menu_up");
-var k_down = Input_UIPressed("menu_down");
-var k_left = Input_UIPressed("menu_left");
-var k_right = Input_UIPressed("menu_right");
-var k_ok = Input_UIConfirm();
-var k_back = Input_UIBack();
+var step_ms = Presentation_StepMs(delta_time);   // D108 F2a: the boot logo, the cutscene holds and the credits roll run on a ms clock
 
 if (state == "boot_logo") {
     if (Transition_IsActive()) return;
 
     switch (boot_logo_phase) {
         case 0: // fade in
-            boot_logo_timer += 1;
-            var in_t = clamp(boot_logo_timer / max(1, boot_logo_fade_in_frames), 0, 1);
+            boot_logo_timer += step_ms;
+            var in_t = clamp(boot_logo_timer / max(1, boot_logo_fade_in_ms), 0, 1);
             // smoothstep easing keeps the intro logo fade seamless and bell-curved
             boot_logo_alpha = in_t * in_t * (3 - (2 * in_t));
-            if (boot_logo_timer >= max(1, boot_logo_fade_in_frames)) {
+            if (boot_logo_timer + TRANSITION_DONE_SLACK_MS >= max(1, boot_logo_fade_in_ms)) {
                 boot_logo_phase = 1;
                 boot_logo_timer = 0;
                 boot_logo_alpha = 1;
@@ -44,20 +25,20 @@ if (state == "boot_logo") {
             break;
 
         case 1: // hold
-            boot_logo_timer += 1;
+            boot_logo_timer += step_ms;
             boot_logo_alpha = 1;
-            if (boot_logo_timer >= max(0, boot_logo_hold_frames)) {
+            if (boot_logo_timer + TRANSITION_DONE_SLACK_MS >= max(0, boot_logo_hold_ms)) {
                 boot_logo_phase = 2;
                 boot_logo_timer = 0;
             }
             break;
 
         case 2: // fade out
-            boot_logo_timer += 1;
-            var out_t = clamp(boot_logo_timer / max(1, boot_logo_fade_out_frames), 0, 1);
+            boot_logo_timer += step_ms;
+            var out_t = clamp(boot_logo_timer / max(1, boot_logo_fade_out_ms), 0, 1);
             out_t = out_t * out_t * (3 - (2 * out_t));
             boot_logo_alpha = 1 - out_t;
-            if (boot_logo_timer >= max(1, boot_logo_fade_out_frames)) {
+            if (boot_logo_timer + TRANSITION_DONE_SLACK_MS >= max(1, boot_logo_fade_out_ms)) {
                 boot_logo_phase = 3;
                 boot_logo_timer = 0;
                 boot_logo_alpha = 0;
@@ -65,10 +46,11 @@ if (state == "boot_logo") {
             break;
 
         default: // black hold, then reveal title menu
-            boot_logo_timer += 1;
+            boot_logo_timer += step_ms;
             boot_logo_alpha = 0;
-            if (boot_logo_timer >= max(0, boot_logo_black_hold_frames)) {
-                state = "main";
+            if (boot_logo_timer + TRANSITION_DONE_SLACK_MS >= max(0, boot_logo_black_hold_ms)) {
+                state = "splash";   // D128: the title art with a blinking prompt; a key goes on to the menu (Title_SplashStep)
+                title_t0 = current_time;
                 Transition_RequestBlackFlash(1, TRANSITION_CUTSCENE_FADE_IN_FRAMES);
             }
             break;
@@ -77,126 +59,42 @@ if (state == "boot_logo") {
     return;
 }
 
-if (state == "main") {
-    var title_idx_new = 0;
-    var title_idx_load = 1;
-    var title_idx_settings = 2;
-    var title_idx_exit = 3;
-
-    load_available = Save_HasAnySlot();
-    if (!load_available && main_index == title_idx_load) {
-        main_index = (main_index + 1) mod array_length(main_options);
-    }
-
-    if (k_up) {
-        var max_loop_up = array_length(main_options);
-        repeat (max_loop_up) {
-            main_index = (main_index + array_length(main_options) - 1) mod array_length(main_options);
-            if (load_available || main_index != title_idx_load) break;
-        }
-        SFX_PlayUI("ui_move");
-    }
-    if (k_down) {
-        var max_loop_down = array_length(main_options);
-        repeat (max_loop_down) {
-            main_index = (main_index + 1) mod array_length(main_options);
-            if (load_available || main_index != title_idx_load) break;
-        }
-        SFX_PlayUI("ui_move");
-    }
-
-    if (k_ok) {
-        var opt = main_index;
-        if (opt == title_idx_load && !load_available) {
-            main_index = (main_index + 1) mod array_length(main_options);
-            SFX_PlayUI("ui_move");
-            return;
-        }
-
-        SFX_PlayUI("ui_confirm");
-        if (opt == title_idx_new) {
-            UI_ModalRootBegin("title_difficulty");
-            var current_difficulty = DIFFICULTY_NORMAL;
-            if (variable_struct_exists(gs, "difficulty")) current_difficulty = Difficulty_Normalize(gs.difficulty);
-            difficulty_index = 1;
-            for (var di = 0; di < array_length(difficulty_values); di++) {
-                if (difficulty_values[di] == current_difficulty) {
-                    difficulty_index = di;
-                    break;
-                }
-            }
-            difficulty_opened_frame = Input_Frame();
-            difficulty_closing = false;
-            difficulty_close_frame = UI_OPENED_FRAME_NONE;
-            difficulty_pending_action = "";
-            state = "difficulty";
-        } else if (opt == title_idx_load) {
-            SaveMenu_Open("load", "main");
-        } else if (opt == title_idx_settings) {
-            SettingsPopup_Open("title");
-            state = "settings";
-        } else if (opt == title_idx_exit) {
-            game_end();
-        }
+if (state == "credits") {   // C5 (D105): the credits roll after the ending's closing text; hold confirm to skip it (D48)
+    Skip_Claim();
+    credits_t += step_ms;
+    if (credits_t >= Credits_TotalMs() || Skip_Consume()) {
+        Skip_Reset();
+        state = "credits_end";
+        Transition_RequestCutsceneFade(rm_start);
     }
     return;
 }
+if (state == "credits_end") return;
 
-if (state == "difficulty") {
-    if (difficulty_closing) {
-        if (Input_Frame() - difficulty_close_frame >= UI_POPUP_FADE_FRAMES) {
-            var da = string(difficulty_pending_action);
-            difficulty_closing = false;
-            difficulty_close_frame = UI_OPENED_FRAME_NONE;
-            if (da == "start_intro") {
-                Difficulty_SetCurrent(difficulty_pending_value);
-                gs.in_main_menu = false;
-                Transition_RequestCutsceneById("intro");
-            } else {
-                state = "main";
-            }
-        }
-        return;
-    }
+if (state == "run_flow") {   // C1: run summary, new run (scr_room_state RunFlow_*)
+    RunFlow_Step();
+    return;
+}
 
-    var diff_rows = array_length(difficulty_options) + 1; // options + Back
-    if (k_up) {
-        difficulty_index = (difficulty_index + diff_rows - 1) mod diff_rows;
-        SFX_PlayUI("ui_move");
-    }
-    if (k_down) {
-        difficulty_index = (difficulty_index + 1) mod diff_rows;
-        SFX_PlayUI("ui_move");
-    }
+if (state == "splash") {   // D128: the menu takes no key until the splash is over
+    Title_SplashStep(id);
+    return;
+}
 
-    if (k_back) {
-        SFX_PlayUI("ui_back");
-        UI_ModalRootEnd(false);
-        difficulty_closing = true;
-        difficulty_close_frame = Input_Frame();
-        difficulty_pending_action = "to_main";
-        return;
-    }
-
-    if (k_ok) {
-        SFX_PlayUI("ui_confirm");
-        if (difficulty_index >= 0 && difficulty_index < array_length(difficulty_values)) {
-            UI_ModalRootHold("title_room_change");
-            difficulty_pending_value = difficulty_values[difficulty_index];
-            difficulty_closing = true;
-            difficulty_close_frame = Input_Frame();
-            difficulty_pending_action = "start_intro";
-        } else {
-            UI_ModalRootEnd(false);
-            difficulty_closing = true;
-            difficulty_close_frame = Input_Frame();
-            difficulty_pending_action = "to_main";
-        }
-    }
+if (state == "main" || state == "settings") {
+    Title_Step(id);   // scr_menu.gml: the title menu, the settings popup
     return;
 }
 
 if (state == "cutscene") {
+    // D48 / I-055 / D146: holding confirm for 2 s skips the whole cutscene (the prompt shows from 1 s) (it still counts as seen: the end block below runs as usual).
+    // A tap only advances text. Not counted while the cutscene is not running, nor once it is already ending.
+    if (!variable_instance_exists(id, "cutscene_skip")) cutscene_skip = false;
+    if (cutscene_started && !cutscene_skip) {
+        Skip_Claim();
+        if (Skip_Consume()) cutscene_skip = true;
+    }
+
     // Allow first cutscene segment to initialize under the entry fade so the
     // first image reveals with fade-in (instead of popping after fade ends).
     // Still block processing while transitioning out of rm_cutscene.
@@ -252,29 +150,7 @@ if (state == "cutscene") {
         gs.ui.cutscene_logo_alpha = 0;
 
         var seg0 = cutscene_sequence[cutscene_segment_index];
-        var seg0_text_only = true;
-        if (variable_struct_exists(seg0, "text_only")) seg0_text_only = seg0.text_only;
-        gs.ui.cutscene_text_only = seg0_text_only;
-        if (variable_struct_exists(seg0, "chars_per_sec")) gs.ui.cutscene_chars_per_sec = real(seg0.chars_per_sec);
-        else gs.ui.cutscene_chars_per_sec = -1;
-        var seg0_sprite = noone;
-        if (variable_struct_exists(seg0, "sprite")) seg0_sprite = seg0.sprite;
-        if ((is_undefined(seg0_sprite) || seg0_sprite == noone || seg0_sprite == -1) && variable_struct_exists(seg0, "sprite_name")) {
-            seg0_sprite = asset_get_index(string(seg0.sprite_name));
-        }
-        if (is_undefined(seg0_sprite) || seg0_sprite == -1 || seg0_sprite == noone) seg0_sprite = black_screen;
-        gs.ui.cutscene_bg_sprite = seg0_sprite;
-        var seg0_lines = variable_struct_exists(seg0, "lines") ? seg0.lines : [];
-        if (is_array(seg0_lines) && array_length(seg0_lines) > 0) {
-            Dialogue_StartLines(seg0_lines);
-        } else {
-            gs.ui.mode = UI_NONE;
-            gs.ui.lines = [];
-            gs.ui.lines_raw = [];
-            gs.ui.index = 0;
-            gs.ui.speaker = "";
-            cutscene_segment_hold_timer = max(0, variable_struct_exists(seg0, "hold_frames") ? seg0.hold_frames : 0);
-        }
+        cutscene_segment_hold_timer = Cutscene_SegmentApply(seg0);
         return;
     }
 
@@ -288,30 +164,7 @@ if (state == "cutscene") {
                 cutscene_segment_index = cutscene_transition_next_index;
                 cutscene_segment_hold_timer = 0;
                 var seg_sw = cutscene_sequence[cutscene_segment_index];
-                var seg_sw_text_only = true;
-                if (variable_struct_exists(seg_sw, "text_only")) seg_sw_text_only = seg_sw.text_only;
-                gs.ui.cutscene_text_only = seg_sw_text_only;
-                if (variable_struct_exists(seg_sw, "chars_per_sec")) gs.ui.cutscene_chars_per_sec = real(seg_sw.chars_per_sec);
-                else gs.ui.cutscene_chars_per_sec = -1;
-                var seg_sw_sprite = noone;
-                if (variable_struct_exists(seg_sw, "sprite")) seg_sw_sprite = seg_sw.sprite;
-                if ((is_undefined(seg_sw_sprite) || seg_sw_sprite == noone || seg_sw_sprite == -1) && variable_struct_exists(seg_sw, "sprite_name")) {
-                    seg_sw_sprite = asset_get_index(string(seg_sw.sprite_name));
-                }
-                if (is_undefined(seg_sw_sprite) || seg_sw_sprite == -1 || seg_sw_sprite == noone) seg_sw_sprite = black_screen;
-                gs.ui.cutscene_bg_sprite = seg_sw_sprite;
-
-                var seg_sw_lines = variable_struct_exists(seg_sw, "lines") ? seg_sw.lines : [];
-                if (is_array(seg_sw_lines) && array_length(seg_sw_lines) > 0) {
-                    Dialogue_StartLines(seg_sw_lines);
-                } else {
-                    gs.ui.mode = UI_NONE;
-                    gs.ui.lines = [];
-                    gs.ui.lines_raw = [];
-                    gs.ui.index = 0;
-                    gs.ui.speaker = "";
-                    cutscene_segment_hold_timer = max(0, variable_struct_exists(seg_sw, "hold_frames") ? seg_sw.hold_frames : 0);
-                }
+                cutscene_segment_hold_timer = Cutscene_SegmentApply(seg_sw);
 
                 cutscene_transition_switched = true;
             }
@@ -322,30 +175,7 @@ if (state == "cutscene") {
             cutscene_segment_index = cutscene_transition_next_index;
             cutscene_segment_hold_timer = 0;
             var seg_fallback = cutscene_sequence[cutscene_segment_index];
-            var seg_fallback_text_only = true;
-            if (variable_struct_exists(seg_fallback, "text_only")) seg_fallback_text_only = seg_fallback.text_only;
-            gs.ui.cutscene_text_only = seg_fallback_text_only;
-            if (variable_struct_exists(seg_fallback, "chars_per_sec")) gs.ui.cutscene_chars_per_sec = real(seg_fallback.chars_per_sec);
-            else gs.ui.cutscene_chars_per_sec = -1;
-            var seg_fallback_sprite = noone;
-            if (variable_struct_exists(seg_fallback, "sprite")) seg_fallback_sprite = seg_fallback.sprite;
-            if ((is_undefined(seg_fallback_sprite) || seg_fallback_sprite == noone || seg_fallback_sprite == -1) && variable_struct_exists(seg_fallback, "sprite_name")) {
-                seg_fallback_sprite = asset_get_index(string(seg_fallback.sprite_name));
-            }
-            if (is_undefined(seg_fallback_sprite) || seg_fallback_sprite == -1 || seg_fallback_sprite == noone) seg_fallback_sprite = black_screen;
-            gs.ui.cutscene_bg_sprite = seg_fallback_sprite;
-
-            var seg_fallback_lines = variable_struct_exists(seg_fallback, "lines") ? seg_fallback.lines : [];
-            if (is_array(seg_fallback_lines) && array_length(seg_fallback_lines) > 0) {
-                Dialogue_StartLines(seg_fallback_lines);
-            } else {
-                gs.ui.mode = UI_NONE;
-                gs.ui.lines = [];
-                gs.ui.lines_raw = [];
-                gs.ui.index = 0;
-                gs.ui.speaker = "";
-                cutscene_segment_hold_timer = max(0, variable_struct_exists(seg_fallback, "hold_frames") ? seg_fallback.hold_frames : 0);
-            }
+            cutscene_segment_hold_timer = Cutscene_SegmentApply(seg_fallback);
         }
 
         cutscene_wait_transition = false;
@@ -358,11 +188,20 @@ if (state == "cutscene") {
     var seg_cur_lines = variable_struct_exists(seg_cur, "lines") ? seg_cur.lines : [];
     var segment_done = false;
 
+    if (cutscene_skip) {
+        // Skipped: close the line that is on screen and go straight to the end below (the same end block as watching to the last line).
+        Dialogue_CloseNow();
+        gs.ui.lines = [];
+        gs.ui.lines_raw = [];
+        seg_cur_lines = [];
+        cutscene_segment_hold_timer = 0;
+    }
+
     if (is_array(seg_cur_lines) && array_length(seg_cur_lines) > 0) {
         segment_done = (gs.ui.mode != UI_DIALOGUE && array_length(gs.ui.lines) <= 0);
     } else {
-        if (cutscene_segment_hold_timer > 0) cutscene_segment_hold_timer -= 1;
-        segment_done = (cutscene_segment_hold_timer <= 0);
+        if (cutscene_segment_hold_timer > 0) cutscene_segment_hold_timer -= step_ms;
+        segment_done = (cutscene_segment_hold_timer <= TRANSITION_DONE_SLACK_MS);
     }
 
     if (!variable_struct_exists(gs.ui, "cutscene_logo_sprite")) gs.ui.cutscene_logo_sprite = noone;
@@ -374,7 +213,7 @@ if (state == "cutscene") {
         var logo_line_idx = variable_struct_exists(gs.ui, "index") ? max(0, round(real(gs.ui.index))) : 0;
         if (logo_line_idx >= 3) logo_target = 1;
     }
-    var logo_step = 1 / max(1, round(max(1, game_get_speed(gamespeed_fps)) * 0.30));
+    var logo_step = step_ms / CUTSCENE_LOGO_FADE_MS;   // a full fade takes CUTSCENE_LOGO_FADE_MS (300 ms) at any frame rate
     if (gs.ui.cutscene_logo_alpha < logo_target) {
         gs.ui.cutscene_logo_alpha = min(logo_target, gs.ui.cutscene_logo_alpha + logo_step);
     } else {
@@ -386,6 +225,7 @@ if (state == "cutscene") {
     if (!segment_done) return;
 
     var next_index = cutscene_segment_index + 1;
+    if (cutscene_skip) next_index = array_length(cutscene_sequence);
     if (next_index < array_length(cutscene_sequence)) {
         var seg_next = cutscene_sequence[next_index];
         var use_slow_segment_fade = false;
@@ -405,39 +245,13 @@ if (state == "cutscene") {
 
         cutscene_segment_index = next_index;
         cutscene_segment_hold_timer = 0;
-        var seg_next_text_only = true;
-        if (variable_struct_exists(seg_next, "text_only")) seg_next_text_only = seg_next.text_only;
-        gs.ui.cutscene_text_only = seg_next_text_only;
-        if (variable_struct_exists(seg_next, "chars_per_sec")) gs.ui.cutscene_chars_per_sec = real(seg_next.chars_per_sec);
-        else gs.ui.cutscene_chars_per_sec = -1;
-        var seg_next_sprite = noone;
-        if (variable_struct_exists(seg_next, "sprite")) seg_next_sprite = seg_next.sprite;
-        if ((is_undefined(seg_next_sprite) || seg_next_sprite == noone || seg_next_sprite == -1) && variable_struct_exists(seg_next, "sprite_name")) {
-            seg_next_sprite = asset_get_index(string(seg_next.sprite_name));
-        }
-        if (is_undefined(seg_next_sprite) || seg_next_sprite == -1 || seg_next_sprite == noone) seg_next_sprite = black_screen;
-        gs.ui.cutscene_bg_sprite = seg_next_sprite;
-        var seg_next_lines = variable_struct_exists(seg_next, "lines") ? seg_next.lines : [];
-        if (is_array(seg_next_lines) && array_length(seg_next_lines) > 0) {
-            Dialogue_StartLines(seg_next_lines);
-        } else {
-            gs.ui.mode = UI_NONE;
-            gs.ui.lines = [];
-            gs.ui.lines_raw = [];
-            gs.ui.index = 0;
-            gs.ui.speaker = "";
-            cutscene_segment_hold_timer = max(0, variable_struct_exists(seg_next, "hold_frames") ? seg_next.hold_frames : 0);
-        }
+        cutscene_segment_hold_timer = Cutscene_SegmentApply(seg_next);
         return;
     }
 
-    gs.ui.cutscene_active = false;
-    gs.ui.cutscene_bg_sprite = noone;
-    gs.ui.dialogue_box_half = false;
-    gs.ui.cutscene_text_only = false;
+    // I-051 / H2: cutscene_active, the picture, the text mode and the logo stay set while the exit transition fades to black, so the
+    // last image fades out with the screen instead of vanishing first. Transition_PreRoomChange (Cutscene_ClearUiState) clears them.
     gs.ui.cutscene_chars_per_sec = -1;
-    gs.ui.cutscene_logo_sprite = noone;
-    gs.ui.cutscene_logo_alpha = 0;
     gs.pending_cutscene_id = "";
 
     cutscene_started = false;
@@ -447,58 +261,32 @@ if (state == "cutscene") {
     cutscene_wait_transition = false;
     cutscene_transition_next_index = -1;
     cutscene_transition_switched = false;
+    cutscene_skip = false;
+    Skip_Reset();
 
     switch (cutscene_id) {
         case "intro":
-            // reset core state for new game
-            if (ds_exists(gs.defeated_enemies, ds_type_list)) ds_list_clear(gs.defeated_enemies);
-            gs.room_states = {};
-            gs.persist = {};
-            gs.persist_applied = {};
-            gs.uid_counter = 1;
-            gs.enemy_reset_version = 0;
-            gs.boss_defeated = { mini_boss: false, final_boss: false };
-
-            GameState_SetSelectedClass(CLASS_NOBODY);
-            gs.player_ch = CharacterCreate_Player(CLASS_NOBODY);
-            GameState_SetPlayer(gs.player_ch);
-
-            gs.in_main_menu = false;
-            gs.pending_floor1_intro_dialogue = true;
-            GameSettings_ApplyAll();
-            Transition_RequestCutsceneFade(rm_floor1, "start", -1, true);
+            // C1: the intro is story (D26): marked seen, then the first run starts (the reset of core state moved into Run_StartNew)
+            Story_Mark(Story_CutsceneKey("intro"));
+            Run_StartNew(true);
             break;
         case "ending":
+            Run_OnWin();   // C1: wins + 1; the first win unlocks the Nobody class
             gs.in_main_menu = true;
-            Transition_RequestCutsceneFade(rm_start);
+            Cutscene_ClearUiState();
+            Skip_Reset();
+            credits_t = 0;
+            state = "credits";   // C5 (D105): the credits roll, then the title
             break;
         case "game_over":
+            // C1 (D46, D103): no reload after a death. The run is already over in the profile; show the summary, then a new run (the echo comes after its class pick, D130).
             gs.in_main_menu = false;
-            var load_slot = 0;
-            if (variable_struct_exists(gs, "save_slot")) {
-                var preferred_slot = round(real(gs.save_slot));
-                if (preferred_slot >= 1 && preferred_slot <= 3 && Save_HasSlot(preferred_slot)) {
-                    load_slot = preferred_slot;
-                }
-            }
-            if (load_slot <= 0) load_slot = Save_FindLatestSlot();
-
-            if (load_slot > 0 && Save_Read(load_slot)) {
-                // Save_Read handles transition to the loaded room.
-            } else {
-                gs.in_main_menu = true;
-                Transition_RequestCutsceneFade(rm_start);
-            }
+            RunFlow_Begin();
+            state = "run_flow";
             break;
         default:
             Transition_RequestRoomFade(rm_start);
             break;
     }
-    return;
-}
-
-if (state == "settings") {
-    SettingsPopup_HandleInput();
-    if (!SettingsPopup_IsOpen("title")) state = "main";
     return;
 }

@@ -8,27 +8,25 @@ function CharacterCreate_Player(_class_id) {
     ch.exp = 0;
     ch.exp_next = Exp_NextLevel(ch.level);
 
-    ch.stats = StatsCreateBase();
-    // apply class bonus
-    ch.stats.str  += ch.class_cfg.bonus.str;
-    ch.stats.agi  += ch.class_cfg.bonus.agi;
-    ch.stats.def  += ch.class_cfg.bonus.def;
-    ch.stats.intt += ch.class_cfg.bonus.intt;
-    ch.stats.luck += ch.class_cfg.bonus.luck;
-    ch.stats = StatsClampAll(ch.stats);
+    // Level-1 stats of the class (combat-spec.md section 2).
+    ch.stats = StatsClampAll({ atk: ch.class_cfg.stats.atk, def: ch.class_cfg.stats.def, spd: ch.class_cfg.stats.spd, mag: ch.class_cfg.stats.mag });
 
-    ch.hp = 9999; // temp; will clamp after compute
-    ch.mp = 9999;
+    // RecomputeResources reads hp/mp, so they must exist first; a new character then starts full.
+    ch.hp = 0;
+    ch.mp = 0;
 
     ch = RecomputeResources(ch);
+    ch.hp = ch.max_hp;
+    ch.mp = ch.max_mp;
 
     // inventory/equip (later sections)
     ch.inventory = [];
-    ch.equip = { weapon: 0, head: 0, body: 0, ring1: 0, ring2: 0 };
+    ch.equip = { weapon: 0, head: 0, body: 0, ring1: 0, ring2: 0, accessory: 0 };   // C3 (D92): accessory = ring or charm
     ch.skills = Player_DefaultSkills(_class_id);
     ch.stat_points = 0;
     ch.status = [];
     ch.inventory = Inv_Add(ch.inventory, 10, 2);
+    ch = Card_EnsureFields(ch);   // C2: upgrades, passives, owed picks
     ch = Player_NormalizeProgression(ch, true);
 
     return ch;
@@ -50,72 +48,22 @@ function Difficulty_GetCurrent() {
     return DIFFICULTY_NORMAL;
 }
 
-function Difficulty_Label(_difficulty = -1) {
-    var d = _difficulty;
-    if (argument_count <= 0 || d == -1) d = Difficulty_GetCurrent();
-    d = Difficulty_Normalize(d);
-    switch (d) {
-        case DIFFICULTY_EASY: return Loc_T("settings.difficulty.option.0", "Easy");
-        case DIFFICULTY_HARD: return Loc_T("settings.difficulty.option.2", "Hard");
-        default: return Loc_T("settings.difficulty.option.1", "Normal");
-    }
-}
-
+// D35: ONE difficulty. Whatever difficulty id is saved (the id only survives for the title screen and the save format until the UI
+// packets drop it), the profile is the same. The single knob is the QTE assist multiplier on damage the PLAYER takes (1 = off);
+// the assist setting writes global.assist_damage_taken_mult (combat-spec.md section 5).
 function Difficulty_Profile(_difficulty = -1) {
-    var d = _difficulty;
-    if (argument_count <= 0 || d == -1) d = Difficulty_GetCurrent();
-    d = Difficulty_Normalize(d);
-
-    switch (d) {
-        case DIFFICULTY_EASY:
-            return {
-                id: DIFFICULTY_EASY,
-                player_stat_mult: 1.00,
-                enemy_stat_mult: 1.00,
-                player_hp_mult: 1.15,
-                player_mp_mult: 1.05,
-                enemy_hp_mult: 0.90,
-                enemy_mp_mult: 0.95,
-                player_damage_mult: 1.08,
-                enemy_damage_mult: 0.90,
-                enemy_status_chance_mult: 0.90,
-                player_exp_mult: 1.20
-            };
-        case DIFFICULTY_HARD:
-            return {
-                id: DIFFICULTY_HARD,
-                player_stat_mult: 1.00,
-                enemy_stat_mult: 1.00,
-                player_hp_mult: 0.92,
-                player_mp_mult: 0.95,
-                enemy_hp_mult: 1.12,
-                enemy_mp_mult: 1.00,
-                player_damage_mult: 0.94,
-                enemy_damage_mult: 1.12,
-                enemy_status_chance_mult: 1.08,
-                player_exp_mult: 0.85
-            };
-        default:
-            return {
-                id: DIFFICULTY_NORMAL,
-                player_stat_mult: 1.00,
-                enemy_stat_mult: 1.00,
-                player_hp_mult: 1.00,
-                player_mp_mult: 1.00,
-                enemy_hp_mult: 1.00,
-                enemy_mp_mult: 1.00,
-                player_damage_mult: 1.00,
-                enemy_damage_mult: 1.00,
-                enemy_status_chance_mult: 1.00,
-                player_exp_mult: 1.00
-            };
-    }
+    var assist = 1;
+    if (variable_global_exists("assist_damage_taken_mult")) assist = clamp(real(global.assist_damage_taken_mult), 0, 1);
+    return {
+        id: DIFFICULTY_NORMAL,
+        assist_damage_taken_mult: assist,
+        player_exp_mult: 1.00
+    };
 }
 
 function Difficulty_SetCurrent(_difficulty) {
     var gs = GameState_Get();
     gs.difficulty = Difficulty_Normalize(_difficulty);
-    global.difficulty = gs.difficulty;
     return gs.difficulty;
 }
 
@@ -166,6 +114,23 @@ function Player_CanAcceptMove(_pl) {
     return true;
 }
 
+// I-048: the player never rests between tiles. Called each step when not mid-step (save/load, aborted step, odd spawn).
+// Picks the nearest cell that is not a wall or an interactable. Returns true when it moved the player.
+function Player_TileBlocked(_inst, _x, _y) {
+    var _hit = false;
+    with (_inst) _hit = place_meeting(_x, _y, obj_wall) || Grid_PropBlocks(id, _x, _y);   // D179: tall grass is walkable
+    return _hit;
+}
+
+function Player_SnapIfOffGrid(_pl) {
+    if (!instance_exists(_pl)) return false;
+    if (Grid_IsAligned(_pl.x) && Grid_IsAligned(_pl.y)) return false;
+    var _p = Grid_FindFreeSnap(_pl, _pl.x, _pl.y, function(_inst, _x, _y) { return !Player_TileBlocked(_inst, _x, _y); });
+    _pl.x = _p.x;
+    _pl.y = _p.y;
+    return true;
+}
+
 function Player_StartAutoResolveRecover(_pl, _recover_frames = ENEMY_AUTO_RESOLVE_RECOVER_FRAMES, _apply_battle_cooldown = true) {
     if (!instance_exists(_pl)) return;
 
@@ -174,6 +139,12 @@ function Player_StartAutoResolveRecover(_pl, _recover_frames = ENEMY_AUTO_RESOLV
     var gx = round(_pl.x / tile) * tile;
     var gy = round(_pl.y / tile) * tile;
     var frames = max(0, round(real(_recover_frames)));
+    // I-048: never settle into a wall or a chest; take the nearest free cell instead.
+    if (Player_TileBlocked(_pl, gx, gy)) {
+        var _free_cell = Grid_FindFreeSnap(_pl, _pl.x, _pl.y, function(_inst, _x, _y) { return !Player_TileBlocked(_inst, _x, _y); });
+        gx = _free_cell.x;
+        gy = _free_cell.y;
+    }
 
     if (variable_instance_exists(_pl, "moving")) _pl.moving = false;
     if (variable_instance_exists(_pl, "move_timer")) _pl.move_timer = 0;
@@ -205,6 +176,81 @@ function Player_StartAutoResolveRecover(_pl, _recover_frames = ENEMY_AUTO_RESOLV
     if (_apply_battle_cooldown && variable_instance_exists(_pl, "battle_cooldown")) {
         _pl.battle_cooldown = max(_pl.battle_cooldown, BATTLE_COOLDOWN_FRAMES);
     }
+
+    Player_ArmExitIgnore(_pl, gx, gy);   // D64
+}
+
+// D64: a player placed (arrival, battle return, Continue) standing on an exit tile: that exit ignores them until they step off it. _gx/_gy: the cell
+// (default: the one the player is on). A point test on the cell centre uses the exit's mask only (a fresh player has no mask until its first Step).
+function Player_ArmExitIgnore(_pl, _gx = undefined, _gy = undefined) {
+    if (!instance_exists(_pl) || !variable_instance_exists(_pl, "exit_ignore")) return noone;
+    var tile = GRID_TILE_SIZE;
+    if (variable_instance_exists(_pl, "tile_size")) tile = max(1, round(real(_pl.tile_size)));
+    var gx = is_undefined(_gx) ? round(_pl.x / tile) * tile : _gx;
+    var gy = is_undefined(_gy) ? round(_pl.y / tile) * tile : _gy;
+    var _exit_here = instance_position(gx + tile / 2, gy + tile / 2, obj_room_transition);
+    if (_exit_here != noone) _pl.exit_ignore = _exit_here;
+    return _exit_here;
+}
+
+// ---- D127: the first class chest of a run cannot be skipped ----
+// rm_floor1 holds the run's first class chest and skill chest (D73: the first one opened gives the class choice) and nothing there is
+// reachable only after the exit, so floor 1's exit refuses a player who has not chosen a class yet. A character struct that predates
+// class_chosen counts as chosen when it has a class (the same rule as Card_EnsureFields).
+function ClassGuard_Applies(_ch, _room) {
+    if (!is_struct(_ch)) return false;
+    if (_room != rm_floor1) return false;
+    if (variable_struct_exists(_ch, "class_chosen")) return !_ch.class_chosen;
+    return !(variable_struct_exists(_ch, "class_id") && _ch.class_id != CLASS_NOBODY);
+}
+
+// The way back from a direction (the one the player was walking into the exit); -1 for none.
+function ClassGuard_BackDir(_dir) {
+    switch (_dir) {
+        case RIGHT: return LEFT;
+        case LEFT: return RIGHT;
+        case UP: return DOWN;
+        case DOWN: return UP;
+    }
+    return -1;
+}
+
+// Where the player steps after the lines: straight back from the exit, else sideways; never into a wall or a chest. -1 when boxed in.
+function ClassGuard_PickDir(_pl, _dir_to_exit) {
+    if (!instance_exists(_pl) || _dir_to_exit == -1) return -1;
+    var tile = GRID_TILE_SIZE;
+    if (variable_instance_exists(_pl, "tile_size")) tile = max(1, round(real(_pl.tile_size)));
+    var back = ClassGuard_BackDir(_dir_to_exit);
+    var side_a = (back == LEFT || back == RIGHT) ? UP : LEFT;
+    var tries = [back, side_a, ClassGuard_BackDir(side_a)];
+    for (var i = 0; i < 3; i++) {
+        var d = tries[i];
+        var tx = _pl.x + ((d == RIGHT) - (d == LEFT)) * tile;
+        var ty = _pl.y + ((d == DOWN) - (d == UP)) * tile;
+        if (!Player_TileBlocked(_pl, tx, ty)) return d;
+    }
+    return -1;
+}
+
+// Called by an exit (obj_room_transition) the player walked into. True = the exit does not fire: the step into it is undone, the two lines
+// play, and the player's Step walks him one tile back once they are read (the same movement code as any step, so he stays on the grid, D69).
+function ClassGuard_OnExit(_pl) {
+    if (!instance_exists(_pl)) return false;
+    var gs = GameState_Get();
+    if (!ClassGuard_Applies(gs.player_ch, room)) return false;
+    if (UI_IsBlocking()) return true;   // a screen is already up: the exit waits (the lines come when the player walks into it again)
+    var dir_to_exit = variable_instance_exists(_pl, "move_dir") ? _pl.move_dir : -1;
+    if (dir_to_exit == -1 && variable_instance_exists(_pl, "face")) dir_to_exit = _pl.face;
+    if (variable_instance_exists(_pl, "moving") && _pl.moving && variable_instance_exists(_pl, "step_from_x")) {
+        _pl.x = _pl.step_from_x;   // the step into the exit is undone, as an aborted step is (I-048)
+        _pl.y = _pl.step_from_y;
+    }
+    _pl.moving = false;
+    _pl.move_timer = 0;
+    _pl.move_dir = -1;
+    _pl.class_guard_to = dir_to_exit;
+    Dialogue_StartLines(DialogueDB_Get("sys_class_chest_guard"));
+    return true;
 }
 
 function Player_EnsureDialogueSettle(_pl, _recover_frames = PLAYER_DIALOGUE_SETTLE_FRAMES) {
@@ -463,6 +509,34 @@ function DialogueTrigger_BeginFollowRestoreBlend(_tr) {
     return true;
 }
 
+// The camera pan is skipped: follow comes back and the camera is put on the player at once. The cinematic then waits for its dialogue to end
+// (like a trigger with no pan), which releases the enemy lock and the input lock as usual. Not a cut for the dialogue itself.
+function DialogueTrigger_SkipPan(_tr) {
+    if (!instance_exists(_tr)) return;
+    var cam = _tr.cine_cam_id;
+    if (!is_undefined(cam) && cam != -1) {
+        if (variable_instance_exists(_tr, "cine_follow_suspended") && _tr.cine_follow_suspended) {
+            var restore_obj = obj_player;
+            if (variable_instance_exists(_tr, "camera_restore_target_object")) {
+                var ro = _tr.camera_restore_target_object;
+                if (is_real(ro) && object_exists(ro)) restore_obj = ro;
+            }
+            camera_set_view_target(cam, restore_obj);
+            _tr.cine_follow_suspended = false;
+        }
+        var pl = DialogueTrigger_GetPlayerInst();
+        if (instance_exists(pl)) {
+            var pt = DialogueTrigger_GetTargetPoint(pl);
+            var pos = DialogueTrigger_CameraPosForPoint(cam, pt.x, pt.y);
+            camera_set_view_pos(cam, pos.x, pos.y);
+        }
+    }
+    _tr.cine_cam_id = -1;
+    _tr.cine_target_inst = noone;
+    _tr.cine_phase = "wait_dialogue_end";
+    Skip_Reset();
+}
+
 function DialogueTrigger_ApplyBlackHandoff(_tr) {
     if (!instance_exists(_tr)) return;
     DialogueTrigger_CleanupCinematic(_tr, true, true);
@@ -607,6 +681,16 @@ function DialogueTrigger_UpdateCinematic(_tr) {
     }
 
     var cam = _tr.cine_cam_id;
+
+    // D48 / I-055: holding confirm for about a second ends the camera pan (it counts as seen; a tap only advances text).
+    if (_tr.cine_phase == "pan_in" || _tr.cine_phase == "hold" || _tr.cine_phase == "pan_out") {
+        Skip_Claim();
+        if (Skip_Consume()) {
+            DialogueTrigger_SkipPan(_tr);
+            return;
+        }
+    }
+
     var ease_name = DIALOGUE_TRIGGER_EASE_DEFAULT;
     if (variable_instance_exists(_tr, "camera_ease")) ease_name = string(_tr.camera_ease);
 
@@ -734,6 +818,7 @@ function DialogueTrigger_UpdateCinematic(_tr) {
 
 function UI_IsBlocking() {
     if (Transition_IsInputLocked()) return true;
+    if (Tutorial_IsOpen() || Tutorial_JustClosed()) return true;   // D45: a tutorial pop-up stops the world until it is dismissed
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui") || !is_struct(gs.ui)) return false;
     if (variable_struct_exists(gs.ui, "mode") && gs.ui.mode != UI_NONE) return true;
@@ -744,28 +829,12 @@ function UI_IsBlocking() {
 }
 
 function UI_GetTextScale() {
-    var gui_w = max(1, display_get_gui_width());
-    var gui_h = max(1, display_get_gui_height());
-    var fit_screen = false;
-    if (variable_global_exists("state")
-    && is_struct(global.state)
-    && variable_struct_exists(global.state, "settings")
-    && is_struct(global.state.settings)
-    && variable_struct_exists(global.state.settings, "fit_screen")) {
-        fit_screen = (global.state.settings.fit_screen != 0);
-    }
-
-    // Preserve legacy 3x/4x/5x windowed behavior, while allowing fullscreen UI to scale up.
-    var ref_scale = fit_screen ? DISPLAY_SCALE_DEFAULT : DISPLAY_SCALE_MAX;
-    var ref_w = max(1, DISPLAY_BASE_W * ref_scale);
-    var ref_h = max(1, DISPLAY_BASE_H * ref_scale);
-    var dyn = min(gui_w / ref_w, gui_h / ref_h);
-    var scale = UI_TEXT_SCALE_BASE * dyn;
-    if (fit_screen) {
-        // Fullscreen readability: keep pixel font stable.
-        scale = round(scale * 2) / 2;
-    }
-    return clamp(scale, UI_TEXT_SCALE_MIN, UI_TEXT_SCALE_MAX);
+    // Integer UI-grid rule (display-design.md section 2): the pixel font lands on whole window pixels.
+    // n = window pixels per font pixel, a multiple of the GUI unit (ui_scale); the text scale follows from the font's own pixel (DISPLAY_FONT_PX).
+    var _l = Display_Layout();
+    var _u = _l.ui_scale;
+    var _n = max(_u, round(round(0.8 * _l.scale) / _u) * _u);
+    return clamp(_n / (DISPLAY_FONT_PX * _u), UI_TEXT_SCALE_MIN, UI_TEXT_SCALE_MAX);
 }
 
 function UI_GetVisualScale() {
@@ -775,454 +844,182 @@ function UI_GetVisualScale() {
 
 function UI_GetSpriteScale(_base = 1) {
     var mul = max(0.0001, real(_base));
-    var visual = UI_GetVisualScale();
-    var fit_screen = false;
-    if (variable_global_exists("state")
-    && is_struct(global.state)
-    && variable_struct_exists(global.state, "settings")
-    && is_struct(global.state.settings)
-    && variable_struct_exists(global.state.settings, "fit_screen")) {
-        fit_screen = (global.state.settings.fit_screen != 0);
-    }
-
-    var step = max(1, ceil(visual));
-    if (fit_screen) {
-        // Slight fullscreen boost so bars/icons/logos don't stay tiny vs larger text.
-        step = max(1, ceil(visual + 0.25));
-    }
+    var step = max(1, ceil(UI_GetVisualScale()));
     return max(1, round(mul * step));
 }
 
+// The scale text is DRAWN at. English: the integer rule above. Korean (D98): Galmuri is added at its final window-pixel size
+// (a whole multiple of its native 9 or 11 px, UI_KoFont), so it is drawn at 1 texel = 1 window pixel = 1 / ui_scale GUI units.
+// Cached per (layout struct, language): Display_Relayout makes a new layout struct and Loc_SetLanguage changes the language string, so either rebuilds it.
+function UI_GetFontScale() {
+    var _l = Display_Layout();
+    var _lang = Loc_GetLanguage();
+    var _c = variable_global_exists("ui_fs_cache") ? global.ui_fs_cache : undefined;
+    if (is_struct(_c) && _c.layout == _l && _c.lang == _lang) return _c.scale;
+    var _s = UI_FontScaleBuild();
+    global.ui_fs_cache = { layout: _l, lang: _lang, scale: _s };
+    return _s;
+}
+
+// The uncached computation of UI_GetFontScale. Counted (UI_FontScaleBuilds) so a check can see how often it runs.
+function UI_FontScaleBuild() {
+    if (!variable_global_exists("ui_fs_builds")) global.ui_fs_builds = 0;
+    global.ui_fs_builds++;
+    if (Loc_GetLanguage() == "ko" && UI_KoFont() != -1) return 1 / Display_Layout().ui_scale;
+    return UI_GetTextScale();
+}
+
+function UI_FontScaleBuilds() {
+    return variable_global_exists("ui_fs_builds") ? global.ui_fs_builds : 0;
+}
+
 function UI_TextWidth(_txt) {
-    var s = UI_GetTextScale();
+    var s = UI_GetFontScale();
     return max(0, round(string_width(string(_txt)) * s));
 }
 
 function UI_TextHeight(_txt = "A") {
-    var s = UI_GetTextScale();
+    var s = UI_GetFontScale();
     return max(1, round(string_height(string(_txt)) * s));
 }
 
 function UI_DrawText(_x, _y, _txt) {
-    var s = UI_GetTextScale();
+    var s = UI_GetFontScale();
     draw_text_transformed(real(_x), real(_y), string(_txt), s, s, 0);
 }
 
 function UI_DrawTextTransformed(_x, _y, _txt, _xscale, _yscale, _angle) {
-    var s = UI_GetTextScale();
+    var s = UI_GetFontScale();
     draw_text_transformed(real(_x), real(_y), string(_txt), real(_xscale) * s, real(_yscale) * s, real(_angle));
 }
 
-function UI_DrawTextExt(_x, _y, _txt, _sep, _w) {
-    var s = max(0.0001, UI_GetTextScale());
-    var sep = real(_sep);
-    var wrap_w = real(_w);
-    if (sep > 0) sep = max(1, round(sep / s));
-    if (wrap_w > 0) wrap_w = max(1, round(wrap_w / s));
-    draw_text_ext_transformed(real(_x), real(_y), string(_txt), sep, wrap_w, s, s, 0);
+// The Korean UI font (D98): Galmuri9 or Galmuri11 (SIL OFL, Included Files at fonts/galmuri) added at the whole multiple of its
+// native size that matches the English line height in window pixels. One font per size is cached. -1 when the file is missing.
+function UI_KoFont() {
+    var l = Display_Layout();
+    var sig = l.scale * 100 + l.ui_scale;
+    if (variable_global_exists("ui_ko_sig") && global.ui_ko_sig == sig) return global.ui_ko_cur;   // same layout as the last call
+    var target = UI_KoTargetPx();
+    var f = UI_KoFontGet(Ui_KoFontChoice(target));
+    global.ui_ko_sig = sig;
+    global.ui_ko_cur = f;
+    return f;
+}
+
+// The window-pixel height the Korean font is chosen for: the English line height at the text scale in force.
+function UI_KoTargetPx() {
+    if (!variable_global_exists("ui_en_line_px")) {
+        var f0 = draw_get_font();
+        draw_set_font(UI_FONT);
+        global.ui_en_line_px = string_height("A");   // the English font's line height at text scale 1.0, in window pixels
+        draw_set_font(f0);
+    }
+    return global.ui_en_line_px * UI_GetTextScale() * Display_Layout().ui_scale;
+}
+
+// The font for one Ui_KoFontChoice result { face, k, px }: made on first use and cached by face and multiple. -1 when the file is missing (a miss is cached too).
+function UI_KoFontGet(_ch) {
+    if (!variable_global_exists("ui_ko_fonts") || !is_struct(global.ui_ko_fonts)) global.ui_ko_fonts = {};
+    var key = "g" + string(_ch.face) + "x" + string(_ch.k);
+    var f = -1;
+    if (variable_struct_exists(global.ui_ko_fonts, key)) {
+        f = variable_struct_get(global.ui_ko_fonts, key);
+    } else {
+        var path = "fonts/galmuri/Galmuri" + string(_ch.face) + ".ttf";
+        if (file_exists(path)) {
+            var t0 = current_time;
+            f = font_add(path, _ch.px * 0.75, false, false, 32, 55203);   // points = pixels * 0.75
+            show_debug_message("[UI] Galmuri" + string(_ch.face) + " x" + string(_ch.k) + " (" + string(_ch.px) + " px) font " + string(f) + " added in " + string(current_time - t0) + " ms");
+        } else {
+            show_debug_message("[UI] Korean font file missing: " + path);
+        }
+        variable_struct_set(global.ui_ko_fonts, key, f);   // a miss is cached too: no retry every frame
+    }
+    return f;
+}
+
+// R3 (D168): the UI has one pixel font, drawn at whole multiples of its pixel (English) or as Galmuri at its own whole multiples (Korean). A "type step" is one
+// notch down in that size: step 0 is the size UI_SetFont and UI_GetFontScale give, step 1 the next smaller one the UI can draw (English: one window pixel
+// per font pixel less; Korean: the next smaller Galmuri size). Returns { font, scale, step }; step is 0 when there is nothing smaller. Used for the one
+// name that has a single word wider than its column. Does not change the font that is set.
+function UI_FontStep(_step) {
+    var s0 = UI_GetFontScale();
+    var cur = { font: UI_FONT, scale: s0, step: 0 };
+    if (Loc_GetLanguage() == "ko") {
+        var fk = UI_KoFont();
+        if (fk != -1) cur.font = fk;
+    }
+    if (_step <= 0) return cur;
+    var l = Display_Layout();
+    var u = l.ui_scale;
+    if (Loc_GetLanguage() == "ko" && cur.font != UI_FONT) {
+        var now = Ui_KoFontChoice(UI_KoTargetPx());
+        var best = undefined;
+        var faces = [9, 11];
+        for (var i = 0; i < 2; i++) {
+            var k = floor((now.px - 1) / faces[i]);
+            if (k < 1) continue;
+            var px = faces[i] * k;
+            if (is_undefined(best) || px > best.px) best = { face: faces[i], k: k, px: px };
+        }
+        if (is_undefined(best)) return cur;
+        var fs = UI_KoFontGet(best);
+        if (fs == -1) return cur;
+        return { font: fs, scale: 1 / u, step: 1 };
+    }
+    var n = round(s0 * DISPLAY_FONT_PX * u);   // window pixels per font pixel now
+    var n1 = n - u;
+    if (n1 < 1) return cur;
+    return { font: UI_FONT, scale: n1 / (DISPLAY_FONT_PX * u), step: 1 };
 }
 
 function UI_SetFont() {
     var font_to_use = UI_FONT;
     if (Loc_GetLanguage() == "ko") {
-        if (!variable_global_exists("ui_font_ko")) global.ui_font_ko = -1;
-        if (!variable_global_exists("ui_font_ko_warned")) global.ui_font_ko_warned = false;
-
-        // Retry until success so one failed early load doesn't permanently break Korean text.
-        if (global.ui_font_ko == -1) {
-            // Match English UI scale more closely.
-            var ko_size = 11;
-            // Use only sandbox-safe relative paths (absolute paths are blocked by the runner).
-            var ko_paths = [
-                "NanumGothic-Regular.ttf",
-                "datafiles/NanumGothic-Regular.ttf",
-                "datafiles/fonts/NanumGothic-Regular.ttf",
-                "NotoSansCJKkr-Regular.otf",
-                "datafiles/NotoSansCJKkr-Regular.otf",
-                "datafiles/fonts/NotoSansCJKkr-Regular.otf"
-            ];
-
-            for (var i = 0; i < array_length(ko_paths); i++) {
-                var p = ko_paths[i];
-                if (!file_exists(p)) continue;
-                global.ui_font_ko = font_add(p, ko_size, false, false, 32, 55203);
-                if (global.ui_font_ko != -1) break;
-            }
-
-            if (global.ui_font_ko == -1 && !global.ui_font_ko_warned) {
-                global.ui_font_ko_warned = true;
-                show_debug_message("UI_SetFont: failed to load Korean runtime font from all known paths.");
-            } else if (global.ui_font_ko != -1) {
-                global.ui_font_ko_warned = false;
-            }
-        }
-
-        if (global.ui_font_ko != -1) font_to_use = global.ui_font_ko;
+        var fk = UI_KoFont();
+        if (fk != -1) font_to_use = fk;
     }
     draw_set_font(font_to_use);
 }
 
-function UI_PopupFadeAlpha(_opened_frame, _target_alpha = 1, _fade_frames = UI_POPUP_FADE_FRAMES) {
-    var target = clamp(real(_target_alpha), 0, 1);
-    var frames = max(1, round(real(_fade_frames)));
-    if (!is_real(_opened_frame) || _opened_frame < 0) return target;
-    var age = max(0, Input_Frame() - _opened_frame);
-    return target * clamp(age / frames, 0, 1);
-}
-
-function UI_PopupAlpha(_opened_frame, _closing = false, _close_frame = UI_OPENED_FRAME_NONE, _target_alpha = 1, _fade_frames = UI_POPUP_FADE_FRAMES) {
-    var a = UI_PopupFadeAlpha(_opened_frame, _target_alpha, _fade_frames);
-    if (_closing) {
-        var frames = max(1, round(real(_fade_frames)));
-        var cf = is_real(_close_frame) ? _close_frame : Input_Frame();
-        var t = clamp((Input_Frame() - cf) / frames, 0, 1);
-        a *= (1 - t);
-    }
-    return clamp(a, 0, 1);
-}
-
-function UI_ModalRootEnsure() {
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
-    if (!variable_struct_exists(gs.ui, "modal_root")) {
-        gs.ui.modal_root = {
-            active: false,
-            owner: "",
-            opened_frame: UI_OPENED_FRAME_NONE,
-            closing: false,
-            close_frame: UI_OPENED_FRAME_NONE,
-            hold_until_transition: false,
-            hold_mode: ""
-        };
-    }
-    return gs.ui.modal_root;
-}
-
-function UI_ModalRootBegin(_owner = "") {
-    var gs = GameState_Get();
-    var root = UI_ModalRootEnsure();
-    if (!root.active) {
-        root.active = true;
-        root.opened_frame = Input_Frame();
-    }
-    root.owner = string(_owner);
-    root.closing = false;
-    root.close_frame = UI_OPENED_FRAME_NONE;
-    root.hold_until_transition = false;
-    root.hold_mode = "";
-    gs.ui.modal_root = root;
-}
-
-function UI_ModalRootTransfer(_owner = "") {
-    var gs = GameState_Get();
-    var root = UI_ModalRootEnsure();
-    if (!root.active) {
-        UI_ModalRootBegin(_owner);
-        return;
-    }
-    root.owner = string(_owner);
-    root.closing = false;
-    root.close_frame = UI_OPENED_FRAME_NONE;
-    root.hold_until_transition = false;
-    root.hold_mode = "";
-    gs.ui.modal_root = root;
-}
-
-function UI_ModalRootHold(_mode = "transition") {
-    var gs = GameState_Get();
-    var root = UI_ModalRootEnsure();
-    if (!root.active) return;
-
-    root.closing = false;
-    root.close_frame = UI_OPENED_FRAME_NONE;
-    root.hold_until_transition = (string(_mode) == "transition");
-    root.hold_mode = string(_mode);
-    gs.ui.modal_root = root;
-}
-
-function UI_ModalRootEnd(_hold_until_transition = false, _immediate = false) {
-    var gs = GameState_Get();
-    var root = UI_ModalRootEnsure();
-    if (!root.active) return;
-
-    if (_immediate) {
-        root.active = false;
-        root.owner = "";
-        root.opened_frame = UI_OPENED_FRAME_NONE;
-        root.closing = false;
-        root.close_frame = UI_OPENED_FRAME_NONE;
-        root.hold_until_transition = false;
-        root.hold_mode = "";
-        gs.ui.modal_root = root;
-        return;
-    }
-
-    if (_hold_until_transition) {
-        root.closing = false;
-        root.close_frame = UI_OPENED_FRAME_NONE;
-        root.hold_until_transition = true;
-        root.hold_mode = "transition";
-        gs.ui.modal_root = root;
-        return;
-    }
-
-    if (root.closing) return;
-    root.closing = true;
-    root.close_frame = Input_Frame();
-    root.hold_until_transition = false;
-    root.hold_mode = "";
-    gs.ui.modal_root = root;
-}
-
+// _fade_dim is kept for the callers: the modal dim it used to fade out is gone (every screen draws its own backdrop).
 function UI_InterruptCloseAll(_fade_dim = true) {
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "ui")) gs.ui = {};
 
     // Immediately hide all modal/popups to avoid stale mode locks during transitions.
-    if (variable_struct_exists(gs.ui, "menu") && is_struct(gs.ui.menu)) {
-        var m = gs.ui.menu;
-        m.open = false;
-        m.closing = false;
-        m.close_frame = UI_OPENED_FRAME_NONE;
-        m.inv_popup_open = false;
-        m.inv_popup_closing = false;
-        m.inv_popup_close_frame = UI_OPENED_FRAME_NONE;
-        m.inv_popup_open_frame = UI_OPENED_FRAME_NONE;
-        gs.ui.menu = m;
+    if (KeepThis_Active()) KeepThis_Revert();   // D140: a window change nobody confirmed goes back
+    if (is_struct(TabMenu_Get())) {   // D1b: the one menu is a framework screen held in a global
+        TabSettings_Discard();
+        global.tab_ui = undefined;
     }
 
-    if (variable_struct_exists(gs.ui, "pause_menu") && is_struct(gs.ui.pause_menu)) {
-        var pm = gs.ui.pause_menu;
-        pm.open = false;
-        pm.closing = false;
-        pm.close_frame = UI_OPENED_FRAME_NONE;
-        pm.opened_frame = UI_OPENED_FRAME_NONE;
-        gs.ui.pause_menu = pm;
-    }
+    Notice_Interrupt();
+    Confirm_Close();       // D156
 
-    if (variable_struct_exists(gs.ui, "save_menu") && is_struct(gs.ui.save_menu)) {
-        var sm = gs.ui.save_menu;
-        sm.open = false;
-        sm.closing = false;
-        sm.close_frame = UI_OPENED_FRAME_NONE;
-        sm.confirm = false;
-        sm.confirm_closing = false;
-        sm.confirm_close_frame = UI_OPENED_FRAME_NONE;
-        sm.pending_action = "";
-        sm.pending_slot = 0;
-        gs.ui.save_menu = sm;
-    }
-
-    if (variable_struct_exists(gs.ui, "bed_menu") && is_struct(gs.ui.bed_menu)) {
-        var bm = gs.ui.bed_menu;
-        bm.open = false;
-        bm.closing = false;
-        bm.close_frame = UI_OPENED_FRAME_NONE;
-        bm.pending_action = "";
-        gs.ui.bed_menu = bm;
-    }
-
-    if (variable_struct_exists(gs.ui, "class_select") && is_struct(gs.ui.class_select)) {
-        var cs = gs.ui.class_select;
-        cs.open = false;
-        cs.closing = false;
-        cs.close_frame = UI_OPENED_FRAME_NONE;
-        cs.pending_apply_class = -1;
-        cs.open_block_frame = UI_OPENED_FRAME_NONE;
-        cs.opened_frame = UI_OPENED_FRAME_NONE;
-        gs.ui.class_select = cs;
-    }
+    CardsUi_Interrupt();   // C2: what is owed opens again afterwards
+    BedUi_Interrupt();     // C4: the bed stays free
+    ShopUi_Interrupt();    // C3
+    TrapUi_Interrupt();    // R3 ideas2: a trapped chest's bar ends with no cost and no bonus (the chest's item was given when it opened)
 
     if (variable_struct_exists(gs.ui, "settings_popup") && is_struct(gs.ui.settings_popup)) {
         var sp = gs.ui.settings_popup;
         sp.open = false;
         sp.owner = "";
         sp.closing = false;
-        sp.close_frame = UI_OPENED_FRAME_NONE;
-        sp.opened_frame = UI_OPENED_FRAME_NONE;
-        sp.dirty = false;
-        sp.lr_hold_dir = 0;
-        sp.lr_hold_frames = 0;
+        sp.closed_ms = -1;
+        sp.menu = undefined;
         gs.ui.settings_popup = sp;
     }
 
     if (gs.ui.mode != UI_DIALOGUE) {
         gs.ui.mode = UI_NONE;
     }
-
-    // Keep dim behavior consistent: either fade out (default) or clear instantly.
-    if (_fade_dim) UI_ModalRootEnd(false, false);
-    else UI_ModalRootEnd(false, true);
-}
-
-function UI_GetModalVisualAlpha() {
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui")) return -1;
-
-    if (room == rm_start && instance_exists(obj_start_controller)) {
-        var sc = instance_find(obj_start_controller, 0);
-        if (instance_exists(sc)
-        && variable_instance_exists(sc, "state")
-        && string(sc.state) == "difficulty"
-        && variable_instance_exists(sc, "difficulty_opened_frame")
-        && variable_instance_exists(sc, "difficulty_closing")
-        && variable_instance_exists(sc, "difficulty_close_frame")) {
-            return UI_PopupAlpha(sc.difficulty_opened_frame, sc.difficulty_closing, sc.difficulty_close_frame, 1);
-        }
-    }
-
-    if (SettingsPopup_IsOpen("pause") && variable_struct_exists(gs.ui, "settings_popup")) {
-        var sp = gs.ui.settings_popup;
-        var sp_alpha = UI_PopupAlpha(sp.opened_frame, sp.closing, sp.close_frame, 1);
-
-        // Linked modal chain: while pause owns the stack and opens Settings,
-        // keep dim sourced from the stronger of parent/child alpha so dim
-        // never drops during handoff frames.
-        if (gs.ui.mode == UI_PAUSE && variable_struct_exists(gs.ui, "pause_menu")) {
-            var pm = gs.ui.pause_menu;
-            var pm_alpha = UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
-            return max(sp_alpha, pm_alpha);
-        }
-
-        return sp_alpha;
-    }
-
-    switch (gs.ui.mode) {
-        case UI_MENU:
-            if (variable_struct_exists(gs.ui, "menu")) {
-                var m = gs.ui.menu;
-                return UI_PopupAlpha(m.opened_frame, m.closing, m.close_frame, 1);
-            }
-            break;
-        case UI_PAUSE:
-            if (variable_struct_exists(gs.ui, "pause_menu")) {
-                var pm = gs.ui.pause_menu;
-                return UI_PopupAlpha(pm.opened_frame, pm.closing, pm.close_frame, 1);
-            }
-            break;
-        case UI_SAVE:
-            if (variable_struct_exists(gs.ui, "save_menu")) {
-                var sm = gs.ui.save_menu;
-                return UI_PopupAlpha(sm.opened_frame, sm.closing, sm.close_frame, 1);
-            }
-            break;
-        case UI_BED:
-            if (variable_struct_exists(gs.ui, "bed_menu")) {
-                var bm = gs.ui.bed_menu;
-                return UI_PopupAlpha(bm.opened_frame, bm.closing, bm.close_frame, 1);
-            }
-            break;
-    }
-
-    return -1;
-}
-
-function UI_UpdateModalDimState() {
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui")) gs.ui = {};
-    if (!variable_struct_exists(gs.ui, "modal_dim_alpha")) gs.ui.modal_dim_alpha = 0;
-    var prev_alpha = real(gs.ui.modal_dim_alpha);
-
-    var root = UI_ModalRootEnsure();
-    var alpha = 0;
-
-    if (root.active) {
-        if (root.hold_mode == "gameplay_load") {
-            alpha = 0.6;
-            if (!Transition_IsActive()
-            && variable_struct_exists(gs, "in_main_menu")
-            && !gs.in_main_menu) {
-                root.active = false;
-                root.owner = "";
-                root.opened_frame = UI_OPENED_FRAME_NONE;
-                root.closing = false;
-                root.close_frame = UI_OPENED_FRAME_NONE;
-                root.hold_until_transition = false;
-                root.hold_mode = "";
-                alpha = 0;
-            }
-        } else if (root.hold_mode == "title_room_change") {
-            var title_visual_alpha = UI_GetModalVisualAlpha();
-            if (title_visual_alpha >= 0) alpha = title_visual_alpha * 0.6;
-            else alpha = 0.6;
-
-            if (room != rm_start) {
-                root.active = false;
-                root.owner = "";
-                root.opened_frame = UI_OPENED_FRAME_NONE;
-                root.closing = false;
-                root.close_frame = UI_OPENED_FRAME_NONE;
-                root.hold_until_transition = false;
-                root.hold_mode = "";
-                alpha = 0;
-            }
-        } else if (root.hold_until_transition) {
-            alpha = 0.6;
-            if (Transition_IsActive()) {
-                root.active = false;
-                root.owner = "";
-                root.opened_frame = UI_OPENED_FRAME_NONE;
-                root.closing = false;
-                root.close_frame = UI_OPENED_FRAME_NONE;
-                root.hold_until_transition = false;
-                root.hold_mode = "";
-                alpha = 0;
-            }
-        } else {
-            var visual_alpha = UI_GetModalVisualAlpha();
-            if (visual_alpha >= 0) {
-                alpha = visual_alpha * 0.6;
-                // Keep dim sustained across linked modal handoffs (e.g. Bed -> Save,
-                // Pause -> Settings) while modal root remains active. Only the final
-                // modal-root close should fade the dim out.
-                if (!root.closing && alpha < prev_alpha) alpha = prev_alpha;
-            } else if (root.closing) {
-                alpha = UI_PopupAlpha(root.opened_frame, true, root.close_frame, 1) * 0.6;
-                if (Input_Frame() - root.close_frame >= UI_POPUP_FADE_FRAMES) {
-                    root.active = false;
-                    root.owner = "";
-                    root.opened_frame = UI_OPENED_FRAME_NONE;
-                    root.closing = false;
-                    root.close_frame = UI_OPENED_FRAME_NONE;
-                    root.hold_until_transition = false;
-                    root.hold_mode = "";
-                    alpha = 0;
-                }
-            } else {
-                alpha = UI_PopupAlpha(root.opened_frame, false, UI_OPENED_FRAME_NONE, 1) * 0.6;
-            }
-        }
-    }
-
-    gs.ui.modal_root = root;
-    gs.ui.modal_dim_alpha = alpha;
-    return alpha;
-}
-
-function UI_DrawModalDim() {
-    var gs = GameState_Get();
-    if (!variable_struct_exists(gs, "ui")) return;
-    var alpha = 0;
-    if (variable_struct_exists(gs.ui, "modal_dim_alpha")) alpha = real(gs.ui.modal_dim_alpha);
-    if (alpha <= 0) return;
-
-    var w = display_get_gui_width();
-    var h = display_get_gui_height();
-    draw_set_alpha(alpha);
-    draw_set_color(c_black);
-    draw_rectangle(0, 0, w, h, false);
-    draw_set_alpha(1);
-    draw_set_color(c_white);
 }
 
 function Action_CanAct(_pl) {
     if (UI_IsBlocking()) return false;
     return Player_CanAcceptMove(_pl);
-}
-
-function Action_KeyPressed(_pl, _action) {
-    if (!Action_CanAct(_pl)) return false;
-    return Input_Pressed(_action);
 }
 
 function Action_Request(_pl, _action) {
@@ -1261,8 +1058,13 @@ function GameSettings_Defaults() {
         audio_sfx: VOL_SFX_DEFAULT,
         audio_bgm: VOL_MUSIC_DEFAULT,
         display_scale: DISPLAY_SCALE_DEFAULT,
-        fit_screen: false,
-        language: "en"
+        window_mode: WINDOW_MODE_BORDERLESS,   // D91: first launch is borderless fullscreen (settings_version 8 replaced fit_screen)
+        language: "en",
+        text_speed: 1,    // settings_version 9 (D0): 0 slow, 1 normal, 2 fast (Settings_TextSpeedMul)
+        screen_shake: 1,  // 1 on, 0 off
+        rumble: 1,        // G8 (D136): controller rumble, 1 on, 0 off. No settings_version bump: a file without the field loads On.
+        qte_assist: 0,    // 1 on: zones x1.5 and arrow time x1.3 (D35, Qte_AssistMult / Qte_AssistTimeMultNow)
+        keys: Binds_Defaults()   // settings_version 10 (D49): the keyboard keys per rebindable action (scr_input, Binds_*)
     };
 }
 
@@ -1273,17 +1075,27 @@ function GameSettings_Normalize(_settings) {
         if (variable_struct_exists(_settings, "audio_sfx")) out.audio_sfx = _settings.audio_sfx;
         if (variable_struct_exists(_settings, "audio_bgm")) out.audio_bgm = _settings.audio_bgm;
         if (variable_struct_exists(_settings, "display_scale")) out.display_scale = _settings.display_scale;
-        if (variable_struct_exists(_settings, "fit_screen")) out.fit_screen = _settings.fit_screen;
+        if (variable_struct_exists(_settings, "window_mode")) out.window_mode = _settings.window_mode;
+        else if (variable_struct_exists(_settings, "fit_screen")) out.window_mode = Display_ModeFromLegacy(GameSettings_ToReal(_settings.fit_screen, 0) != 0);   // an old struct
         if (variable_struct_exists(_settings, "language")) out.language = _settings.language;
+        if (variable_struct_exists(_settings, "text_speed")) out.text_speed = _settings.text_speed;
+        if (variable_struct_exists(_settings, "screen_shake")) out.screen_shake = _settings.screen_shake;
+        if (variable_struct_exists(_settings, "rumble")) out.rumble = _settings.rumble;
+        if (variable_struct_exists(_settings, "qte_assist")) out.qte_assist = _settings.qte_assist;
+        if (variable_struct_exists(_settings, "keys")) out.keys = _settings.keys;
     }
 
     out.audio_ui = clamp(GameSettings_ToReal(out.audio_ui, VOL_UI_DEFAULT), 0, 1);
     out.audio_sfx = clamp(GameSettings_ToReal(out.audio_sfx, VOL_SFX_DEFAULT), 0, 1);
     out.audio_bgm = clamp(GameSettings_ToReal(out.audio_bgm, VOL_MUSIC_DEFAULT), 0, 1);
     out.display_scale = clamp(round(GameSettings_ToReal(out.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-    out.fit_screen = (GameSettings_ToReal(out.fit_screen, 0) != 0);
+    out.window_mode = Display_NormalizeMode(out.window_mode);
     out.language = GameSettings_NormalizeLanguage(out.language);
-    if (DISPLAY_FORCE_FIT_SCREEN != 0) out.fit_screen = true;
+    out.text_speed = clamp(round(GameSettings_ToReal(out.text_speed, 1)), 0, SETTINGS_TEXT_SPEED_MAX);
+    out.screen_shake = (GameSettings_ToReal(out.screen_shake, 1) != 0) ? 1 : 0;
+    out.rumble = (GameSettings_ToReal(out.rumble, 1) != 0) ? 1 : 0;
+    out.qte_assist = (GameSettings_ToReal(out.qte_assist, 0) != 0) ? 1 : 0;
+    out.keys = Binds_Normalize(out.keys);
     return out;
 }
 
@@ -1307,149 +1119,30 @@ function GameSettings_ApplyAudio() {
     Audio_SetMusicVolume(settings.audio_bgm);
 }
 
-function GameSettings_ApplyDisplay() {
-    var settings = GameSettings_Ensure();
-    var base_w = max(1, DISPLAY_BASE_W);
-    var base_h = max(1, DISPLAY_BASE_H);
-
-    var scale_fixed = clamp(round(GameSettings_ToReal(settings.display_scale, DISPLAY_SCALE_DEFAULT)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-    settings.display_scale = scale_fixed;
-    var fit_screen = settings.fit_screen;
-
-    // This project does not use a manual application surface pipeline.
-    application_surface_draw_enable(true);
-    if (!variable_global_exists("display_texfilter_init") || !global.display_texfilter_init) {
-        gpu_set_texfilter(false);
-        global.display_texfilter_init = true;
-    }
-
-    view_enabled = true;
-    view_visible[0] = true;
-    for (var vi = 1; vi < 8; vi++) {
-        view_visible[vi] = false;
-    }
-    view_hborder[0] = max(1, floor(base_w * 0.5) - 1);
-    view_vborder[0] = max(1, floor(base_h * 0.5) - 1);
-
-    // Keep desktop builds borderless to avoid title-bar/frame mismatch across PCs.
-    if (os_type == os_windows) {
-        window_set_showborder(false);
-    }
-
-    var disp_w = max(1, display_get_width());
-    var disp_h = max(1, display_get_height());
-
-    // Reuse fit_screen as the persisted fullscreen toggle.
-    if (window_get_fullscreen() != fit_screen) {
-        window_set_fullscreen(fit_screen);
-    }
-
-    if (fit_screen) {
-        if (!window_get_fullscreen()) {
-            if (window_get_width() != disp_w || window_get_height() != disp_h) {
-                window_set_size(disp_w, disp_h);
-            }
-            if (window_get_x() != 0 || window_get_y() != 0) {
-                window_set_position(0, 0);
-            }
-        }
-    } else {
-        var fixed_w = base_w * scale_fixed;
-        var fixed_h = base_h * scale_fixed;
-        if (window_get_width() != fixed_w || window_get_height() != fixed_h) {
-            window_set_size(fixed_w, fixed_h);
-            window_center();
-        }
-    }
-
-    var win_w = max(1, window_get_width());
-    var win_h = max(1, window_get_height());
-    if (win_w <= 0 || win_h <= 0) {
-        win_w = disp_w;
-        win_h = disp_h;
-    }
-
-    var port_x = 0;
-    var port_y = 0;
-    var port_w = win_w;
-    var port_h = win_h;
-    if (!fit_screen) {
-        var used_scale = max(1, scale_fixed);
-        port_w = max(1, round(base_w * used_scale));
-        port_h = max(1, round(base_h * used_scale));
-        if (port_w > win_w || port_h > win_h) {
-            var dyn_scale = min(win_w / base_w, win_h / base_h);
-            port_w = max(1, round(base_w * dyn_scale));
-            port_h = max(1, round(base_h * dyn_scale));
-        }
-        port_x = floor((win_w - port_w) * 0.5);
-        port_y = floor((win_h - port_h) * 0.5);
-    }
-
-    view_xport[0] = port_x;
-    view_yport[0] = port_y;
-    view_wport[0] = port_w;
-    view_hport[0] = port_h;
-
-    var cam = view_camera[0];
-    if (!is_undefined(cam) && cam != -1) {
-        camera_set_view_size(cam, base_w, base_h);
-        var cam_x = clamp(camera_get_view_x(cam), 0, max(0, room_width - base_w));
-        var cam_y = clamp(camera_get_view_y(cam), 0, max(0, room_height - base_h));
-        camera_set_view_pos(cam, cam_x, cam_y);
-    }
-
-    if (surface_exists(application_surface)) {
-        if (surface_get_width(application_surface) != base_w || surface_get_height(application_surface) != base_h) {
-            surface_resize(application_surface, base_w, base_h);
-        }
-    }
-
-    // Keep GUI virtual size synced to the active window so all menus/dialogue
-    // scale dynamically with resolution changes and aspect differences.
-    display_set_gui_size(win_w, win_h);
-}
-
 function GameSettings_ApplyAll() {
     var settings = GameSettings_Ensure();
     Loc_SetLanguage(settings.language);
     GameSettings_ApplyAudio();
-    GameSettings_ApplyDisplay();
+    Binds_Apply(settings.keys);   // D49: the player's keys
 }
 
-function GameSettings_Commit(_settings, _save_config = false) {
+// Settings (a window row, kept or put back): the only caller that asks the display for something (boot does the same from Display_Init).
+function GameSettings_ApplyDisplayRequest() {
+    var settings = GameSettings_Ensure();
+    Display_Request({ mode: settings.window_mode, scale: settings.display_scale });
+}
+
+// _apply_display = false for a change that cannot move the window (a volume, the keys): no window request is made for it.
+function GameSettings_Commit(_settings, _save_config = false, _apply_display = true) {
     var gs = GameState_Get();
     gs.settings = GameSettings_Normalize(_settings);
     GameState_SyncLegacy();
     GameSettings_ApplyAll();
+    if (_apply_display) GameSettings_ApplyDisplayRequest();
     if (_save_config) {
         Save_WriteSettingsConfig(gs.settings);
     }
     return gs.settings;
-}
-
-function GameSettings_SetUIVolume(_v) {
-    var settings = GameSettings_Ensure();
-    settings.audio_ui = clamp(GameSettings_ToReal(_v, settings.audio_ui), 0, 1);
-    GameSettings_ApplyAudio();
-}
-
-function GameSettings_SetSFXVolume(_v) {
-    var settings = GameSettings_Ensure();
-    settings.audio_sfx = clamp(GameSettings_ToReal(_v, settings.audio_sfx), 0, 1);
-    GameSettings_ApplyAudio();
-}
-
-function GameSettings_SetBGMVolume(_v) {
-    var settings = GameSettings_Ensure();
-    settings.audio_bgm = clamp(GameSettings_ToReal(_v, settings.audio_bgm), 0, 1);
-    GameSettings_ApplyAudio();
-}
-
-function GameSettings_SetScale(_scale) {
-    var settings = GameSettings_Ensure();
-    settings.display_scale = clamp(round(GameSettings_ToReal(_scale, settings.display_scale)), DISPLAY_SCALE_MIN, DISPLAY_SCALE_MAX);
-    GameSettings_ApplyDisplay();
 }
 
 // --------------------
@@ -1605,10 +1298,10 @@ function GameState_Init() {
             dialogue_reveal_accum: 0,
             dialogue_chars_per_sec: UI_DIALOGUE_CHARS_PER_SEC,
             dialogue_state: UI_DIALOGUE_STATE_REVEALING,
-            dialogue_hold_frames: 0,
-            dialogue_hold_duration: 0,
+            dialogue_hold_ms: 0,
+            dialogue_hold_duration_ms: 0,
             dialogue_tw_line_index: -1,
-            dialogue_open_block_frame: UI_OPENED_FRAME_NONE,
+            dialogue_open_lock: undefined,
             cinematic_input_lock_count: 0
         };
     }
@@ -1620,10 +1313,10 @@ function GameState_Init() {
     if (!variable_struct_exists(gs.ui, "dialogue_reveal_accum")) gs.ui.dialogue_reveal_accum = 0;
     if (!variable_struct_exists(gs.ui, "dialogue_chars_per_sec")) gs.ui.dialogue_chars_per_sec = UI_DIALOGUE_CHARS_PER_SEC;
     if (!variable_struct_exists(gs.ui, "dialogue_state")) gs.ui.dialogue_state = UI_DIALOGUE_STATE_REVEALING;
-    if (!variable_struct_exists(gs.ui, "dialogue_hold_frames")) gs.ui.dialogue_hold_frames = 0;
-    if (!variable_struct_exists(gs.ui, "dialogue_hold_duration")) gs.ui.dialogue_hold_duration = 0;
+    if (!variable_struct_exists(gs.ui, "dialogue_hold_ms")) gs.ui.dialogue_hold_ms = 0;
+    if (!variable_struct_exists(gs.ui, "dialogue_hold_duration_ms")) gs.ui.dialogue_hold_duration_ms = 0;
     if (!variable_struct_exists(gs.ui, "dialogue_tw_line_index")) gs.ui.dialogue_tw_line_index = -1;
-    if (!variable_struct_exists(gs.ui, "dialogue_open_block_frame")) gs.ui.dialogue_open_block_frame = UI_OPENED_FRAME_NONE;
+    if (!variable_struct_exists(gs.ui, "dialogue_open_lock")) gs.ui.dialogue_open_lock = undefined;
     if (!variable_struct_exists(gs.ui, "cinematic_input_lock_count")) gs.ui.cinematic_input_lock_count = 0;
     gs.ui.cinematic_input_lock_count = max(0, round(real(gs.ui.cinematic_input_lock_count)));
     if (!variable_struct_exists(gs.ui, "lines_raw") || !is_array(gs.ui.lines_raw)) gs.ui.lines_raw = [];
@@ -1686,11 +1379,6 @@ function GameState_SyncLegacy() {
 
     Input_Init();
 
-    global.selected_class = gs.selected_class;
-    global.difficulty = gs.difficulty;
-    global.defeated_enemies = gs.defeated_enemies;
-    global.player_ch = gs.player_ch;
-
     if (variable_struct_exists(gs, "item_db")) {
         global.item_db = gs.item_db;
     }
@@ -1710,47 +1398,22 @@ function GameState_SyncLegacy() {
     if (variable_struct_exists(gs, "dialogue_db")) {
         global.dialogue_db = gs.dialogue_db;
     }
-
-
-    if (variable_struct_exists(gs, "battle")) {
-        global.battle_return_room = gs.battle.return_room;
-        global.battle_return_x = gs.battle.return_x;
-        global.battle_return_y = gs.battle.return_y;
-        global.battle_enemy_persist_id = gs.battle.enemy_persist_id;
-        global.battle_enemy_id = gs.battle.enemy_id;
-        global.battle_enemy_level = gs.battle.enemy_level;
-        global.battle_enemy_room = gs.battle.enemy_room;
-        global.just_returned_from_battle = gs.battle.just_returned;
-    }
-
-    if (variable_struct_exists(gs, "uid_counter")) {
-        global.uid_counter = gs.uid_counter;
-    }
-
-    if (variable_struct_exists(gs, "settings")) {
-        global.settings = gs.settings;
-    }
-
-    global.player_inst = gs.player_inst;
 }
 
 function GameState_SetSelectedClass(_class_id) {
     var gs = GameState_Get();
     gs.selected_class = _class_id;
-    global.selected_class = _class_id;
 }
 
 function GameState_SetPlayer(_ch) {
     if (is_struct(_ch)) _ch = Player_NormalizeProgression(_ch, true);
     var gs = GameState_Get();
     gs.player_ch = _ch;
-    global.player_ch = _ch;
 }
 
 function GameState_SetPlayerInst(_inst) {
     var gs = GameState_Get();
     gs.player_inst = _inst;
-    global.player_inst = _inst;
 }
 
 function GameState_SetBattleReturn(_room, _x, _y, _face, _snap_to_grid = true) {
@@ -1764,11 +1427,6 @@ function GameState_SetBattleReturn(_room, _x, _y, _face, _snap_to_grid = true) {
     gs.battle.return_x = _x;
     gs.battle.return_y = _y;
     gs.battle.return_face = (argument_count >= 4) ? _face : -1;
-
-    global.battle_return_room = _room;
-    global.battle_return_x = _x;
-    global.battle_return_y = _y;
-    global.battle_return_face = gs.battle.return_face;
 }
 
 function GameState_SetBattleEnemy(_persist_id, _enemy_id, _enemy_level = 0) {
@@ -1777,11 +1435,7 @@ function GameState_SetBattleEnemy(_persist_id, _enemy_id, _enemy_level = 0) {
     gs.battle.enemy_id = _enemy_id;
     gs.battle.enemy_level = max(0, round(_enemy_level));
     gs.battle.enemy_room = room;
-
-    global.battle_enemy_persist_id = _persist_id;
-    global.battle_enemy_id = _enemy_id;
-    global.battle_enemy_level = gs.battle.enemy_level;
-    global.battle_enemy_room = room;
+    gs.battle.enemy_elite = "";   // C3 (D86): EnemyPersist_BeginEncounter sets the map enemy's modifier after this
 
     // Entering battle should not leave any lingering modal/dim state behind.
     UI_InterruptCloseAll(true);
@@ -1790,7 +1444,6 @@ function GameState_SetBattleEnemy(_persist_id, _enemy_id, _enemy_level = 0) {
 function GameState_SetJustReturned(_flag) {
     var gs = GameState_Get();
     gs.battle.just_returned = _flag;
-    global.just_returned_from_battle = _flag;
 }
 
 function GameState_SetCheckpoint(_room, _x, _y) {
@@ -1811,6 +1464,7 @@ function Player_LearnSkill(_ch, _skill_id) {
     }
     if (!exists) {
         array_push(_ch.skills, _skill_id);
+        Skill_Discover(_skill_id);   // D148
     }
     return _ch;
 }

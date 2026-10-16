@@ -1,0 +1,165 @@
+# Issues (the single triage table)
+
+Every note from the friend, the owner, a review or a bug hunt becomes one row here. The verbatim words stay in `research/playtest-notes.md` (the inbox). Rules are from `research/lessons-from-past-projects.md` section 4.5 and `IMPROVE.md`.
+
+## Rules
+
+- **Never paraphrase on entry.** Rows from a person carry their words in quotes. Rows found by an audit or review say "audit:" and name the file.
+- **Class:** BUG (something is wrong), FEEL (works but feels bad), BALANCE (numbers), FEATURE (something missing), QUESTION (needs an owner or reporter answer).
+- **Severity:** P1 blocks play. P2 hurts. P3 is polish.
+- **Build id:** the build the reporter played. `unknown` for the old notes. From now on every new row names the build id shown on the title screen.
+- **BUG rows get a `REGRESSION.md` entry before the fix.** FEEL and BALANCE rows need the owner's number or target (ask with grill-me, one decision at a time, with a recommendation).
+- **Closing:** a BUG closes only when the reporter's own repro passes on a new build (shown by the bot or screenshots; for feel, by the reporter). "Fixed" is a proposal until the owner confirms.
+- **Freeze rule:** while any P1 BUG is open, no feature work starts.
+- **Status values:** `open`, `needs-repro`, `confirmed`, `fixed-on-next` (waiting for the owner), `closed`, `superseded` (a decision made it obsolete), `question`.
+- Triage the same day a note arrives. Open P1s are counted in the `STATE.md` header.
+
+## Open P1s: 0 (none confirmed; nothing has a repro yet)
+
+## Changes on 2026-10-14 (roguelike direction D25-D36, plan review)
+
+Phases were renumbered (8 phases now, `ROADMAP.md`). Requirement ids named in the table below still point to `REQUIREMENTS.md`; the ones that changed meaning:
+
+- **Difficulty (I-019):** D35 removes Easy/Normal/Hard, so STAT-09 is now "one difficulty". I-019 closes when the difficulty switch and the dead multipliers are deleted.
+- **I-031 (level 8 vs level 10 at the boss):** superseded by D27/D30. Levels reset each run; the curve is built for one 45-60 minute run (PROG-08 replaced). Closes when PROG-08 passes in the simulator.
+- **I-030, I-004, I-036:** now served by the per-floor tables (PROG-07), card picks (PROG-04) and the profile/run save split (SAVE-01, SAVE-02).
+- **I-007 (mini boss):** its "stays removed" check now means stays removed within a run; a new run brings him back (RUN-03).
+- **I-010 (cutscene-end screen bug):** still needed for the first viewing; cutscenes now play once per save (RUN-07/08).
+- **New rows I-040 to I-046 below** record roguelike-related findings from the plan review.
+
+## Table
+
+Reporter notes (friend, before 2026-10-13):
+
+| ID | Reporter words | Class | Sev | Build | Repro | Expected | Status |
+|----|----------------|-------|-----|-------|-------|----------|--------|
+| I-001 | "scale problem. screen bug" | BUG | P2 | unknown | needs-repro: bot + screenshots at supported sizes; see I-010, I-011 | picture is the right size and stable | needs-repro; REQ DISP-04..08, R-001, R-002 |
+| I-002 | "foresight skills idk what it does" | FEEL | P2 | unknown | audit: tooltip says "Next attack cannot miss" for "3 turns"; real duration 9; a basic attack burns it and never rolls to hit; the buff is a tiny text tag; the cast animation plays on the enemy (`combat-bugs.md` section 2) | Foresight has a clear effect and tooltip (D24) | open; REQ STAT-10, UI-06; R-012 |
+| I-003 | "(bone shud be foresight +)" | QUESTION | P3 | unknown | ask the friend: was "bone" an icon, the floor-8 bones prop, or a skill name? There is no bone item or skill (`combat-bugs.md` section 3) | D24 reads it as: Foresight's icon should be an eye | question; REQ ART-03 |
+| I-004 | "skill books appear in books twice" | BUG | P2 | unknown | audit: not reproducible at HEAD; guards exist since `f39236b`; suspects: old build, a save with two entries, or the Skills tab (`combat-bugs.md` section 4) | one entry per book; no duplicate skill ids | needs-repro; REQ BUG-04, R-003; ends in Phase 6 (books removed) |
+| I-005 | "ice spear animation is slow" | FEEL | P3 | unknown | audit: Ice Spear is at the speed cap, 1.15 s plus a fixed 1 s hold (`combat-bugs.md` section 5) | total skill time at the owner's target (to be set) | open; REQ BUG-05, R-013 |
+| I-006 | "hilt bash animation slow" | FEEL | P3 | unknown | audit: 0.86 s plus 1 s hold; last two frames empty; grants 2 free actions so it feels longest | same as I-005 | open; REQ BUG-06, R-014 |
+| I-007 | "mini boss moves around so he isnt blocking tje way" | BUG | P2 | unknown | audit: stationary at HEAD (`ai_stationary = true` since `f39236b`); likely an old build | mini boss stays at (224,32) | needs-repro; REQ BUG-07, R-007 |
+| I-008 | "i dont take dmg while being poisoned" | BUG | P2 | unknown | audit: tick exists (2-3 HP after each player action) but is nearly silent; skipped on the killing blow and on a failed Run (`combat-bugs.md` section 1) | HP falls each tick and the player notices | needs-repro; REQ BUG-08, R-005 |
+| I-009 | "incease the hit rate of skills specifically a tiny bit i missed 4 to 5 consecutive horizontal slashes l" | BALANCE | P2 | unknown | audit: hit chance 61.8-88.8%; a 4-5 miss streak is a 1-10% event per session (`combat-bugs.md` section 7) | skills do not miss (D6) | superseded by D6; closes when STAT-04 / R-006 pass |
+
+Owner notes (2026-10-13):
+
+| ID | Reporter words | Class | Sev | Build | Repro | Expected | Status |
+|----|----------------|-------|-----|-------|-------|----------|--------|
+| I-010 | "Screen bug when a cutscene ends (also places with dialogue)." | BUG | P2 | unknown | audit hypotheses: H1 full display re-apply at the end of every transition; H2 cutscene art vanishes before the exit fade; H3 camera snap after pan-out (`resolution.md` section 3b). Not yet reproduced | no visible change when a cutscene or dialogue ends | needs-repro; REQ DISP-06..08, BUG-29, R-001, R-017 |
+| I-011 | "Resolution/scaling problems in general." | BUG | P2 | unknown | audit: stacked scaling (port bigger than surface), variable GUI size, display owned by the audio manager (`resolution-gamemaker.md` 4.1) | one display manager, correct at every size | open; REQ DISP-02..12 |
+| I-012 | "QTE never felt right." | FEEL | P2 | unknown | audit: tiny perfect window (about 1-2 frames), slow random-speed ring, no feedback, frame-rate bound (`audit/qte.md` section 4) | fair, readable, graded QTE (D4, D5, D7, D20) | open; REQ QTE-01..15, R-010 |
+| I-013 | "Skills unbalanced against each other." | BALANCE | P2 | unknown | audit: stun skills triple actions; Wound beats Horizontal Slash; weapons ignored by skills (`balance-data.md` S1, S3, S5) | skills inside the approved bands | open; REQ BAL-05 |
+| I-014 | "Buff/debuff icons reuse other skill icons as placeholders" | FEATURE | P2 | unknown | audit: 10 of 14 statuses have no real icon; 6 use frames of 48x48 FX sheets; 3 reuse other badges; Sunder has none; all drawn as 0.54x text tags (`icons-needed.md` section 2) | real 16x16 icons with turn counters | open; REQ ART-03, UI-04, R-011 |
+| I-015 | "Inventory and the rest of the UI look bad." | FEATURE | P2 | unknown | audit: flat white/black rectangles, mixed pixel grids, one flat inventory list, no skill icons, no enemy HP on screen (`audit/ui.md` P1-P8) | one frame, one font, palette colours, clear screens | open; REQ UI-01..14 |
+
+Found by audits and reviews (no person's words):
+
+| ID | Finding | Class | Sev | Build | Repro / evidence | Expected | Status |
+|----|---------|-------|-----|-------|------------------|----------|--------|
+| I-016 | audit: skill tooltips show base status turns, not applied turns (Foresight "3" is 9, Wound "2" is 5, Guard "2" is 6) | BUG | P2 | HEAD `0b6e2f8` | `combat-bugs.md` C; `balance-data.md` S11; `scr_menu.gml:337-351` vs `scr_db_skill.gml:854-888` | tooltip number equals applied number | open; REQ BUG-16, R-015 |
+| I-017 | audit: Curse ignores its 50% chance and the hit roll; its three damage-over-time effects cancel each other; log says all three applied | BUG | P3 | HEAD `0b6e2f8` | `combat-bugs.md` B; `balance-data.md` S12 | effect matches the log and the stated chance | open; REQ BUG-17, R-016 |
+| I-018 | audit: window colour is red (`options_main.yy:26` is 255) and the fade covers only the picture, not the window | BUG | P3 | HEAD `0b6e2f8` | `resolution.md` H4 (suspected); confirm with fullscreen at 3x on 1080p | pure black bars | needs-repro; R-018 |
+| I-019 | audit: difficulty multipliers are floored on small integers (Easy turns 1-damage hits into 0, Hard player hits lose a flat 1); `player_stat_mult` and `enemy_stat_mult` are never read | BUG | P2 | HEAD `0b6e2f8` | `balance-data.md` section 1, S7 | difficulty changes outcomes by approved amounts | open; REQ STAT-09, R-031 |
+| I-020 | audit: stun skills give 2 free actions on any hit, even when the 60% stun roll fails | BUG | P2 | HEAD `0b6e2f8` | `combat-bugs.md` A; `scr_combat.gml:699-704` | no extra actions from stun (D19) | open; REQ BUG-18, R-030; replaced in Phase 5 |
+| I-021 | audit: weapon accuracy is shown on weapons but never affects a player roll | BUG | P3 | HEAD `0b6e2f8` | `combat-bugs.md` D | weapons add to skill damage (D22) | superseded by D22; REQ STAT-03 |
+| I-022 | audit: a failed Run does not tick statuses | BUG | P3 | HEAD `0b6e2f8` | `combat-bugs.md` E; `scr_combat.gml:779-804` | statuses advance by the turn rules | open; R-022; revisit in Phase 5 |
+| I-023 | audit: self-buff animations play on the enemy | BUG | P3 | HEAD `0b6e2f8` | `combat-bugs.md` F; `scr_combat.gml:676-686` | buff effect on the player | open; REQ BUG-21, R-024 |
+| I-024 | audit: a guarded (0-damage) enemy hit still applies its status and skips the defence QTE | BUG | P3 | HEAD `0b6e2f8` | `combat-bugs.md` J | defined by the damage-over-time rules (D21) | open; REQ BUG-22 |
+| I-025 | audit: basic attacks pass `1 + crit_bonus` to the crit check, skills pass `crit_bonus` | BUG | P3 | HEAD `0b6e2f8` | `combat-bugs.md` K | one crit rule | open; REQ BUG-23 |
+| I-026 | audit: `SKILL_POWER_STRIKE` (id 0) has a macro and a loc key but no `SkillDB` record | BUG | P3 | HEAD `0b6e2f8` | `combat-bugs.md` H | no orphan ids | open; REQ BUG-24, R-004 |
+| I-027 | audit: the HP bar drops before the defence QTE is played; part is refunded after, so a good defence looks like a heal | BUG | P2 | HEAD `0b6e2f8` | `audit/qte.md` section 2.6 (inferred from code, needs a play check) | HP changes after the defence resolves | needs-repro; R-025 |
+| I-028 | audit: hard-coded English outside localization: "Game saved." (`obj_game_controller/Step_0.gml:70`), the level-up text (`scr_enemy.gml:84`), `Equip_CanEquip` messages | BUG | P3 | HEAD `0b6e2f8` | `audit/ui.md` P10 | all text through `game_text.xlsx` | open; REQ LOC-03, R-026 |
+| I-029 | audit: level-up message mentions "stat points" while the Stats tab is read-only | BUG | P3 | HEAD `0b6e2f8` | `audit/ui.md` P8 (not checked in play) | no stale text | needs-repro; replaced by UI-09 |
+| I-030 | audit: loot tier weights clamp the enemy level to 3, so floors 3 and 9 drop the same quality; no gold or shop | BALANCE | P2 | HEAD `0b6e2f8` | `balance-data.md` S14 | loot improves per floor (D23) | open; REQ PROG-05..07 |
+| I-031 | audit: one clean pass reaches about level 8; the final boss is level 10 | BALANCE | P2 | HEAD `0b6e2f8` | `balance-data.md` section 3 [calc] | final boss met at a sensible level (D14) | open; REQ PROG-08 |
+| I-032 | audit: floor 2 Dire Wolf (win 6-15% with average timing) and floor 5 Palehorn (0-23% at level 4-5) are walls for most play styles | BALANCE | P2 | HEAD `0b6e2f8` | `balance-data.md` S9 [model only, never run in the game] | within the approved win-rate bands | open; REQ BAL-04, BAL-05 |
+| I-033 | audit: `randomize()` is called inside a gameplay script, so seeded tests are impossible | BUG | P3 | HEAD `0b6e2f8` | `codebase/CONCERNS.md` Randomness; `scr_player.gml:1530` | randomize once at boot; tests can seed | open; REQ VER-12 |
+| I-034 | audit: debug keys (`P`, `F5`, `F9`, `L`, `K`, `J`, `U`, `O`) are bound unconditionally | BUG | P2 | HEAD `0b6e2f8` | `codebase/CONCERNS.md` Security | off in release exports | open; REQ BUG-26, REL-06 |
+| I-035 | audit: `ch.hp = 9999; // temp` at `scr_player.gml:20` | QUESTION | P3 | HEAD `0b6e2f8` | `codebase/CONCERNS.md`; find out whether it runs | no cheat value in play | question; REQ BUG-27 |
+| I-036 | audit: old snapshot versions are rejected with no migration and no friendly message; the save write is not atomic; `Save_ToReal` throws on non-numeric text | BUG | P2 | HEAD `0b6e2f8` | `codebase/CONCERNS.md` Fragile Areas; `scr_save.gml:85-87` | D16: friendly rejection; safe write | open; REQ SAVE-02, SAVE-04, SAVE-05 |
+| I-037 | audit: `rm_floor6_5` is only 144 px wide, narrower than the view | BUG | P3 | HEAD `0b6e2f8` | `resolution.md` section 4b step 9 | no area outside the room visible | open; REQ DISP-10 |
+| I-038 | audit: slime Solidify makes the next player skill auto-miss; this breaks "skills always hit" | BALANCE | P3 | HEAD `0b6e2f8` | `balance-data.md` S13; `combat-bugs.md` section 7 | rule redefined in Phase 5 (G5) | superseded by D6; REQ STAT-06 |
+| I-039 | The friend probably played an old build. Which build or APK did they play? | QUESTION | P2 | unknown | `combat-bugs.md` top note | answer recorded before any code change for I-004, I-007, I-008. If no answer comes, the repros run on the current build and that is the answer (plan review 1b item 6) | closed (owner 2026-10-14: no longer needed) |
+| I-040 | plan review: death reloads the latest save slot (`obj_start_controller/Step_0.gml`, case `game_over`) | FEATURE | P2 | HEAD `0b6e2f8` | `plan-review.md` 1d | death ends the run and returns to the entrance room (D26, D31) | open; REQ RUN-02, RUN-16, R-036 |
+| I-041 | plan review: saving respawns every regular enemy (`Save_Write` calls `Enemy_ResetAll`, `scr_save.gml:394`), a farming loop | BALANCE | P3 | HEAD `0b6e2f8` | `plan-review.md` 1d | the owner decides respawns inside a run (G2); a test proves it | open; REQ RUN-15 |
+| I-042 | plan review: about 352 step-counted timers; a frame hitch changes outcomes | BUG | P3 | HEAD `0b6e2f8` | `codebase/CONCERNS.md` lines 24-30 | gameplay timers run on a clock | open; REQ ROB-01 |
+| I-043 | plan review: input buffering disabled, dead frames between arrows, wrong key fails at once, `Input_Update` returns early on the same ms, no hold-repeat in lists | FEEL | P2 | HEAD `0b6e2f8` | `audit/qte.md` 2.4; `audit/ui.md` P9; `scr_input.gml:242` | forgiving, consistent input | open; REQ ROB-02, QTE-05, UI-10 |
+| I-044 | plan review: 18 `ds_*` creates against 6 destroys, no CleanUp events, globals re-created every Step. Repeated runs in one session would make this grow | BUG | P3 | HEAD `0b6e2f8` | `codebase/CONCERNS.md` lines 32-51 | no growth over 20 runs | open; REQ ROB-03 |
+| I-045 | plan review: the pause menu has no Save; saving only at beds. A 45-60 minute run needs a chosen way to stop and resume | FEATURE | P3 | HEAD `0b6e2f8` | `audit/ui.md` P8 | G2 decides; RUN-14 proves it | question; REQ RUN-14 |
+| I-046 | plan review: D3 "Android later" conflicts with D28 "no post-release" | QUESTION | P3 | n/a | `DECISIONS.md` | owner confirmed 2026-10-14: Android never built (D38) | closed |
+| I-047 | owner 2026-10-14: "enemies get stuck" | BUG | P2 | unknown | needs repro (audit/movement.md) | enemies path around walls and never get stuck | open |
+| I-048 | owner 2026-10-14: "player is not aligned"; "AI and players get easily stuck"; "the maps dont align properly with the grid" | BUG | P2 | unknown | needs repro (audit/movement.md) | player snaps cleanly to the tile grid | open |
+| I-049 | owner 2026-10-14: "the trigger interactables like when moving room to room or scene, i want to see" | BUG/FEATURE | P2 | unknown | needs repro (audit/movement.md) | room/scene triggers fire reliably and can be shown in a debug view | open |
+| I-050 | owner 2026-10-14: "make sure the game is optimized and pathfinding is really good" | FEEL | P2 | unknown | profile (audit/movement.md) | steady frame rate; good pathfinding | open |
+| I-051 | owner 2026-10-14: "the screen/resolution breaks whenever i do the cutscene, im not sure even if the way i built the game with the scenes and rooms and cutscene are optimal" | BUG+QUESTION | P1 | unknown | audit/resolution.md H1-H6 | screen stays correct through every cutscene end; display rebuild reviews room/cutscene flow and simplifies only where it causes bugs | fixed on next (disp-b: no relayout on transitions/cutscenes, art kept through fade), awaiting owner play |
+| I-052 | owner 2026-10-14: "some animations are Large and not sized well like the foresight the eyeball was half of the screen" | BUG | P2 | unknown | cast Foresight in battle; check every skill/status effect animation | every battle effect animation fits its target at the right scale (L4 screenshot per skill) | fixed on next (fx-fix, R-0xx), awaiting owner play |
+| I-053 | display spike 2026-10-14: test game window takes foreground ~273 ms after a minimized launch | BUG (tooling) | P2 | n/a | run any window mode while using another app | test runs never take focus | fixed on next (hidden desktop + foreground probe in the gate) |
+| I-054 | owner playtest 2026-10-14 (build d312bfb): "can there be a windowed, borderless, and fullscreen mode" | FEATURE | P2 | d312bfb-20261014 | owner screenshots 1-3 | three window modes in Settings (DISP-11) | open |
+| I-055 | owner playtest 2026-10-14 (build d312bfb): "can I be able to skip the intro (if its a new game, like the cutscene intro)" | FEATURE | P2 | d312bfb-20261014 | owner screenshots 1-3 | hold confirm skips the intro cutscene (D48) | open |
+| I-056 | owner playtest 2026-10-14 (build d312bfb): "the line of sight of the slime was glitching, there was a tinier circle on the top left ... after the combat or running away it never came back" | BUG | P1 | d312bfb-20261014 | owner screenshots 1-3 | sight range drawn around the enemy in world space; reappears after battle/run | fixed on next (a1-draw, R-061/R-062), awaiting owner play |
+| I-057 | owner playtest 2026-10-14 (build d312bfb): "if i opened the second chest that gave the skill book without a class it just says nothing is there" | BUG/DESIGN | P2 | d312bfb-20261014 | owner screenshots 1-3 | grill: class chest vs skill chest order | fixed on c2-cards (R-070): first class/skill chest = class choice, later ones = card pick |
+| I-058 | owner playtest 2026-10-14 (build d312bfb): "extra visuals on the top left ... an arrow of the chest on the top left. a lot of the UI elements shows there" | BUG | P1 | d312bfb-20261014 | owner screenshots 1-3 | no UI/world marker ever drawn at the screen corner; all draw in the right space after the display rebuild | fixed on next (a1-draw, R-061), awaiting owner play |
+| I-059 | owner playtest 2026-10-14 (build d312bfb): "make the arrow have an outline sometimes it blends in the floor color" | FEEL | P3 | d312bfb-20261014 | owner screenshots 1-3 | interact arrow has a dark outline, readable on every floor colour | fixed on next (a1-draw, R-063), awaiting owner play |
+| I-060 | owner playtest 2026-10-14 (build d312bfb): "spells are not in the right sizes of the monsters ... ice spear was smaller than the slime" | BUG | P2 | d312bfb-20261014 | owner screenshots 1-3 | effects scale to at least the target size | fixed on next (a1-draw, R-065), awaiting owner play |
+| I-061 | owner playtest 2026-10-14 (build d312bfb): "inventory, skills, stats (tab) ... improve the wordings, just the overall UI its terrible" | UI | P1 | d312bfb-20261014 | owner screenshots 1-3 | UI phase: full redesign of every menu | open |
+| I-062 | owner playtest 2026-10-14 (build d312bfb): "the settings menu also needs to be improved its terrible, all the UIs need to be improved" | UI | P1 | d312bfb-20261014 | owner screenshots 1-3 | UI phase | open |
+| I-063 | owner playtest 2026-10-14 (build d312bfb): "when i hold shift and then run, the animation stops playing it should just speed up the normal walk animation" | BUG | P2 | d312bfb-20261014 | owner screenshots 1-3 | run plays the walk animation faster | fixed on next (a1-draw, R-064), awaiting owner play |
+| I-064 | owner playtest 2026-10-14 (build d312bfb): "i thought we are changing how beds work? is that still how we are saving" | EXPECTATION | P2 | d312bfb-20261014 | owner screenshots 1-3 | beds become rest sites (D46/D47) in the run-loop build | open |
+| I-065 | B4 report: "the Knight is rebuilt at 10 HP when a battle starts" (setting max_hp before battle has no effect) | BUG? | P1 | next | verify: does the player carry HP/max HP/level gains into every battle in real play? | battle uses the run character as-is | open (improvement mode) |
+| I-066 | B4 report: six small enemy moves (Poison Fangs, Bite, ...) still get the defence bar; D7 says only big/telegraphed attacks | BUG (spec) | P2 | next | fight a spider/snake | small moves just hit; only telegraphed heavy moves use the defence bar | open |
+| I-067 | B4 report: wrapped combat-log rows overlap the enemy name header | UI | P2 | next | long log lines in battle | log never overlaps the HUD (D1) | open (D1) |
+| I-068 | review 2026-10-14: merchant placeholder is the Nobody sprite tinted yellow — breaks the 4-colour palette (D10) | BUG/ART | P2 | next | shot_merchant_world.png | merchant uses only palette colours; gold tint is an owner-approved exception (D110); new AI merchant sprite in progress, owner picks | in progress |
+| I-069 | bug hunt 2026-10-16: echo skill from another class is silently lost (echo chosen before the class pick) | DESIGN | P3 | next | die as Knight, echo Horizontal Slash, pick Mage | owner decides (PLAYTEST-QUEUE question 1) | waiting on owner |
+| I-070 | bug hunt 2026-10-16: D88 milestone unlocks (extra cards/passives/throwables) not implemented | DESIGN | P3 | next | profile with no milestones still gets every card | owner decides (question 2) | waiting on owner |
+| I-071 | bug hunt 2026-10-16: closing the window does not save the run (D46 "on quit") | BUG/IDE | P3 | next | Alt-F4 mid-floor loses up to ~10 s | Game End event saves the run (owner IDE task) | waiting on owner |
+| I-072 | bug hunt 2026-10-16: stolen items never returned, battle win never lists loot; weak Smoke Bomb gives no dodge; throwable cap not applied on class pick | BUG | P2 | next | see fix-hunt1 | checks in fix-hunt1 | fixed on next (dbc678a); owner confirms at playtest Q-061 |
+| I-073 | bug hunt 2: enemies keep chasing under the pause/Tab/bed/card/tutorial screens and can start a fight behind the pause (D122) | BUG | P2 | next | alt-tab while a wolf chases | enemies freeze under any screen | fixed on next (63deaae); in the next playtest build |
+| I-074 | bug hunt 2: enemy home resets to the authored spot after re-entering a room or a battle; enemies walk across the room (D33/D63/D66) | BUG | P2 | next | leave and re-enter rm_floor4 | home saved with the room state | fixed on next (63deaae); in the next playtest build |
+| I-075 | bug hunt 2: after a battle or Continue on an exit tile the first key press fires the exit (D64) | BUG | P2 | next | arrive on floor 1 from floor 2, fight the slime at once | exit ignores the player until they step off | fixed on next (63deaae); in the next playtest build |
+| I-076 | bug hunt 2: auto-resolve + autosave + Continue re-deals the room (types/places/elites change, D33) | BUG | P3 | next | auto-resolve 1 of 3 enemies, wait 10 s, quit, Continue | same layout after Continue | fixed on next (63deaae); in the next playtest build |
+
+| I-077 | owner playtest round 3 note 1 (7f4d08e-20261016): player sprite flashes light/dark while walking (squash frames drawn above the Foreground haze) | BUG | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #1 | see status | open: packet light (R-089) |
+| I-078 | owner playtest round 3 note 2 (7f4d08e-20261016): player stays bright while running (same cause as I-077) | BUG | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #2 | see status | open: packet light (R-090) |
+| I-079 | owner playtest round 3 note 3 (7f4d08e-20261016): no Load Game / multiple runs | FEATURE | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #3 | see status | open: D175 profiles + 3 save files |
+| I-080 | owner playtest round 3 note 4 (7f4d08e-20261016): New Game skips the intro and keeps old data (profile is global, D26) | DESIGN | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #4 | see status | open: D175 |
+| I-081 | owner playtest round 3 note 5 (7f4d08e-20261016): enemies float in battle: want a soft shadow under each | ART/UI | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #5 | see status | open: packet bvis |
+| I-082 | owner playtest round 3 note 6 (7f4d08e-20261016): Attack preview plate reads 'Damag..' / 'Perfec..' | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #6 | see status | open: fixed on next (61a27c6, R-085 check) |
+| I-083 | owner playtest round 3 note 7 (7f4d08e-20261016): is Guard viable? (no: halves one hit only) | BALANCE | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #7 | see status | open: D180 |
+| I-084 | owner playtest round 3 note 8 (7f4d08e-20261016): last-turn status blink (solid box) hard to see; want an outline | UI | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #8 | see status | open: packet bvis (R-094) |
+| I-085 | owner playtest round 3 note 9 (7f4d08e-20261016): QTE grades in ALL CAPS | TEXT | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #9 | see status | open: D171 decided; packet menus |
+| I-086 | owner playtest round 3 note 10 (7f4d08e-20261016): 'Horizontal Slash' does not fit its card | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #10 | see status | open: packet cards (R-095, D168) |
+| I-087 | owner playtest round 3 note 11 (7f4d08e-20261016): card pick 'Skip: +5 Gold' not worth it: remove | DESIGN | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #11 | see status | open: D174; packet cards |
+| I-088 | owner playtest round 3 note 12 (7f4d08e-20261016): no visible mouse cursor; wants mouse control | FEATURE | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #12 | see status | open: D182 |
+| I-089 | owner playtest round 3 note 13 (7f4d08e-20261016): point-and-click movement? | QUESTION | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #13 | see status | open: D182: no |
+| I-090 | owner playtest round 3 note 14 (7f4d08e-20261016): level-up stats/max HP show on the HUD right after the kill, before the level-up screen | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #14 | see status | open: D177 |
+| I-091 | owner playtest round 3 note 15 (7f4d08e-20261016): level-up screen: class growth unclear; arrows on every row | UI | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #15 | see status | open: D177 |
+| I-092 | owner playtest round 3 note 16 (7f4d08e-20261016): Max HP/MP as stats like Elden Ring Vigor/Mind | DESIGN | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #16 | see status | open: D176 (balance proposal first) |
+| I-093 | owner playtest round 3 note 17 (7f4d08e-20261016): wolf reaction dialogue replays after already seen (flag reaches the profile only on autosave) | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #17 | see status | open: flush flag to profile at once |
+| I-094 | owner playtest round 3 note 18 (7f4d08e-20261016): merchant not affected by lighting | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #18 | see status | open: packet light (R-091) |
+| I-095 | owner playtest round 3 note 19 (7f4d08e-20261016): item name colours inconsistent (chest gold, drops white) | UI/DESIGN | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #19 | see status | open: D178 rarity colours |
+| I-096 | owner playtest round 3 note 20 (7f4d08e-20261016): buying past the carry limit: gold safe? | CHECK | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #20 | see status | open: verified safe (Shop_Buy refuses before spending); dim full rows |
+| I-097 | owner playtest round 3 note 21 (7f4d08e-20261016): Gear: 'Equipped'/'Bag' headers blend with 'No Armor' rows | UI | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #21 | see status | open: packet menus (R-096) |
+| I-098 | owner playtest round 3 note 22 (7f4d08e-20261016): enemies see through objects; no hiding in bushes | BUG/DESIGN | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #22 | see status | open: D179 |
+| I-099 | owner playtest round 3 note 23 (7f4d08e-20261016): snake sprite covered by its nameplate and chips | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #23 | see status | open: packet bvis (R-092) |
+| I-100 | owner playtest round 3 note 24 (7f4d08e-20261016): which stat affects stagger? too easy? | QUESTION | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #24 | see status | open: D181: stays |
+| I-101 | owner playtest round 3 note 25 (7f4d08e-20261016): Controls 'Reset to defaults' gives no clear feedback | UI | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #25 | see status | open: packet menus (R-097) |
+| I-102 | owner playtest round 3 note 26 (7f4d08e-20261016): death summary title is always the same | CONTENT | P3 | 7f4d08e-20261016 | playtest-notes.md round 3 #26 | see status | open: D183 |
+| I-103 | owner playtest round 3 note 27 (7f4d08e-20261016): run summary 'Enemies Beat..' / 'Perfect Ra..' cut | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #27 | see status | open: fixed on next (61a27c6); add a fit check |
+| I-104 | owner playtest round 3 note 28 (7f4d08e-20261016): Spellweave card name/tag/text spill out of the frame | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #28 | see status | open: packet cards (R-095) |
+| I-105 | owner playtest round 3 note 29 (7f4d08e-20261016): huge enemy sight; enemies find you at your last spot; cannot escape a slime | DESIGN | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #29 | see status | open: D179 |
+
+| I-106 | owner playtest round 4 note 1 (8d176ba-20261017): Shift+P while typing a profile name opens the DEBUG OVERLAY; "please delete this debug overlay" | BUG | P1 | 8d176ba-20261017 | type a name with P in the name entry | no debug overlay or debug hotkey in the player's game at all (release, D188); keys typed into the name never trigger anything else | fixed on next (fix-r4nodebug, R-120); in the release build |
+
+| I-107 | owner playtest round 4 note 2 (8d176ba): battle Skill list shows one row under the details panel; cannot tell there are more skills or that the list scrolls | UI | P1 | 8d176ba-20261017 | Archer L1 battle, open Skill | the list shows how many skills there are and that it scrolls (at least 2 rows visible where possible, arrows / 'n/m'); the 'Space Choose' hint is not cut at the right edge | open: final fixes |
+| I-108 | owner playtest round 4 note 3 (8d176ba): status chip labels (e.g. THIRST 3) are green; wants plain white like before | UI | P2 | 8d176ba-20261017 | Dire Wolf battle | chip label text white (UI text colour), the last-turn blink still readable | open: final fixes |
+
+| I-109 | owner playtest round 4 note 4 (8d176ba): level-up growth rows are gold over the whole row; wants only the new (right-most) number gold. Same shot: mouse hover shows DEF's +1 and DEF details while the highlight bar stays on SPD | UI | P2 | 8d176ba-20261017 | level up, hover rows with the mouse | only the new number is gold (label + old number white); mouse hover moves the highlight, the +1 and the details together | open: final fixes |
+| I-110 | owner playtest round 4 note 5 (8d176ba): entering a bush should be super forgiving: a chasing monster stops at once, shows ?, stands a few seconds, then patrols | DESIGN (owner-directed) | P1 | 8d176ba-20261017 | get chased, walk into a bush | stepping into a bush (moving or still) breaks any chase at once: ? immediately, stand ~2-3 s, then patrol/return home; hiding matters | open: final fixes |
+
+| I-111 | owner playtest round 4 note 6 (8d176ba): enemies still look like they float; put every enemy's feet on the top line of the three bottom HUD windows (Choirbeast too). Same shot: the final boss fight shows the forest background | UI/ART | P2 | 8d176ba-20261017 | any battle; the final boss | feet on the HUD's top edge at every size; bosses use the boss background if that was intended | open: final fixes |
+
+---
+
+*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-112.*

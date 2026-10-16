@@ -1,0 +1,419 @@
+// Scratch spike code (was appended to scr_debug.gml in a scratch copy; never part of the game). Flag -dispspike -case=geo|geo2|rooms|ui|ui0|lag [-blit=gui].
+// ============================================================================
+// DISPLAY SPIKE (scratch copy only; never committed). Flag: -dispspike
+// ============================================================================
+function Spk_Has(_f) {
+    for (var _i = 0; _i <= parameter_count(); _i++) { if (parameter_string(_i) == _f) return true; }
+    return false;
+}
+function Spk_Log(_s) { show_debug_message("[SPK] " + _s); }
+
+function Spk_State(_tag) {
+    var _cam = view_camera[0];
+    var _ap = application_get_position();
+    var _sw = surface_exists(application_surface) ? surface_get_width(application_surface) : -1;
+    var _sh = surface_exists(application_surface) ? surface_get_height(application_surface) : -1;
+    var _vis = "";
+    for (var _i = 0; _i < 8; _i++) _vis += string(view_visible[_i] ? 1 : 0);
+    Spk_Log("state " + _tag + " room=" + room_get_name(room) + " win=" + string(window_get_width()) + "x" + string(window_get_height())
+        + " disp=" + string(display_get_width()) + "x" + string(display_get_height())
+        + " gui=" + string(display_get_gui_width()) + "x" + string(display_get_gui_height())
+        + " surf=" + string(_sw) + "x" + string(_sh)
+        + " view_en=" + string(view_enabled) + " vis=" + _vis
+        + " port=" + string(view_xport[0]) + "," + string(view_yport[0]) + "," + string(view_wport[0]) + "x" + string(view_hport[0])
+        + " cam=" + string(camera_get_view_x(_cam)) + "," + string(camera_get_view_y(_cam)) + "," + string(camera_get_view_width(_cam)) + "x" + string(camera_get_view_height(_cam))
+        + " border=" + string(camera_get_view_border_x(_cam)) + "," + string(camera_get_view_border_y(_cam))
+        + " appPos=" + string(_ap[0]) + "," + string(_ap[1]) + "," + string(_ap[2]) + "," + string(_ap[3]));
+}
+
+function Spike_Boot() {
+    if (!Spk_Has("-dispspike")) return;
+    if (variable_global_exists("spk")) return;
+    var _sel = "all";
+    for (var _i = 0; _i <= parameter_count(); _i++) { if (string_pos("-case=", parameter_string(_i)) == 1) _sel = string_copy(parameter_string(_i), 7, 99); }
+    global.spk = { f: 0, t: 0, step: 0, lay: undefined, mode: "G1", cap: "", cap_done: true, cap_via: "gui", trace: 0,
+                   gw: 160, gh: 144, gk: 1, gox: 0, goy: 0, blit: "post", lagn: 0, ui: "", wait_file: "", wait_n: 0, ops: [], win_wait: 0, win_target: [0, 0], win_t0: 0, fonts: {}, done: false };
+    for (var _i = 0; _i <= parameter_count(); _i++) { if (parameter_string(_i) == "-blit=gui") global.spk.blit = "gui"; }
+    show_debug_message("[TEST-BUILD] " + BUILD_ID);
+    Spk_Log("boot blit=" + global.spk.blit + " sel=" + _sel + " os=" + string(os_type) + " parms=" + string(parameter_count()));
+    exception_unhandled_handler(function(_ex) {
+        show_debug_message("[SPK] CRASH " + string(_ex.message));
+        if (variable_struct_exists(_ex, "stacktrace") && is_array(_ex.stacktrace) && array_length(_ex.stacktrace) > 0) show_debug_message("[SPK] at " + string(_ex.stacktrace[0]));
+        game_end(2);
+        return 0;
+    });
+    gpu_set_texfilter(false);
+    application_surface_draw_enable(false);
+    surface_resize(application_surface, 160, 144);
+    Spk_State("boot");
+    global.spk.ops = Spk_BuildOps(_sel);
+}
+
+function Spk_BuildOps(_sel) {
+    var _o = [];
+    var _sizes = [[480, 432], [640, 576], [1000, 700], [1280, 720], [1920, 1080], [2560, 1440]];
+    if (_sel == "all" || _sel == "geo") {
+        array_push(_o, { op: "wait", n: 60 });
+        array_push(_o, { op: "rep", tag: "before_any_apply_in_rm_start" });
+        array_push(_o, { op: "hideui" });
+        for (var _i = 0; _i < array_length(_sizes); _i++) {
+            var _w = _sizes[_i][0], _h = _sizes[_i][1];
+            array_push(_o, { op: "win", w: _w, h: _h });
+            var _modes = ["G0", "G1", "G2", "G3"];
+            for (var _m = 0; _m < array_length(_modes); _m++) {
+                array_push(_o, { op: "layout", mode: _modes[_m] });
+                array_push(_o, { op: "wait", n: 4 });
+                array_push(_o, { op: "rep", tag: "geo_" + _modes[_m] });
+                array_push(_o, { op: "cap", name: "a_" + string(_w) + "x" + string(_h) + "_" + _modes[_m], via: "gui" });
+                array_push(_o, { op: "grab", name: "a_" + string(_w) + "x" + string(_h) + "_" + _modes[_m] });
+            }
+        }
+        // screen_save from the Step event vs from Draw GUI End, same frame content
+        array_push(_o, { op: "win", w: 1920, h: 1080 });
+        array_push(_o, { op: "layout", mode: "G1" });
+        array_push(_o, { op: "wait", n: 4 });
+        array_push(_o, { op: "cap", name: "x_step_1920x1080", via: "step" });
+        array_push(_o, { op: "cap", name: "x_gui_1920x1080", via: "gui" });
+        // stale GUI: resize the window without re-applying
+        array_push(_o, { op: "layout", mode: "G0" });
+        array_push(_o, { op: "wait", n: 4 });
+        array_push(_o, { op: "winraw", w: 1280, h: 720 });
+        array_push(_o, { op: "wait", n: 10 });
+        array_push(_o, { op: "rep", tag: "stale_after_window_set_size_no_reapply_G0" });
+        array_push(_o, { op: "cap", name: "b_stale_G0_1280x720", via: "gui" });
+    }
+    if (_sel == "lag") {
+        array_push(_o, { op: "wait", n: 60 });
+        array_push(_o, { op: "hideui" });
+        array_push(_o, { op: "layout", mode: "G1" });
+        array_push(_o, { op: "wait", n: 10 });
+        array_push(_o, { op: "lag", w: 1920, h: 1080 });
+        array_push(_o, { op: "wait", n: 20 });
+        array_push(_o, { op: "lag", w: 640, h: 576 });
+        array_push(_o, { op: "wait", n: 20 });
+    }
+    if (_sel == "geo2") {
+        array_push(_o, { op: "wait", n: 60 });
+        array_push(_o, { op: "hideui" });
+        var _sz2 = [[480, 432], [1000, 700], [1920, 1080], [2560, 1440]];
+        for (var _i = 0; _i < array_length(_sz2); _i++) {
+            array_push(_o, { op: "win", w: _sz2[_i][0], h: _sz2[_i][1] });
+            array_push(_o, { op: "layout", mode: "G1" });
+            array_push(_o, { op: "wait", n: 6 });
+            array_push(_o, { op: "cap", name: "a_" + string(_sz2[_i][0]) + "x" + string(_sz2[_i][1]) + "_G1", via: "gui" });
+            array_push(_o, { op: "grab", name: "a_" + string(_sz2[_i][0]) + "x" + string(_sz2[_i][1]) + "_G1" });
+        }
+    }
+    if (_sel == "all" || _sel == "rooms") {
+        array_push(_o, { op: "win", w: 1920, h: 1080 });
+        array_push(_o, { op: "layout", mode: "G1" });
+        var _rooms = [rm_floor1, rm_battle, rm_cutscene, rm_floor6_5, rm_start];
+        for (var _r = 0; _r < array_length(_rooms); _r++) {
+            array_push(_o, { op: "goto", r: _rooms[_r] });
+            array_push(_o, { op: "wait", n: 40 });
+            array_push(_o, { op: "rep", tag: "room_settled" });
+            array_push(_o, { op: "cap", name: "c_" + room_get_name(_rooms[_r]) + "_1920x1080", via: "gui" });
+            array_push(_o, { op: "grab", name: "c_" + room_get_name(_rooms[_r]) + "_1920x1080" });
+        }
+    }
+    if (_sel == "all" || _sel == "ui") {
+        var _scn = [[480, 432], [640, 576], [800, 720], [1920, 1080]];
+        var _rules = ["R1", "R2", "R3"];
+        array_push(_o, { op: "wait", n: 30 });
+        array_push(_o, { op: "goto", r: rm_floor1 });
+        array_push(_o, { op: "wait", n: 30 });
+        for (var _i = 0; _i < array_length(_scn); _i++) {
+            array_push(_o, { op: "win", w: _scn[_i][0], h: _scn[_i][1] });
+            for (var _k = 0; _k < array_length(_rules); _k++) {
+                array_push(_o, { op: "layout", mode: (_rules[_k] == "R1") ? "G3" : "G1" });
+                array_push(_o, { op: "ui", rule: _rules[_k] });
+                array_push(_o, { op: "wait", n: 4 });
+                array_push(_o, { op: "cap", name: "d_" + string(_scn[_i][0]) + "x" + string(_scn[_i][1]) + "_" + _rules[_k], via: "gui" });
+            }
+        }
+        array_push(_o, { op: "ui", rule: "" });
+    }
+    if (_sel == "ui0") {
+        array_push(_o, { op: "wait", n: 30 });
+        array_push(_o, { op: "goto", r: rm_floor1 });
+        array_push(_o, { op: "wait", n: 30 });
+        var _s0 = [[480, 432], [800, 720]];
+        for (var _i = 0; _i < array_length(_s0); _i++) {
+            array_push(_o, { op: "win", w: _s0[_i][0], h: _s0[_i][1] });
+            array_push(_o, { op: "layout", mode: "G0" });
+            array_push(_o, { op: "ui", rule: "R0" });
+            array_push(_o, { op: "wait", n: 4 });
+            array_push(_o, { op: "cap", name: "d_" + string(_s0[_i][0]) + "x" + string(_s0[_i][1]) + "_R0", via: "gui" });
+        }
+    }
+    array_push(_o, { op: "end" });
+    return _o;
+}
+
+// The prototype of Display_Apply: layout from the CURRENT window size, then the GUI mode under test.
+function Spk_Apply(_mode) {
+    var _s = global.spk;
+    var _ww = window_get_width(), _wh = window_get_height();
+    var _l = Display_CalcLayout(_ww, _wh);
+    _s.lay = _l;
+    _s.mode = _mode;
+    display_set_gui_maximise();           // reset any earlier scale/offset
+    display_set_gui_size(-1, -1);         // reset any earlier size
+    switch (_mode) {
+        case "G0": display_set_gui_size(160, 144); display_set_gui_maximise(_l.scale, _l.scale, _l.game_x, _l.game_y); _s.gw = 160; _s.gh = 144; _s.gk = _l.scale; _s.gox = _l.game_x; _s.goy = _l.game_y; break;
+        case "G1": display_set_gui_size(_l.gui_w, _l.gui_h); display_set_gui_maximise(_l.ui_scale, _l.ui_scale, _l.gui_x, _l.gui_y); _s.gw = _l.gui_w; _s.gh = _l.gui_h; _s.gk = _l.ui_scale; _s.gox = _l.gui_x; _s.goy = _l.gui_y; break;
+        case "G2": display_set_gui_size(_ww, _wh); _s.gw = _ww; _s.gh = _wh; _s.gk = 1; _s.gox = 0; _s.goy = 0; break;
+        case "G3": display_set_gui_size(640, 576); display_set_gui_maximise(_l.scale / 4, _l.scale / 4, _l.game_x, _l.game_y); _s.gw = 640; _s.gh = 576; _s.gk = _l.scale / 4; _s.gox = _l.game_x; _s.goy = _l.game_y; break;
+    }
+    Spk_Log("apply mode=" + _mode + " win=" + string(_ww) + "x" + string(_wh) + " scale=" + string(_l.scale) + " game=" + string(_l.game_x) + "," + string(_l.game_y) + "," + string(_l.game_w) + "x" + string(_l.game_h)
+        + " ui=" + string(_l.ui_scale) + " gui=" + string(_l.gui_w) + "x" + string(_l.gui_h) + "@" + string(_l.gui_x) + "," + string(_l.gui_y)
+        + " -> display_get_gui=" + string(display_get_gui_width()) + "x" + string(display_get_gui_height()));
+}
+
+// Called from obj_game_controller Create (every room): what the room set, then the code-side binding.
+function Spike_RoomStart() {
+    if (!variable_global_exists("spk")) return;
+    var _s = global.spk;
+    Spk_State("room_create_BEFORE_bind");
+    var _cam = view_camera[0];
+    view_enabled = true;
+    view_visible[0] = true;
+    for (var _i = 1; _i < 8; _i++) view_visible[_i] = false;
+    camera_set_view_size(_cam, 160, 144);
+    camera_set_view_border(_cam, 79, 71);
+    view_xport[0] = 0; view_yport[0] = 0; view_wport[0] = 160; view_hport[0] = 144;
+    Spk_State("room_create_AFTER_bind");
+    with (obj_sfx_manager) depth = 1000000;
+    _s.trace = 4;
+}
+
+function Spike_PreDraw() {
+    if (!variable_global_exists("spk")) return;
+    var _s = global.spk;
+    if (_s.trace > 0) { Spk_State("predraw_trace" + string(_s.trace)); }
+}
+
+function Spike_Draw() {
+    if (!variable_global_exists("spk")) return;
+    // a 1 px red border and a green cross on the 160x144 view, in room coordinates
+    var _cam = view_camera[0];
+    var _cx = camera_get_view_x(_cam), _cy = camera_get_view_y(_cam);
+    draw_set_color(c_red);
+    draw_rectangle(_cx, _cy, _cx + 159, _cy, false);
+    draw_rectangle(_cx, _cy + 143, _cx + 159, _cy + 143, false);
+    draw_rectangle(_cx, _cy, _cx, _cy + 143, false);
+    draw_rectangle(_cx + 159, _cy, _cx + 159, _cy + 143, false);
+    draw_set_color(c_lime);
+    draw_line(_cx + 70, _cy + 72, _cx + 90, _cy + 72);
+    draw_line(_cx + 80, _cy + 62, _cx + 80, _cy + 82);
+    draw_set_color(c_white);
+}
+
+function Spike_GuiBlit() {
+    if (!variable_global_exists("spk")) return;
+    var _s = global.spk;
+    if (_s.blit != "gui" || is_undefined(_s.lay)) return;
+    var _l = _s.lay;
+    if (_s.cap != "" && !_s.cap_done && surface_exists(application_surface)) surface_save(application_surface, _s.cap + "_1x.png");
+    // inside the GUI layer: GUI unit = ui_scale window px, origin at gui_x/gui_y
+    draw_clear(c_black);
+    gpu_set_blendenable(false);
+    draw_surface_ext(application_surface, (_l.game_x - _l.gui_x) / _l.ui_scale, (_l.game_y - _l.gui_y) / _l.ui_scale, _l.scale / _l.ui_scale, _l.scale / _l.ui_scale, 0, c_white, 1);
+    gpu_set_blendenable(true);
+}
+
+function Spike_PostDraw() {
+    if (!variable_global_exists("spk")) return;
+    var _s = global.spk;
+    if (_s.blit == "gui") return;
+    var _l = _s.lay;
+    var _ww = window_get_width(), _wh = window_get_height();
+    if (_s.cap != "" && !_s.cap_done && surface_exists(application_surface)) {
+        surface_save(application_surface, _s.cap + "_1x.png");
+    }
+    draw_clear(c_black);
+    if (is_undefined(_l)) _l = Display_CalcLayout(_ww, _wh);
+    gpu_set_blendenable(false);
+    draw_surface_ext(application_surface, _l.game_x, _l.game_y, _l.scale, _l.scale, 0, c_white, 1);
+    gpu_set_blendenable(true);
+    // full-window outline in magenta at what GML says the window is
+    draw_set_color(c_fuchsia);
+    draw_rectangle(0, 0, _ww - 1, 0, false);
+    draw_rectangle(0, _wh - 1, _ww - 1, _wh - 1, false);
+    draw_rectangle(0, 0, 0, _wh - 1, false);
+    draw_rectangle(_ww - 1, 0, _ww - 1, _wh - 1, false);
+    draw_set_color(c_white);
+    if (_s.trace > 0) {
+        var _ap = application_get_position();
+        Spk_Log("postdraw trace" + string(_s.trace) + " win=" + string(_ww) + "x" + string(_wh) + " appPos=" + string(_ap[0]) + "," + string(_ap[1]) + "," + string(_ap[2]) + "," + string(_ap[3]));
+        _s.trace--;
+    }
+}
+
+function Spk_Font(_pt) {
+    var _s = global.spk;
+    var _k = "k" + string(_pt);
+    if (!variable_struct_exists(_s.fonts, _k)) {
+        var _f = font_add("NanumGothic-Regular.ttf", _pt, false, false, 32, 55203);
+        variable_struct_set(_s.fonts, _k, _f);
+        Spk_Log("font_add pt=" + string(_pt) + " -> " + string(_f));
+    }
+    return variable_struct_get(_s.fonts, _k);
+}
+
+function Spk_DrawUI0() {
+    var _s = global.spk;
+    draw_set_color(make_color_rgb(24, 24, 56));
+    draw_rectangle(0, 0, 160, 144, false);
+    draw_set_color(c_white);
+    draw_set_halign(fa_left); draw_set_valign(fa_top);
+    draw_set_font(retro_gaming);
+    draw_text_transformed(2, 1, "HP 12/20 MP 4/8", 0.5, 0.5, 0);
+    draw_text_transformed(2, 12, "Attack  Item  Skill", 0.5, 0.5, 0);
+    var _pts = [5, 6, 7, 8, 9];
+    var _y = 24;
+    for (var _i = 0; _i < array_length(_pts); _i++) {
+        draw_set_font(Spk_Font(_pts[_i]));
+        draw_text(2, _y, "사용 가능한 항목이 없습니다. " + string(_pts[_i]));
+        _y += string_height("A") + 1;
+        draw_text(2, _y, "공격   도구   기술   도망");
+        _y += string_height("A") + 3;
+    }
+    draw_set_font(retro_gaming);
+}
+
+function Spk_DrawUI(_rule) {
+    var _s = global.spk;
+    var _l = _s.lay;
+    if (_rule == "R0") { Spk_DrawUI0(); return; }
+    var _gw = _s.gw, _gh = _s.gh;
+    var _sc = _l.scale, _u = _l.ui_scale;
+    draw_set_color(make_color_rgb(24, 24, 56));
+    draw_rectangle(0, 0, _gw, _gh, false);
+    var _fe = 1, _ko_pt = 11, _ko_k = 1;   // english scale (GUI units), korean pt and korean draw scale
+    var _n = max(1, round(0.8 * _sc));
+    switch (_rule) {
+        case "R1": _fe = 1.6; _ko_pt = 11; _ko_k = 1.6; break;                                   // today's look in a 640x576 grid, fractional
+        case "R2": _n = max(_u, round(_n / _u) * _u); _fe = _n / (2 * _u); _ko_pt = max(6, round(7.5 * _n / _u / 1.333)); _ko_k = 1; break;   // integer GUI scale, korean raster in GUI units
+        case "R3": _n = max(_u, round(_n / _u) * _u); _fe = _n / (2 * _u); _ko_pt = max(6, round(7.5 * _n / 1.333)); _ko_k = 1 / _u; break;   // korean raster in window px, drawn at 1/u
+    }
+    draw_set_font(retro_gaming);
+    draw_set_halign(fa_left); draw_set_valign(fa_top);
+    var _x = 8, _y = 6;
+    draw_set_color(c_white);
+    draw_text_transformed(_x, _y, "RULE " + _rule + " s" + string(_sc) + " u" + string(_u) + " n" + string(_n), _fe, _fe, 0);
+    _y += 22 * _fe;
+    draw_text_transformed(_x, _y, "HP 12/20  MP 4/8  Lv 3", _fe, _fe, 0);
+    _y += 24 * _fe;
+    var _tw = string_width("Attack") * _fe;
+    draw_set_color(c_white);
+    draw_rectangle(_x, _y, _x + _tw + 8 * _fe, _y + 22 * _fe, false);
+    draw_set_color(c_black);
+    draw_text_transformed(_x + 4 * _fe, _y + 1 * _fe, "Attack", _fe, _fe, 0);
+    draw_set_color(c_white);
+    draw_text_transformed(_x + _tw + 20 * _fe, _y + 1 * _fe, "Item  Skill  Run", _fe, _fe, 0);
+    _y += 28 * _fe;
+    draw_text_transformed(_x, _y, "No items available.", _fe, _fe, 0);
+    _y += 24 * _fe;
+    draw_set_font(Spk_Font(_ko_pt));
+    var _kh = string_height("A") * _ko_k;
+    draw_text_transformed(_x, _y, "사용 가능한 항목이 없습니다.", _ko_k, _ko_k, 0);
+    _y += _kh + 4 * _fe;
+    draw_text_transformed(_x, _y, "공격   도구   기술   도망", _ko_k, _ko_k, 0);
+    _y += _kh + 6 * _fe;
+    // 1-GUI-unit line comb: uneven widths here show a fractional GUI scale
+    draw_set_color(c_white);
+    for (var _i = 0; _i < 24; _i++) { draw_rectangle(_x + _i * 3, _y, _x + _i * 3, _y + 10, false); }
+    for (var _i = 0; _i < 8; _i++) { if (_i mod 2 == 0) draw_rectangle(_x + 80 + _i * 2, _y, _x + 80 + _i * 2 + 1, _y + 3, false); }
+    draw_set_font(retro_gaming);
+}
+
+function Spike_GuiEnd() {
+    if (!variable_global_exists("spk")) return;
+    var _s = global.spk;
+    if (_s.ui != "") Spk_DrawUI(_s.ui);
+    var _gw = _s.gw, _gh = _s.gh;
+    draw_set_color(c_aqua);
+    draw_rectangle(0, 0, 2, 2, false);
+    draw_rectangle(_gw - 3, 0, _gw - 1, 2, false);
+    draw_rectangle(0, _gh - 3, 2, _gh - 1, false);
+    draw_rectangle(_gw - 3, _gh - 3, _gw - 1, _gh - 1, false);
+    draw_set_color(c_white);
+    if (_s.cap != "" && !_s.cap_done && _s.cap_via == "gui") {
+        var _w = window_get_width(), _h = window_get_height();
+        screen_save(_s.cap + ".png");
+        Spk_Log("[SHOT] file=" + _s.cap + ".png w=" + string(_w) + " h=" + string(_h) + " via=gui gui=" + string(_gw) + "x" + string(_gh) + " appPos=" + string(application_get_position()[0]) + "," + string(application_get_position()[1]));
+        _s.cap_done = true;
+    }
+}
+
+function Spike_Step() {
+    if (!variable_global_exists("spk")) return;
+    var _s = global.spk;
+    if (_s.done) return;
+    _s.f++;
+    with (obj_sfx_manager) depth = 1000000;
+    if (_s.f > 6000) { Spk_Log("TIMEOUT"); game_end(1); _s.done = true; return; }
+    if (_s.cap != "" && !_s.cap_done && _s.cap_via == "step") {
+        var _w = window_get_width(), _h = window_get_height();
+        screen_save(_s.cap + ".png");
+        Spk_Log("[SHOT] file=" + _s.cap + ".png w=" + string(_w) + " h=" + string(_h) + " via=step");
+        _s.cap_done = true;
+        return;
+    }
+    if (_s.lagn > 0) {
+        var _ap = application_get_position();
+        Spk_Log("lag t+" + string(13 - _s.lagn) + " win=" + string(window_get_width()) + "x" + string(window_get_height()) + " gui=" + string(display_get_gui_width()) + "x" + string(display_get_gui_height()) + " appPos=" + string(_ap[0]) + "," + string(_ap[1]) + "," + string(_ap[2]) + "," + string(_ap[3]));
+        _s.lagn--;
+    }
+    if (!_s.cap_done) return;           // waiting for a capture
+    if (_s.wait_file != "") {
+        _s.wait_n++;
+        if (file_exists(_s.wait_file)) { file_delete(_s.wait_file); _s.wait_file = ""; }
+        else if (_s.wait_n > 1200) { Spk_Log("grab ack TIMEOUT " + _s.wait_file); _s.wait_file = ""; }
+        return;
+    }
+    if (_s.win_wait > 0) {              // waiting for window_set_size to land
+        if (window_get_width() == _s.win_target[0] && window_get_height() == _s.win_target[1]) {
+            Spk_Log("window reached " + string(_s.win_target[0]) + "x" + string(_s.win_target[1]) + " after " + string(_s.f - _s.win_t0) + " frames");
+            _s.win_wait = -3;           // 3 more frames
+        } else if (_s.f - _s.win_t0 > 120) {
+            Spk_Log("window NEVER reached " + string(_s.win_target[0]) + "x" + string(_s.win_target[1]) + ", is " + string(window_get_width()) + "x" + string(window_get_height()));
+            _s.win_wait = 0;
+        }
+        return;
+    }
+    if (_s.win_wait < 0) { _s.win_wait++; return; }
+    if (_s.t > 0) { _s.t--; return; }
+    if (_s.step >= array_length(_s.ops)) return;
+    var _o = _s.ops[_s.step];
+    _s.step++;
+    switch (_o.op) {
+        case "wait": _s.t = _o.n; break;
+        case "rep": Spk_State(_o.tag); break;
+        case "win":
+            Spk_Log("window_set_size " + string(_o.w) + "x" + string(_o.h) + " now=" + string(window_get_width()) + "x" + string(window_get_height()));
+            window_set_size(_o.w, _o.h);
+            Spk_Log("  immediately after: window_get=" + string(window_get_width()) + "x" + string(window_get_height()));
+            _s.win_target = [_o.w, _o.h]; _s.win_t0 = _s.f; _s.win_wait = 1;
+            break;
+        case "winraw": window_set_size(_o.w, _o.h); _s.win_target = [_o.w, _o.h]; _s.win_t0 = _s.f; _s.win_wait = 1; break;
+        case "layout": Spk_Apply(_o.mode); break;
+        case "lag":
+            Spk_Log("lag: set_size " + string(_o.w) + "x" + string(_o.h) + " from win=" + string(window_get_width()) + " gui=" + string(display_get_gui_width()) + "x" + string(display_get_gui_height()) + " appPos=" + string(application_get_position()[0]));
+            window_set_size(_o.w, _o.h); _s.lagn = 12; break;
+        case "hideui": with (obj_start_controller) visible = false; with (obj_ui_controller) visible = false; Spk_Log("hid game ui"); break;
+        case "grab": Spk_Log("GRAB " + _o.name + " win=" + string(window_get_width()) + "x" + string(window_get_height())); _s.wait_file = "ack_" + _o.name; _s.wait_n = 0; break;
+        case "cap": _s.cap = _o.name; _s.cap_via = _o.via; _s.cap_done = false; break;
+        case "goto":
+            if (_o.r == rm_floor1 || _o.r == rm_battle) { Scenario_NewKnight(); GameState_SetBattleReturn(rm_floor1, 0, 0, 0); GameState_SetBattleEnemy("spk", ENEMY_SLIME, 1); }
+            room_goto(_o.r);
+            break;
+        case "ui": _s.ui = _o.rule; Spk_Log("ui rule " + _o.rule); break;
+        case "end":
+            Spk_Log("[TEST-SUMMARY] pass=1 fail=0 errors=0");
+            _s.done = true;
+            game_end(0);
+            break;
+    }
+}

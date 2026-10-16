@@ -79,6 +79,8 @@ ALLOW_EXACT = {
     "+",
     "-",
     ">",
+    "{killer}",   # the death-line placeholder, not text
+    ".grave.line.obj_grave.",   # a key fragment
 }
 
 ALLOW_PREFIX = (
@@ -88,6 +90,12 @@ ALLOW_PREFIX = (
     "enemy_skill_",
     "dialogue_",
     "interact.name.",
+    "skill:",   # C2 card ids (scr_db_skill)
+    "up:",
+    "pas:",
+    "fb:",
+    "card.pas.",
+    "card.fb.",
 )
 
 SKIP_LINE_TOKENS = (
@@ -103,12 +111,14 @@ SKIP_LINE_TOKENS = (
     "sfx_key:",
     "sfx_candidates:",
     "fx_sprite:",
+    "#macro CREDITS_CREATOR_TBD",   # TODO-OWNER placeholder until the creator names arrive (D40)
 )
 
 SKIP_FUNCTIONS_BY_FILE = {
-    "scripts/scr_dialogue/scr_dialogue.gml": {"DialogueDB_Init"},
+    # D3: the dialogue tables are keyed data (key + English fallback; Loc_T reads them by key): death lines, wake lines, lore notes, closing text, the D154 choices
+    "scripts/scr_dialogue/scr_dialogue.gml": {"DialogueDB_Init", "DeathLine_Defs", "WakeLine_Pick", "Note_Defs", "Story_ClosingLines", "Credits_SoundAssets", "Credits_NewSfxAssets", "Choice_Raw", "Choice_Lines"},
     "scripts/scr_db_item/scr_db_item.gml": {"ItemDB_Init", "ItemDB_GetPassiveTemplate"},
-    "scripts/scr_db_skill/scr_db_skill.gml": {"SkillDB_Init"},
+    "scripts/scr_db_skill/scr_db_skill.gml": {"SkillDB_Init", "CardDB_Init"},   # C2: the card table is data; Card_Name and Card_Sentence look the text up with Loc_T
     "scripts/scr_db_enemy/scr_db_enemy.gml": {"EnemyDB_Init"},
     "scripts/scr_status/scr_status.gml": {"StatusDB_Init"},
 }
@@ -131,13 +141,40 @@ def decode(raw: str) -> str:
     )
 
 
+def strip_comment(line: str) -> str:
+    """Drop a trailing // comment (a // inside a string literal is kept)."""
+    in_str = False
+    i = 0
+    while i < len(line):
+        c = line[i]
+        if in_str:
+            if c == "\\":
+                i += 2
+                continue
+            if c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+        elif c == "/" and line[i : i + 2] == "//":
+            return line[:i]
+        i += 1
+    return line
+
+
 def iter_literals(line: str) -> Iterable[str]:
     for m in STRING_RE.finditer(line):
         yield decode(m.group(1))
 
 
+PLACEHOLDER_RE = re.compile(r"\{[A-Za-z_][A-Za-z0-9_]*\}")
+
+
 def looks_player_facing(text: str) -> bool:
     if text in ALLOW_EXACT:
+        return False
+    # a format token such as "{n}" is not text; with the tokens removed, a string with no letters left
+    # ("{n}", "{a}/{b}") is non-text, while "Lv {n}" keeps "Lv" and is still flagged.
+    if not re.search(r"[A-Za-z]", PLACEHOLDER_RE.sub("", text)):
         return False
     if text.startswith(ALLOW_PREFIX):
         return False
@@ -194,7 +231,10 @@ def lint_file(path: Path, root: Path) -> List[Tuple[int, str]]:
             if in_skip_func:
                 continue
 
+        line = strip_comment(line)
         if "Loc_T(" in line:
+            continue
+        if "key:" in line and "text:" in line:   # a keyed table row: { key: "x.y", text: "English fallback" }
             continue
         if any(tok in line for tok in SKIP_LINE_TOKENS):
             continue

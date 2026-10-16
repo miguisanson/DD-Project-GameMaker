@@ -1,5 +1,17 @@
 if (trigger_cooldown > 0) trigger_cooldown -= 1;
 
+// C1 (D26): a story trigger (dialogue, camera pan, enemy freeze) plays once per profile; a later run finds it already done.
+if (!variable_instance_exists(id, "story_key")) {
+    story_key = "";
+    if (trigger_once && persist_id != "") {
+        story_key = "trigger:" + RoomState_Key(room, persist_id);
+        if (Story_Seen(story_key)) {
+            triggered = true;
+            story_prev_seen = true;   // C5 (D106): played on an earlier run; a boss pan becomes a name banner
+        }
+    }
+}
+
 DialogueTrigger_UpdateCinematic(id);
 
 if (!trigger_enabled) exit;
@@ -32,6 +44,7 @@ if (is_string(trigger_sfx_on_fire_key) && trigger_sfx_on_fire_key != "") {
 }
 
 trigger_fired_once = true;
+if (variable_instance_exists(id, "story_key") && story_key != "") Story_Mark(story_key);
 DialogueTrigger_StartCinematic(id);
 
 pending_trigger = false;
