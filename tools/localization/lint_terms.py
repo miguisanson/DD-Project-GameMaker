@@ -108,7 +108,7 @@ LABEL_RES = [re.compile(r"^" + p + r"$") for p in LABEL_KEYS]
 SAME_EN_TWO_KO_OK = {"run", "ok", "no", "effects", "brace", "damage taken"}
 
 SMALL = {"a", "an", "the", "of", "to", "in", "on", "at", "for", "and", "or", "but", "by", "with", "into", "from", "as", "vs", "per"}
-CAPS_OK = {"BREAK"}
+CAPS_OK = {"BREAK", "PERFECT", "GOOD", "WEAK"}   # R3 note 9 (D171): the QTE grade words are the one all-capitals exception; OK is short enough to pass anyway
 
 
 def in_scope(key: str) -> bool:

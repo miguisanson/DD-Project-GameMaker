@@ -151,6 +151,7 @@ function Test_RunAll() {
     Test_RunSuite("Hunt7Feel", Test_Suite_Hunt7Feel);
     Test_RunSuite("Review7", Test_Suite_Review7);
     Test_RunSuite("R3Cards", Test_Suite_R3Cards);
+    Test_RunSuite("R3Menus", Test_Suite_R3Menus);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -1061,7 +1062,7 @@ function Test_Suite_Qte() {
     // feedback: each grade has its own word and its own existing sound (QTE-12, GAP-01)
     SFX_EnsureManager();
     var _grades = ["PERFECT", "GOOD", "OK", "WEAK"];
-    var _words = ["Perfect", "Good", "OK", "Weak"];
+    var _words = ["PERFECT", "GOOD", "OK", "WEAK"];   // R3 note 9: the grade words are capitals
     var _seen = [];
     for (var _gi = 0; _gi < 4; _gi++) {
         var _sk = Qte_GradeSfxKey(_grades[_gi]);
@@ -14508,4 +14509,118 @@ function Test_R3CardsNames() {
     Loc_SetLanguage("en");
     Test_Eq("r3cards names: the final boss is Pale Choirbeast", EnemyDB_Get(ENEMY_FINAL_BOSS).name, "Pale Choirbeast");
     Loc_SetLanguage(_lang0);
+}
+
+// ============================================================================================================================
+// Round 3 menus (owner notes 9, 21, 25; D171): R-096 section headers stand out, R-097 "Reset to Defaults" asks and shows what it did. The QTE grade words
+// are all capitals in English (note 9). The flow through real keys is in smoke steps 1040..1049, the pictures in shots 1030..1039.
+// ============================================================================================================================
+function Test_Suite_R3Menus() {
+    Test_RunSuite("R3Menus.gradewords", Test_R3GradeWords);
+    Test_RunSuite("R3Menus.headers", Test_R3Headers);
+    Test_RunSuite("R3Menus.reset", Test_R3Reset);
+}
+
+// Note 9: PERFECT, GOOD, OK and WEAK in capitals (only these four words); Korean is as it was; the 2x word fits every window width.
+function Test_R3GradeWords() {
+    var _s = TextFit_Begin();
+    var _keys = ["PERFECT", "GOOD", "OK", "WEAK"];
+    var _en = ["PERFECT", "GOOD", "OK", "WEAK"];
+    var _ko = [chr(0xC644) + chr(0xBCBD), chr(0xC88B) + chr(0xC74C), chr(0xBB34) + chr(0xB09C), chr(0xC57D) + chr(0xD568)];   // as before: wanbyeok, joeum, munan, yakham
+    var _sizes = TextFit_Sizes();
+    for (var _i = 0; _i < 4; _i++) {
+        TextFit_Set(480, 432, "en");
+        Test_Eq("r3 grade word en " + _keys[_i], Qte_GradeLabel(_keys[_i]), _en[_i]);
+        TextFit_Set(480, 432, "ko");
+        Test_Eq("r3 grade word ko " + _keys[_i], Qte_GradeLabel(_keys[_i]), _ko[_i]);
+    }
+    for (var _z = 0; _z < array_length(_sizes); _z++) {
+        for (var _l = 0; _l < 2; _l++) {
+            var _lang = (_l == 0) ? "en" : "ko";
+            TextFit_Set(_sizes[_z][0], _sizes[_z][1], _lang);
+            for (var _w = 0; _w < 4; _w++) {
+                var _tw = UI_TextWidth(Qte_GradeLabel(_keys[_w])) * 2;
+                Test_True("r3 grade word " + _lang + " " + _keys[_w] + " at 2x fits the " + string(_sizes[_z][0]) + " px width", _tw <= Display_GuiW() - 2 * Ui_Metrics().margin);
+            }
+        }
+    }
+    // an enemy near a screen edge must not push the word off the screen: the left edge is held inside the margins
+    Test_Eq("r3 grade word: a centre near the left edge is held at the margin", Qte_GradeWordLeft(5, 100, 480, 8), 8);
+    Test_Eq("r3 grade word: a centre near the right edge is held at the margin", Qte_GradeWordLeft(475, 100, 480, 8), 480 - 8 - 100);
+    Test_Eq("r3 grade word: a centre in the middle stays centred", Qte_GradeWordLeft(240, 100, 480, 8), 190);
+    TextFit_End(_s);
+}
+
+// Note 21 / R-096: a section header (kind "head") is a dark strip with pale text; an empty slot is a dim light-green row. Never selectable, one shared draw.
+function Test_R3Headers() {
+    var _head = { id: "h", kind: "head", label: "Equipped", value: "", enabled: false };
+    var _dim = { id: "d", kind: "button", label: "No Armor", value: "", enabled: true, dim: true };
+    var _item = { id: "i", kind: "button", label: "Iron Sword", value: "", enabled: true };
+    var _hs = Ui_RowStyle(_head, false);
+    var _ds = Ui_RowStyle(_dim, false);
+    var _is = Ui_RowStyle(_item, false);
+    Test_Eq("r3 header: the strip is the dark green", _hs.strip, UI_C_DARK);
+    Test_Eq("r3 header: the text is the palette's lightest", _hs.text, UI_C_LIGHTEST);
+    Test_Eq("r3 header: it is the same with the cursor on it", Ui_RowStyle(_head, true).strip, UI_C_DARK);
+    Test_True("r3 header: its text colour differs from a dim row's as drawn", Ui_TextColor(_hs.text) != Ui_TextColor(_ds.text));
+    Test_True("r3 header: its fill differs from a dim row's (which has none)", _hs.strip != _ds.strip);
+    Test_Eq("r3 an empty-slot (dim) row stays the light green", _ds.text, UI_C_LIGHT);
+    Test_Eq("r3 an empty-slot (dim) row has no strip", _ds.strip, -1);
+    Test_Eq("r3 an item row has no strip", _is.strip, -1);
+    Test_Eq("r3 an item row keeps the main text colour", Ui_TextColor(_is.text), UI_C_TEXT);
+    // the strip: a gap above it, except for the first row of the list
+    var _first = Ui_HeadRect(10, 200, 50, 16, 3, true);
+    var _later = Ui_HeadRect(10, 200, 50, 16, 3, false);
+    Test_Eq("r3 header strip: the first one has no gap above", _first.y, 50);
+    Test_Eq("r3 header strip: a later one leaves a gap of one pixel unit above", _later.y, 53);
+    Test_Eq("r3 header strip: the first one ends at the bottom of the row", _first.y + _first.h, 66);
+    Test_Eq("r3 header strip: a later one ends at the bottom of the row", _later.y + _later.h, 66);
+    Test_Eq("r3 header strip: it spans the row", _later.x + _later.w, 200);
+    // the real lists
+    var _g = TabGear_Items(CharacterCreate_Player(CLASS_KNIGHT));
+    var _armor = Test_RowById(_g, "id", "empty_body");
+    var _acc = Test_RowById(_g, "id", "empty_accessory");
+    Test_True("r3 gear: the Equipped header is a head row", _g[0].kind == "head" && _g[0].label == "Equipped");
+    Test_Eq("r3 gear: No Armor draws the dim light green", Ui_RowStyle(_armor, false).text, UI_C_LIGHT);
+    Test_Eq("r3 gear: No Accessory draws the dim light green", Ui_RowStyle(_acc, false).text, UI_C_LIGHT);
+    Test_True("r3 gear: the header does not look like No Armor", Ui_RowStyle(_g[0], false).strip != Ui_RowStyle(_armor, false).strip);
+    var _kn = CharacterCreate_Player(CLASS_KNIGHT);
+    _kn.inventory = Inv_Add(_kn.inventory, 2, 1);
+    var _g2 = TabGear_Items(_kn);
+    var _bag = -1;
+    for (var _i = 0; _i < array_length(_g2); _i++) if (_g2[_i].id == "head_bag") _bag = _i;
+    Test_True("r3 gear: the Bag header is a head row with a strip", _bag >= 0 && _g2[_bag].kind == "head" && Ui_RowStyle(_g2[_bag], false).strip == UI_C_DARK);
+    // the cursor never rests on a header
+    var _m = Ui_MenuNew("r3_head", _g2, {});
+    Test_True("r3 gear: the cursor starts on a row, not a header", _m.items[_m.cursor].kind != "head");
+}
+
+// Note 25 / R-097: what a reset changed, the notice text, the flash.
+function Test_R3Reset() {
+    var _old = Binds_Copy(Binds_Defaults());
+    variable_struct_set(_old, "run", [ord("F")]);
+    variable_struct_set(_old, "tab_next", [ord("G")]);
+    var _changed = Controls_ChangedRows(_old, Binds_Defaults());
+    Test_Eq("r3 reset: the rows that differ from the defaults are named", string(_changed), string(["run", "tab_next"]));
+    Test_Eq("r3 reset: nothing differs when the keys are the defaults", array_length(Controls_ChangedRows(Binds_Defaults(), Binds_Defaults())), 0);
+    Loc_SetLanguage("en");
+    Test_Eq("r3 reset: the notice says keys are back", Controls_ResetText(2), "Keys are back to the defaults.");
+    Test_Eq("r3 reset: the notice says when nothing changed", Controls_ResetText(0), "Keys were already the defaults.");
+    Test_Eq("r3 reset: the question", Loc_T("controls.reset_ask", "?"), "Reset every key to its default?");
+    Test_True("r3 flash: on at the start", Ui_FlashOn(0));
+    Test_False("r3 flash: off before it starts", Ui_FlashOn(-1));
+    Test_False("r3 flash: blinks off", Ui_FlashOn(250));
+    Test_True("r3 flash: and on again", Ui_FlashOn(350));
+    Test_False("r3 flash: over after 600 ms", Ui_FlashOn(600));
+    Test_Eq("r3 flash: lasts about 600 ms", CONTROLS_FLASH_MS, 600);
+    // the page rows carry the flash start for the changed rows only
+    var _items = Controls_Items(Binds_Defaults(), "", "", "", ["run"], 1234);
+    Test_Eq("r3 flash: a changed row carries the start time", Test_RowById(_items, "id", "run").flash_at, 1234);
+    var _other = Test_RowById(_items, "id", "tab_next");
+    Test_True("r3 flash: an unchanged row does not", !variable_struct_exists(_other, "flash_at") || _other.flash_at < 0);
+    // the Korean strings exist
+    Loc_SetLanguage("ko");
+    Test_True("r3 reset: the question has a Korean text", Loc_T("controls.reset_ask", "?") != "Reset every key to its default?" && Loc_T("controls.reset_ask", "?") != "?");
+    Test_True("r3 reset: the already-defaults notice has a Korean text", Loc_T("controls.reset_same", "?") != "Keys were already the defaults." && Loc_T("controls.reset_same", "?") != "?");
+    Loc_SetLanguage("en");
 }
