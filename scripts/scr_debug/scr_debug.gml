@@ -3128,7 +3128,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsR4Final2(_s);   // r4final2 (I-111): slime, snake, wolf, Palehorn, Choirbeast with their feet on the HUD row's top edge, and the Skill list against the Choirbeast; three sizes; the end of the pictures
             break;
         case 1190: case 1191: case 1192: case 1193: case 1194: case 1195: case 1196: case 1197: case 1198: case 1199:
-            Scenario_StepShotsRelease(_s);   // release (D188-D190): the title with its version label and Credits row, the credits page top and bottom (English and Korean), the keys that scroll it; three sizes; the end of the pictures
+            Scenario_StepShotsRelease(_s);   // release (D188-D190): the title with its version label and Credits row, the credits page top and bottom (English and Korean), the keys that scroll it; three sizes; goes on with r4lootglow (1250)
+            break;
+        case 1250: case 1251: case 1252: case 1253: case 1254: case 1255: case 1256: case 1257: case 1258: case 1259:
+            Scenario_StepShotsR4LootGlow(_s);   // r4lootglow (D195, R-133): the gold outline on a closed chest and a whole barrel, none on an opened chest and a barrel broken for real, in a dark and a lit room; three sizes; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -4747,6 +4750,7 @@ function Scenario_WorldFlags(_w, _fileB) {
 
 function Scenario_WorldStage(_w) {
     global.light_clock = 0;   // D159: the fires flicker with the game clock; the pictures A and B must not differ by a flicker step
+    global.lootglow_clock = 0;   // D195: nor by a step of the gold pulse on the closed chest (freed again when the world pictures end)
     with (obj_enemy) instance_destroy();
     _w.sl = instance_create_layer(1 * GRID_TILE_SIZE, 7 * GRID_TILE_SIZE, "Instances", obj_slime);   // in the open lit part of the room, over light and dark floor (frozen, so its sight does not matter)
     Scenario_PlaceEnemy(_w.sl, 1, 7);
@@ -4822,7 +4826,7 @@ function Scenario_StepShotsWorld(_s) {
         case 65:
             if (_s.t >= 4) {
                 Scenario_Check("shots_world_saved_" + _w.shot, file_exists(_w.shot));
-                if (_w.pass >= 1) { Scenario_Next(_s, 150); break; }   // C5: the story pictures
+                if (_w.pass >= 1) { global.lootglow_clock = -1; Scenario_Next(_s, 150); break; }   // C5: the story pictures
                 Scenario_Next(_s, 66);
             }
             break;
@@ -19063,7 +19067,7 @@ function Scenario_StepShotsR4Final2(_s) {
     }
 }
 
-// Release packet (D188, D189, D190): pictures 1190..1197, shot_release_<scene>_<w>x<h>.png at scales 3, 4, 5. The end of the pictures: the last step calls Scenario_MouseEnd.
+// Release packet (D188, D189, D190): pictures 1190..1197, shot_release_<scene>_<w>x<h>.png at scales 3, 4, 5. The last step goes on with r4lootglow (1250).
 //   title            the title with the version stamp ("v1.0" over the build id) at the lower right and the Credits row (cursor on it)
 //   credits_top      the Credits page at its top
 //   credits_bottom   the same scrolled to the end
@@ -19210,9 +19214,131 @@ function Scenario_StepShotsRelease(_s) {
             if (_o.di >= array_length(_scenes)) {
                 Loc_SetLanguage("en");
                 Scenario_SetWindowScale(3);
-                Scenario_MouseEnd();   // the end of the pictures
+                Scenario_Next(_s, 1250);   // goes on with the r4lootglow pictures (1250..1254), the end of the pictures
             } else {
                 Scenario_Next(_s, 1190);
+            }
+            break;
+    }
+}
+
+
+// ============================================================================================================================================================
+// R4 lootglow (D195, R-133) pictures 1250..1259: the gold outline on what still holds loot. Two rooms, three window sizes (scale 3, 4, 5), shot_r4lootglow_<scene>_<w>x<h>.png:
+//   dark   rm_floor7 (a dark cave, a fire stand at its west end): an opened chest, a whole barrel, a closed chest and a barrel the player breaks for real, in a row
+//   lit    rm_floor2 (the daylight clearing): the same row
+// Only the whole barrel and the closed chest have the outline; the opened chest and the barrel broken by the player (the real Interact_Handle) have none. The last pictures of the run: they end it.
+//   1250: enter the room   1251: set the row up   1252: press Interact on the barrel, it breaks, its outline goes   1253: the picture at this scale   1254: next scale / room
+// ============================================================================================================================================================
+function Scenario_R4LootGlowScene(_i) {
+    switch (_i) {
+        case 0: return { name: "dark", rm: rm_floor7, row: 6, opened: 8, barrel: 7, chest: 9, pl: 11, brk: 12 };   // row 6 is out of reach of the cave torches (radius 3) and its fire: the unlit floor
+        case 1: return { name: "lit", rm: rm_floor2, row: 6, opened: 7, barrel: 6, chest: 8, pl: 10, brk: 11 };
+    }
+    return undefined;
+}
+
+function Scenario_R4LootGlowClean(_o) {
+    var _ids = ["opened", "barrel", "chest", "brk"];
+    for (var _i = 0; _i < array_length(_ids); _i++) {
+        if (variable_struct_exists(_o, _ids[_i]) && instance_exists(variable_struct_get(_o, _ids[_i]))) with (variable_struct_get(_o, _ids[_i])) instance_destroy();
+    }
+}
+
+function Scenario_StepShotsR4LootGlow(_s) {
+    if (!variable_struct_exists(_s, "r4lg")) _s.r4lg = { di: 0, si: 0 };
+    var _o = _s.r4lg;
+    var _scales = [3, 4, 5];
+    var _sc = Scenario_R4LootGlowScene(_o.di);
+    var _gs = GameState_Get();
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    switch (_s.step) {
+        case 1250:   // a new knight and a run: the room, by way of another one (the player is only spawned on a room change)
+            if (_sc == undefined) { Scenario_SetWindowScale(3); Scenario_MouseEnd(); break; }   // the end of the pictures
+            if (_s.t == 1) {
+                Mouse_FakeClear();
+                Display_ClearZoom();
+                Loc_SetLanguage("en");
+                global.tutorial_off = true;
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_Release();
+                global.light_clock = 1500;   // the fires flicker is frozen at one step, so a picture can be taken again
+                global.lootglow_clock = -1;   // the gold pulse runs on the real clock here
+                var _g = Scenario_NewKnight(CLASS_KNIGHT);
+                _g.run = Run_Create(4242);
+                _g.run.gold = 40;
+                Scenario_NoOwed();
+                Scenario_SetWindowScale(3);
+                _o.via = (_sc.rm == rm_floor2) ? rm_floor3 : rm_floor2;
+                room_goto(_o.via);
+            }
+            if (_s.t == 30 && room == _o.via) room_goto(_sc.rm);
+            if (_s.t > 70 && Scenario_FloorReady(_sc.rm) && Player_IsSettled(_pl)) Scenario_Next(_s, 1251);
+            if (_s.t > 600) { Scenario_Check("shots_r4lootglow_enters_the_room_" + _sc.name, false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+            break;
+        case 1251:   // the row: opened chest, whole barrel, closed chest, [player], a barrel to break
+            with (obj_enemy) instance_destroy();
+            Dialogue_CloseNow();
+            Scenario_ClearUi();
+            Scenario_NoOwed();
+            Scenario_R4LootGlowClean(_o);
+            _o.opened = Scenario_Block(obj_chest_opened, _sc.opened, _sc.row);
+            _o.barrel = Scenario_Block(obj_barrel_lv1, _sc.barrel, _sc.row);
+            _o.barrel.persist_id = "r4lg_" + _sc.name + "_barrel";
+            _o.chest = Scenario_Block(obj_chest_lv1, _sc.chest, _sc.row);
+            _o.chest.persist_id = "r4lg_" + _sc.name + "_chest";
+            _o.brk = Scenario_Block(obj_barrel_lv1, _sc.brk, _sc.row);
+            _o.brk.persist_id = "r4lg_" + _sc.name + "_brk";
+            _pl = Scenario_PlacePlayer(_sc.pl, _sc.row);
+            _pl.face = RIGHT;
+            _gs.player_ch.hp = _gs.player_ch.max_hp;
+            var _t = LootGlow_Targets();
+            Scenario_Check("shots_r4lootglow_the_whole_barrel_and_the_closed_chest_have_the_outline_" + _sc.name, array_contains(_t, _o.barrel.id) && array_contains(_t, _o.chest.id) && array_contains(_t, _o.brk.id));
+            Scenario_Check("shots_r4lootglow_the_opened_chest_has_none_" + _sc.name, !array_contains(_t, _o.opened.id));
+            _o.tapped = false;
+            Scenario_Next(_s, 1252);
+            break;
+        case 1252:   // the player breaks the barrel next to him, through the real interaction: its outline goes at once
+            if (!_o.tapped && _s.t >= 20) { _o.tapped = true; Scenario_Tap("interact"); }
+            if (_o.tapped && instance_exists(_o.brk) && _o.brk.swapped) {
+                Scenario_Check("shots_r4lootglow_the_broken_barrel_lost_its_outline_" + _sc.name, !LootGlow_Has(_o.brk) && !array_contains(LootGlow_Targets(), _o.brk.id));
+                Scenario_Check("shots_r4lootglow_the_other_two_kept_theirs_" + _sc.name, LootGlow_Has(_o.barrel) && LootGlow_Has(_o.chest));
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_NoOwed();
+                _o.si = 0;
+                Scenario_Next(_s, 1253);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_r4lootglow_the_barrel_breaks_" + _sc.name, false, "mode=" + string(_gs.ui.mode) + " swapped=" + string(instance_exists(_o.brk) ? _o.brk.swapped : -1)); Scenario_Release(); Scenario_MouseEnd(); }
+            break;
+        case 1253:   // the picture at this scale
+            if (_s.t == 1) {
+                Scenario_SetWindowScale(_scales[_o.si]);
+                _o.d0 = LootGlow_DrawCount();
+            }
+            if (_s.t >= 40) {
+                var _a = LootGlow_Alpha(LootGlow_Clock());
+                var _tag = _sc.name + "_" + string(_scales[_o.si]);
+                Scenario_Check("shots_r4lootglow_the_part_drew_the_two_outlines_" + _tag, LootGlow_DrawCount() - _o.d0 >= 2, "drawn=" + string(LootGlow_DrawCount() - _o.d0));
+                Scenario_Check("shots_r4lootglow_the_pulse_is_between_35_and_70_percent_" + _tag, _a >= 0.349 && _a <= 0.701, string(_a));
+                Scenario_Check("shots_r4lootglow_no_dialogue_is_open_" + _tag, _gs.ui.mode == UI_NONE && array_length(_gs.ui.lines) == 0);
+                _s.shot = "shot_r4lootglow_" + _sc.name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1254);
+            }
+            break;
+        case 1254:   // next scale, then the next room
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _o.si++;
+                if (_o.si >= array_length(_scales)) {
+                    Scenario_R4LootGlowClean(_o);
+                    _o.di++;
+                    Scenario_Next(_s, 1250);
+                } else {
+                    Scenario_Next(_s, 1253);
+                }
             }
             break;
     }

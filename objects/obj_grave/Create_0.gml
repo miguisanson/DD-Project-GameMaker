@@ -4,6 +4,7 @@ interact_name = Loc_T("interact.name.obj_grave", "Grave");
 dialogue_id = "";
 
 grave_interactable = true;
+searched = false;   // D195 (R-133): set by the first search (Grave_MarkSearched); the gold outline is only on a grave that has not been searched
 ghost_spawn_chance = 0.15;
 ghost_marker_id = "";
 ghost_duration_frames = game_get_speed(gamespeed_fps);
