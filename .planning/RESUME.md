@@ -7,7 +7,6 @@ Game code is on branch `next` (worktree `E:\Github_Projects\DD-Project-GameMaker
 ## In flight
 | Worktree | Branch | Brief | State |
 |---|---|---|---|
-| wt\polish | fix-r4polish | polish.md | battle toast never covers the enemy; level-up legend wording |
 | wt\lootglow | feat-r4lootglow | lootglow.md | D195 gold outline on containers that still hold loot |
 A full gate on next (with final2 + release merged) was started; re-run if its result is unknown.
 
