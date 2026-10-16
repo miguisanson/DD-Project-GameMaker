@@ -578,7 +578,10 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeR3Mouse(_s);   // mouse (D182, R-111): the title, Settings sliders, the seed entry through a fake mouse; goes on with ideas2 (1120)
             break;
         case 1120: case 1121: case 1122: case 1123: case 1124: case 1125: case 1126: case 1127: case 1128: case 1129:
-            Scenario_StepSmokeR3Ideas2(_s);   // ideas2 (D173, D185): a trapped chest on floor 2 through real keys: the line, the one-time tutorial, the bar (map paused), Perfect and Weak; the end of the chain (its last step calls Scenario_MouseEnd)
+            Scenario_StepSmokeR3Ideas2(_s);   // ideas2 (D173, D185): a trapped chest on floor 2 through real keys: the line, the one-time tutorial, the bar (map paused), Perfect and Weak; goes on with r4final2 (1130)
+            break;
+        case 1130: case 1131: case 1132: case 1133: case 1134: case 1135: case 1136: case 1137: case 1138: case 1139:
+            Scenario_StepSmokeR4Bush(_s);   // r4final2 (I-110, R-124): a slime chases the player, he walks into a bush with real keys: "?" at once, it stands 2.5 s, then roams, never re-spots him in the bush; goes on with the Save step (1140)
             break;
         case 1110: case 1111: case 1112: case 1113: case 1114: case 1115: case 1116: case 1117: case 1118: case 1119:
             Scenario_StepSmokeR3Ideas1(_s);   // r3ideas1 (D173, D185, R-114, R-115): a resisted Bleeding is said and remembered by the Codex; a poison tick kills and the death tip is the poison one; goes on with saves2 (1070)
@@ -18464,10 +18467,10 @@ function Scenario_StepSmokeR3Ideas2(_s) {
             }
             if (_s.t > 1200) { Scenario_Check("ideas2_smoke_the_weak_flow_ends", false, "tapped=" + string(_d.tapped) + " mode=" + string(_gs.ui.mode) + " trap=" + string(TrapUi_IsOpen())); Scenario_MouseEnd(); }
             break;
-        case 1124:   // the end of the chain
+        case 1124:   // goes on with r4final2 (1130..), the end of the chain
             Scenario_RestoreFocus();
             global.tutorial_off = true;
-            Scenario_MouseEnd();
+            Scenario_Next(_s, 1130);
             break;
     }
 }
@@ -18722,6 +18725,113 @@ function Scenario_StepShotsR4Final1(_s) {
                     Scenario_Next(_s, 1130);
                 }
             }
+            break;
+    }
+}
+
+
+// ============================================================================
+// Round 4 final fixes, packet final2, smoke steps 1130..1139 (rm_floor3, real keys). I-110 (R-124): a slime facing the player 2 tiles away chases him; he steps up into the bush patch (3,5) with a
+// real key: at once the slime drops the chase ("?" up, mode stand), stands on its cell for about 2.5 s, then it roams again (idle); it never chases while he is in the bush (stood still, then
+// walking to (3,4) inside the bush) for 270 frames from the moment he stepped in; stepping out onto (3,6) afterwards it spots him again. The last step goes on with the Save steps (1140).
+// ============================================================================
+function Scenario_StepSmokeR4Bush(_s) {
+    if (!variable_struct_exists(_s, "r4b")) _s.r4b = { };
+    var _h = _s.r4b;
+    var _T = GRID_TILE_SIZE;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _e = (variable_struct_exists(_h, "e") && instance_exists(_h.e)) ? _h.e : noone;
+    switch (_s.step) {
+        case 1130:   // rm_floor3 by a real room change; the slime at (5,6) facing left, the player at (3,6)
+            if (_s.t == 1) {
+                Scenario_Release();
+                Scenario_ClearUi();
+                Dialogue_CloseNow();
+                Scenario_NewKnight(CLASS_KNIGHT);
+                room_goto(rm_floor2);
+            }
+            if (_s.t == 30 && room == rm_floor2) room_goto(rm_floor3);
+            if (_s.t > 70 && Scenario_FloorReady(rm_floor3) && Player_IsSettled(_pl)) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_Check("r4final2_smoke_the_bush_cell_3_5_has_its_grass", instance_position(3 * _T + _T / 2, 5 * _T + _T / 2, obj_tall_grass) != noone);
+                _h.e = Scenario_H11Enemy(obj_slime, 5, 6, -1, LEFT);
+                Scenario_PlacePlayer(3, 6);
+                _pl.face = UP;   // already facing the bush: one press moves a step (a press on a new direction only turns, D69)
+                _h.f0 = _s.f;
+                Scenario_Next(_s, 1131);
+            }
+            if (_s.t > 600) { Scenario_Check("r4final2_smoke_rm_floor3_is_ready", false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+            break;
+        case 1131:   // spotted; the player walks up into the bush
+            if (_e == noone) { Scenario_Check("r4final2_smoke_the_slime_is_alive", false); Scenario_MouseEnd(); break; }
+            if (_e.ai_mode == "chase") {
+                Scenario_Check("r4final2_smoke_the_slime_chases_him_in_the_open", !Player_InBush(_pl) && _e.alert_pop > 0);
+                _h.bush_f = -1;
+                _h.stand_f = -1;
+                _h.end_f = -1;
+                _h.chased = false;
+                _h.moved = false;
+                _h.up2 = false;
+                Scenario_Hold("move_up", 6);
+                Scenario_Next(_s, 1132);
+            }
+            if (_s.t > 60) { Scenario_Check("r4final2_smoke_the_slime_chases_him_in_the_open", false, "mode=" + _e.ai_mode); Scenario_MouseEnd(); }
+            break;
+        case 1132:   // the step into the bush: at once the chase is dropped; the stand; the roam
+            if (_e == noone) { Scenario_Check("r4final2_smoke_the_slime_is_alive_in_the_bush", false); Scenario_MouseEnd(); break; }
+            var _ec = Scenario_H11Cell(_e);
+            if (_h.bush_f < 0 && Player_InBush(_pl)) _h.bush_f = _s.f;
+            if (_h.stand_f < 0 && _e.ai_mode == "stand") {
+                _h.stand_f = _s.f;
+                _h.stand_cx = _ec.cx;
+                _h.stand_cy = _ec.cy;
+                Scenario_Check("r4final2_smoke_the_player_is_in_the_bush_when_it_drops_the_chase", _h.bush_f >= 0, "bush_f=" + string(_h.bush_f));
+                Scenario_Check("r4final2_smoke_it_drops_the_chase_within_3_frames_of_his_stepping_in", _h.bush_f >= 0 && _h.stand_f - _h.bush_f <= 3, "after " + string(_h.stand_f - _h.bush_f));
+                Scenario_Check("r4final2_smoke_the_question_mark_is_up_at_once", _e.q_pops == 1 && _e.question_pop > 0, "q_pops=" + string(_e.q_pops) + " pop=" + string(_e.question_pop));
+                Scenario_Check("r4final2_smoke_no_fight_started", room == rm_floor3 && !Transition_IsActive());
+            }
+            if (_h.stand_f >= 0) {
+                if (_e.ai_mode == "chase") _h.chased = true;
+                if (_e.ai_mode == "stand" && (_ec.cx != _h.stand_cx || _ec.cy != _h.stand_cy)) _h.moved = true;
+                if (_e.ai_mode != "stand" && _h.end_f < 0) {
+                    _h.end_f = _s.f;
+                    _e.idle_timer = 100000;   // keep it where it stands: the rest is measured on one spot
+                    _e.turn_timer = 100000;
+                    _e.look_dir = LEFT;
+                    Scenario_Check("r4final2_smoke_it_stood_still_for_about_2_5_seconds", _h.end_f - _h.stand_f >= 140 && _h.end_f - _h.stand_f <= 175, "frames " + string(_h.end_f - _h.stand_f));
+                    Scenario_Check("r4final2_smoke_it_did_not_walk_while_it_stood", !_h.moved);
+                    Scenario_Check("r4final2_smoke_after_the_stand_it_roams_again", _e.ai_mode == "idle", "mode=" + _e.ai_mode);
+                    Scenario_Check("r4final2_smoke_it_put_up_exactly_one_question_mark", _e.q_pops == 1, "q_pops=" + string(_e.q_pops));
+                }
+                if (_h.end_f >= 0 && !_h.up2 && _s.f - _h.end_f >= 6) {   // he walks on inside the bush to (3,4): moving, not hidden
+                    _h.up2 = true;
+                    Scenario_Hold("move_up", 6);
+                }
+                if (_s.f - _h.stand_f >= 262) {
+                    Scenario_Check("r4final2_smoke_it_never_chased_him_in_the_bush_for_the_stand_and_2_seconds", !_h.chased, "mode=" + _e.ai_mode);
+                    Scenario_Check("r4final2_smoke_he_walked_on_inside_the_bush", Player_InBush(_pl) && Scenario_H11Cell(_pl).cy == 4, "cy=" + string(Scenario_H11Cell(_pl).cy));
+                    _pl.face = DOWN;   // he leaves: two steps down onto (3,6), 2 tiles in front of it
+                    Scenario_Hold("move_down", 30);
+                    _h.out_f = _s.f;
+                    Scenario_Next(_s, 1133);
+                }
+            }
+            if (_s.t > 600) { Scenario_Check("r4final2_smoke_the_slime_stands_and_roams_again", false, "stand_f=" + string(_h.stand_f) + " end_f=" + string(_h.end_f) + " mode=" + _e.ai_mode); Scenario_MouseEnd(); }
+            break;
+        case 1133:   // out of the bush and past the ignore window: it sees him again as normal
+            if (_e == noone) { Scenario_Check("r4final2_smoke_the_slime_is_alive_after_he_left", false); Scenario_MouseEnd(); break; }
+            if (_e.ai_mode == "chase") {
+                Scenario_Check("r4final2_smoke_out_of_the_bush_it_spots_him_again", !Player_InBush(_pl));
+                Scenario_Next(_s, 1134);
+            }
+            if (_s.t > 150) { Scenario_Check("r4final2_smoke_out_of_the_bush_it_spots_him_again", false, "mode=" + _e.ai_mode + " cooldown=" + string(_e.spot_cooldown)); Scenario_Next(_s, 1134); }
+            break;
+        case 1134:   // the end of the chain (until the Save steps are added)
+            with (obj_enemy) instance_destroy();
+            Scenario_Release();
+            Scenario_MouseEnd();
             break;
     }
 }

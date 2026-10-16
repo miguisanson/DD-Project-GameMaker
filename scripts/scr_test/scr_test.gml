@@ -19220,6 +19220,7 @@ function Test_R4Final1Chips() {
 // ============================================================================================================================================================
 function Test_Suite_R4Final2() {
     Test_RunSuite("R4Final2.levelup", Test_R4Final2LevelUp);
+    Test_RunSuite("R4Final2.bush", Test_R4Final2Bush);
 }
 
 // I-109 (D177 amended): the stat label and the current number are white; only the NEW number (after ">") is gold. A class growth row shows it always, the hovered row shows its "+1"
@@ -19294,4 +19295,122 @@ function Test_R4Final2LevelUp() {
     Test_True("r4final2 levelup: any other menu still glides (between its old place and the target)", Ui_MenuBandY(_plainm, 100, 16) > 40 && Ui_MenuBandY(_plainm, 100, 16) < 100);
     Loc_SetLanguage(_lang0);
     Test_LvRunEnd(_k);
+}
+
+// ---- I-110 (amends D179): the moment the player steps into a bush, every enemy that chases or searches drops it: "?" at once, stands still AI_BUSH_STAND_FRAMES (2.5 s), then roams / goes
+// home; blind to the player for the stand + 2 s (AI_IGNORE_FRAMES) from that moment. Enemies are real obj_slime instances on the test room's grid, the player a stand-in instance. ----
+function Test_R4F2Tick(_e, _pl, _n) {
+    var _cfg = EnemyDB_Get(_e.enemy_id);
+    for (var _i = 0; _i < _n; _i++) EnemyAI_Update(_e, _cfg, _pl);
+}
+
+function Test_R4F2Enemy(_cx, _cy, _face) {
+    var _T = GRID_TILE_SIZE;
+    var _e = instance_create_depth(_cx * _T, _cy * _T, 0, obj_slime);
+    EnemyAI_Init(_e);
+    _e.home_x = _e.x;
+    _e.home_y = _e.y;
+    _e.home_cx = _cx;
+    _e.home_cy = _cy;
+    _e.look_dir = _face;
+    _e.idle_timer = 100000;   // it stays where it is until it has a reason to move
+    _e.turn_timer = 100000;
+    _e.prof.sight = 3;
+    return _e;
+}
+
+function Test_R4F2Player(_cx, _cy) {
+    var _T = GRID_TILE_SIZE;
+    var _pl = instance_create_depth(_cx * _T, _cy * _T, 0, obj_slime);   // a stand-in: only its place and the movement fields count
+    _pl.moving = false;
+    _pl.step_speed = 1;
+    _pl.walk_speed = 1;
+    _pl.still_frames = 0;
+    return _pl;
+}
+
+function Test_R4Final2Bush() {
+    if (asset_get_index("EnemyAI_BushLose") == -1) { Test_True("r4final2 bush: EnemyAI_BushLose exists (not implemented yet)", false); return; }
+    var _T = GRID_TILE_SIZE;
+    Test_Eq("r4final2 bush: the stand is 150 frames (2.5 s)", AI_BUSH_STAND_FRAMES, 150);
+    var _grass = instance_create_depth(5 * _T, 4 * _T, 0, obj_tall_grass);   // the bush cell (5,4)
+    var _pl = Test_R4F2Player(4, 4);
+    var _e = Test_R4F2Enemy(2, 4, RIGHT);
+    // 1. a chase: the player is 2 tiles in front of it in the open
+    Test_R4F2Tick(_e, _pl, 3);
+    Test_Eq("r4final2 bush: (setup) the slime chases the player in the open", _e.ai_mode, "chase");
+    Test_False("r4final2 bush: (setup) the player is not in a bush yet", Player_InBush(_pl));
+    // 2. he steps into the bush (walking: not hidden): on the very next update it drops the chase with a "?"
+    _pl.x = 5 * _T;
+    _pl.moving = true;
+    Test_True("r4final2 bush: the player in the grass cell is in a bush, moving or not", Player_InBush(_pl));
+    Test_R4F2Tick(_e, _pl, 1);
+    Test_Eq("r4final2 bush: the chase is dropped at once (mode stand)", _e.ai_mode, "stand");
+    Test_Eq("r4final2 bush: the ? goes up at once, once", string(_e.q_pops) + "/" + string(_e.question_pop), "1/" + string(AI_QUESTION_FRAMES));
+    Test_Eq("r4final2 bush: it cannot notice him for the stand + 2 s (270 frames)", _e.spot_cooldown, AI_BUSH_STAND_FRAMES + AI_IGNORE_FRAMES);
+    Test_True("r4final2 bush: the search is forgotten", is_undefined(_e.srch));
+    // 3. it stands still the whole stand; never chases though he walks about in the grass in front of it
+    var _cx0 = Nav_CellOf(_e.x + _T / 2);
+    var _cy0 = Nav_CellOf(_e.y + _T / 2);
+    var _moved = false;
+    var _chased = false;
+    var _stand_ticks = 1;
+    var _left = -1;
+    for (var _i = 0; _i < 400; _i++) {
+        Test_R4F2Tick(_e, _pl, 1);
+        if (_e.ai_mode == "chase") _chased = true;
+        if (_e.ai_mode == "stand") {
+            _stand_ticks++;
+            if (Nav_CellOf(_e.x + _T / 2) != _cx0 || Nav_CellOf(_e.y + _T / 2) != _cy0 || _e.moving) _moved = true;
+        } else if (_left < 0) {
+            _left = _i + 2;   // the update on which the stand ended, counted from the update of the bush step
+            _e.idle_timer = 100000;   // keep it in place after the stand so the rest is measured on one spot
+            _e.turn_timer = 100000;
+            _e.look_dir = RIGHT;
+        }
+        if (_i == 230) _pl.x = 4 * _T;   // he leaves the bush (still inside the 270 frame window)
+        if (_i >= 266) break;
+    }
+    Test_False("r4final2 bush: it never walks during the stand", _moved);
+    Test_True("r4final2 bush: the stand lasts about 2.5 s (150 +- 3 frames, was " + string(_stand_ticks) + ")", abs(_stand_ticks - AI_BUSH_STAND_FRAMES) <= 3);
+    Test_Eq("r4final2 bush: after the stand a roamer is idle (it patrols / roams again)", _e.ai_mode, "idle");
+    Test_False("r4final2 bush: it never chased inside the window (he walked in the grass in front of it, then stepped out)", _chased);
+    Test_False("r4final2 bush: and the player is out of the bush", Player_InBush(_pl));
+    // 4. once the 270 frames are over, in the open in its cone: it notices him again as normal
+    Test_R4F2Tick(_e, _pl, 12);
+    Test_Eq("r4final2 bush: after the ignore window he is spotted in the open again", _e.ai_mode, "chase");
+    // 5. a searching enemy drops the search the same way
+    var _e2 = Test_R4F2Enemy(2, 6, LEFT);   // facing away: it does not see him, so it stays a searcher
+    var _pl2 = Test_R4F2Player(4, 6);
+    var _grass2 = instance_create_depth(5 * _T, 6 * _T, 0, obj_tall_grass);
+    _e2.ai_mode = "search";
+    _e2.srch = Search_Create(2, 6, AI_SEARCH_FRAMES);
+    _e2.spot_cooldown = 0;
+    Test_R4F2Tick(_e2, _pl2, 1);   // the player in the open (not in view of a searcher that turns away): bush state is recorded
+    _pl2.x = 5 * _T;
+    Test_R4F2Tick(_e2, _pl2, 1);
+    Test_Eq("r4final2 bush: a searching enemy stands too (mode stand, one ?)", _e2.ai_mode + "/" + string(_e2.q_pops), "stand/1");
+    Test_True("r4final2 bush: its search is gone, so no second ? comes at the end of it", is_undefined(_e2.srch));
+    // 6. no roam: it walks home after the stand
+    _e2.prof.idle = "still";
+    _e2.stand_timer = 1;
+    Test_R4F2Tick(_e2, _pl2, 1);
+    Test_Eq("r4final2 bush: an enemy that does not roam walks home after the stand", _e2.ai_mode, "return");
+    // 7. an enemy that was only idle is not touched by the player stepping into a bush
+    var _e3 = Test_R4F2Enemy(2, 8, RIGHT);
+    var _pl3 = Test_R4F2Player(7, 8);
+    var _grass3 = instance_create_depth(8 * _T, 8 * _T, 0, obj_tall_grass);
+    Test_R4F2Tick(_e3, _pl3, 2);
+    _pl3.x = 8 * _T;
+    Test_R4F2Tick(_e3, _pl3, 3);
+    Test_Eq("r4final2 bush: an idle enemy stays idle (no ?, no stand)", _e3.ai_mode + "/" + string(_e3.q_pops), "idle/0");
+    instance_destroy(_e);
+    instance_destroy(_e2);
+    instance_destroy(_e3);
+    instance_destroy(_pl);
+    instance_destroy(_pl2);
+    instance_destroy(_pl3);
+    instance_destroy(_grass);
+    instance_destroy(_grass2);
+    instance_destroy(_grass3);
 }
