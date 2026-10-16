@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T01:06:58Z",
-    "row_count": 1207
+    "generated_at_utc": "2026-10-16T01:51:30Z",
+    "row_count": 1208
   },
   "default_lang": "en",
   "languages": [
@@ -1279,6 +1279,10 @@
     "controls.waiting": {
       "en": "Press the new key for {action}. Esc cancels.",
       "ko": "{action}에 쓸 새 키를 누르세요. Esc로 취소합니다."
+    },
+    "controls.waiting_pad": {
+      "en": "Press the new key for {action}. [k:back] cancels.",
+      "ko": "{action}에 쓸 새 키를 누르세요. [k:back] 버튼으로 취소합니다."
     },
     "credits.by": {
       "en": "by PaleRook",

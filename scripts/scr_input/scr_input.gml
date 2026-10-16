@@ -731,6 +731,7 @@ function Binds_ToActions(_keys) {
         for (var a = 0; a < array_length(rows[i].actions); a++) {
             var dst = [];
             for (var k = 0; k < array_length(src); k++) array_push(dst, src[k]);
+            if (rows[i].id == "back" && !array_contains(dst, vk_escape)) array_push(dst, vk_escape);   // Hunt 6 UI (D140): Esc is reserved, so it is always Back whatever Back is rebound to
             variable_struct_set(out, rows[i].actions[a], dst);
         }
     }
