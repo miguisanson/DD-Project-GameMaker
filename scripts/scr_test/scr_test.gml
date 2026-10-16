@@ -10072,8 +10072,8 @@ function Test_Suite_LevelUpGrowth() {
     _vic.exp = _vic.exp_next - 1;
     var _slime = EnemyCreate(ENEMY_SLIME);
     var _rw = Battle_GrantRewards(_vic, _slime);
-    var _auto = LevelUp_AutoGainSummary(_rw.player);
-    Test_True("D143 (setup) the victory levelled the Knight up and the summary is not empty", _rw.levels_gained >= 1 && _auto != "");
+    var _auto = "ATK +1, DEF +1";   // what a Knight's level-up gives (the screen shows it; the text must not)
+    Test_True("D143 (setup) the victory won a level (owed until the screen, D177: nothing applied, so no gain summary yet)", _rw.levels_gained >= 1 && LevelUp_AutoGainSummary(_rw.player) == "" && _rw.player.level == _vic.level);
     var _lines = Battle_BuildVictoryDialogueLines(_slime, _rw, _rw.player);
     var _txt = "";
     for (var _i = 0; _i < array_length(_lines); _i++) _txt += is_struct(_lines[_i]) ? _lines[_i].text : string(_lines[_i]);

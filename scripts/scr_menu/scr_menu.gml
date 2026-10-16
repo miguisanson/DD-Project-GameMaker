@@ -1307,13 +1307,20 @@ function TabMenu_CardData(_mt) {
     global.tabmenu_card_builds = TabMenu_CardBuilds() + 1;
     c = {
         lang: lang, mt: _mt,
-        hp: Loc_T("battle.hud.hp", "HP"), mp: Loc_T("battle.hud.mp", "MP"), xp: Loc_T("tab.lbl.xp", "EXP"), xp_max: Loc_T("tab.val.max", "MAX"),
+        hp: Loc_T("battle.hud.hp", "HP"), mp: Loc_T("battle.hud.mp", "MP"), xp: Loc_T("tab.lbl.xp", "EXP"), xp_max: Loc_T("tab.val.max", "MAX"), xp_ready: Loc_T("tab.val.level_up", "Level Up"),
         level_tpl: Loc_T("battle.hud.level", "Lv {n}"), seed_tpl: Loc_T("tab.lbl.seed_small", "Seed: {n}"),
-        lab_w: 0, k_hp: -999, k_mp: -999, k_xp: -999, val_w: 0
+        lab_w: 0, k_hp: -999, k_mp: -999, k_xp: -999, k_owed: -1, val_w: 0
     };
     c.lab_w = max(UI_TextWidth(c.hp), max(UI_TextWidth(c.mp), UI_TextWidth(c.xp)));
     global.tabmenu_card = c;
     return c;
+}
+
+// D177: the status card's EXP bar: full and "Level Up" while a level is owed (won, the screen not yet confirmed), else EXP over the bar, "MAX" at the cap. { ratio, text }
+function TabMenu_XpBar(_ch, _max_txt = undefined, _ready_txt = undefined) {
+    if (LevelUp_Owed(_ch) > 0) return { ratio: 1, text: is_undefined(_ready_txt) ? Loc_T("tab.val.level_up", "Level Up") : _ready_txt };
+    if (_ch.exp_next > 0) return { ratio: clamp(_ch.exp / _ch.exp_next, 0, 1), text: string(_ch.exp) + "/" + string(_ch.exp_next) };
+    return { ratio: 1, text: is_undefined(_max_txt) ? Loc_T("tab.val.max", "MAX") : _max_txt };
 }
 
 // One bar row of the card: label, bar, "cur/max".
@@ -1343,14 +1350,17 @@ function TabMenu_DrawStatusCard(_x, _y, _w, _h, _ch, _alpha) {
     Ui_Text(x0, yy, nm, UI_C_LIGHTEST);
     Ui_Text(x1, yy, string_replace_all(cd.level_tpl, "{n}", string(_ch.level)), UI_C_LIGHT, fa_right);   // what Loc_T(.., { n }) makes
     yy += lh + p;
-    if (cd.k_hp != _ch.max_hp || cd.k_mp != _ch.max_mp || cd.k_xp != _ch.exp_next) {   // the widest "cur/max" text only changes with the maxima
+    var owed_now = (LevelUp_Owed(_ch) > 0) ? 1 : 0;
+    if (cd.k_hp != _ch.max_hp || cd.k_mp != _ch.max_mp || cd.k_xp != _ch.exp_next || cd.k_owed != owed_now) {   // the widest "cur/max" text only changes with the maxima
         var vw = UI_TextWidth(string(_ch.max_hp) + "/" + string(_ch.max_hp));
         vw = max(vw, UI_TextWidth(string(_ch.max_mp) + "/" + string(_ch.max_mp)));
         vw = max(vw, UI_TextWidth(string(_ch.exp_next) + "/" + string(_ch.exp_next)));
+        if (owed_now == 1) vw = max(vw, UI_TextWidth(cd.xp_ready));   // D177: "Level Up" in place of the numbers
         cd.val_w = vw;
         cd.k_hp = _ch.max_hp;
         cd.k_mp = _ch.max_mp;
         cd.k_xp = _ch.exp_next;
+        cd.k_owed = owed_now;
     }
     var bx = x0 + cd.lab_w + 2 * p;
     var bw = x1 - cd.val_w - 2 * p - bx;
@@ -1358,7 +1368,8 @@ function TabMenu_DrawStatusCard(_x, _y, _w, _h, _ch, _alpha) {
     yy += lh + p;
     TabMenu_DrawCardBar(x0, x1, yy, bx, bw, cd.mp, (_ch.max_mp > 0) ? clamp(_ch.mp / _ch.max_mp, 0, 1) : 1, string(_ch.mp) + "/" + string(_ch.max_mp), "mp");
     yy += lh + p;
-    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, cd.xp, (_ch.exp_next > 0) ? clamp(_ch.exp / _ch.exp_next, 0, 1) : 1, (_ch.exp_next > 0) ? (string(_ch.exp) + "/" + string(_ch.exp_next)) : cd.xp_max, "xp");
+    var xb = TabMenu_XpBar(_ch, cd.xp_max, cd.xp_ready);
+    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, cd.xp, xb.ratio, xb.text, "xp");
     yy += lh + p;
     Hud_DrawCoin(x0, yy + (lh - 6 * p) div 2, p);
     Ui_Text(x0 + 8 * p, yy, string(Gold_Get()), UI_C_LIGHTEST);

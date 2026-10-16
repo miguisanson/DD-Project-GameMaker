@@ -917,7 +917,7 @@ function RunSave_Build() {
     var pl = gs.player_ch;
     var summary = {   // D175: what the save-file list shows, readable without applying the run (Slots_Summary)
         class_id: (is_struct(pl) && variable_struct_exists(pl, "class_id")) ? pl.class_id : gs.selected_class,
-        level: (is_struct(pl) && variable_struct_exists(pl, "level")) ? pl.level : 1,
+        level: (is_struct(pl) && variable_struct_exists(pl, "level")) ? Player_EffLevel(pl) : 1,   // D177: a level won and not yet confirmed counts
         floor: run_floor,
         run_time_ms: RunStats_Of(run).play_ms,
         seed: run.seed,

@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T13:42:40Z",
-    "row_count": 1248
+    "generated_at_utc": "2026-10-16T13:53:41Z",
+    "row_count": 1249
   },
   "default_lang": "en",
   "languages": [
@@ -4823,6 +4823,10 @@
     "tab.val.floor": {
       "en": "Floor {n}",
       "ko": "{n}층"
+    },
+    "tab.val.level_up": {
+      "en": "Level Up",
+      "ko": "레벨 업"
     },
     "tab.val.locked": {
       "en": "Locked",

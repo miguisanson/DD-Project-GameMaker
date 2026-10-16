@@ -7638,7 +7638,7 @@ function Scenario_StepSmokeTabMenu(_s) {
                 Scenario_Check("tabmenu_the_menu_key_opens_it", _gs.ui.mode == UI_MENU && is_struct(_u), "mode=" + string(_gs.ui.mode) + " room=" + room_get_name(room));
                 if (!is_struct(_u)) { Scenario_Finish(); break; }
                 Scenario_Check("tabmenu_starts_on_status", _u.tab == 0 && _m.id == "tab_status");
-                Scenario_Check("tabmenu_status_lists_the_four_stats", array_length(_m.items) == 4 && _m.cursor == 0);
+                Scenario_Check("tabmenu_status_lists_the_six_stats", array_length(_m.items) == 6 && _m.cursor == 0);   // D176: ATK DEF SPD MAG VIG MND
                 Scenario_Check("tabmenu_status_has_a_description_for_each", string_length(_m.items[0].help) > 10 && _m.items[0].help != _m.items[1].help);
                 Scenario_Next(_s, 182);
             }
@@ -11081,6 +11081,8 @@ function Scenario_StepSmokeLevelUp(_s) {
                 if (Run_IsActive()) variable_struct_remove(_gs, "run");   // levelled before the run exists: the free points are placed at once
                 var _k = CharacterCreate_Player(CLASS_KNIGHT);
                 _k = LevelUp_ApplyLevel(LevelUp_ApplyLevel(_k));
+                _k = Player_NormalizeProgression(_k, true);   // the EXP bar of level 3
+                _k.card_picks = 0;   // the two level-ups owed a card pick each; this scenario is about the next one
                 _k.exp = _k.exp_next - 1;
                 _gs.run = Run_Create(7721);
                 GameState_SetPlayer(_k);
@@ -11109,6 +11111,7 @@ function Scenario_StepSmokeLevelUp(_s) {
             Scenario_BotPlainAttack(_s, _bc);
             break;
         case 522:   // back on the map: the screen opens; the Knight is still level 3 with a full "Level Up" bar
+            if (Scenario_CardsTalk(_s)) break;   // the first level-up queues the hero's one-time remark (Dialogue_NarrativeOnLevelUp); it is read through first
             if (_s.t > 5 && CardsUi_Kind() == "stat") {
                 var _ms = Ui_StackTop(global.cards_ui.stk);
                 Scenario_Check("levelup_the_free_point_screen_opens_first", _ms.id == "cards_stat");
@@ -11127,6 +11130,7 @@ function Scenario_StepSmokeLevelUp(_s) {
             if (_s.t > 900) { Scenario_Check("levelup_the_free_point_screen_opens", false, "kind=" + CardsUi_Kind() + " room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
         case 523:   // one confirm: level 4, the growth and the point; the card pick comes next and is answered
+            if (Scenario_CardsTalk(_s)) break;
             if (_s.t > 30 && array_length(_lu.q) == 0 && CardsUi_Kind() == "cards" && !variable_struct_exists(_lu, "p1")) {
                 _lu.p1 = true;
                 Scenario_Check("levelup_the_confirm_made_level_4", _ch.level == 4 && _ch.levels_owed == 0, "level=" + string(_ch.level) + " owed=" + string(_ch.levels_owed));
@@ -11141,7 +11145,7 @@ function Scenario_StepSmokeLevelUp(_s) {
                 Scenario_Check("levelup_nothing_is_owed_after_the_pick", Cards_NextOwed(_ch) == "");
                 Scenario_Next(_s, 470);   // H1 (D140, D141, 470..489) goes on; its last step ends the chain
             }
-            if (_s.t > 900) { Scenario_Check("levelup_the_point_and_the_pick_are_answered", false, "kind=" + CardsUi_Kind() + " q=" + string(array_length(_lu.q))); Scenario_NoticeEnd(); }
+            if (_s.t > 900) { Scenario_Check("levelup_the_point_and_the_pick_are_answered", false, "kind=" + CardsUi_Kind() + " q=" + string(array_length(_lu.q)) + " owed=" + Cards_NextOwed(_ch) + " level=" + string(_ch.level) + " lo=" + string(_ch.levels_owed) + " sp=" + string(_ch.stat_points) + " cp=" + string(_ch.card_picks) + " mode=" + string(_gs.ui.mode) + " lines=" + string(array_length(_gs.ui.lines)) + " room=" + room_get_name(room) + " tr=" + string(Transition_IsActive())); Scenario_NoticeEnd(); }
             break;
     }
 }
@@ -15974,7 +15978,7 @@ function Scenario_StepSmokeLabels(_s) {
                 Status_Add(_g2, STATUS_GUARD, 4, 0);
                 Status_Add(_g2, STATUS_POISON, 0, 0, 3);
                 Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);
-                Ui_MemSet(Ui_MemGlobal(), "tab_status", 0);
+                Ui_MemSet(Ui_MemGlobal(), "tab_status", 2);   // D176: six stats now; from the third row four presses reach the Guard status as before
                 Ui_MemSet(Ui_MemGlobal(), "tab_system", 0);
             }
             if (_s.t == 8) Scenario_Tap("menu");
@@ -16142,7 +16146,7 @@ function Scenario_StepShotsLabels(_s) {
                         Status_Add(_gs.player_ch, STATUS_BURN, 2, 3);
                         Ui_MemSet(Ui_MemGlobal(), "tab_status", 0);
                         Menu_Open(0);
-                        Ui_MenuFixCursor(TabMenu_TopMenu(), 4);   // Guard, with its sentence and its turns left
+                        Ui_MenuFixCursor(TabMenu_TopMenu(), 6);   // Guard, with its sentence and its turns left (after the six stats, D176)
                         break;
                     case "gear":
                         Menu_Open(3);
@@ -16151,7 +16155,7 @@ function Scenario_StepShotsLabels(_s) {
                         Menu_Open(6);
                         TabHelp_Open();
                         TabHelpStats_Open();
-                        Ui_MenuFixCursor(TabMenu_TopMenu(), 8);   // Perfect, with the number from the data
+                        Ui_MenuFixCursor(TabMenu_TopMenu(), 10);   // Perfect, with the number from the data (VIG and MND joined the terms, D176)
                         break;
                 }
             }

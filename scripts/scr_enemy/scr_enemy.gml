@@ -116,14 +116,14 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
     var exp_mult = variable_struct_exists(cfg, "auto_resolve_exp_mult") ? max(0, real(cfg.auto_resolve_exp_mult)) : ENEMY_AUTO_RESOLVE_EXP_MULT_DEFAULT;
     var loot_mult = variable_struct_exists(cfg, "auto_resolve_loot_mult") ? clamp(real(cfg.auto_resolve_loot_mult), 0, 1) : ENEMY_AUTO_RESOLVE_LOOT_MULT_DEFAULT;
     var diff = Difficulty_Profile();   // D35: only player_exp_mult (1) is left
-    var at_cap_before = Level_IsAtCap(p.level);
+    var at_cap_before = Level_IsAtCap(Player_EffLevel(p));   // D177: counting the levels owed
 
     var level_exp_mult = 1;
     if (variable_struct_exists(cfg, "level")) {
         level_exp_mult = clamp(1 + ((_enemy_level - round(cfg.level)) * 0.10), 0.70, 1.40);
     }
     var exp_gain = 0;
-    if (!Level_IsAtCap(p.level)) {
+    if (!Level_IsAtCap(Player_EffLevel(p))) {
         exp_gain = max(1, round(real(cfg.exp) * level_exp_mult * exp_mult));
         if (is_struct(diff) && variable_struct_exists(diff, "player_exp_mult")) {
             exp_gain = max(1, round(exp_gain * max(0, real(diff.player_exp_mult))));
@@ -160,7 +160,7 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
         auto_stat_summary: LevelUp_AutoGainSummary(p),
         gold_gain: gold_gain,
         loot_gained: is_array(loot) && array_length(loot) > 0,
-        at_level_cap: at_cap_before || Level_IsAtCap(p.level)
+        at_level_cap: at_cap_before || Level_IsAtCap(Player_EffLevel(p))
     };
 
     Dialogue_NarrativeOnLevelUp(result.levels_gained);
