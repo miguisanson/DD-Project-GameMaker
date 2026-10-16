@@ -142,6 +142,15 @@
 #macro HIDE_SETTLE_FRAMES 20       // the player must stand still this long on a hiding cell before it counts as hidden (walking across one does not)
 #macro HIDE_PLAYER_ALPHA 0.5       // how see-through the hidden player is drawn
 
+// D179 (R-098): sight is a cone. Agent-chosen first numbers, for the owner to tune at the playtest.
+#macro AI_CONE_COLOUR UI_C_DARK    // the faint sight cone is a shade of this palette colour. The brief said UI_C_LIGHTEST, but every floor is that colour already: measured, a lightest tint changes no pixel there (the cone was invisible)
+#macro AI_CONE_ALPHA_NEAR 0.10     // the faint sight cone drawn in front of an enemy: the tint of the cells nearest to it (alpha of AI_CONE_COLOUR) ...
+#macro AI_CONE_ALPHA_MID 0.08      // ... the middle ...
+#macro AI_CONE_ALPHA_FAR 0.06      // ... and the edge, softer
+#macro AI_CONE_CHASE_MULT 1.4      // a chasing enemy's cone is a little stronger (still faint: 0.14 at most)
+#macro AI_TURN_MIN_FRAMES 120      // an idle enemy turns to a new random direction every 2 to 4 seconds
+#macro AI_TURN_MAX_FRAMES 240
+
 #macro INTERACT_NONE       0
 #macro INTERACT_DOOR       2
 #macro INTERACT_SWITCH     3

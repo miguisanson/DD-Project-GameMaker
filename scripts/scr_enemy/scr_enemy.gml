@@ -398,7 +398,8 @@ function EnemyAI_CanStep(_inst, _mx, _my) {
 // ----------------------------------------------------------------------------
 // Per-type overworld personality (D63 sight, D66 idle personalities, D67 chase speed). Data, not code paths.
 // Speeds are pixels per frame; the player walks at 1 and runs at 2, so chase < 1 means "you can walk away" and wolves (1.0) keep up.
-//   sight       tiles; an enemy notices the player inside this circle when no wall is between (see_through ignores walls)
+//   sight       tiles; an enemy notices the player inside a 90 degree CONE in front of it (D179) of this radius, when nothing that blocks sight is between (see_through ignores walls
+//               and props), and always within 1 tile all round it. 3 for every enemy, 4 for the dire wolf and the mad whisp.
 //   chase       speed while chasing / walking to the last seen spot
 //   idle        "wander" (pause, one step, pause), "drift" (steps almost without pause), "patrol" (walks legs to far spots),
 //               "still" (ambusher: stays on its post)
@@ -409,17 +410,17 @@ function EnemyAI_CanStep(_inst, _mx, _my) {
 // The numbers are first guesses for the owner to tune by playing (reported in the packet notes).
 // ----------------------------------------------------------------------------
 function EnemyAI_Profile(_enemy_id) {
-    var _p = { sight: 4, chase: 0.8, idle: "wander", idle_speed: 0.6, pause_min: 40, pause_max: 100, roam: 3,
+    var _p = { sight: 3, chase: 0.8, idle: "wander", idle_speed: 0.6, pause_min: 40, pause_max: 100, roam: 3,
                search: 90, react: 14, pass: false, see_through: false, fixed: false, ret_speed: 0.8 };
     switch (_enemy_id) {
         case ENEMY_SLIME:        _p.chase = 0.7;  _p.idle_speed = 0.4; _p.pause_min = 60; _p.pause_max = 140; _p.roam = 2; _p.ret_speed = 0.6; break;
         case ENEMY_SPIDER:       _p.chase = 0.85; _p.idle_speed = 0.8; _p.pause_min = 25; _p.pause_max = 70; break;
         case ENEMY_SNAKE:        _p.chase = 0.85; _p.idle_speed = 0.7; _p.pause_min = 30; _p.pause_max = 80; break;
-        case ENEMY_MADWHISP:     _p.sight = 5; _p.chase = 0.85; _p.idle = "drift"; _p.idle_speed = 0.5; _p.pause_min = 0; _p.pause_max = 8; _p.roam = 4; break;
-        case ENEMY_KILLER_PLANT: _p.sight = 3; _p.chase = 0.8; _p.idle = "still"; _p.roam = 0; _p.search = 60; _p.react = 20; break;
-        case ENEMY_DIREWOLF:     _p.sight = 5; _p.chase = 1.0; _p.idle = "patrol"; _p.idle_speed = 0.9; _p.pause_min = 20; _p.pause_max = 50; _p.roam = 5; _p.react = 8; _p.ret_speed = 0.9; break;
+        case ENEMY_MADWHISP:     _p.sight = 4; _p.chase = 0.85; _p.idle = "drift"; _p.idle_speed = 0.5; _p.pause_min = 0; _p.pause_max = 8; _p.roam = 4; break;
+        case ENEMY_KILLER_PLANT: _p.chase = 0.8; _p.idle = "still"; _p.roam = 0; _p.search = 60; _p.react = 20; break;
+        case ENEMY_DIREWOLF:     _p.sight = 4; _p.chase = 1.0; _p.idle = "patrol"; _p.idle_speed = 0.9; _p.pause_min = 20; _p.pause_max = 50; _p.roam = 5; _p.react = 8; _p.ret_speed = 0.9; break;
         case ENEMY_GHOSTSWORD:   _p.chase = 0.85; _p.idle = "drift"; _p.idle_speed = 0.6; _p.pause_min = 0; _p.pause_max = 10; _p.roam = 4; _p.pass = true; _p.see_through = true; break;
-        case ENEMY_STRANGER:     _p.sight = 5; _p.chase = 0.9; _p.idle_speed = 0.7; _p.pause_min = 40; _p.pause_max = 90; _p.react = 20; break;
+        case ENEMY_STRANGER:     _p.chase = 0.9; _p.idle_speed = 0.7; _p.pause_min = 40; _p.pause_max = 90; _p.react = 20; break;
         case ENEMY_MINI_BOSS:
         case ENEMY_FINAL_BOSS:   _p.sight = 0; _p.idle = "still"; _p.roam = 0; _p.fixed = true; break;
     }
@@ -445,10 +446,22 @@ function Nav_MarkInstance(_g, _block, _sight, _exit = false) {
     }
 }
 
+// D179 (R-098): what blocks sight. ONE list for the whole game (the room grid and the checks both ask here). Walls, trees, stumps, rocks, barrels (whole or broken),
+// chests (closed or open), graves and tall grass / bushes do. Everything else a room holds does not: torches and fire stands (lit or out), skulls, bones, dung,
+// NPCs, doors, switches and beds, and any plain obj_interactable. _obj is an object index (a child counts as its parent).
+function Sight_BlocksObject(_obj) {
+    static _list = [obj_wall, obj_tree_1, obj_tree_2, obj_tree_stump1, obj_tree_stump2, obj_rock1, obj_rock2, obj_barrel, obj_barrel_broken,
+                    obj_chest, obj_chest_opened, obj_grave, obj_tall_grass];
+    for (var _i = 0; _i < array_length(_list); _i++) {
+        if (_obj == _list[_i] || object_is_ancestor(_obj, _list[_i])) return true;
+    }
+    return false;
+}
+
 function Nav_BuildGrid() {
     var _g = Nav_GridCreate(ceil(room_width / GRID_TILE_SIZE), ceil(room_height / GRID_TILE_SIZE));
     with (obj_wall) Nav_MarkInstance(_g, true, true);
-    with (obj_interactable) Nav_MarkInstance(_g, true, false);
+    with (obj_interactable) Nav_MarkInstance(_g, true, Sight_BlocksObject(object_index));
     with (obj_room_transition) Nav_MarkInstance(_g, true, false, true);   // enemies never park on an exit; the exit cells are kept for the clear zones (D158)
     return _g;
 }
@@ -526,11 +539,40 @@ function EnemyAI_Init(_inst) {
     _inst.stuck_events = 0;
     _inst.home_cx = Nav_CellOf(Grid_Snap(_inst.home_x) + GRID_TILE_SIZE / 2);
     _inst.home_cy = Nav_CellOf(Grid_Snap(_inst.home_y) + GRID_TILE_SIZE / 2);
+    _inst.look_dir = (abs(_inst.home_cx * 3 + _inst.home_cy * 5)) mod 4;   // D179: the way it faces (RIGHT, UP, LEFT, DOWN): from where it stands, so a room looks the same every time
+    _inst.turn_timer = AI_TURN_MIN_FRAMES + (abs(_inst.home_cx * 7 + _inst.home_cy * 11)) mod (AI_TURN_MAX_FRAMES - AI_TURN_MIN_FRAMES + 1);
 }
 
-// Notices the player: inside the sight circle and (unless see_through) no wall on the line between the two cells; a hidden player (D153) only from 1 tile (Sight_CanSee).
+// Notices the player: inside the cone in front of it (the way it faces, D179) or within 1 tile, and (unless see_through) nothing that blocks sight on the line between the two cells;
+// a hidden player (D153) only from 1 tile (Sight_CanSee). An enemy without a facing (a stand-in in a check) sees all round.
 function EnemyAI_CanSee(_inst, _pl, _nav, _tiles, _hidden = false) {
-    return Sight_CanSee(_nav.grid, _inst.x, _inst.y, _pl.x, _pl.y, _tiles, _inst.prof.see_through, _hidden);
+    var _face = variable_instance_exists(_inst, "look_dir") ? _inst.look_dir : -1;
+    return Sight_CanSee(_nav.grid, _inst.x, _inst.y, _pl.x, _pl.y, _tiles, _inst.prof.see_through, _hidden, _face);
+}
+
+// The cardinal direction that points most nearly from cell (_ecx,_ecy) at cell (_tx,_ty); _keep when they are the same cell. Ties go to the horizontal.
+function Look_DirToward(_ecx, _ecy, _tx, _ty, _keep) {
+    var _dx = _tx - _ecx;
+    var _dy = _ty - _ecy;
+    if (_dx == 0 && _dy == 0) return _keep;
+    if (abs(_dx) >= abs(_dy)) return (_dx > 0) ? RIGHT : LEFT;
+    return (_dy > 0) ? DOWN : UP;
+}
+
+// A new facing for an idle enemy: never the same, any of the other three (_r 0..2).
+function Look_NextDir(_dir, _r) {
+    return (_dir + 1 + clamp(floor(_r), 0, 2)) mod 4;
+}
+
+// An enemy that waits turns to a new random direction every 2 to 4 seconds (D179); one that walks faces where it walks (EnemyAI_BeginStep), one that has just spotted the player faces him.
+function EnemyAI_TurnTick(_inst) {
+    if (_inst.moving || _inst.ai_mode != "idle") return;
+    if (_inst.turn_timer > 0) {
+        _inst.turn_timer--;
+        return;
+    }
+    _inst.look_dir = Look_NextDir(_inst.look_dir, irandom(2));
+    _inst.turn_timer = irandom_range(AI_TURN_MIN_FRAMES, AI_TURN_MAX_FRAMES);
 }
 
 function EnemyAI_BeginStep(_inst, _dir, _speed) {
@@ -539,6 +581,7 @@ function EnemyAI_BeginStep(_inst, _dir, _speed) {
     var _my = (_dir == DOWN) - (_dir == UP);
     _inst.move_dir = _dir;
     _inst.last_dir = _dir;
+    _inst.look_dir = _dir;   // D179: it faces where it walks
     _inst.moving = true;
     _inst.move_timer = _t;
     _inst.step_tx = _inst.x + _mx * _t;
@@ -645,7 +688,7 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
     }
 
     var _nav = Nav_Get();
-    World_RegisterFx(_inst);   // the "!" and the sight circle are drawn by the world layer script (objects have no Draw event, no .yy edits)
+    World_RegisterFx(_inst);   // the "!" and the sight cone are drawn by the world layer script (objects have no Draw event, no .yy edits)
 
     var _t = GRID_TILE_SIZE;
     if (_inst.alert_pop > 0) _inst.alert_pop--;
@@ -656,11 +699,11 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
     var _pcx = Nav_CellOf(_pl.x + _t / 2);
     var _pcy = Nav_CellOf(_pl.y + _t / 2);
     var _hidden = Player_IsHidden(_pl);   // D153: still on a hiding cell: only seen from 1 tile
-    var _per = EnemyAI_Perceive(_nav.grid, _p, _inst.x, _inst.y, _pl.x, _pl.y, Player_IsRunning(_pl), _hidden);   // sight, and the noise of a RUN (D153)
+    var _per = EnemyAI_Perceive(_nav.grid, _p, _inst.x, _inst.y, _pl.x, _pl.y, Player_IsRunning(_pl), _hidden, _inst.look_dir);   // sight (the cone in front of it, D179), and the noise of a RUN (D153)
     var _sees = (_inst.spot_cooldown <= 0) && _per.sees;
     var _heard = (_inst.spot_cooldown <= 0) && _per.heard;
     if (_inst.ai_mode == "chase") {
-        // a little extra range once chasing so the edge of the circle does not flicker
+        // a little extra range once chasing so the edge of the cone does not flicker
         if (_sees || EnemyAI_CanSee(_inst, _pl, _nav, _p.sight + 1, _hidden)) {
             _inst.last_seen_cx = _pcx;
             _inst.last_seen_cy = _pcy;
@@ -673,6 +716,7 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
         }
     } else if (_sees) {
         _inst.ai_mode = "chase";
+        _inst.look_dir = Look_DirToward(Nav_CellOf(_inst.x + _t / 2), Nav_CellOf(_inst.y + _t / 2), _pcx, _pcy, _inst.look_dir);   // D179: it turns to face him
         _inst.last_seen_cx = _pcx;
         _inst.last_seen_cy = _pcy;
         _inst.last_seen_dir = _pl.face;
@@ -700,6 +744,7 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
     if (_inst.ai_state == ENEMY_ALERT) _inst.forget_time = _inst.forget_delay;
 
     // ---- decide (only between steps) ----
+    EnemyAI_TurnTick(_inst);
     if (!_inst.moving) {
         EnemyAI_HoldOwnCell(_inst, _nav);
         var _ecx = Nav_CellOf(_inst.x + _t / 2);
@@ -895,6 +940,7 @@ function World_FxPlan(_has_foreground) {
 function World_FxParts() {
     static _parts = [
         { name: "note", body: true, pass: "top" },             // C5 (D107): the lore notes lie under everything else
+        { name: "sight", body: true, pass: "top" },            // D179 (R-098): the very faint cone in front of each enemy, a tint on the floor under the darkness
         { name: "player_squash", body: true, pass: "body" },   // D138 (G6): the player's step squash, drawn here while his plain sprite is off
         { name: "merchant_glow", body: true, pass: "body" },   // D113: the pulsing gold glow round the merchant, darkened like him (R-091)
         { name: "light", body: false, pass: "top" },           // H14 (D157, D159): the room's darkness with the fires cut out of it; everything after it stays at full brightness
@@ -909,6 +955,7 @@ function World_FxParts() {
 function World_DrawFxPart(_name) {
     switch (_name) {
         case "note": Note_DrawWorldFx(); break;
+        case "sight": Sight_DrawWorldFx(); break;
         case "player_squash": MapFx_DrawPlayerSquash(); break;
         case "light": Light_DrawPass(); break;
         case "nav": Nav_DrawWorldFx(); break;
@@ -966,6 +1013,74 @@ function Nav_FxColors() {
         global.nav_fx_colors = { c0: UI_C_DARKEST, c1: UI_C_DARK, c2: UI_C_LIGHT, c3: UI_C_LIGHTEST };
     }
     return global.nav_fx_colors;
+}
+
+// ---- the faint sight cone (D179, R-098) ----
+// The tint of one cell of an enemy's cone: _band 2 near the enemy .. 0 at the edge (softer), a little stronger while it chases. Alpha of AI_CONE_COLOUR.
+function Sight_ConeAlpha(_band, _chasing) {
+    var _a = (_band >= 2) ? AI_CONE_ALPHA_NEAR : ((_band == 1) ? AI_CONE_ALPHA_MID : AI_CONE_ALPHA_FAR);
+    return _chasing ? _a * AI_CONE_CHASE_MULT : _a;
+}
+
+// What the last pass drew (the pictures check it): { calls, enemies, cells, alpha_max }.
+function Sight_ConeStats() {
+    if (!variable_global_exists("sight_cone_stats") || !is_struct(global.sight_cone_stats)) global.sight_cone_stats = { calls: 0, enemies: 0, cells: 0, alpha_max: 0 };
+    return global.sight_cone_stats;
+}
+
+// Does this enemy show a cone: awake and roaming (not defeated, not a boss or an enemy that stays on its post, not held by a cut scene), with a sight at all.
+function Sight_ConeShown(_inst) {
+    if (_inst.defeated || !variable_instance_exists(_inst, "prof") || !variable_instance_exists(_inst, "look_dir")) return false;
+    if (_inst.prof.fixed || _inst.prof.sight <= 0) return false;
+    if (variable_instance_exists(_inst, "ai_stationary") && _inst.ai_stationary) return false;
+    if (variable_instance_exists(_inst, "cine_lock_count") && _inst.cine_lock_count > 0) return false;
+    return true;
+}
+
+// Called by World_DrawFx (a layer script, see World_RegisterFx), before the darkness: the cells every roaming enemy on screen can see right now, as a very faint shade of
+// AI_CONE_COLOUR on the floor, near cells a little stronger than the edge, a chasing enemy's a little stronger again. It is the very set the sight test uses (Vis_Cone with the
+// facing), so what is tinted is what it sees: the cone, cut off by props and walls. The cells of the props themselves are not tinted.
+function Sight_DrawWorldFx() {
+    if (!Fx_IsWorldPass()) return;
+    var _st = Sight_ConeStats();
+    _st.calls++;
+    _st.enemies = 0;
+    _st.cells = 0;
+    _st.alpha_max = 0;
+    if (!instance_exists(obj_enemy)) return;
+    var _cam = view_camera[0];
+    if (is_undefined(_cam) || _cam == -1) return;
+    var _vx = camera_get_view_x(_cam);
+    var _vy = camera_get_view_y(_cam);
+    var _vw = camera_get_view_width(_cam);
+    var _vh = camera_get_view_height(_cam);
+    var _T = GRID_TILE_SIZE;
+    var _g = Nav_Get().grid;
+    var _oc = draw_get_color();
+    var _oa = draw_get_alpha();
+    draw_set_color(AI_CONE_COLOUR);
+    with (obj_enemy) {
+        if (!Sight_ConeShown(id)) continue;
+        var _ecx = Nav_CellOf(x + _T / 2);
+        var _ecy = Nav_CellOf(y + _T / 2);
+        var _tiles = Vis_EnemyTiles(prof, ai_mode);
+        var _reach = (ceil(_tiles) + 1) * _T;
+        if (_ecx * _T + _reach < _vx || _ecx * _T - _reach > _vx + _vw || _ecy * _T + _reach < _vy || _ecy * _T - _reach > _vy + _vh) continue;   // off screen
+        var _cone = Vis_Cone(_g, _ecx, _ecy, _tiles, prof.see_through, look_dir);
+        var _chasing = (ai_mode == "chase");
+        _st.enemies++;
+        for (var _i = 0; _i < array_length(_cone.runs); _i += 4) {
+            var _a = Sight_ConeAlpha(_cone.runs[_i + 3], _chasing);
+            var _x0 = (_ecx + _cone.runs[_i]) * _T;
+            var _y0 = (_ecy + _cone.runs[_i + 1]) * _T;
+            draw_set_alpha(_a);
+            draw_rectangle(_x0, _y0, _x0 + _cone.runs[_i + 2] * _T - 1, _y0 + _T - 1, false);
+            _st.cells += _cone.runs[_i + 2];
+            _st.alpha_max = max(_st.alpha_max, _a);
+        }
+    }
+    draw_set_color(_oc);
+    draw_set_alpha(_oa);
 }
 
 // Called by World_DrawFx (a layer script, see World_RegisterFx): the "!" over an enemy that just spotted the player and the "?" over one that gave up.
@@ -1040,7 +1155,8 @@ function Nav_GridCreate(_w, _h) {
     return { w: _w, h: _h, block: array_create(_w * _h, 0), sight: array_create(_w * _h, 0), exits: [], vis: undefined };
 }
 
-// rows: array of strings. "." free, "#" wall (blocks movement and sight), "~" blocks movement only.
+// rows: array of strings. "." free, "#" wall (blocks movement and sight), "~" blocks movement only (a torch), "o" blocks both (a barrel, a tree: D179),
+// "g" blocks sight only (tall grass: it can be walked through, D179).
 function Nav_GridFromRows(_rows) {
     var _h = array_length(_rows);
     var _w = 1;
@@ -1049,8 +1165,9 @@ function Nav_GridFromRows(_rows) {
     for (var _y2 = 0; _y2 < _h; _y2++) {
         for (var _x = 0; _x < string_length(_rows[_y2]); _x++) {
             var _ch = string_char_at(_rows[_y2], _x + 1);
-            if (_ch == "#") Nav_GridSet(_g, _x, _y2, true, true);
+            if (_ch == "#" || _ch == "o") Nav_GridSet(_g, _x, _y2, true, true);
             else if (_ch == "~") Nav_GridSet(_g, _x, _y2, true, false);
+            else if (_ch == "g") Nav_GridSet(_g, _x, _y2, false, true);
         }
     }
     return _g;
@@ -1157,11 +1274,24 @@ function Vis_Scan(_g, _cone, _row, _start, _end, _oct, _r2) {
     }
 }
 
-// The set of cells lit from cell (_cx,_cy) with radius _tiles (not kept: Vis_Cone is the cached way).
-function Vis_Compute(_g, _cx, _cy, _tiles, _see_through = false) {
+// D179: is the cell (_dx,_dy) away from the viewer inside the 90 degree cone round the way it faces (_face: RIGHT, UP, LEFT or DOWN)? In front, and no further off to the side
+// than it is ahead: the edge (45 degrees) counts. -1 (no facing) means all round. The viewer's own cell is not asked.
+function Vis_InCone(_dx, _dy, _face) {
+    switch (_face) {
+        case RIGHT: return (_dx > 0 && abs(_dy) <= _dx);
+        case LEFT:  return (_dx < 0 && abs(_dy) <= -_dx);
+        case DOWN:  return (_dy > 0 && abs(_dx) <= _dy);
+        case UP:    return (_dy < 0 && abs(_dx) <= -_dy);
+    }
+    return true;
+}
+
+// The set of cells lit from cell (_cx,_cy) with radius _tiles (not kept: Vis_Cone is the cached way). _face (D179): only the cone in front of a viewer that faces that way,
+// plus the ring of 1 tile all round it (every cell next to it that does not block sight itself, even round a corner); -1 = the whole circle (the old shape).
+function Vis_Compute(_g, _cx, _cy, _tiles, _see_through = false, _face = -1) {
     var _r = max(0, floor(_tiles));
     var _side = 2 * _r + 1;
-    var _cone = { cx: _cx, cy: _cy, tiles: _tiles, r: _r, side: _side, see_through: _see_through, cells: array_create(_side * _side, 0), runs: [] };
+    var _cone = { cx: _cx, cy: _cy, tiles: _tiles, r: _r, side: _side, see_through: _see_through, face: _face, cells: array_create(_side * _side, 0), runs: [] };
     var _r2 = _tiles * _tiles;
     Vis_Mark(_cone, 0, 0);
     if (_see_through) {
@@ -1173,14 +1303,26 @@ function Vis_Compute(_g, _cx, _cy, _tiles, _see_through = false) {
     } else {
         for (var _oct = 0; _oct < 8; _oct++) Vis_Scan(_g, _cone, 1, 1.0, 0.0, _oct, _r2);
     }
-    // the runs for drawing: three bands by distance, near ones first
+    if (_face >= 0) {
+        for (var _fy = -_r; _fy <= _r; _fy++) {
+            for (var _fx = -_r; _fx <= _r; _fx++) {
+                if ((_fx != 0 || _fy != 0) && max(abs(_fx), abs(_fy)) > 1 && !Vis_InCone(_fx, _fy, _face)) _cone.cells[(_fy + _r) * _side + _fx + _r] = 0;
+            }
+        }
+        for (var _ry = -1; _ry <= 1; _ry++) {
+            for (var _rx = -1; _rx <= 1; _rx++) {
+                if (!Nav_SightBlocked(_g, _cx + _rx, _cy + _ry)) Vis_Mark(_cone, _rx, _ry);
+            }
+        }
+    }
+    // the runs for drawing: three bands by distance, near ones first. A cell that blocks sight is lit (its near face) but is not drawn: the tint stops in front of the prop.
     for (var _b = 2; _b >= 0; _b--) {
         for (var _y = -_r; _y <= _r; _y++) {
             var _x = -_r;
             while (_x <= _r) {
-                if (Vis_Band(_cone, _x, _y) != _b) { _x++; continue; }
+                if (Vis_Band(_cone, _x, _y) != _b || Nav_SightBlocked(_g, _cx + _x, _cy + _y)) { _x++; continue; }
                 var _x0 = _x;
-                while (_x <= _r && Vis_Band(_cone, _x, _y) == _b) _x++;
+                while (_x <= _r && Vis_Band(_cone, _x, _y) == _b && !Nav_SightBlocked(_g, _cx + _x, _cy + _y)) _x++;
                 array_push(_cone.runs, _x0, _y, _x - _x0, _b);
             }
         }
@@ -1196,22 +1338,22 @@ function Vis_Band(_cone, _dx, _dy) {
     return (_d <= 0.4) ? 2 : ((_d <= 0.75) ? 1 : 0);
 }
 
-// The set for a cell and radius, worked out once and kept on the grid.
-function Vis_Cone(_g, _cx, _cy, _tiles, _see_through = false) {
-    if (!Nav_GridInside(_g, _cx, _cy)) return Vis_Compute(_g, _cx, _cy, _tiles, _see_through);
+// The set for a cell, radius and facing, worked out once and kept on the grid.
+function Vis_Cone(_g, _cx, _cy, _tiles, _see_through = false, _face = -1) {
+    if (!Nav_GridInside(_g, _cx, _cy)) return Vis_Compute(_g, _cx, _cy, _tiles, _see_through, _face);
     if (!is_array(_g.vis)) _g.vis = array_create(_g.w * _g.h, undefined);
     var _i = _cy * _g.w + _cx;
     var _list = _g.vis[_i];
     if (is_array(_list)) {
         for (var _k = 0; _k < array_length(_list); _k++) {
             var _c = _list[_k];
-            if (_c.tiles == _tiles && _c.see_through == _see_through) return _c;
+            if (_c.tiles == _tiles && _c.see_through == _see_through && _c.face == _face) return _c;
         }
     } else {
         _list = [];
         _g.vis[_i] = _list;
     }
-    var _n = Vis_Compute(_g, _cx, _cy, _tiles, _see_through);
+    var _n = Vis_Compute(_g, _cx, _cy, _tiles, _see_through, _face);
     array_push(_list, _n);
     return _n;
 }
@@ -1557,9 +1699,10 @@ function Sight_PlayerHidden(_cells, _pcx, _pcy, _moving, _still_frames) {
     return false;
 }
 
-// Can an enemy at pixel (_ex,_ey) see a player at pixel (_px,_py)? The player's cell must be one the enemy's light reaches (Vis_Cone: a circle of _tiles cut off by walls,
-// the same set that is drawn as its light, D157), unless _see_through; a hidden player only from HIDE_SEEN_TILES.
-function Sight_CanSee(_g, _ex, _ey, _px, _py, _tiles, _see_through, _hidden) {
+// Can an enemy at pixel (_ex,_ey) facing _face see a player at pixel (_px,_py)? The player's cell must be one the enemy's sight reaches (Vis_Cone: the 90 degree cone in front of it
+// and the ring of 1 tile all round it, out to _tiles, cut off by whatever blocks sight; D179), unless _see_through (the cone still applies); a hidden player only from HIDE_SEEN_TILES.
+// _face -1: no facing, the whole circle (only a check that wants the old shape passes it; the game always has a facing).
+function Sight_CanSee(_g, _ex, _ey, _px, _py, _tiles, _see_through, _hidden, _face = -1) {
     if (_tiles <= 0) return false;
     var _half = GRID_TILE_SIZE / 2;
     var _ecx = Nav_CellOf(_ex + _half);
@@ -1567,13 +1710,13 @@ function Sight_CanSee(_g, _ex, _ey, _px, _py, _tiles, _see_through, _hidden) {
     var _pcx = Nav_CellOf(_px + _half);
     var _pcy = Nav_CellOf(_py + _half);
     if (_hidden && max(abs(_ecx - _pcx), abs(_ecy - _pcy)) > HIDE_SEEN_TILES) return false;
-    return Vis_Has(Vis_Cone(_g, _ecx, _ecy, _tiles, _see_through), _pcx, _pcy);
+    return Vis_Has(Vis_Cone(_g, _ecx, _ecy, _tiles, _see_through, _face), _pcx, _pcy);
 }
 
 // What an enemy (profile _prof, pixel position _ex,_ey) notices of a player at pixel (_px,_py): { sees, heard }. heard only counts when it does not see him.
-function EnemyAI_Perceive(_g, _prof, _ex, _ey, _px, _py, _running, _hidden) {
+function EnemyAI_Perceive(_g, _prof, _ex, _ey, _px, _py, _running, _hidden, _face = -1) {
     var _half = GRID_TILE_SIZE / 2;
-    var _sees = Sight_CanSee(_g, _ex, _ey, _px, _py, _prof.sight, _prof.see_through, _hidden);
+    var _sees = Sight_CanSee(_g, _ex, _ey, _px, _py, _prof.sight, _prof.see_through, _hidden, _face);
     var _heard = !_sees && Hear_RunHeard(Nav_CellOf(_ex + _half), Nav_CellOf(_ey + _half), Nav_CellOf(_px + _half), Nav_CellOf(_py + _half), _running);
     return { sees: _sees, heard: _heard };
 }

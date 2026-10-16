@@ -3895,6 +3895,13 @@ function Scenario_PlaceEnemy(_e, _cx, _cy) {
     }
 }
 
+// D179: an enemy sees in a cone, so a stage that needs it to notice the player says which way it faces (and keeps it so: no idle turning).
+function Scenario_FaceEnemy(_e, _dir) {
+    EnemyAI_Init(_e);
+    _e.look_dir = _dir;
+    _e.turn_timer = 100000;
+}
+
 function Scenario_PlacePlayer(_cx, _cy) {
     var _pl = instance_find(obj_player, 0);
     _pl.x = _cx * GRID_TILE_SIZE;
@@ -3954,6 +3961,7 @@ function Scenario_StepMove(_s) {
             with (obj_enemy) instance_destroy();   // the room's own slime is not part of the stage
             _mv.sl = instance_create_layer(15 * GRID_TILE_SIZE, 9 * GRID_TILE_SIZE, "Instances", (_s.mp == 4) ? obj_ghost_sword : obj_dire_wolf);
             Scenario_PlaceEnemy(_mv.sl, 15, 9);
+            Scenario_FaceEnemy(_mv.sl, RIGHT);   // D179: toward the player, who stands to its right
             Scenario_PlacePlayer(19, 9);
             switch (_s.mp) {
                 case 0:   // A: a rock on the straight line, sight is clear
@@ -3976,6 +3984,7 @@ function Scenario_StepMove(_s) {
                     Scenario_PlaceEnemy(_mv.sl, 16, 8);
                     _mv.other = instance_create_layer(16 * GRID_TILE_SIZE, 10 * GRID_TILE_SIZE, "Instances", obj_dire_wolf);
                     Scenario_PlaceEnemy(_mv.other, 16, 10);
+                    Scenario_FaceEnemy(_mv.other, RIGHT);
                     break;
                 case 4:   // E: a ghost behind a wall: sees through it and flies over it
                     Scenario_Block(obj_wall, 17, 8);
@@ -4578,11 +4587,11 @@ function Scenario_WorldFlags(_w, _fileB) {
     var _t = GRID_TILE_SIZE;
     var _cx = _sl.x + _t / 2, _cy = _sl.y + _t / 2;
     var _sc = Scenario_WorldWin(_cx, _cy).s;
-    // D157: the slime's sight is light now (the dotted ring of D63 is gone). Every run of lit cells of its set is a place where A (slime there) may differ from B (slime gone);
-    // the probes are free floor cells of the set that must differ (about 24 of them, those on the picture).
+    // D179 (replaces D160: sight is invisible): the slime's sight is drawn as a very faint cone (Sight_DrawWorldFx). Every run of drawn cells of its cone is a place where A (slime there)
+    // may differ from B (slime gone); the probes are free floor cells of the cone that must differ (about 24 of them, those on the picture; at least 2 have to: a tint changes no pixel that is already the lightest colour).
     var _g = Nav_Get().grid;
     var _ecx = Nav_CellOf(_cx), _ecy = Nav_CellOf(_cy);
-    var _cone = Vis_Cone(_g, _ecx, _ecy, Vis_EnemyTiles(_sl.prof, _sl.ai_mode), false);
+    var _cone = Vis_Cone(_g, _ecx, _ecy, Vis_EnemyTiles(_sl.prof, _sl.ai_mode), false, _sl.look_dir);
     var _lboxes = "";
     for (var _q = 0; _q < array_length(_cone.runs); _q += 4) {
         var _lw = Scenario_WorldWin((_ecx + _cone.runs[_q]) * _t, (_ecy + _cone.runs[_q + 1]) * _t);
@@ -4632,7 +4641,7 @@ function Scenario_WorldFlags(_w, _fileB) {
     return "pair=" + _fileB + " corner=24 cornerxy=" + string(round(_cc.x)) + "," + string(round(_cc.y))
         + " rp=" + _rp + " bp=" + string(round(_bp1.x)) + "," + string(round(_bp1.y)) + ";" + string(round(_bp2.x)) + "," + string(round(_bp2.y))
         + " ap=" + _ap
-        + " boxes=" + _boxes;   // D160: no allowed boxes for the sight cells: the slime casts no light, so a difference there is a stray mark
+        + " boxes=" + _boxes + _lboxes;   // D179: the drawn cells of the cone are allowed places
 }
 
 function Scenario_WorldStage(_w) {
@@ -4642,6 +4651,8 @@ function Scenario_WorldStage(_w) {
     Scenario_PlaceEnemy(_w.sl, 1, 7);
     EnemyAI_Init(_w.sl);   // freeze it before its first update (that update may be late after a battle, and would pick a wander step): no wandering, no spotting, "!" held on
     _w.sl.idle_timer = 1000000;
+    _w.sl.turn_timer = 1000000;   // D179: it keeps facing the player (the cone is part of the picture)
+    _w.sl.look_dir = RIGHT;
     _w.sl.spot_cooldown = 1000000;
     _w.sl.alert_pop = 1000000;
     _w.chest = Scenario_Block(obj_chest_lv1, 5, 7);   // right of the player and clear of the room's light shaft (it dims what is under it)
@@ -8733,6 +8744,7 @@ function Scenario_StepSmokeHunt2(_s) {
                 with (obj_enemy) instance_destroy();
                 _h.w = instance_create_layer(16 * _T, 9 * _T, "Instances", obj_dire_wolf);
                 Scenario_PlaceEnemy(_h.w, 16, 9);
+                Scenario_FaceEnemy(_h.w, RIGHT);   // D179: toward the player, who stands to its right
                 Scenario_PlacePlayer(19, 9);
                 _h.ph = 0;
                 Scenario_Next(_s, 251);
@@ -10482,6 +10494,7 @@ function Scenario_StepSmokeRunStats(_s) {
                 with (obj_enemy) instance_destroy();
                 _rs.w = instance_create_layer(16 * _T, 9 * _T, "Instances", obj_dire_wolf);   // the same stage as bug hunt 2: it sees the player 3 tiles away and runs at him
                 Scenario_PlaceEnemy(_rs.w, 16, 9);
+                Scenario_FaceEnemy(_rs.w, RIGHT);   // D179: toward the player, who stands to its right
                 Scenario_PlacePlayer(19, 9);
                 _rs.ms0 = _gs.run.stats.play_ms;
                 _s.boost = { hp: 99, mp: 11 };   // the fight is played to its end whatever the wolf does
@@ -12299,7 +12312,7 @@ function Scenario_StepSmokeH11(_s) {
             if (_s.t == HIDE_SETTLE_FRAMES + 10) {
                 Scenario_Check("h11_standing_still_on_the_hiding_cell_hides_the_player", Player_IsHidden(_pl));
                 Scenario_Check("h11_the_hidden_player_is_drawn_see_through", abs(_pl.image_alpha - HIDE_PLAYER_ALPHA) < 0.01, "alpha=" + string(_pl.image_alpha));
-                _h.e = Scenario_H11Enemy(obj_dire_wolf, 3, 6, -1);   // sight 5, as in the game; 2 tiles below, clear line over (3,5)
+                _h.e = Scenario_H11Enemy(obj_dire_wolf, 3, 6, -1, UP);   // sight 4 (D179), as in the game; 2 tiles below, clear line over (3,5), facing him
                 _h.t_c = _s.f;
                 _h.spotted = false;
                 Scenario_Next(_s, 587);
@@ -12438,7 +12451,7 @@ function Scenario_StepShotsH11(_s) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
                 with (obj_enemy) instance_destroy();
                 Scenario_PlacePlayer(3, 4);
-                _h.e = Scenario_H11Enemy(obj_slime, 3, 6, -1);
+                _h.e = Scenario_H11Enemy(obj_slime, 3, 6, -1, UP);   // D179: it faces him
             }
             if (_s.t == HIDE_SETTLE_FRAMES + 20) {
                 Scenario_Check("shots_h11_the_player_is_hidden_and_unseen", Player_IsHidden(_pl) && _h.e.ai_mode == "idle" && _h.e.alert_pop == 0);
@@ -12787,7 +12800,7 @@ function Scenario_H14Scene(_i) {
         case 0: return { name: "forest", rm: rm_floor2, pcx: 3, pcy: 5, foes: [[obj_dire_wolf, 9, 5]], wait: 40 };
         case 1: return { name: "cave", rm: rm_floor7, pcx: 3, pcy: 4, foes: [[obj_spider, 8, 5]], wait: 40 };
         case 2: return { name: "torches", rm: rm_floor6, pcx: 8, pcy: 4, foes: [], wait: 40 };
-        case 3: return { name: "shadow", rm: rm_floor3, pcx: 2, pcy: 4, foes: [[obj_dire_wolf, 7, 4]], wait: 40 };
+        case 3: return { name: "shadow", rm: rm_floor3, pcx: 2, pcy: 4, foes: [[obj_dire_wolf, 6, 4, LEFT]], wait: 40 };   // D179: sight 4 and a cone: it stands 4 tiles from him, facing the wall
         case 4: return { name: "hidden", rm: rm_floor3, pcx: 3, pcy: 4, foes: [[obj_dire_wolf, 3, 6]], wait: HIDE_SETTLE_FRAMES + 30 };
     }
     return undefined;
@@ -12818,7 +12831,7 @@ function Scenario_StepShotsH14(_s) {
                 Scenario_PlacePlayer(_sc.pcx, _sc.pcy);
                 _h.e = [];
                 for (var _k = 0; _k < array_length(_sc.foes); _k++) {
-                    array_push(_h.e, Scenario_H11Enemy(_sc.foes[_k][0], _sc.foes[_k][1], _sc.foes[_k][2], -1));
+                    array_push(_h.e, Scenario_H11Enemy(_sc.foes[_k][0], _sc.foes[_k][1], _sc.foes[_k][2], -1, (array_length(_sc.foes[_k]) > 3) ? _sc.foes[_k][3] : -1));
                 }
                 Scenario_Next(_s, 731);
             }
@@ -12873,7 +12886,7 @@ function Scenario_H14Judge(_h, _sc, _pl) {
     if (_sc.name == "shadow" || _sc.name == "hidden") {
         var _g = Nav_Get().grid;
         var _ec = Scenario_H11Cell(_h.e[0]);
-        var _cone = Vis_Cone(_g, _ec.cx, _ec.cy, _h.e[0].prof.sight, _h.e[0].prof.see_through);
+        var _cone = Vis_Cone(_g, _ec.cx, _ec.cy, _h.e[0].prof.sight, _h.e[0].prof.see_through, _h.e[0].look_dir);
         if (_sc.name == "shadow") Scenario_Check("shots_h14_shadow_the_player_stands_in_the_dark_inside_the_radius", !Vis_Has(_cone, _pcx, _pcy) && point_distance(_ec.cx, _ec.cy, _pcx, _pcy) <= _h.e[0].prof.sight);
         else Scenario_Check("shots_h14_hidden_the_player_is_hidden_and_the_cell_is_a_dark_pocket", Player_IsHidden(_pl) && Light_PocketCell(_ec.cx, _ec.cy, _pcx, _pcy));
     }
@@ -14536,9 +14549,9 @@ function Scenario_StepShotsR3Menus(_s) {
 // ============================================================================
 function Scenario_R3StealthScene(_i) {
     switch (_i) {
-        case 0: return { name: "dark", rm: rm_floor7, pcx: 4, pcy: 5, foe: obj_spider, ecx: 8, ecy: 5, face: RIGHT, chase: false, wait: 40 };
-        case 1: return { name: "lit", rm: rm_floor2, pcx: 4, pcy: 5, foe: obj_dire_wolf, ecx: 9, ecy: 5, face: RIGHT, chase: false, wait: 40 };
-        case 2: return { name: "chase", rm: rm_floor3, pcx: 2, pcy: 6, foe: obj_slime, ecx: 8, ecy: 6, face: RIGHT, chase: true, wait: 40 };
+        case 0: return { name: "dark", rm: rm_floor7, pcx: 2, pcy: 5, foe: obj_spider, ecx: 5, ecy: 5, face: RIGHT, chase: false, wait: 40 };
+        case 1: return { name: "lit", rm: rm_floor2, pcx: 3, pcy: 6, foe: obj_dire_wolf, ecx: 6, ecy: 6, face: RIGHT, chase: false, wait: 40 };
+        case 2: return { name: "chase", rm: rm_floor3, pcx: 2, pcy: 6, foe: obj_slime, ecx: 5, ecy: 6, face: RIGHT, chase: true, wait: 40 };
     }
     return undefined;
 }
@@ -14548,6 +14561,7 @@ function Scenario_R3StealthJudge(_h, _sc, _pl) {
     var _tag = "shots_r3stealth_" + _sc.name + "_";
     var _e = instance_exists(_h.e) ? _h.e : noone;
     Scenario_Check(_tag + "the_enemy_is_alive", _e != noone);
+    Scenario_Check(_tag + "no_dialogue_is_open", GameState_Get().ui.mode == UI_NONE && array_length(GameState_Get().ui.lines) == 0);
     if (_e == noone) return;
     if (asset_get_index("Sight_ConeStats") == -1) { Scenario_Check(_tag + "the_cone_drawing_exists", false); return; }
     var _st = Sight_ConeStats();
