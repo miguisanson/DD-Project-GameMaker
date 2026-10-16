@@ -8,37 +8,7 @@ if (!group_loaded && !global.audio_group_load_requested) {
 }
 if (group_loaded) global.audio_group_load_requested = false;
 
-if (keyboard_check_pressed(ord("P"))) {
-    global.audio_debug_enabled = !global.audio_debug_enabled;
-    if (global.audio_debug_enabled) {
-        global.audio_debug_last_key = global.audio_debug_test_key;
-        var _audit = SFX_DebugAuditRequired(true);
-        global.audio_debug_missing_count = _audit.missing;
-        global.audio_debug_total_count = _audit.total;
-        var test = SFX_DebugPlayTest(global.audio_debug_last_key);
-        global.audio_debug_last_channel = test.channel;
-        global.audio_debug_last_status = "Played: " + string(global.audio_debug_last_key) + " -> " + string(test.status);
-        if (is_struct(test.resolve)) {
-            global.audio_debug_last_ok = test.resolve.ok;
-            global.audio_debug_last_asset = test.resolve.asset;
-            global.audio_debug_last_asset_name = test.resolve.asset_name;
-            global.audio_debug_last_reason = test.resolve.reason;
-        }
-
-        // Direct engine smoke test to isolate mapping vs runtime audio path.
-        global.audio_debug_direct_handle = audio_play_sound(Modern5, 0, false);
-        global.audio_debug_direct_playing = (global.audio_debug_direct_handle != -1) && audio_is_playing(global.audio_debug_direct_handle);
-        if (global.audio_debug_direct_handle == -1) {
-            global.audio_debug_last_status += " | direct=FAILED";
-        } else if (!global.audio_debug_direct_playing) {
-            global.audio_debug_last_status += " | direct=CHANNEL NOT PLAYING";
-        } else {
-            global.audio_debug_last_status += " | direct=PLAYING";
-        }
-    } else {
-        global.audio_debug_last_status = "Audio debug OFF";
-    }
-}
+// R-120 (I-106): the audio debug overlay (P) is gone from the player's game.
 
 if (global.audio_debug_enabled) {
     var info = SFX_DebugResolve(global.audio_debug_last_key);
