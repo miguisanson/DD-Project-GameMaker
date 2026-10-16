@@ -1,0 +1,38 @@
+# Bug hunt session 6 - menus, UI and input (read-only, code of branch `next` at HEAD 8bf7707)
+
+Method: read scr_menu (Tab menu, Settings/Keep this, Controls, title, seed entry, cards/class/echo, bed, shop, Confirm, Notice, Tutorial, Focus), scr_input (bindings, prompts, markup), obj_ui_controller / obj_start_controller / obj_battle_controller Step, scr_dialogue (choice UI, Notes reader text), localization.json. Traced scenarios by hand; nothing was run or edited. The worktree is mid-merge, so the committed state (`git show HEAD:`) was read. Paths are relative to the `next` worktree. Not repeated: bughunt-session5.md, bughunt-session6-combat.md, bughunt-session6-run.md, ISSUES.md.
+
+## 1. P2 - Esc / Tab / Start pressed while the player is mid-step is thrown away
+- Where: `scripts/scr_menu/scr_menu.gml:845-851` (`Menu_CanOpen` needs `Player_IsSettled`), `objects/obj_ui_controller/Step_0.gml:72` (the open test uses the one-frame `Input_UIPressed`), `scripts/scr_player/scr_player.gml:97-107` (`Player_IsSettled`: off-grid or `move_timer > 0` is not settled), `objects/obj_player/Create_0.gml` (`PLAYER_MOVE_SPEED_DEFAULT` 1 = 16 frames per tile, run = 8).
+- Repro: walk down a corridor holding D (or tap a direction) and tap Esc, Tab or the pad's Start/X/Y. The player is settled for exactly one frame per tile (the frame the step ends), so the press opens the menu about 1 time in 16 (1 in 8 running); every other press does nothing, no sound. It only works reliably when standing still, and for 267 ms after any single step. Nothing remembers the press (the player's own direction buffer, `buffer_frames`, and `Focus_Step`'s `focus_pending` both do remember; the menu key does not).
+- Violates: D140 (Esc and Tab open the menu, on the map). Worst moment: an enemy is closing in and the player presses Esc to stop and think.
+- Fix idea: when `k_menu` / `k_pause` is refused only because `Player_IsSettled` is false, keep the request for about 12 frames (like `buf_dir`) and open on the first settled frame (single use, then forget it).
+
+## 2. P2 - A pad-only player cannot leave the Controls "Press a key..." state
+- Where: `scripts/scr_menu/scr_menu.gml:2274-2284` (`ControlsPage_Handle`: while `capture != ""` only `Controls_PollKey()` (keyboard, :2198) and a right click are read), `:866-872` (`Menu_CaptureActive` is true, so Tab/X/Start/Q/E/LB/RB are all ignored by `obj_ui_controller/Step_0.gml:71` and `Menu_HandleInput`), `Input_GamepadButtons` (`scr_input.gml:200`).
+- Repro (title or in game, controller only): Settings > Controls > A on "Confirm" shows "Press a key...". B, X, Y, Start, LB, RB, A do nothing at all (a pad press is not a keyboard key; the row's help sentence says "Esc cancels", which a pad has no button for). The menu cannot be closed or left; only a keyboard Esc, a right click or closing the window gets out. The footer meanwhile still says "[Select]" / "[Back]" (`TabMenu_Hint`), so it looks like Back should work.
+- Violates: D95/D140 (Back works the same everywhere, pad included); the help text itself ("The controller stays as it is") invites a pad player to open the page.
+- Fix idea: in the capture branch also treat `Input_UIBack()` / pad B (and the pad's menu key) as cancel (`ControlsPage_OnKey(sp, vk_escape)`), and make the hint line say "[k:back] Cancel" while capturing.
+
+## 3. P3 - Esc (and the pad's Y) open the menu but are not "Back" inside it
+- Where: `scr_input.gml:26,55` (cancel = [Esc, X]) vs `:206` (pad `pause` = Y, `cancel` = B only); `Binds_Assign` `scr_input.gml:694-723` (a new key replaces `cur[0]`, which for Back is Esc) + `Binds_ToActions` `:725-738` (the Back row is the whole `cancel` table; Esc is `Binds_Reserved` so it can never be bound back); `obj_ui_controller/Step_0.gml:70-75`.
+- Repro A (pad): on the map press Y: the menu opens. Press Y again: nothing (only X/Start/B close it; `pause` is read only to open, here and in `obj_battle_controller/Step_0.gml:84`). D140 says "(the pad's X, Y and Start)" open the same menu; Y is the pad's Esc but is dead inside.
+- Repro B (keyboard): Settings > Controls > set Back to Backspace. `cancel` becomes [Backspace, X]: Esc still opens the menu on the map but no longer closes it, no longer dismisses a tutorial/notice, no longer answers No on a Yes/No pop-up and no longer reverts "Keep this?". Only "Reset to defaults" brings it back.
+- Violates: D140 ("Esc is Back inside it"), D95 (same keys everywhere).
+- Fix idea: add `vk_escape` to the `cancel` action in `Binds_ToActions` (Esc is reserved anyway) and let `pause` count as Back inside `Menu_HandleInput` / `Ui_ReadInput` (`s.back = Input_UIBack() || Input_UIPressed("pause")`, only when a menu is up).
+
+## 4. P3 - "Keep this?" is kept by the second click of a double click, before the new window is even up
+- Where: `scripts/scr_menu/scr_menu.gml:2892-2904` (`KeepThis_Step`: any `mouse_check_button_pressed(mb_left)` after the 60 ms lock = Keep), lock set in `Settings_Change` (:2838-2850, `lock_ms = current_time`); the window change itself lands after `DISPLAY_SETTLE_FRAMES` / `DISPLAY_FS_WAIT` frames (`scr_display.gml:172-175`).
+- Repro: Settings > Window row, double click (about 100-200 ms apart). The first click switches the mode, the second keeps it before the resize has shown. If the new mode is wrong (black exclusive fullscreen, window off-screen) the 10 s safety net never runs.
+- Violates: D140 (window/scale changes revert unless confirmed).
+- Fix idea: ignore Confirm and clicks until the display request has finished (`Display` idle) plus about 400 ms, and require the click to land inside `global.keep_this_rect`.
+
+## 5. P3 - The Items tab says "Throw it at an enemy in battle." while you are in a battle
+- Where: `scripts/scr_menu/scr_menu.gml:1112-1117` (`TabMenu_OnConfirm`, case "items": the throwable branch runs before `TabItems_Use`, so it never reaches the in-fight message at :179-182).
+- Repro: fight, Tab, Items, highlight a Bomb/Poison Flask, Confirm. Toast: "Throw it at an enemy in battle." Potions in the same list say "In a fight, use ITEM in the battle menu." The throwable text was written for the map.
+- Violates: the intent of the hunt-6 change (battle menu read-only, tell the player what to do instead).
+- Fix idea: test `room == rm_battle` first and use `menu.msg.items_in_fight` for every row.
+
+## Looked at and found sound (no finding)
+Confirm pop-up (No first, same-frame answer guard, closed by interrupts); Keep this? revert on Back/Tab/timeout/close/interrupt and on leaving the page; Settings tab to Controls and back; Q/E and tab clicks blocked while capturing or Keep this? is up; shop sell of the last item and gear unequip (cursor re-fixed by `Ui_MenuFixCursor`); Notes reader (arming only at the end of the text, wheel/keys, first press not answering, language/scale re-wrap); dialogue choice UI and the D154 flows (all 40 `choice.*` keys have Korean); seed entry (9 digits, zero refused, Back returns to the pick, Q/LB deletes on a pad); class/echo/stat/replace screens (Back does nothing or keeps the offer, as intended); Korean coverage (every literal `Loc_T` key exists in `localization.json` with a Korean text; `{n}` placeholders and `[k:..]` tags match; only 4 identical-by-design strings); device prompts (dialogue pages are re-laid-out when the device changes; every `[k:x]` in text names a valid action); Dialogue_Open closing the menu; focus-loss pause persistence.
+Minor, not counted: volume sliders cannot be moved with the mouse (a click on a slider does nothing, `Ui_MenuUpdate` clears it), rebinding Back/Confirm/Up/Down to a digit key makes the seed entry type and act at once, the Controls row label is cut with ".." while "Press a key..." is shown at 480 x 432.
