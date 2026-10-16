@@ -118,7 +118,7 @@ function Player_CanAcceptMove(_pl) {
 // Picks the nearest cell that is not a wall or an interactable. Returns true when it moved the player.
 function Player_TileBlocked(_inst, _x, _y) {
     var _hit = false;
-    with (_inst) _hit = place_meeting(_x, _y, obj_wall) || place_meeting(_x, _y, obj_interactable);
+    with (_inst) _hit = place_meeting(_x, _y, obj_wall) || Grid_PropBlocks(id, _x, _y);   // D179: tall grass is walkable
     return _hit;
 }
 

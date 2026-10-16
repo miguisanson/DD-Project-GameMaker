@@ -134,7 +134,7 @@ if (!moving) {
         if (turn_timer <= 0) {
             var tx = x + ((want == RIGHT) - (want == LEFT)) * tile_size;
             var ty = y + ((want == DOWN) - (want == UP)) * tile_size;
-            if (!place_meeting(tx, ty, obj_wall) && !place_meeting(tx, ty, obj_interactable)) {
+            if (!place_meeting(tx, ty, obj_wall) && !Grid_PropBlocks(id, tx, ty)) {   // D179: tall grass is walkable
                 moving = true;
             } else if (bump_dir != want) {
                 // D70: soft sound and a tiny nudge, once per press (not once per frame)
@@ -171,7 +171,7 @@ if (moving) {
         case RIGHT: x += step_speed; break;
     }
 
-    if (place_meeting(x, y, obj_wall) || place_meeting(x, y, obj_interactable)) {
+    if (place_meeting(x, y, obj_wall) || Grid_PropBlocks(id, x, y)) {
         moving = false;
         move_timer = 0;
 

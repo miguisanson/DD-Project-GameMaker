@@ -10444,7 +10444,7 @@ function Test_Suite_SeedInput() {
 
 // ============================================================================
 // H11 (D153, D158): smarter map AI, hiding spots, no spawn camping. Expected values come from the brief:
-//   hear radius 4 tiles (running only), flee search up to 4 tiles past the last seen cell, one "?" per search, a hidden player is seen from 1 tile only,
+//   hear radius 2 tiles (running only, D179), a search that stays on the last seen cell for 3 s (D179; Test_Suite_R3StealthB), one "?" per search, a hidden player is seen from 1 tile only,
 //   idle / patrol targets >= 3 tiles from every exit, no enemy within 3 tiles of the arrival tile, a relocated enemy >= 4 tiles from the exit.
 // ============================================================================
 function Test_H11Open(_w, _h) {
@@ -10455,89 +10455,8 @@ function Test_H11Open(_w, _h) {
     return Nav_GridFromRows(_rows);
 }
 
-// An enemy that lost the player: walks to the last seen cell (A*, one cell per tick), then follows its Search_Step goals until the search is done.
-// Returns { trail: [[cx,cy], ...], pops, pop_cell, done, ticks }.
-function Test_H11RunSearch(_g, _sx, _sy, _lcx, _lcy, _dir) {
-    var _out = { trail: [[_sx, _sy]], pops: 0, pop_cell: [-1, -1], done: false, ticks: 0 };
-    var _cx = _sx;
-    var _cy = _sy;
-    while (_cx != _lcx || _cy != _lcy) {   // the chase part: walk to the last seen cell
-        var _p = Nav_FindPath(_g, _cx, _cy, _lcx, _lcy);
-        if (array_length(_p) == 0) break;
-        _cx = _p[0][0];
-        _cy = _p[0][1];
-        array_push(_out.trail, [_cx, _cy]);
-    }
-    var _se = Search_Create(_lcx, _lcy, _dir, AI_LOOK_FRAMES);
-    while (_out.ticks < 3000 && !_out.done) {
-        _out.ticks++;
-        var _r = Search_Step(_se, _g, _cx, _cy);
-        if (_r.pop) { _out.pops++; _out.pop_cell = [_cx, _cy]; }
-        if (_r.done) { _out.done = true; break; }
-        if (_r.goal_cx >= 0 && (_cx != _r.goal_cx || _cy != _r.goal_cy)) {
-            var _q = Nav_FindPath(_g, _cx, _cy, _r.goal_cx, _r.goal_cy);
-            if (array_length(_q) > 0) {
-                _cx = _q[0][0];
-                _cy = _q[0][1];
-                array_push(_out.trail, [_cx, _cy]);
-            }
-        }
-    }
-    // a finished search stays finished and never pops again
-    var _after = Search_Step(_se, _g, _cx, _cy);
-    _out.pops += _after.pop ? 1 : 0;
-    return _out;
-}
-
-function Test_H11Visited(_trail, _cx, _cy) {
-    for (var _i = 0; _i < array_length(_trail); _i++) {
-        if (_trail[_i][0] == _cx && _trail[_i][1] == _cy) return true;
-    }
-    return false;
-}
-
-function Test_H11MaxX(_trail) {
-    var _m = -1;
-    for (var _i = 0; _i < array_length(_trail); _i++) _m = max(_m, _trail[_i][0]);
-    return _m;
-}
-
-function Test_H11Search() {
-    var _g = Test_H11Open(16, 5);
-    // the enemy starts at (2,2), loses the player at (8,2) who was running RIGHT: it must reach (8,2), then go on to (12,2) (4 tiles past), then give up
-    var _r = Test_H11RunSearch(_g, 2, 2, 8, 2, RIGHT);
-    Test_True("H11 search: the enemy walks to the last seen cell", Test_H11Visited(_r.trail, 8, 2));
-    Test_True("H11 search: then searches 4 tiles toward the flee direction", Test_H11Visited(_r.trail, 12, 2));
-    Test_Eq("H11 search: and no further than 4 tiles", Test_H11MaxX(_r.trail), 12);
-    Test_Eq("H11 search: the ? goes up exactly once", _r.pops, 1);
-    Test_True("H11 search: the ? goes up at the end of the flee leg", _r.pop_cell[0] == 12 && _r.pop_cell[1] == 2);
-    Test_True("H11 search: then the search is over (the enemy goes home)", _r.done);
-
-    // a wall right ahead: the leg has nowhere to go; a wall two cells ahead: it stops one cell short of it
-    var _gw = Nav_GridFromRows(["................", "................", ".........#......", "................", "................"]);
-    var _rw = Test_H11RunSearch(_gw, 2, 2, 8, 2, RIGHT);
-    Test_Eq("H11 search: a wall right ahead, the leg goes nowhere", Test_H11MaxX(_rw.trail), 8);
-    Test_Eq("H11 search: still one ? when the leg is blocked", _rw.pops, 1);
-    var _gw2 = Nav_GridFromRows(["................", "................", "..........#.....", "................", "................"]);
-    Test_Eq("H11 search: a wall two cells ahead stops the leg one cell ahead", Test_H11MaxX(Test_H11RunSearch(_gw2, 2, 2, 8, 2, RIGHT).trail), 9);
-
-    // the room edge stops it too; UP from row 2 of 5 can only go to row 0
-    var _ru = Test_H11RunSearch(_g, 8, 4, 8, 2, UP);
-    Test_True("H11 search: UP is followed to the room edge", Test_H11Visited(_ru.trail, 8, 0));
-    Test_Eq("H11 search: and the ? goes up once there", _ru.pops, 1);
-
-    // no known direction: it looks at the last seen cell and gives up there
-    var _rn = Test_H11RunSearch(_g, 2, 2, 8, 2, -1);
-    Test_True("H11 search: no flee direction, the ? goes up at the last seen cell", _rn.pops == 1 && _rn.pop_cell[0] == 8 && _rn.pop_cell[1] == 2 && _rn.done);
-
-    // the flee cell itself
-    var _fc = Search_FleeCell(_g, 8, 2, LEFT, 4);
-    Test_True("H11 flee cell: LEFT 4 tiles from (8,2) is (4,2)", _fc.cx == 4 && _fc.cy == 2);
-    _fc = Search_FleeCell(_g, 8, 2, DOWN, 4);
-    Test_True("H11 flee cell: DOWN stops at the room edge (8,4)", _fc.cx == 8 && _fc.cy == 4);
-    _fc = Search_FleeCell(_g, 8, 2, -1, 4);
-    Test_True("H11 flee cell: no direction stays on the last seen cell", _fc.cx == 8 && _fc.cy == 2);
-}
+// (The search that walked on along the player's facing, its flee cell and the tests of both are gone with D179: an enemy that lost the player now stands on the last seen cell for
+// 3 s and gives up there; Test_R3Search holds the new rules.)
 
 function Test_H11Hear() {
     // D179: the hearing radius is 2 tiles (it was 4)
@@ -10594,7 +10513,7 @@ function Test_H11Hide() {
     _pr = EnemyAI_Perceive(_g, _prof, 6 * _T, 2 * _T, 5 * _T, 2 * _T, false, _hid);
     Test_True("H11 hide: through the senses, hidden at distance 1 is seen", _pr.sees);
 
-    // the table: some rooms have 1..3 hiding cells, not every room; every cell is a free floor cell inside its room
+    // the table (D179: the bush patches' cells, up to 12 to a room, every floor from 2 on; Test_R3Bushes checks them against the room): every cell is a free floor cell inside its room
     var _rooms = Scenario_GridRooms();
     var _with = 0;
     var _bad = "";
@@ -10602,7 +10521,7 @@ function Test_H11Hide() {
         var _name = room_get_name(_rooms[_i]);
         var _hc = Hide_Cells(_name);
         if (array_length(_hc) > 0) _with++;
-        if (array_length(_hc) > 3) _bad += " " + _name + ":more-than-3";
+        if (array_length(_hc) > 12) _bad += " " + _name + ":more-than-12";
         var _m = Test_H11Model(_rooms[_i]);
         for (var _k = 0; _k < array_length(_hc); _k++) {
             var _cx = _hc[_k][0];
@@ -10613,9 +10532,9 @@ function Test_H11Hide() {
         }
         Test_False("H11 hide: " + _name + " does not know a cell outside the room", Hide_IsCell(_name, -5, -5));
     }
-    Test_True("H11 hide: at least 3 rooms have hiding cells (" + string(_with) + ")", _with >= 3);
+    Test_True("H11 hide: at least 9 rooms have hiding cells (" + string(_with) + ")", _with >= 9);
     Test_True("H11 hide: not every room has them (" + string(_with) + " of " + string(array_length(_rooms)) + ")", _with < array_length(_rooms));
-    Test_Eq("H11 hide: every hiding cell is free floor inside its room, at most 3 per room (bad:" + _bad + ")", _bad, "");
+    Test_Eq("H11 hide: every hiding cell is free floor inside its room, at most 12 per room (bad:" + _bad + ")", _bad, "");
 }
 
 // A tile-sized box of an object placed in a room: { l, t, r, b } in pixels from its sprite's bbox, or undefined without a sprite.
@@ -10630,7 +10549,7 @@ function Test_H11Bbox(_obj, _x, _y, _sx, _sy) {
 }
 
 // One floor room from its asset: { grid, exits: [[cx,cy]], spawns: [[cx,cy]], slots: [{ pid, enemy_id, x, y, fixed }] }.
-// Walls and objects block movement, walls block sight, exits are blocked cells (as Nav_BuildGrid does for the live room).
+// Walls and objects block movement (tall grass does not, D179), walls and the props of Sight_BlocksObject block sight, exits are blocked cells (as Nav_BuildGrid does for the live room).
 function Test_H11Model(_rm) {
     var _info = room_get_info(_rm, false, true, false, false, false);
     var _T = GRID_TILE_SIZE;
@@ -10654,12 +10573,14 @@ function Test_H11Model(_rm) {
             var _isw = (_o == obj_wall);
             var _isx = (_o == obj_room_transition);
             var _isi = (_o == obj_interactable || object_is_ancestor(_o, obj_interactable));
+            var _walk = (_isi && Interactable_Walkable(_o));   // D179: tall grass: walkable
+            var _blocks_sight = (_isw || (_isi && Sight_BlocksObject(_o)));
             if (!_isw && !_isx && !_isi) continue;
             var _bb = Test_H11Bbox(_o, _in.x, _in.y, _sx, _sy);
             if (!is_struct(_bb)) continue;
             for (var _cx = floor(_bb.l / _T); _cx <= floor(_bb.r / _T); _cx++) {
                 for (var _cy = floor(_bb.t / _T); _cy <= floor(_bb.b / _T); _cy++) {
-                    Nav_GridSet(_g, _cx, _cy, true, _isw);
+                    Nav_GridSet(_g, _cx, _cy, !_walk, _blocks_sight);
                     if (_isx) { array_push(_m.exits, [_cx, _cy]); Nav_GridAddExit(_g, _cx, _cy); }
                 }
             }
@@ -10798,7 +10719,6 @@ function Test_H11Spots() {
 function Test_Suite_MapAI() {
     var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
     EnemyDB_Init(); SkillDB_Init(); StatusDB_Init();
-    Test_H11Search();
     Test_H11Hear();
     Test_H11Hide();
     Test_H11Spots();
@@ -15229,6 +15149,8 @@ function Test_R3Grass() {
     var _made = Bush_Place([[[1, 5], [2, 5]], [[7, 6], [7, 7]]]);
     Test_Eq("r3stealth grass: Bush_Place makes one grass per cell", _made, 4);
     Test_Eq("r3stealth grass: there is grass on its cells", (instance_position(1 * 16 + 8, 5 * 16 + 8, obj_tall_grass) != noone && instance_position(7 * 16 + 8, 7 * 16 + 8, obj_tall_grass) != noone) ? 1 : 0, 1);
+    var _bg = instance_position(1 * 16 + 8, 5 * 16 + 8, obj_tall_grass);
+    Test_True("r3stealth grass: a bush placed in code is drawn (the object itself is invisible: the room art paints its own grass)", _bg != noone && _bg.visible && _bg.sprite_index == tall_grass_asset);
     Test_Eq("r3stealth grass: a second call makes none", Bush_Place([[[1, 5], [2, 5]], [[7, 6], [7, 7]]]), 0);
     with (obj_tall_grass) instance_destroy();
 }

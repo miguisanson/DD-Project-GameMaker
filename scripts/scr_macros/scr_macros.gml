@@ -131,12 +131,13 @@
 #macro ENEMY_SCAN_RADIUS_DEFAULT 32
 
 // H11 (D153, D158): smarter map AI, hiding spots, no spawn camping. Agent-chosen first numbers, for the owner to tune at the playtest.
-#macro AI_HEAR_RUN_TILES 4         // an enemy hears the player RUN inside this straight-line distance (tiles, any direction, walls do not block sound); walking is silent
-#macro AI_FLEE_SEARCH_TILES 4      // after the last seen cell an enemy searches this many tiles further the way the player was heading
+#macro AI_HEAR_RUN_TILES 2         // an enemy hears the player RUN inside this straight-line distance (tiles, any direction, D179: 2, and not through walls: it needs a clear line or a way of at most 2 steps); walking is silent
+#macro AI_SEARCH_FRAMES 180        // D179: an enemy that lost the player stands on the last cell it saw him on and looks round this long (3 s), then puts up one "?" and goes home
+#macro AI_SEARCH_TURN_FRAMES 45    // ... turning a quarter round this often
+#macro AI_IGNORE_FRAMES 120        // ... and then cannot notice the player for this long (2 s), unless he bumps into it (touching still starts a fight)
 #macro AI_EXIT_CLEAR_TILES 3       // idle and patrol targets keep at least this far from every exit cell
 #macro AI_ARRIVAL_CLEAR_TILES 3    // on a room arrival no enemy stands closer than this to the arrival tile
 #macro AI_EXIT_RELOCATE_TILES 4    // an enemy found nearer than this to an exit on arrival is put back at its home, or at a spot at least this far from every exit
-#macro AI_LOOK_FRAMES 30           // the pause at the last seen cell, and again before it gives up (the profile's own search time / 3 when it has one)
 #macro AI_QUESTION_FRAMES 70       // how long the "?" of a given-up search stays over the enemy's head
 #macro HIDE_SEEN_TILES 1           // a hidden player is only seen from this close (Chebyshev, tiles)
 #macro HIDE_SETTLE_FRAMES 20       // the player must stand still this long on a hiding cell before it counts as hidden (walking across one does not)
