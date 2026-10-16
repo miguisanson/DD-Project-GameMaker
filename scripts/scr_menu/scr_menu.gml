@@ -453,17 +453,11 @@ function Codex_HistoryRows(_prof) {
         var res = variable_struct_exists(h, "result") ? string(h.result) : "died";
         var cause = variable_struct_exists(h, "cause") ? string(h.cause) : "";
         var sentence;
-        var value;
-        if (res == "won") {
-            sentence = Loc_T("tab.hist.won", "You climbed out of the tunnel.");
-            value = Loc_T("tab.val.won", "Won");
-        } else if (res == "abandoned") {
-            sentence = Loc_T("tab.hist.abandoned", "You abandoned this run on floor {n}.", { n: string(fl) });
-            value = Loc_T("tab.val.abandoned", "Abandoned");
-        } else {
-            sentence = (cause != "") ? Loc_T("tab.hist.died_to", "Floor {n}: felled by {name}.", { name: cause, n: string(fl) }) : Loc_T("tab.hist.died", "You fell on floor {n}.", { n: string(fl) });
-            value = Loc_T("tab.val.floor", "Floor {n}", { n: string(fl) });
-        }
+        if (res == "won") sentence = Loc_T("tab.hist.won", "You climbed out of the tunnel.");
+        else if (res == "abandoned") sentence = Loc_T("tab.hist.abandoned", "You abandoned this run on floor {n}.", { n: string(fl) });
+        else sentence = (cause != "") ? Loc_T("tab.hist.died_to", "Floor {n}: felled by {name}.", { name: cause, n: string(fl) }) : Loc_T("tab.hist.died", "You fell on floor {n}.", { n: string(fl) });
+        // H13c (D156): the row is the class and level alone. The result (won / gave up / floor and killer) is the sentence in the details panel; a value column on every row
+        // made the list ask for so much width that the number lines had to put each value under its label and the panel outgrew the screen.
         // G9 (D137): the six run stats made eleven lines, which do not fit the details panel at 800 x 720. The level is in the row's title, the gold is gone with the run
         // (D23), so those two lines gave way; the floor, the foes beaten and the seed stay.
         var lines = [
@@ -474,11 +468,30 @@ function Codex_HistoryRows(_prof) {
         for (var sl = 0; sl < array_length(stat_lines); sl++) array_push(lines, stat_lines[sl]);
         array_push(lines, { label: Loc_T("tab.lbl.seed", "Seed"), value: string(variable_struct_exists(h, "seed") ? h.seed : 0) });
         array_push(rows, {
-            id: "run_" + string(i), label: Loc_T("tab.hist.row", "{cls} Lv {n}", { cls: string(cname), n: string(h.level) }), value: value, kind: "button", enabled: true, help: sentence, hint: "",
+            id: "run_" + string(i), label: Loc_T("tab.hist.row", "{cls} Lv {n}", { cls: string(cname), n: string(h.level) }), value: "", kind: "button", enabled: true, help: sentence, hint: "",
             lines: lines
         });
     }
     return rows;
+}
+
+// H13c (D156): how many columns the run history's number lines use in the details panel (1 or 2). A run has nine lines: one to a row is the look, but in a language whose
+// sentences wrap more (Korean) that is taller than the body, so two to a row (the run summary's way) is used then; it is also the choice when it is the shorter of the two
+// and the one-column page does not fit. Measured at the details width this page really gets.
+function Codex_HistoryCols(_rows) {
+    if (array_length(_rows) <= 0) return 1;
+    var z = TabMenu_Zones("codex_history");
+    var mt = z.mt;
+    var p = mt.p;
+    var m = Ui_MenuNew("fit_history", _rows, { layout: { title: Loc_T("tab.codex.history", "Run History"), anchor: "center", details: true, details_pos: "right", details_cols: 1, det_art: true, hides_below: true } });
+    var lneed = Ui_MenuListNeed(Ui_MenuMeasureRowsFresh(m, mt), p);
+    var hs = [0, 0];
+    for (var c = 1; c <= 2; c++) {
+        var det_w = TabMenu_Widths(z, lneed, Ui_MenuDetailsNeed(_rows, p, c)).det_w;
+        for (var i = 0; i < array_length(_rows); i++) hs[c - 1] = max(hs[c - 1], Ui_DetailsHeight(det_w, _rows[i].help, _rows[i].lines, c));
+    }
+    if (hs[0] - 2 * p <= z.body_h) return 1;   // the same allowance the fit check makes: the text may use 2p of the 4p kept under the last line
+    return (hs[1] < hs[0]) ? 2 : 1;
 }
 
 function Codex_UnlockRows(_prof) {
@@ -523,7 +536,7 @@ function TabMenu_ListShare(_tid) {
     switch (_tid) {
         case "codex_bestiary": return 0.4;   // the page on the right has the long text and the numbers
         case "codex_notes": return 0.5;      // D147: room for the note titles and "Notes found 2/8" (the details text of a note must still fit at 800 x 720 too)
-        case "codex_history": return 0.58;
+        case "codex_history": return 0.4;    // H13c: rows are the class and level alone now (no value column), so the details panel gets the width
         case "gear": case "items": case "skills": return 0.55;   // long names with icons
         case "settings": return 0.6;                              // a name and a value on every row
         case "system": return 0.5;
@@ -962,7 +975,9 @@ function TabCodex_Page(_kind, _prof) {
             var brows = Codex_BestiaryRows(_prof);
             return { rows: brows, title: Loc_T("tab.codex.bestiary_title", "Bestiary {n}/{max}", { n: string(Codex_BestiaryCount(_prof)), max: string(array_length(brows)) }), cols: 2 };
         case "notes": return { rows: Codex_NoteRows(_prof), title: Codex_NotesTitle(_prof), cols: 1 };
-        case "history": return { rows: Codex_HistoryRows(_prof), title: Loc_T("tab.codex.history", "Run History"), cols: 1 };
+        case "history":
+            var hrows = Codex_HistoryRows(_prof);
+            return { rows: hrows, title: Loc_T("tab.codex.history", "Run History"), cols: Codex_HistoryCols(hrows) };
     }
     return { rows: Codex_UnlockRows(_prof), title: Loc_T("tab.codex.unlocks", "Unlocks"), cols: 1 };
 }

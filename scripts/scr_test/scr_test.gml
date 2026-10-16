@@ -13728,10 +13728,7 @@ function TextFit_Known() {
         { where: "tab items 800x720 ko", has: "details of" },
         { where: "codex bestiary 800x720 en", has: "details of" },   // "The Pale Choirbeast" asks the list for 502 of 764 units, which leaves the details too narrow
         { where: "codex bestiary 800x720 en", has: "line value" },
-        { where: "codex bestiary 800x720 ko", has: "details of" },
-        { where: "codex history 640x576 ko", has: "details of" },    // the run's number lines and the list rows ask for more than the body has
-        { where: "codex history 800x720 en", has: "details of" },
-        { where: "codex history 800x720 ko", has: "details of" }
+        { where: "codex bestiary 800x720 ko", has: "details of" }
     ];
 }
 
