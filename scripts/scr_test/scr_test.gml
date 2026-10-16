@@ -145,6 +145,7 @@ function Test_RunAll() {
     Test_RunSuite("Hunt6Combat", Test_Suite_Hunt6Combat);
     Test_RunSuite("Hunt6Ui", Test_Suite_Hunt6Ui);
     Test_RunSuite("Review6", Test_Suite_Review6);
+    Test_RunSuite("TextFit", Test_Suite_TextFit);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -13675,5 +13676,331 @@ function Test_Suite_Hunt6Ui() {
         var _map = TabItems_Press(_ch, _row, false);
         Test_Eq("hunt6ui items: on the map the throwable row still says to throw it in a battle", _map.msg, Loc_T("item.msg.throw_in_battle", "Throw it at an enemy in battle."));
         Test_Eq("hunt6ui items: the Firebomb is not spent either way", Inv_Count(_ch.inventory, 30), 1);
+    }
+}
+// ============================================================================================================================
+// H13b (D156): the "text fits" suite. Every workbook row of the known card / plate / list types goes through the fit helper (UiFit_Check and the draws'
+// own pure layout functions) at 480 x 432, 640 x 576 and 800 x 720, in English and in Korean. A failure names the row, what it needs and what it has.
+// ============================================================================================================================
+function TextFit_Begin() {
+    var _s = { lang0: Loc_GetLanguage(), disp0: (variable_global_exists("display") ? global.display : undefined), own: false, f0: draw_get_font() };
+    if (!(is_struct(_s.disp0) && is_struct(_s.disp0.layout))) {
+        _s.own = true;
+        global.display = { layout: Display_CalcLayout(480, 432), apply_count: 0, frame: 0 };
+    }
+    _s.layout0 = global.display.layout;
+    return _s;
+}
+
+function TextFit_Set(_w, _h, _lang) {
+    Loc_SetLanguage(_lang);
+    global.display.layout = Display_CalcLayout(_w, _h);
+    UI_SetFont();
+    Ui_Metrics();
+}
+
+function TextFit_End(_s) {
+    global.display.layout = _s.layout0;
+    Loc_SetLanguage(_s.lang0);
+    if (_s.own) global.display = _s.disp0;
+    draw_set_font(_s.f0);
+}
+
+function TextFit_Sizes() {
+    return [[480, 432], [640, 576], [800, 720]];
+}
+
+// The rows that no layout can fit and that the text side has to shorten (reported with the packet; each is listed with what it needs). A failure that matches an
+// entry (the assertion's name ends with `where`, the failure text holds `has`) is not reported; every entry must still match something, so the day the text is
+// shortened the entry is deleted from here. Nothing else may fail.
+function TextFit_Known() {
+    return [
+        { where: "tab skills 800x720 en", has: "'Horizontal Slash'" },
+        { where: "battle lists 640x576 en", has: "'Horizontal Slash'" },
+        { where: "battle lists 800x720 en", has: "'Horizontal Slash'" },
+        { where: "battle lists 800x720 en", has: "'Poison Arrow'" },
+        { where: "card pick 640x576 en", has: "'Meditation+'" },
+        { where: "card pick 640x576 en", has: "'Apothecary'" },
+        { where: "card pick 640x576 en", has: "'Scrounger'" },
+        { where: "card pick 800x720 en", has: "card name" },          // one-word names of 10 to 11 letters ("Meditation+", "Foresight+", "Spellweave", "Apothecary", "Horizontal") are wider than a column
+        { where: "card pick 800x720 en", has: "pick screen with" },   // the tall upgrade cards: three columns of Skill / Upgrade text do not fit the height of 800 x 720
+        { where: "tab items 800x720 en", has: "details of" },        // throwables: the sentence and six number lines are 20 to 64 units taller than the details panel
+        { where: "tab items 800x720 ko", has: "details of" },
+        { where: "codex bestiary 800x720 en", has: "details of" },   // "The Pale Choirbeast" asks the list for 502 of 764 units, which leaves the details too narrow
+        { where: "codex bestiary 800x720 en", has: "line value" },
+        { where: "codex bestiary 800x720 ko", has: "details of" },
+        { where: "codex history 640x576 ko", has: "details of" },    // the run's number lines and the list rows ask for more than the body has
+        { where: "codex history 800x720 en", has: "details of" },
+        { where: "codex history 800x720 ko", has: "details of" }
+    ];
+}
+
+// _fn(_w, _h, _lang) -> an array of failure texts; one assertion per picture size and language, named _name.
+function TextFit_Each(_name, _fn) {
+    var _s = TextFit_Begin();
+    var _sizes = TextFit_Sizes();
+    var _langs = ["en", "ko"];
+    var _known = TextFit_Known();
+    if (!variable_global_exists("textfit_known_hits")) global.textfit_known_hits = array_create(array_length(_known), 0);
+    for (var _i = 0; _i < array_length(_sizes); _i++) {
+        for (var _j = 0; _j < array_length(_langs); _j++) {
+            TextFit_Set(_sizes[_i][0], _sizes[_i][1], _langs[_j]);
+            var _all = _fn(_sizes[_i][0], _sizes[_i][1], _langs[_j]);
+            var _label = _name + " " + string(_sizes[_i][0]) + "x" + string(_sizes[_i][1]) + " " + _langs[_j];
+            var _fails = [];
+            for (var _f = 0; _f < array_length(_all); _f++) {
+                var _is_known = false;
+                for (var _k = 0; _k < array_length(_known); _k++) {
+                    if (_known[_k].where == _label && string_pos(_known[_k].has, _all[_f]) > 0) {
+                        _is_known = true;
+                        global.textfit_known_hits[_k]++;
+                    }
+                }
+                if (!_is_known) array_push(_fails, _all[_f]);
+            }
+            var _txt = "";
+            for (var _m = 0; _m < min(5, array_length(_fails)); _m++) _txt += ((_m > 0) ? "; " : "") + _fails[_m];
+            if (array_length(_fails) > 5) _txt += "; +" + string(array_length(_fails) - 5) + "x";
+            Test_Eq("H13b fit " + _label, _txt, "");
+        }
+    }
+    TextFit_End(_s);
+}
+
+// A wrapped block of text in a column _w wide. The text may use the 2p of padding between the column and the frame's fill (it stays inside the frame, which is
+// what the scripted runs check); a word wider than that is a failure.
+function TextFit_Block(_fails, _what, _txt, _w, _p) {
+    var _c = UiFit_Check(_txt, _w + 2 * _p, -1, true);
+    if (!_c.ok) array_push(_fails, _what + " '" + string_copy(string(_txt), 1, 24) + "' " + string(_c.w) + ">" + string(_w));
+}
+
+// One line of text in a room _room wide, no wrapping. Pushes a failure text when it does not fit.
+function TextFit_Line(_fails, _what, _txt, _room) {
+    var _c = UiFit_Check(_txt, _room, -1, false);
+    if (!_c.ok) array_push(_fails, _what + " '" + string(_txt) + "' " + string(_c.w) + ">" + string(_room));
+}
+
+// The rows of a Tab page against its list and details panels (the draw's own widths: TabMenu_Zones, TabMenu_Widths, Ui_MenuLabelRoom, Ui_DetailsHeight).
+function TextFit_TabPage(_fails, _tid, _rows, _title, _cols = 1) {
+    var _z = TabMenu_Zones(_tid);
+    var _mt = _z.mt;
+    var _p = _mt.p;
+    var _m = Ui_MenuNew("fit_" + _tid, _rows, { layout: { title: _title, anchor: "center", details: true, details_pos: "right", details_cols: _cols, det_art: true, hides_below: true } });
+    var _mc = Ui_MenuMeasureRowsFresh(_m, _mt);
+    var _wd = TabMenu_Widths(_z, Ui_MenuListNeed(_mc, _p), _mc.det_need);
+    if (_wd.list_w + _wd.det_w > _z.list_w + _z.det_w) array_push(_fails, _tid + " widths " + string(_wd.list_w) + "+" + string(_wd.det_w) + " exceed the body " + string(_z.list_w + _z.det_w));
+    TextFit_Line(_fails, _tid + " title", _title, _wd.list_w - 8 * _p);
+    var _inner = _wd.det_w - 8 * _p;
+    var _col_w = (_inner - (_cols - 1) * 3 * _p) / _cols;
+    for (var _i = 0; _i < array_length(_rows); _i++) {
+        var _r = _rows[_i];
+        var _val = variable_struct_exists(_r, "value") ? _r.value : "";
+        if (variable_struct_get(_r, "kind") != "head") {
+            TextFit_Line(_fails, _tid + " row", _r.label, Ui_MenuLabelRoom(_wd.list_w, _p, _mc.icon_px, variable_struct_exists(_r, "icon_item"), _val));
+        }
+        if (!variable_struct_exists(_r, "help") || _r.help == "") continue;
+        var _lines = variable_struct_exists(_r, "lines") ? _r.lines : [];
+        for (var _l = 0; _l < array_length(_lines); _l++) {
+            TextFit_Line(_fails, _tid + " line value", _lines[_l].value, _col_w + 2 * _p);   // a label that does not fit with its value goes over it, a label wider than the column wraps
+            if (UI_TextWidth(_lines[_l].label) > _col_w) TextFit_Block(_fails, _tid + " line label", _lines[_l].label, _col_w, _p);
+        }
+        var _dh = Ui_DetailsHeight(_wd.det_w, _r.help, _lines, _cols, variable_struct_exists(_r, "seq") ? array_length(_r.seq) : 0, _r);
+        // Ui_DetailsHeight keeps 4p under the last line; the text may use 2p of it (it stays inside the frame's fill, which the scripted runs check)
+        if (_dh - 2 * _p > _z.body_h) array_push(_fails, _tid + " details of '" + string(_r.label) + "' need " + string(_dh) + " have " + string(_z.body_h) + " (list " + string(_wd.list_w) + " of " + string(Ui_MenuListNeed(_mc, _p)) + " asked, details " + string(_wd.det_w) + " of " + string(_mc.det_need) + " asked)");
+    }
+}
+
+// A character that owns every item and knows every skill and card passive of every class, with every status on it.
+function TextFit_Char() {
+    ItemDB_Init(); SkillDB_Init(); EnemyDB_Init();
+    var _ch = CharacterCreate_Player(CLASS_KNIGHT);
+    for (var _i = 1; _i < 120; _i++) {
+        var _it = ItemDB_Get(_i);
+        if (is_struct(_it) && _it.id == _i) _ch.inventory = Inv_Add(_ch.inventory, _i, 9);
+    }
+    var _cls = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE];
+    _ch.skills = [];
+    _ch.passives = [];
+    for (var _c = 0; _c < array_length(_cls); _c++) {
+        var _ids = Skill_IdsOfClass(_cls[_c]);
+        for (var _s = 0; _s < array_length(_ids); _s++) if (!Card_ArrayHas(_ch.skills, _ids[_s])) array_push(_ch.skills, _ids[_s]);
+        var _pids = Card_PoolPassiveIds(_cls[_c]);
+        for (var _q = 0; _q < array_length(_pids); _q++) if (!Card_ArrayHas(_ch.passives, _pids[_q])) array_push(_ch.passives, _pids[_q]);
+    }
+    var _sids = Status_AllIds();
+    for (var _t = 0; _t < array_length(_sids); _t++) _ch = Status_Add(_ch, _sids[_t], 3, 2);
+    return _ch;
+}
+
+// A profile that has met every enemy (elite too), read every note, finished a run of each result.
+function TextFit_Profile() {
+    var _prof = Profile_Default();
+    var _ids = Codex_EnemyIds();
+    for (var _i = 0; _i < array_length(_ids); _i++) Codex_Met(_prof, _ids[_i], true);
+    var _defs = Note_Defs();
+    for (var _n = 0; _n < array_length(_defs); _n++) Note_MarkCollected(_prof, _defs[_n].id);
+    var _res = ["won", "abandoned", "died"];
+    var _cl = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE, CLASS_NOBODY];
+    for (var _h = 0; _h < 4; _h++) array_push(_prof.history, { class_id: _cl[_h], level: LEVEL_CAP, floor: 9, result: _res[_h mod 3], cause: EnemyDB_Get(ENEMY_FINAL_BOSS).name, kills: 999, seed: 99999 });
+    Profile_Unlock(_prof, "nobody_class");
+    return _prof;
+}
+
+// The widest of _names as drawn now.
+function TextFit_Longest(_names) {
+    var _best = "";
+    var _bw = -1;
+    for (var _i = 0; _i < array_length(_names); _i++) {
+        var _w = UI_TextWidth(_names[_i]);
+        if (_w > _bw) { _bw = _w; _best = _names[_i]; }
+    }
+    return _best;
+}
+
+function Test_Suite_TextFit() {
+    global.textfit_known_hits = array_create(array_length(TextFit_Known()), 0);
+    // ---- the Tab pages: every row's label in its list, every number line and sentence in its details panel ----
+    TextFit_Each("tab skills", function(_w, _h, _l) { var _f = []; var _c = TextFit_Char(); TextFit_TabPage(_f, "skills", TabSkills_Items(_c), TabMenu_Title("skills", _c)); return _f; });
+    TextFit_Each("tab items", function(_w, _h, _l) { var _f = []; var _c = TextFit_Char(); TextFit_TabPage(_f, "items", TabItems_Items(_c), TabMenu_Title("items", _c)); return _f; });
+    TextFit_Each("tab gear", function(_w, _h, _l) { var _f = []; var _c = TextFit_Char(); TextFit_TabPage(_f, "gear", TabGear_Items(_c), TabMenu_Title("gear", _c)); return _f; });
+    TextFit_Each("tab status", function(_w, _h, _l) { var _f = []; var _c = TextFit_Char(); TextFit_TabPage(_f, "status", TabStatus_Items(_c), TabMenu_Title("status", _c)); return _f; });
+    var _kinds = ["bestiary", "notes", "history", "unlocks"];
+    for (var _ki = 0; _ki < 4; _ki++) {
+        TextFit_Each("codex " + _kinds[_ki], method({ k: _kinds[_ki] }, function(_w, _h, _l) { var _f = []; var _pg = TabCodex_Page(k, TextFit_Profile()); TextFit_TabPage(_f, "codex_" + k, _pg.rows, _pg.title, _pg.cols); return _f; }));
+    }
+    TextFit_Each("codex list", function(_w, _h, _l) { var _f = []; TextFit_TabPage(_f, "codex", TabCodex_Items(TextFit_Profile()), Loc_T("tab.title.codex", "Codex")); return _f; });
+    TextFit_Each("tab system", function(_w, _h, _l) { var _f = []; TextFit_TabPage(_f, "system", TabSystem_Items(false), Loc_T("tab.title.system", "System")); return _f; });
+    TextFit_Each("help list", function(_w, _h, _l) { var _f = []; TextFit_TabPage(_f, "system", TabHelp_Items(), Loc_T("help.title", "Help")); return _f; });
+    TextFit_Each("help stats", function(_w, _h, _l) { var _f = []; TextFit_TabPage(_f, "system", Help_StatsItems(), Loc_T("help.stats.title", "Stats & terms")); return _f; });
+
+    // ---- the battle: the command rows, the skill and item rows with their icons and MP / count, the number lines of the details panel ----
+    TextFit_Each("battle commands", function(_w, _h, _l) {
+        var _f = [];
+        var _mt = Ui_Metrics();
+        var _z = Battle_Zones();
+        var _pw = min(Battle_CmdPanelW(_z, _mt), _mt.gw - 2 * _mt.margin);
+        var _rows = Battle_CmdItems();
+        _rows[4].value = "100%";
+        for (var _i = 0; _i < array_length(_rows); _i++) TextFit_Line(_f, "cmd", _rows[_i].label, Ui_MenuLabelRoom(_pw, _mt.p, 0, false, variable_struct_exists(_rows[_i], "value") ? _rows[_i].value : ""));
+        return _f;
+    });
+    TextFit_Each("battle lists", function(_w, _h, _l) {
+        var _f = [];
+        var _mt = Ui_Metrics();
+        var _p = _mt.p;
+        var _z = Battle_Zones();
+        var _c = TextFit_Char();
+        var _sets = [Battle_SkillRows(_c, undefined), Battle_ItemRows(_c)];
+        var _icon_px = 16 * max(1, floor(_mt.row_h / 16));
+        var _col_w = (_z.right.w - 8 * _p - 3 * _p) / 2;
+        for (var _s = 0; _s < 2; _s++) {
+            for (var _i = 0; _i < array_length(_sets[_s]); _i++) {
+                var _r = _sets[_s][_i];
+                TextFit_Line(_f, (_s == 0) ? "skill" : "item", _r.label, Ui_MenuLabelRoom(_z.right.w, _p, (_s == 0) ? _icon_px : 0, (_s == 1), _r.value));
+                for (var _k = 0; _k < array_length(_r.lines); _k++) {
+                    TextFit_Line(_f, "battle line value of '" + string(_r.label) + "'", _r.lines[_k].value, _col_w + 2 * _p);
+                    if (UI_TextWidth(_r.lines[_k].label) > _col_w) TextFit_Block(_f, "battle line label of '" + string(_r.label) + "'", _r.lines[_k].label, _col_w, _p);
+                }
+            }
+        }
+        return _f;
+    });
+
+    // ---- the attack preview plate: the worst hits the game can show (a single value, a multi-hit run, an unequal run of four) ----
+    TextFit_Each("attack plate", function(_w, _h, _l) {
+        var _f = [];
+        var _mt = Ui_Metrics();
+        var _z = Battle_Zones();
+        var _pw = min(Battle_CmdPanelW(_z, _mt), _mt.gw - 2 * _mt.margin);
+        var _cmd = { x: _mt.gw - _mt.margin - _pw, y: _z.band_top, w: _pw, h: _z.cmd_h };
+        var _cases = [{ ok_hits: [9], perfect_hits: [12] }, { ok_hits: [24, 24], perfect_hits: [30, 30] }, { ok_hits: [10, 14], perfect_hits: [12, 18] }, { ok_hits: [99], perfect_hits: [99] }];   // a hit, two equal hits, two unequal hits (a guard used up), the largest number
+        for (var _i = 0; _i < array_length(_cases); _i++) {
+            var _pl = Battle_PreviewPlateLayout(_cmd, _z, _mt, _cases[_i]);
+            if (_pl.r.h > _cmd.h) array_push(_f, "plate case " + string(_i) + " is taller than the command menu");
+            if (!_pl.ok) array_push(_f, "plate case " + string(_i) + " needs " + string(_pl.text_w) + " has " + string(_pl.fit_w));
+            if (_pl.r.x < _z.player.x + _z.player.w) array_push(_f, "plate case " + string(_i) + " overlaps the player panel");
+            if (_pl.r.y + _pl.r.h > _mt.gh) array_push(_f, "plate case " + string(_i) + " leaves the screen");
+        }
+        return _f;
+    });
+
+    // ---- the card pick: every card at the pick's column width, and the whole screen (title, cards, Skip, hint) on the screen ----
+    TextFit_Each("card pick", function(_w, _h, _l) {
+        var _f = [];
+        var _mt = Ui_Metrics();
+        var _p = _mt.p;
+        var _gap = 4 * _p;
+        var _cw = floor((_mt.gw - 2 * _mt.margin - 2 * _gap) / 3);
+        var _iw = _cw - 8 * _p;
+        var _all = CardDB_All();
+        var _skip = Loc_T("cards.pick.skip", "Skip: +{gold} gold", { gold: string(Card_SkipGold()) });
+        var _hint = Loc_T("cards.pick.hint", "[k:left][k:right] Choose   [k:confirm] Take");
+        for (var _i = 0; _i < array_length(_all); _i++) {
+            var _c = _all[_i];
+            var _name = Card_Name(_c);
+            TextFit_Block(_f, "card name", _name, _iw - 5 * _p, _p);
+            TextFit_Block(_f, "card tag", Card_TypeTag(_c), _iw - 5 * _p, _p);
+            TextFit_Block(_f, "card sentence of '" + _name + "'", Card_Sentence(_c), _iw, _p);
+            var _ls = Card_Lines(_c);
+            for (var _k = 0; _k < array_length(_ls); _k++) {
+                TextFit_Block(_f, "card line label of '" + _name + "'", _ls[_k].label, _iw, _p);
+                TextFit_Line(_f, "card line value of '" + _name + "'", _ls[_k].value, _iw);
+            }
+            var _one = CardsUi_PickPlan([_c], _cw, _skip, _hint, _mt);   // the screen with this card as the tallest
+            if (_one.lay.bottom > _mt.gh - _mt.p) array_push(_f, "pick screen with '" + _name + "' (" + string(_one.ch_max) + ") ends at " + string(_one.lay.bottom) + " of " + string(_mt.gh));
+        }
+        return _f;
+    });
+
+    // ---- pop-ups: every tutorial and confirm question wraps into its box and the box stays on the screen ----
+    TextFit_Each("pop-ups", function(_w, _h, _l) {
+        var _f = [];
+        var _mt = Ui_Metrics();
+        var _ids = Tutorial_Ids();
+        for (var _i = 0; _i < array_length(_ids); _i++) {
+            var _e = Tutorial_Get(_ids[_i]);
+            var _b = Tutorial_Box(_e, 0);
+            TextFit_Line(_f, "tutorial title", _e.title, _b.iw);
+            TextFit_Block(_f, "tutorial '" + _ids[_i] + "' body", _e.body, _b.iw, _mt.p);
+            if (_b.y + _b.h > _mt.gh - _mt.margin) array_push(_f, "tutorial '" + _ids[_i] + "' box ends at " + string(_b.y + _b.h) + " of " + string(_mt.gh));
+        }
+        var _c = TextFit_Char();
+        var _items = [];
+        for (var _n = 1; _n < 120; _n++) { var _it = ItemDB_Get(_n); if (is_struct(_it) && _it.id == _n) array_push(_items, _it.name); }
+        var _skills = [];
+        for (var _s = 0; _s < array_length(_c.skills); _s++) array_push(_skills, SkillDB_Get(_c.skills[_s]).name);
+        var _cls = [];
+        for (var _k = 0; _k < 4; _k++) array_push(_cls, DB_PlayerClass(_k).name);
+        var _item = TextFit_Longest(_items);
+        var _skill = TextFit_Longest(_skills);
+        var _qs = [Loc_T("confirm.abandon", "Abandon this run? It counts as a death, but you keep the echo."), TabSystem_Question("quit", false), TabSystem_Question("quit", true),
+                   Loc_T("class.select.become", "Become {cls}?", { cls: TextFit_Longest(_cls) }), Loc_T("confirm.echo", "Keep {name} as your echo?", { name: _item }),
+                   Loc_T("confirm.replace", "Forget {forget} and learn {learn}?", { forget: _skill, learn: _skill }), Loc_T("confirm.sell", "Sell {name} for {price}?", { name: _item, price: "9999" }),
+                   Loc_T("confirm.new_game", "Start a new game? The saved run will be abandoned.")];
+        for (var _q = 0; _q < array_length(_qs); _q++) {
+            var _cb = Confirm_Box(_qs[_q], _mt);
+            TextFit_Block(_f, "confirm", _qs[_q], _cb.iw, _mt.p);
+            if (_cb.y + _cb.h > _mt.gh - _mt.margin) array_push(_f, "confirm '" + string_copy(_qs[_q], 1, 20) + "' box ends at " + string(_cb.y + _cb.h));
+        }
+        return _f;
+    });
+
+    // ---- the credits roll: every line inside the screen's width, every file name of the sound credits inside its column ----
+    TextFit_Each("credits", function(_w, _h, _l) {
+        var _f = [];
+        var _mt = Ui_Metrics();
+        var _cl = Credits_Layout();
+        for (var _i = 0; _i < array_length(_cl.rows); _i++) {
+            var _r = _cl.rows[_i];
+            if (_r.kind == "names") TextFit_Block(_f, "credits names", _r.text, _cl.col_w, _mt.p);
+            else if (_r.kind != "gap") TextFit_Line(_f, "credits " + _r.kind, _r.text, _mt.gw - 2 * _mt.margin);
+        }
+        return _f;
+    });
+
+    // ---- the rows the text side has to shorten are still too long (an entry that matches nothing is deleted from TextFit_Known) ----
+    var _known = TextFit_Known();
+    for (var _e = 0; _e < array_length(_known); _e++) {
+        Test_True("H13b known text row still needs shorter text: " + _known[_e].where + " " + _known[_e].has, global.textfit_known_hits[_e] > 0);
     }
 }

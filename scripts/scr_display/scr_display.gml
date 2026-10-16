@@ -422,6 +422,7 @@ function Display_DrawFrame() {
     var _d = global.display;
     if (_d.drawn_frame == _d.frame) return;
     _d.drawn_frame = _d.frame;
+    UiFit_FrameBegin();   // H13b (D156): the text-fit recorder forgets the last frame's frames
     var _l = _d.layout;
     if (!is_struct(_l) || !surface_exists(application_surface)) return;
     draw_clear(c_black);

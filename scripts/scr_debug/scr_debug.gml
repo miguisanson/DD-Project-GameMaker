@@ -206,8 +206,10 @@ function Build_DrawId() {
     var _r = Build_IdRect();
     var _p = Ui_Px();
     draw_set_alpha(1);
+    global.uifit_skip = true;   // H13b: the stamp is not panel text (it may sit over a panel's corner)
     Ui_Text(_r.x + _p, _r.y + _p, Build_IdShort(), UI_C_DARKEST);
     Ui_Text(_r.x, _r.y, Build_IdShort(), UI_C_TEXT);
+    global.uifit_skip = false;
     draw_set_color(_c);
     draw_set_alpha(_a);
     draw_set_halign(_h);
@@ -259,6 +261,7 @@ function Scenario_Boot() {
 
     global.rng_inited = true;   // GameState_Init skips randomize()
     random_set_seed(12345);
+    UiFit_Enable(true);   // H13b (D156): every scripted run records text that does not fit; -shots asserts none arrived since the last picture
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.choice_off = true;   // D154: nor the small flavour questions (the Stranger, the merchant, a note, the wake line) unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
@@ -269,6 +272,7 @@ function Scenario_Finish() {
     var _s = global.scn;
     _s.done = true;
     show_debug_message("[TEST-FRAMES] " + _s.mode + " frames=" + string(_s.f) + " of " + string(_s.cap));
+    if (UiFit_On()) show_debug_message("[FIT-SUMMARY] failures=" + string(global.uifit.total));
     show_debug_message("[TEST-SUMMARY] pass=" + string(_s.pass) + " fail=" + string(_s.fail) + " errors=" + string(_s.errors));
     game_end((_s.fail > 0 || _s.errors > 0) ? 1 : 0);
 }
@@ -2882,6 +2886,8 @@ function Scenario_ShotLayout(_file, _flags = "", _crop = undefined) {
     }
     var _ap = application_get_position();
     var _fade = Transition_IsActive() && GameState_Get().transition_fx.alpha > 0.001;
+    var _fit = UiFit_Take();   // H13b (D156): no panel drawn since the last picture reported a fit failure
+    Scenario_Check("shots_textfit_" + _file + "_" + Loc_GetLanguage(), array_length(_fit) == 0, UiFit_Describe(_fit));
     screen_save(_file);
     show_debug_message("[SHOT] file=" + _file + " w=" + string(_w) + " h=" + string(_h) + " scale=" + string(_l.scale)
         + " gx=" + string(_l.game_x) + " gy=" + string(_l.game_y) + " gw=" + string(_l.game_w) + " gh=" + string(_l.game_h)

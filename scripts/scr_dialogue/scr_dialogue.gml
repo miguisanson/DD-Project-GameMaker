@@ -1399,6 +1399,7 @@ function Dialogue_Draw() {
     draw_set_valign(fa_top);
     if (cutscene_text_only) {   // over the cutscene's art: plain text with a 1 px shadow, as before
         if (speaker != "") {
+            if (UiFit_On()) UiFit_TextDrawn(layout.speaker_x, layout.speaker_y, speaker + ":", fa_left);
             draw_set_color(UI_C_DARKEST);
             UI_DrawText(layout.speaker_x + UI_CUTSCENE_TEXT_SHADOW_X, layout.speaker_y + UI_CUTSCENE_TEXT_SHADOW_Y, speaker + ":");
             draw_set_color(UI_C_TEXT);
@@ -1409,6 +1410,7 @@ function Dialogue_Draw() {
             Dialogue_DrawRich(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text, UI_C_DARKEST, 1, UI_C_DARKEST);
             Dialogue_DrawRich(text_x, text_y, visible_text, UI_C_TEXT, 1, -1);
         } else {
+            if (UiFit_On()) UiFit_TextDrawn(text_x, text_y, page_text, fa_left);   // H13b (D156): the whole page, not the part typed so far
             draw_set_color(UI_C_DARKEST);
             UI_DrawText(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text);
             draw_set_color(UI_C_TEXT);
@@ -1421,6 +1423,7 @@ function Dialogue_Draw() {
         if (rich) {
             Dialogue_DrawRich(text_x, text_y, visible_text, UI_C_TEXT, open_t, -1);
         } else {
+            if (UiFit_On()) UiFit_TextDrawn(text_x, text_y, page_text, fa_left);
             draw_set_color(UI_C_TEXT);
             UI_DrawText(text_x, text_y, visible_text);
         }
@@ -2066,6 +2069,23 @@ function Credits_Layout() {
     return layout;
 }
 
+// H13b (D156): the sound credits are file names with no space to break at; one wider than the roll's column ("Slime_Attack__Nr__1__Minecraft_Sound____...") is cut
+// into chunks, one per line, instead of running off the screen.
+function Credits_BreakLong(_text, _col_w) {
+    var words = string_split(_text, " ");
+    var out = "";
+    for (var i = 0; i < array_length(words); i++) {
+        var w = words[i];
+        if (UI_TextWidth(w) > _col_w) {
+            var chunks = Dialogue_BreakWordToLines(w, _col_w);
+            w = "";
+            for (var j = 0; j < array_length(chunks); j++) w += ((j > 0) ? "\n" : "") + chunks[j];
+        }
+        out += ((i > 0) ? " " : "") + w;
+    }
+    return out;
+}
+
 // The uncached computation of Credits_Layout. Counted (Credits_LayoutBuilds).
 function Credits_LayoutBuild() {
     if (!variable_global_exists("credits_layout_builds")) global.credits_layout_builds = 0;
@@ -2079,6 +2099,7 @@ function Credits_LayoutBuild() {
         var e = entries[i];
         var h = mt.line_h;
         var pre = 0;
+        if (e.kind == "names") e = { kind: e.kind, text: Credits_BreakLong(e.text, col_w) };
         if (e.kind == "gap") h = mt.line_h;
         else if (e.kind == "names") h = Ui_TextBlockH(e.text, col_w);
         else if (e.kind == "title") h = mt.line_h * 2;
@@ -2112,6 +2133,7 @@ function Credits_Draw(_ms) {
     var l = Credits_Layout();
     var top = mt.gh - round(Credits_ScrollPx(_ms));   // 60 GUI pixels per second
     var cx = round(mt.gw / 2);
+    global.uifit_scroll = true;   // H13b: the roll scrolls through the top and the bottom of the screen: only the sides are checked
     for (var i = 0; i < array_length(l.rows); i++) {
         var r = l.rows[i];
         var ry = top + r.y;
@@ -2122,6 +2144,7 @@ function Credits_Draw(_ms) {
             case "line": Ui_Text(cx, ry, r.text, UI_C_LIGHT, fa_center); break;
             case "names": {
                 var s = max(0.0001, UI_GetFontScale());
+                if (UiFit_On()) UiFit_BlockDrawn(round(cx - l.col_w / 2), ry, r.text, l.col_w);   // H13b (D156)
                 draw_set_halign(fa_center);
                 draw_set_valign(fa_top);
                 draw_set_color(UI_C_TEXT);
@@ -2130,6 +2153,7 @@ function Credits_Draw(_ms) {
             } break;
         }
     }
+    global.uifit_scroll = false;
 }
 
 // ==========================================================================================================================
