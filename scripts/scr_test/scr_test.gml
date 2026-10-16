@@ -147,6 +147,7 @@ function Test_RunAll() {
     Test_RunSuite("Review6", Test_Suite_Review6);
     Test_RunSuite("Hunt7Prog", Test_Suite_Hunt7Prog);
     Test_RunSuite("TextFit", Test_Suite_TextFit);
+    Test_RunSuite("Hunt7Map", Test_Suite_Hunt7Map);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -13236,7 +13237,11 @@ function Test_SurfaceAlpha(_surf, _side) {
 
 // What the elite marks paint on top of the sprite's own pixels, and outside them: { inside, outside, bright } (bright = outside pixels that are fully opaque and exactly _col).
 function Test_EliteFxOverSprite(_spr, _img, _col) {
-    var _ring = Elite_FxRing(_spr, _img, 1, 1, 0, _col);
+    return Test_RingOverSprite(Elite_FxRing(_spr, _img, 1, 1, 0, _col), _spr, _img, _col);
+}
+
+// The same for any marks picture { surf, r } built round a sprite (the elite's outline, the merchant's glow).
+function Test_RingOverSprite(_ring, _spr, _img, _col) {
     var _side = _ring.r * 2;
     var _w = surface_get_width(_ring.surf);
     var _buf = buffer_create(_w * surface_get_height(_ring.surf) * 4, buffer_fixed, 1);
@@ -14208,5 +14213,98 @@ function Test_Suite_TextFit() {
     var _known = TextFit_Known();
     for (var _e = 0; _e < array_length(_known); _e++) {
         Test_True("H13b known text row still needs shorter text: " + _known[_e].where + " " + _known[_e].has, global.textfit_known_hits[_e] > 0);
+    }
+}
+// ============================================================================
+// Bug hunt 7, map and world (build 7f4d08e): the step squash under the darkness, the merchant under the darkness, a sprite saved by name.
+// (The grace period in a menu, the Stranger in the arrival clean-up and the clean-up in the run save are checked in the smoke run, steps 980..989.)
+// ============================================================================
+function Test_Suite_Hunt7Map() {
+    Test_RunSuite("Hunt7Map.draw", Test_Hunt7MapDraw);
+    Test_RunSuite("Hunt7Map.merchant", Test_Hunt7MapMerchant);
+    Test_RunSuite("Hunt7Map.save", Test_Hunt7MapSave);
+}
+
+// 1. The world pass draws every picture of a world object (a figure, a note on the floor) BEFORE the room's darkness, and only marks after it.
+function Test_Hunt7MapDraw() {
+    var _parts = World_FxParts();
+    var _light = -1;
+    var _squash = -1;
+    for (var _i = 0; _i < array_length(_parts); _i++) {
+        if (_parts[_i].name == "light") _light = _i;
+        if (_parts[_i].name == "player_squash") _squash = _i;
+    }
+    Test_True("hunt7map draw: the darkness is one part of the world pass", _light >= 0);
+    Test_True("hunt7map draw: the player's step squash is drawn, and before the darkness", _squash >= 0 && _squash < _light);
+    var _late_body = "";
+    var _early_mark = "";
+    for (var _j = 0; _j < array_length(_parts); _j++) {
+        if (_parts[_j].body && _j > _light) _late_body += _parts[_j].name + " ";
+        if (!_parts[_j].body && _j < _light) _early_mark += _parts[_j].name + " ";
+    }
+    Test_Eq("hunt7map draw: no picture of a world object comes after the darkness", _late_body, "");
+    Test_Eq("hunt7map draw: nothing but the darkness itself is a mark before it", _early_mark, "");
+    var _names = "";
+    for (var _k = _light + 1; _k < array_length(_parts); _k++) _names += _parts[_k].name + " ";
+    Test_Eq("hunt7map draw: after the darkness only the marks stay bright", _names, "nav player_prompt elite merchant_glow mapfx ");
+}
+
+// 1b. The merchant's gold glow is a ring round his shape with his own pixels cut out (as the elite's marks): the sprite itself is the object's own draw, under the darkness.
+function Test_Hunt7MapMerchant() {
+    var _spr = asset_get_index(Merchant_SpriteName());
+    if (_spr == -1) _spr = nobody_down;
+    Test_True("hunt7map merchant: there is a sprite to test with", sprite_exists(_spr));
+    var _o = Test_RingOverSprite(Merchant_FxRing(_spr, 0, UI_C_MERCHANT_GOLD), _spr, 0, UI_C_MERCHANT_GOLD);
+    Test_Eq("hunt7map merchant: the glow paints nothing over the merchant's own pixels", _o.inside, 0);
+    Test_True("hunt7map merchant: the glow is there round him", _o.outside > 0);
+    Test_True("hunt7map merchant: the glow is the gold, fully opaque (the pulse is the draw's alpha)", _o.bright > 0);
+}
+
+// 5. A swapped torch, chest or barrel is saved with its sprite's NAME (a raw sprite number changes when a sprite is added between builds), and an old save with the number still loads.
+function Test_Hunt7MapSave() {
+    RoomState_Init();
+    var _gs = GameState_Get();
+    var _objs = [obj_torch, obj_chest, obj_barrel];
+    for (var _i = 0; _i < array_length(_objs); _i++) {
+        var _on = object_get_name(_objs[_i]);
+        var _pid = "hunt7map_" + _on;
+        var _key = RoomState_Key(room, _pid);
+        var _a = instance_create_depth(0, 0, 0, _objs[_i]);
+        _a.persist_id = _pid;
+        var _swap = _a.swap_sprite;
+        var _swap_name = sprite_get_name(_swap);
+        var _plain = _a.sprite_index;
+        Test_True("hunt7map save " + _on + ": it has a swap sprite and a different plain one", sprite_exists(_swap) && _swap != _plain);
+        _a.sprite_index = _swap;
+        _a.swapped = true;
+        RoomState_SaveInstance(_a, ["swapped", "sprite_index"], false);
+        instance_destroy(_a);
+        // through the save file's own text
+        var _rec = json_parse(json_stringify(RoomState_Get(room, _pid)));
+        Test_True("hunt7map save " + _on + ": the saved record names the sprite", string_pos("\"" + _swap_name + "\"", json_stringify(_rec)) > 0);
+        Test_False("hunt7map save " + _on + ": and holds no raw sprite number", variable_struct_exists(_rec.vars, "sprite_index"));
+        variable_struct_set(_gs.persist, _key, _rec);
+        var _b = instance_create_depth(0, 0, 0, _objs[_i]);
+        _b.persist_id = _pid;
+        RoomState_ApplyInstance(_b);
+        Test_True("hunt7map save " + _on + ": loaded, it is swapped", _b.swapped);
+        Test_Eq("hunt7map save " + _on + ": loaded, it shows the swap sprite", sprite_get_name(_b.sprite_index), _swap_name);
+        instance_destroy(_b);
+        // an old save: the raw number, as the build before this wrote it
+        variable_struct_set(_gs.persist, _key, { removed: false, vars: { swapped: true, sprite_index: _swap }, obj_name: _on });
+        var _c = instance_create_depth(0, 0, 0, _objs[_i]);
+        _c.persist_id = _pid;
+        RoomState_ApplyInstance(_c);
+        Test_True("hunt7map save " + _on + ": an old save with the number still loads swapped", _c.swapped);
+        Test_Eq("hunt7map save " + _on + ": and shows the swap sprite", sprite_get_name(_c.sprite_index), _swap_name);
+        instance_destroy(_c);
+        // an old save from a build whose sprite numbers were different: the number points at some other sprite, the swap sprite still wins
+        variable_struct_set(_gs.persist, _key, { removed: false, vars: { swapped: true, sprite_index: _plain }, obj_name: _on });
+        var _d = instance_create_depth(0, 0, 0, _objs[_i]);
+        _d.persist_id = _pid;
+        RoomState_ApplyInstance(_d);
+        Test_Eq("hunt7map save " + _on + ": an old save with a stale number shows the swap sprite, not the stale picture", sprite_get_name(_d.sprite_index), _swap_name);
+        instance_destroy(_d);
+        variable_struct_remove(_gs.persist, _key);
     }
 }

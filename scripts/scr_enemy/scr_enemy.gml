@@ -874,14 +874,39 @@ function World_RegisterFx(_inst) {
     layer_script_end(layer_exists("Foreground") ? layer_get_id("Foreground") : _inst.layer, World_DrawFx);
 }
 
+// The parts of the world pass in drawing order (bug hunt 7). body: the part draws a picture of a WORLD OBJECT (a figure, a note on the floor), which belongs under the room's
+// darkness like the figures drawn by their own Draw events: a figure standing in the dark must look like it, also for the 120 ms of a step squash. The marks (the "!" and "?", the
+// interact arrow, the elite outline, the merchant's glow, chest bursts) come after the darkness and stay bright. Test_Hunt7MapDraw holds the order.
+function World_FxParts() {
+    static _parts = [
+        { name: "note", body: true },            // C5 (D107): the lore notes lie under everything else
+        { name: "player_squash", body: true },   // D138 (G6): the player's step squash, drawn here while his plain sprite is off
+        { name: "light", body: false },          // H14 (D157, D159): the room's darkness with the fires cut out of it; everything after it stays at full brightness
+        { name: "nav", body: false },
+        { name: "player_prompt", body: false },
+        { name: "elite", body: false },          // C3 (D86): the pulsing outline round elites
+        { name: "merchant_glow", body: false },  // D113: the pulsing gold glow round the merchant
+        { name: "mapfx", body: false }           // D138 (G6): chest burst, the rising item, the level-up sparkle
+    ];
+    return _parts;
+}
+
+function World_DrawFxPart(_name) {
+    switch (_name) {
+        case "note": Note_DrawWorldFx(); break;
+        case "player_squash": MapFx_DrawPlayerSquash(); break;
+        case "light": Light_DrawPass(); break;
+        case "nav": Nav_DrawWorldFx(); break;
+        case "player_prompt": Player_DrawWorldFx(); break;
+        case "elite": Elite_DrawWorldFx(); break;
+        case "merchant_glow": Merchant_DrawWorldFx(); break;
+        case "mapfx": MapFx_DrawWorldFx(); break;
+    }
+}
+
 function World_DrawFx() {
-    Note_DrawWorldFx();   // C5 (D107): the lore notes lie under everything else
-    Light_DrawPass();   // H14 (D157, D159): the room's darkness with the enemies' sight and the fires cut out of it; everything drawn below this line stays at full brightness
-    Nav_DrawWorldFx();
-    Player_DrawWorldFx();
-    Elite_DrawWorldFx();   // C3 (D86): the pulsing outline round elites
-    Merchant_DrawWorldFx();   // D113: the pulsing gold glow round the merchant
-    MapFx_DrawWorldFx();   // D138 (G6): chest burst, the rising item, the level-up sparkle, the player's step squash
+    var _parts = World_FxParts();
+    for (var _i = 0; _i < array_length(_parts); _i++) World_DrawFxPart(_parts[_i].name);
 }
 
 // (D157: the sight ring is no longer drawn; this cache stays only until D108's clean-up removes it with Test_SightRingCache.)
@@ -1639,7 +1664,8 @@ function EnemyAI_PopQuestion(_inst) {
 }
 
 // D158: on a room arrival (the player is placed) every enemy that stands near an exit or near the arrival tile is put back (home, or a clear spot) and forgets its chase.
-// Bosses and story enemies (cine_id) stay where the room has them. Returns how many were moved.
+// Bosses and story enemies (cine_id) stay where the room has them; the Stranger does not (bug hunt 7: D158 says "no enemy", and he is one on the map). Returns how many were moved.
+// What it moved is saved at once (RoomState_Save): the autosave of the arrival and a Quit to title then hold the room as it stands, so a Continue shows the same room (D132).
 function Enemy_ArrivalFix(_pl) {
     if (!instance_exists(_pl)) return 0;
     var _t = GRID_TILE_SIZE;
@@ -1650,7 +1676,7 @@ function Enemy_ArrivalFix(_pl) {
     with (obj_enemy) {
         if (defeated || enemy_id < 0) continue;
         if (variable_instance_exists(id, "cine_id") && string(cine_id) != "") continue;
-        if (EnemyDB_Get(enemy_id).is_boss || enemy_id == ENEMY_STRANGER) continue;
+        if (EnemyDB_Get(enemy_id).is_boss) continue;
         var _r = Enemy_ArrivalCell(_g, Nav_CellOf(x + _t / 2), Nav_CellOf(y + _t / 2), Nav_CellOf(home_x + _t / 2), Nav_CellOf(home_y + _t / 2), _acx, _acy);
         if (!_r.moved) continue;
         x = _r.cx * _t;
@@ -1674,5 +1700,6 @@ function Enemy_ArrivalFix(_pl) {
         }
         _n++;
     }
+    if (_n > 0) RoomState_Save(room);
     return _n;
 }

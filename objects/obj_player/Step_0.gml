@@ -14,7 +14,9 @@ Player_EnsureSpriteSet();
 if (!is_real(face)) face = DOWN;
 if (face < 0 || face > 3) face = DOWN;
 
-if (battle_cooldown > 0) {
+// The grace period after a Run / Continue runs down only while the player is free: not under a menu, a dialogue, a pop-up or a fade (bug hunt 7), or healing after an escape
+// would leave the enemy on the player's tile free to start the fight again the moment the menu closes.
+if (battle_cooldown > 0 && !UI_IsBlocking()) {
     battle_cooldown -= 1;
 }
 

@@ -1032,11 +1032,12 @@ function MapFx_DrawWorldFx() {
     }
     draw_set_alpha(a0);
     draw_set_colour(c0);
-    MapFx_DrawPlayerSquash();
 }
 
 // The player while a step's squash is on: the sprite is drawn here (Player's own draw is off for those frames, see obj_player Step) in whole pixels, feet on the tile.
+// A world part of World_DrawFx drawn BEFORE the darkness (bug hunt 7), so the squashed sprite is darkened like the plain one.
 function MapFx_DrawPlayerSquash() {
+    if (!Fx_IsWorldPass()) return;
     if (!instance_exists(obj_player)) return;
     var pl = instance_find(obj_player, 0);
     if (!variable_instance_exists(pl, "squash_on") || !pl.squash_on) return;
@@ -1089,7 +1090,8 @@ function Battle_BgApply(_floor, _boss) {
 //   - enemies cut nothing out (D160, amends D157): their sight is not shown; the stats keep a cones field that stays 0.
 // One pass per frame: one view-sized surface, filled with the darkness, the light shapes drawn into it with a blend that only lowers its alpha, then drawn over the world.
 // The pass runs at the start of World_DrawFx: the characters and the floor are darkened with the rest (a figure standing in the dark must look like it),
-// while everything World_DrawFx draws after it (the "!" and "?", the interact arrow, the elite outline, the merchant glow, chest bursts) stays at full brightness.
+// while everything World_DrawFx draws after it (the "!" and "?", the interact arrow, the elite outline, the merchant glow, chest bursts) stays at full brightness
+// (World_FxParts: the pictures of world objects, the player's step squash among them, are drawn before it).
 // ============================================================================
 #macro LIGHT_DARK_ALPHA 0.28         // how dark a room is where no light reaches (D159: 0.4; D164: lighter, 0.28 is a first value for the owner to judge; still not barely dimmed)
 #macro LIGHT_DAY_ALPHA 0.10          // a room open to the sky (D164)
