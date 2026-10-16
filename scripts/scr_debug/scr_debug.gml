@@ -13563,7 +13563,7 @@ function Scenario_StepSmokeLabels(_s) {
                 var _sm = TabMenu_TopMenu();
                 var _row = _sm.items[_sm.cursor];
                 Scenario_Check("labels_the_cursor_is_on_the_guard_status", _row.id == "status_" + string(STATUS_GUARD), "id=" + string(_row.id));
-                Scenario_Check("labels_the_highlighted_status_says_what_it_does_and_its_turns", string_pos("4 turns left", _row.help) > 0 && string_pos("next incoming hit", string_lower(_row.help)) > 0, "help=" + _row.help);
+                Scenario_Check("labels_the_highlighted_status_says_what_it_does_and_its_turns", string_pos("4 turns left", _row.help) > 0 && string_pos("next hit", string_lower(_row.help)) > 0, "help=" + _row.help);
                 Scenario_Tap("menu_down");
             }
             if (_s.t == 90) {

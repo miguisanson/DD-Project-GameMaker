@@ -2156,37 +2156,37 @@ function Tutorial_Get(_id) {
     switch (_id) {
         case "timeline":
             return { id: _id, title: Loc_T("tutorial.timeline.title", "Turn order"),
-                body: Loc_T("tutorial.timeline.body", "The strip at the top shows who acts next. Faster fighters act more often, and some skills push an enemy back a turn.") };
+                body: Loc_T("tutorial.timeline.body", "The top strip shows who acts next. Faster fighters act more often, and some skills push an enemy back a turn.") };
         case "bar":
-            return { id: _id, title: Loc_T("tutorial.bar.title", "The sliding bar"),
-                body: Loc_T("tutorial.bar.body", "A cursor slides along the bar. Press [k:confirm] when it is over the bright zone. The closer to the middle, the harder you hit.") };
+            return { id: _id, title: Loc_T("tutorial.bar.title", "Timing bar"),
+                body: Loc_T("tutorial.bar.body", "Press [k:confirm] when the cursor is on the bright zone. The closer to the middle, the harder the hit.") };
         case "arrows":
             return { id: _id, title: Loc_T("tutorial.arrows.title", "Arrow skills"),
-                body: Loc_T("tutorial.arrows.body", "Skills show a row of arrows. Press [k:up][k:down][k:left][k:right] in that order before the time bar runs out. A wrong press costs time.") };
+                body: Loc_T("tutorial.arrows.body", "Match the row of arrows with [k:up][k:down][k:left][k:right], in order, before the time bar empties. A wrong press costs time.") };
         case "defence":
             return { id: _id, title: Loc_T("tutorial.defence.title", "Defending"),
                 body: Loc_T("tutorial.defence.body", "When an enemy winds up a big attack, a bar appears. Press [k:confirm] on the bright zone to take less damage and shake off its effects.") };
         case "stagger":
-            return { id: _id, title: Loc_T("tutorial.stagger.title", "Stagger and BREAK"),
-                body: Loc_T("tutorial.stagger.body", "Good hits fill the enemy's stagger meter. When it is full the enemy is BROKEN: it loses a turn and takes +50% damage.") };
+            return { id: _id, title: Loc_T("tutorial.stagger.title", "Stagger"),
+                body: Loc_T("tutorial.stagger.body", "[t]Good[/t] hits fill the enemy's [t]stagger[/t] meter. When it is full: [a]BREAK[/a]. The enemy loses a turn and takes +50% damage.") };
         case "cards":
             return { id: _id, title: Loc_T("tutorial.cards.title", "Cards"),
-                body: Loc_T("tutorial.cards.body", "Level-ups and skill chests offer 3 cards: a new skill, an upgrade or a passive. Take one, or skip for a little gold.") };
+                body: Loc_T("tutorial.cards.body", "Level-ups and skill chests offer 3 cards: a skill, an upgrade or a passive. Take one, or skip for a little gold.") };
         case "shop":
             return { id: _id, title: Loc_T("tutorial.shop.title", "The shop"),
-                body: Loc_T("tutorial.shop.body", "The merchant sells potions and gear. Gold is kept for the whole run, and the stock changes with every run.") };
+                body: Loc_T("tutorial.shop.body", "The merchant sells potions and gear. Gold lasts the whole run; the stock changes every run.") };
         case "throwables":
             return { id: _id, title: Loc_T("tutorial.throwables.title", "Throwables"),
-                body: Loc_T("tutorial.throwables.body", "Throwable items hurt an enemy straight from the item menu. Each one is used up when thrown, so save them for hard fights.") };
+                body: Loc_T("tutorial.throwables.body", "Throw them from the item menu to hurt an enemy. Each is used up, so save them for hard fights.") };
         case "bed":
             return { id: _id, title: Loc_T("tutorial.bed.title", "Beds"),
-                body: Loc_T("tutorial.bed.body", "Each bed can be used once per run. Rest to restore all your HP and MP, or use it to upgrade one of your skills.") };
+                body: Loc_T("tutorial.bed.body", "Each bed works once per run. Rest to restore all your [t]HP[/t] and [t]MP[/t], or upgrade one skill.") };
         case "elite":
             return { id: _id, title: Loc_T("tutorial.elite.title", "Elites"),
-                body: Loc_T("tutorial.elite.body", "Marked enemies are Elites. They are tougher than normal ones, but their rewards are better.") };
+                body: Loc_T("tutorial.elite.body", "Marked enemies are [t]Elites[/t]: tougher than the rest, with better rewards.") };
         case "status":
             return { id: _id, title: Loc_T("tutorial.status.title", "Statuses"),
-                body: Loc_T("tutorial.status.body", "Poison, Burning, Bleeding and Stun last a few turns. The icons under a name show which ones a fighter has.") };
+                body: Loc_T("tutorial.status.body", "Icons under a name show a fighter's statuses, like [t]Poison[/t] or [t]Burn[/t]. They last a few turns.") };
     }
     return undefined;
 }

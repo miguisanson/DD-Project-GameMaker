@@ -469,17 +469,17 @@ function Status_Describe(_status_id, _data = undefined) {
             }
             break;
         case STATUS_STUN:
-            line = Loc_T("status.desc.status_stun", "Pushed back on the turn bar. Then Steadfast: cannot be stunned for 2 turns.");
+            line = Loc_T("status.desc.status_stun", "Pushed back on the turn strip. Then [t]Steadfast[/t]: cannot be stunned for 2 turns.");
             break;
         case STATUS_GUARD:
-            line = Loc_T("status.desc.status_guard", "Blocks the next incoming hit.");
+            line = Loc_T("status.desc.status_guard", "Blocks the next hit.");
             break;
         case STATUS_DMG_UP:
             vars.mult = Status_Cfg(_status_id, "dmg_mult", 1);
             line = Loc_T("status.desc.status_dmg_up", "Next attack deals {mult} times the damage.", vars);
             break;
         case STATUS_EVASION:
-            line = Loc_T("status.desc.status_evasion", "Dodges the next incoming attack.");
+            line = Loc_T("status.desc.status_evasion", "Dodges the next attack.");
             break;
         case STATUS_CRIT_UP:
             var bag = Crit_BagSize(Combat_CritChance(Status_Cfg(_status_id, "crit_bonus", 0)));   // R1b (D124): the odds in plain words, from the marble bag (D119)
@@ -504,14 +504,14 @@ function Status_Describe(_status_id, _data = undefined) {
         case STATUS_BLOODTHIRSTY:
             vars.take = round((1 - Status_Cfg(_status_id, "guard_mult", 1)) * 100);
             vars.deal = round((Status_Cfg(_status_id, "dmg_mult", 1) - 1) * 100);
-            line = Loc_T("status.desc.status_bloodthirsty", "Until hit: take {take}% less, deal {deal}% more damage.", vars);
+            line = Loc_T("status.desc.status_bloodthirsty", "Until you are hit: take {take}% less damage, deal {deal}% more.", vars);
             break;
         case STATUS_BLESSING:
             vars.pct = round((1 - Status_Cfg(_status_id, "guard_mult", 1)) * 100);
-            line = Loc_T("status.desc.status_blessing", "Next incoming hit deals {pct}% less damage.", vars);
+            line = Loc_T("status.desc.status_blessing", "The next hit you take deals {pct}% less damage.", vars);
             break;
         case STATUS_SUNDER:
-            line = Loc_T("status.desc.status_sunder", "Lose defence.{mods}", vars);
+            line = Loc_T("status.desc.status_sunder", "Lowers [t]DEF[/t].{mods}", vars);
             break;
         case STATUS_BRACE:
             vars.pct = round((1 - Status_Cfg(_status_id, "guard_mult", 1)) * 100);
