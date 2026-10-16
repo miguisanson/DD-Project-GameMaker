@@ -169,6 +169,7 @@ function Test_RunAll() {
     Test_RunSuite("R3LevelUp", Test_Suite_R3LevelUp);
     Test_RunSuite("R3Ideas1", Test_Suite_R3Ideas1);
     Test_RunSuite("R3Ideas2", Test_Suite_R3Ideas2);
+    Test_RunSuite("R4NoDebug", Test_Suite_R4NoDebug);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -18927,4 +18928,18 @@ function Test_I2Finisher() {
     Test_True("finisher: the killing Perfect's impact shake and jolt are held back during the finisher", GameState_Get().cam_shake.mag == 0);
     instance_destroy(_bc.enemy_inst);
     Display_ClearZoom();
+}
+
+// ============================================================================================================================
+// Round 4 note 1 (I-106, R-120): "P still does this, please delete this debug overlay". The player's game has no debug overlay and no debug hotkey:
+// the hotkeys (P, J, L, K, U, O and the save/load ones) only work when the exe is started with -debug; P typed into a name never opens anything.
+// ============================================================================================================================
+function Test_Suite_R4NoDebug() {
+    Test_Eq("r4nodebug: debug hotkeys are off in a normal launch (no -debug)", Debug_HotkeysAllowed(), false);
+    var _was = Debug_IsEnabled();
+    global.debug.enabled = false;
+    Debug_Update();
+    Test_Eq("r4nodebug: a debug update without -debug leaves debug off", Debug_IsEnabled(), false);
+    global.debug.enabled = _was;
+    Test_Eq("r4nodebug: there is no audio debug overlay switch", variable_global_exists("audio_debug_enabled") && global.audio_debug_enabled, false);
 }
