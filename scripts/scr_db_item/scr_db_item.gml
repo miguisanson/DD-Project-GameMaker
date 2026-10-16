@@ -534,6 +534,55 @@ function ItemDB_Get(_id) {
     return { id: 0, name: Loc_T("item.name.0", "None"), type: ITEM_KEY, stackable: false, max_stack: 0, equip_slot: "", power: 0, stat_type: -1, acc: 0, preferred_class: -1, sprite: noone, bonus: { atk:0, def:0, spd:0, mag:0 }, use: { effect: "none", power: 0, status: -1, target: TGT_SELF, fx_sprite:noone, fx_frames:12, fx_speed:0.2, skill_id: -1 }, value: 0 };
 }
 
+// ---- rarity (D178, R-110): every item is Common (1, white), Rare (2, gold #E8C547) or Epic (3, gold that pulses to a lighter gold). ONE explicit table, filled from the
+// highest loot tier each item appears at (scr_loot.gml: chest, barrel and enemy tables carry tier 1..3 per entry; D117 rolls the tier first). Items that are in no loot table
+// go by their price (value): under 18 Common, 18 to 39 Rare, 40 and up Epic. That rule gives: Poison Pot 18, Ice Flask 20 and the rings and charms 40..46 (28 to 36) Rare.
+//   Common (1): 1 Wooden Sword, 4 Wooden Bow, 7 Wooden Staff, 20 Leather Armor, 23 Cloth Robe, 10 HP Potion Lv1, 11 MP Potion Lv1, 12 Antidote, 13 Bandage, 33 Smoke Bomb
+//   Rare   (2): 2 Iron Sword, 5 Iron Bow, 8 Ruby Staff, 21 Iron Armor, 24 Silk Robe, 14 HP Potion Lv2, 17 MP Potion Lv2, 30 Firebomb, 31 Poison Pot, 32 Ice Flask, 40..46 the accessories
+//   Epic   (3): 3 Platinum Sword, 6 Platinum Bow, 9 Diamond Staff, 22 Platinum Armor, 25 Mithril Robe, 15 HP Potion Lv3, 18 MP Potion Lv3
+// An id that is not in the table (a new item, nothing at all) is rated by its price too; the unknown id 0 / 9999 has value 0, so Common.
+function Item_Rarity(_id) {
+    switch (_id) {
+        case 1: case 4: case 7: case 20: case 23: case 10: case 11: case 12: case 13: case 33: return 1;
+        case 2: case 5: case 8: case 21: case 24: case 14: case 17: case 30: case 31: case 32:
+        case 40: case 41: case 42: case 43: case 44: case 45: case 46: return 2;
+        case 3: case 6: case 9: case 22: case 25: case 15: case 18: return 3;
+    }
+    var it = ItemDB_Get(_id);
+    var v = (is_struct(it) && variable_struct_exists(it, "value")) ? it.value : 0;
+    return (v >= 40) ? 3 : ((v >= 18) ? 2 : 1);
+}
+
+// The clock the Epic pulse and gem run on: the game's own time, or a held time for the pictures (global.rarity_clock >= 0).
+function Rarity_Clock() {
+    if (variable_global_exists("rarity_clock") && global.rarity_clock >= 0) return global.rarity_clock;
+    return current_time;
+}
+
+// 0..1: 0 at the start of every 600 ms, 1 in the middle (a smooth rise and fall).
+function Rarity_Pulse(_now = undefined) {
+    var t = is_undefined(_now) ? Rarity_Clock() : _now;
+    return 0.5 - 0.5 * cos(2 * pi * ((t mod 600) / 600));
+}
+
+// The colour of an item name: Common white, Rare gold (the merchant gold #E8C547), Epic the gold pulsing to a lighter gold every ~600 ms. _now: a time in ms (the live clock by default).
+function Rarity_Color(_r, _now = undefined) {
+    if (_r >= 3) return merge_color(UI_C_MERCHANT_GOLD, UI_C_RARITY_EPIC, Rarity_Pulse(_now));
+    if (_r == 2) return UI_C_MERCHANT_GOLD;
+    return UI_C_TEXT;
+}
+
+// An item's name for a sentence: "[r2]Iron Sword[/r2]" (the tag is the item's rarity, drawn by the rich-text drawer); with _qty the count follows the tag, uncoloured.
+// Every message that names an item uses this (D178); never put an item's plain name in a sentence.
+function Item_NameMarked(_id, _qty = undefined) {
+    var it = ItemDB_Get(_id);
+    var nm = (is_struct(it) && variable_struct_exists(it, "name")) ? string(it.name) : "";
+    var tag = "r" + string(Item_Rarity(_id));
+    var out = "[" + tag + "]" + nm + "[/" + tag + "]";
+    if (!is_undefined(_qty)) out = Loc_T("battle.menu.item_row", "{name} x{qty}", { name: out, qty: string(_qty) });   // the same "name xN" row the battle list uses
+    return out;
+}
+
 // D108 F1a: a serial number for "the language and string table as they are now". It changes when the language, its revision (Loc_SetLanguage)
 // or the string table (a payload load) changes, so each item localizes once per change instead of on every ItemDB_Get.
 function Item_LocSerial() {
@@ -810,7 +859,7 @@ function Throw_Resolve(_item_id, _user, _target, _key) {
         res.escape = true;
         array_push(parts, Loc_T("throw.msg.escape", "You slip away in the smoke!"));
     }
-    var msg = Loc_T("throw.msg.thrown", "You throw the {item}!", { item: item.name });
+    var msg = Loc_T("throw.msg.thrown", "You throw the {item}!", { item: Item_NameMarked(item.id) });
     for (var i = 0; i < array_length(parts); i++) msg += " " + parts[i];
     res.msg = msg;
     return res;

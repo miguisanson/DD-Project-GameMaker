@@ -371,6 +371,11 @@ function Loot_Grant(_inv, _loot) {
     return _inv;
 }
 
+// D178: the lines a chest, barrel or grave says for one item it gave ("Received [r2]Iron Sword[/r2] x1."): the name in its rarity colour.
+function Loot_ReceivedLines(_item_id, _qty) {
+    return DialogueDB_GetFormatted("loot_received", { item: Item_NameMarked(_item_id), qty: _qty });
+}
+
 function Loot_BuildMessageEntries(_loot, _prefix = "Loot: ") {
     var out = [];
     if (!is_array(_loot)) return out;
@@ -385,11 +390,12 @@ function Loot_BuildMessageEntries(_loot, _prefix = "Loot: ") {
         var qty = variable_struct_exists(it, "qty") ? max(1, round(real(it.qty))) : 1;
         var item = ItemDB_Get(it.item_id);
         if (!is_struct(item)) continue;
-        var txt = prefix + string(item.name) + " x" + string(qty);
+        var txt = prefix + Item_NameMarked(item.id, qty);   // D178: the name in its rarity colour (the dialogue box draws the markup)
         array_push(out, {
             text: txt,
             icon_sprite: variable_struct_exists(item, "sprite") ? item.sprite : noone,
-            icon_subimg: 0
+            icon_subimg: 0,
+            icon_rarity: Item_Rarity(item.id)   // the dialogue box draws the gem on the icon (Rare, Epic)
         });
     }
 

@@ -3754,7 +3754,7 @@ function Battle_DrawLog(_bc, _z) {
     if (n <= 0) return;
     var alpha = clamp((LOG_TOAST_MS - res.age) / 400, 0, 1) * clamp(res.age / 60 + 0.4, 0, 1);
     var tw = 0;
-    for (var i = 0; i < n; i++) tw = max(tw, UI_TextWidth(res.lines[i]));
+    for (var i = 0; i < n; i++) tw = max(tw, Ui_LineWidth(res.lines[i]));   // D178: a line can carry an item's name in its rarity colour
     var w = min(tw + 8 * p, _z.msg.w);
     var h = 8 * p + n * mt.line_h + (n - 1) * p;
     var lx = round(_z.msg.x + (_z.msg.w - w) * 0.5);
@@ -3762,7 +3762,7 @@ function Battle_DrawLog(_bc, _z) {
     Ui_DrawFrame(lx, ly, w, h, alpha, p);
     var a0 = draw_get_alpha();
     draw_set_alpha(alpha);
-    for (var j = 0; j < n; j++) Ui_Text(lx + w * 0.5, ly + 4 * p + j * (mt.line_h + p), res.lines[j], UI_C_LIGHTEST, fa_center);
+    for (var j = 0; j < n; j++) Ui_LineDraw(lx + w * 0.5, ly + 4 * p + j * (mt.line_h + p), res.lines[j], w, UI_C_LIGHTEST, fa_center);
     draw_set_alpha(a0);
     _bc.hud.rects.log = { x: lx, y: ly, w: w, h: h };
 }

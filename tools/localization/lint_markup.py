@@ -5,7 +5,9 @@ The rules are in docs/text-markup.md; the game's parser is Markup_Parse in scrip
 Flagged, per string and language:
   - a tag the game drops: unknown (`[x]`, `[k:dance]`), unclosed (`[t]` with no `[/t]`), nested (a tag inside a tag), stray (`[/t]` with no opener);
   - the old `{confirm}` spelling of a button (write `[k:confirm]`);
-  - [a] around anything but BREAK, Perfect (or their Korean words) or {item} (the one gold accent is for rare / critical words);
+  - [a] around anything but BREAK, Perfect (or their Korean words) (the one gold accent is for rare / critical words);
+  - an item tag ([r1] [r2] [r3], D178: an item's name in its rarity colour) written in the workbook: the game puts it around every item name it fills into
+    {item} / {name} (Item_NameMarked), so a string never carries one;
   - English and Korean that do not carry the same number of [a] spans and [k:..] buttons;
   - key letters written as text in English (A/D, WASD, Press Z, Up / Down ...): use [k:left][k:right], [k:confirm].
 
@@ -24,24 +26,25 @@ from typing import List, Tuple
 
 SHEET = "strings"
 ACTIONS = {"confirm", "back", "cancel", "up", "down", "left", "right", "interact", "run", "tab_prev", "tab_next", "menu", "pause", "start"}
-ACCENT_OK = {"BREAK", "Perfect", "{item}", "브레이크", "완벽"}
+ACCENT_OK = {"BREAK", "Perfect", "브레이크", "완벽"}
+ITEM_TAGS = ("r1", "r2", "r3")
 KEY_LETTERS = ["A/D", "W/S", "WASD", "A / D", "Up / Down", "Left / Right", "Press Z", "Press X", "Press Space", "Press Enter", "Press Esc"]
 OLD_BUTTON_RE = re.compile(r"\{(confirm|back|cancel|up|down|left|right|interact|run|tab_prev|tab_next|menu|pause|start)\}")
 
 
 def tag_kind(inner: str) -> str:
     """What the text between [ and ] is: t / a / /t / /a / k:<action> / ? (tag-shaped, unknown) / '' (not a tag)."""
-    m = re.fullmatch(r"(/?)([a-z]+)(?::([a-z_]+))?", inner)
+    m = re.fullmatch(r"(/?)([a-z]+|r[0-9]+)(?::([a-z_]+))?", inner)
     if not m:
         return ""
     close, name, arg = m.group(1), m.group(2), m.group(3)
     if close:
         if arg is not None:
             return ""
-        return "/" + name if name in ("t", "a") else "?"
+        return "/" + name if name in ("t", "a") + ITEM_TAGS else "?"
     if arg is not None:
         return "k:" + arg if name == "k" and arg in ACTIONS else "?"
-    return name if name in ("t", "a") else "?"
+    return name if name in ("t", "a") + ITEM_TAGS else "?"
 
 
 def has_tag(text: str) -> bool:
@@ -57,7 +60,7 @@ def has_tag(text: str) -> bool:
 
 
 def parse(text: str) -> Tuple[List[Tuple[str, str]], List[str]]:
-    """Returns ([(kind, text)], problems): kind is 'text', 'term', 'accent' or 'action'. Mirrors Markup_Parse."""
+    """Returns ([(kind, text)], problems): kind is 'text', 'term', 'accent', 'item' or 'action'. Mirrors Markup_Parse."""
     out: List[Tuple[str, str]] = []
     problems: List[str] = []
     buf = ""
@@ -76,7 +79,7 @@ def parse(text: str) -> Tuple[List[Tuple[str, str]], List[str]]:
             continue
         buf += s[:o]
         after = rest[c + 1:]
-        if kind in ("t", "a"):
+        if kind in ("t", "a") + ITEM_TAGS:
             cp = after.find("[/" + kind + "]")
             body = after[:cp] if cp >= 0 else ""
             if cp >= 0 and not has_tag(body):
@@ -84,8 +87,8 @@ def parse(text: str) -> Tuple[List[Tuple[str, str]], List[str]]:
                     out.append(("text", buf))
                 buf = ""
                 if body:
-                    out.append(("term" if kind == "t" else "accent", body))
-                s = after[cp + 4:]
+                    out.append(("term" if kind == "t" else ("accent" if kind == "a" else "item"), body))
+                s = after[cp + 3 + len(kind):]
                 continue
             problems.append(("nested [%s]" if cp >= 0 else "unclosed [%s]") % kind)
         elif kind.startswith("k:"):
@@ -114,10 +117,13 @@ def check_row(ref: str, en: str, ko: str) -> List[str]:
             errs.append("%s [%s]: %s" % (ref, lang, p))
         if OLD_BUTTON_RE.search(text):
             errs.append("%s [%s]: old {action} button, write [k:action]" % (ref, lang))
+        for k, t in toks:
+            if k == "item":
+                errs.append("%s [%s]: item tag around '%s' (the game marks item names itself; write plain {item})" % (ref, lang, t))
         accents = [t for k, t in toks if k == "accent"]
         for a in accents:
             if a not in ACCENT_OK:
-                errs.append("%s [%s]: [a] around '%s' (only BREAK, Perfect, {item})" % (ref, lang, a))
+                errs.append("%s [%s]: [a] around '%s' (only BREAK, Perfect)" % (ref, lang, a))
         counts[lang] = (len(accents), sum(1 for k, _ in toks if k == "action"))
     if counts["en"] != counts["ko"]:
         errs.append("%s: en has %d accents / %d buttons, ko has %d / %d" % (ref, counts["en"][0], counts["en"][1], counts["ko"][0], counts["ko"][1]))
@@ -151,6 +157,13 @@ def selftest() -> int:
     expect("accent allow-list", len(check_row("x", "a [a]gold[/a]", "a [a]gold[/a]")) >= 1, True)
     expect("parity", len(check_row("x", "[a]BREAK[/a]", "BREAK")) >= 1, True)
     expect("key letters", len(check_row("x", "Move with A/D", "A/D")) >= 1, True)
+    expect("item tags parse", parse("Got [r2]Iron Sword[/r2] x1")[0], [("text", "Got "), ("item", "Iron Sword"), ("text", " x1")])
+    expect("item tags: clean", parse("[r1]a[/r1] [r3]b[/r3]")[1], [])
+    expect("[r4] is unknown", len(parse("[r4]a[/r4]")[1]) >= 1, True)
+    expect("a tag in an item tag nests", len(parse("[r2]a [t]b[/t][/r2]")[1]) >= 1, True)
+    expect("an item tag in the workbook is flagged", len(check_row("x", "Got [r2]{item}[/r2]", "[r2]{item}[/r2]")) >= 1, True)
+    expect("plain {item} is fine", check_row("x", "Got {item}", "{item}"), [])
+    expect("[a] around {item} is flagged now", len(check_row("x", "Got [a]{item}[/a]", "[a]{item}[/a]")) >= 1, True)
     expect("a good row", check_row("x", "[t]Poison[/t] and [a]BREAK[/a]: [k:confirm]", "[t]독[/t]과 [a]BREAK[/a]: [k:confirm]"), [])
     print("selftest %s" % ("FAILED" if bad else "ok"))
     return 1 if bad else 0

@@ -150,7 +150,7 @@ function DialogueDB_Init() {
 
     global.dialogue_db[? "chest_open"] = ["You open the chest."];
     global.dialogue_db[? "chest_empty"] = ["It's empty."];
-    global.dialogue_db[? "loot_received"] = ["Received {item} x{qty}."];
+    global.dialogue_db[? "loot_received"] = ["Received {item} x{qty}."];   // {item} arrives already marked with its rarity tag (Item_NameMarked)
 
     global.dialogue_db[? "loot_empty"] = ["Nothing was found."];
 
@@ -1361,11 +1361,13 @@ function Dialogue_Draw() {
     var line_entry = "";
     var line_icon_sprite = noone;
     var line_icon_subimg = 0;
+    var line_icon_rarity = 1;
     if (array_length(gs.ui.lines) > 0 && gs.ui.index >= 0 && gs.ui.index < array_length(gs.ui.lines)) {
         line_entry = gs.ui.lines[gs.ui.index];
         line = Dialogue_LineText(line_entry);
         if (is_struct(line_entry) && variable_struct_exists(line_entry, "icon_sprite")) line_icon_sprite = line_entry.icon_sprite;
         if (is_struct(line_entry) && variable_struct_exists(line_entry, "icon_subimg")) line_icon_subimg = round(line_entry.icon_subimg);
+        if (is_struct(line_entry) && variable_struct_exists(line_entry, "icon_rarity")) line_icon_rarity = line_entry.icon_rarity;   // D178: the gem on a drop's icon
     }
     var speaker = variable_struct_exists(gs.ui, "speaker") ? gs.ui.speaker : "";
     var layout = Dialogue_TextLayout(speaker);
@@ -1406,6 +1408,7 @@ function Dialogue_Draw() {
             UI_DrawText(layout.speaker_x, layout.speaker_y, speaker + ":");
         }
         if (icon_draw_w > 0) draw_sprite_ext(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1, icon_scale, icon_scale, 0, c_white, 1);
+        if (icon_draw_w > 0) Rarity_DrawGem(layout.text_x, text_y + 1, sprite_get_width(line_icon_sprite) * icon_scale, line_icon_rarity, 1);
         if (rich) {
             Dialogue_DrawRich(text_x + UI_CUTSCENE_TEXT_SHADOW_X, text_y + UI_CUTSCENE_TEXT_SHADOW_Y, visible_text, UI_C_DARKEST, 1, UI_C_DARKEST);
             Dialogue_DrawRich(text_x, text_y, visible_text, UI_C_TEXT, 1, -1);
@@ -1420,6 +1423,7 @@ function Dialogue_Draw() {
         var a0 = draw_get_alpha();
         draw_set_alpha(open_t);
         if (icon_draw_w > 0) draw_sprite_ext(line_icon_sprite, line_icon_subimg, layout.text_x, text_y + 1, icon_scale, icon_scale, 0, c_white, open_t);
+        if (icon_draw_w > 0) Rarity_DrawGem(layout.text_x, text_y + 1, sprite_get_width(line_icon_sprite) * icon_scale, line_icon_rarity, open_t);
         if (rich) {
             Dialogue_DrawRich(text_x, text_y, visible_text, UI_C_TEXT, open_t, -1);
         } else {

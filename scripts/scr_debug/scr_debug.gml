@@ -265,7 +265,7 @@ function Scenario_Boot() {
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.choice_off = true;   // D154: nor the small flavour questions (the Stranger, the merchant, a note, the wake line) unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 40000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 44000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 44000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 44000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -3046,7 +3046,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsR3Menus(_s);   // round 3 menus (R-096, R-097): the Gear and Skills headers, the reset question and notice in the game and on the title; goes on with r3stealth (1040)
             break;
         case 1040: case 1041: case 1042: case 1043: case 1044: case 1045: case 1046: case 1047: case 1048: case 1049:
-            Scenario_StepShotsR3Stealth(_s);   // r3stealth (D179, R-098): the faint sight cone in a dark cave, the daylight clearing and while chasing; three scenes, two sizes; the end of the pictures
+            Scenario_StepShotsR3Stealth(_s);   // r3stealth (D179, R-098): the faint sight cone in a dark cave, the daylight clearing and while chasing; three scenes, two sizes; goes on with r3rarity (1080)
+            break;
+        case 1080: case 1081: case 1082: case 1083: case 1084: case 1085: case 1086: case 1087: case 1088: case 1089:
+            Scenario_StepShotsRarity(_s);   // r3rarity (D178, R-110): item names in their rarity colour and the gem on the icons: a chest line, a battle drop, the Items and Gear tabs, the shop; three sizes; the end of the pictures
             break;
         case 1050: case 1051: case 1052: case 1053: case 1054: case 1055: case 1056: case 1057: case 1058: case 1059:
             Scenario_StepShotsTextFit2(_s);   // round 3 textfit2 (R-106): the Skills tab, the battle Skill list and the Controls page with the long names, three sizes; the end of the pictures
@@ -15431,7 +15434,7 @@ function Scenario_StepShotsR3Stealth(_s) {
     var _sc = Scenario_R3StealthScene(_h.i);
     switch (_s.step) {
         case 1040:   // build the scene _h.i
-            if (_sc == undefined) { Scenario_SetWindowScale(3); with (obj_enemy) instance_destroy(); Scenario_Next(_s, 1060); break; }   // goes on with saves2 pictures (1060..1069), the end of the pictures
+            if (_sc == undefined) { Scenario_SetWindowScale(3); with (obj_enemy) instance_destroy(); Scenario_Next(_s, 1080); break; }   // goes on with the rarity pictures (1080..1083), then saves2 (1060..1069), the end of the pictures
             if (_s.t == 1) {
                 Scenario_Release();
                 Scenario_ClearUi();
@@ -17175,6 +17178,166 @@ function Scenario_StepShotsR3Bvis(_s) {
                     Scenario_Next(_s, 1030);   // goes on with the round 3 menus pictures (1030..1033), the end of the pictures
                 } else {
                     Scenario_Next(_s, 1010);
+                }
+            }
+            break;
+    }
+}
+
+// ============================================================================
+// Round 3 packet rarity (D178; R-110) pictures 1080..1089: item names in their rarity colour and the rarity gem on the icons. Five scenes at windowed scale 3 (480 x 432), 4 (640 x 576)
+// and 5 (800 x 720), shot_r3rarity_<scene>_<w>x<h>.png. The Epic pulse and gem are held (global.rarity_clock): 300 ms (the lightest gold, the pale gem frame) at scales 3 and 5, 0 ms
+// (the plain gold, the plain gem) at scale 4, so both phases are seen. The end of the pictures: the last step calls Scenario_NoticeEnd.
+//   chest  a chest line "Received <Rare item> x1." in the dialogue box        drop   a battle drop line "Loot: <Epic item> x1" with the icon and its sparkling gem
+//   items  the Items tab: a common, a rare and an epic potion, a rare and a common throwable     gear   the Gear tab: worn, rare, epic, and dim rows (a Rare one too)
+//   shop   the Buy list with 40 gold: the rows you cannot pay are light green, their gems still show
+// ============================================================================
+function Scenario_R3RarityScenes() {
+    return ["chest", "drop", "items", "gear", "shop"];
+}
+
+// The words of a wrapped line's styled spans (each word of a name carries its own tag) joined with spaces.
+function Scenario_JoinWords(_spans) {
+    var _out = "";
+    for (var _i = 0; _i < array_length(_spans); _i++) _out += ((_i > 0) ? " " : "") + _spans[_i];
+    return _out;
+}
+
+function Scenario_R3RarityCleanup() {
+    Scenario_R3Cleanup();
+    if (ShopUi_IsOpen()) ShopUi_Close();
+    Dialogue_CloseNow();
+    Scenario_ClearUi();
+}
+
+function Scenario_StepShotsRarity(_s) {
+    var _scenes = Scenario_R3RarityScenes();
+    var _scales = [3, 4, 5];
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "r3r")) _s.r3r = { di: 0, si: 0, n: 0 };
+    var _o = _s.r3r;
+    var _scene = _scenes[_o.di];
+    var _tag = _scene + "_" + string(_scales[_o.si]);
+    switch (_s.step) {
+        case 1080:   // enter a floor at this scale with the fixture
+            if (_s.t == 1) {
+                Scenario_R3RarityCleanup();
+                Loc_SetLanguage("en");
+                global.tutorial_off = true;
+                var _g = Scenario_NewKnight(CLASS_KNIGHT);
+                _g.run = Run_Create(2468);
+                _g.run.gold = (_scene == "shop") ? 40 : 87;
+                var _k = _g.player_ch;
+                var _bag = [10, 11, 14, 15, 30, 33, 1, 2, 3, 22, 8, 23, 40];
+                for (var _b = 0; _b < array_length(_bag); _b++) _k.inventory = Inv_Add(_k.inventory, _bag[_b], 1);
+                Equip_Item(_k, 1);
+                GameState_SetPlayer(_k);
+                Scenario_NoOwed();
+                Scenario_SetWindowScale(_scales[_o.si]);
+                _o.n++;
+                room_goto((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3);
+            }
+            if (_s.t >= 25 && Scenario_FloorReady((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3)) Scenario_Next(_s, 1081);
+            if (_s.t > 600) { Scenario_Check("shots_r3rarity_enters_the_room_" + _tag, false, "room=" + room_get_name(room)); global.rarity_clock = -1; Scenario_NoticeEnd(); }
+            break;
+        case 1081:   // set the scene up
+            global.rarity_clock = (_o.si == 1) ? 0 : 300;
+            with (obj_enemy) instance_destroy();
+            Scenario_ClearUi();
+            Scenario_NoOwed();
+            switch (_scene) {
+                case "chest":
+                    Dialogue_StartWithSpeaker(Loc_T("interact.name.obj_chest", "Chest"), Loot_ReceivedLines(2, 1));
+                    break;
+                case "drop":
+                    Dialogue_StartLines(Loot_BuildMessageEntries([{ item_id: 3, qty: 1 }], Loc_T("combat.msg.loot_prefix", "Loot: ")));
+                    break;
+                case "items": Menu_Open(2); break;
+                case "gear":  Menu_Open(3); break;
+                case "shop":
+                    ShopUi_Open(0);
+                    break;
+            }
+            Scenario_Next(_s, 1082);
+            break;
+        case 1082:   // let the panels settle, then check and shoot
+            if (_scene == "shop" && _s.t == 20) ShopUi_RootConfirm(Ui_StackTop(global.shop_ui.stk), 0);   // the Buy list
+            if (_s.t == 3 && (_scene == "chest" || _scene == "drop")) {
+                Dialogue_TypewriterPrepareCurrentLine();
+                Dialogue_TypewriterRevealInstant();
+                _gs.ui.dialogue_state = UI_DIALOGUE_STATE_READY;
+            }
+            if (_s.t < 40) break;
+            _s.shot = "shot_r3rarity_" + _scene + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+            Scenario_NoOwedCheck("shots_r3rarity_no_card_or_level_up_screen_is_open_" + _tag);
+            switch (_scene) {
+                case "chest":
+                    var _ct = Dialogue_LineText(_gs.ui.lines[0]);
+                    var _cn = Test_RT_Spans(_ct, "r2");
+                    Scenario_Check("shots_r3rarity_chest_dialogue_is_open_" + _tag, _gs.ui.mode == UI_DIALOGUE);
+                    Scenario_Check("shots_r3rarity_chest_line_names_the_rare_item_in_gold_" + _tag, Scenario_JoinWords(_cn) == string(ItemDB_Get(2).name) && Markup_Colour("r2", UI_C_TEXT) == make_color_rgb($E8, $C5, $47), _ct);
+                    Scenario_Check("shots_r3rarity_chest_line_has_no_plain_gold_accent_" + _tag, array_length(Test_RT_Spans(_ct, "accent")) == 0);
+                    break;
+                case "drop":
+                    var _dl = _gs.ui.lines[0];
+                    Scenario_Check("shots_r3rarity_drop_dialogue_is_open_" + _tag, _gs.ui.mode == UI_DIALOGUE);
+                    Scenario_Check("shots_r3rarity_drop_line_names_the_epic_item_" + _tag, is_struct(_dl) && Scenario_JoinWords(Test_RT_Spans(_dl.text, "r3")) == string(ItemDB_Get(3).name) && _dl.icon_rarity == 3, is_struct(_dl) ? _dl.text : "not a struct");
+                    Scenario_Check("shots_r3rarity_drop_line_has_an_icon_for_the_gem_" + _tag, is_struct(_dl) && _dl.icon_sprite != noone && sprite_exists(_dl.icon_sprite));
+                    break;
+                case "items":
+                    Scenario_Check("shots_r3rarity_items_menu_is_open_" + _tag, _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && TabMenu_Ids()[TabMenu_Get().tab] == "items", "mode=" + string(_gs.ui.mode));
+                    Scenario_TabLayoutChecks(_tag);
+                    var _im = TabMenu_TopMenu();
+                    var _r10 = Test_RowById(_im.items, "item_id", 10);
+                    var _r14 = Test_RowById(_im.items, "item_id", 14);
+                    var _r15 = Test_RowById(_im.items, "item_id", 15);
+                    Scenario_Check("shots_r3rarity_items_potions_are_white_gold_and_pulse_" + _tag, is_struct(_r10) && is_struct(_r14) && is_struct(_r15) && Ui_RowLabelColor(_r10, false) == UI_C_TEXT && Ui_RowLabelColor(_r14, false) == UI_C_MERCHANT_GOLD && Ui_RowLabelColor(_r15, false) == Rarity_Color(3));
+                    break;
+                case "gear":
+                    Scenario_Check("shots_r3rarity_gear_menu_is_open_" + _tag, _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && TabMenu_Ids()[TabMenu_Get().tab] == "gear", "mode=" + string(_gs.ui.mode));
+                    Scenario_TabLayoutChecks(_tag);
+                    var _gm = TabMenu_TopMenu();
+                    var _g2 = Test_RowById(_gm.items, "item_id", 2);
+                    var _g3 = Test_RowById(_gm.items, "item_id", 3);
+                    var _g8 = Test_RowById(_gm.items, "item_id", 8);
+                    var _g23 = Test_RowById(_gm.items, "item_id", 23);
+                    Scenario_Check("shots_r3rarity_gear_rare_and_epic_rows_are_coloured_" + _tag, is_struct(_g2) && is_struct(_g3) && Ui_RowLabelColor(_g2, false) == UI_C_MERCHANT_GOLD && Ui_RowLabelColor(_g3, false) == Rarity_Color(3));
+                    Scenario_Check("shots_r3rarity_gear_a_dim_rare_row_stays_light_green_" + _tag, is_struct(_g8) && _g8.dim && Item_Rarity(8) == 2 && Ui_RowLabelColor(_g8, false) == UI_C_LIGHT && is_struct(_g23) && _g23.dim && Ui_RowLabelColor(_g23, false) == UI_C_LIGHT);
+                    break;
+                case "shop":
+                    var _sm = Ui_StackTop(global.shop_ui.stk);
+                    Scenario_Check("shots_r3rarity_shop_buy_list_is_open_" + _tag, ShopUi_IsOpen() && _sm.id == "shop_buy", _sm.id);
+                    var _okc = true;
+                    var _hi = 0;
+                    var _dimn = 0;
+                    for (var _r = 0; _r < array_length(_sm.items); _r++) {
+                        var _row = _sm.items[_r];
+                        if (!variable_struct_exists(_row, "icon_item")) continue;
+                        var _want = (variable_struct_exists(_row, "dim") && _row.dim) ? UI_C_LIGHT : Rarity_Color(Item_Rarity(_row.icon_item.id));
+                        if (Ui_RowLabelColor(_row, false) != _want) _okc = false;
+                        if (Item_Rarity(_row.icon_item.id) >= 2) _hi++;
+                        if (variable_struct_exists(_row, "dim") && _row.dim) _dimn++;
+                    }
+                    Scenario_Check("shots_r3rarity_shop_rows_are_in_their_rarity_colour_or_dim_" + _tag, _okc);
+                    Scenario_Check("shots_r3rarity_shop_shows_rare_or_epic_items_" + _tag, _hi >= 1, "rare+epic rows=" + string(_hi));
+                    Scenario_Check("shots_r3rarity_shop_has_rows_you_cannot_pay_" + _tag, _dimn >= 1, "dim rows=" + string(_dimn));
+                    break;
+            }
+            Scenario_ShotLayout(_s.shot);
+            Scenario_Next(_s, 1083);
+            break;
+        case 1083:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_R3RarityCleanup();
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    global.rarity_clock = -1;
+                    Scenario_SetWindowScale(3);
+                    Scenario_Next(_s, 1060);   // goes on with the saves2 title pictures (1060..1069), the end of the pictures
+                } else {
+                    Scenario_Next(_s, 1080);
                 }
             }
             break;

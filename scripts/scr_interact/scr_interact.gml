@@ -362,7 +362,7 @@ function Interact_Handle(_inst) {
                     var rqty = variable_struct_exists(rit, "qty") ? max(1, round(real(rit.qty))) : 1;
                     var ritem = ItemDB_Get(rit.item_id);
                     if (!is_struct(ritem)) continue;
-                    var gain_lines = DialogueDB_GetFormatted("loot_received", { item: ritem.name, qty: rqty });
+                    var gain_lines = Loot_ReceivedLines(ritem.id, rqty);   // D178: the name in its rarity colour
                     for (var gi = 0; gi < array_length(gain_lines); gi++) {
                         array_push(grave_dialogue_lines, gain_lines[gi]);
                     }
@@ -461,8 +461,7 @@ function Interact_Handle(_inst) {
                     for (var i = 0; i < array_length(loot); i++) {
                         var it = loot[i];
                         var qty = it.qty;
-                        var item = ItemDB_Get(it.item_id);
-                        var lines = DialogueDB_GetFormatted("loot_received", { item: item.name, qty: qty });
+                        var lines = Loot_ReceivedLines(it.item_id, qty);   // D178: the name in its rarity colour
                         for (var j = 0; j < array_length(lines); j++) array_push(loot_lines, lines[j]);
                     }
                     Dialogue_StartWithSpeaker(name, loot_lines);

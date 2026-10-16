@@ -164,6 +164,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Wolf", Test_Suite_R3Wolf);
     Test_RunSuite("R3Shop", Test_Suite_R3Shop);
     Test_RunSuite("R3Title", Test_Suite_R3Title);
+    Test_RunSuite("Rarity", Test_Suite_Rarity);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -2657,7 +2658,7 @@ function Test_Suite_Loc() {
     _k.inventory = Inv_Add(_k.inventory, 2, 1);
     var _can = Equip_CanEquip(_k, 2);
     Test_True("LOC-03 Equip_CanEquip owned weapon is ok", _can.ok);
-    Test_Eq("LOC-03 Equip_CanEquip success text (en)", _can.msg, "Equipped " + string(_can.item.name) + ".");
+    Test_Eq("LOC-03 Equip_CanEquip success text (en)", _can.msg, "Equipped " + Item_NameMarked(_can.item.id) + ".");
     // Auto-resolve result line: exp, level up, loot.
     var _msg = Enemy_AutoResolveBuildMessage({ name: "Slime" }, { exp_gain: 5, levels_gained: 1, loot_gained: true });
     Test_Eq("LOC-03 auto-resolve line (en)", _msg, "You overpower Slime. (+5 EXP) Level up x1! Loot gained.");
@@ -10926,7 +10927,7 @@ function Test_ConfirmClassAndEcho() {
     var _em = CardsUi_EchoMenu();
     CardsUi_EchoConfirm(_em, 0);
     Test_True("H2 picking an echo opens the pop-up", Confirm_IsOpen());
-    Test_Eq("H2 the echo question names the echo", Confirm_Question(), "Keep " + ItemDB_Get(11).name + " as your echo?");
+    Test_Eq("H2 the echo question names the echo", Confirm_Question(), "Keep " + Item_NameMarked(11) + " as your echo?");
     Test_Eq("H2 the echo pop-up starts on No", Confirm_Menu().cursor, 1);
     Test_Eq("H2 the echo is not taken before Yes", Inv_Count(GameState_Get().player_ch.inventory, 11), _inv0);
     Test_Eq("H2 and the offer is still there", array_length(GameState_Get().player_ch.echo_offer), 1);
@@ -10994,7 +10995,7 @@ function Test_ConfirmSell() {
     var _price = Shop_SellPrice(_gear);
     ShopUi_SellConfirm(_m, _ig);
     Test_True("H2 selling gear opens the pop-up", Confirm_IsOpen());
-    Test_Eq("H2 the sell question names the gear and the price", Confirm_Question(), "Sell " + ItemDB_Get(_gear).name + " for " + string(_price) + "?");
+    Test_Eq("H2 the sell question names the gear and the price", Confirm_Question(), "Sell " + Item_NameMarked(_gear) + " for " + string(_price) + "?");
     Test_Eq("H2 the sell pop-up starts on No", Confirm_Menu().cursor, 1);
     Test_Eq("H2 the gear is still in the bag before Yes", Inv_Count(GameState_Get().player_ch.inventory, _gear), 1);
     Test_Eq("H2 and the gold is the same", _gs.run.gold, 10);
@@ -12664,7 +12665,7 @@ function Test_Suite_RichText() {
     var _acc_bad = "";
     var _par_bad = "";
     var _pats = ["A/D", "W/S", "WASD", "A / D", "Up / Down", "Left / Right", "Press Z", "Press X", "Press Space", "Press Enter", "Press Esc"];
-    var _allowed = ["BREAK", "Perfect", "{item}"];
+    var _allowed = ["BREAK", "Perfect"];   // D178: a received item is no longer an accent: its name carries its rarity tag
     for (var _k = 0; _k < array_length(_keys); _k++) {
         var _e = variable_struct_get(Loc_GetData().strings, _keys[_k]);
         if (!is_struct(_e)) continue;
@@ -12678,7 +12679,7 @@ function Test_Suite_RichText() {
     }
     Test_Eq("RT no English string names keys as letters or slashes", _bad, "");
     Test_Eq("RT every English and Korean string has well-formed markup", _problems, "");
-    Test_Eq("RT [a] holds only BREAK, Perfect or a received item", _acc_bad, "");
+    Test_Eq("RT [a] holds only BREAK or Perfect", _acc_bad, "");
     Test_Eq("RT English and Korean carry the same accents and buttons", _par_bad, "");
     Test_True("RT the key terms are marked in English (tutorial, status, stat text)", array_length(Test_RT_Spans(Loc_T("tutorial.stagger.body"), "accent")) >= 1 && array_length(Test_RT_Spans(Loc_T("status.desc.poison"), "term")) >= 1 && array_length(Test_RT_Spans(Loc_T("menu.tooltip.stat.atk.desc"), "term")) >= 1);
     Test_True("RT the button mentions are button markup", Test_RT_Count(Loc_T("tutorial.bar.body"), "glyph") >= 1 && Test_RT_Count(Loc_T("tutorial.arrows.body"), "glyph") == 4 && Test_RT_Count(Loc_T("runflow.continue"), "glyph") == 1);
@@ -14365,11 +14366,11 @@ function Test_Hunt7FeelText() {
     var _loot = [{ item_id: 31, qty: 1 }];
     Loc_SetLanguage("en");
     var _en = Loot_BuildMessageEntries(_loot, Loc_T("combat.msg.loot_prefix", "Loot: "));
-    Test_Eq("hunt7feel text: the English loot line", _en[0].text, "Loot: " + string(ItemDB_Get(31).name) + " x1");
+    Test_Eq("hunt7feel text: the English loot line", _en[0].text, "Loot: " + Item_NameMarked(31, 1));
     Loc_SetLanguage("ko");
     var _ko = Loot_BuildMessageEntries(_loot, Loc_T("combat.msg.loot_prefix", "Loot: "));
-    Test_Eq("hunt7feel text: the Korean loot line has a space after the colon", _ko[0].text, "전리품: " + string(ItemDB_Get(31).name) + " x1");
-    Test_Eq("hunt7feel text: a prefix that already ends in a space gets no second one", Loot_BuildMessageEntries(_loot, "Loot: ")[0].text, "Loot: " + string(ItemDB_Get(31).name) + " x1");
+    Test_Eq("hunt7feel text: the Korean loot line has a space after the colon", _ko[0].text, "전리품: " + Item_NameMarked(31, 1));
+    Test_Eq("hunt7feel text: a prefix that already ends in a space gets no second one", Loot_BuildMessageEntries(_loot, "Loot: ")[0].text, "Loot: " + Item_NameMarked(31, 1));
     Test_Eq("hunt7feel text: the Korean auto-resolve victory line is Korean", Enemy_AutoResolveBuildMessage({ name: "슬라임" }, { }), "슬라임을(를) 가볍게 쓰러뜨렸습니다.");
     Loc_SetLanguage("en");
     Test_Eq("hunt7feel text: the English auto-resolve victory line is unchanged", Enemy_AutoResolveBuildMessage({ name: "Slime" }, { }), "You overpower Slime.");
@@ -16998,4 +16999,279 @@ function Test_R3TitleRun(_prefix) {
     var _ta = RunTitle_Choose({ result: "abandoned", seed: 3 });
     Test_True("r3title: an abandoned run shows an abandoned-run title", Test_ArrHasStr(_ab, _ta.key));
     Test_True("r3title: the text is a real sentence in the language of the moment", string_length(RunTitle_Text(_ta)) > 3);
+}
+
+// ============================================================================================================================
+// Round 3 packet rarity (D178, R-110): every item has a rarity (1 Common white, 2 Rare gold #E8C547, 3 Epic gold that pulses to a lighter gold every 600 ms);
+// every message that names an item marks the name with [r1] / [r2] / [r3]; lists draw the name in the rarity colour unless the row is dim; an icon of a Rare or
+// Epic item has a small gem at its top-right corner (Epic: two frames). Expected values are the brief's: HP Potion Lv1 common, a tier-2 loot item rare, a tier-3 one epic;
+// a loot-table item has the highest tier it appears at; an item in no loot table goes by its price (under 18 common, 18 to 39 rare, 40 and up epic).
+// ============================================================================================================================
+function Test_Suite_Rarity() {
+    if (!script_exists(asset_get_index("Item_Rarity"))) {
+        Test_True("r3rarity: Item_Rarity exists: not implemented", false);
+        return;
+    }
+    var _lang = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    Test_RunSuite("Rarity.table", Test_RarityTable);
+    Test_RunSuite("Rarity.markup", Test_RarityMarkup);
+    Test_RunSuite("Rarity.colour", Test_RarityColour);
+    Test_RunSuite("Rarity.paths", Test_RarityPaths);
+    Test_RunSuite("Rarity.shop", Test_RarityShop);
+    Test_RunSuite("Rarity.rows", Test_RarityRows);
+    Test_RunSuite("Rarity.gem", Test_RarityGem);
+    Test_RunSuite("Rarity.workbook", Test_RarityWorkbook);
+    Loc_SetLanguage(_lang);
+}
+
+function Test_RarityTable() {
+    Test_Eq("r3rarity table: HP Potion Lv1 is common", Item_Rarity(10), 1);
+    Test_Eq("r3rarity table: Iron Sword (tier 2) is rare", Item_Rarity(2), 2);
+    Test_Eq("r3rarity table: HP Potion Lv2 (tier 2) is rare", Item_Rarity(14), 2);
+    Test_Eq("r3rarity table: Platinum Sword (tier 3) is epic", Item_Rarity(3), 3);
+    Test_Eq("r3rarity table: HP Potion Lv3 (tier 3) is epic", Item_Rarity(15), 3);
+    Test_Eq("r3rarity table: Wooden Sword (tier 1) is common", Item_Rarity(1), 1);
+    Test_Eq("r3rarity table: Firebomb (enemy tier 2) is rare", Item_Rarity(30), 2);
+    Test_Eq("r3rarity table: Smoke Bomb (enemy tier 1) is common", Item_Rarity(33), 1);
+    // every loot-table item has the highest tier it appears at (in any table)
+    var _best = {};
+    var _tables = ["chest", "barrel", "enemy"];
+    for (var _t = 0; _t < array_length(_tables); _t++) {
+        var _tab = Loot_TableGet(_tables[_t]);
+        for (var _i = 0; _i < array_length(_tab); _i++) {
+            if (_tab[_i].item_id == 0) continue;
+            var _k = string(_tab[_i].item_id);
+            var _old = variable_struct_exists(_best, _k) ? variable_struct_get(_best, _k) : 0;
+            variable_struct_set(_best, _k, max(_old, _tab[_i].tier));
+        }
+    }
+    var _names = variable_struct_get_names(_best);
+    var _bad = "";
+    for (var _n = 0; _n < array_length(_names); _n++) if (Item_Rarity(real(_names[_n])) != variable_struct_get(_best, _names[_n])) _bad += _names[_n] + " ";
+    Test_True("r3rarity table: the loot tables hold items to check", array_length(_names) >= 25);
+    Test_Eq("r3rarity table: every loot-table item has the highest loot tier it appears at", _bad, "");
+    // items in no loot table go by price: under 18 common, 18..39 rare, 40 and up epic
+    Test_Eq("r3rarity table: Poison Pot (18, in no table) is rare", Item_Rarity(31), 2);
+    Test_Eq("r3rarity table: Ice Flask (20, in no table) is rare", Item_Rarity(32), 2);
+    var _acc_bad = "";
+    for (var _a = 40; _a <= 46; _a++) if (Item_Rarity(_a) != 2) _acc_bad += string(_a) + " ";
+    Test_Eq("r3rarity table: the rings and charms (28 to 36) are rare", _acc_bad, "");
+    // every item in the DB has a rarity from 1 to 3
+    var _db_bad = "";
+    var _key = ds_map_find_first(global.item_db);
+    var _count = 0;
+    while (!is_undefined(_key)) {
+        var _r = Item_Rarity(_key);
+        if (_r < 1 || _r > 3) _db_bad += string(_key) + " ";
+        _count++;
+        _key = ds_map_find_next(global.item_db, _key);
+    }
+    Test_True("r3rarity table: the item DB has items to check", _count >= 30);
+    Test_Eq("r3rarity table: every item has a rarity from 1 to 3", _db_bad, "");
+    Test_Eq("r3rarity table: an unknown id is common (never an error)", Item_Rarity(9999), 1);
+}
+
+function Test_RarityMarkup() {
+    var _n10 = string(ItemDB_Get(10).name);
+    var _n2 = string(ItemDB_Get(2).name);
+    var _n15 = string(ItemDB_Get(15).name);
+    Test_Eq("r3rarity markup: a common name", Item_NameMarked(10), "[r1]" + _n10 + "[/r1]");
+    Test_Eq("r3rarity markup: a rare name", Item_NameMarked(2), "[r2]" + _n2 + "[/r2]");
+    Test_Eq("r3rarity markup: an epic name", Item_NameMarked(15), "[r3]" + _n15 + "[/r3]");
+    Test_Eq("r3rarity markup: with a count the count follows the tag", Item_NameMarked(15, 3), "[r3]" + _n15 + "[/r3] x3");
+    var _sentence = "Got " + Item_NameMarked(2) + " now";
+    Test_True("r3rarity markup: the name is one rare span", array_length(Test_RT_Spans(_sentence, "r2")) == 1 && Test_RT_Spans(_sentence, "r2")[0] == _n2);
+    Test_True("r3rarity markup: an epic span", array_length(Test_RT_Spans(Item_NameMarked(15), "r3")) == 1);
+    Test_True("r3rarity markup: a common span", array_length(Test_RT_Spans(Item_NameMarked(10), "r1")) == 1);
+    Test_Eq("r3rarity markup: the tags are not shown", Markup_Strip(_sentence, "keyboard"), "Got " + _n2 + " now");
+    Test_Eq("r3rarity markup: the tags have no width", Markup_Width(Item_NameMarked(2), "keyboard"), Markup_Width(_n2, "keyboard"));
+    Test_Eq("r3rarity markup: well-formed item tags have no problems", array_length(Markup_Problems("[r1]a[/r1] [r2]b[/r2] [r3]c[/r3]")), 0);
+    Test_True("r3rarity markup: [r4] is not a tag we know", array_length(Markup_Problems("[r4]a[/r4]")) > 0);
+    Test_True("r3rarity markup: an item tag does not nest a term", array_length(Markup_Problems("[r2]a [t]b[/t][/r2]")) > 0);
+    Test_True("r3rarity markup: a text with an item tag goes through the rich drawer", Prompt_HasTokens(Item_NameMarked(2)));
+    Test_Eq("r3rarity markup: reveal keeps the span closed", Markup_Reveal("x [r3]Platinum[/r3]", 5), "x [r3]Pla[/r3]");
+    Test_Eq("r3rarity markup: a marked name fitted plain is the bare name", Ui_FitText(Item_NameMarked(2), 1000), _n2);
+}
+
+function Test_RarityColour() {
+    Test_Eq("r3rarity colour: common is white", Rarity_Color(1, 0), UI_C_TEXT);
+    Test_Eq("r3rarity colour: rare is exactly #E8C547", Rarity_Color(2, 0), make_color_rgb($E8, $C5, $47));
+    Test_Eq("r3rarity colour: rare is the merchant gold", Rarity_Color(2, 123), UI_C_MERCHANT_GOLD);
+    Test_Eq("r3rarity colour: rare does not pulse", Rarity_Color(2, 300), Rarity_Color(2, 0));
+    Test_Eq("r3rarity colour: epic starts at the gold", Rarity_Color(3, 0), make_color_rgb($E8, $C5, $47));
+    var _mid = Rarity_Color(3, 300);
+    Test_True("r3rarity colour: epic is lighter than the gold in the middle of the pulse", _mid != Rarity_Color(3, 0) && color_get_red(_mid) >= $E8 && color_get_green(_mid) > $C5 && color_get_blue(_mid) > $47);
+    Test_Eq("r3rarity colour: the pulse repeats every 600 ms", Rarity_Color(3, 600), Rarity_Color(3, 0));
+    Test_Eq("r3rarity colour: and again 1200 ms on", Rarity_Color(3, 1200 + 300), Rarity_Color(3, 300));
+    Test_Eq("r3rarity colour: the pulse is 0 at the start and 1 in the middle", string(Rarity_Pulse(0)) + "/" + string(Rarity_Pulse(300)), "0/1");
+    Test_True("r3rarity colour: Markup_Colour follows the rarity", Markup_Colour("r1", UI_C_LIGHT) == UI_C_TEXT && Markup_Colour("r2", UI_C_LIGHT) == UI_C_MERCHANT_GOLD);
+    Test_True("r3rarity colour: common text is not the term green", Rarity_Color(1, 0) != UI_C_TERM);
+    global.rarity_clock = 300;
+    Test_Eq("r3rarity colour: with the clock held at 300 ms epic is at its lightest", Markup_Colour("r3", UI_C_LIGHT), Rarity_Color(3, 300));
+    global.rarity_clock = -1;
+}
+
+// each message path names the item through Item_NameMarked: the builders are called directly
+function Test_RarityPaths() {
+    var _n2 = "[r2]" + string(ItemDB_Get(2).name) + "[/r2]";
+    var _n3 = "[r3]" + string(ItemDB_Get(3).name) + "[/r3]";
+    var _n10 = "[r1]" + string(ItemDB_Get(10).name) + "[/r1]";
+    var _n30 = "[r2]" + string(ItemDB_Get(30).name) + "[/r2]";
+    // chest, barrel, grave: the received line
+    var _rl = Loot_ReceivedLines(2, 1);
+    Test_Eq("r3rarity paths: the chest line marks a rare name", _rl[0], "Received " + _n2 + " x1.");
+    Test_Eq("r3rarity paths: and a common one", Loot_ReceivedLines(10, 3)[0], "Received " + _n10 + " x3.");
+    Test_Eq("r3rarity paths: the received line no longer uses the one gold accent", string_pos("[a]", Loot_ReceivedLines(10, 3)[0]), 0);
+    Loc_SetLanguage("ko");
+    Test_True("r3rarity paths: the Korean line marks the name too", string_pos("[r2]" + string(ItemDB_Get(2).name) + "[/r2]", Loot_ReceivedLines(2, 1)[0]) > 0 && string_pos("[a]", Loot_ReceivedLines(2, 1)[0]) == 0);
+    Loc_SetLanguage("en");
+    // battle drop and auto-resolve drop (one builder)
+    var _en = Loot_BuildMessageEntries([{ item_id: 3, qty: 1 }, { item_id: 10, qty: 2 }], "Loot: ");
+    Test_Eq("r3rarity paths: a battle drop line marks an epic name", _en[0].text, "Loot: " + _n3 + " x1");
+    Test_Eq("r3rarity paths: and a common one", _en[1].text, "Loot: " + _n10 + " x2");
+    Test_Eq("r3rarity paths: the drop line carries the rarity for the gem", _en[0].icon_rarity, 3);
+    Test_Eq("r3rarity paths: a common drop carries 1", _en[1].icon_rarity, 1);
+    var _hero = Test_Hero(CLASS_KNIGHT);
+    var _rw = { exp_gain: 1, levels_gained: 0, stat_points_gained: 0, gold: 0, loot: [{ item_id: 2, qty: 1 }] };
+    var _lines = Battle_BuildVictoryDialogueLines(EnemyCreate(ENEMY_SLIME), _rw, _hero);
+    var _found = false;
+    for (var _i = 0; _i < array_length(_lines); _i++) if (is_struct(_lines[_i]) && string_pos(_n2, _lines[_i].text) > 0) _found = true;
+    Test_True("r3rarity paths: the victory lines mark the drop", _found);
+    // steal
+    var _victim = Test_Hero(CLASS_KNIGHT);
+    _victim.inventory = Inv_Add([], 2, 1);
+    var _st = Skill_Use(EnemyCreate(ENEMY_STRANGER), _victim, SKILL_STEAL);
+    Test_Eq("r3rarity paths: the steal line marks the name", _st.msg, "Stole " + _n2 + ".");
+    // throw
+    var _th = Throw_Resolve(30, Test_Hero(CLASS_KNIGHT), EnemyCreate(ENEMY_SLIME), QTE_OK);
+    Test_True("r3rarity paths: the throw line marks the name", string_pos("You throw the " + _n30 + "!", _th.msg) == 1);
+    // equip, unequip
+    var _k = Test_Hero(CLASS_KNIGHT);
+    _k.inventory = Inv_Add(_k.inventory, 2, 1);
+    Test_Eq("r3rarity paths: the equip line marks the name", Equip_CanEquip(_k, 2).msg, "Equipped " + _n2 + ".");
+    var _tg = Gear_Toggle(_k, 2);
+    Test_True("r3rarity paths: (setup) the sword is worn", _tg.ok && _tg.equipped);
+    var _off = Gear_Toggle(_tg.ch, 2);
+    Test_Eq("r3rarity paths: the unequip line marks the name", _off.msg, "Unequipped " + _n2 + ".");
+    // "Replaces {item}" in the gear details
+    var _g = Test_Hero(CLASS_KNIGHT);
+    _g.inventory = Inv_Add(_g.inventory, 1, 1);
+    _g.inventory = Inv_Add(_g.inventory, 2, 1);
+    Equip_Item(_g, 1);
+    var _gi = TabGear_Items(_g);
+    var _iron = Test_RowById(_gi, "item_id", 2);
+    Test_True("r3rarity paths: the gear details say what a swap replaces, with a marked name", is_struct(_iron) && string_pos("Replaces [r1]" + string(ItemDB_Get(1).name) + "[/r1].", _iron.help) > 0);
+    // the echo question
+    Test_Eq("r3rarity paths: the echo question names an item in its colour", CardsUi_EchoName({ kind: "item", id: 2 }), _n2);
+}
+
+function Test_RarityShop() {
+    var _gs = GameState_Get();
+    var _hero = Test_Hero(CLASS_KNIGHT);
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_shop = variable_global_exists("shop_ui") ? global.shop_ui : undefined;
+    _gs.run = Run_Create(5160);
+    _gs.run.gold = 500;
+    global.shop_ui = { stk: Ui_StackNew(), shop_index: 0, msg: "", msg_ref: undefined, quote_kind: "", quote_idx: -1, msg_ms: -100000, lock: InputLock_New(0), opened_ms: current_time };
+    var _n2 = "[r2]" + string(ItemDB_Get(2).name) + "[/r2]";
+    // sell: a rare sword (gear asks first; the question names it in its colour)
+    _hero.inventory = Inv_Add(_hero.inventory, 2, 1);
+    var _m = Ui_MenuNew("test_r3rarity_sell", ShopUi_SellItems(), { on_confirm: ShopUi_SellConfirm });
+    var _ig = -1;
+    for (var _j = 0; _j < array_length(_m.items); _j++) if (_m.items[_j].item_id == 2) _ig = _j;
+    Test_True("r3rarity shop: the sell list shows the sword", _ig >= 0);
+    var _price = Shop_SellPrice(2);
+    ShopUi_SellConfirm(_m, _ig);
+    Test_Eq("r3rarity shop: the sell question marks the name", Confirm_Question(), "Sell " + _n2 + " for " + string(_price) + "?");
+    Confirm_Back();
+    ShopUi_SellConfirm(_m, _ig);
+    Test_True("r3rarity shop: (setup) Yes sells the sword", Test_ConfirmSayYes());
+    Test_Eq("r3rarity shop: the sold line marks the name", global.shop_ui.msg, "Sold " + _n2 + " for " + string(_price) + ".");
+    // buy: the stock row of an item
+    var _rows = Shop_RunStock(_gs.run, 0, _gs.player_ch);
+    var _item_row = -1;
+    for (var _r = 0; _r < array_length(_rows); _r++) if (_rows[_r].kind != "card" && _rows[_r].qty > 0 && _rows[_r].price <= _gs.run.gold) { _item_row = _r; break; }
+    Test_True("r3rarity shop: the stock has an item to buy", _item_row >= 0);
+    if (_item_row >= 0) {
+        var _bid = _rows[_item_row].id;
+        var _bm = Ui_MenuNew("test_r3rarity_buy", ShopUi_BuyItems(), { on_confirm: ShopUi_BuyConfirm });
+        ShopUi_BuyConfirm(_bm, _item_row);
+        Test_True("r3rarity shop: the bought line marks the name", string_pos("Bought " + Item_NameMarked(_bid) + " for ", global.shop_ui.msg) == 1);
+    }
+    global.shop_ui = _old_shop;
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+function Test_RarityRows() {
+    var _rare = ItemDB_Get(2);
+    var _epic = ItemDB_Get(3);
+    var _common = ItemDB_Get(1);
+    Test_Eq("r3rarity rows: a rare row's name is gold", Ui_RowLabelColor({ label: "x", icon_item: _rare, enabled: true }, false), UI_C_MERCHANT_GOLD);
+    Test_Eq("r3rarity rows: gold when selected too", Ui_RowLabelColor({ label: "x", icon_item: _rare, enabled: true }, true), UI_C_MERCHANT_GOLD);
+    Test_Eq("r3rarity rows: a common row's name stays white", Ui_RowLabelColor({ label: "x", icon_item: _common, enabled: true }, false), UI_C_TEXT);
+    global.rarity_clock = 300;
+    Test_Eq("r3rarity rows: an epic row's name is the pulsing colour", Ui_RowLabelColor({ label: "x", icon_item: _epic, enabled: true }, false), Rarity_Color(3, 300));
+    global.rarity_clock = -1;
+    Test_Eq("r3rarity rows: a dim row stays light green even for a rare item", Ui_RowLabelColor({ label: "x", icon_item: _rare, enabled: true, dim: true }, false), UI_C_LIGHT);
+    Test_Eq("r3rarity rows: a dim epic row too", Ui_RowLabelColor({ label: "x", icon_item: _epic, enabled: true, dim: true }, true), UI_C_LIGHT);
+    Test_Eq("r3rarity rows: a disabled row stays dark", Ui_RowLabelColor({ label: "x", icon_item: _rare, enabled: false }, false), UI_C_DARK);
+    Test_Eq("r3rarity rows: a row with no item is as before", Ui_RowLabelColor({ label: "Run", enabled: true }, false), UI_C_TEXT);
+    Test_Eq("r3rarity rows: an empty slot (dim, no item) stays light green", Ui_RowLabelColor({ label: "No Armor", enabled: true, dim: true }, false), UI_C_LIGHT);
+    Test_Eq("r3rarity rows: a header is as before", Ui_RowLabelColor({ label: "Bag", kind: "head", enabled: false }, false), UI_C_LIGHTEST);
+    // the real lists
+    var _k = Test_Hero(CLASS_KNIGHT);
+    _k.inventory = Inv_Add(_k.inventory, 10, 1);
+    _k.inventory = Inv_Add(_k.inventory, 14, 1);
+    _k.inventory = Inv_Add(_k.inventory, 15, 1);
+    var _it = TabItems_Items(_k);
+    var _c1 = Ui_RowLabelColor(Test_RowById(_it, "item_id", 10), false);
+    var _c2 = Ui_RowLabelColor(Test_RowById(_it, "item_id", 14), false);
+    Test_True("r3rarity rows: the Items tab shows a common potion white and a rare one gold", _c1 == UI_C_TEXT && _c2 == UI_C_MERCHANT_GOLD);
+    _k.inventory = Inv_Add(_k.inventory, 8, 1);   // a staff the Knight cannot wear: a rare item in a dim row
+    var _gi = TabGear_Items(_k);
+    var _staff = Test_RowById(_gi, "item_id", 8);
+    Test_True("r3rarity rows: (setup) the Ruby Staff is a dim row for the Knight", is_struct(_staff) && _staff.dim);
+    Test_Eq("r3rarity rows: and its name stays light green in the Gear tab", Ui_RowLabelColor(_staff, false), UI_C_LIGHT);
+    var _bi = Battle_ItemRows(_k);
+    Test_True("r3rarity rows: the battle item rows carry the item for the colour", array_length(_bi) >= 1 && variable_struct_exists(_bi[0], "icon_item"));
+}
+
+function Test_RarityGem() {
+    Test_Eq("r3rarity gem: a common icon has no gem", array_length(Rarity_GemRows(1, 0)), 0);
+    var _rare0 = Rarity_GemRows(2, 0);
+    Test_Eq("r3rarity gem: a rare gem is 3 rows", array_length(_rare0), 3);
+    var _sq = (array_length(_rare0) == 3) && string_length(_rare0[0]) == 3 && string_length(_rare0[1]) == 3 && string_length(_rare0[2]) == 3;
+    Test_True("r3rarity gem: 3 wide and 3 tall", _sq);
+    if (_sq) {
+        Test_Eq("r3rarity gem: a rare gem is a gold diamond: the centre and the four middles", string_char_at(_rare0[1], 2) + string_char_at(_rare0[0], 2) + string_char_at(_rare0[2], 2) + string_char_at(_rare0[1], 1) + string_char_at(_rare0[1], 3), "ggggg");
+        Test_True("r3rarity gem: the corners of a rare gem are not gold", string_char_at(_rare0[0], 1) != "g" && string_char_at(_rare0[0], 3) != "g" && string_char_at(_rare0[2], 1) != "g" && string_char_at(_rare0[2], 3) != "g");
+    }
+    Test_Eq("r3rarity gem: a rare gem does not sparkle", json_stringify(Rarity_GemRows(2, 1)), json_stringify(_rare0));
+    Test_True("r3rarity gem: an epic gem has two different frames", json_stringify(Rarity_GemRows(3, 0)) != json_stringify(Rarity_GemRows(3, 1)));
+    Test_Eq("r3rarity gem: an epic gem is also 3 tall", array_length(Rarity_GemRows(3, 1)), 3);
+    Test_True("r3rarity gem: the frame flips every 300 ms", Rarity_GemFrame(0) == 0 && Rarity_GemFrame(299) == 0 && Rarity_GemFrame(300) == 1 && Rarity_GemFrame(600) == 0);
+    Test_Eq("r3rarity gem: the gold of the gem", Rarity_GemColor("g"), UI_C_MERCHANT_GOLD);
+}
+
+// No workbook string writes an item tag (the game marks every item name it fills in) and none uses the gold accent round an item.
+function Test_RarityWorkbook() {
+    Loc_Init();
+    var _keys = variable_struct_get_names(Loc_GetData().strings);
+    var _bad = "";
+    var _acc = "";
+    for (var _k = 0; _k < array_length(_keys); _k++) {
+        var _e = variable_struct_get(Loc_GetData().strings, _keys[_k]);
+        if (!is_struct(_e)) continue;
+        var _langs = ["en", "ko"];
+        for (var _l = 0; _l < 2; _l++) {
+            var _t = variable_struct_exists(_e, _langs[_l]) ? string(variable_struct_get(_e, _langs[_l])) : "";
+            if (string_pos("[r1]", _t) > 0 || string_pos("[r2]", _t) > 0 || string_pos("[r3]", _t) > 0) _bad += _keys[_k] + "/" + _langs[_l] + " ";
+            if (string_pos("[a]{item}[/a]", _t) > 0 || string_pos("[a]{name}[/a]", _t) > 0) _acc += _keys[_k] + "/" + _langs[_l] + " ";
+        }
+    }
+    Test_True("r3rarity workbook: the workbook has strings to check", array_length(_keys) > 500);
+    Test_Eq("r3rarity workbook: no string writes an item tag", _bad, "");
+    Test_Eq("r3rarity workbook: no string puts the gold accent round an item", _acc, "");
 }

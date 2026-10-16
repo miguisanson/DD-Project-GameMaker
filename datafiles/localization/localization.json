@@ -3,7 +3,7 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T13:25:55Z",
+    "generated_at_utc": "2026-10-16T13:49:57Z",
     "row_count": 1268
   },
   "default_lang": "en",
@@ -1861,8 +1861,8 @@
       "ko": "아무것도 찾지 못했다."
     },
     "dialogue.loot_received.0": {
-      "en": "Received [a]{item}[/a] x{qty}.",
-      "ko": "[a]{item}[/a] x{qty}을(를) 받았습니다."
+      "en": "Received {item} x{qty}.",
+      "ko": "{item} x{qty}을(를) 받았습니다."
     },
     "dialogue.rock.0": {
       "en": "Just a rock.",
