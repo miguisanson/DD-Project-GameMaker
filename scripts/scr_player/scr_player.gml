@@ -899,33 +899,78 @@ function UI_KoFont() {
     var l = Display_Layout();
     var sig = l.scale * 100 + l.ui_scale;
     if (variable_global_exists("ui_ko_sig") && global.ui_ko_sig == sig) return global.ui_ko_cur;   // same layout as the last call
-    if (!variable_global_exists("ui_ko_fonts") || !is_struct(global.ui_ko_fonts)) global.ui_ko_fonts = {};
+    var target = UI_KoTargetPx();
+    var f = UI_KoFontGet(Ui_KoFontChoice(target));
+    global.ui_ko_sig = sig;
+    global.ui_ko_cur = f;
+    return f;
+}
+
+// The window-pixel height the Korean font is chosen for: the English line height at the text scale in force.
+function UI_KoTargetPx() {
     if (!variable_global_exists("ui_en_line_px")) {
         var f0 = draw_get_font();
         draw_set_font(UI_FONT);
         global.ui_en_line_px = string_height("A");   // the English font's line height at text scale 1.0, in window pixels
         draw_set_font(f0);
     }
-    var target = global.ui_en_line_px * UI_GetTextScale() * l.ui_scale;
-    var ch = Ui_KoFontChoice(target);
-    var key = "g" + string(ch.face) + "x" + string(ch.k);
+    return global.ui_en_line_px * UI_GetTextScale() * Display_Layout().ui_scale;
+}
+
+// The font for one Ui_KoFontChoice result { face, k, px }: made on first use and cached by face and multiple. -1 when the file is missing (a miss is cached too).
+function UI_KoFontGet(_ch) {
+    if (!variable_global_exists("ui_ko_fonts") || !is_struct(global.ui_ko_fonts)) global.ui_ko_fonts = {};
+    var key = "g" + string(_ch.face) + "x" + string(_ch.k);
     var f = -1;
     if (variable_struct_exists(global.ui_ko_fonts, key)) {
         f = variable_struct_get(global.ui_ko_fonts, key);
     } else {
-        var path = "fonts/galmuri/Galmuri" + string(ch.face) + ".ttf";
+        var path = "fonts/galmuri/Galmuri" + string(_ch.face) + ".ttf";
         if (file_exists(path)) {
             var t0 = current_time;
-            f = font_add(path, ch.px * 0.75, false, false, 32, 55203);   // points = pixels * 0.75
-            show_debug_message("[UI] Galmuri" + string(ch.face) + " x" + string(ch.k) + " (" + string(ch.px) + " px) font " + string(f) + " added in " + string(current_time - t0) + " ms");
+            f = font_add(path, _ch.px * 0.75, false, false, 32, 55203);   // points = pixels * 0.75
+            show_debug_message("[UI] Galmuri" + string(_ch.face) + " x" + string(_ch.k) + " (" + string(_ch.px) + " px) font " + string(f) + " added in " + string(current_time - t0) + " ms");
         } else {
             show_debug_message("[UI] Korean font file missing: " + path);
         }
         variable_struct_set(global.ui_ko_fonts, key, f);   // a miss is cached too: no retry every frame
     }
-    global.ui_ko_sig = sig;
-    global.ui_ko_cur = f;
     return f;
+}
+
+// R3 (D168): the UI has one pixel font, drawn at whole multiples of its pixel (English) or as Galmuri at its own whole multiples (Korean). A "type step" is one
+// notch down in that size: step 0 is the size UI_SetFont and UI_GetFontScale give, step 1 the next smaller one the UI can draw (English: one window pixel
+// per font pixel less; Korean: the next smaller Galmuri size). Returns { font, scale, step }; step is 0 when there is nothing smaller. Used for the one
+// name that has a single word wider than its column. Does not change the font that is set.
+function UI_FontStep(_step) {
+    var s0 = UI_GetFontScale();
+    var cur = { font: UI_FONT, scale: s0, step: 0 };
+    if (Loc_GetLanguage() == "ko") {
+        var fk = UI_KoFont();
+        if (fk != -1) cur.font = fk;
+    }
+    if (_step <= 0) return cur;
+    var l = Display_Layout();
+    var u = l.ui_scale;
+    if (Loc_GetLanguage() == "ko" && cur.font != UI_FONT) {
+        var now = Ui_KoFontChoice(UI_KoTargetPx());
+        var best = undefined;
+        var faces = [9, 11];
+        for (var i = 0; i < 2; i++) {
+            var k = floor((now.px - 1) / faces[i]);
+            if (k < 1) continue;
+            var px = faces[i] * k;
+            if (is_undefined(best) || px > best.px) best = { face: faces[i], k: k, px: px };
+        }
+        if (is_undefined(best)) return cur;
+        var fs = UI_KoFontGet(best);
+        if (fs == -1) return cur;
+        return { font: fs, scale: 1 / u, step: 1 };
+    }
+    var n = round(s0 * DISPLAY_FONT_PX * u);   // window pixels per font pixel now
+    var n1 = n - u;
+    if (n1 < 1) return cur;
+    return { font: UI_FONT, scale: n1 / (DISPLAY_FONT_PX * u), step: 1 };
 }
 
 function UI_SetFont() {

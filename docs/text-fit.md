@@ -24,9 +24,12 @@ The build stamp (`Build_DrawId`) and the scrolling credits roll (top and bottom 
    (`TabMenu_Widths`; the list never takes more than two thirds). The battle command menu is half the right column unless a label needs more
    (`Battle_CmdPanelW`). The attack plate has 6p of air each side, 4p when only that fits, and four lines (label, number, label, number) when the gap is
    narrower than "Perfect 12" (`Battle_PreviewPlateLayout`).
-4. **Tighten**: the card pick lowers its spacing (p instead of 2p between a card's blocks, 2p instead of 3p between the parts) and puts the hint beside the
-   Skip box when the whole screen would not end above the bottom margin (`CardsUi_PickPlan`).
-5. **Shrink**: not used. No panel draws below the D8 text rule.
+4. **Tighten**: the card pick takes the room first: a 2p margin and a 3p gap (`CardsUi_PickColumns`) and p of air inside a card's frame (`CardsUi_InnerW`).
+   It lowers its spacing (p instead of 2p between a card's blocks, 2p instead of 3p between the parts of the screen) when the whole screen would not end
+   above the bottom margin (`CardsUi_PickPlan`). There is no Skip box under the cards (owner note 11).
+5. **Shrink** (D168), only for a card name with a single word wider than its column after step 4: that name is drawn one notch smaller, the next smaller size the UI
+   can draw (`UI_FontStep`: English one window pixel per font pixel less, Korean the next smaller Galmuri). Names keep their wording and wrap by words first
+   (`CardsUi_NameFit`). No other text is drawn below the D8 text rule.
 6. **Ellipsis** (`Ui_FitText`): no decision allows it for a workbook row. It stays in `Ui_MenuDraw` rows, the details labels and the reader replies as the
    last resort, and every use is a recorded fit failure.
 
@@ -39,5 +42,3 @@ fit was shortened (the throwables' sentences, the "Hit for ... / 100% Poison." c
 |---|---|---|
 | Skill lists (en) | Horizontal Slash | 326 units; the battle list has 238 at 800 x 720 (207 at 640 x 576), the Tab list 302 |
 | Battle list (en) | Poison Arrow | 258 of 238 at 800 x 720 |
-| Card names (en) | Meditation(+), Foresight+, Spellweave, Apothecary, Scrounger, Whetstone, Horizontal Slash(+) | one word of 9 to 11 letters is wider than a column at 640 x 576 / 800 x 720 (up to 232 of 196) |
-| Bestiary (en, 800 x 720) | The Pale Choirbeast | the name asks the list for 502 of 764 units, which leaves the details panel too narrow for every other enemy; "Pale Choirbeast" (no "The") passes every check |

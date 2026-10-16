@@ -5467,10 +5467,6 @@ function Test_Suite_Cards() {
     _fb_hp.hp = 2;
     var _tk5 = Card_Take(_fb_hp, "fb:rest");
     Test_Eq("C2 Second Wind (fallback) heals half of max HP", _tk5.ch.hp, min(_fb_hp.max_hp, 2 + floor(_fb_hp.max_hp / 2)));
-    Test_Eq("C2 Skip pays a small gold amount", Card_SkipGold(), 5);
-    _gs.run = Run_Create(1);
-    Card_SkipOffer();
-    Test_Eq("C2 skipping adds the gold to the run", _gs.run.gold, 5);
 
     // ---- passives that act in the game ----
     var _pm = Test_CardPlayer(CLASS_KNIGHT, [], [], ["pas:field_medic"]);
@@ -5613,13 +5609,10 @@ function Test_Suite_Cards() {
     Profile_Unlock(_prof, "nobody_class");
     Test_False("C2 Nobody is open once the profile has won", Card_ClassChoices(_prof)[3].locked);
 
-    // the pick screen's cursor model (D95: wrap-around): cards left/right, Skip below
+    // the pick screen's cursor model (D95: wrap-around): cards left/right; R3: no Skip row, up / down stay (the rest is Test_Suite_R3Cards)
     Test_Eq("C2 pick cursor: right moves to the next card", Cards_PickMove(0, 3, 1, 0, 0), 1);
     Test_Eq("C2 pick cursor: left from the first card wraps to the last", Cards_PickMove(0, 3, -1, 0, 0), 2);
     Test_Eq("C2 pick cursor: right from the last card wraps to the first", Cards_PickMove(2, 3, 1, 0, 2), 0);
-    Test_Eq("C2 pick cursor: down goes to Skip", Cards_PickMove(1, 3, 0, 1, 1), 3);
-    Test_Eq("C2 pick cursor: up from Skip returns to the card it left", Cards_PickMove(3, 3, 0, -1, 1), 1);
-    Test_Eq("C2 pick cursor: left/right on Skip stay on Skip", Cards_PickMove(3, 3, 1, 0, 1), 3);
 
     // skill books are gone (D18)
     var _books = 0;
@@ -14128,21 +14121,23 @@ function Test_Suite_TextFit() {
         return _f;
     });
 
-    // ---- the card pick: every card at the pick's column width, and the whole screen (title, cards, Skip, hint) on the screen ----
+    // ---- the card pick: every card at the pick's column width (the draw's own CardsUi_PickColumns / CardsUi_InnerW / CardsUi_NameFit), and the whole screen (title, cards, hint) on the screen ----
     TextFit_Each("card pick", function(_w, _h, _l) {
         var _f = [];
         var _mt = Ui_Metrics();
         var _p = _mt.p;
-        var _gap = 4 * _p;
-        var _cw = floor((_mt.gw - 2 * _mt.margin - 2 * _gap) / 3);
-        var _iw = _cw - 8 * _p;
+        var _col = CardsUi_PickColumns(_mt, 3);
+        var _cw = _col.cw;
+        var _iw = CardsUi_InnerW(_cw, _mt);
         var _all = CardDB_All();
-        var _skip = Loc_T("cards.pick.skip", "Skip: +{gold} gold", { gold: string(Card_SkipGold()) });
         var _hint = Loc_T("cards.pick.hint", "[k:left][k:right] Choose   [k:confirm] Take");
+        if (3 * _cw + 2 * _col.gap > _mt.gw - 2 * _p) array_push(_f, "the three cards (" + string(_cw) + " each) do not fit the screen " + string(_mt.gw));
         for (var _i = 0; _i < array_length(_all); _i++) {
             var _c = _all[_i];
             var _name = Card_Name(_c);
-            TextFit_Block(_f, "card name", _name, _iw - 5 * _p, _p);
+            var _nf = CardsUi_NameFit(_name, _iw - 5 * _p, _mt);
+            if (_nf.w > _iw - 5 * _p) array_push(_f, "card name '" + _name + "' needs " + string(_nf.w) + " has " + string(_iw - 5 * _p) + " (type step " + string(_nf.step) + ")");
+            if (_nf.lines > 2) array_push(_f, "card name '" + _name + "' takes " + string(_nf.lines) + " lines");
             TextFit_Block(_f, "card tag", Card_TypeTag(_c), _iw - 5 * _p, _p);
             TextFit_Block(_f, "card sentence of '" + _name + "'", Card_Sentence(_c), _iw, _p);
             var _ls = Card_Lines(_c);
@@ -14150,7 +14145,7 @@ function Test_Suite_TextFit() {
                 TextFit_Block(_f, "card line label of '" + _name + "'", _ls[_k].label, _iw, _p);
                 TextFit_Line(_f, "card line value of '" + _name + "'", _ls[_k].value, _iw);
             }
-            var _one = CardsUi_PickPlan([_c], _cw, _skip, _hint, _mt);   // the screen with this card as the tallest
+            var _one = CardsUi_PickPlan([_c], _cw, _hint, _mt);   // the screen with this card as the tallest
             if (_one.lay.bottom > _mt.gh - _mt.p) array_push(_f, "pick screen with '" + _name + "' (" + string(_one.ch_max) + ") ends at " + string(_one.lay.bottom) + " of " + string(_mt.gh));
         }
         return _f;

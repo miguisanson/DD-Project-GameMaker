@@ -1790,9 +1790,9 @@ function CardsUi_Take(_card_id) {
     CardsUi_Close();
 }
 
-function CardsUi_SkipPick() {
+// R3: the pick has no Skip. With no card on offer there is nothing to choose: confirm answers the pick and closes (it used to be Skip, without the gold).
+function CardsUi_PickEmpty() {
     var gs = GameState_Get();
-    Card_SkipOffer();
     CardsUi_Commit(Cards_ConsumePick(gs.player_ch));
     CardsUi_Close();
 }
@@ -1802,21 +1802,20 @@ function CardsUi_PickUpdate(_u) {
     var snap = Ui_ReadInput();
     var n = array_length(pk.ids);
     var dx = (snap.right_p ? 1 : 0) - (snap.left_p ? 1 : 0);
-    var dy = (snap.down_p ? 1 : 0) - (snap.up_p ? 1 : 0);
     var hover = Ui_HoverIndex(pk.rects, snap.mx, snap.my);
     var cur = pk.cursor;
     if (snap.mouse_moved && hover >= 0) cur = hover;
-    if (dx != 0 || dy != 0) cur = Cards_PickMove(cur, n, dx, dy, pk.last);
+    if (dx != 0) cur = Cards_PickMove(cur, n, dx, 0, pk.last);
     if (cur != pk.cursor) {
         pk.cursor = cur;
-        if (cur < n) pk.last = cur;
+        pk.last = cur;
         SFX_PlayUI("ui_move");
     }
     var go = snap.confirm || (snap.click && hover == pk.cursor);
     if (go) {
         SFX_PlayUI("ui_confirm");
-        if (pk.cursor < n) CardsUi_Take(pk.ids[pk.cursor]);
-        else CardsUi_SkipPick();
+        if (n <= 0) CardsUi_PickEmpty();
+        else CardsUi_Take(pk.ids[clamp(pk.cursor, 0, n - 1)]);
     }
 }
 
@@ -1846,13 +1845,41 @@ function CardsUi_LabelH(_line, _iw, _mt) {
     return max(_mt.line_h, Ui_TextBlockH(_line.label, _iw));
 }
 
+// R3 (D168, owner notes 10 and 28): where the pick screen's three cards stand: { margin, gap, cw }. The cards take the room first: a 2p margin at the sides and a
+// 3p gap (the selected card's halo is p wide, so the halos never touch), which leaves every card wider than the old 3p / 4p did.
+function CardsUi_PickColumns(_mt, _n = 3) {
+    var p = _mt.p;
+    var margin = 2 * p;
+    var gap = 3 * p;
+    var cw = floor((_mt.gw - 2 * margin - (_n - 1) * gap) / max(1, _n));
+    return { margin: margin, gap: gap, cw: cw };
+}
+
+// The room a card's text has inside its frame: the frame is 2p thick and the text keeps p from it (it kept 2p).
+function CardsUi_InnerW(_w, _mt) {
+    return _w - 6 * _mt.p;
+}
+
+// R3 (D168): how a card's name is laid out in a column _w wide (the arrow of the selected card is outside it): { step, w, h, lines, y_off }. Names keep their
+// wording and wrap by words at the UI's size (step 0); when one word is wider than the column the whole name takes the next smaller size the UI has
+// (UI_FontStep, step 1) so it still fits. h is at least one normal line; y_off centres a name that is lower than that. Pure.
+function CardsUi_NameFit(_name, _w, _mt) {
+    var m = Ui_TextBlockMeasureStep(_name, _w, 0);
+    var step = 0;
+    if (m.w > _w) {
+        var m1 = Ui_TextBlockMeasureStep(_name, _w, 1);
+        if (m1.step > 0 && m1.w < m.w) { m = m1; step = 1; }
+    }
+    return { step: step, w: m.w, h: max(m.h, _mt.line_h), lines: m.lines, y_off: max(0, (_mt.line_h - m.h) div 2) };
+}
+
 // _g: the space between a card's blocks (2p; p on a screen that is tight, CardsUi_PickPlan).
 function CardsUi_CardHeight(_c, _w, _mt, _g = -1) {
     var p = _mt.p;
     var g = (_g < 0) ? 2 * p : _g;
-    var iw = _w - 8 * p;
+    var iw = CardsUi_InnerW(_w, _mt);
     var h = 8 * p;
-    h += max(Ui_TextBlockH(Card_Name(_c), iw - 5 * p), _mt.line_h) + g;
+    h += CardsUi_NameFit(Card_Name(_c), iw - 5 * p, _mt).h + g;
     h += max(Ui_TextBlockH(Card_TypeTag(_c), iw - 5 * p), _mt.line_h) + p + p + g;   // the tag (it wraps), the rule
     h += Ui_TextBlockH(Card_Sentence(_c), iw) + g;
     var seq = Card_Sequence(_c);
@@ -1870,7 +1897,7 @@ function CardsUi_DrawCard(_x, _y, _w, _h, _c, _sel, _a, _g = -1) {
     var mt = Ui_Metrics();
     var p = mt.p;
     var g = (_g < 0) ? 2 * p : _g;
-    var iw = _w - 8 * p;
+    var iw = CardsUi_InnerW(_w, mt);
     if (_sel) {   // a bright halo outside the frame
         Ui_Box(_x + p, _y - p, _x + _w - p, _y, UI_C_LIGHT);
         Ui_Box(_x + p, _y + _h, _x + _w - p, _y + _h + p, UI_C_LIGHT);
@@ -1878,16 +1905,15 @@ function CardsUi_DrawCard(_x, _y, _w, _h, _c, _sel, _a, _g = -1) {
         Ui_Box(_x + _w, _y + p, _x + _w + p, _y + _h - p, UI_C_LIGHT);
     }
     Ui_DrawFrame(_x, _y, _w, _h, _a, p);
-    var x0 = _x + 4 * p;
+    var x0 = _x + 3 * p;
     var ty = _y + 4 * p;
-    var name = Card_Name(_c);
-    var nh = max(Ui_TextBlockH(name, iw - 5 * p), mt.line_h);
+    var nf = CardsUi_NameFit(Card_Name(_c), iw - 5 * p, mt);
     if (_sel) {
-        Ui_Box(_x + 3 * p, ty - p, _x + _w - 3 * p, ty + nh + p, UI_C_DARK);
+        Ui_Box(_x + 3 * p, ty - p, _x + _w - 3 * p, ty + nf.h + p, UI_C_DARK);
         Ui_Arrow(x0 + Ui_Bob(current_time) * p, ty + (mt.line_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
     }
-    Ui_TextBlock(x0 + 5 * p, ty, name, iw - 5 * p, UI_C_TEXT);
-    ty += nh + g;
+    Ui_TextBlockStep(x0 + 5 * p, ty + nf.y_off, Card_Name(_c), iw - 5 * p, UI_C_TEXT, nf.step);
+    ty += nf.h + g;
     var tag = Card_TypeTag(_c);
     Ui_TextBlock(x0 + 5 * p, ty, tag, iw - 5 * p, UI_C_LIGHT);
     ty += max(Ui_TextBlockH(tag, iw - 5 * p), mt.line_h) + p;
@@ -1916,47 +1942,24 @@ function CardsUi_DrawCard(_x, _y, _w, _h, _c, _sel, _a, _g = -1) {
     }
 }
 
-// H13b (D156): where the pick screen's parts stand, from the tallest card's height (_ch_max): { total, y0, cards_y, skip_y, skip_w, skip_h, hint_y, bottom }.
+// H13b (D156), R3: where the pick screen's parts stand, from the tallest card's height (_ch_max): { total, y0, cards_y, hint_x, hint_y, hint_w, hint_h, bottom }.
+// The title, the cards and the hint line, centred on the screen (the Skip box that shared the bottom row is gone, so the cards get its room).
 // _slide moves the title and the cards up while the screen slides in. Pure; `bottom` is where the hint line ends and must stay on the screen.
-function CardsUi_PickLayout(_ch_max, _skip_label, _hint, _mt, _slide = 0, _tight = false) {
+function CardsUi_PickLayout(_ch_max, _hint, _mt, _slide = 0, _tight = false) {
     var p = _mt.p;
-    var gap = _tight ? 2 * p : 3 * p;   // between the title, the cards and the bottom row
-    var skip_w = UI_TextWidth(_skip_label) + (_tight ? 14 : 24) * p;
-    var skip_h = _mt.row_h + (_tight ? 2 * p : 4 * p);
-    var skip_x, hint_x, hint_w, hint_h, row_h, skip_dy, hint_dy;
-    var hint_parts = [_hint];
-    if (_tight) {   // the Skip box on the left with the hint beside it (one row), not the hint under a centred box
-        hint_w = _mt.gw - 2 * _mt.margin - skip_w - 4 * p;
-        hint_h = UiFit_Measure(_hint, hint_w, true).h;
-        if (UiFit_Measure(_hint, hint_w, true).lines > 1 && string_pos("   ", _hint) > 0) {   // too long for one line: one button and its word per line, never a button apart from its word
-            hint_parts = string_split(_hint, "   ");
-            hint_h = array_length(hint_parts) * (_mt.line_h + p) - p;
-        }
-        row_h = max(skip_h, hint_h);
-        skip_x = _mt.margin;
-        hint_x = _mt.margin + skip_w + 4 * p;
-        skip_dy = (row_h - skip_h) div 2;
-        hint_dy = (row_h - hint_h) div 2;
-    } else {
-        hint_w = round(_mt.gw * 0.8);
-        hint_h = UiFit_Measure(_hint, hint_w, true).h;
-        row_h = skip_h + 2 * p + hint_h;
-        skip_x = round((_mt.gw - skip_w) / 2);
-        hint_x = round(_mt.gw * 0.1);
-        skip_dy = 0;
-        hint_dy = skip_h + 2 * p;
-    }
-    var total = _mt.line_h + gap + _ch_max + gap + row_h;
+    var gap = _tight ? 2 * p : 3 * p;   // between the title, the cards and the hint
+    var hint_w = _mt.gw - 2 * _mt.margin;
+    var hint_h = UiFit_Measure(_hint, hint_w, true).h;
+    var total = _mt.line_h + gap + _ch_max + gap + hint_h;
     var y0 = max(_tight ? _mt.pad : _mt.margin, round((_mt.gh - total) / 2));
     var cy = y0 + _mt.line_h + gap - _slide;
-    var sy = cy + _ch_max + gap;
-    return { total: total, tight: _tight, y0: y0 - _slide, cards_y: cy, skip_x: skip_x, skip_y: sy + skip_dy, skip_w: skip_w, skip_h: skip_h,
-             hint_x: hint_x, hint_y: sy + hint_dy, hint_w: hint_w, hint_h: hint_h, hint_parts: hint_parts, bottom: sy + row_h };
+    var hy = cy + _ch_max + gap;
+    return { total: total, tight: _tight, y0: y0 - _slide, cards_y: cy, hint_x: _mt.margin, hint_y: hy, hint_w: hint_w, hint_h: hint_h, bottom: hy + hint_h };
 }
 
-// H13b (D156): the plan of the pick screen for the cards _cards, each _cw wide: { tight, g, ch_max, lay }. The roomy spacing (2p between a card's blocks, 3p between the
-// parts of the screen) when the whole screen ends a margin above the bottom with it; the tight spacing (p and 2p, a smaller Skip box) when it does not. Pure.
-function CardsUi_PickPlan(_cards, _cw, _skip_label, _hint, _mt, _slide = 0) {
+// H13b (D156), R3: the plan of the pick screen for the cards _cards, each _cw wide: { tight, g, ch_max, lay }. The roomy spacing (2p between a card's blocks,
+// 3p between the parts of the screen) when the whole screen ends a margin above the bottom with it; the tight spacing (p and 2p) when it does not. Pure.
+function CardsUi_PickPlan(_cards, _cw, _hint, _mt, _slide = 0) {
     var p = _mt.p;
     var plan = undefined;
     for (var pass = 0; pass < 2; pass++) {
@@ -1964,7 +1967,7 @@ function CardsUi_PickPlan(_cards, _cw, _skip_label, _hint, _mt, _slide = 0) {
         var g = tight ? p : 2 * p;
         var chm = 0;
         for (var i = 0; i < array_length(_cards); i++) chm = max(chm, CardsUi_CardHeight(_cards[i], _cw, _mt, g));
-        var lay = CardsUi_PickLayout(chm, _skip_label, _hint, _mt, _slide, tight);
+        var lay = CardsUi_PickLayout(chm, _hint, _mt, _slide, tight);
         plan = { tight: tight, g: g, ch_max: chm, lay: lay };
         if (lay.bottom <= _mt.gh - _mt.margin) break;
     }
@@ -1976,45 +1979,29 @@ function CardsUi_DrawPick(_u, _a) {
     var mt = Ui_Metrics();
     var p = mt.p;
     var n = array_length(pk.ids);
-    var gap = 4 * p;
-    var margin = mt.margin;
-    var cw = floor((mt.gw - 2 * margin - (n - 1) * gap) / n);
+    var col = CardsUi_PickColumns(mt, max(1, n));
+    var cw = col.cw;
     var cards = [];
     for (var i = 0; i < n; i++) array_push(cards, CardDB_Get(pk.ids[i]));
     var picks = GameState_Get().player_ch.card_picks;
     var title = Loc_T("cards.pick.title", "Choose a Card");
     if (picks > 1) title += "  " + Loc_T("cards.pick.left", "({n} picks left)", { n: string(picks) });
-    var skip_label = Loc_T("cards.pick.skip", "Skip: +{gold} Gold", { gold: string(Card_SkipGold()) });
     var hint = Loc_T("cards.pick.hint", "[k:left][k:right] Choose   [k:confirm] Take");
     var slide = p * round((1 - _a) * 3);
-    var plan = CardsUi_PickPlan(cards, cw, skip_label, hint, mt, slide);
+    var plan = CardsUi_PickPlan(cards, cw, hint, mt, slide);
     var ch_max = plan.ch_max;
     var pl = plan.lay;
-    var skip_w = pl.skip_w;
-    var skip_h = pl.skip_h;
     Ui_Text(mt.gw / 2, pl.y0, title, UI_C_LIGHTEST, fa_center);
     var cy = pl.cards_y;
     var rects = [];
+    var x_start = round((mt.gw - (n * cw + (n - 1) * col.gap)) / 2);   // the row of cards is centred (the few units left over are split evenly)
     for (var k = 0; k < n; k++) {
-        var cx = margin + k * (cw + gap);
+        var cx = x_start + k * (cw + col.gap);
         CardsUi_DrawCard(cx, cy, cw, ch_max, cards[k], k == pk.cursor, _a, plan.g);
         array_push(rects, { x: cx, y: cy, w: cw, h: ch_max });
     }
-    var sx = pl.skip_x;
-    var sy = pl.skip_y;
-    var skip_sel = (pk.cursor >= n);
-    if (skip_sel) {
-        Ui_Box(sx - p, sy - p, sx + skip_w + p, sy + skip_h + p, UI_C_LIGHT);
-    }
-    Ui_DrawFrame(sx, sy, skip_w, skip_h, _a, p);
-    if (skip_sel) Ui_Arrow(sx + 5 * p + Ui_Bob(current_time) * p, sy + (skip_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
-    if (pl.tight) Ui_Text(sx + 9 * p, sy + (skip_h - mt.line_h) div 2, skip_label, skip_sel ? UI_C_LIGHTEST : UI_C_LIGHT);   // the narrow box: past the marker
-    else Ui_Text(sx + skip_w / 2, sy + (skip_h - mt.line_h) div 2, skip_label, skip_sel ? UI_C_LIGHTEST : UI_C_LIGHT, fa_center);
-    array_push(rects, { x: sx, y: sy, w: skip_w, h: skip_h });
     pk.rects = rects;
-    for (var hp = 0; hp < array_length(pl.hint_parts); hp++) {
-        Prompt_RichDraw(pl.hint_x, pl.hint_y + hp * (mt.line_h + p), pl.hint_parts[hp], pl.hint_w, UI_C_LIGHT, pl.tight ? fa_left : fa_center, _a);
-    }
+    Prompt_RichDraw(pl.hint_x, pl.hint_y, hint, pl.hint_w, UI_C_LIGHT, fa_center, _a);
 }
 
 function CardsUi_Draw() {
@@ -4465,6 +4452,39 @@ function Ui_TextBlock(_x, _y, _txt, _w, _col) {
     draw_set_valign(fa_top);
     draw_set_color(Ui_TextColor(_col));
     draw_text_ext_transformed(round(_x), round(_y), string(_txt), -1, max(1, round(_w / s)), s, s, 0);
+}
+
+// R3 (D168): the measure and the draw of a wrapped plain block at a type step (UI_FontStep: 0 = the UI size, 1 = the next smaller one). { w: the widest line,
+// h: the height, lines }. Plain text only (no prompts or markup); the font that was set is put back.
+function Ui_TextBlockMeasureStep(_txt, _w, _step) {
+    var fs = UI_FontStep(_step);
+    var f0 = draw_get_font();
+    draw_set_font(fs.font);
+    var s = max(0.0001, fs.scale);
+    var sep_w = max(1, round(_w / s));
+    var h = round(string_height_ext(string(_txt), -1, sep_w) * s);
+    var w = round(string_width_ext(string(_txt), -1, sep_w) * s);
+    var lh = max(1, round(string_height("A") * s));
+    draw_set_font(f0);
+    return { w: w, h: h, lines: max(1, round(h / lh)), line_h: lh, step: fs.step };
+}
+
+function Ui_TextBlockStep(_x, _y, _txt, _w, _col, _step) {
+    if (_step <= 0) { Ui_TextBlock(_x, _y, _txt, _w, _col); return; }
+    var fs = UI_FontStep(_step);
+    var f0 = draw_get_font();
+    draw_set_font(fs.font);
+    var s = max(0.0001, fs.scale);
+    if (UiFit_On()) {
+        var m = Ui_TextBlockMeasureStep(_txt, _w, _step);
+        draw_set_font(fs.font);
+        UiFit_BoxDrawn(string(_txt), _x, _y, _x + m.w, _y + m.h, _x, _y);
+    }
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+    draw_set_color(Ui_TextColor(_col));
+    draw_text_ext_transformed(round(_x), round(_y), string(_txt), -1, max(1, round(_w / s)), s, s, 0);
+    draw_set_font(f0);
 }
 
 // D100 details panel: one plain sentence, then number lines [{ label, value }] (generated from the real game data by the caller).

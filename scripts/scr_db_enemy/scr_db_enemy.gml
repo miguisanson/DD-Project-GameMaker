@@ -320,7 +320,7 @@ function EnemyDB_Init() {
 
     global.enemy_db[? ENEMY_FINAL_BOSS] = {
         id: ENEMY_FINAL_BOSS,
-        name: "The Pale Choirbeast",
+        name: "Pale Choirbeast",
         level: 10,
         stats: { atk: 21, def: 24, spd: 14, mag: 19 },
         base_hp: 140,

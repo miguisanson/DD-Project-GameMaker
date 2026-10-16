@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T06:15:14Z",
-    "row_count": 1209
+    "generated_at_utc": "2026-10-16T08:28:50Z",
+    "row_count": 1208
   },
   "default_lang": "en",
   "languages": [
@@ -607,10 +607,6 @@
     "cards.pick.left": {
       "en": "({n} picks left)",
       "ko": "(남은 선택 {n}번)"
-    },
-    "cards.pick.skip": {
-      "en": "Skip: +{gold} Gold",
-      "ko": "건너뛰기: +{gold} 골드"
     },
     "cards.pick.title": {
       "en": "Choose a Card",
@@ -2149,7 +2145,7 @@
       "ko": "다이어울프"
     },
     "enemy.name.enemy_final_boss": {
-      "en": "The Pale Choirbeast",
+      "en": "Pale Choirbeast",
       "ko": "창백한 성가대 짐승"
     },
     "enemy.name.enemy_ghostsword": {
