@@ -17,6 +17,7 @@ param(
     [switch]$DryRun,
     [switch]$Force,
     [switch]$IncludeUnusedFonts,
+    [switch]$SkipGate,                                # test hook: use the build already in SourceDir; refused for a destination under E:\Games
     [string]$ProjectDir = '',                         # default: the repo this script lives in
     [string]$WorkRoot = 'E:\Temp\dd-gate-release',    # the gate's scratch root (must contain "dd-gate")
     [string]$SourceDir = '',                          # default: <WorkRoot>\out (the gate's build); the dry-run tests point it at a fake one
@@ -39,6 +40,7 @@ $ZipPath = Join-Path $DestRoot ($PkgName + '.zip')
 
 # ---- 1. drive and space: E: only -----------------------------------------------------------------
 if ([IO.Path]::GetPathRoot($DestRoot) -ine 'E:\') { Refuse 2 "the destination '$DestRoot' is not on drive E: (releases are built on E: only)" }
+if ($SkipGate -and $DestRoot -like 'E:\Games*') { Refuse 2 '-SkipGate is a test hook and may not write into E:\Games: a release always runs the gate' }
 if ($WorkRoot -notlike '*dd-gate*') { Refuse 2 "the work root '$WorkRoot' must contain 'dd-gate'" }
 $free = [math]::Round((Get-PSDrive -Name E -ErrorAction Stop).Free / 1GB, 1)
 Write-Host "SPACE E: $free GB free (need $MinFreeGB)"
@@ -57,7 +59,9 @@ $gateScript = Join-Path $ProjectDir 'tools\automation\run_tests.ps1'
 $gateArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$gateScript`" -Mode fast -WorkRoot `"$WorkRoot`""
 Write-Host "GATE powershell $gateArgs"
 
-$plan = New-Object System.Collections.ArrayList   # @{ Src; Rel }
+# The package as a list of @{ Src; Rel }. Built again after the gate: before a real run the build folder does not exist yet.
+function Get-Plan {
+$plan = New-Object System.Collections.ArrayList
 function Add-File([string]$src, [string]$rel) { [void]$plan.Add(@{ Src = $src; Rel = $rel }) }
 function Add-Tree([string]$srcDir, [string]$relDir) {
     if (-not (Test-Path -LiteralPath $srcDir)) { Add-File $srcDir $relDir; return }   # reported as MISSING
@@ -81,6 +85,9 @@ $ofl = Join-Path $SourceDir 'fonts\galmuri\OFL-Galmuri.txt'
 if (-not (Test-Path -LiteralPath $ofl)) { $ofl = Join-Path $ProjectDir 'datafiles\fonts\galmuri\OFL-Galmuri.txt' }
 Add-File $ofl 'LICENSES/OFL-Galmuri.txt'
 Add-File (Join-Path $PSScriptRoot 'LICENSES\CC-BY-4.0-attribution.txt') 'LICENSES/CC-BY-4.0-attribution.txt'
+return ,$plan
+}
+$plan = Get-Plan
 
 $missing = @($plan | Where-Object { -not (Test-Path -LiteralPath $_.Src -PathType Leaf) })
 foreach ($p in $plan) { Write-Host "FILE $($p.Rel)" }
@@ -95,17 +102,22 @@ if ($DryRun) {
 # ---- 4. nothing may be overwritten, then the gate ----------------------------------------------------
 if ((Test-Path -LiteralPath $PkgDir) -and -not $Force) { Refuse 6 "'$PkgDir' already exists (move it away, or use -Force)" }
 if ((Test-Path -LiteralPath $ZipPath) -and -not $Force) { Refuse 6 "'$ZipPath' already exists (move it away, or use -Force)" }
-if (-not (Test-Path -LiteralPath $gateScript)) { Refuse 2 "gate script not found: $gateScript" }
+if (-not $SkipGate -and -not (Test-Path -LiteralPath $gateScript)) { Refuse 2 "gate script not found: $gateScript" }
 
-Write-Host 'Running the gate on the current commit (a few minutes)...'
-$gateOut = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $gateScript -Mode fast -WorkRoot $WorkRoot 2>&1 | ForEach-Object { "$_" })
-$gateOut | Select-Object -Last 12 | ForEach-Object { Write-Host "  $_" }
-if (-not ($gateOut | Where-Object { $_ -match '^GATE PASS' })) { Refuse 4 'the gate did not print GATE PASS' }
-$bid = $gateOut | Where-Object { $_ -match '^build id\s+(\S+)' } | Select-Object -First 1
-if ($bid -match 'dirty') { Refuse 3 "the gate built from uncommitted files ($bid)" }
-Write-Host "BUILD $bid"
+if ($SkipGate) {
+    Write-Host 'GATE skipped (-SkipGate, test hook)'
+} else {
+    Write-Host 'Running the gate on the current commit (a few minutes)...'
+    $gateOut = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $gateScript -Mode fast -WorkRoot $WorkRoot 2>&1 | ForEach-Object { "$_" })
+    $gateOut | Select-Object -Last 12 | ForEach-Object { Write-Host "  $_" }
+    if (-not ($gateOut | Where-Object { $_ -match '^GATE PASS' })) { Refuse 4 'the gate did not print GATE PASS' }
+    $bid = $gateOut | Where-Object { $_ -match '^build id\s+(\S+)' } | Select-Object -First 1
+    if ($bid -match 'dirty') { Refuse 3 "the gate built from uncommitted files ($bid)" }
+    Write-Host "BUILD $bid"
+}
 
 # ---- 5. copy and zip -----------------------------------------------------------------------------------
+$plan = Get-Plan   # the build exists now
 $missing = @($plan | Where-Object { -not (Test-Path -LiteralPath $_.Src -PathType Leaf) })
 if ($missing.Count -gt 0) { foreach ($m in $missing) { Write-Host "MISSING $($m.Src)" }; Refuse 5 'a file of the package is missing in the build' }
 New-Item -ItemType Directory -Force -Path $PkgDir | Out-Null

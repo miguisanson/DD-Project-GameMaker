@@ -156,6 +156,50 @@ class DryRun(unittest.TestCase):
         self.assertRegex(text, r"(?m)^SPACE E: [0-9.]+ GB free")
 
 
+class RealRun(unittest.TestCase):
+    """The copy and the zip for real, into a scratch folder, with the gate skipped (a test hook that is refused for the E:/Games folder)."""
+
+    @classmethod
+    def setUpClass(cls):
+        os.makedirs(SCRATCH_ROOT, exist_ok=True)
+        cls.tmp = tempfile.mkdtemp(prefix="dd-release-real-", dir=SCRATCH_ROOT)
+        cls.out = make_fake_out(cls.tmp)
+        cls.dest = os.path.join(cls.tmp, "Release")
+        cls.repo = make_repo(os.path.join(cls.tmp, "clean"), False)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def run_it(self, extra=None):
+        return run_ps(["-SkipGate", "-SourceDir", self.out, "-DestRoot", self.dest, "-ProjectDir", self.repo] + (extra or []))
+
+    def test_a_real_run_copies_and_zips_exactly_the_package(self):
+        code, text = self.run_it()
+        self.assertEqual(code, 0, text)
+        pkg = os.path.join(self.dest, PKG)
+        on_disk = set()
+        for root, _dirs, files in os.walk(pkg):
+            for f in files:
+                on_disk.add(os.path.relpath(os.path.join(root, f), pkg).replace("\\", "/"))
+        self.assertEqual(on_disk, EXPECTED_FILES)
+        import zipfile
+        z = zipfile.ZipFile(os.path.join(self.dest, PKG + ".zip"))
+        names = {n for n in z.namelist() if not n.endswith("/")}
+        self.assertEqual(names, {PKG + "/" + f for f in EXPECTED_FILES})
+        self.assertTrue(all("\\" not in n for n in z.namelist()), "zip entries must use forward slashes")
+        self.assertIsNone(z.testzip())
+        self.assertIn("RELEASE OK", text)
+        code, text = self.run_it()
+        self.assertEqual(code, 6, text)   # never overwrites
+
+    def test_skip_gate_is_refused_into_games(self):
+        bad = r"E:\Games\dd-release-test-never-created"
+        code, text = run_ps(["-SkipGate", "-SourceDir", self.out, "-DestRoot", bad, "-ProjectDir", self.repo])
+        self.assertEqual(code, 2, text)
+        self.assertFalse(os.path.exists(bad))
+
+
 class Texts(unittest.TestCase):
     def test_credits_txt_has_every_credit_and_url(self):
         text = read(os.path.join(HERE, "CREDITS.txt"))
