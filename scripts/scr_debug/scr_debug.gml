@@ -3048,7 +3048,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsEliteDeath(_s);   // H13a (D156): an elite slime and an elite plant on the map, the death scene with its picture, 480 x 432 and 800 x 720; goes on with the round 3 menus (1030)
             break;
         case 1030: case 1031: case 1032: case 1033: case 1034: case 1035: case 1036: case 1037: case 1038: case 1039:
-            Scenario_StepShotsR3Menus(_s);   // round 3 menus (R-096, R-097): the Gear and Skills headers, the reset question and notice in the game and on the title; the end of the pictures
+            Scenario_StepShotsR3Menus(_s);   // round 3 menus (R-096, R-097): the Gear and Skills headers, the reset question and notice in the game and on the title; goes on with r3stealth (1040)
+            break;
+        case 1040: case 1041: case 1042: case 1043: case 1044: case 1045: case 1046: case 1047: case 1048: case 1049:
+            Scenario_StepShotsR3Stealth(_s);   // r3stealth (D179, R-098): the faint sight cone in a dark cave, the daylight clearing and while chasing; three scenes, two sizes; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -12177,12 +12180,14 @@ function Scenario_StepShotsConfirm(_s) {
 //   586-588: a dire wolf 2 tiles from the hiding cell (3,4): the player stands still there, no "!" and no battle; one step off the cell and the wolf spots him.
 //   589-592: a spider put next to the exit chased to: the player leaves and comes back, the spider is 4 tiles from the exit, nobody within 3 tiles of the arrival tile.
 // ============================================================================
-function Scenario_H11Enemy(_obj, _cx, _cy, _sight) {
+function Scenario_H11Enemy(_obj, _cx, _cy, _sight, _face = -1) {
     var _e = instance_create_layer(_cx * GRID_TILE_SIZE, _cy * GRID_TILE_SIZE, "Instances", _obj);
     EnemyAI_Init(_e);
     Scenario_PlaceEnemy(_e, _cx, _cy);
     if (_sight >= 0) _e.prof.sight = _sight;
     _e.idle_timer = 100000;   // it stays where it is until it has a reason to move
+    _e.turn_timer = 100000;   // D179: and keeps the way it faces (a cone has a front); _face -1 leaves the facing it was given
+    if (_face >= 0) _e.look_dir = _face;
     return _e;
 }
 
@@ -12665,7 +12670,7 @@ function Scenario_StepSmokeH14(_s) {
                 Scenario_Release();
                 Scenario_Check("h14_the_stage_cells_of_rm_floor3_are_free", Scenario_H14Free(12, 6) && Scenario_H14Free(10, 6) && Scenario_H14Free(9, 6) && Scenario_H14Free(9, 5));
                 _h.pillar = Scenario_Block(obj_wall, 10, 6);
-                _h.e = Scenario_H11Enemy(obj_slime, 12, 6, 4);
+                _h.e = Scenario_H11Enemy(obj_slime, 12, 6, 4, LEFT);   // D179: it faces the pillar and the player behind it
                 Scenario_PlacePlayer(9, 6);
                 _pl.face = UP;   // already facing the way it will walk: a tap on a new direction only turns (D69)
                 _h.bad = false;
@@ -14512,10 +14517,112 @@ function Scenario_StepShotsR3Menus(_s) {
                 if (_o.si >= array_length(Scenario_R3Scales(_o.di))) { _o.si = 0; _o.di++; }
                 if (_o.di >= array_length(_scenes)) {
                     Scenario_SetWindowScale(3);
-                    Scenario_NoticeEnd();   // the end of the pictures: removes the files and the profile the steps made
+                    Scenario_Next(_s, 1040);   // goes on with r3stealth (1040..1043), the end of the pictures
                 } else {
                     Scenario_Next(_s, 1030);
                 }
+            }
+            break;
+    }
+}
+
+// ============================================================================
+// Round 3 packet stealth (D179, R-098) pictures 1040-1049, three scenes at scale 3 (480 x 432) and scale 5 (800 x 720), shot_r3stealth_<scene>_<w>x<h>.png:
+//   dark   rm_floor7 (a dark cave): a spider facing right, the very faint cone in front of it, the player standing behind it, not seen
+//   lit    rm_floor2 (the daylight clearing): a dire wolf facing right (sight 4: a longer cone), the player behind it
+//   chase  rm_floor3: a slime that chases (a little stronger cone, sight 4 instead of 3)
+// The checks at the moment of the picture: exactly one cone was drawn, it is faint (0.10 calm, 0.16 chasing at most), the enemy faces the way the picture is built for,
+// and the player stands outside the cone.
+// ============================================================================
+function Scenario_R3StealthScene(_i) {
+    switch (_i) {
+        case 0: return { name: "dark", rm: rm_floor7, pcx: 4, pcy: 5, foe: obj_spider, ecx: 8, ecy: 5, face: RIGHT, chase: false, wait: 40 };
+        case 1: return { name: "lit", rm: rm_floor2, pcx: 4, pcy: 5, foe: obj_dire_wolf, ecx: 9, ecy: 5, face: RIGHT, chase: false, wait: 40 };
+        case 2: return { name: "chase", rm: rm_floor3, pcx: 2, pcy: 6, foe: obj_slime, ecx: 8, ecy: 6, face: RIGHT, chase: true, wait: 40 };
+    }
+    return undefined;
+}
+
+function Scenario_R3StealthJudge(_h, _sc, _pl) {
+    var _T = GRID_TILE_SIZE;
+    var _tag = "shots_r3stealth_" + _sc.name + "_";
+    var _e = instance_exists(_h.e) ? _h.e : noone;
+    Scenario_Check(_tag + "the_enemy_is_alive", _e != noone);
+    if (_e == noone) return;
+    if (asset_get_index("Sight_ConeStats") == -1) { Scenario_Check(_tag + "the_cone_drawing_exists", false); return; }
+    var _st = Sight_ConeStats();
+    Scenario_Check(_tag + "exactly_one_cone_was_drawn_with_cells", _st.enemies == 1 && _st.cells > 0, "enemies=" + string(_st.enemies) + " cells=" + string(_st.cells));
+    var _max = _sc.chase ? 0.16 : 0.10;
+    Scenario_Check(_tag + "the_cone_is_faint", _st.alpha_max >= 0.05 && _st.alpha_max <= _max + 0.0001, "alpha_max=" + string(_st.alpha_max));
+    Scenario_Check(_tag + "the_enemy_faces_the_way_the_picture_is_built_for", variable_instance_exists(_e, "look_dir") && _e.look_dir == _sc.face);
+    Scenario_Check(_tag + "the_enemy_is_" + (_sc.chase ? "chasing" : "calm"), _sc.chase ? (_e.ai_mode == "chase") : (_e.ai_mode == "idle" && _e.alert_pop == 0), "mode=" + _e.ai_mode);
+    var _ec = Scenario_H11Cell(_e);
+    var _pcx = Nav_CellOf(_pl.x + _T / 2);
+    var _pcy = Nav_CellOf(_pl.y + _T / 2);
+    var _cone = Vis_Cone(Nav_Get().grid, _ec.cx, _ec.cy, Vis_EnemyTiles(_e.prof, _e.ai_mode), _e.prof.see_through, _e.look_dir);
+    Scenario_Check(_tag + "the_player_stands_outside_the_cone", !Vis_Has(_cone, _pcx, _pcy));
+}
+
+function Scenario_StepShotsR3Stealth(_s) {
+    if (!variable_struct_exists(_s, "r3st")) _s.r3st = { i: 0, e: noone };
+    var _h = _s.r3st;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _sc = Scenario_R3StealthScene(_h.i);
+    switch (_s.step) {
+        case 1040:   // build the scene _h.i
+            if (_sc == undefined) { Scenario_SetWindowScale(3); Scenario_NoticeEnd(); break; }   // the end of the pictures: removes the files and the profile the steps made
+            if (_s.t == 1) {
+                Scenario_Release();
+                Scenario_ClearUi();
+                Dialogue_CloseNow();
+                global.light_clock = 1500;   // the fires' flicker is frozen at one step, so a picture can be taken again
+                Scenario_NewKnight(CLASS_KNIGHT);
+                Scenario_SetWindowScale(3);
+                _h.via = (_sc.rm == rm_floor2) ? rm_floor3 : rm_floor2;
+                room_goto(_h.via);   // via another room: the controller only spawns the player on a room change
+            }
+            if (_s.t == 30 && room == _h.via) room_goto(_sc.rm);
+            if (_s.t > 70 && Scenario_FloorReady(_sc.rm) && Player_IsSettled(_pl)) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_PlacePlayer(_sc.pcx, _sc.pcy);
+                _pl.face = RIGHT;
+                _h.e = Scenario_H11Enemy(_sc.foe, _sc.ecx, _sc.ecy, -1, _sc.face);
+                if (_sc.chase) {
+                    _h.e.ai_mode = "chase";   // standing in chase mode: its cone is the chasing one and it has not seen the player (he is behind it)
+                    _h.e.react_timer = 100000;
+                    _h.e.last_seen_cx = _sc.pcx;
+                    _h.e.last_seen_cy = _sc.pcy;
+                }
+                Scenario_Next(_s, 1041);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_r3stealth_" + _sc.name + "_room_is_ready", false, "room=" + room_get_name(room) + " player=" + string(_pl != noone)); Scenario_NoticeEnd(); }
+            break;
+        case 1041:   // scale 3, wait, shoot
+            if (_s.t == 1) Scenario_SetWindowScale(3);
+            if (_s.t >= _sc.wait) {
+                Scenario_R3StealthJudge(_h, _sc, _pl);
+                _s.shot = "shot_r3stealth_" + _sc.name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1042);
+            }
+            break;
+        case 1042:   // scale 5
+            if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+            if (_s.t == 4) Scenario_SetWindowScale(5);
+            if (_s.t >= 40) {
+                _s.shot = "shot_r3stealth_" + _sc.name + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1043);
+            }
+            break;
+        case 1043:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                with (obj_enemy) instance_destroy();
+                _h.i++;
+                Scenario_Next(_s, 1040);
             }
             break;
     }

@@ -154,6 +154,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Menus", Test_Suite_R3Menus);
     Test_RunSuite("R3Light", Test_Suite_R3Light);
     Test_RunSuite("R3Bvis", Test_Suite_R3Bvis);
+    Test_RunSuite("R3Stealth", Test_Suite_R3Stealth);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -11378,11 +11379,11 @@ function Test_LightVis() {
     var _slime = EnemyAI_Profile(ENEMY_SLIME);
     var _wolf = EnemyAI_Profile(ENEMY_DIREWOLF);
     var _boss = EnemyAI_Profile(ENEMY_FINAL_BOSS);
-    Test_Eq("H14 vis: a slime lights a radius of 4 while idle", Vis_EnemyTiles(_slime, "idle"), 4);
-    Test_Eq("H14 vis: a slime lights a radius of 5 while it chases (+1 tile)", Vis_EnemyTiles(_slime, "chase"), 5);
-    Test_Eq("H14 vis: a slime lights a radius of 4 while it searches", Vis_EnemyTiles(_slime, "search"), 4);
-    Test_Eq("H14 vis: a dire wolf lights a radius of 5 while idle", Vis_EnemyTiles(_wolf, "idle"), 5);
-    Test_Eq("H14 vis: a dire wolf lights a radius of 6 while it chases", Vis_EnemyTiles(_wolf, "chase"), 6);
+    Test_Eq("H14 vis: a slime lights a radius of 3 while idle (D179)", Vis_EnemyTiles(_slime, "idle"), 3);
+    Test_Eq("H14 vis: a slime lights a radius of 4 while it chases (+1 tile)", Vis_EnemyTiles(_slime, "chase"), 4);
+    Test_Eq("H14 vis: a slime lights a radius of 3 while it searches", Vis_EnemyTiles(_slime, "search"), 3);
+    Test_Eq("H14 vis: a dire wolf lights a radius of 4 while idle (D179)", Vis_EnemyTiles(_wolf, "idle"), 4);
+    Test_Eq("H14 vis: a dire wolf lights a radius of 5 while it chases", Vis_EnemyTiles(_wolf, "chase"), 5);
     Test_Eq("H14 vis: the final boss lights nothing", Vis_EnemyTiles(_boss, "idle"), 0);
 
     // the set is worked out once per (cell, radius) and again only when the grid changes
@@ -14912,4 +14913,179 @@ function Test_R3Blink() {
     var _c3 = Battle_StatusChips(_ch3);
     Test_True("r3bvis blink: a poison never blinks (its count is stacks)", !_c3[0].last);
     Test_True("r3bvis blink: a burn on its last turn blinks", _c3[1].last);
+}
+
+// ============================================================================================================================
+// Round 3 packet stealth, part A: sight (owner notes 22, 29; D179; R-098). Expected values are the brief's, worked out by hand:
+//   an enemy sees the player when he is within 1 tile in any direction, OR within its sight (3 tiles; dire wolf and mad whisp 4) AND inside a 90 degree cone
+//   round the way it faces AND nothing that blocks sight is between. A cell is in the cone when it is in front and no further off to the side than it is ahead
+//   (45 degrees inclusive). Walls, trees, rocks, stumps, barrels, chests, graves and tall grass block sight; torches, fire stands, skulls, bones, dung, NPCs,
+//   doors, switches and beds do not. A very faint cone (0.06..0.10 alpha, softer at the edge, a little stronger while it chases) is drawn under the darkness.
+// ============================================================================================================================
+function Test_Suite_R3Stealth() {
+    Test_RunSuite("R3Stealth.cone", Test_R3Cone);
+    Test_RunSuite("R3Stealth.blockers", Test_R3Blockers);
+    Test_RunSuite("R3Stealth.profiles", Test_R3Profiles);
+    Test_RunSuite("R3Stealth.draw", Test_R3ConeDraw);
+}
+
+// Can an enemy on cell (_ecx,_ecy) facing _face see a player on cell (_pcx,_pcy)?
+function Test_R3Sees(_g, _ecx, _ecy, _pcx, _pcy, _tiles, _face, _see_through = false, _hidden = false) {
+    var _T = GRID_TILE_SIZE;
+    return Sight_CanSee(_g, _ecx * _T, _ecy * _T, _pcx * _T, _pcy * _T, _tiles, _see_through, _hidden, _face);
+}
+
+// 1. The cone: in front, behind, beside, the ring of 1 tile, the range, the four facings, ghosts, hidden players.
+function Test_R3Cone() {
+    var _g = Nav_GridFromRows(Test_LightOpen(21, 11));
+    // the enemy stands on (10,5), facing RIGHT, sight 3
+    Test_True("r3stealth cone: 3 tiles straight ahead is seen", Test_R3Sees(_g, 10, 5, 13, 5, 3, RIGHT));
+    Test_False("r3stealth cone: 4 tiles straight ahead is out of range", Test_R3Sees(_g, 10, 5, 14, 5, 3, RIGHT));
+    Test_True("r3stealth cone: a wolf or a whisp (sight 4) sees 4 tiles ahead", Test_R3Sees(_g, 10, 5, 14, 5, 4, RIGHT));
+    Test_True("r3stealth cone: 2 ahead and 1 up is inside the cone", Test_R3Sees(_g, 10, 5, 12, 4, 3, RIGHT));
+    Test_True("r3stealth cone: 2 ahead and 2 up is on the edge of the cone (45 degrees counts)", Test_R3Sees(_g, 10, 5, 12, 3, 3, RIGHT));
+    Test_True("r3stealth cone: 2 ahead and 2 down is on the other edge", Test_R3Sees(_g, 10, 5, 12, 7, 3, RIGHT));
+    Test_False("r3stealth cone: 3 ahead and 1 up is outside the circle of 3", Test_R3Sees(_g, 10, 5, 13, 4, 3, RIGHT));
+    Test_False("r3stealth cone: 1 ahead and 2 up is outside the cone (too far to the side)", Test_R3Sees(_g, 10, 5, 11, 3, 3, RIGHT));
+    Test_False("r3stealth cone: 2 tiles beside it (up) is not seen", Test_R3Sees(_g, 10, 5, 10, 3, 3, RIGHT));
+    Test_False("r3stealth cone: 2 tiles beside it (down) is not seen", Test_R3Sees(_g, 10, 5, 10, 7, 3, RIGHT));
+    Test_False("r3stealth cone: 2 tiles behind it is not seen", Test_R3Sees(_g, 10, 5, 8, 5, 3, RIGHT));
+    Test_False("r3stealth cone: 3 tiles behind it is not seen", Test_R3Sees(_g, 10, 5, 7, 5, 3, RIGHT));
+    Test_False("r3stealth cone: behind and a little off is not seen", Test_R3Sees(_g, 10, 5, 8, 4, 3, RIGHT));
+    // the ring of one tile, in every direction
+    var _ring_bad = "";
+    for (var _dy = -1; _dy <= 1; _dy++) {
+        for (var _dx = -1; _dx <= 1; _dx++) {
+            if (!Test_R3Sees(_g, 10, 5, 10 + _dx, 5 + _dy, 3, RIGHT)) _ring_bad += " (" + string(_dx) + "," + string(_dy) + ")";
+        }
+    }
+    Test_Eq("r3stealth cone: every cell within 1 tile is seen whichever way it faces (missed:" + _ring_bad + ")", _ring_bad, "");
+    // the other three facings (the same shape turned)
+    Test_True("r3stealth cone: facing LEFT it sees 3 tiles to the left", Test_R3Sees(_g, 10, 5, 7, 5, 3, LEFT));
+    Test_False("r3stealth cone: facing LEFT it does not see 3 tiles to the right", Test_R3Sees(_g, 10, 5, 13, 5, 3, LEFT));
+    Test_True("r3stealth cone: facing UP it sees 3 tiles up", Test_R3Sees(_g, 10, 5, 10, 2, 3, UP));
+    Test_False("r3stealth cone: facing UP it does not see 2 tiles down", Test_R3Sees(_g, 10, 5, 10, 7, 3, UP));
+    Test_False("r3stealth cone: facing UP it does not see 2 tiles to the right", Test_R3Sees(_g, 10, 5, 12, 5, 3, UP));
+    Test_True("r3stealth cone: facing DOWN it sees 3 tiles down", Test_R3Sees(_g, 10, 5, 10, 8, 3, DOWN));
+    Test_True("r3stealth cone: facing DOWN it sees 2 down and 2 left (the edge)", Test_R3Sees(_g, 10, 5, 8, 7, 3, DOWN));
+    Test_False("r3stealth cone: facing DOWN it does not see 3 tiles up", Test_R3Sees(_g, 10, 5, 10, 2, 3, DOWN));
+    // the cone is a set of cells: facing RIGHT with sight 3 on open floor: 9 cells ahead (3 + 5 + 1), its own cell and the 5 ring cells not already ahead = 15
+    var _cone = Vis_Cone(_g, 10, 5, 3, false, RIGHT);
+    var _n = 0;
+    for (var _y = 0; _y < 11; _y++) {
+        for (var _x = 0; _x < 21; _x++) {
+            if (Vis_Has(_cone, _x, _y)) _n++;
+        }
+    }
+    Test_Eq("r3stealth cone: facing RIGHT with sight 3 on open floor lights 15 cells", _n, 15);
+    // it is the same set the sight test uses, for every cell of the window and every facing
+    var _mismatch = "";
+    for (var _f = 0; _f < 4; _f++) {
+        var _c4 = Vis_Cone(_g, 10, 5, 4, false, _f);
+        for (var _yy = 0; _yy < 11; _yy++) {
+            for (var _xx = 4; _xx < 17; _xx++) {
+                if (Vis_Has(_c4, _xx, _yy) != Test_R3Sees(_g, 10, 5, _xx, _yy, 4, _f)) _mismatch += " f" + string(_f) + "(" + string(_xx) + "," + string(_yy) + ")";
+            }
+        }
+    }
+    Test_Eq("r3stealth cone: the light set and Sight_CanSee agree on every cell and facing (differ:" + _mismatch + ")", _mismatch, "");
+    // a wall ahead: the cell behind it is not seen, the wall's own cell is lit
+    var _gw = Nav_GridFromRows(["....................", "....................", "....................", "....................", "....................", "............#.......", "....................", "....................", "...................."]);
+    Test_False("r3stealth cone: a wall 2 ahead hides the player behind it", Test_R3Sees(_gw, 10, 5, 13, 5, 3, RIGHT));
+    Test_True("r3stealth cone: the wall's own cell is lit", Vis_Has(Vis_Cone(_gw, 10, 5, 3, false, RIGHT), 12, 5));
+    Test_True("r3stealth cone: a ghost sees through the wall in front", Test_R3Sees(_gw, 10, 5, 13, 5, 3, RIGHT, true));
+    Test_False("r3stealth cone: a ghost still does not see behind it", Test_R3Sees(_gw, 10, 5, 8, 5, 3, RIGHT, true));
+    Test_False("r3stealth cone: a ghost still does not see 2 tiles beside it", Test_R3Sees(_gw, 10, 5, 10, 3, 3, RIGHT, true));
+    // hidden players: only from 1 tile, cone or not
+    Test_False("r3stealth cone: a hidden player 2 ahead is not seen", Test_R3Sees(_g, 10, 5, 12, 5, 3, RIGHT, false, true));
+    Test_True("r3stealth cone: a hidden player 1 ahead is seen", Test_R3Sees(_g, 10, 5, 11, 5, 3, RIGHT, false, true));
+    Test_True("r3stealth cone: a hidden player 1 behind is seen", Test_R3Sees(_g, 10, 5, 9, 5, 3, RIGHT, false, true));
+    // the radius it sees with: its sight, one more while it chases
+    Test_Eq("r3stealth cone: a slime sees 3 tiles when idle", Vis_EnemyTiles(EnemyAI_Profile(ENEMY_SLIME), "idle"), 3);
+    Test_Eq("r3stealth cone: a slime sees 4 tiles while it chases", Vis_EnemyTiles(EnemyAI_Profile(ENEMY_SLIME), "chase"), 4);
+    Test_Eq("r3stealth cone: a dire wolf sees 4 tiles when idle", Vis_EnemyTiles(EnemyAI_Profile(ENEMY_DIREWOLF), "idle"), 4);
+    Test_Eq("r3stealth cone: a dire wolf sees 5 tiles while it chases", Vis_EnemyTiles(EnemyAI_Profile(ENEMY_DIREWOLF), "chase"), 5);
+    Test_Eq("r3stealth cone: a mad whisp sees 4 tiles when idle", Vis_EnemyTiles(EnemyAI_Profile(ENEMY_MADWHISP), "idle"), 4);
+    Test_Eq("r3stealth cone: a boss sees nothing", Vis_EnemyTiles(EnemyAI_Profile(ENEMY_FINAL_BOSS), "idle"), 0);
+}
+
+// 2. What blocks sight: one function names every prop; the room grid takes it from the live instances.
+function Test_R3Blockers() {
+    if (asset_get_index("Sight_BlocksObject") == -1) { Test_True("r3stealth blockers: Sight_BlocksObject exists (not implemented yet)", false); return; }
+    var _block = [obj_wall, obj_tree_1, obj_tree_2, obj_tree_stump1, obj_tree_stump2, obj_rock1, obj_rock2, obj_barrel, obj_barrel_lv1, obj_barrel_lv2, obj_barrel_lv3, obj_barrel_broken,
+                  obj_chest, obj_chest_lv1, obj_chest_lv2, obj_chest_lv3, obj_chest_class_select, obj_chest_skillbook, obj_chest_opened, obj_tall_grass, obj_grave];
+    var _pass = [obj_torch, obj_torch_off, obj_fire_stand, obj_fire_stand_off, obj_skull_1, obj_skull_2, obj_bone, obj_horned_skull, obj_dung_pile, obj_npc, obj_door, obj_switch, obj_bed, obj_interactable];
+    var _bad_b = "";
+    for (var _i = 0; _i < array_length(_block); _i++) {
+        if (!Sight_BlocksObject(_block[_i])) _bad_b += " " + object_get_name(_block[_i]);
+    }
+    var _bad_p = "";
+    for (var _j = 0; _j < array_length(_pass); _j++) {
+        if (Sight_BlocksObject(_pass[_j])) _bad_p += " " + object_get_name(_pass[_j]);
+    }
+    Test_Eq("r3stealth blockers: walls, trees, stumps, rocks, barrels, chests, graves and tall grass block sight (missed:" + _bad_b + ")", _bad_b, "");
+    Test_Eq("r3stealth blockers: torches, fire stands, skulls, bones, dung, NPCs, doors, switches and beds do not (wrongly block:" + _bad_p + ")", _bad_p, "");
+
+    // on a hand-made map: a barrel ('o': solid and blocks sight) between the enemy and the player hides him; a torch ('~': solid, sight passes) does not; grass ('g') is walkable and blocks sight
+    var _gb = Nav_GridFromRows(["...........", "...........", "...........", "....o......", "...........", "..........."]);
+    Test_False("r3stealth blockers: a barrel between the enemy and the player hides him", Test_R3Sees(_gb, 2, 3, 6, 3, 4, RIGHT));
+    Test_True("r3stealth blockers: the same player in the next row is seen past the barrel", Test_R3Sees(_gb, 2, 2, 6, 2, 4, RIGHT));
+    var _gt = Nav_GridFromRows(["...........", "...........", "...........", "....~......", "...........", "..........."]);
+    Test_True("r3stealth blockers: a torch between them does not hide him", Test_R3Sees(_gt, 2, 3, 6, 3, 4, RIGHT));
+    var _gg = Nav_GridFromRows(["...........", "...........", "...........", "....g......", "...........", "..........."]);
+    Test_False("r3stealth blockers: grass between them hides him", Test_R3Sees(_gg, 2, 3, 6, 3, 4, RIGHT));
+    Test_False("r3stealth blockers: grass can be walked through", Nav_CellBlocked(_gg, 4, 3));
+    Test_True("r3stealth blockers: grass blocks sight", Nav_SightBlocked(_gg, 4, 3));
+
+    // the live room grid: instances put into the room are classified by Sight_BlocksObject (barrel, tree 2x2, torch, grass)
+    // (the test room is small, 10 x 9 cells: everything is put inside it, and the grid must say so, because a cell outside a grid counts as blocked for movement and for sight)
+    var _made = [instance_create_depth(16, 32, 0, obj_barrel), instance_create_depth(48, 32, 0, obj_tree_1), instance_create_depth(96, 32, 0, obj_torch), instance_create_depth(128, 32, 0, obj_tall_grass)];
+    var _lg = Nav_BuildGrid();
+    Test_True("r3stealth blockers: (setup) the cells used are inside the live grid", Nav_GridInside(_lg, 8, 2) && Nav_GridInside(_lg, 4, 3));
+    Test_True("r3stealth blockers: the live grid has the barrel as a solid that blocks sight", Nav_CellBlocked(_lg, 1, 2) && Nav_SightBlocked(_lg, 1, 2));
+    Test_True("r3stealth blockers: the live grid has the tree's four cells blocking sight", Nav_SightBlocked(_lg, 3, 2) && Nav_SightBlocked(_lg, 4, 3));
+    Test_True("r3stealth blockers: the live grid has the torch solid but see-through", Nav_CellBlocked(_lg, 6, 2) && !Nav_SightBlocked(_lg, 6, 2));
+    Test_True("r3stealth blockers: the live grid has the grass blocking sight", Nav_SightBlocked(_lg, 8, 2));
+    for (var _k = 0; _k < array_length(_made); _k++) instance_destroy(_made[_k]);
+}
+
+// 3. The sight of each kind: 3 tiles, wolf and whisp 4; the ghost still sees through walls; bosses see nothing.
+function Test_R3Profiles() {
+    var _want = [[ENEMY_SLIME, 3], [ENEMY_SPIDER, 3], [ENEMY_SNAKE, 3], [ENEMY_KILLER_PLANT, 3], [ENEMY_GHOSTSWORD, 3], [ENEMY_STRANGER, 3], [ENEMY_DIREWOLF, 4], [ENEMY_MADWHISP, 4]];
+    for (var _i = 0; _i < array_length(_want); _i++) {
+        Test_Eq("r3stealth profiles: sight of enemy " + string(_want[_i][0]) + " is " + string(_want[_i][1]) + " tiles", EnemyAI_Profile(_want[_i][0]).sight, _want[_i][1]);
+    }
+    Test_True("r3stealth profiles: the ghost sword still sees through walls", EnemyAI_Profile(ENEMY_GHOSTSWORD).see_through);
+    Test_False("r3stealth profiles: a slime does not", EnemyAI_Profile(ENEMY_SLIME).see_through);
+    Test_Eq("r3stealth profiles: the mini boss sees nothing", EnemyAI_Profile(ENEMY_MINI_BOSS).sight, 0);
+    Test_Eq("r3stealth profiles: the final boss sees nothing", EnemyAI_Profile(ENEMY_FINAL_BOSS).sight, 0);
+    // today's chase speeds are kept (px per frame)
+    var _chase = [[ENEMY_SLIME, 0.7], [ENEMY_SPIDER, 0.85], [ENEMY_SNAKE, 0.85], [ENEMY_MADWHISP, 0.85], [ENEMY_KILLER_PLANT, 0.8], [ENEMY_DIREWOLF, 1.0], [ENEMY_GHOSTSWORD, 0.85], [ENEMY_STRANGER, 0.9]];
+    for (var _j = 0; _j < array_length(_chase); _j++) {
+        Test_Eq("r3stealth profiles: chase speed of enemy " + string(_chase[_j][0]) + " is kept at " + string(_chase[_j][1]), EnemyAI_Profile(_chase[_j][0]).chase, _chase[_j][1]);
+    }
+}
+
+// 4. The faint cone: a part of the world pass under the darkness, very faint, softer at the edge, a little stronger while it chases.
+function Test_R3ConeDraw() {
+    var _parts = World_FxParts();
+    var _sight = -1;
+    var _light = -1;
+    for (var _i = 0; _i < array_length(_parts); _i++) {
+        if (_parts[_i].name == "sight") _sight = _i;
+        if (_parts[_i].name == "light") _light = _i;
+    }
+    Test_True("r3stealth draw: the sight cone is a part of the world pass", _sight >= 0);
+    Test_True("r3stealth draw: it is drawn before the darkness (under it)", _sight >= 0 && _sight < _light);
+    Test_Eq("r3stealth draw: it is drawn in the top pass with the darkness", (_sight >= 0 && variable_struct_exists(_parts[_sight], "pass")) ? _parts[_sight].pass : "(no pass)", "top");
+    if (asset_get_index("Sight_ConeAlpha") == -1) { Test_True("r3stealth draw: Sight_ConeAlpha exists (not implemented yet)", false); return; }
+    var _bad = "";
+    for (var _band = 0; _band <= 2; _band++) {
+        var _a = Sight_ConeAlpha(_band, false);
+        var _c = Sight_ConeAlpha(_band, true);
+        if (_a < 0.06 - 0.0001 || _a > 0.10 + 0.0001) _bad += " calm" + string(_band) + "=" + string(_a);
+        if (_c <= _a || _c > 0.16) _bad += " chase" + string(_band) + "=" + string(_c);
+    }
+    Test_Eq("r3stealth draw: every band is 0.06..0.10 calm and a little stronger (at most 0.16) while it chases (bad:" + _bad + ")", _bad, "");
+    Test_True("r3stealth draw: the edge (band 0) is softer than the middle (band 2)", Sight_ConeAlpha(0, false) < Sight_ConeAlpha(2, false));
 }
