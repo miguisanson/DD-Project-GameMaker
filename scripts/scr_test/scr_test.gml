@@ -168,6 +168,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Mouse", Test_Suite_R3Mouse);
     Test_RunSuite("R3LevelUp", Test_Suite_R3LevelUp);
     Test_RunSuite("R3Ideas1", Test_Suite_R3Ideas1);
+    Test_RunSuite("R3Balance", Test_Suite_R3Balance);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -293,11 +294,11 @@ function Test_Suite_Stats() {
     Test_Eq("vec mp_2_10_39", Resource_MaxMp(2, 10, 39), 47);
     Test_Eq("vec mp_2_1_12", Resource_MaxMp(2, 1, 12), 16);
     Test_Eq("vec mp_1_5_4", Resource_MaxMp(1, 5, 4), 16);
-    Test_ClassAt("vec cls_knight_1", CLASS_KNIGHT, 1, 9, 11, 9, 3, 10, 11);
-    Test_ClassAt("vec cls_knight_2", CLASS_KNIGHT, 2, 10, 13, 9, 3, 16, 12);
-    Test_ClassAt("vec cls_knight_3", CLASS_KNIGHT, 3, 11, 15, 9, 3, 22, 13);
-    Test_ClassAt("vec cls_knight_5", CLASS_KNIGHT, 5, 13, 19, 9, 3, 37, 15);
-    Test_ClassAt("vec cls_knight_10", CLASS_KNIGHT, 10, 18, 29, 9, 3, 70, 20);
+    Test_ClassAt("vec cls_knight_1", CLASS_KNIGHT, 1, 11, 12, 9, 3, 10, 11);
+    Test_ClassAt("vec cls_knight_2", CLASS_KNIGHT, 2, 12, 14, 9, 3, 16, 12);
+    Test_ClassAt("vec cls_knight_3", CLASS_KNIGHT, 3, 13, 16, 9, 3, 22, 13);
+    Test_ClassAt("vec cls_knight_5", CLASS_KNIGHT, 5, 15, 20, 9, 3, 37, 15);
+    Test_ClassAt("vec cls_knight_10", CLASS_KNIGHT, 10, 20, 30, 9, 3, 70, 20);
     Test_ClassAt("vec cls_archer_1", CLASS_ARCHER, 1, 8, 8, 11, 4, 10, 12);
     Test_ClassAt("vec cls_archer_2", CLASS_ARCHER, 2, 10, 8, 12, 4, 16, 14);
     Test_ClassAt("vec cls_archer_3", CLASS_ARCHER, 3, 12, 8, 12, 4, 22, 16);
@@ -18455,4 +18456,20 @@ function Test_R3IdWorkbook() {
     }
     Test_Eq("r3ideas1 workbook: every new string is in the workbook in English and Korean", _miss, "");
     Test_Eq("r3ideas1 workbook: the Korean is not the English", _same, "");
+}
+
+// D186 (R3 balance, R-118): the class-spread nudges. Expected values are the owner-approved numbers of tools/balance (balance-r3.md), not read back from the code.
+// The class stat lines are the `vec cls_*` vectors; here the skill cost and the Archer growth rule.
+function Test_Suite_R3Balance() {
+    SkillDB_Init();
+    Test_Eq("r3balance: Wound costs 4 MP (it was 3)", SkillDB_Get(SKILL_WOUND).mp_cost, 4);
+    Test_Eq("r3balance: Wound keeps its power 4", SkillDB_Get(SKILL_WOUND).power, 4);
+    Test_Eq("r3balance: Archer gains SPD on level 2", LevelUp_ClassGrowthGain(CLASS_ARCHER, 2).spd, 1);
+    Test_Eq("r3balance: Archer gains no SPD on level 3", LevelUp_ClassGrowthGain(CLASS_ARCHER, 3).spd, 0);
+    Test_Eq("r3balance: Archer gains SPD on level 4", LevelUp_ClassGrowthGain(CLASS_ARCHER, 4).spd, 1);
+    Test_Eq("r3balance: Archer gains no SPD on level 9", LevelUp_ClassGrowthGain(CLASS_ARCHER, 9).spd, 0);
+    Test_Eq("r3balance: Archer still gains ATK 1 on level 3", LevelUp_ClassGrowthGain(CLASS_ARCHER, 3).atk, 1);
+    Test_Eq("r3balance: Knight starts at SPD 9", CharacterCreate_Player(CLASS_KNIGHT).stats.spd, 9);
+    Test_Eq("r3balance: Nobody starts at ATK 9 DEF 9 SPD 11", string(CharacterCreate_Player(CLASS_NOBODY).stats.atk) + " " + string(CharacterCreate_Player(CLASS_NOBODY).stats.def) + " " + string(CharacterCreate_Player(CLASS_NOBODY).stats.spd), "9 9 11");
+    Test_Eq("r3balance: Archer starts at ATK 8 SPD 11", string(CharacterCreate_Player(CLASS_ARCHER).stats.atk) + " " + string(CharacterCreate_Player(CLASS_ARCHER).stats.spd), "8 11");
 }

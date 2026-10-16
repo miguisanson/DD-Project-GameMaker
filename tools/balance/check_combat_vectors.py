@@ -67,10 +67,10 @@ def nobody_fixed(lv):
     return tuple(x + y for x, y in zip(a, b))
 
 
-# D186 (R3 balance): Knight ATK 11->9, DEF 12->11, SPD 10->9; Archer ATK 9->8, SPD 13->11 and SPD growth only on even levels; Nobody ATK 8->9, DEF 8->9, SPD 9->11.
+# D186 (R3 balance): Knight SPD 10->9 (and Wound costs 4 MP, scr_db_skill); Archer ATK 9->8, SPD 13->11 and SPD growth only on even levels; Nobody ATK 8->9, DEF 8->9, SPD 9->11.
 CLASSES = {
     # name: base atk,def,spd,mag, hd, mp_gain, fixed growth fn(level) -> (atk,def,spd,mag), free-point default stat index (0 atk 1 def 2 spd 3 mag)
-    "knight": dict(base=(9, 11, 9, 3), hd=10, mp_gain=1, fixed=lambda lv: (1, 1, 0, 0), free=1),
+    "knight": dict(base=(11, 12, 9, 3), hd=10, mp_gain=1, fixed=lambda lv: (1, 1, 0, 0), free=1),
     "archer": dict(base=(8, 8, 11, 4), hd=8, mp_gain=2, fixed=lambda lv: (1, 0, 1 if lv % 2 == 0 else 0, 0), free=0),
     "mage": dict(base=(5, 7, 10, 12), hd=6, mp_gain=2, fixed=lambda lv: (0, 0, 0, 2), free=3),
     "nobody": dict(base=(9, 9, 11, 3), hd=8, mp_gain=1,
