@@ -1,19 +1,20 @@
-# Resume here (2026-10-17 night, shipping NO HOPE v1.0)
+# NO HOPE v1.0 — shipped 2026-10-17
 
-The owner finished their LAST playtest and said: do all the fixes and ship; keep going after a usage-limit reset. No new features unless the owner reopens development.
-Start with `/continue_DD-Project-GameMaker`, then this file and `.planning/STATE.md` (WIP line). Decisions: `research/DECISIONS.md` up to D195. Agent cap: 2 at a time (memory).
-Game code is on branch `next` (worktree `E:\Github_Projects\DD-Project-GameMaker-wt\next`); docs on `v1.9` (this checkout). Packet briefs: `E:\Temp\dd-briefs\*.md` (common.md = rules for every packet).
+The owner ended development after the round-4 playtest. The release is built; nothing is pushed.
 
-## In flight
-| Worktree | Branch | Brief | State |
-|---|---|---|---|
-| (none) | | | all packets merged into next; final full gate running |
-A full gate on next (with final2 + release merged) was started; re-run if its result is unknown.
+## Where things are
+- **Release:** `E:\Games\NO HOPE Release\`
+  - `NO-HOPE-v1.0-windows.zip` (63.4 MB, sha256 C6719F157989198BE51C51DE5234D670BF72DE8AFD2E9F0C019A34824A77C837), and the same files unzipped in `NO-HOPE-v1.0-windows\`
+  - `itch-page.md` (paste into itch.io) and `itch-screenshots\1-6.png` (640x576, upload in order)
+  - The release exe passed all 8042 unit tests from the zip (scratch save folder).
+- **Code:** branch `main` = v1.9 = next, tagged `v1.0` (local only). `next` keeps its worktree at `E:\Github_Projects\DD-Project-GameMaker-wt\next`. All 114 branches kept.
+- **Last playtest build:** `E:\Games\DD-Project Playtest\8d176ba-20261017` (older builds deleted; the owner's old save backups kept).
+- **Owner IDE steps (optional, before uploading):** Game Options > Windows: display name "NO HOPE" (code already sets the window caption), company/description/icon; optionally remove the unused included fonts NotoSansCJKkr-Regular.otf and NanumGothic-Regular.ttf (~18 MB; the release script already leaves them out of the zip).
+- **Not done (owner's choice):** no battle/boss music (D194); IDEA-12 branching upgrades (needs a grill-me); Nobody stays the hard class (sim ~36% win; a starter skill would fix it — new mechanic).
 
-## Then, in order
-1. Merge polish and lootglow into next one at a time (conflicts are always: suite registration lines -> keep both; appended test/scenario functions -> keep both, close the first function; shots/smoke chains -> make the previous end go to the new start; run_tests.ps1 Shots count = sum; workbook -> `python E:\Temp\dd-merge\wbmerge.py <branch>` then rebuild localization + lints). Fast gate after each.
-2. Full gate (`run_tests.ps1 -Mode full -WorkRoot 'E:\Temp\dd-gate-next'`) on a clean committed tree with the owner OFF the PC (REAL SAVE FILES CHANGED = the owner is playing; not a code failure).
-3. Release: from the `next` worktree run `powershell -NoProfile -ExecutionPolicy Bypass -File tools/release/make_release.ps1` (it gates, refuses a dirty tree, builds `E:\Games\NO HOPE Release\NO-HOPE-v1.0-windows\` + `.zip`). Retake the itch screenshots from that clean build's shots (tools/release/screenshots, 640x576) and commit. Check the zip: unzip to E:\Temp, run `NO HOPE.exe -runtests` once, look at the title (v1.0, Credits).
-4. Merge `next` -> `v1.9` -> `main` locally, tag `v1.0`. Do NOT push (owner did not ask).
-5. Tidy (owner: delete only regenerable bloat, keep all branches/history): E:\Temp\dd-gate*, E:\Temp\dd-* scratch, E:\Temp\dd-briefs (after copying any useful report into .planning/research), old playtest builds in E:\Games\DD-Project Playtest except the newest, merged worktrees (keep `next`). Update STATE/BOARD to "Shipped v1.0" with a short "how to resume development" (open the project in GameMaker, branch next/main, the gate command, the briefs pattern).
-6. Tell the owner: where the zip and itch-page.md are, the owner IDE steps (Game Options display name "NO HOPE", company/description/icon; optional removal of the unused Noto/Nanum fonts), and that nothing was pushed.
+## How to pick development back up
+1. Open `DD-Project.yyp` in GameMaker from `E:\Github_Projects\DD-Project-GameMaker` (branch `v1.9`, or check out `main` / tag `v1.0`). Game code changes go on `next` (worktree above), merged to `v1.9` after a playtest.
+2. Start a Claude session with `/continue_DD-Project-GameMaker`; read `AGENTS.md`, `.planning/STATE.md`, this file, `research/DECISIONS.md` (D1-D195).
+3. The gate: `powershell -NoProfile -ExecutionPolicy Bypass -File tools/automation/run_tests.ps1 -Mode fast` (add `-Mode full` before a playtest, never while playing: it watches the real save folder).
+4. Work pattern that shipped v1.0: one brief per packet (examples in `research/packet-briefs-r4/`, rules in `common.md`), a Sonnet agent per packet in its own worktree, the integrator merges one at a time (helpers in `research/merge-helpers/`, e.g. `wbmerge.py` for the text workbook) and runs the gate after each.
+5. A new release: `tools/release/make_release.ps1` (clean tree; gates, builds, zips into `E:\Games\NO HOPE Release`).
