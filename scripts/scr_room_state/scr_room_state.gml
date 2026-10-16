@@ -921,6 +921,12 @@ function Run_AutosaveAllowed() {
 
 function Run_AutoSave() {
     if (!Run_AutosaveAllowed()) return false;
+    return Run_SaveNow();
+}
+
+// The write of an autosave, without the guard (the System tab's Save row has checked its own: Menu_SaveReason, I-112): the story flags go to the profile, the run file of the active
+// save file is written atomically.
+function Run_SaveNow() {
     var gs = GameState_Get();
     var ok = false;
     try {

@@ -667,7 +667,7 @@ function TabMenu_ItemsFor(_id, _ch) {
         case "items": return TabItems_Items(_ch, room == rm_battle);
         case "gear": return TabGear_Items(_ch, room == rm_battle);
         case "codex": return TabCodex_Items(Profile_Get());
-        case "system": return TabSystem_Items(room == rm_battle);
+        case "system": return TabSystem_Items(room == rm_battle, Menu_SaveReason());
     }
     return [];
 }
@@ -688,10 +688,16 @@ function TabMenu_BuildPage(_id) {
     return pg;
 }
 
-// ---- the System tab (D140, D141): Help, Abandon run, Quit to title; all on in a fight too. The last two ask first (D156) ----
-function TabSystem_Items(_in_battle = false) {
+// ---- the System tab (D140, D141, I-112): Help, Save, Save & Quit to Title, Abandon run, Quit to title. Abandon and the quits ask first (D156); Save and Save & Quit are greyed, with the reason
+// as their help line, in a fight, in a cutscene and when there is no run (_save_block: Menu_SaveBlock's answer, "" = allowed) ----
+function TabSystem_Items(_in_battle = false, _save_block = "") {
+    var save_on = (_save_block == "");
+    var save_help = Loc_T("pause.help.save", "Saves your run now. Continue picks it up from here.");
+    var sq_help = Loc_T("pause.help.save_quit", "Saves your run, then goes to the title. Continue picks it up from here.");
     return [
         { id: "help", label: Loc_T("pause.option.help", "Help"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.help", "Every hint the game has: the ones you have seen and the ones still to come.") },
+        { id: "save", label: Loc_T("pause.option.save", "Save"), value: "", kind: "button", enabled: save_on, lines: [], help: save_on ? save_help : Menu_SaveReasonText(_save_block) },
+        { id: "save_quit", label: Loc_T("pause.option.save_quit", "Save & Quit to Title"), value: "", kind: "button", enabled: save_on, lines: [], help: save_on ? sq_help : Menu_SaveReasonText(_save_block) },
         { id: "abandon", value: "", kind: "button", enabled: true, lines: [],
           label: Loc_T("pause.option.abandon", "Abandon Run"),
           help: Loc_T("pause.help.abandon", "Ends this run now. It counts as a death, but you keep the echo.") },
@@ -701,12 +707,64 @@ function TabSystem_Items(_in_battle = false) {
     ];
 }
 
+// I-112: why saving is not possible now ("" = it is): no run going ("none"), a fight ("battle"), a cutscene or the title ("cutscene"). Pure: the room and whether a run is going.
+function Menu_SaveBlock(_room, _run_active) {
+    if (!_run_active) return "none";
+    if (_room == rm_battle) return "battle";
+    if (_room == rm_cutscene || _room == rm_start) return "cutscene";
+    return "";
+}
+
+// The same for the game as it is now: also "busy" where the autosave itself would refuse (the player is down, a room is still being set up).
+function Menu_SaveReason() {
+    var why = Menu_SaveBlock(room, Run_IsActive());
+    if (why == "" && !Run_AutosaveAllowed()) why = "busy";
+    return why;
+}
+
+function Menu_SaveReasonText(_why) {
+    switch (_why) {
+        case "battle": return Loc_T("tab.system.save_battle", "You cannot save during a battle.");
+        case "cutscene": return Loc_T("tab.system.save_cutscene", "You cannot save during a cutscene.");
+        case "none": return Loc_T("tab.system.save_none", "There is no run to save.");
+    }
+    return Loc_T("tab.system.save_busy", "You cannot save right now.");
+}
+
+// I-112: saves the run now, the autosave's own write (the active profile's active save file, Save_WriteFileAtomic). _block: a test passes the answer of Menu_SaveBlock; undefined = the game now.
+// Returns { ok, why, text }: text is what the notice says ("Game saved.", or why it could not be).
+function Menu_SaveNow(_block = undefined) {
+    var why = is_undefined(_block) ? Menu_SaveReason() : _block;
+    if (why != "") return { ok: false, why: why, text: Menu_SaveReasonText(why) };
+    var ok = Run_SaveNow();
+    return { ok: ok, why: ok ? "" : "failed", text: ok ? Loc_T("save.done", "Game saved.") : Loc_T("save.failed", "The game could not be saved.") };
+}
+
+// The Save row: saves, then a notice over the menu (the menu stays open under it).
+function TabSystem_SaveRow() {
+    var r = Menu_SaveNow();
+    SFX_PlayUI(r.ok ? "ui_confirm" : "ui_deny");
+    Notice_Open(r.text);
+}
+
+// Yes to "Save and quit to title?": it saves first; only when that worked does the menu fade out and Menu_CloseFinalize take the player to the title (a failed save says so and stays).
+function TabSystem_SaveQuitYes(_d) {
+    var r = Menu_SaveNow();
+    if (!r.ok) {
+        SFX_PlayUI("ui_deny");
+        Notice_Open(r.text);
+        return;
+    }
+    TabSystem_Yes({ id: "quit" });
+}
+
 // D156: the question a System row asks before it acts (a fight says what Continue will do).
 function TabSystem_Question(_id, _in_battle = false) {
     switch (_id) {
         case "abandon": return Loc_T("confirm.abandon", "Abandon this run? It counts as a death, but you keep the echo.");
         case "quit": return _in_battle ? Loc_T("confirm.quit_battle", "Quit to title? Continue puts you back just before this battle.")
                                        : Loc_T("confirm.quit", "Quit to title? The run is saved and Continue picks it up again.");
+        case "save_quit": return Loc_T("confirm.save_quit", "Save and quit to title? Continue picks it up from here.");
     }
     return "";
 }
@@ -1274,6 +1332,12 @@ function TabMenu_OnConfirm(_m, _i) {
                 case "help":
                     TabHelp_Open();
                     break;
+                case "save":   // I-112
+                    TabSystem_SaveRow();
+                    break;
+                case "save_quit":   // I-112: asks, then saves, then leaves (a failed save stays)
+                    Confirm_Open(TabSystem_Question("save_quit", false), TabSystem_SaveQuitYes, { id: "save_quit" });
+                    break;
                 case "abandon":
                 case "quit":
                     Confirm_Open(TabSystem_Question(it.id, room == rm_battle), TabSystem_Yes, { id: it.id });   // D156
@@ -1753,8 +1817,8 @@ function CardsUi_StatHelp(_stat_id) {
     return "";
 }
 
-// D177: the level-up screen. Rows ATK DEF SPD MAG VIG MND. The rows the class grows are gold and read "now > now + growth"; the others read only the number; the row under the
-// cursor adds its "+1" (CardsUi_StatRefresh, every frame). The details say what the stat does and Now / After (VIG: Max HP, MND: Max MP), with the class growth and the
+// D177 (amended I-109): the level-up screen. Rows ATK DEF SPD MAG VIG MND. The rows the class grows read "now > now + growth" with only the NEW number gold (the label and the old number
+// are white); the others read only the number; the row under the cursor adds its "+1" (its new number gold too; CardsUi_StatRefresh, every frame). The details say what the stat does and Now / After (VIG: Max HP, MND: Max MP), with the class growth and the
 // point both counted. "Now" is the character as he is, "After" the preview of the level the screen is for (LevelUp_PreviewCharacter).
 function CardsUi_StatMenu() {
     var ch = GameState_Get().player_ch;
@@ -1773,16 +1837,13 @@ function CardsUi_StatMenu() {
         if (sid == STAT_VIG) lines = [ { label: Loc_T("cards.stat.hp_now", "Max HP Now"), value: string(ch.max_hp) }, { label: Loc_T("cards.stat.hp_after", "Max HP After"), value: string(Resource_MaxHpOfVig(after)) } ];
         else if (sid == STAT_MND) lines = [ { label: Loc_T("cards.stat.mp_now", "Max MP Now"), value: string(ch.max_mp) }, { label: Loc_T("cards.stat.mp_after", "Max MP After"), value: string(Resource_MaxMpOfMnd(after)) } ];
         else lines = [ { label: Loc_T("cards.stat.now", "Now"), value: string(now) }, { label: Loc_T("cards.stat.after", "After"), value: string(after) } ];
-        var row = { label: Stat_ShortName(sid), value: "", help: CardsUi_StatHelp(sid), lines: lines, stat: sid, now: now, grow: grow };
-        if (grow > 0) {
-            row.col = UI_C_MERCHANT_GOLD;
-            any_growth = true;
-        }
+        var row = { label: Stat_ShortName(sid), value: "", help: CardsUi_StatHelp(sid), lines: lines, stat: sid, now: now, grow: grow, new_col: UI_C_MERCHANT_GOLD };   // I-109: only the NEW number (after ">") is gold; the label and the old number are white
+        if (grow > 0) any_growth = true;
         array_push(items, row);
     }
     var m = Ui_MenuNew("cards_stat", items, {
         on_confirm: CardsUi_StatConfirm, on_back: CardsUi_NoBack,
-        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(plvl) }), note: any_growth ? Loc_T("levelup.legend", "Gold = your class grows these") : "", note_col: UI_C_MERCHANT_GOLD, anchor: "center", details: true }
+        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(plvl) }), note: any_growth ? Loc_T("levelup.legend", "Gold = your class grows these") : "", note_col: UI_C_MERCHANT_GOLD, anchor: "center", details: true, snap_band: true }   // I-109: the bar sits on the cursor row in the same frame as the +1 and the details (no glide)
     });
     Ui_MenuFixCursor(m, clamp(DB_PlayerClass(ch.class_id).free_default, 0, 5));   // the class's usual stat first
     CardsUi_StatRefresh(m);
@@ -5216,7 +5277,7 @@ function Ui_MenuNew(_id, _items, _opts) {
         owner: noone, data: {}, lock_ms: current_time,
         layout: { title: "", note: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false,
                   x_anchor: "center", panel_w: 0, y_bottom: -1, max_h: 0, details_pos: "below", details_cols: 1, rows_max: 0,
-                  y_top: -1, det_w: 0, det_art: false, det_top: -1, det_h: -1, det_floor_y: -1, det_floor_alt: -1 },
+                  y_top: -1, det_w: 0, det_art: false, det_top: -1, det_h: -1, det_floor_y: -1, det_floor_alt: -1, snap_band: false },
         rect: { x: 0, y: 0, w: 0, h: 0 }, det_rect: { x: 0, y: 0, w: 0, h: 0 }, hint_hidden: false,
         opened_ms: current_time, closed_ms: -1, cur_y: -1, last_draw_ms: current_time
     };
@@ -5233,6 +5294,30 @@ function Ui_MenuNew(_id, _items, _opts) {
     }
     Ui_MenuFixCursor(m, Ui_MemGet(Ui_MemGlobal(), _id, array_length(_items)));
     return m;
+}
+
+// Where the highlight band is this frame: it glides toward _target_y (Ui_Glide), except on a menu that sets layout.snap_band (the level-up screen, I-109), where it is at the
+// target at once, so the band, the "+1" and the details panel always show the same row. Pure.
+function Ui_MenuBandY(_m, _target_y, _dt) {
+    if (variable_struct_exists(_m.layout, "snap_band") && _m.layout.snap_band) return _target_y;
+    return Ui_Glide(_m.cur_y, _target_y, _dt);
+}
+
+// I-109: how a row's value is drawn: { old, new, old_col, new_col }. A row with new_col whose value reads "12 > 13" draws "12 > " in the row colour and "13" in new_col (right
+// aligned together); any other row (or a plain number) is one colour: old = the whole value, new = "". Pure.
+function Ui_RowValueSpec(_row, _sel = false) {
+    var v = variable_struct_exists(_row, "value") ? string(_row.value) : "";
+    var base = Ui_RowStyle(_row, _sel).text;
+    var spec = { old: v, new: "", old_col: base, new_col: base };
+    if (variable_struct_exists(_row, "new_col") && Ui_ItemEnabled(_row)) {
+        var at = string_pos(" > ", v);
+        if (at > 0) {
+            spec.old = string_copy(v, 1, at + 2);
+            spec.new = string_copy(v, at + 3, string_length(v));
+            spec.new_col = _row.new_col;
+        }
+    }
+    return spec;
 }
 
 // Puts the cursor on _want, or the next enabled item when that one is disabled.
@@ -6611,7 +6696,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var cur_i = clamp(_m.cursor, 0, max(0, n - 1));
     var target_y = rows_y0 + offs[cur_i] - top_off;
     if (_m.cur_y < 0) _m.cur_y = target_y;
-    _m.cur_y = Ui_Glide(_m.cur_y, target_y, now - _m.last_draw_ms);
+    _m.cur_y = Ui_MenuBandY(_m, target_y, now - _m.last_draw_ms);
     _m.last_draw_ms = now;
     var band_y = round(_m.cur_y);
     var band_h = (n > 0) ? rhs[cur_i] : mt.row_h;
@@ -6692,7 +6777,13 @@ function Ui_MenuDraw(_m, _alpha = 1) {
             Ui_Box(bx, by, bx + fill, by + 2 * p, sel ? UI_C_LIGHTEST : UI_C_LIGHT);
             bars[k] = { x: bx, y: ry, w: bar_w, h: rh };
         } else if (variable_struct_exists(row, "value") && row.value != "") {
-            Ui_Text(x1, vty, row.value, col, fa_right);
+            var vspec = Ui_RowValueSpec(row, sel);
+            if (vspec.new != "") {   // I-109: "12 > " in the row colour, the new number in its own (gold)
+                Ui_Text(x1, vty, vspec.new, vspec.new_col, fa_right);
+                Ui_Text(x1 - UI_TextWidth(vspec.new), vty, vspec.old, vspec.old_col, fa_right);
+            } else {
+                Ui_Text(x1, vty, row.value, col, fa_right);
+            }
         }
     }
     // marker: follows the glide, bobs one pixel

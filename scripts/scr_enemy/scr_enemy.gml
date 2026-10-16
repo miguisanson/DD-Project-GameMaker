@@ -528,6 +528,8 @@ function EnemyAI_Init(_inst) {
     _inst.alert_pop = 0;
     _inst.react_timer = 0;
     _inst.spot_cooldown = 0;
+    _inst.stand_timer = 0;   // I-110: the frames left of a stand after the player stepped into a bush
+    _inst.bush_in = false;   // I-110: the player was in a bush on the last update (the drop happens on the step in, not every frame)
     _inst.idle_timer = irandom_range(0, max(1, _p.pause_max));
     _inst.patrol_cx = -1;
     _inst.patrol_cy = -1;
@@ -701,6 +703,9 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
     var _pcx = Nav_CellOf(_pl.x + _t / 2);
     var _pcy = Nav_CellOf(_pl.y + _t / 2);
     var _hidden = Player_IsHidden(_pl);   // D153: still on a hiding cell: only seen from 1 tile
+    var _in_bush = Player_InBush(_pl);
+    if (_in_bush && !_inst.bush_in && (_inst.ai_mode == "chase" || _inst.ai_mode == "search")) EnemyAI_BushLose(_inst);   // I-110: the step into a bush breaks the chase at once, moving or still
+    _inst.bush_in = _in_bush;
     var _per = EnemyAI_Perceive(_nav.grid, _p, _inst.x, _inst.y, _pl.x, _pl.y, Player_IsRunning(_pl), _hidden, _inst.look_dir);   // sight (the cone in front of it, D179), and the noise of a RUN (D153)
     var _sees = (_inst.spot_cooldown <= 0) && _per.sees;
     var _heard = (_inst.spot_cooldown <= 0) && _per.heard;
@@ -769,6 +774,12 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
                     if (_sr.turn) _inst.look_dir = (_inst.look_dir + 3) mod 4;   // it looks about: a quarter turn clockwise (RIGHT, DOWN, LEFT, UP)
                     if (_sr.pop) EnemyAI_PopQuestion(_inst);
                     if (_sr.done) EnemyAI_GiveUp(_inst);   // heads home, and notices nothing for 2 s
+                    _inst.stuck_frames = 0;
+                    break;
+                case "stand":
+                    _inst.stand_timer--;   // I-110: stands still, looking about (a quarter turn every AI_SEARCH_TURN_FRAMES), then roams again or walks home
+                    if (_inst.stand_timer > 0 && (_inst.stand_timer mod AI_SEARCH_TURN_FRAMES) == 0) _inst.look_dir = (_inst.look_dir + 3) mod 4;
+                    if (_inst.stand_timer <= 0) EnemyAI_StandEnd(_inst);
                     _inst.stuck_frames = 0;
                     break;
                 case "return":
@@ -1656,6 +1667,40 @@ function EnemyAI_GiveUp(_inst) {
     _inst.srch = undefined;
     _inst.stuck_frames = 0;
     _inst.spot_cooldown = AI_IGNORE_FRAMES;
+}
+
+// I-110 (amends D179): the player is in a bush: the cell his middle is in holds tall grass (moving or standing still; hidden is the separate, still-for-a-moment rule of Player_IsHidden).
+function Player_InBush(_pl) {
+    var _half = GRID_TILE_SIZE / 2;
+    var _pcx = Nav_CellOf(_pl.x + _half);
+    var _pcy = Nav_CellOf(_pl.y + _half);
+    return (instance_position(_pcx * GRID_TILE_SIZE + _half, _pcy * GRID_TILE_SIZE + _half, obj_tall_grass) != noone);
+}
+
+// I-110: the player stepped into a bush while this enemy chased or searched: it drops that at once, puts up its "?" now, stands still AI_BUSH_STAND_FRAMES (2.5 s) and cannot notice the
+// player for the stand + AI_IGNORE_FRAMES (2 s) from now on. (Touching it still starts a fight: that is the collision, not the senses.)
+function EnemyAI_BushLose(_inst) {
+    _inst.ai_mode = "stand";
+    _inst.srch = undefined;   // no search of its own: no second "?" at the end of one
+    _inst.react_timer = 0;
+    _inst.stuck_frames = 0;
+    _inst.patrol_cx = -1;
+    _inst.stand_timer = AI_BUSH_STAND_FRAMES;
+    _inst.spot_cooldown = AI_BUSH_STAND_FRAMES + AI_IGNORE_FRAMES;
+    EnemyAI_PopQuestion(_inst);
+}
+
+// The stand is over: an enemy that roams or patrols goes on at once (idle with no pause left); one that stays on its post walks home (and is idle there).
+function EnemyAI_StandEnd(_inst) {
+    _inst.srch = undefined;
+    _inst.stuck_frames = 0;
+    _inst.patrol_cx = -1;
+    if (_inst.prof.idle == "still" || _inst.prof.roam <= 0) {
+        _inst.ai_mode = "return";
+    } else {
+        _inst.ai_mode = "idle";
+        _inst.idle_timer = 0;
+    }
 }
 
 // D179 (R-098, R-099): the bush patches of a room, placed in code at room start (Bush_PlaceRoom: obj_tall_grass instances, no room edits): [[[cx, cy], ...], ...], one array of 2 to 4

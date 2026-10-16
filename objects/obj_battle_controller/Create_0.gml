@@ -24,6 +24,8 @@ Battle_BgApply(room_exists(bg_room) ? Run_FloorOfRoomName(room_get_name(bg_room)
 var cx = DISPLAY_BASE_W div 2;
 var cy = (DISPLAY_BASE_H div 2) - 14;   // D99: a little above the middle, so the bottom panels, the lists and the log have room under it
 
+lift_applied = 0;                 // I-111: the world pixels the enemy stands above its ground line while a skill or item list is open (Battle_ListLift)
+list_lift = [0, 0];
 var enemy_at = Battle_EnemyPlace(e.sprite);   // R3 (note 23): every enemy's opaque bottom on one ground line, so a full-canvas sprite does not sit high
 enemy_inst = instance_create_layer(
     enemy_at.x,

@@ -173,6 +173,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Loudness", Test_Suite_R3Loudness);
     Test_RunSuite("R4Final1", Test_Suite_R4Final1);
     Test_RunSuite("R3Balance", Test_Suite_R3Balance);
+    Test_RunSuite("R4Final2", Test_Suite_R4Final2);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -10111,7 +10112,7 @@ function Test_Suite_OneMenu() {
     Test_Eq("D140 wrapping on the 7th tab goes to the 1st", Ui_TabStep(6, TabMenu_Count(), 1), 0);
     Test_Eq("D140 Q on the first tab wraps to System", Ui_TabStep(0, TabMenu_Count(), -1), 6);
 
-    // ---- the System tab: Help, Abandon run, Quit to title; all on in a battle too (D141) ----
+    // ---- the System tab: Help, Save, Save & Quit to Title, Abandon run, Quit to title (I-112 added the two Save rows); Abandon and Quit are on in a battle too (D141) ----
     var _sys = TabSystem_Items();
     var _sys_ids = "";
     var _sys_lb = "";
@@ -10119,23 +10120,22 @@ function Test_Suite_OneMenu() {
         _sys_ids += ((_i > 0) ? "/" : "") + _sys[_i].id;
         _sys_lb += ((_i > 0) ? "," : "") + _sys[_i].label;
     }
-    Test_Eq("D140 System rows", _sys_ids, "help/abandon/quit");
-    Test_Eq("D140 System labels", _sys_lb, "Help,Abandon Run,Quit to Title");
-    var _all_on = (array_length(_sys) == 3);
-    var _all_help = (array_length(_sys) == 3);
+    Test_Eq("D140 System rows", _sys_ids, "help/save/save_quit/abandon/quit");
+    Test_Eq("D140 System labels", _sys_lb, "Help,Save,Save & Quit to Title,Abandon Run,Quit to Title");
+    var _all_on = (array_length(_sys) == 5);
+    var _all_help = (array_length(_sys) == 5);
     for (var _i3 = 0; _i3 < array_length(_sys); _i3++) {
         _all_on = _all_on && _sys[_i3].enabled;
         _all_help = _all_help && string_length(_sys[_i3].help) > 0;
     }
-    Test_True("D140 all three System rows are on on the map", _all_on);
+    Test_True("D140 all five System rows are on on the map", _all_on);
     Test_True("D100 every System row explains itself", _all_help);
-    var _sysb = TabSystem_Items(true);
-    var _all_on_b = (array_length(_sysb) == 3);
-    for (var _i4 = 0; _i4 < array_length(_sysb); _i4++) _all_on_b = _all_on_b && _sysb[_i4].enabled;
-    Test_True("D141 Abandon run and Quit to title are on in a battle", _all_on_b);
-    Test_Eq("D141 in a battle Quit says it returns to just before the fight", (array_length(_sysb) == 3) ? _sysb[2].help : "", Loc_T("tab.system.quit_battle_help", "Goes back to the title. Continue puts you back just before this battle."));
+    var _sysb = TabSystem_Items(true, "battle");
+    var _all_on_b = (array_length(_sysb) == 5) && _sysb[0].enabled && _sysb[3].enabled && _sysb[4].enabled;
+    Test_True("D141 Abandon run and Quit to title are on in a battle (the two Save rows are greyed, I-112)", _all_on_b);
+    Test_Eq("D141 in a battle Quit says it returns to just before the fight", (array_length(_sysb) == 5) ? _sysb[4].help : "", Loc_T("tab.system.quit_battle_help", "Goes back to the title. Continue puts you back just before this battle."));
     // D156 replaced the press-twice Abandon row by the shared Yes / No pop-up: the row always reads "Abandon run" (Test_Suite_Confirm checks the pop-up).
-    Test_Eq("D156 the Abandon row always reads Abandon run", (array_length(_sys) == 3) ? _sys[1].label : "", "Abandon Run");
+    Test_Eq("D156 the Abandon row always reads Abandon run", (array_length(_sys) == 5) ? _sys[3].label : "", "Abandon Run");
 
     // ---- Settings: no Apply row, no pending copy; a change is live at once ----
     var _items = SettingsMenu_Items(GameSettings_Defaults(), 16);
@@ -10834,14 +10834,14 @@ function Test_ConfirmSystem() {
     Menu_Open(6);
     var _u = TabMenu_Get();
     var _m = TabMenu_TopMenu();
-    Test_Eq("H2 the System list has Help, Abandon run and Quit to title", (array_length(_m.items) == 3) ? (_m.items[0].id + "/" + _m.items[1].id + "/" + _m.items[2].id) : "", "help/abandon/quit");
+    Test_Eq("H2 the System list has Help, Save, Save & Quit, Abandon run and Quit to title (I-112)", (array_length(_m.items) == 5) ? (_m.items[0].id + "/" + _m.items[1].id + "/" + _m.items[2].id + "/" + _m.items[3].id + "/" + _m.items[4].id) : "", "help/save/save_quit/abandon/quit");
     // Help opens its page at once, no question
     TabMenu_OnConfirm(_m, 0);
     Test_False("H2 Help asks nothing", Confirm_IsOpen());
     Test_Eq("H2 Help opens its page", Ui_StackDepth(_u.pages[_u.tab].stk), 2);
     Ui_StackBack(_u.pages[_u.tab].stk);
     // Abandon run
-    TabMenu_OnConfirm(_m, 1);
+    TabMenu_OnConfirm(_m, 3);
     Test_True("H2 Abandon run opens the pop-up", Confirm_IsOpen());
     Test_Eq("H2 the Abandon question", Confirm_Question(), "Abandon this run? It counts as a death, but you keep the echo.");
     Test_Eq("H2 the Abandon pop-up starts on No", Confirm_Menu().cursor, 1);
@@ -10850,7 +10850,7 @@ function Test_ConfirmSystem() {
     Confirm_Back();
     Test_Eq("H2 No leaves the run alone", _u.pending, "");
     Test_True("H2 and the menu open", _u.closed_ms < 0);
-    TabMenu_OnConfirm(_m, 1);
+    TabMenu_OnConfirm(_m, 3);
     Test_True("H2 Abandon run Yes is answered", Test_ConfirmSayYes());
     Test_Eq("H2 Yes abandons", _u.pending, "abandon");
     Test_True("H2 and the menu starts to close", _u.closed_ms >= 0);
@@ -10859,14 +10859,14 @@ function Test_ConfirmSystem() {
     Menu_Open(6);
     _u = TabMenu_Get();
     _m = TabMenu_TopMenu();
-    TabMenu_OnConfirm(_m, 2);
+    TabMenu_OnConfirm(_m, 4);
     Test_True("H2 Quit to title opens the pop-up", Confirm_IsOpen());
     Test_Eq("H2 the Quit question on the map", Confirm_Question(), "Quit to title? The run is saved and Continue picks it up again.");
     Test_Eq("H2 the Quit pop-up starts on No", Confirm_Menu().cursor, 1);
     Test_Eq("H2 the first press has not quit", _u.pending, "");
     Confirm_Back();
     Test_Eq("H2 No does not quit", _u.pending, "");
-    TabMenu_OnConfirm(_m, 2);
+    TabMenu_OnConfirm(_m, 4);
     Test_True("H2 Quit to title Yes is answered", Test_ConfirmSayYes());
     Test_Eq("H2 Yes quits", _u.pending, "quit");
     Menu_Close(true);
@@ -11022,16 +11022,16 @@ function Test_ConfirmNoArmed() {
     Test_True("H2 TabSystem_Disarm is gone", asset_get_index("TabSystem_Disarm") == -1);
     Test_True("H2 Title_NewArmed is gone", asset_get_index("Title_NewArmed") == -1);
     Test_True("H2 Title_DisarmNew is gone", asset_get_index("Title_DisarmNew") == -1);
-    Test_Eq("H2 the Abandon row never reads Sure", TabSystem_Items()[1].label, "Abandon Run");
+    Test_Eq("H2 the Abandon row never reads Sure", TabSystem_Items()[3].label, "Abandon Run");
     Test_Eq("H2 the title row never reads Sure", Title_MainItems(true, true)[1].label, "New Game");
     var _gs = Test_Hero(CLASS_KNIGHT);
     var _mem = Ui_MemGet(Ui_MemGlobal(), "tab_menu_active", TabMenu_Count());
     Menu_Open(6);
     var _u = TabMenu_Get();
     Test_False("H2 the open menu keeps no sys_armed flag", variable_struct_exists(_u, "sys_armed"));
-    TabMenu_OnConfirm(TabMenu_TopMenu(), 1);
+    TabMenu_OnConfirm(TabMenu_TopMenu(), 3);
     Test_False("H2 pressing Abandon sets no armed flag", variable_struct_exists(_u, "sys_armed"));
-    Test_Eq("H2 and leaves the row as it was", TabMenu_TopMenu().items[1].label, "Abandon Run");
+    Test_Eq("H2 and leaves the row as it was", TabMenu_TopMenu().items[3].label, "Abandon Run");
     Confirm_Close();
     Menu_Close(true);
     Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", _mem);
@@ -13785,12 +13785,12 @@ function Test_Suite_Hunt7Prog() {
     _gs.player_ch = _lvn;
     var _m1 = CardsUi_StatMenu();
     Test_Eq("h7prog levelup: the first prompt is level 2", _m1.layout.title, "Level 2: Place 1 Point");
-    Test_Eq("h7prog levelup: with level 2's growth rows gold (ATK, SPD, VIG, MND)", Test_LvGoldRows(_m1), "ATK,SPD,VIG,MND");
+    Test_Eq("h7prog levelup: with level 2's growth rows gold (ATK, SPD, VIG, MND)", Test_LvGrowRows(_m1), "ATK,SPD,VIG,MND");
     _lvn = Cards_PlaceStat(_lvn, STAT_ATK);
     _gs.player_ch = _lvn;
     var _m2 = CardsUi_StatMenu();
     Test_Eq("h7prog levelup: the second prompt is level 3", _m2.layout.title, "Level 3: Place 1 Point");
-    Test_Eq("h7prog levelup: with level 3's growth rows gold (DEF, MAG, VIG, MND)", Test_LvGoldRows(_m2), "DEF,MAG,VIG,MND");
+    Test_Eq("h7prog levelup: with level 3's growth rows gold (DEF, MAG, VIG, MND)", Test_LvGrowRows(_m2), "DEF,MAG,VIG,MND");
     var _lvk = CharacterCreate_Player(CLASS_KNIGHT);
     _lvk = Player_AddExp(_lvk, Exp_NextLevel(1) + Exp_NextLevel(2) + Exp_NextLevel(3));
     _gs.player_ch = _lvk;
@@ -14789,6 +14789,7 @@ function Test_R3Ground() {
     Test_True("r3bvis ground: every enemy's opaque bottom is on the same world y (" + _list + ")", _same);
     Test_True("r3bvis ground: every enemy is centred across the picture", _centred);
     Test_True("r3bvis ground: the feet stand in the lower half of the picture, above the HUD", is_undefined(_first) ? false : (_first >= 72 && _first <= 96));
+    Test_Eq("r3bvis ground: the line is Battle_GroundY (the HUD row's top edge, I-111: it was the fixed 80)", _first, Battle_GroundY());
 }
 
 // 2. The shadow: 70% of the opaque width, a quarter of that high, centred under the feet a pixel or two below, two nested ellipses.
@@ -16094,6 +16095,9 @@ function Test_R3FixDetLists() {
             for (var _k = 0; _k < 2; _k++) {
                 var _m = _menus[_k];
                 var _state = (_k == 0) ? BSTATE_SKILL_MENU : BSTATE_ITEM_MENU;
+                _bc.battle_state = _state;   // I-111: the list is open: the enemy stands lifted when the list has no room under its feet (Battle_ListLift)
+                Battle_MenusLayout(_bc);
+                _er = Battle_EnemyRect(_bc);
                 for (var _i = 0; _i < array_length(_m.items); _i++) {
                     _m.cursor = _i;
                     var _it = _m.items[_i];
@@ -17941,11 +17945,11 @@ function Test_LvRowValues(_m) {
     return _out;
 }
 
-function Test_LvGoldRows(_m) {
+function Test_LvGrowRows(_m) {
     var _out = "";
     for (var _i = 0; _i < array_length(_m.items); _i++) {
         var _it = _m.items[_i];
-        if (variable_struct_exists(_it, "col") && _it.col == UI_C_MERCHANT_GOLD) _out += (_out != "" ? "," : "") + _it.label;
+        if (variable_struct_exists(_it, "grow") && _it.grow > 0) _out += (_out != "" ? "," : "") + _it.label;   // I-109: the growth rows (their NEW number is the gold part)
     }
     return _out;
 }
@@ -17968,7 +17972,7 @@ function Test_LvScreen() {
     var _m = CardsUi_StatMenu();
     Test_Eq("levelup screen: six rows", array_length(_m.items), 6);
     Test_Eq("levelup screen: ATK DEF SPD MAG VIG MND in that order", _m.items[0].label + _m.items[1].label + _m.items[2].label + _m.items[3].label + _m.items[4].label + _m.items[5].label, "ATKDEFSPDMAGVIGMND");
-    Test_Eq("levelup screen: the Knight's growth rows are gold", Test_LvGoldRows(_m), "ATK,DEF,VIG,MND");
+    Test_Eq("levelup screen: the Knight's growth rows are ATK, DEF, VIG, MND", Test_LvGrowRows(_m), "ATK,DEF,VIG,MND");
     Test_Eq("levelup screen: the cursor starts on the class stat (DEF)", _m.cursor, STAT_DEF);
     Test_Eq("levelup screen: so DEF reads 12 > 14, the other growth rows now > now + growth, the rest only the number", Test_LvRowValues(_m), "11 > 12|12 > 14|9|3|10 > 12|11 > 12");
     _m.cursor = STAT_SPD;
@@ -17977,10 +17981,10 @@ function Test_LvScreen() {
     _m.cursor = STAT_VIG;
     CardsUi_StatRefresh(_m);
     Test_Eq("levelup screen: on VIG it reads 10 > 13 (growth 2 + the point)", _m.items[4].value, "10 > 13");
-    Test_Eq("levelup screen: the gold rows stay gold under the cursor", Test_LvGoldRows(_m), "ATK,DEF,VIG,MND");
-    // a row's own colour is the text colour of that row, selected or not; a greyed row stays grey
-    Test_Eq("levelup screen: a gold row draws gold", Ui_RowStyle(_m.items[0], false).text, UI_C_MERCHANT_GOLD);
-    Test_Eq("levelup screen: and gold when selected", Ui_RowStyle(_m.items[0], true).text, UI_C_MERCHANT_GOLD);
+    Test_Eq("levelup screen: the growth rows stay the growth rows under the cursor", Test_LvGrowRows(_m), "ATK,DEF,VIG,MND");
+    // I-109: the label and the current number of every row are white, growth row or not, selected or not (only the new number is gold: Test_R4Final2LevelUp); a greyed row stays grey
+    Test_Eq("levelup screen: a growth row's label draws white (was gold before I-109)", Ui_RowStyle(_m.items[0], false).text, UI_C_TEXT);
+    Test_Eq("levelup screen: and white when selected", Ui_RowStyle(_m.items[0], true).text, UI_C_TEXT);
     Test_Eq("levelup screen: a plain row is white", Ui_RowStyle(_m.items[2], false).text, UI_C_TEXT);
     Test_Eq("levelup screen: a greyed row stays grey whatever its colour", Ui_RowStyle({ label: "x", value: "", enabled: false, col: UI_C_MERCHANT_GOLD }, false).text, UI_C_DARK);
     // the details: what it does, Now and After
@@ -17997,26 +18001,26 @@ function Test_LvScreen() {
     var _mg = Player_AddExp(CharacterCreate_Player(CLASS_MAGE), Exp_NextLevel(1));
     _gs.player_ch = _mg;
     var _mm = CardsUi_StatMenu();
-    Test_Eq("levelup screen: the Mage's growth rows are MAG, VIG, MND", Test_LvGoldRows(_mm), "MAG,VIG,MND");
+    Test_Eq("levelup screen: the Mage's growth rows are MAG, VIG, MND", Test_LvGrowRows(_mm), "MAG,VIG,MND");
     Test_Eq("levelup screen: the cursor starts on MAG (12 > 15 hovered), VIG 10 > 12, MND 16 > 19", Test_LvRowValues(_mm), "5|7|10|12 > 15|10 > 12|16 > 19");
     // Nobody rotates: level 2's growth is ATK +1, SPD +1 (plus VIG +2, MND +1)
     var _nb = Player_AddExp(CharacterCreate_Player(CLASS_NOBODY), Exp_NextLevel(1));
     _gs.player_ch = _nb;
     var _nm = CardsUi_StatMenu();
-    Test_Eq("levelup screen: Nobody's growth rows follow the rotation (level 2: ATK, SPD, VIG, MND)", Test_LvGoldRows(_nm), "ATK,SPD,VIG,MND");
+    Test_Eq("levelup screen: Nobody's growth rows follow the rotation (level 2: ATK, SPD, VIG, MND)", Test_LvGrowRows(_nm), "ATK,SPD,VIG,MND");
     // two levels owed: the second screen is level 3's, with level 3's growth
     var _two = Player_AddExp(CharacterCreate_Player(CLASS_NOBODY), Exp_NextLevel(1) + Exp_NextLevel(2));
     _two = Cards_PlaceStat(_two, STAT_ATK);
     _gs.player_ch = _two;
     var _m3 = CardsUi_StatMenu();
     Test_Eq("levelup screen: the second owed level's screen is titled level 3", _m3.layout.title, "Level 3: Place 1 Point");
-    Test_Eq("levelup screen: with level 3's growth rows (DEF, MAG, VIG, MND)", Test_LvGoldRows(_m3), "DEF,MAG,VIG,MND");
+    Test_Eq("levelup screen: with level 3's growth rows (DEF, MAG, VIG, MND)", Test_LvGrowRows(_m3), "DEF,MAG,VIG,MND");
     // a point banked by an older save and no level owed: no growth, no gold, no legend
     var _old = CharacterCreate_Player(CLASS_KNIGHT);
     _old.stat_points = 1;
     _gs.player_ch = _old;
     var _om = CardsUi_StatMenu();
-    Test_Eq("levelup screen: a banked point alone has no gold rows", Test_LvGoldRows(_om), "");
+    Test_Eq("levelup screen: a banked point alone has no gold rows", Test_LvGrowRows(_om), "");
     Test_Eq("levelup screen: and no legend", _om.layout.note, "");
     Test_Eq("levelup screen: every row reads only the number, the one under the cursor (DEF) now > now + 1", Test_LvRowValues(_om), "11|12 > 13|9|3|10|11");
     Loc_SetLanguage("ko");
@@ -19115,6 +19119,9 @@ function Test_R4Final1Lists() {
                             var _cnt = array_length(_m.items);
                             if (_cnt <= 0) continue;
                             if (_k == 1 && !(_c == 0 && _v == 1 && _e == 0)) continue;   // the item list: once per language and size, the full inventory against the boss
+                            _bc.battle_state = _state;   // I-111: the list is open: the enemy stands lifted when the list has no room under its feet (Battle_ListLift)
+                            Battle_MenusLayout(_bc);
+                            _er = Battle_EnemyRect(_bc);
                             var _top = 0;
                             var _seq = [];
                             for (var _a = 0; _a < _cnt; _a++) array_push(_seq, _a);
@@ -19305,3 +19312,383 @@ function Test_R3BalanceGold() {
     Test_Eq("r3balance D193: the Coin Purse card gives 8 gold", CardDB_Get("fb:gold").params.gold, 8);
     Test_Eq("r3balance D193: prices stay (Smoke Bomb 21)", Shop_Price(33), 21);
 }
+
+// ============================================================================================================================================================
+// R4 final2 (owner round-4 notes 4, 5): I-109 level-up gold only on the new number + one cursor, I-110 a bush breaks a chase, I-111 monsters stand on the HUD's top line,
+// I-112 Save and Save & Quit in the system menu.
+// ============================================================================================================================================================
+function Test_Suite_R4Final2() {
+    Test_RunSuite("R4Final2.levelup", Test_R4Final2LevelUp);
+    Test_RunSuite("R4Final2.bush", Test_R4Final2Bush);
+    Test_RunSuite("R4Final2.ground", Test_R4Final2Ground);
+    Test_RunSuite("R4Final2.saverows", Test_R4Final2SaveRows);
+    Test_RunSuite("R4Final2.savefile", Test_R4Final2SaveFileRun);
+}
+
+// I-109 (D177 amended): the stat label and the current number are white; only the NEW number (after ">") is gold. A class growth row shows it always, the hovered row shows its "+1"
+// new number gold too. Mouse hover moves the highlight, the "+1" and the details together: one cursor.
+function Test_R4Final2LevelUp() {
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    var _k = Test_LvRunBegin();
+    var _gs = GameState_Get();
+    // the row draw spec: old part white, new part gold
+    var _sp = Ui_RowValueSpec({ label: "ATK", value: "12 > 13", new_col: UI_C_MERCHANT_GOLD }, false);
+    Test_Eq("r4final2 levelup: a growth row's old part is '12 > '", _sp.old, "12 > ");
+    Test_Eq("r4final2 levelup: its new number is '13'", _sp.new, "13");
+    Test_Eq("r4final2 levelup: the old part is white", _sp.old_col, UI_C_TEXT);
+    Test_Eq("r4final2 levelup: the new number is gold", _sp.new_col, UI_C_MERCHANT_GOLD);
+    var _sp2 = Ui_RowValueSpec({ label: "SPD", value: "10", new_col: UI_C_MERCHANT_GOLD }, false);
+    Test_Eq("r4final2 levelup: a row with no '>' is only the white number", _sp2.old + "|" + _sp2.new + "|" + string(_sp2.old_col), "10||" + string(UI_C_TEXT));
+    var _sp3 = Ui_RowValueSpec({ label: "Music", value: "50%" }, false);
+    Test_Eq("r4final2 levelup: an ordinary row (no new_col) is one colour", _sp3.old + "|" + _sp3.new + "|" + string(_sp3.old_col == _sp3.new_col), "50%||1");
+    // a Knight: ATK, DEF, VIG, MND grow
+    var _kn = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1));
+    _gs.player_ch = _kn;
+    var _m = CardsUi_StatMenu();
+    var _labels_white = true;
+    var _col_bad = "";
+    for (var _i = 0; _i < 6; _i++) {
+        if (Ui_RowStyle(_m.items[_i], false).text != UI_C_TEXT || Ui_RowStyle(_m.items[_i], true).text != UI_C_TEXT || Ui_RowLabelColor(_m.items[_i], false) != UI_C_TEXT) { _labels_white = false; _col_bad += _m.items[_i].label + " "; }
+        if (variable_struct_exists(_m.items[_i], "col")) { _labels_white = false; _col_bad += _m.items[_i].label + "(col) "; }
+    }
+    Test_True("r4final2 levelup: every row's label and current number are white (" + _col_bad + ")", _labels_white);
+    // growth rows (not hovered): ATK, VIG, MND show old white, new gold; DEF is the cursor row: also gold
+    var _gold_new = "";
+    var _plain = "";
+    for (var _j = 0; _j < 6; _j++) {
+        var _s = Ui_RowValueSpec(_m.items[_j], _j == _m.cursor);
+        if (_s.new != "" && _s.new_col == UI_C_MERCHANT_GOLD && _s.old_col == UI_C_TEXT) _gold_new += _m.items[_j].label + ",";
+        else if (_s.new == "" && _s.old_col == UI_C_TEXT) _plain += _m.items[_j].label + ",";
+    }
+    Test_Eq("r4final2 levelup: the Knight's rows with a gold NEW number (growth rows and the hovered DEF)", _gold_new, "ATK,DEF,VIG,MND,");
+    Test_Eq("r4final2 levelup: the other rows (SPD, MAG) are a plain white number", _plain, "SPD,MAG,");
+    // hover a non-growth row: its new number is gold, the rest white
+    _m.cursor = STAT_SPD;
+    CardsUi_StatRefresh(_m);
+    var _spd = Ui_RowValueSpec(_m.items[2], true);
+    Test_Eq("r4final2 levelup: hovered SPD reads '10 > 11' with the 11 gold and '10 > ' white", _spd.old + _spd.new + "|" + string(_spd.old_col == UI_C_TEXT) + string(_spd.new_col == UI_C_MERCHANT_GOLD), "10 > 11|11");
+    var _def = Ui_RowValueSpec(_m.items[1], false);
+    Test_Eq("r4final2 levelup: DEF, no longer hovered, is '12 > 13' with only 13 gold", _def.old + _def.new + "|" + string(_def.old_col == UI_C_TEXT) + string(_def.new_col == UI_C_MERCHANT_GOLD), "12 > 13|11");
+    // one cursor: the mouse over a row moves the highlight (band target), the +1 and the details (the row the details read) together
+    var _mh = CardsUi_StatMenu();
+    var _rects = [];
+    for (var _ri = 0; _ri < 6; _ri++) array_push(_rects, { x: 0, y: _ri * 10, w: 100, h: 10 });
+    _mh.rects = _rects;
+    var _ms = Ui_SnapNew();
+    _ms.mx = 5;
+    _ms.my = 15;   // DEF's row
+    _ms.mouse_moved = true;
+    Ui_MenuStep(_mh, _ms, 5000);
+    CardsUi_StatRefresh(_mh);
+    _ms.my = 25;   // SPD's row
+    Ui_MenuStep(_mh, _ms, 5000);
+    CardsUi_StatRefresh(_mh);
+    Test_Eq("r4final2 levelup: the pointer over SPD puts the cursor on SPD", _mh.cursor, STAT_SPD);
+    Test_Eq("r4final2 levelup: so SPD (and only SPD) shows the +1", Test_LvRowValues(_mh), "11 > 12|12 > 13|10 > 11|3|10 > 12|11 > 12");
+    Test_Eq("r4final2 levelup: and the details panel reads SPD's row (its help line)", _mh.items[_mh.cursor].help, CardsUi_StatHelp(STAT_SPD));
+    Test_Eq("r4final2 levelup: and SPD's Now / After lines", Test_RowValue(_mh.items[_mh.cursor].lines, "Now") + ">" + Test_RowValue(_mh.items[_mh.cursor].lines, "After"), "10>11");
+    // the highlight bar jumps with the cursor on this screen (no glide that can lag behind the +1 and the details)
+    Test_True("r4final2 levelup: the level-up screen's highlight bar is not a glide (it is on the cursor row in the same frame)", _mh.layout.snap_band);
+    _mh.cur_y = 40;
+    Test_Eq("r4final2 levelup: a snapping menu's bar is at the target at once", Ui_MenuBandY(_mh, 100, 16), 100);
+    var _plainm = Ui_MenuNew("r4f2_plain", [{ label: "a", value: "" }, { label: "b", value: "" }], {});
+    _plainm.cur_y = 40;
+    Test_True("r4final2 levelup: any other menu still glides (between its old place and the target)", Ui_MenuBandY(_plainm, 100, 16) > 40 && Ui_MenuBandY(_plainm, 100, 16) < 100);
+    Loc_SetLanguage(_lang0);
+    Test_LvRunEnd(_k);
+}
+
+// ---- I-110 (amends D179): the moment the player steps into a bush, every enemy that chases or searches drops it: "?" at once, stands still AI_BUSH_STAND_FRAMES (2.5 s), then roams / goes
+// home; blind to the player for the stand + 2 s (AI_IGNORE_FRAMES) from that moment. Enemies are real obj_slime instances on the test room's grid, the player a stand-in instance. ----
+function Test_R4F2Tick(_e, _pl, _n) {
+    var _cfg = EnemyDB_Get(_e.enemy_id);
+    for (var _i = 0; _i < _n; _i++) EnemyAI_Update(_e, _cfg, _pl);
+}
+
+function Test_R4F2Enemy(_cx, _cy, _face) {
+    var _T = GRID_TILE_SIZE;
+    var _e = instance_create_depth(_cx * _T, _cy * _T, 0, obj_slime);
+    EnemyAI_Init(_e);
+    _e.home_x = _e.x;
+    _e.home_y = _e.y;
+    _e.home_cx = _cx;
+    _e.home_cy = _cy;
+    _e.look_dir = _face;
+    _e.idle_timer = 100000;   // it stays where it is until it has a reason to move
+    _e.turn_timer = 100000;
+    _e.prof.sight = 3;
+    return _e;
+}
+
+function Test_R4F2Player(_cx, _cy) {
+    var _T = GRID_TILE_SIZE;
+    var _pl = instance_create_depth(_cx * _T, _cy * _T, 0, obj_slime);   // a stand-in: only its place and the movement fields count
+    _pl.moving = false;
+    _pl.step_speed = 1;
+    _pl.walk_speed = 1;
+    _pl.still_frames = 0;
+    return _pl;
+}
+
+function Test_R4Final2Bush() {
+    if (asset_get_index("EnemyAI_BushLose") == -1) { Test_True("r4final2 bush: EnemyAI_BushLose exists (not implemented yet)", false); return; }
+    var _T = GRID_TILE_SIZE;
+    Test_Eq("r4final2 bush: the stand is 150 frames (2.5 s)", AI_BUSH_STAND_FRAMES, 150);
+    var _grass = instance_create_depth(5 * _T, 4 * _T, 0, obj_tall_grass);   // the bush cell (5,4)
+    var _pl = Test_R4F2Player(4, 4);
+    var _e = Test_R4F2Enemy(2, 4, RIGHT);
+    // 1. a chase: the player is 2 tiles in front of it in the open
+    Test_R4F2Tick(_e, _pl, 3);
+    Test_Eq("r4final2 bush: (setup) the slime chases the player in the open", _e.ai_mode, "chase");
+    Test_False("r4final2 bush: (setup) the player is not in a bush yet", Player_InBush(_pl));
+    // 2. he steps into the bush (walking: not hidden): on the very next update it drops the chase with a "?"
+    _pl.x = 5 * _T;
+    _pl.moving = true;
+    Test_True("r4final2 bush: the player in the grass cell is in a bush, moving or not", Player_InBush(_pl));
+    Test_R4F2Tick(_e, _pl, 1);
+    Test_Eq("r4final2 bush: the chase is dropped at once (mode stand)", _e.ai_mode, "stand");
+    Test_Eq("r4final2 bush: the ? goes up at once, once", string(_e.q_pops) + "/" + string(_e.question_pop), "1/" + string(AI_QUESTION_FRAMES));
+    Test_Eq("r4final2 bush: it cannot notice him for the stand + 2 s (270 frames)", _e.spot_cooldown, AI_BUSH_STAND_FRAMES + AI_IGNORE_FRAMES);
+    Test_True("r4final2 bush: the search is forgotten", is_undefined(_e.srch));
+    // 3. it stands still the whole stand; never chases though he walks about in the grass in front of it
+    var _cx0 = Nav_CellOf(_e.x + _T / 2);
+    var _cy0 = Nav_CellOf(_e.y + _T / 2);
+    var _moved = false;
+    var _chased = false;
+    var _stand_ticks = 1;
+    var _left = -1;
+    for (var _i = 0; _i < 400; _i++) {
+        Test_R4F2Tick(_e, _pl, 1);
+        if (_e.ai_mode == "chase") _chased = true;
+        if (_e.ai_mode == "stand") {
+            _stand_ticks++;
+            if (Nav_CellOf(_e.x + _T / 2) != _cx0 || Nav_CellOf(_e.y + _T / 2) != _cy0 || _e.moving) _moved = true;
+        } else if (_left < 0) {
+            _left = _i + 2;   // the update on which the stand ended, counted from the update of the bush step
+            _e.idle_timer = 100000;   // keep it in place after the stand so the rest is measured on one spot
+            _e.turn_timer = 100000;
+            _e.look_dir = RIGHT;
+        }
+        if (_i == 230) _pl.x = 4 * _T;   // he leaves the bush (still inside the 270 frame window)
+        if (_i >= 266) break;
+    }
+    Test_False("r4final2 bush: it never walks during the stand", _moved);
+    Test_True("r4final2 bush: the stand lasts about 2.5 s (150 +- 3 frames, was " + string(_stand_ticks) + ")", abs(_stand_ticks - AI_BUSH_STAND_FRAMES) <= 3);
+    Test_Eq("r4final2 bush: after the stand a roamer is idle (it patrols / roams again)", _e.ai_mode, "idle");
+    Test_False("r4final2 bush: it never chased inside the window (he walked in the grass in front of it, then stepped out)", _chased);
+    Test_False("r4final2 bush: and the player is out of the bush", Player_InBush(_pl));
+    // 4. once the 270 frames are over, in the open in its cone: it notices him again as normal
+    Test_R4F2Tick(_e, _pl, 12);
+    Test_Eq("r4final2 bush: after the ignore window he is spotted in the open again", _e.ai_mode, "chase");
+    // 5. a searching enemy drops the search the same way
+    var _e2 = Test_R4F2Enemy(2, 6, LEFT);   // facing away: it does not see him, so it stays a searcher
+    var _pl2 = Test_R4F2Player(4, 6);
+    var _grass2 = instance_create_depth(5 * _T, 6 * _T, 0, obj_tall_grass);
+    _e2.ai_mode = "search";
+    _e2.srch = Search_Create(2, 6, AI_SEARCH_FRAMES);
+    _e2.spot_cooldown = 0;
+    Test_R4F2Tick(_e2, _pl2, 1);   // the player in the open (not in view of a searcher that turns away): bush state is recorded
+    _pl2.x = 5 * _T;
+    Test_R4F2Tick(_e2, _pl2, 1);
+    Test_Eq("r4final2 bush: a searching enemy stands too (mode stand, one ?)", _e2.ai_mode + "/" + string(_e2.q_pops), "stand/1");
+    Test_True("r4final2 bush: its search is gone, so no second ? comes at the end of it", is_undefined(_e2.srch));
+    // 6. no roam: it walks home after the stand
+    _e2.prof.idle = "still";
+    _e2.stand_timer = 1;
+    Test_R4F2Tick(_e2, _pl2, 1);
+    Test_Eq("r4final2 bush: an enemy that does not roam walks home after the stand", _e2.ai_mode, "return");
+    // 7. an enemy that was only idle is not touched by the player stepping into a bush
+    var _e3 = Test_R4F2Enemy(2, 8, RIGHT);
+    var _pl3 = Test_R4F2Player(7, 8);
+    var _grass3 = instance_create_depth(8 * _T, 8 * _T, 0, obj_tall_grass);
+    Test_R4F2Tick(_e3, _pl3, 2);
+    _pl3.x = 8 * _T;
+    Test_R4F2Tick(_e3, _pl3, 3);
+    Test_Eq("r4final2 bush: an idle enemy stays idle (no ?, no stand)", _e3.ai_mode + "/" + string(_e3.q_pops), "idle/0");
+    instance_destroy(_e);
+    instance_destroy(_e2);
+    instance_destroy(_e3);
+    instance_destroy(_pl);
+    instance_destroy(_pl2);
+    instance_destroy(_pl3);
+    instance_destroy(_grass);
+    instance_destroy(_grass2);
+    instance_destroy(_grass3);
+}
+
+// ---- I-111 (amends R3 bvis note 23): the battle ground line is the top edge of the bottom HUD row (the player panel's top border; the preview plate and the command menu are not higher), so
+// every enemy's opaque bottom (its feet) stands just on it, at every window size, computed from the HUD layout (Battle_GroundY: whole world pixels, never below the line). Tall sprites keep
+// their top under the turn strip. The shadow is right under the feet. ----
+function Test_R4Final2Ground() {
+    if (asset_get_index("Battle_GroundY") == -1) { Test_True("r4final2 ground: Battle_GroundY exists (not implemented yet)", false); return; }
+    var _s = TextFit_Begin();
+    var _sizes = [[480, 432], [640, 576], [800, 720], [960, 880], [960, 864], [1280, 1152], [1366, 768], [1920, 1080], [1920, 1200]];
+    var _langs = ["en", "ko"];
+    var _bad_feet = "";
+    var _bad_top = "";
+    var _bad_shadow = "";
+    var _bad_hud = "";
+    var _bad_same = "";
+    var _n = 0;
+    for (var _l = 0; _l < 2; _l++) {
+        for (var _z = 0; _z < array_length(_sizes); _z++) {
+            TextFit_Set(_sizes[_z][0], _sizes[_z][1], _langs[_l]);
+            var _ws = Display_WorldScale();
+            var _zn = Battle_Zones();
+            var _mt = Ui_Metrics();
+            var _tag0 = _langs[_l] + "@" + string(_sizes[_z][0]) + "x" + string(_sizes[_z][1]);
+            // the HUD row's top edge: the player panel's top border; the command menu and the plate are not higher (the menu is as tall as the row, the plate is aligned with it)
+            if (_zn.player.y != _zn.band_top || Battle_GroundY() * _ws > _zn.band_top + 0.001 || Battle_GroundY() * _ws < _zn.band_top - _ws) _bad_hud += _tag0 + " ground=" + string(Battle_GroundY()) + " band=" + string(_zn.band_top) + "; ";
+            var _bottom0 = undefined;
+            for (var _id = ENEMY_SLIME; _id <= ENEMY_FINAL_BOSS; _id++) {
+                var _bc = Test_R3Make(_id, "", 0, false, false);
+                var _er = Battle_EnemyRect(_bc);
+                var _sh = Battle_EnemyShadowRect(_bc);
+                var _tag = _tag0 + " e" + string(_id) + " ";
+                _n++;
+                // feet: on the line, less than one world pixel above it, never into the HUD
+                var _feet = _er.y + _er.h;
+                if (_feet > _zn.band_top || _feet < _zn.band_top - _ws - 0.5) _bad_feet += _tag + "feet=" + string(_feet) + " line=" + string(_zn.band_top) + "; ";
+                if (is_undefined(_bottom0)) _bottom0 = _feet; else if (abs(_feet - _bottom0) > 1) _bad_same += _tag;   // (a fractional world scale rounds the rect by a unit)
+                // a tall sprite: its top stays under the turn strip; where the sprite is taller than the room between the strip and the HUD row (a boss in Korean, whose HUD row is taller, at the big sizes)
+                // the gap above is gone and the feet stay on the line (never the HUD): only the English HUD and the 32 px enemies are held to it
+                if ((_langs[_l] == "en" || _id < ENEMY_MINI_BOSS) && _er.y < Battle_TimelineBottom()) _bad_top += _tag + "top=" + string(_er.y) + " strip=" + string(Battle_TimelineBottom()) + "; ";
+                // the shadow's centre is a world pixel under the feet, so its upper half is covered by the feet
+                var _below = (_sh.y + _sh.h * 0.5) - _feet;
+                if (_below < _ws - 1 || _below > 2 * _ws + 1 || _sh.w <= 0) _bad_shadow += _tag + "below=" + string(_below) + "; ";
+                instance_destroy(_bc.enemy_inst);
+            }
+        }
+    }
+    Test_True("r4final2 ground: (setup) " + string(_n) + " enemy x size x language cases were looked at", _n >= 150);
+    Test_Eq("r4final2 ground: the line is the player panel's top edge (whole world pixels, never below it, under one pixel above it)", _bad_hud, "");
+    Test_Eq("r4final2 ground: every enemy's feet stand on the HUD row's top edge at every size (slime, spider, snake, whisp, plant, wolf, ghost sword, stranger, Palehorn, Choirbeast)", _bad_feet, "");
+    Test_Eq("r4final2 ground: all enemies' feet are on one GUI y at each size", _bad_same, "");
+    Test_Eq("r4final2 ground: a tall sprite (Palehorn, Choirbeast, English) and every 32 px enemy still have their top under the turn strip", _bad_top, "");
+    Test_Eq("r4final2 ground: the shadow is right under the feet", _bad_shadow, "");
+    // the window size changes in a fight: the enemy follows the layout
+    TextFit_Set(480, 432, "en");
+    var _bc2 = Test_R3Make(ENEMY_FINAL_BOSS, "", 0, false, false);
+    var _spr = _bc2.enemy_inst.sprite_index;
+    TextFit_Set(800, 720, "en");
+    var _mv = Battle_EnemyRegound(_bc2.enemy_inst, _spr);
+    Test_True("r4final2 ground: a new window size moves the enemy onto the new line", _mv);
+    Test_Eq("r4final2 ground: and it is where Battle_EnemyPlace puts it", _bc2.enemy_inst.y, Battle_EnemyPlace(_spr).y);
+    Test_False("r4final2 ground: nothing moves when the layout has not changed", Battle_EnemyRegound(_bc2.enemy_inst, _spr));
+    instance_destroy(_bc2.enemy_inst);
+    TextFit_End(_s);
+    // R-126: both bosses fight on the boss arena (D165), whatever the floor; every other enemy on its floor's picture
+    var _boss_bad = "";
+    for (var _b = ENEMY_MINI_BOSS; _b <= ENEMY_FINAL_BOSS; _b++) {
+        var _db = EnemyDB_Get(_b);
+        for (var _f = 1; _f <= 9; _f++) if (Battle_BgSpriteName(_f, _db.is_boss) != "spr_battle_bg_boss") _boss_bad += string(_b) + "@" + string(_f) + " ";
+    }
+    Test_Eq("r4final2 ground: Palehorn and the Choirbeast both use spr_battle_bg_boss on every floor", _boss_bad, "");
+    Test_True("r4final2 ground: the boss arena sprite is imported (it is not the plain fallback)", Battle_BgSprite("spr_battle_bg_boss") != battle_screen);
+}
+
+// ---- I-112: the System tab gets "Save" (saves the run now, a notice "Game saved.") and "Save & Quit to Title"; both are greyed, with the reason as their help line, in a fight, in a cutscene and
+// when there is no run. The write is the autosave's (RunSave_WriteTo on the active slot). ----
+function Test_R4Final2SaveRows() {
+    if (asset_get_index("Menu_SaveBlock") == -1) { Test_True("r4final2 save: Menu_SaveBlock exists (not implemented yet)", false); return; }
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    // when saving is blocked (pure: the room and whether a run is going)
+    Test_Eq("r4final2 save: on a floor with a run going saving is allowed", Menu_SaveBlock(rm_floor1, true), "");
+    Test_Eq("r4final2 save: in a fight it is blocked (battle)", Menu_SaveBlock(rm_battle, true), "battle");
+    Test_Eq("r4final2 save: in a cutscene it is blocked (cutscene)", Menu_SaveBlock(rm_cutscene, true), "cutscene");
+    Test_Eq("r4final2 save: with no run it is blocked (none)", Menu_SaveBlock(rm_floor1, false), "none");
+    Test_Eq("r4final2 save: no run wins over a fight", Menu_SaveBlock(rm_battle, false), "none");
+    // the rows
+    var _ok = TabSystem_Items(false, "");
+    var _ids = "";
+    var _lb = "";
+    var _all_on = true;
+    var _all_help = true;
+    for (var _i = 0; _i < array_length(_ok); _i++) {
+        _ids += ((_i > 0) ? "/" : "") + _ok[_i].id;
+        _lb += ((_i > 0) ? "," : "") + _ok[_i].label;
+        _all_on = _all_on && _ok[_i].enabled;
+        _all_help = _all_help && string_length(_ok[_i].help) > 0;
+    }
+    Test_Eq("r4final2 save: the System rows", _ids, "help/save/save_quit/abandon/quit");
+    Test_Eq("r4final2 save: the System labels", _lb, "Help,Save,Save & Quit to Title,Abandon Run,Quit to Title");
+    Test_True("r4final2 save: every row is on on the map and explains itself", _all_on && _all_help);
+    var _why = ["battle", "cutscene", "none"];
+    var _text = ["You cannot save during a battle.", "You cannot save during a cutscene.", "There is no run to save."];
+    for (var _w = 0; _w < 3; _w++) {
+        var _rows = TabSystem_Items(_why[_w] == "battle", _why[_w]);
+        Test_False("r4final2 save: Save is greyed (" + _why[_w] + ")", _rows[1].enabled);
+        Test_False("r4final2 save: Save & Quit is greyed (" + _why[_w] + ")", _rows[2].enabled);
+        Test_Eq("r4final2 save: Save says why (" + _why[_w] + ")", _rows[1].help, _text[_w]);
+        Test_Eq("r4final2 save: Save & Quit says why (" + _why[_w] + ")", _rows[2].help, _text[_w]);
+        Test_True("r4final2 save: Help, Abandon and Quit stay on (" + _why[_w] + ")", _rows[0].enabled && _rows[3].enabled && _rows[4].enabled);
+    }
+    Test_Eq("r4final2 save: the Save & Quit question", TabSystem_Question("save_quit", false), "Save and quit to title? Continue picks it up from here.");
+    // the mouse: a click on an enabled row confirms it, a greyed row does not answer
+    var _m = Ui_MenuNew("r4f2_sys", TabSystem_Items(false, ""), {});
+    var _rects = [];
+    for (var _r = 0; _r < array_length(_m.items); _r++) array_push(_rects, { x: 0, y: _r * 10, w: 100, h: 10 });
+    _m.rects = _rects;
+    var _sn = Ui_SnapNew();
+    _sn.mx = 5;
+    _sn.my = 15;   // the Save row
+    _sn.mouse_moved = true;
+    _sn.click = true;
+    var _ev = Ui_MenuStep(_m, _sn, 5000);
+    Test_True("r4final2 save: a click on the Save row confirms it", _ev.confirm && _m.items[_ev.index].id == "save", string(_ev.index));
+    var _g = Ui_MenuNew("r4f2_sys2", TabSystem_Items(true, "battle"), {});
+    _g.rects = _rects;
+    var _ev2 = Ui_MenuStep(_g, _sn, 5000);
+    Test_False("r4final2 save: a click on the greyed Save row does nothing", _ev2.confirm);
+    // Korean: the new rows have their own text (not the English fallback)
+    Loc_SetLanguage("ko");
+    var _ko = TabSystem_Items(false, "");
+    Test_True("r4final2 save: the Korean labels are Korean", _ko[1].label != "Save" && _ko[2].label != "Save & Quit to Title" && string_length(_ko[1].help) > 0);
+    Loc_SetLanguage(_lang0);
+}
+
+function Test_R4Final2SaveFile(_p) {
+    if (asset_get_index("Menu_SaveNow") == -1) { Test_True("r4final2 save: Menu_SaveNow exists (not implemented yet)", false); return; }
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_cp = _gs.checkpoint;
+    var _old_persist = _gs.persist;
+    var _old_class = _gs.selected_class;
+    _gs.run = Run_Create(6161);
+    _gs.run.gold = 44;
+    var _pl = CharacterCreate_Player(CLASS_MAGE);
+    _pl.level = 3;
+    _gs.player_ch = _pl;
+    _gs.selected_class = CLASS_MAGE;
+    _gs.checkpoint = { room: rm_floor3, x: 48, y: 64 };
+    _gs.persist = {};
+    var _path = RunSave_Path();
+    Test_Eq("r4final2 save: the active slot's file is run_0_0", _path, _p + "run_0_0.sav");
+    Test_ProfPutRun(_path, 4, 777, CLASS_KNIGHT, 2, 1, 1000, 5);   // an older save in the slot (saved at 5)
+    // blocked: nothing is written
+    var _b = Menu_SaveNow("battle");
+    Test_False("r4final2 save: in a fight nothing is saved", _b.ok);
+    Test_Eq("r4final2 save: and the answer says why", _b.text, "You cannot save during a battle.");
+    Test_Eq("r4final2 save: the file is untouched (saved at 5)", Slots_Summary(Profiles_Active())[Slot_Active()].saved_at, 5);
+    // allowed: the same file, written now, this run
+    var _r = Menu_SaveNow("");
+    Test_True("r4final2 save: Save writes the run", _r.ok);
+    Test_Eq("r4final2 save: the notice reads Game saved.", _r.text, "Game saved.");
+    var _sm = Slots_Summary(Profiles_Active())[Slot_Active()];
+    Test_Eq("r4final2 save: the active slot's file is this run now (seed)", _sm.seed, 6161);
+    Test_True("r4final2 save: its saved_at moved on", _sm.saved_at > 5);
+    Test_Eq("r4final2 save: it is a good run file", _sm.status, "ok");
+    var _l = RunSave_LoadFrom(_path);
+    Test_Eq("r4final2 save: it loads back with this run's gold", is_struct(_l.run) ? _l.run.gold : -1, 44);
+    // the other save files are not touched
+    Test_False("r4final2 save: slot 1 is still empty", Slots_Summary(Profiles_Active())[1].exists);
+    _gs.checkpoint = _old_cp;
+    _gs.persist = _old_persist;
+    _gs.selected_class = _old_class;
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+function Test_R4Final2SaveFileRun() { Test_ProfRun("tpc_", Test_R4Final2SaveFile); }

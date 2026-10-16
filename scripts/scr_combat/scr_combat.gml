@@ -3109,13 +3109,30 @@ function Battle_MenusLayout(_bc) {
     _bc.ui_item.layout.y_bottom = z.list_bottom;
     // G10 (D129): the details panel stands above the list and grows upward; it stops just under the enemy (the list and the panel give way, Ui_MenuDraw)
     // R-108: the prompt line stands right above the details panel, so the floor is the enemy's bottom plus the hint's height, so that neither covers the enemy
+    // I-111: the enemy's feet are on the HUD row's top edge, so a list that has not room for two rows under it lifts the enemy while it is open (Battle_ListLift): the floors below
+    // are those of the enemy lifted for that list.
+    var mt = Ui_Metrics();
+    var ws = Display_WorldScale();
     var er = Battle_EnemyRect(_bc);
+    var have = (er.w > 0 && er.h > 0);
+    var applied = Battle_Has(_bc, "lift_applied") ? _bc.lift_applied : 0;   // the world pixels it stands above the line now
+    var feet0 = er.y + er.h + applied * ws;   // its feet on the ground line
+    var top0 = er.y + applied * ws;
     var ms = [_bc.ui_skill, _bc.ui_item];
     var sts = [BSTATE_SKILL_MENU, BSTATE_ITEM_MENU];
+    var lifts = [0, 0];
     for (var i = 0; i < 2; i++) {
         var hint_h = Battle_ListHintRect({ x: 0, y: 0, w: ms[i].layout.panel_w, h: 0 }, sts[i]).h;
-        ms[i].layout.det_floor_y = (er.w > 0 && er.h > 0) ? er.y + er.h + ((hint_h > 0) ? hint_h + Ui_Px() : Ui_Px()) : -1;   // I-107: the hint's plate stands right on the details panel, one pixel unit under the enemy
-        ms[i].layout.det_floor_alt = (er.w > 0 && er.h > 0) ? er.y + er.h + Ui_Px() : -1;   // the floor when the hint is left out because nothing else makes room
+        if (have) lifts[i] = Battle_ListLift(ms[i], mt, ws, feet0, top0);
+        var feet_i = feet0 - lifts[i] * ws;
+        ms[i].layout.det_floor_y = have ? feet_i + ((hint_h > 0) ? hint_h + Ui_Px() : Ui_Px()) : -1;   // I-107: the hint's plate stands right on the details panel, one pixel unit under the enemy
+        ms[i].layout.det_floor_alt = have ? feet_i + Ui_Px() : -1;   // the floor when the hint is left out because nothing else makes room
+    }
+    _bc.list_lift = lifts;
+    var want = (_bc.battle_state == sts[0]) ? lifts[0] : ((_bc.battle_state == sts[1]) ? lifts[1] : 0);
+    if (have && want != applied) {   // the open list has its enemy lifted at once (the Step of the battle does the same every frame)
+        Battle_EnemyRegound(_bc.enemy_inst, _bc.enemy_inst.sprite_index, want);
+        _bc.lift_applied = want;
     }
 }
 
@@ -3442,17 +3459,73 @@ function Battle_EnemyRect(_bc) {
     return { x: round(x0), y: round(y0), w: round(x1 - x0), h: round(y1 - y0) };
 }
 
-// R3 (owner note 23): the ground every enemy stands on, in world pixels. Every battle enemy's opaque bottom (its feet) sits on this one line, whatever the size of
-// its picture (the 32 x 32 enemies and the 48 and 64 high bosses): the biggest boss still clears the turn strip at every window size, and the shadow
-// under the feet is drawn on this line.
-#macro BATTLE_GROUND_Y 80
+// R3 (owner note 23), I-111 (owner round 4): the ground every enemy stands on, in world pixels. Every battle enemy's opaque bottom (its feet) sits on this one line, whatever the size of
+// its picture (the 32 x 32 enemies and the 48 and 64 high bosses). I-111: the line is the top edge of the bottom HUD row (the player panel's top border, which the command menu and the
+// preview plate are not higher than), so the monsters stand on the panels instead of floating above them. It follows the window: it is worked out from the HUD zones of the current
+// layout (Battle_GroundY), in whole world pixels (the feet never go into the HUD, and stand less than one world pixel above it). A tall boss keeps its feet on the line, so the gap above it
+// (to the turn strip) shrinks; the shadow is drawn right under the feet.
 
-// Where the enemy instance goes in the battle room (its top left corner, origin 0): centred across the picture, the opaque bottom on BATTLE_GROUND_Y.
-function Battle_EnemyPlace(_spr) {
+// The HUD row's top edge in GUI units for the layout now: BattleHud_Zones' band_top (it does not depend on the turn strip, so this can run before a fight's timeline exists).
+function Battle_HudTopGui() {
+    var mt = Ui_Metrics();
+    return BattleHud_Zones(mt.gw, mt.gh, mt.p, mt.line_h, 0, 16 * Battle_IconK(), Battle_ChipLabelH()).band_top;
+}
+
+// The ground line in whole world pixels for the layout now (the largest line that is not below the HUD row's top edge).
+function Battle_GroundY() {
+    var ws = max(0.0001, Display_WorldScale());
+    return floor(Battle_HudTopGui() / ws + 0.0001);
+}
+
+// Where the enemy instance goes in the battle room (its top left corner, origin 0): centred across the picture, the opaque bottom on the ground line.
+function Battle_EnemyPlace(_spr, _ground_y = undefined) {
+    var gy = is_undefined(_ground_y) ? Battle_GroundY() : _ground_y;
     var cx = DISPLAY_BASE_W div 2;
-    if (_spr == noone) return { x: cx - 8, y: BATTLE_GROUND_Y - 16 };
+    if (_spr == noone) return { x: cx - 8, y: gy - 16 };
     var feet = sprite_get_bbox_bottom(_spr) + 1 - sprite_get_yoffset(_spr);
-    return { x: cx - sprite_get_width(_spr) div 2, y: BATTLE_GROUND_Y - feet };
+    return { x: cx - sprite_get_width(_spr) div 2, y: gy - feet };
+}
+
+// The window (the layout) changed in a fight, or a list opened: put the enemy instance on the ground line (_lift world pixels above it, see Battle_ListLift). Returns true when it
+// moved. (obj_battle_controller Step, every frame; it is cheap.)
+function Battle_EnemyRegound(_inst, _spr, _lift = 0) {
+    if (!instance_exists(_inst)) return false;
+    var at = Battle_EnemyPlace(_spr, Battle_GroundY() - _lift);
+    if (_inst.x == at.x && _inst.y == at.y) return false;
+    _inst.x = at.x;
+    _inst.y = at.y;
+    return true;
+}
+
+// I-111: with the feet on the HUD row's top edge a skill or item list has less room under the enemy than it had. While such a list is open the enemy stands this many world pixels above
+// its ground line, as many as the list needs for its most squeezed layout with two rows (the details sentence alone, the type one step smaller, the panels sharing a border: what
+// R-108 / I-107 promise) for ANY of its rows (so it does not move as the cursor does), never more than keeps its top under the turn strip. 0 when everything fits as it is (the
+// default 480 x 432 window). _feet0 = where its feet are on the ground line (GUI y). Cached on the menu: it only changes with the rows, the language or the window.
+function Battle_ListLift(_m, _mt, _ws, _feet0, _er_top0) {
+    var n = array_length(_m.items);
+    if (n <= 0) return 0;
+    var key = string(n) + "|" + string(Loc_GetRevision()) + "|" + string(_m.layout.panel_w) + "|" + string(_m.layout.y_bottom) + "|" + string(_mt.p) + "|" + string(round(_feet0)) + "|" + string(round(_er_top0)) + "|" + string(Display_GuiH());
+    for (var k = 0; k < n; k++) key += "," + string(string_length(variable_struct_exists(_m.items[k], "help") ? _m.items[k].help : ""));
+    if (variable_struct_exists(_m, "lift_key") && _m.lift_key == key) return _m.lift_val;
+    var mm = Ui_MenuMeasure(_m, _mt);
+    var chrome = 2 * (4 * _mt.p);   // the battle lists have no title and no note
+    var rows = min(2, n);
+    var space = _m.layout.y_bottom - (_feet0 + Ui_Px());
+    var lack = 0;
+    for (var i = 0; i < n; i++) {
+        var sq = Ui_DetailsHeight(mm.panel_w, variable_struct_exists(_m.items[i], "help") ? _m.items[i].help : "", [], 2, 0, undefined, 1, true);
+        lack = max(lack, Ui_AboveNeed(sq, -2 * _mt.p, chrome, rows, mm.rhs, _mt, i) - space);
+    }
+    var lift = (lack > 0) ? ceil(lack / _ws) : 0;
+    var cap = max(0, floor((_er_top0 - Battle_TimelineBottom()) / _ws));   // the opaque top stays under the turn strip
+    lift = min(lift, cap);
+    _m.lift_key = key;
+    _m.lift_val = lift;
+    return lift;
+}
+
+function Battle_Has(_o, _name) {
+    return is_struct(_o) ? variable_struct_exists(_o, _name) : variable_instance_exists(_o, _name);
 }
 
 // R3 (owner note 5): the soft shadow under an enemy, two nested ellipses in the darkest colour. Pure: the sprite drawn with its origin at (_exs, _eys),

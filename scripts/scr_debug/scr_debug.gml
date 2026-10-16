@@ -578,7 +578,13 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeR3Mouse(_s);   // mouse (D182, R-111): the title, Settings sliders, the seed entry through a fake mouse; goes on with ideas2 (1120)
             break;
         case 1120: case 1121: case 1122: case 1123: case 1124: case 1125: case 1126: case 1127: case 1128: case 1129:
-            Scenario_StepSmokeR3Ideas2(_s);   // ideas2 (D173, D185): a trapped chest on floor 2 through real keys: the line, the one-time tutorial, the bar (map paused), Perfect and Weak; the end of the chain (its last step calls Scenario_MouseEnd)
+            Scenario_StepSmokeR3Ideas2(_s);   // ideas2 (D173, D185): a trapped chest on floor 2 through real keys: the line, the one-time tutorial, the bar (map paused), Perfect and Weak; goes on with r4final2 (1130)
+            break;
+        case 1130: case 1131: case 1132: case 1133: case 1134: case 1135: case 1136: case 1137: case 1138: case 1139:
+            Scenario_StepSmokeR4Bush(_s);   // r4final2 (I-110, R-124): a slime chases the player, he walks into a bush with real keys: "?" at once, it stands 2.5 s, then roams, never re-spots him in the bush; goes on with the Save step (1140)
+            break;
+        case 1140: case 1141: case 1142: case 1143: case 1144: case 1145: case 1146: case 1147: case 1148: case 1149:
+            Scenario_StepSmokeR4Save(_s);   // r4final2 (I-112, R-127): Tab > System > Save (notice "Game saved.", the run file is newer), Save & Quit to Title, Continue; the end of the chain (its last step calls Scenario_MouseEnd)
             break;
         case 1110: case 1111: case 1112: case 1113: case 1114: case 1115: case 1116: case 1117: case 1118: case 1119:
             Scenario_StepSmokeR3Ideas1(_s);   // r3ideas1 (D173, D185, R-114, R-115): a resisted Bleeding is said and remembered by the Codex; a poison tick kills and the death tip is the poison one; goes on with saves2 (1070)
@@ -1136,6 +1142,14 @@ function Scenario_StepSmokeSkip(_s) {
 
 function Scenario_Aligned(_inst) {
     return (instance_exists(_inst) && Grid_IsAligned(_inst.x) && Grid_IsAligned(_inst.y));
+}
+
+// I-112: the index of a System tab row by its id (the Save rows moved the others down); -1 when there is none.
+function Scenario_SystemRow(_id) {
+    var _m = TabMenu_TopMenu();
+    if (!is_struct(_m)) return -1;
+    for (var _i = 0; _i < array_length(_m.items); _i++) if (_m.items[_i].id == _id) return _i;
+    return -1;
 }
 
 function Scenario_CanSaveSlot() {
@@ -3093,7 +3107,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsR3Ideas2(_s);   // ideas2 (D173, D185): the trapped line and the bar on the map, the boss's zoom punch; three sizes; goes on with r4final1 (1130), the end of the pictures
             break;
         case 1130: case 1131: case 1132: case 1133: case 1134: case 1135: case 1136: case 1137: case 1138: case 1139:
-            Scenario_StepShotsR4Final1(_s);   // r4final1 (I-107, I-108): the battle Skill list with its counter, arrows and two rows (Archer level 1, a full Mage list, Korean) and white chip labels; three sizes; the end of the pictures
+            Scenario_StepShotsR4Final1(_s);   // r4final1 (I-107, I-108): the battle Skill list with its counter, arrows and two rows (Archer level 1, a full Mage list, Korean) and white chip labels; three sizes; goes on with r4final2 (1140)
+            break;
+        case 1140: case 1141: case 1142: case 1143: case 1144: case 1145: case 1146: case 1147: case 1148: case 1149:
+            Scenario_StepShotsR4Final2(_s);   // r4final2 (I-111): slime, snake, wolf, Palehorn, Choirbeast with their feet on the HUD row's top edge, and the Skill list against the Choirbeast; three sizes; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -5012,7 +5029,7 @@ function Scenario_StepSmokeRun(_s) {
                 Scenario_ClearUi();
                 Menu_Open(6);
             }
-            if (_s.t == 12) Scenario_Tap("menu_down");   // Help, Abandon run
+            if (_s.t == 12) Ui_MenuFixCursor(TabMenu_TopMenu(), Scenario_SystemRow("abandon"));   // Help, Save, Save & Quit, Abandon run (I-112: the cursor is put on it; the walk down is checked in the System tab steps)
             if (_s.t == 60) {
                 Scenario_Check("abandon_cursor_is_on_the_abandon_row", is_struct(TabMenu_TopMenu()) && TabMenu_TopMenu().items[TabMenu_TopMenu().cursor].id == "abandon", "cursor=" + string(is_struct(TabMenu_TopMenu()) ? TabMenu_TopMenu().cursor : -1));
                 Scenario_Tap("confirm");
@@ -7926,11 +7943,11 @@ function Scenario_StepSmokeTabMenu(_s) {
                     Scenario_Check("tabmenu_the_pause_key_opens_the_same_menu", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
                     Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 6);
                     TabMenu_Switch(TabMenu_Get(), 6);
-                    Scenario_Check("tabmenu_system_has_the_three_rows_and_starts_on_help", array_length(TabMenu_TopMenu().items) == 3 && TabMenu_TopMenu().cursor == 0);
+                    Scenario_Check("tabmenu_system_has_the_five_rows_and_starts_on_help", array_length(TabMenu_TopMenu().items) == 5 && TabMenu_TopMenu().cursor == 0);
                     Scenario_Tap("menu_up");
                     break;
                 case 19:
-                    Scenario_Check("tabmenu_system_up_from_help_wraps_to_quit", TabMenu_TopMenu().cursor == 2, "cursor=" + string(TabMenu_TopMenu().cursor));
+                    Scenario_Check("tabmenu_system_up_from_help_wraps_to_quit", TabMenu_TopMenu().cursor == 4, "cursor=" + string(TabMenu_TopMenu().cursor));
                     Scenario_Tap("menu_down");
                     break;
                 case 26:
@@ -10620,7 +10637,7 @@ function Scenario_StepSmokeRunStats(_s) {
             }
             if (_s.t == 10) _rs.pa = _gs.run.stats.play_ms;
             if (_s.t == 50) Scenario_Check("g9_run_time_stops_under_the_menu", Menu_IsOpen() && _gs.run.stats.play_ms == _rs.pa, "paused at " + string(_rs.pa) + ", 40 frames later " + string(_gs.run.stats.play_ms));
-            if (_s.t == 80) Scenario_Tap("menu_down");   // Help, Abandon run
+            if (_s.t == 80) Ui_MenuFixCursor(TabMenu_TopMenu(), Scenario_SystemRow("abandon"));   // Help, Save, Save & Quit, Abandon run (I-112)
             if (_s.t == 125) {
                 Scenario_Check("g9_the_menu_cursor_is_on_abandon", is_struct(TabMenu_TopMenu()) && TabMenu_TopMenu().items[TabMenu_TopMenu().cursor].id == "abandon", "cursor=" + string(is_struct(TabMenu_TopMenu()) ? TabMenu_TopMenu().cursor : -1));
                 Scenario_Tap("confirm");
@@ -11168,8 +11185,8 @@ function Scenario_StepSmokeLevelUp(_s) {
                 Scenario_Check("levelup_the_cursor_starts_on_the_class_stat", _ms.cursor == STAT_DEF, "cursor=" + string(_ms.cursor));
                 // D177: the Knight's growth rows (ATK, DEF, VIG, MND) are gold, SPD and MAG are not; growth rows read now > now + growth, the hovered one now > now + growth + 1
                 var _gold = "";
-                for (var _gi = 0; _gi < array_length(_ms.items); _gi++) if (variable_struct_exists(_ms.items[_gi], "col") && _ms.items[_gi].col == UI_C_MERCHANT_GOLD) _gold += _ms.items[_gi].label + ",";
-                Scenario_Check("levelup_the_class_growth_rows_are_gold", _gold == "ATK,DEF,VIG,MND,", "gold=" + _gold);
+                for (var _gi = 0; _gi < array_length(_ms.items); _gi++) if (_ms.items[_gi].grow > 0) _gold += _ms.items[_gi].label + ",";
+                Scenario_Check("levelup_the_class_growth_rows_have_a_gold_new_number", _gold == "ATK,DEF,VIG,MND,", "gold=" + _gold);
                 Scenario_Check("levelup_a_growth_row_reads_now_to_now_plus_growth", _ms.items[0].value == string(_lu.b.atk) + " > " + string(_lu.b.atk + 1), "ATK=" + _ms.items[0].value);
                 Scenario_Check("levelup_the_hovered_growth_row_adds_the_point", _ms.items[1].value == string(_lu.b.def) + " > " + string(_lu.b.def + 2), "DEF=" + _ms.items[1].value);
                 Scenario_Check("levelup_VIG_reads_its_growth_of_3_on_level_4", _ms.items[4].value == string(_lu.b.vig) + " > " + string(_lu.b.vig + 3), "VIG=" + _ms.items[4].value);
@@ -11283,7 +11300,7 @@ function Scenario_StepSmokeOneMenu(_s) {
                 _u = TabMenu_Get();
                 var _tm = TabMenu_TopMenu();
                 Scenario_Check("onemenu_Q_from_status_wraps_to_system", is_struct(_u) && _u.tab == 6 && TabMenu_Ids()[_u.tab] == "system", "tab=" + string(is_struct(_u) ? _u.tab : -1));
-                Scenario_Check("onemenu_system_has_help_abandon_and_quit", is_struct(_tm) && array_length(_tm.items) == 3 && _tm.items[0].id == "help" && _tm.items[1].id == "abandon" && _tm.items[2].id == "quit");
+                Scenario_Check("onemenu_system_has_help_save_save_quit_abandon_and_quit", is_struct(_tm) && array_length(_tm.items) == 5 && _tm.items[0].id == "help" && _tm.items[1].id == "save" && _tm.items[2].id == "save_quit" && _tm.items[3].id == "abandon" && _tm.items[4].id == "quit");
                 Scenario_Tap("esc");
             }
             if (_s.t == 120) {
@@ -11384,7 +11401,8 @@ function Scenario_StepSmokeOneMenu(_s) {
                 _u = TabMenu_Get();
                 var _tm2 = TabMenu_TopMenu();
                 Scenario_Check("onemenu_Q_reaches_system_in_the_fight", is_struct(_u) && _u.tab == 6, "tab=" + string(is_struct(_u) ? _u.tab : -1));
-                Scenario_Check("onemenu_abandon_and_quit_are_on_in_the_fight", is_struct(_tm2) && array_length(_tm2.items) == 3 && _tm2.items[1].enabled && _tm2.items[2].enabled);
+                Scenario_Check("onemenu_abandon_and_quit_are_on_in_the_fight", is_struct(_tm2) && array_length(_tm2.items) == 5 && _tm2.items[3].enabled && _tm2.items[4].enabled);
+                Scenario_Check("r4final2_smoke_save_and_save_quit_are_greyed_in_the_fight_with_the_reason", is_struct(_tm2) && !_tm2.items[1].enabled && !_tm2.items[2].enabled && _tm2.items[1].help == "You cannot save during a battle." && _tm2.items[2].help == "You cannot save during a battle.", is_struct(_tm2) ? _tm2.items[1].help : "");
                 _bc.p.hp = 1;   // the fight goes on in the meantime: none of it may come back
                 _bc.p.mp = 0;
                 Scenario_Tap("menu_down");
@@ -11392,7 +11410,7 @@ function Scenario_StepSmokeOneMenu(_s) {
             if (_s.t == 40) Scenario_Tap("menu_down");
             if (_s.t == 52) {
                 var _tm3 = TabMenu_TopMenu();
-                Scenario_Check("onemenu_the_cursor_is_on_quit", is_struct(_tm3) && _tm3.cursor == 2 && _tm3.items[2].id == "quit", "cursor=" + string(is_struct(_tm3) ? _tm3.cursor : -1));
+                Scenario_Check("onemenu_the_cursor_is_on_quit", is_struct(_tm3) && _tm3.cursor == 4 && _tm3.items[4].id == "quit", "cursor=" + string(is_struct(_tm3) ? _tm3.cursor : -1));   // (the greyed Save rows are skipped: Help, Abandon, Quit)
                 Scenario_Tap("confirm");
             }
             if (_s.t == 64) {   // D156: the first press only asks, in the fight too
@@ -11652,7 +11670,7 @@ function Scenario_StepShotsLevelUp(_s) {
                 var _gold = "";
                 for (var _i = 0; _i < array_length(_m.items); _i++) {
                     _vals += (_i > 0 ? "|" : "") + _m.items[_i].value;
-                    if (variable_struct_exists(_m.items[_i], "col") && _m.items[_i].col == UI_C_MERCHANT_GOLD) _gold += _m.items[_i].label + ",";
+                    if (_m.items[_i].grow > 0) _gold += _m.items[_i].label + ",";
                 }
                 var _want_vals = "";   // D186 (r3balance): Knight SPD 10 -> 9
                 var _want_gold = "ATK,DEF,VIG,MND,";
@@ -11664,7 +11682,7 @@ function Scenario_StepShotsLevelUp(_s) {
                     case "knight_ko": _want_vals = "11 > 12|12 > 13|9|3|10 > 13|11 > 12"; break;
                 }
                 Scenario_Check("shots_levelup_the_rows_read_by_the_rule_" + _tag, _vals == _want_vals, "vals=" + _vals + " want=" + _want_vals);
-                Scenario_Check("shots_levelup_the_class_growth_rows_are_gold_" + _tag, _gold == _want_gold, "gold=" + _gold);
+                Scenario_Check("shots_levelup_the_class_growth_rows_have_a_gold_new_number_" + _tag, _gold == _want_gold, "gold=" + _gold);
                 Scenario_Check("shots_levelup_the_legend_is_gold_text_not_the_growth_line_" + _tag, _m.layout.note == Loc_T("levelup.legend", "Gold = your class grows these") && string_pos("growth:", _m.layout.note) == 0, "note=" + string(_m.layout.note));
                 Scenario_TF2RowsFit(_m, "levelup_" + _tag);
                 _s.shot = "shot_ui_levelup_" + _scene + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
@@ -11729,8 +11747,7 @@ function Scenario_StepSmokeConfirm(_s) {
             if (_s.t == 16) {
                 Scenario_Check("confirm_the_menu_opens_on_system", _gs.ui.mode == UI_MENU && is_struct(_u) && TabMenu_Ids()[_u.tab] == "system", "mode=" + string(_gs.ui.mode));
                 Scenario_Check("confirm_a_run_is_going", Run_IsActive());
-                Ui_MenuFixCursor(TabMenu_TopMenu(), 0);   // the list remembers where it was left: start from Help
-                Scenario_Tap("menu_down");
+                Ui_MenuFixCursor(TabMenu_TopMenu(), Scenario_SystemRow("abandon"));   // the list remembers where it was left; I-112: the Save rows are between Help and Abandon, the cursor is put on Abandon
             }
             if (_s.t == 30) {
                 var _tm = TabMenu_TopMenu();
@@ -11827,8 +11844,7 @@ function Scenario_StepSmokeConfirm(_s) {
             }
             if (_s.t == 44) {
                 Scenario_Check("confirm_the_menu_opens_again_on_system", _gs.ui.mode == UI_MENU && is_struct(_u) && TabMenu_Ids()[_u.tab] == "system", "mode=" + string(_gs.ui.mode));
-                Ui_MenuFixCursor(TabMenu_TopMenu(), 0);
-                Scenario_Tap("menu_down");
+                Ui_MenuFixCursor(TabMenu_TopMenu(), Scenario_SystemRow("abandon"));   // I-112: the Save rows are between Help and Abandon
             }
             if (_s.t == 58) Scenario_Tap("confirm");
             if (_s.t == 72) {
@@ -12038,7 +12054,7 @@ function Scenario_StepShotsOneMenu(_s) {
             switch (_scenes[_o.di]) {
                 case "system":
                     Menu_Open(6);
-                    Ui_MenuFixCursor(TabMenu_TopMenu(), 2);   // Quit to title, with its help sentence
+                    Ui_MenuFixCursor(TabMenu_TopMenu(), Scenario_SystemRow("save_quit"));   // I-112: Save & Quit to Title, with its help sentence (the System tab now has the two Save rows)
                     break;
                 case "settings":
                     Menu_Open(5);
@@ -12239,8 +12255,8 @@ function Scenario_StepShotsConfirm(_s) {
                 Scenario_ClearUi();
                 if (_sc == "korean") Loc_SetLanguage("ko");
                 Menu_Open(6);
-                Ui_MenuFixCursor(TabMenu_TopMenu(), 1);   // Abandon run
-                TabMenu_OnConfirm(TabMenu_TopMenu(), 1);
+                Ui_MenuFixCursor(TabMenu_TopMenu(), Scenario_SystemRow("abandon"));   // Abandon run (I-112: row 3 now)
+                TabMenu_OnConfirm(TabMenu_TopMenu(), Scenario_SystemRow("abandon"));
             }
             Scenario_Next(_s, 672);
             break;
@@ -12384,7 +12400,7 @@ function Scenario_StepSmokeH11(_s) {
                 _h.min_cy = _c.cy;
                 _h.saw_return = false;
                 _h.t_b = _s.f;
-                Scenario_PlacePlayer(3, 4);
+                Scenario_PlacePlayer(7, 7);   // I-110: far from every bush (it was (3,4), a bush cell; the last up key still moves him one step): a player who steps into a bush makes every searcher stand and roam, and the search this step watches would not happen
                 Scenario_Next(_s, 584);
             }
             if (_s.t > 90) { Scenario_Check("h11_running_within_2_tiles_out_of_sight_is_heard", false, "mode=" + ((_e != noone) ? _e.ai_mode : "gone")); Scenario_Release(); Scenario_NoticeEnd(); }
@@ -14537,49 +14553,35 @@ function Scenario_StepSmokeR3Stealth(_s) {
             if (_s.t > 60) { Scenario_Check("r3stealth_a_slime_facing_the_player_3_tiles_away_spots_him", false, "mode=" + _e.ai_mode); Scenario_NoticeEnd(); }
             break;
         case 1052:   // down two tiles, then right along row 8
-            if (_s.t == 20) Scenario_Hold("move_right", 70);   // 7 tiles to the grass at (9,8); the skull at (10,8) stops him
+            if (_s.t == 20) Scenario_Hold("move_right", 70);   // 7 tiles to (9,8); the skull at (10,8) stops him (the grass that was there is taken away in step 1050: see there)
             if (instance_position(_pl.x + _T / 2, _pl.y + _T / 2, obj_tall_grass) != noone) _h.walked_in_bush = true;
             if (_s.t == 90) Scenario_Next(_s, 1053);
             break;
-        case 1053:   // watch the slime until it is idle at home again
+        case 1053:   // I-110: he steps into the grass at (9,8): the slime that chases him drops it at once (one "?"), stands about 2.5 s, then it is idle again (watched until then)
             if (_s.t == 5) {
                 var _bc = Scenario_H11Cell(_pl);
                 Scenario_Check("r3stealth_the_player_ran_to_the_grass_at_9_8", _bc.cx == 9 && _bc.cy == 8 && !_pl.moving, "at " + string(_bc.cx) + "," + string(_bc.cy));
             }
             if (_e == noone) { Scenario_Check("r3stealth_the_slime_is_alive_after_the_run", false); Scenario_NoticeEnd(); break; }
             var _ec = Scenario_H11Cell(_e);
-            var _pc = Scenario_H11Cell(_pl);
             if (instance_position(_pl.x + _T / 2, _pl.y + _T / 2, obj_tall_grass) != noone) _h.walked_in_bush = true;
-            if (_e.ai_mode == "search") {
-                if (_h.search_f < 0) {
-                    _h.search_f = _s.f;
-                    _h.search_cx = _ec.cx;
-                    _h.search_cy = _ec.cy;
-                    Scenario_Check("r3stealth_the_search_starts_on_the_last_cell_it_saw_him", _ec.cx == _e.last_seen_cx && _ec.cy == _e.last_seen_cy, "at " + string(_ec.cx) + "," + string(_ec.cy) + " last seen " + string(_e.last_seen_cx) + "," + string(_e.last_seen_cy));
-                }
-                if (_ec.cx != _h.search_cx || _ec.cy != _h.search_cy) _h.moved_in_search = true;
-            }
-            if (_e.ai_mode == "return" && _h.return_f < 0) {
-                _h.return_f = _s.f;
+            if (!variable_struct_exists(_h, "stand_f")) { _h.stand_f = -1; _h.end_f = -1; _h.moved_in_stand = false; }
+            if (_e.ai_mode == "stand" && _h.stand_f < 0) {
+                _h.stand_f = _s.f;
+                _h.stand_cx = _ec.cx;
+                _h.stand_cy = _ec.cy;
                 _h.cooldown = _e.spot_cooldown;
                 _h.pops = _e.q_pops;
             }
-            if (_e.ai_mode == "idle" && _h.return_f >= 0 && _h.home_f < 0) {
-                _h.home_f = _s.f;
-                Scenario_Check("r3stealth_the_slime_is_home_again", _ec.cx == 5 && _ec.cy == 6 && !_e.moving, "at " + string(_ec.cx) + "," + string(_ec.cy));
-            }
-            if (_h.home_f >= 0 || _s.f - _h.spot_f > 700) {
+            if (_e.ai_mode == "stand" && (_ec.cx != _h.stand_cx || _ec.cy != _h.stand_cy)) _h.moved_in_stand = true;
+            if (_h.stand_f >= 0 && _e.ai_mode != "stand" && _h.end_f < 0) _h.end_f = _s.f;
+            if (_h.end_f >= 0 || _s.f - _h.spot_f > 700) {
                 Scenario_Release();
-                var _took = _h.home_f - _h.spot_f;
-                Scenario_Check("r3stealth_it_found_its_way_home", _h.home_f >= 0, "mode=" + _e.ai_mode);
-                Scenario_Check("r3stealth_the_slime_is_home_within_6_seconds_of_starting_to_search", _h.home_f >= 0 && _h.search_f >= 0 && (_h.home_f - _h.search_f) <= 360, "took " + string(_h.home_f - _h.search_f) + " frames");
-                Scenario_Check("r3stealth_and_within_9_seconds_of_spotting_him", _h.home_f >= 0 && _took <= 540, "took " + string(_took) + " frames");
-                Scenario_Check("r3stealth_it_searched_for_about_3_seconds", _h.search_f >= 0 && _h.return_f >= 0 && (_h.return_f - _h.search_f) >= 150 && (_h.return_f - _h.search_f) <= 230, "frames " + string(_h.return_f - _h.search_f));
-                Scenario_Check("r3stealth_it_stood_still_while_it_searched", _h.search_f >= 0 && !_h.moved_in_search);
-                Scenario_Check("r3stealth_it_put_up_exactly_one_question_mark", _h.return_f >= 0 && _h.pops == 1 && _e.q_pops == 1, "q_pops=" + string(_e.q_pops));
-                Scenario_Check("r3stealth_it_cannot_notice_him_for_2_seconds_after_giving_up", _h.return_f >= 0 && _h.cooldown >= 115 && _h.cooldown <= 120, "cooldown=" + string(variable_struct_exists(_h, "cooldown") ? _h.cooldown : -1));
-                Scenario_Check("r3stealth_the_player_walked_into_the_bush_with_real_keys", _h.walked_in_bush);
-                Scenario_Check("r3stealth_he_was_still_hidden_when_it_gave_up", Player_IsHidden(_pl));
+                Scenario_Check("r3stealth_the_slime_drops_the_chase_when_he_steps_into_the_grass_and_stands", _h.stand_f >= 0 && _h.walked_in_bush, "mode=" + _e.ai_mode);
+                Scenario_Check("r3stealth_it_stood_for_about_2_5_seconds", _h.stand_f >= 0 && _h.end_f >= 0 && (_h.end_f - _h.stand_f) >= 140 && (_h.end_f - _h.stand_f) <= 175, "frames " + string(_h.end_f - _h.stand_f));
+                Scenario_Check("r3stealth_it_stood_still_while_it_stood", _h.stand_f >= 0 && !_h.moved_in_stand);
+                Scenario_Check("r3stealth_it_put_up_exactly_one_question_mark", _h.stand_f >= 0 && _h.pops == 1 && _e.q_pops == 1, "q_pops=" + string(_e.q_pops));
+                Scenario_Check("r3stealth_it_cannot_notice_him_for_the_stand_and_2_seconds", _h.stand_f >= 0 && _h.cooldown >= 230 && _h.cooldown <= 270, "cooldown=" + string(variable_struct_exists(_h, "cooldown") ? _h.cooldown : -1));
                 Scenario_Check("r3stealth_no_fight_started", room == rm_floor3 && !Transition_IsActive());
                 Scenario_Next(_s, 1054);
             }
@@ -18465,10 +18467,10 @@ function Scenario_StepSmokeR3Ideas2(_s) {
             }
             if (_s.t > 1200) { Scenario_Check("ideas2_smoke_the_weak_flow_ends", false, "tapped=" + string(_d.tapped) + " mode=" + string(_gs.ui.mode) + " trap=" + string(TrapUi_IsOpen())); Scenario_MouseEnd(); }
             break;
-        case 1124:   // the end of the chain
+        case 1124:   // goes on with r4final2 (1130..), the end of the chain
             Scenario_RestoreFocus();
             global.tutorial_off = true;
-            Scenario_MouseEnd();
+            Scenario_Next(_s, 1130);
             break;
     }
 }
@@ -18718,9 +18720,325 @@ function Scenario_StepShotsR4Final1(_s) {
                 if (_o.di >= array_length(_scenes)) {
                     Loc_SetLanguage("en");
                     Scenario_SetWindowScale(3);
-                    Scenario_MouseEnd();   // the end of the pictures
+                    Scenario_Next(_s, 1140);   // goes on with the r4final2 pictures (1140..1143), the end of the pictures
                 } else {
                     Scenario_Next(_s, 1130);
+                }
+            }
+            break;
+    }
+}
+
+
+// ============================================================================
+// Round 4 final fixes, packet final2, smoke steps 1130..1139 (rm_floor3, real keys). I-110 (R-124): a slime facing the player 2 tiles away chases him; he steps up into the bush patch (3,5) with a
+// real key: at once the slime drops the chase ("?" up, mode stand), stands on its cell for about 2.5 s, then it roams again (idle); it never chases while he is in the bush (stood still, then
+// walking to (3,4) inside the bush) for 270 frames from the moment he stepped in; stepping out onto (3,6) afterwards it spots him again. The last step goes on with the Save steps (1140).
+// ============================================================================
+function Scenario_StepSmokeR4Bush(_s) {
+    if (!variable_struct_exists(_s, "r4b")) _s.r4b = { };
+    var _h = _s.r4b;
+    var _T = GRID_TILE_SIZE;
+    var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
+    var _e = (variable_struct_exists(_h, "e") && instance_exists(_h.e)) ? _h.e : noone;
+    switch (_s.step) {
+        case 1130:   // rm_floor3 by a real room change; the slime at (5,6) facing left, the player at (3,6)
+            if (_s.t == 1) {
+                Scenario_Release();
+                Scenario_ClearUi();
+                Dialogue_CloseNow();
+                Scenario_NewKnight(CLASS_KNIGHT);
+                room_goto(rm_floor2);
+            }
+            if (_s.t == 30 && room == rm_floor2) room_goto(rm_floor3);
+            if (_s.t > 70 && Scenario_FloorReady(rm_floor3) && Player_IsSettled(_pl)) {
+                with (obj_enemy) instance_destroy();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_Check("r4final2_smoke_the_bush_cell_3_5_has_its_grass", instance_position(3 * _T + _T / 2, 5 * _T + _T / 2, obj_tall_grass) != noone);
+                _h.e = Scenario_H11Enemy(obj_slime, 5, 6, -1, LEFT);
+                Scenario_PlacePlayer(3, 6);
+                _pl.face = UP;   // already facing the bush: one press moves a step (a press on a new direction only turns, D69)
+                _h.f0 = _s.f;
+                Scenario_Next(_s, 1131);
+            }
+            if (_s.t > 600) { Scenario_Check("r4final2_smoke_rm_floor3_is_ready", false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+            break;
+        case 1131:   // spotted; the player walks up into the bush
+            if (_e == noone) { Scenario_Check("r4final2_smoke_the_slime_is_alive", false); Scenario_MouseEnd(); break; }
+            if (_e.ai_mode == "chase") {
+                Scenario_Check("r4final2_smoke_the_slime_chases_him_in_the_open", !Player_InBush(_pl) && _e.alert_pop > 0);
+                _h.bush_f = -1;
+                _h.stand_f = -1;
+                _h.end_f = -1;
+                _h.chased = false;
+                _h.moved = false;
+                _h.up2 = false;
+                Scenario_Hold("move_up", 6);
+                Scenario_Next(_s, 1132);
+            }
+            if (_s.t > 60) { Scenario_Check("r4final2_smoke_the_slime_chases_him_in_the_open", false, "mode=" + _e.ai_mode); Scenario_MouseEnd(); }
+            break;
+        case 1132:   // the step into the bush: at once the chase is dropped; the stand; the roam
+            if (_e == noone) { Scenario_Check("r4final2_smoke_the_slime_is_alive_in_the_bush", false); Scenario_MouseEnd(); break; }
+            var _ec = Scenario_H11Cell(_e);
+            if (_h.bush_f < 0 && Player_InBush(_pl)) _h.bush_f = _s.f;
+            if (_h.stand_f < 0 && _e.ai_mode == "stand") {
+                _h.stand_f = _s.f;
+                _h.stand_cx = _ec.cx;
+                _h.stand_cy = _ec.cy;
+                Scenario_Check("r4final2_smoke_the_player_is_in_the_bush_when_it_drops_the_chase", _h.bush_f >= 0, "bush_f=" + string(_h.bush_f));
+                Scenario_Check("r4final2_smoke_it_drops_the_chase_within_3_frames_of_his_stepping_in", _h.bush_f >= 0 && _h.stand_f - _h.bush_f <= 3, "after " + string(_h.stand_f - _h.bush_f));
+                Scenario_Check("r4final2_smoke_the_question_mark_is_up_at_once", _e.q_pops == 1 && _e.question_pop > 0, "q_pops=" + string(_e.q_pops) + " pop=" + string(_e.question_pop));
+                Scenario_Check("r4final2_smoke_no_fight_started", room == rm_floor3 && !Transition_IsActive());
+            }
+            if (_h.stand_f >= 0) {
+                if (_e.ai_mode == "chase") _h.chased = true;
+                if (_e.ai_mode == "stand" && (_ec.cx != _h.stand_cx || _ec.cy != _h.stand_cy)) _h.moved = true;
+                if (_e.ai_mode != "stand" && _h.end_f < 0) {
+                    _h.end_f = _s.f;
+                    _e.idle_timer = 100000;   // keep it where it stands: the rest is measured on one spot
+                    _e.turn_timer = 100000;
+                    _e.look_dir = LEFT;
+                    Scenario_Check("r4final2_smoke_it_stood_still_for_about_2_5_seconds", _h.end_f - _h.stand_f >= 140 && _h.end_f - _h.stand_f <= 175, "frames " + string(_h.end_f - _h.stand_f));
+                    Scenario_Check("r4final2_smoke_it_did_not_walk_while_it_stood", !_h.moved);
+                    Scenario_Check("r4final2_smoke_after_the_stand_it_roams_again", _e.ai_mode == "idle", "mode=" + _e.ai_mode);
+                    Scenario_Check("r4final2_smoke_it_put_up_exactly_one_question_mark", _e.q_pops == 1, "q_pops=" + string(_e.q_pops));
+                }
+                if (_h.end_f >= 0 && !_h.up2 && _s.f - _h.end_f >= 6) {   // he walks on inside the bush to (3,4): moving, not hidden
+                    _h.up2 = true;
+                    Scenario_Hold("move_up", 6);
+                }
+                if (_s.f - _h.stand_f >= 262) {
+                    Scenario_Check("r4final2_smoke_it_never_chased_him_in_the_bush_for_the_stand_and_2_seconds", !_h.chased, "mode=" + _e.ai_mode);
+                    Scenario_Check("r4final2_smoke_he_walked_on_inside_the_bush", Player_InBush(_pl) && Scenario_H11Cell(_pl).cy == 4, "cy=" + string(Scenario_H11Cell(_pl).cy));
+                    _pl.face = DOWN;   // he leaves: two steps down onto (3,6), 2 tiles in front of it
+                    Scenario_Hold("move_down", 30);
+                    _h.out_f = _s.f;
+                    Scenario_Next(_s, 1133);
+                }
+            }
+            if (_s.t > 600) { Scenario_Check("r4final2_smoke_the_slime_stands_and_roams_again", false, "stand_f=" + string(_h.stand_f) + " end_f=" + string(_h.end_f) + " mode=" + _e.ai_mode); Scenario_MouseEnd(); }
+            break;
+        case 1133:   // out of the bush and past the ignore window: it sees him again as normal
+            if (_e == noone) { Scenario_Check("r4final2_smoke_the_slime_is_alive_after_he_left", false); Scenario_MouseEnd(); break; }
+            if (_e.ai_mode == "chase") {
+                Scenario_Check("r4final2_smoke_after_the_window_it_spots_him_again", _s.f - _h.stand_f >= 268, "after " + string(_s.f - _h.stand_f));
+                Scenario_Next(_s, 1134);
+            }
+            if (_s.t > 150) { Scenario_Check("r4final2_smoke_after_the_window_it_spots_him_again", false, "mode=" + _e.ai_mode + " cooldown=" + string(_e.spot_cooldown)); Scenario_Next(_s, 1134); }
+            break;
+        case 1134:   // goes on with the Save steps (1140)
+            with (obj_enemy) instance_destroy();
+            Scenario_Release();
+            Scenario_Next(_s, 1140);
+            break;
+    }
+}
+
+// ============================================================================
+// Round 4 final fixes, packet final2, smoke steps 1140..1149 (rm_floor1, real keys). I-112 (R-127): the System tab's Save and Save & Quit to Title.
+//   1140: a run on rm_floor1, the run file written once (its saved_at is the reference)
+//   1141: Tab opens the menu on System, down to Save, confirm: the notice "Game saved." and the run file's saved_at is newer; the notice is answered
+//   1142: down to Save & Quit to Title, confirm: the pop-up asks (cursor on No), Yes: the run is saved and the title is reached; the run file is not older
+//   1143: the title: Continue is on and resumes the run on the same floor; the end of the chain (Scenario_MouseEnd)
+// ============================================================================
+function Scenario_StepSmokeR4Save(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "r4s")) _s.r4s = { };
+    var _h = _s.r4s;
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _u = TabMenu_Get();
+    switch (_s.step) {
+        case 1140:   // a run on rm_floor1
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP r4final2 save smoke (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_Finish();   // not MouseEnd / a wipe: outside the gate those would touch the real profile files
+                    break;
+                }
+                Scenario_Release();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Confirm_Close();
+                Scenario_NewKnight(CLASS_KNIGHT);
+                if (!Run_IsActive()) _gs.run = Run_Create(7788);
+                room_goto(rm_floor1);
+            }
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor1) && Player_IsSettled(instance_find(obj_player, 0))) {
+                _h.seed0 = _gs.run.seed;
+                Run_AutoSave();   // the reference: what the file holds now
+                _h.t0 = Slots_Summary(Profiles_Active())[Slot_Active()].saved_at;
+                Scenario_Check("r4final2_smoke_the_run_file_is_there_to_start_with", RunSave_HasSave() && _h.t0 > 0, "saved_at=" + string(_h.t0));
+                Scenario_Next(_s, 1141);
+            }
+            if (_s.t > 600) { Scenario_Check("r4final2_smoke_rm_floor1_is_ready", false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+            break;
+        case 1141:   // the menu on System, Save
+            if (_s.t == 1) {
+                Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 6);   // the menu opens on System
+                Scenario_Tap("menu");
+            }
+            if (_s.t == 140) {   // (a long wait: the saved_at of two saves differ by whole seconds)
+                Scenario_Check("r4final2_smoke_the_menu_opens_on_system", _gs.ui.mode == UI_MENU && is_struct(_u) && TabMenu_Ids()[_u.tab] == "system", "mode=" + string(_gs.ui.mode));
+                Ui_MenuFixCursor(TabMenu_TopMenu(), 0);   // start from Help
+                Scenario_Tap("menu_down");
+            }
+            if (_s.t == 154) {
+                var _tm = TabMenu_TopMenu();
+                Scenario_Check("r4final2_smoke_down_from_help_is_save", is_struct(_tm) && _tm.items[_tm.cursor].id == "save" && _tm.items[_tm.cursor].enabled, "cursor=" + string(is_struct(_tm) ? _tm.cursor : -1));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 170) {
+                Scenario_Check("r4final2_smoke_a_notice_says_game_saved", Notice_IsOpen() && Notice_Text() == "Game saved.", Notice_IsOpen() ? Notice_Text() : "no notice");
+                var _sm = Slots_Summary(Profiles_Active())[Slot_Active()];
+                Scenario_Check("r4final2_smoke_the_run_file_is_newer", _sm.saved_at > _h.t0 && _sm.status == "ok", "saved_at=" + string(_sm.saved_at) + " was " + string(_h.t0));
+                Scenario_Check("r4final2_smoke_it_is_the_same_run", _sm.seed == _h.seed0, "seed=" + string(_sm.seed));
+                _h.t1 = _sm.saved_at;
+                Scenario_Check("r4final2_smoke_the_menu_is_still_open_under_the_notice", _gs.ui.mode == UI_MENU && is_struct(_u) && _u.closed_ms < 0);
+                Scenario_Tap("confirm");   // answers the notice
+            }
+            if (_s.t == 200) {
+                Scenario_Check("r4final2_smoke_the_notice_is_gone_and_the_menu_stays", !Notice_IsOpen() && _gs.ui.mode == UI_MENU && is_struct(_u) && _u.closed_ms < 0, "notice=" + string(Notice_IsOpen()));
+                Scenario_Next(_s, 1142);
+            }
+            break;
+        case 1142:   // Save & Quit to Title
+            if (_s.t == 1) Scenario_Tap("menu_down");
+            if (_s.t == 14) {
+                var _tm2 = TabMenu_TopMenu();
+                Scenario_Check("r4final2_smoke_down_from_save_is_save_and_quit", is_struct(_tm2) && _tm2.items[_tm2.cursor].id == "save_quit" && _tm2.items[_tm2.cursor].enabled, "cursor=" + string(is_struct(_tm2) ? _tm2.cursor : -1));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t == 28) {
+                Scenario_Check("r4final2_smoke_save_and_quit_asks_first", Confirm_IsOpen() && Confirm_Question() == "Save and quit to title? Continue picks it up from here." && Confirm_Menu().cursor == 1 && room == rm_floor1, Confirm_IsOpen() ? Confirm_Question() : "none");
+                Scenario_Tap("menu_up");   // No -> Yes
+            }
+            if (_s.t == 42) {
+                Scenario_Check("r4final2_smoke_the_popup_is_on_yes", Confirm_IsOpen() && Confirm_Menu().cursor == 0);
+                Scenario_Tap("confirm");   // Yes
+            }
+            if (_s.t > 46 && room == rm_start && !Transition_IsActive()) {
+                var _sm2 = Slots_Summary(Profiles_Active())[Slot_Active()];
+                Scenario_Check("r4final2_smoke_save_and_quit_reaches_the_title", _gs.in_main_menu && !is_struct(TabMenu_Get()) && !Confirm_IsOpen());
+                Scenario_Check("r4final2_smoke_the_run_file_is_not_older_than_the_save", _sm2.saved_at >= _h.t1 && _sm2.status == "ok" && _sm2.seed == _h.seed0, "saved_at=" + string(_sm2.saved_at) + " save was " + string(_h.t1));
+                Scenario_Next(_s, 1143);
+            }
+            if (_s.t > 600) { Scenario_Check("r4final2_smoke_save_and_quit_reaches_the_title", false, "room=" + room_get_name(room) + " mode=" + string(_gs.ui.mode)); Scenario_MouseEnd(); }
+            break;
+        case 1143:   // the title: Continue resumes the run on the same floor
+            if (room == rm_start && _sc != noone && !Transition_IsActive() && !variable_struct_exists(_h, "tt")) {
+                if (_sc.state != "main") { _sc.state = "main"; break; }
+                if (is_struct(_sc.title_stk) && _s.t > 20) {
+                    _h.tt = _s.t;
+                    var _top = Ui_StackTop(_sc.title_stk);
+                    Scenario_Check("r4final2_smoke_continue_is_on_and_has_the_cursor", _top.items[0].id == "continue" && _top.items[0].enabled && _top.cursor == 0, "cursor=" + string(_top.cursor));
+                    Scenario_Tap("confirm");
+                }
+            }
+            if (variable_struct_exists(_h, "tt") && _s.t > _h.tt + 10 && Scenario_FloorReady(rm_floor1) && !_gs.load_spawn_pending) {
+                Scenario_Check("r4final2_smoke_continue_resumes_the_same_run_on_the_same_floor", Run_IsActive() && _gs.run.seed == _h.seed0 && room == rm_floor1, "seed=" + (Run_IsActive() ? string(_gs.run.seed) : "no run") + " room=" + room_get_name(room));
+                Scenario_MouseEnd();   // the end of the chain
+            }
+            if (_s.t > 900) { Scenario_Check("r4final2_smoke_continue_reaches_the_floor", false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+            break;
+    }
+}
+
+
+// ============================================================================
+// Round 4 final fixes, packet final2 (I-111, R-125) pictures 1140..1143, shot_r4final2_<scene>_<w>x<h>.png at scales 3, 4, 5. The end of the pictures: the last step calls Scenario_MouseEnd.
+//   slime, snake, wolf, palehorn, choirbeast: the command menu is up, the enemy's feet stand on the top edge of the bottom row of panels
+//   choir_list: a Mage with every Mage skill against the Pale Choirbeast, the Skill list open on the third row (the enemy stands lifted only as far as the list needs)
+// ============================================================================
+function Scenario_R4Final2Scenes() {
+    return ["slime", "snake", "wolf", "palehorn", "choirbeast", "choir_list"];
+}
+
+function Scenario_R4Final2Enemy(_di) {
+    switch (_di) {
+        case 0: return ENEMY_SLIME;
+        case 1: return ENEMY_SNAKE;
+        case 2: return ENEMY_DIREWOLF;
+        case 3: return ENEMY_MINI_BOSS;
+    }
+    return ENEMY_FINAL_BOSS;
+}
+
+function Scenario_StepShotsR4Final2(_s) {
+    if (!variable_struct_exists(_s, "r4g")) _s.r4g = { di: 0, si: 0 };
+    var _o = _s.r4g;
+    var _scenes = Scenario_R4Final2Scenes();
+    var _scales = [3, 4, 5];
+    switch (_s.step) {
+        case 1140:   // scene _o.di at scale _o.si: enter the battle
+            if (_s.t == 1) {
+                Mouse_FakeClear();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Loc_SetLanguage("en");
+                Scenario_NewKnight((_o.di == 5) ? CLASS_MAGE : CLASS_KNIGHT);
+                Scenario_SetWindowScale(_scales[_o.si]);
+                Scenario_GotoBattle("shots_r4final2_" + string(_o.di) + "_" + string(_o.si), Scenario_R4Final2Enemy(_o.di));
+            }
+            if (_s.t >= 25) Scenario_Next(_s, 1141);
+            break;
+        case 1141:   // set the scene up
+            var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+            Scenario_Check("shots_r4final2_in_battle_" + _scenes[_o.di], _inb, "room=" + room_get_name(room));
+            if (!_inb) { Scenario_MouseEnd(); return; }
+            var _bc = instance_find(obj_battle_controller, 0);
+            _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
+            _bc.pops = [];
+            _bc.combat_log = [];
+            _bc.tl_who = TL_PLAYER;
+            _bc.turn = TURN_PLAYER;
+            _bc.enemy_action_pending = false;
+            _bc.battle_state = BSTATE_MENU;
+            if (_o.di == 5) _bc.p.skills = Skill_IdsOfClass(CLASS_MAGE);
+            _bc.p.mp = _bc.p.max_mp;
+            _bc.ui_cmd = undefined;   // the menus are built again from the character
+            Scenario_Next(_s, 1142);
+            break;
+        case 1142:   // build the menus (open the list for the list scene), let the open animation finish, check, take the picture
+            var _bc2 = instance_find(obj_battle_controller, 0);
+            if (_s.t == 1) {
+                Battle_MenusBuild(_bc2);
+                if (_o.di == 5) {
+                    Battle_OpenList(_bc2, BSTATE_SKILL_MENU);
+                    _bc2.ui_skill.cursor = 2;
+                }
+            }
+            if (_o.di == 5 && _s.t >= 2) _bc2.ui_skill.opened_ms = current_time - 1000;
+            if (_s.t >= 20) {
+                var _tag = _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height());
+                var _zn = Battle_Zones();
+                var _er = Battle_EnemyRect(_bc2);
+                var _ws = Display_WorldScale();
+                var _lift = (variable_instance_exists(_bc2, "lift_applied") ? _bc2.lift_applied : 0) * _ws;
+                Scenario_Check("shots_r4final2_the_feet_are_on_the_hud_rows_top_edge_" + _tag, (_er.y + _er.h + _lift) <= _zn.band_top && (_er.y + _er.h + _lift) >= _zn.band_top - _ws - 1, "feet=" + string(_er.y + _er.h) + " lift=" + string(_lift) + " line=" + string(_zn.band_top));
+                if (_o.di != 5) Scenario_Check("shots_r4final2_not_lifted_with_the_command_menu_up_" + _tag, _lift == 0, "lift=" + string(_lift));
+                if (_o.di == 5) {
+                    Scenario_Check("shots_r4final2_the_list_is_open_" + _tag, _bc2.battle_state == BSTATE_SKILL_MENU && array_length(_bc2.ui_skill.items) >= 4, "state=" + string(_bc2.battle_state));
+                    var _m = _bc2.ui_skill;
+                    Scenario_Check("shots_r4final2_the_list_does_not_stand_on_the_enemy_" + _tag, _m.det_rect.w <= 0 || (_m.det_rect.y >= _er.y + _er.h && _m.rect.y >= _er.y + _er.h), "det=" + json_stringify(_m.det_rect) + " enemy=" + json_stringify(_er));
+                }
+                _s.shot = "shot_r4final2_" + _tag + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1143);
+            }
+            break;
+        case 1143:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Loc_SetLanguage("en");
+                    Scenario_SetWindowScale(3);
+                    Scenario_MouseEnd();   // the end of the pictures
+                } else {
+                    Scenario_Next(_s, 1140);
                 }
             }
             break;

@@ -143,6 +143,7 @@
 #macro AI_ARRIVAL_CLEAR_TILES 3    // on a room arrival no enemy stands closer than this to the arrival tile
 #macro AI_EXIT_RELOCATE_TILES 4    // an enemy found nearer than this to an exit on arrival is put back at its home, or at a spot at least this far from every exit
 #macro AI_QUESTION_FRAMES 70       // how long the "?" of a given-up search stays over the enemy's head
+#macro AI_BUSH_STAND_FRAMES 150    // I-110 (amends D179): the player steps into a bush: every enemy that chases or searches drops it at once (a "?"), stands still this long (2.5 s), then roams / goes home; it cannot notice him for this + AI_IGNORE_FRAMES from that moment
 #macro HIDE_SEEN_TILES 1           // a hidden player is only seen from this close (Chebyshev, tiles)
 #macro HIDE_SETTLE_FRAMES 20       // the player must stand still this long on a hiding cell before it counts as hidden (walking across one does not)
 #macro HIDE_PLAYER_ALPHA 0.5       // how see-through the hidden player is drawn
