@@ -41,6 +41,7 @@ if (cutscene_active) {
 
 CardsUi_Draw();   // C2: class choice, stat point, card pick, replace a skill
 ShopUi_Draw();    // C3 (D85): the merchant's shop
+TrapUi_Draw();    // R3 ideas2 (D173): the trapped chest's sliding bar
 Hud_DrawGold();   // C3 (D23): the run's gold, in the world and in battle
 
 Dialogue_Draw();   // D101: the framed box with the speaker tab, the typewriter text, the arrow and any choices

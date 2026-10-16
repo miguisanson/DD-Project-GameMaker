@@ -358,6 +358,12 @@ function Icon_FallbackData() {
 #macro FEEL_DEATH_FREEZE_MS 120         // the killing blow: freeze + white flash, then the burst
 #macro FEEL_DEATH_BURST_MS 500
 #macro FEEL_DEATH_BURST_BOSS_MS 900
+// R3 ideas2 (D173, D185; IDEA-21): the boss finisher. When a BOSS dies the killing hit freezes the picture longer, the picture punches in on the boss and eases back, and a held
+// beat of stillness (no new sound, no shake, the boss still drawn) comes before the death pop and the "slain" text. The numbers are the agent's (D185), the owner judges them in the playtest:
+#macro FEEL_FINISHER_FREEZE_MS 250      // the freeze on the killing hit of a boss (a normal hit freezes 40 / 80 / 120 ms)
+#macro FEEL_FINISHER_ZOOM_MS 300        // the zoom punch: in over the first 30%, eased back out
+#macro FEEL_FINISHER_ZOOM_PX 6          // px a side of the 160 px picture at the peak: 160 / 148 = 8.1% zoom
+#macro FEEL_FINISHER_BEAT_MS 600        // the held beat, after the freeze and before the death pop (so the pop starts 850 ms after the kill)
 #macro FEEL_GRAVITY 260                 // particle gravity, world px per second squared
 #macro FEEL_JOLT_MS 80                  // D139: the view pushes in 2-3 px and eases back
 #macro FEEL_RECOIL_MS 150               // the enemy squashes and springs back
@@ -515,6 +521,29 @@ function Feel_PlayKeep(_key, _vol, _pitch) {
     SFX_Play(_key, _vol, _pitch);
     global.sfx_last_key = k;
     global.sfx_last_handle = h;
+}
+
+// ---- the boss finisher (D173, IDEA-21): pure curves of the ms since the kill ----
+function Feel_FinisherTotalMs() {
+    return FEEL_FINISHER_FREEZE_MS + FEEL_FINISHER_BEAT_MS;
+}
+
+// The moment the zoom is at its peak (30% of its time: Feel_Pulse).
+function Feel_FinisherPeakMs() {
+    return FEEL_FINISHER_ZOOM_MS * 0.3;
+}
+
+// px a side the picture pushes in _t_ms after the kill: up to FEEL_FINISHER_ZOOM_PX (~8%) and eased back to 0 by FEEL_FINISHER_ZOOM_MS. It does NOT depend on the Screen shake setting
+// (a zoom is not a shake: the setting only turns the shakes off); 0 before the kill and once it has run.
+function Feel_FinisherInsetPx(_t_ms) {
+    return round(FEEL_FINISHER_ZOOM_PX * Feel_Pulse(_t_ms, FEEL_FINISHER_ZOOM_MS));
+}
+
+// 0 = freeze (and the zoom), 1 = the held beat, 2 = over (the death pop starts).
+function Feel_FinisherPhase(_t_ms) {
+    if (_t_ms < FEEL_FINISHER_FREEZE_MS) return 0;
+    if (_t_ms < Feel_FinisherTotalMs()) return 1;
+    return 2;
 }
 
 // ---- the enemy death pop (D138) ----

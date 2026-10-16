@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T15:37:06Z",
-    "row_count": 1272
+    "generated_at_utc": "2026-10-16T16:07:38Z",
+    "row_count": 1280
   },
   "default_lang": "en",
   "languages": [
@@ -4984,6 +4984,30 @@
       "en": "Press Any Key",
       "ko": "아무 키나 누르세요"
     },
+    "trap.bar.prompt": {
+      "en": "Disarm it! [k:confirm]",
+      "ko": "해제하자! [k:confirm]"
+    },
+    "trap.line.trapped": {
+      "en": "It's trapped!",
+      "ko": "함정이다!"
+    },
+    "trap.result.fine": {
+      "en": "The trap clicks harmlessly.",
+      "ko": "함정이 아무 일 없이 풀렸다."
+    },
+    "trap.result.perfect": {
+      "en": "Perfect! You disarm the trap and find a bonus item.",
+      "ko": "완벽해! 함정을 해제하고 보너스 아이템을 찾았다."
+    },
+    "trap.result.weak": {
+      "en": "The trap snaps! You lose {hp} HP.",
+      "ko": "함정이 작동했다! HP를 {hp} 잃었다."
+    },
+    "trap.result.weak_none": {
+      "en": "The trap snaps, but you barely feel it.",
+      "ko": "함정이 작동했지만 거의 아프지 않았다."
+    },
     "tutorial.arrows.body": {
       "en": "Match the row of arrows with [k:up][k:down][k:left][k:right], in order, before the time bar empties. A wrong press costs time.",
       "ko": "시간 막대가 비기 전에 [k:up][k:down][k:left][k:right]으로 화살표 줄을 순서대로 누르세요. 틀리면 시간이 깎입니다."
@@ -5079,6 +5103,14 @@
     "tutorial.timeline.title": {
       "en": "Turn Order",
       "ko": "턴 순서"
+    },
+    "tutorial.trap.body": {
+      "en": "Each floor has one trapped chest. Press [k:confirm] on the bright zone: Perfect finds a bonus, Weak costs HP. You keep the chest's item.",
+      "ko": "층마다 함정 상자가 하나 있습니다. 밝은 구간에서 [k:confirm]을(를) 누르세요. 완벽은 보너스, 약함은 HP 손실입니다. 상자 속 아이템은 그대로 얻습니다."
+    },
+    "tutorial.trap.title": {
+      "en": "Trapped Chest",
+      "ko": "함정 상자"
     },
     "ui.skip_hold": {
       "en": "Hold to Skip",

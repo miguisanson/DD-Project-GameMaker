@@ -171,6 +171,7 @@
 #macro UI_BED 6
 #macro UI_CARDS 7   // C2: class choice, stat point, card pick, replace-a-skill screens (CardsUi_*)
 #macro UI_SHOP 8    // C3 (D85): the merchant's shop (ShopUi_*)
+#macro UI_TRAP 9    // R3 ideas2 (D173, IDEA-03): the trapped chest's sliding bar over the paused map (TrapUi_*)
 #macro UI_FONT retro_gaming
 #macro GRID_TILE_SIZE 16
 #macro PLAYER_MOVE_SPEED_DEFAULT 1

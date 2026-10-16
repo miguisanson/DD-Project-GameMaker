@@ -3946,6 +3946,7 @@ function Scenario_RestoreFocus() {
 // player and every enemy. Drop it (and any open dialogue) before a movement part starts.
 function Scenario_ClearUi() {
     Scenario_RestoreFocus();
+    TrapUi_Interrupt();   // R3 ideas2: a trapped chest's bar (or its wait behind the line) does not carry into the next scene
     var _gs = GameState_Get();
     _gs.pending_post_battle_dialogue_lines = [];
     if (_gs.ui.mode != UI_NONE || array_length(_gs.ui.lines) > 0) UI_InterruptCloseAll(false);
@@ -5762,7 +5763,7 @@ function Scenario_StepSmokeRest(_s) {
                 _rc.h1 = true;
                 var _hm = TabMenu_TopMenu();
                 Scenario_Check("help_opens_from_the_system_tab", _gs.ui.mode == UI_MENU && TabMenu_Get().tab == 6 && _hm.id == "help");
-                Scenario_Check("help_lists_all_eleven_mechanics", array_length(_hm.items) == 12 && _hm.items[0].id == "timeline" && _hm.items[10].id == "status" && _hm.items[11].id == "stats_terms");
+                Scenario_Check("help_lists_all_twelve_mechanics", array_length(_hm.items) == 13 && _hm.items[0].id == "timeline" && _hm.items[10].id == "status" && _hm.items[11].id == "trap" && _hm.items[12].id == "stats_terms");
                 Scenario_Check("help_rows_carry_their_text", string_length(_hm.items[1].help) > 20 && string_pos("[k:confirm]", _hm.items[1].help) > 0);
                 Ui_MenuFixCursor(_hm, 1);
                 Scenario_Check("help_cursor_row_is_the_sliding_bar", _hm.items[_hm.cursor].id == "bar");
@@ -16068,7 +16069,7 @@ function Scenario_StepSmokeLabels(_s) {
             }
             if (_s.t == 120) {
                 var _hm = TabMenu_TopMenu();
-                Scenario_Check("labels_help_opens_with_the_stats_page_added", TabMenu_Depth() == 2 && _hm.id == "help" && array_length(_hm.items) == 12, "depth=" + string(TabMenu_Depth()) + " items=" + string(array_length(_hm.items)));
+                Scenario_Check("labels_help_opens_with_the_stats_page_added", TabMenu_Depth() == 2 && _hm.id == "help" && array_length(_hm.items) == 13, "depth=" + string(TabMenu_Depth()) + " items=" + string(array_length(_hm.items)));
                 Scenario_Tap("menu_up");   // wraps to the last row
             }
             if (_s.t == 134) {
@@ -18011,7 +18012,8 @@ function Scenario_StepSmokeR3Ideas2(_s) {
     var _pl = instance_exists(obj_player) ? instance_find(obj_player, 0) : noone;
     switch (_s.step) {
         case 1120:   // the packet's functions exist; a new run, then floor 2
-            if (_s.t == 1) {
+            if (!variable_struct_exists(_d, "init")) {
+                _d.init = true;
                 Mouse_FakeClear();
                 var _fns = ["Trap_PickPid", "Trap_IsTrapped", "Trap_Apply", "TrapUi_Open", "TrapUi_Step", "TrapUi_Draw", "TrapUi_Finish", "Feel_FinisherTotalMs"];
                 var _miss = "";
@@ -18022,6 +18024,13 @@ function Scenario_StepSmokeR3Ideas2(_s) {
                 Scenario_ClearUi();
                 Confirm_Close();
                 Scenario_NewKnight();
+                _d.hop = (room == rm_floor3) ? rm_floor1 : rm_floor3;   // the player is only spawned on a room change: hop to a floor that is not this one first
+                room_goto(_d.hop);
+            }
+            if (_s.t > 5 && !variable_struct_exists(_d, "hopped")) {
+                if (_s.t > 20 && Scenario_FloorReady(_d.hop)) { _d.hopped = true; _s.t = 6; }
+                else if (_s.t > 900) { Scenario_Check("ideas2_smoke_a_floor_is_reached", false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+                break;
             }
             if (_s.t > 5 && !variable_struct_exists(_d, "begun")) {
                 if (Scenario_Hunt2Begin(_s, _d, 7701)) { _d.begun = true; _s.t = 0; }
@@ -18210,12 +18219,18 @@ function Scenario_StepShotsR3Ideas2(_s) {
                 GameSettings_Ensure().screen_shake = 1;
                 Scenario_NoOwed();
                 Scenario_SetWindowScale(_scales[_o.si]);
+                _o.hop = false;
                 if (_boss) Scenario_GotoBattle("shots_ideas2_boss", ENEMY_MINI_BOSS);
+                else if (room == rm_floor2) { room_goto(rm_floor1); _o.hop = true; }   // the player is only spawned on a room change: leave floor 2 first
                 else room_goto(rm_floor2);
             }
             if (_boss) {
                 if (_s.t >= 30 && room == rm_battle && _bc != noone) Scenario_Next(_s, 1121);
-            } else if (_s.t >= 25 && Scenario_FloorReady(rm_floor2)) {
+            } else if (_o.hop && _s.t >= 25 && Scenario_FloorReady(rm_floor1)) {
+                _o.hop = false;
+                room_goto(rm_floor2);
+                _s.t = 2;
+            } else if (!_o.hop && _s.t >= 25 && Scenario_FloorReady(rm_floor2)) {
                 Scenario_Next(_s, 1121);
             }
             if (_s.t > 600) { Scenario_Check("shots_r3ideas2_enters_the_scene_" + _tag, false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
@@ -18273,6 +18288,7 @@ function Scenario_StepShotsR3Ideas2(_s) {
                 if (_s.t <= 3) _bc.death_pop.fin_ms = Feel_FinisherPeakMs();   // hold the punch at its peak: the picture is the same every run
             } else if (_scene == "trap_bar" && _s.t <= 3) {
                 global.trap_ui.ms = 520;   // the cursor part-way along, before the bright zone
+                global.trap_ui.opened_ms = current_time - 1000;   // the plate has finished fading in, whatever the frame rate
             }
             if (_s.t == 3) {
                 var _mt = Ui_Metrics();
@@ -18291,6 +18307,7 @@ function Scenario_StepShotsR3Ideas2(_s) {
                         var _zr = _bc.feel_zr;
                         Scenario_Check("shots_r3ideas2_the_boss_zoom_is_at_its_peak_" + _tag, _bc.feel_inset >= FEEL_FINISHER_ZOOM_PX && _zr.zoom >= 1.07 && _zr.zoom <= 1.09, "inset=" + string(_bc.feel_inset) + " zoom=" + string(_zr.zoom));
                         Scenario_Check("shots_r3ideas2_the_boss_is_still_drawn_in_the_hold_" + _tag, Feel_SpriteVisible(_bc.death_pop.t_ms) && Battle_DeathPopHeld(_bc));
+                        Scenario_Check("shots_r3ideas2_the_display_is_zoomed_by_about_8_percent_" + _tag, global.display.zoom >= 1.07 && global.display.zoom <= 1.09, string(global.display.zoom));
                         break;
                 }
                 Scenario_ShotLayout(_s.shot);

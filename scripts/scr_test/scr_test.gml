@@ -6362,7 +6362,7 @@ function Test_Suite_Tutorial() {
     var _ids = Tutorial_Ids();
     var _txt = "";
     for (var _i = 0; _i < array_length(_ids); _i++) _txt += ((_i > 0) ? "," : "") + _ids[_i];
-    Test_Eq("D45 the eleven mechanics, in order", _txt, "timeline,bar,arrows,defence,stagger,cards,shop,throwables,bed,elite,status");
+    Test_Eq("D45 the twelve mechanics, in order (R3 ideas2 added the trapped chest)", _txt, "timeline,bar,arrows,defence,stagger,cards,shop,throwables,bed,elite,status,trap");
     for (var _j = 0; _j < array_length(_ids); _j++) {
         var _e = Tutorial_Get(_ids[_j]);
         Test_True("D45 " + _ids[_j] + " has a title and a short text", is_struct(_e) && string_length(_e.title) > 2 && string_length(_e.body) > 20 && string_length(_e.body) < 260);
@@ -6405,7 +6405,7 @@ function Test_Suite_Tutorial() {
     global.tutorial_off = false;
     // the Help page lists all eleven, seen or not
     var _help = Tutorial_HelpItems();
-    Test_Eq("D45 the Help page lists all eleven", array_length(_help), 11);
+    Test_Eq("D45 the Help page lists all twelve", array_length(_help), 12);
     Test_Eq("D45 the Help rows carry the titles", _help[1].label, Tutorial_Get("bar").title);
     Test_Eq("D45 the Help rows carry the text for the details panel", _help[1].help, Tutorial_Get("bar").body);
     Test_True("D45 the pop-up footer has a prompt", Prompt_HasTokens(Tutorial_Footer()));
@@ -12371,7 +12371,7 @@ function Test_Suite_Labels() {
 
     // ---- D156: the Help page "Stats & terms" ----
     var _hi = TabHelp_Items();
-    Test_Eq("D156 the Help list has the 11 hints and the stats page", array_length(_hi), 12);
+    Test_Eq("D156 the Help list has the 12 hints (R3 ideas2 added the trapped chest) and the stats page", array_length(_hi), 13);
     Test_Eq("D156 the stats page is the last row", _hi[array_length(_hi) - 1].id, "stats_terms");
     Test_Eq("D156 its title", _hi[array_length(_hi) - 1].label, "Stats & Terms");
     Test_Eq("D156 the hints keep their places", _hi[0].id, "timeline");
