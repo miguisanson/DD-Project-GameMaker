@@ -6,7 +6,8 @@ Build: fixing round-3 playtest notes on `next` (next playtest build after batch 
 - Your notes are logged (ISSUES I-077..I-105) and your answers are locked as D174-D183 (profiles + 3 save files, VIG/MND, gold growth rows, rarity colours, stealth package + faint cone, Guard + MP, stagger unchanged, Skip removed, ALL CAPS grades, mouse cursor without click-to-move).
 - Batch 1 building now: lighting flicker + merchant light, enemy shadows + snake position + buff blink, card Skip removal + card text fit, caps grades + Gear headers + reset pop-up.
 - Batch 2 next: profiles/save files, stealth, rarity, Guard, mouse, level-up screen, wolf dialogue, death titles.
-- Nothing waiting on you: I set the VIG/MND and idea numbers (D184/D185, Mage = glass cannon); you judge them in the playtest. After the fixes I go straight on to the ideas (weak points, trapped chests, boss finisher, death tip); branching upgrades waits for a quick Q&A. Music/refuse-sound candidates will be in artudio_candidates with PICK.md.
+- Nothing waiting on you: I set the VIG/MND and idea numbers (D184/D185, Mage = glass cannon); you judge them in the playtest. After the fixes I go straight on to the ideas (weak points, trapped chests, boss finisher, death tip); branching upgrades waits for a quick Q&A. 
+- **Waiting on you (when back):** listen to the music/refuse-sound candidates in `artudio_candidates\PICK.md` (my picks: battle B2, boss K2, refuse R1), import your picks in GameMaker as the file says, then I wire them in.
 - Running 2 agents at a time (your cap); roughly 10-14 h for the fixes, then the ideas.
 - Already fixed on `next` (in the next build): the "Damag.."/"Perfec.." plate, the run summary labels.
 
