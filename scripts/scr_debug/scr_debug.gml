@@ -11654,14 +11654,14 @@ function Scenario_StepShotsLevelUp(_s) {
                     _vals += (_i > 0 ? "|" : "") + _m.items[_i].value;
                     if (variable_struct_exists(_m.items[_i], "col") && _m.items[_i].col == UI_C_MERCHANT_GOLD) _gold += _m.items[_i].label + ",";
                 }
-                var _want_vals = "";
+                var _want_vals = "";   // D186 (r3balance): Knight SPD 10 -> 9
                 var _want_gold = "ATK,DEF,VIG,MND,";
                 switch (_scene) {
-                    case "knight_growth": _want_vals = "11 > 13|12 > 13|10|3|10 > 12|11 > 12"; break;
-                    case "knight_plain": _want_vals = "11 > 12|12 > 13|10 > 11|3|10 > 12|11 > 12"; break;
+                    case "knight_growth": _want_vals = "11 > 13|12 > 13|9|3|10 > 12|11 > 12"; break;
+                    case "knight_plain": _want_vals = "11 > 12|12 > 13|9 > 10|3|10 > 12|11 > 12"; break;
                     case "mage_growth": _want_vals = "5|7|10|12 > 15|10 > 12|16 > 19"; _want_gold = "MAG,VIG,MND,"; break;
                     case "mage_plain": _want_vals = "5 > 6|7|10|12 > 14|10 > 12|16 > 19"; _want_gold = "MAG,VIG,MND,"; break;
-                    case "knight_ko": _want_vals = "11 > 12|12 > 13|10|3|10 > 13|11 > 12"; break;
+                    case "knight_ko": _want_vals = "11 > 12|12 > 13|9|3|10 > 13|11 > 12"; break;
                 }
                 Scenario_Check("shots_levelup_the_rows_read_by_the_rule_" + _tag, _vals == _want_vals, "vals=" + _vals + " want=" + _want_vals);
                 Scenario_Check("shots_levelup_the_class_growth_rows_are_gold_" + _tag, _gold == _want_gold, "gold=" + _gold);
