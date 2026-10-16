@@ -3503,7 +3503,7 @@ function Title_CardModel(_load) {
         class_name: DB_PlayerClass(cls).name,
         floor: variable_struct_exists(r, "floor") ? floor(Save_ToReal(r.floor, 0)) : 0,
         gold: variable_struct_exists(r, "gold") ? round(Save_ToReal(r.gold, 0)) : 0,
-        time_ms: variable_struct_exists(r, "play_ms") ? Save_ToReal(r.play_ms, -1) : -1   // the run save has no play-time field yet (started_at is a wall-clock date): shown only when one exists
+        time_ms: (variable_struct_exists(r, "stats") && is_struct(r.stats) && variable_struct_exists(r.stats, "play_ms")) ? Save_ToReal(r.stats.play_ms, -1) : -1   // the time played is stats.play_ms (D137); a save from before that has none, so no Time row
     };
 }
 

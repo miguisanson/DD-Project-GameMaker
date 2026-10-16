@@ -328,15 +328,17 @@ function Run_RngCreate(_seed) {
     return out;
 }
 
+// A random seed is always one the seed entry can take back (1 .. SEED_ENTRY_MAX, at most 9 digits): the Status tab and the summary show it, and "same seed, same run" must hold when it is typed.
 function Run_NewSeed() {
-    return irandom_range(1, RNG_MOD - 2);
+    return irandom_range(1, SEED_ENTRY_MAX);
 }
 
 // ---- seed input (D152) ----
 // New Game offers a random seed (the default) or one the player types. A typed seed is up to 9 digits (so it stays a positive 32-bit whole number
 // well under RNG_MOD); the entry is a string of digits plus a cursor, not a padded number: "000123" is the seed 123. Seeds run 1 .. RNG_MOD - 2 (the
-// range Run_NewSeed draws from), so an empty or all-zero entry cannot be confirmed. Pure functions: the title screen only calls them.
+// range a typed seed may be in; Run_NewSeed draws 1 .. SEED_ENTRY_MAX, all of which can be typed), so an empty or all-zero entry cannot be confirmed. Pure functions: the title screen only calls them.
 #macro SEED_DIGITS_MAX 9
+#macro SEED_ENTRY_MAX 999999999   // nine nines: the largest seed the entry takes, and the largest a random draw gives
 
 function Seed_IsValid(_n) {
     return is_real(_n) && _n >= 1 && _n <= RNG_MOD - 2 && _n == floor(_n);
@@ -747,7 +749,7 @@ function Run_StartNew(_intro_dialogue = false, _seed = undefined) {
     var ch = CharacterCreate_Player(CLASS_NOBODY);
     prof.runs_started += 1;
     Profile_Flush();
-    RunSave_Delete();
+    RunSave_DeleteUnlessKept();
 
     gs.player_ch = ch;
     GameState_SetPlayer(gs.player_ch);
@@ -786,9 +788,15 @@ function Run_AbandonSaved(_path = undefined) {
         Profile_RecordRun(prof, entry);
         Profile_Flush();
     }
-    // An old-format file is cleared too (review 1): left behind, Continue kept showing the old-slot notice after a new game.
-    // A newer-version or damaged file is left where it is.
-    if (l.status == "ok" || l.status == "missing" || l.status == "old") RunSave_Delete(_path);
+    RunSave_DeleteUnlessKept(_path, l.status);
+}
+
+// Starting a new run clears the run file, except a newer-version or damaged one: that is left where it is (D16: nothing is deleted that this build cannot read;
+// the player may switch between builds on one save folder). An old-format file is cleared too (review 1): left behind, Continue kept showing the old-slot notice after a new game.
+// _status: the status of the file when the caller has just read it.
+function RunSave_DeleteUnlessKept(_path = undefined, _status = undefined) {
+    var st = is_undefined(_status) ? RunSave_LoadFrom(_path).status : _status;
+    if (st == "ok" || st == "missing" || st == "old") RunSave_Delete(_path);
 }
 
 // Title screen, New Game after the difficulty pick: the intro cutscene plays once per profile (D26); later runs start at once.

@@ -141,6 +141,7 @@ function Test_RunAll() {
     Test_RunSuite("RichText", Test_Suite_RichText);
     Test_RunSuite("Hunt5a", Test_Suite_Hunt5a);
     Test_RunSuite("Choices", Test_Suite_Choices);
+    Test_RunSuite("Hunt6Run", Test_Suite_Hunt6Run);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -7928,8 +7929,7 @@ function Test_Suite_Title() {
     Test_Eq("D128 card: a sub-floor room (2.5) shows floor 2", Title_CardText(Title_CardModel({ status: "ok", run: { gold: 0, floor: 2.5, statData: { selected_class: CLASS_KNIGHT } } })).rows[0].value, "2");
     Test_Eq("D128 card: no gold in the save is 0", Title_CardText(Title_CardModel({ status: "ok", run: { floor: 1, statData: { selected_class: CLASS_KNIGHT } } })).rows[1].value, "0");
     Test_Eq("D128 card: no floor drops the floor row", array_length(Title_CardText(Title_CardModel({ status: "ok", run: { gold: 9, floor: 0, statData: { selected_class: CLASS_KNIGHT } } })).rows), 1);
-    var _run_t = { gold: 1, floor: 3, play_ms: 3725000, statData: { selected_class: CLASS_MAGE } };
-    var _tt = Title_CardText(Title_CardModel({ status: "ok", run: _run_t }));
+    var _tt = Title_CardText(Title_CardModel(Test_RealRunSaveLoad(3725000)));   // hunt6run: a run save built and written by the real save code, not a made-up shape
     Test_Eq("D128 card: a tracked play time adds a third row", array_length(_tt.rows), 3);
     Test_Eq("D128 card: play time reads h:mm:ss", _tt.rows[2].value, "1:02:05");
     Test_Eq("D128 time: under an hour reads m:ss", Title_FormatTime(125000), "2:05");
@@ -13091,4 +13091,75 @@ function Test_Suite_Choices() {
     Loc_SetLanguage(_lang);
     global.profile = _keep;
     global.profile_status = _keep_st;
+}
+// ---- hunt 6 (run loop and persistence): seeds the entry can take, the Continue card time, a kept run file ----
+// Writes a run save with the real save code (RunSave_WriteTo) holding the given play time, reads it back with RunSave_LoadFrom and gives the result to the caller.
+// The run, class, checkpoint and persist the test borrows are put back.
+function Test_RealRunSaveLoad(_play_ms) {
+    var _gs = GameState_Get();
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_cp = _gs.checkpoint;
+    var _old_persist = _gs.persist;
+    var _old_class = _gs.selected_class;
+    _gs.run = Run_Create(4321);
+    _gs.run.gold = 55;
+    _gs.run.stats.play_ms = _play_ms;
+    _gs.selected_class = CLASS_MAGE;
+    _gs.checkpoint = { room: rm_floor3, x: 48, y: 64 };
+    _gs.persist = {};
+    var _f = "test_hunt6_card.sav";
+    Save_DeleteFileSet(_f);
+    RunSave_WriteTo(_f);
+    var _l = RunSave_LoadFrom(_f);
+    Save_DeleteFileSet(_f);
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+    _gs.checkpoint = _old_cp;
+    _gs.persist = _old_persist;
+    _gs.selected_class = _old_class;
+    return _l;
+}
+
+function Test_Suite_Hunt6Run() {
+    // 1. every random seed can be typed back into the seed entry (D152: up to 9 digits) and is a valid seed
+    var _not_typable = 0;
+    var _invalid = 0;
+    var _first_bad = 0;
+    var _max = 0;
+    repeat (2000) {
+        var _n = Run_NewSeed();
+        _max = max(_max, _n);
+        if (!Seed_IsValid(_n)) _invalid++;
+        if (SeedParse(string(_n)) != _n) { _not_typable++; if (_first_bad == 0) _first_bad = _n; }
+    }
+    Test_Eq("hunt6run seed: every drawn seed is a valid seed", _invalid, 0);
+    Test_Eq("hunt6run seed: every drawn seed parses back from its own digits (first bad: " + string(_first_bad) + ")", _not_typable, 0);
+    Test_True("hunt6run seed: no drawn seed is longer than the nine digits the entry takes (largest " + string(_max) + ")", _max <= 999999999);
+    var _entry = SeedEntry_New();
+    var _digits = string(Run_NewSeed());
+    for (var _i = 1; _i <= string_length(_digits); _i++) SeedEntry_Type(_entry, ord(string_char_at(_digits, _i)) - 48);
+    Test_Eq("hunt6run seed: a drawn seed typed into the entry gives the same number", SeedEntry_Value(_entry), real(_digits));
+    Test_Eq("hunt6run seed: a typed seed still maps to itself", Run_ResolveSeed(123456789), 123456789);
+
+    // 2. the Continue card shows the time played that the real run save holds (stats.play_ms, D137)
+    var _l = Test_RealRunSaveLoad(3725000);
+    Test_Eq("hunt6run card: the real run save loads ok", _l.status, "ok");
+    var _m = Title_CardModel(_l);
+    Test_Eq("hunt6run card: the card reads the time played from a real run save", _m.time_ms, 3725000);
+    var _t = Title_CardText(_m);
+    Test_Eq("hunt6run card: a real run save gives a Time row", _t.rows[array_length(_t.rows) - 1].label, Loc_T("title.card.time", "Time"));
+    Test_Eq("hunt6run card: the Time row reads h:mm:ss", _t.rows[array_length(_t.rows) - 1].value, "1:02:05");
+    var _t0 = Title_CardText(Title_CardModel(Test_RealRunSaveLoad(0)));
+    Test_Eq("hunt6run card: a real run save of a fresh run shows 0:00", _t0.rows[array_length(_t0.rows) - 1].value, "0:00");
+    Test_Eq("hunt6run card: a save with no stats drops the time (old save)", Title_CardModel({ status: "ok", run: { gold: 1, floor: 1, statData: {} } }).time_ms, -1);
+
+    // 3. Run_AbandonSaved keeps a damaged run file as it keeps a newer one (the rule New Game follows; the smoke step 840 pins Run_StartNew itself)
+    var _ab = "test_hunt6_damaged.sav";
+    Save_DeleteFileSet(_ab);
+    Test_RawWrite(_ab, "{ this is not a run save");
+    Test_Eq("hunt6run keep: the damaged run file reads as corrupt", RunSave_LoadFrom(_ab).status, "corrupt");
+    Run_AbandonSaved(_ab);
+    Test_True("hunt6run keep: Run_AbandonSaved keeps a damaged run file", RunSave_ExistsAt(_ab));
+    Test_Eq("hunt6run keep: the damaged run file is unchanged", Test_RawRead(_ab), "{ this is not a run save");
+    Save_DeleteFileSet(_ab);
 }
