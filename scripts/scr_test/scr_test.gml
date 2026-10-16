@@ -375,13 +375,13 @@ function Test_Suite_Stats() {
     _staffer.inventory = Inv_Add(_staffer.inventory, 7, 1);
     Test_True("Equip: Wooden Staff equips", Equip_Item(_staffer, 7));
     Test_Eq("D22 weapon power: Wooden Staff (power 3) is the equipped weapon power", Combat_WeaponPower(_staffer), 3);
-    Test_Eq("D22 weapon power: no weapon counts as 2 (fists)", Combat_WeaponPower(CharacterCreate_Player(CLASS_MAGE)), 2);
+    Test_Eq("D22 weapon power: no weapon counts as 5 (fists; D186, was 2)", Combat_WeaponPower(CharacterCreate_Player(CLASS_MAGE)), 5);
     // D22: the same skill hits harder with a weapon equipped. Fireball (power 6) on a Stranger (DEF14), Mage MAG12: fists 2*(6+1)=14 -> 6.46 = 6; Wooden Staff 2*(6+1.5)=15 -> 6.92 = 7.
     var _bare = CharacterCreate_Player(CLASS_MAGE); _bare.mp = 99;
     var _armed = _staffer; _armed.mp = 99;
     var _fb_bare = Skill_Use(_bare, EnemyCreate(ENEMY_STRANGER), SKILL_FIREBALL);
     var _fb_armed = Skill_Use(_armed, EnemyCreate(ENEMY_STRANGER), SKILL_FIREBALL);
-    Test_Eq("D22 Fireball without a weapon deals 6", _fb_bare.dmg, 6);
+    Test_Eq("D22 Fireball without a weapon deals 8 (skill power 6 + fists 5 -> 17 vs DEF 14; D186, was 6)", _fb_bare.dmg, 8);
     Test_Eq("D22 Fireball with the Wooden Staff deals 7", _fb_armed.dmg, 7);
     // STAT-12 / D76: fixed growth plus ONE free point per level. Spending it: Level_ApplyFreePoint.
     var _c = CharacterCreate_Player(CLASS_KNIGHT);

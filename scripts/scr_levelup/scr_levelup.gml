@@ -108,7 +108,7 @@ function LevelUp_ClassGrowthGain(_class_id, _new_level) {
     var lvl = max(2, round(_new_level));
     switch (_class_id) {
         case CLASS_KNIGHT: return { atk:1, def:1, spd:0, mag:0, vig:(((lvl - 2) mod 3 == 2) ? 3 : 2), mnd:1 };
-        case CLASS_ARCHER: return { atk:1, def:0, spd:((lvl mod 2 == 0) ? 1 : 0), mag:0, vig:2, mnd:2 };   // D186: SPD only on even levels (it was every level)
+        case CLASS_ARCHER: return { atk:1, def:0, spd:1, mag:0, vig:2, mnd:2 };
         case CLASS_MAGE:   return { atk:0, def:0, spd:0, mag:2, vig:((lvl mod 2 == 0) ? 2 : 1), mnd:3 };
         case CLASS_NOBODY:
             // Balanced-low (D83), two points a level since D111 (E1-6): the point that cycles ATK, DEF, SPD, MAG, plus the one two steps further on the cycle.
