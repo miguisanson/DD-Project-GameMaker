@@ -1,6 +1,6 @@
 # DD-Project board
 Updated after every step that lands. The full build list is `.planning/BUILD-PLAN.md`; the design spec is `.planning/research/DECISIONS.md` (D1-D125).
-Build: READY - playtest build 7f4d08e-20261016 (all of round 3: D140-D165); agents keep improving on `next` | Release then stop (D28)
+Build: PAUSED for your playtest of 7f4d08e-20261016 - agents stopped; `next` holds ~25 more fixes + the boss background for the next build | Release then stop (D28)
 
 ## Now — PLAYTEST NOW
 - Play: `E:\Games\DD-Project Playtest\7f4d08e-20261016\DD-Project.exe` (your saves carry over; old builds 943ce6d and earlier can be deleted).
@@ -22,8 +22,7 @@ Build: READY - playtest build 7f4d08e-20261016 (all of round 3: D140-D165); agen
 - Balance proposals approved (D111); runs ~25-30 min accepted (D112); merchant = A with a gold glow outline, no tint (D113); icons v2 + redo weakest (D114); white text for names (D115).
 
 ## Waiting on you (whenever convenient; close GameMaker afterwards)
-- **Import the boss background** (5 min, GameMaker, project in `E:\Github_Projects\DD-Project-GameMaker-wt
-ext`): Sprites → Create → Sprite, name `spr_battle_bg_boss`, Import `art\battle_bg\candidates\D13.png` (160 x 144), Origin Top Left, Ctrl+S, close GameMaker, tell me "imported".
+- DONE 2026-10-17: boss background imported (on `next`; it shows from the next playtest build on).
 - **Pick ideas** for after the playtest: `.planning/IDEAS.md` (25 ideas, my top 5 at the end). Reply with the ids you want.
 - **5 quick questions** at the end of the playtest checklist (battle menu read-only in fights, the Stranger loot rule, the reworded chest lines, QTE grade capitals, a real refuse sound).
 - **Names that do not fit their cards/panels at big window sizes** (your call): Horizontal Slash, Poison Arrow, Meditation+, Apothecary (cards at 640x576/800x720), The Pale Choirbeast (bestiary). Options: shorter names (e.g. "Pale Choirbeast" without "The" fits), or the card shows the name on two lines. Say which.
