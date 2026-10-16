@@ -15480,6 +15480,12 @@ function Test_Suite_R3Saves2() {
     Test_RunSuite("R3Saves2.newgame", Test_R3s2NewGameRun);
     Test_RunSuite("R3Saves2.overwrite", Test_R3s2OverwriteRun);
     Test_RunSuite("R3Saves2.delete", Test_R3s2DeleteRun);
+    Test_RunSuite("R3Saves2.name", Test_R3s2NameRun);
+    Test_RunSuite("R3Saves2.grid", Test_R3s2GridRun);
+    Test_RunSuite("R3Saves2.profrows", Test_R3s2ProfRowsRun);
+    Test_RunSuite("R3Saves2.profswitch", Test_R3s2ProfSwitchRun);
+    Test_RunSuite("R3Saves2.profdelete", Test_R3s2ProfDeleteRun);
+    Test_RunSuite("R3Saves2.profcreate", Test_R3s2ProfCreateRun);
 }
 
 function Test_R3s2ItemsRun() { Test_ProfRun("tq1_", Test_R3s2Items); }
@@ -15674,4 +15680,220 @@ function Test_R3s2Delete(_p) {
     Test_ConfirmSayYes();
     Test_Eq("saves2 delete: with no file left the picker goes back to the title", Ui_StackDepth(_c.title_stk), 1);
     Test_False("saves2 delete: and Load Game has nothing", Title_State().any);
+}
+
+// ---- Part 2: the profile screen and the name entry ----
+function Test_R3s2NameRun() { Test_ProfRun("tq7_", Test_R3s2Name); }
+function Test_R3s2GridRun() { Test_ProfRun("tq8_", Test_R3s2Grid); }
+function Test_R3s2ProfRowsRun() { Test_ProfRun("tq9_", Test_R3s2ProfRows); }
+function Test_R3s2ProfSwitchRun() { Test_ProfRun("tqa_", Test_R3s2ProfSwitch); }
+function Test_R3s2ProfDeleteRun() { Test_ProfRun("tqb_", Test_R3s2ProfDelete); }
+function Test_R3s2ProfCreateRun() { Test_ProfRun("tqd_", Test_R3s2ProfCreate); }
+
+function Test_R3s2Name(_p) {
+    var _e = NameEntry_New("Profile 2");
+    Test_Eq("saves2 name: the entry starts on the suggestion", _e.text, "Profile 2");
+    Test_True("saves2 name: the suggestion can be accepted", NameEntry_CanConfirm(_e));
+    Test_True("saves2 name: the first typed letter is accepted", NameEntry_Type(_e, "A"));
+    Test_Eq("saves2 name: it replaces the suggestion", _e.text, "A");
+    NameEntry_Type(_e, "B");
+    NameEntry_Type(_e, "C");
+    Test_Eq("saves2 name: typing ABC", _e.text, "ABC");
+    Test_True("saves2 name: a digit is accepted", NameEntry_Type(_e, "7"));
+    Test_True("saves2 name: so is a space", NameEntry_Type(_e, " "));
+    Test_False("saves2 name: but not two spaces in a row", NameEntry_Type(_e, " "));
+    NameEntry_Type(_e, "Z");
+    Test_Eq("saves2 name: the text so far", _e.text, "ABC7 Z");
+    Test_False("saves2 name: a character that is not a letter, digit or space is refused", NameEntry_Type(_e, "#"));
+    Test_False("saves2 name: so is a lower case letter (the entry is upper case)", NameEntry_Type(_e, "q"));
+    NameEntry_Backspace(_e);
+    Test_Eq("saves2 name: backspace takes one away", _e.text, "ABC7 ");
+    Test_Eq("saves2 name: the value is trimmed", NameEntry_Value(_e), "ABC7");
+    for (var _i = 0; _i < 12; _i++) NameEntry_Type(_e, "X");
+    Test_Eq("saves2 name: at most 12 characters", string_length(_e.text), 12);
+    Test_False("saves2 name: the 13th is refused", NameEntry_Type(_e, "Y"));
+    var _s = NameEntry_New("");
+    Test_False("saves2 name: an empty name cannot be confirmed", NameEntry_CanConfirm(_s));
+    NameEntry_Type(_s, " ");
+    Test_Eq("saves2 name: a leading space is refused", _s.text, "");
+    NameEntry_Type(_s, "A");
+    NameEntry_Backspace(_s);
+    Test_False("saves2 name: emptied again it is refused", NameEntry_CanConfirm(_s));
+    var _f = NameEntry_New("Profile 3");
+    NameEntry_Backspace(_f);
+    Test_Eq("saves2 name: backspace on the suggestion clears all of it", _f.text, "");
+    NameEntry_Backspace(_f);
+    Test_Eq("saves2 name: and backspace on nothing does nothing", _f.text, "");
+}
+
+function Test_R3s2Grid(_p) {
+    Test_Eq("saves2 grid: the first cell is A", NameEntry_CellChar(0, 0), "A");
+    Test_Eq("saves2 grid: nine to a row: I ends the first", NameEntry_CellChar(8, 0), "I");
+    Test_Eq("saves2 grid: J starts the second", NameEntry_CellChar(0, 1), "J");
+    Test_Eq("saves2 grid: 0 follows Z", NameEntry_CellChar(8, 2), "0");
+    Test_Eq("saves2 grid: the last cell is 9", NameEntry_CellChar(8, 3), "9");
+    Test_Eq("saves2 grid: the fifth row is buttons, not letters", NameEntry_CellChar(0, 4), "");
+    Test_Eq("saves2 grid: Space, Delete, OK each take a third of the last row", NameEntry_ButtonAt(0) + "," + NameEntry_ButtonAt(4) + "," + NameEntry_ButtonAt(8), "space,delete,ok");
+    var _e = NameEntry_New("");
+    NameEntry_Move(_e, -1, 0);
+    Test_Eq("saves2 grid: left from the first column wraps to the last", _e.cx, 8);
+    NameEntry_Move(_e, 1, 0);
+    Test_Eq("saves2 grid: and right wraps back", _e.cx, 0);
+    NameEntry_Move(_e, 0, -1);
+    Test_Eq("saves2 grid: up from the first row wraps to the buttons", _e.cy, 4);
+    NameEntry_Move(_e, 0, 1);
+    Test_Eq("saves2 grid: down from the buttons wraps to the first row", _e.cy, 0);
+    var _a = NameEntry_Press(_e);
+    Test_Eq("saves2 grid: pressing a letter cell types it", _a.kind + _a.ch, "charA");
+    _e.cx = 4;
+    _e.cy = 4;
+    Test_Eq("saves2 grid: pressing the middle button deletes", NameEntry_Press(_e).kind, "delete");
+    _e.cx = 8;
+    Test_Eq("saves2 grid: pressing the last button finishes", NameEntry_Press(_e).kind, "ok");
+    _e.cx = 1;
+    Test_Eq("saves2 grid: pressing the first button types a space", NameEntry_Press(_e).kind, "space");
+}
+
+// A profile file with stats, for another profile than the active one.
+function Test_R3s2WriteStats(_pid, _runs, _wins, _best) {
+    var _path = Profiles_PathOf(_pid);
+    var _r = Profile_Load(_path);
+    var _pr = _r.profile;
+    _pr.runs_started = _runs;
+    _pr.wins = _wins;
+    _pr.best_floor = _best;
+    Profile_SaveTo(_path, _pr);
+}
+
+function Test_R3s2ProfRows(_p) {
+    var _rows = Title_ProfileRows();
+    Test_Eq("saves2 profiles: one profile: its row and New Profile", Test_R3s2Ids(_rows), "prof_0,prof_new");
+    Test_Eq("saves2 profiles: the row is the name", _rows[0].label, "Profile 1");
+    Test_Eq("saves2 profiles: the active one is marked", _rows[0].value, "Active");
+    Test_Eq("saves2 profiles: New Profile reads New Profile", _rows[1].label, "New Profile");
+    Profile_Get().runs_started = 5;
+    Profile_Get().wins = 2;
+    Profile_Get().best_floor = 6;
+    Profile_Flush();
+    var _b = Profiles_Create("Bea");
+    Test_R3s2WriteStats(_b, 9, 1, 3);
+    _rows = Title_ProfileRows();
+    Test_Eq("saves2 profiles: two profiles and New Profile", Test_R3s2Ids(_rows), "prof_0,prof_1,prof_new");
+    Test_Eq("saves2 profiles: the active profile's runs", Test_RowValue(_rows[0].lines, "Runs"), "5");
+    Test_Eq("saves2 profiles: its wins", Test_RowValue(_rows[0].lines, "Wins"), "2");
+    Test_Eq("saves2 profiles: its best floor", Test_RowValue(_rows[0].lines, "Best Floor"), "6");
+    Test_Eq("saves2 profiles: another profile's runs come from its own file", Test_RowValue(_rows[1].lines, "Runs"), "9");
+    Test_Eq("saves2 profiles: its wins", Test_RowValue(_rows[1].lines, "Wins"), "1");
+    Test_Eq("saves2 profiles: its best floor", Test_RowValue(_rows[1].lines, "Best Floor"), "3");
+    Test_Eq("saves2 profiles: only the active one says Active", _rows[1].value, "");
+    Profiles_Create("Cy");
+    Profiles_Create("Di");
+    _rows = Title_ProfileRows();
+    Test_Eq("saves2 profiles: four profiles and no New Profile row", Test_R3s2Ids(_rows), "prof_0,prof_1,prof_2,prof_3");
+    var _c = Test_R3s2Title();
+    var _m = Title_ProfileOpen(_c);
+    Test_Eq("saves2 profiles: the screen opens above the title", Ui_StackTop(_c.title_stk).id, "profiles");
+    Test_Eq("saves2 profiles: titled Profiles", _m.layout.title, "Profiles");
+    Test_Eq("saves2 profiles: the cursor starts on the active profile", _m.cursor, 0);
+    Test_Eq("saves2 profiles: four rows", array_length(_m.items), 4);
+}
+
+function Test_R3s2ProfSwitch(_p) {
+    Test_ProfPutRun(_p + "run_0_0.sav", 3, 61, CLASS_KNIGHT, 2, 1, 1000, 5);
+    var _b = Profiles_Create("Bea");
+    var _c = Test_R3s2Title();
+    var _m = Title_ProfileOpen(_c);
+    Test_Eq("saves2 switch: the screen is open", Ui_StackDepth(_c.title_stk), 2);
+    Ui_MenuFixCursor(_m, 1);
+    _m.on_confirm(_m, 1);
+    Test_Eq("saves2 switch: confirming another profile switches to it", Profiles_Active(), _b);
+    Test_Eq("saves2 switch: the screen closes", Ui_StackDepth(_c.title_stk), 1);
+    Test_True("saves2 switch: the title is asked to refresh", _c.title_refresh);
+    var _st = Title_State();
+    Test_Eq("saves2 switch: Continue follows: Bea has no save file", _st.cont, -1);
+    var _m2 = Title_ProfileOpen(_c);
+    Test_Eq("saves2 switch: the cursor starts on the active profile", _m2.cursor, 1);
+    Ui_MenuFixCursor(_m2, 0);
+    _m2.on_confirm(_m2, 0);
+    Test_Eq("saves2 switch: back to Profile 1", Profiles_Active(), 0);
+    Test_Eq("saves2 switch: Continue follows: its save file is back", Title_State().cont, 0);
+    var _m3 = Title_ProfileOpen(_c);
+    _m3.on_confirm(_m3, 0);
+    Test_Eq("saves2 switch: confirming the active profile changes nothing", Profiles_Active(), 0);
+    Test_Eq("saves2 switch: and closes the screen", Ui_StackDepth(_c.title_stk), 1);
+}
+
+function Test_R3s2ProfDelete(_p) {
+    Test_ConfirmReset();
+    Test_ProfPutRun(_p + "run_0_0.sav", 3, 62, CLASS_KNIGHT, 2, 1, 1000, 5);
+    var _b = Profiles_Create("Bea");
+    Test_ProfPutRun(_p + "run_" + string(_b) + "_1.sav", 3, 63, CLASS_MAGE, 2, 1, 1000, 6);
+    var _c = Test_R3s2Title();
+    var _m = Title_ProfileOpen(_c);
+    Ui_MenuFixCursor(_m, 1);
+    Title_ProfileDeleteAsk(_c, _m);
+    Test_True("saves2 profile delete: the delete key asks Yes / No", Confirm_IsOpen());
+    Test_Eq("saves2 profile delete: the question names the profile", Confirm_Question(), "Delete profile Bea? Its Codex, history and save files are lost.");
+    Test_Eq("saves2 profile delete: it starts on No", Confirm_Menu().cursor, 1);
+    Confirm_Back();
+    Test_Eq("saves2 profile delete: No keeps it", array_length(Profiles_List()), 2);
+    Title_ProfileDeleteAsk(_c, _m);
+    Test_True("saves2 profile delete: Yes is answered", Test_ConfirmSayYes());
+    Test_Eq("saves2 profile delete: the profile is gone", array_length(Profiles_List()), 1);
+    Test_False("saves2 profile delete: and its save files", RunSave_ExistsAt(_p + "run_" + string(_b) + "_1.sav"));
+    Test_Eq("saves2 profile delete: the screen shows one profile and New Profile", Test_R3s2Ids(_m.items), "prof_0,prof_new");
+    Test_Eq("saves2 profile delete: the other profile's save files are untouched", Title_State(0).any, true);
+    Test_Eq("saves2 profile delete: the screen stays open", Ui_StackTop(_c.title_stk).id, "profiles");
+    // deleting the active one switches as the data layer does
+    var _d = Profiles_Create("Dee");
+    Profiles_Switch(_d);
+    var _m2 = Title_ProfileOpen(_c);
+    Test_Eq("saves2 profile delete: the cursor is on the active profile", _m2.items[_m2.cursor].pid, _d);
+    Title_ProfileDeleteAsk(_c, _m2);
+    Test_ConfirmSayYes();
+    Test_Eq("saves2 profile delete: deleting the active profile makes the first one active", Profiles_Active(), 0);
+    Test_True("saves2 profile delete: the title is asked to refresh", _c.title_refresh);
+    // the last profile cannot be deleted away: a fresh Profile 1 stands in
+    var _m3 = Ui_StackTop(_c.title_stk);
+    Title_ProfileDeleteAsk(_c, _m3);
+    Test_ConfirmSayYes();
+    Test_Eq("saves2 profile delete: the last profile is replaced by a fresh one", array_length(Profiles_List()), 1);
+    Test_Eq("saves2 profile delete: named Profile 1", Profiles_ActiveName(), "Profile 1");
+    Test_False("saves2 profile delete: with nothing saved", Title_State().any);
+}
+
+function Test_R3s2ProfCreate(_p) {
+    Test_ConfirmReset();
+    var _c = Test_R3s2Title();
+    var _m = Title_ProfileOpen(_c);
+    Ui_MenuFixCursor(_m, 1);
+    _m.on_confirm(_m, 1);
+    var _n = Title_NameOf(_c);
+    Test_True("saves2 create: New Profile opens the name entry", is_struct(_n));
+    Test_Eq("saves2 create: it suggests Profile 2", _n.e.text, "Profile 2");
+    NameEntry_Type(_n.e, "A");
+    NameEntry_Type(_n.e, "B");
+    NameEntry_Type(_n.e, "C");
+    Title_NameConfirm(_c);
+    Test_False("saves2 create: confirming closes the entry", is_struct(Title_NameOf(_c)));
+    Test_Eq("saves2 create: the profile exists", array_length(Profiles_List()), 2);
+    Test_Eq("saves2 create: it is the active one, named ABC", Profiles_ActiveName(), "ABC");
+    Test_Eq("saves2 create: the profile screen closes", Ui_StackDepth(_c.title_stk), 1);
+    Test_True("saves2 create: the title is asked to refresh", _c.title_refresh);
+    Test_False("saves2 create: it starts fresh: nothing saved", Title_State().any);
+    Test_False("saves2 create: it starts fresh: the intro is not seen", Story_Seen(Story_CutsceneKey("intro")));
+    // an empty name is refused and nothing is made
+    var _m2 = Title_ProfileOpen(_c);
+    Ui_MenuFixCursor(_m2, array_length(_m2.items) - 1);
+    _m2.on_confirm(_m2, array_length(_m2.items) - 1);
+    var _n2 = Title_NameOf(_c);
+    NameEntry_Backspace(_n2.e);
+    Title_NameConfirm(_c);
+    Test_True("saves2 create: an empty name keeps the entry open", is_struct(Title_NameOf(_c)));
+    Test_Eq("saves2 create: and makes no profile", array_length(Profiles_List()), 2);
+    Test_True("saves2 create: with a line saying why", Title_NameOf(_c).msg);
+    // Esc / Back cancels
+    Title_NameCancel(_c);
+    Test_False("saves2 create: cancel closes the entry", is_struct(Title_NameOf(_c)));
+    Test_Eq("saves2 create: and the profile screen is still there", Ui_StackTop(_c.title_stk).id, "profiles");
 }
