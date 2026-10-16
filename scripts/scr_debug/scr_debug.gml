@@ -170,10 +170,7 @@ function Debug_HotkeysAllowed() {
 
 function Debug_Update() {
     Debug_Init();
-    if (!Debug_HotkeysAllowed()) {
-        if (global.debug.enabled) Debug_Toggle();   // never left on from anywhere else
-        return;
-    }
+    if (!Debug_HotkeysAllowed()) return;   // no hotkeys; a scenario that switches debug on by code keeps it (there is no overlay any more)
     if (Input_Pressed("debug_toggle")) Debug_Toggle();
     if (!Debug_IsEnabled()) return;
     if (Input_Pressed("debug_enemy_damage_skill")) Debug_ToggleEnemyDamageSkillOnly();
