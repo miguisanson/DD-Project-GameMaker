@@ -29,6 +29,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import check_combat_vectors as ref  # noqa: E402  (the reference formulas of the spec; imported, never copied)
+import vig_mnd as vm  # noqa: E402  (D176: Max HP from VIG, Max MP from MND; a data file that carries vig/mnd in its classes, or constants.vigmnd=1, plays by it)
 
 DEFAULT_DATA = os.path.join(HERE, "export_data.json")
 LAYOUT = os.path.join(HERE, "layout.json")
@@ -218,6 +219,8 @@ class Data:
                     row[fk] = min(60, row[fk] + 1)
                 c["by_level"][lv - 1].update(atk=row["atk"], **{"def": row["def"]}, spd=row["spd"], mag=row["mag"])
         self.tweaks = list(tweaks or [])
+        # D176: VIG / MND. An export from a build that has them says so in by_level; `--tweak constants.vigmnd=1` plays an older export by the new numbers (and =0 the other way).
+        self.vigmnd = bool(raw["constants"].get("vigmnd", "vig" in raw["classes"][0]["by_level"][0]))
         self.exp_next = [lv["exp_next"] for lv in raw["levels"]]
         self.raw = raw
         self.build = raw.get("build", "?")
@@ -467,8 +470,13 @@ class Rules:
         return w["power"] if w else self.d.const["unarmed_power"]
 
     def resources(self, f):
-        f.mhp = ref.hp_max(f.hd, f.level) + getattr(f, "hp_bonus", 0)   # D143: + the Max HP bought with free points
-        f.mmp = ref.mp_max(f.mp_gain, f.level, f.st["mag"]) + getattr(f, "mp_bonus", 0)
+        if self.d.vigmnd:   # D176: VIG / MND (the free points put on them are hp_pts / mp_pts)
+            cname = CLASS_NAMES[f.class_id]
+            f.mhp = vm.new_hp(cname, f.level, getattr(f, "hp_pts", 0))
+            f.mmp = vm.new_mp(cname, f.level, getattr(f, "mp_pts", 0))
+        else:
+            f.mhp = ref.hp_max(f.hd, f.level) + getattr(f, "hp_bonus", 0)   # D143: + the Max HP bought with free points
+            f.mmp = ref.mp_max(f.mp_gain, f.level, f.st["mag"]) + getattr(f, "mp_bonus", 0)
         f.hp = min(f.hp, f.mhp)
         f.mp = min(f.mp, f.mmp)
 
@@ -1714,7 +1722,7 @@ class RunSim:
         if hp_pts + mp_pts:
             st[ST_KEY[self.free_stat_key()]] -= hp_pts + mp_pts
         p.hp_bonus = self.d.const.get("free_point_hp_gain", FREE_POINT_HP_GAIN) * hp_pts
-        p.mp_bonus = self.d.const.get("free_point_mp_gain", FREE_POINT_MP_GAIN) * mp_pts
+        p.mp_bonus = self.d.const.get("free_point_mp_gain", FREE_POINT_MP_GAIN) * mp_pts   # (D176: with VIG / MND resources() reads hp_pts / mp_pts instead)
         for k in st:
             st[k] = min(60, st[k])
         mhp0, mmp0 = p.mhp, p.mmp
@@ -1741,6 +1749,10 @@ class RunSim:
         refills = 1 + self.beds_ahead()
         hp_gain = self.d.const.get("free_point_hp_gain", FREE_POINT_HP_GAIN)
         mp_gain = self.d.const.get("free_point_mp_gain", FREE_POINT_MP_GAIN)
+        if self.d.vigmnd:   # D176: what one more point of VIG / MND is worth at this level (the curves soften)
+            cname = CLASS_NAMES[p.class_id]
+            hp_gain = vm.new_hp(cname, p.level, p.__dict__.get("hp_pts", 0) + 1) - vm.new_hp(cname, p.level, p.__dict__.get("hp_pts", 0))
+            mp_gain = vm.new_mp(cname, p.level, p.__dict__.get("mp_pts", 0) + 1) - vm.new_mp(cname, p.level, p.__dict__.get("mp_pts", 0))
         w = clone_player(p)   # the build without the point on the class stat
         w.st = dict(p.st)
         w.st[ST_KEY[self.free_stat_key()]] -= 1
@@ -1749,6 +1761,7 @@ class RunSim:
         g_stat = (base - self.value(p)) * n
         q = clone_player(w)
         q.mp_bonus = getattr(w, "mp_bonus", 0) + mp_gain
+        q.mp_pts = getattr(w, "mp_pts", 0) + 1
         R.resources(q)
         g_mp = (base - self.value(q)) * n + MP_VALUE * mp_gain * refills
         g_hp = hp_gain * refills

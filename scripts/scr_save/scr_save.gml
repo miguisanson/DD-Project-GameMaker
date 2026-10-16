@@ -440,7 +440,7 @@ function Save_Path(_slot) {
 // current, never written and never deleted: they are only recognised, so the title screen can say why they cannot be loaded.
 // ============================================================================================================
 #macro PROFILE_VERSION 3   // 3 (D175): name, a copy of the index name (the index is authoritative). 2 (D148): skills_known, the skill memory. An older file is read and migrated.
-#macro RUN_SAVE_VERSION 3   // 3 (D175): the summary block (class, level, floor, run time, seed, saved_at) the save-file list reads. A version 2 file still loads (migrated in memory).
+#macro RUN_SAVE_VERSION 4   // 4 (D176): the player's stats carry vig and mnd (Max HP / Max MP come from them; hp_bonus / mp_bonus are gone). 3 (D175): the summary block (class, level, floor, run time, seed, saved_at) the save-file list reads. A version 2 or 3 file still loads (migrated in memory).
 #macro RUN_SAVE_MIN_VERSION 2
 #macro PROFILE_HISTORY_MAX 50
 #macro PROFILES_MAX 4
@@ -933,7 +933,7 @@ function RunSave_Build() {
     var pl = gs.player_ch;
     var summary = {   // D175: what the save-file list shows, readable without applying the run (Slots_Summary)
         class_id: (is_struct(pl) && variable_struct_exists(pl, "class_id")) ? pl.class_id : gs.selected_class,
-        level: (is_struct(pl) && variable_struct_exists(pl, "level")) ? pl.level : 1,
+        level: (is_struct(pl) && variable_struct_exists(pl, "level")) ? Player_EffLevel(pl) : 1,   // D177: a level won and not yet confirmed counts
         floor: run_floor,
         run_time_ms: RunStats_Of(run).play_ms,
         seed: run.seed,
@@ -1043,11 +1043,14 @@ function RunSave_SummaryOf(_raw) {
     return out;
 }
 
-// A loaded run file brought to the current version in memory: the summary block is filled in (version 2 has none). The file itself is
-// rewritten as version 3 by the next autosave; nothing is written here.
+// A loaded run file brought to the current version in memory: the summary block is filled in (version 2 has none) and the player gets VIG and MND (versions 2 and 3 have
+// hp_bonus / mp_bonus instead: Player_MigrateVigMnd turns them into points). The file itself is rewritten as the current version by the next autosave; nothing is written here.
 function RunSave_Migrate(_raw) {
     if (!is_struct(_raw)) return _raw;
     if (!variable_struct_exists(_raw, "summary") || !is_struct(_raw.summary)) _raw.summary = RunSave_SummaryOf(_raw);
+    if (variable_struct_exists(_raw, "statData") && is_struct(_raw.statData) && variable_struct_exists(_raw.statData, "player") && is_struct(_raw.statData.player)) {
+        _raw.statData.player = Player_MigrateVigMnd(_raw.statData.player);
+    }
     _raw.run_version = RUN_SAVE_VERSION;
     return _raw;
 }

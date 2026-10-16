@@ -335,6 +335,13 @@ function Scenario_InputOverride() {
     }
 }
 
+// EXP won the old way, for a scenario that only needs the level: in a run the level is owed until the screen is confirmed (D177), so every owed level is applied here at once
+// (the free points banked, as a run banks them). A scenario about the screen itself does not use this.
+function Scenario_AddExpApplied(_ch, _amount) {
+    _ch = Player_AddExp(_ch, _amount);
+    return LevelUp_ApplyOwed(_ch);
+}
+
 function Scenario_NewKnight(_class = CLASS_KNIGHT) {
     var _gs = GameState_Init();
     _gs.player_ch = CharacterCreate_Player(_class);
@@ -3002,7 +3009,8 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsRunStats(_s);   // G9 (D137): the run summary with the stats (English, Korean), the Codex run history with and without stats; goes on with H4 (540..549)
             break;
         case 540: case 541: case 542: case 543: case 544: case 545: case 546: case 547: case 548: case 549:
-            Scenario_StepShotsLevelUp(_s);   // H4 (D143): the free-point screen with the class growth line, two sizes and Korean; goes on with H1 (490..499)
+        case 1100: case 1101: case 1102: case 1103: case 1104: case 1105: case 1106: case 1107: case 1108: case 1109:
+            Scenario_StepShotsLevelUp(_s);   // H4 (D143), r3levelup (D177): the level-up screen, five scenes at three sizes; goes on with H1 (490..499)
             break;
         case 490: case 491: case 492: case 493: case 494: case 495: case 496: case 497: case 498: case 499:
             Scenario_StepShotsOneMenu(_s);   // H1 (D140): the System tab, the Settings tab and the "Keep this?" prompt, two sizes; goes on with H10 (570..579)
@@ -3946,6 +3954,7 @@ function Scenario_NoOwed() {
         _k.skill_pending = -1;
         _k.card_picks = 0;
         _k.stat_points = 0;
+        _k.levels_owed = 0;   // D177: a level won and not yet confirmed opens the level-up screen too
         _k.offer = [];
         if (variable_struct_exists(_k, "echo_offer")) _k.echo_offer = [];
     }
@@ -4475,7 +4484,7 @@ function Export_Build() {
     ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init();
     var data = { version: 1, build: BUILD_ID, spec: ".planning/research/combat-spec.md" };
     data.constants = {
-        stat_ids: { atk: STAT_ATK, def: STAT_DEF, spd: STAT_SPD, mag: STAT_MAG },
+        stat_ids: { atk: STAT_ATK, def: STAT_DEF, spd: STAT_SPD, mag: STAT_MAG, vig: STAT_VIG, mnd: STAT_MND },
         stat_min: STAT_MIN, stat_max: STAT_MAX, level_cap: LEVEL_CAP_TECHNICAL,
         power_scale: COMBAT_POWER_SCALE, weapon_skill_share: COMBAT_WEAPON_SKILL_SHARE, unarmed_power: COMBAT_UNARMED_POWER,
         crit_mult: COMBAT_CRIT_MULT, crit_chance_max: COMBAT_CRIT_CHANCE_MAX, free_points_per_level: LEVEL_FREE_POINTS_PER_LEVEL,
@@ -4499,7 +4508,7 @@ function Export_Build() {
                 array_push(cfg.growth_per_level, { level: lv2, gain: LevelUp_ClassGrowthGain(class_ids[ci], lv2) });
                 ch = LevelUp_ApplyLevel(ch);
             }
-            array_push(cfg.by_level, { level: lv2, atk: ch.stats.atk, def: ch.stats.def, spd: ch.stats.spd, mag: ch.stats.mag, hp: ch.max_hp, mp: ch.max_mp });
+            array_push(cfg.by_level, { level: lv2, atk: ch.stats.atk, def: ch.stats.def, spd: ch.stats.spd, mag: ch.stats.mag, vig: ch.stats.vig, mnd: ch.stats.mnd, hp: ch.max_hp, mp: ch.max_mp });   // D176: hp / mp are the VIG / MND curves (the simulator reads them)
         }
         array_push(data.classes, cfg);
     }
@@ -6005,8 +6014,8 @@ function Scenario_StepSmokeCards(_s) {
         case 138:   // level-up: first the free stat point
             if (_s.t > 5 && CardsUi_Kind() == "stat") {
                 var _ms = Ui_StackTop(global.cards_ui.stk);
-                Scenario_Check("cards_level_up_owes_a_stat_point_and_a_pick", _ch.level == 2 && _ch.stat_points == 1 && _ch.card_picks == 1);
-                Scenario_Check("cards_level_up_opens_the_stat_prompt_first", _ms.id == "cards_stat" && array_length(_ms.items) == 6);   // H4 (D143): was 4; Max HP +3 and Max MP +2 joined the four stats
+                Scenario_Check("cards_level_up_owes_the_level_until_the_stat_prompt_is_answered", _ch.level == 1 && _ch.levels_owed == 1 && _ch.stat_points == 0 && _ch.card_picks == 0);   // D177: the level, the point and the pick are given at the confirm
+                Scenario_Check("cards_level_up_opens_the_stat_prompt_first", _ms.id == "cards_stat" && array_length(_ms.items) == 6);   // D176: ATK DEF SPD MAG VIG MND
                 Scenario_Check("cards_stat_prompt_starts_on_the_class_stat", _ms.cursor == STAT_MAG, "cursor=" + string(_ms.cursor));
                 _cd.q = ["menu_up", "confirm"];   // MAG -> SPD, place the point
                 Scenario_Next(_s, 139);
@@ -7455,7 +7464,7 @@ function Scenario_StepBotD1a(_s) {
         case 0:   // I-065: set the run character up
             if (_s.t == 10) {
                 var _gs = Scenario_NewKnight();
-                var _ch = Player_AddExp(_gs.player_ch, 200);
+                var _ch = Scenario_AddExpApplied(_gs.player_ch, 200);
                 _ch.hp = max(1, _ch.max_hp - 3);
                 GameState_SetPlayer(_ch);
                 _s.stt = { level: _ch.level, max_hp: _ch.max_hp, hp: _ch.hp, atk: _ch.stats.atk, def: _ch.stats.def, spd: _ch.stats.spd, mag: _ch.stats.mag, seen: false };
@@ -7489,7 +7498,7 @@ function Scenario_StepBotD1a(_s) {
                 var _t2 = _s.stt;
                 Scenario_Check("bot_i065_back_in_the_floor", room == rm_floor1, "room=" + room_get_name(room));
                 Scenario_Check("bot_i065_level_after_the_fight_is_not_lower", _after.level >= _t2.level, "after=" + string(_after.level) + " before=" + string(_t2.level));
-                Scenario_Check("bot_i065_max_hp_after_the_fight_follows_the_level", _after.max_hp == Resource_MaxHp(_after.class_cfg.hd, _after.level), "max_hp=" + string(_after.max_hp));
+                Scenario_Check("bot_i065_max_hp_after_the_fight_follows_the_level", _after.max_hp == Resource_MaxHpOfVig(_after.stats.vig), "max_hp=" + string(_after.max_hp));
                 Scenario_Check("bot_i065_stats_after_the_fight_are_not_lower", _after.stats.atk >= _t2.atk && _after.stats.def >= _t2.def && _after.stats.spd >= _t2.spd && _after.stats.mag >= _t2.mag);
                 Scenario_Check("bot_i065_hp_after_the_fight_is_in_bounds", _after.hp > 0 && _after.hp <= _after.max_hp, "hp=" + string(_after.hp) + "/" + string(_after.max_hp));
                 Scenario_Next(_s, 3);
@@ -7643,7 +7652,7 @@ function Scenario_StepSmokeTabMenu(_s) {
                 Scenario_Check("tabmenu_the_menu_key_opens_it", _gs.ui.mode == UI_MENU && is_struct(_u), "mode=" + string(_gs.ui.mode) + " room=" + room_get_name(room));
                 if (!is_struct(_u)) { Scenario_Finish(); break; }
                 Scenario_Check("tabmenu_starts_on_status", _u.tab == 0 && _m.id == "tab_status");
-                Scenario_Check("tabmenu_status_lists_the_four_stats", array_length(_m.items) == 4 && _m.cursor == 0);
+                Scenario_Check("tabmenu_status_lists_the_six_stats", array_length(_m.items) == 6 && _m.cursor == 0);   // D176: ATK DEF SPD MAG VIG MND
                 Scenario_Check("tabmenu_status_has_a_description_for_each", string_length(_m.items[0].help) > 10 && _m.items[0].help != _m.items[1].help);
                 Scenario_Next(_s, 182);
             }
@@ -10444,7 +10453,7 @@ function Scenario_StepSmokeMapJuice(_s) {
                 Scenario_ClearUi();
                 MapFx_Clear();
                 _mj.lv0 = _gs.player_ch.level;
-                var _chl = Player_AddExp(_gs.player_ch, max(1, _gs.player_ch.exp_next));
+                var _chl = Scenario_AddExpApplied(_gs.player_ch, max(1, _gs.player_ch.exp_next));
                 GameState_SetPlayer(_chl);
                 if (instance_exists(obj_player)) obj_player.character = _gs.player_ch;
                 Scenario_Check("mapjuice_the_character_gained_a_level", _gs.player_ch.level == _mj.lv0 + 1, "level=" + string(_gs.player_ch.level));
@@ -10750,7 +10759,7 @@ function Scenario_StepShotsMapJuice(_s) {
         case 404:   // a level-up: the sparkle ring 200 ms in
             if (_s.t == 1) {
                 MapFx_Clear();
-                var _chl = Player_AddExp(_gs.player_ch, max(1, _gs.player_ch.exp_next));
+                var _chl = Scenario_AddExpApplied(_gs.player_ch, max(1, _gs.player_ch.exp_next));
                 _chl.card_picks = 0;   // the level's screens (stat point, card pick) would open over the picture
                 _chl.stat_points = 0;
                 GameState_SetPlayer(_chl);
@@ -11068,91 +11077,110 @@ function Scenario_StepSmokeH3(_s) {
     }
 }
 
-// ---- H4 (D143, amends D76), steps 520..529: the level-up screen with real keys. A Knight of the run levels up: the screen shows "Knight growth: ATK +1, DEF +1",
-// offers six rows (the four stats, Max HP +3, Max MP +2), a point on Max HP raises max and current HP by 3, then the next level-up's point goes to Max MP.
-// The last step ends the smoke chain (Scenario_NoticeEnd). ----
+// ---- H4 (D143, D176, D177), steps 520..529: the level-up through a real fight and the real screen. A Knight of level 3 in a run, one EXP short of level 4, beats a Slime
+// with the real attack key: the battle and the map show the Knight as he was (level 3, the same stats and Max HP, a "Level Up" bar), the screen opens, one confirm
+// applies the level, the class growth and the point together (Max HP follows VIG, the current HP rises with it), the card pick comes next.
+// The last step goes on with H1 (470). ----
 function Scenario_StepSmokeLevelUp(_s) {
     var _gs = GameState_Get();
     if (!variable_struct_exists(_s, "lu")) _s.lu = { q: [] };
     var _lu = _s.lu;
     var _ch = _gs.player_ch;
+    var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
     Scenario_CardsTapQueue(_s, _lu);
     switch (_s.step) {
-        case 520:   // a fresh Knight in the run, hurt a little, one level-up away
+        case 520:   // a level 3 Knight in the run, one EXP short of level 4, goes into a fight with a Slime
             if (_s.t == 1) {
                 CardsUi_Close();
                 Scenario_ClearUi();
+                if (Run_IsActive()) variable_struct_remove(_gs, "run");   // levelled before the run exists: the free points are placed at once
                 var _k = CharacterCreate_Player(CLASS_KNIGHT);
-                _k.hp = _k.max_hp - 4;
-                _lu.hp0 = _k.hp;
-                _lu.atk0 = _k.stats.atk;
-                _lu.def0 = _k.stats.def;
-                _lu.mp0 = _k.mp;
+                _k = LevelUp_ApplyLevel(LevelUp_ApplyLevel(_k));
+                _k = Player_NormalizeProgression(_k, true);   // the EXP bar of level 3
+                _k.card_picks = 0;   // the two level-ups owed a card pick each; this scenario is about the next one
+                _k.exp = _k.exp_next - 1;
+                _gs.run = Run_Create(7721);
                 GameState_SetPlayer(_k);
                 if (instance_exists(obj_player)) obj_player.character = _gs.player_ch;
+                _lu.b = { level: _k.level, atk: _k.stats.atk, def: _k.stats.def, vig: _k.stats.vig, mnd: _k.stats.mnd, max_hp: _k.max_hp, max_mp: _k.max_mp };
                 Scenario_Check("levelup_a_run_is_going_and_the_player_places_the_point", Run_IsActive() && !Level_AutoPlaceEnabled());
-                GameState_SetPlayer(Player_AddExp(_gs.player_ch, _gs.player_ch.exp_next));
-                if (instance_exists(obj_player)) obj_player.character = _gs.player_ch;
-                Scenario_Check("levelup_the_knight_reached_level_2_owing_one_point", _gs.player_ch.level == 2 && _gs.player_ch.stat_points == 1, "level=" + string(_gs.player_ch.level) + " points=" + string(_gs.player_ch.stat_points));
+                Scenario_Check("levelup_the_knight_is_level_3_one_exp_short", _k.level == 3 && _k.exp == _k.exp_next - 1 && _k.max_hp == 22, "level=" + string(_k.level) + " max_hp=" + string(_k.max_hp));
+                _s.vstart = _s.f;
+                Scenario_GotoBattle("lu_slime", ENEMY_SLIME);
+                Scenario_Next(_s, 521);
             }
+            break;
+        case 521:   // the fight is played with the real attack key; when it is won the Knight on screen is the Knight who went in
+            if (_bc == noone) {
+                if (_s.t > 120) { Scenario_Check("levelup_the_fight_starts", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+                break;
+            }
+            if (_bc.battle_over) {
+                Scenario_Check("levelup_the_battle_still_shows_level_3", _bc.p.level == _lu.b.level, "level=" + string(_bc.p.level));
+                Scenario_Check("levelup_the_battle_still_shows_the_same_max_hp_and_max_mp", _bc.p.max_hp == _lu.b.max_hp && _bc.p.max_mp == _lu.b.max_mp, "max_hp=" + string(_bc.p.max_hp) + " max_mp=" + string(_bc.p.max_mp));
+                Scenario_Check("levelup_the_battle_still_shows_the_same_stats", _bc.p.stats.atk == _lu.b.atk && _bc.p.stats.def == _lu.b.def && _bc.p.stats.vig == _lu.b.vig && _bc.p.stats.mnd == _lu.b.mnd);
+                Scenario_Next(_s, 522);
+                break;
+            }
+            if (_s.f - _s.vstart > 4000) { Scenario_Check("levelup_the_fight_ends", false, "state=" + string(_bc.battle_state)); Scenario_NoticeEnd(); break; }
+            Scenario_BotPlainAttack(_s, _bc);
+            break;
+        case 522:   // back on the map: the screen opens; the Knight is still level 3 with a full "Level Up" bar
+            if (Scenario_CardsTalk(_s)) break;   // the first level-up queues the hero's one-time remark (Dialogue_NarrativeOnLevelUp); it is read through first
             if (_s.t > 5 && CardsUi_Kind() == "stat") {
                 var _ms = Ui_StackTop(global.cards_ui.stk);
                 Scenario_Check("levelup_the_free_point_screen_opens_first", _ms.id == "cards_stat");
                 Scenario_Check("levelup_the_screen_offers_six_rows", array_length(_ms.items) == 6, "n=" + string(array_length(_ms.items)));
-                Scenario_Check("levelup_the_screen_shows_the_knight_growth", _ms.layout.note == "Knight growth: ATK +1, DEF +1", "note=" + string(_ms.layout.note));
-                Scenario_Check("levelup_the_rows_end_with_max_hp_and_max_mp", array_length(_ms.items) == 6 && _ms.items[4].label == "Max HP +3" && _ms.items[5].label == "Max MP +2");
+                Scenario_Check("levelup_the_knight_is_still_level_3_with_one_level_owed", _ch.level == 3 && _ch.levels_owed == 1, "level=" + string(_ch.level) + " owed=" + string(_ch.levels_owed));
+                Scenario_Check("levelup_the_stats_are_unchanged_until_the_confirm", _ch.stats.atk == _lu.b.atk && _ch.stats.def == _lu.b.def && _ch.stats.vig == _lu.b.vig && _ch.stats.mnd == _lu.b.mnd, "atk=" + string(_ch.stats.atk) + " def=" + string(_ch.stats.def) + " vig=" + string(_ch.stats.vig));
+                Scenario_Check("levelup_max_hp_and_max_mp_are_unchanged_until_the_confirm", _ch.max_hp == _lu.b.max_hp && _ch.max_mp == _lu.b.max_mp, "max_hp=" + string(_ch.max_hp));
+                Scenario_Check("levelup_no_point_is_banked_and_no_card_is_owed_yet", _ch.stat_points == 0 && _ch.card_picks == 0);
+                var _bar = TabMenu_XpBar(_ch);
+                Scenario_Check("levelup_the_exp_bar_is_full_and_says_level_up", _bar.ratio == 1 && _bar.text == Loc_T("tab.val.level_up", "Level Up"), "text=" + string(_bar.text));
                 Scenario_Check("levelup_the_cursor_starts_on_the_class_stat", _ms.cursor == STAT_DEF, "cursor=" + string(_ms.cursor));
-                _lu.q = ["menu_down", "menu_down", "menu_down", "confirm"];   // DEF -> SPD -> MAG -> Max HP, place the point
-                Scenario_Next(_s, 521);
+                // D177: the Knight's growth rows (ATK, DEF, VIG, MND) are gold, SPD and MAG are not; growth rows read now > now + growth, the hovered one now > now + growth + 1
+                var _gold = "";
+                for (var _gi = 0; _gi < array_length(_ms.items); _gi++) if (variable_struct_exists(_ms.items[_gi], "col") && _ms.items[_gi].col == UI_C_MERCHANT_GOLD) _gold += _ms.items[_gi].label + ",";
+                Scenario_Check("levelup_the_class_growth_rows_are_gold", _gold == "ATK,DEF,VIG,MND,", "gold=" + _gold);
+                Scenario_Check("levelup_a_growth_row_reads_now_to_now_plus_growth", _ms.items[0].value == string(_lu.b.atk) + " > " + string(_lu.b.atk + 1), "ATK=" + _ms.items[0].value);
+                Scenario_Check("levelup_the_hovered_growth_row_adds_the_point", _ms.items[1].value == string(_lu.b.def) + " > " + string(_lu.b.def + 2), "DEF=" + _ms.items[1].value);
+                Scenario_Check("levelup_VIG_reads_its_growth_of_3_on_level_4", _ms.items[4].value == string(_lu.b.vig) + " > " + string(_lu.b.vig + 3), "VIG=" + _ms.items[4].value);
+                Scenario_Check("levelup_a_row_that_does_not_grow_reads_only_the_number", _ms.items[2].value == string(_ch.stats.spd) && _ms.items[3].value == string(_ch.stats.mag), "SPD=" + _ms.items[2].value + " MAG=" + _ms.items[3].value);
+                _lu.hp_pre = _ch.hp;
+                _lu.q = ["menu_down"];   // DEF -> SPD: the +1 moves with the cursor
+                Scenario_Next(_s, 524);
             }
-            if (_s.t > 900) { Scenario_Check("levelup_the_free_point_screen_opens", false, "kind=" + CardsUi_Kind()); Scenario_NoticeEnd(); }
+            if (_s.t > 900) { Scenario_Check("levelup_the_free_point_screen_opens", false, "kind=" + CardsUi_Kind() + " room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
-        case 521:   // the point is on Max HP; the card pick comes next and is skipped
+        case 524:   // the keyboard moved the cursor to SPD: SPD shows its +1, DEF is back to its growth; then back to DEF and confirm
+            if (_s.t > 20 && array_length(_lu.q) == 0 && CardsUi_Kind() == "stat" && !variable_struct_exists(_lu, "kb")) {
+                _lu.kb = true;
+                var _mk = Ui_StackTop(global.cards_ui.stk);
+                Scenario_Check("levelup_down_moved_the_cursor_to_spd", _mk.cursor == STAT_SPD, "cursor=" + string(_mk.cursor));
+                Scenario_Check("levelup_the_hovered_plain_row_shows_its_plus_one", _mk.items[2].value == string(_ch.stats.spd) + " > " + string(_ch.stats.spd + 1), "SPD=" + _mk.items[2].value);
+                Scenario_Check("levelup_the_row_left_behind_goes_back_to_its_growth", _mk.items[1].value == string(_lu.b.def) + " > " + string(_lu.b.def + 1), "DEF=" + _mk.items[1].value);
+                _lu.q = ["menu_up", "confirm"];   // back on DEF: the point goes on DEF, the class's usual stat
+                Scenario_Next(_s, 523);
+            }
+            if (_s.t > 900) { Scenario_Check("levelup_the_keyboard_moves_the_cursor", false, "kind=" + CardsUi_Kind() + " q=" + string(array_length(_lu.q))); Scenario_NoticeEnd(); }
+            break;
+        case 523:   // one confirm: level 4, the growth and the point; the card pick comes next and is answered
+            if (Scenario_CardsTalk(_s)) break;
             if (_s.t > 30 && array_length(_lu.q) == 0 && CardsUi_Kind() == "cards" && !variable_struct_exists(_lu, "p1")) {
                 _lu.p1 = true;
-                var _hd = _ch.class_cfg.hd;
-                Scenario_Check("levelup_max_hp_went_up_by_3", _ch.max_hp == Resource_MaxHp(_hd, 2) + 3, "max_hp=" + string(_ch.max_hp));
-                Scenario_Check("levelup_current_hp_went_up_by_the_level_and_by_3", _ch.hp == _lu.hp0 + (Resource_MaxHp(_hd, 2) - Resource_MaxHp(_hd, 1)) + 3, "hp=" + string(_ch.hp) + " was " + string(_lu.hp0));
+                Scenario_Check("levelup_the_confirm_made_level_4", _ch.level == 4 && _ch.levels_owed == 0, "level=" + string(_ch.level) + " owed=" + string(_ch.levels_owed));
+                Scenario_Check("levelup_the_class_growth_and_the_point_arrived", _ch.stats.atk == _lu.b.atk + 1 && _ch.stats.def == _lu.b.def + 2 && _ch.stats.vig == _lu.b.vig + 3 && _ch.stats.mnd == _lu.b.mnd + 1, "atk=" + string(_ch.stats.atk) + " def=" + string(_ch.stats.def) + " vig=" + string(_ch.stats.vig));
+                Scenario_Check("levelup_max_hp_follows_vig", _ch.max_hp == Resource_MaxHpOfVig(_lu.b.vig + 3) && _ch.max_hp == 31, "max_hp=" + string(_ch.max_hp));
+                Scenario_Check("levelup_the_current_hp_rose_by_what_max_hp_gained", _ch.hp == min(_ch.max_hp, _lu.hp_pre + (_ch.max_hp - _lu.b.max_hp)), "hp=" + string(_ch.hp) + " was " + string(_lu.hp_pre));
                 Scenario_Check("levelup_the_point_is_spent_once", _ch.stat_points == 0);
-                Scenario_Check("levelup_only_the_class_growth_reached_the_stats", _ch.stats.atk == _lu.atk0 + 1 && _ch.stats.def == _lu.def0 + 1, "atk=" + string(_ch.stats.atk) + " def=" + string(_ch.stats.def));
                 Scenario_CardsHarmless();
                 _lu.q = ["confirm"];   // R3: no Skip any more; the first card (a harmless one) answers the pick
             }
             if (variable_struct_exists(_lu, "p1") && array_length(_lu.q) == 0 && _s.t > 150 && !CardsUi_IsOpen()) {
                 Scenario_Check("levelup_nothing_is_owed_after_the_pick", Cards_NextOwed(_ch) == "");
-                _lu.mp1 = _ch.mp;
-                GameState_SetPlayer(Player_AddExp(_gs.player_ch, _gs.player_ch.exp_next));   // level 3: the next point goes to Max MP
-                if (instance_exists(obj_player)) obj_player.character = _gs.player_ch;
-                Scenario_Next(_s, 522);
-            }
-            if (_s.t > 900) { Scenario_Check("levelup_the_point_and_the_pick_are_answered", false, "kind=" + CardsUi_Kind() + " q=" + string(array_length(_lu.q))); Scenario_NoticeEnd(); }
-            break;
-        case 522:   // level 3: the screen again; Max MP
-            if (_s.t > 5 && CardsUi_Kind() == "stat") {
-                var _m2 = Ui_StackTop(global.cards_ui.stk);
-                Scenario_Check("levelup_level_3_shows_the_growth_line_again", _m2.layout.note == "Knight growth: ATK +1, DEF +1", "note=" + string(_m2.layout.note));
-                Scenario_Check("levelup_level_3_title_names_the_level", string_pos("3", _m2.layout.title) > 0, "title=" + string(_m2.layout.title));
-                _lu.q = ["menu_down", "menu_down", "menu_down", "menu_down", "confirm"];   // DEF -> ... -> Max MP
-                Scenario_Next(_s, 523);
-            }
-            if (_s.t > 900) { Scenario_Check("levelup_level_3_opens_the_free_point_screen", false, "kind=" + CardsUi_Kind()); Scenario_NoticeEnd(); }
-            break;
-        case 523:
-            if (_s.t > 30 && array_length(_lu.q) == 0 && CardsUi_Kind() == "cards" && !variable_struct_exists(_lu, "p2")) {
-                _lu.p2 = true;
-                var _hd3 = _ch.class_cfg.hd;
-                Scenario_Check("levelup_max_mp_went_up_by_2", _ch.max_mp == Resource_MaxMp(_ch.class_cfg.mp_gain, 3, _ch.stats.mag) + 2, "max_mp=" + string(_ch.max_mp));
-                Scenario_Check("levelup_current_mp_went_up_with_the_level_and_by_2", _ch.mp == min(_ch.max_mp, _lu.mp1 + (Resource_MaxMp(_ch.class_cfg.mp_gain, 3, _ch.stats.mag) - Resource_MaxMp(_ch.class_cfg.mp_gain, 2, _ch.stats.mag)) + 2), "mp=" + string(_ch.mp));
-                Scenario_Check("levelup_the_earlier_max_hp_bonus_is_kept", _ch.max_hp == Resource_MaxHp(_hd3, 3) + 3, "max_hp=" + string(_ch.max_hp));
-                Scenario_Check("levelup_the_second_point_is_spent_once", _ch.stat_points == 0);
-                Scenario_CardsHarmless();
-                _lu.q = ["confirm"];   // R3: no Skip any more; the first card (a harmless one) answers the pick
-            }
-            if (variable_struct_exists(_lu, "p2") && array_length(_lu.q) == 0 && _s.t > 150 && !CardsUi_IsOpen()) {
-                Scenario_Check("levelup_nothing_is_owed_at_the_end", Cards_NextOwed(_ch) == "");
                 Scenario_Next(_s, 470);   // H1 (D140, D141, 470..489) goes on; its last step ends the chain
             }
-            if (_s.t > 900) { Scenario_Check("levelup_the_second_point_and_pick_are_answered", false, "kind=" + CardsUi_Kind() + " q=" + string(array_length(_lu.q))); Scenario_NoticeEnd(); }
+            if (_s.t > 900) { Scenario_Check("levelup_the_point_and_the_pick_are_answered", false, "kind=" + CardsUi_Kind() + " q=" + string(array_length(_lu.q)) + " owed=" + Cards_NextOwed(_ch) + " level=" + string(_ch.level) + " lo=" + string(_ch.levels_owed) + " sp=" + string(_ch.stat_points) + " cp=" + string(_ch.card_picks) + " mode=" + string(_gs.ui.mode) + " lines=" + string(array_length(_gs.ui.lines)) + " room=" + room_get_name(room) + " tr=" + string(Transition_IsActive())); Scenario_NoticeEnd(); }
             break;
     }
 }
@@ -11547,72 +11575,91 @@ function Scenario_StepSmokeSeed(_s) {
     }
 }
 
-// ---- H4 (D143) pictures 540-549: the free-point screen with the class growth line. shot_ui_levelup_stat_480x432.png (cursor on the class stat),
-// shot_ui_levelup_stat_800x720.png (cursor on Max HP, so its help line is on screen), shot_ui_levelup_stat_ko_480x432.png (Korean, cursor on Max MP). ----
+// ---- D177 pictures 540 and 1100..1103: the level-up screen. Five scenes: a Knight with the cursor on a growth row (ATK), on a row that does not grow (SPD), a Mage the same (MAG, ATK),
+// the Knight in Korean on VIG; each at windowed scale 3 (480 x 432), 4 (640 x 576) and 5 (800 x 720). shot_ui_levelup_<scene>_<w>x<h>.png. Every row must fit (measured), the gold rows are
+// the class's, the values follow the rule. Goes on with H1 (490). ----
+function Scenario_LvShotScenes() {
+    return ["knight_growth", "knight_plain", "mage_growth", "mage_plain", "knight_ko"];
+}
+
 function Scenario_StepShotsLevelUp(_s) {
     var _gs = GameState_Get();
+    var _scenes = Scenario_LvShotScenes();
+    if (!variable_struct_exists(_s, "lvs")) _s.lvs = { di: 0, si: 0 };
+    var _o = _s.lvs;
+    var _scales = [3, 4, 5];
+    var _scene = _scenes[min(_o.di, array_length(_scenes) - 1)];
+    var _tag = _scene + "_" + string(_scales[min(_o.si, 2)]);
+    var _mage = (string_pos("mage", _scene) == 1);
+    var _ko = (string_pos("_ko", _scene) > 0);
     switch (_s.step) {
-        case 540:   // a Knight of a run, level 2, owing the point: the screen is opened by hand so no map or timing is involved
+        case 540:   // the old pictures are replaced by the loop below
+            Scenario_Next(_s, 1100);
+            break;
+        case 1100:   // a character of a run with a level owed (the EXP won the real way); the screen is opened by hand so no map or timing is involved
             if (_s.t == 1) {
                 CardsUi_Close();
                 Scenario_ClearUi();
-                var _k = CharacterCreate_Player(CLASS_KNIGHT);
-                _k.hp = _k.max_hp - 4;
-                GameState_SetPlayer(_k);
                 if (!Run_IsActive()) _gs.run = Run_Create(2469);
-                GameState_SetPlayer(Player_AddExp(_gs.player_ch, _gs.player_ch.exp_next));
-                _gs.player_ch.card_picks = 0;
-                Scenario_SetWindowScale(3);
-                Loc_SetLanguage("en");
+                var _c = CharacterCreate_Player(_mage ? CLASS_MAGE : CLASS_KNIGHT);
+                _c = Player_AddExp(_c, _c.exp_next);
+                GameState_SetPlayer(_c);
+                Scenario_SetWindowScale(_scales[_o.si]);
+                Loc_SetLanguage(_ko ? "ko" : "en");
             }
             if (_s.t == 30) {
                 CardsUi_Open("stat");
-                Scenario_Check("shots_levelup_the_free_point_screen_is_open", CardsUi_Kind() == "stat");
+                Scenario_Check("shots_levelup_the_screen_is_open_" + _tag, CardsUi_Kind() == "stat" && _gs.player_ch.levels_owed == 1 && _gs.player_ch.level == 1);
             }
-            if (_s.t == 70) {
-                var _ms = Ui_StackTop(global.cards_ui.stk);
-                Scenario_Check("shots_levelup_the_growth_line_is_on_the_screen", _ms.layout.note == "Knight growth: ATK +1, DEF +1");
-                Scenario_ShotUi(_s, "levelup_stat");
-                Scenario_Next(_s, 541);
-            }
-            break;
-        case 541:   // 800 x 720, the cursor on Max HP
-            if (_s.t == 3) {
-                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
-                Scenario_SetWindowScale(5);
-                Ui_MenuFixCursor(Ui_StackTop(global.cards_ui.stk), 4);
-            }
-            if (_s.t == 60) {
-                Scenario_Check("shots_levelup_the_cursor_is_on_max_hp", Ui_StackTop(global.cards_ui.stk).cursor == 4);
-                Scenario_ShotUi(_s, "levelup_stat");
-                Scenario_Next(_s, 542);
-            }
-            break;
-        case 542:   // Korean at 480 x 432, the cursor on Max MP
-            if (_s.t == 3) {
-                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
-                Scenario_SetWindowScale(3);
-                Loc_SetLanguage("ko");
-                CardsUi_Close();
-                CardsUi_Open("stat");
-            }
-            if (_s.t == 50) {
-                Ui_MenuFixCursor(Ui_StackTop(global.cards_ui.stk), 5);
+            if (_s.t == 50 && CardsUi_Kind() == "stat") {
+                var _row = 0;
+                if (_scene == "knight_plain") _row = STAT_SPD;
+                if (_scene == "mage_growth") _row = STAT_MAG;
+                if (_scene == "knight_ko") _row = STAT_VIG;
+                Ui_MenuFixCursor(Ui_StackTop(global.cards_ui.stk), _row);
             }
             if (_s.t == 90) {
-                Scenario_Check("shots_levelup_the_korean_screen_is_open", CardsUi_Kind() == "stat" && Ui_StackTop(global.cards_ui.stk).layout.note != "Knight growth: ATK +1, DEF +1");
-                Scenario_ShotUi(_s, "levelup_stat_ko");
-                Scenario_Next(_s, 543);
+                var _m = Ui_StackTop(global.cards_ui.stk);
+                var _vals = "";
+                var _gold = "";
+                for (var _i = 0; _i < array_length(_m.items); _i++) {
+                    _vals += (_i > 0 ? "|" : "") + _m.items[_i].value;
+                    if (variable_struct_exists(_m.items[_i], "col") && _m.items[_i].col == UI_C_MERCHANT_GOLD) _gold += _m.items[_i].label + ",";
+                }
+                var _want_vals = "";
+                var _want_gold = "ATK,DEF,VIG,MND,";
+                switch (_scene) {
+                    case "knight_growth": _want_vals = "11 > 13|12 > 13|10|3|10 > 12|11 > 12"; break;
+                    case "knight_plain": _want_vals = "11 > 12|12 > 13|10 > 11|3|10 > 12|11 > 12"; break;
+                    case "mage_growth": _want_vals = "5|7|10|12 > 15|10 > 12|16 > 19"; _want_gold = "MAG,VIG,MND,"; break;
+                    case "mage_plain": _want_vals = "5 > 6|7|10|12 > 14|10 > 12|16 > 19"; _want_gold = "MAG,VIG,MND,"; break;
+                    case "knight_ko": _want_vals = "11 > 12|12 > 13|10|3|10 > 13|11 > 12"; break;
+                }
+                Scenario_Check("shots_levelup_the_rows_read_by_the_rule_" + _tag, _vals == _want_vals, "vals=" + _vals + " want=" + _want_vals);
+                Scenario_Check("shots_levelup_the_class_growth_rows_are_gold_" + _tag, _gold == _want_gold, "gold=" + _gold);
+                Scenario_Check("shots_levelup_the_legend_is_gold_text_not_the_growth_line_" + _tag, _m.layout.note == Loc_T("levelup.legend", "Gold = your class grows these") && string_pos("growth:", _m.layout.note) == 0, "note=" + string(_m.layout.note));
+                Scenario_TF2RowsFit(_m, "levelup_" + _tag);
+                _s.shot = "shot_ui_levelup_" + _scene + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1101);
             }
             break;
-        case 543:
+        case 1101:
             if (_s.t == 3) {
                 Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
-                Loc_SetLanguage("en");
-                _gs.player_ch.stat_points = 0;
-                _gs.player_ch.card_picks = 0;
                 CardsUi_Close();
-                Scenario_Next(_s, 490);   // H1 (D140, pictures 490..493) goes on; its last step ends the run (Scenario_Finish)
+                _o.si++;
+                if (_o.si >= 3) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Loc_SetLanguage("en");
+                    Scenario_SetWindowScale(3);
+                    _gs.player_ch.levels_owed = 0;
+                    _gs.player_ch.stat_points = 0;
+                    _gs.player_ch.card_picks = 0;
+                    Scenario_Next(_s, 490);   // H1 (D140, pictures 490..493) goes on; its last step ends the run (Scenario_Finish)
+                } else {
+                    Scenario_Next(_s, 1100);
+                }
             }
             break;
     }
@@ -15985,7 +16032,7 @@ function Scenario_StepSmokeLabels(_s) {
                 Status_Add(_g2, STATUS_GUARD, 4, 0);
                 Status_Add(_g2, STATUS_POISON, 0, 0, 3);
                 Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", 0);
-                Ui_MemSet(Ui_MemGlobal(), "tab_status", 0);
+                Ui_MemSet(Ui_MemGlobal(), "tab_status", 2);   // D176: six stats now; from the third row four presses reach the Guard status as before
                 Ui_MemSet(Ui_MemGlobal(), "tab_system", 0);
             }
             if (_s.t == 8) Scenario_Tap("menu");
@@ -16153,7 +16200,7 @@ function Scenario_StepShotsLabels(_s) {
                         Status_Add(_gs.player_ch, STATUS_BURN, 2, 3);
                         Ui_MemSet(Ui_MemGlobal(), "tab_status", 0);
                         Menu_Open(0);
-                        Ui_MenuFixCursor(TabMenu_TopMenu(), 4);   // Guard, with its sentence and its turns left
+                        Ui_MenuFixCursor(TabMenu_TopMenu(), 6);   // Guard, with its sentence and its turns left (after the six stats, D176)
                         break;
                     case "gear":
                         Menu_Open(3);
@@ -16162,7 +16209,7 @@ function Scenario_StepShotsLabels(_s) {
                         Menu_Open(6);
                         TabHelp_Open();
                         TabHelpStats_Open();
-                        Ui_MenuFixCursor(TabMenu_TopMenu(), 8);   // Perfect, with the number from the data
+                        Ui_MenuFixCursor(TabMenu_TopMenu(), 10);   // Perfect, with the number from the data (VIG and MND joined the terms, D176)
                         break;
                 }
             }

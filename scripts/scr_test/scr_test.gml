@@ -166,6 +166,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Title", Test_Suite_R3Title);
     Test_RunSuite("Rarity", Test_Suite_Rarity);
     Test_RunSuite("R3Mouse", Test_Suite_R3Mouse);
+    Test_RunSuite("R3LevelUp", Test_Suite_R3LevelUp);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -292,23 +293,23 @@ function Test_Suite_Stats() {
     Test_Eq("vec mp_2_1_12", Resource_MaxMp(2, 1, 12), 16);
     Test_Eq("vec mp_1_5_4", Resource_MaxMp(1, 5, 4), 16);
     Test_ClassAt("vec cls_knight_1", CLASS_KNIGHT, 1, 11, 12, 10, 3, 10, 11);
-    Test_ClassAt("vec cls_knight_2", CLASS_KNIGHT, 2, 12, 14, 10, 3, 17, 12);
-    Test_ClassAt("vec cls_knight_3", CLASS_KNIGHT, 3, 13, 16, 10, 3, 24, 13);
-    Test_ClassAt("vec cls_knight_5", CLASS_KNIGHT, 5, 15, 20, 10, 3, 38, 15);
-    Test_ClassAt("vec cls_knight_10", CLASS_KNIGHT, 10, 20, 30, 10, 3, 73, 20);
+    Test_ClassAt("vec cls_knight_2", CLASS_KNIGHT, 2, 12, 14, 10, 3, 16, 12);
+    Test_ClassAt("vec cls_knight_3", CLASS_KNIGHT, 3, 13, 16, 10, 3, 22, 13);
+    Test_ClassAt("vec cls_knight_5", CLASS_KNIGHT, 5, 15, 20, 10, 3, 37, 15);
+    Test_ClassAt("vec cls_knight_10", CLASS_KNIGHT, 10, 20, 30, 10, 3, 70, 20);
     Test_ClassAt("vec cls_archer_1", CLASS_ARCHER, 1, 9, 8, 13, 4, 10, 12);
     Test_ClassAt("vec cls_archer_2", CLASS_ARCHER, 2, 11, 8, 14, 4, 16, 14);
     Test_ClassAt("vec cls_archer_3", CLASS_ARCHER, 3, 13, 8, 15, 4, 22, 16);
     Test_ClassAt("vec cls_archer_5", CLASS_ARCHER, 5, 17, 8, 17, 4, 34, 20);
     Test_ClassAt("vec cls_archer_10", CLASS_ARCHER, 10, 27, 8, 22, 4, 64, 30);
     Test_ClassAt("vec cls_mage_1", CLASS_MAGE, 1, 5, 7, 10, 12, 10, 16);
-    Test_ClassAt("vec cls_mage_2", CLASS_MAGE, 2, 5, 7, 10, 15, 15, 19);
-    Test_ClassAt("vec cls_mage_3", CLASS_MAGE, 3, 5, 7, 10, 18, 20, 23);
-    Test_ClassAt("vec cls_mage_5", CLASS_MAGE, 5, 5, 7, 10, 24, 30, 30);
-    Test_ClassAt("vec cls_mage_10", CLASS_MAGE, 10, 5, 7, 10, 39, 55, 47);
+    Test_ClassAt("vec cls_mage_2", CLASS_MAGE, 2, 5, 7, 10, 15, 16, 19);
+    Test_ClassAt("vec cls_mage_3", CLASS_MAGE, 3, 5, 7, 10, 18, 19, 22);
+    Test_ClassAt("vec cls_mage_5", CLASS_MAGE, 5, 5, 7, 10, 24, 28, 28);
+    Test_ClassAt("vec cls_mage_10", CLASS_MAGE, 10, 5, 7, 10, 39, 52, 43);
     Test_ClassAt("vec cls_nobody_1", CLASS_NOBODY, 1, 8, 8, 9, 3, 10, 11);
     Test_ClassAt("vec cls_nobody_2", CLASS_NOBODY, 2, 10, 8, 10, 3, 16, 12);
-    Test_ClassAt("vec cls_nobody_3", CLASS_NOBODY, 3, 11, 9, 10, 4, 22, 14);
+    Test_ClassAt("vec cls_nobody_3", CLASS_NOBODY, 3, 11, 9, 10, 4, 22, 13);
     Test_ClassAt("vec cls_nobody_5", CLASS_NOBODY, 5, 14, 10, 11, 5, 34, 16);
     Test_ClassAt("vec cls_nobody_10", CLASS_NOBODY, 10, 22, 12, 14, 7, 64, 22);
     Test_Eq("vec exp_1", Exp_NextLevel(1), 12);
@@ -354,7 +355,7 @@ function Test_Suite_Stats() {
     var _tank = CharacterCreate_Player(CLASS_KNIGHT); _tank.stats.def = 30;
     Test_True("STAT-01 more DEF takes less damage", Combat_Damage(EnemyCreate(ENEMY_FINAL_BOSS), _tank, Test_Wpn(9, STAT_ATK, 0)) < Combat_Damage(EnemyCreate(ENEMY_FINAL_BOSS), _lo, Test_Wpn(9, STAT_ATK, 0)));
     var _wiz = CharacterCreate_Player(CLASS_KNIGHT); _wiz.stats.mag = 21; _wiz = RecomputeResources(_wiz);
-    Test_True("STAT-01 more MAG gives more max MP", _wiz.max_mp > _lo.max_mp);
+    Test_Eq("STAT-01 more MAG gives no max MP (D176: MND does)", _wiz.max_mp, _lo.max_mp);
     Test_True("STAT-01 more MAG gives more spell damage", Combat_Damage(_wiz, EnemyCreate(ENEMY_SLIME), Test_Wpn(10, STAT_MAG, 0)) > Combat_Damage(_lo, EnemyCreate(ENEMY_SLIME), Test_Wpn(10, STAT_MAG, 0)));
     Test_True("STAT-01 SPD decides who acts first (Archer 13 vs Slime 9)", Combat_PlayerActsFirst(Combat_EffectiveStat(CharacterCreate_Player(CLASS_ARCHER), STAT_SPD), Combat_EffectiveStat(EnemyCreate(ENEMY_SLIME), STAT_SPD)));
     Test_True("STAT-01 SPD decides who acts first (Knight 10 vs Slime 9, D111)", Combat_PlayerActsFirst(Combat_EffectiveStat(_lo, STAT_SPD), Combat_EffectiveStat(EnemyCreate(ENEMY_SLIME), STAT_SPD)));
@@ -2465,7 +2466,7 @@ function Test_Suite_Export() {
     Test_True("Export: status ids are unique", Export_IdsUnique(_back.statuses));
     Test_False("Export: duplicate ids are detected", Export_IdsUnique([{ id: 1 }, { id: 1 }]));
     Test_Eq("Export: level table row 1 needs 12 EXP", _back.levels[0].exp_next, 12);
-    Test_Eq("Export: Knight level 10 HP matches the vector (73)", _back.classes[1].by_level[9].hp, 73);
+    Test_Eq("Export: Knight level 10 HP matches the vector (70, D176)", _back.classes[1].by_level[9].hp, 70);
     Test_Eq("Export: constants carry the power scale", _back.constants.power_scale, 2);
     Test_Eq("Export: the final boss exports its basic power (14, D111)", _back.enemies[9].basic_power, 14);
     Test_False("Export: no asset references leak into the data", string_pos("sprite", json_stringify(_back.enemies)) > 0);
@@ -5594,7 +5595,7 @@ function Test_Suite_Cards() {
     var _auto = LevelUp_ApplyLevel(Test_CardPlayer(CLASS_KNIGHT));
     Test_True("C2 outside a run (tests, tools) the point is still auto-placed", Level_AutoPlaceEnabled() && _auto.stat_points == 0);
     var _opts = Cards_StatOptions(Test_CardPlayer(CLASS_KNIGHT));
-    Test_True("C2 the stat prompt offers ATK, DEF, SPD, MAG with from > to values", array_length(_opts) == 4 && _opts[0].stat == STAT_ATK && _opts[3].stat == STAT_MAG && _opts[0].to == _opts[0].from + 1);
+    Test_True("C2 the stat prompt offers ATK, DEF, SPD, MAG, VIG, MND with from > to values", array_length(_opts) == 6 && _opts[0].stat == STAT_ATK && _opts[3].stat == STAT_MAG && _opts[5].stat == STAT_MND && _opts[0].to == _opts[0].from + 1);
 
     // chests (D73, fixes I-057): the first class or skill chest gives the class choice, later ones a pick
     var _fresh = Test_CardPlayer(CLASS_NOBODY);
@@ -5789,7 +5790,8 @@ function Test_Suite_BattleUi() {
     _lv = Player_AddExp(_lv, 200);
     var _lv_before = { level: _lv.level, max_hp: _lv.max_hp, hp: _lv.hp, atk: _lv.stats.atk, def: _lv.stats.def, spd: _lv.stats.spd, mag: _lv.stats.mag };
     Test_True("BattleUi (I-065) 200 EXP levels the Knight up", _lv_before.level >= 3);
-    Test_Eq("BattleUi (I-065) max HP follows the level: base 10 + 7 per level", _lv_before.max_hp, 10 + (_lv_before.level - 1) * 7);
+    Test_Eq("BattleUi (I-065) 200 EXP is level 5 for a Knight", _lv_before.level, 5);
+    Test_Eq("BattleUi (I-065) max HP follows the level: a Knight at level 5 has VIG 19 and 37 Max HP (D176)", _lv_before.max_hp, 37);
     var _lv2 = Player_NormalizeProgression(_lv, true);
     Test_Eq("BattleUi (I-065) normalising keeps the level", _lv2.level, _lv_before.level);
     Test_Eq("BattleUi (I-065) normalising keeps max HP", _lv2.max_hp, _lv_before.max_hp);
@@ -5976,14 +5978,17 @@ function Test_Suite_TabMenu() {
     Test_Eq("D115 a row you cannot afford is the light green", Ui_RowColor(false, true, true), UI_C_LIGHT);
     Test_Eq("D115 a greyed row is the dark green", Ui_RowColor(false, false, false), UI_C_DARK);
 
-    // ---- Status: ATK DEF SPD MAG with plain descriptions, then statuses ----
+    // ---- Status: ATK DEF SPD MAG VIG MND with plain descriptions, then statuses ----
     var _k = CharacterCreate_Player(CLASS_KNIGHT);
     var _base_atk = _k.stats.atk;
     var _st = TabStatus_Items(_k);
-    Test_Eq("D90 Status lists ATK, DEF, SPD, MAG first", _st[0].label + _st[1].label + _st[2].label + _st[3].label, "ATKDEFSPDMAG");
+    Test_Eq("D90 Status lists ATK, DEF, SPD, MAG, VIG, MND first", _st[0].label + _st[1].label + _st[2].label + _st[3].label + _st[4].label + _st[5].label, "ATKDEFSPDMAGVIGMND");
     Test_Eq("D90 Status shows the character's ATK", _st[0].value, string(_base_atk));
     Test_Eq("D90 Status ATK has a plain description", _st[0].help, Loc_T("menu.tooltip.stat.atk.desc", "Increases physical damage (basic attacks and ATK skills)."));
-    Test_Eq("D90 a character with no status has four rows", array_length(_st), 4);
+    Test_Eq("D90 a character with no status has six rows (D176: VIG and MND)", array_length(_st), 6);
+    Test_Eq("levelup status: VIG shows 10 with Max HP 10 as its number line", _st[4].value + "/" + Test_RowValue(_st[4].lines, Loc_T("tab.lbl.max_hp", "Max HP")), "10/10");
+    Test_Eq("levelup status: MND shows 11 with Max MP 11 as its number line", _st[5].value + "/" + Test_RowValue(_st[5].lines, Loc_T("tab.lbl.max_mp", "Max MP")), "11/11");
+    Test_True("levelup status: VIG and MND have a plain description each", string_length(_st[4].help) > 0 && string_length(_st[5].help) > 0 && _st[4].help != _st[5].help);
     _k.inventory = Inv_Add(_k.inventory, 40, 1);
     Test_True("D92 the Copper Ring (ATK +1) equips in the accessory slot", Equip_Item(_k, 40) && Equip_SlotGet(_k, "accessory") == 40);
     _st = TabStatus_Items(_k);
@@ -5992,8 +5997,8 @@ function Test_Suite_TabMenu() {
     Test_Eq("D100 Status ATK shows the base", Test_RowValue(_st[0].lines, Loc_T("tab.lbl.base", "Base")), string(_base_atk));
     _k = Status_Add(_k, STATUS_POISON, 0, 0, 2);
     _st = TabStatus_Items(_k);
-    Test_Eq("D90 a status is listed after the four stats", array_length(_st), 5);
-    Test_Eq("D90 the status row is the status's name", _st[4].label, StatusDB_Get(STATUS_POISON).name);
+    Test_Eq("D90 a status is listed after the six stats", array_length(_st), 7);
+    Test_Eq("D90 the status row is the status's name", _st[6].label, StatusDB_Get(STATUS_POISON).name);
 
     // ---- Skills: the equipped skills with MP, arrows and numbers from the data (D100); passives after them ----
     var _sk = CharacterCreate_Player(CLASS_KNIGHT);
@@ -7552,7 +7557,7 @@ function Test_Suite_FairRng() {
     Test_True("R1 D123: floor 6 with 10 free slots always has exactly 2 elites", _two_ok);
 
     // ---- D125: run save version 2 ----
-    Test_Eq("R1 D125: the run save version is 3 (saves1: summary fields)", RUN_SAVE_VERSION, 3);
+    Test_Eq("R1 D125: the run save version is 4 (D176: VIG and MND)", RUN_SAVE_VERSION, 4);
 
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }
@@ -8375,7 +8380,7 @@ function Test_BagsGold() {
     _gs.run = Run_Create(2);
     RunSave_ApplyState(_old);
     Test_True("D126 gold: a save without the bags loads with empty ones", variable_struct_exists(_gs.run, "gold_bag") && is_array(_gs.run.gold_bag) && array_length(_gs.run.gold_bag) == 0);
-    Test_Eq("D126 gold: the run save version is 3 (saves1: summary fields)", RUN_SAVE_VERSION, 3);
+    Test_Eq("D126 gold: the run save version is 4 (D176: VIG and MND)", RUN_SAVE_VERSION, 4);
 }
 
 function Test_BagsFind() {
@@ -9041,7 +9046,7 @@ function Test_Suite_EchoAfterClass() {
     var _gm_first = variable_struct_exists(_gm, "echo_offer") && array_length(_gm.echo_offer) > 0 ? _gm.echo_offer[0].id : -998;
     Test_Eq("D130 run save: the same first option", (variable_struct_exists(_back, "echo_offer") && array_length(_back.echo_offer) > 0) ? _back.echo_offer[0].id : -999, _gm_first);
     Test_Eq("D130 run save: the loaded character is still owed the pick", Cards_NextOwed(_back), "echo");
-    Test_Eq("D130 run save: the version is 3 (saves1: summary fields)", RUN_SAVE_VERSION, 3);
+    Test_Eq("D130 run save: the version is 4 (D176: VIG and MND)", RUN_SAVE_VERSION, 4);
     _gs.player_ch = _old_pl;
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }
@@ -9991,52 +9996,37 @@ function Test_Suite_LevelUpGrowth() {
     if (_own) global.display = { layout: Display_CalcLayout(480, 432), apply_count: 0 };
     var _f0 = draw_get_font();
 
-    // ---- the growth line, class by class ----
-    Test_Eq("D143 Knight growth line", LevelUp_GrowthText(CLASS_KNIGHT, 2), "Knight growth: ATK +1, DEF +1");
-    Test_Eq("D143 Knight growth line is the same at level 7", LevelUp_GrowthText(CLASS_KNIGHT, 7), "Knight growth: ATK +1, DEF +1");
-    Test_Eq("D143 Archer growth line", LevelUp_GrowthText(CLASS_ARCHER, 2), "Archer growth: ATK +1, SPD +1");
-    Test_Eq("D143 Mage growth line", LevelUp_GrowthText(CLASS_MAGE, 2), "Mage growth: MAG +2");
-    // Nobody rotates (D83/D111): the point that cycles ATK, DEF, SPD, MAG from level 2, plus the one two steps further on
-    Test_Eq("D143 Nobody growth line at level 2", LevelUp_GrowthText(CLASS_NOBODY, 2), "Nobody growth: ATK +1, SPD +1");
-    Test_Eq("D143 Nobody growth line at level 3", LevelUp_GrowthText(CLASS_NOBODY, 3), "Nobody growth: DEF +1, MAG +1");
-    Test_Eq("D143 Nobody growth line at level 4", LevelUp_GrowthText(CLASS_NOBODY, 4), "Nobody growth: ATK +1, SPD +1");
-    Test_Eq("D143 Nobody growth line at level 5", LevelUp_GrowthText(CLASS_NOBODY, 5), "Nobody growth: DEF +1, MAG +1");
-    Test_Eq("D143 an unknown class has no growth line", LevelUp_GrowthText(99, 2), "");
-    Loc_SetLanguage("ko");
-    Test_True("D143 the growth line resolves in Korean, not the English fallback", Loc_GetRaw("levelup.growth", "ko") != "{class} growth: {gains}" && Loc_GetRaw("levelup.growth", "ko") != "");
-    Test_True("D143 the Korean growth line is not the English one", LevelUp_GrowthText(CLASS_KNIGHT, 2) != "Knight growth: ATK +1, DEF +1");
-    Loc_SetLanguage("en");
+    // ---- the growth is the gold rows of the screen now (D177), not a line of text: Test_LvScreen checks them class by class ----
 
-    // ---- the free-point menu: the four stats, then Max HP +3 and Max MP +2 ----
+    // ---- the free-point menu: ATK DEF SPD MAG VIG MND (D176: VIG and MND replace the Max HP +3 / Max MP +2 rows) ----
     var _kn = Test_CardPlayer(CLASS_KNIGHT);
     var _opts = Cards_FreePointOptions(_kn);
     Test_Eq("D143 the free-point menu has six rows", array_length(_opts), 6);
     Test_True("D143 the first four rows are ATK, DEF, SPD, MAG", _opts[0].stat == STAT_ATK && _opts[1].stat == STAT_DEF && _opts[2].stat == STAT_SPD && _opts[3].stat == STAT_MAG);
-    Test_True("D143 the fifth row is Max HP +3, the sixth Max MP +2", _opts[4].stat == FREE_POINT_MAX_HP && _opts[5].stat == FREE_POINT_MAX_MP);
-    Test_Eq("D143 Max HP row label", _opts[4].label, "Max HP +3");
-    Test_Eq("D143 Max MP row label", _opts[5].label, "Max MP +2");
-    Test_True("D143 the Max HP row shows the max HP now and after (+3)", _opts[4].from == _kn.max_hp && _opts[4].to == _kn.max_hp + 3);
-    Test_True("D143 the Max MP row shows the max MP now and after (+2)", _opts[5].from == _kn.max_mp && _opts[5].to == _kn.max_mp + 2);
+    Test_True("D143 the fifth row is VIG, the sixth MND (D176)", _opts[4].stat == STAT_VIG && _opts[5].stat == STAT_MND);
+    Test_Eq("D143 VIG row label", _opts[4].label, "VIG");
+    Test_Eq("D143 MND row label", _opts[5].label, "MND");
+    Test_True("D143 the VIG row shows VIG now and after (+1)", _opts[4].from == _kn.stats.vig && _opts[4].to == _kn.stats.vig + 1);
+    Test_True("D143 the MND row shows MND now and after (+1)", _opts[5].from == _kn.stats.mnd && _opts[5].to == _kn.stats.mnd + 1);
 
-    // ---- placing the point on Max HP / Max MP ----
+    // ---- placing the point on VIG / MND ----
     var _hp = Test_CardPlayer(CLASS_KNIGHT);
     _hp.stat_points = 1;
     _hp.hp = _hp.max_hp - 5;
     var _hp_max0 = _hp.max_hp;
     var _hp_cur0 = _hp.hp;
     var _hp_atk0 = _hp.stats.atk;
-    var _hp2 = Cards_PlaceStat(_hp, FREE_POINT_MAX_HP);
-    Test_Eq("D143 a point on Max HP raises max HP by 3", _hp2.max_hp, _hp_max0 + 3);
-    Test_Eq("D143 a point on Max HP raises current HP by 3", _hp2.hp, _hp_cur0 + 3);
-    Test_Eq("D143 the Max HP point is spent", _hp2.stat_points, 0);
-    Test_Eq("D143 the Max HP point leaves the stats alone", _hp2.stats.atk, _hp_atk0);
-    var _hp3 = Cards_PlaceStat(_hp2, FREE_POINT_MAX_HP);
-    Test_True("D143 with no point left a second Max HP placement does nothing", _hp3.max_hp == _hp_max0 + 3 && _hp3.hp == _hp_cur0 + 3 && _hp3.stat_points == 0);
+    var _hp2 = Cards_PlaceStat(_hp, STAT_VIG);
+    Test_Eq("D143 a point on VIG raises max HP by 3", _hp2.max_hp, _hp_max0 + 3);
+    Test_Eq("D143 a point on VIG raises current HP by 3", _hp2.hp, _hp_cur0 + 3);
+    Test_Eq("D143 the VIG point is spent", _hp2.stat_points, 0);
+    Test_Eq("D143 the VIG point leaves the other stats alone", _hp2.stats.atk, _hp_atk0);
+    var _hp3 = Cards_PlaceStat(_hp2, STAT_VIG);
+    Test_True("D143 with no point left a second VIG placement does nothing", _hp3.max_hp == _hp_max0 + 3 && _hp3.hp == _hp_cur0 + 3 && _hp3.stat_points == 0);
     var _hp_re = RecomputeResources(variable_clone(_hp2));
-    Test_Eq("D143 the Max HP bonus survives a resource recompute (a load, a level-up)", _hp_re.max_hp, _hp_max0 + 3);
-    var _hp_lvl0 = _hp2.level;   // LevelUp_ApplyLevel changes the struct it is given
+    Test_Eq("D143 the VIG point survives a resource recompute (a load, a level-up)", _hp_re.max_hp, _hp_max0 + 3);
     var _hp_lv = LevelUp_ApplyLevel(_hp2);
-    Test_Eq("D143 the Max HP bonus is kept on the next level", _hp_lv.max_hp, Resource_MaxHp(_hp_lv.class_cfg.hd, _hp_lvl0 + 1) + 3);
+    Test_Eq("D143 the VIG point is kept on the next level (VIG 11 + 2)", _hp_lv.max_hp, Resource_MaxHpOfVig(13));
 
     var _mp = Test_CardPlayer(CLASS_KNIGHT);
     _mp.stat_points = 1;
@@ -10044,13 +10034,13 @@ function Test_Suite_LevelUpGrowth() {
     var _mp_max0 = _mp.max_mp;
     var _mp_cur0 = _mp.mp;
     var _mp_hp0 = _mp.max_hp;
-    var _mp2 = Cards_PlaceStat(_mp, FREE_POINT_MAX_MP);
-    Test_Eq("D143 a point on Max MP raises max MP by 2", _mp2.max_mp, _mp_max0 + 2);
-    Test_Eq("D143 a point on Max MP raises current MP by 2", _mp2.mp, _mp_cur0 + 2);
-    Test_Eq("D143 the Max MP point is spent", _mp2.stat_points, 0);
-    Test_Eq("D143 the Max MP point leaves max HP alone", _mp2.max_hp, _mp_hp0);
-    var _mp3 = Cards_PlaceStat(_mp2, FREE_POINT_MAX_MP);
-    Test_True("D143 with no point left a second Max MP placement does nothing", _mp3.max_mp == _mp_max0 + 2 && _mp3.mp == _mp_cur0 + 2);
+    var _mp2 = Cards_PlaceStat(_mp, STAT_MND);
+    Test_Eq("D143 a point on MND raises max MP by 1", _mp2.max_mp, _mp_max0 + 1);
+    Test_Eq("D143 a point on MND raises current MP by 1", _mp2.mp, _mp_cur0 + 1);
+    Test_Eq("D143 the MND point is spent", _mp2.stat_points, 0);
+    Test_Eq("D143 the MND point leaves max HP alone", _mp2.max_hp, _mp_hp0);
+    var _mp3 = Cards_PlaceStat(_mp2, STAT_MND);
+    Test_True("D143 with no point left a second MND placement does nothing", _mp3.max_mp == _mp_max0 + 1 && _mp3.mp == _mp_cur0 + 1);
 
     // a plain stat point still works as before
     var _st = Test_CardPlayer(CLASS_MAGE);
@@ -10061,11 +10051,11 @@ function Test_Suite_LevelUpGrowth() {
 
     // ---- the screen shows the growth line and the six rows ----
     _gs.run = Run_Create(5);
-    var _lv = LevelUp_ApplyLevel(Test_CardPlayer(CLASS_KNIGHT));
+    var _lv = Player_AddExp(Test_CardPlayer(CLASS_KNIGHT), Exp_NextLevel(1));   // D177: a level won in a run is owed until the screen is answered
     _gs.player_ch = _lv;
     var _menu = CardsUi_StatMenu();
     Test_Eq("D143 the free-point screen has six rows", array_length(_menu.items), 6);
-    Test_Eq("D143 the free-point screen shows the class growth line", _menu.layout.note, "Knight growth: ATK +1, DEF +1");
+    Test_Eq("D143 the free-point screen shows the gold legend (D177), no longer the class growth line", _menu.layout.note, "Gold = your class grows these");
     Test_Eq("D143 the free-point screen still opens first when a point is owed", Cards_NextOwed(_lv), "stat");
     var _mt = Ui_Metrics();
     var _mc = Ui_MenuMeasure(_menu, _mt);
@@ -10076,8 +10066,8 @@ function Test_Suite_LevelUpGrowth() {
     _vic.exp = _vic.exp_next - 1;
     var _slime = EnemyCreate(ENEMY_SLIME);
     var _rw = Battle_GrantRewards(_vic, _slime);
-    var _auto = LevelUp_AutoGainSummary(_rw.player);
-    Test_True("D143 (setup) the victory levelled the Knight up and the summary is not empty", _rw.levels_gained >= 1 && _auto != "");
+    var _auto = "ATK +1, DEF +1";   // what a Knight's level-up gives (the screen shows it; the text must not)
+    Test_True("D143 (setup) the victory won a level (owed until the screen, D177: nothing applied, so no gain summary yet)", _rw.levels_gained >= 1 && LevelUp_AutoGainSummary(_rw.player) == "" && _rw.player.level == _vic.level);
     var _lines = Battle_BuildVictoryDialogueLines(_slime, _rw, _rw.player);
     var _txt = "";
     for (var _i = 0; _i < array_length(_lines); _i++) _txt += is_struct(_lines[_i]) ? _lines[_i].text : string(_lines[_i]);
@@ -10090,7 +10080,7 @@ function Test_Suite_LevelUpGrowth() {
     variable_struct_remove(_gs, "run");
     var _auto_ch = LevelUp_ApplyLevel(Test_CardPlayer(CLASS_KNIGHT));
     Test_True("D143 outside a run the free point is still auto-placed on the class stat", Level_AutoPlaceEnabled() && _auto_ch.stat_points == 0 && _auto_ch.stats.def == Test_CardPlayer(CLASS_KNIGHT).stats.def + 2);
-    Test_Eq("D143 outside a run the auto-placed point does not touch max HP beyond the level", _auto_ch.max_hp, Resource_MaxHp(_auto_ch.class_cfg.hd, 2));
+    Test_Eq("D143 outside a run the auto-placed point does not touch max HP beyond the level (VIG 12 = 16)", _auto_ch.max_hp, Resource_MaxHpOfVig(12));
 
     _gs.player_ch = _old_player;
     if (_had_run) _gs.run = _old_run;
@@ -13784,21 +13774,19 @@ function Test_Suite_Hunt7Prog() {
     // ---- 4. P3: a level-up that gives several levels steps through each level's growth (D143) ----
     _gs.run = Run_Create(31);
     var _lvn = CharacterCreate_Player(CLASS_NOBODY);
-    _lvn.exp = Exp_NextLevel(1) + Exp_NextLevel(2);
-    _lvn = LevelUp_FromExp(_lvn);
-    Test_True("h7prog levelup: (setup) one fight took the Nobody from level 1 to 3 with two points owed", _lvn.level == 3 && _lvn.stat_points == 2);
+    _lvn = Player_AddExp(_lvn, Exp_NextLevel(1) + Exp_NextLevel(2));
+    Test_True("h7prog levelup: (setup) one fight owes the Nobody two levels (D177: he is still level 1 until the screens are answered)", _lvn.level == 1 && _lvn.levels_owed == 2);
     _gs.player_ch = _lvn;
     var _m1 = CardsUi_StatMenu();
     Test_Eq("h7prog levelup: the first prompt is level 2", _m1.layout.title, "Level 2: Place 1 Point");
-    Test_Eq("h7prog levelup: with level 2's growth", _m1.layout.note, "Nobody growth: ATK +1, SPD +1");
+    Test_Eq("h7prog levelup: with level 2's growth rows gold (ATK, SPD, VIG, MND)", Test_LvGoldRows(_m1), "ATK,SPD,VIG,MND");
     _lvn = Cards_PlaceStat(_lvn, STAT_ATK);
     _gs.player_ch = _lvn;
     var _m2 = CardsUi_StatMenu();
     Test_Eq("h7prog levelup: the second prompt is level 3", _m2.layout.title, "Level 3: Place 1 Point");
-    Test_Eq("h7prog levelup: with level 3's growth", _m2.layout.note, "Nobody growth: DEF +1, MAG +1");
+    Test_Eq("h7prog levelup: with level 3's growth rows gold (DEF, MAG, VIG, MND)", Test_LvGoldRows(_m2), "DEF,MAG,VIG,MND");
     var _lvk = CharacterCreate_Player(CLASS_KNIGHT);
-    _lvk.exp = Exp_NextLevel(1) + Exp_NextLevel(2) + Exp_NextLevel(3);
-    _lvk = LevelUp_FromExp(_lvk);
+    _lvk = Player_AddExp(_lvk, Exp_NextLevel(1) + Exp_NextLevel(2) + Exp_NextLevel(3));
     _gs.player_ch = _lvk;
     var _ttl = [];
     for (var _p = 0; _p < 3; _p++) {
@@ -15077,7 +15065,7 @@ function Test_ProfPutRun(_path, _ver, _seed, _cls, _level, _floor, _ms, _saved) 
 
 function Test_ProfVersions() {
     Test_Eq("profiles: PROFILE_VERSION is 3 (adds name)", PROFILE_VERSION, 3);
-    Test_Eq("profiles: RUN_SAVE_VERSION is 3 (adds the summary fields)", RUN_SAVE_VERSION, 3);
+    Test_Eq("profiles: RUN_SAVE_VERSION is 4 (adds VIG and MND)", RUN_SAVE_VERSION, 4);
     Test_Eq("profiles: the default profile has an empty name until the index gives one", Profile_Default().name, "");
     Test_Eq("profiles: a v3 profile keeps its name copy", Profile_Normalize({ profile_version: 3, name: "Zed" }).name, "Zed");
     Test_Eq("profiles: a v2 profile has no name (the index is authoritative)", Profile_Normalize({ profile_version: 2, deaths: 1 }).name, "");
@@ -15085,18 +15073,20 @@ function Test_ProfVersions() {
     var _v1 = json_parse(Test_ProfRunText(1, 5, CLASS_KNIGHT, 3, 2, 9000, 40));
     var _v3 = json_parse(Test_ProfRunText(3, 5, CLASS_KNIGHT, 3, 2, 9000, 40));
     var _v4 = json_parse(Test_ProfRunText(4, 5, CLASS_KNIGHT, 3, 2, 9000, 40));
+    var _v5 = json_parse(Test_ProfRunText(5, 5, CLASS_KNIGHT, 3, 2, 9000, 40));
     Test_Eq("profiles: a v2 run file is still ok (migrated, not refused)", RunSave_Check(_v2), "ok");
     Test_Eq("profiles: a v3 run file is ok", RunSave_Check(_v3), "ok");
     Test_Eq("profiles: a v1 run file is old", RunSave_Check(_v1), "old");
-    Test_Eq("profiles: a run file one version ahead is newer", RunSave_Check(_v4), "newer");
+    Test_Eq("profiles: a v4 run file is ok (D176)", RunSave_Check(_v4), "ok");
+    Test_Eq("profiles: a run file one version ahead is newer", RunSave_Check(_v5), "newer");
     Test_True("profiles: a v2 run file passes the write validator", RunSave_IsCurrentRaw(_v2));
-    // loading a v2 file migrates it in memory: it comes back as version 3 with a summary block derived from what the file has
+    // loading a v2 file migrates it in memory: it comes back as the current version (4, D176) with a summary block derived from what the file has
     var _f = "test_prof_v2_run.sav";
     Save_DeleteFileSet(_f);
     Test_RawWrite(_f, Test_ProfRunText(2, 5, CLASS_KNIGHT, 3, 2, 9000, 40));
     var _l = RunSave_LoadFrom(_f);
     Test_Eq("profiles: a v2 run file loads with status ok", _l.status, "ok");
-    Test_Eq("profiles: and comes back as version 3", _l.status == "ok" ? _l.run.run_version : -1, 3);
+    Test_Eq("profiles: and comes back as version 4", _l.status == "ok" ? _l.run.run_version : -1, 4);
     Test_True("profiles: with a summary block", _l.status == "ok" && variable_struct_exists(_l.run, "summary") && is_struct(_l.run.summary));
     if (_l.status == "ok" && variable_struct_exists(_l.run, "summary")) {
         Test_Eq("profiles: derived summary class", _l.run.summary.class_id, CLASS_KNIGHT);
@@ -15513,7 +15503,7 @@ function Test_ProfRunSummary() {
         Test_Eq("run summary: seed", _s.seed, 12345);
         Test_Eq("run summary: saved at matches the save", _s.saved_at, _raw.statData.saved_at);
     }
-    Test_Eq("run summary: the file says version 3", _raw.run_version, 3);
+    Test_Eq("run summary: the file says version 4 (D176)", _raw.run_version, 4);
     _gs.checkpoint = _old_cp;
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }
@@ -16321,7 +16311,7 @@ function Test_R3s2State(_p) {
 function Test_R3s2Rows(_p) {
     var _t = date_create_datetime(2026, 10, 16, 14, 5, 0);
     Test_ProfPutRun(_p + "run_0_0.sav", 3, 21, CLASS_KNIGHT, 3, 2, 9000, _t);
-    Test_RawWrite(_p + "run_0_1.sav", Test_ProfRunText(4, 22, CLASS_MAGE, 3, 2, 9000, _t));   // a version this build does not know: "newer" (written raw: the atomic writer would refuse it)
+    Test_RawWrite(_p + "run_0_1.sav", Test_ProfRunText(5, 22, CLASS_MAGE, 3, 2, 9000, _t));   // a version this build does not know: "newer" (written raw: the atomic writer would refuse it)
     var _rows = Title_SlotRows(Slots_Summary(0), "load");
     Test_Eq("saves2 rows: one row per save file", array_length(_rows), 3);
     Test_Eq("saves2 rows: the first label", _rows[0].label, "Save 1");
@@ -17540,4 +17530,547 @@ function Test_R3MouseScreens() {
     _s.wheel = -1;
     Ui_MenuStep(_sy, _s, 70000);
     Test_Eq("r3mouse screens: the wheel scrolls a list (down = next row)", _sy.cursor, 2);
+}
+
+// ==========================================================================================================================
+// R3 levelup (D176, D177, D184; owner notes 14, 15, 16): VIG and MND stats, level gains on confirm, the level-up screen.
+// Expected numbers come from tools/balance/vig_mnd.py (the table in E:\Temp\dd-briefs\out\vig-mnd-table.md), written before the GML.
+// ==========================================================================================================================
+function Test_Suite_R3LevelUp() {
+    Test_LvCurves();
+    Test_LvClassTable();
+    Test_LvStatRules();
+    Test_LvMigration();
+    Test_LvDeferred();
+    Test_LvScreen();
+    Test_LvTextFit();
+}
+
+// A class at a level with its free point on the class's usual stat (auto-placed outside a run): VIG, MND, Max HP, Max MP.
+function Test_LvAt(_name, _class, _level, _vig, _mnd, _hp, _mp) {
+    var _c = CharacterCreate_Player(_class);
+    for (var _i = 1; _i < _level; _i++) _c = LevelUp_ApplyLevel(_c);
+    Test_Eq(_name + " level", _c.level, _level);
+    Test_Eq(_name + " VIG", _c.stats.vig, _vig);
+    Test_Eq(_name + " MND", _c.stats.mnd, _mnd);
+    Test_Eq(_name + " max HP", _c.max_hp, _hp);
+    Test_Eq(_name + " max MP", _c.max_mp, _mp);
+}
+
+// Every free point put on VIG (or MND) from level 2 to 10, the way a player in a run places it.
+function Test_LvDump(_class, _stat) {
+    var _c = CharacterCreate_Player(_class);
+    global.levelup_auto_place = false;
+    for (var _i = 2; _i <= 10; _i++) {
+        _c = LevelUp_ApplyLevel(_c);
+        _c = Cards_PlaceStat(_c, _stat);
+    }
+    global.levelup_auto_place = true;
+    return _c;
+}
+
+function Test_LvCurves() {
+    // Max HP from VIG: 3 per point above 10 up to VIG 28, then 2 up to VIG 38, then 1
+    Test_Eq("levelup curve: VIG 10 is Max HP 10", Resource_MaxHpOfVig(10), 10);
+    Test_Eq("levelup curve: VIG 12 is Max HP 16", Resource_MaxHpOfVig(12), 16);
+    Test_Eq("levelup curve: VIG 28 is Max HP 64 (the last full point)", Resource_MaxHpOfVig(28), 64);
+    Test_Eq("levelup curve: VIG 31 is Max HP 70 (soft cap: 2 a point)", Resource_MaxHpOfVig(31), 70);
+    Test_Eq("levelup curve: VIG 38 is Max HP 84", Resource_MaxHpOfVig(38), 84);
+    Test_Eq("levelup curve: VIG 39 is Max HP 85 (soft cap: 1 a point)", Resource_MaxHpOfVig(39), 85);
+    Test_Eq("levelup curve: VIG 50 is Max HP 96", Resource_MaxHpOfVig(50), 96);
+    Test_Eq("levelup curve: VIG below 10 is no less than 10", Resource_MaxHpOfVig(4), 10);
+    // Max MP from MND: 1 per point above 10 up to MND 44, then 1/2 up to 56, then 1/4 (floored)
+    Test_Eq("levelup curve: MND 11 is Max MP 11", Resource_MaxMpOfMnd(11), 11);
+    Test_Eq("levelup curve: MND 16 is Max MP 16", Resource_MaxMpOfMnd(16), 16);
+    Test_Eq("levelup curve: MND 44 is Max MP 44", Resource_MaxMpOfMnd(44), 44);
+    Test_Eq("levelup curve: MND 45 is still Max MP 44 (half a point)", Resource_MaxMpOfMnd(45), 44);
+    Test_Eq("levelup curve: MND 46 is Max MP 45", Resource_MaxMpOfMnd(46), 45);
+    Test_Eq("levelup curve: MND 56 is Max MP 50", Resource_MaxMpOfMnd(56), 50);
+    Test_Eq("levelup curve: MND 60 is Max MP 51 (a quarter a point)", Resource_MaxMpOfMnd(60), 51);
+}
+
+function Test_LvClassTable() {
+    // class growth on reaching a level: VIG and MND next to ATK DEF SPD MAG
+    var _g = LevelUp_ClassGrowthGain(CLASS_KNIGHT, 2);
+    Test_True("levelup growth: Knight L2 is ATK+1 DEF+1 VIG+2 MND+1", _g.atk == 1 && _g.def == 1 && _g.spd == 0 && _g.mag == 0 && _g.vig == 2 && _g.mnd == 1);
+    Test_Eq("levelup growth: Knight VIG L3", LevelUp_ClassGrowthGain(CLASS_KNIGHT, 3).vig, 2);
+    Test_Eq("levelup growth: Knight VIG L4 is +3", LevelUp_ClassGrowthGain(CLASS_KNIGHT, 4).vig, 3);
+    Test_Eq("levelup growth: Knight VIG L7 is +3", LevelUp_ClassGrowthGain(CLASS_KNIGHT, 7).vig, 3);
+    Test_Eq("levelup growth: Knight VIG L10 is +3", LevelUp_ClassGrowthGain(CLASS_KNIGHT, 10).vig, 3);
+    _g = LevelUp_ClassGrowthGain(CLASS_ARCHER, 6);
+    Test_True("levelup growth: Archer is ATK+1 SPD+1 VIG+2 MND+2", _g.atk == 1 && _g.def == 0 && _g.spd == 1 && _g.mag == 0 && _g.vig == 2 && _g.mnd == 2);
+    _g = LevelUp_ClassGrowthGain(CLASS_MAGE, 2);
+    Test_True("levelup growth: Mage L2 is MAG+2 VIG+2 MND+3", _g.atk == 0 && _g.mag == 2 && _g.vig == 2 && _g.mnd == 3);
+    Test_Eq("levelup growth: Mage VIG on an odd level is only +1", LevelUp_ClassGrowthGain(CLASS_MAGE, 3).vig, 1);
+    Test_Eq("levelup growth: Mage VIG on level 10 is +2", LevelUp_ClassGrowthGain(CLASS_MAGE, 10).vig, 2);
+    Test_Eq("levelup growth: Nobody VIG is +2", LevelUp_ClassGrowthGain(CLASS_NOBODY, 7).vig, 2);
+    Test_Eq("levelup growth: Nobody MND L2 is +1", LevelUp_ClassGrowthGain(CLASS_NOBODY, 2).mnd, 1);
+    Test_Eq("levelup growth: Nobody MND L5 is +2", LevelUp_ClassGrowthGain(CLASS_NOBODY, 5).mnd, 2);
+    Test_Eq("levelup growth: Nobody MND L6 is +1", LevelUp_ClassGrowthGain(CLASS_NOBODY, 6).mnd, 1);
+    Test_Eq("levelup growth: Nobody MND L9 is +2", LevelUp_ClassGrowthGain(CLASS_NOBODY, 9).mnd, 2);
+    Test_Eq("levelup growth: a class with no growth has no VIG", LevelUp_ClassGrowthGain(99, 2).vig, 0);
+    // the table: VIG, MND, Max HP, Max MP per class at levels 1, 2, 3, 5, 10 (the free point on the class's usual stat)
+    Test_LvAt("levelup table knight 1", CLASS_KNIGHT, 1, 10, 11, 10, 11);
+    Test_LvAt("levelup table knight 2", CLASS_KNIGHT, 2, 12, 12, 16, 12);
+    Test_LvAt("levelup table knight 3", CLASS_KNIGHT, 3, 14, 13, 22, 13);
+    Test_LvAt("levelup table knight 5", CLASS_KNIGHT, 5, 19, 15, 37, 15);
+    Test_LvAt("levelup table knight 10", CLASS_KNIGHT, 10, 31, 20, 70, 20);
+    Test_LvAt("levelup table archer 1", CLASS_ARCHER, 1, 10, 12, 10, 12);
+    Test_LvAt("levelup table archer 2", CLASS_ARCHER, 2, 12, 14, 16, 14);
+    Test_LvAt("levelup table archer 3", CLASS_ARCHER, 3, 14, 16, 22, 16);
+    Test_LvAt("levelup table archer 5", CLASS_ARCHER, 5, 18, 20, 34, 20);
+    Test_LvAt("levelup table archer 10", CLASS_ARCHER, 10, 28, 30, 64, 30);
+    Test_LvAt("levelup table mage 1", CLASS_MAGE, 1, 10, 16, 10, 16);
+    Test_LvAt("levelup table mage 2", CLASS_MAGE, 2, 12, 19, 16, 19);
+    Test_LvAt("levelup table mage 3", CLASS_MAGE, 3, 13, 22, 19, 22);
+    Test_LvAt("levelup table mage 5", CLASS_MAGE, 5, 16, 28, 28, 28);
+    Test_LvAt("levelup table mage 10", CLASS_MAGE, 10, 24, 43, 52, 43);
+    Test_LvAt("levelup table nobody 1", CLASS_NOBODY, 1, 10, 11, 10, 11);
+    Test_LvAt("levelup table nobody 2", CLASS_NOBODY, 2, 12, 12, 16, 12);
+    Test_LvAt("levelup table nobody 3", CLASS_NOBODY, 3, 14, 13, 22, 13);
+    Test_LvAt("levelup table nobody 5", CLASS_NOBODY, 5, 18, 16, 34, 16);
+    Test_LvAt("levelup table nobody 10", CLASS_NOBODY, 10, 28, 22, 64, 22);
+    // D184: every class's Max HP and Max MP at every level stays within 10% of what the old silent growth gave (the free point on the class's usual stat);
+    // the Mage is the most fragile
+    var _classes = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE, CLASS_NOBODY];
+    var _off = "";
+    var _frail = "";
+    for (var _ci = 0; _ci < 4; _ci++) {
+        var _c = CharacterCreate_Player(_classes[_ci]);
+        for (var _l = 1; _l <= 10; _l++) {
+            if (_l > 1) _c = LevelUp_ApplyLevel(_c);
+            var _old_hp = Resource_MaxHp(_c.class_cfg.hd, _l);
+            var _old_mp = Resource_MaxMp(_c.class_cfg.mp_gain, _l, _c.stats.mag);
+            if (abs(_c.max_hp / _old_hp - 1) > 0.10) _off += " " + string(_classes[_ci]) + "/L" + string(_l) + "/hp";
+            if (abs(_c.max_mp / _old_mp - 1) > 0.10) _off += " " + string(_classes[_ci]) + "/L" + string(_l) + "/mp";
+            if (_l >= 2 && _classes[_ci] != CLASS_MAGE) {   // level 2 is a tie (16 each: 15 + 1 against 16 is as far as 10% allows), from level 3 the Mage has less
+                var _mage = CharacterCreate_Player(CLASS_MAGE);
+                for (var _m = 2; _m <= _l; _m++) _mage = LevelUp_ApplyLevel(_mage);
+                if ((_l == 2) ? (_mage.max_hp > _c.max_hp) : (_mage.max_hp >= _c.max_hp)) _frail += " " + string(_classes[_ci]) + "/L" + string(_l);
+            }
+        }
+    }
+    Test_Eq("levelup D184: HP and MP stay within 10% of the old numbers at every level (off:" + _off + ")", _off, "");
+    Test_Eq("levelup D184: the Mage has the least Max HP of every class at every level (tied at 2, less from 3; not less:" + _frail + ")", _frail, "");
+    // D184: leveling VIG is not easy mode: all nine free points on VIG, against the class with its points elsewhere
+    Test_Eq("levelup soft cap: a Knight with every free point on VIG has 86 Max HP at level 10 (not 70 + 27)", Test_LvDump(CLASS_KNIGHT, STAT_VIG).max_hp, 86);
+    Test_Eq("levelup soft cap: an Archer's is 82", Test_LvDump(CLASS_ARCHER, STAT_VIG).max_hp, 82);
+    Test_Eq("levelup soft cap: a Mage's is 74", Test_LvDump(CLASS_MAGE, STAT_VIG).max_hp, 74);
+    Test_Eq("levelup soft cap: a Nobody's is 82", Test_LvDump(CLASS_NOBODY, STAT_VIG).max_hp, 82);
+    Test_Eq("levelup soft cap: a Knight with every free point on MND has 29 Max MP", Test_LvDump(CLASS_KNIGHT, STAT_MND).max_mp, 29);
+    Test_Eq("levelup soft cap: a Mage with every free point on MND has 48 Max MP", Test_LvDump(CLASS_MAGE, STAT_MND).max_mp, 48);
+}
+
+function Test_LvStatRules() {
+    Test_Eq("levelup stats: STAT_VIG is 4", STAT_VIG, 4);
+    Test_Eq("levelup stats: STAT_MND is 5", STAT_MND, 5);
+    Test_Eq("levelup stats: VIG key", Stat_Key(STAT_VIG), "vig");
+    Test_Eq("levelup stats: MND key", Stat_Key(STAT_MND), "mnd");
+    Test_Eq("levelup stats: VIG name", Stat_ShortName(STAT_VIG), "VIG");
+    Test_Eq("levelup stats: MND name", Stat_ShortName(STAT_MND), "MND");
+    var _k = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_True("levelup stats: a new character has vig and mnd in its stats", variable_struct_exists(_k.stats, "vig") && variable_struct_exists(_k.stats, "mnd"));
+    Test_Eq("levelup stats: Stat_Get reads VIG", Stat_Get(_k, STAT_VIG), 10);
+    Test_Eq("levelup stats: Stat_Get reads MND", Stat_Get(_k, STAT_MND), 11);
+    // D176: MAG no longer adds Max MP
+    var _wiz = CharacterCreate_Player(CLASS_KNIGHT); _wiz.stats.mag = 41; _wiz = RecomputeResources(_wiz);
+    Test_Eq("levelup stats: more MAG gives no Max MP", _wiz.max_mp, 11);
+    // the free point on VIG / MND: +1 stat, the Max HP / Max MP it gives, and the current HP / MP rise with it
+    var _p = CharacterCreate_Player(CLASS_KNIGHT);
+    _p.stat_points = 2;
+    _p.hp = 7;
+    _p.mp = 5;
+    var _p1 = Cards_PlaceStat(_p, STAT_VIG);
+    Test_Eq("levelup point: VIG +1", _p1.stats.vig, 11);
+    Test_Eq("levelup point: Max HP +3", _p1.max_hp, 13);
+    Test_Eq("levelup point: HP rises by the same 3", _p1.hp, 10);
+    Test_Eq("levelup point: it costs the point", _p1.stat_points, 1);
+    var _p2 = Cards_PlaceStat(_p1, STAT_MND);
+    Test_Eq("levelup point: MND +1", _p2.stats.mnd, 12);
+    Test_Eq("levelup point: Max MP +1", _p2.max_mp, 12);
+    Test_Eq("levelup point: MP rises by the same 1", _p2.mp, 6);
+    var _p3 = Cards_PlaceStat(_p2, STAT_VIG);
+    Test_Eq("levelup point: with no point left nothing changes", _p3.stats.vig, 11);
+    var _bad = CharacterCreate_Player(CLASS_KNIGHT); _bad.stat_points = 1;
+    _bad = Level_ApplyFreePoint(_bad, 17);
+    Test_Eq("levelup point: an unknown stat keeps the point", _bad.stat_points, 1);
+    // the prompt's rows: ATK DEF SPD MAG VIG MND, each value now > after
+    var _o = Cards_FreePointOptions(CharacterCreate_Player(CLASS_MAGE));
+    Test_Eq("levelup rows: six rows", array_length(_o), 6);
+    Test_Eq("levelup rows: in the order ATK DEF SPD MAG VIG MND", _o[0].label + _o[1].label + _o[2].label + _o[3].label + _o[4].label + _o[5].label, "ATKDEFSPDMAGVIGMND");
+    Test_True("levelup rows: the fifth is VIG, the sixth MND", _o[4].stat == STAT_VIG && _o[5].stat == STAT_MND);
+    Test_True("levelup rows: a Mage's VIG goes 10 > 11, MND 16 > 17", _o[4].from == 10 && _o[4].to == 11 && _o[5].from == 16 && _o[5].to == 17);
+    // the stat cap
+    var _cap = CharacterCreate_Player(CLASS_KNIGHT); _cap.stats.vig = 60; _cap.stat_points = 1;
+    _cap = Level_ApplyFreePoint(_cap, STAT_VIG);
+    Test_Eq("levelup stats: VIG clamps at the stat maximum (60)", _cap.stats.vig, 60);
+}
+
+// What an old save held: no vig / mnd, the Max HP / Max MP bought with free points as hp_bonus (+3 a point) and mp_bonus (+2 a point).
+function Test_LvLegacy(_class, _level, _hp_bonus, _mp_bonus) {
+    var _s = DB_PlayerClass(_class).stats;
+    return { class_id: _class, level: _level, exp: 0, hp: 5, mp: 3, stat_points: 0, hp_bonus: _hp_bonus, mp_bonus: _mp_bonus,
+             stats: { atk: _s.atk, def: _s.def, spd: _s.spd, mag: _s.mag } };
+}
+
+function Test_LvMigration() {
+    // each bonus point becomes a point of VIG / MND on top of the class's own growth to that level
+    var _a = Player_MigrateVigMnd(Test_LvLegacy(CLASS_KNIGHT, 5, 6, 4));
+    Test_Eq("levelup migrate: Knight L5 with hp_bonus 6 (2 points) has VIG 19 + 2", _a.stats.vig, 21);
+    Test_Eq("levelup migrate: and mp_bonus 4 (2 points) has MND 15 + 2", _a.stats.mnd, 17);
+    Test_False("levelup migrate: hp_bonus is gone", variable_struct_exists(_a, "hp_bonus"));
+    Test_False("levelup migrate: mp_bonus is gone", variable_struct_exists(_a, "mp_bonus"));
+    var _a2 = Player_MigrateVigMnd(_a);
+    Test_True("levelup migrate: doing it twice changes nothing", _a2.stats.vig == 21 && _a2.stats.mnd == 17);
+    var _m = Player_MigrateVigMnd(Test_LvLegacy(CLASS_MAGE, 1, 0, 0));
+    Test_True("levelup migrate: a fresh Mage is VIG 10 MND 16", _m.stats.vig == 10 && _m.stats.mnd == 16);
+    var _r = Player_MigrateVigMnd(Test_LvLegacy(CLASS_ARCHER, 3, 3, 2));
+    Test_True("levelup migrate: Archer L3 with 1 + 1 points is VIG 14 + 1, MND 16 + 1", _r.stats.vig == 15 && _r.stats.mnd == 17);
+    var _n = Player_MigrateVigMnd(Test_LvLegacy(CLASS_NOBODY, 10, 9, 6));
+    Test_True("levelup migrate: Nobody L10 with 3 + 3 points is VIG 28 + 3, MND 22 + 3", _n.stats.vig == 31 && _n.stats.mnd == 25);
+    var _f = Player_MigrateVigMnd(Test_LvLegacy(CLASS_KNIGHT, 2, 4, 3));
+    Test_True("levelup migrate: a bonus that is not a whole number of points rounds down (4 > 1 point, 3 > 1 point)", _f.stats.vig == 13 && _f.stats.mnd == 13);
+    var _bare = Player_MigrateVigMnd({ class_id: CLASS_KNIGHT, level: 3 });
+    Test_False("levelup migrate: a struct with no stats is left alone", variable_struct_exists(_bare, "stats"));
+    // loading normalises: the Max HP / Max MP come from the new stats, the current HP / MP are kept (up to the maxima)
+    var _lo = Player_NormalizeProgression(Test_LvLegacy(CLASS_KNIGHT, 5, 6, 4), true);
+    Test_Eq("levelup migrate: Knight L5 loads with Max HP 43 (VIG 21)", _lo.max_hp, 43);
+    Test_Eq("levelup migrate: and Max MP 17 (MND 17)", _lo.max_mp, 17);
+    Test_Eq("levelup migrate: the current HP is kept", _lo.hp, 5);
+    Test_Eq("levelup migrate: the current MP is kept", _lo.mp, 3);
+    // a run file written before (version 2 and 3) loads migrated to the current version with its player converted
+    Test_Eq("levelup save: RUN_SAVE_VERSION is 4", RUN_SAVE_VERSION, 4);
+    var _f3 = "test_levelup_v3_run.sav";
+    var _f2 = "test_levelup_v2_run.sav";
+    Save_DeleteFileSet(_f3);
+    Save_DeleteFileSet(_f2);
+    var _raw3 = { run_version: 3, seed: 9, floor: 2, gold: 5, kills: 1, rng: {}, summary: { class_id: CLASS_KNIGHT, level: 5, floor: 2, run_time_ms: 1000, seed: 9, saved_at: 3 },
+                  statData: { selected_class: CLASS_KNIGHT, player: Test_LvLegacy(CLASS_KNIGHT, 5, 6, 4), save_room_name: "rm_floor2", saved_at: 3 } };
+    var _raw2 = { run_version: 2, seed: 9, floor: 2, gold: 5, kills: 1, rng: {}, statData: { selected_class: CLASS_ARCHER, player: Test_LvLegacy(CLASS_ARCHER, 3, 3, 2), save_room_name: "rm_floor2", saved_at: 3 } };
+    Test_RawWrite(_f3, json_stringify(_raw3));
+    Test_RawWrite(_f2, json_stringify(_raw2));
+    var _l3 = RunSave_LoadFrom(_f3);
+    Test_Eq("levelup save: a version 3 file still loads", _l3.status, "ok");
+    if (_l3.status == "ok") {
+        Test_Eq("levelup save: and comes back as version 4", _l3.run.run_version, 4);
+        var _pl = _l3.run.statData.player;
+        Test_True("levelup save: its player has VIG 21 and MND 17", _pl.stats.vig == 21 && _pl.stats.mnd == 17);
+        Test_False("levelup save: and no hp_bonus", variable_struct_exists(_pl, "hp_bonus"));
+        Test_Eq("levelup save: the summary level is the saved level", _l3.run.summary.level, 5);
+    }
+    var _l2 = RunSave_LoadFrom(_f2);
+    Test_Eq("levelup save: a version 2 file still loads", _l2.status, "ok");
+    if (_l2.status == "ok") {
+        Test_Eq("levelup save: and comes back as version 4 too", _l2.run.run_version, 4);
+        Test_True("levelup save: its Archer has VIG 14 + 1 and MND 16 + 1", _l2.run.statData.player.stats.vig == 15 && _l2.run.statData.player.stats.mnd == 17);
+    }
+    Save_DeleteFileSet(_f3);
+    Save_DeleteFileSet(_f2);
+    Test_Eq("levelup save: a file one version ahead is newer", RunSave_Check({ run_version: 5, seed: 1, statData: {} }), "newer");
+    Test_Eq("levelup save: a version 4 file is ok", RunSave_Check({ run_version: 4, seed: 1, statData: {} }), "ok");
+    // a save written by this build carries the new stats and loads back the same
+    var _gs = GameState_Get();
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    var _old_p = _gs.player_ch;
+    var _old_cp = _gs.checkpoint;
+    var _old_persist = _gs.persist;
+    _gs.run = Run_Create(4321);
+    _gs.checkpoint = { room: rm_floor3, x: 48, y: 64 };
+    _gs.persist = {};
+    var _pc = CharacterCreate_Player(CLASS_MAGE);
+    _pc = LevelUp_ApplyLevel(_pc);
+    _pc = LevelUp_ApplyLevel(_pc);
+    _gs.player_ch = _pc;
+    var _ff = "test_levelup_v4_run.sav";
+    Save_DeleteFileSet(_ff);
+    RunSave_WriteTo(_ff);
+    var _l4 = RunSave_LoadFrom(_ff);
+    Save_DeleteFileSet(_ff);
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+    _gs.player_ch = _old_p;
+    _gs.checkpoint = _old_cp;
+    _gs.persist = _old_persist;
+    Test_Eq("levelup save: a run written now is version 4", _l4.status == "ok" ? _l4.run.run_version : -1, 4);
+    Test_True("levelup save: with the Mage's VIG 13 and MND 22 in it", _l4.status == "ok" && _l4.run.statData.player.stats.vig == 13 && _l4.run.statData.player.stats.mnd == 22);
+}
+
+// ---- note 14 (D177): winning a fight does not change level, stats or Max HP / Max MP; the owed levels apply, one at a time, when the player confirms the screen ----
+function Test_LvRunBegin() {
+    var _gs = GameState_Get();
+    var _keep = { had: variable_struct_exists(_gs, "run"), run: variable_struct_exists(_gs, "run") ? _gs.run : undefined, player: _gs.player_ch };
+    _gs.run = Run_Create(5);
+    return _keep;
+}
+
+function Test_LvRunEnd(_keep) {
+    var _gs = GameState_Get();
+    if (_keep.had) _gs.run = _keep.run; else variable_struct_remove(_gs, "run");
+    _gs.player_ch = _keep.player;
+}
+
+function Test_LvDeferred() {
+    var _k = Test_LvRunBegin();
+    Test_False("levelup owed: a run is going, so level-ups are not auto-placed", Level_AutoPlaceEnabled());
+    // one level's EXP: nothing changes but the debt
+    var _a = CharacterCreate_Player(CLASS_KNIGHT);
+    var _a0 = { atk: _a.stats.atk, def: _a.stats.def, vig: _a.stats.vig, mnd: _a.stats.mnd, hp: _a.max_hp, mp: _a.max_mp };
+    _a = Player_AddExp(_a, Exp_NextLevel(1));
+    Test_Eq("levelup owed: the level stays 1 after the EXP is won", _a.level, 1);
+    Test_Eq("levelup owed: one level is owed", _a.levels_owed, 1);
+    Test_True("levelup owed: ATK, DEF, VIG and MND are what they were", _a.stats.atk == _a0.atk && _a.stats.def == _a0.def && _a.stats.vig == _a0.vig && _a.stats.mnd == _a0.mnd);
+    Test_True("levelup owed: Max HP and Max MP are what they were", _a.max_hp == _a0.hp && _a.max_mp == _a0.mp);
+    Test_Eq("levelup owed: no free point is banked yet", _a.stat_points, 0);
+    Test_Eq("levelup owed: no card pick is owed yet", _a.card_picks, 0);
+    Test_Eq("levelup owed: the fight reports one level gained", _a.last_levels_gained, 1);
+    Test_Eq("levelup owed: and one stat point gained (R-113: it was never set above 0)", _a.last_stat_points_gained, 1);
+    Test_Eq("levelup owed: the EXP bar is on level 2's bar with nothing carried over", _a.exp_next, Exp_NextLevel(2));
+    Test_Eq("levelup owed: nothing carried over", _a.exp, 0);
+    Test_Eq("levelup owed: the screen is owed first", Cards_NextOwed(_a), "stat");
+    Test_Eq("levelup owed: and it is the screen for level 2", LevelUp_PromptLevel(_a), 2);
+    // more than one level in one grant: one owed per level, the rest of the EXP kept
+    var _b = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1) + Exp_NextLevel(2) + 5);
+    Test_Eq("levelup owed: two levels owed from one fight", _b.levels_owed, 2);
+    Test_Eq("levelup owed: still level 1", _b.level, 1);
+    Test_Eq("levelup owed: the EXP left over is kept", _b.exp, 5);
+    Test_Eq("levelup owed: on level 3's bar", _b.exp_next, Exp_NextLevel(3));
+    Test_Eq("levelup owed: two points gained", _b.last_stat_points_gained, 2);
+    // a second fight on top of an owed level adds to it
+    var _c = Player_AddExp(variable_clone(_a), Exp_NextLevel(2));
+    Test_Eq("levelup owed: a second fight before the screen adds a level (2 owed)", _c.levels_owed, 2);
+    Test_Eq("levelup owed: and that fight reports 1 gained", _c.last_levels_gained, 1);
+    // what the screen shows: the character as it will be, the real one untouched
+    var _pv = LevelUp_PreviewCharacter(_a);
+    Test_Eq("levelup owed: the preview is level 2", _pv.level, 2);
+    Test_True("levelup owed: with the class growth in its stats (ATK +1, DEF +1, VIG +2, MND +1)", _pv.stats.atk == _a0.atk + 1 && _pv.stats.def == _a0.def + 1 && _pv.stats.vig == _a0.vig + 2 && _pv.stats.mnd == _a0.mnd + 1);
+    Test_True("levelup owed: the character itself did not move", _a.level == 1 && _a.levels_owed == 1 && _a.stats.atk == _a0.atk && _a.max_hp == _a0.hp);
+    // confirming: the level, the growth and the chosen point, together
+    _a.hp = 7;
+    var _d = Cards_PlaceStat(variable_clone(_a), STAT_DEF);
+    Test_Eq("levelup confirm: now level 2", _d.level, 2);
+    Test_Eq("levelup confirm: nothing is owed any more", _d.levels_owed, 0);
+    Test_Eq("levelup confirm: ATK got the growth", _d.stats.atk, _a0.atk + 1);
+    Test_Eq("levelup confirm: DEF got the growth and the point", _d.stats.def, _a0.def + 2);
+    Test_Eq("levelup confirm: VIG got the growth", _d.stats.vig, _a0.vig + 2);
+    Test_Eq("levelup confirm: Max HP follows VIG (16)", _d.max_hp, 16);
+    Test_Eq("levelup confirm: the current HP rises with it (7 + 6)", _d.hp, 13);
+    Test_Eq("levelup confirm: the point is spent", _d.stat_points, 0);
+    Test_Eq("levelup confirm: a card pick is owed now", _d.card_picks, 1);
+    Test_Eq("levelup confirm: the card screen is next", Cards_NextOwed(_d), "cards");
+    // two owed: one screen each
+    var _e = Cards_PlaceStat(variable_clone(_b), STAT_ATK);
+    Test_True("levelup confirm: two owed, the first confirm gives level 2 and leaves one owed", _e.level == 2 && _e.levels_owed == 1);
+    Test_Eq("levelup confirm: the next screen is for level 3", LevelUp_PromptLevel(_e), 3);
+    Test_Eq("levelup confirm: and it is a stat screen again before any card pick", Cards_NextOwed(_e), "stat");
+    var _f = Cards_PlaceStat(_e, STAT_SPD);
+    Test_True("levelup confirm: the second confirm gives level 3 and clears the debt", _f.level == 3 && _f.levels_owed == 0);
+    Test_Eq("levelup confirm: two card picks are owed by then", _f.card_picks, 2);
+    Test_Eq("levelup confirm: the EXP carried over is still there", _f.exp, 5);
+    // the cap: the debt never goes past level 10, the EXP bar has nothing to fill
+    var _g = CharacterCreate_Player(CLASS_KNIGHT);
+    _g.level = 9;
+    _g = Player_NormalizeProgression(_g, true);
+    _g = Player_AddExp(_g, 5000);
+    Test_True("levelup owed: level 9 with a huge grant owes only the one level to the cap", _g.level == 9 && _g.levels_owed == 1);
+    Test_Eq("levelup owed: the bar is empty at the cap", _g.exp_next, 0);
+    var _g2 = Player_AddExp(_g, 100);
+    Test_True("levelup owed: at the owed cap more EXP changes nothing", _g2.levels_owed == 1 && _g2.last_levels_gained == 0);
+    // saving and loading keep the debt and the EXP (the normalisation a load runs must not clamp it away)
+    var _h = Player_NormalizeProgression(variable_clone(_b), true);
+    Test_True("levelup owed: a load keeps the owed levels and the EXP", _h.levels_owed == 2 && _h.exp == 5 && _h.level == 1);
+    // the run summary counts the owed levels (a death before the screen keeps today's numbers)
+    Test_Eq("levelup owed: the effective level is the level plus the debt", Player_EffLevel(_b), 3);
+    var _hist = Run_MakeHistoryEntry(Run_Get(), _b, "rm_floor2", "died", "Slime");
+    Test_Eq("levelup owed: a death before the screen counts the owed levels in the history", _hist.level, 3);
+    var _raw = { seed: 1, floor: 2, statData: { player: { class_id: CLASS_KNIGHT, level: 4, levels_owed: 1 }, save_room_name: "rm_floor2" } };
+    Test_Eq("levelup owed: an abandoned save counts them too", Run_HistoryEntryFromSave(_raw).level, 5);
+    var _gs = GameState_Get();
+    var _cp0 = _gs.checkpoint;
+    var _ps0 = _gs.persist;
+    _gs.checkpoint = { room: rm_floor3, x: 48, y: 64 };
+    _gs.persist = {};
+    _gs.player_ch = _b;
+    var _sv = RunSave_Build();
+    _gs.checkpoint = _cp0;
+    _gs.persist = _ps0;
+    Test_Eq("levelup owed: the save's summary level counts them", _sv.summary.level, 3);
+    Test_Eq("levelup owed: and the player in the save still has the debt", _sv.statData.player.levels_owed, 2);
+    // the status card: the bar is full and says so, nothing else changes
+    var _bar = TabMenu_XpBar(_a);
+    Test_True("levelup owed: the EXP bar is full", _bar.ratio == 1);
+    Test_Eq("levelup owed: and says Level Up", _bar.text, Loc_T("tab.val.level_up", "Level Up"));
+    var _bar2 = TabMenu_XpBar(Test_LvAfterExp(CLASS_KNIGHT, 5));
+    Test_True("levelup owed: with no debt the bar is EXP over the bar", abs(_bar2.ratio - 5 / Exp_NextLevel(1)) < 0.0001 && _bar2.text == "5/" + string(Exp_NextLevel(1)));
+    // winning a battle: Battle_GrantRewards leaves the player as he was, with the debt
+    EnemyDB_Init(); SkillDB_Init(); Loot_Init();
+    var _p = CharacterCreate_Player(CLASS_KNIGHT);
+    _p.exp = _p.exp_next - 1;
+    var _rw = Battle_GrantRewards(variable_clone(_p), EnemyCreate(ENEMY_SLIME));
+    Test_Eq("levelup battle: the rewards say one level was gained", _rw.levels_gained, 1);
+    Test_Eq("levelup battle: and one stat point", _rw.stat_points_gained, 1);
+    Test_True("levelup battle: the player coming out is still level 1 with the same Max HP / Max MP and stats", _rw.player.level == 1 && _rw.player.max_hp == _p.max_hp && _rw.player.max_mp == _p.max_mp && _rw.player.stats.atk == _p.stats.atk && _rw.player.stats.vig == _p.stats.vig);
+    Test_Eq("levelup battle: with the level owed", _rw.player.levels_owed, 1);
+    // a class chosen with a level owed keeps the debt
+    var _cc = Card_ClassCharacter(variable_clone(_b), CLASS_MAGE);
+    Test_True("levelup class: choosing a class keeps the owed levels and the level", _cc.levels_owed == 2 && _cc.level == 1);
+    Test_Eq("levelup class: and the EXP", _cc.exp, 5);
+    Test_LvRunEnd(_k);
+    // outside a run (tests, tools) EXP still levels at once, and the points are still auto-placed
+    var _o = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1) + Exp_NextLevel(2));
+    Test_True("levelup owed: outside a run EXP levels the character at once (level 3, nothing owed)", _o.level == 3 && _o.levels_owed == 0);
+    Test_Eq("levelup owed: and reports 2 stat points gained (R-113)", _o.last_stat_points_gained, 2);
+}
+
+// A fresh character of a class with _exp EXP won (outside a run: nothing levels).
+function Test_LvAfterExp(_class, _exp) {
+    var _c = CharacterCreate_Player(_class);
+    return Player_AddExp(_c, _exp);
+}
+
+// ---- D177 (owner note 15): the level-up screen. Six rows ATK DEF SPD MAG VIG MND; the class's growth rows in gold with "now > now+growth", the other rows only the number;
+// the row under the cursor (keyboard or mouse) shows its "> +1" (a growth row "now > now+growth+1"). Details: what the stat does, Now / After (VIG: Max HP, MND: Max MP). ----
+function Test_LvRowValues(_m) {
+    var _out = "";
+    for (var _i = 0; _i < array_length(_m.items); _i++) _out += (_i > 0 ? "|" : "") + _m.items[_i].value;
+    return _out;
+}
+
+function Test_LvGoldRows(_m) {
+    var _out = "";
+    for (var _i = 0; _i < array_length(_m.items); _i++) {
+        var _it = _m.items[_i];
+        if (variable_struct_exists(_it, "col") && _it.col == UI_C_MERCHANT_GOLD) _out += (_out != "" ? "," : "") + _it.label;
+    }
+    return _out;
+}
+
+function Test_LvScreen() {
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    var _k = Test_LvRunBegin();
+    var _gs = GameState_Get();
+    // the value rule, on its own
+    Test_Eq("levelup screen: a growth row shows now > now + growth", Cards_StatRowValue(12, 1, false), "12 > 13");
+    Test_Eq("levelup screen: a hovered growth row shows now > now + growth + 1", Cards_StatRowValue(12, 1, true), "12 > 14");
+    Test_Eq("levelup screen: a row that does not grow shows only the number", Cards_StatRowValue(10, 0, false), "10");
+    Test_Eq("levelup screen: hovered, it shows now > now + 1", Cards_StatRowValue(10, 0, true), "10 > 11");
+    Test_Eq("levelup screen: a growth of 3 reads 10 > 13", Cards_StatRowValue(10, 3, false), "10 > 13");
+    Test_Eq("levelup screen: a value at the cap does not pass 60", Cards_StatRowValue(60, 0, true), "60 > 60");
+    // a Knight with a level owed: ATK +1, DEF +1, VIG +2, MND +1 are the growth rows
+    var _kn = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1));
+    _gs.player_ch = _kn;
+    var _m = CardsUi_StatMenu();
+    Test_Eq("levelup screen: six rows", array_length(_m.items), 6);
+    Test_Eq("levelup screen: ATK DEF SPD MAG VIG MND in that order", _m.items[0].label + _m.items[1].label + _m.items[2].label + _m.items[3].label + _m.items[4].label + _m.items[5].label, "ATKDEFSPDMAGVIGMND");
+    Test_Eq("levelup screen: the Knight's growth rows are gold", Test_LvGoldRows(_m), "ATK,DEF,VIG,MND");
+    Test_Eq("levelup screen: the cursor starts on the class stat (DEF)", _m.cursor, STAT_DEF);
+    Test_Eq("levelup screen: so DEF reads 12 > 14, the other growth rows now > now + growth, the rest only the number", Test_LvRowValues(_m), "11 > 12|12 > 14|10|3|10 > 12|11 > 12");
+    _m.cursor = STAT_SPD;
+    CardsUi_StatRefresh(_m);
+    Test_Eq("levelup screen: with the cursor on SPD it reads 10 > 11 and DEF goes back to 12 > 13", Test_LvRowValues(_m), "11 > 12|12 > 13|10 > 11|3|10 > 12|11 > 12");
+    _m.cursor = STAT_VIG;
+    CardsUi_StatRefresh(_m);
+    Test_Eq("levelup screen: on VIG it reads 10 > 13 (growth 2 + the point)", _m.items[4].value, "10 > 13");
+    Test_Eq("levelup screen: the gold rows stay gold under the cursor", Test_LvGoldRows(_m), "ATK,DEF,VIG,MND");
+    // a row's own colour is the text colour of that row, selected or not; a greyed row stays grey
+    Test_Eq("levelup screen: a gold row draws gold", Ui_RowStyle(_m.items[0], false).text, UI_C_MERCHANT_GOLD);
+    Test_Eq("levelup screen: and gold when selected", Ui_RowStyle(_m.items[0], true).text, UI_C_MERCHANT_GOLD);
+    Test_Eq("levelup screen: a plain row is white", Ui_RowStyle(_m.items[2], false).text, UI_C_TEXT);
+    Test_Eq("levelup screen: a greyed row stays grey whatever its colour", Ui_RowStyle({ label: "x", value: "", enabled: false, col: UI_C_MERCHANT_GOLD }, false).text, UI_C_DARK);
+    // the details: what it does, Now and After
+    Test_True("levelup screen: every row has a one-line explanation", string_length(_m.items[0].help) > 0 && string_length(_m.items[4].help) > 0 && string_length(_m.items[5].help) > 0);
+    Test_Eq("levelup screen: the DEF row's Now / After are the stat now and after growth + the point", Test_RowValue(_m.items[1].lines, "Now") + ">" + Test_RowValue(_m.items[1].lines, "After"), "12>14");
+    Test_Eq("levelup screen: the VIG row shows Max HP now and after (VIG 13 = 19)", Test_RowValue(_m.items[4].lines, Loc_T("cards.stat.hp_now", "Max HP Now")) + ">" + Test_RowValue(_m.items[4].lines, Loc_T("cards.stat.hp_after", "Max HP After")), "10>19");
+    Test_Eq("levelup screen: the MND row shows Max MP now and after (MND 13 = 13)", Test_RowValue(_m.items[5].lines, Loc_T("cards.stat.mp_now", "Max MP Now")) + ">" + Test_RowValue(_m.items[5].lines, Loc_T("cards.stat.mp_after", "Max MP After")), "11>13");
+    Test_Eq("levelup screen: the Korean-or-English legend replaces the 'Knight growth' line", _m.layout.note, Loc_T("levelup.legend", "Gold = your class grows these"));
+    Test_True("levelup screen: the legend is not the old growth line", string_pos("growth:", _m.layout.note) == 0);
+    Test_Eq("levelup screen: the legend is drawn in gold", _m.layout.note_col, UI_C_MERCHANT_GOLD);
+    Test_Eq("levelup screen: the title names the level being confirmed", _m.layout.title, "Level 2: Place 1 Point");
+    Test_Eq("levelup screen: the character itself has not moved", _kn.level + _kn.levels_owed * 10, 11);
+    // a Mage: MAG, VIG and MND grow; ATK DEF SPD do not
+    var _mg = Player_AddExp(CharacterCreate_Player(CLASS_MAGE), Exp_NextLevel(1));
+    _gs.player_ch = _mg;
+    var _mm = CardsUi_StatMenu();
+    Test_Eq("levelup screen: the Mage's growth rows are MAG, VIG, MND", Test_LvGoldRows(_mm), "MAG,VIG,MND");
+    Test_Eq("levelup screen: the cursor starts on MAG (12 > 15 hovered), VIG 10 > 12, MND 16 > 19", Test_LvRowValues(_mm), "5|7|10|12 > 15|10 > 12|16 > 19");
+    // Nobody rotates: level 2's growth is ATK +1, SPD +1 (plus VIG +2, MND +1)
+    var _nb = Player_AddExp(CharacterCreate_Player(CLASS_NOBODY), Exp_NextLevel(1));
+    _gs.player_ch = _nb;
+    var _nm = CardsUi_StatMenu();
+    Test_Eq("levelup screen: Nobody's growth rows follow the rotation (level 2: ATK, SPD, VIG, MND)", Test_LvGoldRows(_nm), "ATK,SPD,VIG,MND");
+    // two levels owed: the second screen is level 3's, with level 3's growth
+    var _two = Player_AddExp(CharacterCreate_Player(CLASS_NOBODY), Exp_NextLevel(1) + Exp_NextLevel(2));
+    _two = Cards_PlaceStat(_two, STAT_ATK);
+    _gs.player_ch = _two;
+    var _m3 = CardsUi_StatMenu();
+    Test_Eq("levelup screen: the second owed level's screen is titled level 3", _m3.layout.title, "Level 3: Place 1 Point");
+    Test_Eq("levelup screen: with level 3's growth rows (DEF, MAG, VIG, MND)", Test_LvGoldRows(_m3), "DEF,MAG,VIG,MND");
+    // a point banked by an older save and no level owed: no growth, no gold, no legend
+    var _old = CharacterCreate_Player(CLASS_KNIGHT);
+    _old.stat_points = 1;
+    _gs.player_ch = _old;
+    var _om = CardsUi_StatMenu();
+    Test_Eq("levelup screen: a banked point alone has no gold rows", Test_LvGoldRows(_om), "");
+    Test_Eq("levelup screen: and no legend", _om.layout.note, "");
+    Test_Eq("levelup screen: every row reads only the number, the one under the cursor (DEF) now > now + 1", Test_LvRowValues(_om), "11|12 > 13|10|3|10|11");
+    Loc_SetLanguage("ko");
+    var _ko = CardsUi_StatMenu();
+    Test_True("levelup screen: the Korean legend is not the English one", _ko.layout.note != "Gold = your class grows these");
+    Loc_SetLanguage(_lang0);
+    // keyboard: Down moves the cursor one row and the +1 moves with it
+    var _kb = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1));
+    _gs.player_ch = _kb;
+    var _km = CardsUi_StatMenu();
+    var _sn = Ui_SnapNew();
+    _sn.down = true;
+    _sn.down_p = true;
+    var _ev = Ui_MenuStep(_km, _sn, 5000);
+    CardsUi_StatRefresh(_km);
+    Test_True("levelup screen: Down moves the cursor from DEF to SPD", _ev.moved && _km.cursor == STAT_SPD);
+    Test_Eq("levelup screen: and the +1 moves with it (SPD 10 > 11, DEF back to 12 > 13)", _km.items[2].value + "|" + _km.items[1].value, "10 > 11|12 > 13");
+    // mouse: the row under the pointer is the cursor, a click confirms it
+    var _mm2 = CardsUi_StatMenu();
+    var _rects = [];
+    for (var _ri = 0; _ri < 6; _ri++) array_push(_rects, { x: 0, y: _ri * 10, w: 100, h: 10 });
+    _mm2.rects = _rects;
+    var _ms2 = Ui_SnapNew();
+    _ms2.mx = 5;
+    _ms2.my = 35;
+    _ms2.mouse_moved = true;
+    var _ev2 = Ui_MenuStep(_mm2, _ms2, 5000);
+    CardsUi_StatRefresh(_mm2);
+    Test_True("levelup screen: the pointer over the MAG row moves the cursor there", _ev2.moved && _mm2.cursor == STAT_MAG);
+    Test_Eq("levelup screen: MAG shows 3 > 4 under the pointer", _mm2.items[3].value, "3 > 4");
+    Test_Eq("levelup screen: DEF is back to 12 > 13", _mm2.items[1].value, "12 > 13");
+    _ms2.click = true;
+    var _ev3 = Ui_MenuStep(_mm2, _ms2, 5000);
+    Test_True("levelup screen: a click on the row confirms it", _ev3.confirm && _ev3.index == STAT_MAG);
+    Test_LvRunEnd(_k);
+}
+
+// D177: every size and language the screen is drawn in: the rows, the title, the legend and the explanations fit (every cursor position: the value under the cursor is the longest).
+function Test_LvFitFails(_class) {
+    var _gs = GameState_Get();
+    _gs.player_ch = Player_AddExp(CharacterCreate_Player(_class), 12);
+    var _mt = Ui_Metrics();
+    var _m = CardsUi_StatMenu();
+    var _fails = [];
+    var _mc = undefined;
+    for (var _cur = 0; _cur < array_length(_m.items); _cur++) {
+        _m.cursor = _cur;
+        CardsUi_StatRefresh(_m);
+        _mc = Ui_MenuMeasure(_m, _mt);
+        for (var _i = 0; _i < array_length(_m.items); _i++) TextFit_Row(_fails, "levelup row", _m.items[_i].label, _m.items[_i].value, _mc.panel_w, _mt.p, _mc.icon_px, false, _mt);
+    }
+    TextFit_Title(_fails, "levelup title", _m.layout.title, _mc.panel_w - 8 * _mt.p, _mt);
+    if (_m.layout.note != "") TextFit_Line(_fails, "levelup legend", _m.layout.note, _mc.panel_w - 8 * _mt.p);
+    for (var _h = 0; _h < array_length(_m.items); _h++) TextFit_Block(_fails, "levelup help " + _m.items[_h].label, _m.items[_h].help, _mc.panel_w - 8 * _mt.p, _mt.p);
+    return _fails;
+}
+
+function Test_LvTextFit() {
+    var _k = Test_LvRunBegin();
+    TextFit_Each("levelup screen (Knight)", function(_w, _h, _l) { return Test_LvFitFails(CLASS_KNIGHT); });
+    TextFit_Each("levelup screen (Mage)", function(_w, _h, _l) { return Test_LvFitFails(CLASS_MAGE); });
+    Test_LvRunEnd(_k);
 }

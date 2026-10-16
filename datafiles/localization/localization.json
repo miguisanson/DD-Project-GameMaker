@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T13:49:57Z",
-    "row_count": 1268
+    "generated_at_utc": "2026-10-16T15:37:06Z",
+    "row_count": 1272
   },
   "default_lang": "en",
   "languages": [
@@ -632,21 +632,21 @@
       "en": "After",
       "ko": "이후"
     },
-    "cards.stat.maxhp": {
-      "en": "Max HP +{n}",
-      "ko": "최대 HP +{n}"
+    "cards.stat.hp_after": {
+      "en": "Max HP After",
+      "ko": "최대 HP 이후"
     },
-    "cards.stat.maxhp.desc": {
-      "en": "Raises your max [t]HP[/t] by {n} and restores {n} [t]HP[/t].",
-      "ko": "최대 [t]HP[/t]가 {n} 오르고 [t]HP[/t]를 {n} 회복합니다."
+    "cards.stat.hp_now": {
+      "en": "Max HP Now",
+      "ko": "최대 HP 현재"
     },
-    "cards.stat.maxmp": {
-      "en": "Max MP +{n}",
-      "ko": "최대 MP +{n}"
+    "cards.stat.mp_after": {
+      "en": "Max MP After",
+      "ko": "최대 MP 이후"
     },
-    "cards.stat.maxmp.desc": {
-      "en": "Raises your max [t]MP[/t] by {n} and restores {n} [t]MP[/t].",
-      "ko": "최대 [t]MP[/t]가 {n} 오르고 [t]MP[/t]를 {n} 회복합니다."
+    "cards.stat.mp_now": {
+      "en": "Max MP Now",
+      "ko": "최대 MP 현재"
     },
     "cards.stat.now": {
       "en": "Now",
@@ -2245,8 +2245,8 @@
       "ko": "구간을 놓치면 피해가 {pct}% 줄어듭니다."
     },
     "help.stats.help": {
-      "en": "What Power, ATK, DEF, MAG, SPD, Crit, the grades, BREAK and every status mean.",
-      "ko": "위력, ATK, DEF, MAG, SPD, 치명타, 등급, 브레이크와 모든 상태 이상의 뜻입니다."
+      "en": "What Power, ATK, DEF, MAG, SPD, VIG, MND, Crit, the grades, BREAK and every status mean.",
+      "ko": "위력, ATK, DEF, MAG, SPD, VIG, MND, 치명타, 등급, 브레이크와 모든 상태 이상의 뜻입니다."
     },
     "help.stats.title": {
       "en": "Stats & Terms",
@@ -2856,13 +2856,9 @@
       "en": "A weapon with {power} power.",
       "ko": "위력 {power}의 무기입니다."
     },
-    "levelup.gain": {
-      "en": "{stat} +{n}",
-      "ko": "{stat} +{n}"
-    },
-    "levelup.growth": {
-      "en": "{name} growth: {gains}",
-      "ko": "{name} 성장: {gains}"
+    "levelup.legend": {
+      "en": "Gold = your class grows these",
+      "ko": "금색 = 직업이 성장시키는 능력치"
     },
     "menu.common.back": {
       "en": "Back",
@@ -3153,12 +3149,20 @@
       "ko": "전투 능력에 영향을 줍니다."
     },
     "menu.tooltip.stat.mag.desc": {
-      "en": "Increases spell damage and max [t]MP[/t].",
-      "ko": "마법 피해와 최대 [t]MP[/t]를 늘립니다."
+      "en": "Increases spell damage.",
+      "ko": "마법 피해를 늘립니다."
+    },
+    "menu.tooltip.stat.mnd.desc": {
+      "en": "Raises max [t]MP[/t]. The more you add, the less each point gives.",
+      "ko": "최대 [t]MP[/t]를 늘립니다. 많이 올릴수록 포인트 하나의 효과는 줄어듭니다."
     },
     "menu.tooltip.stat.spd.desc": {
       "en": "Decides who acts first.",
       "ko": "누가 먼저 행동할지 정합니다."
+    },
+    "menu.tooltip.stat.vig.desc": {
+      "en": "Raises max [t]HP[/t]. The more you add, the less each point gives.",
+      "ko": "최대 [t]HP[/t]를 늘립니다. 많이 올릴수록 포인트 하나의 효과는 줄어듭니다."
     },
     "menu.tooltip.status.default": {
       "en": "Status",
@@ -4792,6 +4796,14 @@
       "en": "Level",
       "ko": "레벨"
     },
+    "tab.lbl.max_hp": {
+      "en": "Max HP",
+      "ko": "최대 HP"
+    },
+    "tab.lbl.max_mp": {
+      "en": "Max MP",
+      "ko": "최대 MP"
+    },
     "tab.lbl.met": {
       "en": "Met",
       "ko": "만남"
@@ -4903,6 +4915,10 @@
     "tab.val.floor": {
       "en": "Floor {n}",
       "ko": "{n}층"
+    },
+    "tab.val.level_up": {
+      "en": "Level Up",
+      "ko": "레벨 업"
     },
     "tab.val.locked": {
       "en": "Locked",

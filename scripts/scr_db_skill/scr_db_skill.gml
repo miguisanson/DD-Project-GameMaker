@@ -2102,6 +2102,7 @@ function Card_ClassCharacter(_old, _class_id) {
         var lvl = variable_struct_exists(_old, "level") ? max(1, round(_old.level)) : 1;
         ch.level = lvl;
         if (variable_struct_exists(_old, "exp")) ch.exp = _old.exp;
+        ch.levels_owed = LevelUp_Owed(_old);   // D177: a level won and not yet confirmed stays owed (the EXP is the carry-over after it)
         if (variable_struct_exists(_old, "inventory")) {
             ch.inventory = variable_clone(_old.inventory);
             // D84: a class carries 5 of a throwable, only Nobody 8; the extra units are dropped when the class is picked
@@ -2127,6 +2128,8 @@ function Card_ClassCharacter(_old, _class_id) {
             ch.stats.def = StatClamp(ch.stats.def + g.def);
             ch.stats.spd = StatClamp(ch.stats.spd + g.spd);
             ch.stats.mag = StatClamp(ch.stats.mag + g.mag);
+            ch.stats.vig = StatClamp(ch.stats.vig + g.vig);   // D176
+            ch.stats.mnd = StatClamp(ch.stats.mnd + g.mnd);
         }
         Card_EnsureFields(_old);
         var kept = [];

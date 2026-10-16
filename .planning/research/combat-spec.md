@@ -29,6 +29,11 @@ class default at once (`Level_AutoPlaceEnabled()`, `global.levelup_auto_place`, 
 `max_hp = 10 + (L-1) * (ceil(hd/2) + 2)`  (Knight 7/level, Archer 6, Mage 5, Nobody 6; no stat adds HP).
 `max_mp = 10 + (L-1) * mp_gain + floor(MAG / 2)`  (raw MAG, equipment not included). One difficulty only: no HP/MP multipliers.
 
+**D176 / D184 (packet r3levelup) replaces the two formulas above** (they stay in the code as `Resource_MaxHp` / `Resource_MaxMp`, the reference the new numbers are compared with). Max HP and Max MP are stats now, like Vigor and Mind: 
+`max_hp = Resource_MaxHpOfVig(VIG)` = 10 + 3 per VIG point above 10 up to VIG 28, then 2 per point up to VIG 38, then 1; `max_mp = Resource_MaxMpOfMnd(MND)` = 10 + 1 per MND point above 10 up to MND 44, then 1/2 up to 56, then 1/4 (floored). 
+Every class starts at VIG 10; MND starts Knight 11, Archer 12, Mage 16, Nobody 11. MAG adds no MP. Class growth lists VIG and MND next to the four stats (`LevelUp_ClassGrowthGain`: Knight VIG +2 (+3 on levels 4, 7, 10) MND +1; Archer VIG +2 MND +2; Mage VIG +2 on even levels, +1 on odd, MND +3; Nobody VIG +2, MND +1 (+2 on levels 5 and 9)), and the free point may go to any of the six. 
+The numbers, the old-vs-new table and the soft-cap check are in `tools/balance/vig_mnd.py` (`--check` fails when a class leaves 10% of the old HP/MP or the Mage is not the most fragile). Level gains are given when the level-up screen is confirmed (D177), not when the fight is won.
+
 ## 4. Damage (D77, D22, D61)
 ```
 power   = 2 * weapon.power                                  basic attack of the player (no weapon equipped counts as weapon.power 2, "fists")

@@ -2,6 +2,24 @@ function Level_IsAtCap(_level) {
     return (round(_level) >= LEVEL_CAP_TECHNICAL);
 }
 
+// D177: the levels won in a fight that wait for the player to confirm the level-up screen (ch.levels_owed). The character's level, stats, Max HP / Max MP and bank of points
+// stay as they were until then; the EXP bar counts from level + levels_owed.
+function LevelUp_Owed(_ch) {
+    return (is_struct(_ch) && variable_struct_exists(_ch, "levels_owed")) ? max(0, round(real(_ch.levels_owed))) : 0;
+}
+
+// The level the character counts as everywhere a number about the run is told (the run summary, the history, the save list): the level plus the owed levels, so a death
+// before the screen keeps the levels he had won.
+function Player_EffLevel(_ch) {
+    if (!is_struct(_ch)) return 1;
+    return clamp((variable_struct_exists(_ch, "level") ? round(real(_ch.level)) : 1) + LevelUp_Owed(_ch), 1, LEVEL_CAP_TECHNICAL);
+}
+
+// In a run the level-ups wait for the screen (D177); outside one (tests, tools) EXP levels the character at once, the points auto-placed, as before.
+function LevelUp_Deferred() {
+    return Run_IsActive();
+}
+
 function Player_NormalizeProgression(_ch, _recompute_resources = true, _clamp_exp_for_ui = true) {
     if (!is_struct(_ch)) return _ch;
 
@@ -17,13 +35,12 @@ function Player_NormalizeProgression(_ch, _recompute_resources = true, _clamp_ex
     if (!variable_struct_exists(_ch.stats, "def")) _ch.stats.def = 10;
     if (!variable_struct_exists(_ch.stats, "spd")) _ch.stats.spd = variable_struct_exists(_ch.stats, "agi") ? _ch.stats.agi : 10;
     if (!variable_struct_exists(_ch.stats, "mag")) _ch.stats.mag = variable_struct_exists(_ch.stats, "intt") ? _ch.stats.intt : 10;
-    _ch.stats = StatsClampAll({ atk: _ch.stats.atk, def: _ch.stats.def, spd: _ch.stats.spd, mag: _ch.stats.mag });
-
-    // D143: the Max HP / Max MP bought with free points; a character without the fields has none.
-    if (!variable_struct_exists(_ch, "hp_bonus")) _ch.hp_bonus = 0;
-    if (!variable_struct_exists(_ch, "mp_bonus")) _ch.mp_bonus = 0;
-    _ch.hp_bonus = max(0, round(_ch.hp_bonus));
-    _ch.mp_bonus = max(0, round(_ch.mp_bonus));
+    var st = { atk: _ch.stats.atk, def: _ch.stats.def, spd: _ch.stats.spd, mag: _ch.stats.mag };
+    if (variable_struct_exists(_ch.stats, "vig")) st.vig = _ch.stats.vig;
+    if (variable_struct_exists(_ch.stats, "mnd")) st.mnd = _ch.stats.mnd;
+    _ch.stats = StatsClampAll(st);
+    // D176: a character made before VIG and MND (its Max HP / Max MP bought with free points as hp_bonus / mp_bonus) gets them, once.
+    _ch = Player_MigrateVigMnd(_ch);
 
     // Banked free points (D76) survive; a character without the field has none.
     if (!variable_struct_exists(_ch, "stat_points")) _ch.stat_points = 0;
@@ -34,12 +51,15 @@ function Player_NormalizeProgression(_ch, _recompute_resources = true, _clamp_ex
     if (!variable_struct_exists(_ch, "exp")) _ch.exp = 0;
     _ch.exp = max(0, round(_ch.exp));
 
-    if (Level_IsAtCap(_ch.level)) {
-        _ch.level = LEVEL_CAP_TECHNICAL;
+    // D177: owed levels (won, not yet confirmed) never take the character past the cap; the EXP bar is the one of the level he will be
+    _ch.levels_owed = clamp(LevelUp_Owed(_ch), 0, LEVEL_CAP_TECHNICAL - _ch.level);
+    var eff_level = _ch.level + _ch.levels_owed;
+    if (Level_IsAtCap(eff_level)) {
+        if (Level_IsAtCap(_ch.level)) _ch.level = LEVEL_CAP_TECHNICAL;
         _ch.exp = 0;
         _ch.exp_next = 0;
     } else {
-        _ch.exp_next = Exp_NextLevel(_ch.level);
+        _ch.exp_next = Exp_NextLevel(eff_level);
         if (_ch.exp_next <= 0) _ch.exp_next = 1;
         if (_clamp_exp_for_ui) {
             _ch.exp = min(_ch.exp, _ch.exp_next - 1);
@@ -55,13 +75,41 @@ function Player_NormalizeProgression(_ch, _recompute_resources = true, _clamp_ex
     return _ch;
 }
 
+// D176: a character made before VIG and MND has no vig / mnd. They become what the class growth gave up to its level, plus a point for every LEGACY_HP_PER_POINT (3) of
+// hp_bonus and LEGACY_MP_PER_POINT (2) of mp_bonus (the Max HP / Max MP it bought with free points; a bonus that is not a whole number of points rounds down). hp_bonus and
+// mp_bonus are dropped. A struct with no stats is left alone; one that already has vig and mnd only loses the old fields. Safe on a character loaded as plain data
+// (no class_cfg needed), so RunSave_Migrate can use it on a save file.
+function Player_MigrateVigMnd(_ch) {
+    if (!is_struct(_ch) || !variable_struct_exists(_ch, "stats") || !is_struct(_ch.stats)) return _ch;
+    if (!variable_struct_exists(_ch.stats, "vig") || !variable_struct_exists(_ch.stats, "mnd")) {
+        var cid = variable_struct_exists(_ch, "class_id") ? round(real(_ch.class_id)) : CLASS_NOBODY;
+        var lvl = variable_struct_exists(_ch, "level") ? clamp(round(real(_ch.level)), 1, LEVEL_CAP_TECHNICAL) : 1;
+        var vig = VIG_START;
+        var mnd = DB_PlayerClass(cid).stats.mnd;
+        for (var l = 2; l <= lvl; l++) {
+            var g = LevelUp_ClassGrowthGain(cid, l);
+            vig += g.vig;
+            mnd += g.mnd;
+        }
+        var hb = variable_struct_exists(_ch, "hp_bonus") ? max(0, round(real(_ch.hp_bonus))) : 0;
+        var mb = variable_struct_exists(_ch, "mp_bonus") ? max(0, round(real(_ch.mp_bonus))) : 0;
+        _ch.stats.vig = StatClamp(vig + hb div LEGACY_HP_PER_POINT);
+        _ch.stats.mnd = StatClamp(mnd + mb div LEGACY_MP_PER_POINT);
+    }
+    if (variable_struct_exists(_ch, "hp_bonus")) variable_struct_remove(_ch, "hp_bonus");
+    if (variable_struct_exists(_ch, "mp_bonus")) variable_struct_remove(_ch, "mp_bonus");
+    return _ch;
+}
+
 // Fixed growth per class for reaching _new_level (>= 2); combat-spec.md section 2. The level's ONE free point is separate (D76).
+// D176: VIG and MND are listed with the other stats (they make Max HP and Max MP): Knight ATK+1 DEF+1 VIG+2 (3 on levels 4, 7, 10) MND+1; Archer ATK+1 SPD+1 VIG+2 MND+2;
+// Mage MAG+2 VIG+2 on even levels and +1 on odd MND+3 (the glass cannon: the least Max HP, the most Max MP); Nobody the rotation below, VIG+2, MND+1 (+2 on levels 5 and 9).
 function LevelUp_ClassGrowthGain(_class_id, _new_level) {
     var lvl = max(2, round(_new_level));
     switch (_class_id) {
-        case CLASS_KNIGHT: return { atk:1, def:1, spd:0, mag:0 };
-        case CLASS_ARCHER: return { atk:1, def:0, spd:1, mag:0 };
-        case CLASS_MAGE:   return { atk:0, def:0, spd:0, mag:2 };
+        case CLASS_KNIGHT: return { atk:1, def:1, spd:0, mag:0, vig:(((lvl - 2) mod 3 == 2) ? 3 : 2), mnd:1 };
+        case CLASS_ARCHER: return { atk:1, def:0, spd:1, mag:0, vig:2, mnd:2 };
+        case CLASS_MAGE:   return { atk:0, def:0, spd:0, mag:2, vig:((lvl mod 2 == 0) ? 2 : 1), mnd:3 };
         case CLASS_NOBODY:
             // Balanced-low (D83), two points a level since D111 (E1-6): the point that cycles ATK, DEF, SPD, MAG, plus the one two steps further on the cycle.
             var rot = [
@@ -73,9 +121,9 @@ function LevelUp_ClassGrowthGain(_class_id, _new_level) {
             var ri = (lvl - 2) mod array_length(rot);
             var r1 = rot[ri];
             var r2 = rot[(ri + 2) mod array_length(rot)];
-            return { atk:r1.atk + r2.atk, def:r1.def + r2.def, spd:r1.spd + r2.spd, mag:r1.mag + r2.mag };
+            return { atk:r1.atk + r2.atk, def:r1.def + r2.def, spd:r1.spd + r2.spd, mag:r1.mag + r2.mag, vig:2, mnd:(((lvl - 2) mod 4 == 3) ? 2 : 1) };
     }
-    return { atk:0, def:0, spd:0, mag:0 };
+    return { atk:0, def:0, spd:0, mag:0, vig:0, mnd:0 };
 }
 
 // Free points are placed by the player in a run (the stat prompt, CardsUi); outside a run (tests, tools) they go to the class default at once.
@@ -84,32 +132,15 @@ function Level_AutoPlaceEnabled() {
     return global.levelup_auto_place && !Run_IsActive();   // C2: during a run the player places the point (the stat prompt); tests and tools still auto-place
 }
 
-// D76: spends one banked free point on _stat_id (STAT_ATK/DEF/SPD/MAG). Does nothing without a point or with an unknown stat.
+// D76: spends one banked free point on _stat_id (STAT_ATK/DEF/SPD/MAG, D176: also STAT_VIG / STAT_MND). Does nothing without a point or with an unknown stat.
+// The stat only moves: Max HP / Max MP follow in RecomputeResources (Cards_PlaceStat also raises the current HP / MP by what the point added).
 function Level_ApplyFreePoint(_ch, _stat_id) {
     if (!is_struct(_ch) || !variable_struct_exists(_ch, "stat_points") || _ch.stat_points <= 0) return _ch;
-    if (!Stat_IsValid(_stat_id)) return _ch;
+    if (!Stat_IsTrainable(_stat_id)) return _ch;
     var key = Stat_Key(_stat_id);
     variable_struct_set(_ch.stats, key, StatClamp(variable_struct_get(_ch.stats, key) + 1));
     _ch.stat_points -= 1;
     if (variable_struct_exists(_ch, "last_growth") && is_struct(_ch.last_growth)) variable_struct_set(_ch.last_growth, key, variable_struct_get(_ch.last_growth, key) + 1);
-    return _ch;
-}
-
-// D143: spends one banked free point on Max HP (+FREE_POINT_HP_GAIN) or Max MP (+FREE_POINT_MP_GAIN); the current HP / MP rise by the same amount.
-// The bonus lives on the character (hp_bonus, mp_bonus) and RecomputeResources adds it, so a level-up or a load keeps it. Does nothing without a point.
-function Level_ApplyResourcePoint(_ch, _id) {
-    if (!is_struct(_ch) || !variable_struct_exists(_ch, "stat_points") || _ch.stat_points <= 0) return _ch;
-    if (_id != FREE_POINT_MAX_HP && _id != FREE_POINT_MAX_MP) return _ch;
-    var hp0 = _ch.hp;
-    var mp0 = _ch.mp;
-    var max_hp0 = _ch.max_hp;
-    var max_mp0 = _ch.max_mp;
-    if (_id == FREE_POINT_MAX_HP) _ch.hp_bonus = (variable_struct_exists(_ch, "hp_bonus") ? _ch.hp_bonus : 0) + FREE_POINT_HP_GAIN;
-    else _ch.mp_bonus = (variable_struct_exists(_ch, "mp_bonus") ? _ch.mp_bonus : 0) + FREE_POINT_MP_GAIN;
-    _ch.stat_points -= 1;
-    _ch = RecomputeResources(_ch);
-    _ch.hp = clamp(hp0 + max(0, _ch.max_hp - max_hp0), 0, _ch.max_hp);
-    _ch.mp = clamp(mp0 + max(0, _ch.max_mp - max_mp0), 0, _ch.max_mp);
     return _ch;
 }
 
@@ -124,6 +155,7 @@ function LevelUp_ApplyLevel(_ch) {
     var max_mp_before = variable_struct_exists(_ch, "max_mp") ? _ch.max_mp : mp_before;
 
     _ch.level += 1;
+    _ch.levels_owed = max(0, LevelUp_Owed(_ch) - 1);   // D177: an owed level, now given (the EXP bar is already the one of level + owed: it does not move)
     if (!is_struct(_ch.stats)) _ch.stats = StatsCreateBase();
 
     var class_id = variable_struct_exists(_ch, "class_id") ? _ch.class_id : CLASS_NOBODY;
@@ -132,12 +164,16 @@ function LevelUp_ApplyLevel(_ch) {
     _ch.stats.def = StatClamp(_ch.stats.def + gain.def);
     _ch.stats.spd = StatClamp(_ch.stats.spd + gain.spd);
     _ch.stats.mag = StatClamp(_ch.stats.mag + gain.mag);
+    _ch.stats.vig = StatClamp(_ch.stats.vig + gain.vig);   // D176: Max HP and Max MP follow from these two (RecomputeResources below)
+    _ch.stats.mnd = StatClamp(_ch.stats.mnd + gain.mnd);
 
-    if (!variable_struct_exists(_ch, "last_growth") || !is_struct(_ch.last_growth)) _ch.last_growth = { atk:0, def:0, spd:0, mag:0 };
+    if (!variable_struct_exists(_ch, "last_growth") || !is_struct(_ch.last_growth)) _ch.last_growth = { atk:0, def:0, spd:0, mag:0, vig:0, mnd:0 };
     _ch.last_growth.atk += gain.atk;
     _ch.last_growth.def += gain.def;
     _ch.last_growth.spd += gain.spd;
     _ch.last_growth.mag += gain.mag;
+    _ch.last_growth.vig = (variable_struct_exists(_ch.last_growth, "vig") ? _ch.last_growth.vig : 0) + gain.vig;
+    _ch.last_growth.mnd = (variable_struct_exists(_ch.last_growth, "mnd") ? _ch.last_growth.mnd : 0) + gain.mnd;
 
     // D81: a 1-of-3 card pick at every level-up.
     _ch.card_picks = max(0, _ch.card_picks) + 1;
@@ -153,6 +189,25 @@ function LevelUp_ApplyLevel(_ch) {
     _ch.hp = clamp(hp_before + max(0, _ch.max_hp - max_hp_before), 0, _ch.max_hp);
     _ch.mp = clamp(mp_before + max(0, _ch.max_mp - max_mp_before), 0, _ch.max_mp);
     return _ch;
+}
+
+// D177: every owed level given at once (the free points banked, or placed when auto-place is on). The screen gives them one at a time (Cards_PlaceStat); this is for
+// callers that want the level now (a class change, scenarios, tools).
+function LevelUp_ApplyOwed(_ch) {
+    var guard = 0;
+    while (LevelUp_Owed(_ch) > 0 && guard < LEVEL_CAP_TECHNICAL) {
+        _ch = LevelUp_ApplyLevel(_ch);
+        guard++;
+    }
+    return _ch;
+}
+
+// D177: the character as he will be once the level the screen is for is confirmed (class growth in; the point not yet placed): what the screen shows as "now > after".
+// A copy: the character is not touched. With nothing owed (a point banked by an older save) it is just a copy.
+function LevelUp_PreviewCharacter(_ch) {
+    var pv = variable_clone(_ch);
+    if (LevelUp_Owed(pv) > 0 && pv.stat_points <= 0) pv = LevelUp_ApplyLevel(pv);
+    return pv;
 }
 
 // The class's default free-point stat (-1 when it has none).
@@ -180,6 +235,8 @@ function LevelUp_AutoGainSummary(_ch) {
     if (g.def > 0) array_push(parts, "DEF +" + string(g.def));
     if (g.spd > 0) array_push(parts, "SPD +" + string(g.spd));
     if (g.mag > 0) array_push(parts, "MAG +" + string(g.mag));
+    if (variable_struct_exists(g, "vig") && g.vig > 0) array_push(parts, "VIG +" + string(g.vig));
+    if (variable_struct_exists(g, "mnd") && g.mnd > 0) array_push(parts, "MND +" + string(g.mnd));
     var out = "";
     for (var i = 0; i < array_length(parts); i++) {
         if (i > 0) out += ", ";
@@ -214,7 +271,7 @@ function LevelUp_FromExp(_ch) {
     _ch.last_stat_points_gained = 0;
     _ch.last_auto_stat_id = -1;
     _ch.last_auto_stat_gained = 0;
-    _ch.last_growth = { atk:0, def:0, spd:0, mag:0 };
+    _ch.last_growth = { atk:0, def:0, spd:0, mag:0, vig:0, mnd:0 };
 
     if (Level_IsAtCap(_ch.level)) {
         _ch.exp = 0;
@@ -241,13 +298,55 @@ function LevelUp_FromExp(_ch) {
     } else {
         _ch.exp = min(_ch.exp, max(0, _ch.exp_next - 1));
     }
+    _ch.last_stat_points_gained = _ch.last_levels_gained * LEVEL_FREE_POINTS_PER_LEVEL;   // R-113: it was reset to 0 above and never set
 
+    return _ch;
+}
+
+// D177: the same bookkeeping as LevelUp_FromExp, but the levels are only OWED: the level, the stats, Max HP / Max MP, the points and the card picks stay as they were until
+// the player confirms the level-up screen (Cards_PlaceStat gives one owed level per confirm). The EXP bar is the one of the level he will be (level + owed).
+function LevelUp_OweFromExp(_ch) {
+    _ch = Player_NormalizeProgression(_ch, false, false);
+    _ch.last_levels_gained = 0;
+    _ch.last_stat_points_gained = 0;
+    _ch.last_auto_stat_id = -1;
+    _ch.last_auto_stat_gained = 0;
+    _ch.last_growth = { atk:0, def:0, spd:0, mag:0, vig:0, mnd:0 };
+
+    var owed0 = LevelUp_Owed(_ch);
+    var owed = owed0;
+    var eff = _ch.level + owed;
+    if (Level_IsAtCap(eff)) {
+        _ch.exp = 0;
+        _ch.exp_next = 0;
+        return _ch;
+    }
+    var need = Exp_NextLevel(eff);
+    var guard = 0;
+    while (need > 0 && _ch.exp >= need && !Level_IsAtCap(eff)) {
+        _ch.exp -= need;
+        owed += 1;
+        eff += 1;
+        need = Exp_NextLevel(eff);
+        guard += 1;
+        if (guard > 200) break;
+    }
+    _ch.levels_owed = owed;
+    if (Level_IsAtCap(eff)) {
+        _ch.exp = 0;
+        _ch.exp_next = 0;
+    } else {
+        _ch.exp_next = need;
+        _ch.exp = min(_ch.exp, max(0, need - 1));
+    }
+    _ch.last_levels_gained = owed - owed0;
+    _ch.last_stat_points_gained = _ch.last_levels_gained * LEVEL_FREE_POINTS_PER_LEVEL;
     return _ch;
 }
 
 function Player_AddExp(_ch, _amount) {
     _ch = Player_NormalizeProgression(_ch, false, false);
-    if (Level_IsAtCap(_ch.level)) {
+    if (Level_IsAtCap(_ch.level + LevelUp_Owed(_ch))) {
         _ch.last_exp_gain = 0;
         _ch.last_levels_gained = 0;
         _ch.last_stat_points_gained = 0;
@@ -260,7 +359,7 @@ function Player_AddExp(_ch, _amount) {
     var grant = max(0, round(_amount));
     _ch.last_exp_gain = grant;
     _ch.exp += grant;
-    _ch = LevelUp_FromExp(_ch);
+    _ch = LevelUp_Deferred() ? LevelUp_OweFromExp(_ch) : LevelUp_FromExp(_ch);   // D177: in a run the levels wait for the screen
     return _ch;
 }
 
@@ -275,7 +374,7 @@ function Cards_NextOwed(_ch) {
     if (_ch.class_pick) return "class";
     if (array_length(_ch.echo_offer) > 0) return "echo";   // D130: the lost run's gift, right after the class pick
     if (_ch.skill_pending >= 0) return "replace";
-    if (!Level_AutoPlaceEnabled() && _ch.stat_points > 0) return "stat";
+    if (!Level_AutoPlaceEnabled() && (_ch.stat_points > 0 || LevelUp_Owed(_ch) > 0)) return "stat";   // D177: a banked point, or a level won and not yet confirmed
     if (_ch.card_picks > 0 && _ch.class_chosen) return "cards";   // picks wait for the class (so they come from its pool)
     return "";
 }
@@ -297,55 +396,48 @@ function Cards_ChestOpened(_ch) {
     return ch;
 }
 
-// D143: the line the level-up screen shows: what the class gains by itself at _level, e.g. "Knight growth: ATK +1, DEF +1" (Nobody's rotates, so the
-// level matters). "" for a class with no growth.
-function LevelUp_GrowthText(_class_id, _level) {
-    var g = LevelUp_ClassGrowthGain(_class_id, _level);
-    var keys = ["atk", "def", "spd", "mag"];
-    var ids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG];
-    var gains = "";
-    for (var i = 0; i < 4; i++) {
-        var n = variable_struct_get(g, keys[i]);
-        if (n <= 0) continue;
-        if (gains != "") gains += ", ";
-        gains += Loc_T("levelup.gain", "{stat} +{n}", { stat: Stat_ShortName(ids[i]), n: n });
-    }
-    if (gains == "") return "";
-    return Loc_T("levelup.growth", "{name} growth: {gains}", { name: DB_PlayerClass(_class_id).name, gains: gains });
+// D177: what a row of the level-up screen reads. A row the class grows shows "now > now + growth" (gold); a row it does not grow shows only the number; the row under the
+// cursor (keyboard or mouse) shows its "> +1" on top: a growth row "now > now + growth + 1", another "now > now + 1". Never past the stat maximum.
+function Cards_StatRowValue(_now, _grow, _hover) {
+    var g = max(0, _grow);
+    if (g <= 0 && !_hover) return string(_now);
+    return string(_now) + " > " + string(StatClamp(_now + g + (_hover ? 1 : 0)));
 }
 
 // Hunt 7 (D143): the level a free-point prompt is for. A fight that gives several levels owes one point per level and the prompts open one by one, so the
 // prompt for the oldest point still owed is the character's level minus the points still owed, plus one (never below 2 or above the level).
 function LevelUp_PromptLevel(_ch) {
+    if (LevelUp_Owed(_ch) > 0 && _ch.stat_points <= 0) return _ch.level + 1;   // D177: the screen is for the next owed level
     var owed = (variable_struct_exists(_ch, "stat_points") ? max(0, _ch.stat_points) : 0) / LEVEL_FREE_POINTS_PER_LEVEL;
     return clamp(_ch.level - ceil(owed) + 1, min(2, _ch.level), _ch.level);
 }
 
-// D143: the free-point prompt's rows: the four stats, then Max HP and Max MP (value now > after).
+// D143, D176: the free-point prompt's rows: the six stats ATK DEF SPD MAG VIG MND (value now > after the point).
 function Cards_FreePointOptions(_ch) {
-    var out = Cards_StatOptions(_ch);
-    array_push(out, { stat: FREE_POINT_MAX_HP, label: Loc_T("cards.stat.maxhp", "Max HP +{n}", { n: FREE_POINT_HP_GAIN }), from: _ch.max_hp, to: _ch.max_hp + FREE_POINT_HP_GAIN });
-    array_push(out, { stat: FREE_POINT_MAX_MP, label: Loc_T("cards.stat.maxmp", "Max MP +{n}", { n: FREE_POINT_MP_GAIN }), from: _ch.max_mp, to: _ch.max_mp + FREE_POINT_MP_GAIN });
-    return out;
+    return Cards_StatOptions(_ch);
 }
 
-// The four rows of the free-point prompt: the stat, its value now and after the point.
+// The rows of the free-point prompt: the stat, its value now and after the point.
 function Cards_StatOptions(_ch) {
-    var ids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG];
+    var ids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG, STAT_VIG, STAT_MND];
     var out = [];
-    for (var i = 0; i < 4; i++) {
-        var from = variable_struct_get(_ch.stats, Stat_Key(ids[i]));
+    for (var i = 0; i < array_length(ids); i++) {
+        var from = Stat_Get(_ch, ids[i]);
         array_push(out, { stat: ids[i], label: Stat_ShortName(ids[i]), from: from, to: StatClamp(from + 1) });
     }
     return out;
 }
 
-// Spends one banked point on _stat_id (Level_ApplyFreePoint, or Level_ApplyResourcePoint for Max HP / Max MP) and gives the extra MP a MAG point adds.
+// The level-up screen's confirm (D177): with a level owed and no point banked, the level comes first (class growth, one free point, one card pick), then the point goes on
+// _stat_id (Level_ApplyFreePoint); the current HP / MP rise by the Max HP / Max MP the level and the point added (VIG, MND). A banked point of an older save is just spent.
 function Cards_PlaceStat(_ch, _stat_id) {
-    if (_stat_id == FREE_POINT_MAX_HP || _stat_id == FREE_POINT_MAX_MP) return Level_ApplyResourcePoint(_ch, _stat_id);   // D143
+    if (!is_struct(_ch)) return _ch;
+    if (LevelUp_Owed(_ch) > 0 && _ch.stat_points <= 0) _ch = LevelUp_ApplyLevel(_ch);   // the level raises Max HP / MP, and the current HP / MP with them
+    var max_hp0 = _ch.max_hp;
     var max_mp0 = _ch.max_mp;
     _ch = Level_ApplyFreePoint(_ch, _stat_id);
     _ch = RecomputeResources(_ch);
+    _ch.hp = clamp(_ch.hp + max(0, _ch.max_hp - max_hp0), 0, _ch.max_hp);
     _ch.mp = clamp(_ch.mp + max(0, _ch.max_mp - max_mp0), 0, _ch.max_mp);
     return _ch;
 }

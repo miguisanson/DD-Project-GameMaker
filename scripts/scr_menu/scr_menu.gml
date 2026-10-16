@@ -78,29 +78,35 @@ function TabMenu_Signed(_n) {
     return ((_n > 0) ? "+" : "") + string(_n);
 }
 
-// ---- Status: ATK DEF SPD MAG with what each does, then the statuses on the character ----
+// ---- Status: ATK DEF SPD MAG VIG MND with what each does, then the statuses on the character ----
 function Stat_Sentence(_stat_id) {
     switch (_stat_id) {
         case STAT_ATK: return Loc_T("menu.tooltip.stat.atk.desc", "Increases physical damage (basic attacks and ATK skills).");
         case STAT_DEF: return Loc_T("menu.tooltip.stat.def.desc", "Reduces all damage you take.");
         case STAT_SPD: return Loc_T("menu.tooltip.stat.spd.desc", "Decides who acts first.");
-        case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage and max MP.");
+        case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage.");
+        case STAT_VIG: return Loc_T("menu.tooltip.stat.vig.desc", "Raises max HP. The more you add, the less each point gives.");   // D176
+        case STAT_MND: return Loc_T("menu.tooltip.stat.mnd.desc", "Raises max MP. The more you add, the less each point gives.");
     }
     return Loc_T("menu.tooltip.stat.default.desc", "Affects battle performance.");
 }
 
 function TabStatus_Items(_ch) {
     var items = [];
-    var sids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG];
-    for (var i = 0; i < 4; i++) {
+    var sids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG, STAT_VIG, STAT_MND];
+    for (var i = 0; i < array_length(sids); i++) {
         var sid = sids[i];
         var base = variable_struct_get(_ch.stats, Stat_Key(sid));
-        var gear = Equip_GetStatBonus(_ch, sid);
-        var fx = Status_ModStat(_ch, sid);
         var lines = [{ label: Loc_T("tab.lbl.base", "Base"), value: string(base) }];
-        if (gear != 0) array_push(lines, { label: Loc_T("tab.lbl.gear", "Gear"), value: TabMenu_Signed(gear) });
-        if (fx != 0) array_push(lines, { label: Loc_T("tab.lbl.effects", "Effects"), value: TabMenu_Signed(fx) });
-        array_push(lines, { label: Loc_T("tab.lbl.total", "Total"), value: string(Stat_Get(_ch, sid)) });
+        if (sid == STAT_VIG || sid == STAT_MND) {   // D176: no gear or effect touches them: the line that matters is what they make
+            array_push(lines, (sid == STAT_VIG) ? { label: Loc_T("tab.lbl.max_hp", "Max HP"), value: string(_ch.max_hp) } : { label: Loc_T("tab.lbl.max_mp", "Max MP"), value: string(_ch.max_mp) });
+        } else {
+            var gear = Equip_GetStatBonus(_ch, sid);
+            var fx = Status_ModStat(_ch, sid);
+            if (gear != 0) array_push(lines, { label: Loc_T("tab.lbl.gear", "Gear"), value: TabMenu_Signed(gear) });
+            if (fx != 0) array_push(lines, { label: Loc_T("tab.lbl.effects", "Effects"), value: TabMenu_Signed(fx) });
+            array_push(lines, { label: Loc_T("tab.lbl.total", "Total"), value: string(Stat_Get(_ch, sid)) });
+        }
         var row = { id: Stat_Key(sid), label: Stat_ShortName(sid), value: string(Stat_Get(_ch, sid)), kind: "button", enabled: true, help: Stat_Sentence(sid), lines: lines, hint: "" };
         if (is_struct(_ch.class_cfg) && variable_struct_exists(_ch.class_cfg, "sprites") && sprite_exists(_ch.class_cfg.sprites.down)) row.pic = { spr: _ch.class_cfg.sprites.down, sub: 0 };
         array_push(items, row);
@@ -693,9 +699,9 @@ function Help_Term(_id, _label, _help) {
 function Help_StatsItems() {
     var out = [];
     array_push(out, Help_Term("power", Loc_T("card.lbl.power", "Power"), Loc_T("help.line.power", "How hard a weapon or skill hits. More Power means more damage.")));
-    var stat_ids = [STAT_ATK, STAT_DEF, STAT_MAG, STAT_SPD];
-    var stat_keys = ["atk", "def", "mag", "spd"];
-    for (var i = 0; i < 4; i++) array_push(out, Help_Term(stat_keys[i], Stat_ShortName(stat_ids[i]), Stat_Sentence(stat_ids[i])));
+    var stat_ids = [STAT_ATK, STAT_DEF, STAT_MAG, STAT_SPD, STAT_VIG, STAT_MND];
+    var stat_keys = ["atk", "def", "mag", "spd", "vig", "mnd"];
+    for (var i = 0; i < array_length(stat_ids); i++) array_push(out, Help_Term(stat_keys[i], Stat_ShortName(stat_ids[i]), Stat_Sentence(stat_ids[i])));
     array_push(out, Help_Term("hp", Loc_T("battle.hud.hp", "HP"), Loc_T("help.line.hp", "Health. At 0 HP you fall.")));
     array_push(out, Help_Term("mp", Loc_T("battle.hud.mp", "MP"), Loc_T("help.line.mp", "Magic points. Skills spend them; potions and rest restore them.")));
     array_push(out, Help_Term("crit", Loc_T("help.term.crit", "Crit"), Loc_T("help.line.crit", "A critical hit deals {mult} times the damage. [t]Take Aim[/t] and some gear raise the odds.", { mult: string(COMBAT_CRIT_MULT) })));
@@ -1301,13 +1307,20 @@ function TabMenu_CardData(_mt) {
     global.tabmenu_card_builds = TabMenu_CardBuilds() + 1;
     c = {
         lang: lang, mt: _mt,
-        hp: Loc_T("battle.hud.hp", "HP"), mp: Loc_T("battle.hud.mp", "MP"), xp: Loc_T("tab.lbl.xp", "EXP"), xp_max: Loc_T("tab.val.max", "MAX"),
+        hp: Loc_T("battle.hud.hp", "HP"), mp: Loc_T("battle.hud.mp", "MP"), xp: Loc_T("tab.lbl.xp", "EXP"), xp_max: Loc_T("tab.val.max", "MAX"), xp_ready: Loc_T("tab.val.level_up", "Level Up"),
         level_tpl: Loc_T("battle.hud.level", "Lv {n}"), seed_tpl: Loc_T("tab.lbl.seed_small", "Seed: {n}"),
-        lab_w: 0, k_hp: -999, k_mp: -999, k_xp: -999, val_w: 0
+        lab_w: 0, k_hp: -999, k_mp: -999, k_xp: -999, k_owed: -1, val_w: 0
     };
     c.lab_w = max(UI_TextWidth(c.hp), max(UI_TextWidth(c.mp), UI_TextWidth(c.xp)));
     global.tabmenu_card = c;
     return c;
+}
+
+// D177: the status card's EXP bar: full and "Level Up" while a level is owed (won, the screen not yet confirmed), else EXP over the bar, "MAX" at the cap. { ratio, text }
+function TabMenu_XpBar(_ch, _max_txt = undefined, _ready_txt = undefined) {
+    if (LevelUp_Owed(_ch) > 0) return { ratio: 1, text: is_undefined(_ready_txt) ? Loc_T("tab.val.level_up", "Level Up") : _ready_txt };
+    if (_ch.exp_next > 0) return { ratio: clamp(_ch.exp / _ch.exp_next, 0, 1), text: string(_ch.exp) + "/" + string(_ch.exp_next) };
+    return { ratio: 1, text: is_undefined(_max_txt) ? Loc_T("tab.val.max", "MAX") : _max_txt };
 }
 
 // One bar row of the card: label, bar, "cur/max".
@@ -1337,14 +1350,17 @@ function TabMenu_DrawStatusCard(_x, _y, _w, _h, _ch, _alpha) {
     Ui_Text(x0, yy, nm, UI_C_LIGHTEST);
     Ui_Text(x1, yy, string_replace_all(cd.level_tpl, "{n}", string(_ch.level)), UI_C_LIGHT, fa_right);   // what Loc_T(.., { n }) makes
     yy += lh + p;
-    if (cd.k_hp != _ch.max_hp || cd.k_mp != _ch.max_mp || cd.k_xp != _ch.exp_next) {   // the widest "cur/max" text only changes with the maxima
+    var owed_now = (LevelUp_Owed(_ch) > 0) ? 1 : 0;
+    if (cd.k_hp != _ch.max_hp || cd.k_mp != _ch.max_mp || cd.k_xp != _ch.exp_next || cd.k_owed != owed_now) {   // the widest "cur/max" text only changes with the maxima
         var vw = UI_TextWidth(string(_ch.max_hp) + "/" + string(_ch.max_hp));
         vw = max(vw, UI_TextWidth(string(_ch.max_mp) + "/" + string(_ch.max_mp)));
         vw = max(vw, UI_TextWidth(string(_ch.exp_next) + "/" + string(_ch.exp_next)));
+        if (owed_now == 1) vw = max(vw, UI_TextWidth(cd.xp_ready));   // D177: "Level Up" in place of the numbers
         cd.val_w = vw;
         cd.k_hp = _ch.max_hp;
         cd.k_mp = _ch.max_mp;
         cd.k_xp = _ch.exp_next;
+        cd.k_owed = owed_now;
     }
     var bx = x0 + cd.lab_w + 2 * p;
     var bw = x1 - cd.val_w - 2 * p - bx;
@@ -1352,7 +1368,8 @@ function TabMenu_DrawStatusCard(_x, _y, _w, _h, _ch, _alpha) {
     yy += lh + p;
     TabMenu_DrawCardBar(x0, x1, yy, bx, bw, cd.mp, (_ch.max_mp > 0) ? clamp(_ch.mp / _ch.max_mp, 0, 1) : 1, string(_ch.mp) + "/" + string(_ch.max_mp), "mp");
     yy += lh + p;
-    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, cd.xp, (_ch.exp_next > 0) ? clamp(_ch.exp / _ch.exp_next, 0, 1) : 1, (_ch.exp_next > 0) ? (string(_ch.exp) + "/" + string(_ch.exp_next)) : cd.xp_max, "xp");
+    var xb = TabMenu_XpBar(_ch, cd.xp_max, cd.xp_ready);
+    TabMenu_DrawCardBar(x0, x1, yy, bx, bw, cd.xp, xb.ratio, xb.text, "xp");
     yy += lh + p;
     Hud_DrawCoin(x0, yy + (lh - 6 * p) div 2, p);
     Ui_Text(x0 + 8 * p, yy, string(Gold_Get()), UI_C_LIGHTEST);
@@ -1681,32 +1698,55 @@ function CardsUi_StatHelp(_stat_id) {
         case STAT_ATK: return Loc_T("menu.tooltip.stat.atk.desc", "Increases physical damage (basic attacks and ATK skills).");
         case STAT_DEF: return Loc_T("menu.tooltip.stat.def.desc", "Reduces all damage you take.");
         case STAT_SPD: return Loc_T("menu.tooltip.stat.spd.desc", "Decides who acts first.");
-        case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage and max MP.");
-        case FREE_POINT_MAX_HP: return Loc_T("cards.stat.maxhp.desc", "Raises your max HP by {n} and restores {n} HP.", { n: FREE_POINT_HP_GAIN });   // D143
-        case FREE_POINT_MAX_MP: return Loc_T("cards.stat.maxmp.desc", "Raises your max MP by {n} and restores {n} MP.", { n: FREE_POINT_MP_GAIN });
+        case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage.");
+        case STAT_VIG: return Loc_T("menu.tooltip.stat.vig.desc", "Raises max HP. The more you add, the less each point gives.");   // D176
+        case STAT_MND: return Loc_T("menu.tooltip.stat.mnd.desc", "Raises max MP. The more you add, the less each point gives.");
     }
     return "";
 }
 
+// D177: the level-up screen. Rows ATK DEF SPD MAG VIG MND. The rows the class grows are gold and read "now > now + growth"; the others read only the number; the row under the
+// cursor adds its "+1" (CardsUi_StatRefresh, every frame). The details say what the stat does and Now / After (VIG: Max HP, MND: Max MP), with the class growth and the
+// point both counted. "Now" is the character as he is, "After" the preview of the level the screen is for (LevelUp_PreviewCharacter).
 function CardsUi_StatMenu() {
     var ch = GameState_Get().player_ch;
-    var opts = Cards_FreePointOptions(ch);   // D143: the four stats, Max HP, Max MP
+    var pv = LevelUp_PreviewCharacter(ch);   // the level the screen is for, class growth in, the point not placed
     var plvl = LevelUp_PromptLevel(ch);   // hunt 7: a fight that gave several levels steps through each level's growth, oldest first
+    var ids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG, STAT_VIG, STAT_MND];
     var items = [];
-    for (var i = 0; i < array_length(opts); i++) {
-        var o = opts[i];
-        array_push(items, {
-            label: o.label, value: string(o.from) + " > " + string(o.to), help: CardsUi_StatHelp(o.stat),
-            lines: [ { label: Loc_T("cards.stat.now", "Now"), value: string(o.from) }, { label: Loc_T("cards.stat.after", "After"), value: string(o.to) } ],
-            stat: o.stat
-        });
+    var any_growth = false;
+    for (var i = 0; i < array_length(ids); i++) {
+        var sid = ids[i];
+        var key = Stat_Key(sid);
+        var now = variable_struct_get(ch.stats, key);
+        var grow = max(0, variable_struct_get(pv.stats, key) - now);
+        var after = StatClamp(variable_struct_get(pv.stats, key) + 1);   // growth and the point
+        var lines = [];
+        if (sid == STAT_VIG) lines = [ { label: Loc_T("cards.stat.hp_now", "Max HP Now"), value: string(ch.max_hp) }, { label: Loc_T("cards.stat.hp_after", "Max HP After"), value: string(Resource_MaxHpOfVig(after)) } ];
+        else if (sid == STAT_MND) lines = [ { label: Loc_T("cards.stat.mp_now", "Max MP Now"), value: string(ch.max_mp) }, { label: Loc_T("cards.stat.mp_after", "Max MP After"), value: string(Resource_MaxMpOfMnd(after)) } ];
+        else lines = [ { label: Loc_T("cards.stat.now", "Now"), value: string(now) }, { label: Loc_T("cards.stat.after", "After"), value: string(after) } ];
+        var row = { label: Stat_ShortName(sid), value: "", help: CardsUi_StatHelp(sid), lines: lines, stat: sid, now: now, grow: grow };
+        if (grow > 0) {
+            row.col = UI_C_MERCHANT_GOLD;
+            any_growth = true;
+        }
+        array_push(items, row);
     }
     var m = Ui_MenuNew("cards_stat", items, {
         on_confirm: CardsUi_StatConfirm, on_back: CardsUi_NoBack,
-        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(plvl) }), note: LevelUp_GrowthText(ch.class_id, plvl), anchor: "center", details: true }
+        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(plvl) }), note: any_growth ? Loc_T("levelup.legend", "Gold = your class grows these") : "", note_col: UI_C_MERCHANT_GOLD, anchor: "center", details: true }
     });
-    Ui_MenuFixCursor(m, clamp(DB_PlayerClass(ch.class_id).free_default, 0, 3));   // the class's usual stat first
+    Ui_MenuFixCursor(m, clamp(DB_PlayerClass(ch.class_id).free_default, 0, 5));   // the class's usual stat first
+    CardsUi_StatRefresh(m);
     return m;
+}
+
+// The rows' values follow the cursor: the row under it shows its +1. Called when the menu is made and every frame it is drawn.
+function CardsUi_StatRefresh(_m) {
+    for (var i = 0; i < array_length(_m.items); i++) {
+        var it = _m.items[i];
+        it.value = Cards_StatRowValue(it.now, it.grow, i == _m.cursor);
+    }
 }
 
 function CardsUi_StatConfirm(_m, _i) {
@@ -2012,6 +2052,7 @@ function CardsUi_Draw() {
     UI_SetFont();
     draw_set_alpha(1);
     Ui_DimBackdrop(UI_DIM_SCREEN * a);
+    if (u.kind == "stat" && is_struct(Ui_StackTop(u.stk)) && Ui_StackTop(u.stk).id == "cards_stat") CardsUi_StatRefresh(Ui_StackTop(u.stk));   // D177: the row under the cursor shows its +1
     if (u.kind == "cards") CardsUi_DrawPick(u, a);
     else Ui_StackDraw(u.stk, 0.5);
     draw_set_alpha(1);
@@ -5397,7 +5438,9 @@ function Ui_RowStyle(_row, _sel = false) {
     var kd = variable_struct_exists(_row, "kind") ? _row.kind : "button";
     if (kd == "head") return { text: UI_C_LIGHTEST, strip: -1, rule: UI_C_LIGHT };
     var dim = variable_struct_exists(_row, "dim") && _row.dim;
-    return { text: Ui_RowColor(_sel, Ui_ItemEnabled(_row), dim), strip: -1, rule: -1 };
+    var txt = Ui_RowColor(_sel, Ui_ItemEnabled(_row), dim);
+    if (variable_struct_exists(_row, "col") && Ui_ItemEnabled(_row)) txt = _row.col;   // D177: a row with a colour of its own (the level-up screen's gold growth rows), selected or not
+    return { text: txt, strip: -1, rule: -1 };
 }
 
 // D178: the colour of a row's NAME. An item row (it carries icon_item) shows its name in the item's rarity colour (Common white, Rare gold, Epic pulsing gold) unless the row is
@@ -6466,7 +6509,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         ty0 += header_h;
     }
     if (L.note != "") {
-        Ui_Text(x0, ty0, Ui_FitText(L.note, x1 - x0), UI_C_LIGHT);
+        Ui_Text(x0, ty0, Ui_FitText(L.note, x1 - x0), variable_struct_exists(L, "note_col") ? L.note_col : UI_C_LIGHT);
         ty0 += note_h;
     }
     var rows_y0 = ty0;

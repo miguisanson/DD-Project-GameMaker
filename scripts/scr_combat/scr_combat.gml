@@ -415,7 +415,7 @@ function Battle_GrantRewards(_p, _e) {
     if (is_struct(_e)) {
         if (variable_struct_exists(_e, "exp")) {
             var exp_gain = max(0, round(real(_e.exp)));
-            if (variable_struct_exists(_p, "level") && Level_IsAtCap(_p.level)) {
+            if (variable_struct_exists(_p, "level") && Level_IsAtCap(Player_EffLevel(_p))) {   // D177: counting the levels owed
                 exp_gain = 0;
             }
             if (exp_gain > 0) {
@@ -476,7 +476,7 @@ function Battle_BuildVictoryDialogueLines(_enemy, _rewards, _player) {
         gold_gain: (is_struct(_rewards) && variable_struct_exists(_rewards, "gold")) ? max(0, round(real(_rewards.gold))) : 0,   // C3
         auto_stat_summary: (is_struct(_rewards) && variable_struct_exists(_rewards, "auto_stat_summary")) ? string(_rewards.auto_stat_summary) : "",
         loot_gained: loot_gained,
-        at_level_cap: (is_struct(_player) && variable_struct_exists(_player, "level")) ? Level_IsAtCap(_player.level) : false
+        at_level_cap: (is_struct(_player) && variable_struct_exists(_player, "level")) ? Level_IsAtCap(Player_EffLevel(_player)) : false   // D177: counting the owed levels
     };
 
     Dialogue_NarrativeOnLevelUp(result.levels_gained);

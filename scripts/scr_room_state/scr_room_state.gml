@@ -745,7 +745,7 @@ function Run_MakeHistoryEntry(_run, _ch, _room_name, _result, _cause) {
     return {
         seed: _run.seed,
         class_id: is_struct(_ch) ? _ch.class_id : CLASS_NOBODY,
-        level: is_struct(_ch) ? _ch.level : 1,
+        level: is_struct(_ch) ? Player_EffLevel(_ch) : 1,   // D177: a level won and not yet confirmed counts
         floor: Run_FloorOfRoomName(_room_name),
         room: _room_name,
         result: _result,
@@ -843,7 +843,7 @@ function Run_HistoryEntryFromSave(_raw) {
     var entry = {
         seed: _raw.seed,
         class_id: (is_struct(pl) && variable_struct_exists(pl, "class_id")) ? pl.class_id : CLASS_NOBODY,
-        level: (is_struct(pl) && variable_struct_exists(pl, "level")) ? pl.level : 1,
+        level: (is_struct(pl) && variable_struct_exists(pl, "level")) ? Player_EffLevel(pl) : 1,   // D177: counting the owed levels
         floor: variable_struct_exists(_raw, "floor") ? _raw.floor : 0,
         room: variable_struct_exists(_raw.statData, "save_room_name") ? _raw.statData.save_room_name : "",
         result: "abandoned",
