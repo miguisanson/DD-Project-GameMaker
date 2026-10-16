@@ -145,6 +145,7 @@ function Test_RunAll() {
     Test_RunSuite("Hunt6Combat", Test_Suite_Hunt6Combat);
     Test_RunSuite("Hunt6Ui", Test_Suite_Hunt6Ui);
     Test_RunSuite("Review6", Test_Suite_Review6);
+    Test_RunSuite("Hunt7Prog", Test_Suite_Hunt7Prog);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -13676,4 +13677,212 @@ function Test_Suite_Hunt6Ui() {
         Test_Eq("hunt6ui items: on the map the throwable row still says to throw it in a battle", _map.msg, Loc_T("item.msg.throw_in_battle", "Throw it at an enemy in battle."));
         Test_Eq("hunt6ui items: the Firebomb is not spent either way", Inv_Count(_ch.inventory, 30), 1);
     }
+}
+
+// ============================================================================================================================
+// Bug hunt session 7: progression (a Nobody's loot, potion numbers, a throwable at its cap, a multi-level level-up prompt)
+// ============================================================================================================================
+function Test_Hunt7IsGear(_item_id) {
+    var _it = ItemDB_Get(_item_id);
+    return is_struct(_it) && (_it.type == ITEM_WEAPON || _it.type == ITEM_ARMOR);
+}
+
+function Test_Hunt7CountGear(_loot) {
+    var _n = 0;
+    for (var _i = 0; _i < array_length(_loot); _i++) if (Test_Hunt7IsGear(_loot[_i].item_id)) _n++;
+    return _n;
+}
+
+function Test_Suite_Hunt7Prog() {
+    ItemDB_Init();
+    var _gs = Test_FixBegin(DIFFICULTY_NORMAL);
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _run0 = _had_run ? _gs.run : undefined;
+
+    // ---- 1. P2: a Nobody that has chosen (it stays Nobody) is never offered a weapon or armor it cannot wear ----
+    var _nb = CharacterCreate_Player(CLASS_NOBODY);
+    _nb.class_chosen = true;
+    var _pre = CharacterCreate_Player(CLASS_NOBODY);
+    _pre.class_chosen = false;   // the run's start, before the class chest: it will become a class that can wear gear
+    var _kn1 = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_False("h7prog gear: a Nobody is not eligible for a Wooden Sword", Loot_ItemEligibleForPlayer(1, _nb));
+    Test_False("h7prog gear: a Nobody is not eligible for Leather Armor", Loot_ItemEligibleForPlayer(20, _nb));
+    Test_False("h7prog gear: nor for a Cloth Robe", Loot_ItemEligibleForPlayer(23, _nb));
+    Test_True("h7prog gear: a Nobody can still be given a potion", Loot_ItemEligibleForPlayer(10, _nb));
+    Test_True("h7prog gear: and a ring (anyone wears it)", Loot_ItemEligibleForPlayer(40, _nb));
+    Test_True("h7prog gear: the Nobody before the class chest is still offered gear (it becomes a class)", Loot_ItemEligibleForPlayer(1, _pre));
+    Test_True("h7prog gear: a Knight is still offered Knight gear", Loot_ItemEligibleForPlayer(1, _kn1));
+    Test_False("h7prog gear: and not Mage gear", Loot_ItemEligibleForPlayer(7, _kn1));
+    _gs.player_ch = _nb;
+    var _gear_nb = 0, _empty_nb = 0, _gear_pre = 0, _gear_kn = 0, _gear_barrel = 0;
+    for (var _sd = 1; _sd <= 90; _sd++) {
+        for (var _lv = 1; _lv <= 3; _lv++) {
+            var _room = "rm_floor" + string(1 + (_sd mod 9));
+            var _lt = Shuffle_ChestLoot(_sd, _room, "q" + string(_sd), _lv, "chest_basic", _nb);
+            if (array_length(_lt) < 1) _empty_nb++;
+            _gear_nb += Test_Hunt7CountGear(_lt);
+            _gear_pre += Test_Hunt7CountGear(Shuffle_ChestLoot(_sd, _room, "q" + string(_sd), _lv, "chest_basic", _pre));
+            _gear_kn += Test_Hunt7CountGear(Shuffle_ChestLoot(_sd, _room, "q" + string(_sd), _lv, "chest_basic", _kn1));
+            _gear_barrel += Test_Hunt7CountGear(Shuffle_ChestLoot(_sd, _room, "b" + string(_sd), _lv, "barrel_basic", _nb));
+        }
+    }
+    Test_Eq("h7prog gear: 270 chests of a chosen Nobody hold no weapon or armor", _gear_nb, 0);
+    Test_Eq("h7prog gear: and none of them is empty (the draw falls back to a usable item)", _empty_nb, 0);
+    Test_Eq("h7prog gear: 270 barrels of a chosen Nobody hold no weapon or armor", _gear_barrel, 0);
+    Test_True("h7prog gear: the Nobody before its class chest still finds gear", _gear_pre > 0);
+    Test_True("h7prog gear: a Knight still finds gear", _gear_kn > 0);
+    var _rg = Rng_New(77, "h7enemy");
+    var _e_gear = 0, _e_none = 0, _e_t23 = 0;
+    for (var _i = 0; _i < 360; _i++) {
+        var _eit = Loot_RollFromTable("enemy", 1 + (_i mod 3), _nb, CLASS_NOBODY, [], _rg);
+        if (!is_struct(_eit)) { _e_none++; continue; }
+        if (Test_Hunt7IsGear(_eit.item_id)) _e_gear++;
+        if (_eit.item_id == 14 || _eit.item_id == 17) _e_t23++;
+    }
+    Test_Eq("h7prog gear: 360 enemy drops of a chosen Nobody hold no gear", _e_gear, 0);
+    Test_Eq("h7prog gear: and none rolls nothing", _e_none, 0);
+    Test_True("h7prog gear: the rarity tier is still rolled first (middle-tier potions still drop)", _e_t23 > 0);
+    var _c3 = 0;
+    for (var _j = 0; _j < 300; _j++) {
+        var _cit = Loot_RollFromTable("chest", 3, _nb, CLASS_NOBODY, [], _rg);
+        if (is_struct(_cit) && (_cit.item_id == 15 || _cit.item_id == 18)) _c3++;
+    }
+    Test_True("h7prog gear: the top tier still shows for a Nobody (a Lv3 potion when the gear is filtered out)", _c3 > 0);
+    _gs.run = Run_Create(7);
+    var _g_gear = 0, _g_none = 0;
+    for (var _k = 0; _k < 80; _k++) {
+        var _gl = GraveLoot_RollTierItem(2 + (_k mod 2), CLASS_NOBODY, _nb);
+        if (array_length(_gl) < 1) _g_none++;
+        _g_gear += Test_Hunt7CountGear(_gl);
+    }
+    Test_Eq("h7prog gear: 80 grave rewards of a chosen Nobody hold no gear", _g_gear, 0);
+    Test_Eq("h7prog gear: and none is empty", _g_none, 0);
+
+    // ---- 2. P3: the map Items tab, the shop and the echo show the number a potion will heal, not the base ----
+    var _kn = CharacterCreate_Player(CLASS_KNIGHT);
+    _kn.level = 5;
+    _kn.inventory = Inv_Add(_kn.inventory, 10, 1);
+    _gs.player_ch = _kn;
+    var _hp1 = ItemDB_Get(10);
+    Test_Eq("h7prog potion: an HP Potion Lv1 at level 5 heals 8 + 4 = 12", Item_ComputeAmount(_kn, _hp1.use), 12);
+    Test_Eq("h7prog potion: its sentence says 12", Item_Sentence(_hp1, _kn), "Restores 12 [t]HP[/t].");
+    Test_Eq("h7prog potion: its number line says 12", Item_NumberLines(_hp1, _kn)[0].value, "12");
+    Test_Eq("h7prog potion: with no character the sentence keeps the base number", Item_Sentence(_hp1), "Restores 8 [t]HP[/t].");
+    var _irow = undefined;
+    var _irows = TabItems_Items(_kn, false);
+    for (var _r = 0; _r < array_length(_irows); _r++) if (_irows[_r].item_id == 10) _irow = _irows[_r];
+    Test_True("h7prog potion: the Items tab lists the potion", is_struct(_irow));
+    if (is_struct(_irow)) {
+        Test_Eq("h7prog potion: the Items tab sentence says 12", _irow.help, "Restores 12 [t]HP[/t].");
+        Test_Eq("h7prog potion: the Items tab number says 12", _irow.lines[0].value, "12");
+    }
+    var _srow = ShopUi_ItemFor({ kind: "item", id: 10, qty: 3, price: 10 }, _kn, 50);
+    Test_Eq("h7prog potion: the shop sentence says 12", _srow.help, "Restores 12 [t]HP[/t].");
+    Test_Eq("h7prog potion: the shop number says 12", _srow.lines[0].value, "12");
+    var _echo = CardsUi_EchoDetails({ kind: "item", id: 10 });
+    Test_Eq("h7prog potion: the echo panel says 12", _echo.sentence, "Restores 12 [t]HP[/t].");
+    var _t1 = variable_clone(_kn); _t1.hp = 1; _t1.max_hp = 99;
+    Item_Use(10, _kn, _t1);
+    Test_Eq("h7prog potion: using it heals exactly the number that was shown", _t1.hp - 1, real(Item_NumberLines(_hp1, _kn)[0].value));
+    _kn.passives = ["pas:potion_lore"];   // +15%
+    Test_Eq("h7prog potion: with Potion Lore it heals round(12 x 1.15) = 14", Item_ComputeAmount(_kn, _hp1.use), 14);
+    Test_Eq("h7prog potion: and the number line says 14", Item_NumberLines(_hp1, _kn)[0].value, "14");
+    var _t2 = variable_clone(_kn); _t2.hp = 1; _t2.max_hp = 99;
+    Item_Use(10, _kn, _t2);
+    Test_Eq("h7prog potion: and it heals 14", _t2.hp - 1, 14);
+    var _kn9 = CharacterCreate_Player(CLASS_KNIGHT);
+    _kn9.level = 9;
+    var _hp3 = ItemDB_Get(15);
+    Test_Eq("h7prog potion: an HP Potion Lv3 at level 9 heals 28 + floor(8 x 1.2) = 37", Item_ComputeAmount(_kn9, _hp3.use), 37);
+    Test_Eq("h7prog potion: the shop number says 37", ShopUi_ItemFor({ kind: "item", id: 15, qty: 1, price: 40 }, _kn9, 99).lines[0].value, "37");
+    var _mp1 = ItemDB_Get(11);
+    Test_Eq("h7prog potion: an MP Potion's number line is what it restores at level 9", Item_NumberLines(_mp1, _kn9)[0].value, string(Item_ComputeAmount(_kn9, _mp1.use)));
+    var _kn1b = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_Eq("h7prog potion: at level 1 the number is still the base 8", Item_NumberLines(_hp1, _kn1b)[0].value, "8");
+
+    // ---- 3. P3: a chest, drop or grave never rolls a throwable that is already at its stack cap (no "x0") ----
+    var _kt = CharacterCreate_Player(CLASS_KNIGHT);
+    _gs.player_ch = _kt;
+    var _base_inv = variable_clone(_kt.inventory);
+    var _cap = Throw_Cap(_kt);
+    _kt.inventory = Inv_Add(variable_clone(_base_inv), 33, _cap);
+    Test_Eq("h7prog cap: (setup) the Knight holds a full stack of Smoke Bombs", Inv_Count(_kt.inventory, 33), _cap);
+    Test_False("h7prog cap: a full stack of Smoke Bombs is not eligible", Loot_ItemEligibleForPlayer(33, _kt));
+    Test_True("h7prog cap: another throwable is", Loot_ItemEligibleForPlayer(30, _kt));
+    _kt.inventory = Inv_Add(variable_clone(_base_inv), 33, _cap - 1);
+    Test_True("h7prog cap: one short of the cap is still eligible", Loot_ItemEligibleForPlayer(33, _kt));
+    var _zero = 0, _hits = 0, _empty = 0, _over = 0;
+    for (var _s2 = 1; _s2 <= 400; _s2++) {
+        var _fl = 1 + (_s2 mod 3);
+        var _thr = Loot_FloorExtras(_s2, _fl)[0].item_id;
+        _kt.inventory = Inv_Add(variable_clone(_base_inv), _thr, _cap);
+        var _cl = Shuffle_ChestLoot(_s2, "rm_floor" + string(_fl), "t" + string(_s2), 1 + (_s2 mod 3), "chest_basic", _kt);
+        if (array_length(_cl) < 1) _empty++;
+        for (var _m = 0; _m < array_length(_cl); _m++) if (_cl[_m].item_id == _thr) _hits++;
+        _kt.inventory = Loot_Grant(_kt.inventory, _cl);
+        for (var _m2 = 0; _m2 < array_length(_cl); _m2++) if (_cl[_m2].qty <= 0) _zero++;
+        if (Inv_Count(_kt.inventory, _thr) > _cap) _over++;
+    }
+    Test_Eq("h7prog cap: 400 chests never roll the throwable the player holds a full stack of", _hits, 0);
+    Test_Eq("h7prog cap: no chest line has a zero quantity", _zero, 0);
+    Test_Eq("h7prog cap: no chest is empty", _empty, 0);
+    Test_Eq("h7prog cap: the stack never goes over the cap", _over, 0);
+    _gs.run = Run_Create(9);
+    _kt.inventory = Inv_Add(Inv_Add(variable_clone(_base_inv), 33, _cap), 30, _cap);   // the only throwables the enemy table has
+    var _d_thr = 0, _d_none = 0, _d_dry_wrong = 0;
+    for (var _n = 0; _n < 200; _n++) {
+        _gs.run.drop_dry = 10;   // the drop chance is 100%
+        var _drop = Loot_RollEnemy({ id: ENEMY_SLIME, level: 1, loot_key: "enemy_basic" });
+        if (array_length(_drop) < 1) { _d_none++; continue; }
+        if (_drop[0].item_id == 33 || _drop[0].item_id == 30) _d_thr++;
+        if (_gs.run.drop_dry != 0) _d_dry_wrong++;
+    }
+    Test_Eq("h7prog cap: 200 enemy drops never roll a throwable at its cap", _d_thr, 0);
+    Test_Eq("h7prog cap: and a sure drop is never lost to it", _d_none, 0);
+    Test_Eq("h7prog cap: every received drop resets the dry-fight counter", _d_dry_wrong, 0);
+    var _b_zero = 0, _b_over = 0;
+    var _inv4 = Inv_Add(Inv_Add(variable_clone(_base_inv), 33, _cap - 1), 30, _cap - 1);
+    for (var _s3 = 1; _s3 <= 300; _s3++) {
+        _kt.inventory = variable_clone(_inv4);
+        var _bl = Loot_RollContainer(1, "enemy_boss", Rng_New(_s3, "h7boss"), undefined, _kt);   // a boss leaves two items
+        _kt.inventory = Loot_Grant(_kt.inventory, _bl);
+        for (var _m3 = 0; _m3 < array_length(_bl); _m3++) if (_bl[_m3].qty <= 0) _b_zero++;
+        if (Inv_Count(_kt.inventory, 33) > _cap || Inv_Count(_kt.inventory, 30) > _cap) _b_over++;
+    }
+    Test_Eq("h7prog cap: a two-item drop never shows a zero line when the first item fills the stack", _b_zero, 0);
+    Test_Eq("h7prog cap: and never goes over the cap", _b_over, 0);
+
+    // ---- 4. P3: a level-up that gives several levels steps through each level's growth (D143) ----
+    _gs.run = Run_Create(31);
+    var _lvn = CharacterCreate_Player(CLASS_NOBODY);
+    _lvn.exp = Exp_NextLevel(1) + Exp_NextLevel(2);
+    _lvn = LevelUp_FromExp(_lvn);
+    Test_True("h7prog levelup: (setup) one fight took the Nobody from level 1 to 3 with two points owed", _lvn.level == 3 && _lvn.stat_points == 2);
+    _gs.player_ch = _lvn;
+    var _m1 = CardsUi_StatMenu();
+    Test_Eq("h7prog levelup: the first prompt is level 2", _m1.layout.title, "Level 2: Place 1 Point");
+    Test_Eq("h7prog levelup: with level 2's growth", _m1.layout.note, "Nobody growth: ATK +1, SPD +1");
+    _lvn = Cards_PlaceStat(_lvn, STAT_ATK);
+    _gs.player_ch = _lvn;
+    var _m2 = CardsUi_StatMenu();
+    Test_Eq("h7prog levelup: the second prompt is level 3", _m2.layout.title, "Level 3: Place 1 Point");
+    Test_Eq("h7prog levelup: with level 3's growth", _m2.layout.note, "Nobody growth: DEF +1, MAG +1");
+    var _lvk = CharacterCreate_Player(CLASS_KNIGHT);
+    _lvk.exp = Exp_NextLevel(1) + Exp_NextLevel(2) + Exp_NextLevel(3);
+    _lvk = LevelUp_FromExp(_lvk);
+    _gs.player_ch = _lvk;
+    var _ttl = [];
+    for (var _p = 0; _p < 3; _p++) {
+        array_push(_ttl, CardsUi_StatMenu().layout.title);
+        _lvk = Cards_PlaceStat(_lvk, STAT_ATK);
+        _gs.player_ch = _lvk;
+    }
+    Test_Eq("h7prog levelup: three levels give three prompts, levels 2, 3 and 4", _ttl[0] + "|" + _ttl[1] + "|" + _ttl[2], "Level 2: Place 1 Point|Level 3: Place 1 Point|Level 4: Place 1 Point");
+    var _single = CharacterCreate_Player(CLASS_KNIGHT);
+    _single.level = 6;
+    _single.stat_points = 0;
+    _gs.player_ch = _single;
+    Test_Eq("h7prog levelup: with no point owed the prompt falls back to the current level", CardsUi_StatMenu().layout.title, "Level 6: Place 1 Point");
+
+    if (_had_run) _gs.run = _run0; else variable_struct_remove(_gs, "run");
 }
