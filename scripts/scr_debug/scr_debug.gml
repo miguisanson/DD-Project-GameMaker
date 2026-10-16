@@ -2719,10 +2719,10 @@ function Scenario_StepBotAI(_s) {
                 } else if (_d_menu || _d.ac != 0) {
                     Scenario_BotAct(_s, _bcD, "attack", false);
                 }
-            } else if (_d.k == 4) {   // SPD 16 against the Knight's 8: the enemy acts twice in a row on the real timeline
+            } else if (_d.k == 4) {   // SPD 16 against the Knight's 9 (D186; it was 10): the enemy takes 3 of the next 5 turns (16 : 9 is 64%), a 5-turn window no longer always holds a double turn
                 if (array_length(_bcD.turn_log) >= _d.len0 + 5) {
                     var _seq = Scenario_BotTurnsSince(_bcD, _d.len0);
-                    Scenario_Check("bot_ai_palehorn_phase_2_real_turns_show_the_faster_enemy", string_pos("EE", _seq) > 0, "turns " + _seq);
+                    Scenario_Check("bot_ai_palehorn_phase_2_real_turns_show_the_faster_enemy", string_count("E", _seq) >= 3, "turns " + _seq);
                     Scenario_Next(_s, 31);
                 } else if (_d_menu || _d.ac != 0) {
                     Scenario_BotAct(_s, _bcD, "attack", false);

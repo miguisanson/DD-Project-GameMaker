@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "D112: a winning run takes 25-30 minutes (it was 45-60, D30). Target bands for the run simulator (tools/balance/sim.py --check, tools/balance/report.py). Numbers come from DECISIONS.md (D14 D30 D61), balance-methods.md section 6.2, combat-spec.md section 7 and the E1 packet brief. Proposals, not owner-locked values: the owner adjusts them (D13).",
+  "about": "D112: a winning run takes 25-30 minutes (it was 45-60, D30). Target bands for the run simulator (tools/balance/sim.py --check, tools/balance/report.py). Numbers come from DECISIONS.md (D14 D30 D61), balance-methods.md section 6.2, combat-spec.md section 7 and the E1 packet brief. Proposals, not owner-locked values: the owner adjusts them (D13). D186 (owner, 2026-10-17): for the class-spread pass every class aims at about 60-85% sim win rate (average profile, 2000 runs, seed 1); that band is the owner's and replaces the run_win_rate / nobody_win_rate average bands below for that pass (the numbers below are kept as the old proposals).",
   "check_runs": 300,
   "check_seed": 20261014,
   "check_classes": [

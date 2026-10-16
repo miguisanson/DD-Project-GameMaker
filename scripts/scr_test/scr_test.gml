@@ -389,10 +389,10 @@ function Test_Suite_Stats() {
     Test_True("D76 free points auto-place until the level-up UI exists", Level_AutoPlaceEnabled());
     _c.stat_points = 1;
     var _c2 = Level_ApplyFreePoint(_c, STAT_SPD);
-    Test_Eq("Level_ApplyFreePoint adds +1 to the chosen stat", _c2.stats.spd, 11);   // Knight SPD 10 (D111) + 1
+    Test_Eq("Level_ApplyFreePoint adds +1 to the chosen stat", _c2.stats.spd, 10);   // Knight SPD 9 (D186; it was 10) + 1
     Test_Eq("Level_ApplyFreePoint spends the point", _c2.stat_points, 0);
     var _c3 = Level_ApplyFreePoint(_c2, STAT_SPD);
-    Test_Eq("Level_ApplyFreePoint with no points left changes nothing", _c3.stats.spd, 11);
+    Test_Eq("Level_ApplyFreePoint with no points left changes nothing", _c3.stats.spd, 10);
     var _c4 = CharacterCreate_Player(CLASS_KNIGHT); _c4.stat_points = 1;
     _c4 = Level_ApplyFreePoint(_c4, 17);
     Test_Eq("Level_ApplyFreePoint rejects an unknown stat and keeps the point", _c4.stat_points, 1);
@@ -405,7 +405,7 @@ function Test_Suite_Stats() {
     _bank = LevelUp_ApplyLevel(_bank);
     global.levelup_auto_place = true;
     Test_Eq("D76 level-up with auto-place off banks 1 free point", _bank.stat_points, 1);
-    Test_Eq("D76 level-up with auto-place off still applies the fixed growth (Archer SPD+1 ATK+1)", _bank.stats.spd + _bank.stats.atk, 13 + 9 + 2);
+    Test_Eq("D76 level-up with auto-place off still applies the fixed growth (Archer SPD+1 ATK+1)", _bank.stats.spd + _bank.stats.atk, 11 + 8 + 2);   // D186: Archer SPD 11 and ATK 8 at level 1; level 2 is an even level, so SPD grows
     Test_Eq("LevelUp_ApplyLevel gives the HP gain as current HP (Archer L2 = 16)", _bank.hp, 16);
     // EXP: 834 exactly reaches the cap; 624 (a clean pass to the final boss) is level 9.
     var _run = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), 834);
@@ -5274,7 +5274,7 @@ function Test_Suite_Cards() {
     Test_Eq("C2 Ice Spear+ needs 1 arrow less", Card_UpgradedSequenceLength(SKILL_ICE_SPEAR, [SKILL_ICE_SPEAR]), 4);
     Test_Eq("C2 an upgrade of another skill leaves the arrows alone", Card_UpgradedSequenceLength(SKILL_ICE_SPEAR, [SKILL_FIREBALL]), 5);
     var _wu = Skill_WithUpgrade(SkillDB_Get(SKILL_WOUND), CardDB_Get(Card_UpgradeId(SKILL_WOUND)));
-    Test_True("C2 Wound+ power 4 -> 6 and bleed chance 75% -> 100%", _wu.power == 6 && _wu.status_chance == 1);
+    Test_True("C2 Wound+ power 3 -> 5 and bleed chance 75% -> 100%", _wu.power == 5 && _wu.status_chance == 1);   // D186: Wound power 3 (was 4)
     var _hu = Skill_WithUpgrade(SkillDB_Get(SKILL_HILT_BASH), CardDB_Get(Card_UpgradeId(SKILL_HILT_BASH)));
     Test_True("C2 Hilt Bash+ power 4 -> 5 and stun chance 60% -> 85%", _hu.power == 5 && abs(_hu.status_chance - 0.85) < 0.0001);
     var _mu = Skill_WithUpgrade(SkillDB_Get(SKILL_MUSCLE_UP), CardDB_Get(Card_UpgradeId(SKILL_MUSCLE_UP)));
@@ -7339,8 +7339,8 @@ function Test_Suite_BalanceD111() {
 
     // E1-5: Knight base SPD 8 -> 10
     var _kn = CharacterCreate_Player(CLASS_KNIGHT);
-    Test_Eq("D111 Knight SPD 10", _kn.stats.spd, 10);
-    Test_Eq("D111 Knight SPD still 10 at level 2 (fixed growth has none)", LevelUp_ApplyLevel(_kn).stats.spd, 10);
+    Test_Eq("D111 Knight SPD 9 (D186: was 10)", _kn.stats.spd, 9);
+    Test_Eq("D111 Knight SPD still 9 at level 2 (fixed growth has none)", LevelUp_ApplyLevel(_kn).stats.spd, 9);
 
     // E1-6: Nobody gets two fixed points a level (the old one plus the one two steps further on the ATK-DEF-SPD-MAG cycle), throwables x2
     Test_D111_Gain("D111 Nobody L2 gain", 2, 1, 0, 1, 0);
@@ -7354,7 +7354,7 @@ function Test_Suite_BalanceD111() {
     Test_D111_Gain("D111 Nobody L10 gain", 10, 1, 0, 1, 0);
     var _nb = CharacterCreate_Player(CLASS_NOBODY);
     for (var _l = 2; _l <= 10; _l++) _nb = LevelUp_ApplyLevel(_nb);
-    Test_True("D111 Nobody L10 stats ATK 22 DEF 12 SPD 14 MAG 7 (8+5+9, 8+4, 9+5, 3+4)", _nb.stats.atk == 22 && _nb.stats.def == 12 && _nb.stats.spd == 14 && _nb.stats.mag == 7);
+    Test_True("D111 Nobody L10 stats ATK 23 DEF 13 SPD 16 MAG 7 (9+5+9, 9+4, 11+5, 3+4; D186 start 9/9/11)", _nb.stats.atk == 23 && _nb.stats.def == 13 && _nb.stats.spd == 16 && _nb.stats.mag == 7);
     Test_Eq("D111 THROW_NOBODY_MULT is 2", THROW_NOBODY_MULT, 2);
     Test_Eq("D111 Nobody's throws are x2", Throw_Mult(CharacterCreate_Player(CLASS_NOBODY)), 2);
     Test_Eq("D111 the Knight's throws are x1", Throw_Mult(CharacterCreate_Player(CLASS_KNIGHT)), 1);
@@ -7582,8 +7582,8 @@ function Test_Suite_FairUi() {
     var _sl = EnemyCreate(ENEMY_SLIME);
     // Review 1: the shown percent never rounds up to a sure thing (floor, 99 at most) and says 100 only when the chance is exactly 1.
     // D124 says "a whole percent"; round() showed 100% for 0.9955 while the escape could still fail, so the two figures below are floored (spec refinement).
-    Test_Eq("R1b D124: Knight (SPD 10) vs Slime (SPD 9): 10/19 = 52.6 -> 52%", Battle_RunPct(_k, _sl, 0), 52);
-    Test_Eq("R1b D124: after one failed try: 77.6 -> 77%", Battle_RunPct(_k, _sl, 1), 77);
+    Test_Eq("R1b D124: Knight (SPD 9) vs Slime (SPD 9): 9/18 = 50%", Battle_RunPct(_k, _sl, 0), 50);
+    Test_Eq("R1b D124: after one failed try: 75%", Battle_RunPct(_k, _sl, 1), 75);
     var _fast = CharacterCreate_Player(CLASS_KNIGHT);
     var _slow = EnemyCreate(ENEMY_SLIME);
     _fast.stats.spd = 41;
@@ -7598,7 +7598,7 @@ function Test_Suite_FairUi() {
     Test_Eq("Review1: equal SPD, no failed try -> 50%", Battle_RunPct(_fast, _slow, 0), 50);
     Test_Eq("R1b D124: a boss cannot be fled (-1)", Battle_RunPct(_k, EnemyCreate(ENEMY_MINI_BOSS), 0), -1);
     var _cmd = Battle_CmdItems({ p: _k, e: _sl, run_fails: 0 });
-    Test_Eq("R1b D124: the RUN row shows the chance", _cmd[4].value, "52%");
+    Test_Eq("R1b D124: the RUN row shows the chance", _cmd[4].value, "50%");
     var _cmd_b = Battle_CmdItems({ p: _k, e: EnemyCreate(ENEMY_FINAL_BOSS), run_fails: 0 });
     Test_Eq("R1b D124: against a boss the RUN row says no", _cmd_b[4].value, Loc_T("battle.action.run_no", "No"));
     Test_Eq("R1b D124: without a battle the RUN row has no number", Battle_CmdItems()[4].value, "");
@@ -17966,10 +17966,10 @@ function Test_LvScreen() {
     Test_Eq("levelup screen: ATK DEF SPD MAG VIG MND in that order", _m.items[0].label + _m.items[1].label + _m.items[2].label + _m.items[3].label + _m.items[4].label + _m.items[5].label, "ATKDEFSPDMAGVIGMND");
     Test_Eq("levelup screen: the Knight's growth rows are gold", Test_LvGoldRows(_m), "ATK,DEF,VIG,MND");
     Test_Eq("levelup screen: the cursor starts on the class stat (DEF)", _m.cursor, STAT_DEF);
-    Test_Eq("levelup screen: so DEF reads 12 > 14, the other growth rows now > now + growth, the rest only the number", Test_LvRowValues(_m), "11 > 12|12 > 14|10|3|10 > 12|11 > 12");
+    Test_Eq("levelup screen: so DEF reads 12 > 14, the other growth rows now > now + growth, the rest only the number", Test_LvRowValues(_m), "11 > 12|12 > 14|9|3|10 > 12|11 > 12");
     _m.cursor = STAT_SPD;
     CardsUi_StatRefresh(_m);
-    Test_Eq("levelup screen: with the cursor on SPD it reads 10 > 11 and DEF goes back to 12 > 13", Test_LvRowValues(_m), "11 > 12|12 > 13|10 > 11|3|10 > 12|11 > 12");
+    Test_Eq("levelup screen: with the cursor on SPD it reads 9 > 10 and DEF goes back to 12 > 13", Test_LvRowValues(_m), "11 > 12|12 > 13|9 > 10|3|10 > 12|11 > 12");
     _m.cursor = STAT_VIG;
     CardsUi_StatRefresh(_m);
     Test_Eq("levelup screen: on VIG it reads 10 > 13 (growth 2 + the point)", _m.items[4].value, "10 > 13");
@@ -18014,7 +18014,7 @@ function Test_LvScreen() {
     var _om = CardsUi_StatMenu();
     Test_Eq("levelup screen: a banked point alone has no gold rows", Test_LvGoldRows(_om), "");
     Test_Eq("levelup screen: and no legend", _om.layout.note, "");
-    Test_Eq("levelup screen: every row reads only the number, the one under the cursor (DEF) now > now + 1", Test_LvRowValues(_om), "11|12 > 13|10|3|10|11");
+    Test_Eq("levelup screen: every row reads only the number, the one under the cursor (DEF) now > now + 1", Test_LvRowValues(_om), "11|12 > 13|9|3|10|11");
     Loc_SetLanguage("ko");
     var _ko = CardsUi_StatMenu();
     Test_True("levelup screen: the Korean legend is not the English one", _ko.layout.note != "Gold = your class grows these");
@@ -18029,7 +18029,7 @@ function Test_LvScreen() {
     var _ev = Ui_MenuStep(_km, _sn, 5000);
     CardsUi_StatRefresh(_km);
     Test_True("levelup screen: Down moves the cursor from DEF to SPD", _ev.moved && _km.cursor == STAT_SPD);
-    Test_Eq("levelup screen: and the +1 moves with it (SPD 10 > 11, DEF back to 12 > 13)", _km.items[2].value + "|" + _km.items[1].value, "10 > 11|12 > 13");
+    Test_Eq("levelup screen: and the +1 moves with it (SPD 9 > 10, DEF back to 12 > 13)", _km.items[2].value + "|" + _km.items[1].value, "9 > 10|12 > 13");
     // mouse: the row under the pointer is the cursor, a click confirms it
     var _mm2 = CardsUi_StatMenu();
     var _rects = [];
@@ -18462,8 +18462,9 @@ function Test_R3IdWorkbook() {
 // The class stat lines are the `vec cls_*` vectors; here the skill cost and the Archer growth rule.
 function Test_Suite_R3Balance() {
     SkillDB_Init();
-    Test_Eq("r3balance: Wound costs 4 MP (it was 3)", SkillDB_Get(SKILL_WOUND).mp_cost, 4);
-    Test_Eq("r3balance: Wound keeps its power 4", SkillDB_Get(SKILL_WOUND).power, 4);
+    Test_Eq("r3balance: Wound power is 3 (it was 4)", SkillDB_Get(SKILL_WOUND).power, 3);
+    Test_Eq("r3balance: Wound still costs 3 MP (so still 3 arrows)", SkillDB_Get(SKILL_WOUND).mp_cost, 3);
+    Test_Eq("r3balance: Horizontal Slash power is 4 (it was 5), cost 5", string(SkillDB_Get(SKILL_HORIZ_SLASH).power) + " " + string(SkillDB_Get(SKILL_HORIZ_SLASH).mp_cost), "4 5");
     Test_Eq("r3balance: Archer gains SPD on level 2", LevelUp_ClassGrowthGain(CLASS_ARCHER, 2).spd, 1);
     Test_Eq("r3balance: Archer gains no SPD on level 3", LevelUp_ClassGrowthGain(CLASS_ARCHER, 3).spd, 0);
     Test_Eq("r3balance: Archer gains SPD on level 4", LevelUp_ClassGrowthGain(CLASS_ARCHER, 4).spd, 1);

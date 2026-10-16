@@ -7,7 +7,7 @@ function SkillDB_Init() {
         id: SKILL_WOUND,
         name: "Wound",
         mp_cost: 3,
-        power: 4,
+        power: 3,   // D186 (R3 balance): was 4
         power_mult: 1,
         stat_type: STAT_ATK,
         acc: 0,
@@ -92,7 +92,7 @@ function SkillDB_Init() {
         id: SKILL_HORIZ_SLASH,
         name: "Horizontal Slash",
         mp_cost: 5,
-        power: 5,
+        power: 4,   // D186 (R3 balance): was 5
         power_mult: 1.5,
         stat_type: STAT_ATK,
         acc: 0,
