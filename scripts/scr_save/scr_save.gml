@@ -431,22 +431,48 @@ function Save_Path(_slot) {
 }
 
 // ============================================================================================================
-// C1: profile + run saves (D16, D36, D46). Two files, each with its own version:
-//   profile.sav  what outlives a run: story seen, unlocks, the echo waiting for the next run, run history, counters.
-//   run.sav      the run in progress: seed, RNG stream states, player, room state, position. Deleted when the run ends.
-// Both go through the SAVE-04 atomic helpers (.tmp -> verify -> .bak). The old slot files (savedata0..3.sav) are never read as
+// C1: profile + run saves (D16, D36, D46), per profile since D175 (saves1). Files, each with its own version:
+//   profiles.sav        the index of up to 4 profiles (D175): names, the active profile, the save file last used. Its own validator, version 1.
+//   profile_<id>.sav    what outlives a run: story seen, unlocks, the echo waiting for the next run, run history, counters (id 0..3).
+//   run_<id>_<slot>.sav the run in progress in save file <slot> (0..2) of profile <id>: seed, RNG stream states, player, room state, position. Deleted when the run ends.
+// Before D175 there was one profile.sav and one run.sav: Profiles_EnsureInit migrates them to profile_0.sav / run_0_0.sav once and keeps the originals as *.pre-profiles.
+// Everything goes through the SAVE-04 atomic helpers (.tmp -> verify -> .bak). The old slot files (savedata0..3.sav) are never read as
 // current, never written and never deleted: they are only recognised, so the title screen can say why they cannot be loaded.
 // ============================================================================================================
-#macro PROFILE_VERSION 2   // 2 (D148): skills_known, the skill memory. A version 1 file is read and migrated (no skill memory yet).
-#macro RUN_SAVE_VERSION 2
+#macro PROFILE_VERSION 3   // 3 (D175): name, a copy of the index name (the index is authoritative). 2 (D148): skills_known, the skill memory. An older file is read and migrated.
+#macro RUN_SAVE_VERSION 3   // 3 (D175): the summary block (class, level, floor, run time, seed, saved_at) the save-file list reads. A version 2 file still loads (migrated in memory).
+#macro RUN_SAVE_MIN_VERSION 2
 #macro PROFILE_HISTORY_MAX 50
+#macro PROFILES_MAX 4
+#macro PROFILE_SLOTS 3
+#macro PROFILE_NAME_MAX 12
+#macro PROFILES_INDEX_VERSION 1
 
-function Profile_Path() {
-    return "profile.sav";
+// Prefix of every profile/save file name: "" in the game; a test sandbox sets global.save_prefix so it never touches the real files.
+function Save_Prefix() {
+    return (variable_global_exists("save_prefix") && is_string(global.save_prefix)) ? global.save_prefix : "";
 }
 
+function Profiles_IndexPath() {
+    return Save_Prefix() + "profiles.sav";
+}
+
+function Profiles_PathOf(_id) {
+    return Save_Prefix() + "profile_" + string(_id) + ".sav";
+}
+
+function Slots_PathOf(_id, _slot) {
+    return Save_Prefix() + "run_" + string(_id) + "_" + string(_slot) + ".sav";
+}
+
+// The ACTIVE profile's file.
+function Profile_Path() {
+    return Profiles_PathOf(Profiles_Active());
+}
+
+// The ACTIVE profile's ACTIVE save file (the global save slot, set by New Game / Load Game / Continue through Slot_SetActive).
 function RunSave_Path() {
-    return "run.sav";
+    return Slots_PathOf(Profiles_Active(), Slot_Active());
 }
 
 // ---- old slot files (D16) ----
@@ -489,6 +515,7 @@ function Profile_Default() {
         runs_started: 0,
         best_floor: 0,
         legacy_notice_seen: false,
+        name: "",                              // D175: a copy of the profile's name in the index (the index is authoritative); "" until a flush
         settings_file: Save_SettingsPath()     // settings stay in their own file
     };
 }
@@ -555,6 +582,7 @@ function Profile_Normalize(_raw) {
         if (variable_struct_exists(_raw, counters[c])) variable_struct_set(p, counters[c], max(0, Save_ToReal(variable_struct_get(_raw, counters[c]), 0)));
     }
     if (variable_struct_exists(_raw, "legacy_notice_seen")) p.legacy_notice_seen = (Save_ToReal(_raw.legacy_notice_seen, 0) != 0);
+    if (variable_struct_exists(_raw, "name") && is_string(_raw.name)) p.name = _raw.name;
     return p;
 }
 
@@ -674,12 +702,15 @@ function Profile_Get() {
         var r = Profile_Load(Profile_Path());
         global.profile = r.profile;
         global.profile_status = r.status;
+        global.profile.name = Profiles_ActiveName();
     }
     return global.profile;
 }
 
 function Profile_Flush() {
-    return Profile_SaveTo(Profile_Path(), Profile_Get());
+    var p = Profile_Get();
+    p.name = Profiles_ActiveName();   // D175: the file keeps a copy of the name; the index is authoritative
+    return Profile_SaveTo(Profile_Path(), p);
 }
 
 // What to tell the player about the profile file at launch: "" when it loaded fine or did not exist yet.
@@ -697,6 +728,7 @@ function Profile_NoticeText() {
 // A fresh in-memory profile and no profile file (scenarios and tests only).
 function Profile_ResetForTest() {
     global.profile = Profile_Default();
+    global.profile.name = Profiles_ActiveName();
     global.profile_status = "missing";
     Save_DeleteFileSet(Profile_Path());
 }
@@ -756,7 +788,8 @@ function Story_CopyProfileToFlags(_p, _flags) {
 function RunSave_IsCurrentRaw(_raw) {
     if (!is_struct(_raw)) return false;
     if (!variable_struct_exists(_raw, "run_version")) return false;
-    if (Save_ToReal(_raw.run_version, -1) != RUN_SAVE_VERSION) return false;
+    var ver = Save_ToReal(_raw.run_version, -1);
+    if (ver < RUN_SAVE_MIN_VERSION || ver > RUN_SAVE_VERSION) return false;   // D175: a version 2 file is still good (RunSave_LoadFrom migrates it in memory)
     if (!variable_struct_exists(_raw, "seed") || !variable_struct_exists(_raw, "statData")) return false;
     return is_struct(_raw.statData);
 }
@@ -767,7 +800,7 @@ function RunSave_Check(_raw) {
     if (!variable_struct_exists(_raw, "run_version")) return "old";
     var ver = Save_ToReal(_raw.run_version, 0);
     if (ver > RUN_SAVE_VERSION) return "newer";
-    if (ver < RUN_SAVE_VERSION) return "old";
+    if (ver < RUN_SAVE_MIN_VERSION) return "old";
     return RunSave_IsCurrentRaw(_raw) ? "ok" : "corrupt";
 }
 
@@ -840,7 +873,7 @@ function RunSave_LoadFrom(_path = undefined) {
     var cur = Save_ReadJsonFile(path, RunSave_IsCurrentRaw);
     if (is_struct(cur)) {
         out.status = "ok";
-        out.run = cur;
+        out.run = RunSave_Migrate(cur);
         return out;
     }
     var raw = Save_ParseJsonText(Save_ReadTextFile(path), Save_IsStructValue);
@@ -880,6 +913,16 @@ function RunSave_Build() {
     stat.boss_defeated = boss_flags;
 
     var where = Save_CapturePosition();
+    var run_floor = Run_FloorOfRoomName(where.room_name);
+    var pl = gs.player_ch;
+    var summary = {   // D175: what the save-file list shows, readable without applying the run (Slots_Summary)
+        class_id: (is_struct(pl) && variable_struct_exists(pl, "class_id")) ? pl.class_id : gs.selected_class,
+        level: (is_struct(pl) && variable_struct_exists(pl, "level")) ? pl.level : 1,
+        floor: run_floor,
+        run_time_ms: RunStats_Of(run).play_ms,
+        seed: run.seed,
+        saved_at: stat.saved_at
+    };
     stat.save_room_name = where.room_name;
     stat.save_x = where.x;
     stat.save_y = where.y;
@@ -904,7 +947,8 @@ function RunSave_Build() {
         gold_bag: run.gold_bag,   // D126: no version bump; a save without them loads with empty bags
         find_bag: run.find_bag,
         started_at: run.started_at,
-        floor: Run_FloorOfRoomName(where.room_name),
+        floor: run_floor,
+        summary: summary,
         statData: stat,
         levelData: gs.persist
     };
@@ -948,4 +992,507 @@ function RunSave_ApplyState(_raw) {
     if (variable_struct_exists(_raw, "started_at")) run.started_at = Save_ToReal(_raw.started_at, run.started_at);
     gs.run = run;
     return info;
+}
+
+// ============================================================================================================
+// D175 (saves1): profiles and save files. The data layer only; the title/menu UI comes next.
+//   Up to 4 named profiles (ids 0..3). A profile owns profile_<id>.sav (Codex, run history, bestiary, story seen, unlocks, skill memory, echo pool)
+//   and 3 save files run_<id>_<slot>.sav (a run in progress each). Settings stay global (settings_config.json).
+//   profiles.sav is the index: { index_version: 1, active, profiles: [ { id, name, created, last_slot, last_played } ] }.
+//   Profile_Path() / RunSave_Path() answer for the active profile and its active save file, so every older call site keeps working.
+// ============================================================================================================
+
+// ---- run save: summary block (what Slots_Summary lists) and the in-memory migration of a version 2 file ----
+
+// The summary of a run file as { class_id, level, floor, run_time_ms, seed, saved_at }; a field the file does not have is -1 (missing).
+// Reads the file's own summary block when it has one, else works the same values out from the fields every version has.
+function RunSave_SummaryOf(_raw) {
+    var out = { class_id: -1, level: -1, floor: -1, run_time_ms: -1, seed: -1, saved_at: -1 };
+    if (!is_struct(_raw)) return out;
+    var st = (variable_struct_exists(_raw, "statData") && is_struct(_raw.statData)) ? _raw.statData : {};
+    var pl = (variable_struct_exists(st, "player") && is_struct(st.player)) ? st.player : {};
+    if (variable_struct_exists(pl, "class_id")) out.class_id = Save_ToReal(pl.class_id, -1);
+    else if (variable_struct_exists(st, "selected_class")) out.class_id = Save_ToReal(st.selected_class, -1);
+    if (variable_struct_exists(pl, "level")) out.level = Save_ToReal(pl.level, -1);
+    if (variable_struct_exists(_raw, "floor")) out.floor = Save_ToReal(_raw.floor, -1);
+    if (variable_struct_exists(_raw, "stats") && is_struct(_raw.stats) && variable_struct_exists(_raw.stats, "play_ms")) out.run_time_ms = Save_ToReal(_raw.stats.play_ms, -1);
+    if (variable_struct_exists(_raw, "seed")) out.seed = Save_ToReal(_raw.seed, -1);
+    if (variable_struct_exists(st, "saved_at")) out.saved_at = Save_ToReal(st.saved_at, -1);
+    if (variable_struct_exists(_raw, "summary") && is_struct(_raw.summary)) {
+        var keys = variable_struct_get_names(out);
+        for (var i = 0; i < array_length(keys); i++) {
+            if (variable_struct_exists(_raw.summary, keys[i])) variable_struct_set(out, keys[i], Save_ToReal(variable_struct_get(_raw.summary, keys[i]), -1));
+        }
+    }
+    return out;
+}
+
+// A loaded run file brought to the current version in memory: the summary block is filled in (version 2 has none). The file itself is
+// rewritten as version 3 by the next autosave; nothing is written here.
+function RunSave_Migrate(_raw) {
+    if (!is_struct(_raw)) return _raw;
+    if (!variable_struct_exists(_raw, "summary") || !is_struct(_raw.summary)) _raw.summary = RunSave_SummaryOf(_raw);
+    _raw.run_version = RUN_SAVE_VERSION;
+    return _raw;
+}
+
+// ---- names ----
+// Control characters dropped, spaces trimmed at both ends, cut to PROFILE_NAME_MAX letters. "" when nothing is left.
+function Profiles_CleanName(_name) {
+    if (!is_string(_name)) return "";
+    var s = "";
+    for (var i = 1; i <= string_length(_name); i++) {
+        var c = string_char_at(_name, i);
+        if (ord(c) >= 32) s += c;
+    }
+    while (string_length(s) > 0 && string_char_at(s, 1) == " ") s = string_delete(s, 1, 1);
+    if (string_length(s) > PROFILE_NAME_MAX) s = string_copy(s, 1, PROFILE_NAME_MAX);
+    while (string_length(s) > 0 && string_char_at(s, string_length(s)) == " ") s = string_delete(s, string_length(s), 1);
+    return s;
+}
+
+// "Profile 1" for id 0, "Profile 2" for id 1 ... (the first word follows the language).
+function Profiles_DefaultName(_id) {
+    return Profiles_CleanName(Loc_T("profile.default_name", "Profile") + " " + string(_id + 1));
+}
+
+// ---- the index ----
+// true for a usable index: version 1, 1..4 entries, each with a unique id 0..3 and a text name. Fields that are missing or odd (active, last_slot ...) are repaired by Profiles_IndexNormalize.
+function Profiles_IndexIsValid(_raw) {
+    if (!is_struct(_raw)) return false;
+    if (!variable_struct_exists(_raw, "index_version") || Save_ToReal(_raw.index_version, -1) != PROFILES_INDEX_VERSION) return false;
+    if (!variable_struct_exists(_raw, "profiles") || !is_array(_raw.profiles)) return false;
+    var n = array_length(_raw.profiles);
+    if (n < 1 || n > PROFILES_MAX) return false;
+    var seen = [false, false, false, false];
+    for (var i = 0; i < n; i++) {
+        var e = _raw.profiles[i];
+        if (!is_struct(e) || !variable_struct_exists(e, "id") || !variable_struct_exists(e, "name") || !is_string(e.name)) return false;
+        var pid = Save_ToReal(e.id, -1);
+        if (pid < 0 || pid >= PROFILES_MAX || pid != floor(pid) || seen[pid]) return false;
+        seen[pid] = true;
+    }
+    return true;
+}
+
+function Profiles_CmpId(_a, _b) {
+    return _a.id - _b.id;
+}
+
+function Profiles_NewEntry(_id, _name) {
+    return { id: _id, name: _name, created: date_current_datetime(), last_slot: 0, last_played: 0 };
+}
+
+// A valid raw index as the in-memory index: entries sorted by id, names cleaned, last_slot inside 0..2, active one of the entries.
+function Profiles_IndexNormalize(_raw) {
+    var entries = [];
+    for (var i = 0; i < array_length(_raw.profiles); i++) {
+        var e = _raw.profiles[i];
+        var pid = floor(Save_ToReal(e.id, 0));
+        var name = Profiles_CleanName(e.name);
+        if (name == "") name = Profiles_DefaultName(pid);
+        array_push(entries, {
+            id: pid,
+            name: name,
+            created: variable_struct_exists(e, "created") ? Save_ToReal(e.created, 0) : 0,
+            last_slot: clamp(floor(variable_struct_exists(e, "last_slot") ? Save_ToReal(e.last_slot, 0) : 0), 0, PROFILE_SLOTS - 1),
+            last_played: variable_struct_exists(e, "last_played") ? Save_ToReal(e.last_played, 0) : 0
+        });
+    }
+    array_sort(entries, Profiles_CmpId);
+    var active = variable_struct_exists(_raw, "active") ? floor(Save_ToReal(_raw.active, -1)) : -1;
+    var found = false;
+    for (var k = 0; k < array_length(entries); k++) if (entries[k].id == active) found = true;
+    if (!found) active = entries[0].id;
+    return { index_version: PROFILES_INDEX_VERSION, active: active, profiles: entries };
+}
+
+function Profiles_Save() {
+    if (!variable_global_exists("profiles_index") || !is_struct(global.profiles_index)) return false;
+    return Save_WriteFileAtomic(Profiles_IndexPath(), json_stringify(global.profiles_index), Profiles_IndexIsValid);
+}
+
+// A fresh profile file with a name (a default profile otherwise).
+function Profiles_WriteFresh(_id, _name) {
+    var p = Profile_Default();
+    p.name = _name;
+    return Profile_SaveTo(Profiles_PathOf(_id), p);
+}
+
+// An index rebuilt from the profile_<id>.sav files that exist (index lost or damaged). Names come from the files' name copy; the lowest id is active;
+// last_slot is the newest save file. undefined when no profile file exists.
+function Profiles_RebuildFromFiles() {
+    var entries = [];
+    for (var pid = 0; pid < PROFILES_MAX; pid++) {
+        var path = Profiles_PathOf(pid);
+        if (!file_exists(path) && !file_exists(path + ".bak")) continue;
+        var name = "";
+        var cur = Save_ReadJsonFile(path, Profile_IsCurrentRaw);
+        if (is_struct(cur) && variable_struct_exists(cur, "name") && is_string(cur.name)) name = Profiles_CleanName(cur.name);
+        if (name == "") name = Profiles_DefaultName(pid);
+        var e = Profiles_NewEntry(pid, name);
+        var newest = Slots_NewestExisting(pid);
+        e.last_slot = (newest >= 0) ? newest : 0;
+        array_push(entries, e);
+    }
+    if (array_length(entries) == 0) return undefined;
+    return { index_version: PROFILES_INDEX_VERSION, active: entries[0].id, profiles: entries };
+}
+
+// ---- migration of the single profile.sav / run.sav (before D175) ----
+function Profiles_LegacyPaths() {
+    var pre = Save_Prefix();
+    return [pre + "profile.sav", pre + "profile.sav.bak", pre + "run.sav", pre + "run.sav.bak"];
+}
+
+function Profiles_LegacyPresent() {
+    var paths = Profiles_LegacyPaths();
+    for (var i = 0; i < array_length(paths); i++) if (file_exists(paths[i])) return true;
+    return false;
+}
+
+// Copies src to dst (a .bak next to it comes along by the caller). false when dst does not hold the same text afterwards. A different file already at dst is moved aside, never overwritten.
+function Profiles_CopyFile(_src, _dst) {
+    if (!file_exists(_src)) return true;
+    var text = Save_ReadTextFile(_src);
+    if (file_exists(_dst)) {
+        if (is_string(text) && Save_ReadTextFile(_dst) == text) return true;   // an earlier, interrupted migration already copied it
+        RunSave_KeepAside(_dst);
+        if (file_exists(_dst)) return false;
+    }
+    file_copy(_src, _dst);   // the answer is not trusted: the copy is checked by reading it back
+    return file_exists(_dst) && Save_ReadTextFile(_dst) == text;
+}
+
+// Renames a file to <file>.pre-profiles ("-2", "-3" ... when that name is taken). Never deletes.
+function Profiles_RetireFile(_path) {
+    if (!file_exists(_path)) return;
+    var dst = _path + ".pre-profiles";
+    var n = 1;
+    while (file_exists(dst)) {
+        n++;
+        dst = _path + ".pre-profiles-" + string(n);
+    }
+    if (!file_rename(_path, dst)) show_debug_message("[SAVE] could not rename " + _path + " to " + dst + "; it stays where it is");
+}
+
+// First launch with no profiles.sav and no profile_<id>.sav: the old profile.sav and run.sav (whichever exist) become profile 0 ("Profile 1") and its save file 1.
+// Copies first (run, then profile), writes the index, and only then renames the originals to *.pre-profiles. With nothing at all: a fresh "Profile 1".
+function Profiles_MigrateLegacy() {
+    var name = Profiles_DefaultName(0);
+    var idx = { index_version: PROFILES_INDEX_VERSION, active: 0, profiles: [Profiles_NewEntry(0, name)] };
+    var pre = Save_Prefix();
+    var have = Profiles_LegacyPresent();
+    var copied = true;
+    if (have) {
+        if (!Profiles_CopyFile(pre + "run.sav", Slots_PathOf(0, 0))) copied = false;
+        if (!Profiles_CopyFile(pre + "run.sav.bak", Slots_PathOf(0, 0) + ".bak")) copied = false;
+        if (file_exists(pre + "profile.sav") || file_exists(pre + "profile.sav.bak")) {
+            if (!Profiles_CopyFile(pre + "profile.sav", Profiles_PathOf(0))) copied = false;
+            if (!Profiles_CopyFile(pre + "profile.sav.bak", Profiles_PathOf(0) + ".bak")) copied = false;
+        } else {
+            Profiles_WriteFresh(0, name);
+        }
+    } else {
+        Profiles_WriteFresh(0, name);
+    }
+    global.profiles_index = idx;
+    if (!have) {
+        Profiles_Save();
+        return idx;
+    }
+    if (!copied) {
+        // Could not copy everything: do not claim the migration and do not touch the originals; the next launch tries again.
+        show_debug_message("[SAVE] profile migration could not copy every file; the old files were left as they are");
+        return idx;
+    }
+    if (Profiles_Save()) {
+        var paths = Profiles_LegacyPaths();
+        for (var i = 0; i < array_length(paths); i++) Profiles_RetireFile(paths[i]);
+    }
+    return idx;
+}
+
+// Loads profiles.sav (or its .bak). A missing or damaged index is rebuilt: from the profile files if any, else from the old single-file save, else a fresh "Profile 1".
+// A damaged index file is copied to profiles.sav.corrupt first.
+function Profiles_LoadIndex() {
+    var path = Profiles_IndexPath();
+    var raw = Save_ReadJsonFile(path, Profiles_IndexIsValid);
+    if (is_struct(raw)) return Profiles_IndexNormalize(raw);
+    if (file_exists(path)) Save_QuarantineFile(path);
+    var idx = Profiles_RebuildFromFiles();
+    if (is_struct(idx)) {
+        global.profiles_index = idx;
+        Profiles_Save();
+        return idx;
+    }
+    return Profiles_MigrateLegacy();   // sets global.profiles_index itself (the copies need the paths)
+}
+
+// Makes sure the index is loaded (the first call of a game session, or of a test sandbox). Cheap afterwards.
+function Profiles_EnsureInit() {
+    if (variable_global_exists("profiles_index") && is_struct(global.profiles_index)) return;
+    var idx = Profiles_LoadIndex();
+    global.profiles_index = idx;
+    global.save_slot_active = 0;
+    var e = Profiles_FindEntry(idx.active);
+    global.save_slot_active = Profiles_StartSlot(e.id, e.last_slot);
+}
+
+// The save file a profile starts on: the Continue target when there is one, else the slot it last used.
+function Profiles_StartSlot(_id, _last_slot) {
+    var target = Slots_ContinueTarget(_id);
+    return (target >= 0) ? target : _last_slot;
+}
+
+// The entry (the index's own struct) of a profile id, undefined when there is none.
+function Profiles_FindEntry(_id) {
+    if (!variable_global_exists("profiles_index") || !is_struct(global.profiles_index)) return undefined;
+    var l = global.profiles_index.profiles;
+    for (var i = 0; i < array_length(l); i++) if (l[i].id == _id) return l[i];
+    return undefined;
+}
+
+// ---- profiles API ----
+// The profiles as copies of their index entries { id, name, created, last_slot, last_played }, sorted by id.
+function Profiles_List() {
+    Profiles_EnsureInit();
+    var out = [];
+    var l = global.profiles_index.profiles;
+    for (var i = 0; i < array_length(l); i++) {
+        array_push(out, { id: l[i].id, name: l[i].name, created: l[i].created, last_slot: l[i].last_slot, last_played: l[i].last_played });
+    }
+    return out;
+}
+
+// The id of the active profile.
+function Profiles_Active() {
+    Profiles_EnsureInit();
+    return global.profiles_index.active;
+}
+
+function Profiles_ActiveName() {
+    Profiles_EnsureInit();
+    return Profiles_FindEntry(global.profiles_index.active).name;
+}
+
+// Makes a profile with a name (trimmed, 1..12 letters, longer is cut) and its own empty profile file. Returns its id (the lowest free one), or -1 when the name is empty or 4 profiles exist.
+// It does not switch to it.
+function Profiles_Create(_name) {
+    Profiles_EnsureInit();
+    var name = Profiles_CleanName(_name);
+    if (name == "") return -1;
+    var l = global.profiles_index.profiles;
+    if (array_length(l) >= PROFILES_MAX) return -1;
+    var pid = 0;
+    while (is_struct(Profiles_FindEntry(pid))) pid++;
+    Profiles_PurgeFiles(pid);   // what a profile of that id left behind (an interrupted delete)
+    if (!Profiles_WriteFresh(pid, name)) return -1;
+    array_push(l, Profiles_NewEntry(pid, name));
+    array_sort(l, Profiles_CmpId);
+    if (!Profiles_Save()) {
+        for (var i = 0; i < array_length(l); i++) if (l[i].id == pid) { array_delete(l, i, 1); break; }
+        return -1;
+    }
+    return pid;
+}
+
+// Makes another profile the active one: the current profile is written, the other is loaded into global.profile (global.profile_status is reset by that load), and the save file
+// in use becomes the other profile's Continue file. false for an unknown id (nothing changes).
+function Profiles_Switch(_id) {
+    Profiles_EnsureInit();
+    var e = Profiles_FindEntry(_id);
+    if (!is_struct(e)) return false;
+    if (_id == global.profiles_index.active) return true;
+    Profile_Flush();
+    var old_active = global.profiles_index.active;
+    global.profiles_index.active = _id;
+    if (!Profiles_Save()) {
+        global.profiles_index.active = old_active;
+        return false;
+    }
+    global.profile = undefined;
+    Profile_Get();
+    global.save_slot_active = Profiles_StartSlot(_id, e.last_slot);
+    return true;
+}
+
+// Gives a profile a new name (same rules as Profiles_Create). The index is written, and the profile file's name copy follows. false for an unknown id or an empty name.
+function Profiles_Rename(_id, _name) {
+    Profiles_EnsureInit();
+    var name = Profiles_CleanName(_name);
+    var e = Profiles_FindEntry(_id);
+    if (name == "" || !is_struct(e)) return false;
+    var old = e.name;
+    e.name = name;
+    if (!Profiles_Save()) {
+        e.name = old;
+        return false;
+    }
+    if (_id == global.profiles_index.active) {
+        Profile_Flush();
+    } else {
+        var path = Profiles_PathOf(_id);
+        var r = Profile_Load(path);
+        if (r.status == "ok") {
+            r.profile.name = name;
+            Profile_SaveTo(path, r.profile);
+        }
+    }
+    return true;
+}
+
+// Removes the files of a profile id: its profile file and its 3 save files. A file this build cannot read (newer, damaged) is moved aside as <name>.kept-<time>.sav instead of deleted (D16).
+function Profiles_PurgeFiles(_id) {
+    for (var s = 0; s < PROFILE_SLOTS; s++) {
+        var rp = Slots_PathOf(_id, s);
+        if (RunSave_ExistsAt(rp)) RunSave_DeleteUnlessKept(rp, undefined, true);
+    }
+    var pp = Profiles_PathOf(_id);
+    if (file_exists(pp) || file_exists(pp + ".bak")) {
+        if (is_struct(Save_ReadJsonFile(pp, Profile_IsCurrentRaw))) Save_DeleteFileSet(pp);
+        else RunSave_KeepAside(pp);
+    }
+}
+
+// Deletes a profile and its 3 save files (the UI asks first). Deleting the active one makes the lowest remaining id active; deleting the last one makes a fresh "Profile 1".
+// The deleted profile is not written first. false for an unknown id.
+function Profiles_Delete(_id) {
+    Profiles_EnsureInit();
+    var idx = global.profiles_index;
+    var pos = -1;
+    for (var i = 0; i < array_length(idx.profiles); i++) if (idx.profiles[i].id == _id) pos = i;
+    if (pos < 0) return false;
+    var was_active = (idx.active == _id);
+    var old_entries = idx.profiles;
+    var old_active = idx.active;
+    var rest = [];
+    for (var k = 0; k < array_length(old_entries); k++) if (k != pos) array_push(rest, old_entries[k]);
+    var fresh = (array_length(rest) == 0);
+    if (fresh) array_push(rest, Profiles_NewEntry(0, Profiles_DefaultName(0)));
+    idx.profiles = rest;
+    if (was_active || fresh) idx.active = rest[0].id;
+    if (!Profiles_Save()) {   // the index first: a crash after it leaves orphan files, never an index that names a profile whose files are half gone
+        idx.profiles = old_entries;
+        idx.active = old_active;
+        return false;
+    }
+    Profiles_PurgeFiles(_id);
+    if (fresh) Profiles_WriteFresh(0, rest[0].name);
+    if (was_active || fresh) {
+        global.profile = undefined;
+        Profile_Get();
+        global.save_slot_active = Profiles_StartSlot(idx.active, Profiles_FindEntry(idx.active).last_slot);
+    }
+    return true;
+}
+
+// ---- save files (slots) ----
+// The save file in use (0..2): set by New Game / Load Game / Continue.
+function Slot_Active() {
+    Profiles_EnsureInit();
+    return clamp(floor(Save_ToReal(global.save_slot_active, 0)), 0, PROFILE_SLOTS - 1);
+}
+
+// Uses a save file (0..2) from now on; the active profile remembers it as its last played one. false (nothing changes) for a slot outside 0..2.
+function Slot_SetActive(_slot) {
+    Profiles_EnsureInit();
+    var s = Save_ToReal(_slot, -1);
+    if (s < 0 || s >= PROFILE_SLOTS || s != floor(s)) return false;
+    global.save_slot_active = s;
+    var e = Profiles_FindEntry(global.profiles_index.active);
+    e.last_slot = s;
+    e.last_played = date_current_datetime();
+    Profiles_Save();
+    return true;
+}
+
+// One save file read without applying it: { slot, exists, status, class_id, level, floor, run_time_ms, seed, saved_at }.
+// status: "empty" (no file), "ok", "newer", "old", "corrupt". A field the file does not give (or an unreadable file) is -1.
+function Slots_ReadSummary(_slot, _path) {
+    var o = { slot: _slot, exists: false, status: "empty", class_id: -1, level: -1, floor: -1, run_time_ms: -1, seed: -1, saved_at: -1 };
+    if (!RunSave_ExistsAt(_path)) return o;
+    o.exists = true;
+    var l = RunSave_LoadFrom(_path);
+    o.status = (l.status == "missing") ? "corrupt" : l.status;
+    if (o.status == "ok") {
+        var sm = RunSave_SummaryOf(l.run);
+        o.class_id = sm.class_id;
+        o.level = sm.level;
+        o.floor = sm.floor;
+        o.run_time_ms = sm.run_time_ms;
+        o.seed = sm.seed;
+        o.saved_at = sm.saved_at;
+    }
+    return o;
+}
+
+// The 3 save files of a profile as Slots_ReadSummary entries; [] for an unknown profile.
+function Slots_Summary(_profile_id) {
+    Profiles_EnsureInit();
+    var out = [];
+    if (!is_struct(Profiles_FindEntry(_profile_id))) return out;
+    for (var s = 0; s < PROFILE_SLOTS; s++) array_push(out, Slots_ReadSummary(s, Slots_PathOf(_profile_id, s)));
+    return out;
+}
+
+// The first save file of a profile with no file at all (a damaged file is not empty), -1 when all three are used (or the profile is unknown).
+function Slots_FirstEmpty(_profile_id) {
+    var l = Slots_Summary(_profile_id);
+    for (var i = 0; i < array_length(l); i++) if (!l[i].exists) return l[i].slot;
+    return -1;
+}
+
+// The existing save file of a profile that was saved last (its summary's saved_at; an unreadable one counts as oldest), -1 when there is none.
+function Slots_NewestExisting(_profile_id) {
+    var best = -1;
+    var best_at = -2;
+    for (var s = 0; s < PROFILE_SLOTS; s++) {
+        var path = Slots_PathOf(_profile_id, s);
+        if (!RunSave_ExistsAt(path)) continue;
+        var at = Slots_ReadSummary(s, path).saved_at;
+        if (best < 0 || at > best_at) {
+            best = s;
+            best_at = at;
+        }
+    }
+    return best;
+}
+
+// What Continue loads: the profile's last played save file when its file exists, else the newest existing one, else -1 (Continue is off). Defaults to the active profile.
+function Slots_ContinueTarget(_profile_id = undefined) {
+    Profiles_EnsureInit();
+    var pid = is_undefined(_profile_id) ? Profiles_Active() : _profile_id;
+    var e = Profiles_FindEntry(pid);
+    if (!is_struct(e)) return -1;
+    if (RunSave_ExistsAt(Slots_PathOf(pid, e.last_slot))) return e.last_slot;
+    return Slots_NewestExisting(pid);
+}
+
+// Deletes one save file of a profile (the UI asks first). A run that is there counts as abandoned in that profile's history, as Run_AbandonSaved does when New Game replaces a run.
+// A file this build cannot read (newer, damaged) is moved aside, not deleted (D16). true when the slot is empty afterwards and there was something in it.
+function Slot_Delete(_profile_id, _slot) {
+    Profiles_EnsureInit();
+    if (!is_struct(Profiles_FindEntry(_profile_id))) return false;
+    var s = Save_ToReal(_slot, -1);
+    if (s < 0 || s >= PROFILE_SLOTS || s != floor(s)) return false;
+    var path = Slots_PathOf(_profile_id, s);
+    if (!RunSave_ExistsAt(path)) return false;
+    var l = RunSave_LoadFrom(path);
+    if (l.status == "ok") {
+        var entry = Run_HistoryEntryFromSave(l.run);
+        if (_profile_id == global.profiles_index.active) {
+            Profile_RecordRun(Profile_Get(), entry);
+            Profile_Flush();
+        } else {
+            var ppath = Profiles_PathOf(_profile_id);
+            var r = Profile_Load(ppath);
+            if (r.status == "ok") {
+                Profile_RecordRun(r.profile, entry);
+                Profile_SaveTo(ppath, r.profile);
+            }
+        }
+    }
+    RunSave_DeleteUnlessKept(path, l.status, true);
+    return !RunSave_ExistsAt(path);
 }
