@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T09:53:40Z",
-    "row_count": 1211
+    "generated_at_utc": "2026-10-16T12:52:00Z",
+    "row_count": 1213
   },
   "default_lang": "en",
   "languages": [
@@ -976,6 +976,10 @@
       "en": "You brace yourself.",
       "ko": "몸을 웅크립니다."
     },
+    "combat.msg.guard_mp": {
+      "en": "You brace yourself. +{mp} MP",
+      "ko": "몸을 웅크립니다. MP +{mp}"
+    },
     "combat.msg.level_up": {
       "en": "Level up x{levels}!",
       "ko": "레벨 업 x{levels}!"
@@ -1159,6 +1163,10 @@
     "combat.msg.windup_broken": {
       "en": "{enemy}'s {skill} is broken off!",
       "ko": "{enemy}의 {skill}이(가) 끊겼습니다!"
+    },
+    "combat.pop.guard_mp": {
+      "en": "+{mp} MP",
+      "ko": "MP +{mp}"
     },
     "common.cancel": {
       "en": "Cancel",
@@ -4153,8 +4161,8 @@
       "ko": "맞을 때까지: 받는 피해 {take}% 감소, 주는 피해 {deal}% 증가."
     },
     "status.desc.status_brace": {
-      "en": "Braced for the next hit: it deals {pct}% less damage.",
-      "ko": "다음 공격에 대비합니다. 피해가 {pct}% 줄어듭니다."
+      "en": "Until your next turn every hit you take deals {pct}% less damage.",
+      "ko": "내 다음 턴까지 받는 모든 공격의 피해가 {pct}% 줄어듭니다."
     },
     "status.desc.status_crit_up": {
       "en": "1 in every {n} hits is a critical.",

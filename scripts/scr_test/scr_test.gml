@@ -5758,7 +5758,7 @@ function Test_Suite_BattleUi() {
     var _irows = Battle_ItemRows(_player);
     Test_True("BattleUi the HP potion is in the item list with its quantity", array_length(_irows) >= 1 && _irows[0].item_id == 10 && _irows[0].qty == 2);
 
-    // ---- the Guard command (D99): the next hit deals half, then it is gone ----
+    // ---- the Guard command (D99, D180): every hit deals half until the player's next turn starts (the Brace is not used up by a hit) ----
     var _slime = EnemyCreate(ENEMY_SLIME);
     var _src = { power: 6, stat_type: STAT_ATK };
     var _g0 = CharacterCreate_Player(CLASS_KNIGHT);
@@ -5767,14 +5767,16 @@ function Test_Suite_BattleUi() {
     Test_True("BattleUi Guard leaves the player Braced", Status_Has(_g1, STATUS_BRACE));
     var _braced_hit = Combat_ApplyDamage(_slime, _g1, _src, 1, 1, { is_skill: false });
     Test_True("BattleUi a Braced hit deals about half (" + string(_plain_hit) + " -> " + string(_braced_hit.dmg) + ")", _plain_hit >= 2 && _braced_hit.dmg < _plain_hit && abs(_braced_hit.dmg - _plain_hit * 0.5) <= 1);
-    Test_False("BattleUi the hit used the Brace up", Status_Has(_braced_hit.defender, STATUS_BRACE));
+    Test_True("BattleUi the hit does not use the Brace up (D180)", Status_Has(_braced_hit.defender, STATUS_BRACE));
     var _g2 = Battle_GuardApply(CharacterCreate_Player(CLASS_KNIGHT));
     _g2 = Status_Tick(_g2);
     Test_True("BattleUi Brace survives the Guard turn's own tick", Status_Has(_g2, STATUS_BRACE));
     _g2 = Status_Tick(_g2);
     Test_True("BattleUi Brace is not worn off by the player's own turns (hunt 6: it counts the enemy's turns)", Status_Has(_g2, STATUS_BRACE));
     _g2 = Status_TickEnemyTurn(Status_TickEnemyTurn(_g2));
-    Test_False("BattleUi Brace fades after two enemy turns when nothing hit", Status_Has(_g2, STATUS_BRACE));
+    Test_True("BattleUi Brace stays through the enemy's turns (D180)", Status_Has(_g2, STATUS_BRACE));
+    _g2 = Status_ExpireAtPlayerTurn(_g2);
+    Test_False("BattleUi Brace is gone as the player's next turn starts, with or without a hit (D180)", Status_Has(_g2, STATUS_BRACE));
 
     // ---- I-065: level gains survive the battle's own normalisation (GameState_Init runs it at every battle start) ----
     var _lv = CharacterCreate_Player(CLASS_KNIGHT);
@@ -13377,7 +13379,7 @@ function Test_Suite_Hunt6Combat() {
     Test_Eq("hunt6 menu: the weapon stays worn", Equip_SlotGet(_g, "weapon"), 1);
     Test_True("hunt6 menu: outside a fight armor goes on", Gear_Toggle(_g, 22).ok);
 
-    // ---- 3. Guard (the Brace status) lasts until the enemy's turns are over, not through the player's own turns ----
+    // ---- 3. Guard (the Brace status) lasts until the player's next turn starts (D180), not through the player's own turns before the enemy acted ----
     var _slime = EnemyCreate(ENEMY_SLIME);
     var _src = { power: 6, stat_type: STAT_ATK };
     var _plain = Combat_ApplyDamage(_slime, CharacterCreate_Player(CLASS_KNIGHT), _src, 1, 1, { is_skill: false }).dmg;
@@ -13390,21 +13392,22 @@ function Test_Suite_Hunt6Combat() {
     Test_True("hunt6 guard: still braced after the player acted three times in a row", Status_Has(_bc.p, STATUS_BRACE));
     var _hit = Combat_ApplyDamage(_slime, _bc.p, _src, 1, 1, { is_skill: false });
     Test_True("hunt6 guard: the enemy's hit then deals about half (" + string(_plain) + " -> " + string(_hit.dmg) + ")", _plain >= 2 && abs(_hit.dmg - _plain * 0.5) <= 1);
-    Test_False("hunt6 guard: that hit used the Brace up", Status_Has(_hit.defender, STATUS_BRACE));
+    Test_True("hunt6 guard: that hit does not use the Brace up (D180)", Status_Has(_hit.defender, STATUS_BRACE));
     var _bp2 = CharacterCreate_Player(CLASS_KNIGHT);
     var _bc2 = Test_Hunt1Bc(_bp2, EnemyCreate(ENEMY_SLIME));
     Battle_GuardApply(_bp2);
-    Test_Eq("hunt6 guard: the chip reads 2 enemy turns", Battle_StatusCurrentTurns(_bc2.p, STATUS_BRACE), 2);
-    Battle_PlayerFinalizeTurn(_bc2, _bc2.p, _bc2.e);
+    Test_Eq("hunt6 guard: the chip reads 1: it lasts until the player's next turn (D180)", Battle_StatusCurrentTurns(_bc2.p, STATUS_BRACE), 1);
+    Battle_PlayerFinalizeTurn(_bc2, _bc2.p, _bc2.e);   // the Guard turn
+    Test_True("hunt6 guard: braced when the enemy's turn comes", Status_Has(_bc2.p, STATUS_BRACE));
     _bc2.enemy_actions_remaining = 0;
     Battle_EnemyFinalizeTurnState(_bc2, _bc2.p, _bc2.e);   // the enemy spends its turn on a wind-up: no hit
-    Test_True("hunt6 guard: braced after an enemy turn without a hit", Status_Has(_bc2.p, STATUS_BRACE));
-    Test_Eq("hunt6 guard: one enemy turn used", Battle_StatusCurrentTurns(_bc2.p, STATUS_BRACE), 1);
-    Battle_PlayerFinalizeTurn(_bc2, _bc2.p, _bc2.e);   // the player acts, the big attack comes next
-    Test_True("hunt6 guard: braced when the wind-up's attack arrives", Status_Has(_bc2.p, STATUS_BRACE));
-    _bc2.enemy_actions_remaining = 0;
-    Battle_EnemyFinalizeTurnState(_bc2, _bc2.p, _bc2.e);   // a second enemy turn with no hit
-    Test_False("hunt6 guard: gone after two enemy turns with no hit", Status_Has(_bc2.p, STATUS_BRACE));
+    for (var _more = 0; _more < 4 && _bc2.tl_who == TL_ENEMY; _more++) {   // a faster enemy acts again first; the Brace holds for those turns
+        Test_True("hunt6 guard: still braced for the enemy's next turn", Status_Has(_bc2.p, STATUS_BRACE));
+        _bc2.enemy_actions_remaining = 0;
+        Battle_EnemyFinalizeTurnState(_bc2, _bc2.p, _bc2.e);
+    }
+    Test_Eq("hunt6 guard: the player's turn is next", _bc2.tl_who, TL_PLAYER);
+    Test_False("hunt6 guard: gone as the player's next turn starts, even when the enemy's turn had no hit (D180)", Status_Has(_bc2.p, STATUS_BRACE));
 
     // ---- 4. Take Aim and Muscle Up last as many player actions as the tooltip says (the cast turn's own tick does not count) ----
     var _tk = [[CLASS_ARCHER, SKILL_TAKE_AIM, STATUS_CRIT_UP, 9, "Take Aim"], [CLASS_KNIGHT, SKILL_MUSCLE_UP, STATUS_GUARD, 6, "Muscle Up"]];
