@@ -161,8 +161,19 @@ function Debug_KillPlayer() {
     Debug_Record("Kill Player");
 }
 
+// R-120 (I-106): the player's game has no debug hotkeys. They only work when the exe is started with -debug (testing by hand); the automated runs drive
+// the debug functions directly, not through these keys.
+function Debug_HotkeysAllowed() {
+    for (var _i = 1; _i <= parameter_count(); _i++) if (parameter_string(_i) == "-debug") return true;
+    return false;
+}
+
 function Debug_Update() {
     Debug_Init();
+    if (!Debug_HotkeysAllowed()) {
+        if (global.debug.enabled) Debug_Toggle();   // never left on from anywhere else
+        return;
+    }
     if (Input_Pressed("debug_toggle")) Debug_Toggle();
     if (!Debug_IsEnabled()) return;
     if (Input_Pressed("debug_enemy_damage_skill")) Debug_ToggleEnemyDamageSkillOnly();
