@@ -12847,6 +12847,7 @@ function Scenario_StepShotsH14(_s) {
                 Scenario_Release();
                 global.light_clock = 1500;   // the fires' flicker is frozen at one step, so a picture can be taken again
                 Scenario_NewKnight(CLASS_KNIGHT);
+                Scenario_NoOwed();   // R-109: the pictures before this left a character that owes a level-up point: its screen would open over the map
                 Scenario_SetWindowScale(3);
                 _h.via = (_sc.rm == rm_floor2) ? rm_floor3 : rm_floor2;
                 room_goto(_h.via);   // via another room: the controller only spawns the player on a room change
@@ -12856,6 +12857,7 @@ function Scenario_StepShotsH14(_s) {
                 with (obj_enemy) instance_destroy();
                 Dialogue_CloseNow();
                 Scenario_ClearUi();
+                Scenario_NoOwed();
                 Scenario_PlacePlayer(_sc.pcx, _sc.pcy);
                 _h.e = [];
                 for (var _k = 0; _k < array_length(_sc.foes); _k++) {
@@ -14609,6 +14611,7 @@ function Scenario_TF2Scales(_di) {
 }
 
 function Scenario_TF2Cleanup() {
+    Scenario_NoOwed();   // R-109
     Confirm_Close();
     Notice_Interrupt();
     if (is_struct(TabMenu_Get())) Menu_Close(true);
@@ -14664,6 +14667,7 @@ function Scenario_StepShotsTextFit2(_s) {
             if (_s.t > 600) { Scenario_Check("shots_r3textfit2_enters_the_room_" + _tag, false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
         case 1051:   // set the scene up (the language after the room: a room's controller reloads it from the settings)
+            Scenario_NoOwed();   // R-109: the fixture's experience levelled the knight; the level-up screen opened under the menu
             Loc_SetLanguage(_ko ? "ko" : "en");
             if (_battle) {
                 var _bc = instance_find(obj_battle_controller, 0);
@@ -14765,6 +14769,7 @@ function Scenario_R3IsTitle(_di) {
 }
 
 function Scenario_R3Cleanup() {
+    Scenario_NoOwed();   // R-109
     Confirm_Close();
     Notice_Interrupt();
     if (is_struct(TabMenu_Get())) Menu_Close(true);
@@ -14817,6 +14822,7 @@ function Scenario_StepShotsR3Menus(_s) {
             if (_s.t > 600) { Scenario_Check("shots_r3menus_enters_the_room_" + _tag, false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
         case 1031:   // set the scene up
+            Scenario_NoOwed();   // R-109: the fixture's experience levelled the knight; the level-up screen opened under the menu
             if (_title) {
                 with (obj_start_controller) { if (state == "boot_logo" || state == "splash") state = "main"; }
                 with (obj_start_controller) { state = "settings"; }
