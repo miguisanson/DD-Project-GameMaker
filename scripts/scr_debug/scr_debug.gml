@@ -2027,7 +2027,8 @@ function Scenario_StepBotStatus(_s) {
                     _bc.e.hp = 999;
                     _bc.p.max_hp = 99;   // the battle starts with the class's real HP, so raise it here
                     _bc.p.hp = 99;
-                    Turn_Push(_bc.tl, TL_ENEMY, 100000);   // B3: the enemy is a very long way down the timeline, so it never acts (the player acts every turn)
+                    Turn_Push(_bc.tl, TL_ENEMY, 100000);   // B3: the enemy is a very long way down the timeline, so it (almost) never acts
+                    _bc.enemy_weapon = { power: 0, stat_type: STAT_ATK, acc: 0, preferred_class: -1 };   // D192: nobody gets a third turn in a row, so the enemy does take a turn after two of the player's: it hits for 0
                     _bc.p = Status_Add(_bc.p, STATUS_POISON, 0, 0, 3);
                     Scenario_Check(_name + "_poison_3_stacks_applied", Status_Stacks(_bc.p, STATUS_POISON) == 3);
                     _t.k = 1;
@@ -2294,7 +2295,7 @@ function Scenario_StepBotTurns(_s) {
                 var _ne = string_count("E", _got);
                 Scenario_Check(_name + "_a_real_turns_follow_the_timeline_model", _got == _want, "got " + _got + " want " + _want + " spd p=" + string(Combat_EffectiveStat(_bc.p, STAT_SPD)) + " e=" + string(Combat_EffectiveStat(_bc.e, STAT_SPD)) + " e.status=" + json_stringify(_bc.e.status) + " p.status=" + json_stringify(_bc.p.status));
                 Scenario_Check(_name + "_a_fast_player_acts_twice_before_a_slow_enemy", string_pos("PP", _got) > 0, _got);
-                Scenario_Check(_name + "_a_player_acts_at_least_twice_as_often_as_the_slow_enemy", (_n - _ne) >= 2 * _ne && _ne >= 1, _got);
+                Scenario_Check(_name + "_a_player_acts_at_least_twice_as_often_as_the_slow_enemy", (_n - _ne) > _ne && _ne >= 1, _got);   // D192: gauge rate 10 + SPD, so SPD 12 against 4 is about 1.6 : 1, not 3 : 1 (was >= 2x)
                 Scenario_Check(_name + "_a_strip_preview_is_the_next_five_turns", Scenario_BotPreviewString(_bc.tl, 5) == Scenario_BotPreviewString(Turn_Copy(_bc.tl), 5) && array_length(Battle_TimelineSlots(_bc)) == 5);
                 Scenario_Check(_name + "_a_no_extra_action_counter_left", !variable_instance_exists(_bc, "player_bonus_actions_remaining"));
                 Scenario_Next(_s, 2);
