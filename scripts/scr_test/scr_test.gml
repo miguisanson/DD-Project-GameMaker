@@ -160,6 +160,7 @@ function Test_RunAll() {
     Test_RunSuite("R3StealthB", Test_Suite_R3StealthB);
     Test_RunSuite("R3FixDet", Test_Suite_R3FixDet);
     Test_RunSuite("R3Guard", Test_Suite_R3Guard);
+    Test_RunSuite("R3Wolf", Test_Suite_R3Wolf);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -16274,4 +16275,61 @@ function Test_Suite_R3Guard() {
     var _s2 = Test_R3GuardSequence(false, _src, _plain);   // an enemy turn without a hit (a wind-up): the Brace still ends with it
     Test_True("r3guard: a turn with no hit: the player was Braced throughout it", _s2.enemy_turns >= 1 && _s2.braced_all_enemy);
     Test_True("r3guard: a turn with no hit: the Brace is gone as the player's next turn starts", _s2.gone_at_player && _s2.who == TL_PLAYER);
+}
+
+// ---- R3 guardsmall item 2 (R-103, owner note 17): a one-time reaction (the wolf's, the slime's) reaches the PROFILE the moment it is shown, so the game being killed or quit before the
+// next autosave cannot replay it; an event the profile has seen never queues, whatever the run's flags say. ----
+function Test_Suite_R3Wolf() { Test_ProfRun("tpw_", Test_R3WolfRun); }
+
+function Test_R3VictoryHasSlimeLine(_lines) {
+    var _want = Loc_T("combat.msg.floor1_reaction.0", "That thing was alive. And I nearly wasn't.");
+    for (var _i = 0; _i < array_length(_lines); _i++) if (is_string(_lines[_i]) && _lines[_i] == _want) return true;
+    return false;
+}
+
+function Test_R3WolfRun(_prefix) {
+    var _gs = GameState_Get();
+    var _old_flags = _gs.flags;
+    var _had_battle = variable_struct_exists(_gs, "battle") && is_struct(_gs.battle);
+    var _old_id = (_had_battle && variable_struct_exists(_gs.battle, "enemy_id")) ? _gs.battle.enemy_id : -1;
+    var _old_room = (_had_battle && variable_struct_exists(_gs.battle, "enemy_room")) ? _gs.battle.enemy_room : -1;
+    _gs.flags = {};
+    var _id = "floor2_dire_wolf_reaction";
+    var _key = "flag:" + Dialogue_NarrativeDoneFlagKey(_id);
+
+    // the wolf: killed, queued, shown (marked done)
+    Test_True("r3wolf: killing the Dire Wolf on floor 2 queues its reaction the first time", Dialogue_NarrativeOnEnemyDefeated(ENEMY_DIREWOLF, rm_floor2));
+    Dialogue_NarrativeMarkDone(_id);
+    Test_True("r3wolf: marking it done marks the profile's story key at once", Story_Seen(_key));
+    // the game being killed: the process dies before the 10 s autosave: the profile comes back from disk, the run is rebuilt from the last save (without the flag)
+    Test_ProfRelaunch();
+    _gs.flags = {};
+    Test_True("r3wolf: the profile file has it after the game was killed", Story_Seen(_key));
+    Test_True("r3wolf: so the event reads as done", Dialogue_NarrativeIsDone(_id));
+    Test_False("r3wolf: killing the wolf again does not queue the reaction", Dialogue_NarrativeOnEnemyDefeated(ENEMY_DIREWOLF, rm_floor2));
+    Test_False("r3wolf: and nothing is pending", Dialogue_NarrativeIsPending(_id));
+
+    // another event goes the same way (the Stranger's), and one nobody has seen is untouched
+    Dialogue_NarrativeMarkDone("first_stranger_encounter_reaction");
+    Test_ProfRelaunch();
+    _gs.flags = {};
+    Test_False("r3wolf: the Stranger's reaction does not queue again after the game was killed either", Dialogue_NarrativeOnStrangerEncounterResolved());
+    Test_True("r3wolf: an event nobody has seen still queues", Dialogue_NarrativeOnLevelUp(1));
+
+    // the slime's one-time lines after the first fight
+    Profile_ResetForTest();
+    _gs.flags = {};
+    if (!_had_battle) _gs.battle = {};
+    _gs.battle.enemy_id = ENEMY_SLIME;
+    _gs.battle.enemy_room = rm_floor1;
+    var _foe = EnemyCreate(ENEMY_SLIME);
+    var _hero = CharacterCreate_Player(CLASS_KNIGHT);
+    Test_True("r3wolf: the first slime kill says its line", Test_R3VictoryHasSlimeLine(Battle_BuildVictoryDialogueLines(_foe, {}, _hero)));
+    Test_True("r3wolf: and marks the profile at once", Story_Seen("flag:floor1_slime_kill_reaction_done"));
+    Test_ProfRelaunch();
+    _gs.flags = {};
+    Test_False("r3wolf: after the game was killed the slime line does not come back", Test_R3VictoryHasSlimeLine(Battle_BuildVictoryDialogueLines(_foe, {}, _hero)));
+
+    _gs.flags = _old_flags;
+    if (_had_battle) { _gs.battle.enemy_id = _old_id; _gs.battle.enemy_room = _old_room; } else variable_struct_remove(_gs, "battle");
 }
