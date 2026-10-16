@@ -6590,14 +6590,14 @@ function Test_Suite_Economy() {
     ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init(); CardDB_Init();
 
     // ---- gold (D23): 10 + 2 per level; rank 2 x1.2; boss x3; elite x2 ----
-    Test_Eq("C3 gold: level 1 normal enemy = 12", Gold_Base(1, 1, false, false), 12);
-    Test_Eq("C3 gold: level 2 = 14", Gold_Base(2, 1, false, false), 14);
-    Test_Eq("C3 gold: level 5 = 20", Gold_Base(5, 1, false, false), 20);
-    Test_Eq("C3 gold: an elite pays double (level 5: 40)", Gold_Base(5, 1, false, true), 40);
-    Test_Eq("C3 gold: rank 2 pays x1.2 (level 5: 24)", Gold_Base(5, 2, false, false), 24);
-    Test_Eq("C3 gold: level 8 rank 2 = 31 (31.2 rounded)", Gold_Base(8, 2, false, false), 31);
-    Test_Eq("C3 gold: the mini boss (level 8, boss) = 78", Gold_Base(8, 3, true, false), 78);
-    Test_Eq("C3 gold: a rank 2 elite at level 8 = 62", Gold_Base(8, 2, false, true), 62);
+    Test_Eq("C3 gold: level 1 normal enemy = 4 (3.5 rounded; D193, was 12)", Gold_Base(1, 1, false, false), 4);
+    Test_Eq("C3 gold: level 2 = 4 (D193, was 14)", Gold_Base(2, 1, false, false), 4);
+    Test_Eq("C3 gold: level 5 = 6 (5.5 rounded; D193, was 20)", Gold_Base(5, 1, false, false), 6);
+    Test_Eq("C3 gold: an elite pays double (level 5: 11; D193, was 40)", Gold_Base(5, 1, false, true), 11);
+    Test_Eq("C3 gold: rank 2 pays x1.2 (level 5: 6.6 -> 7; D193, was 24)", Gold_Base(5, 2, false, false), 7);
+    Test_Eq("C3 gold: level 8 rank 2 = 8 (8.4 rounded; D193, was 31)", Gold_Base(8, 2, false, false), 8);
+    Test_Eq("C3 gold: the mini boss (level 8, boss) = 21 (D193, was 78)", Gold_Base(8, 3, true, false), 21);
+    Test_Eq("C3 gold: a rank 2 elite at level 8 = 17 (16.8 rounded; D193, was 62)", Gold_Base(8, 2, false, true), 17);
     var _r12 = Gold_Range(12);
     Test_True("C3 gold: the range of 12 is 9..15 (+-25%)", _r12.lo == 9 && _r12.hi == 15);
     var _r40 = Gold_Range(40);
@@ -6646,8 +6646,8 @@ function Test_Suite_Economy() {
     Test_Eq("C3 gold: the run history keeps the gold the run had", _hist.gold, 25);
 
     // income against prices (the target: a floor of gold buys one or two things)
-    Test_True("C3 balance: two fights of floor 2 (28 gold) buy a Smoke Bomb (21)", Gold_Base(2, 1, false, false) * 2 >= Shop_Price(33));
-    Test_True("C3 balance: but not a Smoke Bomb and a Firebomb together (48)", Gold_Base(2, 1, false, false) * 2 < Shop_Price(33) + Shop_Price(30));
+    Test_True("C3 balance (D193): two fights of floor 2 (8 gold) no longer buy a Smoke Bomb (21; it was 28 gold)", Gold_Base(2, 1, false, false) * 2 < Shop_Price(33));
+    Test_True("C3 balance (D193): it takes about six floor-2 fights to buy a Smoke Bomb", Gold_Base(2, 1, false, false) * 6 >= Shop_Price(33));
 
     // ---- prices: ceil(value x 1.5); sell = half ----
     Test_Eq("C3 price: HP Potion Lv1 (value 8) = 12", Shop_Price(10), 12);
@@ -6845,21 +6845,21 @@ function Test_Suite_Economy() {
     var _rk = Test_Hero(CLASS_KNIGHT);
     var _picks0 = _rk.card_picks;
     var _rw = Battle_GrantRewards(_rk, EnemyCreate(ENEMY_SLIME));
-    Test_True("C3 reward: a Slime (level 1) pays 9..15 gold", _rw.gold >= 9 && _rw.gold <= 15);
+    Test_True("C3 reward: a Slime (level 1) pays 3..5 gold (D193, was 9..15)", _rw.gold >= 3 && _rw.gold <= 5);
     Test_Eq("C3 reward: the gold went into the run", _gs.run.gold, _rw.gold);
     Test_False("C3 reward: a normal enemy gives no card pick", _rw.card_pick);
     Test_Eq("C3 reward: no pick owed", _rw.player.card_picks, _picks0);
     _gs.run.gold = 0;
     var _rk2 = Test_Hero(CLASS_KNIGHT);
     var _rw2 = Battle_GrantRewards(_rk2, Elite_Apply(EnemyCreate(ENEMY_SLIME), "brutal"));
-    Test_True("C3 reward: an elite Slime pays 18..30 gold (double)", _rw2.gold >= 18 && _rw2.gold <= 30);
+    Test_True("C3 reward: an elite Slime pays 5..9 gold (double; D193, was 18..30)", _rw2.gold >= 5 && _rw2.gold <= 9);
     Test_True("C3 reward: an elite gives a card pick", _rw2.card_pick);
     Test_Eq("C3 reward: the pick is owed by the character", _rw2.player.card_picks, _picks0 + 1);
     _gs.run.gold = 0;
     var _rk3 = Test_Hero(CLASS_KNIGHT);
     _rk3 = Card_Take(_rk3, "pas:coin_sense").ch;
     var _rw3 = Battle_GrantRewards(_rk3, EnemyCreate(ENEMY_MINI_BOSS));
-    Test_True("C3 reward: the mini boss pays about 78 (58..98), +10% with Coin Sense", _rw3.gold >= 58 && _rw3.gold <= 116);
+    Test_True("C3 reward: the mini boss pays about 21 (15..27), +10% with Coin Sense (D193, was about 78)", _rw3.gold >= 15 && _rw3.gold <= 30);
 
     // ---- per-run shuffles (D33): enemy pools, placement, elites, chests ----
     var _bad_pool = false;
@@ -18464,6 +18464,7 @@ function Test_Suite_R3Balance() {
     SkillDB_Init();
     Test_RunSuite("R3Balance.stagger", Test_R3BalanceStagger);
     Test_RunSuite("R3Balance.turns", Test_R3BalanceTurns);
+    Test_RunSuite("R3Balance.gold", Test_R3BalanceGold);
     Test_Eq("r3balance: Wound power is 3 (it was 4)", SkillDB_Get(SKILL_WOUND).power, 3);
     Test_Eq("r3balance: Wound still costs 3 MP (so still 3 arrows)", SkillDB_Get(SKILL_WOUND).mp_cost, 3);
     Test_Eq("r3balance: Horizontal Slash power is 4 (it was 5), cost 5", string(SkillDB_Get(SKILL_HORIZ_SLASH).power) + " " + string(SkillDB_Get(SKILL_HORIZ_SLASH).mp_cost), "4 5");
@@ -18526,4 +18527,12 @@ function Test_R3BalanceTurns() {
     var _tl4 = Turn_New([Turn_Fighter(TL_PLAYER, 10), Turn_Fighter(TL_ENEMY, 10)]);
     Turn_Next(_tl4);
     Test_True("r3balance D192: a stun still lands and makes the target Steadfast", Turn_Stun(_tl4, TL_ENEMY) && Turn_Find(_tl4, TL_ENEMY).steadfast == TURN_STEADFAST_TURNS);
+}
+
+// D193 (less gold): enemies pay (3 + 0.5 x level) x rank / boss / elite (it was 10 + 2 x level), the Coin Purse card gives 8 (it was 15); prices stay.
+function Test_R3BalanceGold() {
+    Test_Eq("r3balance D193: GOLD_BASE is 3", GOLD_BASE, 3);
+    Test_Eq("r3balance D193: GOLD_PER_LEVEL is 0.5", GOLD_PER_LEVEL, 0.5);
+    Test_Eq("r3balance D193: the Coin Purse card gives 8 gold", CardDB_Get("fb:gold").params.gold, 8);
+    Test_Eq("r3balance D193: prices stay (Smoke Bomb 21)", Shop_Price(33), 21);
 }

@@ -2351,6 +2351,10 @@ class RunSim:
         rows = self.shop_stock(idx)
         spent = 0
         bought = []
+        gold_in = self.gold   # D193: what the run carries to this merchant, and what his shelf holds
+        stock_value = sum(r["price"] * r["qty"] for r in rows)
+        stock_n = sum(r["qty"] for r in rows)
+        prices = sorted(r["price"] for r in rows for _ in range(r["qty"]))
         while True:
             base_v = self.value(p)
             base_rb = self.run_bonus(p)
@@ -2377,7 +2381,7 @@ class RunSim:
             else:
                 self.take_card(r["id"])
             bought.append(r["id"])
-        self.rec["shops"].append(dict(idx=idx, spent=spent, bought=bought))
+        self.rec["shops"].append(dict(idx=idx, spent=spent, bought=bought, gold_in=gold_in, stock_value=stock_value, stock_n=stock_n, prices=prices))
         self.rec["buys"].extend(bought)
 
     def row_value(self, r, base_v, base_rb):

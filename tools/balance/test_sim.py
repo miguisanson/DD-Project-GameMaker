@@ -181,10 +181,26 @@ class AI(unittest.TestCase):
 
 
 class Economy(unittest.TestCase):
-    def test_gold_of_a_level_5_rank_2_enemy_is_24_plus_minus_25_percent(self):   # (10 + 2*5) * 1.2
+    def test_gold_of_a_level_5_rank_2_enemy_is_7_plus_minus_25_percent(self):   # D193: (3 + 0.5*5) * 1.2 = 6.6 (was (10 + 2*5) * 1.2 = 24)
         g = D.eco
         base = sim.rhu((g["gold_base"] + g["gold_per_level"] * 5) * g["gold_rank2_mult"])
-        self.assertEqual(base, 24)
+        self.assertEqual(base, 7)
+
+    def test_the_coin_purse_gives_8_gold(self):                                # D193 (was 15)
+        self.assertEqual(D.cards["fb:gold"]["params"]["gold"], 8)
+
+    def test_the_first_merchant_is_about_two_items_away_from_what_a_run_carries(self):   # D193: gold for 1-2 items at the first merchant (the cheapest first), not the shelf
+        n = 0
+        for seed in range(1, 9):
+            r = sim.RunSim(D, "knight", "average", seed, rules=R)
+            r.play()
+            first = r.rec["shops"][0]
+            total = 0
+            for p in first["prices"]:
+                if total + p <= first["gold_in"]:
+                    total += p
+                    n += 1
+        self.assertLessEqual(n / 8.0, 2.0)
 
     def test_card_offer_has_three_distinct_cards_and_forces_an_upgrade_after_two_dry_offers(self):
         run = sim.RunSim(D, "knight", "average", 7, rules=R)
