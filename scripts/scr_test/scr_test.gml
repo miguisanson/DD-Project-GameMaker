@@ -13750,7 +13750,7 @@ function Test_Hunt7MapSave() {
         // through the save file's own text
         var _rec = json_parse(json_stringify(RoomState_Get(room, _pid)));
         Test_True("hunt7map save " + _on + ": the saved record names the sprite", string_pos("\"" + _swap_name + "\"", json_stringify(_rec)) > 0);
-        Test_False("hunt7map save " + _on + ": and holds no raw sprite number", variable_struct_exists(_rec.vars, "sprite_index") && is_real(_rec.vars.sprite_index));
+        Test_False("hunt7map save " + _on + ": and holds no raw sprite number", variable_struct_exists(_rec.vars, "sprite_index"));
         variable_struct_set(_gs.persist, _key, _rec);
         var _b = instance_create_depth(0, 0, 0, _objs[_i]);
         _b.persist_id = _pid;

@@ -140,6 +140,12 @@ function RoomState_SaveInstance(_inst, _vars, _removed) {
     for (var i = 0; i < array_length(_vars); i++) {
         var v = _vars[i];
         if (variable_instance_exists(_inst, v)) {
+            if (v == "sprite_index") {
+                // bug hunt 7: a sprite is saved by its NAME, never by its number (the number shifts when a sprite is added between builds, save-systems: no engine asset ids)
+                var spr = variable_instance_get(_inst, v);
+                if ((is_numeric(spr) || is_handle(spr)) && sprite_exists(spr)) variable_struct_set(data.vars, "sprite_name", sprite_get_name(spr));
+                continue;
+            }
             variable_struct_set(data.vars, v, variable_instance_get(_inst, v));
         }
     }
@@ -215,6 +221,27 @@ function RoomState_SetAlive(_room, _persist_id) {
     RoomState_Set(_room, _persist_id, alive);
 }
 
+// The picture of a saved instance (bug hunt 7). A save holds the sprite's NAME (`sprite_name`, resolved with asset_get_index); an older save holds the raw `sprite_index` number,
+// which may point at another sprite after a build that added one. Every instance that saves a picture got it by swapping to its own swap_sprite, so a swapped instance with a swap
+// sprite takes that; otherwise the old number is used only when it is a real sprite. Nothing in the save is trusted to be a sprite: a name or number that is not one changes nothing.
+function RoomState_ApplySprite(_inst, _vars) {
+    if (!is_struct(_vars)) return;
+    if (variable_struct_exists(_vars, "sprite_name")) {
+        var nm = _vars.sprite_name;
+        var spr = is_string(nm) ? asset_get_index(nm) : -1;
+        if (spr != -1 && sprite_exists(spr)) _inst.sprite_index = spr;
+        return;
+    }
+    if (!variable_struct_exists(_vars, "sprite_index")) return;
+    var old = _vars.sprite_index;
+    var swapped = variable_instance_exists(_inst, "swapped") && _inst.swapped;
+    if (swapped && variable_instance_exists(_inst, "swap_sprite") && _inst.swap_sprite != noone && sprite_exists(_inst.swap_sprite)) {
+        _inst.sprite_index = _inst.swap_sprite;
+    } else if ((is_numeric(old) || is_handle(old)) && sprite_exists(old)) {
+        _inst.sprite_index = old;
+    }
+}
+
 function RoomState_ApplyInstance(_inst) {
     if (!RoomState_EnsurePersistId(_inst)) {
         RoomState_Warn("[Persist] Missing persist_id on " + object_get_name(_inst.object_index) + " in " + room_get_name(room));
@@ -252,8 +279,10 @@ function RoomState_ApplyInstance(_inst) {
         var names = variable_struct_get_names(data.vars);
         for (var i = 0; i < array_length(names); i++) {
             var n = names[i];
+            if (n == "sprite_name" || n == "sprite_index") continue;   // pictures are restored below
             variable_instance_set(_inst, n, variable_struct_get(data.vars, n));
         }
+        RoomState_ApplySprite(_inst, data.vars);
     }
     if (RoomState_IsEnemyInstance(_inst)) {
         if (variable_instance_exists(_inst, "defeated")) _inst.defeated = false;

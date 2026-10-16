@@ -678,8 +678,9 @@ function Merchant_EnsureInRoom() {
     return inst;
 }
 
-// The gold glow round the merchant on the map (World_DrawFx, scr_enemy): the sprite's silhouette in #E8C547 one pixel out in 8 directions,
-// pulsing with Merchant_GlowAlpha, then the sprite itself on top. obj_npc has no Draw event, so this also steps the 2-frame idle (2 fps).
+// The gold glow round the merchant on the map (World_DrawFx, scr_enemy): the sprite's silhouette in #E8C547 one pixel out in 8 directions, pulsing with Merchant_GlowAlpha.
+// The glow is a ring round his shape with his own pixels cut out (Merchant_FxRing): the sprite itself is the object's own draw, under the room's darkness like every other figure
+// (bug hunt 7: it used to be drawn again on top of the darkness, so he stood at full brightness in a dark room). obj_npc has no Draw event, so this also steps the 2-frame idle (2 fps).
 function Merchant_DrawWorldFx() {
     if (!Fx_IsWorldPass()) return;
     if (!instance_exists(obj_npc)) return;
@@ -690,17 +691,26 @@ function Merchant_DrawWorldFx() {
     with (obj_npc) {
         if (!variable_instance_exists(id, "merchant") || !merchant) continue;
         if (sprite_index == _idle && _idle != -1) image_index = (current_time div 500) mod max(1, sprite_get_number(_idle));
-        gpu_set_fog(true, _gold, 0, 1);
-        for (var _dy = -1; _dy <= 1; _dy++) {
-            for (var _dx = -1; _dx <= 1; _dx++) {
-                if (_dx == 0 && _dy == 0) continue;
-                draw_sprite_ext(sprite_index, image_index, x + _dx, y + _dy, 1, 1, 0, c_white, _alpha);
-            }
-        }
-        gpu_set_fog(false, c_white, 0, 1);
-        draw_sprite_ext(sprite_index, image_index, x, y, 1, 1, 0, c_white, 1);
+        var _ring = Merchant_FxRing(sprite_index, image_index, _gold);
+        var _side = _ring.r * 2;
+        draw_surface_part_ext(_ring.surf, 0, 0, _side, _side, x - _ring.r, y - _ring.r, 1, 1, c_white, _alpha);
     }
     draw_set_alpha(_oa);
+}
+
+// The merchant's glow as a picture: his shape one pixel out in _col (fully opaque, the pulse is the alpha it is drawn with) in a small surface, and then his own pixels cut out of it.
+// Returns { surf, r } like Elite_FxRing: the sprite's origin is at (r, r) in the surface (a cached surface shared with the elite marks, read only the 2r x 2r corner).
+function Merchant_FxRing(_spr, _img, _col) {
+    var _r = ceil(point_distance(0, 0, sprite_get_width(_spr), sprite_get_height(_spr))) + 3;
+    var _surf = Elite_FxSurface(_r * 2);
+    surface_set_target(_surf);
+    draw_clear_alpha(c_black, 0);
+    Elite_DrawOutline(_spr, _img, _r, _r, 1, 1, 0, _col, 1);
+    gpu_set_blendmode_ext_sepalpha(bm_zero, bm_one, bm_zero, bm_inv_src_alpha);   // colour untouched, alpha * (1 - source alpha): the sprite's pixels take the glow away
+    draw_sprite_ext(_spr, _img, _r, _r, 1, 1, 0, c_white, 1);
+    gpu_set_blendmode(bm_normal);
+    surface_reset_target();
+    return { surf: _surf, r: _r };
 }
 
 // ---- elites (D86) ----
