@@ -56,7 +56,7 @@
 #macro LEGACY_MP_PER_POINT 2
 #macro PLAYER_BASE_HP 10
 #macro PLAYER_BASE_MP 10
-#macro COMBAT_UNARMED_POWER 5           // weapon power of a character with no weapon equipped (D186: was 2; only the Nobody fights unarmed)
+#macro COMBAT_UNARMED_POWER 2           // weapon power of a character with no weapon equipped
 #macro COMBAT_POWER_SCALE 2           // spec section 4: weapon/skill power x this = formula power
 #macro COMBAT_WEAPON_SKILL_SHARE 0.5  // D22: how much of the weapon's power adds to a player's skill power
 #macro COMBAT_CRIT_MULT 2

@@ -1,6 +1,6 @@
 // Classes (combat-spec.md section 2). `stats` are the level-1 values (D176: with VIG and MND, which make Max HP and Max MP); fixed growth per level is LevelUp_ClassGrowthGain (scr_levelup).
 // `hd` and `mp_gain` are the pre-D176 silent per-level growth: only Resource_MaxHp / Resource_MaxMp (the reference the new numbers are compared with) read them.
-// D186 (R3 balance, retuned after D191-D193, tools/balance/sim.py): Knight SPD 10->9 (and Wound power 3, scr_db_skill); Archer ATK 9->8, SPD 13->12; Nobody ATK 8->10, DEF 8->9, SPD 9->12 (and COMBAT_UNARMED_POWER 5, scr_macros).
+// D186 (R3 balance, retuned after D191-D193, tools/balance/sim.py): Knight SPD 10->9 (and Wound power 3, scr_db_skill); Archer ATK 9->8, SPD 13->12; Nobody ATK 8->10, DEF 8->9, SPD 9->12.
 // `free_default` is where the level's free point goes until the level-up UI lets the player choose (D76).
 function DB_PlayerClass(_class_id) {
     switch (_class_id) {

@@ -593,6 +593,7 @@ function Turn_Next(_tl) {
     var last = variable_struct_exists(_tl, "last") ? _tl.last : -1;
     var streak = variable_struct_exists(_tl, "streak") ? _tl.streak : 0;
     var blocked = (streak >= TURN_MAX_IN_ROW) ? last : -999;
+    if (n < 2) blocked = -999;   // a timeline of one fighter has nobody to hand the turn to
     var ready = false;
     for (var i = 0; i < n; i++) { if (fs[i].id != blocked && fs[i].gauge >= TURN_GAUGE_MAX) ready = true; }
     if (!ready) {
