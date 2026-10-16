@@ -19367,7 +19367,7 @@ function Test_R4Final2LevelUp() {
     _m.cursor = STAT_SPD;
     CardsUi_StatRefresh(_m);
     var _spd = Ui_RowValueSpec(_m.items[2], true);
-    Test_Eq("r4final2 levelup: hovered SPD reads '10 > 11' with the 11 gold and '10 > ' white", _spd.old + _spd.new + "|" + string(_spd.old_col == UI_C_TEXT) + string(_spd.new_col == UI_C_MERCHANT_GOLD), "10 > 11|11");
+    Test_Eq("r4final2 levelup: hovered SPD reads '9 > 10' with the 10 gold and '9 > ' white (D186: Knight SPD 9)", _spd.old + _spd.new + "|" + string(_spd.old_col == UI_C_TEXT) + string(_spd.new_col == UI_C_MERCHANT_GOLD), "9 > 10|11");
     var _def = Ui_RowValueSpec(_m.items[1], false);
     Test_Eq("r4final2 levelup: DEF, no longer hovered, is '12 > 13' with only 13 gold", _def.old + _def.new + "|" + string(_def.old_col == UI_C_TEXT) + string(_def.new_col == UI_C_MERCHANT_GOLD), "12 > 13|11");
     // one cursor: the mouse over a row moves the highlight (band target), the +1 and the details (the row the details read) together
@@ -19385,9 +19385,9 @@ function Test_R4Final2LevelUp() {
     Ui_MenuStep(_mh, _ms, 5000);
     CardsUi_StatRefresh(_mh);
     Test_Eq("r4final2 levelup: the pointer over SPD puts the cursor on SPD", _mh.cursor, STAT_SPD);
-    Test_Eq("r4final2 levelup: so SPD (and only SPD) shows the +1", Test_LvRowValues(_mh), "11 > 12|12 > 13|10 > 11|3|10 > 12|11 > 12");
+    Test_Eq("r4final2 levelup: so SPD (and only SPD) shows the +1", Test_LvRowValues(_mh), "11 > 12|12 > 13|9 > 10|3|10 > 12|11 > 12");   // D186: Knight SPD 9
     Test_Eq("r4final2 levelup: and the details panel reads SPD's row (its help line)", _mh.items[_mh.cursor].help, CardsUi_StatHelp(STAT_SPD));
-    Test_Eq("r4final2 levelup: and SPD's Now / After lines", Test_RowValue(_mh.items[_mh.cursor].lines, "Now") + ">" + Test_RowValue(_mh.items[_mh.cursor].lines, "After"), "10>11");
+    Test_Eq("r4final2 levelup: and SPD's Now / After lines", Test_RowValue(_mh.items[_mh.cursor].lines, "Now") + ">" + Test_RowValue(_mh.items[_mh.cursor].lines, "After"), "9>10");
     // the highlight bar jumps with the cursor on this screen (no glide that can lag behind the +1 and the details)
     Test_True("r4final2 levelup: the level-up screen's highlight bar is not a glide (it is on the cursor row in the same frame)", _mh.layout.snap_band);
     _mh.cur_y = 40;
