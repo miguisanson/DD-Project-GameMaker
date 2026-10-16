@@ -276,11 +276,9 @@ function SFX_ApplyActiveGains(_fade_ms = 0) {
         if (h == -1 || !audio_is_playing(h)) continue;
         var key = variable_struct_exists(rec, "key") ? rec.key : "";
         var base = variable_struct_exists(rec, "base") ? rec.base : 1;
-        var trim = SFX_GetGain(key);
-        var cat = SFX_CategoryForKey(key);
-        var cat_gain = (cat == "ui") ? global.vol_ui : global.vol_sfx;
         var vary = variable_struct_exists(rec, "vary") ? rec.vary : 1;
-        var gain = clamp(base, 0, 1) * trim * global.vol_master * cat_gain * vary;
+        var asset = variable_struct_exists(rec, "asset") ? rec.asset : noone;
+        var gain = SFX_ComputeGain(key, asset, base, vary);
         audio_sound_gain(h, gain, max(0, _fade_ms));
     }
 }
@@ -429,17 +427,13 @@ function SFX_RegisterSkillAudioFromDB() {
 
         SFX_RegisterResolved(key, candidates);
 
-        var gain = 1;
-        if (variable_struct_exists(sk, "sfx_gain")) {
-            gain = real(sk.sfx_gain);
-        } else if (string_copy(key, 1, 11) == "enemy_skill") {
-            // Enemy skill audio defaults to the monster gain profile.
-            gain = MONSTER_SFX_GAIN;
-        }
-        SFX_RegisterGain(key, clamp(gain, 0, 1));
+        // R-119: a skill's own sfx_gain (bloodthirsty 0.64) and the monster default (0.8) are folded into the per-sound gain table: the key trim is 1.
+        SFX_RegisterGain(key, 1);
     }
 }
 
+// R-119: the per-key volume tweaks that used to live here (monster 0.8, dire wolf spawn 0.216, dire wolf attack 0.72) are folded into the
+// per-sound gain table (SFX_BuildGainTable), so every key trim is 1. Dialogue stays muted (no sound is registered for it).
 function SFX_RegisterGainDefaults() {
     SFX_EnsureGainMaps();
     ds_map_clear(global.sfx_gain_db);
@@ -506,32 +500,32 @@ function SFX_RegisterGainDefaults() {
     SFX_RegisterGain("skill_take_aim", 1.00);
 
     // Enemy spawn
-    SFX_RegisterGain("enemy_spawn_slime", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_spawn_spider", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_spawn_mad_whisp", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_spawn_ghost_sword", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_spawn_dire_wolf", 0.30 * MONSTER_SFX_GAIN * 0.90);
-    SFX_RegisterGain("enemy_spawn_snake", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_spawn_killer_plant", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_spawn_stranger", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_spawn_mini_boss", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_spawn_final_boss", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_spawn_slime", 1.00);
+    SFX_RegisterGain("enemy_spawn_spider", 1.00);
+    SFX_RegisterGain("enemy_spawn_mad_whisp", 1.00);
+    SFX_RegisterGain("enemy_spawn_ghost_sword", 1.00);
+    SFX_RegisterGain("enemy_spawn_dire_wolf", 1.00);
+    SFX_RegisterGain("enemy_spawn_snake", 1.00);
+    SFX_RegisterGain("enemy_spawn_killer_plant", 1.00);
+    SFX_RegisterGain("enemy_spawn_stranger", 1.00);
+    SFX_RegisterGain("enemy_spawn_mini_boss", 1.00);
+    SFX_RegisterGain("enemy_spawn_final_boss", 1.00);
 
     // Enemy special
-    SFX_RegisterGain("enemy_special_slime", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_special_spider", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_special_mad_whisp", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_special_ghost_sword", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_special_dire_wolf", 1.00 * MONSTER_SFX_GAIN * 0.90);
-    SFX_RegisterGain("enemy_special_snake", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_special_killer_plant", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_special_stranger", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_special_mini_boss", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_special_final_boss", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_special_slime", 1.00);
+    SFX_RegisterGain("enemy_special_spider", 1.00);
+    SFX_RegisterGain("enemy_special_mad_whisp", 1.00);
+    SFX_RegisterGain("enemy_special_ghost_sword", 1.00);
+    SFX_RegisterGain("enemy_special_dire_wolf", 1.00 * 0.90);
+    SFX_RegisterGain("enemy_special_snake", 1.00);
+    SFX_RegisterGain("enemy_special_killer_plant", 1.00);
+    SFX_RegisterGain("enemy_special_stranger", 1.00);
+    SFX_RegisterGain("enemy_special_mini_boss", 1.00);
+    SFX_RegisterGain("enemy_special_final_boss", 1.00);
 
     // Legacy/Fallback
-    SFX_RegisterGain("enemy_spawn_unknown", 1.00 * MONSTER_SFX_GAIN);
-    SFX_RegisterGain("enemy_special_unknown", 1.00 * MONSTER_SFX_GAIN);
+    SFX_RegisterGain("enemy_spawn_unknown", 1.00);
+    SFX_RegisterGain("enemy_special_unknown", 1.00);
     SFX_RegisterGain("pickup", 1.00);
     SFX_RegisterGain("push_rock", 1.00);
     SFX_RegisterGain("dog_pet", 1.00);
@@ -573,7 +567,7 @@ function BGM_RegisterGainDefaults() {
     BGM_RegisterGain("forest_bgm", 1.00);
     BGM_RegisterGain("arrival_bgm", 1.00);
     BGM_RegisterGain("twilight_bgm", 1.00);
-    BGM_RegisterGain("haunting_bgm", 0.35);
+    BGM_RegisterGain("haunting_bgm", 1.00);   // was 0.35: folded into the gain table (R-119)
     BGM_RegisterGain("haunting2_bgm", 1.00);
 }
 
@@ -617,6 +611,22 @@ function SFX_Play(_key, _vol = 1, _pitch = 1) {
     global.sfx_last_pitch = play_pitch;
     global.sfx_last_vary = vary.vol;
 
+    // R-119: the sound's table gain (dB) is recorded before the play too, so a test can read it with no sound device
+    var base_gain = clamp(_vol, 0, 1);
+    var gain = SFX_ComputeGain(_key, snd, base_gain, vary.vol);
+    global.sfx_last_asset = snd;
+    global.sfx_last_gain_db = SFX_AssetGainDb(snd);
+    global.sfx_last_gain = gain;
+
+    // R-119: at most SFX_MAX_SAME_SOUND copies of one sound at once; the oldest copy is stopped to make room
+    if (!variable_global_exists("sfx_active") || !is_array(global.sfx_active)) global.sfx_active = [];
+    SFX_CleanupActive();
+    var _victim = SFX_SameSoundOverflow(global.sfx_active, snd, SFX_MAX_SAME_SOUND);
+    if (_victim >= 0) {
+        audio_stop_sound(global.sfx_active[_victim].handle);
+        array_delete(global.sfx_active, _victim, 1);
+    }
+
     var snd_handle = audio_play_sound(snd, 0, false);
     if (snd_handle == -1) {
         global.sfx_last_key = _key;
@@ -624,18 +634,10 @@ function SFX_Play(_key, _vol = 1, _pitch = 1) {
         return -1;
     }
 
-    var category = SFX_CategoryForKey(_key);
-    var cat_gain = global.vol_sfx;
-    if (category == "ui") cat_gain = global.vol_ui;
-    var base_gain = clamp(_vol, 0, 1);
-    var trim = SFX_GetGain(_key);
-    var gain = clamp(base_gain * trim * global.vol_master * cat_gain * vary.vol, 0, 1);
     audio_sound_gain(snd_handle, gain, 0);
     audio_sound_pitch(snd_handle, max(0.01, play_pitch));
 
-    if (!variable_global_exists("sfx_active") || !is_array(global.sfx_active)) global.sfx_active = [];
-    SFX_CleanupActive();
-    array_push(global.sfx_active, { handle: snd_handle, key: _key, base: base_gain, vary: vary.vol });
+    array_push(global.sfx_active, { handle: snd_handle, key: _key, asset: snd, base: base_gain, vary: vary.vol });
 
     global.sfx_last_key = _key;
     global.sfx_last_handle = snd_handle;
@@ -926,7 +928,7 @@ function BGM_MixApplyForRoom(_room_id, _fade_in_ms = -1, _fade_out_ms = -1) {
 
         variable_struct_set(global.bgm_mix_active, key, active);
 
-        var trim = BGM_GetGainByKey(key);
+        var trim = BGM_TrackTrim(key);   // R-119: key trim times the track's table gain
         var target_gain = active ? (global.vol_master * global.vol_music * trim * BGM_Duck()) : 0;
         audio_sound_gain(handle, target_gain, active ? in_ms : out_ms);
     }
@@ -966,7 +968,7 @@ function BGM_ApplyGain(_fade_ms = 0) {
         if (!variable_struct_exists(global.bgm_mix_handles, key)) continue;
         var h = variable_struct_get(global.bgm_mix_handles, key);
         if (h == -1 || !audio_is_playing(h)) continue;
-        var trim = BGM_GetGainByKey(key);
+        var trim = BGM_TrackTrim(key);   // R-119: key trim times the track's table gain
         var active = variable_struct_exists(global.bgm_mix_active, key) && variable_struct_get(global.bgm_mix_active, key);
         var target = active ? (global.vol_master * global.vol_music * trim * BGM_Duck()) : 0;
         audio_sound_gain(h, target, max(0, _fade_ms));
@@ -1087,3 +1089,239 @@ function SFX_EnsureAudioGlobals() {
     if (!variable_global_exists("audio_debug_missing_count")) global.audio_debug_missing_count = 0;
     if (!variable_global_exists("audio_debug_total_count")) global.audio_debug_total_count = 0;
 }
+
+
+// ---- R-119: one gain (dB) per sound asset, so no sound is far louder than another -------------------------------------
+// tools/audio/measure_loudness.py measures every file under sounds/ (tools/audio/loudness.json); tools/audio/write_gain_table.py works
+// each one to its group target (SFX -26, UI -29, music and ambience -28 LUFS, a boss/roar sound 2 dB louder) and writes the table below.
+// The play paths (SFX_Play, SFX_ApplyActiveGains, the music mix, the skillbook ambience) multiply it with the bus and settings volume
+// and the D116 variation. The old per-key volume tweaks (monster 0.8, dire wolf 0.3, haunting 0.35, ...) are folded into the table:
+// every key trim is 1 now. A sound with no row plays at 0 dB. The audio files themselves are untouched.
+// Headroom: the targets are 8 dB under the brief's relative -18/-20, and at most SFX_MAX_SAME_SOUND copies of one sound play at once.
+#macro SFX_GAIN_MAX 4.0          // +12 dB: a sound's final linear gain never goes above this (GameMaker treats a gain above 1 as a boost)
+#macro SFX_MAX_SAME_SOUND 3      // copies of one sound at once; the 4th stops the oldest
+
+function SFX_DbToLinear(_db) {
+    return power(10, _db / 20);
+}
+
+function SFX_GainTable() {
+    if (!variable_global_exists("sfx_gain_table") || !is_struct(global.sfx_gain_table)) global.sfx_gain_table = SFX_BuildGainTable();
+    return global.sfx_gain_table;
+}
+
+// the sound's asset name: an asset (the number GameMaker gives it) or its name as text; "" for anything else
+function SFX_AssetName(_asset) {
+    if (is_string(_asset)) return _asset;
+    if (!SFX_IsValidSoundAsset(_asset)) return "";
+    return audio_get_name(_asset);
+}
+
+function SFX_GainTableHas(_asset) {
+    var _n = SFX_AssetName(_asset);
+    return (_n != "") && variable_struct_exists(SFX_GainTable(), _n);
+}
+
+// the table gain in dB for a sound asset (or its name); 0 for a sound with no row
+function SFX_AssetGainDb(_asset) {
+    var _n = SFX_AssetName(_asset);
+    if (_n == "") return 0;
+    var _t = SFX_GainTable();
+    if (!variable_struct_exists(_t, _n)) return 0;
+    return variable_struct_get(_t, _n);
+}
+
+function SFX_AssetGain(_asset) {
+    return SFX_DbToLinear(SFX_AssetGainDb(_asset));
+}
+
+// the linear gain one play of _key (playing _asset) gets: base * key trim * table gain * master * bus * variation, never above SFX_GAIN_MAX
+function SFX_ComputeGain(_key, _asset, _base, _vary) {
+    SFX_ClampVolumes();
+    var _cat_gain = (SFX_CategoryForKey(_key) == "ui") ? global.vol_ui : global.vol_sfx;
+    return clamp(clamp(_base, 0, 1) * SFX_GetGain(_key) * SFX_AssetGain(_asset) * global.vol_master * _cat_gain * _vary, 0, SFX_GAIN_MAX);
+}
+
+// a music or ambience track's trim: its key trim times its table gain (1 for an unknown track)
+function BGM_TrackTrim(_key) {
+    return BGM_GetGainByKey(_key) * SFX_AssetGain(BGM_GetSound(_key));
+}
+
+// the index of the oldest record of _asset to stop so a new copy fits under _max copies, or -1 when there is room.
+// _active is the list of { handle, asset } records, oldest first.
+function SFX_SameSoundOverflow(_active, _asset, _max) {
+    var _count = 0;
+    var _oldest = -1;
+    for (var _i = 0; _i < array_length(_active); _i++) {
+        var _rec = _active[_i];
+        if (!is_struct(_rec) || !variable_struct_exists(_rec, "asset")) continue;
+        if (_rec.asset != _asset) continue;
+        if (_oldest < 0) _oldest = _i;
+        _count++;
+    }
+    return (_count >= _max) ? _oldest : -1;
+}
+
+// ==== BEGIN GENERATED SFX GAIN TABLE (tools/audio/write_gain_table.py, R-119: do not hand-edit) ====
+// sound asset name -> gain in dB; the play path multiplies it with the bus / settings volume. Comment: file level (LUFS, peak dBFS) and the group target.
+function SFX_BuildGainTable() {
+    var _t = {};
+    variable_struct_set(_t, "Abstract1", 12.0);   // ui -42.3 LUFS pk -17.5 -> target -29
+    variable_struct_set(_t, "Abstract2", 12.0);   // ui -42.2 LUFS pk -18.2 -> target -29
+    variable_struct_set(_t, "African1", 6.0);   // ui -35.2 LUFS pk -13.5 -> target -29
+    variable_struct_set(_t, "African2", 5.5);   // ui -34.7 LUFS pk -20.2 -> target -29
+    variable_struct_set(_t, "African3", 4.0);   // ui -33.2 LUFS pk -19.1 -> target -29
+    variable_struct_set(_t, "African4", 1.5);   // ui -30.6 LUFS pk -18.6 -> target -29
+    variable_struct_set(_t, "Ambience_haunting", -11.5);   // music -16.7 LUFS pk -1.2 -> target -28
+    variable_struct_set(_t, "Ambience_haunting_2", 0.0);   // music -27.9 LUFS pk -8.4 -> target -28
+    variable_struct_set(_t, "Arrival", -14.0);   // music -14.0 LUFS pk -0.3 -> target -28
+    variable_struct_set(_t, "Bite_2", -2.0);   // sfx -24.0 LUFS pk -1.0 -> target -26
+    variable_struct_set(_t, "Blocked", -5.0);   // sfx -20.9 LUFS pk -5.7 -> target -26
+    variable_struct_set(_t, "Body_falling_wood", -10.0);   // sfx -15.9 LUFS pk -1.8 -> target -26
+    variable_struct_set(_t, "Bow_Attack_", -2.0);   // sfx -23.9 LUFS pk -6.8 -> target -26
+    variable_struct_set(_t, "Bow_Impact_Hit_", -4.5);   // sfx -21.3 LUFS pk -5.2 -> target -26
+    variable_struct_set(_t, "Coffee1", 4.0);   // ui -33.1 LUFS pk -13.8 -> target -29
+    variable_struct_set(_t, "Coffee2", 2.5);   // ui -31.3 LUFS pk -12.0 -> target -29
+    variable_struct_set(_t, "Crying_moaning_ambience", 8.5);   // ambience -36.7 LUFS pk -23.4 -> target -28
+    variable_struct_set(_t, "Crying_moaning_ambience_2", 10.5);   // ambience -38.7 LUFS pk -21.6 -> target -28
+    variable_struct_set(_t, "Crying_moaning_ambience_3", 5.5);   // ambience -33.4 LUFS pk -16.4 -> target -28
+    variable_struct_set(_t, "Dropping_keys", -13.0);   // sfx -13.2 LUFS pk -0.2 -> target -26
+    variable_struct_set(_t, "Fireball_2", -14.0);   // sfx -12.2 LUFS pk -0.1 -> target -26
+    variable_struct_set(_t, "Ghost_scream_3", -14.0);   // sfx -9.8 LUFS pk -0.1 -> target -24
+    variable_struct_set(_t, "GooeySlime___Sound_Effect", -4.5);   // sfx -21.4 LUFS pk -1.0 -> target -26
+    variable_struct_set(_t, "Hiss", -5.0);   // sfx -20.9 LUFS pk -9.9 -> target -26
+    variable_struct_set(_t, "Knife_stab", -5.5);   // sfx -20.5 LUFS pk -0.1 -> target -26
+    variable_struct_set(_t, "Laugh_evil_deep_3", -4.5);   // sfx -21.7 LUFS pk -4.2 -> target -26
+    variable_struct_set(_t, "Laugh_spooky_3", -18.0);   // sfx -7.9 LUFS pk -2.9 -> target -26
+    variable_struct_set(_t, "Laugh_spooky_4", -4.5);   // sfx -21.3 LUFS pk -10.0 -> target -26
+    variable_struct_set(_t, "Liquid_slosh", 5.0);   // sfx -31.2 LUFS pk -15.1 -> target -26
+    variable_struct_set(_t, "Metal_resonance", -10.5);   // sfx -15.3 LUFS pk -2.8 -> target -26
+    variable_struct_set(_t, "Minimalist1", 8.0);   // ui -36.8 LUFS pk -10.2 -> target -29
+    variable_struct_set(_t, "Minimalist10", 7.0);   // ui -35.9 LUFS pk -11.1 -> target -29
+    variable_struct_set(_t, "Minimalist11", 5.5);   // ui -34.6 LUFS pk -10.9 -> target -29
+    variable_struct_set(_t, "Minimalist12", 4.0);   // ui -33.2 LUFS pk -10.1 -> target -29
+    variable_struct_set(_t, "Minimalist13", 3.5);   // ui -32.4 LUFS pk -8.7 -> target -29
+    variable_struct_set(_t, "Minimalist2", 9.0);   // ui -38.2 LUFS pk -11.4 -> target -29
+    variable_struct_set(_t, "Minimalist3", 7.5);   // ui -36.5 LUFS pk -13.0 -> target -29
+    variable_struct_set(_t, "Minimalist4", 3.5);   // ui -32.3 LUFS pk -9.7 -> target -29
+    variable_struct_set(_t, "Minimalist5", 4.5);   // ui -33.6 LUFS pk -10.2 -> target -29
+    variable_struct_set(_t, "Minimalist6", 7.0);   // ui -36.0 LUFS pk -12.1 -> target -29
+    variable_struct_set(_t, "Minimalist7", 10.5);   // ui -39.5 LUFS pk -14.5 -> target -29
+    variable_struct_set(_t, "Minimalist8", 7.0);   // ui -36.0 LUFS pk -15.6 -> target -29
+    variable_struct_set(_t, "Minimalist9", 0.0);   // ui -29.0 LUFS pk -8.6 -> target -29
+    variable_struct_set(_t, "Modern1", 8.0);   // ui -36.8 LUFS pk -16.1 -> target -29
+    variable_struct_set(_t, "Modern10", 6.5);   // ui -35.6 LUFS pk -18.9 -> target -29
+    variable_struct_set(_t, "Modern11", 6.5);   // ui -35.7 LUFS pk -19.5 -> target -29
+    variable_struct_set(_t, "Modern12", 7.0);   // ui -36.0 LUFS pk -18.9 -> target -29
+    variable_struct_set(_t, "Modern13", 1.5);   // ui -30.6 LUFS pk -19.2 -> target -29
+    variable_struct_set(_t, "Modern14", 0.0);   // ui -29.1 LUFS pk -14.3 -> target -29
+    variable_struct_set(_t, "Modern15", 0.5);   // ui -29.4 LUFS pk -14.3 -> target -29
+    variable_struct_set(_t, "Modern16", -3.5);   // ui -25.6 LUFS pk -14.3 -> target -29
+    variable_struct_set(_t, "Modern2", 1.5);   // ui -30.5 LUFS pk -18.0 -> target -29
+    variable_struct_set(_t, "Modern3", 1.5);   // ui -30.3 LUFS pk -18.1 -> target -29
+    variable_struct_set(_t, "Modern4", 2.0);   // ui -30.9 LUFS pk -18.1 -> target -29
+    variable_struct_set(_t, "Modern5", 1.5);   // ui -30.4 LUFS pk -18.0 -> target -29
+    variable_struct_set(_t, "Modern6", 1.0);   // ui -30.2 LUFS pk -18.1 -> target -29
+    variable_struct_set(_t, "Modern7", 2.0);   // ui -30.9 LUFS pk -18.1 -> target -29
+    variable_struct_set(_t, "Modern8", 2.0);   // ui -31.2 LUFS pk -20.4 -> target -29
+    variable_struct_set(_t, "Modern9", 2.5);   // ui -31.3 LUFS pk -21.1 -> target -29
+    variable_struct_set(_t, "Monster_Roar_5", -16.0);   // sfx -8.0 LUFS pk 0.2 -> target -24
+    variable_struct_set(_t, "Monster_Roar_9", -15.5);   // sfx -8.4 LUFS pk 0.1 -> target -24
+    variable_struct_set(_t, "Monster_chatter", -12.0);   // sfx -14.0 LUFS pk -1.8 -> target -26
+    variable_struct_set(_t, "Monster_chatter_2", -6.5);   // sfx -19.5 LUFS pk -5.5 -> target -26
+    variable_struct_set(_t, "Monster_chatter_3", -7.5);   // sfx -18.3 LUFS pk -4.4 -> target -26
+    variable_struct_set(_t, "Monster_chatter_4", 0.0);   // sfx -26.1 LUFS pk -10.8 -> target -26
+    variable_struct_set(_t, "Punch_1", -7.0);   // sfx -18.9 LUFS pk -3.0 -> target -26
+    variable_struct_set(_t, "Punch_2", -5.5);   // sfx -20.5 LUFS pk -3.0 -> target -26
+    variable_struct_set(_t, "Punch_3", -5.0);   // sfx -20.8 LUFS pk -2.1 -> target -26
+    variable_struct_set(_t, "Punch_crunchy", -7.5);   // sfx -18.5 LUFS pk 0.1 -> target -26
+    variable_struct_set(_t, "Punch_crunchy_2", -8.0);   // sfx -18.0 LUFS pk -0.1 -> target -26
+    variable_struct_set(_t, "Retro1", 8.0);   // ui -37.2 LUFS pk -17.1 -> target -29
+    variable_struct_set(_t, "Retro10", -6.0);   // ui -23.1 LUFS pk -11.9 -> target -29
+    variable_struct_set(_t, "Retro11", 2.0);   // ui -31.0 LUFS pk -23.0 -> target -29
+    variable_struct_set(_t, "Retro12", 5.0);   // ui -33.8 LUFS pk -23.0 -> target -29
+    variable_struct_set(_t, "Retro2", 8.5);   // ui -37.4 LUFS pk -17.5 -> target -29
+    variable_struct_set(_t, "Retro3", 0.5);   // ui -29.3 LUFS pk -11.5 -> target -29
+    variable_struct_set(_t, "Retro4", 0.0);   // ui -29.0 LUFS pk -11.6 -> target -29
+    variable_struct_set(_t, "Retro5", 1.0);   // ui -29.9 LUFS pk -11.7 -> target -29
+    variable_struct_set(_t, "Retro6", -2.5);   // ui -26.6 LUFS pk -11.4 -> target -29
+    variable_struct_set(_t, "Retro7", -2.5);   // ui -26.7 LUFS pk -11.3 -> target -29
+    variable_struct_set(_t, "Retro8", -3.0);   // ui -25.9 LUFS pk -12.0 -> target -29
+    variable_struct_set(_t, "Retro9", -3.5);   // ui -25.6 LUFS pk -12.0 -> target -29
+    variable_struct_set(_t, "Slice_Whoosh_Sound_Effect", -13.0);   // sfx -12.8 LUFS pk -1.7 -> target -26
+    variable_struct_set(_t, "Slime_Attack__Nr__1__Minecraft_Sound____Sound_Effect_for_editing", -4.0);   // sfx -21.8 LUFS pk -6.5 -> target -26
+    variable_struct_set(_t, "The_Twilight_of_Camelot", -16.0);   // music -12.0 LUFS pk -0.3 -> target -28
+    variable_struct_set(_t, "Whip_2", -1.5);   // sfx -24.3 LUFS pk -4.4 -> target -26
+    variable_struct_set(_t, "Wood_Block1", -1.5);   // ui -27.3 LUFS pk -7.7 -> target -29
+    variable_struct_set(_t, "Wood_Block2", -2.0);   // ui -27.1 LUFS pk -8.2 -> target -29
+    variable_struct_set(_t, "Wood_Block3", -4.5);   // ui -24.6 LUFS pk -8.1 -> target -29
+    variable_struct_set(_t, "barrel_break", -4.5);   // sfx -21.6 LUFS pk -8.6 -> target -26
+    variable_struct_set(_t, "bleed", -9.5);   // sfx -16.4 LUFS pk -4.4 -> target -26
+    variable_struct_set(_t, "chest_open", -5.0);   // sfx -21.0 LUFS pk -7.2 -> target -26
+    variable_struct_set(_t, "dire_wolf_attack", -10.5);   // sfx -15.3 LUFS pk -0.1 -> target -26
+    variable_struct_set(_t, "dire_wolf_attack_2", -9.5);   // sfx -16.6 LUFS pk -2.1 -> target -26
+    variable_struct_set(_t, "dire_wolf_attack_3", -9.0);   // sfx -17.2 LUFS pk -1.0 -> target -26
+    variable_struct_set(_t, "dire_wolf_spawn", -14.5);   // sfx -11.7 LUFS pk -0.2 -> target -26
+    variable_struct_set(_t, "dire_wolf_spawn_2", -10.0);   // sfx -16.1 LUFS pk -4.4 -> target -26
+    variable_struct_set(_t, "double_shot", -12.0);   // sfx -13.8 LUFS pk -0.4 -> target -26
+    variable_struct_set(_t, "evasion_up", -13.5);   // sfx -12.4 LUFS pk -6.2 -> target -26
+    variable_struct_set(_t, "final_boss_attack_2", -5.0);   // sfx -20.8 LUFS pk -3.8 -> target -26
+    variable_struct_set(_t, "final_boss_attack_3", -11.0);   // sfx -14.9 LUFS pk -4.4 -> target -26
+    variable_struct_set(_t, "final_boss_spawn", -8.0);   // sfx -15.9 LUFS pk -5.1 -> target -24
+    variable_struct_set(_t, "final_boss_spawn_2", -7.5);   // sfx -16.6 LUFS pk -2.7 -> target -24
+    variable_struct_set(_t, "fireball", -7.5);   // sfx -18.3 LUFS pk -4.5 -> target -26
+    variable_struct_set(_t, "foresight", -10.5);   // sfx -15.4 LUFS pk -6.6 -> target -26
+    variable_struct_set(_t, "forest_bgm__for_everymap_with_trees", 6.0);   // music -34.2 LUFS pk -19.6 -> target -28
+    variable_struct_set(_t, "ghost_sword_attack", -2.5);   // sfx -23.3 LUFS pk -6.1 -> target -26
+    variable_struct_set(_t, "ghost_sword_attack_2", 2.0);   // sfx -27.9 LUFS pk -7.6 -> target -26
+    variable_struct_set(_t, "ghost_sword_attack_3", 1.5);   // sfx -27.3 LUFS pk -6.5 -> target -26
+    variable_struct_set(_t, "ghost_sword_spawn", -8.5);   // sfx -17.5 LUFS pk -6.6 -> target -26
+    variable_struct_set(_t, "ghost_sword_spawn_2", 2.0);   // sfx -27.8 LUFS pk -15.7 -> target -26
+    variable_struct_set(_t, "horinzotal_slash", -12.0);   // sfx -13.8 LUFS pk -4.7 -> target -26
+    variable_struct_set(_t, "horizontal_slash", -15.5);   // sfx -10.6 LUFS pk -3.8 -> target -26
+    variable_struct_set(_t, "ice_spear", -9.5);   // sfx -16.5 LUFS pk -4.3 -> target -26
+    variable_struct_set(_t, "kill_torch", -8.5);   // sfx -17.6 LUFS pk -5.7 -> target -26
+    variable_struct_set(_t, "killer_plant_attack", 0.0);   // sfx -26.0 LUFS pk -8.6 -> target -26
+    variable_struct_set(_t, "killer_plant_attack_2", 5.5);   // sfx -31.5 LUFS pk -12.1 -> target -26
+    variable_struct_set(_t, "killer_plant_attack_3", 6.0);   // sfx -31.8 LUFS pk -16.5 -> target -26
+    variable_struct_set(_t, "killer_plant_spawn", 11.5);   // sfx -37.3 LUFS pk -31.0 -> target -26
+    variable_struct_set(_t, "killer_plant_spawn_2", 0.5);   // sfx -26.7 LUFS pk -10.8 -> target -26
+    variable_struct_set(_t, "mad_whisp_attack", -5.5);   // sfx -20.4 LUFS pk -5.7 -> target -26
+    variable_struct_set(_t, "mad_whisp_attack_2", -6.0);   // sfx -20.0 LUFS pk -3.7 -> target -26
+    variable_struct_set(_t, "mad_whisp_attack_3", -6.0);   // sfx -19.8 LUFS pk -1.0 -> target -26
+    variable_struct_set(_t, "mad_whisp_spawn", -6.0);   // sfx -19.9 LUFS pk -5.1 -> target -26
+    variable_struct_set(_t, "mad_whisp_spawn_2", -4.0);   // sfx -22.0 LUFS pk -7.5 -> target -26
+    variable_struct_set(_t, "mage_attack", -8.5);   // sfx -17.3 LUFS pk -5.1 -> target -26
+    variable_struct_set(_t, "meditation35", -16.0);   // sfx -9.9 LUFS pk -3.7 -> target -26
+    variable_struct_set(_t, "mini_boss_attack", -12.0);   // sfx -13.8 LUFS pk -5.1 -> target -26
+    variable_struct_set(_t, "mini_boss_attack_2", -12.5);   // sfx -13.7 LUFS pk -1.0 -> target -26
+    variable_struct_set(_t, "mini_boss_attack_3", -10.0);   // sfx -16.0 LUFS pk -1.0 -> target -26
+    variable_struct_set(_t, "mini_boss_spawn", -14.5);   // sfx -9.5 LUFS pk -0.8 -> target -24
+    variable_struct_set(_t, "mini_boss_spawn_2", -11.5);   // sfx -12.5 LUFS pk -1.0 -> target -24
+    variable_struct_set(_t, "miss_effect", -1.5);   // sfx -24.3 LUFS pk -9.1 -> target -26
+    variable_struct_set(_t, "miss_effect2", -3.0);   // sfx -22.8 LUFS pk -12.2 -> target -26
+    variable_struct_set(_t, "muscle_up", -10.0);   // sfx -15.8 LUFS pk -8.7 -> target -26
+    variable_struct_set(_t, "overall_bgm", 0.0);   // music -28.1 LUFS pk -9.5 -> target -28
+    variable_struct_set(_t, "rev_up", -13.0);   // sfx -13.2 LUFS pk -4.4 -> target -26
+    variable_struct_set(_t, "slime_attack_2", -3.0);   // sfx -23.2 LUFS pk -1.0 -> target -26
+    variable_struct_set(_t, "slime_attack_3", -3.5);   // sfx -22.4 LUFS pk -1.0 -> target -26
+    variable_struct_set(_t, "slime_spawn_2", -4.5);   // sfx -21.4 LUFS pk -3.3 -> target -26
+    variable_struct_set(_t, "snake_attack_2", 1.5);   // sfx -27.4 LUFS pk -10.0 -> target -26
+    variable_struct_set(_t, "snake_attack_3", 0.0);   // sfx -26.0 LUFS pk -9.2 -> target -26
+    variable_struct_set(_t, "snake_spaawn_and_attack", -8.5);   // sfx -17.7 LUFS pk -10.8 -> target -26
+    variable_struct_set(_t, "snake_spawn_2", 1.5);   // sfx -27.5 LUFS pk -13.9 -> target -26
+    variable_struct_set(_t, "spider_attack_2", -2.0);   // sfx -24.1 LUFS pk -3.3 -> target -26
+    variable_struct_set(_t, "spider_attack_3", -2.0);   // sfx -24.1 LUFS pk -9.2 -> target -26
+    variable_struct_set(_t, "spider_both_attack_and_spawn", -13.5);   // sfx -12.4 LUFS pk -5.5 -> target -26
+    variable_struct_set(_t, "spider_spawn_2", -4.0);   // sfx -21.9 LUFS pk -4.0 -> target -26
+    variable_struct_set(_t, "stranger_attack_2", -4.5);   // sfx -21.7 LUFS pk -8.8 -> target -26
+    variable_struct_set(_t, "stranger_attack_3", -4.0);   // sfx -22.1 LUFS pk -5.7 -> target -26
+    variable_struct_set(_t, "stranger_spawn_2", -9.0);   // sfx -17.1 LUFS pk -3.7 -> target -26
+    variable_struct_set(_t, "stun", -1.0);   // sfx -25.2 LUFS pk -11.7 -> target -26
+    variable_struct_set(_t, "sword_attack", -3.0);   // sfx -22.8 LUFS pk -5.7 -> target -26
+    variable_struct_set(_t, "sword_impact", -1.0);   // sfx -25.0 LUFS pk -6.2 -> target -26
+    variable_struct_set(_t, "take_aim", -15.0);   // sfx -11.2 LUFS pk -3.8 -> target -26
+    variable_struct_set(_t, "waterspray", -14.0);   // sfx -12.2 LUFS pk -4.7 -> target -26
+    return _t;
+}
+// ==== END GENERATED SFX GAIN TABLE ====
