@@ -519,8 +519,17 @@ function Profile_Normalize(_raw) {
         var oid = Save_ToReal(o.id, -1);
         if ((okind == "item" || okind == "skill") && !Run_EchoHas(p.echo_pool, okind, oid)) array_push(p.echo_pool, { kind: okind, id: oid });
     }
-    // D148: version 2 added the skill memory; a version 1 file has none, so it starts empty (whatever the file holds under that name is not trusted)
-    if (Save_ToReal(variable_struct_exists(_raw, "profile_version") ? _raw.profile_version : 0, 0) >= 2 && variable_struct_exists(_raw, "skills_known") && is_struct(_raw.skills_known)) {
+    var raw_ver = Save_ToReal(variable_struct_exists(_raw, "profile_version") ? _raw.profile_version : 0, 0);
+    // Review 6: a version 1 file has no skill memory field, but what it does hold is the echo of its last death (echo_pool, or the older echo_offer / echo): "everything the lost run had",
+    // skills included (Run_EchoPoolAfter, before D144). Those skills were held in a run, so they are discovered (D148); without this the first playtest after the update showed "???"
+    // for them and the echo had nothing to offer. Items in the pool are not skills. v1 holds no other skill list: a history entry has the class and level only.
+    if (raw_ver < 2) {
+        for (var ek = 0; ek < array_length(p.echo_pool); ek++) {
+            if (p.echo_pool[ek].kind == "skill") Profile_SkillLearn(p, p.echo_pool[ek].id);
+        }
+    }
+    // D148: version 2 added the skill memory; a version 1 file has none of its own, so it starts from the pool above (whatever the file holds under that name is not trusted)
+    if (raw_ver >= 2 && variable_struct_exists(_raw, "skills_known") && is_struct(_raw.skills_known)) {
         var sknames = variable_struct_get_names(_raw.skills_known);
         for (var sk = 0; sk < array_length(sknames); sk++) {
             if (sknames[sk] != "" && string_digits(sknames[sk]) == sknames[sk] && variable_struct_get(_raw.skills_known, sknames[sk]) == true) variable_struct_set(p.skills_known, string(real(sknames[sk])), true);
@@ -774,6 +783,56 @@ function RunSave_Delete(_path = undefined) {
     Save_DeleteFileSet(is_undefined(_path) ? RunSave_Path() : _path);
 }
 
+// Moves a run file this build must not delete (a newer version's, or a damaged one) to a sibling name in the same folder, "run.kept-<unix time>.sav" ("-2", "-3" ... when that name is
+// taken), with its .bak next to it. A rename, so it either happened or it did not; nothing leaves the save folder. Done before a new run can write run.sav (review 6, finding 1: the
+// new run's first autosave replaced the file that New Game had "kept"). Returns the new name of the run file, "" when there was nothing to move or the move failed (the file is then
+// left where it is and a line goes to the log).
+function RunSave_KeepAside(_path = undefined) {
+    var path = is_undefined(_path) ? RunSave_Path() : _path;
+    if (!file_exists(path) && !file_exists(path + ".bak")) return "";
+    var tz = date_get_timezone();
+    date_set_timezone(timezone_utc);
+    var stamp = floor((date_current_datetime() - 25569) * 86400);   // days since 1899-12-30 -> seconds since 1970-01-01 UTC
+    date_set_timezone(tz);
+    var base = filename_path(path) + filename_change_ext(filename_name(path), "");
+    var ext = filename_ext(path);
+    var dst = base + ".kept-" + string(stamp) + ext;
+    var n = 1;
+    while (file_exists(dst) || file_exists(dst + ".bak")) {
+        n++;
+        dst = base + ".kept-" + string(stamp) + "-" + string(n) + ext;
+    }
+    var parts = ["", ".bak"];
+    var moved = true;
+    for (var i = 0; i < array_length(parts); i++) {
+        if (!file_exists(path + parts[i])) continue;
+        if (!file_rename(path + parts[i], dst + parts[i]) || !file_exists(dst + parts[i])) moved = false;
+    }
+    if (file_exists(path + ".tmp")) file_delete(path + ".tmp");   // a half-written file of ours, never the kept one
+    if (!moved) {
+        show_debug_message("[SAVE] could not move " + path + " aside; it stays where it is");
+        return "";
+    }
+    return dst;
+}
+
+// The files RunSave_KeepAside left next to a run file ("run.kept-<unix time>.sav", "run.kept-<unix time>-2.sav" ...), oldest name first. Names are relative to the save folder like the run file's own.
+function RunSave_KeptFiles(_path = undefined) {
+    var path = is_undefined(_path) ? RunSave_Path() : _path;
+    var dir = filename_path(path);
+    var ext = filename_ext(path);
+    var base = filename_change_ext(filename_name(path), "");
+    var out = [];
+    var f = file_find_first(dir + base + ".kept-*" + ext, 0);
+    while (f != "") {
+        array_push(out, dir + f);
+        f = file_find_next();
+    }
+    file_find_close();
+    array_sort(out, true);
+    return out;
+}
+
 // Returns { status, run }: status as for Profile_Load (ok, missing, newer, old, corrupt); run is the parsed save when ok.
 function RunSave_LoadFrom(_path = undefined) {
     var path = is_undefined(_path) ? RunSave_Path() : _path;
@@ -859,6 +918,7 @@ function RunSave_WriteTo(_path = undefined) {
 // Puts a loaded run save into the game: run struct (seed, stream states, gold, kills) and the world/player state.
 // Returns { room_id, x, y, face }; the caller starts the transition (Save_BeginLoadTransition).
 function RunSave_ApplyState(_raw) {
+    EnemyPersist_ClearSnapshot();   // review 6: a loaded run has no fight behind it
     var gs = GameState_Init();
     var info = Save_ApplySnapshotState({ statData: _raw.statData, levelData: variable_struct_exists(_raw, "levelData") ? _raw.levelData : {} }, true);
 

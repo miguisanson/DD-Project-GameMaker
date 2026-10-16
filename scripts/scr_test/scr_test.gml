@@ -144,6 +144,7 @@ function Test_RunAll() {
     Test_RunSuite("Hunt6Run", Test_Suite_Hunt6Run);
     Test_RunSuite("Hunt6Combat", Test_Suite_Hunt6Combat);
     Test_RunSuite("Hunt6Ui", Test_Suite_Hunt6Ui);
+    Test_RunSuite("Review6", Test_Suite_Review6);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -12806,21 +12807,35 @@ function Test_Suite_Hunt5a() {
     _gs.battle.enemy_room = rm_floor2;
     global.encounter_snapshot = "{}";
     EnemyPersist_ResolveBattle(true);
-    Test_False("hunt5a: a won fight clears the snapshot", EnemyPersist_HasSnapshot());
+    Test_True("hunt5a: a won fight keeps the snapshot while the message shows (review 6: a quit there must still save)", EnemyPersist_HasSnapshot());
+    EnemyPersist_AfterMapSave();
+    Test_False("hunt5a: the map's save after a won fight clears the snapshot", EnemyPersist_HasSnapshot());
 
     // a fled fight from the map
     global.encounter_snapshot = "{}";
     EnemyPersist_ResolveBattle(false);
-    Test_False("hunt5a: a fled fight clears the snapshot", EnemyPersist_HasSnapshot());
+    Test_True("hunt5a: a fled fight keeps the snapshot while the message shows", EnemyPersist_HasSnapshot());
+    EnemyPersist_AfterMapSave();
+    Test_False("hunt5a: the map's save after a fled fight clears the snapshot", EnemyPersist_HasSnapshot());
 
     // a fight that did not start from the map (no enemy to resolve) still ends
     _gs.battle.enemy_persist_id = "";
     global.encounter_snapshot = "{}";
     EnemyPersist_ResolveBattle(true);
-    Test_False("hunt5a: a won fight with no map enemy clears the snapshot", EnemyPersist_HasSnapshot());
+    Test_True("hunt5a: a won fight with no map enemy keeps the snapshot until the map has saved", EnemyPersist_HasSnapshot());
+    EnemyPersist_AfterMapSave();
+    Test_False("hunt5a: and the map's save clears it", EnemyPersist_HasSnapshot());
     global.encounter_snapshot = "{}";
     EnemyPersist_ResolveBattle(false);
-    Test_False("hunt5a: a fled fight with no map enemy clears the snapshot", EnemyPersist_HasSnapshot());
+    Test_True("hunt5a: a fled fight with no map enemy keeps the snapshot until the map has saved", EnemyPersist_HasSnapshot());
+    EnemyPersist_AfterMapSave();
+    Test_False("hunt5a: and the map's save clears it too", EnemyPersist_HasSnapshot());
+    // a map save with a fight still going (not decided) leaves its snapshot alone
+    global.encounter_snapshot = "{}";
+    global.encounter_resolved = false;
+    EnemyPersist_AfterMapSave();
+    Test_True("hunt5a: a map save does not clear the snapshot of a fight that is not decided", EnemyPersist_HasSnapshot());
+    EnemyPersist_ClearSnapshot();
 
     // Quit used it: a second quit must not write it again
     var _gs2 = _gs;
@@ -13175,6 +13190,223 @@ function Test_Suite_Hunt6Run() {
     Test_True("hunt6run keep: Run_AbandonSaved keeps a damaged run file", RunSave_ExistsAt(_ab));
     Test_Eq("hunt6run keep: the damaged run file is unchanged", Test_RawRead(_ab), "{ this is not a run save");
     Save_DeleteFileSet(_ab);
+}
+
+/// ---- Review 6 (review-opus-session6.md, findings 1 to 4) ----
+// Expected values come from the rules, not from the code: D16 (nothing is deleted that this build cannot read; the player may switch builds on one save folder),
+// D148 ("???" until a skill was discovered in any run), D132 + D141 (closing in a fight keeps what was taken since the last autosave), D159 / D164 (a figure standing in the
+// dark looks like it; only the marks drawn after the darkness stay bright).
+
+// The run, class, checkpoint and persist the tests borrow, kept to put back.
+function Test_Review6Borrow() {
+    var _gs = GameState_Get();
+    return { had_run: variable_struct_exists(_gs, "run"), run: variable_struct_exists(_gs, "run") ? _gs.run : undefined, cp: _gs.checkpoint, persist: _gs.persist, cls: _gs.selected_class, ch: _gs.player_ch, flags: _gs.flags, snap: variable_global_exists("encounter_snapshot") ? global.encounter_snapshot : undefined };
+}
+
+function Test_Review6Return(_b) {
+    var _gs = GameState_Get();
+    if (_b.had_run) _gs.run = _b.run; else variable_struct_remove(_gs, "run");
+    _gs.checkpoint = _b.cp;
+    _gs.persist = _b.persist;
+    _gs.selected_class = _b.cls;
+    _gs.player_ch = _b.ch;
+    _gs.flags = _b.flags;
+    global.encounter_snapshot = _b.snap;
+}
+
+function Test_Review6DropKept(_path) {
+    var _k = RunSave_KeptFiles(_path);
+    for (var _i = 0; _i < array_length(_k); _i++) Save_DeleteFileSet(_k[_i]);
+}
+
+// The alpha byte of every pixel of a surface's first _side x _side pixels, read in one go.
+function Test_SurfaceAlpha(_surf, _side) {
+    var _w = surface_get_width(_surf);
+    var _buf = buffer_create(_w * surface_get_height(_surf) * 4, buffer_fixed, 1);
+    buffer_get_surface(_buf, _surf, 0);
+    var _m = array_create(_side * _side, 0);
+    for (var _y = 0; _y < _side; _y++) {
+        for (var _x = 0; _x < _side; _x++) _m[_y * _side + _x] = buffer_peek(_buf, (_y * _w + _x) * 4 + 3, buffer_u8);
+    }
+    buffer_delete(_buf);
+    return _m;
+}
+
+// What the elite marks paint on top of the sprite's own pixels, and outside them: { inside, outside, bright } (bright = outside pixels that are fully opaque and exactly _col).
+function Test_EliteFxOverSprite(_spr, _img, _col) {
+    var _ring = Elite_FxRing(_spr, _img, 1, 1, 0, _col);
+    var _side = _ring.r * 2;
+    var _w = surface_get_width(_ring.surf);
+    var _buf = buffer_create(_w * surface_get_height(_ring.surf) * 4, buffer_fixed, 1);
+    buffer_get_surface(_buf, _ring.surf, 0);
+    var _spr_surf = surface_create(_side, _side);
+    surface_set_target(_spr_surf);
+    draw_clear_alpha(c_black, 0);
+    draw_sprite_ext(_spr, _img, _ring.r, _ring.r, 1, 1, 0, c_white, 1);
+    surface_reset_target();
+    var _sp = Test_SurfaceAlpha(_spr_surf, _side);
+    surface_free(_spr_surf);
+    var _out = { inside: 0, outside: 0, bright: 0 };
+    for (var _y = 0; _y < _side; _y++) {
+        for (var _x = 0; _x < _side; _x++) {
+            var _o = (_y * _w + _x) * 4;
+            var _a = buffer_peek(_buf, _o + 3, buffer_u8);
+            if (_a <= 0) continue;
+            if (_sp[_y * _side + _x] > 0) { _out.inside++; continue; }
+            _out.outside++;
+            var _c = buffer_peek(_buf, _o, buffer_u8) | (buffer_peek(_buf, _o + 1, buffer_u8) << 8) | (buffer_peek(_buf, _o + 2, buffer_u8) << 16);
+            if (_a == 255 && _c == (_col & $FFFFFF)) _out.bright++;
+        }
+    }
+    buffer_delete(_buf);
+    return _out;
+}
+
+function Test_Suite_Review6() {
+    // ---- 1. New Game keeps a newer-version or damaged run.sav: it is moved to a sibling name BEFORE the new run saves, so the new run's first autosave cannot overwrite it ----
+    var _b = Test_Review6Borrow();
+    var _gs = GameState_Get();
+    var _p = "test_review6_run.sav";
+    Save_DeleteFileSet(_p);
+    Test_Review6DropKept(_p);
+    var _newer = json_stringify({ run_version: RUN_SAVE_VERSION + 50, seed: 1, marker: "keep me" });
+    Test_RawWrite(_p, _newer);
+    RunSave_DeleteUnlessKept(_p, undefined, true);   // what Run_StartNew does
+    var _kept = RunSave_KeptFiles(_p);
+    Test_False("review6 keep: the newer file is no longer at the run file's name", RunSave_ExistsAt(_p));
+    Test_Eq("review6 keep: it is kept under one other name", array_length(_kept), 1);
+    if (array_length(_kept) == 1) {
+        Test_Eq("review6 keep: the kept file holds the newer run unchanged", Test_RawRead(_kept[0]), _newer);
+        Test_True("review6 keep: the kept name is a sibling in the save folder (no path)", string_pos("/", _kept[0]) == 0 && string_pos("\\", _kept[0]) == 0 && string_pos(":", _kept[0]) == 0 && string_copy(_kept[0], 1, 21) == "test_review6_run.kept");
+    }
+    // the new run's first autosave (the same write Run_AutoSave makes): run.sav is the new run, the kept file is still there
+    _gs.run = Run_Create(6200);
+    _gs.run.gold = 31;
+    _gs.selected_class = CLASS_MAGE;
+    _gs.checkpoint = { room: rm_floor1, x: 48, y: 64 };
+    _gs.persist = {};
+    Test_True("review6 keep: the new run saves", RunSave_WriteTo(_p));
+    var _nl = RunSave_LoadFrom(_p);
+    Test_Eq("review6 keep: run.sav is the new run after its first save", _nl.status, "ok");
+    Test_Eq("review6 keep: it is the new run's gold", is_struct(_nl.run) ? _nl.run.gold : -1, 31);
+    _kept = RunSave_KeptFiles(_p);
+    Test_Eq("review6 keep: the kept file is still there after the new run saved", array_length(_kept), 1);
+    if (array_length(_kept) >= 1) Test_Eq("review6 keep: and still unchanged", Test_RawRead(_kept[0]), _newer);
+    // a damaged file is kept the same way, and a second one gets its own name even in the same second
+    Save_DeleteFileSet(_p);
+    Test_RawWrite(_p, "{ this is not a run save");
+    RunSave_DeleteUnlessKept(_p, undefined, true);
+    _kept = RunSave_KeptFiles(_p);
+    Test_False("review6 keep: the damaged file is moved off the run file's name", RunSave_ExistsAt(_p));
+    Test_Eq("review6 keep: both kept files exist under different names", array_length(_kept), 2);
+    var _texts = [];
+    for (var _i = 0; _i < array_length(_kept); _i++) array_push(_texts, Test_RawRead(_kept[_i]));
+    Test_True("review6 keep: one holds the damaged text", array_contains(_texts, "{ this is not a run save"));
+    Test_True("review6 keep: the other still holds the newer run", array_contains(_texts, _newer));
+    // a good run file is not "kept": it is cleared as before, and nothing is made from it
+    Test_Review6DropKept(_p);
+    Test_True("review6 keep: setup, a current run file", RunSave_WriteTo(_p));
+    RunSave_DeleteUnlessKept(_p, undefined, true);
+    Test_False("review6 keep: a current run file is cleared", RunSave_ExistsAt(_p));
+    Test_Eq("review6 keep: and nothing is kept from it", array_length(RunSave_KeptFiles(_p)), 0);
+    RunSave_DeleteUnlessKept(_p, undefined, true);
+    Test_Eq("review6 keep: no file at all keeps nothing", array_length(RunSave_KeptFiles(_p)), 0);
+    Save_DeleteFileSet(_p);
+    Test_Review6DropKept(_p);
+    Test_Review6Return(_b);
+
+    // ---- 2. A version 1 profile has no skill memory, but its echo entries name skills the last run had: they become the memory ----
+    var _pf = "test_review6_profile.sav";
+    Save_DeleteFileSet(_pf);
+    Test_RawWrite(_pf, json_stringify({
+        profile_version: 1, story_seen: {}, unlocks: {}, deaths: 1,
+        echo_pool: [{ kind: "skill", id: SKILL_TAKE_AIM }, { kind: "item", id: SKILL_FIREBALL }, { kind: "skill", id: SKILL_MUSCLE_UP }],
+        history: []
+    }));
+    var _l1 = Profile_Load(_pf);
+    Test_Eq("review6 v1: the old profile loads ok", _l1.status, "ok");
+    Test_True("review6 v1: a skill in the echo pool is remembered (Take Aim)", Profile_SkillKnown(_l1.profile, SKILL_TAKE_AIM));
+    Test_True("review6 v1: the other skill in the pool is remembered (Muscle Up)", Profile_SkillKnown(_l1.profile, SKILL_MUSCLE_UP));
+    Test_False("review6 v1: an item in the pool is not a skill (id of Fireball)", Profile_SkillKnown(_l1.profile, SKILL_FIREBALL));
+    var _o1 = Profile_Normalize({ profile_version: 1, echo_offer: [{ kind: "skill", id: SKILL_WOUND }] });
+    Test_True("review6 v1: a skill in the old echo offer is remembered", Profile_SkillKnown(_o1, SKILL_WOUND));
+    var _o2 = Profile_Normalize({ profile_version: 1, echo: { kind: "skill", id: SKILL_FIREBALL } });
+    Test_True("review6 v1: a skill in the old chosen echo is remembered", Profile_SkillKnown(_o2, SKILL_FIREBALL));
+    var _o3 = Profile_Normalize({ profile_version: 1, echo_pool: [{ kind: "item", id: SKILL_WOUND }] });
+    Test_Eq("review6 v1: a pool of items alone gives no skill memory", array_length(variable_struct_get_names(_o3.skills_known)), 0);
+    Save_DeleteFileSet(_pf);
+
+    // ---- 3. Quit or close after the fight is decided (the enemy fell, or the escape worked) and before the map is back: the pre-fight snapshot is still there ----
+    var _b3 = Test_Review6Borrow();
+    var _old_pid = _gs.battle.enemy_persist_id;
+    var _old_eid = _gs.battle.enemy_id;
+    var _old_room = _gs.battle.enemy_room;
+    var _cf = "test_review6_close.sav";
+    for (var _won = 0; _won < 2; _won++) {
+        var _w = (_won == 1) ? "slain" : "ran away";
+        _gs.run = Run_Create(6300);
+        _gs.run.gold = 5;
+        var _m = CharacterCreate_Player(CLASS_MAGE);
+        _m.hp = 7;
+        _gs.player_ch = _m;
+        _gs.selected_class = CLASS_MAGE;
+        _gs.flags = {};
+        _gs.checkpoint = { room: rm_floor2, x: 48, y: 64 };
+        _gs.persist = {};
+        RoomState_SetAlive(rm_floor2, "r6_e1");
+        global.encounter_snapshot = undefined;
+        EnemyPersist_SnapshotRun();   // the moment before the encounter (chests and cards taken since the last autosave are in it)
+        _gs.battle.enemy_persist_id = "r6_e1";
+        _gs.battle.enemy_id = 0;
+        _gs.battle.enemy_room = rm_floor2;
+        var _m2 = CharacterCreate_Player(CLASS_MAGE);
+        _m2.hp = 3;
+        _gs.player_ch = _m2;
+        _gs.run.gold = 40;   // the reward
+        EnemyPersist_ResolveBattle(_won == 1);
+        Test_True("review6 " + _w + ": the pre-fight snapshot is still held while the message shows", EnemyPersist_HasSnapshot());
+        Save_DeleteFileSet(_cf);
+        Test_True("review6 " + _w + ": closing now writes a run save", Run_SaveOnClose(true, rm_battle, _cf));
+        var _cl = RunSave_LoadFrom(_cf);
+        Test_Eq("review6 " + _w + ": it reads back ok", _cl.status, "ok");
+        Test_Eq("review6 " + _w + ": it is the moment before the encounter (the gold then)", is_struct(_cl.run) ? _cl.run.gold : -1, 5);
+        Save_DeleteFileSet(_cf);
+    }
+    // the fade back to the map is part of "before the map is back": a close there writes the snapshot too (it is complete text, the fade does not matter to it)
+    _gs.run = Run_Create(6300);
+    _gs.run.gold = 5;
+    var _m4 = CharacterCreate_Player(CLASS_MAGE);
+    _m4.hp = 7;
+    _gs.player_ch = _m4;
+    _gs.flags = {};
+    _gs.checkpoint = { room: rm_floor2, x: 48, y: 64 };
+    _gs.persist = {};
+    global.encounter_snapshot = undefined;
+    EnemyPersist_SnapshotRun();
+    EnemyPersist_ResolveBattle(true);
+    Transition_Init();
+    var _tx_was = _gs.transition_fx.active;
+    _gs.transition_fx.active = true;
+    var _fade_ok = Run_SaveOnClose(true, rm_battle, _cf);
+    _gs.transition_fx.active = _tx_was;
+    Test_True("review6 fade: closing during the fade back to the map writes the pre-fight run", _fade_ok);
+    Test_Eq("review6 fade: it reads back ok", RunSave_LoadFrom(_cf).status, "ok");
+    Save_DeleteFileSet(_cf);
+    _gs.battle.enemy_persist_id = _old_pid;
+    _gs.battle.enemy_id = _old_eid;
+    _gs.battle.enemy_room = _old_room;
+    Test_Review6Return(_b3);
+
+    // ---- 4. An elite's marks do not paint over the sprite: the sprite stays under the room's darkness, only the outline and rim (drawn after it) stay bright ----
+    var _names = ["slime_moving", "killer_plant_moving", "dire_wolf_moving"];
+    for (var _n = 0; _n < array_length(_names); _n++) {
+        var _spr = asset_get_index(_names[_n]);
+        if (_spr == -1) { Test_True("review6 elite: the sprite " + _names[_n] + " exists", false); continue; }
+        var _r = Test_EliteFxOverSprite(_spr, 0, UI_C_LIGHTEST);
+        Test_Eq("review6 elite: " + _names[_n] + " marks paint no pixel of the sprite itself", _r.inside, 0);
+        Test_True("review6 elite: " + _names[_n] + " marks still paint the outline round it (" + string(_r.outside) + " px)", _r.outside > 0);
+        Test_True("review6 elite: " + _names[_n] + " outline pixels are the full pulse colour (" + string(_r.bright) + " px)", _r.bright > 0);
+    }
 }
 
 // ---- Hunt 6 combat (bug hunt session 6, findings 1 to 6 in .planning/research/bughunt-session6-combat.md) ----
