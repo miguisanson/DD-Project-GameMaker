@@ -507,7 +507,7 @@ function Skip_Reset() {
 function Skip_HintRect() {
     var _mt = Ui_Metrics();   // also sets the UI font
     var _p = _mt.p;
-    var _txt = Loc_T("ui.skip_hold", "Hold to skip");
+    var _txt = Loc_T("ui.skip_hold", "Hold to Skip");
     var _tw = UI_TextWidth(_txt);
     var _w = _tw + 10 * _p;   // 2p frame + 2p air + 1p for the last glyph to breathe, each side
     var _h = _mt.line_h + 12 * _p;
@@ -558,8 +558,8 @@ function Binds_RowDefs() {
             { id: "left",     actions: ["move_left", "menu_left"],   ctx: "both", label: "Left" },
             { id: "right",    actions: ["move_right", "menu_right"], ctx: "both", label: "Right" },
             { id: "run",      actions: ["run"],                 ctx: "world", label: "Run" },
-            { id: "tab_prev", actions: ["tab_prev"],            ctx: "menu",  label: "Previous tab" },
-            { id: "tab_next", actions: ["tab_next"],            ctx: "menu",  label: "Next tab" },
+            { id: "tab_prev", actions: ["tab_prev"],            ctx: "menu",  label: "Previous Tab" },
+            { id: "tab_next", actions: ["tab_next"],            ctx: "menu",  label: "Next Tab" },
             { id: "interact", actions: ["interact"],            ctx: "world", label: "Interact" }
         ];
     }

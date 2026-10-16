@@ -499,7 +499,7 @@ function Status_Describe(_status_id, _data = undefined) {
         case STATUS_MEDITATION:
             var mt = Status_Cfg(_status_id, "tick", { mp_min: 0, mp_max: 0 });
             vars.n = Status_TickAmount(min(mt.mp_min, mt.mp_max), max(mt.mp_min, mt.mp_max));   // D126: the exact average
-            line = Loc_T("status.desc.status_meditation", "Recover {n} MP each turn.", vars);
+            line = Loc_T("status.desc.status_meditation", "Restore {n} MP each turn.", vars);
             break;
         case STATUS_SOLIDIFY:
             vars.pct = round((1 - Status_Cfg(_status_id, "guard_mult", 1)) * 100);

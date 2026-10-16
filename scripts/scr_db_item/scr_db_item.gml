@@ -871,11 +871,11 @@ function Item_NumberLines(_item, _ch) {
         if (u.power > 0) array_push(lines, { label: Loc_T("shop.lbl.power", "Power"), value: string(u.power) });
         if (u.burn_turns > 0) array_push(lines, { label: Loc_T("shop.lbl.burn", "Burn"), value: string(Throw_BurnBase(_ch)) + " x " + string(u.burn_turns) });
         if (u.stacks > 0) array_push(lines, { label: Loc_T("shop.lbl.poison", "Poison"), value: string(RoundHalfUp(u.stacks * nm)) });
-        if (u.stun) array_push(lines, { label: Loc_T("shop.lbl.stun", "Stun"), value: Loc_T("shop.val.pushback", "Push back") });
-        if (u.evade_turns > 0) array_push(lines, { label: Loc_T("shop.lbl.evade", "Dodge"), value: Loc_T("shop.val.turns", "{n} turns", { n: string(RoundHalfUp(u.evade_turns * nm)) }) });
+        if (u.stun) array_push(lines, { label: Loc_T("shop.lbl.stun", "Stun"), value: Loc_T("shop.val.pushback", "Push Back") });
+        if (u.evade_turns > 0) array_push(lines, { label: Loc_T("shop.lbl.evade", "Evasion"), value: Loc_T("shop.val.turns", "{n} turns", { n: string(RoundHalfUp(u.evade_turns * nm)) }) });
         if (u.escape) array_push(lines, { label: Loc_T("shop.lbl.perfect", "Perfect"), value: Loc_T("shop.val.escape", "Escape") });
         if (nm != 1) array_push(lines, { label: Loc_T("shop.lbl.nobody", "Nobody"), value: "x" + string_format(nm, 1, 1) });
-        array_push(lines, { label: Loc_T("shop.lbl.carry", "Carry up to"), value: string(Throw_Cap(_ch)) });
+        array_push(lines, { label: Loc_T("shop.lbl.carry", "Carry Limit"), value: string(Throw_Cap(_ch)) });
         return lines;
     }
     if (_item.type == ITEM_ACCESSORY) {
@@ -886,7 +886,7 @@ function Item_NumberLines(_item, _ch) {
         if (b.mag != 0) array_push(lines, { label: Stat_ShortName(STAT_MAG), value: ((b.mag > 0) ? "+" : "") + string(b.mag) });
         if (variable_struct_exists(_item, "passive_params")) {
             var pp = _item.passive_params;
-            if (variable_struct_exists(pp, "damage_reduction")) array_push(lines, { label: Loc_T("shop.lbl.damage_taken", "Damage taken"), value: "-" + string(round(pp.damage_reduction * 100)) + "%" });
+            if (variable_struct_exists(pp, "damage_reduction")) array_push(lines, { label: Loc_T("shop.lbl.damage_taken", "Damage Taken"), value: "-" + string(round(pp.damage_reduction * 100)) + "%" });
             if (variable_struct_exists(pp, "mp_gain")) array_push(lines, { label: Loc_T("shop.lbl.mp", "MP"), value: Loc_T("shop.val.mp_every", "+{n} every {k} turns", { n: string(pp.mp_gain), k: string(pp.every_n_turns) }) });
             if (variable_struct_exists(pp, "gold_mult")) array_push(lines, { label: Loc_T("shop.lbl.gold", "Gold"), value: "+" + string(round(pp.gold_mult * 100)) + "%" });
         }

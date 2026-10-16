@@ -986,7 +986,7 @@ function Scenario_StepSmokeTitle(_s) {
                     _sc.title_refresh = true;
                     break;
                 case 50:
-                    Scenario_Check("title_a_damaged_save_shows_cant_continue", _sc.title_card.kind == "cant" && Title_CardText(_sc.title_card).title == Loc_T("title.card.cant", "Can't continue"), "kind=" + string(_sc.title_card.kind));
+                    Scenario_Check("title_a_damaged_save_shows_cant_continue", _sc.title_card.kind == "cant" && Title_CardText(_sc.title_card).title == Loc_T("title.card.cant", "Can't Continue"), "kind=" + string(_sc.title_card.kind));
                     Scenario_Check("title_the_continue_row_stays_selectable_for_the_notice", _m.items[1].enabled);
                     RunSave_Delete();
                     _sc.title_refresh = true;
@@ -9296,7 +9296,7 @@ function Scenario_StepShotsFairUi(_s) {
                     var _mt = Ui_Metrics();
                     var _r = _bc2.ui_cmd.items[4];
                     var _tag = _scenes[_s.di] + "_" + string(_scales[_s.si]);
-                    Scenario_Check("shots_fairui_run_value_" + _tag, _r.value == ((_s.di == 2) ? Loc_T("battle.action.run_no", "no") : string(Battle_RunPct(_bc2.p, _bc2.e, _bc2.run_fails)) + "%"), "value=" + _r.value);
+                    Scenario_Check("shots_fairui_run_value_" + _tag, _r.value == ((_s.di == 2) ? Loc_T("battle.action.run_no", "No") : string(Battle_RunPct(_bc2.p, _bc2.e, _bc2.run_fails)) + "%"), "value=" + _r.value);
                     Scenario_Check("shots_fairui_label_and_value_fit_" + _tag, UI_TextWidth(_r.label) + UI_TextWidth(_r.value) + 16 * _mt.p <= _bc2.ui_cmd.rect.w || _bc2.ui_cmd.rect.w == 0, "w=" + string(_bc2.ui_cmd.rect.w));
                 }
             }
@@ -10296,11 +10296,11 @@ function Scenario_StepSmokeRunStats(_s) {
     if (!variable_struct_exists(_s, "rs")) _s.rs = { w: noone, seen: false, sum_t: -1, quiet: 0 };
     var _rs = _s.rs;
     var _bc = (room == rm_battle && instance_exists(obj_battle_controller)) ? instance_find(obj_battle_controller, 0) : noone;
-    var _fw = Loc_T("stat.fights_won", "Fights won");
-    var _dd = Loc_T("stat.dmg_dealt", "Damage dealt");
-    var _dt = Loc_T("stat.dmg_taken", "Damage taken");
-    var _pf = Loc_T("stat.perfect", "Perfect rate");
-    var _tm = Loc_T("stat.time", "Run time");
+    var _fw = Loc_T("stat.fights_won", "Battles Won");
+    var _dd = Loc_T("stat.dmg_dealt", "Damage Dealt");
+    var _dt = Loc_T("stat.dmg_taken", "Damage Taken");
+    var _pf = Loc_T("stat.perfect", "Perfect Rate");
+    var _tm = Loc_T("stat.time", "Run Time");
     switch (_s.step) {
         case 440:   // a clean profile and a new run
             if (_s.t == 1) {
@@ -10652,8 +10652,8 @@ function Scenario_StepShotsRunStats(_s) {
         case 462:   // the summary with the stats
             if (_s.t == 30) {
                 var _rows = RunFlow_SummaryRows(_flow.entry);
-                Scenario_Check("shots_runstats_summary_perfect_rate", Test_RowValue(_rows, Loc_T("stat.perfect", "Perfect rate")) == "61%");
-                Scenario_Check("shots_runstats_summary_run_time", Test_RowValue(_rows, Loc_T("stat.time", "Run time")) == "22:14");
+                Scenario_Check("shots_runstats_summary_perfect_rate", Test_RowValue(_rows, Loc_T("stat.perfect", "Perfect Rate")) == "61%");
+                Scenario_Check("shots_runstats_summary_run_time", Test_RowValue(_rows, Loc_T("stat.time", "Run Time")) == "22:14");
                 Scenario_ShotRunStats(_s, "summary");
             }
             if (_s.t == 34) {
@@ -11100,7 +11100,7 @@ function Scenario_StepSmokeOneMenu(_s) {
                 Scenario_Tap("confirm");
             }
             if (_s.t == 64) {   // D156: the first press only asks, in the fight too
-                Scenario_Check("confirm_quit_in_the_fight_asks_first", Confirm_IsOpen() && Confirm_Menu().cursor == 1 && room == rm_battle && Confirm_Question() == "Quit to title? Continue puts you back just before this fight.", "open=" + string(Confirm_IsOpen()) + " room=" + room_get_name(room));
+                Scenario_Check("confirm_quit_in_the_fight_asks_first", Confirm_IsOpen() && Confirm_Menu().cursor == 1 && room == rm_battle && Confirm_Question() == "Quit to title? Continue puts you back just before this battle.", "open=" + string(Confirm_IsOpen()) + " room=" + room_get_name(room));
                 Scenario_Check("confirm_quit_in_the_fight_has_not_left_yet", is_struct(TabMenu_Get()) && TabMenu_Get().pending == "" && !_gs.in_main_menu);
                 Scenario_Tap("menu_up");   // No -> Yes
             }
@@ -11202,9 +11202,9 @@ function Scenario_StepSmokeSeed(_s) {
             }
             if (_s.t > 8 && is_struct(_top) && _top.id == "seed_choice") {
                 Scenario_Check("seed_smoke_new_game_opens_the_seed_pick", Ui_StackDepth(_sc.title_stk) == 2 && !is_struct(_sc.title_exit));
-                Scenario_Check("seed_smoke_random_seed_is_the_first_row", _top.items[0].id == "random" && _top.items[0].label == Loc_T("seed.choice.random", "Random seed"), "label=" + string(_top.items[0].label));
+                Scenario_Check("seed_smoke_random_seed_is_the_first_row", _top.items[0].id == "random" && _top.items[0].label == Loc_T("seed.choice.random", "Random Seed"), "label=" + string(_top.items[0].label));
                 Scenario_Check("seed_smoke_random_seed_is_highlighted", _top.cursor == 0, "cursor=" + string(_top.cursor));
-                Scenario_Check("seed_smoke_enter_seed_is_the_second_row", _top.items[1].id == "enter" && _top.items[1].label == Loc_T("seed.choice.enter", "Enter seed"));
+                Scenario_Check("seed_smoke_enter_seed_is_the_second_row", _top.items[1].id == "enter" && _top.items[1].label == Loc_T("seed.choice.enter", "Enter Seed"));
                 Scenario_Tap("menu_down");
                 Scenario_Next(_s, 552);
             }
@@ -12827,7 +12827,7 @@ function Scenario_StepSmokeNotes(_s) {
                 case 72:
                     _m = TabMenu_TopMenu();
                     Scenario_Check("notes_confirm_opens_the_notes_page", _m.id == "codex_notes" && TabMenu_Depth() == 2, "id=" + _m.id);
-                    Scenario_Check("notes_the_page_says_found_1_of_8", _m.layout.title == "Notes found 1/8", _m.layout.title);
+                    Scenario_Check("notes_the_page_says_found_1_of_8", _m.layout.title == "Notes Found 1/8", _m.layout.title);
                     Scenario_Check("notes_the_found_note_is_listed_by_title", _m.items[0].label == _d1.title);
                     Scenario_Check("notes_the_others_are_question_marks", _m.items[1].label == "???" && _m.items[7].label == "???");
                     Scenario_Tap("menu_down");
@@ -13107,7 +13107,7 @@ function Scenario_StepShotsNotes(_s) {
                 var _m = TabMenu_TopMenu();
                 Scenario_Check("shots_notes_open_" + _tag, _gs.ui.mode == UI_MENU && is_struct(_m), "mode=" + string(_gs.ui.mode));
                 if (_scenes[_o.di] == "list") {
-                    Scenario_Check("shots_notes_list_is_the_notes_page_" + _tag, is_struct(_m) && _m.id == "codex_notes" && _m.layout.title == "Notes found 2/8", is_struct(_m) ? _m.layout.title : "");
+                    Scenario_Check("shots_notes_list_is_the_notes_page_" + _tag, is_struct(_m) && _m.id == "codex_notes" && _m.layout.title == "Notes Found 2/8", is_struct(_m) ? _m.layout.title : "");
                     Scenario_TabLayoutChecks(_tag);
                 } else {
                     var _r = is_struct(_m) ? _m.rect : { x: -1, y: -1, w: 0, h: 0 };

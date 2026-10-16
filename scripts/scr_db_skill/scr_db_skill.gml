@@ -1456,24 +1456,24 @@ function CardDB_Init() {
     var pas = [
         ["quick_feet",    "Quick Feet",    "Light on your feet: +{n} SPD for good.",                    [], "stat_spd",         { stat_spd: 1 }],
         ["venom_coat",    "Venom Coat",    "[t]Poison[/t] you inflict adds {n} extra stack.",                   [], "poison_stacks",    { poison_stacks: 1 }],
-        ["field_medic",   "Field Medic",   "Heal {n} HP after each fight you win.",                     [], "heal_after_fight", { heal_after_fight: 3 }],
+        ["field_medic",   "Field Medic",   "Restore {n} HP after each battle you win.",                 [], "heal_after_fight", { heal_after_fight: 3 }],
         ["steady_hands",  "Steady Hands",  "Perfect zones are {n}% wider.",                             [], "perfect_widen",    { perfect_widen: 0.10 }],
         ["coin_sense",    "Coin Sense",    "Find {n}% more gold.",                                      [], "gold_mult",        { gold_mult: 0.10 }],
         ["mana_spring",   "Mana Spring",   "Regain {n} MP at the start of each of your turns.",         [], "mp_gain",          { mp_gain: 1, every_n_turns: 1 }],
         ["potion_lore",   "Potion Lore",   "Potions work {n}% better.",                                 [], "item_power",       { item_power: 0.15 }],
-        ["opening_blow",  "Opening Blow",  "Enemies start each fight with {n} stagger.",                [], "start_stagger",    { start_stagger: 1 }],
+        ["opening_blow",  "Opening Blow",  "Enemies start each battle with {n} stagger.",                [], "start_stagger",    { start_stagger: 1 }],
         ["k_iron_hide",   "Iron Hide",     "Thick armour sense: +{n} DEF for good.",                    K,  "stat_def",         { stat_def: 2 }],
         ["k_bulwark",     "Bulwark",       "Guard on yourself lasts {n} turns longer.",                 K,  "guard_turns",      { guard_turns: 3 }],
         ["k_heavy_hands", "Heavy Hands",   "A harder swing: +{n} ATK for good.",                        K,  "stat_atk",         { stat_atk: 2 }],
         ["a_fleet_foot",  "Fleet Foot",    "Quicker than the wind: +{n} SPD for good.",                 A,  "stat_spd",         { stat_spd: 2 }],
         ["a_barbed",      "Barbed Arrows", "Your damage skills hit for {n} more power.",                A,  "skill_power",      { skill_power: 1 }],
-        ["a_second_wind", "Second Wind",   "Regain {n} MP after each fight you win.",                   A,  "mp_after_fight",   { mp_after_fight: 2 }],
+        ["a_second_wind", "Second Wind",   "Regain {n} MP after each battle you win.",                  A,  "mp_after_fight",   { mp_after_fight: 2 }],
         ["m_arcane_well", "Arcane Well",   "A deeper well: +{n} MAG for good.",                         M,  "stat_mag",         { stat_mag: 2 }],
         ["m_spellweave",  "Spellweave",    "Your skills cost {n} MP less (never below 1).",             M,  "mp_cost_less",     { mp_cost_less: 1 }],
         ["m_cold_focus",  "Cold Focus",    "Statuses you inflict last {n} turn longer.",                M,  "status_turn_bonus",{ status_turn_bonus: 1 }],
         ["n_tonic",       "Tonic Blend",   "Healing potions also restore {n} MP.",                      N,  "potion_mp",        { potion_mp: 2 }],
         ["n_apothecary",  "Apothecary",    "Potions work {n}% better.",                                 N,  "item_power",       { item_power: 0.30 }],
-        ["n_scrounger",   "Scrounger",     "{n}% chance to find a potion after each fight you win.",    N,  "find_potion_pct",  { find_potion_pct: 0.30 }]
+        ["n_scrounger",   "Scrounger",     "{n}% chance to find a potion after each battle you win.",    N,  "find_potion_pct",  { find_potion_pct: 0.30 }]
     ];
     for (var p = 0; p < array_length(pas); p++) {
         var row = pas[p];
@@ -1693,7 +1693,7 @@ function Card_TypeTag(_c) {
     switch (_c.kind) {
         case "skill": return Loc_T("card.tag.skill", "Skill");
         case "upgrade": return Loc_T("card.tag.upgrade", "Upgrade");
-        case "passive": return array_length(_c.classes) > 0 ? Loc_T("card.tag.class_passive", "Class passive") : Loc_T("card.tag.passive", "Passive");
+        case "passive": return array_length(_c.classes) > 0 ? Loc_T("card.tag.class_passive", "Class Passive") : Loc_T("card.tag.passive", "Passive");
     }
     return Loc_T("card.tag.boon", "Boon");
 }
@@ -1781,19 +1781,19 @@ function Card_Lines(_c) {
             case "stat_def": array_push(lines, Card_NumLine(Loc_T("card.lbl.def", "DEF"), "+" + string(round(val)))); break;
             case "stat_spd": array_push(lines, Card_NumLine(Loc_T("card.lbl.spd", "SPD"), "+" + string(round(val)))); break;
             case "stat_mag": array_push(lines, Card_NumLine(Loc_T("card.lbl.mag", "MAG"), "+" + string(round(val)))); break;
-            case "stat_main": array_push(lines, Card_NumLine(Loc_T("card.lbl.main_stat", "Main stat"), "+" + string(round(val)))); break;
-            case "poison_stacks": array_push(lines, Card_NumLine(Loc_T("card.lbl.poison_stacks", "Poison stacks"), "+" + string(round(val)))); break;
-            case "heal_after_fight": array_push(lines, Card_NumLine(Loc_T("card.lbl.after_fight", "After fight"), Loc_T("card.val.hp", "+{n} HP", { n: string(round(val)) }))); break;
-            case "mp_after_fight": array_push(lines, Card_NumLine(Loc_T("card.lbl.after_fight", "After fight"), Loc_T("card.val.mp", "+{n} MP", { n: string(round(val)) }))); break;
-            case "find_potion_pct": array_push(lines, Card_NumLine(Loc_T("card.lbl.potion_find", "Potion find"), Card_Pct(val))); break;
-            case "perfect_widen": array_push(lines, Card_NumLine(Loc_T("card.lbl.perfect", "Perfect zone"), "+" + Card_Pct(val))); break;
+            case "stat_main": array_push(lines, Card_NumLine(Loc_T("card.lbl.main_stat", "Main Stat"), "+" + string(round(val)))); break;
+            case "poison_stacks": array_push(lines, Card_NumLine(Loc_T("card.lbl.poison_stacks", "Poison Stacks"), "+" + string(round(val)))); break;
+            case "heal_after_fight": array_push(lines, Card_NumLine(Loc_T("card.lbl.after_fight", "After Battle"), Loc_T("card.val.hp", "+{n} HP", { n: string(round(val)) }))); break;
+            case "mp_after_fight": array_push(lines, Card_NumLine(Loc_T("card.lbl.after_fight", "After Battle"), Loc_T("card.val.mp", "+{n} MP", { n: string(round(val)) }))); break;
+            case "find_potion_pct": array_push(lines, Card_NumLine(Loc_T("card.lbl.potion_find", "Potion Find"), Card_Pct(val))); break;
+            case "perfect_widen": array_push(lines, Card_NumLine(Loc_T("card.lbl.perfect", "Perfect Zone"), "+" + Card_Pct(val))); break;
             case "gold_mult": array_push(lines, Card_NumLine(Loc_T("card.lbl.gold", "Gold"), "+" + Card_Pct(val))); break;
-            case "mp_gain": array_push(lines, Card_NumLine(Loc_T("card.lbl.each_turn", "Each turn"), Loc_T("card.val.mp", "+{n} MP", { n: string(round(val)) }))); break;
+            case "mp_gain": array_push(lines, Card_NumLine(Loc_T("card.lbl.each_turn", "Each Turn"), Loc_T("card.val.mp", "+{n} MP", { n: string(round(val)) }))); break;
             case "item_power": array_push(lines, Card_NumLine(Loc_T("card.lbl.potions", "Potions"), "+" + Card_Pct(val))); break;
             case "guard_turns": array_push(lines, Card_NumLine(Loc_T("card.lbl.guard", "Guard"), Loc_T("card.val.turns", "+{n} turns", { n: string(round(val)) }))); break;
-            case "skill_power": array_push(lines, Card_NumLine(Loc_T("card.lbl.skill_power", "Skill power"), "+" + string(round(val)))); break;
+            case "skill_power": array_push(lines, Card_NumLine(Loc_T("card.lbl.skill_power", "Skill Power"), "+" + string(round(val)))); break;
             case "mp_cost_less": array_push(lines, Card_NumLine(Loc_T("card.lbl.skill_mp", "Skill MP"), "-" + string(round(val)))); break;
-            case "status_turn_bonus": array_push(lines, Card_NumLine(Loc_T("card.lbl.status_turns", "Status turns"), "+" + string(round(val)))); break;
+            case "status_turn_bonus": array_push(lines, Card_NumLine(Loc_T("card.lbl.status_turns", "Status Turns"), "+" + string(round(val)))); break;
             case "start_stagger": array_push(lines, Card_NumLine(Loc_T("card.lbl.stagger", "Stagger"), "+" + string(round(val)))); break;
             case "potion_mp": array_push(lines, Card_NumLine(Loc_T("card.lbl.potion_mp", "Potion MP"), "+" + string(round(val)))); break;
             case "heal_pct": array_push(lines, Card_NumLine(Loc_T("card.lbl.restores", "Restores"), Loc_T("card.val.restores", "{pct} HP, MP", { pct: Card_Pct(val) }))); break;

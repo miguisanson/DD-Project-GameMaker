@@ -995,7 +995,7 @@ function RunFlow_Step() {
 }
 
 function RunFlow_CauseLine(_entry) {
-    if (_entry.result == "abandoned") return Loc_T("runflow.cause.abandoned", "You gave up the run.");
+    if (_entry.result == "abandoned") return Loc_T("runflow.cause.abandoned", "You abandoned the run.");
     if (_entry.cause != "") return Loc_T("runflow.cause.enemy", "Felled by: {name}", { name: _entry.cause });
     return Loc_T("runflow.cause.unknown", "Something in the dark took you.");
 }
@@ -1003,11 +1003,11 @@ function RunFlow_CauseLine(_entry) {
 // The rows of the run summary: the five of old, since D137 the six run stats ("-" for an entry without them), and since D152 the seed.
 function RunFlow_SummaryRows(_entry) {
     var rows = [
-        { label: Loc_T("runflow.sum.floor", "Floor reached"), value: string(_entry.floor) },
+        { label: Loc_T("runflow.sum.floor", "Floor Reached"), value: string(_entry.floor) },
         { label: Loc_T("runflow.sum.class", "Class"), value: string(DB_PlayerClass(_entry.class_id).name) },
         { label: Loc_T("runflow.sum.level", "Level"), value: string(_entry.level) },
-        { label: Loc_T("runflow.sum.kills", "Foes beaten"), value: string(_entry.kills) },
-        { label: Loc_T("runflow.sum.falls", "Falls so far"), value: string(Profile_Get().deaths) }
+        { label: Loc_T("runflow.sum.kills", "Enemies Beaten"), value: string(_entry.kills) },
+        { label: Loc_T("runflow.sum.falls", "Falls So Far"), value: string(Profile_Get().deaths) }
     ];
     var st = RunStats_Lines(_entry);
     for (var i = 0; i < array_length(st); i++) array_push(rows, st[i]);
@@ -1154,7 +1154,7 @@ function RunFlow_Draw() {
         var title = Loc_T("runflow.title", "The tunnel keeps you.");
         var rows = RunFlow_SummaryRows(f.entry);
         var sentence = RunFlow_CauseLine(f.entry);
-        var footer = Loc_T("runflow.continue", "Press [k:confirm] to go on");
+        var footer = Loc_T("runflow.continue", "Press [k:confirm] to continue");
         var pw = min(w - 2 * mt.margin, round(w * 0.62));
         var cols = 1;
         var dh = Ui_DetailsHeight(pw, sentence, rows);
@@ -1301,12 +1301,12 @@ function RunStats_Lines(_entry) {
     var st = RunStats_FromEntry(_entry);
     var has = is_struct(st);
     return [
-        { label: Loc_T("stat.perfect", "Perfect rate"), value: has ? RunStats_PerfectText(st) : "-" },
-        { label: Loc_T("stat.crits", "Crits landed"), value: has ? string(st.crits) : "-" },
-        { label: Loc_T("stat.dmg_dealt", "Damage dealt"), value: has ? string(st.dmg_dealt) : "-" },
-        { label: Loc_T("stat.dmg_taken", "Damage taken"), value: has ? string(st.dmg_taken) : "-" },
-        { label: Loc_T("stat.fights_won", "Fights won"), value: has ? string(st.fights_won) : "-" },
-        { label: Loc_T("stat.time", "Run time"), value: has ? RunStats_TimeText(st.play_ms) : "-" }
+        { label: Loc_T("stat.perfect", "Perfect Rate"), value: has ? RunStats_PerfectText(st) : "-" },
+        { label: Loc_T("stat.crits", "Crits Landed"), value: has ? string(st.crits) : "-" },
+        { label: Loc_T("stat.dmg_dealt", "Damage Dealt"), value: has ? string(st.dmg_dealt) : "-" },
+        { label: Loc_T("stat.dmg_taken", "Damage Taken"), value: has ? string(st.dmg_taken) : "-" },
+        { label: Loc_T("stat.fights_won", "Battles Won"), value: has ? string(st.fights_won) : "-" },
+        { label: Loc_T("stat.time", "Run Time"), value: has ? RunStats_TimeText(st.play_ms) : "-" }
     ];
 }
 
