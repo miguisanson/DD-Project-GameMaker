@@ -245,6 +245,11 @@ function Display_TestRun() {
     return Scenario_HasFlag("-smoke") || Scenario_HasFlag("-bot") || Scenario_HasFlag("-shots") || Scenario_HasFlag("-runtests");
 }
 
+// Release (D189): the window reads NO HOPE (the project's own display name is set in the IDE, Game Options; this does not depend on it). Called by Display_Init.
+function Display_ApplyCaption() {
+    window_set_caption(GAME_TITLE);
+}
+
 // Boot, once. Takes the display over from the engine's defaults: no automatic application-surface draw (Display_DrawFrame does it,
 // integer scale, centred, black bars), nearest-neighbour textures, a black window colour, a 160x144 surface that is never resized again.
 function Display_Init() {
@@ -254,6 +259,7 @@ function Display_Init() {
         had_focus: window_has_focus(), want_mode: WINDOW_MODE_BORDERLESS, want_scale: DISPLAY_SCALE_DEFAULT,
         zoom: 1, zoom_cx: 0, zoom_cy: 0
     };
+    Display_ApplyCaption();
     application_surface_draw_enable(false);
     gpu_set_texfilter(false);
     surface_resize(application_surface, DISPLAY_BASE_W, DISPLAY_BASE_H);

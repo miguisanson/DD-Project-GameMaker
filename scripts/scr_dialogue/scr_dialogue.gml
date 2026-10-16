@@ -2141,94 +2141,39 @@ function Story_ClosingLines() {
     ];
 }
 
-// TODO-OWNER: the owner has not sent the sound / music creator names yet (D40). Until then every sound carries this placeholder; when the names
-// arrive, set the creator of each asset in Credits_SoundAssets below (the roll groups sounds by creator by itself).
-#macro CREDITS_CREATOR_TBD "(owner to supply)"
-
-// All 126 original sound and music assets, by asset name (TODO-OWNER: creator per asset), then the 30 new D116 takes with their creators.
-function Credits_SoundAssets() {
-    var names = [
-        "Abstract1", "Abstract2", "African1", "African2", "African3", "African4", "Ambience_haunting",
-        "Ambience_haunting_2", "Arrival", "barrel_break", "Bite_2", "bleed", "Blocked", "Body_falling_wood",
-        "Bow_Attack_", "Bow_Impact_Hit_", "chest_open", "Coffee1", "Coffee2", "Crying_moaning_ambience",
-        "Crying_moaning_ambience_2", "Crying_moaning_ambience_3", "dire_wolf_attack", "dire_wolf_spawn",
-        "double_shot", "Dropping_keys", "evasion_up", "final_boss_spawn", "fireball", "Fireball_2", "foresight",
-        "forest_bgm__for_everymap_with_trees", "Ghost_scream_3", "ghost_sword_attack", "ghost_sword_spawn",
-        "GooeySlime___Sound_Effect", "Hiss", "horinzotal_slash", "horizontal_slash", "ice_spear", "kill_torch",
-        "killer_plant_attack", "killer_plant_spawn", "Knife_stab", "Laugh_evil_deep_3", "Laugh_spooky_3",
-        "Laugh_spooky_4", "Liquid_slosh", "mad_whisp_attack", "mad_whisp_spawn", "mage_attack", "meditation35",
-        "Metal_resonance", "mini_boss_attack", "mini_boss_spawn", "Minimalist1", "Minimalist10", "Minimalist11",
-        "Minimalist12", "Minimalist13", "Minimalist2", "Minimalist3", "Minimalist4", "Minimalist5", "Minimalist6",
-        "Minimalist7", "Minimalist8", "Minimalist9", "miss_effect", "miss_effect2", "Modern1", "Modern10",
-        "Modern11", "Modern12", "Modern13", "Modern14", "Modern15", "Modern16", "Modern2", "Modern3", "Modern4",
-        "Modern5", "Modern6", "Modern7", "Modern8", "Modern9", "Monster_chatter", "Monster_chatter_2",
-        "Monster_chatter_3", "Monster_chatter_4", "Monster_Roar_5", "Monster_Roar_9", "muscle_up", "overall_bgm",
-        "Punch_1", "Punch_2", "Punch_3", "Punch_crunchy", "Punch_crunchy_2", "Retro1", "Retro10", "Retro11",
-        "Retro12", "Retro2", "Retro3", "Retro4", "Retro5", "Retro6", "Retro7", "Retro8", "Retro9", "rev_up",
-        "Slice_Whoosh_Sound_Effect", "Slime_Attack__Nr__1__Minecraft_Sound____Sound_Effect_for_editing",
-        "snake_spaawn_and_attack", "spider_both_attack_and_spawn", "stun", "sword_attack", "sword_impact",
-        "take_aim", "The_Twilight_of_Camelot", "waterspray", "Whip_2", "Wood_Block1", "Wood_Block2", "Wood_Block3"
-    ];
-    var out = [];
-    for (var i = 0; i < array_length(names); i++) array_push(out, { asset: names[i], creator: CREDITS_CREATOR_TBD });   // TODO-OWNER
-    var extra = Credits_NewSfxAssets();
-    for (var j = 0; j < array_length(extra); j++) array_push(out, extra[j]);
-    return out;
-}
-
-// D116: the extra monster takes (CC0, OpenGameArt) the owner imports from art/sfx_new/. The names are known now, so the creators are too.
-// rubberduck = "80 CC0 creature SFX" 1 and 2; Ogrebane = "Monster Sound Effects Pack"; Darsycho = "Monster snarls". Source of each file: art/sfx_new/README.md.
-function Credits_NewSfxAssets() {
-    var takes = [
-        ["rubberduck", "slime_spawn_2"], ["rubberduck", "slime_attack_2"], ["rubberduck", "slime_attack_3"],
-        ["rubberduck", "spider_spawn_2"], ["rubberduck", "spider_attack_2"], ["rubberduck", "spider_attack_3"],
-        ["rubberduck", "snake_spawn_2"], ["rubberduck", "snake_attack_2"], ["rubberduck", "snake_attack_3"],
-        ["rubberduck", "dire_wolf_spawn_2"], ["rubberduck", "dire_wolf_attack_2"], ["Darsycho", "dire_wolf_attack_3"],
-        ["rubberduck", "killer_plant_spawn_2"], ["rubberduck", "killer_plant_attack_2"], ["rubberduck", "killer_plant_attack_3"],
-        ["rubberduck", "mad_whisp_spawn_2"], ["rubberduck", "mad_whisp_attack_2"], ["rubberduck", "mad_whisp_attack_3"],
-        ["rubberduck", "ghost_sword_spawn_2"], ["rubberduck", "ghost_sword_attack_2"], ["rubberduck", "ghost_sword_attack_3"],
-        ["rubberduck", "stranger_spawn_2"], ["rubberduck", "stranger_attack_2"], ["rubberduck", "stranger_attack_3"],
-        ["rubberduck", "mini_boss_spawn_2"], ["Ogrebane", "mini_boss_attack_2"], ["Ogrebane", "mini_boss_attack_3"],
-        ["rubberduck", "final_boss_spawn_2"], ["rubberduck", "final_boss_attack_2"], ["Darsycho", "final_boss_attack_3"]
-    ];
-    var out = [];
-    for (var i = 0; i < array_length(takes); i++) array_push(out, { asset: takes[i][1], creator: takes[i][0] });
-    return out;
-}
-
-// The credits roll as { kind, text }: "title", "head", "line", "names" (a paragraph) and "gap".
+// The credits (D105, D189, D190, D194), one text for the ending's roll and the title's Credits page: "NO HOPE, a game by PaleRook", the engine, the art (with the AI-assisted
+// disclosure and the Kenney courtesy), the sounds and the music by the pack they came from (D190: the verified sources of .planning/research/credits-check.md; the per-file list
+// is gone), the fonts. No music beyond what the game plays (D194). Kinds: { kind, text }: "title", "head", "line" (one centred line), "para" (a wrapped paragraph) and "gap".
+// tools/release/CREDITS.txt carries the same sentences plus the URLs and licence names (Test_make_release.py checks they agree).
 function Credits_Lines() {
     if (!variable_global_exists("credits_lines_builds")) global.credits_lines_builds = 0;
     global.credits_lines_builds++;
     var out = [];
     array_push(out, { kind: "title", text: Loc_T("credits.title", "NO HOPE") });
-    array_push(out, { kind: "line", text: Loc_T("credits.game_by", "Game and art by PaleRook") });
+    array_push(out, { kind: "line", text: Loc_T("credits.game_by", "a game by PaleRook") });
+    array_push(out, { kind: "gap", text: "" });
+    array_push(out, { kind: "head", text: Loc_T("credits.engine", "Engine") });
+    array_push(out, { kind: "para", text: Loc_T("credits.tool_gamemaker", "Made with GameMaker") });
+    array_push(out, { kind: "gap", text: "" });
+    array_push(out, { kind: "head", text: Loc_T("credits.art", "Art") });
+    array_push(out, { kind: "para", text: Loc_T("credits.art_by", "Game art by PaleRook") });
+    array_push(out, { kind: "para", text: Loc_T("credits.art_ai", "The battle backgrounds and the first drafts of some icons were made with AI assistance (Stable Diffusion XL 1.0 with the Pixel Art XL LoRA by nerijs), then chosen and edited by PaleRook.") });
+    array_push(out, { kind: "para", text: Loc_T("credits.art_kenney", "Thanks to the Kenney 1-Bit Pack (CC0), kenney.nl") });
+    array_push(out, { kind: "gap", text: "" });
+    array_push(out, { kind: "head", text: Loc_T("credits.sounds", "Sound") });
+    array_push(out, { kind: "para", text: Loc_T("credits.snd_ui", "UI sounds: Universal UI/Menu Soundpack by Nathan Gibson (Cyrex Studios), CC BY 4.0") });
+    array_push(out, { kind: "para", text: Loc_T("credits.snd_fesliyan", "Sound effects: Fesliyan Studios, fesliyanstudios.com") });
+    array_push(out, { kind: "para", text: Loc_T("credits.snd_atelier", "Monster sounds: Atelier Magicae, Beasts SFX Vol.1 and Monster SFX Vol.1") });
+    array_push(out, { kind: "para", text: Loc_T("credits.snd_horror", "Horror sounds: YourPalRob, Must-Have Horror Sound Effects") });
+    array_push(out, { kind: "para", text: Loc_T("credits.snd_cc0", "Creature sounds (CC0): rubberduck, Ogrebane and Darsycho, from OpenGameArt") });
+    array_push(out, { kind: "gap", text: "" });
+    array_push(out, { kind: "head", text: Loc_T("credits.music", "Music") });
+    array_push(out, { kind: "para", text: Loc_T("credits.music_ifness", "Fantasy Vol. 3 Kingdoms by Ifness (Justin Allan Arnold), CC BY 4.0, ifnessfreemusic.com") });
     array_push(out, { kind: "gap", text: "" });
     array_push(out, { kind: "head", text: Loc_T("credits.fonts", "Fonts") });
-    array_push(out, { kind: "line", text: Loc_T("credits.font_galmuri", "Galmuri by Lee Minseo (OFL-1.1)") });
-    array_push(out, { kind: "line", text: Loc_T("credits.font_pixel", "Retro Gaming pixel font") });
+    array_push(out, { kind: "para", text: Loc_T("credits.font_galmuri", "Galmuri by Lee Minseo, SIL Open Font License 1.1 (OFL-1.1)") });
+    array_push(out, { kind: "para", text: Loc_T("credits.font_pixel", "Retro Gaming by Daymarius, a free font (dafont.com)") });
     array_push(out, { kind: "gap", text: "" });
-    array_push(out, { kind: "head", text: Loc_T("credits.tools", "Tools") });
-    array_push(out, { kind: "line", text: Loc_T("credits.tool_gamemaker", "Made with GameMaker") });
-    array_push(out, { kind: "gap", text: "" });
-    array_push(out, { kind: "head", text: Loc_T("credits.sounds", "Sound and music") });
-    var snd = Credits_SoundAssets();
-    var creators = [];
-    for (var i = 0; i < array_length(snd); i++) {
-        var seen = false;
-        for (var c = 0; c < array_length(creators); c++) { if (creators[c] == snd[i].creator) seen = true; }
-        if (!seen) array_push(creators, snd[i].creator);
-    }
-    for (var g = 0; g < array_length(creators); g++) {
-        var list = "";
-        for (var s = 0; s < array_length(snd); s++) {
-            if (snd[s].creator != creators[g]) continue;
-            list += ((list == "") ? "" : ", ") + snd[s].asset;
-        }
-        array_push(out, { kind: "line", text: Loc_T("credits.creator", "creator: {name}", { name: creators[g] }) });
-        array_push(out, { kind: "names", text: list });
-        array_push(out, { kind: "gap", text: "" });
-    }
     array_push(out, { kind: "gap", text: "" });
     array_push(out, { kind: "line", text: Loc_T("credits.thanks", "Thank you for playing.") });
     array_push(out, { kind: "line", text: Loc_T("credits.by", "by PaleRook") });
@@ -2295,9 +2240,9 @@ function Credits_LayoutBuild() {
         var e = entries[i];
         var h = mt.line_h;
         var pre = 0;
-        if (e.kind == "names") e = { kind: e.kind, text: Credits_BreakLong(e.text, col_w) };
+        if (e.kind == "names" || e.kind == "para") e = { kind: e.kind, text: Credits_BreakLong(e.text, col_w) };
         if (e.kind == "gap") h = mt.line_h;
-        else if (e.kind == "names") h = Ui_TextBlockH(e.text, col_w);
+        else if (e.kind == "names" || e.kind == "para") h = Ui_TextBlockH(e.text, col_w);
         else if (e.kind == "title") h = mt.line_h * 2;
         else if (e.kind == "head") pre = mt.line_h div 2;
         ypos += pre;
@@ -2324,21 +2269,26 @@ function Credits_TotalMs(_layout = undefined) {
 
 function Credits_Draw(_ms) {
     var mt = Ui_Metrics();
-    var p = mt.p;
     Ui_Box(0, 0, mt.gw, mt.gh, UI_C_DARKEST);
+    Credits_DrawRows(mt.gh - round(Credits_ScrollPx(_ms)));   // 60 GUI pixels per second
+}
+
+// The rows of the roll with the first one's top edge at _top; only the rows that reach the screen are drawn. The ending's roll scrolls them by the clock, the title's Credits page
+// by the player (Title_CreditsDraw).
+function Credits_DrawRows(_top) {
+    var mt = Ui_Metrics();
     var l = Credits_Layout();
-    var top = mt.gh - round(Credits_ScrollPx(_ms));   // 60 GUI pixels per second
     var cx = round(mt.gw / 2);
     global.uifit_scroll = true;   // H13b: the roll scrolls through the top and the bottom of the screen: only the sides are checked
     for (var i = 0; i < array_length(l.rows); i++) {
         var r = l.rows[i];
-        var ry = top + r.y;
+        var ry = _top + r.y;
         if (ry > mt.gh || ry + r.h < 0) continue;
         switch (r.kind) {
             case "title": Ui_Text(cx, ry, r.text, UI_C_LIGHTEST, fa_center); break;
             case "head": Ui_Text(cx, ry, r.text, UI_C_LIGHTEST, fa_center); break;
             case "line": Ui_Text(cx, ry, r.text, UI_C_LIGHT, fa_center); break;
-            case "names": {
+            case "names": case "para": {
                 var s = max(0.0001, UI_GetFontScale());
                 if (UiFit_On()) UiFit_BlockDrawn(round(cx - l.col_w / 2), ry, r.text, l.col_w);   // H13b (D156)
                 draw_set_halign(fa_center);
@@ -2350,6 +2300,30 @@ function Credits_Draw(_ms) {
         }
     }
     global.uifit_scroll = false;
+}
+
+// ---- the Credits page of the title (release packet): the same roll, scrolled by the player ----
+#macro CREDITS_KEY_LINES_PER_SEC 6   // Up / Down held: this many lines a second
+#macro CREDITS_WHEEL_LINES 3         // one wheel notch
+
+// The most the roll can scroll when _body_h of it shows at a time (0 when it all fits).
+function Credits_ScrollMax(_total, _body_h) {
+    return max(0, _total - _body_h);
+}
+
+function Credits_ScrollClamp(_scroll, _total, _body_h) {
+    return clamp(_scroll, 0, Credits_ScrollMax(_total, _body_h));
+}
+
+// One frame of scrolling, a pure function: _held_dir +1 Down held / -1 Up held / 0, _page_dir +1 / -1 for one page (the body less two lines, so two lines stay in view), _wheel
+// as Mouse_WheelDir (+1 turned up, which goes back), _drag_dy how far the dragging pointer went UP this frame. Returns the new scroll in GUI pixels, kept inside the roll.
+function Credits_ScrollInput(_scroll, _total, _body_h, _line_h, _step_ms, _held_dir, _page_dir, _wheel, _drag_dy) {
+    var s = _scroll;
+    s += _held_dir * _line_h * CREDITS_KEY_LINES_PER_SEC * _step_ms / 1000;
+    s -= _wheel * _line_h * CREDITS_WHEEL_LINES;
+    s += _page_dir * max(_line_h, _body_h - 2 * _line_h);
+    s += _drag_dy;
+    return Credits_ScrollClamp(s, _total, _body_h);
 }
 
 // ==========================================================================================================================

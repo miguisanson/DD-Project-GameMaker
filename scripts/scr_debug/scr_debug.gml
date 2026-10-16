@@ -201,11 +201,19 @@ function Build_IdShort() {
     return _short;
 }
 
-// Where the build id stands on the GUI grid: { x, y, w, h } (the lower right corner, one margin in). A check reads it to keep every screen's panels clear of it.
+// Release (D188): what the corner reads, two right-aligned lines: "v1.0" over the short build id ("1a2b3c4"). On one line ("v1.0 - 1a2b3c4") the stamp is wider than the room
+// beside the title menu at the larger window sizes; stacked it is no wider than the build id alone was.
+function Build_LabelLines() {
+    return ["v" + VERSION, Build_IdShort()];
+}
+
+// Where the stamp stands on the GUI grid: { x, y, w, h } (the lower right corner, one margin in, two lines tall). A check reads it to keep every screen's panels clear of it.
 function Build_IdRect() {
     var _mt = Ui_Metrics();
-    var _w = UI_TextWidth(Build_IdShort());
-    return { x: _mt.gw - _w - _mt.margin, y: _mt.gh - _mt.line_h - _mt.margin, w: _w, h: _mt.line_h };
+    var _l = Build_LabelLines();
+    var _w = max(UI_TextWidth(_l[0]), UI_TextWidth(_l[1]));
+    var _h = 2 * _mt.line_h;
+    return { x: _mt.gw - _w - _mt.margin, y: _mt.gh - _h - _mt.margin, w: _w, h: _h };
 }
 
 // The one text style (palette white with the dark one-pixel shadow the splash prompt uses), so it reads over the art and over a panel alike.
@@ -215,8 +223,12 @@ function Build_DrawId() {
     var _p = Ui_Px();
     draw_set_alpha(1);
     global.uifit_skip = true;   // H13b: the stamp is not panel text (it may sit over a panel's corner)
-    Ui_Text(_r.x + _p, _r.y + _p, Build_IdShort(), UI_C_DARKEST);
-    Ui_Text(_r.x, _r.y, Build_IdShort(), UI_C_TEXT);
+    var _l = Build_LabelLines();
+    var _mt = Ui_Metrics();
+    for (var _i = 0; _i < 2; _i++) {
+        Ui_Text(_r.x + _r.w + _p, _r.y + _i * _mt.line_h + _p, _l[_i], UI_C_DARKEST, fa_right);
+        Ui_Text(_r.x + _r.w, _r.y + _i * _mt.line_h, _l[_i], UI_C_TEXT, fa_right);
+    }
     global.uifit_skip = false;
     draw_set_color(_c);
     draw_set_alpha(_a);
@@ -677,7 +689,7 @@ function Scenario_StepSmokeUi(_s) {
             Scenario_Tap("menu_up");
             break;
         case 4:
-            Scenario_Check("ui_up_from_the_first_item_lands_on_the_last", _top.cursor == 4, "cursor=" + string(_top.cursor));
+            Scenario_Check("ui_up_from_the_first_item_lands_on_the_last", _top.cursor == 5, "cursor=" + string(_top.cursor));
             Scenario_Tap("menu_down");
             break;
         case 10:
@@ -717,7 +729,10 @@ function Scenario_StepSmokeUi(_s) {
         case 66:
             Scenario_Tap("menu_down");
             break;
-        case 72:
+        case 72:   // release: Credits is a row now (Settings, Credits, Quit): one more Down to wrap
+            Scenario_Tap("menu_down");
+            break;
+        case 78:
             Scenario_Check("ui_title_cursor_back_on_new_game", _top.cursor == 1, "cursor=" + string(_top.cursor));
             break;
         case 80:
@@ -868,7 +883,7 @@ function Scenario_StepSmokeNewGameGuard(_s) {
                     Scenario_Tap("menu_up");
                     break;
                 case 9:
-                    Scenario_Check("newgame_guard_up_from_continue_wraps_to_quit", _m.cursor == 4, "cursor=" + string(_m.cursor));
+                    Scenario_Check("newgame_guard_up_from_continue_wraps_to_quit", _m.cursor == 5, "cursor=" + string(_m.cursor));
                     Scenario_Tap("menu_down");
                     break;
                 case 15:
@@ -996,7 +1011,7 @@ function Scenario_StepSmokeTitle(_s) {
             switch (_s.t) {
                 case 3: Scenario_Tap("menu_up"); break;
                 case 9:
-                    Scenario_Check("title_up_from_continue_wraps_to_exit", _m.cursor == 4, "cursor=" + string(_m.cursor));
+                    Scenario_Check("title_up_from_continue_wraps_to_exit", _m.cursor == 5, "cursor=" + string(_m.cursor));
                     Scenario_Tap("menu_down");
                     break;
                 case 15:
@@ -3094,6 +3109,9 @@ function Scenario_StepShots(_s) {
             break;
         case 1130: case 1131: case 1132: case 1133: case 1134: case 1135: case 1136: case 1137: case 1138: case 1139:
             Scenario_StepShotsR4Final1(_s);   // r4final1 (I-107, I-108): the battle Skill list with its counter, arrows and two rows (Archer level 1, a full Mage list, Korean) and white chip labels; three sizes; the end of the pictures
+            break;
+        case 1190: case 1191: case 1192: case 1193: case 1194: case 1195: case 1196: case 1197: case 1198: case 1199:
+            Scenario_StepShotsRelease(_s);   // release (D188-D190): the title with its version label and Credits row, the credits page top and bottom (English and Korean), the keys that scroll it; three sizes; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -14730,7 +14748,7 @@ function Scenario_StepSmokeR3Saves2(_s) {
             if (_s.t == 1) {
                 var _ids = "";
                 for (var _i = 0; _i < array_length(_top.items); _i++) _ids += ((_i > 0) ? "," : "") + _top.items[_i].id;
-                Scenario_Check("saves2_smoke_the_title_rows", _ids == "continue,new,load,settings,exit", _ids);
+                Scenario_Check("saves2_smoke_the_title_rows", _ids == "continue,new,load,settings,credits,exit", _ids);
                 Scenario_Check("saves2_smoke_continue_is_grey_with_nothing_saved", !_top.items[0].enabled);
                 Scenario_Check("saves2_smoke_load_game_is_grey_with_nothing_saved", !_top.items[2].enabled);
                 Scenario_Check("saves2_smoke_the_cursor_starts_on_new_game", _top.cursor == 1, "cursor=" + string(_top.cursor));
@@ -15732,7 +15750,7 @@ function Scenario_StepShotsR3Saves2(_s) {
                         var _cr = _c.title_card_rect;
                         Scenario_Check("shots_s2_title_card_is_shown_" + _tag, _c.title_card.kind == "run" && Scenario_S2Inside(_cr, _mt), json_stringify(_cr));
                         Scenario_Check("shots_s2_title_card_clear_of_the_menu_and_the_build_id_" + _tag, !Test_RectsOverlap(_cr, _m1.rect) && !Test_RectsOverlap(_cr, _idr), json_stringify(_cr));
-                        Scenario_Check("shots_s2_title_has_five_rows_" + _tag, array_length(_m1.items) == 5 && _m1.items[0].id == "continue" && _m1.cursor == 0);
+                        Scenario_Check("shots_s2_title_has_six_rows_" + _tag, array_length(_m1.items) == 6 && _m1.items[0].id == "continue" && _m1.cursor == 0);
                         var _pb = _c.title_btn.profile;   // D175: the profile button, lower left: inside the picture, clear of the menu, the card and the build id
                         Scenario_Check("shots_s2_title_profile_button_inside_the_gui_" + _tag, Scenario_S2Inside(_pb, _mt), json_stringify(_pb));
                         Scenario_Check("shots_s2_title_profile_button_clear_of_the_menu_the_card_and_the_build_id_" + _tag, !Test_RectsOverlap(_pb, _m1.rect) && !Test_RectsOverlap(_pb, _cr) && !Test_RectsOverlap(_pb, _idr), json_stringify(_pb) + " vs " + json_stringify(_m1.rect) + " " + json_stringify(_cr));
@@ -17496,7 +17514,7 @@ function Scenario_StepSmokeR3Mouse(_s) {
             break;
         case 1101:   // hover moves the row, a click opens Settings; a slider by click and by drag, a toggle by click; right click is Back
             if (_s.t == 2) {
-                Scenario_Check("r3mouse_smoke_the_title_menu_drew_its_rows", array_length(_top.rects) == 5 && _top.rects[3].w > 0 && _top.items[3].id == "settings", string(array_length(_top.rects)));
+                Scenario_Check("r3mouse_smoke_the_title_menu_drew_its_rows", array_length(_top.rects) == 6 && _top.rects[3].w > 0 && _top.items[3].id == "settings", string(array_length(_top.rects)));
                 Scenario_MouseToRect(_top.rects[3]);
             }
             if (_s.t == 8) {
@@ -18718,10 +18736,167 @@ function Scenario_StepShotsR4Final1(_s) {
                 if (_o.di >= array_length(_scenes)) {
                     Loc_SetLanguage("en");
                     Scenario_SetWindowScale(3);
-                    Scenario_MouseEnd();   // the end of the pictures
+                    Scenario_Next(_s, 1190);   // goes on with release (1190), the end of the pictures
                 } else {
                     Scenario_Next(_s, 1130);
                 }
+            }
+            break;
+    }
+}
+
+
+// ============================================================================
+// Release packet (D188, D189, D190): pictures 1190..1197, shot_release_<scene>_<w>x<h>.png at scales 3, 4, 5. The end of the pictures: the last step calls Scenario_MouseEnd.
+//   title            the title with the version stamp ("v1.0" over the build id) at the lower right and the Credits row (cursor on it)
+//   credits_top      the Credits page at its top
+//   credits_bottom   the same scrolled to the end
+//   credits_ko_top / credits_ko_bottom   the same in Korean
+// The first credits_top picture also drives the scroll keys for real: the wheel, Down held, a page (the tab key), a click-and-drag, then Back closes the page.
+// ============================================================================
+function Scenario_ReleaseScenes() {
+    return ["title", "credits_top", "credits_bottom", "credits_ko_top", "credits_ko_bottom"];
+}
+
+function Scenario_StepShotsRelease(_s) {
+    if (!variable_struct_exists(_s, "rel")) _s.rel = { di: 0, si: 0 };
+    var _o = _s.rel;
+    var _scenes = Scenario_ReleaseScenes();
+    var _scales = [3, 4, 5];
+    var _scene = _scenes[_o.di];
+    var _ko = (string_pos("_ko_", _scene) > 0);
+    var _tag = _scene + "_" + string(_scales[_o.si]);
+    var _c = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _gs = GameState_Get();
+    var _mt = Ui_Metrics();
+    switch (_s.step) {
+        case 1190:   // a fresh title at this scale
+            if (_s.t == 1) {
+                Mouse_FakeClear();
+                Scenario_ClearUi();
+                Confirm_Close();
+                Notice_Interrupt();
+                Loc_SetLanguage("en");   // the room restart below reads the saved language again: Korean is set once the title is up
+                Scenario_SetWindowScale(_scales[_o.si]);
+                _gs.in_main_menu = true;
+                _gs.startup_logo_seen = true;
+                room_goto(rm_start);
+            }
+            if (_s.t >= 40 && room == rm_start && _c != noone && _c.state == "main" && is_struct(_c.title_stk) && !Transition_IsActive() && !Notice_IsOpen() && Ui_MenuAlpha(_c.title_stk.menus[0], current_time) >= 1) {
+                if (_ko) {
+                    Loc_SetLanguage("ko");
+                    _c.title_refresh = true;
+                }
+                Scenario_Next(_s, 1191);
+            }
+            if (_s.t > 900) { Scenario_Check("shots_release_reaches_the_title_" + _tag, false, "room=" + room_get_name(room)); Scenario_MouseEnd(); }
+            break;
+        case 1191:   // put the cursor on Credits; the credits scenes press Confirm on it, as a player does
+            var _m0 = _c.title_stk.menus[0];
+            if (_s.t == 1) {
+                Scenario_Check("shots_release_the_credits_row_is_the_fifth_" + _tag, array_length(_m0.items) == 6 && _m0.items[4].id == "credits" && _m0.items[5].id == "exit", Test_ReleaseIds(_m0.items));
+                Ui_MenuFixCursor(_m0, 4);
+            }
+            if (_s.t == 3 && _scene != "title") Scenario_Tap("confirm");
+            if (_s.t >= 25) {
+                if (_scene != "title") {
+                    Scenario_Check("shots_release_confirm_on_the_credits_row_opens_the_page_" + _tag, is_struct(Title_CreditsOf(_c)));
+                    if (!is_struct(Title_CreditsOf(_c))) { Scenario_MouseEnd(); break; }
+                    if (string_pos("bottom", _scene) > 0) Title_CreditsOf(_c).scroll = 1000000;   // the draw keeps it inside the roll
+                }
+                Scenario_Next(_s, 1192);
+            }
+            break;
+        case 1192:   // assert the layout, take the picture
+            if (_s.t >= 20) {
+                var _idr = Build_IdRect();
+                Scenario_Check("shots_release_the_language_is_" + _tag, Loc_GetLanguage() == (_ko ? "ko" : "en"));
+                Scenario_Check("shots_release_the_stamp_is_v1_0_over_the_build_id_" + _tag, Build_LabelLines()[0] == "v1.0" && Build_LabelLines()[1] == Build_IdShort() && _idr.h == 2 * _mt.line_h, json_stringify(Build_LabelLines()));
+                Scenario_Check("shots_release_the_label_is_inside_the_gui_" + _tag, Scenario_S2Inside(_idr, _mt), json_stringify(_idr));
+                if (_scene == "title") {
+                    var _mr = _c.title_stk.menus[0].rect;
+                    Scenario_Check("shots_release_title_menu_inside_the_gui_" + _tag, Scenario_S2Inside(_mr, _mt), json_stringify(_mr));
+                    Scenario_Check("shots_release_title_menu_clear_of_the_label_" + _tag, !Test_RectsOverlap(_mr, _idr), json_stringify(_mr) + " vs " + json_stringify(_idr));
+                    Scenario_Check("shots_release_title_menu_clear_of_the_corner_buttons_" + _tag, !Test_RectsOverlap(_mr, _c.title_btn.profile) && !Test_RectsOverlap(_mr, _c.title_btn.codex), json_stringify(_mr));
+                    Scenario_Check("shots_release_title_label_clear_of_the_corner_buttons_" + _tag, !Test_RectsOverlap(_idr, _c.title_btn.profile) && !Test_RectsOverlap(_idr, _c.title_btn.codex));
+                    Scenario_Check("shots_release_title_cursor_is_on_credits_" + _tag, _c.title_stk.menus[0].cursor == 4);
+                } else {
+                    var _cr = Title_CreditsOf(_c);
+                    var _body = Title_CreditsBody();
+                    var _l = Credits_Layout();
+                    var _hr = _c.title_hint_rect;
+                    Scenario_Check("shots_release_credits_key_line_inside_the_gui_" + _tag, Scenario_S2Inside(_hr, _mt), json_stringify(_hr));
+                    Scenario_Check("shots_release_credits_key_line_clear_of_the_label_" + _tag, !Test_RectsOverlap(_hr, _idr), json_stringify(_hr) + " vs " + json_stringify(_idr));
+                    Scenario_Check("shots_release_credits_body_is_above_the_key_line_" + _tag, _body.bottom <= _hr.y && _body.h > 2 * _mt.line_h, json_stringify(_body.h));
+                    var _last = _l.rows[array_length(_l.rows) - 1];
+                    if (string_pos("bottom", _scene) > 0) {
+                        Scenario_Check("shots_release_credits_scrolled_to_the_end_" + _tag, _cr.scroll == Credits_ScrollMax(_l.total, _body.h) && _cr.scroll > 0, "scroll=" + string(_cr.scroll));
+                        Scenario_Check("shots_release_credits_last_row_is_in_the_body_" + _tag, _last.y + _last.h - _cr.scroll <= _body.h + 1, "bottom=" + string(_last.y + _last.h - _cr.scroll) + " body=" + string(_body.h));
+                    } else {
+                        Scenario_Check("shots_release_credits_start_at_the_top_" + _tag, _cr.scroll == 0 && _l.rows[0].y + _body.top >= _body.top);
+                        Scenario_Check("shots_release_credits_are_longer_than_the_body_at_this_size_" + _tag, _l.total > _body.h, "total=" + string(_l.total) + " body=" + string(_body.h));
+                    }
+                }
+                _s.shot = "shot_release_" + _scene + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1193);
+            }
+            break;
+        case 1193:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                if (_scene == "credits_top" && _o.si == 0) {
+                    Scenario_Next(_s, 1194);   // the keys of the page, once
+                } else {
+                    Scenario_Next(_s, 1196);
+                }
+            }
+            break;
+        case 1194:   // the keys of the page: the wheel, Down held, a page, a click-and-drag
+            var _cr2 = Title_CreditsOf(_c);
+            if (!is_struct(_cr2) && _s.t < 57) { Scenario_Check("shots_release_the_page_is_still_open", false, "t=" + string(_s.t)); Scenario_MouseEnd(); break; }
+            var _body2 = Title_CreditsBody();
+            var _ln = Credits_Layout();
+            if (_s.t == 1) { _o.s0 = _cr2.scroll; Scenario_MouseTo(_mt.gw / 2, _mt.gh / 2); Mouse_FakeWheel(-1); }
+            if (_s.t == 4) {
+                Scenario_Check("shots_release_the_wheel_down_scrolls_three_lines", abs(_cr2.scroll - _o.s0 - 3 * _mt.line_h) < 0.5, "scroll=" + string(_cr2.scroll) + " from " + string(_o.s0));
+                _o.s1 = _cr2.scroll;
+                Scenario_Hold("menu_down", 20);
+            }
+            if (_s.t == 40) {
+                Scenario_Check("shots_release_down_held_scrolls_on", _cr2.scroll > _o.s1 + _mt.line_h, "scroll=" + string(_cr2.scroll) + " from " + string(_o.s1));
+                _o.s2 = _cr2.scroll;
+                Scenario_Tap("tab_next");
+            }
+            if (_s.t == 44) {
+                Scenario_Check("shots_release_a_page_key_scrolls_a_page", _cr2.scroll >= min(Credits_ScrollMax(_ln.total, _body2.h), _o.s2 + max(_mt.line_h, _body2.h - 2 * _mt.line_h)) - 0.5, "scroll=" + string(_cr2.scroll) + " from " + string(_o.s2));
+                _o.s3 = _cr2.scroll;
+                Scenario_MouseTo(_mt.gw / 2, _mt.gh / 2);
+                Scenario_MouseClick(mb_left);
+                Mouse_FakeHold(mb_left, true);
+            }
+            if (_s.t == 48) Scenario_MouseTo(_mt.gw / 2, _mt.gh / 2 - 10);   // the pointer goes up 10 GUI px: the page reads 10 px further down
+            if (_s.t == 52) {
+                Mouse_FakeHold(mb_left, false);
+                Scenario_Check("shots_release_dragging_up_scrolls_down", _cr2.scroll > _o.s3 + 5 || _o.s3 >= Credits_ScrollMax(_ln.total, _body2.h) - 0.5, "scroll=" + string(_cr2.scroll) + " from " + string(_o.s3));
+            }
+            if (_s.t == 56) Scenario_Tap("cancel");
+            if (_s.t >= 62) {
+                Scenario_Check("shots_release_back_closes_the_credits_and_the_title_is_there", !is_struct(Title_CreditsOf(_c)) && _c.state == "main" && is_struct(_c.title_stk));
+                Mouse_FakeClear();
+                Scenario_Next(_s, 1196);
+            }
+            break;
+        case 1196:   // next picture
+            if (_scene != "title" && is_struct(Title_CreditsOf(_c))) Title_CreditsClose(_c);
+            _o.si++;
+            if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+            if (_o.di >= array_length(_scenes)) {
+                Loc_SetLanguage("en");
+                Scenario_SetWindowScale(3);
+                Scenario_MouseEnd();   // the end of the pictures
+            } else {
+                Scenario_Next(_s, 1190);
             }
             break;
     }

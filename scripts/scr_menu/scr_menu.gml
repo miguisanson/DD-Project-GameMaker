@@ -3542,6 +3542,7 @@ function Title_MainItems(_can_continue, _can_load) {
         { id: "new", label: Loc_T("menu.main.option.0", "New Game"), kind: "button", enabled: true },
         { id: "load", label: Loc_T("menu.main.option.1", "Load Game"), kind: "button", enabled: _can_load },
         { id: "settings", label: Loc_T("menu.main.option.2", "Settings"), kind: "button", enabled: true },
+        { id: "credits", label: Loc_T("menu.main.option.credits", "Credits"), kind: "button", enabled: true },   // release: the scrolling credits page (Title_Credits*)
         { id: "exit", label: Loc_T("menu.main.option.3", "Quit Game"), kind: "button", enabled: true }
     ];
 }
@@ -3745,6 +3746,9 @@ function Title_OnConfirm(_m, _i) {
             SettingsPopup_Open("title");
             c.state = "settings";
             break;
+        case "credits":
+            Title_CreditsOpen(c);
+            break;
         case "exit": game_end(); break;
     }
 }
@@ -3792,6 +3796,12 @@ function Title_HintPlanOf(_groups) {
     return plan;
 }
 
+// Release: the lowest y a full-width panel of a title screen may reach: the top of the key line or of the version stamp (two lines tall), whichever is higher.
+function Title_PlanFloorY(_hp) {
+    var idr = Build_IdRect();
+    return (_hp.rect.w > 0) ? min(_hp.rect.y, idr.y) : idr.y;
+}
+
 // The key line of the screen on top of the title.
 function Title_HintPlan(_c, _m) {
     return Title_HintPlanOf(Title_HintGroups(_m));
@@ -3806,7 +3816,7 @@ function Title_PickerFit(_c, _m) {
     var L = _m.layout;
     var hp = Title_HintPlan(_c, _m);
     var top_y = mt.margin;
-    var bot_y = ((hp.rect.w > 0) ? hp.rect.y : mt.gh - mt.margin) - mt.margin;
+    var bot_y = Title_PlanFloorY(hp) - mt.margin;
     var avail = bot_y - top_y;
     L.details_pos = "below";   // measured first as the stacked layout
     L.x_anchor = "center";
@@ -4315,7 +4325,7 @@ function Title_CodexDraw(_c) {
     var hp = Title_HintPlanOf(groups);
     var z = TabMenu_Zones((string_pos("codex_", top.id) == 1) ? top.id : "codex");
     z.body_y = z.tabs_y;   // no tabs header here: the body starts at the top margin and ends above the key line
-    z.body_h = hp.rect.y - mt.margin - z.body_y;
+    z.body_h = Title_PlanFloorY(hp) - mt.margin - z.body_y;
     Ui_DimBackdrop(UI_DIM_SCREEN * a);
     if (is_struct(stk.leaving) && Ui_MenuAlpha(stk.leaving, now) <= 0) stk.leaving = undefined;
     TabMenu_FitMenu(top, z, 0);
@@ -4326,6 +4336,95 @@ function Title_CodexDraw(_c) {
     }
     Title_DrawKeyPlan(hp, a);
     _c.title_hint_rect = hp.rect;
+    draw_set_alpha(1);
+}
+
+// ---- Credits (release packet): the roll of the ending (Credits_Lines), as a page you scroll yourself ----
+// Up / Down (pad: stick or d-pad) held, Q / E (pad shoulders) a page, the mouse wheel, or a click-and-drag; Back closes. Over the dimmed title, the key line at the lower left like the
+// Codex's. The body is the screen between the top margin and the key line; rows scrolled past either edge are covered by a band of the background, so they never run under the keys.
+function Title_CreditsOf(_c) {
+    return (variable_instance_exists(_c, "title_credits") && is_struct(_c.title_credits)) ? _c.title_credits : undefined;
+}
+
+function Title_CreditsOpen(_c) {
+    _c.title_credits = { t: current_time, scroll: 0, drag: false, my: 0 };
+}
+
+function Title_CreditsClose(_c) {
+    _c.title_credits = undefined;
+    _c.title_hint_rect = { x: 0, y: 0, w: 0, h: 0 };
+    if (is_struct(_c.title_stk) && array_length(_c.title_stk.menus) > 0) _c.title_stk.menus[0].lock_ms = current_time;   // the press that closed it must not answer the title
+}
+
+function Title_CreditsGroups() {
+    return [Loc_T("credits.hint", "[k:up][k:down] Scroll"), Loc_T("tab.hint.back", "[k:back] Back")];
+}
+
+// { hp (the key line's plan), top, bottom, h }: where the roll shows.
+function Title_CreditsBody() {
+    var mt = Ui_Metrics();
+    var hp = Title_HintPlanOf(Title_CreditsGroups());
+    var bottom = Title_PlanFloorY(hp) - mt.margin;
+    return { hp: hp, top: mt.margin, bottom: bottom, h: max(mt.line_h, bottom - mt.margin) };
+}
+
+function Title_CreditsStep(_c) {
+    var cr = Title_CreditsOf(_c);
+    if (current_time - cr.t < UI_INPUT_LOCK_MS) return;   // the press that opened the page
+    if (Input_UIBack() || Input_ClickBack()) {
+        SFX_PlayUI("ui_back");
+        Title_CreditsClose(_c);
+        return;
+    }
+    var mt = Ui_Metrics();
+    var body = Title_CreditsBody();
+    var l = Credits_Layout();
+    var mp = Ui_MousePos();
+    var dy = 0;
+    if (Mouse_Pressed(mb_left)) {
+        cr.drag = true;
+        cr.my = mp.y;
+    }
+    if (cr.drag) {
+        if (Mouse_Held(mb_left)) {
+            dy = cr.my - mp.y;
+            cr.my = mp.y;
+        } else {
+            cr.drag = false;
+        }
+    }
+    var held = (Input_Held("menu_down") ? 1 : 0) - (Input_Held("menu_up") ? 1 : 0);
+    var page = (Input_Pressed("tab_next") ? 1 : 0) - (Input_Pressed("tab_prev") ? 1 : 0);
+    cr.scroll = Credits_ScrollInput(cr.scroll, l.total, body.h, mt.line_h, Presentation_StepMs(delta_time), held, page, Mouse_WheelDir(), dy);
+}
+
+function Title_CreditsDraw(_c) {
+    var cr = Title_CreditsOf(_c);
+    var now = current_time;
+    var a = Ui_AnimT(cr.t, now);
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var body = Title_CreditsBody();
+    var l = Credits_Layout();
+    cr.scroll = Credits_ScrollClamp(cr.scroll, l.total, body.h);   // the window or the language changed since the last step
+    Ui_DimBackdrop(a);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(a);
+    Credits_DrawRows(body.top - round(cr.scroll));
+    draw_set_alpha(a);
+    Ui_Box(0, 0, mt.gw, body.top, UI_C_DARKEST);   // the bands that hide what has scrolled past the body
+    Ui_Box(0, body.bottom, mt.gw, mt.gh, UI_C_DARKEST);
+    var smax = Credits_ScrollMax(l.total, body.h);
+    if (smax > 0) {   // a thin scroll bar at the right edge: the track and the part of the roll that shows
+        var bx = mt.gw - 2 * p;
+        var th = max(2 * p, round(body.h * body.h / l.total));
+        var ty = body.top + round((body.h - th) * cr.scroll / smax);
+        Ui_Box(bx, body.top, bx + p, body.top + body.h, UI_C_DARK);
+        Ui_Box(bx, ty, bx + p, ty + th, UI_C_LIGHT);
+    }
+    draw_set_alpha(a0);
+    Title_DrawKeyPlan(body.hp, a);
+    _c.title_hint_rect = body.hp.rect;
     draw_set_alpha(1);
 }
 
@@ -4643,6 +4742,10 @@ function Title_Step(_c) {
         Title_CodexStep(_c);
         return;
     }
+    if (is_struct(Title_CreditsOf(_c))) {   // release: the credits page
+        Title_CreditsStep(_c);
+        return;
+    }
     if (_c.title_refresh) Title_Refresh(_c);
     if (Ui_StackDepth(_c.title_stk) == 1 && Title_ButtonKeys(_c)) return;   // D175: the profile button's key, or a click on it
     var top = Ui_StackTop(_c.title_stk);
@@ -4660,6 +4763,8 @@ function Title_Draw(_c) {
         Title_NameDraw(_c);
     } else if (is_struct(Title_CodexOf(_c))) {   // D175: and the Codex
         Title_CodexDraw(_c);
+    } else if (is_struct(Title_CreditsOf(_c))) {   // release: and the credits page
+        Title_CreditsDraw(_c);
     } else {
         var pk = (Ui_StackDepth(_c.title_stk) >= 2 && Title_IsPicker(_c.title_stk.menus[1])) ? _c.title_stk.menus[1] : undefined;
         if (is_struct(pk)) {   // D175: a save file picker stands alone over the dimmed picture (the title menu is not drawn under it), clear of its key line

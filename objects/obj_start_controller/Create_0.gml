@@ -8,6 +8,7 @@ title_hint_rect = { x: 0, y: 0, w: 0, h: 0 };   // D175: where the picker's key 
 title_btn = { profile: { x: 0, y: 0, w: 0, h: 0 }, codex: { x: 0, y: 0, w: 0, h: 0 } };   // D175: where the title's corner buttons were drawn last (the mouse and -shots read them)
 title_name = undefined;      // D175: the name entry (a struct while it is open)
 title_codex = undefined;     // D175: the Codex screen of the title (a struct while it is open)
+title_credits = undefined;   // release: the Credits page of the title (a struct while it is open)
 title_name_rects = undefined;
 title_cursor_reset = false;  // D175: after another profile, the title cursor starts where a fresh title would put it
 title_t0 = -100000;          // D128: when the picture started to fade in (a fresh launch sets it when the splash appears; every other visit shows it at once)

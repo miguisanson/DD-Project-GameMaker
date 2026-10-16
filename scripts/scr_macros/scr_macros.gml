@@ -373,3 +373,7 @@
 
 // Build id (VER-10). tools/automation/run_tests.ps1 rewrites this line in its scratch copy only.
 #macro BUILD_ID "dev"
+
+// Release (D188, D189): the version the title shows next to the build id, and the name of the game (the window caption, Display_ApplyCaption).
+#macro VERSION "1.0"
+#macro GAME_TITLE "NO HOPE"
