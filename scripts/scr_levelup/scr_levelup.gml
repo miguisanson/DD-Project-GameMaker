@@ -314,6 +314,13 @@ function LevelUp_GrowthText(_class_id, _level) {
     return Loc_T("levelup.growth", "{name} growth: {gains}", { name: DB_PlayerClass(_class_id).name, gains: gains });
 }
 
+// Hunt 7 (D143): the level a free-point prompt is for. A fight that gives several levels owes one point per level and the prompts open one by one, so the
+// prompt for the oldest point still owed is the character's level minus the points still owed, plus one (never below 2 or above the level).
+function LevelUp_PromptLevel(_ch) {
+    var owed = (variable_struct_exists(_ch, "stat_points") ? max(0, _ch.stat_points) : 0) / LEVEL_FREE_POINTS_PER_LEVEL;
+    return clamp(_ch.level - ceil(owed) + 1, min(2, _ch.level), _ch.level);
+}
+
 // D143: the free-point prompt's rows: the four stats, then Max HP and Max MP (value now > after).
 function Cards_FreePointOptions(_ch) {
     var out = Cards_StatOptions(_ch);

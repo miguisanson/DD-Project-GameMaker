@@ -148,11 +148,13 @@ function Loot_ArrayHasItemId(_arr, _item_id) {
     return false;
 }
 
-function Loot_ItemClassAllowed(_item, _class_id) {
+// _class_chosen: the Nobody has answered the class chest, so it stays Nobody and wears no weapon or armor (hunt 7); before that it becomes a class, so anything goes.
+function Loot_ItemClassAllowed(_item, _class_id, _class_chosen = false) {
     if (!is_struct(_item)) return false;
 
     var class_id = round(real(_class_id));
-    if (class_id < 0 || class_id == CLASS_NOBODY) return true;
+    if (class_id < 0) return true;
+    if (class_id == CLASS_NOBODY && !_class_chosen) return true;
 
     if (variable_struct_exists(_item, "preferred_class") && _item.preferred_class != -1 && _item.preferred_class != class_id) {
         return false;
@@ -184,8 +186,14 @@ function Loot_ItemEligibleForPlayer(_item_id, _player = undefined, _class_id = -
 
     var is_equip = (variable_struct_exists(item, "type") && (item.type == ITEM_WEAPON || item.type == ITEM_ARMOR || item.type == ITEM_ACCESSORY));
     if (is_equip) {
-        if (!Loot_ItemClassAllowed(item, class_id)) return false;
+        var chosen = is_struct(p) && variable_struct_exists(p, "class_chosen") && p.class_chosen;
+        if (!Loot_ItemClassAllowed(item, class_id, chosen)) return false;
         if (Loot_PlayerOwnsItem(p, _item_id)) return false;
+    }
+
+    // hunt 7: a throwable whose stack is full cannot be received (Loot_Grant would hand over "x0"); roll something else
+    if (Item_IsThrowable(item) && is_struct(p) && variable_struct_exists(p, "inventory") && is_array(p.inventory)) {
+        if (Inv_Count(p.inventory, _item_id) >= Throw_Cap(p)) return false;
     }
 
     return true;
@@ -289,6 +297,12 @@ function Loot_RollContainer(_level, _key, _rng = undefined, _extra = undefined, 
             var unique_drop = is_struct(item_cfg) && (item_cfg.type == ITEM_WEAPON || item_cfg.type == ITEM_ARMOR || item_cfg.type == ITEM_ACCESSORY);
             if (unique_drop && !Loot_ArrayHasItemId(exclude_ids, it.item_id)) {
                 array_push(exclude_ids, it.item_id);
+            }
+            // hunt 7: what this roll adds to a throwable stack counts before the next roll, so a second item cannot be an "x0"
+            if (Item_IsThrowable(item_cfg) && is_struct(player) && variable_struct_exists(player, "inventory") && is_array(player.inventory) && !Loot_ArrayHasItemId(exclude_ids, it.item_id)) {
+                var pending = 0;
+                for (var pk = 0; pk < array_length(items); pk++) if (items[pk].item_id == it.item_id) pending += items[pk].qty;
+                if (Inv_Count(player.inventory, it.item_id) + pending >= Throw_Cap(player)) array_push(exclude_ids, it.item_id);
             }
         }
     }

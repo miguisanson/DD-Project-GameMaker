@@ -657,6 +657,11 @@ function Item_ComputeAmount(_user, _use) {
     return Item_AdjustAmount(_user, _use, Item_BaseAmount(_use));
 }
 
+// Hunt 7 (D100): the number a screen shows for a potion: what Item_Use applies to _ch (level scaling, Potion Lore), or the base without a character.
+function Item_ShownAmount(_ch, _use) {
+    return is_struct(_ch) ? Item_ComputeAmount(_ch, _use) : Item_BaseAmount(_use);
+}
+
 function Item_Use(_item_id, _user, _target) {
     var item = ItemDB_Get(_item_id);
     var result = { ok: true, msg: "", fx_sprite: item.use.fx_sprite, fx_frames: item.use.fx_frames, fx_speed: item.use.fx_speed };
@@ -827,7 +832,8 @@ function Item_BonusText(_item) {
     return txt;
 }
 
-function Item_Sentence(_item) {
+// _ch (optional): the viewer. A heal or MP potion then says what it will really give that character (level scaling, Potion Lore); without one, the base number.
+function Item_Sentence(_item, _ch = undefined) {
     if (!is_struct(_item) || !variable_struct_exists(_item, "id") || _item.id == 0) return "";
     if (Item_IsThrowable(_item)) {
         var u = _item.use;
@@ -848,8 +854,8 @@ function Item_Sentence(_item) {
     if (_item.type == ITEM_CONSUMABLE && variable_struct_exists(_item, "use")) {
         var us = _item.use;
         switch (us.effect) {
-            case "heal": return Loc_T("item.sent.heal", "Restores {n} HP.", { n: string(Item_BaseAmount(us)) });   // D126: one number
-            case "mp": return Loc_T("item.sent.mp", "Restores {n} MP.", { n: string(Item_BaseAmount(us)) });
+            case "heal": return Loc_T("item.sent.heal", "Restores {n} HP.", { n: string(Item_ShownAmount(_ch, us)) });   // D126: one number
+            case "mp": return Loc_T("item.sent.mp", "Restores {n} MP.", { n: string(Item_ShownAmount(_ch, us)) });
             case "cure": return Loc_T("item.sent.cure", "Cures {status}.", { status: StatusDB_Get(us.status).name });
         }
     }
@@ -894,8 +900,8 @@ function Item_NumberLines(_item, _ch) {
     }
     if (_item.type == ITEM_CONSUMABLE && variable_struct_exists(_item, "use")) {
         var us = _item.use;
-        if (us.effect == "heal") array_push(lines, { label: Loc_T("shop.lbl.hp", "HP"), value: string(Item_BaseAmount(us)) });   // D126: the exact average
-        else if (us.effect == "mp") array_push(lines, { label: Loc_T("shop.lbl.mp", "MP"), value: string(Item_BaseAmount(us)) });
+        if (us.effect == "heal") array_push(lines, { label: Loc_T("shop.lbl.hp", "HP"), value: string(Item_ShownAmount(_ch, us)) });   // D126: the exact number the viewer gets
+        else if (us.effect == "mp") array_push(lines, { label: Loc_T("shop.lbl.mp", "MP"), value: string(Item_ShownAmount(_ch, us)) });
         else if (us.effect == "cure") array_push(lines, { label: Loc_T("shop.lbl.cures", "Cures"), value: StatusDB_Get(us.status).name });
         return lines;
     }
