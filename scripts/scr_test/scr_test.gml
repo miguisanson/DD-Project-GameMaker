@@ -156,6 +156,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Bvis", Test_Suite_R3Bvis);
     Test_RunSuite("Profiles", Test_Suite_Profiles);
     Test_RunSuite("TextFit2", Test_Suite_TextFit2);
+    Test_RunSuite("R3FixDet", Test_Suite_R3FixDet);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -15670,5 +15671,162 @@ function Test_TextFit2Menu() {
     var _mc2 = Ui_MenuMeasure(_m2, _mt);
     Test_Eq("textfit2 menu: short names make no extra height", _mc2.extra_h, 0);
     Test_Eq("textfit2 menu: and every row is a normal row", _mc2.rhs[0] + _mc2.rhs[1], 2 * _mt.row_h);
+    TextFit_End(_s);
+}
+
+// ============================================================================================================================
+// Round 3 playtest, packet fixdet (R-108): in the battle's Skill and Item lists the details panel, the list and the "Choose" hint never stand on the enemy or the player panel,
+// whatever the row heights (wrapped names are taller), size and language. When space is short the details panel drops its least important lines first (it keeps the sentence
+// and the Damage / Perfect / MP lines), then the list shows fewer rows. The Damage / Perfect line pair never leaves a value alone on a row. Picture: shot 1050..1059's battle_skills.
+// ============================================================================================================================
+function Test_Suite_R3FixDet() {
+    Test_RunSuite("R3FixDet.lists", Test_R3FixDetLists);
+    Test_RunSuite("R3FixDet.pairs", Test_R3FixDetPairs);
+}
+
+// The lines a battle details panel must always keep (by label): Damage, Perfect and MP for a skill; the first line for anything else (an item).
+function Test_R3FixDetKeeps(_lines, _is_skill) {
+    var _out = [];
+    for (var _i = 0; _i < array_length(_lines); _i++) {
+        var _lb = _lines[_i].label;
+        var _keep = _is_skill ? (_lb == Loc_T("battle.det.damage", "Damage") || _lb == Loc_T("battle.det.perfect", "Perfect") || _lb == Loc_T("card.lbl.mp", "MP")) : (_i == 0);
+        if (_keep) array_push(_out, _lb);
+    }
+    return _out;
+}
+
+function Test_R3FixDetLabels(_lines) {
+    var _out = [];
+    for (var _i = 0; _i < array_length(_lines); _i++) array_push(_out, _lines[_i].label);
+    return _out;
+}
+
+function Test_R3FixDetLists() {
+    var _s = TextFit_Begin();
+    var _gs = GameState_Get();
+    var _old = _gs.player_ch;
+    var _langs = ["en", "ko"];
+    var _sizes = TextFit_Sizes();
+    var _f = { enemy: "", player: "", screen: "", hint: "", keep: "", order: "", rows: "", setup: "" };
+    var _n = 0;
+    for (var _l = 0; _l < 2; _l++) {
+        for (var _z = 0; _z < array_length(_sizes); _z++) {
+            TextFit_Set(_sizes[_z][0], _sizes[_z][1], _langs[_l]);
+            var _mt = Ui_Metrics();
+            var _gh = Display_GuiH();
+            var _gw = Display_GuiW();
+            var _ch = TextFit_Char();
+            _ch.upgrades = [];
+            for (var _u = 0; _u < array_length(_ch.skills); _u++) array_push(_ch.upgrades, _ch.skills[_u]);
+            _gs.player_ch = _ch;
+            var _bc = Test_R3Make(ENEMY_FINAL_BOSS, "", 0, false, false);
+            _bc.p = _ch;
+            _bc.run_fails = 0;
+            _bc.ui_cmd = undefined;
+            Battle_MenusBuild(_bc);
+            Battle_MenusLayout(_bc);
+            var _er = Battle_EnemyRect(_bc);
+            var _zn = Battle_Zones();
+            var _menus = [_bc.ui_skill, _bc.ui_item];
+            for (var _k = 0; _k < 2; _k++) {
+                var _m = _menus[_k];
+                var _state = (_k == 0) ? BSTATE_SKILL_MENU : BSTATE_ITEM_MENU;
+                for (var _i = 0; _i < array_length(_m.items); _i++) {
+                    _m.cursor = _i;
+                    var _it = _m.items[_i];
+                    var _mc = Ui_MenuMeasure(_m, _mt);
+                    var _g = Ui_MenuGeom(_m, _mt, _mc, 1);
+                    var _hr = Battle_ListHintRect(_g.det_rect, _state);
+                    var _tag = _langs[_l] + " " + string(_sizes[_z][0]) + " " + ((_k == 0) ? "skill " : "item ") + string(_it.label) + "; ";
+                    _n++;
+                    var _rects = [["list", _g.rect], ["details", _g.det_rect], ["hint", _hr]];
+                    for (var _q = 0; _q < 3; _q++) {
+                        var _r = _rects[_q][1];
+                        if (_r.w <= 0) continue;
+                        if (Test_RectsOverlap(_r, _er)) _f.enemy += _tag + _rects[_q][0] + json_stringify(_r) + " enemy" + json_stringify(_er) + "; ";
+                        if (Test_RectsOverlap(_r, _zn.player)) _f.player += _tag + _rects[_q][0] + "; ";
+                        if (_r.x < 0 || _r.y < 0 || _r.x + _r.w > _gw || _r.y + _r.h > _gh) _f.screen += _tag + _rects[_q][0] + json_stringify(_r) + "; ";
+                    }
+                    if (_g.det_rect.w > 0 && _hr.w <= 0) _f.hint += _tag + "no hint; ";
+                    // what the panel kept: the sentence, and the lines in priority order
+                    var _full = Test_R3FixDetLabels(_it.lines);
+                    var _shown = Test_R3FixDetLabels(_g.lines_shown);
+                    var _keeps = Test_R3FixDetKeeps(_it.lines, _k == 0);
+                    var _missing = false;
+                    for (var _w = 0; _w < array_length(_keeps); _w++) if (!Card_ArrayHas(_shown, _keeps[_w])) _missing = true;
+                    if (_g.det_rect.w <= 0 || _missing) _f.keep += _tag + "shown=" + json_stringify(_shown) + " keep=" + json_stringify(_keeps) + "; ";
+                    var _dropped = (array_length(_shown) < array_length(_full));
+                    if (_dropped && json_stringify(_shown) != json_stringify(_keeps)) _f.order += _tag + "shown=" + json_stringify(_shown) + " keep=" + json_stringify(_keeps) + "; ";
+                    var _normal_rows = min(3, array_length(_m.items));
+                    var _reduced = (_g.rows_vis < _normal_rows);
+                    if (_reduced && (json_stringify(_shown) != json_stringify(_keeps) || (variable_struct_exists(_it, "seq") && array_length(_it.seq) > 0 && !_g.seq_drop))) _f.rows += _tag + "rows=" + string(_g.rows_vis) + " shown=" + json_stringify(_shown) + "; ";
+                    if (_g.gap < _mt.margin && _g.rows_vis != 1) _f.rows += _tag + "gap shrunk with " + string(_g.rows_vis) + " rows; ";
+                }
+                if (array_length(_m.items) < 3) _f.setup += _langs[_l] + " " + string(_sizes[_z][0]) + " list " + string(_k) + " has " + string(array_length(_m.items)) + " rows; ";
+            }
+            instance_destroy(_bc.enemy_inst);
+        }
+    }
+    _gs.player_ch = _old;
+    Test_True("r3fixdet lists: (setup) every row of both lists was looked at (" + string(_n) + ")", _n >= 100);
+    Test_Eq("r3fixdet lists: (setup) both lists have enough rows to scroll", _f.setup, "");
+    Test_Eq("r3fixdet lists: neither the list nor its details panel nor the hint stands on the enemy (480, 640, 800; en, ko)", _f.enemy, "");
+    Test_Eq("r3fixdet lists: nor on the player panel", _f.player, "");
+    Test_Eq("r3fixdet lists: all of them are on screen", _f.screen, "");
+    Test_Eq("r3fixdet lists: the hint stays with the details panel", _f.hint, "");
+    Test_Eq("r3fixdet lists: the details panel always keeps its sentence and its Damage / Perfect / MP lines", _f.keep, "");
+    Test_Eq("r3fixdet lists: when lines are dropped only the least important are left out (all of them go before one that matters)", _f.order, "");
+    Test_Eq("r3fixdet lists: the list shows fewer rows only after the details dropped what they could", _f.rows, "");
+    TextFit_End(_s);
+}
+
+// The Damage / Perfect pair: two label-value pairs on one row when both fit, else one under the other; a value is never alone on a row of its own.
+function Test_R3FixDetPairs() {
+    var _s = TextFit_Begin();
+    TextFit_Set(640, 576, "en");
+    var _mt = Ui_Metrics();
+    var _p = _mt.p;
+    var _lines = [{ label: "Damage", value: "17" }, { label: "Perfect", value: "22" }];
+    var _nd = Ui_DetailsLineNeed("Damage", "17", _p);
+    var _np = Ui_DetailsLineNeed("Perfect", "22", _p);
+    Test_True("r3fixdet pairs: (setup) Perfect 22 needs more than Damage 17", _np > _nd);
+    var _wide = Ui_DetailsPlan(_lines, 2 * _np + 3 * _p, 2, _mt);
+    Test_Eq("r3fixdet pairs: both fit a row: one row of two", array_length(_wide.rows), 1);
+    Test_Eq("r3fixdet pairs: with two cells", array_length(_wide.rows[0].cells), 2);
+    Test_Eq("r3fixdet pairs: and it is one text row tall", _wide.h, _mt.line_h + _p);
+    var _in = 2 * _nd + 3 * _p;   // the columns fit Damage 17 but not Perfect 22
+    var _tight = Ui_DetailsPlan(_lines, _in, 2, _mt);
+    Test_Eq("r3fixdet pairs: Perfect does not fit its column: the pair goes on two rows", array_length(_tight.rows), 2);
+    Test_True("r3fixdet pairs: Damage 17 is one row, Perfect 22 the next", array_length(_tight.rows) == 2 && _tight.rows[0].cells[0].i == 0 && _tight.rows[1].cells[0].i == 1);
+    if (array_length(_tight.rows) == 2) {
+        Test_Eq("r3fixdet pairs: each is the whole width", _tight.rows[0].cells[0].w, _in);
+        Test_Eq("r3fixdet pairs: each is one text row tall (the value is not alone under its label)", _tight.rows[1].h, _mt.line_h + _p);
+    }
+    Test_Eq("r3fixdet pairs: so the pair is two text rows tall", _tight.h, 2 * (_mt.line_h + _p));
+    Test_Eq("r3fixdet pairs: the height helper reads the plan", Ui_DetailsLinesH(_lines, _in, 2, _mt), _tight.h);
+    // two lines that fit never move: Power / MP beside each other
+    var _pm = Ui_DetailsPlan([{ label: "Power", value: "7" }, { label: "MP", value: "5" }], 400, 2, _mt);
+    Test_Eq("r3fixdet pairs: Power and MP stay on one row", array_length(_pm.rows), 1);
+    // the real battle pair at every size and language: no value stacked under its label, no label wrapped
+    var _bad = "";
+    var _langs = ["en", "ko"];
+    var _sizes = TextFit_Sizes();
+    for (var _l = 0; _l < 2; _l++) {
+        for (var _z = 0; _z < array_length(_sizes); _z++) {
+            TextFit_Set(_sizes[_z][0], _sizes[_z][1], _langs[_l]);
+            var _mt2 = Ui_Metrics();
+            var _zn = Battle_Zones();
+            var _pair = [{ label: Loc_T("battle.det.damage", "Damage"), value: "999" }, { label: Loc_T("battle.det.perfect", "Perfect"), value: "999" }];
+            var _pl = Ui_DetailsPlan(_pair, _zn.right.w - 8 * _mt2.p, 2, _mt2);
+            for (var _r = 0; _r < array_length(_pl.rows); _r++) {
+                for (var _c = 0; _c < array_length(_pl.rows[_r].cells); _c++) {
+                    var _cell = _pl.rows[_r].cells[_c];
+                    var _ln = _pair[_cell.i];
+                    if (Ui_DetailsLineStacked(_ln.label, _ln.value, _cell.w, _mt2.p) || UI_TextWidth(_ln.label) > _cell.w) _bad += _langs[_l] + " " + string(_sizes[_z][0]) + " " + _ln.label + "; ";
+                }
+            }
+        }
+    }
+    Test_Eq("r3fixdet pairs: at 480, 640, 800 in en and ko the Damage and Perfect lines each fit their cell", _bad, "");
     TextFit_End(_s);
 }

@@ -4820,26 +4820,25 @@ function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1, _cols = 1
         ty0 += p;
         Ui_Box(x0, ty0, x1, ty0 + p, UI_C_DARK);
         ty0 += p;
-        var cols = max(1, _cols);
-        var col_w = (x1 - x0 - (cols - 1) * 3 * p) / cols;
-        var row_h = 0;   // H13b (D156): a number line that does not fit one row puts its value on the row below; a label wider than the column wraps
-        for (var i = 0; i < array_length(_lines); i++) {
-            var cx0 = x0 + (i mod cols) * (col_w + 3 * p);
-            var vtxt = string(_lines[i].value);
-            var has_delta = variable_struct_exists(_lines[i], "delta") && _lines[i].delta != 0;
-            var lh_i = Ui_DetailsLineH(_lines[i].label, vtxt, col_w, p, has_delta, mt);
-            row_h = max(row_h, lh_i);
-            var vy = ty0 + lh_i - (mt.line_h + p);   // the value is on the line's last row
-            if (UI_TextWidth(_lines[i].label) > col_w) Ui_TextBlock(cx0, ty0, _lines[i].label, col_w, UI_C_LIGHT);
-            else Ui_Text(cx0, ty0, _lines[i].label, UI_C_LIGHT);
-            Ui_Text(cx0 + col_w, vy, _lines[i].value, UI_C_LIGHTEST, fa_right);
-            if (has_delta) {
-                Ui_DeltaMark(cx0 + col_w - UI_TextWidth(_lines[i].value) - 7 * p, vy + (mt.line_h - 3 * p) div 2, _lines[i].delta, p, (_lines[i].delta > 0) ? UI_C_LIGHTEST : UI_C_LIGHT);
+        var plan = Ui_DetailsPlan(_lines, x1 - x0, _cols, mt);   // H13b (D156): a number line that does not fit one row puts its value on the row below; a label wider than the column wraps
+        for (var r = 0; r < array_length(plan.rows); r++) {
+            var prow = plan.rows[r];
+            for (var c = 0; c < array_length(prow.cells); c++) {
+                var cell = prow.cells[c];
+                var i = cell.i;
+                var cx0 = x0 + cell.x;
+                var vtxt = string(_lines[i].value);
+                var has_delta = variable_struct_exists(_lines[i], "delta") && _lines[i].delta != 0;
+                var lh_i = Ui_DetailsLineH(_lines[i].label, vtxt, cell.w, p, has_delta, mt);
+                var vy = ty0 + lh_i - (mt.line_h + p);   // the value is on the line's last row
+                if (UI_TextWidth(_lines[i].label) > cell.w) Ui_TextBlock(cx0, ty0, _lines[i].label, cell.w, UI_C_LIGHT);
+                else Ui_Text(cx0, ty0, _lines[i].label, UI_C_LIGHT);
+                Ui_Text(cx0 + cell.w, vy, _lines[i].value, UI_C_LIGHTEST, fa_right);
+                if (has_delta) {
+                    Ui_DeltaMark(cx0 + cell.w - UI_TextWidth(_lines[i].value) - 7 * p, vy + (mt.line_h - 3 * p) div 2, _lines[i].delta, p, (_lines[i].delta > 0) ? UI_C_LIGHTEST : UI_C_LIGHT);
+                }
             }
-            if ((i mod cols) == cols - 1 || i == array_length(_lines) - 1) {
-                ty0 += row_h;
-                row_h = 0;
-            }
+            ty0 += prow.h;
         }
     }
     draw_set_alpha(a0);
@@ -5032,21 +5031,31 @@ function Ui_DetailsLineH(_label, _value, _col_w, _p, _delta, _mt) {
     return (Ui_DetailsLineStacked(_label, _value, _col_w, _p, _delta) ? 2 : 1) * (_mt.line_h + _p);
 }
 
-// The number lines' height in a details panel whose inner width is _inner, _cols to a row.
-function Ui_DetailsLinesH(_lines, _inner, _cols, _mt) {
+// How the number lines of a details panel are laid out, _inner wide, _cols to a row: { rows: [{ h, cells: [{ i (the line), x (from the inner left edge), w (the cell's width) }] }], h }.
+function Ui_DetailsPlan(_lines, _inner, _cols, _mt) {
     var p = _mt.p;
     var cols = max(1, _cols);
     var col_w = (_inner - (cols - 1) * 3 * p) / cols;
     var n = array_length(_lines);
+    var rows = [];
     var h = 0;
     for (var i = 0; i < n; i += cols) {
         var rh = 0;
+        var cells = [];
         for (var c = 0; c < cols && i + c < n; c++) {
-            rh = max(rh, Ui_DetailsLineH(_lines[i + c].label, _lines[i + c].value, col_w, p, variable_struct_exists(_lines[i + c], "delta") && _lines[i + c].delta != 0, _mt));
+            var dl = _lines[i + c];
+            rh = max(rh, Ui_DetailsLineH(dl.label, dl.value, col_w, p, variable_struct_exists(dl, "delta") && dl.delta != 0, _mt));
+            array_push(cells, { i: i + c, x: c * (col_w + 3 * p), w: col_w });
         }
+        array_push(rows, { h: rh, cells: cells });
         h += rh;
     }
-    return h;
+    return { rows: rows, h: h };
+}
+
+// The number lines' height in a details panel whose inner width is _inner, _cols to a row.
+function Ui_DetailsLinesH(_lines, _inner, _cols, _mt) {
+    return Ui_DetailsPlan(_lines, _inner, _cols, _mt).h;
 }
 
 // Level 1: the widths of the rows (uncached).
@@ -5168,23 +5177,14 @@ function Ui_MenuMeasure(_m, _mt) {
     return mc;
 }
 
-// Draws one menu: frame, optional title, rows (label left, value / slider right), the gliding highlight with a bobbing marker, and
-// the details panel of the highlighted item when layout.details is set. _alpha 0..1 fades and slides the panel (D97).
-// Stores each row's rectangle in m.rects for the mouse. Needs UI_SetFont-compatible state; sets and restores the draw state.
-function Ui_MenuDraw(_m, _alpha = 1) {
-    if (_alpha <= 0) return;
-    if (TabNote_IsReader(_m)) { TabNote_ReaderDraw(_m, _alpha); return; }   // D147: the note reader is a text panel, not a list
-    var mt = Ui_Metrics();
+// The geometry of a menu for one draw: the list panel, the details panel, the rows' window, from the measured struct _mm (Ui_MenuMeasure) and the menu's layout. Pure: it draws and
+// stores nothing (Ui_MenuDraw draws from it; the fit checks read it without a draw). _alpha slides the panel in (D97).
+function Ui_MenuGeom(_m, _mt, _mm, _alpha = 1) {
+    var mt = _mt;
     var p = mt.p;
     var L = _m.layout;
     var n = array_length(_m.items);
-    var now = current_time;
-    var a0 = draw_get_alpha();
-    var c0 = draw_get_color();
-    var bar_w = 14 * p;
-
-    // widths and the details panel's height: measured once per change (Ui_MenuMeasure), not every frame
-    var mm = Ui_MenuMeasure(_m, mt);
+    var mm = _mm;
     var icon_px = mm.icon_px;     // the icon column (battle lists): one icon pixel is k GUI units, k = whole units that fit a row
     var panel_w = mm.panel_w;
     var title_fit = (L.title != "") ? Ui_TitleFit(L.title, panel_w - 8 * p, mt) : undefined;   // R-106: a title wider than the panel wraps (a long skill name in "Learn X: Replace Which?")
@@ -5242,12 +5242,55 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var det_above = (det_h > 0 && L.details_pos == "above");
     var list_y = det_above ? (py + det_h + gap) : py;     // the list panel's top; the details panel is above or below it
     var det_y = det_above ? py : (py + panel_h + gap);
-    _m.rect = { x: px, y: list_y, w: panel_w, h: panel_h };
-    _m.det_rect = (det_h > 0) ? { x: px, y: det_y, w: panel_w, h: det_h } : { x: 0, y: 0, w: 0, h: 0 };
+    var cur_it = (n > 0) ? _m.items[clamp(_m.cursor, 0, n - 1)] : undefined;
+    var lines_shown = (is_struct(cur_it) && variable_struct_exists(cur_it, "lines")) ? cur_it.lines : [];   // the number lines the details panel draws
+    var rect = { x: px, y: list_y, w: panel_w, h: panel_h };
+    var det_rect = (det_h > 0) ? { x: px, y: det_y, w: panel_w, h: det_h } : { x: 0, y: 0, w: 0, h: 0 };
     if (det_right) {
         var dx = px + panel_w + mt.margin;
-        _m.det_rect = { x: dx, y: ((L.det_top >= 0) ? L.det_top - slide : list_y), w: (L.det_w > 0) ? L.det_w : max(0, mt.gw - mt.margin - dx), h: (L.det_h >= 0) ? L.det_h : panel_h };
+        det_rect = { x: dx, y: ((L.det_top >= 0) ? L.det_top - slide : list_y), w: (L.det_w > 0) ? L.det_w : max(0, mt.gw - mt.margin - dx), h: (L.det_h >= 0) ? L.det_h : panel_h };
     }
+    return { rect: rect, det_rect: det_rect, icon_px: icon_px, panel_w: panel_w, title_fit: title_fit, header_h: header_h, note_h: note_h, chrome_y: chrome_y, rhs: rhs, extra: extra, all_h: all_h, det_h: det_h, seq_drop: seq_drop,
+             gap: gap, det_right: det_right, list_room: list_room, panel_h: panel_h, total_h: total_h, px: px, py: py, slide: slide, det_above: det_above, list_y: list_y, det_y: det_y, one_row: one_row, rows_lim: rows_lim, rows_vis: rows_vis, lines_shown: lines_shown };
+}
+
+// Draws one menu: frame, optional title, rows (label left, value / slider right), the gliding highlight with a bobbing marker, and
+// the details panel of the highlighted item when layout.details is set. _alpha 0..1 fades and slides the panel (D97).
+// Stores each row's rectangle in m.rects for the mouse. Needs UI_SetFont-compatible state; sets and restores the draw state.
+function Ui_MenuDraw(_m, _alpha = 1) {
+    if (_alpha <= 0) return;
+    if (TabNote_IsReader(_m)) { TabNote_ReaderDraw(_m, _alpha); return; }   // D147: the note reader is a text panel, not a list
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var L = _m.layout;
+    var n = array_length(_m.items);
+    var now = current_time;
+    var a0 = draw_get_alpha();
+    var c0 = draw_get_color();
+    var bar_w = 14 * p;
+
+    // widths and the details panel's height: measured once per change (Ui_MenuMeasure), not every frame
+    var mm = Ui_MenuMeasure(_m, mt);
+    var g = Ui_MenuGeom(_m, mt, mm, _alpha);
+    var icon_px = g.icon_px;      // the icon column (battle lists): one icon pixel is k GUI units, k = whole units that fit a row
+    var panel_w = g.panel_w;
+    var title_fit = g.title_fit;
+    var header_h = g.header_h;
+    var note_h = g.note_h;
+    var rhs = g.rhs;              // R-106: each row's height (a label that wraps makes a taller row) and how its label is laid out
+    var extra = g.extra;          // the most any row is taller than a normal one (0: every row is a normal row)
+    var det_h = g.det_h;          // the highlighted item's own when the panel is above (the tallest sentence otherwise)
+    var seq_drop = g.seq_drop;    // G10: the arrow strip is left out of the details when nothing else makes room
+    var det_right = g.det_right;
+    var list_room = g.list_room;
+    var panel_h = g.panel_h;
+    var px = g.px;
+    var slide = g.slide;
+    var det_above = g.det_above;
+    var list_y = g.list_y;
+    var det_y = g.det_y;
+    _m.rect = g.rect;
+    _m.det_rect = g.det_rect;
 
     _m.top = Ui_ScrollTopH(_m.cursor, _m.top, rhs, list_room);
     var vis_end = (n > 0) ? Ui_RowsEnd(rhs, _m.top, list_room) : -1;

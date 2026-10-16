@@ -3144,15 +3144,24 @@ function Battle_HintLabels(_state) {
     return [];
 }
 
-// The prompt line of a list (C4's glyphs: the keyboard key or the pad button of the device in use), right-aligned just above the details panel.
-function Battle_DrawListHint(_m, _state) {
-    if (_m.det_rect.w <= 0) return;
+// Where a list's prompt line stands: right-aligned just above the details panel _det (a rect { x, y, w, h }); { x, y, w, h, txt } or a zero rect when the state has no hint
+// or the panel is not up. Pure (the draw and the checks read it).
+function Battle_ListHintRect(_det, _state) {
+    var none = { x: 0, y: 0, w: 0, h: 0, txt: "" };
+    if (_det.w <= 0) return none;
     var hints = Battle_HintLabels(_state);
-    if (array_length(hints) == 0) return;
+    if (array_length(hints) == 0) return none;
     var mt = Ui_Metrics();
     var txt = hints[0].text;
-    var lay = Prompt_RichLayout(txt, _m.det_rect.w);
-    Prompt_RichDraw(_m.det_rect.x + _m.det_rect.w - lay.line_w[0] - mt.p, _m.det_rect.y - lay.h - mt.p, txt, _m.det_rect.w, UI_C_LIGHT, fa_left, Ui_MenuAlpha(_m, current_time));
+    var lay = Prompt_RichLayout(txt, _det.w);
+    return { x: _det.x + _det.w - lay.line_w[0] - mt.p, y: _det.y - lay.h - mt.p, w: lay.line_w[0], h: lay.h, txt: txt };
+}
+
+// The prompt line of a list (C4's glyphs: the keyboard key or the pad button of the device in use), right-aligned just above the details panel.
+function Battle_DrawListHint(_m, _state) {
+    var hr = Battle_ListHintRect(_m.det_rect, _state);
+    if (hr.w <= 0) return;
+    Prompt_RichDraw(hr.x, hr.y, hr.txt, _m.det_rect.w, UI_C_LIGHT, fa_left, Ui_MenuAlpha(_m, current_time));
 }
 
 function Battle_DrawMenus(_bc) {
