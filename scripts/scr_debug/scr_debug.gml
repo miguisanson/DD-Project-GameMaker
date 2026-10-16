@@ -543,7 +543,10 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeHunt6Ui(_s);   // hunt6ui: Esc / Tab mid-step, Y closes the menu, a pad leaves "Press a key...", a quick double press and "Keep this?"; goes on to hunt7map (980)
             break;
         case 980: case 981: case 982: case 983: case 984: case 985: case 986: case 987: case 988: case 989:
-            Scenario_StepSmokeHunt7Map(_s);   // hunt7map: the Stranger in the arrival clean-up and in the run save, the post-Run grace holds in a menu; the end of the chain (its last step calls Scenario_NoticeEnd)
+            Scenario_StepSmokeHunt7Map(_s);   // hunt7map: the Stranger in the arrival clean-up and in the run save, the post-Run grace holds in a menu; goes on with the round 3 menus (1040)
+            break;
+        case 1040: case 1041: case 1042: case 1043: case 1044: case 1045: case 1046: case 1047: case 1048: case 1049:
+            Scenario_StepSmokeR3Menus(_s);   // round 3 menus (R-096, R-097): Controls > Reset to Defaults asks, No and Esc change nothing, Yes resets and a notice says so, the changed row flashes; the end of the chain
             break;
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step goes on to G6 (380)
@@ -3036,7 +3039,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsChoices(_s);   // H12a (D154): the merchant's question with its two replies open above the box, English and Korean, two sizes; goes on with H13a (800)
             break;
         case 800: case 801: case 802: case 803: case 804: case 805: case 806: case 807: case 808: case 809:
-            Scenario_StepShotsEliteDeath(_s);   // H13a (D156): an elite slime and an elite plant on the map, the death scene with its picture, 480 x 432 and 800 x 720; the end of the pictures
+            Scenario_StepShotsEliteDeath(_s);   // H13a (D156): an elite slime and an elite plant on the map, the death scene with its picture, 480 x 432 and 800 x 720; goes on with the round 3 menus (1030)
+            break;
+        case 1030: case 1031: case 1032: case 1033: case 1034: case 1035: case 1036: case 1037: case 1038: case 1039:
+            Scenario_StepShotsR3Menus(_s);   // round 3 menus (R-096, R-097): the Gear and Skills headers, the reset question and notice in the game and on the title; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -13848,8 +13854,358 @@ function Scenario_StepSmokeHunt7Map(_s) {
                 Scenario_Next(_s, 987);
             }
             break;
-        case 987:   // the end of the chain: removes the files and the profile the steps made
+        case 987:   // goes on with the round 3 menus (1040..1045), the end of the chain
+            Scenario_Next(_s, 1040);
+            break;
+    }
+}
+
+// ============================================================================
+// Round 3 menus (R3 notes 9, 21, 25; D171; R-096, R-097), smoke steps 1040..1049: the Controls page's "Reset to Defaults" through real keys. One key is rebound, Reset asks (the cursor
+// on No), No and Esc change nothing, Yes puts the defaults back and a notice says so, the changed row flashes once the notice is gone; a second Reset says the keys were already the
+// defaults. They go on from the step before (hunt7map, 980..987) and the last one calls Scenario_NoticeEnd.
+// ============================================================================
+function Scenario_R3RowIndex(_menu, _id) {
+    for (var _i = 0; _i < array_length(_menu.items); _i++) if (_menu.items[_i].id == _id) return _i;
+    return -1;
+}
+
+function Scenario_R3Abort(_s, _what, _detail) {
+    Scenario_Check(_what, false, _detail);
+    Confirm_Close();
+    Notice_Interrupt();
+    Menu_Close(true);
+    Scenario_ClearUi();
+    Settings_SetKeys(Binds_Defaults());
+    Scenario_NoticeEnd();
+}
+
+function Scenario_StepSmokeR3Menus(_s) {
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "r3m")) _s.r3m = {};
+    var _h = _s.r3m;
+    SettingsPopup_Ensure();
+    var _sp = _gs.ui.settings_popup;
+    var _ask = "Reset every key to its default?";
+    var _run_f = string([ord("F")]);
+    switch (_s.step) {
+        case 1040:   // Settings > Controls with the keyboard: the Run row waits for a key and takes F (the key press itself is the page's own entry point)
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Dialogue_CloseNow();
+                global.input.last_device = "keyboard";
+                Settings_SetKeys(Binds_Defaults());
+                Menu_Open(5);
+            }
+            if (!variable_struct_exists(_h, "c0") && SettingsPopup_IsOpen("tab") && _s.t > 10 && current_time - _sp.menu.lock_ms >= UI_INPUT_LOCK_MS + 80) {
+                _h.c0 = true;
+                Ui_MenuFixCursor(_sp.menu, max(0, Scenario_R3RowIndex(_sp.menu, "controls")));
+                Scenario_Tap("confirm");
+                _h.c0_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "c0") && !variable_struct_exists(_h, "c1") && is_struct(_sp.controls) && _s.t > _h.c0_t + 10) {
+                _h.c1 = true;
+                Ui_MenuFixCursor(_sp.controls.menu, max(0, Scenario_R3RowIndex(_sp.controls.menu, "run")));
+                Scenario_Tap("confirm");
+                _h.c1_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "c1") && !variable_struct_exists(_h, "c2") && is_struct(_sp.controls) && _sp.controls.capture == "run" && _s.t > _h.c1_t + 10 && !InputLock_Active(_sp.controls.lock)) {
+                _h.c2 = true;
+                ControlsPage_OnKey(_sp, ord("F"));
+                _h.c2_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "c2") && _s.t > _h.c2_t + 6) {
+                Scenario_Check("r3menus_run_was_rebound_to_f", string(GameSettings_Ensure().keys.run) == _run_f, string(GameSettings_Ensure().keys.run));
+                Scenario_Next(_s, 1041);
+            }
+            if (_s.t > 400) Scenario_R3Abort(_s, "r3menus_the_controls_page_opens_and_takes_a_key", "c0=" + string(variable_struct_exists(_h, "c0")) + " c1=" + string(variable_struct_exists(_h, "c1")) + " c2=" + string(variable_struct_exists(_h, "c2")));
+            break;
+        case 1041:   // Reset to Defaults asks first, the cursor on No: No keeps the key, so does Esc
+            if (_s.t == 10) {
+                Ui_MenuFixCursor(_sp.controls.menu, max(0, Scenario_R3RowIndex(_sp.controls.menu, "reset")));
+                Scenario_Tap("confirm");
+                _h.r0_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "r0_t") && !variable_struct_exists(_h, "r1") && Confirm_IsOpen() && _s.t > _h.r0_t + 6 && current_time - Confirm_Menu().lock_ms >= UI_INPUT_LOCK_MS + 80) {
+                _h.r1 = true;
+                Scenario_Check("r3menus_reset_asks_first", Confirm_Question() == _ask, Confirm_Question());
+                Scenario_Check("r3menus_the_question_starts_on_no", Confirm_Menu().cursor == 1);
+                Scenario_Check("r3menus_asking_changed_no_key", string(GameSettings_Ensure().keys.run) == _run_f);
+                Scenario_Check("r3menus_asking_pops_no_notice_yet", !Notice_IsOpen());
+                Scenario_Tap("confirm");   // No
+                _h.r1_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "r1") && !variable_struct_exists(_h, "r2") && _s.t > _h.r1_t + 8) {
+                _h.r2 = true;
+                Scenario_Check("r3menus_no_closes_the_question", !Confirm_IsOpen());
+                Scenario_Check("r3menus_no_keeps_the_custom_key", string(GameSettings_Ensure().keys.run) == _run_f);
+                Scenario_Check("r3menus_no_pops_no_notice", !Notice_IsOpen());
+                Scenario_Check("r3menus_no_stays_on_the_controls_page", is_struct(_sp.controls) && _gs.ui.mode == UI_MENU);
+                Scenario_Tap("confirm");   // the cursor is still on Reset: ask again
+                _h.r2_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "r2") && !variable_struct_exists(_h, "r3") && Confirm_IsOpen() && _s.t > _h.r2_t + 6 && current_time - Confirm_Menu().lock_ms >= UI_INPUT_LOCK_MS + 80) {
+                _h.r3 = true;
+                Scenario_Tap("esc");   // Back is No
+                _h.r3_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "r3") && _s.t > _h.r3_t + 8) {
+                Scenario_Check("r3menus_esc_closes_the_question", !Confirm_IsOpen());
+                Scenario_Check("r3menus_esc_keeps_the_custom_key", string(GameSettings_Ensure().keys.run) == _run_f);
+                Scenario_Check("r3menus_esc_pops_no_notice", !Notice_IsOpen());
+                Scenario_Next(_s, 1042);
+            }
+            if (_s.t > 400) Scenario_R3Abort(_s, "r3menus_reset_asks_and_no_changes_nothing", "r0=" + string(variable_struct_exists(_h, "r0_t")) + " r1=" + string(variable_struct_exists(_h, "r1")) + " r2=" + string(variable_struct_exists(_h, "r2")) + " r3=" + string(variable_struct_exists(_h, "r3")) + " open=" + string(Confirm_IsOpen()));
+            break;
+        case 1042:   // Reset, Yes: the defaults are back and a notice says so, over the open menu
+            if (_s.t == 6) {
+                Scenario_Tap("confirm");
+                _h.y0_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "y0_t") && !variable_struct_exists(_h, "y1") && Confirm_IsOpen() && _s.t > _h.y0_t + 6 && current_time - Confirm_Menu().lock_ms >= UI_INPUT_LOCK_MS + 80) {
+                _h.y1 = true;
+                Scenario_Tap("menu_up");   // No -> Yes
+                _h.y1_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "y1") && !variable_struct_exists(_h, "y2") && _s.t > _h.y1_t + 8) {
+                _h.y2 = true;
+                Scenario_Check("r3menus_the_cursor_moved_to_yes", Confirm_IsOpen() && Confirm_Menu().cursor == 0);
+                Scenario_Tap("confirm");   // Yes
+                _h.y2_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "y2") && !variable_struct_exists(_h, "y3") && _s.t > _h.y2_t + 8) {
+                _h.y3 = true;
+                Scenario_Check("r3menus_yes_puts_the_default_run_key_back", string(GameSettings_Ensure().keys.run) == string(Binds_Defaults().run), string(GameSettings_Ensure().keys.run));
+                Scenario_Check("r3menus_yes_closes_the_question", !Confirm_IsOpen());
+                Scenario_Check("r3menus_yes_opens_the_notice", Notice_IsOpen() && Notice_Text() == "Keys are back to the defaults.", Notice_Text());
+                Scenario_Check("r3menus_the_menu_stays_open_under_the_notice", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && is_struct(_sp.controls));
+                Scenario_Check("r3menus_the_changed_row_is_marked_to_flash", is_struct(_sp.controls) && string(_sp.controls.flash_rows) == string(["run"]), is_struct(_sp.controls) ? string(_sp.controls.flash_rows) : "no page");
+                Scenario_Check("r3menus_the_flash_waits_for_the_notice", is_struct(_sp.controls) && _sp.controls.flash_at < 0);
+                Scenario_Check("r3menus_the_bindings_in_use_are_the_defaults", global.input.bindings.run[0] == vk_shift);
+                Scenario_Next(_s, 1043);
+            }
+            if (_s.t > 400) Scenario_R3Abort(_s, "r3menus_reset_yes_flow", "y0=" + string(variable_struct_exists(_h, "y0_t")) + " y1=" + string(variable_struct_exists(_h, "y1")) + " y2=" + string(variable_struct_exists(_h, "y2")) + " open=" + string(Confirm_IsOpen()));
+            break;
+        case 1043:   // the notice is answered; the menu is still there and the changed row flashes
+            if (!variable_struct_exists(_h, "n0") && Notice_CanAnswer()) {
+                _h.n0 = true;
+                Scenario_Tap("confirm");
+                _h.n0_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "n0") && !variable_struct_exists(_h, "n1") && !Notice_IsOpen() && _s.t > _h.n0_t + 6) {
+                _h.n1 = true;
+                _h.n1_t = _s.t;
+                Scenario_Check("r3menus_the_notice_is_gone", !Notice_IsOpen());
+                Scenario_Check("r3menus_the_menu_is_still_open_after_the_notice", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && SettingsPopup_IsOpen("tab") && is_struct(_sp.controls));
+            }
+            if (variable_struct_exists(_h, "n1") && _s.t > _h.n1_t + 3) {
+                var _fi = is_struct(_sp.controls) ? Scenario_R3RowIndex(_sp.controls.menu, "run") : -1;
+                Scenario_Check("r3menus_the_flash_started_when_the_notice_closed", is_struct(_sp.controls) && _sp.controls.flash_at >= 0 && _sp.controls.flash_at <= current_time);
+                Scenario_Check("r3menus_the_run_row_carries_the_flash", _fi >= 0 && _sp.controls.menu.items[_fi].flash_at == _sp.controls.flash_at);
+                Scenario_Check("r3menus_a_row_that_did_not_change_does_not_flash", is_struct(_sp.controls) && !variable_struct_exists(_sp.controls.menu.items[Scenario_R3RowIndex(_sp.controls.menu, "up")], "flash_at"));
+                Scenario_Next(_s, 1044);
+            }
+            if (_s.t > 400) Scenario_R3Abort(_s, "r3menus_the_notice_is_answered", "n0=" + string(variable_struct_exists(_h, "n0")) + " open=" + string(Notice_IsOpen()));
+            break;
+        case 1044:   // Reset again with nothing to reset: the notice says the keys were already the defaults, and nothing flashes
+            if (_s.t == 40) {   // let the first flash run out so a flash that did start would show as new
+                Ui_MenuFixCursor(_sp.controls.menu, max(0, Scenario_R3RowIndex(_sp.controls.menu, "reset")));
+                Scenario_Tap("confirm");
+                _h.a0_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "a0_t") && !variable_struct_exists(_h, "a1") && Confirm_IsOpen() && _s.t > _h.a0_t + 6 && current_time - Confirm_Menu().lock_ms >= UI_INPUT_LOCK_MS + 80) {
+                _h.a1 = true;
+                Scenario_Tap("menu_up");
+                _h.a1_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "a1") && !variable_struct_exists(_h, "a2") && _s.t > _h.a1_t + 8) {
+                _h.a2 = true;
+                Scenario_Tap("confirm");   // Yes
+                _h.a2_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "a2") && !variable_struct_exists(_h, "a3") && _s.t > _h.a2_t + 8) {
+                _h.a3 = true;
+                Scenario_Check("r3menus_the_second_reset_says_already_the_defaults", Notice_IsOpen() && Notice_Text() == "Keys were already the defaults.", Notice_Text());
+                Scenario_Check("r3menus_the_second_reset_flashes_no_row", is_struct(_sp.controls) && array_length(_sp.controls.flash_rows) == 0);
+                _h.a3_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "a3") && !variable_struct_exists(_h, "a4") && Notice_CanAnswer()) {
+                _h.a4 = true;
+                Scenario_Tap("confirm");
+                _h.a4_t = _s.t;
+            }
+            if (variable_struct_exists(_h, "a4") && _s.t > _h.a4_t + 8 && !Notice_IsOpen()) {
+                Scenario_Check("r3menus_the_menu_is_open_after_the_second_notice", _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && is_struct(_sp.controls));
+                Scenario_Next(_s, 1045);
+            }
+            if (_s.t > 500) Scenario_R3Abort(_s, "r3menus_the_second_reset_flow", "a0=" + string(variable_struct_exists(_h, "a0_t")) + " a1=" + string(variable_struct_exists(_h, "a1")) + " a2=" + string(variable_struct_exists(_h, "a2")) + " a3=" + string(variable_struct_exists(_h, "a3")) + " a4=" + string(variable_struct_exists(_h, "a4")) + " open=" + string(Confirm_IsOpen()) + "/" + string(Notice_IsOpen()));
+            break;
+        case 1045:   // the end of the chain: removes the files and the profile the steps made
+            Menu_Close(true);
+            Scenario_ClearUi();
+            Settings_SetKeys(Binds_Defaults());
             Scenario_NoticeEnd();
+            break;
+    }
+}
+
+// ---- Round 3 menus pictures 1030..1039: the Gear tab (Equipped and Bag headers, No Armor and No Accessory under them), the Skills tab (the Passives header), the Controls
+// page's reset question and the notice after it (in the game), and the same question and notice over the title's settings; windowed scale 3 (480 x 432), 4 (640 x 576) and 5
+// (800 x 720), the title ones at 3 only. shot_r3menus_<scene>_<w>x<h>.png. The last pictures of the run: they end it. ----
+function Scenario_R3Scenes() {
+    return ["gear", "skills", "reset_ask", "reset_notice", "title_ask", "title_notice"];
+}
+
+function Scenario_R3Scales(_di) {
+    return (_di >= 4) ? [3] : [3, 4, 5];
+}
+
+function Scenario_R3IsTitle(_di) {
+    return (_di >= 4);
+}
+
+function Scenario_R3Cleanup() {
+    Confirm_Close();
+    Notice_Interrupt();
+    if (is_struct(TabMenu_Get())) Menu_Close(true);
+    SettingsPopup_Close(true);
+    Settings_SetKeys(Binds_Defaults());
+    Scenario_ClearUi();
+}
+
+function Scenario_StepShotsR3Menus(_s) {
+    var _scenes = Scenario_R3Scenes();
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "r3s")) _s.r3s = { n: 0, di: 0, si: 0 };
+    var _o = _s.r3s;
+    var _scales = Scenario_R3Scales(_o.di);
+    var _tag = _scenes[_o.di] + "_" + string(_scales[_o.si]);
+    var _title = Scenario_R3IsTitle(_o.di);
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    switch (_s.step) {
+        case 1030:   // enter the room at this scale: a floor (two take turns) for the in-game scenes, the title for the others
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Dialogue_CloseNow();
+                Loc_SetLanguage("en");
+                if (_title) {
+                    Scenario_SetWindowScale(_scales[_o.si]);
+                    room_goto(rm_start);
+                } else {
+                    if (_scenes[_o.di] == "skills") {
+                        Scenario_TabFixture();
+                    } else {
+                        var _g = Scenario_NewKnight(CLASS_KNIGHT);
+                        var _k = _g.player_ch;
+                        _k.inventory = Inv_Add(_k.inventory, 1, 1);
+                        Equip_Item(_k, 1);   // the weapon is worn; armor and accessory are not: two empty slots, and the bag holds an armor, an accessory and a second weapon
+                        _k.inventory = Inv_Add(_k.inventory, 22, 1);
+                        _k.inventory = Inv_Add(_k.inventory, 40, 1);
+                        _k.inventory = Inv_Add(_k.inventory, 2, 1);
+                        GameState_SetPlayer(_k);
+                    }
+                    Scenario_SetWindowScale(_scales[_o.si]);
+                    _o.n++;
+                    room_goto((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3);
+                }
+            }
+            if (_s.t >= 25) {
+                if (_title ? (room == rm_start && _sc != noone) : Scenario_FloorReady((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3)) Scenario_Next(_s, 1031);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_r3menus_enters_the_room_" + _tag, false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1031:   // set the scene up
+            if (_title) {
+                with (obj_start_controller) { if (state == "boot_logo" || state == "splash") state = "main"; }
+                with (obj_start_controller) { state = "settings"; }
+                SettingsPopup_Open("title");
+            } else {
+                with (obj_enemy) instance_destroy();
+                switch (_scenes[_o.di]) {
+                    case "gear":   Menu_Open(3); break;
+                    case "skills": Menu_Open(1); break;
+                    default:       Menu_Open(5); break;
+                }
+            }
+            if (string_pos("reset", _scenes[_o.di]) == 1 || string_pos("title", _scenes[_o.di]) == 1) {
+                SettingsPopup_Ensure();
+                var _sp = _gs.ui.settings_popup;
+                var _kc = Binds_Copy(Binds_Defaults());
+                variable_struct_set(_kc, "run", [ord("F")]);   // one key that is not the default, so the reset has something to change
+                Settings_SetKeys(_kc);
+            }
+            Scenario_Next(_s, 1032);
+            break;
+        case 1032:   // let the panels settle (the Settings tab opens by itself), open the Controls page and the question, then check and take the picture
+            if (string_pos("reset", _scenes[_o.di]) == 1 || string_pos("title", _scenes[_o.di]) == 1) {
+                SettingsPopup_Ensure();
+                var _sp2 = _gs.ui.settings_popup;
+                if (!variable_struct_exists(_s, "r3_c") && SettingsPopup_IsOpen() && _s.t >= 12) {
+                    _s.r3_c = true;
+                    ControlsPage_Open(_sp2);
+                    Ui_MenuFixCursor(_sp2.controls.menu, max(0, Scenario_R3RowIndex(_sp2.controls.menu, "reset")));
+                    ControlsPage_OnConfirm(_sp2.controls.menu, Scenario_R3RowIndex(_sp2.controls.menu, "reset"));   // the question
+                    if (string_pos("notice", _scenes[_o.di]) > 0) {
+                        Confirm_Resolve(true);   // Yes: the keys are back and the notice opens
+                    }
+                    _s.r3_t = _s.t;
+                }
+                if (!variable_struct_exists(_s, "r3_c")) {
+                    if (_s.t > 300) { Scenario_Check("shots_r3menus_the_settings_open_" + _tag, false); Scenario_R3Cleanup(); Scenario_NoticeEnd(); }
+                    break;
+                }
+                if (_s.t < _s.r3_t + 30) break;   // the pop-up fades in
+            } else if (_s.t < 24) {
+                break;
+            }
+            _s.shot = "shot_r3menus_" + _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+            switch (_scenes[_o.di]) {
+                case "gear":
+                    Scenario_Check("shots_r3menus_gear_menu_is_open_" + _tag, _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()), "mode=" + string(_gs.ui.mode));
+                    Scenario_TabLayoutChecks(_tag);
+                    var _gm = TabMenu_TopMenu();
+                    var _bagi = Scenario_R3RowIndex(_gm, "head_bag");
+                    Scenario_Check("shots_r3menus_gear_has_both_headers_" + _tag, _gm.items[0].kind == "head" && _bagi > 0 && _gm.items[_bagi].kind == "head");
+                    Scenario_Check("shots_r3menus_gear_empty_slots_are_dim_rows_" + _tag, _gm.items[Scenario_R3RowIndex(_gm, "empty_body")].dim && _gm.items[Scenario_R3RowIndex(_gm, "empty_accessory")].dim);
+                    Scenario_Check("shots_r3menus_gear_cursor_is_on_a_row_" + _tag, _gm.items[_gm.cursor].kind != "head");
+                    break;
+                case "skills":
+                    Scenario_Check("shots_r3menus_skills_menu_is_open_" + _tag, _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && TabMenu_Ids()[TabMenu_Get().tab] == "skills", "mode=" + string(_gs.ui.mode));
+                    Scenario_TabLayoutChecks(_tag);
+                    var _skm = TabMenu_TopMenu();
+                    var _pi = Scenario_R3RowIndex(_skm, "head_passives");
+                    Scenario_Check("shots_r3menus_skills_has_the_passives_header_" + _tag, _pi > 0 && _skm.items[_pi].kind == "head");
+                    break;
+                case "reset_ask":
+                case "title_ask":
+                    Scenario_Check("shots_r3menus_the_question_is_up_" + _tag, Confirm_IsOpen() && Confirm_Question() == "Reset every key to its default?" && Confirm_Menu().cursor == 1, Confirm_IsOpen() ? Confirm_Question() : "none");
+                    break;
+                case "reset_notice":
+                case "title_notice":
+                    Scenario_Check("shots_r3menus_the_notice_is_up_" + _tag, Notice_IsOpen() && Notice_Text() == "Keys are back to the defaults.", Notice_Text());
+                    break;
+            }
+            Scenario_ShotLayout(_s.shot);
+            Scenario_Next(_s, 1033);
+            break;
+        case 1033:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_R3Cleanup();
+                variable_struct_remove(_s, "r3_c");
+                variable_struct_remove(_s, "r3_t");
+                if (_title) {
+                    with (obj_start_controller) { state = "main"; }
+                }
+                _o.si++;
+                if (_o.si >= array_length(Scenario_R3Scales(_o.di))) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Scenario_SetWindowScale(3);
+                    Scenario_NoticeEnd();   // the end of the pictures: removes the files and the profile the steps made
+                } else {
+                    Scenario_Next(_s, 1030);
+                }
+            }
             break;
     }
 }
@@ -13944,7 +14300,7 @@ function Scenario_StepShotsEliteDeath(_s) {
                 _s.eg_i++;
                 if (_s.eg_i >= array_length(_scales)) {
                     Scenario_SetWindowScale(3);
-                    Scenario_NoticeEnd();   // the end of the pictures: removes the files and the profile the steps made
+                    Scenario_Next(_s, 1030);   // goes on with the round 3 menus pictures, the end of the pictures
                 } else {
                     _flow.phase = "summary";
                     _flow.t = 0;
